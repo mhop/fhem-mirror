@@ -20,9 +20,17 @@ my %EnO_rorgname = ("F6"=>"switch",     # org 05, RPS
 my @EnO_ptm200btn = ("AI", "A0", "BI", "B0", "CI", "C0", "DI", "D0");
 my %EnO_ptm200btn;
 
-# Peha House Control System (PHC)
+# Peha House Control System (PHC System)
 # PHC Gateway Commands
 my @EnO_phcCmd = ("switching", "dimming", "setpointShift", "setpointBasic", "controlVar", "fanStage");
+my %EnO_phcCmd = (
+  "switching"     => 1,
+  "dimming"       => 2,
+  "setpointShift" => 3,
+  "setpointBasic" => 4,
+  "controlVar"    => 5,
+  "fanStage"      => 6,
+);
 
 # Some Manufacturers (e.g. Jaeger Direkt) also sell EnOcean products without an
 # entry in the table below. This table is only needed for A5 category devices.
@@ -88,11 +96,15 @@ my %EnO_subType = (
   "A5.04.02" => "tempHumiSensor.02",
   "A5.06.01" => "lightSensor.01",
   "A5.06.02" => "lightSensor.02",
+  "A5.06.03" => "lightSensor.03",
   "A5.07.01" => "occupSensor.01",
+  "A5.07.02" => "occupSensor.02",
+  "A5.07.03" => "occupSensor.03",
   "A5.08.01" => "lightTempOccupSensor.01",
   "A5.08.02" => "lightTempOccupSensor.02",
   "A5.08.03" => "lightTempOccupSensor.03",
   "A5.09.01" => "COSensor.01",
+  "A5.09.02" => "COSensor.02",
   "A5.09.04" => "tempHumiCO2Sensor.01",
   "A5.10.01" => "roomSensorControl.05",
   "A5.10.02" => "roomSensorControl.05",
@@ -125,6 +137,12 @@ my %EnO_subType = (
   "A5.13.04" => "weatherStation",
   "A5.13.05" => "weatherStation",
   "A5.13.06" => "weatherStation",
+  "A5.14.01" => "multiFuncSensor",
+  "A5.14.02" => "multiFuncSensor",
+  "A5.14.03" => "multiFuncSensor",
+  "A5.14.04" => "multiFuncSensor",
+  "A5.14.05" => "multiFuncSensor",
+  "A5.14.06" => "multiFuncSensor",
   "A5.20.01" => "MD15",
   "A5.30.01" => "digitalInput.01",
   "A5.30.02" => "digitalInput.02",
@@ -404,11 +422,27 @@ EnOcean_Set($@)
         Log $ll2, "EnOcean: set $name $cmd";
       }    
 
-    } elsif ($st eq "phcGateway") {
+    } elsif ($st eq "phcGateway" && $model ne "FSG70") {
       # PHC Gateway (EEP A5-38-08)
+      # select PHC Command from attribute phcCmd or command line
       my $data;
-      my $phcCmd = AttrVal($name, "phcCmd", "");
-      my $phcCmdID;
+      my $phcCmd = AttrVal($name, "phcCmd", undef);
+      if ($phcCmd && $EnO_phcCmd{$phcCmd}) {
+        # PHC Command from attribute phcCmd
+        if ($EnO_phcCmd{$cmd}) {
+          # shift $cmd
+          $cmd = $a[1];
+          shift(@a);
+        }
+      } elsif ($EnO_phcCmd{$cmd}) {
+        # PHC Command from command line
+        $phcCmd = $cmd;
+        $cmd = $a[1];
+        shift(@a);      
+      } else {
+        return "Unknown PHC Gateway Command " . $cmd . ", choose one of " . join(" ", sort keys %EnO_phcCmd);
+      }
+      my $phcCmdID;      
       my $setCmd = 0;
       my $subDef = AttrVal($name, "subDef", "$hash->{DEF}");
       my $time = 0;      
@@ -451,6 +485,7 @@ EnOcean_Set($@)
         $setCmd = 9;
         my $subDef = AttrVal($name, "subDef", "$hash->{DEF}");
         if ($cmd eq "teach") {
+          $setCmd = 0;
           $data = sprintf "A5%02X000000%s00", $phcCmdID, $subDef;
           
         } elsif ($cmd eq "dim") {
@@ -549,43 +584,197 @@ EnOcean_Set($@)
           if ($rampTime > 255) { $rampTime = 255; }
           if ($rampTime < 0) { $rampTime = 0; }
           $updateState = 0;
-          $data = sprintf "A502%02X%02X%02X%s00", $dimVal, $rampTime, $setCmd, $subDef;
+          $data = sprintf "A5%02X%02X%02X%02X%s00", $phcCmdID, $dimVal, $rampTime, $setCmd, $subDef;
         }
       
       } elsif ($phcCmd eq "setpointShift") {
         $phcCmdID = 3;
         if($cmd eq "teach") { $data = sprintf "A5%02X000000%s00", $phcCmdID, $subDef;
         } else {
-          
+          if (($cmd =~ m/^[+-]?\d+(\.\d+)?$/) && ($cmd >= -12.7) && ($cmd <= 12.8)) {
+            $data = sprintf "A5%02X00%02X08%s00", $phcCmdID, ($cmd + 12.7) * 10, $subDef;          
+          } else {
+            return "Usage: $cmd is not numeric or out of range";
+          }
         }
       
       } elsif ($phcCmd eq "setpointBasic") {
         $phcCmdID = 4;
         if($cmd eq "teach") { $data = sprintf "A5%02X000000%s00", $phcCmdID, $subDef;
         } else {
-          
+          if (($cmd =~ m/^[+-]?\d+(\.\d+)?$/) && ($cmd >= 0) && ($cmd <= 51.2)) {
+            $data = sprintf "A5%02X00%02X08%s00", $phcCmdID, $cmd * 5, $subDef;          
+          } else {
+            return "Usage: $cmd is not numeric or out of range.";
+          }          
         }
       
       } elsif ($phcCmd eq "controlVar") {
         $phcCmdID = 5;
-        if($cmd eq "teach") { $data = printf "A5%02X000000%s00", $phcCmdID, $subDef;
+        my $controlVar = ReadingsVal($name, "controlVar", 0);
+        if($cmd eq "teach") { 
+          $data = printf "A5%02X000000%s00", $phcCmdID, $subDef;
+        } elsif ($cmd eq "presence") {
+          if ($a[1] eq "standby") {
+            $setCmd = 0x0A;
+          } elsif ($a[1] eq "absent") {
+            $setCmd = 9;
+          } elsif ($a[1] eq "present") {
+            $setCmd = 8;
+          } else {
+            return "Usage: $cmd $a[1] unknown.";             
+          }
+          shift(@a);  
+          $data = sprintf "A5%02X00%02X%02X%s00", $phcCmdID, $controlVar, $setCmd, $subDef;
+        } elsif ($cmd eq "energyHoldOff") {
+          if ($a[1] eq "normal") {
+            $setCmd = 8;
+          } elsif ($a[1] eq "holdoff") {
+            $setCmd = 0x0C;
+          } else {
+            return "Usage: $cmd $a[1] unknown.";             
+          }
+          shift(@a);             
+          $data = sprintf "A5%02X00%02X%02X%s00", $phcCmdID, $controlVar, $setCmd, $subDef;
+        } elsif ($cmd eq "controllerMode") {
+          if ($a[1] eq "auto") {
+            $setCmd = 8;
+          } elsif ($a[1] eq "heating") {
+            $setCmd = 0x28;
+          } elsif ($a[1] eq "cooling") {
+            $setCmd = 0x48;
+          } elsif ($a[1] eq "off" or $a[1] eq "BI") {
+            $setCmd = 0x68;
+          } else {
+            return "Usage: $cmd $a[1] unknown.";             
+          }
+          shift(@a);             
+          $data = sprintf "A5%02X00%02X%02X%s00", $phcCmdID, $controlVar, $setCmd, $subDef;
+        } elsif ($cmd eq "controllerState") {
+          if ($a[1] eq "auto") {
+            $setCmd = 8;
+          } elsif ($a[1] eq "override") {
+            $setCmd = 0x18;
+            if (defined($a[2]) && ($a[2] =~ m/^[+-]?\d+$/) && ($a[2] >= 0) && ($a[2] <= 100) ) {
+              $controlVar = $a[2] * 255;
+              shift(@a);
+            } else {
+              return "Usage: Control Variable Override is not numeric or out of range.";            
+            }
+          } else {
+            return "Usage: $cmd $a[1] unknown.";             
+          }
+          shift(@a);             
+          $data = sprintf "A5%02X00%02X%02X%s00", $phcCmdID, $controlVar, $setCmd, $subDef;
         } else {
-          
+          return "Usage: Controller State unknown or not defined.";       
         }
       
       } elsif ($phcCmd eq "fanStage") {
         $phcCmdID = 6;
-        if($cmd eq "teach") { $data = sprintf "A5%02X000000%s00", $phcCmdID, $subDef;
+        if($cmd eq "teach") { 
+          $data = sprintf "A5%02X000000%s00", $phcCmdID, $subDef;
         } else {
-          
+          if ($cmd eq "auto") {
+            $data = sprintf "A5%02X00%02X08%s00", $phcCmdID, 255, $subDef;          
+          } elsif (($cmd =~ m/^[+-]?\d+$/) && ($cmd >= 0) && ($cmd <= 3)) {
+            $data = sprintf "A5%02X00%02X08%s00", $phcCmdID, $cmd, $subDef;          
+          } else {
+            return "Usage: $cmd is not numeric or out of range"
+          }        
         }
-      
+      } else {
+        return "Unknown PHC Gateway Command " . $cmd . ", choose one of ". join(" ", sort keys %EnO_phcCmd);
       }
       # write phcGateway command
       # len: 0x000A optlen: 0x00 pakettype: 0x01(radio)
       IOWrite($hash, "000A0001", $data);
-      Log $ll2, "EnOcean: set $name $cmd";
+      Log $ll2, "EnOcean: set $name $cmd $setCmd";
     
+    } elsif ($st eq "manufProfile") {
+      if ($manufID eq "00D") {
+        # Eltako Shutter
+        my $position = ReadingsVal($name, "position", undef);
+        my $shutTime = AttrVal($name, "shutTime", 255);
+        my $subDef = AttrVal($name, "subDef", "$hash->{DEF}");
+        my $shutCmd = 0;
+        $shutTime = 255 if ($shutTime !~ m/^[+-]?\d+$/);
+        $shutTime = 255 if ($shutTime > 255);
+        $shutTime = 1 if ($shutTime < 1);        
+        if ($cmd eq "teach") {
+          my $data=sprintf("A5FFF80D80%s00", $subDef);
+          Log $ll2, "EnOcean: set $name $cmd";
+          # len:000a optlen:00 pakettype:1(radio)
+          IOWrite($hash, "000A0001", $data);
+        } elsif ($cmd eq "stop") {
+          $shutCmd = 0;
+        } elsif ($cmd eq "up" || $cmd eq "B0") {
+          if(defined $a[1]) {
+            if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] > 0 && $a[1] <= 100) { 
+              $shutTime = $shutTime / 100 * $a[1]; 
+              $position -= $a[1];
+              if($position <= 0) { $position = 0; }
+              shift(@a);
+            } else {
+              return "Usage: $a[1] is not numeric or out of range";
+            }
+          } else {
+            $position = 0;
+          }
+      	  readingsSingleUpdate($hash,"position",$position,1);      	
+          $shutCmd = 1;
+        } elsif ($cmd eq "down" || $cmd eq "BI") {
+          if(defined $a[1]) {
+            if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] < 100) { 
+              $shutTime = $shutTime / 100 * $a[1]; 
+              $position += $a[1];
+              if($position > 100) { $position = 100; }
+              shift(@a);
+            } else {
+              return "Usage: $a[1] is not numeric or out of range";
+            }        
+          } else {
+            $position = 100;
+          }
+      	  readingsSingleUpdate($hash,"position",$position,1);      	
+          $shutCmd = 2;
+        } elsif ($cmd eq "position") {
+          if (!defined $position) {
+            return "Position unknown, please first open the blinds completely."
+          } else {
+            if (defined $a[1] && $a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] <= 100) {
+              if ($position < $a[1]) {
+                # down
+                $shutTime = $shutTime / 100 * ($a[1] - $position); 
+                $shutCmd = 2;
+              } elsif ($position > $a[1]) {
+                # up
+                $shutTime = $shutTime / 100 * ($position - $a[1]); 
+                $shutCmd = 1;
+              } else {
+                # position ok
+                $shutCmd = 0;
+              }
+              readingsSingleUpdate($hash,"position",$a[1],1);       
+              shift(@a);
+            } else {
+              return "Usage: $a[1] is not numeric or out of range";
+            }        
+          }  
+        } else { 
+          return "Unknown argument " . $cmd . ", choose one of up stop down position teach"
+        }
+        if($shutCmd || $cmd eq "stop") {
+          $updateState = 0;
+          my $data = sprintf("A5%02X%02X%02X%02X%s00",
+                        0x00, $shutTime, $shutCmd, 8, $subDef);
+          IOWrite($hash, "000A0001", $data);
+          Log $ll2, "EnOcean: set $name $cmd";
+        }    
+      } else {
+        return "Manufacturer Specific Application unknown. Set correct attr manufID.";
+      }
+      
     } else {
     # Rocker Switch, simulate a PTM200 switch module
       # separate first and second action
@@ -960,22 +1149,32 @@ EnOcean_Parse($$)
       # Gas Sensor, CO Sensor (EEP A5-09-01)
       # [untested]
       # $db_3 is the CO concentration where 0x00 = 0 ppm ... 0xFF = 255 ppm
-      # $db_2 is the CO concentration where 0x00 = 0 ppm ... 0xFF = 255 ppm
       # $db_1 is the temperature where 0x00 = 0 °C ... 0xFF = 255 °C
       # $db_0 bit D1 temperature sensor available 0 = no, 1 = yes
       my $coChannel1 = $db_3;
-      my $coChannel2 = $db_2;
-      push @event, "3:Channel1:$coChannel1";      
-      push @event, "3:Channel2:$coChannel2";
-      if ($coChannel1 == $coChannel2) {
-        push @event, "3:state:$coChannel1";
-      } else {
-        push @event, "3:state:measuring error";
-      }    
+      push @event, "3:CO:$coChannel1";      
       if ($db_0 & 2) {
         my $temp = $db_1;
         push @event, "3:temperature:$temp";
       }      
+      push @event, "3:state:$coChannel1";
+    
+    } elsif($st eq "COSensor.02") {
+      # Gas Sensor, CO Sensor (EEP A5-09-02)
+      # [untested]
+      # $db_3 is the voltage where 0x00 = 0 V ... 0xFF = 5.1 V
+      # $db_2 is the CO concentration where 0x00 = 0 ppm ... 0xFF = 1020 ppm
+      # $db_1 is the temperature where 0x00 = 0 °C ... 0xFF = 51 °C
+      # $db_0_bit_1 temperature sensor available 0 = no, 1 = yes
+      my $coChannel1 = $db_2 << 2;
+      my $voltage = sprintf "0.1f", $db_3 * 0.02;
+      push @event, "3:CO:$coChannel1";      
+      if ($db_0 & 2) {
+        my $temp = sprintf "%0.1f", $db_1 * 0.2;
+        push @event, "3:temperature:$temp";
+      }
+      push @event, "3:voltage:$voltage";
+      push @event, "3:state:$coChannel1";
     
     } elsif($st eq "tempHumiCO2Sensor.01") {
       # Gas Sensor, CO2 Sensor (EEP A5-09-04)
@@ -1128,7 +1327,7 @@ EnOcean_Parse($$)
           $lux = sprintf "%d", $db_2 * 116.48 + 300;
         }
       } else {
-        $voltage = sprintf "%d", $db_3 * 0.02;
+        $voltage = sprintf "0.1f", $db_3 * 0.02;
         if($db_0 & 1) {
           $lux = sprintf "%d", $db_2 * 116.48 + 300;
         } else {
@@ -1146,7 +1345,7 @@ EnOcean_Parse($$)
       # $db_1 is the illuminance (ILL1) where min 0x00 = 0 lx, max 0xFF = 1020 lx
       # $db_0_bit_0 is Range select where 0 = ILL1, 1 = ILL2
       my $lux;
-      my $voltage = sprintf "%d", $db_3 * 0.02;
+      my $voltage = sprintf "0.1f", $db_3 * 0.02;
       if($db_0 & 1) {
         $lux = $db_2 << 1;
       } else {
@@ -1156,13 +1355,57 @@ EnOcean_Parse($$)
       push @event, "3:brightness:$lux";
       push @event, "3:state:$lux";
 
+    } elsif ($st eq "lightSensor.03") {
+      # Light Sensor (EEP A5-06-03)
+      # $db_3 is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
+      # $db_3 > 0xFA is error code
+      # $db_2_bit_7 ... $db_1_bit_6 is the illuminance where min 0x000 = 0 lx, max 0x3E8 = 1000 lx
+      my $lux = $db_2 << 2 | $db_1 >> 6;
+      if ($lux == 1001) {$lux = "over range";}
+      my $voltage = sprintf "0.1f", $db_3 * 0.02;
+      if ($db_3 > 250) {push @event, "3:errorCode:$db_3";}
+      push @event, "3:voltage:$voltage";
+      push @event, "3:brightness:$lux";
+      push @event, "3:state:$lux";
+
     } elsif ($st eq "occupSensor.01") {
       # Occupancy Sensor (EEP A5-07-01)
+      # $db_3 is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
+      # $db_3 > 0xFA is error code
       # $db_1 is PIR Status (motion) where 0 ... 127 = off, 128 ... 255 = on
       my $motion = "off";
       if ($db_1 >= 128) {$motion = "on";}
+      if ($db_0 & 1) {push @event, "3:voltage:" . sprintf "0.1f", $db_3 * 0.02;}
+      if ($db_3 > 250) {push @event, "3:errorCode:$db_3";}
       push @event, "3:motion:$motion";
       push @event, "3:state:$motion";
+         
+    } elsif ($st eq "occupSensor.02") {
+      # Occupancy Sensor (EEP A5-07-02)
+      # $db_3 is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
+      # $db_3 > 0xFA is error code
+      # $db_0_bit_7 is PIR Status (motion) where 0 = off, 1 = on
+      my $motion = $db_0 >> 7 ? "on" : "off";
+      if ($db_3 > 250) {push @event, "3:errorCode:$db_3";}
+      push @event, "3:motion:$motion";
+      push @event, "3:voltage:" . sprintf "0.1f", $db_3 * 0.02;
+      push @event, "3:state:$motion";
+         
+    } elsif ($st eq "occupSensor.03") {
+      # Occupancy Sensor (EEP A5-07-03)
+      # $db_3 is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
+      # $db_3 > 0xFA is error code
+      # $db_2_bit_7 ... $db_1_bit_6 is the illuminance where min 0x000 = 0 lx, max 0x3E8 = 1000 lx
+      # $db_0_bit_7 is PIR Status (motion) where 0 = off, 1 = on
+      my $motion = $db_0 >> 7 ? "on" : "off";
+      my $lux = $db_2 << 2 | $db_1 >> 6;
+      if ($lux == 1001) {$lux = "over range";}
+      my $voltage = sprintf "0.1f", $db_3 * 0.02;
+      if ($db_3 > 250) {push @event, "3:errorCode:$db_3";}
+      push @event, "3:brightness:$lux";
+      push @event, "3:motion:$motion";
+      push @event, "3:voltage:$voltage";
+      push @event, "3:state:M: $motion E: $lux U: $voltage";     
          
     } elsif ($st =~ m/^lightTempOccupSensor/) { 
       # Light, Temperatur and Occupancy Sensor (EEP A5-08-01 ... A5-08-03)
@@ -1286,7 +1529,7 @@ EnOcean_Parse($$)
       } 
       
     } elsif ($st eq "weatherStation") {
-      # Weather Station (EEP A5-13-01 ... EEP A5-13-06)
+      # Weather Station (EEP A5-13-01 ... EEP A5-13-06, EEP A5-13-10)
       # [Eltako FWS61, untested]
       # $db_0_bit_7 ... $db_0_bit_4 is the Identifier
       my $identifier = $db_0 >> 4;
@@ -1313,15 +1556,37 @@ EnOcean_Parse($$)
         # $db_3 is the sun exposure west where 0x00 = 1 lx ... 0xFF = 150 klx
         # $db_2 is the sun exposure south where 0x00 = 1 lx ... 0xFF = 150 klx
         # $db_1 is the sun exposure east where 0x00 = 1 lx ... 0xFF = 150 klx
+        # $db_0_bit_2 is hemisphere where 0 = north, 1 = south
+        my $hemisphere = $db_0 & 4 ? "south" : "north";
         my $sunWest = sprintf "%d", 1 + $db_3 * 149999 / 255;
         my $sunSouth = sprintf "%d", 1 + $db_2 * 149999 / 255;
         my $sunEast = sprintf "%d", 1 + $db_1 * 149999 / 255;
+        push @event, "3:hemisphere:$hemisphere";
         push @event, "3:sunWest:$sunWest";
         push @event, "3:sunSouth:$sunSouth";
         push @event, "3:sunEast:$sunEast";       
       } else {
-        # EEP A5-13-03 ... EEP A5-13-06 not implemented        
+        # EEP A5-13-03 ... EEP A5-13-06, EEP A5-13-10 not implemented        
       }
+
+    } elsif ($st eq "multiFuncSensor") {
+      # Multi-Func Sensor (EEP A5-14-01 ... A5-14-06)
+      # $db_3 is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
+      # $db_3 > 0xFA is error code
+      # $db_2 is the illuminance where min 0x00 = 0 lx, max 0xFA = 1000 lx
+      # $db_0_bit_1 is Vibration where 0 = off, 1 = on
+      # $db_0_bit_0 is Contact where 0 = closed, 1 = open
+      my $lux = $db_2;
+      if ($lux == 251) {$lux = "over range";}
+      my $voltage = sprintf "0.1f", $db_3 * 0.02;
+      if ($db_3 > 250) {push @event, "3:errorCode:$db_3";}
+      my $vibration = $db_0 & 2 ? "on" : "off";
+      my $contact = $db_0 & 1 ? "open" : "closed";
+      push @event, "3:brightness:$lux";
+      push @event, "3:contact:$contact";
+      push @event, "3:vibration:$vibration";
+      push @event, "3:voltage:$voltage";      
+      push @event, "3:state:C: $contact V: $vibration E: $lux U: $voltage";
 
     } elsif ($st =~ m/^digitalInput/) {
       # Digital Input (EEP A5-30-01, A5-30-02)
@@ -1350,7 +1615,7 @@ EnOcean_Parse($$)
         # teach-in, identify and store command type in attr phcCmd
         my $phcCmd = AttrVal($name, "phcCmd", undef);
         if (!$phcCmd) {
-          $phcCmd = $EnO_phcCmd[$db_3];
+          $phcCmd = $EnO_phcCmd[$db_3 - 1];
           $attr{$name}{phcCmd} = $phcCmd;
         }
       }
@@ -1358,9 +1623,9 @@ EnOcean_Parse($$)
         # Switching 
         # Eltako devices not send A5 telegrams
         push @event, "3:executeTime:" . sprintf "%0.1f", (($db_2 << 8) | $db_1) / 10;
-        push @event, "3:lock:" . $db_0 & 4 ? "lock" : "unlock";
-        push @event, "3:executeType" . $db_0 & 2 ? "delay" : "duration";
-        push @event, "3:state:" . $db_0 & 1 ? "on" : "off";      
+        push @event, "3:lock:" . ($db_0 & 4 ? "lock" : "unlock");
+        push @event, "3:executeType" . ($db_0 & 2 ? "delay" : "duration");
+        push @event, "3:state:" . ($db_0 & 1 ? "on" : "off");      
       } elsif ($db_3 == 2) {
         # Dimming
         # $db_0_bit_2 is store final value, not used, because
@@ -1398,14 +1663,14 @@ EnOcean_Parse($$)
         push @event, "3:controllerMode:heating";                
         push @event, "3:state:heating";                
         } elsif ($controllerMode == 2){
-        push @event, "3:controllerMode:colling"; 
-        push @event, "3:state:colling"; 
+        push @event, "3:controllerMode:cooling"; 
+        push @event, "3:state:cooling"; 
         } elsif ($controllerMode == 3){
         push @event, "3:controllerMode:off"; 
         push @event, "3:state:off"; 
         }
-        push @event, "3:controllerState:" . $db_0 & 0x10 ? "override" : "auto";
-        push @event, "3:energyHoldOff:" . $db_0 & 4 ? "holdoff" : "normal";
+        push @event, "3:controllerState:" . ($db_0 & 0x10 ? "override" : "auto");
+        push @event, "3:energyHoldOff:" . ($db_0 & 4 ? "holdoff" : "normal");
         my $occupancy = $db_0 & 3;
         if ($occupancy == 0) {
         push @event, "3:presence:present";        
@@ -1698,49 +1963,6 @@ EnOcean_Undef($$)
     the attr switchMode is set to "pushbutton".
     </li>
     <br><br>
-
-    <li>Dimmer<br>
-        [Eltako FUD12, FUD14, FUD61, FUD70, tested with Eltako devices only]<br>
-    <ul>
-    <code>set &lt;name&gt; &lt;value&gt;</code>
-    <br><br>
-    where <code>value</code> is
-      <li>teach<br>
-        initiate teach-in mode</li>
-      <li>on<br>
-        issue switch on command</li>
-      <li>off<br>
-        issue switch off command</li>
-      <li>dim dim/% [dim time 1-100/%]<br>
-        issue dim command</li>
-      <li>dimup dim/% [dim time 1-100/%]<br>
-        issue dim command</li>
-      <li>dimdown dim/% [dim time 1-100/%]<br>
-        issue dim command</li>
-      <li><a href="#setExtensions">set extensions</a> are supported.</li>
-    </ul><br>
-    Set attr subType to eltakoDimmer manually.<br>
-    Use the sensor type "PC/FVS" for Eltako devices.
-    </li>
-    <br><br>
-    
-    <li>Dimmer for fluorescent lamps<br>
-        [Eltako FSG70, tested with Eltako FSG70 only]<br>
-    <ul>
-    <code>set &lt;name&gt; &lt;value&gt;</code>
-    <br><br>
-    where <code>value</code> is
-      <li>on<br>
-        issue switch on command</li>
-      <li>off<br>
-        issue switch off command</li>
-      <li><a href="#setExtensions">set extensions</a> are supported.</li>
-    </ul><br>
-    Set attr eventMap to B0:on BI:off, attr model to FSG70, attr
-    subType to eltakoDimmer and attr switchMode to pushbutton manually.<br>
-    Use the sensor type "Richtungstaster" for Eltako devices.
-    </li>
-    <br><br>
     
     <li>Battery Powered Actuator (EEP A5-20-01)<br>
         [Kieback&Peter MD15-FTL-xx]<br>
@@ -1761,7 +1983,7 @@ EnOcean_Undef($$)
       <li>valveOpen<br>
           Maintenance Mode (service on): Valve open</li>
       <li>valveClosed<br>
-          DMaintenance Mode (service on): Valve closed</li>
+          Maintenance Mode (service on): Valve closed</li>
       <li>unattended<br>
           Do not regulate the actuator.</li>
     </ul><br>
@@ -1773,6 +1995,27 @@ EnOcean_Undef($$)
     </li>
     <br><br>
      
+    <li><a name="PHC Gateway">PHC Gateway</a> (EEP A5-38-08)<br>
+        The PHC Gateway profile include 6 different commands (Switching, Dimming,
+        Setpoint Shift, Basic Setpoint, Control variable, Fan stage. The commands
+        can be selected by the attribute phcCmd or command line. The attribute
+        entry has priority.<br>
+    <ul>
+      <code>set &lt;name&gt; &lt;value&gt;</code>
+      <br><br>
+      where <code>value</code> is
+        <li>&lt;phcCmd&gt; &lt;cmd&gt; [subCmd]<br>
+          initiate PHC Gateway commands by command line</li>
+        <li>&lt;cmd&gt; [subCmd]<br>
+          initiate PHC Gateway commands if attribute phcCmd is set.</li>
+    </ul><br>
+       The attr subType must be phcGateway. Attribute phcCmd can also be set to
+       switching|dimming|setpointShift|setpointBasic|ControlVar|fanStage.<br>
+       This is done if the device was created by autocreate.<br>
+       For Eltako devices attributes must be set manually.
+    </li>
+    <br><br>     
+
      <li>PHC Gateway (EEP A5-38-08)<br>
          Switching<br>
          [Eltako FLC61, FSR14]<br>
@@ -1807,11 +2050,11 @@ EnOcean_Undef($$)
           issue switch on command</li>
         <li>off [lock|unlock]<br>
           issue switch off command</li>
-        <li>dim dim/% [rampTime/s lock|unlock]<br>
+        <li>dim dim/% [rampTime/s [lock|unlock]]<br>
           issue dim command</li>
-        <li>dimup dim/% [rampTime/s lock|unlock]<br>
+        <li>dimup dim/% [rampTime/s [lock|unlock]]<br>
           issue dim command</li>
-        <li>dimdown dim/% [rampTime/s lock|unlock]<br>
+        <li>dimdown dim/% [rampTime/s [lock|unlock]]<br>
           issue dim command</li>
         <li><a href="#setExtensions">set extensions</a> are supported.</li>
      </ul><br>
@@ -1823,6 +2066,171 @@ EnOcean_Undef($$)
      </li>
      <br><br>
      
+    <li>PHC Gateway (EEP A5-38-08)<br>
+        Dimming of fluorescent lamps<br>
+        [Eltako FSG70, tested with Eltako FSG70 only]<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+      <li>on<br>
+        issue switch on command</li>
+      <li>off<br>
+        issue switch off command</li>
+      <li><a href="#setExtensions">set extensions</a> are supported.</li>
+    </ul><br>
+    The attr subType must be phcGateway and phcCmd must be dimming. Set attr eventMap to B0:on BI:off,
+    attr model to FSG70 and attr switchMode to pushbutton manually.<br>
+    Use the sensor type "Richtungstaster" for Eltako devices.
+    </li>
+    <br><br>
+
+     <li>PHC Gateway (EEP A5-38-08)<br>
+         Setpoint shift<br>
+         [untested]<br>
+     <ul>
+      <code>set &lt;name&gt; &lt;value&gt;</code>
+      <br><br>
+      where <code>value</code> is
+        <li>teach<br>
+          initiate teach-in mode</li>
+        <li>1/K <br>
+          issue Setpoint shift</li>
+     </ul><br>
+        Setpoint Range: T = -12.7 K ... 12.8 K<br>
+        The attr subType must be phcGateway and phcCmd must be setpointShift.
+        This is done if the device was created by autocreate.<br>
+     </li>
+     <br><br>
+
+     <li>PHC Gateway (EEP A5-38-08)<br>
+         Basic Setpoint<br>
+         [untested]<br>
+     <ul>
+      <code>set &lt;name&gt; &lt;value&gt;</code>
+      <br><br>
+      where <code>value</code> is
+        <li>teach<br>
+          initiate teach-in mode</li>
+        <li>t/&#176C<br>
+          issue Basic Setpoint</li>
+     </ul><br>
+        Setpoint Range: t = 0 &#176C ... 51.2 &#176C<br>
+        The attr subType must be phcGateway and phcCmd must be setpointBasic.
+        This is done if the device was created by autocreate.<br>
+     </li>
+     <br><br>
+     
+     <li>PHC Gateway (EEP A5-38-08)<br>
+         Control variable<br>
+         [untested]<br>
+     <ul>
+      <code>set &lt;name&gt; &lt;value&gt;</code>
+      <br><br>
+      where <code>value</code> is
+        <li>teach<br>
+          initiate teach-in mode</li>
+        <li>presence present|absent|standby<br>
+          issue Room occupancy</li>
+        <li>energyHoldOff normal|holdoff<br>
+          issue Energy hold off</li>
+        <li>controllerMode auto|heating|cooling|off<br>
+          issue Controller mode</li>
+        <li>controllerState auto|override <0 ... 100> <br>
+          issue Control variable override</li>
+     </ul><br>
+        Override Range: cvov = 0 % ... 100 %<br>
+        The attr subType must be phcGateway and phcCmd must be controlVar.
+        This is done if the device was created by autocreate.<br>
+     </li>
+     <br><br>
+     
+     <li>PHC Gateway (EEP A5-38-08)<br>
+         Fan stage<br>
+         [untested]<br>
+     <ul>
+      <code>set &lt;name&gt; &lt;value&gt;</code>
+      <br><br>
+      where <code>value</code> is
+        <li>teach<br>
+          initiate teach-in mode</li>
+        <li>0 ... 3|auto<br>
+          issue Fan Stage override</li>
+     </ul><br>
+        The attr subType must be phcGateway and phcCmd must be fanStage.
+        This is done if the device was created by autocreate.<br>
+     </li>
+     <br><br>
+     
+    <li><a name="Manufacturer Specific Applications">Manufacturer Specific Applications</a> (EEP A5-3F-7F)<br>
+        Shutter<br>
+        [Eltako FSB12, FSB14, FSB61, FSB70, tested with Eltako devices only]<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+      <li>teach<br>
+        initiate teach-in mode</li>
+      <li>up [position/%]<br>
+        issue roll up command</li>
+      <li>down [position/%]<br>
+        issue roll down command</li>
+      <li>position position/%<br>
+        set shutter to position</li>
+      <li>stop<br>
+        issue stop command</li>
+    </ul><br>
+    Set attr subType to manufProfile, manufID to 00D and attr model to
+    FSB12|FSB14|FSB61|FSB70 manually.<br>
+    Use the sensor type "Szenentaster/PC" for Eltako devices.
+    </li>
+    <br><br>
+
+    <li>Dimmer<br>
+        [Eltako FUD12, FUD14, FUD61, FUD70, tested with Eltako devices only]<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+      <li>teach<br>
+        initiate teach-in mode</li>
+      <li>on<br>
+        issue switch on command</li>
+      <li>off<br>
+        issue switch off command</li>
+      <li>dim dim/% [dim time 1-100/%]<br>
+        issue dim command</li>
+      <li>dimup dim/% [dim time 1-100/%]<br>
+        issue dim command</li>
+      <li>dimdown dim/% [dim time 1-100/%]<br>
+        issue dim command</li>
+      <li><a href="#setExtensions">set extensions</a> are supported.</li>
+    </ul><br>
+    Old profile, use <a href="#PHC Gateway">PHC Gateway</a> alternative.<br>
+    Set attr subType to eltakoDimmer manually.<br>
+    Use the sensor type "PC/FVS" for Eltako devices.
+    </li>
+    <br><br>
+    
+    <li>Dimmer for fluorescent lamps<br>
+        [Eltako FSG70, tested with Eltako FSG70 only]<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+      <li>on<br>
+        issue switch on command</li>
+      <li>off<br>
+        issue switch off command</li>
+      <li><a href="#setExtensions">set extensions</a> are supported.</li>
+    </ul><br>
+    Old profile, use <a href="#PHC Gateway">PHC Gateway</a> alternative.<br>
+    Set attr eventMap to B0:on BI:off, attr model to FSG70, attr
+    subType to eltakoDimmer and attr switchMode to pushbutton manually.<br>
+    Use the sensor type "Richtungstaster" for Eltako devices.
+    </li>
+    <br><br>
+
     <li>Shutter (EEP F6-02-01 ... F6-02-02 and A5-3F-7F)<br>
         [Eltako FSB12, FSB14, FSB61, FSB70, tested with Eltako devices only]<br>
     <ul>
@@ -1838,6 +2246,8 @@ EnOcean_Undef($$)
       <li>stop<br>
         issue stop command</li>
     </ul><br>
+    Old profile, use <a href="#Manufacturer Specific Applications">Manufacturer Specific Applications</a>
+    alternative.<br>
     Set attr subType to eltakoShutter and attr model to
     FSB12|FSB14|FSB61|FSB70 manually.<br>
     Use the sensor type "Szenentaster/PC" for Eltako devices.
@@ -1886,7 +2296,7 @@ EnOcean_Undef($$)
       </li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a name="shutTime">shutTime</a> t/s<br>
+    <li><a name="shutTime">shutTime</a> t/s, [shutTime] = 1 ... 255, 255 is default.<br>
       Use the attr shutTime to set the time delay to the position "Halt" in
       seconds. Select a delay time that is at least as long as the shading element
       or roller shutter needs to move from its end position to the other position.<br>
@@ -1994,6 +2404,19 @@ EnOcean_Undef($$)
      </li>
      <br><br>
 
+     <li>Smoke Detector (EEP F6-02-01 ... F6-02-02)<br>
+         [Eltako FRW, untested]<br>
+     <ul>
+         <li>smoke-alarm</li>
+         <li>off</li>
+         <li>alarm: smoke-alarm|off</li>
+         <li>battery: low|ok</li>
+         <li>state: smoke-alarm|off</li>
+     </ul><br>
+        Set attr subType to FRW.
+     </li>
+     <br><br>
+
      <li>Key Card Activated Switch (EEP F6-04-01)<br>
          [Eltako FKC, FKF, FZS, untested]<br>
      <ul>
@@ -2002,51 +2425,6 @@ EnOcean_Undef($$)
          <li>state: keycard inserted|keycard removed</li>
      </ul><br>
          Set attr subType to keycard manually.
-     </li>
-     <br><br>
-
-     <li>Single Input Contact, Door/Window Contact
-         (EEP D5-00-01, 1BS Telegram)<br>
-         [Eltako FTK, Peha D 450 FU, STM-250, BSC ?] 
-     <ul>
-         <li>closed</li>
-         <li>open</li>
-         <li>learnBtn: on</li>
-         <li>state: open|closed</li>
-     </ul></li>
-     <br><br>
-
-     <li>Dimmer<br>
-         [Eltako FUD14, FUD61, FUD70, FSG14, FSG70, ...]<br>
-     <ul>
-        <li>on</li>
-        <li>off</li>
-        <li>dimValue: Dim/% (Sensor Range: Dim = 0 % ... 100 %)</li>
-        <li>dimValueLast: Dim/%<br>
-            Last value received from the bidirectional dimmer.</li>
-        <li>dimValueStored: Dim/%<br>
-            Last value saved by <code>set &lt;name&gt; dim &lt;value&gt;</code>.</li>      
-        <li>state: on|off</li>
-     </ul><br>
-         Set attr subType to eltakoDimmer manually.
-     </li>   
-     <br><br>
-         
-     <li>Shutter (EEP F6-02-01 ... F6-02-02)<br>
-         [Eltako FSB14, FSB61, FSB70]<br>
-     <ul>
-        <li>B0<br>
-            The status of the device will become "B0" after the TOP endpoint is
-            reached, or it has finished an "up %" command.</li>
-        <li>BI<br>
-            The status of the device will become "BI" if the BOTTOM endpoint is
-            reached</li>
-        <li>released<br>
-            The status of the device become "released" between one of the endpoints.</li>
-        <li>state: BO|BI|released</li>
-     </ul><br>
-        Set attr subType to eltakoShutter and attr model to
-        FSB14|FSB61|FSB70 manually.
      </li>
      <br><br>
      
@@ -2063,39 +2441,15 @@ EnOcean_Undef($$)
      </li>
      <br><br>
 
-     <li>Smoke Detector (EEP F6-02-01 ... F6-02-02)<br>
-         [Eltako FRW, untested]<br>
+     <li>Single Input Contact, Door/Window Contact
+         (EEP D5-00-01, 1BS Telegram)<br>
+         [Eltako FTK, Peha D 450 FU, STM-250, BSC ?] 
      <ul>
-         <li>smoke-alarm</li>
-         <li>off</li>
-         <li>alarm: smoke-alarm|off</li>
-         <li>battery: low|ok</li>
-         <li>state: smoke-alarm|off</li>
-     </ul><br>
-        Set attr subType to FRW.
-     </li>
-     <br><br>
-
-     <li>Battery Powered Actuator (EEP A5-20-01)<br>
-         [Kieback&Peter MD15-FTL-xx]<br>
-     <ul>
-       <li>Actuator/%</li>
-       <li>actuator: ok|obstructed</li>
-       <li>battery: ok|low</li>
-       <li>currentValue: Actuator/%</li>
-       <li>cover: open|closed</li>
-       <li>energyInput: enabled|disabled</li>
-       <li>energyStorage: charged|empty</li>
-       <li>selfCtl: on|off</li>
-       <li>serviceOn: yes|no</li>
-       <li>temperature: t/&#176C</li>
-       <li>tempSensor: failed|ok</li>
-       <li>window: open|closed</li>
-       <li>state: Actuator/%</li>
-     </ul><br>
-        The attr subType must be MD15. This is done if the device was created by
-        autocreate.
-     </li>
+         <li>closed</li>
+         <li>open</li>
+         <li>learnBtn: on</li>
+         <li>state: open|closed</li>
+     </ul></li>
      <br><br>
 
      <li>Temperature Sensors with with different ranges (EEP A5-02-01 ... A5-02-30)<br>
@@ -2109,15 +2463,134 @@ EnOcean_Undef($$)
         created by autocreate. 
      </li>
      <br><br>
+
+     <li>Temperatur and Humidity Sensor (EEP A5-04-02)<br>
+         [Eltako FAFT60, FIFT63AP]<br>
+     <ul>
+       <li>T: t/&#176C H: rH/% B: unknown|low|ok</li>
+       <li>battery: unknown|low|ok</li>      
+       <li>energyStorage: unknown|empty|charged|full</li>      
+       <li>humidity: rH/% (Sensor Range: rH = 0 % ... 100 %)</li>
+       <li>temperature: t/&#176C (Sensor Range: t = -20 &#176C ... 60 &#176C)</li>
+       <li>voltage: U/V</li> (Sensor Range: U = 0 V ... 6.6 V)
+       <li>state: T: t/&#176C H: rH/% B: unknown|low|ok</li>
+     </ul><br>
+        The attr subType must be tempHumiSensor.02 and attr
+        manufID must be 00D for Eltako Devices. This is done if the device was
+        created by autocreate. 
+     </li>
+     <br><br>
+
+     <li>Light Sensor (EEP A5-06-01)<br>
+         [Eltako FAH60, FAH63, FIH63, Thermokon SR65 LI]<br>
+     <ul>
+       <li>E/lx</li>
+       <li>brightness: E/lx (Sensor Range: 300 lx ... 30 klx, 600 lx ... 60 klx
+       , Sensor Range for Eltako: E = 0 lx ... 100 lx, 300 lx ... 30 klx)</li>
+       <li>voltage: U/V</li> (Sensor Range: U = 0 V ... 5.1 V)
+       <li>state: E/lx</li>
+     </ul><br>
+        Eltako devices only support Brightness.<br>
+        The attr subType must be lightSensor.01 and attr manufID must be 00D
+        for Eltako Devices. This is done if the device was created by
+        autocreate. 
+     </li>
+     <br><br>
+
+     <li>Light Sensor (EEP A5-06-02)<br>
+         [untested]<br>
+     <ul>
+       <li>E/lx</li>
+       <li>brightness: E/lx (Sensor Range: 0 lx ... 1020 lx</li>
+       <li>voltage: U/V (Sensor Range: U = 0 V ... 5.1 V)</li>
+       <li>state: E/lx</li>
+     </ul><br>
+        The attr subType must be lightSensor.02. This is done if the device was
+        created by autocreate. 
+     </li>
+     <br><br>
+
+     <li>Light Sensor (EEP A5-06-03)<br>
+         [untested]<br>
+     <ul>
+       <li>E/lx</li>
+       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 1000 lx, over range)</li>
+       <li>errorCode: 251 ... 255</li>
+       <li>state: E/lx</li>
+     </ul><br>
+        The attr subType must be lightSensor.03. This is done if the device was
+        created by autocreate. 
+     </li>
+     <br><br>
+
+      <li>Occupancy Sensor (EEP A5-07-01, A5-07-02)<br>
+         [untested]<br>
+     <ul>
+       <li>on|off</li>
+       <li>errorCode: 251 ... 255</li>
+       <li>motion: on|off</li>
+       <li>voltage: U/V (Sensor Range: U = 0 V ... 5.0 V)</li>
+       <li>state: on|off</li>
+     </ul><br>
+        The attr subType must be occupSensor.<01|02>. This is done if the device was
+        created by autocreate. 
+     </li>
+     <br><br>
+
+      <li>Occupancy Sensor (EEP A5-07-03)<br>
+         [untested]<br>
+     <ul>
+       <li>M: on|off E: E/lx U: U/V</li>
+       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 1000 lx, over range)</li>
+       <li>errorCode: 251 ... 255</li>
+       <li>motion: on|off</li>
+       <li>voltage: U/V (Sensor Range: U = 0 V ... 5.0 V)</li>
+       <li>state: M: on|off E: E/lx U: U/V</li>
+     </ul><br>
+        The attr subType must be occupSensor.03. This is done if the device was
+        created by autocreate. 
+     </li>
+     <br><br>
+
+     <li>Light, Temperatur and Occupancy Sensor (EEP A5-08-01 ... A5-08-03)<br>
+         [Eltako FABH63, FBH55, FBH63, FIBH63, Thermokon SR-MDS, PEHA 482 FU-BM DE]<br>
+     <ul>
+       <li>M: on|off E: E/lx P: absent|present T: t/&#176C U: U/V</li>
+       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 510, 1020, 1530 or 2048 lx)</li>
+       <li>motion: on|off</li>
+       <li>presence: absent|present</li>
+       <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 51 &#176C or -30 &#176C ... 50 &#176C)</li>
+       <li>voltage: U/V</li> (Sensor Range: U = 0 V ... 5.1 V)
+       <li>state: M: on|off E: E/lx P: absent|present T: t/&#176C U: U/V</li>
+     </ul><br>
+        Eltako and PEHA devices only support Brightness and Motion.<br>
+        The attr subType must be lightTempOccupSensor.<01|02|03> and attr
+        manufID must be 00D for Eltako Devices. This is done if the device was
+        created by autocreate. 
+     </li>
+     <br><br>
      
      <li>Gas Sensor, CO Sensor (EEP A5-09-01)<br>
          [untested]<br>
      <ul>
-       <li>Channel1, Channel2: c/ppm (Sensor Range: c = 0 ppm ... 255 ppm)</li>
+       <li>CO: c/ppm (Sensor Range: c = 0 ppm ... 255 ppm)</li>
        <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 255 &#176C)</li>
-       <li>state: c/ppm | measuring error</li>
+       <li>state: c/ppm</li>
      </ul><br>
         The attr subType must be COSensor.01. This is done if the device was
+        created by autocreate. 
+     </li>
+     <br><br>
+     
+     <li>Gas Sensor, CO Sensor (EEP A5-09-02)<br>
+         [untested]<br>
+     <ul>
+       <li>CO: c/ppm (Sensor Range: c = 0 ppm ... 1020 ppm)</li>
+       <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 51.0 &#176C)</li>
+       <li>voltage: U/V</li> (Sensor Range: U = 0 V ... 5.1 V)
+       <li>state: c/ppm</li>
+     </ul><br>
+        The attr subType must be COSensor.02. This is done if the device was
         created by autocreate. 
      </li>
      <br><br>
@@ -2173,7 +2646,7 @@ EnOcean_Undef($$)
      </li>
      <br><br>
      
-     <li>Room Sensor and Control Unit (EEP A5-10-15 - A5-10-17)<br>
+     <li>Room Sensor and Control Unit (EEP A5-10-15 ... A5-10-17)<br>
          [untested]<br>
      <ul>
        <li>T: t/&#176C P: absent|present SP: 0 ... 63</li>
@@ -2183,82 +2656,6 @@ EnOcean_Undef($$)
        <li>state: T: t/&#176C P: absent|present SP: 0 ... 63</li>
      </ul><br>
         The attr subType must be roomSensorControl.02. This is done if the device was
-        created by autocreate. 
-     </li>
-     <br><br>
-
-     <li>Temperatur and Humidity Sensor (EEP A5-04-02)<br>
-         [Eltako FAFT60, FIFT63AP]<br>
-     <ul>
-       <li>T: t/&#176C H: rH/% B: unknown|low|ok</li>
-       <li>battery: unknown|low|ok</li>      
-       <li>energyStorage: unknown|empty|charged|full</li>      
-       <li>humidity: rH/% (Sensor Range: rH = 0 % ... 100 %)</li>
-       <li>temperature: t/&#176C (Sensor Range: t = -20 &#176C ... 60 &#176C)</li>
-       <li>voltage: U/V</li> (Sensor Range: U = 0 V ... 6.6 V)
-       <li>state: T: t/&#176C H: rH/% B: unknown|low|ok</li>
-     </ul><br>
-        The attr subType must be tempHumiSensor.02 and attr
-        manufID must be 00D for Eltako Devices. This is done if the device was
-        created by autocreate. 
-     </li>
-     <br><br>
-
-     <li>Light Sensor (EEP A5-06-01)<br>
-         [Eltako FAH60, FAH63, FIH63, Thermokon SR65 LI]<br>
-     <ul>
-       <li>E/lx</li>
-       <li>brightness: E/lx (Sensor Range: 300 lx ... 30 klx, 600 lx ... 60 klx
-       , Sensor Range for Eltako: E = 0 lx ... 100 lx, 300 lx ... 30 klx)</li>
-       <li>voltage: U/V</li> (Sensor Range: U = 0 V ... 5.1 V)
-       <li>state: E/lx</li>
-     </ul><br>
-        Eltako devices only support Brightness.<br>
-        The attr subType must be lightSensor.01 and attr manufID must be 00D
-        for Eltako Devices. This is done if the device was created by
-        autocreate. 
-     </li>
-     <br><br>
-
-     <li>Light Sensor (EEP A5-06-02)<br>
-         [untested]<br>
-     <ul>
-       <li>E/lx</li>
-       <li>brightness: E/lx (Sensor Range: 0 lx ... 1020 lx</li>
-       <li>voltage: U/V</li> (Sensor Range: U = 0 V ... 5.1 V)
-       <li>state: E/lx</li>
-     </ul><br>
-        The attr subType must be lightSensor.02. This is done if the device was
-        created by autocreate. 
-     </li>
-     <br><br>
-
-      <li>Occupancy Sensor (EEP A5-07-01)<br>
-         [untested]<br>
-     <ul>
-       <li>on|off</li>
-       <li>motion: on|off</li>
-       <li>state: on|off</li>
-     </ul><br>
-        The attr subType must be occupSensor.01. This is done if the device was
-        created by autocreate. 
-     </li>
-     <br><br>
-
-     <li>Light, Temperatur and Occupancy Sensor (EEP A5-08-01 ... A5-08-03)<br>
-         [Eltako FABH63, FBH55, FBH63, FIBH63, Thermokon SR-MDS]<br>
-     <ul>
-       <li>M: on|off E: E/lx P: absent|present T: t/&#176C U: U/V</li>
-       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 510, 1020, 1530 or 2048 lx)</li>
-       <li>motion: on|off</li>
-       <li>presence: absent|present</li>
-       <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 51 &#176C or -30 &#176C ... 50 &#176C)</li>
-       <li>voltage: U/V</li> (Sensor Range: U = 0 V ... 5.1 V)
-       <li>state: M: on|off E: E/lx P: absent|present T: t/&#176C U: U/V</li>
-     </ul><br>
-        Eltako devices only support Brightness and Motion.<br>
-        The attr subType must be lightTempOccupSensor.<01|02|03> and attr
-        manufID must be 00D for Eltako Devices. This is done if the device was
         created by autocreate. 
      </li>
      <br><br>
@@ -2308,19 +2705,20 @@ EnOcean_Undef($$)
      </li>
      <br><br>
  
-     <li>Weather Station (EEP A5-13-01 ... EEP A5-13-06)<br>
+     <li>Weather Station (EEP A5-13-01 ... EEP A5-13-06, EEP A5-13-10)<br>
          [Eltako FWS61, untested]<br>
      <ul>
        <li>T: t/&#176C B: E/lx W: Vs/m IR: yes|no</li>
        <li>brightness: E/lx (Sensor Range: E = 0 lx ... 999 lx)</li>
-       <li>temperature: t/&#176C (Sensor Range: t = -40 &#176C ... 80 &#176C)</li>
        <li>dayNight: day|night</li>
+       <li>hemisphere: north|south</li>
        <li>isRaining: yes|no</li>
        <li>sunEast: E/lx (Sensor Range: E = 1 lx ... 150 klx)</li> 
        <li>sunSouth: E/lx (Sensor Range: E = 1 lx ... 150 klx)</li>
        <li>sunWest: E/lx (Sensor Range: E = 1 lx ... 150 klx)</li>
+       <li>temperature: t/&#176C (Sensor Range: t = -40 &#176C ... 80 &#176C)</li>
        <li>windSpeed: Vs/m (Sensor Range: V = 0 m/s ... 70 m/s)</li>
-      <li>state:T: t/&#176C B: E/lx W: Vs/m IR: yes|no</li>
+       <li>state:T: t/&#176C B: E/lx W: Vs/m IR: yes|no</li>
      </ul><br>
         Brightness is the strength of the dawn light. SunEast,
         sunSouth and sunWest are the solar radiation from the respective
@@ -2330,10 +2728,48 @@ EnOcean_Undef($$)
         autocreate.<br>
         The Eltako Weather Station FWS61 supports not the day/night indicator
         (dayNight).<br>
-        EEP A5-13-03 ... EEP A5-13-06 are not implemented.
+        EEP A5-13-03 ... EEP A5-13-06, EEP A5-13-10 are not implemented.
      </li>
      <br><br>
      
+      <li>Multi-Func Sensor (EEP A5-14-01 ... A5-14-06)<br>
+         [untested]<br>
+     <ul>
+       <li>C: open|closed V: on|off E: E/lx U: U/V</li>
+       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 1000 lx, over range)</li>
+       <li>contact: open|closed</li>
+       <li>errorCode: 251 ... 255</li>
+       <li>vibration: on|off</li>
+       <li>voltage: U/V (Sensor Range: U = 0 V ... 5.0 V)</li>
+       <li>state: C: open|closed V: on|off E: E/lx U: U/V</li>
+     </ul><br>
+        The attr subType must be multiFuncSensor. This is done if the device was
+        created by autocreate. 
+     </li>
+     <br><br>
+
+     <li>Battery Powered Actuator (EEP A5-20-01)<br>
+         [Kieback&Peter MD15-FTL-xx]<br>
+     <ul>
+       <li>Actuator/%</li>
+       <li>actuator: ok|obstructed</li>
+       <li>battery: ok|low</li>
+       <li>currentValue: Actuator/%</li>
+       <li>cover: open|closed</li>
+       <li>energyInput: enabled|disabled</li>
+       <li>energyStorage: charged|empty</li>
+       <li>selfCtl: on|off</li>
+       <li>serviceOn: yes|no</li>
+       <li>temperature: t/&#176C</li>
+       <li>tempSensor: failed|ok</li>
+       <li>window: open|closed</li>
+       <li>state: Actuator/%</li>
+     </ul><br>
+        The attr subType must be MD15. This is done if the device was created by
+        autocreate.
+     </li>
+     <br><br>
+
      <li>Digital Input (EEP A5-30-01, A5-30-02)<br>
          [Thermokon SR65 DI, untested]<br>
      <ul>
@@ -2385,6 +2821,61 @@ EnOcean_Undef($$)
      </li>
      <br><br>
      
+     <li>PHC Gateway (EEP A5-38-08)<br>
+         Setpoint shift<br>
+         [untested]<br>
+     <ul>
+       <li>1/K</li>
+       <li>setpointShift: 1/K (Sensor Range: T = -12.7 K ... 12.8 K)</li>
+       <li>state: 1/K</li>
+     </ul><br>
+        The attr subType must be phcGateway, phcCmd must be setpointShift.
+        This is done if the device was created by autocreate.
+     </li>
+     <br><br>     
+     
+     <li>PHC Gateway (EEP A5-38-08)<br>
+         Basic Setpoint<br>
+         [untested]<br>
+     <ul>
+       <li>t/&#176C</li>
+       <li>setpoint: t/&#176C (Sensor Range: t = 0 &#176C ... 51.2 &#176C)</li>
+       <li>state: t/&#176C</li>
+     </ul><br>
+        The attr subType must be phcGateway, phcCmd must be setpointBasic.
+        This is done if the device was created by autocreate.
+     </li>
+     <br><br>     
+     
+     <li>PHC Gateway (EEP A5-38-08)<br>
+         Control variable<br>
+         [untested]<br>
+     <ul>
+       <li>auto|heating|cooling|off</li>
+       <li>controlVar: cvov (Sensor Range: cvov = 0 % ... 100 %)</li>
+       <li>controllerMode: auto|heating|cooling|off</li>
+       <li>controllerState: auto|override</li>
+       <li>energyHoldOff: normal|holdoff</li>
+       <li>presence: present|absent|standby</li>
+       <li>state: auto|heating|cooling|off</li>
+     </ul><br>
+        The attr subType must be phcGateway, phcCmd must be controlVar.
+        This is done if the device was created by autocreate.
+     </li>
+     <br><br>
+     
+     <li>PHC Gateway (EEP A5-38-08)<br>
+         Fan stage<br>
+         [untested]<br>
+     <ul>
+       <li>0 ... 3|auto</li>
+       <li>state: 0 ... 3|auto</li>
+     </ul><br>
+        The attr subType must be phcGateway, phcCmd must be fanStage.
+        This is done if the device was created by autocreate.
+     </li>
+     <br><br>
+     
      <li>Manufacturer Specific Applications (EEP A5-3F-7F)<br><br>
          Wireless Analog Input Module<br>
          [Thermokon SR65 3AI, untested]<br>
@@ -2399,33 +2890,60 @@ EnOcean_Undef($$)
         for Thermokon Devices. This is done if the device was
         created by autocreate. 
      </li>
-     <br><br>     
-     
-     <li>Light Sensor (EEP similar 07-06-01)<br>
-         [Eltako FAH60, FAH63, FIH63]<br>
-     <ul>
-       <li>E/lx</li>
-       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 100 lx, 300 lx ... 30 klx)</li>
-       <li>state: E/lx</li>
-     </ul><br>
-        Old profile, use subType lightSensor.01 alternative.<br>
-        Set attr subType to FAH or attr model to FAH60|FAH63|FIH63
-        manually.
-     </li>
      <br><br>
-
-     <li>Light and Occupancy Sensor (EEP similar A5-08-01)<br>
-         [Eltako FABH63, FBH55, FBH63, FIBH63]<br>
+     
+     <li>Manufacturer Specific Applications (EEP A5-3F-7F)<br><br>
+         Shutter (EEP F6-02-01 ... F6-02-02)<br>
+         [Eltako FSB14, FSB61, FSB70]<br>
      <ul>
-       <li>yes</li>
-       <li>no</li>
-       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 2048 lx)</li>
-       <li>motion: yes|no</li>
-       <li>state: yes|no</li>
+        <li>B0<br>
+            The status of the device will become "B0" after the TOP endpoint is
+            reached, or it has finished an "up" or "position 0" command.</li>
+        <li>BI<br>
+            The status of the device will become "BI" if the BOTTOM endpoint is
+            reached</li>
+        <li>released<br>
+            The status of the device become "released" between one of the endpoints.</li>
+        <li>state: BO|BI|released</li>
      </ul><br>
-         Old profile, use subType lightTempOccupSensor.01 alternative.<br>
-         Set attr subType to FBH or attr model to FABH63|FBH55|FBH63|FIBH63
-         manually.
+        Set attr subType to manufProfile, attr manufID to 00D and attr model to
+        FSB14|FSB61|FSB70 manually.
+     </li>
+     <br><br>     
+
+     <li>Dimmer<br>
+         [Eltako FUD14, FUD61, FUD70, FSG14, FSG70, ...]<br>
+     <ul>
+        <li>on</li>
+        <li>off</li>
+        <li>dimValue: Dim/% (Sensor Range: Dim = 0 % ... 100 %)</li>
+        <li>dimValueLast: Dim/%<br>
+            Last value received from the bidirectional dimmer.</li>
+        <li>dimValueStored: Dim/%<br>
+            Last value saved by <code>set &lt;name&gt; dim &lt;value&gt;</code>.</li>      
+        <li>state: on|off</li>
+     </ul><br>
+        Old profile, use <a href="#PHC Gateway">PHC Gateway</a> alternative.<br>
+        Set attr subType to eltakoDimmer manually.
+     </li>   
+     <br><br>
+         
+     <li>Shutter (EEP F6-02-01 ... F6-02-02)<br>
+         [Eltako FSB14, FSB61, FSB70]<br>
+     <ul>
+        <li>B0<br>
+            The status of the device will become "B0" after the TOP endpoint is
+            reached, or it has finished an "up %" command.</li>
+        <li>BI<br>
+            The status of the device will become "BI" if the BOTTOM endpoint is
+            reached</li>
+        <li>released<br>
+            The status of the device become "released" between one of the endpoints.</li>
+        <li>state: BO|BI|released</li>
+     </ul><br>
+        Old profile, use <a href="#Manufacturer Specific Applications">Manufacturer Specific Applications</a>
+        alternative.<br>
+        Set attr subType to eltakoShutter and attr model to FSB14|FSB61|FSB70 manually.
      </li>
      <br><br>
 
@@ -2456,6 +2974,34 @@ EnOcean_Undef($$)
         Old profile, use subType roomSensorControl.05 alternative.<br>
         Set attr model to SR04|SR04P|SR04T|SR04PT|SR04PMS|SR04PS|SR04PST or
         attr subType to SR04.
+     </li>
+     <br><br>
+     
+     <li>Light Sensor (EEP similar A5-06-01)<br>
+         [Eltako FAH60, FAH63, FIH63]<br>
+     <ul>
+       <li>E/lx</li>
+       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 100 lx, 300 lx ... 30 klx)</li>
+       <li>state: E/lx</li>
+     </ul><br>
+        Old profile, use subType lightSensor.01 alternative.<br>
+        Set attr subType to FAH or attr model to FAH60|FAH63|FIH63
+        manually.
+     </li>
+     <br><br>
+
+     <li>Light and Occupancy Sensor (EEP similar A5-08-01)<br>
+         [Eltako FABH63, FBH55, FBH63, FIBH63]<br>
+     <ul>
+       <li>yes</li>
+       <li>no</li>
+       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 2048 lx)</li>
+       <li>motion: yes|no</li>
+       <li>state: yes|no</li>
+     </ul><br>
+         Old profile, use subType lightTempOccupSensor.01 alternative.<br>
+         Set attr subType to FBH or attr model to FABH63|FBH55|FBH63|FIBH63
+         manually.
      </li>
      <br><br>
      
