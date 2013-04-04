@@ -3341,9 +3341,9 @@ sub CUL_HM_decodeTime16($) {####################
 sub CUL_HM_secSince2000() {#####################
   # Calculate the local time in seconds from 2000.
   my $t = time();
+
   my @l = localtime($t);
   my @g = gmtime($t);
-  #  my $t2 = $t + 60*(($l[2]-$g[2] + ((($l[5]<<9)|$l[7]) <=> (($g[5]<<9)|$g[7])) * 24 + $l[8]) * 60 + $l[1]-$g[1]) 
   my $t2 = $t + 60*(($l[2]-$g[2] + ((($l[5]<<9)|$l[7]) <=> (($g[5]<<9)|$g[7])) * 24) * 60 + $l[1]-$g[1]) 
                            # timezone and daylight saving...
         - 946684800        # seconds between 01.01.2000, 00:00 and THE EPOCH (1970)
