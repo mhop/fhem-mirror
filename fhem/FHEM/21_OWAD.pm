@@ -27,6 +27,7 @@
 # get <name> reading  => measurement for all channels
 # get <name> alarm    => alarm measurement settings for all channels
 # get <name> status   => alarm and i/o status for all channels
+# get <name> version  => OWX version number
 #
 # set <name> interval => set period for measurement
 #
@@ -74,12 +75,13 @@ use strict;
 use warnings;
 sub Log($$);
 
+my $owx_version="3.21";
+#-- fixed raw channel name, flexible channel name
+my @owg_fixed   = ("A","B","C","D");
+my @owg_channel = ("A","B","C","D");
 #-- value globals
 my @owg_status;
 my $owg_state;
-#-- channel name - fixed is the first array, variable the second 
-my @owg_fixed   = ("A","B","C","D");
-my @owg_channel = ("A","B","C","D");
 #-- channel values - always the raw values from the device
 my @owg_val=("","","","");
 #-- channel mode - fixed for now
@@ -102,6 +104,7 @@ my %gets = (
   "reading"     => "",
   "alarm"       => "",
   "status"      => "",
+  "version"     => ""
 );
 
 my %sets = (
@@ -263,6 +266,49 @@ sub OWAD_Define ($$) {
 
 ########################################################################################
 #
+# OWAD_ChannelNames - find the real channel names  
+#
+#  Parameter hash = hash of device addressed
+#
+########################################################################################
+
+sub OWAD_ChannelNames($) { 
+  my ($hash) = @_;
+  
+  my $name    = $hash->{NAME};
+  my $state   = $hash->{READINGS}{"state"}{VAL};
+ 
+  my ($cname,@cnama,$unit,@unarr);
+
+  for (my $i=0;$i<int(@owg_fixed);$i++){
+    #-- name
+    $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i]."|voltage";
+    @cnama = split(/\|/,$cname);
+    if( int(@cnama)!=2){
+      Log 1, "OWAD: Incomplete channel name specification $cname. Better use $cname|<type of data>"
+        if( $state eq "defined");
+      push(@cnama,"unknown");
+    }
+    $owg_channel[$i]=$cnama[0];
+ 
+    #-- unit
+    $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "Volt|V";
+    @unarr= split(/\|/,$unit);
+    if( int(@unarr)!=2 ){
+      Log 1, "OWAD: Incomplete channel unit specification $unit. Better use $unit|<abbreviation>"
+        if( $state eq "defined");
+      push(@unarr,"");  
+    }
+   
+    #-- put into readings
+    $hash->{READINGS}{$owg_channel[$i]}{TYPE}     = $cnama[1];  
+    $hash->{READINGS}{$owg_channel[$i]}{UNIT}     = $unarr[0];
+    $hash->{READINGS}{$owg_channel[$i]}{UNITABBR} = $unarr[1];
+  }
+}  
+
+########################################################################################
+#
 # OWAD_InitializeDevice - delayed setting of initial readings and channel names  
 #
 #  Parameter hash = hash of device addressed
@@ -272,35 +318,14 @@ sub OWAD_Define ($$) {
 sub OWAD_InitializeDevice($) {
   my ($hash) = @_;
   
-  my $name   = $hash->{NAME};
+  my $name      = $hash->{NAME};
   my $interface = $hash->{IODev}->{TYPE};
   
   #-- Initial readings 
   @owg_val   = ("","","","");
    
-  #-- Set channel names, channel units and alarm values
+  #-- Initial alarm values
   for( my $i=0;$i<int(@owg_fixed);$i++) { 
-    #-- name
-    my $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i]."|voltage";
-    my @cnama = split(/\|/,$cname);
-    if( int(@cnama)!=2){
-      Log 1, "OWAD: Incomplete channel name specification $cname. Better use $cname|<type of data>";
-      push(@cnama,"unknown");
-    }
- 
-    #-- unit
-    my $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "Volt|V";
-    my @unarr= split(/\|/,$unit);
-    if( int(@unarr)!=2 ){
-      Log 1, "OWAD: Incomplete channel unit specification $unit. Better use $unit|<abbreviation>";
-      push(@unarr,"");  
-    }
-   
-    #-- put into readings
-    $owg_channel[$i] = $cnama[0]; 
-    $hash->{READINGS}{"$owg_channel[$i]"}{TYPE}     = $cnama[1];  
-    $hash->{READINGS}{"$owg_channel[$i]"}{UNIT}     = $unarr[0];
-    $hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR} = $unarr[1];
     $hash->{ERRCOUNT}      = 0;
 
     #-- alarm enabling
@@ -363,6 +388,7 @@ sub OWAD_FormatValues($) {
   my ($offset,$factor,$vval,$vlow,$vhigh,$vfunc,$ret);
   my $vfuncall = "";
   my $svalue = "";
+  
   #-- insert initial values 
   for( my $k=0;$k<int(@owg_fixed);$k++ ){
     $vfuncall .= "\$owg_val[$k]=$owg_val[$k];";
@@ -384,22 +410,19 @@ sub OWAD_FormatValues($) {
     return if( $owg_val[$i] eq "");
   }
   
+  #-- obtain channel names
+  OWAD_ChannelNames($hash);
+  
   #-- check if device needs to be initialized
   OWAD_InitializeDevice($hash)
     if( $hash->{READINGS}{"state"}{VAL} eq "defined");
-  
+    
   #-- put into READINGS
   readingsBeginUpdate($hash);
   
   #-- formats for output
   for (my $i=0;$i<int(@owg_fixed);$i++){
-    my $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i]."|voltage";
-    my @cnama = split(/\|/,$cname);
-    $owg_channel[$i]=$cnama[0];
-    
-    my $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "Volt|V";
-    my @unarr= split(/\|/,$unit);
-    
+
     #-- skip a few things when the values are undefined or zero
     if( !defined($owg_val[$i]) ){
       $svalue .= "$owg_channel[$i]: ???"
@@ -419,12 +442,15 @@ sub OWAD_FormatValues($) {
         } else {
           $vfunc = "V$owg_fixed[$i]";
         }
-        $hash->{tempf}{"$owg_fixed[$i]"}{function}   = $vfunc;  
+        $hash->{tempf}{$owg_fixed[$i]}{function}   = $vfunc;  
         
         #-- replace by proper values (VA -> $owg_val[0] etc.)
+        #   careful: how to prevent {VAL} from being replaced ?
         for( my $k=0;$k<int(@owg_fixed);$k++ ){
           my $sstr = "V$owg_fixed[$k]";
+          $vfunc =~ s/VAL/WERT/g;
           $vfunc =~ s/$sstr/\$owg_val[$k]/g;
+          $vfunc =~ s/WERT/VAL/g;
         }
         
         #-- determine the measured value from the function
@@ -446,7 +472,7 @@ sub OWAD_FormatValues($) {
         $main::attr{$name}{$owg_fixed[$i]."High"}=$vhigh;            
         
         #-- string buildup for return value, STATE and alarm
-        $svalue .= sprintf( "%s: %5.3f %s", $owg_channel[$i], $vval,$unarr[1]);
+        $svalue .= sprintf( "%s: %5.3f %s", $owg_channel[$i], $vval,$hash->{READINGS}{$owg_channel[$i]}{UNITABBR});
                
         #-- Test for alarm condition
         $alarm = "none";
@@ -547,6 +573,11 @@ sub OWAD_Get($@) {
     $value = $hash->{INTERVAL};
      return "$name.interval => $value";
   } 
+  
+  #-- get version
+  if( $a[1] eq "version") {
+    return "$name.version => $owx_version";
+  }
   
   #-- reset presence
   $hash->{PRESENT}  = 0;
@@ -757,11 +788,12 @@ sub OWAD_Set($@) {
   
   #-- define vars
   my $ret     = undef;
-  my $channel = undef;
+  my $channon = undef;
   my $channo  = undef;
   my $factor;
   my $offset;
   my $condx;
+  
   my $name    = $hash->{NAME};
   my $model   = $hash->{OW_MODEL};
  
@@ -779,11 +811,11 @@ sub OWAD_Set($@) {
   
   #-- find out which channel we have
   my $tc =$key;
-  if( $tc =~ s/(.*)(Alarm|Low|High)/$channel=$1/se ) {
+  if( $tc =~ s/(.*)(Alarm|Low|High)/$channon=$1/se ) {
     for (my $i=0;$i<int(@owg_fixed);$i++){
       if( $tc eq $owg_fixed[$i] ){
         $channo  = $i;
-        $channel = $tc;
+        $channon = $tc;
         last;
       }
     }
