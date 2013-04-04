@@ -250,7 +250,7 @@ sub HMLAN_Parse($$) {##########################################################
     my $srcId = (length($mFld[5])>11)?$src:"lastRec";
     $hash->{helper}{nextSend}{$srcId} = gettimeofday() + 0.100;
     if ($debug){
-      Log $ll5, 'HMLAN_Parse: '.$name.' S:'.$mFld[0]
+      Log $ll5, 'HMLAN_Pars1: '.$name.' S:'.$mFld[0]
 	                               .(($mFld[0] =~ m/^E/)?'  ':'')
 	                               .' stat:'.$mFld[1]
 	                               .' t:'.$mFld[2].' d:'.$mFld[3]
@@ -446,7 +446,7 @@ sub HMLAN_secSince2000() {#####################################################
   my $t = time();
   my @l = localtime($t);
   my @g = gmtime($t);
-  $t += 60*(($l[2]-$g[2] + ((($l[5]<<9)|$l[7]) <=> (($g[5]<<9)|$g[7])) * 24 + $l[8]) * 60 + $l[1]-$g[1]) 
+  $t += 60*(($l[2]-$g[2] + ((($l[5]<<9)|$l[7]) <=> (($g[5]<<9)|$g[7])) * 24) * 60 + $l[1]-$g[1]) 
                            # timezone and daylight saving...
         - 946684800        # seconds between 01.01.2000, 00:00 and THE EPOCH (1970)
         - 7200;            # HM Special
