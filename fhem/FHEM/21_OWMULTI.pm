@@ -28,6 +28,7 @@
 # get <name> temperature => temperature measurement
 # get <name> VDD         => supply voltage measurement
 # get <name> V|raw       => raw external voltage measurement
+# get <name> version     => OWX version number
 #
 # set <name> interval    => set period for measurement
 #
@@ -68,6 +69,7 @@ use strict;
 use warnings;
 sub Log($$);
 
+my $owx_version="3.21";
 #-- temperature and voltage globals - always the raw values from the device
 my $owg_temp;
 my $owg_volt;
@@ -81,8 +83,9 @@ my %gets = (
   "reading"     => "",
   "temperature" => "",
   "VDD"         => "",
-  "V"           => "",
+  "VAD"         => "",
   "raw"         => "",
+  "version"     => ""
 );
 
 my %sets = (
@@ -210,80 +213,55 @@ sub OWMULTI_Define ($$) {
   readingsSingleUpdate($hash,"state","defined",1);
   Log 3, "OWMULTI: Device $name defined."; 
   
-  #-- Start timer for initialization in a few seconds
-  InternalTimer(time()+10, "OWMULTI_InitializeDevice", $hash, 0);
-   
   #-- Start timer for updates
-  InternalTimer(time()+10+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 0);
+  InternalTimer(time()+10, "OWMULTI_GetValues", $hash, 0);
 
   return undef; 
 }
   
 ########################################################################################
 #
-# OWMULTI_InitializeDevice - delayed setting of initial readings and channel names  
+# OWMULTI_ChannelNames - find the real channel names  
 #
 #  Parameter hash = hash of device addressed
 #
 ########################################################################################
 
-sub OWMULTI_InitializeDevice($) {
+sub OWMULTI_ChannelNames($) { 
   my ($hash) = @_;
   
   my $name   = $hash->{NAME};
-  my @args;
-  
-  #-- unit attribute defined ?
-  $hash->{READINGS}{"temperature"}{UNIT} = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
-  $hash->{READINGS}{"temperature"}{TYPE} = "temperature";
-  
-  #-- Initial readings
-  $owg_temp = "";
-  $owg_volt = "";
-  $owg_vdd  = "";  
+  my $state  = $hash->{READINGS}{"state"}{VAL};
+   
+  my ($cname,@cnama,$unit,@unarr);
+  my ($tunit,$toffset,$tfactor,$tabbr,$vfunc);
+
   #-- Set channel name, channel unit for voltage channel
-  my $cname = defined($attr{$name}{"VName"})  ? $attr{$name}{"VName"} : "voltage|voltage";
-  my @cnama = split(/\|/,$cname);
+  $cname = defined($attr{$name}{"VName"})  ? $attr{$name}{"VName"} : "voltage|voltage";
+  @cnama = split(/\|/,$cname);
   if( int(@cnama)!=2){
-    Log 1, "OWMULTI: Incomplete channel name specification $cname. Better use $cname|<type of data>";
+    Log 1, "OWMULTI: Incomplete channel name specification $cname. Better use $cname|<type of data>"
+      if( $state eq "defined");
     push(@cnama,"unknown");
   }
  
   #-- unit
-  my $unit = defined($attr{$name}{"VUnit"})  ? $attr{$name}{"VUnit"} : "Volt|V";
-  my @unarr= split(/\|/,$unit);
+  $unit = defined($attr{$name}{"VUnit"})  ? $attr{$name}{"VUnit"} : "Volt|V";
+  @unarr= split(/\|/,$unit);
   if( int(@unarr)!=2 ){
-    Log 1, "OWMULTI: Incomplete channel unit specification $unit. Better use $unit|<abbreviation>";
+    Log 1, "OWMULTI: Incomplete channel unit specification $unit. Better use $unit|<abbreviation>"
+      if( $state eq "defined");
     push(@unarr,"");  
   }
     
   #-- put into readings
   $owg_channel = $cnama[0]; 
-  $hash->{READINGS}{"$owg_channel"}{TYPE}     = $cnama[1];  
-  $hash->{READINGS}{"$owg_channel"}{UNIT}     = $unarr[0];
-  $hash->{READINGS}{"$owg_channel"}{UNITABBR} = $unarr[1];
+  $hash->{READINGS}{$owg_channel}{TYPE}     = $cnama[1];  
+  $hash->{READINGS}{$owg_channel}{UNIT}     = $unarr[0];
+  $hash->{READINGS}{$owg_channel}{UNITABBR} = $unarr[1];
     
-  #-- Initialize all the display stuff  
-  OWMULTI_FormatValues($hash);
-  
-}
-
-########################################################################################
-#
-# OWMULTI_FormatValues - put together various format strings 
-#
-#  Parameter hash = hash of device addressed, fs = format string
-#
-########################################################################################
-
-sub OWMULTI_FormatValues($) {
-  my ($hash) = @_;
-  
-  my $name    = $hash->{NAME}; 
-  my ($tunit,$toffset,$tfactor,$tabbr,$tval,$vfunc,$vval);
-  my $svalue  = "";
-  
-  #-- attributes defined ?
+  #-- temperature scale 
+  $hash->{READINGS}{"temperature"}{UNIT} = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
   $tunit  = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : $hash->{READINGS}{"temperature"}{UNIT};
   $toffset = defined($attr{$name}{"tempOffset"}) ? $attr{$name}{"tempOffset"} : 0.0 ;
   $tfactor = 1.0;
@@ -301,21 +279,64 @@ sub OWMULTI_FormatValues($) {
     $tabbr="?";
     Log 1, "OWMULTI_FormatValues: unknown unit $tunit";
   }
+  
   #-- these values are rather complex to obtain, therefore save them in the hash
+  $hash->{READINGS}{"temperature"}{TYPE}     = "temperature";
   $hash->{READINGS}{"temperature"}{UNIT}     = $tunit;
   $hash->{READINGS}{"temperature"}{UNITABBR} = $tabbr;
   $hash->{tempf}{offset}                     = $toffset;
   $hash->{tempf}{factor}                     = $tfactor;
+}  
+
+########################################################################################
+#
+# OWMULTI_InitializeDevice - delayed setting of initial readings and channel names  
+#
+#  Parameter hash = hash of device addressed
+#
+########################################################################################
+
+sub OWMULTI_InitializeDevice($) {
+  my ($hash) = @_;
+  
+  my $name   = $hash->{NAME};
+  
+  #-- Initial readings
+  $owg_temp = "";
+  $owg_volt = "";
+  $owg_vdd  = "";  
+  
+}
+
+########################################################################################
+#
+# OWMULTI_FormatValues - put together various format strings 
+#
+#  Parameter hash = hash of device addressed, fs = format string
+#
+########################################################################################
+
+sub OWMULTI_FormatValues($) {
+  my ($hash) = @_;
+  
+  my $name    = $hash->{NAME}; 
+  my ($toffset,$tfactor,$tval,$vfunc,$vval);
+  my $svalue  = "";
   
   #-- no change in any value if invalid reading
-  return if( $owg_temp eq "");
+  return if( ($owg_temp eq "") || ($owg_vdd == 0) );
+  
+  #-- obtain channel names
+  OWMULTI_ChannelNames($hash);
+  
+  #-- check if device needs to be initialized
+  OWMULTI_InitializeDevice($hash)
+    if( $hash->{READINGS}{"state"}{VAL} eq "defined");
   
   #-- correct values for proper offset, factor 
-  $tval  = ($owg_temp + $toffset)*$tfactor;
-   
-  my $cname = defined($attr{$name}{"VName"})  ? $attr{$name}{"VName"} : "voltage|voltage";
-  my @cnama = split(/\|/,$cname);
-  $owg_channel=$cnama[0];
+  $toffset = $hash->{tempf}{offset};
+  $tfactor = $hash->{tempf}{factor};
+  $tval    = ($owg_temp + $toffset)*$tfactor;
   
   #-- attribute VFunction defined ?
   $vfunc   = defined($attr{$name}{"VFunction"}) ? $attr{$name}{"VFunction"} : "V";
@@ -338,11 +359,11 @@ sub OWMULTI_FormatValues($) {
   }
   
   #-- string buildup for return value, STATE 
-  $svalue .= sprintf( "%s: %5.2f %s (T: %5.2f %s)", $owg_channel, $vval,$hash->{READINGS}{"$owg_channel"}{UNITABBR},$tval,$tabbr);
+  $svalue .= sprintf( "%s: %5.2f %s (T: %5.2f %s)", $owg_channel, $vval,$hash->{READINGS}{$owg_channel}{UNITABBR},$tval,$hash->{READINGS}{"temperature"}{UNITABBR});
   
   #-- put into READINGS
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash,"$owg_channel",$vval);
+  readingsBulkUpdate($hash,$owg_channel,$vval);
   readingsBulkUpdate($hash,"VDD",$owg_vdd);
   readingsBulkUpdate($hash,"temperature",$tval);
   
@@ -407,6 +428,11 @@ sub OWMULTI_Get($@) {
      return "$name.interval => $value";
   } 
   
+  #-- get version
+  if( $a[1] eq "version") {
+    return "$name.version => $owx_version";
+  }
+  
   #-- reset presence
   $hash->{PRESENT}  = 0;
 
@@ -427,12 +453,16 @@ sub OWMULTI_Get($@) {
     return "OWMULTI: Could not get values from device $name, reason $ret";
   }
   $hash->{PRESENT} = 1; 
-  OWMULTI_FormatValues($hash);
   
   #-- return the special reading
   if ($reading eq "reading") {
-    return "OWMULTI: $name.reading => ".
-      $hash->{READINGS}{"$owg_channel"}{VAL};
+    return "OWMULTI: $name.reading => ".OWMULTI_FormatValues($hash);
+  }
+  
+  #-- return the special reading
+  if ($reading eq "VAD") {
+    return "OWMULTI: $name.VAD => ".
+      $hash->{READINGS}{$owg_channel}{VAL};
   } 
   if ($reading eq "temperature") {
     return "OWMULTI: $name.temperature => ".
@@ -442,7 +472,7 @@ sub OWMULTI_Get($@) {
     return "OWMULTI: $name.VDD => ".
       $hash->{READINGS}{"VDD"}{VAL};
   } 
-  if ( ($reading eq "V")|($reading eq "raw")) {
+  if ( $reading eq "raw") {
     return "OWMULTI: $name.V => ".
       $owg_volt;
   } 
@@ -483,14 +513,12 @@ sub OWMULTI_GetValues($@) {
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSMULTI_GetValues($hash);
   }else{
-    Log 3, "OWMULTI: GetValues with wrong IODev type $interface";
-    return 1;
+    return "OWMULTI: GetValues with wrong IODev type $interface";
   }
 
   #-- process results
   if( defined($ret)  ){
-    Log 3, "OWMULTI: Could not get values from device $name, reason $ret";
-    return 1;
+    return "OWMULTI: Could not get values from device $name, reason $ret";
   }
   $hash->{PRESENT} = 1; 
 
@@ -825,10 +853,6 @@ sub OWXMULTI_GetValues($) {
   $owg_volt = ($msb*256+ $lsb)/100;   
     
   return undef;
-    
-  #} else {
-  #  return "OWXMULTI: Unknown device family $hash->{OW_FAMILY}\n";
-  #}
 }
 
 #######################################################################################
@@ -886,8 +910,8 @@ sub OWXMULTI_SetValues($@) {
         <p>FHEM module to commmunicate with 1-Wire multi-sensors, currently the DS2438 smart battery
             monitor<br /> <br />This 1-Wire module works with the OWX interface module or with the OWServer interface module
                 (prerequisite: Add this module's name to the list of clients in OWServer).
-            Please define an <a href="#OWX">OWX</a> device or <a href="#OWServer">OWServer</a> device first. <br/></p>
-        <br /><h4>Example</h4>
+            Please define an <a href="#OWX">OWX</a> device or <a href="#OWServer">OWServer</a> device first.</p>
+       <h4>Example</h4>
         <p>
             <code>define OWX_M OWMULTI 7C5034010000 45</code>
             <br />
@@ -896,14 +920,13 @@ sub OWXMULTI_SetValues($@) {
             <code>attr OWX_M VUnit percent|%</code>
             <br />
             <code>attr OWX_M VFunction (161.29 * V / VDD - 25.8065)/(1.0546 - 0.00216 * T)</code>
-            <br />
-        </p><br />
+        </p>
         <a name="OWMULTIdefine"></a>
         <h4>Define</h4>
         <p>
             <code>define &lt;name&gt; OWMULTI [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code> or <br/>
             <code>define &lt;name&gt; OWMULTI &lt;fam&gt;.&lt;id&gt; [&lt;interval&gt;]</code> 
-            <br /><br /> Define a 1-Wire multi-sensor<br /><br /></p>
+            <br /><br /> Define a 1-Wire multi-sensor</p>
         <ul>
             <li>
                 <code>[&lt;model&gt;]</code><br /> Defines the sensor model (and thus 1-Wire family
@@ -925,7 +948,6 @@ sub OWXMULTI_SetValues($@) {
                 <code>&lt;interval&gt;</code>
                 <br />Measurement interval in seconds. The default is 300 seconds. </li>
         </ul>
-        <br />
         <a name="OWMULTIset"></a>
         <h4>Set</h4>
         <ul>
@@ -933,7 +955,6 @@ sub OWXMULTI_SetValues($@) {
                     <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
                 interval in seconds. The default is 300 seconds. </li>
         </ul>
-        <br />
         <a name="OWMULTIget"></a>
         <h4>Get</h4>
         <ul>
@@ -948,7 +969,9 @@ sub OWXMULTI_SetValues($@) {
                     <code>get &lt;name&gt; interval</code></a><br />Returns measurement interval in
                 seconds. </li>
             <li><a name="owmulti_reading">
-                    <code>get &lt;name&gt; reading</code></a><br />Obtain the measurement value from
+                    <code>get &lt;name&gt; reading</code></a><br />Obtain the measurement values </li>
+            <li><a name="owmulti_vad">
+                    <code>get &lt;name&gt; VAD</code></a><br />Obtain the measurement value from
                 VFunction. </li>
             <li><a name="owmulti_temperature">
                     <code>get &lt;name&gt; temperature</code></a><br />Obtain the temperature value. </li>
@@ -958,7 +981,6 @@ sub OWXMULTI_SetValues($@) {
                     <code>get &lt;name&gt; V</code> or <code>get &lt;name&gt;
                 raw</code></a><br />Obtain the raw external voltage measurement. </li>
         </ul>
-        <br />
         <a name="OWMULTIattr"></a>
         <h4>Attributes</h4>
         <ul>

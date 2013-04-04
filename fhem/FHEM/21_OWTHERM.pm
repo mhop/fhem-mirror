@@ -29,6 +29,7 @@
 # get <name> interval    => query interval
 # get <name> temperature => temperature measurement
 # get <name> alarm       => alarm temperature settings
+# get <name> version     => OWX version number
 #
 # set <name> interval    => set period for measurement
 # set <name> tempLow     => lower alarm temperature setting 
@@ -40,6 +41,9 @@
 # attr <name> stateAH  "<string>"  = character string for denoting high alarm condition, default is up triangle
 # attr <name> tempOffset <float>   = temperature offset in degree Celsius added to the raw temperature reading 
 # attr <name> tempUnit  <string>   = unit of measurement, e.g. Celsius/Kelvin/Fahrenheit or C/K/F, default is Celsius
+# attr <name> tempConv onkick|onread    =  determines, whether a temperature measurement will happen when "kicked" 
+#               through the OWX backend module (all temperature sensors at the same time), or on 
+#               reading the sensor (1 second waiting time). 
 # attr <name> tempLow   <float>    = value for low alarm 
 # attr <name> tempHigh  <float>    = value for high alarm 
 #
@@ -68,6 +72,7 @@ use strict;
 use warnings;
 sub Log($$);
 
+my $owx_version="3.21";
 #-- temperature globals - always the raw values from/for the device
 my $owg_temp     = "";
 my $owg_th       = "";
@@ -82,7 +87,8 @@ my %gets = (
   "present"     => "",
   "interval"    => "",
   "temperature" => "",
-  "alarm"       => ""
+  "alarm"       => "",
+  "version"     => ""
 );
 
 my %sets = (
@@ -122,7 +128,7 @@ sub OWTHERM_Initialize ($) {
   $hash->{AttrList}= "IODev model:DS1820,DS18B20,DS1822 loglevel:0,1,2,3,4,5 ".
                      "stateAL stateAH ".
                      "tempOffset tempUnit:C,Celsius,F,Fahrenheit,K,Kelvin ".
-                     "tempLow tempHigh ".
+                     "tempConv:onkick,onread tempLow tempHigh ".
                      $readingFnAttributes;                
   }
   
@@ -273,6 +279,23 @@ sub OWTHERM_InitializeDevice($) {
   $hash->{ERRCOUNT}                          = 0;
   $hash->{tempf}{offset}                     = $offset;
   $hash->{tempf}{factor}                     = $factor;
+  
+  #-- Check if temperature conversion is consistent
+  if( $interface eq "OWX" ){
+    if( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
+      if( !(defined($attr{$hash->{IODev}->{NAME}}{dokick})) || 
+           ( defined($attr{$hash->{IODev}->{NAME}}{dokick}) && ($attr{$hash->{IODev}->{NAME}}{dokick} eq "0") )){
+        Log 1,"OWTHERM: Attribute tempConv=onkick changed to onread for $name because interface is not kicking";
+        $attr{$name}{tempConv}="onread";
+      }
+    }
+  }elsif( $interface eq "OWServer" ){
+    if( !(defined($attr{$name}{tempConv})) ||
+         (defined($attr{$name}{tempConv}) && ($attr{$name}{tempConv} eq "onread") ) ){
+      Log 1,"OWTHERM: Attribute tempConv=onread changed to onkick for $name because interface is OWFS";
+      $attr{$name}{tempConv}="onread";
+    }
+  }  
   
   #-- Set the attribute values if defined
   if(  defined($attr{$name}{"tempLow"}) ){
@@ -437,10 +460,15 @@ sub OWTHERM_Get($@) {
   } 
   
   #-- get interval
-  if($reading eq "interval") {
+  if($a[1] eq "interval") {
     $value = $hash->{INTERVAL};
      return "$name.interval => $value";
   } 
+  
+  #-- get version
+  if( $a[1] eq "version") {
+    return "$name.version => $owx_version";
+  }
   
   #-- reset presence
   $hash->{PRESENT}  = 0;
@@ -778,9 +806,10 @@ sub OWXTHERM_GetValues($) {
   my $owx_dev = $hash->{ROM_ID};
   #-- hash of the busmaster
   my $master = $hash->{IODev};
+  my $name   = $hash->{NAME};
   
-  #-- check, if the conversion has been called before - only on devices with real power
-  if( defined($attr{$hash->{IODev}->{NAME}}{buspower}) && ( $attr{$hash->{IODev}->{NAME}}{buspower} eq "real") ){
+  #-- check, if the conversion has been called before for all sensors
+  if( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
     $con=0;
   }  
 
@@ -981,7 +1010,9 @@ sub OWXTHERM_SetValues($@) {
         <ul>
             <li><a name="owtherm_interval">
                     <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Temperature
-                measurement intervall in seconds. The default is 300 seconds.</li>
+                readout intervall in seconds. The default is 300 seconds. <b>Attention:</b>This is the 
+                readout interval. Whether an actual temperature measurement is performed, is determined by the
+                tempConv attribute </li>
             <li><a name="owtherm_tempHigh">
                     <code>set &lt;name&gt; tempHigh &lt;float&gt;</code></a>
                 <br /> The high alarm temperature (on the temperature scale chosen by the attribute
@@ -1022,6 +1053,12 @@ sub OWXTHERM_SetValues($@) {
                 </a>
                 <br />character string for denoting high alarm condition, default is upward
                 triangle, e.g. the code &amp;#x25B4; leading to the sign &#x25B4; </li>
+                <li><a name="owtherm_tempConv">
+                    <code>attr &lt;name&gt; tempConv onkick|onread</code>
+                </a>
+                <br /> determines, whether a temperature measurement will happen when "kicked" 
+                through the OWX backend module (all temperature sensors at the same time), or on 
+                reading the sensor (1 second waiting time, default). </li>
             <li><a name="owtherm_tempOffset"><code>attr &lt;name&gt; tempOffset &lt;float&gt;</code>
                 </a>
                 <br />temperature offset in &deg;C added to the raw temperature reading. </li>

@@ -23,6 +23,7 @@
 # get <name> counter  => four values (16 Bit) of the gpio counter
 # get <name> version  => firmware version of the LCD adapter
 # get <name> memory <page> => get one of the internal memory pages 0..6
+# get <name> version  => OWX version number
 #
 # set <name> alert red|yellow|beep|none  => set one of the alert states (gpio pins)
 # set <name> icon <num> on|off|blink  => set one of the icons 0..14
@@ -61,6 +62,7 @@ use strict;
 use warnings;
 sub Log($$);
 
+my $owx_version="3.21";
 #-- controller may be HD44780 or KS0073 
 #   these values have to be changed for different display 
 #   geometries or memory maps
@@ -77,7 +79,7 @@ my %gets = (
   "memory"      => "",
   "gpio"        => "",
   "counter"     => "",
-  "version"     => "",
+  "version"     => ""
   #"register"    => "",
   #"data"        => ""
 );
@@ -253,7 +255,7 @@ sub OWLCD_Get($@) {
   #-- get version
   if($a[1] eq "version") {
     $value = OWXLCD_Get($hash,"version");
-    return "$name.version => $value";
+    return "$name.version => $owx_version (LCD firmware $value)";
   }
   
   #-- get EEPROM content

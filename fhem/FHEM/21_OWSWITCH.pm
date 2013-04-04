@@ -30,6 +30,7 @@
 #            state of 1 = OFF therefore corresponds to an output state of 1 = OFF, but a measured
 #            state of 0 = ON can also be due to an external shortening of the output.
 # get <name> gpio  => values for channels
+# get <name> version  => OWX version number
 #
 # set <name> interval => set period for measurement
 # set <name> output <channel-name>  on|off|on-for-timer <int>|on-for-timer <int>
@@ -74,9 +75,11 @@ use strict;
 use warnings;
 sub Log($$);
 
-#-- channel name - fixed is the first array, variable the second 
-my @owg_fixed  = ("A","B","C","D","E","F","G","H");
-my @owg_channel;
+my $owx_version="3.21";
+#-- fixed raw channel name, flexible channel name
+my @owg_fixed   = ("A","B","C","D","E","F","G","H");
+my @owg_channel = ("A","B","C","D","E","F","G","H");
+
 #-- channel values - always the raw input resp. output values from the device
 my @owg_val;
 my @owg_vax;
@@ -86,7 +89,8 @@ my %gets = (
   "present"     => "",
   "interval"    => "",
   "input"       => "",
-  "gpio"        => ""
+  "gpio"        => "",
+  "version"     => ""
 );
 
 my %sets = (
@@ -133,7 +137,7 @@ sub OWSWITCH_Initialize ($) {
     "stateS ".
     $readingFnAttributes;
  
-  #-- correct list of attributes
+  #-- initial list of attributes
   for( my $i=0;$i<8;$i++ ){
     $attlist .= " ".$owg_fixed[$i]."Name";
     $attlist .= " ".$owg_fixed[$i]."Unit";
@@ -185,15 +189,12 @@ sub OWSWITCH_Define ($$) {
     if(int(@a)>=4) { $interval = $a[3]; }
     if( $fam eq "3A" ){
       $model = "DS2413";
-      @owg_fixed = ("A","B");
       CommandAttr (undef,"$name model DS2413"); 
     }elsif( $fam eq "12" ){
       $model = "DS2406";
-      @owg_fixed = ("A","B");
       CommandAttr (undef,"$name model DS2406"); 
     }elsif( $fam eq "29" ){
       $model = "DS2408";
-      @owg_fixed = ("A","B","C","D","E","F","G","H");
       CommandAttr (undef,"$name model DS2408"); 
     }else{
       return "OWSWITCH: Wrong 1-Wire device family $fam";
@@ -205,15 +206,12 @@ sub OWSWITCH_Define ($$) {
     if(int(@a)>=5) { $interval = $a[4]; }
     if( $model eq "DS2413" ){
       $fam = "3A";
-      @owg_fixed = ("A","B");
       CommandAttr (undef,"$name model DS2413"); 
     }elsif( $model eq "DS2406" ){
       $fam = "12";
-      @owg_fixed = ("A","B");
       CommandAttr (undef,"$name model DS2406"); 
     }elsif( $model eq "DS2408" ){
       $fam = "29";
-      @owg_fixed = ("A","B","C","D","E","F","G","H");
       CommandAttr (undef,"$name model DS2408"); 
     }else{
       return "OWSWITCH: Wrong 1-Wire device model $model";
@@ -221,7 +219,7 @@ sub OWSWITCH_Define ($$) {
   } else {    
     return "OWSWITCH: $a[0] ID $a[2] invalid, specify a 12 or 2.12 digit value";
   }
-
+ 
   #--   determine CRC Code - only if this is a direct interface
   $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
   
@@ -244,17 +242,55 @@ sub OWSWITCH_Define ($$) {
   #--
   readingsSingleUpdate($hash,"state","defined",1);
   Log 3, "OWSWITCH: Device $name defined."; 
-
-  #-- Initialization reading according to interface type
-  my $interface= $hash->{IODev}->{TYPE};
- 
-  #-- Start timer for initialization in a few seconds
-  InternalTimer(time()+10, "OWSWITCH_InitializeDevice", $hash, 0);
   
   #-- Start timer for updates
-  InternalTimer(time()+10+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 0);
+  InternalTimer(time()+10, "OWSWITCH_GetValues", $hash, 0);
 
   return undef; 
+}
+
+########################################################################################
+#
+# OWSWITCH_ChannelNames - find the real channel names  
+#
+#  Parameter hash = hash of device addressed
+#
+########################################################################################
+
+sub OWSWITCH_ChannelNames($) { 
+  my ($hash) = @_;
+ 
+  my $name    = $hash->{NAME}; 
+  my $state   = $hash->{READINGS}{"state"}{VAL};
+ 
+  my ($cname,@cnama,$unit,@unarr);
+
+  for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
+    #-- name
+    $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i]."|onoff";
+    @cnama = split(/\|/,$cname);
+    if( int(@cnama)!=2){
+      Log 1, "OWSWITCH: Incomplete channel name specification $cname. Better use $cname|<type of data>"
+        if( $state eq "defined");
+      push(@cnama,"unknown");
+    }
+    #-- put into readings 
+    $owg_channel[$i] = $cnama[0]; 
+    $hash->{READINGS}{$owg_channel[$i]}{TYPE}     = $cnama[1];  
+ 
+    #-- unit
+    my $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "ON|OFF";
+    my @unarr= split(/\|/,$unit);
+    if( int(@unarr)!=2 ){
+      Log 1, "OWSWITCH: Wrong channel unit specification $unit, replaced by ON|OFF"
+        if( $state eq "defined");
+      $unit="ON|OFF";
+    }
+
+    #-- put into readings
+    $hash->{READINGS}{$owg_channel[$i]}{UNIT}     = $unit;
+    $hash->{READINGS}{$owg_channel[$i]}{UNITABBR} = $unit;
+  }
 }
 
 ########################################################################################
@@ -266,55 +302,16 @@ sub OWSWITCH_Define ($$) {
 ########################################################################################
 
 sub OWSWITCH_InitializeDevice($) {
+
   my ($hash) = @_;
-  
   my $name   = $hash->{NAME};
-    
-  #-- Set channel names, channel units 
+  
+  #-- Initial readings 
   for( my $i=0;$i<$cnumber{$attr{$name}{"model"}} ;$i++) { 
     #-- Initial readings ERR
     $owg_val[$i]   = 1;
     $owg_vax[$i]   = 0;
-    #-- name
-    my $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i]."|onoff";
-    my @cnama = split(/\|/,$cname);
-    if( int(@cnama)!=2){
-      Log 1, "OWSWITCH: Incomplete channel name specification $cname. Better use $cname|<type of data>";
-      push(@cnama,"unknown");
-    }
- 
-    #-- unit
-    my $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "ON|OFF";
-    my @unarr= split(/\|/,$unit);
-    if( int(@unarr)!=2 ){
-      Log 1, "OWSWITCH: Wrong channel unit specification $unit, replaced by ON|OFF";
-      $unit="ON|OFF";
-    }
-
-    #-- put into readings
-    $owg_channel[$i] = $cnama[0];  
-    $hash->{READINGS}{"$owg_channel[$i]"}{TYPE}     = $cnama[1];  
-    $hash->{READINGS}{"$owg_channel[$i]"}{UNIT}     = $unit;
-    $hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR} = $unit;
   }
-  
-  #-- set status according to interface type
-  my $interface= $hash->{IODev}->{TYPE};
-  
-  #-- OWX interface
-  if( !defined($interface) ){
-    return "OWSWITCH: Interface missing";
-  } elsif( $interface eq "OWX" ){
-  #-- OWFS interface
-  #}elsif( $interface eq "OWFS" ){
-  #  $ret = OWFSAD_GetPage($hash,"reading");
-  #-- Unknown interface
-  }else{
-    return "OWSWITCH: InitializeDevice with wrong IODev type $interface";
-  }
-
-  #-- Initialize all the display stuff  
-  OWSWITCH_FormatValues($hash);
 }
 
 ########################################################################################
@@ -329,20 +326,24 @@ sub OWSWITCH_FormatValues($) {
   my ($hash) = @_;
   
   my $name    = $hash->{NAME}; 
-  my ($offset,$factor,$vval,$vvax,$vstr,$cname,$unit,@unarr,@cnama,$valid);
+  my ($offset,$factor,$vval,$vvax,$vstr,@unarr,$valid);
   my $svalue  = ""; 
   
   #-- external shortening signature
   my $sname = defined($attr{$name}{"stateS"})  ? $attr{$name}{"stateS"} : "&#x2607;";  
+  
+  #-- obtain channel names
+  OWSWITCH_ChannelNames($hash);
+  
+  #-- check if device needs to be initialized
+  OWSWITCH_InitializeDevice($hash)
+    if( $hash->{READINGS}{"state"}{VAL} eq "defined"); 
   
   #-- put into READINGS
   readingsBeginUpdate($hash);
 
   #-- formats for output
   for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
-    $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i];  
-    @cnama = split(/\|/,$cname);
-    $owg_channel[$i]=$cnama[0];
     
     #-- input state is 0 = ON or 1 = OFF
     $vval    = $owg_val[$i];
@@ -350,8 +351,7 @@ sub OWSWITCH_FormatValues($) {
     $vvax    = $owg_vax[$i];
  
     #-- string buildup for return value and STATE
-    $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "ON|OFF";
-    @unarr= split(/\|/,$unit);
+    @unarr= split(/\|/,$hash->{READINGS}{$owg_channel[$i]}{UNIT});
     $vstr    = $unarr[$vval];
     
     #-- put into readings only when valid
@@ -359,7 +359,7 @@ sub OWSWITCH_FormatValues($) {
       $vstr ="???"
     }else{
       $vstr.= $sname if( ($vval == 0) && ($vvax == 1) );
-      readingsBulkUpdate($hash,"$owg_channel[$i]",$vstr);
+      readingsBulkUpdate($hash,$owg_channel[$i],$vstr);
     } 
     $svalue .= sprintf( "%s: %s" , $owg_channel[$i], $vstr);
 
@@ -367,7 +367,6 @@ sub OWSWITCH_FormatValues($) {
     if( $i<($cnumber{$attr{$name}{"model"}}-1) ){
       $svalue .= " ";
     }
-    
   }
   
   #-- STATE
@@ -393,9 +392,7 @@ sub OWSWITCH_Get($@) {
   my $model   = $hash->{OW_MODEL};
   my ($value,$value2,$value3)   = (undef,undef,undef);
   my $ret     = "";
-  my $offset;
-  my $factor;
-  my $page;
+  my ($offset,$factor,$page,$cname,@cnama,@channel);
 
   #-- check syntax
   return "OWSWITCH: Get argument is missing @a"
@@ -426,14 +423,21 @@ sub OWSWITCH_Get($@) {
      return "$name.interval => $value";
   } 
   
+  #-- get version
+  if( $a[1] eq "version") {
+    return "$name.version => $owx_version";
+  }
+  
   #-- reset presence
   $hash->{PRESENT}  = 0;
+  
+  #-- get channel names
+  OWSWITCH_ChannelNames($hash);
   
   #-- get values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
 
   #-- get single state
-  # TODO: WAS passiert, wenn channel name noch falsch ist ?
   if( $reading eq "input" ){
     return "OWSWITCH: get needs parameter when reading input: <channel>"
       if( int(@a)<2 );
@@ -451,17 +455,16 @@ sub OWSWITCH_Get($@) {
     if( $interface eq "OWX" ){
       $ret = OWXSWITCH_GetState($hash);
     #-- OWFS interface
-    #}elsif( $interface eq "OWFS" ){
-    #  $ret = OWFSSWITCH_GetPage($hash,"reading");
+    }elsif( $interface eq "OWFS" ){
+      $ret = OWFSSWITCH_GetState($hash);
     #-- Unknown interface
     }else{
       return "OWSWITCH: Get with wrong IODev type $interface";
     }
     #-- process results
     OWSWITCH_FormatValues($hash);  
-    my @states = split(/,/,$hash->{STATE});
-    
-    return $a[2]." = ".$states[$fnd]; 
+    $hash->{PRESENT} = 1; 
+    return $name.".".$a[2]." => ".$hash->{READINGS}{$owg_channel[$fnd]}{VAL};
     
   #-- get all states
   }elsif( $reading eq "gpio" ){
@@ -475,14 +478,13 @@ sub OWSWITCH_Get($@) {
     }else{
       return "OWSWITCH: Get with wrong IODev type $interface";
     }
+    #-- process results
+    if( defined($ret)  ){
+      return "OWSWITCH: Could not get values from device $name, reason $ret";
+    }
+    $hash->{PRESENT} = 1; 
+    return "OWSWITCH: $name.$reading => ".OWSWITCH_FormatValues($hash);  
   }
-  #-- process results
-  if( defined($ret)  ){
-    return "OWSWITCH: Could not get values from device $name, reason $ret";
-  }
-  $hash->{PRESENT} = 1; 
-  return "OWSWITCH: $name.$reading => ".OWSWITCH_FormatValues($hash);  
- 
 }
 
 #######################################################################################
@@ -558,6 +560,11 @@ sub OWSWITCH_Set($@) {
   my $key     = $a[1];
   my $value   = $a[2];
   
+  my $name    = $hash->{NAME};
+  my $model   = $hash->{OW_MODEL};
+  
+  my ($ret,$cname,@cnama,@channel);
+  
   #-- for the selector: which values are possible
   if (@a == 2){
     my $newkeys = join(" ", sort keys %sets);
@@ -569,20 +576,12 @@ sub OWSWITCH_Set($@) {
         return "OWSWITCH: Set with unknown argument $a[1]";
   }
   
-  #-- define vars
-  my $ret     = undef;
-  my $channel = undef;
-  my $channo  = undef;
-  my $condx;
-  my $name    = $hash->{NAME};
-  my $model   = $hash->{OW_MODEL};
-  
   #-- reset the device
   if($key eq "init") {
-    return "OWCOUNT: init needs parameter 'yes'"
+    return "OWSWITCH: init needs parameter 'yes'"
       if($value ne "yes");
     OWSWITCH_InitializeDevice($hash);
-    return "OWCOUNT: Re-initialized device";
+    return "OWSWITCH: Re-initialized device $name";
   }
  
   #-- set new timer interval
@@ -596,18 +595,21 @@ sub OWSWITCH_Set($@) {
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 1);
     return undef;
   }
+    
+  #-- obtain channel names
+  OWSWITCH_ChannelNames($hash);
    
   #-- Set readings according to interface type
   my $interface= $hash->{IODev}->{TYPE};
   
   #-- set single state
-  # TODO: WAS passiert, wenn channel name noch falsch ist ?
   if( $key eq "output" ){
     return "OWSWITCH: get needs parameter when writing output: <channel>"
       if( int(@a)<2 );
     #-- find out which channel we have
     my $fnd=undef;
     for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
+      Log 1," testing $a[2] against $owg_channel[$i] and $owg_fixed[$i]";
       if( ($a[2] eq $owg_channel[$i]) || ($a[2] eq $owg_fixed[$i]) ){
         $fnd=$i;
         last;
@@ -724,8 +726,6 @@ sub OWSWITCH_Undef ($) {
 #
 # Prefix = OWFSSWITCH
 #
-########################################################################################
-
 ########################################################################################
 #
 # OWFSSWITCH_GetState - Get gpio ports from device
@@ -1103,23 +1103,21 @@ sub OWXSWITCH_SetState($$) {
         <p>FHEM module to commmunicate with 1-Wire Programmable Switches <br />
          <br />This 1-Wire module works with the OWX interface module or with the OWServer interface module
              (prerequisite: Add this module's name to the list of clients in OWServer).
-            Please define an <a href="#OWX">OWX</a> device or <a href="#OWServer">OWServer</a> device first. <br /></p>
-        <br /><h4>Example</h4>
+            Please define an <a href="#OWX">OWX</a> device or <a href="#OWServer">OWServer</a> device first.</p>
+        <h4>Example</h4>
         <p>
             <code>define OWX_S OWSWITCH DS2413 B5D502000000 60</code>
             <br />
             <code>attr OWX_S AName Lampe|light</code>
             <br />
             <code>attr OWX_S AUnit AN|AUS</code>
-            <br />
         </p>
-        <br />
         <a name="OWSWITCHdefine"></a>
         <h4>Define</h4>
         <p>
             <code>define &lt;name&gt; OWSWITCH [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code> or <br/>
             <code>define &lt;name&gt; OWSWITCH &lt;fam&gt;.&lt;id&gt; [&lt;interval&gt;]</code> 
-            <br /><br /> Define a 1-Wire switch.<br /><br /></p>
+            <br /><br /> Define a 1-Wire switch.<br /><br />
         <ul>
             <li>
                 <code>[&lt;model&gt;]</code><br /> Defines the switch model (and thus 1-Wire family
@@ -1162,7 +1160,6 @@ sub OWXSWITCH_SetState($$) {
             <li><a name="owswitch_init">
                     <code>set &lt;name&gt; init yes</code></a><br /> Re-initialize the device</li>
         </ul>
-        <br />
         <a name="OWSWITCHget"></a>
         <h4>Get</h4>
         <ul>
@@ -1186,7 +1183,6 @@ sub OWXSWITCH_SetState($$) {
             <li><a name="owswitch_gpio">
                     <code>get &lt;name&gt; gpio</code></a><br />Obtain state of all channels</li>
         </ul>
-        <br />
         <a name="OWSWITCHattr"></a>
         <h4>Attributes</h4> For each of the following attributes, the channel identification A,B,...
         may be used. <ul>
