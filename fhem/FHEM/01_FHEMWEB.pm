@@ -2156,7 +2156,7 @@ FW_showWeblink($$$$)
         FW_pO "<img src=\"$arg\"/>";
       }
 
-      FW_showWeblinkDetail($d);
+      FW_showWeblinkDetail($d) if(!$FW_hiddenroom{detail});
 
     }
   }
