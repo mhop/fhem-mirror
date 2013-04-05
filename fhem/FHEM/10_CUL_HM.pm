@@ -115,7 +115,7 @@ sub CUL_HM_autoReadConfig($){
   while(@{$modules{CUL_HM}{helper}{updtCfgLst}}){
     my $name = shift(@{$modules{CUL_HM}{helper}{updtCfgLst}});
     my $hash = CUL_HM_name2Hash($name);
-	if (0 != substr(AttrVal($name,"autoReadReg","0"),0,1)){
+	if (0 != substr(CUL_HM_Get($hash,$name,"param","autoReadReg"),0,1)){
 	  CUL_HM_Set($hash,$name,"getSerial");
 	  CUL_HM_Set($hash,$name,"getConfig");
 	  CUL_HM_Set($hash,$name,"statusRequest");
@@ -1527,6 +1527,7 @@ sub CUL_HM_queueAutoRead($){
   my @arr;
   @arr = CUL_HM_noDup((@{$modules{CUL_HM}{helper}{updtCfgLst}}, $name));
   $modules{CUL_HM}{helper}{updtCfgLst} =\@arr;
+  Log 1,"General queued $name :".join "-",$modules{CUL_HM}{helper}{updtCfgLst};
   RemoveInternalTimer("updateConfig");
   InternalTimer(gettimeofday()+5,"CUL_HM_autoReadConfig", "updateConfig", 0);
 }
@@ -2004,7 +2005,7 @@ sub CUL_HM_Set($@) {
 	  $rName =~ s/_chn:.*//;
 	  my $curVal = CUL_HM_getRegFromStore($rName,
 	                                      $addr,$list,$peerId.$peerChn);
-	  return "cannot read current value for Bitfield - retrieve Data first" 
+	  return "cannot calculate value. Please issue set $name getConfig first" 
 	             if (!$curVal ||$curVal eq "invalid");
 	  $curVal =~ s/set_//; # set is not relevant, we take it as given
 	  $data = ($curVal & (~($mask<<$bit)))|($data<<$bit);

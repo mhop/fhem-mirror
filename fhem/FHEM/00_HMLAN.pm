@@ -250,7 +250,7 @@ sub HMLAN_Parse($$) {##########################################################
     my $srcId = (length($mFld[5])>11)?$src:"lastRec";
     $hash->{helper}{nextSend}{$srcId} = gettimeofday() + 0.100;
     if ($debug){
-      Log $ll5, 'HMLAN_Pars1: '.$name.' S:'.$mFld[0]
+      Log $ll5, 'HMLAN_Parse: '.$name.' S:'.$mFld[0]
 	                               .(($mFld[0] =~ m/^E/)?'  ':'')
 	                               .' stat:'.$mFld[1]
 	                               .' t:'.$mFld[2].' d:'.$mFld[3]
