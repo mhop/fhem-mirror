@@ -95,7 +95,7 @@ energy_Define($$)
  $hash->{Interval} = int(@args) >= 5 ? int($args[4]) : 300;
  $hash->{Timeout}  = int(@args) >= 6 ? int($args[5]) : 4;
 
- Log 3, "$hash->{NAME} will read from SML at $hash->{Host}:$hash->{Port} " ;
+ Log 4, "$hash->{NAME} will read from SML at $hash->{Host}:$hash->{Port} " ;
  $hash->{Invalid}    = -1;    # default value for invalid readings
  $hash->{Rereads}    =  2;    # number of retries when reading curPwr of 0
  $hash->{UseSVTime}  = '';    # use the SV time as timestamp (else: TimeNow())
@@ -176,15 +176,18 @@ if (defined ($socket) and $socket and $socket->connected())
 
 	@array = split(/\n/,$message);
 	foreach (@array){
- 	    if ( $_ =~ /<v>(.*)<\/v>/ )
-  	    {
-  		Log 5, "$hash->{NAME} got fresh values from $ip ($1)";
-      		$last = $1;
-      		$counts++ ;
-      		$summary += $1;
-		if ($last < $min) {$min = $last};
+ 	    if ( $_ =~ /<v>(.*)<\/v>/ ){
+			Log 5, "$hash->{NAME} got fresh values from $ip ($1)";
+			if ( $1 eq "NaN" ){
+				Log 5, "$hash->{NAME} NaN fehler ($1) summary: $summary";
+			}else{
+				$last = $1;
+				$counts++ ;
+				$summary += $1;
+				if ($last < $min) {$min = $last};
                 if ($last > $max) {$max = $last};
-            }
+			}
+        }
  	    if ( $_ =~ /<error>(.*)<\/error>/ )
   	    {
       		if ( $1 eq "true" )
@@ -290,7 +293,7 @@ if ( $success == 0 and $summary > 0 and $counts > 0)
      }
      push @{$hash->{CHANGED}}, $log;
      DoTrigger($hash->{NAME}, undef) if ($init_done);
-     Log 3, "$hash->{NAME} write log file: $log";
+     Log 4, "$hash->{NAME} write log file: $log";
 }else{
      Log 3, "$hash->{NAME} can't update - device send a error";
 }
