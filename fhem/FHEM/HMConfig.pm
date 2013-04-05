@@ -553,7 +553,6 @@ my %culHmRegModel = (
  
   "HM-LC-Bl1PBU-FM" =>{transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,localResDis     =>1,},
 
-  "HM-LC-Dim1L-P"   =>{loadAppearBehav =>1,loadErrCalib	   =>1},
   "HM-LC-Dim1L-Pl-2"=>{confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib	   =>1,
                       },
   "HM-LC-Dim1L-CV"  =>{confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib	   =>1,
@@ -578,6 +577,9 @@ my %culHmRegModel = (
 		               DimElsActionType=>1,
 		               DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1,
 		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1,			
+                      },
+  "HM-LC-Dim1T-Pl-2"=>{confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,
+                       fuseDelay	   =>1,
                       },
   "HM-LC-Dim1TPBU-FM"=>{                   ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,
                        fuseDelay	   =>1,
@@ -643,17 +645,15 @@ $culHmRegModel{"HM-RC-12-SW"}      = $culHmRegModel{"HM-RC-12"};
 $culHmRegModel{"HM-RC-19-B"}       = $culHmRegModel{"HM-RC-19"};
 $culHmRegModel{"HM-RC-19-SW"}      = $culHmRegModel{"HM-RC-19"};
 
-$culHmRegModel{"HM-LC-Dim1L-CV"}   = $culHmRegModel{"HM-LC-Dim1L-P"};
-$culHmRegModel{"HM-LC-Dim1L-SM"}   = $culHmRegModel{"HM-LC-Dim1L-P"};
+$culHmRegModel{"HM-LC-Dim1L-Pl"}   = $culHmRegModel{"HM-LC-Dim1L-CV"};
+$culHmRegModel{"HM-LC-Dim2L-SM"}   = $culHmRegModel{"HM-LC-Dim1L-CV"};
 $culHmRegModel{"HM-LC-Dim2L-CV"}   = $culHmRegModel{"HM-LC-Dim1L-Pl-2"};
 $culHmRegModel{"Schueco-263-132"}  = $culHmRegModel{"HM-LC-Dim1L-Pl-2"};
-$culHmRegModel{"HM-LC-Dim2L-SM"}   = $culHmRegModel{"HM-LC-Dim1L-CV"};
-$culHmRegModel{"HM-LC-Dim1L-Pl"}   = $culHmRegModel{"HM-LC-Dim1L-CV"};
 $culHmRegModel{"HM-LC-Dim1T-CV"}   = $culHmRegModel{"HM-LC-Dim1T-Pl"};
-$culHmRegModel{"HM-LC-Dim1T-Pl-2"} = $culHmRegModel{"HM-LC-Dim1T-Pl"};
 $culHmRegModel{"HM-LC-Dim1T-FM"}   = $culHmRegModel{"HM-LC-Dim1T-Pl"};
 $culHmRegModel{"HM-LC-Dim2T-SM"}   = $culHmRegModel{"HM-LC-Dim1T-Pl"};
-$culHmRegModel{"Schueco-263-134"}  = $culHmRegModel{"HM-LC-Dim1T-Pl"};
+$culHmRegModel{"Schueco-263-133"}  = $culHmRegModel{"HM-LC-Dim1TPBU-FM"};
+$culHmRegModel{"Schueco-263-134"}  = $culHmRegModel{"HM-LC-Dim1T-Pl-2"};
 
 $culHmRegModel{"ASH550I"}           = $culHmRegModel{"HM-WDS10-TH-O"};
 $culHmRegModel{"ASH550"}            = $culHmRegModel{"HM-WDS10-TH-O"};
