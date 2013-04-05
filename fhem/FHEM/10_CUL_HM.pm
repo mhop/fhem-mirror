@@ -33,7 +33,6 @@ my %culHmBits             =HMConfig::HMConfig_getHash("culHmBits");
 my @culHmCmdFlags         =HMConfig::HMConfig_getHash("culHmCmdFlags");
 my $K_actDetID            =HMConfig::HMConfig_getHash("K_actDetID");
 
-
 ############################################################
 
 sub CUL_HM_Initialize($);
@@ -553,7 +552,6 @@ sub CUL_HM_Parse($$) {##############################
 	      ($msgType eq '10' &&$sType eq '06')){    # infoStatus
 	  $chn = substr($p,2,2); 
 
-
 	  my $temp = substr($p,4,2);
 	  my $dTemp =  ($temp eq '00')?'off':
 	              (($temp eq 'C8')?'on' :
@@ -561,12 +559,12 @@ sub CUL_HM_Parse($$) {##############################
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
 	  if($chnHash){
 	    my $chnName = $chnHash->{NAME};
-        my $mode = ReadingsVal($chnName,"R-MdTempReg","");	
+        my $mode = ReadingsVal($chnName,"R-controlMode","");	
 	    push @entities,CUL_HM_UpdtReadSingle($chnHash,"desired-temp",$dTemp,1);
-	    CUL_HM_UpdtReadSingle($chnHash,"desired-temp-manu",$dTemp,1) if($mode eq 'manual '  && $msgType eq '10');
-#	    readingsSingleUpdate($chnHash,"desired-temp-cent",$dTemp,1) if($mode eq 'central ' && $msgType eq '02');
+	    CUL_HM_UpdtReadSingle($chnHash,"desired-temp-manu",$dTemp,1) if($mode =~ m /manual/  && $msgType eq '10');
+#	    readingsSingleUpdate($chnHash,"desired-temp-cent",$dTemp,1) if($mode =~ m /central/ && $msgType eq '02');
 #		removed - shall not be changed automatically - change is  only temporary
-#       CUL_HM_Set($chnHash,$chnName,"desired-temp",$dTemp)         if($mode eq 'central ' && $msgType eq '10');
+#       CUL_HM_Set($chnHash,$chnName,"desired-temp",$dTemp)         if($mode =~ m /central/ && $msgType eq '10');
        }
       push @event, "desired-temp:" .$dTemp;
     }
@@ -644,11 +642,11 @@ sub CUL_HM_Parse($$) {##############################
           my $dTemp;
 	      if($chnHash){
 	        my $chnName = $chnHash->{NAME};
-            my $mode = ReadingsVal($chnName,"R-MdTempReg","");	
+            my $mode = ReadingsVal($chnName,"R-controlMode","");	
             $dTemp = ReadingsVal($chnName,"desired-temp","21.0");
 		    if (!$chnHash->{helper}{oldMode} || $chnHash->{helper}{oldMode} ne $mode){
-		      $dTemp = ReadingsVal($chnName,"desired-temp-manu",$dTemp)if ($mode eq 'manual ');
-		      $dTemp = ReadingsVal($chnName,"desired-temp-cent",$dTemp)if ($mode eq 'central ');
+		      $dTemp = ReadingsVal($chnName,"desired-temp-manu",$dTemp)if ($mode =~ m /manual/);
+		      $dTemp = ReadingsVal($chnName,"desired-temp-cent",$dTemp)if ($mode =~ m /central/);
 		      $chnHash->{helper}{oldMode} = $mode;
 		    }
 			push @entities,CUL_HM_UpdtReadSingle($chnHash,"desired-temp",$dTemp,1);
@@ -1527,7 +1525,6 @@ sub CUL_HM_queueAutoRead($){
   my @arr;
   @arr = CUL_HM_noDup((@{$modules{CUL_HM}{helper}{updtCfgLst}}, $name));
   $modules{CUL_HM}{helper}{updtCfgLst} =\@arr;
-  Log 1,"General queued $name :".join "-",$modules{CUL_HM}{helper}{updtCfgLst};
   RemoveInternalTimer("updateConfig");
   InternalTimer(gettimeofday()+5,"CUL_HM_autoReadConfig", "updateConfig", 0);
 }
@@ -2284,10 +2281,10 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'0202'.
 	                                                   CUL_HM_convTemp($a[2]));
     my $chnHash = CUL_HM_id2Hash($dst."02");
-	my $mode = ReadingsVal($chnHash->{NAME},"R-MdTempReg","");
+	my $mode = ReadingsVal($chnHash->{NAME},"R-controlMode","");
 	$mode =~ s/set_//;#consider set as given
 	readingsSingleUpdate($chnHash,"desired-temp-cent",$a[2],1) 
-	      if($mode eq 'central ');
+	      if($mode =~ m/central/);
   } 
   elsif($cmd =~ m/^tempList(...)/) { ###################################### reg
     my %day2off = ( "Sat"=>"5 0B", "Sun"=>"5 3B", "Mon"=>"5 6B",
