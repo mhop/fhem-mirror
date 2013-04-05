@@ -334,14 +334,14 @@ TRX_LIGHT_Set($@)
 	my $bindata;
 	my $hexdata;
 
-	if ($command =~ /^[0-2]*$/) { # if it is base4 just append it
+	if ($command =~ /^[0-3]*$/) { # if it is base4 just append it
 		$pt2262_cmd = $deviceid.$command;
 	} else {
 		return "-999- set PT2262: cmd=$command name=$name not found";
 	}
 
 
-  	if (uc($pt2262_cmd) =~ /^[0-2][0-2][0-2][0-2][0-2][0-2][0-2][0-2][0-2][0-2][0-2][0-2]$/ ) {
+  	if (uc($pt2262_cmd) =~ /^[0-3][0-3][0-3][0-3][0-3][0-3][0-3][0-3][0-3][0-3][0-3][0-3]$/ ) {
 
 		$base_4 = $pt2262_cmd;
 		# convert base4 to binary:
