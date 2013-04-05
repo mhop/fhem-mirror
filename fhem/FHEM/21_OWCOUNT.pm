@@ -37,6 +37,7 @@
 # Additional attributes are defined in fhem.cfg, in some cases per channel, where <channel>=A,B
 #
 # attr <name> LogM <string> = device name (not file name) of monthly log file
+# attr <name> LogY <string> = device name (not file name) of yearly log file
 # attr <name> <channel>Name <string>|<string> = name for the channel | a type description for the measured value
 # attr <name> <channel>Unit <string>|<string> = unit of measurement for this channel | its abbreviation 
 # attr <name> <channel>Rate <string>|<string> = name for the channel ratw | a type description for the measured value
@@ -136,7 +137,7 @@ sub OWCOUNT_Initialize ($) {
   $hash->{SetFn}   = "OWCOUNT_Set";
   
   #-- see header for attributes
-  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423 loglevel:0,1,2,3,4,5 LogM ".
+  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423 loglevel:0,1,2,3,4,5 LogM LogY ".
                 $readingFnAttributes;
   for( my $i=0;$i<int(@owg_fixed);$i++ ){
     $attlist .= " ".$owg_fixed[$i]."Name";
@@ -501,11 +502,19 @@ sub OWCOUNT_FormatValues($) {
   
   #-- daybreak postprocessing
   if( $daybreak == 1 ){
-    my $total;
+    my ($total,$total0,$total1);
     #-- daily/monthly accumulated value
     my @monthv = OWCOUNT_GetMonth($hash);
-    my $total0 = @monthv[0]->[1];
-    my $total1 = @monthv[1]->[1];
+    #-- error check
+    if( int(@monthv) == 2 ){
+      $total0 = @monthv[0]->[1];
+      $total1 = @monthv[1]->[1];
+    }else{
+      Log 1,"OWCOUNT: no monthly summary possible, ".@monthv[0];
+      $total0 = "";
+      $total1 = "";
+    };
+    #-- todo: put current monthly value also in day-end logging
     $dvalue    = sprintf("D%02d ",$day).$dvalue;
     readingsBulkUpdate($hash,"day",$dvalue);
     if( $monthbreak == 1){
@@ -586,8 +595,8 @@ sub OWCOUNT_Get($@) {
     $value="$name.month =>\n";
     my @month2 = OWCOUNT_GetMonth($hash);
     #-- error case
-    if( int(@month2) == 1 ){
-      return $month2[0];
+    if( int(@month2) != 2 ){
+      return $value." no monthly summary possible, ".$month2[0];
     }
     #-- 3 entries for each day
     for(my $i=0;$i<int(@month2);$i++){
@@ -721,8 +730,7 @@ sub OWCOUNT_GetMonth($) {
   #-- Check current logfile 
   my $ln = $attr{$name}{"LogM"};
   if( !(defined($ln))){
-    Log 1,"OWCOUNT_GetMonth: Attribute LogM is missing";
-    return undef;
+    return "attribute LogM is missing";
   }
   
   #-- get channel names 
@@ -1324,6 +1332,9 @@ sub OWXCOUNT_SetPage($$$) {
             <li><a name="owcount_logm"><code>attr &lt;name&gt; LogM
                         &lt;string&gt;|</code></a>
                 <br />device name (not file name) of monthly log file.</li>
+                 <li><a name="owcount_logy"><code>attr &lt;name&gt; LogY
+                        &lt;string&gt;|</code></a>
+                <br />device name (not file name) of yearly log file.</li>
         </ul>
         <p>For each of the following attributes, the channel identification A,B may be used.</p>
         <ul>
