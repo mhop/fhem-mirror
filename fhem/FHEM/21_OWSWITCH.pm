@@ -75,7 +75,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.21";
+my $owx_version="3.23";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -609,7 +609,6 @@ sub OWSWITCH_Set($@) {
     #-- find out which channel we have
     my $fnd=undef;
     for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
-      Log 1," testing $a[2] against $owg_channel[$i] and $owg_fixed[$i]";
       if( ($a[2] eq $owg_channel[$i]) || ($a[2] eq $owg_fixed[$i]) ){
         $fnd=$i;
         last;
