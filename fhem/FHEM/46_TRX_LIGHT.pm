@@ -193,6 +193,7 @@ TRX_LIGHT_Set($@)
 
   my $name = $a[0];
   my $command = $a[1];
+  my $command_state = $a[1];
   my $level = 0;
   my $arg3 = "";
 
@@ -325,7 +326,7 @@ TRX_LIGHT_Set($@)
 	if ($command eq "level") {
 		$command .= sprintf " %d", $level;
 	} 
-  	Log 1,"TRX_LIGHT_Set lighting3 name=$name device_type=$device_type, deviceid=$deviceid command=$command" if (1 || $TRX_LIGHT_debug == 1);
+  	Log 1,"TRX_LIGHT_Set lighting3 name=$name device_type=$device_type, deviceid=$deviceid command=$command" if (1 ||$TRX_LIGHT_debug == 1);
   	Log 1,"TRX_LIGHT_Set lighting3 hexline=$hex_prefix$hex_command" if (1 || $TRX_LIGHT_debug == 1);
   } elsif ($protocol_type == 0x13) {
 	# lighting4 (PT2262)
@@ -348,7 +349,7 @@ TRX_LIGHT_Set($@)
 		my %b42b = (0 => "00", 1 => "01", 2 => "10", 3 => "11");
 		($bindata = $base_4) =~ s/(.)/$b42b{lc $1}/g;
 		$hexdata = unpack("H*", pack("B*", $bindata));
-		Log 1,"TRX_LIGHT_Set PT2262: base4='$base_4', binary='$bindata' hex='$hexdata'";
+		Log 1,"TRX_LIGHT_Set PT2262: base4='$base_4', binary='$bindata' hex='$hexdata'" if ($TRX_LIGHT_debug == 1);
 
   	} else {
 		Log 4,"TRX_LIGHT_Set lighting4:PT2262 cmd='$pt2262_cmd' needs to be base4 and has 12 digits (name=$name device_type=$device_type, deviceid=$deviceid)";
@@ -356,8 +357,8 @@ TRX_LIGHT_Set($@)
   	}
   	$hex_prefix = sprintf "0913";
   	$hex_command = sprintf "00%02x%s015E00", $seqnr, $hexdata; 
-  	Log 1,"TRX_LIGHT_Set lighting4:PT2262 name=$name device_type=$device_type, hexdata=$hexdata" if (1 ||$TRX_LIGHT_debug == 1);
-  	Log 1,"TRX_LIGHT_Set lighting4:PT2262 hexline=$hex_prefix$hex_command" if (1 || $TRX_LIGHT_debug == 1);
+  	Log 1,"TRX_LIGHT_Set lighting4:PT2262 name=$name cmd=$command cmd_state=$command_state hexdata=$hexdata" if (1 || $TRX_LIGHT_debug == 1);
+  	Log 1,"TRX_LIGHT_Set lighting4:PT2262 hexline=$hex_prefix$hex_command" if ($TRX_LIGHT_debug == 1);
  } elsif ($protocol_type == 0x14) {
 	# lighting5
   	if (uc($deviceid) =~ /^[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]$/ ) {
@@ -380,10 +381,10 @@ TRX_LIGHT_Set($@)
   IOWrite($hash, $hex_prefix, $hex_command);
 
   my $tn = TimeNow();
-  $hash->{CHANGED}[0] = $command;
-  $hash->{STATE} = $command;
+  $hash->{CHANGED}[0] = $command_state;
+  $hash->{STATE} = $command_state;
   $hash->{READINGS}{state}{TIME} = $tn;
-  $hash->{READINGS}{state}{VAL} = $command;
+  $hash->{READINGS}{state}{VAL} = $command_state;
 
   return $ret;
 }
