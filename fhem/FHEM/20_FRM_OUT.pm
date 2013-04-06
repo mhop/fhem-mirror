@@ -93,7 +93,7 @@ FRM_OUT_Undef($$)
 <h3>FRM_OUT</h3>
 <ul>
   represents a pin of an <a href="http://www.arduino.cc">Arduino</a> running <a href="http://www.firmata.org">Firmata</a>
-  configured for digital input.<br>
+  configured for digital output.<br>
   Requires a defined <a href="#FRM">FRM</a>-device to work.<br><br> 
   
   <a name="FRM_OUTdefine"></a>
