@@ -290,8 +290,7 @@ sub d {
 
   my @c= split("P", $d);
   $sign= -1 if($c[0] eq "-");
-  shift @c if($c[0] =~ m/[\+\-]/);
-  my ($dw,$dt)= split("T", $c[0]);
+  my ($dw,$dt)= split("T", $c[1]);
   $dt="" unless defined($dt);
   if($dw =~ m/(\d+)D$/) {
     $t+= 86400*$1; # days
