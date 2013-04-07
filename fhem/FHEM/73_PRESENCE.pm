@@ -201,6 +201,12 @@ PRESENCE_Undef($$)
 
 
   RemoveInternalTimer($hash);
+  
+  if(defined($hash->{helper}{RUNNING_PID}))
+  {
+    BlockingKill($hash->{helper}{RUNNING_PID});
+  }
+  
   DevIo_CloseDev($hash); 
   return undef;
 }
@@ -410,15 +416,15 @@ sub PRESENCE_StartLocalScan($;$)
 
     if($hash->{MODE} eq "local-bluetooth")
     {
-	BlockingCall("PRESENCE_DoLocalBluetoothScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60);
+	$hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60) unless(exists($hash->{helper}{RUNNING_PID}));
     }
     elsif($hash->{MODE} eq "lan-ping")
     {
-	BlockingCall("PRESENCE_DoLocalPingScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60);
+	$hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60) unless(exists($hash->{helper}{RUNNING_PID}));
     }
     elsif($hash->{MODE} eq "fritzbox")
     {
-	BlockingCall("PRESENCE_DoLocalFritzBoxScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local."|".AttrVal($hash->{NAME}, "fritzbox_repeater", "0"), "PRESENCE_ProcessLocalScan", 60);
+	$hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local."|".AttrVal($hash->{NAME}, "fritzbox_repeater", "0"), "PRESENCE_ProcessLocalScan", 60) unless(exists($hash->{helper}{RUNNING_PID}));
     }
     
 }
@@ -607,13 +613,17 @@ sub
 PRESENCE_ProcessLocalScan($)
 {
  my ($string) = @_;
+ 
+ 
+ return unless(defined($string));
+    
  my @a = split("\\|",$string);
- 
- my $hash = $defs{$a[0]};
- my $local = $a[1];
- 
+ my $hash = $defs{$a[0]}; 
  return if($hash->{helper}{DISABLED});
  
+ 
+ my $local = $a[1];
+
  Log GetLogLevel($hash->{NAME}, 5), "PRESENCE_ProcessLocalScan: $string";
  
  if($hash->{MODE} eq "fritzbox" and defined($a[3]))
@@ -626,6 +636,7 @@ PRESENCE_ProcessLocalScan($)
  }
  
  readingsBeginUpdate($hash);
+ 
  if($a[2] eq "present")
  {
     readingsBulkUpdate($hash, "state", "present");
@@ -640,9 +651,10 @@ PRESENCE_ProcessLocalScan($)
     Log GetLogLevel($hash->{NAME}, 2), "PRESENCE: error while processing device ".$hash->{NAME}." - ".$a[3];
  }
 
-
  readingsEndUpdate($hash, 1);
-
+ 
+ delete($hash->{helper}{RUNNING_PID});
+ 
  #Schedule the next check withing $timeout if it is a regular run
  unless($local)
  {
