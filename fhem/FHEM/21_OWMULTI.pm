@@ -69,7 +69,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.21";
+my $owx_version="3.23";
 #-- temperature and voltage globals - always the raw values from the device
 my $owg_temp;
 my $owg_volt;
@@ -290,26 +290,6 @@ sub OWMULTI_ChannelNames($) {
 
 ########################################################################################
 #
-# OWMULTI_InitializeDevice - delayed setting of initial readings and channel names  
-#
-#  Parameter hash = hash of device addressed
-#
-########################################################################################
-
-sub OWMULTI_InitializeDevice($) {
-  my ($hash) = @_;
-  
-  my $name   = $hash->{NAME};
-  
-  #-- Initial readings
-  $owg_temp = "";
-  $owg_volt = "";
-  $owg_vdd  = "";  
-  
-}
-
-########################################################################################
-#
 # OWMULTI_FormatValues - put together various format strings 
 #
 #  Parameter hash = hash of device addressed, fs = format string
@@ -324,14 +304,10 @@ sub OWMULTI_FormatValues($) {
   my $svalue  = "";
   
   #-- no change in any value if invalid reading
-  return if( ($owg_temp eq "") || ($owg_vdd == 0) );
+  return if( ($owg_temp eq "") || ($owg_vdd eq "") || ($owg_volt eq "") );
   
   #-- obtain channel names
   OWMULTI_ChannelNames($hash);
-  
-  #-- check if device needs to be initialized
-  OWMULTI_InitializeDevice($hash)
-    if( $hash->{READINGS}{"state"}{VAL} eq "defined");
   
   #-- correct values for proper offset, factor 
   $toffset = $hash->{tempf}{offset};
@@ -351,7 +327,7 @@ sub OWMULTI_FormatValues($) {
   #Log 1, "vfunc= ".$vfunc;
   $vfunc = eval($vfunc);
   if( !$vfunc ){
-    $vval = 0.0;
+    $vval = "";
   } elsif( $vfunc ne "" ){
     $vval = int( $vfunc*1000 )/1000;
   } else {
@@ -494,6 +470,10 @@ sub OWMULTI_GetValues($@) {
   my $value   = "";
   my $ret     = "";
   
+  #-- check if device needs to be initialized
+  OWMULTI_InitializeDevice($hash)
+    if( $hash->{READINGS}{"state"}{VAL} eq "defined");
+  
   #-- restart timer for updates
   RemoveInternalTimer($hash);
   InternalTimer(time()+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 1);
@@ -526,6 +506,28 @@ sub OWMULTI_GetValues($@) {
   Log 5, $value;
 
   return undef;
+}
+
+########################################################################################
+#
+# OWMULTI_InitializeDevice - delayed setting of initial readings and channel names  
+#
+#  Parameter hash = hash of device addressed
+#
+########################################################################################
+
+sub OWMULTI_InitializeDevice($) {
+  my ($hash) = @_;
+  
+  my $name   = $hash->{NAME};
+  
+  #-- Initial readings
+  $owg_temp = "";
+  $owg_volt = "";
+  $owg_vdd  = "";  
+  
+  #-- Set state to initialized
+  readingsSingleUpdate($hash,"state","initialized",1);
 }
 
 #######################################################################################
@@ -588,10 +590,12 @@ sub OWMULTI_Set($@) {
   #-- OWFS interface 
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSMULTI_SetValues($hash,@a);
-    return $ret
-      if(defined($ret));
   } else {
-  return "OWMULTI: Set with wrong IODev type $interface";
+    return "OWMULTI: Set with wrong IODev type $interface";
+  }
+  #-- process results
+  if( defined($ret)  ){
+    return "OWMULTI: Could not set device $name, reason: ".$ret;
   }
   
   #-- process results - we have to reread the device
@@ -896,7 +900,6 @@ sub OWXMULTI_SetValues($@) {
     return "OWXMULTI: Device $owx_dev not accessible"; 
   } 
   
-  #DoTrigger($name, undef) if($init_done);
   return undef;
 }
 
