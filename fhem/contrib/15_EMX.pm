@@ -17,11 +17,14 @@
 #   <code>    is a number 1 - 12 or the keyword "emulator".
 #   <rpunit>  is the scale factor = rotations per kWh or m^3 (not needed for emulator)
 #
-# get <name> midnight => todays starting value for counter
-# get <name> month    => summary of current month
+# get <name> midnight     => todays starting value for counter and power meter
+# get <name> cnt_midnight => todays starting value for counter
+# get <name> pm_midnight  => todays starting value for power meter
+# get <name> month        => summary of current month
 #
-# set <name> midnight => todays starting value for counter
-# set <name> pmeter   => power meter reading at last midnight
+# set <name> cnt_midnight => todays starting value for counter
+# set <name> pm_midnight  => todays starting value for power meter
+# set <name> pm_current   => current power meter reading
 #   
 # Attributes are set as
 #
@@ -66,14 +69,16 @@ use strict;
 use warnings;
 
 my %gets = (
-  "midnight"    => "",
-  "pmeter"      => "",
-  "month"       => ""
+  "midnight"      => "",
+  "cnt_midnight"  => "",
+  "pm_midnight"   => "",
+  "month"         => ""
 );
 
 my %sets = (
-  "midnight"  => "T",
-  "pmeter"    => "M",
+  "cnt_midnight"  => "C",
+  "pm_midnight"   => "P",
+  "pm_current"    => "M",
 );
 
 #-- Global variables for the raw readings
@@ -149,7 +154,7 @@ sub EMX_Define ($$) {
     #-- set/ get artificial data
     my $msg=EMX_emu(0,12345);
     $hash->{READINGS}{"count"}{midnight}   = 12345;
-    $hash->{READINGS}{"energy"}{midnight} = 0;
+    $hash->{READINGS}{"pmeter"}{midnight} = 0;
     EMX_store($hash);
     $hash->{emumsg}=$msg;
     
@@ -272,7 +277,7 @@ sub EMX_FormatValues ($) {
     if( $deltim>=0 ){
       $daybreak = 1;
       #-- Timer data from tomorrow
-      my ($secn,$minn,$hourn,$dayn,$monthn,$yearn,$wdayn,$ydayn,$isdstn) = localtime(time() + 24*60*60);   
+      my ($secn,$minn,$hourn,$dayn,$monthn,$yearn,$wdayn,$ydayn,$isdstn) = localtime(time() + 3600);   
       #-- Check, whether we have a new month
       if( $dayn == 1 ){
         $monthbreak = 1;
@@ -350,7 +355,7 @@ sub EMX_FormatValues ($) {
         Log 3,"EMX: Wrong device model $model";
       }
       #-- power meter value 
-      $tval = $vval + $hash->{READINGS}{"energy"}{midnight};
+      $tval = $vval + $hash->{READINGS}{"pmeter"}{midnight};
     
       #-- calculate cost
       if( defined($main::attr{$name}{"CostD"}) ){
@@ -404,7 +409,7 @@ sub EMX_FormatValues ($) {
       
       #-- state format
       $svalue = sprintf("W: %5.2f %s P: %5.2f %s Pmax: %5.3f %s",$vval,$unit,$rval,$runit,$pval,$runit);
-      #-- put into READING
+      #-- put into READINGS
       readingsBulkUpdate($hash,"count",$emx_cnt);
       readingsBulkUpdate($hash,"energy",$vval);
       readingsBulkUpdate($hash,"pmeter",$tval);
@@ -415,16 +420,16 @@ sub EMX_FormatValues ($) {
       #-- daybreak postprocessing
       if( $daybreak == 1 ){
         #-- store corrected counter value at midnight 
-        $hash->{READINGS}{"count"}{midnight}   = $emx_cnt;
-        $hash->{READINGS}{"energy"}{midnight} = $tval;
+        $hash->{READINGS}{"count"}{midnight}  = $emx_cnt;
+        $hash->{READINGS}{"pmeter"}{midnight} = $tval;
         EMX_store($hash);
         #-- daily/monthly accumulated value
         my @monthv = EMX_GetMonth($hash);
         my $total  = $monthv[0]+$vval;
-        $dvalue    = sprintf("D_%02d Wd: %5.2f %s Wm: %6.2f %s Cd: %5.2f €",$day,$vval,$unit,$total,$unit,int($cost*100)/100);
+        $dvalue    = sprintf("D%02d Wd: %5.2f %s Wm: %6.2f %s Cd: %5.2f €",$day,$vval,$unit,$total,$unit,int($cost*100)/100);
         readingsBulkUpdate($hash,"day",$dvalue);
         if( $monthbreak == 1){
-          $mvalue = sprintf("M_%02d Wm: %6.2f %s",$month,$total,$unit);
+          $mvalue = sprintf("M%02d Wm: %6.2f %s",$month+1,$total,$unit);
           readingsBulkUpdate($hash,"month",$mvalue);
           Log 1,$name." has monthbreak $msg ".$mvalue;
         }  
@@ -461,14 +466,19 @@ my $key   = shift @a;
 my $value;
 my $ret;
    
-#-- midnight counter value 
+#-- both midnight values 
 if($key eq "midnight"){
+   return "EMX_Get => midhight counter ".$hash->{READINGS}{"count"}{midnight}." (pmeter ".$hash->{READINGS}{"pmeter"}{midnight}.")";
+}  
+
+#-- midnight counter value 
+if($key eq "cnt_midnight"){
    $value = $hash->{READINGS}{"count"}{midnight};
 }  
 
 #-- midnight power meter value 
-if($key eq "pmeter"){
-   $value = $hash->{READINGS}{"energy"}{midnight};
+if($key eq "pm_midnight"){
+   $value = $hash->{READINGS}{"pmeter"}{midnight};
 }  
 
 #-- monthly summary 
@@ -510,11 +520,22 @@ my $value = join("", @a);
 my $tn = TimeNow();
 my $ret;
 
-#-- value of meter reading may be set at runtime
-if($key eq "pmeter"){
-   return "EMX_Set: Wrong midnight value for power meter, must be 0 <= value < 65536"
-     if( ($value < 0) || ($value > 65535) );
-   $hash->{READINGS}{"energy"}{midnight}=$value;
+#-- value of midnight power meter reading may be set at runtime
+if($key eq "pm_midnight"){
+   return "EMX_Set: Wrong midnight value for power meter, must be 0 <= value < 99999"
+     if( ($value < 0) || ($value > 99999) );
+   $hash->{READINGS}{"pmeter"}{midnight}=$value;
+   #-- store this for later usage
+   $ret = EMX_store($hash);
+   return "EMX_Set: ".$ret
+     if( defined($ret) );
+}
+
+#-- value of current power meter reading may be set at runtime
+if($key eq "pm_current"){
+   return "EMX_Set: Wrong current value for power meter, must be 0 <= value < 99999"
+     if( ($value < 0) || ($value > 99999) );
+   $hash->{READINGS}{"pmeter"}{midnight}=$value-$hash->{READINGS}{"energy"}{VAL};
    #-- store this for later usage
    $ret = EMX_store($hash);
    return "EMX_Set: ".$ret
@@ -522,7 +543,7 @@ if($key eq "pmeter"){
 }
    
 #-- midnight counter value may be set at runtime
-if($key eq "midnight"){
+if( ($key eq "midnight") || ($key eq "cnt_midnight") ){
    return "EMX_Set: Wrong midnight value for counter, must be -65536 <= value < 65536"
      if( ($value < -65536) || ($value > 65535) );
    $hash->{READINGS}{"count"}{midnight}=$value;
@@ -633,14 +654,14 @@ sub EMX_store($) {
     
     if( $hash->{CODE} eq "emulator"){
       $msg = sprintf "%4d-%02d-%02d %02d:%02d:%02d %d %d", 
-        $year+1900,$month,$day,$hour,$min,$sec,
+        $year+1900,$month+1,$day,$hour,$min,$sec,
         $hash->{READINGS}{"count"}{midnight},
-        $hash->{READINGS}{"energy"}{midnight}; 
+        $hash->{READINGS}{"pmeter"}{midnight}; 
     } else {
       $msg = sprintf "%4d-%02d-%02d midnight %7.2f %7.2f",
-        $year+1900,$month,$day,
+        $year+1900,$month+1,$day,
         $hash->{READINGS}{"count"}{midnight},
-        $hash->{READINGS}{"energy"}{midnight};
+        $hash->{READINGS}{"pmeter"}{midnight};
     }
     print EMXFILE $msg;
     Log 1, "EMX_store: $name $msg";
@@ -672,20 +693,20 @@ sub EMX_recall($) {
     my @a=split(' ',$line);
     #-- Timer data from yesterday
     my ($sec,$min,$hour,$day,$month,$year,$wday,$yday,$isdst) = localtime(time() - 24*60*60);   
-    $msg = sprintf "%4d-%02d-%02d",     $year+1900,$month,$day;
+    $msg = sprintf "%4d-%02d-%02d",     $year+1900,$month+1,$day;
     if( $msg ne $a[0]){
       Log 1, "EMX_recall: midnight value $a[2] for $name not from last day, but from $a[0]";
       $hash->{READINGS}{"count"}{midnight}   = $a[2];
-      $hash->{READINGS}{"energy"}{midnight} = defined($a[3]) ? $a[3] : 0;
+      $hash->{READINGS}{"pmeter"}{midnight} = defined($a[3]) ? $a[3] : 0;
     } else {
       Log 1, "EMX_recall: recalled midnight value $a[2] for $name";
       $hash->{READINGS}{"count"}{midnight}   = $a[2]; 
-      $hash->{READINGS}{"energy"}{midnight} = defined($a[3]) ? $a[3] : 0;
+      $hash->{READINGS}{"pmeter"}{midnight} = defined($a[3]) ? $a[3] : 0;
     }
   } else {
     Log 1, "EMX_recall: Cannot open EMX_$name.dat for reading!";
     $hash->{READINGS}{"count"}{midnight}=0;
-    $hash->{READINGS}{"energy"}{midnight}=0;
+    $hash->{READINGS}{"pmeter"}{midnight}=0;
   }
   return undef;                    
 }
@@ -719,7 +740,6 @@ sub EMX_GetMonth($) {
       while( <EMXFILE> ){
         #-- line looks like 
         #   2013-02-09_23:59:31 <name> day D_09 Wd:  0.00 Wm: 171.70
-
         my $line = $_;
         chomp($line);
         if ( $line =~ m/$regexp/i){  
@@ -738,11 +758,12 @@ sub EMX_GetMonth($) {
     }
     #-- add data from current day
     $total = int($total*100)/100;
-    my ($sec,$min,$hour,$day,$month,$year,$wday,$yday,$isdst) = localtime(time);
-    my $deltim = ($hour+$min/60.0 + $sec/3600.0)/24.0;
     my $total2 = int(100*($total+$hash->{READINGS}{"energy"}{VAL}))/100;
-    my $av = int(100*$total2/(int(@month)+$deltim))/100;
-    
+    #-- number of days so far, including the present day
+    my ($sec,$min,$hour,$day,$month,$year,$wday,$yday,$isdst) = localtime(time);
+    my $deltim = int(@month)+($hour+$min/60.0 + $sec/3600.0)/24.0;
+    my $av = int(100*$total2/$deltim)/100;
+    #-- output format
     return ($total,$total2,$av);
   } 
 }
@@ -830,16 +851,26 @@ sub EMX_emu ($$) {
         <a name="EMXset"></a>
         <h4>Set</h4>
         <ul>
-            <li><a name="emx_midnight">
-                    <code>set &lt;name&gt; midnight &lt;int&gt;</code></a><br /> Value of counter at midnight </li>
+            <li><a name="emx_cnt_midnight">
+                    <code>set &lt;name&gt; cnt_midnight &lt;int&gt;</code></a><br /> Midnight Value of internal counter </li>
+            <li><a name="emx_pm_midnight">
+                    <code>set &lt;name&gt; pm_midnight &lt;int&gt;</code></a><br /> Midnight value of external power meter</li>
+            <li><a name="emx_pmeter">
+                    <code>set &lt;name&gt; pm_current &lt;int&gt;</code></a><br /> Current value of external power meter</li>
         </ul>
         <br />
         <a name="EMXget"></a>
         <h4>Get</h4>
         <ul>
-            <li><a name="emx_midnight2">
+            <li><a name="emx_midnight">
                     <code>get &lt;name&gt; midnight</code></a>
-                <br /> Returns the value of the counter at midnight </li>
+                <br /> Returns the midnight value of the counter and power meter </li>
+                 <li><a name="emx_cnt_midnight2">
+                    <code>get &lt;name&gt; cnt_midnight</code></a>
+                <br /> Returns the midnight value of the internal counter</li>
+                 <li><a name="emx_pm_midnight2">
+                    <code>get &lt;name&gt; pm_midnight</code></a>
+                <br /> Returns the midnight value of the power meter</li>
             <li><a name="emx_month">
                     <code>get &lt;name&gt; month</code>
                 </a>
