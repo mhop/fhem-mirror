@@ -239,7 +239,7 @@ RFXCOM_DoInit($)
 
   if(defined($attr{$name}) && defined($attr{$name}{"do_not_init"})) {
     	Log 1, "RFXCOM: defined with noinit. Do not send init string to device.";
-  	$hash->{STATE} = "Initialized" if(!$hash->{STATE});
+  	$hash->{STATE} = "Initialized";
 
         # Reset the counter
         delete($hash->{XMIT_TIME});
@@ -267,7 +267,7 @@ RFXCOM_DoInit($)
 	return "RFXCOM: Initialization Error %name expected char=0x2c, but char=$char received.";
   } else {
     	Log 1, "RFXCOM: Init OK";
-  	$hash->{STATE} = "Initialized" if(!$hash->{STATE});
+  	$hash->{STATE} = "Initialized";
   }
   #
 

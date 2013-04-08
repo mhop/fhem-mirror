@@ -211,7 +211,7 @@ TRX_DoInit($)
 
   if(defined($attr{$name}) && defined($attr{$name}{"do_not_init"})) {
     	Log 1, "TRX: defined with noinit. Do not send init string to device.";
-  	$hash->{STATE} = "Initialized" if(!$hash->{STATE});
+  	$hash->{STATE} = "Initialized";
 
         # Reset the counter
         delete($hash->{XMIT_TIME});
@@ -242,7 +242,7 @@ TRX_DoInit($)
 	return "TRX: Initialization Error %name expected char=0x2c, but char=$char received.";
   } else {
     	Log 1, "TRX: Init OK";
-  	$hash->{STATE} = "Initialized" if(!$hash->{STATE});
+  	$hash->{STATE} = "Initialized";
 	# Analyse result and display it:
 	if ($buf =~ m/^\x0d\x01\x00(.)(.)(.)(.)(.)(.)(.)(.)(.)(.)(.)/) {
 		my $status = "";
