@@ -4,10 +4,11 @@ package main;
 
 =pod
 ### Usage:
-sub TestBlocking() { BlockingCall("DoSleep", 5, "SleepDone", 8); }
+sub TestBlocking() { BlockingCall("DoSleep", 5, "SleepDone", 8, "AbortFn", "AbortArg"); }
 sub DoSleep($)     { sleep(shift); return "I'm done"; }
 sub SleepDone($)   { Log 1, "SleepDone: " . shift; }
-sub TestBlocking2() { BlockingCall("DoSleep", 5, "SleepDone", 2); }
+sub AbortFn($)     { Log 1, "Aborted: " . shift; }
+sub TestBlocking2() { BlockingCall("DoSleep", 5, "SleepDone", 2, "AbortFn", "AbortArg"); }
 =cut
 
 
@@ -25,7 +26,7 @@ my $telnetDevice;
 sub
 BlockingCall($$@)
 {
-  my ($blockingFn, $arg, $finishFn, $timeout) = @_;
+  my ($blockingFn, $arg, $finishFn, $timeout, $abortFn, $abortArg) = @_;
 
   # Look for the telnetport
   # must be done before forking to be able to create a temporary device
@@ -66,7 +67,8 @@ BlockingCall($$@)
   }
 
   if($pid) {
-    my %h = ( pid=>$pid, fn=>$blockingFn, finishFn=>$finishFn );
+    my %h = ( pid=>$pid, fn=>$blockingFn, finishFn=>$finishFn, 
+              abortFn=>$abortFn, abortArg=>$abortArg );
     if($timeout) {
       InternalTimer(gettimeofday()+$timeout, "BlockingKill", \%h, 0);
     }
@@ -131,10 +133,16 @@ BlockingKill($)
   if($^O !~ m/Win/) {
     if($h->{pid} && kill(9, $h->{pid})) {
       Log 1, "Timeout for $h->{fn} reached, terminated process $h->{pid}";
-      if($h->{finishFn}) {
+      if($h->{abortFn}) {
+        no strict "refs";
+        my $ret = &{$h->{abortFn}}($h->{abortArg});
+        use strict "refs";
+
+      } elsif($h->{finishFn}) {
         no strict "refs";
         my $ret = &{$h->{finishFn}}();
         use strict "refs";
+
       }
     }
   }
