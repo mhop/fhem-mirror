@@ -2352,7 +2352,7 @@ DoTrigger($$@)
     my @ntfyList = sort { $defs{$a}{NTFY_ORDER} cmp $defs{$b}{NTFY_ORDER} }
                    grep { $defs{$_}{NTFY_ORDER} } keys %defs;
     Log 5, "Notify loop for $dev $hash->{CHANGED}->[0]";
-    $hash->{TRIGGERTIME} = TimeNow(); # Optimize FileLog
+    $hash->{NTFY_TRIGGERTIME} = TimeNow(); # Optimize FileLog
     foreach my $n (@ntfyList) {
       next if(!defined($defs{$n}));     # Was deleted in a previous notify
       my $r = CallFn($n, "NotifyFn", $defs{$n}, $hash);

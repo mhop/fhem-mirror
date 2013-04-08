@@ -98,7 +98,7 @@ FileLog_Log($$)
   my $n = $dev->{NAME};
   my $re = $log->{REGEXP};
   my $max = int(@{$dev->{CHANGED}});
-  my $tn = $dev->{TRIGGERTIME};
+  my $tn = $dev->{NTFY_TRIGGERTIME};
   my $ct = $dev->{CHANGETIME};
   my $wrotesome;
   my $fh = $log->{FH};
@@ -118,7 +118,8 @@ FileLog_Log($$)
   }
   if($wrotesome) {
     $fh->flush;
-    $fh->sync if !($^O eq 'MSWin32'); #not implemented in Windows
+# Too much IO
+#    $fh->sync if !($^O eq 'MSWin32'); #not implemented in Windows
   }
   return "";
 }
