@@ -206,7 +206,7 @@ TRX_LIGHT_Set($@)
 
   if ($na == 3) {
   	$arg3 = $a[2];
-	if ($na == 3 && $command ne "level" ) {
+	if ($na == 3 && $command eq "level" ) {
 	  	$level = $a[2];
 	} 
   } 
