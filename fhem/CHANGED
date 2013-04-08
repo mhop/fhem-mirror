@@ -1,6 +1,7 @@
-# Add changes at the top of the list.
-
+# Add changes at the top of the list. Keep it in ASCII
 - SVN
+
+- 2013-04-08 (5.4)
   - feature: updatefhem will be silently converted to update
   - feature: FHEMWEB: save button replaced with the menu entry "Save config"
   - feature: notify supports $NAME/$EVENT/$EVTPART0/etc. @/% is deprecated.
@@ -123,7 +124,7 @@
   - feature: devicepair in 10_CUL_HM.pm supports unset
   - feature: devicepair for single Button in 10_CUL_HM.pm (by MartinP)
   - feature: new Modules 75_MSG.pm, 76_MSGFile.pm and 76_MSGMail.pm (by
-    R�diger)
+    Ruediger)
   - feature: new Module 59_Twilight.pm to calculate current daylight
   - feature: internal NotifyOrderPrefix: 98_average.pm is more straightforward
   - feature: the usb command tries to flash unflashed CULs on linux
