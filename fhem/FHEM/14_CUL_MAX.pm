@@ -128,7 +128,7 @@ CUL_MAX_Check($@)
   $version =~ m/V (.*)\.(.*) .*/;
   my ($major_version,$minorversion) = ($1, $2);
   $version = 100*$major_version + $minorversion;
-  if($version < 153) {
+  if($version < 154) {
     Log 2, "You are using an old version of the CUL firmware, which has known bugs with respect to MAX! support. Please update.";
   }
   return $version;
