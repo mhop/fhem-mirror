@@ -433,27 +433,6 @@ Ext.define('FHEM.view.LineChartPanel', {
                         },
                         {  
                             xtype: 'combobox', 
-                            name: 'xaxiscombo',
-                            fieldLabel: 'Select X Axis',
-                            labelWidth: 90,
-                            inputWidth: 100,
-                            store: Ext.create('Ext.data.Store', {
-                                fields: ['name'],
-                                data : [
-                                    {'name':'TIMESTAMP'},
-                                    {'name':'DEVICE'},
-                                    {'name':'TYPE'},
-                                    {'name':'EVENT'},
-                                    {'name':'READING'},
-                                    {'name':'VALUE'},
-                                    {'name':'UNIT'}
-                                ]
-                            }),
-                            displayField: 'name',
-                            valueField: 'name'
-                        },
-                        {  
-                            xtype: 'combobox', 
                             name: 'yaxiscombo',
                             fieldLabel: 'Select Y-Axis',
                             disabled: true,
@@ -499,6 +478,12 @@ Ext.define('FHEM.view.LineChartPanel', {
                             xtype: 'checkboxfield', 
                             name: 'yaxisfillcheck',
                             boxLabel: 'Fill'
+                        },
+                        {  
+                            xtype: 'checkboxfield', 
+                            name: 'yaxisstepcheck',
+                            boxLabel: 'Steps',
+                            tooltip: 'Check, if the chart should be shown with steps instead of a linear Line'
                         },
                         {  
                             xtype: 'combobox', 

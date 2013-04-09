@@ -76,12 +76,12 @@ UPD 2013-04-03_07:27:17 345 www/frontend/app/resources/icons/arrow_left.png
 UPD 2013-04-03_07:27:17 733 www/frontend/app/resources/icons/add.png
 UPD 2013-04-03_07:27:17 389 www/frontend/app/resources/icons/resultset_previous.png
 UPD 2013-04-01_07:05:33 2154 www/frontend/app/app.js
-UPD 2013-04-03_07:26:41 26743 www/frontend/app/view/LineChartPanel.js
+UPD 2013-04-09_07:08:49 26062 www/frontend/app/view/LineChartPanel.js
 UPD 2013-04-03_07:26:40 15793 www/frontend/app/view/DevicePanel.js
-UPD 2013-04-03_07:26:41 8588 www/frontend/app/view/Viewport.js
+UPD 2013-04-09_07:08:49 8588 www/frontend/app/view/Viewport.js
 UPD 2013-04-01_07:05:14 2476 www/frontend/app/view/TableDataGridPanel.js
-UPD 2013-04-03_07:04:19 44036 www/frontend/app/controller/ChartController.js
-UPD 2013-04-03_07:04:20 13004 www/frontend/app/controller/MainController.js
+UPD 2013-04-09_07:08:13 45636 www/frontend/app/controller/ChartController.js
+UPD 2013-04-09_07:08:13 13004 www/frontend/app/controller/MainController.js
 UPD 2013-04-01_07:04:35 202 www/frontend/app/model/ReadingsModel.js
 UPD 2013-04-01_07:04:36 338 www/frontend/app/model/SavedChartsModel.js
 UPD 2013-04-01_07:04:34 11535 www/frontend/app/model/ChartModel.js
