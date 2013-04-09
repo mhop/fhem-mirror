@@ -416,15 +416,15 @@ sub PRESENCE_StartLocalScan($;$)
 
     if($hash->{MODE} eq "local-bluetooth")
     {
-	$hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60) unless(exists($hash->{helper}{RUNNING_PID}));
+	$hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
     elsif($hash->{MODE} eq "lan-ping")
     {
-	$hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60) unless(exists($hash->{helper}{RUNNING_PID}));
+	$hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
     elsif($hash->{MODE} eq "fritzbox")
     {
-	$hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local."|".AttrVal($hash->{NAME}, "fritzbox_repeater", "0"), "PRESENCE_ProcessLocalScan", 60) unless(exists($hash->{helper}{RUNNING_PID}));
+	$hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local."|".AttrVal($hash->{NAME}, "fritzbox_repeater", "0"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
     
 }
@@ -626,6 +626,13 @@ PRESENCE_ProcessLocalScan($)
 
  Log GetLogLevel($hash->{NAME}, 5), "PRESENCE_ProcessLocalScan: $string";
  
+ if(defined($hash->{helper}{RETRY_COUNT}))
+ {
+    Log GetLogLevel($hash->{NAME}, 2), "PRESENCE: ".$hash->{NAME}." returned a valid result after ".$hash->{helper}{RETRY_COUNT}." unsuccesful ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry");
+    delete($hash->{helper}{RETRY_COUNT});
+ }
+
+ 
  if($hash->{MODE} eq "fritzbox" and defined($a[3]))
  {
     $hash->{helper}{cachednr} = $a[3] if(($a[2] eq "present") || ($a[2] eq "absent")); 
@@ -662,6 +669,47 @@ PRESENCE_ProcessLocalScan($)
     InternalTimer(gettimeofday()+($a[2] eq "present" ? $hash->{TIMEOUT_PRESENT} : $hash->{TIMEOUT_NORMAL}), "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
  }
 }
+
+sub
+PRESENCE_ProcessAbortedScan($)
+{
+
+   my ($hash) = @_;
+   
+   
+   delete($hash->{helper}{RUNNING_PID});
+   RemoveInternalTimer($hash);
+   
+   if(defined($hash->{helper}{RETRY_COUNT}))
+   {
+    if($hash->{helper}{RETRY_COUNT} >= 3)
+    {
+	Log GetLogLevel($hash->{NAME}, 2), "PRESENCE: ".$hash->{NAME}." could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry"). " (resuming normal operation)" if($hash->{helper}{RETRY_COUNT} == 3);
+	InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+	$hash->{helper}{RETRY_COUNT}++;
+    }
+    else
+    {
+	Log GetLogLevel($hash->{NAME}, 2), "PRESENCE: ".$hash->{NAME}." could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry")." (retrying in 10 seconds)";
+	InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+        $hash->{helper}{RETRY_COUNT}++;
+    }
+    
+   }
+   else
+   {
+     $hash->{helper}{RETRY_COUNT} = 1;
+     InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+     Log 2, "PRESENCE: ".$hash->{NAME}." could not be checked (retrying in 10 seconds)"
+   
+   
+   }
+   
+   
+
+
+}
+
 1;
 
 =pod

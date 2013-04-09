@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - bugfix:  fixing dead PRESENCE definitions in case of timeouts
 
 - 2013-04-08 (5.4)
   - feature: updatefhem will be silently converted to update
