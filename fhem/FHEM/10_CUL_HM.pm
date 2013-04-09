@@ -167,7 +167,7 @@ sub CUL_HM_updateConfig($){
 	  if ($hash->{helper}{role}{chn}){
 	    my $chn = (length($id) == 8)?substr($id,6,2):"01";
 	    my $devId = substr($id,0,6);
-		if ($culHmModel{$mId}{chn} =~ m/Sw._V/){# there are virtual channels
+		if ($culHmModel{$mId} && $culHmModel{$mId}{chn} =~ m/Sw._V/){#virtual?
 		  my @chnPh = (grep{$_ =~ m/Sw:/ } split ',',$culHmModel{$mId}{chn});
 		  @chnPh = split ':',$chnPh[0] if (@chnPh);
 		  my $chnPhyMax = $chnPh[2]?$chnPh[2]:1;         # max Phys channels
@@ -715,22 +715,11 @@ sub CUL_HM_Parse($$) {##############################
 	  if (defined $des && $des != $vp && ($err&0x30) == 0x00){
 	    push @event, "operState:errorTargetNotMet";
 	    push @event, "operStateErrCnt:".
-	               (ReadingsVal($name,"ValveStateErrCnt","0")+1);
+	               (ReadingsVal($name,"operStateErrCnt","0")+1);
 	  }
 	  else{
 	    push @event, "operState:".((($err&0x30) == 0x00)?"onTarget":"adjusting");
 	  }
-    }
-
-    # CMD:A010 SRC:13F251 DST:5D24C9 0401 00000000 05 09:00 0A:07 00:00
-    # status change report to paired central unit
-	#read List5 reg 09 (offset) and 0A (err-pos)
-	#list 5 is channel-dependant not link dependant
-	#        => Link discriminator (00000000) is fixed
-    elsif($msgType eq "10" && $p =~ m/^04..........0509(..)0A(..)/) {
-      my (    $of,     $vep) = (hex($1), hex($2));
-      push @event, "ValveErrorPosition:$vep %";
-      push @event, "ValveOffset:$of %";
     }
   } 
   elsif($model =~ m/^(HM-Sen-Wa-Od|HM-CC-SCD)$/){ #############################
@@ -874,9 +863,9 @@ sub CUL_HM_Parse($$) {##############################
     }
   } 
   elsif($st =~ m /^(remote|pushButton|swi)$/) { ###############################
-    if($msgType =~ m/^4./ && $p =~ m/^(..)(..)$/) {
-      my ($buttonField, $bno) = (hex($1), hex($2));# button number/event count
-	  my $buttonID = $buttonField&0x3f;# only 6 bit are valid
+    if($msgType =~ m/^4./ && $p =~ m/^(..)(..)/) {
+      my ($chn, $bno) = (hex($1), hex($2));# button number/event count
+	  my $buttonID = $chn&0x3f;# only 6 bit are valid
 	  my $btnName;
 	  my $state = "";
       my $chnHash = $modules{CUL_HM}{defptr}{$src.sprintf("%02X",$buttonID)};	  
@@ -887,19 +876,19 @@ sub CUL_HM_Parse($$) {##############################
 	  else{# Button not defined, use default naming
 	    $chnHash = $shash;
 	    if ($st eq "swi"){#maintain history for event naming
-			$btnName = "Btn$buttonField";
+			$btnName = "Btn$chn";
 		}
 		else{
-			my $btn = int((($buttonField&0x3f)+1)/2);
-			$btnName = "Btn$btn";
-			$state = ($buttonField&1 ? "off" : "on")
+		  my $btn = int((($chn&0x3f)+1)/2);
+		  $btnName = "Btn$btn";
+		  $state = ($chn&1 ? "off" : "on")
 		}
 	  }
       my $trigType;
-      if($buttonField & 0x40){
+      if($chn & 0x40){
 		if(!$shash->{BNO} || $shash->{BNO} ne $bno){#bno = event counter
-			$shash->{BNO}=$bno;
-			$shash->{BNOCNT}=1; # message counter reest
+		  $shash->{BNO}=$bno;
+		  $shash->{BNOCNT}=1; # message counter reest
 		}
 		$shash->{BNOCNT}+=1;
         $state .= "Long" .($msgFlag eq "A0" ? "Release" : "").
@@ -910,11 +899,11 @@ sub CUL_HM_Parse($$) {##############################
         $state .= ($st eq "swi")?"toggle":"Short";#swi only support toggle
 		$trigType = "Short";
       }
-	  $shash->{helper}{addVal} = $buttonField;   #store to handle changesFread
+	  $shash->{helper}{addVal} = $chn;   #store to handle changesFread
 	  push @entities,CUL_HM_UpdtReadBulk($chnHash,1,
 	                                         ,"state:".$state.$target
 	                                         ,"trigger:".$trigType."_".$bno);
-      push @event,"battery:". (($buttonField&0x80)?"low":"ok");
+      push @event,"battery:". (($chn&0x80)?"low":"ok");
       push @event,"state:$btnName $state$target";
     }
   }
@@ -929,13 +918,13 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "flags:".     (($flag)?"none"     :$flag  );
 	}
   }
-  elsif($st eq "virtual"){#####################################################
+  elsif($st eq "virtual"){ ####################################################
     # possibly add code to count all acks that are paired. 
     if($msgType eq "02") {# this must be a reflection from what we sent, ignore
       push @event, "";
 	}
   }
-  elsif($st eq "outputUnit"){##################################################
+  elsif($st eq "outputUnit"){ #################################################
     if($msgType eq "40" && $p =~ m/^(..)(..)$/){
       my ($button, $bno) = (hex($1), hex($2));
       if(!(exists($shash->{BNO})) || $shash->{BNO} ne $bno){
@@ -995,7 +984,12 @@ sub CUL_HM_Parse($$) {##############################
       ($state, $err) = ($1, hex($2));
 	  my $bright = hex($state);
       push @event, "brightness:".$bright;
-      push @event, "cover:".     (($err&0x0E)?"open" :"closed");        
+	  if ($model eq "HM-Sec-MDIR"){
+	    push @event, "sabotageError:".(($err&0x0E)?"on":"off");   
+	  }
+	  else{
+  	    push @event, "cover:".        (($err&0x0E)?"open" :"closed");
+	  }
 	  push @event, "battery:".   (($err&0x80)?"low"  :"ok"  );
     }
     elsif($msgType eq "41" && $p =~ m/^01(..)(..)(..)/) {#01 is channel
@@ -1114,8 +1108,9 @@ sub CUL_HM_Parse($$) {##############################
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});
 	  push @event, "alive:yes";
 	  push @event, "battery:". (($err&0x80)?"low"  :"ok"  );
-	  if ($model ne "HM-SEC-WDS"){	  
-		push @event, "cover:". (($err&0x0E)?"open" :"closed");
+	  if (   $model eq "HM-SEC-SC" ||
+	         $model eq "HM-Sec-RHS"){push @event, "sabotageError:".(($err&0x0E)?"on":"off");
+	  }elsif($model ne "HM-SEC-WDS"){push @event, "cover:"        .(($err&0x0E)?"open" :"closed");
 	  }
 	}
 	elsif($msgType eq "41"){
@@ -1124,7 +1119,6 @@ sub CUL_HM_Parse($$) {##############################
 	  $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});	
 	}
-
 	if (defined($state)){# if state was detected post events
       my %txt;
       %txt = ("C8"=>"open", "64"=>"tilted", "00"=>"closed");
@@ -1134,7 +1128,6 @@ sub CUL_HM_Parse($$) {##############################
 	  $txt = "unknown:$state" if(!$txt);
 	  push @event, "state:$txt";
 	  push @event, "contact:$txt$target";
-	  
     }
     else{push @event, "3SSunknownMsg:$p" if(!@event);}
   } 
@@ -1285,9 +1278,8 @@ sub CUL_HM_Parse($$) {##############################
     CUL_HM_SndCmd($ack[$i++],$ack[$i++])while ($i<@ack);
   }
 
-  CUL_HM_ProcessCmdStack($shash) if ($respRemoved); # cont stack if a response is complete
+  CUL_HM_ProcessCmdStack($shash) if ($respRemoved); # cont if complete
   #------------ process events ------------------
-
   push @event, "noReceiver:src:$src ($cmd) $p" if(!@event);
   CUL_HM_UpdtReadBulk($shash,1,@event); #events to the channel
   $defs{$shash->{NAME}}{EVENTS}++;  # count events for channel
@@ -2792,6 +2784,7 @@ sub CUL_HM_protState($$){
   my ($hash,$state) = @_;
   $hash->{protState} = $state;
   readingsSingleUpdate($hash,"state",$state,1)if (!$hash->{helper}{role}{chn});
+  DoTrigger($hash->{NAME}, undef) if ($state eq "CMDs_done");
 }
 sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
   my ($hash) =  @_;  
@@ -2993,14 +2986,15 @@ sub CUL_HM_peerChName($$$) {#in:<IDorName> <deviceID> <ioID>, out:name
 }
 sub CUL_HM_getMId($) {#in: hash(chn or dev) out:model key (key for %culHmModel)
  # Will store result in device helper
-  my ($hash) = @_;
+  my $hash = shift;
   $hash = CUL_HM_getDeviceHash($hash);
   my $mId = $hash->{helper}{mId};
   if (!$mId){   
     my $model = AttrVal($hash->{NAME}, "model", "");
     foreach my $mIdKey(keys%culHmModel){
-	  next if (!$culHmModel{$mIdKey}{name} || $culHmModel{$mIdKey}{name} ne $model);
-	  $mId = $hash->{helper}{mId} = $mIdKey ;
+	  next if (!$culHmModel{$mIdKey}{name} || 
+	            $culHmModel{$mIdKey}{name} ne $model);
+	  $hash->{helper}{mId} = $mIdKey ;
 	  return $mIdKey;
     }
 	return "";
