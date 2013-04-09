@@ -90,12 +90,12 @@ Ext.define('FHEM.controller.ChartController', {
         
         var me = this;
         //getting the necessary values
-        var devices = Ext.ComponentQuery.query('combobox[name=devicecombo]');
-        var xaxes = Ext.ComponentQuery.query('combobox[name=xaxiscombo]');
-        var yaxes = Ext.ComponentQuery.query('combobox[name=yaxiscombo]');
-        var yaxescolorcombos = Ext.ComponentQuery.query('combobox[name=yaxiscolorcombo]');
-        var yaxesfillchecks = Ext.ComponentQuery.query('checkbox[name=yaxisfillcheck]');
-        var yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]');
+        var devices = Ext.ComponentQuery.query('combobox[name=devicecombo]'),
+            yaxes = Ext.ComponentQuery.query('combobox[name=yaxiscombo]'),
+            yaxescolorcombos = Ext.ComponentQuery.query('combobox[name=yaxiscolorcombo]'),
+            yaxesfillchecks = Ext.ComponentQuery.query('checkbox[name=yaxisfillcheck]'),
+            yaxesstepcheck = Ext.ComponentQuery.query('checkbox[name=yaxisstepcheck]'),
+            yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]');
         
         var starttime = me.getStarttimepicker().getValue(),
             dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s'),
@@ -128,7 +128,7 @@ Ext.define('FHEM.controller.ChartController', {
         me.minYValue = 9999999;
         
         //setting x-axis title
-        chart.axes.get(1).setTitle(xaxes[0]);
+        chart.axes.get(1).setTitle("TIMESTAMP");
      
         //check if timerange or dynamic time should be used
         dynamicradio.eachBox(function(box, idx){
@@ -194,12 +194,15 @@ Ext.define('FHEM.controller.ChartController', {
         var i = 0;
         Ext.each(yaxes, function(yaxis) {
             var device = devices[i].getValue(),
-                xaxis = xaxes[i].getValue(),
                 yaxis = yaxes[i].getValue(),
                 yaxiscolorcombo = yaxescolorcombos[i].getValue(),
                 yaxisfillcheck = yaxesfillchecks[i].checked,
+                yaxisstepcheck = yaxesstepcheck[i].checked,
                 yaxisstatistics = yaxesstatistics[i].getValue();
-            me.populateAxis(i, yaxes.length, device, xaxis, yaxis, yaxiscolorcombo, yaxisfillcheck, yaxisstatistics, dbstarttime, dbendtime);
+            if(yaxis === "" || yaxis === null) {
+                yaxis = yaxes[i].getRawValue();
+            }
+            me.populateAxis(i, yaxes.length, device, yaxis, yaxiscolorcombo, yaxisfillcheck, yaxisstepcheck, yaxisstatistics, dbstarttime, dbendtime);
             i++;
         });
         
@@ -264,7 +267,7 @@ Ext.define('FHEM.controller.ChartController', {
     /**
      * fill the axes with data
      */
-    populateAxis: function(i, axeslength, device, xaxis, yaxis, yaxiscolorcombo, yaxisfillcheck, yaxisstatistics, dbstarttime, dbendtime) {
+    populateAxis: function(i, axeslength, device, yaxis, yaxiscolorcombo, yaxisfillcheck, yaxisstepcheck, yaxisstatistics, dbstarttime, dbendtime) {
         
         var me = this,
             chart = me.getChart(),
@@ -282,7 +285,7 @@ Ext.define('FHEM.controller.ChartController', {
         var url;
         if (!Ext.isDefined(yaxisstatistics) || yaxisstatistics === "none" || Ext.isEmpty(yaxisstatistics)) {
             url += '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+' + dbstarttime + '+' + dbendtime + '+';
-            url +=device + '+timerange+' + xaxis + '+' + yaxis;
+            url +=device + '+timerange+' + "TIMESTAMP" + '+' + yaxis;
             url += '&XHR=1'; 
         } else { //setup url to get statistics
             url += '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+' + dbstarttime + '+' + dbendtime + '+';
@@ -300,7 +303,7 @@ Ext.define('FHEM.controller.ChartController', {
                 url += '+yearstats+';
             }
             
-            url += xaxis + '+' + yaxis;
+            url += 'TIMESTAMP' + '+' + yaxis;
             url += '&XHR=1'; 
             
         }
@@ -407,6 +410,24 @@ Ext.define('FHEM.controller.ChartController', {
                       }
                       item.set(valuetext, valuestring);
                       item.set(timestamptext, json.data[j].TIMESTAMP);
+                      
+                      //check if we have to ues steps
+                      //if yes, create a new record with the same value as the last one
+                      //and a timestamp 1 second less than the actual record to add
+                      if(yaxisstepcheck) {
+                          if (store.last()) {
+                              var lastrec = store.last();
+                              var datetomodify = new Date(json.data[j].TIMESTAMP);
+                              var modtimestamp = Ext.Date.add(datetomodify, Ext.Date.SECOND, -1);
+                              var stepitem = lastrec.copy();
+                              Ext.iterate(stepitem.data, function(key, value) {
+                                  if (key.indexOf("TIMESTAMP") >= 0) {
+                                      stepitem.set(key, modtimestamp);
+                                  }
+                              });
+                              store.add(stepitem);
+                          }
+                      }
                       store.add(item);
                       
                       //rewrite of valuestring to get always numbers, even when text as value was passed to model
@@ -663,10 +684,10 @@ Ext.define('FHEM.controller.ChartController', {
                 
                 //getting the necessary values
                 var devices = Ext.ComponentQuery.query('combobox[name=devicecombo]');
-                var xaxes = Ext.ComponentQuery.query('combobox[name=xaxiscombo]');
                 var yaxes = Ext.ComponentQuery.query('combobox[name=yaxiscombo]');
                 var yaxescolorcombos = Ext.ComponentQuery.query('combobox[name=yaxiscolorcombo]');
                 var yaxesfillchecks = Ext.ComponentQuery.query('checkbox[name=yaxisfillcheck]');
+                var yaxesstepchecks = Ext.ComponentQuery.query('checkbox[name=yaxisstepcheck]');
                 var yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]');
                 
                 var basesstart = Ext.ComponentQuery.query('numberfield[name=basestart]');
@@ -699,15 +720,16 @@ Ext.define('FHEM.controller.ChartController', {
                 Ext.each(devices, function(dev) {
                     
                     var device = dev.getValue(),
-                        xaxis = xaxes[i].getValue(),
                         yaxis = yaxes[i].getValue(),
                         yaxiscolorcombo = yaxescolorcombos[i].getDisplayValue(),
                         yaxisfillcheck = yaxesfillchecks[i].checked,
+                        yaxisstepcheck = yaxesstepchecks[i].checked,
                         yaxisstatistics = yaxesstatistics[i].getValue();
                     
                     if (i === 0) {
-                        jsonConfig += '"x":"' + xaxis + '","y":"' + yaxis + '","device":"' + device + '",';
+                        jsonConfig += '"y":"' + yaxis + '","device":"' + device + '",';
                         jsonConfig += '"yaxiscolorcombo":"' + yaxiscolorcombo + '","yaxisfillcheck":"' + yaxisfillcheck + '",';
+                        jsonConfig += '"yaxisstepcheck":"' + yaxisstepcheck + '",';
                         if (yaxisstatistics !== "none") {
                             jsonConfig += '"yaxisstatistics":"' + yaxisstatistics + '",';
                         }
@@ -716,10 +738,12 @@ Ext.define('FHEM.controller.ChartController', {
                             devicename = "y" + (i + 1) + "device",
                             colorname = "y" + (i + 1) + "axiscolorcombo",
                             fillname = "y" + (i + 1) + "axisfillcheck",
+                            stepname = "y" + (i + 1) + "axisstepcheck",
                             statsname = "y" + (i + 1) + "axisstatistics";
                         
                         jsonConfig += '"' + axisname + '":"' + yaxis + '","' + devicename + '":"' + device + '",';
                         jsonConfig += '"' + colorname + '":"' + yaxiscolorcombo + '","' + fillname + '":"' + yaxisfillcheck + '",';
+                        jsonConfig += '"' + stepname + '":"' + yaxisstepcheck + '",';
                         if (yaxisstatistics !== "none") {
                             jsonConfig += '"' + statsname + '":"' + yaxisstatistics + '",';
                         }
@@ -824,11 +848,11 @@ Ext.define('FHEM.controller.ChartController', {
                     yaxeslength++;
                 }
                 
-                var xaxes = Ext.ComponentQuery.query('combobox[name=xaxiscombo]');
                 var devices = Ext.ComponentQuery.query('combobox[name=devicecombo]');
                 var yaxes = Ext.ComponentQuery.query('combobox[name=yaxiscombo]');
                 var yaxescolorcombos = Ext.ComponentQuery.query('combobox[name=yaxiscolorcombo]');
                 var yaxesfillchecks = Ext.ComponentQuery.query('checkbox[name=yaxisfillcheck]');
+                var yaxesstepchecks = Ext.ComponentQuery.query('checkbox[name=yaxisstepcheck]');
                 var yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]');
                 
                 var i = 0;
@@ -838,9 +862,9 @@ Ext.define('FHEM.controller.ChartController', {
                         yaxes[i].getStore().getProxy().url = url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+' + chartdata.device + '+getreadings&XHR=1';
                         yaxes[i].setDisabled(false);
                         yaxes[i].setValue(chartdata.y);
-                        xaxes[i].setValue(chartdata.x);
                         yaxescolorcombos[i].setValue(chartdata.yaxiscolorcombo);
                         yaxesfillchecks[i].setValue(chartdata.yaxisfillcheck);
+                        yaxesstepchecks[i].setValue(chartdata.yaxisstepcheck);
                         
                         if (chartdata.yaxisstatistics && chartdata.yaxisstatistics !== "") {
                             yaxesstatistics[i].setValue(chartdata.yaxisstatistics);
@@ -853,15 +877,16 @@ Ext.define('FHEM.controller.ChartController', {
                             axisname = "y" + (i + 1) + "axis",
                             axiscolorcombo = axisname + "colorcombo",
                             axisfillcheck = axisname + "fillcheck",
+                            axisstepcheck = axisname + "stepcheck",
                             axisstatistics = axisname + "statistics";
                             
                         eval('devices[i].setValue(chartdata.' + axisdevice + ')');
                         yaxes[i].getStore().getProxy().url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+' + eval('chartdata.' + axisdevice) + '+getreadings&XHR=1';
                         yaxes[i].setDisabled(false);
-                        xaxes[i].setValue(chartdata.x);
                         eval('yaxes[i].setValue(chartdata.' + axisname + ')');
                         eval('yaxescolorcombos[i].setValue(chartdata.' + axiscolorcombo + ')');
                         eval('yaxesfillchecks[i].setValue(chartdata.' + axisfillcheck + ')');
+                        eval('yaxesstepchecks[i].setValue(chartdata.' + axisstepcheck + ')');
                         
                         if (eval('chartdata.' + axisstatistics) && eval('chartdata.' + axisstatistics) !== "") {
                             eval('yaxesstatistics[i].setValue(chartdata.' + axisstatistics + ')');

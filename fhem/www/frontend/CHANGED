@@ -1,3 +1,6 @@
+Update vom 09.4.2013
+  * Step Funktion für Charts hinzugefügt
+  * X-Achsenauswahl entfernt, da nur Timestmap Sinn macht
 Update vom 03.4.2013
   * Bugfix in der Verarbeitung der Userconfig für nicht numerische Werte
   * Icons hinzugefügt

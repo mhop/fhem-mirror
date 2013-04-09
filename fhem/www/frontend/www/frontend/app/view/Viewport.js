@@ -34,7 +34,7 @@ Ext.define('FHEM.view.Viewport', {
                         {
                             xtype: 'panel',
                             html: '<p><img src="../../fhem/images/default/fhemicon.png" height="70px"</></p><h1 class="x-panel-header">Frontend</h1>',
-                            width: '30%',
+                            width: '25%',
                             border: false
                         },
                         {
@@ -48,7 +48,7 @@ Ext.define('FHEM.view.Viewport', {
                         {
                             xtype: 'panel',
                             border: false,
-                            width: '20%',
+                            width: '25%',
                             items: [
                                 {
                                     xtype: 'button',
