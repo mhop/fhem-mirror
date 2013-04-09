@@ -68,8 +68,6 @@ sub HMLAN_Define($$) {#########################################################
     return undef;
   }
   $hash->{DeviceName} = $dev;
-  $hash->{helper}{dPend} = 0;# data pending in HMLAN
-  $hash->{helper}{lastSend} = 0;
   my $ret = DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
   return $ret;
 }
@@ -190,11 +188,20 @@ sub HMLAN_Write($$$) {#########################################################
 # my $IDack = '+'.$dst.',02,00,';     # guess: ID acknowledge
 # my $IDack = '+'.$dst.',FF,00,';     # guess: ID acknowledge General
 # my $IDsub = '-'.$dst;               # guess: ID remove?
+# my $IDnew = '+'.$dst.',00,01,';     # newChannel- trailing 01 to be sent if talk to neu channel
   my $IDadd = '+'.$dst.',00,00,';     # guess: add ID?                                     
-
 
   if (!$lhash{$dst} && $dst ne "000000"){
     HMLAN_SimpleWrite($hash, $IDadd);
+	delete $hash->{helper}{$dst};
+	my $rxt = CUL_HM_Get(CUL_HM_id2Hash($dst),CUL_HM_id2Name($dst),"param","rxType");
+	if (!($rxt & ~0x04)){#config only
+	  $hash->{helper}{$dst}{newChn} = '+'.$dst.",01,01,FE1F";
+    }
+	else{
+	  $hash->{helper}{$dst}{newChn} = '+'.$dst.',00,01,';
+	}
+	$hash->{helper}{$dst}{name} = CUL_HM_id2Name($dst);
     $lhash{$dst} = 1;
    	$hash->{assignIDs}=join(',',keys %lhash);
    	$hash->{assignIDsCnt}=scalar(keys %lhash);
@@ -242,78 +249,81 @@ sub HMLAN_Parse($$) {##########################################################
   
   if ($letter =~ m/^[ER]/){#@mFld=($src, $status, $msec, $d2, $rssi, $msg)
     # max speed for devices is 100ms after receive - example:TC
-	# will prepare the delay here
-	my $src = substr($mFld[5],6,6);
-	my $dst = substr($mFld[5],12,6);
-	my $flg = hex(substr($mFld[5],2,2));
-	my $mNo = substr($mFld[5],0,2);
-    my $srcId = (length($mFld[5])>11)?$src:"lastRec";
-    $hash->{helper}{nextSend}{$srcId} = gettimeofday() + 0.100;
-    if ($debug){
-      Log $ll5, 'HMLAN_Parse: '.$name.' S:'.$mFld[0]
-	                               .(($mFld[0] =~ m/^E/)?'  ':'')
-	                               .' stat:'.$mFld[1]
-	                               .' t:'.$mFld[2].' d:'.$mFld[3]
-								   .' r:'.$mFld[4] 
-                                   .'     m:'.$mNo
-                                   .' '.substr($mFld[5],2,4)
-                                   .' '.$srcId
-                                   .' '.$dst
-                                   .' '.substr($mFld[5],18);
-	}
-	else{
-      Log $ll5, 'HMLAN_Parse: '.$name.' S:'.$mFld[0]
-	                               .(($mFld[0] =~ m/^E/)?'  ':'')
-	                               .' stat:'.$mFld[1]
-	                               .' t:'.$mFld[2].' d:'.$mFld[3]
-								   .' r:'.$mFld[4] 
- 								   .' m:'.$mFld[5];
-    }
-								  
-    my $dmsg = sprintf("A%02X%s", length($mFld[5])/2, uc($mFld[5]));
 
-    # handle status. 
-	#    00 00=msg without relation
-	#    00 01=ack that HMLAN waited for
-	#    00 02=msg send, no ack was requested
-	#    00 08=nack - ack was requested, msg repeated 3 times, still no ack
-	#    00 21=
-	#    00 30=
-	#    00 81=open
-	#    01 xx=
-	#    02 xx=prestate to 04xx. 
-	#    04 xx=nothing sent anymore. Any restart unsuccessful except power
-	
-#    HMLAN_SimpleWrite($hash, '+'.$src) if (($letter eq 'R') && $src ne AttrVal($name, "hmId", $mFld[4]));
-
-#    if (!($flg & 0x25)){#rule out other messages 
-#	  HMLAN_SimpleWrite($hash, '-'.$src);
-#	  HMLAN_SimpleWrite($hash, '+'.$src);
-#	}
     my $stat = hex($mFld[1]);
+	my ($mNo,$flg,$type,$src,$dst) = ($1,$2,$3,$4,$5)# Std Header
+	                  if ($mFld[5] =~ m/^(..)(..)(..)(.{6})(.{6})/);
+	my $p = substr($mFld[5],18);                     # additional content
+    my $rssi = hex($mFld[4])-65536;
+
+    Log $ll5, 'HMLAN_Parse: '.$name.' R:'.$mFld[0]
+	                               .(($mFld[0] =~ m/^E/)?'  ':'')
+	                               .' stat:' .$mFld[1]
+	                               .' t:'    .$mFld[2]
+								   .' d:'    .$mFld[3]
+								   .' r:'    .$mFld[4] 
+                                   .'     m:'.$mNo
+                                   .' '.$flg.$type
+                                   .' '.$src
+                                   .' '.$dst
+                                   .' '.$p;
+								  
+    # handle status. 
+	#    00 00= msg without relation
+	#    00 01= ack that HMLAN waited for
+	#    00 02= msg send, no ack was requested
+	#    00 08= nack - ack was requested, msg repeated 3 times, still no ack
+	#    00 21= (seen with 'R')
+	#    00 30=
+	#    00 41= (seen with 'R')
+	#    00 50= (seen with 'E')
+	#    00 81= open
+	#    01 xx= (seen with 'E')
+	#    02 xx= prestate to 04xx. 
+	#    04 xx= nothing sent anymore. Any restart unsuccessful except power
+	# 
+    # HMLAN_SimpleWrite($hash, '+'.$src) if (($letter eq 'R') && $src ne AttrVal($name, "hmId", $mFld[4]));
+    # 
+    # if (!($flg & 0x25)){#rule out other messages 
+	#  HMLAN_SimpleWrite($hash, '-'.$src);
+	#  HMLAN_SimpleWrite($hash, '+'.$src);
+	# }
 	if($stat & 0x040A){ # do not parse this message, no valid content
 	  Log $ll5, 'HMLAN_Parse: problems detected - please restart HMLAN'if($stat & 0x0400);
 	  Log $ll5, 'HMLAN_Parse: discard'                                 if($stat & 0x000A);  
 	  return ;# message with no ack is send - do not dispatch
 	}
+	if ($mFld[1] !~ m/00(01|02|21|41)/ && $letter eq 'R'){
+      Log $ll5, 'HMLAN_Parse: discard, NACK';
+	  return;
+	}
     Log $ll5, 'HMLAN_Parse: special reply '.$mFld[1]        if($stat & 0x0200);
 
-	# HMLAN sends ACK for flag 'A0' but not for 'A4'. Background is unknown - 
+	# HMLAN sends ACK for flag 'A0' but not for 'A4'(config mode)- 
 	# we ack ourself an long as logic is uncertain 
-	if ($flg == 0xA4 && $hash->{owner} eq $dst){
-	  Log $ll5, "HMLAN: manual ACK";
+	if (hex($flg) == 0xA4 && $hash->{owner} eq $dst){
+	  Log $ll5, "HMLAN: ACK config";
 	  HMLAN_Write($hash,undef, "As15".$mNo."8002".$dst.$src."00");
 	}
-
-    $dmsg .=  (($mFld[1] !~ m/00(01|02|21)/ && $letter eq 'R')?":NACK:":"::")
-	         .(hex($mFld[4])-65536)
-			 .":".$name;
-
-    $hash->{uptime} = HMLAN_uptime($mFld[2]);
-	$hash->{RSSI}   = hex($mFld[4])-65536;
-    $hash->{RAWMSG} = $rmsg;
-    $hash->{"${name}_MSGCNT"}++;
-    $hash->{"${name}_TIME"} = TimeNow();
+     #update some User information ------
+	  $hash->{uptime} = HMLAN_uptime($mFld[2]);
+	  $hash->{RSSI}   = $rssi;
+      $hash->{RAWMSG} = $rmsg;
+      $hash->{"${name}_MSGCNT"}++;
+      $hash->{"${name}_TIME"} = TimeNow();
+	
+	
+	if (($hash->{helper}{$src}{flg}) && ($letter eq 'R')){ #HMLAN is done? 
+	  $hash->{helper}{$src}{flg} = 0;                      #release send-holdoff
+	  HMLAN_SimpleWrite($hash, $hash->{helper}{$src}{msg}) #send delayed msg if any
+	                              if ($hash->{helper}{$src}{msg});
+	  $hash->{helper}{$src}{msg} = "";                     #clear message
+	}
+	# prepare dispatch-----------
+    # HM format A<len><msg>:<info>:<RSSI>:<IOname>  Info is not used anymore
+    my $dmsg = sprintf("A%02X%s::", length($mFld[5])/2, uc($mFld[5]))
+	          .$rssi                 #RSSI
+			  .":".$name;            #add sender Name
     my %addvals = (RAWMSG => $rmsg, RSSI => hex($mFld[4])-65536);
     Dispatch($hash, $dmsg, \%addvals);
   }
@@ -350,48 +360,45 @@ sub HMLAN_SimpleWrite(@) {#####################################################
   return if(!$hash || AttrVal($hash->{NAME}, "dummy", undef));
   my $name = $hash->{NAME};
   my $ll5 = GetLogLevel($name,5);
+  my $len = length($msg);
 
-  my $tn = gettimeofday();
-  # calculate maximum data speed for HMLAN. 
-  #  Theorie 2,5kByte/s
-  #  tested allowes no more then 2 byte/ms incl overhead
-  #  It is even slower if HMLAN waits for acks, acks are missing,...
-  my $bytPend = $hash->{helper}{dPend} - 
-                int(($tn - $hash->{helper}{lastSend})*4000);
-  $bytPend = 0 if ($bytPend < 0);
-  $hash->{helper}{dPend} = $bytPend + length($msg);
-  $hash->{helper}{lastSend} = $tn;
-  my $wait = $bytPend/4000; # HMLAN 
-  #  => wait time to protect HMLAN overload
-#  my $wait = $bytPend>>11; # fast divide by 2048 
-
-  # It is not possible to answer befor 100ms
-  my $id = (length($msg)>51)?substr($msg,46,6):"";
-  my $DevDelay=0;
-  if ($id && $hash->{helper}{nextSend}{$id}){
-    $DevDelay = $hash->{helper}{nextSend}{$id} - $tn; # calculate time passed
-	$DevDelay = ($DevDelay > 0.01)?( $DevDelay -= int($DevDelay)):0;
+  if ($len>51){
+    $msg =~ m/(.{9}).(..).(.{8}).(..).(.{8}).(..)(....)(.{6})(.{6})(.*)/;
+	Log $ll5, 'HMLAN_Send:  '.$name.' S:'.$1
+                             .' stat:  ' .$2
+                             .' t:'      .$3
+                             .' d:'      .$4
+                             .' r:'      .$5 
+                             .' m:'      .$6
+                             .' '        .$7 
+                             .' '        .$8
+                             .' '        .$9
+                             .' '        .$10;
+    if ($len > 52){#channel informatiion included
+      my ($flg,$dst,$chn) = (substr($msg,36,2),substr($msg,46,6),substr($msg,52,2));
+	  if ( $hash->{helper}{$dst}{flg}){                #send not ack by HMLAN
+        if($hash->{helper}{$dst}{to} > gettimeofday()){#will not wait forever!
+	      $hash->{helper}{$dst}{msg} = $msg;           #postpone  message
+	      Log $ll5,"HMLAN_Delay: $name msg delayed $dst $msg";
+	      return;
+	    }
+	    else{
+	      Log $ll5,"HMLAN_Delay: $name timed out";
+	    }
+	  }
+	  $hash->{helper}{$dst}{flg} = (hex($flg)&0x20)?1:0;
+      $hash->{helper}{$dst}{to} = gettimeofday() + 2;# flag timeout after 2 sec
+ 
+	if ($hash->{helper}{$dst}{chn} && $hash->{helper}{$dst}{chn} ne $chn){
+	  my $updt = $hash->{helper}{$dst}{newChn};
+      Log $ll5, 'HMLAN_Send:  '.$name.' S:'.$updt; 
+	  syswrite($hash->{TCPDev}, $updt."\r\n")     if($hash->{TCPDev});
+	}
+	$hash->{helper}{$dst}{chn} = $chn;
   }
-  $wait = ($DevDelay >$wait)?$DevDelay:$wait; # select the longer waittime
-  select(undef, undef, undef, $wait)if ($wait>0.01);
-  
-  
-  if ($debug){
-    Log $ll5, 'HMLAN_Send:         S:'   .substr($msg,0,9).
-                              ' stat:  ' .substr($msg,10,2).
-                              ' t:'      .substr($msg,13,8).
-                              ' d:'      .substr($msg,22,2).
-                              ' r:'      .substr($msg,25,8).  
-                              ' m:'      .substr($msg,34,2).
-                              ' '        .substr($msg,36,4). 
-                              ' '        .substr($msg,40,6).
-                              ' '        .substr($msg,46,6). 
-                              ' '        .substr($msg,52)      
-   							if (length($msg )>51);
-    Log $ll5, 'HMLAN_Send:  '.$msg     if (length($msg) <=51); 
-  }
+ }
   else{
-    Log $ll5, 'HMLAN_Send:  '.$msg; #normal trace
+    Log $ll5, 'HMLAN_Send:  '.$name.' I:'.$msg; 
   }
   
   $msg .= "\r\n" unless($nonl);
@@ -479,6 +486,9 @@ sub HMLAN_secSince2000() {#####################################################
     <li>set the dummy attribute for the HMLAN device in fhem
   </ul>
   <br><br>
+
+
+
 
 
   <a name="HMLANdefine"></a>
