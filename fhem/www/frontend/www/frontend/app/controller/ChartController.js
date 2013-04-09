@@ -417,7 +417,7 @@ Ext.define('FHEM.controller.ChartController', {
                       if(yaxisstepcheck) {
                           if (store.last()) {
                               var lastrec = store.last();
-                              var datetomodify = new Date(json.data[j].TIMESTAMP);
+                              var datetomodify = Ext.Date.parse(json.data[j].TIMESTAMP, "Y-m-d H:i:s");
                               var modtimestamp = Ext.Date.add(datetomodify, Ext.Date.SECOND, -1);
                               var stepitem = lastrec.copy();
                               Ext.iterate(stepitem.data, function(key, value) {
