@@ -295,27 +295,6 @@ sub OWSWITCH_ChannelNames($) {
 
 ########################################################################################
 #
-# OWSWITCH_InitializeDevice - delayed setting of initial readings and channel names  
-#
-#  Parameter hash = hash of device addressed
-#
-########################################################################################
-
-sub OWSWITCH_InitializeDevice($) {
-
-  my ($hash) = @_;
-  my $name   = $hash->{NAME};
-  
-  #-- Initial readings 
-  for( my $i=0;$i<$cnumber{$attr{$name}{"model"}} ;$i++) { 
-    #-- Initial readings ERR
-    $owg_val[$i]   = 1;
-    $owg_vax[$i]   = 0;
-  }
-}
-
-########################################################################################
-#
 # OWSWITCH_FormatValues - put together various format strings 
 #
 #  Parameter hash = hash of device addressed, fs = format string
@@ -334,10 +313,6 @@ sub OWSWITCH_FormatValues($) {
   
   #-- obtain channel names
   OWSWITCH_ChannelNames($hash);
-  
-  #-- check if device needs to be initialized
-  OWSWITCH_InitializeDevice($hash)
-    if( $hash->{READINGS}{"state"}{VAL} eq "defined"); 
   
   #-- put into READINGS
   readingsBeginUpdate($hash);
@@ -439,7 +414,7 @@ sub OWSWITCH_Get($@) {
 
   #-- get single state
   if( $reading eq "input" ){
-    return "OWSWITCH: get needs parameter when reading input: <channel>"
+    return "OWSWITCH: Get needs parameter when reading input: <channel>"
       if( int(@a)<2 );
     my $fnd=undef;
     for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
@@ -448,7 +423,7 @@ sub OWSWITCH_Get($@) {
         last;
       }
     }
-    return "OWSWITCH: invalid input address, must be A,B,... or defined channel name"
+    return "OWSWITCH: Invalid input address, must be A,B,... or defined channel name"
       if( !defined($fnd) );
 
     #-- OWX interface
@@ -468,7 +443,7 @@ sub OWSWITCH_Get($@) {
     
   #-- get all states
   }elsif( $reading eq "gpio" ){
-    return "OWSWITCH: get needs no parameter when reading gpio"
+    return "OWSWITCH: Get needs no parameter when reading gpio"
       if( int(@a)==1 );
 
     if( $interface eq "OWX" ){
@@ -502,8 +477,10 @@ sub OWSWITCH_GetValues($) {
   my $model   = $hash->{OW_MODEL};
   my $value   = "";
   my $ret     = "";
-  my $offset;
-  my $factor;
+  
+  #-- check if device needs to be initialized
+  OWSWITCH_InitializeDevice($hash)
+    if( $hash->{READINGS}{"state"}{VAL} eq "defined"); 
 
   #-- restart timer for updates
   RemoveInternalTimer($hash);
@@ -545,6 +522,31 @@ sub OWSWITCH_GetValues($) {
   return undef;
 }
 
+########################################################################################
+#
+# OWSWITCH_InitializeDevice - initial readings 
+#  Parameter hash = hash of device addressed
+#
+########################################################################################
+
+sub OWSWITCH_InitializeDevice($) {
+
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  
+  #-- Initial readings 
+  for( my $i=0;$i<$cnumber{$attr{$name}{"model"}} ;$i++) { 
+    #-- Initial readings ERR
+    $owg_val[$i]   = 1;
+    $owg_vax[$i]   = 0;
+  }
+   
+  #-- Set state to initialized
+  readingsSingleUpdate($hash,"state","initialized",1);
+  
+  return undef;
+}
+
 #######################################################################################
 #
 # OWSWITCH_Set - Set one value for device
@@ -563,7 +565,9 @@ sub OWSWITCH_Set($@) {
   my $name    = $hash->{NAME};
   my $model   = $hash->{OW_MODEL};
   
-  my ($ret,$cname,@cnama,@channel);
+  my ($cname,@cnama,@channel);
+  my $ret="";
+  my ($ret1,$ret2);
   
   #-- for the selector: which values are possible
   if (@a == 2){
@@ -578,7 +582,7 @@ sub OWSWITCH_Set($@) {
   
   #-- reset the device
   if($key eq "init") {
-    return "OWSWITCH: init needs parameter 'yes'"
+    return "OWSWITCH: Set init needs parameter 'yes'"
       if($value ne "yes");
     OWSWITCH_InitializeDevice($hash);
     return "OWSWITCH: Re-initialized device $name";
@@ -604,7 +608,7 @@ sub OWSWITCH_Set($@) {
   
   #-- set single state
   if( $key eq "output" ){
-    return "OWSWITCH: get needs parameter when writing output: <channel>"
+    return "OWSWITCH: Set needs parameter when writing output: <channel>"
       if( int(@a)<2 );
     #-- find out which channel we have
     my $fnd=undef;
@@ -614,7 +618,7 @@ sub OWSWITCH_Set($@) {
         last;
       }
     }
-    return "OWSWITCH: invalid output address, must be A,B,... or defined channel name"
+    return "OWSWITCH: Invalid output address, must be A,B,... or defined channel name"
       if( !defined($fnd) );
 
     #-- prepare gpio value
@@ -652,7 +656,7 @@ sub OWSWITCH_Set($@) {
     
     #-- OWX interface
     if( $interface eq "OWX" ){
-      $ret   = OWXSWITCH_GetState($hash);
+      $ret1  = OWXSWITCH_GetState($hash);
       $value = 0;
       #-- vax or val ?
       for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
@@ -661,10 +665,10 @@ sub OWSWITCH_Set($@) {
         $value += ($nval<<$i) 
           if( $i == $fnd );  
       }
-      $ret = OWXSWITCH_SetState($hash,$value);
+      $ret2 = OWXSWITCH_SetState($hash,$value);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
-      $ret   = OWFSSWITCH_GetState($hash);
+      $ret1  = OWFSSWITCH_GetState($hash);
       $value = 0;
       #-- vax or val ?
       for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
@@ -673,10 +677,18 @@ sub OWSWITCH_Set($@) {
         $value += ($nval<<$i) 
           if( $i == $fnd );  
       }
-      $ret = OWFSSWITCH_SetState($hash,$value);
+      $ret2 = OWFSSWITCH_SetState($hash,$value);
     #-- Unknown interface
     }else{
       return "OWSWITCH: Get with wrong IODev type $interface";
+    }
+   #-- process results
+    $ret .= $ret1
+      if( defined($ret1) );
+    $ret .= $ret2
+      if( defined($ret2) );
+    if( $ret ne "" ){
+      return "OWSWITCH: Could not set device $name, reason: ".$ret;
     }
  
   #-- set state
@@ -691,6 +703,10 @@ sub OWSWITCH_Set($@) {
       $ret = OWFSSWITCH_SetState($hash,int($value));
     }else{
       return "OWSWITCH: GetValues with wrong IODev type $interface";
+    }
+    #-- process results
+    if( defined($ret)  ){
+      return "OWSWITCH: Could not set device $name, reason: ".$ret;
     }
   }
   
@@ -1019,7 +1035,7 @@ sub OWXSWITCH_SetState($$) {
     #-- read the data
     $res=OWX_Complex($master,$owx_dev,$select,2);
     if( $res eq 0 ){
-      return "OWXSWITCH: Device $owx_dev not accessible in writing"; 
+      return "device $owx_dev not accessible in writing"; 
     }
     #-- reset the bus
     OWX_Reset($master);
@@ -1029,7 +1045,7 @@ sub OWXSWITCH_SetState($$) {
     
     #-- very crude check - should be CRC
     if( int(@data) != 6){
-      return "OWXSWITCH: State could not be set for device $owx_dev";
+      return "state could not be set for device $owx_dev";
     } 
     
     #-- put into local buffer
@@ -1049,14 +1065,14 @@ sub OWXSWITCH_SetState($$) {
     #-- read the data
     $res=OWX_Complex($master,$owx_dev,$select,1);
     if( $res eq 0 ){
-      return "OWXSWITCH: Device $owx_dev not accessible in writing"; 
+      return "device $owx_dev not accessible in writing"; 
     }
     
     #-- process results
     @data=split(//,substr($res,10));
     
     if( $data[2] ne "\xAA"){
-      return "OWXSWITCH: State could not be set for device $owx_dev";
+      return "state could not be set for device $owx_dev";
     }
     #-- reset the bus
     OWX_Reset($master);
@@ -1072,7 +1088,7 @@ sub OWXSWITCH_SetState($$) {
     #-- read the data
     $res=OWX_Complex($master,$owx_dev,$select,1);
     if( $res eq 0 ){
-      return "OWXSWITCH: Device $owx_dev not accessible in writing"; 
+      return "device $owx_dev not accessible in writing"; 
     }
     #-- reset the bus
     OWX_Reset($master);
@@ -1081,11 +1097,11 @@ sub OWXSWITCH_SetState($$) {
     @data=split(//,substr($res,10));
   
     if( $data[2] ne "\xAA"){
-      return "OWXSWITCH: State could not be set for device $owx_dev";
+      return "state could not be set for device $owx_dev";
     }  
   
   }else {
-    return "OWXSWITCH: Unknown device family $hash->{OW_FAMILY}\n";
+    return "unknown device family $hash->{OW_FAMILY}\n";
   }
 
   return undef;
