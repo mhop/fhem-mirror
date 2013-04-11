@@ -256,7 +256,7 @@ sub HMLAN_Parse($$) {##########################################################
 	my $p = substr($mFld[5],18);                     # additional content
     my $rssi = hex($mFld[4])-65536;
 
-    Log $ll5, 'HMLAN_Parse: '.$name.' R:'.$mFld[0]
+    Log $ll5, "HMLAN_Parse: $name R:".$mFld[0]
 	                               .(($mFld[0] =~ m/^E/)?'  ':'')
 	                               .' stat:' .$mFld[1]
 	                               .' t:'    .$mFld[2]
@@ -289,20 +289,23 @@ sub HMLAN_Parse($$) {##########################################################
 	#  HMLAN_SimpleWrite($hash, '+'.$src);
 	# }
 	if($stat & 0x040A){ # do not parse this message, no valid content
-	  Log $ll5, 'HMLAN_Parse: problems detected - please restart HMLAN'if($stat & 0x0400);
-	  Log $ll5, 'HMLAN_Parse: discard'                                 if($stat & 0x000A);  
+	  Log $ll5, "HMLAN_Parse: $name problems detected - please restart HMLAN"if($stat & 0x0400);
+	  Log $ll5, "HMLAN_Parse: $name discard"                                 if($stat & 0x000A);
 	  return ;# message with no ack is send - do not dispatch
 	}
 	if ($mFld[1] !~ m/00(01|02|21|41)/ && $letter eq 'R'){
-      Log $ll5, 'HMLAN_Parse: discard, NACK';
+      Log $ll5, "HMLAN_Parse: $name discard, NACK state:".$mFld[1];
 	  return;
 	}
-    Log $ll5, 'HMLAN_Parse: special reply '.$mFld[1]        if($stat & 0x0200);
+    Log $ll5, "HMLAN_Parse: $name special reply ".$mFld[1]        if($stat & 0x0200);
 
 	# HMLAN sends ACK for flag 'A0' but not for 'A4'(config mode)- 
-	# we ack ourself an long as logic is uncertain 
-	if (hex($flg) == 0xA4 && $hash->{owner} eq $dst){
-	  Log $ll5, "HMLAN: ACK config";
+	# we ack ourself an long as logic is uncertain - also possible is 'A6' for RHS
+	if (hex($flg)&0x2){
+	  $hash->{helper}{$src}{nextSend} = gettimeofday() + 0.130;
+	}
+	if (hex($flg)&0xA4 == 0xA4 && $hash->{owner} eq $dst){
+	  Log $ll5, "HMLAN_Parse: $name ACK config";
 	  HMLAN_Write($hash,undef, "As15".$mNo."8002".$dst.$src."00");
 	}
      #update some User information ------
@@ -311,7 +314,6 @@ sub HMLAN_Parse($$) {##########################################################
       $hash->{RAWMSG} = $rmsg;
       $hash->{"${name}_MSGCNT"}++;
       $hash->{"${name}_TIME"} = TimeNow();
-	
 	
 	if (($hash->{helper}{$src}{flg}) && ($letter eq 'R')){ #HMLAN is done? 
 	  $hash->{helper}{$src}{flg} = 0;                      #release send-holdoff
@@ -334,6 +336,7 @@ sub HMLAN_Parse($$) {##########################################################
     $hash->{uptime} = HMLAN_uptime($mFld[5]);
    	$hash->{assignIDsReport}=$mFld[6];
     $hash->{helper}{keepAliveRec} = 1;
+    $hash->{helper}{keepAliveRpt} = 0; 
     Log $ll5, 'HMLAN_Parse: '.$name.                 ' V:'.$mFld[1]
 	                               .' sNo:'.$mFld[2].' d:'.$mFld[3]
 								   .' O:'  .$mFld[4].' m:'.$mFld[5].' IDcnt:'.$mFld[6];
@@ -361,8 +364,18 @@ sub HMLAN_SimpleWrite(@) {#####################################################
   my $name = $hash->{NAME};
   my $ll5 = GetLogLevel($name,5);
   my $len = length($msg);
+  
+  # It is not possible to answer befor 100ms
 
   if ($len>51){
+    my $dst = substr($msg,46,6);
+    if ($dst && $hash->{helper}{$dst}{nextSend}){
+      my $DevDelay=0;
+      $DevDelay = $hash->{helper}{$dst}{nextSend} - gettimeofday();
+	  $DevDelay = ($DevDelay > 0.01)?( $DevDelay -= int($DevDelay)):0;
+	  delete $hash->{helper}{$dst}{nextSend};
+      select(undef, undef, undef, $DevDelay)if ($DevDelay>0.01);
+    }
     $msg =~ m/(.{9}).(..).(.{8}).(..).(.{8}).(..)(....)(.{6})(.{6})(.*)/;
 	Log $ll5, 'HMLAN_Send:  '.$name.' S:'.$1
                              .' stat:  ' .$2
@@ -375,7 +388,7 @@ sub HMLAN_SimpleWrite(@) {#####################################################
                              .' '        .$9
                              .' '        .$10;
     if ($len > 52){#channel informatiion included
-      my ($flg,$dst,$chn) = (substr($msg,36,2),substr($msg,46,6),substr($msg,52,2));
+      my ($flg,$chn) = (substr($msg,36,2),substr($msg,52,2));
 	  if ( $hash->{helper}{$dst}{flg}){                #send not ack by HMLAN
         if($hash->{helper}{$dst}{to} > gettimeofday()){#will not wait forever!
 	      $hash->{helper}{$dst}{msg} = $msg;           #postpone  message
@@ -423,6 +436,8 @@ sub HMLAN_DoInit($) {##########################################################
   
   foreach (keys %lhash){delete ($lhash{$_})};# clear IDs - HMLAN might have a reset 
   $hash->{helper}{keepAliveRec} = 1; # ok for first time
+  $hash->{helper}{keepAliveRpt} = 0; # ok for first time
+  RemoveInternalTimer( "keepAliveCk:".$name);# avoid duplicate timer
   RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
   InternalTimer(gettimeofday()+25, "HMLAN_KeepAlive", "keepAlive:".$name, 0);
   return undef;
@@ -437,16 +452,26 @@ sub HMLAN_KeepAlive($) {#######################################################
   HMLAN_SimpleWrite($hash, "K");
   RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
   my $rt = AttrVal($name,"respTime",1);
-  InternalTimer(gettimeofday()+$rt, "HMLAN_KeepAliveCheck", "keepAliveCk:".$name, 1);
+  InternalTimer(gettimeofday()+$rt,"HMLAN_KeepAliveCheck","keepAliveCk:".$name,1);
   InternalTimer(gettimeofday()+25, "HMLAN_KeepAlive", "keepAlive:".$name, 1);
 }
 sub HMLAN_KeepAliveCheck($) {##################################################
   my($in ) = shift;
   my(undef,$name) = split(':',$in);
   my $hash = $defs{$name};
-  if ($hash->{helper}{keepAliveRec} != 1){
-    DevIo_Disconnected($hash);
+  if ($hash->{helper}{keepAliveRec} != 1){# no answer
+    if ($hash->{helper}{keepAliveRpt} >2){# give up here
+      DevIo_Disconnected($hash);
+    }
+    else{
+      $hash->{helper}{keepAliveRpt}++;
+	  HMLAN_KeepAlive("keepAlive:".$name);#repeat
+    }
   }
+  else{
+    $hash->{helper}{keepAliveRpt}=0;
+  }
+
 }
 sub HMLAN_secSince2000() {#####################################################
   # Calculate the local time in seconds from 2000.
