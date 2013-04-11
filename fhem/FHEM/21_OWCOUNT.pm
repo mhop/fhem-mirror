@@ -351,6 +351,7 @@ sub OWCOUNT_FormatValues($) {
     
   #-- Check, whether we have a new day at the next reading
   $deltim = $hour*60.0+$min+$sec/60.0 - (1440 - $hash->{INTERVAL}/60.0);
+  #$deltim = $min+$sec/60.0 - 55;
   if( $deltim>=0 ){
     $daybreak = 1;
     $monthbreak = 0;
@@ -478,10 +479,10 @@ sub OWCOUNT_FormatValues($) {
     @monthv = OWCOUNT_GetMonth($hash);
     #-- error check
     if( int(@monthv) == 2 ){
-      $total0 = @monthv[0]->[1];
-      $total1 = @monthv[1]->[1];
+      $total0 = $monthv[0]->[1];
+      $total1 = $monthv[1]->[1];
     }else{
-      Log 3,"OWCOUNT: No monthly summary possible, ".@monthv[0];
+      Log 3,"OWCOUNT: No monthly summary possible, ".$monthv[0];
       $total0 = "";
       $total1 = "";
     };
@@ -521,6 +522,7 @@ sub OWCOUNT_Get($@) {
   my $ret     = "";
   my $page;
   my ($unit,$daily);
+  my ($ret1,$ret2);
 
   #-- check syntax
   return "OWCOUNT: Get argument is missing @a"
@@ -596,7 +598,7 @@ sub OWCOUNT_Get($@) {
   #-- check syntax for getting memory page 0..13 or midnight A/B
   if( ($reading eq "memory") || ($reading eq "midnight") ){
     if( $reading eq "memory" ){
-      return "OWCOUNT: get needs parameter when reading memory: <page>"
+      return "OWCOUNT: Get needs parameter when reading memory: <page>"
         if( int(@a)<2 );
       $page=int($a[2]);
       if( ($page<0) || ($page>13) ){
@@ -611,7 +613,7 @@ sub OWCOUNT_Get($@) {
       }elsif( ($a[2] eq $owg_channel[1]) || ($a[2] eq "B") ){    
         $page=15;
       } else {
-        return "OWCOUNT: invalid midnight counter address, must be A, B or defined channel name"
+        return "OWCOUNT: Invalid midnight counter address, must be A, B or defined channel name"
       }
     }
     #-- OWX interface
@@ -634,7 +636,7 @@ sub OWCOUNT_Get($@) {
   
   #-- check syntax for getting counter
   if( $reading eq "counter" ){
-    return "OWCOUNT: get needs parameter when reading counter: <channel>"
+    return "OWCOUNT: Get needs parameter when reading counter: <channel>"
       if( int(@a)<2 );
     #-- find out which channel we have
     if( ($a[2] eq $owg_channel[0]) || ($a[2] eq "A") ){
@@ -642,7 +644,7 @@ sub OWCOUNT_Get($@) {
     }elsif( ($a[2] eq $owg_channel[1]) || ($a[2] eq "B") ){    
       $page=15;
     } else {
-      return "OWCOUNT: invalid counter address, must be A, B or defined channel name"
+      return "OWCOUNT: Invalid counter address, must be A, B or defined channel name"
     }
 
     #-- OWX interface
@@ -657,21 +659,25 @@ sub OWCOUNT_Get($@) {
     }
   #-- check syntax for getting counters
   }elsif( $reading eq "counters" ){
-    return "OWCOUNT: get needs no parameter when reading counters"
+    return "OWCOUNT: Get needs no parameter when reading counters"
       if( int(@a)==1 );
     #-- OWX interface
     if( $interface eq "OWX" ){
-      $ret  = OWXCOUNT_GetPage($hash,14);
-      $ret .= OWXCOUNT_GetPage($hash,15);
+      $ret1 = OWXCOUNT_GetPage($hash,14);
+      $ret2 = OWXCOUNT_GetPage($hash,15);
     }elsif( $interface eq "OWServer" ){
-      $ret  = OWFSCOUNT_GetPage($hash,14);
-      $ret .= OWFSCOUNT_GetPage($hash,15);
+      $ret1 = OWFSCOUNT_GetPage($hash,14);
+      $ret2 = OWFSCOUNT_GetPage($hash,15);
     }else{
       return "OWCOUNT: GetValues with wrong IODev type $interface";
     }
   }
   #-- process results
-  if( $ret  ){
+  $ret .= $ret1
+    if( defined($ret1) );
+  $ret .= $ret2
+    if( defined($ret2) );
+  if( $ret ne ""  ){
     return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
   }
   $hash->{PRESENT} = 1; 
@@ -780,14 +786,11 @@ sub OWCOUNT_GetValues($) {
   my $model   = $hash->{OW_MODEL};
   my $value   = "";
   my $ret     = "";
+  my ($ret1,$ret2);
   
   #-- check if device needs to be initialized
   OWCOUNT_InitializeDevice($hash)
     if( $hash->{READINGS}{"state"}{VAL} eq "defined");
-  
-  #-- define warnings
-  my $warn        = "none";
-  $hash->{ALARM}  = "0";
 
   #-- restart timer for updates
   RemoveInternalTimer($hash);
@@ -799,17 +802,21 @@ sub OWCOUNT_GetValues($) {
   #-- Get readings according to interface type
   my $interface= $hash->{IODev}->{TYPE};
   if( $interface eq "OWX" ){
-    $ret  = OWXCOUNT_GetPage($hash,14);
-    $ret .= OWXCOUNT_GetPage($hash,15);
+    $ret1 = OWXCOUNT_GetPage($hash,14);
+    $ret2 = OWXCOUNT_GetPage($hash,15);
   }elsif( $interface eq "OWServer" ){
-    $ret  = OWFSCOUNT_GetPage($hash,14);
-    $ret .= OWFSCOUNT_GetPage($hash,15);
+    $ret1 = OWFSCOUNT_GetPage($hash,14);
+    $ret2 = OWFSCOUNT_GetPage($hash,15);
   }else{
     return "OWCOUNT: GetValues with wrong IODev type $interface";
   }
   
   #-- process results
-  if( defined($ret)  ){
+  $ret .= $ret1
+    if( defined($ret1) );
+  $ret .= $ret2
+    if( defined($ret2) );
+  if( $ret ne ""  ){
     return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
   }
   $hash->{PRESENT} = 1; 

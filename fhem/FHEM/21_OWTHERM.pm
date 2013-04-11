@@ -72,7 +72,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.21";
+my $owx_version="3.23";
 #-- temperature globals - always the raw values from/for the device
 my $owg_temp     = "";
 my $owg_th       = "";
@@ -235,97 +235,36 @@ sub OWTHERM_Define ($$) {
 
   return undef; 
 }
-  
-########################################################################################
+ 
+#######################################################################################
 #
-# OWTHERM_InitializeDevice - delayed setting of initial readings
+# OWTHERM_Attr - Set one attribute value for device
 #
 #  Parameter hash = hash of device addressed
+#            a = argument array
 #
 ########################################################################################
 
-sub OWTHERM_InitializeDevice($) {
-  my ($hash) = @_;
+sub OWTHERM_Attr(@) {
+  my ($do,@a) = @_;
   
-  my $name   = $hash->{NAME};
-  my $interface = $hash->{IODev}->{TYPE};
-  my @a = ($name,"",0);
-  my ($unit,$offset,$factor,$abbr,$value);
+  my $name    = $a[0];
+  my $key     = $a[1];
+  my $ret;
   
-  #-- attributes defined ?
-  $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "&#x25BE;";
-  $stateah = defined($attr{$name}{stateAH}) ? $attr{$name}{stateAH} : "&#x25B4;";
-  $unit    = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
-  $offset  = defined($attr{$name}{"tempOffset"}) ? $attr{$name}{"tempOffset"} : 0.0 ;
-  $factor  = 1.0;
+  #-- only alarm settings may be modified at runtime for now
+  return undef
+    if( $key !~ m/(.*)(Low|High)/ );
+  #-- safeguard against uninitialized devices
+  return undef
+    if( $main::defs{$name}->{READINGS}{"state"}{VAL} eq "defined" );
   
-  if( $unit eq "Celsius" ){
-    $abbr   = "&deg;C";
-  } elsif ($unit eq "Kelvin" ){
-    $abbr   = "K";
-    $offset += "273.16"
-  } elsif ($unit eq "Fahrenheit" ){
-    $abbr   = "&deg;F";
-    $offset = ($offset+32)/1.8;
-    $factor = 1.8;
-  } else {
-    $abbr="?";
-    Log 3, "OWTHERM_FormatValues: unknown unit $unit";
+  if( $do eq "set")
+  {
+    $ret = OWTHERM_Set($main::defs{$name},@a);
+  } elsif( $do eq "del"){
   }
-  #-- these values are rather complex to obtain, therefore save them in the hash
-  $hash->{READINGS}{"temperature"}{TYPE} = "temperature";
-  $hash->{READINGS}{"temperature"}{UNIT}     = $unit;
-  $hash->{READINGS}{"temperature"}{UNITABBR} = $abbr;
-  $hash->{ERRCOUNT}                          = 0;
-  $hash->{tempf}{offset}                     = $offset;
-  $hash->{tempf}{factor}                     = $factor;
-  
-  #-- Check if temperature conversion is consistent
-  if( $interface eq "OWX" ){
-    if( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
-      if( !(defined($attr{$hash->{IODev}->{NAME}}{dokick})) || 
-           ( defined($attr{$hash->{IODev}->{NAME}}{dokick}) && ($attr{$hash->{IODev}->{NAME}}{dokick} eq "0") )){
-        Log 1,"OWTHERM: Attribute tempConv=onkick changed to onread for $name because interface is not kicking";
-        $attr{$name}{tempConv}="onread";
-      }
-    }
-  }elsif( $interface eq "OWServer" ){
-    if( !(defined($attr{$name}{tempConv})) ||
-         (defined($attr{$name}{tempConv}) && ($attr{$name}{tempConv} eq "onread") ) ){
-      Log 1,"OWTHERM: Attribute tempConv=onread changed to onkick for $name because interface is OWFS";
-      $attr{$name}{tempConv}="onread";
-    }
-  }  
-  
-  #-- Set the attribute values if defined
-  if(  defined($attr{$name}{"tempLow"}) ){
-    $value = $attr{$name}{"tempLow"};
-    $a[1] = "tempLow"; 
-    $a[2] = floor($value/$factor-$offset+0.5);
-    #-- put into device
-    #-- OWX interface
-    if( $interface eq "OWX" ){
-      OWXTHERM_SetValues($hash,@a);
-    #-- OWFS interface
-    }elsif( $interface eq "OWServer" ){
-      OWFSTHERM_SetValues($hash,@a);
-    } 
-  }
-  if( defined($attr{$name}{"tempHigh"}) ){
-    $value = $attr{$name}{"tempHigh"};
-    $a[1] = "tempHigh"; 
-    $a[2] = floor($value/$factor-$offset+0.5);
-    #-- put into device
-    #-- OWX interface
-    if( $interface eq "OWX" ){
-      OWXTHERM_SetValues($hash,@a);
-    #-- OWFS interface
-    }elsif( $interface eq "OWServer" ){
-      OWFSTHERM_SetValues($hash,@a);
-    } 
-  }
-  #-- Set state to initialized
-  readingsSingleUpdate($hash,"state","initialized",1);
+  return $ret;
 }
 
 ########################################################################################
@@ -362,7 +301,7 @@ sub OWTHERM_FormatValues($) {
     $factor = 1.8;
   } else {
     $abbr="?";
-    Log 3, "OWTHERM_FormatValues: unknown unit $unit";
+    Log 3, "OWTHERM_FormatValues: Unknown temperature unit $unit";
   }
   #-- these values are rather complex to obtain, therefore save them in the hash
   $hash->{READINGS}{"temperature"}{UNIT}     = $unit;
@@ -372,10 +311,6 @@ sub OWTHERM_FormatValues($) {
   
   #-- no change in any value if invalid reading
   return if( $owg_temp eq "");
-  
-  #-- check if device needs to be initialized
-  OWTHERM_InitializeDevice($hash)
-    if( $hash->{READINGS}{"state"}{VAL} eq "defined");
   
   #-- correct values for proper offset, factor 
   $vval  = ($owg_temp + $offset)*$factor;
@@ -518,6 +453,10 @@ sub OWTHERM_GetValues($@) {
   my $value   = "";
   my $ret     = "";
   
+  #-- check if device needs to be initialized
+  OWTHERM_InitializeDevice($hash)
+    if( $hash->{READINGS}{"state"}{VAL} eq "defined");
+  
   #-- restart timer for updates
   RemoveInternalTimer($hash);
   InternalTimer(time()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
@@ -553,6 +492,108 @@ sub OWTHERM_GetValues($@) {
 
   $value=OWTHERM_FormatValues($hash);
   Log 5, $value;
+  
+  return undef;
+}
+
+########################################################################################
+#
+# OWTHERM_InitializeDevice - delayed setting of initial readings
+#
+#  Parameter hash = hash of device addressed
+#
+########################################################################################
+
+sub OWTHERM_InitializeDevice($) {
+  my ($hash) = @_;
+  
+  my $name   = $hash->{NAME};
+  my $interface = $hash->{IODev}->{TYPE};
+  my @a = ($name,"",0);
+  my ($unit,$offset,$factor,$abbr,$value,$ret);
+  
+  #-- attributes defined ?
+  $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "&#x25BE;";
+  $stateah = defined($attr{$name}{stateAH}) ? $attr{$name}{stateAH} : "&#x25B4;";
+  $unit    = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
+  $offset  = defined($attr{$name}{"tempOffset"}) ? $attr{$name}{"tempOffset"} : 0.0 ;
+  $factor  = 1.0;
+  
+  if( $unit eq "Celsius" ){
+    $abbr   = "&deg;C";
+  } elsif ($unit eq "Kelvin" ){
+    $abbr   = "K";
+    $offset += "273.16"
+  } elsif ($unit eq "Fahrenheit" ){
+    $abbr   = "&deg;F";
+    $offset = ($offset+32)/1.8;
+    $factor = 1.8;
+  } else {
+    $abbr="?";
+    Log 3, "OWTHERM_FormatValues: unknown unit $unit";
+  }
+  #-- these values are rather complex to obtain, therefore save them in the hash
+  $hash->{READINGS}{"temperature"}{TYPE} = "temperature";
+  $hash->{READINGS}{"temperature"}{UNIT}     = $unit;
+  $hash->{READINGS}{"temperature"}{UNITABBR} = $abbr;
+  $hash->{ERRCOUNT}                          = 0;
+  $hash->{tempf}{offset}                     = $offset;
+  $hash->{tempf}{factor}                     = $factor;
+  
+  #-- Check if temperature conversion is consistent
+  if( $interface eq "OWX" ){
+    if( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
+      if( !(defined($attr{$hash->{IODev}->{NAME}}{dokick})) || 
+           ( defined($attr{$hash->{IODev}->{NAME}}{dokick}) && ($attr{$hash->{IODev}->{NAME}}{dokick} eq "0") )){
+        Log 1,"OWTHERM: Attribute tempConv=onkick changed to onread for $name because interface is not kicking";
+        $attr{$name}{tempConv}="onread";
+      }
+    }
+  }elsif( $interface eq "OWServer" ){
+    if( !(defined($attr{$name}{tempConv})) ||
+         (defined($attr{$name}{tempConv}) && ($attr{$name}{tempConv} eq "onread") ) ){
+      Log 1,"OWTHERM: Attribute tempConv=onread changed to onkick for $name because interface is OWFS";
+      $attr{$name}{tempConv}="onread";
+    }
+  }  
+  
+  #-- Set the attribute values if defined
+  if(  defined($attr{$name}{"tempLow"}) ){
+    $value = $attr{$name}{"tempLow"};
+    $a[1] = "tempLow"; 
+    $a[2] = floor($value/$factor-$offset+0.5);
+    #-- put into device
+    #-- OWX interface
+    if( $interface eq "OWX" ){
+      $ret = OWXTHERM_SetValues($hash,@a);
+    #-- OWFS interface
+    }elsif( $interface eq "OWServer" ){
+      $ret = OWFSTHERM_SetValues($hash,@a);
+    } 
+    #-- process results
+    if( defined($ret)  ){
+      return "OWTHERM: Could not initialize device $name, reason: ".$ret;
+    }
+  }
+  if( defined($attr{$name}{"tempHigh"}) ){
+    $value = $attr{$name}{"tempHigh"};
+    $a[1] = "tempHigh"; 
+    $a[2] = floor($value/$factor-$offset+0.5);
+    #-- put into device
+    #-- OWX interface
+    if( $interface eq "OWX" ){
+      $ret = OWXTHERM_SetValues($hash,@a);
+    #-- OWFS interface
+    }elsif( $interface eq "OWServer" ){
+      $ret = OWFSTHERM_SetValues($hash,@a);
+    } 
+    #-- process results
+    if( defined($ret)  ){
+      return "OWTHERM: Could not initialize device $name, reason: ".$ret;
+    }
+  }
+  #-- Set state to initialized
+  readingsSingleUpdate($hash,"state","initialized",1);
   
   return undef;
 }
@@ -640,8 +681,10 @@ sub OWTHERM_Set($@) {
     } else {
       return "OWTHERM: Set with wrong IODev type $interface";
     }
-    return $ret
-      if(defined($ret));
+    #-- process results
+    if( defined($ret)  ){
+      return "OWTHERM: Could not set device $name, reason: ".$ret;
+    }
   }
   
   #-- process results
@@ -650,37 +693,6 @@ sub OWTHERM_Set($@) {
   Log 4, "OWTHERM: Set $hash->{NAME} $key $value";
   
   return undef;
-}
-
-#######################################################################################
-#
-# OWTHERM_Attr - Set one attribute value for device
-#
-#  Parameter hash = hash of device addressed
-#            a = argument array
-#
-########################################################################################
-
-sub OWTHERM_Attr(@) {
-  my ($do,@a) = @_;
-  
-  my $name    = $a[0];
-  my $key     = $a[1];
-  my $ret;
-  
-  #-- only alarm settings may be modified at runtime for now
-  return undef
-    if( $key !~ m/(.*)(Low|High)/ );
-  #-- safeguard against uninitialized devices
-  return undef
-    if( $main::defs{$name}->{READINGS}{"state"}{VAL} eq "defined" );
-  
-  if( $do eq "set")
-  {
-    $ret = OWTHERM_Set($main::defs{$name},@a);
-  } elsif( $do eq "del"){
-  }
-  return $ret;
 }
 
 ########################################################################################

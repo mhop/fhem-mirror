@@ -52,7 +52,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.21";
+my $owx_version="3.23";
 #-- declare variables
 my %gets = (
   "present"     => "",
