@@ -187,6 +187,7 @@ my %culHmModel=(
 );
 
 
+
 ##----------definitions for register settings-----------------	
 	# definition of Register for all devices
 	# a: address, incl bits 13.4 4th bit in reg 13
@@ -211,7 +212,7 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   MaxTimeF        =>{a=> 29.0,s=>1.0,l=>3,min=>0  ,max=>25.4    ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>0,t=>"max time first direction"},
   DriveMode       =>{a=> 31.0,s=>1.0,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{direct=>0,viaUpperEnd=>1,viaLowerEnd=>2,viaNextEnd=>3}},
 #dimmer mainly                                                                                 
-  OnDly           =>{a=>  6.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"on delay "},
+  OnDly           =>{a=>  6.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"on delay"},
   OnTime          =>{a=>  7.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"on time, 111600 = infinite"},
   OffDly          =>{a=>  8.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"off delay"},
   OffTime         =>{a=>  9.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"off time, 111600 = infinite"},
@@ -242,6 +243,8 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   DimElsOnTimeMd  =>{a=> 38.7,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{absolut=>0,minimal=>1}},
   DimElsActionType=>{a=> 38.0,s=>0.4,l=>3,min=>0  ,max=>8       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3,upDim=>4,downDim=>5,toggelDim=>6,toggelDimToCnt=>7,toggelDimToCntInv=>8}},
 #output Unit                                                                                       
+  ActTypeMp3      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Tone or MP3 to be palyed"},
+  ActTypeLed      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED color"    ,lit=>{no=>0x00,red_short=>0x11,red_long=>0x12,green_short=>0x21,green_long=>0x22,orange_short=>0x31,orange_long=>0x32}},
   ActType         =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Action type(LED or Tone)"},
   ActNum          =>{a=> 37  ,s=>1  ,l=>3,min=>1  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Action Number"},
   Intense         =>{a=> 43  ,s=>1  ,l=>3,min=>10 ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Volume",lit=>{vol_0=>255,vol_1=>250,vol_2=>246,vol_3=>240,vol_4=>234,vol_5=>227,vol_6=>218,vol_7=>207,vol_8=>190,vol_9=>162,vol_00=>10}},  
@@ -667,21 +670,20 @@ $culHmRegModel{"HM-WDS40-TH-I"}     = $culHmRegModel{"HM-WDS10-TH-O"};
 $culHmRegModel{"Schueco_263-157"}   = $culHmRegModel{"HM-WDS10-TH-O"};
 $culHmRegModel{"IS-WDS-TH-OD-S-R3"} = $culHmRegModel{"HM-WDS10-TH-O"};
 
-  
-  
 my %culHmRegChan = (# if channelspecific then enter them here 
-  "HM-CC-TC02"      =>{displayMode  =>1,displayTemp  =>1,displayTempUnit=>1,
-                       controlMode  =>1,decalcDay    =>1,
-                       "day-temp"   =>1,"night-temp" =>1,"party-temp" =>1,
-			           mdTempValve  =>1,partyEndDay  =>1,
-			           partyEndMin  =>1,partyEndHr   =>1,
-			           decalHr      =>1,decalMin     =>1, 
+  "HM-CC-TC02"      =>{displayMode     =>1,displayTemp     =>1,displayTempUnit =>1,
+                       controlMode     =>1,decalcDay       =>1,
+                       "day-temp"      =>1,"night-temp"    =>1,"party-temp"    =>1,
+			           mdTempValve     =>1,partyEndDay     =>1,
+			           partyEndMin     =>1,partyEndHr      =>1,
+			           decalHr         =>1,decalMin        =>1,
                     },    
-  "HM-CC-TC03"      =>{tempWinOpen  =>1, }, #window channel
-  "HM-RC-1912"      =>{msgShowTime  =>1, beepAtAlarm    =>1, beepAtService =>1,beepAtInfo  =>1,
-                       backlAtAlarm =>1, backlAtService =>1, backlAtInfo   =>1,
-                       lcdSymb      =>1, lcdLvlInterp   =>1},
-  "HM-OU-CFM-PL02"  =>{Intense=>1},
+  "HM-CC-TC03"      =>{tempWinOpen     =>1, }, #window channel
+  "HM-RC-1912"      =>{msgShowTime     =>1, beepAtAlarm    =>1, beepAtService  =>1,beepAtInfo  =>1,
+                       backlAtAlarm    =>1, backlAtService =>1, backlAtInfo    =>1,
+                       lcdSymb         =>1, lcdLvlInterp   =>1},
+  "HM-OU-CFM-PL01"  =>{ActTypeLed      =>1},
+  "HM-OU-CFM-PL02"  =>{ActTypeMp3      =>1,Intense         =>1},
   "HM-SEC-WIN01"    =>{setupDir        =>1,pullForce       =>1,pushForce       =>1,tiltMax         =>1,
                        CtValLo         =>1,CtValHi         =>1,
                        CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1,
@@ -693,21 +695,6 @@ my %culHmRegChan = (# if channelspecific then enter them here
 #clones - - - - - - - - - - - - - - -   
 $culHmRegChan{"HM-RC-19-B12"}     = $culHmRegChan{"HM-RC-1912"};
 $culHmRegChan{"HM-RC-19-SW12"}    = $culHmRegChan{"HM-RC-1912"};
-
-
-
- 
-# RC send BCAST to specific address. Is the meaning understood?
-my @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "CFG", "Bit3",
-                     "BURST", "BIDI", "RPTED", "RPTEN");
-					 #RPTEN    0x80: set in every message. Meaning?
-					 #RPTED    0x40: repeated (repeater operation)
-                     #BIDI     0x20: response is expected
-					 #Burst    0x10: set if burst is required by device
-					 #Bit3     0x08:
-					 #CFG      0x04: Device in Config mode 
-					 #WAKEMEUP 0x02: awake - hurry up to send messages
-					 #WAKEUP   0x01: send initially to keep the device awake
 
 ##--------------- Conversion routines for register settings
 
@@ -730,9 +717,9 @@ my %culHmModelGets = (
 my %culHmGlobalSets = (# all but virtuals
   regBulk       => "<list>:<peer> <addr1:data1> <addr2:data2> ...",
   statusRequest => "",
-  getRegRaw     =>"[List0|List1|List2|List3|List4|List5|List6] ... <PeerChannel>",
+  getRegRaw     =>"[List0|List1|List2|List3|List4|List5|List6] ... [<PeerChannel>]",
   getConfig     => "",
-  regSet        =>"<regName> <value> ... <peerChannel>",
+  regSet        =>"<regName> <value> ... [<peerChannel>]",
   clear         =>"[readings|msgEvents]",
 );
 my %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
@@ -832,6 +819,18 @@ my %culHmChanSets = (
 );
 # clones- - - - - - - - - - - - - - - - - 
 $culHmChanSets{"HM-CC-TC00"}     = $culHmChanSets{"HM-CC-TC02"};
+
+# RC send BCAST to specific address. Is the meaning understood?
+my @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "CFG", "Bit3",
+                     "BURST", "BIDI", "RPTED", "RPTEN");
+					 #RPTEN    0x80: set in every message. Meaning?
+					 #RPTED    0x40: repeated (repeater operation)
+                     #BIDI     0x20: response is expected
+					 #Burst    0x10: set if burst is required by device
+					 #Bit3     0x08:
+					 #CFG      0x04: Device in Config mode 
+					 #WAKEMEUP 0x02: awake - hurry up to send messages
+					 #WAKEUP   0x01: send initially to keep the device awake
 
 ##############################---messages---###################################
 my %culHmBits = (

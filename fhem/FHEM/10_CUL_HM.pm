@@ -2497,6 +2497,7 @@ sub CUL_HM_Set($@) {
   
   readingsSingleUpdate($hash,"state",$state,1) if($state);
 
+
   $rxType = CUL_HM_getRxType($devHash);
   Log GetLogLevel($name,2), "CUL_HM set $name " . 
                             join(" ", @a[1..$#a])." rxt:".$rxType;
@@ -2617,7 +2618,6 @@ sub CUL_HM_Pair(@) {
 sub CUL_HM_getConfig($$$$$){
   my ($hash,$chnhash,$id,$dst,$chn) = @_;
   my $flag = CUL_HM_getFlag($hash);
-
   foreach my $readEntry (keys %{$chnhash->{READINGS}}){
 	  delete $chnhash->{READINGS}{$readEntry} if ($readEntry =~ m/^[\.]?RegL_/);
   }
@@ -3394,7 +3394,7 @@ sub CUL_HM_fltCvT($) { # float -> config time
 	last if ($inValue < $fltCvT{$div});
 	$exp++;
   }
-  return ($exp << 5)+int($inValue/$div2);
+  return ($exp << 5)+int($inValue/$div2+.1);
 }
 sub CUL_HM_CvTflt($) { # config time -> float
   my ($inValue) = @_;
