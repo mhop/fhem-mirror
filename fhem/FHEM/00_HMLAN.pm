@@ -186,7 +186,7 @@ sub HMLAN_Write($$$) {#########################################################
 # my $IDHM  = '+'.$dst.',01,00,F1EF'; #used by HMconfig - meanning??
 # my $IDadd = '+'.$dst;               # guess: add ID?                                     
 # my $IDack = '+'.$dst.',02,00,';     # guess: ID acknowledge
-# my $IDack = '+'.$dst.',FF,00,';     # guess: ID acknowledge General
+# my $IDack = '+'.$dst.',FF,00,';     # guess: ID acknowledge
 # my $IDsub = '-'.$dst;               # guess: ID remove?
 # my $IDnew = '+'.$dst.',00,01,';     # newChannel- trailing 01 to be sent if talk to neu channel
   my $IDadd = '+'.$dst.',00,00,';     # guess: add ID?                                     
@@ -301,8 +301,8 @@ sub HMLAN_Parse($$) {##########################################################
 
 	# HMLAN sends ACK for flag 'A0' but not for 'A4'(config mode)- 
 	# we ack ourself an long as logic is uncertain - also possible is 'A6' for RHS
-	if (hex($flg)&0x2){
-	  $hash->{helper}{$src}{nextSend} = gettimeofday() + 0.130;
+	if (hex($flg)&0x2){#General 4 oder 2 ? 
+	  $hash->{helper}{nextSend}{$src} = gettimeofday() + 0.100;
 	}
 	if (hex($flg)&0xA4 == 0xA4 && $hash->{owner} eq $dst){
 	  Log $ll5, "HMLAN_Parse: $name ACK config";
@@ -369,12 +369,11 @@ sub HMLAN_SimpleWrite(@) {#####################################################
 
   if ($len>51){
     my $dst = substr($msg,46,6);
-    if ($dst && $hash->{helper}{$dst}{nextSend}){
-      my $DevDelay=0;
-      $DevDelay = $hash->{helper}{$dst}{nextSend} - gettimeofday();
-	  $DevDelay = ($DevDelay > 0.01)?( $DevDelay -= int($DevDelay)):0;
-	  delete $hash->{helper}{$dst}{nextSend};
-      select(undef, undef, undef, $DevDelay)if ($DevDelay>0.01);
+    if ($hash->{helper}{nextSend}{$dst}){
+      my $DevDelay = $hash->{helper}{nextSend}{$dst} - gettimeofday();
+      select(undef, undef, undef, (($DevDelay > 0.1)?0.1:$DevDelay))
+	        if ($DevDelay > 0.01);
+	  delete $hash->{helper}{nextSend}{$dst};
     }
     $msg =~ m/(.{9}).(..).(.{8}).(..).(.{8}).(..)(....)(.{6})(.{6})(.*)/;
 	Log $ll5, 'HMLAN_Send:  '.$name.' S:'.$1
@@ -387,29 +386,29 @@ sub HMLAN_SimpleWrite(@) {#####################################################
                              .' '        .$8
                              .' '        .$9
                              .' '        .$10;
-    if ($len > 52){#channel informatiion included
-      my ($flg,$chn) = (substr($msg,36,2),substr($msg,52,2));
-	  if ( $hash->{helper}{$dst}{flg}){                #send not ack by HMLAN
-        if($hash->{helper}{$dst}{to} > gettimeofday()){#will not wait forever!
-	      $hash->{helper}{$dst}{msg} = $msg;           #postpone  message
-	      Log $ll5,"HMLAN_Delay: $name msg delayed $dst $msg";
-	      return;
-	    }
-	    else{
-	      Log $ll5,"HMLAN_Delay: $name timed out";
-	    }
+	if ( $hash->{helper}{$dst}{flg}){                #send not ack by HMLAN
+      if($hash->{helper}{$dst}{to} > gettimeofday()){#will not wait forever!
+	    $hash->{helper}{$dst}{msg} = $msg;           #postpone  message
+	    Log $ll5,"HMLAN_Delay: $name msg delayed $dst $msg";
+	    return;
 	  }
-	  $hash->{helper}{$dst}{flg} = (hex($flg)&0x20)?1:0;
-      $hash->{helper}{$dst}{to} = gettimeofday() + 2;# flag timeout after 2 sec
- 
-	if ($hash->{helper}{$dst}{chn} && $hash->{helper}{$dst}{chn} ne $chn){
-	  my $updt = $hash->{helper}{$dst}{newChn};
-      Log $ll5, 'HMLAN_Send:  '.$name.' S:'.$updt; 
-	  syswrite($hash->{TCPDev}, $updt."\r\n")     if($hash->{TCPDev});
-	}
-	$hash->{helper}{$dst}{chn} = $chn;
+	  else{
+	    Log $ll5,"HMLAN_Delay: $name timed out";
+	  }
+    }
+    my $flg = substr($msg,36,2);
+	$hash->{helper}{$dst}{flg} = (hex($flg)&0x20)?1:0;
+    $hash->{helper}{$dst}{to} = gettimeofday() + 2;# flag timeout after 2 sec
+    if ($len > 52){#channel information included
+	  my $chn = substr($msg,52,2);
+	  if ($hash->{helper}{$dst}{chn} && $hash->{helper}{$dst}{chn} ne $chn){
+	    my $updt = $hash->{helper}{$dst}{newChn};
+        Log $ll5, 'HMLAN_Send:  '.$name.' S:'.$updt; 
+	    syswrite($hash->{TCPDev}, $updt."\r\n")     if($hash->{TCPDev});
+	  }
+	  $hash->{helper}{$dst}{chn} = $chn;
+	} 
   }
- }
   else{
     Log $ll5, 'HMLAN_Send:  '.$name.' I:'.$msg; 
   }

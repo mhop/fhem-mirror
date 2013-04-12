@@ -2783,6 +2783,7 @@ sub CUL_HM_eventP($$) {#handle protocol events
 sub CUL_HM_protState($$){
   my ($hash,$state) = @_;
   $hash->{protState} = $state;
+  delete $hash->{helper}{burstEvtCnt} if ($state =~ m/^CMDs_done/);
   readingsSingleUpdate($hash,"state",$state,1)if (!$hash->{helper}{role}{chn});
   DoTrigger($hash->{NAME}, undef) if ($state eq "CMDs_done");
 }
