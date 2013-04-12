@@ -303,6 +303,7 @@ TRX_LIGHT_Set($@)
   	$hex_command = sprintf "%02x%02x%s%02x%02x00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd, $level; 
 	if ($command eq "level") {
 		$command .= sprintf " %d", $level;
+		$command_state = $command;
 	} 
   	Log 1,"TRX_LIGHT_Set lighting2 name=$name device_type=$device_type, deviceid=$deviceid command=$command" if ($TRX_LIGHT_debug == 1);
   	Log 1,"TRX_LIGHT_Set lighting2 hexline=$hex_prefix$hex_command" if ($TRX_LIGHT_debug == 1);
@@ -325,6 +326,7 @@ TRX_LIGHT_Set($@)
   	$hex_command = sprintf "%02x%02x%s%02x00", $device_type_num & 0xff, $seqnr, $koppla_id, $cmnd; 
 	if ($command eq "level") {
 		$command .= sprintf " %d", $level;
+		$command_state = $command;
 	} 
   	Log 1,"TRX_LIGHT_Set lighting3 name=$name device_type=$device_type, deviceid=$deviceid command=$command" if (1 ||$TRX_LIGHT_debug == 1);
   	Log 1,"TRX_LIGHT_Set lighting3 hexline=$hex_prefix$hex_command" if (1 || $TRX_LIGHT_debug == 1);
@@ -371,6 +373,7 @@ TRX_LIGHT_Set($@)
   	$hex_command = sprintf "%02x%02x%s%02x%02x00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd, $level; 
 	if ($command eq "level") {
 		$command .= sprintf " %d", $level;
+		$command_state = $command;
 	} 
   	Log 1,"TRX_LIGHT_Set lighting5 name=$name device_type=$device_type, deviceid=$deviceid command=$command" if ($TRX_LIGHT_debug == 1);
   	Log 1,"TRX_LIGHT_Set lighting5 hexline=$hex_prefix$hex_command" if ($TRX_LIGHT_debug == 1);
