@@ -15,7 +15,7 @@ sub HMLAN_secSince2000();
 
 sub HMLAN_SimpleWrite(@);
 
-my $debug = 0; # set 1 for better log readability
+my $debug = 1; # set 1 for better log readability
 my %sets = (
   "hmPairForSec" => "HomeMatic",
   "hmPairSerial" => "HomeMatic",
@@ -276,7 +276,7 @@ sub HMLAN_Parse($$) {##########################################################
 	#    00 21= (seen with 'R')
 	#    00 30=
 	#    00 41= (seen with 'R')
-	#    00 50= (seen with 'E')
+	#    00 50= (seen with 'R')
 	#    00 81= open
 	#    01 xx= (seen with 'E')
 	#    02 xx= prestate to 04xx. 
@@ -293,7 +293,7 @@ sub HMLAN_Parse($$) {##########################################################
 	  Log $ll5, "HMLAN_Parse: $name discard"                                 if($stat & 0x000A);
 	  return ;# message with no ack is send - do not dispatch
 	}
-	if ($mFld[1] !~ m/00(01|02|21|41)/ && $letter eq 'R'){
+	if ($mFld[1] !~ m/00(01|02|21|41|50)/ && $letter eq 'R'){
       Log $ll5, "HMLAN_Parse: $name discard, NACK state:".$mFld[1];
 	  return;
 	}
@@ -301,7 +301,7 @@ sub HMLAN_Parse($$) {##########################################################
 
 	# HMLAN sends ACK for flag 'A0' but not for 'A4'(config mode)- 
 	# we ack ourself an long as logic is uncertain - also possible is 'A6' for RHS
-	if (hex($flg)&0x2){#General 4 oder 2 ? 
+	if (hex($flg)&0x4){#General 4 oder 2 ? 
 	  $hash->{helper}{nextSend}{$src} = gettimeofday() + 0.100;
 	}
 	if (hex($flg)&0xA4 == 0xA4 && $hash->{owner} eq $dst){
