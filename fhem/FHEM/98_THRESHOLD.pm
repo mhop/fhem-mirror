@@ -184,12 +184,12 @@ THRESHOLD_Set($@)
   return "$pn, need a parameter for set" if(@a < 2);
   my $arg = $a[1];
   my $value = (defined $a[2]) ? $a[2] : "";
-  my $desired_value;
   my $set_state = ($hash->{helper}{state_cmd1} eq "" and $hash->{helper}{state_cmd2} eq "") ? 1 : 0;
- 
+  my $desired_value = ReadingsVal($pn,"desired_value","");
  
   if ($arg eq "desired" ) {
     return "$pn: set desired value:$value, desired value needs a numeric parameter" if(@a != 3 || $value !~ m/^[-\d\.]*$/);
+	return $ret if ($desired_value == $value);
     Log GetLogLevel($pn,3), "set $pn $arg $value";
 	readingsBeginUpdate  ($hash);
 	readingsBulkUpdate   ($hash, "state", "active $value") if ($set_state);
@@ -198,15 +198,13 @@ THRESHOLD_Set($@)
 	readingsBulkUpdate   ($hash, "desired_value", $value);
 	readingsEndUpdate    ($hash, 1);
   } elsif ($arg eq "deactivated" ) {
-      $desired_value = ReadingsVal($pn,"desired_value","");
-	  return "$pn: set deactivated, set desired value first" if (!$desired_value);
+      return "$pn: set deactivated, set desired value first" if (!$desired_value);
 	  $ret=CommandAttr(undef, "$pn disable 1");   
 	  if (!$ret) {
 	    readingsSingleUpdate   ($hash, "state", "deactivated $desired_value",1) if ($set_state);
 	  }
   } elsif ($arg eq "active" ) {
-      $desired_value = ReadingsVal($pn,"desired_value","");
-	  return "$pn: set active, set desired value first" if (!$desired_value);
+      return "$pn: set active, set desired value first" if (!$desired_value);
 	  $ret=CommandDeleteAttr(undef, "$pn disable");
 	  if (!$ret) {
 		readingsBeginUpdate  ($hash);
@@ -217,7 +215,6 @@ THRESHOLD_Set($@)
 	} elsif ($arg eq "hysteresis" ) {
 		return "$pn: set hysteresis value:$value, hysteresis needs a numeric parameter" if (@a != 3  || $value !~ m/^[\d\.]*$/ );
 		$hash->{hysteresis} = $value;
-		$desired_value = ReadingsVal($pn,"desired_value","");
 		if ($desired_value) {
 		  readingsBeginUpdate  ($hash);
 	      readingsBulkUpdate   ($hash, "threshold_min",$desired_value-$hash->{hysteresis});
