@@ -492,7 +492,7 @@ my %culHmRegGeneral = (
   intKeyVisib=>1,pairCentral=>1,
 	);
 my %culHmRegType = (
-  remote            =>{expectAES       =>1,peerNeedsBurst  =>1,dblPress        =>1,longPress       =>1,
+  remote            =>{peerNeedsBurst  =>1,expectAES       =>1,dblPress        =>1,longPress       =>1,
 					   sign            =>1,
                       },
   blindActuator     =>{driveUp         =>1,driveDown       =>1,driveTurn       =>1,refRunCounter   =>1,
@@ -543,7 +543,8 @@ my %culHmRegType = (
 					   OnTime          =>1,
 			           },
   motionDetector    =>{evtFltrPeriod   =>1,evtFltrNum      =>1,minInterval     =>1,
-			           captInInterval=>1,brightFilter    =>1,ledOnTime       =>1,
+			           captInInterval  =>1,brightFilter    =>1,ledOnTime       =>1,
+					   peerNeedsBurst  =>1,
 			           },
   threeStateSensor  =>{cyclicInfoMsg   =>1,                    transmDevTryMax =>1,
 					                                          ,transmitTryMax  =>1,
