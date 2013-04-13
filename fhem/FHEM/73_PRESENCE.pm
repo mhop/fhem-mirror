@@ -126,8 +126,8 @@ PRESENCE_Define($$)
     	
 		$hash->{MODE} = $2;
 		$hash->{helper}{call} = $3;
-		$hash->{TIMEOUT_NORMAL} = (defined($4) ? $4 : 30);
-		$hash->{TIMEOUT_PRESENT} = (defined($5) ? $5 : 30);
+		$hash->{TIMEOUT_NORMAL} = ($4 ne "" ? $4 : 30);
+		$hash->{TIMEOUT_PRESENT} = ($5 ne "" ? $5 : 30);
 		
 		if($hash->{helper}{call} =~ /\|/)
 		{
@@ -725,7 +725,7 @@ PRESENCE_DoLocalFunctionScan($)
     my $ret;
     my $return;
     
-    Log GetLogLevel($name, 2), "PRESENCE_DoLocalFunctionScan: $string";
+    Log GetLogLevel($name, 5), "PRESENCE_DoLocalFunctionScan: $string";
 
     $ret = AnalyzeCommandChain(undef, $call);
     
