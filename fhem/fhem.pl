@@ -1510,10 +1510,12 @@ PrintHash($$)
 {
   my ($h, $lev) = @_;
   my $si = AttrVal("global", "showInternalValues", 0);
+  return "" if($h->{".visited"});
+  $h->{".visited"} = 1;
 
   my ($str,$sstr) = ("","");
   foreach my $c (sort keys %{$h}) {
-    next if(!$si && $c =~ m/^\./);
+    next if(!$si && $c =~ m/^\./ || $c eq ".visited");
     if(ref($h->{$c})) {
       if(ref($h->{$c}) eq "HASH") {
         if(defined($h->{$c}{TIME}) && defined($h->{$c}{VAL})) {
@@ -1538,6 +1540,7 @@ PrintHash($$)
       $str .= sprintf("%*s %-10s %s\n", $lev," ",$c, defined($v) ? $v : "");
     }
   }
+  delete $h->{".visited"};
   return $str . $sstr;
 }
 
