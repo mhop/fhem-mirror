@@ -15,7 +15,7 @@ sub HMLAN_secSince2000();
 
 sub HMLAN_SimpleWrite(@);
 
-my $debug = 1; # set 1 for better log readability
+my $debug = 0; # set 1 for better log readability
 my %sets = (
   "hmPairForSec" => "HomeMatic",
   "hmPairSerial" => "HomeMatic",
@@ -391,9 +391,6 @@ sub HMLAN_SimpleWrite(@) {#####################################################
 	    $hash->{helper}{$dst}{msg} = $msg;           #postpone  message
 	    Log $ll5,"HMLAN_Delay: $name msg delayed $dst $msg";
 	    return;
-	  }
-	  else{
-	    Log $ll5,"HMLAN_Delay: $name timed out";
 	  }
     }
     my $flg = substr($msg,36,2);
