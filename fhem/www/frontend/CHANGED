@@ -1,3 +1,6 @@
+Update vom 14.4.2013
+  * Multiple Y-Skalen hinzugefügt (linke + rechte Achse)
+  * Bug in Stepansicht behoben
 Update vom 09.4.2013
   * Step Funktion für Charts hinzugefügt
   * X-Achsenauswahl entfernt, da nur Timestmap Sinn macht
