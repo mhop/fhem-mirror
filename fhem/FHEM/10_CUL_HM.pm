@@ -1277,7 +1277,6 @@ sub CUL_HM_Parse($$) {##############################
 	my $i=0;
     CUL_HM_SndCmd($ack[$i++],$ack[$i++])while ($i<@ack);
   }
-
   CUL_HM_ProcessCmdStack($shash) if ($respRemoved); # cont if complete
   #------------ process events ------------------
   push @event, "noReceiver:src:$src ($cmd) $p" if(!@event);
@@ -2835,6 +2834,7 @@ sub CUL_HM_PushCmdStack($$) {
   my @arr = ();
   my $hash = CUL_HM_getDeviceHash($chnhash);
   my $name = $hash->{NAME};
+
   if(!$hash->{cmdStack}){
     $hash->{cmdStack} = \@arr;
 	delete ($hash->{helper}{burstEvtCnt}) if (!$hash->{helper}{respWait});
@@ -2860,7 +2860,7 @@ sub CUL_HM_ProcessCmdStack($) {
       CUL_HM_protState($hash,"CMDs_processing...");                         
 	  CUL_HM_eventP($hash,"Snd");	  
     }
-    if(!@{$hash->{cmdStack}}) {
+    elsif(!@{$hash->{cmdStack}}) {
       delete($hash->{cmdStack});
       delete($hash->{protCmdPend}); 
 	  #-- update info ---
