@@ -12,6 +12,16 @@ Ext.define('FHEM.controller.ChartController', {
      * minValue of Y Axis gets saved here as reference
      */
     minYValue: 9999999,
+    
+    /**
+     * maxValue of Y2 Axis gets saved here as reference
+     */
+    maxY2Value: 0,
+    
+    /**
+     * minValue of Y2 Axis gets saved here as reference
+     */
+    minY2Value: 9999999,
 
     refs: [
            {
@@ -95,7 +105,8 @@ Ext.define('FHEM.controller.ChartController', {
             yaxescolorcombos = Ext.ComponentQuery.query('combobox[name=yaxiscolorcombo]'),
             yaxesfillchecks = Ext.ComponentQuery.query('checkbox[name=yaxisfillcheck]'),
             yaxesstepcheck = Ext.ComponentQuery.query('checkbox[name=yaxisstepcheck]'),
-            yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]');
+            yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]'),
+            axissideradio = Ext.ComponentQuery.query('radiogroup[name=axisside]');
         
         var starttime = me.getStarttimepicker().getValue(),
             dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s'),
@@ -118,6 +129,10 @@ Ext.define('FHEM.controller.ChartController', {
             chart.series.removeAt(i);
         }
         
+        //Reset axis titles
+        chart.axes.get(0).setTitle("");
+        chart.axes.get(1).setTitle("");
+        
         //reset zoomValues
         chartpanel.setLastYmax(null);
         chartpanel.setLastYmin(null);
@@ -126,10 +141,9 @@ Ext.define('FHEM.controller.ChartController', {
         
         me.maxYValue = 0;
         me.minYValue = 9999999;
+        me.maxY2Value = 0;
+        me.minY2Value = 9999999;
         
-        //setting x-axis title
-        chart.axes.get(1).setTitle("TIMESTAMP");
-     
         //check if timerange or dynamic time should be used
         dynamicradio.eachBox(function(box, idx){
             var date = new Date();
@@ -198,11 +212,12 @@ Ext.define('FHEM.controller.ChartController', {
                 yaxiscolorcombo = yaxescolorcombos[i].getValue(),
                 yaxisfillcheck = yaxesfillchecks[i].checked,
                 yaxisstepcheck = yaxesstepcheck[i].checked,
-                yaxisstatistics = yaxesstatistics[i].getValue();
+                yaxisstatistics = yaxesstatistics[i].getValue(),
+                axisside = axissideradio[i].getChecked()[0].getSubmitValue();
             if(yaxis === "" || yaxis === null) {
                 yaxis = yaxes[i].getRawValue();
             }
-            me.populateAxis(i, yaxes.length, device, yaxis, yaxiscolorcombo, yaxisfillcheck, yaxisstepcheck, yaxisstatistics, dbstarttime, dbendtime);
+            me.populateAxis(i, yaxes.length, device, yaxis, yaxiscolorcombo, yaxisfillcheck, yaxisstepcheck, axisside, yaxisstatistics, dbstarttime, dbendtime);
             i++;
         });
         
@@ -267,7 +282,7 @@ Ext.define('FHEM.controller.ChartController', {
     /**
      * fill the axes with data
      */
-    populateAxis: function(i, axeslength, device, yaxis, yaxiscolorcombo, yaxisfillcheck, yaxisstepcheck, yaxisstatistics, dbstarttime, dbendtime) {
+    populateAxis: function(i, axeslength, device, yaxis, yaxiscolorcombo, yaxisfillcheck, yaxisstepcheck, axisside, yaxisstatistics, dbstarttime, dbendtime) {
         
         var me = this,
             chart = me.getChart(),
@@ -277,9 +292,9 @@ Ext.define('FHEM.controller.ChartController', {
             generalizationfactor = Ext.ComponentQuery.query('combobox[name=genfactor]')[0].getValue();
         
         if (i > 0) {
-            var yseries = me.createSeries('VALUE' + (i + 1), yaxis, yaxisfillcheck, yaxiscolorcombo);
+            var yseries = me.createSeries('VALUE' + (i + 1), yaxis, yaxisfillcheck, yaxiscolorcombo, axisside);
         } else {
-            var yseries = me.createSeries('VALUE', yaxis, yaxisfillcheck, yaxiscolorcombo);
+            var yseries = me.createSeries('VALUE', yaxis, yaxisfillcheck, yaxiscolorcombo, axisside);
         }
         
         var url;
@@ -394,8 +409,8 @@ Ext.define('FHEM.controller.ChartController', {
                   
                   //add records to store
                   for (var j = 0; j < json.data.length; j++) {
-                      var item = Ext.create('FHEM.model.ChartModel');
                       
+                      var item = Ext.create('FHEM.model.ChartModel');
                       Ext.iterate(item.data, function(key, value) {
                           if (key.indexOf("TIMESTAMP") >= 0) {
                               item.set(key, json.data[j].TIMESTAMP);
@@ -413,12 +428,13 @@ Ext.define('FHEM.controller.ChartController', {
                       
                       //check if we have to ues steps
                       //if yes, create a new record with the same value as the last one
-                      //and a timestamp 1 second less than the actual record to add
+                      //and a timestamp 1 millisecond less than the actual record to add.
+                      // only do this, when last record is from same axis
                       if(yaxisstepcheck) {
-                          if (store.last()) {
+                          if (store.last() && !Ext.isEmpty(store.last().get(valuetext)) && store.last().get(valuetext) !== "") {
                               var lastrec = store.last();
                               var datetomodify = Ext.Date.parse(json.data[j].TIMESTAMP, "Y-m-d H:i:s");
-                              var modtimestamp = Ext.Date.add(datetomodify, Ext.Date.SECOND, -1);
+                              var modtimestamp = Ext.Date.add(datetomodify, Ext.Date.MILLI, -1);
                               var stepitem = lastrec.copy();
                               Ext.iterate(stepitem.data, function(key, value) {
                                   if (key.indexOf("TIMESTAMP") >= 0) {
@@ -426,20 +442,30 @@ Ext.define('FHEM.controller.ChartController', {
                                   }
                               });
                               store.add(stepitem);
-                          }
+                          } 
                       }
                       store.add(item);
                       
                       //rewrite of valuestring to get always numbers, even when text as value was passed to model
-                      valuestring = store.last().get(valuetext);
+                      valuestring = item.get(valuetext);
                       
                       // recheck if our min and max values are still valid
-                      if (me.minYValue > valuestring) {
-                          me.minYValue = valuestring;
+                      if (yseries.axis === "left") {
+                          if (me.minYValue > valuestring) {
+                              me.minYValue = valuestring;
+                          }
+                          if (me.maxYValue < valuestring) {
+                              me.maxYValue = valuestring;
+                          }
+                      } else if (yseries.axis === "right") {
+                          if (me.minY2Value > valuestring) {
+                              me.minY2Value = valuestring;
+                          }
+                          if (me.maxY2Value < valuestring) {
+                              me.maxY2Value = valuestring;
+                          }
                       }
-                      if (me.maxYValue < valuestring) {
-                          me.maxYValue = valuestring;
-                      }
+                     
                   }
                   
                   if (generalization.checked) {
@@ -501,32 +527,76 @@ Ext.define('FHEM.controller.ChartController', {
         //remove the old max values of y axis to get a dynamic range
         delete chart.axes.get(0).maximum;
         delete chart.axes.get(0).minimum;
+        delete chart.axes.get(1).maximum;
+        delete chart.axes.get(1).minimum;
         
         chart.axes.get(0).maximum = me.maxYValue;
-        if (me.minYValue === 9999999) {
-            chart.axes.get(0).minimum = 0;
+        chart.axes.get(1).maximum = me.maxY2Value;
+        
+        // adopt the values from the other y-axis, if we have no values assigned at all
+        if (chart.axes.get(0).maximum === 0 && chart.axes.get(1).maximum > 0) {
+            chart.axes.get(0).maximum = chart.axes.get(1).maximum;
+        }
+        if (me.minYValue === 9999999 && me.minY2Value < 9999999) {
+            chart.axes.get(0).minimum = me.minY2Value;
         } else {
             chart.axes.get(0).minimum = me.minYValue;
         }
         
+        if (chart.axes.get(1).maximum === 0 && chart.axes.get(0).maximum > 0) {
+            chart.axes.get(1).maximum = chart.axes.get(0).maximum;
+        }
+        if (me.minY2Value === 9999999 && me.minYValue < 9999999) {
+            chart.axes.get(1).minimum = me.minYValue;
+        } else {
+            chart.axes.get(1).minimum = me.minY2Value;
+        }
+        
+        
         // set the x axis range dependent on user given timerange
-        var starttime = me.getStarttimepicker().getValue(),
-            endtime = me.getEndtimepicker().getValue();
-        chart.axes.get(1).fromDate = starttime;
-        chart.axes.get(1).toDate = endtime;
-        chart.axes.get(1).processView();
+        var chart = me.getChart(),
+            store = chart.getStore(),
+            starttime = new Date(me.getStarttimepicker().getValue()),
+            endtime = new Date(me.getEndtimepicker().getValue());
+        
+        chart.axes.get(2).fromDate = starttime;
+        chart.axes.get(2).toDate = endtime;
+        chart.axes.get(2).processView();
         chart.redraw();
         
         chart.setLoading(false);
+        
     },
     
     /**
      * create a single series for the chart
      */
-    createSeries: function(yfield, title, fill, color) {
+    createSeries: function(yfield, title, fill, color, axisside) {
+        
+        //setting axistitle and fontsize
+        var chart = this.getChart(),
+            axis;
+        
+        if (axisside === "left") {
+            axis = chart.axes.get(0);
+        } else if (axisside === "right") {
+            axis = chart.axes.get(1);
+        }
+        var currenttitle = axis.title;
+        
+        if (currenttitle === "") {
+            axis.setTitle(title);
+        } else {
+            axis.setTitle(axis.title + " / " + title);
+        }
+        axis.displaySprite.attr.font = "14px Arial, Helvetica, sans-serif";
+        
+        //adding linked yfield to axis fields
+        axis.fields.push(yfield);
+        
         var series = {
                 type : 'line',
-                axis : 'left',
+                axis : axisside,
                 xField : 'TIMESTAMP',
                 yField : yfield,
                 title: title,
@@ -645,6 +715,8 @@ Ext.define('FHEM.controller.ChartController', {
         //reset y-axis max
         me.maxYValue = 0;
         me.minYValue = 9999999;
+        me.maxY2Value = 0;
+        me.minY2Value = 9999999;
         
         var starttime = me.getStarttimepicker().getValue(),
             dbstarttime = Ext.Date.format(starttime, 'Y-m-d H:i:s'),
@@ -688,6 +760,7 @@ Ext.define('FHEM.controller.ChartController', {
                 var yaxescolorcombos = Ext.ComponentQuery.query('combobox[name=yaxiscolorcombo]');
                 var yaxesfillchecks = Ext.ComponentQuery.query('checkbox[name=yaxisfillcheck]');
                 var yaxesstepchecks = Ext.ComponentQuery.query('checkbox[name=yaxisstepcheck]');
+                var axissideradio = Ext.ComponentQuery.query('radiogroup[name=axisside]');
                 var yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]');
                 
                 var basesstart = Ext.ComponentQuery.query('numberfield[name=basestart]');
@@ -724,12 +797,15 @@ Ext.define('FHEM.controller.ChartController', {
                         yaxiscolorcombo = yaxescolorcombos[i].getDisplayValue(),
                         yaxisfillcheck = yaxesfillchecks[i].checked,
                         yaxisstepcheck = yaxesstepchecks[i].checked,
+                        axisside = axissideradio[i].getChecked()[0].getSubmitValue();
                         yaxisstatistics = yaxesstatistics[i].getValue();
                     
                     if (i === 0) {
                         jsonConfig += '"y":"' + yaxis + '","device":"' + device + '",';
                         jsonConfig += '"yaxiscolorcombo":"' + yaxiscolorcombo + '","yaxisfillcheck":"' + yaxisfillcheck + '",';
                         jsonConfig += '"yaxisstepcheck":"' + yaxisstepcheck + '",';
+                        jsonConfig += '"yaxisside":"' + axisside + '",';
+                        
                         if (yaxisstatistics !== "none") {
                             jsonConfig += '"yaxisstatistics":"' + yaxisstatistics + '",';
                         }
@@ -739,11 +815,13 @@ Ext.define('FHEM.controller.ChartController', {
                             colorname = "y" + (i + 1) + "axiscolorcombo",
                             fillname = "y" + (i + 1) + "axisfillcheck",
                             stepname = "y" + (i + 1) + "axisstepcheck",
+                            sidename = "y" + (i + 1) + "axisside",
                             statsname = "y" + (i + 1) + "axisstatistics";
                         
                         jsonConfig += '"' + axisname + '":"' + yaxis + '","' + devicename + '":"' + device + '",';
                         jsonConfig += '"' + colorname + '":"' + yaxiscolorcombo + '","' + fillname + '":"' + yaxisfillcheck + '",';
                         jsonConfig += '"' + stepname + '":"' + yaxisstepcheck + '",';
+                        jsonConfig += '"' + sidename + '":"' + axisside + '",';
                         if (yaxisstatistics !== "none") {
                             jsonConfig += '"' + statsname + '":"' + yaxisstatistics + '",';
                         }
@@ -833,6 +911,8 @@ Ext.define('FHEM.controller.ChartController', {
                 //reset y-axis max
                 me.maxYValue = 0;
                 me.minYValue = 9999999;
+                me.maxY2Value = 0;
+                me.minY2Value = 9999999;
                 
                 //count axes
                 var axescount = 0;
@@ -853,6 +933,7 @@ Ext.define('FHEM.controller.ChartController', {
                 var yaxescolorcombos = Ext.ComponentQuery.query('combobox[name=yaxiscolorcombo]');
                 var yaxesfillchecks = Ext.ComponentQuery.query('checkbox[name=yaxisfillcheck]');
                 var yaxesstepchecks = Ext.ComponentQuery.query('checkbox[name=yaxisstepcheck]');
+                var axissideradio = Ext.ComponentQuery.query('radiogroup[name=axisside]');
                 var yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]');
                 
                 var i = 0;
@@ -865,6 +946,7 @@ Ext.define('FHEM.controller.ChartController', {
                         yaxescolorcombos[i].setValue(chartdata.yaxiscolorcombo);
                         yaxesfillchecks[i].setValue(chartdata.yaxisfillcheck);
                         yaxesstepchecks[i].setValue(chartdata.yaxisstepcheck);
+                        axissideradio[i].items.items[0].setValue(chartdata.yaxisside);
                         
                         if (chartdata.yaxisstatistics && chartdata.yaxisstatistics !== "") {
                             yaxesstatistics[i].setValue(chartdata.yaxisstatistics);
@@ -878,6 +960,7 @@ Ext.define('FHEM.controller.ChartController', {
                             axiscolorcombo = axisname + "colorcombo",
                             axisfillcheck = axisname + "fillcheck",
                             axisstepcheck = axisname + "stepcheck",
+                            axisside = axisname + "side",
                             axisstatistics = axisname + "statistics";
                             
                         eval('devices[i].setValue(chartdata.' + axisdevice + ')');
@@ -887,6 +970,7 @@ Ext.define('FHEM.controller.ChartController', {
                         eval('yaxescolorcombos[i].setValue(chartdata.' + axiscolorcombo + ')');
                         eval('yaxesfillchecks[i].setValue(chartdata.' + axisfillcheck + ')');
                         eval('yaxesstepchecks[i].setValue(chartdata.' + axisstepcheck + ')');
+                        eval('axissideradio[i].items.items[0].setValue(chartdata.' + axisside + ')');
                         
                         if (eval('chartdata.' + axisstatistics) && eval('chartdata.' + axisstatistics) !== "") {
                             eval('yaxesstatistics[i].setValue(chartdata.' + axisstatistics + ')');

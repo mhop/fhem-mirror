@@ -33,6 +33,16 @@ Ext.define('FHEM.view.LineChartPanel', {
         lastYmin: null,
         
         /**
+         * last max value of Y2 axis before zoom was applied
+         */
+        lastY2max: null,
+        
+        /**
+         * last min value of Y2 axis before zoom was applied
+         */
+        lastY2min: null,
+        
+        /**
          * last max value of Y axis before zoom was applied
          */
         lastXmax: null,
@@ -40,7 +50,12 @@ Ext.define('FHEM.view.LineChartPanel', {
         /**
          * last min value of Y axis before zoom was applied
          */
-        lastXmin: null
+        lastXmin: null,
+        
+        /**
+         * 
+         */
+        axiscounter: 0
     },
     
     artifactSeries: [],
@@ -261,10 +276,13 @@ Ext.define('FHEM.view.LineChartPanel', {
                             handler: function(btn) {
                                 var chart = me.down('chart');
                                 chart.restoreZoom();
+                                
                                 chart.axes.get(0).minimum = me.getLastYmin();
                                 chart.axes.get(0).maximum = me.getLastYmax();
-                                chart.axes.get(1).minimum = me.getLastXmin();
-                                chart.axes.get(1).maximum = me.getLastXmax();
+                                chart.axes.get(1).minimum = me.getLastY2min();
+                                chart.axes.get(1).maximum = me.getLastY2max();
+                                chart.axes.get(2).minimum = me.getLastXmin();
+                                chart.axes.get(2).maximum = me.getLastXmax();
                                 
                                 chart.redraw();
                                 //helper to reshow the hidden items after zooming back out
@@ -294,8 +312,8 @@ Ext.define('FHEM.view.LineChartPanel', {
                             type : 'Numeric',
                             name : 'yaxe',
                             position : 'left',
-                            fields : [ 'VALUE', 'VALUE2' ],
-                            title : 'VALUE',
+                            fields : [],
+                            title : '',
                             grid : {
                                 odd : {
                                     opacity : 1,
@@ -304,6 +322,13 @@ Ext.define('FHEM.view.LineChartPanel', {
                                     'stroke-width' : 0.5
                                 }
                             }
+                        }, 
+                        {
+                            type : 'Numeric',
+                            name : 'yaxe2',
+                            position : 'right',
+                            fields : [],
+                            title : ''
                         }, 
                         {
                             type : 'Time',
@@ -324,22 +349,22 @@ Ext.define('FHEM.view.LineChartPanel', {
                             evt.preventDefault();
                         },
                         select: {
-                            fn: function(chart, selection, evt) {
-                                delete chart.axes.get(1).fromDate;
-                                delete chart.axes.get(1).toDate;
-                                if (Ext.isEmpty(me.getLastYmax())) {
-                                    me.setLastYmax(chart.axes.get(0).maximum);
-                                    me.setLastYmin(chart.axes.get(0).minimum);
-                                }
-                                if (Ext.isEmpty(me.getLastXmax())) {
-                                    me.setLastXmax(chart.axes.get(1).maximum);
-                                    me.setLastXmin(chart.axes.get(1).minimum);
-                                }
-                                chart.axes.get(1).processView();
-                                chart.redraw();
-                                chart.setZoom(selection);
+                            fn: function(chart, zoomConfig, evt) {
+                                
+                                delete chart.axes.get(2).fromDate;
+                                delete chart.axes.get(2).toDate;
+                                me.setLastYmax(chart.axes.get(0).maximum);
+                                me.setLastYmin(chart.axes.get(0).minimum);
+                                me.setLastY2max(chart.axes.get(1).maximum);
+                                me.setLastY2min(chart.axes.get(1).minimum);
+                                me.setLastXmax(chart.axes.get(2).maximum);
+                                me.setLastXmin(chart.axes.get(2).minimum);
+                                
+                                chart.setZoom(zoomConfig);
                                 chart.mask.hide();
+                                
                                 //helper hiding series and items which are out of scope
+                                    //var me = this;
                                 Ext.each(chart.series.items, function(serie) {
                                     if (serie.items.length === 0) {
                                         me.artifactSeries.push(serie);
@@ -348,6 +373,7 @@ Ext.define('FHEM.view.LineChartPanel', {
                                             item.redraw();
                                         });
                                         serie.hideAll();
+                                        
                                     }
                                 });
                             }
@@ -388,13 +414,15 @@ Ext.define('FHEM.view.LineChartPanel', {
         
         var me = this;
         
+        me.setAxiscounter(me.getAxiscounter() + 1);
+        
         var components = 
             {
                 xtype: 'fieldset',
                 name: 'singlerowfieldset',
                 layout: 'column',
                 defaults: {
-                    margin: '5 5 5 5'
+                    margin: '5 5 5 0'
                 },
                 items: 
                     [
@@ -485,6 +513,20 @@ Ext.define('FHEM.view.LineChartPanel', {
                             boxLabel: 'Steps',
                             tooltip: 'Check, if the chart should be shown with steps instead of a linear Line'
                         },
+                        {
+                            xtype: 'radiogroup',
+                            name: 'axisside',
+                            allowBlank: false,
+                            border: true,
+                            defaults: {
+                                padding: "0 15px 0 0",
+                                checked: false
+                            },
+                            items: [
+                                { labelWidth: 50, fieldLabel: 'Left Axis', name: 'rbc' + me.getAxiscounter(), inputValue: 'left', checked: true },
+                                { labelWidth: 60, fieldLabel: 'Right Axis', name: 'rbc' + me.getAxiscounter(), inputValue: 'right' }
+                            ]
+                        },
                         {  
                             xtype: 'combobox', 
                             name: 'yaxisstatisticscombo',
@@ -537,7 +579,7 @@ Ext.define('FHEM.view.LineChartPanel', {
                         },
                         {
                             xtype: 'button',
-                            width: 110,
+                            width: 90,
                             text: 'Add Baseline',
                             name: 'addbaselinebtn',
                             handler: function(btn) {
