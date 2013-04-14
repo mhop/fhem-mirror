@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - bugfix:  fixing not-working FHEM restart, when a PRESENCE check is running
+  - bugfix:  fixing memory overflow when "list" a PRESENCE definition
   - bugfix:  fixing dead PRESENCE definitions in case of timeouts
 
 - 2013-04-08 (5.4)
