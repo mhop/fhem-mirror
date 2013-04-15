@@ -766,7 +766,8 @@ AnalyzeCommand($$)
   if(!defined($cmds{$fn}) || !defined($cmds{$fn}{Fn})) {
     map { $fn = $_ if(lc($fn) eq lc($_)); } keys %modules;
     $fn = LoadModule($fn);
-    return "Unknown command $fn, try help" if(!defined($cmds{lc($fn)}));
+    $fn = lc($fn) if(defined($cmds{lc($fn)}));
+    return "Unknown command $fn, try help" if(!defined($cmds{$fn}));
   }
 
 
