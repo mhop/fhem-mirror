@@ -201,9 +201,15 @@ TRX_SECURITY_Define($$)
 
   $type = uc($type);
 
-  my $device_name = "TRX".$DOT.$type.$DOT.$deviceid;
+  my $my_type;
+  if ($type eq "WD18") {
+	$my_type = "DS10A"; # device will be received as DS10A	
+  } else {
+	$my_type = $type;
+  }
+  my $device_name = "TRX".$DOT.$my_type.$DOT.$deviceid;
 
-  if ($type ne "DS10A" && $type ne "SD90" && $type ne "MS10A" && $type ne "MS14A" && $type ne "KR18" && $type ne "KD101" && $type ne "VISONIC_WINDOW" & $type ne "VISONIC_MOTION" & $type ne "VISONIC_REMOTE") {
+  if ($type ne "DS10A" && $type ne "SD90" && $type ne "MS10A" && $type ne "MS14A" && $type ne "KR18" && $type ne "KD101" && $type ne "VISONIC_WINDOW" & $type ne "VISONIC_MOTION" & $type ne "VISONIC_REMOTE" && $type ne "WD18") {
   	Log 1,"TRX_SECURITY define: wrong type: $type";
   	return "TRX_SECURITY: wrong type: $type";
   }
@@ -310,6 +316,8 @@ sub TRX_SECURITY_parse_X10Sec {
   my $name = $def->{NAME};
   return "" if(IsIgnored($name));
 
+  my $device_type = $def->{TRX_LIGHT_type}; # overwrite device_type to allow WD18 and others
+
   my $data = $bytes->[6];
 
   my $hexdata = sprintf '%02x', $data;
@@ -386,6 +394,7 @@ sub TRX_SECURITY_parse_X10Sec {
   my $current = "";
 
   Log 1, "TRX_SECURITY: $name devn=$device_name first=$firstdevice subtype=$subtype command=$command, delay=$delay, batt=$battery cmd=$hexdata" if ($TRX_SECURITY_debug == 1);
+#Log 1, "TRX_SECURITY: $name devn=$device_name first=$firstdevice subtype=$subtype command=$command, delay=$delay, batt=$battery cmd=$hexdata";
 
   my $n = 0;
   my $tm = TimeNow();
@@ -401,11 +410,17 @@ sub TRX_SECURITY_parse_X10Sec {
   	$sensor = $def->{TRX_SECURITY_devicelog};
   } 
 
-  $current =$command;
+  $current = $command;
   if (($device_type eq "DS10A") || ($device_type eq "VISONIC_WINDOW")) {
 	$current = "Error";
 	$current = "Open" if ($command eq "alert");
 	$current = "Closed" if ($command eq "normal");
+  } elsif ($device_type eq "WD18") {
+	$current = "Error";
+	$current = "normal" if ($command eq "alert");
+	$current = "alert" if ($command eq "normal");
+	$delay = "";  
+	$option = "";  
   }
 
   readingsBeginUpdate($def);
