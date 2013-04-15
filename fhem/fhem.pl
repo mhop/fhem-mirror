@@ -758,7 +758,6 @@ AnalyzeCommand($$)
       }
     }
   }
-
   $fn = $cmds{$fn}{ReplacedBy}
                 if(defined($cmds{$fn}) && defined($cmds{$fn}{ReplacedBy}));
 
@@ -767,8 +766,9 @@ AnalyzeCommand($$)
   if(!defined($cmds{$fn}) || !defined($cmds{$fn}{Fn})) {
     map { $fn = $_ if(lc($fn) eq lc($_)); } keys %modules;
     $fn = LoadModule($fn);
-    return "Unknown command $fn, try help" if(!defined($cmds{$fn}));
+    return "Unknown command $fn, try help" if(!defined($cmds{lc($fn)}));
   }
+
 
   $param = "" if(!defined($param));
   no strict "refs";
