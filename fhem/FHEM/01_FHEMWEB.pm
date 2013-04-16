@@ -57,8 +57,6 @@ use vars qw($FW_cssdir);  # css directory for web server: the first available
                           # from $FW_dir/css, $FW_dir
 use vars qw($FW_gplotdir);# gplot directory for web server: the first
                           # available from $FW_dir/gplot,$FW_dir
-use vars qw($FW_jsdir);   # js directory for web server: the first available
-                          # from $FW_dir/javascript, $FW_dir
 use vars qw($MW_dir);     # moddir (./FHEM), needed by edit Files in new
                           # structure
 use vars qw($FW_ME);      # webname (default is fhem), needed by 97_GROUP
@@ -118,7 +116,7 @@ FHEMWEB_Initialize($)
   $hash->{UndefFn} = "FW_Undef";
   $hash->{NotifyFn}= "FW_SecurityCheck";
   $hash->{AttrList}= 
-    "loglevel:0,1,2,3,4,5,6 webname fwcompress:0,1 ".
+    "loglevel:0,1,2,3,4,5,6 webname fwcompress:0,1 javascripts ".
     "plotmode:gnuplot,gnuplot-scroll,SVG plotsize endPlotToday:1,0 plotfork ".
     "stylesheetPrefix touchpad:deprecated smallscreen:deprecated ".
     "basicAuth basicAuthMsg hiddenroom hiddengroup HTTPS allowfrom CORS:0,1 ".
@@ -136,7 +134,6 @@ FHEMWEB_Initialize($)
   $FW_icondir  = "$FW_dir/images";
   $FW_cssdir   = "$FW_dir/pgm2";
   $FW_gplotdir = "$FW_dir/gplot";
-  $FW_jsdir    = "$FW_dir/pgm2";
 
 }
 
@@ -386,7 +383,7 @@ FW_answerCall($)
       $file = $1; $ext = $2;
     }
     my $ldir = "$FW_dir/$dir";
-    $ldir = "$FW_dir/pgm2" if($dir eq "css" || $dir eq "js");
+    $ldir = "$FW_dir/pgm2" if($dir eq "css" || $dir eq "js"); # FLOORPLAN compat
     $ldir = "$attr{global}{modpath}/docs" if($dir eq "docs");
 
     if(-r "$ldir/$file.$ext") {                # no return for FLOORPLAN
@@ -463,6 +460,7 @@ FW_answerCall($)
     }
   }
 
+
   #Now execute the command
   $FW_cmdret = $docmd ? FW_fC($cmd, $cmddev) : "";
 
@@ -528,7 +526,7 @@ FW_answerCall($)
     FW_pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
   }
 
-  FW_pO "<link href=\"$FW_ME/css/style.css\" rel=\"stylesheet\"/>";
+  FW_pO "<link href=\"$FW_ME/pgm2/style.css\" rel=\"stylesheet\"/>";
  
   ########################
   # FW Extensions
@@ -537,13 +535,16 @@ FW_answerCall($)
       my $h = $data{FWEXT}{$k};
       next if($h !~ m/HASH/ || !$h->{SCRIPT});
       FW_pO "<script type=\"text/javascript\" ".
-                "src=\"$FW_ME/js/$h->{SCRIPT}\"></script>";
+                "src=\"$FW_ME/pgm2/$h->{SCRIPT}\"></script>";
     }
   }
 
   my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
-  FW_pO sprintf($jsTemplate, "$FW_ME/js/svg.js") if($FW_plotmode eq "SVG");
-  FW_pO sprintf($jsTemplate, "$FW_ME/js/fhemweb.js");
+  FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/svg.js") if($FW_plotmode eq "SVG");
+  FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/fhemweb.js");
+  foreach my $js (split(",", AttrVal($FW_wname, "javascripts", ""))) {
+    FW_pO sprintf($jsTemplate, $js);
+  }
 
   my $onload = AttrVal($FW_wname, "longpoll", undef) ?
                       "onload=\"FW_delayedStart()\"" : "";
@@ -1737,37 +1738,41 @@ FW_calcWeblink($$)
     my $t = $now + $off*3600;
     my @l = localtime($t);
     $FW_devs{$d}{from}
-        = sprintf("%04d-%02d-%02d_%02d",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+        = sprintf("%04d-%02d-%02d_%02d:00:00",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
     @l = localtime($t+3600);
     $FW_devs{$d}{to}
-        = sprintf("%04d-%02d-%02d_%02d",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+        = sprintf("%04d-%02d-%02d_%02d:00:01",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
 
   } elsif($zoom eq "qday") {
     my $t = $now + $off*21600;
     my @l = localtime($t);
     $l[2] = int($l[2]/6)*6;
-    $FW_devs{$d}{from}
-        = sprintf("%04d-%02d-%02d_%02d",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+    $FW_devs{$d}{from} =
+        sprintf("%04d-%02d-%02d_%02d:00:00",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
     @l = localtime($t+21600);
     $l[2] = int($l[2]/6)*6;
-    $FW_devs{$d}{to}
-        = sprintf("%04d-%02d-%02d_%02d",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+    $FW_devs{$d}{to} =
+        sprintf("%04d-%02d-%02d_%02d:00:01",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
 
   } elsif($zoom eq "day") {
     my $t = $now + $off*86400;
     my @l = localtime($t);
-    $FW_devs{$d}{from} = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
+    $FW_devs{$d}{from} =
+        sprintf("%04d-%02d-%02d_00:00:00",$l[5]+1900,$l[4]+1,$l[3]);
     @l = localtime($t+86400);
-    $FW_devs{$d}{to}   = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
+    $FW_devs{$d}{to} =
+        sprintf("%04d-%02d-%02d_00:00:01",$l[5]+1900,$l[4]+1,$l[3]);
 
   } elsif($zoom eq "week") {
     my @l = localtime($now);
     my $start = (AttrVal($FW_wname, "endPlotToday", undef) ? 6 : $l[6]);
     my $t = $now - ($start*86400) + ($off*86400)*7;
     @l = localtime($t);
-    $FW_devs{$d}{from} = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
+    $FW_devs{$d}{from} = 
+        sprintf("%04d-%02d-%02d_00:00:00",$l[5]+1900,$l[4]+1,$l[3]);
     @l = localtime($t+7*86400);
-    $FW_devs{$d}{to}   = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
+    $FW_devs{$d}{to} = 
+        sprintf("%04d-%02d-%02d_00:00:01",$l[5]+1900,$l[4]+1,$l[3]);
 
  } elsif($zoom eq "month") {
     my ($endDay, @l);
@@ -1784,17 +1789,18 @@ FW_calcWeblink($$)
     }
     $l[4] += $off;
     $l[4] += 12, $l[5]-- if($l[4] < 0);
-    $FW_devs{$d}{from} = sprintf("%04d-%02d-%02d", $l[5]+1900, $l[4]+1,$endDay);
-
+    $FW_devs{$d}{from} =
+        sprintf("%04d-%02d-%02d_00:00:00", $l[5]+1900, $l[4]+1,$endDay);
     $l[4]++;
     $l[4] = 0, $l[5]++ if($l[4] == 12);
-    $FW_devs{$d}{to}   = sprintf("%04d-%02d-%02d", $l[5]+1900, $l[4]+1,$endDay);
+    $FW_devs{$d}{to} =
+        sprintf("%04d-%02d-%02d_00:00:01", $l[5]+1900, $l[4]+1,$endDay);
 
   } elsif($zoom eq "year") {
     my @l = localtime($now);
     $l[5] += $off;
-    $FW_devs{$d}{from} = sprintf("%04d", $l[5]+1900);
-    $FW_devs{$d}{to}   = sprintf("%04d", $l[5]+1901);
+    $FW_devs{$d}{from} = sprintf("%04d-01-01_00:00:00", $l[5]+1900);
+    $FW_devs{$d}{to}   = sprintf("%04d-01-01_00:00:01", $l[5]+1901);
 
   }
 }
@@ -1950,7 +1956,8 @@ FW_style($$)
     FW_doDetail($a[2]);
 
   } elsif($a[1] eq "eventMonitor") {
-    FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/console.js\"></script>";
+    FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\">".
+          "</script>";
     FW_pO "<div id=\"content\">";
     FW_pO "<div id=\"console\">";
     FW_pO "Events:<br>\n";
@@ -2567,8 +2574,7 @@ FW_Get($@)
     return "web server root:      $FW_dir\n".
            "icon directory:       $FW_icondir\n".
            "css directory:        $FW_cssdir\n".
-           "gplot directory:      $FW_gplotdir\n".
-           "javascript directory: $FW_jsdir";
+           "gplot directory:      $FW_gplotdir";
 
   } else {
     return "Unknown argument $arg choose one of icon pathlist";
