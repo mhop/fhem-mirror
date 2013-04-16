@@ -243,9 +243,8 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   DimElsOnTimeMd  =>{a=> 38.7,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{absolut=>0,minimal=>1}},
   DimElsActionType=>{a=> 38.0,s=>0.4,l=>3,min=>0  ,max=>8       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3,upDim=>4,downDim=>5,toggelDim=>6,toggelDimToCnt=>7,toggelDimToCntInv=>8}},
 #output Unit                                                                                       
-  ActTypeMp3      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Tone or MP3 to be palyed"},
+  ActTypeMp3      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Tone or MP3 to be played"},
   ActTypeLed      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED color"    ,lit=>{no=>0x00,red_short=>0x11,red_long=>0x12,green_short=>0x21,green_long=>0x22,orange_short=>0x31,orange_long=>0x32}},
-  ActType         =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Action type(LED or Tone)"},
   ActNum          =>{a=> 37  ,s=>1  ,l=>3,min=>1  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Action Number"},
   Intense         =>{a=> 43  ,s=>1  ,l=>3,min=>10 ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Volume",lit=>{vol_0=>255,vol_1=>250,vol_2=>246,vol_3=>240,vol_4=>234,vol_5=>227,vol_6=>218,vol_7=>207,vol_8=>190,vol_9=>162,vol_00=>10}},  
 # statemachines
@@ -606,7 +605,7 @@ my %culHmRegModel = (
                        SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
                        CtValLo         =>1,CtValHi         =>1,
                        CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1,
-			           ActType         =>1,ActNum          =>1,lgMultiExec     =>1},
+			           ActionType      =>1,ActNum          =>1,lgMultiExec     =>1},
   "HM-SEC-MDIR"     =>{                    sabotageMsg     =>1,},
   "HM-CC-TC"        =>{backlOnTime     =>1,backlOnMode     =>1,btnLock         =>1},
   "HM-CC-SCD"       =>{peerNeedsBurst  =>1,expectAES       =>1,
