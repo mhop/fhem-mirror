@@ -876,6 +876,7 @@ PRESENCE_ProcessAbortedScan($)
   <li><b>lan-ping</b> - A presence check of a device via network ping in your LAN/WLAN</li>
   <li><b>fritzbox</b> - A presence check by requesting the device state from the FritzBox internals (only available when running FHEM on a FritzBox!)</li>
   <li><b>local-bluetooth</b> - A presence check by searching directly for a given bluetooth device nearby</li>
+  <li><b>function</b> - A presence check by using your own perl function which returns a presence status</li>
   <li><b>lan-bluetooth</b> - A presence check of a bluetooth device via LAN network by connecting to a presenced or collectord instance</li>
   </ul>
   <br><br>
@@ -896,6 +897,11 @@ PRESENCE_ProcessAbortedScan($)
     <br>
     Checks for a bluetooth device and reports its presence state. For this mode the shell command "hcitool" is required (provided with a <a href="http://www.bluez.org" target="_new">bluez</a> installation under Debian via APT), as well
     as a functional bluetooth device directly attached to your machine.<br><br>
+    <b>Mode: function</b><br><br>
+    <code>define &lt;name&gt; PRESENCE function {...} [ &lt;check-interval&gt; [ &lt;present-check-interval&gt; ] ]</code><br>
+    <br>
+    Checks for a presence state via perl-code. You can use a self-written perl function to obtain the presence state of a specific device (e.g. via SNMP check).<br><br>
+    The function must return 0 (absent) or 1 (present).<br><br>
     <b>Mode: lan-bluetooth</b><br><br>
     Checks for a bluetooth device with the help of presenced or collectord. They can be installed where-ever you like, just must be accessible via network.
      The given device will be checked for presence status.<br>
@@ -1000,7 +1006,7 @@ Options:
   <a name="PRESENCEset"></a>
   <b>Set</b>
   <ul>
-  <li><b>statusRequest</b> - (Only for local-bluetooth, lan-ping and fritzbox) - Schedules an immediatly check.</li>
+  <li><b>statusRequest</b> - (Only for mode local-bluetooth, lan-ping, function and fritzbox) - Schedules an immediatly check.</li>
   </ul>
   <br>
 
@@ -1069,6 +1075,7 @@ Options:
   <li><b>lan-ping</b> - Eine Erkennung auf Basis von Ping-Tests im lokalen LAN/WLAN</li>
   <li><b>fritzbox</b> - Eine Erkennung aufgrund der internen Abfrage des Status auf der FritzBox (nur m&ouml;glich, wenn FHEM auf einer FritzBox l&auml;uft)</li>
   <li><b>local-bluetooth</b> - Eine Erkennung auf Basis von Bluetooth-Abfragen durch den FHEM Server. Das Ger&auml;t muss dabei in Empfangsreichweite sein, aber nicht sichtbar sein</li>
+  <li><b>function</b> - Eine Erkennung mithilfe einer selbst geschriebenen Perl-Funktion, welche den Anwesenheitsstatus ermittelt.</li>
   <li><b>lan-bluetooth</b> - Eine Erkennung durch Bluetooth-Abfragen via Netzwerk (LAN/WLAN) in ein oder mehreren R&auml;umen</li>
   </ul>
   <br><br>
@@ -1080,16 +1087,21 @@ Options:
     Pr&uuml;ft ob ein Ger&auml;t &uuml;ber Netzwerk (&uuml;blicherweise WLAN) auf Ping-Anfragen reagiert und setzt entsprechend den Anwesenheitsstatus.<br>
     <br>
     <b>Modus: fritzbox</b><br><br>
-    <code>define &lt;name&gt; PRESENCE fritzbox &lt;device-name&gt; [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
+    <code>define &lt;name&gt; PRESENCE fritzbox &lt;Ger&auml;tename&gt; [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
     <br>
     Pr&uuml;ft ob ein Ger&auml;t welches per WLAN mit der FritzBox verbunden ist, erreichbar durch Abfrage des Status mit dem Befehl ctlmgr_ctl. 
-    Der Ger&auml;tename (Parameter: &lt;device-name&gt;) muss dem Namen entsprechen, welcher im Men&uuml;punkt "Heimnetz" auf der FritzBox-Oberfl&auml;che angezeigt wird.<br>
+    Der Ger&auml;tename (Parameter: &lt;Ger&auml;tename&gt;) muss dem Namen entsprechen, welcher im Men&uuml;punkt "Heimnetz" auf der FritzBox-Oberfl&auml;che angezeigt wird.<br>
     <br>
     <b>Modus: local-bluetooth</b><br><br>
     <code>define &lt;name&gt; PRESENCE local-bluetooth &lt;Bluetooth-Adresse&gt; [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
     <br>
     Pr&uuml;ft ob ein Bluetooth-Ger&auml;t abgefragt werden kann und meldet dies als Anwesenheit. F&uuml;r diesen Modus wird der Shell-Befehl "hcitool" ben&ouml;tigt
     (wird durch das Paket <a href="http://www.bluez.org" target="_new">bluez</a> bereitgestellt), sowie ein funktionierender Bluetooth-Empf&auml;nger (intern oder als USB-Stick)<br><br>
+    <b>Modus: function</b><br><br>
+    <code>define &lt;name&gt; PRESENCE function {...} [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
+    <br>
+    Pr&uuml;ft den Anwesenheitsstatus mithilfe einer selbst geschriebenen Perl-Funktion (z.B. SNMP Abfrage).<br><br>
+    Diese Funktion muss 0 (Abwesend) oder 1 (Anwesend) zurückgeben.<br><br>
     <b>Modus: lan-bluetooth</b><br><br>
     Pr&uuml;ft ein Bluetooth-Ger&auml;t auf Anwesenheit &uuml;ber Netzwerk mit Hilfe von presenced oder collectord. Diese k&ouml;nnen auf jeder Maschine installiert werden,
     welche eine Standard-Perl-Umgebung bereitstellt und &uuml;ber Netzwerk erreichbar ist.
@@ -1197,7 +1209,7 @@ Options:
   <b>Set</b>
   <ul>
   
-  <li><b>statusRequest</b> - (Nu f&uuml;r local-bluetooth, lan-ping and fritzbox) - Startet einen sofortigen Check.</li> 
+  <li><b>statusRequest</b> - (Nur f&uuml;r Modus local-bluetooth, lan-ping, function und fritzbox) - Startet einen sofortigen Check.</li> 
   </ul>
   <br>
 
