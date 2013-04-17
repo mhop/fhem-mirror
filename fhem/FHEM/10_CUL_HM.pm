@@ -93,7 +93,7 @@ sub CUL_HM_Initialize($) {
                        "rawToReadable unit ".#"KFM-Sensor" only
                        "peerIDs repPeers ".
                        "actCycle actStatus ".
-					   "autoReadReg:1_restart,0_off,2_pon-restart,3_onChange ".
+					   "autoReadReg:1_restart,0_off,2_pon-restart,3_onChange,4_reqStatus ".
 					   "expert:0_off,1_on,2_full ".
 
                        "hmClass:obsolete devInfo:obsolete ". #unused
@@ -107,6 +107,16 @@ sub CUL_HM_Initialize($) {
   $hash->{AttrList}  .= " subType:".join(",",
                CUL_HM_noDup(map { $culHmModel{$_}{st} } keys %culHmModel));
   CUL_HM_initRegHash();
+}
+
+sub CUL_HM_reqStatus($){
+  while(@{$modules{CUL_HM}{helper}{reqStatus}}){
+    my $name = shift(@{$modules{CUL_HM}{helper}{reqStatus}});
+    my $hash = CUL_HM_name2Hash($name);
+	CUL_HM_Set($hash,$name,"statusRequest");
+	InternalTimer(gettimeofday()+4,"CUL_HM_reqStatus","CUL_HM_reqStatus",0);
+	last;
+  }
 }
 sub CUL_HM_autoReadConfig($){
   # will trigger a getConfig and statusrequest for each device assigned.
@@ -1487,7 +1497,10 @@ sub CUL_HM_parseCommon(@){#####################################################
 						(-1)*(hex($rssi)))
 			if ($rssi && $rssi ne '00' && $rssi ne'80');
 	  #todo = what is the answer to a status request
-	  if ($pendType eq "StatusReq"){#it is the answer to our request
+	  my $name = $shash->{NAME};
+	  @{$modules{CUL_HM}{helper}{reqStatus}} = grep { $_ != $name }
+                                       @{$modules{CUL_HM}{helper}{reqStatus}};
+      if ($pendType eq "StatusReq"){#it is the answer to our request
 		my $chnSrc = $src.$shash->{helper}{respWait}{forChn};
 		my $chnhash = $modules{CUL_HM}{defptr}{$chnSrc}; 
 		$chnhash = $shash if (!$chnhash);
@@ -1918,6 +1931,7 @@ sub CUL_HM_Set($@) {
 		$adList .= sprintf("%02X%02X",hex($addr),hex($data)) if ($addr ne "00");
 		return "wrong addr or data:".$ad if (hex($addr)>255 || hex($data)>255);
 	  }
+	  $chn = 0 if ($list == 0);
       CUL_HM_pushConfig($hash,$id,$dst,$chn,$peerID,$peerChn,$list,$adList);
 	}
   } 
@@ -2412,7 +2426,7 @@ sub CUL_HM_Set($@) {
 	}
 	else{#serve internal channels for actor
 	  my $pChn = $chn; # simple device, only one button per channel
-	  $pChn = (($vChn && $vChn eq "off")?-1:0) + $chn*2 if($st ne 'switch');
+	  $pChn = (($vChn && $vChn eq "off")?-1:0) + $chn*2 if($st eq 'blindActuator'||$st eq 'dimmer');
       CUL_HM_PushCmdStack($hash, sprintf("++%s3E%s%s%s40%02X%02X",$flag,
 	                                 $id,$dst,$dst,
                                      $pChn+(($mode && $mode eq "long")?64:0),
@@ -2495,7 +2509,6 @@ sub CUL_HM_Set($@) {
   }
   
   readingsSingleUpdate($hash,"state",$state,1) if($state);
-
 
   $rxType = CUL_HM_getRxType($devHash);
   Log GetLogLevel($name,2), "CUL_HM set $name " . 
@@ -2688,8 +2701,9 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
   my ($msgId, $msgFlag,$msgType,$dst,$p) = ($2,hex($3),$4,$6,$7)
       if ($cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/);
   my ($chn,$subType) = ($1,$2) if($p =~ m/^(..)(..)/); 
+#  my ($subType,$chn) = ($1,$2) if($p =~ m/^(..)(..)/); 
   my $rTo = rand(20)/10+4; #default response timeout
-  if ($msgType eq "01" && $subType){ 
+  if   ($msgType eq "01" && $subType){ 
     if ($subType eq "03"){ #PeerList-------------
   	  #--- remember request params in device level
   	  $hash->{helper}{respWait}{Pending} = "PeerList";
@@ -2740,6 +2754,15 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
 #	  InternalTimer(gettimeofday()+$rTo, "CUL_HM_respPendTout", "respPend:$dst", 0);
 #	  return;
 #    }
+  }
+  elsif($msgType eq '11' && $chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
+    my $name = CUL_HM_hash2Name($hash);
+    if (substr(AttrVal($name,"autoReadReg",0),0,1) > 3){
+	  @{$modules{CUL_HM}{helper}{reqStatus}}= 
+	           CUL_HM_noDup(@{$modules{CUL_HM}{helper}{reqStatus}},$name);
+	  RemoveInternalTimer("CUL_HM_reqStatus");
+	  InternalTimer(gettimeofday()+120,"CUL_HM_reqStatus","CUL_HM_reqStatus", 0);
+	}
   }
   
   if (($msgFlag & 0x20) && ($dst ne '000000')){
@@ -2874,9 +2897,10 @@ sub CUL_HM_pushConfig($$$$$$$$) {#generate messages to cnfig data to register
   my ($hash,$src,$dst,$chn,$peerAddr,$peerChn,$list,$content) = @_;
   my $flag = CUL_HM_getFlag($hash);
   my $tl = length($content);
-  $chn =     sprintf("%02X",$chn);
+#  $chn     = $list?sprintf("%02X",$chn):"00";# channel = 00 for List 0
+  $chn     = sprintf("%02X",$chn);
   $peerChn = sprintf("%02X",$peerChn);
-  $list =    sprintf("%02X",$list);
+  $list    = sprintf("%02X",$list);
 
   # --store pending changes in shadow to handle bit manipulations cululativ--
   $peerAddr = "000000" if(!$peerAddr);
@@ -4548,6 +4572,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
         '1' will execute a getConfig for the device automatically after each reboot of FHEM. <br>
 		'2' like '1' plus execute after power_on.<br>
 		'3' includes '2' plus updates on writes to the device<br>
+		'4' includes '3' plus tries to request status if it seems to be missing<br>
 		Execution will be delayed in order to prevent congestion at startup. Therefore the update 
 		of the readings and the display will be delayed depending on the sice of the database.<br>
 		Recommendations and constrains upon usage:<br>
