@@ -24,6 +24,7 @@ LIRC_Initialize($)
 # Consumer
   $hash->{DefFn}   = "LIRC_Define";
   $hash->{UndefFn} = "LIRC_Undef";
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6";
 }
 
 #####################################
@@ -92,9 +93,10 @@ LIRC_Read($)
   if( my @ready = $select->can_read(0) ){ 
     # an ir event has been received (if you are tracking other filehandles, you need to make sure it is lirc)
     my @codes = $lirc->next_codes;    # should not block
+    my $name = $hash->{NAME};
     for my $code (@codes){
-      Log 3, "LIRC $code toggle";
-      DoTrigger($code, "toggle");
+      Log GetLogLevel($name,3), "LIRC $name $code";
+      DoTrigger($name, $code);
     }
   }
 
@@ -119,7 +121,7 @@ LIRC_Ready($)
 <a name="LIRC"></a>
 <h3>LIRC</h3>
 <ul>
-  Use infrared signals received by an lirc device as toggle events.
+  Generate FHEM-events when an LIRC device receives infrared signals.
   <br><br>
   Note: this module needs the Lirc::Client perl module.
   <br><br>
@@ -142,7 +144,7 @@ LIRC_Ready($)
     end</pre>
     and you press the pwr button the IrPower toggle event occures at fhem.
     <pre>
-    define IrPower01 notify IrPower set lamp toggle</pre>
+    define IrPower01 notify Lirc:IrPower set lamp toggle</pre>
     turns the lamp on and off.
     If you want a faster reaction to keypresses you have to change the
     defaultvalue of readytimeout from 5 seconds to e.g. 1 second in fhem.pl
@@ -156,7 +158,10 @@ LIRC_Ready($)
   <b>Get</b> <ul>N/A</ul><br>
 
   <a name="LIRCattr"></a>
-  <b>Attributes</b> <ul>N/A</ul><br>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#loglevel">loglevel</a></li>
+  /ul><br>
 </ul>
 
 =end html
