@@ -245,8 +245,8 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
 #output Unit                                                                                       
   ActTypeMp3      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Tone or MP3 to be played"},
   ActTypeLed      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED color"    ,lit=>{no=>0x00,red_short=>0x11,red_long=>0x12,green_short=>0x21,green_long=>0x22,orange_short=>0x31,orange_long=>0x32}},
-  ActNum          =>{a=> 37  ,s=>1  ,l=>3,min=>1  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Action Number"},
-  Intense         =>{a=> 43  ,s=>1  ,l=>3,min=>10 ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Volume",lit=>{vol_0=>255,vol_1=>250,vol_2=>246,vol_3=>240,vol_4=>234,vol_5=>227,vol_6=>218,vol_7=>207,vol_8=>190,vol_9=>162,vol_00=>10}},  
+  ActNum          =>{a=> 37  ,s=>1  ,l=>3,min=>1  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Number of repetitions"},
+  Intense         =>{a=> 43  ,s=>1  ,l=>3,min=>10 ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Volume",lit=>{vol_100=>255,vol_90=>250,vol_80=>246,vol_70=>240,vol_60=>234,vol_50=>227,vol_40=>218,vol_30=>207,vol_20=>190,vol_10=>162,vol_00=>10}},  
 # statemachines
   BlJtOn          =>{a=> 11.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from on"      ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
   BlJtOff         =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from off"     ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
@@ -254,8 +254,8 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   BlJtDlyOff      =>{a=> 12.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOff",lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
   BlJtRampOn      =>{a=> 13.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from rampOn"  ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
   BlJtRampOff     =>{a=> 13.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from rampOff" ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
-  BlJtRefOn       =>{a=> 28.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from refOn"   ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
-  BlJtRefOff      =>{a=> 28.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from refOff"  ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  BlJtRefOn       =>{a=> 30.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from refOn"   ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  BlJtRefOff      =>{a=> 30.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from refOff"  ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
   
   DimJtOn         =>{a=> 11.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from on"      ,lit=>{no=>0,dlyOn=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,off=>6}},
   DimJtOff        =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from off"     ,lit=>{no=>0,dlyOn=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,off=>6}},
@@ -417,7 +417,7 @@ my %culHmRegDefine = (
   brightFilter    =>{a=>  2.4,s=>0.4,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"brightness filter - ignore light at night"},
   eventDlyTime    =>{a=> 33  ,s=>1  ,l=>1,min=>0  ,max=>7620    ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>1,t=>"event delay time"},
   ledOnTime       =>{a=> 34  ,s=>1  ,l=>1,min=>0  ,max=>1.275   ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>0,t=>"LED ontime"},
-  eventFilterTime =>{a=> 35  ,s=>1  ,l=>1,min=>0  ,max=>7620    ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
+  eventFilterTime =>{a=> 35  ,s=>0.7,l=>1,min=>0  ,max=>7620    ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
 # - different range
   evtFltrTime     =>{a=> 35.0,s=>1  ,l=>1,min=>600,max=>1200    ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
 
@@ -772,22 +772,17 @@ $culHmSubTypeSets{pushButton}     = $culHmSubTypeSets{remote};
 $culHmSubTypeSets{motionDetector} = $culHmSubTypeSets{threeStateSensor};
 
 my %culHmModelSets = (# channels of this subtype-------------
-  "HM-CC-VD"     =>{ 
-          valvePos  => "position"},
-  "HM-RC-19"     =>{	
-		  service   => "<count>", 
-		  alarm     => "<count>", 
-		  display   => "<text> [comma,no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
-  "HM-PB-4DIS-WM"=>{
-	      text      => "<btn> [on|off] <txt1> <txt2>"},
-  "HM-OU-LED16"  =>{
-		  led    =>"[off|red|green|orange]" ,
-		  ilum   =>"[0-15] [0-127]" },
-  "HM-OU-CFM-PL" =>{
-	      led       => "<color>[,<color>..]",
-		  playTone  => "<MP3No>[,<MP3No>..]"},
-  "HM-Sys-sRP-Pl"=>{
-	      setRepeat => "[no1..36] <sendName> <recName> [bdcast-yes|no]"},
+  "HM-CC-VD"     =>{valvePos  => "position"},
+  "HM-RC-19"     =>{service   => "<count>", 
+		            alarm     => "<count>", 
+		            display   => "<text> [comma,no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
+  "HM-PB-4DIS-WM"=>{text      => "<btn> [on|off] <txt1> <txt2>"},
+  "HM-OU-LED16"  =>{led       =>"[off|red|green|orange]" ,
+		            ilum      =>"[0-15] [0-127]" },
+  "HM-OU-CFM-PL" =>{led       => "<color>[,<color>..]",
+		            playTone  => "<MP3No>[,<MP3No>..]",
+					press     => "[long|short] [on|off] ..."},
+  "HM-Sys-sRP-Pl"=>{setRepeat => "[no1..36] <sendName> <recName> [bdcast-yes|no]"},
 );
 # clones- - - - - - - - - - - - - - - - - 
 $culHmModelSets{"HM-RC-19-B"}  = $culHmModelSets{"HM-RC-19"};
@@ -928,17 +923,24 @@ my %culHmBits = (
                      STATUS  => '4,2', 
                      UNKNOWN => "6,2",
                      RSSI    => '08,02,$val=(-1)*(hex($val))' } },
-  "11;p02=0400" => { txt => "RESET" },
-  "11;p01=02"   => { txt => "SET" , params => {
+  "11;p01=02"   => { txt => "SET"         , params => {
                      CHANNEL  => "02,2", 
                      VALUE    => "04,2", 
                      RAMPTIME => '06,4,$val=CUL_HM_decodeTime16($val)', 
                      DURATION => '10,4,$val=CUL_HM_decodeTime16($val)', } }, 
-  "11;p01=80"   => { txt => "LED" , params => {
+  "11;p01=03"   => { txt => "STOP_change" , params => {
+                     CHANNEL  => "02,2"} }, 
+  "11;p02=0400" => { txt => "RESET" },
+  "11;p01=80"   => { txt => "LED"         , params => {
                      CHANNEL  => "02,2", 
                      COLOR    => "04,2", } }, 
-  "11;p01=81"   => { txt => "LEDall" , params => {
+  "11;p02=8100" => { txt => "LEDall"      , params => {
                      Led1To16 => '04,8,$val= join(":",sprintf("%b",hex($val))=~ /(.{2})/g)',
+					 } }, 
+  "11;p01=81"   => { txt => "LEVEL"      , params => {
+                     CHANNEL  => "02,2", 
+                     TIME     => '04,2,$val=hex($val)', 
+                     SPEED    => '06,2,$val=hex($val)', 
 					 } }, 
   "12"          => { txt => "HAVE_DATA"},
   "3E"          => { txt => "SWITCH", params => {
