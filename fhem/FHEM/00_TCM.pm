@@ -270,12 +270,6 @@ TCM_Read($)
 
         Dispatch($hash, "EnOcean:$org:$d1:$id:$status:$odata", \%addvals);
 
-        # Schorsch M: dispatch corrections
-        if(!Dispatch($hash, "EnOcean:$org:$d1:$id:$status:$odata", \%addvals)) {
-          Log 1 , "Dispatch was called devices was not defined call Dispatch again";
-          Dispatch($hash, "EnOcean:$org:$d1:$id:$status:$odata", \%addvals);
-        }
-
       } elsif($t eq "02") {
         my $rc = substr($mdata, 0, 2);
         my %codes = (
