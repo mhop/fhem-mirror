@@ -485,17 +485,6 @@ sub CUL_HM_Parse($$) {##############################
   elsif($lcm eq "09A112") {      #### Another fhem wants to talk (HAVE_DATA)
     ;
   } 
-  elsif($msgType eq "00" ){      #### DEVICE_INFO,  Pairing-Request 
- 	CUL_HM_ProcessCmdStack($shash) if(CUL_HM_getRxType($shash) & 0x04);#config
-    CUL_HM_infoUpdtDevData($name, $shash,$p);#update data
-
-    if($shash->{cmdStack} && (CUL_HM_getRxType($shash) & 0x04)) {
-	  push @event,"";
-    } 
-	else {
-      push @event, CUL_HM_Pair($name, $shash,$cmd,$src,$dst,$p);
-    }
-  } 
   elsif($model =~ m/^(KS550|HM-WDS100-C6-O)$/) { ##############################
 
     if($msgType eq "70" && $p =~ m/^(....)(..)(....)(....)(..)(..)(..)/) {
@@ -1369,7 +1358,14 @@ sub CUL_HM_parseCommon(@){#####################################################
 	    CUL_HM_respPendRm($shash);
 	  }
 	} 
-  }
+ 	CUL_HM_ProcessCmdStack($shash) if(CUL_HM_getRxType($shash) & 0x04);#config
+    CUL_HM_infoUpdtDevData($shash->{NAME}, $shash,$p);#update data
+
+    if(!$shash->{cmdStack} || !(CUL_HM_getRxType($shash) & 0x04)) {
+      CUL_HM_Pair($shash->{NAME}, $shash,$msgFlag.$msgType,$src,$dst,$p);
+    }
+	return "done";
+  } 
   elsif($msgType eq "10"){######################################
     my $subType = substr($p,0,2);
 	if($subType eq "00"){ #storePeerList#################
@@ -1496,9 +1492,7 @@ sub CUL_HM_parseCommon(@){#####################################################
                         ($dhash?CUL_HM_hash2Name($dhash):$shash->{IODev}{NAME}),
 						(-1)*(hex($rssi)))
 			if ($rssi && $rssi ne '00' && $rssi ne'80');
-	  #todo = what is the answer to a status request
-	  my $name = $shash->{NAME};
-	  @{$modules{CUL_HM}{helper}{reqStatus}} = grep { $_ != $name }
+	  @{$modules{CUL_HM}{helper}{reqStatus}} = grep { $_ != $shash->{NAME} }
                                        @{$modules{CUL_HM}{helper}{reqStatus}};
       if ($pendType eq "StatusReq"){#it is the answer to our request
 		my $chnSrc = $src.$shash->{helper}{respWait}{forChn};
@@ -1516,6 +1510,9 @@ sub CUL_HM_parseCommon(@){#####################################################
 		}
 	  }
 	}
+  }
+  elsif($msgType eq "40"){ #someone is triggere#################
+	CUL_HM_qStateUpdat($dst)if (hex($msgFlag) & 0x20 && $dhash);
   }
   elsif($msgType eq "70"){ #Time to trigger TC##################
     #send wakeup and process command stack
@@ -2668,7 +2665,7 @@ sub CUL_HM_getConfig($$$$$){
   }
  }
 
-#+++++++++++++++++ Protocol stack, sending, repeat++++++++++++++++++++++++++++
+#+++++++++++++++++ Protocol stack, sending, repeat+++++++++++++++++++++++++++++
 sub CUL_HM_SndCmd($$) {
   my ($hash, $cmd) = @_;
   $hash = CUL_HM_getDeviceHash($hash); 
@@ -2701,7 +2698,6 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
   my ($msgId, $msgFlag,$msgType,$dst,$p) = ($2,hex($3),$4,$6,$7)
       if ($cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/);
   my ($chn,$subType) = ($1,$2) if($p =~ m/^(..)(..)/); 
-#  my ($subType,$chn) = ($1,$2) if($p =~ m/^(..)(..)/); 
   my $rTo = rand(20)/10+4; #default response timeout
   if   ($msgType eq "01" && $subType){ 
     if ($subType eq "03"){ #PeerList-------------
@@ -2756,13 +2752,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
 #    }
   }
   elsif($msgType eq '11' && $chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
-    my $name = CUL_HM_hash2Name($hash);
-    if (substr(AttrVal($name,"autoReadReg",0),0,1) > 3){
-	  @{$modules{CUL_HM}{helper}{reqStatus}}= 
-	           CUL_HM_noDup(@{$modules{CUL_HM}{helper}{reqStatus}},$name);
-	  RemoveInternalTimer("CUL_HM_reqStatus");
-	  InternalTimer(gettimeofday()+120,"CUL_HM_reqStatus","CUL_HM_reqStatus", 0);
-	}
+    CUL_HM_qStateUpdat($dst);
   }
   
   if (($msgFlag & 0x20) && ($dst ne '000000')){
@@ -3778,6 +3768,18 @@ sub CUL_HM_stateUpdat($){#in:name, send status-request
   my $name = shift;
   (undef,$name)=split":",$name,2;
   CUL_HM_Set(CUL_HM_name2Hash($name),$name,"statusRequest") if ($name);
+}
+sub CUL_HM_qStateUpdat($){#in:name or id, queue send stat-request after 12 sec
+  my $name = shift;
+  $name = CUL_HM_id2Name($name) if ($name =~ m/^[A-F0-9]{6,8}$/i);
+  $name =~ s /_chn:..$//;
+  return if (!$defs{$name}); #device unknown, ignore
+  if (substr(AttrVal($name,"autoReadReg",0),0,1) > 3){
+ 	@{$modules{CUL_HM}{helper}{reqStatus}}= 
+	           CUL_HM_noDup(@{$modules{CUL_HM}{helper}{reqStatus}},$name);
+	RemoveInternalTimer("CUL_HM_reqStatus");
+	InternalTimer(gettimeofday()+120,"CUL_HM_reqStatus","CUL_HM_reqStatus", 0);
+  }
 }
 
 #+++++++++++++++++ external use +++++++++++++++++++++++++++++++++++++++++++++++
