@@ -12,7 +12,6 @@ package main;
 #  TCM_120_User_Manual_V1.53_02.pdf
 #  EnOcean Serial Protocol 3 (ESP3) (for the TCM310)
 
-
 # TODO: 
 # Check BSC Temp
 # Check Stick Temp
