@@ -752,13 +752,13 @@ my %culHmSubTypeSets = (# channels of this subtype
 					   up         => "[<changeValue>] [ontime] [ramptime]...",
 					   down       => "[<changeValue>] [ontime] [ramptime]..." 
 					   },
-  remote           =>{ peerChan   => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
-  threeStateSensor =>{ peerChan   => "<btnNumber> device ... single [set|unset] [actor|remote|both]",},
-  virtual          =>{ peerChan   => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
+  remote           =>{ peerChan   => "<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]",},
+  threeStateSensor =>{ peerChan   => "<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]",},
+  virtual          =>{ peerChan   => "<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]",
 		               press      => "[long|short]...",
                        valvePos   => "position", },#acting as TC
   smokeDetector    =>{ test       => "", alarmOn=>"", alarmOff=>"", 
-		               peerChan   => "<btnNumber> device ... single [set|unset] actor",},
+		               peerChan   => "<btnNumber> <actChn> ... single [set|unset] actor",},
   winMatic         =>{ matic      => "<btn>",
                        keydef     => "<btn> <txt1> <txt2>",
                        create     => "<txt>" },
@@ -779,9 +779,7 @@ my %culHmModelSets = (# channels of this subtype-------------
   "HM-PB-4DIS-WM"=>{text      => "<btn> [on|off] <txt1> <txt2>"},
   "HM-OU-LED16"  =>{led       =>"[off|red|green|orange]" ,
 		            ilum      =>"[0-15] [0-127]" },
-  "HM-OU-CFM-PL" =>{led       => "<color>[,<color>..]",
-		            playTone  => "<MP3No>[,<MP3No>..]",
-					press     => "[long|short] [on|off] ..."},
+  "HM-OU-CFM-PL" =>{press     => "[long|short] [on|off] ..."},
   "HM-Sys-sRP-Pl"=>{setRepeat => "[no1..36] <sendName> <recName> [bdcast-yes|no]"},
 );
 # clones- - - - - - - - - - - - - - - - - 
@@ -791,7 +789,7 @@ $culHmModelSets{"HM-RC-19-SW"} = $culHmModelSets{"HM-RC-19"};
 
 my %culHmChanSets = (
   "HM-CC-TC02"  =>{ 
-          peerChan       => "<btnNumber> device ... single [set|unset] [actor|remote|both]",
+          peerChan       => "<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]",
           "day-temp"     => "[on,off,6.0..30.0]",
           "night-temp"   => "[on,off,6.0..30.0]",
           "party-temp"   => "[on,off,6.0..30.0]",
@@ -811,6 +809,8 @@ my %culHmChanSets = (
           sysTime        =>	""	  },
   "HM-SEC-WIN01"=>{  stop         =>"",
                      level        =>"<level> <relockDly> <speed>..."},
+  "HM-OU-CFM-PL01" =>{led       => "<color>[,<color>...] [<repeat>]"},
+  "HM-OU-CFM-PL02" =>{playTone  => "<MP3No>[,<MP3No>...] [<repeat>]"},
 );
 # clones- - - - - - - - - - - - - - - - - 
 $culHmChanSets{"HM-CC-TC00"}     = $culHmChanSets{"HM-CC-TC02"};

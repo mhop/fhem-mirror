@@ -124,7 +124,7 @@ sub CUL_HM_autoReadConfig($){
   while(@{$modules{CUL_HM}{helper}{updtCfgLst}}){
     my $name = shift(@{$modules{CUL_HM}{helper}{updtCfgLst}});
     my $hash = CUL_HM_name2Hash($name);
-	if (0 != substr(CUL_HM_Get($hash,$name,"param","autoReadReg"),0,1)){
+	if (0 != CUL_HM_getARead($name)){
 	  CUL_HM_Set($hash,$name,"getSerial");
 	  CUL_HM_Set($hash,$name,"getConfig");
 	  CUL_HM_Set($hash,$name,"statusRequest");
@@ -166,8 +166,8 @@ sub CUL_HM_updateConfig($){
 	  #delete $attr{$name}{peerIDs}; # remove historical data
 	}
 
-    my $st = CUL_HM_Get($hash,$name,"param","subType");
-    my $md = CUL_HM_Get($hash,$name,"param","model");
+    my $st  = CUL_HM_Get($hash,$name,"param","subType");
+    my $md  = CUL_HM_Get($hash,$name,"param","model");
     if ("HM-CC-TC" eq $md){
 	  $hash->{helper}{role}{chn} = 1 if (length($id) == 6); #tc special 
 	}
@@ -234,7 +234,7 @@ sub CUL_HM_updateConfig($){
 	  }
 	}
 	$attr{$name}{webCmd} = $webCmd if ($webCmd);
-	push @getConfList,$name if (0 != substr(AttrVal($name,"autoReadReg","0"),0,1));
+	push @getConfList,$name if (0 != CUL_HM_getARead($name));
   }
   $modules{CUL_HM}{helper}{updtCfgLst} = \@getConfList;
   CUL_HM_autoReadConfig("updateConfig");
@@ -952,9 +952,8 @@ sub CUL_HM_Parse($$) {##############################
  	      my $bitLoc = ($msgChn-1)*2;#calculate bit location
  	      my $mask = 3<<$bitLoc;
  	      my $value = sprintf("%08X",(hex($devState) &~$mask)|($msgState<<$bitLoc));
-	      push @entities,
-		  CUL_HM_UpdtReadBulk($shash,1,"color:".$value,
-		                               "state:".$value);
+	      push @entities,CUL_HM_UpdtReadBulk($shash,1,"color:".$value,
+		                                              "state:".$value);
  	      if ($chnHash){
  	        $shash = $chnHash;
  	        my %colorTable=("00"=>"off","01"=>"red","02"=>"green","03"=>"orange");
@@ -1032,46 +1031,30 @@ sub CUL_HM_Parse($$) {##############################
     }
     elsif ($msgType eq "41"){ #Alarm detected
 	  my ($No,$state) = (substr($p,2,2),substr($p,4,2));
-	  if($dhash && $dname ne $name){ # update source(ID is reported in $dst...)
-	    if (!$dhash->{helper}{alarmNo} || $dhash->{helper}{alarmNo} ne $No){
-		  $dhash->{helper}{alarmNo} = $No;
-		  push @entities,CUL_HM_UpdtReadSingle($dhash,'state',
-		                              (($state eq "01")?"off":
-									  (($state eq "C7")?"smoke-forward":
-									                    "smoke-alarm")),1);
-		}
+	  if(($dhash && $dname ne $name) && # update source(ID is reported in $dst...)
+	     (!$dhash->{helper}{alarmNo} || $dhash->{helper}{alarmNo} ne $No)){
+		$dhash->{helper}{alarmNo} = $No;
+		push @entities,
+		     CUL_HM_UpdtReadBulk($dhash,1,
+			           'state:'.(($state eq "01")?"off":"smoke-Alarm_".$No),
+			   	       "eventNo:".$No
+			           );
 	  }
 	  # - - - - - - now handle the team - - - - - - 
 	  $shash->{helper}{alarmList} = "" if (!$shash->{helper}{alarmList});
-	  $shash->{helper}{alarmFwd}  = "" if (!$shash->{helper}{alarmFwd});
 	  if ($state eq "01") { # clear Alarm for one sensor
 		$shash->{helper}{alarmList} =~ s/",".$dst//;
-	  }
-	  elsif($state eq "C7"){# add alarm forwarding
-		$shash->{helper}{alarmFwd} .= ",".$dst;
 	  }
 	  else{                 # add alarm for Sensor
 		$shash->{helper}{alarmList} .= ",".$dst;
 	  }
-	  my $alarmList; # make alarm ID list readable
+	  my $alarmList;        # make alarm ID list readable
 	  foreach(split(",",$shash->{helper}{alarmList})){
 	    $alarmList .= CUL_HM_id2Name($_)."," if ($_);
 	  }
-	  if (!$alarmList){# all alarms are gone - clear forwarding
-		  foreach(split(",",$shash->{helper}{alarmFwd})){	
-			my $fHash = CUL_HM_id2Hash($1) if ($1);
-		    push @entities,CUL_HM_UpdtReadSingle($fHash,'state',"off",1)if ($fHash);
-		  }
-		$shash->{helper}{alarmList} = "";
-		$shash->{helper}{alarmFwd}  = "";
-	  }
-	  my $alarmFwd; # make forward ID list readable
-	  foreach(split(",",$shash->{helper}{alarmFwd})){
-	    $alarmFwd .= CUL_HM_id2Name($_)."," if ($_);
-	  }
+	  $shash->{helper}{alarmList} = ""  if (!$alarmList);
       push @event,"state:"        .($alarmList?"smoke-Alarm":"off" );
       push @event,"smoke_detect:" .($alarmList?$alarmList   :"none");
-      push @event,"smoke_forward:".($alarmFwd ?$alarmFwd    :"none");
     } 
     elsif ($msgType eq "01"){ #Configs
 	  my $sType = substr($p,0,2);
@@ -1489,8 +1472,8 @@ sub CUL_HM_parseCommon(@){#####################################################
 	elsif($subType eq "06"){ #reply to status request=======================
 	  my $rssi = substr($p,8,2);# --calculate RSSI
       CUL_HM_storeRssi(CUL_HM_hash2Name($shash),
-                        ($dhash?CUL_HM_hash2Name($dhash):$shash->{IODev}{NAME}),
-						(-1)*(hex($rssi)))
+                       ($dhash?CUL_HM_hash2Name($dhash):$shash->{IODev}{NAME}),
+					   (-1)*(hex($rssi)))
 			if ($rssi && $rssi ne '00' && $rssi ne'80');
 	  @{$modules{CUL_HM}{helper}{reqStatus}} = grep { $_ != $shash->{NAME} }
                                        @{$modules{CUL_HM}{helper}{reqStatus}};
@@ -1504,8 +1487,8 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  else{
 		my ($chn) = ($1) if($p =~ m/^..(..)/);
 		if ($chn eq "00"){
-		  CUL_HM_queueAutoRead(CUL_HM_hash2Name($shash))
-		    if (1 < substr(AttrVal($shash->{NAME},"autoReadReg",0),0,1));
+		  CUL_HM_queueAutoRead(CUL_HM_hash2Name($shash)) 
+		        if (1 < CUL_HM_getARead($shash->{NAME}));
 		  return "powerOn" ;# check dst eq "000000" as well?
 		}
 	  }
@@ -2243,32 +2226,36 @@ sub CUL_HM_Set($@) {
 	  }
 	}
 	elsif($md eq "HM-OU-CFM-PL"){
-	  return "use channel 1 of the device for LED" if ($chn != 1);
 	  my %color = (redL =>18,greenL =>34,orangeL =>50,
 	               redS =>17,greenS =>33,orangeS =>49);
 	  my @ledList = split(',',$a[2]);
-	  my $ledBytes;
+	  my $repeat = (defined $a[3] && $a[3] =~ m/^(\d+)$/)?$a[3]:1;
+	  return "repetition $repeat out of range [1..255]"
+          if($repeat < 1 ||	$repeat > 255);
+
+	  my $ledBytes = sprintf("%02X",$repeat);
 	  foreach my $led (@ledList){
         if (!$color{$led} ){# wrong parameter
 	        return "'$led' unknown. use: ".join(" ",sort keys(%color));
 	    }
         $ledBytes .= sprintf("%02X",$color{$led});
 	  }
-      CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.'0101'.$ledBytes);
+      CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.'01'.$ledBytes);
 	}
 	else{
 	  return "device for command cannot be identified";
 	}
   } 
   elsif($cmd eq "playTone") { #################################################
-    $chn = "02" if (length($hash->{DEF}) == 6);# be nice, select implicite
-	return "use channel 2 of the device to play MP3" if ($chn != 2);
 	my @mp3List = split(',',$a[2]);
-	my $mp3Bytes;
+	my $repeat = (defined $a[3] && $a[3] =~ m/^(\d+)$/)?$a[3]:1;
+	return "repetition $repeat out of range [1..255]"
+          if($repeat < 1 ||	$repeat > 255);
+	my $mp3Bytes = sprintf("%02X",$repeat);
 	foreach my $mp3 (@mp3List){
       $mp3Bytes .= sprintf("%02X",$mp3);
 	}
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.'0202'.$mp3Bytes);
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.'01'.$mp3Bytes);
   } 
   elsif($cmd eq "ilum") { ################################################# reg
 	return "$a[2] not specified. choose 0-15 for brightness"  if ($a[2]>15);
@@ -2431,7 +2418,7 @@ sub CUL_HM_Set($@) {
 	}
   } 
   elsif($cmd eq "peerChan") { #################################################
-    #peerChan <btnN> device ... [single|dual] [set|unset] [actor|remote|both]
+    #peerChan <btnN> <device> ... [single|dual] [set|unset] [actor|remote|both]
 	my ($bNo,$peerN,$single,$set,$target) = ($a[2],$a[3],$a[4],$a[5],$a[6]);
 	$state = "";
 	return "$bNo is not a button number"                          if(($bNo < 1) && !$chn);
@@ -2926,8 +2913,8 @@ sub CUL_HM_pushConfig($$$$$$$$) {#generate messages to cnfig data to register
 	                                 substr($content,$l,$ml));
   }
   CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$chn."06");
-  my $rd = substr(CUL_HM_Get($hash,$hash->{NAME},"param","autoReadReg"),0,1);
-  CUL_HM_queueAutoRead(CUL_HM_hash2Name($hash)) if ($rd=~m/\d/ && 2 < $rd);
+  CUL_HM_queueAutoRead(CUL_HM_hash2Name($hash)) 
+        if (2 < CUL_HM_getARead($hash->{NAME}));
 }
 sub CUL_HM_Resend($) {#resend a message if there is no answer
   my $hash = shift;
@@ -3774,12 +3761,17 @@ sub CUL_HM_qStateUpdat($){#in:name or id, queue send stat-request after 12 sec
   $name = CUL_HM_id2Name($name) if ($name =~ m/^[A-F0-9]{6,8}$/i);
   $name =~ s /_chn:..$//;
   return if (!$defs{$name}); #device unknown, ignore
-  if (substr(AttrVal($name,"autoReadReg",0),0,1) > 3){
+  if (CUL_HM_getARead($name) > 3){
  	@{$modules{CUL_HM}{helper}{reqStatus}}= 
 	           CUL_HM_noDup(@{$modules{CUL_HM}{helper}{reqStatus}},$name);
 	RemoveInternalTimer("CUL_HM_reqStatus");
 	InternalTimer(gettimeofday()+120,"CUL_HM_reqStatus","CUL_HM_reqStatus", 0);
   }
+}
+sub CUL_HM_getARead($){#return valid autoRegRead as integer
+  my $name = shift;
+  my $aRd = CUL_HM_Get($defs{$name},$name,"param","autoReadReg");
+  return ($aRd eq "undefined")?0:int($aRd);
 }
 
 #+++++++++++++++++ external use +++++++++++++++++++++++++++++++++++++++++++++++
@@ -4157,8 +4149,8 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
          activate learn mode. Whether commands are pending is reported on
          device level with parameter 'protCmdPend'.
        <ul>
-    <li><B>peerChan &lt;btn_no&gt; &lt;hmDevice&gt; [single|dual]
-        [set|unset] [actor|remote]</B><a name="CUL_HMpeerChan"></a><br>
+    <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>]
+        [<u>set</u>|unset] [<u>both</u>|actor|remote]</B><a name="CUL_HMpeerChan"></a><br>
 
          peerChan will establish a connection between a sender-<B>channel</B> and
          an actuator-<B>channel</B> called link in HM nomenclatur. Peering must not be 
@@ -4189,18 +4181,20 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
          well as one sender-channel to multiple Actuator-channel is
          possible.<br>
 
-         &lt;hmDevice&gt; is the actuator-channel to be peered.<br>
+         &lt;actChan&gt; is the actuator-channel to be peered.<br>
 
          &lt;btn_no&gt; is the sender-channel (button) to be peered. If
          'single' is choosen buttons are counted from 1. For 'dual' btn_no is
          the number of the Button-pair to be used. I.e. '3' in dual is the
          3rd button pair correcponding to button 5 and 6 in single mode.<br>
 
-         If the command is executed on a channel the btn_no is ignored.<br>
+         If the command is executed on a channel the btn_no is ignored.
+		 It needs to be set, should be 0<br>
 
          [single|dual]: this mode impacts the default behavior of the 
          Actuator upon using this button. E.g. a dimmer can be learned to a 
          single button or to a button pair. <br>
+		 Defaults to dual.<br>
 
          'dual' (default) Button pairs two buttons to one actuator. With a 
          dimmer this means one button for dim-up and one for dim-down. <br>
@@ -4209,13 +4203,15 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
          simple switch actuator to toggle on/off. Nevertheless also dimmer can
          be learned to only one button. <br>
 
+         [set|unset]: selects either enter a peering or remove it.<br>
+		 Defaults to set.<br>
          'set'   will setup peering for the channels<br>
-
          'unset' will remove the peering for the channels<br>
 
          [actor|remote|both] limits the execution to only actor or only remote.
          This gives the user the option to redo the peering on the remote
          channel while the settings in the actor will not be removed.<br>
+		 Defaults to both.<br>
 
          Example:
 		 <ul> 
@@ -4322,13 +4318,17 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
     <li>OutputUnit (HM-OU-CFM-PL)
     <ul>
       <li><B>led &lt;color&gt;[,&lt;color&gt;..]</B><br>
-          Possible colors are [redL|greenL|yellowL|redS|greenS|yellowS]. A
-          sequence of colors can be given separating the color entries by ','.
-          White spaces must not be used in the list. 'S' indicates short and
-          'L' long ilumination. <br></li>
-      <li><B>playTone &lt;MP3No&gt[,&lt;MP3No&gt..]</B><br>
-         Play a series of tones. List is to be entered separated by ','. White
-         spaces must not be used in the list.<br></li>
+        Possible colors are [redL|greenL|yellowL|redS|greenS|yellowS]. A
+        sequence of colors can be given separating the color entries by ','.
+        White spaces must not be used in the list. 'S' indicates short and
+        'L' long ilumination. <br>
+         repeat defines how many times the sequence is executed. Defaults to 1<br>
+	  </li>
+      <li><B>playTone &lt;MP3No&gt[,&lt;MP3No&gt..] [,&lt;repeat&gt..]</B><br>
+        Play a series of tones. List is to be entered separated by ','. White
+        spaces must not be used in the list.<br>
+        repeat defines how many times the sequence is played. Defaults to 1<br>
+	  </li>
     </ul><br>
 	</li>
     <li>HM-RC-19xxx

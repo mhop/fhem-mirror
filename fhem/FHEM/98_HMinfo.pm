@@ -9,7 +9,6 @@ sub CommandXmlList($$);
 sub XmlEscape($);
 use Blocking;
 
-
 sub HMinfo_Initialize($$) {####################################################
   my ($hash) = @_;
 
@@ -20,7 +19,8 @@ sub HMinfo_Define($$){#########################################################
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $name = $hash->{NAME};
-  $hash->{Version} = "Beta-04";
+  $hash->{Version} = "01";
+  $attr{$name}{webCmd} = "protoEvents:rssi:peerXref:configCheck:models";
   return;
 }
 sub HMinfo_getParam(@) { ######################################################
@@ -55,12 +55,15 @@ sub HMinfo_regCheck(@) { ######################################################
 	  push @peerIdInReg,CUL_HM_name2Id($peer);
     }
 	#- - - -  check whether peer is required - - - - 
-    my $peerLinReg = (join ",",sort @peerIdInReg);
-    $peerLinReg .= "," if ($peerLinReg);
-    my $peerIDs = AttrVal($eName,"peerIDs","");
-    $peerIDs =~ s/00000000,//;
-    push @peerRegsFail,$eName." - found:".$peerLinReg." expected:".$peerIDs 
-                       if ($peerLinReg ne $peerIDs);
+	my $st = CUL_HM_Get($defs{$eName},$eName,"param","subType");
+	if ($st !~ m/(thermostat|smokeDetector)/){
+      my $peerLinReg = (join ",",sort @peerIdInReg);
+      $peerLinReg .= "," if ($peerLinReg);
+      my $peerIDs = AttrVal($eName,"peerIDs","");
+      $peerIDs =~ s/00000000,//;
+      push @peerRegsFail,$eName." - found:".$peerLinReg." expected:".$peerIDs 
+                         if ($peerLinReg ne $peerIDs);
+	}
   }
   return  "\n incomplete register set\n    " .(join "\n    ",sort @regIncompl)
          ."\n missing Peer Registerset\n    ".(join "\n    ",sort @peerRegsFail)
@@ -331,15 +334,6 @@ sub HMinfo_SetFn($$) {#########################################################
   elsif($cmd eq "models")     {##print capability, models----------------------
     my %th = CUL_HM_putHash("culHmModel");
 	my @model;
-	push @model,sprintf("%4s %-24s %-16s %-13s %-5s %-5s %s"
-	                      ,"  ID"
-	                      ,"name"
-						  ,"subType"
-						  ,"supportedMode"
-						  ,"Info"
-						  ,"List"
-						  ,"channels"
-						  );  
 	foreach (keys %th){
 	  my $mode = $th{$_}{rxt};
 	  $mode =~ s/c/config/;
@@ -355,17 +349,27 @@ sub HMinfo_SetFn($$) {#########################################################
 	    my ($n,$s,$e) = split(":",$_);
 	    $chan .= $s.(($s eq $e)?"":("-".$e))." ".$n.", ";
 	  }
-	  push @model,sprintf("%4s %-24s %-16s %-13s %-5s %-5s %s"
-	                      ,$_
-	                      ,$th{$_}{name}
+	  push @model,sprintf("%-16s %-24s %4s %-13s %-5s %-5s %s"
 						  ,$th{$_}{st}
+	                      ,$th{$_}{name}
+	                      ,$_
 						  ,$mode
 						  ,$th{$_}{cyc}
 						  ,$list
 						  ,$chan
 						  );  
 	}
-	$ret = $cmd.($filter?" filtered":"").":$filter\n  ".join"\n  ",grep(/$filter/,sort @model);
+	$ret = $cmd.($filter?" filtered":"").":$filter\n  " 
+	       .sprintf("%-16s %-24s %4s %-13s %-5s %-5s %s\n  "
+						  ,"subType"
+	                      ,"name"
+	                      ,"ID"
+						  ,"supportedMode"
+						  ,"Info"
+						  ,"List"
+						  ,"channels"
+						  )
+			.join"\n  ",grep(/$filter/,sort @model);  
   }
   elsif($cmd eq "help")       {
 	$ret = " Unknown argument $cmd, choose one of "
@@ -476,114 +480,105 @@ sub HMinfo_post($) {###########################################################
 <h3>HMinfo</h3>
 <ul>
   <tr><td>
-  HMinfo is a module that shall support in getting an overview of HM 
-  installation and settings. It also allows some HM wide commands such 
-  as store all collected register settings. 
-  <br>
+  HMinfo is a module that shall support in getting an overview of 
+  eQ-3 HomeMatic devices as defines in <a href="#CUL_HM">CUL_HM</a>. 
+  It also allows some HM wide commands such 
+  as store all collected register settings.<br><br>
+  
   Commands will be executed on all HM entities of the installation. 
   If applicable and evident execution is restricted to related entities. 
-  This means that rssi is only executed on devices, not in channels. 
-  Channels never have rssi values.<br>
-  Filter can be applied as following:<br>
-  set &lt;name&gt; &lt;cmd&gt; &lt;filter&gt; [&lt;param&gt;]<br>
-  whereby the filter is has the two segments<br>
-  [-dcasev] [-f &lt;filter&gt;]<br>
-  with filter for types <br>
-    <li>
-       d - device   :include devices<br>
-       c - channels :include channels<br>
-       v - virtual  :supress fhem virtual<br>
-       p - physical :supress physical<br>
-       a - aktor    :supress actor<br>
-       s - sensor   :supress sensor<br>
-       e - empty    :include results even if requested fields are empty<br>
-	</li>
-	and/or a filter for names:<br>
-	<li>
-      -f - filter   :regexp to filter entity names <br>
-    </li>
-	example:<br>
-	<li>
-      set hm param -d -f dim state # display param 'state' for all devices whos name contains dim
-      set hm param -c -f ^dimUG$ peerList # display param 'peerList' for all channels whos name is dimUG
-      set hm param -dcv expert # get attribut expert for all channels,devices or virtuals
-    </li>
+  This means that rssi is executed only on devices, never channels since 
+  they never have support rssi values.<br><br>
+  <b>Filter</b>
+  <ul>  can be applied as following:<br><br>
+        <code>set &lt;name&gt; &lt;cmd&gt; &lt;filter&gt; [&lt;param&gt;]</code><br>
+        whereby filter has two segments, typefilter and name filter<br>
+        [-dcasev] [-f &lt;filter&gt;]<br><br>
+        filter for <b>types</b> <br>
+		<ul>
+            <li>d - device   :include devices</li>
+            <li>c - channels :include channels</li>
+            <li>v - virtual  :supress fhem virtual</li>
+            <li>p - physical :supress physical</li>
+            <li>a - aktor    :supress actor</li>
+            <li>s - sensor   :supress sensor</li>
+            <li>e - empty    :include results even if requested fields are empty</li>
+		</ul>
+	    and/or a filter for <b>names</b>:<br>
+	    <ul>
+		    <li>-f - filter   :regexp to filter entity names </li>
+        </ul>
+	    Example:<br>
+	    <ul><code>
+           set hm param -d -f dim state # display param 'state' for all devices whos name contains dim<br>
+           set hm param -c -f ^dimUG$ peerList # display param 'peerList' for all channels whos name is dimUG<br>
+           set hm param -dcv expert # get attribut expert for all channels,devices or virtuals<br>
+        </code></ul>
+  </ul>
   <br>
   <a name="HMinfodefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; HMinfo</code><br>   
+    <code>define &lt;name&gt; HMinfo</code><br> 
+    Just one entity needs to be defines, no parameter are necessary.<br> 	
   </ul>
   <br>
 
   <a name="HMinfoset"></a>
   <b>Set</b>
-  even though the commands are more a get funktion they are implemented 
-  as set to allow simple web interface usage  <br>
   <ul>
-    <li><a href="#models">models</a><br>
-	    <li>list all HM models that are supported in FHEM
-		</li>
-	</li>
-    <li><a href="#param">param &lt;name&gt; &lt;name&gt;...</a><br>
-	    <li>returns a table parameter values (attribute, readings,...) 
-		for all entities as a table
-		</li>
-	</li>
-    <li><a href="#regCheck">regCheck</a><br>
-	    <li>performs a consistancy check on register readings for completeness
-		</li>
-	</li>
-    <li><a href="#peerCheck">peerCheck</a><br>
-	    <li>performs a consistancy check on peers. If a peer is set in one channel 
-		this funktion will search wether the peer also exist on the opposit side.
-		</li>
-	</li>
-    <li><a href="#configCheck">configCheck</a><br>
-	    <li>performs a consistancy check of HM settings. It includes regCheck and peerCheck
-		</li>
-	</li>
-    <li><a href="#peerXref">peerXref</a><br>
-	    <li>provides a cross-reference on peerings, a kind of who-with-who summary over HM
-		</li>
-	</li>
-    <li><a href="#saveConfig">saveConfig</a><br>
-	    <li>performs a save for all HM register setting. 
-		</li>
-	</li>
-    <li><a href="#clearProtocol">clearProtocol</a><br>
-	    <li>executes a set clear msgEvents on all HM devices
-		</li>	
-	</li>
-    <li><a href="#clearReadings">clearReadings</a><br>
-	    <li>executes a set clear readings on all HM devices
-		</li>	
-	</li>
-    <li><a href="#clearRssi">clearRssi</a><br>
-	    <li>executes a set clear rssi on all HM devices
-		</li>	
-	</li>
-    <li><a href="#autoReadReg">autoReadReg</a><br>
-	    <li>stimulates a read of the configuration for the devices.
-		</li>	
-	</li>
-    <li><a href="#sys">sys</a><br>
-	</li>
+  even though the commands are more a get funktion they are implemented 
+  as set to allow simple web interface usage<br>
+    <ul>
+      <li><a href="#models">models</a><br>
+	      list all HM models that are supported in FHEM
+	  </li>
+      <li><a href="#param">param &lt;name&gt; &lt;name&gt;...</a><br>
+	      returns a table parameter values (attribute, readings,...) 
+	  	for all entities as a table
+	  </li>
+      <li><a href="#regCheck">regCheck</a><br>
+	      performs a consistancy check on register readings for completeness
+	  </li>
+      <li><a href="#peerCheck">peerCheck</a><br>
+	      performs a consistancy check on peers. If a peer is set in one channel 
+	  	this funktion will search wether the peer also exist on the opposit side.
+	  </li>
+      <li><a href="#configCheck">configCheck</a><br>
+	      performs a consistancy check of HM settings. It includes regCheck and peerCheck
+	  </li>
+      <li><a href="#peerXref">peerXref</a><br>
+	      provides a cross-reference on peerings, a kind of who-with-who summary over HM
+	  </li>
+      <li><a href="#saveConfig">saveConfig</a><br>
+	      performs a save for all HM register setting. 
+	  </li>
+      <li><a href="#clearProtocol">clearProtocol</a><br>
+	      executes a set clear msgEvents on all HM devices
+	  </li>
+      <li><a href="#clearReadings">clearReadings</a><br>
+	      executes a set clear readings on all HM devices
+	  </li>
+      <li><a href="#clearRssi">clearRssi</a><br>
+	      executes a set clear rssi on all HM devices
+	  </li>
+      <li><a href="#autoReadReg">autoReadReg</a><br>
+	      stimulates a read of the configuration for the devices.
+	  </li>
+      <li><a href="#sys">sys</a><br>
+	  </li>
+    </ul>  
   </ul>
   <br>
 
   <a name="HMinfoget"></a>
   <b>Get</b>
-  <ul>
-  N/A
-  </ul>
+  <ul> N/A </ul>
   <br><br>
 
   <a name="HMinfoattr"></a>
   <b>Attributes</b>
-  <ul>
-  N/A 
-  </ul>
+  <ul>N/A</ul>
 </ul>
 =end html
 =cut
