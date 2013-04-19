@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - change:  stucture triggers on each change, see event-on-change-reading
   - feature: PRESENCE: new mode "function" to use own perl functions for
              presence checks
   - bugfix:  fixing not-working FHEM restart, when a PRESENCE check is running
