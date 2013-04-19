@@ -1,0 +1,29 @@
+############################
+# Display the measured temp and the actuator.
+# Corresponding FileLog definition: 
+# define <filelogname> FileLog /var/log/fhem/esa2000-%Y.log <esa2000name>
+#set terminal png transparent size <SIZE> crop
+
+set terminal png transparent truecolor rounded medium size <SIZE> enhanced
+
+set output '<OUT>.png'
+set title '<TL>'
+
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set grid xtics y2tics
+
+set ytics nomirror
+set ylabel <L1>
+set yrange [0:]
+
+set y2tics
+set y2label <L2>
+set y2range [0:]
+
+#FileLog 8:CUR\x3a\s[0-9]::
+#FileLog 4:hour_last\x3a\s[0-9]:0:
+
+plot "<IN>" ls l0     axes x1y2 title '<L2>' with fsteps,\
+     "<IN>" ls l1fill axes x1y1 title '<L1>' with fsteps

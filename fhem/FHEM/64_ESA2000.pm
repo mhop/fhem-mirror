@@ -13,7 +13,8 @@ use strict;
 use warnings;
 
 my %codes = (
-  "19fa" => "ESA2000_LED",
+  "011e" => "ESAx000WZ",
+  "031e" => "ESA1000Z",
 );
 
 
@@ -29,7 +30,9 @@ ESA2000_Initialize($)
   $hash->{DefFn}     = "ESA2000_Define";
   $hash->{UndefFn}   = "ESA2000_Undef";
   $hash->{ParseFn}   = "ESA2000_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:esa2000-led loglevel:0,1,2,3,4,5,6 ignore:0,1 base_1 base_2";
+  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 loglevel:0,1,2,3,4,5,6 ignore:0,1 ".
+                       "model:esa2000-led,esa2000-wz,esa2000-s0,esa1000wz-ir,esa1000wz-s0,esa1000wz-led,esa1000gas base_1 base_2 ".
+                       $readingFnAttributes;
 }
 
 #####################################
@@ -68,12 +71,34 @@ ESA2000_Parse($$)
 {
   my ($hash, $msg) = @_;
 
-# 0123456789012345678901234567890123456789
-# S0119FA011E00007D6E003100000007C9F9 ESA2000_LED
+# 0 00 0000 0001 11111111 1222 222222 2333
+# 0 12 3456 7890 12345678 9012 345678 9012
+# S                                            Sensorkennung
+#   ss                                         Sequenze und Sequenzwiederhohlung mit gesetzten höchsten Bit
+#      dddd                                    Device
+#           cccc                               Code
+#                vvvvvvvv vvvv vvvvvv vvvv     Valves
+#                tttttttt                      Gesamtimpules
+#                         aaaa                 Impule je Sequenz
+#                              zzzzzz          Zeitstempel seit Start des Adapters             (ESA1000)
+#                                     kkkk     Impulse je kWh/m3
+#
+# Examples:
+# ---------
+# S 01 19FA 011E 00007D6E 0031 000000 07C9     ESA2000_LED      Zählerkonstante = 2000
+# S 12 5E42 011E 00000030 0002 000000 0206     ESA2000_WZ       Zählerkonstante = 600
+# S 48 6062 011E 00000061 0001 000000 002B     ESA2000_WZ       Zählerkonstante = 75
+# S 93 5DDA 011E 00004F85 0000 000000 0205     ESA2000_WZ       Zählerkonstante = 600
+# S 16 68C5 011E 000000BB 0000 001FB4 03CB     ESA1000WZ_LED    Zählerkonstante = 1000
+# S AB 0595 031E 000A047E 0000 227C46 0004     ESA1000GAS       Zählerkonstante = 1
+# S 1C 0785 011E 00011CDA 0002 0D056C 004C     ESA1000WZ_LED    Zählerkonstante = 75
+# S 6E 003D 011E 00037650 0011 02C1DA 07D0     ESA1000WZ_S0     Zählerkonstante = 2000
+# S A3 0543 031E 0000099C 0064 001147 000F     ESA1000GAS       Zählerkonstante = 10
+
   $msg = lc($msg);
   my $seq = substr($msg, 1, 2);
-  my $cde = substr($msg, 3, 4);
-  my $dev = substr($msg, 7, 4);
+  my $dev = substr($msg, 3, 4);
+  my $cde = substr($msg, 7, 4);
   my $val = substr($msg, 11, 22);
 
   Log 5, "ESA2000 msg $msg";
@@ -106,147 +131,19 @@ ESA2000_Parse($$)
 #  ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = gmtime(time);
 #  $year = $year + 1900;
 
-  if($type eq "ESA2000_LED") {
+#  0- 5     repeat, sequence, total_ticks, actual_ticks, ticks, raw
+#  6-12     total, actual, diff, diff_sec, diff_ticks, last_sec, raw_total
+# 13-17     max, day, month, year, rate
+# 18-23     day_hr, day_lr, month_hr, month_lr, year_hr, year_lr
+# 24-28     day_last, month_last, year_last, hour, hour_last
 
-    @txt = ( "repeat", "sequence", "total_ticks", "actual_ticks", "ticks_kwh", "raw", "total_kwh", "actual_kwh", "diff_kwh", "diff_sec", "diff_ticks", "last_sec", "raw_total_kwh", "max_kwh", "day_kwh", "month_kwh", "year_kwh", "rate", "hr_kwh", "lr_kwh", "day_hr_kwh", "day_lr_kwh", "month_hr_kwh", "month_lr_kwh", "year_hr_kwh", "year_lr_kwh" );
+  if(($type eq "ESAx000WZ") || ($type eq "ESA1000Z")) {
 
-
-    # Codierung Hex
-    $v[0] =  int(hex($seq) / 128) ? "+" : "-"; # repeated
-    $v[1] =  hex($seq) % 128;
-    $v[2] =  hex(substr($val,0,8));
-    $v[3] =  hex(substr($val,8,4));
-    $v[4] =  hex(substr($val,18,4)) ^ 25; # XOR 25, whyever bit 1,4,5 are swapped?!?! Probably a (receive-) error in CUL-FW?
-
-    $v[11] = time();
-    # check if low-rate or high-rate. note that this is different per electricity company! (Here weekday from 6-20 is high rate)
-    my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
-    if ( (0 < $wday ) && ($wday < 6) && (5 < $hour) && ($hour < 20) ) {
-      $v[17] = "HR";
-    } else {
-      $v[17] = "LR";
-    } 
-
-    $v[5] = sprintf("CNT: %d%s CUM: %d CUR: %d  TICKS: %d %s",
-                         $v[1], $v[0], $v[2], $v[3], $v[4], $v[17] );
-
-    if (defined($def->{READINGS}{$txt[11]}{VAL})) {
-      $v[9] =  $v[11] - $def->{READINGS}{$txt[11]}{VAL}; # seconds since last update
-    } 
-    if(defined($v[9]) && $v[9] != 0) {
-      $v[7] =  $v[3]/$v[4]/$v[9]*3600; # calculate kW/h since last update
-    } else {
-      $v[7] = -1;
-    }
-    $v[8] =  $v[3]/$v[4]; # calculate kWh diff from readings (raw from device....), whats this relly?
-    if(defined($def->{READINGS}{$txt[2]}{VAL})) {
-      if($def->{READINGS}{$txt[2]}{VAL} <=$v[2]) { # check for resetted counter.... only accept increase in counter
-        $v[10] = $v[2] - $def->{READINGS}{$txt[2]}{VAL}; # shoudl be the same as actual_ticks if no packets are lost
-      }
-    }
-    if(defined($v[10])) {
-      $v[6] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[6]}{VAL}) ? $def->{READINGS}{$txt[6]}{VAL} : 0); # cumulate kWh to ensure tick-changes are calculated correctly (does this ever happen?)
-      if(defined($def->{READINGS}{$txt[14]}{TIME})) {
-        if(substr($now,0,10) eq substr($def->{READINGS}{$txt[14]}{TIME},0,10)) { # a bit clumsy, I agree, but it works and its logical and this is pearl, right?
-          $v[14] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[14]}{VAL}) ? $def->{READINGS}{$txt[14]}{VAL} : 0); # cumulate kWh to ensure tick-changes are calculated correctly (does this ever happen?)
-          if ($v[17] eq "HR" ) {
-            $v[18] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[18]}{VAL}) ? $def->{READINGS}{$txt[18]}{VAL} : 0); # high-rate
-          } else {
-            $v[19] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[19]}{VAL}) ? $def->{READINGS}{$txt[19]}{VAL} : 0); # low-rate
-          }
-        } else {
-          $v[14] = $v[10]/$v[4];
-          if ($v[17] eq "HR" ) {
-            $v[18] = $v[10]/$v[4];
-          } else {
-            $v[19] = $v[10]/$v[4];
-          }
-       }
-      } else {
-          $v[14] = $v[10]/$v[4];
-          if ($v[17] eq "HR" ) {
-            $v[18] = $v[10]/$v[4];
-          } else {
-            $v[19] = $v[10]/$v[4];
-          }
-        }
-      if(defined($def->{READINGS}{$txt[15]}{TIME})) {
-        if(substr($now,0,7) eq substr($def->{READINGS}{$txt[15]}{TIME},0,7)) { # a bit clumsy, I agree, but it works and its logical and this is pearl, right?
-          $v[15] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[15]}{VAL}) ? $def->{READINGS}{$txt[15]}{VAL} : 0); # cumulate kWh to ensure tick-changes are calculated correctly (does this ever happen?)
-          if ($v[17] eq "HR" ) {
-            $v[20] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[20]}{VAL}) ? $def->{READINGS}{$txt[20]}{VAL} : 0); # high-rate
-          } else {
-            $v[21] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[21]}{VAL}) ? $def->{READINGS}{$txt[21]}{VAL} : 0); # low-rate
-          }
-        } else {
-          $v[15] = $v[10]/$v[4];
-          if ($v[17] eq "HR" ) {
-            $v[20] = $v[10]/$v[4];
-          } else {
-            $v[21] = $v[10]/$v[4];
-          }
-        }
-      } else {
-          $v[15] = $v[10]/$v[4];
-          if ($v[17] eq "HR" ) {
-            $v[20] = $v[10]/$v[4];
-          } else {
-            $v[21] = $v[10]/$v[4];
-          }
-        }
-      if(defined($def->{READINGS}{$txt[16]}{TIME})) {
-        if(substr($now,0,4) eq substr($def->{READINGS}{$txt[16]}{TIME},0,4)) { # a bit clumsy, I agree, but it works and its logical and this is pearl, right?
-          $v[16] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[16]}{VAL}) ? $def->{READINGS}{$txt[16]}{VAL} : 0); # cumulate kWh to ensure tick-changes are calculated correctly (does this ever happen?)
-          if ($v[17] eq "HR" ) {
-            $v[22] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[22]}{VAL}) ? $def->{READINGS}{$txt[22]}{VAL} : 0); # high-rate
-          } else {
-            $v[23] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[23]}{VAL}) ? $def->{READINGS}{$txt[23]}{VAL} : 0); # low-rate
-          }
-        } else {
-          $v[16] = $v[10]/$v[4];
-          if ($v[17] eq "HR" ) {
-            $v[22] = $v[10]/$v[4];
-          } else {
-            $v[23] = $v[10]/$v[4];
-          }
-        }
-      } else {
-          $v[16] = $v[10]/$v[4];
-          if ($v[17] eq "HR" ) {
-            $v[22] = $v[10]/$v[4];
-          } else {
-            $v[23] = $v[10]/$v[4];
-          }
-        }
-    } else {
-      $v[6] = 0;
-    } 
-
-    $v[12] =  $v[2]/$v[4]; # calculate kWh total since reset of device (does only make sense if ticks per kWh does not change!!)
-    if(defined($def->{READINGS}{$txt[13]}{VAL})) {
-      if($v[7] >= $def->{READINGS}{$txt[13]}{VAL}) {
-        $v[13] = $v[7]; # update max kw/h
-      }
-    } else {
-      $v[13] = $v[7]; # update max kw/h
-    }
-      
-
-    # add counter_1 and counter_2 (Hoch- und Niedertarif Basiswerte)
-    if(defined($attr{$name}) &&
-       defined($attr{$name}{"count_1"}) &&
-       ($attr{$name}{"count_1"}>0)) {
-         $v[13] = $v[12] + $attr{$name}{"count_1"};
-      }
-
-    if(defined($attr{$name}) &&
-       defined($attr{$name}{"count_2"}) &&
-       ($attr{$name}{"count_2"}>0)) {
-        $v[13] = $v[12] + $attr{$name}{"count_2"};
-      }
-
-    $val = sprintf("CNT: %d%s CUM: %0.3f CUR: %0.3f TICKS: %d %s",
-                         $v[1], $v[0], $v[6], $v[7], $v[4], $v[17]);
+    @txt = ( "repeat", "sequence", "total_ticks", "actual_ticks", "ticks", "raw", 
+             "total", "actual", "diff", "diff_sec", "diff_ticks", "last_sec", "raw_total", 
+             "max", "day", "month", "year", "rate", 
+             "day_hr", "day_lr", "month_hr", "month_lr", "year_hr", "year_lr",
+             "day_last", "month_last", "year_last", "hour", "hour_last" );
 
   } else {
 
@@ -255,27 +152,127 @@ ESA2000_Parse($$)
 
   }
 
+    # Codierung Hex
+    $v[0] =  int(hex($seq) / 128) ? "+" : "-";
+    $v[1] =  hex($seq) % 128;
+    $v[2] =  hex(substr($val,0,8));
+    $v[3] =  hex(substr($val,8,4));
+    $v[4] =  hex(substr($val,18,4)) ^ hex(substr($msg,3,2));    # XOR high byte of device-id
 
-  my $max = int(@txt);
+    my $corr = 1;
+    if ($type eq "ESA1000Z") {
+      $corr = 1000/$v[4];
+    }
+
+    # check if low-rate or high-rate. note that this is different per electricity company! (Here weekday from 6-20 is high rate)
+    my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+
+    if ( (0 < $wday ) && ($wday < 6) && (5 < $hour) && ($hour < 20) ) {
+      $v[17] = "HR";
+    } else {
+      $v[17] = "LR";
+    }
+
+    $v[5] = sprintf("CNT: %d%s CUM: %d CUR: %d  TICKS: %d %s",
+                         $v[1], $v[0], $v[2], $v[3], $v[4], $v[17] );
+
+    $v[11] = time();
+    $v[9] =  $v[11] - (defined($def->{READINGS}{$txt[11]}{VAL}) ? $def->{READINGS}{$txt[11]}{VAL} : $v[11]); # seconds since last update
+
+    $v[7] = -1;
+    $v[8] = sprintf("%.4f", $v[3]/$v[4]/$corr);    # calculate kWh diff from readings (raw from device....), whats this relly?
+
+    if(defined($def->{READINGS}{$txt[2]}{VAL}) && $def->{READINGS}{$txt[2]}{VAL} <=$v[2]) {    # check for resetted counter.... only accept increase in counter
+      $v[10] = $v[2] - $def->{READINGS}{$txt[2]}{VAL};                                         # should be the same as actual_ticks if no packets are lost
+    }
+
+    if(defined($v[10])) {
+      my $con = $v[10]/$v[4]/$corr;
+      if($v[9] >= 110) {
+        # Zeitdifferenz zu gering (ESA 120s bis 184s)
+        # $v[9] = (($v[9] lt 110) ? 150 : $v[9]);
+        $v[7] = $con/$v[9]*3600;                                        # calculate kW/h since last update
+      }
+      $v[6] = $con + (defined($def->{READINGS}{$txt[6]}{VAL}) ? $def->{READINGS}{$txt[6]}{VAL} : 0); # cumulate kWh to ensure tick-changes are calculated correctly (does this ever happen?)
+      # 27 "hour"
+      # 28 "hour_last"
+      if(defined($def->{READINGS}{$txt[27]}{VAL})) {
+        $v[27] = $con + ((substr($now,0,13) eq substr($def->{READINGS}{$txt[27]}{TIME},0,13)) ? $def->{READINGS}{$txt[27]}{VAL} : 0);
+        $v[28] = $def->{READINGS}{$txt[27]}{VAL} if(substr($now,0,13) ne substr($def->{READINGS}{$txt[27]}{TIME},0,13));
+      } else {
+        $v[27] = $con
+      }
+      #     Day          #     Month          #     Year
+      # 14 "day"         # 15 "month"         # 16 "year"
+      # 18 "day_hr"      # 20 "month_hr"      # 22 "year_hr"
+      # 19 "day_lr"      # 21 "month_lr"      # 23 "year_lr"
+      # 24 "day_last"    # 25 "month_last"    # 26 "year_last"
+      for(my $i = 0; $i < 3; $i++) {
+        if(defined($def->{READINGS}{$txt[$i+14]}{VAL})) {
+          $v[14+$i] = $con + ((substr($now,0,10-$i*3) eq substr($def->{READINGS}{$txt[$i+14]}{TIME},0,10-$i*3)) ? $def->{READINGS}{$txt[14+$i]}{VAL} : 0);
+          $v[24+$i] = $def->{READINGS}{$txt[14+$i]}{VAL} if(substr($now,0,10-$i*3) ne substr($def->{READINGS}{$txt[$i+14]}{TIME},0,10-$i*3));
+        } else {
+          $v[14+$i] = $con
+        }
+        if ($v[17] eq "HR" ) {
+          # high-rate
+          $v[18+2*$i] = $con + (defined($def->{READINGS}{$txt[18+2*$i]}{VAL}) && (substr($now,0,10-3*$i) eq substr($def->{READINGS}{$txt[18+2*$i]}{TIME},0,10-3*$i)) ? $def->{READINGS}{$txt[18+2*$i]}{VAL} : 0);
+        } else {
+          # low-rate
+          $v[19+2*$i] = $con + (defined($def->{READINGS}{$txt[19+2*$i]}{VAL}) && (substr($now,0,10-3*$i) eq substr($def->{READINGS}{$txt[19+2*$i]}{TIME},0,10-3*$i)) ? $def->{READINGS}{$txt[19+2*$i]}{VAL} : 0);
+        }
+      }
+
+      if(!defined($def->{READINGS}{$txt[13]}{VAL})) {
+        $v[13] = $v[7];    # update max kw/h
+      } elsif($v[7] >= $def->{READINGS}{$txt[13]}{VAL}) {
+        $v[13] = $v[7];    # update max kw/h
+      }
+
+      $v[12] = $v[2]/$v[4]/$corr;   # calculate kWh total since reset of device (does only make sense if ticks per kWh does not change!!)
+      # add counter_1 and counter_2 (Hoch- und Niedertarif Basiswerte)
+      if(defined($attr{$name}) &&
+        defined($attr{$name}{"base_1"})) {
+          $v[12] = sprintf("%.3f", $v[12] + $attr{$name}{"base_1"});
+      }
+      if(defined($attr{$name}) &&
+        defined($attr{$name}{"base_2"})) {
+          $v[12] = sprintf("%.3f", $v[12] + $attr{$name}{"base_2"});
+      }
+
+    } else {
+      #  6 "total_kwh"
+      $v[6] = (defined($def->{READINGS}{$txt[6]}{VAL}) ? $def->{READINGS}{$txt[6]}{VAL} : 0);
+    }
+
+    $val = sprintf("CNT: %d%s CUM: %0.3f CUR: %0.3f TICKS: %d %s",
+                       $v[1], $v[0], $v[6], $v[7], $v[4], $v[17]);
+
+  #
+  # from here readings are effectively updated
+  #
+  readingsBeginUpdate($def);
+
+  Log GetLogLevel($name,4), "ESA2000 $name: $val";
 
   if ( (defined($def->{READINGS}{"sequence"}{VAL}) ? $def->{READINGS}{"sequence"}{VAL} : "") ne $v[1] ) {
-    Log GetLogLevel($name,4), "ESA2000 $name: $val";
+    my $max = int(@txt);
     for( my $i = 0; $i < $max; $i++) {
-      if ( $v[$i] ) {
-        $def->{READINGS}{$txt[$i]}{TIME} = $now;
-        $def->{READINGS}{$txt[$i]}{VAL} = $v[$i];
-        $def->{CHANGED}[$i] = "$txt[$i]: $v[$i]";
+      if (defined($v[$i])) {
+        readingsBulkUpdate($def, $txt[$i], $v[$i]);
       }
     }
-    $def->{READINGS}{type}{TIME} = $now;
-    $def->{READINGS}{type}{VAL} = $type;
 
-    $def->{STATE} = $val;
-    $def->{CHANGED}[$max++] = $val;
+    readingsBulkUpdate($def, "type", $type);
+    readingsBulkUpdate($def, "state", $val);
+
   } else {
-    Log GetLogLevel($name,4), "(ESA2000/DISCARDED $name: $val)";
-    return "($name)";
+    Log GetLogLevel($name,4), "ESA2000/DISCARDED $name: $val";
   }
+  #
+  # now we are done with updating readings
+  #
+  readingsEndUpdate($def, 1);
 
   return $name;
 }
@@ -304,21 +301,22 @@ ESA2000_Parse($$)
   </ul>
   <br>
 
-  <a name="CUL_EMset"></a>
+  <a name="ESA2000set"></a>
   <b>Set</b> <ul>N/A</ul><br>
 
-  <a name="CUL_EMget"></a>
+  <a name="ESA2000get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="CUL_EMattr"></a>
+  <a name="ESA2000attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#ignore">ignore</a></li><br>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
-    <li><a href="#model">model</a> (ESA2000_LED)</li><br>
+    <li><a href="#model">model</a>esa2000-led, esa2000-wz, esa2000-s0, esa1000wz-ir, esa1000wz-s0, esa1000wz-led, esa1000gas</li><br>
     <li><a href="#IODev">IODev</a></li><br>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
   </ul>
   <br>
 </ul>
