@@ -252,13 +252,10 @@ sub structure_Notify($$)
 
   }
 
-  #eigenen Status jetzt setzen, nur wenn abweichend
-  my $oldState = ReadingsVal($me, "state", "");
-  if($oldState ne $newState) {
-    Log GetLogLevel($me,5), "Update structure '$me' to $newState" .
-                " because device $dev->{NAME} has changed";
-    readingsSingleUpdate($hash, "state", $newState, 1);
-  }
+  Log GetLogLevel($me,5), "Update structure '$me' to $newState" .
+              " because device $dev->{NAME} has changed";
+  readingsSingleUpdate($hash, "state", $newState, 1);
+
   delete($hash->{INNTFY});
   undef;
 }
