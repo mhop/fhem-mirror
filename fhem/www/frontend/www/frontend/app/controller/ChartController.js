@@ -49,6 +49,10 @@ Ext.define('FHEM.controller.ChartController', {
                ref: 'chart' //this.getChart()
            },
            {
+               selector: 'chartformpanel',
+               ref: 'panel[name=chartformpanel]' //this.getChartformpanel()
+           },
+           {
                selector: 'linechartpanel',
                ref: 'linechartpanel' //this.getLinechartpanel()
            },
@@ -59,6 +63,10 @@ Ext.define('FHEM.controller.ChartController', {
            {
                selector: 'grid[name=savedchartsgrid]',
                ref: 'savedchartsgrid' //this.getSavedchartsgrid()
+           },
+           {
+               selector: 'grid[name=chartdata]',
+               ref: 'chartdatagrid' //this.getChartdatagrid()
            }
            
     ],
@@ -88,6 +96,22 @@ Ext.define('FHEM.controller.ChartController', {
             },
             'actioncolumn[name=savedchartsactioncolumn]': {
                 click: this.deletechart
+            },
+            'grid[name=chartdata]': {
+//                itemmouseenter: this.highlightRecordInChart
+                itemclick: this.highlightRecordInChart
+            },
+            'panel[name=chartpanel]': {
+                collapse: this.resizeChart,
+                expand: this.resizeChart
+            },
+            'panel[name=chartformpanel]': {
+                collapse: this.resizeChart,
+                expand: this.resizeChart
+            },
+            'panel[name=chartgridpanel]': {
+                collapse: this.resizeChart,
+                expand: this.resizeChart
             }
         });
         
@@ -99,6 +123,13 @@ Ext.define('FHEM.controller.ChartController', {
     requestChartData: function(stepchangecalled) {
         
         var me = this;
+        
+        //show loadmask
+        me.getLinechartpanel().setLoading(true);
+        
+        //collapse chart settings
+        me.getChartformpanel().collapse();
+        
         //getting the necessary values
         var devices = Ext.ComponentQuery.query('combobox[name=devicecombo]'),
             yaxes = Ext.ComponentQuery.query('combobox[name=yaxiscombo]'),
@@ -114,24 +145,37 @@ Ext.define('FHEM.controller.ChartController', {
             dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s'),
             dynamicradio = Ext.ComponentQuery.query('radiogroup[name=dynamictime]')[0],
             chartpanel = me.getLinechartpanel(),
-            chart = me.getChart(),
-            store = chart.getStore(),
-            proxy = store.getProxy();
+            chart = me.getChart();
         
-        //show loadmask
-        chart.setLoading(true);
-        
-        //cleanup store
-        store.removeAll();
-        
-        //cleanup chart
-        for (var i = chart.series.length -1; i >= 0; i--) {
-            chart.series.removeAt(i);
+        //cleanup chartpanel 
+        var existingchartgrid = Ext.ComponentQuery.query('panel[name=chartgridpanel]')[0];
+        if (!existingchartgrid) {
+            var chartdatagrid = Ext.create('FHEM.view.ChartGridPanel', {
+                name: 'chartgridpanel',
+                height: 200,
+                maxHeight: 200
+            });
+            chartpanel.add(chartdatagrid);
+        } else {
+            existingchartgrid.down('grid').getStore().removeAll();
+        }
+        var existingchart = Ext.ComponentQuery.query('panel[name=chartpanel]')[0];
+        if (!existingchart) {
+            var store = Ext.create('FHEM.store.ChartStore'),
+                proxy = store.getProxy();
+            chart = me.createChart(store);
+            chartpanel.add(chart);
+        } else {
+            chart.getStore().removeAll();
+            chart.getStore().destroy();
+            //removes the store completely from chart
+            chart.bindStore();
+            var chartstore = Ext.create('FHEM.store.ChartStore');
+            chart.bindStore(chartstore);
+            chart.series.removeAll();
+            chart.axes.get(0).setTitle("");
         }
         
-        //Reset axis titles
-        chart.axes.get(0).setTitle("");
-        chart.axes.get(1).setTitle("");
         
         //reset zoomValues
         chartpanel.setLastYmax(null);
@@ -206,7 +250,7 @@ Ext.define('FHEM.controller.ChartController', {
         });
         
         var i = 0;
-        Ext.each(yaxes, function(yaxis) {
+        Ext.each(yaxes, function(y) {
             var device = devices[i].getValue(),
                 yaxis = yaxes[i].getValue(),
                 yaxiscolorcombo = yaxescolorcombos[i].getValue(),
@@ -217,10 +261,177 @@ Ext.define('FHEM.controller.ChartController', {
             if(yaxis === "" || yaxis === null) {
                 yaxis = yaxes[i].getRawValue();
             }
+            
             me.populateAxis(i, yaxes.length, device, yaxis, yaxiscolorcombo, yaxisfillcheck, yaxisstepcheck, axisside, yaxisstatistics, dbstarttime, dbendtime);
             i++;
         });
         
+    },
+    
+    /**
+     * resize the chart to fit the centerpanel
+     */
+    resizeChart: function() {
+        var lcp = Ext.ComponentQuery.query('linechartpanel')[0];
+        var lcv = Ext.ComponentQuery.query('chart')[0];
+        var cfp = Ext.ComponentQuery.query('form[name=chartformpanel]')[0];
+        var cdg = Ext.ComponentQuery.query('panel[name=chartgridpanel]')[0];
+        
+        if (lcp && lcv && cfp && cdg) {
+            var chartheight = lcp.getHeight() - cfp.getHeight() - cdg.getHeight() - 95;
+            var chartwidth = lcp.getWidth() - 25;
+            lcv.setHeight(chartheight);
+            lcv.setWidth(chartwidth);
+        }
+        
+    },
+    
+    /**
+     * create the base chart
+     */
+    createChart: function(store) {
+        var me = this;
+        
+        var chart = Ext.create('Ext.panel.Panel', {
+            title: 'Chart',
+            name: 'chartpanel',
+            collapsible: true,
+            titleCollapse: true,
+            items: [
+                {
+                    xtype: 'toolbar',
+                    items: [
+                        {
+                            xtype: 'button',
+                            width: 100,
+                            text: 'Step back',
+                            name: 'stepback',
+                            icon: 'app/resources/icons/resultset_previous.png'
+                        },
+                        {
+                            xtype: 'button',
+                            width: 100,
+                            text: 'Step forward',
+                            name: 'stepforward',
+                            icon: 'app/resources/icons/resultset_next.png'
+                        },
+                        {
+                            xtype: 'button',
+                            width: 100,
+                            text: 'Reset Zoom',
+                            name: 'resetzoom',
+                            icon: 'app/resources/icons/delete.png',
+                            scope: me,
+                            handler: function(btn) {
+                                var chart = btn.up().up().down('chart');
+                                chart.restoreZoom();
+                                
+                                chart.axes.get(0).minimum = chart.up().up().getLastYmin();
+                                chart.axes.get(0).maximum = chart.up().up().getLastYmax();
+                                chart.axes.get(1).minimum = chart.up().up().getLastY2min();
+                                chart.axes.get(1).maximum = chart.up().up().getLastY2max();
+                                chart.axes.get(2).minimum = chart.up().up().getLastXmin();
+                                chart.axes.get(2).maximum = chart.up().up().getLastXmax();
+                                
+                                chart.redraw();
+                                //helper to reshow the hidden items after zooming back out
+                                if (chart.up().up().artifactSeries && chart.up().up().artifactSeries.length > 0) {
+                                    Ext.each(chart.up().up().artifactSeries, function(serie) {
+                                        serie.showAll();
+                                        Ext.each(serie.group.items, function(item) {
+                                            if (item.type === "circle") {
+                                                item.show();
+                                                item.redraw();
+                                            }
+                                        });
+                                    });
+                                    chart.up().up().artifactSeries = [];
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    xtype: 'chart',
+                    legend: {
+                        position: 'right'
+                    },
+                    axes: [ 
+                        {
+                            type : 'Numeric',
+                            name : 'yaxe',
+                            position : 'left',
+                            fields : [],
+                            title : '',
+                            grid : {
+                                odd : {
+                                    opacity : 1,
+                                    fill : '#ddd',
+                                    stroke : '#bbb',
+                                    'stroke-width' : 0.5
+                                }
+                            }
+                        }, 
+                        {
+                            type : 'Numeric',
+                            name : 'yaxe2',
+                            position : 'right',
+                            fields : [],
+                            title : ''
+                        }, 
+                        {
+                            type : 'Time',
+                            name : 'xaxe',
+                            position : 'bottom',
+                            fields : [ 'TIMESTAMP' ],
+                            dateFormat : "Y-m-d H:i:s",
+                            title : 'Time'
+                        }
+                    ],
+                    animate: true,
+                    store: store,
+                    enableMask: true,
+                    mask: true,//'vertical',//true, //'horizontal',
+                    listeners: {
+                        mousedown: function(evt) {
+                            // fix for firefox, not dragging images
+                            evt.preventDefault();
+                        },
+                        select: {
+                            fn: function(chart, zoomConfig, evt) {
+                                
+                                delete chart.axes.get(2).fromDate;
+                                delete chart.axes.get(2).toDate;
+                                chart.up().up().setLastYmax(chart.axes.get(0).maximum);
+                                chart.up().up().setLastYmin(chart.axes.get(0).minimum);
+                                chart.up().up().setLastY2max(chart.axes.get(1).maximum);
+                                chart.up().up().setLastY2min(chart.axes.get(1).minimum);
+                                chart.up().up().setLastXmax(chart.axes.get(2).maximum);
+                                chart.up().up().setLastXmin(chart.axes.get(2).minimum);
+                                
+                                chart.setZoom(zoomConfig);
+                                chart.mask.hide();
+                                
+                                //helper hiding series and items which are out of scope
+                                Ext.each(chart.series.items, function(serie) {
+                                    if (serie.items.length === 0) {
+                                        chart.up().up().artifactSeries.push(serie);
+                                        Ext.each(serie.group.items, function(item) {
+                                            item.hide();
+                                            item.redraw();
+                                        });
+                                        serie.hideAll();
+                                        
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }    
+            ]
+        });
+        
+        return chart;
     },
     
     /**
@@ -288,13 +499,14 @@ Ext.define('FHEM.controller.ChartController', {
             chart = me.getChart(),
             store = chart.getStore(),
             proxy = store.getProxy(),
+            yseries,
             generalization = Ext.ComponentQuery.query('radio[boxLabel=active]')[0],
             generalizationfactor = Ext.ComponentQuery.query('combobox[name=genfactor]')[0].getValue();
         
         if (i > 0) {
-            var yseries = me.createSeries('VALUE' + (i + 1), yaxis, yaxisfillcheck, yaxiscolorcombo, axisside);
+            yseries = me.createSeries('VALUE' + (i + 1), yaxis, yaxisfillcheck, yaxiscolorcombo, axisside);
         } else {
-            var yseries = me.createSeries('VALUE', yaxis, yaxisfillcheck, yaxiscolorcombo, axisside);
+            yseries = me.createSeries('VALUE', yaxis, yaxisfillcheck, yaxiscolorcombo, axisside);
         }
         
         var url;
@@ -400,6 +612,10 @@ Ext.define('FHEM.controller.ChartController', {
                       }
                   }
                   
+                  //as we have the valuetext, we can fill the grid
+                //fill the grid with the data
+                  me.fillChartGrid(json.data, valuetext);
+                  
                   var timestamptext;
                   if (i === 0) {
                       timestamptext = 'TIMESTAMP';
@@ -484,19 +700,19 @@ Ext.define('FHEM.controller.ChartController', {
         //check if we have added the last dataset
         if ((i + 1) === axeslength) {
             //add baselines
-            var i = 0,
+            var j = 0,
                 basesstart = Ext.ComponentQuery.query('numberfield[name=basestart]'),
                 basesend = Ext.ComponentQuery.query('numberfield[name=baseend]'),
                 basescolors = Ext.ComponentQuery.query('combobox[name=baselinecolorcombo]'),
                 basesfills = Ext.ComponentQuery.query('checkboxfield[name=baselinefillcheck]');
             
             Ext.each(basesstart, function(base) {
-                var basestart = basesstart[i].getValue(),
-                    baseend = basesend[i].getValue(),
-                    basecolor = basescolors[i].getValue(),
-                    basefill = basesfills[i].checked;
+                var basestart = basesstart[j].getValue(),
+                    baseend = basesend[j].getValue(),
+                    basecolor = basescolors[j].getValue(),
+                    basefill = basesfills[j].checked;
                 
-                me.createBaseLine(i + 1, basestart, baseend, basefill, basecolor);
+                me.createBaseLine(j + 1, basestart, baseend, basefill, basecolor);
                 
                 //adjust min and max on y axis
                 if (me.maxYValue < basestart) {
@@ -521,7 +737,6 @@ Ext.define('FHEM.controller.ChartController', {
      * do the final layout of chart after all data is loaded
      */
     doFinalChartLayout: function(chart) {
-        
         var me = this;
         
         //remove the old max values of y axis to get a dynamic range
@@ -554,9 +769,7 @@ Ext.define('FHEM.controller.ChartController', {
         
         
         // set the x axis range dependent on user given timerange
-        var chart = me.getChart(),
-            store = chart.getStore(),
-            starttime = new Date(me.getStarttimepicker().getValue()),
+        var starttime = new Date(me.getStarttimepicker().getValue()),
             endtime = new Date(me.getEndtimepicker().getValue());
         
         chart.axes.get(2).fromDate = starttime;
@@ -564,7 +777,9 @@ Ext.define('FHEM.controller.ChartController', {
         chart.axes.get(2).processView();
         chart.redraw();
         
-        chart.setLoading(false);
+        me.resizeChart();
+        
+        me.getLinechartpanel().setLoading(false);
         
     },
     
@@ -834,16 +1049,16 @@ Ext.define('FHEM.controller.ChartController', {
                     jsonConfig += '"generalizationfactor":"' + generalizationfactor + '",';
                 }
                 
-                var i = 0;
+                var j = 0;
                 Ext.each(basesstart, function(base) {
-                    var basestart = basesstart[i].getValue(),
-                        baseend = basesend[i].getValue(),
-                        basecolor = basescolors[i].getDisplayValue(),
-                        basefill = basesfills[i].checked;
+                    var basestart = basesstart[j].getValue(),
+                        baseend = basesend[j].getValue(),
+                        basecolor = basescolors[j].getDisplayValue(),
+                        basefill = basesfills[j].checked;
                     
-                    i++;
-                    jsonConfig += '"base' + i + 'start":"' + basestart + '","base' + i + 'end":"' + baseend + '",';
-                    jsonConfig += '"base' + i + 'color":"' + basecolor + '","base' + i + 'fill":"' + basefill + '",';
+                    j++;
+                    jsonConfig += '"base' + j + 'start":"' + basestart + '","base' + j + 'end":"' + baseend + '",';
+                    jsonConfig += '"base' + j + 'color":"' + basecolor + '","base' + j + 'fill":"' + basefill + '",';
                 });
                 
                 jsonConfig += '"starttime":"' + dbstarttime + '","endtime":"' + dbendtime + '"}';
@@ -983,8 +1198,7 @@ Ext.define('FHEM.controller.ChartController', {
 
                 //handling baselines
                 var basesstart = Ext.ComponentQuery.query('numberfield[name=basestart]'),
-                    baselinecount = 0,
-                    i = 1;
+                    baselinecount = 0;
                 
                 Ext.iterate(chartdata, function(key, value) {
                     if (key.indexOf("base") >= 0 && key.indexOf("start") >= 0 && value != "null") {
@@ -998,8 +1212,8 @@ Ext.define('FHEM.controller.ChartController', {
                     renderedbaselines++;
                 }
                 
-                var i = 0,
-                    j = 1;
+                i = 0;
+                var j = 1;
                     basesstart = Ext.ComponentQuery.query('numberfield[name=basestart]'),
                     basesend = Ext.ComponentQuery.query('numberfield[name=baseend]'),
                     basescolors = Ext.ComponentQuery.query('combobox[name=baselinecolorcombo]'),
@@ -1123,6 +1337,114 @@ Ext.define('FHEM.controller.ChartController', {
             Ext.Msg.alert("Error", "The Chart could not be deleted, no record id has been found");
         }
             
-    } 
+    },
+    
+    /**
+     * fill the charts grid with data
+     */
+    fillChartGrid: function(jsondata, valuetext) {
+        if (jsondata && jsondata[0]) {
+            this.getChartformpanel().collapse();
+            
+            var store = this.getChartdatagrid().getStore(),
+                columnwidth = 0,
+                storefields = [],
+                gridcolumns = [];
+            
+            if (store.model.fields && store.model.fields.length > 0) {
+                Ext.each(store.model.getFields(), function(field) {
+                    storefields.push(field.name);
+                });
+            }
+            var i = 0;
+            Ext.each(jsondata, function(dataset) {
+                Ext.iterate(dataset, function(key, value) {
+                    
+                    if (!Ext.Array.contains(storefields, key)) {
+                        storefields.push(key);
+                    }
+                });
+                // we add each dataset a new key for the valuetext
+                jsondata[i].valuetext = valuetext;
+                i++;
+            });
+            store.model.setFields(storefields);
+            
+            columnwidth = 99 / storefields.length + "%";
+            
+            Ext.each(storefields, function(key) {
+                var column;
+                if (key != "TIMESTAMP") {
+                    column = { 
+                        header: key,
+                        dataIndex: key, 
+//                        xtype: 'numbercolumn',
+//                        format:'0.000',
+//                        renderer: function(value){
+//                            return parseFloat(value, 10);
+//                        },
+                        width: columnwidth
+                    };
+                } else {
+                    column = { 
+                        header: key,
+                        dataIndex: key, 
+                        width: columnwidth
+                    };
+                }
+                
+                gridcolumns.push(column);
+            });
+            
+            this.getChartdatagrid().reconfigure(store, gridcolumns);
+            store.add(jsondata);
+        }
+        
+    },
+    
+    /**
+     * highlight hoverered record from grid in chart
+     */
+    highlightRecordInChart: function(gridview, record) {
 
+        var recdate = new Date(Ext.Date.parse(record.get("TIMESTAMP"), 'Y-m-d H:i:s')),
+            chartstore = this.getChart().getStore(),
+            chartrecord,
+            found = false,
+            highlightSprite;
+        
+        chartstore.each(function(rec) {
+            if (Ext.Date.isEqual(new Date(rec.get("TIMESTAMP")), recdate)) {
+                var valuematcher = record.raw.valuetext,
+                    gridvaluematcher = valuematcher.replace(/[0-9]/g, '');
+                var chartrec = rec.get(valuematcher);
+                var gridrec = record.get(gridvaluematcher);
+                if (parseInt(chartrec, 10) === parseInt(gridrec, 10)) {
+                    chartrecord = rec;
+                    return false;
+                }
+            }
+        });
+        
+        if (chartrecord && !Ext.isEmpty(chartrecord)) {
+            Ext.each(this.getChart().series.items, function(serie) {
+                Ext.each(serie.items, function(sprite) {
+                    if (sprite.storeItem === chartrecord) {
+                        highlightSprite = sprite;
+                        found = true;
+                    }
+                    if (found) {
+                        return;
+                    }
+                });
+                if (found) {
+                    return;
+                }
+            });
+            if (highlightSprite && !Ext.isEmpty(highlightSprite)) {
+                highlightSprite.sprite.attr.radius = 10;
+                this.getChart().redraw();
+            }
+        }
+    }
 });

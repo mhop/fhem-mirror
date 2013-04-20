@@ -1,3 +1,6 @@
+Update vom 20.4.2013
+  * Über dem CHart wird nun eine interaktive Tabelle mit den zugehörigen Daten angezeigt
+  * Chartrendering effizienter
 Update vom 14.4.2013
   * Multiple Y-Skalen hinzugefügt (linke + rechte Achse)
   * Bug in Stepansicht behoben

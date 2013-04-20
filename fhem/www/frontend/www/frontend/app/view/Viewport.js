@@ -194,6 +194,8 @@ Ext.define('FHEM.view.Viewport', {
                             xtype: 'text',
                             name: 'statustextfield',
                             padding: '50 0 0 20',
+                            width: 400,
+                            height: 130,
                             html: '<br>Welcome to the new FHEM Frontend.<br>For Informations, Problems and discussion, visit the <a href="http://forum.fhem.de/index.php?t=msg&th=10439&start=0&rid=0">FHEM Forums</a>'
                         }
                     ],
