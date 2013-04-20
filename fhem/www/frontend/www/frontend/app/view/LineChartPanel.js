@@ -8,6 +8,7 @@ Ext.define('FHEM.view.LineChartPanel', {
         'FHEM.store.ChartStore',
         'FHEM.store.DeviceStore',
         'FHEM.store.ReadingsStore',
+        'FHEM.view.ChartGridPanel',
         'Ext.form.Panel',
         'Ext.form.field.Radio',
         'Ext.form.field.Date',
@@ -79,10 +80,6 @@ Ext.define('FHEM.view.LineChartPanel', {
             autoScroll: true,
             collapsible: true,
             titleCollapse: true,
-            listeners: {
-                collapse: me.layoutChart,
-                expand: me.layoutChart
-            },
             items: [
                 {
                     xtype: 'fieldset',
@@ -240,171 +237,12 @@ Ext.define('FHEM.view.LineChartPanel', {
         
         //add the first yaxis line
         me.createNewYAxis();
-        
-        //creating the chart
-        var chartstore = Ext.create('FHEM.store.ChartStore');
-        var linechartview = Ext.create('Ext.panel.Panel', {
-            title: 'Chart',
-            autoScroll: true,
-            collapsible: true,
-            titleCollapse: true,
-            items: [
-                {
-                    xtype: 'toolbar',
-                    items: [
-                        {
-                            xtype: 'button',
-                            width: 100,
-                            text: 'Step back',
-                            name: 'stepback',
-                            icon: 'app/resources/icons/resultset_previous.png'
-                        },
-                        {
-                            xtype: 'button',
-                            width: 100,
-                            text: 'Step forward',
-                            name: 'stepforward',
-                            icon: 'app/resources/icons/resultset_next.png'
-                        },
-                        {
-                            xtype: 'button',
-                            width: 100,
-                            text: 'Reset Zoom',
-                            name: 'resetzoom',
-                            icon: 'app/resources/icons/delete.png',
-                            scope: me,
-                            handler: function(btn) {
-                                var chart = me.down('chart');
-                                chart.restoreZoom();
-                                
-                                chart.axes.get(0).minimum = me.getLastYmin();
-                                chart.axes.get(0).maximum = me.getLastYmax();
-                                chart.axes.get(1).minimum = me.getLastY2min();
-                                chart.axes.get(1).maximum = me.getLastY2max();
-                                chart.axes.get(2).minimum = me.getLastXmin();
-                                chart.axes.get(2).maximum = me.getLastXmax();
-                                
-                                chart.redraw();
-                                //helper to reshow the hidden items after zooming back out
-                                if (me.artifactSeries && me.artifactSeries.length > 0) {
-                                    Ext.each(me.artifactSeries, function(serie) {
-                                        serie.showAll();
-                                        Ext.each(serie.group.items, function(item) {
-                                            if (item.type === "circle") {
-                                                item.show();
-                                                item.redraw();
-                                            }
-                                        });
-                                    });
-                                    me.artifactSeries = [];
-                                }
-                            }
-                        }
-                    ]
-                },
-                {
-                    xtype: 'chart',
-                    legend: {
-                        position: 'right'
-                    },
-                    axes: [ 
-                        {
-                            type : 'Numeric',
-                            name : 'yaxe',
-                            position : 'left',
-                            fields : [],
-                            title : '',
-                            grid : {
-                                odd : {
-                                    opacity : 1,
-                                    fill : '#ddd',
-                                    stroke : '#bbb',
-                                    'stroke-width' : 0.5
-                                }
-                            }
-                        }, 
-                        {
-                            type : 'Numeric',
-                            name : 'yaxe2',
-                            position : 'right',
-                            fields : [],
-                            title : ''
-                        }, 
-                        {
-                            type : 'Time',
-                            name : 'xaxe',
-                            position : 'bottom',
-                            fields : [ 'TIMESTAMP' ],
-                            dateFormat : "Y-m-d H:i:s",
-                            title : 'Time'
-                        }
-                    ],
-                    animate: true,
-                    store: chartstore,
-                    enableMask: true,
-                    mask: true,//'vertical',//true, //'horizontal',
-                    listeners: {
-                        mousedown: function(evt) {
-                            // fix for firefox, not dragging images
-                            evt.preventDefault();
-                        },
-                        select: {
-                            fn: function(chart, zoomConfig, evt) {
-                                
-                                delete chart.axes.get(2).fromDate;
-                                delete chart.axes.get(2).toDate;
-                                me.setLastYmax(chart.axes.get(0).maximum);
-                                me.setLastYmin(chart.axes.get(0).minimum);
-                                me.setLastY2max(chart.axes.get(1).maximum);
-                                me.setLastY2min(chart.axes.get(1).minimum);
-                                me.setLastXmax(chart.axes.get(2).maximum);
-                                me.setLastXmin(chart.axes.get(2).minimum);
-                                
-                                chart.setZoom(zoomConfig);
-                                chart.mask.hide();
-                                
-                                //helper hiding series and items which are out of scope
-                                    //var me = this;
-                                Ext.each(chart.series.items, function(serie) {
-                                    if (serie.items.length === 0) {
-                                        me.artifactSeries.push(serie);
-                                        Ext.each(serie.group.items, function(item) {
-                                            item.hide();
-                                            item.redraw();
-                                        });
-                                        serie.hideAll();
-                                        
-                                    }
-                                });
-                            }
-                        }
-                    }
-                }    
-            ]
-        });
             
         me.items = [
-            chartSettingPanel,
-            linechartview
+            chartSettingPanel
         ];
-        
         me.callParent(arguments);
         
-        me.on("resize", me.layoutChart);
-        
-    },
-    
-    /**
-     * helper function to relayout the chartview dependent on free space
-     */
-    layoutChart: function() {
-        var lcp = Ext.ComponentQuery.query('linechartpanel')[0];
-        var lcv = Ext.ComponentQuery.query('chart')[0];
-        var cfp = Ext.ComponentQuery.query('form[name=chartformpanel]')[0];
-        var chartheight = lcp.getHeight() - cfp.getHeight() - 85;
-        var chartwidth = lcp.getWidth() - 25;
-        lcv.setHeight(chartheight);
-        lcv.setWidth(chartwidth);
     },
     
     /**
