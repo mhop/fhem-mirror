@@ -161,7 +161,7 @@ LIRC_Ready($)
   <b>Attributes</b>
   <ul>
     <li><a href="#loglevel">loglevel</a></li>
-  /ul><br>
+  </ul><br>
 </ul>
 
 =end html
