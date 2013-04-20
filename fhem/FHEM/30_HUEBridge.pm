@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use POSIX;
 use JSON;
-use Try::Tiny;
+#use Try::Tiny;
 use Data::Dumper;
 use MIME::Base64;
 
