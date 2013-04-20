@@ -28,6 +28,7 @@ use strict;
 use warnings;
 use POSIX;
 
+sub Log($$);
 sub Heating_Control_Update($);
 
 ##################################### 
@@ -103,21 +104,22 @@ Heating_Control_Define($$)
     my $anzahl = @t;
     if ( $anzahl >= 2 && $anzahl <= 3) {
       push(@switchingtimes, $a[$i]);
-    } else { 
+    } else {
       #der Rest ist das auzufuehrende Kommando/condition
       $conditionOrCommand = trim(join(" ", @a[$i..@a-1]));
-      last; 
+      last;
     }
   }
 
   $hash->{NAME}           = $name;
   $hash->{DEVICE}         = $device;
-  $hash->{helper}{SWITCHINGTIMES} = join(" ", @switchingtimes); 
+  $modules{Heating_Control}{defptr}{$hash->{NAME}} = $hash;
+  $hash->{helper}{SWITCHINGTIMES} = join(" ", @switchingtimes);
   if($conditionOrCommand =~  m/^\(.*\)$/g) {         #condition (*)
      $hash->{helper}{CONDITION} = $conditionOrCommand;
   } elsif(length($conditionOrCommand) > 0 ) {
      $hash->{helper}{COMMAND} = $conditionOrCommand;
-  }  
+  }
 
   my $daysRegExp    = "(mo|di|mi|do|fr|sa|so|tu|we|th|su)";
   my $daysRegExp_en = "(tu|we|th|su)";
@@ -240,6 +242,7 @@ Heating_Control_Undef($$)
   my ($hash, $arg) = @_;
 
   RemoveInternalTimer($hash);
+  delete $modules{Heating_Control}{defptr}{$hash->{NAME}};
   return undef;
 }
 
@@ -263,34 +266,24 @@ Heating_Control_Update($)
   $wday=7 if($wday==0);
   my @days = ($wday..7, 1..$wday);
 
-  Log $loglevel, "Begin##################>$hash->{NAME}";
-  Log $loglevel, "wday------------>$wday";
-
   for (my $d=0; $d<@days; $d++) {
-    Log $loglevel, "d------------>$d--->nextSwitch:$nextSwitch";
     #ueber jeden Tag
     last if ($nextSwitch > 0);
-    Log $loglevel, "days[$d]------------>$days[$d]";
     foreach my $st (sort (keys %{ $hash->{helper}{SWITCHINGTIME}{$days[$d]} })) {
-      Log $loglevel, "st------------>$st";
+
       # Tagediff +  Sekunden des Tages addieren
       my $secondsToSwitch = $d*24*3600       +
          3600*(int(substr($st,0,2)) - $hour) +
            60*(int(substr($st,3,2)) - $min ) - $sec;
-      Log $loglevel, "secondsToSwitch------------>$secondsToSwitch";
-      Log $loglevel, "wday-days[d]----------->$wday $days[$d]";
 
       $next = $now+$secondsToSwitch;
 
       Log $loglevel, "Jetzt:".strftime('%d.%m.%Y %H:%M:%S',localtime($now))." -> Next: ".strftime('%d.%m.%Y %H:%M:%S',localtime($next))." -> Temp: $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$st}";
       if ($now >= $next) {
         $newDesTemperature =  $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$st};
-        Log $loglevel, "newDestemperature------------>$newDesTemperature";
         $nowSwitch = $now;
-        Log $loglevel, "nowSwitch------------>$nowSwitch--->" .strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch));
       } else {
         $nextSwitch = $next;
-        Log $loglevel, "nextSwitch------------>$nextSwitch--->".strftime('%d.%m.%Y %H:%M:%S',localtime($nextSwitch));
         $nextDesTemperature = $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$st};
         last;
       }
@@ -308,7 +301,7 @@ Heating_Control_Update($)
   Log $loglevel, "NowSwitch: ".strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch))." ; AktDesiredTemp: $AktDesiredTemp ; newDesTemperature: $newDesTemperature";
   Log $loglevel, "NextSwitch=".strftime('%d.%m.%Y %H:%M:%S',localtime($nextSwitch));
   
-  if ($nowSwitch gt "" && $AktDesiredTemp ne $newDesTemperature) {
+  if ($nowSwitch gt "" && !($AktDesiredTemp eq $newDesTemperature || $AktDesiredTemp == $newDesTemperature) ) {
     if (defined $hash->{helper}{CONDITION}) {
       $command = '{ fhem("set @ '.$hash->{helper}{DESIRED_TEMP_READING}.' %") if' . $hash->{helper}{CONDITION} . '}';
     } elsif (defined $hash->{helper}{COMMAND}) {
@@ -322,12 +315,13 @@ Heating_Control_Update($)
     $command =~ s/@/$hash->{DEVICE}/g;
     $command =~ s/%/$newDesTemperature/g;
     $command = SemicolonEscape($command);
-    Log $loglevel, "command-$hash->{NAME}----------->$command";
+    Log $loglevel, "command: $command";
     my $ret  = AnalyzeCommandChain(undef, $command);
     Log GetLogLevel($name,3), $ret if($ret);
   }
 
   InternalTimer($nextSwitch, "Heating_Control_Update", $hash, 0);
+
   readingsBeginUpdate($hash);
   readingsBulkUpdate ($hash,  "nextUpdate", strftime("%d.%m.%Y %H:%M:%S",localtime($nextSwitch)));
   readingsBulkUpdate ($hash,  "nextValue",  $nextDesTemperature);
@@ -459,7 +453,7 @@ sub SortNumber {
     zu setzende Temperatur im &lt;profile&gt; automatisch mittels <br><br>
     <code>set &lt;device&gt; (desired-temp|desiredTemerature) &lt;temp&gt;</code> <br><br> gesendet.
     Struktuen von Heizk&oumlrperthermostaten bekommen aufgrund des fhem-Typs auch desired-temp gesendet:
-    Nutze bitte explizite Kommandos wenn du Strukturen von MAX Heizthermostaten gesteuert werden sollen.<br><br>
+    Nutze bitte explizite Kommandos wenn Strukturen von MAX Heizthermostaten gesteuert werden sollen.<br><br>
     Ist eine &lt;condition&gt; angegeben und ist zum Schaltpunkt der Ausdruck unwahr,
     so wird dieser Schaltpunkt nicht ausgef&uumlhrt.<br>
     Alternativ zur Automatik kann stattdessen eigener Perl-Code im &lt;command&gt; ausgef&uumlhrt werden.
