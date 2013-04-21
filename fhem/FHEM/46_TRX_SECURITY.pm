@@ -56,7 +56,8 @@ my %security_device_codes = (	# HEXSTRING => "NAME", "name of reading",
 
 my %security_device_commands = (	# HEXSTRING => commands
 	# 0x20: X10, KD101, Visonic, Meiantech
-	0x2000 => [ "", "", "", "", "", "", ""], # DS10A
+	0x2000 => [ "Closed", "", "Open", "", "", "", ""], # DS10A
+	0x2001 => [ "", "", "", "", "alert", "normal", ""], # MS10A
 	0x2003 => [ "", "", "", "", "", "", "alert", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "pair",], # KD101
 );
 
@@ -108,7 +109,7 @@ TRX_SECURITY_Set($@)
   my $device_type = $hash->{TRX_SECURITY_type};
   my $deviceid = $hash->{TRX_SECURITY_deviceid};
 
-  if ($device_type ne "KD101") {
+  if ($device_type ne "KD101" && $device_type ne "DS10A" && $device_type ne "MS10A") {
 	return "No set implemented for $device_type";	
   }
 
@@ -148,10 +149,10 @@ TRX_SECURITY_Set($@)
   	my $id1;
   	my $id2;
   	my $id3;
-  	if ($deviceid =~ /(..)(..)(..)/ ) {
-		$id1 = $1;
-		$id2 = $2;
-		$id3 = $3;
+  	if ($deviceid =~ /(..)(..)/ ) {
+		$id1 = $2;
+		$id2 = "00";
+		$id3 = $1;
   	} else {
 		Log 4,"TRX_SECURITY_Set lightning1 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
 		return "error set name=$name  deviceid=$deviceid";
@@ -160,8 +161,29 @@ TRX_SECURITY_Set($@)
 	# lightning1
   	$hex_prefix = sprintf "0820";
   	$hex_command = sprintf "%02x%02x%02s%02s%02s%02x00", $device_type_num & 0xff, $seqnr, $id1, $id2, $id3, $cmnd; 
-  	Log 1,"TRX_SECURITY_Set name=$name device_type=$device_type, deviceid=$deviceid id1=$id1, id1=$id2, id1=$id3, command=$command" if ($TRX_SECURITY_debug == 1);
+  	Log 1,"TRX_SECURITY_Set name=$name device_type=$device_type, deviceid=$deviceid id1=$id1, id2=$id2, id3=$id3, command=$command" if ($TRX_SECURITY_debug == 1);
   	Log 1,"TRX_SECURITY_Set hexline=$hex_prefix$hex_command" if ($TRX_SECURITY_debug == 1);
+
+  	my $sensor = "";
+
+  	readingsBeginUpdate($hash);
+
+	# Now set the statechange:
+  	if ($hash->{STATE} ne $command) { 
+		$sensor = "statechange";
+		readingsBulkUpdate($hash, $sensor, $command);
+  	}
+
+	# Now set the devicelog:
+  	$sensor = $hash->{TRX_SECURITY_devicelog};
+	readingsBulkUpdate($hash, $sensor, $command);
+
+	# Set battery
+  	$sensor = "battery";
+	readingsBulkUpdate($hash, $sensor, "ok");
+
+  	readingsEndUpdate($hash, 1);
+
   } else {
 	return "No set implemented for $device_type . Unknown protocol type";	
   }
@@ -202,14 +224,14 @@ TRX_SECURITY_Define($$)
   $type = uc($type);
 
   my $my_type;
-  if ($type eq "WD18") {
+  if ($type eq "WD18" || $type eq "GD18" ) {
 	$my_type = "DS10A"; # device will be received as DS10A	
   } else {
 	$my_type = $type;
   }
   my $device_name = "TRX".$DOT.$my_type.$DOT.$deviceid;
 
-  if ($type ne "DS10A" && $type ne "SD90" && $type ne "MS10A" && $type ne "MS14A" && $type ne "KR18" && $type ne "KD101" && $type ne "VISONIC_WINDOW" & $type ne "VISONIC_MOTION" & $type ne "VISONIC_REMOTE" && $type ne "WD18") {
+  if ($type ne "DS10A" && $type ne "SD90" && $type ne "MS10A" && $type ne "MS14A" && $type ne "KR18" && $type ne "KD101" && $type ne "VISONIC_WINDOW" & $type ne "VISONIC_MOTION" & $type ne "VISONIC_REMOTE" && $type ne "GD18" && $type ne "WD18") {
   	Log 1,"TRX_SECURITY define: wrong type: $type";
   	return "TRX_SECURITY: wrong type: $type";
   }
@@ -316,8 +338,6 @@ sub TRX_SECURITY_parse_X10Sec {
   my $name = $def->{NAME};
   return "" if(IsIgnored($name));
 
-  my $device_type = $def->{TRX_LIGHT_type}; # overwrite device_type to allow WD18 and others
-
   my $data = $bytes->[6];
 
   my $hexdata = sprintf '%02x', $data;
@@ -394,7 +414,6 @@ sub TRX_SECURITY_parse_X10Sec {
   my $current = "";
 
   Log 1, "TRX_SECURITY: $name devn=$device_name first=$firstdevice subtype=$subtype command=$command, delay=$delay, batt=$battery cmd=$hexdata" if ($TRX_SECURITY_debug == 1);
-#Log 1, "TRX_SECURITY: $name devn=$device_name first=$firstdevice subtype=$subtype command=$command, delay=$delay, batt=$battery cmd=$hexdata";
 
   my $n = 0;
   my $tm = TimeNow();
@@ -415,7 +434,7 @@ sub TRX_SECURITY_parse_X10Sec {
 	$current = "Error";
 	$current = "Open" if ($command eq "alert");
 	$current = "Closed" if ($command eq "normal");
-  } elsif ($device_type eq "WD18") {
+  } elsif ($device_type eq "WD18" || $device_type eq "GD18") {
 	$current = "Error";
 	$current = "normal" if ($command eq "alert");
 	$current = "alert" if ($command eq "normal");
