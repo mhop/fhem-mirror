@@ -59,7 +59,6 @@ DEL www/frontend/lib/ext-4.1.1a/images/gray/grid
 DEL www/frontend/lib/ext-4.1.1a/images/gray/util
 DEL www/frontend/lib/ext-4.1.1a/images/gray/panel-header
 DEL www/frontend/lib/ext-4.1.1a/images/gray/tip
-#UPD 2013-04-21_05:44:48 61176 FHEM/93_DbLog.pm
 UPD 2013-04-01_07:05:58 894 www/frontend/index.html
 UPD 2013-02-27_07:20:39 236 www/frontend/README.txt
 UPD 2013-04-01_07:05:33 613 www/frontend/app/userconfig.js
