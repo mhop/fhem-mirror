@@ -1030,6 +1030,9 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "";
     }
     elsif ($msgType eq "41"){ #Alarm detected
+	  #C8: Smoke Alarm
+	  #C7: tone off
+	  #01: no alarm
 	  my ($No,$state) = (substr($p,2,2),substr($p,4,2));
 	  if(($dhash && $dname ne $name) && # update source(ID is reported in $dst...)
 	     (!$dhash->{helper}{alarmNo} || $dhash->{helper}{alarmNo} ne $No)){
@@ -1055,6 +1058,11 @@ sub CUL_HM_Parse($$) {##############################
 	  $shash->{helper}{alarmList} = ""  if (!$alarmList);
       push @event,"state:"        .($alarmList?"smoke-Alarm":"off" );
       push @event,"smoke_detect:" .($alarmList?$alarmList   :"none");
+	  #--- check out teamstatus, members might be shy ---
+	  my $peerList = ReadingsVal($name,"peerList","");
+	  foreach my $pNm (split(",",$peerList)){
+		CUL_HM_qStateUpdat($pNm)if ($pNm);
+	  }
     } 
     elsif ($msgType eq "01"){ #Configs
 	  my $sType = substr($p,0,2);
@@ -1495,7 +1503,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 	}
   }
   elsif($msgType eq "40"){ #someone is triggere#################
-	CUL_HM_qStateUpdat($dst)if (hex($msgFlag) & 0x20 && $dhash);
+	CUL_HM_qStateUpdatIfEnab($dst)if (hex($msgFlag) & 0x20 && $dhash);
   }
   elsif($msgType eq "70"){ #Time to trigger TC##################
     #send wakeup and process command stack
@@ -2000,8 +2008,8 @@ sub CUL_HM_Set($@) {
 	}
 	my $cHash = CUL_HM_id2Hash($dst.($chn eq '00'?"":$chn));
 	$cHash = $hash if (!$cHash);
-    CUL_HM_pushConfig($cHash,$id,$dst,$lChn,$peerId,$peerChn,$list,$addrData);
-  } 
+     CUL_HM_pushConfig($cHash,$id,$dst,$lChn,$peerId,hex($peerChn),$list,$addrData);
+   } 
   elsif($cmd eq "level") { ####################################################
 	#level        =>"<level> <relockDly> <speed>..."
     my (undef,undef,$lvl,$rLocDly,$speed) = @a; 
@@ -2228,34 +2236,41 @@ sub CUL_HM_Set($@) {
 	elsif($md eq "HM-OU-CFM-PL"){
 	  my %color = (redL =>18,greenL =>34,orangeL =>50,
 	               redS =>17,greenS =>33,orangeS =>49);
-	  my @ledList = split(',',$a[2]);
+	  my @itemList = split(',',$a[2]);
 	  my $repeat = (defined $a[3] && $a[3] =~ m/^(\d+)$/)?$a[3]:1;
+      my $itemCnt = int(@itemList);
+	  return "no more then 12 entries please"  if ($itemCnt>12);
 	  return "repetition $repeat out of range [1..255]"
           if($repeat < 1 ||	$repeat > 255);
-
-	  my $ledBytes = sprintf("%02X",$repeat);
-	  foreach my $led (@ledList){
+      #<entries><multiply><MP3><MP3>
+	  my $msgBytes = sprintf("01%02X",$repeat);
+	  foreach my $led (@itemList){
         if (!$color{$led} ){# wrong parameter
 	        return "'$led' unknown. use: ".join(" ",sort keys(%color));
 	    }
-        $ledBytes .= sprintf("%02X",$color{$led});
+        $msgBytes .= sprintf("%02X",$color{$led});
 	  }
-      CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.'01'.$ledBytes);
+	  # need to fill up empty locations  for LED channel
+	  $msgBytes = substr($msgBytes."000000000000000000000000",0,28);
+      CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.$msgBytes);
 	}
 	else{
 	  return "device for command cannot be identified";
 	}
   } 
   elsif($cmd eq "playTone") { #################################################
-	my @mp3List = split(',',$a[2]);
+	my @itemList = split(',',$a[2]);
 	my $repeat = (defined $a[3] && $a[3] =~ m/^(\d+)$/)?$a[3]:1;
+    my $itemCnt = int(@itemList);
+	return "no more then 12 entries please"  if ($itemCnt>12);
 	return "repetition $repeat out of range [1..255]"
           if($repeat < 1 ||	$repeat > 255);
-	my $mp3Bytes = sprintf("%02X",$repeat);
-	foreach my $mp3 (@mp3List){
-      $mp3Bytes .= sprintf("%02X",$mp3);
+    #<entries><multiply><MP3><MP3>
+	my $msgBytes = sprintf("%02X%02X",$itemCnt,$repeat);
+	foreach my $mp3 (@itemList){
+      $msgBytes .= sprintf("%02X",$mp3);
 	}
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.'01'.$mp3Bytes);
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.$msgBytes);
   } 
   elsif($cmd eq "ilum") { ################################################# reg
 	return "$a[2] not specified. choose 0-15 for brightness"  if ($a[2]>15);
@@ -2739,7 +2754,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
 #    }
   }
   elsif($msgType eq '11' && $chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
-    CUL_HM_qStateUpdat($dst);
+    CUL_HM_qStateUpdatIfEnab($dst);
   }
   
   if (($msgFlag & 0x20) && ($dst ne '000000')){
@@ -2834,7 +2849,6 @@ sub CUL_HM_PushCmdStack($$) {
   my @arr = ();
   my $hash = CUL_HM_getDeviceHash($chnhash);
   my $name = $hash->{NAME};
-
   if(!$hash->{cmdStack}){
     $hash->{cmdStack} = \@arr;
 	delete ($hash->{helper}{burstEvtCnt}) if (!$hash->{helper}{respWait});
@@ -3756,7 +3770,7 @@ sub CUL_HM_stateUpdat($){#in:name, send status-request
   (undef,$name)=split":",$name,2;
   CUL_HM_Set(CUL_HM_name2Hash($name),$name,"statusRequest") if ($name);
 }
-sub CUL_HM_qStateUpdat($){#in:name or id, queue send stat-request after 12 sec
+sub CUL_HM_qStateUpdatIfEnab($){#in:name or id, queue stat-request after 12 sec
   my $name = shift;
   $name = CUL_HM_id2Name($name) if ($name =~ m/^[A-F0-9]{6,8}$/i);
   $name =~ s /_chn:..$//;
@@ -3767,6 +3781,16 @@ sub CUL_HM_qStateUpdat($){#in:name or id, queue send stat-request after 12 sec
 	RemoveInternalTimer("CUL_HM_reqStatus");
 	InternalTimer(gettimeofday()+120,"CUL_HM_reqStatus","CUL_HM_reqStatus", 0);
   }
+}
+sub CUL_HM_qStateUpdat($){#in:name or id, queue send stat-request after 12 sec
+  my $name = shift;
+  $name = CUL_HM_id2Name($name) if ($name =~ m/^[A-F0-9]{6,8}$/i);
+  $name =~ s /_chn:..$//;
+  return if (!$defs{$name}); #device unknown, ignore
+  @{$modules{CUL_HM}{helper}{reqStatus}}= 
+	          CUL_HM_noDup(@{$modules{CUL_HM}{helper}{reqStatus}},$name);
+  RemoveInternalTimer("CUL_HM_reqStatus");
+  InternalTimer(gettimeofday()+120,"CUL_HM_reqStatus","CUL_HM_reqStatus", 0);
 }
 sub CUL_HM_getARead($){#return valid autoRegRead as integer
   my $name = shift;
@@ -4322,12 +4346,12 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
         sequence of colors can be given separating the color entries by ','.
         White spaces must not be used in the list. 'S' indicates short and
         'L' long ilumination. <br>
-         repeat defines how many times the sequence is executed. Defaults to 1<br>
+        <b>repeat</b> defines how often the sequence shall be executed. Defaults to 1.<br>
 	  </li>
       <li><B>playTone &lt;MP3No&gt[,&lt;MP3No&gt..] [,&lt;repeat&gt..]</B><br>
         Play a series of tones. List is to be entered separated by ','. White
         spaces must not be used in the list.<br>
-        repeat defines how many times the sequence is played. Defaults to 1<br>
+        <b>repeat</b> defines how often the sequence shall be played. Defaults to 1.<br>
 	  </li>
     </ul><br>
 	</li>
