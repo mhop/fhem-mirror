@@ -4,6 +4,11 @@ package main;
 
 use strict;
 use warnings;
+use vars qw($FW_subdir);  # Sub-path in URL for extensions, e.g. 95_FLOORPLAN
+use vars qw($FW_ME);      # webname (default is fhem), needed by 97_GROUP
+use vars qw(%FW_hiddenroom); # hash of hidden rooms, used by weblink
+use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by weblink
+use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by weblink
 
 #####################################
 sub
@@ -12,7 +17,11 @@ weblink_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn} = "weblink_Define";
-  $hash->{AttrList}= "fixedrange plotmode plotsize label title htmlattr plotfunction";
+  $hash->{AttrList} = "fixedrange plotmode plotsize label ".
+                        "title htmlattr plotfunction";
+  $hash->{FW_summaryFn} = "weblink_FwFn";
+  $hash->{FW_detailFn}  = "weblink_FwFn";
+  $hash->{FW_atPageEnd} = 1;
 }
 
 
@@ -32,6 +41,110 @@ weblink_Define($$)
   $hash->{LINK} = $link;
   $hash->{STATE} = "initial";
   return undef;
+}
+
+#####################################
+# FLOORPLAN compat
+sub
+FW_showWeblink($$$$)
+{
+  my ($d,undef,undef,$buttons) = @_;
+
+  if($buttons !~ m/HASH/) {
+    my %h = (); $buttons = \%h;
+  }
+  FW_pO weblink_FwFn(undef, $d, "", $buttons);
+  return $buttons;
+}
+
+
+##################
+sub
+weblink_FwDetail($)
+{
+  my ($d)= @_;
+  my $alias= AttrVal($d, "alias", $d);
+
+  my $ret = "<br>";
+  $ret .= FW_pHPlain("detail=$d", $alias) if(!$FW_subdir);
+  FW_pO "<br>";
+  return $ret;
+}
+
+sub
+weblink_FwFn($$$$)
+{
+  my ($FW_chash, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+  my $hash   = $defs{$d};
+  my $link   = $hash->{LINK};
+  my $wltype = $hash->{WLTYPE};
+  my $ret = "";
+
+  my $attr = AttrVal($d, "htmlattr", "");
+  if($wltype eq "htmlCode") {
+    $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/);
+    $ret = $link;
+
+  } elsif($wltype eq "link") {
+    $ret = "<a href=\"$link\" $attr>$d</a>"; # no FW_pH, open extra browser
+
+  } elsif($wltype eq "image") {
+    $ret = "<img src=\"$link\" $attr><br>" . 
+           weblink_FwDetail($d);
+
+  } elsif($wltype eq "iframe") {
+    $ret = "<iframe src=\"$link\" $attr>Iframes disabled</iframe>" .
+           weblink_FwDetail($d);
+
+  } elsif($wltype eq "fileplot" || $wltype eq "dbplot" ) {
+
+    # plots navigation buttons
+    if((!$pageHash || !$pageHash->{buttons}) &&
+       ($wltype eq "fileplot" || $wltype eq "dbplot") &&
+       AttrVal($d, "fixedrange", "x") !~ m/^[ 0-9:-]*$/) {
+
+      $ret .= FW_zoomLink("zoom=-1", "Zoom-in", "zoom in");
+      $ret .= FW_zoomLink("zoom=1",  "Zoom-out","zoom out");
+      $ret .= FW_zoomLink("off=-1",  "Prev",    "prev");
+      $ret .= FW_zoomLink("off=1",   "Next",    "next");
+      $pageHash->{buttons} = 1 if($pageHash);
+      $ret .= "<br>";
+    }
+
+    my @va = split(":", $link, 3);
+    if($wltype eq "fileplot" &&
+            (@va != 3 || !$defs{$va[0]} || !$defs{$va[0]}{currentlogfile})) {
+      $ret .= "Broken definition for fileplot $d: $link<br>";
+
+    } elsif ($wltype eq "dbplot" && (@va != 2 || !$defs{$va[0]})) {
+      $ret .= "Broken definition for dbplot $d: $link<br>";
+
+    } else {
+      if(defined($va[2]) && $va[2] eq "CURRENT") {
+        $defs{$va[0]}{currentlogfile} =~ m,([^/]*)$,;
+        $va[2] = $1;
+      }
+
+      if ($wltype eq "dbplot") {
+        $va[2] = "-";
+      }
+
+      my $wl = "&amp;pos=" . join(";", map {"$_=$FW_pos{$_}"} keys %FW_pos);
+
+      my $arg="$FW_ME?cmd=showlog $d $va[0] $va[1] $va[2]$wl";
+      if(AttrVal($d,"plotmode",$FW_plotmode) eq "SVG") {
+        my ($w, $h) = split(",", AttrVal($d,"plotsize",$FW_plotsize));
+        $ret .= "<embed src=\"$arg\" type=\"image/svg+xml\" " .
+              "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
+
+      } else {
+        $ret .= "<img src=\"$arg\"/>";
+      }
+
+      $ret .= weblink_FwDetail($d) if(!$FW_hiddenroom{detail} && $pageHash);
+    }
+  }
+  return $ret;
 }
 
 1;
