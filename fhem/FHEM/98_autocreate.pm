@@ -78,7 +78,7 @@ my %flogpar = (
       => { GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME" },
 
   "FBDECT.*"
-      => { GPLOT => "power4:Power,", FILTER => "%NAME:power.*",
+      => { GPLOT => "power4:Power,", FILTER => "%NAME:power\\x3a.*",
            ATTR => "event-min-interval:power:120" },
 );
 
