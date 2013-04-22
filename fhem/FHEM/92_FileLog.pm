@@ -6,6 +6,7 @@ use strict;
 use warnings;
 use IO::File;
 #use Devel::Size qw(size total_size);
+use vars qw($FW_ss);      # is smallscreen
 
 sub seekTo($$$$);
 
@@ -23,6 +24,9 @@ FileLog_Initialize($)
   $hash->{AttrFn}   = "FileLog_Attr";
   # logtype is used by the frontend
   $hash->{AttrList} = "disable:0,1 logtype nrarchive archivedir archivecmd";
+
+  $hash->{FW_summaryFn} = "FW_dumpFileLog";
+  $hash->{FW_detailFn}  = "FW_dumpFileLog";
 }
 
 
@@ -94,6 +98,7 @@ FileLog_Log($$)
 
   my $ln = $log->{NAME};
   return if($attr{$ln} && $attr{$ln}{disable});
+  return if(!$dev || !defined($dev->{CHANGED}));
 
   my $n = $dev->{NAME};
   my $re = $log->{REGEXP};
@@ -160,6 +165,38 @@ FileLog_Set($@)
   $hash->{FH} = $fh;
   return undef;
 }
+
+#########################
+sub
+FW_dumpFileLog($$$$)
+{
+  my ($FW_chash, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+
+  return "<div id=\"$d\" align=\"center\" class=\"col2\">$defs{$d}{STATE}</div>"
+        if($FW_ss && $pageHash);
+
+  my $row = 0;
+  my $ret = sprintf("<table class=\"%swide\">", $pageHash ? "" : "block ");
+  foreach my $f (FW_fileList($defs{$d}{logfile})) {
+    my $class = (!$pageHash ? (($row++&1)?"odd":"even") : "");
+    $ret .= "<tr class=\"$class\">";
+    $ret .= "<td><div class=\"dname\">$f</div></td>";
+    my $idx = 0;
+    foreach my $ln (split(",", AttrVal($d, "logtype", "text"))) {
+      if($FW_ss && $idx++) {
+        $ret .= "</tr><tr class=\"".(($row++&1)?"odd":"even")."\"><td>";
+      }
+      my ($lt, $name) = split(":", $ln);
+      $name = $lt if(!$name);
+      $ret .= FW_pH("cmd=logwrapper $d $lt $f",
+                    "<div class=\"dval\">$name</div>", 1, "dval", 1);
+    }
+    $ret .= "</tr>";
+  }
+  $ret .= "</table>";
+  return $ret;
+}
+
 
 ###################################
 # We use this function to be able to scroll/zoom in the plots created from the

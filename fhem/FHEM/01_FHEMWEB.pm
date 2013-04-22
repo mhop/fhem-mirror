@@ -19,7 +19,6 @@ sub FW_calcWeblink($$);
 sub FW_dev2image($);
 sub FW_digestCgi($);
 sub FW_doDetail($);
-sub FW_dumpFileLog($$$);
 sub FW_fatal($);
 sub FW_fileList($);
 sub FW_htmlEscape($);
@@ -40,7 +39,6 @@ sub FW_select($$$$$@);
 sub FW_serveSpecial($$$$);
 sub FW_showLog($);
 sub FW_showRoom();
-sub FW_showWeblink($$$$);
 sub FW_style($$);
 sub FW_submit($$@);
 sub FW_substcfg($$$$$$);
@@ -59,7 +57,7 @@ use vars qw($FW_gplotdir);# gplot directory for web server: the first
                           # available from $FW_dir/gplot,$FW_dir
 use vars qw($MW_dir);     # moddir (./FHEM), needed by edit Files in new
                           # structure
-use vars qw($FW_ME);      # webname (default is fhem), needed by 97_GROUP
+use vars qw($FW_ME);      # webname (default is fhem), used by 97_GROUP/weblink
 use vars qw($FW_ss);      # is smallscreen, needed by 97_GROUP/95_VIEW
 use vars qw($FW_tp);      # is touchpad (iPad / etc)
 use vars qw($FW_sp);      # stylesheetPrefix
@@ -68,9 +66,12 @@ use vars qw($FW_sp);      # stylesheetPrefix
 use vars qw(%FW_types);   # device types,
 use vars qw($FW_RET);     # Returned data (html)
 use vars qw($FW_wname);   # Web instance
-use vars qw($FW_subdir);  # Sub-path in URL for extensions, e.g. 95_FLOORPLAN
+use vars qw($FW_subdir);  # Sub-path in URL, used by FLOORPLAN/weblink
 use vars qw(%FW_pos);     # scroll position
 use vars qw($FW_cname);   # Current connection name
+use vars qw(%FW_hiddenroom); # hash of hidden rooms, used by weblink
+use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by weblink
+use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by weblink
 
 my $FW_zlib_checked;
 my $FW_use_zlib = 1;
@@ -86,13 +87,10 @@ my $FW_data;       # Filecontent from browser when editing a file
 my $FW_detail;     # currently selected device for detail view
 my %FW_devs;       # hash of from/to entries per device
 my %FW_icons;      # List of icons
-my $FW_plotmode;   # Global plot mode (WEB attribute)
-my $FW_plotsize;   # Global plot size (WEB attribute)
 my $FW_RETTYPE;    # image/png or the like
 my $FW_room;       # currently selected room
 my %FW_rooms;      # hash of all rooms
 my %FW_types;      # device types, for sorting
-my %FW_hiddenroom; # hash of hidden rooms
 my %FW_hiddengroup;# hash of hidden groups
 my $FW_inform;
 my $FW_XHR;        # Data only answer, no HTML
@@ -116,7 +114,7 @@ FHEMWEB_Initialize($)
   $hash->{UndefFn} = "FW_Undef";
   $hash->{NotifyFn}= "FW_SecurityCheck";
   $hash->{AttrList}= 
-    "loglevel:0,1,2,3,4,5,6 webname fwcompress:0,1 javascripts ".
+    "loglevel:0,1,2,3,4,5,6 webname fwcompress:0,1 ".
     "plotmode:gnuplot,gnuplot-scroll,SVG plotsize endPlotToday:1,0 plotfork ".
     "stylesheetPrefix touchpad:deprecated smallscreen:deprecated ".
     "basicAuth basicAuthMsg hiddenroom hiddengroup HTTPS allowfrom CORS:0,1 ".
@@ -124,10 +122,7 @@ FHEMWEB_Initialize($)
 
   ###############
   # Initialize internal structures
-  addToAttrList("webCmd");
-  addToAttrList("icon");
-  addToAttrList("devStateIcon");
-  addToAttrList("sortby");
+  map { addToAttrList($_) } ( "webCmd", "icon", "devStateIcon", "sortby");
   InternalTimer(time()+60, "FW_closeOldClients", 0, 0);
   
   $FW_dir      = "$attr{global}{modpath}/www";
@@ -135,6 +130,9 @@ FHEMWEB_Initialize($)
   $FW_cssdir   = "$FW_dir/pgm2";
   $FW_gplotdir = "$FW_dir/gplot";
 
+  $data{webCmdFn}{slider}     = "FW_sliderFn";
+  $data{webCmdFn}{timepicker} = "FW_timepickerFn";
+  $data{webCmdFn}{"~dropdown"}= "FW_dropdownFn"; # Should be the last
 }
 
 #####################################
@@ -450,13 +448,13 @@ FW_answerCall($)
   # Axels FHEMWEB modules...
   if(defined($data{FWEXT})) {
     foreach my $k (sort keys %{$data{FWEXT}}) {
-      if($arg =~ m/^$k/) {
-        no strict "refs";
-        #Returns undef if it already sent a HTTP header
-        ($FW_RETTYPE, $FW_RET) = &{$data{FWEXT}{$k}{FUNC}}($arg);
-        use strict "refs";
-        return defined($FW_RETTYPE) ? 0 : -1;
-      }
+      my $h = $data{FWEXT}{$k};
+      next if($arg !~ m/^$k/ || $h !~ m/HASH/ || !$h->{FUNC});
+      no strict "refs";
+      #Returns undef if it already sent a HTTP header
+      ($FW_RETTYPE, $FW_RET) = &{$h->{FUNC}}($arg);
+      use strict "refs";
+      return defined($FW_RETTYPE) ? 0 : -1;
     }
   }
 
@@ -542,9 +540,6 @@ FW_answerCall($)
   my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
   FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/svg.js") if($FW_plotmode eq "SVG");
   FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/fhemweb.js");
-  foreach my $js (split(",", AttrVal($FW_wname, "javascripts", ""))) {
-    FW_pO sprintf($jsTemplate, $js);
-  }
 
   my $onload = AttrVal($FW_wname, "longpoll", undef) ?
                       "onload=\"FW_delayedStart()\"" : "";
@@ -564,13 +559,13 @@ FW_answerCall($)
     }
     FW_pO "</div>";
 
-  } 
+  }
 
   FW_roomOverview($cmd);
      if($cmd =~ m/^style /)    { FW_style($cmd,undef);    }
+  elsif($cmd =~ /^logwrapper/) { return FW_logWrapper($cmd); }
   elsif($FW_detail)            { FW_doDetail($FW_detail); }
   elsif($FW_room)              { FW_showRoom();           }
-  elsif($cmd =~ /^logwrapper/) { return FW_logWrapper($cmd); }
   elsif(!$FW_cmdret && AttrVal("global", "motd", "none") ne "none") {
     my $motd = AttrVal("global","motd",undef);
     $motd =~ s/\n/<br>/g;
@@ -721,6 +716,7 @@ FW_makeTable($$@)
 }
 
 ##############################
+# Used only for set or attr lists.
 sub
 FW_makeSelect($$$$)
 {
@@ -787,13 +783,6 @@ FW_doDetail($)
   FW_makeSelect($d, "attr", $attrList,"attr");
   FW_makeTable($d, $attr{$d}, "deleteattr");    # Attributes
 
-
-  if($t eq "FileLog" ) {
-    FW_pO "<table class=\"block wide\">";
-    FW_dumpFileLog($d, 0, 1);
-    FW_pO "</table>";
-  }
-
   ## dependent objects
   my @dob;  # dependent objects - triggered by current device
   foreach my $dn (sort keys %defs) { 
@@ -806,12 +795,13 @@ FW_doDetail($)
   }
   FW_makeTableFromArray("Probably associated with", @dob);
 
-  FW_pO "</td></tr></table>";
-
-  if($t eq "weblink") {
-    FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE}, 1);
-    FW_pO "<br><br>";
+  if($modules{$t}{FW_detailFn}) {
+    no strict "refs";
+    FW_pO &{$modules{$t}{FW_detailFn}}($FW_chash, $d, $FW_room) . "<br>";
+    use strict "refs";
   }
+
+  FW_pO "</td></tr></table>";
 
   FW_pH "cmd=style iconFor $d", "Select icon";
   FW_pH "cmd=style showDSI $d", "Extend devStateIcon";
@@ -861,8 +851,8 @@ FW_roomOverview($)
     $FW_room = AttrVal($FW_detail, "room", undef);
     $FW_room = $1 if($FW_room && $FW_room =~ m/^([^,]*),/);
     $FW_room = "" if(!$FW_room);
-    FW_pHPlain "room=$FW_room",
-        "<div id=\"back\">" . FW_makeImage("back") . "</div>";
+    FW_pO(FW_pHPlain("room=$FW_room",
+        "<div id=\"back\">" . FW_makeImage("back") . "</div>"));
     FW_pO "<div id=\"menu\">$FW_detail details</div>";
     return;
 
@@ -884,7 +874,7 @@ FW_roomOverview($)
   }
      
   ########################
-  # FW Extensions
+  # Show FW Extensions in the menu
   if(defined($data{FWEXT})) {
     foreach my $k (sort keys %{$data{FWEXT}}) {
       my $h = $data{FWEXT}{$k};
@@ -1020,15 +1010,15 @@ FW_showRoom()
 
   my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
   
-  # array of all device names in the room (exception weblinks without group attribute)
+  # array of all device names in the room (exception weblinks without group
+  # attribute)
   my @devs= grep { ($FW_rooms{$FW_room}{$_}||$FW_room eq "all") &&
                       !IsIgnored($_) } keys %defs;
-
-  my %group;
-  my @weblinks;
+  my (%group, @atEnds);
   foreach my $dev (@devs) {
-    if($defs{$dev}{TYPE} eq "weblink" && !AttrVal($dev, "group", undef)) {
-      push @weblinks, $dev;
+    if($modules{$defs{$dev}{TYPE}}{FW_atPageEnd} &&
+       !AttrVal($dev, "group", undef)) {
+      push @atEnds, $dev;
       next;
     }
     foreach my $grp (split(",", AttrVal($dev, "group", $FW_types{$dev}))) {
@@ -1039,6 +1029,7 @@ FW_showRoom()
 
   # row counter
   my $row=1;
+  my %extPage = ();
     
   # iterate over the distinct groups  
   foreach my $g (sort keys %group) {
@@ -1067,95 +1058,38 @@ FW_showRoom()
       }
       $row++;
 
-      if($type eq "weblink") {
+      if($modules{$type}{FW_summaryFn}) {
         FW_pO "<td>";
-        FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE}, undef);
+        no strict "refs";
+        FW_pO &{$modules{$type}{FW_summaryFn}}($FW_chash, $d, $FW_room, \%extPage);
+        use strict "refs";
         FW_pO "</td>";
         next;
       }
 
       my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf);
-      FW_pO "<td id=\"$d\">$txt";
+      FW_pO "<td id=\"$d\">$txt</td>";
 
       ######
       # Commands, slider, dropdown
-      if(!$FW_ss) {
-        FW_pO "</td>";
-        if($cmdlist) {
-          my @cList = split(":", $cmdlist);
-          my $firstIdx = 0;
-
-          # Special handling (slider, dropdown)
-          my $cmd = $cList[0];
+      if(!$FW_ss && $cmdlist) {
+        foreach my $cmd (split(":", $cmdlist)) {
+          my $htmlTxt;
           if($allSets && $allSets =~ m/$cmd:([^ ]*)/) {
             my $values = $1;
-
-            if($values =~ m/^slider,(.*),(.*),(.*)/) { ##### Slider
-              my ($min,$stp, $max) = ($1, $2, $3);
-              my $srf = $FW_room ? "&room=$FW_room" : "";
-              my $cv = ReadingsVal($d, $cmd, Value($d));
-              $cmd = "" if($cmd eq "state");
-              $cv =~ s/.*?(\d+).*/$1/; # get first number
-              $cv = 0 if($cv !~ m/\d/);
-              FW_pO "<td colspan='2'>".
-                      "<div class='slider' id='slider.$d' ".
-                           "min='$min' stp='$stp' max='$max' ".
-                           "cmd='$FW_ME?cmd=set $d $cmd %$srf'>".
-                        "<div class='handle'>$min</div></div>".
-                      "<script type=\"text/javascript\">" .
-                        "Slider(document.getElementById('slider.$d'),'$cv')".
-                      "</script>".
-                    "</td>";
-              $firstIdx=1;
-
-            } elsif($values =~ m/^time$/) { ##### Time picker
-              my $srf = $FW_room ? "&room=$FW_room" : "";
-              my $cv = ReadingsVal($d, $cmd, Value($d));
-              $cmd = "" if($cmd eq "state");
-              my $c = "\"$FW_ME?cmd=set $d $cmd %$srf\"";
-              FW_pO "<td colspan='2'>".
-                      "<input name='time.$d' value='$cv' type='text'".
-                                                " readonly size='5'>".
-                      "<input type='button' value='+'".
-                                                " onclick='addTime(this,$c)'>".
-                    "</td>";
-              $firstIdx=1;
-
-            } else {    ##### Dropdown
-
-              my @tv = split(",", $values);
-              # Hack: eventmap (translation only) should not result in a
-              # dropdown.  eventMap/webCmd/etc handling must be cleaned up.
-              if(@tv > 1) {
-                $firstIdx=1;
-                if($cmd eq "desired-temp" || $cmd eq "desiredTemperature") {
-                  $txt = ReadingsVal($d, $cmd, 20);
-                  $txt =~ s/ .*//;        # Cut off Celsius
-                  $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
-                } else {
-                  $txt = Value($d);
-                  $txt =~ s/$cmd //;
-                }
-                FW_pO "<td>".
-                  FW_hidden("arg.$d", $cmd) .
-                  FW_hidden("dev.$d", $d) .
-                  ($FW_room ? FW_hidden("room", $FW_room) : "") .
-                  FW_select("$d-$cmd","val.$d", \@tv, $txt, "dropdown").
-                  "</td><td>".
-                  FW_submit("cmd.$d", "set").
-                  "</td>";
-              }
+            foreach my $fn (sort keys %{$data{webCmdFn}}) {
+              no strict "refs";
+              $htmlTxt = &{$data{webCmdFn}{$fn}}($d,$cmd,$values);
+              use strict "refs";
+              last if($htmlTxt);
             }
           }
+          if($htmlTxt) {
+            FW_pO $htmlTxt;
 
-          for(my $idx=$firstIdx; $idx < @cList; $idx++) {
-            FW_pH "cmd.$d=set $d $cList[$idx]$rf", $cList[$idx], 1,"col3";
+          } else {
+            FW_pH "cmd.$d=set $d $cmd$rf", $cmd, 1, "col3";
           }
-
-
-        } elsif($type eq "FileLog") {
-          $row = FW_dumpFileLog($d, 1, $row);
-
         }
       }
       FW_pO "</tr>";
@@ -1165,12 +1099,13 @@ FW_showRoom()
   }
   FW_pO "</table><br>";
 
-  # Now the weblinks
-  my $buttons = 1;
+  # Now the "atEnds"
   foreach my $d (sort { lc(AttrVal($a, "sortby", AttrVal($a,"alias",$a))) cmp
                         lc(AttrVal($b, "sortby", AttrVal($b,"alias",$b))) }
-                   @weblinks) {
-    $buttons = FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE}, $buttons);
+                   @atEnds) {
+    no strict "refs";
+    FW_pO &{$modules{$defs{$d}{TYPE}}{FW_summaryFn}}($FW_chash, $d, $FW_room, \%extPage);
+    use strict "refs";
   }
   FW_pO "</div>";
   FW_pO "</form>";
@@ -1283,7 +1218,8 @@ FW_logWrapper($)
   if(defined($type) && $type eq "text") {
     $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
     my $path = "$1/$file";
-    $path =~ s/%L/$attr{global}{logdir}/g if($path =~ m/%/ && $attr{global}{logdir}); # %L present and log directory defined
+    $path =~ s/%L/$attr{global}{logdir}/g
+        if($path =~ m/%/ && $attr{global}{logdir});
     $path = AttrVal($d,"archivedir","") . "/$file" if(!-f $path);
 
     FW_pO "<div id=\"content\">";
@@ -1310,10 +1246,10 @@ FW_logWrapper($)
   } else {
     FW_pO "<div id=\"content\">";
     FW_pO "<br>";
-    FW_zoomLink("cmd=$cmd;zoom=-1", "Zoom-in", "zoom in");
-    FW_zoomLink("cmd=$cmd;zoom=1",  "Zoom-out","zoom out");
-    FW_zoomLink("cmd=$cmd;off=-1",  "Prev",    "prev");
-    FW_zoomLink("cmd=$cmd;off=1",   "Next",    "next");
+    FW_pO FW_zoomLink("cmd=$cmd;zoom=-1", "Zoom-in", "zoom in");
+    FW_pO FW_zoomLink("cmd=$cmd;zoom=1",  "Zoom-out","zoom out");
+    FW_pO FW_zoomLink("cmd=$cmd;off=-1",  "Prev",    "prev");
+    FW_pO FW_zoomLink("cmd=$cmd;off=1",   "Next",    "next");
     FW_pO "<table><tr><td>";
     FW_pO "<td>";
     my $logtype = $defs{$d}{TYPE};
@@ -1658,9 +1594,9 @@ FW_zoomLink($$$)
 
     $val = "day" if(!$val);
     $val = $FW_zoom{$val};
-    return if(!defined($val) || $val+$off < 0 || $val+$off >= int(@FW_zoom) );
+    return "" if(!defined($val) || $val+$off < 0 || $val+$off >= int(@FW_zoom));
     $val = $FW_zoom[$val+$off];
-    return if(!$val);
+    return "" if(!$val);
 
     # Approximation of the next offset.
     my $w_off = $FW_pos{off};
@@ -1683,7 +1619,7 @@ FW_zoomLink($$$)
 
   } else {
 
-    return if((!$val && $off > 0) || ($val && $val+$off > 0)); # no future
+    return "" if((!$val && $off > 0) || ($val && $val+$off > 0)); # no future
     $off=($val ? $val+$off : $off);
     my $zoom=$FW_pos{zoom};
     $zoom = 0 if(!$zoom);
@@ -1691,8 +1627,7 @@ FW_zoomLink($$$)
 
   }
 
-  FW_pO "&nbsp;&nbsp;";
-  FW_pHPlain "$cmd", FW_makeImage($img, $alt);
+  return "&nbsp;&nbsp;".FW_pHPlain("$cmd", FW_makeImage($img, $alt));
 }
 
 ##################
@@ -2010,36 +1945,43 @@ FW_pO(@)
 sub
 FW_pH(@)
 {
-   my ($link, $txt, $td, $class) = @_;
+  my ($link, $txt, $td, $class, $doRet) = @_;
+  my $ret = "";
 
-   FW_pO "<td>" if($td);
-   $link = ($link =~ m,^/,) ? $link : "$FW_ME$FW_subdir?$link";
-   $class = "" if(!defined($class));
-   $class  = " class=\"$class\"" if($class);
+  $ret .= "<td>" if($td);
+  $link = ($link =~ m,^/,) ? $link : "$FW_ME$FW_subdir?$link";
+  $class = "" if(!defined($class));
+  $class = " class=\"$class\"" if($class);
 
-   # Using onclick, as href starts safari in a webapp.
-   # Known issue: the pointer won't change
-   if($FW_ss || $FW_tp) { 
-     FW_pO "<a onClick=\"location.href='$link'\"><div$class>$txt</div></a>";
+  # Using onclick, as href starts safari in a webapp.
+  # Known issue: the pointer won't change
+  if($FW_ss || $FW_tp) { 
+    $ret .= "<a onClick=\"location.href='$link'\"><div$class>$txt</div></a>";
 
-   } else {
-     FW_pO "<a href=\"$link\"><div$class>$txt</div></a>";
-   }
-   FW_pO "</td>" if($td);
+  } else {
+    $ret .= "<a href=\"$link\"><div$class>$txt</div></a>";
+  }
+  $ret .= "</td>" if($td);
+  return $ret if($doRet);
+  FW_pO $ret;
 }
 
+#################
+# href without class/div, returned as a string
 sub
 FW_pHPlain(@)
 {
-   my ($link, $txt, $td) = @_;
+  my ($link, $txt, $td) = @_;
 
-   FW_pO "<td>" if($td);
-   if($FW_ss || $FW_tp) {
-     FW_pO "<a onClick=\"location.href='$FW_ME$FW_subdir?$link'\">$txt</a>";
-   } else {
-     FW_pO "<a href=\"$FW_ME$FW_subdir?$link\">$txt</a>";
-   }
-   FW_pO "</td>" if($td);
+  my $ret = "";
+  $ret .= "<td>" if($td);
+  if($FW_ss || $FW_tp) {
+    $ret .= "<a onClick=\"location.href='$FW_ME$FW_subdir?$link'\">$txt</a>";
+  } else {
+    $ret .= "<a href=\"$FW_ME$FW_subdir?$link\">$txt</a>";
+  }
+  $ret .= "</td>" if($td);
+  return $ret;
 }
 
 
@@ -2082,92 +2024,6 @@ FW_fC($@)
     $ret = AnalyzeCommandChain($FW_chash, $cmd);
   }
   return $ret;
-}
-
-##################
-sub
-FW_showWeblinkDetail($)
-{
-  my ($d)= @_;
-  my $alias= AttrVal($d, "alias", $d);
-
-  FW_pO "<br>";
-  FW_pHPlain("detail=$d", $alias) if(!$FW_subdir);
-  FW_pO "<br>";
-}
-
-sub
-FW_showWeblink($$$$)
-{
-  my ($d, $v, $t, $buttons) = @_;
-
-  my $attr = AttrVal($d, "htmlattr", "");
-
-  if($t eq "htmlCode") {
-    $v = AnalyzePerlCommand($FW_chash, $v) if($v =~ m/^{(.*)}$/);
-    FW_pO $v;
-
-  } elsif($t eq "link") {
-    FW_pO "<a href=\"$v\" $attr>$d</a>"; # no FW_pH, want to open extra browser
-
-  } elsif($t eq "image") {
-    FW_pO "<img src=\"$v\" $attr><br>";
-    FW_showWeblinkDetail($d);
-
-  } elsif($t eq "iframe") {
-    FW_pO "<iframe src=\"$v\" $attr>Iframes disabled</iframe>";
-    FW_showWeblinkDetail($d);
-
-  } elsif($t eq "fileplot" || $t eq "dbplot" ) {
-
-    # plots navigation buttons
-    if($buttons &&
-       ($defs{$d}{WLTYPE} eq "fileplot" || $defs{$d}{WLTYPE} eq "dbplot") &&
-       AttrVal($d, "fixedrange", "x") !~ m/^[ 0-9:-]*$/) {
-
-      FW_zoomLink("zoom=-1", "Zoom-in", "zoom in");
-      FW_zoomLink("zoom=1",  "Zoom-out","zoom out");
-      FW_zoomLink("off=-1",  "Prev",    "prev");
-      FW_zoomLink("off=1",   "Next",    "next");
-      $buttons = 0;
-      FW_pO "<br>";
-    }
-
-    my @va = split(":", $v, 3);
-    if($defs{$d}{WLTYPE} eq "fileplot" &&
-            (@va != 3 || !$defs{$va[0]} || !$defs{$va[0]}{currentlogfile})) {
-      FW_pO "Broken definition for fileplot $d: $v<br>";
-
-    } elsif ($defs{$d}{WLTYPE} eq "dbplot" && (@va != 2 || !$defs{$va[0]})) {
-      FW_pO "Broken definition for dbplot $d: $v<br>";
-
-    } else {
-      if(defined($va[2]) && $va[2] eq "CURRENT") {
-        $defs{$va[0]}{currentlogfile} =~ m,([^/]*)$,;
-        $va[2] = $1;
-      }
-
-      if ($defs{$d}{WLTYPE} eq "dbplot") {
-        $va[2] = "-";
-      }
-
-      my $wl = "&amp;pos=" . join(";", map {"$_=$FW_pos{$_}"} keys %FW_pos);
-
-      my $arg="$FW_ME?cmd=showlog $d $va[0] $va[1] $va[2]$wl";
-      if(AttrVal($d,"plotmode",$FW_plotmode) eq "SVG") {
-        my ($w, $h) = split(",", AttrVal($d,"plotsize",$FW_plotsize));
-        FW_pO "<embed src=\"$arg\" type=\"image/svg+xml\" " .
-              "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
-
-      } else {
-        FW_pO "<img src=\"$arg\"/>";
-      }
-
-      FW_showWeblinkDetail($d) if(!$FW_hiddenroom{detail});
-
-    }
-  }
-  return $buttons;
 }
 
 sub
@@ -2355,40 +2211,6 @@ FW_makeEdit($$$)
   FW_pO  "</td>";
 }
 
-sub
-FW_dumpFileLog($$$)
-{
-  my ($d, $oneRow,$row) = @_;
-
-  foreach my $f (FW_fileList($defs{$d}{logfile})) {
-    my $nr;
-
-    if($oneRow) {
-      FW_pF "<tr class=\"%s\">", ($row&1)?"odd":"even";
-      FW_pO "<td><div class=\"dname\">$f</div></td>";
-    }
-    foreach my $ln (split(",", AttrVal($d, "logtype", "text"))) {
-      my ($lt, $name) = split(":", $ln);
-      $name = $lt if(!$name);
-      if(!$oneRow) {
-        FW_pF "<tr class=\"%s\">", ($row&1)?"odd":"even";
-        FW_pF "<td><div class=\"dname\">%s</div></td>", ($nr ? "" : $f);
-      }
-      FW_pH "cmd=logwrapper $d $lt $f",
-              "<div class=\"dval\">$name</div>", 1, "dval";
-      if(!$oneRow) {
-        FW_pO "</tr>";
-        $row++;
-      }
-      $nr++;
-    }
-    if($oneRow) {
-      FW_pO "</tr>";
-      $row++;
-    }
-  }
-  return $row;
-}
 
 sub
 FW_roomStatesForInform($)
@@ -2624,6 +2446,74 @@ FW_htmlEscape($)
   $txt =~ s/</&lt;/g;
   $txt =~ s/>/&gt;/g;
   return $txt;
+}
+
+sub
+FW_sliderFn($$$)
+{
+  my ($d,$cmd,$values) = @_;
+
+  return undef if($values !~ m/^slider,(.*),(.*),(.*)$/);
+  my ($min,$stp, $max) = ($1, $2, $3);
+  my $srf = $FW_room ? "&room=$FW_room" : "";
+  my $cv = ReadingsVal($d, $cmd, Value($d));
+  $cmd = "" if($cmd eq "state");
+  my $id = ($cmd eq "state") ? "" : "-$cmd";
+  $cv =~ s/.*?(\d+).*/$1/; # get first number
+  $cv = 0 if($cv !~ m/\d/);
+  return "<td colspan='2'>".
+           "<div class='slider' id='slider.$d$id' ".
+                "min='$min' stp='$stp' max='$max' ".
+                "cmd='$FW_ME?cmd=set $d $cmd %$srf'>".
+             "<div class='handle'>$min</div></div>".
+           "<script type=\"text/javascript\">" .
+               "Slider(document.getElementById('slider.$d$id'),'$cv')</script>".
+         "</td>";
+}
+
+sub
+FW_timepickerFn()
+{
+  my ($d,$cmd,$values) = @_;
+
+  return undef if($values ne "time");
+  my $srf = $FW_room ? "&room=$FW_room" : "";
+  my $cv = ReadingsVal($d, $cmd, Value($d));
+  $cmd = "" if($cmd eq "state");
+  my $c = "\"$FW_ME?cmd=set $d $cmd %$srf\"";
+  return "<td colspan='2'>".
+            "<input name='time.$d' value='$cv' type='text' readonly size='5'>".
+            "<input type='button' value='+' onclick='addTime(this,$c)'>".
+          "</td>";
+}
+
+sub 
+FW_dropdownFn()
+{
+  my ($d,$cmd,$values) = @_;
+
+  my @tv = split(",", $values);
+  # Hack: eventmap (translation only) should not result in a
+  # dropdown.  eventMap/webCmd/etc handling must be cleaned up.
+  if(@tv > 1) {
+    my $txt;
+    if($cmd eq "desired-temp" || $cmd eq "desiredTemperature") {
+      $txt = ReadingsVal($d, $cmd, 20);
+      $txt =~ s/ .*//;        # Cut off Celsius
+      $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
+    } else {
+      $txt = Value($d);
+      $txt =~ s/$cmd //;
+    }
+    return "<td colspan='2'><form>".
+      FW_hidden("arg.$d", $cmd) .
+      FW_hidden("dev.$d", $d) .
+      ($FW_room ? FW_hidden("room", $FW_room) : "") .
+      FW_select("$d-$cmd","val.$d", \@tv, $txt, "dropdown").
+      FW_submit("cmd.$d", "set").
+      "</form></td>";
+  }
+  return undef;
 }
 
 1;
