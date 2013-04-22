@@ -134,6 +134,8 @@ sub structure_Notify($$)
   return "" if (!@structPrio && $behavior eq "relative");
 
 
+  return "" if($hash->{INSET}); # Do not trigger for our own set
+
   if($hash->{INNTFY}) {
     Log 1, "ERROR: endless loop detected in structure_Notify $me";
     return "";
