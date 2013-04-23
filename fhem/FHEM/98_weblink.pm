@@ -9,6 +9,7 @@ use vars qw($FW_ME);      # webname (default is fhem), needed by 97_GROUP
 use vars qw(%FW_hiddenroom); # hash of hidden rooms, used by weblink
 use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by weblink
 use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by weblink
+use vars qw(%FW_pos);     # scroll position
 
 #####################################
 sub
@@ -53,7 +54,7 @@ FW_showWeblink($$$$)
   if($buttons !~ m/HASH/) {
     my %h = (); $buttons = \%h;
   }
-  FW_pO weblink_FwFn(undef, $d, "", $buttons);
+  FW_pO(weblink_FwFn(undef, $d, "", $buttons));
   return $buttons;
 }
 
@@ -67,7 +68,7 @@ weblink_FwDetail($)
 
   my $ret = "<br>";
   $ret .= FW_pHPlain("detail=$d", $alias) if(!$FW_subdir);
-  FW_pO "<br>";
+  $ret .= "<br>";
   return $ret;
 }
 
