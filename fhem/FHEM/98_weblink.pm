@@ -75,7 +75,7 @@ weblink_FwDetail($)
 sub
 weblink_FwFn($$$$)
 {
-  my ($FW_chash, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash   = $defs{$d};
   my $link   = $hash->{LINK};
   my $wltype = $hash->{WLTYPE};

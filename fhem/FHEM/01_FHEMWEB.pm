@@ -798,7 +798,7 @@ FW_doDetail($)
 
   if($modules{$t}{FW_detailFn}) {
     no strict "refs";
-    FW_pO &{$modules{$t}{FW_detailFn}}($FW_chash, $d, $FW_room) . "<br>";
+    FW_pO &{$modules{$t}{FW_detailFn}}($FW_wname, $d, $FW_room) . "<br>";
     use strict "refs";
   }
 
@@ -1062,7 +1062,7 @@ FW_showRoom()
       if($modules{$type}{FW_summaryFn}) {
         FW_pO "<td>";
         no strict "refs";
-        FW_pO &{$modules{$type}{FW_summaryFn}}($FW_chash, $d, $FW_room, \%extPage);
+        FW_pO &{$modules{$type}{FW_summaryFn}}($FW_wname,$d,$FW_room,\%extPage);
         use strict "refs";
         FW_pO "</td>";
         next;

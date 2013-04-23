@@ -170,7 +170,7 @@ FileLog_Set($@)
 sub
 FW_dumpFileLog($$$$)
 {
-  my ($FW_chash, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
 
   return "<div id=\"$d\" align=\"center\" class=\"col2\">$defs{$d}{STATE}</div>"
         if($FW_ss && $pageHash);
