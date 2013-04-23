@@ -15,7 +15,7 @@ SYSSTAT_Initialize($)
   $hash->{UndefFn}  = "SYSSTAT_Undefine";
   $hash->{GetFn}    = "SYSSTAT_Get";
   $hash->{AttrFn}   = "SYSSTAT_Attr";
-  $hash->{AttrList} = "filesystems showpercent:1 useregex:1 ssh_user loglevel:0,1,2,3,4,5,6 ".
+  $hash->{AttrList} = "filesystems raspberrytemperature:1 showpercent:1 useregex:1 ssh_user loglevel:0,1,2,3,4,5,6 ".
                        $readingFnAttributes;
 }
 
@@ -121,6 +121,7 @@ SYSSTAT_Attr($$$)
   my $orig = $attrVal;
   $attrVal= "1" if($attrName eq "useregex");
   $attrVal= "1" if($attrName eq "showpercent");
+  $attrVal= "1" if($attrName eq "raspberrytemperature");
 
   if( $attrName eq "filesystems") {
     my $hash = $defs{$name};
@@ -143,6 +144,7 @@ SYSSTAT_Attr($$$)
 }
 
 sub SYSSTAT_getLoadAVG( $ );
+sub SYSSTAT_getPiTemp( $ );
 sub
 SYSSTAT_GetUpdate($)
 {
@@ -197,9 +199,15 @@ SYSSTAT_GetUpdate($)
       }
     }
   }
+
+  if( AttrVal($hash->{NAME}, "raspberrytemperature", "") ne "" ) {
+    my $temp = SYSSTAT_getPiTemp($hash);
+    readingsSingleUpdate($hash,"temperature",$temp,defined($hash->{LOCAL} ? 0 : 1));
+  }
 }
 
-sub SYSSTAT_getLoadAVG( $ )
+sub
+SYSSTAT_getLoadAVG( $ )
 {
   my ($hash) = @_;
 
@@ -234,6 +242,37 @@ sub SYSSTAT_getLoadAVG( $ )
   }
 
   return $hash->{loadavg}->get;
+}
+
+sub
+SYSSTAT_getPiTemp( $ )
+{
+  my ($hash) = @_;
+
+  my $filename = "/sys/class/thermal/thermal_zone0/temp";
+
+  my $temp;
+  if( defined($hash->{HOST}) ) {
+      my $cmd = qx(which ssh);
+      chomp( $cmd );
+      my $user = AttrVal($hash->{NAME}, "ssh_user", undef );
+      $cmd .= ' ';
+      $cmd .= $user."\@" if( defined($user) );
+      $cmd .= $hash->{HOST}." cat ". $filename ." 2>/dev/null";
+      if( open(my $fh, "$cmd|" ) ) {
+        $temp = <$fh>;
+        close($fh);
+      }
+    } else {
+      if( open( my $fh, '<', $filename ) )
+        {
+          $temp = <$fh>;
+
+          close($fh);
+        }
+    }
+
+  return $temp / 1000;
 }
 
 
@@ -323,6 +362,8 @@ sub SYSSTAT_getLoadAVG( $ )
     </ul></li></lu>
     <li>showpercent<br>
       If set the usage is shown in percent. If not set the remaining free space in bytes is shown.</li>
+    <li>raspberrytemperature<br>
+      If set the raspberry pi on chip termal sensor is read.</li>
     <li>useregex<br>
       If set the entries of the filesystems list are treated as regex.</li>
     <li>ssh_user<br>
