@@ -532,8 +532,9 @@ FW_answerCall($)
     foreach my $k (sort keys %{$data{FWEXT}}) {
       my $h = $data{FWEXT}{$k};
       next if($h !~ m/HASH/ || !$h->{SCRIPT});
-      FW_pO "<script type=\"text/javascript\" ".
-                "src=\"$FW_ME/pgm2/$h->{SCRIPT}\"></script>";
+      my $script = $h->{SCRIPT};
+      $script = ($script =~ m,^/,) ? "$FW_ME$script" : "$FW_ME/pgm2/$script";
+      FW_pO "<script type=\"text/javascript\" src=\"$script\"></script>";
     }
   }
 
@@ -1079,7 +1080,8 @@ FW_showRoom()
             my $values = $1;
             foreach my $fn (sort keys %{$data{webCmdFn}}) {
               no strict "refs";
-              $htmlTxt = &{$data{webCmdFn}{$fn}}($d,$cmd,$values);
+              $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,
+                                                 $d, $FW_room, $cmd, $values);
               use strict "refs";
               last if($htmlTxt);
             }
@@ -2451,7 +2453,7 @@ FW_htmlEscape($)
 sub
 FW_sliderFn($$$)
 {
-  my ($d,$cmd,$values) = @_;
+  my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
 
   return undef if($values !~ m/^slider,(.*),(.*),(.*)$/);
   my ($min,$stp, $max) = ($1, $2, $3);
@@ -2474,7 +2476,7 @@ FW_sliderFn($$$)
 sub
 FW_timepickerFn()
 {
-  my ($d,$cmd,$values) = @_;
+  my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
 
   return undef if($values ne "time");
   my $srf = $FW_room ? "&room=$FW_room" : "";
@@ -2490,7 +2492,7 @@ FW_timepickerFn()
 sub 
 FW_dropdownFn()
 {
-  my ($d,$cmd,$values) = @_;
+  my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
 
   my @tv = split(",", $values);
   # Hack: eventmap (translation only) should not result in a
