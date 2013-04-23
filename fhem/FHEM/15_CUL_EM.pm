@@ -22,7 +22,7 @@ CUL_EM_Initialize($)
   $hash->{UndefFn}   = "CUL_EM_Undef";
   $hash->{ParseFn}   = "CUL_EM_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 " .
-                        "model:EMEM,EMWZ,EMGZ loglevel ignore:0,1".
+                        "model:EMEM,EMWZ,EMGZ loglevel ignore:0,1 ".
                         $readingFnAttributes;
 }
 
