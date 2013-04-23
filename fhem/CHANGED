@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: HUEDevice: use webCmdFn for colorpicker
+             added jscolor for colorpicker
   - feature: FHEMWEB: module specific summaryFn/detailFn + defineable webCmdFn
   - change:  ESA2000: adapted device detection , rename readings
   - change:  stucture triggers on each change, see event-on-change-reading

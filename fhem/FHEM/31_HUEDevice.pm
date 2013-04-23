@@ -56,6 +56,27 @@ sub HUEDevice_Initialize($)
                       "$readingFnAttributes ".
                       "model:".join(",", sort keys %hueModels)." ".
                       "subType:colordimmer,dimmer,switch";
+
+  $data{webCmdFn}{colorpicker} = "HUEDevice_colorpickerFn";
+  $data{FWEXT}{"/"}{SCRIPT} = "/jscolor/jscolor.js";
+}
+
+sub
+HUEDevice_colorpickerFn($$$)
+{
+  my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
+ 
+  return undef if($values !~ m/^colorpicker,(.*)$/);
+  my ($mode) = ($1);
+  $mode = "RGB" if( !defined($mode) );
+  my $srf = $FW_room ? "&room=$FW_room" : "";
+  my $srf = $FW_room ? "&room=$FW_room" : "";
+  my $cv = CommandGet("","$d $cmd");
+  $cmd = "" if($cmd eq "state");
+  my $c = "\"$FW_ME?cmd=set $d $cmd %$srf\"";
+  return "<td colspan='2'>".
+           "<input class='color {pickerMode:'$mode'}' value='#$cv' onchange='setColor(this,\"$mode\",$c)'\"/>".
+         "</td>";
 }
 
 sub HUEDevice_Define($$)
@@ -455,7 +476,7 @@ HUEDevice_GetUpdate($)
   }
   if( defined($hue) && $hue != $hash->{fhem}{hue} ) {readingsBulkUpdate($hash,"hue",$hue);}
   if( defined($sat) && $sat != $hash->{fhem}{sat} ) {readingsBulkUpdate($hash,"sat",$sat);}
-  if( $xy eq "," ) {readingsBulkUpdate($hash,"xy","");}
+  if( $xy eq "," && $xy ne $hash->{fhem}{xy} ) {readingsBulkUpdate($hash,"xy","");}
   elsif( $xy ne $hash->{fhem}{xy} ) {readingsBulkUpdate($hash,"xy",$xy);}
 
   my $s = '';
