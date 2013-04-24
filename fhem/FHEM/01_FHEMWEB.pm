@@ -2456,7 +2456,7 @@ FW_sliderFn($$$)
 {
   my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
 
-  return undef if($values !~ m/^slider,(.*),(.*),(.*)$/);
+  return undef if($values !~ m/^slider,(.*),(.*),(.*)$/ || $cmd =~ m/ /);
   my ($min,$stp, $max) = ($1, $2, $3);
   my $srf = $FW_room ? "&room=$FW_room" : "";
   my $cv = ReadingsVal($d, $cmd, Value($d));
