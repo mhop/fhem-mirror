@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - change:  HUEDevice: allow color preset buttons in webCmd
   - feature: SYSSTAT: allow (remote) monitoring raspberry pi on chip temperature
   - feature: HUEDevice: use webCmdFn for colorpicker
              added jscolor for colorpicker

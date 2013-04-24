@@ -65,18 +65,29 @@ sub
 HUEDevice_colorpickerFn($$$)
 {
   my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
- 
+
+  my @args = split("[ \t]+", $cmd);
+
   return undef if($values !~ m/^colorpicker,(.*)$/);
   my ($mode) = ($1);
   $mode = "RGB" if( !defined($mode) );
   my $srf = $FW_room ? "&room=$FW_room" : "";
-  my $srf = $FW_room ? "&room=$FW_room" : "";
   my $cv = CommandGet("","$d $cmd");
   $cmd = "" if($cmd eq "state");
-  my $c = "\"$FW_ME?cmd=set $d $cmd %$srf\"";
-  return "<td colspan='2'>".
-           "<input class='color {pickerMode:'$mode'}' value='#$cv' onchange='setColor(this,\"$mode\",$c)'\"/>".
-         "</td>";
+  if( $args[1] ) {
+    my $c = "\"$FW_ME?cmd=set $d $cmd$srf\"";
+    return "<td colspan='2'>".
+             '<a href='. $c .'>'.
+               '<div style="width:32px;height:19px;'.
+               'border:1px solid #fff;border-radius:8px;background-color:#'. $args[1] .';"></div>'.
+             '</a>';
+           "</td>";
+  } else {
+    my $c = "\"$FW_ME?cmd=set $d $cmd %$srf\"";
+    return "<td colspan='2'>".
+             "<input class='color {pickerMode:'$mode'}' value='#$cv' onchange='setColor(this,\"$mode\",$c)'\"/>".
+           "</td>";
+  }
 }
 
 sub HUEDevice_Define($$)
@@ -108,7 +119,7 @@ sub HUEDevice_Define($$)
   $hash->{fhem}{xy} = '';
 
 
-  CommandAttr(undef,$name.' webCmd rgb:toggle:on:off') if( !defined( AttrVal($hash->{NAME}, "webCmd", undef) ) );
+  CommandAttr(undef,$name.' webCmd rgb:rgb ff0000:rgb C8FF12:rgb 0000ff:toggle:on:off') if( !defined( AttrVal($hash->{NAME}, "webCmd", undef) ) );
   CommandAttr(undef,$name.' devStateIcon {CommandGet("","'.$name.' devStateIcon")}') if( !defined( AttrVal($hash->{NAME}, "devStateIcon", undef) ) );
 
   AssignIoPort($hash);
@@ -619,9 +630,11 @@ HUEDevice_GetUpdate($)
   <b>Attributes</b>
   <ul>
     <li>subType<br>
-      dimmer or switch, default is dimmer.</li>
+      colordimmer, dimmer or switch, default is initialized according to device model.</li>
       <li>devStateIcon<br>
       will be initialized to <code>{CommandGet("","&lt;name&gt; devStateIcon")}</code> to show device color as default in room overview.</li>
+      <li>webCmd<br>
+      will be initialized to <code>rgb:rgb FF0000:rgb C8FF12:rgb 0000FF:toggle:on:off</code> to show colorpicker and 3 color preset buttons in room overview.</li>
   </ul>
 
 </ul><br>
