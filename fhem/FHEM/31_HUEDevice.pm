@@ -119,8 +119,7 @@ sub HUEDevice_Define($$)
   $hash->{fhem}{xy} = '';
 
 
-  CommandAttr(undef,$name.' webCmd rgb:rgb ff0000:rgb C8FF12:rgb 0000ff:toggle:on:off') if( !defined( AttrVal($hash->{NAME}, "webCmd", undef) ) );
-  CommandAttr(undef,$name.' devStateIcon {CommandGet("","'.$name.' devStateIcon")}') if( !defined( AttrVal($hash->{NAME}, "devStateIcon", undef) ) );
+  $attr{$name}{devStateIcon} = '{CommandGet("","'.$name.' devStateIcon")}' if( !defined( $attr{$name}{devStateIcon} ) );
 
   AssignIoPort($hash);
   if(defined($hash->{IODev}->{NAME})) {
@@ -461,6 +460,13 @@ HUEDevice_GetUpdate($)
   $attr{$name}{subType} = $hueModels{$attr{$name}{model}}{subType} unless( defined($attr{$name}{subType})
                                                                            || !defined($attr{$name}{model})
                                                                            || !defined($hueModels{$attr{$name}{model}}{subType}) );
+
+  $attr{$name}{devStateIcon} = '{CommandGet("","'.$name.' devStateIcon")}';
+  if( !defined( $attr{$name}{webCmd} ) ) {
+    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb C8FF12:rgb 0000ff:toggle:on:off' if( $attr{$name}{subType} eq "colordimmer" );
+    $attr{$name}{webCmd} = 'pct:toggle:on:off' if( $attr{$name}{subType} eq "dimmer" );
+    $attr{$name}{webCmd} = 'toggle:on:off' if( $attr{$name}{subType} eq "switch" );
+  }
 
   readingsBeginUpdate($hash);
 
