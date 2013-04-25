@@ -22,9 +22,20 @@ sub DeviceMonitor_Initialize($)
 	$hash->{NotifyFn}  = "DeviceMonitor_Notify";
 	$hash->{GetFn}     = "DeviceMonitor_Get";
 	$hash->{AttrList}  = "disable:0,1";
+	$hash->{FW_summaryFn} = "DeviceMonitor_FwFn";
+    $hash->{FW_detailFn}  = "DeviceMonitor_FwFn";
 	addToAttrList("device_timeout"); 
 }
 
+
+sub DeviceMonitor_FwFn($$)
+{
+	my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+	my $hash   = $defs{$d};
+
+	return DeviceMonitor_GetResult($hash->{NAME},"dead","html");
+ }
+ 
 sub DeviceMonitor_Define($$)
 {
 	my ($hash, $def) = @_;
