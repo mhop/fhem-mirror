@@ -3228,14 +3228,15 @@ readingsBulkUpdate($$$@)
     my @v = grep { my $l = $_;
                    $l =~ s/:.*//;
                    ($reading=~ m/^$l$/) ? $_ : undef} @{$hash->{".attrminint"}};
-    if($changed && @v) {
+    if(@v) {
       my (undef, $minInt) = split(":", $v[0]);
       my $now = $hash->{".updateTime"};
       my $le = $hash->{".lastTime$reading"};
       if($le && $now-$le < $minInt) {
-        $changed = 0;
+        $changed = 0 if(!$eocr);
       } else {
         $hash->{".lastTime$reading"} = $now;
+        $changed = 1 if($eocr);
       }
     }
   }
