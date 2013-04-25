@@ -124,7 +124,7 @@ sub CUL_HM_autoReadConfig($){
   while(@{$modules{CUL_HM}{helper}{updtCfgLst}}){
     my $name = shift(@{$modules{CUL_HM}{helper}{updtCfgLst}});
     my $hash = CUL_HM_name2Hash($name);
-	if (0 != CUL_HM_getARead($name)){
+	if (0 != CUL_HM_getAttrInt($name,"autoReadReg")){
 	  CUL_HM_Set($hash,$name,"getSerial");
 	  CUL_HM_Set($hash,$name,"getConfig");
 	  CUL_HM_Set($hash,$name,"statusRequest");
@@ -144,7 +144,8 @@ sub CUL_HM_updateConfig($){
     my $name = shift(@nameList);
     my $hash = CUL_HM_name2Hash($name);
 	my $id = CUL_HM_hash2Id($hash);
-
+    my $chn = substr($id."00",6,2);
+	
 	if ($id ne $K_actDetID){# if not action detector
  	  CUL_HM_ID2PeerList($name,"",1);       # update peerList out of peerIDs
       my $actCycle = AttrVal($name,"actCycle",undef);
@@ -211,7 +212,7 @@ sub CUL_HM_updateConfig($){
 	  $hash->{helper}{role}{vrt} = 1;
 	}
 
-	# add default web-commands
+	# -+-+-+-+-+ add default web-commands
     my $webCmd;
     $webCmd  = AttrVal($name,"webCmd",undef);
     if(!defined $webCmd){
@@ -224,6 +225,8 @@ sub CUL_HM_updateConfig($){
 	  }elsif($st eq "switch"       ){$webCmd="toggle:on:off:statusRequest";
 	  }elsif($st eq "smokeDetector"){$webCmd="test:alarmOn:alarmOff";
 	  }elsif($st eq "keyMatic"     ){$webCmd="lock:inhibit on:inhibit off";
+	  }elsif($md eq "HM-OU-CFM-PL" ){$webCmd="press short:press long"
+	                                   .($chn eq "02"?":playTone replay":"");
 	  }
 	  if ($webCmd){
 	    my $eventMap  = AttrVal($name,"eventMap",undef);
@@ -234,7 +237,7 @@ sub CUL_HM_updateConfig($){
 	  }
 	}
 	$attr{$name}{webCmd} = $webCmd if ($webCmd);
-	push @getConfList,$name if (0 != CUL_HM_getARead($name));
+	push @getConfList,$name if (0 != CUL_HM_getAttrInt($name,"autoReadReg"));
   }
   $modules{CUL_HM}{helper}{updtCfgLst} = \@getConfList;
   CUL_HM_autoReadConfig("updateConfig");
@@ -333,7 +336,7 @@ sub CUL_HM_Attr(@) {#################################
 	}
     push(@hashL,$eHash);
     foreach my $hash (@hashL){
-	  my $exLvl = CUL_HM_getExpertMode($hash);
+	  my $exLvl = CUL_HM_getAttrInt($hash->{NAME},"expert");
 	  if ($exLvl eq "0"){# off
         foreach my $rdEntry (keys %{$hash->{READINGS}}){
 	      my $rdEntryNew;
@@ -1430,7 +1433,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 		  }
 		}
 		my $peer = $shash->{helper}{respWait}{forPeer};
-		my $regLN = ((CUL_HM_getExpertMode($chnHash) eq "2")?"":".")."RegL_".$list.":".$peer;
+		my $regLN = ((CUL_HM_getAttrInt($chnName,"expert") == 2)?"":".")."RegL_".$list.":".$peer;
 		readingsSingleUpdate($chnHash,$regLN,
 		             ReadingsVal($chnName,$regLN,"")." ".$data,0);
 		if ($data =~m/00:00$/){ # this was the last message in the block
@@ -1456,7 +1459,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  my($chn,$peerID,$list,$data) = ($1,$2,$3,$4) if($p =~ m/^04(..)(........)(..)(.*)/);
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
 	  $chnHash = $shash if(!$chnHash); # will add param to dev if no chan
-	  my $regLN = ((CUL_HM_getExpertMode($chnHash) eq "2")?"":".")."RegL_".$list.":".CUL_HM_id2Name($peerID);
+	  my $regLN = ((CUL_HM_getAttrInt($chnHash->{NAME},"expert") == 2)?"":".")."RegL_".$list.":".CUL_HM_id2Name($peerID);
       $regLN =~ s/broadcast//;
 	  $regLN =~ s/ /_/g; #remove blanks
 
@@ -1496,7 +1499,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 		my ($chn) = ($1) if($p =~ m/^..(..)/);
 		if ($chn eq "00"){
 		  CUL_HM_queueAutoRead(CUL_HM_hash2Name($shash)) 
-		        if (1 < CUL_HM_getARead($shash->{NAME}));
+		        if (1 < CUL_HM_getAttrInt($shash->{NAME},"autoReadReg"));
 		  return "powerOn" ;# check dst eq "000000" as well?
 		}
 	  }
@@ -2070,7 +2073,7 @@ sub CUL_HM_Set($@) {
   elsif($cmd eq "inhibit") { ##################################################
   	return "$a[2] is not on or off" if($a[2] !~ m/^(on|off)$/);
  	my $val = ($a[2] eq "on") ? "01" : "00";
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$val.'01');	# SET_LOCK
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$val.$chn);	# SET_LOCK
   }
   elsif($cmd =~ m/^(up|down|pct)$/) { #########################################
 	my ($lvl,$tval,$rval) = ($a[2],"","");
@@ -2095,11 +2098,14 @@ sub CUL_HM_Set($@) {
   elsif($cmd eq "text") { ################################################# reg
     $state = "";
     my ($bn,$l1, $l2, $s) = ($chn,$a[2],$a[3],54); # Create CONFIG_WRITE_INDEX string
-	if (!$roleC){# if used on device. Should be removed :todo
+	if (!$roleC){# if used on device. 
       return "$a[2] is not a button number" if($a[2] !~ m/^\d$/ || $a[2] < 1);
       return "$a[3] is not on or off" if($a[3] !~ m/^(on|off)$/);
       $bn = $a[2]*2-($a[3] eq "on" ? 0 : 1);
 	  ($l1, $l2) = ($a[4],$a[5]);
+	}
+	else{
+	  return "to many parameter. Try set $a[0] text $a[2] $a[3]" if($a[4]);
 	}
 
     $l1 = substr($l1."\x00", 0, 13);
@@ -2259,18 +2265,26 @@ sub CUL_HM_Set($@) {
 	}
   } 
   elsif($cmd eq "playTone") { #################################################
-	my @itemList = split(',',$a[2]);
-	my $repeat = (defined $a[3] && $a[3] =~ m/^(\d+)$/)?$a[3]:1;
-    my $itemCnt = int(@itemList);
-	return "no more then 12 entries please"  if ($itemCnt>12);
-	return "repetition $repeat out of range [1..255]"
-          if($repeat < 1 ||	$repeat > 255);
-    #<entries><multiply><MP3><MP3>
-	my $msgBytes = sprintf("%02X%02X",$itemCnt,$repeat);
-	foreach my $mp3 (@itemList){
-      $msgBytes .= sprintf("%02X",$mp3);
+	my $msg;
+	if ($a[2] eq 'replay'){
+	  $msg = ReadingsVal($chnHash->{NAME},".lastTone","");
 	}
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.$msgBytes);
+	else{
+	  my @itemList = split(',',$a[2]);
+	  my $repeat = (defined $a[3] && $a[3] =~ m/^(\d+)$/)?$a[3]:1;
+      my $itemCnt = int(@itemList);
+	  return "no more then 12 entries please"  if ($itemCnt>12);
+	  return "repetition $repeat out of range [1..255]"
+            if($repeat < 1 ||	$repeat > 255);
+      #<entries><multiply><MP3><MP3>
+	  my $msgBytes = sprintf("%02X%02X",$itemCnt,$repeat);
+	  foreach my $mp3 (@itemList){
+        $msgBytes .= sprintf("%02X",$mp3);
+	  }
+	  $msg = '++'.$flag.'11'.$id.$dst.'80'.$chn.$msgBytes;
+	  CUL_HM_UpdtReadSingle($chnHash,".lastTone",$msg,0);
+	}
+    CUL_HM_PushCmdStack($hash,$msg) if ($msg);
   } 
   elsif($cmd eq "ilum") { ################################################# reg
 	return "$a[2] not specified. choose 0-15 for brightness"  if ($a[2]>15);
@@ -2630,34 +2644,39 @@ sub CUL_HM_getConfig($$$$$){
   my ($hash,$chnhash,$id,$dst,$chn) = @_;
   my $flag = CUL_HM_getFlag($hash);
   foreach my $readEntry (keys %{$chnhash->{READINGS}}){
-	  delete $chnhash->{READINGS}{$readEntry} if ($readEntry =~ m/^[\.]?RegL_/);
+	  delete $chnhash->{READINGS}{$readEntry} if ($readEntry =~ m/^[\.]?(RegL_|R-)/);
   }
-  #get Peer-list in any case - it is part of config
-  CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s03",$flag,$id,$dst,$chn));
   my $lstAr = $culHmModel{CUL_HM_getMId($hash)}{lst};
   if($lstAr){
-    my @list = split(",",$lstAr); #get valid lists e.g."1, 5:2:3.p ,6:2"
+    my @list = split(",",$lstAr); #get valid lists e.g."1, 5:2.3p ,6:2"
+    my $pReq = 0; # Peer request not issued, do only once for channel
     foreach my$listEntry (@list){# each list that is define for this channel
       my ($peerReq,$chnValid)= (0,0);
       my ($listNo,$chnLst1) = split(":",$listEntry); 
 	  if (!$chnLst1){
-	    $chnValid = 1; #if no entry channel is valid
-	    $peerReq = 1 if($listNo==3 ||$listNo==4); #default
+	    $chnValid = 1; #if no entry go for all channels
+	    $peerReq = 1 if($listNo eq 'p' || $listNo==3 ||$listNo==4); #default
 	  }
 	  else{
 	    my @chnLst = split('\.',$chnLst1);
 	    foreach my $lchn (@chnLst){
 	      $peerReq = 1 if ($lchn =~ m/p/);
-	  	no warnings;#know that lchan may be followed by a 'p' causing a warning
-	      $chnValid = 1 if (int($lchn) == hex($chn));
-	  	use warnings;
+	  	  no warnings;#know that lchan may be followed by a 'p' causing a warning
+	        $chnValid = 1 if (int($lchn) == hex($chn));
+	  	  use warnings;
 	      last if ($chnValid);
         }
 	  }
 	  if ($chnValid){# yes, we will go for a list
 	    if ($peerReq){# need to get the peers first
-          $chnhash->{helper}{getCfgList} = "all";      # peers first
-          $chnhash->{helper}{getCfgListNo} = $listNo;
+          if($listNo ne 'p'){# not if 'only peers'!
+		    $chnhash->{helper}{getCfgList} = "all";
+            $chnhash->{helper}{getCfgListNo} = $listNo;
+		  }
+		  if (!$pReq){#get peers first, but only once per channel
+		    CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s03",$flag,$id,$dst,$chn));
+			$pReq = 1;
+		  }
 	    }
 	    else{
           CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s0400000000%02X",$flag,$id,$dst,$chn,$listNo));
@@ -2665,7 +2684,7 @@ sub CUL_HM_getConfig($$$$$){
 	  }	
     }
   }
- }
+}
 
 #+++++++++++++++++ Protocol stack, sending, repeat+++++++++++++++++++++++++++++
 sub CUL_HM_SndCmd($$) {
@@ -2737,7 +2756,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
 
 	  $peer ="" if($list !~ m/^0[34]$/);
 	  #empty val since reading will be cumulative 
-	  my $rlName = ((CUL_HM_getExpertMode($hash) eq "2")?"":".")."RegL_".$list.":".$peer;
+	  my $rlName = ((CUL_HM_getAttrInt($hash->{NAME},"expert") == 2)?"":".")."RegL_".$list.":".$peer;
       $chnhash->{READINGS}{$rlName}{VAL}=""; 
       delete ($chnhash->{READINGS}{$rlName}{TIME}); 
 	  return;
@@ -2898,7 +2917,7 @@ sub CUL_HM_pushConfig($$$$$$$$) {#generate messages to cnfig data to register
   my $peerN = ($peerAddr ne "000000")?CUL_HM_id2Name($peerAddr.$peerChn):"";
   $peerN =~ s/broadcast//;
   $peerN =~ s/ /_/g;#remote blanks
-  my $regLN = ((CUL_HM_getExpertMode($hash) eq "2")?"":".").
+  my $regLN = ((CUL_HM_getAttrInt($hash->{NAME},"expert") == 2)?"":".").
               "RegL_".$list.":".$peerN;
   #--- copy data from readings to shadow
   my $chnhash = $modules{CUL_HM}{defptr}{$dst.$chn};
@@ -2928,7 +2947,7 @@ sub CUL_HM_pushConfig($$$$$$$$) {#generate messages to cnfig data to register
   }
   CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$chn."06");
   CUL_HM_queueAutoRead(CUL_HM_hash2Name($hash)) 
-        if (2 < CUL_HM_getARead($hash->{NAME}));
+        if (2 < CUL_HM_getAttrInt($hash->{NAME},"autoReadReg"));
 }
 sub CUL_HM_Resend($) {#resend a message if there is no answer
   my $hash = shift;
@@ -3058,15 +3077,6 @@ sub CUL_HM_getAssChnIds($) { #in: name out:ID list of assotiated channels
   push @chnIdList,$dId if (length($dId) == 8);
   return sort(@chnIdList);
 }
-sub CUL_HM_getExpertMode($) { # get expert level for the entity. 
-  # if expert level is not set try to get it for device
-  my ($hash) = @_;
-  my $expLvl = AttrVal($hash->{NAME},"expert","");
-  my $dHash = CUL_HM_getDeviceHash($hash);
-  $expLvl = AttrVal($dHash->{NAME},"expert","0") 
-        if ($expLvl eq "");
-  return substr($expLvl,0,1);
-}
 
 #+++++++++++++++++ Conversions names, hashes, ids++++++++++++++++++++++++++++++
 sub CUL_HM_Id($) {#in: ioHash out: ioHMid 
@@ -3133,6 +3143,12 @@ sub CUL_HM_getDeviceHash($) {#in: hash out: devicehash
   return $hash if(!$hash->{DEF});
   my $devHash = $modules{CUL_HM}{defptr}{substr($hash->{DEF},0,6)};
   return ($devHash)?$devHash:$hash;
+}
+sub CUL_HM_getDeviceName($) {#in: name out: name of device
+  my $name = shift;
+  return $name if(!$defs{$name});#unknown, return input
+  my $devHash = $modules{CUL_HM}{defptr}{substr($defs{$name}{DEF},0,6)};
+  return ($devHash)?$devHash->{NAME}:$name;
 }
 
 #+++++++++++++++++ debug ++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -3207,7 +3223,7 @@ sub CUL_HM_getRegFromStore($$$$) {#read a register from backup data
   }
   $peerId  = CUL_HM_peerChId(($peerId?$peerId:"00000000"),$dId,$iId);
 							    
-  my $regLN = ((CUL_HM_getExpertMode($hash) eq "2")?"":".").
+  my $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".").
               "RegL_".sprintf("%02X",$list).":".CUL_HM_peerChName($peerId,$dId,$iId);
   $regLN =~ s/broadcast//;
   
@@ -3265,7 +3281,7 @@ sub CUL_HM_updtRegDisp($$$) {
   push @regArr, keys %{$culHmRegModel{$md}} if($culHmRegModel{$md}); 
   push @regArr, keys %{$culHmRegChan{$md.$chn}} if($culHmRegChan{$md.$chn}); 
   my @changedRead;
-  my $expLvl = (CUL_HM_getExpertMode($hash) ne  "0")?1:0;
+  my $expLvl = (CUL_HM_getAttrInt($name,"expert") == 0)?1:0;
   foreach my $regName (@regArr){
     next if ($culHmRegDefine{$regName}->{l} ne $listNo);
     my $rgVal = CUL_HM_getRegFromStore($name,$regName,$list,$peerId);
@@ -3278,11 +3294,18 @@ sub CUL_HM_updtRegDisp($$$) {
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
 
   # ---  handle specifics -  Devices with abnormal or long register
-  CUL_HM_TCtempReadings($hash)  if (($list == 5 ||$list == 6) && 
-                      substr($hash->{DEF},6,2) eq "02"        &&
-                      CUL_HM_Get($hash,$name,"param","model") eq "HM-CC-TC");
-  CUL_HM_repReadings($hash) if (($list == 2)                  && 
-		              CUL_HM_Get($hash,$name,"param","subType") eq "repeater");
+  my $md = CUL_HM_Get($hash,$name,"param","model");
+  my $st = CUL_HM_Get($hash,$name,"param","subType");
+  if ($md eq "HM-CC-TC"){#handle temperature readings
+    CUL_HM_TCtempReadings($hash)  if (($list == 5 ||$list == 6) && 
+                      substr($hash->{DEF},6,2) eq "02");
+  }
+  if ($md eq "HM-PB-4DIS-WM"){#add text
+    CUL_HM_4DisText($hash)  if ($list == 1) ;
+  }
+  elsif ($st eq "repeater"){
+    CUL_HM_repReadings($hash) if ($list == 2);
+  }
 #  CUL_HM_dimLog($hash) if(CUL_HM_Get($hash,$name,"param","subType") eq "dimmer");
 }
 #############################
@@ -3417,10 +3440,34 @@ sub CUL_HM_CvTflt($) { # config time -> float
   return ($inValue & 0x1f)*((sort {$a <=> $b} keys(%fltCvT))[$inValue >> 5]);
 }
 
+sub CUL_HM_4DisText($) {# convert text for 4dis
+  #text1: start at 54 (0x36) length 12 (0x0c)
+  #text2: start at 70 (0x46) length 12 (0x0c)
+  my ($hash)=@_;
+  my $name = $hash->{NAME};
+  my $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")."RegL_";
+  my $reg1 = ReadingsVal($name,$regLN."05:" ,"");
+  my %txt;
+  foreach my $sAddr (54,70){
+    my $txtHex = $reg1;  #one row
+	my $sStr = sprintf("%02X:",$sAddr);
+    $txtHex =~ s/.* $sStr//;       #remove reg prior to string
+	$sStr = sprintf("%02X:",$sAddr+11);
+    $txtHex =~ s/$sStr(..).*/,$1/; #remove reg after string
+    $txtHex =~ s/ ..:/,/g;         #remove addr 
+    $txtHex =~ s/,00.*//;          #remove trailing string
+    my @ch = split(",",$txtHex,12);
+    foreach (@ch){$txt{$sAddr}.=chr(hex($_))};
+  }  
+  CUL_HM_UpdtReadBulk($hash,1,"text1:".$txt{54},
+                              "text2:".$txt{70});
+  return "text1:".$txt{54}."\n".
+         "text2:".$txt{70}."\n";
+}
 sub CUL_HM_TCtempReadings($) {# parse TC readings
   my ($hash)=@_;
   my $name = $hash->{NAME};
-  my $regLN = ((CUL_HM_getExpertMode($hash) eq "2")?"":".")."RegL_";
+  my $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")."RegL_";
   my $reg5 = ReadingsVal($name,$regLN."05:" ,"");
   my $reg6 = ReadingsVal($name,$regLN."06:" ,"");
   my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
@@ -3562,10 +3609,10 @@ sub CUL_HM_ActGetCreateHash() {# get ActionDetector - create if necessary
 sub CUL_HM_time2sec($) {
   my ($timeout) = @_;
   my ($h,$m) = split(":",$timeout);
-  no warnings;
+  no warnings 'numeric';
   $h = int($h);
   $m = int($m);
-  use warnings;
+  use warnings 'numeric';
   return ((sprintf("%03s:%02d",$h,$m)),((int($h)*60+int($m))*60));
 }
 sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
@@ -3775,7 +3822,7 @@ sub CUL_HM_qStateUpdatIfEnab($){#in:name or id, queue stat-request after 12 sec
   $name = CUL_HM_id2Name($name) if ($name =~ m/^[A-F0-9]{6,8}$/i);
   $name =~ s /_chn:..$//;
   return if (!$defs{$name}); #device unknown, ignore
-  if (CUL_HM_getARead($name) > 3){
+  if (CUL_HM_getAttrInt($name,"autoReadReg") > 3){
  	@{$modules{CUL_HM}{helper}{reqStatus}}= 
 	           CUL_HM_noDup(@{$modules{CUL_HM}{helper}{reqStatus}},$name);
 	RemoveInternalTimer("CUL_HM_reqStatus");
@@ -3792,10 +3839,14 @@ sub CUL_HM_qStateUpdat($){#in:name or id, queue send stat-request after 12 sec
   RemoveInternalTimer("CUL_HM_reqStatus");
   InternalTimer(gettimeofday()+120,"CUL_HM_reqStatus","CUL_HM_reqStatus", 0);
 }
-sub CUL_HM_getARead($){#return valid autoRegRead as integer
-  my $name = shift;
-  my $aRd = CUL_HM_Get($defs{$name},$name,"param","autoReadReg");
-  return ($aRd eq "undefined")?0:int($aRd);
+sub CUL_HM_getAttrInt($$){#return attrValue as integer
+  my ($name,$attrName) = @_;
+  my $val = AttrVal($name,$attrName,"");
+  no warnings 'numeric';
+  $val = int(AttrVal(CUL_HM_getDeviceName($name),$attrName,0))+0 
+        if ($val eq "");
+  use warnings 'numeric';
+  return substr($val,0,1);
 }
 
 #+++++++++++++++++ external use +++++++++++++++++++++++++++++++++++++++++++++++
@@ -3973,43 +4024,54 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
          data!. It controlls actions taken upon receive of a trigger from the
          peer.<br>
 
-	 List4: settings for channel (button) of a remote<br><br>
+	    List4: settings for channel (button) of a remote<br><br>
 
          &lt;PeerChannel&gt; paired HMid+ch, i.e. 4 byte (8 digit) value like
          '12345601'. It is mendatory for List 3 and 4 and can be left out for
          List 0 and 1. <br>
 
-	 'all' can be used to get data of each paired link of the channel. <br>
+	    'all' can be used to get data of each paired link of the channel. <br>
 
-         'selfxx' can be used to address data for internal channels (associated
-         with the build-in switches if any). xx is the number of the channel in
-         decimal.<br>
+        'selfxx' can be used to address data for internal channels (associated
+        with the build-in switches if any). xx is the number of the channel in
+        decimal.<br>
 
-         Note1: execution depends on the entity. If List1 is requested on a
-         device rather then a channel the command will retrieve List1 for all
-         channels assotiated. List3 with peerChannel = all will get all link
-         for all channel if executed on a device.<br>
+        Note1: execution depends on the entity. If List1 is requested on a
+        device rather then a channel the command will retrieve List1 for all
+        channels assotiated. List3 with peerChannel = all will get all link
+        for all channel if executed on a device.<br>
 
-         Note2: for 'sender' see <a href="#CUL_HMremote">remote</a> <br>
+        Note2: for 'sender' see <a href="#CUL_HMremote">remote</a> <br>
 
-         Note3: the information retrieval may take a while - especially for
-         devices with a lot of channels and links. It may be necessary to
-         refresh the web interface manually to view the results <br>
+        Note3: the information retrieval may take a while - especially for
+        devices with a lot of channels and links. It may be necessary to
+        refresh the web interface manually to view the results <br>
 
-         Note4: the direct buttons on a HM device are hidden by default.
-         Nevertheless those are implemented as links as well. To get access to
-         the 'internal links' it is necessary to issue 'set &lt;name&gt; regSet
-         intKeyVisib 1' or 'set &lt;name&gt; setRegRaw List0 2 81'. Reset it
-         by replacing '81' with '01'<br> example:<br>
+        Note4: the direct buttons on a HM device are hidden by default.
+        Nevertheless those are implemented as links as well. To get access to
+        the 'internal links' it is necessary to issue 'set &lt;name&gt; regSet
+        intKeyVisib 1' or 'set &lt;name&gt; setRegRaw List0 2 81'. Reset it
+        by replacing '81' with '01'<br> example:<br>
 
-	 <ul><code>
-	 set mydimmer getRegRaw List1<br>
-	 set mydimmer getRegRaw List3 all <br>
-	 </code></ul>
-	 </li>
- 	 <li><B>getSerial</B><a name="CUL_HMgetSerial"></a><br>
+	  <ul><code>
+	    set mydimmer getRegRaw List1<br>
+	    set mydimmer getRegRaw List3 all <br>
+	  </code></ul>
+	  </li>
+ 	  <li><B>getSerial</B><a name="CUL_HMgetSerial"></a><br>
          Read serial number from device and write it to attribute serialNr.
-	 </li>
+	  </li>
+	  <li><B>inhibit [on|off]</B><br>
+         Block / unblock all directly peered remotes and the hardware buttons of the
+         device. If inhibit set on, the channel status can be controlled only by
+         FHEM.<br><br>
+         Examples:
+         <ul><code>
+           # Block operation<br>
+           set keymatic inhibit on <br><br>
+        </ul></code>  
+      </li>
+
      <li><B>pair</B><a name="CUL_HMpair"></a><br>
          Pair the device with a known serialNumber (e.g. after a device reset) 
 		 to FHEM Central unit. FHEM Central is usualy represented by CUL/CUNO, 
@@ -4341,17 +4403,31 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	</li>
     <li>OutputUnit (HM-OU-CFM-PL)
     <ul>
-      <li><B>led &lt;color&gt;[,&lt;color&gt;..]</B><br>
+      <li><B>led &lt;color&gt;[,&lt;color&gt;..] [&lt;repeat&gt..]</B><br>
         Possible colors are [redL|greenL|yellowL|redS|greenS|yellowS]. A
         sequence of colors can be given separating the color entries by ','.
         White spaces must not be used in the list. 'S' indicates short and
         'L' long ilumination. <br>
         <b>repeat</b> defines how often the sequence shall be executed. Defaults to 1.<br>
 	  </li>
-      <li><B>playTone &lt;MP3No&gt[,&lt;MP3No&gt..] [,&lt;repeat&gt..]</B><br>
+      <li><B>playTone &lt;MP3No&gt[,&lt;MP3No&gt..] [&lt;repeat&gt..]</B><br>
         Play a series of tones. List is to be entered separated by ','. White
         spaces must not be used in the list.<br>
+        <b>replay</b> can be entered to repeat the last sound played once more.<br>
         <b>repeat</b> defines how often the sequence shall be played. Defaults to 1.<br>
+		Example:
+		<ul><code>
+           # "hello" in display, symb bulb on, backlight, beep<br>
+           set cfm_Mp3 playTone 3  # MP3 title 3 once<br>
+           set cfm_Mp3 playTone 3 3 # MP3 title 3  3 times<br>
+           set cfm_Mp3 playTone 3,6,8,3,4 # MP3 title list 3,6,8,3,4 once<br>
+           set cfm_Mp3 playTone 3,6,8,3,4 255# MP3 title list 3,6,8,3,4 255 times<br>
+           set cfm_Mp3 playTone replay # repeat last sequence<br>
+		   <br>
+           set cfm_Led led redL 4 # led red blink 3 times long<br>
+           set cfm_Led led redS,redS,redS,redL,redL,redL,redS,redS,redS 255 # SOS 255 times<br>
+           </ul></code>  
+
 	  </li>
     </ul><br>
 	</li>
@@ -4412,18 +4488,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
          Unlocked the door so that the door can be opened.<br>
          [sec]: Sets the delay in seconds after the lock automatically locked
          again.<br>0 - 65535 seconds</li>
-      <li><B>inhibit [on|off]</B><br>
-         Block / unblock all directly peered remotes and the hardware buttons of the
-         keyMatic. If inhibit set on, the door lock drive can be controlled only by
-         FHEM.<br><br>
-         Examples:
-         <ul><code>
-           # Lock the lock<br>
-           set keymatic lock<br><br>
-           # open the door and relock the lock after 60 seconds<br>
-          set keymatic unlock 60
-        </ul></code>  
-        </li>
+      </li>
       </ul>
 	</li>
 	  
