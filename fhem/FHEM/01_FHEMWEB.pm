@@ -1084,7 +1084,7 @@ FW_showRoom()
               $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,
                                                  $d, $FW_room, $cmd, $values);
               use strict "refs";
-              last if($htmlTxt);
+              last if(defined($htmlTxt));
             }
           }
           if($htmlTxt) {
@@ -2456,7 +2456,8 @@ FW_sliderFn($$$)
 {
   my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
 
-  return undef if($values !~ m/^slider,(.*),(.*),(.*)$/ || $cmd =~ m/ /);
+  return undef if($values !~ m/^slider,(.*),(.*),(.*)$/);
+  return "" if($cmd =~ m/ /);   # webCmd pct 30 should generate a link
   my ($min,$stp, $max) = ($1, $2, $3);
   my $srf = $FW_room ? "&room=$FW_room" : "";
   my $cv = ReadingsVal($d, $cmd, Value($d));
@@ -2480,6 +2481,7 @@ FW_timepickerFn()
   my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
 
   return undef if($values ne "time");
+  return "" if($cmd =~ m/ /);   # webCmd on-for-timer 30 should generate a link
   my $srf = $FW_room ? "&room=$FW_room" : "";
   my $cv = ReadingsVal($d, $cmd, Value($d));
   $cmd = "" if($cmd eq "state");
@@ -2495,6 +2497,7 @@ FW_dropdownFn()
 {
   my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
 
+  return "" if($cmd =~ m/ /);   # webCmd temp 30 should generate a link
   my @tv = split(",", $values);
   # Hack: eventmap (translation only) should not result in a
   # dropdown.  eventMap/webCmd/etc handling must be cleaned up.
