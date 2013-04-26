@@ -94,7 +94,7 @@ FB_CALLMONITOR_Initialize($)
   
  
   
-  $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 unique-call-ids:0,1 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,internal,klicktel.de,dasoertliche.de,search.ch,none reverse-search-cache:0,1 reverse-search-phonebook-file ".
+  $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 unique-call-ids:0,1 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,internal,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at,none reverse-search-cache:0,1 reverse-search-phonebook-file ".
                         $readingFnAttributes;
 }
 
@@ -208,7 +208,6 @@ FB_CALLMONITOR_Read($)
   my $data = $buf;
   my $area_code = AttrVal($name, "local-area-code", "");
   my $external_number = undef;
-  
   
   
    @array = split(";", $data);
@@ -361,6 +360,7 @@ my $name = $hash->{NAME};
 my $result;
 my $invert_match = undef;
 
+chomp $number;
 
 # Using internal phonebook if available and enabled
 if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-search", "none") eq "internal" and defined($hash->{helper}{PHONEBOOK}))
@@ -475,6 +475,42 @@ if(AttrVal($name, "reverse-search", "none") eq "search.ch")
   }
 }
 
+# Austria ONLY!!! Ask dasschnelle.at
+if(AttrVal($name, "reverse-search", "none") eq "dasschnelle.at")
+{
+  Log GetLogLevel($name, 4), "FB_CALLMONITOR: $name using dasschnelle.at for reverse search of $number";
+  
+  $result = GetFileFromURL("http://www.dasschnelle.at/result/index/results?PerPage=5&pageNum=1&what=".$number."&where=&rubrik=0&bezirk=0&orderBy=Standard&mapsearch=false", 5, undef, 1);
+  if(not defined($result))
+  {
+    if(AttrVal($name, "reverse-search-cache", "0") eq "1")
+    {
+       $hash->{helper}{CACHE}{$number} = "timeout";
+       undef($result);
+       return "timeout";
+    }
+    
+  }
+  else
+  {
+   #Log 2, $result;
+   if($result =~ /name\s+:\s+"(.+?)",/)
+   {
+    
+     $invert_match = "";
+     
+     while($result =~ /name\s+:\s+"(.+?)",/g)
+     {
+       $invert_match = $1 if(length($1) > length($invert_match));
+     }
+
+     $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+     FB_CALLMONITOR_writeToCache($hash, $number, $invert_match) if(AttrVal($name, "reverse-search-cache", "0") eq "1");
+     undef($result);
+     return $invert_match;
+   }
+  }
+}
 
 if(AttrVal($name, "reverse-search-cache", "0") eq "1")
 { 
@@ -729,10 +765,10 @@ sub FB_CALLMONITOR_loadCacheFile($)
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li><a name="reverse-search">reverse-search</a> (all|internal|klicktel.de|dasoertliche.de|search.ch|none)</li>
+    <li><a name="reverse-search">reverse-search</a> (all|internal|klicktel.de|dasoertliche.de|search.ch|dasschnelle.at|none)</li>
     Activate the reverse searching of the external number (at dial and call receiving).
     It is possible to select a specific web service, which should be used for reverse searching.
-    If the attribute is set to "all", the reverse search will use the internal phonebook (if running FHEM on a FritzBox) or reverse search on all websites (execept search.ch) until a valid answer is found on of them 
+    If the attribute is set to "all", the reverse search will use the internal phonebook (if running FHEM on a FritzBox) or reverse search on all websites (execept search.ch and dasschnelle.at) until a valid answer is found on of them 
     If is set to "none", then no reverse searching will be used.<br><br>Default value is "none".<br><br>
     <li><a name="reverse-search-cache">reverse-search-cache</a></li>
     If this attribute is activated each reverse-search result is saved in an internal cache
@@ -828,12 +864,12 @@ sub FB_CALLMONITOR_loadCacheFile($)
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li><a name="reverse-search">reverse-search</a> (all|internal|klicktel.de|dasoertliche.de|search.ch|none)</li>
+    <li><a name="reverse-search">reverse-search</a> (all|internal|klicktel.de|dasoertliche.de|search.ch|dasschnelle.at|none)</li>
     Aktiviert die R&uuml;ckw&auml;rtssuche der externen Rufnummer der Gegenstelle (bei eingehenden/abgehenden Anrufen).
     Es ist m&ouml;glich einen bestimmten Suchanbieter zu verwenden, welcher f&uuml;r die R&uuml;ckw&auml;rtssuche verwendet werden soll.
     Falls FHEM auf einer FritzBox Fon l&auml;uft, kann mit dem Wert "internal" ausschlie&szlig;lich das interne Telefonbuch verwendet werden.
     Wenn dieses Attribut auf dem Wert "all" steht, wird (sofern FHEM auf einer FritzBox Fon l&auml;uft) das interne Telefonbuch verwendet,
-    sowie alle verf&uuml;gbaren Suchanbieter (ausser search.ch)
+    sowie alle verf&uuml;gbaren Suchanbieter (ausser search.ch und dasschnelle.at)
     f&uuml;r die R&uuml;ckw&auml;rtssuche herangezogen, solange bis irgend ein Anbieter ein valides Ergebniss liefert.
     Wenn der Wert "none" ist, wird keine R&uuml;ckw&auml;rtssuche durchgef&uuml;hrt.<br><br>Standardwert ist "none" (keine R&uuml;ckw&auml;rtssuche).<br><br>
     <li><a name="reverse-search-cache">reverse-search-cache</a></li>
