@@ -160,6 +160,12 @@ Ext.define('FHEM.view.Viewport', {
                             title: 'Database Tables',
                             name: 'tabledataaccordionpanel',
                             autoScroll: true
+                        },
+                        {
+                            xtype: 'panel',
+                            title: 'Highcharts',
+                            name: 'highchartsaccordionpanel',
+                            autoScroll: true
                         }
                     ]
                 }, 

@@ -1,3 +1,6 @@
+Update vom 26.4.2013
+  * Testintegration von Highcharts
+  * Neue abhängige Bibliotheken Highcharts und JQuery hinzugefügt
 Update vom 20.4.2013
   * Über dem CHart wird nun eine interaktive Tabelle mit den zugehörigen Daten angezeigt
   * Chartrendering effizienter

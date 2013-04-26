@@ -6,7 +6,8 @@ Ext.Loader.setConfig({
     enabled: true,
     disableCaching: false,
     paths: {
-        'FHEM': 'app'
+        'FHEM': 'app',
+        'Chart' : 'lib/highcharts/'
     }
 });
 
@@ -18,7 +19,8 @@ Ext.application({
 
     controllers: [
         'FHEM.controller.MainController',
-        'FHEM.controller.ChartController'
+        'FHEM.controller.ChartController',
+        'FHEM.controller.HighChartController'
     ],
 
     launch: function() {
