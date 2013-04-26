@@ -4,7 +4,8 @@
 Ext.define('FHEM.controller.MainController', {
     extend: 'Ext.app.Controller',
     requires: [
-       'FHEM.view.DevicePanel'
+       'FHEM.view.DevicePanel',
+       'FHEM.view.HighChartsPanel'
     ],
 
     refs: [
@@ -47,6 +48,9 @@ Ext.define('FHEM.controller.MainController', {
             },
             'panel[name=tabledataaccordionpanel]': {
                 expand: this.showDatabaseTablePanel
+            },
+            'panel[name=highchartsaccordionpanel]': {
+                expand: this.showHighChartsPanel
             },
             'treepanel[name=maintreepanel]': {
                 itemclick: this.showDevicePanel
@@ -426,6 +430,29 @@ Ext.define('FHEM.controller.MainController', {
             duration: 500,
             remove: false
         });
-    }
+    },
+    
+    showHighChartsPanel: function() {
+        var panel = {
+                xtype: 'highchartspanel',
+                name: 'highchartspanel',
+                region: 'center',
+                layout: 'fit'
+            };
+            this.destroyCenterPanels();
+            this.getMainviewport().add(panel);
+            
+//            var createdpanel = this.getMainviewport().down('tabledatagridpanel');
+//            
+//            createdpanel.getEl().setOpacity(0);
+//            createdpanel.show();
+//            
+//            createdpanel.getEl().animate({
+//                opacity: 1, 
+//                easing: 'easeIn',
+//                duration: 1500,
+//                remove: false
+//            });
+        }
     
 });
