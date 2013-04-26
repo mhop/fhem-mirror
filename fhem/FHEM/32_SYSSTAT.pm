@@ -202,7 +202,7 @@ SYSSTAT_GetUpdate($)
 
   if( AttrVal($hash->{NAME}, "raspberrytemperature", "") ne "" ) {
     my $temp = SYSSTAT_getPiTemp($hash);
-    readingsSingleUpdate($hash,"temperature",$temp,defined($hash->{LOCAL} ? 0 : 1));
+    readingsSingleUpdate($hash,"temperature",$temp,defined($hash->{LOCAL} ? 0 : 1)) if( $temp > 0 && $temp < 200 );
   }
 }
 
