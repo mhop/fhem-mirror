@@ -33,7 +33,7 @@ DIR www/frontend/lib/highcharts
 DIR www/frontend/lib/highcharts/ux
 DIR www/frontend/lib/highcharts/ux/Highcharts
 DIR www/frontend/lib/jquery
-UPD 2013-04-26_05:06:42 1065 www/frontend/index.html
+UPD 2013-04-26_05:06:42 1059 www/frontend/index.html
 UPD 2013-04-26_05:06:43 616 www/frontend/README.txt
 UPD 2013-04-01_07:05:33 613 www/frontend/app/userconfig.js
 UPD 2013-04-01_08:00:32 2104 www/frontend/app/resources/loading.png
