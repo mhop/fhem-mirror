@@ -165,7 +165,6 @@ PRESENCE_Define($$)
 
 	$hash->{DeviceName} = $dev;
 
-	return DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
     }
     else
     {
