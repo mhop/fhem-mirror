@@ -1,3 +1,7 @@
+Update vom 27.4.2013
+  * Performance Verbesserungen der Charts
+  * Achsenkonfiguration aufgeräumt
+  * Achsenbeschriftung verbessert / erweitert
 Update vom 26.4.2013
   * Testintegration von Highcharts
   * Neue abhängige Bibliotheken Highcharts und JQuery hinzugefügt

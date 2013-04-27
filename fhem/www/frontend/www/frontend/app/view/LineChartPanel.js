@@ -73,6 +73,21 @@ Ext.define('FHEM.view.LineChartPanel', {
         
         var me = this;
         
+        me.devicestore = Ext.create('FHEM.store.DeviceStore', {
+            proxy: {
+                type: 'ajax',
+                noCache: false,
+                method: 'POST',
+                url: '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+getdevices&XHR=1',
+                reader: {
+                    type: 'json',
+                    root: 'data',
+                    totalProperty: 'totalCount'
+                }
+            },
+            autoLoad: true
+        });
+        
         var chartSettingPanel = Ext.create('Ext.form.Panel', {
             title: 'Chart Settings - Click me to edit',
             name: 'chartformpanel',
@@ -123,6 +138,7 @@ Ext.define('FHEM.view.LineChartPanel', {
                           name: 'starttimepicker',
                           format: 'Y-m-d H:i:s',
                           fieldLabel: 'Starttime',
+                          allowBlank: false,
                           labelWidth: 70
                         },
                         {
@@ -130,6 +146,7 @@ Ext.define('FHEM.view.LineChartPanel', {
                           name: 'endtimepicker',
                           format: 'Y-m-d H:i:s',
                           fieldLabel: 'Endtime',
+                          allowBlank: false,
                           labelWidth: 70
                         },
                         {
@@ -180,6 +197,24 @@ Ext.define('FHEM.view.LineChartPanel', {
                             text: 'Reset Fields',
                             name: 'resetchartform',
                             icon: 'app/resources/icons/delete.png'
+                        },
+                        {
+                            xtype: 'button',
+                            width: 110,
+                            text: 'Add another Y-Axis',
+                            name: 'addyaxisbtn',
+                            handler: function(btn) {
+                                me.createNewYAxis();
+                            }
+                        },
+                        {
+                            xtype: 'button',
+                            width: 90,
+                            text: 'Add Baseline',
+                            name: 'addbaselinebtn',
+                            handler: function(btn) {
+                                me.createNewBaseLineFields(btn);
+                            }      
                         },
                         {
                             xtype: 'radio',
@@ -269,19 +304,9 @@ Ext.define('FHEM.view.LineChartPanel', {
                           name: 'devicecombo',
                           fieldLabel: 'Select Device',
                           labelWidth: 90,
-                          store: Ext.create('FHEM.store.DeviceStore', {
-                              proxy: {
-                                  type: 'ajax',
-                                  method: 'POST',
-                                  url: '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+getdevices&XHR=1',
-                                  reader: {
-                                      type: 'json',
-                                      root: 'data',
-                                      totalProperty: 'totalCount'
-                                  }
-                              },
-                              autoLoad: true
-                          }),
+                          store: me.devicestore,
+                          allowBlank: false,
+                          queryMode: 'local',
                           displayField: 'DEVICE',
                           valueField: 'DEVICE',
                           listeners: {
@@ -301,6 +326,7 @@ Ext.define('FHEM.view.LineChartPanel', {
                             xtype: 'combobox', 
                             name: 'yaxiscombo',
                             fieldLabel: 'Select Y-Axis',
+                            allowBlank: false,
                             disabled: true,
                             labelWidth: 90,
                             inputWidth: 110,
@@ -408,20 +434,11 @@ Ext.define('FHEM.view.LineChartPanel', {
                         },
                         {
                             xtype: 'button',
-                            width: 110,
-                            text: 'Add another Y-Axis',
-                            name: 'addyaxisbtn',
+                            width: 60,
+                            text: 'Remove',
+                            name: 'removerowbtn',
                             handler: function(btn) {
-                                me.createNewYAxis();
-                            }
-                        },
-                        {
-                            xtype: 'button',
-                            width: 90,
-                            text: 'Add Baseline',
-                            name: 'addbaselinebtn',
-                            handler: function(btn) {
-                                me.createNewBaseLineFields(btn);
+                                me.removeRow(btn);
                             }      
                         }
                 ]
@@ -435,54 +452,83 @@ Ext.define('FHEM.view.LineChartPanel', {
      * 
      */
     createNewBaseLineFields: function(btn) {
+        var me = this;
+        
         var itemsToAdd = [
             {
-                xtype: 'numberfield',
-                fieldLabel: 'Startvalue',
-                name: 'basestart',
-                allowBlank: false,
-                labelWidth: 60,
-                width: 120
-            },
-            {
-                xtype: 'numberfield',
-                fieldLabel: 'Endvalue',
-                name: 'baseend',
-                allowBlank: false,
-                labelWidth: 60,
-                width: 120
-            },
-            {  
-                xtype: 'combobox', 
-                name: 'baselinecolorcombo',
-                fieldLabel: 'Baseline Color',
-                labelWidth: 100,
-                inputWidth: 70,
-                store: Ext.create('Ext.data.Store', {
-                    fields: ['name', 'value'],
-                    data : [
-                        {'name':'Blue','value':'#2F40FA'},
-                        {'name':'Green', 'value':'#46E01B'},
-                        {'name':'Orange','value':'#F0A800'},
-                        {'name':'Red','value':'#E0321B'},
-                        {'name':'Yellow','value':'#F5ED16'}
+                xtype: 'fieldset',
+                name: 'baselineowfieldset',
+                layout: 'column',
+                defaults: {
+                    margin: '5 5 5 0'
+                },
+                items: 
+                    [
+                        {
+                            xtype: 'numberfield',
+                            fieldLabel: 'Startvalue',
+                            name: 'basestart',
+                            allowBlank: false,
+                            labelWidth: 60,
+                            width: 120
+                        },
+                        {
+                            xtype: 'numberfield',
+                            fieldLabel: 'Endvalue',
+                            name: 'baseend',
+                            allowBlank: false,
+                            labelWidth: 60,
+                            width: 120
+                        },
+                        {  
+                            xtype: 'combobox', 
+                            name: 'baselinecolorcombo',
+                            fieldLabel: 'Baseline Color',
+                            labelWidth: 100,
+                            inputWidth: 70,
+                            store: Ext.create('Ext.data.Store', {
+                                fields: ['name', 'value'],
+                                data : [
+                                    {'name':'Blue','value':'#2F40FA'},
+                                    {'name':'Green', 'value':'#46E01B'},
+                                    {'name':'Orange','value':'#F0A800'},
+                                    {'name':'Red','value':'#E0321B'},
+                                    {'name':'Yellow','value':'#F5ED16'}
+                                ]
+                            }),
+                            displayField: 'name',
+                            valueField: 'value',
+                            value: '#46E01B'
+                        },
+                        {  
+                            xtype: 'checkboxfield', 
+                            name: 'baselinefillcheck',
+                            boxLabel: 'Fill'
+                        },
+                        {
+                            xtype: 'button',
+                            width: 60,
+                            text: 'Remove',
+                            name: 'removebaselinebtn',
+                            handler: function(btn) {
+                                me.removeRow(btn);
+                            }      
+                        }
                     ]
-                }),
-                displayField: 'name',
-                valueField: 'value',
-                value: '#46E01B'
-            },
-            {  
-                xtype: 'checkboxfield', 
-                name: 'baselinefillcheck',
-                boxLabel: 'Fill'
             }
         ];
-        if (Ext.isDefined(btn)) {
-            btn.up().add(itemsToAdd);
-        } else {
-            this.down('fieldset[name=singlerowfieldset]').add(itemsToAdd);
-        }
+        Ext.ComponentQuery.query('fieldset[name=axesfieldset]')[0].add(itemsToAdd);
         
+    },
+    
+    /**
+     * remove the current chart configuration row
+     */
+    removeRow: function(btn) {
+        var me = this;
+        if (btn.name === "removerowbtn") {
+            me.setAxiscounter(me.getAxiscounter() - 1);
+        }
+        btn.up().destroy();
     }
 });

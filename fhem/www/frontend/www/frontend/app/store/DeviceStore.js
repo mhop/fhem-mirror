@@ -8,6 +8,7 @@ Ext.define('FHEM.store.DeviceStore', {
     proxy: {
         type: 'ajax',
         method: 'POST',
+        noCache : false,
         url: '', //gets set by controller
         reader: {
             type: 'json',

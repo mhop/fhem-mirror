@@ -127,145 +127,148 @@ Ext.define('FHEM.controller.ChartController', {
         //show loadmask
         me.getLinechartpanel().setLoading(true);
         
-        //collapse chart settings
-        me.getChartformpanel().collapse();
+        //timeout needed for loadmask to appear
+        window.setTimeout(function() {
         
-        //getting the necessary values
-        var devices = Ext.ComponentQuery.query('combobox[name=devicecombo]'),
-            yaxes = Ext.ComponentQuery.query('combobox[name=yaxiscombo]'),
-            yaxescolorcombos = Ext.ComponentQuery.query('combobox[name=yaxiscolorcombo]'),
-            yaxesfillchecks = Ext.ComponentQuery.query('checkbox[name=yaxisfillcheck]'),
-            yaxesstepcheck = Ext.ComponentQuery.query('checkbox[name=yaxisstepcheck]'),
-            yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]'),
-            axissideradio = Ext.ComponentQuery.query('radiogroup[name=axisside]');
-        
-        var starttime = me.getStarttimepicker().getValue(),
-            dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s'),
-            endtime = me.getEndtimepicker().getValue(),
-            dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s'),
-            dynamicradio = Ext.ComponentQuery.query('radiogroup[name=dynamictime]')[0],
-            chartpanel = me.getLinechartpanel(),
-            chart = me.getChart();
-        
-        //cleanup chartpanel 
-        var existingchartgrid = Ext.ComponentQuery.query('panel[name=chartgridpanel]')[0];
-        if (!existingchartgrid) {
-            var chartdatagrid = Ext.create('FHEM.view.ChartGridPanel', {
-                name: 'chartgridpanel',
-                height: 200,
-                maxHeight: 200
-            });
-            chartpanel.add(chartdatagrid);
-        } else {
-            existingchartgrid.down('grid').getStore().removeAll();
-        }
-        var existingchart = Ext.ComponentQuery.query('panel[name=chartpanel]')[0];
-        if (!existingchart) {
-            var store = Ext.create('FHEM.store.ChartStore'),
-                proxy = store.getProxy();
-            chart = me.createChart(store);
-            chartpanel.add(chart);
-        } else {
-            chart.getStore().removeAll();
-            chart.getStore().destroy();
-            //removes the store completely from chart
-            chart.bindStore();
-            var chartstore = Ext.create('FHEM.store.ChartStore');
-            chart.bindStore(chartstore);
-            chart.series.removeAll();
-            chart.axes.get(0).setTitle("");
-        }
-        
-        
-        //reset zoomValues
-        chartpanel.setLastYmax(null);
-        chartpanel.setLastYmin(null);
-        chartpanel.setLastXmax(null);
-        chartpanel.setLastXmin(null);
-        
-        me.maxYValue = 0;
-        me.minYValue = 9999999;
-        me.maxY2Value = 0;
-        me.minY2Value = 9999999;
-        
-        //check if timerange or dynamic time should be used
-        dynamicradio.eachBox(function(box, idx){
-            var date = new Date();
-            if (box.checked && stepchangecalled !== true) {
-                if (box.inputValue === "year") {
-                    starttime = Ext.Date.parse(date.getUTCFullYear() + "-01-01", "Y-m-d");
-                    dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
-                    endtime = Ext.Date.parse(date.getUTCFullYear() +  1 + "-01-01", "Y-m-d");
-                    dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
-                } else if (box.inputValue === "month") {
-                    starttime = Ext.Date.getFirstDateOfMonth(date);
-                    dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
-                    endtime = Ext.Date.getLastDateOfMonth(date);
-                    dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
-                } else if (box.inputValue === "week") {
-                    date.setHours(0);
-                    date.setMinutes(0);
-                    date.setSeconds(0);
-                    //monday starts with 0 till sat with 5, sund with -1
-                    var dayoffset = date.getDay() - 1,
-                        monday,
-                        nextmonday;
-                    if (dayoffset >= 0) {
-                        monday = Ext.Date.add(date, Ext.Date.DAY, -dayoffset);
-                    } else {
-                        //we have a sunday
-                        monday = Ext.Date.add(date, Ext.Date.DAY, -6);
-                    }
-                    nextmonday = Ext.Date.add(monday, Ext.Date.DAY, 7);
-                    
-                    starttime = monday;
-                    dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
-                    endtime = nextmonday;
-                    dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
-                    
-                } else if (box.inputValue === "day") {
-                    date.setHours(0);
-                    date.setMinutes(0);
-                    date.setSeconds(0);
-                    
-                    starttime = date;
-                    dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
-                    endtime = Ext.Date.add(date, Ext.Date.DAY, 1);
-                    dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
-                    
-                } else if (box.inputValue === "hour") {
-                    date.setMinutes(0);
-                    date.setSeconds(0);
-                    
-                    starttime = date;
-                    dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
-                    endtime = Ext.Date.add(date, Ext.Date.HOUR, 1);
-                    dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
-                } else {
-                    Ext.Msg.alert("Error", "Could not setup the dynamic time.");
-                }
-                me.getStarttimepicker().setValue(starttime);
-                me.getEndtimepicker().setValue(endtime);
+            //suspending complex layouts
+            Ext.suspendLayouts();
+            
+            //getting the necessary values
+            var devices = Ext.ComponentQuery.query('combobox[name=devicecombo]'),
+                yaxes = Ext.ComponentQuery.query('combobox[name=yaxiscombo]'),
+                yaxescolorcombos = Ext.ComponentQuery.query('combobox[name=yaxiscolorcombo]'),
+                yaxesfillchecks = Ext.ComponentQuery.query('checkbox[name=yaxisfillcheck]'),
+                yaxesstepcheck = Ext.ComponentQuery.query('checkbox[name=yaxisstepcheck]'),
+                yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]'),
+                axissideradio = Ext.ComponentQuery.query('radiogroup[name=axisside]');
+            
+            var starttime = me.getStarttimepicker().getValue(),
+                dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s'),
+                endtime = me.getEndtimepicker().getValue(),
+                dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s'),
+                dynamicradio = Ext.ComponentQuery.query('radiogroup[name=dynamictime]')[0],
+                chartpanel = me.getLinechartpanel(),
+                chart = me.getChart();
+            
+            //cleanup chartpanel 
+            var existingchartgrid = Ext.ComponentQuery.query('panel[name=chartgridpanel]')[0];
+            if (!existingchartgrid) {
+                var chartdatagrid = Ext.create('FHEM.view.ChartGridPanel', {
+                    name: 'chartgridpanel',
+                    height: 200,
+                    maxHeight: 200
+                });
+                chartpanel.add(chartdatagrid);
+            } else {
+                existingchartgrid.down('grid').getStore().removeAll();
             }
-        });
-        
-        var i = 0;
-        Ext.each(yaxes, function(y) {
-            var device = devices[i].getValue(),
-                yaxis = yaxes[i].getValue(),
-                yaxiscolorcombo = yaxescolorcombos[i].getValue(),
-                yaxisfillcheck = yaxesfillchecks[i].checked,
-                yaxisstepcheck = yaxesstepcheck[i].checked,
-                yaxisstatistics = yaxesstatistics[i].getValue(),
-                axisside = axissideradio[i].getChecked()[0].getSubmitValue();
-            if(yaxis === "" || yaxis === null) {
-                yaxis = yaxes[i].getRawValue();
+            var existingchart = Ext.ComponentQuery.query('panel[name=chartpanel]')[0];
+            if (!existingchart) {
+                var store = Ext.create('FHEM.store.ChartStore'),
+                    proxy = store.getProxy();
+                chart = me.createChart(store);
+                chartpanel.add(chart);
+            } else {
+                chart.getStore().removeAll();
+                chart.getStore().destroy();
+                //removes the store completely from chart
+                chart.bindStore();
+                var chartstore = Ext.create('FHEM.store.ChartStore');
+                chart.bindStore(chartstore);
+                chart.series.removeAll();
+                chart.axes.get(0).setTitle("");
             }
             
-            me.populateAxis(i, yaxes.length, device, yaxis, yaxiscolorcombo, yaxisfillcheck, yaxisstepcheck, axisside, yaxisstatistics, dbstarttime, dbendtime);
-            i++;
-        });
-        
+            //reset zoomValues
+            chartpanel.setLastYmax(null);
+            chartpanel.setLastYmin(null);
+            chartpanel.setLastXmax(null);
+            chartpanel.setLastXmin(null);
+            
+            me.maxYValue = 0;
+            me.minYValue = 9999999;
+            me.maxY2Value = 0;
+            me.minY2Value = 9999999;
+            
+            //check if timerange or dynamic time should be used
+            dynamicradio.eachBox(function(box, idx){
+                var date = new Date();
+                if (box.checked && stepchangecalled !== true) {
+                    if (box.inputValue === "year") {
+                        starttime = Ext.Date.parse(date.getUTCFullYear() + "-01-01", "Y-m-d");
+                        dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
+                        endtime = Ext.Date.parse(date.getUTCFullYear() +  1 + "-01-01", "Y-m-d");
+                        dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
+                    } else if (box.inputValue === "month") {
+                        starttime = Ext.Date.getFirstDateOfMonth(date);
+                        dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
+                        endtime = Ext.Date.getLastDateOfMonth(date);
+                        dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
+                    } else if (box.inputValue === "week") {
+                        date.setHours(0);
+                        date.setMinutes(0);
+                        date.setSeconds(0);
+                        //monday starts with 0 till sat with 5, sund with -1
+                        var dayoffset = date.getDay() - 1,
+                            monday,
+                            nextmonday;
+                        if (dayoffset >= 0) {
+                            monday = Ext.Date.add(date, Ext.Date.DAY, -dayoffset);
+                        } else {
+                            //we have a sunday
+                            monday = Ext.Date.add(date, Ext.Date.DAY, -6);
+                        }
+                        nextmonday = Ext.Date.add(monday, Ext.Date.DAY, 7);
+                        
+                        starttime = monday;
+                        dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
+                        endtime = nextmonday;
+                        dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
+                        
+                    } else if (box.inputValue === "day") {
+                        date.setHours(0);
+                        date.setMinutes(0);
+                        date.setSeconds(0);
+                        
+                        starttime = date;
+                        dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
+                        endtime = Ext.Date.add(date, Ext.Date.DAY, 1);
+                        dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
+                        
+                    } else if (box.inputValue === "hour") {
+                        date.setMinutes(0);
+                        date.setSeconds(0);
+                        
+                        starttime = date;
+                        dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
+                        endtime = Ext.Date.add(date, Ext.Date.HOUR, 1);
+                        dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
+                    } else {
+                        Ext.Msg.alert("Error", "Could not setup the dynamic time.");
+                    }
+                    me.getStarttimepicker().setValue(starttime);
+                    me.getEndtimepicker().setValue(endtime);
+                }
+            });
+            
+            var i = 0;
+            Ext.each(yaxes, function(y) {
+                var device = devices[i].getValue(),
+                    yaxis = yaxes[i].getValue(),
+                    yaxiscolorcombo = yaxescolorcombos[i].getValue(),
+                    yaxisfillcheck = yaxesfillchecks[i].checked,
+                    yaxisstepcheck = yaxesstepcheck[i].checked,
+                    yaxisstatistics = yaxesstatistics[i].getValue(),
+                    axisside = axissideradio[i].getChecked()[0].getSubmitValue();
+                if(yaxis === "" || yaxis === null) {
+                    yaxis = yaxes[i].getRawValue();
+                }
+                
+                me.populateAxis(i, yaxes.length, device, yaxis, yaxiscolorcombo, yaxisfillcheck, yaxisstepcheck, axisside, yaxisstatistics, dbstarttime, dbendtime);
+                i++;
+            });
+            
+        }, 300);
     },
     
     /**
@@ -277,13 +280,24 @@ Ext.define('FHEM.controller.ChartController', {
         var cfp = Ext.ComponentQuery.query('form[name=chartformpanel]')[0];
         var cdg = Ext.ComponentQuery.query('panel[name=chartgridpanel]')[0];
         
-        if (lcp && lcv && cfp && cdg) {
-            var chartheight = lcp.getHeight() - cfp.getHeight() - cdg.getHeight() - 95;
-            var chartwidth = lcp.getWidth() - 25;
-            lcv.setHeight(chartheight);
-            lcv.setWidth(chartwidth);
-        }
+        // disable animation as long as we resize, causes serious performance issues
+        lcv.animate = false;
         
+        if (lcp && lcv && cfp && cdg) {
+            var lcph = lcp.getHeight(),
+                lcpw = lcp.getWidth(),
+                cfph = cfp.getHeight(),
+                cdgh = cdg.getHeight();
+            
+            if (lcph && lcpw && cfph && cdgh) {
+                var chartheight = lcph - cfph - cdgh - 95;
+                var chartwidth = lcpw - 25;
+                lcv.setHeight(chartheight);
+                lcv.setWidth(chartwidth);
+            }
+        }
+        lcv.animate = true;
+        lcv.redraw();
     },
     
     /**
@@ -388,7 +402,7 @@ Ext.define('FHEM.controller.ChartController', {
                             title : 'Time'
                         }
                     ],
-                    animate: true,
+                    animate: false,
                     store: store,
                     enableMask: true,
                     mask: true,//'vertical',//true, //'horizontal',
@@ -438,7 +452,6 @@ Ext.define('FHEM.controller.ChartController', {
      * creating baselines
      */
     createBaseLine: function(index, basestart, baseend, basefill, basecolor) {
-        
         var me = this,
             chart = me.getChart(),
             store = chart.getStore(),
@@ -504,9 +517,9 @@ Ext.define('FHEM.controller.ChartController', {
             generalizationfactor = Ext.ComponentQuery.query('combobox[name=genfactor]')[0].getValue();
         
         if (i > 0) {
-            yseries = me.createSeries('VALUE' + (i + 1), yaxis, yaxisfillcheck, yaxiscolorcombo, axisside);
+            yseries = me.createSeries('VALUE' + (i + 1), device + " - " + yaxis, yaxisfillcheck, yaxiscolorcombo, axisside);
         } else {
-            yseries = me.createSeries('VALUE', yaxis, yaxisfillcheck, yaxiscolorcombo, axisside);
+            yseries = me.createSeries('VALUE', device + " - " + yaxis, yaxisfillcheck, yaxiscolorcombo, axisside);
         }
         
         var url;
@@ -613,7 +626,7 @@ Ext.define('FHEM.controller.ChartController', {
                   }
                   
                   //as we have the valuetext, we can fill the grid
-                //fill the grid with the data
+                  //fill the grid with the data
                   me.fillChartGrid(json.data, valuetext);
                   
                   var timestamptext;
@@ -645,7 +658,7 @@ Ext.define('FHEM.controller.ChartController', {
                       //check if we have to ues steps
                       //if yes, create a new record with the same value as the last one
                       //and a timestamp 1 millisecond less than the actual record to add.
-                      // only do this, when last record is from same axis
+                      //only do this, when last record is from same axis
                       if(yaxisstepcheck) {
                           if (store.last() && !Ext.isEmpty(store.last().get(valuetext)) && store.last().get(valuetext) !== "") {
                               var lastrec = store.last();
@@ -727,7 +740,7 @@ Ext.define('FHEM.controller.ChartController', {
                 if (me.minYValue > baseend) {
                     me.minYValue = baseend;
                 }
-                i++;
+                j++;
             });
             me.doFinalChartLayout(chart);
         }
@@ -774,12 +787,16 @@ Ext.define('FHEM.controller.ChartController', {
         
         chart.axes.get(2).fromDate = starttime;
         chart.axes.get(2).toDate = endtime;
-        chart.axes.get(2).processView();
-        chart.redraw();
         
-        me.resizeChart();
+        chart.axes.get(2).processView();
+        
+        //collapse chart settings
+        me.getChartformpanel().collapse();
         
         me.getLinechartpanel().setLoading(false);
+        
+        //enable animation
+        chart.animate = true;
         
     },
     
@@ -787,6 +804,9 @@ Ext.define('FHEM.controller.ChartController', {
      * create a single series for the chart
      */
     createSeries: function(yfield, title, fill, color, axisside) {
+        
+        //resuming the layout
+        Ext.resumeLayouts(true);
         
         //setting axistitle and fontsize
         var chart = this.getChart(),
@@ -804,7 +824,16 @@ Ext.define('FHEM.controller.ChartController', {
         } else {
             axis.setTitle(axis.title + " / " + title);
         }
-        axis.displaySprite.attr.font = "14px Arial, Helvetica, sans-serif";
+        if (axis.title.length > 80) {
+            axis.displaySprite.attr.font = "10px Arial, Helvetica, sans-serif";
+        } else if (axis.title.length > 50) {
+            axis.displaySprite.attr.font = "12px Arial, Helvetica, sans-serif";
+        } else if (axis.title.length > 40) {
+            axis.displaySprite.attr.font = "13px Arial, Helvetica, sans-serif";
+        }  else  {
+            axis.displaySprite.attr.font = "14px Arial, Helvetica, sans-serif";
+        }
+        
         
         //adding linked yfield to axis fields
         axis.fields.push(yfield);
@@ -1344,7 +1373,7 @@ Ext.define('FHEM.controller.ChartController', {
      */
     fillChartGrid: function(jsondata, valuetext) {
         if (jsondata && jsondata[0]) {
-            this.getChartformpanel().collapse();
+            //this.getChartformpanel().collapse();
             
             var store = this.getChartdatagrid().getStore(),
                 columnwidth = 0,
