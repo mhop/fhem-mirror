@@ -49,15 +49,15 @@ UPD 2013-04-03_07:27:17 345 www/frontend/app/resources/icons/arrow_left.png
 UPD 2013-04-03_07:27:17 733 www/frontend/app/resources/icons/add.png
 UPD 2013-04-03_07:27:17 389 www/frontend/app/resources/icons/resultset_previous.png
 UPD 2013-04-26_05:05:23 2238 www/frontend/app/app.js
-UPD 2013-04-20_04:52:50 20318 www/frontend/app/view/LineChartPanel.js
+UPD 2013-04-27_06:11:24 22156 www/frontend/app/view/LineChartPanel.js
 UPD 2013-04-26_05:05:57 22790 www/frontend/app/view/HighChartsPanel.js
 UPD 2013-04-20_04:52:50 1202 www/frontend/app/view/ChartGridPanel.js
 UPD 2013-04-03_07:26:40 15793 www/frontend/app/view/DevicePanel.js
 UPD 2013-04-26_05:05:57 8922 www/frontend/app/view/Viewport.js
 UPD 2013-04-01_07:05:14 2476 www/frontend/app/view/TableDataGridPanel.js
-UPD 2013-04-20_04:52:30 62546 www/frontend/app/controller/ChartController.js
+UPD 2013-04-27_06:11:02 64176 www/frontend/app/controller/ChartController.js
 UPD 2013-04-26_05:05:41 12806 www/frontend/app/controller/HighChartController.js
-UPD 2013-04-26_05:05:41 13891 www/frontend/app/controller/MainController.js
+UPD 2013-04-27_06:15:02 13892 www/frontend/app/controller/MainController.js
 UPD 2013-04-01_07:04:35 202 www/frontend/app/model/ReadingsModel.js
 UPD 2013-04-01_07:04:36 338 www/frontend/app/model/SavedChartsModel.js
 UPD 2013-04-01_07:04:34 11535 www/frontend/app/model/ChartModel.js
@@ -67,7 +67,7 @@ UPD 2013-04-01_07:04:54 432 www/frontend/app/store/ChartStore.js
 UPD 2013-04-01_07:04:54 451 www/frontend/app/store/SavedChartsStore.js
 UPD 2013-04-01_07:04:54 426 www/frontend/app/store/ReadingsStore.js
 UPD 2013-04-01_07:04:54 1048 www/frontend/app/store/TableDataStore.js
-UPD 2013-04-01_07:04:53 414 www/frontend/app/store/DeviceStore.js
+UPD 2013-04-27_06:11:13 439 www/frontend/app/store/DeviceStore.js
 UPD 2013-04-01_07:03:30 260475 www/frontend/lib/ext-4.2.0.663/ext-theme-gray-all.css
 UPD 2013-04-01_07:03:30 1434875 www/frontend/lib/ext-4.2.0.663/ext-all.js
 UPD 2013-04-01_07:03:33 1981 www/frontend/lib/ext-4.2.0.663/images/tools/tools-sprites-trans.gif
