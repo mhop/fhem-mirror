@@ -126,7 +126,8 @@ sub CommandTrigger($$);
 
 #Special values in %modules (used if set):
 # DefFn    - define a "device" of this type
-# UndefFn  - clean up at delete
+# UndefFn  - clean up (delete timer, close fd), called by delete and rereadcfg
+# DeleteFn - clean up (delete logfile), called by delete after UndefFn
 # ParseFn  - Interpret a raw message
 # ListFn   - details for this "device"
 # SetFn    - set/activate this device
@@ -1408,6 +1409,11 @@ CommandDelete($$)
     }
 
     my $ret = CallFn($sdev, "UndefFn", $defs{$sdev}, $sdev);
+    if($ret) {
+      push @rets, $ret;
+      next;
+    }
+    $ret = CallFn($sdev, "DeleteFn", $defs{$sdev}, $sdev);
     if($ret) {
       push @rets, $ret;
       next;

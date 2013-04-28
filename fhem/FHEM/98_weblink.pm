@@ -61,12 +61,13 @@ FW_showWeblink($$$$)
 
 ##################
 sub
-weblink_FwDetail($)
+weblink_FwDetail($@)
 {
-  my ($d)= @_;
+  my ($d, $text)= @_;
   my $alias= AttrVal($d, "alias", $d);
 
   my $ret = "<br>";
+  $ret .= "$text " if($text);
   $ret .= FW_pHPlain("detail=$d", $alias) if(!$FW_subdir);
   $ret .= "<br>";
   return $ret;
@@ -115,10 +116,10 @@ weblink_FwFn($$$$)
     my @va = split(":", $link, 3);
     if($wltype eq "fileplot" &&
             (@va != 3 || !$defs{$va[0]} || !$defs{$va[0]}{currentlogfile})) {
-      $ret .= "Broken definition for fileplot $d: $link<br>";
+      $ret .= weblink_FwDetail($d, "Broken definition ");
 
     } elsif ($wltype eq "dbplot" && (@va != 2 || !$defs{$va[0]})) {
-      $ret .= "Broken definition for dbplot $d: $link<br>";
+      $ret .= weblink_FwDetail($d, "Broken definition ");
 
     } else {
       if(defined($va[2]) && $va[2] eq "CURRENT") {

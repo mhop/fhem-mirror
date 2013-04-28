@@ -2205,10 +2205,11 @@ FW_makeEdit($$$)
 
   FW_pO  "</tr><tr><td colspan=\"2\">";
   FW_pO   "<div id=\"edit\" style=\"display:none\"><form>";
+  FW_pO      FW_hidden("detail", $name);
   my $cmd = "modify";
   my $ncols = $FW_ss ? 30 : 60;
-  FW_pO     "<textarea name=\"val.${cmd}$name\" cols=\"$ncols\" rows=\"10\">".
-          "$val</textarea>";
+  FW_pO     "<textarea name=\"val.${cmd}$name\" ".
+                "cols=\"$ncols\" rows=\"10\">$val</textarea>";
   FW_pO     "<br>" . FW_submit("cmd.${cmd}$name", "$cmd $name");
   FW_pO   "</form></div>";
   FW_pO  "</td>";
