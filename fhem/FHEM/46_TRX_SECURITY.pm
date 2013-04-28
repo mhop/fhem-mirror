@@ -58,6 +58,7 @@ my %security_device_commands = (	# HEXSTRING => commands
 	# 0x20: X10, KD101, Visonic, Meiantech
 	0x2000 => [ "Closed", "", "Open", "", "", "", ""], # DS10A
 	0x2001 => [ "", "", "", "", "alert", "normal", ""], # MS10A
+	0x2002 => [ "", "", "", "", "", "", "Panic", "EndPanic", "", "Arm_Away", "Arm_Away_Delayed", "Arm_Home", "Arm_Home_Delayed", "Disarm"], # KR18
 	0x2003 => [ "", "", "", "", "", "", "alert", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "pair",], # KD101
 );
 
@@ -109,7 +110,7 @@ TRX_SECURITY_Set($@)
   my $device_type = $hash->{TRX_SECURITY_type};
   my $deviceid = $hash->{TRX_SECURITY_deviceid};
 
-  if ($device_type ne "KD101" && $device_type ne "DS10A" && $device_type ne "MS10A") {
+  if ($device_type ne "KD101" && $device_type ne "DS10A" && $device_type ne "MS10A" && $device_type ne "KR18") {
 	return "No set implemented for $device_type";	
   }
 
@@ -153,6 +154,10 @@ TRX_SECURITY_Set($@)
 		$id1 = $2;
 		$id2 = "00";
 		$id3 = $1;
+  	} elsif ($deviceid =~ /(..)(..)(..)/ ) {
+                $id1 = $1;
+                $id2 = $2;
+                $id3 = $3;
   	} else {
 		Log 4,"TRX_SECURITY_Set lightning1 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
 		return "error set name=$name  deviceid=$deviceid";
@@ -164,25 +169,27 @@ TRX_SECURITY_Set($@)
   	Log 1,"TRX_SECURITY_Set name=$name device_type=$device_type, deviceid=$deviceid id1=$id1, id2=$id2, id3=$id3, command=$command" if ($TRX_SECURITY_debug == 1);
   	Log 1,"TRX_SECURITY_Set hexline=$hex_prefix$hex_command" if ($TRX_SECURITY_debug == 1);
 
-  	my $sensor = "";
+  	if ($device_type ne "KD101") {
+	  	my $sensor = "";
 
-  	readingsBeginUpdate($hash);
+  		readingsBeginUpdate($hash);
 
-	# Now set the statechange:
-  	if ($hash->{STATE} ne $command) { 
-		$sensor = "statechange";
+		# Now set the statechange:
+	  	if ($hash->{STATE} ne $command) { 
+			$sensor = "statechange";
+			readingsBulkUpdate($hash, $sensor, $command);
+  		}
+
+		# Now set the devicelog:
+	  	$sensor = $hash->{TRX_SECURITY_devicelog};
 		readingsBulkUpdate($hash, $sensor, $command);
-  	}
 
-	# Now set the devicelog:
-  	$sensor = $hash->{TRX_SECURITY_devicelog};
-	readingsBulkUpdate($hash, $sensor, $command);
+		# Set battery
+	  	$sensor = "battery";
+		readingsBulkUpdate($hash, $sensor, "ok");
 
-	# Set battery
-  	$sensor = "battery";
-	readingsBulkUpdate($hash, $sensor, "ok");
-
-  	readingsEndUpdate($hash, 1);
+  		readingsEndUpdate($hash, 1);
+	}
 
   } else {
 	return "No set implemented for $device_type . Unknown protocol type";	
@@ -354,7 +361,7 @@ sub TRX_SECURITY_parse_X10Sec {
 	0x05 => ['X10Sec', 'normal', '', '', ''],
 
 	0x06 => ['X10Sec', 'alert', '', '', ''],
-	0x07 => ['X10Sec', 'normal', '', '', ''],
+	0x07 => ['X10Sec', 'Security-EndPanic', '', '', ''],
 
 	0x08 => ['X10Sec', 'IR', '', '', ''],
 
@@ -415,6 +422,7 @@ sub TRX_SECURITY_parse_X10Sec {
 
   Log 1, "TRX_SECURITY: $name devn=$device_name first=$firstdevice subtype=$subtype command=$command, delay=$delay, batt=$battery cmd=$hexdata" if ($TRX_SECURITY_debug == 1);
 
+
   my $n = 0;
   my $tm = TimeNow();
   my $val = "";
@@ -444,7 +452,7 @@ sub TRX_SECURITY_parse_X10Sec {
 
   readingsBeginUpdate($def);
 
-  if (($device_type ne "KR18") || ($device_type ne "VISONIC_REMOTE")) {  
+  if (($device_type ne "KR18") && ($device_type ne "VISONIC_REMOTE")) {  
   	if ($firstdevice == 1) {
 		$val .= $current;
   	}
@@ -460,13 +468,17 @@ sub TRX_SECURITY_parse_X10Sec {
 	$current = $command;
 
 	#$sensor = $def->{TRX_SECURITY_devicelog};
-	$val = $current;
-	readingsBulkUpdate($def, $sensor, $current);
+	#$val = $current;
+	#readingsBulkUpdate($def, $sensor, $current);
+
+	$current = "Security-Panic" if ($command eq "alert");
 
 	my @cmd_split = split(/-/, $command);
 	$sensor = $cmd_split[0];
 	$current = $cmd_split[1];
 	readingsBulkUpdate($def, $sensor, $current);
+
+	$val .= $current;
   }
 
   if ($battery ne "") {
