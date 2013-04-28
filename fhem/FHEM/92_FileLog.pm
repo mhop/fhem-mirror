@@ -20,13 +20,14 @@ FileLog_Initialize($)
   $hash->{SetFn}    = "FileLog_Set";
   $hash->{GetFn}    = "FileLog_Get";
   $hash->{UndefFn}  = "FileLog_Undef";
+  $hash->{DeleteFn} = "FileLog_Delete";
   $hash->{NotifyFn} = "FileLog_Log";
   $hash->{AttrFn}   = "FileLog_Attr";
   # logtype is used by the frontend
   $hash->{AttrList} = "disable:0,1 logtype nrarchive archivedir archivecmd";
 
-  $hash->{FW_summaryFn} = "FW_dumpFileLog";
-  $hash->{FW_detailFn}  = "FW_dumpFileLog";
+  $hash->{FW_summaryFn} = "FileLog_fhemwebFn";
+  $hash->{FW_detailFn}  = "FileLog_fhemwebFn";
 }
 
 
@@ -65,6 +66,16 @@ FileLog_Undef($$)
   close($hash->{FH});
   return undef;
 }
+
+sub
+FileLog_Delete($$)
+{
+  my ($hash, $name) = @_;
+  return if(!$hash->{currentlogfile});
+  unlink($hash->{currentlogfile});
+  return undef;
+}
+
 
 sub
 FileLog_Switch($)
@@ -148,27 +159,100 @@ FileLog_Attr(@)
 }
 
 ###################################
+
 sub
 FileLog_Set($@)
 {
   my ($hash, @a) = @_;
-  
-  return "no set argument specified" if(int(@a) != 2);
-  return "Unknown argument $a[1], choose one of reopen"
-        if($a[1] ne "reopen");
+  my $me = $hash->{NAME};
 
-  my $fh = $hash->{FH};
-  my $cn = $hash->{currentlogfile};
-  $fh->close();
-  $fh = new IO::File ">>$cn";
-  return "Can't open $cn" if(!defined($fh));
-  $hash->{FH} = $fh;
+  return "no set argument specified" if(int(@a) < 2);
+  my %sets = (reopen=>0, absorb=>1, addRegexpPart=>2, removeRegexpPart=>1);
+  
+  my $cmd = $a[1];
+  if(!defined($sets{$cmd})) {
+    my $r = "Unknown argument $cmd, choose one of ".join(" ",sort keys %sets);
+    my $fllist = join(",", grep { $me ne $_ } devspec2array("TYPE=FileLog"));
+    $r =~ s/absorb/absorb:$fllist/;
+    return $r;
+  }
+  return "$cmd needs $sets{$cmd} parameter(s)" if(@a-$sets{$cmd} != 2);
+
+  if($cmd eq "reopen") {
+    my $fh = $hash->{FH};
+    my $cn = $hash->{currentlogfile};
+    $fh->close();
+    $fh = new IO::File(">>$cn");
+    return "Can't open $cn" if(!defined($fh));
+    $hash->{FH} = $fh;
+
+  } elsif($cmd eq "addRegexpPart") {
+    my %h;
+    my $re = "$a[2]:$a[3]";
+    map { $h{$_} = 1 } split(/\|/, $hash->{REGEXP});
+    $h{$re} = 1;
+    $re = join("|", sort keys %h);
+    eval { "Hallo" =~ m/^$re$/ };
+    return "Bad regexp: $@" if($@);
+    $hash->{REGEXP} = $re;
+    $hash->{DEF} = $hash->{logfile} ." $re";
+    
+  } elsif($cmd eq "removeRegexpPart") {
+    my %h;
+    map { $h{$_} = 1 } split(/\|/, $hash->{REGEXP});
+    return "Cannot remove regexp part: not found" if(!$h{$a[2]});
+    return "Cannot remove last regexp part" if(int(keys(%h)) == 1);
+    delete $h{$a[2]};
+    my $re = join("|", sort keys %h);
+    eval { "Hallo" =~ m/^$re$/ };
+    return "Bad regexp: $@" if($@);
+    $hash->{REGEXP} = $re;
+    $hash->{DEF} = $hash->{logfile} ." $re";
+
+  } elsif($cmd eq "absorb") {
+    my $victim = $a[2];
+    return "need another FileLog as argument."
+      if(!$victim ||
+         !$defs{$victim} ||
+         $defs{$victim}{TYPE} ne "FileLog" ||
+         $victim eq $me);
+    my $vh = $defs{$victim};
+    my $mylogfile = $hash->{currentlogfile};
+    return "Cant open the associated files"
+        if(!open(FH1, $mylogfile) ||
+           !open(FH2, $vh->{currentlogfile}) ||
+           !open(FH3, ">$mylogfile.new"));
+
+    my $fh = $hash->{FH};
+    $fh->close();
+
+    my $b1 = <FH1>; my $b2 = <FH2>;
+    while(defined($b1) && defined($b2)) {
+      if($b1 lt $b2) {
+        print FH3 $b1; $b1 = <FH1>;
+      } else {
+        print FH3 $b2; $b2 = <FH2>;
+      }
+    }
+
+    while($b1 = <FH1>) { print FH3 $b1; }
+    while($b2 = <FH2>) { print FH3 $b2; }
+    close(FH1); close(FH2); close(FH3);
+    rename("$mylogfile.new", $mylogfile);
+    $fh = new IO::File(">>$mylogfile");
+    $hash->{FH} = $fh;
+
+    $hash->{REGEXP} .= "|".$vh->{REGEXP};
+    $hash->{DEF} = $hash->{logfile} . " ". $hash->{REGEXP};
+    CommandDelete(undef, $victim);
+
+  }
   return undef;
 }
 
 #########################
 sub
-FW_dumpFileLog($$$$)
+FileLog_fhemwebFn($$$$)
 {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
 
@@ -193,6 +277,58 @@ FW_dumpFileLog($$$$)
     }
     $ret .= "</tr>";
   }
+  $ret .= "</table>";
+  return $ret if($pageHash);
+
+  # DETAIL only from here on
+  my $hash = $defs{$d};
+
+  $ret .= "<br>Regexp parts";
+  $ret .= "<br><table class=\"block wide\">";
+  my @ra = split(/\|/, $hash->{REGEXP});
+  if(@ra > 1) {
+    foreach my $r (@ra) {
+      $ret .= "<tr class=\"".(($row++&1)?"odd":"even")."\">";
+      my $cmd = "cmd.X=set $d removeRegexpPart&val.X=$r";
+      $ret .= "<td>$r</td>";
+      $ret .= FW_pH("$cmd&detail=$d", "removeRegexpPart", 1,undef,1);
+      $ret .= "</tr>";
+    }
+  }
+
+  my @et = devspec2array("TYPE=eventTypes");
+  if(!@et) {
+    $ret .= FW_pH("$FW_ME/docs/commandref.html#eventTypes",
+                  "To add a regexp an eventTypes definition is needed",
+                  1, undef, 1);
+  } else {
+    my %dh;
+    foreach my $l (split("\n", AnalyzeCommand(undef, "get $et[0] list"))) {
+      my @a = split(/[ \r\n]/, $l);
+      $a[1] = "" if(!defined($a[1]));
+      $a[1] =~ s/\.\*//g;
+      $a[1] =~ s/,.*//g;
+      $dh{$a[0]}{".*"} = 1;
+      $dh{$a[0]}{$a[1].".*"} = 1;
+    }
+    my $list = ""; my @al;
+    foreach my $dev (sort keys %dh) {
+      $list .= " $dev:" . join(",", sort keys %{$dh{$dev}});
+      push @al, $dev;
+    }
+    $ret .= "<tr><td colspan=\"2\"><form autocomplete=\"off\">";
+    $ret .= FW_hidden("detail", $d);
+    $ret .= FW_hidden("dev.$d", "$d addRegexpPart");
+    $ret .= FW_submit("cmd.$d", "set", "set");
+    $ret .= "<div class=\"set downText\">&nbsp;$d addRegexpPart&nbsp;</div>";
+    $ret .= FW_select("","arg.$d",\@al, undef, "set",
+        "FW_selChange(this.options[selectedIndex].text,'$list','val.$d')");
+    $ret .= FW_textfield("val.$d", 30, "set");
+    $ret .= "<script type=\"text/javascript\">" .
+              "FW_selChange('$al[0]','$list','val.$d')</script>";
+    $ret .= "</form></td></tr>";
+  }
+
   $ret .= "</table>";
   return $ret;
 }
@@ -585,12 +721,45 @@ seekTo($$$$)
   <a name="FileLogset"></a>
   <b>Set </b>
   <ul>
-    <code>set &lt;name&gt; reopen</code><br>
-
-    Used to reopen a FileLog after making some manual changes to the logfile.
+    <li>reopen
+      <ul>
+        Reopen a FileLog after making some manual changes to the
+        logfile.
+      </ul>
+      </li>
+    <li>addRegexpPart &lt;device&gt; &lt;regexp&gt;
+      <ul>
+        add a regexp part, which is constructed as device:regexp.  The parts
+        are separated by |.  Note: as the regexp parts are resorted, manually
+        constructed regexps may become invalid.
+      </ul>
+      </li>
+    <li>removeRegexpPart &lt;re&gt;
+      <ul>
+        remove a regexp part.  Note: as the regexp parts are resorted, manually
+        constructed regexps may become invalid.<br>
+        The inconsistency in addRegexpPart/removeRegexPart arguments originates
+        from the reusage of javascript functions.
+      </ul>
+      </li>
+    <li>absorb secondFileLog 
+      <ul>
+        merge the current and secondFileLog into one file, add the regexp of the
+        secondFileLog to the current one, and delete secondFileLog.<br>
+        This command is needed to create combined plots (weblinks).<br>
+        <b>Notes:</b>
+        <ul>
+          <li>secondFileLog will be deleted (i.e. the FHEM definition and
+              the file itself).</li>
+          <li>only the current files will be merged.</li>
+          <li>weblinks using secondFilelog will become broken, they have to be
+              adopted to the new logfile or deleted.</li>
+        </ul>
+      </ul>
+      </li>
+      <br>
+    </ul>
     <br>
-  </ul>
-  <br>
 
 
   <a name="FileLogget"></a>
@@ -665,7 +834,7 @@ seekTo($$$$)
     <a name="archivecmd"></a>
     <a name="nrarchive"></a>
     <li>archivecmd / archivedir / nrarchive<br>
-    When a new FileLog file is opened, the FileLog archiver wil be called.
+        When a new FileLog file is opened, the FileLog archiver wil be called.
         This happens only, if the name of the logfile has changed (due to
         time-specific wildcards, see the <a href="#FileLog">FileLog</a>
         section), and there is a new entry to be written into the file.

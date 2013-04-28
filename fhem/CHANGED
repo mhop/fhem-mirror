@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: eventTypes module added, to help with FileLog details screen
   - feature: FB_CALLMONITOR: new reverse search provider dasschnelle.at for
              reverse search of austrian telephone numbers
   - bugfix:  event-on-change-reading in combination with event-change-interval

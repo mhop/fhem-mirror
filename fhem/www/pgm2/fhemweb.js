@@ -235,9 +235,13 @@ FW_selChange(sel, list, elName)
   var value;
   var l = list.split(" ");
   for(var i=0; i < l.length; i++) {
-    var nv = l[i].split(":",2);
-    if(nv[0] == sel) {
-      value = nv[1]; break;
+    cmd = l[i];
+    var off = l[i].indexOf(":");
+    if(off >= 0)
+      cmd = l[i].substring(0, off);
+    if(cmd == sel) {
+      if(off >= 0)
+        value = l[i].substring(off+1);
     }
   }
   var el = document.getElementsByName(elName)[0];
