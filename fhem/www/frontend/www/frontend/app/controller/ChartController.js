@@ -155,8 +155,9 @@ Ext.define('FHEM.controller.ChartController', {
             if (!existingchartgrid) {
                 var chartdatagrid = Ext.create('FHEM.view.ChartGridPanel', {
                     name: 'chartgridpanel',
-                    height: 200,
-                    maxHeight: 200
+                    minHeight: 200,
+                    maxHeight: 200,
+                    collapsed: true
                 });
                 chartpanel.add(chartdatagrid);
             } else {
@@ -177,6 +178,7 @@ Ext.define('FHEM.controller.ChartController', {
                 chart.bindStore(chartstore);
                 chart.series.removeAll();
                 chart.axes.get(0).setTitle("");
+                chart.axes.get(1).setTitle("");
             }
             
             //reset zoomValues
@@ -275,6 +277,7 @@ Ext.define('FHEM.controller.ChartController', {
      * resize the chart to fit the centerpanel
      */
     resizeChart: function() {
+        
         var lcp = Ext.ComponentQuery.query('linechartpanel')[0];
         var lcv = Ext.ComponentQuery.query('chart')[0];
         var cfp = Ext.ComponentQuery.query('form[name=chartformpanel]')[0];
@@ -290,14 +293,24 @@ Ext.define('FHEM.controller.ChartController', {
                 cdgh = cdg.getHeight();
             
             if (lcph && lcpw && cfph && cdgh) {
-                var chartheight = lcph - cfph - cdgh - 95;
-                var chartwidth = lcpw - 25;
-                lcv.setHeight(chartheight);
-                lcv.setWidth(chartwidth);
+                var chartheight = lcph - cfph - cdgh - 80;
+                var chartwidth = lcpw - 5;
+                lcv.height = chartheight;
+                lcv.width = chartwidth;
+                //render after 50ms to get component right
+                window.setTimeout(function() {
+                    if (lcv.series.get(0).hideAll) {
+                        lcv.series.get(0).hideAll();
+                    }
+                    lcv.doComponentLayout();
+                    if (lcv.series.get(0).showAll) {
+                        lcv.series.get(0).showAll();
+                    }
+                    lcv.redraw();
+                }, 50);
             }
         }
         lcv.animate = true;
-        lcv.redraw();
     },
     
     /**
@@ -311,6 +324,7 @@ Ext.define('FHEM.controller.ChartController', {
             name: 'chartpanel',
             collapsible: true,
             titleCollapse: true,
+            animCollapse: false,
             items: [
                 {
                     xtype: 'toolbar',
@@ -368,7 +382,9 @@ Ext.define('FHEM.controller.ChartController', {
                 {
                     xtype: 'chart',
                     legend: {
-                        position: 'right'
+                        position: 'right',
+                        labelFont: '10px Helvetica, sans-serif',
+                        padding: 4
                     },
                     axes: [ 
                         {
@@ -791,7 +807,9 @@ Ext.define('FHEM.controller.ChartController', {
         chart.axes.get(2).processView();
         
         //collapse chart settings
-        me.getChartformpanel().collapse();
+        //me.getChartformpanel().collapse();
+        
+        me.resizeChart();
         
         me.getLinechartpanel().setLoading(false);
         

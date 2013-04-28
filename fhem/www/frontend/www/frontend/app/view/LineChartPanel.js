@@ -95,6 +95,7 @@ Ext.define('FHEM.view.LineChartPanel', {
             autoScroll: true,
             collapsible: true,
             titleCollapse: true,
+            animCollapse: false,
             items: [
                 {
                     xtype: 'fieldset',

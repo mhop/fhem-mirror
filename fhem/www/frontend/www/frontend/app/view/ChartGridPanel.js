@@ -28,7 +28,7 @@ Ext.define('FHEM.view.ChartGridPanel', {
     
     titleCollapse: true,
     
-    collapsed: false,
+    animCollapse: false,
     
     /**
      * init function
