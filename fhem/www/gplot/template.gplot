@@ -10,14 +10,12 @@ set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
 
 set title '<TL>'
-set ylabel "Power (KW)"
-set y2label "Power (KW)"
+set ylabel "Humidity"
+set y2label "Temperature"
 set grid
 set ytics
 set y2tics
-set format y "%.1f"
-set format y2 "%.1f"
 
-#FileLog 4::0:
+#FileLog 4:RegExp::
 
-plot "<IN>" using 1:4 notitle with lines
+plot "<IN>" using 1:2 title 'Line 1' with lines
