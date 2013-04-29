@@ -295,9 +295,10 @@ wl_PEdit($$$$)
   $ret .=" <td>Y-Axis,Plot-Type,Style</td></tr>";
 
   my ($colnums, $colregs, $coldata) = wl_getRegFromFile($file);
-  $colnums = join(",", 3..$colnums);
+  $colnums = join(",", 4..$colnums);
   my $max = @{$conf{lAxis}}+1;
   $max = 7 if($max > 7);
+  $max = 1 if(!$conf{lTitle}[0]);
   my $r = 0;
   for($r=0; $r < $max; $r++) {
     $ret .= "<tr class=\"".(($r&1)?"odd":"even")."\"><td>";
@@ -339,6 +340,12 @@ weblink_WriteGplot($)
   my ($arg) = @_;
   FW_digestCgi($arg);
 
+  my $hasTl;
+  for(my $i=0; $i <= 8; $i++) {
+    $hasTl = 1 if($FW_webArgs{"title_$i"});
+  }
+  return if(!$hasTl);
+
   my $fName = $FW_webArgs{gplotName};
   return if(!$fName);
   if(!open(FH, ">$fName")) {
@@ -351,7 +358,7 @@ weblink_WriteGplot($)
   print FH "set xdata time\n";
   print FH "set timefmt \"%Y-%m-%d_%H:%M:%S\"\n";
   print FH "set xlabel \" \"\n";
-  print FH "set title '<L1>'\n";
+  print FH "set title '<TL>'\n";
   print FH "set ytics ".$FW_webArgs{ytics}."\n";
   print FH "set y2tics ".$FW_webArgs{y2tics}."\n";
   print FH "set grid".($FW_webArgs{gridy}  ? " ytics" :"").
