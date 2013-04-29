@@ -10,6 +10,10 @@ use vars qw(%FW_hiddenroom); # hash of hidden rooms, used by weblink
 use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by weblink
 use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by weblink
 use vars qw(%FW_pos);     # scroll position
+use vars qw($FW_gplotdir);# gplot directory for web server: the first
+use vars qw(%FW_webArgs); # all arguments specified in the GET
+
+use IO::File;
 
 #####################################
 sub
@@ -20,9 +24,11 @@ weblink_Initialize($)
   $hash->{DefFn} = "weblink_Define";
   $hash->{AttrList} = "fixedrange plotmode plotsize label ".
                         "title htmlattr plotfunction";
+  $hash->{SetFn}    = "weblink_Set";
   $hash->{FW_summaryFn} = "weblink_FwFn";
   $hash->{FW_detailFn}  = "weblink_FwFn";
   $hash->{FW_atPageEnd} = 1;
+  $data{FWEXT}{"/weblinkDetails"}{FUNC} = "weblink_WriteGplot";
 }
 
 
@@ -43,6 +49,38 @@ weblink_Define($$)
   $hash->{STATE} = "initial";
   return undef;
 }
+
+sub
+weblink_Set($@)
+{
+  my ($hash, @a) = @_;
+  my $me = $hash->{NAME};
+  return "no set argument specified" if(int(@a) < 2);
+  my %sets = (copyGplotFile=>0);
+  
+  my $cmd = $a[1];
+  return "Unknown argument $cmd, choose one of ".join(" ",sort keys %sets)
+    if(!defined($sets{$cmd}));
+  return "$cmd needs $sets{$cmd} parameter(s)" if(@a-$sets{$cmd} != 2);
+
+  if($cmd eq "copyGplotFile") {
+    return "type is not fileplot" if($hash->{WLTYPE} ne "fileplot");
+    my @a = split(":", $hash->{LINK});
+    my $srcName = "$FW_gplotdir/$a[1].gplot";
+    $a[1] = $hash->{NAME};
+    my $dstName = "$FW_gplotdir/$a[1].gplot";
+    $hash->{LINK} = join(":", @a);
+    $hash->{DEF} = "$hash->{WLTYPE} $hash->{LINK}";
+    open(SFH, $srcName) || return "Can't open $srcName: $!";
+    open(DFH, ">$dstName") || return "Can't open $dstName: $!";
+    while(my $l = <SFH>) {
+      print DFH $l;
+    }
+    close(SFH); close(DFH);
+  }
+  return undef;
+}
+
 
 #####################################
 # FLOORPLAN compat
@@ -143,10 +181,207 @@ weblink_FwFn($$$$)
         $ret .= "<img src=\"$arg\"/>";
       }
 
-      $ret .= weblink_FwDetail($d) if(!$FW_hiddenroom{detail} && $pageHash);
+      if(!$pageHash) {
+        $ret .= wl_PEdit($FW_wname,$d,$room,$pageHash)
+                if($wltype eq "fileplot" && $FW_plotmode eq "SVG");
+        $ret .= "<br>";
+
+      } else {
+        $ret .= weblink_FwDetail($d) if(!$FW_hiddenroom{detail});
+
+      }
+
     }
   }
   return $ret;
+}
+
+sub
+wl_cb($$$)
+{
+  my ($v,$t,$c) = @_;
+  $c = ($c ? " checked" : "");
+  return "<td>$t&nbsp;<input type=\"checkbox\" name=\"$v\" value=\"$v\"$c></td>";
+}
+
+sub
+wl_txt($$$$)
+{
+  my ($v,$t,$c,$sz) = @_;
+  $c = "" if(!defined($c));
+  $c =~ s/"//g;
+  return "$t&nbsp;<input type=\"text\" name=\"$v\" size=\"$sz\" ".
+                "value=\"$c\"/>";
+}
+
+sub
+wl_sel($$$@)
+{
+  my ($v,$l,$c,$fnData) = @_;
+  my @al = split(",",$l);
+  return FW_select($v,$v,\@al,$c, "set", $fnData);
+}
+
+sub
+wl_getRegFromFile($)
+{
+  my ($fName) = @_;
+  my $fh = new IO::File $fName;
+  if(!$fh) {
+    Log 1, "$fName: $!";
+    return (3, "NoFile", "NoFile");
+  }
+  $fh->seek(0, 2); # Go to the end
+  my $sz = $fh->tell;
+  $fh->seek($sz > 65536 ? $sz-65536 : 0, 0);
+  my $data = <$fh>;
+  my $maxcols = 0;
+  my %h;
+  while($data = <$fh>) {
+    my @cols = split(" ", $data);
+    $maxcols = @cols if(@cols > $maxcols);
+    $cols[2] =~ s/:/./g;
+    my $key = "$cols[1].$cols[2]";
+    $h{$key} = $data;
+  }
+  $fh->close();
+  return ($maxcols+1, 
+                join(",", sort keys %h),
+                join("<br>", map { $h{$_} } sort keys %h)),
+  close(FH);
+}
+
+############################
+# gnuplot file "editor"
+sub
+wl_PEdit($$$$)
+{
+  my ($FW_wname,$d,$room,$pageHash) = @_;
+  my @a = split(":", $defs{$d}{LINK});
+  my $gp = "$FW_gplotdir/$a[1].gplot";
+  my $file = $defs{$a[0]}{currentlogfile};
+  
+  my ($err, $cfg, $plot, $flog) = FW_readgplotfile($d, $gp, $file);
+  ($cfg, $plot) = FW_substcfg(1, $d, $cfg, $plot, $file, "<OuT>");
+  my %conf = SVG_digestConf($cfg, $plot);
+
+  my $ret .= "<br><form autocomplete=\"off\" action=\"$FW_ME/weblinkDetails\">";
+  $ret .= FW_hidden("detail", $d);
+  $ret .= FW_hidden("gplotName", $gp);
+  $ret .= "<table class=\"block wide\">";
+  $ret .= "<tr class=\"odd\">";
+  $ret .= "<td>Label</td>";
+  $ret .= "<td>".wl_txt("ylabel", "left", $conf{ylabel}, 16)."</td>";
+  $ret .= "<td>".wl_txt("y2label","right", $conf{y2label}, 16)."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr class=\"even\">";
+  $ret .= "<td>Tics as (\"Txt\" val, ...)</td>";
+  $ret .= "<td>".wl_txt("ytics", "left", $conf{ytics}, 16)."</td>";
+  $ret .= "<td>".wl_txt("y2tics","right", $conf{y2tics}, 16)."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr class=\"odd\">";
+  $ret .= "<td>Grid aligned</td>";
+  $ret .= wl_cb("gridy", "left", $conf{hasygrid});
+  $ret .= wl_cb("gridy2","right",$conf{hasy2grid});
+  $ret .= "</tr>";
+  $ret .= "<tr class=\"even\">";
+  $ret .= "<td>Range as [min:max]</td>";
+  $ret .= "<td>".wl_txt("yrange", "left", $conf{yrange}, 16)."</td>";
+  $ret .= "<td>".wl_txt("y2range", "right", $conf{y2range}, 16)."</td>";
+  $ret .= "</tr>";
+
+  $ret .= "<tr class=\"odd\"><td>Label</td>";
+  $ret .= "<td>Column,Regexp,DefaultValue,Function</td>";
+  $ret .=" <td>Y-Axis,Plot-Type,Style</td></tr>";
+
+  my ($colnums, $colregs, $coldata) = wl_getRegFromFile($file);
+  $colnums = join(",", 3..$colnums);
+  my $max = @{$conf{lAxis}}+1;
+  $max = 7 if($max > 7);
+  my $r = 0;
+  for($r=0; $r < $max; $r++) {
+    $ret .= "<tr class=\"".(($r&1)?"odd":"even")."\"><td>";
+    $ret .= wl_txt("title_${r}", "", $conf{lTitle}[$r], 12);
+    $ret .= "</td><td>";
+    my @f = split(":", ($flog->[$r] ? $flog->[$r] : ":::"), 4);
+    $ret .= wl_sel("cl_${r}", $colnums, $f[0]);
+    $ret .= wl_sel("re_${r}", $colregs, $f[1]);
+    $ret .= wl_txt("df_${r}", "", $f[2], 2);
+    $ret .= wl_txt("fn_${r}", "", $f[3], 6);
+
+    $ret .= "</td><td>";
+    my $v = $conf{lAxis}[$r];
+    $ret .= wl_sel("axes_${r}", "left,right", 
+                    ($v && $v eq "x1y1") ? "left" : "right");
+    $ret .= wl_sel("type_${r}", "lines,points,steps,fsteps,histeps,bars",
+                    $conf{lType}[$r]);
+    my $ls = $conf{lStyle}[$r]; 
+    if($ls) {
+      $ls =~ s/class=//g;
+      $ls =~ s/"//g; 
+    }
+    $ret .= wl_sel("style_${r}", "l0,l1,l2,l3,l4,l5,l6,l7,l8,".
+                    "l0fill,l1fill,l2fill,l3fill,l4fill,l5fill,l6fill", $ls);
+    $ret .= "</td></tr>";
+  }
+  $ret .= "<tr class=\"".(($r++&1)?"odd":"even")."\"><td colspan=\"3\">";
+  $ret .= "Example lines for each regexp:<br>$coldata</td></tr>";
+
+  $ret .= "<tr class=\"".(($r++&1)?"odd":"even")."\"><td colspan=\"3\">";
+  $ret .= FW_submit("submit", "Write .gplot file")."</td></tr>";
+
+  $ret .= "</table></form>";
+}
+
+sub
+weblink_WriteGplot($)
+{
+  my ($arg) = @_;
+  FW_digestCgi($arg);
+
+  my $fName = $FW_webArgs{gplotName};
+  return if(!$fName);
+  if(!open(FH, ">$fName")) {
+    Log 1, "weblink_WriteGplot: Can't write $fName";
+    return;
+  }
+  print FH "# Created by FHEMWEB, ".TimeNow()."\n";
+  print FH "set terminal png transparent size <SIZE> crop\n";
+  print FH "set output '<OUT>.png'\n";
+  print FH "set xdata time\n";
+  print FH "set timefmt \"%Y-%m-%d_%H:%M:%S\"\n";
+  print FH "set xlabel \" \"\n";
+  print FH "set title '<L1>'\n";
+  print FH "set ytics ".$FW_webArgs{ytics}."\n";
+  print FH "set y2tics ".$FW_webArgs{y2tics}."\n";
+  print FH "set grid".($FW_webArgs{gridy}  ? " ytics" :"").
+                      ($FW_webArgs{gridy2} ? " y2tics":"")."\n";
+  print FH "set ylabel \"$FW_webArgs{ylabel}\"\n";
+  print FH "set y2label \"$FW_webArgs{y2label}\"\n";
+  print FH "set yrange $FW_webArgs{yrange}\n" if($FW_webArgs{yrange});
+  print FH "set y2range $FW_webArgs{yrange}\n" if($FW_webArgs{y2range});
+  print FH "\n";
+
+  my @plot;
+  for(my $i=0; $i <= 8; $i++) {
+    next if(!$FW_webArgs{"title_$i"});
+    print FH "#FileLog ". $FW_webArgs{"cl_$i"} .":".
+                          $FW_webArgs{"re_$i"} .":".
+                          $FW_webArgs{"df_$i"} .":".
+                          $FW_webArgs{"fn_$i"} ."\n";
+    push @plot, "\"<IN>\" using 1:2 axes ".
+                ($FW_webArgs{"axes_$i"} eq "right" ? "x1y2" : "x1y1").
+                " title '".$FW_webArgs{"title_$i"} ."'".
+                " ls "    .$FW_webArgs{"style_$i"} .
+                " with "  .$FW_webArgs{"type_$i"};
+  }
+  print FH "\n";
+  print FH "plot ".join(",\\\n     ", @plot)."\n";
+  close(FH);
+
+  #foreach my $k (sort keys %FW_webArgs) {
+  #  Log 1, "$k: $FW_webArgs{$k}";
+  #}
 }
 
 1;
@@ -192,7 +427,16 @@ weblink_FwFn($$$$)
   </ul>
 
   <a name="weblinkset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set</b>
+  <ul>
+    <li>copyGplotFile<br>
+      Only applicable to fileplot type weblinks.<br>
+      Copy the currently specified gplot file to a new file, which is named
+      after the weblink (existing files will be overwritten), in order to be
+      able to modify it locally without the problem of being overwritten by
+      update. The weblink definition will be updated.
+    </li>
+  </ul><br>
 
   <a name="weblinkget"></a>
   <b>Get</b> <ul>N/A</ul><br>
