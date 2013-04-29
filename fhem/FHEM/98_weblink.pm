@@ -70,6 +70,7 @@ weblink_Set($@)
     $a[1] = $hash->{NAME};
     my $dstName = "$FW_gplotdir/$a[1].gplot";
     $hash->{LINK} = join(":", @a);
+    return "this is already a unique gplot file" if($srcName eq $dstName);
     $hash->{DEF} = "$hash->{WLTYPE} $hash->{LINK}";
     open(SFH, $srcName) || return "Can't open $srcName: $!";
     open(DFH, ">$dstName") || return "Can't open $dstName: $!";
@@ -262,7 +263,6 @@ wl_PEdit($$$$)
   my $file = $defs{$a[0]}{currentlogfile};
   
   my ($err, $cfg, $plot, $flog) = FW_readgplotfile($d, $gp, $file);
-  ($cfg, $plot) = FW_substcfg(1, $d, $cfg, $plot, $file, "<OuT>");
   my %conf = SVG_digestConf($cfg, $plot);
 
   my $ret .= "<br><form autocomplete=\"off\" action=\"$FW_ME/weblinkDetails\">";
