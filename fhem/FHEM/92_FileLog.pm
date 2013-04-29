@@ -316,7 +316,8 @@ FileLog_fhemwebFn($$$$)
       $list .= " $dev:" . join(",", sort keys %{$dh{$dev}});
       push @al, $dev;
     }
-    $ret .= "<tr><td colspan=\"2\"><form autocomplete=\"off\">";
+    $ret .= "<tr class=\"".(($row++&1)?"odd":"even")."\">";
+    $ret .= "<td colspan=\"2\"><form autocomplete=\"off\">";
     $ret .= FW_hidden("detail", $d);
     $ret .= FW_hidden("dev.$d", "$d addRegexpPart");
     $ret .= FW_submit("cmd.$d", "set", "set");
@@ -328,8 +329,17 @@ FileLog_fhemwebFn($$$$)
               "FW_selChange('$al[0]','$list','val.$d')</script>";
     $ret .= "</form></td></tr>";
   }
-
   $ret .= "</table>";
+
+  my $newIdx=1;
+  while($defs{"wl_${d}_$newIdx"}) {
+    $newIdx++;
+  }
+  my $name = "wl_${d}_$newIdx";
+  $ret .= FW_pH("cmd=define $name weblink fileplot $d:template:CURRENT;".
+                     "set $name copyGplotFile&detail=$name",
+                "<div class=\"dval\">Create new SVG plot</div>", 0, "dval", 1);
+
   return $ret;
 }
 

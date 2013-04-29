@@ -28,6 +28,52 @@ SVG_Initialize($)
 }
 
 
+######################
+# Convert the configuration to a "readable" form -> array to hash
+sub
+SVG_digestConf($$)
+{
+  my ($confp,$plot) = @_;
+
+  my %conf;
+  map { chomp; my @a=split(" ",$_, 3);
+        if($a[0] && $a[0] eq "set") { $conf{lc($a[1])} = $a[2]; }
+      } @{$confp};
+
+  $conf{title} = "" if(!defined($conf{title}));
+  $conf{title} =~ s/'//g;
+
+  ######################
+  # Digest grid
+  my $t = ($conf{grid} ? $conf{grid} : "");
+  #$conf{hasxgrid} = ( $t =~ /.*xtics.*/ ? 1 : 0); # Unused
+  $conf{hasygrid} = ( $t =~ /.*ytics.*/ ? 1 : 0);
+  $conf{hasy2grid}= ( $t =~ /.*y2tics.*/ ? 1 : 0);
+
+  # Digest axes/title/etc from $plot (gnuplot) and draw the line-titles
+  my (@lAxis,@lTitle,@lType,@lStyle,@lWidth);
+  my ($i, $pTemp);
+  $pTemp = $plot; $i = 0; $pTemp =~ s/ axes (\w+)/$lAxis[$i++]=$1/gse;
+  $pTemp = $plot; $i = 0; $pTemp =~ s/ title '([^']*)'/$lTitle[$i++]=$1/gse;
+  $pTemp = $plot; $i = 0; $pTemp =~ s/ with (\w+)/$lType[$i++]=$1/gse;
+  $pTemp = $plot; $i = 0; $pTemp =~ s/ ls (\w+)/$lStyle[$i++]=$1/gse;
+  $pTemp = $plot; $i = 0; $pTemp =~ s/ lw (\w+)/$lWidth[$i++]=$1/gse;
+
+  for my $i (0..int(@lType)-1) {         # lAxis is optional
+    $lAxis[$i] = "x1y2" if(!$lAxis[$i]);
+    $lStyle[$i] = "class=\"". (defined($lStyle[$i]) ? $lStyle[$i] : "l$i")."\"";
+    $lWidth[$i] = (defined($lWidth[$i]) ?
+                        "style=\"stroke-width:$lWidth[$i]\"" :"");
+  }
+
+  $conf{lAxis}  = \@lAxis;
+  $conf{lTitle} = \@lTitle;
+  $conf{lType}  = \@lType;
+  $conf{lStyle} = \@lStyle;
+  $conf{lWidth} = \@lWidth;
+  return %conf;
+}
+
 #####################################
 sub
 SVG_render($$$$$$$$)
@@ -50,15 +96,10 @@ SVG_render($$$$$$$$)
 
   ######################
   # Convert the configuration to a "readable" form -> array to hash
-  my %conf;                             # gnuplot file settings
-  map { chomp; my @a=split(" ",$_, 3);
-         if($a[0] && $a[0] eq "set") { $conf{lc($a[1])} = $a[2]; } } @{$confp};
+  my %conf = SVG_digestConf($confp, $plot);
 
   my $ps = "800,400";
   $ps = $1 if($conf{terminal} =~ m/.*size[ ]*([^ ]*)/);
-  $conf{title} = "" if(!defined($conf{title}));
-  $conf{title} =~ s/'//g;
-
   my ($ow,$oh) = split(",", $ps);       # Original width
   my ($w, $h) = ($ow-2*$x, $oh-2*$y);   # Rect size
 
@@ -114,15 +155,8 @@ SVG_render($$$$$$$$)
         "class=\"copy\" text-anchor=\"end\"> </text>";
 
   ######################
-  # Digest grid
-  my $t = ($conf{grid} ? $conf{grid} : "");
-  my $hasxgrid = ( $t =~ /.*xtics.*/ ? 1 : 0);
-  my $hasygrid = ( $t =~ /.*ytics.*/ ? 1 : 0);
-  my $hasy2grid = ( $t =~ /.*y2tics.*/ ? 1 : 0);
-  
-  ######################
   # Left label = ylabel and right label = y2label
-  $t = ($conf{ylabel} ? $conf{ylabel} : "");
+  my $t = ($conf{ylabel} ? $conf{ylabel} : "");
   $t =~ s/"//g;
   if(!$SVG_ss) {
     ($off1,$off2) = (3*$th/4, $oh/2);
@@ -137,29 +171,14 @@ SVG_render($$$$$$$$)
   }
 
   ######################
-  # Digest axes/title/etc from $plot (gnuplot) and draw the line-titles
-  my (@lAxis,@lTitle,@lType,@lStyle,@lWidth);
-  my ($i, $pTemp);
-  $pTemp = $plot; $i = 0; $pTemp =~ s/ axes (\w+)/$lAxis[$i++]=$1/gse;
-  $pTemp = $plot; $i = 0; $pTemp =~ s/ title '([^']*)'/$lTitle[$i++]=$1/gse;
-  $pTemp = $plot; $i = 0; $pTemp =~ s/ with (\w+)/$lType[$i++]=$1/gse;
-  $pTemp = $plot; $i = 0; $pTemp =~ s/ ls (\w+)/$lStyle[$i++]=$1/gse;
-  $pTemp = $plot; $i = 0; $pTemp =~ s/ lw (\w+)/$lWidth[$i++]=$1/gse;
-
-  for my $i (0..int(@lType)-1) {         # lAxis is optional
-    $lAxis[$i] = "x1y2" if(!$lAxis[$i]);
-    $lStyle[$i] = "class=\"". (defined($lStyle[$i]) ? $lStyle[$i] : "l$i") . "\"";
-    $lWidth[$i] = (defined($lWidth[$i]) ? "style=\"stroke-width:$lWidth[$i]\"" :"");
-  }
-
   ($off1,$off2) = ($ow-$x-$th, $y+$th);
 
 
   ######################
   # Plot caption (title)
-  for my $i (0..int(@lTitle)-1) {
+  for my $i (0..int(@{$conf{lTitle}})-1) {
     my $j = $i+1;
-    my $t = $lTitle[$i];
+    my $t = $conf{lTitle}[$i];
     my $desc = "";
     if(defined($data{"min$j"}) && $data{"min$j"} ne "undef") {
       $desc = sprintf("%s: Min:%g Max:%g Last:%g",
@@ -167,7 +186,8 @@ SVG_render($$$$$$$$)
     }
     SVG_pO "<text title=\"$desc\" ".
           "onclick=\"parent.svg_labelselect(evt)\" line_id=\"line_$i\" " .
-          "x=\"$off1\" y=\"$off2\" text-anchor=\"end\" $lStyle[$i]>$t</text>";
+          "x=\"$off1\" y=\"$off2\" text-anchor=\"end\" ".
+                "$conf{lStyle}[$i]>$t</text>";
     $off2 += $th;
   }
 
@@ -195,7 +215,7 @@ SVG_render($$$$$$$$)
     }
     $dpoff = $ndpoff+1;
     if($l =~ m/^#/) {
-      my $a = $lAxis[$idx];
+      my $a = $conf{lAxis}[$idx];
       if(defined($a)) {
         $hmin{$a} = $min if(!defined($hmin{$a}) || $hmin{$a} > $min);
         $hmax{$a} = $max if(!defined($hmax{$a}) || $hmax{$a} < $max);
@@ -338,7 +358,7 @@ SVG_render($$$$$$$$)
       $step = $l/10;
       last;
     }
-    if($step == 0.001 && $hmax{$a} == $hmin{$a}) { # Don't want 0.001 range for nil
+    if($step==0.001 && $hmax{$a}==$hmin{$a}) { # Don't want 0.001 range for nil
        $step = 1;
        $ma = $mi + $step;
     }
@@ -403,7 +423,7 @@ SVG_render($$$$$$$$)
     #-- tics handling
     my $tic = $htics{$a};
     #-- tics as in the config-file
-    if($tic && $tic !~ m/mirror/) {     
+    if($tic && $tic !~ m/mirror/) {
       $tic =~ s/^\((.*)\)$/$1/;   # Strip ()
       foreach my $onetic (split(",", $tic)) {
         $onetic =~ s/^ *(.*) *$/$1/;
@@ -416,12 +436,12 @@ SVG_render($$$$$$$$)
         SVG_pO "<polyline points=\"$off3,$off2 $off4,$off2\" $cll/>";
         #--grids
         my $off6 = $x+$w;
-        if( ($a eq "x1y1") && $hasygrid )  {
+        if( ($a eq "x1y1") && $conf{hasygrid} )  {
+          SVG_pO "<polyline points=\"$x,$off2 $off6,$off2\" class=\"vgrid\"/>"
+            if($tvalue > $hmin{$a} && $tvalue < $hmax{$a});
+        }elsif( ($a eq "x1y2") && $conf{hasy2grid} )  {
           SVG_pO "  <polyline points=\"$x,$off2 $off6,$off2\" class=\"vgrid\"/>"
-            if($i > $hmin{$a} && $i < $hmax{$a});
-        }elsif( ($a eq "x1y2") && $hasy2grid )  {
-          SVG_pO "  <polyline points=\"$x,$off2 $off6,$off2\" class=\"vgrid\"/>"
-            if($i > $hmin{$a} && $i < $hmax{$a});
+            if($tvalue > $hmin{$a} && $tvalue < $hmax{$a});
         }
         $off2 += $th/4;
         #--  text
@@ -435,11 +455,11 @@ SVG_render($$$$$$$$)
         SVG_pO "  <polyline points=\"$off3,$off2 $off4,$off2\" $cll/>";
         #--grids
         my $off6 = $x+$w;
-        if( ($a eq "x1y1") && $hasygrid )  {
+        if( ($a eq "x1y1") && $conf{hasygrid} )  {
           my $off6 = $x+$w;
           SVG_pO "  <polyline points=\"$x,$off2 $off6,$off2\" class=\"vgrid\"/>"
             if($i > $hmin{$a} && $i < $hmax{$a});
-        }elsif(  ($a eq "x1y2") && $hasy2grid )  {
+        }elsif(  ($a eq "x1y2") && $conf{hasy2grid} )  {
           SVG_pO "  <polyline points=\"$x,$off2 $off6,$off2\" class=\"vgrid\"/>"
             if($i > $hmin{$a} && $i < $hmax{$a});
         }
@@ -456,7 +476,7 @@ SVG_render($$$$$$$$)
   ######################
   # Second loop over the data: draw the measured points
   for(my $idx=$#hdx; $idx >= 0; $idx--) {
-    my $a = $lAxis[$idx];
+    my $a = $conf{lAxis}[$idx];
 
     SVG_pO "<!-- Warning: No axis for data item $idx defined -->" if(!defined($a));
     next if(!defined($a));
@@ -470,19 +490,20 @@ SVG_render($$$$$$$$)
 
     my $yh = $y+$h;
     #-- Title attributes
-    my $tl = $lTitle[$idx] ? $lTitle[$idx]  : "";
+    my $tl = $conf{lTitle}[$idx] ? $conf{lTitle}[$idx]  : "";
     #my $dec = int(log($hmul*3)/log(10)); # perl can be compiled without log() !
     my $dec = length(sprintf("%d",$hmul*3))-1;
     $dec = 0 if($dec < 0);
     my $attributes = "id=\"line_$idx\" decimals=\"$dec\" ".
           "x_off=\"$fromsec\" x_min=\"$x\" x_mul=\"$tmul\" ".
           "y_h=\"$yh\" y_min=\"$min\" y_mul=\"$hmul\" title=\"$tl\" ".
-          "onclick=\"parent.svg_click(evt)\" $lWidth[$idx] $lStyle[$idx]";
-    my $isFill = ($lStyle[$idx] =~ m/fill/);
+          "onclick=\"parent.svg_click(evt)\" ".
+                "$conf{lWidth}[$idx] $conf{lStyle}[$idx]";
+    my $isFill = ($conf{lStyle}[$idx] =~ m/fill/);
 
     my ($lx, $ly) = (-1,-1);
 
-    if($lType[$idx] eq "points" ) {
+    if($conf{lType}[$idx] eq "points" ) {
       foreach my $i (0..int(@{$dxp})-1) {
         my ($x1, $y1) = (int($x+$dxp->[$i]),
                          int($y+$h-($dyp->[$i]-$min)*$hmul));
@@ -493,7 +514,7 @@ SVG_render($$$$$$$$)
         SVG_pO "<polyline $attributes points=\"$ret\"/>";
       }
 
-    } elsif($lType[$idx] eq "steps" || $lType[$idx] eq "fsteps" ) {
+    } elsif($conf{lType}[$idx] eq "steps" || $conf{lType}[$idx] eq "fsteps" ) {
 
       $ret .=  sprintf(" %d,%d", $x+$dxp->[0], $y+$h) if($isFill && @{$dxp});
       if(@{$dxp} == 1) {
@@ -506,7 +527,7 @@ SVG_render($$$$$$$$)
           my ($x2, $y2) = ($x+$dxp->[$i],   $y+$h-($dyp->[$i]  -$min)*$hmul);
           next if(int($x2) == $lx && int($y1) == $ly);
           $lx = int($x2); $ly = int($y2);
-          if($lType[$idx] eq "steps") {
+          if($conf{lType}[$idx] eq "steps") {
             $ret .=  sprintf(" %d,%d %d,%d %d,%d", $x1,$y1, $x2,$y1, $x2,$y2);
           } else {
             $ret .=  sprintf(" %d,%d %d,%d %d,%d", $x1,$y1, $x1,$y2, $x2,$y2);
@@ -517,7 +538,7 @@ SVG_render($$$$$$$$)
 
       SVG_pO "<polyline $attributes points=\"$ret\"/>";
 
-    } elsif($lType[$idx] eq "histeps" ) {
+    } elsif($conf{lType}[$idx] eq "histeps" ) {
       $ret .=  sprintf(" %d,%d", $x+$dxp->[0], $y+$h) if($isFill && @{$dxp});
       if(@{$dxp} == 1) {
           my $y1 = $y+$h-($dyp->[0]-$min)*$hmul;
@@ -536,7 +557,7 @@ SVG_render($$$$$$$$)
       $ret .=  sprintf(" %d,%d", $lx, $y+$h) if($isFill && $lx > -1);
       SVG_pO "<polyline $attributes points=\"$ret\"/>";
 
-    } elsif( $lType[$idx] eq "bars" ) {
+    } elsif( $conf{lType}[$idx] eq "bars" ) {
        if(@{$dxp} == 1) {
           my $y1 = $y+$h-($dyp->[0]-$min)*$hmul;
           $ret .=  sprintf(" %d,%d %d,%d %d,%d %d,%d",

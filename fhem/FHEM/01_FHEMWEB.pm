@@ -72,6 +72,7 @@ use vars qw($FW_cname);   # Current connection name
 use vars qw(%FW_hiddenroom); # hash of hidden rooms, used by weblink
 use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by weblink
 use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by weblink
+use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 my $FW_zlib_checked;
 my $FW_use_zlib = 1;
@@ -81,7 +82,6 @@ my $FW_use_zlib = 1;
 # Note: for delivering SVG plots we fork
 my @FW_httpheader; # HTTP header, line by line
 my @FW_enc;        # Accepted encodings (browser header)
-my %FW_webArgs;    # all arguments specified in the GET
 my $FW_cmdret;     # Returned data by the fhem call
 my $FW_data;       # Filecontent from browser when editing a file
 my $FW_detail;     # currently selected device for detail view
@@ -454,6 +454,7 @@ FW_answerCall($)
       #Returns undef if it already sent a HTTP header
       ($FW_RETTYPE, $FW_RET) = &{$h->{FUNC}}($arg);
       use strict "refs";
+      last if(!$FW_RET);
       return defined($FW_RETTYPE) ? 0 : -1;
     }
   }
@@ -623,6 +624,7 @@ FW_digestCgi($)
   $cmd.=" $arg{$c}" if(defined($arg{$c}) &&
                        ($arg{$c} ne "state" || $cmd !~ m/^set/));
   $cmd.=" $val{$c}" if(defined($val{$c}));
+#Log 1, "GOT:$arg -> CMD:$cmd";
   return ($cmd, $c);
 }
 
@@ -751,8 +753,6 @@ FW_doDetail($)
 {
   my ($d) = @_;
 
-  FW_pO "<form method=\"get\" action=\"$FW_ME\">";
-  FW_pO FW_hidden("detail", $d);
 
   my $h = $defs{$d};
   my $t = $h->{TYPE};
@@ -772,6 +772,16 @@ FW_doDetail($)
     }
   }
   FW_pO "<table><tr><td>";
+
+  if($modules{$t}{FW_detailFn}) {
+    no strict "refs";
+    FW_pO &{$modules{$t}{FW_detailFn}}($FW_wname, $d, $FW_room) . "<br>";
+    use strict "refs";
+  }
+
+  FW_pO "<form method=\"get\" action=\"$FW_ME\">";
+  FW_pO FW_hidden("detail", $d);
+
   FW_makeSelect($d, "set", getAllSets($d), "set");
   FW_makeTable($d, $h);                         # Internal values
   FW_pO "Readings" if($h->{READINGS});
@@ -794,13 +804,8 @@ FW_doDetail($)
       push(@dob, $dn);
     }
   }
+  FW_pO "</form>";
   FW_makeTableFromArray("Probably associated with", @dob);
-
-  if($modules{$t}{FW_detailFn}) {
-    no strict "refs";
-    FW_pO &{$modules{$t}{FW_detailFn}}($FW_wname, $d, $FW_room) . "<br>";
-    use strict "refs";
-  }
 
   FW_pO "</td></tr></table>";
 
@@ -809,7 +814,6 @@ FW_doDetail($)
   FW_pH "$FW_ME/docs/commandref.html#${t}", "Device specific help";
   FW_pO "<br><br>";
   FW_pO "</div>";
-  FW_pO "</form>";
 
 }
 
@@ -819,7 +823,7 @@ FW_makeTableFromArray($@) {
   my ($txt,@obj) = @_;
   if (@obj>0) {
     my $row=1;
-    FW_pO "<br>" if($FW_RET !~ m/<br>$/);
+    FW_pO "<br><br>";
     FW_pO "$txt";
     FW_pO '<table class="block wide">';
     foreach (sort @obj) {
@@ -1533,7 +1537,6 @@ FW_select($$$$$@)
   $jSelFn = ($jSelFn ? "onchange=\"$jSelFn\"" : "");
   $id = ($id ? "id=\"$id\"" : "");
   my $s = "<select $jSelFn $id name=\"$n\" class=\"$class\">";
-
   foreach my $v (@{$va}) {
     if($def && $v eq $def) {
       $s .= "<option selected=\"selected\" value=\"$v\">$v</option>\n";
