@@ -101,9 +101,6 @@ sub HUEBridge_OpenDev($)
     return undef;
   }
 
-  $hash->{name} = $result->{'name'};
-  $hash->{swversion} = $result->{'swversion'};
-
   if( !defined($result->{'mac'}) )
     {
       HUEBridge_Pair($hash);
@@ -181,15 +178,24 @@ sub
 HUEBridge_GetUpdate($)
 {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
 
   if(!$hash->{LOCAL}) {
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "HUEBridge_GetUpdate", $hash, 1);
   }
 
-  my $text='';
+  my $result = HUEBridge_Call($hash, 'config', undef);
+  $hash->{name} = $result->{name};
+  $hash->{swversion} = $result->{swversion};
 
-  return($text);
+  if( defined( $result->{swupdate} ) ) {
+    my $txt = $result->{swupdate}->{text};
+    readingsSingleUpdate($hash, "swupdate", $txt, defined($hash->{LOCAL} ? 0 : 1)) if( $txt ne ReadingsVal($name,"swupdate","") );
+    $hash->{updatestate} = $result->{swupdate}->{updatestate};
+  } elsif ( defined(  $hash->{swupdate} ) ) {
+    delete( $hash->{updatestate} );
+  }
 }
 
 sub
