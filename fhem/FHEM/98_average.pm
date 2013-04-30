@@ -121,7 +121,8 @@ average_Notify($$)
          $idx == 1 && ($dLast[1] == $dNow[1])) {
         my $cum = $r->{$cumName}{VAL} + ($secNow-$secLast) * $val;
         $r->{$cumName}{VAL} = $cum;
-        $r->{$avgName}{VAL} = sprintf("%0.1f", $cum/$secNow);
+        my $div = ($secNow ? $secNow : 1);
+        $r->{$avgName}{VAL} = sprintf("%0.1f", $cum/$div);
         ##MH change only if current value bigger than maxvalue
         if($r->{$maxName}{VAL} < $val) {
           $r->{$maxName}{VAL} = sprintf("%0.1f", $val); ##MH
