@@ -242,13 +242,14 @@ wl_getRegFromFile($)
   while($data = <$fh>) {
     my @cols = split(" ", $data);
     $maxcols = @cols if(@cols > $maxcols);
-    my $key = "$cols[1].$cols[2]";
-    $h{$key} = $data;
+    $cols[2] = "*" if($cols[2] =~ m/^[-\.\d]+$/);
+    $h{"$cols[1].$cols[2]"} = $data;
+    $h{"$cols[1].*"} = "" if($cols[2] ne "*");
   }
   $fh->close();
   return ($maxcols+1, 
                 join(",", sort keys %h),
-                join("<br>", map { $h{$_} } sort keys %h)),
+                join("<br>", grep /.+/,map { $h{$_} } sort keys %h)),
   close(FH);
 }
 
@@ -301,9 +302,9 @@ wl_PEdit($$$$)
   $ret .=" <td>Y-Axis,Plot-Type,Style,Width</td></tr>";
 
   my ($colnums, $colregs, $coldata) = wl_getRegFromFile($file);
-  $colnums = join(",", 4..$colnums);
+  $colnums = join(",", 3..$colnums);
   my $max = @{$conf{lAxis}}+1;
-  $max = 7 if($max > 7);
+  $max = 8 if($max > 8);
   $max = 1 if(!$conf{lTitle}[0]);
   my $r = 0;
   for($r=0; $r < $max; $r++) {
