@@ -1066,17 +1066,20 @@ FW_showRoom()
       }
       $row++;
 
-      if($modules{$type}{FW_summaryFn}) {
-        FW_pO "<td>";
+      my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf);
+
+      my $sfn = $modules{$type}{FW_summaryFn};
+      if($sfn) {
         no strict "refs";
-        FW_pO &{$modules{$type}{FW_summaryFn}}($FW_wname,$d,$FW_room,\%extPage);
+        $txt = &{$sfn}($FW_wname, $d, $FW_room, \%extPage);
         use strict "refs";
-        FW_pO "</td>";
-        next;
+        FW_pO "<td id=\"$type.$d\">$txt</td>";
+
+      } else {
+        FW_pO "<td id=\"$d\">$txt</td>";
+
       }
 
-      my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf);
-      FW_pO "<td id=\"$d\">$txt</td>";
 
       ######
       # Commands, slider, dropdown
@@ -1114,7 +1117,8 @@ FW_showRoom()
                         lc(AttrVal($b, "sortby", AttrVal($b,"alias",$b))) }
                    @atEnds) {
     no strict "refs";
-    FW_pO &{$modules{$defs{$d}{TYPE}}{FW_summaryFn}}($FW_chash, $d, $FW_room, \%extPage);
+    FW_pO &{$modules{$defs{$d}{TYPE}}{FW_summaryFn}}($FW_chash, $d, 
+                                                        $FW_room, \%extPage);
     use strict "refs";
   }
   FW_pO "</div>";
