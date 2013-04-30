@@ -210,7 +210,7 @@ wl_txt($$$$)
 {
   my ($v,$t,$c,$sz) = @_;
   $c = "" if(!defined($c));
-  $c =~ s/"//g;
+  $c =~ s/"/\&quot;/g;
   return "$t&nbsp;<input type=\"text\" name=\"$v\" size=\"$sz\" ".
                 "value=\"$c\"/>";
 }
@@ -220,6 +220,7 @@ wl_sel($$$@)
 {
   my ($v,$l,$c,$fnData) = @_;
   my @al = split(",",$l);
+  $c =~ s/\\x3a/:/g if($c);
   return FW_select($v,$v,\@al,$c, "set", $fnData);
 }
 
@@ -241,7 +242,6 @@ wl_getRegFromFile($)
   while($data = <$fh>) {
     my @cols = split(" ", $data);
     $maxcols = @cols if(@cols > $maxcols);
-    $cols[2] =~ s/:/./g;
     my $key = "$cols[1].$cols[2]";
     $h{$key} = $data;
   }
@@ -275,7 +275,9 @@ wl_PEdit($$$$)
   $ret .= "</tr>";
   $ret .= "<tr class=\"odd\">";
   $ret .= "<td>Y-Axis label</td>";
+  $conf{ylabel} =~ s/"//g if($conf{ylabel});
   $ret .= "<td>".wl_txt("ylabel", "left", $conf{ylabel}, 16)."</td>";
+  $conf{y2label} =~ s/"//g if($conf{y2label});
   $ret .= "<td>".wl_txt("y2label","right", $conf{y2label}, 16)."</td>";
   $ret .= "</tr>";
   $ret .= "<tr class=\"even\">";
@@ -336,7 +338,7 @@ wl_PEdit($$$$)
     $ret .= "</td></tr>";
   }
   $ret .= "<tr class=\"".(($r++&1)?"odd":"even")."\"><td colspan=\"3\">";
-  $ret .= "Example lines for each regexp:<br>$coldata</td></tr>";
+  $ret .= "Example lines for input:<br>$coldata</td></tr>";
 
   $ret .= "<tr class=\"".(($r++&1)?"odd":"even")."\"><td colspan=\"3\">";
   $ret .= FW_submit("submit", "Write .gplot file")."</td></tr>";
@@ -382,8 +384,10 @@ weblink_WriteGplot($)
   my @plot;
   for(my $i=0; $i <= 8; $i++) {
     next if(!$FW_webArgs{"title_$i"});
-    print FH "#FileLog ". $FW_webArgs{"cl_$i"} .":".
-                          $FW_webArgs{"re_$i"} .":".
+    my $re = $FW_webArgs{"re_$i"};
+    $re = "" if(!defined($re));
+    $re =~ s/:/\\x3a/g;
+    print FH "#FileLog ". $FW_webArgs{"cl_$i"} .":$re:".
                           $FW_webArgs{"df_$i"} .":".
                           $FW_webArgs{"fn_$i"} ."\n";
     push @plot, "\"<IN>\" using 1:2 axes ".
