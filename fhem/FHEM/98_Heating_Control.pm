@@ -41,6 +41,7 @@ Heating_Control_Initialize($)
   $hash->{DefFn}   = "Heating_Control_Define";
   $hash->{UndefFn} = "Heating_Control_Undef";
   $hash->{GetFn}   = "Heating_Control_Get";
+  $hash->{UpdFn}   = "Heating_Control_Update";
   $hash->{AttrList}= "disable:0,1 loglevel:0,1,2,3,4,5 ".
                         $readingFnAttributes;
 }
@@ -71,7 +72,6 @@ Heating_Control_Define($$)
 {
   my ($hash, $def) = @_;
 
-  RemoveInternalTimer($hash);
   my  @a = split("[ \t]+", $def);
  
   return "Usage: define <name> Heating_Control <device> <switching times> <condition|command>"
@@ -224,6 +224,7 @@ Heating_Control_Define($$)
     }
   }
 
+  RemoveInternalTimer($hash);
   my $now    = time();
   InternalTimer ($now+30, "Heating_Control_Update", $hash, 0);
 
@@ -283,8 +284,8 @@ Heating_Control_Update($)
         $newDesTemperature =  $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$st};
         $nowSwitch = $now;
       } else {
-        $nextSwitch = $next;
         $nextDesTemperature = $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$st};
+        $nextSwitch = $next;
         last;
       }
     }
@@ -320,6 +321,7 @@ Heating_Control_Update($)
     Log GetLogLevel($name,3), $ret if($ret);
   }
 
+  RemoveInternalTimer($hash);
   InternalTimer($nextSwitch, "Heating_Control_Update", $hash, 0);
 
   readingsBeginUpdate($hash);
@@ -329,6 +331,18 @@ Heating_Control_Update($)
   readingsEndUpdate  ($hash,  defined($hash->{LOCAL} ? 0 : 1));
   
   return 1;
+}
+#
+sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
+
+  foreach my $hc ( sort keys %{$modules{Heating_Control}{defptr}} ) {
+     my $hash = $modules{Heating_Control}{defptr}{$hc};
+
+     if($hash->{helper}{CONDITION}) {
+        next if (!(eval ($hash->{helper}{CONDITION})))     ;
+     }
+     Heating_Control_Update($hash);
+  }
 }
 
 sub SortNumber {
