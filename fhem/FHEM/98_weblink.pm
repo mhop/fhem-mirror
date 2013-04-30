@@ -269,28 +269,32 @@ wl_PEdit($$$$)
   $ret .= FW_hidden("detail", $d);
   $ret .= FW_hidden("gplotName", $gp);
   $ret .= "<table class=\"block wide\">";
+  $ret .= "<tr class=\"even\">";
+  $ret .= "<td>Plot title</td>";
+  $ret .= "<td>".wl_txt("title", "", $conf{title}, 32)."</td>";
+  $ret .= "</tr>";
   $ret .= "<tr class=\"odd\">";
-  $ret .= "<td>Label</td>";
+  $ret .= "<td>Y-Axis label</td>";
   $ret .= "<td>".wl_txt("ylabel", "left", $conf{ylabel}, 16)."</td>";
   $ret .= "<td>".wl_txt("y2label","right", $conf{y2label}, 16)."</td>";
+  $ret .= "</tr>";
+  $ret .= "<tr class=\"even\">";
+  $ret .= "<td>Grid aligned</td>";
+  $ret .= wl_cb("gridy", "left", $conf{hasygrid});
+  $ret .= wl_cb("gridy2","right",$conf{hasy2grid});
+  $ret .= "</tr>";
+  $ret .= "<tr class=\"odd\">";
+  $ret .= "<td>Range as [min:max]</td>";
+  $ret .= "<td>".wl_txt("yrange", "left", $conf{yrange}, 16)."</td>";
+  $ret .= "<td>".wl_txt("y2range", "right", $conf{y2range}, 16)."</td>";
   $ret .= "</tr>";
   $ret .= "<tr class=\"even\">";
   $ret .= "<td>Tics as (\"Txt\" val, ...)</td>";
   $ret .= "<td>".wl_txt("ytics", "left", $conf{ytics}, 16)."</td>";
   $ret .= "<td>".wl_txt("y2tics","right", $conf{y2tics}, 16)."</td>";
   $ret .= "</tr>";
-  $ret .= "<tr class=\"odd\">";
-  $ret .= "<td>Grid aligned</td>";
-  $ret .= wl_cb("gridy", "left", $conf{hasygrid});
-  $ret .= wl_cb("gridy2","right",$conf{hasy2grid});
-  $ret .= "</tr>";
-  $ret .= "<tr class=\"even\">";
-  $ret .= "<td>Range as [min:max]</td>";
-  $ret .= "<td>".wl_txt("yrange", "left", $conf{yrange}, 16)."</td>";
-  $ret .= "<td>".wl_txt("y2range", "right", $conf{y2range}, 16)."</td>";
-  $ret .= "</tr>";
 
-  $ret .= "<tr class=\"odd\"><td>Label</td>";
+  $ret .= "<tr class=\"odd\"><td>Diagramm label</td>";
   $ret .= "<td>Column,Regexp,DefaultValue,Function</td>";
   $ret .=" <td>Y-Axis,Plot-Type,Style</td></tr>";
 
@@ -323,6 +327,12 @@ wl_PEdit($$$$)
     }
     $ret .= wl_sel("style_${r}", "l0,l1,l2,l3,l4,l5,l6,l7,l8,".
                     "l0fill,l1fill,l2fill,l3fill,l4fill,l5fill,l6fill", $ls);
+    my $lw = $conf{lWidth}[$r]; 
+    if($lw) {
+      $lw =~ s/.*stroke-width://g;
+      $lw =~ s/"//g; 
+    }
+    $ret .= wl_sel("width_${r}", "0.2,0.5,1,1.5,2,3,4", ($lw ? $lw : 1));
     $ret .= "</td></tr>";
   }
   $ret .= "<tr class=\"".(($r++&1)?"odd":"even")."\"><td colspan=\"3\">";
@@ -358,7 +368,7 @@ weblink_WriteGplot($)
   print FH "set xdata time\n";
   print FH "set timefmt \"%Y-%m-%d_%H:%M:%S\"\n";
   print FH "set xlabel \" \"\n";
-  print FH "set title '<TL>'\n";
+  print FH "set title '$FW_webArgs{title}'\n";
   print FH "set ytics ".$FW_webArgs{ytics}."\n";
   print FH "set y2tics ".$FW_webArgs{y2tics}."\n";
   print FH "set grid".($FW_webArgs{gridy}  ? " ytics" :"").
@@ -380,6 +390,7 @@ weblink_WriteGplot($)
                 ($FW_webArgs{"axes_$i"} eq "right" ? "x1y2" : "x1y1").
                 " title '".$FW_webArgs{"title_$i"} ."'".
                 " ls "    .$FW_webArgs{"style_$i"} .
+                " lw "    .$FW_webArgs{"width_$i"} .
                 " with "  .$FW_webArgs{"type_$i"};
   }
   print FH "\n";

@@ -57,7 +57,7 @@ SVG_digestConf($$)
   $pTemp = $plot; $i = 0; $pTemp =~ s/ title '([^']*)'/$lTitle[$i++]=$1/gse;
   $pTemp = $plot; $i = 0; $pTemp =~ s/ with (\w+)/$lType[$i++]=$1/gse;
   $pTemp = $plot; $i = 0; $pTemp =~ s/ ls (\w+)/$lStyle[$i++]=$1/gse;
-  $pTemp = $plot; $i = 0; $pTemp =~ s/ lw (\w+)/$lWidth[$i++]=$1/gse;
+  $pTemp = $plot; $i = 0; $pTemp =~ s/ lw ([\w.]+)/$lWidth[$i++]=$1/gse;
 
   for my $i (0..int(@lType)-1) {         # lAxis is optional
     $lAxis[$i] = "x1y2" if(!$lAxis[$i]);
