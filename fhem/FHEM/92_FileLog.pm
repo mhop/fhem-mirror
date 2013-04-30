@@ -7,6 +7,7 @@ use warnings;
 use IO::File;
 #use Devel::Size qw(size total_size);
 use vars qw($FW_ss);      # is smallscreen
+use vars qw($FW_ME);      # webname (default is fhem), needed by 97_GROUP
 
 sub seekTo($$$$);
 
