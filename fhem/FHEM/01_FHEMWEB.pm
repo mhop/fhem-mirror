@@ -778,7 +778,8 @@ FW_doDetail($)
 
   if($modules{$t}{FW_detailFn}) {
     no strict "refs";
-    FW_pO &{$modules{$t}{FW_detailFn}}($FW_wname, $d, $FW_room) . "<br>";
+    my $txt = &{$modules{$t}{FW_detailFn}}($FW_wname, $d, $FW_room);
+    FW_pO "$txt<br>" if(defined($txt));
     use strict "refs";
   }
 
@@ -1069,11 +1070,15 @@ FW_showRoom()
       my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf);
 
       my $sfn = $modules{$type}{FW_summaryFn};
+      my $newtxt;
       if($sfn) {
         no strict "refs";
-        $txt = &{$sfn}($FW_wname, $d, $FW_room, \%extPage);
+        my $newtxt = &{$sfn}($FW_wname, $d, $FW_room, \%extPage);
         use strict "refs";
-        FW_pO "<td id=\"$type.$d\">$txt</td>";
+      }
+
+      if(defined($newtxt)) {
+        FW_pO "<td id=\"$type.$d\">$newtxt</td>";
 
       } else {
         FW_pO "<td id=\"$d\">$txt</td>";
