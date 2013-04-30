@@ -295,8 +295,8 @@ wl_PEdit($$$$)
   $ret .= "</tr>";
 
   $ret .= "<tr class=\"odd\"><td>Diagramm label</td>";
-  $ret .= "<td>Column,Regexp,DefaultValue,Function</td>";
-  $ret .=" <td>Y-Axis,Plot-Type,Style</td></tr>";
+  $ret .= "<td>Input:Column,Regexp,DefaultValue,Function</td>";
+  $ret .=" <td>Y-Axis,Plot-Type,Style,Width</td></tr>";
 
   my ($colnums, $colregs, $coldata) = wl_getRegFromFile($file);
   $colnums = join(",", 4..$colnums);
@@ -311,7 +311,7 @@ wl_PEdit($$$$)
     my @f = split(":", ($flog->[$r] ? $flog->[$r] : ":::"), 4);
     $ret .= wl_sel("cl_${r}", $colnums, $f[0]);
     $ret .= wl_sel("re_${r}", $colregs, $f[1]);
-    $ret .= wl_txt("df_${r}", "", $f[2], 2);
+    $ret .= wl_txt("df_${r}", "", $f[2], 1);
     $ret .= wl_txt("fn_${r}", "", $f[3], 6);
 
     $ret .= "</td><td>";
