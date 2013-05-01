@@ -7,18 +7,15 @@ use warnings;
 
 # Open Tasks
 #  - precision for model percent to 0,1
-#  - send time & date methods and as command
-#  - send 4bit values for (8bit-types)
 #  - allow defined groups that are only used for sending of data (no status shown)
-#  - add convinience method for sending dim values / allow slider
-#  - get should also be able to get for a given group
 
 my %eib_c2b = (
 	"off" => "00",
 	"on" => "01",
 	"on-for-timer" => "01",
 	"on-till" => "01",
-	"value" => ""
+	"raw" => "",
+	"value" => "" #value must be last.. because of slider functionality in Set
 );
 
 my %codes = (
@@ -39,11 +36,11 @@ my %eib_dpttypes = (
 
   # 1-Octet unsigned value
   "dpt5" 		=> {"CODE"=>"dpt5", "UNIT"=>"",  "factor"=>1},
-  "percent" 	=> {"CODE"=>"dpt5", "UNIT"=>"%", "factor"=>100/255},
+  "percent" 	=> {"CODE"=>"dpt5", "UNIT"=>"%", "factor"=>100/255, "slider"=>"0,1,100"},
   "dpt5.003" 	=> {"CODE"=>"dpt5", "UNIT"=>"&deg;", "factor"=>360/255},
   "angle" 		=> {"CODE"=>"dpt5", "UNIT"=>"&deg;", "factor"=>360/255}, # alias for dpt5.003
   "dpt5.004" 	=> {"CODE"=>"dpt5", "UNIT"=>"%", "factor"=>1},
-  "percent255" 	=> {"CODE"=>"dpt5", "UNIT"=>"%", "factor"=>1}, #alias for dpt5.004
+  "percent255" 	=> {"CODE"=>"dpt5", "UNIT"=>"%", "factor"=>1 , "slider"=>"0,1,255"}, #alias for dpt5.004
 
   # 2-Octet unsigned Value (current, length, brightness)
   "dpt7" 		=> {"CODE"=>"dpt7", "UNIT"=>""},
@@ -199,11 +196,14 @@ EIB_Set($@)
   
   $arg1 = $a[2] if($na>2);
   $arg2 = $a[3] if($na>3);
+  my $model = $attr{$name}{"model"};
+  my $sliderdef = !defined($model)?undef:$eib_dpttypes{"$model"}{"slider"};
 
   my $c = $eib_c2b{$value};
   if(!defined($c)) {
-    return "Unknown argument $value, choose one of " .
-                                join(" ", sort keys %eib_c2b);
+  	my $resp = "Unknown argument $value, choose one of " . join(" ", sort keys %eib_c2b);
+  	$resp = $resp . ":slider,$sliderdef" if(defined $sliderdef);
+  	return $resp;
   }
   
   # the command can be send to any of the defined groups indexed starting by 1
@@ -216,10 +216,16 @@ EIB_Set($@)
   Log GetLogLevel($name,2), "EIB set $v";
   (undef, $v) = split(" ", $v, 2);	# Not interested in the name...
 
-  if($value eq "value" && defined($arg1)) {                                
+  if($value eq "raw" && defined($arg1)) {                                
   	# complex value command.
   	# the additional argument is transfered alone.
     $c = $arg1;
+  } elsif ($value eq "value" && defined($arg1)) {
+  	# value to be translated according to datapoint type
+  	$c = EIB_EncodeByDatapointType($hash,$name,$arg1);
+  	
+  	# set the value to the back translated value
+  	$v = EIB_ParseByDatapointType($hash,$name,$c);
   }
 
   my $groupcode = $hash->{CODE}{$groupnr};
@@ -286,6 +292,7 @@ EIB_Set($@)
   }
   return $ret;
 }
+
 
 sub
 EIB_Parse($$)
@@ -355,6 +362,100 @@ EIB_Parse($$)
    		return "UNDEFINED EIB_$dev EIB $dev";
    	}
   }
+}
+
+sub
+EIB_EncodeByDatapointType($$$)
+{
+	my ($hash, $name, $value) = @_;
+	my $model = $attr{$name}{"model"};
+	
+	# nothing to do if no model is given
+	return $value if(!defined($model));
+	
+	my $dpt = $eib_dpttypes{"$model"};
+	Log(4,"EIB encode $value for $name model: $model dpt: $dpt");
+	return $value if(!defined($dpt));
+
+	my $code = $eib_dpttypes{"$model"}{"CODE"};
+	my $unit = $eib_dpttypes{"$model"}{"UNIT"};
+	my $transval = undef;
+	
+	Log(4,"EIB encode $value for $name model: $model dpt: $code unit: $unit");
+	
+	if ($code eq "dpt5") 
+	{
+		my $dpt5factor = $eib_dpttypes{"$model"}{"factor"};
+		my $fullval = sprintf("00%.2x",($value/$dpt5factor));
+		$transval = $fullval;
+				
+		Log(5,"EIB $code encode $value = $fullval factor = $dpt5factor translated: $transval");
+		
+	} elsif ($code eq "dpt7") 
+	{
+		my $fullval = sprintf("00%.2x",$value);
+		$transval = $fullval;
+				
+		Log(5,"EIB $code encode $value = $fullval translated: $transval");
+		
+	} elsif($code eq "dpt9") 
+	{
+		my $sign = $value<0?-1:1;
+		my $absval = abs($value);
+		my $exp = $absval==0?0:int(log($absval)/log(2));
+		my $mant = $absval / (2**$exp) *100;
+		$mant = ((~($mant+1))&0x07FF) if($sign<0);
+		
+		my $fullval = $mant+2048*$exp;
+		$fullval |=0x8000 if($sign<0);
+		
+		$transval = sprintf("00%.4x",$fullval);
+		
+		Log(5,"EIB $code encode $value = $fullval sign: $sign mant: $mant exp: $exp translated: $transval");
+		
+	} elsif ($code eq "dpt10") 
+	{
+		# set current Time
+		my ($secs,$mins,$hours,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+		$year+=1900;
+		$mon++;
+		
+		my $fullval = $secs + ($mins<<8) + ($hours<<16);
+		$transval = sprintf("00%.6x",$fullval);
+				
+		Log(5,"EIB $code encode $value = $fullval hours: $hours mins: $mins secs: $secs translated: $transval");
+		
+	} elsif ($code eq "dpt11") 
+	{
+		# set current Date
+		my ($secs,$mins,$hours,$day,$month,$year,$wday,$yday,$isdst) = localtime(time);
+		$year+=1900;
+		$month++;
+		
+		my $fullval = ($year-2000) + ($month<<8) + ($day<<16);
+		$transval = sprintf("00%.6x",$fullval);
+
+		Log(5,"EIB $code encode $value = $fullval day: $day month: $month year: $year translated: $transval");
+		
+	} elsif ($code eq "dptxx") {
+		
+	}
+	
+	
+	# set state to translated value
+	if(defined($transval))
+	{
+		Log(4,"EIB $name translated $value $unit to $transval");
+		$value = "$transval";
+	}
+	else
+	{
+		Log(4,"EIB $name model $model value $value could not be translated/encoded. Just do a dec2hex translation");
+		$value = sprintf("00%.2x",$value);
+		
+	}
+	
+	return $value;
 }
 
 sub
@@ -554,7 +655,8 @@ eib_name2hex($)
 	<li><b>off</b> switch off device
 	<li><b>on-for-timer</b> <secs> switch on the device for the given time. After the specified seconds a switch off command is sent.
 	<li><b>on-till</b> <time spec> switches the device on. The device will be switched off at the given time.
-    <li><b>value</b> <hexvalue> sends the given value as raw data to the device.
+    <li><b>raw</b> <hexvalue> sends the given value as raw data to the device.
+    <li><b>value</b> <decimal value> transforms the value according to the chosen model and send the result to the device.
 
     <br>Example:
     <ul><code>
@@ -562,7 +664,8 @@ eib_name2hex($)
       set lamp1 off<br>
       set lamp1 on-for-timer 10<br>
       set lamp1 on-till 13:15:00<br>
-      set lamp1 value 234578<br>
+      set lamp1 raw 234578<br>
+      set lamp1 value 23.44<br>
     </code></ul>
     </li>
 
@@ -574,6 +677,33 @@ eib_name2hex($)
 	   set lamp1 on g2 (will send "on" to 0/10/02)
 	</code></ul>
 
+	A dimmer can be used with a slider as shown in following example:
+	<br><ul><code>
+		define dim1 EIB 0/0/5
+		attr dim1 model percent
+		attr dim1 webCmd value
+	</code></ul>
+	
+	The current date and time can be sent to the bus by the following settings:
+	<br><ul><code>
+	
+	define timedev EIB 0/0/7
+	attr timedev model dpt10
+	attr timedev eventMap /value now:now/
+	attr timedev webCmd now
+	
+	define datedev EIB 0/0/8
+	attr datedev model dpt11
+	attr datedev eventMap /value now:now/
+	attr datedev webCmd now
+	
+	# send every midnight the new date
+	define dateset at *00:00:00 set datedev value now
+	
+	# send every hour the current time
+	define timeset at +*01:00:00 set timedev value now
+	</code></ul>	
+	
   </ul>
   <br>
 
