@@ -336,6 +336,11 @@ TUL_SimpleWrite(@)
     $eibmsg->{'dst'} = $2;
     my $hexvalues = $3;
     my @data =  map hex($_), $hexvalues =~ /(..)/g;
+    
+    # check: first byte is only allowed to contain data in the lower 6bits
+    #        to make sure all is fine, we mask the first byte
+    $data[0] = $data[0] & 0x3f if(defined($data[0]));
+    
     print "SimpleWrite data: @data \n";
     $eibmsg->{'data'} = \@data;
     
@@ -701,9 +706,10 @@ sub encode_eibd($)
     @msg = (
 	    tul_hex2addr( $mref->{'dst'}), 	# Destination address
 	    0x0 | ($APCI >> 2), 	# TPDU type, Sequence no, APCI (msb)
-	    (($APCI & 0x3) << 6) | ($datalen ==1? $data[0] : 0),
+	    (($APCI & 0x3) << 6) | $data[0],
 	    );
     if ($datalen > 1) {
+    	shift(@data);
 		push @msg, @data;
     }
     return @msg;
@@ -798,11 +804,12 @@ sub encode_tpuart($)
     	0xBC, # EIB ctrl byte
 		tul_hex2addr($mref->{'src'}), # src address    	
 	    tul_hex2addr( $mref->{'dst'}), 	# Destination address
-	    0xE0 | ($datalen + ($datalen>1?1:0)), # Routing counter + data len
+	    0xE0 | $datalen, # Routing counter + data len
 	    0x00,
-	    (($APCI & 0x3) << 6) | ($datalen ==1? $data[0] : 0),
+	    (($APCI & 0x3) << 6) | $data[0],
 	    );
     if ($datalen > 1) {
+    	shift(@data);
 		push @msg, @data;
     }
     
