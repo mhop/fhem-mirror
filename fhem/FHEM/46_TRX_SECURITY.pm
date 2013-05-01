@@ -150,11 +150,11 @@ TRX_SECURITY_Set($@)
   	my $id1;
   	my $id2;
   	my $id3;
-  	if ($deviceid =~ /(..)(..)/ ) {
+  	if ($deviceid =~ /^(..)(..)$/) {
 		$id1 = $2;
 		$id2 = "00";
 		$id3 = $1;
-  	} elsif ($deviceid =~ /(..)(..)(..)/ ) {
+  	} elsif ($deviceid =~ /^(..)(..)(..)$/) {
                 $id1 = $1;
                 $id2 = $2;
                 $id3 = $3;
