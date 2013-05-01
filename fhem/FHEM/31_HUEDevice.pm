@@ -15,6 +15,7 @@ use SetExtensions;
 my %hueModels = (
   LCT001 => {name => 'HUE Bulb'             ,type => 'Extended color light'   ,subType => 'colordimmer',},
   LLC001 => {name => 'LivingColors G2'      ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LLC005 => {name => 'LivingColors Bloom'   ,type => 'Color Light'            ,subType => 'colordimmer',},
   LLC006 => {name => 'LivingColors Iris'    ,type => 'Color Light'            ,subType => 'colordimmer',},
   LLC007 => {name => 'LivingColors Bloom'   ,type => 'Color Light'            ,subType => 'colordimmer',},
   LWB001 => {name => 'LivingWhites Bulb'    ,type => 'Dimmable light'         ,subType => 'dimmer',},
