@@ -1,3 +1,10 @@
+Update vom 01.5.2013
+  * Performance Verbesserungen der Charts
+  * Statistikberechnungen nach ZoomIn hinzugefügt
+  * Highcharts entfernt
+  * Schatten in Charts entfernt
+  * Achsenkonfiguration manuell möglich (min/max)
+  * Achsenbeschriftung verbessert
 Update vom 27.4.2013
   * Performance Verbesserungen der Charts
   * Achsenkonfiguration aufgeräumt

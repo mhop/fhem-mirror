@@ -91,7 +91,7 @@ Ext.define('FHEM.view.LineChartPanel', {
         var chartSettingPanel = Ext.create('Ext.form.Panel', {
             title: 'Chart Settings - Click me to edit',
             name: 'chartformpanel',
-            maxHeight: 230,
+            maxHeight: 270,
             autoScroll: true,
             collapsible: true,
             titleCollapse: true,
@@ -168,6 +168,107 @@ Ext.define('FHEM.view.LineChartPanel', {
                                 { fieldLabel: 'daily', name: 'rb', inputValue: 'day' },
                                 { fieldLabel: 'hourly', name: 'rb', inputValue: 'hour' }
                             ]
+                        }
+                    ]
+                }, 
+                {
+
+                    xtype: 'fieldset',
+                    layout: 'column',
+                    title: 'Axis Configuration',
+                    defaults: {
+                        margin: '0 0 0 10'
+                    },
+                    items: [
+                        {
+                            xtype: 'radiogroup',
+                            name: 'leftaxisconfiguration',
+                            fieldLabel: 'Left Axis Scalerange',
+                            labelWidth: 120,
+                            allowBlank: true,
+                            defaults: {
+                                labelWidth: 55,
+                                padding: "0 25px 0 0",
+                                checked: false
+                            },
+                            items: [
+                                { fieldLabel: 'automatic', name: 'rb1', inputValue: 'automatic', checked: true },
+                                { fieldLabel: 'manual', name: 'rb1', inputValue: 'manual' }
+                            ],
+                            listeners: {
+                                change: function(rb1, newval, oldval) {
+                                    if (newval.rb1 === "automatic") {
+                                        rb1.up().down('numberfield[name=leftaxisminimum]').setDisabled(true);
+                                        rb1.up().down('numberfield[name=leftaxismaximum]').setDisabled(true);
+                                    } else {
+                                        rb1.up().down('numberfield[name=leftaxisminimum]').setDisabled(false);
+                                        rb1.up().down('numberfield[name=leftaxismaximum]').setDisabled(false);
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            xtype: 'numberfield',
+                            fieldLabel: 'Minimum',
+                            name: 'leftaxisminimum',
+                            allowBlank: false,
+                            disabled: true,
+                            labelWidth: 60,
+                            width: 120
+                        },
+                        {
+                            xtype: 'numberfield',
+                            fieldLabel: 'Maximum',
+                            name: 'leftaxismaximum',
+                            allowBlank: false,
+                            disabled: true,
+                            labelWidth: 60,
+                            width: 120
+                        },
+                        {
+                            xtype: 'radiogroup',
+                            name: 'rightaxisconfiguration',
+                            fieldLabel: 'Right Axis Scalerange',
+                            labelWidth: 130,
+                            allowBlank: true,
+                            defaults: {
+                                labelWidth: 55,
+                                padding: "0 25px 0 0",
+                                checked: false
+                            },
+                            items: [
+                                { fieldLabel: 'automatic', name: 'rb2', inputValue: 'automatic', checked: true },
+                                { fieldLabel: 'manual', name: 'rb2', inputValue: 'manual' }
+                            ],
+                            listeners: {
+                                change: function(rb2, newval, oldval) {
+                                    if (newval.rb2 === "automatic") {
+                                        rb2.up().down('numberfield[name=rightaxisminimum]').setDisabled(true);
+                                        rb2.up().down('numberfield[name=rightaxismaximum]').setDisabled(true);
+                                    } else {
+                                        rb2.up().down('numberfield[name=rightaxisminimum]').setDisabled(false);
+                                        rb2.up().down('numberfield[name=rightaxismaximum]').setDisabled(false);
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            xtype: 'numberfield',
+                            fieldLabel: 'Minimum',
+                            name: 'rightaxisminimum',
+                            allowBlank: false,
+                            disabled: true,
+                            labelWidth: 60,
+                            width: 120
+                        },
+                        {
+                            xtype: 'numberfield',
+                            fieldLabel: 'Maximum',
+                            name: 'rightaxismaximum',
+                            allowBlank: false,
+                            disabled: true,
+                            labelWidth: 60,
+                            width: 120
                         }
                     ]
                 }, 

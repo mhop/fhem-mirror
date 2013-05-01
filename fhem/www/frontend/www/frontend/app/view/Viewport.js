@@ -28,20 +28,22 @@ Ext.define('FHEM.view.Viewport', {
             items: [
                 {
                     region: 'north',
-                    height: 85,
+                    height: 45,
                     layout: 'hbox',
                     items: [
                         {
-                            xtype: 'panel',
-                            html: '<p><img src="../../fhem/images/default/fhemicon.png" height="70px"</></p><h1 class="x-panel-header">Frontend</h1>',
+                            xtype: 'container',
+                            //html: '<p><img src="../../fhem/images/default/fhemicon.png" height="40px"</></p><h1 class="x-panel-header">Frontend</h1>',
+                            html: 'FHEM Webfrontend',
                             width: '25%',
+                            padding: '15px 0 0 5px',
                             border: false
                         },
                         {
                             xtype: 'textfield',
                             name: 'commandfield',
                             width: '30%',
-                            padding: '30px 0 0 0',
+                            padding: '10px 0 0 0',
                             fieldLabel: 'Send Commands',
                             border: false
                         },
@@ -53,7 +55,7 @@ Ext.define('FHEM.view.Viewport', {
                                 {
                                     xtype: 'button',
                                     width: 80,
-                                    margin: '30px 0 0 5px',
+                                    margin: '10px 0 0 5px',
                                     text: 'Execute',
                                     name: 'executecommand',
                                     icon: 'app/resources/icons/arrow_left.png'
@@ -61,7 +63,7 @@ Ext.define('FHEM.view.Viewport', {
                                 {
                                     xtype: 'button',
                                     width: 110,
-                                    margin: '30px 0 0 5px',
+                                    margin: '10px 0 0 5px',
                                     text: 'Save to Config',
                                     name: 'saveconfig',
                                     icon: 'app/resources/icons/database_save.png'
@@ -76,7 +78,7 @@ Ext.define('FHEM.view.Viewport', {
                                 {
                                     xtype: 'button',
                                     width: 75,
-                                    margin: '30px 5px 0 5px',
+                                    margin: '10px 5px 0 5px',
                                     text: 'Shutdown',
                                     name: 'shutdownfhem',
                                     tooltip: 'Shutdown FHEM',
@@ -85,7 +87,7 @@ Ext.define('FHEM.view.Viewport', {
                                 {
                                     xtype: 'button',
                                     width: 70,
-                                    margin: '30px 5px 0 5px',
+                                    margin: '10px 5px 0 5px',
                                     text: 'Restart',
                                     name: 'restartfhem',
                                     tooltip: 'Restart FHEM',
@@ -159,12 +161,6 @@ Ext.define('FHEM.view.Viewport', {
                             xtype: 'panel',
                             title: 'Database Tables',
                             name: 'tabledataaccordionpanel',
-                            autoScroll: true
-                        },
-                        {
-                            xtype: 'panel',
-                            title: 'Highcharts',
-                            name: 'highchartsaccordionpanel',
                             autoScroll: true
                         }
                     ]

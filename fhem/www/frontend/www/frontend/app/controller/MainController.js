@@ -4,8 +4,7 @@
 Ext.define('FHEM.controller.MainController', {
     extend: 'Ext.app.Controller',
     requires: [
-       'FHEM.view.DevicePanel',
-       'FHEM.view.HighChartsPanel'
+       'FHEM.view.DevicePanel'
     ],
 
     refs: [
@@ -48,9 +47,6 @@ Ext.define('FHEM.controller.MainController', {
             },
             'panel[name=tabledataaccordionpanel]': {
                 expand: this.showDatabaseTablePanel
-            },
-            'panel[name=highchartsaccordionpanel]': {
-                expand: this.showHighChartsPanel
             },
             'treepanel[name=maintreepanel]': {
                 itemclick: this.showDevicePanel
@@ -97,7 +93,7 @@ Ext.define('FHEM.controller.MainController', {
         
         if (Ext.isDefined(FHEM.version)) {
             var sp = this.getStatustextfield();
-            sp.setText(FHEM.version + "; Frontend Version: 0.61 - 2013-04-27");
+            sp.setText(FHEM.version + "; Frontend Version: 0.7 - 2013-05-01");
         }
         
         //setup west accordion / treepanel
@@ -430,29 +426,6 @@ Ext.define('FHEM.controller.MainController', {
             duration: 500,
             remove: false
         });
-    },
-    
-    showHighChartsPanel: function() {
-        var panel = {
-                xtype: 'highchartspanel',
-                name: 'highchartspanel',
-                region: 'center',
-                layout: 'fit'
-            };
-            this.destroyCenterPanels();
-            this.getMainviewport().add(panel);
-            
-//            var createdpanel = this.getMainviewport().down('tabledatagridpanel');
-//            
-//            createdpanel.getEl().setOpacity(0);
-//            createdpanel.show();
-//            
-//            createdpanel.getEl().animate({
-//                opacity: 1, 
-//                easing: 'easeIn',
-//                duration: 1500,
-//                remove: false
-//            });
-        }
+    }
     
 });
