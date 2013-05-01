@@ -151,6 +151,11 @@ Ext.define('FHEM.controller.ChartController', {
                 chart = me.getChart();
             
             //cleanup chartpanel 
+            var existingwins = Ext.ComponentQuery.query('window[name=statisticswin]');
+            Ext.each(existingwins, function(existingwin) {
+                existingwin.destroy();
+            });
+            
             var existingchartgrid = Ext.ComponentQuery.query('panel[name=chartgridpanel]')[0];
             if (!existingchartgrid) {
                 var chartdatagrid = Ext.create('FHEM.view.ChartGridPanel', {
@@ -352,6 +357,12 @@ Ext.define('FHEM.controller.ChartController', {
                             scope: me,
                             handler: function(btn) {
                                 var chart = btn.up().up().down('chart');
+                                
+                                var existingwins = Ext.ComponentQuery.query('window[name=statisticswin]');
+                                Ext.each(existingwins, function(existingwin) {
+                                    existingwin.destroy();
+                                });
+                                
                                 chart.restoreZoom();
                                 
                                 chart.axes.get(0).minimum = chart.up().up().getLastYmin();
@@ -419,6 +430,7 @@ Ext.define('FHEM.controller.ChartController', {
                         }
                     ],
                     animate: false,
+                    shadow: false,
                     store: store,
                     enableMask: true,
                     mask: true,//'vertical',//true, //'horizontal',
@@ -452,6 +464,89 @@ Ext.define('FHEM.controller.ChartController', {
                                         });
                                         serie.hideAll();
                                         
+                                    } else {
+                                        //creating statistic windows after zooming
+                                        var html,
+                                            count = 0,
+                                            sum = 0,
+                                            average = 0,
+                                            min = 99999999,
+                                            max = 0,
+                                            lastrec,
+                                            diffkwh = 0,
+                                            winwidth = 125,
+                                            winheight = 105;
+                                        Ext.each(serie.items, function(item) {
+                                            if (Ext.isNumeric(item.value[1])) {
+                                                count++;
+                                                sum = sum + item.value[1];
+                                                if (min > item.value[1]) {
+                                                    min = item.value[1];
+                                                }
+                                                if (max < item.value[1]) {
+                                                    max = item.value[1];
+                                                }
+                                                if (serie.title.indexOf('actual_kwh') >= 0) {
+                                                    if (lastrec) {
+                                                        var diffhrs = Ext.Date.getElapsed(lastrec.value[0], item.value[0]) / 1000 / 3600;
+                                                        diffkwh = diffkwh + diffhrs * lastrec.value[1];
+                                                    }
+                                                    lastrec = item;
+                                                    winwidth = 165,
+                                                    winheight = 130;
+                                                }
+                                            }
+                                        });
+                                        average = sum / count;
+                                        
+                                        html = '<b>Selected Items: </b>' + count + '<br>';
+                                        html += '<b>Sum: </b>' + Ext.util.Format.round(sum, 5) + '<br>';
+                                        html += '<b>Average: </b>' + Ext.util.Format.round(average, 5) + '<br>';
+                                        html += '<b>Min: </b>' + min + '<br>';
+                                        html += '<b>Max: </b>' + max + '<br>';
+                                        if (serie.title.indexOf('actual_kwh') >= 0) {
+                                            html += '<b>Used kW/h: </b>' + Ext.util.Format.round(diffkwh, 3) + '<br>';
+                                            html += '<b>Costs (at 25c/kWh): </b>' + Ext.util.Format.round(diffkwh * 0.25, 2) + '€<br>';
+                                        }
+                                        
+                                        var existingwins = Ext.ComponentQuery.query('window[name=statisticswin]'),
+                                            matchfound = false,
+                                            lastwin;
+                                        if (existingwins.length > 0) {
+                                            Ext.each(existingwins, function(existingwin) {
+                                                lastwin = existingwin;
+                                                if (existingwin.title === serie.title) {
+                                                    existingwin.update(html);
+                                                    existingwin.showAt(chart.getWidth() - 145, chart.getPosition()[1] + 8);
+                                                    matchfound = true;
+                                                } 
+                                            });
+                                            if (!matchfound) {
+                                                var win = Ext.create('Ext.window.Window', {
+                                                    width: winwidth,
+                                                    height: winheight,
+                                                    html: html,
+                                                    title: serie.title,
+                                                    name: 'statisticswin',
+                                                    preventHeader: true,
+                                                    border: false,
+                                                    plain: true
+                                                });
+                                                win.showAt(chart.getWidth() - 145, lastwin.getPosition()[1] + lastwin.getHeight());
+                                            }
+                                        } else {
+                                            var win = Ext.create('Ext.window.Window', {
+                                                width: winwidth,
+                                                height: winheight,
+                                                html: html,
+                                                title: serie.title,
+                                                name: 'statisticswin',
+                                                preventHeader: true,
+                                                border: false,
+                                                plain: true
+                                            });
+                                            win.showAt(chart.getWidth() - 145, chart.getPosition()[1] + 8);
+                                        }
                                     }
                                 });
                             }
@@ -766,13 +861,16 @@ Ext.define('FHEM.controller.ChartController', {
      * do the final layout of chart after all data is loaded
      */
     doFinalChartLayout: function(chart) {
-        var me = this;
+        var me = this,
+            leftaxisconfiguration = Ext.ComponentQuery.query('radiogroup[name=leftaxisconfiguration]')[0].getChecked()[0].inputValue,
+            rightaxisconfiguration = Ext.ComponentQuery.query('radiogroup[name=rightaxisconfiguration]')[0].getChecked()[0].inputValue;
         
         //remove the old max values of y axis to get a dynamic range
         delete chart.axes.get(0).maximum;
         delete chart.axes.get(0).minimum;
         delete chart.axes.get(1).maximum;
         delete chart.axes.get(1).minimum;
+        
         
         chart.axes.get(0).maximum = me.maxYValue;
         chart.axes.get(1).maximum = me.maxY2Value;
@@ -796,6 +894,29 @@ Ext.define('FHEM.controller.ChartController', {
             chart.axes.get(1).minimum = me.minY2Value;
         }
         
+        //if user has specified its own range, use it
+        if (leftaxisconfiguration === "manual") {
+            var leftaxismin = Ext.ComponentQuery.query('numberfield[name=leftaxisminimum]')[0].getValue(),
+                leftaxismax = Ext.ComponentQuery.query('numberfield[name=leftaxismaximum]')[0].getValue();
+            
+            if (Ext.isNumeric(leftaxismin) && Ext.isNumeric(leftaxismax)) {
+                chart.axes.get(0).minimum = leftaxismin;
+                chart.axes.get(0).maximum = leftaxismax;
+            } else {
+                Ext.Msg.alert("Error", "Please select a valid minimum and maximum for the axis!");
+            }
+        }
+        if (rightaxisconfiguration === "manual") {
+            var rightaxismin = Ext.ComponentQuery.query('numberfield[name=rightaxisminimum]')[0].getValue(),
+                rightaxismax = Ext.ComponentQuery.query('numberfield[name=rightaxismaximum]')[0].getValue();
+            
+            if (Ext.isNumeric(rightaxismin) && Ext.isNumeric(rightaxismax)) {
+                chart.axes.get(1).minimum = rightaxismin;
+                chart.axes.get(1).maximum = rightaxismax;
+            } else {
+                Ext.Msg.alert("Error", "Please select a valid minimum and maximum for the axis!");
+            }
+        }
         
         // set the x axis range dependent on user given timerange
         var starttime = new Date(me.getStarttimepicker().getValue()),
@@ -804,10 +925,22 @@ Ext.define('FHEM.controller.ChartController', {
         chart.axes.get(2).fromDate = starttime;
         chart.axes.get(2).toDate = endtime;
         
-        chart.axes.get(2).processView();
         
-        //collapse chart settings
-        //me.getChartformpanel().collapse();
+        var timediffhrs = Ext.Date.getElapsed(chart.axes.get(2).fromDate, chart.axes.get(2).toDate) / 1000 / 3600;
+        
+        if (timediffhrs <= 1) {
+            chart.axes.get(2).step = [Ext.Date.MINUTE, 10];
+        } else if (timediffhrs <= 24) {
+            chart.axes.get(2).step = [Ext.Date.HOUR, 1];
+        } else if (timediffhrs <= 168) {
+            chart.axes.get(2).step = [Ext.Date.DAY, 1];
+        } else if (timediffhrs <= 720) {
+            chart.axes.get(2).step = [Ext.Date.DAY, 7];
+        } else if (timediffhrs < 720) {
+            chart.axes.get(2).step = [Ext.Date.MONTH, 1];
+        }
+        
+        chart.axes.get(2).processView();
         
         me.resizeChart();
         
@@ -868,7 +1001,8 @@ Ext.define('FHEM.controller.ChartController', {
                 fill: fill,
                 style: {
                     fill: color,
-                    stroke: color
+                    stroke: '#808080',
+                    'stroke-width': 2
                 },
                 markerConfig: {
                     type: 'circle',
@@ -966,6 +1100,15 @@ Ext.define('FHEM.controller.ChartController', {
         Ext.ComponentQuery.query('datefield[name=starttimepicker]')[0].reset();
         Ext.ComponentQuery.query('datefield[name=endtimepicker]')[0].reset();
         Ext.ComponentQuery.query('radiofield[name=generalization]')[1].setValue(true);
+        
+        Ext.ComponentQuery.query('numberfield[name=leftaxisminimum]')[0].reset();
+        Ext.ComponentQuery.query('numberfield[name=leftaxismaximum]')[0].reset();
+        Ext.ComponentQuery.query('numberfield[name=rightaxisminimum]')[0].reset();
+        Ext.ComponentQuery.query('numberfield[name=rightaxismaximum]')[0].reset();
+        
+        Ext.ComponentQuery.query('radiogroup[name=leftaxisconfiguration]')[0].items.items[0].setValue(true);
+        Ext.ComponentQuery.query('radiogroup[name=rightaxisconfiguration]')[0].items.items[0].setValue(true);
+    
     },
     
     /**
@@ -1037,6 +1180,8 @@ Ext.define('FHEM.controller.ChartController', {
                     dynamicradio = Ext.ComponentQuery.query('radiogroup[name=dynamictime]')[0],
                     generalization = Ext.ComponentQuery.query('radio[boxLabel=active]')[0],
                     generalizationfactor = Ext.ComponentQuery.query('combobox[name=genfactor]')[0].getValue(),
+                    leftaxisconfiguration = Ext.ComponentQuery.query('radiogroup[name=leftaxisconfiguration]')[0].getChecked()[0].inputValue,
+                    rightaxisconfiguration = Ext.ComponentQuery.query('radiogroup[name=rightaxisconfiguration]')[0].getChecked()[0].inputValue,
                     chart = me.getChart(),
                     store = chart.getStore();
                 
@@ -1094,6 +1239,30 @@ Ext.define('FHEM.controller.ChartController', {
                 if(generalization.checked) {
                     jsonConfig += '"generalization":"true",';
                     jsonConfig += '"generalizationfactor":"' + generalizationfactor + '",';
+                }
+                
+                if (leftaxisconfiguration === 'manual') {
+                    var leftaxismin = Ext.ComponentQuery.query('numberfield[name=leftaxisminimum]')[0].getValue(),
+                        leftaxismax = Ext.ComponentQuery.query('numberfield[name=leftaxismaximum]')[0].getValue();
+                
+                    if (Ext.isNumeric(leftaxismin) && Ext.isNumeric(leftaxismax)) {
+                        jsonConfig += '"leftaxismin":"' + leftaxismin + '",';
+                        jsonConfig += '"leftaxismax":"' + leftaxismax + '",';
+                    } else {
+                        Ext.Msg.alert("Error", "Left axis configuration is invalid, values will not be saved!");
+                    }
+                }
+                
+                if (rightaxisconfiguration === "manual") {
+                    var rightaxismin = Ext.ComponentQuery.query('numberfield[name=rightaxisminimum]')[0].getValue(),
+                        rightaxismax = Ext.ComponentQuery.query('numberfield[name=rightaxismaximum]')[0].getValue();
+                    
+                    if (Ext.isNumeric(rightaxismin) && Ext.isNumeric(rightaxismax)) {
+                        jsonConfig += '"rightaxismin":"' + rightaxismin + '",';
+                        jsonConfig += '"rightaxismax":"' + rightaxismax + '",';
+                    } else {
+                        Ext.Msg.alert("Error", "Right axis configuration is invalid, values will not be saved!");
+                    }
                 }
                 
                 var j = 0;
@@ -1303,6 +1472,18 @@ Ext.define('FHEM.controller.ChartController', {
                 } else {
                     genfaccombo.setValue('30');
                     genbox.setValue(false);
+                }
+                
+                if (chartdata.leftaxismin && chartdata.leftaxismax) {
+                    Ext.ComponentQuery.query('radiogroup[name=leftaxisconfiguration]')[0].items.items[1].setValue(true);
+                    Ext.ComponentQuery.query('numberfield[name=leftaxisminimum]')[0].setValue(chartdata.leftaxismin);
+                    Ext.ComponentQuery.query('numberfield[name=leftaxismaximum]')[0].setValue(chartdata.leftaxismax);
+                }
+                
+                if (chartdata.rightaxismin && chartdata.rightaxismax) {
+                    Ext.ComponentQuery.query('radiogroup[name=rightaxisconfiguration]')[0].items.items[1].setValue(true);
+                    Ext.ComponentQuery.query('numberfield[name=rightaxisminimum]')[0].setValue(chartdata.rightaxismin);
+                    Ext.ComponentQuery.query('numberfield[name=rightaxismaximum]')[0].setValue(chartdata.rightaxismax);
                 }
                 
                 this.requestChartData();
