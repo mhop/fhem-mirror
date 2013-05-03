@@ -15,7 +15,7 @@ SYSSTAT_Initialize($)
   $hash->{UndefFn}  = "SYSSTAT_Undefine";
   $hash->{GetFn}    = "SYSSTAT_Get";
   $hash->{AttrFn}   = "SYSSTAT_Attr";
-  $hash->{AttrList} = "filesystems raspberrytemperature:1 showpercent:1 useregex:1 ssh_user loglevel:0,1,2,3,4,5,6 ".
+  $hash->{AttrList} = "filesystems raspberrytemperature:0,1,2 showpercent:1 useregex:1 ssh_user loglevel:0,1,2,3,4,5,6 ".
                        $readingFnAttributes;
 }
 
@@ -121,7 +121,6 @@ SYSSTAT_Attr($$$)
   my $orig = $attrVal;
   $attrVal= "1" if($attrName eq "useregex");
   $attrVal= "1" if($attrName eq "showpercent");
-  $attrVal= "1" if($attrName eq "raspberrytemperature");
 
   if( $attrName eq "filesystems") {
     my $hash = $defs{$name};
@@ -149,6 +148,7 @@ sub
 SYSSTAT_GetUpdate($)
 {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
 
   if(!$hash->{LOCAL}) {
     RemoveInternalTimer($hash);
@@ -179,11 +179,11 @@ SYSSTAT_GetUpdate($)
     my $usage = $hash->{diskusage}->get;
 
     my $type = 'free';
-    if( AttrVal($hash->{NAME}, "showpercent", "") ne "" ) {
+    if( AttrVal($name, "showpercent", "") ne "" ) {
       $type = 'usageper';
     }
 
-    if( AttrVal($hash->{NAME}, "useregex", "") eq "" ) {
+    if( AttrVal($name, "useregex", "") eq "" ) {
       for my $filesystem (@{$hash->{filesystems}}) {
         my $fs = $usage->{$filesystem};
         readingsSingleUpdate($hash,$fs->{mountpoint},$fs->{$type},defined($hash->{LOCAL} ? 0 : 1));
@@ -200,9 +200,14 @@ SYSSTAT_GetUpdate($)
     }
   }
 
-  if( AttrVal($hash->{NAME}, "raspberrytemperature", "") ne "" ) {
+  if( AttrVal($name, "raspberrytemperature", "0") > 0 ) {
     my $temp = SYSSTAT_getPiTemp($hash);
-    readingsSingleUpdate($hash,"temperature",$temp,defined($hash->{LOCAL} ? 0 : 1)) if( $temp > 0 && $temp < 200 );
+    if( $temp > 0 && $temp < 200  ) {
+      if( AttrVal($name, "raspberrytemperature", "0") eq 2 ) {
+          $temp = sprintf( "%.1f", (3 * ReadingsVal($name,"temperature",$temp) + $temp ) / 4 );
+        }
+      readingsSingleUpdate($hash,"temperature",$temp,defined($hash->{LOCAL} ? 0 : 1));
+    }
   }
 }
 
@@ -363,7 +368,8 @@ SYSSTAT_getPiTemp( $ )
     <li>showpercent<br>
       If set the usage is shown in percent. If not set the remaining free space in bytes is shown.</li>
     <li>raspberrytemperature<br>
-      If set the raspberry pi on chip termal sensor is read.</li>
+      If set and > 0 the raspberry pi on chip termal sensor is read.<br>
+      If set to 2 a geometric average over the last 4 values is created.</li>
     <li>useregex<br>
       If set the entries of the filesystems list are treated as regex.</li>
     <li>ssh_user<br>
