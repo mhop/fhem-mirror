@@ -237,14 +237,19 @@ sub HMLAN_uptime($$) {#########################################################
   my $sec = int($msec/1000);
   
 #  my ($sysec, $syusec) = gettimeofday();
-#  if (!$hash->{helper}{refTime}){ #init referenceTime
-#    $hash->{helper}{refTime} = $syusec/1000;
-#    $hash->{helper}{refTimeS} = $sysec*1000+$syusec/1000;
+#  my $symsec = int($sysec*1000+$syusec/1000);
+#  if ($hash->{helper}{refTime} == 1){ #init referenceTime
+#    $hash->{helper}{refTime} = 2;
+#    $hash->{helper}{refTimeS} = $symsec;
 #    $hash->{helper}{refTStmp} = $msec; 
+#    $hash->{helper}{msgdly} = $hash->{helper}{msgdlymin} = $hash->{helper}{msgdlymax} = 0; 
+#  }
+#  elsif ($hash->{helper}{refTime} == 0){ #init referenceTime
+#    $hash->{helper}{refTime} = 1;
 #  }
 #  else{
-#    my $dly = ($sysec*1000+$syusec/1000 - $hash->{helper}{refTimeS} ) -
-#	          ($msec        - $hash->{helper}{refTStmp});
+#    my $dly = ($symsec - $hash->{helper}{refTimeS} ) -
+#	          ($msec   - $hash->{helper}{refTStmp});
 #    $hash->{helper}{msgdly} = $dly;
 #    $hash->{helper}{msgdlymin} = $dly 
 #	    if (!$hash->{helper}{msgdlymin} || $hash->{helper}{msgdlymin} > $dly);
@@ -253,18 +258,6 @@ sub HMLAN_uptime($$) {#########################################################
 #	readingsSingleUpdate($hash,"msgDly","last:".$hash->{helper}{msgdly}
 #	                                   ." min:".$hash->{helper}{msgdlymin}
 #	                                   ." max:".$hash->{helper}{msgdlymax},0);
-#	Log 1,"General msgDly: ".$hash->{helper}{msgdly}
-#	                ." min:".$hash->{helper}{msgdlymin}
-#	                ." max:".$hash->{helper}{msgdlymax}
-#					." syss:".$sysec
-#					." sysus:".$syusec/1000
-#					." sysref:".$hash->{helper}{refTime}
-#					." sysrefS:".$hash->{helper}{refTimeS}
-#					." sysrefC:".($sysec*1000+$syusec/1000)
-#					." sysrefSd:".($sysec*1000+$syusec/1000 - $hash->{helper}{refTimeS})
-#					." lan:".$msec
-#					." land:".($msec- $hash->{helper}{refTStmp})
-#					;
 #  }
   return sprintf("%03d %02d:%02d:%02d.%03d",
                   int($msec/86400000), int($sec/3600),
@@ -325,6 +318,7 @@ sub HMLAN_Parse($$) {##########################################################
 	}
 	if ($mFld[1] !~ m/00(01|02|21|41|50)/ && $letter eq 'R'){
       Log $ll5, "HMLAN_Parse: $name discard, NACK state:".$mFld[1];
+	  $hash->{helper}{$dst}{flg} = 0;#NACK is also a response, continue process
 	  return;
 	}
     Log $ll5, "HMLAN_Parse: $name special reply ".$mFld[1]        if($stat & 0x0200);
@@ -345,11 +339,13 @@ sub HMLAN_Parse($$) {##########################################################
     $hash->{"${name}_MSGCNT"}++;
     $hash->{"${name}_TIME"} = TimeNow();
 	
-	if (($hash->{helper}{$src}{flg}) && ($letter eq 'R')){ #HMLAN is done? 
-	  $hash->{helper}{$src}{flg} = 0;                      #release send-holdoff
-	  HMLAN_SimpleWrite($hash, $hash->{helper}{$src}{msg}) #send delayed msg if any
-	                              if ($hash->{helper}{$src}{msg});
-	  $hash->{helper}{$src}{msg} = "";                     #clear message
+    if ($letter eq 'R' && $hash->{helper}{$src}{flg}){
+	  $hash->{helper}{$src}{flg} = 0;                 #release send-holdoff
+	  if ($hash->{helper}{$src}{msg}){                #send delayed msg if any
+	    Log $ll5,"HMLAN_SdDly: $name $src ".$hash->{helper}{$src}{msg};
+		HMLAN_SimpleWrite($hash, $hash->{helper}{$src}{msg});
+	  }
+	  $hash->{helper}{$src}{msg} = "";                #clear message
 	}
 	# prepare dispatch-----------
     # HM format A<len><msg>:<info>:<RSSI>:<IOname>  Info is not used anymore
@@ -416,17 +412,19 @@ sub HMLAN_SimpleWrite(@) {#####################################################
                              .' '        .$8
                              .' '        .$9
                              .' '        .$10;
-	if ( $hash->{helper}{$dst}{flg}){                #send not ack by HMLAN
-      if($hash->{helper}{$dst}{to} > gettimeofday()){#will not wait forever!
-	    $hash->{helper}{$dst}{msg} = $msg;           #postpone  message
+	if ($dst ne $attr{$name}{hmId}){  #delay send if answer is pending
+	  if ( $hash->{helper}{$dst}{flg} &&                #HMLAN's ack pending
+          ($hash->{helper}{$dst}{to} > gettimeofday())){#won't wait forever!
+	    $hash->{helper}{$dst}{msg} = $msg;              #postpone  message
 	    Log $ll5,"HMLAN_Delay: $name msg delayed $dst $msg";
 	    return;
 	  }
-    }
-    my $flg = substr($msg,36,2);
-	$hash->{helper}{$dst}{flg} = (hex($flg)&0x20)?1:0;
-    $hash->{helper}{$dst}{to} = gettimeofday() + 2;# flag timeout after 2 sec
-    if ($len > 52){#channel information included
+      my $flg = substr($msg,36,2);
+	  $hash->{helper}{$dst}{flg} = (hex($flg)&0x20)?1:0;
+      $hash->{helper}{$dst}{to} = gettimeofday() + 2;# flag timeout after 2 sec
+	  $hash->{helper}{$dst}{msg} = "";
+	}
+    if ($len > 52){#channel information included, send sone kind of clearance
 	  my $chn = substr($msg,52,2);
 	  if ($hash->{helper}{$dst}{chn} && $hash->{helper}{$dst}{chn} ne $chn){
 	    my $updt = $hash->{helper}{$dst}{newChn};
