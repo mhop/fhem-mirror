@@ -461,7 +461,7 @@ sub FRM_poll
     	vec($rin, $hash->{FD}, 1) = 1;
     	my $nfound = select($rout=$rin, undef, undef, 0.1);
     	my $mfound = vec($rout, $hash->{FD}, 1); 
-		if($mfound) {
+		if($mfound && defined $hash->{FirmataDevice}) {
 			$hash->{FirmataDevice}->poll();
 		}
 		return $mfound;
@@ -472,7 +472,7 @@ sub FRM_poll
   		if($po) {
   			($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
   		}
-  		if ($InBytes && $InBytes>0) {
+  		if ($InBytes && $InBytes>0 && defined $hash->{FirmataDevice}) {
 			$hash->{FirmataDevice}->poll();
   		}
 	}
