@@ -236,7 +236,7 @@ TRX_DoInit($)
   if (! $buf) {
     	Log 1, "TRX: Initialization Error: No character read";
 	return "TRX: Initialization Error $name: no char read";
-  } elsif ($buf !~ m/^\x0d\x01\x00.........../) {
+  } elsif ($buf !~ m/\x0d\x01\x00.........../) {
 	my $hexline = unpack('H*', $buf);
     	Log 1, "TRX: Initialization Error hexline='$hexline'";
 	return "TRX: Initialization Error %name expected char=0x2c, but char=$char received.";
@@ -244,7 +244,7 @@ TRX_DoInit($)
     	Log 1, "TRX: Init OK";
   	$hash->{STATE} = "Initialized";
 	# Analyse result and display it:
-	if ($buf =~ m/^\x0d\x01\x00(.)(.)(.)(.)(.)(.)(.)(.)(.)(.)(.)/) {
+	if ($buf =~ m/\x0d\x01\x00(.)(.)(.)(.)(.)(.)(.)(.)(.)(.)(.)/) {
 		my $status = "";
 
 		my $seqnbr = $1;
