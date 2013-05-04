@@ -1073,7 +1073,7 @@ FW_showRoom()
       my $newtxt;
       if($sfn) {
         no strict "refs";
-        my $newtxt = &{$sfn}($FW_wname, $d, $FW_room, \%extPage);
+        $newtxt = &{$sfn}($FW_wname, $d, $FW_room, \%extPage);
         use strict "refs";
       }
 
