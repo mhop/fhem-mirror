@@ -237,7 +237,11 @@ sub CUL_HM_updateConfig($){
 	  }
 	}
 	$attr{$name}{webCmd} = $webCmd if ($webCmd);
-	push @getConfList,$name if (0 != CUL_HM_getAttrInt($name,"autoReadReg"));
+
+    no warnings 'numeric';
+    my $autoRead = int(AttrVal($name,"autoReadReg",0))+0;
+    use warnings 'numeric';
+	push @getConfList,$name if (0 != $autoRead);
   }
   $modules{CUL_HM}{helper}{updtCfgLst} = \@getConfList;
   CUL_HM_autoReadConfig("updateConfig");
@@ -729,7 +733,10 @@ sub CUL_HM_Parse($$) {##############################
 	    ($mTp eq "41"))                { 
 	  my $level = substr($p,4,2);
 	  my %lvl=("00"=>"normal","64"=>"added","C8"=>"addedStrong");
-      $level = hex($level)/2 if($model eq "HM-Sen-Wa-Od");
+	  if($model eq "HM-Sen-Wa-Od"){
+        $level = hex($level)/2 ;
+	    push @event, "level:$level%";
+	  }
 	  $level = $lvl{$level}  if($model eq "HM-CC-SCD");
 	  push @event, "state:".$level."%";
 	  
@@ -4799,6 +4806,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
   <li>smokeDetector<br>
       [off|smoke-Alarm|alive]             # for team leader<br>
 	  [off|smoke-forward|smoke-alarm]     # for team members<br>
+	  [normal|added|addedStrong]          #HM-CC-SCD<br>
  	  SDteam [add|remove]_$dname<br>
       battery [low|ok]<br>
       smoke_detect on from $src<br>
@@ -4836,6 +4844,14 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
       error [unknown|motor aborted|clutch failure|none']<br>
       lock [unlocked|locked]<br>
       [unlocked|locked|uncertain]<br>
+  </li>
+  <li>HM-CC-SCD<br>
+	  [normal|added|addedStrong]<br>
+      battery [low|ok]<br>
+  </li>
+  <li>HM-Sen-Wa-Od<br>
+	  $level%<br>
+	  level $level%<br>
   </li>
   </ul>
   <br>
