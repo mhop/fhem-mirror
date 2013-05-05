@@ -103,6 +103,7 @@ sub
 weblink_FwDetail($@)
 {
   my ($d, $text)= @_;
+  return "" if(AttrVal($d, "group", ""));
   my $alias= AttrVal($d, "alias", $d);
 
   my $ret = "<br>";
