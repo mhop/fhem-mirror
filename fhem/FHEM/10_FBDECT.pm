@@ -13,10 +13,7 @@ sub FBDECT_Set($@);
 sub FBDECT_Get($@);
 sub FBDECT_Cmd($$@);
 
-my @fbdect_models = qw(
-  "AVM FRITZ!Dect Powerline 546E"
-  "AVM FRITZ!Dect 200"
-);
+my @fbdect_models = qw(Powerline546E Dect200);
 
 my %fbdect_payload = (
    7 => { n=>"connected" },
