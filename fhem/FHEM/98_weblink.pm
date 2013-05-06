@@ -38,7 +38,7 @@ weblink_Define($$)
 {
   my ($hash, $def) = @_;
   my ($type, $name, $wltype, $link) = split("[ \t]+", $def, 4);
-  my %thash = ( link=>1, fileplot=>1, dbplot=>1, image=>1, iframe=>1, htmlCode=>1 );
+  my %thash = ( link=>1, fileplot=>1, dbplot=>1, image=>1, iframe=>1, htmlCode=>1, cmdList=>1 );
   
   if(!$link || !$thash{$wltype}) {
     return "Usage: define <name> weblink [" .
@@ -137,6 +137,25 @@ weblink_FwFn($$$$)
   } elsif($wltype eq "iframe") {
     $ret = "<iframe src=\"$link\" $attr>Iframes disabled</iframe>" .
            weblink_FwDetail($d);
+
+  } elsif($wltype eq "cmdList") {
+
+    my @lines = split(" ", $link);
+    my $row = 0;
+    my $ret = "<table>";
+    $ret .= "<tr><td><div class=\"devType\"><a href=\"/fhem?detail=$d\">".AttrVal($d, "alias", $d)."</div></td></tr>";
+    $ret .= "<tr><td><table class=\"block wide\">";
+    foreach my $line (@lines) {
+      my @args = split(":", $line, 3);
+
+      $ret .= "<tr class=\"".(($row++&1)?"odd":"even")."\">";
+      $ret .= "<td><a href=\"/fhem?cmd=$args[2]\"><div class=\col1\"><img src=\"/fhem/icons/$args[0]\" width=19 height=19 align=\"center\" alt=\"$args[0]\" title=\"$args[0]\"> $args[1]</div></a></td></td>";
+      $ret .= "</tr>";
+    }
+    $ret .= "</table></td></tr>";
+    $ret .= "</table><br>";
+
+    return $ret;
 
   } elsif($wltype eq "fileplot" || $wltype eq "dbplot" ) {
 
@@ -419,7 +438,7 @@ weblink_WriteGplot($)
   <a name="weblinkdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; weblink [link|fileplot|dbplot|image|iframe|htmlCode]
+    <code>define &lt;name&gt; weblink [link|fileplot|dbplot|image|iframe|htmlCode|cmdList]
                 &lt;argument&gt;</code>
     <br><br>
     This is a placeholder used with webpgm2 to be able to integrate links
@@ -435,6 +454,7 @@ weblink_WriteGplot($)
       <code>define w_Frlink weblink htmlCode { WeatherAsHtml("w_Frankfurt") }</code><br>
       <code>define MyPlot weblink fileplot &lt;logdevice&gt;:&lt;gnuplot-file&gt;:&lt;logfile&gt;</code><br>
       <code>define MyPlot weblink dbplot &lt;logdevice&gt;:&lt;gnuplot-file&gt;</code><br>
+      <code>define systemCommands weblink cmdList pair:Pair:set+cul2+hmPairForSec+60 restart:Restart:shutdown+restart update:UpdateCheck:update+check</code><br>
     </ul>
     <br>
 
@@ -447,6 +467,7 @@ weblink_WriteGplot($)
           the current logfile to a weblink, it will always refer to the current
           file, even if its name changes regularly (and not the one you
           originally specified).</li>
+      <li>For cmdList &lt;argument&gt; consist of a list of space separated icon:label:cmd triples.</li>
 	</ul>
   </ul>
 
