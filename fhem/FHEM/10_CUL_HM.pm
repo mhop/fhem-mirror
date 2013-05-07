@@ -3450,7 +3450,7 @@ sub CUL_HM_4DisText($) {# convert text for 4dis
   my ($hash)=@_;
   my $name = $hash->{NAME};
   my $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")."RegL_";
-  my $reg1 = ReadingsVal($name,$regLN."05:" ,"");
+  my $reg1 = ReadingsVal($name,$regLN."01:" ,"");
   my %txt;
   foreach my $sAddr (54,70){
     my $txtHex = $reg1;  #one row
