@@ -86,34 +86,59 @@ TCM_Define($$)
 
 
 #####################################
-# Input is HEX, without header and CRC
+# Input is header and data (HEX), without CRC
 sub
 TCM_Write($$$)
 {
   my ($hash,$fn,$msg) = @_;
   my $name = $hash->{NAME};
+  my $ll2 = GetLogLevel($name,2);
   my $ll5 = GetLogLevel($name,5);
 
   return if(!defined($fn));
 
   my $bstring;
   if($hash->{MODEL} eq "120") {
-    $bstring = "$fn$msg";
-    $bstring = "A55A".$bstring.TCM_CSUM($bstring);
-
-  } else {      # 310 / ESP3
-
-    if(!$fn) { # "Old-Type" Radio Packet
-      $msg =~ m/^6B05(..)000000(........)(..)$/;
-      $fn = "00070701";
-      $msg = "F6$1$2${3}03FFFFFFFFFF00";
+    # TCM 120 (ESP2)
+    if (!$fn) {
+      # command with ESP2 format
+      $bstring = $msg;
+    } else {
+      # command with ESP3 format
+      my $packetType = hex (substr ($fn, 6, 2));
+      if ($packetType != 1) {
+        Log $ll2, "TCM120 $name: Packet Type not supported.";
+        return;
+      }
+      my $odataLen = hex (substr ($fn, 4, 2));
+      if ($odataLen != 0) {
+        Log $ll2, "TCM120 $name: Radio Telegram with optional Data not supported.";
+        return;
+      }    
+      #my $mdataLen = hex (substr ($fn, 0, 4));
+      my $rorg = substr ($msg, 0, 2);
+      # translate the RORG to ORG
+      my %rorgmap = ("F6"=>"05",
+                     "D5"=>"06",
+                     "A5"=>"07",
+                    );
+      if($rorgmap{$rorg}) {
+        $rorg = $rorgmap{$rorg};
+      } else {
+        Log $ll2, "TCM120 $name: unknown RORG mapping for $rorg";
+      }
+      if ($rorg eq "05" || $rorg eq "06") {
+        $bstring = "6B" . $rorg . substr ($msg, 2, 2) . "000000" . substr ($msg, 4);    
+      } else {
+        $bstring = "6B" . $rorg . substr ($msg, 2);    
+      }  
     }
-    $bstring = sprintf("55%s%s%s%s",    # $fn == Header, $msg == DATA
-        $fn, TCM_CRC8($fn), $msg, TCM_CRC8($msg));
-
+    $bstring = "A55A" . $bstring . TCM_CSUM($bstring);
+  } else {
+    # TCM 310 (ESP3)
+    $bstring = "55" . $fn . TCM_CRC8($fn) . $msg . TCM_CRC8($msg);
   }
-  Log $ll5, "$hash->{NAME} sending $bstring";
-
+  Log $ll5, "TCM $name sending $bstring";
   DevIo_SimpleWrite($hash, $bstring, 1);
 }
 
@@ -421,17 +446,19 @@ my %gets120 = (
 );
 
 my %gets310 = (
-  "sw_ver"       => {cmd=>"03",
-                     APPVersion  => "1,4",
-                     APIVersion  => "5,4",
-                     ChipID      => "9,4",
-                     ChipVersion => "13,4",
-                     Desc         => "17,16,STR", },
-  "idbase"       => {cmd=>"08",
-                     BaseId                => "1,4",
-                     RemainingWriteCycles => "5,1",},
+  "sw_ver"   => {cmd         => "03",
+                 APPVersion  => "1,4",
+                 APIVersion  => "5,4",
+                 ChipID      => "9,4",
+                 ChipVersion => "13,4",
+                 Desc        => "17,16,STR",},
+  "idbase"   => {cmd                  => "08",
+                 BaseId               => "1,4",
+                 RemainingWriteCycles => "5,1",},
+  "repeater" => {cmd       => "10",
+                 repEnable => "1,1",
+                 repLevel  => "2,1",},
 );
-
 
 sub
 TCM_Get($@)
