@@ -176,7 +176,7 @@ sub fs20easylamp_get_addwidget_setup_html() {
 sub fs20easylamp_get_addwidget_prepare_attributes() {
 	my $output = '
 		var temp_array = new Array();
-		temp_array[0] = "attribute";
+		temp_array[0] = "fhemname";
 		temp_array[1] = $("#combobox option:selected").val()
 		attributes_array[0] = temp_array;
 	';
@@ -205,7 +205,7 @@ sub fs20easylamp_getwidget_html() {
 ########################################################################################
 
 sub fs20easylamp_get_lamp_status () {
-	my $attribute = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "attribute");
+	my $attribute = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "fhemname");
 	my $d = $defs{$attribute};
 	return $d->{STATE};
 }
@@ -219,7 +219,7 @@ sub fs20easylamp_get_lamp_status () {
 ########################################################################################
 
 sub fs20easylamp_set_lamp_status() {
-	my $attribute = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "attribute");
+	my $attribute = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "fhemname");
 	my $d = $defs{$attribute};
 	Log 3, "set ".$d->{NAME}." ".$_GET{"status"};
 	fhem "set ".$d->{NAME}." ".$_GET{"status"};

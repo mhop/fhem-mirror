@@ -4,7 +4,7 @@
 #
 # YAF - Yet Another Floorplan
 # FHEM Projektgruppe Hochschule Karlsruhe, 2013
-# Markus Mangei, Daniel Weisensee
+# Markus Mangei, Daniel Weisensee, Prof. Dr. Peter A. Henning
 #
 ########################################################################################
 #
@@ -24,3 +24,10 @@
 ########################################################################################
 
 Please notice the installation guide included in the documentation.
+
+Bitte beachten Sie die beiliegende Anleitung
+
+WESENTLICHE ÄNDERUNGEN in YAF 0.41
+
+-  Das Attribut "attribute" in der Konfigurationsdatei wurde in "fhemname" umbenannt. Bitte 
+   bei schon bestehenden Installationen von YAF manuell ändern
