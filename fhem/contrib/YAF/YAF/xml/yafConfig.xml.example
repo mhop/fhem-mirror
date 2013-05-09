@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+########################################################################################
+#
+# yafConfig.xml
+#
+# YAF - Yet Another Floorplan
+# FHEM Projektgruppe Hochschule Karlsruhe, 2013
+# Markus Mangei, Daniel Weisensee
+#
+########################################################################################
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################################
+-->
+<configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="xmlSchema.xsd">
+  <settings>
+    <refresh interval="5"/>
+  </settings>
+  <views>
+    <view id="1" name="Erdgeschoss">
+      <backgrounds>
+        <background img_url="./img/eg.jpeg" x_pos="1" y_pos="1"/>
+      </backgrounds>
+      <widgets>
+        <widget name="fs20easylamp" x_pos="308" y_pos="202" id="1">
+          <attr name="fhemname" value="ez_LichtRegal"/>
+        </widget>
+      </widgets>
+    </view>
+    <view id="2" name="Obergeschoss">
+      <backgrounds>
+        <background img_url="./img/1og.jpeg" x_pos="1" y_pos="1"/>
+      </backgrounds>
+      <widgets>
+        <widget name="fs20easylamp" x_pos="151" y_pos="279" id="1">
+          <attr name="fhemname" value="ez_LichtRegal2"/>
+        </widget>
+      </widgets>
+    </view>
+  </views>
+</configuration>

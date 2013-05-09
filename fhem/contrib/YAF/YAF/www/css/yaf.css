@@ -1,0 +1,100 @@
+/*
+ * ########################################################################################
+ *
+ * yaf.css
+ *
+ * YAF - Yet Another Floorplan
+ * FHEM Projektgruppe Hochschule Karlsruhe, 2013
+ * Markus Mangei, Daniel Weisensee
+ *
+ * ########################################################################################
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * ########################################################################################
+ */
+#menue {
+     width: 250px;
+     float: left;
+     height: 550px;
+ }
+ 
+ #content {
+     float: left;
+     height: 550px;
+ }
+ 
+ .tab {
+     height: 500px;
+     width: 600px;
+ }
+ 
+ .menue_button {
+     width: 240px
+ }
+ 
+ .menue_block {
+ 	margin-bottom: 10px;
+ }
+ 
+ #menue_button_editview {
+     margin-top: 10px;
+ }
+ 
+#dialog_manageviews-table {
+ 	width: 100%;
+ }
+ 
+#dialog_manageviews-table col.col1 { }
+#dialog_manageviews-table col.col2 { width:20px; }
+#dialog_manageviews-table col.col3 { width:20px; }
+         
+         .loading_animation {
+    display:    none;
+    position:   fixed;
+    z-index:    1000;
+    top:        0;
+    left:       0;
+    height:     100%;
+    width:      100%;
+    background: rgba( 255, 255, 255, .8 ) 
+                url('../img/loading.gif') 
+                50% 50% 
+                no-repeat;
+}
+
+.widgets { 
+            padding: 0em; 
+            position: absolute;
+            width: 33px;
+            height: 33px;
+            cursor: move; 
+            opacity: 1;
+            border: 0px; 
+}
+
+#widget_menue {
+            padding: 0em;
+            position: absolute;
+            width: 100px;
+            height: 33px;
+            border: 1px;
+            z-index: 999;
+}
+       
+.widget_menue {
+    width: 33px;
+    height: 33px;
+    float: left;
+} 

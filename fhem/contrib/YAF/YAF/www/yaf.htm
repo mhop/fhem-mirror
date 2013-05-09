@@ -1,0 +1,181 @@
+<!--
+########################################################################################
+#
+# yaf.htm
+#
+# YAF - Yet Another Floorplan
+# FHEM Projektgruppe Hochschule Karlsruhe, 2013
+# Markus Mangei, Daniel Weisensee
+#
+########################################################################################
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################################
+-->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="us" lang="us">
+	<head>
+		<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+		<title>YAF GUI</title>
+		<link type="text/css" href="css/smoothness/jquery-ui-1.9.1.custom.css" rel="stylesheet"/>
+		<link type="text/css" href="css/yaf.css" rel="stylesheet" />
+		<script type="text/javascript" src="js/jquery-1.8.2.js"></script>
+		<script type="text/javascript" src="js/jquery-ui-1.9.1.custom.js"></script>
+		<script type="text/javascript" src="js/jquery.ui.touch-punch.min.js"></script>
+		<script type="text/javascript" src="js/yaf-dialogs.js"></script>
+		<script type="text/javascript" src="js/yaf-basics.js"></script>
+		
+		<script>
+		
+	
+			// Array mit den Namen und den zugehörigen Id's der Sichten
+			var views = new Array();
+			var widgets = new Array();
+			var current_view_id = null;
+			var current_widget_id = null;
+			var refreshTime = null;
+			
+			// Modus in der Sich YAF befindet
+			// modus=0: Live Modus
+			// modus=1: Positionierungs Modus 
+			var view_mode = 0;
+			var widgetWasMoved = false;
+			var close_widget_menue = true;
+			
+			// Speichert die Id der View, die gelöscht werden soll
+			var delete_view_id = null;
+			var edit_view_name = null;
+			var edit_view_id = null;
+			var add_widget_name = null;
+			
+			
+		
+			
+			
+			// Initialisiert die Oberfläche
+			function init() {
+				init_tabs();
+				init_menue();
+				$("#widget_menue").hide();
+				init_dialogs();
+				init_handlers();
+				load_views(show_views);
+				init_RefreshWidgets();
+				return;
+			}
+		
+			
+			###widget_js###
+			
+			$(document).ready(function() {	
+				init();
+			});
+		</script>
+		<style>
+	 		###widget_css###
+		</style>
+	</head>
+	<body>
+	    <div id="container">
+	        <div id="menue">
+	        	<div class="menue_block">
+	            	<button id="button_back" class="menue_button">Zu FHEM</button>
+	            </div>
+	            <div class="menue_block">
+	            	<button id="button_settings" class="menue_button">Einstellungen</button>
+	            </div>
+	            <div class="menue_block">
+		            <button id="button_addview" class="menue_button">Sicht hinzufügen</button>
+		            <button id="button_manageviews" class="menue_button">Sichten verwalten</button>
+	            </div>
+	            <div class="menue_block">
+		            <button id="button_addwidget" class="menue_button">Widget hinzufügen</button>
+	            </div>
+	            <div class="menue_block">
+		             <div id="button_editview" class="menue_button">
+		                <input type="radio" id="button_switchmode_0" name="radio" checked="checked"/><label for="button_switchmode_0" style="width: 118px;">Live</label>
+		                <input type="radio" id="button_switchmode_1" name="radio"/><label for="button_switchmode_1" style="width: 118px;">Bearbeiten</label>
+		            </div>
+	            </div>
+	        </div>
+	        <div id="content">
+	            <div id="tabs">
+                    <div id="widget_menue">
+                        <button id="widget_menue_edit" class="widget_menue"></button>
+                        <button id="widget_menue_delete" class="widget_menue"></button>
+                    </div>
+	            	<div id="tabs_error"></div>
+	                <ul id="views">              
+	                </ul>
+	            </div>
+	            
+	        </div>
+	    </div>
+	    
+	    <div id="dialog_addview" title="Sicht hinzufügen">
+	    	<div class="loading_animation" id="dialog_addview_loading"></div>
+	    	<p>Hier können Sie YAF eine neue Sicht hinzufügen.</p>
+			<label>Name: </label><input id="dialog_addview_name" name="dialog_addview_name"/>
+		</div> 
+
+	    <div id="dialog_editview" title="Sicht bearbeiten">
+	    	<div class="loading_animation" id="dialog_addview_loading"></div>
+	    	<p>Hier können Sie die bestehende Sicht ändern.</p>
+			<label>Name: </label><input id="dialog_editview_name" name="dialog_editview_name" value="" />
+		</div> 
+				
+	    <div id="dialog_deleteview" title="Sicht löschen">
+	    	<div class="loading_animation" id="dialog_deleteview_loading"></div>
+	    	<p>Sind Sie sicher, dass Sie die Sicht "<span><b id="label_deleteview"></b></span>" löschen Möchten? Es gehen alle Widgets verloren, die auf dieser Sicht verankert sind!</p>
+		</div>
+		
+	     <div id="dialog_manageviews" title="Sichten verwalten">
+	 		<div class="loading_animation" id="dialog_manageviews_loading"></div>
+	    	<p>Hier können Sie einzelne Sichten löschen oder bearbeiten. Gelöschte Sichten können nicht wiederhergestellt werden!</p>
+			<table id="dialog_manageviews-table">
+			</table>
+		</div>
+
+	     <div id="dialog_addwidget" title="Widget hinzufügen">
+	 		<div class="loading_animation" id="dialog_addwidget_loading"></div>
+	    	<p>Hier können Sie Widgets zur ausgewählten Sicht hinzufügen.</p>
+			<table id="dialog_addwidget_table">
+			</table>
+		</div>	
+		
+	    <div id="dialog_addwidget_setup" title="Widget hinzufügen">
+	 		<div class="loading_animation" id="dialog_addwidget_setup_loading"></div>
+	    	<p>Widget vom Typ <b id="dialog_addwidget_setup_widget"></b> hinzufügen: </p>
+			<div id="dialog_addwidget_setup_form" />
+		</div>
+		
+	    <div id="dialog_editwidget" title="Widget bearbeiten">
+	    	<div class="loading_animation" id="dialog_editwidget_loading"></div>
+	    	<p>Widget "<span><b id="label_editwidget"></b></span>" bearbeiten:</p>
+		</div>
+		
+	    <div id="dialog_deletewidget" title="Widget löschen">
+	    	<div class="loading_animation" id="dialog_deletewidget_loading"></div>
+	    	<p>Sind Sie sicher, dass Sie das Widget "<span><b id="label_deletewidget"></b></span>" löschen möchten?</p>
+		</div>
+		
+	     <div id="dialog_settings" title="Einstellungen">
+	 		<div class="loading_animation" id="dialog_settings_loading"></div>
+	    	<p>Einstellungen</p>
+	    	<label>Refresh-Intervall: </label><input id="dialog_settings_intervall" name="dialog_settings_intervall" value="" />
+		</div>
+		
+	</body>
+</html>
