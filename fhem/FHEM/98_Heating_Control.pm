@@ -255,7 +255,7 @@ Heating_Control_Update($)
   my $next   = 0;
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
 
-  my $AktDesiredTemp     = ReadingsVal($hash->{DEVICE}, $hash->{helper}{DESIRED_TEMP_READING}, 0);
+  my $AktDesiredTemp     = sprintf("%.1f", ReadingsVal($hash->{DEVICE}, $hash->{helper}{DESIRED_TEMP_READING}, 0));
   my $newDesTemperature  = $AktDesiredTemp; #default#
   my $nextDesTemperature = 0;
   my $nextSwitch = 0;
@@ -282,6 +282,7 @@ Heating_Control_Update($)
       Log $loglevel, "Jetzt:".strftime('%d.%m.%Y %H:%M:%S',localtime($now))." -> Next: ".strftime('%d.%m.%Y %H:%M:%S',localtime($next))." -> Temp: $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$st}";
       if ($now >= $next) {
         $newDesTemperature =  $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$st};
+        $newDesTemperature =  sprintf("%.1f", $newDesTemperature) if ($newDesTemperature =~ m/^[0-9]{1,3}$/i);
         $nowSwitch = $now;
       } else {
         $nextDesTemperature = $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$st};
@@ -302,7 +303,7 @@ Heating_Control_Update($)
   Log $loglevel, "NowSwitch: ".strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch))." ; AktDesiredTemp: $AktDesiredTemp ; newDesTemperature: $newDesTemperature";
   Log $loglevel, "NextSwitch=".strftime('%d.%m.%Y %H:%M:%S',localtime($nextSwitch));
   
-  if ($nowSwitch gt "" && !($AktDesiredTemp eq $newDesTemperature || $AktDesiredTemp == $newDesTemperature) ) {
+  if ($nowSwitch gt "" && $AktDesiredTemp ne $newDesTemperature ) {
     if (defined $hash->{helper}{CONDITION}) {
       $command = '{ fhem("set @ '.$hash->{helper}{DESIRED_TEMP_READING}.' %") if' . $hash->{helper}{CONDITION} . '}';
     } elsif (defined $hash->{helper}{COMMAND}) {
