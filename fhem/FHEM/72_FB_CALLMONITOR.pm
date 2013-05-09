@@ -261,12 +261,12 @@ FB_CALLMONITOR_Read($)
     }
     elsif ($array[1] eq "DISCONNECT")
     {
-	if (($array[3] eq "0") and ($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{EVENT} eq "RING")) 
+	if (($array[3] eq "0") and (exists($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}) and $hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{EVENT} eq "RING")) 
 	{
             readingsBulkUpdate($hash, "missed_call", $hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{NUMBER})
 	}
 	
-	delete($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}) if(defined($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}));
+	delete($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}) if(exists($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}));
     }
 
 
