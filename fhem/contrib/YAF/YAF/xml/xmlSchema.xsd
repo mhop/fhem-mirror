@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+########################################################################################
+#
+# xmlSchema.xsd
+#
+# YAF - Yet Another Floorplan
+# FHEM Projektgruppe Hochschule Karlsruhe, 2013
+# Markus Mangei, Daniel Weisensee
+#
+########################################################################################
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################################
+-->
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<!--  declaration of root -->
+	<xsd:element name="configuration" type="configuration-type" />
+
+	<xsd:complexType name="configuration-type">
+		<xsd:sequence>
+			<xsd:element name="settings" type="settings-type" minOccurs="1" maxOccurs="1" />
+			<xsd:element name="views" type="views-type" minOccurs="1" maxOccurs="1" />
+		</xsd:sequence>
+	</xsd:complexType>
+	
+	<!-- settings -->
+	<xsd:complexType name="settings-type">
+		<xsd:sequence>
+			<xsd:element name="refresh" minOccurs="1" maxOccurs="1">
+				<xsd:complexType>
+					<xsd:attribute name="interval" type="xsd:int" use="required" />
+				</xsd:complexType>
+			</xsd:element>
+		</xsd:sequence>	
+	</xsd:complexType>
+	
+	<!-- views -->
+	<xsd:complexType name="views-type">
+		<xsd:sequence>
+			<xsd:element name="view" type="view-type" minOccurs="0" maxOccurs="unbounded" />
+		</xsd:sequence>
+	</xsd:complexType>
+	
+	<xsd:complexType name="view-type">
+		<xsd:sequence>
+			<xsd:element name="backgrounds" type="backgrounds-type" minOccurs="0" maxOccurs="1" />
+			<xsd:element name="widgets" type="widgets-type" minOccurs="1" maxOccurs="1" />
+		</xsd:sequence>
+		<xsd:attribute name="id" type="xsd:int" use="required" />
+		<xsd:attribute name="name" type="xsd:string" use="required" />
+	</xsd:complexType>
+	
+	<xsd:complexType name="backgrounds-type">
+		<xsd:sequence>
+			<xsd:element name="background" minOccurs="0" maxOccurs="unbounded">
+				<xsd:complexType>
+					<xsd:attribute name="img_url" type="xsd:string" use="required" />
+					<xsd:attribute name="x_pos" type="xsd:int" use="required" />
+					<xsd:attribute name="y_pos" type="xsd:int" use="required" />
+				</xsd:complexType>
+			</xsd:element>
+		</xsd:sequence>
+	</xsd:complexType>
+	
+	<xsd:complexType name="widgets-type">
+		<xsd:sequence>
+			<xsd:element name="widget" type="widget-type" minOccurs="0" maxOccurs="unbounded" />
+		</xsd:sequence>
+	</xsd:complexType>
+	
+	<xsd:complexType name="widget-type">
+		<xsd:sequence>
+			<xsd:element name="attr" minOccurs="0" maxOccurs="unbounded">
+				<xsd:complexType>
+					<xsd:attribute name="name" type="xsd:string" use="required" />
+					<xsd:attribute name="value" type="xsd:string" use="required" />
+				</xsd:complexType>
+			</xsd:element>
+		</xsd:sequence>
+		<xsd:attribute name="id" type="xsd:int" use="required" />
+		<xsd:attribute name="name" type="xsd:string" use="required" />
+		<xsd:attribute name="x_pos" type="xsd:int" use="required" />
+		<xsd:attribute name="y_pos" type="xsd:int" use="required" />
+	</xsd:complexType>
+</xsd:schema>
