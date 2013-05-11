@@ -2847,7 +2847,7 @@ FW_dropdownFn()
         Space separated list of room:icon pairs, to override the default
         behaviour of showing an icon, if there is one with the name of
         "icoRoomName". This is the correct way to remove the icon for the room
-        Evertything, or the set one for rooms with / in the name (e.g.
+        Everything, or to set one for rooms with / in the name (e.g.
         Anlagen/EDV). The first part is treated as regexp, so space is
         represented by a dot.  Example:<br>
         attr WEB roomIcons Everything: Anlagen.EDV:icoEverything
