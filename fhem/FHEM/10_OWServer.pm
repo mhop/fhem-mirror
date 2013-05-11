@@ -605,7 +605,7 @@ OWServer_Set($@)
     Get all readings (OWServer / <a href="#OWDevice">OWDevice</a>) via a child process. This ensures, that FHEM
     is not blocked during communicating with the owserver.<br>
     Example:<br>
-    <code> attr <name> nonblocking 1</code>
+    <code> attr &lt;name&gt; nonblocking 1</code>
     </li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#eventMap">eventMap</a></li>
