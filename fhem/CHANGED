@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
-  - feature: SYSSTAT: optionaly calculate geometric average of last 4 temperature values
+  - feature: FHEMWEB attribute roomIcons added
+  - feature: SYSSTAT: optionaly calculate geometric average of last 4
+             temperature values
   - feature: weblink details screen can be used to edit .gplot files
   - feature: eventTypes module added, to help with FileLog details screen
   - feature: FB_CALLMONITOR: new reverse search provider dasschnelle.at for

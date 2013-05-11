@@ -118,7 +118,8 @@ FHEMWEB_Initialize($)
     "plotmode:gnuplot,gnuplot-scroll,SVG plotsize endPlotToday:1,0 plotfork ".
     "stylesheetPrefix touchpad:deprecated smallscreen:deprecated ".
     "basicAuth basicAuthMsg hiddenroom hiddengroup HTTPS allowfrom CORS:0,1 ".
-    "refresh longpoll:1,0 redirectCmds:0,1 reverseLogs:0,1 menuEntries";
+    "refresh longpoll:1,0 redirectCmds:0,1 reverseLogs:0,1 menuEntries ".
+    "roomIcons";
 
   ###############
   # Initialize internal structures
@@ -743,7 +744,7 @@ FW_makeSelect($$$$)
   FW_pO FW_select("","arg.$cmd$d",\@al, $selEl, $class,
         "FW_selChange(this.options[selectedIndex].text,'$list','val.$cmd$d')");
   FW_pO FW_textfield("val.$cmd$d", 30, $class);
-
+Log 1, "$d $cmd $list";
   # Initial setting
   FW_pO "<script type=\"text/javascript\">" .
         "FW_selChange('$selEl','$list','val.$cmd$d')</script>";
@@ -970,7 +971,10 @@ FW_roomOverview($)
         }
 
         # image tag if we have an icon, else empty
-        my $icon = FW_iconName("ico$l1") ? FW_makeImage("ico$l1")."&nbsp;" : "";
+        my $icoName = "ico$l1";
+        map { my ($n,$v) = split(":",$_); $icoName=$v if($l1 =~ m/$n/); }
+                        split(" ", AttrVal($FW_wname, "roomIcons", ""));
+        my $icon = FW_iconName($icoName) ? FW_makeImage($icoName)."&nbsp;" : "";
 
         if($l2 =~ m/.html$/ || $l2 =~ m/^http/) {
            FW_pO "$td<a href=\"$l2\">$icon$l1</a></td>";
@@ -2835,6 +2839,18 @@ FW_dropdownFn()
         icon-chooser in FHEMWEB to ease this task.  Setting icons for the room
         itself is indirect: there must exist an icon with the name
         ico<ROOMNAME>.png in the modpath directory.
+        </li>
+        <br>
+
+    <a name="roomIcons"></a>
+    <li>roomIcons<br>
+        Space separated list of room:icon pairs, to override the default
+        behaviour of showing an icon, if there is one with the name of
+        "icoRoomName". This is the correct way to remove the icon for the room
+        Evertything, or the set one for rooms with / in the name (e.g.
+        Anlagen/EDV). The first part is treated as regexp, so space is
+        represented by a dot.  Example:<br>
+        attr WEB roomIcons Everything: Anlagen.EDV:icoEverything
         </li>
         <br>
 
