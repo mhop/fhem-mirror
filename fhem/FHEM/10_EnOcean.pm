@@ -264,6 +264,7 @@ EnOcean_Set($@)
   my $stSet = AttrVal($name, "subTypeSet", undef);
   if (defined $stSet) {$st = $stSet;}
   my $subDef = AttrVal($name, "subDef", "$hash->{DEF}");
+  my $switchMode = AttrVal($name, "switchMode", "switch");
   my $tn = TimeNow();
   my $updateState = 1;
 
@@ -394,7 +395,7 @@ EnOcean_Set($@)
         $updateState = 0;
         $data = sprintf "A502%02X%02X%02X", $dimVal, $dimTime, $onoff|0x08;
         $header = "000A0001";
-        Log $ll2, "EnOcean: set $name $cmd $dimVal";
+        Log $ll2, "EnOcean: set $name $cmd";
       }
 
     } elsif($st eq "eltakoShutter") {
@@ -880,7 +881,6 @@ EnOcean_Set($@)
         return "Unknown Gateway Command " . $cmd . ", choose one of ". join(" ", sort keys %EnO_gwCmd);
       }
       # write gateway command
-      # header: len: 0x000A optlen: 0x00 pakettype: 0x01(radio)
       $header = "000A0001";
       Log $ll2, "EnOcean: set $name $cmd";
 
@@ -1041,7 +1041,6 @@ EnOcean_Set($@)
       my $channelD = ReadingsVal($name, "channelD", undef);
       my $subDef0 = AttrVal($name, "subDef0", "$hash->{DEF}");
       my $subDefI = AttrVal($name, "subDefI", "$hash->{DEF}");
-      my $switchMode = AttrVal($name, "switchMode", "switch");
       my $switchType = AttrVal($name, "switchType", "direction");
       # first action
       if ($switchType eq "central") {
@@ -1099,20 +1098,21 @@ EnOcean_Set($@)
         $data = sprintf "F6%02X", $switchCmd;
         $header = "00070001";
         Log $ll2, "EnOcean: set $name $cmd";
-        if ($switchMode eq "pushbutton") {
-          $data = "F600";
-          $status = "20";
-	  Log $ll2, "EnOcean: set $name released";
-        }
       }
     }
-    ##
     if($st ne "MD15") {
       if ($repeatingAllowed eq "no") {
         $status = substr ($status, 0, 1) . "F";
       }
       $data = sprintf "%s%s%s", $data, $subDef, $status;
       IOWrite ($hash, $header, $data);
+      if ($switchMode eq "pushbutton") {
+        $data = "F600";
+        $status = "20";
+        $data = sprintf "%s%s%s", $data, $subDef, $status;
+	Log $ll2, "EnOcean: set $name released";
+        IOWrite ($hash, $header, $data);
+      }
     }
     select(undef, undef, undef, 0.2);   # Tested by joerg. He prefers 0.3 :)
   }
@@ -2792,7 +2792,7 @@ EnOcean_Undef($$)
           initiate Gateway commands if attribute gwCmd is set.</li>
     </ul><br>
        The attr subType must be gateway. Attribute gwCmd can also be set to
-       switching|dimming|setpointShift|setpointBasic|ControlVar|fanStage|blindCmd.<br>
+       switching|dimming|setpointShift|setpointBasic|controlVar|fanStage|blindCmd.<br>
        This is done if the device was created by autocreate.<br>
        For Eltako devices attributes must be set manually.
     </li>
@@ -3134,7 +3134,7 @@ EnOcean_Undef($$)
       </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#eventMap">eventMap</a></li>
-    <li><a name="gwCmd">gwCmd</a> switching|dimming|setpointShift|setpointBasic|ControlVar|fanStage|blindCmd<br>
+    <li><a name="gwCmd">gwCmd</a> switching|dimming|setpointShift|setpointBasic|controlVar|fanStage|blindCmd<br>
       Gateway Command Type, see <a href="#Gateway">Gateway</a> profile
       </li>
     <li><a href="#ignore">ignore</a></li>
