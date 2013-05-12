@@ -735,10 +735,10 @@ sub CUL_HM_Parse($$) {##############################
 	  my %lvl=("00"=>"normal","64"=>"added","C8"=>"addedStrong");
 	  if($model eq "HM-Sen-Wa-Od"){
         $level = hex($level)/2 ;
-	    push @event, "level:$level%";
+	    push @event, "level:$level %";
 	  }
 	  $level = $lvl{$level}  if($model eq "HM-CC-SCD");
-	  push @event, "state:".$level."%";
+	  push @event, "state:".$level." %";
 	  
 	  my $err = hex(substr($p,6,2));
 	  push @event, "battery:".($err&0x80?"low":"ok") if (defined $err);
