@@ -221,7 +221,7 @@ FW_Read($)
   # This is a hack... Dont want to do it each time after a fork.
   if(!$modules{SVG}{LOADED} && -f "$attr{global}{modpath}/FHEM/98_SVG.pm") {
     my $ret = CommandReload(undef, "98_SVG");
-    Log 0, $ret if($ret);
+    Log 1, $ret if($ret);
   }
 
   # Data from HTTP Client
@@ -744,7 +744,6 @@ FW_makeSelect($$$$)
   FW_pO FW_select("","arg.$cmd$d",\@al, $selEl, $class,
         "FW_selChange(this.options[selectedIndex].text,'$list','val.$cmd$d')");
   FW_pO FW_textfield("val.$cmd$d", 30, $class);
-Log 1, "$d $cmd $list";
   # Initial setting
   FW_pO "<script type=\"text/javascript\">" .
         "FW_selChange('$selEl','$list','val.$cmd$d')</script>";
@@ -1515,7 +1514,7 @@ FW_showLog($)
     my $ret;
     if(!$modules{SVG}{LOADED}) {
       $ret = CommandReload(undef, "98_SVG");
-      Log 0, $ret if($ret);
+      Log 1, $ret if($ret);
     }
     Log 5, "plotcommand: get $d $file INT $f $t " . join(" ", @{$flog});
     $ret = FW_fC("get $d $file INT $f $t " . join(" ", @{$flog}));
