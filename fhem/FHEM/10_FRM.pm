@@ -82,9 +82,11 @@ sub FRM_Define($$) {
 
 #####################################
 sub FRM_Undef($) {
-	my $hash = @_;
+	my $hash = shift;
 	FRM_forall_clients($hash,\&FRM_Client_Unassign,undef);
-	DevIo_Disconnected($hash);
+	if (defined $hash->{DeviceName}) {
+		DevIo_Disconnected($hash);
+	};
 	my $device = $hash->{FirmataDevice};
 	if (defined $device) {
 		if (defined $device->{io}) {
