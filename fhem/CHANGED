@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: TCM: new attr blockSenderID:
+             Block receiving telegrams with a TCM SenderID sent by repeaters
   - feature: TCM: For TCM120 Transceiver now the transmission of RPS and 4BS
              commands supported
   - feature: EnOcean: Now all RPS / 1BS profiles, more than 90 4BS profiles and
