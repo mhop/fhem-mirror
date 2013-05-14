@@ -567,6 +567,11 @@ PRESENCE_DoLocalFritzBoxScan($)
         {
             Log GetLogLevel($name, 5), "PRESENCE ($name) - checking with cached number the $check_command state ($number)";
     	    $status = qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command);
+    	    
+    	    chomp $status;
+    	    
+    	    Log GetLogLevel($name, 5), "PRESENCE ($name) - ctlmgr_ctl (cached: $number) returned: $status";
+    	    
     	    if(not $status =~ /^\s*\d+\s*$/)
     	    {
         	return "$name|$local|error|could not execute ctlmgr_ctl (cached)";
@@ -582,6 +587,8 @@ PRESENCE_DoLocalFritzBoxScan($)
     my $max = qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice/count);
     
     chomp $max;
+    
+    Log GetLogLevel($name, 5), "PRESENCE ($name) - ctlmgr_ctl (getting device count) returned: $max";
     
     if(not $max =~ /^\s*\d+\s*$/)
     {
@@ -605,6 +612,8 @@ PRESENCE_DoLocalFritzBoxScan($)
 	{
   	    $status=qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command); 
   	    
+  	    chomp $status;
+  	    
   	    Log GetLogLevel($name, 5), "PRESENCE ($name) - $check_command for device number $net_device is $status";
   	    last;
 	}
@@ -612,8 +621,6 @@ PRESENCE_DoLocalFritzBoxScan($)
 	$number++;
 	sleep 0.2;
     }
-    
-    chomp $status;
 
     return ($status == 0 ? "$name|$local|absent" : "$name|$local|present").($number <= $max ? "|$number" : "");
 }
