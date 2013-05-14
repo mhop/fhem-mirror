@@ -53,7 +53,7 @@ TCM_Initialize($)
   $hash->{UndefFn} = "TCM_Undef";
   $hash->{GetFn}   = "TCM_Get";
   $hash->{SetFn}   = "TCM_Set";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 loglevel:0,1,2,3,4,5,6 blockSenderID:own,no";
 }
 
 #####################################
@@ -64,6 +64,7 @@ TCM_Define($$)
   my @a = split("[ \t][ \t]*", $def);
   my $name = $a[0];
   my $model = $a[2];
+  my $baseID;
 
   return "wrong syntax. Correct is: define <name> TCM [120|310] ".
                         "{devicename[\@baudrate]|ip:port}"
@@ -81,6 +82,14 @@ TCM_Define($$)
   $hash->{DeviceName} = $dev;
   $hash->{MODEL} = $model;
   my $ret = DevIo_OpenDev($hash, 0, undef);
+  my @getBaseID = ("get", "baseID");
+  if (TCM_Get($hash, @getBaseID) =~ /[Ff]{2}[\dA-Fa-f]{6}/ ) {
+    $hash->{BaseID} = sprintf "%08X", hex $&;
+    $hash->{LastID} = sprintf "%08X", (hex $&) + 127;
+  } else {
+    $hash->{BaseID} = "00000000";
+    $hash->{LastID} = "00000000";
+  }
   return $ret;
 }
 
@@ -209,8 +218,11 @@ TCM_Read($)
   return "" if(!defined($buf));
 
   my $name = $hash->{NAME};
-  my $ll5 = GetLogLevel($name,5);
-  my $ll2 = GetLogLevel($name,2);
+  my $blockSenderID = ReadingsVal($name, "blockSenderID", "no");
+  my $baseID = hex $hash->{BaseID};
+  my $lastID = hex $hash->{LastID};
+  my $ll5 = GetLogLevel($name, 5);
+  my $ll2 = GetLogLevel($name, 2);
 
   my $data = $hash->{PARTIAL} . uc(unpack('H*', $buf));
   Log $ll5, "$name/RAW: $data";
@@ -224,13 +236,13 @@ TCM_Read($)
       my $rest = substr($data, 28);
 
       if($crc ne $mycrc) {
-        Log $ll2, "$name: wrong checksum: got $crc, computed $mycrc" ;
+        Log $ll2, "TCM: $name wrong checksum: got $crc, computed $mycrc" ;
         $data = $rest;
         next;
       }
 
-      # Receive Radio Telegram (RRT)
       if($net =~ m/^0B(..)(........)(........)(..)/) {
+        # Receive Radio Telegram (RRT)
         my ($org, $d1,$id,$status) = ($1, $2, $3, $4);
 
         # Re-translate the ORG to RadioORG / TCM310 equivalent
@@ -240,9 +252,15 @@ TCM_Read($)
         } else {
           Log 1, "TCM120: unknown ORG mapping for $org";
         }
-        Dispatch($hash, "EnOcean:$org:$d1:$id:$status", undef);
 
-      } else {                    # Receive Message Telegram (RMT)
+        if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
+          Log $ll5, "TCM: $name Telegram from $id blocked.";        
+        } else {
+          Dispatch($hash, "EnOcean:$org:$d1:$id:$status", undef);
+        }
+
+      } else {
+        # Receive Message Telegram (RMT)
         TCM_Parse120($hash, $net, 0);
 
       }
@@ -272,14 +290,14 @@ TCM_Read($)
 
       my $mycrc = TCM_CRC8($hdr);
       if($mycrc ne $crc) {
-        Log $ll2, "$name: wrong header checksum: got $crc, computed $mycrc" ;
+        Log $ll2, "TCM: $name wrong header checksum: got $crc, computed $mycrc" ;
         $data = $rest;
         next;
       }
       $mycrc = TCM_CRC8($mdata . $odata);
       $crc  = substr($data, -2);
       if($mycrc ne $crc) {
-        Log $ll2, "$name: wrong data checksum: got $crc, computed $mycrc" ;
+        Log $ll2, "TCM: $name wrong data checksum: got $crc, computed $mycrc" ;
         $data = $rest;
         next;
       }
@@ -289,26 +307,34 @@ TCM_Read($)
         my ($org, $d1, $id, $status) = ($1,$2,$3,$4);
 
         $odata =~ m/^(..)(........)(..)(..)$/;
-        my %addvals = (SubTelNum => hex($1), DestinationID => $2,
-                       RSSI => hex($3), SecurityLevel => hex($4),);
+        my %addvals = (
+          SubTelNum     => hex($1),
+          DestinationID => $2,
+          RSSI          => hex($3),
+          SecurityLevel => hex($4),
+        );
         $hash->{RSSI} = hex($3);
-
-        Dispatch($hash, "EnOcean:$org:$d1:$id:$status:$odata", \%addvals);
+        
+        if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
+          Log $ll5, "TCM: $name Telegram from $id blocked.";        
+        } else {
+          Dispatch($hash, "EnOcean:$org:$d1:$id:$status:$odata", \%addvals);
+        }
 
       } elsif($t eq "02") {
         my $rc = substr($mdata, 0, 2);
         my %codes = (
-          "00"=>"RET_OK",
-          "01"=>"RET_ERROR",
-          "02"=>"RET_NOT_SUPPORTED",
-          "03"=>"RET_WRONG_PARAM",
-          "04"=>"RET_OPERATION_DENIED",
+          "00" => "RET_OK",
+          "01" => "RET_ERROR",
+          "02" => "RET_NOT_SUPPORTED",
+          "03" => "RET_WRONG_PARAM",
+          "04" => "RET_OPERATION_DENIED",
         );
         $rc = $codes{$rc} if($codes{$rc});
-        Log (($rc eq "RET_OK") ? $ll5 : $ll2, "$name: RESPONSE: $rc") ;
+        Log (($rc eq "RET_OK") ? $ll5 : $ll2, "$name: RESPONSE: $rc");
 
       } else {
-        Log $ll2, "$name: unknown packet type $t: $data" ;
+        Log $ll2, "$name: unknown packet type $t: $data";
 
       }
 
@@ -397,7 +423,7 @@ TCM_Parse310($$$)
   my $ll5 = GetLogLevel($name,5);
   my $ll2 = GetLogLevel($name,2);
 
-  Log $ll5, "TCMParse: $rawmsg";
+  Log $ll5, "TCM Parse: $rawmsg";
 
   my $rc = substr($rawmsg, 0, 2);
   my $msg;
@@ -441,6 +467,7 @@ TCM_Ready($)
 my %gets120 = (
   "sensitivity"  => "AB48",
   "idbase"       => "AB58",
+  "baseID"       => "AB58",
   "modem_status" => "AB68",
   "sw_ver"       => "AB4B",
 );
@@ -453,7 +480,10 @@ my %gets310 = (
                  ChipVersion => "13,4",
                  Desc        => "17,16,STR",},
   "idbase"   => {cmd                  => "08",
-                 BaseId               => "1,4",
+                 BaseID               => "1,4",
+                 RemainingWriteCycles => "5,1",},
+  "baseID"   => {cmd                  => "08",
+                 BaseID               => "1,4",
                  RemainingWriteCycles => "5,1",},
   "repeater" => {cmd       => "10",
                  repEnable => "1,1",
@@ -518,6 +548,7 @@ TCM_RemovePair($)
 my %sets120 = (    # Name, Data to send to the CUL, Regexp for the answer
   "pairForSec"   => { cmd=>"AB18", arg=>"\\d+" },
   "idbase"       => { cmd=>"AB18", arg=>"FF[8-9A-F][0-9A-F]{5}" },
+  "baseID"       => { cmd=>"AB18", arg=>"FF[8-9A-F][0-9A-F]{5}" },
   "sensitivity"  => { cmd=>"AB08", arg=>"0[01]" },
   "sleep"        => { cmd=>"AB09" },
   "wake"         => { cmd=>"" }, # Special
@@ -529,6 +560,7 @@ my %sets120 = (    # Name, Data to send to the CUL, Regexp for the answer
 my %sets310 = (
   "pairForSec"   => { cmd=>"AB18", arg=>"\\d+" },
   "idbase"       => { cmd=>"07", arg=>"FF[8-9A-F][0-9A-F]{5}" },
+  "baseID"       => { cmd=>"07", arg=>"FF[8-9A-F][0-9A-F]{5}" },
 # The following 3 does not seem to work / dont get an answer
 #  "sleep"        => { cmd=>"01", arg=>"00[0-9A-F]{6}" },
 #  "reset"        => { cmd=>"02" },
@@ -711,6 +743,12 @@ TCM_Undef($$)
   As the TCM120 and the TCM310 speak completely different protocols, this
   module implements 2 drivers in one. It is the "physical" part for the <a
   href="#EnOcean">EnOcean</a> module.<br><br>
+  Please note that EnOcean repeaters also send Fhem data telegrams again. Use
+  <code>attr &lt;name&gt; <a href="#blockSenderID">blockSenderID</a> own</code>
+  to block receiving telegrams with TCM SenderIDs.<br>
+  The address range used by your transceiver module, you can find in the
+  parameters BaseID and LastID.
+  <br><br>
 
   <a name="TCMdefine"></a>
   <b>Define</b>
@@ -735,41 +773,52 @@ TCM_Undef($$)
   <a name="TCMset"></a>
   <b>Set </b>
   <ul>
+    <li>baseID<br>
+        Set the BaseID.<br>
+        Note: The firmware executes this command only up to then times to prevent misuse.
+        </li>
     <li>idbase<br>
-        Set the ID base. Note: The firmware executes this command only up to
-        then times to prevent misuse.
+        Set the BaseID.<br>
+        Note: The firmware executes this command only up to then times to prevent misuse.
         </li>
     <li>modem_off</li>
     <li>modem_on</li>
     <li>reset</li>
     <li>sensitivity</li>
     <li>sleep</li>
-    <li>wake
-        For details see the datasheet available from
-        www.enocean.com.  If you do not understand it, than you probably don't
-        need it :)
-        </li><br><br>
+    <li>wake</li><br>
+    For details see the datasheet available from <a href="http://www.enocean.com">www.enocean.com</a>.
+    If you do not understand it, than you probably don't need it :)
+<br><br>
   </ul>
 
   <a name="TCMget"></a>
   <b>Get</b>
   <ul>
+    <li>baseID<br>
+      Get the BaseID. You need this command in order to control EnOcean devices,
+      see the <a href="#EnOceandefine">EnOcean</a> paragraph.
+      </li>
     <li>idbase<br>
-        Get the ID base. You need this command in order to control EnOcean
-        devices, see the <a href="#EnOceandefine">EnOcean</a>
-        paragraph.</li>><br>
-    <li>modem_status</li><br>
-    <li>sensitivity</li><br>
-    <li>sw_ver<br>
-        for details see the datasheet available from www.enocean.com
-        </li><br>
+      Get the BaseID. You need this command in order to control EnOcean devices,
+      see the <a href="#EnOceandefine">EnOcean</a> paragraph.
+      </li>
+    <li>modem_status</li>
+    <li>sensitivity</li>
+    <li>sw_ver</li><br>
+    For details see the datasheet available from <a href="http://www.enocean.com">www.enocean.com</a>
+    <br><br>
   </ul>
 
   <a name="TCMattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a name="blockSenderID">blockSenderID</a> &lt;own|no&gt;,
+      [blockSenderID] = no is default.<br>
+      Block receiving telegrams with a TCM SenderID sent by repeaters.      
+      </li>
     <li><a href="#attrdummy">dummy</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#loglevel">loglevel</a></li>
   </ul>
   <br>
