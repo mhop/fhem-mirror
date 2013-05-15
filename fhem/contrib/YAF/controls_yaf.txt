@@ -11,8 +11,7 @@ DIR FHEM/YAF/www/smoothness/images
 DIR FHEM/YAF/www/img
 DIR FHEM/YAF/www/js
 DIR FHEM/YAF/xml
-UPD 2013-05-15_20:00:00 48 FHEM/01_YAF.pm
-UPD 2013-05-15_20:00:00 57 FHEM/01_YAFWebserver.pm
+UPD 2013-05-15_20:00:00 11409 FHEM/01_YAF.pm
 UPD 2013-05-15_20:00:00 6590 FHEM/YAF/widgets/fs20st/fs20st.pm
 UPD 2013-05-15_20:00:00 6617 FHEM/YAF/widgets/fs20easylamp/fs20easylamp.pm
 UPD 2013-05-15_20:00:00 2608 FHEM/YAF/www/img/loading.gif
@@ -27,7 +26,7 @@ UPD 2013-05-15_20:00:00 237176 FHEM/YAF/www/js/jquery-ui-1.9.1.custom.min.js
 UPD 2013-05-15_20:00:00 13875 FHEM/YAF/www/js/yaf-basics.js
 UPD 2013-05-15_20:00:00 448301 FHEM/YAF/www/js/jquery-ui-1.9.1.custom.js
 UPD 2013-05-15_20:00:00 265218 FHEM/YAF/www/js/jquery-1.8.2.js
-UPD 2013-05-15_20:00:00 2313 FHEM/YAF/www/css/yaf.css
+UPD 2013-05-15_20:00:00 2365 FHEM/YAF/www/css/yaf.css
 UPD 2013-05-15_20:00:00 30900 FHEM/YAF/www/css/smoothness/jquery-ui-1.9.1.custom.css
 UPD 2013-05-15_20:00:00 4369 FHEM/YAF/www/css/smoothness/images/ui-icons_222222_256x240.png
 UPD 2013-05-15_20:00:00 180 FHEM/YAF/www/css/smoothness/images/ui-bg_flat_0_aaaaaa_40x100.png
@@ -43,8 +42,7 @@ UPD 2013-05-15_20:00:00 105 FHEM/YAF/www/css/smoothness/images/ui-bg_glass_65_ff
 UPD 2013-05-15_20:00:00 4369 FHEM/YAF/www/css/smoothness/images/ui-icons_2e83ff_256x240.png
 UPD 2013-05-15_20:00:00 101 FHEM/YAF/www/css/smoothness/images/ui-bg_highlight-soft_75_cccccc_1x100.png
 UPD 2013-05-15_20:00:00 26086 FHEM/YAF/www/css/smoothness/jquery-ui-1.9.1.custom.min.css
-UPD 2013-05-15_20:00:00 1975 FHEM/YAF/xml/yafConfig.xml.example
 UPD 2013-05-15_20:00:00 3641 FHEM/YAF/xml/xmlSchema.xsd
-UPD 2013-05-15_20:00:00 2828 FHEM/YAF/xml/yafConfig.xml
-UPD 2013-05-15_20:00:00 16747 FHEM/YAF/YAFConfig.pm
+UPD 2013-05-15_20:00:00 1690 FHEM/YAF/xml/yafConfig.xml
+UPD 2013-05-15_20:00:00 16740 FHEM/YAF/YAFConfig.pm
 UPD 2013-05-15_20:00:00 3439 FHEM/YAF/YAFWidgets.pm
