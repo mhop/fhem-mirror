@@ -163,33 +163,22 @@ my %EnO_subType = (
   "A5.30.02" => "digitalInput.02",
   "A5.38.08" => "gateway",
   "A5.3F.7F" => "manufProfile",
+  "D5.00.01" => "contact",
+  "F6.04.01" => "keycard",
+  "F6.10.00" => "windowHandle",
   1          => "switch",
-  2          => "contact",
-  3          => "sensor",
-  4          => "windowHandle",
-  5          => "eltakoDimmer",
-  6          => "eltakoShutter",
-  7          => "FAH",
-  8          => "FBH",
-  9          => "FTF",
- 10          => "SR04",
- 11          => "FRW",
- 12          => "keycard",
- 13          => "raw",
+  2          => "sensor",
+  3          => "FRW",
+  4          => "PM101",
+  5          => "raw",
 );
 
 my @EnO_models = qw (
   other
-  FAH60 FAH63 FIH63
-  FABH63 FBH55 FBH63 FIBH63
   FSB14 FSB61 FSB70
-  FSG70
   FSM12 FSM61
   FT55
-  FTF55
   FTS12
-  PM101
-  SR04 SR04P SR04T SR04PT SR04PMS SR04PS SR04PST
 );
 
 # Initialize
@@ -206,18 +195,18 @@ EnOcean_Initialize($)
   $hash->{ParseFn}   = "EnOcean_Parse";
   $hash->{SetFn}     = "EnOcean_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
-                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
-                       "actualTemp dimTime dimValueOn ".
-                       "model:".join(",", @EnO_models)." ".
-                       "gwCmd:".join(",", sort @EnO_gwCmd)." ".
-                       "manufID:".join(",", keys %EnO_manuf)." ". 
-                       "rampTime ".
-                       "repeatingAllowed:yes,no ".
-                       "shutTime subDef subDef0 subDefI ".
-                       "subType:".join(",", sort grep { !$subTypeList{$_}++ } values %EnO_subType)." ".
-                       "subTypeSet:".join(",", sort grep { !$subTypeSetList{$_}++ } values %EnO_subType)." ".
-                       "switchMode:switch,pushbutton ".
-                       "switchType:direction,universal,central ".
+                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 " .
+                       "actualTemp dimTime dimValueOn " .
+                       "model:" . join(",", @EnO_models) . " " .
+                       "gwCmd:" . join(",", sort @EnO_gwCmd) . " " .
+                       "manufID:" . join(",", keys %EnO_manuf) . " " . 
+                       "rampTime " .
+                       "repeatingAllowed:yes,no " .
+                       "shutTime subDef subDef0 subDefI " .
+                       "subType:" . join(",", sort grep { !$subTypeList{$_}++ } values %EnO_subType) . " " .
+                       "subTypeSet:" . join(",", sort grep { !$subTypeSetList{$_}++ } values %EnO_subType) . " " .
+                       "switchMode:switch,pushbutton " .
+                       "switchType:direction,universal,central " .
                        $readingFnAttributes;
 
   for(my $i=0; $i<@EnO_ptm200btn;$i++) {
@@ -279,14 +268,14 @@ EnOcean_Set($@)
     # See also http://www.oscat.de/community/index.php/topic,985.30.html
     # Maintenance commands (runInit, liftSet, valveOpen, valveClosed)
       my %sets = (
-        "desired-temp"   => "\\d+(\\.\\d)?",
-        "actuator"       => "\\d+",
-        "unattended"     => "",
-        "initialize"     => "",
-        "runInit"        => "",
-        "liftSet"        => "",
-        "valveOpen"      => "",
-        "valveClosed"    => "",
+        "desired-temp" => "\\d+(\\.\\d)?",
+        "actuator"     => "\\d+",
+        "unattended"   => "",
+        "initialize"   => "",
+        "runInit"      => "",
+        "liftSet"      => "",
+        "valveOpen"    => "",
+        "valveClosed"  => "",
       );
       my $re = $sets{$a[0]};
       return "Unknown argument $cmd, choose one of ".join(" ", sort keys %sets)
@@ -307,140 +296,6 @@ EnOcean_Set($@)
 
       $hash->{READINGS}{$cmd}{TIME} = $tn;
       $hash->{READINGS}{$cmd}{VAL} = $arg;
-
-    } elsif($st eq "eltakoDimmer") {
-      # Dimmer
-      my $sendDimCmd=0;
-      my $dimTime=AttrVal($name, "dimTime", 1);
-      my $onoff=1;
-      my $dimVal=$hash->{READINGS}{dimValue}{VAL};
-
-      if($cmd eq "teach") {
-        $data = "A502000000";
-        $header = "000A0001";
-        Log $ll2, "EnOcean: set $name $cmd";
-
-      } elsif($cmd eq "dim") {
-        return "Usage: $cmd percent [dimspeed 1-100]" if(@a<2 or $a[1]>100);
-        # for eltako relative (0-100) (but not compliant to EEP because DB0.2
-        # is 0)
-        $dimVal=$a[1];
-	readingsSingleUpdate($hash, "dimValueStored", $dimVal, 1);
-        shift(@a);
-        if(defined($a[1])) {
-          $dimTime = sprintf("%X",(($a[1]*2.55)-255)*-1);
-          shift(@a);
-        }
-        $sendDimCmd=1;
-
-      } elsif($cmd eq "dimup") {
-        return "Usage: $cmd percent [dimspeed 1-100]" if(@a<2 or $a[1]>100);
-        $dimVal+=$a[1];
-	readingsSingleUpdate($hash,"dimValueStored",$dimVal,1);
-        shift(@a);
-        if(defined($a[1])) {
-          $dimTime=sprintf("%X",(($a[1]*2.55)-255)*-1);
-          shift(@a);
-        }
-        $sendDimCmd=1;
-
-      } elsif($cmd eq "dimdown") {
-        return "Usage: $cmd percent [dimspeed 1-100]" if(@a<2 or $a[1]>100);
-        $dimVal-=$a[1];
-	readingsSingleUpdate($hash,"dimValueStored",$dimVal,1);
-        shift(@a);
-        if(defined($a[1])) {
-          $dimTime=sprintf("%X",(($a[1]*2.55)-255)*-1);
-          shift(@a);
-        }
-        $sendDimCmd=1;
-
-      } elsif($cmd eq "on" || $cmd eq "B0") {
-        $dimTime=1;
-        $sendDimCmd=1;
-        my $dimValueOn = AttrVal($name, "dimValueOn", 100);
-        if ($dimValueOn eq "stored") {
-          $dimVal = ReadingsVal($name, "dimValueStored", 100);
-          if ($dimVal < 1) {
-            $dimVal = 100;
-            readingsSingleUpdate($hash, "dimValueStored", $dimVal, 1);
-          }
-        } elsif ($dimValueOn eq "last") {
-          $dimVal = ReadingsVal($name, "dimValueLast", 100);
-          if ($dimVal < 1) {
-            $dimVal = 100;
-          }
-        } else {
-          $dimVal = $dimValueOn;
-          if($dimValueOn > 100) { $dimVal = 100; }
-          if($dimValueOn < 1)   { $dimVal = 1; }
-        }
-
-      } elsif($cmd eq "off" || $cmd eq "BI") {
-        $dimTime=1;
-        $onoff=0;
-        $sendDimCmd=1;
-        $dimVal=0;
-
-      } else {
-        my $list = "dim:slider,0,1,100 dimup:slider,0,1,100 ".
-                   "dimdown:slider,0,1,100 on off teach";
-        return SetExtensions($hash, $list, $name, @a);
-      }
-
-      if($sendDimCmd) {
-        $a[0]="on";
-          if($dimVal > 100) { $dimVal=100; }
-          if($dimVal <= 0) { $dimVal=0; $onoff=0; $a[0]="off"; }
-        $updateState = 0;
-        $data = sprintf "A502%02X%02X%02X", $dimVal, $dimTime, $onoff|0x08;
-        $header = "000A0001";
-        Log $ll2, "EnOcean: set $name $cmd";
-      }
-
-    } elsif($st eq "eltakoShutter") {
-      # Shutter
-      my $shutTime = AttrVal($name, "shutTime", 0);
-      my $shutCmd = 0x00;
-      if($cmd eq "teach") {
-        $data = "A5FFF80D80";
-        $header = "000A0001";
-        Log $ll2, "EnOcean: set $name $cmd";
-
-      } elsif($cmd eq "stop") {
-        $shutCmd = 0x00;
-
-      } elsif($cmd eq "up" || $cmd eq "B0") {
-        my $position = 100;
-        if($a[1]) {
-          $shutTime = $shutTime/100*$a[1];
-          $position = $hash->{READINGS}{position}{VAL}+$a[1];
-            if($position > 100) { $position = 100; };
-        }
-        $hash->{READINGS}{position}{TIME} = $tn;
-        $hash->{READINGS}{position}{VAL} = $position;
-        $shutCmd = 0x01;
-
-      } elsif($cmd eq "down" || $cmd eq "BI") {
-        my $position = 0;
-        if($a[1]) {
-          $shutTime = $shutTime/100*$a[1];
-          $position = $hash->{READINGS}{position}{VAL}-$a[1];
-            if($position <= 0) { $position = 0; };
-        }
-        $hash->{READINGS}{position}{TIME} = $tn;
-        $hash->{READINGS}{position}{VAL} = $position;
-        $shutCmd = 0x02;
-      } else {
-        return "Unknown argument " . $cmd . ", choose one of up down stop teach"
-      }
-      shift(@a);
-      if($shutCmd || ($cmd eq "stop")) {
-        $updateState = 0;
-        $data = sprintf "A5%02X%02X%02X%02X", 0x00, $shutTime, $shutCmd, 0x08;
-        $header = "000A0001";
-        Log $ll2, "EnOcean: set $name $cmd";
-      }
 
     } elsif ($st eq "gateway") {
       # Gateway (EEP A5-38-08)
@@ -489,7 +344,7 @@ EnOcean_Set($@)
           $updateState = 0;
           $data = sprintf "A5%02X%04X%02X", $gwCmdID, $time, $setCmd;
         } else {
-          my $cmdList = "B0 BI off on teach";
+          my $cmdList = "B0 BI teach";
           return SetExtensions ($hash, $cmdList, $name, @a);
           $updateState = 0;
           $data = sprintf "A5%02X%04X%02X", $gwCmdID, $time, $setCmd;
@@ -584,7 +439,7 @@ EnOcean_Set($@)
           $sendDimCmd = 1;
 
         } else {
-          my $cmdList = "dim:slider,0,1,100 B0 BI on off teach";
+          my $cmdList = "dim:slider,0,1,100 B0 BI teach";
           return SetExtensions ($hash, $cmdList, $name, @a);
         }
         if($sendDimCmd) {
@@ -881,6 +736,7 @@ EnOcean_Set($@)
         return "Unknown Gateway Command " . $cmd . ", choose one of ". join(" ", sort keys %EnO_gwCmd);
       }
       # write gateway command
+      # header: len: 0x000A optlen: 0x00 pakettype: 0x01(radio)
       $header = "000A0001";
       Log $ll2, "EnOcean: set $name $cmd";
 
@@ -953,7 +809,7 @@ EnOcean_Set($@)
             }
           }
         } else {
-          return "Unknown argument " . $cmd . ", choose one of up stop down position teach"
+          return "Unknown argument " . $cmd . ", choose one of position:slider,0,5,100 up stop down teach"
         }
         if($shutCmd || $cmd eq "stop") {
           $updateState = 0;
@@ -1109,8 +965,8 @@ EnOcean_Set($@)
       if ($switchMode eq "pushbutton") {
         $data = "F600";
         $status = "20";
-        $data = sprintf "%s%s%s", $data, $subDef, $status;
 	Log $ll2, "EnOcean: set $name released";
+        $data = sprintf "%s%s%s", $data, $subDef, $status;
         IOWrite ($hash, $header, $data);
       }
     }
@@ -1227,7 +1083,7 @@ EnOcean_Parse($$)
         push @event, "3:channelD:DI";
       }
     # released events are disturbing when using a remote, since it overwrites
-    # the "real" state immediately. In the case of an Eltako FSB14, FSB61
+    # the "real" state immediately. In the case of an Eltako FSB14, FSB61 ...
     # the state should remain released. (by Thomas)
     $event = "buttons" if ($msg =~ m/released$/ &&
                            $model ne "FT55" && $model ne "FSB14" &&
@@ -1292,85 +1148,16 @@ EnOcean_Parse($$)
       push @event, "3:selfCtl:"      . (($db_0 & 0x04) ? "on" : "off");
       EnOcean_MD15Cmd($hash, $name, $db_1);
 
-    } elsif($model eq "PM101") {
+    } elsif($st eq "PM101") {
       # Light and Presence Sensor [Omnio Ratio eagle-PM101]
       # The sensor also sends switching commands (RORG F6) with the senderID-1
-      # code by aicgazi
-      # $db_2 is the illuminance where max value 0xFF stands for 1000 lx
-      my $lux = sprintf "%3d", $db_2;
-      $lux = sprintf "%04.2f", ( $lux * 1000 / 255 ) ;
-      push @event, "3:brightness:$lux";
-      push @event, "3:channel1:" . ($db_0 & 0x01 ? "off" : "on");
-      push @event, "3:channel2:" . ($db_0 & 0x02 ? "off" : "on");
-      push @event, "3:motion:" . ($db_0 & 0x02 ? "off" : "on");
-      push @event, "3:state:" . ($db_0 & 0x02 ? "off" : "on");
-
-    } elsif($st eq "FAH" || $model =~ /^(FAH60|FAH63|FIH63)$/) {
-      # Light Sensor
-      # [Eltako FAH60, FAH63, FIH63] (EEP A5-06-01 plus Data_byte3)
-      # $db_3 is the illuminance where min 0x00 = 0 lx, max 0xFF = 100 lx
-      # $db_2 must be 0x00
-      if($db_2 eq 0x00) {
-        my $luxlow = sprintf "%3d", $db_3;
-        $luxlow = sprintf "%d", ( $luxlow * 100 / 255 ) ;
-        push @event, "3:brightness:$luxlow";
-        push @event, "3:state:$luxlow";
-      } else {
-        # $db_2 is the illuminance where min 0x00 = 300 lx, max 0xFF = 30000 lx
-        my $lux = sprintf "%3d", $db_2;
-        $lux = sprintf "%d", (( $lux * 116.48) + 300 ) ;
-        push @event, "3:brightness:$lux";
-        push @event, "3:state:$lux";
-      }
-
-    } elsif($st eq "FBH" || $model =~ /^(FABH63|FBH55|FBH63|FIBH63)$/) {
-      # Light and Occupancy Sensor (no Temperature)
-      # [Eltako FABH63, FBH55, FBH63, FIBH63] (EEP similar A5-08-01)
-      # $db_0 motion detection where 0x0D = motion and 0x0F = no motion
-      # (DB0_Bit1 = 1 or 0)
-      if($db_0 eq 0x0D) {
-        push @event, "3:motion:yes";
-        push @event, "3:state:yes";
-      }
-      if($db_0 eq 0x0F) {
-        push @event, "3:motion:no";
-        push @event, "3:state:no";
-      }
-      # $db_2 is the illuminance where min 0x00 = 0 lx, max 0xFF = 2048 lx
-      my $lux = sprintf "%3d", $db_2;
-      $lux = sprintf "%d", ( $lux * 2048 / 255 ) ;
-      push @event, "3:brightness:$lux";
-      # $db_3 is voltage in EEP A5-08-01 but not used by Eltako !?
-      # push @event, "3:voltage:$db_3";
-
-    } elsif($st eq "FTF" || $model eq "FTF55") {
-      # Temperature Sensor (EEP A5-02-05)
-      # [Eltako FTF55, Thermokon SR04]
-      # $db_1 is the temperature where 0x00 = 40°C and 0xFF = 0°C
-      my $temp = sprintf "%3d", $db_1;
-      $temp = sprintf "%0.1f", ( 40 - $temp * 40 / 255 ) ;
-      push @event, "3:state:$temp";
-      push @event, "3:temperature:$temp";
-
-    } elsif($model =~ m/^SR04/ || $st eq "SR04") {
-      # Room Sensor and Control Unit
-      # [Thermokon SR04 *]
-      my ($fspeed, $temp, $present, $solltemp);
-      $fspeed = 3;
-      $fspeed = 2      if($db_3 >= 145);
-      $fspeed = 1      if($db_3 >= 165);
-      $fspeed = 0      if($db_3 >= 190);
-      $fspeed = "Auto" if($db_3 >= 210);
-      $temp   = sprintf("%0.1f", 40-$db_1/6.375);      # 40..0
-      $present= $db_0&0x1 ? "no" : "yes";
-      $solltemp= sprintf("%0.1f", $db_2/6.375);
-      push @event, "3:state:temperature $temp";
-      push @event, "3:set_point: $solltemp";
-      push @event, "3:setpoint:$db_2";
-      push @event, "3:fan:$fspeed";
-      push @event, "3:present:$present" if($present eq "yes");
-      push @event, "3:learnBtn:on" if(!($db_0&0x8));
-      push @event, "3:T:$temp SP: $db_3 F: $fspeed P: $present";
+      # $db_2 is the illuminance where 0x00 = 0 lx ... 0xFF = 1000 lx
+      my $channel2 = $db_0 & 2 ? "yes" : "no";
+      push @event, "3:brightness:" . $db_2 << 2;
+      push @event, "3:channel1:" . ($db_0 & 1 ? "yes" : "no");
+      push @event, "3:channel2:" . $channel2;
+      push @event, "3:motion:" . $channel2;
+      push @event, "3:state:" . $channel2;
 
     } elsif ($st =~ m/^tempSensor/) {
       # Temperature Sensor with with different ranges (EEP A5-02-01 ... A5-02-1B)
@@ -2484,17 +2271,6 @@ EnOcean_Parse($$)
         push @event, "3:state:Manufacturer Specific Application unknown";
       }
 
-    } elsif ($st eq "eltakoDimmer") {
-      # Dimmer
-      # todo: create a more general solution for the central-command responses
-      if($db_3 eq 0x02) { # dim
-        push @event, "3:state:" . ($db_0 & 0x01 ? "on" : "off");
-        push @event, "3:dimValue:" . $db_2;
-        if ($db_2 > 0) {
-          push @event, "3:dimValueLast:" . $db_2;
-        }
-      }
-
     } elsif ($st eq "raw") {
       # raw
       push @event, "3:state:RORG: $rorg DATA: $data STATUS: $status ODATA: $odata";    
@@ -2629,6 +2405,10 @@ EnOcean_Undef($$)
   In order to enable communication with EnOcean remote stations a
   <a href="#TCM">TCM</a> module is necessary.
   <br><br>
+  Please note that EnOcean repeaters also send Fhem data telegrams again.
+  Use the TCM <code>attr &lt;name&gt; <a href="#blockSenderID">blockSenderID</a> own</code>
+  to block receiving telegrams with a TCM SenderIDs.
+  <br><br>
 
   <a name="EnOceandefine"></a>
   <b>Define</b>
@@ -2647,12 +2427,12 @@ EnOcean_Undef($$)
     In order to control devices, you cannot reuse the SenderIDs/
     DestinationID of other devices (like remotes), instead you have to create
     your own, which must be in the allowed SenderID range of the underlying Fhem
-    IO device. For this first query the <a href="#TCM">TCM</a> with the
-    <code>get &lt;tcm&gt; idbase</code> command for the BaseID. You can use
-    up to 127 IDs starting with the BaseID + 1 shown there. The BaseID is
-    used for A5 devices with a bidectional teach-in only. If you are using an Fhem
-    SenderID outside of the allowed range, you will see an ERR_ID_RANGE
-    message in the Fhem log.<br>
+    IO device, see <a href="#TCM">TCM</a> BaseID, LastID. For this first query the
+    <a href="#TCM">TCM</a> with the <code>get &lt;tcm&gt; baseID</code> command
+    for the BaseID. You can use up to 127 IDs starting with the BaseID + 1 shown there.
+    The BaseID is used for A5 devices with a bidectional teach-in only. If you
+    are using an Fhem SenderID outside of the allowed range, you will see an
+    ERR_ID_RANGE message in the Fhem log.<br>
     In order to control bidirectional F6 devices (switches, actors) with
     additional SenderIDs you can use the attributes <a href="#subDef">subDef</a>,
     <a href="#subDef0">subDef0</a> and <a href="#subDefI">subDefI</a>.<br>
@@ -2985,7 +2765,7 @@ EnOcean_Undef($$)
         Position Range: position = 0 % ... 100 %<br>
         Angle Time Range: ta = 0 s ... 25.5 s<br>
         Runtime value for the sunblind reversion time. Select the time to revolve
-        the sunblind from one slat engle end psosition to the other end position.<br>
+        the sunblind from one slat angle end position to the other end position.<br>
         Slat Angle: &alpha;|&alpha;s|&alpha;o = -180 &#176 ... 180 &#176<br>
         Position Logic, normal: Blinds fully opens corresponds to Position = 0 %<br>
         Position Logic, inverse: Blinds fully opens corresponds to Position = 100 %<br>
@@ -3034,83 +2814,17 @@ EnOcean_Undef($$)
     Set attr subType to raw manually.
     </li>
     <br><br>
-
-    <li>Dimmer<br>
-        [Eltako FUD12, FUD14, FUD61, FUD70, tested with Eltako devices only]<br>
-    <ul>
-    <code>set &lt;name&gt; &lt;value&gt;</code>
-    <br><br>
-    where <code>value</code> is
-      <li>teach<br>
-        initiate teach-in mode</li>
-      <li>on<br>
-        issue switch on command</li>
-      <li>off<br>
-        issue switch off command</li>
-      <li>dim dim/% [dim time 1-100/%]<br>
-        issue dim command</li>
-      <li>dimup dim/% [dim time 1-100/%]<br>
-        issue dim command</li>
-      <li>dimdown dim/% [dim time 1-100/%]<br>
-        issue dim command</li>
-      <li><a href="#setExtensions">set extensions</a> are supported.</li>
-    </ul><br>
-    Old profile, use <a href="#Gateway">Gateway</a> alternative.<br>
-    Set attr subType to eltakoDimmer manually.<br>
-    Use the sensor type "PC/FVS" for Eltako devices.
-    </li>
-    <br><br>
-
-    <li>Dimmer for fluorescent lamps<br>
-        [Eltako FSG70, tested with Eltako FSG70 only]<br>
-    <ul>
-    <code>set &lt;name&gt; &lt;value&gt;</code>
-    <br><br>
-    where <code>value</code> is
-      <li>on<br>
-        issue switch on command</li>
-      <li>off<br>
-        issue switch off command</li>
-      <li><a href="#setExtensions">set extensions</a> are supported.</li>
-    </ul><br>
-    Old profile, use <a href="#Gateway">Gateway</a> alternative.<br>
-    Set attr subType to eltakoDimmer, attr subTypeSet to switch, attr eventMap
-    to B0:on BI:off and attr switchMode to pushbutton manually.<br>
-    Use the sensor type "Richtungstaster" for Eltako devices.
-    </li>
-    <br><br>
-
-    <li>Shutter (EEP F6-02-01 ... F6-02-02 and A5-3F-7F)<br>
-        [Eltako FSB12, FSB14, FSB61, FSB70, tested with Eltako devices only]<br>
-    <ul>
-    <code>set &lt;name&gt; &lt;value&gt;</code>
-    <br><br>
-    where <code>value</code> is
-      <li>teach<br>
-        initiate teach-in mode</li>
-      <li>up [position/%]<br>
-        issue roll up command</li>
-      <li>down [position/%]<br>
-        issue roll down command</li>
-      <li>stop<br>
-        issue stop command</li>
-    </ul><br>
-    Old profile, use <a href="#Manufacturer Specific Applications">Manufacturer Specific Applications</a>
-    alternative.<br>
-    Set attr subType to eltakoShutter and attr model to
-    FSB14|FSB61|FSB70 manually.<br>
-    Use the sensor type "Szenentaster/PC" for Eltako devices.
-    </li>
-  </ul>
-  <br>
-
+  </ul></ul>
+  
   <a name="EnOceanget"></a>
-  <b>Get</b> <ul>N/A</ul><br>
+  <b>Get</b>
+  <ul>N/A</ul><br>
 
   <a name="EnOceanattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a name="actualTemp">actualTemp</a> t/&#176C<br>
+      <ul>
+      <li><a name="actualTemp">actualTemp</a> t/&#176C<br>
       The value of the actual temperature, used when controlling MD15 devices.
       Should by filled via a notify from a distinct temperature sensor. If
       absent, the reported temperature from the MD15 is used.
@@ -3222,12 +2936,14 @@ EnOcean_Undef($$)
       <a href="#subDef0">subDef0</a> and <a href="#subDefI">subDefI</a>.
       </li>
     <li><a href="#webCmd">webCmd</a></li>
+    </ul>
   </ul>
   <br>
 
   <a name="EnOceanevents"></a>
   <b>Generated events</b>
   <ul>
+    <ul>
      <li>Switch / Bidirectional Actor (EEP F6-02-01 ... F6-03-02)<br>
      <ul>
          <li>A0</li>
@@ -3298,7 +3014,7 @@ EnOcean_Undef($$)
          <li>open from tilted</li>
          <li>state: closed|open|tilted|open from tilted</li>
      </ul><br>
-        The device should be created by autocreate.
+        The device windowHandle should be created by autocreate.
      </li>
      <br><br>
 
@@ -3822,7 +3538,6 @@ EnOcean_Undef($$)
         autocreate.<br>
         The Eltako Weather Station FWS61 supports not the day/night indicator
         (dayNight).<br>
-        EEP A5-13-03 ... EEP A5-13-06 are not implemented.
      </li>
      <br><br>
 
@@ -4019,7 +3734,7 @@ EnOcean_Undef($$)
             reached</li>
         <li>released<br>
             The status of the device become "released" between one of the endpoints.</li>
-        <li>state: BO|BI|released</li>
+        <li>state: B0|BI|released</li>
      </ul><br>
         Set attr subType to manufProfile, attr manufID to 00D and attr model to
         FSB14|FSB61|FSB70 manually.
@@ -4034,7 +3749,7 @@ EnOcean_Undef($$)
        <li>statusSent: status (Range: 0x00 ... 0xFF)</li>
        <li>state: RORG: rorg DATA: data STATUS: status ODATA: odata</li>
     </ul><br>
-    With the help of this command data messages in hexadecimal format can be received.
+    With the help of this command data messages in hexadecimal format can be sent and received.
     The telegram type (RORG) 4BS can be received. For further information,
     see <a href="http://www.enocean-alliance.org/eep/">EnOcean Equipment Profiles (EEP)</a>. 
     <br>
@@ -4042,116 +3757,25 @@ EnOcean_Undef($$)
     </li>
     <br><br>
 
-     <li>Dimmer<br>
-         [Eltako FUD14, FUD61, FUD70, FSG14, FSG70, ...]<br>
-     <ul>
-        <li>on</li>
-        <li>off</li>
-        <li>dimValue: Dim/% (Sensor Range: Dim = 0 % ... 100 %)</li>
-        <li>dimValueLast: Dim/%<br>
-            Last value received from the bidirectional dimmer.</li>
-        <li>dimValueStored: Dim/%<br>
-            Last value saved by <code>set &lt;name&gt; dim &lt;value&gt;</code>.</li>
-        <li>state: on|off</li>
-     </ul><br>
-        Old profile, use <a href="#Gateway">Gateway</a> alternative.<br>
-        Set attr subType to eltakoDimmer manually.
-     </li>
-     <br><br>
-
-     <li>Shutter (EEP F6-02-01 ... F6-02-02)<br>
-         [Eltako FSB14, FSB61, FSB70]<br>
-     <ul>
-        <li>B0<br>
-            The status of the device will become "B0" after the TOP endpoint is
-            reached, or it has finished an "up %" command.</li>
-        <li>BI<br>
-            The status of the device will become "BI" if the BOTTOM endpoint is
-            reached</li>
-        <li>released<br>
-            The status of the device become "released" between one of the endpoints.</li>
-        <li>state: BO|BI|released</li>
-     </ul><br>
-        Old profile, use <a href="#Manufacturer Specific Applications">Manufacturer Specific Applications</a>
-        alternative.<br>
-        Set attr subType to eltakoShutter and attr model to FSB14|FSB61|FSB70 manually.
-     </li>
-     <br><br>
-
-     <li>Temperature Sensor (EEP A5-02-05)<br>
-         [Eltako FTF55]<br>
-     <ul>
-       <li>t/&#176C</li>
-       <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 40 &#176C)</li>
-       <li>state: t/&#176C</li>
-     </ul><br>
-        Old profile, use subType roomSensorControl.05 alternative.<br>
-        Set attr subType to FTF or attr model to FTF55 manually.
-     </li>
-     <br><br>
-
-     <li>Room Sensor and Control Unit (EEP A5-02-05, A5-10-03, A5-10-0C, A5-10-05,
-         A5-10-06, A5-10-04, A5-10-01)<br>
-         [Thermokon SR04 *]<br>
-     <ul>
-       <li>T: t/&#176C SP: 0 ... 255 F: 0|1|2|3|Auto P: yes|no</li>
-       <li>fan: 0|1|2|3|Auto</li>
-       <li>learnBtn: on</li>
-       <li>present: yes</li>
-       <li>temperature: t/&#176C</li>
-       <li>set_point: 0 ... 255</li>
-       <li>state: T: t/&#176C SP: 0 ... 255 F: 0|1|2|3|Auto P: yes|no</li>
-     </ul><br>
-        Old profile, use subType roomSensorControl.05 alternative.<br>
-        Set attr model to SR04|SR04P|SR04T|SR04PT|SR04PMS|SR04PS|SR04PST or
-        attr subType to SR04.
-     </li>
-     <br><br>
-
-     <li>Light Sensor (EEP similar A5-06-01)<br>
-         [Eltako FAH60, FAH63, FIH63]<br>
-     <ul>
-       <li>E/lx</li>
-       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 100 lx, 300 lx ... 30 klx)</li>
-       <li>state: E/lx</li>
-     </ul><br>
-        Old profile, use subType lightSensor.01 alternative.<br>
-        Set attr subType to FAH or attr model to FAH60|FAH63|FIH63
-        manually.
-     </li>
-     <br><br>
-
-     <li>Light and Occupancy Sensor (EEP similar A5-08-01)<br>
-         [Eltako FABH63, FBH55, FBH63, FIBH63]<br>
-     <ul>
-       <li>yes</li>
-       <li>no</li>
-       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 2048 lx)</li>
-       <li>motion: yes|no</li>
-       <li>state: yes|no</li>
-     </ul><br>
-         Old profile, use subType lightTempOccupSensor.01 alternative.<br>
-         Set attr subType to FBH or attr model to FABH63|FBH55|FBH63|FIBH63
-         manually.
-     </li>
-     <br><br>
-
-     <li>Light and Presence Sensor<br>
-         [Omnio Ratio eagle-PM101]<br>
-     <ul>
-       <li>on</li>
-       <li>off</li>
-       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 1000 lx)</li>
-       <li>channel1: on|off</li> (Motion message in depending on the brightness threshold)
-       <li>channel2: on|off</li> (Motion message)
-       <li>motion: on|off</li> (Channel 2)
-       <li>state: on|off</li> (Channel 2)
-     </ul><br>
-         The sensor also sends switching commands (RORG F6) with
-         the senderID-1.<br>
-         Set attr model to PM101 manually. Automatic teach-in is not possible,
-         since no EEP and manufacturer ID are sent.
-     </li>
+    <li>Light and Presence Sensor<br>
+        [Omnio Ratio eagle-PM101]<br>
+    <ul>
+      <li>yes</li>
+      <li>no</li>
+      <li>brightness: E/lx (Sensor Range: E = 0 lx ... 1000 lx)</li>
+      <li>channel1: yes|no<br>
+      Motion message in depending on the brightness threshold</li>
+      <li>channel2: yes|no<br>
+      Motion message</li>
+      <li>motion: yes|no<br>
+      Channel 2</li>
+      <li>state: yes|no<br>
+      Channel 2</li>
+    </ul><br>
+    The sensor also sends switching commands (RORG F6) with the SenderID-1.<br>
+    Set attr subType to PM101 manually. Automatic teach-in is not possible,
+    since no EEP and manufacturer ID are sent.
+    </li>
   </ul>
 </ul>
 
