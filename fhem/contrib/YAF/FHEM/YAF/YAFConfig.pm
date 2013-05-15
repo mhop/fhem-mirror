@@ -250,7 +250,7 @@ sub YAF_addView{
         #-- set default background
  		my $backgrounds = $config->createElement('backgrounds');
  		my $background = $config->createElement('background');
- 		$background->setAttribute('img_url', "./img/eg.jpeg");
+ 		$background->setAttribute('img_url', "./img/background.png");
  		$background->setAttribute('x_pos', 1);
  		$background->setAttribute('y_pos', 1);
  		$backgrounds->appendChild($background);
