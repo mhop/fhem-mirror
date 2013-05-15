@@ -149,8 +149,23 @@ HUEBridge_Set($@)
     RemoveInternalTimer($hash);
     HUEBridge_GetUpdate($hash);
     return undef;
+  } elsif($cmd eq 'swupdate') {
+    my $obj = {
+      'swupdate' => { 'updatestate' => 3, },
+    };
+    my $result = HUEBridge_Call($hash, 'config', $obj);
+
+    if( !defined($result) || $result->{'error'} ) {
+      return $result->{'error'}->{'description'};
+    }
+
+    $hash->{updatestate} = 3;
+    $hash->{STATE} = "updating";
+    return "starting update";
   } else {
-    return "Unknown argument $cmd, choose one of statusRequest";
+    my $list = "statusRequest";
+    $list .= " swupdate" if( defined($hash->{updatestate}) && $hash->{updatestate} == 2 );
+    return "Unknown argument $cmd, choose one of $list";
   }
 }
 
@@ -191,7 +206,10 @@ HUEBridge_GetUpdate($)
 
   if( defined( $result->{swupdate} ) ) {
     my $txt = $result->{swupdate}->{text};
-    readingsSingleUpdate($hash, "swupdate", $txt, defined($hash->{LOCAL} ? 0 : 1)) if( $txt ne ReadingsVal($name,"swupdate","") );
+    readingsSingleUpdate($hash, "swupdate", $txt, defined($hash->{LOCAL} ? 0 : 1)) if( $txt && $txt ne ReadingsVal($name,"swupdate","") );
+    $hash->{STATE} = "update done" if( $result->{swupdate}->{updatestate} == 0 &&  $hash->{updatestate} >= 2 );
+    $hash->{STATE} = "update failed" if( $result->{swupdate}->{updatestate} == 2 &&  $hash->{updatestate} == 3 );
+
     $hash->{updatestate} = $result->{swupdate}->{updatestate};
   } elsif ( defined(  $hash->{swupdate} ) ) {
     delete( $hash->{updatestate} );
@@ -419,7 +437,7 @@ HUEBridge_HTTP_Request($$$@)
   $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
   my @header= split("\r\n", $1);
   my $hostpath= $quiet ? "<hidden>" : $host . $path;
-  Log 4, "HUEBridge_HTTP_Request $displayurl: Got data, length: ".length($ret);
+  Log 5, "HUEBridge_HTTP_Request $displayurl: Got data, length: ".length($ret);
   if(!length($ret)) {
     Log 4, "HUEBridge_HTTP_Request $displayurl: Zero length data, header follows...";
     for (@header) {
@@ -488,6 +506,8 @@ HUEBridge_HTTP_Request($$$@)
   <b>Set</b>
   <ul>
     <li>statusRequest<br>
+    Update bridge status.</li>
+    <li>swupdate<br>
     Update bridge status.</li>
   </ul><br>
 </ul><br>
