@@ -120,7 +120,7 @@ sub HUEDevice_Define($$)
   $hash->{fhem}{xy} = '';
 
 
-  $attr{$name}{devStateIcon} = '{CommandGet("","'.$name.' devStateIcon")}' if( !defined( $attr{$name}{devStateIcon} ) );
+  $attr{$name}{devStateIcon} = '{(CommandGet("","'.$name.' devStateIcon"),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
 
   AssignIoPort($hash);
   if(defined($hash->{IODev}->{NAME})) {
