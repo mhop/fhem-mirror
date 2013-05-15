@@ -207,8 +207,10 @@ HUEBridge_GetUpdate($)
   if( defined( $result->{swupdate} ) ) {
     my $txt = $result->{swupdate}->{text};
     readingsSingleUpdate($hash, "swupdate", $txt, defined($hash->{LOCAL} ? 0 : 1)) if( $txt && $txt ne ReadingsVal($name,"swupdate","") );
-    $hash->{STATE} = "update done" if( $result->{swupdate}->{updatestate} == 0 &&  $hash->{updatestate} >= 2 );
-    $hash->{STATE} = "update failed" if( $result->{swupdate}->{updatestate} == 2 &&  $hash->{updatestate} == 3 );
+    if( defined($hash->{updatestate}) ){
+      $hash->{STATE} = "update done" if( $result->{swupdate}->{updatestate} == 0 &&  $hash->{updatestate} >= 2 );
+      $hash->{STATE} = "update failed" if( $result->{swupdate}->{updatestate} == 2 &&  $hash->{updatestate} == 3 );
+    }
 
     $hash->{updatestate} = $result->{swupdate}->{updatestate};
   } elsif ( defined(  $hash->{swupdate} ) ) {
