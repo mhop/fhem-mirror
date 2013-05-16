@@ -1554,9 +1554,9 @@ FW_select($$$$$@)
   my $s = "<select $jSelFn $id name=\"$n\" class=\"$class\">";
   foreach my $v (@{$va}) {
     if($def && $v eq $def) {
-      $s .= "<option selected=\"selected\" value=\"$v\">$v</option>\n";
+      $s .= "<option selected=\"selected\" value='$v'>$v</option>\n";
     } else {
-      $s .= "<option value=\"$v\">$v</option>\n";
+      $s .= "<option value='$v'>$v</option>\n";
     }
   }
   $s .= "</select>";

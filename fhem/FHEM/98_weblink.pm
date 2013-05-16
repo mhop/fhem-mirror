@@ -273,6 +273,14 @@ wl_getRegFromFile($)
   close(FH);
 }
 
+sub
+wl_addTics($$)
+{
+  my ($in, $p) = @_;
+  return if(!$in || $in !~ m/^\((.*)\)$/);
+  map { $p->{"\"$2\""}=1 if(m/^ *([^ ]+) ([^ ]+) */); } split(",",$1);
+}
+
 ############################
 # gnuplot file "editor"
 sub
@@ -323,13 +331,19 @@ wl_PEdit($$$$)
 
   my ($colnums, $colregs, $coldata) = wl_getRegFromFile($file);
   $colnums = join(",", 3..$colnums);
-  my $max = @{$conf{lAxis}}+1;
+
+  my %tickh;
+  wl_addTics($conf{ytics}, \%tickh);
+  wl_addTics($conf{y2tics}, \%tickh);
+  $colnums = join(",", sort keys %tickh).",$colnums" if(%tickh);
+
+  my $max = @{$conf{lType}}+1;
   $max = 8 if($max > 8);
-  $max = 1 if(!$conf{lTitle}[0]);
   my $r = 0;
   for($r=0; $r < $max; $r++) {
     $ret .= "<tr class=\"".(($r&1)?"odd":"even")."\"><td>";
-    $ret .= wl_txt("title_${r}", "", $conf{lTitle}[$r], 12);
+    $ret .= wl_txt("title_${r}", "", !$conf{lTitle}[$r]&&$r<($max-1) ? 
+                                      "notitle" : $conf{lTitle}[$r], 12);
     $ret .= "</td><td>";
     my @f = split(":", ($flog->[$r] ? $flog->[$r] : ":::"), 4);
     $ret .= wl_sel("cl_${r}", $colnums, $f[0]);
@@ -413,7 +427,8 @@ weblink_WriteGplot($)
                           $FW_webArgs{"fn_$i"} ."\n";
     push @plot, "\"<IN>\" using 1:2 axes ".
                 ($FW_webArgs{"axes_$i"} eq "right" ? "x1y2" : "x1y1").
-                " title '".$FW_webArgs{"title_$i"} ."'".
+                ($FW_webArgs{"title_$i"} eq "notitle" ? " notitle" :
+                            " title '".$FW_webArgs{"title_$i"} ."'").
                 " ls "    .$FW_webArgs{"style_$i"} .
                 " lw "    .$FW_webArgs{"width_$i"} .
                 " with "  .$FW_webArgs{"type_$i"};
@@ -468,7 +483,7 @@ weblink_WriteGplot($)
           file, even if its name changes regularly (and not the one you
           originally specified).</li>
       <li>For cmdList &lt;argument&gt; consist of a list of space separated icon:label:cmd triples.</li>
-	</ul>
+    </ul>
   </ul>
 
   <a name="weblinkset"></a>
@@ -491,15 +506,14 @@ weblink_WriteGplot($)
   <ul>
     <a name="htmlattr"></a>
     <li>htmlattr<br>
-      HTML attributes to be used for link, image and iframe type of links. E.g.:<br>
+      HTML attributes to be used for link, image and iframe type of links.
+      E.g.:<br>
       <ul>
         <code>
         define yw weblink wl_im1 iframe http://weather.yahooapis.com/forecastrss?w=650272&u=c<br>
         attr yw weblink htmlattr width="480" height="560"<br>
         </code>
-      </ul>
-      </li>
-      <br>
+      </ul></li>
     <li><a href="#fixedrange">fixedrange</a></li>
     <li><a href="#plotsize">plotsize</a></li>
     <li><a href="#plotmode">plotmode</a></li>
@@ -511,9 +525,9 @@ weblink_WriteGplot($)
       expression, so you have access e.g. to the Value functions.<br><br>
 
       If the plotmode is gnuplot-scroll or SVG, you can also use the min, max,
-      avg, cnt, sum, currval (last value) and currdate (last date) values of the
-      individual curves, by accessing the corresponding values from the data
-      hash, see the example below:<br>
+      avg, cnt, sum, currval (last value) and currdate (last date) values of
+      the individual curves, by accessing the corresponding values from the
+      data hash, see the example below:<br>
 
       <ul>
         <li>Fixed text for the right and left axis:<br>
@@ -554,16 +568,37 @@ weblink_WriteGplot($)
             #FileLog 4:IR\x3a:0:
         </li>
         <li>#DbLog <SPEC1><br>
-            with: attr <weblinkdevice> plotfunction "Garage_Raumtemp:temperature::"<br>
-            instead of<br>
+            with: attr <weblinkdevice> plotfunction
+            "Garage_Raumtemp:temperature::"<br> instead of<br>
             #DbLog Garage_Raumtemp:temperature::
         </li>
       </ul>
     </li>
-
   </ul>
   <br>
 
+  <a name="weblinkEditor"></a>
+  <b>Plot-Editor specialities</b>
+  <ul>
+    If the weblink type is set to fileplot, a weblink editor is displayed in
+    the detail view of the weblink. Most features are obvious here, up to some
+    exceptions:
+    <li>if you want to omit the title for a Diagram label, enter notitle in the
+      input field.</li>
+    <li>if you want to specify a fixed value (not taken from a column) if a
+      string found (e.g. 1 of the FS20 switch is on 0 if it off), then you have
+      to specify the Tics first, and write the .gplot file, before you can
+      select this value from the dropdown.<br>
+      Example:
+      <ul>
+      Enter in the Tics field: ("On" 1, "Off" 0)<br>
+      Write .gplot file<br>
+      Select "1" from the column dropdown (note the double quote!) for the
+      regexp switch.on, and "0" for the regexp switch.off.<br>
+      Write .gplot file again<br>
+      </ul></li>
+  </ul>
+  <br>
 </ul>
 
 =end html
