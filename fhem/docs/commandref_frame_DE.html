@@ -398,30 +398,48 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 
     <a name="userReadings"></a>
     <li>userReadings<br>
-    A comma-separated list of definitions of user-defined readings. Each definition has the form
-    <code>&lt;reading&gt; [&lt;modifier&gt;] { &lt;perl code&gt; }</code>. After a single or bulk
-    readings update, the user-defined readings are set by evaluating the <a href="#perl">
-    perl code</a>
-    <code>{ &lt;perl code&gt; }</code> for all definitions and setting the value of
-    the respective user-defined reading <code>&lt;reading&gt;</code> to the result.<br><br>
-    Examples:<br>
-    <code>attr myEnergyMeter userReadings energy { ReadingsVal("myEnergyMeter","counters.A",0)/1250.0;; }</code><br>
-    <code>attr myMultiMeter userReadings energy1 { ReadingsVal("myMultiMeter","counters.A",0)/1250.0;; },
-          energy2 { ReadingsVal("myMultiMeter","counters.B",0)/1250.0;; }</code>
-    <br><br>
-    <code>&lt;modifier&gt;</code> can take one of these values:
+    Komma getrennte Liste von benutzerdefinierten Readings. Jede Definition hat
+    folgendes Format:
+    <ul><code>
+    &lt;reading&gt;[:&lt;trigger&gt;] [&lt;modifier&gt;] { &lt;perl code&gt; }
+    </code></ul>
+    Diese benutzerdefinierte Readings werden bei jeder Aktualisierung der
+    Ger&auml;tereadings gesetzt, indem das spezifizierte <a href="#perl">perl
+    code</a> <code>{ &lt;perl code&gt; }</code> ausgef&uuml;hrt wird, und
+    dessen Wert dem Reading zugewiesen wird.
+
+    Falls &lt;trigger&gt; spezifiziert ist, dann findet diese Ausf&uuml;hrung
+    nur dann statt, falls einer der aktualisierten Readings dem regexp
+    &lt;trigger&gt; entspricht (matched). <br>
+    Beispiele:
+    <ul><code>
+      attr myEnergyMeter userReadings energy
+        { ReadingsVal("myEnergyMeter","counters.A",0)/1250.0;; }<br>
+      attr myMultiMeter userReadings
+        energy1:counters.A {ReadingsVal("myMultiMeter","counters.A",0)/1250.0},
+        energy2:counters.B {ReadingsVal("myMultiMeter","counters.B",0)/1250.0}
+    </code></ul>
+    <code>&lt;modifier&gt;</code> kann die folgenden Werte haben:
     <ul>
-      <li>none: the same as it would not have been given at all.</li>
-      <li>difference: the reading is set to the difference between the current and the previously evaluated value.</li>
-      <li>differential: the reading is set to the difference between the current and the previously evaluated value divided
-        by the time in seconds between the current and the previous evaluation. Granularity of time is one second. No
-        value is calculated if the time past is below one second. Useful to calculate rates.</li>
-    </ul><br>
-    Example:<br>
-    <code>attr myPowerMeter userReadings power differential { ReadingsVal("myPowerMeter","counters.A",0)/1250.0;; }</code><br><br>
-    Note: user readings with modifiers difference and differential store the calculated values internally. The user reading is
-    set earliest at the second evaluation. Beware of stale values when changing definitions!
+      <li>none: als ob man es gar nicht spezifiziert h&auml;tte.</li>
+      <li>difference: das Reading wird auf die Differenz zw. dem aktuellen und
+        dem vorherigen Wert gesetzt.</li>
+      <li>differential: das Reading wird auf die Differenz zw. dem aktuellen und
+        dem vorherigen Wert, geteilt durch die Sekunden zw. der aktuellen Zeit
+        und der letzten Auswertung, sekundengenau. Kein Wert wird berechnet,
+        falls der Unterschied unter eine Sekunde liegt.
+        </li>
+    </ul>
+    Beispiel:
+    <ul><code>
+      attr myPowerMeter userReadings power differential
+        { ReadingsVal("myPowerMeter","counters.A",0)/1250.0}
+    </code></ul>
+    Achtung: Falls difference oder differential spezifiziert ist, dann werden
+    f&uuml;r die Berechnung &auml;ltere Werte ben&ouml;tigt, d.h. der Wert wird
+    fr&uuml;hestens beim zweiten &Auml;nderung gesetzt.
     </li><br>
+
 
   </ul>
   <br>

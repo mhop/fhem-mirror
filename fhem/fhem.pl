@@ -1459,7 +1459,6 @@ CommandDeleteAttr($$)
     $a[0] = $sdev;
     
     if($a[1] eq "userReadings") {
-      #Debug "Deleting userReadings for $sdev";
       delete($defs{$sdev}{'.userReadings'});
     }
 
@@ -1868,26 +1867,32 @@ CommandAttr($$)
     if($a[1] eq "userReadings") {
 
       my %userReadings;
-      # myReading1 [modifier1] { codecodecode1 }, myReading2 [modifier2] { codecodecode2 }, ...
+      # myReading1[:trigger1] [modifier1] { codecodecode1 }, ...
       my $arg= $a[2];
 
-      my $regexi= '\s*(\w+)\s+((\w+)\s+)?({.*?})\s*'; # matches myReading1 { codecode1 }
+      # matches myReading1[:trigger2] { codecode1 }
+      my $regexi= '\s*(\w+)(:\S*)?\s+((\w+)\s+)?({.*?})\s*';
       my $regexo= '^(' . $regexi . ')(,\s*(.*))*$';
 
-      #Debug "arg is $arg";
+      #Log 1, "arg is $arg";
 
       while($arg =~ /$regexo/) {
         my $userReading= $2;
-        my $modifier= $4 ? $4 : "none";
-        my $perlCode= $5;
-        #Debug sprintf("userReading %s has perlCode %s with modifier %s",$userReading,$perlCode,$modifier);
+        my $trigger= $3 ? $3 : undef;
+        my $modifier= $5 ? $5 : "none";
+        my $perlCode= $6;
+        #Log 1, sprintf("userReading %s has perlCode %s with modifier %s%s",
+        # $userReading,$perlCode,$modifier,$trigger?" and trigger $trigger":"");
         if(grep { /$modifier/ } qw(none difference differential)) {
+          $trigger =~ s/^:// if($trigger);
+          $userReadings{$userReading}{trigger}= $trigger;
           $userReadings{$userReading}{modifier}= $modifier;
           $userReadings{$userReading}{perlCode}= $perlCode;
         } else {
-          push @rets, "$sdev: unknown modifier $modifier for userReading $userReading, this userReading will be ignored";
+          push @rets, "$sdev: unknown modifier $modifier for ".
+                "userReading $userReading, this userReading will be ignored";
         }
-        $arg= defined($7) ? $7 : "";
+        $arg= defined($8) ? $8 : "";
       }
       $hash->{'.userReadings'}= \%userReadings;
     } 
@@ -2915,7 +2920,7 @@ addEvent($$)
 sub
 getInterfaces($) {
   my ($hash)= @_;
-  #Debug "getInterfaces(" . $hash->{NAME} .")= " . $hash->{internals}{interfaces};
+  #Debug "getInterfaces(" . $hash->{NAME} .")= ".$hash->{internals}{interfaces};
   if(defined($hash->{internals}{interfaces})) {
     return split(/:/, $hash->{internals}{interfaces});
   } else {
@@ -3133,6 +3138,13 @@ readingsEndUpdate($$)
   if(defined($hash->{'.userReadings'})) {
     my %userReadings= %{$hash->{'.userReadings'}};
     foreach my $userReading (keys %userReadings) {
+
+      my $trigger = $userReadings{$userReading}{trigger};
+      if(defined($trigger)) {
+        my @fnd = grep { $_ && $_ =~ m/^$trigger/ } @{$hash->{CHANGED}};
+        next if(!@fnd);
+      }
+
       my $modifier= $userReadings{$userReading}{modifier};
       my $perlCode= $userReadings{$userReading}{perlCode};
       my $oldvalue= $userReadings{$userReading}{value};

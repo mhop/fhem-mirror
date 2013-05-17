@@ -1,7 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: userReadings may have a filter
   - feature: HUEBridge: allow starting of bridge firmware update
-  - change:  EnOcean: profil PM101 changed, old profiles FAH, FBH, FTF, SR04 removed  
+  - change:  EnOcean: profil PM101 changed, old profiles FAH, FBH, FTF, SR04
+             removed  
   - feature: TCM: new attr blockSenderID:
              Block receiving telegrams with a TCM SenderID sent by repeaters
   - feature: TCM: For TCM120 Transceiver now the transmission of RPS and 4BS
