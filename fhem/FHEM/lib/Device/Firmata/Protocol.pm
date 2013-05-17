@@ -744,6 +744,11 @@ sub packet_onewire_request {
 		$subcommand |= $ONE_WIRE_COMMANDS->{READ_REQUEST_BIT};
 		push @data,$args->{read} & 0xFF;
 		push @data,($args->{read}>>8) & 0xFF;
+		if ($self->{protocol_version} ne 'V_2_04') {
+			my $id = (defined $args->{id}) ? $args->{id} : 0;
+			push @data,$id &0xFF;
+			push @data,($id>>8) & 0xFF;
+		}
 	}
 	if (defined $args->{delay}) {
 		$subcommand |= $ONE_WIRE_COMMANDS->{DELAY_REQUEST_BIT};
@@ -774,13 +779,24 @@ sub handle_onewire_reply {
 			  and do {    #PIN,COMMAND,ADDRESS,DATA
 
 				my @data = unpack_from_7bit(@$sysex_data);
-				my $device = shift_onewire_device_from_byte_array(\@data);
+				if ($self->{protocol_version} eq 'V_2_04') {
+					my $device = shift_onewire_device_from_byte_array(\@data);
 
-				return {
-					pin     => $pin,
-					command => 'READ_REPLY',
-					device  => $device,
-					data    => \@data
+					return {
+						pin     => $pin,
+						command => 'READ_REPLY',
+						device  => $device,
+						data    => \@data
+					};
+				} else {
+					my $id = shift @data;
+					$id += (shift @data)<<8;
+					return {
+						pin     => $pin,
+						command => 'READ_REPLY',
+						id      => $id,
+						data    => \@data
+					};
 				};
 			  };
 
