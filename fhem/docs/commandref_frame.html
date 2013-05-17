@@ -396,29 +396,47 @@ A line ending with \ will be concatenated with the next one, so long lines
 
     <a name="userReadings"></a>
     <li>userReadings<br>
-    A comma-separated list of definitions of user-defined readings. Each definition has the form
-    <code>&lt;reading&gt; [&lt;modifier&gt;] { &lt;perl code&gt; }</code>. After a single or bulk
-    readings update, the user-defined readings are set by evaluating the <a href="#perl">
-    perl code</a>
-    <code>{ &lt;perl code&gt; }</code> for all definitions and setting the value of
-    the respective user-defined reading <code>&lt;reading&gt;</code> to the result.<br><br>
-    Examples:<br>
-    <code>attr myEnergyMeter userReadings energy { ReadingsVal("myEnergyMeter","counters.A",0)/1250.0;; }</code><br>
-    <code>attr myMultiMeter userReadings energy1 { ReadingsVal("myMultiMeter","counters.A",0)/1250.0;; },
-          energy2 { ReadingsVal("myMultiMeter","counters.B",0)/1250.0;; }</code>
-    <br><br>
+      A comma-separated list of definitions of user-defined readings. Each
+      definition has the form:
+      <ul>
+      <code>
+      &lt;reading&gt;[:&lt;trigger&gt;] [&lt;modifier&gt;] { &lt;perl code&gt; }
+      </code>
+      </ul>
+      After a single or bulk readings update, the user-defined readings are set
+      by evaluating the <a href="#perl">perl code</a><code> { &lt;perl code&gt;
+      }</code> for all definitions and setting the value of the respective
+      user-defined reading <code>&lt;reading&gt;</code> to the result. If
+      &lt;trigger&gt; is given, then all processing for this specific user
+      reading is only done if one of the just updated "reading: value"
+      combinations matches &lt;trigger&gt;, which is treated as a regexp.
+      <br>
+      Examples:<br>
+      <ul><code>
+        attr myEnergyMeter userReadings energy
+          { ReadingsVal("myEnergyMeter","counters.A",0)/1250.0;; }<br>
+        attr myMultiMeter userReadings
+          energy1:counters.A { ReadingsVal("myMultiMeter","counters.A",0)/1250.0;; },
+          energy2:counters.B { ReadingsVal("myMultiMeter","counters.B",0)/1250.0;; }
+      </code></ul>
     <code>&lt;modifier&gt;</code> can take one of these values:
     <ul>
       <li>none: the same as it would not have been given at all.</li>
-      <li>difference: the reading is set to the difference between the current and the previously evaluated value.</li>
-      <li>differential: the reading is set to the difference between the current and the previously evaluated value divided
-        by the time in seconds between the current and the previous evaluation. Granularity of time is one second. No
-        value is calculated if the time past is below one second. Useful to calculate rates.</li>
-    </ul><br>
+      <li>difference: the reading is set to the difference between the current
+          and the previously evaluated value.</li>
+      <li>differential: the reading is set to the difference between the
+          current and the previously evaluated value divided by the time in
+          seconds between the current and the previous evaluation. Granularity
+          of time is one second. No value is calculated if the time past is
+          below one second.  Useful to calculate rates.</li>
+    </ul>
     Example:<br>
-    <code>attr myPowerMeter userReadings power differential { ReadingsVal("myPowerMeter","counters.A",0)/1250.0;; }</code><br><br>
-    Note: user readings with modifiers difference and differential store the calculated values internally. The user reading is
-    set earliest at the second evaluation. Beware of stale values when changing definitions!
+    <ul><code>attr myPowerMeter userReadings power 
+      differential { ReadingsVal("myPowerMeter","counters.A",0)/1250.0;; }
+    </code></ul>
+    Note: user readings with modifiers difference and differential store the
+    calculated values internally. The user reading is set earliest at the
+    second evaluation. Beware of stale values when changing definitions!
     </li><br>
     </ul>
   <br>
