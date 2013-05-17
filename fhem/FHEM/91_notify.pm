@@ -184,8 +184,8 @@ notify_Attr(@)
         definition.</li>
       </ul></li>
 
-      <li>To use database logging, copy the file contrib/91_DbLog.pm into your
-      modules directory, and change the $dbconn parameter in the file.</li>
+      <li>To use database logging, define a dblog instance and change the
+      $dbconn parameter in the file.</li>
 
       <li>Following special events will be generated for the device "global"
       <ul>
