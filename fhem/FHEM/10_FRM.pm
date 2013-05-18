@@ -490,6 +490,7 @@ FRM_OWX_Init($$)
 	return $ret if (defined $ret);
 	my $firmata = $hash->{IODev}->{FirmataDevice};
 	my $pin = $hash->{PIN};
+	$hash->{FRM_OWX_CORRELATIONID} = 0;
 	$firmata->observe_onewire($pin,\&FRM_OWX_observer,$hash);
 	$hash->{FRM_OWX_REPLIES} = {};
 	$hash->{DEVS} = [];
@@ -507,9 +508,25 @@ sub FRM_OWX_observer
 	my $command = $data->{command};
 	COMMAND_HANDLER: {
 		$command eq "READ_REPLY" and do {
-			my $owx_device = FRM_OWX_firmata_to_device($data->{device});
+			my $id = $data->{id};
+			my $request = (defined $id) ? $hash->{FRM_OWX_REQUESTS}->{$id} : undef;
+			unless (defined $request) {
+				return unless (defined $data->{device});
+				my $owx_device = FRM_OWX_firmata_to_device($data->{device});
+				my %requests = %{$hash->{FRM_OWX_REQUESTS}};
+				foreach my $key (keys %requests) {
+					if ($requests{$key}->{device} eq $owx_device) {
+						$request = $requests{$key};
+						$id = $key;
+						last;
+					};
+				};
+			};
+			return unless (defined $request);
 			my $owx_data = pack "C*",@{$data->{data}};
+			my $owx_device = $request->{device};
 			$hash->{FRM_OWX_REPLIES}->{$owx_device} = $owx_data;
+			delete $hash->{FRM_OWX_REQUESTS}->{$id};
 			last;			
 		};
 		($command eq "SEARCH_REPLY" or $command eq "SEARCH_ALARMS_REPLY") and do {
@@ -633,7 +650,14 @@ sub FRM_OWX_Complex ($$$$) {
 		$ow_command->{"read"} = $numread;
 		#Firmata sends 0-address on read after skip
 		$owx_dev = '00.000000000000.00' unless defined $owx_dev;
-		$hash->{FRM_OWX_REPLIES}->{$owx_dev} = undef;		
+		my $id = $hash->{FRM_OWX_CORRELATIONID};
+		$ow_command->{"id"} = $hash->{FRM_OWX_CORRELATIONID};
+		$hash->{FRM_OWX_REQUESTS}->{$id} = {
+			command => $ow_command,
+			device => $owx_dev
+		};
+		delete $hash->{FRM_OWX_REPLIES}->{$owx_dev};		
+		$hash->{FRM_OWX_CORRELATIONID} = ($id + 1) & 0xFFFF;
 	}
 
 	$firmata->onewire_command_series( $pin, $ow_command );
