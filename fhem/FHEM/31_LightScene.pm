@@ -166,7 +166,7 @@ LightScene_Set($@)
   } elsif( $cmd eq "set" ) {
     my ($d, @args) = @a;
 
-    if( !defined( $scene ) || !defined( $d ) || !defined( @args ) ) { return "Usage: set $name set <scene_name> <device> <cmd>" };
+    if( !defined( $scene ) || !defined( $d ) || !@args ) { return "Usage: set $name set <scene_name> <device> <cmd>" };
 
     if( defined($hash->{SCENES}{$scene})
         && defined($hash->{SCENES}{$scene}{$d}) )
