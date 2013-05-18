@@ -84,7 +84,7 @@ YAMAHA_AVR_GetStatus($;$)
 	YAMAHA_AVR_getModel($hash);
     }
 
-    if(not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0)
+    if((not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0) or (not defined($hash->{helper}{SCENES}) or length($hash->{helper}{SCENES}) == 0))
     {
 	YAMAHA_AVR_getInputs($hash);
     }
@@ -202,10 +202,15 @@ YAMAHA_AVR_Set($@)
     my $inputs_piped = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{INPUTS}), 0) : "" ;
     my $inputs_comma = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{INPUTS}), 1) : "" ;
    
+
+    my $scenes_piped = defined($hash->{helper}{SCENES}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{SCENES}), 0) : "" ;
+    my $scenes_comma = defined($hash->{helper}{SCENES}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{SCENES}), 1) : "" ;
+    
+       
     return "No Argument given" if(!defined($a[1]));     
  
     my $what = $a[1];
-    my $usage = "Unknown argument $what, choose one of on off volume:slider,-80,1,16 input:".$inputs_comma." mute:on,off remoteControl:setup,up,down,left,right,return,option,display,enter statusRequest";
+    my $usage = "Unknown argument $what, choose one of on off volume:slider,-80,1,16 input:".$inputs_comma." mute:on,off remoteControl:setup,up,down,left,right,return,option,display,enter scene:".$scenes_comma." statusRequest";
 
     readingsBeginUpdate($hash);
 
@@ -243,37 +248,35 @@ YAMAHA_AVR_Set($@)
 	{
 	    if($hash->{STATE} eq "on")
 	    {
-		$inputs_piped =~ s/,/|/g;
-	    if(not $inputs_piped eq "")
-	    {
-		if($a[2] =~ /^($inputs_piped)$/)
+		if(not $inputs_piped eq "")
 		{
-		    $command = YAMAHA_AVR_getCommandParam($hash, $a[2]);
-		    if(defined($command) and length($command) > 0)
+		    if($a[2] =~ /^($inputs_piped)$/)
 		    {
-			$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Input><Input_Sel>".$command."</Input_Sel></Input></$zone></YAMAHA_AV>");
+			$command = YAMAHA_AVR_getInputParam($hash, $a[2]);
+			if(defined($command) and length($command) > 0)
+			{
+			    $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Input><Input_Sel>".$command."</Input_Sel></Input></$zone></YAMAHA_AV>");
+			}
+			else
+			{
+			    return "invalid input: ".$a[2];
+			}
+
+			if(not $result =~ /RC="0"/)
+			{
+			    # if the returncode isn't 0, than the command was not successful
+			    return "Could not set input to ".$a[2].".";
+			}
 		    }
 		    else
 		    {
-			return "invalid input: ".$a[2];
+			return $usage;
 		    }
-
-		    if(not $result =~ /RC="0"/)
-		    {
-			# if the returncode isn't 0, than the command was not successful
-			return "Could not set input to ".$a[2].".";
-		    }
-		}
-		else
-		{
-		    return $usage;
-		}
-	      }
-	      else
-	      {
-	        return "No inputs are avaible. Please try an statusUpdate.";
-	      }
-	     
+	        }
+	        else
+	        {
+	    	    return "No inputs are avaible. Please try an statusUpdate.";
+	        }
 	    }
 	    else
 	    {
@@ -283,6 +286,53 @@ YAMAHA_AVR_Set($@)
 	else
 	{
 	    return $inputs_piped eq "" ? "No inputs are available. Please try an statusUpdate." : "No input parameter was given";
+	}
+
+    }
+    elsif($what eq "scene")
+    {
+	if(defined($a[2]))
+	{
+	    if($hash->{STATE} eq "on")
+	    {
+		if(not $scenes_piped eq "")
+		{
+		    if($a[2] =~ /^($scenes_piped)$/)
+		    {
+			$command = YAMAHA_AVR_getSceneName($hash, $a[2]);
+			if(defined($command) and length($command) > 0)
+			{
+			    $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Scene><Scene_Sel>".$command."</Scene_Sel></Scene></$zone></YAMAHA_AV>");
+			}
+			else
+			{
+			    return "invalid input: ".$a[2];
+			}
+
+			if(not $result =~ /RC="0"/)
+			{
+			    # if the returncode isn't 0, than the command was not successful
+			    return "Could not set scene to ".$a[2].".";
+			}
+		    }
+		    else
+		    {
+			return $usage;
+		    }
+	        }
+	        else
+	        {
+	    	    return "No scenes are avaible. Please try an statusUpdate.";
+	        }
+	    }
+	    else
+	    {
+		return "scene can only be used when device is powered on";
+	    }
+	}
+	else
+	{
+	    return $scenes_piped eq "" ? "No inputs are available. Please try an statusUpdate." : "No input parameter was given";
 	}
 
     }
@@ -568,16 +618,16 @@ sub YAMAHA_AVR_InputParam2Fhem($$)
 
 #############################
 # Converts all Zones to FHEM usable command lists
-sub YAMAHA_AVR_Zone2Fhem($$)
+sub YAMAHA_AVR_Param2Fhem($$)
 {
-    my ($zones, $replace_pipes) = @_;
+    my ($param, $replace_pipes) = @_;
 
    
-    $zones =~ s/\s+//g;
-    $zones =~ s/_//g;
-    $zones =~ s/\|/,/g if($replace_pipes == 1);
+    $param =~ s/\s+//g;
+    $param =~ s/_//g;
+    $param =~ s/\|/,/g if($replace_pipes == 1);
 
-    return lc $zones;
+    return lc $param;
 
 }
 
@@ -594,7 +644,31 @@ sub YAMAHA_AVR_getZoneName($$)
 
     foreach $item (@commands)
     {
-	if(YAMAHA_AVR_Zone2Fhem($item, 0) eq $zone)
+	if(YAMAHA_AVR_Param2Fhem($item, 0) eq $zone)
+	{
+	    return $item;
+	}
+    
+    }
+    
+    return undef;
+    
+}
+
+#############################
+# Returns the Yamaha Parameter Name for the FHEM like aquivalents
+sub YAMAHA_AVR_getSceneName($$)
+{
+   my ($hash, $scene) = @_;
+   my $item;
+   
+   return undef if(not defined($hash->{helper}{SCENES}));
+   
+   my @commands = split("\\|", $hash->{helper}{SCENES});
+
+    foreach $item (@commands)
+    {
+	if(YAMAHA_AVR_Param2Fhem($item, 0) eq $scene)
 	{
 	    return $item;
 	}
@@ -607,7 +681,7 @@ sub YAMAHA_AVR_getZoneName($$)
 
 #############################
 # Returns the Yamaha Parameter Name for the FHEM like input channel
-sub YAMAHA_AVR_getCommandParam($$)
+sub YAMAHA_AVR_getInputParam($$)
 {
    my ($hash, $command) = @_;
    my $item;
@@ -685,7 +759,7 @@ sub YAMAHA_AVR_getModel($)
     #
     # $hash->{helper}{ZONES} .= "|Zone_2";
     
-    $hash->{ZONES_AVAILABLE} = YAMAHA_AVR_Zone2Fhem($hash->{helper}{ZONES}, 1);
+    $hash->{ZONES_AVAILABLE} = YAMAHA_AVR_Param2Fhem($hash->{helper}{ZONES}, 1);
     
     
     if(defined(YAMAHA_AVR_getZoneName($hash, lc $hash->{helper}{SELECTED_ZONE})))
@@ -740,6 +814,26 @@ sub YAMAHA_AVR_getInputs($)
 	$hash->{helper}{INPUTS} = join("|", sort split("\\|", $hash->{helper}{INPUTS}));
 	
     
+    $response = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Scene><Scene_Sel_Item>GetParam</Scene_Sel_Item></Scene></$zone></YAMAHA_AV>");
+    
+    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get the available scenes from device $name. Please turn on the device or check for correct hostaddress!!!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
+    
+    return undef unless (defined($response));
+    
+    delete($hash->{helper}{SCENES}) if(defined($hash->{helper}{SCENES}));
+    
+    while($response =~ /<Item_\d+>.*?<Param>(.+?)<\/Param>.*?<RW>(\w+)<\/RW>.*?<\/Item_\d+>/gc)
+    {
+      if($2 eq "W")
+      {
+        if(defined($hash->{helper}{SCENES}) and length($hash->{helper}{SCENES}) > 0)
+	{
+        $hash->{helper}{SCENES} .= "|";
+	}
+  
+        $hash->{helper}{SCENES} .= $1;
+      }
+    }
 
 }
 
@@ -815,7 +909,7 @@ sub YAMAHA_AVR_getInputs($)
     <code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code>
     <br><br>
     Currently, the following commands are defined; the available inputs are depending on the used receiver.
-    The module only offers the real available inputs. The following input commands are just an example and can differ.
+    The module only offers the real available inputs and scenes. The following input commands are just an example and can differ.
 <br><br>
 <ul><code>on<br>
 off<br>
@@ -836,7 +930,11 @@ input tuner<br>
 input v-aux<br>
 input audio<br>
 input server<br>
-volume -80..16	(volume between -80 and +16 dB)<br>
+scene scene1<br>
+scene scene2<br>
+scene scene3<br>
+scene scene4<br>
+volume -80..16        # (volume between -80 and +16 dB)<br>
 mute on<br>
 mute off</code></ul>
 </ul><br><br>
@@ -998,7 +1096,7 @@ volume_level</code></ul><br><br>
   <ul>
     <code>set &lt;Name&gt; &lt;Kommando&gt; [&lt;Parameter&gt;]</code>
     <br><br>
-    Aktuell werden folgende Kommandos unterst&uuml;tzt. Die verf&uuml;gbaren Eing&auml;nge k&ouml;nnen je nach Receiver-Modell variieren.
+    Aktuell werden folgende Kommandos unterst&uuml;tzt. Die verf&uuml;gbaren Eing&auml;nge und Szenen k&ouml;nnen je nach Receiver-Modell variieren.
     Die folgenden Eing&auml;nge stehen beispielhaft an einem RX-V473 Receiver zur Verf&uuml;gung.
     Aktuell stehen folgende Kommandos zur Verf&uuml;gung.
 <br><br>
@@ -1022,7 +1120,11 @@ input tuner<br>
 input v-aux<br>
 input audio<br>
 input server<br>
-volume -80..16	(Lautst&auml;rke zwischen -80 und +16 dB)<br>
+scene scene1<br>
+scene scene2<br>
+scene scene3<br>
+scene scene4<br>
+volume -80..16          # (Lautst&auml;rke zwischen -80 und +16 dB)<br>
 mute on<br>
 mute off</code></ul><br><br>
 
