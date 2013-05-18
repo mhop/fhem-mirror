@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: YAMAHA_AVR: new set command to select scenes
   - feature: PRESENCE: new attribute ping_count
   - feature: userReadings may have a filter
   - feature: HUEBridge: allow starting of bridge firmware update
