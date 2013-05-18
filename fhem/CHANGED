@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: PRESENCE: new attribute ping_count
   - feature: userReadings may have a filter
   - feature: HUEBridge: allow starting of bridge firmware update
   - change:  EnOcean: profil PM101 changed, old profiles FAH, FBH, FTF, SR04
