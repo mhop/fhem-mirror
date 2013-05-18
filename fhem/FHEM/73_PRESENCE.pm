@@ -51,7 +51,7 @@ PRESENCE_Initialize($)
   $hash->{DefFn}   = "PRESENCE_Define";
   $hash->{UndefFn} = "PRESENCE_Undef";
   $hash->{AttrFn}  = "PRESENCE_Attr";
-  $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 fritzbox_repeater:0,1 loglevel:1,2,3,4,5 ".$readingFnAttributes;
+  $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 fritzbox_repeater:0,1 loglevel:1,2,3,4,5 ping_count:1,2,3,4,5,6,7,8,9,10 ".$readingFnAttributes;
   
 }
 
@@ -480,7 +480,7 @@ sub PRESENCE_StartLocalScan($;$)
     }
     elsif($hash->{MODE} eq "lan-ping")
     {
-	$hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+	$hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local."|".AttrVal($hash->{NAME}, "ping_count", "4"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
     elsif($hash->{MODE} eq "fritzbox")
     {
@@ -501,13 +501,14 @@ PRESENCE_DoLocalPingScan($)
 {
 
     my ($string) = @_;
-    my ($name, $device, $local) = split("\\|", $string);
+    my ($name, $device, $local, $count) = split("\\|", $string);
 
     Log GetLogLevel($defs{$name}{NAME}, 5), "PRESENCE_DoLocalPingScan: $string";
    
     my $retcode;
     my $return;
     my $temp;
+
     if($^O =~ m/(Win|cygwin)/)
     {
 	eval "require Net::Ping;";
@@ -529,7 +530,7 @@ PRESENCE_DoLocalPingScan($)
     }
     else
     {
-	$temp = qx(ping -c 4 $device);
+	$temp = qx(ping -c $count $device);
 	
 	Log GetLogLevel($name, 5), "PRESENCE ($name) - ping command returned with output:\n$temp";
 	$return = "$name|$local|".($temp =~ /\d+ [Bb]ytes (from|von)/ ? "present" : "absent");
@@ -1033,7 +1034,10 @@ Options:
     If this attribute is activated, an active check will be disabled.<br><br>
     Possible values: 0 => not disabled , 1 => disabled<br>
     Default Value is 0 (not disabled)<br><br>
-    <li><a>fritzbox_repeater</a></li> (Only in Mode "fritzbox" applicable)
+    <li><a>ping_count</a></li> (Only in Mode "ping" on non-Windows machines applicable)<br>
+    Changes the count of the used ping packets to recognize a present state. Depending on your network performance sometimes a packet can be lost or blocked.<br><br>
+    Default Value is 4 (packets)<br><br>
+    <li><a>fritzbox_repeater</a></li> (Only in Mode "fritzbox" applicable)<br>
     If your FritzBox is part of a network using repeaters, than this attribute needs to be enabled to ensure a correct recognition for devices, which are connected via repeater.
     <br><br>
     This attribute is also needed, if your network device has no speed information on the FritzBox website (Home Network).<br><br>
@@ -1236,7 +1240,11 @@ Options:
     Wenn dieses Attribut aktiviert ist, wird die Anwesenheitserkennung nicht mehr durchgef&uuml;hrt.<br><br>
     M&ouml;gliche Werte: 0 => Erkennung durchf&uuml;hren , 1 => Keine Erkennungen durchf&uuml;hren<br>
     Standardwert ist 0 (Erkennung durchf&uuml;hren)<br><br>
-    <li><a>fritzbox_repeater</a></li> (Nur im Modus "fritzbox" anwendbar)
+    <li><a>ping_count</a></li> (Nur im Modus "ping" anwendbar auf Nicht-Windows-Maschinen)<br>
+    Verändert die Anzahl der Ping-Pakete die gesendet werden sollen um die Anwesenheit zu erkennen. 
+    Je nach Netzwerkstabilität können erste Pakete verloren gehen oder blockiert werden.<br><br>
+    Standartwert ist 4 (Versuche)<br><br>
+    <li><a>fritzbox_repeater</a></li> (Nur im Modus "fritzbox" anwendbar)<br>
     Wenn die FritzBox Teil eines Netzwerkes ist, welches mit Repeatern arbeitet, dann muss dieses Attribut gesetzt sein um die Erkennung von Ger&auml;ten zu gew&auml;hrleisten,
     welche &uuml;ber einen Repeater erreichbar sind.
     <br><br>
