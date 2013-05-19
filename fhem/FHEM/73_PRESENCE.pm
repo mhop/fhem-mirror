@@ -541,6 +541,31 @@ PRESENCE_DoLocalPingScan($)
 }
 
 sub
+PRESENCE_ExecuteFritzBoxCMD($$)
+{
+
+my ($name, $cmd) = @_;
+my $status;
+my $wait;
+ while(-e "/var/tmp/fhem-PRESENCE-cmd-lock.tmp")
+ { 
+   $wait = int(rand(4))+2;
+   Log GetLogLevel($name, 5), "PRESENCE_ExecuteFritzBoxCMD: ($name) - ctlmgr_ctl is locked. waiting $wait seconds...";
+   sleep $wait;
+ }
+
+ qx(touch /var/tmp/fhem-PRESENCE-cmd-lock.tmp);
+
+ $status = qx($cmd);
+
+ qx(rm /var/tmp/fhem-PRESENCE-cmd-lock.tmp);
+
+ return $status;
+
+  
+}
+
+sub
 PRESENCE_DoLocalFritzBoxScan($)
 {
     my ($string) = @_;
@@ -558,16 +583,16 @@ PRESENCE_DoLocalFritzBoxScan($)
     {
         $number = $defs{$name}{helper}{cachednr};
        
-        Log GetLogLevel($name, 5), "PRESENCE_DoLocalFritzBoxScan: name=$name device=$device cachednr=$number";
+        Log GetLogLevel($name, 5), "PRESENCE_DoLocalFritzBoxScan: try checking $name as device $device with cached number $number";
        
-        my $cached_name = qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/name);    
+        my $cached_name = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/name");    
         chomp $cached_name;
        
         # only use the cached $number if it has still the correct device name
         if($cached_name eq $device)
         {
             Log GetLogLevel($name, 5), "PRESENCE ($name) - checking with cached number the $check_command state ($number)";
-    	    $status = qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command);
+    	    $status = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command");
     	    
     	    chomp $status;
     	    
@@ -585,7 +610,7 @@ PRESENCE_DoLocalFritzBoxScan($)
 	}
     }
 
-    my $max = qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice/count);
+    my $max = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice/count");
     
     chomp $max;
     
@@ -604,14 +629,14 @@ PRESENCE_DoLocalFritzBoxScan($)
     
     while($number <= $max)
     {
-	$net_device=qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/name);
+	$net_device = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/name");
         
         chomp $net_device;
         
         Log GetLogLevel($name, 5), "PRESENCE ($name) - checking with device number $number the $check_command state ($net_device)";
 	if($net_device eq $device)
 	{
-  	    $status=qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command); 
+  	    $status = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command"); 
   	    
   	    chomp $status;
   	    
@@ -625,6 +650,7 @@ PRESENCE_DoLocalFritzBoxScan($)
 
     return ($status == 0 ? "$name|$local|absent" : "$name|$local|present").($number <= $max ? "|$number" : "");
 }
+
 
 sub
 PRESENCE_DoLocalBluetoothScan($)
