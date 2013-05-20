@@ -909,7 +909,8 @@ PRESENCE_ProcessAbortedScan($)
   <li><b>lan-ping</b> - A presence check of a device via network ping in your LAN/WLAN</li>
   <li><b>fritzbox</b> - A presence check by requesting the device state from the FritzBox internals (only available when running FHEM on a FritzBox!)</li>
   <li><b>local-bluetooth</b> - A presence check by searching directly for a given bluetooth device nearby</li>
-  <li><b>function</b> - A presence check by using your own perl function which returns a presence status</li>
+  <li><b>function</b> - A presence check by using your own perl function which returns a presence state</li>
+  <li><b>shellscript</b> - A presence check by using an self-written script or binary which returns a presence state</li>
   <li><b>lan-bluetooth</b> - A presence check of a bluetooth device via LAN network by connecting to a presenced or collectord instance</li>
   </ul>
   <br><br>
@@ -918,31 +919,48 @@ PRESENCE_ProcessAbortedScan($)
   <ul><b>Mode: lan-ping</b><br><br>
     <code>define &lt;name&gt; PRESENCE lan-ping &lt;ip-address&gt; [ &lt;check-interval&gt; [ &lt;present-check-interval&gt; ] ]</code><br>
     <br>
-    Checks for a network device via PING requests and reports its presence state.<br>
+    Checks for a network device via PING requests and reports its presence state.<br><br>
+    <u>Example</u><br><br>
+    <code>define iPhone PRESENCE lan-ping 192.168.179.21</code><br>
     <br>
     <b>Mode: fritzbox</b><br><br>
     <code>define &lt;name&gt; PRESENCE fritzbox &lt;device-name&gt; [ &lt;check-interval&gt; [ &lt;present-check-interval&gt; ] ]</code><br>
     <br>
-    Checks for a network device by requesting the internal state on a FritzBox via ctlmgr_ctl. The device-name must be the same as shown in the network overview of the FritzBox<br>
-    <br>
+    Checks for a network device by requesting the internal state on a FritzBox via ctlmgr_ctl. The device-name must be the same as shown in the network overview of the FritzBox<br><br>
+    <i>This check is only applicaple when FHEM is running on a FritzBox!</i><br><br>
+    <u>Example</u><br><br>
+    <code>define iPhone PRESENCE fritzbox iPhone-4S</code><br><br>
     <b>Mode: local-bluetooth</b><br><br>
     <code>define &lt;name&gt; PRESENCE local-bluetooth &lt;bluetooth-address&gt; [ &lt;check-interval&gt; [ &lt;present-check-interval&gt; ] ]</code><br>
     <br>
     Checks for a bluetooth device and reports its presence state. For this mode the shell command "hcitool" is required (provided with a <a href="http://www.bluez.org" target="_new">bluez</a> installation under Debian via APT), as well
     as a functional bluetooth device directly attached to your machine.<br><br>
+    <u>Example</u><br><br>
+    <code>define iPhone PRESENCE local-bluetooth 0a:8d:4f:51:3c:8f</code><br><br>
     <b>Mode: function</b><br><br>
     <code>define &lt;name&gt; PRESENCE function {...} [ &lt;check-interval&gt; [ &lt;present-check-interval&gt; ] ]</code><br>
     <br>
     Checks for a presence state via perl-code. You can use a self-written perl function to obtain the presence state of a specific device (e.g. via SNMP check).<br><br>
-    The function must return 0 (absent) or 1 (present).<br><br>
+    The function must return 0 (absent) or 1 (present). An example can be found in the <a href="http://www.fhemwiki.de/wiki/Anwesenheitserkennung" target="_new">FHEM-Wiki</a>.<br><br>
+    <u>Example</u><br><br>
+    <code>define iPhone PRESENCE function {snmpCheck("10.0.1.1","0x44d77429f35c")}</code><br><br>
+    <b>Mode: shellscript</b><br><br>
+    <code>define &lt;name&gt; PRESENCE shellscript "&lt;path&gt; [&lt;arg1&gt;] [&lt;argN&gt;]..." [ &lt;check-interval&gt; [ &lt;present-check-interval&gt; ] ]</code><br>
+    <br>
+    Checks for a presence state via shell script. You can use a self-written script or binary in any language to obtain the presence state of a specific device (e.g. via SNMP check).<br><br>
+    The shell must return 0 (absent) or 1 (present) on <u>console (STDOUT)</u>. Any other values will be treated as an error<br><br>
+    <u>Example</u><br><br>
+    <code>define iPhone PRESENCE shellscript "/opt/check_device.sh iPhone"</code><br><br>
     <b>Mode: lan-bluetooth</b><br><br>
     Checks for a bluetooth device with the help of presenced or collectord. They can be installed where-ever you like, just must be accessible via network.
      The given device will be checked for presence status.<br>
     <br>
-    <code>define &lt;name&gt; PRESENCE &lt;ip-address&gt;[:port] &lt;bluetooth-address&gt; [ &lt;check-interval&gt; ]</code><br>
+    <code>define &lt;name&gt; PRESENCE lan-bluetooth &lt;ip-address&gt;[:port] &lt;bluetooth-address&gt; [ &lt;check-interval&gt; ]</code><br>
     <br>
     The default port is 5111 (presenced). Alternatly you can use port 5222 (collectord)<br>
     <br>
+    <u>Example</u><br><br>
+    <code>define iPhone PRESENCE lan-bluetooth 127.0.0.1:5222 0a:4f:36:d8:f9:89</code><br><br>
     <u>presenced</u><br><br>
     <ul>The presence is a perl network daemon, which provides presence checks of multiple bluetooth devices over network. 
     It listens on TCP port 5111 for incoming connections from a FHEM PRESENCE instance or a running collectord.<br>
@@ -1112,6 +1130,7 @@ Options:
   <li><b>fritzbox</b> - Eine Erkennung aufgrund der internen Abfrage des Status auf der FritzBox (nur m&ouml;glich, wenn FHEM auf einer FritzBox l&auml;uft)</li>
   <li><b>local-bluetooth</b> - Eine Erkennung auf Basis von Bluetooth-Abfragen durch den FHEM Server. Das Ger&auml;t muss dabei in Empfangsreichweite sein, aber nicht sichtbar sein</li>
   <li><b>function</b> - Eine Erkennung mithilfe einer selbst geschriebenen Perl-Funktion, welche den Anwesenheitsstatus ermittelt.</li>
+  <li><b>shellscript</b> - Eine Erkennung mithilfe eines selbst geschriebenen Skriptes oder Programm (egal in welcher Sprache).</li>
   <li><b>lan-bluetooth</b> - Eine Erkennung durch Bluetooth-Abfragen via Netzwerk (LAN/WLAN) in ein oder mehreren R&auml;umen</li>
   </ul>
   <br><br>
@@ -1120,33 +1139,48 @@ Options:
   <ul><b>Modus: lan-ping</b><br><br>
     <code>define &lt;name&gt; PRESENCE lan-ping &lt;IP-Addresse oder Hostname&gt; [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
     <br>
-    Pr&uuml;ft ob ein Ger&auml;t &uuml;ber Netzwerk (&uuml;blicherweise WLAN) auf Ping-Anfragen reagiert und setzt entsprechend den Anwesenheitsstatus.<br>
-    <br>
+    Pr&uuml;ft ob ein Ger&auml;t &uuml;ber Netzwerk (&uuml;blicherweise WLAN) auf Ping-Anfragen reagiert und setzt entsprechend den Anwesenheitsstatus.<br><br>
+    <u>Beispiel</u><br><br>
+    <code>define iPhone PRESENCE lan-ping 192.168.179.21</code><br><br>
     <b>Modus: fritzbox</b><br><br>
     <code>define &lt;name&gt; PRESENCE fritzbox &lt;Ger&auml;tename&gt; [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
     <br>
     Pr&uuml;ft ob ein Ger&auml;t welches per WLAN mit der FritzBox verbunden ist, erreichbar durch Abfrage des Status mit dem Befehl ctlmgr_ctl. 
-    Der Ger&auml;tename (Parameter: &lt;Ger&auml;tename&gt;) muss dem Namen entsprechen, welcher im Men&uuml;punkt "Heimnetz" auf der FritzBox-Oberfl&auml;che angezeigt wird.<br>
-    <br>
+    Der Ger&auml;tename (Parameter: &lt;Ger&auml;tename&gt;) muss dem Namen entsprechen, welcher im Men&uuml;punkt "Heimnetz" auf der FritzBox-Oberfl&auml;che angezeigt wird.<br><br>
+    <i>Dieser Modus ist nur verwendbar, wenn FHEM auf einer FritzBox läuft!</i><br><br>
+    <u>Beispiel</u><br><br>
+    <code>define iPhone PRESENCE fritzbox iPhone-4S</code><br><br>
     <b>Modus: local-bluetooth</b><br><br>
     <code>define &lt;name&gt; PRESENCE local-bluetooth &lt;Bluetooth-Adresse&gt; [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
     <br>
     Pr&uuml;ft ob ein Bluetooth-Ger&auml;t abgefragt werden kann und meldet dies als Anwesenheit. F&uuml;r diesen Modus wird der Shell-Befehl "hcitool" ben&ouml;tigt
     (wird durch das Paket <a href="http://www.bluez.org" target="_new">bluez</a> bereitgestellt), sowie ein funktionierender Bluetooth-Empf&auml;nger (intern oder als USB-Stick)<br><br>
+    <u>Beispiel</u><br><br>
+    <code>define iPhone PRESENCE local-bluetooth 0a:4f:36:d8:f9:8</code><br><br>
     <b>Modus: function</b><br><br>
     <code>define &lt;name&gt; PRESENCE function {...} [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
     <br>
     Pr&uuml;ft den Anwesenheitsstatus mithilfe einer selbst geschriebenen Perl-Funktion (z.B. SNMP Abfrage).<br><br>
-    Diese Funktion muss 0 (Abwesend) oder 1 (Anwesend) zurückgeben.<br><br>
+    Diese Funktion muss 0 (Abwesend) oder 1 (Anwesend) zurückgeben. Ein entsprechendes Beispiel findet man im <a href="http://www.fhemwiki.de/wiki/Anwesenheitserkennung" target="_new">FHEM-Wiki</a>.<br><br>
+    <u>Beispiel</u><br><br>
+    <code>define iPhone PRESENCE function {snmpCheck("10.0.1.1","0x44d77429f35c")</code><br><br>
+    <b>Mode: shellscript</b><br><br>
+    <code>define &lt;name&gt; PRESENCE shellscript "&lt;Skript-Pfad&gt; [&lt;arg1&gt;] [&lt;argN&gt;]..." [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
+    <br>
+    Pr&uuml;ft den Anwesenheitsstatus mithilfe eines selbst geschrieben Skripts oder Programmes (egal in welcher Programmier-/Skriptsprache)<br><br>
+    Der Aufruf dieses Skriptes muss eine 0 (Abwesend) oder 1 (Anwesend) auf der <u>Kommandozeile (STDOUT)</u> ausgeben. Alle anderen Werte/Ausgaben werden als Fehler behandelt.<br><br>
+    <u>Beispiel</u><br><br>
+    <code>define iPhone PRESENCE shellscript "/opt/check_device.sh iPhone"</code><br><br>
     <b>Modus: lan-bluetooth</b><br><br>
     Pr&uuml;ft ein Bluetooth-Ger&auml;t auf Anwesenheit &uuml;ber Netzwerk mit Hilfe von presenced oder collectord. Diese k&ouml;nnen auf jeder Maschine installiert werden,
     welche eine Standard-Perl-Umgebung bereitstellt und &uuml;ber Netzwerk erreichbar ist.
     <br>
     <br>
-    <code>define &lt;name&gt; PRESENCE &lt;IP-Adresse&gt;[:Port] &lt;Bluetooth-Adresse&gt; [ &lt;Interval&gt; ]</code><br>
+    <code>define &lt;name&gt; PRESENCE lan-bluetooth &lt;IP-Adresse&gt;[:Port] &lt;Bluetooth-Adresse&gt; [ &lt;Interval&gt; ]</code><br>
     <br>
-    Der Standardport ist 5111 (presenced). Alternativ kann man den Port 5222 (collectord) nutzen. Generell ist der Port aber frei w&auml;hlbar.<br>
-    <br>
+    Der Standardport ist 5111 (presenced). Alternativ kann man den Port 5222 (collectord) nutzen. Generell ist der Port aber frei w&auml;hlbar.<br><br>
+    <u>Beispiel</u><br><br>
+    <code>define iPhone PRESENCE lan-bluetooth 127.0.0.1:5222 0a:4f:36:d8:f9:8</code><br><br>
     <u>presenced</u><br><br>
     <ul>Der presenced ist ein Perl Netzwerk Dienst, welcher eine Bluetooth-Anwesenheitserkennung von ein oder mehreren Ger&auml;ten &uuml;ber Netzwerk bereitstellt. 
     Dieser lauscht standardm&auml;&szlig;ig auf TCP Port 5111 nach eingehenden Verbindungen von dem PRESENCE Modul oder einem collectord.<br>
