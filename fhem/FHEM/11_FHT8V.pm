@@ -77,8 +77,13 @@ FHT8V_Set($@)
     Log GetLogLevel($n,3), "FHT8V set $n $arg";
     IOWrite($hash, "", sprintf("T%s002f00", $hash->{addr}));
 
+  } elsif ($arg eq "decalc" ) {
+    Log GetLogLevel($n,3), "FHT8V set $n $arg";
+    $hash->{STATE} = "lime-protection";
+    IOWrite($hash, "", sprintf("T%s000A00", $hash->{addr}));
+
   } else {
-    return "Unknown argument $a[1], choose one of valve pair"
+    return "Unknown argument $a[1], choose one of valve pair decalc"
 
   }
   return "";
@@ -153,11 +158,14 @@ FHT8V_Get($@)
   <b>Set </b>
   <ul>
       <li>set &lt;name&gt; valve &lt;value;&gt;<br>
-      Set the valve to the given value (in percent, from 0 to 100).
-      </li>
+        Set the valve to the given value (in percent, from 0 to 100).
+        </li>
       <li>set &lt;name&gt; pair<br>
-      Pair the valve with the CUL.
-      </li>
+        Pair the valve with the CUL.
+        </li>
+      <li>set &lt;name&gt; decalc<br>
+        Start a decalcifying cycle on the given valve
+        </li>
   </ul>
   <br>
 
