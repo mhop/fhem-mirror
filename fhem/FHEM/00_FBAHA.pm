@@ -143,10 +143,14 @@ FBAHA_getDevList($$)
   my ($hash, $onlyId) = @_;
 
   FBAHA_Write($hash, "05", "00000000");  # CONFIG_REQ
-  my ($err, $data) = FBAHA_ReadAnswer($hash, "CONFIG_RSP", "^06");
-  return ($err) if($err);
+  my $data = "";
+  for(;;) {
+    my ($err, $buf) = FBAHA_ReadAnswer($hash, "CONFIG_RSP", "^06");
+    return ($err) if($err);
+    $data .= substr($buf, 32);
+    last if($buf =~ m/^060[23]/);
+  }
 
-  $data = substr($data, 32); # Header
   return FBAHA_configInd($data, $onlyId);
 }
 
@@ -178,7 +182,7 @@ FBAHA_configInd($$)
       if(!$onlyId || $onlyId == $id);
 
     if($onlyId && $onlyId == $id) {
-      my $mnf = hex(substr($data,184, 4)); # empty/0
+      my $mnf = hex(substr($data,184, 8)); # empty/0
       my $idf = substr($data,192,40);      # empty/0
       my $frm = substr($data,232,40);      # empty/0
       push @answer, "  MANUF:$mnf";
