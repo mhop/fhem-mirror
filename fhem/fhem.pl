@@ -1384,10 +1384,12 @@ AssignIoPort($)
     my $cl = $defs{$p}{Clients};
     $cl = $modules{$defs{$p}{TYPE}}{Clients} if(!$cl);
 
-    if((defined($cl) && $cl =~ m/:$hash->{TYPE}:/) &&
-        $defs{$p}{NAME} ne $hash->{NAME}) {      # e.g. RFR
-      $hash->{IODev} = $defs{$p};
-      last;
+    if($cl && $defs{$p}{NAME} ne $hash->{NAME}) {      # e.g. RFR
+      my @fnd = grep { $hash->{TYPE} =~ m/^$_$/; } split(":", $cl);
+      if(@fnd) {
+        $hash->{IODev} = $defs{$p};
+        last;
+      }
     }
   }
   Log 3, "No I/O device found for $hash->{NAME}" if(!$hash->{IODev});
