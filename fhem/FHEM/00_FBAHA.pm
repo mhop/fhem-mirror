@@ -160,7 +160,7 @@ FBAHA_configInd($$)
   while(length($data) >= 288) {
     my $id  = hex(substr($data,  0, 4)); 
     my $act = hex(substr($data,  4, 2));
-    my $typ = hex(substr($data,  8, 4));
+    my $typ = hex(substr($data,  8, 8));
     my $lsn = hex(substr($data, 16, 8));
     my $nam = pack("H*",substr($data,24,160)); $nam =~ s/\x0//g;
 
