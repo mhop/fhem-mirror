@@ -413,7 +413,7 @@ weblink_WriteGplot($)
   print FH "set ylabel \"$FW_webArgs{ylabel}\"\n";
   print FH "set y2label \"$FW_webArgs{y2label}\"\n";
   print FH "set yrange $FW_webArgs{yrange}\n" if($FW_webArgs{yrange});
-  print FH "set y2range $FW_webArgs{yrange}\n" if($FW_webArgs{y2range});
+  print FH "set y2range $FW_webArgs{y2range}\n" if($FW_webArgs{y2range});
   print FH "\n";
 
   my @plot;
