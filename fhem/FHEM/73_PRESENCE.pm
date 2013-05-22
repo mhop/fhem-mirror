@@ -1,4 +1,4 @@
-﻿# $Id$
+# $Id$
 ##############################################################################
 #
 #     73_PRESENCE.pm
@@ -540,29 +540,30 @@ PRESENCE_DoLocalPingScan($)
 
 }
 
-sub
+sub 
 PRESENCE_ExecuteFritzBoxCMD($$)
 {
 
-my ($name, $cmd) = @_;
-my $status;
-my $wait;
- while(-e "/var/tmp/fhem-PRESENCE-cmd-lock.tmp")
- { 
-   $wait = int(rand(4))+2;
-   Log GetLogLevel($name, 5), "PRESENCE_ExecuteFritzBoxCMD: ($name) - ctlmgr_ctl is locked. waiting $wait seconds...";
-   sleep $wait;
- }
+	my ($name, $cmd) = @_;
+	my $status;
+	my $wait;
 
- qx(touch /var/tmp/fhem-PRESENCE-cmd-lock.tmp);
+	while(-e "/var/tmp/fhem-PRESENCE-cmd-lock.tmp" and (stat("/var/tmp/fhem-PRESENCE-cmd-lock.tmp"))[9] > (gettimeofday() - 2))
+	{	 
+		$wait = int(rand(4))+2;
+		Log GetLogLevel($name, 5), "PRESENCE_ExecuteFritzBoxCMD: ($name) - ctlmgr_ctl is locked. waiting $wait seconds...";
+		sleep $wait;
+	}
 
- $status = qx($cmd);
+	unlink("/var/tmp/fhem-PRESENCE-cmd-lock.tmp") if(-e "/var/tmp/fhem-PRESENCE-cmd-lock.tmp");
+	
+	qx(touch /var/tmp/fhem-PRESENCE-cmd-lock.tmp);
 
- qx(rm /var/tmp/fhem-PRESENCE-cmd-lock.tmp);
+	$status = qx($cmd);
 
- return $status;
+	unlink("/var/tmp/fhem-PRESENCE-cmd-lock.tmp") if(-e "/var/tmp/fhem-PRESENCE-cmd-lock.tmp");
 
-  
+	return $status;
 }
 
 sub
