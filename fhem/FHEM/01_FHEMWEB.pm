@@ -453,12 +453,11 @@ FW_answerCall($)
       next if($arg !~ m/^$k/ || $h !~ m/HASH/ || !$h->{FUNC});
       no strict "refs";
       #Returns undef if it already sent a HTTP header
-      ($FW_RETTYPE, $FW_RET) = &{$h->{FUNC}}($arg);
+      my $localType;
+      ($localType, $FW_RET) = &{$h->{FUNC}}($arg);
       use strict "refs";
-      if(!$FW_RET) {
-        $FW_RETTYPE = "text/html; charset=$FW_encoding";
-        last;
-      }
+      last if($FW_RET && $FW_RET eq "continue"); # Continue displaying the data
+      $FW_RETTYPE = $localType;
       return defined($FW_RETTYPE) ? 0 : -1;
     }
   }
