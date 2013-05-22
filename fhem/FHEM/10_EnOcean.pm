@@ -175,6 +175,7 @@ my %EnO_subType = (
 
 my @EnO_models = qw (
   other
+  slats
   FSB14 FSB61 FSB70
   FSM12 FSM61
   FT55
@@ -196,12 +197,13 @@ EnOcean_Initialize($)
   $hash->{SetFn}     = "EnOcean_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 " .
-                       "actualTemp dimTime dimValueOn " .
+                       "actualTemp " .
+                       "dimTime dimValueOn " .
                        "model:" . join(",", @EnO_models) . " " .
                        "gwCmd:" . join(",", sort @EnO_gwCmd) . " " .
                        "manufID:" . join(",", keys %EnO_manuf) . " " . 
-                       "rampTime " .
-                       "repeatingAllowed:yes,no " .
+                       "rampTime repeatingAllowed:yes,no " .
+                       "scaleMax scaleMin " .
                        "shutTime subDef subDef0 subDefI " .
                        "subType:" . join(",", sort grep { !$subTypeList{$_}++ } values %EnO_subType) . " " .
                        "subTypeSet:" . join(",", sort grep { !$subTypeSetList{$_}++ } values %EnO_subType) . " " .
@@ -843,7 +845,7 @@ EnOcean_Set($@)
       # to do: optional data
       if ($cmd eq "4BS"){
         # 4BS Telegram
-        if ($a[1] && $a[1] =~ /^[\dA-F]{8}$/) {
+        if ($a[1] && $a[1] =~ m/^[\dA-F]{8}$/) {
           $data = sprintf "A5%s", $a[1];
           $header = "000A0001";
         } else {
@@ -851,7 +853,7 @@ EnOcean_Set($@)
         }
       } elsif ($cmd eq "1BS") {
         # 1BS Telegram
-        if ($a[1] && $a[1] =~ /^[\dA-F]{2}$/) {
+        if ($a[1] && $a[1] =~ m/^[\dA-F]{2}$/) {
           $data = sprintf "D5%s", $a[1];
           $header = "00070001";
         } else {
@@ -859,17 +861,17 @@ EnOcean_Set($@)
         }
       } elsif ($cmd eq "RPS") {
         # RPS Telegram
-        if ($a[1] && $a[1] =~ /^[\dA-F]{2}$/) {
+        if ($a[1] && $a[1] =~ m/^[\dA-F]{2}$/) {
           $data = sprintf "F6%s", $a[1];
           $header = "00070001";
         } else {
           return "Wrong parameter, choose RPS <data 1 Byte hex> [status 1 Byte hex]";
         }
       } else {
-        return "Unknown argument $cmd, choose one of RPS 1BS 4BS";
+        return "Unknown argument $cmd, choose one of RPS 1BS 4BS timer";
       }
       if ($a[2]) {
-        if ($a[2] !~ /^[\dA-F]{2}$/) {
+        if ($a[2] !~ m/^[\dA-F]{2}$/) {
           return "Wrong status parameter, choose $cmd $a[1] [status 1 Byte hex]";
         }
        $status = $a[2];
@@ -877,9 +879,9 @@ EnOcean_Set($@)
       }
       $updateState = 0;
       readingsSingleUpdate($hash, "RORG", $cmd, 1);
-      readingsSingleUpdate($hash, "dataSent", $a[1], 1);
+      readingsSingleUpdate($hash, "dataSent", substr($data, 2), 1);
       readingsSingleUpdate($hash, "statusSent", $status, 1);
-      Log $ll2, "EnOcean: set $name $cmd $a[1] $status";
+      Log $ll2, "EnOcean: set $name $cmd " . substr($data, 2) . " $status";
       shift(@a);     
       
     } else {
@@ -1089,7 +1091,7 @@ EnOcean_Parse($$)
                            $model ne "FT55" && $model ne "FSB14" &&
                            $model ne "FSB61" && $model ne "FSB70" &&
                            $model ne "FSM12" && $model ne "FSM61" &&
-                           $model ne "FTS12");
+                           $model ne "FTS12" && $model ne "slats");
     }
     push @event, "3:$event:$msg";
 
@@ -1345,7 +1347,7 @@ EnOcean_Parse($$)
       # [Eltako FTF55D, FTF55H, Thermokon SR04 *, Thanos SR *, untested]
       # $db_3 is the fan speed or night reduction for Eltako
       # $db_2 is the setpoint where 0x00 = min ... 0xFF = max or
-      # reference temperature for Eltako whre 0x00 = 0°C ... 0xFF = 40°C
+      # reference temperature for Eltako where 0x00 = 0°C ... 0xFF = 40°C
       # $db_1 is the temperature where 0x00 = +40°C ... 0xFF = 0°C
       # $db_0 bit D0 is the occupy button, pushbutton or slide switch
       my $temp = sprintf "%0.1f", 40 - $db_1 / 6.375;
@@ -1371,6 +1373,7 @@ EnOcean_Parse($$)
         push @event, "3:fan:$fspeed";
         push @event, "3:switch:$switch";
         push @event, "3:setpoint:$db_2";
+        EnOcean_ReadingScaled($hash, "setpoint", 0, 255);
       }
       push @event, "3:temperature:$temp";
 
@@ -1389,6 +1392,7 @@ EnOcean_Parse($$)
       push @event, "3:switch:$switch";
       push @event, "3:setpoint:$db_2";
       push @event, "3:temperature:$temp";
+      EnOcean_ReadingScaled($hash, "setpoint", 0, 255);
 
     } elsif($st eq "roomSensorControl.02") {
       # Room Sensor and Control Unit (A5-10-15 ... A5-10-17)
@@ -1403,6 +1407,7 @@ EnOcean_Parse($$)
       push @event, "3:presence:$presence";
       push @event, "3:setpoint:$setpoint";
       push @event, "3:temperature:$temp";
+      EnOcean_ReadingScaled($hash, "setpoint", 0, 63);
 
     } elsif($st eq "roomSensorControl.18") {
       # Room Sensor and Control Unit (A5-10-18)
@@ -1639,6 +1644,7 @@ EnOcean_Parse($$)
       push @event, "3:setpoint:$setpoint";
       push @event, "3:temperature:$temp";
       push @event, "3:state:T: $temp F: $fanSpeed SP: $setpoint P: $presence";
+      EnOcean_ReadingScaled($hash, "setpoint", 0, 255);
 
     } elsif($st eq "tempHumiSensor.02") {
       # Temperatur and Humidity Sensor(EEP A5-04-02)
@@ -1905,9 +1911,9 @@ EnOcean_Parse($$)
       # $db_0_bit_7 is the Service Mode where 0 = no, 1 = yes
       # $db_0_bit_6 is the Position Mode where 0 = normal, 1 = inverse
       push @event, "3:positon:" . $db_3;
-      my $angle = ($db_2 & 0x7F) << 1;
-      if ($db_2 & 80) {$angle *= -1;}
-      push @event, "3:angle:" . $angle;
+      my $anglePos = ($db_2 & 0x7F) << 1;
+      if ($db_2 & 80) {$anglePos *= -1;}
+      push @event, "3:anglePos:" . $anglePos;
       my $alarm = ($db_1 & 0x30) >> 4;
       if ($alarm == 0) {
         push @event, "3:alarm:off";
@@ -2348,6 +2354,32 @@ EnOcean_A5Cmd($$$)
   IOWrite($hash, "000A0701", # varLen=0A optLen=07 msgType=01=radio,
           sprintf("A5%s%s0001%sFF00",$msg,$org,$hash->{DEF}));
           # type=A5 msg:4 senderId:4 status=00 subTelNum=01 destId:4 dBm=FF Security=00
+}
+
+# EnOcean_Set called from sub InternalTimer()
+sub
+EnOcean_TimerSet($)
+{
+  my ($par)=@_;
+  EnOcean_Set($par->{hash}, @{$par->{timerCmd}});
+}
+
+# Scale Readings
+sub
+EnOcean_ReadingScaled($$$$)
+{
+  my ($hash, $readingName, $readingMin, $readingMax) = @_;
+  my $name = $hash->{NAME};
+  my $readingVal = ReadingsVal($hash->{NAME}, $readingName, undef);
+  my $scaleMin = AttrVal($name, "scaleMin", undef);
+  my $scaleMax = AttrVal($name, "scaleMax", undef);
+  if (defined $scaleMax && defined $scaleMin &&
+      $scaleMax =~ m/^[+-]?\d+(\.\d+)?$/ && $scaleMax =~ m/^[+-]?\d+(\.\d+)?$/) {
+    my $valScaled = ($readingMin*$scaleMax-$scaleMin*$readingMax)/
+                    ($readingMin-$readingMax)+
+                    ($scaleMin-$scaleMax)/($readingMin-$readingMax)*$readingVal;
+    readingsSingleUpdate($hash, $readingName."Scaled", $valScaled, 1);
+  }  
 }
 
 # Undef
@@ -2866,6 +2898,12 @@ EnOcean_Undef($$)
       EnOcean Repeater in the transmission range of Fhem may forward data messages
       of the device, if the attribute is set to yes.
     </li>
+    <li><a name="scaleMax">scaleMax</a> &lt;floating-point number&gt;<br>
+      Scaled maximum value of the reading setpoint
+    </li>
+    <li><a name="scaleMin">scaleMin</a> &lt;floating-point number&gt;<br>
+      Scaled minimum value of the reading setpoint
+    </li>
     <li><a href="#showtime">showtime</a></li>
     <li><a name="shutTime">shutTime</a> t/s, [shutTime] = 1 ... 255, 255 is default.<br>
       Use the attr shutTime to set the time delay to the position "Halt" in
@@ -3231,6 +3269,7 @@ EnOcean_Undef($$)
        <li>fan: 0|1|2|3|auto</li>
        <li>switch: 0|1</li>
        <li>setpoint: 0 ... 255</li>
+       <li>setpointScaled: &lt;floating-point number&gt;</li>
        <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 40 &#176C)</li>
        <li>state: T: t/&#176C SP: 0 ... 255 F: 0|1|2|3|auto SW: 0|1</li><br>
        Alternatively for Eltako devices
@@ -3240,9 +3279,13 @@ EnOcean_Undef($$)
        <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 40 &#176C)</li>
        <li>state: T: t/&#176C SPT: t/&#176C NR: t/&#176C</li><br>
      </ul><br>
-        The attr subType must be roomSensorControl.05 and attr
-        manufID must be 00D for Eltako Devices. This is done if the device was
-        created by autocreate.
+       The scaling of the setpoint knob is device- and vendor-specific. Set the
+       attributes <a href="#scaleMax">scaleMax</a> and <a href="#scaleMin">scaleMin</a>
+       for the additional scaled reading setpointScaled. Use attribut
+       <a href="#userReadings">userReadings</a> to adjust the scaling alternatively.<br>
+       The attr subType must be roomSensorControl.05 and attr
+       manufID must be 00D for Eltako Devices. This is done if the device was
+       created by autocreate.
      </li>
      <br><br>
 
@@ -3254,10 +3297,15 @@ EnOcean_Undef($$)
        <li>switch: 0|1</li>
        <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 40 &#176C)</li>
        <li>setpoint: 0 ... 255</li>
+       <li>setpointScaled: &lt;floating-point number&gt;</li>
        <li>state: T: t/&#176C H: rH/% SP: 0 ... 255 SW: 0|1</li>
      </ul><br>
-         The attr subType must be roomSensorControl.01. This is
-         done if the device was created by autocreate.
+       The scaling of the setpoint knob is device- and vendor-specific. Set the
+       attributes <a href="#scaleMax">scaleMax</a> and <a href="#scaleMin">scaleMin</a>
+       for the additional scaled reading setpointScaled. Use attribut
+       <a href="#userReadings">userReadings</a> to adjust the scaling alternatively.<br>
+       The attr subType must be roomSensorControl.01. This is
+       done if the device was created by autocreate.
      </li>
      <br><br>
 
@@ -3268,10 +3316,15 @@ EnOcean_Undef($$)
        <li>presence: absent|present</li>
        <li>temperature: t/&#176C (Sensor Range: t = -10 &#176C ... 41.2 &#176C)</li>
        <li>setpoint: 0 ... 63</li>
+       <li>setpointScaled: &lt;floating-point number&gt;</li>
        <li>state: T: t/&#176C SP: 0 ... 63 P: absent|present</li>
      </ul><br>
-        The attr subType must be roomSensorControl.02. This is done if the device was
-        created by autocreate.
+       The scaling of the setpoint knob is device- and vendor-specific. Set the
+       attributes <a href="#scaleMax">scaleMax</a> and <a href="#scaleMin">scaleMin</a>
+       for the additional scaled reading setpointScaled. Use attribut
+       <a href="#userReadings">userReadings</a> to adjust the scaling alternatively.<br>
+       The attr subType must be roomSensorControl.02. This is done if the device was
+       created by autocreate.
      </li>
      <br><br>
 
@@ -3379,11 +3432,16 @@ EnOcean_Undef($$)
        <li>fan: 0|1|2|3|auto</li>
        <li>presence: absent|present|disabled</li>
        <li>setpoint: 0 ... 255</li>
+       <li>setpointScaled: &lt;floating-point number&gt;</li>
        <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 40 &#176C)</li>
        <li>state: T: t/&#176C F: 0|1|2|3|auto SP: 0 ... 255 P: absent|present|disabled</li>
      </ul><br>
-        The attr subType must be roomSensorControl.1F. This is done if the device was
-        created by autocreate.
+       The scaling of the setpoint knob is device- and vendor-specific. Set the
+       attributes <a href="#scaleMax">scaleMax</a> and <a href="#scaleMin">scaleMin</a>
+       for the additional scaled reading setpointScaled. Use attribut
+       <a href="#userReadings">userReadings</a> to adjust the scaling alternatively.<br>
+       The attr subType must be roomSensorControl.1F. This is done if the device was
+       created by autocreate.
      </li>
      <br><br>
 
@@ -3432,7 +3490,7 @@ EnOcean_Undef($$)
      <ul>
        <li>open|closed|not reached|not available</li>
        <li>alarm: on|off|no endpoints defined|not used</li>
-       <li>angle: &alpha;/&#176 (Sensor Range: &alpha; = -360 &#176 ... 360 &#176)</li>
+       <li>anglePos: &alpha;/&#176 (Sensor Range: &alpha; = -360 &#176 ... 360 &#176)</li>
        <li>endPosition: open|closed|not reached|not available</li>
        <li>position: pos/% (Sensor Range: pos = 0 % ... 100 %)</li>
        <li>serviceOn: yes|no</li>
