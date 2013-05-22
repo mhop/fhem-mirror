@@ -256,7 +256,7 @@ SYSSTAT_getPiTemp( $ )
 
   my $filename = "/sys/class/thermal/thermal_zone0/temp";
 
-  my $temp;
+  my $temp = -1;
   if( defined($hash->{HOST}) ) {
       my $cmd = qx(which ssh);
       chomp( $cmd );
