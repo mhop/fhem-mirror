@@ -3287,7 +3287,7 @@ sub CUL_HM_updtRegDisp($$$) {
   push @regArr, keys %{$culHmRegModel{$md}} if($culHmRegModel{$md}); 
   push @regArr, keys %{$culHmRegChan{$md.$chn}} if($culHmRegChan{$md.$chn}); 
   my @changedRead;
-  my $expLvl = (CUL_HM_getAttrInt($name,"expert") == 0)?1:0;
+  my $expLvl = (CUL_HM_getAttrInt($name,"expert") != 0)?1:0;
   foreach my $regName (@regArr){
     next if ($culHmRegDefine{$regName}->{l} ne $listNo);
     my $rgVal = CUL_HM_getRegFromStore($name,$regName,$list,$peerId);
