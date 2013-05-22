@@ -233,7 +233,8 @@ LightScene_Set($@)
 
     } elsif ( $cmd eq "scene" ) {
       $hash->{STATE} = $scene;
-      $ret .= " ". CommandSet(undef,"$d $hash->{SCENES}{$scene}{$d}");
+      $ret .= " " if( $ret );
+      $ret .= CommandSet(undef,"$d $hash->{SCENES}{$scene}{$d}");
     } else {
       $ret = "Unknown argument $cmd, choose one of save scene";
     }
