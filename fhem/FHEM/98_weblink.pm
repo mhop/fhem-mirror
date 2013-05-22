@@ -391,13 +391,13 @@ weblink_WriteGplot($)
   for(my $i=0; $i <= 8; $i++) {
     $hasTl = 1 if($FW_webArgs{"title_$i"});
   }
-  return if(!$hasTl);
+  return (undef, "continue") if(!$hasTl);
 
   my $fName = $FW_webArgs{gplotName};
-  return if(!$fName);
+  return (undef, "continue") if(!$fName);
   if(!open(FH, ">$fName")) {
     Log 1, "weblink_WriteGplot: Can't write $fName";
-    return;
+    return (undef, "continue");
   }
   print FH "# Created by FHEMWEB, ".TimeNow()."\n";
   print FH "set terminal png transparent size <SIZE> crop\n";
@@ -440,6 +440,7 @@ weblink_WriteGplot($)
   #foreach my $k (sort keys %FW_webArgs) {
   #  Log 1, "$k: $FW_webArgs{$k}";
   #}
+  return (undef, "continue");
 }
 
 1;
