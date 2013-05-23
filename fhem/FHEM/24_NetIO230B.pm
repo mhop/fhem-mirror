@@ -121,13 +121,17 @@ NetIO230B_Request($@)
 {
 	my ($hash, $cmd, $list) = @_;
 	my $URL='';
+	
+	my $timeout=4;
+	my $noshutdown=1;
+	
 	my $log='';
 	my $parm='l';
 	if($cmd eq "set") {
 	  $parm = $list;
 	}
 
-	my $response = GetFileFromURL("http://"."$hash->{HOST}/tgi/control.tgi?l=p:". $hash->{USER}.":".$hash->{PASS}."&p=".$parm);
+	my $response = GetFileFromURL("http://"."$hash->{HOST}/tgi/control.tgi?l=p:". $hash->{USER}.":".$hash->{PASS}."&p=".$parm, $timeout, undef, $noshutdown );
 	if(!$response or length($response)==0)
 	{
 		Log 3, "NetIO230B_Request failed: ".$log;
