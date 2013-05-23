@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: MANTAINER.txt added
   - feature: PRESENCE: new mode "shellscript" to use own
              scripts or binaries for presence recognition
   - feature: YAMAHA_AVR: new set command to select scenes

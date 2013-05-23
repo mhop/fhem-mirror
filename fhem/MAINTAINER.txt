@@ -175,6 +175,8 @@ FHEM/TcpServerUtils.pm        rudolfkoenig       forum.fhem.de/Automatisierung
 FHEM/lib/Device/Firmata/*     ntruchsess         forum.fhem.de/Sonstiges
 FHEM/FhemUtils/*              mfr69bs            forum.fhem.de/Sonstiges
 
+contrib/YAF/*                 danielweisensee    forum.fhem.de/Frontends
+
 www/gplot/*                   rudolfkoenig       forum.fhem.de/Frontends
 www/images/*                  rudolfkoenig       forum.fhem.de/Frontends
 www/pgm2/*                    rudolfkoenig       forum.fhem.de/Frontends
