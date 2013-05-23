@@ -456,7 +456,10 @@ FW_answerCall($)
       my $localType;
       ($localType, $FW_RET) = &{$h->{FUNC}}($arg);
       use strict "refs";
-      last if($FW_RET && $FW_RET eq "continue"); # Continue displaying the data
+      if($FW_RET && $FW_RET eq "continue") { # Continue displaying the data
+        $FW_RET="";
+        last;
+      }
       $FW_RETTYPE = $localType;
       return defined($FW_RETTYPE) ? 0 : -1;
     }
