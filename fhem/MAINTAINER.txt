@@ -10,181 +10,181 @@ When adding a new file, add yourself as the maintainer.
 
 File                          Maintainer         Contact
 =========================================================================
-fhem.pl                       rudolfkoenig         forum.fhem.de/Sonstiges
-fhem.cfg                      rudolfkoenig         forum.fhem.de/Sonstiges
-Makefile                      rudolfkoenig         forum.fhem.de/Sonstiges
-                                                  
-FHEM/00_CM11.pm               borisneubert         forum.fhem.de/SlowRF
-FHEM/00_CUL.pm                rudolfkoenig         forum.fhem.de/SlowRF
-FHEM/00_FBAHA.pm              rudolfkoenig         forum.fhem.de/FRITZ!Box
-FHEM/00_FHZ.pm                rudolfkoenig         forum.fhem.de/SlowRF
-FHEM/00_HMLAN.pm              martinp876           forum.fhem.de/Sonstiges
-FHEM/00_KM271.pm              physikus             forum.fhem.de/Sonstiges
-FHEM/00_LIRC.pm               rudolfkoenig         forum.fhem.de/Sonstiges
-FHEM/00_MAXLAN.pm             mgehre               forum.fhem.de/MAX
-FHEM/00_OWX.pm                pahenning            forum.fhem.de/1Wire
-FHEM/00_TCM.pm                klaus-schauer        forum.fhem.de/EnOcean
-FHEM/00_TUL.pm                hotmaz               forum.fhem.de/KNX/EIB
-FHEM/00_ZWDongle.pm           rudolfkoenig         forum.fhem.de/ZWave
-FHEM/01_FHEMWEB.pm            rudolfkoenig         forum.fhem.de/Frontends
-FHEM/02_HTTPSRV.pm            borisneubert         forum.fhem.de/Frontends
-FHEM/02_RSS.pm                borisneubert         forum.fhem.de/Frontends
-FHEM/09_BS.pm                 borisneubert         forum.fhem.de/SlowRF
-FHEM/09_CUL_FHTTK.pm          painseeker           forum.fhem.de/SlowRF
-FHEM/09_USF1000.pm            borisneubert         forum.fhem.de/SlowRF
-FHEM/10_CUL_HM.pm             martinp876           forum.fhem.de/HomeMatic
-FHEM/10_CUL_IR.pm             odroegehorn          forum.fhem.de/SlowRF
-FHEM/10_EIB.pm                hotmaz               forum.fhem.de/KNX/EIB
-FHEM/10_EnOcean.pm            klaus-schauer        forum.fhem.de/EnOcean
-FHEM/10_FBDECT.pm             rudolfkoenig         forum.fhem.de/FRITZ!Box
-FHEM/10_FRM.pm                ntruchsess           forum.fhem.de/Sonstiges
-FHEM/10_FS20.pm               rudolfkoenig         forum.fhem.de/SlowRF
-FHEM/10_IT.pm                 borisneubert         forum.fhem.de/InterTechno
-FHEM/10_MAX.pm                mgehre               forum.fhem.de/MAX
-FHEM/10_OWServer.pm           borisneubert         forum.fhem.de/1Wire
-FHEM/10_ZWave.pm              rudolfkoenig         forum.fhem.de/ZWave
-FHEM/11_FHT.pm                rudolfkoenig         forum.fhem.de/SlowRF
-FHEM/11_FHT8V.pm              rudolfkoenig         forum.fhem.de/SlowRF
-FHEM/11_OWDevice.pm           borisneubert         forum.fhem.de/1Wire
-FHEM/12_HMS.pm                rudolfkoenig         forum.fhem.de/SlowRF
-FHEM/13_KS300.pm              rudolfkoenig         forum.fhem.de/SlowRF
-FHEM/14_CUL_MAX.pm            mgehre               forum.fhem.de/MAX
-FHEM/14_CUL_TX.pm             rudolfkoenig         forum.fhem.de/SlowRF
-FHEM/14_CUL_WS.pm             rudolfkoenig         forum.fhem.de/SlowRF
-FHEM/15_CUL_EM.pm             rudolfkoenig         forum.fhem.de/SlowRF
-FHEM/16_CUL_RFR.pm            rudolfkoenig         forum.fhem.de/SlowRF
-FHEM/17_SIS_PMS.pm            painseeker           forum.fhem.de/Sonstiges
-FHEM/18_CUL_HOERMANN.pm       rudolfkoenig         forum.fhem.de/SlowRF
-FHEM/20_FRM_AD.pm             ntruchsess           forum.fhem.de/Sonstiges
-FHEM/20_FRM_I2C.pm            ntruchsess           forum.fhem.de/Sonstiges
-FHEM/20_FRM_IN.pm             ntruchsess           forum.fhem.de/Sonstiges
-FHEM/20_FRM_LCD.pm            ntruchsess           forum.fhem.de/Sonstiges
-FHEM/20_FRM_OUT.pm            ntruchsess           forum.fhem.de/Sonstiges
-FHEM/20_FRM_PWM.pm            ntruchsess           forum.fhem.de/Sonstiges
-FHEM/20_FRM_SERVO.pm          ntruchsess           forum.fhem.de/Sonstiges
-FHEM/20_OWFS.pm               mfr69b               forum.fhem.de/1Wire
-FHEM/20_X10.pm                borisneubert         forum.fhem.de/SlowRF
-FHEM/21_OWAD.pm               pahenning            forum.fhem.de/1Wire
-FHEM/21_OWCOUNT.pm            pahenning            forum.fhem.de/1Wire
-FHEM/21_OWID.pm               pahenning            forum.fhem.de/1Wire
-FHEM/21_OWLCD.pm              pahenning            forum.fhem.de/1Wire
-FHEM/21_OWMULTI.pm            pahenning            forum.fhem.de/1Wire
-FHEM/21_OWSWITCH.pm           pahenning            forum.fhem.de/1Wire
-FHEM/21_OWTEMP.pm             mfr69b               forum.fhem.de/1Wire
-FHEM/21_OWTHERM.pm            pahenning            forum.fhem.de/1Wire
-FHEM/22_ALL3076.pm            sachag               forum.fhem.de/Snstiges
-FHEM/23_ALL4027.pm            sachag               forum.fhem.de/Sonstiges
-FHEM/23_LUXTRONIK2.pm         oskarfessel          forum.fhem.de/Sonstiges
-FHEM/23_WEBIO.pm              sachag               forum.fhem.de/Sonstiges
-FHEM/23_WEBIO_12DIGITAL.pm    sachag               forum.fhem.de/Sonstiges
-FHEM/23_WEBTHERM.pm           sachag               forum.fhem.de/Sonstiges
-FHEM/24_NetIO230B.pm          rudolfkoenig/orphan  forum.fhem.de/Sonstiges
-FHEM/30_HUEBridge.pm          justme1968           forum.fhem.de/Sonstiges
-FHEM/31_HUEDevice.pm          justme1968           forum.fhem.de/Sonstiges
-FHEM/31_LightScene.pm         justme1968           forum.fhem.de/Sonstiges
-FHEM/32_SYSSTAT.pm            justme1968           forum.fhem.de/Sonstiges
-FHEM/40_RFXCOM.pm             wherzig              forum.fhem.de/RFXTRX
-FHEM/41_OREGON.pm             wherzig              forum.fhem.de/Sonstiges
-FHEM/42_RFXMETER.pm           wherzig              forum.fhem.de/RFXTRX
-FHEM/43_RFXX10REC.pm          wherzig              forum.fhem.de/RFXTRX
-FHEM/45_TRX.pm                wherzig              forum.fhem.de/RFXTRX
-FHEM/46_TRX_ELSE.pm           wherzig              forum.fhem.de/RFXTRX
-FHEM/46_TRX_LIGHT.pm          wherzig              forum.fhem.de/RFXTRX
-FHEM/46_TRX_SECURITY.pm       wherzig              forum.fhem.de/RFXTRX
-FHEM/46_TRX_WEATHER.pm        wherzig              forum.fhem.de/RFXTRX
-FHEM/49_IPCAM.pm              mfr69bs              forum.fhem.de/Sonstiges
-FHEM/50_WS300.pm              tdressler            forum.fhem.de/SlowRF
-FHEM/56_POKEYS.pm             axelberner           forum.fhem.de/Sonstiges
-FHEM/57_Calendar.pm           borisneubert         forum.fhem.de/Sonstiges
-FHEM/59_HCS.pm                mfr69bs              forum.fhem.de/Automatisierung
-FHEM/59_Twilight.pm           unimatrix27          forum.fhem.de/Sonstiges
-FHEM/59_Weather.pm            borisneubert         forum.fhem.de/Sonstiges
-FHEM/60_EM.pm                 rudolfkoenig         forum.fhem.de/SlowRF
-FHEM/61_EMWZ.pm               rudolfkoenig         forum.fhem.de/SlowRF
-FHEM/62_EMEM.pm               rudolfkoenig         forum.fhem.de/SlowRF
-FHEM/63_EMGZ.pm               rudolfkoenig         forum.fhem.de/SlowRF
-FHEM/64_ESA2000.pm            stromer-12           forum.fhem.de/SlowRF
-FHEM/66_ECMD.pm               borisneubert         forum.fhem.de/Sonstiges
-FHEM/67_ECMDDevice.pm         borisneubert         forum.fhem.de/Sonstiges
-FHEM/70_SCIVT.pm              rudolfkoenig/orphan  forum.fhem.de/Sonstiges
-FHEM/70_SISPM.pm              real-wusel           forum.fhem.de/Sonstiges
-FHEM/70_SML.pm                bentele              forum.fhem.de/Sonstiges
-FHEM/70_STV.pm                bentele              forum.fhem.de/Sonstiges
-FHEM/70_TellStick.pm          real-wusel           forum.fhem.de/Sonstiges
-FHEM/70_USBWX.pm              wherzig              forum.fhem.de/Sonstiges
-FHEM/70_VIERA.pm              teevau               forum.fhem.de/Sonstiges
-FHEM/70_WS3600.pm             painseeker           forum.fhem.de/Sonstiges
-FHEM/71_YAMAHA_AVR.pm         markusbloch          forum.fhem.de/Sonstiges
-FHEM/72_FB_CALLMONITOR.pm     markusbloch          forum.fhem.de/Sonstiges
-FHEM/73_PRESENCE.pm           markusbloch          forum.fhem.de/Automatisierung
-FHEM/75_MSG.pm                ruebedo              forum.fhem.de/Automatisierung
-FHEM/76_MSGFile.pm            ruebedo              forum.fhem.de/Automatisierung
-FHEM/76_MSGMail.pm            ruebedo              forum.fhem.de/Automatisierung
-FHEM/80_M232.pm               tdressler            forum.fhem.de/Sonstiges
-FHEM/80_xxLG7000.pm           painseeker           forum.fhem.de/Sonstiges
-FHEM/81_M232Counter.pm        tdressler            forum.fhem.de/Sonstiges
-FHEM/82_LGTV.pm               painseeker           forum.fhem.de/Sonstiges
-FHEM/82_M232Voltage.pm        tdressler            forum.fhem.de/Sonstiges
-FHEM/87_WS2000.pm             tdressler            forum.fhem.de/Sonstiges
-FHEM/88_ALL4000T.pm           sachag               forum.fhem.de/Sonstiges
-FHEM/88_IPWE.pm               tdressler            forum.fhem.de/Sonstiges
-FHEM/88_Itach_Relay.pm        sachag               forum.fhem.de/Sonstiges
-FHEM/88_VantagePro2.pm        sachag               forum.fhem.de/Sonstiges
-FHEM/88_WEBCOUNT.pm           sachag               forum.fhem.de/Sonstiges
-FHEM/90_at.pm                 rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/91_eventTypes.pm         rudolfkoenig         forum.fhem.de/Frontends
-FHEM/91_notify.pm             rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/91_sequence.pm           rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/91_watchdog.pm           rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/92_FileLog.pm            rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/93_DbLog.pm              tobiasfaust          forum.fhem.de/Automatisierung
-FHEM/93_FHEM2FHEM.pm          rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/95_FLOORPLAN.pm          ulimaass             forum.fhem.de/Frontends
-FHEM/95_PachLog.pm            rudolfkoenig/orphan  forum.fhem.de/Sonstiges
-FHEM/95_holiday.pm            rudolfkoenig         forum.fhem.de/Sonstiges
-FHEM/98_CULflash.pm           rudolfkoenig         forum.fhem.de/Sonstiges
-FHEM/98_HMinfo.pm             martinp876           forum.fhem.de/Sonstiges
-FHEM/98_Heating_Control.pm    dietmar63            forum.fhem.de/Sonstiges
-FHEM/98_JsonList.pm           mfr69b               forum.fhem.de/Automatisierung
-FHEM/98_PID.pm                rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/98_SVG.pm                rudolfkoenig         forum.fhem.de/Frontends
-FHEM/98_THRESHOLD.pm          damian-s             forum.fhem.de/Automatisierung
-FHEM/98_WOL.pm                klassm               forum.fhem.de/Sonstiges
-FHEM/98_XmlList.pm            rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/98_autocreate.pm         rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/98_average.pm            rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/98_backup.pm             mfr69bs              forum.fhem.de/Sonstiges
-FHEM/98_dewpoint.pm           wherzig              forum.fhem.de/Automatisierung
-FHEM/98_dummy.pm              rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/98_fheminfo.pm           mfr69bs              forum.fhem.de/Sonstiges
-FHEM/98_notice.pm             mfr69bs              forum.fhem.de/Sonstiges
-FHEM/98_structure.pm          rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/98_telnet.pm             rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/98_update.pm             mfr69bs              forum.fhem.de/Sonstiges
-FHEM/98_weblink.pm            rudolfkoenig         forum.fhem.de/Frontends
-FHEM/99_SUNRISE_EL.pm         rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/99_Utils.pm              rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/Blocking.pm              rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/DevIo.pm                 rudolfkoenig         forum.fhem.de/Sonstiges
-FHEM/FritzBoxUtils.pm         rudolfkoenig         forum.fhem.de/FRITZ!Box
-FHEM/HMConfig.pm              martinp876           forum.fhem.de/HomeMatic
-FHEM/HttpUtils.pm             rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/MaxCommon.pm             mgehre               forum.fhem.de/MAX
-FHEM/SetExtensions.pm         rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/TcpServerUtils.pm        rudolfkoenig         forum.fhem.de/Automatisierung
-FHEM/lib/Device/Firmata/*     ntruchsess           forum.fhem.de/Sonstiges
-FHEM/FhemUtils/*              mfr69bs              forum.fhem.de/Sonstiges
+fhem.pl                      rudolfkoenig         http://forum.fhem.de Sonstiges
+fhem.cfg                     rudolfkoenig         http://forum.fhem.de Sonstiges
+Makefile                     rudolfkoenig         http://forum.fhem.de Sonstiges
                                                  
-contrib/YAF/*                 danielweisensee      forum.fhem.de/Frontends
-                                                 
-www/gplot/*                   rudolfkoenig         forum.fhem.de/Frontends
-www/images/*                  rudolfkoenig         forum.fhem.de/Frontends
-www/pgm2/*                    rudolfkoenig         forum.fhem.de/Frontends
-www/jscolor/*                 justme1968           forum.fhem.de/Frontends
-www/frontend/*                johannnes            forum.fhem.de/Frontends
-                                                 
-docs/fhem-floorplan-*         ulimaass             forum.fhem.de/Sonstiges
-docs/*                        rudolfkoenig         forum.fhem.de/Sonstiges
+FHEM/00_CM11.pm              borisneubert         http://forum.fhem.de SlowRF
+FHEM/00_CUL.pm               rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/00_FBAHA.pm             rudolfkoenig         http://forum.fhem.de FRITZ!Box
+FHEM/00_FHZ.pm               rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/00_HMLAN.pm             martinp876           http://forum.fhem.de Sonstiges
+FHEM/00_KM271.pm             physikus             http://forum.fhem.de Sonstiges
+FHEM/00_LIRC.pm              rudolfkoenig         http://forum.fhem.de Sonstiges
+FHEM/00_MAXLAN.pm            mgehre               http://forum.fhem.de MAX
+FHEM/00_OWX.pm               pahenning            http://forum.fhem.de 1Wire
+FHEM/00_TCM.pm               klaus-schauer        http://forum.fhem.de EnOcean
+FHEM/00_TUL.pm               hotmaz               http://forum.fhem.de KNX/EIB
+FHEM/00_ZWDongle.pm          rudolfkoenig         http://forum.fhem.de ZWave
+FHEM/01_FHEMWEB.pm           rudolfkoenig         http://forum.fhem.de Frontends
+FHEM/02_HTTPSRV.pm           borisneubert         http://forum.fhem.de Frontends
+FHEM/02_RSS.pm               borisneubert         http://forum.fhem.de Frontends
+FHEM/09_BS.pm                borisneubert         http://forum.fhem.de SlowRF
+FHEM/09_CUL_FHTTK.pm         painseeker           http://forum.fhem.de SlowRF
+FHEM/09_USF1000.pm           borisneubert         http://forum.fhem.de SlowRF
+FHEM/10_CUL_HM.pm            martinp876           http://forum.fhem.de HomeMatic
+FHEM/10_CUL_IR.pm            odroegehorn          http://forum.fhem.de SlowRF
+FHEM/10_EIB.pm               hotmaz               http://forum.fhem.de KNX/EIB
+FHEM/10_EnOcean.pm           klaus-schauer        http://forum.fhem.de EnOcean
+FHEM/10_FBDECT.pm            rudolfkoenig         http://forum.fhem.de FRITZ!Box
+FHEM/10_FRM.pm               ntruchsess           http://forum.fhem.de Sonstiges
+FHEM/10_FS20.pm              rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/10_IT.pm                borisneubert         http://forum.fhem.de InterTechno
+FHEM/10_MAX.pm               mgehre               http://forum.fhem.de MAX
+FHEM/10_OWServer.pm          borisneubert         http://forum.fhem.de 1Wire
+FHEM/10_ZWave.pm             rudolfkoenig         http://forum.fhem.de ZWave
+FHEM/11_FHT.pm               rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/11_FHT8V.pm             rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/11_OWDevice.pm          borisneubert         http://forum.fhem.de 1Wire
+FHEM/12_HMS.pm               rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/13_KS300.pm             rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/14_CUL_MAX.pm           mgehre               http://forum.fhem.de MAX
+FHEM/14_CUL_TX.pm            rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/14_CUL_WS.pm            rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/15_CUL_EM.pm            rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/16_CUL_RFR.pm           rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/17_SIS_PMS.pm           painseeker           http://forum.fhem.de Sonstiges
+FHEM/18_CUL_HOERMANN.pm      rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/20_FRM_AD.pm            ntruchsess           http://forum.fhem.de Sonstiges
+FHEM/20_FRM_I2C.pm           ntruchsess           http://forum.fhem.de Sonstiges
+FHEM/20_FRM_IN.pm            ntruchsess           http://forum.fhem.de Sonstiges
+FHEM/20_FRM_LCD.pm           ntruchsess           http://forum.fhem.de Sonstiges
+FHEM/20_FRM_OUT.pm           ntruchsess           http://forum.fhem.de Sonstiges
+FHEM/20_FRM_PWM.pm           ntruchsess           http://forum.fhem.de Sonstiges
+FHEM/20_FRM_SERVO.pm         ntruchsess           http://forum.fhem.de Sonstiges
+FHEM/20_OWFS.pm              mfr69b               http://forum.fhem.de 1Wire
+FHEM/20_X10.pm               borisneubert         http://forum.fhem.de SlowRF
+FHEM/21_OWAD.pm              pahenning            http://forum.fhem.de 1Wire
+FHEM/21_OWCOUNT.pm           pahenning            http://forum.fhem.de 1Wire
+FHEM/21_OWID.pm              pahenning            http://forum.fhem.de 1Wire
+FHEM/21_OWLCD.pm             pahenning            http://forum.fhem.de 1Wire
+FHEM/21_OWMULTI.pm           pahenning            http://forum.fhem.de 1Wire
+FHEM/21_OWSWITCH.pm          pahenning            http://forum.fhem.de 1Wire
+FHEM/21_OWTEMP.pm            mfr69b               http://forum.fhem.de 1Wire
+FHEM/21_OWTHERM.pm           pahenning            http://forum.fhem.de 1Wire
+FHEM/22_ALL3076.pm           sachag               http://forum.fhem.de Snstiges
+FHEM/23_ALL4027.pm           sachag               http://forum.fhem.de Sonstiges
+FHEM/23_LUXTRONIK2.pm        oskarfessel          http://forum.fhem.de Sonstiges
+FHEM/23_WEBIO.pm             sachag               http://forum.fhem.de Sonstiges
+FHEM/23_WEBIO_12DIGITAL.pm   sachag               http://forum.fhem.de Sonstiges
+FHEM/23_WEBTHERM.pm          sachag               http://forum.fhem.de Sonstiges
+FHEM/24_NetIO230B.pm         rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
+FHEM/30_HUEBridge.pm         justme1968           http://forum.fhem.de Sonstiges
+FHEM/31_HUEDevice.pm         justme1968           http://forum.fhem.de Sonstiges
+FHEM/31_LightScene.pm        justme1968           http://forum.fhem.de Sonstiges
+FHEM/32_SYSSTAT.pm           justme1968           http://forum.fhem.de Sonstiges
+FHEM/40_RFXCOM.pm            wherzig              http://forum.fhem.de RFXTRX
+FHEM/41_OREGON.pm            wherzig              http://forum.fhem.de Sonstiges
+FHEM/42_RFXMETER.pm          wherzig              http://forum.fhem.de RFXTRX
+FHEM/43_RFXX10REC.pm         wherzig              http://forum.fhem.de RFXTRX
+FHEM/45_TRX.pm               wherzig              http://forum.fhem.de RFXTRX
+FHEM/46_TRX_ELSE.pm          wherzig              http://forum.fhem.de RFXTRX
+FHEM/46_TRX_LIGHT.pm         wherzig              http://forum.fhem.de RFXTRX
+FHEM/46_TRX_SECURITY.pm      wherzig              http://forum.fhem.de RFXTRX
+FHEM/46_TRX_WEATHER.pm       wherzig              http://forum.fhem.de RFXTRX
+FHEM/49_IPCAM.pm             mfr69bs              http://forum.fhem.de Sonstiges
+FHEM/50_WS300.pm             tdressler            http://forum.fhem.de SlowRF
+FHEM/56_POKEYS.pm            axelberner           http://forum.fhem.de Sonstiges
+FHEM/57_Calendar.pm          borisneubert         http://forum.fhem.de Sonstiges
+FHEM/59_HCS.pm               mfr69bs              http://forum.fhem.de Automatisierung
+FHEM/59_Twilight.pm          unimatrix27          http://forum.fhem.de Sonstiges
+FHEM/59_Weather.pm           borisneubert         http://forum.fhem.de Sonstiges
+FHEM/60_EM.pm                rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/61_EMWZ.pm              rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/62_EMEM.pm              rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/63_EMGZ.pm              rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/64_ESA2000.pm           stromer-12           http://forum.fhem.de SlowRF
+FHEM/66_ECMD.pm              borisneubert         http://forum.fhem.de Sonstiges
+FHEM/67_ECMDDevice.pm        borisneubert         http://forum.fhem.de Sonstiges
+FHEM/70_SCIVT.pm             rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
+FHEM/70_SISPM.pm             real-wusel           http://forum.fhem.de Sonstiges
+FHEM/70_SML.pm               bentele              http://forum.fhem.de Sonstiges
+FHEM/70_STV.pm               bentele              http://forum.fhem.de Sonstiges
+FHEM/70_TellStick.pm         real-wusel           http://forum.fhem.de Sonstiges
+FHEM/70_USBWX.pm             wherzig              http://forum.fhem.de Sonstiges
+FHEM/70_VIERA.pm             teevau               http://forum.fhem.de Sonstiges
+FHEM/70_WS3600.pm            painseeker           http://forum.fhem.de Sonstiges
+FHEM/71_YAMAHA_AVR.pm        markusbloch          http://forum.fhem.de Sonstiges
+FHEM/72_FB_CALLMONITOR.pm    markusbloch          http://forum.fhem.de Sonstiges
+FHEM/73_PRESENCE.pm          markusbloch          http://forum.fhem.de Automatisierung
+FHEM/75_MSG.pm               ruebedo              http://forum.fhem.de Automatisierung
+FHEM/76_MSGFile.pm           ruebedo              http://forum.fhem.de Automatisierung
+FHEM/76_MSGMail.pm           ruebedo              http://forum.fhem.de Automatisierung
+FHEM/80_M232.pm              tdressler            http://forum.fhem.de Sonstiges
+FHEM/80_xxLG7000.pm          painseeker           http://forum.fhem.de Sonstiges
+FHEM/81_M232Counter.pm       tdressler            http://forum.fhem.de Sonstiges
+FHEM/82_LGTV.pm              painseeker           http://forum.fhem.de Sonstiges
+FHEM/82_M232Voltage.pm       tdressler            http://forum.fhem.de Sonstiges
+FHEM/87_WS2000.pm            tdressler            http://forum.fhem.de Sonstiges
+FHEM/88_ALL4000T.pm          sachag               http://forum.fhem.de Sonstiges
+FHEM/88_IPWE.pm              tdressler            http://forum.fhem.de Sonstiges
+FHEM/88_Itach_Relay.pm       sachag               http://forum.fhem.de Sonstiges
+FHEM/88_VantagePro2.pm       sachag               http://forum.fhem.de Sonstiges
+FHEM/88_WEBCOUNT.pm          sachag               http://forum.fhem.de Sonstiges
+FHEM/90_at.pm                rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/91_eventTypes.pm        rudolfkoenig         http://forum.fhem.de Frontends
+FHEM/91_notify.pm            rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/91_sequence.pm          rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/91_watchdog.pm          rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/92_FileLog.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/93_DbLog.pm             tobiasfaust          http://forum.fhem.de Automatisierung
+FHEM/93_FHEM2FHEM.pm         rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/95_FLOORPLAN.pm         ulimaass             http://forum.fhem.de Frontends
+FHEM/95_PachLog.pm           rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
+FHEM/95_holiday.pm           rudolfkoenig         http://forum.fhem.de Sonstiges
+FHEM/98_CULflash.pm          rudolfkoenig         http://forum.fhem.de Sonstiges
+FHEM/98_HMinfo.pm            martinp876           http://forum.fhem.de Sonstiges
+FHEM/98_Heating_Control.pm   dietmar63            http://forum.fhem.de Sonstiges
+FHEM/98_JsonList.pm          mfr69b               http://forum.fhem.de Automatisierung
+FHEM/98_PID.pm               rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/98_SVG.pm               rudolfkoenig         http://forum.fhem.de Frontends
+FHEM/98_THRESHOLD.pm         damian-s             http://forum.fhem.de Automatisierung
+FHEM/98_WOL.pm               klassm               http://forum.fhem.de Sonstiges
+FHEM/98_XmlList.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/98_autocreate.pm        rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/98_average.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/98_backup.pm            mfr69bs              http://forum.fhem.de Sonstiges
+FHEM/98_dewpoint.pm          wherzig              http://forum.fhem.de Automatisierung
+FHEM/98_dummy.pm             rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/98_fheminfo.pm          mfr69bs              http://forum.fhem.de Sonstiges
+FHEM/98_notice.pm            mfr69bs              http://forum.fhem.de Sonstiges
+FHEM/98_structure.pm         rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/98_telnet.pm            rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/98_update.pm            mfr69bs              http://forum.fhem.de Sonstiges
+FHEM/98_weblink.pm           rudolfkoenig         http://forum.fhem.de Frontends
+FHEM/99_SUNRISE_EL.pm        rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/99_Utils.pm             rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/Blocking.pm             rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/DevIo.pm                rudolfkoenig         http://forum.fhem.de Sonstiges
+FHEM/FritzBoxUtils.pm        rudolfkoenig         http://forum.fhem.de FRITZ!Box
+FHEM/HMConfig.pm             martinp876           http://forum.fhem.de HomeMatic
+FHEM/HttpUtils.pm            rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/MaxCommon.pm            mgehre               http://forum.fhem.de MAX
+FHEM/SetExtensions.pm        rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/TcpServerUtils.pm       rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/lib/Device/Firmata/*    ntruchsess           http://forum.fhem.de Sonstiges
+FHEM/FhemUtils/*             mfr69bs              http://forum.fhem.de Sonstiges
+                                                
+contrib/YAF/*                danielweisensee      http://forum.fhem.de Frontends
+                                                
+www/gplot/*                  rudolfkoenig         http://forum.fhem.de Frontends
+www/images/*                 rudolfkoenig         http://forum.fhem.de Frontends
+www/pgm2/*                   rudolfkoenig         http://forum.fhem.de Frontends
+www/jscolor/*                justme1968           http://forum.fhem.de Frontends
+www/frontend/*               johannnes            http://forum.fhem.de Frontends
+                                                
+docs/fhem-floorplan-*        ulimaass             http://forum.fhem.de Sonstiges
+docs/*                       rudolfkoenig         http://forum.fhem.de Sonstiges
 
 Files that every developer should modify/extend
   MAINTAINER.txt
