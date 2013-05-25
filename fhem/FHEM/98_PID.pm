@@ -17,7 +17,7 @@ PID_Initialize($)
   $hash->{DefFn}   = "PID_Define";
   $hash->{SetFn}   = "PID_Set";
   $hash->{NotifyFn} = "PID_Notify";
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 roundValveValue:0,1";
 }
 
 
@@ -223,7 +223,8 @@ PID_setValue($)
   Log GetLogLevel($pn,4), sprintf("PID $pn: p:%.2f i:%.2f d:%.2f", $p, $i, $d);
 
   # Hack to round.
-  $a = int($a) if(($pid->{satMax} - $pid->{satMin}) >= 100);
+  my ($satMin, $satMax) = ($pid->{satMin}, $pid->{satMax});
+  $a = int($a) if(AttrVal($pn, "roundValveValue", ($satMax-$satMin >= 100)));
 
   my $ret = fhem sprintf("set %s %s %g", $pid->{actor}, $pid->{command}, $a);
   Log GetLogLevel($pn,1), "output of $pn command: $ret" if($ret);
@@ -304,6 +305,12 @@ PID_setValue($)
   <ul>
     <li><a href="#disable">disable</a></li>
     <li><a href="#loglevel">loglevel</a></li>
+    <a name="roundValveValue"></a>
+    <li>roundValveValue<br>
+        round the valve value to an integer, of the attribute is set to 1.
+        The valve value is automatically rounded, if the attribtue is not set,
+        and the difference between min and max is greater than 100.
+        </li><br>
   </ul>
   <br>
 </ul>
