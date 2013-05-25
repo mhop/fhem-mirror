@@ -1682,7 +1682,8 @@ CommandRename($$)
   my ($cl, $param) = @_;
   my ($old, $new) = split(" ", $param);
 
-  $old = "''" if(!defined($old));
+  return "old name is empty" if(!defined($old));
+  return "new name is empty" if(!defined($new));
 
   return "Please define $old first" if(!defined($defs{$old}));
   return "$new already defined" if(defined($defs{$new}));
