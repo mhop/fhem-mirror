@@ -110,9 +110,9 @@ TRX_ELSE_Parse($$)
     push (@rfxcom_data_array, ord($_) );
   }
 
-  my $num_bytes = ord(substr($msg,0,1));
+  my $num_bytes = ord(substr($bin_msg,0,1));
 
-  if ($num_bytes < 3) {
+  if ($num_bytes < 4) {
     return;
   }
 
@@ -122,7 +122,7 @@ TRX_ELSE_Parse($$)
   my $res = "";
   if ($type == 0x02) {
 	my $subtype = $rfxcom_data_array[1];
-	my $msg = $rfxcom_data_array[2];
+	my $msg = $rfxcom_data_array[3];
 	if (($msg != 0x00) && ($msg != 0x01)) {
   		Log 0, "TRX_ELSE: error transmit NACK=".sprintf("%02x",$msg);
 	} 
