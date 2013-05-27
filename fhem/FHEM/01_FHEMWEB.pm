@@ -2532,13 +2532,23 @@ FW_dropdownFn()
       $txt = Value($d);
       $txt =~ s/$cmd //;
     }
+
+    my $fpname = $FW_wname;
+    $fpname =~ s/.*floorplan\/(\w+)$/$1/;  #allow usage of attr fp_setbutton
+    my $fwsel;
+    if(AttrVal($fpname,'fp_setbutton',1)) {
+      $fwsel = FW_select("$d-$cmd","val.$d", \@tv, $txt, "dropdown").
+               FW_submit("cmd.$d", "set");
+    } else {
+      $fwsel = FW_select("$d-$cmd","val.$d", \@tv, $txt,"dropdown","submit()").
+               FW_hidden("cmd.$d", "set");
+    }
+
     return "<td colspan='2'><form>".
       FW_hidden("arg.$d", $cmd) .
       FW_hidden("dev.$d", $d) .
       ($FW_room ? FW_hidden("room", $FW_room) : "") .
-      FW_select("$d-$cmd","val.$d", \@tv, $txt, "dropdown").
-      FW_submit("cmd.$d", "set").
-      "</form></td>";
+      "$fwsel</form></td>";
   }
   return undef;
 }
