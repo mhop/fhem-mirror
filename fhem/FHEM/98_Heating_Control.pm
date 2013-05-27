@@ -83,8 +83,8 @@ Heating_Control_Define($$)
   my @switchingtimes;
   my $conditionOrCommand = "";
 
-  my @Wochentage_de = ("Montag","Dienstag","Mittwoch", "Donnerstag","Freitag","Samstag", "Sonntag");
-  my @Wochentage_en = ("Monday","Tuesday", "Wednesday","Thursday",  "Friday", "Saturday","Sunday");
+  my @Wochentage_de = ("Sonntag","Montag","Dienstag","Mittwoch", "Donnerstag","Freitag","Samstag" );
+  my @Wochentage_en = ("Sunday", "Monday","Tuesday", "Wednesday","Thursday",  "Friday", "Saturday");
 
   return "invalid Device, given Device <$device> not found" if(!$defs{$device});
 
@@ -94,8 +94,8 @@ Heating_Control_Define($$)
   delete($hash->{helper}{SWITCHINGTIMES})    if($hash->{helper}{SWITCHINGTIMES});
   delete($hash->{helper}{SWITCHINGTIME})     if($hash->{helper}{SWITCHINGTIME});
   for (my $w=0; $w<@Wochentage_de; $w++) {
-    delete($hash->{"PROFILE ".($w+1).": ".$Wochentage_de[$w]}) if($hash->{"PROFILE ".($w+1).": ".$Wochentage_de[$w]});
-    delete($hash->{"PROFILE ".($w+1).": ".$Wochentage_en[$w]}) if($hash->{"PROFILE ".($w+1).": ".$Wochentage_en[$w]});
+    delete($hash->{"PROFILE ".($w).": ".$Wochentage_de[$w]}) if($hash->{"PROFILE ".($w).": ".$Wochentage_de[$w]});
+    delete($hash->{"PROFILE ".($w).": ".$Wochentage_en[$w]}) if($hash->{"PROFILE ".($w).": ".$Wochentage_en[$w]});
   }
 
   for(my $i=0; $i<@a; $i++) {
@@ -125,12 +125,12 @@ Heating_Control_Define($$)
   my $daysRegExp_en = "(tu|we|th|su)";
 
   my %dayNumber=();
-  my $idx = 1;
-  foreach my $day  ("mo","di","mi","do","fr","sa","so") {
+  my $idx = 0;
+  foreach my $day  ("so","mo","di","mi","do","fr","sa") {
      $dayNumber{$day} = $idx; $idx++;
   }
-  $idx = 1;
-  foreach my $day  ("mo","tu","we","th","fr","sa","su") {
+  $idx = 0;
+  foreach my $day  ("su","mo","tu","we","th","fr","sa") {
      $dayNumber{$day} = $idx; $idx++;
   }
 
@@ -153,6 +153,7 @@ Heating_Control_Define($$)
     #Aufzaehlung 1234 ...
     if (      $daylist =~  m/^(\d){0,7}$/g) {
 
+        $daylist =~ s/7/0/g;
         @days = split("", $daylist);
         @hdays{@days}=1;
 
@@ -190,8 +191,6 @@ Heating_Control_Define($$)
 
     return "invalid time in $name <$time> HH:MM"
       if(!($time =~  m/^[0-2][0-9]:[0-5][0-9]$/g));
-    #return "invalid temperature in $name <$para> 99.9"
-    #  if(!($para =~  m/^\d{1,2}(\.\d){0,1}$/g));
 
     for (my $d=0; $d<@days; $d++) {
       #Log 3, "Switchingtime: $switchingtimes[$i] : $days[$d] -> $time -> $para ";
@@ -217,10 +216,10 @@ Heating_Control_Define($$)
   }
 
   # Profile sortiert aufbauen
-  for (my $d=1; $d<=7; $d++) {
+  for (my $d=0; $d<=6; $d++) {
     foreach my $st (sort (keys %{ $hash->{helper}{SWITCHINGTIME}{$d} })) {
       my $para = $hash->{helper}{SWITCHINGTIME}{$d}{$st};
-      $hash->{"PROFILE ".($d).": ".$$rWochentage[$d-1]} .= sprintf("%s %s, ", $st, $para);
+      $hash->{"PROFILE ".($d).": ".$$rWochentage[$d]} .= sprintf("%s %s, ", $st, $para);
     }
   }
 
@@ -251,58 +250,64 @@ sub
 Heating_Control_Update($)
 {
   my ($hash) = @_;
+  my $mod = "[".$hash->{NAME} ."] ";
+
   my $now    = time() + 5;       # garantiert > als die eingestellte Schlatzeit
-  my $next   = 0;
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
 
-  my $AktDesiredTemp     = sprintf("%.1f", ReadingsVal($hash->{DEVICE}, $hash->{helper}{DESIRED_TEMP_READING}, 0));
-  my $newDesTemperature  = $AktDesiredTemp; #default#
+  my $AktDesiredTemp = ReadingsVal($hash->{DEVICE}, $hash->{helper}{DESIRED_TEMP_READING}, 0);
+     $AktDesiredTemp = sprintf("%.1f", $AktDesiredTemp)   if ($AktDesiredTemp =~ m/^[0-9]{1,3}$/i);
+  my $newDesTemperature  = $AktDesiredTemp;   #default#
   my $nextDesTemperature = 0;
+  my $next       = 0;
   my $nextSwitch = 0;
   my $nowSwitch  = 0;
 
   my $loglevel   = GetLogLevel ($hash->{NAME}, 5);
-  #  $loglevel   = 3;
 
-  $wday=7 if($wday==0);
-  my @days = ($wday..7, 1..$wday);
-
-  for (my $d=0; $d<@days; $d++) {
-    #ueber jeden Tag
-    last if ($nextSwitch > 0);
-    foreach my $st (sort (keys %{ $hash->{helper}{SWITCHINGTIME}{$days[$d]} })) {
-
-      # Tagediff +  Sekunden des Tages addieren
-      my $secondsToSwitch = $d*24*3600       +
-         3600*(int(substr($st,0,2)) - $hour) +
-           60*(int(substr($st,3,2)) - $min ) - $sec;
-
-      $next = $now+$secondsToSwitch;
-
-      Log $loglevel, "Jetzt:".strftime('%d.%m.%Y %H:%M:%S',localtime($now))." -> Next: ".strftime('%d.%m.%Y %H:%M:%S',localtime($next))." -> Temp: $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$st}";
-      if ($now >= $next) {
-        $newDesTemperature =  $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$st};
-        $newDesTemperature =  sprintf("%.1f", $newDesTemperature) if ($newDesTemperature =~ m/^[0-9]{1,3}$/i);
-        $nowSwitch = $now;
-      } else {
-        $nextDesTemperature = $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$st};
-        $nextSwitch = $next;
-        last;
-      }
-    }
+  my $startIdx;
+  for (my $d=-1; $d>=-7; $d--) {
+     my $wd = ($d+$wday) % 7;
+     my $anzSwitches = keys %{ $hash->{helper}{SWITCHINGTIME}{$wd} };
+     $startIdx = $d;
+     last if ($anzSwitches > 0);
   }
 
-  if ($nextSwitch eq "") {
-     $nextSwitch = $now + 3600;
+  for (my $d=$startIdx; $d<=7; $d++) {
+     #ueber jeden Tag
+     last if ($nextSwitch > 0);
+     my $wd = ($d+$wday) % 7;
+     foreach my $st (sort (keys %{ $hash->{helper}{SWITCHINGTIME}{$wd} })) {
+
+        # Tagediff +  Sekunden des Tages addieren
+        my $secondsToSwitch = $d*24*3600 + 3600*(int(substr($st,0,2)) - $hour) + 60*(int(substr($st,3,2)) - $min ) - $sec;
+        my $next = $now + $secondsToSwitch;
+
+        if ($secondsToSwitch<=10 && $secondsToSwitch>=-20) {
+           Log $loglevel, $mod." Jetzt:".strftime('%d.%m.%Y %H:%M:%S',localtime($now))." -> Next: ".strftime('%d.%m.%Y %H:%M:%S',localtime($next))." -> Temp: $hash->{helper}{SWITCHINGTIME}{$wd}{$st} ".$secondsToSwitch;
+        }
+        if ($secondsToSwitch<=0) {
+          $newDesTemperature =  $hash->{helper}{SWITCHINGTIME}{$wd}{$st};
+          $newDesTemperature =  sprintf("%.1f", $newDesTemperature)   if ($newDesTemperature =~ m/^[0-9]{1,3}$/i);
+          $nowSwitch = $next;
+        } else {
+          $nextDesTemperature = $hash->{helper}{SWITCHINGTIME}{$wd}{$st};
+          $nextDesTemperature =  sprintf("%.1f", $nextDesTemperature) if ($nextDesTemperature =~ m/^[0-9]{1,3}$/i);
+          $nextSwitch = $next;
+          last;
+        }
+
+     }
   }
 
   my $name = $hash->{NAME};
   my $unit = $hash->{helper}{UNIT};
   my $command;
   
-  Log $loglevel, "NowSwitch: ".strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch))." ; AktDesiredTemp: $AktDesiredTemp ; newDesTemperature: $newDesTemperature";
-  Log $loglevel, "NextSwitch=".strftime('%d.%m.%Y %H:%M:%S',localtime($nextSwitch));
-  
+  #$nextSwitch += get_SummerTimeOffset($now, $nextSwitch);
+  Log $loglevel, $mod .strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch))." ; AktDesiredTemp: $AktDesiredTemp ; newDesTemperature: $newDesTemperature";
+  Log $loglevel, $mod .strftime('%d.%m.%Y %H:%M:%S',localtime($nextSwitch));
+
   if ($nowSwitch gt "" && $AktDesiredTemp ne $newDesTemperature ) {
     if (defined $hash->{helper}{CONDITION}) {
       $command = '{ fhem("set @ '.$hash->{helper}{DESIRED_TEMP_READING}.' %") if' . $hash->{helper}{CONDITION} . '}';
@@ -317,9 +322,14 @@ Heating_Control_Update($)
     $command =~ s/@/$hash->{DEVICE}/g;
     $command =~ s/%/$newDesTemperature/g;
     $command = SemicolonEscape($command);
-    Log $loglevel, "command: $command";
+    Log $loglevel, $mod."command: $command";
     my $ret  = AnalyzeCommandChain(undef, $command);
     Log GetLogLevel($name,3), $ret if($ret);
+  }
+
+  my $active;
+  if (defined $hash->{helper}{CONDITION}) {
+     $active = eval ($hash->{helper}{CONDITION});
   }
 
   RemoveInternalTimer($hash);
@@ -328,7 +338,7 @@ Heating_Control_Update($)
   readingsBeginUpdate($hash);
   readingsBulkUpdate ($hash,  "nextUpdate", strftime("%d.%m.%Y %H:%M:%S",localtime($nextSwitch)));
   readingsBulkUpdate ($hash,  "nextValue",  $nextDesTemperature);
-  readingsBulkUpdate ($hash,  "state",      $newDesTemperature);
+  readingsBulkUpdate ($hash,  "state",      $active ? $newDesTemperature : "inactive" );
   readingsEndUpdate  ($hash,  defined($hash->{LOCAL} ? 0 : 1));
   
   return 1;
@@ -340,7 +350,10 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
      my $hash = $modules{Heating_Control}{defptr}{$hc};
 
      if($hash->{helper}{CONDITION}) {
-        next if (!(eval ($hash->{helper}{CONDITION})))     ;
+        if (!(eval ($hash->{helper}{CONDITION}))) {
+           readingsSingleUpdate ($hash,  "state",      "inactive", 1);
+           next;
+        }
      }
      Heating_Control_Update($hash);
   }
