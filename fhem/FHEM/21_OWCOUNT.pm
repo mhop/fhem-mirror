@@ -80,7 +80,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.23";
+my $owx_version="3.25";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -1171,14 +1171,14 @@ sub OWXCOUNT_GetPage($$) {
     if( $page == 14) {
       $owg_val[0] = $value;
       #-- parse float from midnight
-      $owg_str =~ /([\d\.]+)/;
+      $owg_str =~ s/[^\d\.]+//g;
       $owg_str = int($owg_str*100)/100;
       $owg_str = 0.0 if(!(defined($owg_str)));
       $owg_midnight[0] = $owg_str;
     }elsif( $page == 15) {
       $owg_val[1] = $value;
       #-- parse float from midnight
-      $owg_str =~ /([\d\.]+)/;
+      $owg_str =~ s/[^\d\.]+//g;
       $owg_str = int($owg_str*100)/100;
       $owg_str = 0.0 if(!(defined($owg_str)));
       $owg_midnight[1] = $owg_str;
