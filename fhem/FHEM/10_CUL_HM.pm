@@ -1865,6 +1865,8 @@ sub CUL_HM_Set($@) {
   elsif($cmd eq "peerBulk") { #################################################
 	$state = "";
 	my $pL = $a[2];
+	return "unknown action: $a[3] - use set or unset" if ($a[3] && $a[3] !~ m/^(set|unset)/);
+	my $set = ($a[3] eq "unset")?"02":"01";
 	foreach my $peer (split(',',$pL)){
 	  next if ($peer =~ m/^self/);
 	  my $pID = CUL_HM_peerChId($peer,$dst,$id);
@@ -1876,7 +1878,7 @@ sub CUL_HM_Set($@) {
          ($culHmChanSets{$md.$chn} &&$culHmChanSets{$md.$chn}{peerChan})  ){
 	    $pCh2 = "00";                        # button behavior
       }
-	  CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chn.'01'.
+	  CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chn.$set.
 	                      substr($pID,0,6).$pCh1.$pCh2);
 	}
   } 
@@ -2913,7 +2915,7 @@ sub CUL_HM_pushConfig($$$$$$$$) {#generate messages to cnfig data to register
   my ($hash,$src,$dst,$chn,$peerAddr,$peerChn,$list,$content) = @_;
   my $flag = CUL_HM_getFlag($hash);
   my $tl = length($content);
-#  $chn     = $list?sprintf("%02X",$chn):"00";# channel = 00 for List 0
+
   $chn     = sprintf("%02X",$chn);
   $peerChn = sprintf("%02X",$peerChn);
   $list    = sprintf("%02X",$list);
@@ -4085,25 +4087,29 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
          certain status information is also not reported.  Paring is on device
          level. Channels cannot be paired to central separate from the device. 
 		 See also <a href="#CUL_HMgetpair">getPair</a>  and 
-		 <a href="#CUL_HMunpair">unpair</a>.</li><br>
+		 <a href="#CUL_HMunpair">unpair</a>.<br>
 		 Don't confuse pair (to a central) with peer (channel to channel) with
 		 <a href="#CUL_HMpeerChan">peerChan</a>.<br>
-     <li><B>peerBulk</B> <peerch1,peerch2,...<a name="CUL_HMpeerBulk"></a><br>
-	     peerBulk will add peer channels to the channel. All channels in the 
-		 list will be added. This includes that the parameter and behavior 
-		 defined for this 'link' will return to the defaults. peerBulk is only
-		 meant to add peers. More suffisticated funktionality as provided by
-		 <a href="#CUL_HMpeerChan">peerChan</a> is not supported. peerBulk
-		 will only add channels in 'single' button mode.<br>
-		 Also note that peerBulk will not delete any existing peers, just add
-		 and re-add given peers.<br>
-		 Main purpose of this command is the usage for re-store data to a 
-		 device. It is recommended to restore register configuration utilising
-		 <a href="#CUL_HMregBulk">regBulk</a>
+	 </li>
+     <li><B>peerBulk</B> &lt;peerch1,peerch2,...&gt; [set|unset]<a name="CUL_HMpeerBulk"></a><br>
+	     peerBulk will add peer channels to the channel. All peers in the 
+		 list will be added. <br>
+		 peering sets the configuration of this link to its defaults. As peers are not 
+		 added in pairs default will be as defined for 'single' by HM for this device. <br> 
+		 More suffisticated funktionality is provided by
+		 <a href="#CUL_HMpeerChan">peerChan</a>.<br>
+		 peerBulk will not delete existing peers, just handle the given peerlist. 
+		 Other already installed peers will not be touched.<br>
+		 peerBulk may be used to remove peers using <B>unset</B> option while default ist set.<br>
+		 
+		 Main purpose of this command is to re-store data to a device. 
+		 It is recommended to restore register configuration utilising
+		 <a href="#CUL_HMregBulk">regBulk</a> subsequent. <br>
 	 Example:<br>
 	 <ul><code>
 	 set myChannel peerBulk 12345601,<br>
 	 set myChannel peerBulk self01,self02,FB_Btn_04,FB_Btn_03,<br>
+	 set myChannel peerBulk 12345601 unset # remove peer 123456 channel 01<br>
 	 </code></ul>
 	 </li>
      <li><B>regRaw [List0|List1|List2|List3|List4] &lt;addr&gt; &lt;data&gt;</B>
@@ -4600,6 +4606,17 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
          returns a list of register that are decoded by FHEM for this device.<br>
 		 Note that there could be more register implemented for a device.<br>
          </li>
+	 
+     <li><B>saveConfig &lt;file&gt;</B><a name="CUL_HMsaveConfig"></a><br>
+         stores peers and register to the file.<br>
+		 Stored will be the data as available in fhem. It is necessary to read the information from the device prior to the save.<br>
+		 The command supports device-level action. I.e. if executed on a device also all related channel entities will be stored implicitely.<br>
+		 Storage to the file will be cumulative. If an entity is stored multiple times to the same file data will be appended. User can identify time of storage in the file if necessary.<br>
+		 Content of the file can be used to restore device configuration. It will restore all peers and all register to the entity.<br>		 
+		 Constrains/Restrictions:<br>
+		 prior to rewrite data to an entity it is necessary to pair the device with FHEM.<br>
+		 restore will not delete any peered channels, it will just add peer channels.<br>
+         </li>
 	 <br></ul>
 
   <a name="CUL_HMattr"></a>
@@ -4685,19 +4702,6 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
   <a name="CUL_HMevents"></a>
   <b>Generated events:</b>
   <ul>
-  <li>KS550/HM-WDS100-C6-O:<br>
-      T: $t H: $h W: $w R: $r IR: $ir WD: $wd WDR: $wdr S: $s B: $b<br>
-      temperature $t<br>
-      humidity $h<br>
-      windSpeed $w<br>
-      windDirection $wd<br>
-      windDirRange $wdr<br>
-      rain $r<br>
-      isRaining $ir<br>
-      sunshine $s<br>
-      brightness $b<br>
-      unknown $p<br>
-	  </li>
   <li>HM-CC-TC:<br>
       T: $t H: $h<br>
       measured-temp $t<br>
@@ -4731,20 +4735,17 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	  operState:[errorTargetNotMet|onTarget|adjusting]  # operational condition<br>
 	  operStateErrCnt:$cnt          # number of failed settings<br>
   </li>
-  <li>KFM100:<br>
-      $v<br>
-      $cv,$unit<br>
-      rawValue:$v<br>
-      Sequence:$seq<br>
-      content:$cv,$unit<br>
+  <li>HM-CC-SCD<br>
+	  [normal|added|addedStrong]<br>
+      battery [low|ok]<br>
   </li>
-  <li>HM-LC-BL1-PB-FM:<br>
-      motor: [opening|closing]<br>
-	  </li>
   <li>HM-SEC-SFA-SM:<br>
 	  powerError [on|off]<br>
 	  sabotageError [on|off]<br>
 	  battery: [critical|low|ok]<br>
+  </li>
+  <li>HM-LC-BL1-PB-FM:<br>
+      motor: [opening|closing]<br>
   </li>
   <li>HM-LC-SW1-BA-PCB:<br>
 	  battery: [low|ok]<br>
@@ -4758,16 +4759,51 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
   <li>HM-OU-CFM-PL<br>
 	  [on|off|$val]<br>
   </li>
-  <li>switch/dimmer/blindActuator:<br>
-	  $val<br>
-	  powerOn [on|off|$val]<br>
-      [unknown|motor|dim] [up|down|stop]:$val<br>
+  <li>HM-Sen-Wa-Od<br>
+	  $level%<br>
+	  level $level%<br>
+  </li>
+  <li>KFM100:<br>
+      $v<br>
+      $cv,$unit<br>
+      rawValue:$v<br>
+      Sequence:$seq<br>
+      content:$cv,$unit<br>
+  </li>
+  <li>KS550/HM-WDS100-C6-O:<br>
+      T: $t H: $h W: $w R: $r IR: $ir WD: $wd WDR: $wdr S: $s B: $b<br>
+      temperature $t<br>
+      humidity $h<br>
+      windSpeed $w<br>
+      windDirection $wd<br>
+      windDirRange $wdr<br>
+      rain $r<br>
+      isRaining $ir<br>
+      sunshine $s<br>
+      brightness $b<br>
+      unknown $p<br>
+  </li>
+  <li>THSensor  and HM-WDC7000<br>
+      T: $t H: $h AP: $ap<br>
+      temperature $t<br>
+      humidity $h<br>
+      airpress $ap                   #HM-WDC7000 only<br>
   </li>
   <li>dimmer:<br>
       overload [on|off]<br>
       overheat [on|off]<br>
       reduced [on|off]<br>
       dim: [up|down|stop]<br>
+  </li>
+  <li>motionDetector<br>
+      brightness:$b<br>
+      alive<br>
+      motion on (to $dest)<br>
+      motionCount $cnt _next:$nextTr"-"[0x0|0x1|0x2|0x3|15|30|60|120|240|0x9|0xa|0xb|0xc|0xd|0xe|0xf]<br>
+      cover [closed|open]        # not for HM-Sec-MDIR<br>
+	  sabotageError [on|off]     # only HM-Sec-MDIR<br>
+      battery [low|ok]<br>
+	  devState_raw.$d1 $d2<br>
   </li>
   <li>remote/pushButton/outputUnit<br>
 	  <ul> (to $dest) is added if the button is peered and does not send to broadcast<br>
@@ -4794,14 +4830,10 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
       Btn$x toggle (to $dest)<br>
       battery: [low|ok]<br>
   </li>
-  <li>motionDetector<br>
-      brightness:$b<br>
-      alive<br>
-      motion on (to $dest)<br>
-      motionCount $cnt _next:$nextTr"-"[0x0|0x1|0x2|0x3|15|30|60|120|240|0x9|0xa|0xb|0xc|0xd|0xe|0xf]<br>
-      cover [closed|open]<br>
-      battery [low|ok]<br>
-	  devState_raw.$d1 $d2<br>
+  <li>switch/dimmer/blindActuator:<br>
+	  $val<br>
+	  powerOn [on|off|$val]<br>
+      [unknown|motor|dim] [up|down|stop]:$val<br>
   </li>
   <li>smokeDetector<br>
       [off|smoke-Alarm|alive]             # for team leader<br>
@@ -4820,12 +4852,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
       battery [low|ok]<br>
       contact [open|tilted|closed]<br>
 	  contact [wet|damp|dry]         #HM-SEC-WDS only<br>
-  </li>
-  <li>THSensor  and HM-WDC7000<br>
-      T: $t H: $h AP: $ap<br>
-      temperature $t<br>
-      humidity $h<br>
-      airpress $ap                   #HM-WDC7000 only<br>
+	  sabotageError [on|off]         #HM-SEC-SC and HM-Sec-RHS only<br>
   </li>
   <li>winMatic<br>
 	  [locked|$value]<br>
@@ -4844,14 +4871,6 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
       error [unknown|motor aborted|clutch failure|none']<br>
       lock [unlocked|locked]<br>
       [unlocked|locked|uncertain]<br>
-  </li>
-  <li>HM-CC-SCD<br>
-	  [normal|added|addedStrong]<br>
-      battery [low|ok]<br>
-  </li>
-  <li>HM-Sen-Wa-Od<br>
-	  $level%<br>
-	  level $level%<br>
   </li>
   </ul>
   <br>
