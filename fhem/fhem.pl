@@ -3254,7 +3254,11 @@ readingsBulkUpdate($$$@)
       my $now = $hash->{".updateTime"};
       my $le = $hash->{".lastTime$reading"};
       if($le && $now-$le < $minInt) {
-        $changed = 0 if(!$eocr);
+        if(!$eocr || ($eocr && $value eq $readings->{VAL})){
+          $changed = 0;
+        } else {
+          $hash->{".lastTime$reading"} = $now;
+        }
       } else {
         $hash->{".lastTime$reading"} = $now;
         $changed = 1 if($eocr);
