@@ -175,7 +175,6 @@ my %EnO_subType = (
 
 my @EnO_models = qw (
   other
-  slats
   FSB14 FSB61 FSB70
   FSM12 FSM61
   FT55
@@ -197,14 +196,14 @@ EnOcean_Initialize($)
   $hash->{SetFn}     = "EnOcean_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 " .
-                       "actualTemp " .
-                       "dimTime dimValueOn " .
+                       "actualTemp angleMax:slider,-180,20,180 angleMin:slider,-180,20,180 " .
+                       "angleTime:0,1,2,3,4,5,6 dimValueOn " .
                        "model:" . join(",", @EnO_models) . " " .
                        "gwCmd:" . join(",", sort @EnO_gwCmd) . " " .
                        "manufID:" . join(",", keys %EnO_manuf) . " " . 
                        "rampTime repeatingAllowed:yes,no " .
-                       "scaleMax scaleMin " .
-                       "shutTime subDef subDef0 subDefI " .
+                       "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin " .
+                       "shutTime shutTimeCloses subDef subDef0 subDefI " .
                        "subType:" . join(",", sort grep { !$subTypeList{$_}++ } values %EnO_subType) . " " .
                        "subTypeSet:" . join(",", sort grep { !$subTypeSetList{$_}++ } values %EnO_subType) . " " .
                        "switchMode:switch,pushbutton " .
@@ -258,7 +257,6 @@ EnOcean_Set($@)
   my $switchMode = AttrVal($name, "switchMode", "switch");
   my $tn = TimeNow();
   my $updateState = 1;
-
   shift @a;
 
   for(my $i = 0; $i < @a; $i++) {
@@ -557,7 +555,7 @@ EnOcean_Set($@)
           $updateState = 0;
           $data = sprintf "A5%02X00%02X%02X", $gwCmdID, $controlVar, $setCmd;
         } else {
-          return "Unknown argument, choose one of teach presence energyHoldOff controllerMode controllerState";
+          return "Unknown argument, choose one of teach presence:absent,present,standby energyHoldOff:holdoff,normal controllerMode:cooling,heating,off controllerState:auto,override";
         }
 
       } elsif ($gwCmd eq "fanStage") {
@@ -576,7 +574,7 @@ EnOcean_Set($@)
           }
           shift(@a);          
         } else {
-          return "Unknown argument, choose one of teach stage";
+          return "Unknown argument, choose one of teach stage:auto,0,1,2,3";
         }
 
       } elsif ($gwCmd eq "blindCmd") {
@@ -745,82 +743,194 @@ EnOcean_Set($@)
     } elsif ($st eq "manufProfile") {
       if ($manufID eq "00D") {
         # Eltako Shutter
+        my $angleMax = AttrVal($name, "angleMax", 90);
+        my $angleMin = AttrVal($name, "angleMin", -90);
+        my $anglePos = ReadingsVal($name, "anglePos", undef);
+        my $angleTime = AttrVal($name, "angleTime", 0);
         my $position = ReadingsVal($name, "position", undef);
         my $shutTime = AttrVal($name, "shutTime", 255);
+        my $shutTimeCloses = AttrVal($name, "shutTimeCloses", $shutTime);
+        $shutTimeCloses = $shutTime if ($shutTimeCloses < $shutTimeCloses);
         my $shutCmd = 0;
+        $angleMax = 90 if ($angleMax !~ m/^[+-]?\d+$/);
+        $angleMax = 180 if ($angleMax > 180);
+        $angleMax = -180 if ($angleMax < -180);
+        $angleMin = -90 if ($angleMin !~ m/^[+-]?\d+$/);
+        $angleMin = 180 if ($angleMin > 180);
+        $angleMin = -180 if ($angleMin < -180);
+        ($angleMax, $angleMin) = ($angleMin, $angleMax) if ($angleMin > $angleMax);
+        $angleMax ++ if ($angleMin == $angleMax);
+        $angleTime = 6 if ($angleTime !~ m/^[+-]?\d+$/);
+        $angleTime = 6 if ($angleTime > 6);
+        $angleTime = 0 if ($angleTime < 0);
         $shutTime = 255 if ($shutTime !~ m/^[+-]?\d+$/);
         $shutTime = 255 if ($shutTime > 255);
         $shutTime = 1 if ($shutTime < 1);
         if ($cmd eq "teach") {
           $data = "A5FFF80D80";
-          $header = "000A0001";
-          Log $ll2, "EnOcean: set $name $cmd";
         } elsif ($cmd eq "stop") {
+          # stop
+          # delete readings, as they are undefined
+          CommandDeleteReading(undef, "$name anglePos");
+          CommandDeleteReading(undef, "$name position");
+          readingsSingleUpdate($hash, "state", "stop", 1);
           $shutCmd = 0;
+        } elsif ($cmd eq "opens") {
+          # opens >> B0
+          $anglePos = 0;
+          readingsSingleUpdate($hash, "anglePos", $anglePos, 1);
+          $position = 0;
+          readingsSingleUpdate($hash, "position", $position, 1);
+          $shutTime = $shutTimeCloses;
+          $shutCmd = 1;
+          $updateState = 0;
+        } elsif ($cmd eq "closes") {
+          # closes >> BI
+          $anglePos = $angleMax;
+          readingsSingleUpdate($hash, "anglePos", $anglePos, 1);
+          $position = 100;
+      	  readingsSingleUpdate($hash, "position", $position, 1);
+          $shutTime = $shutTimeCloses;
+          $shutCmd = 2;
+          $updateState = 0;
         } elsif ($cmd eq "up" || $cmd eq "B0") {
+          # up
           if(defined $a[1]) {
-            if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] > 0 && $a[1] <= 100) {
-              $shutTime = $shutTime / 100 * $a[1];
-              $position -= $a[1];
-              if($position <= 0) { $position = 0; }
+            if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] <= 255) {
+              $position -= $a[1] / $shutTime * 100;
+              if ($angleTime) {
+                $anglePos -= ($angleMax - $angleMin) * $shutTime / $angleTime;
+                if ($anglePos < $angleMin) {
+                  $anglePos = $angleMin;
+                }
+              } else {
+                $anglePos = $angleMin;                
+              }
+              if ($position <= 0) {
+                $anglePos = 0;
+                $position = 0;
+              }
+              $shutTime = $a[1];
               shift(@a);
-            } else {
+           } else {
               return "Usage: $a[1] is not numeric or out of range";
             }
           } else {
+            $anglePos = 0;
             $position = 0;
           }
-      	  readingsSingleUpdate($hash,"position",$position,1);
+          readingsSingleUpdate($hash, "anglePos", sprintf("%d", $anglePos), 1);
+      	  readingsSingleUpdate($hash, "position", sprintf("%d", $position), 1);
           $shutCmd = 1;
         } elsif ($cmd eq "down" || $cmd eq "BI") {
+          # down
           if(defined $a[1]) {
-            if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] < 100) {
-              $shutTime = $shutTime / 100 * $a[1];
-              $position += $a[1];
-              if($position > 100) { $position = 100; }
-              shift(@a);
+            if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] < 255) {
+              $position += $a[1] / $shutTime * 100;
+              if ($angleTime) {              
+                $anglePos += ($angleMax - $angleMin) * $shutTime / $angleTime;              
+                if ($anglePos > $angleMax) {
+                  $anglePos = $angleMax;
+                }
+              } else {
+                $anglePos = $angleMax;                
+              }
+              if($position > 100) { 
+                $anglePos = $angleMax;
+                $position = 100;
+              }
+             $shutTime = $a[1];
+             shift(@a);
             } else {
               return "Usage: $a[1] is not numeric or out of range";
             }
           } else {
+            $anglePos = $angleMax;
             $position = 100;
           }
-          readingsSingleUpdate($hash,"position",$position,1);
+          readingsSingleUpdate($hash, "anglePos", sprintf("%d", $anglePos), 1);
+          readingsSingleUpdate($hash, "position", sprintf("%d", $position), 1);
           $shutCmd = 2;
         } elsif ($cmd eq "position") {
           if (!defined $position) {
-            return "Position unknown, please first open the blinds completely."
+            return "Position unknown, please first opens the blinds completely."
+          } elsif ($angleTime > 0 && !defined $anglePos){
+            return "Slats angle position unknown, please first opens the blinds completely."
           } else {
+            my $anglePosLast = $anglePos;
+            my $shutTimeSet = $shutTime;
+            if (defined $a[2]) {
+              if ($a[2] =~ m/^[+-]?\d+$/ && $a[2] >= $angleMin && $a[2] <= $angleMax) {
+                $anglePos = $a[2];
+              } else {
+                return "Usage: $a[1] $a[2] is not numeric or out of range";
+              }
+              splice(@a,2,1);
+            } else {
+              $anglePos = $angleMax;              
+            }
             if (defined $a[1] && $a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] <= 100) {
               if ($position < $a[1]) {
                 # down
-                $shutTime = $shutTime / 100 * ($a[1] - $position);
+                ##
+                $angleTime = $angleTime * ($angleMax - $anglePos)/($angleMax - $angleMin);
+                $shutTime = $shutTime  * ($a[1] - $position) / 100 + $angleTime;
+                $position = $a[1] + $angleTime / $shutTimeSet * 100;
+                if ($position >= 100) {
+                  $position = 100;
+                }
                 $shutCmd = 2;
+                if ($angleTime) {
+                  my @timerCmd = ($name, "up", $angleTime);
+                  my %par = (hash => $hash, timerCmd => \@timerCmd);
+                  InternalTimer(gettimeofday() + $shutTime + 1, "EnOcean_TimerSet", \%par, 0);
+                }
               } elsif ($position > $a[1]) {
                 # up
-                $shutTime = $shutTime / 100 * ($position - $a[1]);
+                ##
+                $angleTime = $angleTime * ($anglePos - $angleMin) /($angleMax - $angleMin);
+                $shutTime = $shutTime * ($position - $a[1]) / 100 + $angleTime;
+                $position = $a[1] - $angleTime / $shutTimeSet * 100;
+                if ($position <= 0) {
+                  $position = 0;
+                  $anglePos = 0;
+                }
                 $shutCmd = 1;
+                if ($angleTime && $a[1] > 0) {
+                  my @timerCmd = ($name, "down", $angleTime);
+                  my %par = (hash => $hash, timerCmd => \@timerCmd);
+                  InternalTimer(gettimeofday() + $shutTime + 1, "EnOcean_TimerSet", \%par, 0);                
+                }
               } else {
-                # position ok
-                $shutCmd = 0;
+                if ($anglePosLast > $anglePos) {
+                  # up
+                  $shutTime = $angleTime * ($anglePosLast - $anglePos)/($angleMax - $angleMin);
+                  $shutCmd = 1;
+                } elsif ($anglePosLast < $anglePos) {
+                  # down
+                  $shutTime = $angleTime * ($anglePos - $anglePosLast) /($angleMax - $angleMin);
+                  $shutCmd = 2;
+                } else {
+                  # position and slats angle ok
+                  $shutCmd = 0;
+                }             
               }
-              readingsSingleUpdate($hash,"position",$a[1],1);
+              readingsSingleUpdate($hash, "anglePos", sprintf("%d", $anglePos), 1);
+              readingsSingleUpdate($hash, "position", sprintf("%d", $position), 1);
               shift(@a);
             } else {
               return "Usage: $a[1] is not numeric or out of range";
             }
           }
         } else {
-          return "Unknown argument " . $cmd . ", choose one of position:slider,0,5,100 up stop down teach"
+          return "Unknown argument " . $cmd . ", choose one of closes down opens position:slider,0,5,100 stop teach up"
         }
         if($shutCmd || $cmd eq "stop") {
           $updateState = 0;
           $data = sprintf "A5%02X%02X%02X%02X", 0, $shutTime, $shutCmd, 8;
-          $header = "000A0001";
-          Log $ll2, "EnOcean: set $name $cmd";
         }
-      } else {
-        return "Manufacturer Specific Application unknown. Set correct attr manufID.";
+        $header = "000A0001";
+        Log $ll2, "EnOcean: set $name $cmd";
       }
 
     } elsif ($st eq "contact") {
@@ -868,7 +978,7 @@ EnOcean_Set($@)
           return "Wrong parameter, choose RPS <data 1 Byte hex> [status 1 Byte hex]";
         }
       } else {
-        return "Unknown argument $cmd, choose one of RPS 1BS 4BS timer";
+        return "Unknown argument $cmd, choose one of RPS 1BS 4BS";
       }
       if ($a[2]) {
         if ($a[2] !~ m/^[\dA-F]{2}$/) {
@@ -967,6 +1077,8 @@ EnOcean_Set($@)
       if ($switchMode eq "pushbutton") {
         $data = "F600";
         $status = "20";
+        # next commands will be sent with a delay
+        select(undef, undef, undef, 0.2);
 	Log $ll2, "EnOcean: set $name released";
         $data = sprintf "%s%s%s", $data, $subDef, $status;
         IOWrite ($hash, $header, $data);
@@ -1373,7 +1485,7 @@ EnOcean_Parse($$)
         push @event, "3:fan:$fspeed";
         push @event, "3:switch:$switch";
         push @event, "3:setpoint:$db_2";
-        EnOcean_ReadingScaled($hash, "setpoint", 0, 255);
+        push @event, "3:setpointScaled:" . EnOcean_ReadingScaled($hash, $db_2, 0, 255);
       }
       push @event, "3:temperature:$temp";
 
@@ -1392,7 +1504,7 @@ EnOcean_Parse($$)
       push @event, "3:switch:$switch";
       push @event, "3:setpoint:$db_2";
       push @event, "3:temperature:$temp";
-      EnOcean_ReadingScaled($hash, "setpoint", 0, 255);
+      push @event, "3:setpointScaled:" . EnOcean_ReadingScaled($hash, $db_2, 0, 255);
 
     } elsif($st eq "roomSensorControl.02") {
       # Room Sensor and Control Unit (A5-10-15 ... A5-10-17)
@@ -1407,7 +1519,7 @@ EnOcean_Parse($$)
       push @event, "3:presence:$presence";
       push @event, "3:setpoint:$setpoint";
       push @event, "3:temperature:$temp";
-      EnOcean_ReadingScaled($hash, "setpoint", 0, 63);
+      push @event, "3:setpointScaled:" . EnOcean_ReadingScaled($hash, $setpoint, 0, 63);
 
     } elsif($st eq "roomSensorControl.18") {
       # Room Sensor and Control Unit (A5-10-18)
@@ -1644,7 +1756,7 @@ EnOcean_Parse($$)
       push @event, "3:setpoint:$setpoint";
       push @event, "3:temperature:$temp";
       push @event, "3:state:T: $temp F: $fanSpeed SP: $setpoint P: $presence";
-      EnOcean_ReadingScaled($hash, "setpoint", 0, 255);
+      push @event, "3:setpointScaled:" . EnOcean_ReadingScaled($hash, $setpoint, 0, 255);
 
     } elsif($st eq "tempHumiSensor.02") {
       # Temperatur and Humidity Sensor(EEP A5-04-02)
@@ -2368,19 +2480,26 @@ EnOcean_TimerSet($)
 sub
 EnOcean_ReadingScaled($$$$)
 {
-  my ($hash, $readingName, $readingMin, $readingMax) = @_;
+  my ($hash, $readingVal, $readingMin, $readingMax) = @_;
   my $name = $hash->{NAME};
-  my $readingVal = ReadingsVal($hash->{NAME}, $readingName, undef);
+  my $valScaled;
+#  my $readingVal = ReadingsVal($hash->{NAME}, $readingName, undef);
+  my $scaleDecimals = AttrVal($name, "scaleDecimals", undef);
   my $scaleMin = AttrVal($name, "scaleMin", undef);
   my $scaleMax = AttrVal($name, "scaleMax", undef);
   if (defined $scaleMax && defined $scaleMin &&
       $scaleMax =~ m/^[+-]?\d+(\.\d+)?$/ && $scaleMax =~ m/^[+-]?\d+(\.\d+)?$/) {
-    my $valScaled = ($readingMin*$scaleMax-$scaleMin*$readingMax)/
-                    ($readingMin-$readingMax)+
-                    ($scaleMin-$scaleMax)/($readingMin-$readingMax)*$readingVal;
-    readingsSingleUpdate($hash, $readingName."Scaled", $valScaled, 1);
-  }  
-}
+    $valScaled = ($readingMin*$scaleMax-$scaleMin*$readingMax)/
+                 ($readingMin-$readingMax)+
+                 ($scaleMin-$scaleMax)/($readingMin-$readingMax)*$readingVal;
+#    readingsSingleUpdate($hash, $readingName."Scaled", $valScaled, 1);
+  }
+  if (defined $scaleDecimals && $scaleDecimals =~ m/^[0-9]?$/) {
+    $scaleDecimals = "%0." . $scaleDecimals . "f";
+    $valScaled = sprintf "$scaleDecimals", $valScaled;
+  }
+  return $valScaled;  
+} 
 
 # Undef
 sub
@@ -2776,17 +2895,17 @@ EnOcean_Undef($$)
         <li>down td/s ta/s<br>
           issue roll down command</li>
         <li>position position/% &alpha;/&#176<br>
-          drive blinds to postion with angle value</li>
+          drive blinds to position with angle value</li>
         <li>stop<br>
           issue blinds stops command</li>
         <li>runtimeSet tu/s td/s<br>
           set runtime parameter</li>
         <li>angleSet ta/s<br>
           set angle configuration</li>
-        <li>positionMinMax positionMin/% positionMin/%<br>
-          set Min, Max values for position</li>
-        <li>angleMinMax &alpha;s/&#176 &alpha;o/&#176<br>
-          set slat angle for Shut und Open position</li>
+        <li>positionMinMax positionMin/% positionMax/%<br>
+          set min, max values for position</li>
+        <li>angleMinMax &alpha;o/&#176 &alpha;s/&#176<br>
+          set slat angle for open and shut position</li>
         <li>positionLogic normal|inverse<br>
           set position logic</li>
      </ul><br>
@@ -2798,7 +2917,7 @@ EnOcean_Undef($$)
         Angle Time Range: ta = 0 s ... 25.5 s<br>
         Runtime value for the sunblind reversion time. Select the time to revolve
         the sunblind from one slat angle end position to the other end position.<br>
-        Slat Angle: &alpha;|&alpha;s|&alpha;o = -180 &#176 ... 180 &#176<br>
+        Slat Angle: &alpha;|&alpha;o|&alpha;s = -180 &#176 ... 180 &#176<br>
         Position Logic, normal: Blinds fully opens corresponds to Position = 0 %<br>
         Position Logic, inverse: Blinds fully opens corresponds to Position = 100 %<br>
         The attr subType must be gateway and gwCmd must be blindCmd. The profile
@@ -2815,18 +2934,30 @@ EnOcean_Undef($$)
     where <code>value</code> is
       <li>teach<br>
         initiate teach-in mode</li>
-      <li>up [position/%]<br>
+      <li>opens<br>
+        issue blinds opens command</li>
+      <li>up tu/s<br>
         issue roll up command</li>
-      <li>down [position/%]<br>
+      <li>closes<br>
+        issue blinds closes command</li>
+      <li>down td/s<br>
         issue roll down command</li>
-      <li>position position/%<br>
-        set shutter to position</li>
+      <li>position position/% [&alpha;/&#176]<br>
+        drive blinds to position with angle value</li>
       <li>stop<br>
         issue stop command</li>
     </ul><br>
-    Set attr subType to manufProfile, manufID to 00D and attr model to
-    FSB14|FSB61|FSB70 manually.<br>
-    Use the sensor type "Szenentaster/PC" for Eltako devices.
+      Runtime Range: tu|td = 1 s ... 255 s<br>
+      Position Range: position = 0 % ... 100 %<br>
+      Slat Angle Range: &alpha; = -180 &#176 ... 180 &#176<br>
+      Angle Time Range: ta = 0 s ... 6 s<br>
+      The devive can only fully controlled if the attributes <a href="#angleMax">angleMax</a>,
+      <a href="#angleMin">angleMin</a>, <a href="#angleTime">angleTime</a>,
+      <a href="#shutTime">shutTime</a> and <a href="#shutTimeCloses">shutTimeCloses</a>,
+      are set correctly.
+      Set attr subType to manufProfile, manufID to 00D and attr model to
+      FSB14|FSB61|FSB70 manually.<br>
+      Use the sensor type "Szenentaster/PC" for Eltako devices.
     </li>
     <br><br>
 
@@ -2855,18 +2986,26 @@ EnOcean_Undef($$)
   <a name="EnOceanattr"></a>
   <b>Attributes</b>
   <ul>
-      <ul>
-      <li><a name="actualTemp">actualTemp</a> t/&#176C<br>
+    <ul>
+    <li><a name="actualTemp">actualTemp</a> t/&#176C<br>
       The value of the actual temperature, used when controlling MD15 devices.
       Should by filled via a notify from a distinct temperature sensor. If
       absent, the reported temperature from the MD15 is used.
-      </li>
+    </li>
+    <li><a name="angleMax">angleMax</a> &alpha;s/&#176, [&alpha;s] = -180 ... 180, 90 is default.<br>
+      Slat angle end position maximum.<br>
+      angleMax is supported for shutter.<br>
+    </li>
+    <li><a name="angleMin">angleMin</a> &alpha;o/&#176, [&alpha;o] = -180 ... 180, -90 is default.<br>
+      Slat angle end position minimum.<br>
+      angleMin is supported for shutter.<br>
+    </li>
+    <li><a name="angleTime">angleTime</a> t/s, [angleTime] = 0 ... 6, 0 is default.<br>
+      Runtime value for the sunblind reversion time. Select the time to revolve
+      the sunblind from one slat angle end position to the other end position.<br>
+      angleTime is supported for shutter.<br>
+    </li>
     <li><a href="#devStateIcon">devStateIcon</a></li>
-    <li><a name="dimTime">dimTime</a> relative, [dimTime] = 1 is default.<br>
-      No ramping or for Eltako dimming speed set on the dimmer if [dimTime] = 0.<br>
-      Ramping time which fast to low dimming if [dimTime] = 1 ... 100.<br>
-      dimTime is supported for dimmer.
-      </li>
     <li><a name="dimValueOn">dimValueOn</a> dim/%|last|stored,
       [dimValueOn] = 100 is default.<br>
       Dim value for the command "on".<br>
@@ -2898,6 +3037,9 @@ EnOcean_Undef($$)
       EnOcean Repeater in the transmission range of Fhem may forward data messages
       of the device, if the attribute is set to yes.
     </li>
+    <li><a name="scaleDecimals">scaleDecimals</a> 0 ... 9<br>
+      Decimal rounding with x digits of the scaled reading setpoint
+    </li>
     <li><a name="scaleMax">scaleMax</a> &lt;floating-point number&gt;<br>
       Scaled maximum value of the reading setpoint
     </li>
@@ -2910,6 +3052,12 @@ EnOcean_Undef($$)
       seconds. Select a delay time that is at least as long as the shading element
       or roller shutter needs to move from its end position to the other position.<br>
       shutTime is supported for shutter.
+      </li>
+    <li><a name="shutTimeCloses">shutTimeCloses</a> t/s, [shutTimeCloses] = 1 ... 255, [shutTime] is default.<br>
+      Set the attr shutTimeCloses to define the runtime used by the commands opens and closes.
+      Select a runtime that is at least as long as the value set by the delay switch of the actuator.
+      <br>
+      shutTimeCloses is supported for shutter.
       </li>
     <li><a name="subDef">subDef</a> &lt;EnOcean SenderID&gt;,
       [subDef] = [def] is default.<br>
@@ -3279,7 +3427,7 @@ EnOcean_Undef($$)
        <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 40 &#176C)</li>
        <li>state: T: t/&#176C SPT: t/&#176C NR: t/&#176C</li><br>
      </ul><br>
-       The scaling of the setpoint knob is device- and vendor-specific. Set the
+       The scaling of the setpoint adjustment is device- and vendor-specific. Set the
        attributes <a href="#scaleMax">scaleMax</a> and <a href="#scaleMin">scaleMin</a>
        for the additional scaled reading setpointScaled. Use attribut
        <a href="#userReadings">userReadings</a> to adjust the scaling alternatively.<br>
@@ -3300,7 +3448,7 @@ EnOcean_Undef($$)
        <li>setpointScaled: &lt;floating-point number&gt;</li>
        <li>state: T: t/&#176C H: rH/% SP: 0 ... 255 SW: 0|1</li>
      </ul><br>
-       The scaling of the setpoint knob is device- and vendor-specific. Set the
+       The scaling of the setpoint adjustment is device- and vendor-specific. Set the
        attributes <a href="#scaleMax">scaleMax</a> and <a href="#scaleMin">scaleMin</a>
        for the additional scaled reading setpointScaled. Use attribut
        <a href="#userReadings">userReadings</a> to adjust the scaling alternatively.<br>
@@ -3319,7 +3467,7 @@ EnOcean_Undef($$)
        <li>setpointScaled: &lt;floating-point number&gt;</li>
        <li>state: T: t/&#176C SP: 0 ... 63 P: absent|present</li>
      </ul><br>
-       The scaling of the setpoint knob is device- and vendor-specific. Set the
+       The scaling of the setpoint adjustment is device- and vendor-specific. Set the
        attributes <a href="#scaleMax">scaleMax</a> and <a href="#scaleMin">scaleMin</a>
        for the additional scaled reading setpointScaled. Use attribut
        <a href="#userReadings">userReadings</a> to adjust the scaling alternatively.<br>
@@ -3436,7 +3584,7 @@ EnOcean_Undef($$)
        <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 40 &#176C)</li>
        <li>state: T: t/&#176C F: 0|1|2|3|auto SP: 0 ... 255 P: absent|present|disabled</li>
      </ul><br>
-       The scaling of the setpoint knob is device- and vendor-specific. Set the
+       The scaling of the setpoint adjustment is device- and vendor-specific. Set the
        attributes <a href="#scaleMax">scaleMax</a> and <a href="#scaleMin">scaleMin</a>
        for the additional scaled reading setpointScaled. Use attribut
        <a href="#userReadings">userReadings</a> to adjust the scaling alternatively.<br>
