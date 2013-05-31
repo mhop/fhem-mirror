@@ -84,7 +84,7 @@ FBAHA_Set($@)
         my ($i,$p) = ($1,$2,$3);
         my $msg = "UNDEFINED FBDECT_$i FBDECT $i $p";
         DoTrigger("global", $msg, 1);
-        Log 1, $msg;
+        Log 3, "$msg, please define it";
       }
     }
   }
