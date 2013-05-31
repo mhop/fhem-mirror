@@ -15,7 +15,7 @@ SYSSTAT_Initialize($)
   $hash->{UndefFn}  = "SYSSTAT_Undefine";
   $hash->{GetFn}    = "SYSSTAT_Get";
   $hash->{AttrFn}   = "SYSSTAT_Attr";
-  $hash->{AttrList} = "filesystems raspberrytemperature:0,1,2 showpercent:1 useregex:1 ssh_user loglevel:0,1,2,3,4,5,6 ".
+  $hash->{AttrList} = "filesystems raspberrycpufreq:1 raspberrytemperature:0,1,2 showpercent:1 useregex:1 ssh_user loglevel:0,1,2,3,4,5,6 ".
                        $readingFnAttributes;
 }
 
@@ -121,6 +121,7 @@ SYSSTAT_Attr($$$)
   my $orig = $attrVal;
   $attrVal= "1" if($attrName eq "useregex");
   $attrVal= "1" if($attrName eq "showpercent");
+  $attrVal= "1" if($attrName eq "raspberrycpufreq");
 
   if( $attrName eq "filesystems") {
     my $hash = $defs{$name};
@@ -209,6 +210,11 @@ SYSSTAT_GetUpdate($)
       readingsSingleUpdate($hash,"temperature",$temp,defined($hash->{LOCAL} ? 0 : 1));
     }
   }
+
+  if( AttrVal($name, "raspberrycpufreq", "0") > 0 ) {
+    my $freq = SYSSTAT_getPiFreq($hash);
+    readingsSingleUpdate($hash,"cpufreq",$freq,defined($hash->{LOCAL} ? 0 : 1));
+  }
 }
 
 sub
@@ -278,6 +284,37 @@ SYSSTAT_getPiTemp( $ )
     }
 
   return $temp / 1000;
+}
+
+sub
+SYSSTAT_getPiFreq( $ )
+{
+  my ($hash) = @_;
+
+  my $filename = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq";
+
+  my $freq = 0;
+  if( defined($hash->{HOST}) ) {
+      my $cmd = qx(which ssh);
+      chomp( $cmd );
+      my $user = AttrVal($hash->{NAME}, "ssh_user", undef );
+      $cmd .= ' ';
+      $cmd .= $user."\@" if( defined($user) );
+      $cmd .= $hash->{HOST}." cat ". $filename ." 2>/dev/null";
+      if( open(my $fh, "$cmd|" ) ) {
+        $freq = <$fh>;
+        close($fh);
+      }
+    } else {
+      if( open( my $fh, '<', $filename ) )
+        {
+          $freq = <$fh>;
+
+          close($fh);
+        }
+    }
+
+  return $freq / 1000;
 }
 
 
@@ -368,6 +405,9 @@ SYSSTAT_getPiTemp( $ )
     <li>showpercent<br>
       If set the usage is shown in percent. If not set the remaining free space in bytes is shown.</li>
     <li>raspberrytemperature<br>
+      If set and > 0 the raspberry pi on chip termal sensor is read.<br>
+      If set to 2 a geometric average over the last 4 values is created.</li>
+    <li>raspberrycpufreq<br>
       If set and > 0 the raspberry pi on chip termal sensor is read.<br>
       If set to 2 a geometric average over the last 4 values is created.</li>
     <li>useregex<br>
