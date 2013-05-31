@@ -129,14 +129,14 @@ FBDECT_Parse($$@)
   my $mt = substr($msg, 0, 2);
   if($mt ne "07" && $mt ne "04") {
     Log 1, "FBDECT: unknown message type $mt";
-    return;
+    return "";  # Nobody else is able to handle this
   }
 
   my $id = hex(substr($msg, 16, 4));
   my $hash = $modules{FBDECT}{defptr}{$id};
   if(!$hash) {
     my $ret = "UNDEFINED FBDECT_$id FBDECT $id switch";
-    Log 1, $ret;
+    Log 3, "$ret, please define it";
     DoTrigger("global", $ret);
     return "";
   }
