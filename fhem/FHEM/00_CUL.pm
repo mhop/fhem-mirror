@@ -1036,6 +1036,7 @@ CUL_Attr(@)
     }
 
     Log 2, "Switched $name rfmode to $a[3]";
+    delete $hash->{".clientArray"};
 
   }
  
