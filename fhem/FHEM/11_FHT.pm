@@ -566,16 +566,13 @@ FHT_Parse($$)
     Log $ll4, "FHT $name windowsensor: $valSensor";
   }
 
-  if(substr($msg,24,1) eq "7") {        # Do not store FHZ acks.
-    $cmd = "FHZ:$cmd";
+  $cmd = "FHZ:$cmd" if(substr($msg,24,1) eq "7");
 
-  } else {
-    readingsBulkUpdate($def, $cmd, $val);
-    if($cmd eq "measured-temp") {
-      readingsBulkUpdate($def, "state", "measured-temp: $val", 0);
-      readingsBulkUpdate($def, "temperature", $val); # For dewpoint
-    }    
-  }
+  readingsBulkUpdate($def, $cmd, $val);
+  if($cmd eq "measured-temp") {
+    readingsBulkUpdate($def, "state", "measured-temp: $val", 0);
+    readingsBulkUpdate($def, "temperature", $val); # For dewpoint
+  }    
 
   Log $ll4, "FHT $name $cmd: $val";
 
