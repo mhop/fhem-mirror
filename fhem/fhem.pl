@@ -1388,6 +1388,7 @@ AssignIoPort($)
       my @fnd = grep { $hash->{TYPE} =~ m/^$_$/; } split(":", $cl);
       if(@fnd) {
         $hash->{IODev} = $defs{$p};
+        delete($defs{$p}{".clientArray"}); # Force a recompute
         last;
       }
     }
@@ -2582,21 +2583,19 @@ Dispatch($$$)
 
   my @found;
 
-  my $cl = $hash->{Clients};
-  $cl = $iohash->{Clients} if(!$cl);
-  foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
-                  grep {defined($modules{$_}{ORDER})} keys %modules) {
+  my $clientArray = $hash->{".clientArray"};
+  $clientArray = computeClientArray($hash, $iohash) if(!$clientArray);
 
-    next if(!(defined($cl) && $cl =~ m/:$m:/));
-
+  foreach my $m (@{$clientArray}) {
     # Module is not loaded or the message is not for this module
-    next if(!$modules{$m}{Match} || $dmsg !~ m/$modules{$m}{Match}/i);
+    next if($dmsg !~ m/$modules{$m}{Match}/i);
 
     no strict "refs"; $readingsUpdateDelayTrigger = 1;
     @found = &{$modules{$m}{ParseFn}}($hash,$dmsg);
     use strict "refs"; $readingsUpdateDelayTrigger = 0;
     last if(int(@found));
   }
+
   if(!int(@found)) {
     my $h = $hash->{MatchList}; $h = $iohash->{MatchList} if(!$h);
     if(defined($h)) {
@@ -3337,6 +3336,27 @@ sub
 fhemTimeLocal($$$$$$) {
     my $t= fhemTimeGm($_[0],$_[1],$_[2],$_[3],$_[4],$_[5]);
     return $t-fhemTzOffset($t);
+}
+
+sub
+computeClientArray($$)
+{
+  my ($hash, $iohash) = @_;
+  my @a = ();
+  my @mRe = split(":", $hash->{Clients} ? $hash->{Clients}:$iohash->{Clients});
+
+  foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
+                  grep { defined($modules{$_}{ORDER}) } keys %modules) {
+    foreach my $re (@mRe) {
+      if($m =~ m/^$re$/) {
+        push @a, $m if($modules{$m}{Match});
+        last;
+      }
+    }
+  }
+
+  $hash->{".clientArray"} = \@a;
+  return \@a;
 }
 
 1;
