@@ -30,34 +30,34 @@ BlockingCall($$@)
 
   # Look for the telnetport
   # must be done before forking to be able to create a temporary device
-    my $tName = "telnetForBlockingFn";
-    $telnetDevice = $tName if($defs{$tName});
+  my $tName = "telnetForBlockingFn";
+  $telnetDevice = $tName if($defs{$tName});
 
-    if(!$telnetDevice) {
-      foreach my $d (sort keys %defs) {
-        my $h = $defs{$d};
-        next if(!$h->{TYPE} || $h->{TYPE} ne "telnet" || $h->{SNAME});
-        next if($attr{$d}{SSL} || $attr{$d}{password});
-        next if($h->{DEF} =~ m/IPV6/);
-        $telnetDevice = $d;
-        last;
-      }
+  if(!$telnetDevice) {
+    foreach my $d (sort keys %defs) {
+      my $h = $defs{$d};
+      next if(!$h->{TYPE} || $h->{TYPE} ne "telnet" || $h->{SNAME});
+      next if($attr{$d}{SSL} || $attr{$d}{password});
+      next if($h->{DEF} =~ m/IPV6/);
+      $telnetDevice = $d;
+      last;
     }
+  }
 
-    # If not suitable telnet device found, create a temporary one
-    if(!$telnetDevice) {
-      if(!CommandDefine(undef, "$tName telnet 0")) {
-        CommandAttr(undef, "$tName room hidden");
-        $telnetDevice = $tName;
-        $defs{$tName}{TEMPORARY} = 1;
-      }
+  # If not suitable telnet device found, create a temporary one
+  if(!$telnetDevice) {
+    if(!CommandDefine(undef, "$tName telnet 0")) {
+      CommandAttr(undef, "$tName room hidden");
+      $telnetDevice = $tName;
+      $defs{$tName}{TEMPORARY} = 1;
     }
+  }
 
-    if(!$telnetDevice) {
-      my $msg = "CallBlockingFn: No telnet port found and cannot create one.";
-      Log 1, $msg;
-      return $msg;
-    }
+  if(!$telnetDevice) {
+    my $msg = "CallBlockingFn: No telnet port found and cannot create one.";
+    Log 1, $msg;
+    return $msg;
+  }
 
   # do fork
   my $pid = fork;
