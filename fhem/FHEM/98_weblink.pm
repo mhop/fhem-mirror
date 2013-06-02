@@ -256,11 +256,13 @@ wl_getRegFromFile($)
   $fh->seek(0, 2); # Go to the end
   my $sz = $fh->tell;
   $fh->seek($sz > 65536 ? $sz-65536 : 0, 0);
-  my $data = <$fh>;
+  my $data;
+  $data = <$fh> if($sz > 65536); # discard the first/partial line
   my $maxcols = 0;
   my %h;
   while($data = <$fh>) {
     my @cols = split(" ", $data);
+    next if(@cols < 3);
     $maxcols = @cols if(@cols > $maxcols);
     $cols[2] = "*" if($cols[2] =~ m/^[-\.\d]+$/);
     $h{"$cols[1].$cols[2]"} = $data;
