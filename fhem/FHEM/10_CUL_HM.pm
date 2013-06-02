@@ -557,8 +557,8 @@ sub CUL_HM_Parse($$) {##############################
     elsif(($mTp eq '02' &&$sType eq '01')||    # ackStatus
 	      ($mTp eq '10' &&$sType eq '06')){    # infoStatus
 	  $chn = substr($p,2,2); 
-
 	  my $temp = substr($p,4,2);
+	  my $err = hex(substr($p,6,2));
 	  my $dTemp =  ($temp eq '00')?'off':
 	              (($temp eq 'C8')?'on' :
 				                    sprintf("%0.1f", hex($temp)/2));
@@ -573,6 +573,7 @@ sub CUL_HM_Parse($$) {##############################
 #       CUL_HM_Set($chnHash,$chnName,"desired-temp",$dTemp)         if($mode =~ m /central/ && $mTp eq '10');
        }
       push @event, "desired-temp:" .$dTemp;
+	  push @event, "battery:".($err&0x80?"low":"ok");  
     }
     elsif($mTp eq "10"){                       # Config change report
 	  $chn = substr($p,2,2);
@@ -1881,6 +1882,7 @@ sub CUL_HM_Set($@) {
 	  CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chn.$set.
 	                      substr($pID,0,6).$pCh1.$pCh2);
 	}
+	CUL_HM_queueAutoRead($name) if (2 < CUL_HM_getAttrInt($name,"autoReadReg"));
   } 
   elsif($cmd =~ m/^(regBulk|getRegRaw)$/) { ############################### reg
     my ($list,$addr,$data,$peerID);
@@ -2513,6 +2515,7 @@ sub CUL_HM_Set($@) {
   	              "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerChn}00");
   	      CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,hex($peerChn),4,$burst)
 				   if($md ne "HM-CC-TC");
+		  CUL_HM_queueAutoRead($name) if (2 < CUL_HM_getAttrInt($name,"autoReadReg"));
 	    }
       }
 	}
@@ -2525,6 +2528,8 @@ sub CUL_HM_Set($@) {
 	    my $peerFlag = CUL_HM_getFlag($peerHash);
         CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",
             $peerFlag,$id,$peerDst,$peerChn,$cmdB,$dst,$b2,$b1 ));
+		CUL_HM_queueAutoRead($peerHash->{name}) 
+		      if (2 < CUL_HM_getAttrInt($peerHash->{name},"autoReadReg"));
 	  }
 	}
 	return ("",1) if ($target && $target eq "remote");#Nothing to transmit for actor
