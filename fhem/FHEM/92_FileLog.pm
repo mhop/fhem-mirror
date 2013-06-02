@@ -619,6 +619,25 @@ RESCAN:
   return ($outf eq "-") ? $ret : join(" ", @fname);
 }
 
+###############
+# this is not elegant
+sub
+seekBackOneLine($$)
+{
+  my ($fh, $pos) = @_;
+  my $buf;
+  $pos -= 2; # skip current CR/NL
+  $fh->seek($pos, 0);
+  while($pos > 0 && $fh->read($buf, 1)) {
+    if($buf eq "\n" || $buf eq "\r") {
+      $fh->seek(++$pos, 0);
+      return $pos;
+    }
+    $fh->seek(--$pos, 0);
+  }
+  return 0;
+}
+
 ###################################
 sub
 seekTo($$$$)
@@ -647,7 +666,7 @@ seekTo($$$$)
       $next = $fh->tell;
       $data = <$fh>;
       if(!$data) {
-        $last = $next;
+        $last = seekBackOneLine($fh, $next);
         last;
       }
 
