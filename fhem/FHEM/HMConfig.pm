@@ -95,7 +95,7 @@ my %culHmModel=(
                                                                                                                      ,chn=>"Btn:1:17,Disp:18:18",},
   "0038" => {name=>"HM-RC-19-B"              ,st=>'remote'            ,cyc=>''      ,rxt=>'c:b' ,lst=>'1,4:1p.2p.3p.4p.5p.6p.7p.8p.9p.10p.11p.12p.13p.14p.15p.16p'
                                                                                                                      ,chn=>"Btn:1:17,Disp:18:18",},
-  "0039" => {name=>"HM-CC-TC"                ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'5:2.3p,6:2'   ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3",},
+  "0039" => {name=>"HM-CC-TC"                ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'p:2p,5:2.3p,6:2',chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3",},
   "003A" => {name=>"HM-CC-VD"                ,st=>'thermostat'        ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'p,5'          ,chn=>"",},
   "003B" => {name=>"HM-RC-4-B"               ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
   "003C" => {name=>"HM-WDS20-TH-O"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'p'            ,chn=>"",},
@@ -325,6 +325,9 @@ my %culHmRegDefine = (
   keypressSignal  =>{a=>  3.0,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Keypress beep"           ,lit=>{off=>0,on=>1}},
   signal          =>{a=>  3.4,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Confirmation beep"       ,lit=>{off=>0,on=>1}},
   signalTone      =>{a=>  3.6,s=>0.2,l=>0,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                        ,lit=>{low=>0,mid=>1,high=>2,veryHigh=>3}},
+
+  brightness      =>{a=>  4.0,s=>0.4,l=>0,min=>0  ,max=>15      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Display brightness"},
+  energyOpt       =>{a=>  8.0,s=>1.0,l=>0,min=>0  ,max=>127     ,c=>'factor'   ,f=>2       ,u=>'s'   ,d=>1,t=>"energy Option: Duration of ilumination"},
 # sec_mdir                                                                                   
   cyclicInfoMsg   =>{a=>  9.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message"          ,lit=>{off=>0,on=>1}},
   sabotageMsg     =>{a=> 16.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"enable sabotage message" ,lit=>{off=>0,on=>1}},
@@ -605,6 +608,7 @@ my %culHmRegModel = (
   "HM-PB-4DIS-WM"   =>{peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1},
   "HM-WDS100-C6-O"  =>{stormUpThresh   =>1,stormLowThresh  =>1},
   "KS550"           =>{stormUpThresh   =>1,stormLowThresh  =>1},
+  "HM-OU-LED16"     =>{brightness      =>1,energyOpt       =>1,localResDis     =>1},
   "HM-OU-CFM-PL"    =>{localResetDis   =>1,
   			           OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1,
 			           OnTimeMode      =>1,OffTimeMode     =>1, 
@@ -949,10 +953,14 @@ my %culHmBits = (
   "11;p02=8100" => { txt => "LEDall"      , params => {
                      Led1To16 => '04,8,$val= join(":",sprintf("%b",hex($val))=~ /(.{2})/g)',
 					 } }, 
-  "11;p01=81"   => { txt => "LEVEL"      , params => {
-                     CHANNEL  => "02,2", 
+  "11;p01=81"   => { txt => "LEVEL"       , params => {
+                     CHANNEL  => "02,2",  
                      TIME     => '04,2,$val=hex($val)', 
                      SPEED    => '06,2,$val=hex($val)', 
+					 } }, 
+  "11;p01=82"   => { txt => "Sleepmode"   , params => {#only LED16? 
+                     CHANNEL  => "02,2", 
+                     MODE     => '04,2,$val=hex($val)', 
 					 } }, 
   "12"          => { txt => "HAVE_DATA"},
   "3E"          => { txt => "SWITCH", params => {

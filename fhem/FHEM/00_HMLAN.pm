@@ -15,7 +15,7 @@ sub HMLAN_secSince2000();
 
 sub HMLAN_SimpleWrite(@);
 
-my $debug = 0; # set 1 for better log readability
+my $debug = 1; # set 1 for better log readability
 my %sets = (
   "hmPairForSec" => "HomeMatic",
   "hmPairSerial" => "HomeMatic",
@@ -60,7 +60,6 @@ sub HMLAN_Define($$) {#########################################################
   my $name = $a[0];
   my $dev = $a[2];
   $dev .= ":1000" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
-  $attr{$name}{hmId} = sprintf("%06X", time() % 0xffffff); # Will be overwritten
 
   if($dev eq "none") {
     Log 1, "$name device is none, commands will be echoed only";
@@ -171,41 +170,42 @@ my %lhash; # remember which ID is assigned to this HMLAN
 
 sub HMLAN_Write($$$) {#########################################################
   my ($hash,$fn,$msg) = @_;
-  my ($mtype,$src,$dst) = (substr($msg, 8, 2),
-                           substr($msg, 10, 6),
-						   substr($msg, 16, 6));
-  my $ll5 = GetLogLevel($hash->{NAME},5);						   
-
-  if ($mtype eq "02" && $src eq $hash->{owner} && length($msg) == 24){
-    # Acks are generally send by HMLAN autonomously
-    # Special 
-    Log $ll5, "HMLAN: Skip ACK" if (!$debug);
-	return;
-  }
-# my $IDHM  = '+'.$dst.',01,00,F1EF'; #used by HMconfig - meanning??
-# my $IDadd = '+'.$dst;               # guess: add ID?                                     
-# my $IDack = '+'.$dst.',02,00,';     # guess: ID acknowledge
-# my $IDack = '+'.$dst.',FF,00,';     # guess: ID acknowledge
-# my $IDsub = '-'.$dst;               # guess: ID remove?
-# my $IDnew = '+'.$dst.',00,01,';     # newChannel- trailing 01 to be sent if talk to neu channel
-  my $IDadd = '+'.$dst.',00,00,';     # guess: add ID?                                     
-
-  if (!$lhash{$dst} && $dst ne "000000"){
-    HMLAN_SimpleWrite($hash, $IDadd);
-	delete $hash->{helper}{$dst};
-	my $rxt = CUL_HM_Get(CUL_HM_id2Hash($dst),CUL_HM_id2Name($dst),"param","rxType");
-	if (!($rxt & ~0x04)){#config only
-	  $hash->{helper}{$dst}{newChn} = '+'.$dst.",01,01,FE1F";
+  if (length($msg)>22){
+    my ($mtype,$src,$dst) = (substr($msg, 8, 2),
+                             substr($msg, 10, 6),
+	  					     substr($msg, 16, 6));
+    my $ll5 = GetLogLevel($hash->{NAME},5);						   
+    
+    if ($mtype eq "02" && $src eq $hash->{owner} && length($msg) == 24){
+      # Acks are generally send by HMLAN autonomously
+      # Special 
+      Log $ll5, "HMLAN: Skip ACK" if (!$debug);
+	  return;
     }
-	else{
-	  $hash->{helper}{$dst}{newChn} = '+'.$dst.',00,01,';
-	}
-	$hash->{helper}{$dst}{name} = CUL_HM_id2Name($dst);
-    $lhash{$dst} = 1;
-   	$hash->{assignIDs}=join(',',keys %lhash);
-   	$hash->{assignIDsCnt}=scalar(keys %lhash);
+#   my $IDHM  = '+'.$dst.',01,00,F1EF'; #used by HMconfig - meanning??
+#   my $IDadd = '+'.$dst;               # guess: add ID?                                     
+#   my $IDack = '+'.$dst.',02,00,';     # guess: ID acknowledge
+#   my $IDack = '+'.$dst.',FF,00,';     # guess: ID acknowledge
+#   my $IDsub = '-'.$dst;               # guess: ID remove?
+#   my $IDnew = '+'.$dst.',00,01,';     # newChannel- trailing 01 to be sent if talk to neu channel
+    my $IDadd = '+'.$dst.',00,00,';     # guess: add ID?                                     
+    
+    if (!$lhash{$dst} && $dst ne "000000"){
+      HMLAN_SimpleWrite($hash, $IDadd);
+	  delete $hash->{helper}{$dst};
+	  my $rxt = CUL_HM_Get(CUL_HM_id2Hash($dst),CUL_HM_id2Name($dst),"param","rxType");
+	  if (!($rxt & ~0x04)){#config only
+	    $hash->{helper}{$dst}{newChn} = '+'.$dst.",01,01,FE1F";
+      }
+	  else{
+	    $hash->{helper}{$dst}{newChn} = '+'.$dst.',00,01,';
+	  }
+	  $hash->{helper}{$dst}{name} = CUL_HM_id2Name($dst);
+      $lhash{$dst} = 1;
+      $hash->{assignIDs}=join(',',keys %lhash);
+      $hash->{assignIDsCnt}=scalar(keys %lhash);
+    }
   }
-
   my $tm = int(gettimeofday()*1000) % 0xffffffff;
   $msg = sprintf("S%08X,00,00000000,01,%08X,%s",$tm, $tm, substr($msg, 4));
   HMLAN_SimpleWrite($hash, $msg);
@@ -366,8 +366,10 @@ sub HMLAN_Parse($$) {##########################################################
     Log $ll5, 'HMLAN_Parse: '.$name.                 ' V:'.$mFld[1]
 	                               .' sNo:'.$mFld[2].' d:'.$mFld[3]
 								   .' O:'  .$mFld[4].' t:'.$mFld[5].' IDcnt:'.$mFld[6];
-    my $myId = AttrVal($name, "hmId", $mFld[4]);
-    if(lc($mFld[4]) ne lc($myId) && !AttrVal($name, "dummy", 0)) {
+    my $myId = AttrVal($name, "hmId", "");
+	$myId = $attr{$name}{hmId} = $mFld[4] if (!$myId);
+	
+    if($mFld[4] ne $myId && !AttrVal($name, "dummy", 0)) {
       Log 1, 'HMLAN setting owner to '.$myId.' from '.$mFld[4];
       HMLAN_SimpleWrite($hash, "A$myId");
     }
