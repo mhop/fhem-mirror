@@ -28,9 +28,6 @@ use strict;
 use warnings;
 use POSIX;
 
-sub Log($$);
-sub Heating_Control_Update($);
-
 ##################################### 
 sub
 Heating_Control_Initialize($)
@@ -53,7 +50,6 @@ Heating_Control_Get($@)
   return "argument is missing" if(int(@a) != 2);
 
   $hash->{LOCAL} = 1;
-  #Heating_Control_GetUpdate($hash);
   delete $hash->{LOCAL};
   my $reading= $a[1];
   my $value;
@@ -74,7 +70,7 @@ Heating_Control_Define($$)
 
   my  @a = split("[ \t]+", $def);
  
-  return "Usage: define <name> Heating_Control <device> <switching times> <condition|command>"
+  return "Usage: define <name> $hash->{TYPE} <device> <switching times> <condition|command>"
      if(@a < 4);
 
   my $name       = shift @a;
@@ -113,7 +109,7 @@ Heating_Control_Define($$)
 
   $hash->{NAME}           = $name;
   $hash->{DEVICE}         = $device;
-  $modules{Heating_Control}{defptr}{$hash->{NAME}} = $hash;
+  $modules{$hash->{TYPE}}{defptr}{$hash->{NAME}} = $hash;
   $hash->{helper}{SWITCHINGTIMES} = join(" ", @switchingtimes);
   if($conditionOrCommand =~  m/^\(.*\)$/g) {         #condition (*)
      $hash->{helper}{CONDITION} = $conditionOrCommand;
@@ -173,7 +169,7 @@ Heating_Control_Define($$)
            if ($low <= $high) {
               @subDays = ($low .. $high);           
 		      	  } else {
-			          @subDays = (1 .. $high, $low .. 7);
+			          @subDays = ($dayNumber{so} .. $high, $low .. $dayNumber{sa});
 			        }
            @hdays{@subDays}=1;
         } else {
@@ -205,9 +201,6 @@ Heating_Control_Define($$)
     $hash->{helper}{DESIRED_TEMP_READING} = "desired-temp";
   }
 
-  $hash->{helper}{UNIT} = "°C";
-  my $unit = $hash->{helper}{UNIT};
-
   my $rWochentage;
   if ($englisch) {
      $rWochentage = \@Wochentage_en;
@@ -225,7 +218,7 @@ Heating_Control_Define($$)
 
   RemoveInternalTimer($hash);
   my $now    = time();
-  InternalTimer ($now+30, "Heating_Control_Update", $hash, 0);
+  InternalTimer ($now+30, "$hash->{TYPE}_Update", $hash, 0);
 
   readingsBeginUpdate  ($hash);
   readingsBulkUpdate   ($hash, "nextUpdate",   strftime("Heute, %H:%M:%S",localtime($now+30)));
@@ -242,7 +235,7 @@ Heating_Control_Undef($$)
   my ($hash, $arg) = @_;
 
   RemoveInternalTimer($hash);
-  delete $modules{Heating_Control}{defptr}{$hash->{NAME}};
+  delete $modules{$hash->{TYPE}}{defptr}{$hash->{NAME}};
   return undef;
 }
 
@@ -301,7 +294,6 @@ Heating_Control_Update($)
   }
 
   my $name = $hash->{NAME};
-  my $unit = $hash->{helper}{UNIT};
   my $command;
   
   #$nextSwitch += get_SummerTimeOffset($now, $nextSwitch);
@@ -327,13 +319,13 @@ Heating_Control_Update($)
     Log GetLogLevel($name,3), $ret if($ret);
   }
 
-  my $active;
+  my $active = 1;
   if (defined $hash->{helper}{CONDITION}) {
      $active = eval ($hash->{helper}{CONDITION});
   }
 
   RemoveInternalTimer($hash);
-  InternalTimer($nextSwitch, "Heating_Control_Update", $hash, 0);
+  InternalTimer($nextSwitch, "$hash->{TYPE}_Update", $hash, 0);
 
   readingsBeginUpdate($hash);
   readingsBulkUpdate ($hash,  "nextUpdate", strftime("%d.%m.%Y %H:%M:%S",localtime($nextSwitch)));
