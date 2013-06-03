@@ -168,7 +168,7 @@ YAMAHA_AVR_Get($@)
     
     $what = $a[1];
     
-    if($what =~ /^(power|input|volume_level|mute)$/)
+    if($what =~ /^(power|input|input_name|output|volume_level|mute)$/)
     {
         YAMAHA_AVR_GetStatus($hash, 1);
 
@@ -183,7 +183,7 @@ YAMAHA_AVR_Get($@)
     }
     else
     {
-	return "Unknown argument $what, choose one of param power input volume_level mute get";
+	return "Unknown argument $what, choose one of power input input_name volume_level mute".(exists($hash->{READINGS}{output})?" output":"");
     }
 }
 
@@ -1000,8 +1000,10 @@ mute off</code></ul>
     Currently, the following commands are defined and return the current state of the receiver.<br><br>
 <ul><code>power<br>
 input<br>
+input_name<br>
 mute<br>
-volume_level</code></ul><br><br>
+volume_level<br>
+output        # only available in zones other than mainzone</code></ul><br><br>
   </ul>
   <a name="YAMAHA_AVRattr"></a>
   <b>Attributes</b>
@@ -1021,6 +1023,15 @@ volume_level</code></ul><br><br>
        Optional attribute to define the time window for the volume smoothing in seconds.
        For example the value 2 means the smooth process in general should take 2 seconds.
        The value 0 means "as fast as possible". Default value is 0.
+  </ul>
+  <br>
+  <b>Generated Readings/Events:</b><br>
+  <ul>
+  <li><b>input</b> - The selected input source according to the FHEM input commands</li>
+  <li><b>input_name</b> - The input description as seen on the receiver display</li>
+  <li><b>mute</b> - Reports the mute status of the receiver or zone (can be "on" or "off")</li>
+  <li><b>power</b> - Reports the power status of the receiver or zone (can be "on" or "standby")</li>
+  <li><b>volume_level</b> - Reports the current volume level of the receiver or zone (between -80.0 and +15 dB)</li>
   </ul>
 <br>
   <b>Implementator's note</b>
@@ -1187,8 +1198,9 @@ mute off</code></ul><br><br>
     <br><br>
     Aktuell stehen folgende Parameter zur Verf&uuml;gung welche den aktuellen Status des Receivers zur&uuml;ck geben.<br><br>
      <ul>
-     <li><code>power</code> - Betriebszustand des Receiveres/Zone (on oder off)</li>
+     <li><code>power</code> - Betriebszustand des Receiveres/Zone (on oder standby)</li>
      <li><code>input</code> - Gew&auml;hlter Eingang</li>
+     <li><code>input_name</code> - Bezeichnung des gew&auml;hlten Einganges wie im Display des Receivers</li>
      <li><code>mute</code> - Lautlos an oder aus (on oder off)</li>
      <li><code>volume_level</code> - Lautst&auml;rkepegel in dB</li>
      </ul>
@@ -1212,6 +1224,15 @@ mute off</code></ul><br><br>
 	Optionales Attrribut welches das Zeitfenster in Sekunden f&uuml;r die Anpassung angibt.
        Als Beispiel bedeutet der Wert 2 dass innerhalb von 2 Sekunden die Lautst&auml;rkeanpassung durchgef&uuml;hrt werden soll.
        Der Wert 0 bedeutet, dass die Anpassung so schnell wie m&ouml;glich geschehen soll. Der Standardwert ist 0.
+  </ul>
+  <br>
+  <b>Generierte Readings/Events:</b><br>
+  <ul>
+  <li><b>input</b> - Der ausgew&auml;hlte Eingang entsprechend dem FHEM-Kommando</li>
+  <li><b>input_name</b> - Die Eingangsbezeichnung, so wie sie am Receiver eingestellt wurde und auf dem Display erscheint</li>
+  <li><b>mute</b> - Der aktuelle Stumm-Status("on" =&gt; Stumm, "off" =&gt; Laut)</li>
+  <li><b>power</b> - Der aktuelle Betriebsstatuse ("on" =&gt; an, "off" =&gt; aus)</li>
+  <li><b>volume_level</b> - Der aktuelle Lautst&auml;rkepegel (zwischen -80.0 und +15 dB)</li>
   </ul>
 <br>
   <b>Hinweise des Autors</b>
