@@ -70,7 +70,7 @@ FBDECT_Define($$)
 }
  
 ###################################
-my %sets = ("on"=>1, "off"=>1);
+my %sets = ("on"=>1, "off"=>1, "msgInterval"=>1);
 sub
 FBDECT_Set($@)
 {
@@ -79,12 +79,28 @@ FBDECT_Set($@)
   my $cmd = $a[1];
 
   if(!$sets{$cmd}) {
-    return SetExtensions($hash, join(" ", sort keys %sets), @a);
+    my $usage =  join(" ", sort keys %sets);
+    return SetExtensions($hash, $usage, @a);
   }
-  my $relay = sprintf("%08x%04x0000%08x", 15, 4, $cmd eq "on" ? 1 : 0);
-  my $msg = sprintf("%04x0000%08x$relay", $hash->{id}, length($relay)/2);
-  IOWrite($hash, "07", $msg);
-  readingsSingleUpdate($hash, "state", "set_$cmd", 1);
+
+  my $relay;
+  if($cmd eq "on" || $cmd eq "off") {
+    my $relay = sprintf("%08x%04x0000%08x", 15, 4, $cmd eq "on" ? 1 : 0);
+    my $msg = sprintf("%04x0000%08x$relay", $hash->{id}, length($relay)/2);
+    IOWrite($hash, "07", $msg);
+    readingsSingleUpdate($hash, "state", "set_$cmd", 1);
+  }
+  if($cmd eq "msgInterval") {
+    return "msgInterval needs seconds as parameter"
+        if(!defined($a[2]) || $a[2] !~ m/^\d+$/);
+    # Set timer for RELAY, CURRENT, VOLTAGE, POWER, ENERGY,
+    # POWER_FACTOR, TEMP, RELAY_TIMES, 
+    foreach my $i (24, 26, 27, 28, 29, 30, 31, 32) {
+      my $txt = sprintf("%08x%04x0000%08x", $i, 4, $a[2]);
+      my $msg = sprintf("%04x0000%08x$txt", $hash->{id}, length($txt)/2);
+      IOWrite($hash, "07", $msg);
+    }
+  }
   return undef;
 }
 
@@ -238,6 +254,8 @@ FBDECT_Undef($$)
   set the device on or off.</li>
   <li>
    <a href="#setExtensions">set extensions</a> are supported.</li>
+  <li>msgInterval &lt;sec&gt;<br>
+    Number of seconds between the sensor messages.
   </ul>
   <br>
 
@@ -312,9 +330,12 @@ FBDECT_Undef($$)
   <b>Set</b>
   <ul>
   <li>on/off<br>
-  Ger&auml;t einschalten bzw. ausschalten.</li>
+    Ger&auml;t einschalten bzw. ausschalten.</li>
   <li>
-  Die <a href="#setExtensions">set extensions</a> werden unterst&uuml;tzt.</li>
+    Die <a href="#setExtensions">set extensions</a> werden
+    unterst&uuml;tzt.</li>
+  <li>msgInterval &lt;sec&gt;<br>
+    Anzahl der Sekunden zwischen den Sensornachrichten.
   </ul>
   <br>
 

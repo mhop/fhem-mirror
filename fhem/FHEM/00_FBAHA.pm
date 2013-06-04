@@ -48,16 +48,15 @@ FBAHA_Define($$)
     return "wrong syntax: define <name> FBAHA hostname:2002";
   }
 
-  DevIo_CloseDev($hash);
-
   my $name = $a[0];
   my $dev = $a[2];
-
   $hash->{Clients} = ":FBDECT:";
   my %matchList = ( "1:FBDECT" => ".*" );
   $hash->{MatchList} = \%matchList;
 
+  DevIo_CloseDev($hash);
   $hash->{DeviceName} = $dev;
+
   my $ret = DevIo_OpenDev($hash, 0, "FBAHA_DoInit");
   return $ret;
 }
@@ -69,7 +68,7 @@ FBAHA_Set($@)
 {
   my ($hash, @a) = @_;
   my $name = shift @a;
-  my %sets = ("createDevs"=>1, "reregister"=>1);
+  my %sets = ("createDevs"=>1, "reregister"=>1, "reopen"=>1);
 
   return "set $name needs at least one parameter" if(@a < 1);
   my $type = shift @a;
@@ -90,6 +89,7 @@ FBAHA_Set($@)
   }
 
   if($type eq "reregister") {
+    # Release seems to be deadly on the 546e
     FBAHA_Write($hash, "02", "") if($hash->{HANDLE});  # RELEASE
     FBAHA_Write($hash, "00", "00010001");              # REGISTER
     my ($err, $data) = FBAHA_ReadAnswer($hash, "REGISTER", "^01");
@@ -102,6 +102,7 @@ FBAHA_Set($@)
     if($data =~ m/^01030010(........)/) {
       $hash->{STATE} = "Initialized";
       $hash->{HANDLE} = $1;
+      Log 1, "FBAHA $hash->{NAME} registered with handle: $hash->{HANDLE}";
 
     } else {
       my $msg = "Got bogus answer for REGISTER request: $data";
@@ -111,6 +112,12 @@ FBAHA_Set($@)
 
     }
     FBAHA_Write($hash, "03", "0000028200000000");  # LISTEN
+  }
+
+  if($type eq "reopen") {
+    DevIo_CloseDev($hash);
+    delete $hash->{HANDLE};
+    return DevIo_OpenDev($hash, 0, "FBAHA_DoInit");
   }
 
   return undef;
@@ -202,8 +209,6 @@ FBAHA_DoInit($)
 {
   my $hash = shift;
   my $name = $hash->{NAME};
-  Log 1, "FBAHA_DoInit called";
-
   return FBAHA_Set($hash, ($name, "reregister"));
 }
 
@@ -361,6 +366,12 @@ FBAHA_Ready($)
     create a FHEM device for each DECT device found on the AHA-Host, see also
     get devList.
     </li>
+  <li>reopen<br>
+    close and reopen the connection to the AHA server. Debugging only.
+    </li>
+  <li>reregister<br>
+    release existing registration handle, and get a new one. Debugging only.
+    </li>
   </ul>
   <br>
 
@@ -435,6 +446,14 @@ FBAHA_Ready($)
   <li>createDevs<br>
     legt FHEM Ger&auml;te an f&uuml;r jedes auf dem AHA-Server gefundenen DECT
     Eintrag, siehe auch "get devList".
+    </li>
+  <li>reopen<br>
+    Schlie&szlig;t und &oulm;ffnet die Verbindung zum AHA Server. Nur f&uuml;r
+    debugging.
+    </li>
+  <li>reregister<br>
+    Gibt den AHA handle frei, und registriert sich erneut beim AHA Server. Nur
+    f&uuml;r debugging.
     </li>
   </ul>
   <br>
