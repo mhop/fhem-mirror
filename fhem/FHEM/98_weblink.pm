@@ -181,11 +181,6 @@ weblink_FwFn($$$$)
       $ret .= weblink_FwDetail($d, "Broken definition ");
 
     } else {
-      if(defined($va[2]) && $va[2] eq "CURRENT") {
-        $defs{$va[0]}{currentlogfile} =~ m,([^/]*)$,;
-        $va[2] = $1;
-      }
-
       if ($wltype eq "dbplot") {
         $va[2] = "-";
       }
