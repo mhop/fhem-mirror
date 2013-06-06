@@ -119,6 +119,7 @@ FileLog_Log($$)
   my $ct = $dev->{CHANGETIME};
   my $wrotesome;
   my $fh = $log->{FH};
+  my $switched;
 
   for (my $i = 0; $i < $max; $i++) {
     my $s = $dev->{CHANGED}[$i];
@@ -127,7 +128,10 @@ FileLog_Log($$)
     if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/ || "$t:$n:$s" =~ m/^$re$/) {
       $t =~ s/ /_/; # Makes it easier to parse with gnuplot
 
-      FileLog_Switch($log);
+      if(!$switched) {
+        FileLog_Switch($log);
+        $switched = 1;
+      }
 
       print $fh "$t $n $s\n";
       $wrotesome = 1;
@@ -135,8 +139,8 @@ FileLog_Log($$)
   }
   if($wrotesome) {
     $fh->flush;
-# Too much IO
-#    $fh->sync if !($^O eq 'MSWin32'); #not implemented in Windows
+    # Skip sync, it costs too much HD strain, esp. on SSD
+    # $fh->sync if !($^O eq 'MSWin32'); #not implemented in Windows
   }
   return "";
 }
@@ -375,28 +379,48 @@ FileLog_Get($@)
   my $from = shift @a;
   my $to   = shift @a; # Now @a contains the list of column_specs
   my $internal;
+
   if($outf eq "INT") {
     $outf = "-";
     $internal = 1;
   }
 
-  FileLog_Switch($hash);
+      
   if($inf eq "-") {
+    # In case the plot is drawn afte midnight, before the first event is logged.
+    FileLog_Switch($hash);
     $inf = $hash->{currentlogfile};
 
   } else {
+    my $linf;
+    if($inf eq "CURRENT") {
+      # Try to guess
+      if($from =~ m/^(....)-(..)-(..)/) {
+        $linf = $hash->{logfile};
+        my ($Y,$m,$d) = ($1,$2,$3);
+        $linf =~ s/%Y/$Y/g;
+        $linf =~ s/%m/$m/g;
+        $linf =~ s/%d/$d/g;
+      } else {
+        $linf = $hash->{currentlogfile};
+      }
+
+    } else {
+      $linf = "$1/$inf" if($hash->{currentlogfile} =~ m,^(.*)/[^/]*$,);
+      $linf = "" if(!$linf); # Missing log directory
+
+    }
+
     # Look for the file in the log directory...
-    my $linf = "$1/$inf" if($hash->{currentlogfile} =~ m,^(.*)/[^/]*$,);
-    return undef if(!$linf);
     if(!-f $linf) {
       # ... or in the archivelog
       $linf = AttrVal($hash->{NAME},"archivedir",".") ."/". $inf;
-      return "Error: cannot access $linf" if(!-f $linf);
+      $linf = "";
     }
     $inf = $linf;
   }
-  my $ifh = new IO::File $inf;
-  seekTo($inf, $ifh, $hash, $from);
+  my $ifh = new IO::File $inf if($inf);
+  seekTo($inf, $ifh, $hash, $from) if($ifh);
 
   #############
   # Digest the input.
@@ -456,7 +480,7 @@ RESCAN:
       last if($rescanIdx<1 || !$rescanNum);
       $l = $rescanArr[$rescanIdx--];
     } else {
-      $l = <$ifh>;
+      $l = <$ifh> if($ifh);
       last if(!$l);
     }
 
@@ -544,7 +568,7 @@ RESCAN:
   # If no value found for some of the required columns, then look for the last
   # matching entry outside of the range. Known as the "window left open
   # yesterday" problem
-  if(!$rescan) {
+  if(!$rescan && $ifh) {
     $rescanNum = 0;
     map { $rescanNum++ if(!$d[$_]->{count} && $d[$_]->{df} eq "") } (0..$#a);
     if($rescanNum) {
@@ -561,7 +585,7 @@ RESCAN:
     }
   }
 
-  $ifh->close();
+  $ifh->close() if($ifh);
 
   my $ret = "";
   for(my $i = 0; $i < int(@a); $i++) {
