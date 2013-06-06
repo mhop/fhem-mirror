@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: FHEMWEB: SVGcache attribute & clearSvgCache set command added
   - feature: SYSSTAT: allow (remote) monitoring raspberry pi on cpu frequency
   - feature: MANTAINER.txt added
   - feature: PRESENCE: new mode "shellscript" to use own
@@ -8,7 +9,7 @@
   - feature: PRESENCE: new attribute ping_count
   - feature: userReadings may have a filter
   - feature: HUEBridge: allow starting of bridge firmware update
-  - change:  EnOcean: profil PM101 changed, old profiles FAH, FBH, FTF, SR04
+  - change:  EnOcean: profile PM101 changed, old profiles FAH, FBH, FTF, SR04
              removed  
   - feature: TCM: new attr blockSenderID:
              Block receiving telegrams with a TCM SenderID sent by repeaters
@@ -16,7 +17,7 @@
              commands supported
   - feature: EnOcean: Now all RPS / 1BS profiles, more than 90 4BS profiles and
              some manufacturer specific profiles are supported
-  - feature: EnOcean: profiles (subType) are updated from EEP 2.1 to EEP 2.5           
+  - feature: EnOcean: profiles (subType) are updated from EEP 2.1 to EEP 2.5
   - feature: FHEMWEB attribute roomIcons added
   - feature: SYSSTAT: optionaly calculate geometric average of last 4
              temperature values
