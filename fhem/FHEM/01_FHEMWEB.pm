@@ -119,7 +119,7 @@ FHEMWEB_Initialize($)
     "stylesheetPrefix touchpad:deprecated smallscreen:deprecated ".
     "basicAuth basicAuthMsg hiddenroom hiddengroup HTTPS allowfrom CORS:0,1 ".
     "refresh longpoll:1,0 redirectCmds:0,1 reverseLogs:0,1 menuEntries ".
-    "roomIcons";
+    "roomIcons SVGcache";
 
   ###############
   # Initialize internal structures
@@ -1519,11 +1519,30 @@ FW_showLog($)
       Log 1, $ret if($ret);
     }
     Log 5, "plotcommand: get $d $file INT $f $t " . join(" ", @{$flog});
-    $ret = FW_fC("get $d $file INT $f $t " . join(" ", @{$flog}));
-    ($cfg, $plot) = FW_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
-    FW_pO SVG_render($wl, $f, $t, $cfg,
-                        $internal_data, $plot, $FW_wname, $FW_cssdir);
+
     $FW_RETTYPE = "image/svg+xml";
+
+    my $SVGcache = (AttrVal($FW_wname, "SVGcache", undef) && $t lt TimeNow());
+    my $cDir = "$FW_dir/SVGcache";
+    my $cName = "$cDir/$wl-$f-$t.svg";
+    if($SVGcache && open(CFH, $cName)) {
+      FW_pO join("", <CFH>);
+      close(CFH);
+
+    } else {
+      FW_fC("get $d $file INT $f $t " . join(" ", @{$flog}));
+      ($cfg, $plot) = FW_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
+      $ret = SVG_render($wl, $f, $t, $cfg,
+                        $internal_data, $plot, $FW_wname, $FW_cssdir);
+      FW_pO $ret;
+      if($SVGcache) {
+        mkdir($cDir) if(! -d $cDir);
+        if(open(CFH, ">$cName")) {
+          print CFH $ret;
+          close(CFH);
+        }
+      }
+    }
 
   }
 
@@ -2434,15 +2453,27 @@ sub
 FW_Set($@)
 {
   my ($hash, @a) = @_;
+  my %cmd = ("rereadicons" => 1, "clearSvgCache" => 1);
 
   return "no set value specified" if(@a < 2);
-  return "Unknown argument $a[1], choose one of " . "rereadicons"
-        unless($a[1] eq "rereadicons");
+  return ("Unknown argument $a[1], choose one of ".join(" ", sort keys %cmd))
+        if(!$cmd{$a[1]});
 
-  my @dirs = keys %FW_icons;
-  %FW_icons = ();
-  foreach my $d  (@dirs) {
-    FW_readIcons($d);
+  if($a[1] eq "rereadicons") {
+    my @dirs = keys %FW_icons;
+    %FW_icons = ();
+    foreach my $d  (@dirs) {
+      FW_readIcons($d);
+    }
+  }
+  if($a[1] eq "clearSvgCache") {
+    my $cDir = "$FW_dir/SVGcache";
+    if(opendir(DH, $cDir)) {
+      map { my $n="$cDir/$_"; unlink($n) if(-f $n); } readdir(DH);;
+      closedir(DH);
+    } else {
+      return "Can't open $cDir: $!";
+    }
   }
   return undef;
 }
@@ -2585,13 +2616,16 @@ FW_dropdownFn()
   <a name="FHEMWEBset"></a>
   <b>Set</b>
   <ul>
-    <code>set &lt;name&gt; rereadicons</code>
-    <br><br>
-    Rereads the icons in the icon path and updates the mapping from logical icons to physical files.
-    Use after adding, deleting or changing icons.
-    <br><br>
-
+    <li>rereadicons<br>
+      Rereads the icons in the icon path and updates the mapping from logical
+      icons to physical files.  Use after adding, deleting or changing icons.
+      </li>
+    <li>clearSvgCache<br>
+      Delete all files found in the www/SVGcache directory, which is used to
+      cache SVG data, if the SVGcache attribute is set.
+      </li>
   </ul>
+  <br>
 
   <a name="FHEMWEBget"></a>
   <b>Get</b>
@@ -2605,7 +2639,8 @@ FW_dropdownFn()
           </code>
         </ul>
     <li>pathlist<br>
-        return FHEMWEB specific directories, where files for given types are located
+        return FHEMWEB specific directories, where files for given types are
+        located
     <br><br>
 
   </ul>
@@ -2662,6 +2697,14 @@ FW_dropdownFn()
         width,height. You can set individual sizes by setting the plotsize of
         the weblink. Default is 800,160 for desktop, and 480,160 for
         smallscreen.
+        </li><br>
+
+    <a name="SVGcache"></a>
+    <li>SVGcache<br>
+        if set, cache plots which won't change any more (the end-date is prior
+        to the current timestamp). The files are written to the www/SVGcache
+        directory. Default is off.<br>
+        See also the clearSvgCache command for clearing the cache.
         </li><br>
 
     <a name="fixedrange"></a>
