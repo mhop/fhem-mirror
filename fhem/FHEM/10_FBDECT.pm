@@ -256,6 +256,7 @@ FBDECT_Undef($$)
    <a href="#setExtensions">set extensions</a> are supported.</li>
   <li>msgInterval &lt;sec&gt;<br>
     Number of seconds between the sensor messages.
+    </li>
   </ul>
   <br>
 
@@ -336,6 +337,7 @@ FBDECT_Undef($$)
     unterst&uuml;tzt.</li>
   <li>msgInterval &lt;sec&gt;<br>
     Anzahl der Sekunden zwischen den Sensornachrichten.
+    </li>
   </ul>
   <br>
 
