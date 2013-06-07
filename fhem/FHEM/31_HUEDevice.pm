@@ -557,7 +557,7 @@ HUEDevice_GetUpdate($)
     </ul>
   </ul><br>
 
-  <a name="SYSSTAT_Readings"></a>
+  <a name="HUE_Readings"></a>
   <b>Readings</b>
   <ul>
     <li>bri<br>
