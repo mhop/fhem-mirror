@@ -2200,7 +2200,11 @@ FW_dev2image($)
           $rlink = $link;
           last;
         }
-        return ($iconName, $link, (defined(FW_iconName($iconName)) ? 0 : 1));
+        if(defined(FW_iconName($iconName)))  {
+          return ($iconName, $link, 0);
+        } else {
+          return ($state, $link, 1);
+        }
       }
     }
   }
