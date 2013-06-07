@@ -123,7 +123,7 @@ FHEMWEB_Initialize($)
 
   ###############
   # Initialize internal structures
-  map { addToAttrList($_) } ( "webCmd", "icon", "devStateIcon", "sortby");
+  map { addToAttrList($_) } ( "webCmd", "icon", "devStateIcon", "sortby", "devStateStyle");
   InternalTimer(time()+60, "FW_closeOldClients", 0, 0);
   
   $FW_dir      = "$attr{global}{modpath}/www";
@@ -2391,7 +2391,8 @@ FW_devState($$)
 
   }
 
-  $txt = "<div id=\"$d\" class=\"col2\">$txt</div>";
+  my $style = AttrVal($d, "devStateStyle", "");
+  $txt = "<div id=\"$d\" $style class=\"col2\">$txt</div>";
 
   if($hasOnOff) {
     # Have to cover: "on:An off:Aus", "A0:Aus AI:An Aus:off An:on"
@@ -2941,6 +2942,15 @@ FW_dropdownFn()
         <ul>
         Perl regexp enclosed in {}. Example:<br>
         {'&lt;div style="width:32px;height:32px;background-color:green"&gt;&lt;/div&gt;'}
+        </ul>
+        </li>
+        <br>
+
+    <a name="devStateStyle"></a>
+    <li>devStateStyle<br>
+        Specify an HTML style for the given device, e.g.:<br>
+        <ul>
+        attr sensor devStateStyle style="text-align:left;;font-weight:bold;;"<br>
         </ul>
         </li>
         <br>
