@@ -14,6 +14,7 @@ select   { font-family:Arial, sans-serif; font-size:16px;}
 .devType { padding-top:10px; font-size:12px;}
 a {  color: #278727; }
 img {  border-style: none; }
+.col2 { text-align:center; }
 
 div.col1 { width: 188px; height: 30px; white-space: nowrap; }
 div.col2 { width: 108px; height: 30px; 
