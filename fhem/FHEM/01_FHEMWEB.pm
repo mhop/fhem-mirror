@@ -2387,7 +2387,7 @@ FW_devState($$)
 
   }
 
-  $txt = "<div id=\"$d\" align=\"center\" class=\"col2\">$txt</div>";
+  $txt = "<div id=\"$d\" class=\"col2\">$txt</div>";
 
   if($hasOnOff) {
     # Have to cover: "on:An off:Aus", "A0:Aus AI:An Aus:off An:on"

@@ -37,6 +37,7 @@ div.dist { padding-top:0.3em; }
 button.dist { margin:10px; background:transparent; border:0px; cursor:pointer; }
 
 a img { border-style:none; }
+.col2 { text-align:center; }
 
 /* detail-selector & slider */
 select {  margin-left:5px; margin-right:5px; }

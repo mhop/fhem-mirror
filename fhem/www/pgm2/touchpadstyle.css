@@ -13,6 +13,7 @@ select   { font-family:Arial, sans-serif; font-size:18px}
 
 .devType { padding-top:20px; }
 a {  color: #278727; }
+.col2 { text-align:center; }
 
 table.block { border:1px solid gray; width: 100%; background: #F8F8E0; }
 table.block tr.odd { background: #F0F0D8; }
