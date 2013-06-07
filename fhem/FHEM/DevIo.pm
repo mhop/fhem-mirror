@@ -142,7 +142,7 @@ DevIo_OpenDev($$$)
       return;
     }
 
-    my $conn = IO::Socket::INET->new(PeerAddr => $dev);
+    my $conn = IO::Socket::INET->new(PeerAddr => $dev, Timeout => 3);
     if($conn) {
       delete($hash->{NEXT_OPEN})
 
