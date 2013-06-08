@@ -1522,7 +1522,8 @@ FW_showLog($)
 
     $FW_RETTYPE = "image/svg+xml";
 
-    my $SVGcache = (AttrVal($FW_wname, "SVGcache", undef) && $t lt TimeNow());
+    (my $cachedate = TimeNow()) =~ s/ /_/g;
+    my $SVGcache = (AttrVal($FW_wname, "SVGcache", undef) && $t lt $cachedate);
     my $cDir = "$FW_dir/SVGcache";
     my $cName = "$cDir/$wl-$f-$t.svg";
     if($SVGcache && open(CFH, $cName)) {
