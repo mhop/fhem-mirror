@@ -26,7 +26,7 @@ DevIo_DoSimpleRead($)
 
   } elsif($hash->{TCPDev}) {
     $res = sysread($hash->{TCPDev}, $buf, 256);
-    $buf = undef if(!defined($res));
+    $buf = "" if(!defined($res));
 
   }
   return $buf;
@@ -142,7 +142,8 @@ DevIo_OpenDev($$$)
       return;
     }
 
-    my $conn = IO::Socket::INET->new(PeerAddr => $dev, Timeout => 3);
+    my $timeout = $hash->{TIMEOUT} ? $hash->{TIMEOUT} : 3;
+    my $conn = IO::Socket::INET->new(PeerAddr => $dev, Timeout => $timeout);
     if($conn) {
       delete($hash->{NEXT_OPEN})
 
@@ -323,7 +324,7 @@ DevIo_Disconnected($)
 
   # Without the following sleep the open of the device causes a SIGSEGV,
   # and following opens block infinitely. Only a reboot helps.
-  sleep(5);
+  sleep(5) if($hash->{USBDEV});
 
   DoTrigger($name, "DISCONNECTED");
 }

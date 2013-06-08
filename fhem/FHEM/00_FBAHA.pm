@@ -209,7 +209,9 @@ FBAHA_DoInit($)
 {
   my $hash = shift;
   my $name = $hash->{NAME};
-  return FBAHA_Set($hash, ($name, "reregister"));
+  delete $hash->{HANDLE}; # else reregister fails / RELEASE is deadly
+  my $ret = FBAHA_Set($hash, ($name, "reregister"));
+  return $ret;
 }
 
 #####################################
@@ -293,22 +295,20 @@ FBAHA_ReadAnswer($$$)
   my ($hash, $arg, $regexp) = @_;
   return ("No FD (dummy device?)", undef)
         if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
-  my $to = ($hash->{RA_Timeout} ? $hash->{RA_Timeout} : 3);
 
   for(;;) {
     return ("Device lost when reading answer for get $arg", undef)
       if(!$hash->{FD});
     my $rin = '';
     vec($rin, $hash->{FD}, 1) = 1;
-    my $nfound = select($rin, undef, undef, $to);
-    if($nfound < 0) {
-      next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
-      my $err = $!;
+    my $nfound = select($rin, undef, undef, 3);
+    if($nfound <= 0) {
+      next if ($! == EAGAIN() || $! == EINTR());
+      my $err = ($! ? $! : "Timeout");
+      $hash->{TIMEOUT} = 1;
       DevIo_Disconnected($hash);
       return("FBAHA_ReadAnswer $arg: $err", undef);
     }
-    return ("Timeout reading answer for get $arg", undef)
-      if($nfound == 0);
     my $buf = DevIo_SimpleRead($hash);
     return ("No data", undef) if(!defined($buf));
 
