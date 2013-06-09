@@ -897,7 +897,7 @@ sub CUL_HM_Parse($$) {##############################
       if($chn & 0x40){
 		if(!$shash->{BNO} || $shash->{BNO} ne $bno){#bno = event counter
 		  $shash->{BNO}=$bno;
-		  $shash->{BNOCNT}=1; # message counter reest
+		  $shash->{BNOCNT}=0; # message counter reest
 		}
 		$shash->{BNOCNT}+=1;
         $state .= "Long" .($mFlg eq "A0" ? "Release" : "").
@@ -1778,7 +1778,8 @@ sub CUL_HM_Set($@) {
     return "$cmd requires parameter: $h";
   }
 
-  #convert 'old' commands to current methodes like regSet...
+  #convert 'old' commands to current methodes like regSet and regBulk...
+  # Unify the interface
   if($cmd =~ m/^(displayMode|displayTemp|controlMode|decalcDay|displayTempUnit)$/ ||
      $cmd =~ m/^(day|night|party)-temp$/){ #
 	splice @a,1,0,"regSet";# make hash,regSet,reg,value
@@ -1790,6 +1791,35 @@ sub CUL_HM_Set($@) {
   elsif($cmd eq "unpair"){
 	splice @a,1,3, ("regSet","pairCentral","000000");
   }
+  elsif($cmd eq "ilum") { ################################################# reg
+	return "$a[2] not specified. choose 0-15 for brightness"  if ($a[2]>15);
+	return "$a[3] not specified. choose 0-127 for duration"   if ($a[3]>127);
+	return "unsupported for channel, use $devName"            if (!$roleD);
+	splice @a,1,3, ("regBulk","RegL_00:",sprintf(" 04:%02X",$a[2]),sprintf(" 08:%02X",$a[3]*2));
+  } 
+  elsif($cmd eq "text") { ################################################# reg
+    my ($bn,$l1, $l2) = ($chn,$a[2],$a[3]); # Create CONFIG_WRITE_INDEX string
+	if (!$roleC){# if used on device. 
+      return "$a[2] is not a button number" if($a[2] !~ m/^\d$/ || $a[2] < 1);
+      return "$a[3] is not on or off" if($a[3] !~ m/^(on|off)$/);
+      $bn = $a[2]*2-($a[3] eq "on" ? 0 : 1);
+	  ($l1, $l2) = ($a[4],$a[5]);
+	}
+	else{
+	  return "to many parameter. Try set $a[0] text $a[2] $a[3]" if($a[4]);
+	}
+
+    my $s = 54;
+    $l1 = substr($l1."\x00", 0, 13);
+    $l1 =~ s/(.)/sprintf(" %02X:%02X",$s++,ord($1))/ge;
+
+    $s = 70;
+    $l2 = substr($l2."\x00", 0, 13);
+    $l2 =~ s/(.)/sprintf(" %02X:%02X",$s++,ord($1))/ge;
+
+	@a = ($a[0],"regBulk","RegL_00:",split(" ",$l1.$l2));
+  } 
+
   $cmd = $a[1];# get converted command
   
      #if chn cmd is executed on device but refers to a channel?
@@ -1888,7 +1918,7 @@ sub CUL_HM_Set($@) {
     my ($list,$addr,$data,$peerID);
 	$state = "";
 	if ($cmd eq "regBulk"){
-	  ($list) = ($a[2]);
+	  $list = $a[2];
 	  $list =~ s/[\.]?RegL_//;
 	  ($list,$peerID) = split(":",$list);
 	  return "unknown list Number:".$list if(hex($list)>6);
@@ -2107,30 +2137,6 @@ sub CUL_HM_Set($@) {
   elsif($cmd eq "stop") { #####################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'03'.$chn);
   } 
-  elsif($cmd eq "text") { ################################################# reg
-    $state = "";
-    my ($bn,$l1, $l2, $s) = ($chn,$a[2],$a[3],54); # Create CONFIG_WRITE_INDEX string
-	if (!$roleC){# if used on device. 
-      return "$a[2] is not a button number" if($a[2] !~ m/^\d$/ || $a[2] < 1);
-      return "$a[3] is not on or off" if($a[3] !~ m/^(on|off)$/);
-      $bn = $a[2]*2-($a[3] eq "on" ? 0 : 1);
-	  ($l1, $l2) = ($a[4],$a[5]);
-	}
-	else{
-	  return "to many parameter. Try set $a[0] text $a[2] $a[3]" if($a[4]);
-	}
-
-    $l1 = substr($l1."\x00", 0, 13);
-    $s = 54;
-    $l1 =~ s/(.)/sprintf("%02X%02X",$s++,ord($1))/ge;
-
-    $l2 = substr($l2."\x00", 0, 13);
-    $s = 70;
-    $l2 =~ s/(.)/sprintf("%02X%02X",$s++,ord($1))/ge;
-    $l1 .= $l2;
-
-    CUL_HM_pushConfig($hash, $id, $dst, $bn,0,0,1, $l1);
-  } 
   elsif($cmd eq "setRepeat") { ################################################
     #      setRepeat    => "[no1..36] <sendName> <recName> [bdcast-yes|no]"}
     $state = "";
@@ -2298,15 +2304,6 @@ sub CUL_HM_Set($@) {
 	}
     CUL_HM_PushCmdStack($hash,$msg) if ($msg);
   } 
-  elsif($cmd eq "ilum") { ################################################# reg
-	return "$a[2] not specified. choose 0-15 for brightness"  if ($a[2]>15);
-	return "$a[3] not specified. choose 0-127 for duration"  if ($a[3]>127);
-	return "unsupported for HMid:".$hash->{DEF}.", use HMId:".substr($hash->{DEF},0,6)
-	                  if (length($hash->{DEF}) != 6);
-	my $addrData = sprintf("04%02X08%02X",$a[2],$a[3]*2);
-	# write list0,
-	CUL_HM_pushConfig($hash,$id,$dst,0,0,0,0,$addrData);
-  } 
   elsif($cmd eq "desired-temp") { #############################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'0202'.
 	                                                   CUL_HM_convTemp($a[2]));
@@ -2458,11 +2455,11 @@ sub CUL_HM_Set($@) {
 									 $pressCnt));                                     
 	}
   } 
-  elsif($cmd eq "peerChan") { #################################################
+  elsif($cmd eq "peerChan") { ############################################# reg
     #peerChan <btnN> <device> ... [single|dual] [set|unset] [actor|remote|both]
 	my ($bNo,$peerN,$single,$set,$target) = ($a[2],$a[3],$a[4],$a[5],$a[6]);
 	$state = "";
-	return "$bNo is not a button number"                          if(($bNo < 1) && !$chn);
+	return "$bNo is not a button number"                          if(($bNo < 1) && $roleD);
 	my $peerDst = CUL_HM_name2Id($peerN);
 	$peerDst .= "01" if( length($peerDst)==6);
     return "please enter peer"                                    if(!$peerDst);
@@ -2484,21 +2481,20 @@ sub CUL_HM_Set($@) {
 	$set = ($set eq "unset")?0:1;
 
 	my ($b1,$b2,$nrCh2Pair);
-	$b1 = ($isChannel) ? hex($chn):(!$bNo?"01":$bNo);
-	$b1 = $b1*2 - 1 if(!$single && !$isChannel);
+	$b1 = (!$roleD) ? hex($chn) : ($single?$bNo : ($bNo*2 - 1));
 	if ($single){
 	  $b2 = $b1;
 	  $b1 = 0 if ($st eq "smokeDetector");
 	  $nrCh2Pair = 1;
 	}
 	else{
-	    $b2 = $b1 + 1;
-	    $nrCh2Pair = 2;
+	  $b2 = $b1 + 1;
+	  $nrCh2Pair = 2;
 	}
 	my $cmdB = ($set)?"01":"02";# do we set or remove?
 
     # First the remote (one loop for on, one for off)
-	my $pSt = AttrVal( CUL_HM_id2Name($peerDst), "subType", "");#peer SubType
+	my $pSt = AttrVal( CUL_HM_hash2Name($peerHash), "subType", "");#peer SubType
 	if (!$target || $target =~ m/^(remote|both)$/){
 	  my $burst = ($pSt eq "thermostat"?"0101":"0100");#set burst for target 
       for(my $i = 1; $i <= $nrCh2Pair; $i++) {
@@ -3129,7 +3125,7 @@ sub CUL_HM_name2Id(@) { #in: name or HMid ==>out: HMid, "" if no match
 }
 sub CUL_HM_id2Name($) { #in: name or HMid out: name
   my ($p) = @_;
-  return $p                      if($attr{$p}); # is already name
+  return $p                      if($defs{$p}); # is already name
   return $p                      if ($p =~ m/_chn:/);
   my $devId= substr($p, 0, 6);
   return "broadcast"             if($devId eq "000000"); 
@@ -3818,7 +3814,8 @@ sub CUL_HM_storeRssi(@){
   my $hash = CUL_HM_name2Hash($name);
   my $rssi;
   foreach (keys %{$rssiP}){
-	$rssi .= $_.":".(int($rssiP->{$_}*100)/100)." ";
+    my $val = $rssiP->{$_}?$rssiP->{$_}:0;
+	$rssi .= $_.":".(int($val*100)/100)." ";
   }  
   $hash->{"rssi_".$peerName} = $rssi;
  return ;
@@ -4709,6 +4706,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
   <ul>
   <li>HM-CC-TC:<br>
       T: $t H: $h<br>
+  	  battery:[low|ok]<br>
       measured-temp $t<br>
       humidity $h<br>
       actuator $vp %<br>

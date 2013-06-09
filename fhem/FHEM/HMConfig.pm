@@ -165,7 +165,7 @@ my %culHmModel=(
   "0080" => {name=>"ROTO_ZEL-STG-RM-HS-4"    ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, # HM Remote 4 buttons
   "0081" => {name=>"ROTO_ZEL-STG-RM-FDK"     ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",}, # HM Rotary Handle Sensor
   "0082" => {name=>"Roto_ZEL-STG-RM-FFK"     ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, # HM Shutter Contact
-  "0083" => {name=>"Roto_ZEL-STG-RM-FSS-UP3" ,st=>'switch'            ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"",}, # HM Switch Interface 3 switches
+  "0083" => {name=>"Roto_ZEL-STG-RM-FSS-UP3" ,st=>'swi'               ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"",}, # HM Switch Interface 3 switches
   "0084" => {name=>"Schueco_263-160"         ,st=>'smokeDetector'     ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, # HM SENSOR_FOR_CARBON_DIOXIDE
   "0086" => {name=>"Schueco_263-146"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)
   "0087" => {name=>"Schueco_263-147"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)   						
@@ -182,6 +182,7 @@ my %culHmModel=(
   "0093" => {name=>"Schueco_263-158"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'p'            ,chn=>"",}, #
   "0094" => {name=>"Schueco_263-157"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'p'            ,chn=>"",}, #
   "009F" => {name=>"HM-Sen-Wa-Od"            ,st=>'sensor'            ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, #capacitive filling level sensor
+  "00A0" => {name=>"HM-RC-4-2"               ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
   "00A1" => {name=>"HM-LC-SW1-PL2"           ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",}, #
   "00A2" => {name=>"ROTO_ZEL-STG-RM-FZS-2"   ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, #radio-controlled socket adapter switch actuator 1-channel
   "00A3" => {name=>"HM-LC-Dim1L-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
@@ -189,6 +190,9 @@ my %culHmModel=(
   "00A7" => {name=>"HM-Sen-RD-O"             ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1:1,4:1'      ,chn=>"Rain:1:1,Sw:2:2",},
   "00A9" => {name=>"HM-PB-6-WM55"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:6",},
   #263 167                        HM Smoke Detector Schueco 
+  #"HM-RC-Key4-2"
+  #"HM-RC-Sec4-2"
+  
 );
 
 
@@ -345,6 +349,7 @@ my %culHmRegDefine = (
 # Blind     9:00 10:00 20:00
 # BL1TPBU  02:01 21:FF
 # Dim1TPBU 02:01 21:FF 22:00
+#Keymatic 3.3 unknown, seen 1 here
   
 #--- list 1, Channel level------------------
 #blindActuator mainly                                                                             
@@ -500,6 +505,7 @@ my %culHmRegGeneral = (
   intKeyVisib=>1,pairCentral=>1,
 	);
 my %culHmRegType = (
+  swi               =>{peerNeedsBurst  =>1,expectAES       =>1},
   remote            =>{peerNeedsBurst  =>1,expectAES       =>1,dblPress        =>1,longPress       =>1,
 					   sign            =>1,
                       },
@@ -781,6 +787,7 @@ my %culHmSubTypeSets = (# channels of this subtype
 );
 # clones- - - - - - - - - - - - - - - - - 
 $culHmSubTypeSets{pushButton}     = $culHmSubTypeSets{remote};
+$culHmSubTypeSets{swi}            = $culHmSubTypeSets{remote};
 $culHmSubTypeSets{motionDetector} = $culHmSubTypeSets{threeStateSensor};
 
 my %culHmModelSets = (# channels of this subtype-------------
