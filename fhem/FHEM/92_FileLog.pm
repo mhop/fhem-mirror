@@ -401,6 +401,7 @@ FileLog_Get($@)
         $linf =~ s/%Y/$Y/g;
         $linf =~ s/%m/$m/g;
         $linf =~ s/%d/$d/g;
+        $linf =~ s/%L/$attr{global}{logdir}/g if($attr{global}{logdir});
       } else {
         $linf = $hash->{currentlogfile};
       }
