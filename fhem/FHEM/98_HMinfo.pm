@@ -530,42 +530,40 @@ sub HMinfo_post($) {###########################################################
   even though the commands are more a get funktion they are implemented 
   as set to allow simple web interface usage<br>
     <ul>
-      <li><a href="#models">models</a><br>
+      <li><a name="#models">models</a><br>
 	      list all HM models that are supported in FHEM
 	  </li>
-      <li><a href="#param">param &lt;name&gt; &lt;name&gt;...</a><br>
+      <li><a name="#param">param &lt;name&gt; &lt;name&gt;...</a><br>
 	      returns a table parameter values (attribute, readings,...) 
 	  	for all entities as a table
 	  </li>
-      <li><a href="#regCheck">regCheck</a><br>
+      <li><a name="#regCheck">regCheck</a><br>
 	      performs a consistancy check on register readings for completeness
 	  </li>
-      <li><a href="#peerCheck">peerCheck</a><br>
+      <li><a name="#peerCheck">peerCheck</a><br>
 	      performs a consistancy check on peers. If a peer is set in one channel 
 	  	this funktion will search wether the peer also exist on the opposit side.
 	  </li>
-      <li><a href="#configCheck">configCheck</a><br>
+      <li><a name="#configCheck">configCheck</a><br>
 	      performs a consistancy check of HM settings. It includes regCheck and peerCheck
 	  </li>
-      <li><a href="#peerXref">peerXref</a><br>
+      <li><a name="#peerXref">peerXref</a><br>
 	      provides a cross-reference on peerings, a kind of who-with-who summary over HM
 	  </li>
-      <li><a href="#saveConfig">saveConfig</a><br>
-	      performs a save for all HM register setting. 
+      <li><a name="#saveConfig">saveConfig</a><br>
+	      performs a save for all HM register setting and peers. See <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>. 
 	  </li>
-      <li><a href="#clearProtocol">clearProtocol</a><br>
+      <li><a name="#clearProtocol">clearProtocol</a><br>
 	      executes a set clear msgEvents on all HM devices
 	  </li>
-      <li><a href="#clearReadings">clearReadings</a><br>
+      <li><a name="#clearReadings">clearReadings</a><br>
 	      executes a set clear readings on all HM devices
 	  </li>
-      <li><a href="#clearRssi">clearRssi</a><br>
+      <li><a name="#clearRssi">clearRssi</a><br>
 	      executes a set clear rssi on all HM devices
 	  </li>
-      <li><a href="#autoReadReg">autoReadReg</a><br>
-	      stimulates a read of the configuration for the devices.
-	  </li>
-      <li><a href="#sys">sys</a><br>
+      <li><a name="#autoReadReg">autoReadReg</a><br>
+	      stimulates a read of the configuration for the CUL_HM devices with attribut autoReadReg set to 1 or higher. 
 	  </li>
     </ul>  
   </ul>

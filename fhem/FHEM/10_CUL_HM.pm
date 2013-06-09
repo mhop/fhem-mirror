@@ -454,15 +454,17 @@ sub CUL_HM_Parse($$) {##############################
   my $msgX = "No:$mNo - t:$mTp s:$src d:$dst ".($p?$p:"");
 
   if($shash->{lastMsg} && $shash->{lastMsg} eq $msgX) { #duplicate -lost 'ack'?
-    if($shash->{helper}{rpt}                 &&         #was responded
-       $shash->{helper}{rpt}{IO}  eq $ioName &&         #from same IO
-       $shash->{helper}{rpt}{msg} eq $msg    &&         #not from repeater
-       $shash->{helper}{rpt}{ts}  < gettimeofday()-0.5){#todo: hack since HMLAN sends duplicate status messages
+    if(   $shash->{helper}{rpt}                           #was responded
+       && $shash->{helper}{rpt}{IO}  eq $ioName           #from same IO
+       && $shash->{helper}{rpt}{flg} eq substr($msg,5,1)  #not from repeater
+#       && $shash->{helper}{rpt}{ts}  < gettimeofday()-0.5 #todo: hack since HMLAN sends duplicate status messages
+	   ){
 	  my $ack = $shash->{helper}{rpt}{ack};#shorthand
 	  my $i=0;
       CUL_HM_SndCmd(${$ack}[$i++],${$ack}[$i++]) while ($i<@{$ack});
 	  $shash->{helper}{rpt}{ts} = gettimeofday();
       Log GetLogLevel($name,4), "CUL_HM $name dup: repeat ack, dont process";
+	  Log 1,"General ############ duplicate";
 	}
 	else{
       Log GetLogLevel($name,4), "CUL_HM $name dup: dont process";
@@ -1272,7 +1274,7 @@ sub CUL_HM_Parse($$) {##############################
   if (@ack)	{# send acks and store for repeat
     my $sRptHash = $modules{CUL_HM}{defptr}{$src}{helper}{rpt};
     $sRptHash->{IO}  = $ioName;
-    $sRptHash->{msg} = $msg;
+    $sRptHash->{flg} = substr($msg,5,1);
     $sRptHash->{ack} = \@ack;
 	$sRptHash->{ts}  = gettimeofday();
 	my $i=0;
