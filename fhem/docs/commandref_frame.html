@@ -214,6 +214,15 @@ off at 07:00.<br>
   define lampoff at 07:00 set Lamp1 off; set Lamp2 off<br>
   define lampoff at 07:00 set Lamp1 off;; set Lamp2 off<br>
   </ul>
+For every further indirection you need to double the semicolons:, e.g. to
+switch on every day 2 devices at 7:00 for 10 minutes you have to write:<br>
+  <ul>
+  define onAt at 07:00 set Lamp1 on;;set Lamp2 on;; define offAt at +00:10 set Lamp1 off;;;;set Lamp2 off
+  </ul>
+Don't dispair, the previous example can also be written as 
+  <ul>
+  define onAt at 07:00 set Lamp1,Lamp2 on-for-timer 600
+  </ul>
 <br>
 
 
