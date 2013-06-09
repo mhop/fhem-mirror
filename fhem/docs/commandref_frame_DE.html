@@ -178,19 +178,24 @@ Die Kommunikation mit FHEM kann entweder in einer "session" (&uuml;ber telnet) o
 <a name="command"></a>
 <h3>FHEM Befehlstypen</h3>
 <ul>
-Es gibt drei Arten von Befehlen: "fhem" Befehle (werden in diesem Dokument 
-beschrieben), SHELL-Befehle (diese m&uuml;ssen von doppelten Anf&uuml;hrungszeichen "" 
-eingeschlossen werden) und PERL-Ausdr&uuml;cken (von geschwungenen Klammern {} 
-eingeschlossen). SHELL-Befehle oder PERL-Ausdr&uuml;cke werden f&uuml;r komplexe <a href="#at">at</a> 
-oder <a href="#notify">notify</a> Ausdr&uuml;cke ben&ouml;tigt, k&ouml;nnen aber auch als "normale" Befehle angewendet werden.&nbsp;
-  <p class="MsoNormal">Die folgenden drei Befehle bewirken z.B. dasselbe 
-  Ergebnis, wenn sie am "telnet"-Prompt eingegeben werden:
+Es gibt drei Arten von Befehlen: "fhem" Befehle (werden in diesem Dokument
+beschrieben), SHELL-Befehle (diese m&uuml;ssen von doppelten
+Anf&uuml;hrungszeichen "" eingeschlossen werden) und PERL-Ausdr&uuml;cken (von
+geschwungenen Klammern {} eingeschlossen). SHELL-Befehle oder
+PERL-Ausdr&uuml;cke werden f&uuml;r komplexe <a href="#at">at</a> oder <a
+href="#notify">notify</a> Ausdr&uuml;cke ben&ouml;tigt, k&ouml;nnen aber auch
+als "normale" Befehle angewendet werden.
+<br>
+<br>
+
+Die folgenden drei Befehle bewirken z.B. dasselbe Ergebnis, wenn sie am
+telnet-Prompt eingegeben werden:
   <ul>
   set lamp off<br>
   "fhem.pl 7072 "set lamp off""<br>
   {fhem("set lamp off")}<br>
   </ul>
-&nbsp;<p>SHELL-Kommandos werden im Hintergrund ausgef&uuml;hrt, 
+SHELL-Kommandos werden im Hintergrund ausgef&uuml;hrt, 
 PERL-Ausdr&uuml;cke und FHEM-Kommandos werden im Haupt-"thread" ausgef&uuml;hrt. Um 
 PERL-Ausdr&uuml;cke leichter eingeben zu k&ouml;nnen, sind einige Spezialfunktionen und 
 Variablen verf&uuml;gbar. Lesen Sie sich bitte die Abschnitte
@@ -198,25 +203,39 @@ Variablen verf&uuml;gbar. Lesen Sie sich bitte die Abschnitte
 Perl special</a> zum besseren Verst&auml;ndnis durch.</p>
 <p>Um FHEM-Befehle in einen SHELL-Script zu triggern (dies ist 
 eine "andere" M&ouml;glichkeit), benutzen Sie bitte die oben beschriebene Client-Form 
-der fhem.pl.</p>
-<p>&nbsp;</p>
-<p">Mehrere FHEM-Kommandos hintereinander werden mittels 
+der fhem.pl.
+<br>
+
+Mehrere FHEM-Kommandos hintereinander werden mittels 
 Semikolon (;) getrennt. Weil Semikola auch in PERL-Code oder SHELL-Programmen 
 benutzt werden, m&uuml;ssen sie mittels doppelten Semikola gesch&uuml;tzt werden. Lesen 
-Sie sich bitte die <b>Bermerkungen </b>des <a href="#notify">notify</a>-Abschnittes zu Kommandoparametern und Regeln durch.</p>
-<p>Z.B. schaltet die erste der folgenden Befehlszeilen die 
-Lampe 1 nur/erst zur Uhrzeit 07:00 Uhr aus, die Lampe 2 aber sofort und die 
-zweite Befehlszeile schaltet Lampe 1 und 2 um 7:00 Uhr gleichzeitig aus. </p>
-<p>&nbsp;</p>
+Sie sich bitte die <b>Bermerkungen </b>des <a href="#notify">notify</a>-Abschnittes zu Kommandoparametern und Regeln durch.
+<br>
+
+Z.B. schaltet die erste der folgenden Befehlszeilen die Lampe 1 nur/erst zur
+Uhrzeit 07:00 Uhr aus, die Lampe 2 aber sofort und die zweite Befehlszeile
+schaltet Lampe 1 und 2 um 7:00 Uhr gleichzeitig aus.
   <ul>
   define lampoff at 07:00 set Lamp1 off; set Lamp2 off<br>
   define lampoff at 07:00 set Lamp1 off;; set Lamp2 off<br>
   </ul>
-&nbsp;<p">Befehle k&ouml;nnen entweder direkt eingegeben oder aus 
-seiner Datei (z.B. am Start von FHEM aus der Konfugurationsdatei eingelesen 
-werden. Die Befehle werden entweder direkt ausgef&uuml;hrt oder sp&auml;ter wenn sie als 
-Argumente eines <a href="#at">at</a> oder <a href="#notify">notify</a>-Befehles verwendet werden. </p>
-<p>&nbsp;</p>
+  <br>
+F&uuml;r jede weitere Indirektion muss man die Strichpunkte verdoppeln. Um also die beiden Lampen um 7:00 f&uuml;r 10 Minuten einzuschalten schreibt man:
+  <ul>
+  define onAt at 07:00 set Lamp1 on;;set Lamp2 on;; define offAt at +00:10 set Lamp1 off;;;;set Lamp2 off
+  </ul>
+Keine Angst, das Vorherige kann in FHEM auch deutlich einfacher formuliert werden als:
+  <ul>
+  define onAt at 07:00 set Lamp1,Lamp2 on-for-timer 600
+  </ul>
+  <br>
+
+Befehle k&ouml;nnen entweder direkt eingegeben oder aus einer Datei (z.B. am
+Start von FHEM aus der Konfugurationsdatei) eingelesen werden. Die Befehle
+werden entweder direkt ausgef&uuml;hrt oder sp&auml;ter wenn sie als Argumente
+eines <a href="#at">at</a> oder <a href="#notify">notify</a>-Befehles verwendet
+werden.
+
 <p>Eine mit einem \ abgeschlossene Zeile wird mit der 
 nachfolgenden Zeile verbunden. Somit k&ouml;nnen lange Befehlszeilen (die z.B. aus 
 mehreren PERL-Befehlen bestehen) auf mehrere Zeilen aufgteilt werden. Einige 
@@ -229,7 +248,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <a name="devspec"></a>
 <h3>Ger&auml;te-Spezifikation (devspec)</h3>
 <ul>
-  <p>Die Befehle
+  Die Befehle
     <a href="#attr">attr</a>,
     <a href="#deleteattr">deleteattr</a>,<a href="#delete">delete</a>,
     <a href="#get">get</a>,
@@ -238,7 +257,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     <a href="#setstate">setstate</a>,<a href="file:///C:/Inetpub/wwwroot/www.fhem.de/commandref_frame_DE.html#setstate"><span style="text-decoration: underline">
   </span></a>k&ouml;nnen eine komplexere 
   Ger&auml;tespezifikation als Argumente enthalten, die auch eine Anzahl von Ger&auml;ten 
-  betreffen kann. Eine Ger&auml;tespezifikation (Kurzfassung) kann z.B. so aussehen:</p>
+  betreffen kann. Eine Ger&auml;tespezifikation (Kurzfassung) kann z.B. so aussehen:
   <ul>
   <li>ein einzelner Ger&auml;tename. Dies ist der 
   meist vorkommende Fall.</li>
@@ -254,8 +273,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   Als Attribut k&ouml;nnen Sie entweder Attribute die mittels "attr"-Befehl oder 
   eines der "internen" Attribute wie DEF, STATE oder TYPE angeben.</li>
   </ul>
-  &nbsp;<p>
-  Beispiele: </p>
+  Beispiele:
   <ul>
     <code>set lamp1 on</code><br>
     <code>set lamp1,lamp2,lamp3 on</code><br>
@@ -267,8 +285,8 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     <code>list disabled=</code><br>
     <code>list TYPE=FS20</code><br>
   </ul>
-  Bemerkungen: <br>
-&nbsp;<ul>
+  Bemerkungen:
+  <ul>
   <li>zuerst wird die durch Kommata getrennte 
   Spezifikation abgearbeitet, dann folgen die Bereichsspezifikationen und die 
   regul&auml;ren Ausdr&uuml;cke</li>
