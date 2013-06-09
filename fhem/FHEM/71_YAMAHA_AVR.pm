@@ -293,8 +293,7 @@ YAMAHA_AVR_Set($@)
     {
 	if(defined($a[2]))
 	{
-	    if($hash->{STATE} eq "on")
-	    {
+	    
 		if(not $scenes_piped eq "")
 		{
 		    if($a[2] =~ /^($scenes_piped)$/)
@@ -324,11 +323,6 @@ YAMAHA_AVR_Set($@)
 	        {
 	    	    return "No scenes are avaible. Please try an statusUpdate.";
 	        }
-	    }
-	    else
-	    {
-		return "scene can only be used when device is powered on";
-	    }
 	}
 	else
 	{
