@@ -317,7 +317,7 @@ ECMDDevice_Define($$)
     Example:
     <ul>
       <code>set myRelais1 on</code><br>
-      <code>set myDisplay text This\x20text\x20has\x20blanks!<code><br>
+      <code>set myDisplay text This\x20text\x20has\x20blanks!</code><br>
     </ul>
     <br>
   </ul>
