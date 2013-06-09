@@ -117,8 +117,7 @@ FileLog_Log($$)
   my $max = int(@{$dev->{CHANGED}});
   my $tn = $dev->{NTFY_TRIGGERTIME};
   my $ct = $dev->{CHANGETIME};
-  my $wrotesome;
-  my $fh = $log->{FH};
+  my $fh;
   my $switched;
 
   for (my $i = 0; $i < $max; $i++) {
@@ -132,12 +131,11 @@ FileLog_Log($$)
         FileLog_Switch($log);
         $switched = 1;
       }
-
+      $fh = $log->{FH};
       print $fh "$t $n $s\n";
-      $wrotesome = 1;
     }
   }
-  if($wrotesome) {
+  if($fh) {
     $fh->flush;
     # Skip sync, it costs too much HD strain, esp. on SSD
     # $fh->sync if !($^O eq 'MSWin32'); #not implemented in Windows
