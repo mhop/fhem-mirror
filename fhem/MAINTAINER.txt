@@ -97,7 +97,7 @@ FHEM/50_WS300.pm             tdressler            http://forum.fhem.de SlowRF
 FHEM/56_POKEYS.pm            axelberner           http://forum.fhem.de Sonstiges
 FHEM/57_Calendar.pm          borisneubert         http://forum.fhem.de Sonstiges
 FHEM/59_HCS.pm               mfr69bs              http://forum.fhem.de Automatisierung
-FHEM/59_Twilight.pm          unimatrix27          http://forum.fhem.de Sonstiges
+FHEM/59_Twilight.pm          dietmar63            http://forum.fhem.de Unterstützende Dienste
 FHEM/59_Weather.pm           borisneubert         http://forum.fhem.de Sonstiges
 FHEM/60_EM.pm                rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/61_EMWZ.pm              rudolfkoenig         http://forum.fhem.de SlowRF
@@ -144,7 +144,7 @@ FHEM/95_PachLog.pm           rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
 FHEM/95_holiday.pm           rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/98_CULflash.pm          rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/98_HMinfo.pm            martinp876           http://forum.fhem.de Sonstiges
-FHEM/98_Heating_Control.pm   dietmar63            http://forum.fhem.de Sonstiges
+FHEM/98_Heating_Control.pm   dietmar63            http://forum.fhem.de Unterstützende Dienste
 FHEM/98_JsonList.pm          mfr69b               http://forum.fhem.de Automatisierung
 FHEM/98_PID.pm               rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_SVG.pm               rudolfkoenig         http://forum.fhem.de Frontends

@@ -28,6 +28,7 @@ use strict;
 use warnings;
 use POSIX;
 use HttpUtils;
+use Math::Trig;
 
 sub Twilight_calc($$$$$$$);
 sub Twilight_getWeatherHorizon($);
@@ -282,24 +283,21 @@ Twilight_GetUpdate($)
 sub
 Twilight_calc($$$$$$$)
 {
-  my ($latitude, $longitude, $horizon, $declination,
-      $timezone, $midseconds, $timediff) = @_;
-  my $suntime=0;
-  my $sunrise=0;
-  my $sunset=0;
-  eval {
-    $suntime = 12*acos((sin($horizon/57.29578) -
-                        sin($latitude/57.29578) * sin($declination)) /
-                       (cos($latitude/57.29578)*cos($declination))) /
-                  3.141592 ;
-    $sunrise = $midseconds +
-               (12-$timediff -$suntime -$longitude/15+$timezone) *
-               3600;
-    $sunset  = $midseconds +
-               (12-$timediff +$suntime -$longitude/15+$timezone) *
-               3600;
-  };
-  $sunrise = $sunset = "nan" if($@);
+  my ($latitude, $longitude, $horizon, $declination, $timezone, $midseconds, $timediff) = @_;
+
+  my $s1 = sin($horizon /57.29578);
+  my $s2 = sin($latitude/57.29578) * sin($declination);
+  my $s3 = cos($latitude/57.29578) * cos($declination);
+
+  my ($suntime, $sunrise, $sunset);
+  my $acosArg = ($s1 - $s2) / $s3;
+  if (abs($acosArg) < 1.0) {         # ok
+     $suntime = 12*acos($acosArg)/pi;
+     $sunrise = $midseconds + (12-$timediff -$suntime -$longitude/15+$timezone) * 3600;
+     $sunset  = $midseconds + (12-$timediff +$suntime -$longitude/15+$timezone) * 3600;
+  } else {
+     $sunrise = $sunset = "nan";
+  }
   return $sunrise, $sunset;
 }
 
@@ -315,7 +313,7 @@ Twilight_getWeatherHorizon($)
   # yahoo weather API
   my $location=$hash->{WEATHER};
   my $xml = GetFileFromURL("http://weather.yahooapis.com/forecastrss?w=".
-                            $location."&u=c",4.0);
+                            $location."&u=c",4.0, undef, 1);
   my $current;
   if($xml=~/code="(.*)"(\ *)temp/){
     if(defined($1)){
@@ -329,8 +327,9 @@ Twilight_getWeatherHorizon($)
      return 1;
    }
   }
-  Log 1, "[TWILIGHT] No Weather location found at yahoo weather ".
-        "for location ID: $location";
+
+  Log 1, "[TWILIGHT] No Weather location found at yahoo weather for location ID: $location\nxml:\n$xml";
+
   $hash->{WEATHER_HORIZON}="0";
   $hash->{CONDITION}="-1";
 }
