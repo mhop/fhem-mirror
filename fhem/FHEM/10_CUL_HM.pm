@@ -1497,7 +1497,7 @@ sub CUL_HM_parseCommon(@){#####################################################
                        ($dhash?CUL_HM_hash2Name($dhash):$shash->{IODev}{NAME}),
 					   (-1)*(hex($rssi)))
 			if ($rssi && $rssi ne '00' && $rssi ne'80');
-	  @{$modules{CUL_HM}{helper}{reqStatus}} = grep { $_ != $shash->{NAME} }
+	  @{$modules{CUL_HM}{helper}{reqStatus}} = grep { $_ ne $shash->{NAME} }
                                        @{$modules{CUL_HM}{helper}{reqStatus}};
       if ($pendType eq "StatusReq"){#it is the answer to our request
 		my $chnSrc = $src.$shash->{helper}{respWait}{forChn};
@@ -2480,7 +2480,7 @@ sub CUL_HM_Set($@) {
 	                                                                  $st eq "motionDetector" )    && (!$single || $single ne "single"));
 
 	$single = ($single eq "single")?1:"";#default to dual
-	$set = ($set eq "unset")?0:1;
+	$set = ($set && $set eq "unset")?0:1;
 
 	my ($b1,$b2,$nrCh2Pair);
 	$b1 = (!$roleD) ? hex($chn) : ($single?$bNo : ($bNo*2 - 1));
