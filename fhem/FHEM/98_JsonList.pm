@@ -74,7 +74,7 @@ sub
 PrintHashJson($$)
 {
   my ($h, $lev) = @_;
-
+  return if($h->{PrintHashJson});
 
   my $hc = keys %{$h};
   my @str;
@@ -88,7 +88,9 @@ PrintHashJson($$)
         } else {
           $str .= sprintf("%*s\"%s\": {\n", $lev, " ", $c);
           if(keys(%{$h->{$c}}) != 0) {
+            $h->{PrintHashJson} = 1;
             $str .= PrintHashJson($h->{$c}, $lev+2);
+            delete($h->{PrintHashJson});
           } else {
             $str .= sprintf("%*s\"null\": \"null\"\n", $lev+4, " ");
           }
