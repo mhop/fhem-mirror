@@ -234,8 +234,7 @@ sub HMLAN_uptime($$) {#########################################################
   my ($hash,$msec) = @_;
 
   $msec = hex($msec);
-  my $sec = int($msec/1000);
-  
+  my $sec = int($msec/1000);  
 #  my ($sysec, $syusec) = gettimeofday();
 #  my $symsec = int($sysec*1000+$syusec/1000);
 #  if ($hash->{helper}{refTime} == 1){ #init referenceTime
@@ -314,6 +313,7 @@ sub HMLAN_Parse($$) {##########################################################
 	if($stat & 0x040A){ # do not parse this message, no valid content
 	  Log $ll5, "HMLAN_Parse: $name problems detected - please restart HMLAN"if($stat & 0x0400);
 	  Log $ll5, "HMLAN_Parse: $name discard"                                 if($stat & 0x000A);
+	  $hash->{helper}{$dst}{flg} = 0;#NACK is also a response, continue process
 	  return ;# message with no ack is send - do not dispatch
 	}
 	if ($mFld[1] !~ m/00(01|02|21|41|50)/ && $letter eq 'R'){
@@ -322,6 +322,13 @@ sub HMLAN_Parse($$) {##########################################################
 	  return;
 	}
     Log $ll5, "HMLAN_Parse: $name special reply ".$mFld[1]        if($stat & 0x0200);
+
+     #update some User information ------
+	$hash->{uptime} = HMLAN_uptime($hash,$mFld[2]);
+	$hash->{RSSI}   = $rssi;
+    $hash->{RAWMSG} = $rmsg;
+    $hash->{"${name}_MSGCNT"}++;
+    $hash->{"${name}_TIME"} = TimeNow();
 
 	# HMLAN sends ACK for flag 'A0' but not for 'A4'(config mode)- 
 	# we ack ourself an long as logic is uncertain - also possible is 'A6' for RHS
@@ -332,17 +339,11 @@ sub HMLAN_Parse($$) {##########################################################
 	  Log $ll5, "HMLAN_Parse: $name ACK config";
 	  HMLAN_Write($hash,undef, "As15".$mNo."8002".$dst.$src."00");
 	}
-     #update some User information ------
-	$hash->{uptime} = HMLAN_uptime($hash,$mFld[2]);
-	$hash->{RSSI}   = $rssi;
-    $hash->{RAWMSG} = $rmsg;
-    $hash->{"${name}_MSGCNT"}++;
-    $hash->{"${name}_TIME"} = TimeNow();
 	
     if ($letter eq 'R' && $hash->{helper}{$src}{flg}){
 	  $hash->{helper}{$src}{flg} = 0;                 #release send-holdoff
 	  if ($hash->{helper}{$src}{msg}){                #send delayed msg if any
-	    Log $ll5,"HMLAN_SdDly: $name $src ".$hash->{helper}{$src}{msg};
+	    Log $ll5,"HMLAN_SdDly: $name $src";
 		HMLAN_SimpleWrite($hash, $hash->{helper}{$src}{msg});
 	  }
 	  $hash->{helper}{$src}{msg} = "";                #clear message
@@ -403,22 +404,11 @@ sub HMLAN_SimpleWrite(@) {#####################################################
 	        if ($DevDelay > 0.01);
 	  delete $hash->{helper}{nextSend}{$dst};
     }
-    $msg =~ m/(.{9}).(..).(.{8}).(..).(.{8}).(..)(....)(.{6})(.{6})(.*)/;
-	Log $ll5, 'HMLAN_Send:  '.$name.' S:'.$1
-                             .' stat:  ' .$2
-                             .' t:'      .$3
-                             .' d:'      .$4
-                             .' r:'      .$5 
-                             .' m:'      .$6
-                             .' '        .$7 
-                             .' '        .$8
-                             .' '        .$9
-                             .' '        .$10;
 	if ($dst ne $attr{$name}{hmId}){  #delay send if answer is pending
 	  if ( $hash->{helper}{$dst}{flg} &&                #HMLAN's ack pending
           ($hash->{helper}{$dst}{to} > gettimeofday())){#won't wait forever!
 	    $hash->{helper}{$dst}{msg} = $msg;              #postpone  message
-	    Log $ll5,"HMLAN_Delay: $name msg delayed $dst $msg";
+	    Log $ll5,"HMLAN_Delay: $name $dst";
 	    return;
 	  }
       my $flg = substr($msg,36,2);
@@ -435,6 +425,17 @@ sub HMLAN_SimpleWrite(@) {#####################################################
 	  }
 	  $hash->{helper}{$dst}{chn} = $chn;
 	} 
+    $msg =~ m/(.{9}).(..).(.{8}).(..).(.{8}).(..)(....)(.{6})(.{6})(.*)/;
+	Log $ll5, 'HMLAN_Send:  '.$name.' S:'.$1
+                             .' stat:  ' .$2
+                             .' t:'      .$3
+                             .' d:'      .$4
+                             .' r:'      .$5 
+                             .' m:'      .$6
+                             .' '        .$7 
+                             .' '        .$8
+                             .' '        .$9
+                             .' '        .$10;
   }
   else{
     Log $ll5, 'HMLAN_Send:  '.$name.' I:'.$msg; 
@@ -459,7 +460,6 @@ sub HMLAN_DoInit($) {##########################################################
   HMLAN_SimpleWrite($hash, "Y03,00,");
   HMLAN_SimpleWrite($hash, "Y03,00,");
   HMLAN_SimpleWrite($hash, "T$s2000,04,00,00000000");
- 
   $hash->{helper}{refTime}=0;
   
   foreach (keys %lhash){delete ($lhash{$_})};# clear IDs - HMLAN might have a reset 
