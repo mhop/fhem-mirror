@@ -12,10 +12,15 @@ sub EnOcean_Initialize($);
 sub EnOcean_Parse($$);
 sub EnOcean_Set($@);
 sub EnOcean_MD15Cmd($$$);
+sub EnOcean_SndRadio($$$$$$$);
+sub EnOcean_ReadingScaled($$$$);
+sub EnOcean_TimerSet($);
+sub EnOcean_Undef($$);
 
-my %EnO_rorgname = ("F6" => "switch",     # org 05, RPS
-                    "D5" =>" contact",    # org 06, 1BS
-                    "A5" => "sensor",     # org 07, 4BS
+my %EnO_rorgname = ("F6" => "switch",  # RPS, org 05
+                    "D5" =>" contact", # 1BS, org 06
+                    "A5" => "sensor",  # 4BS, org 07
+                    "D2" => "vld",     # VLD
                    );
 my @EnO_ptm200btn = ("AI", "A0", "BI", "B0", "CI", "C0", "DI", "D0");
 my %EnO_ptm200btn;
@@ -168,9 +173,10 @@ my %EnO_subType = (
   "F6.10.00" => "windowHandle",
   1          => "switch",
   2          => "sensor",
-  3          => "FRW",
-  4          => "PM101",
-  5          => "raw",
+  3          => "vld",
+  4          => "FRW",
+  5          => "PM101",
+  6          => "raw",
 );
 
 my @EnO_models = qw (
@@ -197,12 +203,13 @@ EnOcean_Initialize($)
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 " .
                        "actualTemp angleMax:slider,-180,20,180 angleMin:slider,-180,20,180 " .
-                       "angleTime:0,1,2,3,4,5,6 dimValueOn " .
+                       "angleTime:0,1,2,3,4,5,6 destinationID dimValueOn " .
                        "model:" . join(",", @EnO_models) . " " .
                        "gwCmd:" . join(",", sort @EnO_gwCmd) . " " .
                        "manufID:" . join(",", keys %EnO_manuf) . " " . 
                        "rampTime repeatingAllowed:yes,no " .
                        "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin " .
+                       "securityLevel:unencrypted " .
                        "shutTime shutTimeCloses subDef subDef0 subDefI " .
                        "subType:" . join(",", sort grep { !$subTypeList{$_}++ } values %EnO_subType) . " " .
                        "subTypeSet:" . join(",", sort grep { !$subTypeSetList{$_}++ } values %EnO_subType) . " " .
@@ -243,17 +250,25 @@ EnOcean_Set($@)
 
   my $name = $hash->{NAME};
   my $data;
-  my $header;
+  my $destinationID = AttrVal($name, "destinationID", undef);
+  if (!defined $destinationID || $destinationID eq "multicast") {
+    $destinationID = "FFFFFFFF";
+  } elsif ($destinationID eq "unicast") {
+    $destinationID = $hash->{DEF};
+  } elsif ($destinationID !~ m/^[\dA-F]{8}$/) {
+    return "DestinationID $destinationID wrong, choose <8-digit-hex-code>.";
+  }
   my $ll2 = GetLogLevel($name, 2);
   my $manufID = AttrVal($name, "manufID", "");
   my $model = AttrVal($name, "model", "");
-  my $repeatingAllowed = AttrVal($name, "repeatingAllowed", "yes");
+  my $rorg;
   my $sendCmd = "yes";
   my $status = "00";
   my $st = AttrVal($name, "subType", "");
   my $stSet = AttrVal($name, "subTypeSet", undef);
   if (defined $stSet) {$st = $stSet;}
-  my $subDef = AttrVal($name, "subDef", "$hash->{DEF}");
+  my $subDef = AttrVal($name, "subDef", $hash->{DEF});
+  if ($subDef !~ m/^[\dA-F]{8}$/) {return "SenderID $subDef wrong, choose <8-digit-hex-code>.";}
   my $switchMode = AttrVal($name, "switchMode", "switch");
   my $tn = TimeNow();
   my $updateState = 1;
@@ -267,6 +282,7 @@ EnOcean_Set($@)
     # [Kieback&Peter MD15-FTL-xx]
     # See also http://www.oscat.de/community/index.php/topic,985.30.html
     # Maintenance commands (runInit, liftSet, valveOpen, valveClosed)
+      $rorg = "A5";
       my %sets = (
         "desired-temp" => "\\d+(\\.\\d)?",
         "actuator"     => "\\d+",
@@ -302,29 +318,29 @@ EnOcean_Set($@)
       # select Command from attribute gwCmd or command line
       my $gwCmd = AttrVal($name, "gwCmd", undef);
       if ($gwCmd && $EnO_gwCmd{$gwCmd}) {
-        # PHC Command from attribute gwCmd
+        # command from attribute gwCmd
         if ($EnO_gwCmd{$cmd}) {
           # shift $cmd
           $cmd = $a[1];
           shift(@a);
         }
       } elsif ($EnO_gwCmd{$cmd}) {
-        # PHC Command from command line
+        # command from command line
         $gwCmd = $cmd;
         $cmd = $a[1];
         shift(@a);
       } else {
-        return "Unknown Gateway Command " . $cmd . ", choose one of " . join(" ", sort keys %EnO_gwCmd);
+        return "Unknown Gateway command " . $cmd . ", choose one of " . join(" ", sort keys %EnO_gwCmd);
       }
       my $gwCmdID;
+      $rorg = "A5";
       my $setCmd = 0;
-      ## $status = "00";
       my $time = 0;
       if ($gwCmd eq "switching") {
         # Switching
         $gwCmdID = 1;
         if($cmd eq "teach") {
-          $data = sprintf "A5%02X000000", $gwCmdID;
+          $data = sprintf "%02X000000", $gwCmdID;
         } elsif ($cmd eq "on" || $cmd eq "B0") {
           $setCmd = 9;
           if ($a[1]) {
@@ -333,7 +349,7 @@ EnOcean_Set($@)
             shift(@a);
           }
           $updateState = 0;
-          $data = sprintf "A5%02X%04X%02X", $gwCmdID, $time, $setCmd;
+          $data = sprintf "%02X%04X%02X", $gwCmdID, $time, $setCmd;
         } elsif ($cmd eq "off" || $cmd eq "BI") {
           $setCmd = 8;
           if ($a[1]) {
@@ -342,12 +358,12 @@ EnOcean_Set($@)
             shift(@a);
           }
           $updateState = 0;
-          $data = sprintf "A5%02X%04X%02X", $gwCmdID, $time, $setCmd;
+          $data = sprintf "%02X%04X%02X", $gwCmdID, $time, $setCmd;
         } else {
           my $cmdList = "B0 BI teach";
           return SetExtensions ($hash, $cmdList, $name, @a);
           $updateState = 0;
-          $data = sprintf "A5%02X%04X%02X", $gwCmdID, $time, $setCmd;
+          $data = sprintf "%02X%04X%02X", $gwCmdID, $time, $setCmd;
         }
 
       } elsif ($gwCmd eq "dimming") {
@@ -359,7 +375,7 @@ EnOcean_Set($@)
         $setCmd = 9;
         if ($cmd eq "teach") {
           $setCmd = 0;
-          $data = sprintf "A5%02X000000", $gwCmdID;
+          $data = sprintf "%02X000000", $gwCmdID;
         } elsif ($cmd eq "dim") {
           return "Usage: $cmd dim/% [rampTime/s lock|unlock]"
             if(@a < 2 || $a[1] < 0 || $a[1] > 100 || $a[1] !~ m/^[+-]?\d+$/);
@@ -461,17 +477,17 @@ EnOcean_Set($@)
           if ($rampTime > 255) { $rampTime = 255; }
           if ($rampTime < 0) { $rampTime = 0; }
           $updateState = 0;
-          $data = sprintf "A5%02X%02X%02X%02X", $gwCmdID, $dimVal, $rampTime, $setCmd;
+          $data = sprintf "%02X%02X%02X%02X", $gwCmdID, $dimVal, $rampTime, $setCmd;
         }
 
       } elsif ($gwCmd eq "setpointShift") {
         $gwCmdID = 3;
         if ($cmd eq "teach") {
-          $data = sprintf "A5%02X000000", $gwCmdID;
+          $data = sprintf "%02X000000", $gwCmdID;
         } elsif ($cmd eq "shift") {
           if (($a[1] =~ m/^[+-]?\d+(\.\d+)?$/) && ($a[1] >= -12.7) && ($a[1] <= 12.8)) {
             $updateState = 0;
-            $data = sprintf "A5%02X00%02X08", $gwCmdID, ($a[1] + 12.7) * 10;
+            $data = sprintf "%02X00%02X08", $gwCmdID, ($a[1] + 12.7) * 10;
             shift(@a);
           } else {
             return "Usage: $a[1] is not numeric or out of range";
@@ -487,7 +503,7 @@ EnOcean_Set($@)
         } elsif ($cmd eq "basic") {
           if (($a[1] =~ m/^[+-]?\d+(\.\d+)?$/) && ($a[1] >= 0) && ($a[1] <= 51.2)) {
             $updateState = 0;
-            $data = sprintf "A5%02X00%02X08", $gwCmdID, $a[1] * 5;
+            $data = sprintf "%02X00%02X08", $gwCmdID, $a[1] * 5;
             shift(@a);
           } else {
             return "Usage: $cmd parameter is not numeric or out of range.";
@@ -512,7 +528,7 @@ EnOcean_Set($@)
             return "Usage: $cmd parameter unknown.";
           }
           shift(@a);
-          $data = sprintf "A5%02X00%02X%02X", $gwCmdID, $controlVar, $setCmd;
+          $data = sprintf "%02X00%02X%02X", $gwCmdID, $controlVar, $setCmd;
         } elsif ($cmd eq "energyHoldOff") {
           if ($a[1] eq "normal") {
             $setCmd = 8;
@@ -522,7 +538,7 @@ EnOcean_Set($@)
             return "Usage: $cmd parameter unknown.";
           }
           shift(@a);
-          $data = sprintf "A5%02X00%02X%02X", $gwCmdID, $controlVar, $setCmd;
+          $data = sprintf "%02X00%02X%02X", $gwCmdID, $controlVar, $setCmd;
         } elsif ($cmd eq "controllerMode") {
           if ($a[1] eq "auto") {
             $setCmd = 8;
@@ -536,7 +552,7 @@ EnOcean_Set($@)
             return "Usage: $cmd parameter unknown.";
           }
           shift(@a);
-          $data = sprintf "A5%02X00%02X%02X", $gwCmdID, $controlVar, $setCmd;
+          $data = sprintf "%02X00%02X%02X", $gwCmdID, $controlVar, $setCmd;
         } elsif ($cmd eq "controllerState") {
           if ($a[1] eq "auto") {
             $setCmd = 8;
@@ -553,7 +569,7 @@ EnOcean_Set($@)
           }
           shift(@a);
           $updateState = 0;
-          $data = sprintf "A5%02X00%02X%02X", $gwCmdID, $controlVar, $setCmd;
+          $data = sprintf "%02X00%02X%02X", $gwCmdID, $controlVar, $setCmd;
         } else {
           return "Unknown argument, choose one of teach presence:absent,present,standby energyHoldOff:holdoff,normal controllerMode:cooling,heating,off controllerState:auto,override";
         }
@@ -561,14 +577,14 @@ EnOcean_Set($@)
       } elsif ($gwCmd eq "fanStage") {
         $gwCmdID = 6;
         if($cmd eq "teach") {
-          $data = sprintf "A5%02X000000", $gwCmdID;
+          $data = sprintf "%02X000000", $gwCmdID;
         } elsif ($cmd eq "stage") {
           if ($a[1] eq "auto") {
             $updateState = 0;
-            $data = sprintf "A5%02X00%02X08", $gwCmdID, 255;
+            $data = sprintf "%02X00%02X08", $gwCmdID, 255;
           } elsif ($a[1] && $a[1] =~ m/^[0-3]$/) {
             $updateState = 0;
-            $data = sprintf "A5%02X00%02X08", $gwCmdID, $a[1];
+            $data = sprintf "%02X00%02X08", $gwCmdID, $a[1];
           } else {
             return "Usage: $cmd parameter is not numeric or out of range"
           }
@@ -730,15 +746,12 @@ EnOcean_Set($@)
           $updateState = 0;
         } else {
         }
-        $data = sprintf "A5%02X%02X%02X%02X", $gwCmdID, $blindParam1, $blindParam2, $setCmd;
+        $data = sprintf "%02X%02X%02X%02X", $gwCmdID, $blindParam1, $blindParam2, $setCmd;
 
       } else {
-        return "Unknown Gateway Command " . $cmd . ", choose one of ". join(" ", sort keys %EnO_gwCmd);
+        return "Unknown Gateway command " . $cmd . ", choose one of ". join(" ", sort keys %EnO_gwCmd);
       }
-      # write gateway command
-      # header: len: 0x000A optlen: 0x00 pakettype: 0x01(radio)
-      $header = "000A0001";
-      Log $ll2, "EnOcean: set $name $cmd";
+      Log $ll2, "EnOcean: set $name $cmd $setCmd";
 
     } elsif ($st eq "manufProfile") {
       if ($manufID eq "00D") {
@@ -748,6 +761,7 @@ EnOcean_Set($@)
         my $anglePos = ReadingsVal($name, "anglePos", undef);
         my $angleTime = AttrVal($name, "angleTime", 0);
         my $position = ReadingsVal($name, "position", undef);
+        $rorg = "A5";
         my $shutTime = AttrVal($name, "shutTime", 255);
         my $shutTimeCloses = AttrVal($name, "shutTimeCloses", $shutTime);
         $shutTimeCloses = $shutTime if ($shutTimeCloses < $shutTimeCloses);
@@ -767,7 +781,7 @@ EnOcean_Set($@)
         $shutTime = 255 if ($shutTime > 255);
         $shutTime = 1 if ($shutTime < 1);
         if ($cmd eq "teach") {
-          $data = "A5FFF80D80";
+          $data = "FFF80D80";
         } elsif ($cmd eq "stop") {
           # stop
           # delete readings, as they are undefined
@@ -872,7 +886,6 @@ EnOcean_Set($@)
             if (defined $a[1] && $a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] <= 100) {
               if ($position < $a[1]) {
                 # down
-                ##
                 $angleTime = $angleTime * ($angleMax - $anglePos)/($angleMax - $angleMin);
                 $shutTime = $shutTime  * ($a[1] - $position) / 100 + $angleTime;
                 $position = $a[1] + $angleTime / $shutTimeSet * 100;
@@ -887,7 +900,6 @@ EnOcean_Set($@)
                 }
               } elsif ($position > $a[1]) {
                 # up
-                ##
                 $angleTime = $angleTime * ($anglePos - $angleMin) /($angleMax - $angleMin);
                 $shutTime = $shutTime * ($position - $a[1]) / 100 + $angleTime;
                 $position = $a[1] - $angleTime / $shutTimeSet * 100;
@@ -927,15 +939,15 @@ EnOcean_Set($@)
         }
         if($shutCmd || $cmd eq "stop") {
           $updateState = 0;
-          $data = sprintf "A5%02X%02X%02X%02X", 0, $shutTime, $shutCmd, 8;
+          $data = sprintf "%02X%02X%02X%02X", 0, $shutTime, $shutCmd, 8;
         }
-        $header = "000A0001";
         Log $ll2, "EnOcean: set $name $cmd";
       }
 
     } elsif ($st eq "contact") {
       # 1BS Telegram
       # Single Input Contact (EEP D5-00-01)
+      $rorg = "D5";
       my $setCmd;
       if ($cmd eq "teach") {
         $setCmd = 0;
@@ -946,8 +958,7 @@ EnOcean_Set($@)
       } else {
         return "Unknown argument $cmd, choose one of open closed teach";
       }
-      $data = sprintf "D5%02X", $setCmd;
-      $header = "00070001";
+      $data = sprintf "%02X", $setCmd;
       Log $ll2, "EnOcean: set $name $cmd";
 
     } elsif ($st eq "raw") {
@@ -956,29 +967,52 @@ EnOcean_Set($@)
       if ($cmd eq "4BS"){
         # 4BS Telegram
         if ($a[1] && $a[1] =~ m/^[\dA-F]{8}$/) {
-          $data = sprintf "A5%s", $a[1];
-          $header = "000A0001";
+          $data = $a[1];
+          $rorg = "A5";
         } else {
           return "Wrong parameter, choose 4BS <data 4 Byte hex> [status 1 Byte hex]";
         }
       } elsif ($cmd eq "1BS") {
         # 1BS Telegram
         if ($a[1] && $a[1] =~ m/^[\dA-F]{2}$/) {
-          $data = sprintf "D5%s", $a[1];
-          $header = "00070001";
+          $data = $a[1];
+          $rorg = "D5";
         } else {
           return "Wrong parameter, choose 1BS <data 1 Byte hex> [status 1 Byte hex]";
         }
       } elsif ($cmd eq "RPS") {
         # RPS Telegram
         if ($a[1] && $a[1] =~ m/^[\dA-F]{2}$/) {
-          $data = sprintf "F6%s", $a[1];
-          $header = "00070001";
+          $data = $a[1];
+          $rorg = "F6";
         } else {
           return "Wrong parameter, choose RPS <data 1 Byte hex> [status 1 Byte hex]";
         }
+      } elsif ($cmd eq "VLD") {
+        # VLD Telegram
+        if ($a[1] && $a[1] =~ m/^[\dA-F]{2,28}$/ && !(length($a[1]) % 2)) {
+          $data = $a[1];
+          $rorg = "D2";
+        } else {
+          return "Wrong parameter, choose VLD <data 1 ... 14 Byte hex> [status 1 Byte hex]";
+        }
+      } elsif ($cmd eq "timer") {
+        ### test
+        if ($a[1] && $a[1] =~ m/^[\d]{2}$/) {
+          $data = "09";
+          $rorg = "F6";
+          
+          readingsSingleUpdate($hash, "test", 127, 1);          
+          readingsSingleUpdate($hash, "testScaled", EnOcean_ReadingScaled($hash, 127, 0, 255), 1) ;
+
+          my @timerCmd = ($name, "RPS", "08");
+          my %par = (hash => $hash, timerCmd => \@timerCmd);
+          InternalTimer(gettimeofday() + $a[1], "EnOcean_TimerSet", \%par, 0);
+        } else {
+          return "Wrong parameter, choose timer <time/s>";
+        }
       } else {
-        return "Unknown argument $cmd, choose one of RPS 1BS 4BS";
+        return "Unknown argument $cmd, choose one of 1BS 4BS RPS VLD timer";
       }
       if ($a[2]) {
         if ($a[2] !~ m/^[\dA-F]{2}$/) {
@@ -989,9 +1023,9 @@ EnOcean_Set($@)
       }
       $updateState = 0;
       readingsSingleUpdate($hash, "RORG", $cmd, 1);
-      readingsSingleUpdate($hash, "dataSent", substr($data, 2), 1);
+      readingsSingleUpdate($hash, "dataSent", $data, 1);
       readingsSingleUpdate($hash, "statusSent", $status, 1);
-      Log $ll2, "EnOcean: set $name $cmd " . substr($data, 2) . " $status";
+      Log $ll2, "EnOcean: set $name $cmd";
       shift(@a);     
       
     } else {
@@ -1063,28 +1097,25 @@ EnOcean_Set($@)
         $switchCmd |= ($d2<<1) | 0x01;
       }
       if ($sendCmd ne "no") {
-        $data = sprintf "F6%02X", $switchCmd;
-        $header = "00070001";
+        $data = sprintf "%02X", $switchCmd;
+        $rorg = "F6";
         Log $ll2, "EnOcean: set $name $cmd";
       }
     }
     if($st ne "MD15") {
-      if ($repeatingAllowed eq "no") {
-        $status = substr ($status, 0, 1) . "F";
-      }
-      $data = sprintf "%s%s%s", $data, $subDef, $status;
-      IOWrite ($hash, $header, $data);
+      EnOcean_SndRadio(undef, $hash, $rorg, $data, $subDef, $status, $destinationID);
       if ($switchMode eq "pushbutton") {
-        $data = "F600";
+        $data = "00";
+        $rorg = "F6";
         $status = "20";
         # next commands will be sent with a delay
         select(undef, undef, undef, 0.2);
 	Log $ll2, "EnOcean: set $name released";
-        $data = sprintf "%s%s%s", $data, $subDef, $status;
-        IOWrite ($hash, $header, $data);
+        EnOcean_SndRadio(undef, $hash, $rorg, $data, $subDef, $status, $destinationID);
       }
     }
-    select(undef, undef, undef, 0.2);   # Tested by joerg. He prefers 0.3 :)
+    # next commands will be sent with a delay
+    select(undef, undef, undef, 0.2);
   }
   # set reading state if acknowledge is not expected
   $subDef = AttrVal($name, "subDef", undef);
@@ -1099,70 +1130,68 @@ sub
 EnOcean_Parse($$)
 {
   my ($iohash, $msg) = @_;
-  my (undef,$rorg,$data,$id,$status,$odata) = split(":", $msg);
-
+  my (undef, $packetType, $rorg, $data, $id, $status, $odata) = split(":", $msg);
   my $rorgname = $EnO_rorgname{$rorg};
-  if(!$rorgname) {
-    Log 2, "Unknown EnOcean RORG ($rorg) received from $id";
+  if (!$rorgname) {
+    Log 2, "EnOcean: RORG ($rorg) received from $id unknown.";
     return "";
   }
-
   my $hash = $modules{EnOcean}{defptr}{$id};
-  if(!$hash) {
-    Log 3, "EnOcean Unknown device with ID $id, please define it";
+  if (!$hash) {
+    Log 3, "EnOcean: Unknown device with ID $id, please define it";
     return "UNDEFINED EnO_${rorgname}_$id EnOcean $id";
   }
-
   my $name = $hash->{NAME};
-  my $dl = length($data);
-  my $db_3 = hex substr($data,0,2);
-  my $db_2 = hex substr($data,2,2) if($dl > 2);
-  my $db_1 = hex substr($data,4,2) if($dl > 4);
-  my $db_0 = hex substr($data,6,2) if($dl > 6);
+  # extract data bytes $db[x] ... $db[0]
+  my @db;
+  my $dbCntr = 0;
+  for (my $strCntr = length($data) / 2 - 1; $strCntr >= 0; $strCntr--) {
+    $db[$dbCntr] = hex substr($data, $strCntr * 2, 2);
+    $dbCntr++;
+  }  
   my @event;
   my $ll4 = GetLogLevel($name, 4);
   my $model = AttrVal($name, "model", "");
   my $manufID = AttrVal($name, "manufID", "");
   my $st = AttrVal($name, "subType", "");
-  
-  Log $ll4, "$name: ORG:$rorg DATA:$data ID:$id STATUS:$status";
+  Log $ll4, "EnOcean: $name PacketType: $packetType RORG:$rorg DATA:$data ID:$id STATUS:$status";
 
-  if($rorg eq "F6") {
+  if ($rorg eq "F6") {
     # RPS Telegram (PTM200)
     # Rocker Switch (EEP F6-02-01 ... F6-03-02)
     # Position Switch, Home and Office Application (EEP F6-04-01)
     # Mechanical Handle (EEP F6-10-00)
     my $event = "state";
-    my $nu =  ((hex($status)&0x10)>>4);
+    my $nu =  ((hex($status) & 0x10) >> 4);
     # unused flags (AFAIK)
     #push @event, "1:T21:".((hex($status)&0x20)>>5);
     #push @event, "1:NU:$nu";
 
-    if($nu) {
+    if ($nu) {
       # Theoretically there can be a released event with some of the A0,BI
       # pins set, but with the plastic cover on this wont happen.
-      $msg  = $EnO_ptm200btn[($db_3&0xe0)>>5];
-      $msg .= ",".$EnO_ptm200btn[($db_3&0x0e)>>1] if($db_3 & 1);
-      $msg .= " released" if(!($db_3 & 0x10));
+      $msg  = $EnO_ptm200btn[($db[0] & 0xE0) >> 5];
+      $msg .= ",".$EnO_ptm200btn[($db[0] & 0x0E) >> 1] if ($db[0] & 1);
+      $msg .= " released" if (!($db[0] & 0x10));
 
     } else {
-      if($db_3 == 112) {
+      if ($db[0] == 112) {
         # Key Card, not tested
         $msg = "keycard inserted";
 
-      } elsif($db_3 & 0xC0) {
+      } elsif ($db[0] & 0xC0) {
         # Only a Mechanical Handle is setting these bits when nu=0
-        $msg = "closed"           if($db_3 == 0xF0);
-        $msg = "open"             if($db_3 == 0xE0);
-        $msg = "tilted"           if($db_3 == 0xD0);
-        $msg = "open from tilted" if($db_3 == 0xC0);
+        $msg = "closed"           if ($db[0] == 0xF0);
+        $msg = "open"             if ($db[0] == 0xE0);
+        $msg = "tilted"           if ($db[0] == 0xD0);
+        $msg = "open from tilted" if ($db[0] == 0xC0);
 
       } else {
         if($st eq "keycard") {
           $msg = "keycard removed";
         }
         else {
-          $msg = (($db_3&0x10) ? "pressed" : "released");
+          $msg = (($db[0] & 0x10) ? "pressed" : "released");
         }
       }
     }
@@ -1207,22 +1236,22 @@ EnOcean_Parse($$)
     }
     push @event, "3:$event:$msg";
 
-  } elsif($rorg eq "D5") {
+  } elsif ($rorg eq "D5") {
   # 1BS Telegram
   # Single Input Contact (EEP D5-00-01)
   # [Eltako FTK, STM-250]
-    push @event, "3:state:" . ($db_3 & 1 ? "closed" : "open");
-    push @event, "3:learnBtn:on" if (!($db_3 & 0x8));
+    push @event, "3:state:" . ($db[0] & 1 ? "closed" : "open");
+    push @event, "3:learnBtn:on" if (!($db[0] & 8));
 
-  } elsif($rorg eq "A5") {
+  } elsif ($rorg eq "A5") {
   # 4BS Telegram
-    if(($db_0 & 0x08) == 0) {
+    if (($db[0] & 0x08) == 0) {
     # teach-in telegram
-      if($db_0 & 0x80) {
+      if ($db[0] & 0x80) {
         # teach-in telegram with EEP and Manufacturer ID
-        my $fn = sprintf "%02x", ($db_3 >> 2);
-        my $tp = sprintf "%02X", ((($db_3 & 3) << 5) | ($db_2 >> 3));
-        my $mf = sprintf "%03X", ((($db_2 & 7) << 8) | $db_1);
+        my $fn = sprintf "%02X", ($db[3] >> 2);
+        my $tp = sprintf "%02X", ((($db[3] & 3) << 5) | ($db[2] >> 3));
+        my $mf = sprintf "%03X", ((($db[2] & 7) << 8) | $db[1]);
         # manufID to account for vendor-specific features
         $attr{$name}{manufID} = $mf;
         $mf = $EnO_manuf{$mf} if($EnO_manuf{$mf});
@@ -1233,128 +1262,137 @@ EnOcean_Parse($$)
         $st = $EnO_subType{$st} if($EnO_subType{$st});
         $attr{$name}{subType} = $st;
 
-        if("$fn.$tp" eq "20.01" && $iohash->{pair}) {      # MD15
-          select(undef, undef, undef, 0.1);                # max 10 Seconds
-          EnOcean_A5Cmd($hash, "800800F0", "00000000");
+        if ("$fn.$tp" eq "20.01" && $iohash->{pair}) {
+          # bidirectional teach-in for EEP A5-20-01 (MD15)
+          # SenderID = BaseID
+          $attr{$name}{subDef} = "00000000";
+          $attr{$name}{destinationID} = "unicast";
+          # next commands will be sent with a delay, max 10 s
+          select(undef, undef, undef, 0.1);
+          # teach-in response
+          EnOcean_SndRadio(undef, $hash, $rorg, "800800F0", "00000000", "00", $hash->{DEF});
           select(undef, undef, undef, 0.5);
           EnOcean_MD15Cmd($hash, $name, 128); # 128 == 20 degree C
         }
-        # subType, manufID storing corrected
+        # store attr subType, manufID ...
         CommandSave(undef, undef);
+        # delete standard readings
+        CommandDeleteReading(undef, "$name sensor[0-9]");
+        CommandDeleteReading(undef, "$name D[0-9]");
       } else {
         push @event, "3:teach-in:No EEP profile identifier and no Manufacturer ID";
       }
 
-    } elsif($st eq "MD15") {
+    } elsif ($st eq "MD15") {
       # Battery Powered Actuator (EEP A5-20-01)
       # [Kieback&Peter MD15-FTL-xx]
-      push @event, "3:state:$db_3";
-      push @event, "3:currentValue:$db_3";
-      push @event, "3:serviceOn:"    . (($db_2 & 0x80) ? "yes" : "no");
-      push @event, "3:energyInput:"  . (($db_2 & 0x40) ? "enabled":"disabled");
-      push @event, "3:energyStorage:". (($db_2 & 0x20) ? "charged":"empty");
-      push @event, "3:battery:"      . (($db_2 & 0x10) ? "ok" : "low");
-      push @event, "3:cover:"        . (($db_2 & 0x08) ? "open" : "closed");
-      push @event, "3:tempSensor:"   . (($db_2 & 0x04) ? "failed" : "ok");
-      push @event, "3:window:"       . (($db_2 & 0x02) ? "open" : "closed");
-      push @event, "3:actuatorStatus:".(($db_2 & 0x01) ? "obstructed" : "ok");
-      push @event, "3:measured-temp:". sprintf "%0.1f", ($db_1*40/255);
-      push @event, "3:selfCtl:"      . (($db_0 & 0x04) ? "on" : "off");
-      EnOcean_MD15Cmd($hash, $name, $db_1);
+      push @event, "3:state:$db[3]";
+      push @event, "3:currentValue:$db[3]";
+      push @event, "3:serviceOn:"    . (($db[2] & 0x80) ? "yes" : "no");
+      push @event, "3:energyInput:"  . (($db[2] & 0x40) ? "enabled":"disabled");
+      push @event, "3:energyStorage:". (($db[2] & 0x20) ? "charged":"empty");
+      push @event, "3:battery:"      . (($db[2] & 0x10) ? "ok" : "low");
+      push @event, "3:cover:"        . (($db[2] & 0x08) ? "open" : "closed");
+      push @event, "3:tempSensor:"   . (($db[2] & 0x04) ? "failed" : "ok");
+      push @event, "3:window:"       . (($db[2] & 0x02) ? "open" : "closed");
+      push @event, "3:actuatorStatus:".(($db[2] & 0x01) ? "obstructed" : "ok");
+      push @event, "3:measured-temp:". sprintf "%0.1f", ($db[1]*40/255);
+      push @event, "3:selfCtl:"      . (($db[0] & 0x04) ? "on" : "off");
+      EnOcean_MD15Cmd($hash, $name, $db[1]);
 
-    } elsif($st eq "PM101") {
+    } elsif ($st eq "PM101") {
       # Light and Presence Sensor [Omnio Ratio eagle-PM101]
       # The sensor also sends switching commands (RORG F6) with the senderID-1
-      # $db_2 is the illuminance where 0x00 = 0 lx ... 0xFF = 1000 lx
-      my $channel2 = $db_0 & 2 ? "yes" : "no";
-      push @event, "3:brightness:" . $db_2 << 2;
-      push @event, "3:channel1:" . ($db_0 & 1 ? "yes" : "no");
+      # $db[2] is the illuminance where 0x00 = 0 lx ... 0xFF = 1000 lx
+      my $channel2 = $db[0] & 2 ? "yes" : "no";
+      push @event, "3:brightness:" . $db[2] << 2;
+      push @event, "3:channel1:" . ($db[0] & 1 ? "yes" : "no");
       push @event, "3:channel2:" . $channel2;
       push @event, "3:motion:" . $channel2;
       push @event, "3:state:" . $channel2;
 
     } elsif ($st =~ m/^tempSensor/) {
       # Temperature Sensor with with different ranges (EEP A5-02-01 ... A5-02-1B)
-      # $db_1 is the temperature where 0x00 = max °C ... 0xFF = min °C
+      # $db[1] is the temperature where 0x00 = max °C ... 0xFF = min °C
       my $temp;
-      $temp = sprintf "%0.1f", -40 - $db_1 / 6.375 if ($st eq "tempSensor.01");
-      $temp = sprintf "%0.1f", -30 - $db_1 / 6.375 if ($st eq "tempSensor.02");
-      $temp = sprintf "%0.1f", -20 - $db_1 / 6.375 if ($st eq "tempSensor.03");
-      $temp = sprintf "%0.1f", -10 - $db_1 / 6.375 if ($st eq "tempSensor.04");
-      $temp = sprintf "%0.1f",   0 - $db_1 / 6.375 if ($st eq "tempSensor.05");
-      $temp = sprintf "%0.1f",  10 - $db_1 / 6.375 if ($st eq "tempSensor.06");
-      $temp = sprintf "%0.1f",  20 - $db_1 / 6.375 if ($st eq "tempSensor.07");
-      $temp = sprintf "%0.1f",  30 - $db_1 / 6.375 if ($st eq "tempSensor.08");
-      $temp = sprintf "%0.1f",  40 - $db_1 / 6.375 if ($st eq "tempSensor.09");
-      $temp = sprintf "%0.1f",  50 - $db_1 / 6.375 if ($st eq "tempSensor.0A");
-      $temp = sprintf "%0.1f",  60 - $db_1 / 6.375 if ($st eq "tempSensor.0B");
-      $temp = sprintf "%0.1f", -60 - $db_1 / 3.1875 if ($st eq "tempSensor.10");
-      $temp = sprintf "%0.1f", -50 - $db_1 / 3.1875 if ($st eq "tempSensor.11");
-      $temp = sprintf "%0.1f", -40 - $db_1 / 3.1875 if ($st eq "tempSensor.12");
-      $temp = sprintf "%0.1f", -30 - $db_1 / 3.1875 if ($st eq "tempSensor.13");
-      $temp = sprintf "%0.1f", -20 - $db_1 / 3.1875 if ($st eq "tempSensor.14");
-      $temp = sprintf "%0.1f", -10 - $db_1 / 3.1875 if ($st eq "tempSensor.15");
-      $temp = sprintf "%0.1f",   0 - $db_1 / 3.1875 if ($st eq "tempSensor.16");
-      $temp = sprintf "%0.1f",  10 - $db_1 / 3.1875 if ($st eq "tempSensor.17");
-      $temp = sprintf "%0.1f",  20 - $db_1 / 3.1875 if ($st eq "tempSensor.18");
-      $temp = sprintf "%0.1f",  30 - $db_1 / 3.1875 if ($st eq "tempSensor.19");
-      $temp = sprintf "%0.1f",  40 - $db_1 / 3.1875 if ($st eq "tempSensor.1A");
-      $temp = sprintf "%0.1f",  50 - $db_1 / 3.1875 if ($st eq "tempSensor.1B");
-      $temp = sprintf "%0.2f",  -10 - (($db_2 << 8) | $db_1) / 19.98 if ($st eq "tempSensor.20");
-      $temp = sprintf "%0.1f",  -40 - (($db_2 << 8) | $db_1) / 6.3 if ($st eq "tempSensor.30");
+      $temp = sprintf "%0.1f", -40 - $db[1] / 6.375 if ($st eq "tempSensor.01");
+      $temp = sprintf "%0.1f", -30 - $db[1] / 6.375 if ($st eq "tempSensor.02");
+      $temp = sprintf "%0.1f", -20 - $db[1] / 6.375 if ($st eq "tempSensor.03");
+      $temp = sprintf "%0.1f", -10 - $db[1] / 6.375 if ($st eq "tempSensor.04");
+      $temp = sprintf "%0.1f",   0 - $db[1] / 6.375 if ($st eq "tempSensor.05");
+      $temp = sprintf "%0.1f",  10 - $db[1] / 6.375 if ($st eq "tempSensor.06");
+      $temp = sprintf "%0.1f",  20 - $db[1] / 6.375 if ($st eq "tempSensor.07");
+      $temp = sprintf "%0.1f",  30 - $db[1] / 6.375 if ($st eq "tempSensor.08");
+      $temp = sprintf "%0.1f",  40 - $db[1] / 6.375 if ($st eq "tempSensor.09");
+      $temp = sprintf "%0.1f",  50 - $db[1] / 6.375 if ($st eq "tempSensor.0A");
+      $temp = sprintf "%0.1f",  60 - $db[1] / 6.375 if ($st eq "tempSensor.0B");
+      $temp = sprintf "%0.1f", -60 - $db[1] / 3.1875 if ($st eq "tempSensor.10");
+      $temp = sprintf "%0.1f", -50 - $db[1] / 3.1875 if ($st eq "tempSensor.11");
+      $temp = sprintf "%0.1f", -40 - $db[1] / 3.1875 if ($st eq "tempSensor.12");
+      $temp = sprintf "%0.1f", -30 - $db[1] / 3.1875 if ($st eq "tempSensor.13");
+      $temp = sprintf "%0.1f", -20 - $db[1] / 3.1875 if ($st eq "tempSensor.14");
+      $temp = sprintf "%0.1f", -10 - $db[1] / 3.1875 if ($st eq "tempSensor.15");
+      $temp = sprintf "%0.1f",   0 - $db[1] / 3.1875 if ($st eq "tempSensor.16");
+      $temp = sprintf "%0.1f",  10 - $db[1] / 3.1875 if ($st eq "tempSensor.17");
+      $temp = sprintf "%0.1f",  20 - $db[1] / 3.1875 if ($st eq "tempSensor.18");
+      $temp = sprintf "%0.1f",  30 - $db[1] / 3.1875 if ($st eq "tempSensor.19");
+      $temp = sprintf "%0.1f",  40 - $db[1] / 3.1875 if ($st eq "tempSensor.1A");
+      $temp = sprintf "%0.1f",  50 - $db[1] / 3.1875 if ($st eq "tempSensor.1B");
+      $temp = sprintf "%0.2f",  -10 - (($db[2] << 8) | $db[1]) / 19.98 if ($st eq "tempSensor.20");
+      $temp = sprintf "%0.1f",  -40 - (($db[2] << 8) | $db[1]) / 6.3 if ($st eq "tempSensor.30");
       push @event, "3:temperature:$temp";
       push @event, "3:state:$temp";
 
-    } elsif($st eq "COSensor.01") {
+    } elsif ($st eq "COSensor.01") {
       # Gas Sensor, CO Sensor (EEP A5-09-01)
       # [untested]
-      # $db_3 is the CO concentration where 0x00 = 0 ppm ... 0xFF = 255 ppm
-      # $db_1 is the temperature where 0x00 = 0 °C ... 0xFF = 255 °C
-      # $db_0 bit D1 temperature sensor available 0 = no, 1 = yes
-      my $coChannel1 = $db_3;
+      # $db[3] is the CO concentration where 0x00 = 0 ppm ... 0xFF = 255 ppm
+      # $db[1] is the temperature where 0x00 = 0 °C ... 0xFF = 255 °C
+      # $db[0] bit D1 temperature sensor available 0 = no, 1 = yes
+      my $coChannel1 = $db[3];
       push @event, "3:CO:$coChannel1";
-      if ($db_0 & 2) {
-        my $temp = $db_1;
+      if ($db[0] & 2) {
+        my $temp = $db[1];
         push @event, "3:temperature:$temp";
       }
       push @event, "3:state:$coChannel1";
 
-    } elsif($st eq "COSensor.02") {
+    } elsif ($st eq "COSensor.02") {
       # Gas Sensor, CO Sensor (EEP A5-09-02)
       # [untested]
-      # $db_3 is the voltage where 0x00 = 0 V ... 0xFF = 5.1 V
-      # $db_2 is the CO concentration where 0x00 = 0 ppm ... 0xFF = 1020 ppm
-      # $db_1 is the temperature where 0x00 = 0 °C ... 0xFF = 51 °C
-      # $db_0_bit_1 temperature sensor available 0 = no, 1 = yes
-      my $coChannel1 = $db_2 << 2;
-      my $voltage = sprintf "0.1f", $db_3 * 0.02;
+      # $db[3] is the voltage where 0x00 = 0 V ... 0xFF = 5.1 V
+      # $db[2] is the CO concentration where 0x00 = 0 ppm ... 0xFF = 1020 ppm
+      # $db[1] is the temperature where 0x00 = 0 °C ... 0xFF = 51 °C
+      # $db[0]_bit_1 temperature sensor available 0 = no, 1 = yes
+      my $coChannel1 = $db[2] << 2;
+      my $voltage = sprintf "0.1f", $db[3] * 0.02;
       push @event, "3:CO:$coChannel1";
-      if ($db_0 & 2) {
-        my $temp = sprintf "%0.1f", $db_1 * 0.2;
+      if ($db[0] & 2) {
+        my $temp = sprintf "%0.1f", $db[1] * 0.2;
         push @event, "3:temperature:$temp";
       }
       push @event, "3:voltage:$voltage";
       push @event, "3:state:$coChannel1";
 
-    } elsif($st eq "tempHumiCO2Sensor.01") {
+    } elsif ($st eq "tempHumiCO2Sensor.01") {
       # Gas Sensor, CO2 Sensor (EEP A5-09-04)
       # [Thermokon SR04 CO2 *, untested]
-      # $db_3 is the humidity where 0x00 = 0 %rH ... 0xC8 = 100 %rH
-      # $db_2 is the CO2 concentration where 0x00 = 0 ppm ... 0xFF = 2500 ppm
-      # $db_1 is the temperature where 0x00 = 0°C ... 0xFF = +51 °C
-      # $db_0 bit D2 humidity sensor available 0 = no, 1 = yes
-      # $db_0 bit D1 temperature sensor available 0 = no, 1 = yes
+      # $db[3] is the humidity where 0x00 = 0 %rH ... 0xC8 = 100 %rH
+      # $db[2] is the CO2 concentration where 0x00 = 0 ppm ... 0xFF = 2500 ppm
+      # $db[1] is the temperature where 0x00 = 0°C ... 0xFF = +51 °C
+      # $db[0] bit D2 humidity sensor available 0 = no, 1 = yes
+      # $db[0] bit D1 temperature sensor available 0 = no, 1 = yes
       my $humi = "unknown";
       my $temp = "unknown";
       my $airQuality;
-      if ($db_0 & 4) {
-        $humi = $db_3 >> 1;
+      if ($db[0] & 4) {
+        $humi = $db[3] >> 1;
       push @event, "3:humidity:$humi";
       }
-      my $co2 = sprintf "%d", $db_2 * 10;
+      my $co2 = sprintf "%d", $db[2] * 10;
       push @event, "3:CO2:$co2";
-      if ($db_0 & 2) {
-        $temp = sprintf "%0.1f", $db_1 * 51 / 255 ;
+      if ($db[0] & 2) {
+        $temp = sprintf "%0.1f", $db[1] * 51 / 255 ;
         push @event, "3:temperature:$temp";
       }
       if ($co2 <= 400) {
@@ -1372,18 +1410,18 @@ EnOcean_Parse($$)
     } elsif ($st eq "radonSensor.01") {
       # Gas Sensor, Radon Sensor (EEP A5-09-06)
       # [untested]
-      # $db_3_bit_7 ... $db_2_bit_6 is the radon activity where 0 = 0 Bq/m3 ... 1023 = 1023 Bq/m3
-      my $rn = $db_3 << 2 | $db_2 >> 6;
+      # $db[3]_bit_7 ... $db[2]_bit_6 is the radon activity where 0 = 0 Bq/m3 ... 1023 = 1023 Bq/m3
+      my $rn = $db[3] << 2 | $db[2] >> 6;
       push @event, "3:Rn:$rn";
       push @event, "3:state:$rn";
 
     } elsif ($st eq "vocSensor.01") {
       # Gas Sensor, VOC Sensor (EEP A5-09-05)
       # [untested]
-      # $db_3_bit_7 ... $db_2_bit_0 is the VOC concentration where 0 = 0 ppb ... 65535 = 65535 ppb
-      # $db_1 is the VOC identification
-      # $db_0_bit_1 ... $db_0_bit_0 is the scale multiplier
-      my $vocSCM = $db_0 & 3;
+      # $db[3]_bit_7 ... $db[2]_bit_0 is the VOC concentration where 0 = 0 ppb ... 65535 = 65535 ppb
+      # $db[1] is the VOC identification
+      # $db[0]_bit_1 ... $db[0]_bit_0 is the scale multiplier
+      my $vocSCM = $db[0] & 3;
       if ($vocSCM == 3) {
         $vocSCM = 10;
       } elsif ($vocSCM == 2) {
@@ -1393,7 +1431,7 @@ EnOcean_Parse($$)
       } else {
         $vocSCM = 0.01;
       }
-      my $vocConc = sprintf "%f", ($db_3 << 8 | $db_2) * $vocSCM;
+      my $vocConc = sprintf "%f", ($db[3] << 8 | $db[2]) * $vocSCM;
       my %vocID = (
         0 => "VOCT",
         1 => "Formaldehyde",
@@ -1423,8 +1461,8 @@ EnOcean_Parse($$)
         26 => "Diethyl Ether",
         255 => "Ozone",
       );
-      if ($vocID{$db_1}) {
-        push @event, "3:vocName:$vocID{$db_1}";
+      if ($vocID{$db[1]}) {
+        push @event, "3:vocName:$vocID{$db[1]}";
       } else {
         push @event, "3:vocName:unknown";
       }
@@ -1434,21 +1472,21 @@ EnOcean_Parse($$)
     } elsif ($st eq "particlesSensor.01") {
       # Gas Sensor, Particles Sensor (EEP A5-09-07)
       # [untested]
-      # $db_3_bit_7 ... $db_2_bit_7 is the particle concentration < 10 µm
+      # $db[3]_bit_7 ... $db[2]_bit_7 is the particle concentration < 10 µm
       # where 0 = 0 µg/m3 ... 511 = 511 µg/m3
-      # $db_2_bit_6 ... $db_1_bit_6 is the particle concentration < 2.5 µm
+      # $db[2]_bit_6 ... $db[1]_bit_6 is the particle concentration < 2.5 µm
       # where 0 = 0 µg/m3 ... 511 = 511 µg/m3
-      # $db_1_bit_5 ... $db_0_bit_5 is the particle concentration < 1 µm
+      # $db[1]_bit_5 ... $db[0]_bit_5 is the particle concentration < 1 µm
       # where 0 = 0 µg/m3 ... 511 = 511 µg/m3
-      # $db_0_bit_2 = 1 = Sensor PM10 active
-      # $db_0_bit_1 = 1 = Sensor PM2_5 active
-      # $db_0_bit_0 = 1 = Sensor PM1 active
+      # $db[0]_bit_2 = 1 = Sensor PM10 active
+      # $db[0]_bit_1 = 1 = Sensor PM2_5 active
+      # $db[0]_bit_0 = 1 = Sensor PM1 active
       my $pm_10 = "inactive";
       my $pm_2_5 = "inactive";
       my $pm_1 = "inactive";
-      if ($db_0 & 4) {$pm_10 = $db_3 << 1 | $db_2 >> 7;}
-      if ($db_0 & 2) {$pm_2_5 = ($db_2 & 0x7F) << 1 | $db_1 >> 7;}
-      if ($db_0 & 1) {$pm_1 = ($db_1 & 0x3F) << 3 | $db_0 >> 5;}
+      if ($db[0] & 4) {$pm_10 = $db[3] << 1 | $db[2] >> 7;}
+      if ($db[0] & 2) {$pm_2_5 = ($db[2] & 0x7F) << 1 | $db[1] >> 7;}
+      if ($db[0] & 1) {$pm_1 = ($db[1] & 0x3F) << 3 | $db[0] >> 5;}
       push @event, "3:particles_10:$pm_10";
       push @event, "3:particles_2_5:$pm_2_5";
       push @event, "3:particles_1:$pm_1";
@@ -1457,96 +1495,105 @@ EnOcean_Parse($$)
     } elsif ($st eq "roomSensorControl.05") {
       # Room Sensor and Control Unit (EEP A5-10-01 ... A5-10-0D)
       # [Eltako FTF55D, FTF55H, Thermokon SR04 *, Thanos SR *, untested]
-      # $db_3 is the fan speed or night reduction for Eltako
-      # $db_2 is the setpoint where 0x00 = min ... 0xFF = max or
+      # $db[3] is the fan speed or night reduction for Eltako
+      # $db[2] is the setpoint where 0x00 = min ... 0xFF = max or
       # reference temperature for Eltako where 0x00 = 0°C ... 0xFF = 40°C
-      # $db_1 is the temperature where 0x00 = +40°C ... 0xFF = 0°C
-      # $db_0 bit D0 is the occupy button, pushbutton or slide switch
-      my $temp = sprintf "%0.1f", 40 - $db_1 / 6.375;
+      # $db[1] is the temperature where 0x00 = +40°C ... 0xFF = 0°C
+      # $db[0] bit D0 is the occupy button, pushbutton or slide switch
+      my $temp = sprintf "%0.1f", 40 - $db[1] / 6.375;
       if ($manufID eq "00D") {
         my $nightReduction = 0;
-        $nightReduction = 1 if ($db_3 == 0x06);
-        $nightReduction = 2 if ($db_3 == 0x0c);
-        $nightReduction = 3 if ($db_3 == 0x13);
-        $nightReduction = 4 if ($db_3 == 0x19);
-        $nightReduction = 5 if ($db_3 == 0x1f);
-        my $setpointTemp = sprintf "%0.1f", $db_2 / 6.375;
+        $nightReduction = 1 if ($db[3] == 0x06);
+        $nightReduction = 2 if ($db[3] == 0x0c);
+        $nightReduction = 3 if ($db[3] == 0x13);
+        $nightReduction = 4 if ($db[3] == 0x19);
+        $nightReduction = 5 if ($db[3] == 0x1f);
+        my $setpointTemp = sprintf "%0.1f", $db[2] / 6.375;
         push @event, "3:state:T: $temp SPT: $setpointTemp NR: $nightReduction";
         push @event, "3:nightReduction:$nightReduction";
         push @event, "3:setpointTemp:$setpointTemp";
       } else {
         my $fspeed = 3;
-        $fspeed = 2      if ($db_3 >= 145);
-        $fspeed = 1      if ($db_3 >= 165);
-        $fspeed = 0      if ($db_3 >= 190);
-        $fspeed = "auto" if ($db_3 >= 210);
-        my $switch = $db_0 & 1;
-        push @event, "3:state:T: $temp SP: $db_2 F: $fspeed SW: $switch";
+        $fspeed = 2      if ($db[3] >= 145);
+        $fspeed = 1      if ($db[3] >= 165);
+        $fspeed = 0      if ($db[3] >= 190);
+        $fspeed = "auto" if ($db[3] >= 210);
+        my $switch = $db[0] & 1;
+        push @event, "3:state:T: $temp SP: $db[2] F: $fspeed SW: $switch";
         push @event, "3:fan:$fspeed";
         push @event, "3:switch:$switch";
-        push @event, "3:setpoint:$db_2";
-        push @event, "3:setpointScaled:" . EnOcean_ReadingScaled($hash, $db_2, 0, 255);
+        push @event, "3:setpoint:$db[2]";
+        my $setpointScaled = EnOcean_ReadingScaled($hash, $db[2], 0, 255);
+        if (defined $setpointScaled) {
+          push @event, "3:setpointScaled:" . $setpointScaled;
+        }
       }
       push @event, "3:temperature:$temp";
 
-    } elsif($st eq "roomSensorControl.01") {
+    } elsif ($st eq "roomSensorControl.01") {
       # Room Sensor and Control Unit (EEP A5-04-01, A5-10-10 ... A5-10-14)
       # [Thermokon SR04 * rH, Thanus SR *, untested]
-      # $db_3 is the setpoint where 0x00 = min ... 0xFF = max
-      # $db_2 is the humidity where 0x00 = 0%rH ... 0xFA = 100%rH
-      # $db_1 is the temperature where 0x00 = 0°C ... 0xFA = +40°C
-      # $db_0 bit D0 is the occupy button, pushbutton or slide switch
-      my $temp = sprintf "%0.1f", $db_1 * 40 / 250;
-      my $humi = sprintf "%d", $db_2 / 2.5;
-      my $switch = $db_0 & 1;
-      push @event, "3:state:T: $temp H: $humi SP: $db_2 SW: $switch";
+      # $db[3] is the setpoint where 0x00 = min ... 0xFF = max
+      # $db[2] is the humidity where 0x00 = 0%rH ... 0xFA = 100%rH
+      # $db[1] is the temperature where 0x00 = 0°C ... 0xFA = +40°C
+      # $db[0] bit D0 is the occupy button, pushbutton or slide switch
+      my $temp = sprintf "%0.1f", $db[1] * 40 / 250;
+      my $humi = sprintf "%d", $db[2] / 2.5;
+      my $switch = $db[0] & 1;
+      push @event, "3:state:T: $temp H: $humi SP: $db[2] SW: $switch";
       push @event, "3:humidity:$humi";
       push @event, "3:switch:$switch";
-      push @event, "3:setpoint:$db_2";
+      push @event, "3:setpoint:$db[2]";
       push @event, "3:temperature:$temp";
-      push @event, "3:setpointScaled:" . EnOcean_ReadingScaled($hash, $db_2, 0, 255);
+      my $setpointScaled = EnOcean_ReadingScaled($hash, $db[2], 0, 255);
+      if (defined $setpointScaled) {
+        push @event, "3:setpointScaled:" . $setpointScaled;
+      }
 
-    } elsif($st eq "roomSensorControl.02") {
+    } elsif ($st eq "roomSensorControl.02") {
       # Room Sensor and Control Unit (A5-10-15 ... A5-10-17)
       # [untested]
-      # $db_2 bit D7 ... D2 is the setpoint where 0 = min ... 63 = max
-      # $db_2 bit D1 ... $db_1 bit D0 is the temperature where 0 = -10°C ... 1023 = +41.2°C
-      # $db_0_bit_0 is Occupany Button where 0 = pressed, 1 = released
-      my $temp = sprintf "%0.2f", -10 + ((($db_2 & 3) << 8) | $db_1) / 19.98;
-      my $setpoint = ($db_2 & 0xFC) >> 2;
-      my $presence = $db_0 & 1 ? "absent" : "present";
+      # $db[2] bit D7 ... D2 is the setpoint where 0 = min ... 63 = max
+      # $db[2] bit D1 ... $db[1] bit D0 is the temperature where 0 = -10°C ... 1023 = +41.2°C
+      # $db[0]_bit_0 is Occupany Button where 0 = pressed, 1 = released
+      my $temp = sprintf "%0.2f", -10 + ((($db[2] & 3) << 8) | $db[1]) / 19.98;
+      my $setpoint = ($db[2] & 0xFC) >> 2;
+      my $presence = $db[0] & 1 ? "absent" : "present";
       push @event, "3:state:T: $temp SP: $setpoint P: $presence";
       push @event, "3:presence:$presence";
       push @event, "3:setpoint:$setpoint";
       push @event, "3:temperature:$temp";
-      push @event, "3:setpointScaled:" . EnOcean_ReadingScaled($hash, $setpoint, 0, 63);
+      my $setpointScaled = EnOcean_ReadingScaled($hash, $db[2], 0, 255);
+      if (defined $setpointScaled) {
+        push @event, "3:setpointScaled:" . $setpointScaled;
+      }
 
-    } elsif($st eq "roomSensorControl.18") {
+    } elsif ($st eq "roomSensorControl.18") {
       # Room Sensor and Control Unit (A5-10-18)
       # [untested]
-      # $db_3 is the illuminance where min 0x00 = 0 lx, max 0xFA = 1000 lx
-      # $db_2 is the setpoint where 250 = 0 °C ... 0 = 40 °C
-      # $db_1 is the temperature where 250 = 0 °C ... 0 = 40 °C
-      # $db_0_bit_6 ... $db_0_bit_4 is the fan speed
-      # $db_0_bit_1 is Occupany enable where 0 = enabled, 1 = disabled
-      # $db_0_bit_0 is Occupany Button where 0 = pressed, 1 = released
-      my $lux = $db_3 << 2;
-      if ($db_3 == 251) {$lux = "over range";}
-      my $setpoint = sprintf "%0.1f", 40 - $db_2 * 40 / 250;
-      my $temp = sprintf "%0.1f", 40 - $db_1 * 40 / 250;
+      # $db[3] is the illuminance where min 0x00 = 0 lx, max 0xFA = 1000 lx
+      # $db[2] is the setpoint where 250 = 0 °C ... 0 = 40 °C
+      # $db[1] is the temperature where 250 = 0 °C ... 0 = 40 °C
+      # $db[0]_bit_6 ... $db[0]_bit_4 is the fan speed
+      # $db[0]_bit_1 is Occupany enable where 0 = enabled, 1 = disabled
+      # $db[0]_bit_0 is Occupany Button where 0 = pressed, 1 = released
+      my $lux = $db[3] << 2;
+      if ($db[3] == 251) {$lux = "over range";}
+      my $setpoint = sprintf "%0.1f", 40 - $db[2] * 40 / 250;
+      my $temp = sprintf "%0.1f", 40 - $db[1] * 40 / 250;
       my $fanSpeed;
-      if ((($db_0 & 0x70) >> 4) == 0) {
+      if ((($db[0] & 0x70) >> 4) == 0) {
         $fanSpeed = "auto";
-      } elsif ((($db_0 & 0x70) >> 4) == 7) {
+      } elsif ((($db[0] & 0x70) >> 4) == 7) {
         $fanSpeed = "off";
       } else {
-        $fanSpeed = (($db_0 & 0x70) >> 4) - 1;
+        $fanSpeed = (($db[0] & 0x70) >> 4) - 1;
       }
       my $presence;
-      if ($db_0 & 2) {
+      if ($db[0] & 2) {
         $presence = "disabled";
       } else {
-        $presence = $db_0 & 1 ? "absent" : "present";
+        $presence = $db[0] & 1 ? "absent" : "present";
       }
       push @event, "3:brightness:$lux";
       push @event, "3:fan:$fanSpeed";
@@ -1555,31 +1602,31 @@ EnOcean_Parse($$)
       push @event, "3:temperature:$temp";
       push @event, "3:state:T: $temp B: $lux F: $fanSpeed SP: $setpoint P: $presence";
 
-    } elsif($st eq "roomSensorControl.19") {
+    } elsif ($st eq "roomSensorControl.19") {
       # Room Sensor and Control Unit (A5-10-19)
       # [untested]
-      # $db_3 is the humidity where min 0x00 = 0 %rH, max 0xFA = 10 %rH
-      # $db_2 is the setpoint where 250 = 0 °C ... 0 = 40 °C
-      # $db_1 is the temperature where 250 = 0 °C ... 0 = 40 °C
-      # $db_0_bit_6 ... $db_0_bit_4 is the fan speed
-      # $db_0_bit_1 is Occupany Button where 0 = pressed, 1 = released
-      # $db_0_bit_0 is Occupany enable where 0 = enabled, 1 = disabled
-      my $humi = $db_3 / 2.5;
-      my $setpoint = sprintf "%0.1f", 40 - $db_2 * 40 / 250;
-      my $temp = sprintf "%0.1f", 40 - $db_1 * 40 / 250;
+      # $db[3] is the humidity where min 0x00 = 0 %rH, max 0xFA = 10 %rH
+      # $db[2] is the setpoint where 250 = 0 °C ... 0 = 40 °C
+      # $db[1] is the temperature where 250 = 0 °C ... 0 = 40 °C
+      # $db[0]_bit_6 ... $db[0]_bit_4 is the fan speed
+      # $db[0]_bit_1 is Occupany Button where 0 = pressed, 1 = released
+      # $db[0]_bit_0 is Occupany enable where 0 = enabled, 1 = disabled
+      my $humi = $db[3] / 2.5;
+      my $setpoint = sprintf "%0.1f", 40 - $db[2] * 40 / 250;
+      my $temp = sprintf "%0.1f", 40 - $db[1] * 40 / 250;
       my $fanSpeed;
-      if ((($db_0 & 0x70) >> 4) == 0) {
+      if ((($db[0] & 0x70) >> 4) == 0) {
         $fanSpeed = "auto";
-      } elsif ((($db_0 & 0x70) >> 4) == 7) {
+      } elsif ((($db[0] & 0x70) >> 4) == 7) {
         $fanSpeed = "off";
       } else {
-        $fanSpeed = (($db_0 & 0x70) >> 4) - 1;
+        $fanSpeed = (($db[0] & 0x70) >> 4) - 1;
       }
       my $presence;
-      if ($db_0 & 1) {
+      if ($db[0] & 1) {
         $presence = "disabled";
       } else {
-        $presence = $db_0 & 2 ? "absent" : "present";
+        $presence = $db[0] & 2 ? "absent" : "present";
       }
       push @event, "3:fan:$fanSpeed";
       push @event, "3:humidity:$humi";
@@ -1588,33 +1635,33 @@ EnOcean_Parse($$)
       push @event, "3:temperature:$temp";
       push @event, "3:state:T: $temp H: $humi F: $fanSpeed SP: $setpoint P: $presence";
 
-    } elsif($st eq "roomSensorControl.1A") {
+    } elsif ($st eq "roomSensorControl.1A") {
       # Room Sensor and Control Unit (A5-10-1A)
       # [untested]
-      # $db_3 is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
-      # $db_3 > 0xFA is error code
-      # $db_2 is the setpoint where 250 = 0 °C ... 0 = 40 °C
-      # $db_1 is the temperature where 250 = 0 °C ... 0 = 40 °C
-      # $db_0_bit_6 ... $db_0_bit_4 is the fan speed
-      # $db_0_bit_1 is Occupany enable where 0 = enabled, 1 = disabled
-      # $db_0_bit_0 is Occupany Button where 0 = pressed, 1 = released
-      my $voltage = sprintf "0.1f", $db_3 * 0.02;
-      if ($db_3 > 250) {push @event, "3:errorCode:$db_3";}
-      my $setpoint = sprintf "%0.1f", 40 - $db_2 * 40 / 250;
-      my $temp = sprintf "%0.1f", 40 - $db_1 * 40 / 250;
+      # $db[3] is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
+      # $db[3] > 0xFA is error code
+      # $db[2] is the setpoint where 250 = 0 °C ... 0 = 40 °C
+      # $db[1] is the temperature where 250 = 0 °C ... 0 = 40 °C
+      # $db[0]_bit_6 ... $db[0]_bit_4 is the fan speed
+      # $db[0]_bit_1 is Occupany enable where 0 = enabled, 1 = disabled
+      # $db[0]_bit_0 is Occupany Button where 0 = pressed, 1 = released
+      my $voltage = sprintf "0.1f", $db[3] * 0.02;
+      if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
+      my $setpoint = sprintf "%0.1f", 40 - $db[2] * 40 / 250;
+      my $temp = sprintf "%0.1f", 40 - $db[1] * 40 / 250;
       my $fanSpeed;
-      if ((($db_0 & 0x70) >> 4) == 0) {
+      if ((($db[0] & 0x70) >> 4) == 0) {
         $fanSpeed = "auto";
-      } elsif ((($db_0 & 0x70) >> 4) == 7) {
+      } elsif ((($db[0] & 0x70) >> 4) == 7) {
         $fanSpeed = "off";
       } else {
-        $fanSpeed = (($db_0 & 0x70) >> 4) - 1;
+        $fanSpeed = (($db[0] & 0x70) >> 4) - 1;
       }
       my $presence;
-      if ($db_0 & 2) {
+      if ($db[0] & 2) {
         $presence = "disabled";
       } else {
-        $presence = $db_0 & 1 ? "absent" : "present";
+        $presence = $db[0] & 1 ? "absent" : "present";
       }
       push @event, "3:fan:$fanSpeed";
       push @event, "3:presence:$presence";
@@ -1623,34 +1670,34 @@ EnOcean_Parse($$)
       push @event, "3:voltage:$voltage";
       push @event, "3:state:T: $temp F: $fanSpeed SP: $setpoint P: $presence U: $voltage";
 
-    } elsif($st eq "roomSensorControl.1B") {
+    } elsif ($st eq "roomSensorControl.1B") {
       # Room Sensor and Control Unit (A5-10-1B)
       # [untested]
-      # $db_3 is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
-      # $db_3 > 0xFA is error code
-      # $db_2 is the illuminance where min 0x00 = 0 lx, max 0xFA = 1000 lx
-      # $db_1 is the temperature where 250 = 0 °C ... 0 = 40 °C
-      # $db_0_bit_6 ... $db_0_bit_4 is the fan speed
-      # $db_0_bit_1 is Occupany enable where 0 = enabled, 1 = disabled
-      # $db_0_bit_0 is Occupany Button where 0 = pressed, 1 = released
-      my $voltage = sprintf "0.1f", $db_3 * 0.02;
-      if ($db_3 > 250) {push @event, "3:errorCode:$db_3";}
-      my $lux = $db_2 << 2;
-      if ($db_2 == 251) {$lux = "over range";}
-      my $temp = sprintf "%0.1f", 40 - $db_1 * 40 / 250;
+      # $db[3] is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
+      # $db[3] > 0xFA is error code
+      # $db[2] is the illuminance where min 0x00 = 0 lx, max 0xFA = 1000 lx
+      # $db[1] is the temperature where 250 = 0 °C ... 0 = 40 °C
+      # $db[0]_bit_6 ... $db[0]_bit_4 is the fan speed
+      # $db[0]_bit_1 is Occupany enable where 0 = enabled, 1 = disabled
+      # $db[0]_bit_0 is Occupany Button where 0 = pressed, 1 = released
+      my $voltage = sprintf "0.1f", $db[3] * 0.02;
+      if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
+      my $lux = $db[2] << 2;
+      if ($db[2] == 251) {$lux = "over range";}
+      my $temp = sprintf "%0.1f", 40 - $db[1] * 40 / 250;
       my $fanSpeed;
-      if ((($db_0 & 0x70) >> 4) == 0) {
+      if ((($db[0] & 0x70) >> 4) == 0) {
         $fanSpeed = "auto";
-      } elsif ((($db_0 & 0x70) >> 4) == 7) {
+      } elsif ((($db[0] & 0x70) >> 4) == 7) {
         $fanSpeed = "off";
       } else {
-        $fanSpeed = (($db_0 & 0x70) >> 4) - 1;
+        $fanSpeed = (($db[0] & 0x70) >> 4) - 1;
       }
       my $presence;
-      if ($db_0 & 2) {
+      if ($db[0] & 2) {
         $presence = "disabled";
       } else {
-        $presence = $db_0 & 1 ? "absent" : "present";
+        $presence = $db[0] & 1 ? "absent" : "present";
       }
       push @event, "3:brightness:$lux";
       push @event, "3:fan:$fanSpeed";
@@ -1659,32 +1706,32 @@ EnOcean_Parse($$)
       push @event, "3:voltage:$voltage";
       push @event, "3:state:T: $temp B: $lux F: $fanSpeed P: $presence U: $voltage";
 
-    } elsif($st eq "roomSensorControl.1C") {
+    } elsif ($st eq "roomSensorControl.1C") {
       # Room Sensor and Control Unit (A5-10-1C)
       # [untested]
-      # $db_3 is the illuminance where min 0x00 = 0 lx, max 0xFA = 1000 lx
-      # $db_2 is the illuminance setpoint where min 0x00 = 0 lx, max 0xFA = 1000 lx
-      # $db_1 is the temperature where 250 = 0 °C ... 0 = 40 °C
-      # $db_0_bit_6 ... $db_0_bit_4 is the fan speed
-      # $db_0_bit_1 is Occupany enable where 0 = enabled, 1 = disabled
-      # $db_0_bit_0 is Occupany Button where 0 = pressed, 1 = released
-      my $lux = $db_3 << 2;
-      if ($db_3 == 251) {$lux = "over range";}
-      my $setpoint = $db_2 << 2;
-      my $temp = sprintf "%0.1f", 40 - $db_1 * 40 / 250;
+      # $db[3] is the illuminance where min 0x00 = 0 lx, max 0xFA = 1000 lx
+      # $db[2] is the illuminance setpoint where min 0x00 = 0 lx, max 0xFA = 1000 lx
+      # $db[1] is the temperature where 250 = 0 °C ... 0 = 40 °C
+      # $db[0]_bit_6 ... $db[0]_bit_4 is the fan speed
+      # $db[0]_bit_1 is Occupany enable where 0 = enabled, 1 = disabled
+      # $db[0]_bit_0 is Occupany Button where 0 = pressed, 1 = released
+      my $lux = $db[3] << 2;
+      if ($db[3] == 251) {$lux = "over range";}
+      my $setpoint = $db[2] << 2;
+      my $temp = sprintf "%0.1f", 40 - $db[1] * 40 / 250;
       my $fanSpeed;
-      if ((($db_0 & 0x70) >> 4) == 0) {
+      if ((($db[0] & 0x70) >> 4) == 0) {
         $fanSpeed = "auto";
-      } elsif ((($db_0 & 0x70) >> 4) == 7) {
+      } elsif ((($db[0] & 0x70) >> 4) == 7) {
         $fanSpeed = "off";
       } else {
-        $fanSpeed = (($db_0 & 0x70) >> 4) - 1;
+        $fanSpeed = (($db[0] & 0x70) >> 4) - 1;
       }
       my $presence;
-      if ($db_0 & 2) {
+      if ($db[0] & 2) {
         $presence = "disabled";
       } else {
-        $presence = $db_0 & 1 ? "absent" : "present";
+        $presence = $db[0] & 1 ? "absent" : "present";
       }
       push @event, "3:brightness:$lux";
       push @event, "3:fan:$fanSpeed";
@@ -1693,31 +1740,31 @@ EnOcean_Parse($$)
       push @event, "3:temperature:$temp";
       push @event, "3:state:T: $temp B: $lux F: $fanSpeed SP: $setpoint P: $presence";
 
-    } elsif($st eq "roomSensorControl.1D") {
+    } elsif ($st eq "roomSensorControl.1D") {
       # Room Sensor and Control Unit (A5-10-1D)
       # [untested]
-      # $db_3 is the humidity where min 0x00 = 0 %rH, max 0xFA = 10 %rH
-      # $db_2 is the humidity setpoint where min 0x00 = 0 %rH, max 0xFA = 10 %rH
-      # $db_1 is the temperature where 250 = 0 °C ... 0 = 40 °C
-      # $db_0_bit_6 ... $db_0_bit_4 is the fan speed
-      # $db_0_bit_1 is Occupany enable where 0 = enabled, 1 = disabled
-      # $db_0_bit_0 is Occupany Button where 0 = pressed, 1 = released
-      my $humi = $db_3 / 2.5;
-      my $setpoint = $db_2 / 2.5;
-      my $temp = sprintf "%0.1f", 40 - $db_1 * 40 / 250;
+      # $db[3] is the humidity where min 0x00 = 0 %rH, max 0xFA = 10 %rH
+      # $db[2] is the humidity setpoint where min 0x00 = 0 %rH, max 0xFA = 10 %rH
+      # $db[1] is the temperature where 250 = 0 °C ... 0 = 40 °C
+      # $db[0]_bit_6 ... $db[0]_bit_4 is the fan speed
+      # $db[0]_bit_1 is Occupany enable where 0 = enabled, 1 = disabled
+      # $db[0]_bit_0 is Occupany Button where 0 = pressed, 1 = released
+      my $humi = $db[3] / 2.5;
+      my $setpoint = $db[2] / 2.5;
+      my $temp = sprintf "%0.1f", 40 - $db[1] * 40 / 250;
       my $fanSpeed;
-      if ((($db_0 & 0x70) >> 4) == 0) {
+      if ((($db[0] & 0x70) >> 4) == 0) {
         $fanSpeed = "auto";
-      } elsif ((($db_0 & 0x70) >> 4) == 7) {
+      } elsif ((($db[0] & 0x70) >> 4) == 7) {
         $fanSpeed = "off";
       } else {
-        $fanSpeed = (($db_0 & 0x70) >> 4) - 1;
+        $fanSpeed = (($db[0] & 0x70) >> 4) - 1;
       }
       my $presence;
-      if ($db_0 & 2) {
+      if ($db[0] & 2) {
         $presence = "disabled";
       } else {
-        $presence = $db_0 & 1 ? "absent" : "present";
+        $presence = $db[0] & 1 ? "absent" : "present";
       }
       push @event, "3:fan:$fanSpeed";
       push @event, "3:humidity:$humi";
@@ -1726,56 +1773,59 @@ EnOcean_Parse($$)
       push @event, "3:temperature:$temp";
       push @event, "3:state:T: $temp H: $humi F: $fanSpeed SP: $setpoint P: $presence";
 
-    } elsif($st eq "roomSensorControl.1F") {
+    } elsif ($st eq "roomSensorControl.1F") {
       # Room Sensor and Control Unit (A5-10-1F)
       # [untested]
-      # $db_3 is the fan speed
-      # $db_2 is the setpoint where 0 = 0 ... 255 = 255
-      # $db_1 is the temperature where 250 = 0 °C ... 0 = 40 °C
-      # $db_0_bit_6 ... $db_0_bit_4 is the fan speed
-      # $db_0_bit_6 ... $db_0_bit_4 are flags
-      # $db_0_bit_1 is Occupany enable where 0 = enabled, 1 = disabled
-      # $db_0_bit_0 is Occupany Button where 0 = pressed, 1 = released
+      # $db[3] is the fan speed
+      # $db[2] is the setpoint where 0 = 0 ... 255 = 255
+      # $db[1] is the temperature where 250 = 0 °C ... 0 = 40 °C
+      # $db[0]_bit_6 ... $db[0]_bit_4 is the fan speed
+      # $db[0]_bit_6 ... $db[0]_bit_4 are flags
+      # $db[0]_bit_1 is Occupany enable where 0 = enabled, 1 = disabled
+      # $db[0]_bit_0 is Occupany Button where 0 = pressed, 1 = released
       my $fanSpeed = "unknown";
-      if ($db_0 & 0x10) {
+      if ($db[0] & 0x10) {
         $fanSpeed = 3;
-        $fanSpeed = 2      if ($db_3 >= 145);
-        $fanSpeed = 1      if ($db_3 >= 165);
-        $fanSpeed = 0      if ($db_3 >= 190);
-        $fanSpeed = "auto" if ($db_3 >= 210);
+        $fanSpeed = 2      if ($db[3] >= 145);
+        $fanSpeed = 1      if ($db[3] >= 165);
+        $fanSpeed = 0      if ($db[3] >= 190);
+        $fanSpeed = "auto" if ($db[3] >= 210);
       }
       my $setpoint = "unknown";
-      $setpoint = $db_2 if ($db_0 & 0x20);
+      $setpoint = $db[2] if ($db[0] & 0x20);
       my $temp = "unknown";
-      $temp = sprintf "%0.1f", 40 - $db_1 * 40 / 250 if ($db_0 & 0x40);
+      $temp = sprintf "%0.1f", 40 - $db[1] * 40 / 250 if ($db[0] & 0x40);
       my $presence = "unknown";
-      $presence = "absent" if (!($db_0 & 2));
-      $presence = "present" if (!($db_0 & 1));
+      $presence = "absent" if (!($db[0] & 2));
+      $presence = "present" if (!($db[0] & 1));
       push @event, "3:fan:$fanSpeed";
       push @event, "3:presence:$presence";
       push @event, "3:setpoint:$setpoint";
       push @event, "3:temperature:$temp";
       push @event, "3:state:T: $temp F: $fanSpeed SP: $setpoint P: $presence";
-      push @event, "3:setpointScaled:" . EnOcean_ReadingScaled($hash, $setpoint, 0, 255);
+      my $setpointScaled = EnOcean_ReadingScaled($hash, $db[2], 0, 255);
+      if (defined $setpointScaled) {
+        push @event, "3:setpointScaled:" . $setpointScaled;
+      }
 
-    } elsif($st eq "tempHumiSensor.02") {
+    } elsif ($st eq "tempHumiSensor.02") {
       # Temperatur and Humidity Sensor(EEP A5-04-02)
       # [Eltako FAFT60, FIFT63AP]
-      # $db_3 is the voltage where 0x59 = 2.5V ... 0x9B = 4V, only at Eltako
-      # $db_2 is the humidity where 0x00 = 0%rH ... 0xFA = 100%rH
-      # $db_1 is the temperature where 0x00 = -20°C ... 0xFA = +60°C
-      my $humi = sprintf "%d", $db_2 / 2.5;
-      my $temp = sprintf "%0.1f", -20 + $db_1 * 80 / 250;
+      # $db[3] is the voltage where 0x59 = 2.5V ... 0x9B = 4V, only at Eltako
+      # $db[2] is the humidity where 0x00 = 0%rH ... 0xFA = 100%rH
+      # $db[1] is the temperature where 0x00 = -20°C ... 0xFA = +60°C
+      my $humi = sprintf "%d", $db[2] / 2.5;
+      my $temp = sprintf "%0.1f", -20 + $db[1] * 80 / 250;
       my $battery = "unknown";
       if ($manufID eq "00D") {
         # Eltako sensor
-        my $voltage = sprintf "%0.1f", $db_3 * 6.58 / 255;
+        my $voltage = sprintf "%0.1f", $db[3] * 6.58 / 255;
         my $energyStorage = "unknown";
-        if ($db_3 <= 0x58) {
+        if ($db[3] <= 0x58) {
           $energyStorage = "empty";
           $battery = "low";
         }
-        elsif ($db_3 <= 0xDC) {
+        elsif ($db[3] <= 0xDC) {
           $energyStorage = "charged";
           $battery = "ok";
         }
@@ -1794,26 +1844,26 @@ EnOcean_Parse($$)
     } elsif ($st eq "lightSensor.01") {
       # Light Sensor (EEP A5-06-01)
       # [Eltako FAH60, FAH63, FIH63, Thermokon SR65 LI, untested]
-      # $db_3 is the voltage where 0x00 = 0 V ... 0xFF = 5.1 V
-      # $db_3 is the low illuminance for Eltako devices where
-      # min 0x00 = 0 lx, max 0xFF = 100 lx, if $db_2 = 0
-      # $db_2 is the illuminance (ILL2) where min 0x00 = 300 lx, max 0xFF = 30000 lx
-      # $db_1 is the illuminance (ILL1) where min 0x00 = 600 lx, max 0xFF = 60000 lx
-      # $db_0_bit_0 is Range select where 0 = ILL1, 1 = ILL2
+      # $db[3] is the voltage where 0x00 = 0 V ... 0xFF = 5.1 V
+      # $db[3] is the low illuminance for Eltako devices where
+      # min 0x00 = 0 lx, max 0xFF = 100 lx, if $db[2] = 0
+      # $db[2] is the illuminance (ILL2) where min 0x00 = 300 lx, max 0xFF = 30000 lx
+      # $db[1] is the illuminance (ILL1) where min 0x00 = 600 lx, max 0xFF = 60000 lx
+      # $db[0]_bit_0 is Range select where 0 = ILL1, 1 = ILL2
       my $lux;
       my $voltage = "unknown";
       if ($manufID eq "00D") {
-        if($db_2 == 0) {
-          $lux = sprintf "%d", $db_3 * 100 / 255;
+        if($db[2] == 0) {
+          $lux = sprintf "%d", $db[3] * 100 / 255;
         } else {
-          $lux = sprintf "%d", $db_2 * 116.48 + 300;
+          $lux = sprintf "%d", $db[2] * 116.48 + 300;
         }
       } else {
-        $voltage = sprintf "0.1f", $db_3 * 0.02;
-        if($db_0 & 1) {
-          $lux = sprintf "%d", $db_2 * 116.48 + 300;
+        $voltage = sprintf "0.1f", $db[3] * 0.02;
+        if($db[0] & 1) {
+          $lux = sprintf "%d", $db[2] * 116.48 + 300;
         } else {
-          $lux = sprintf "%d", $db_1 * 232.94 + 600;
+          $lux = sprintf "%d", $db[1] * 232.94 + 600;
         }
         push @event, "3:voltage:$voltage";
       }
@@ -1822,16 +1872,16 @@ EnOcean_Parse($$)
 
     } elsif ($st eq "lightSensor.02") {
       # Light Sensor (EEP A5-06-02)
-      # $db_3 is the voltage where 0x00 = 0 V ... 0xFF = 5.1 V
-      # $db_2 is the illuminance (ILL2) where min 0x00 = 0 lx, max 0xFF = 510 lx
-      # $db_1 is the illuminance (ILL1) where min 0x00 = 0 lx, max 0xFF = 1020 lx
-      # $db_0_bit_0 is Range select where 0 = ILL1, 1 = ILL2
+      # $db[3] is the voltage where 0x00 = 0 V ... 0xFF = 5.1 V
+      # $db[2] is the illuminance (ILL2) where min 0x00 = 0 lx, max 0xFF = 510 lx
+      # $db[1] is the illuminance (ILL1) where min 0x00 = 0 lx, max 0xFF = 1020 lx
+      # $db[0]_bit_0 is Range select where 0 = ILL1, 1 = ILL2
       my $lux;
-      my $voltage = sprintf "0.1f", $db_3 * 0.02;
-      if($db_0 & 1) {
-        $lux = $db_2 << 1;
+      my $voltage = sprintf "0.1f", $db[3] * 0.02;
+      if($db[0] & 1) {
+        $lux = $db[2] << 1;
       } else {
-        $lux = $db_1 << 2;
+        $lux = $db[1] << 2;
       }
       push @event, "3:voltage:$voltage";
       push @event, "3:brightness:$lux";
@@ -1839,51 +1889,51 @@ EnOcean_Parse($$)
 
     } elsif ($st eq "lightSensor.03") {
       # Light Sensor (EEP A5-06-03)
-      # $db_3 is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
-      # $db_3 > 0xFA is error code
-      # $db_2_bit_7 ... $db_1_bit_6 is the illuminance where min 0x000 = 0 lx, max 0x3E8 = 1000 lx
-      my $lux = $db_2 << 2 | $db_1 >> 6;
+      # $db[3] is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
+      # $db[3] > 0xFA is error code
+      # $db[2]_bit_7 ... $db[1]_bit_6 is the illuminance where min 0x000 = 0 lx, max 0x3E8 = 1000 lx
+      my $lux = $db[2] << 2 | $db[1] >> 6;
       if ($lux == 1001) {$lux = "over range";}
-      my $voltage = sprintf "0.1f", $db_3 * 0.02;
-      if ($db_3 > 250) {push @event, "3:errorCode:$db_3";}
+      my $voltage = sprintf "0.1f", $db[3] * 0.02;
+      if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
       push @event, "3:voltage:$voltage";
       push @event, "3:brightness:$lux";
       push @event, "3:state:$lux";
 
     } elsif ($st eq "occupSensor.01") {
       # Occupancy Sensor (EEP A5-07-01)
-      # $db_3 is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
-      # $db_3 > 0xFA is error code
-      # $db_1 is PIR Status (motion) where 0 ... 127 = off, 128 ... 255 = on
+      # $db[3] is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
+      # $db[3] > 0xFA is error code
+      # $db[1] is PIR Status (motion) where 0 ... 127 = off, 128 ... 255 = on
       my $motion = "off";
-      if ($db_1 >= 128) {$motion = "on";}
-      if ($db_0 & 1) {push @event, "3:voltage:" . sprintf "0.1f", $db_3 * 0.02;}
-      if ($db_3 > 250) {push @event, "3:errorCode:$db_3";}
+      if ($db[1] >= 128) {$motion = "on";}
+      if ($db[0] & 1) {push @event, "3:voltage:" . sprintf "0.1f", $db[3] * 0.02;}
+      if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
       push @event, "3:motion:$motion";
       push @event, "3:state:$motion";
 
     } elsif ($st eq "occupSensor.02") {
       # Occupancy Sensor (EEP A5-07-02)
-      # $db_3 is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
-      # $db_3 > 0xFA is error code
-      # $db_0_bit_7 is PIR Status (motion) where 0 = off, 1 = on
-      my $motion = $db_0 >> 7 ? "on" : "off";
-      if ($db_3 > 250) {push @event, "3:errorCode:$db_3";}
+      # $db[3] is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
+      # $db[3] > 0xFA is error code
+      # $db[0]_bit_7 is PIR Status (motion) where 0 = off, 1 = on
+      my $motion = $db[0] >> 7 ? "on" : "off";
+      if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
       push @event, "3:motion:$motion";
-      push @event, "3:voltage:" . sprintf "0.1f", $db_3 * 0.02;
+      push @event, "3:voltage:" . sprintf "0.1f", $db[3] * 0.02;
       push @event, "3:state:$motion";
 
     } elsif ($st eq "occupSensor.03") {
       # Occupancy Sensor (EEP A5-07-03)
-      # $db_3 is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
-      # $db_3 > 0xFA is error code
-      # $db_2_bit_7 ... $db_1_bit_6 is the illuminance where min 0x000 = 0 lx, max 0x3E8 = 1000 lx
-      # $db_0_bit_7 is PIR Status (motion) where 0 = off, 1 = on
-      my $motion = $db_0 >> 7 ? "on" : "off";
-      my $lux = $db_2 << 2 | $db_1 >> 6;
+      # $db[3] is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
+      # $db[3] > 0xFA is error code
+      # $db[2]_bit_7 ... $db[1]_bit_6 is the illuminance where min 0x000 = 0 lx, max 0x3E8 = 1000 lx
+      # $db[0]_bit_7 is PIR Status (motion) where 0 = off, 1 = on
+      my $motion = $db[0] >> 7 ? "on" : "off";
+      my $lux = $db[2] << 2 | $db[1] >> 6;
       if ($lux == 1001) {$lux = "over range";}
-      my $voltage = sprintf "0.1f", $db_3 * 0.02;
-      if ($db_3 > 250) {push @event, "3:errorCode:$db_3";}
+      my $voltage = sprintf "0.1f", $db[3] * 0.02;
+      if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
       push @event, "3:brightness:$lux";
       push @event, "3:motion:$motion";
       push @event, "3:voltage:$voltage";
@@ -1891,26 +1941,26 @@ EnOcean_Parse($$)
 
     } elsif ($st =~ m/^lightTempOccupSensor/) {
       # Light, Temperatur and Occupancy Sensor (EEP A5-08-01 ... A5-08-03)
-      # $db_3 is the voltage where 0x00 = 0 V ... 0xFF = 5.1 V
-      # $db_2 is the illuminance where min 0x00 = 0 lx, max 0xFF = 510 lx, 1020 lx, (2048 lx)
-      # $db_1 is the temperature whrere 0x00 = 0 °C ... 0xFF = 51 °C or -30 °C ... 50°C
-      # $db_0_bit_1 is PIR Status (motion) where 0 = on, 1 = off
-      # $db_0_bit_0 is Occupany Button where 0 = pressed, 1 = released
+      # $db[3] is the voltage where 0x00 = 0 V ... 0xFF = 5.1 V
+      # $db[2] is the illuminance where min 0x00 = 0 lx, max 0xFF = 510 lx, 1020 lx, (2048 lx)
+      # $db[1] is the temperature whrere 0x00 = 0 °C ... 0xFF = 51 °C or -30 °C ... 50°C
+      # $db[0]_bit_1 is PIR Status (motion) where 0 = on, 1 = off
+      # $db[0]_bit_0 is Occupany Button where 0 = pressed, 1 = released
       my $lux;
       my $temp;
-      my $voltage = sprintf "%0.1f", $db_3 * 0.02;
-      my $motion = $db_0 & 2 ? "off" : "on";
-      my $presence = $db_0 & 1 ? "absent" : "present";
+      my $voltage = sprintf "%0.1f", $db[3] * 0.02;
+      my $motion = $db[0] & 2 ? "off" : "on";
+      my $presence = $db[0] & 1 ? "absent" : "present";
 
       if ($st eq "lightTempOccupSensor.01") {
         # Light, Temperatur and Occupancy Sensor (EEP A5-08-01)
         # [Eltako FABH63, FBH55, FBH63, FIBH63]
         if ($manufID eq "00D") {
-          $lux = sprintf "%d", $db_2 * 2048 / 255;
+          $lux = sprintf "%d", $db[2] * 2048 / 255;
           push @event, "3:state:M: $motion E: $lux";
         } else {
-          $lux = $db_2 << 1;
-          $temp = sprintf "%0.1f", $db_1 * 0.2;
+          $lux = $db[2] << 1;
+          $temp = sprintf "%0.1f", $db[1] * 0.2;
           push @event, "3:state:M: $motion E: $lux P: $presence T: $temp U: $voltage";
           push @event, "3:presence:$presence";
           push @event, "3:temperature:$temp";
@@ -1918,16 +1968,16 @@ EnOcean_Parse($$)
         }
       } elsif ($st eq "lightTempOccupSensor.02") {
         # Light, Temperatur and Occupancy Sensor (EEP A5-08-02)
-        $lux = $db_2 << 2;
-        $temp = sprintf "%0.1f", $db_1 * 0.2;
+        $lux = $db[2] << 2;
+        $temp = sprintf "%0.1f", $db[1] * 0.2;
         push @event, "3:state:M: $motion E: $lux P: $presence T: $temp U: $voltage";
         push @event, "3:presence:$presence";
         push @event, "3:temperature:$temp";
         push @event, "3:voltage:$voltage";
       } elsif ($st eq "lightTempOccupSensor.03") {
         # Light, Temperatur and Occupancy Sensor (EEP A5-08-03)
-        $lux = $db_2 * 6;
-        $temp = sprintf "%0.1f", -30 + $db_1 * 80 / 255;
+        $lux = $db[2] * 6;
+        $temp = sprintf "%0.1f", -30 + $db[1] * 80 / 255;
         push @event, "3:state:M: $motion E: $lux P: $presence T: $temp U: $voltage";
         push @event, "3:presence:$presence";
         push @event, "3:temperature:$temp";
@@ -1938,56 +1988,56 @@ EnOcean_Parse($$)
 
     } elsif ($st eq "lightCtrlState.01") {
       # Lighting Controller State (EEP A5-11-01)
-      # $db_3 is the illumination where 0x00 = 0 lx ... 0xFF = 510 lx
-      # $db_2 is the illumination Setpoint where 0x00 = 0 ... 0xFF = 255
-      # $db_1 is the Dimming Output Level where 0x00 = 0 ... 0xFF = 255
-      # $db_0_bit_7 is the Repeater state where 0 = disabled, 1 = enabled
-      # $db_0_bit_6 is the Power Relay Timer state where 0 = disabled, 1 = enabled
-      # $db_0_bit_5 is the Daylight Harvesting state where 0 = disabled, 1 = enabled
-      # $db_0_bit_4 is the Dimming mode where 0 = switching, 1 = dimming
-      # $db_0_bit_2 is the Magnet Contact state where 0 = open, 1 = closed
-      # $db_0_bit_1 is the Occupancy (prensence) state where 0 = absent, 1 = present
-      # $db_0_bit_0 is the Power Relay state where 0 = off, 1 = on
-      push @event, "3:brightness:" . ($db_3 << 1);
-      push @event, "3:illum:$db_2";
-      push @event, "3:dimValue:$db_1";
-      push @event, "3:powerRelayTimer:" . ($db_0 & 0x80 ? "enabled" : "disabled");
-      push @event, "3:repeater:" . ($db_0 & 0x40 ? "enabled" : "disabled");
-      push @event, "3:daylightHarvesting:" . ($db_0 & 0x20 ? "enabled" : "disabled");
-      push @event, "3:mode:" . ($db_0 & 0x10 ? "dimming" : "switching");
-      push @event, "3:contact:" . ($db_0 & 4 ? "closed" : "open");
-      push @event, "3:presence:" . ($db_0 & 2 ? "present" : "absent");
-      push @event, "3:powerSwitch:" . ($db_0 & 1 ? "on" : "off");
-      push @event, "3:state:" . ($db_0 & 1 ? "on" : "off");
+      # $db[3] is the illumination where 0x00 = 0 lx ... 0xFF = 510 lx
+      # $db[2] is the illumination Setpoint where 0x00 = 0 ... 0xFF = 255
+      # $db[1] is the Dimming Output Level where 0x00 = 0 ... 0xFF = 255
+      # $db[0]_bit_7 is the Repeater state where 0 = disabled, 1 = enabled
+      # $db[0]_bit_6 is the Power Relay Timer state where 0 = disabled, 1 = enabled
+      # $db[0]_bit_5 is the Daylight Harvesting state where 0 = disabled, 1 = enabled
+      # $db[0]_bit_4 is the Dimming mode where 0 = switching, 1 = dimming
+      # $db[0]_bit_2 is the Magnet Contact state where 0 = open, 1 = closed
+      # $db[0]_bit_1 is the Occupancy (prensence) state where 0 = absent, 1 = present
+      # $db[0]_bit_0 is the Power Relay state where 0 = off, 1 = on
+      push @event, "3:brightness:" . ($db[3] << 1);
+      push @event, "3:illum:$db[2]";
+      push @event, "3:dimValue:$db[1]";
+      push @event, "3:powerRelayTimer:" . ($db[0] & 0x80 ? "enabled" : "disabled");
+      push @event, "3:repeater:" . ($db[0] & 0x40 ? "enabled" : "disabled");
+      push @event, "3:daylightHarvesting:" . ($db[0] & 0x20 ? "enabled" : "disabled");
+      push @event, "3:mode:" . ($db[0] & 0x10 ? "dimming" : "switching");
+      push @event, "3:contact:" . ($db[0] & 4 ? "closed" : "open");
+      push @event, "3:presence:" . ($db[0] & 2 ? "present" : "absent");
+      push @event, "3:powerSwitch:" . ($db[0] & 1 ? "on" : "off");
+      push @event, "3:state:" . ($db[0] & 1 ? "on" : "off");
 
     } elsif ($st eq "tempCtrlState.01") {
       # Temperature Controller Output (EEP A5-11-02)
-      # $db_3 is the Control Variable where 0x00 = 0 % ... 0xFF = 100 %
-      # $db_2 is the Fan Stage
-      # $db_1 is the Actual Setpoint where 0x00 = 0 °C ... 0xFF = 51.2 °C
-      # $db_0_bit_7 is the Alarm state where 0 = no, 1 = yes
-      # $db_0_bit_6 ... $db_0_bit_5 is the Controller Mode
-      # $db_0_bit_4 is the Controller State where 0 = auto, 1 = override
-      # $db_0_bit_2 is the Energy hold-off where 0 = normal, 1 = hold-off
-      # $db_0_bit_1 ... $db_0_bit_0is the Occupancy (prensence) state where 0 = present
+      # $db[3] is the Control Variable where 0x00 = 0 % ... 0xFF = 100 %
+      # $db[2] is the Fan Stage
+      # $db[1] is the Actual Setpoint where 0x00 = 0 °C ... 0xFF = 51.2 °C
+      # $db[0]_bit_7 is the Alarm state where 0 = no, 1 = yes
+      # $db[0]_bit_6 ... $db[0]_bit_5 is the Controller Mode
+      # $db[0]_bit_4 is the Controller State where 0 = auto, 1 = override
+      # $db[0]_bit_2 is the Energy hold-off where 0 = normal, 1 = hold-off
+      # $db[0]_bit_1 ... $db[0]_bit_0is the Occupancy (prensence) state where 0 = present
       # 1 = absent, 3 = standby, 4 = frost
-      push @event, "3:controlVar:" . sprintf "%d", $db_3 * 100 / 255;
-      if (($db_2 & 3) == 0) {
+      push @event, "3:controlVar:" . sprintf "%d", $db[3] * 100 / 255;
+      if (($db[2] & 3) == 0) {
         push @event, "3:fan:0";
-      } elsif (($db_2 & 3) == 1){
+      } elsif (($db[2] & 3) == 1){
         push @event, "3:fan:1";
-      } elsif (($db_2 & 3) == 2){
+      } elsif (($db[2] & 3) == 2){
         push @event, "3:fan:2";
-      } elsif (($db_2 & 3) == 3){
+      } elsif (($db[2] & 3) == 3){
         push @event, "3:fan:3";
-      } elsif ($db_2 == 255){
+      } elsif ($db[2] == 255){
         push @event, "3:fan:unknown";
       }
-      push @event, "3:fanMode:" . ($db_2 & 0x10 ? "auto" : "manual");
-      my $setpointTemp = sprintf "%0.1f", $db_1 * 0.2;
+      push @event, "3:fanMode:" . ($db[2] & 0x10 ? "auto" : "manual");
+      my $setpointTemp = sprintf "%0.1f", $db[1] * 0.2;
       push @event, "3:setpointTemp:$setpointTemp";
-      push @event, "3:alarm:" . ($db_0 & 1 ? "on" : "off");
-      my $controllerMode = ($db_0 & 0x60) >> 5;
+      push @event, "3:alarm:" . ($db[0] & 1 ? "on" : "off");
+      my $controllerMode = ($db[0] & 0x60) >> 5;
       if ($controllerMode == 0) {
         push @event, "3:controllerMode:auto";
       } elsif ($controllerMode == 1) {
@@ -1997,36 +2047,36 @@ EnOcean_Parse($$)
       } elsif ($controllerMode == 3) {
         push @event, "3:controllerMode:off";
       }
-      push @event, "3:controllerState:" . ($db_0 & 0x10 ? "override" : "auto");
-      push @event, "3:energyHoldOff:" . ($db_0 & 4 ? "holdoff" : "normal");
-      if (($db_0 & 3) == 0) {
+      push @event, "3:controllerState:" . ($db[0] & 0x10 ? "override" : "auto");
+      push @event, "3:energyHoldOff:" . ($db[0] & 4 ? "holdoff" : "normal");
+      if (($db[0] & 3) == 0) {
         push @event, "3:presence:present";
-      } elsif (($db_0 & 3) == 1){
+      } elsif (($db[0] & 3) == 1){
         push @event, "3:presence:absent";
-      } elsif (($db_0 & 3) == 2){
+      } elsif (($db[0] & 3) == 2){
         push @event, "3:presence:standby";
-      } elsif (($db_0 & 3) == 3){
+      } elsif (($db[0] & 3) == 3){
         push @event, "3:presence:frost";
       }
       push @event, "3:state:$setpointTemp";
 
     } elsif ($st eq "shutterCtrlState.01") {
       # Blind Status (EEP A5-11-03)
-      # $db_3 is the Shutter Position where 0 = 0 % ... 100 = 100 %
-      # $db_2_bit_7 is the Angle sign where 0 = positive, 1 = negative
-      # $db_2_bit_6 ... $db_2_bit_0 where 0 = 0° ... 90 = 180°
-      # $db_1_bit_7 is the Positon Value Flag where 0 = no available, 1 = available
-      # $db_1_bit_6 is the Angle Value Flag where 0 = no available, 1 = available
-      # $db_1_bit_5 ... $db_1_bit_4 is the Error State (alarm)
-      # $db_1_bit_3 ... $db_1_bit_2 is the End-position State
-      # $db_1_bit_1 ... $db_1_bit_0 is the Shutter State
-      # $db_0_bit_7 is the Service Mode where 0 = no, 1 = yes
-      # $db_0_bit_6 is the Position Mode where 0 = normal, 1 = inverse
-      push @event, "3:positon:" . $db_3;
-      my $anglePos = ($db_2 & 0x7F) << 1;
-      if ($db_2 & 80) {$anglePos *= -1;}
+      # $db[3] is the Shutter Position where 0 = 0 % ... 100 = 100 %
+      # $db[2]_bit_7 is the Angle sign where 0 = positive, 1 = negative
+      # $db[2]_bit_6 ... $db[2]_bit_0 where 0 = 0° ... 90 = 180°
+      # $db[1]_bit_7 is the Positon Value Flag where 0 = no available, 1 = available
+      # $db[1]_bit_6 is the Angle Value Flag where 0 = no available, 1 = available
+      # $db[1]_bit_5 ... $db[1]_bit_4 is the Error State (alarm)
+      # $db[1]_bit_3 ... $db[1]_bit_2 is the End-position State
+      # $db[1]_bit_1 ... $db[1]_bit_0 is the Shutter State
+      # $db[0]_bit_7 is the Service Mode where 0 = no, 1 = yes
+      # $db[0]_bit_6 is the Position Mode where 0 = normal, 1 = inverse
+      push @event, "3:positon:" . $db[3];
+      my $anglePos = ($db[2] & 0x7F) << 1;
+      if ($db[2] & 80) {$anglePos *= -1;}
       push @event, "3:anglePos:" . $anglePos;
-      my $alarm = ($db_1 & 0x30) >> 4;
+      my $alarm = ($db[1] & 0x30) >> 4;
       if ($alarm == 0) {
         push @event, "3:alarm:off";
       } elsif ($alarm == 1){
@@ -2036,7 +2086,7 @@ EnOcean_Parse($$)
       } elsif ($alarm == 3){
         push @event, "3:alarm:not used";
       }
-      my $endPosition = ($db_1 & 0x0C) >> 2;
+      my $endPosition = ($db[1] & 0x0C) >> 2;
       if ($endPosition == 0) {
         push @event, "3:endPosition:not available";
         push @event, "3:state:not available";
@@ -2050,31 +2100,31 @@ EnOcean_Parse($$)
         push @event, "3:endPosition:closed";
         push @event, "3:state:closed";
       }
-      my $shutterState = $db_1 & 3;
-      if (($db_1 & 3) == 0) {
+      my $shutterState = $db[1] & 3;
+      if (($db[1] & 3) == 0) {
         push @event, "3:shutterState:not available";
-      } elsif (($db_1 & 3) == 1) {
+      } elsif (($db[1] & 3) == 1) {
         push @event, "3:shutterState:stopped";
-      } elsif (($db_1 & 3) == 2){
+      } elsif (($db[1] & 3) == 2){
         push @event, "3:shutterState:opens";
-      } elsif (($db_1 & 3) == 3){
+      } elsif (($db[1] & 3) == 3){
         push @event, "3:shutterState:closes";
       }
-      push @event, "3:serviceOn:" . ($db_2 & 0x80 ? "yes" : "no");
-      push @event, "3:positionMode:" . ($db_2 & 0x40 ? "inverse" : "normal");
+      push @event, "3:serviceOn:" . ($db[2] & 0x80 ? "yes" : "no");
+      push @event, "3:positionMode:" . ($db[2] & 0x40 ? "inverse" : "normal");
 
     } elsif ($st eq "lightCtrlState.02") {
       # Extended Lighting Status (EEP A5-11-04)
-      # $db_3 the contents of the variable depends on the parameter mode
-      # $db_2 the contents of the variable depends on the parameter mode
-      # $db_1 the contents of the variable depends on the parameter mode
-      # $db_0_bit_7 is the Service Mode where 0 = no, 1 = yes
-      # $db_0_bit_6 is the operating hours flag where 0 = not available, 1 = available
-      # $db_0_bit_5 ... $db_0_bit_4 is the Error State (alarm)
-      # $db_0_bit_2 ... $db_0_bit_1 is the parameter mode
-      # $db_0_bit_0 is the lighting status where 0 = off, 1 = on
-      push @event, "3:serviceOn:" . ($db_1 & 0x80 ? "yes" : "no");
-      my $alarm = ($db_0 & 0x30) >> 4;
+      # $db[3] the contents of the variable depends on the parameter mode
+      # $db[2] the contents of the variable depends on the parameter mode
+      # $db[1] the contents of the variable depends on the parameter mode
+      # $db[0]_bit_7 is the Service Mode where 0 = no, 1 = yes
+      # $db[0]_bit_6 is the operating hours flag where 0 = not available, 1 = available
+      # $db[0]_bit_5 ... $db[0]_bit_4 is the Error State (alarm)
+      # $db[0]_bit_2 ... $db[0]_bit_1 is the parameter mode
+      # $db[0]_bit_0 is the lighting status where 0 = off, 1 = on
+      push @event, "3:serviceOn:" . ($db[1] & 0x80 ? "yes" : "no");
+      my $alarm = ($db[0] & 0x30) >> 4;
       if ($alarm == 0) {
         push @event, "3:alarm:off";
       } elsif ($alarm == 1){
@@ -2084,44 +2134,44 @@ EnOcean_Parse($$)
       } elsif ($alarm == 3){
         push @event, "3:alarm:external periphery failure";
       }
-      my $mode = ($db_0 & 6) >> 1;
+      my $mode = ($db[0] & 6) >> 1;
       if ($mode == 0) {
         # dimmer value and lamp operating hours
-        push @event, "3:dimValue:$db_3";
-        if ($db_0 & 40) {
-          push @event, "3:lampOpHours:" . ($db_2 << 8 | $db_1);
+        push @event, "3:dimValue:$db[3]";
+        if ($db[0] & 40) {
+          push @event, "3:lampOpHours:" . ($db[2] << 8 | $db[1]);
         } else {
           push @event, "3:lampOpHours:unknown";
         }
       } elsif ($mode == 1){
         # RGB value
-        push @event, "3:RGB:$db_3 $db_2 $db_1";
+        push @event, "3:RGB:$db[3] $db[2] $db[1]";
       } elsif ($mode == 2){
         # energy metering value
         my @measureUnit = ("mW", "W", "kW", "MW", "Wh", "kWh", "MWh", "GWh",
                            "mA", "1/10 A", "mV", "1/10 V");
-        push @event, "3:measuredValue:" . ($db_3 << 8 | $db_2);
-        if (defined $measureUnit[$db_1]) {
-          push @event, "3:measureUnit:" . $measureUnit[$db_1];
+        push @event, "3:measuredValue:" . ($db[3] << 8 | $db[2]);
+        if (defined $measureUnit[$db[1]]) {
+          push @event, "3:measureUnit:" . $measureUnit[$db[1]];
         } else {
           push @event, "3:measureUnit:unknown";
         }
       } elsif ($mode == 3){
         # not used
       }
-      push @event, "3:powerSwitch:" . ($db_0 & 1 ? "on" : "off");
-      push @event, "3:state:" . ($db_0 & 1 ? "on" : "off");
+      push @event, "3:powerSwitch:" . ($db[0] & 1 ? "on" : "off");
+      push @event, "3:state:" . ($db[0] & 1 ? "on" : "off");
 
     } elsif ($st =~ m/^autoMeterReading/) {
       # Automated meter reading (AMR) (EEP A5-12-00 ... A5-12-03)
-      # $db_3 (MSB) + $db_2 + $db_1 (LSB) is the Meter reading
-      # $db_0_bit_7 ... $db_0_bit_4 is the Measurement channel
-      # $db_0_bit_2 is the Data type where 0 = cumulative value, 1 = current value
-      # $db_0_bit_1 ... $db_0_bit_0 is the Divisor where 0 = x/1, 1 = x/10,
+      # $db[3] (MSB) + $db[2] + $db[1] (LSB) is the Meter reading
+      # $db[0]_bit_7 ... $db[0]_bit_4 is the Measurement channel
+      # $db[0]_bit_2 is the Data type where 0 = cumulative value, 1 = current value
+      # $db[0]_bit_1 ... $db[0]_bit_0 is the Divisor where 0 = x/1, 1 = x/10,
       # 2 = x/100, 3 = x/1000
-      # my $meterReading = hex sprintf "%02x%02x%02x", $db_3, $db_2, $db_1;
-      my $dataType = ($db_0 & 4) >> 2;
-      my $divisor = $db_0 & 3;
+      # my $meterReading = hex sprintf "%02x%02x%02x", $db[3], $db[2], $db[1];
+      my $dataType = ($db[0] & 4) >> 2;
+      my $divisor = $db[0] & 3;
       if ($divisor == 3) {
         $divisor = 1000;
       } elsif ($divisor == 2) {
@@ -2131,8 +2181,8 @@ EnOcean_Parse($$)
       } else {
         $divisor = 1;
       }
-      my $meterReading = sprintf "%0.1f", ($db_3 << 16 | $db_2 << 8 | $db_1) / $divisor;
-      my $channel = $db_0 >> 4;
+      my $meterReading = sprintf "%0.1f", ($db[3] << 16 | $db[2] << 8 | $db[1]) / $divisor;
+      my $channel = $db[0] >> 4;
 
       if ($st eq "autoMeterReading.00") {
         # Automated meter reading (AMR), Counter (EEP A5-12-01)
@@ -2148,24 +2198,24 @@ EnOcean_Parse($$)
       } elsif ($st eq "autoMeterReading.01") {
         # Automated meter reading (AMR), Electricity (EEP A5-12-01)
         # [Eltako FSS12, FWZ12, DSZ14DRS, DSZ14WDRS]
-        # $db_0_bit_7 ... $db_0_bit_4 is the Tariff info
-        # $db_0_bit_2 is the Data type where 0 = cumulative value kWh,
+        # $db[0]_bit_7 ... $db[0]_bit_4 is the Tariff info
+        # $db[0]_bit_2 is the Data type where 0 = cumulative value kWh,
         # 1 = current value W
         if ($dataType == 1) {
           # momentary power
           push @event, "3:power:$meterReading";
           push @event, "3:state:$meterReading";
-        } elsif ($db_0 == 0x8F && $manufID eq "00D") {
+        } elsif ($db[0] == 0x8F && $manufID eq "00D") {
           # Eltako, read meter serial number
           my $serialNumber;
-          if ($db_0 == 0) {
+          if ($db[0] == 0) {
             # first 2 digits of the serial number
-            $serialNumber = printf "S-%01x%01x", $db_3 >> 4, $db_3 & 0x0F;
+            $serialNumber = printf "S-%01x%01x", $db[3] >> 4, $db[3] & 0x0F;
           } else {
             # last 4 digits of the serial number
             $serialNumber = substr (ReadingsVal($name, "serialNumber", "S---"), 0, 4);
             $serialNumber = printf "%4c%01x%01x%01x%01x", $serialNumber,
-                            $db_2 >> 4, $db_2 & 0x0F, $db_3 >> 4, $db_3 & 0x0F;
+                            $db[2] >> 4, $db[2] & 0x0F, $db[3] >> 4, $db[3] & 0x0F;
           }
           push @event, "3:serialNumber:$serialNumber";
         } else {
@@ -2189,20 +2239,20 @@ EnOcean_Parse($$)
     } elsif ($st eq "environmentApp") {
       # Environmental Applications (EEP A5-13-01 ... EEP A5-13-06, EEP A5-13-10)
       # [Eltako FWS61, untested]
-      # $db_0_bit_7 ... $db_0_bit_4 is the Identifier
-      my $identifier = $db_0 >> 4;
+      # $db[0]_bit_7 ... $db[0]_bit_4 is the Identifier
+      my $identifier = $db[0] >> 4;
       if ($identifier == 1) {
         # Weather Station (EEP A5-13-01)
-        # $db_3 is the dawn sensor where 0x00 = 0 lx ... 0xFF = 999 lx
-        # $db_2 is the temperature where 0x00 = -40 °C ... 0xFF = 80 °C
-        # $db_1 is the wind speed where 0x00 = 0 m/s ... 0xFF = 70 m/s
-        # $db_0_bit_2 is day / night where 0 = day, 1 = night
-        # $db_0_bit_1 is rain indication where 0 = no (no rain), 1 = yes (rain)
-        my $dawn = sprintf "%d", $db_3 * 999 / 255;
-        my $temp = sprintf "%0.1f", -40 + $db_2 * 120 / 255;
-        my $windSpeed = sprintf "%0.1f", $db_1 * 70 / 255;
-        my $dayNight = $db_0 & 2 ? "night" : "day";
-        my $isRaining = $db_0 & 1 ? "yes" : "no";
+        # $db[3] is the dawn sensor where 0x00 = 0 lx ... 0xFF = 999 lx
+        # $db[2] is the temperature where 0x00 = -40 °C ... 0xFF = 80 °C
+        # $db[1] is the wind speed where 0x00 = 0 m/s ... 0xFF = 70 m/s
+        # $db[0]_bit_2 is day / night where 0 = day, 1 = night
+        # $db[0]_bit_1 is rain indication where 0 = no (no rain), 1 = yes (rain)
+        my $dawn = sprintf "%d", $db[3] * 999 / 255;
+        my $temp = sprintf "%0.1f", -40 + $db[2] * 120 / 255;
+        my $windSpeed = sprintf "%0.1f", $db[1] * 70 / 255;
+        my $dayNight = $db[0] & 2 ? "night" : "day";
+        my $isRaining = $db[0] & 1 ? "yes" : "no";
         push @event, "3:brightness:$dawn";
         push @event, "3:dayNight:$dayNight";
         push @event, "3:isRaining:$isRaining";
@@ -2211,25 +2261,25 @@ EnOcean_Parse($$)
         push @event, "3:state:T: $temp B: $dawn W: $windSpeed IR: $isRaining";
       } elsif ($identifier == 2) {
         # Sun Intensity (EEP A5-13-02)
-        # $db_3 is the sun exposure west where 0x00 = 1 lx ... 0xFF = 150 klx
-        # $db_2 is the sun exposure south where 0x00 = 1 lx ... 0xFF = 150 klx
-        # $db_1 is the sun exposure east where 0x00 = 1 lx ... 0xFF = 150 klx
-        # $db_0_bit_2 is hemisphere where 0 = north, 1 = south
-        push @event, "3:hemisphere:" . ($db_0 & 4 ? "south" : "north");
-        push @event, "3:sunWest:" . sprintf "%d", 1 + $db_3 * 149999 / 255;
-        push @event, "3:sunSouth:" . sprintf "%d", 1 + $db_2 * 149999 / 255;
-        push @event, "3:sunEast:" . sprintf "%d", 1 + $db_1 * 149999 / 255;
+        # $db[3] is the sun exposure west where 0x00 = 1 lx ... 0xFF = 150 klx
+        # $db[2] is the sun exposure south where 0x00 = 1 lx ... 0xFF = 150 klx
+        # $db[1] is the sun exposure east where 0x00 = 1 lx ... 0xFF = 150 klx
+        # $db[0]_bit_2 is hemisphere where 0 = north, 1 = south
+        push @event, "3:hemisphere:" . ($db[0] & 4 ? "south" : "north");
+        push @event, "3:sunWest:" . sprintf "%d", 1 + $db[3] * 149999 / 255;
+        push @event, "3:sunSouth:" . sprintf "%d", 1 + $db[2] * 149999 / 255;
+        push @event, "3:sunEast:" . sprintf "%d", 1 + $db[1] * 149999 / 255;
       } elsif ($identifier == 7) {
         # Sun Position and Radiation (EEP A5-13-10)
-        # $db_3_bit_7 ... $db_3_bit_1 is Sun Elevation where 0 = 0 ° ... 90 = 90 °
-        # $db_3_bit_0 is day / night where 0 = day, 1 = night
-        # $db_2 is Sun Azimuth where 0 = -90 ° ... 180 = 90 °
-        # $db_1 and $db_0_bit_2 ... $db_0_bit_0 is Solar Radiation where
+        # $db[3]_bit_7 ... $db[3]_bit_1 is Sun Elevation where 0 = 0 ° ... 90 = 90 °
+        # $db[3]_bit_0 is day / night where 0 = day, 1 = night
+        # $db[2] is Sun Azimuth where 0 = -90 ° ... 180 = 90 °
+        # $db[1] and $db[0]_bit_2 ... $db[0]_bit_0 is Solar Radiation where
         # 0 = 0 W/m2 ... 2000 = 2000 W/m2
-        my $sunElev = $db_3 >> 1;
-        my $sunAzim = $db_2 - 90;
-        my $solarRad = $db_1 << 3 | $db_0 & 7;
-        push @event, "3:dayNight:" . ($db_3 & 1 ? "night" : "day");
+        my $sunElev = $db[3] >> 1;
+        my $sunAzim = $db[2] - 90;
+        my $solarRad = $db[1] << 3 | $db[0] & 7;
+        push @event, "3:dayNight:" . ($db[3] & 1 ? "night" : "day");
         push @event, "3:solarRadiation:$solarRad";
         push @event, "3:sunAzimuth:$sunAzim";
         push @event, "3:sunElevation:$sunElev";
@@ -2240,17 +2290,17 @@ EnOcean_Parse($$)
 
     } elsif ($st eq "multiFuncSensor") {
       # Multi-Func Sensor (EEP A5-14-01 ... A5-14-06)
-      # $db_3 is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
-      # $db_3 > 0xFA is error code
-      # $db_2 is the illuminance where min 0x00 = 0 lx, max 0xFA = 1000 lx
-      # $db_0_bit_1 is Vibration where 0 = off, 1 = on
-      # $db_0_bit_0 is Contact where 0 = closed, 1 = open
-      my $lux = $db_2 << 2;
-      if ($db_2 == 251) {$lux = "over range";}
-      my $voltage = sprintf "0.1f", $db_3 * 0.02;
-      if ($db_3 > 250) {push @event, "3:errorCode:$db_3";}
-      my $vibration = $db_0 & 2 ? "on" : "off";
-      my $contact = $db_0 & 1 ? "open" : "closed";
+      # $db[3] is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
+      # $db[3] > 0xFA is error code
+      # $db[2] is the illuminance where min 0x00 = 0 lx, max 0xFA = 1000 lx
+      # $db[0]_bit_1 is Vibration where 0 = off, 1 = on
+      # $db[0]_bit_0 is Contact where 0 = closed, 1 = open
+      my $lux = $db[2] << 2;
+      if ($db[2] == 251) {$lux = "over range";}
+      my $voltage = sprintf "0.1f", $db[3] * 0.02;
+      if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
+      my $vibration = $db[0] & 2 ? "on" : "off";
+      my $contact = $db[0] & 1 ? "open" : "closed";
       push @event, "3:brightness:$lux";
       push @event, "3:contact:$contact";
       push @event, "3:vibration:$vibration";
@@ -2263,68 +2313,68 @@ EnOcean_Parse($$)
       if ($st eq "digtalInput.01") {
         # Single Input Contact, Batterie Monitor (EEP A5-30-01)
         # [Thermokon SR65 DI, untested]
-        # $db_2 is the supply voltage, if >= 121 = battery ok
-        # $db_1 is the input state, if <= 195 = contact closed
-        my $battery = $db_2 >= 121 ? "ok" : "low";
-        $contact = $db_1 <= 195 ? "closed" : "open";
+        # $db[2] is the supply voltage, if >= 121 = battery ok
+        # $db[1] is the input state, if <= 195 = contact closed
+        my $battery = $db[2] >= 121 ? "ok" : "low";
+        $contact = $db[1] <= 195 ? "closed" : "open";
         push @event, "3:battery:$battery";
       } else {
         # Single Input Contact (EEP A5-30-01)
-        # $db_0_bit_0 is the input state where 0 = closed, 1 = open
-        $contact = $db_0 & 1 ? "open" : "closed";
+        # $db[0]_bit_0 is the input state where 0 = closed, 1 = open
+        $contact = $db[0] & 1 ? "open" : "closed";
       }
       push @event, "3:contact:$contact";
       push @event, "3:state:$contact";
 
     } elsif ($st eq "gateway") {
       # Gateway (EEP A5-38-08)
-      # $db_3 is the command ID ($gwCmdID)
+      # $db[3] is the command ID ($gwCmdID)
       # Eltako devices not send teach-in telegrams
-      if(($db_0 & 8) == 0) {
+      if(($db[0] & 8) == 0) {
         # teach-in, identify and store command type in attr gwCmd
         my $gwCmd = AttrVal($name, "gwCmd", undef);
         if (!$gwCmd) {
-          $gwCmd = $EnO_gwCmd[$db_3 - 1];
+          $gwCmd = $EnO_gwCmd[$db[3] - 1];
           $attr{$name}{gwCmd} = $gwCmd;
         }
       }
-      if ($db_3 == 1) {
+      if ($db[3] == 1) {
         # Switching
         # Eltako devices not send A5 telegrams
-        push @event, "3:executeTime:" . sprintf "%0.1f", (($db_2 << 8) | $db_1) / 10;
-        push @event, "3:lock:" . ($db_0 & 4 ? "lock" : "unlock");
-        push @event, "3:executeType" . ($db_0 & 2 ? "delay" : "duration");
-        push @event, "3:state:" . ($db_0 & 1 ? "on" : "off");
-      } elsif ($db_3 == 2) {
+        push @event, "3:executeTime:" . sprintf "%0.1f", (($db[2] << 8) | $db[1]) / 10;
+        push @event, "3:lock:" . ($db[0] & 4 ? "lock" : "unlock");
+        push @event, "3:executeType" . ($db[0] & 2 ? "delay" : "duration");
+        push @event, "3:state:" . ($db[0] & 1 ? "on" : "off");
+      } elsif ($db[3] == 2) {
         # Dimming
-        # $db_0_bit_2 is store final value, not used, because
+        # $db[0]_bit_2 is store final value, not used, because
         # dimming value is always stored
-        push @event, "3:rampTime:$db_1";
-        push @event, "3:state:" . ($db_0 & 0x01 ? "on" : "off");
-        if ($db_0 & 4) {
+        push @event, "3:rampTime:$db[1]";
+        push @event, "3:state:" . ($db[0] & 0x01 ? "on" : "off");
+        if ($db[0] & 4) {
           # Relative Dimming Range
-          push @event, "3:dimValue:" . sprintf "%d", $db_2 * 100 / 255;
+          push @event, "3:dimValue:" . sprintf "%d", $db[2] * 100 / 255;
         } else {
-          push @event, "3:dimValue:$db_2";
+          push @event, "3:dimValue:$db[2]";
         }
-        push @event, "3:dimValueLast:$db_2" if ($db_2 > 0);
-      } elsif ($db_3 == 3) {
+        push @event, "3:dimValueLast:$db[2]" if ($db[2] > 0);
+      } elsif ($db[3] == 3) {
         # Setpoint shift
         # $db1 is setpoint shift where 0 = -12.7 K ... 255 = 12.8 K
-        my $setpointShift = sprintf "%0.1f", -12.7 + $db_1 / 10;
+        my $setpointShift = sprintf "%0.1f", -12.7 + $db[1] / 10;
         push @event, "3:setpointShift:$setpointShift";
         push @event, "3:state:$setpointShift";
-      } elsif ($db_3 == 4) {
+      } elsif ($db[3] == 4) {
         # Basic Setpoint
         # $db1 is setpoint where 0 = 0 °C ... 255 = 51.2 °C
-        my $setpoint = sprintf "%0.1f", $db_1 / 5;
+        my $setpoint = sprintf "%0.1f", $db[1] / 5;
         push @event, "3:setpoint:$setpoint";
         push @event, "3:state:$setpoint";
-      } elsif ($db_3 == 5) {
+      } elsif ($db[3] == 5) {
         # Control variable
         # $db1 is control variable override where 0 = 0 % ... 255 = 100 %
-        push @event, "3:controlVar:" . sprintf "%d", $db_1 * 100 / 255;
-        my $controllerMode = ($db_0 & 0x60) >> 5;
+        push @event, "3:controlVar:" . sprintf "%d", $db[1] * 100 / 255;
+        my $controllerMode = ($db[0] & 0x60) >> 5;
         if ($controllerMode == 0) {
           push @event, "3:controllerMode:auto";
           push @event, "3:state:auto";
@@ -2338,9 +2388,9 @@ EnOcean_Parse($$)
           push @event, "3:controllerMode:off";
           push @event, "3:state:off";
         }
-        push @event, "3:controllerState:" . ($db_0 & 0x10 ? "override" : "auto");
-        push @event, "3:energyHoldOff:" . ($db_0 & 4 ? "holdoff" : "normal");
-        my $occupancy = $db_0 & 3;
+        push @event, "3:controllerState:" . ($db[0] & 0x10 ? "override" : "auto");
+        push @event, "3:energyHoldOff:" . ($db[0] & 4 ? "holdoff" : "normal");
+        my $occupancy = $db[0] & 3;
         if ($occupancy == 0) {
           push @event, "3:presence:present";
         } elsif ($occupancy == 1){
@@ -2348,38 +2398,38 @@ EnOcean_Parse($$)
         } elsif ($occupancy == 2){
           push @event, "3:presence:standby";
         }
-      } elsif ($db_3 == 6) {
+      } elsif ($db[3] == 6) {
         # Fan stage
-        if ($db_1 == 0) {
+        if ($db[1] == 0) {
           push @event, "3:fan:0";
           push @event, "3:state:0";
-        } elsif ($db_1 == 1) {
+        } elsif ($db[1] == 1) {
           push @event, "3:fan:1";
           push @event, "3:state:1";
-        } elsif ($db_1 == 2) {
+        } elsif ($db[1] == 2) {
           push @event, "3:fan:2";
           push @event, "3:state:2";
-        } elsif ($db_1 == 3) {
+        } elsif ($db[1] == 3) {
           push @event, "3:fan:3";
           push @event, "3:state:3";
-        } elsif ($db_1 == 255) {
+        } elsif ($db[1] == 255) {
           push @event, "3:fan:auto";
           push @event, "3:state:auto";
         }
       } else {
-          push @event, "3:state:Gateway Command ID $db_3 unknown.";
+          push @event, "3:state:Gateway Command ID $db[3] unknown.";
       }
 
     } elsif ($st eq "manufProfile") {
       # Manufacturer Specific Applications (EEP A5-3F-7F)
       if ($manufID eq "002") {
         # [Thermokon SR65 3AI, untested]
-        # $db_3 is the input 3 where 0x00 = 0 V ... 0xFF = 10 V
-        # $db_2 is the input 2 where 0x00 = 0 V ... 0xFF = 10 V
-        # $db_1 is the input 1 where 0x00 = 0 V ... 0xFF = 10 V
-        my $input3 = sprintf "%0.2f", $db_3 * 10 / 255;
-        my $input2 = sprintf "%0.2f", $db_2 * 10 / 255;
-        my $input1 = sprintf "%0.2f", $db_1 * 10 / 255;
+        # $db[3] is the input 3 where 0x00 = 0 V ... 0xFF = 10 V
+        # $db[2] is the input 2 where 0x00 = 0 V ... 0xFF = 10 V
+        # $db[1] is the input 1 where 0x00 = 0 V ... 0xFF = 10 V
+        my $input3 = sprintf "%0.2f", $db[3] * 10 / 255;
+        my $input2 = sprintf "%0.2f", $db[2] * 10 / 255;
+        my $input1 = sprintf "%0.2f", $db[1] * 10 / 255;
         push @event, "3:input1:$input1";
         push @event, "3:input2:$input2";
         push @event, "3:input3:$input3";
@@ -2391,18 +2441,35 @@ EnOcean_Parse($$)
 
     } elsif ($st eq "raw") {
       # raw
-      push @event, "3:state:RORG: $rorg DATA: $data STATUS: $status ODATA: $odata";    
+      push @event, "3:state:RORG: $rorg DATA: $data STATUS: $status ODATA: $odata";
     
     } else {
     # unknown devices
-      push @event, "3:state:$db_3";
-      push @event, "3:sensor1:$db_3";
-      push @event, "3:sensor2:$db_2";
-      push @event, "3:sensor3:$db_1";
-      push @event, "3:D3:".(($db_0&0x8)?1:0);
-      push @event, "3:D2:".(($db_0&0x4)?1:0);
-      push @event, "3:D1:".(($db_0&0x2)?1:0);
-      push @event, "3:D0:".(($db_0&0x1)?1:0);
+      push @event, "3:state:$db[3]";
+      push @event, "3:sensor1:$db[3]";
+      push @event, "3:sensor2:$db[2]";
+      push @event, "3:sensor3:$db[1]";
+      push @event, "3:D3:".(($db[0] & 8) ? 1:0);
+      push @event, "3:D2:".(($db[0] & 4) ? 1:0);
+      push @event, "3:D1:".(($db[0] & 2) ? 1:0);
+      push @event, "3:D0:".(($db[0] & 1) ? 1:0);
+    }
+
+  } elsif ($rorg eq "D2") {
+  # VLD Telegram
+    if ($st eq "test") {
+    
+    } elsif ($st eq "raw") {
+      # raw
+      push @event, "3:state:RORG: $rorg DATA: $data STATUS: $status ODATA: $odata";    
+      # display data bytes $db[0] ... $db[x]
+      for (my $dbCntr = 0; $dbCntr <= $#db; $dbCntr++) {
+        push @event, "3:DB_" . $dbCntr . ":" . $db[$dbCntr];
+      }  
+    
+    } else {
+    # unknown devices
+      push @event, "3:state:$data";
     }
   }
 
@@ -2428,7 +2495,7 @@ EnOcean_MD15Cmd($$$)
     my $arg1 = ReadingsVal($name, $cmd, 0); # Command-Argument
     if($cmd eq "actuator") {
 #      $msg = sprintf("%02X000000", $arg1);
-      $msg = sprintf("%02X7F0008", $arg1);
+      $msg = sprintf "%02X7F0008", $arg1;
     } elsif($cmd eq "desired-temp") {
 #      $msg = sprintf "%02X%02X0400", $arg1*255/40, AttrVal($name, "actualTemp", ($db_1*40/255)) * 255/40;
 #      $msg = sprintf "%02X%02X0408", $arg1*255/40, AttrVal($name, "actualTemp", (255 - $db_1)*40/255) *255/40;
@@ -2449,7 +2516,7 @@ EnOcean_MD15Cmd($$$)
     }
     if($msg) {
       select(undef, undef, undef, 0.2);
-      EnOcean_A5Cmd($hash, $msg, "00000000");
+      EnOcean_SndRadio(undef, $hash, "A5", $msg, "00000000", "00", $hash->{DEF});
       if($cmd eq "initialize") {
         delete($defs{$name}{READINGS}{CMD});
         delete($defs{$name}{READINGS}{$cmd});
@@ -2458,22 +2525,27 @@ EnOcean_MD15Cmd($$$)
   }
 }
 
-# A5Cmd
+# send EnOcean ESP3 Packet Type Radio
 sub
-EnOcean_A5Cmd($$$)
+EnOcean_SndRadio($$$$$$$)
 {
-  my ($hash, $msg, $org) = @_;
-  IOWrite($hash, "000A0701", # varLen=0A optLen=07 msgType=01=radio,
-          sprintf("A5%s%s0001%sFF00",$msg,$org,$hash->{DEF}));
-          # type=A5 msg:4 senderId:4 status=00 subTelNum=01 destId:4 dBm=FF Security=00
-}
-
-# EnOcean_Set called from sub InternalTimer()
-sub
-EnOcean_TimerSet($)
-{
-  my ($par)=@_;
-  EnOcean_Set($par->{hash}, @{$par->{timerCmd}});
+  my ($ctrl, $hash, $rorg, $data, $senderID, $status, $destinationID) = @_;
+  my $odata = "";
+  my $odataLength = 0;
+  if (AttrVal($hash->{NAME}, "repeatingAllowed", "yes") eq "no") {
+    $status = substr ($status, 0, 1) . "F";
+  }
+  my $securityLevel = AttrVal($hash->{NAME}, "securityLevel", 0);
+  if ($securityLevel eq "unencrypted") {$securityLevel = 0;}
+  if ($destinationID ne "FFFFFFFF" || $securityLevel) {
+    # SubTelNum = 03, DestinationID:4, RSSI = FF, SecurityLevel:2
+    $odata = sprintf "03%sFF%02X", $destinationID, $securityLevel;
+    $odataLength = 7;    
+  }
+  # Data Length:4 Optional Length:2 Packet Type = 01 (radio)
+  my $header = sprintf "%04X%02X01", (length($data)/2 + 6), $odataLength;
+  $data = $rorg . $data . $senderID . $status . $odata;
+  IOWrite($hash, $header, $data);
 }
 
 # Scale Readings
@@ -2483,7 +2555,6 @@ EnOcean_ReadingScaled($$$$)
   my ($hash, $readingVal, $readingMin, $readingMax) = @_;
   my $name = $hash->{NAME};
   my $valScaled;
-#  my $readingVal = ReadingsVal($hash->{NAME}, $readingName, undef);
   my $scaleDecimals = AttrVal($name, "scaleDecimals", undef);
   my $scaleMin = AttrVal($name, "scaleMin", undef);
   my $scaleMax = AttrVal($name, "scaleMax", undef);
@@ -2492,7 +2563,6 @@ EnOcean_ReadingScaled($$$$)
     $valScaled = ($readingMin*$scaleMax-$scaleMin*$readingMax)/
                  ($readingMin-$readingMax)+
                  ($scaleMin-$scaleMax)/($readingMin-$readingMax)*$readingVal;
-#    readingsSingleUpdate($hash, $readingName."Scaled", $valScaled, 1);
   }
   if (defined $scaleDecimals && $scaleDecimals =~ m/^[0-9]?$/) {
     $scaleDecimals = "%0." . $scaleDecimals . "f";
@@ -2500,6 +2570,14 @@ EnOcean_ReadingScaled($$$$)
   }
   return $valScaled;  
 } 
+
+# EnOcean_Set called from sub InternalTimer()
+sub
+EnOcean_TimerSet($)
+{
+  my ($par)=@_;
+  EnOcean_Set($par->{hash}, @{$par->{timerCmd}});
+}
 
 # Undef
 sub
@@ -2578,7 +2656,7 @@ EnOcean_Undef($$)
     In order to control devices, you cannot reuse the SenderIDs/
     DestinationID of other devices (like remotes), instead you have to create
     your own, which must be in the allowed SenderID range of the underlying Fhem
-    IO device, see <a href="#TCM">TCM</a> BaseID, LastID. For this first query the
+    IO device, see <a href="#TCM">TCM</a> <a name="BaseID">BaseID</a>, LastID. For this first query the
     <a href="#TCM">TCM</a> with the <code>get &lt;tcm&gt; baseID</code> command
     for the BaseID. You can use up to 127 IDs starting with the BaseID + 1 shown there.
     The BaseID is used for A5 devices with a bidectional teach-in only. If you
@@ -2967,11 +3045,11 @@ EnOcean_Undef($$)
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
     where <code>value</code> is
-      <li>RPS|1BS|4BS data [status]<br>
+      <li>RPS|1BS|4BS|VLD data [status]<br>
         sent data telegram</li>
     </ul><br>
     With the help of this command data messages in hexadecimal format can be sent.
-    Telegram types (RORG) RPS, 1BS and 4BS are supported. For further information,
+    Telegram types (RORG) RPS, 1BS, 4BS and VLD are supported. For further information,
     see <a href="http://www.enocean-alliance.org/eep/">EnOcean Equipment Profiles (EEP)</a>. 
     <br>
     Set attr subType to raw manually.
@@ -3004,6 +3082,11 @@ EnOcean_Undef($$)
       Runtime value for the sunblind reversion time. Select the time to revolve
       the sunblind from one slat angle end position to the other end position.<br>
       angleTime is supported for shutter.<br>
+    </li>
+    <li><a name="destinationID">destinationID</a> multicast|unicast|00000000 ... FFFFFFFF,
+      [destinationID] = multicast is default<br>
+      Destination ID, special values: multicast = FFFFFFFF, unicast = [DEF],
+      <a href="#BaseID">BaseID</a> = 00000000
     </li>
     <li><a href="#devStateIcon">devStateIcon</a></li>
     <li><a name="dimValueOn">dimValueOn</a> dim/%|last|stored,
@@ -3046,6 +3129,9 @@ EnOcean_Undef($$)
     <li><a name="scaleMin">scaleMin</a> &lt;floating-point number&gt;<br>
       Scaled minimum value of the reading setpoint
     </li>
+    <li><a name="securityLevel">securityLevel</a> unencrypted, [securityLevel] = unencrypted is default<br>
+      Type of Encryption
+    </li>
     <li><a href="#showtime">showtime</a></li>
     <li><a name="shutTime">shutTime</a> t/s, [shutTime] = 1 ... 255, 255 is default.<br>
       Use the attr shutTime to set the time delay to the position "Halt" in
@@ -3053,7 +3139,8 @@ EnOcean_Undef($$)
       or roller shutter needs to move from its end position to the other position.<br>
       shutTime is supported for shutter.
       </li>
-    <li><a name="shutTimeCloses">shutTimeCloses</a> t/s, [shutTimeCloses] = 1 ... 255, [shutTime] is default.<br>
+    <li><a name="shutTimeCloses">shutTimeCloses</a> t/s, [shutTimeCloses] = 1 ... 255,
+      [shutTimeCloses] = [shutTime] is default.<br>
       Set the attr shutTimeCloses to define the runtime used by the commands opens and closes.
       Select a runtime that is at least as long as the value set by the delay switch of the actuator.
       <br>
@@ -3938,9 +4025,11 @@ EnOcean_Undef($$)
         <li>BI<br>
             The status of the device will become "BI" if the BOTTOM endpoint is
             reached</li>
+        <li>stop<br>
+            The status of the device become "stop" if stop command is sent.</li>
         <li>released<br>
             The status of the device become "released" between one of the endpoints.</li>
-        <li>state: B0|BI|released</li>
+        <li>state: B0|BI|stop|released</li>
      </ul><br>
         Set attr subType to manufProfile, attr manufID to 00D and attr model to
         FSB14|FSB61|FSB70 manually.
