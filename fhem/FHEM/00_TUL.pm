@@ -701,6 +701,7 @@ sub encode_eibd($)
 		return;
     }
     @data = @{$mref->{'data'}};
+    @data = (0x0) if(!(defined @data) || !(defined $data[0])); #make sure data has at least one element
     my $datalen = @data;
     Log(5,"encode_eibd dst: $mref->{'dst'} apci: $APCI datalen: $datalen data: @data");
     @msg = (
