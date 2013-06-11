@@ -1,8 +1,6 @@
 ##############################################
 # $Id$
 package main;
-# BUG: smallscreen webapp icon (works for touchpad?)
-# BUG: iPhone5 webapp black margin
 
 use strict;
 use warnings;
@@ -87,6 +85,7 @@ my $FW_data;       # Filecontent from browser when editing a file
 my $FW_detail;     # currently selected device for detail view
 my %FW_devs;       # hash of from/to entries per device
 my %FW_icons;      # List of icons
+my @FW_iconDirs;   # Directory search order for icons
 my $FW_RETTYPE;    # image/png or the like
 my $FW_room;       # currently selected room
 my %FW_rooms;      # hash of all rooms
@@ -119,7 +118,7 @@ FHEMWEB_Initialize($)
     "stylesheetPrefix touchpad:deprecated smallscreen:deprecated ".
     "basicAuth basicAuthMsg hiddenroom hiddengroup HTTPS allowfrom CORS:0,1 ".
     "refresh longpoll:1,0 redirectCmds:0,1 reverseLogs:0,1 menuEntries ".
-    "roomIcons SVGcache";
+    "roomIcons SVGcache iconPath";
 
   ###############
   # Initialize internal structures
@@ -355,6 +354,7 @@ FW_answerCall($)
   $FW_sp = AttrVal($FW_wname, "stylesheetPrefix", "");
   $FW_ss = ($FW_sp =~ m/smallscreen/);
   $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
+  @FW_iconDirs = split(":", AttrVal($FW_wname, "iconPath", "$FW_sp:default"));
 
   # /icons/... => current state of ...
   # also used for static images: unintended, but too late to change
@@ -1951,7 +1951,7 @@ FW_iconTable($$$$)
 {
   my ($name, $re, $cmdFmt, $textfield) = @_;
   my %icoList = ();
-  foreach my $style ("default", $FW_sp) {
+  foreach my $style (@FW_iconDirs) {
     foreach my $imgName (sort grep {/^$re/} keys %{$FW_icons{$style}}) {
       $imgName =~ s/\.[^.]*$//; # Cut extension
       next if(!$FW_icons{$style}{$imgName}); # Dont cut it twice: FS20.on.png
@@ -1966,7 +1966,7 @@ FW_iconTable($$$$)
   }
   foreach my $i (sort keys %icoList) {
     FW_pF "<button type='submit' class='dist' name='cmd' value='$cmdFmt'>%s".
-                '</button>', $i, FW_makeImage($i);
+                "</button>", $i, FW_makeImage($i);
   }
   FW_pO "</form>";
   FW_pO "</div>";
@@ -2034,7 +2034,31 @@ FW_makeImage(@)
 {
   my ($name, $txt)= @_;
   $txt = $name if(!defined($txt));
-  return "<img src=\"$FW_ME/icons/$name\" alt=\"$txt\" title=\"$txt\">";
+  my $p = FW_iconPath($name);
+  return $name if(!$p);
+  if($p =~ m/\.svg$/i) {
+    if(open(FH, "$FW_icondir/$p")) {
+      <FH>; <FH>; <FH>; # Skip the first 3 lines;
+      my $data = join("", <FH>);
+      close(FH);
+      $data =~ s/[\r\n]/ /g;
+      $data =~ s/ *$//g;
+      $name =~ m/(@.*)$/;
+      my $col = $1 if($1);
+      if($col) {
+        $col =~ s/@//;
+        $col = "#$col" if($col =~ m/^\d+$/);
+        $data =~ s/fill="#000000"/class="$name" fill="$col"/
+      } else {
+        $data =~ s/fill="#000000"/class="$name"/; # Default by style.css
+      }
+      return $data;
+    } else {
+      return $name;
+    }
+  } else {
+    return "<img src=\"$FW_ME/images/$p\" alt=\"$txt\" title=\"$txt\">";
+  }
 }
 
 ####
@@ -2097,8 +2121,15 @@ FW_Attr(@)
     } else {
       delete $attr{$name}{$sP};
     }
-
   }
+
+  if($a[2] eq "iconPath" && $a[0] eq "set") {
+    foreach my $pe (split(":", $a[3])) {
+      $pe =~ s+\.\.++g;
+      FW_readIcons($pe);
+    }
+  }
+
   return $retMsg;
 }
 
@@ -2110,7 +2141,6 @@ FW_readIconsFrom($$)
 {
   my ($dir,$subdir)= @_;
 
-  #Log 1, "OPENDIR: $dir $subdir";
   my $ldir = ($subdir ? "$dir/$subdir" : $dir);
   my @entries;
   if(opendir(DH, "$FW_icondir/$ldir")) {
@@ -2124,14 +2154,23 @@ FW_readIconsFrom($$)
         unless($entry eq "." || $entry eq ".." || $entry eq ".svn");
 
     } else {
-      my $filename = $subdir ? "$subdir/$entry" : $entry;
-      $FW_icons{$dir}{$filename} = $filename;
+      if($entry =~ m/^iconalias.txt$/i && open(FH, "$FW_icondir/$ldir/$entry")) {
+        while(my $l = <FH>) {
+          chomp($l);
+          my @a = split(" ", $l);
+          next if($l =~ m/^#/ || @a < 2);
+          $FW_icons{$dir}{$a[0]} = $a[1];
+        }
+        close(FH);
+      } elsif($entry =~ m/(gif|ico|jpg|png|jpeg|svg)$/i) {
+        my $filename = $subdir ? "$subdir/$entry" : $entry;
+        $FW_icons{$dir}{$filename} = $filename;
 
-      my $tag = $filename;     # Add it without extension too
-      $tag =~ s/\.[^.]*$//;
-      #Log 1, "Adding $dir $tag -> $filename";
-      $FW_icons{$dir}{$tag} = $filename;
-
+        my $tag = $filename;     # Add it without extension too
+        $tag =~ s/\.[^.]*$//;
+        #Log 1, "Adding $dir $tag -> $filename";
+        $FW_icons{$dir}{$tag} = $filename;
+      }
     }
   }
 }
@@ -2150,8 +2189,10 @@ sub
 FW_iconName($)
 {
   my ($name)= @_;
-  return $name if($FW_icons{$FW_sp} && $FW_icons{$FW_sp}{$name});
-  return $name if($FW_icons{default}{$name});
+  $name =~ s/@.*//;
+  foreach my $pe (@FW_iconDirs) {
+    return $name if($pe && $FW_icons{$pe} && $FW_icons{$pe}{$name});
+  }
   return undef;
 }
 
@@ -2163,9 +2204,11 @@ sub
 FW_iconPath($)
 {
   my ($name) = @_;
-  my $sp = ($FW_sp && $FW_icons{$FW_sp} ? $FW_icons{$FW_sp} : undef);
-  return "$FW_sp/$sp->{$name}" if($sp && $sp->{$name});
-  return "default/$FW_icons{default}{$name}" if($FW_icons{default}{$name});
+  $name =~ s/@.*//;
+  foreach my $pe (@FW_iconDirs) {
+    return "$pe/$FW_icons{$pe}{$name}"
+        if($pe && $FW_icons{$pe} && $FW_icons{$pe}{$name});
+  }
   return undef;
 }
 
@@ -2822,6 +2865,16 @@ FW_dropdownFn()
       rendered differently in this mode to avoid switching back to the "normal"
       browser.
       </li>
+      <br>
+
+    <a name="iconPath"></a>
+    <li>iconPath<br>
+      colon separated list of directories where the icons are read from.
+      The directories start in the fhem/www/images directory. The default is
+      $stylesheetPrefix:default<br>
+      Set it to openautomation only to get a lot of SVG images.
+      </li>
+      <br>
 
     <a name="hiddenroom"></a>
     <li>hiddenroom<br>
@@ -2943,6 +2996,11 @@ FW_dropdownFn()
         <ul>
         Perl regexp enclosed in {}. Example:<br>
         {'&lt;div style="width:32px;height:32px;background-color:green"&gt;&lt;/div&gt;'}
+        </ul>
+        Note: if the image is referencing an SVG icon, then you can use the @colorname
+        suffix to color the image. E.g.:<br>
+        <ul>
+        attr Fax devStateIcon on:control_building_empty@red off:control_building_filled:278727
         </ul>
         </li>
         <br>

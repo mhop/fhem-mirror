@@ -69,3 +69,6 @@ button.dist { margin:5px; background:transparent; border:0px; cursor:pointer; }
           height:20px; line-height:20px;
           -webkit-user-select:none; -moz-user-select:none; -user-select:none;
           border:3px solid; color:#278727; text-align:center; } 
+
+svg { max-height:32px; max-width:32px; fill:#278727; }
+g.on { fill:red; }
