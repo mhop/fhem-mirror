@@ -975,7 +975,8 @@ FW_roomOverview($)
         my $icoName = "ico$l1";
         map { my ($n,$v) = split(":",$_); $icoName=$v if($l1 =~ m/$n/); }
                         split(" ", AttrVal($FW_wname, "roomIcons", ""));
-        my $icon = FW_iconName($icoName) ? FW_makeImage($icoName)."&nbsp;" : "";
+        my $icon = FW_iconName($icoName) ?
+                        FW_makeImage($icoName,$icoName,"icon")."&nbsp;" : "";
 
         if($l2 =~ m/.html$/ || $l2 =~ m/^http/) {
            FW_pO "$td<a href=\"$l2\">$icon$l1</a></td>";
@@ -1063,7 +1064,7 @@ FW_showRoom()
       FW_pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
       my $devName = AttrVal($d, "alias", $d);
       my $icon = AttrVal($d, "icon", "");
-      $icon = FW_makeImage($icon) . "&nbsp;" if($icon);
+      $icon = FW_makeImage($icon,$icon,"icon") . "&nbsp;" if($icon);
 
       if($FW_hiddenroom{detail}) {
         FW_pO "<td><div class=\"col1\">$icon$devName</div></td>";
@@ -1357,6 +1358,11 @@ FW_substcfg($$$$$$)
   my $oll = $attr{global}{verbose};
   $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
 
+  if($file eq "CURRENT") {
+    my @a = split(":", $defs{$wl}{LINK});
+    $file = $defs{$a[0]}{currentlogfile};
+    $file =~ s+.*/++;
+  }
   my $fileesc = $file;
   $fileesc =~ s/\\/\\\\/g;      # For Windows, by MarkusRR
   my $title = AttrVal($wl, "title", "\"$fileesc\"");
@@ -1917,15 +1923,15 @@ FW_style($$)
     $ret = "";
 
   } elsif($a[1] eq "iconFor") {
-    FW_iconTable("iconFor", "^ico", "style setIF $a[2] %s", undef);
+    FW_iconTable("iconFor", "icon", "style setIF $a[2] %s", undef);
 
   } elsif($a[1] eq "setIF") {
     FW_fC("attr $a[2] icon $a[3]");
     FW_doDetail($a[2]);
 
   } elsif($a[1] eq "showDSI") {
-    FW_iconTable("devStateIcon", '^((?!(weather|_big|fhemicon|darklogo)).)*$',
-        "style addDSI $a[2] %s", "Enter value/regexp for STATE");
+    FW_iconTable("devStateIcon", "",
+                 "style addDSI $a[2] %s", "Enter value/regexp for STATE");
 
   } elsif($a[1] eq "addDSI") {
     my $dsi = AttrVal($a[2], "devStateIcon", "");
@@ -1949,12 +1955,15 @@ FW_style($$)
 sub
 FW_iconTable($$$$)
 {
-  my ($name, $re, $cmdFmt, $textfield) = @_;
+  my ($name, $class, $cmdFmt, $textfield) = @_;
+
   my %icoList = ();
   foreach my $style (@FW_iconDirs) {
-    foreach my $imgName (sort grep {/^$re/} keys %{$FW_icons{$style}}) {
+    foreach my $imgName (sort keys %{$FW_icons{$style}}) {
       $imgName =~ s/\.[^.]*$//; # Cut extension
       next if(!$FW_icons{$style}{$imgName}); # Dont cut it twice: FS20.on.png
+      next if($FW_icons{$style}{$imgName} !~ m/$imgName/); # Skip alias
+      next if($imgName=~m+^(weather/|shutter.*big|fhemicon|favicon|darklogo)+);
       $icoList{$imgName} = 1;
     }
   }
@@ -1965,8 +1974,8 @@ FW_iconTable($$$$)
     FW_pO "$textfield:&nbsp;".FW_textfieldv("data",20,"iconTable",".*")."<br>";
   }
   foreach my $i (sort keys %icoList) {
-    FW_pF "<button type='submit' class='dist' name='cmd' value='$cmdFmt'>%s".
-                "</button>", $i, FW_makeImage($i);
+    FW_pF "<button title='%s' type='submit' class='dist' name='cmd' ".
+              "value='$cmdFmt'>%s</button>", $i, $i, FW_makeImage($i,$i,$class);
   }
   FW_pO "</form>";
   FW_pO "</div>";
@@ -2032,8 +2041,11 @@ FW_pHPlain(@)
 sub
 FW_makeImage(@)
 {
-  my ($name, $txt)= @_;
+  my ($name, $txt, $class)= @_;
+
   $txt = $name if(!defined($txt));
+  $class = "" if(!$class);
+
   my $p = FW_iconPath($name);
   return $name if(!$p);
   if($p =~ m/\.svg$/i) {
@@ -2043,21 +2055,23 @@ FW_makeImage(@)
       close(FH);
       $data =~ s/[\r\n]/ /g;
       $data =~ s/ *$//g;
+      $data =~ s/<svg/<svg class="$class $name"/;
       $name =~ m/(@.*)$/;
       my $col = $1 if($1);
       if($col) {
         $col =~ s/@//;
         $col = "#$col" if($col =~ m/^\d+$/);
-        $data =~ s/fill="#000000"/class="$name" fill="$col"/
+        $data =~ s/fill="#000000"/fill="$col"/;
       } else {
-        $data =~ s/fill="#000000"/class="$name"/; # Default by style.css
+        $data =~ s/fill="#000000"//;
       }
       return $data;
     } else {
       return $name;
     }
   } else {
-    return "<img src=\"$FW_ME/images/$p\" alt=\"$txt\" title=\"$txt\">";
+    $class = "class='$class'" if($class);
+    return "<img $class src=\"$FW_ME/images/$p\" alt=\"$txt\" title=\"$txt\">";
   }
 }
 

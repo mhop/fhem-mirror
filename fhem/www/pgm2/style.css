@@ -56,5 +56,5 @@ select {  margin-left:5px; margin-right:5px; }
 
 pre { white-space: pre-wrap; }
 
-svg { max-height:32px; max-width:32px; fill:#278727; }
-g.on { fill:red; }
+svg      { height:32px; width:32px; fill:#278727; }
+svg.on   { fill:orange; }

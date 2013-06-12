@@ -61,5 +61,5 @@ select {  margin-left:5px; margin-right:5px; }
           border:2px solid; color:white; text-align:center; }
 .downText { margin-top:2px; }
 
-svg { max-height:32px; max-width:32px; fill:#fff; }
+svg { height:32px; width:32px; fill:#fff; }
 g.on { fill:red; }
