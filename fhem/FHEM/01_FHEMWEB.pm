@@ -2045,6 +2045,8 @@ FW_makeImage(@)
 
   $txt = $name if(!defined($txt));
   $class = "" if(!$class);
+  $class = "$class $name";
+  $class =~ s/\./_/g;
 
   my $p = FW_iconPath($name);
   return $name if(!$p);
@@ -2055,7 +2057,7 @@ FW_makeImage(@)
       close(FH);
       $data =~ s/[\r\n]/ /g;
       $data =~ s/ *$//g;
-      $data =~ s/<svg/<svg class="$class $name"/;
+      $data =~ s/<svg/<svg class="$class"/;
       $name =~ m/(@.*)$/;
       my $col = $1 if($1);
       if($col) {
