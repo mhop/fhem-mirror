@@ -734,6 +734,7 @@ sub TRX_LIGHT_parse_PT2262 {
   	Log 1, "TRX_LIGHT: PT2262 device_name=$device_name data=$hexdata" if ($TRX_LIGHT_debug == 1);
   	$def = $modules{TRX_LIGHT}{defptr}{$device_name};
   	if(!$def) {
+		$dev_reading = "";
 		Log 1, "UNDEFINED $device_name TRX_LIGHT $dev_type $device $dev_reading" if ($TRX_LIGHT_debug == 1);
        		Log 3, "TRX_LIGHT: TRX_LIGHT Unknown device $device_name, please define it";
 		return "UNDEFINED $device_name TRX_LIGHT $dev_type $device $dev_reading";
