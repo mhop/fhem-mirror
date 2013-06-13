@@ -4,13 +4,13 @@ package main;
 
 use strict;
 use warnings;
-use Time::HiRes qw(gettimeofday);
+use Time::HiRes qw(gettimeofday time);
 
 sub HMLAN_Parse($$);
 sub HMLAN_Read($);
 sub HMLAN_Write($$$);
 sub HMLAN_ReadAnswer($$$);
-sub HMLAN_uptime($$);
+sub HMLAN_uptime($@);
 sub HMLAN_secSince2000();
 
 sub HMLAN_SimpleWrite(@);
@@ -159,7 +159,8 @@ sub HMLAN_ReadAnswer($$$) {# This is a direct read for commands like get
     if($mdata =~ m/\r\n/) {
       if($regexp && $mdata !~ m/$regexp/) {
         HMLAN_Parse($hash, $mdata);
-      } else {
+      } 
+	  else {
         return (undef, $mdata);
       }
     }
@@ -230,37 +231,35 @@ sub HMLAN_Read($) {############################################################
   }
   $hash->{PARTIAL} = $hmdata;
 }
-sub HMLAN_uptime($$) {#########################################################
-  my ($hash,$msec) = @_;
+sub HMLAN_uptime($@) {#########################################################
+  my ($hmtC,$hash) = @_;  # hmTime Current
 
-  $msec = hex($msec);
-  my $sec = int($msec/1000);  
-#  my ($sysec, $syusec) = gettimeofday();
-#  my $symsec = int($sysec*1000+$syusec/1000);
-#  if ($hash->{helper}{refTime} == 1){ #init referenceTime
-#    $hash->{helper}{refTime} = 2;
-#    $hash->{helper}{refTimeS} = $symsec;
-#    $hash->{helper}{refTStmp} = $msec; 
-#    $hash->{helper}{msgdly} = $hash->{helper}{msgdlymin} = $hash->{helper}{msgdlymax} = 0; 
-#  }
-#  elsif ($hash->{helper}{refTime} == 0){ #init referenceTime
-#    $hash->{helper}{refTime} = 1;
-#  }
-#  else{
-#    my $dly = ($symsec - $hash->{helper}{refTimeS} ) -
-#	          ($msec   - $hash->{helper}{refTStmp});
-#    $hash->{helper}{msgdly} = $dly;
-#    $hash->{helper}{msgdlymin} = $dly 
-#	    if (!$hash->{helper}{msgdlymin} || $hash->{helper}{msgdlymin} > $dly);
-#    $hash->{helper}{msgdlymax} = $dly 
-#	    if (!$hash->{helper}{msgdlymax} || $hash->{helper}{msgdlymax} < $dly);
-#	readingsSingleUpdate($hash,"msgDly","last:".$hash->{helper}{msgdly}
-#	                                   ." min:".$hash->{helper}{msgdlymin}
-#	                                   ." max:".$hash->{helper}{msgdlymax},0);
-#  }
+  $hmtC = hex($hmtC);
+
+  if ($hash && $hash->{helper}{ref}){ #will calculate new ref-time
+	my $ref = $hash->{helper}{ref};#shortcut
+    my $sysC = int(time()*1000);   #current systime in ms
+	my $offC = $sysC - $hmtC;      #offset calc between time and HM-stamp
+	if ($ref->{hmtL} && ($hmtC > $ref->{hmtL})){
+	  if (($sysC - $ref->{kTs})<20){ #if delay is more then 20ms, we dont trust
+	    if ($ref->{sysL}){
+	      $ref->{drft} = ($offC - $ref->{offL})/($sysC - $ref->{sysL});        
+	    }
+        $ref->{sysL} = $sysC;
+        $ref->{offL} = $offC;
+	  }
+	}
+	else{# hm had a skip in time, start over calculation
+	  delete $hash->{helper}{ref};
+	}
+	$hash->{helper}{ref}{hmtL} = $hmtC;
+	$hash->{helper}{ref}{kTs} = 0;
+  }
+
+  my $sec = int($hmtC/1000);  
   return sprintf("%03d %02d:%02d:%02d.%03d",
-                  int($msec/86400000), int($sec/3600),
-                  int(($sec%3600)/60), $sec%60, $msec % 1000);
+                  int($hmtC/86400000), int($sec/3600),
+                  int(($sec%3600)/60), $sec%60, $hmtC % 1000);
 }
 sub HMLAN_Parse($$) {##########################################################
   my ($hash, $rmsg) = @_;
@@ -324,16 +323,36 @@ sub HMLAN_Parse($$) {##########################################################
     Log $ll5, "HMLAN_Parse: $name special reply ".$mFld[1]        if($stat & 0x0200);
 
      #update some User information ------
-	$hash->{uptime} = HMLAN_uptime($hash,$mFld[2]);
+	$hash->{uptime} = HMLAN_uptime($mFld[2]);
 	$hash->{RSSI}   = $rssi;
     $hash->{RAWMSG} = $rmsg;
     $hash->{"${name}_MSGCNT"}++;
     $hash->{"${name}_TIME"} = TimeNow();
 
+	my $dly = 0;
+    if ($hash->{helper}{ref} && $hash->{helper}{ref}{drft}){
+      my $ref = $hash->{helper}{ref};#shortcut
+      my $sysC = int(time()*1000);   #current systime in ms
+      $dly = int($sysC - (hex($mFld[2]) + $ref->{offL} + $ref->{drft}*($sysC - $ref->{sysL})));
+
+	  $hash->{helper}{dly}{lst} = $dly;
+	  my $dlyP = $hash->{helper}{dly};
+	  $dlyP->{min} = $dly if (!$dlyP->{min} || $dlyP->{min}>$dly);
+	  $dlyP->{max} = $dly if (!$dlyP->{max} || $dlyP->{max}<$dly);
+	  if ($dlyP->{cnt}) {$dlyP->{cnt}++} else {$dlyP->{cnt} = 1} ;
+	  
+	  $hash->{msgParseDly} =   "min:" .$dlyP->{min}
+	                         ." max:" .$dlyP->{max}
+						     ." last:".$dlyP->{lst}
+						     ." cnt:" .$dlyP->{cnt};	  
+	  $dly = 0 if ($dly<0);	  
+    }
+
 	# HMLAN sends ACK for flag 'A0' but not for 'A4'(config mode)- 
 	# we ack ourself an long as logic is uncertain - also possible is 'A6' for RHS
 	if (hex($flg)&0x4){#not sure: 4 oder 2 ? 
-	  $hash->{helper}{nextSend}{$src} = gettimeofday() + 0.100;
+	  my $wait = 0.100 - $dly/1000;
+	  $hash->{helper}{nextSend}{$src} = gettimeofday() + $wait if ($wait > 0);
 	}
 	if (hex($flg)&0xA4 == 0xA4 && $hash->{owner} eq $dst){
 	  Log $ll5, "HMLAN_Parse: $name ACK config";
@@ -360,8 +379,8 @@ sub HMLAN_Parse($$) {##########################################################
     $hash->{serialNr} = $mFld[2];
     $hash->{firmware} = sprintf("%d.%d", (hex($mFld[1])>>12)&0xf, hex($mFld[1]) & 0xffff);
     $hash->{owner} = $mFld[4];
-    $hash->{uptime} = HMLAN_uptime($hash,$mFld[5]);
-   	$hash->{assignIDsReport}=$mFld[6];
+    $hash->{uptime} = HMLAN_uptime($mFld[5],$hash);
+   	$hash->{assignIDsReport}=hex($mFld[6]);
     $hash->{helper}{keepAliveRec} = 1;
     $hash->{helper}{keepAliveRpt} = 0;
     Log $ll5, 'HMLAN_Parse: '.$name.                 ' V:'.$mFld[1]
@@ -460,8 +479,8 @@ sub HMLAN_DoInit($) {##########################################################
   HMLAN_SimpleWrite($hash, "Y03,00,");
   HMLAN_SimpleWrite($hash, "Y03,00,");
   HMLAN_SimpleWrite($hash, "T$s2000,04,00,00000000");
-  $hash->{helper}{refTime}=0;
-  
+  delete $hash->{helper}{ref};
+
   foreach (keys %lhash){delete ($lhash{$_})};# clear IDs - HMLAN might have a reset 
   $hash->{helper}{keepAliveRec} = 1; # ok for first time
   $hash->{helper}{keepAliveRpt} = 0; # ok for first time
@@ -478,6 +497,7 @@ sub HMLAN_KeepAlive($) {#######################################################
 
   return if(!$hash->{FD});
   HMLAN_SimpleWrite($hash, "K");
+  $hash->{helper}{ref}{kTs} = int(time()*1000);
   RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
   my $rt = AttrVal($name,"respTime",1);
   InternalTimer(gettimeofday()+$rt,"HMLAN_KeepAliveCheck","keepAliveCk:".$name,1);
