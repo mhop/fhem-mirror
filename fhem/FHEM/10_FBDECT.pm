@@ -245,7 +245,7 @@ FBDECT_Undef($$)
   <a href="#autocreate">autocreate</a>
   </ul>
   <br>
-  <br
+  <br>
 
   <a name="FBDECTset"></a>
   <b>Set</b>
