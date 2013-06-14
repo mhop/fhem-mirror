@@ -2249,24 +2249,26 @@ FW_dev2image($)
     if($devStateIcon =~ m/^{.*}$/) {
       my ($html, $link) = eval $devStateIcon;
       Log 1, "devStateIcon $name: $@" if($@);
-      return ($link, undef, 1) if(!$html); # only one value returned by the {}
-      return ($html, $link, 1);
-    }
+      return ($link, undef, 1) if(defined($html) && $html == "");
+      return ($html, $link, 1) if(defined($html));
 
-    my @list = split(" ", $devStateIcon);
-    foreach my $l (@list) {
-      my ($re, $iconName, $link) = split(":", $l, 3);
-      if(defined($re) && $state =~ m/^$re$/) {
-        if($iconName eq "") {
-          $rlink = $link;
-          last;
-        }
-        if(defined(FW_iconName($iconName)))  {
-          return ($iconName, $link, 0);
-        } else {
-          return ($state, $link, 1);
+    } else {
+      my @list = split(" ", $devStateIcon);
+      foreach my $l (@list) {
+        my ($re, $iconName, $link) = split(":", $l, 3);
+        if(defined($re) && $state =~ m/^$re$/) {
+          if($iconName eq "") {
+            $rlink = $link;
+            last;
+          }
+          if(defined(FW_iconName($iconName)))  {
+            return ($iconName, $link, 0);
+          } else {
+            return ($state, $link, 1);
+          }
         }
       }
+
     }
   }
 
@@ -3011,7 +3013,9 @@ FW_dropdownFn()
         </ul>
         Second form:<br>
         <ul>
-        Perl regexp enclosed in {}. Example:<br>
+        Perl regexp enclosed in {}. If the code returns undef, then the default
+        icon is used, if it retunes "" then the name of the state is displayed.
+        Example:<br>
         {'&lt;div style="width:32px;height:32px;background-color:green"&gt;&lt;/div&gt;'}
         </ul>
         Note: if the image is referencing an SVG icon, then you can use the @colorname
