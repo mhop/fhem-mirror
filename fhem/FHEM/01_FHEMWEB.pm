@@ -2047,6 +2047,7 @@ FW_makeImage(@)
   $class = "" if(!$class);
   $class = "$class $name";
   $class =~ s/\./_/g;
+  $class =~ s/@/ /g;
 
   my $p = FW_iconPath($name);
   return $name if(!$p);
