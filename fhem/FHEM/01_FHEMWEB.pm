@@ -2249,7 +2249,7 @@ FW_dev2image($)
     if($devStateIcon =~ m/^{.*}$/) {
       my ($html, $link) = eval $devStateIcon;
       Log 1, "devStateIcon $name: $@" if($@);
-      return ($link, undef, 1) if(defined($html) && $html == "");
+      return ($link, undef, 1) if(defined($html) && $html eq "");
       return ($html, $link, 1) if(defined($html));
 
     } else {
