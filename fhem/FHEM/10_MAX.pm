@@ -436,7 +436,8 @@ MAX_Set($@)
     return "Number of arguments must be even" if(@args%2 == 1);
 
     #Send wakeUp, so we can send the weekprofile pakets without preamble
-    MAX_WakeUp($hash) if( @args > 2 );
+    #Disabled for now. Seems like the first packet is lost. Maybe inserting a delay after the wakeup will fix this
+    #MAX_WakeUp($hash) if( @args > 2 );
 
     for(my $i = 0; $i < @args; $i += 2) {
       return "Expected day, got $args[$i]" if(!exists($decalcDaysInv{$args[$i]}));
