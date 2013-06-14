@@ -1,7 +1,7 @@
 The source of this project is hosted on sourceforge, if you wish you can get
 the latest version with the following command:
 
-  svn co https://fhem.svn.sourceforge.net/svnroot/fhem/trunk/fhem fhem
+  svn co https://svn.code.sf.net/p/fhem/code/trunk/fhem
 
 If you wish to contribute to the project, then
 - create a sourceforge account 
