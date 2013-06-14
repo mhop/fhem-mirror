@@ -80,10 +80,10 @@ HUEDevice_devStateIcon($)
   return undef
          if( AttrVal($name, "model", "") eq "LWL001" );
 
-  return '<div style="height:19px;'.
-         'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';">'.
-         '<img src="/fhem/icons/'.$hash->{STATE}.'" alt="'.$hash->{STATE}.'" title="'.$hash->{STATE}.'">'.
-         '</div>' if( ReadingsVal($name,"colormode","") eq "ct" );
+  #return '<div style="height:19px;'.
+  #       'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';">'.
+  #       '<img src="/fhem/icons/'.$hash->{STATE}.'" alt="'.$hash->{STATE}.'" title="'.$hash->{STATE}.'">'.
+  #       '</div>' if( ReadingsVal($name,"colormode","") eq "ct" );
 
   return '<div style="width:32px;height:19px;'.
          'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';"></div>';
