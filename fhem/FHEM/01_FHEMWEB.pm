@@ -1537,7 +1537,7 @@ FW_showLog($)
       close(CFH);
 
     } else {
-      FW_fC("get $d $file INT $f $t " . join(" ", @{$flog}));
+      FW_fC("get $d $file INT $f $t " . join(" ", @{$flog}), 1);
       ($cfg, $plot) = FW_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
       $ret = SVG_render($wl, $f, $t, $cfg,
                         $internal_data, $plot, $FW_wname, $FW_cssdir);
