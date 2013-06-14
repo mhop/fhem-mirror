@@ -58,8 +58,45 @@ sub HUEDevice_Initialize($)
                       "model:".join(",", sort keys %hueModels)." ".
                       "subType:colordimmer,dimmer,switch";
 
+  #$hash->{FW_summaryFn} = "HUEDevice_summaryFn";
+
   $data{webCmdFn}{colorpicker} = "HUEDevice_colorpickerFn";
   $data{FWEXT}{"/"}{SCRIPT} = "/jscolor/jscolor.js";
+}
+
+sub
+HUEDevice_devStateIcon($)
+{
+  my($hash) = @_;
+  $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
+
+  return undef if( !$hash );
+
+  my $name = $hash->{NAME};
+
+  return undef
+         if( ReadingsVal($name,"state","off") eq "off" || ReadingsVal($name,"bri","0") eq 0 );
+
+  return undef
+         if( AttrVal($name, "model", "") eq "LWL001" );
+
+  return '<div style="height:19px;'.
+         'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';">'.
+         '<img src="/fhem/icons/'.$hash->{STATE}.'" alt="'.$hash->{STATE}.'" title="'.$hash->{STATE}.'">'.
+         '</div>' if( ReadingsVal($name,"colormode","") eq "ct" );
+
+  return '<div style="width:32px;height:19px;'.
+         'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';"></div>';
+}
+sub
+HUEDevice_summaryFn($$$$)
+{
+Log 3, "HUEDevice_summaryFn";
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+  my $hash   = $defs{$d};
+  my $name = $hash->{NAME};
+
+  return HUEDevice_devStateIcon($hash);
 }
 
 sub
@@ -120,7 +157,7 @@ sub HUEDevice_Define($$)
   $hash->{fhem}{xy} = '';
 
 
-  $attr{$name}{devStateIcon} = '{(CommandGet("","'.$name.' devStateIcon"),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
+  $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
 
   AssignIoPort($hash);
   if(defined($hash->{IODev}->{NAME})) {
@@ -379,19 +416,7 @@ HUEDevice_Get($@)
     }
     return sprintf( "%02x%02x%02x", $r+0.5, $g+0.5, $b+0.5 );
   } elsif ( $cmd eq "devStateIcon" ) {
-    return '<img src="/fhem/icons/off" alt="off" title="off">'
-           if( ReadingsVal($name,"state","off") eq "off" || ReadingsVal($name,"bri","0") eq 0 );
-
-    return '<img src="/fhem/icons/'.$hash->{STATE}.'" alt="'.$hash->{STATE}.'" title="'.$hash->{STATE}.'">'
-           if( AttrVal($hash->{NAME}, "model", "") eq "LWL001" );
-
-    return '<div style="height:19px;'.
-           'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';">'.
-           '<img src="/fhem/icons/'.$hash->{STATE}.'" alt="'.$hash->{STATE}.'" title="'.$hash->{STATE}.'">'.
-           '</div>' if( ReadingsVal($name,"colormode","") eq "ct" );
-
-    return '<div style="width:32px;height:19px;'.
-           'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';"></div>';
+    return HUEDevice_devStateIcon($hash);
   }
 
   return "Unknown argument $cmd, choose one of rgb devStateIcon";
@@ -462,7 +487,8 @@ HUEDevice_GetUpdate($)
                                                                            || !defined($attr{$name}{model})
                                                                            || !defined($hueModels{$attr{$name}{model}}{subType}) );
 
-  $attr{$name}{devStateIcon} = '{CommandGet("","'.$name.' devStateIcon")}';
+  $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
+
   if( !defined( $attr{$name}{webCmd} ) ) {
     $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb C8FF12:rgb 0000ff:toggle:on:off' if( $attr{$name}{subType} eq "colordimmer" );
     $attr{$name}{webCmd} = 'pct:toggle:on:off' if( $attr{$name}{subType} eq "dimmer" );
@@ -557,7 +583,7 @@ HUEDevice_GetUpdate($)
     </ul>
   </ul><br>
 
-  <a name="HUE_Readings"></a>
+  <a name="HUEDevice_Readings"></a>
   <b>Readings</b>
   <ul>
     <li>bri<br>
