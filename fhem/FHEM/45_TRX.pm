@@ -5,7 +5,7 @@
 #
 # Derived from 00_CUL.pm: Copyright (C) Rudolf Koenig"
 #
-# Copyright (C) 2012 Willi Herzig
+# Copyright (C) 2012/2013 Willi Herzig
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -33,6 +33,7 @@ use Time::HiRes qw(gettimeofday);
 
 my $last_rmsg = "abcd";
 my $last_time = 1;
+my $trx_rssi = 0;
 
 sub TRX_Clear($);
 sub TRX_Read($);
@@ -53,10 +54,10 @@ TRX_Initialize($)
   $hash->{Clients} =
         ":TRX_WEATHER:TRX_SECURITY:TRX_LIGHT:TRX_ELSE:";
   my %mc = (
-    "1:TRX_WEATHER"   	=> "^..(50|51|52|54|55|56|57|5a|5d).*",
+    "1:TRX_WEATHER"   	=> "^..(50|51|52|54|55|56|57|58|5a|5d).*",
     "2:TRX_SECURITY" 	=> "^..(20).*", 
     "3:TRX_LIGHT"	=> "^..(10|11|12|13|14).*", 
-    "4:TRX_ELSE"   	=> "^..(0[0-f]|1[5-f]|2[1-f]|3[0-f]|4[0-f]|53|58|59|5b|5c|5e|5f|[6-f][0-f]).*",
+    "4:TRX_ELSE"   	=> "^..(0[0-f]|1[5-f]|2[1-f]|3[0-f]|4[0-f]|53|59|5b|5c|5e|5f|[6-f][0-f]).*",
   );
   $hash->{MatchList} = \%mc;
 
@@ -67,7 +68,7 @@ TRX_Initialize($)
   $hash->{UndefFn} = "TRX_Undef";
   $hash->{GetFn}   = "TRX_Get";
   $hash->{StateFn} = "TRX_SetState";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 do_not_init:1:0 addvaltrigger:1:0 longids loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 do_not_init:1,0 addvaltrigger:1,0 longids rssi:1,0 loglevel:0,1,2,3,4,5,6";
   $hash->{ShutdownFn} = "TRX_Shutdown";
 }
 
@@ -101,8 +102,7 @@ TRX_Define($$)
       return "wrong syntax: define <name> TRX devicename [noinit]"
     }
   }
-  
-  
+   
   $hash->{DeviceName} = $dev;
   my $ret = DevIo_OpenDev($hash, 0, "TRX_DoInit");
   return $ret;
@@ -484,6 +484,16 @@ attr RFXTRXUSB longids BTHR918N
 # Use longids for TX3_T and TX3_H devices.
 # Will generate devices names like TX3_T_07, TX3_T_01 ,TX3_H_07.
 attr RFXTRXUSB longids TX3_T,TX3_H</PRE>
+    </li><br>
+   <li>rssi<br>
+        1: enable RSSI logging, 0: disable RSSI logging<br>
+Default is no RSSI logging.
+      <br><br>
+      Examples:<PRE>
+# Do log rssi values (this is default):
+attr RFXCOMUSB rssi 0
+# Enable rssi logging for devices:
+attr RFXCOMUSB rssi 1
     </li><br>
   </ul>
   <br>

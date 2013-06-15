@@ -4,7 +4,7 @@
 #     46_TRX_SECURITY.pm
 #     FHEM module for X10, KD101, Visonic
 #
-#     Copyright (C) 2012 Willi Herzig
+#     Copyright (C) 2012/2013 Willi Herzig
 #
 #     This file is part of fhem.
 #
@@ -37,6 +37,7 @@ use warnings;
 my $TRX_SECURITY_debug = 0;
 
 my $time_old = 0;
+my $trx_rssi;
 
 my $TRX_SECURITY_type_default = "ds10a";
 
@@ -395,6 +396,7 @@ sub TRX_SECURITY_parse_X10Sec {
   my $type = "";
   my $delay = "";
   my $battery = "";
+  my $rssi = "";
   my $option = "";
   my @res;
   if (exists $x10_security{$data}) {
@@ -416,6 +418,11 @@ sub TRX_SECURITY_parse_X10Sec {
 	else {
 		Log 1,"TRX_SECURITY: X10Sec unkown battery_level=$battery_level";
 	}
+  }
+
+  if ($trx_rssi == 1) {
+  	$rssi = sprintf("%d", ($bytes->[7] & 0xf0) >> 4);
+	#Log 1, "TRX_SECURITY: $name devn=$device_name rssi=$rssi";
   }
 
   my $current = "";
@@ -489,6 +496,12 @@ sub TRX_SECURITY_parse_X10Sec {
 	readingsBulkUpdate($def, $sensor, $current);
   }
 
+  if ($rssi ne "") {
+	$sensor = "rssi";
+	readingsBulkUpdate($def, $sensor, $rssi);
+  }
+
+
   if ($delay ne '') {
 	$sensor = "delay";
 	$current = "Error";
@@ -515,6 +528,12 @@ sub
 TRX_SECURITY_Parse($$)
 {
   my ($iohash, $hexline) = @_;
+
+  $trx_rssi = 0;
+  if (defined($attr{$iohash->{NAME}}{rssi})) {
+  	$trx_rssi = $attr{$iohash->{NAME}}{rssi};
+  	#Log 1,"TRX_SECURITY_Parse: attr rssi = $trx_rssi";
+  }
 
   my $time = time();
   # convert to binary
