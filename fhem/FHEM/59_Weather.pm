@@ -484,8 +484,8 @@ WeatherAsHtml($)
         ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""),
         ReadingsVal($d, "wind_condition", ""));
 
-  for(my $i=1; $i<=2; $i++) {
-    #  Yahoo provides only 2 days.
+  for(my $i=1; $i<=5; $i++) {
+    #  Yahoo provides 5 days since June 2013 (previouly 2 days)
     #next if (ReadingsVal($d, "fc${i}_code", "") eq ""); # MH skip non existent entries
 
     $ret .= sprintf('<tr><td width=%d>%s</td><td>%s: %s<br>min %s°C max %s°C</td></tr>',
