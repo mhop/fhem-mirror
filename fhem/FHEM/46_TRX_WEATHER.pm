@@ -57,6 +57,9 @@
 # "UVN800"	is Oregon UVN800
 # "TFA_UV"	is TFA_UV-Sensor
 #
+# Date/Time Sensors:
+# * "RTGR328_DATE" is RTGR328N
+#
 # Energy Sensors:
 # * "CM160"	is OWL CM119, CM160
 # * "CM180"	is OWL CM180
@@ -100,13 +103,14 @@ use warnings;
 my $TRX_HEX_debug = 0;
 
 my $time_old = 0;
+my $trx_rssi;
 
 sub
 TRX_WEATHER_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^..(50|51|52|54|55|56|57|5a|5d).*";
+  $hash->{Match}     = "^..(50|51|52|54|55|56|57|58|5a|5d).*";
   $hash->{DefFn}     = "TRX_WEATHER_Define";
   $hash->{UndefFn}   = "TRX_WEATHER_Undef";
   $hash->{ParseFn}   = "TRX_WEATHER_Parse";
@@ -176,6 +180,8 @@ my %types =
    0x5610 => { part => 'WIND', method => \&TRX_WEATHER_common_anemometer, },
    # UV
    0x5709 => { part => 'UV', method => \&TRX_WEATHER_common_uv, },
+   # Date/Time sensors
+   0x580D => { part => 'DATE', method => \&TRX_WEATHER_common_datetime, },
    # Energy usage sensors
    0x5A11 => { part => 'ENERGY', method => \&TRX_WEATHER_common_energy, },
     # WEIGHT
@@ -281,6 +287,17 @@ sub TRX_WEATHER_simple_battery {
 	type => 'battery',
 	current => $battery,
   };
+
+  my $rssi = ($bytes->[$off] & 0xf0) >> 4;
+
+  if ($trx_rssi == 1) {
+  	push @$res, {
+		device => $dev,
+		type => 'rssi',
+		current => sprintf("%d",$rssi),
+  	};
+  }
+
 }
 
 sub TRX_WEATHER_battery {
@@ -301,6 +318,17 @@ sub TRX_WEATHER_battery {
 	type => 'battery',
 	current => $battery,
   };
+
+  my $rssi = ($bytes->[$off] & 0xf0) >> 4;
+
+  if ($trx_rssi == 1) {
+  	push @$res, {
+		device => $dev,
+		type => 'rssi',
+		current => sprintf("%d",$rssi),
+  	};
+  }
+
 }
 
 
@@ -318,6 +346,7 @@ sub TRX_WEATHER_use_longid {
 
   return 0;
 }
+
 
 # ------------------------------------------------------------
 #
@@ -754,6 +783,63 @@ sub TRX_WEATHER_common_uv {
 
 # ------------------------------------------------------------
 #
+sub TRX_WEATHER_common_datetime {
+    	my $type = shift;
+	my $longids = shift;
+    	my $bytes = shift;
+
+  my $subtype = sprintf "%02x", $bytes->[1];
+  #Log 1,"subtype=$subtype";
+  my $dev_type;
+
+  my %devname =
+    (	# HEXSTRING => "NAME"
+	0x01 => "RTGR328_DATE", # RTGR328N datetime datagram
+  );
+
+  if (exists $devname{$bytes->[1]}) {
+  	$dev_type = $devname{$bytes->[1]};
+  } else {
+  	Log 1,"TRX_WEATHER: common_datetime error undefined subtype=$subtype";
+  	my @res = ();
+  	return @res;
+  }
+
+  my $dev_str = $dev_type;
+  if (TRX_WEATHER_use_longid($longids,$dev_type)) {
+  	$dev_str .= $DOT.sprintf("%02x%02x", $bytes->[3],$bytes->[4]);
+  }
+
+  my @res = ();
+
+  # hexline debugging
+  if ($TRX_HEX_debug) {
+    my $hexline = ""; for (my $i=0;$i<@$bytes;$i++) { $hexline .= sprintf("%02x",$bytes->[$i]);} 
+    push @res, { device => $dev_str, type => 'hexline', current => $hexline, units => 'hex', };
+  }
+
+  push @res, {
+	device => $dev_str,
+	type => 'date',
+	current => sprintf("%02d-%02d-%02d", $bytes->[5],$bytes->[6],$bytes->[7]),
+	units => 'yymmdd',
+  };
+
+  push @res, {
+	device => $dev_str,
+	type => 'time',
+	current => sprintf("%02d:%02d:%02d", $bytes->[9],$bytes->[10],$bytes->[11]),
+	units => 'hhmmss',
+  };
+
+  TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 12); 
+
+  return @res;
+}
+
+
+# ------------------------------------------------------------
+#
 sub TRX_WEATHER_common_energy {
     	my $type = shift;
 	my $longids = shift;
@@ -829,6 +915,7 @@ sub TRX_WEATHER_common_energy {
   return @res;
 }
 
+
 # ------------------------------------------------------------
 #
 sub TRX_WEATHER_common_weight {
@@ -902,6 +989,12 @@ TRX_WEATHER_Parse($$)
   if (defined($attr{$iohash->{NAME}}{longids})) {
   	$longids = $attr{$iohash->{NAME}}{longids};
   	#Log 1,"0: attr longids = $longids";
+  }
+
+  $trx_rssi = 0;
+  if (defined($attr{$iohash->{NAME}}{rssi})) {
+  	$trx_rssi = $attr{$iohash->{NAME}}{rssi};
+  	#Log 1,"0: attr rssi = $trx_rssi";
   }
 
   my $time = time();
@@ -1104,6 +1197,20 @@ TRX_WEATHER_Parse($$)
 	}
 	elsif ($i->{type} eq "hexline") { 
 			$sensor = "hexline";			
+			readingsBulkUpdate($def, $sensor, $i->{current});
+	}
+	elsif ($i->{type} eq "rssi") { 
+			$sensor = "rssi";			
+			readingsBulkUpdate($def, $sensor, $i->{current});
+	}
+	elsif ($i->{type} eq "date") { 
+			$val .= $i->{current}." ";
+			$sensor = "date";			
+			readingsBulkUpdate($def, $sensor, $i->{current});
+	}
+	elsif ($i->{type} eq "time") { 
+			$val .= $i->{current}." ";
+			$sensor = "time";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	else { 
