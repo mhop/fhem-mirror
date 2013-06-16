@@ -1452,7 +1452,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 		  if($list eq "00"){
 			my $name = CUL_HM_id2Name($src);
 			readingsSingleUpdate($shash,"PairedTo",
-		                    CUL_HM_getRegFromStore($name,"pairCentral",0,"00000000"),0);
+		                    CUL_HM_getRegFromStore($name,"pairCentral",0,""),0);
 		  }		  
 		  CUL_HM_respPendRm($shash);
 		  delete $chnHash->{helper}{shadowReg}{$regLN};#remove shadowhash
@@ -3240,7 +3240,7 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
 			                              substr(CUL_HM_name2Id($name),0,6),
 										  CUL_HM_IOid($hash)):"")
 			if(!$regLN);
-  
+
   my $data=0;
   my $convFlg = "";# confirmation flag - indicates data not confirmed by device
   for (my $size2go = $size;$size2go>0;$size2go -=8){
