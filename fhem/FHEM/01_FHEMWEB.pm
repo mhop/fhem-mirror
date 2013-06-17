@@ -15,6 +15,7 @@ sub FW_iconPath($);
 sub FW_answerCall($);
 sub FW_calcWeblink($$);
 sub FW_dev2image($);
+sub FW_devState($$@);
 sub FW_digestCgi($);
 sub FW_doDetail($);
 sub FW_fatal($);
@@ -1073,23 +1074,9 @@ FW_showRoom()
       }
       $row++;
 
-      my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf);
+      my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
 
-      my $sfn = $modules{$type}{FW_summaryFn};
-      my $newtxt;
-      if($sfn) {
-        no strict "refs";
-        $newtxt = &{$sfn}($FW_wname, $d, $FW_room, \%extPage);
-        use strict "refs";
-      }
-
-      if(defined($newtxt)) {
-        FW_pO "<td id=\"$type.$d\">$newtxt</td>";
-
-      } else {
-        FW_pO "<td id=\"$d\">$txt</td>";
-
-      }
+      FW_pO "<td id=\"$d\">$txt</td>";
 
 
       ######
@@ -2330,8 +2317,9 @@ FW_roomStatesForInform($)
 
   my $data = "";
   my @rl = devspec2array("room=$room");
+  my %extPage = ();
   foreach my $dn (@rl) {
-    my ($allSet, $cmdlist, $txt) = FW_devState($dn, "");
+    my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
     $data .= "$dn<<$defs{$dn}{STATE}<<$txt\r\n"
         if($defs{$dn} && $defs{$dn}{STATE});
   }
@@ -2349,6 +2337,7 @@ FW_Notify($$)
   my $ln = $ntfy->{NAME};
   my $dn = $dev->{NAME};
   my $data;
+  my %extPage;
 
   my $rn = AttrVal($dn, "room", "");
   if($filter eq "all" || $rn =~ m/\b$filter\b/) {
@@ -2361,7 +2350,7 @@ FW_Notify($$)
     $FW_ss = ($FW_sp =~ m/smallscreen/);
     $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
 
-    my ($allSet, $cmdlist, $txt) = FW_devState($dn, "");
+    my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
     ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir) = @old;
     $data = "$dn<<$dev->{STATE}<<$txt\n";
 
@@ -2418,9 +2407,9 @@ FW_FlushInform($)
 ###################
 # Compute the state (==second) column
 sub
-FW_devState($$)
+FW_devState($$@)
 {
-  my ($d, $rf) = @_;
+  my ($d, $rf, $extPage) = @_;
 
   my ($hasOnOff, $link);
 
@@ -2487,6 +2476,19 @@ FW_devState($$)
 
     }
   }
+
+  my $type = $defs{$d}{TYPE};
+  my $sfn = $modules{$type}{FW_summaryFn};
+  if($sfn) {
+    if(!defined($extPage)) {
+       my %hash;
+       $extPage = \%hash;
+    }
+    no strict "refs";
+    $txt = &{$sfn}($FW_wname, $d, $FW_room, $extPage);
+    use strict "refs";
+  }
+
   return ($allSets, $cmdList, $txt);
 }
 
