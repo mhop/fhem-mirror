@@ -127,7 +127,7 @@ energy_Update($)
   InternalTimer(gettimeofday() + $hash->{Interval}, "energy_Update", $hash, 0);
  }
 
- Log 3, "$hash->{NAME} tries to contact SML at $hash->{Host}:$hash->{Port}";
+ Log 4, "$hash->{NAME} tries to contact SML at $hash->{Host}:$hash->{Port}";
 
  my $success  = 0;
  my %readings = ();
