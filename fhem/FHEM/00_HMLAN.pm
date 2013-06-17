@@ -542,7 +542,9 @@ sub HMLAN_secSince2000() {#####################################################
 <h3>HMLAN</h3>
 <ul>
   <tr><td>
-  The HMLAN is the fhem module for the eQ-3 HomeMatic LAN Configurator.
+  The HMLAN is the fhem module for the eQ-3 HomeMatic LAN Configurator.<br>
+  A description on how to use  <a href="https://git.zerfleddert.de/cgi-bin/gitweb.cgi/hmcfgusb">hmCfgUsb</a>
+  can be found follwing the link.
   <br><br>
   The fhem module will emulate a CUL device, so the <a href="#CUL_HM">CUL_HM</a>
   module can be used to define HomeMatic devices.<br><br>

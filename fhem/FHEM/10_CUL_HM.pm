@@ -2041,11 +2041,10 @@ sub CUL_HM_Set($@) {
 	  #read full 8 bit!!!
 	  my $rName = CUL_HM_id2Name($dst.$lChn);
 	  $rName =~ s/_chn:.*//;
-	  my $curVal = CUL_HM_getRegFromStore($rName,
-	                                      $addr,$list,$peerId.$peerChn);
-	  return "cannot calculate value. Please issue set $name getConfig first" 
-	             if (!$curVal ||$curVal eq "invalid");
-	  $curVal =~ s/set_//; # set is not relevant, we take it as given
+	  my $curVal = CUL_HM_getRegFromStore($rName,$addr,$list,$peerId.$peerChn);
+  	  return "cannot calculate value. Please issue set $name getConfig first" 
+	             if ($curVal !~ m/^(set_|)(\d+)$/);
+	  $curVal = $2; # we expect one byte in int, strap 'set_' possibly
 	  $data = ($curVal & (~($mask<<$bit)))|($data<<$bit);
 	  $addrData.=sprintf("%02X%02X",$addr,$data);
 	}
@@ -2122,7 +2121,7 @@ sub CUL_HM_Set($@) {
   }
   elsif($cmd =~ m/^(up|down|pct)$/) { #########################################
 	my ($lvl,$tval,$rval) = ($a[2],"","");
-	if ($cmd ne "pct"){#dim [<changeValue>|up|down] ... [ontime] [ramptime]
+	if ($cmd ne "pct"){#dim [<changeValue>] ... [ontime] [ramptime]
 	  $lvl = 10 if (!defined $a[2]); #set default step
 	  $lvl = -1*$lvl if ($cmd eq "down");
 	  $lvl += CUL_HM_getChnLvl($name);
@@ -3232,27 +3231,28 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
 	$size = int($size)*8 + ($size*10)%10;
 	$conversion = $reg->{c}; #unconvert formula
 	$factor = $reg->{f};
-	$unit = $reg->{u};
+	$unit = " ".$reg->{u};
   }
-  $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")
+
+  if(!$regLN){
+    $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")
               .sprintf("RegL_%02X:",$list)
 			  .($peerId?CUL_HM_peerChName($peerId,
 			                              substr(CUL_HM_name2Id($name),0,6),
-										  CUL_HM_IOid($hash)):"")
-			if(!$regLN);
+										  CUL_HM_IOid($hash)):"");
+	$regLN =~ s/broadcast//;
+  }
 
   my $data=0;
   my $convFlg = "";# confirmation flag - indicates data not confirmed by device
   for (my $size2go = $size;$size2go>0;$size2go -=8){
     my $addrS = sprintf("%02X",$addr);
-    
 	my ($dReadS,$dReadR) = (undef,"");
     $dReadS = $1 if(   $hash->{helper}{shadowReg}
 	                && $hash->{helper}{shadowReg}{$regLN}
 					&& $hash->{helper}{shadowReg}{$regLN} =~ m/$addrS:(..)/);
     $dReadR = $1 if(  $hash->{READINGS}{$regLN}
-	                &&$hash->{READINGS}{$regLN}{VAL}      =~ m/$addrS:(..)/);
-	
+	                &&$hash->{READINGS}{$regLN}{VAL}      =~ m/$addrS:(..)/);	
     my $dRead = $dReadR;
 	if (defined $dReadS){
 	  $convFlg = "set_" if ($dReadR ne $dReadS);
@@ -3270,16 +3270,12 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   if (!$conversion){                ;# do nothing
   } elsif($conversion eq "factor"){$data /= $factor;
   } elsif($conversion eq "lit"   ){$data = $reg->{litInv}{$data}?$reg->{litInv}{$data}:"undef lit";
-#  } elsif(defined($reg->{lit}))   { 
-#    foreach (keys%{$reg->{lit}}){ 
-#	  if ($data == $reg->{lit}{$_}){$data = $_; last; }
-#  }   
   } elsif($conversion eq "fltCvT"){$data = CUL_HM_CvTflt($data);
   } elsif($conversion eq "m10s3" ){$data = ($data+3)/10;
   } elsif($conversion eq "hex"   ){$data = sprintf("0x%X",$data);
   } else { return " conversion undefined - please contact admin";
   } 
-  return $convFlg.$data.' '.$unit;
+  return $convFlg.$data.$unit;
 }
 sub CUL_HM_updtRegDisp($$$) {
   my($hash,$list,$peerId)=@_;
@@ -4006,9 +4002,6 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 
      Universal commands (available to most hm devices):
      <ul>
-	 <li><B>actiondetect &lt;[hhh:mm]|off&gt;</B><a name="CUL_HMactiondetect"></a><br>
-         outdated command. This functionality is started by entering or modify of the attribute actCycle. see attribure section for details<br>
-	 </li>
 	 <li><B>clear &lt;[readings|msgEvents]&gt;</B><a name="CUL_HMclear"></a><br>
          A set of variables can be removed.<br>
 		 <ul>
@@ -4082,9 +4075,11 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
          Read serial number from device and write it to attribute serialNr.
 	  </li>
 	  <li><B>inhibit [on|off]</B><br>
-         Block / unblock all directly peered remotes and the hardware buttons of the
-         device. If inhibit set on, the channel status can be controlled only by
-         FHEM.<br><br>
+         Block / unblock all changes to the actor channel, i.e. actor state is frozen 
+		 untill inhibit is set off again. Inhibit can be executed on any actor channel 
+		 but obviously not on sensors - would not make any sense.<br>
+		 Practically it can be used to suspend any notifies as well as peered channel action 
+		 temporarily without the need to delete them. <br>
          Examples:
          <ul><code>
            # Block operation<br>
@@ -4200,17 +4195,17 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
      </ul>
 
      <br>
-     <B>subType (i.e family) dependent commands:</B>
+     <B>subType dependent commands:</B>
      <ul>
      <br>
     <li>switch
        <ul>
-          <li><B>on</B>  - set the switch on</li>
-          <li><B>off</B> - set the switch off</li>
+          <li><B>on</B> <a name="CUL_HMon"> </a> - set level to 100%</li>
+          <li><B>off</B><a name="CUL_HMoff"></a> - set level to 0%</li>
           <li><B>on-for-timer &lt;sec&gt;</B><a name="CUL_HMonForTimer"></a> -
               set the switch on for the given seconds [0-85825945].<br> Note:
-              off-for-timer like FS20 is not supported. It needs to be programmed
-              on link level.</li>
+              off-for-timer like FS20 is not supported. It may to be programmed
+              thru channel register.</li>
           <li><B>on-till &lt;time&gt;</B><a name="CUL_HMonTill"></a> - set the switch on for the given end time.<br>
 	      <ul><code>set &lt;name&gt; on-till 20:32:10<br></code></ul>
 	      Currently a max of 24h is supported with endtime.<br>
@@ -4221,7 +4216,8 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 			  [on|off] is relevant only for devices with direct buttons per channel. 
 			  Those are available for dimmer and blind-actor, usually not for switches<br>
 		  </li>
-          <li><B>toggle</B> - toggle the switch.</li>
+          <li><B>toggle</B><a name="CUL_HMtoggle"></a> - toggle the Actor. It will switch from any current 
+		         level to off or from off to 100%</li>
        </ul>
      <br>
 	 </li>
@@ -4229,7 +4225,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	   Dimmer may support virtual channels. Those are autocrated if applicable. Usually there are 2 virtual channels
 	   in addition to the primary channel. Virtual dimmer channels are inactive by default but can be used in 
 	   in parallel to the primay channel to control light. <br>
-	   Virtual channels have default naming SW<channel>_V<no>. e.g. Dimmer_SW1_V1 and Dimmer_SW1_V2.<br>
+	   Virtual channels have default naming SW&lt;channel&gt;_V&lt;no&gt;. e.g. Dimmer_SW1_V1 and Dimmer_SW1_V2.<br>
 	   Dimmer virtual channels are completely different from FHEM virtual buttons and actors but 
 	   are part of the HM device. Documentation and capabilities for virtual channels is out of scope.<br>
        <ul>
@@ -4240,15 +4236,20 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
              On-time is analog "on-for-timer".<br>
              Ramp-time default is 2.5s, 0 means instantanous<br>
              </li>
-         <li><B>on</B> set level to 100%<br></li>
-         <li><B>off</B> set level to 0%<br></li>
+         <li><B><a href="#CUL_HMon">on</a></B></li>
+         <li><B><a href="#CUL_HMoff">off</a></B></li>
          <li><B><a href="#CUL_HMpress">press &lt;[short|long]&gt;&lt;[on|off]&gt;</a></B></li>
-         <li><B>toggle</B> - toggle between off and the last on-value</li>
+         <li><B><a href="#CUL_HMtoggle">toggle</a></B></li>
          <li><B><a href="#CUL_HMonForTimer">on-for-timer &lt;sec&gt;</a></B> - Dimmer only! <br></li>
-         <li><B><a href="#CUL_HMonForTimer">on-till &lt;time&gt;</a></B> - Dimmer only! <br></li>
-         <li><B>stop</B> - stop motion or dim ramp</li>
-         <li><B>up [changeValue] [ontime] [ramptime]</B> dim up one step<br></li>
-         <li><B>down [changeValue] [ontime] [ramptime]</B> dim up one step<br></li>
+         <li><B><a href="#CUL_HMonTill">on-till &lt;time&gt;</a></B> - Dimmer only! <br></li>
+         <li><B>stop</B> - stop motion (blind) or dim ramp</li>
+         <li><B>pct [&lt;ontime&gt] [&lt;ramptime&gt]</B> - set actor to a desired level. Optional ontime and ramptime could be given</li>
+         <li><B>up [changeValue] [&lt;ontime&gt] [&lt;ramptime&gt]</B> dim up one step</li>
+         <li><B>down [changeValue] [&lt;ontime&gt] [&lt;ramptime&gt]</B> dim up one step<br>
+		     changeValue is optional an gives the level to be changed up or down in percent. Granularity is 0.5%, default is 10%. <br>
+			 ontime is optional an gives the duration of the level to be kept. '0' means forever and is default.<br>
+			 ramptime is optional an defines the change speed to reach the new level. It is meaningful only for dimmer.
+		     <br></li>
        </ul>
     <br>
 	</li>
@@ -4337,7 +4338,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
     </li>
        </ul>
 	</li>
-    <li><br>virtual<a name="CUL_HMvirtual"></a><br>
+    <li>virtual<a name="CUL_HMvirtual"></a><br>
        <ul>
        <li><B><a href="#CUL_HMpeerChan">peerChan</a></B> see remote</li>
        <li><B>press [long|short]<a name="CUL_HMpress"></a></B>
@@ -4347,7 +4348,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	   </li>
        </ul>
     </li>   
-    <li><br>smokeDetector<br>
+    <li>smokeDetector<br>
        Note: All these commands work right now only if you have more then one
        smoekDetector, and you peered them to form a group. For issuing the
        commands you have to use the master of this group, and currently you
@@ -4363,7 +4364,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
        <li><B>alarmOff</B> - switch off the alarm</li>
      </ul>
     </li>
-    <li><br>4Dis (HM-PB-4DIS-WM)
+    <li>4Dis (HM-PB-4DIS-WM)
     <ul>
       <li><B>text &lt;btn_no&gt; [on|off] &lt;text1&gt; &lt;text2&gt;</B><br>
           Set the text on the display of the device. To this purpose issue
@@ -4384,31 +4385,32 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
     <br></li>
     <li>Climate-Control (HM-CC-TC)
     <ul>
-      <li>day-temp &lt;tmp&gt;<br>
-          night-temp &lt;tmp&gt;<br>
-          party-temp &lt;tmp&gt;<br>
-          desired-temp &lt;tmp&gt;<br>
-          Set different temperatures. Temp must be between 6 and 30
+      <li><B>day-temp &lt;temp&gt;</B><br></li>
+      <li><B>night-temp &lt;temp&gt;</B><br></li>
+      <li><B>party-temp &lt;temp&gt;</B><br></li>
+      <li><B>desired-temp &lt;temp&gt;</B><br>
+          Set different temperatures. &lt;temp&gt; must be between 6 and 30
           Celsius, and precision is half a degree.</li>
-      <li>tempListSat HH:MM temp ... 24:00 temp<br>
-          tempListSun HH:MM temp ... 24:00 temp<br>
-          tempListMon HH:MM temp ... 24:00 temp<br>
-          tempListTue HH:MM temp ... 24:00 temp<br>
-          tempListThu HH:MM temp ... 24:00 temp<br>
-          tempListWed HH:MM temp ... 24:00 temp<br>
-          tempListFri HH:MM temp ... 24:00 temp<br>
+      <li><B>tempListSat HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListSun HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListMon HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListTue HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListThu HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListWed HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListFri HH:MM temp ... 24:00 temp</B><br>
           Specify a list of temperature intervals. Up to 24 intervals can be
           specified for each week day, the resolution is 10 Minutes. The
           last time spec must always be 24:00.<br>
-          Example: set th tempListSat 06:00 19 23:00 22.5 24:00 19<br>
-          Meaning: until 6:00 temperature shall be 19, from then until 23:00 temperature shall be 
-          22.5, thereafter until midnight, 19 degrees celsius is desired.</li>
-      <li>displayMode [temp-only|temp-hum]<br>
-          displayTemp [actual|setpoint]<br>
-          displayTempUnit [celsius|fahrenheit]<br>
-          controlMode [manual|auto|central|party]<br>
-          decalcDay &lt;day&gt;</li>
-      <li>systime <br>
+          Example: until 6:00 temperature shall be 19, from then until 23:00 temperature shall be 
+          22.5, thereafter until midnight, 19 degrees celsius is desired.<br>
+		  <code> set th tempListSat 06:00 19 23:00 22.5 24:00 19<br></code>
+          </li>
+      <li><B>displayMode [temp-only|temp-hum]</B><br></li>
+      <li><B>displayTemp [actual|setpoint]</B><br></li>
+      <li><B>displayTempUnit [celsius|fahrenheit]</B><br></li>
+      <li><B>controlMode [manual|auto|central|party]</B><br></li>
+      <li><B>decalcDay &lt;day&gt;</B></li>
+      <li><B>systime</B><br>
           set time in climate channel to system time</li>
     </ul><br>
 	</li>
@@ -4421,10 +4423,8 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 		For Expert all LEDs can be set individual by providing a 8-digit hex number to the device.<br></li>
     <li><B>ilum &lt;brightness&gt;&lt;duration&gt; </B><br>
         &lt;brightness&gt; [0-15] of backlight.<br>
-        &lt;duration&gt; [0-127] in sec. 0 is permanent 'on'.<br>
-    </li>
-    </ul><br>
-	</li>
+        &lt;duration&gt; [0-127] in sec. 0 is permanent 'on'.<br></li>
+    </ul><br></li>
     <li>OutputUnit (HM-OU-CFM-PL)
     <ul>
       <li><B>led &lt;color&gt;[,&lt;color&gt;..] [&lt;repeat&gt..]</B><br>
@@ -4453,8 +4453,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
            </ul></code>  
 
 	  </li>
-    </ul><br>
-	</li>
+    </ul><br></li>
     <li>HM-RC-19xxx
       <ul>
       <li><B>alarm &lt;count&gt;</B><br>
@@ -4512,10 +4511,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
          Unlocked the door so that the door can be opened.<br>
          [sec]: Sets the delay in seconds after the lock automatically locked
          again.<br>0 - 65535 seconds</li>
-      </li>
-      </ul>
-	</li>
-	  
+      </ul></li>	  
 	<li>winMatic <br><br>
       <ul>winMatic provides 2 channels, one for the window control and a second
 	  for the accumulator.</ul><br>
@@ -4530,8 +4526,8 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
          stop movement<br>
 		 </li>
       </ul></li>
-   <li>HM-Sys-sRP-Pl<br><br>
-	setRepeat => "[no1..36] <sendName> <recName> [bdcast-yes|no]"
+    <li>HM-Sys-sRP-Pl<br><br>
+	setup the repeater's entries. Up to 36entries can be applied.
     <ul>
       <li><B>setRepeat    &lt;entry&gt; &lt;sender&gt; &lt;receiver&gt; &lt;broadcast&gt;</B><br>
       &lt;entry&gt; [1..36] entry number in repeater table. The repeater can handle up to 36 entries.<br>
@@ -4540,12 +4536,12 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
       &lt;broadcast&gt; [yes|no] determines whether broadcast from this ID shall be repeated<br>
 	  <br>
 	  short application: <br>
-	  setRepeat setAll 0 0 0<br>
+	  <code>setRepeat setAll 0 0 0<br></code>
 	  will rewrite the complete list to the deivce. Data will be taken from attribut repPeer. <br>
 	  attribut repPeer is formated:<br>
 	  src1:dst1:[y/n],src2:dst2:[y/n],src2:dst2:[y/n],...<br>
-	  up to 36entries can be applied.
-    </ul><br></li>
+    </li>
+	</ul>
 	</li>
    </ul>
    <br>
@@ -4716,7 +4712,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
   <a name="CUL_HMevents"></a>
   <b>Generated events:</b>
   <ul>
-  <li>HM-CC-TC:<br>
+  <li><B>HM-CC-TC</B><br>
       T: $t H: $h<br>
   	  battery:[low|ok]<br>
       measured-temp $t<br>
@@ -4739,7 +4735,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	  ValveOffset $of %<br>
       time-request<br>
   </li>
-  <li>HM-CC-VD:<br>
+  <li><B>HM-CC-VD</B><br>
       $vp %<br>
 	  battery:[critical|low|ok]<br>
       motorErr:[ok|blocked|loose|adjusting range too small|opening|closing|stop]<br>
@@ -4750,42 +4746,42 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	  operState:[errorTargetNotMet|onTarget|adjusting]  # operational condition<br>
 	  operStateErrCnt:$cnt          # number of failed settings<br>
   </li>
-  <li>HM-CC-SCD<br>
+  <li><B>HM-CC-SCD</B><br>
 	  [normal|added|addedStrong]<br>
       battery [low|ok]<br>
   </li>
-  <li>HM-SEC-SFA-SM:<br>
+  <li><B>HM-SEC-SFA-SM</B><br>
 	  powerError [on|off]<br>
 	  sabotageError [on|off]<br>
 	  battery: [critical|low|ok]<br>
   </li>
-  <li>HM-LC-BL1-PB-FM:<br>
+  <li><B>HM-LC-BL1-PB-FM</B><br>
       motor: [opening|closing]<br>
   </li>
-  <li>HM-LC-SW1-BA-PCB:<br>
+  <li><B>HM-LC-SW1-BA-PCB</B><br>
 	  battery: [low|ok]<br>
   </li>
-  <li>HM-OU-LED16<br>
+  <li><B>HM-OU-LED16</B><br>
   	  color $value                  # hex - for device only<br>
 	  $value                        # hex - for device only<br>
 	  color [off|red|green|orange]  # for channel <br>
       [off|red|green|orange]	    # for channel <br>
   </li>
-  <li>HM-OU-CFM-PL<br>
+  <li><B>HM-OU-CFM-PL</B><br>
 	  [on|off|$val]<br>
   </li>
-  <li>HM-Sen-Wa-Od<br>
+  <li><B>HM-Sen-Wa-Od</B><br>
 	  $level%<br>
 	  level $level%<br>
   </li>
-  <li>KFM100:<br>
+  <li><B>KFM100</B><br>
       $v<br>
       $cv,$unit<br>
       rawValue:$v<br>
       Sequence:$seq<br>
       content:$cv,$unit<br>
   </li>
-  <li>KS550/HM-WDS100-C6-O:<br>
+  <li><B>KS550/HM-WDS100-C6-O</B><br>
       T: $t H: $h W: $w R: $r IR: $ir WD: $wd WDR: $wdr S: $s B: $b<br>
       temperature $t<br>
       humidity $h<br>
@@ -4798,19 +4794,19 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
       brightness $b<br>
       unknown $p<br>
   </li>
-  <li>THSensor  and HM-WDC7000<br>
+  <li><B>THSensor  and HM-WDC7000</B><br>
       T: $t H: $h AP: $ap<br>
       temperature $t<br>
       humidity $h<br>
       airpress $ap                   #HM-WDC7000 only<br>
   </li>
-  <li>dimmer:<br>
+  <li><B>dimmer</B><br>
       overload [on|off]<br>
       overheat [on|off]<br>
       reduced [on|off]<br>
       dim: [up|down|stop]<br>
   </li>
-  <li>motionDetector<br>
+  <li><B>motionDetector</B><br>
       brightness:$b<br>
       alive<br>
       motion on (to $dest)<br>
@@ -4820,7 +4816,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
       battery [low|ok]<br>
 	  devState_raw.$d1 $d2<br>
   </li>
-  <li>remote/pushButton/outputUnit<br>
+  <li><B>remote/pushButton/outputUnit</B><br>
 	  <ul> (to $dest) is added if the button is peered and does not send to broadcast<br>
 	  Release is provided for peered channels only</ul>
       Btn$x onShort<br>
@@ -4836,21 +4832,21 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
       Btn$x onLongRelease $counter (to $dest)<br>
       Btn$x offLongRelease $counter (to $dest)<br>
   </li>
-  <li>remote/pushButton<br>
+  <li><B>remote/pushButton</B><br>
       battery [low|ok]<br>
 	  trigger [Long|Short]_$no trigger event from channel<br>
   </li>
-  <li>swi<br>
+  <li><B>swi</B><br>
       Btn$x toggle<br>
       Btn$x toggle (to $dest)<br>
       battery: [low|ok]<br>
   </li>
-  <li>switch/dimmer/blindActuator:<br>
+  <li><B>switch/dimmer/blindActuator</B><br>
 	  $val<br>
 	  powerOn [on|off|$val]<br>
       [unknown|motor|dim] [up|down|stop]:$val<br>
   </li>
-  <li>smokeDetector<br>
+  <li><B>smokeDetector</B><br>
       [off|smoke-Alarm|alive]             # for team leader<br>
 	  [off|smoke-forward|smoke-alarm]     # for team members<br>
 	  [normal|added|addedStrong]          #HM-CC-SCD<br>
@@ -4859,7 +4855,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
       smoke_detect on from $src<br>
       test:from $src<br>
   </li>
-  <li>threeStateSensor<br>
+  <li><B>threeStateSensor</B><br>
       [open|tilted|closed]]<br>
       [wet|damp|dry]                 #HM-SEC-WDS only<br>
 	  cover [open|closed]            #HM-SEC-WDS only<br>
@@ -4869,7 +4865,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	  contact [wet|damp|dry]         #HM-SEC-WDS only<br>
 	  sabotageError [on|off]         #HM-SEC-SC and HM-Sec-RHS only<br>
   </li>
-  <li>winMatic<br>
+  <li><B>winMatic</B><br>
 	  [locked|$value]<br>
 	  motorError [no|TurnError|TiltError]<br>
 	  direction [no|up|down|undefined]<br>	 
@@ -4879,7 +4875,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
       airing [inactiv|$value]<br>
       contact tesed<br>
   </li>
-  <li>keyMatic<br>
+  <li><B>keyMatic</B><br>
       unknown:40<br>
       battery [low|ok]<br>
       uncertain [yes|no]<br>
