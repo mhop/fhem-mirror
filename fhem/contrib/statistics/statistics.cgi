@@ -65,6 +65,10 @@ sub drawColumnChartTop10ModDef(@);
 sub drawBarChartModules(@);
 sub viewStatistics();
 
+my %tblColName;
+my %tblSum;
+my %tblCnt;
+
 # cascading style sheet
 my $css = "http://fhem.de/../css/style.css";
 
@@ -328,20 +332,30 @@ sub drawColumnChartTop10ModDef(@) {
   my ($table,$postfix,$rowtitle,$width,$height,$divID) = @_;
   $sth = $dbh->prepare("SELECT * FROM $table where 1=0");
   $sth->execute();
-  my $res = $sth->{NAME};
+  my @res = @{$sth->{NAME}};
+  $tblColName{$table} = \@res;
   $sth->finish;
-  my %hash = ();
-  foreach my $column (@$res) {
-    my ($sum) = $dbh->selectrow_array("SELECT sum($column) FROM $table");
-    $hash{$column} = $sum;
+
+  my @cols = map { "sum($_),count($_)" }
+             grep { $_ ne "uniqueID" } @res;
+  $sth = $dbh->prepare("SELECT ".join(",",@cols)." FROM $table");
+  $sth->execute();
+  my @row = $sth->fetchrow_array;
+  my %sum = ();
+  my %cnt = ();
+  for(my $idx = 0; $idx < @res; $idx++) {
+    $sum{$res[$idx]} = $row[2*$idx];
+    $cnt{$res[$idx]} = $row[2*$idx+1];
   }
+  $sth->finish;
+  $tblSum{$table} = \%sum;
+  $tblCnt{$table} = \%cnt;
 
   my $data;
   my $i=0;
-  foreach my $column (sort {$hash{$b} <=> $hash{$a}} keys %hash) {
-    next if($column eq "uniqueID");
+  foreach my $column (sort {$sum{$b} <=> $sum{$a}} keys %sum) {
     next if($excludeFromTop10definitions =~ /$column/);
-    $data .= "\t['$column',$hash{$column}],\n";
+    $data .= "\t['$column',$sum{$column}],\n";
     $i++;
     last if($i == 10);
   }
@@ -577,6 +591,7 @@ sub drawTable3cols(@) {
   my %hash;
   while(my $h = $sth->fetchrow_hashref) {
      foreach my $k (keys %{$h}) {
+       next if($k eq "uniqueID");
        $hash{$k}{count}++ if($h->{$k});
        $hash{$k}{sum} += $h->{$k} if($h->{$k});
      }
