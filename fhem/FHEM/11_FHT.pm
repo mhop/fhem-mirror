@@ -462,8 +462,8 @@ FHT_Parse($$)
 
     if(defined($def->{".measuredLow"})) {
 
-      $val = ($val*256.0 + $def->{".measuredLow"})/10.0+
-                        AttrVal($name, "tmpcorr", 0.0);
+      $val = sprintf("%.1f", ($val*256.0 + $def->{".measuredLow"})/10.0+
+                                AttrVal($name, "tmpcorr", 0.0));
       $cmd = "measured-temp";
     } else {
       return "";
