@@ -2232,30 +2232,28 @@ FW_dev2image($)
 
   my ($icon, $rlink);
   my $devStateIcon = AttrVal($name, "devStateIcon", undef);
-  if(defined($devStateIcon)) {
-    if($devStateIcon =~ m/^{.*}$/) {
-      my ($html, $link) = eval $devStateIcon;
-      Log 1, "devStateIcon $name: $@" if($@);
-      return ($link, undef, 1) if(defined($html) && $html eq "");
-      return ($html, $link, 1) if(defined($html));
+  if(defined($devStateIcon) && $devStateIcon =~ m/^{.*}$/) {
+    my ($html, $link) = eval $devStateIcon;
+    Log 1, "devStateIcon $name: $@" if($@);
+    return ($html, $link, 1) if(defined($html) && $html =~ m/^<.*>$/);
+    $devStateIcon = $html;
+  }
 
-    } else {
-      my @list = split(" ", $devStateIcon);
-      foreach my $l (@list) {
-        my ($re, $iconName, $link) = split(":", $l, 3);
-        if(defined($re) && $state =~ m/^$re$/) {
-          if($iconName eq "") {
-            $rlink = $link;
-            last;
-          }
-          if(defined(FW_iconName($iconName)))  {
-            return ($iconName, $link, 0);
-          } else {
-            return ($state, $link, 1);
-          }
+  if(defined($devStateIcon)) {
+    my @list = split(" ", $devStateIcon);
+    foreach my $l (@list) {
+      my ($re, $iconName, $link) = split(":", $l, 3);
+      if(defined($re) && $state =~ m/^$re$/) {
+        if($iconName eq "") {
+          $rlink = $link;
+          last;
+        }
+        if(defined(FW_iconName($iconName)))  {
+          return ($iconName, $link, 0);
+        } else {
+          return ($state, $link, 1);
         }
       }
-
     }
   }
 
@@ -3013,18 +3011,21 @@ FW_dropdownFn()
         attr lamp devStateIcon on::A0 off::AI<br>
         attr lamp devStateIcon .*:noIcon<br>
         </ul>
+        Note: if the image is referencing an SVG icon, then you can use the
+        @colorname suffix to color the image. E.g.:<br>
+        <ul>
+        attr Fax devStateIcon on:control_building_empty@red off:control_building_filled:278727
+        </ul>
+
         </ul>
         Second form:<br>
         <ul>
         Perl regexp enclosed in {}. If the code returns undef, then the default
-        icon is used, if it retunes "" then the name of the state is displayed.
+        icon is used, if it retuns a string enclosed in <>, then it is
+        interpreted as an html string. Else the string is interpreted as a
+        devStateIcon of the first fom, see above.
         Example:<br>
         {'&lt;div style="width:32px;height:32px;background-color:green"&gt;&lt;/div&gt;'}
-        </ul>
-        Note: if the image is referencing an SVG icon, then you can use the @colorname
-        suffix to color the image. E.g.:<br>
-        <ul>
-        attr Fax devStateIcon on:control_building_empty@red off:control_building_filled:278727
         </ul>
         </li>
         <br>
