@@ -80,7 +80,7 @@ BlockingCall($$@)
   foreach my $d (sort keys %defs) {   # Close all kind of FD
     my $h = $defs{$d};
     TcpServer_Close($h) if($h->{SERVERSOCKET});
-    DevIo_CloseDev($h)  if($h->{DeviceName});
+    DevIo_CloseDev($h,1)  if($h->{DeviceName});
   }
   
   no strict "refs";
