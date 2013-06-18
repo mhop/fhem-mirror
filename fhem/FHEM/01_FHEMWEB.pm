@@ -2485,8 +2485,9 @@ FW_devState($$@)
        $extPage = \%hash;
     }
     no strict "refs";
-    $txt = &{$sfn}($FW_wname, $d, $FW_room, $extPage);
+    my $newtxt = &{$sfn}($FW_wname, $d, $FW_room, $extPage);
     use strict "refs";
+    $txt = $newtxt if(defined($newtxt)); # As specified
   }
 
   return ($allSets, $cmdList, $txt);
