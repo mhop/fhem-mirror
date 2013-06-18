@@ -6,7 +6,7 @@ sub DevIo_SimpleRead($);
 sub DevIo_TimeoutRead($$);
 sub DevIo_SimpleWrite($$$);
 sub DevIo_OpenDev($$$);
-sub DevIo_CloseDev($);
+sub DevIo_CloseDev($@);
 sub DevIo_Disconnected($);
 sub DevIo_SetHwHandshake($);
 
@@ -279,9 +279,9 @@ DevIo_SetHwHandshake($)
 
 ########################
 sub
-DevIo_CloseDev($)
+DevIo_CloseDev($@)
 {
-  my ($hash) = @_;
+  my ($hash,$isFork) = @_;
   my $name = $hash->{NAME};
   my $dev = $hash->{DeviceName};
 
@@ -292,7 +292,11 @@ DevIo_CloseDev($)
     delete($hash->{TCPDev});
 
   } elsif($hash->{USBDev}) {
-    $hash->{USBDev}->close() ;
+    if($isFork) { # SerialPort close resets the serial parameters.
+      POSIX::close($hash->{USBDev}{FD});
+    } else {
+      $hash->{USBDev}->close() ;
+    }
     delete($hash->{USBDev});
 
   } elsif($hash->{DIODev}) {
