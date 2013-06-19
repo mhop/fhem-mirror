@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: FHEMWEB: longpoll is default now, longpollSVG (default off) added
   - feature: HUEDevice: allow usage of openautomation svg icons
   - feature: FHEMWEB: svg icons / iconPath / www/images/openautomation added
   - feature: FHEMWEB: SVGcache attribute & clearSvgCache set command added

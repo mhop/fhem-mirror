@@ -118,8 +118,8 @@ FHEMWEB_Initialize($)
     "plotmode:gnuplot,gnuplot-scroll,SVG plotsize endPlotToday:1,0 plotfork ".
     "stylesheetPrefix touchpad:deprecated smallscreen:deprecated ".
     "basicAuth basicAuthMsg hiddenroom hiddengroup HTTPS allowfrom CORS:0,1 ".
-    "refresh longpoll:1,0 redirectCmds:0,1 reverseLogs:0,1 menuEntries ".
-    "roomIcons SVGcache iconPath";
+    "refresh longpoll:0,1 longpollSVG:1,0 redirectCmds:0,1 reverseLogs:0,1 ".
+    "menuEntries roomIcons SVGcache iconPath";
 
   ###############
   # Initialize internal structures
@@ -550,7 +550,7 @@ FW_answerCall($)
   FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/svg.js") if($FW_plotmode eq "SVG");
   FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/fhemweb.js");
 
-  my $onload = AttrVal($FW_wname, "longpoll", undef) ?
+  my $onload = AttrVal($FW_wname, "longpoll", 1) ?
                       "onload=\"FW_delayedStart()\"" : "";
   FW_pO "</head>\n<body name=\"$t\" $onload>";
 
@@ -1527,7 +1527,7 @@ FW_showLog($)
       FW_fC("get $d $file INT $f $t " . join(" ", @{$flog}), 1);
       ($cfg, $plot) = FW_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
       $ret = SVG_render($wl, $f, $t, $cfg,
-                        $internal_data, $plot, $FW_wname, $FW_cssdir);
+                        $internal_data, $plot, $FW_wname, $FW_cssdir, $flog);
       FW_pO $ret;
       if($SVGcache) {
         mkdir($cDir) if(! -d $cDir);
@@ -2319,7 +2319,7 @@ FW_roomStatesForInform($)
   foreach my $dn (@rl) {
     my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
     $data .= "$dn<<$defs{$dn}{STATE}<<$txt\r\n"
-        if($defs{$dn} && $defs{$dn}{STATE});
+        if($defs{$dn} && $defs{$dn}{STATE} && $defs{$dn}{TYPE} ne "weblink");
   }
   return $data;
 }
@@ -2463,7 +2463,7 @@ FW_devState($$@)
       }
       $link .= "&room=$room";
     }
-    if(AttrVal($FW_wname, "longpoll", undef)) {
+    if(AttrVal($FW_wname, "longpoll", 1)) {
       $txt = "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
 
     } elsif($FW_ss || $FW_tp) {
@@ -2930,8 +2930,24 @@ FW_dropdownFn()
         In this mode status update is refreshed more or less instantaneously,
         and state change (on/off only) is done without requesting a complete
         refresh from the server.
+        Default is on.
         </li>
         <br>
+
+    <a name="longpollSVG"></a>
+    <li>longpollSVG<br>
+        Reloads an SVG weblink, if an event should modify its content. Since 
+        an exact determination of the affected events is too complicated, we
+        need some help from the #FileLog definition in the .gplot file: the
+        filter used there (second parameter) must either contain only the
+        deviceName or have the form deviceName.event or deviceName.*. This is
+        always the case when using the <a href="#weblinkEditor">Plot
+        editor</a>. The SVG will be reloaded for <b>any</b> event triggered by
+        this deviceName.
+        Default is off.
+        </li>
+        <br>
+
 
     <a name="redirectCmds"></a>
     <li>redirectCmds<br>

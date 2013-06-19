@@ -383,9 +383,9 @@ FileLog_Get($@)
     $internal = 1;
   }
 
-      
+
   if($inf eq "-") {
-    # In case the plot is drawn afte midnight, before the first event is logged.
+    # In case now is after midnight, before the first event is logged.
     FileLog_Switch($hash);
     $inf = $hash->{currentlogfile};
 
@@ -414,7 +414,6 @@ FileLog_Get($@)
     if(!-f $linf) {
       # ... or in the archivelog
       $linf = AttrVal($hash->{NAME},"archivedir",".") ."/". $inf;
-      $linf = "";
     }
     $inf = $linf;
   }
