@@ -2050,7 +2050,7 @@ FW_makeImage(@)
       my $col = $1 if($1);
       if($col) {
         $col =~ s/@//;
-        $col = "#$col" if($col =~ m/^\d+$/);
+        $col = "#$col" if($col =~ m/^([A-F0-9]{6})$/);
         $data =~ s/fill="#000000"/fill="$col"/;
       } else {
         $data =~ s/fill="#000000"//;
