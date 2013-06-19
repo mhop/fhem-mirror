@@ -9,7 +9,7 @@ use POSIX;
 
 
 
-sub SVG_render($$$$$$$$);
+sub SVG_render($$$$$$$$$);
 sub SVG_time_to_sec($);
 sub SVG_fmtTime($$);
 sub SVG_time_align($$);
@@ -76,7 +76,7 @@ SVG_digestConf($$)
 
 #####################################
 sub
-SVG_render($$$$$$$$)
+SVG_render($$$$$$$$$)
 {
   my $name = shift;  # e.g. wl_8
   my $from = shift;  # e.g. 2008-01-01
@@ -86,6 +86,7 @@ SVG_render($$$$$$$$)
   my $plot = shift;  # Plot lines from the .gplot file
   my $parent_name = shift;  # e.g. FHEMWEB instance name
   my $parent_dir  = shift;  # FW_dir
+  my $flog        = shift;  # #FileLog lines, as array pointer
 
   $SVG_RET="";
 
@@ -103,12 +104,17 @@ SVG_render($$$$$$$$)
   my ($ow,$oh) = split(",", $ps);       # Original width
   my ($w, $h) = ($ow-2*$x, $oh-2*$y);   # Rect size
 
+  # Keep only the Filter part of the #FileLog
+  $flog = join(" ", map { my @a=split(":",$_);
+                          $a[1]=~s/\.[^\.]*$//; $a[1]; } @{$flog});
+  $flog = AttrVal($parent_name, "longpollSVG", 0) ? "flog=\"$flog\"" : "";
+
   ######################
   # Html Header
   SVG_pO '<?xml version="1.0" encoding="UTF-8"?>';
   SVG_pO '<!DOCTYPE svg>';
   SVG_pO '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" '.
-         'xmlns:xlink="http://www.w3.org/1999/xlink" >';
+         'xmlns:xlink="http://www.w3.org/1999/xlink" '.$flog.'>';
 
   my $prf = AttrVal($parent_name, "stylesheetPrefix", "");
   SVG_pO "<style type=\"text/css\"><![CDATA[";
