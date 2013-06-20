@@ -186,7 +186,7 @@ my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
 my $readingsUpdateDelayTrigger; # needed internally
-my $doTriggerCalled;            # needed internally
+my $readingsUpdateUsed;         # needed internally
 my $cvsid = '$Id$';
 my $namedef =
   "where <name> is either:\n" .
@@ -1188,13 +1188,13 @@ DoSet(@)
   return CallFn($dev, "SetFn", $hash, @a) if($a[1] && $a[1] eq "?");
 
   @a = ReplaceEventMap($dev, \@a, 0) if($attr{$dev}{eventMap});
-  $doTriggerCalled = 0;
+  $readingsUpdateUsed = 0;
   my ($ret, $skipTrigger) = CallFn($dev, "SetFn", $hash, @a);
   return $ret if($ret);
   return undef if($skipTrigger);
 
   # Backward compatibility. Use readingsUpdate in SetFn now
-  if(!$doTriggerCalled) {
+  if(!$readingsUpdateUsed) {
     shift @a;
     # set arg if the module did not triggered events
     my $arg = join(" ", @a) if(!$hash->{CHANGED} || !int(@{$hash->{CHANGED}}));
@@ -2359,7 +2359,6 @@ DoTrigger($$@)
 
   my $max = int(@{$hash->{CHANGED}});
   Log 5, "Triggering $dev ($max changes)";
-  $doTriggerCalled = 1;
   return "" if(defined($attr{$dev}) && defined($attr{$dev}{do_not_notify}));
 
   ################
@@ -3135,6 +3134,8 @@ readingsEndUpdate($$)
 {
   my ($hash,$dotrigger)= @_;
   my $name = $hash->{NAME};
+
+  $readingsUpdateUsed = 1;
 
   # process user readings
   if(defined($hash->{'.userReadings'})) {
