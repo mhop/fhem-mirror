@@ -53,6 +53,7 @@ SYSSTAT_Define($$)
   $hash->{interval_fs} = $interval_fs;
   SYSSTAT_InitSys( $hash );
 
+  RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SYSSTAT_GetUpdate", $hash, 0);
 
   return undef;
