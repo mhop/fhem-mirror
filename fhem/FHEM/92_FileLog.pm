@@ -400,6 +400,7 @@ FileLog_Get($@)
         $linf =~ s/%m/$m/g;
         $linf =~ s/%d/$d/g;
         $linf =~ s/%L/$attr{global}{logdir}/g if($attr{global}{logdir});
+        $linf = $hash->{currentlogfile} if($linf =~ m/%/);
       } else {
         $linf = $hash->{currentlogfile};
       }
