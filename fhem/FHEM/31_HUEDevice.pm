@@ -90,7 +90,7 @@ HUEDevice_devStateIcon($)
   my $s = $dim_values{int($percent/7)};
 
   return ".*:$s@#".CommandGet("","$name RGB").":toggle" if( $percent < 100 && AttrVal($name, "color-icons", 0) == 2 );
-  return ".*:on@#".CommandGet("","$name rgb").":toggle" if( AttrVal($name, "color-icons", 0) == 1 );
+  return ".*:on@#".CommandGet("","$name rgb").":toggle" if( AttrVal($name, "color-icons", 0) != 0 );
 
   return '<div style="width:32px;height:19px;'.
          'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';"></div>';
