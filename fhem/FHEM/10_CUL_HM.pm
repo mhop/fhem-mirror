@@ -410,8 +410,11 @@ sub CUL_HM_Parse($$) {##############################
   $msg =~ m/A(..)(..)(..)(..)(......)(......)(.*)/;
   my ($len,$mNo,$mFlg,$mTp,$src,$dst,$p) = ($1,$2,$3,$4,$5,$6,$7);
   $p = "" if(!defined($p));
- 
-  return "" if($msgStat && $msgStat eq 'NACK');#discard if lowlevel error
+  my @mI = unpack '(A2)*',$p; # split message info to bytes
+  
+  if ($msgStat){
+    return "" if($msgStat eq 'NACK');#discard if lowlevel error
+  }
   return "" if($src eq $id);#discard mirrored messages
   
   # $shash will be replaced for multichannel commands
@@ -934,8 +937,8 @@ sub CUL_HM_Parse($$) {##############################
 	}
   }
   elsif($st eq "outputUnit"){ #################################################
-    if($mTp eq "40" && $p =~ m/^(..)(..)$/){
-      my ($button, $bno) = (hex($1), hex($2));
+    if($mTp eq "40" && @mI == 2){
+      my ($button, $bno) = (hex($mI[1]), hex($mI[2]));
       if(!(exists($shash->{BNO})) || $shash->{BNO} ne $bno){
         $shash->{BNO}=$bno;
 		  $shash->{BNOCNT}=1;
@@ -946,9 +949,9 @@ sub CUL_HM_Parse($$) {##############################
       my $btn = int($button&0x3f);
       push @event, "state:Btn$btn on$target";
     }
-	elsif(($mTp eq "02" && $p =~ m/^01/) ||   # handle Ack_Status
-	      ($mTp eq "10" && $p =~ m/^06/)){    #    or Info_Status message
-	  my ($msgChn,$msgState) = ((hex($1)&0x1f),$2) if ($p =~ m/..(..)(..)/);
+	elsif(($mTp eq "02" && $mI[0] eq "01") ||   # handle Ack_Status
+	      ($mTp eq "10" && $mI[0] eq "06")){    #    or Info_Status message
+      my ($msgChn,$msgState) = ((hex($mI[1])&0x1f),$mI[2]) if (@mI > 2);
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.sprintf("%02X",$msgChn)};
 	  if ($model eq "HM-OU-LED16") {
 	    #special: all LEDs map to device state
@@ -959,25 +962,44 @@ sub CUL_HM_Parse($$) {##############################
 		  # no event necessary, all the same as before
 		}
 		else {# just update datafields in storage
- 	      my $bitLoc = ($msgChn-1)*2;#calculate bit location
- 	      my $mask = 3<<$bitLoc;
- 	      my $value = sprintf("%08X",(hex($devState) &~$mask)|($msgState<<$bitLoc));
-	      push @entities,CUL_HM_UpdtReadBulk($shash,1,"color:".$value,
-		                                              "state:".$value);
- 	      if ($chnHash){
- 	        $shash = $chnHash;
- 	        my %colorTable=("00"=>"off","01"=>"red","02"=>"green","03"=>"orange");
- 	        my $actColor = $colorTable{$msgState};
- 	        $actColor = "unknown" if(!$actColor);
-		    push @event, "color:$actColor";  
-            push @event, "state:$actColor";			
+          if (@mI > 8){#status for all channel included
+		    # open to decode byte $mI[4] - related to backlight? seen 20 and 21
+		    my $lStat = join("",@mI[5..8]); # all LED status in one long
+ 	        my %colTbl=("00"=>"off","01"=>"red","10"=>"green","11"=>"orange");
+		    my @leds = reverse(unpack('(A2)*',sprintf("%032b",hex($lStat))));
+			$_ = $colTbl{$_} foreach (@leds);
+			for(my $cCnt = 0;$cCnt<16;$cCnt++){# go for all channels
+			  my $cH = $modules{CUL_HM}{defptr}{$src.sprintf("%02X",$cCnt+1)};
+			  next if (!$cH);
+			  if (ReadingsVal($cH->{NAME},"color","") ne $leds[$cCnt]) {
+                push @entities,CUL_HM_UpdtReadBulk($cH,1,"color:".$leds[$cCnt],
+		                                                "state:".$leds[$cCnt]);			    
+			  }
+			}
+	        push @entities,CUL_HM_UpdtReadBulk($shash,1,"color:".$lStat,
+		                                                "state:".$lStat);
+		  }
+		  else{# branch can be removed if message is always that long
+ 	        my $bitLoc = ($msgChn-1)*2;#calculate bit location
+ 	        my $mask = 3<<$bitLoc;
+ 	        my $value = sprintf("%08X",(hex($devState) &~$mask)|($msgState<<$bitLoc));
+	        push @entities,CUL_HM_UpdtReadBulk($shash,1,"color:".$value,
+		                                                "state:".$value);
+		    if ($chnHash){
+ 	          $shash = $chnHash;
+ 	          my %colorTable=("00"=>"off","01"=>"red","02"=>"green","03"=>"orange");
+ 	          my $actColor = $colorTable{$msgState};
+ 	          $actColor = "unknown" if(!$actColor);
+		      push @event, "color:$actColor";  
+              push @event, "state:$actColor";
+            }			  
  	      }
 		}
 	  }
 	  elsif ($model eq "HM-OU-CFM-PL"){
 	    if ($chnHash){
 	      $shash = $chnHash;
-	      my $val = hex($msgState)/2;
+	      my $val = hex($mI[2])/2;
           $val = ($val == 100 ? "on" : ($val == 0 ? "off" : "$val %"));
           push @event, "state:$val";			
 	    }
@@ -1334,9 +1356,6 @@ sub CUL_HM_parseCommon(@){#####################################################
 	if ($subType =~ m/^8/){	  #NACK
 	  $success = "no";
 	  CUL_HM_eventP($shash,"Nack");
-      delete($shash->{cmdStack});
-	  delete($shash->{protCmdPend});
-	  CUL_HM_respPendRm($shash);
 	  $reply = "NACK"; 
 	}
 	elsif($subType eq "01"){ #ACKinfo#################
@@ -1550,6 +1569,8 @@ sub CUL_HM_Get($@) {
 
   my $cmd = $a[1];
   my $dst = $hash->{DEF};
+  return "" if (!$dst);
+
   my $isChannel = (length($dst) == 8)?"true":"";
   my $chn = ($isChannel)?substr($dst,6,2):"01";
   $dst = substr($dst,0,6);
@@ -2704,6 +2725,10 @@ sub CUL_HM_SndCmd($$) {
   $hash = CUL_HM_getDeviceHash($hash); 
   my $io = $hash->{IODev};
   return if(!$io);  
+  if ($io->{helper}{HMcnd} == 4){#io is in overload - dont send messages
+    CUL_HM_eventP($hash,"IOerr");
+	return;
+  }
 
   $cmd =~ m/^(..)(.*)$/;
   my ($mn, $cmd2) = ($1, $2);
@@ -2732,76 +2757,85 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       if ($cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/);
   my ($chn,$subType) = ($1,$2) if($p =~ m/^(..)(..)/); 
   my $rTo = rand(20)/10+4; #default response timeout
-  if   ($mTp eq "01" && $subType){ 
-    if ($subType eq "03"){ #PeerList-------------
-  	  #--- remember request params in device level
-  	  $hash->{helper}{respWait}{Pending} = "PeerList";
-  	  $hash->{helper}{respWait}{PendCmd} = $cmd;
-  	  $hash->{helper}{respWait}{forChn} = substr($p,0,2);#channel info we await
-      
-      # define timeout - holdup cmdStack until response complete or timeout
-  	  InternalTimer(gettimeofday()+$rTo, "CUL_HM_respPendTout", "respPend:$dst", 0);
-	  
-  	  #--- remove readings in channel
-  	  my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"}; 
-  	  $chnhash = $hash if (!$chnhash);
-  	  delete $chnhash->{READINGS}{peerList};#empty old list
-	  delete $chnhash->{helper}{peerIDsRaw};
-	  $attr{$chnhash->{NAME}}{peerIDs} = '';
-	  return;
-    }
-    elsif($subType eq "04"){ #RegisterRead-------
-      my ($peer, $list) = ($1,$2) if ($p =~ m/..04(........)(..)/);
-	  $peer = ($peer ne "00000000")?CUL_HM_peerChName($peer,$dst,""):"";
-	  #--- set messaging items
-	  $hash->{helper}{respWait}{Pending}= "RegisterRead";
-   	  $hash->{helper}{respWait}{PendCmd}= $cmd;
-	  $hash->{helper}{respWait}{forChn} = $chn;
-	  $hash->{helper}{respWait}{forList}= $list;
-	  $hash->{helper}{respWait}{forPeer}= $peer;
-      
-      # define timeout - holdup cmdStack until response complete or timeout
-	  InternalTimer(gettimeofday()+$rTo,"CUL_HM_respPendTout","respPend:$dst", 0);
-	  #--- remove channel entries that will be replaced
-      my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
-      $chnhash = $hash if(!$chnhash);   
-
-	  $peer ="" if($list !~ m/^0[34]$/);
-	  #empty val since reading will be cumulative 
-	  my $rlName = ((CUL_HM_getAttrInt($hash->{NAME},"expert") == 2)?"":".")."RegL_".$list.":".$peer;
-      $chnhash->{READINGS}{$rlName}{VAL}=""; 
-      delete ($chnhash->{READINGS}{$rlName}{TIME}); 
-	  return;
-    }
-#    elsif($subType eq "0A"){ #Pair Serial----------
-#	  #--- set messaging items
-#	  $hash->{helper}{respWait}{Pending} = "PairSerial";
-#  	  $hash->{helper}{respWait}{PendCmd} = $cmd;
-#	  $hash->{helper}{respWait}{forChn} = substr($p,4,20);
-#      
-#      # define timeout - holdup cmdStack until response complete or timeout
-#	  InternalTimer(gettimeofday()+$rTo, "CUL_HM_respPendTout", "respPend:$dst", 0);
-#	  return;
-#    }
-  }
-  elsif($mTp eq '11' && $chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
-    CUL_HM_qStateUpdatIfEnab($dst);
-  }
-  
   if (($mFlg & 0x20) && ($dst ne '000000')){
+    if   ($mTp eq "01" && $subType){ 
+      if ($subType eq "03"){ #PeerList-------------
+    	#--- remember request params in device level
+    	$hash->{helper}{respWait}{Pending} = "PeerList";
+    	$hash->{helper}{respWait}{PendCmd} = $cmd;
+    	$hash->{helper}{respWait}{forChn} = substr($p,0,2);#channel info we await
+        
+        # define timeout - holdup cmdStack until response complete or timeout
+    	InternalTimer(gettimeofday()+$rTo, "CUL_HM_respPendTout", "respPend:$dst", 0);
+	    
+    	#--- remove readings in channel
+    	my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"}; 
+    	$chnhash = $hash if (!$chnhash);
+    	delete $chnhash->{READINGS}{peerList};#empty old list
+	    delete $chnhash->{helper}{peerIDsRaw};
+	    $attr{$chnhash->{NAME}}{peerIDs} = '';
+	    return;
+      }
+      elsif($subType eq "04"){ #RegisterRead-------
+        my ($peer, $list) = ($1,$2) if ($p =~ m/..04(........)(..)/);
+	    $peer = ($peer ne "00000000")?CUL_HM_peerChName($peer,$dst,""):"";
+	    #--- set messaging items
+	    $hash->{helper}{respWait}{Pending}= "RegisterRead";
+     	  $hash->{helper}{respWait}{PendCmd}= $cmd;
+	    $hash->{helper}{respWait}{forChn} = $chn;
+	    $hash->{helper}{respWait}{forList}= $list;
+	    $hash->{helper}{respWait}{forPeer}= $peer;
+        
+        # define timeout - holdup cmdStack until response complete or timeout
+	    InternalTimer(gettimeofday()+$rTo,"CUL_HM_respPendTout","respPend:$dst", 0);
+	    #--- remove channel entries that will be replaced
+        my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
+        $chnhash = $hash if(!$chnhash);   
+    
+	    $peer ="" if($list !~ m/^0[34]$/);
+	    #empty val since reading will be cumulative 
+	    my $rlName = ((CUL_HM_getAttrInt($hash->{NAME},"expert") == 2)?"":".")."RegL_".$list.":".$peer;
+        $chnhash->{READINGS}{$rlName}{VAL}=""; 
+        delete ($chnhash->{READINGS}{$rlName}{TIME}); 
+	    return;
+      }
+#      elsif($subType eq "0A"){ #Pair Serial----------
+# 	   #--- set messaging items
+# 	   $hash->{helper}{respWait}{Pending} = "PairSerial";
+#    	  $hash->{helper}{respWait}{PendCmd} = $cmd;
+# 	   $hash->{helper}{respWait}{forChn} = substr($p,4,20);
+#        
+#        # define timeout - holdup cmdStack until response complete or timeout
+# 	   InternalTimer(gettimeofday()+$rTo, "CUL_HM_respPendTout", "respPend:$dst", 0);
+# 	   return;
+#      }
+    }
+    elsif($mTp eq '11' && $chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
+      CUL_HM_qStateUpdatIfEnab($dst);
+    }
+  
     $hash->{helper}{respWait}{cmd}    = $cmd;
     $hash->{helper}{respWait}{mNo}    = $mNo; #mNo we wait to ack
     $hash->{helper}{respWait}{reSent} = 1;
     
     InternalTimer(gettimeofday()+rand(40)/10+1, "CUL_HM_Resend", $hash, 0);
+    CUL_HM_protState($hash,"CMDs_processing...");                         
+  }
+  else{# no answer expected
+    CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{burstEvtCnt}? 
+	                            ("_events:".$hash->{helper}{burstEvtCnt}):""));
+  }
+  if($hash->{cmdStack} && scalar @{$hash->{cmdStack}}){
+    $hash->{protCmdPend} = scalar @{$hash->{cmdStack}}." CMDs pending";
+  }
+  else{
+    delete($hash->{protCmdPend});
   }
 }
 sub CUL_HM_eventP($$) {#handle protocol events
   #todo: add severity, counter, history and acknowledge
   my ($hash, $evntType) = @_;
-  my $name = $hash->{NAME};
   my $nAttr = $hash;
-  return if (!$name);
   if ($evntType eq "Rcv"){
     $nAttr->{"protLastRcv"} = TimeNow();
 	return;
@@ -2812,15 +2846,20 @@ sub CUL_HM_eventP($$) {#handle protocol events
   $nAttr->{"prot".$evntType} = ++$evntCnt." last_at:".TimeNow();
   
   if ($evntType ne "Snd"){#count unusual events
-    if ($hash->{helper}{burstEvtCnt}){
-	       $hash->{helper}{burstEvtCnt}++;
-	}else {$hash->{helper}{burstEvtCnt}=1;};
+    $hash->{helper}{burstEvtCnt}=0 if(!defined $hash->{helper}{burstEvtCnt});
+    $hash->{helper}{burstEvtCnt}++;
   }
-  if ($evntType eq "Nack" ||$evntType eq "ResndFail"){
-    $nAttr->{protCmdDel} = 0 if(!$nAttr->{protCmdDel});
-    $nAttr->{protCmdDel} += scalar @{$hash->{cmdStack}} if ($hash->{cmdStack});
-	CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{burstEvtCnt}? 
+  if ($evntType =~ m/(Nack|ResndFail|IOerr)/){
+    if (  (CUL_HM_getRxType($hash) & 0x03) == 0 #to slow for wakeup and config
+	    || $evntType eq "IOerr"){            #IO problem
+      $nAttr->{protCmdDel} = 0 if(!$nAttr->{protCmdDel});
+      $nAttr->{protCmdDel} += scalar @{$hash->{cmdStack}} if ($hash->{cmdStack});
+      delete($hash->{cmdStack});
+      delete($nAttr->{protCmdPend});
+	  CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{burstEvtCnt}? 
 	                            ("_events:".$hash->{helper}{burstEvtCnt}):""));
+	}
+	CUL_HM_respPendRm($hash);
   }
 }
 sub CUL_HM_protState($$){
@@ -2855,17 +2894,10 @@ sub CUL_HM_respPendTout($) {
       Log GetLogLevel($name,4),"CUL_HM_Resend: ".$name. " nr ".$pendRsndCnt;
 	  $hash->{helper}{respWait}{PendingRsend} = $pendRsndCnt + 1;
       CUL_HM_SndCmd($hash,substr($hash->{helper}{respWait}{PendCmd},4));
-	  CUL_HM_eventP($hash,"Resnd") if ($pendCmd);
+	  CUL_HM_eventP($hash,"Resnd");
 	}
 	else{
-      CUL_HM_eventP($hash,"ResndFail") if ($pendCmd);
-	  if ((CUL_HM_getRxType($hash) & 0x03) == 0){#to slow for wakeup and config
-        delete($hash->{cmdStack});
-        delete($hash->{protCmdPend});
-		CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{burstEvtCnt}? 
-	                            ("_events:".$hash->{helper}{burstEvtCnt}):""));
-	  }
-	  CUL_HM_respPendRm($hash);
+      CUL_HM_eventP($hash,"ResndFail");
 	  CUL_HM_ProcessCmdStack($hash); # continue processing commands
 	  readingsSingleUpdate($hash,"state","RESPONSE TIMEOUT:".$pendCmd,1);
 	}
@@ -2899,8 +2931,6 @@ sub CUL_HM_ProcessCmdStack($) {
                           !$hash->{helper}{respWait}{Pending}){
     if(@{$hash->{cmdStack}}) {
       CUL_HM_SndCmd($hash, shift @{$hash->{cmdStack}});
-      $hash->{protCmdPend} = scalar @{$hash->{cmdStack}}." CMDs pending";
-      CUL_HM_protState($hash,"CMDs_processing...");                         
 	  CUL_HM_eventP($hash,"Snd");	  
     }
     elsif(!@{$hash->{cmdStack}}) {
@@ -2965,12 +2995,8 @@ sub CUL_HM_Resend($) {#resend a message if there is no answer
   return if(!$hash->{helper}{respWait}{reSent});      # Double timer?
   if($hash->{helper}{respWait}{reSent} >= 3) {
   	CUL_HM_eventP($hash,"ResndFail");
-    delete($hash->{cmdStack});
-    delete($hash->{protCmdPend});
-	CUL_HM_respPendRm($hash);
-	CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{burstEvtCnt}? 
-	                            ("_events:".$hash->{helper}{burstEvtCnt}):""));
 	readingsSingleUpdate($hash,"state","MISSING ACK",1);
+	CUL_HM_ProcessCmdStack($hash); # continue processing commands if any
   }
   else {
   	CUL_HM_eventP($hash,"Resnd");
@@ -4062,9 +4088,12 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 
         Note4: the direct buttons on a HM device are hidden by default.
         Nevertheless those are implemented as links as well. To get access to
-        the 'internal links' it is necessary to issue 'set &lt;name&gt; regSet
-        intKeyVisib 1' or 'set &lt;name&gt; setRegRaw List0 2 81'. Reset it
-        by replacing '81' with '01'<br> example:<br>
+        the 'internal links' it is necessary to issue <br>
+		'set &lt;name&gt; <a href="#CUL_HMregSet">regSet</a> intKeyVisib visib'<br>
+		or<br> 
+		'set &lt;name&gt; <a href="#CUL_HMregBulk">regBulk</a> RegL_0: 2:81'<br> 
+		
+		Reset it by replacing '81' with '01'<br> example:<br>
 
 	  <ul><code>
 	    set mydimmer getRegRaw List1<br>
@@ -4121,8 +4150,6 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	 set myChannel peerBulk 12345601 unset # remove peer 123456 channel 01<br>
 	 </code></ul>
 	 </li>
-     <li><B>regRaw [List0|List1|List2|List3|List4] &lt;addr&gt; &lt;data&gt;</B>
-         replaced by regBulk</li>
      <li><B>regBulk  &lt;reg List&gt;:&lt;peer&gt; &lt;addr1:data1&gt; &lt;addr2:data2&gt;...
 	     </B><a name="CUL_HMregBulk"></a><br>
 		 This command will replace the former regRaw. It allows to set register
