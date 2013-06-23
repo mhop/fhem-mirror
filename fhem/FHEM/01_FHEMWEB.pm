@@ -704,20 +704,28 @@ FW_makeTable($$@)
           $t = "" if(!$t);
           FW_pO "<td><div id=\"$name-$n\">$v</div></td>";
           FW_pO "<td><div id=\"$name-$n-ts\">$t</div></td>";
-
         }
-
       } else {
         $val = FW_htmlEscape($val);
-        FW_pO "<td><div class=\"dval\">$val</div></td>";
-
+		# if possible provide link to reference
+		if ($defs{$val}){
+		  FW_pH "detail=$val", $val,1;
+		}
+		elsif ($n eq "room"){
+		  FW_pO "<td><div class=\"dval\">";
+		  FW_pH "room=$_", $_ foreach(split(",",$val));
+		  FW_pO "</div></td>";
+		}
+		elsif ($n =~ m/^fp_(.*)/ && $defs{$1}){
+		  FW_pH "detail=$1", $val,1;
+		}
+		else{
+		  FW_pO "<td><div class=\"dval\">$val</div></td>";
+	    }
       }
-
     }
     FW_pH "cmd.$name=$cmd $name $n&amp;detail=$name", $cmd, 1
         if($cmd && !$FW_ss);
-
-
     FW_pO "</tr>";
   }
   FW_pO "</table>";
