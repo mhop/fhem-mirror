@@ -384,6 +384,11 @@ weblink_WriteGplot($)
   my ($arg) = @_;
   FW_digestCgi($arg);
 
+  if(!defined($FW_webArgs{cl_0})) {
+    return("text/html;",
+           "missing data in logfile: won't write incomplete .gplot definition");
+  }
+
   my $hasTl;
   for(my $i=0; $i <= 8; $i++) {
     $hasTl = 1 if($FW_webArgs{"title_$i"});
@@ -434,9 +439,6 @@ weblink_WriteGplot($)
   print FH "plot ".join(",\\\n     ", @plot)."\n";
   close(FH);
 
-  #foreach my $k (sort keys %FW_webArgs) {
-  #  Log 1, "$k: $FW_webArgs{$k}";
-  #}
   return (undef, "continue");
 }
 
