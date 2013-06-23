@@ -107,7 +107,7 @@ SVG_render($$$$$$$$$)
   # Keep only the Filter part of the #FileLog
   $flog = join(" ", map { my @a=split(":",$_);
                           $a[1]=~s/\.[^\.]*$//; $a[1]; } @{$flog});
-  $flog = AttrVal($parent_name, "longpollSVG", 0) ? "flog=\"$flog\"" : "";
+  $flog = AttrVal($parent_name, "longpollSVG", 0) ? "flog=\" $flog \"" : "";
 
   ######################
   # Html Header
