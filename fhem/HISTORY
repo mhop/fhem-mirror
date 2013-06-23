@@ -524,3 +524,7 @@
   - added new Javascript Frontend based on ExtJS (by Johannes)
   - added example Setup SQL and configuration for SQLite
   - extended the MySQL Setup SQL to use 512 characters in EVENT column
+
+- Sun Jun 23 2013 (UliM)
+  - Added new module "remotecontrol"
+  
