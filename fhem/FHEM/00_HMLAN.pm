@@ -52,6 +52,7 @@ sub HMLAN_Initialize($) {
                      "hmId hmKey " .
                      "respTime wdStrokeTime:5,10,15,20,25 " .
 					 "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger ".
+					 "wdTimer ".
 					 "hmOvTo ".#General remove
 					 $readingFnAttributes;
 }
