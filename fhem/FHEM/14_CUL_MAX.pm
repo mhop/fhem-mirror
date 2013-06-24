@@ -73,7 +73,7 @@ CUL_MAX_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  return "wrong syntax: define <name> CUL_MAX <srdAddr>" if(@a<3);
+  return "wrong syntax: define <name> CUL_MAX <srcAddr>" if(@a<3);
 
   if(exists($modules{CUL_MAX}{defptr})) {
     Log 1, "There is already one CUL_MAX defined";
@@ -81,7 +81,7 @@ CUL_MAX_Define($$)
   }
   $modules{CUL_MAX}{defptr} = $hash;
 
-  $hash->{addr} = $a[2];
+  $hash->{addr} = lc($a[2]);
   $hash->{STATE} = "Defined";
   $hash->{cnt} = 0;
   $hash->{pairmode} = 0;
@@ -147,13 +147,13 @@ CUL_MAX_Attr(@)
 sub
 CUL_MAX_fakeWTaddr($)
 {
-  return AttrVal($_[0]->{NAME}, "fakeWTaddr", "111111");
+  return lc(AttrVal($_[0]->{NAME}, "fakeWTaddr", "111111"));
 }
 
 sub
 CUL_MAX_fakeSCaddr($)
 {
-  return AttrVal($_[0]->{NAME}, "fakeSCaddr", "222222");
+  return lc(AttrVal($_[0]->{NAME}, "fakeSCaddr", "222222"));
 }
 
 sub
@@ -172,7 +172,7 @@ CUL_MAX_Set($@)
 
   } elsif($setting ~~ ["fakeSC", "fakeWT"]) {
     return "Invalid number of arguments" if(@args == 0);
-    my $dest = $args[0];
+    my $dest = lc($args[0]);
     #$dest may be either a name or an address
     if(exists($defs{$dest})) {
       return "Destination is not a MAX device" if($defs{$dest}{TYPE} ne "MAX");
