@@ -37,6 +37,8 @@
 # 4a- for testing: attr rc1 room TestRemote , attr weblink_rc1 room TestRemote
 # 5 - set rc1 makenotify <executingDevice> (creates a notify of the form: define notify_rc1 notify rc1 set <executingDevice> $EVENT)
 #
+# Published June 23, 2013
+# bugfix "use strict" upon foreign makenotify - June 24, 2013
 
 
 package main;
@@ -57,7 +59,7 @@ sub RC_layout_itunes();
 
 
 #####################################
-# Initializes module
+# Initialize module
 sub
 remotecontrol_Initialize($)
 {
@@ -79,7 +81,7 @@ remotecontrol_Initialize($)
 
 
 #####################################
-# Initializes every new instance
+# Initialize every new instance
 sub
 RC_Define() 
 {
@@ -91,7 +93,7 @@ RC_Define()
 
 
 #####################################
-# Ensures htmlcode is created from scratch after an attribute value has been changed
+# Ensure htmlcode is created from scratch after an attribute value has been changed
 sub 
 RC_Attr(@)
 {
@@ -103,7 +105,7 @@ RC_Attr(@)
 
 
 #####################################
-# Digests set-commands
+# Digest set-commands
 sub
 RC_Set($@)
 {
@@ -146,9 +148,11 @@ RC_Set($@)
   } elsif ($cmd eq "makenotify") {
 	if ($a[2]) {
       my $ndev = $a[2];
-	  my $fn = $defs{$ndev}{TYPE};
+	  my $fn = $defs{$ndev}{TYPE} ? $defs{$ndev}{TYPE} : undef;
 	  if (defined($data{RC_makenotify}{$fn})) {   #foreign makenotify
+	    no strict "refs";
 	    my $msg = &{$data{RC_makenotify}{$fn}}($nam,$ndev);
+		use strict "refs";
 		return $msg;
 	  } else {
         my $nname="notify_$nam";
@@ -171,7 +175,7 @@ RC_Set($@)
 
 
 #####################################
-# Digests get-commands
+# Digest get-commands
 sub
 RC_Get($@)
 {
@@ -198,7 +202,7 @@ RC_Get($@)
 
 
 #####################################
-# Converts all rowXX-attribute-values into htmlcode
+# Convert all rowXX-attribute-values into htmlcode
 sub
 RC_attr2html($) {
   my $name = shift;
@@ -240,12 +244,13 @@ RC_attr2html($) {
     $rc_html .= "</tr>\n";
   }
   $rc_html .= "</table></div>";
+  $rc_html .= "</table>";
   return $rc_html;
 }
 
 
 #####################################
-# Deletes all rowXX-attributes
+# Delete all rowXX-attributes
 sub 
 RC_layout_delete($) {
   my $name = shift;
@@ -257,7 +262,7 @@ RC_layout_delete($) {
 
 
 #####################################
-# Converts array-values into rowXX-attribute-values
+# Convert array-values into rowXX-attribute-values
 sub 
 RC_array2attr($@)
 {
