@@ -115,17 +115,17 @@ TCM_Write($$$)
       $bstring = $msg;
     } else {
       # command with ESP3 format
-      my $packetType = hex (substr ($fn, 6, 2));
+      my $packetType = hex(substr($fn, 6, 2));
       if ($packetType != 1) {
         Log $ll2, "TCM120 $name: Packet Type not supported.";
         return;
       }
-      my $odataLen = hex (substr ($fn, 4, 2));
+      my $odataLen = hex(substr($fn, 4, 2));
       if ($odataLen != 0) {
         Log $ll2, "TCM120 $name: Radio Telegram with optional Data not supported.";
         return;
       }    
-      #my $mdataLen = hex (substr ($fn, 0, 4));
+      #my $mdataLen = hex(substr($fn, 0, 4));
       my $rorg = substr ($msg, 0, 2);
       # translate the RORG to ORG
       my %rorgmap = ("F6"=>"05",
@@ -253,7 +253,10 @@ TCM_Read($)
         } else {
           Log 1, "TCM120: unknown ORG mapping for $org";
         }
-
+        if ($org ne "A5") {
+          # extract db_0
+          $d1 = substr($d1, 0, 2);
+        }
         if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
           Log $ll5, "TCM: $name Telegram from $id blocked.";        
         } else {
@@ -446,16 +449,13 @@ TCM_Parse310($$$)
   my $name = $hash->{NAME};
   my $ll5 = GetLogLevel($name,5);
   my $ll2 = GetLogLevel($name,2);
-
   Log $ll5, "TCM: Parse $rawmsg";
-
   my $rc = substr($rawmsg, 0, 2);
-  my $msg;
+  my $msg = "";
 
   if($rc ne "00") {
-    my $msg = $rc310{$rc};
+    $msg = $rc310{$rc};
     $msg = "Unknown return code $rc" if(!$msg);
-
   } else {
     my @ans;
     foreach my $k (sort keys %{$ptr}) {
@@ -565,6 +565,7 @@ TCM_RemovePair($)
 {
   my $hash = shift;
   delete($hash->{pair});
+  CommandDeleteReading(undef, "$hash->{NAME} pair");
 }
 
 my %sets120 = (    # Name, Data to send to the CUL, Regexp for the answer
@@ -616,6 +617,7 @@ TCM_Set($@)
 
   if($cmd eq "pairForSec") {
     $hash->{pair} = 1;
+    readingsSingleUpdate($hash, "pair", 1, 1);
     InternalTimer(gettimeofday()+$arg, "TCM_RemovePair", $hash, 1);
     return;
   }
