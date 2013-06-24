@@ -1,0 +1,22 @@
+############################
+# Display speedtest results
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<L1>'
+
+set ylabel "Mbit/s"
+set y2label "Mbit/s"
+set y3label "ms"
+
+#DbLog speedtest:download::
+#DbLog speedtest:upload::
+#DbLog speedtest:ping::
+
+plot 
+     using 1:2 ls l0 axes x1y2 title 'download (Mbit/s)' with lines,
+     using 1:2 ls l1 axes x1y1 title 'upload (Mbit/s)' with lines,
+     using 1:2 ls l2 axes x1y3 title 'ping (ms)' with lines,
