@@ -206,9 +206,9 @@ speedtest_SpeedtestAborted($)
   <a name="speedtest_Readings"></a>
   <b>Readings</b>
   <ul>
-    <li>ping<br>
-    <li>download<br>
-    <li>upload<br>
+    <li>ping</li>
+    <li>download</li>
+    <li>upload</li>
   </ul><br>
 
   <a name="speedtest_Set"></a>
@@ -225,16 +225,6 @@ speedtest_SpeedtestAborted($)
       The path to the speedtest binary.</li>
     <li>checks-till-disable<br>
       how often the speedtest should be run before it is automaticaly set to disabled. the value will be decreased by 1 for every run.</li>
-    <li>disable<br>
-      set to 1 to disable the test.</li>
-  </ul>
-  <a name="speedtest_Attr"></a>
-  <b>Attributes</b>
-  <ul>
-    <li>path<br>
-      The path to the speedtest binary.</li>
-    <li>checks-till-disable<br>
-      how often the speedtest should be run before it is set to disabled. the value will be decreased by 1 for every run.</li>
     <li>disable<br>
       set to 1 to disable the test.</li>
   </ul>
