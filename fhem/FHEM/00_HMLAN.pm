@@ -7,14 +7,25 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday time);
 
-sub HMLAN_Parse($$);
-sub HMLAN_Read($);
-sub HMLAN_Write($$$);
+sub HMLAN_Initialize($);
+sub HMLAN_Define($$);
+sub HMLAN_Undef($$);
+sub HMLAN_RemoveHMPair($);
+sub HMLAN_Attr(@);
+sub HMLAN_Set($@);
 sub HMLAN_ReadAnswer($$$);
+sub HMLAN_Write($$$);
+sub HMLAN_Read($);
 sub HMLAN_uptime($@);
-sub HMLAN_secSince2000();
-
+sub HMLAN_Parse($$);
+sub HMLAN_Ready($);
 sub HMLAN_SimpleWrite(@);
+sub HMLAN_DoInit($);
+sub HMLAN_KeepAlive($);
+sub HMLAN_secSince2000();
+sub HMLAN_relOvrLd($);
+sub HMLAN_relOvrLd($);
+sub HMLAN_condUpdate($$);
 
 my $debug = 1; # set 1 for better log readability
 my %sets = ( "hmPairForSec" => "HomeMatic"
