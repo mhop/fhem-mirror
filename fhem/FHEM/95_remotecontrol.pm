@@ -1,4 +1,4 @@
-##############################################
+ï»¿##############################################
 # 95_remotecontrol
 # $Id$
 #
@@ -39,6 +39,8 @@
 #
 # Published June 23, 2013
 # bugfix "use strict" upon foreign makenotify - June 24, 2013
+# converted to UNIX-LF - June 25, 2013
+
 
 
 package main;
@@ -416,8 +418,8 @@ RC_layout_itunes() {
 <a name="remotecontrol"></a>
 <h3>remotecontrol</h3>
 <ul>
-  Erzeugt eine graphische Fernbedienung. Buttons (=icons) können frei ausgewählt und angeordnet werden. Vordefinierte layouts sind verfügbar für z.B. Samsung-TV und iTunes.
-  Jeder "Knopfdruck" kann an das entsprechende fhem-Gerät weitergegeben werden.<br>
+  Erzeugt eine graphische Fernbedienung. Buttons (=icons) kÃ¶nnen frei ausgewÃ¤hlt und angeordnet werden. Vordefinierte layouts sind verfÃ¼gbar fÃ¼r z.B. Samsung-TV und iTunes.
+  Jeder "Knopfdruck" kann an das entsprechende fhem-GerÃ¤t weitergegeben werden.<br>
   Weitere Erklaerungen finden sich im <a href="http://www.fhemwiki.de/wiki/Remotecontrol">Wiki-Eintrag</<>.<br>
 
   <a name="remotecontroldefine"></a><br>
@@ -428,7 +430,7 @@ RC_layout_itunes() {
     <table>
 	<tr><td><code>define rc1 remotecontrol</code></td><td><code># erzeugt eine "leere" remotecontrol</code></td></tr>
     <tr><td><code>get rc1 layout</code></td><td><code># zeigt alle vorhandenen vordefinierten layouts an</code></td></tr>
-    <tr><td><code>set rc1 layout samsung</code></td><td><code># laedt das layout für SamsungTV</code></td></tr>
+    <tr><td><code>set rc1 layout samsung</code></td><td><code># laedt das layout fÃ¼r SamsungTV</code></td></tr>
     <tr><td><code>set rc1 makeweblink</code></td><td><code># erzeugt weblink_rc1 der die remotecontrol in fhemweb or floorplan anzeigt</code></td></tr>
     <tr><td colspan="2"><code>define n_rc1 notify rc1.* set mySamsungTV $EVENT</code></td></tr>
     <tr><td></td><td><code># uebertraegt jeden Tastendruck an mySamsungTV zur Ausfuehrung</code></td></tr>
@@ -453,21 +455,21 @@ RC_layout_itunes() {
   <ul>
     <li><a href="#loglevel">loglevel</a></li>
 	<li><a name="rc_iconpath">rc_iconpath</a><br>
-      Pfad für icons, default ist "icons"</li>
+      Pfad fÃ¼r icons, default ist "icons"</li>
     <li><a name="rc_iconprefix">rc_iconprefix</a><br>
-      Prefix für icon-Dateien, default ist "" . </li>
+      Prefix fÃ¼r icon-Dateien, default ist "" . </li>
     <li>Note: Icon-Namen (Tasten-Bild-Datei-Namen) werden zusammengesetzt als fhem/&lt;rc_iconpath&gt;/&lt;rc_iconprefix&gt;&lt;command|image&gt;</li>
     <br>
 
     <li><a href="#rowXX">rowXX</a><br>
 	<code>attr &lt;rc-name&gt; rowXX &lt;command&gt;[:&lt;image&gt;]</code><br>
     Komma-separarierte Liste von Tasten/Icons je Tastaturzeile. Eine Tastaturzeile kann beliebig viele Tasten enthalten.</li><br>
-    <li>&lt;command&gt; ist der event, der bei Tastendruck ausgelöst wird. Gross/Kleinschreibung beachten.</li>
+    <li>&lt;command&gt; ist der event, der bei Tastendruck ausgelÃ¶st wird. Gross/Kleinschreibung beachten.</li>
     <li>&lt;image&gt; ist der Dateiname des als Taste angezeigten icons</li>
     <li>Verwenden Sie je Taste</li>
     <li>&lt;command&gt; wobei als Taste/icon <code><rc_iconprefix><command></code> angezeigt wird<br>
     Beispiel:<br>
-    <code>attr rc1 rc_iconprefix black_btn_  # gilt für alle Tasten/icons
+    <code>attr rc1 rc_iconprefix black_btn_  # gilt fÃ¼r alle Tasten/icons
           attr rc1 row00 VOLUP</code>
 		-> icon ist black_btn_VOLUP, ein Tastendruck erzeugt den event VOLUP</li>
     <li>oder</li>
@@ -479,7 +481,7 @@ RC_layout_itunes() {
         <code>attr rc1 row00 1,2,3,TV,HDMI<br>
         attr rc2 row00 play:PLAY,pause:PAUSE,louder:VOLUP,quieter:VOLDOWN</code><br>
 	  </li>
-	  <li><b>Hinweis:</b> verwenden Sie :blank für eine 'leere Taste', oder z.B. :blank,:blank,:blank für eine Abstands-Leerzeile.</li>
+	  <li><b>Hinweis:</b> verwenden Sie :blank fÃ¼r eine 'leere Taste', oder z.B. :blank,:blank,:blank fÃ¼r eine Abstands-Leerzeile.</li>
   </ul>
 </ul>
 =end html_DE
