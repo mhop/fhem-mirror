@@ -334,6 +334,7 @@ RC_layout_itunes() {
 
 =pod
 =begin html
+
 <a name="remotecontrol"></a>
 <h3>remotecontrol</h3>
 <ul>
@@ -350,7 +351,7 @@ RC_layout_itunes() {
     <tr><td><code>get rc1 layout</code></td><td><code># displays all available predefined layouts</code></td></tr>
     <tr><td><code>set rc1 layout samsung</code></td><td><code># assigns keys for a SamsungTV</code></td></tr>
     <tr><td><code>set rc1 makeweblink</code></td><td><code># creates weblink_rc1 which displays the remotecontrol in fhemweb or floorplan</code></td></tr>
-    <tr><td><code>set rc1 makenotify mySamsungTV</code></td><td><code># creates notify_rc1 which forwards every buttonclick to mySamsungTV for execution</code></td></tr>
+    <tr><td><code>set rc1 makenotify myTV</code></td><td><code># creates notify_rc1 which forwards every buttonclick to myTV for execution</code></td></tr>
     <tr><td colspan="2"><b>Note:</b> keys can be changed at any time, it is not necessary to redefine the weblink</td></tr>
     <tr><td><code>attr rc1 row15 VOLUP,VOLDOWN</code></td></tr>
 	</table>
@@ -360,7 +361,7 @@ RC_layout_itunes() {
   <b>Set</b>
   <ul>
     <li><code>set &lt;rc-name&gt; layout [delete|&lt;layoutname&gt;]</code><br>
-	<code>layout delete</code> deletes all rowXX-attributes</code><br>
+	<code>layout delete</code> deletes all rowXX-attributes<br>
     <code>layout &lt;layoutname&gt;</code> assigns a predefined layout to rowXX-attributes</li>
 	<li><code>set &lt;rc-name&gt; makeweblink [&lt;name&gt;]</code><br>
     creates a weblink to display the graphical remotecontrol. Default-name is weblink_&lt;rc-name&gt; .</li>
@@ -393,11 +394,12 @@ RC_layout_itunes() {
       <li><code>&lt;command&gt;</code> is the command that will trigger the event after a buttonclick. Case sensitive.</li>
       <li><code>&lt;image&gt;</code> is the filename of the image</li><br>
 	  <li>Per button for the remotecontrol, use</li>
-      <li><code>&lt;command&gt;</code> where an icon with the name <rc_iconprefix><command> is displayed<br>
+      <li><code>&lt;command&gt;</code> where an icon with the name <rc_iconprefix>&lt;command&gt; is displayed<br>
       Example:<br>
-        <code>attr rc1 rc_iconprefix black_btn_  # used for ALL icons on remotecontrol rc1<br>
-              attr rc1 row00 VOLUP </code><br>
-	  		 icon is <code>black_btn_VOLUP</code>, a buttonclick creates the event <code>VOLUP</code></li>
+        <code>attr rc1 rc_iconprefix black_btn_  # used for ALL icons on remotecontrol rc1</code><br>
+        <code>attr rc1 row00 VOLUP </code><br>
+	  		 icon is <code>black_btn_VOLUP</code>, a buttonclick creates the event <code>VOLUP</code>
+	  </li>
       or
       <li><code>&lt;command&gt;:&lt;image&gt;</code> where an icon with the name <code>&lt;rc_iconprefix&gt;&lt;image&gt;</code> is displayed<br>
         Example: <br>
@@ -405,16 +407,17 @@ RC_layout_itunes() {
 		 icon is <code>black_btn_VOLUP</code>, a buttonclick creates the event <code>LOUDER</code>
 	    <br>
         Examples:<br>
-        <code>attr rc1 row00 1,2,3,TV,HDMI<br>
-        attr rc2 row00 play:PLAY,pause:PAUSE,louder:VOLUP,quieter:VOLDOWN</code><br>
-	    </li>
-		<li><b>Hint:</b> use :blank for a blank space, use e.g. :blank,:blank,:blank for a blank row</li>
+        <code>attr rc1 row00 1,2,3,TV,HDMI</code><br>
+        <code>attr rc2 row00 play:PLAY,pause:PAUSE,louder:VOLUP,quieter:VOLDOWN</code><br>
+	  </li>
+      <li><b>Hint:</b> use :blank for a blank space, use e.g. :blank,:blank,:blank for a blank row</li>
 	</ul>
   </ul>
 </ul>
 
 =end html
 =begin html_DE
+
 <a name="remotecontrol"></a>
 <h3>remotecontrol</h3>
 <ul>
@@ -432,8 +435,7 @@ RC_layout_itunes() {
     <tr><td><code>get rc1 layout</code></td><td><code># zeigt alle vorhandenen vordefinierten layouts an</code></td></tr>
     <tr><td><code>set rc1 layout samsung</code></td><td><code># laedt das layout für SamsungTV</code></td></tr>
     <tr><td><code>set rc1 makeweblink</code></td><td><code># erzeugt weblink_rc1 der die remotecontrol in fhemweb or floorplan anzeigt</code></td></tr>
-    <tr><td colspan="2"><code>define n_rc1 notify rc1.* set mySamsungTV $EVENT</code></td></tr>
-    <tr><td></td><td><code># uebertraegt jeden Tastendruck an mySamsungTV zur Ausfuehrung</code></td></tr>
+    <tr><td><code>set rc1 makenotify myTV</code></td><td><code># erzeugt notify_rc1, das jeden Tastendruck an myTV weitergibt</code></td></tr>
     <tr><td colspan="2"><b>Hinweis:</b>die Tastenbelegung kann jederzeit geaendert werden, ohne dass der weblink erneut erzeugt werden muss.</td></tr>
     <tr><td><code>attr rc1 row15 VOLUP,VOLDOWN</code></td></tr>
 	</table>
@@ -443,11 +445,12 @@ RC_layout_itunes() {
   <b>Set</b>
   <ul>
     <li><code>set &lt;rc-name&gt; layout [delete|&lt;layoutname&gt;]</code><br>
-	<code>layout delete</code> loescht alle rowXX-Attribute</code><br>
+	<code>layout delete</code> loescht alle rowXX-Attribute<br>
     <code>layout &lt;layoutname&gt;</code> laedt das  vordefinierte layout in die rowXX-Attribute</li>
 	<li><code>set &lt;rc-name&gt; makeweblink [&lt;name&gt;]</code><br>
     erzeugt einen weblink zur Anzeige der remotecontrol in FHEMWEB oder FLOORPLAN. Default-Name ist weblink_&lt;rc-name&gt; .</li>
-    <tr><td><code>set rc1 makenotify mySamsungTV</code></td><td><code># erzeugt notify_rc1 das jeden Tastendruck an mySamsungTV zur Ausfuehrung weitergibt</code></td></tr>
+    <li><code>set rc1 makenotify mySamsungTV</code><br>
+	erzeugt <code>notify_rc1</code> das jeden Tastendruck an mySamsungTV zur Ausfuehrung weitergibt</li>
   </ul>
   
   <a name="remotecontrolattr"></a><br>
@@ -467,22 +470,24 @@ RC_layout_itunes() {
     <li>&lt;command&gt; ist der event, der bei Tastendruck ausgelöst wird. Gross/Kleinschreibung beachten.</li>
     <li>&lt;image&gt; ist der Dateiname des als Taste angezeigten icons</li>
     <li>Verwenden Sie je Taste</li>
-    <li>&lt;command&gt; wobei als Taste/icon <code><rc_iconprefix><command></code> angezeigt wird<br>
-    Beispiel:<br>
-    <code>attr rc1 rc_iconprefix black_btn_  # gilt für alle Tasten/icons
-          attr rc1 row00 VOLUP</code>
-		-> icon ist black_btn_VOLUP, ein Tastendruck erzeugt den event VOLUP</li>
-    <li>oder</li>
+    <li>&lt;command&gt; wobei als Taste/icon <code><rc_iconprefix>&lt;command&gt;</code> angezeigt wird<br>
+     Beispiel:<br>
+     <code>attr rc1 rc_iconprefix black_btn_  # gilt für alle Tasten/icons</code><br>
+     <code>attr rc1 row00 VOLUP</code><br>
+		-> icon ist <code>black_btn_VOLUP</code>, ein Tastendruck erzeugt den event <code>VOLUP</code>
+	</li><br>
+    oder
     <li>&lt;command&gt;:&lt;image&gt; wobei als Taste/icon &lt;rc_iconprefix&gt;&lt;image&gt; angezeigt wird.<br>
       Beispiel:<br>
 	  <code>attr rc1 row00 LOUDER:VOLUP</code><br>
 	  icon ist black_btn_VOLUP, ein Tastendruck erzeugt den event LOUDER<br>
       Beispiele:
-        <code>attr rc1 row00 1,2,3,TV,HDMI<br>
-        attr rc2 row00 play:PLAY,pause:PAUSE,louder:VOLUP,quieter:VOLDOWN</code><br>
-	  </li>
-	  <li><b>Hinweis:</b> verwenden Sie :blank für eine 'leere Taste', oder z.B. :blank,:blank,:blank für eine Abstands-Leerzeile.</li>
+        <code>attr rc1 row00 1,2,3,TV,HDMI</code><br>
+        <code>attr rc2 row00 play:PLAY,pause:PAUSE,louder:VOLUP,quieter:VOLDOWN</code><br>
+	</li>
+	<li><b>Hinweis:</b> verwenden Sie :blank für eine 'leere Taste', oder z.B. :blank,:blank,:blank für eine Abstands-Leerzeile.</li>
   </ul>
 </ul>
+
 =end html_DE
 =cut

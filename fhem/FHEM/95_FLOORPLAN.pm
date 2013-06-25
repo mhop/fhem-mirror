@@ -804,7 +804,7 @@ FP_input(@)
     </ul>
 	
     <li><a name="fp_backgroundimg">fp_backgroundimg</a><br>
-	Allows to choose a background-picture independent of the floorplan-name.
+	 Allows to choose a background-picture independent of the floorplan-name.
 	</li>
     Example:
 	<ul>
@@ -812,12 +812,13 @@ FP_input(@)
     </ul>
 	
     <li><a name="fp_viewport">fp_viewport</a><br>
-	Allows usage of a user-defined viewport-value for touchpad.<br>
-	Default-viewport-value is "width=768".
+	  Allows usage of a user-defined viewport-value for touchpad.<br>
+	  Default-viewport-value is "width=768".
+    </li>
 	
     <li><a name="fp_inherited">Inherited from FHEMWEB</a><br>
-	The following attributes are inherited from the underlying <a href="#FHEMWEB">FHEMWEB</a> instance:<br>
-    <ul>
+	 The following attributes are inherited from the underlying <a href="#FHEMWEB">FHEMWEB</a> instance:<br>
+     <ul>
 		<a href="#smallscreen">smallscreen</a><br>
 		<a href="#touchpad">touchpad</a><br>
 		<a href="#refresh">refresh</a><br>
@@ -826,7 +827,7 @@ FP_input(@)
 		<a href="#webname">webname</a><br>
 		<a href="#redirectCmds">redirectCmds</a><br>
 		<a href="#longpoll">longpoll</a><br>
-    </ul>
+     </ul>
     </li><br>
   </ul>
   <br>
@@ -952,7 +953,7 @@ FP_input(@)
     </ul>
 
     <li><a name="commandfield">commandfield</a><br>
-	Fügt Ihrem floorplan ein fhem-Kommandofeld hinzu.
+	 Fügt Ihrem floorplan ein fhem-Kommandofeld hinzu.
 	</li>
     Beispiel:
 	<ul>
@@ -960,19 +961,22 @@ FP_input(@)
     </ul>
 	
     <li><a name="fp_backgroundimg">fp_backgroundimg</a><br>
-	Gestattet die Bennung eine Hintergundbilds unabhängig vom floorplan-Namen.<br>
-    <b>Hinweis:</b> Das Attribut kann mittels notify geändert werden, um z.B. unterschiedliche Hintergundbidlder am Tag oder in der Nacht anzuzeigen.<br>
-    Beispiel:
-	<ul>
-      <code>attr Erdgeschoss fp_backgroundimg foobar.png</code><br><br>
-    </ul>
+	 Gestattet die Bennung eine Hintergundbilds unabhängig vom floorplan-Namen.<br>
+     <b>Hinweis:</b> Das Attribut kann mittels notify geändert werden, um z.B. unterschiedliche Hintergundbidlder am Tag oder in der Nacht anzuzeigen.<br>
+     Beispiel:
+	 <ul>
+       <code>attr Erdgeschoss fp_backgroundimg foobar.png</code><br><br>
+     </ul>
+	</li>
+	
     <li><a name="fp_viewport">fp_viewport</a><br>
 	Gestattet die Verwendung eines abweichenden viewport-Wertes für die touchpad-Ausgabe.<br>
 	Die Default-viewport-Angbe ist "width=768".
-
+	</li>
+	
     <li><a name="fp_inherited">Vererbt von FHEMWEB</a><br>
-	Die folgenden Attribute werden von der zugrundliegenden <a href="#FHEMWEB">FHEMWEB</a>-Instanz vererbt:<br>
-    <ul>
+	 Die folgenden Attribute werden von der zugrundliegenden <a href="#FHEMWEB">FHEMWEB</a>-Instanz vererbt:<br>
+     <ul>
 		<a href="#smallscreen">smallscreen</a><br>
 		<a href="#touchpad">touchpad</a><br>
 		<a href="#refresh">refresh</a><br>
@@ -981,7 +985,7 @@ FP_input(@)
 		<a href="#webname">webname</a><br>
 		<a href="#redirectCmds">redirectCmds</a><br>
 		<a href="#longpoll">longpoll</a><br>
-    </ul>
+     </ul>
     </li><br>
   </ul>
   <br>
