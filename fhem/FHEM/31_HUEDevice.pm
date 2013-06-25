@@ -121,17 +121,17 @@ HUEDevice_colorpickerFn($$$)
   $cmd = "" if($cmd eq "state");
   if( $args[1] ) {
     my $c = "\"$FW_ME?cmd=set $d $cmd$srf\"";
-    return "<td colspan='2'>".
+    return '<td align="center">'.
              '<a href='. $c .'>'.
                '<div style="width:32px;height:19px;'.
                'border:1px solid #fff;border-radius:8px;background-color:#'. $args[1] .';"></div>'.
-             '</a>';
-           "</td>";
+             '</a>'.
+           '</td>';
   } else {
     my $c = "\"$FW_ME?cmd=set $d $cmd %$srf\"";
-    return "<td colspan='2'>".
+    return '<td align="center">'.
              "<input class='color {pickerMode:'$mode'}' value='#$cv' onchange='setColor(this,\"$mode\",$c)'\"/>".
-           "</td>";
+           '</td>';
   }
 }
 
@@ -541,7 +541,8 @@ HUEDevice_GetUpdate($)
   $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
 
   if( !defined( $attr{$name}{webCmd} ) ) {
-    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb C8FF12:rgb 0000ff:toggle:on:off' if( $attr{$name}{subType} eq "colordimmer" );
+    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb 00ff00:rgb 0000ff:toggle:on:off' if( $attr{$name}{subType} eq "colordimmer" );
+    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb C8FF12:rgb 0000ff:toggle:on:off' if( AttrVal($name, "model", "") eq "LCT001" );
     $attr{$name}{webCmd} = 'pct:toggle:on:off' if( $attr{$name}{subType} eq "dimmer" );
     $attr{$name}{webCmd} = 'toggle:on:off' if( $attr{$name}{subType} eq "switch" );
   }
