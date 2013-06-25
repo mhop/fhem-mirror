@@ -24,7 +24,7 @@ sub FW_htmlEscape($);
 sub FW_logWrapper($);
 sub FW_makeEdit($$$);
 sub FW_makeImage(@);
-sub FW_makeTable($$@);
+sub FW_makeTable($$$@);
 sub FW_makeTableFromArray($@);
 sub FW_pF($@);
 sub FW_pH(@);
@@ -664,11 +664,12 @@ FW_updateHashes()
 
 ##############################
 sub
-FW_makeTable($$@)
+FW_makeTable($$$@)
 {
-  my($name, $hash, $cmd) = (@_);
+  my($title, $name, $hash, $cmd) = (@_);
 
   return if(!$hash || !int(keys %{$hash}));
+  FW_pO $title;
   FW_pO "<table class=\"block wide\">";
   my $si = AttrVal("global", "showInternalValues", 0);
 
@@ -758,7 +759,7 @@ FW_makeSelect($$$$)
   # Initial setting
   FW_pO "<script type=\"text/javascript\">" .
         "FW_selChange('$selEl','$list','val.$cmd$d')</script>";
-  FW_pO "</form>";
+  FW_pO "</form><br><br>";
 }
 
 ##############################
@@ -798,16 +799,15 @@ FW_doDetail($)
   FW_pO FW_hidden("detail", $d);
 
   FW_makeSelect($d, "set", getAllSets($d), "set");
-  FW_makeTable($d, $h);                         # Internal values
-  FW_pO "Readings" if($h->{READINGS});
-  FW_makeTable($d, $h->{READINGS});             # Readings
+  FW_makeTable("Internals", $d, $h);
+  FW_makeTable("Readings", $d, $h->{READINGS});
 
   my $attrList = getAllAttr($d);
   my $roomList = join(",", sort grep !/ /, keys %FW_rooms);
   $attrList =~ s/room /room:$roomList /;
-
   FW_makeSelect($d, "attr", $attrList,"attr");
-  FW_makeTable($d, $attr{$d}, "deleteattr");    # Attributes
+
+  FW_makeTable("Attributes", $d, $attr{$d}, "deleteattr");
 
   ## dependent objects
   my @dob;  # dependent objects - triggered by current device
@@ -838,7 +838,7 @@ FW_makeTableFromArray($@) {
   my ($txt,@obj) = @_;
   if (@obj>0) {
     my $row=1;
-    FW_pO "<br><br>";
+    FW_pO "<br>";
     FW_pO "$txt";
     FW_pO '<table class="block wide">';
     foreach (sort @obj) {
