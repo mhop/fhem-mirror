@@ -36,41 +36,83 @@ my $K_actDetID            =HMConfig::HMConfig_getHash("K_actDetID");
 ############################################################
 
 sub CUL_HM_Initialize($);
+sub CUL_HM_reqStatus($);
+sub CUL_HM_autoReadConfig($);
+sub CUL_HM_updateConfig($);
 sub CUL_HM_Define($$);
 sub CUL_HM_Undef($$);
+sub CUL_HM_Rename($$$);
+sub CUL_HM_Attr(@);
 sub CUL_HM_Parse($$);
+sub CUL_HM_parseCommon(@);
+sub CUL_HM_queueAutoRead($);
 sub CUL_HM_Get($@);
-sub CUL_HM_fltCvT($);
 sub CUL_HM_Set($@);
+sub CUL_HM_valvePosUpdt(@);
 sub CUL_HM_infoUpdtDevData($$$);
+sub CUL_HM_infoUpdtChanData(@);
 sub CUL_HM_Pair(@);
 sub CUL_HM_getConfig($$$$$);
 sub CUL_HM_SndCmd($$);
 sub CUL_HM_responseSetup($$);
 sub CUL_HM_eventP($$);
+sub CUL_HM_protState($$);
 sub CUL_HM_respPendRm($);
 sub CUL_HM_respPendTout($);
+sub CUL_HM_respPendToutProlong($);
 sub CUL_HM_PushCmdStack($$);
 sub CUL_HM_ProcessCmdStack($);
+sub CUL_HM_pushConfig($$$$$$$$);
 sub CUL_HM_Resend($);
+sub CUL_HM_ID2PeerList ($$$);
+sub CUL_HM_peerChId($$$);
+sub CUL_HM_peerChName($$$);
+sub CUL_HM_getMId($);
+sub CUL_HM_getRxType($);
+sub CUL_HM_getFlag($);
+sub CUL_HM_getAssChnIds($);
 sub CUL_HM_Id($);
+sub CUL_HM_IOid($);
+sub CUL_HM_hash2Id($);
+sub CUL_HM_hash2Name($);
 sub CUL_HM_name2Hash($);
 sub CUL_HM_name2Id(@);
 sub CUL_HM_id2Name($);
+sub CUL_HM_id2Hash($);
 sub CUL_HM_getDeviceHash($);
+sub CUL_HM_getDeviceName($);
 sub CUL_HM_DumpProtocol($$@);
-sub CUL_HM_parseCommon(@);
+sub CUL_HM_getRegFromStore($$$$@);
+sub CUL_HM_updtRegDisp($$$);
 sub CUL_HM_encodeTime8($);
 sub CUL_HM_decodeTime8($);
 sub CUL_HM_encodeTime16($);
 sub CUL_HM_convTemp($);
-sub CUL_HM_updtRegDisp($$$);
 sub CUL_HM_decodeTime16($);
-sub CUL_HM_pushConfig($$$$$$$$);
-sub CUL_HM_maticFn($$$$$);
 sub CUL_HM_secSince2000();
+sub CUL_HM_getChnLvl($);
+sub CUL_HM_initRegHash();
+sub CUL_HM_fltCvT($);
+sub CUL_HM_CvTflt($);
+sub CUL_HM_4DisText($);
+sub CUL_HM_TCtempReadings($);
+sub CUL_HM_repReadings($);
+sub CUL_HM_dimLog($);
+sub CUL_HM_ActGetCreateHash();
+sub CUL_HM_time2sec($);
+sub CUL_HM_ActAdd($$);
+sub CUL_HM_ActDel($);
+sub CUL_HM_ActCheck();
+sub CUL_HM_UpdtReadBulk(@);
+sub CUL_HM_UpdtReadSingle(@);
+sub CUL_HM_setAttrIfCh($$$$);
 sub CUL_HM_noDup(@);        #return list with no duplicates
 sub CUL_HM_noDupInString($);#return string with no duplicates, comma separated
+sub CUL_HM_storeRssi(@);
+sub CUL_HM_stateUpdat($);
+sub CUL_HM_qStateUpdatIfEnab($@);
+sub CUL_HM_getAttrInt($$);
+sub CUL_HM_putHash($);
 
 # ----------------modul globals-----------------------
 my $respRemoved; # used to control trigger of stack processing
@@ -1875,12 +1917,17 @@ sub CUL_HM_Set($@) {
 	  foreach my $var (keys %{$hash}){
 		delete ($hash->{$var}) if ($var =~ m/^prot/);
 		delete ($hash->{EVENTS});
-		delete ($hash->{helper}{rssi});
       }
 	  CUL_HM_protState($hash,"Info_Cleared");
 	}
+	elsif($sect eq "rssi"){
+	  delete $defs{$name}{helper}{rssi};
+	  foreach my $var (keys %{$hash}){
+		delete ($hash->{$var}) if ($var =~ m/^rssi_/);
+      }
+	}
 	else{
-	  return "unknown section. User readings or msgEvents";
+	  return "unknown section. User readings, msgEvents or rssi";
 	}
 	$state = "";
   } 
@@ -2833,7 +2880,8 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
   }
 }
 sub CUL_HM_eventP($$) {#handle protocol events
-  #todo: add severity, counter, history and acknowledge
+  # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
+  # additional variables are protCmdDel,protCmdPend,protState,protLastRcv
   my ($hash, $evntType) = @_;
   my $nAttr = $hash;
   if ($evntType eq "Rcv"){
@@ -2870,7 +2918,7 @@ sub CUL_HM_protState($$){
   Log GetLogLevel($name,6),"CUL_HM $name protEvent:$state".
             ($hash->{cmdStack}?" pending:".scalar @{$hash->{cmdStack}}:"");
 
-  DoTrigger($name, undef) if ($state eq "CMDs_done");
+  DoTrigger($name, undef) if ($state =~ m/^CMDs_done/);
 }
 sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
   my ($hash) =  @_;  
@@ -3755,8 +3803,9 @@ sub CUL_HM_ActCheck() {# perform supervision
 	  $state = "switchedOff";
 	}
 	else{
-	  $actHash->{helper}{$devId}{recent} = $devHash->{"protLastRcv"} #update recent
-	        if ($devHash->{"protLastRcv"});
+	  $actHash->{helper}{$devId}{recent} = ($devHash->{"protLastRcv"})?#update recent
+	                                        $devHash->{"protLastRcv"} 
+											:0;
 	  my $tLast = $actHash->{helper}{$devId}{recent};
       my @t = localtime($tod - $tSec); #time since when a trigger is expected
 	  my $tSince = sprintf("%04d-%02d-%02d %02d:%02d:%02d",
@@ -4033,6 +4082,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 		 <ul>
 		 readings: all readings will be deleted. Any new reading will be added usual. May be used to eliminate old data<br>
 		 msgEvents:  all message event counter will be removed. Also commandstack will be cleared. <br>
+		 rssi:  collected rssi values will be cleared. <br>
 		 </ul>
 	 </li>
 	 <li><B>getConfig</B><a name="CUL_HMgetConfig"></a><br>
@@ -4879,7 +4929,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	  [normal|added|addedStrong]          #HM-CC-SCD<br>
  	  SDteam [add|remove]_$dname<br>
       battery [low|ok]<br>
-      smoke_detect on from $src<br>
+      smoke_detect [none|&lt;src&gt;]<br>
       test:from $src<br>
   </li>
   <li><B>threeStateSensor</B><br>

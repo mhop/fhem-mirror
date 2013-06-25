@@ -709,19 +709,25 @@ FW_makeTable($$$@)
       } else {
         $val = FW_htmlEscape($val);
 		# if possible provide link to reference
-		if ($defs{$val}){
-		  FW_pH "detail=$val", $val,1;
+		if ($n eq "room"){
+		  my @tmp;
+          push @tmp,FW_pH("room=$_" , $_ ,0,"",1,1)foreach(split(",",$val));
+		  FW_pO "<td><div class=\"dval\">"
+		        .join(",",@tmp)
+		        ."</div></td>";	
 		}
-		elsif ($n eq "room"){
-		  FW_pO "<td><div class=\"dval\">";
-		  FW_pH "room=$_", $_ foreach(split(",",$val));
-		  FW_pO "</div></td>";
-		}
-		elsif ($n =~ m/^fp_(.*)/ && $defs{$1}){
+		elsif ($n =~ m/^fp_(.*)/ && $defs{$1}){#special for Floorplan
 		  FW_pH "detail=$1", $val,1;
 		}
 		else{
-		  FW_pO "<td><div class=\"dval\">$val</div></td>";
+		  my @tmp;
+          foreach(split(",",$val)){
+		    if ($defs{$_}){ push @tmp, FW_pH( "detail=$_", $_ ,0,"",1,1);}
+			else{		    push @tmp, $_;}
+		  }
+		  FW_pO "<td><div class=\"dval\">"
+		        .join(",",@tmp)
+		        ."</div></td>";				
 	    }
       }
     }
@@ -808,7 +814,6 @@ FW_doDetail($)
   FW_makeSelect($d, "attr", $attrList,"attr");
 
   FW_makeTable("Attributes", $d, $attr{$d}, "deleteattr");
-
   ## dependent objects
   my @dob;  # dependent objects - triggered by current device
   foreach my $dn (sort keys %defs) { 
@@ -1992,23 +1997,23 @@ FW_pO(@)
 sub
 FW_pH(@)
 {
-  my ($link, $txt, $td, $class, $doRet) = @_;
-  my $ret = "";
+  my ($link, $txt, $td, $class, $doRet,$nonl) = @_;
+  my $ret;
 
-  $ret .= "<td>" if($td);
   $link = ($link =~ m,^/,) ? $link : "$FW_ME$FW_subdir?$link";
-  $class = "" if(!defined($class));
-  $class = " class=\"$class\"" if($class);
-
+  #actually 'div' should be removed if no class is defined
+  #  as I can't check all code for consistancy I add nonl instead
+  $class = ($class)?" class=\"$class\"":"";
+  $txt =  "<div$class>$txt</div>" if (!$nonl);
+  
   # Using onclick, as href starts safari in a webapp.
   # Known issue: the pointer won't change
   if($FW_ss || $FW_tp) { 
-    $ret .= "<a onClick=\"location.href='$link'\"><div$class>$txt</div></a>";
-
+    $ret = "<a onClick=\"location.href='$link'\">$txt</a>";
   } else {
-    $ret .= "<a href=\"$link\"><div$class>$txt</div></a>";
+    $ret = "<a href=\"$link\">$txt</a>";
   }
-  $ret .= "</td>" if($td);
+  $ret = "<td>$ret</td>" if($td);
   return $ret if($doRet);
   FW_pO $ret;
 }
