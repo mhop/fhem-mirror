@@ -344,6 +344,7 @@ sub ReadingToNumber($$)
     <li>disable<br>
         Disables PachLog.
         Nor more Logging to www.pachube.com
+        </li>
    </ul><br>
 
 
