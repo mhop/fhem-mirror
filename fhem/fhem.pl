@@ -2833,6 +2833,17 @@ setGlobalAttrBeforeFork($)
 # Functions used to make fhem-oneliners more readable,
 # but also recommended to be used by modules
 sub
+InternalVal($$$)
+{
+  my ($d,$n,$default) = @_;
+  if(defined($defs{$d}) &&
+     defined($defs{$d}{$n})) {
+     return $defs{$d}{$n};
+  }
+  return $default;
+}
+
+sub
 ReadingsVal($$$)
 {
   my ($d,$n,$default) = @_;

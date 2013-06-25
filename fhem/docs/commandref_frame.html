@@ -1288,15 +1288,15 @@ A line ending with \ will be concatenated with the next one, so long lines
       <li>Value(&lt;devicename&gt;)<br>
         returns the state of the device (the string you see in paranthesis in
         the output of the list command).
-        <br><br>
+        </li><br>
       <li>OldValue(&lt;devicename&gt;)
       <li>OldTimestamp(&lt;devicename&gt;)<br>
         returns the old value/timestamp of the device.
-        <br><br>
+        </li><br>
       <li>
         ReadingsVal(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
         Return the reading (the value in the Readings section of "list device")
-        <br><br>
+        </li><br>
       <li>
         AttrVal(&lt;devicename&gt;,&lt;attribute&gt;,&lt;defaultvalue&gt;)<br>
         Return the attribute of the device
@@ -1307,6 +1307,13 @@ A line ending with \ will be concatenated with the next one, so long lines
         { ReadingsVal("wz", "measured-temp", "20")+0 }<br>
         { ReadingsTimestamp("wz", "measured-temp", 0)}<br>
         { AttrVal("wz", "room", "none") }<br>
+        </li><br>
+      <li>
+        InternalVal(&lt;devicename&gt;,&lt;property&gt;,&lt;defaultvalue&gt;)
+        <br>
+        Return the internal value (the value in the Internals section of "list
+        device").
+        </li><br>
       </ul>
 
 

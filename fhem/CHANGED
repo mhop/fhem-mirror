@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
-  - feature: new module speedtest to monitor internet connection speed with speedtest-cli
+  - feature: InternalVal function added (like ReadingsVal)
+  - feature: new module speedtest to monitor internet connection speed with
+             speedtest-cli
   - feature: new module "remotecontrol" to display a graphical remotecontrol
              for any device
   - feature: HUEDevice: new attribute color-icons to colored svg icons

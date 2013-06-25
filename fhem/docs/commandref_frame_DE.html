@@ -1356,19 +1356,19 @@ ebenfalls 1 bei Urlaubstagen.<br>
     <br>
     <ul>
       <li>Value(&lt;devicename&gt;)<br>
-        gibt den Status eines Ger&auml;tes zur&uuml;ck (entsprechend dem Ausdruck in 
-      Klammern, den Sie beim List-Befehl sehen).
-        <br><br>
-      </li><li>OldValue(&lt;devicename&gt;)
-      </li><li>OldTimestamp(&lt;devicename&gt;)<br>
+        gibt den Status eines Ger&auml;tes zur&uuml;ck (entsprechend dem
+        Ausdruck in Klammern, den Sie beim List-Befehl sehen).
+        </li><br>
+      <li>OldValue(&lt;devicename&gt;)</li>
+      <li>OldTimestamp(&lt;devicename&gt;)<br>
         gibt den vorherigen Wert/Zeitstempel des Ger&auml;tes zur&uuml;ck.
-        <br><br>
-      </li><li>
+        </li><br>
+      <li>
         ReadingsVal(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
         Gibt den Inhalt der &quot;readings&quot; zur&uuml;ck (den Inhalt der in dem &quot;Readings&quot;-Abschnitt 
         von "list device" angezeigt wird)
-        <br><br>
-      </li><li>
+        </li><br>
+      <li>
         AttrVal(&lt;devicename&gt;,&lt;attribute&gt;,&lt;defaultvalue&gt;)<br>
         Gibt die gesetzteb Attribute des Ger&auml;tes zur&uuml;ck
         <br><br>
@@ -1378,7 +1378,13 @@ ebenfalls 1 bei Urlaubstagen.<br>
         { ReadingsVal("wz", "measured-temp", "20")+0 }<br>
         { ReadingsTimestamp("wz", "measured-temp", 0)}<br>
         { AttrVal("wz", "room", "none") }<br>
-      </li></ul>
+        </li><br>
+      <li>
+        InternalVal(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
+        Gibt den Inhalt der &quot;internal&quot; zur&uuml;ck (den Inhalt der in
+        dem &quot;Internals&quot;-Abschnitt von "list device" angezeigt wird)
+        </li><br>
+      </ul>
 
 
   </li><li>
