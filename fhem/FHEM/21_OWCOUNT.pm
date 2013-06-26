@@ -80,7 +80,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.26";
+my $owx_version="3.27";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -703,6 +703,9 @@ sub OWCOUNT_GetMonth($) {
   my @month  = ();
   my @month2 = ();
   my @mchannel;
+  my @linarr;
+  my $day;
+  my $line;
   my ($total,$total2,$daily,$deltim,$av);
 
   #-- Check current logfile 
@@ -723,20 +726,25 @@ sub OWCOUNT_GetMonth($) {
   if( $ret) {
     while( <OWXFILE> ){
       #-- line looks as 
-      #   2013-02-09_23:59:31 <name> day: D09 <aname>: 180.0 <unit> <bname>: 180.0 <unit> etc.
-      my $line = $_;
+      #   2013-02-09_23:59:31 <name> day: D09 <aname>: 180.0 <unit> <arate>: 180.0 <unit> <bname>: 180.0 <unit> <brate>: 180.0 <unit>
+      $line = $_;
       chomp($line);
       if ( $line =~ m/$regexp/i){  
-        my @linarr = split(' ',$line);
-        my $day = $linarr[3];
-        $day =~ s/D_0+//;
-        @mchannel = ();
-        for (my $i=0;$i<int(@owg_fixed);$i++){
-          $val = $linarr[5+3*$i];
-          push(@mchannel,$val);
+        @linarr = split(' ',$line);
+        if( int(@linarr)==4+6*int(@owg_fixed) ){
+          $day = $linarr[3];
+          $day =~ s/D_0+//;
+          @mchannel = ();
+          for (my $i=0;$i<int(@owg_fixed);$i++){
+            $val = $linarr[5+6*$i];
+            push(@mchannel,$val);
+          }
+          push(@month,[@mchannel]);
         }
-        push(@month,[@mchannel]);
       }
+    }
+    if( int(@month)==0 ){
+      return "invalid logfile format in LogM";
     }
   } else { 
     return "cannot open logfile of LogM";
@@ -1027,9 +1035,11 @@ sub OWFSCOUNT_GetPage($$) {
     
     $owg_val[0]      = $vval;
     #-- parse float from midnight
+    # $owg_str =~ /([\d\.]+)/;
+    #   a la truchsess
     $owg_str =~ s/[^\d\.]+//g;
-    $owg_str = int($owg_str*100)/100;
     $owg_str = 0.0 if(!(defined($owg_str)));
+    $owg_str = int($owg_str*100)/100;
     $owg_midnight[0] = $owg_str;
     
   }elsif( $page == 15) {
@@ -1043,10 +1053,12 @@ sub OWFSCOUNT_GetPage($$) {
     if( ($vval eq "") || ($owg_str eq "") );
     
     $owg_val[1]      = $vval;
-      #-- parse float from midnight
+    #-- parse float from midnight
+    # $owg_str =~ /([\d\.]+)/;
+    #   a la truchsess
     $owg_str =~ s/[^\d\.]+//g;
-    $owg_str = int($owg_str*100)/100;
     $owg_str = 0.0 if(!(defined($owg_str)));
+    $owg_str = int($owg_str*100)/100;
     $owg_midnight[1] = $owg_str;
   }else {
     $owg_str = OWServer_Read($master,"/$owx_add/pages/page.".$page);
@@ -1171,16 +1183,20 @@ sub OWXCOUNT_GetPage($$) {
     if( $page == 14) {
       $owg_val[0] = $value;
       #-- parse float from midnight
+      # $owg_str =~ /([\d\.]+)/;
+      #   a la truchsess
       $owg_str =~ s/[^\d\.]+//g;
-      $owg_str = int($owg_str*100)/100;
       $owg_str = 0.0 if(!(defined($owg_str)));
+      $owg_str = int($owg_str*100)/100;
       $owg_midnight[0] = $owg_str;
     }elsif( $page == 15) {
       $owg_val[1] = $value;
       #-- parse float from midnight
+      # $owg_str =~ /([\d\.]+)/;
+      #   a la truchsess
       $owg_str =~ s/[^\d\.]+//g;
-      $owg_str = int($owg_str*100)/100;
       $owg_str = 0.0 if(!(defined($owg_str)));
+      $owg_str = int($owg_str*100)/100;
       $owg_midnight[1] = $owg_str;
     }
       
