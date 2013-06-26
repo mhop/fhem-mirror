@@ -80,7 +80,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.27";
+my $owx_version="3.30";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -448,7 +448,8 @@ sub OWCOUNT_FormatValues($) {
           }
            
           #-- in any mode store the interpolated value in the midnight store
-          OWXCOUNT_SetPage($hash,14+$i,sprintf("%f",$dval2));
+          OWCOUNT_SetPage($hash,14+$i,sprintf("%f",$dval2));
+          
           #-- string buildup for monthly and yearly logging
           $dvalue .= sprintf( " %s: %5.1f %s %sm: %%5.1f %s", $owg_channel[$i],$dval,$unit,$owg_channel[$i],$unit); 
           $mvalue .= sprintf( " %s: %%5.1f %s", $owg_channel[$i],$unit); 
@@ -974,6 +975,41 @@ sub OWCOUNT_Set($@) {
   OWCOUNT_GetValues($hash);  
   OWCOUNT_FormatValues($hash);  
   Log 4, "OWCOUNT: Set $hash->{NAME} $key $value";
+}
+
+#######################################################################################
+#
+# OWCOUNT_SetPage - Set one value for device
+#
+#  Parameter hash = hash of device addressed
+#            page = page addressed
+#            data = data
+#
+########################################################################################
+
+sub OWCOUNT_SetPage ($$$) {
+  my ($hash, $page, $data) = @_;
+  
+  #-- set memory page/counter according to interface type
+  my $interface= $hash->{IODev}->{TYPE};
+  my $name    = $hash->{NAME};
+  my $ret; 
+    
+  #-- OWX interface
+  if( $interface eq "OWX" ){
+    $ret = OWXCOUNT_SetPage($hash,$page,$data);
+  #-- OWFS interface
+  }elsif( $interface eq "OWServer" ){
+    $ret = OWFSCOUNT_SetPage($hash,$page,$data);
+  #-- Unknown interface
+  }else{
+    return "OWCOUNT: SetPage with wrong IODev type $interface";
+  }
+    
+  #-- process results
+  if( defined($ret)  ){
+    return "OWCOUNT: Could not set device $name, reason: ".$ret;
+  }
 }
 
 ########################################################################################
