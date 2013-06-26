@@ -342,10 +342,7 @@ sub CUL_HM_Undef($$) {###############################
     $devHash->{helper}{role}{chn}=1 if($chn eq "01");# return chan 01 role
   }
   else{# delete a device
-    foreach my $channel (keys %{$hash}){
-	  CommandDelete(undef,$hash->{$channel})
-	        if ($channel =~ m/^channel_/);
-    }
+ 	CommandDelete(undef,$hash->{$_}) foreach (grep(/^channel_/,keys %{$hash}));
   }
   delete($modules{CUL_HM}{defptr}{$HMid});
   return undef;
@@ -361,7 +358,7 @@ sub CUL_HM_Rename($$$) {#############################
 	$devHash->{"channel_".$hash->{chanNo}} = $name;
   }
   else{# we are a device - inform channels if exist
-    foreach (grep {$_ =~m/^channel_/} keys%{$hash}){
+    foreach (grep (/^channel_/, keys%{$hash})){
 	  my $chnHash = $defs{$hash->{$_}};
 	  $chnHash->{device} = $name;
 	}
@@ -762,7 +759,7 @@ sub CUL_HM_Parse($$) {##############################
 	  #VD hang detection
 	  my $des = ReadingsVal($name, "ValveDesired", "");
 	  $des =~ s/ .*//; # remove unit
-	  if (defined $des && $des != $vp && ($err&0x30) == 0x00){
+	  if ($des ne $vp && ($err&0x30) == 0x00){
 	    push @event, "operState:errorTargetNotMet";
 	    push @event, "operStateErrCnt:".
 	               (ReadingsVal($name,"operStateErrCnt","0")+1);
@@ -980,7 +977,7 @@ sub CUL_HM_Parse($$) {##############################
   }
   elsif($st eq "outputUnit"){ #################################################
     if($mTp eq "40" && @mI == 2){
-      my ($button, $bno) = (hex($mI[1]), hex($mI[2]));
+      my ($button, $bno) = (hex($mI[0]), hex($mI[1]));
       if(!(exists($shash->{BNO})) || $shash->{BNO} ne $bno){
         $shash->{BNO}=$bno;
 		  $shash->{BNOCNT}=1;
@@ -1447,9 +1444,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 		my @peers = substr($p,2,) =~ /(.{8})/g;
 	    $chnhash->{helper}{peerIDsRaw}.= ",".join",",@peers;
 		
-		foreach my $peer(@peers){	
-    	  CUL_HM_ID2PeerList ($chnNname,$peer,1);
-		}
+    	CUL_HM_ID2PeerList ($chnNname,$_,1) foreach (@peers);
 		if ($p =~ m/000000..$/) {# last entry, peerList is complete
           CUL_HM_respPendRm($shash);		  
 		  # check for request to get List3 data
@@ -1459,8 +1454,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 		    my $id = CUL_HM_IOid($shash);
 		    my $listNo = "0".$chnhash->{helper}{getCfgListNo};
 		    my @peerID = split(",",($attr{$chnNname}{peerIDs}?$attr{$chnNname}{peerIDs}:""));
-		    foreach my $peer (@peerID){
-			  next if ($peer eq '00000000');# ignore termination 
+		    foreach my $peer (grep (!/00000000/,@peerID)){
 			  $peer .="01" if (length($peer) == 6); # add the default
 			  if ($peer &&($peer eq $reqPeer || $reqPeer eq "all")){
 				CUL_HM_PushCmdStack($shash,sprintf("++%s01%s%s%s04%s%s",
@@ -1760,9 +1754,9 @@ sub CUL_HM_Get($@) {
 	    print aSave "\nset ".$eName." peerBulk ".$pIds;
 	  }
 	  my $ehash = $defs{$eName};
-	  foreach my $read (sort keys %{$ehash->{READINGS}}){
-	    next if ($read !~ m/^[\.]?RegL_/);
-	    print aSave "\nset ".$eName." regBulk ".$read." ".ReadingsVal($eName,$read,"");
+	  foreach my $read (sort grep(!/^[\.]?RegL_/,keys %{$ehash->{READINGS}})){
+	    print aSave "\nset ".$eName." regBulk ".$read." "
+		      .ReadingsVal($eName,$read,"");
 		$timestamps .= "\n#        ".ReadingsTimestamp($eName,$read,"")." :".$read;
 	  }
 	  print aSave $timestamps;
@@ -1911,20 +1905,16 @@ sub CUL_HM_Set($@) {
 	  CUL_HM_respPendRm($hash);
 	  delete ($hash->{helper}{burstEvtCnt});
 	  delete ($hash->{cmdStack});
-	  foreach my $var (keys %{$attr{$name}}){ # can be removed versions later
-	    delete ($attr{$name}{$var}) if ($var =~ m/^prot/);
-      }
-	  foreach my $var (keys %{$hash}){
-		delete ($hash->{$var}) if ($var =~ m/^prot/);
-		delete ($hash->{EVENTS});
-      }
+	  delete ($hash->{EVENTS});
+	  #rescue and restore "protLastRcv" for action detector. 
+	  my $protLastRcv = $hash->{protLastRcv} if ($hash->{protLastRcv});
+      delete ($hash->{$_}) foreach (grep(/^prot/,keys %{$hash}));
+	  $hash->{protLastRcv} = $protLastRcv if ($protLastRcv);
 	  CUL_HM_protState($hash,"Info_Cleared");
 	}
 	elsif($sect eq "rssi"){
 	  delete $defs{$name}{helper}{rssi};
-	  foreach my $var (keys %{$hash}){
-		delete ($hash->{$var}) if ($var =~ m/^rssi_/);
-      }
+	  delete ($hash->{$_}) foreach (grep(/^rssi/,keys %{$hash}))
 	}
 	else{
 	  return "unknown section. User readings, msgEvents or rssi";
@@ -1969,8 +1959,7 @@ sub CUL_HM_Set($@) {
 	my $pL = $a[2];
 	return "unknown action: $a[3] - use set or unset" if ($a[3] && $a[3] !~ m/^(set|unset)/);
 	my $set = ($a[3] eq "unset")?"02":"01";
-	foreach my $peer (split(',',$pL)){
-	  next if ($peer =~ m/^self/);
+	foreach my $peer (grep(!/^self/,split(',',$pL))){
 	  my $pID = CUL_HM_peerChId($peer,$dst,$id);
 	  return "unknown peer".$peer if (length($pID) != 8);# peer only to channel
 	  my $pCh1 = substr($pID,6,2);
@@ -2772,7 +2761,7 @@ sub CUL_HM_SndCmd($$) {
   $hash = CUL_HM_getDeviceHash($hash); 
   my $io = $hash->{IODev};
   return if(!$io);  
-  if ($io->{helper}{HMcnd} == 4){#io is in overload - dont send messages
+  if ($io->{helper}{HMcnd} && $io->{helper}{HMcnd} == 4){#io in overload, dont send
     CUL_HM_eventP($hash,"IOerr");
 	return;
   }
@@ -3151,7 +3140,7 @@ sub CUL_HM_getAssChnIds($) { #in: name out:ID list of assotiated channels
   my ($name) = @_;
   my @chnIdList;
   my $hash = $defs{$name};
-  foreach my $channel (grep {$_ =~m/^channel_/} keys %{$hash}){
+  foreach my $channel (grep /^channel_/, keys %{$hash}){
 	my $chnHash = $defs{$hash->{$channel}};
 	push @chnIdList,$chnHash->{DEF} if ($chnHash);
   }
@@ -3918,7 +3907,7 @@ sub CUL_HM_stateUpdat($){#in:name, send status-request
   (undef,$name)=split":",$name,2;
   CUL_HM_Set($defs{$name},$name,"statusRequest") if ($name);
 }
-sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request after 12 sec
+sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request after 12 s
    my ($name,$force) = @_;
   $name = CUL_HM_id2Name($name) if ($name =~ m/^[A-F0-9]{6,8}$/i);
   $name =~ s /_chn:..$//;

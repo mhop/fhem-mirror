@@ -498,77 +498,77 @@ sub HMinfo_status($){##########################################################
   # - prot events if error
   my $hash = shift;
   my $name = $hash->{NAME};
-  my @IDs = keys%{$modules{CUL_HM}{defptr}};
-  my ($nbrE,$nbrD,$nbrC,$nbrV) = (scalar(@IDs),0,0,0);# count entities 
+  my ($nbrE,$nbrD,$nbrC,$nbrV) = (0,0,0,0);# count entities and types
+  #--- used for status
   my @crit = split ",",$attr{$name}{sumStatus};#prepare event
   my %sum;
+  #--- used for error counts
   my @erro = split ",",$attr{$name}{sumERROR};
   my %errFlt;
   my %err;
   my @errNames;
-  my @IOdev;
-  my %prot = (NACK        =>0,IOerr       =>0,ResendFail  =>0,CmdDel  =>0,CmdPend =>0);
-  my @protNames;
-  my @Anames;
-  foreach (@erro){  #prepare reading filter for error counts
+  foreach (@erro){    #prepare reading filter for error counts
     my ($p,@a) = split ":",$_;
-	$errFlt{$p}{x}=1; # at least one reading
+	$errFlt{$p}{x}=1; # add at least one reading
 	$errFlt{$p}{$_}=1 foreach (@a);
   }
-  foreach my $id (@IDs){#search for Parameter
+  #--- used for IO and protocol  
+  my @IOdev;
+  my %prot = (NACK =>0,IOerr =>0,ResendFail  =>0,CmdDel  =>0,CmdPend =>0);
+  my @protNames;     # devices with current protocol events
+  my @Anames;        # devices with ActionDetector events
+  
+  foreach my $id (keys%{$modules{CUL_HM}{defptr}}){#search/count for parameter
     my $ehash = $modules{CUL_HM}{defptr}{$id};
 	my $eName = $ehash->{NAME};
+	$nbrE++;
     $nbrC++ if ($ehash->{helper}{role}{chn});
     $nbrV++ if ($ehash->{helper}{role}{vrt});
-	foreach my $read (@crit){
-	  if ($ehash->{READINGS}{$read}){
-	    my $val = $ehash->{READINGS}{$read}{VAL};
-	    $sum{$read}{$val} =0 if (!$sum{$read}{$val});
-        $sum{$read}{$val}++;
-	  }
+	foreach my $read (@crit){        #---- count critical readings
+	  next if (!$ehash->{READINGS}{$read});
+	  my $val = $ehash->{READINGS}{$read}{VAL};
+	  $sum{$read}{$val} =0 if (!$sum{$read}{$val});
+      $sum{$read}{$val}++;
 	}
-	foreach my $read (keys %errFlt){
-	  if ($ehash->{READINGS}{$read}){
-	    my $val = $ehash->{READINGS}{$read}{VAL};
-		next if (grep (/$val/,(keys%{$errFlt{$read}})));# filter non-Error
-	    $err{$read}{$val} =0 if (!$err{$read}{$val});
-        $err{$read}{$val}++;
-		push @errNames,$eName;
-	  }
+	foreach my $read (keys %errFlt){ #---- count error readings
+	  next if (!$ehash->{READINGS}{$read});
+	  my $val = $ehash->{READINGS}{$read}{VAL};
+      next if (grep (/$val/,(keys%{$errFlt{$read}})));# filter non-Error
+	  $err{$read}{$val} =0 if (!$err{$read}{$val});
+      $err{$read}{$val}++;
+      push @errNames,$eName;
 	}
-    if ($ehash->{helper}{role}{dev}){#restrict to devices
+    if ($ehash->{helper}{role}{dev}){#---restrict to devices
 	  $nbrD++;
 	  push @IOdev,$ehash->{IODev}{NAME} if($ehash->{IODev});
 	  push @Anames,$eName if ($attr{$eName}{actStatus} && $attr{$eName}{actStatus} ne "alive");
-      foreach (keys%prot){
-	    if ($ehash->{"prot".$_}){
-	      $prot{$_}++;
-		  push @protNames,$eName;
-		}
+      foreach (keys%prot){# see if protocol events are to be reported
+	    next if (!$ehash->{"prot".$_});
+	    $prot{$_}++;
+		push @protNames,$eName;
 	  }
 	}
   }
+  #====== collection finished - start data preparation======
+  delete $hash->{$_} foreach (grep(/^(ERR_|sum_)/,keys%{$hash}));# remove old 
 
-  foreach my $v(keys%{$hash}){# remove old readings
-    delete $hash->{$v} if($v =~ m/^(ERR_|sum_)/);
-  }
-  foreach my $read(@crit){
+  foreach my $read(@crit){       #--- display critical counts
     next if (!defined $sum{$read} );
     $hash->{"sum_".$read} = "";
     $hash->{"sum_".$read} .= "$_:$sum{$read}{$_};"foreach(keys %{$sum{$read}});
   }
-  foreach my $read(keys %errFlt){
+  foreach my $read(keys %errFlt){#--- display error counts
     next if (!defined $err{$read} );
     $hash->{"ERR_".$read} = "";
     $hash->{"ERR_".$read} .= "$_:$err{$read}{$_};"foreach(keys %{$err{$read}});
   }
   delete $hash->{ERR_names};
-  $hash->{ERR_names} = join",",@errNames if(@errNames);
+  $hash->{ERR_names} = join",",@errNames if(@errNames);# and name entities
 
   $hash->{sumDefined} = "entities:$nbrE device:$nbrD channel:$nbrC virtual:$nbrV";
-  # ------- what about IO devices??? ------
-  $hash->{actTotal} = $modules{CUL_HM}{defptr}{"000000"}{STATE};# display actionDetector
-  delete $hash->{ERRactNames}if(!@Anames);
+  # ------- display status of action detector ------
+  $hash->{actTotal} = $modules{CUL_HM}{defptr}{"000000"}{STATE};
+  delete $hash->{ERRactNames} if(!@Anames);
   $hash->{ERRactNames} = join",",@Anames;
   
   # ------- what about IO devices??? ------
