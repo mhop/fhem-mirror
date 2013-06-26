@@ -118,8 +118,7 @@ YAMAHA_AVR_GetStatus($;$)
 	    $power = "Off";
        }
        
-	$hash->{STATE} = lc($power);
-       
+       readingsBulkUpdate($hash,"state",lc($power));
     }
     
     if($return =~ /<Volume><Lvl><Val>(.+)<\/Val><Exp>(.+)<\/Exp><Unit>.+<\/Unit><\/Lvl><Mute>(.+)<\/Mute>.*<\/Volume>/)
@@ -222,7 +221,7 @@ YAMAHA_AVR_Set($@)
 	{
 	    # As the receiver startup takes about 5 seconds, the status will be already set, if the return code of the command is 0.
 	    readingsBulkUpdate($hash, "power", "on");
-	    $hash->{STATE} = "on";
+	    readingsBulkUpdate($hash, "state","on");
 	    return undef;
 	}
 	else
@@ -246,7 +245,7 @@ YAMAHA_AVR_Set($@)
     {
 	if(defined($a[2]))
 	{
-	    if($hash->{STATE} eq "on")
+	    if($hash->{READINGS}{power}{VAL} eq "on")
 	    {
 		if(not $inputs_piped eq "")
 		{
@@ -334,7 +333,7 @@ YAMAHA_AVR_Set($@)
     {
 	if(defined($a[2]))
 	{
-	    if($hash->{STATE} eq "on")
+	    if($hash->{READINGS}{power}{VAL} eq "on")
 	    {
 		if( $a[2] eq "on")
 		{
@@ -365,7 +364,7 @@ YAMAHA_AVR_Set($@)
     {
 	if(defined($a[2]) && $a[2] >= -80 && $a[2] < 16)
 	{
-	    if($hash->{STATE} eq "on")
+	    if($hash->{READINGS}{power}{VAL} eq "on")
 	    {
 		if(AttrVal($name, "volume-smooth-change", "0") eq "1")
 		{
