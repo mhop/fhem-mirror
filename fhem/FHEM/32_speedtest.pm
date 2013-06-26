@@ -123,7 +123,7 @@ speedtest_DoSpeedtest($)
 
   my $cmd = AttrVal($name, "path", "/usr/local/speedtest-cli" );
   $cmd .= "/speedtest-cli --simple";
-  $cmd .= "--server $server" if( $server );
+  $cmd .= " --server $server" if( $server );
 
   Log GetLogLevel($name, 5), "starting speedtest";
   my $speedstr = qx($cmd);
