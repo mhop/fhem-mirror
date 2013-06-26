@@ -40,6 +40,7 @@
 # Published June 23, 2013
 # bugfix "use strict" upon foreign makenotify - June 24, 2013
 # converted to UNIX-LF - June 25, 2013
+# fixed minor html-bug - June 26, 2013
 
 
 
@@ -246,7 +247,6 @@ RC_attr2html($) {
     $rc_html .= "</tr>\n";
   }
   $rc_html .= "</table></div>";
-  $rc_html .= "</table>";
   return $rc_html;
 }
 
