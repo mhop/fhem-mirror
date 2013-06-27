@@ -56,14 +56,11 @@ FRM_PWM_Set($@)
   my $command = $a[1];
   my $value = $a[2];
   my $iodev = $hash->{IODev};
-  main::readingsSingleUpdate($hash,"value",$value, 1);
-  if (defined $iodev and defined $iodev->{FirmataDevice} and defined $iodev->{FD}) {
-  	$iodev->{FirmataDevice}->analog_write($hash->{PIN},$value);
-  } else {
-  	return $hash->{NAME}." no IODev assigned" if (!defined $iodev);
-  	return $hash->{NAME}.", ".$iodev->{NAME}." is not connected";
-  }
-  return undef;
+  eval {
+    FRM_Client_FirmataDevice($hash)->analog_write($hash->{PIN},$value);
+    main::readingsSingleUpdate($hash,"value",$value, 1);
+  };
+  return $@;
 }
 
 sub FRM_PWM_State($$$$)

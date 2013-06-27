@@ -399,6 +399,14 @@ FRM_Client_Unassign($)
   $dev->{STATE}="defined";  
 }
 
+sub FRM_Client_FirmataDevice($) {
+  my $hash = shift;
+  my $iodev = $hash->{IODev};
+  die $hash->{NAME}." no IODev assigned" unless defined $iodev;
+  die $hash->{NAME}.", ".$iodev->{NAME}." is not connected" unless (defined $iodev->{FirmataDevice} and (defined $iodev->{FD} or ($^O=~/Win/ and defined $iodev->{USBDev})));
+  return $iodev->{FirmataDevice};
+}
+
 package Firmata_IO;
 
 sub new {

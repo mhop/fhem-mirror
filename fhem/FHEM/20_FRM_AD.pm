@@ -88,10 +88,10 @@ FRM_AD_Get($)
   my $ret;
   ARGUMENT_HANDLER: {
     $cmd eq "reading" and do {
-      my $iodev = $hash->{IODev};
-      return $name." no IODev assigned" if (!defined $iodev);
-      return $name.", ".$iodev->{NAME}." is not connected" if (!(defined $iodev->{FirmataDevice} and defined $iodev->{FD}));
-  	  return $iodev->{FirmataDevice}->analog_read($hash->{PIN});
+      eval {
+        return FRM_Client_FirmataDevice($hash)->analog_read($hash->{PIN});
+      };
+      return $@;
     };
     ( $cmd eq "alarm-upper-threshold" or $cmd eq "alarm-lower-threshold" or $cmd eq "state" ) and do {
       return main::ReadingsVal($name,"count",$gets{$cmd});

@@ -69,15 +69,11 @@ FRM_SERVO_Set($@)
   	if(!defined($sets{$a[1]}));
   my $command = $a[1];
   my $value = $a[2];
-  my $iodev = $hash->{IODev};
-  if (defined $iodev and defined $iodev->{FirmataDevice} and defined $iodev->{FD}) {
-  	$iodev->{FirmataDevice}->servo_write($hash->{PIN},$value);
-	main::readingsSingleUpdate($hash,"state",$value, 1);
-  } else {
-  	return $hash->{NAME}." no IODev assigned" if (!defined $iodev);
-  	return $hash->{NAME}.", ".$iodev->{NAME}." is not connected";
-  }
-  return undef;
+  eval {
+    FRM_Client_FirmataDevice($hash)->servo_write($hash->{PIN},$value);
+    main::readingsSingleUpdate($hash,"state",$value, 1);
+  };
+  return $@;
 }
 
 sub
