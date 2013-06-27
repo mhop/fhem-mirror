@@ -18,7 +18,8 @@ Ext.application({
 
     controllers: [
         'FHEM.controller.MainController',
-        'FHEM.controller.ChartController'
+        'FHEM.controller.ChartController',
+        'FHEM.controller.TableDataController'
     ],
 
     launch: function() {

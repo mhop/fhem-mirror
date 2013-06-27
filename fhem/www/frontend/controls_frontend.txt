@@ -270,14 +270,15 @@ UPD 2013-03-02_01:53:05 770 www/frontend/app/resources/icons/database_refresh.pn
 UPD 2013-03-02_01:53:05 524 www/frontend/app/resources/icons/resultset_last.png
 UPD 2013-04-03_07:27:17 733 www/frontend/app/resources/icons/add.png
 UPD 2013-04-03_07:27:17 389 www/frontend/app/resources/icons/resultset_previous.png
-UPD 2013-05-01_05:09:36 2154 www/frontend/app/app.js
+UPD 2013-06-27_09:34:38 2201 www/frontend/app/app.js
 UPD 2013-05-01_05:10:56 27200 www/frontend/app/view/LineChartPanel.js
 UPD 2013-04-28_02:00:20 1205 www/frontend/app/view/ChartGridPanel.js
 UPD 2013-04-03_07:26:40 15793 www/frontend/app/view/DevicePanel.js
 UPD 2013-05-01_05:10:56 8782 www/frontend/app/view/Viewport.js
-UPD 2013-04-01_07:05:14 2476 www/frontend/app/view/TableDataGridPanel.js
-UPD 2013-05-01_05:10:42 76820 www/frontend/app/controller/ChartController.js
-UPD 2013-05-01_05:10:42 13004 www/frontend/app/controller/MainController.js
+UPD 2013-06-27_09:35:22 10042 www/frontend/app/view/TableDataGridPanel.js
+UPD 2013-06-27_09:34:51 77454 www/frontend/app/controller/ChartController.js
+UPD 2013-06-27_09:34:52 13004 www/frontend/app/controller/MainController.js
+UPD 2013-06-27_09:34:52 5414 www/frontend/app/controller/TableDataController.js
 UPD 2013-04-01_07:04:35 202 www/frontend/app/model/ReadingsModel.js
 UPD 2013-04-01_07:04:36 338 www/frontend/app/model/SavedChartsModel.js
 UPD 2013-04-01_07:04:34 11535 www/frontend/app/model/ChartModel.js
@@ -286,5 +287,5 @@ UPD 2013-04-01_07:04:34 685 www/frontend/app/model/TableDataModel.js
 UPD 2013-04-01_07:04:54 432 www/frontend/app/store/ChartStore.js
 UPD 2013-04-01_07:04:54 451 www/frontend/app/store/SavedChartsStore.js
 UPD 2013-04-01_07:04:54 426 www/frontend/app/store/ReadingsStore.js
-UPD 2013-04-01_07:04:54 1048 www/frontend/app/store/TableDataStore.js
+UPD 2013-06-27_09:35:10 657 www/frontend/app/store/TableDataStore.js
 UPD 2013-04-27_06:11:13 439 www/frontend/app/store/DeviceStore.js

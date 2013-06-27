@@ -93,7 +93,7 @@ Ext.define('FHEM.controller.MainController', {
         
         if (Ext.isDefined(FHEM.version)) {
             var sp = this.getStatustextfield();
-            sp.setText(FHEM.version + "; Frontend Version: 0.7 - 2013-05-01");
+            sp.setText(FHEM.version + "; Frontend Version: 0.8 - 2013-06-27");
         }
         
         //setup west accordion / treepanel
