@@ -53,15 +53,11 @@ FRM_OUT_Set($$$)
   	my $list = "on off";
     return SetExtensions($hash, $list, $name, $cmd, @a);
   }
-  my $iodev = $hash->{IODev};
-  main::readingsSingleUpdate($hash,"value",$cmd, 1);
-  if (defined $iodev and defined $iodev->{FirmataDevice} and defined $iodev->{FD}) {
-  	$iodev->{FirmataDevice}->digital_write($hash->{PIN},$value);
-  } else {
-  	return $name." no IODev assigned" if (!defined $iodev);
-  	return $name.", ".$iodev->{NAME}." is not connected";
-  }
-  return undef;
+  eval {
+    FRM_Client_FirmataDevice($hash)->digital_write($hash->{PIN},$value);
+    main::readingsSingleUpdate($hash,"value",$cmd, 1);
+  };
+  return $@;
 }
 
 sub FRM_OUT_State($$$$)

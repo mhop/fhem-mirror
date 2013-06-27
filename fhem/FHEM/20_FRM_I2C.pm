@@ -32,12 +32,9 @@ FRM_I2C_Init($)
 	$hash->{"i2c-register"} = @$args[1];
 	$hash->{"i2c-bytestoread"} = @$args[2];
 
-	return "no IODev set" unless defined $hash->{IODev};
-	return "no FirmataDevice assigned to ".$hash->{IODev}->{NAME} unless defined $hash->{IODev}->{FirmataDevice};  	
-	
-	eval {
-		$hash->{IODev}->{FirmataDevice}->i2c_read(@$args[0],@$args[1],@$args[2]);
-	};
+  eval {
+    FRM_Client_FirmataDevice($hash)->i2c_read(@$args[0],@$args[1],@$args[2]);
+  };
 	return "error calling i2c_read: ".$@ if ($@);
 	if (! (defined AttrVal($hash->{NAME},"event-min-interval",undef))) {
 		$main::attr{$hash->{NAME}}{"event-min-interval"} = 5;

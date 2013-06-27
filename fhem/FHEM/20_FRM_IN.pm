@@ -102,10 +102,10 @@ FRM_IN_Get($)
   my $cmd = shift @a;
   ARGUMENT_HANDLER: {
     $cmd eq "reading" and do {
-      my $iodev = $hash->{IODev};
-      return $name." no IODev assigned" if (!defined $iodev);
-      return $name.", ".$iodev->{NAME}." is not connected" if (!(defined $iodev->{FirmataDevice} and defined $iodev->{FD}));
-  	  return $iodev->{FirmataDevice}->digital_read($hash->{PIN}) == PIN_HIGH ? "on" : "off";
+      eval {
+        return FRM_Client_FirmataDevice($hash)->digital_read($hash->{PIN}) == PIN_HIGH ? "on" : "off";
+      };
+      return $@;
     };
     ( $cmd eq "count" or $cmd eq "alarm" or $cmd eq "state" ) and do {
       return main::ReadingsVal($name,"count",$gets{$cmd});
