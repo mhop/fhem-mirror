@@ -1124,21 +1124,30 @@ Ext.define('FHEM.controller.ChartController', {
         me.minY2Value = 9999999;
         
         var starttime = me.getStarttimepicker().getValue(),
-            dbstarttime = Ext.Date.format(starttime, 'Y-m-d H:i:s'),
             endtime = me.getEndtimepicker().getValue(),
-            dbendtime = Ext.Date.format(endtime, 'Y-m-d H:i:s');
+            dynamicradio = Ext.ComponentQuery.query('radiogroup[name=dynamictime]')[0];
         
         if(!Ext.isEmpty(starttime) && !Ext.isEmpty(endtime)) {
             var timediff = Ext.Date.getElapsed(starttime, endtime);
             if(btn.name === "stepback") {
-                me.getEndtimepicker().setValue(starttime);
-                var newstarttime = Ext.Date.add(starttime, Ext.Date.MILLI, -timediff);
-                me.getStarttimepicker().setValue(newstarttime);
+                if (dynamicradio.getValue().rb === "month") {
+                    me.getEndtimepicker().setValue(Ext.Date.getLastDateOfMonth(Ext.Date.add(endtime, Ext.Date.MONTH, -1)));
+                    me.getStarttimepicker().setValue(Ext.Date.add(starttime, Ext.Date.MONTH, -1));
+                } else {
+                    me.getEndtimepicker().setValue(starttime);
+                    var newstarttime = Ext.Date.add(starttime, Ext.Date.MILLI, -timediff);
+                    me.getStarttimepicker().setValue(newstarttime);
+                }
                 me.requestChartData(true);
             } else if (btn.name === "stepforward") {
-                me.getStarttimepicker().setValue(endtime);
-                var newendtime = Ext.Date.add(endtime, Ext.Date.MILLI, timediff);
-                me.getEndtimepicker().setValue(newendtime);
+                if (dynamicradio.getValue().rb === "month") {
+                    me.getEndtimepicker().setValue(Ext.Date.getLastDateOfMonth(Ext.Date.add(endtime, Ext.Date.MONTH, +1)));
+                    me.getStarttimepicker().setValue(Ext.Date.add(starttime, Ext.Date.MONTH, +1));
+                } else {
+                    me.getStarttimepicker().setValue(endtime);
+                    var newendtime = Ext.Date.add(endtime, Ext.Date.MILLI, timediff);
+                    me.getEndtimepicker().setValue(newendtime);
+                }
                 me.requestChartData(true);
             }
         }
