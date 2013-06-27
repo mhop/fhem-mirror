@@ -845,7 +845,7 @@ seekTo($$$$)
           <li>&lt;col&gt;
             The column number to return, starting at 1 with the date.
             If the column is enclosed in double quotes, then it is a fix text,
-            not a column nuber.</li>
+            not a column number.</li>
           <li>&lt;regexp&gt;
             If present, return only lines containing the regexp. Case sensitive.
             </li>
