@@ -976,8 +976,25 @@ sub prepareSql(@) {
     } elsif($userquery eq "getcharts") {
         $sql = "SELECT * FROM frontend WHERE TYPE = 'savedchart'";
     } elsif($userquery eq "getTableData") {
-        $countsql = "SELECT count(*) FROM history";
-        $sql = "SELECT * FROM history LIMIT ".$paginglimit." OFFSET ".$pagingstart;
+        if ($device ne '""' && $yaxis ne '""') {
+            $sql = "SELECT * FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+            $sql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
+            $sql .= " LIMIT '$paginglimit' OFFSET '$pagingstart'"; 
+            $countsql = "SELECT count(*) FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' "; 
+            $countsql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'"; 
+        } elsif($device ne '""' && $yaxis eq '""') {  
+            $sql = "SELECT * FROM history WHERE DEVICE = '$device' ";
+            $sql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
+            $sql .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
+            $countsql = "SELECT count(*) FROM history WHERE DEVICE = '$device' ";
+            $countsql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
+        } else {
+            $sql = "SELECT * FROM history";
+            $sql .= " WHERE TIMESTAMP Between '$starttime' AND '$endtime'"; 
+            $sql .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
+            $countsql = "SELECT count(*) FROM history"; 
+            $countsql .= " WHERE TIMESTAMP Between '$starttime' AND '$endtime'"; 
+        }
         return ($sql, $countsql);
     } else {
         $sql = "error";
