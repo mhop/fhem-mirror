@@ -3620,20 +3620,21 @@ sub CUL_HM_repReadings($) {# for repeater in:hash, out: string with peers
   }
   my @readList;
   for (my $n=0;$n<36;$n++){
-    push @readList,"repPeer_$n:undefined";
+    push @readList,"repPeer_$n:undefined" ;
   }
+
   my @retL;
   foreach my$pId(sort keys %pCnt){
-	my ($pdID,$bdcst,$no) = ($1,$2,$3) if ($pId =~ m/(......)(..)(.*)/);
-	my $fNo = $no-1;#shorthand field number, used often
+	my ($pdID,$bdcst,$no) = unpack('A6A2A2',$pId);
+	my $fNo = $no-1;#shorthand field number, often used
 	my $sName = CUL_HM_id2Name($pdID);
 	my $eS = sprintf("%02d %-15s %-15s %-3s %-4s",
 	           $no,$sName
 		      ,((!$pS[$fNo] || $pS[$fNo] ne $sName)?"unknown":" dst>$pD[$fNo]")
 		      ,($bdcst eq "01"?"yes":"no ")
-	          ,( (($bdcst eq "01" && $pB[$fNo] && $pB[$fNo] eq "y")||
-			      ($bdcst eq "00" && $pB[$fNo] && $pB[$fNo] eq "n")) ?"ok":"fail")
-	           );
+	          ,($pB[$fNo] && (  ($bdcst eq "01" && $pB[$fNo] eq "y")
+			                  ||($bdcst eq "00" && $pB[$fNo] eq "n")) ?"ok":"fail")
+			  );
 	push @retL, $eS;
 	$readList[$fNo]=sprintf("repPeer_%02d:%s",$no,$eS);
   }
