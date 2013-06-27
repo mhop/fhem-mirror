@@ -188,6 +188,7 @@ use warnings;
 }
 
 sub HMinfo_SetFn($$) {#########################################################
+  my $start = time();
   my ($hash,$name,$cmd,@a) = @_;
   my ($opt,$optEmpty,$filter) = ("",1,"");
   my $ret;
@@ -455,6 +456,7 @@ sub HMinfo_SetFn($$) {#########################################################
 	
     return HMinfo_SetFnDly(join(",",($childName,$name,$cmd,$opt,$optEmpty,$filter,@a)));
   }
+  Log 1,"General duration:".(time() - $start);
   return $ret;
 }
 
@@ -496,6 +498,7 @@ sub HMinfo_status($){##########################################################
   # - display Assigned IO devices
   # - show ActionDetector status
   # - prot events if error
+  # - rssi - eval minimum values
   my $hash = shift;
   my $name = $hash->{NAME};
   my ($nbrE,$nbrD,$nbrC,$nbrV) = (0,0,0,0);# count entities and types
@@ -512,26 +515,27 @@ sub HMinfo_status($){##########################################################
 	$errFlt{$p}{x}=1; # add at least one reading
 	$errFlt{$p}{$_}=1 foreach (@a);
   }
-  #--- used for IO and protocol  
+  #--- used for IO, protocol  and communication (e.g. rssi)
   my @IOdev;
   my %prot = (NACK =>0,IOerr =>0,ResendFail  =>0,CmdDel  =>0,CmdPend =>0);
   my @protNames;     # devices with current protocol events
   my @Anames;        # devices with ActionDetector events
-  
+  my %rssiMin;
+  my %rssiMinCnt = ("99>"=>0,"80<"=>0,"60>"=>0,"59<"=>0);
+  my @rssiNames;
+
   foreach my $id (keys%{$modules{CUL_HM}{defptr}}){#search/count for parameter
     my $ehash = $modules{CUL_HM}{defptr}{$id};
 	my $eName = $ehash->{NAME};
 	$nbrE++;
     $nbrC++ if ($ehash->{helper}{role}{chn});
     $nbrV++ if ($ehash->{helper}{role}{vrt});
-	foreach my $read (@crit){        #---- count critical readings
-	  next if (!$ehash->{READINGS}{$read});
+	foreach my $read (grep {$ehash->{READINGS}{$_}} @crit){      #---- count critical readings
 	  my $val = $ehash->{READINGS}{$read}{VAL};
 	  $sum{$read}{$val} =0 if (!$sum{$read}{$val});
       $sum{$read}{$val}++;
 	}
-	foreach my $read (keys %errFlt){ #---- count error readings
-	  next if (!$ehash->{READINGS}{$read});
+	foreach my $read (grep {$ehash->{READINGS}{$_}} keys %errFlt){#---- count error readings
 	  my $val = $ehash->{READINGS}{$read}{VAL};
       next if (grep (/$val/,(keys%{$errFlt{$read}})));# filter non-Error
 	  $err{$read}{$val} =0 if (!$err{$read}{$val});
@@ -542,55 +546,76 @@ sub HMinfo_status($){##########################################################
 	  $nbrD++;
 	  push @IOdev,$ehash->{IODev}{NAME} if($ehash->{IODev});
 	  push @Anames,$eName if ($attr{$eName}{actStatus} && $attr{$eName}{actStatus} ne "alive");
-      foreach (keys%prot){# see if protocol events are to be reported
-	    next if (!$ehash->{"prot".$_});
+      foreach (grep {$ehash->{"prot".$_}} keys %prot){#protocol events reported
 	    $prot{$_}++;
 		push @protNames,$eName;
 	  }
+	  $rssiMin{$eName} = 0;
+      foreach (keys %{$ehash->{helper}{rssi}}){
+        $rssiMin{$eName} = $ehash->{helper}{rssi}{$_}{min}
+	      if ($rssiMin{$eName} > $ehash->{helper}{rssi}{$_}{min});
+      }
 	}
   }
   #====== collection finished - start data preparation======
-  delete $hash->{$_} foreach (grep(/^(ERR_|sum_)/,keys%{$hash}));# remove old 
+  delete $hash->{$_} foreach (grep(/^(ERR|sum_)/,keys%{$hash}));# remove old 
 
-  foreach my $read(@crit){       #--- display critical counts
-    next if (!defined $sum{$read} );
+  foreach my $read(grep {defined $sum{$_}} @crit){       #--- disp crt count
     $hash->{"sum_".$read} = "";
     $hash->{"sum_".$read} .= "$_:$sum{$read}{$_};"foreach(keys %{$sum{$read}});
   }
-  foreach my $read(keys %errFlt){#--- display error counts
-    next if (!defined $err{$read} );
+  foreach my $read(grep {defined $err{$_}} keys %errFlt){#--- disp err count
     $hash->{"ERR_".$read} = "";
     $hash->{"ERR_".$read} .= "$_:$err{$read}{$_};"foreach(keys %{$err{$read}});
   }
-  delete $hash->{ERR_names};
+
+  my %allE; # remove duplicates
+  $allE{$_}=0 foreach (grep !//, @errNames);
+  @errNames = sort keys %allE;
   $hash->{ERR_names} = join",",@errNames if(@errNames);# and name entities
 
   $hash->{sumDefined} = "entities:$nbrE device:$nbrD channel:$nbrC virtual:$nbrV";
   # ------- display status of action detector ------
   $hash->{actTotal} = $modules{CUL_HM}{defptr}{"000000"}{STATE};
-  delete $hash->{ERRactNames} if(!@Anames);
   $hash->{ERRactNames} = join",",@Anames;
   
   # ------- what about IO devices??? ------
-  my %tmp;
+  my %tmp; # remove duplicates
   $tmp{$_}=0 for @IOdev;
   delete $tmp{""}; #remove empties if present
-  
   @IOdev = sort keys %tmp;
-  foreach (@IOdev){
-    $_ .= ":".$defs{$_}{READINGS}{cond}{VAL} if($defs{$_}{READINGS}{cond});
+  foreach (grep {$defs{$_}{READINGS}{cond}} @IOdev){
+    $_ .= ":".$defs{$_}{READINGS}{cond}{VAL};
   }
   $hash->{HM_IOdevices}= join",",@IOdev;
+  
   # ------- what about protocol events ------
   # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
   # additional variables are protCmdDel,protCmdPend,protState,protLastRcv
   my @tp;
-  foreach (keys(%prot)){ push @tp,"$_:$prot{$_}" if ($prot{$_})};
-  delete $hash->{ERR__protocol};
-  delete $hash->{ERR__protoNames};
+  push @tp,"$_:$prot{$_}" foreach (grep {$prot{$_}} keys(%prot));
   $hash->{ERR__protocol}   = join",",@tp        if(@tp);
-  $hash->{ERR__protoNames} = join",",@protNames if(@protNames);
 
+  my %all; # remove duplicates
+  $all{$_}=0 foreach (grep !//,@protNames);
+  @protNames = sort keys %all;
+  $hash->{ERR__protoNames} = join",",@protNames if(@protNames);
+  
+  # ------- what about rssi low readings ------
+  foreach (grep {$rssiMin{$_} != 0}keys %rssiMin){
+    if    ($rssiMin{$_}> -60) {$rssiMinCnt{"59<"}++;}
+    elsif ($rssiMin{$_}> -80) {$rssiMinCnt{"60>"}++;}
+    elsif ($rssiMin{$_}< -99) {$rssiMinCnt{"99>"}++;
+	                           push @rssiNames,$_  ;}
+    else                      {$rssiMinCnt{"80<"}++;}
+  }
+ 
+  $hash->{rssiMinLevel} = "";
+  $hash->{rssiMinLevel} .= "$_:$rssiMinCnt{$_} " foreach (sort keys %rssiMinCnt);
+  $hash->{ERR___rssiCrit} = join(",",@rssiNames) if (@rssiNames);
+
+  # ------- update own status ------
+  $hash->{STATE} = "updated:".TimeNow();
   return;
 }
 
@@ -719,7 +744,7 @@ sub HMinfo_status($){##########################################################
 
   <a name="HMinfoattr"><b>Attributes</b></a>
    <ul>
-    <li><a href="#HMinfosumStatus">sumStatus</a><br>
+    <li><a name="#HMinfosumStatus">sumStatus</a><br>
 	    List of readings that shall be screend and counted based on current presence. 
 		I.e. counter is the number of entities with this reading and the same value. 
 		Readings to be searched are separated by comma. <br>
@@ -734,7 +759,7 @@ sub HMinfo_status($){##########################################################
 		Note: counter with '0' value will not be reported. HMinfo will find all present values autonomously<br>
 		Setting is meant to give user a fast overview of parameter that are expected to be system critical<br>
 	</li>
-    <li><a href="#HMinfosumERROR">sumERROR</a>
+    <li><a name="#HMinfosumERROR">sumERROR</a>
 	    Similar to sumStatus but with a focus on error conditions in the system. 
 		Here user can add reading<b>values</b> that are <b>not displayed</b>. I.e. the value is the
 		good-condition that will not be counted.<br>
@@ -749,6 +774,41 @@ sub HMinfo_status($){##########################################################
 		ERR_overheat on:3<br>
 		ERR_Activity dead:5<br>
 	</li>
+   </ul>
+   <br>
+  <a name="HMinfovariables"><b>Variables</b></a>
+   <ul>
+    <li><b>ERR___rssiCrit:</b> list of device names with RSSI reading n min level </li>
+    <li><b>rssiMinLevel:</b> counts of rssi min readings per device, clustered in blocks</li>
+
+    <li><b>ERR__protocol:</b> count of non-recoverable protocol events per device. 
+	    Those events are NACK, IOerr, ResendFail, CmdDel, CmdPend.<br>
+        Coutned are the number of device with those events, not the number of events!</li>
+    <li><b>ERR__protoNames:</b> name-list of devices with non-recoverable protocol events</li>
+    <li><b>HM_IOdevices:</b> list of IO devices used by CUL_HM entities</li>
+    <li><b>actTotal:</b> action detector state, count of devices with ceratin states</li>
+    <li><b>ERRactNames:</b> names of devices that are not alive according to ActionDetector</li>
+    <li><b>sumDefined:</b> count of defines entities in CUL_HM. Entites might be count as 
+	    device AND channel if channel funtion is covered by the device itself. Similar to virtual</li>
+    <li><b>ERR_&lt;reading&gt;:</b> count of readings as defined in attribut 
+	    <a href="#HMinfosumERROR">sumERROR</a>
+	    that do not match the good-content. </li>
+    <li><b>ERR_names:</b> name-list of entities that are counted in any ERR_&lt;reading&gt;
+        sum_&lt;reading&gt;: count of readings as defined in attribut 
+		<a href="#HMinfosumStatus">sumStatus</a>. </li>
+    Example:<br>
+	<li><code>
+      ERR___rssiCrit LightKittchen,WindowDoor,Remote12
+      ERR__protocol NACK:2 ResendFail:5 CmdDel:2 CmdPend:1
+      ERR__protoNames LightKittchen,WindowDoor,Remote12,Ligth1,Light5
+      ERR_battery: low:2;
+      ERR_names: remote1,buttonClara,
+      rssiMinLevel 99&gt;:3 80&lt;:0 60&lt;:7 59&lt;:4
+      sum_battery: ok:5;low:2;
+      sum_overheat: off:7;
+      sumDefined: entities:23 device:11 channel:16 virtual:5;
+	</code></li>
+
    </ul>
 </ul>
 =end html
