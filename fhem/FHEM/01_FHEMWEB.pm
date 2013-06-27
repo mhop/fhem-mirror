@@ -749,7 +749,7 @@ FW_makeSelect($$$$)
   return if(!$list || $FW_hiddenroom{input});
   my @al = sort map { s/:.*//;$_ } split(" ", $list);
 
-  my $selEl = $al[0];
+  my $selEl = (defined($al[0]) ? $al[0] : " ");
   $selEl = $1 if($list =~ m/([^ ]*):slider,/); # promote a slider if available
   $selEl = "room" if($list =~ m/room:/);
 

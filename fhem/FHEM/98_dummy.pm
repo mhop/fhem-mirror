@@ -23,7 +23,7 @@ dummy_Set($@)
   my $name = shift @a;
 
   return "no set value specified" if(int(@a) < 1);
-  my $setList = AttrVal($name, "setList", "*");
+  my $setList = AttrVal($name, "setList", " ");
   return "Unknown argument ?, choose one of $setList" if($a[0] eq "?");
 
   my $v = join(" ", @a);
