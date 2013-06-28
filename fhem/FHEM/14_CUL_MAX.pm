@@ -172,12 +172,13 @@ CUL_MAX_Set($@)
 
   } elsif($setting ~~ ["fakeSC", "fakeWT"]) {
     return "Invalid number of arguments" if(@args == 0);
-    my $dest = lc($args[0]);
+    my $dest = $args[0];
     #$dest may be either a name or an address
     if(exists($defs{$dest})) {
       return "Destination is not a MAX device" if($defs{$dest}{TYPE} ne "MAX");
       $dest = $defs{$dest}{addr};
     } else {
+      $dest = lc($dest); #address to lower-case
       return "No MAX device with address $dest" if(!exists($modules{MAX}{defptr}{$dest}));
     }
 
