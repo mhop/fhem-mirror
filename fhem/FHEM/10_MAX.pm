@@ -598,6 +598,9 @@ MAX_Parse($$)
     #Very seldomly, the HeatingThermostat sends us temperatures like 0.2 or 0.3 degree Celcius - ignore them
     $measuredTemperature = "" if($measuredTemperature ne "" and $measuredTemperature < 1);
 
+    my $measOffset = MAX_ReadingsVal($shash,"measurementOffset");
+    $measuredTemperature -= $measOffset if($measuredTemperature ne "" and $measOffset ne "" and $shash->{type} =~ /HeatingThermostatPlus/ and $hash->{TYPE} eq "MAXLAN");
+
     $shash->{mode} = $mode;
     $shash->{rferror} = $rferror;
     $shash->{dstsetting} = $dstsetting;
