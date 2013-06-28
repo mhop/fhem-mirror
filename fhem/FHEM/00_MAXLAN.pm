@@ -550,17 +550,17 @@ MAXLAN_Parse($$)
       my $boostValve = ($boost & 0x1F) * 5;
       my $boostDuration = $boost >> 5;
       #There is some trailing data missing, which maps to the weekly program
-      $comforttemp /= 2.0; #convert to degree celcius
-      $ecotemp /= 2.0; #convert to degree celcius
-      $tempoffset = $tempoffset/2.0-3.5; #convert to degree
+      $comforttemp     /= 2.0; #convert to degree celcius
+      $ecotemp         /= 2.0; #convert to degree celcius
+      $tempoffset      = $tempoffset/2.0-3.5; #convert to degree
       $maxsetpointtemp /= 2.0;
       $minsetpointtemp /= 2.0;
       $windowopentemp  /= 2.0;
       $windowopendur   *= 5;
-      $maxvalvesetting *= 100/255;
-      $valveoffset     *= 100/255;
-      my $decalcDay       = ($decalcifiction >> 5) & 0x07;
-      my $decalcTime      = $decalcifiction & 0x1F;
+      $maxvalvesetting = int($maxvalvesetting*100/255);
+      $valveoffset     = int($valveoffset*100/255);
+      my $decalcDay    = ($decalcifiction >> 5) & 0x07;
+      my $decalcTime   = $decalcifiction & 0x1F;
       Log $ll5, "comfortemp $comforttemp, ecotemp $ecotemp, boostValve $boostValve, boostDuration $boostDuration, tempoffset $tempoffset, minsetpointtemp $minsetpointtemp, maxsetpointtemp $maxsetpointtemp, windowopentemp $windowopentemp, windowopendur $windowopendur";
       Dispatch($hash, "MAX,1,HeatingThermostatConfig,$addr,$ecotemp,$comforttemp,$maxsetpointtemp,$minsetpointtemp,$boostValve,$boostDuration,$tempoffset,$windowopentemp,$windowopendur,$maxvalvesetting,$valveoffset,$decalcDay,$decalcTime,$weekprofile", {RAWMSG => $rmsg});
 
