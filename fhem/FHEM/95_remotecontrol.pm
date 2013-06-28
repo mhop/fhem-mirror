@@ -178,7 +178,7 @@ RC_Set($@)
   ## set state <command>
   } else {
     Log GetLogLevel($nam,4), "[remotecontrol] set $nam $cmd $par";
-    readingsSingleUpdate($hash,"state",$cmd,1);
+    readingsSingleUpdate($hash,"state",$cmd,1) if (!$par);
   }
 }
 
@@ -334,11 +334,6 @@ RC_layout_itunes() {
   return @row;
 }
 
-#css
-#.rc_body { background: #101010; font-size:6px;}
-#.rc_button { padding: 5px 7px;}
-#.rc_button img { border-style: solid; border-width: 1px; border-color: transparent; }
-#.rc_button img:active { border-color: gray; }
 
 1;
 
