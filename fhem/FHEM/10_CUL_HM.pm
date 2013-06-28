@@ -4310,7 +4310,8 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
          <li><B><a href="#CUL_HMonForTimer">on-for-timer &lt;sec&gt;</a></B> - Dimmer only! <br></li>
          <li><B><a href="#CUL_HMonTill">on-till &lt;time&gt;</a></B> - Dimmer only! <br></li>
          <li><B>stop</B> - stop motion (blind) or dim ramp</li>
-         <li><B>pct [&lt;ontime&gt] [&lt;ramptime&gt]</B> - set actor to a desired level. Optional ontime and ramptime could be given</li>
+         <li><B>pct &lt;level&gt [&lt;ontime&gt] [&lt;ramptime&gt]</B> - set actor to a desired <B>absolut level</B>. 
+		            Optional ontime and ramptime could be given for dimmer.</li>
          <li><B>up [changeValue] [&lt;ontime&gt] [&lt;ramptime&gt]</B> dim up one step</li>
          <li><B>down [changeValue] [&lt;ontime&gt] [&lt;ramptime&gt]</B> dim up one step<br>
 		     changeValue is optional an gives the level to be changed up or down in percent. Granularity is 0.5%, default is 10%. <br>
