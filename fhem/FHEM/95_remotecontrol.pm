@@ -41,6 +41,7 @@
 # bugfix "use strict" upon foreign makenotify - June 24, 2013
 # converted to UNIX-LF - June 25, 2013
 # fixed minor html-bug - June 26, 2013
+# added css-tags rc_body and rc_button - June 27, 2013
 
 
 
@@ -145,14 +146,14 @@ RC_Set($@)
   } elsif ($cmd eq "makeweblink") {
     my $wname = $a[2] ? $a[2] : "weblink_".$nam;
     fhem("define $wname weblink htmlCode {fhem(\"get $hash->{NAME} htmlcode\", 1)}");
-	Log 2, "[remotecontrol] Weblink $wname created.";
+	Log 2, "[remotecontrol] Weblink created: $wname";
 	return "Weblink created: $wname";
   ## set makenotify
   } elsif ($cmd eq "makenotify") {
 	if ($a[2]) {
       my $ndev = $a[2];
 	  my $fn = $defs{$ndev}{TYPE} ? $defs{$ndev}{TYPE} : undef;
-	  if (defined($data{RC_makenotify}{$fn})) {   #foreign makenotify
+	  if (defined($fn) && defined($data{RC_makenotify}{$fn})) {   #foreign makenotify
 	    no strict "refs";
 	    my $msg = &{$data{RC_makenotify}{$fn}}($nam,$ndev);
 		use strict "refs";
@@ -168,11 +169,16 @@ RC_Set($@)
 	}
   ## set ?
   } elsif ($cmd eq "?") {
-    return "layout makeweblink makenotify";
-  ## set <command>
+    my $ret = "Unknown argument $cmd choose one of makeweblink makenotify state layout:";
+	foreach my $fn (sort keys %{$data{RC_layout}}) {
+	  $ret .= $fn . ",";
+	}
+	$ret =~ s/[:,]$//;
+	return $ret;
+  ## set state <command>
   } else {
     Log GetLogLevel($nam,4), "[remotecontrol] set $nam $cmd $par";
-    readingsSingleUpdate($hash,"state",$cmd,1) if (!$par);
+    readingsSingleUpdate($hash,"state",$cmd,1);
   }
 }
 
@@ -199,7 +205,7 @@ RC_Get($@)
     return $layoutlist;
   ## get -> error
   } else {
-    return "Unknown parameter $arg. Choose one of: html";
+    return "Unknown argument $arg choose one of: htmlcode layout";
   }
 }
 
@@ -215,7 +221,7 @@ RC_attr2html($) {
   my $row;
   $rc_html = "\n<div class=\"remotecontrol\">";
 # $rc_html = "\n<div class=\"remotecontrol\" id=\"$name\">"; # provokes update by longpoll
-  $rc_html.= '<table border="2" rules="none">';
+  $rc_html.= '<table class="rc_body">';
   foreach my $rownr (0..19) {
     $rownr = sprintf("%2.2d",$rownr);
 	$row   = AttrVal("$name","row$rownr",undef);
@@ -223,7 +229,7 @@ RC_attr2html($) {
     $rc_html .= "<tr>\n";
     my @btn = split (",",$row);
 	foreach my $btnnr (0..$#btn) {
-      $rc_html .= "<td>";
+      $rc_html .= '<td class="rc_button">';
       if ($btn[$btnnr] ne "") {
         my $cmd;
         my $img;
@@ -296,7 +302,7 @@ RC_layout_samsung() {
   $row[5]=":blank,0,PRECH";
   $row[6]=":blank,:blank,:blank";
   $row[7]="VOLUP:UP,MUTE,CHUP";
-  $row[8]=":VOL,:BLANK,:PROG";
+  $row[8]=":VOL,:blank,:PROG";
   $row[9]="VOLDOWN:DOWN,CH_LIST,CHDOWN";
   $row[10]="MENU,:blank,GUIDE";
   $row[11]=":blank,:blank,:blank";
@@ -321,13 +327,18 @@ sub
 RC_layout_itunes() {
   my $ret;
   my @row;
-  $row[0]="play:PLAY,pause:PAUSE,prev:REWIND,next:FF,louder:VOLUP,quieter:VOLDOWN";
+  $row[0]="play:PLAY,pause:PAUSE,prev:REWIND,next:FF,quieter:VOLDOWN,louder:VOLUP";
   $row[1]="attr rc_iconpath icons/remotecontrol";
   $row[2]="attr rc_iconprefix black_btn_";
   # unused available commands
   return @row;
 }
 
+#css
+#.rc_body { background: #101010; font-size:6px;}
+#.rc_button { padding: 5px 7px;}
+#.rc_button img { border-style: solid; border-width: 1px; border-color: transparent; }
+#.rc_button img:active { border-color: gray; }
 
 1;
 
@@ -491,3 +502,5 @@ RC_layout_itunes() {
 
 =end html_DE
 =cut
+
+
