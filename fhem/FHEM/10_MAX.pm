@@ -615,9 +615,13 @@ MAX_Parse($$)
     #The formatting of desiredTemperature must match with in MAX_Set:$templist
     #Sometime we get an MAX_Parse MAX,1,ThermostatState,01090d,180000000000, where desiredTemperature is 0 - ignore it
     readingsBulkUpdate($shash, "desiredTemperature", sprintf("%2.1f",$desiredTemperature)) if($desiredTemperature != 0);
-    readingsBulkUpdate($shash, "valveposition", $valveposition);
     if($measuredTemperature ne "") {
       readingsBulkUpdate($shash, "temperature", sprintf("%2.1f",$measuredTemperature));
+      if($shash->{type} =~ /HeatingThermostatPlus/ and $hash->{TYPE} eq "MAXLAN") {
+        readingsBulkUpdate($shash, "valveposition", int($valveposition*MAX_ReadingsVal($shash,"maxValveSetting")/100));
+      } else {
+        readingsBulkUpdate($shash, "valveposition", $valveposition);
+      }
     }
 
   }elsif($msgtype ~~ ["WallThermostatState", "WallThermostatControl" ]){
