@@ -62,3 +62,14 @@ select {  margin-left:5px; margin-right:5px; }
           height:20px; line-height:20px; user-select:none;
           border:3px solid; color:#278727; text-align:center; } 
 .downText { margin-top:2px; }
+
+/* next lines are for openautomation-svg */
+svg { height:32px; width:32px; fill:#fff; }
+g.on { fill:red; }
+
+/* next lines are for remotecontrol */
+.rc_body              { border-style: solid; border-color: gray; border-width: 2px; 
+                        padding: 5px; rules: none; background: #C8C8B0; font-size:6px;}
+.rc_button            { padding: 5px 7px;}
+.rc_button img        { border-style: solid; border-width: 1px; border-color: transparent; }
+.rc_button img:active { border-color: gray; }
