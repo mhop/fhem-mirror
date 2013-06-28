@@ -191,6 +191,15 @@ sub HUEDevice_Undefine($$)
 }
 
 sub
+max($@)
+{  
+  my ($max, @vars) = @_; 
+  for (@vars) {
+    $max = $_ if $_ > $max;
+  }
+  return $max;
+}  
+sub
 HUEDevice_SetParam($$@)
 {
   my ($name, $obj, $cmd, $value, $value2) = @_;
@@ -266,7 +275,7 @@ HUEDevice_SetParam($$@)
       #$y = 1 if( $y > 1 );
       $Y = 1 if( $Y > 1 );
 
-      my $bri  = max($r,max($g,$b));
+      my $bri  = max($r,$g,$b);
       #my $bri  = $Y;
 
     $obj->{'on'}  = JSON::true;
@@ -395,7 +404,7 @@ xyYtorgb($$$)
     if( $X > 1
         || $Y > 1
         || $Z > 1 ) {
-      my $f = max($X,max($Y,$Z));
+      my $f = max($X,$Y,$Z);
       $X /= $f;
       $Y /= $f;
       $Z /= $f;
@@ -409,7 +418,7 @@ xyYtorgb($$$)
     if( $r > 1
         || $g > 1
         || $b > 1 ) {
-      my $f = max($r,max($g,$b));
+      my $f = max($r,$g,$b);
       $r /= $f;
       $g /= $f;
       $b /= $f;
