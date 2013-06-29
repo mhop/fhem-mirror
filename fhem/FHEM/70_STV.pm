@@ -9,11 +9,12 @@
 #
 # $Id$
 #
-# Version = 1.1
+# Version = 1.3
 #
 ##############################################################################
-#
-# define <name> STV <host>
+# 
+# define <name> STV <host> <port>
+# define <name> STV <host> 55000 for newer Samsung models
 #
 # set <name> <key> <value>
 #
@@ -29,6 +30,8 @@
 
 package main;
 use IO::Socket::INET;
+use Sys::Hostname;
+use MIME::Base64;
 
 my @gets = ('dummy');
 
@@ -39,46 +42,107 @@ my ($hash) = @_;
  $hash->{DefFn}    = "STV_Define";
  $hash->{StateFn}  = "STV_SetState";
  $hash->{SetFn}    = "STV_Set";
- $hash->{AttrList} = "loglevel:0,1,2,3,4,5";
+ $hash->{AttrFn}   = "STV_Attr";
+ $hash->{AttrList} = "MAC loglevel:0,1,2,3,4,5";
+}
 
+sub 
+STV_Attr(@)
+{
+  my @a = @_;
+  my $hash = $defs{$a[1]};
+  my $mac = AttrVal($a[1], "MAC", undef);
+  $hash->{MAC} = $mac if (defined($mac));
+  return;
 }
 
 sub
 STV_SetState($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
-
   $val = $1 if($val =~ m/^(.*) \d+$/);
   return "Undefined value $val" if(!defined($it_c2b{$val}));
   return undef;
 }
 
+sub getIP()
+{
+ my $host = hostname();
+ my $address = inet_ntoa(scalar gethostbyname(hostname() || 'localhost'));
+ return "$address";
+}
 
-sub
-STV_Define($$)
+sub STV_Define($$)
 {
  my ($hash, $def) = @_;
-
  my @args = split("[ \t]+", $def);
 
- if (int(@args) < 2)
+ if (int(@args) < 3)
  {
-  return "energy_Define: too much arguments. Usage:\n" .
+  return "Define: not enough arguments. Usage:\n" .
          "define <name> STV <host> <port>";
  }
 
  $hash->{Host} = $args[2];
+ if (defined $args[3]) { 
+	$hash->{Port} = $args[3]
+ } else {
+	$hash->{Port} = 52235;
+	$hash->{".validcommands"} = "mute volume call sms date";
+ }
+
+ if ( $hash->{Port} eq 55000 ){
+      $hash->{".validcommands"} = "0 1 2 3 4 5 6 7 8 9 UP DOWN LEFT RIGHT ENTER ".
+                    "MENU PRECH GUIDE INFO RETURN CH_LIST EXIT ".
+                    "SOURCE AD PICTURE_SIZE VOLUP VOLDOWN MUTE ".
+                    "TOOLS POWEROFF CHUP CHDOWN CONTENTS W_LINK ".
+                    "RSS MTS SRS CAPTION TOPMENU SLEEP ESAVING ".
+                    "PLAY PAUSE REWIND FF REC STOP ".
+                    "TV HDMI PIP_ONOFF ASPECT"; 
+	my $system = $^O;
+	if($system =~ m/Win/) {
+		$result = `ipconfig /all`;
+		my @myarp=split(/\n/,$result);
+		foreach (@myarp){
+			if ( /([0-9a-f]{2}[:-][0-9a-f]{2}[:-][0-9a-f]{2}[:-][0-9a-f]{2}[:-][0-9a-f]{2}[:-][0-9a-f]{2})$/i )
+			{
+				$result = $1;
+				$result =~ s/-/:/g;
+			}
+		}
+	}
+	if($system eq "linux") {
+	$result = `ifconfig -a`;
+		my @myarp=split(/\n/,$result);
+		foreach (@myarp){
+			if ( /^(lan|eth0) .*(..:..:..:..:..:..) .*$/ )
+			{
+				$result = $2;
+			}
+		}
+	}
+	# Fritzbox "? (192.168.0.1) at 00:0b:5d:91:fc:bb [ether]  on lan"
+	# debian   "192.168.0.1              ether   c0:25:06:1f:3c:14   C                     eth0"
+	#$result = "? (192.168.0.1) at 00:0b:5d:91:fc:bb [ether]  on lan";
+
+	$hash->{MAC} = $result;
+	$hash->{MyIP} = getIP();
+}	
+
+if ( $hash->{Port} != 55000 && $hash->{Port} != 52235 ){
+	return "[STV] Port is not supported";
+}
+
+
+ Log 3, "[STV] defined with host: $hash->{Host} port: $hash->{Port} MAC: $hash->{MAC}";
  $hash->{STATE} = 'Initialized';
-
- Log 3, "sub define2 with host: $hash->{Host}";
-
  return undef;
 }
 
 sub connection($$)
 {
 	my $tmp =  shift ; 
- 	Log 4, "connection message: $tmp";
+ 	Log 4, "[STV] connection message: $tmp";
 	my $TV = shift;
 	my $buffer = "";
 	my $tmp2 = "";
@@ -93,26 +157,108 @@ sub connection($$)
 		print $sock $tmp;
 		my $buff ="";
 		while ((read $sock, $buff, 1) > 0){
-		$buffer .= $buff;
+			$buffer .= $buff;
 		}
 		@tmp2 = split (/\n/,$buffer);
- 		Log 3, "$TV response: $tmp2[0]";
- 		Log 4, "$TV buffer response: $buffer";
+ 		Log 3, "[STV] $TV response: $tmp2[0]";
+ 		Log 4, "[STV] $TV buffer response: $buffer";
 		$sock->close();
- 		Log 4, "$TV: socket closed";
+ 		Log 4, "[STV] $TV: socket closed";
 	}else{
- 		Log 4, "$TV: not able to close socket";
+ 		Log 4, "[STV] $TV: not able to close socket";
 	}
 }
 
-sub STV_Set($@)
+# new Samsung Models
+sub STV_55000($$$)
 {
+  my ($hash,$name,$cmd) = @_;
+  my $par=undef;
+  my @ARGV = split(" ",$cmd);
+  #### Configuration
+  my $name = $hash->{NAME};
+  my $tv    = "UE46ES8090";  # Might need changing to match your TV type  #"UE46ES8090"
+  my $port  = $hash->{Port}; # TCP port of Samsung TV
+  my $tvip  = $hash->{Host}; # IP Address of TV #"192.168.2.124"
+  my $myip  = $hash->{MyIP}; # IP Address of FHEM Server
+  my $mymac = $hash->{MAC};  # Used for the access control/validation '"24:65:11:80:0D:01"
+  my $appstring = "iphone..iapp.samsung"; # What the iPhone app reports
+  my $tvappstring = "iphone.".$tv.".iapp.samsung"; # TV type
+  my $remotename = "Perl Samsung Remote"; # What gets reported when it asks for permission/also shows in General->Wireless Remote Control menu
+  
+  #### MAC überprüfen wenn nicht gültig vom attribute übernehmen.
+  #if ($mymac !~ /^\w\w:\w\w:\w\w:\w\w|\w\w:\w\w:\w\w:\w\w$/) {
+  #	Log 4, "[STV] MAC invalid - try to search for Attribute MAC";
+  #	$mymac = AttrVal($name, "MAC", ""); 
+  #	if ($mymac !~ /^\w\w:\w\w:\w\w:\w\w|\w\w:\w\w:\w\w:\w\w$/) {
+  #		Log 4, "mymac: $mymac invalid format";
+  #	}else{
+  #		$hash->{MAC} = $mymac ;
+  #	}
+  # }
+  
+  # command-line help
+  if (!$tv|!$tvip|!$myip|!$mymac) {
+    return "[STV] Error - Parameter missing:\nmodel, tvip, myip, mymac.";
+  }
+  Log GetLogLevel($name,5), "[STV] opening socket with tvip: $tvip, cmd: $cmd";
+  my $sock = new IO::Socket::INET (
+  PeerAddr => $tvip,
+  PeerPort => $port,
+  Proto => 'tcp',
+  Timout => 5
+  );
+if (defined ($sock)){
+	 #  Log GetLogLevel($name,3), "[STV] Could not create socket. Aborting." unless $sock;
+	 #  die "Could not create socket: $!\n" unless $sock;
+	 # return "Could not create socket: $!\n" unless $sock;
+	 # Log GetLogLevel($name,3), "[STV] Could not create socket. Aborting.";
+	  my $messagepart1 = chr(0x64) . chr(0x00) . chr(length(encode_base64($myip, ""))) . chr(0x00) . encode_base64($myip, "") . chr(length(encode_base64($mymac, ""))) . chr(0x00) . encode_base64($mymac, "") . chr(length(encode_base64($remotename, ""))) . chr(0x00) . encode_base64($remotename, "");
+	  my $part1 = chr(0x00) . chr(length($appstring)) . chr(0x00) . $appstring . chr(length($messagepart1)) . chr(0x00) . $messagepart1;
+	  print $sock $part1;
+
+	  my $messagepart2 = chr(0xc8) . chr(0x00);
+	  my $part2 = chr(0x00) . chr(length($appstring)) . chr(0x00) . $appstring . chr(length($messagepart2)) . chr(0x00) . $messagepart2;
+	  print $sock $part2;
+	  # Preceding sections all first time only
+
+	  if (defined($par)) {
+		 # Send text, e.g. in YouTube app's search, N.B. NOT BBC iPlayer app.
+		 my $text = $par;
+		 my $messagepart3 = chr(0x01) . chr(0x00) . chr(length(encode_base64($text, ""))) . chr(0x00) . encode_base64($text, "");
+		 my $part3 = chr(0x01) . chr(length($appstring)) . chr(0x00) . $appstring . chr(length($messagepart3)) . chr(0x00) . $messagepart3;
+		 print $sock $part3;
+	  }
+	  else {
+		foreach my $argnum (0 .. $#ARGV) {
+		  # Send remote key(s)
+		  Log GetLogLevel($name,4), "[STV] sending ".uc($ARGV[$argnum]);
+		  my $key = "KEY_" . uc($ARGV[$argnum]);
+		  my $messagepart3 = chr(0x00) . chr(0x00) . chr(0x00) . chr(length(encode_base64($key, ""))) . chr(0x00) . encode_base64($key, "");
+		  my $part3 = chr(0x00) . chr(length($tvappstring)) . chr(0x00) . $tvappstring . chr(length($messagepart3)) . chr(0x00) . $messagepart3;
+		  print $sock $part3;
+		  sleep(1);
+	#        select(undef, undef, undef, 0.5);
+		 }
+	  }
+
+	  close($sock);
+}else{
+	Log GetLogLevel($name,3), "[STV] Could not create socket. Aborting." unless $sock;
+}
+
+}
+
+# old Samsung Models
+sub STV_52235($@$@)
+{
+
   my ($hash, @a) = @_;
   my $name = $hash->{NAME};
   my $TV = $hash->{Host};
   my $count = @a;
-
-  my $arg    = lc($a[1]);      # mute volume
+  my $arg    = lc($a[2]);      # mute volume
+#Log 1, "name: $name host: $TV count: $count 0 $a[0] 1 $a[1] 2 $a[2]";	
   my $cont1  = ucfirst($arg);  # Mute
   my $cont2 = ""; 
   my $cont3 = "";
@@ -123,14 +269,13 @@ sub STV_Set($@)
   my $cont8 = "";
   my $cont9 = "";
 	
-  if (defined $a[2]) { $cont2 = $a[2]}
-  if (defined $a[3]) { $cont3 = $a[3]}
-  if (defined $a[4]) { $cont4 = $a[4]}
-  if (defined $a[5]) { $cont5 = $a[5]}
-  if (defined $a[6]) { $cont6 = $a[6]}
-  if (defined $a[7]) { $cont7 = $a[7]}
-  if (defined $a[8]) { $cont8 = $a[8]}
-  if (defined $a[9]) { $cont9 = $a[9]}
+  if (defined $a[3]) { $cont2 = $a[3]}
+  if (defined $a[4]) { $cont3 = $a[4]}
+  if (defined $a[5]) { $cont4 = $a[5]}
+  if (defined $a[6]) { $cont5 = $a[6]}
+  if (defined $a[7]) { $cont6 = $a[7]}
+  if (defined $a[8]) { $cont7 = $a[8]}
+  if (defined $a[9]) { $cont8 = $a[9]}
 
   my $callsoap = "";
   my $message = "";
@@ -153,7 +298,7 @@ if ( $arg eq "volume")
 	if ( $cont2 > 0 and $cont2 < 100 ){
 		$kind = 1;
 	}else {
-		Log 3, "$name Volume: not correct";	
+		Log 3, "[STV] $name Volume: not correct";	
 		$kind = 0;
 	}
 }
@@ -274,7 +419,7 @@ if ( $kind eq 3 ){ # SMS
         $callsoap .= "&lt;Name&gt;Von: $cont2&lt;/Name&gt;\r\n";
         $callsoap .= "&lt;Number&gt;Nr: $cont3&lt;/Number&gt;\r\n";
         $callsoap .= "&lt;/Sender&gt;\r\n";
-	$callsoap .= "&lt;Body&gt;Inhalt: $body&lt;/Body&gt;\r\n";
+		$callsoap .= "&lt;Body&gt;Inhalt: $body&lt;/Body&gt;\r\n";
         $callsoap .= "</Message>\r\n";
         $callsoap .= "</u:AddMessage>\r\n";
         $callsoap .= "</s:Body>\r\n";
@@ -308,11 +453,11 @@ if ( $kind eq 4 ){ # Termin
         $callsoap .= "&lt;Date&gt;$cont2&lt;/Date&gt;\r\n";
         $callsoap .= "&lt;Time&gt;$cont3&lt;/Time&gt;\r\n";
         $callsoap .= "&lt;/StartTime&gt;\r\n";
-	$callsoap .= "&lt;Owner&gt;\r\n";
-	$callsoap .= "&lt;Name&gt;Fr: $cont4&lt;/Name&gt;\r\n";
-	$callsoap .= "&lt;Number&gt;Nr: $cont5&lt;/Number&gt;\r\n";
-	$callsoap .= "&lt;/Owner&gt;\r\n";
-	$callsoap .= "&lt;Subject&gt;Betreff: $cont6&lt;/Subject&gt;\r\n";
+		$callsoap .= "&lt;Owner&gt;\r\n";
+		$callsoap .= "&lt;Name&gt;Fr: $cont4&lt;/Name&gt;\r\n";
+		$callsoap .= "&lt;Number&gt;Nr: $cont5&lt;/Number&gt;\r\n";
+		$callsoap .= "&lt;/Owner&gt;\r\n";
+		$callsoap .= "&lt;Subject&gt;Betreff: $cont6&lt;/Subject&gt;\r\n";
         $callsoap .= "&lt;EndTime&gt;\r\n";
         $callsoap .= "&lt;Date&gt;$cont7&lt;/Date&gt;\r\n";
         $callsoap .= "&lt;Time&gt;$cont8&lt;/Time&gt;\r\n";
@@ -345,6 +490,35 @@ if ( $kind ne 0 ){
    }
 }
 
+sub STV_Set($@)
+{
+  my ($hash, @a) = @_;
+  my $nam = $a[0];
+  my $name = $hash->{NAME};
+  my $Port = $hash->{Port};
+  my $cmd = (defined($a[1]) ? $a[1] : ""); #command
+  my $par = (defined($a[2]) ? $a[2] : ""); #parameter
+  if ($cmd eq "?" || $cmd eq "") {
+       return $hash->{".validcommands"};
+  }
+  if ($hash->{".validcommands"} =~ /$cmd/) {
+	  if ($Port eq 55000 ){
+		STV_55000($hash,$nam,$cmd);
+	  }
+	  if ($Port eq 52235 ){
+		STV_52235($hash,@_);
+	  }
+  } else {
+		my $ret = "[STV] Invalid command $cmd. Use any of:\n";
+		my @cmds = split(" ",$hash->{".validcommands"});
+		foreach my $line (0..$#cmds) {
+			$ret .= "\n" if ($line > 1 && $line/10 == int($line/10));
+			$ret .= $cmds[$line]." ";
+		}
+		return $ret;
+  }
+}
+
 1;
 
 =pod
@@ -354,13 +528,17 @@ if ( $kind ne 0 ){
 
 <h3>STV</h3>
 <ul><p>
-This module supports Samsung TV devices with few commands. It's developed and tested with Samsung LE39B650.<br>
+This module supports Samsung TV devices.<br>
+LEXXBXX (B Series) use port 52235 <br>
+LEXXCXX (C|D Series) use port 55000 <br>
 </p>
  <b>Define</b><br>
   <code>define &lt;name&gt; STV &lt;host&gt;]</code><br>
   <p>
   Example:<br>
-  define Television1 STV 192.168.178.20 <br>
+  define Television1 STV 192.168.178.20 <br> or
+  define Television2 STV 192.168.178.20 52235 <br>
+  define Television2 STV 192.168.178.20 55000 <br>
   </p>
  <b>Set</b><br>
   set &lt;name&gt; &lt;value&gt; &lt;nummber&gt;<br>where value is one of:<br><br>
