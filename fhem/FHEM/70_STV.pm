@@ -9,7 +9,7 @@
 #
 # $Id$
 #
-# Version = 1.3
+# Version = 1.4
 #
 ##############################################################################
 # 
@@ -187,66 +187,59 @@ sub STV_55000($$$)
   my $remotename = "Perl Samsung Remote"; # What gets reported when it asks for permission/also shows in General->Wireless Remote Control menu
   
   #### MAC überprüfen wenn nicht gültig vom attribute übernehmen.
-  #if ($mymac !~ /^\w\w:\w\w:\w\w:\w\w|\w\w:\w\w:\w\w:\w\w$/) {
-  #	Log 4, "[STV] MAC invalid - try to search for Attribute MAC";
-  #	$mymac = AttrVal($name, "MAC", ""); 
-  #	if ($mymac !~ /^\w\w:\w\w:\w\w:\w\w|\w\w:\w\w:\w\w:\w\w$/) {
-  #		Log 4, "mymac: $mymac invalid format";
-  #	}else{
-  #		$hash->{MAC} = $mymac ;
-  #	}
-  # }
-  
-  # command-line help
-  if (!$tv|!$tvip|!$myip|!$mymac) {
-    return "[STV] Error - Parameter missing:\nmodel, tvip, myip, mymac.";
+  if ($mymac !~ /^\w\w:\w\w:\w\w:\w\w|\w\w:\w\w:\w\w:\w\w$/) {
+	  Log 3, "[STV] mymac: $mymac invalid format";
+  }else{
+	  # command-line help
+	  if (!$tv|!$tvip|!$myip|!$mymac) {
+		return "[STV] Error - Parameter missing:\nmodel, tvip, myip, mymac.";
+	  }
+	  Log GetLogLevel($name,5), "[STV] opening socket with tvip: $tvip, cmd: $cmd";
+	  my $sock = new IO::Socket::INET (
+	  PeerAddr => $tvip,
+	  PeerPort => $port,
+	  Proto => 'tcp',
+	  Timout => 5
+	  );
+	if (defined ($sock)){
+		 #  Log GetLogLevel($name,3), "[STV] Could not create socket. Aborting." unless $sock;
+		 #  die "Could not create socket: $!\n" unless $sock;
+		 # return "Could not create socket: $!\n" unless $sock;
+		 # Log GetLogLevel($name,3), "[STV] Could not create socket. Aborting.";
+		  my $messagepart1 = chr(0x64) . chr(0x00) . chr(length(encode_base64($myip, ""))) . chr(0x00) . encode_base64($myip, "") . chr(length(encode_base64($mymac, ""))) . chr(0x00) . encode_base64($mymac, "") . chr(length(encode_base64($remotename, ""))) . chr(0x00) . encode_base64($remotename, "");
+		  my $part1 = chr(0x00) . chr(length($appstring)) . chr(0x00) . $appstring . chr(length($messagepart1)) . chr(0x00) . $messagepart1;
+		  print $sock $part1;
+
+		  my $messagepart2 = chr(0xc8) . chr(0x00);
+		  my $part2 = chr(0x00) . chr(length($appstring)) . chr(0x00) . $appstring . chr(length($messagepart2)) . chr(0x00) . $messagepart2;
+		  print $sock $part2;
+		  # Preceding sections all first time only
+
+		  if (defined($par)) {
+			 # Send text, e.g. in YouTube app's search, N.B. NOT BBC iPlayer app.
+			 my $text = $par;
+			 my $messagepart3 = chr(0x01) . chr(0x00) . chr(length(encode_base64($text, ""))) . chr(0x00) . encode_base64($text, "");
+			 my $part3 = chr(0x01) . chr(length($appstring)) . chr(0x00) . $appstring . chr(length($messagepart3)) . chr(0x00) . $messagepart3;
+			 print $sock $part3;
+		  }
+		  else {
+			foreach my $argnum (0 .. $#ARGV) {
+			  # Send remote key(s)
+			  Log GetLogLevel($name,4), "[STV] sending ".uc($ARGV[$argnum]);
+			  my $key = "KEY_" . uc($ARGV[$argnum]);
+			  my $messagepart3 = chr(0x00) . chr(0x00) . chr(0x00) . chr(length(encode_base64($key, ""))) . chr(0x00) . encode_base64($key, "");
+			  my $part3 = chr(0x00) . chr(length($tvappstring)) . chr(0x00) . $tvappstring . chr(length($messagepart3)) . chr(0x00) . $messagepart3;
+			  print $sock $part3;
+			  sleep(1);
+		#        select(undef, undef, undef, 0.5);
+			 }
+		  }
+
+		  close($sock);
+	}else{
+		Log GetLogLevel($name,3), "[STV] Could not create socket. Aborting." unless $sock;
+	}
   }
-  Log GetLogLevel($name,5), "[STV] opening socket with tvip: $tvip, cmd: $cmd";
-  my $sock = new IO::Socket::INET (
-  PeerAddr => $tvip,
-  PeerPort => $port,
-  Proto => 'tcp',
-  Timout => 5
-  );
-if (defined ($sock)){
-	 #  Log GetLogLevel($name,3), "[STV] Could not create socket. Aborting." unless $sock;
-	 #  die "Could not create socket: $!\n" unless $sock;
-	 # return "Could not create socket: $!\n" unless $sock;
-	 # Log GetLogLevel($name,3), "[STV] Could not create socket. Aborting.";
-	  my $messagepart1 = chr(0x64) . chr(0x00) . chr(length(encode_base64($myip, ""))) . chr(0x00) . encode_base64($myip, "") . chr(length(encode_base64($mymac, ""))) . chr(0x00) . encode_base64($mymac, "") . chr(length(encode_base64($remotename, ""))) . chr(0x00) . encode_base64($remotename, "");
-	  my $part1 = chr(0x00) . chr(length($appstring)) . chr(0x00) . $appstring . chr(length($messagepart1)) . chr(0x00) . $messagepart1;
-	  print $sock $part1;
-
-	  my $messagepart2 = chr(0xc8) . chr(0x00);
-	  my $part2 = chr(0x00) . chr(length($appstring)) . chr(0x00) . $appstring . chr(length($messagepart2)) . chr(0x00) . $messagepart2;
-	  print $sock $part2;
-	  # Preceding sections all first time only
-
-	  if (defined($par)) {
-		 # Send text, e.g. in YouTube app's search, N.B. NOT BBC iPlayer app.
-		 my $text = $par;
-		 my $messagepart3 = chr(0x01) . chr(0x00) . chr(length(encode_base64($text, ""))) . chr(0x00) . encode_base64($text, "");
-		 my $part3 = chr(0x01) . chr(length($appstring)) . chr(0x00) . $appstring . chr(length($messagepart3)) . chr(0x00) . $messagepart3;
-		 print $sock $part3;
-	  }
-	  else {
-		foreach my $argnum (0 .. $#ARGV) {
-		  # Send remote key(s)
-		  Log GetLogLevel($name,4), "[STV] sending ".uc($ARGV[$argnum]);
-		  my $key = "KEY_" . uc($ARGV[$argnum]);
-		  my $messagepart3 = chr(0x00) . chr(0x00) . chr(0x00) . chr(length(encode_base64($key, ""))) . chr(0x00) . encode_base64($key, "");
-		  my $part3 = chr(0x00) . chr(length($tvappstring)) . chr(0x00) . $tvappstring . chr(length($messagepart3)) . chr(0x00) . $messagepart3;
-		  print $sock $part3;
-		  sleep(1);
-	#        select(undef, undef, undef, 0.5);
-		 }
-	  }
-
-	  close($sock);
-}else{
-	Log GetLogLevel($name,3), "[STV] Could not create socket. Aborting." unless $sock;
-}
-
 }
 
 # old Samsung Models
