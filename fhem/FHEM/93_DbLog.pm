@@ -971,8 +971,12 @@ sub prepareSql(@) {
         $sql = $yearstats;
     } elsif($userquery eq "savechart") {
         $sql = "INSERT INTO frontend (TYPE, NAME, VALUE) VALUES ('savedchart', '$savename', '$jsonChartConfig')";
+    } elsif($userquery eq "renamechart") {
+        $sql = "UPDATE frontend SET NAME = '$savename' WHERE ID = '$jsonChartConfig'";
     } elsif($userquery eq "deletechart") {
         $sql = "DELETE FROM frontend WHERE TYPE = 'savedchart' AND ID = '".$savename."'";
+    } elsif($userquery eq "updatechart") {
+        $sql = "UPDATE frontend SET VALUE = '$jsonChartConfig' WHERE ID = '".$savename."'";
     } elsif($userquery eq "getcharts") {
         $sql = "SELECT * FROM frontend WHERE TYPE = 'savedchart'";
     } elsif($userquery eq "getTableData") {
