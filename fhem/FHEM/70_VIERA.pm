@@ -7,7 +7,16 @@
 # written 2013 by Tobias Vaupel <fhem at 622 mbit dot de>
 #
 #
-# Version = 1.00
+# Version = 1.10
+#
+# Version  History:
+# - 1.10 - 2013-06-29
+# -- Added support for module 95_remotecontrol
+# -- New functions: sub VIERA_RClayout_TV(); sub VIERA_RCmakenotify($$);
+# -- Updated VIERA_Initialize for remotecontrol
+#
+# - 1.00 - yyy-mm-dd
+# -- First release
 #
 ##############################################################################
 #
@@ -28,6 +37,12 @@ package main;
 use strict;
 use warnings;
 use IO::Socket::INET;
+
+#########################
+# Forward declaration for remotecontrol module
+sub VIERA_RClayout_TV();
+sub VIERA_RCmakenotify($$);
+
 
 my %VIERA_remoteControl_args = (
   "NRC_CH_DOWN-ONOFF"   => "Channel down",
@@ -89,11 +104,13 @@ my %VIERA_remoteControl_args = (
 
 sub VIERA_Initialize($){
   my ($hash) = @_;
-  $hash->{DefFn}    = "VIERA_Define";
-  $hash->{SetFn}    = "VIERA_Set";
-  $hash->{GetFn}    = "VIERA_Get";
-  $hash->{UndefFn}  = "VIERA_Undefine";
-  $hash->{AttrList} = "loglevel:0,1,2,3,4,5 " . $readingFnAttributes;
+  $hash->{DefFn}              = "VIERA_Define";
+  $hash->{SetFn}              = "VIERA_Set";
+  $hash->{GetFn}              = "VIERA_Get";
+  $hash->{UndefFn}            = "VIERA_Undefine";
+  $hash->{AttrList}           = "loglevel:0,1,2,3,4,5 " . $readingFnAttributes;
+  $data{RC_layout}{VIERA_TV}  = "VIERA_RClayout_TV";
+  $data{RC_makenotify}{VIERA} = "VIERA_RCmakenotify";
 }
 
 sub VIERA_Undefine($$){
@@ -291,6 +308,47 @@ sub VIERA_Set($@){
     return "Unknown argument $what, $usage";
   }
   return;
+}
+
+#####################################
+# Callback from 95_remotecontrol for command makenotify.
+sub VIERA_RCmakenotify($$) {
+  my ($nam, $ndev) = @_;
+  my $nname="notify_$nam";
+  
+  fhem("define $nname notify $nam set $ndev remoteControl ".'$EVENT',1);
+  Log 2, "[remotecontrol:VIERA] Notify created: $nname";
+  return "Notify created by VIERA: $nname";
+}
+
+#####################################
+# Default-layout for panasonic TV (maybe other VIERA devices will have other layouts)
+sub VIERA_RClayout_TV() {
+  my @row;
+
+  $row[0]="power:POWEROFF2,TV, CHG_INPUT:HDMI";
+  $row[1]="MENU, disp_mode:ASPECT,epg:GUIDE";
+  $row[2]="VIERA_LINK,VTOOLS,INTERNET";
+  $row[3]=":blank,:blank,:blank";
+  $row[4]="INFO:INFO2,UP,cancel:EXIT";
+  $row[5]="LEFT,ENTER,RIGHT";
+  $row[6]="SUBMENU,DOWN,RETURN";
+  $row[7]=":blank,:blank,:blank";
+  $row[8]="d1:1,d2:2,d3:3";
+  $row[9]="d4:4,d5:5,d6:6";
+  $row[10]="d7:7,d8:8,d9:9";
+  $row[11]="MUTE,d0:0,r_tune:PRECH";
+  $row[12]=":blank,:blank,:blank";
+  $row[13]="VOLUP,:blank,ch_up:CHUP";
+  $row[14]=":VOL,:blank,:PROG";
+  $row[15]="VOLDOWN,:blank,ch_down:CHDOWN";
+  $row[16]=":blank,:blank,:blank";
+  $row[17]="rew:REWIND,PLAY,FF";
+  $row[18]="STOP,PAUSE,REC";
+
+  $row[19]="attr rc_iconpath icons/remotecontrol";
+  $row[20]="attr rc_iconprefix black_btn_";
+  return @row;
 }
 
 sub VIERA_BuildXML_NetCtrl($$){
