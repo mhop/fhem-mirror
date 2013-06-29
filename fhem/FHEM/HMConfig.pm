@@ -345,6 +345,7 @@ my %culHmRegDefine = (
 # addr Dec!!
 # SEC-WM55 02:01 (AES on?)
 # SEC-WDS  02:01 16:01(sabotage) ?
+# HM-SEC-MDIR  02:01 ?
 # SEC-SC   02:00 ?
 # Blind     9:00 10:00 20:00
 # BL1TPBU  02:01 21:FF
