@@ -691,22 +691,23 @@ FW_makeTable($$$@)
     if($n eq "DEF" && !$FW_hiddenroom{input}) {
       FW_makeEdit($name, $n, $val);
 
-    } else {
+    } 
+	else {
 
       FW_pO "<td><div class=\"dname\">$n</div></td>";
-      if(ref($val)) {
+      if(ref($val)) {#handle readings
         my ($v, $t) = ($val->{VAL}, $val->{TIME});
         $v = FW_htmlEscape($v);
         if($FW_ss) {
           $t = ($t ? "<br><div class=\"tiny\">$t</div>" : "");
           FW_pO "<td><div class=\"dval\">$v$t</div></td>";
-
-        } else {
+        } else {		
           $t = "" if(!$t);
           FW_pO "<td><div id=\"$name-$n\">$v</div></td>";
           FW_pO "<td><div id=\"$name-$n-ts\">$t</div></td>";
         }
-      } else {
+      } 
+	  else {
         $val = FW_htmlEscape($val);
 		# if possible provide link to reference
 		if ($n eq "room"){
@@ -716,6 +717,13 @@ FW_makeTable($$$@)
 		        .join(",",@tmp)
 		        ."</div></td>";	
 		}
+		elsif ($n eq "webCmd"){
+		  my @tmp;
+          push @tmp,FW_pH("cmd.$name=set $name $_&detail=$name" , $_ ,0,"",1,1)foreach(split(":",$val));
+		  FW_pO "<td><div id=\"$name-$n\">"
+		       .join(":",@tmp)
+		       ."</div></td>";	
+		}	
 		elsif ($n =~ m/^fp_(.*)/ && $defs{$1}){#special for Floorplan
 		  FW_pH "detail=$1", $val,1;
 		}
