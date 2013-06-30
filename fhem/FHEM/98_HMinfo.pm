@@ -480,7 +480,7 @@ sub HMinfo_SetFnDly($) {#######################################################
 						 ;
   }
   else{
-	$ret = " Unknown argument ";
+	return "autoReadReg clear configCheck param peerCheck peerXref protoEvents models regCheck register rssi saveConfig update";
   }
   return $ret;
 }

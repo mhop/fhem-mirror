@@ -826,6 +826,11 @@ $culHmModelSets{"HM-RC-19-SW"} = $culHmModelSets{"HM-RC-19"};
 #%{$culHmModelSets{"HM-RC-19-SW"}} = %{$culHmModelSets{"HM-RC-19"}}; copy
 
 my %culHmChanSets = (
+  "HM-CC-TC00"     =>{ "day-temp"     => "[on,off,6.0..30.0]",
+                       "night-temp"   => "[on,off,6.0..30.0]",
+                       "party-temp"   => "[on,off,6.0..30.0]",
+                       "desired-temp" => "[on,off,6.0..30.0]", 
+                       sysTime        => ""	  },
   "HM-CC-TC02"     =>{ peerChan       => "<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]",
                        "day-temp"     => "[on,off,6.0..30.0]",
                        "night-temp"   => "[on,off,6.0..30.0]",
@@ -843,14 +848,13 @@ my %culHmChanSets = (
                        displayTempUnit => "[celsius|fahrenheit]",
                        controlMode    => "[manual|auto|central|party]",
                        decalcDay      => "day",       
-                       sysTime        =>	""	  },
+                       sysTime        => ""	  },
   "HM-SEC-WIN01"   =>{ stop         =>"",
                        level        =>"<level> <relockDly> <speed>..."},
   "HM-OU-CFM-PL01" =>{ led       => "<color>[,<color>...] [<repeat>]"},
   "HM-OU-CFM-PL02" =>{ playTone  => "<MP3No>[,<MP3No>...] [<repeat>]"}
 );
 # clones- - - - - - - - - - - - - - - - - 
-$culHmChanSets{"HM-CC-TC00"}     = $culHmChanSets{"HM-CC-TC02"};
 $culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};
 
 # RC send BCAST to specific address. Is the meaning understood?

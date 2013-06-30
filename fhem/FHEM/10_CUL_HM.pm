@@ -1840,8 +1840,7 @@ sub CUL_HM_Set($@) {
 
   #convert 'old' commands to current methodes like regSet and regBulk...
   # Unify the interface
-  if($cmd =~ m/^(displayMode|displayTemp|controlMode|decalcDay|displayTempUnit)$/ ||
-     $cmd =~ m/^(day|night|party)-temp$/){ #
+  if($cmd =~ m/^(day|night|party)-temp$/){ #
 	splice @a,1,0,"regSet";# make hash,regSet,reg,value
     ($chn,$isChannel) = ("02","true");#force chn 02
   }
@@ -2384,8 +2383,8 @@ sub CUL_HM_Set($@) {
     return "To many arguments, max is 24 pairs" if(@a > 50);
     return "Bad format, use HH:MM TEMP ..."     if(@a % 2);
     return "Last time spec must be 24:00"       if($a[@a-2] ne "24:00");
-    my $data = "";
-    my $msg = "";
+	
+    my ($data,$msg) = ("","");
     for(my $idx = 2; $idx < @a; $idx += 2) {
       return "$a[$idx] is not in HH:MM format"
                                 if($a[$idx] !~ m/^([0-2]\d):([0-5]\d)/);
