@@ -61,14 +61,13 @@ Ext.define('FHEM.controller.ChartController', {
                ref: 'linecharttoolbar' //this.getLinecharttoolbar()
            },
            {
-               selector: 'grid[name=savedchartsgrid]',
-               ref: 'savedchartsgrid' //this.getSavedchartsgrid()
-           },
-           {
                selector: 'grid[name=chartdata]',
                ref: 'chartdatagrid' //this.getChartdatagrid()
+           },
+           {
+               selector: 'panel[name=maintreepanel]',
+               ref: 'maintreepanel' //this.getMaintreepanel()
            }
-           
     ],
 
     /**
@@ -91,14 +90,19 @@ Ext.define('FHEM.controller.ChartController', {
             'button[name=resetchartform]': {
                 click: this.resetFormFields
             },
-            'grid[name=savedchartsgrid]': {
-                cellclick: this.loadsavedchart
-            },
-            'actioncolumn[name=savedchartsactioncolumn]': {
+            'menuitem[name=deletechartfromcontext]': {
                 click: this.deletechart
             },
+            'menuitem[name=renamechartfromcontext]': {
+                click: this.renamechart
+            },
+            'treepanel[name=maintreepanel]': {
+                itemclick: this.loadsavedchart
+            },
+            'treeview': {
+                drop: this.movenodeintree
+            },
             'grid[name=chartdata]': {
-//                itemmouseenter: this.highlightRecordInChart
                 itemclick: this.highlightRecordInChart
             },
             'panel[name=chartpanel]': {
@@ -511,7 +515,8 @@ Ext.define('FHEM.controller.ChartController', {
                                         
                                         var existingwins = Ext.ComponentQuery.query('window[name=statisticswin]'),
                                             matchfound = false,
-                                            lastwin;
+                                            lastwin,
+                                            win;
                                         if (existingwins.length > 0) {
                                             Ext.each(existingwins, function(existingwin) {
                                                 lastwin = existingwin;
@@ -522,7 +527,7 @@ Ext.define('FHEM.controller.ChartController', {
                                                 } 
                                             });
                                             if (!matchfound) {
-                                                var win = Ext.create('Ext.window.Window', {
+                                                win = Ext.create('Ext.window.Window', {
                                                     width: winwidth,
                                                     height: winheight,
                                                     html: html,
@@ -535,7 +540,7 @@ Ext.define('FHEM.controller.ChartController', {
                                                 win.showAt(chart.getWidth() - 145, lastwin.getPosition()[1] + lastwin.getHeight());
                                             }
                                         } else {
-                                            var win = Ext.create('Ext.window.Window', {
+                                            win = Ext.create('Ext.window.Window', {
                                                 width: winwidth,
                                                 height: winheight,
                                                 html: html,
@@ -1161,6 +1166,19 @@ Ext.define('FHEM.controller.ChartController', {
     saveChartData: function() {
         
         var me = this;
+        
+        //get available foldernames
+//        var rootNode = me.getMaintreepanel().getRootNode(),
+//            folderArray = [];
+//        rootNode.cascadeBy(function(node) {
+//           if (node.get('leaf') === false) {
+//               if (node.get('text') !== 'root') {
+//                   folderArray.push(node.get('text'));
+//               }
+//           }
+//        });
+//        console.log(folderArray);
+        
         Ext.Msg.prompt("Select a name", "Enter a name to save the Chart", function(action, savename) {
             if (action === "ok" && !Ext.isEmpty(savename)) {
                 //replacing spaces in name
@@ -1301,7 +1319,7 @@ Ext.define('FHEM.controller.ChartController', {
                         chart.setLoading(false);
                         var json = Ext.decode(response.responseText);
                         if (json.success === "true" || json.data && json.data.length === 0) {
-                            me.getSavedchartsgrid().getStore().load();
+                            me.getMaintreepanel().fireEvent("treeupdated");
                             Ext.Msg.alert("Success", "Chart successfully saved!");
                         } else if (json.msg) {
                             Ext.Msg.alert("Error", "The Chart could not be saved, error Message is:<br><br>" + json.msg);
@@ -1326,13 +1344,11 @@ Ext.define('FHEM.controller.ChartController', {
     /**
      * loading saved chart data and trigger the load of the chart
      */
-    loadsavedchart: function(grid, td, cellIndex, record) {
-
+    loadsavedchart: function(treeview, record) {
         var me = this;
-        
-        if (cellIndex === 0) {
-            var name = record.get('NAME'),
-                chartdata = record.get('VALUE');
+        if (record.raw.data && record.raw.data.TYPE && record.raw.data.TYPE === "savedchart") {
+            var name = record.raw.data.NAME,
+                chartdata = record.raw.data.VALUE;
             
             if (typeof chartdata !== "object") {
                 try {
@@ -1498,20 +1514,63 @@ Ext.define('FHEM.controller.ChartController', {
                 this.requestChartData();
                 this.getLinechartpanel().setTitle(name);
             } else {
-                Ext.Msg.alert("Error", "The Chart could not be loaded! RawChartdata was: <br>" + rawchartdata);
+                Ext.Msg.alert("Error", "The Chart could not be loaded! RawChartdata was: <br>" + chartdata);
             }
             
         }
     },
     
     /**
+     * Rename a chart
+     */
+    renamechart: function(menu, e) {
+        var me = this,
+            chartid = menu.record.raw.data.ID,
+            oldchartname = menu.record.raw.data.NAME;
+        
+        Ext.Msg.prompt("Renaming Chart", "Enter a new name for this Chart", function(action, savename) {
+            if (action === "ok" && !Ext.isEmpty(savename)) {
+                //replacing spaces in name
+                savename = savename.replace(/ /g, "_");
+                //replacing + in name
+                savename = savename.replace(/\+/g, "_");
+                
+                var url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+renamechart+""+""+' + savename + '+' + chartid + '&XHR=1'; 
+                
+                Ext.Ajax.request({
+                    method: 'GET',
+                    disableCaching: false,
+                    url: url,
+                    success: function(response){
+                        var json = Ext.decode(response.responseText);
+                        if (json && json.success === "true" || json.data && json.data.length === 0) {
+                            me.getMaintreepanel().fireEvent("treeupdated");
+                            Ext.Msg.alert("Success", "Chart successfully renamed!");
+                        } else if (json && json.msg) {
+                            Ext.Msg.alert("Error", "The Chart could not be renamed, error Message is:<br><br>" + json.msg);
+                        } else {
+                            Ext.Msg.alert("Error", "The Chart could not be renamed!");
+                        }
+                    },
+                    failure: function() {
+                        if (json && json.msg) {
+                            Ext.Msg.alert("Error", "The Chart could not be renamed, error Message is:<br><br>" + json.msg);
+                        } else {
+                            Ext.Msg.alert("Error", "The Chart could not be renamed!");
+                        }
+                    }
+                });
+                
+            }
+        });
+    },
+    
+    /**
      * Delete a chart by its id from the database
      */
-    deletechart: function(grid, td, cellIndex, par, evt, record) {
-        
+    deletechart: function(menu, e) {
         var me = this,
-            chartid = record.get('ID'),
-            chart = this.getChart();
+            chartid = menu.record.raw.data.ID;
         
         if (Ext.isDefined(chartid) && chartid !== "") {
             
@@ -1532,18 +1591,24 @@ Ext.define('FHEM.controller.ChartController', {
                         
                         var url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+deletechart+""+""+' + chartid + '&XHR=1'; 
                     
-                        chart.setLoading(true);
-                        
                         Ext.Ajax.request({
                             method: 'GET',
                             disableCaching: false,
                             url: url,
                             success: function(response){
-                                chart.setLoading(false);
                                 var json = Ext.decode(response.responseText);
                                 if (json && json.success === "true" || json.data && json.data.length === 0) {
-                                    me.getSavedchartsgrid().getStore().load();
+                                    var rootNode = me.getMaintreepanel().getRootNode();
+                                    var deletedNode = rootNode.findChildBy(function(rec) {
+                                        if (rec.raw.data && rec.raw.data.ID === chartid) {
+                                            return true;
+                                        }
+                                    }, this, true);
+                                    if (deletedNode) {
+                                        deletedNode.destroy();
+                                    }
                                     Ext.Msg.alert("Success", "Chart successfully deleted!");
+                                    
                                 } else if (json && json.msg) {
                                     Ext.Msg.alert("Error", "The Chart could not be deleted, error Message is:<br><br>" + json.msg);
                                 } else {
@@ -1552,7 +1617,6 @@ Ext.define('FHEM.controller.ChartController', {
                                 btn.up().up().destroy();
                             },
                             failure: function() {
-                                chart.setLoading(false);
                                 if (json && json.msg) {
                                     Ext.Msg.alert("Error", "The Chart could not be deleted, error Message is:<br><br>" + json.msg);
                                 } else {
@@ -1682,6 +1746,61 @@ Ext.define('FHEM.controller.ChartController', {
                 highlightSprite.sprite.attr.radius = 10;
                 this.getChart().redraw();
             }
+        }
+    },
+    
+    /**
+     * handling the moving of nodes in tree, saving new position of saved charts in db
+     */
+    movenodeintree: function(treeview, action, collidatingrecord) {
+        var rec = action.records[0],
+            id = rec.raw.data.ID;
+        
+        if (rec.raw.data && rec.raw.data.ID && rec.raw.data.TYPE === "savedchart") {
+            var rootNode = this.getMaintreepanel().getRootNode();
+            rootNode.cascadeBy(function(node) {
+                if (node.raw && node.raw.data && node.raw.data.ID && node.raw.data.ID === id) {
+                    //updating whole folder to get indexes right
+                    Ext.each(node.parentNode.childNodes, function(node) {
+                        var ownerfolder = node.parentNode.data.text,
+                        index = node.parentNode.indexOf(node);
+                        
+            
+                        if (node.raw.data && node.raw.data.ID && node.raw.data.VALUE) {
+                            var chartid = node.raw.data.ID,
+                                chartconfig = node.raw.data.VALUE;
+                            chartconfig.parentFolder = ownerfolder;
+                            chartconfig.treeIndex = index;
+                            var encodedchartconfig = Ext.encode(chartconfig),
+                                url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+updatechart+""+""+' + chartid + '+' + encodedchartconfig + '&XHR=1'; 
+                            
+                            Ext.Ajax.request({
+                                method: 'GET',
+                                disableCaching: false,
+                                url: url,
+                                success: function(response){
+                                    var json = Ext.decode(response.responseText);
+                                    if (json && json.success === "true" || json.data && json.data.length === 0) {
+                                        //be quiet
+                                    } else if (json && json.msg) {
+                                        Ext.Msg.alert("Error", "The new position could not be saved, error Message is:<br><br>" + json.msg);
+                                    } else {
+                                        Ext.Msg.alert("Error", "The new position could not be saved!");
+                                    }
+                                },
+                                failure: function() {
+                                    if (json && json.msg) {
+                                        Ext.Msg.alert("Error", "The new position could not be saved, error Message is:<br><br>" + json.msg);
+                                    } else {
+                                        Ext.Msg.alert("Error", "The new position could not be saved!");
+                                    }
+                                }
+                            });
+                        }
+                        
+                    });
+                }
+            });
         }
     }
 });

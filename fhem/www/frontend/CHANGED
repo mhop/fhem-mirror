@@ -1,3 +1,9 @@
+Update vom 30.6.2013
+  * Charts nun im Tree
+  * Tree sortierbar
+  * Kontextmenü im Tree
+  * Iframe für FHEM Frontend
+  * Rest siehe Thread im Forum
 Update vom 27.6.2013
   * "Database Tables" können jetzt über Zeit und Parameter konkretisiert werden
   * Bug aus Zeitsprüngen entfernt, damit zwischen Monatswechsel Datum korrekt angezeigt wird

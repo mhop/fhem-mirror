@@ -27,10 +27,6 @@ Ext.define('FHEM.controller.MainController', {
            {
                selector: 'textfield[name=commandfield]',
                ref: 'commandfield' //this.getCommandfield()
-           },
-           {
-               selector: 'grid[name=savedchartsgrid]',
-               ref: 'savedchartsgrid' //this.getSavedchartsgrid()
            }
     ],
 
@@ -42,14 +38,15 @@ Ext.define('FHEM.controller.MainController', {
             'viewport[name=mainviewport]': {
                 afterrender: this.viewportRendered
             },
-            'panel[name=linechartaccordionpanel]': {
-                expand: this.showLineChartPanel
+            'panel[name=fhemaccordion]': {
+                expand: this.showFHEMPanel
             },
             'panel[name=tabledataaccordionpanel]': {
                 expand: this.showDatabaseTablePanel
             },
             'treepanel[name=maintreepanel]': {
-                itemclick: this.showDevicePanel
+                itemclick: this.showDeviceOrChartPanel,
+                treeupdated: this.setupTree
             },
             'textfield[name=commandfield]': {
                 specialkey: this.checkCommand
@@ -65,8 +62,13 @@ Ext.define('FHEM.controller.MainController', {
             },
             'button[name=restartfhem]': {
                 click: this.restartFhem
+            },
+            'button[name=unsortedtree]': {
+                click: this.setupTree
+            },
+            'button[name=sortedtree]': {
+                click: this.setupTree
             }
-        
         });
     },
     
@@ -86,43 +88,123 @@ Ext.define('FHEM.controller.MainController', {
             remove: false
         });
         
-        //load the saved charts store with configured dblog name
-        var store = this.getSavedchartsgrid().getStore();
-        store.getProxy().url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+getcharts&XHR=1';
-        store.load();
-        
         if (Ext.isDefined(FHEM.version)) {
             var sp = this.getStatustextfield();
             sp.setText(FHEM.version + "; Frontend Version: 0.8 - 2013-06-27");
         }
         
-        //setup west accordion / treepanel
-        var wp = this.getWestaccordionpanel(),
-            rootNode = { text:"root", expanded: true, children: []};
+        this.setupTree(false);
+    },
+    
+    /**
+     * setup west accordion / treepanel
+     */
+    setupTree: function(unsorted) {
+        var me = this,
+            rootNode = { text:"root", expanded: true, children: []},
+            oldRootNode = me.getMaintreepanel().getRootNode();
         
-        Ext.each(FHEM.info.Results, function(result) {
-            
-            if (result.list && !Ext.isEmpty(result.list)) {
-                
-                if (result.devices && result.devices.length > 0) {
-                    node = {text: result.list, expanded: true, children: []};
-                    
-                    Ext.each(result.devices, function(device) {
-                        
-                        var subnode = {text: device.NAME, leaf: true, data: device};
-                        node.children.push(subnode);
-                        
-                    }, this);
-                } else {
-                    node = {text: result.list, leaf: true};
+        //first cleanup
+        if (oldRootNode) {
+            oldRootNode.removeAll();
+        }
+        if (unsorted && unsorted.name === 'unsortedtree') {
+            //setup the tree "unsorted"
+            Ext.each(FHEM.info.Results, function(result) {
+                if (result.list && !Ext.isEmpty(result.list)) {
+                    if (result.devices && result.devices.length > 0) {
+                        var blacklist = ['dummy', 'notify', 'Global', 'telnet', 'DbLog', 'FileLog', 'FHEMWEB', 'weblink'];
+                        if (Ext.Array.contains(blacklist, result.list)) {
+                            node = {text: result.list, expanded: false, children: []};
+                        } else {
+                            node = {text: result.list, expanded: true, children: []};
+                        }
+                        Ext.each(result.devices, function(device) {
+                            var subnode = {text: device.NAME, leaf: true, data: device};
+                            node.children.push(subnode);
+                        }, this);
+                    } else {
+                        node = {text: result.list, leaf: true};
+                    }
+                    rootNode.children.push(node);
                 }
+            });
+            this.getMaintreepanel().setRootNode(rootNode);
+            this.addChartsToTree();
+        } else {
+            //sort / create items by room
+            me.getMaintreepanel().setRootNode(rootNode);
+            var root = me.getMaintreepanel().getRootNode();
+            Ext.each(FHEM.info.Results, function(result) {
+                if (result.list && !Ext.isEmpty(result.list)) {
+                    if (result.devices && result.devices.length > 0) {
+                        Ext.each(result.devices, function(device) {
+                            if (device.ATTR && device.ATTR.room) {
+                                //check if room exists
+                                var resultnode = root.findChild("text", device.ATTR.room, true),
+                                    subnode = {text: device.NAME, leaf: true, data: device};
+                                if (!resultnode) {
+                                    //create roomfolder
+                                    var roomfolder;
+                                    if (device.ATTR.room !== "hidden") {
+                                        roomfolder = {text: device.ATTR.room, leaf: false, expanded: true, children: []};
+                                        roomfolder.children.push(subnode);
+                                        root.appendChild(roomfolder);
+                                    }
+                                } else {
+                                    resultnode.appendChild(subnode);
+                                    root.appendChild(resultnode);
+                                }
+                            }
+                        }, this);
+                    } else {
+                        node = {text: result.list, leaf: true};
+                        root.appendChild(node);
+                    }
+                }
+            });
+            this.addChartsToTree();
+        }
+    },
+    
+    /**
+     * 
+     */
+    addChartsToTree: function() {
+      //load the saved charts store with configured dblog name
+        var me = this,
+            store = Ext.create('FHEM.store.SavedChartsStore', {});
+        store.getProxy().url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+getcharts&XHR=1';
+        store.load();
+        //add the charts to the tree
+        store.on("load", function() {
+            var rootNode = me.getMaintreepanel().getRootNode(),
+                chartfolder = {text: "Charts", expanded: true, children: []};
+            rootNode.appendChild(chartfolder);
+            var chartfoldernode = rootNode.findChild("text", "Charts", true);
             
-                rootNode.children.push(node);
+            store.each(function(rec) {
+                var chartchild,
+                    unsortedMode = Ext.ComponentQuery.query('button[name=unsortedtree]')[0].pressed;
                 
-            }
+                if (!unsortedMode && rec.raw && rec.raw.VALUE && rec.raw.VALUE.parentFolder) {
+                    var ownerFolder = rec.raw.VALUE.parentFolder,
+                        index = rec.raw.VALUE.treeIndex,
+                        parentNode = rootNode.findChild("text", ownerFolder, true);
+                    
+                    chartchild = {text: rec.raw.NAME, leaf: true, data: rec.raw, iconCls:'x-tree-icon-leaf-chart'};
+                    if (parentNode === null) {
+                        rootNode.insertChild(index, chartchild);
+                    } else {
+                        parentNode.insertChild(index, chartchild);
+                    }
+                } else {
+                    chartchild = {text: rec.raw.NAME, leaf: true, data: rec.raw, iconCls:'x-tree-icon-leaf-chart'};
+                    chartfoldernode.appendChild(chartchild);
+                }
+            });
+            
         });
-        
-        this.getMaintreepanel().setRootNode(rootNode);
     },
     
     /**
@@ -339,36 +421,82 @@ Ext.define('FHEM.controller.MainController', {
     /**
      * 
      */
-    showDevicePanel: function(view, record) {
-        
-        var title;
-        if (record.raw.ATTR && record.raw.ATTR.alias && !Ext.isEmpty(record.raw.ATTR.alias)) {
-            title = record.raw.data.ATTR.alias;
+    showDeviceOrChartPanel: function(treeview, rec) {
+        var me = this;
+        if (rec.get('leaf') === true && 
+            rec.raw.data &&
+            rec.raw.data.TYPE && 
+            rec.raw.data.TYPE === "savedchart") {
+                var lcp = Ext.ComponentQuery.query('linechartpanel')[0];
+                if (!lcp || lcp.isVisible === false) {
+                    this.showLineChartPanel();
+                }
         } else {
-            title = record.raw.data.NAME;
+            this.showDevicePanel(treeview, rec);
         }
+    },
+    
+    /**
+     * 
+     */
+    showFHEMPanel: function() {
         var panel = {
-            xtype: 'devicepanel',
-            title: title,
+            xtype: 'panel',
+            title: 'FHEM',
             region: 'center',
             layout: 'fit',
-            record: record,
-            hidden: true
+            hidden: false,
+            items : [
+                {
+                    xtype : 'component',
+                    autoEl : {
+                        tag : 'iframe',
+                        src : '../../fhem?'
+                    }
+                }
+            ]
         };
         this.destroyCenterPanels();
         this.getMainviewport().add(panel);
+    },
+    
+    /**
+     * 
+     */
+    showDevicePanel: function(view, record) {
         
-        var createdpanel = this.getMainviewport().down('devicepanel');
-        
-        createdpanel.getEl().setOpacity(0);
-        createdpanel.show();
-        
-        createdpanel.getEl().animate({
-            opacity: 1, 
-            easing: 'easeIn',
-            duration: 500,
-            remove: false
-        });
+        if (record.raw.leaf === true) {
+            var title;
+            if (record.raw.ATTR && 
+                record.raw.ATTR.alias && 
+                !Ext.isEmpty(record.raw.ATTR.alias)) {
+                    title = record.raw.data.ATTR.alias;
+            } else {
+                title = record.raw.data.NAME;
+            }
+            var panel = {
+                xtype: 'devicepanel',
+                title: title,
+                region: 'center',
+                layout: 'fit',
+                record: record,
+                hidden: true
+            };
+            this.destroyCenterPanels();
+            this.getMainviewport().add(panel);
+            
+            var createdpanel = this.getMainviewport().down('devicepanel');
+            
+            createdpanel.getEl().setOpacity(0);
+            createdpanel.show();
+            
+            createdpanel.getEl().animate({
+                opacity: 1, 
+                easing: 'easeIn',
+                duration: 500,
+                remove: false
+            });
+        }
         
     },
     

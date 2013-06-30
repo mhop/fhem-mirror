@@ -99,61 +99,90 @@ Ext.define('FHEM.view.Viewport', {
                 }, {
                     region: 'west',
                     title: 'Navigation',
-                    width: 270,
+                    width: 300,
                     autoScroll: true,
                     resizable: true,
                     xtype: 'panel',
                     name: 'westaccordionpanel',
-                    layout: 'accordion',
+                    layout: {
+                        type: 'accordion'
+                    },
                     items: [
                         {
                             xtype: 'panel',
-                            title: 'FHEM Devices',
+                            title: 'FHEM',
+                            name: 'fhemaccordion',
+                            collapsed: true,
+                            bodyPadding: '5 5 5 5',
+                            html: 'You can see and use the original FHEM Frontend here. <br> If you make changes to your config, it may be neccessary to reload this page to get the updated information.'
+                        },
+                        {
+                            xtype: 'panel',
+                            title: 'Charts / Devices / Rooms',
                             name: 'devicesaccordion',
+                            width: '90%',
                             collapsed: false,
-                            autoScroll: true,
+//                            autoScroll: true,
+                            overflowY: 'auto',
+                            bodyPadding: '2 2 2 2',
                             items: [
                                 {
                                     xtype: 'treepanel',
                                     name: 'maintreepanel',
+                                    border: false,
                                     rootVisible: false,
+                                    viewConfig: {
+                                        plugins: { ptype: 'treeviewdragdrop' }
+                                    },
                                     root: { 
                                         "text": "Root", 
                                         "expanded": 
                                         "true", 
                                         "children": []
-                                    }
-                                }
-                            ]
-                        },
-                        {
-                            xtype: 'panel',
-                            title: 'LineChart',
-                            name: 'linechartaccordionpanel',
-                            autoScroll: true,
-                            layout: 'fit',
-                            items: [
-                                {
-                                    xtype: 'grid',
-                                    columns: [
-                                         { 
-                                             header: 'Saved Charts', 
-                                             dataIndex: 'NAME', 
-                                             width: '80%'
-                                         },
-                                         {
-                                             xtype:'actioncolumn',
-                                             name: 'savedchartsactioncolumn',
-                                             width:'15%',
-                                             items: [{
-                                                 icon: 'lib/ext-4.2.0.663/images/dd/drop-no.gif',
-                                                 tooltip: 'Delete'
-                                             }]
-                                         }
+                                    },
+                                    tbar: [
+                                        { 
+                                            xtype: 'button', 
+                                            name: 'unsortedtree',
+                                            toggleGroup: 'treeorder',
+                                            allowDepress: false,
+                                            text: 'Unsorted'
+                                        },
+                                        { 
+                                            xtype: 'button', 
+                                            name: 'sortedtree',
+                                            toggleGroup: 'treeorder',
+                                            allowDepress: false,
+                                            text: 'Order by Room',
+                                            pressed: true
+                                        }
                                     ],
-                                    store: Ext.create('FHEM.store.SavedChartsStore', {}),
-                                    name: 'savedchartsgrid'
-                                    
+                                    listeners: {
+                                        'itemcontextmenu': function(scope, rec, item, index, e, eOpts) {
+                                            e.preventDefault();
+                                            
+                                            if (rec.raw.data.TYPE && rec.raw.data.TYPE === "savedchart") {
+                                                var menu = Ext.ComponentQuery.query('menu[id=treecontextmenu]')[0];
+                                                if (menu) {
+                                                    menu.destroy();
+                                                }
+                                                Ext.create('Ext.menu.Menu', {
+                                                    id: 'treecontextmenu',
+                                                    items: [
+                                                        {
+                                                            text: 'Delete Chart',
+                                                            name: 'deletechartfromcontext',
+                                                            record: rec
+                                                        }, '-', {
+                                                            text: 'Rename Chart',
+                                                            name: 'renamechartfromcontext',
+                                                            record: rec
+                                                        }
+                                                    ]
+                                                }).showAt(e.xy);
+                                            }
+                                        }
+                                    }
                                 }
                             ]
                         },
@@ -161,7 +190,9 @@ Ext.define('FHEM.view.Viewport', {
                             xtype: 'panel',
                             title: 'Database Tables',
                             name: 'tabledataaccordionpanel',
-                            autoScroll: true
+                            autoScroll: true,
+                            bodyPadding: '5 5 5 5',
+                            html: 'You can search your database here. <br> Specify your queries by selecting a specific device, reading and timerange.'
                         }
                     ]
                 }, 
