@@ -29,7 +29,7 @@ DIR www/frontend/lib/ext-4.2.0.663/images/window
 DIR www/frontend/lib/ext-4.2.0.663/images/grid
 DIR www/frontend/lib/ext-4.2.0.663/images/util
 DIR www/frontend/lib/ext-4.2.0.663/images/util/splitter
-UPD 2013-04-26_05:06:42 899 www/frontend/index.html
+UPD 2013-06-30_11:46:26 988 www/frontend/index.html
 UPD 2013-04-01_07:03:30 260475 www/frontend/lib/ext-4.2.0.663/ext-theme-gray-all.css
 UPD 2013-04-01_07:03:30 1434875 www/frontend/lib/ext-4.2.0.663/ext-all.js
 UPD 2013-04-01_07:03:33 1981 www/frontend/lib/ext-4.2.0.663/images/tools/tools-sprites-trans.gif
@@ -263,6 +263,7 @@ UPD 2013-04-03_07:27:17 781 www/frontend/app/resources/icons/accept.png
 UPD 2013-03-02_01:53:05 626 www/frontend/app/resources/icons/readme.txt
 UPD 2013-04-03_07:27:17 715 www/frontend/app/resources/icons/delete.png
 UPD 2013-03-02_01:53:05 755 www/frontend/app/resources/icons/database_save.png
+UPD 2013-06-30_11:47:24 541 www/frontend/app/resources/icons/chart_bar.png
 UPD 2013-03-02_01:53:05 395 www/frontend/app/resources/icons/resultset_next.png
 UPD 2013-03-02_01:53:05 700 www/frontend/app/resources/icons/stop.png
 UPD 2013-04-03_07:27:17 345 www/frontend/app/resources/icons/arrow_left.png
@@ -270,15 +271,16 @@ UPD 2013-03-02_01:53:05 770 www/frontend/app/resources/icons/database_refresh.pn
 UPD 2013-03-02_01:53:05 524 www/frontend/app/resources/icons/resultset_last.png
 UPD 2013-04-03_07:27:17 733 www/frontend/app/resources/icons/add.png
 UPD 2013-04-03_07:27:17 389 www/frontend/app/resources/icons/resultset_previous.png
+UPD 2013-06-30_11:47:12 101 www/frontend/app/resources/application.css
 UPD 2013-06-27_09:34:38 2201 www/frontend/app/app.js
 UPD 2013-05-01_05:10:56 27200 www/frontend/app/view/LineChartPanel.js
 UPD 2013-04-28_02:00:20 1205 www/frontend/app/view/ChartGridPanel.js
 UPD 2013-04-03_07:26:40 15793 www/frontend/app/view/DevicePanel.js
-UPD 2013-05-01_05:10:56 8782 www/frontend/app/view/Viewport.js
+UPD 2013-06-30_11:47:44 11076 www/frontend/app/view/Viewport.js
 UPD 2013-06-27_09:35:22 10042 www/frontend/app/view/TableDataGridPanel.js
-UPD 2013-06-27_09:34:51 77454 www/frontend/app/controller/ChartController.js
-UPD 2013-06-27_09:34:52 13004 www/frontend/app/controller/MainController.js
-UPD 2013-06-27_09:34:52 5414 www/frontend/app/controller/TableDataController.js
+UPD 2013-06-30_11:46:54 83500 www/frontend/app/controller/ChartController.js
+UPD 2013-06-30_11:46:54 18379 www/frontend/app/controller/MainController.js
+UPD 2013-06-30_11:46:54 5415 www/frontend/app/controller/TableDataController.js
 UPD 2013-04-01_07:04:35 202 www/frontend/app/model/ReadingsModel.js
 UPD 2013-04-01_07:04:36 338 www/frontend/app/model/SavedChartsModel.js
 UPD 2013-04-01_07:04:34 11535 www/frontend/app/model/ChartModel.js

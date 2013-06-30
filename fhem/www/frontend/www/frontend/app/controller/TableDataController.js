@@ -121,7 +121,7 @@ Ext.define('FHEM.controller.TableDataController', {
                 } else {
                     url += operation.start + "+";
                 }
-                url += operation.limit + "&XHR=1"
+                url += operation.limit + "&XHR=1";
                 
                 if (operation.request) {
                     operation.request.url = url;
