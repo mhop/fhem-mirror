@@ -473,6 +473,7 @@ HUEBridge_HTTP_Request($$$@)
   <ul>
     <li>This module needs <code>JSON</code>.<br>
         Pleease install with '<code>cpan install JSON</code>' or your method of choice.</li>
+    <li>autocreate only works for the first bridge. devices on other bridges have to be manualy defined.</li>
   </ul>
 
 
