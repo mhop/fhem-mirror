@@ -125,7 +125,8 @@ FHEMWEB_Initialize($)
 
   ###############
   # Initialize internal structures
-  map { addToAttrList($_) } ( "webCmd", "icon", "devStateIcon", "sortby", "devStateStyle");
+  map { addToAttrList($_) } ( "webCmd", "icon", "devStateIcon",
+                                "sortby", "devStateStyle");
   InternalTimer(time()+60, "FW_closeOldClients", 0, 0);
   
   $FW_dir      = "$attr{global}{modpath}/www";
@@ -2079,9 +2080,9 @@ FW_makeImage(@)
       if($col) {
         $col =~ s/@//;
         $col = "#$col" if($col =~ m/^([A-F0-9]{6})$/);
-        $data =~ s/fill="#000000"/fill="$col"/;
+        $data =~ s/fill="#000000"/fill="$col"/g;
       } else {
-        $data =~ s/fill="#000000"//;
+        $data =~ s/fill="#000000"//g;
       }
       return $data;
     } else {
@@ -2263,7 +2264,7 @@ FW_dev2image($)
   if(defined($devStateIcon) && $devStateIcon =~ m/^{.*}$/) {
     my ($html, $link) = eval $devStateIcon;
     Log 1, "devStateIcon $name: $@" if($@);
-    return ($html, $link, 1) if(defined($html) && $html =~ m/^<.*>$/);
+    return ($html, $link, 1) if(defined($html) && $html =~ m/^<.*>$/s);
     $devStateIcon = $html;
   }
 
