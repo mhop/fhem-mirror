@@ -1,8 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: updateInBackground global attribute
   - feature: SYSSTAT: allow stateFormat
-  - feature: Module 70_VIERA supports now module 95_remotecontrol with own layout
-             for VIERA TV
+  - feature: Module 70_VIERA supports now module 95_remotecontrol with own
+             layout for VIERA TV
   - feature: InternalVal function added (like ReadingsVal)
   - feature: new module speedtest to monitor internet connection speed with
              speedtest-cli

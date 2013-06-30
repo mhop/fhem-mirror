@@ -27,6 +27,7 @@ use strict;
 use warnings;
 use HttpUtils;
 use File::Copy qw(cp mv);
+use Blocking;
 
 sub CommandUpdate($$);
 sub update_CheckFhemRelease($$$);
@@ -192,17 +193,59 @@ CommandUpdate($$)
     ($notice,$unconfirmed) = update_CheckNotice($BRANCH,$update,"before");
     $ret .= $notice if(defined($notice));
     return $ret if($unconfirmed);
-    $ret .= update_DoUpdate($srcdir,$BRANCH,$update,$force,$cl);
-    ($notice,$unconfirmed) = update_CheckNotice($BRANCH,$update,"after");
-    $ret .= $notice if(defined($notice));
-    my $sendStatistics = AttrVal("global","sendStatistics",undef);
-    if(defined($sendStatistics) && lc($sendStatistics) eq "onupdate") {
-      $ret .= "\n\n";
-      $ret .= AnalyzeCommandChain(undef, "fheminfo send");
+
+    if(AttrVal("global","updateInBackground",undef)) {
+      CallFn($cl->{NAME}, "ActivateInformFn", $cl);
+      BlockingCall("update_DoUpdateInBackground", {srcdir=>$srcdir,
+                      BRANCH=>$BRANCH, update=>$update, force=>$force,cl=>$cl});
+      $ret = "Executing the update the background.";
+
+    } else {
+      $ret .= update_DoUpdate($srcdir,$BRANCH,$update,$force,$cl);
+      ($notice,$unconfirmed) = update_CheckNotice($BRANCH,$update,"after");
+      $ret .= $notice if(defined($notice));
+      my $sendStatistics = AttrVal("global","sendStatistics",undef);
+      if(defined($sendStatistics) && lc($sendStatistics) eq "onupdate") {
+        $ret .= "\n\n";
+        $ret .= AnalyzeCommandChain(undef, "fheminfo send");
+      }
     }
+
   }
 
   return $ret;
+}
+
+my $inLog = 0;
+sub
+update_Log2Event($$)
+{
+  my ($level, $text) = @_;
+  return if($inLog || $level > $attr{global}{verbose});
+  $inLog = 1;
+  BlockingInformParent("DoTrigger", ["global", $text, 1], 0);
+  BlockingInformParent("Log", [$level, $text], 0);
+  $inLog = 0;
+}
+
+sub
+update_DoUpdateInBackground($)
+{
+  my ($h) = @_;
+
+  no warnings 'redefine'; # The main process is not affected
+  *Log = \&update_Log2Event;
+  sleep(2); # Give time for ActivateInform / FHEMWEB / JavaScript
+
+  my $ret = update_DoUpdate($h->{srcdir}, $h->{BRANCH}, $h->{update},
+                            $h->{force}, $h->{cl});
+  my ($notice,$unconfirmed) =
+            update_CheckNotice($h->{BRANCH}, $h->{update}, "after");
+  $ret .= $notice if(defined($notice));
+  if(lc(AttrVal("global","sendStatistics","")) eq "onupdate") {
+    $ret .= "\n\n";
+    $ret .= AnalyzeCommandChain(undef, "fheminfo send");
+  }
 }
 
 ########################################

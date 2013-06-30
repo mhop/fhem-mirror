@@ -167,6 +167,7 @@ use vars qw(%data);		# Hash for user data
 use vars qw($devcount);	        # To sort the devices
 use vars qw(%defaultattr);    	# Default attributes, used by FHEM2FHEM
 use vars qw(%addNotifyCB);	# Used by event enhancers (e.g. avarage)
+use vars qw(%inform);	        # Used by telnet_ActivateInform
 
 use vars qw($reread_active);
 
@@ -177,7 +178,6 @@ my $ipv6;			# Using IPV6
 my $currlogfile;		# logfile, without wildcards
 my $currcfgfile="";		# current config/include file
 my $logopened = 0;              # logfile opened or using stdout
-my %inform;			# Inform hash
 my $rcvdquit;			# Used for quit handling in init files
 my $sig_term = 0;		# if set to 1, terminate (saving the state)
 my %intAt;			# Internal at timer hash.
@@ -207,7 +207,7 @@ $modules{Global}{AttrList} =
   "autoload_undefined_devices:1,0 dupTimeout latitude longitude " .
   "backupcmd backupdir backupsymlink backup_before_update " .
   "exclude_from_update motd updatebranch uniqueID ".
-  "sendStatistics:onUpdate,manually,never ".
+  "sendStatistics:onUpdate,manually,never updateInBackground:1,0".
   "showInternalValues:1,0 ";
 $modules{Global}{AttrFn} = "GlobalAttr";
 

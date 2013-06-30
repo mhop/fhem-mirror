@@ -163,6 +163,7 @@ createArchiv($)
   $dateTime =~ s/ /_/g;
   $dateTime =~ s/(:|-)//g;
 
+  my $cmd="";
   if (!defined($backupcmd)) {
     if (lc($symlink) eq "no") {
       $tarOpts = "cf";
@@ -171,10 +172,13 @@ createArchiv($)
     }
 
     # prevents tar's output of "Removing leading /" and return total bytes of archive
-    $ret = `(tar -$tarOpts - @pathname | gzip > $backupdir/FHEM-$dateTime.tar.gz) 2>&1`;
+    $cmd = "tar -$tarOpts - @pathname |gzip > $backupdir/FHEM-$dateTime.tar.gz";
   } else {
-    $ret = `($backupcmd "@pathname") 2>&1`;
+    $ret = "$backupcmd \"@pathname\"";
   }
+  Log 2, "Backup with command: $cmd";
+  $ret = `($cmd) 2>&1`;
+
   if($ret) {
     chomp $ret;
     Log 1, "backup $ret";
