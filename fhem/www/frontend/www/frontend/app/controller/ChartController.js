@@ -1753,54 +1753,60 @@ Ext.define('FHEM.controller.ChartController', {
      * handling the moving of nodes in tree, saving new position of saved charts in db
      */
     movenodeintree: function(treeview, action, collidatingrecord) {
-        var rec = action.records[0],
+        var unsorted = Ext.ComponentQuery.query('treepanel button[name=unsortedtree]')[0].pressed;
+        
+        //only save orders when in sorted mode
+        if (!unsorted) {
+            var rec = action.records[0],
             id = rec.raw.data.ID;
         
-        if (rec.raw.data && rec.raw.data.ID && rec.raw.data.TYPE === "savedchart") {
-            var rootNode = this.getMaintreepanel().getRootNode();
-            rootNode.cascadeBy(function(node) {
-                if (node.raw && node.raw.data && node.raw.data.ID && node.raw.data.ID === id) {
-                    //updating whole folder to get indexes right
-                    Ext.each(node.parentNode.childNodes, function(node) {
-                        var ownerfolder = node.parentNode.data.text,
-                        index = node.parentNode.indexOf(node);
-                        
-            
-                        if (node.raw.data && node.raw.data.ID && node.raw.data.VALUE) {
-                            var chartid = node.raw.data.ID,
-                                chartconfig = node.raw.data.VALUE;
-                            chartconfig.parentFolder = ownerfolder;
-                            chartconfig.treeIndex = index;
-                            var encodedchartconfig = Ext.encode(chartconfig),
-                                url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+updatechart+""+""+' + chartid + '+' + encodedchartconfig + '&XHR=1'; 
+            if (rec.raw.data && rec.raw.data.ID && rec.raw.data.TYPE === "savedchart") {
+                var rootNode = this.getMaintreepanel().getRootNode();
+                rootNode.cascadeBy(function(node) {
+                    if (node.raw && node.raw.data && node.raw.data.ID && node.raw.data.ID === id) {
+                        //updating whole folder to get indexes right
+                        Ext.each(node.parentNode.childNodes, function(node) {
+                            var ownerfolder = node.parentNode.data.text,
+                            index = node.parentNode.indexOf(node);
                             
-                            Ext.Ajax.request({
-                                method: 'GET',
-                                disableCaching: false,
-                                url: url,
-                                success: function(response){
-                                    var json = Ext.decode(response.responseText);
-                                    if (json && json.success === "true" || json.data && json.data.length === 0) {
-                                        //be quiet
-                                    } else if (json && json.msg) {
-                                        Ext.Msg.alert("Error", "The new position could not be saved, error Message is:<br><br>" + json.msg);
-                                    } else {
-                                        Ext.Msg.alert("Error", "The new position could not be saved!");
+                
+                            if (node.raw.data && node.raw.data.ID && node.raw.data.VALUE) {
+                                var chartid = node.raw.data.ID,
+                                    chartconfig = node.raw.data.VALUE;
+                                chartconfig.parentFolder = ownerfolder;
+                                chartconfig.treeIndex = index;
+                                var encodedchartconfig = Ext.encode(chartconfig),
+                                    url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+updatechart+""+""+' + chartid + '+' + encodedchartconfig + '&XHR=1'; 
+                                
+                                Ext.Ajax.request({
+                                    method: 'GET',
+                                    disableCaching: false,
+                                    url: url,
+                                    success: function(response){
+                                        var json = Ext.decode(response.responseText);
+                                        if (json && json.success === "true" || json.data && json.data.length === 0) {
+                                            //be quiet
+                                        } else if (json && json.msg) {
+                                            Ext.Msg.alert("Error", "The new position could not be saved, error Message is:<br><br>" + json.msg);
+                                        } else {
+                                            Ext.Msg.alert("Error", "The new position could not be saved!");
+                                        }
+                                    },
+                                    failure: function() {
+                                        if (json && json.msg) {
+                                            Ext.Msg.alert("Error", "The new position could not be saved, error Message is:<br><br>" + json.msg);
+                                        } else {
+                                            Ext.Msg.alert("Error", "The new position could not be saved!");
+                                        }
                                     }
-                                },
-                                failure: function() {
-                                    if (json && json.msg) {
-                                        Ext.Msg.alert("Error", "The new position could not be saved, error Message is:<br><br>" + json.msg);
-                                    } else {
-                                        Ext.Msg.alert("Error", "The new position could not be saved!");
-                                    }
-                                }
-                            });
-                        }
-                        
-                    });
-                }
-            });
+                                });
+                            }
+                            
+                        });
+                    }
+                });
+            }
+        
         }
     }
 });
