@@ -22,6 +22,28 @@ at_Initialize($)
 
 
 my $oldattr;
+my $at_stt_sec;
+my $at_stt_day;
+
+sub
+at_SecondsTillTomorrow($)  # 86400, if tomorrow is no DST change
+{
+  my $t = shift;
+  my $day = int($t/86400);
+
+  if(!$at_stt_day || $day != $at_stt_day) {
+    my $t = $day*86400+12*3600;
+    my @l1 = localtime($t);
+    my @l2 = localtime($t+86400);
+    $at_stt_sec = 86400+
+                ($l1[2]-$l2[2])*3600+
+                ($l1[1]-$l2[1])*60;
+    $at_stt_day = $day;
+  }
+
+  return $at_stt_sec;
+}
+
 
 #####################################
 sub
@@ -57,7 +79,7 @@ at_Define($$)
   $nt -= ($lt[2]*3600+$lt[1]*60+$lt[0])         # Midnight for absolute time
                         if($rel ne "+");
   $nt += ($hr*3600+$min*60+$sec); # Plus relative time
-  $nt += SecondsTillTomorrow($ot) if($ot >= $nt);  # Do it tomorrow...
+  $nt += at_SecondsTillTomorrow($ot) if($ot >= $nt);  # Do it tomorrow...
   @lt = localtime($nt);
   my $ntm = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
   if($rep) {    # Setting the number of repetitions
@@ -110,7 +132,7 @@ at_Exec($)
   my (undef, $command) = split("[ \t]+", $hash->{DEF}, 2);
   $command = SemicolonEscape($command);
   my $ret = AnalyzeCommandChain(undef, $command) if(!$skip && !$disable);
-  Log GetLogLevel($name,3), $ret if($ret);
+  Log GetLogLevel($name,3), "$name: $ret" if($ret);
 
   return if($hash->{DELETED});           # Deleted in the Command
 

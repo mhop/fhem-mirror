@@ -193,8 +193,6 @@ my $namedef =
   "- a list separated by komma (,)\n" .
   "- a regexp, if it contains one of the following characters: *[]^\$\n" .
   "- a range separated by dash (-)\n";
-my $stt_sec;                    # Used by SecondsTillTomorrow()
-my $stt_day;                    # Used by SecondsTillTomorrow()
 my @cmdList;                    # Remaining commands in a chain. Used by sleep
 my $evalSpecials;               # Used by EvalSpecials->AnalyzeCommand parameter passing
 
@@ -2712,25 +2710,6 @@ AddDuplicate($$)
   $duplicate{$duplidx}{MSG} = shift;
   $duplicate{$duplidx}{TIM} = gettimeofday();
   $duplidx++;
-}
-
-sub
-SecondsTillTomorrow($)  # 86400, if tomorrow is no DST change
-{
-  my $t = shift;
-  my $day = int($t/86400);
-
-  if(!$stt_day || $day != $stt_day) {
-    my $t = $day*86400+12*3600;
-    my @l1 = localtime($t);
-    my @l2 = localtime($t+86400);
-    $stt_sec = 86400+
-                ($l1[2]-$l2[2])*3600+
-                ($l1[1]-$l2[1])*60;
-    $stt_day = $day;
-  }
-
-  return $stt_sec;
 }
 
 # Add an attribute to the userattr list, if not yet present
