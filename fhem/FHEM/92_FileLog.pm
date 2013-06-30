@@ -25,7 +25,8 @@ FileLog_Initialize($)
   $hash->{NotifyFn} = "FileLog_Log";
   $hash->{AttrFn}   = "FileLog_Attr";
   # logtype is used by the frontend
-  $hash->{AttrList} = "disable:0,1 logtype nrarchive archivedir archivecmd";
+  $hash->{AttrList} = "disable:0,1 logtype nrarchive archivedir archivecmd ".
+                      "loglevel";
 
   $hash->{FW_summaryFn} = "FileLog_fhemwebFn";
   $hash->{FW_detailFn}  = "FileLog_fhemwebFn";
@@ -378,6 +379,9 @@ FileLog_Get($@)
   my $to   = shift @a; # Now @a contains the list of column_specs
   my $internal;
 
+  my $name = $hash->{NAME};
+  my $ll = GetLogLevel($name,4);
+
   if($outf eq "INT") {
     $outf = "-";
     $internal = 1;
@@ -414,10 +418,12 @@ FileLog_Get($@)
     # Look for the file in the log directory...
     if(!-f $linf) {
       # ... or in the archivelog
-      $linf = AttrVal($hash->{NAME},"archivedir",".") ."/". $inf;
+      $linf = AttrVal($name, "archivedir",".") ."/". $inf;
     }
     $inf = $linf;
   }
+  Log $ll, "$name get: Input file $inf, from:$from  to:$to";
+
   my $ifh = new IO::File $inf if($inf);
   seekTo($inf, $ifh, $hash, $from) if($ifh);
 
@@ -632,6 +638,9 @@ RESCAN:
     $data{"cnt$j"} = $cnt[$i] ? $cnt[$i] : "undef";
     $data{"currval$j"} = $lastv[$i];
     $data{"currdate$j"} = $lastd[$i];
+
+    Log $ll, "$name get: line $j, regexp:".$d[$i]->{re}.", col:".$d[$i]->{col}.
+                ", output lines:".$data{"cnt$j"};
 
   }
   if($internal) {
@@ -903,6 +912,7 @@ seekTo($$$$)
         </li><br>
 
     <li><a href="#disable">disable</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
 
     <a name="logtype"></a>
     <li>logtype<br>
