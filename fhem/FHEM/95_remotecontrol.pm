@@ -42,6 +42,7 @@
 # converted to UNIX-LF - June 25, 2013
 # fixed minor html-bug - June 26, 2013
 # added css-tags rc_body and rc_button - June 27, 2013
+# deleted leading \n at beginning of html-code - June 30, 2013
 
 
 
@@ -219,8 +220,8 @@ RC_attr2html($) {
   my $iconprefix = AttrVal("$name","rc_iconprefix","");
   my $rc_html;
   my $row;
-  $rc_html = "\n<div class=\"remotecontrol\">";
-# $rc_html = "\n<div class=\"remotecontrol\" id=\"$name\">"; # provokes update by longpoll
+  $rc_html = "<div class=\"remotecontrol\">";
+# $rc_html = "<div class=\"remotecontrol\" id=\"$name\">"; # provokes update by longpoll
   $rc_html.= '<table class="rc_body">';
   foreach my $rownr (0..19) {
     $rownr = sprintf("%2.2d",$rownr);
