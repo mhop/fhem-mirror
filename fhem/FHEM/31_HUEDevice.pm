@@ -152,7 +152,9 @@ sub HUEDevice_Define($$)
   $hash->{STATE} = 'Initialized';
   $hash->{fhem}{interfaces}= "dimmer";
 
+  $hash->{ID} = $id;
   $hash->{fhem}{id} = $id;
+
   $hash->{INTERVAL} = $interval;
 
   $hash->{fhem}{on} = -1;
@@ -329,7 +331,7 @@ HUEDevice_Set($@)
 
 
   if( scalar keys %obj ) {
-    my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",\%obj);
+    my $result = HUEDevice_ReadFromServer($hash,$hash->{ID}."/state",\%obj);
     if( $result->{'error'} ) {
         $hash->{STATE} = $result->{'error'}->{'description'};
         return undef;
@@ -528,7 +530,7 @@ HUEDevice_GetUpdate($)
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "HUEDevice_GetUpdate", $hash, 1);
   }
 
-  my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id});
+  my $result = HUEDevice_ReadFromServer($hash,$hash->{ID});
   if( !defined($result) ) {
     $hash->{STATE} = "unknown";
     return;
