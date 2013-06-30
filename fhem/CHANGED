@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: SYSSTAT: allow stateFormat
   - feature: Module 70_VIERA supports now module 95_remotecontrol with own layout
              for VIERA TV
   - feature: InternalVal function added (like ReadingsVal)

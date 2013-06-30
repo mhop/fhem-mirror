@@ -160,9 +160,13 @@ SYSSTAT_GetUpdate($)
   #my $load = $hash->{loadavg}->get;
   my $load = SYSSTAT_getLoadAVG( $hash );
 
-  $hash->{STATE} = $load->{avg_1} . " " . $load->{avg_5} . " " . $load->{avg_15} if( defined($load->{avg_1}) );
+  readingsBeginUpdate($hash);
 
-  readingsSingleUpdate($hash,"load",$load->{avg_1},defined($hash->{LOCAL} ? 0 : 1));
+  my $state = $load->{avg_1} . " " . $load->{avg_5} . " " . $load->{avg_15} if( defined($load->{avg_1}) );
+
+  readingsBulkUpdate($hash,"state",$state);
+
+  readingsBulkUpdate($hash,"load",$load->{avg_1});
 
   my $do_diskusage = 1;
   if( defined($hash->{INTERVAL_FS} ) ) {
@@ -188,14 +192,14 @@ SYSSTAT_GetUpdate($)
     if( AttrVal($name, "useregex", "") eq "" ) {
       for my $filesystem (@{$hash->{filesystems}}) {
         my $fs = $usage->{$filesystem};
-        readingsSingleUpdate($hash,$fs->{mountpoint},$fs->{$type},defined($hash->{LOCAL} ? 0 : 1));
+        readingsBulkUpdate($hash,$fs->{mountpoint},$fs->{$type});
       }
     } else {
       for my $filesystem (@{$hash->{filesystems}}) {
         foreach my $key (keys %$usage) {
           if( $key =~ /$filesystem/ ) {
             my $fs = $usage->{$key};
-            readingsSingleUpdate($hash,$fs->{mountpoint},$fs->{$type},defined($hash->{LOCAL} ? 0 : 1));
+            readingsBulkUpdate($hash,$fs->{mountpoint},$fs->{$type});
           }
         }
       }
@@ -208,14 +212,16 @@ SYSSTAT_GetUpdate($)
       if( AttrVal($name, "raspberrytemperature", "0") eq 2 ) {
           $temp = sprintf( "%.1f", (3 * ReadingsVal($name,"temperature",$temp) + $temp ) / 4 );
         }
-      readingsSingleUpdate($hash,"temperature",$temp,defined($hash->{LOCAL} ? 0 : 1));
+      readingsBulkUpdate($hash,"temperature",$temp);
     }
   }
 
   if( AttrVal($name, "raspberrycpufreq", "0") > 0 ) {
     my $freq = SYSSTAT_getPiFreq($hash);
-    readingsSingleUpdate($hash,"cpufreq",$freq,defined($hash->{LOCAL} ? 0 : 1));
+    readingsBulkUpdate($hash,"cpufreq",$freq);
   }
+
+  readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
 }
 
 sub
@@ -415,6 +421,7 @@ SYSSTAT_getPiFreq( $ )
       If set the entries of the filesystems list are treated as regex.</li>
     <li>ssh_user<br>
       The username for ssh remote access.</li>
+    <li>readingFnAttributes</li>
   </ul>
 </ul>
 
