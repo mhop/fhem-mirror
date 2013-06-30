@@ -1019,12 +1019,20 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 
     <a name="autoload_undefined_devices"></a>
     <li>autoload_undefined_devices<br>
-        wenn dieses Attribut gesetzt ist, werden die zu einer neu empfangenen 
-    Nachricht zugeh&ouml;rigen Module automatisch geladen.&nbsp; Dies erfolgt vom <a href="#autocreate">
-        autocreate</a> Ger&auml;t, um so automatisch ein FHEM-Ger&auml;t bei erreichen 
-    einer entsprechenden Nachricht zu erstellen.
+        wenn dieses Attribut gesetzt ist, werden die zu einer neu empfangenen
+        Nachricht zugeh&ouml;rigen Module automatisch geladen.&nbsp; Dies
+        erfolgt vom <a href="#autocreate"> autocreate</a> Ger&auml;t, um so
+        automatisch ein FHEM-Ger&auml;t bei erreichen einer entsprechenden
+        Nachricht zu erstellen.
     </li><br>
 
+    <a name="updateInBackground"></a>
+    <li>updateInBackground<br>
+        wenn dieses Attribut gesetzt ist, wird das update Befehl in einem
+        separaten Prozess ausgef&uuml;hrt, und alle Meldungen werden per Event
+        &uuml;bermittelt. In der telnet Sitzung wird inform, in FHEMWEB wird
+        das Event Monitor aktiviert.
+        </li><br>
 
     <a name="backup_before_update"></a>
     <li>backup_before_update<br>

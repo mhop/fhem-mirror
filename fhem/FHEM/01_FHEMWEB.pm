@@ -75,6 +75,7 @@ use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 my $FW_zlib_checked;
 my $FW_use_zlib = 1;
+my $FW_activateInform = 0;
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
@@ -113,6 +114,7 @@ FHEMWEB_Initialize($)
   $hash->{DefFn}   = "FW_Define";
   $hash->{UndefFn} = "FW_Undef";
   $hash->{NotifyFn}= "FW_SecurityCheck";
+  $hash->{ActivateInformFn} = "FW_ActivateInform";
   $hash->{AttrList}= 
     "loglevel:0,1,2,3,4,5,6 webname fwcompress:0,1 ".
     "plotmode:gnuplot,gnuplot-scroll,SVG plotsize endPlotToday:1,0 plotfork ".
@@ -553,6 +555,11 @@ FW_answerCall($)
   my $onload = AttrVal($FW_wname, "longpoll", 1) ?
                       "onload=\"FW_delayedStart()\"" : "";
   FW_pO "</head>\n<body name=\"$t\" $onload>";
+
+  if($FW_activateInform) {
+    $FW_cmdret = $FW_activateInform = "";
+    $cmd = "style eventMonitor";
+  }
 
   if($FW_cmdret) {
     $FW_detail = "";
@@ -2406,7 +2413,11 @@ FW_Notify($$)
     # Collect multiple changes (e.g. from noties) into one message
     $ntfy->{INFORMBUF} .= $data;
     RemoveInternalTimer($ln);
-    InternalTimer(gettimeofday()+0.1, "FW_FlushInform", $ln, 0);
+    if(length($ntfy->{INFORMBUF}) > 1024) {
+      FW_FlushInform($ln);
+    } else {
+      InternalTimer(gettimeofday()+0.1, "FW_FlushInform", $ln, 0);
+    }
   }
 
   return undef;
@@ -2672,6 +2683,12 @@ FW_dropdownFn()
       "$fwsel</form></td>";
   }
   return undef;
+}
+
+sub 
+FW_ActivateInform()
+{
+  $FW_activateInform = 1;
 }
 
 1;

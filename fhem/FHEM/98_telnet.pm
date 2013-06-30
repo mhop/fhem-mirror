@@ -22,6 +22,10 @@ telnet_Initialize($)
   $hash->{NotifyFn}= "telnet_SecurityCheck";
   $hash->{AttrList} = "loglevel:0,1,2,3,4,5,6 globalpassword password ".
                         "allowfrom SSL connectTimeout connectInterval";
+  $hash->{AttrList} = "loglevel:0,1,2,3,4,5,6 globalpassword password ".
+                        "allowfrom SSL connectTimeout connectInterval";
+  $hash->{ActivateInformFn} = "telnet_ActivateInform";
+
 }
 
 #####################################
@@ -291,6 +295,15 @@ telnet_Undef($$)
   my ($hash, $arg) = @_;
   return TcpServer_Close($hash);
 }
+
+sub
+telnet_ActivateInform($)
+{
+  my ($cl) = @_;
+  my $name = $cl->{NAME};
+  CommandInform($cl, "timer") if(!$inform{$name});
+}
+
 
 1;
 

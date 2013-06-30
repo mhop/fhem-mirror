@@ -22,6 +22,7 @@ sub BlockingKill($);
 sub BlockingInformParent($;$$);
 
 my $telnetDevice;
+my $telnetClient;
 
 sub
 BlockingCall($$@)
@@ -102,30 +103,36 @@ BlockingInformParent($;$$)
   $waitForRead = 1 if (!defined($waitForRead));
 	
   # Write the data back, calling the function
-  my $addr = "localhost:$defs{$telnetDevice}{PORT}";
-  my $client = IO::Socket::INET->new(PeerAddr => $addr);
-  Log 1, "CallBlockingFn: Can't connect to $addr\n" if(!$client);
-
-  if (defined($param)) {
-    $param =~ s/'/\\'/g;
-    $param = "'$param'"
-  } else {
-  	$param = "";
+  if(!$telnetClient) {
+    my $addr = "localhost:$defs{$telnetDevice}{PORT}";
+    $telnetClient = IO::Socket::INET->new(PeerAddr => $addr);
+    Log 1, "CallBlockingFn: Can't connect to $addr\n" if(!$telnetClient);
   }
 
-  syswrite($client, "{$informFn($param)}\n");
+  if(defined($param)) {
+    if(ref($param) eq "ARRAY") {
+      $param = join(",", map { $_ =~ s/'/\\'/g; "'$_'" } @{$param});
+
+    } else {
+      $param =~ s/'/\\'/g;
+      $param = "'$param'"
+    }
+  } else {
+    $param = "";
+  }
+
+  syswrite($telnetClient, "{$informFn($param)}\n");
 
   if ($waitForRead) {
-    my $len = sysread($client, $ret, 4096);
+    my $len = sysread($telnetClient, $ret, 4096);
     chop($ret);
     $ret = undef if(!defined($len));
   }
 
-  close($client) if($client);
-  
   return $ret;
 }
 
+# Parent
 sub
 BlockingKill($)
 {
@@ -148,9 +155,11 @@ BlockingKill($)
   }
 }
 
+# Child
 sub
 BlockingExit()
 {
+  close($telnetClient) if($telnetClient);
 
   if($^O =~ m/Win/) {
     eval "require threads;";
