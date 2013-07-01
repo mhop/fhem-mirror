@@ -456,7 +456,6 @@ sub HMinfo_SetFn($$) {#########################################################
 	
     return HMinfo_SetFnDly(join(",",($childName,$name,$cmd,$opt,$optEmpty,$filter,@a)));
   }
-  Log 1,"General duration:".(time() - $start);
   return $ret;
 }
 
@@ -600,6 +599,13 @@ sub HMinfo_status($){##########################################################
   $all{$_}=0 foreach (grep !//,@protNames);
   @protNames = sort keys %all;
   $hash->{ERR__protoNames} = join",",@protNames if(@protNames);
+
+  if ($modules{CUL_HM}{helper}{autoRdCfgLst}){
+     $hash->{autoReadPend} = join ",",@{$modules{CUL_HM}{helper}{autoRdCfgLst}};
+  }
+  else{
+    delete $hash->{autoReadPend};
+  }
   
   # ------- what about rssi low readings ------
   foreach (grep {$rssiMin{$_} != 0}keys %rssiMin){
@@ -609,7 +615,7 @@ sub HMinfo_status($){##########################################################
 	                           push @rssiNames,$_  ;}
     else                      {$rssiMinCnt{"80<"}++;}
   }
- 
+  
   $hash->{rssiMinLevel} = "";
   $hash->{rssiMinLevel} .= "$_:$rssiMinCnt{$_} " foreach (sort keys %rssiMinCnt);
   $hash->{ERR___rssiCrit} = join(",",@rssiNames) if (@rssiNames);
@@ -778,6 +784,8 @@ sub HMinfo_status($){##########################################################
    <br>
   <a name="HMinfovariables"><b>Variables</b></a>
    <ul>
+    <li><b>autoReadPend:</b> list of entities which are queued to retrieve config and status. 
+	                        This is typically scheduled thru autoReadReg</li>
     <li><b>ERR___rssiCrit:</b> list of device names with RSSI reading n min level </li>
     <li><b>rssiMinLevel:</b> counts of rssi min readings per device, clustered in blocks</li>
 
