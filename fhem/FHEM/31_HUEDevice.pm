@@ -79,6 +79,9 @@ HUEDevice_devStateIcon($)
          if( ReadingsVal($name,"state","off") eq "off" || ReadingsVal($name,"bri","0") eq 0 );
 
   return undef
+         if( AttrVal($name, "model", "") eq "LWB001" );
+
+  return undef
          if( AttrVal($name, "model", "") eq "LWL001" );
 
   #return '<div style="height:19px;'.
