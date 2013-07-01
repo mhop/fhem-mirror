@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: HUEDevice: support SVG icons for LWB001 living whites bulb
   - feature: HUEDevice: support more than one bridge
   - feature: updateInBackground global attribute
   - feature: SYSSTAT: allow stateFormat
