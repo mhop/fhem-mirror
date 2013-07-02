@@ -180,7 +180,7 @@ FHEM/FhemUtils/*             mfr69bs              http://forum.fhem.de Sonstiges
 contrib/YAF/*                danielweisensee      http://forum.fhem.de Frontends
                                                 
 www/gplot/*                  rudolfkoenig         http://forum.fhem.de Frontends
-www/images/*                 rudolfkoenig         http://forum.fhem.de Frontends
+www/images/*                 ulimaass             http://forum.fhem.de Frontends
 www/pgm2/*                   rudolfkoenig         http://forum.fhem.de Frontends
 www/jscolor/*                justme1968           http://forum.fhem.de Frontends
 www/frontend/*               johannnes            http://forum.fhem.de Frontends
