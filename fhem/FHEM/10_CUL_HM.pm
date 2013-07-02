@@ -180,12 +180,10 @@ sub CUL_HM_updateConfig($){
   # this gives FHEM sufficient time to fill in attributes
   # it will also be called after each manual definition
   # Purpose is to parse attributes and read config
-  Log 1,"General starting Update";
   foreach my $name (@{$modules{CUL_HM}{helper}{updtCfgLst}}){
     my $hash = $defs{$name};
 	my $id = $hash->{DEF};
     my $chn = substr($id."00",6,2);
-  Log 1,"General starting Update $name";
 	
 	if ($id ne $K_actDetID){# if not action detector
  	  CUL_HM_ID2PeerList($name,"",1);       # update peerList out of peerIDs
@@ -435,7 +433,7 @@ sub CUL_HM_Parse($$) {##############################
   my ($len,$mNo,$mFlg,$mTp,$src,$dst,$p) = ($1,$2,$3,$4,$5,$6,$7);
   $p = "" if(!defined($p));
   my @mI = unpack '(A2)*',$p; # split message info to bytes
-  
+
   if ($msgStat){
     return "" if($msgStat eq 'NACK');#discard if lowlevel error
   }
@@ -482,12 +480,13 @@ sub CUL_HM_Parse($$) {##############################
     if(   $shash->{helper}{rpt}                           #was responded
        && $shash->{helper}{rpt}{IO}  eq $ioName           #from same IO
        && $shash->{helper}{rpt}{flg} eq substr($msg,5,1)  #not from repeater
-#       && $shash->{helper}{rpt}{ts}  < gettimeofday()-0.5 #todo: hack since HMLAN sends duplicate status messages
+       && $shash->{helper}{rpt}{ts}  < gettimeofday()-0.24 # again if older then 240ms (typ repeat time)
+	                                                      #todo: hack since HMLAN sends duplicate status messages
 	   ){
 	  my $ack = $shash->{helper}{rpt}{ack};#shorthand
 	  my $i=0;
-      CUL_HM_SndCmd(${$ack}[$i++],${$ack}[$i++]) while ($i<@{$ack});
 	  $shash->{helper}{rpt}{ts} = gettimeofday();
+      CUL_HM_SndCmd(${$ack}[$i++],${$ack}[$i++]) while ($i<@{$ack});
       Log GetLogLevel($name,4), "CUL_HM $name dup: repeat ack, dont process";
 	}
 	else{
@@ -1243,8 +1242,8 @@ sub CUL_HM_Parse($$) {##############################
   #------------ parse if FHEM or virtual actor is destination   ---------------
 
   if(AttrVal($dname, "subType", "none") eq "virtual"){# see if need for answer
-    if($mTp =~ m/^4./ && $p =~ m/^(..)(..)/) { #Push Button event
-      my ($recChn,$trigNo) = (hex($1),hex($2));# button number/event count
+    if($mTp =~ m/^4/ && @mI > 1) { #Push Button event
+      my ($recChn,$trigNo) = (hex($mI[0]),hex($mI[1]));# button number/event count
 	  my $longPress = ($recChn & 0x40)?"long":"short";
 	  my $recId = $src.sprintf("%02X",($recChn&0x3f));
 	  foreach my $dChId (CUL_HM_getAssChnIds($dname)){# need to check all chan
@@ -2048,7 +2047,9 @@ sub CUL_HM_Set($@) {
 	   
     my $reg  = $culHmRegDefine{$regName};
 	return $st." - ".$regName            # give some help
-	       ." range:". $reg->{min}." to ".$reg->{max}.$reg->{u}
+	       .($reg->{lit}? " liternal:".join(",",keys%{$reg->{lit}})." "
+	                    : " range:". $reg->{min}." to ".$reg->{max}.$reg->{u}
+			 )
 		   .(($reg->{l} == 3)?" peer required":"")." : ".$reg->{t}."\n"
 		          if ($data eq "?");
 	return "value:".$data." out of range for Reg \"".$regName."\""
@@ -2132,7 +2133,7 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'81'.$chn.
 	                    sprintf("%02X%02s%02X",$lvl*2,$rLocDly,$speed*2));
   } 
-  elsif($cmd =~ m/^(on|off|toggle)/) { ########################################
+  elsif($cmd =~ m/^(on|off|toggle)$/) { #######################################
     my $lvl = ($cmd eq 'on')  ? 'C8':
 	         (($cmd eq 'off') ? '00':(CUL_HM_getChnLvl($name) != 0 ?"00":"C8"));
 	if($st eq "blindActuator") { # need to stop blind to protect relais
@@ -2774,6 +2775,7 @@ sub CUL_HM_SndCmd($$) {
 
   if($mn eq "++") {
     $mn = $io->{HM_CMDNR} ? (($io->{HM_CMDNR} +1)&0xff) : 1;
+    $io->{HM_CMDNR} = $mn;
   } 
   elsif($cmd =~ m/^[+-]/){; #continue pure
     IOWrite($hash, "", $cmd);
@@ -2782,7 +2784,6 @@ sub CUL_HM_SndCmd($$) {
   else {
     $mn = hex($mn);
   }
-  $io->{HM_CMDNR} = $mn;
   $cmd = sprintf("As%02X%02X%s", length($cmd2)/2+1, $mn, $cmd2);
   IOWrite($hash, "", $cmd);
   CUL_HM_responseSetup($hash,$cmd);	
