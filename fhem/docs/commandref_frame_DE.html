@@ -447,8 +447,15 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
       <li>differential: das Reading wird auf die Differenz zw. dem aktuellen und
         dem vorherigen Wert, geteilt durch die Sekunden zw. der aktuellen Zeit
         und der letzten Auswertung, sekundengenau. Kein Wert wird berechnet,
-        falls der Unterschied unter eine Sekunde liegt.
-        </li>
+        falls der Unterschied unter eine Sekunde liegt.</li>
+      <li>offset: wenn der aktuellen Wert kleiner als der vorherige Wert ist
+          wird der vorherige Wert zum Reading addiert. Das Reading kann dann
+          als offset verwendet werden um einen Z&auml;hler der durch Sromverlust zur&uuml;ckgesetzt
+          wird zu korrigieren.</li>
+      <li>monotonic: wenn die Differenz zw. dem aktuellen und dem vorherigen Wert
+          positiv ist wird diese Differenz zum Reading addiert. Damit l&auml;sst sich von
+          einem Z&auml;hler der bei Stromverlust zur&uuml;ckgesetzt wird ein monoton
+          wachsender Z&auml;hler ableiten.</li>
     </ul>
     Beispiel:
     <ul><code>
