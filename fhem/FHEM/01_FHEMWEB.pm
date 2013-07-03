@@ -358,7 +358,8 @@ FW_answerCall($)
   $FW_sp = AttrVal($FW_wname, "stylesheetPrefix", "");
   $FW_ss = ($FW_sp =~ m/smallscreen/);
   $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
-  @FW_iconDirs = split(":", AttrVal($FW_wname, "iconPath", "$FW_sp:default"));
+  @FW_iconDirs = grep { $_ } split(":", AttrVal($FW_wname, "iconPath",
+                                "$FW_sp:fhemSVG:openautomation:default"));
 
   # /icons/... => current state of ...
   # also used for static images: unintended, but too late to change
@@ -1869,7 +1870,7 @@ FW_style($$)
     FW_pO $end;
 
   } elsif($a[1] eq "select") {
-    my @fl = FW_fileList("$FW_cssdir/.*style.css");
+    my @fl = grep { $_ !~ m/floorplan/ } FW_fileList("$FW_cssdir/.*style.css");
     FW_pO "$start<table class=\"block\" id=\"at\">";
     my $row = 0;
     foreach my $file (@fl) {
