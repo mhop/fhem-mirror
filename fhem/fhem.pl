@@ -1885,7 +1885,7 @@ CommandAttr($$)
         my $perlCode= $6;
         #Log 1, sprintf("userReading %s has perlCode %s with modifier %s%s",
         # $userReading,$perlCode,$modifier,$trigger?" and trigger $trigger":"");
-        if(grep { /$modifier/ } qw(none difference differential)) {
+        if(grep { /$modifier/ } qw(none difference differential offset monotonic)) {
           $trigger =~ s/^:// if($trigger);
           $userReadings{$userReading}{trigger}= $trigger;
           $userReadings{$userReading}{modifier}= $modifier;
@@ -3163,6 +3163,14 @@ readingsEndUpdate($$)
         if(defined($deltav) && defined($deltat) && ($deltat>= 1.0)) {
           $result= $deltav/$deltat;
         }
+      } elsif($modifier eq "offset") {
+        $oldvalue= 0 if( !defined($oldvalue) );
+        $result = ReadingsVal($name,$userReading,0);
+        $result += $oldvalue if( $value < $oldvalue );
+      } elsif($modifier eq "monotonic") {
+        $oldvalue= 0 if( !defined($oldvalue) );
+        $result = ReadingsVal($name,$userReading,0);
+        $result += $value - $oldvalue if( $value > $oldvalue );
       } 
       readingsBulkUpdate($hash,$userReading,$result,1) if(defined($result));
       # store value
