@@ -2082,8 +2082,10 @@ FW_makeImage(@)
         $col =~ s/@//;
         $col = "#$col" if($col =~ m/^([A-F0-9]{6})$/);
         $data =~ s/fill="#000000"/fill="$col"/g;
+        $data =~ s/fill:#000000/fill:$col/g;
       } else {
         $data =~ s/fill="#000000"//g;
+        $data =~ s/fill:#000000//g;
       }
       return $data;
     } else {
@@ -2188,7 +2190,7 @@ FW_readIconsFrom($$)
         unless($entry eq "." || $entry eq ".." || $entry eq ".svn");
 
     } else {
-      if($entry =~ m/^iconalias.txt$/i && open(FH, "$FW_icondir/$ldir/$entry")) {
+      if($entry =~ m/^iconalias.txt$/i && open(FH, "$FW_icondir/$ldir/$entry")){
         while(my $l = <FH>) {
           chomp($l);
           my @a = split(" ", $l);
@@ -2202,7 +2204,6 @@ FW_readIconsFrom($$)
 
         my $tag = $filename;     # Add it without extension too
         $tag =~ s/\.[^.]*$//;
-        #Log 1, "Adding $dir $tag -> $filename";
         $FW_icons{$dir}{$tag} = $filename;
       }
     }
