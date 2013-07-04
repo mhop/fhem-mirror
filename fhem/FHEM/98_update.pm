@@ -40,7 +40,7 @@ sub update_GetRemoteFiles($$$$);
 sub update_ListChanges($$$);
 sub update_MakeDirectory($);
 sub update_ParseControlFile($$$$);
-sub update_WriteLocalControlFile($$$$);
+sub update_WriteLocalControlFile($$$$$);
 
 
 ########################################
@@ -451,13 +451,13 @@ update_DoUpdate(@)
   my $getUpdates;
   ($fail,$getUpdates) = update_GetRemoteFiles($BRANCH,$url,$updateFiles_ref,$cl);
   $ret .= $getUpdates if($getUpdates);
-  undef($updateFiles_ref);
 
   foreach my $pack (@packages) {
     # write local controlfile
-    my $localControlFile = update_WriteLocalControlFile($BRANCH,$pack,$lControl_ref,$rControl_ref);
+    my $localControlFile = update_WriteLocalControlFile($BRANCH,$pack,$lControl_ref,$rControl_ref,$updateFiles_ref);
     $ret .= $localControlFile if ($localControlFile);
   }
+  undef($updateFiles_ref);
 
   return $ret if($fail);
   if (uc($update) eq "FHEM" || $BRANCH eq "THIRDPARTY") {
@@ -987,9 +987,9 @@ update_CheckFhemRelease($$$)
 
 ########################################
 sub
-update_WriteLocalControlFile($$$$)
+update_WriteLocalControlFile($$$$$)
 {
-  my ($BRANCH,$pack,$lControl_ref,$rControl_ref) = @_;
+  my ($BRANCH,$pack,$lControl_ref,$rControl_ref,$updateFiles_ref) = @_;
   my $modpath = (-d "updatefhem.dir" ? "updatefhem.dir":$attr{global}{modpath});
   my $moddir  = "$modpath/FHEM";
   my $controlsTxt;
@@ -1002,6 +1002,8 @@ update_WriteLocalControlFile($$$$)
   Log 5, "update write $moddir/$controlsTxt";
   my %rControl = %$rControl_ref;
   my %lControl = %$lControl_ref;
+  my %updFiles = %$updateFiles_ref;
+
   foreach my $f (sort keys %{$rControl{$pack}}) {
     my $ctrl = $rControl{$pack}{$f}{ctrl} if (defined($rControl{$pack}{$f}{ctrl}));
     my $date = $rControl{$pack}{$f}{date} if (defined($rControl{$pack}{$f}{date}));
@@ -1010,7 +1012,8 @@ update_WriteLocalControlFile($$$$)
     my $move = $rControl{$pack}{$f}{move} if (defined($rControl{$pack}{$f}{move}));
 
     if ($ctrl eq "UPD") {
-      if (defined($lControl{$pack}{$f}{ctrl}) && $lControl{$pack}{$f}{ctrl} eq "EXC") {
+      if (defined($lControl{$pack}{$f}{ctrl}) &&
+         ($lControl{$pack}{$f}{ctrl} eq "EXC" || !exists $updFiles{$f})) {
         $date = defined($lControl{$pack}{$f}{date}) ? $lControl{$pack}{$f}{date} :
                                                       $rControl{$pack}{$f}{date};
         $size = defined($lControl{$pack}{$f}{size}) ? $lControl{$pack}{$f}{size} :
