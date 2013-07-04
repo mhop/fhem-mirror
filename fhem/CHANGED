@@ -54,6 +54,7 @@
   - bugfix:  fixing not-working FHEM restart, when a PRESENCE check is running
   - bugfix:  fixing memory overflow when "list" a PRESENCE definition
   - bugfix:  fixing dead PRESENCE definitions in case of timeouts
+  - bugfix:  update: error while updating single files fixed. (M. Fischer)
 
 - 2013-04-08 (5.4)
   - feature: updatefhem will be silently converted to update
