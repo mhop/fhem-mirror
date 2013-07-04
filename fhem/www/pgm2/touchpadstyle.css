@@ -50,7 +50,7 @@ g.on { fill:red; }
 
 /* next lines are for remotecontrol */
 .rc_body              { border-style: solid; border-color: gray; border-width: 2px; padding: 5px;
-                        rules: none; background: #C8C8B0; font-size:6px;}
+                        background: #C8C8B0; font-size:6px;}
 .rc_button            { padding: 5px 7px;}
 .rc_button img        { border-style: solid; border-width: 1px; border-color: transparent; }
 .rc_button img:active { border-color: gray; }
