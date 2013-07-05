@@ -98,9 +98,9 @@ DbLog_Attr(@)
 #
 ################################################################
 sub
-DbLog_ParseEvent($$)
+DbLog_ParseEvent($$$)
 {
-  my ($type, $event)= @_;
+  my ($device, $type, $event)= @_;
   my @result;
 
   # split the event into reading and argument
@@ -124,8 +124,13 @@ DbLog_ParseEvent($$)
   elsif(($type eq "OWAD") ||
         ($type eq "OWSWITCH") ||
         ($type eq "OWMULTI")) {
-          $reading = "data";
-          $value = $event;
+      if(int(@parts)>1) {
+        $reading = "data";
+        $value = $event;
+      } else {
+        @parts = split(/\|/, AttrVal($device, $reading."Unit", ""));
+        $unit = $parts[1] if($parts[1]);
+      }
   }
   # FS20
   elsif(($type eq "FS20") ||
@@ -283,11 +288,13 @@ DbLog_ParseEvent($$)
     }
   }
 
-  # DUMMY
+   # DUMMY
   elsif($type eq "DUMMY") {
-        $reading= "data";
-        $value= $event;
-        $unit= "";
+    if( $value eq "" ) {
+      $reading= "data";
+      $value= $event;
+    }
+    $unit= "";
   }
 
   @result= ($reading,$value,$unit);
@@ -342,7 +349,7 @@ DbLog_Log($$)
         $ts = $dev->{CHANGETIME}[$i] if(defined($dev->{CHANGETIME}[$i]));
         # $ts is in SQL format YYYY-MM-DD hh:mm:ss
     
-        my @r= DbLog_ParseEvent($t, $s);
+        my @r= DbLog_ParseEvent($n, $t, $s);
         my $reading= $r[0];
         my $value= $r[1];
         my $unit= $r[2];
@@ -676,11 +683,16 @@ DbLog_Get($@)
       $out_tstamp = "";
 
       ############ Auswerten des 5. Parameters: Regexp ###################
+      # die Regexep wird vor der Function ausgewertet und der Wert im Feld
+      # Value angepasst.
+      ####################################################################
       if($readings[$i]->[4] && $readings[$i]->[4]) {
         #evaluate
         my $val = $sql_value;
+        my $ts  = $sql_timestamp;
         eval("$readings[$i]->[4]");
         $sql_value = $val;
+        $sql_timestamp = $ts;
         if($@) {Log 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@";}
         $out_tstamp = $sql_timestamp;
         $writeout=1;
@@ -694,10 +706,23 @@ DbLog_Get($@)
         $writeout=1;
 
       } elsif ($readings[$i]->[3] && $readings[$i]->[3] =~ m/^int(\d+).*/o) {
-        #Übernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
+        #Uebernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
         $out_value = $1 if($sql_value =~ m/^([-\.\d]+).*/o);
         $out_tstamp = $sql_timestamp;
         $writeout=1;
+
+      } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-ts" && lc($sql_value) !~ m(ignore)) {
+        #Berechung der vergangen Sekunden seit dem letten Logeintrag
+        #zb. die Zeit zwischen on/off
+        my @a = split("[- :]", $sql_timestamp);
+        my $akt_ts = mktime($a[5],$a[4],$a[3],$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
+        if($lastd[$i] ne "undef") {
+          @a = split("[- :]", $lastd[$i]);
+        }
+        my $last_ts = mktime($a[5],$a[4],$a[3],$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
+        $out_tstamp = $sql_timestamp;
+        $out_value = sprintf("%02d", $akt_ts - $last_ts);
+        if(lc($sql_value) =~ m(hide)){$writeout=0;} else {$writeout=1;}
 
       } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {
         #Berechnung eines Stundenwertes
@@ -1226,14 +1251,23 @@ sub chartQuery($@) {
                 Return the delta of the values for a given hour or a given day.
                 Used if the column contains a counter, as is the case for the
                 KS300 rain column.</li>
+              <li>delta-ts<br>
+                Replaced the original value with a measured value of seconds since
+                the last and the actual logentry.
+              </li>
             </ul></li>
             <li>&lt;regexp&gt;<br>
-              The string is evaluated as a perl expression. $val is the
-              current value returned from the Database. The regexp is executed
+              The string is evaluated as a perl expression.  The regexp is executed
               before &lt;fn&gt; parameter.<br>
               Note: The string/perl expression cannot contain spaces,
               as the part after the space will be considered as the
-              next column_spec.
+              next column_spec.<br>
+              <b>Keywords</b>
+              <li>$val is the current value returned from the Database.</li>
+              <li>$ts is the current timestamp returned from the Database.</li>
+              <li>This Logentry will not print out if $val contains th keyword "hide".</li>
+              <li>This Logentry will not print out and not used in the following processing
+                  if $val contains th keyword "ignore".</li>
             </li>
         </ul></li>
       </ul>
@@ -1250,6 +1284,11 @@ sub chartQuery($@) {
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 Bodenfeuchte:data:::$val=~s/.*B:\s([-\.\d]+).*/$1/eg</code><br>
            Example of OWAD: value like this: <code>"A: 49.527 % B: 66.647 % C: 9.797 % D: 0.097 V"</code><br>
            and output for port B is like this: <code>2012-11-20_10:23:54 66.647</code></li>
+        <li><code>get DbLog - - 2013-05-26 2013-05-28 Pumpe:data::delta-ts:$val=~s/on/hide/</code><br>
+           Setting up a "Counter of Uptime". The function delta-ts gets the seconds between the last and the
+           actual logentry. The keyword "hide" will hide the logentry of "on" because this time 
+           is a "counter of Downtime"</li>
+
       </ul>
     <br><br>
   </ul>
@@ -1457,16 +1496,25 @@ sub chartQuery($@) {
                 hochlaufenden Zähler enthalten wie im Falle für ein KS300 Regenzähler
                 oder dem 1-wire Modul OWCOUNT.
               </li>
+              <li>delta-ts<br>
+                Ermittelt die vergangene Zeit zwischen dem letzten und dem aktuellen Logeintrag
+                in Sekunden und ersetzt damit den originalen Wert.
+              </li>
             </ul></li>
             <li>&lt;regexp&gt;<br>
-              Diese Zeichenkette wird als Perl Befehl ausgewertet. $val ist der
-              aktuelle Wert die die Datenbank für ein Device/Reading ausgibt.
-              Die regexp wird vor dem angegebenen &lt;fn&gt; Parameter ausgeführt.
+              Diese Zeichenkette wird als Perl Befehl ausgewertet. Die regexp wird vor dem angegebenen &lt;fn&gt; Parameter ausgeführt.
               <br>
               Bitte zur Beachtung: Diese Zeichenkette darf keine Leerzeichen
               enthalten da diese sonst als &lt;column_spec&gt; Trennung
               interpretiert werden und alles nach dem Leerzeichen als neue
-              &lt;column_spec&gt; gesehen wird.
+              &lt;column_spec&gt; gesehen wird.<br>
+              <b>Schlüsselwörter</b>
+              <li>$val ist der aktuelle Wert die die Datenbank für ein Device/Reading ausgibt.</li>
+              <li>$ts ist der aktuelle Timestamp des Logeintrages.</li>
+              <li>Wird als $val das Schlüsselwort "hide" zurückgegeben, so wird dieser Logeintrag nicht
+                  ausgegeben, trotzdem aber für die Zeitraumberechnung verwendet.</li>
+              <li>Wird als $val das Schlüsselwort "ignore" zurückgegeben, so wird dieser Logeintrag
+                  nicht für eine Folgeberechnung verwendet.</li>
             </li>
         </ul></li>
       </ul>
@@ -1483,6 +1531,10 @@ sub chartQuery($@) {
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 Bodenfeuchte:data:::$val=~s/.*B:\s([-\.\d]+).*/$1/eg</code><br>
            Beispiel von OWAD: Ein Wert wie z.B.: <code>"A: 49.527 % B: 66.647 % C: 9.797 % D: 0.097 V"</code><br>
            und die Ausgabe ist für das Reading B folgende: <code>2012-11-20_10:23:54 66.647</code></li>
+        <li><code>get DbLog - - 2013-05-26 2013-05-28 Pumpe:data::delta-ts:$val=~s/on/hide/</code><br>
+           Realisierung eines Betriebsstundenzählers.Durch delta-ts wird die Zeit in Sek zwischen den Log-
+           einträgen ermittelt. Die Zeiten werden bei den on-Meldungen nicht ausgegeben welche einer Abschaltzeit 
+           entsprechen würden.</li>
       </ul>
     <br><br>
   </ul>
