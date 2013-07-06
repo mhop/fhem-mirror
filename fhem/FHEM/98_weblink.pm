@@ -38,7 +38,7 @@ weblink_Define($$)
 {
   my ($hash, $def) = @_;
   my ($type, $name, $wltype, $link) = split("[ \t]+", $def, 4);
-  my %thash = ( link=>1, fileplot=>1, dbplot=>1, image=>1, iframe=>1, htmlCode=>1, cmdList=>1 );
+  my %thash = ( link=>1, fileplot=>1, dbplot=>1, image=>1, iframe=>1, htmlCode=>1, cmdList=>1, readings=>1 );
   
   if(!$link || !$thash{$wltype}) {
     return "Usage: define <name> weblink [" .
@@ -141,9 +141,9 @@ weblink_FwFn($$$$)
   } elsif($wltype eq "cmdList") {
 
     my @lines = split(" ", $link);
-    my $row = 0;
+    my $row = 1;
     my $ret = "<table>";
-    $ret .= "<tr><td><div class=\"devType\"><a href=\"/fhem?detail=$d\">".AttrVal($d, "alias", $d)."</div></td></tr>";
+    $ret .= "<tr><td><div class=\"devType\"><a href=\"/fhem?detail=$d\">".AttrVal($d, "alias", $d)."</a></div></td></tr>";
     $ret .= "<tr><td><table class=\"block wide\">";
     foreach my $line (@lines) {
       my @args = split(":", $line, 3);
@@ -155,6 +155,82 @@ weblink_FwFn($$$$)
     $ret .= "</table></td></tr>";
     $ret .= "</table><br>";
 
+    return $ret;
+
+  } elsif($wltype eq "readings") {
+    my @params = split(" ", $link);
+
+    my @devices;
+    my $mapping;
+    my $show_heading = 1;
+    my $show_state = 1;
+    my $show_time = 1;
+
+    while (@params) {
+      my $param = shift(@params);
+      
+      if( $param eq '*noheading' ) {
+        $show_heading = 0;
+      }elsif( $param eq '*notime' ) {
+        $show_time = 0;
+      }
+      elsif( $param eq '*nostate' ) {
+        $show_state = 0;
+      }elsif( $param =~ m/^{/) {
+        $mapping = eval $param ." ". join( " ", @params );
+        last;
+      } else {
+        my @device = split(":", $param);
+
+        if( defined($defs{$device[0]}) ) {
+          push @devices, [@device];
+        } else {
+          foreach my $d (sort keys %defs) {
+            next if( $d !~ m/$device[0]/);
+            push @devices, [$d,$device[1]];
+          }
+        }
+      }
+    }
+                
+    my $row = 1;
+    my $ret = "";
+    $ret .= "<table>";
+    $ret .= "<tr><td><div class=\"devType\"><a href=\"/fhem?detail=$d\">".AttrVal($d, "alias", $d)."</a></div></td></tr>" if( $show_heading );
+    $ret .= "<tr><td><table class=\"block wide\">";
+    foreach my $device (@devices) {
+      my $h = $defs{@{$device}[0]};
+      my $regex = @{$device}[1];
+      my $name = $h->{NAME};
+      next if( !$h );
+      foreach my $n (sort keys %{$h->{READINGS}}) {
+        next if( $n =~ m/^\./);
+        next if( $n eq "state" && !$show_state );
+        next if( defined($regex) &&  $n !~ m/$regex/);
+        my $val = $h->{READINGS}->{$n};
+                
+        if(ref($val)) {
+          my ($v, $t) = ($val->{VAL}, $val->{TIME});
+          $v = FW_htmlEscape($v);
+          $t = "" if(!$t);
+                
+          $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
+          $row++;
+                
+          my $m = $n;
+          $m = $mapping->{$n} if( defined($mapping) && defined($mapping->{$n}) );
+          $m = $mapping->{$name.".".$n} if( defined($mapping) && defined($mapping->{$name.".".$n}) );
+          $m =~ s/\$NAME/$name/g;
+          $ret .= "<td><div class=\"dname\"><a href=\"/fhem?detail=$name\">$m</a></div></td>";;
+          $ret .= "<td><div id=\"$name-$n\">$v</div></td>";
+          $ret .= "<td><div id=\"$name-$n-ts\">$t</div></td>" if( $show_time );
+        }         
+      }
+    }
+    $ret .= "</table></td></tr>";
+    $ret .= "</table>";
+    $ret .= "</br>";
+    
     return $ret;
 
   } elsif($wltype eq "fileplot" || $wltype eq "dbplot" ) {
@@ -453,7 +529,7 @@ weblink_WriteGplot($)
   <a name="weblinkdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; weblink [link|fileplot|dbplot|image|iframe|htmlCode|cmdList]
+    <code>define &lt;name&gt; weblink [link|fileplot|dbplot|image|iframe|htmlCode|cmdList|readings]
                 &lt;argument&gt;</code>
     <br><br>
     This is a placeholder used with webpgm2 to be able to integrate links
@@ -470,6 +546,8 @@ weblink_WriteGplot($)
       <code>define MyPlot weblink fileplot &lt;logdevice&gt;:&lt;gnuplot-file&gt;:&lt;logfile&gt;</code><br>
       <code>define MyPlot weblink dbplot &lt;logdevice&gt;:&lt;gnuplot-file&gt;</code><br>
       <code>define systemCommands weblink cmdList pair:Pair:set+cul2+hmPairForSec+60 restart:Restart:shutdown+restart update:UpdateCheck:update+check</code><br>
+      <code>define wl_SystemStatus weblink readings sysstat *nostate *notime  {{ 'load' => 'Systemauslastung in %', 'temperature' => 'Systemtemperatur in &amp;deg;;C'}}</code>
+      <code>define wlHeizung weblink readings t1:temperature t2:temperature t3:temperature *notime {{ 't1.temperature' => 'Vorlauf', 't2.temperature' => 'R&amp;uuml;;cklauf', 't3.temperature' => 'Zirkulation'}}</code>
     </ul>
     <br>
 
@@ -483,6 +561,21 @@ weblink_WriteGplot($)
           file, even if its name changes regularly (and not the one you
           originally specified).</li>
       <li>For cmdList &lt;argument&gt; consist of a list of space separated icon:label:cmd triples.</li>
+      <li>For redings &lt;argument&gt; consist of one or more &lt;device&gt;[:regex] pairs,
+          zero or more of the modifiers *noheading, *notime and *nostate and as the last argument an optional {} expression that should return
+          a perl hash to map reading names to display names.
+      <ul>
+          <li>&lt;device&gt;<br>
+          the device(s) from which the readings should be taken</li>
+          <li>regex<br>
+          an optional regex to select the readings that should be displayed.</li>
+          <li>*noheading<br>don't display the table heading</li>
+          <li>*notime<br>don't display the reading timestamp</li>
+          <li>*nostate<br>don't include the state reading, other readings can be excluded with a regex of the form:<code>^((?!reading).)*$</code></li>
+          <li>{...}<br>
+          a perl expression that returns a hash that maps the reading name to the display name. keys can be either the name of the reading or &lt;device&gt;.&lt;reading&gt;. $NAME is replaced by the device name</li>
+          </li>
+      </ul>
     </ul>
   </ul>
 
