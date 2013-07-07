@@ -546,7 +546,7 @@ weblink_WriteGplot($)
       <code>define MyPlot weblink fileplot &lt;logdevice&gt;:&lt;gnuplot-file&gt;:&lt;logfile&gt;</code><br>
       <code>define MyPlot weblink dbplot &lt;logdevice&gt;:&lt;gnuplot-file&gt;</code><br>
       <code>define systemCommands weblink cmdList pair:Pair:set+cul2+hmPairForSec+60 restart:Restart:shutdown+restart update:UpdateCheck:update+check</code><br>
-      <code>define wl_SystemStatus weblink readings sysstat *nostate *notime  {{ 'load' => 'Systemauslastung in %', 'temperature' => 'Systemtemperatur in &amp;deg;;C'}}</code>
+      <code>define wl_SystemStatus weblink readings sysstat *nostate *notime  {{ 'load' => 'Systemauslastung in %', 'temperature' => 'Systemtemperatur in &amp;deg;;C'}}</code><br>
       <code>define wlHeizung weblink readings t1:temperature t2:temperature t3:temperature *notime {{ 't1.temperature' => 'Vorlauf', 't2.temperature' => 'R&amp;uuml;;cklauf', 't3.temperature' => 'Zirkulation'}}</code>
     </ul>
     <br>
