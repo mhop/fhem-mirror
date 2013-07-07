@@ -91,7 +91,7 @@ Ext.define('FHEM.view.LineChartPanel', {
         var chartSettingPanel = Ext.create('Ext.form.Panel', {
             title: 'Chart Settings - Click me to edit',
             name: 'chartformpanel',
-            maxHeight: 270,
+            maxHeight: 325,
             autoScroll: true,
             collapsible: true,
             titleCollapse: true,
@@ -269,6 +269,32 @@ Ext.define('FHEM.view.LineChartPanel', {
                             disabled: true,
                             labelWidth: 60,
                             width: 120
+                        }
+                    ]
+                }, 
+                {
+                    xtype: 'fieldset',
+                    layout: 'column',
+                    title: 'Axis Title Configuration',
+                    defaults: {
+                        margin: '0 0 5 10'
+                    },
+                    items: [
+                        {
+                            xtype: 'textfield',
+                            fieldLabel: 'Left Axis Title',
+                            name: 'leftaxistitle',
+                            allowBlank: true,
+                            labelWidth: 100,
+                            width: 340
+                        },
+                        {
+                            xtype: 'textfield',
+                            fieldLabel: 'Right Axis Title',
+                            name: 'rightaxistitle',
+                            allowBlank: true,
+                            labelWidth: 100,
+                            width: 340
                         }
                     ]
                 }, 

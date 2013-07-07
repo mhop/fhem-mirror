@@ -79,6 +79,11 @@ Ext.define('FHEM.controller.MainController', {
         
         var me = this;
         
+        me.createFHEMPanel();
+        me.createDevicePanel();
+        me.createLineChartPanel();
+        me.createDatabaseTablePanel();
+        
         me.getMainviewport().show();
         me.getMainviewport().getEl().setOpacity(0);
         me.getMainviewport().getEl().animate({
@@ -90,7 +95,7 @@ Ext.define('FHEM.controller.MainController', {
         
         if (Ext.isDefined(FHEM.version)) {
             var sp = this.getStatustextfield();
-            sp.setText(FHEM.version + "; Frontend Version: 0.8 - 2013-06-27");
+            sp.setText(FHEM.version + "; Frontend Version: 0.9 - 2013-07-07");
         }
         
         this.setupTree(false);
@@ -203,6 +208,10 @@ Ext.define('FHEM.controller.MainController', {
                     chartfoldernode.appendChild(chartchild);
                 }
             });
+            
+            // at last we add a chart template to the folder which wont be saved to db and cannot be deleted
+            chartchild = {text: 'Create new Chart', leaf: true, data: {template: true}, iconCls:'x-tree-icon-leaf-chart'};
+            chartfoldernode.appendChild(chartchild);
             
         });
     },
@@ -411,10 +420,10 @@ Ext.define('FHEM.controller.MainController', {
     /**
      * 
      */
-    destroyCenterPanels: function() {
+    hideCenterPanels: function() {
         var panels = Ext.ComponentQuery.query('panel[region=center]');
         Ext.each(panels, function(panel) {
-            panel.destroy();
+            panel.hide();
         });
     },
     
@@ -423,14 +432,11 @@ Ext.define('FHEM.controller.MainController', {
      */
     showDeviceOrChartPanel: function(treeview, rec) {
         var me = this;
-        if (rec.get('leaf') === true && 
+        if (rec.raw.data.template === true || rec.get('leaf') === true && 
             rec.raw.data &&
             rec.raw.data.TYPE && 
             rec.raw.data.TYPE === "savedchart") {
-                var lcp = Ext.ComponentQuery.query('linechartpanel')[0];
-                if (!lcp || lcp.isVisible === false) {
-                    this.showLineChartPanel();
-                }
+                this.showLineChartPanel();
         } else {
             this.showDevicePanel(treeview, rec);
         }
@@ -440,12 +446,22 @@ Ext.define('FHEM.controller.MainController', {
      * 
      */
     showFHEMPanel: function() {
+        var panel = Ext.ComponentQuery.query('panel[name=fhempanel]')[0];
+        this.hideCenterPanels();
+        panel.show();
+    },
+    
+    /**
+     * 
+     */
+    createFHEMPanel: function() {
         var panel = {
             xtype: 'panel',
+            name: 'fhempanel',
             title: 'FHEM',
             region: 'center',
             layout: 'fit',
-            hidden: false,
+            hidden: true,
             items : [
                 {
                     xtype : 'component',
@@ -456,7 +472,6 @@ Ext.define('FHEM.controller.MainController', {
                 }
             ]
         };
-        this.destroyCenterPanels();
         this.getMainviewport().add(panel);
     },
     
@@ -466,6 +481,7 @@ Ext.define('FHEM.controller.MainController', {
     showDevicePanel: function(view, record) {
         
         if (record.raw.leaf === true) {
+            var panel = Ext.ComponentQuery.query('devicepanel')[0];
             var title;
             if (record.raw.ATTR && 
                 record.raw.ATTR.alias && 
@@ -474,28 +490,11 @@ Ext.define('FHEM.controller.MainController', {
             } else {
                 title = record.raw.data.NAME;
             }
-            var panel = {
-                xtype: 'devicepanel',
-                title: title,
-                region: 'center',
-                layout: 'fit',
-                record: record,
-                hidden: true
-            };
-            this.destroyCenterPanels();
-            this.getMainviewport().add(panel);
+            panel.setTitle(title);
+            panel.record = record;
             
-            var createdpanel = this.getMainviewport().down('devicepanel');
-            
-            createdpanel.getEl().setOpacity(0);
-            createdpanel.show();
-            
-            createdpanel.getEl().animate({
-                opacity: 1, 
-                easing: 'easeIn',
-                duration: 500,
-                remove: false
-            });
+            this.hideCenterPanels();
+            panel.show();
         }
         
     },
@@ -503,8 +502,31 @@ Ext.define('FHEM.controller.MainController', {
     /**
      * 
      */
+    createDevicePanel: function() {
+        var panel = {
+            xtype: 'devicepanel',
+            title: null,
+            region: 'center',
+            layout: 'fit',
+            record: null,
+            hidden: true
+        };
+        this.getMainviewport().add(panel);
+    },
+    
+    /**
+     * 
+     */
     showLineChartPanel: function() {
-        
+        var panel = Ext.ComponentQuery.query('linechartpanel')[0];
+        this.hideCenterPanels();
+        panel.show();
+    },
+    
+    /**
+     * 
+     */
+    createLineChartPanel: function() {
         var panel = {
             xtype: 'linechartpanel',
             name: 'linechartpanel',
@@ -512,27 +534,13 @@ Ext.define('FHEM.controller.MainController', {
             layout: 'fit',
             hidden: true
         };
-        this.destroyCenterPanels();
         this.getMainviewport().add(panel);
-        
-        var createdpanel = this.getMainviewport().down('linechartpanel');
-        
-        createdpanel.getEl().setOpacity(0);
-        createdpanel.show();
-        
-        createdpanel.getEl().animate({
-            opacity: 1, 
-            easing: 'easeIn',
-            duration: 500,
-            remove: false
-        });
-        
     },
     
     /**
      * 
      */
-    showDatabaseTablePanel: function() {
+    createDatabaseTablePanel: function() {
         var panel = {
             xtype: 'tabledatagridpanel',
             name: 'tabledatagridpanel',
@@ -540,20 +548,17 @@ Ext.define('FHEM.controller.MainController', {
             layout: 'fit',
             hidden: true
         };
-        this.destroyCenterPanels();
         this.getMainviewport().add(panel);
         
-        var createdpanel = this.getMainviewport().down('tabledatagridpanel');
-        
-        createdpanel.getEl().setOpacity(0);
-        createdpanel.show();
-        
-        createdpanel.getEl().animate({
-            opacity: 1, 
-            easing: 'easeIn',
-            duration: 500,
-            remove: false
-        });
+    },
+    
+    /**
+     * 
+     */
+    showDatabaseTablePanel: function() {
+        var panel = Ext.ComponentQuery.query('tabledatagridpanel')[0];
+        this.hideCenterPanels();
+        panel.show();
     }
     
 });

@@ -119,23 +119,27 @@ Ext.define('FHEM.view.DevicePanel', {
         };
         me.down('panel[name=container]').add(devicereadingsgrid);
         
-        // Stop all old tasks
-        Ext.TaskManager.stopAll();
-        
-        // Starting a task to update the device readings
-        var task = {
-            run: function(){
-                me.getDeviceData(me.record.raw.data.NAME);
-            },
-            interval: 5000 //5 seconds
-        };
-        Ext.TaskManager.start(task);
-        
-        me.on("afterrender", function() {
+        me.on("show", function() {
             me.setLoading(true);
+            
+            // Stop all old tasks
+            Ext.TaskManager.stopAll();
+            
+            //remove old controls to rerender them on devicechange
+            me.down('fieldset[name=controlfieldset]').removeAll();
+            me.down('fieldset[name=controlfieldset]').hide();
+            
+            // Starting a task to update the device readings
+            var task = {
+                run: function(){
+                    me.getDeviceData(me.record.raw.data.NAME);
+                },
+                interval: 5000 //5 seconds
+            };
+            Ext.TaskManager.start(task);
         });
         
-        me.on("destroy", function() {
+        me.on("hide", function() {
             Ext.TaskManager.stopAll();
         });
         
@@ -311,6 +315,7 @@ Ext.define('FHEM.view.DevicePanel', {
                 }
             });
         } else { // we already have controls added, just checkin the state if everything is up2date
+            
             Ext.each(controlfieldset.items.items, function(subfieldset) {
                 
                 Ext.each(subfieldset.items.items, function(item) {
@@ -338,6 +343,12 @@ Ext.define('FHEM.view.DevicePanel', {
                 });
             });
         }
+        if (controlfieldset.items.length <= 0) {
+            controlfieldset.hide();
+        } else {
+            controlfieldset.show();
+        }
+        
     },
     
     /**
@@ -418,7 +429,6 @@ Ext.define('FHEM.view.DevicePanel', {
      */
     getDeviceData: function(name) {
         var me = this;
-        
         Ext.Ajax.request({
             method: 'GET',
             disableCaching: false,
