@@ -128,6 +128,12 @@ Ext.define('FHEM.controller.ChartController', {
         
         var me = this;
         
+        //hiding chart for performance reasons
+        if (me.getChart()) {
+            me.getChart().getStore().removeAll();
+            me.getChart().hide();
+        }
+        
         //show loadmask
         me.getLinechartpanel().setLoading(true);
         
@@ -292,34 +298,36 @@ Ext.define('FHEM.controller.ChartController', {
         var cfp = Ext.ComponentQuery.query('form[name=chartformpanel]')[0];
         var cdg = Ext.ComponentQuery.query('panel[name=chartgridpanel]')[0];
         
-        // disable animation as long as we resize, causes serious performance issues
-        lcv.animate = false;
-        
-        if (lcp && lcv && cfp && cdg) {
-            var lcph = lcp.getHeight(),
-                lcpw = lcp.getWidth(),
-                cfph = cfp.getHeight(),
-                cdgh = cdg.getHeight();
+        if (lcv) {
+         // disable animation as long as we resize, causes serious performance issues
+            lcv.animate = false;
             
-            if (lcph && lcpw && cfph && cdgh) {
-                var chartheight = lcph - cfph - cdgh - 80;
-                var chartwidth = lcpw - 5;
-                lcv.height = chartheight;
-                lcv.width = chartwidth;
-                //render after 50ms to get component right
-                window.setTimeout(function() {
-                    if (lcv.series.get(0).hideAll) {
-                        lcv.series.get(0).hideAll();
-                    }
-                    lcv.doComponentLayout();
-                    if (lcv.series.get(0).showAll) {
-                        lcv.series.get(0).showAll();
-                    }
-                    lcv.redraw();
-                }, 50);
+            if (lcp && lcv && cfp && cdg) {
+                var lcph = lcp.getHeight(),
+                    lcpw = lcp.getWidth(),
+                    cfph = cfp.getHeight(),
+                    cdgh = cdg.getHeight();
+                
+                if (lcph && lcpw && cfph && cdgh) {
+                    var chartheight = lcph - cfph - cdgh - 80;
+                    var chartwidth = lcpw - 5;
+                    lcv.height = chartheight;
+                    lcv.width = chartwidth;
+                    //render after 50ms to get component right
+                    window.setTimeout(function() {
+                        if (lcv.series.get(0).hideAll) {
+                            lcv.series.get(0).hideAll();
+                        }
+                        lcv.doComponentLayout();
+                        if (lcv.series.get(0).showAll) {
+                            lcv.series.get(0).showAll();
+                        }
+                        lcv.redraw();
+                    }, 50);
+                }
             }
+            lcv.animate = true;
         }
-        lcv.animate = true;
     },
     
     /**
@@ -817,6 +825,8 @@ Ext.define('FHEM.controller.ChartController', {
                       me.generalizeChartData(generalizationfactor, i);
                   }
                   
+                  chart.series.add(yseries);
+                  
               } 
           },
           failure: function() {
@@ -824,8 +834,6 @@ Ext.define('FHEM.controller.ChartController', {
           }
         });
       
-        chart.series.add(yseries);
-        
         //check if we have added the last dataset
         if ((i + 1) === axeslength) {
             //add baselines
@@ -935,14 +943,29 @@ Ext.define('FHEM.controller.ChartController', {
         
         if (timediffhrs <= 1) {
             chart.axes.get(2).step = [Ext.Date.MINUTE, 10];
+            chart.axes.get(2).label.renderer = function(v) { 
+                return Ext.Date.format(new Date(v), "H:i:s"); 
+            };
         } else if (timediffhrs <= 24) {
             chart.axes.get(2).step = [Ext.Date.HOUR, 1];
+            chart.axes.get(2).label.renderer = function(v) { 
+                return Ext.Date.format(new Date(v), "H:i:s"); 
+            };
         } else if (timediffhrs <= 168) {
             chart.axes.get(2).step = [Ext.Date.DAY, 1];
+            chart.axes.get(2).label.renderer = function(v) { 
+                return Ext.Date.format(new Date(v), "d-m-Y"); 
+            };
         } else if (timediffhrs <= 720) {
             chart.axes.get(2).step = [Ext.Date.DAY, 7];
-        } else if (timediffhrs < 720) {
+            chart.axes.get(2).label.renderer = function(v) { 
+                return Ext.Date.format(new Date(v), "d-m-Y"); 
+            };
+        } else if (timediffhrs > 720) {
             chart.axes.get(2).step = [Ext.Date.MONTH, 1];
+            chart.axes.get(2).label.renderer = function(v) { 
+                return Ext.Date.format(new Date(v), "d-m-Y"); 
+            };
         }
         
         chart.axes.get(2).processView();
@@ -953,6 +976,8 @@ Ext.define('FHEM.controller.ChartController', {
         
         //enable animation
         chart.animate = true;
+        
+        chart.show();
         
     },
     
@@ -970,16 +995,24 @@ Ext.define('FHEM.controller.ChartController', {
         
         if (axisside === "left") {
             axis = chart.axes.get(0);
+            axistitle = this.getChartformpanel().down('textfield[name=leftaxistitle]').getValue();
         } else if (axisside === "right") {
             axis = chart.axes.get(1);
+            axistitle = this.getChartformpanel().down('textfield[name=rightaxistitle]').getValue();
         }
-        var currenttitle = axis.title;
         
-        if (currenttitle === "") {
-            axis.setTitle(title);
+        if (axistitle && axistitle !== "") {
+            axis.setTitle(axistitle);
         } else {
-            axis.setTitle(axis.title + " / " + title);
+            var currenttitle = axis.title;
+            
+            if (currenttitle === "") {
+                axis.setTitle(title);
+            } else {
+                axis.setTitle(axis.title + " / " + title);
+            }
         }
+        
         if (axis.title.length > 80) {
             axis.displaySprite.attr.font = "10px Arial, Helvetica, sans-serif";
         } else if (axis.title.length > 50) {
@@ -999,7 +1032,7 @@ Ext.define('FHEM.controller.ChartController', {
                 axis : axisside,
                 xField : 'TIMESTAMP',
                 yField : yfield,
-                title: title,
+                title: axis.title,
                 showInLegend: true,
                 smooth: 0,
                 highlight: true,
@@ -1113,6 +1146,8 @@ Ext.define('FHEM.controller.ChartController', {
         
         Ext.ComponentQuery.query('radiogroup[name=leftaxisconfiguration]')[0].items.items[0].setValue(true);
         Ext.ComponentQuery.query('radiogroup[name=rightaxisconfiguration]')[0].items.items[0].setValue(true);
+        this.getChartformpanel().down('textfield[name=rightaxistitle]').setValue("");
+        this.getChartformpanel().down('textfield[name=leftaxistitle]').setValue("");
     
     },
     
@@ -1167,18 +1202,6 @@ Ext.define('FHEM.controller.ChartController', {
         
         var me = this;
         
-        //get available foldernames
-//        var rootNode = me.getMaintreepanel().getRootNode(),
-//            folderArray = [];
-//        rootNode.cascadeBy(function(node) {
-//           if (node.get('leaf') === false) {
-//               if (node.get('text') !== 'root') {
-//                   folderArray.push(node.get('text'));
-//               }
-//           }
-//        });
-//        console.log(folderArray);
-        
         Ext.Msg.prompt("Select a name", "Enter a name to save the Chart", function(action, savename) {
             if (action === "ok" && !Ext.isEmpty(savename)) {
                 //replacing spaces in name
@@ -1231,14 +1254,24 @@ Ext.define('FHEM.controller.ChartController', {
                         yaxiscolorcombo = yaxescolorcombos[i].getDisplayValue(),
                         yaxisfillcheck = yaxesfillchecks[i].checked,
                         yaxisstepcheck = yaxesstepchecks[i].checked,
-                        axisside = axissideradio[i].getChecked()[0].getSubmitValue();
-                        yaxisstatistics = yaxesstatistics[i].getValue();
+                        yaxisstatistics = yaxesstatistics[i].getValue(),
+                        axisside = axissideradio[i].getChecked()[0].getSubmitValue(),
+                        rightaxistitle = me.getChartformpanel().down('textfield[name=rightaxistitle]').getValue(),
+                        leftaxistitle = me.getChartformpanel().down('textfield[name=leftaxistitle]').getValue();
+                    //replacing spaces in title
+                    rightaxistitle = rightaxistitle.replace(/ /g, "_");
+                    leftaxistitle = leftaxistitle.replace(/ /g, "_");
+                    //replacing + in title
+                    rightaxistitle = rightaxistitle.replace(/\+/g, "_");
+                    leftaxistitle = leftaxistitle.replace(/\+/g, "_");
                     
                     if (i === 0) {
                         jsonConfig += '"y":"' + yaxis + '","device":"' + device + '",';
                         jsonConfig += '"yaxiscolorcombo":"' + yaxiscolorcombo + '","yaxisfillcheck":"' + yaxisfillcheck + '",';
                         jsonConfig += '"yaxisstepcheck":"' + yaxisstepcheck + '",';
                         jsonConfig += '"yaxisside":"' + axisside + '",';
+                        jsonConfig += '"leftaxistitle":"' + leftaxistitle + '",';
+                        jsonConfig += '"rightaxistitle":"' + rightaxistitle + '",';
                         
                         if (yaxisstatistics !== "none") {
                             jsonConfig += '"yaxisstatistics":"' + yaxisstatistics + '",';
@@ -1361,6 +1394,8 @@ Ext.define('FHEM.controller.ChartController', {
             
             //cleanup the form before loading
             this.resetFormFields();
+            
+            this.getChartformpanel().collapse();
             
             if (chartdata && !Ext.isEmpty(chartdata)) {
                 
@@ -1511,12 +1546,32 @@ Ext.define('FHEM.controller.ChartController', {
                     Ext.ComponentQuery.query('numberfield[name=rightaxismaximum]')[0].setValue(chartdata.rightaxismax);
                 }
                 
+                if (chartdata.rightaxistitle && chartdata.rightaxistitle !== "") {
+                    //replacing spaces in title
+                    var rightaxistitle = chartdata.rightaxistitle.replace(/_/g, " ");
+                    me.getChartformpanel().down('textfield[name=rightaxistitle]').setValue(rightaxistitle);
+                }
+                
+                if (chartdata.leftaxistitle && chartdata.leftaxistitle !== "") {
+                    //replacing spaces in title
+                    var leftaxistitle = chartdata.leftaxistitle.replace(/_/g, " ");
+                    me.getChartformpanel().down('textfield[name=leftaxistitle]').setValue(leftaxistitle);
+                }
+                
                 this.requestChartData();
                 this.getLinechartpanel().setTitle(name);
             } else {
                 Ext.Msg.alert("Error", "The Chart could not be loaded! RawChartdata was: <br>" + chartdata);
             }
             
+        } else if (record.raw.data.template) {
+            //seems we have clicked on a template chart, resetting the form...
+            me.resetFormFields();
+            if (me.getChart()) {
+                me.getChart().getStore().removeAll();
+                me.getChart().hide();
+                this.getChartformpanel().expand();
+            }
         }
     },
     
@@ -1760,7 +1815,7 @@ Ext.define('FHEM.controller.ChartController', {
             var rec = action.records[0],
             id = rec.raw.data.ID;
         
-            if (rec.raw.data && rec.raw.data.ID && rec.raw.data.TYPE === "savedchart") {
+            if (rec.raw.data && rec.raw.data.ID && rec.raw.data.TYPE === "savedchart" && !rec.raw.data.template) {
                 var rootNode = this.getMaintreepanel().getRootNode();
                 rootNode.cascadeBy(function(node) {
                     if (node.raw && node.raw.data && node.raw.data.ID && node.raw.data.ID === id) {
