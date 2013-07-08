@@ -10,6 +10,7 @@ use Device::Firmata::Constants  qw/ :all /;
 
 my %sets = (
   "alarm" => "",
+  "count" => 0,
 );
 
 my %gets = (
@@ -26,11 +27,12 @@ FRM_IN_Initialize($)
 
   $hash->{SetFn}     = "FRM_IN_Set";
   $hash->{GetFn}     = "FRM_IN_Get";
+  $hash->{AttrFn}    = "FRM_IN_Attr";
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_IN_Init";
   $hash->{UndefFn}   = "FRM_IN_Undef";
   
-  $hash->{AttrList}  = "IODev count-mode count-threshold loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
+  $hash->{AttrList}  = "IODev count-mode:none,rising,falling,both count-threshold reset-on-threshold-reached:yes,no loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
 }
 
 sub
@@ -54,23 +56,31 @@ FRM_IN_observer
 	my ($pin,$old,$new,$hash) = @_;
 	main::Log(6,"onDigitalMessage for pin ".$pin.", old: ".(defined $old ? $old : "--").", new: ".(defined $new ? $new : "--"));
 	my $name = $hash->{NAME};
-	my $mode = AttrVal($name,"count-mode","rising");
-	my $count = ReadingsVal($name,"count",0);
-	main::readingsBeginUpdate($hash);
-	if ( ($old != $new) 
-	  and (($mode eq "rising" and $old == PIN_LOW) 
-	    or ($mode eq "falling" and $old == PIN_HIGH)
-	    or ($mode eq "both"))) {
-	  $count++;
-	  my $threshold = AttrVal($name,"count-threshold",0);
-      if ( $count >= $threshold ) {
-      	main::readingsBulkUpdate($hash,"alarm","on",1);
-      	$count=0;
-      }
-	  main::readingsBulkUpdate($hash,"count",$count,1); 
-	};
-	main::readingsBulkUpdate($hash,"reading",$new == PIN_HIGH ? "on" : "off", 1);
-	main::readingsEndUpdate($hash,1);
+	if ($old ne $new or !defined $hash->{reading} or $hash->{reading} ne $new) { 
+  	main::readingsBeginUpdate($hash);
+  	if (defined (my $mode = main::AttrVal($name,"count-mode",undef))) {
+  		if ($mode ne "none" 
+  		and (($mode eq "rising" and $old == PIN_LOW)
+  		or ($mode eq "falling" and $old == PIN_HIGH)
+  	    or ($mode eq "both"))) {
+  	    	my $count = main::ReadingsVal($name,"count",0);
+  	    	$count++;
+  	    	if (defined (my $threshold = main::AttrVal($name,"count-threshold",undef))) {
+  	    		if ( $count > $threshold ) {
+  	    			if (AttrVal($name,"reset-on-threshold-reached","no") eq "yes") {
+  	    			  $count=0;
+  	    			  main::readingsBulkUpdate($hash,"alarm","on",1);
+  	    			} elsif ( main::ReadingsVal($name,"alarm","off") ne "on" ) {
+  	    			  main::readingsBulkUpdate($hash,"alarm","on",1);
+  	    			}
+  	    		}
+  	    	}
+  	    	main::readingsBulkUpdate($hash,"count",$count,1);
+  	    } 
+  	};
+  	main::readingsBulkUpdate($hash,"reading",$new == PIN_HIGH ? "on" : "off", 1);
+  	main::readingsEndUpdate($hash,1);
+	}
 }
 
 sub
@@ -87,7 +97,11 @@ FRM_IN_Set
       return undef if (!($value eq "off" or $value eq "on"));
       main::readingsSingleUpdate($hash,"alarm",$value,1);
       last;
-    }
+    };
+    $command eq "count" and do {
+      main::readingsSingleUpdate($hash,"count",$value,1);
+      last;
+    };
   }
 }
 
@@ -112,6 +126,44 @@ FRM_IN_Get($)
     };
   }
   return undef;
+}
+
+sub
+FRM_IN_Attr($$$$) {
+  my ($command,$name,$attribute,$value) = @_;
+  if ($command eq "set") {
+    ARGUMENT_HANDLER: {
+      $attribute eq "count-mode" and do {
+        if ($value ne "none" and !defined main::ReadingsVal($name,"count",undef)) {
+          main::readingsSingleUpdate($main::defs{$name},"count",$sets{count},1);
+        }
+        last;
+      }; 
+      $attribute eq "reset-on-threshold-reached" and do {
+        if ($value eq "yes"
+        and defined (my $threshold = main::AttrVal($name,"count-threshold",undef))) {
+          if (main::ReadingsVal($name,"count",0) > $threshold) {
+            main::readingsSingleUpdate($main::defs{$name},"count",$sets{count},1);
+          }
+        }
+        last;
+      };
+      $attribute eq "count-threshold" and do {
+        if (main::ReadingsVal($name,"count",0) > $value) {
+          my $hash = $main::defs{$name};
+          main::readingsBeginUpdate($hash);
+          if (main::ReadingsVal($name,"alarm","off") ne "on") {
+            main::readingsBulkUpdate($hash,"alarm","on",1);
+          }
+          if (main::AttrVal($name,"reset-on-threshold-reached","no") eq "yes") {
+            main::readingsBulkUpdate($main::defs{$name},"count",0,1);
+          }
+          main::readingsEndUpdate($hash,1);
+        }
+        last;
+      };
+    }
+  }
 }
 
 sub
@@ -165,9 +217,9 @@ FRM_IN_Undef($$)
   <a name="FRM_INattr"></a>
   <b>Attributes</b><br>
   <ul>
-      <li>count-mode rising|falling|both<br>
+      <li>count-mode none|rising|falling|both<br>
       Determines whether 'rising' (transitions from 'off' to 'on') of falling (transitions from 'on' to 'off')<br>
-      edges (or 'both') are counted. Defaults to 'rising'</li>
+      edges (or 'both') are counted. Defaults to 'none'</li>
       <li>count-threshold &lt;number&gt;<br>
       sets the theshold-value for the counter. Whenever 'count' reaches the 'count-threshold' 'alarm' is<br>
       set to 'on' and count is reset to 0. Use 'set alarm off' to clear the alarm.</li>
