@@ -373,19 +373,15 @@ FRM_Init_Pin_Client($$$) {
   	return $u unless defined $args and int(@$args) > 0;
  	my $pin = @$args[0];
   	$hash->{PIN} = $pin;
-	if (defined $hash->{IODev} and defined $hash->{IODev}->{FirmataDevice}) {
-		eval {
-			$hash->{IODev}->{FirmataDevice}->pin_mode($pin,$mode);
-		};
-		if ($@) {
-			main::Log(2,"FRM_Init error setting pin_mode: ".$@);
-			FRM_Client_Unassign($hash);
-			return "error setting ".$hash->{NAME}." pin_mode for pin ".$pin;
-		}
-		return undef;
+  eval {
+    FRM_Client_FirmataDevice($hash)->pin_mode($pin,$mode);
+	};
+	if ($@) {
+		main::Log(2,"FRM_Init error setting pin_mode: ".$@);
+		#FRM_Client_Unassign($hash);
+		return "error setting ".$hash->{NAME}." pin_mode for pin ".$pin;
 	}
-	return "no IODev set" unless defined $hash->{IODev};
-	return "no FirmataDevice assigned to ".$hash->{IODev}->{NAME};  	
+	return undef;
 }
 
 sub
