@@ -56,15 +56,13 @@ FRM_IN_observer
 	my ($pin,$old,$new,$hash) = @_;
 	main::Log(6,"onDigitalMessage for pin ".$pin.", old: ".(defined $old ? $old : "--").", new: ".(defined $new ? $new : "--"));
 	my $name = $hash->{NAME};
-	my $previous = main::ReadingsVal($name,"reading",undef);
-	my $changed = (($old ne $new) or !(defined $previous) or ($previous ne $new));
+	my $changed = ((!(defined $old)) or ($old != $new));
 	main::readingsBeginUpdate($hash);
 	if ($changed) { 
   	if (defined (my $mode = main::AttrVal($name,"count-mode",undef))) {
-  		if ($mode ne "none" 
-  		and (($mode eq "rising" and $old == PIN_LOW)
-  		or ($mode eq "falling" and $old == PIN_HIGH)
-  	    or ($mode eq "both"))) {
+  		if (($mode eq "both")
+  		or (($mode eq "rising") and ($old == PIN_LOW))
+  		or (($mode eq "falling") and ($old == PIN_HIGH))) {
   	    	my $count = main::ReadingsVal($name,"count",0);
   	    	$count++;
   	    	if (defined (my $threshold = main::AttrVal($name,"count-threshold",undef))) {
