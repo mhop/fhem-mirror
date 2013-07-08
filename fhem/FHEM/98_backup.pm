@@ -173,8 +173,10 @@ createArchiv($)
 
     # prevents tar's output of "Removing leading /" and return total bytes of archive
     $cmd = "tar -$tarOpts - @pathname |gzip > $backupdir/FHEM-$dateTime.tar.gz";
+
   } else {
-    $ret = "$backupcmd \"@pathname\"";
+    $cmd = "$backupcmd \"@pathname\"";
+
   }
   Log 2, "Backup with command: $cmd";
   $ret = `($cmd) 2>&1`;
