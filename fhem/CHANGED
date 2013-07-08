@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: FLOORPLAN: enhanced detail-screen for floorplans in fhemweb, 
+             arrange-mode has delete-button, new command 
+			 "get <floorplan-name> config"
   - feature: readings type added to weblink (justme1968)
   - feature: offset and monotonic added to userReadings modifier (justme1968)
   - feature: HUEDevice: support SVG icons for LWB001 living whites bulb
