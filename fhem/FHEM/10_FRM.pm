@@ -21,6 +21,16 @@ use Device::Firmata::Platform;
 sub FRM_Set($@);
 sub FRM_Attr(@);
 
+my %sets = (
+  "reset" => "",
+  "reinit" => ""
+);
+
+my %gets = (
+  "firmware" => "",
+  "version"   => ""
+);
+
 #####################################
 sub FRM_Initialize($) {
 	my $hash = shift @_;
@@ -101,42 +111,49 @@ sub FRM_Undef($) {
 
 #####################################
 sub FRM_Set($@) {
-	my ( $hash, @a ) = @_;
-	my $u1 = "Usage: set <name> reset/reinit\n";
+  my ($hash, @a) = @_;
+  return "Need at least one parameters" if(@a < 2);
+  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %sets)
+  	if(!defined($sets{$a[1]}));
+  my $command = $a[1];
+  my $value = $a[2];
 
-	return $u1 if ( int(@a) < 2 );
-	my $name = $hash->{DeviceName};
-
-	if ( $a[1] eq 'reset' ) {
-		DevIo_CloseDev($hash);	
-		my $ret = DevIo_OpenDev($hash, 0, "FRM_DoInit");
-		return $ret;	
-	} elsif ( $a[1] eq 'reinit' ) {
-		FRM_forall_clients($hash,\&FRM_Init_Client,undef);
-	} else {
-		return "Unknown argument $a[1], supported arguments are reset, reinit";
+  COMMAND_HANDLER: {
+    $command eq "reset" and do {
+  		DevIo_CloseDev($hash);	
+		  return DevIo_OpenDev($hash, 0, "FRM_DoInit");
+    };
+    $command eq "reinit" and do {
+			FRM_forall_clients($hash,\&FRM_Init_Client,undef);
+			last;
+    };
 	}
 	return undef;
 }
 
 #####################################
 sub FRM_Get($@) {
-	my ( $hash, @a ) = @_;
-	return "\"get FRM\" needs only one parameter" if ( @a != 2 );
-	shift @a;
-	my $spec = shift @a;
-	if ( $spec eq "firmware" ) {
-		if (defined $hash->{FirmataDevice}) {
-			return $hash->{FirmataDevice}->{metadata}->{firmware};
-		} else {
-			return "not connected to FirmataDevice";
-		}	
-	} elsif ( $spec eq "version" ) {
-		if (defined $hash->{FirmataDevice}) {
-			return $hash->{FirmataDevice}->{metadata}->{firmware_version};
-		} else {
-			return "not connected to FirmataDevice";
-		}
+  my ($hash, @a) = @_;
+  return "Need at least one parameters" if(@a < 2);
+  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %gets)
+  	if(!defined($gets{$a[1]}));
+  my $name = shift @a;
+  my $cmd = shift @a;
+  ARGUMENT_HANDLER: {
+    $cmd eq "firmware" and do {
+      if (defined $hash->{FirmataDevice}) {
+        return $hash->{FirmataDevice}->{metadata}->{firmware};
+      } else {
+        return "not connected to FirmataDevice";
+      }
+		};
+		$cmd eq "version" and do {
+  		if (defined $hash->{FirmataDevice}) {
+  		  return $hash->{FirmataDevice}->{metadata}->{firmware_version};
+  		} else {
+  		  return "not connected to FirmataDevice";
+		  }
+		};
 	}
 }
 
