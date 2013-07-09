@@ -25,6 +25,8 @@ input {outline:none; background-color: #111111;
        border: 1px solid #ffffff; color: #cccccc; padding:5px;
        margin-left: 10px; border-radius:8px; box-shadow: 5px 5px 5px #000000;}
 input:focus {border: 1px solid red;}
+input:disabled {color: #808080; }
+input[type="submit"] { background-color: #353535; border-style:outset; border-width:2px }
 
 textarea {min-width:1000px; background-color: #111111;
           border: 1px solid #ffffff; color: #cccccc;
@@ -54,12 +56,16 @@ select {  margin-left:5px; margin-right:5px; }
 .set .slider { background:#101010; border-radius:8px; }
 /* timepicker */
 .set .set { margin-bottom:2px; margin-top:3px; }
+.slider { margin-left:10px; float:left; width:250px; height:26px;
+          border-style:solid; border-width:2px; border-color:#555555 }
 
 .handle { position:relative; cursor:pointer; width:50px; 
           height:20px; line-height:20px;
           -webkit-user-select:none; -moz-user-select:none; -user-select:none;
           border:2px solid; color:white; text-align:center; }
 .downText { margin-top:2px; }
+
+
 
 svg { height:32px; width:32px; fill:#fff; }
 g.on { fill:red; }
