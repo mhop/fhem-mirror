@@ -423,7 +423,7 @@ FP_show(){
   FP_menu();
   FP_menuArrange() if ($FP_arrange && ($FP_arrange eq "1" || ($FP_arrange eq $FW_wname) || $FP_arrange eq "detail"));   #shows the arrange-menu
   ## start floorplan  
-  FW_pO "\"screen\" id=\"floorplan\">";
+  FW_pO "<div class=\"screen\" id=\"floorplan\">";
   FW_pO "<div id=\"logo\"></div>";
   ## commandfield in floorplan  
   if (AttrVal("$FP_name", "commandfield", undef)) {
