@@ -1191,7 +1191,8 @@ DoSet(@)
   return undef if($skipTrigger);
 
   # Backward compatibility. Use readingsUpdate in SetFn now
-  if(!$hash->{".triggerUsed"}) {
+  # case: DoSet is called from a notify triggered by DoSet with same dev
+  if(defined($hash->{".triggerUsed"}) && $hash->{".triggerUsed"} == 0) {
     shift @a;
     # set arg if the module did not triggered events
     my $arg = join(" ", @a) if(!$hash->{CHANGED} || !int(@{$hash->{CHANGED}}));
@@ -3082,7 +3083,7 @@ readingsBeginUpdate($)
     $hash->{".attreour"} = \@a;
   }
 
-  $hash->{CHANGED}= ();
+  $hash->{CHANGED}= () if(!defined($hash->{CHANGED}));
   return $fmtDateTime;
 }
 
