@@ -116,6 +116,35 @@ sub structure_Notify($$)
   my $me = $hash->{NAME};
   my $devmap = $hash->{ATTR}."_map";
 
+  if( $dev->{NAME} eq "global" ) {
+    my $max = int(@{$dev->{CHANGED}});
+    for (my $i = 0; $i < $max; $i++) {
+      my $s = $dev->{CHANGED}[$i];
+      $s = "" if(!defined($s));
+      if($s =~ m/^RENAMED ([^ ]*) ([^ ]*)$/) {
+        my ($old, $new) = ($1, $2);
+        if( defined($hash->{CONTENT}{$old}) ) {
+
+          $hash->{DEF} =~ s/(\s+)$old(\s*)/$1$new$2/;
+
+          delete( $hash->{CONTENT}{$old} );
+          $hash->{CONTENT}{$new} = 1;
+        }
+      } elsif($s =~ m/^DELETED ([^ ]*)$/) {
+        my ($name) = ($1);
+
+        if( defined($hash->{CONTENT}{$name}) ) {
+
+          $hash->{DEF} =~ s/(\s+)$name(\s*)/ /;
+          $hash->{DEF} =~ s/^ //;
+          $hash->{DEF} =~ s/ $//;
+
+          delete( $hash->{CONTENT}{$name} );
+        }
+      }
+    }
+  }
+
   return "" if(AttrVal($me,"disable", undef));
 
   #pruefen ob Devices welches das notify ausgeloest hat Mitglied dieser
