@@ -207,7 +207,7 @@ $modules{Global}{AttrList} =
   "autoload_undefined_devices:1,0 dupTimeout latitude longitude " .
   "backupcmd backupdir backupsymlink backup_before_update " .
   "exclude_from_update motd updatebranch uniqueID ".
-  "sendStatistics:onUpdate,manually,never updateInBackground:1,0".
+  "sendStatistics:onUpdate,manually,never updateInBackground:1,0 ".
   "showInternalValues:1,0 ";
 $modules{Global}{AttrFn} = "GlobalAttr";
 
