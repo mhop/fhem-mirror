@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: LightScene: add html overview of all configured scenes in
+             detail view. allow usage of overview in a weblink.
   - feature: FLOORPLAN: enhanced detail-screen for floorplans in fhemweb, 
              arrange-mode has delete-button, new command 
 			 "get <floorplan-name> config"
