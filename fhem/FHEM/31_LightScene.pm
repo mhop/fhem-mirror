@@ -106,6 +106,10 @@ LightScene_2html($)
     $srf = $room if( $room && $room =~ m/^&/ );
     my $link = "cmd=set $name scene $scene";
     my $txt = $scene;
+    if( 1 ) {
+      my ($icon, $link, $isHtml) = FW_dev2image($name, $scene);
+      $txt = ($isHtml ? $icon : FW_makeImage($icon, $scene)) if( $icon );
+    }
     if( AttrVal($FW_wname, "longpoll", 1)) {
       $txt = "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
     } else {
