@@ -14,7 +14,7 @@ sub FW_iconName($);
 sub FW_iconPath($);
 sub FW_answerCall($);
 sub FW_calcWeblink($$);
-sub FW_dev2image($);
+sub FW_dev2image($;$);
 sub FW_devState($$@);
 sub FW_digestCgi($);
 sub FW_doDetail($);
@@ -2248,13 +2248,14 @@ FW_iconPath($)
 }
 
 sub
-FW_dev2image($)
+FW_dev2image($;$)
 {
-  my ($name) = @_;
+  my ($name, $state) = @_;
   my $d = $defs{$name};
   return "" if(!$name || !$d);
 
-  my ($type, $state) = ($d->{TYPE}, $d->{STATE});
+  my $type = $d->{TYPE};
+  $state = $d->{STATE} if(!defined($state));
   return "" if(!$type || !defined($state));
 
   my $model = $attr{$name}{model} if(defined($attr{$name}{model}));
