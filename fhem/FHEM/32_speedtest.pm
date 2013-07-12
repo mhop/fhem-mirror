@@ -111,7 +111,7 @@ speedtest_GetUpdate($)
       }
   }
 
-  $hash->{helper}{RUNNING_PID} = BlockingCall("speedtest_DoSpeedtest", $name."|".$server, "speedtest_SpeedtestDone", 120, "speedtest_SpeedtestAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+  $hash->{helper}{RUNNING_PID} = BlockingCall("speedtest_DoSpeedtest", $name."|".$server, "speedtest_SpeedtestDone", 300, "speedtest_SpeedtestAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
 }
 
 
