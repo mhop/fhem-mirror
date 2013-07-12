@@ -75,14 +75,14 @@ LightScene_2html($)
   my $row = 1;
   my $ret = "";
   $ret .= "<table>";
-  $ret .= "<tr><td><div class=\"devType\"><a href=\"$FW_ME$FW_subdir?detail=$name\">".AttrVal($name, "alias", $name)."</a></div></td></tr>" if( $show_heading );
+  $ret .= "<tr><td><div class=\"devType\"><a href=\"$FW_ME?detail=$name\">".AttrVal($name, "alias", $name)."</a></div></td></tr>" if( $show_heading );
   $ret .= "<tr><td><table class=\"block wide\">";
 
   $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
   $row++;
   $ret .= "<td><div></div></td>";
   foreach my $d (sort keys %{ $hash->{CONTENT} }) {
-    $ret .= "<td><div class=\"col2\"><a href=\"$FW_ME$FW_subdir?detail=$d\">". AttrVal($d, "alias", $d) ."</a></div></td>";
+    $ret .= "<td><div class=\"col2\"><a href=\"$FW_ME?detail=$d\">". AttrVal($d, "alias", $d) ."</a></div></td>";
   }
 
   if( defined($FW_webArgs{detail}) ) {
