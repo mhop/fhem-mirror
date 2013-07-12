@@ -263,13 +263,39 @@ SYSSTAT_getLoadAVG( $ )
 }
 
 sub
-SYSSTAT_getPiTemp( $ )
+SYSSTAT_readCmd($$$)
 {
-  my ($hash) = @_;
+  my ($hash,$command,$default) = @_;
 
-  my $filename = "/sys/class/thermal/thermal_zone0/temp";
+  my $value = $default;
+  if( defined($hash->{HOST}) ) {
+      my $cmd = qx(which ssh);
+      chomp( $cmd );
+      my $user = AttrVal($hash->{NAME}, "ssh_user", undef );
+      $cmd .= ' ';
+      $cmd .= $user."\@" if( defined($user) );
+      $cmd .= $hash->{HOST}." $command 2>/dev/null";
+      if( open(my $fh, "$cmd|" ) ) {
+        $value = <$fh>;
+        close($fh);
+      }
+    } else {
+      if( open( my $fh, "$command|" ) )
+        {
+          $value = <$fh>;
 
-  my $temp = -1;
+          close($fh);
+        }
+    }
+
+  return $value;
+}
+sub
+SYSSTAT_readFile($$$)
+{
+  my ($hash,$filename,$default) = @_;
+
+  my $value = $default;
   if( defined($hash->{HOST}) ) {
       my $cmd = qx(which ssh);
       chomp( $cmd );
@@ -278,17 +304,27 @@ SYSSTAT_getPiTemp( $ )
       $cmd .= $user."\@" if( defined($user) );
       $cmd .= $hash->{HOST}." cat ". $filename ." 2>/dev/null";
       if( open(my $fh, "$cmd|" ) ) {
-        $temp = <$fh>;
+        $value = <$fh>;
         close($fh);
       }
     } else {
       if( open( my $fh, '<', $filename ) )
         {
-          $temp = <$fh>;
+          $value = <$fh>;
 
           close($fh);
         }
     }
+
+  return $value;
+}
+
+sub
+SYSSTAT_getPiTemp( $ )
+{
+  my ($hash) = @_;
+
+  my $temp = SYSSTAT_readFile($hash,"/sys/class/thermal/thermal_zone0/temp",-1);
 
   return $temp / 1000;
 }
@@ -298,28 +334,7 @@ SYSSTAT_getPiFreq( $ )
 {
   my ($hash) = @_;
 
-  my $filename = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq";
-
-  my $freq = 0;
-  if( defined($hash->{HOST}) ) {
-      my $cmd = qx(which ssh);
-      chomp( $cmd );
-      my $user = AttrVal($hash->{NAME}, "ssh_user", undef );
-      $cmd .= ' ';
-      $cmd .= $user."\@" if( defined($user) );
-      $cmd .= $hash->{HOST}." cat ". $filename ." 2>/dev/null";
-      if( open(my $fh, "$cmd|" ) ) {
-        $freq = <$fh>;
-        close($fh);
-      }
-    } else {
-      if( open( my $fh, '<', $filename ) )
-        {
-          $freq = <$fh>;
-
-          close($fh);
-        }
-    }
+  my $freq = SYSSTAT_readFile($hash,"/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq",0);
 
   return $freq / 1000;
 }
