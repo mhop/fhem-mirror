@@ -207,11 +207,10 @@ YAMAHA_AVR_Set($@)
     
        
     return "No Argument given" if(!defined($a[1]));     
- 
+    
     my $what = $a[1];
     my $usage = "Unknown argument $what, choose one of on off volume:slider,-80,1,16 input:".$inputs_comma." mute:on,off remoteControl:setup,up,down,left,right,return,option,display,enter scene:".$scenes_comma." statusRequest";
 
-    readingsBeginUpdate($hash);
 
     if($what eq "on")
     {
@@ -220,8 +219,10 @@ YAMAHA_AVR_Set($@)
 	if($result =~ /RC="0"/ and $result =~ /<Power><\/Power>/)
 	{
 	    # As the receiver startup takes about 5 seconds, the status will be already set, if the return code of the command is 0.
+	    readingsBeginUpdate($hash);
 	    readingsBulkUpdate($hash, "power", "on");
 	    readingsBulkUpdate($hash, "state","on");
+	    readingsEndUpdate($hash, 1);
 	    return undef;
 	}
 	else
@@ -465,7 +466,6 @@ YAMAHA_AVR_Set($@)
     {
 	return $usage;
     }
-    readingsEndUpdate($hash, 1);
     
     # Call the GetStatus() Function to retrieve the new values after setting something (with local flag, so the internal timer is not getting interupted)
     YAMAHA_AVR_GetStatus($hash, 1);
