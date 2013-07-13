@@ -68,7 +68,7 @@
 # * "BWR101" is Oregon Scientific BWR101
 # * "GR101" is Oregon Scientific GR101
 #
-# Copyright (C) 2012 Willi Herzig
+# Copyright (C) 2012/2013 Willi Herzig
 #
 #  This script is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -138,8 +138,8 @@ TRX_WEATHER_Define($$)
   if (($code =~ /^CM160/) || ($code =~ /^CM180/)) {
   	return "wrong syntax: define <name> TRX_WEATHER code [scale_current scale_total add_total]" if (int(@a) != 3 && int(@a) != 6);
   	$hash->{scale_current} = ((int(@a) == 6) ? $a[3] : 1);
-  	$hash->{scale_total} = ((int(@a) == 6) ? $a[4] : 1);
-  	$hash->{add_total} = ((int(@a) == 6) ? $a[5] : 1);
+  	$hash->{scale_total} = ((int(@a) == 6) ? $a[4] : 1.0);
+  	$hash->{add_total} = ((int(@a) == 6) ? $a[5] : 0.0);
   } else {
 	return "wrong syntax: define <name> TRX_WEATHER code" if(int(@a) > 3);
   }
@@ -184,6 +184,7 @@ my %types =
    0x580D => { part => 'DATE', method => \&TRX_WEATHER_common_datetime, },
    # Energy usage sensors
    0x5A11 => { part => 'ENERGY', method => \&TRX_WEATHER_common_energy, },
+   0x5B13 => { part => 'ENERGY2', method => \&TRX_WEATHER_common_energy2, },
     # WEIGHT
    0x5D08 => { part => 'WEIGHT', method => \&TRX_WEATHER_common_weight, },
   );
@@ -839,7 +840,9 @@ sub TRX_WEATHER_common_datetime {
 
 
 # ------------------------------------------------------------
+# T R X _ W E A T H E R _ c o m m o n _ e n e r g y ( )
 #
+# devices: CM119, CM160, CM180
 sub TRX_WEATHER_common_energy {
     	my $type = shift;
 	my $longids = shift;
@@ -899,7 +902,7 @@ sub TRX_WEATHER_common_energy {
 	$bytes->[14] * 256 +
 	$bytes->[15]
 	) / 223.666;
-  $energy_total = sprintf("%.3f", $energy_total/1000);
+  $energy_total = $energy_total / 1000;
 
   push @res, {
 	device => $dev_str,
@@ -911,6 +914,98 @@ sub TRX_WEATHER_common_energy {
   my $count = $bytes->[5];
   #  TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 16) if ($count==0 || $count==1 || $count==2 || $count==3 || $count==8 || $count==9);
   TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 16); 
+
+  return @res;
+}
+
+# ------------------------------------------------------------
+#  T R X _ W E A T H E R _ c o m m o n _ e n e r g y 2
+#
+# devices: CM180i
+sub TRX_WEATHER_common_energy2 {
+    	my $type = shift;
+	my $longids = shift;
+    	my $bytes = shift;
+
+  my $subtype = sprintf "%02x", $bytes->[1];
+  #Log 1,"subtype=$subtype";
+  my $dev_type;
+
+  my %devname =
+    (	# HEXSTRING => "NAME"
+	0x01 => "CM180I", # CM180i
+  );
+
+  if (exists $devname{$bytes->[1]}) {
+  	$dev_type = $devname{$bytes->[1]};
+  } else {
+  	Log 1,"TRX_WEATHER: common_energy2 error undefined subtype=$subtype";
+  	my @res = ();
+  	return @res;
+  }
+
+  #my $seqnbr = sprintf "%02x", $bytes->[2];
+  #Log 1,"seqnbr=$seqnbr";
+
+  my $dev_str = $dev_type;
+  $dev_str .= $DOT.sprintf("%02x%02x", $bytes->[3],$bytes->[4]);
+
+  my @res = ();
+
+  # hexline debugging
+  if ($TRX_HEX_debug) {
+    my $hexline = ""; for (my $i=0;$i<@$bytes;$i++) { $hexline .= sprintf("%02x",$bytes->[$i]);} 
+    push @res, { device => $dev_str, type => 'hexline', current => $hexline, units => 'hex', };
+  }
+
+  my $energy_count = $bytes->[5];
+
+  if (1) {
+	my $energy_current_ch1 = ($bytes->[6] * 256 + $bytes->[7])/10;
+  	my $energy_current_ch2 = ($bytes->[8] * 256 + $bytes->[9])/10;
+  	my $energy_current_ch3 = ($bytes->[10] * 256 + $bytes->[11]/10);
+
+  	push @res, {
+		device => $dev_str,
+		type => 'energy_ch1',
+		current => $energy_current_ch1,
+		units => 'A',
+  	};
+  	push @res, {
+		device => $dev_str,
+		type => 'energy_ch2',
+		current => $energy_current_ch2,
+		units => 'A',
+  	};
+  	push @res, {
+		device => $dev_str,
+		type => 'energy_ch3',
+		current => $energy_current_ch3,
+		units => 'A',
+  	};
+  } 
+  if ($energy_count == 0) {
+  	my $energy_total = (
+		$bytes->[12] * 256*256*256*256*256 + 
+		$bytes->[13] * 256*256*256*256 +
+		$bytes->[14] * 256*256*256 + 
+		$bytes->[15] * 256*256 +
+		$bytes->[16] * 256 +
+		$bytes->[17]
+	) / 223.666;
+  	$energy_total = $energy_total / 1000;
+
+	
+  	push @res, {
+		device => $dev_str,
+		type => 'energy_total',
+		current => $energy_total,
+		units => 'kWh',
+  	};
+
+  }
+  #  TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 16) if ($count==0 || $count==1 || $count==2 || $count==3 || $count==8 || $count==9);
+  TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 18); 
 
   return @res;
 }
@@ -1178,12 +1273,46 @@ TRX_WEATHER_Parse($$)
 			$sensor = "energy_current";
 			readingsBulkUpdate($def, $sensor, $energy_current." ".$i->{units});
 	}
+	elsif ($i->{type} eq "energy_ch1") { 
+			my $energy_current = $i->{current};
+			if (defined($def->{scale_current})) {
+				$energy_current = $energy_current * $def->{scale_current};
+				#Log 1,"scale_current=".$def->{scale_current};			
+			}
+			$val .= "CH1: ".$energy_current." ";
+
+			$sensor = "energy_ch1";
+			readingsBulkUpdate($def, $sensor, $energy_current);
+	}
+	elsif ($i->{type} eq "energy_ch2") { 
+			my $energy_current = $i->{current};
+			if (defined($def->{scale_current})) {
+				$energy_current = $energy_current * $def->{scale_current};
+				#Log 1,"scale_current=".$def->{scale_current};			
+			}
+			$val .= "CH2: ".$energy_current." ";
+
+			$sensor = "energy_ch2";
+			readingsBulkUpdate($def, $sensor, $energy_current);
+	}
+	elsif ($i->{type} eq "energy_ch3") { 
+			my $energy_current = $i->{current};
+			if (defined($def->{scale_current})) {
+				$energy_current = $energy_current * $def->{scale_current};
+				#Log 1,"scale_current=".$def->{scale_current};			
+			}
+			$val .= "CH3: ".$energy_current." ";
+
+			$sensor = "energy_ch3";
+			readingsBulkUpdate($def, $sensor, $energy_current);
+	}
 	elsif ($i->{type} eq "energy_total") { 
 			my $energy_total = $i->{current};
 			if (defined($def->{scale_total}) && defined($def->{add_total})) {
-				$energy_total = $energy_total * $def->{scale_total} + $def->{add_total};
+				$energy_total = sprintf("%.4f",$energy_total * $def->{scale_total} + $def->{add_total});
 				#Log 1,"scale_total=".$def->{scale_total};			
 			}
+			#Log 1,"energy_total=".$energy_total;			
 			$val .= "ESUM: ".$energy_total." ";
 
 			$sensor = "energy_total";
@@ -1297,12 +1426,17 @@ TRX_WEATHER_Parse($$)
   is the device identifier of the energy sensor. It consists of the sensors name and (only if the attribute longids is set of the RFXtrx433) an a two byte hex string (0000-ffff) that identifies the sensor. The define statement with the deviceid is generated automatically by autocreate. The following sensor names are used: <br>
 	"CM160"	(for OWL CM119 or CM160),<br>
 	"CM180"	(for OWL CM180),<br><br>
+	"CM180i"(for OWL CM180i),<br><br>
     </ul>
     The following Readings are generated:<br>
     <ul>
       <code>"energy_current:"</code>: 
         <ul>
-	current usage in Watt. If &lt;scale_current&gt is defined the result is: <code>energy_current * &lt;scale_current&gt;</code>.
+	Only for CM160 and CM180: current usage in Watt. If &lt;scale_current&gt is defined the result is: <code>energy_current * &lt;scale_current&gt;</code>.
+        </ul>
+      <code>"energy_chx:"</code>: 
+        <ul>
+	Only for CM180i (where chx is ch1, ch2 or ch3): current usage in Ampere. If &lt;scale_current&gt is defined the result is: <code>energy_chx * &lt;scale_current&gt;</code>.
         </ul>
       <code>"energy_total:"</code>: 
         <ul>
