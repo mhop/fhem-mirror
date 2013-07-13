@@ -270,7 +270,8 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
   "update" => {
             Hlp => "[development|stable] [<file>|check|fhem],update Fhem" },
   "updatefhem" => { ReplacedBy => "update" },
-  "version" => { Fn => "CommandVersion" },
+  "version" => { Fn => "CommandVersion",
+            Hlp=>"[filter],print SVN version of loaded modules" },
 );
 
 ###################################################
