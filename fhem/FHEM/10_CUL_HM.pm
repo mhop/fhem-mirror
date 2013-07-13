@@ -62,7 +62,7 @@ sub CUL_HM_respPendTout($);
 sub CUL_HM_respPendToutProlong($);
 sub CUL_HM_PushCmdStack($$);
 sub CUL_HM_ProcessCmdStack($);
-sub CUL_HM_pushConfig($$$$$$$$);
+sub CUL_HM_pushConfig($$$$$$$$@);
 sub CUL_HM_Resend($);
 sub CUL_HM_ID2PeerList ($$$);
 sub CUL_HM_peerChId($$$);
@@ -1350,7 +1350,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   # TC wakes up with 8270, not with A258
   # VD wakes up with 8202 
   #                  9610
-  if(  $shash->{cmdStack}              && 
+  if(  $shash->{cmdStack}           && 
       ((hex($mFlg) & 0xA2) == 0x82) && 
 	  (CUL_HM_getRxType($shash) & 0x08)){ #wakeup #####
 	#send wakeup and process command stack
@@ -1946,9 +1946,8 @@ sub CUL_HM_Set($@) {
 	$state = "";
   } 
   elsif($cmd eq "getConfig") { ################################################
-	my $chFound = 0;
 	CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'00040000000000')
-	       if (!$isChannel);
+	       if ($roleD);
 	my @chnIdList = CUL_HM_getAssChnIds($name);
 	foreach my $channel (@chnIdList){
 	  my $chnHash = CUL_HM_id2Hash($channel);
@@ -2031,8 +2030,10 @@ sub CUL_HM_Set($@) {
 	}
   } 
   elsif($cmd eq "regSet") { ############################################### reg
-    #set <name> regSet <regName> <value> <peerChn> 
-	my ($regName,$data,$peerChnIn) = ($a[2],$a[3],$a[4]);
+    #set <name> regSet <regName> <value> [<peerChn>] [prep]
+	#prep is internal use only. It allowes to prepare shadowreg only but supress
+	#writing. Application necessarily needs to execute writing subsequent.
+	my (undef,undef,$regName,$data,$peerChnIn,$prep) = @a;
 	$state = "";
     if (!$culHmRegType{$st}{$regName}      && 
 	    !$culHmRegGeneral{$regName}        &&
@@ -2047,9 +2048,9 @@ sub CUL_HM_Set($@) {
 	   
     my $reg  = $culHmRegDefine{$regName};
 	return $st." - ".$regName            # give some help
-	       .($reg->{lit}? " liternal:".join(",",keys%{$reg->{lit}})." "
+	       .($reg->{lit}? " literal:".join(",",keys%{$reg->{lit}})." "
 	                    : " range:". $reg->{min}." to ".$reg->{max}.$reg->{u}
-			 )
+			)
 		   .(($reg->{l} == 3)?" peer required":"")." : ".$reg->{t}."\n"
 		          if ($data eq "?");
 	return "value:".$data." out of range for Reg \"".$regName."\""
@@ -2116,8 +2117,9 @@ sub CUL_HM_Set($@) {
 	}
 	my $cHash = CUL_HM_id2Hash($dst.($chn eq '00'?"":$chn));
 	$cHash = $hash if (!$cHash);
-     CUL_HM_pushConfig($cHash,$id,$dst,$lChn,$peerId,hex($peerChn),$list,$addrData);
-   } 
+    CUL_HM_pushConfig($cHash,$id,$dst,$lChn,$peerId,hex($peerChn),$list
+	                 ,$addrData,$prep);
+  } 
   elsif($cmd eq "level") { ####################################################
 	#level        =>"<level> <relockDly> <speed>..."
     my (undef,undef,$lvl,$rLocDly,$speed) = @a; 
@@ -2557,7 +2559,7 @@ sub CUL_HM_Set($@) {
 	my $cmdB = ($set)?"01":"02";# do we set or remove?
 
     # First the remote (one loop for on, one for off)
-	my $pSt = AttrVal($peerHash->{NAME}, "subType", "");#peer SubType
+	my $pSt = CUL_HM_Get($peerHash,$peerHash->{NAME},"param","subType");
 	if (!$target || $target =~ m/^(remote|both)$/){
 	  my $burst = ($pSt eq "thermostat"?"0101":"0100");#set burst for target 
       for(my $i = 1; $i <= $nrCh2Pair; $i++) {
@@ -2571,10 +2573,11 @@ sub CUL_HM_Set($@) {
 		else{
 		  my $bStr = sprintf("%02X",$b);
   	      CUL_HM_PushCmdStack($hash, 
-  	              "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerChn}00");
+  	            "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerChn}00");
   	      CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,hex($peerChn),4,$burst)
 				   if($md ne "HM-CC-TC");
-		  CUL_HM_queueAutoRead($name) if (2 < CUL_HM_getAttrInt($name,"autoReadReg"));
+		  CUL_HM_queueAutoRead($name) 
+		           if (2 < CUL_HM_getAttrInt($name,"autoReadReg"));
 	    }
       }
 	}
@@ -2716,8 +2719,8 @@ sub CUL_HM_Pair(@) {
 sub CUL_HM_getConfig($$$$$){
   my ($hash,$chnhash,$id,$dst,$chn) = @_;
   my $flag = CUL_HM_getFlag($hash);
-  foreach my $readEntry (keys %{$chnhash->{READINGS}}){
-	  delete $chnhash->{READINGS}{$readEntry} if ($readEntry =~ m/^[\.]?(RegL_|R-)/);
+  foreach my $readEntry (grep /^[\.]?(RegL_|R-)/,keys %{$chnhash->{READINGS}}){
+	  delete $chnhash->{READINGS}{$readEntry};
   }
   my $lstAr = $culHmModel{CUL_HM_getMId($hash)}{lst};
   if($lstAr){
@@ -2984,8 +2987,8 @@ sub CUL_HM_ProcessCmdStack($) {
   }
   return;
 }
-sub CUL_HM_pushConfig($$$$$$$$) {#generate messages to cnfig data to register
-  my ($hash,$src,$dst,$chn,$peerAddr,$peerChn,$list,$content) = @_;
+sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
+  my ($hash,$src,$dst,$chn,$peerAddr,$peerChn,$list,$content,$prep) = @_;
   my $flag = CUL_HM_getFlag($hash);
   my $tl = length($content);
 
@@ -3018,6 +3021,8 @@ sub CUL_HM_pushConfig($$$$$$$$) {#generate messages to cnfig data to register
     }
   }
   $chnhash->{helper}{shadowReg}{$regLN} = $regs;
+  return if ($prep);#prepare shadowreg only. More data to come. 
+                    #Application takes care about execution
   CUL_HM_updtRegDisp($hash,$list,$peerAddr.$peerChn);
   CUL_HM_PushCmdStack($hash, "++".$flag.'01'.$src.$dst.$chn.'05'.
                                         $peerAddr.$peerChn.$list);
@@ -3029,6 +3034,7 @@ sub CUL_HM_pushConfig($$$$$$$$) {#generate messages to cnfig data to register
   CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$chn."06");
   CUL_HM_queueAutoRead($hash->{NAME}) 
         if (2 < CUL_HM_getAttrInt($hash->{NAME},"autoReadReg"));
+  
 }
 sub CUL_HM_Resend($) {#resend a message if there is no answer
   my $hash = shift;
@@ -3734,7 +3740,7 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
       next if (!$rName            ||
 	         $rName eq "PairedTo" ||                     # derived
 	         $rName eq "peerList" ||                     # derived
-	         $rName eq "Activity:"||                     # derived
+	         $rName eq "Activity" ||                     # derived
 	         $rName =~ m/^[.]?R-/ ||                     # no Regs - those are derived from Reg
 	         ReadingsVal($eName,$rName,"") =~ m/^set_/); # ignore setting
 	  my $ts = ReadingsTimestamp($eName,$rName,"");
@@ -3825,7 +3831,7 @@ sub CUL_HM_ActCheck() {# perform supervision
 	  }
 	}  
 	if ($oldState ne $state){
-	  readingsSingleUpdate($devHash,"Activity:",$state,1);
+	  readingsSingleUpdate($devHash,"Activity",$state,1);
 	  $attr{$devName}{actStatus} = $state;
 	  Log 4,"Device ".$devName." is ".$state;
 	}

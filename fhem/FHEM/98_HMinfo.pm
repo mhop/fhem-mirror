@@ -399,8 +399,20 @@ sub HMinfo_SetFn($$) {#########################################################
 						  )
 			.join"\n  ",grep(/$filter/,sort @model);  
   }
-  elsif($cmd eq "template")   {##template set of register ---------------------
-    return HMinfo_template(@a);
+  elsif($cmd eq "templateSet"){##template: set of register --------------------
+    return HMinfo_templateSet(@a);
+  }
+  elsif($cmd eq "templateChk"){##template: see if it applies ------------------
+    return HMinfo_templateChk(@a);
+  }
+  elsif($cmd eq "templateList"){##template: list templates --------------------
+    return HMinfo_templateList($a[0]);
+  }
+  elsif($cmd eq "templateDef"){##template: define one -------------------------
+    return HMinfo_templateDef(@a);
+  }
+  elsif($cmd eq "cpRegs")     {##copy register             --------------------
+    return HMinfo_cpRegs(@a);
   }
   elsif($cmd eq "update")     {##update hm counts -----------------------------
     return HMinfo_status($hash);
@@ -437,6 +449,14 @@ sub HMinfo_SetFn($$) {#########################################################
 	       ."\n [<nameFilter>]   : only matiching names are processed - partial names are possible"       
 	       ."\n [<modelsFilter>] : any match in the output are searched. "       
 	       ."\n"       
+           ."\n templateChk <entity> <templateName> <peer:[long|short]> [<param1> ...] "   
+           ."\n        compare whether register match the template values"   
+           ."\n templateDef <entity> <templateName> <param1[:<param2>...] <description> <reg1>:<val1> [<reg2>:<val2>] ... "   
+           ."\n        define a template"   
+           ."\n templateList [<templateName>]         # gives a list of templates or a description of the named template"   
+           ."\n        list all currently defined templates or the structure of a given template"   
+           ."\n templateSet <entity> <templateName> <peer:[long|short]> [<param1> ...] "   
+           ."\n        write register according to a given template"   
 	       ."\n ======= typeFilter options: supress class of devices  ===="       
 	       ."\n set <name> <cmd> [-dcasev] [-f <filter>] [params]"       
 	       ."\n      entities according to list will be processed"       
@@ -524,7 +544,8 @@ sub HMinfo_status($){##########################################################
   my @Anames;        # devices with ActionDetector events
   my %rssiMin;
   my %rssiMinCnt = ("99>"=>0,"80<"=>0,"60>"=>0,"59<"=>0);
-  my @rssiNames;
+  my @rssiNames; #entities with ciritcal RSSI
+  my @shdwNames; #entites with shadowRegs, i.e. unconfirmed register ->W_unconfRegs
 
   foreach my $id (keys%{$modules{CUL_HM}{defptr}}){#search/count for parameter
     my $ehash = $modules{CUL_HM}{defptr}{$id};
@@ -532,7 +553,8 @@ sub HMinfo_status($){##########################################################
 	$nbrE++;
     $nbrC++ if ($ehash->{helper}{role}{chn});
     $nbrV++ if ($ehash->{helper}{role}{vrt});
-	foreach my $read (grep {$ehash->{READINGS}{$_}} @crit){      #---- count critical readings
+	push @shdwNames,$eName if (keys %{$ehash->{helper}{shadowReg}});
+	foreach my $read (grep {$ehash->{READINGS}{$_}} @crit){       #---- count critical readings
 	  my $val = $ehash->{READINGS}{$read}{VAL};
 	  $sum{$read}{$val} =0 if (!$sum{$read}{$val});
       $sum{$read}{$val}++;
@@ -560,11 +582,11 @@ sub HMinfo_status($){##########################################################
 	}
   }
   #====== collection finished - start data preparation======
-  delete $hash->{$_} foreach (grep(/^(ERR|sum_)/,keys%{$hash}));# remove old 
+  delete $hash->{$_} foreach (grep(/^(ERR|W_sum_)/,keys%{$hash}));# remove old 
 
   foreach my $read(grep {defined $sum{$_}} @crit){       #--- disp crt count
-    $hash->{"sum_".$read} = "";
-    $hash->{"sum_".$read} .= "$_:$sum{$read}{$_};"foreach(keys %{$sum{$read}});
+    $hash->{"W_sum_".$read} = "";
+    $hash->{"W_sum_".$read} .= "$_:$sum{$read}{$_};"foreach(keys %{$sum{$read}});
   }
   foreach my $read(grep {defined $err{$_}} keys %errFlt){#--- disp err count
     $hash->{"ERR_".$read} = "";
@@ -576,9 +598,9 @@ sub HMinfo_status($){##########################################################
   @errNames = sort keys %allE;
   $hash->{ERR_names} = join",",@errNames if(@errNames);# and name entities
 
-  $hash->{sumDefined} = "entities:$nbrE device:$nbrD channel:$nbrC virtual:$nbrV";
+  $hash->{C_sumDefined} = "entities:$nbrE device:$nbrD channel:$nbrC virtual:$nbrV";
   # ------- display status of action detector ------
-  $hash->{actTotal} = $modules{CUL_HM}{defptr}{"000000"}{STATE};
+  $hash->{I_actTotal} = $modules{CUL_HM}{defptr}{"000000"}{STATE};
   $hash->{ERRactNames} = join",",@Anames;
   
   # ------- what about IO devices??? ------
@@ -589,7 +611,7 @@ sub HMinfo_status($){##########################################################
   foreach (grep {$defs{$_}{READINGS}{cond}} @IOdev){
     $_ .= ":".$defs{$_}{READINGS}{cond}{VAL};
   }
-  $hash->{HM_IOdevices}= join",",@IOdev;
+  $hash->{I_HM_IOdevices}= join",",@IOdev;
   
   # ------- what about protocol events ------
   # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
@@ -603,11 +625,11 @@ sub HMinfo_status($){##########################################################
   @protNames = sort keys %all;
   $hash->{ERR__protoNames} = join",",@protNames if(@protNames);
 
-  if ($modules{CUL_HM}{helper}{autoRdCfgLst}){
-     $hash->{autoReadPend} = join ",",@{$modules{CUL_HM}{helper}{autoRdCfgLst}};
+  if (@{$modules{CUL_HM}{helper}{autoRdCfgLst}}>0){
+     $hash->{I_autoReadPend} = join ",",@{$modules{CUL_HM}{helper}{autoRdCfgLst}};
   }
   else{
-    delete $hash->{autoReadPend};
+    delete $hash->{I_autoReadPend};
   }
   
   # ------- what about rssi low readings ------
@@ -619,10 +641,11 @@ sub HMinfo_status($){##########################################################
     else                      {$rssiMinCnt{"80<"}++;}
   }
   
-  $hash->{rssiMinLevel} = "";
-  $hash->{rssiMinLevel} .= "$_:$rssiMinCnt{$_} " foreach (sort keys %rssiMinCnt);
+  $hash->{I_rssiMinLevel} = "";
+  $hash->{I_rssiMinLevel} .= "$_:$rssiMinCnt{$_} " foreach (sort keys %rssiMinCnt);
   $hash->{ERR___rssiCrit} = join(",",@rssiNames) if (@rssiNames);
-
+  # ------- what about others ------
+  $hash->{W_unConfRegs} = join(",",@shdwNames) if (@shdwNames > 0);
   # ------- update own status ------
   $hash->{STATE} = "updated:".TimeNow();
   return;
@@ -630,24 +653,18 @@ sub HMinfo_status($){##########################################################
 
 
 my %tpl = (
-   autoOff       => {p=>"time"         ,t=>"staircase - auto off after <time>"
-                     ,reg=>{ OnTime          =>"p0"
-                           ,OffTime         =>0        
+   autoOff           => {p=>"time"         ,t=>"staircase - auto off after <time>, extend time with each trigger"
+                    ,reg=>{ OnTime          =>"p0"
+                           ,OffTime         =>111600       
 					 }}
-  ,autotst       => {p=>"time[s] para2",t=>"testTemplate with 2 parameter"
-                    ,reg=>{ R1              =>"p0"
-                           ,R2              =>"p0"        
-                           ,R3              =>"geLo"        
-                           ,R4              =>"p1"     
-					 }}
-  ,motionOnDim   => {p=>"ontime brightness",t=>"Dimmer:on considering sensor brightness"
-                    ,reg=>{ CtOn            =>"ltLo"        
-                           ,CtDlyOff        =>"ltLo"     
-                           ,CtOn            =>"ltLo"        
-                           ,CtOff           =>"ltLo"        
+  ,motionOnDim       => {p=>"ontime brightness",t=>"Dimmer:on for time if MDIR-brightness below level"
+                    ,reg=>{ CtDlyOn         =>"geLo"        
+                           ,CtDlyOff        =>"geLo"     
+                           ,CtOn            =>"geLo"        
+                           ,CtOff           =>"geLo"        
                            ,CtValLo         =>"p1"     
-                           ,CtRampOn        =>"ltLo"        
-                           ,CtRampOff       =>"ltLo"     
+                           ,CtRampOn        =>"geLo"        
+                           ,CtRampOff       =>"geLo"     
                            ,OffTime         =>111600        
                            ,OnTime          =>"p0"   
 						   
@@ -659,38 +676,74 @@ my %tpl = (
                            ,DimJtRampOn     =>"on"     
                            ,DimJtRampOff    =>"dlyOn" 
 					 }}
-  ,motionOnSw    => {p=>"ontime brightness",t=>"Switch:on considering sensor brightness"
-                    ,reg=>{ CtOn            =>"ltLo"        
-                           ,CtDlyOff        =>"ltLo"     
-                           ,CtOn            =>"ltLo"        
-                           ,CtOff           =>"ltLo"        
+  ,motionOnSw        => {p=>"ontime brightness",t=>"Switch:on for time if MDIR-brightness below level"
+                    ,reg=>{ CtDlyOn         =>"geLo"        
+                           ,CtDlyOff        =>"geLo"     
+                           ,CtOn            =>"geLo"        
+                           ,CtOff           =>"geLo"        
                            ,CtValLo         =>"p1"     
                            ,OffTime         =>111600        
                            ,OnTime          =>"p0"   
 						   
-                           ,ActionType     =>"jmpToTarget"        
-                           ,SwJtOn         =>"on"        
-                           ,SwJtOff        =>"dlyOn"     
-                           ,SwJtDlyOn      =>"on"        
-                           ,SwJtDlyOff     =>"dlyOn"        
+                           ,ActionType      =>"jmpToTarget"        
+                           ,SwJtOn          =>"on"        
+                           ,SwJtOff         =>"dlyOn"     
+                           ,SwJtDlyOn       =>"on"        
+                           ,SwJtDlyOff      =>"dlyOn"        
 					}}
+  ,SwConditionAbove  => {p=>"condition",t=>"Switch:execute only if condition level is above limit"
+                    ,reg=>{ CtDlyOn         =>"geLo"        
+                           ,CtDlyOff        =>"geLo"     
+                           ,CtOn            =>"geLo"        
+                           ,CtOff           =>"geLo"        
+                           ,CtValLo         =>"p0"     
+                 	}}
+  ,SwOnCond          => {p=>"level cond",t=>"switch:execute only if condition level is below limit"
+                    ,reg=>{ CtDlyOn         =>"p1"        
+                           ,CtDlyOff        =>"p1"     
+                           ,CtOn            =>"p1"        
+                           ,CtOff           =>"p1"        
+                           ,CtValLo         =>"p0"     
+                 	}}
 );
 
-
-
-
-sub HMinfo_template(@){########################################################
-  #set hm template LichtF autoOff FB2:short 10
-  #set hm template LichtF autotst FB2:short 10 3
-  #Checks
+sub HMinfo_templateDef(@){#####################################################
+  my ($name,$param,$desc,@regs) = @_;
+  return "insufficient parameter" if(!defined $param);
+  if ($param eq "del"){
+    delete $tpl{$name};
+    return;
+  }
+  return "$name already defined, delete it first" if($tpl{$name});
+  return "insufficient parameter" if(@regs < 1);
+  $tpl{$name}{p} = "";
+  $tpl{$name}{p} = join(" ",split(":",$param)) if($param ne "0");
+  $tpl{$name}{t} = $desc;
+  my $paramNo = split(":",$param);
+  foreach (@regs){
+    my ($r,$v)=split":",$_;
+	if (!defined $v){
+	  delete $tpl{$name};
+	  return " empty reg value for $r";
+	}
+	elsif($v =~ m/^p(.)/){
+	  return ($1+1)." params are necessary, only $paramNo aregiven" 
+	        if (($1+1)>$paramNo);
+	}
+	$tpl{$name}{reg}{$r} = $v;
+  }
+}
+sub HMinfo_templateSet(@){########################################################
   my ($aName,$tmpl,$pSet,@p) = @_;
   $pSet = "" if (!$pSet);
   my ($pName,$pTyp) = split(":",$pSet);
-  return "template undefined $tmpl" if (!(grep /$tmpl/, keys%tpl));
-  return "aktor $aName unknown" if (!$defs{$aName});
-  return "give <peer>:[short|long] with peer, not $pSet" if($pName && $pTyp !~ m/(short|long)/);
-  $pSet = $pSet eq "long"?"lg":"sh";
-
+  return "template undefined $tmpl"                       if(!$tpl{$tmpl});
+  return "aktor $aName unknown"                           if(!$defs{$aName});
+  return "exec set $aName getConfig first"                if(!(grep /RegL_/,keys%{$defs{$aName}{READINGS}}));
+  return "give <peer>:[short|long] with peer, not $pSet"  if($pName && $pTyp !~ m/(short|long)/);
+  $pSet = $pTyp eq "long"?"lg":"sh";
+  my $aHash = $defs{$aName};
+  
   my @regCh;
   foreach (keys%{$tpl{$tmpl}{reg}}){
     my $regN = $pSet.$_;
@@ -699,22 +752,175 @@ sub HMinfo_template(@){########################################################
 	  return "insufficient values - at least ".$tpl{p}." are $1 necessary" if (@p < ($1+1));
 	  $regV = $p[$1];
 	}
-	my $ret = CUL_HM_Set($defs{$aName},$aName,"regSet",$regN,"?",$pName);
-	return "Device doesn't support $regN - template $tmpl not applicable"
-	    if ($ret =~ m/failed:/);
-	return "Device doesn't support literal $regV for reg $regN"
-	     if ($ret =~ m/literal:/ && $ret !~ m/\b$regV\b/);#literal supported?
-	return "peer necessary for template"
-	     if ($ret =~ m/peer required/ && !$pName);#
-	#return "range invalid" if (...)
+	my ($ret,undef) = CUL_HM_Set($aHash,$aName,"regSet",$regN,"?",$pName);
+	return "Device doesn't support $regN - template $tmpl not applicable" if ($ret =~ m/failed:/);
+	return "peer necessary for template"                                  if ($ret =~ m/peer required/ && !$pName);
+    return "Device doesn't support literal $regV for reg $regN"           if ($ret =~ m/literal:/ && $ret !~ m/\b$regV\b/);
+	my ($min,$max) = ($1,$2) if ($ret =~ m/range:(.*) to (._?) /);
+	return "$regV out of range:  $min to $max"                            if ($min && ($regV < $min || $regV > $max));
 	push @regCh,"$regN,$regV";
   }
-  foreach (@regCh){#Finally execute
-#    my $ret = CUL_HM_Set($defs{$aName},$aName,"regSet",split(",",$_),$peer);
-	Log 1,"General template write ".$_." for $pName";
-#	return $ret if ($ret);
+  foreach (@regCh){#Finally write to shadow register.
+	my ($ret,undef) = CUL_HM_Set($aHash,$aName,"regSet",split(",",$_),$pName,"prep");
+	return $ret if ($ret);
   }
-  #CUL_HM_Set($defs{$dName},$dName,"clear",$type);
+  foreach my $regl (keys %{$aHash->{helper}{shadowReg}}){#write any existing shadowreg for this entity
+	my @new;
+	my $cur = $aHash->{READINGS}{$regl}{VAL};
+	
+	foreach (split(" ",$aHash->{helper}{shadowReg}{$regl})){
+	  push @new, $_ if ($cur !~ m/$_/);
+	}
+    my ($ret,undef) = CUL_HM_Set($aHash,$aName,"regBulk",$regl,@new);
+    return $ret if ($ret);
+  }
+  return "";
+}
+sub HMinfo_templateChk(@){########################################################
+  my ($aName,$tmpl,$pSet,@p) = @_;
+  $pSet = "" if (!$pSet);
+  my ($pName,$pTyp) = split(":",$pSet);
+  return "template undefined $tmpl"                       if(!$tpl{$tmpl});
+  return "aktor $aName unknown"                           if(!$defs{$aName});
+  return "give <peer>:[short|long] with peer, not $pSet"  if($pName && $pTyp !~ m/(short|long)/);
+  my $pRnm = $pName?($pName."-".($pSet eq "long"?"lg":"sh")):"";
+  my $repl = "";
+  
+  foreach my $rn (keys%{$tpl{$tmpl}{reg}}){
+    my $regV = ReadingsVal($aName,"R-$pRnm$rn",undef);
+	$regV = ReadingsVal($aName,"R-".$rn,undef) if (!defined $regV);
+
+	if (defined $regV){
+	  $regV =~s/ .*//;#strip unit 
+	  my $tplV = $tpl{$tmpl}{reg}{$rn};	
+	  if ($tplV =~m /^p(.)$/) {#replace with User parameter
+	    return "insufficient values - at least ".$tpl{p}." are $1 necessary" if (@p < ($1+1));
+	    $tplV = $p[$1];
+	  }
+	  $repl .= " $rn :$regV should $tplV \n" if ($regV ne $tplV);
+	}
+	else{
+	  $repl .= " reg not found: $rn\n";
+	}
+  }
+  return ($repl?$repl:"template $tmpl match actor:$aName peer:$pSet");
+}
+sub HMinfo_templateList($){####################################################
+  my $templ = shift;
+  my $reply = "";
+#  if(!$templ || !(grep /$templ/,keys%tpl)){# list all templates
+  if(!($templ && (grep /$templ/,keys%tpl))){# list all templates
+    foreach (keys%tpl){
+      $reply .= sprintf("%-16s params:%-24s Info:%s\n"
+	                         ,$_
+	  						 ,$tpl{$_}{p}
+	  						 ,$tpl{$_}{t}
+	                   );
+    }
+  }
+  else{#details about one template
+    $reply = sprintf("%-16s params:%-24s Info:%s\n",$templ,$tpl{$templ}{p},$tpl{$templ}{t});
+    foreach (keys %{$tpl{$templ}{reg}}){
+	  my $val = $tpl{$templ}{reg}{$_};
+	  if ($val =~m /^p(.)$/){
+	    my @a = split(" ",$tpl{$templ}{p});
+	    $val = $a[$1];
+	  }
+	  $reply .= sprintf("  %-16s :%s\n",$_,$val);
+	}
+  }
+  return $reply;
+}
+
+sub HMinfo_cpRegs(@){#########################################################
+  # copy level: 
+  #    List11 cpRegs channelSrc channelDst
+  #    List13/4 cpRegs channelSrc:peer channelDst:peer
+  # 
+  # Checks: registerlist of source must appear complete
+  #         Peer must be present in source and destination, list must be complete
+  
+  #description:
+    #  <li><a name="#HMinfocpRegs">cpRegs &lt;src:peer&gt; &lt;dst:peer&gt; </a><br>
+	#      allows to copy register, setting and behavior of a channel to 
+	#      another or for peers from the same or different channels
+	#     <li>src:peer is the source entity. Peer needs to be given if a peer behabior beeds to be copied <\li>
+	#     <li>dst:peer is the destination entity.<\li>
+	#	Examples are
+	#	 set hm cpRegs blindR blindL  # will copy all general register for this channel from the blindR to the blindL entity. 
+	#	 This includes items like drive times. <br>
+	#	 set hm cpRegs blindR:Btn1 blindL:Btn2  # copy behavior of Btn1/blindR relation to Btn2/blindL<br>
+	#	 set hm cpRegs blindR:Btn1 blindR:Btn2  # copy behavior of Btn1/blindR relation to Btn2/blindR, i.e. inside the same Actor<br>
+	#	 <br>
+	#	 Restrictions:<br> 
+	#	 cpRegs will not add any peers or read from the devices. It is up to the user to read register in advance<br>
+	#	 cpRegs is only allowed between identical models<br>
+	#	 peerings of devices must exist. cpRegs will terminate if peers cannot be identified<br>
+	#	 cpRegs estimates that all readings are up-to-date. It is up to the user to ensure and check data consistancy. <br>
+	#	 <br>
+	#
+	#  </li>
+
+  #help
+  #."\n cpRegs <src:peer> <dst:peer>"   
+  #."\n        copy register for a channel or behavior of channel/peer"   
+  
+  #tests
+  #define tc CUM_HM 222222
+  #attr tc model HM-LC-Dim1TPBU-FM
+  #attr tc peerIDs 18208305,22222201
+  #
+  #set hm cpRegs LichtL:FB_ tc
+  #set hm cpRegs LichtL:FB_Btn_01 tc:FB_Btn_05
+  #set hm cpRegs LichtL:FB_Btn_01 tc:self01
+  
+  my ($srcCh,$dstCh) = @_;
+  my ($srcP,$dstP,$srcPid,$dstPid,$srcRegLn,$dstRegLn);
+  ($srcCh,$srcP) = split(":",$srcCh,2);
+  ($dstCh,$dstP) = split(":",$dstCh,2);
+  return "source channel $srcCh undefined"      if ($defs{$srcCh});
+  return "destination channel $srcCh undefined" if ($defs{$dstCh});
+  #compare source and destination attributes
+#  return "model  not compatible" if (CUL_HM_Get($ehash,$eName,"param","model") ne
+#                                     CUL_HM_Get($ehash,$eName,"param","model"));
+  
+  if ($srcP){# will be peer related copy
+    if   ($srcP =~ m/self(.*)/)      {$srcPid = $defs{$srcCh}{DEF}.sprintf("%02X",$1)}
+    elsif($srcP =~ m/^[A-F0-9]{8}$/i){$srcPid = $srcP;}
+    elsif($srcP =~ m/(.*)_chn:(..)/) {$srcPid = $defs{$1}->{DEF}.$2;}
+    elsif($defs{$srcP})              {$srcPid = $defs{$srcP}{DEF}.$2;}
+    
+	if   ($dstP =~ m/self(.*)/)      {$dstPid = $defs{$dstCh}{DEF}.sprintf("%02X",$1)}
+    elsif($dstP =~ m/^[A-F0-9]{8}$/i){$dstPid = $dstP;}
+    elsif($dstP =~ m/(.*)_chn:(..)/) {$dstPid = $defs{$1}->{DEF}.$2;}
+    elsif($defs{$dstP})              {$dstPid = $defs{$dstP}{DEF}.$2;}
+	
+	return "invalid peers src:$srcP dst:$dstP" if(!$srcPid || $dstPid);
+	return "sourcepeer not in peerlist"        if ($attr{$srcCh}{peerIDs} !~ m/$srcPid/);
+	return "destination peer not in peerlist"  if ($attr{$dstCh}{peerIDs} !~ m/$dstPid/);
+
+	if   ($defs{$srcCh}{READINGS}{"RegL_03:".$srcP})  {$srcRegLn =  "RegL_03:".$srcP}
+	elsif($defs{$srcCh}{READINGS}{".RegL_03:".$srcP}) {$srcRegLn = ".RegL_03:".$srcP}
+	elsif($defs{$srcCh}{READINGS}{"RegL_04:".$srcP})  {$srcRegLn =  "RegL_04:".$srcP}
+	elsif($defs{$srcCh}{READINGS}{".RegL_04:".$srcP}) {$srcRegLn = ".RegL_04:".$srcP}
+	$dstRegLn = $srcRegLn;
+	$dstRegLn =~ s/:.*/:/;
+	$dstRegLn .= $dstP;
+  }
+  else{
+	if   ($defs{$srcCh}{READINGS}{"RegL_01:"})  {$srcRegLn = $defs{$srcCh}{READINGS}{"RegL_01:"}}
+	elsif($defs{$srcCh}{READINGS}{".RegL_01:"}) {$srcRegLn = $defs{$srcCh}{READINGS}{".RegL_01:"}}
+	$dstRegLn = $srcRegLn;
+  }
+  return "source register not available"     if (!$srcRegLn);
+  return "regList incomplete"                if ($defs{$srcCh}{READINGS}{$srcRegLn} !~ m/00:00/);
+ 
+  # we habe a reglist with termination, source and destination peer is checked. Go copy
+  my $srcData = $defs{$srcCh}{READINGS}{$srcRegLn};
+  $srcData =~ s/00:00//; # remove termination
+  Log 1,"General HMinfo_cpRegs:$srcRegLn->".join("-",split(" ",$srcData));
+#  my $ret = CUL_HM_Set($defs{$dstCh},$dstCh,"regBulk",$srcRegLn,split(" ",$srcData));
+#  return $ret;
 }
 1;
 =pod
@@ -830,6 +1036,49 @@ sub HMinfo_template(@){########################################################
       <li><a name="#HMinfosaveConfig">saveConfig</a> <a href="HMinfoFilter">[filter]</a><br>
 	      performs a save for all HM register setting and peers. See <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>. 
 	  </li>
+      <li><a name="#HMinfotemplateDef">templateDef &lt;name&gt; &lt;param&gt; &lt;desc&gt; &lt;reg1:val1&gt; [&lt;reg2:val2&gt;] ...</a><br>
+	      define a template.<br>
+		  <b>param</b> gives the names of parameter necesary to execute the template. It is template dependant 
+		               and coule be an onTime or brightnesslevel. a list of parameter needs to be separated with colon<br>
+					   param1:param2:param3<br>
+					   if del is given as parameter the template is removed<br>
+		  <b>desc</b> shall give a description of the template<br>
+		  <b>reg:val</b> is the registername to be written and the value it needs to be set to.<br>
+		  In case the register is from link set and can destinguist between long and short it is necessary to leave the
+		  leading sh or lg off. <br>
+		  if parameter are used it is necessary to enter p. as value with p0 first, p1 second parameter
+		Examples <br>
+		 set hm HMinfo_templateDef SwOnCond level:cond "my description" CtValLo:p0 CtDlyOn:p1 CtOn:geLo<br>
+		 <br>
+	  </li>
+      <li><a name="#HMinfotemplateList">templateList [&lt;name&gt;]</a><br>
+	      list defined templates. If no name is given all templates will be listed<br>
+	  </li>
+      <li><a name="#HMinfotemplateChk">templateChk &lt;entity&gt; &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
+	     verifies if the register-readings comply to the template <br>
+	     Parameter are identical to <a href="#HMinfotemplateSet">templateSet</a><br>
+	     The procedure will check if the register values match the ones provided by the template
+	  </li>
+      <li><a name="#HMinfotemplateSet">templateSet &lt;entity&gt; &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
+	      sets a bunch of register accroding to a given template. Parameter may be added depending on 
+		  the template setup. <br>
+		  templateSet will collect and accumulate all changes. Finally the results are written streamlined.
+	     <li>entity: peer is the source entity. Peer needs to be given if a peer behabior beeds to be copied <\li>
+	     <li>template: one of the programmed template<\li>
+	     <li>peer: [long|short]:if necessary a peer needs to be given. If no peer is used enter '0'.
+		          with a peer it should be given whether it is for long or short keypress
+		   <\li>
+	     <li>param: number and meaning of parameter depends on the given template<\li>
+		Examples could be (templates not provided, just theoretical)<br>
+		 set hm templateSet Licht1 staircase FB1:short 20  <br>
+		 set hm templateSet Licht1 staircase FB1:long 100  <br>
+		 <br>
+		 Restrictions:<br> 
+		 User must ensure to read configuration prior to execution.<br>
+		 templateSet may not setup a complete register block but only a part if it. This is up to template design.<br>
+		 <br>
+	
+	  </li>
     </ul>  
   </ul>
   <br>
@@ -842,7 +1091,7 @@ sub HMinfo_template(@){########################################################
   <a name="HMinfoattr"><b>Attributes</b></a>
    <ul>
     <li><a name="#HMinfosumStatus">sumStatus</a><br>
-	    List of readings that shall be screend and counted based on current presence. 
+	    Warnings: list of readings that shall be screend and counted based on current presence. 
 		I.e. counter is the number of entities with this reading and the same value. 
 		Readings to be searched are separated by comma. <br>
 		Example: <br>
@@ -850,8 +1099,8 @@ sub HMinfo_template(@){########################################################
            attr hm sumStatus battery,sabotageError<br>
         </code>
 		will cause a reading like<br>
-		sum_batterie ok:5 low:3<br>
-		sum_sabotageError on:1<br>
+		W_sum_batterie ok:5 low:3<br>
+		W_sum_sabotageError on:1<br>
 		<br>
 		Note: counter with '0' value will not be reported. HMinfo will find all present values autonomously<br>
 		Setting is meant to give user a fast overview of parameter that are expected to be system critical<br>
@@ -875,25 +1124,26 @@ sub HMinfo_template(@){########################################################
    <br>
   <a name="HMinfovariables"><b>Variables</b></a>
    <ul>
-    <li><b>autoReadPend:</b> list of entities which are queued to retrieve config and status. 
+    <li><b>I_autoReadPend:</b> Info:list of entities which are queued to retrieve config and status. 
 	                        This is typically scheduled thru autoReadReg</li>
-    <li><b>ERR___rssiCrit:</b> list of device names with RSSI reading n min level </li>
-    <li><b>rssiMinLevel:</b> counts of rssi min readings per device, clustered in blocks</li>
+    <li><b>ERR___rssiCrit:</b> Error:list of devices with RSSI reading n min level </li>
+    <li><b>W_unConfRegs:</b> Warning:list of entities with unconfirmed register changes. Execute getConfig to clear this.</li>
+    <li><b>I_rssiMinLevel:</b> Info:counts of rssi min readings per device, clustered in blocks</li>
 
-    <li><b>ERR__protocol:</b> count of non-recoverable protocol events per device. 
+    <li><b>ERR__protocol:</b> Error:count of non-recoverable protocol events per device. 
 	    Those events are NACK, IOerr, ResendFail, CmdDel, CmdPend.<br>
         Coutned are the number of device with those events, not the number of events!</li>
-    <li><b>ERR__protoNames:</b> name-list of devices with non-recoverable protocol events</li>
-    <li><b>HM_IOdevices:</b> list of IO devices used by CUL_HM entities</li>
-    <li><b>actTotal:</b> action detector state, count of devices with ceratin states</li>
-    <li><b>ERRactNames:</b> names of devices that are not alive according to ActionDetector</li>
-    <li><b>sumDefined:</b> count of defines entities in CUL_HM. Entites might be count as 
+    <li><b>ERR__protoNames:</b> Error:name-list of devices with non-recoverable protocol events</li>
+    <li><b>I_HM_IOdevices:</b> Info:list of IO devices used by CUL_HM entities</li>
+    <li><b>I_actTotal:</b> Info:action detector state, count of devices with ceratin states</li>
+    <li><b>ERRactNames:</b> Error:names of devices that are not alive according to ActionDetector</li>
+    <li><b>C_sumDefined:</b> Count:defined entities in CUL_HM. Entites might be count as 
 	    device AND channel if channel funtion is covered by the device itself. Similar to virtual</li>
-    <li><b>ERR_&lt;reading&gt;:</b> count of readings as defined in attribut 
+    <li><b>ERR_&lt;reading&gt;:</b> Error:count of readings as defined in attribut 
 	    <a href="#HMinfosumERROR">sumERROR</a>
 	    that do not match the good-content. </li>
-    <li><b>ERR_names:</b> name-list of entities that are counted in any ERR_&lt;reading&gt;
-        sum_&lt;reading&gt;: count of readings as defined in attribut 
+    <li><b>ERR_names:</b> Error:name-list of entities that are counted in any ERR_&lt;reading&gt;
+        W_sum_&lt;reading&gt;: count of readings as defined in attribut 
 		<a href="#HMinfosumStatus">sumStatus</a>. </li>
     Example:<br>
 	<li><code>
@@ -902,10 +1152,10 @@ sub HMinfo_template(@){########################################################
       ERR__protoNames LightKittchen,WindowDoor,Remote12,Ligth1,Light5
       ERR_battery: low:2;
       ERR_names: remote1,buttonClara,
-      rssiMinLevel 99&gt;:3 80&lt;:0 60&lt;:7 59&lt;:4
-      sum_battery: ok:5;low:2;
-      sum_overheat: off:7;
-      sumDefined: entities:23 device:11 channel:16 virtual:5;
+      I_rssiMinLevel 99&gt;:3 80&lt;:0 60&lt;:7 59&lt;:4
+      W_sum_battery: ok:5;low:2;
+      W_sum_overheat: off:7;
+      C_sumDefined: entities:23 device:11 channel:16 virtual:5;
 	</code></li>
 
    </ul>
