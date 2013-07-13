@@ -270,6 +270,7 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
   "update" => {
             Hlp => "[development|stable] [<file>|check|fhem],update Fhem" },
   "updatefhem" => { ReplacedBy => "update" },
+  "version" => { Fn => "CommandVersion" },
 );
 
 ###################################################
@@ -2080,6 +2081,29 @@ CommandSleep($$)
 
   }
   return undef;
+}
+
+#####################################
+sub
+CommandVersion($$)
+{
+  my ($cl, $param) = @_;
+
+  my @ret = ("# $cvsid");
+  foreach my $m (sort keys %modules) {
+    next if(!$modules{$m}{LOADED} || $modules{$m}{ORDER} < 0);
+    my $fn = "$attr{global}{modpath}/FHEM/".$modules{$m}{ORDER}."_$m.pm";
+    if(!open(FH, $fn)) {
+      push @ret, "$fn: $!";
+    } else {
+      push @ret, map { chomp; $_ } grep(/# \$Id:/, <FH>);
+    }
+  }
+  if($param) {
+    return join("\n", grep /$param/, @ret);
+  } else {
+    return join("\n", @ret);
+  }
 }
 
 sub
