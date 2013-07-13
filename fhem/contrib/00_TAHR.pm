@@ -14,13 +14,6 @@ use Time::HiRes qw(gettimeofday);
 sub TAHR_Read($);
 sub TAHR_Ready($);
 sub TAHR_setbits($$);
-sub TAHR_SetReading($$$$);
-
-my %tahr_sets = (
-  "ww_soll"         => "0C07656565%02x6565",
-  "ww_betriebsart"  => "0C0E%02x6565656565", 
-);
-
 
 sub
 TAHR_Initialize($)
@@ -34,7 +27,9 @@ TAHR_Initialize($)
   $hash->{DefFn}   = "TAHR_Define";
   $hash->{UndefFn} = "TAHR_Undef";
   $hash->{SetFn}   = "TAHR_Set";
-  $hash->{AttrList}= "do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 ".
+                     "do_not_notify:1,0 ignore:1,0 dummy:1,0 showtime:1,0 ".
+                     $readingFnAttributes;
 }
 
 #####################################
@@ -56,8 +51,9 @@ TAHR_Define($$)
     return undef;
   }
   
+  $hash->{PARTIAL} = "";
   $hash->{DeviceName} = $dev;
-  my $ret = DevIo_OpenDev($hash, 0, "TAHR_Poll");
+  my $ret = DevIo_OpenDev($hash, 0, "TAHR_InitFn");
   return $ret;
 }
 
@@ -77,14 +73,19 @@ sub
 TAHR_Set($@)
 {
   my ($hash, @a) = @_;
+  my %tahr_sets = (
+    "ww_soll"         => "0C07656565%02x6565",
+    "ww_betriebsart"  => "0C0E%02x6565656565", 
+  );
 
   return "\"set TAHR\" needs at least an argument" if(@a < 2);
-
   my $cmd = $tahr_sets{$a[1]};
-  return "Unknown argument $a[1], choose one of " . 
-                join(" ", sort keys %tahr_sets) if(!defined($cmd));
+  if(!defined($cmd)) {
+    return SetExtensions($hash, join(" ", sort keys %tahr_sets), @a);
+  }
+
   # FIXME
-  DevIo_SimpleWrite($hash, $cmd);
+  DevIo_SimpleWrite($hash, sprintf($cmd, $a[2]));
   return undef;
 }
 
@@ -97,20 +98,25 @@ TAHR_Read($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my ($data, $crc);
+  my $ll5 = GetLogLevel($name,5);
 
   my $buf = DevIo_SimpleRead($hash);
   return "" if(!defined($buf));
 
   $buf = unpack('H*', $buf);
-  Log 5, "RAW: $buf";
+  Log $ll5, "RAW: $buf";
 
-  ######################################
-  # Analyze the data
-  my $tn = TimeNow();
-  my ($key, $val) = ("key", "val");
-
-  # FIXME
-  TAHR_SetReading($hash, $tn, $key, $val);
+  $buf = $hash->{PARTIAL} . $buf;
+  while($buf =~ m/^(.*?)\n(.*)$/) {
+    my $line = $1;
+    $buf = $2;
+    ######################################
+    # Analyze the data
+    # FIXME
+    Log $ll5, "LINE: $line";
+    readingsSingleUpdate($hash, "LINE", $line, 1);
+  }
+  $hash->{PARTIAL} = $buf;
 }
 
 #####################################
@@ -119,7 +125,7 @@ TAHR_Ready($)
 {
   my ($hash) = @_;
 
-  return DevIo_OpenDev($hash, 1, undef)
+  return DevIo_OpenDev($hash, 1, "TAHR_InitFn")
                 if($hash->{STATE} eq "disconnected");
 
   # This is relevant for windows/USB only
@@ -129,25 +135,15 @@ TAHR_Ready($)
 }
 
 sub
-TAHR_Poll($)
+TAHR_InitFn($)
 {
-  my ($hash) = @_;
-  return if($hash->{STATE} eq "disconnected");
-  # FIXME
-  DevIo_SimpleWrite($hash, "02"); # Request data
-  InternalTimer(gettimeofday()+5, "TAHR_Poll", $hash, 0);
-  return undef;
-}
-
-sub
-TAHR_SetReading($$$$)
-{
-  my ($hash,$tn,$key,$val) = @_;
+  my $hash = shift;
   my $name = $hash->{NAME};
-  Log GetLogLevel($name,4), "$name: $key $val";
-  $hash->{READINGS}{$key}{TIME} = $tn;
-  $hash->{READINGS}{$key}{VAL} = $val;
-  DoTrigger($name, "$key: $val");
+
+  DevIo_SetHwHandshake($hash) if($hash->{USBDev});
+  $hash->{PARTIAL} = "";
+  $hash->{STATE} = "Initialized";
+  return undef;
 }
 
 
