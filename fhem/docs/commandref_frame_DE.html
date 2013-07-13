@@ -61,6 +61,7 @@
       <a href="#trigger">trigger</a> &nbsp;
       <a href="#update">update</a> &nbsp;
       <a href="#usb">usb</a> &nbsp;
+      <a href="#version">version</a> &nbsp;
       <a href="#xmllist">xmllist</a> &nbsp;
 
   </ul>
@@ -1001,6 +1002,25 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   <br>
   Bemerkung: sleep gefolgt von einem weiteren Befehl und angegeben in at/notify/etc 
   blockiert die Abarbeitung von FHHM nicht.<br>
+</ul>
+
+<a name="version"></a>
+<h3>version</h3>
+<ul>
+  <code>version [filter]</code>
+  <br><br>
+  Gibt die Versionsinformation von fhem.pl und aller geladenen Module aus. Mit der
+  optionalen Parameter kann man die Ausgabe filtern.
+
+  <br><br>
+  Beispiel der Ausgabe:
+  <ul>
+    <code>
+    # $Id: fhem.pl 3405 2013-07-11 19:46:39Z rudolfkoenig $<br>
+    # $Id: 00_CUL.pm 3237 2013-06-01 17:15:59Z rudolfkoenig $<br>
+    # $Id: 10_CUL_HM.pm 3378 2013-07-02 16:57:27Z martinp876 $<br>
+    </code>
+  </ul>
 </ul>
 
 
