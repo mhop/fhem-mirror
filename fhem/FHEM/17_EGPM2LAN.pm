@@ -1,5 +1,5 @@
 ############################################## 
-# $Id: EGPM2LAN.pm 2891 2013-07-11 12:47:57Z alexus $ 
+# $Id: EGPM2LAN.pm 2891 2013-07-14 19:03:51Z alexus $ 
 #
 #  based / modified Version 98_EGPMS2LAN from ericl
 #
@@ -13,8 +13,6 @@
 #
 #  The GNU General Public License can be found at
 #  http://www.gnu.org/copyleft/gpl.html.
-#  A copy is found in the textfile GPL.txt and important notices to the license
-#  from the author is found in LICENSE.txt distributed with these scripts.
 #
 #  This script is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -47,71 +45,57 @@ EGPM2LAN_Set($@)
   my ($hash, @a) = @_; 
 
   return "no set value specified" if(int(@a) < 2); 
-  return "Unknown argument $a[1], choose one of on:1,2,3,4 off:1,2,3,4 toggle:1,2,3,4 clearreadings statusrequest" if($a[1] eq "?"); 
+  return "Unknown argument $a[1], choose one of on:1,2,3,4,all off:1,2,3,4,all toggle:1,2,3,4 clearreadings statusrequest" if($a[1] eq "?"); 
 
-  
   my $name = shift @a; 
   my $setcommand = shift @a; 
   my $params = join(" ", @a); 
   my $logLevel = GetLogLevel($name,4); 
-  my $post = "http://" . $hash->{IP} . "/ POST:";
-
   Log $logLevel, "EGPM2LAN set $name (". $hash->{IP}. ") $setcommand $params";
  
   EGPM2LAN_Login($hash, $logLevel); 
   
-  if($setcommand eq "on") 
+  if($setcommand eq "on" || $setcommand eq "off") 
   { 
-    $post .= "cte1=" . ($params == "1" ? "1" : "") . "&cte2=" . ($params == "2" ? "1" : "") . "&cte3=" . ($params == "3" ? "1" : "") . "&cte4=". ($params == "4" ? "1" : ""); 
-    Log $logLevel, "EGPM2LAN $post";    
-    eval {       
-      CustomGetFileFromURL($hash, $post, 0, $logLevel); 
-      EGPM2LAN_Statusrequest($hash, $logLevel); 
-    }; 
-    if ($@){ 
-      ### catch block 
-      Log $logLevel, "EGPM2LAN error: $@"; 
-    }; 
-  } 
-  elsif($setcommand eq "off") 
-  { 
-    $post .= "cte1=" . ($params == "1" ? "0" : "") . "&cte2=" . ($params == "2" ? "0" : "") . "&cte3=" . ($params == "3" ? "0" : "") . "&cte4=". ($params == "4" ? "0" : ""); 
-    Log $logLevel, "EGPM2LAN $post"; 
-    eval {                 
-      CustomGetFileFromURL($hash, $post, 0, $logLevel); 
-      EGPM2LAN_Statusrequest($hash, $logLevel); 
-    }; 
-    if ($@){ 
-      ### catch block 
-      Log $logLevel, "EGPM2LAN error: $@"; 
-    }; 
-  } 
+    if($params eq "all")
+	  { #switch all Sockets; thanks to eric!
+  	  for (my $count = 1; $count <= 4; $count++)
+      {
+   	    EGPM2LAN_Switch($hash, $setcommand, $count, $logLevel);
+      }
+	  }
+	  else
+	  {  #switch single Socket
+       EGPM2LAN_Switch($hash, $setcommand, $params, $logLevel);
+    }
+	  EGPM2LAN_Statusrequest($hash, $logLevel); 
+  }   
   elsif($setcommand eq "toggle") 
   { 
     my $currentstate = EGPM2LAN_Statusrequest($hash, $logLevel);
     if(defined($currentstate))
     {
-	my @powerstates = split(",", $currentstate);
-	my $newcommand="off";
-	if($powerstates[$params-1] eq "0")
-	{
-	   $newcommand="on";
-	}
-        my @cmd = ($name,$newcommand,$params);
-	EGPM2LAN_Set($hash,@cmd);
+    	my @powerstates = split(",", $currentstate);
+    	my $newcommand="off";
+    	if($powerstates[$params-1] eq "0")
+    	{
+    	   $newcommand="on";
+    	}
+      my @cmd = ($name,$newcommand,$params);
+  	  EGPM2LAN_Set($hash,@cmd);
     } 
   } 
   elsif($setcommand eq "statusrequest") 
   { 
-	EGPM2LAN_Statusrequest($hash, $logLevel); 
+	   EGPM2LAN_Statusrequest($hash, $logLevel); 
   }
   elsif($setcommand eq "clearreadings") 
   { 
-	delete $hash->{READINGS};
+	   delete $hash->{READINGS};
   } 
   else 
   { 
-    return "unknown argument $setcommand, choose one of on, off, toggle, statusrequest, clearreadings"; 
+     return "unknown argument $setcommand, choose one of on, off, toggle, statusrequest, clearreadings"; 
   } 
   
   EGPM2LAN_Logoff($hash, $logLevel); 
@@ -124,10 +108,29 @@ EGPM2LAN_Set($@)
 } 
 
 ################################
+sub EGPM2LAN_Switch($$$$) { 
+  my ($hash, $state, $port, $logLevel) = @_; 
+  $state = ($state eq "on" ? "1" : "0");
+  
+  my $fritz = 0; #may be important for FritzBox-users
+  my $data = "cte1=" . ($port == "1" ? $state : "") . "&cte2=" . ($port == "2" ? $state : "") . "&cte3=" . ($port == "3" ? $state : "") . "&cte4=". ($port == "4" ? $state : ""); 
+  Log $logLevel, "EGPM2LAN $data"; 
+  eval {                 
+    CustomGetFileFromURL($hash ,"http://".$hash->{IP}."/",10 ,$data ,$fritz ,$logLevel); 
+  }; 
+  if ($@){ 
+    ### catch block 
+    Log $logLevel, "EGPM2LAN error: $@"; 
+  }; 
+
+  return 1; 
+} 
+
+################################
 sub EGPM2LAN_Login($$) { 
   my ($hash, $logLevel) = @_; 
 
-  Log $logLevel,"EGPM2LAN try to Login";
+  Log $logLevel,"EGPM2LAN try to Login @".$hash->{IP};
 
   eval{
   CustomGetFileFromURL($hash, "http://".$hash->{IP}."/login.html", 10, "pw=" . (defined($hash->{PASSWORD}) ? $hash->{PASSWORD} : ""), 0, $logLevel);  
@@ -138,6 +141,8 @@ sub EGPM2LAN_Login($$) {
       return 0; 
   }; 
 
+  Log $logLevel,"EGPM2LAN Login successful!";
+    
 return 1; 
 } 
 
@@ -154,7 +159,9 @@ sub EGPM2LAN_GetDeviceInfo($$) {
   my @socketlist; 
   while ($input =~ m/<h2 class=\"ener\">(.+?)<\/h2>/gi) 
   { 
-	push(@socketlist,trim($1)); 
+    my $socketname = trim($1);
+    $socketname =~ s/ /_/g;    #remove spaces
+	  push(@socketlist, $socketname); 
   }
 
   #check 4 dublicate Names
@@ -303,7 +310,8 @@ EGPM2LAN_Define($$)
     <code>define &lt;name&gt; EGPM2LAN &lt;IP-Address&gt; [&lt;Password&gt;]</code><br>
     <br>
     Defines an <a href="http://energenie.com/item.aspx?id=7557" >Energenie EG-PM2-LAN</a> device to switch up to 4 sockets over the network.
-    You can connect and configure your device over the web-interface. Name Settings will be adopted to Fhem-Devices to identify the sockets.
+    If you have more than one device, it is helpful to connect and set names for your sockets over the web-interface.
+    Name Settings will be adopted to FHEM and helps you to identify the sockets later.
 <br>
 </ul>
   <a name="EGPM2LANget"></a>
