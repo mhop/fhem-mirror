@@ -1879,7 +1879,7 @@ sub CUL_HM_Set($@) {
     $l2 = substr($l2."\x00", 0, 13);
     $l2 =~ s/(.)/sprintf(" %02X:%02X",$s++,ord($1))/ge;
 
-	@a = ($a[0],"regBulk","RegL_00:",split(" ",$l1.$l2));
+	@a = ($a[0],"regBulk","RegL_01:",split(" ",$l1.$l2));
   } 
 
   $cmd = $a[1];# get converted command
