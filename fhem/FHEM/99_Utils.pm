@@ -21,20 +21,45 @@ time_str2num($)
 }
 
 sub
-min($$)
+min($@)
 {
-  my ($a,$b) = @_;
-  return $a if($a lt $b);
-  return $b;
+  my ($min, @vars) = @_; 
+  for (@vars) {
+    $min = $_ if $_ lt $min;
+  }           
+  return $min;
 }
 
 sub
-max($$)
+max($@)
 {
-  my ($a,$b) = @_;
-  return $a if($a gt $b);
-  return $b;
+  my ($max, @vars) = @_; 
+  for (@vars) {
+    $max = $_ if $_ gt $max;
+  }           
+  return $max;
 }
+
+sub
+minNum($@)
+{             
+  my ($min, @vars) = @_; 
+  for (@vars) {
+    $min = $_ if $_ < $min;
+  }           
+  return $min;
+}
+
+sub
+maxNum($@)
+{             
+  my ($max, @vars) = @_; 
+  for (@vars) {
+    $max = $_ if $_ > $max;
+  }           
+  return $max;
+}
+
 
 sub
 abstime2rel($)
