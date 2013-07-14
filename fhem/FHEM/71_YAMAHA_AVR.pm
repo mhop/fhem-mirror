@@ -79,11 +79,13 @@ YAMAHA_AVR_GetStatus($;$)
 
     my $device = $hash->{helper}{ADDRESS};
 
+    # get the model informations and available zones if no informations are available
     if(not defined($hash->{ACTIVE_ZONE}) or not defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
     {
 	YAMAHA_AVR_getModel($hash);
     }
 
+    # get all available inputs and scenes if nothing is available
     if((not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0) or (not defined($hash->{helper}{SCENES}) or length($hash->{helper}{SCENES}) == 0))
     {
 	YAMAHA_AVR_getInputs($hash);
@@ -121,27 +123,31 @@ YAMAHA_AVR_GetStatus($;$)
        readingsBulkUpdate($hash,"state",lc($power));
     }
     
+    # current volume and mute status
     if($return =~ /<Volume><Lvl><Val>(.+)<\/Val><Exp>(.+)<\/Exp><Unit>.+<\/Unit><\/Lvl><Mute>(.+)<\/Mute>.*<\/Volume>/)
     {
 	readingsBulkUpdate($hash, "volume_level", ($1 / 10 ** $2));
 	readingsBulkUpdate($hash, "mute", lc($3));
     }
     
+    # (only available in zones other than mainzone) absolute or relative volume change to the mainzone
     if($return =~ /<Volume>.*?<Output>(.+?)<\/Output>.*?<\/Volume>/)
     {
 	readingsBulkUpdate($hash, "output", lc($1));
     }
     else
     {
+       # delete the reading if this information is not available
        delete($hash->{READINGS}{output}) if(defined($hash->{READINGS}{output}));
-    
     }
     
+    # current input same as the corresponding set command name
     if($return =~ /<Input_Sel>(.+)<\/Input_Sel>/)
     {
 	readingsBulkUpdate($hash, "input", YAMAHA_AVR_InputParam2Fhem(lc($1), 0));
     }
     
+    # input name as it is displayed on the receivers front display
     if($return =~ /<Input>.*?<Title>\s*(.+?)\s*<\/Title>.*<\/Input>/)
     {
 	readingsBulkUpdate($hash, "input_name", $1);
@@ -496,7 +502,7 @@ YAMAHA_AVR_Define($$)
     $hash->{helper}{ADDRESS} = $address;
     
     
-    
+    # if a zone was given, use it, otherwise use the mainzone
     if(defined($a[3]))
     {
         $hash->{helper}{SELECTED_ZONE} = $a[3];
@@ -506,7 +512,7 @@ YAMAHA_AVR_Define($$)
 	$hash->{helper}{SELECTED_ZONE} = "mainzone";
     }
     
-    
+    # if an update interval was given which is greater than zero, use it.
     if(defined($a[4]) and $a[4] > 0)
     {
 	$hash->{helper}{INTERVAL}=$a[4];
@@ -536,16 +542,25 @@ YAMAHA_AVR_Define($$)
     }
     
     # set the volume-smooth-change attribute only if it is not defined, so no user values will be overwritten
+    #
+    # own attribute values will be overwritten anyway when all attr-commands are executed from fhem.cfg
     $attr{$name}{"volume-smooth-change"} = "1" unless(defined($attr{$name}{"volume-smooth-change"}));
     
     $hash->{helper}{AVAILABLE} = 1;
 
-     
-    
+    # start the status update timer
     InternalTimer(gettimeofday()+2, "YAMAHA_AVR_GetStatus", $hash, 0);
   
   return undef;
 }
+
+#############################################################################################################
+#
+#   Begin of helper functions
+#
+############################################################################################################
+
+
 
 #############################
 sub
@@ -693,7 +708,8 @@ sub YAMAHA_AVR_getInputParam($$)
     
 }
 
-
+#############################
+# queries the receiver model, system-id, version and all available zones
 sub YAMAHA_AVR_getModel($)
 {
     my ($hash) = @_;
@@ -731,6 +747,7 @@ sub YAMAHA_AVR_getModel($)
 	return undef;
     }
     
+    # query the description url which contains all zones
     $response = CustomGetFileFromURL(0, "http://".$address.$desc_url, 4, undef, 0, ($hash->{helper}{AVAILABLE} ? GetLogLevel($name, 3) : 5));
     
     Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get unit description from device $name. Please turn on the device or check for correct hostaddress!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
@@ -754,7 +771,7 @@ sub YAMAHA_AVR_getModel($)
     
     $hash->{ZONES_AVAILABLE} = YAMAHA_AVR_Param2Fhem($hash->{helper}{ZONES}, 1);
     
-    
+    # if explicitly given in the define command, set the desired zone
     if(defined(YAMAHA_AVR_getZoneName($hash, lc $hash->{helper}{SELECTED_ZONE})))
     {
     
@@ -770,6 +787,9 @@ sub YAMAHA_AVR_getModel($)
     return 0;
 }
 
+
+#############################
+# queries all available inputs and scenes
 sub YAMAHA_AVR_getInputs($)
 {
 
@@ -807,6 +827,7 @@ sub YAMAHA_AVR_getInputs($)
 	$hash->{helper}{INPUTS} = join("|", sort split("\\|", $hash->{helper}{INPUTS}));
 	
     
+    # query all available scenes
     $response = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Scene><Scene_Sel_Item>GetParam</Scene_Sel_Item></Scene></$zone></YAMAHA_AV>");
     
     Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get the available scenes from device $name. Please turn on the device or check for correct hostaddress!!!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
@@ -815,8 +836,10 @@ sub YAMAHA_AVR_getInputs($)
     
     delete($hash->{helper}{SCENES}) if(defined($hash->{helper}{SCENES}));
     
+    # get all available scenes from response
     while($response =~ /<Item_\d+>.*?<Param>(.+?)<\/Param>.*?<RW>(\w+)<\/RW>.*?<\/Item_\d+>/gc)
     {
+      # check if the RW-value is "W" (means: writeable => can be set through FHEM)
       if($2 eq "W")
       {
         if(defined($hash->{helper}{SCENES}) and length($hash->{helper}{SCENES}) > 0)
