@@ -186,6 +186,7 @@ weblink_FwFn($$$$)
           push @devices, [@device];
         } else {
           foreach my $d (sort keys %defs) {
+            next if( IsIgnored($d) );
             next if( $d !~ m/$device[0]/);
             push @devices, [$d,$device[1]];
           }
@@ -222,8 +223,8 @@ weblink_FwFn($$$$)
           $m = $mapping->{$name.".".$n} if( defined($mapping) && defined($mapping->{$name.".".$n}) );
           $m =~ s/\$NAME/$name/g;
           $ret .= "<td><div class=\"dname\"><a href=\"/fhem?detail=$name\">$m</a></div></td>";;
-          $ret .= "<td><div id=\"$name-$n\">$v</div></td>";
-          $ret .= "<td><div id=\"$name-$n-ts\">$t</div></td>" if( $show_time );
+          $ret .= "<td><div informId=\"$name-$n\">$v</div></td>";
+          $ret .= "<td><div informId=\"$name-$n-ts\">$t</div></td>" if( $show_time );
         }         
       }
     }
@@ -546,7 +547,7 @@ weblink_WriteGplot($)
       <code>define MyPlot weblink fileplot &lt;logdevice&gt;:&lt;gnuplot-file&gt;:&lt;logfile&gt;</code><br>
       <code>define MyPlot weblink dbplot &lt;logdevice&gt;:&lt;gnuplot-file&gt;</code><br>
       <code>define systemCommands weblink cmdList pair:Pair:set+cul2+hmPairForSec+60 restart:Restart:shutdown+restart update:UpdateCheck:update+check</code><br>
-      <code>define wl_SystemStatus weblink readings sysstat *nostate *notime  {{ 'load' => 'Systemauslastung in %', 'temperature' => 'Systemtemperatur in &amp;deg;;C'}}</code><br>
+      <code>define wl_SystemStatus weblink readings sysstat *nostate *notime  {{ 'load' => 'Systemauslastung', 'temperature' => 'Systemtemperatur in &amp;deg;;C'}}</code><br>
       <code>define wlHeizung weblink readings t1:temperature t2:temperature t3:temperature *notime {{ 't1.temperature' => 'Vorlauf', 't2.temperature' => 'R&amp;uuml;;cklauf', 't3.temperature' => 'Zirkulation'}}</code>
     </ul>
     <br>
