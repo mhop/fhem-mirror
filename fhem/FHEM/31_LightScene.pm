@@ -96,7 +96,7 @@ LightScene_2html($)
     foreach my $d (sort keys %{ $hash->{CONTENT} }) {
       my %extPage = ();
       my ($allSets, $cmdlist, $txt) = FW_devState($d, $room, \%extPage);
-      $ret .= "<td id=\"$d\">$txt</td>";
+      $ret .= "<td informId=\"$d\">$txt</td>";
     }
   }
 
