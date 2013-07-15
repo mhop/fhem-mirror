@@ -76,6 +76,7 @@ use vars qw(%FW_webArgs); # all arguments specified in the GET
 my $FW_zlib_checked;
 my $FW_use_zlib = 1;
 my $FW_activateInform = 0;
+my @FW_fhemwebjs;
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
@@ -133,6 +134,10 @@ FHEMWEB_Initialize($)
   $FW_icondir  = "$FW_dir/images";
   $FW_cssdir   = "$FW_dir/pgm2";
   $FW_gplotdir = "$FW_dir/gplot";
+  if(opendir(DH, "$FW_dir/pgm2")) {
+    @FW_fhemwebjs = sort grep /^fhemweb.*js$/, readdir(DH);
+    closedir(DH);
+  }
 
   $data{webCmdFn}{slider}     = "FW_sliderFn";
   $data{webCmdFn}{timepicker} = "FW_timepickerFn";
@@ -552,7 +557,9 @@ FW_answerCall($)
 
   my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
   FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/svg.js") if($FW_plotmode eq "SVG");
-  FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/fhemweb.js");
+  foreach my $js (@FW_fhemwebjs) {
+    FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/$js");
+  }
 
   my $onload = AttrVal($FW_wname, "longpoll", 1) ?
                       "onload=\"FW_delayedStart()\"" : "";
@@ -1106,7 +1113,6 @@ FW_showRoom()
       my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
 
       FW_pO "<td informId=\"$d\">$txt</td>";
-
 
       ######
       # Commands, slider, dropdown
@@ -2609,7 +2615,7 @@ FW_htmlEscape($)
 }
 
 sub
-FW_sliderFn($$$)
+FW_sliderFn($$$$$)
 {
   my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
 
@@ -2618,17 +2624,18 @@ FW_sliderFn($$$)
   my ($min,$stp, $max) = ($1, $2, $3);
   my $srf = $FW_room ? "&room=$FW_room" : "";
   my $cv = ReadingsVal($d, $cmd, Value($d));
-  $cmd = "" if($cmd eq "state");
   my $id = ($cmd eq "state") ? "" : "-$cmd";
+  $cmd = "" if($cmd eq "state");
   $cv =~ s/.*?(\d+).*/$1/; # get first number
   $cv = 0 if($cv !~ m/\d/);
   return "<td colspan='2'>".
-           "<div class='slider' id='slider.$d$id' ".
-                "min='$min' stp='$stp' max='$max' ".
-                "cmd='$FW_ME?cmd=set $d $cmd %$srf'>".
-             "<div class='handle'>$min</div></div>".
-           "<script type=\"text/javascript\">" .
-               "Slider(document.getElementById('slider.$d$id'),'$cv')</script>".
+           "<div class='slider' id='slider.$d$id' min='$min' stp='$stp' ".
+                 "max='$max' cmd='$FW_ME?cmd=set $d $cmd %$srf'>".
+             "<div class='handle'>$min</div>".
+           "</div>".
+           "<script type=\"text/javascript\">".
+             "FW_sliderCreate(document.getElementById('slider.$d$id'),'$cv');".
+           "</script>".
          "</td>";
 }
 
@@ -2645,7 +2652,7 @@ FW_timepickerFn()
   my $c = "\"$FW_ME?cmd=set $d $cmd %$srf\"";
   return "<td colspan='2'>".
             "<input name='time.$d' value='$cv' type='text' readonly size='5'>".
-            "<input type='button' value='+' onclick='addTime(this,$c)'>".
+            "<input type='button' value='+' onclick='FW_timeCreate(this,$c)'>".
           "</td>";
 }
 
