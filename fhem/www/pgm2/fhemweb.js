@@ -1,6 +1,7 @@
 /*************** LONGPOLL START **************/
 var FW_pollConn;
 var FW_curLine; // Number of the next line in FW_pollConn.responseText to parse
+var FW_widgets = new Object(); // to be filled by fhemweb_*.js
 
 function
 FW_cmd(arg)     /* see also FW_devState */
@@ -33,9 +34,8 @@ FW_doUpdate()
     var d = lines[i].split("<<", 3);    // Complete arg
     if(d.length != 3)
       continue;
-
     var elArr = document.querySelectorAll("[informId="+d[0]+"]");
-    for (var k=0; k<elArr.length; k++){
+    for(var k=0; k<elArr.length; k++){
       el = elArr[k];
       if(el.nodeName.toLowerCase() == "select") {
         // dropdown: set the selected index to the current value
@@ -52,20 +52,9 @@ FW_doUpdate()
       }
     }
 
-    el = document.getElementById("slider."+d[0]);
-    if(el) {
-      var doSet = 1;    // Only set the "state" slider in the detail view
-      if(el.parentNode.getAttribute("name") == "val.set"+d[0]) {
-        var el2 = document.getElementsByName("arg.set"+d[0])[0];
-        if(el2.nodeName.toLowerCase() == "select" &&
-           el2.options[el2.selectedIndex].value != "state")
-          doSet = 0;
-      }
-      if(doSet) {
-        var val = d[1].replace(/^.*?(\d+).*/g, "$1"); // get first number
-        if(!val.match(/\d+/))
-          val = 0;
-        Slider(el, val);
+    for(var w in FW_widgets) {
+      if(FW_widgets[w].updateLine) {
+        FW_widgets[w].updateLine(d);
       }
     }
 
@@ -75,24 +64,9 @@ FW_doUpdate()
   //Next time, we continue at the next line
   FW_curLine = lines.length;
 
-  // if matches, refresh the SVG by removing and readding the embed tag
-  var embArr = document.getElementsByTagName("embed");
-  for(var i = 0; i < embArr.length; i++) {
-    var svg = embArr[i].getSVGDocument();
-    if(svg == null) // too many events sometimes.
-      continue;
-    svg = svg.firstChild.nextSibling;
-    var flog = svg.getAttribute("flog");
-    for(var j=0; j < devs.length; j++) {
-      if(flog !== null && flog.match(" "+devs[j]+" ")) {
-        var e = embArr[i];
-        var newE = document.createElement("embed");
-        for(var k=0; k<e.attributes.length; k++)
-          newE.setAttribute(e.attributes[k].name, e.attributes[k].value);
-        e.parentNode.insertBefore(newE, e);
-        e.parentNode.removeChild(e);
-        break;
-      }
+  for(var w in FW_widgets) {
+    if(FW_widgets[w].updateDevs) {
+      FW_widgets[w].updateDevs(devs);
     }
   }
 }
@@ -131,134 +105,6 @@ FW_delayedStart()
 }
 /*************** LONGPOLL END **************/
 
-/*************** SLIDER **************/
-function
-Slider(slider, curr)
-{
-  var sh = slider.firstChild;
-  var lastX=-1, offX=0, maxX=0, val=-1;
-  var min = parseFloat(slider.getAttribute("min"));
-  var stp = parseFloat(slider.getAttribute("stp"));
-  var max = parseFloat(slider.getAttribute("max"));
-  var cmd = slider.getAttribute("cmd");
-
-  function
-  init()
-  {
-    maxX = slider.offsetWidth-sh.offsetWidth;
-    if(curr) {
-      offX += (curr-min)*maxX/(max-min);
-      sh.innerHTML = curr;
-      sh.setAttribute('style', 'left:'+offX+'px;');
-    }
-  }
-  init();
-
-  function
-  touchFn(e, fn)
-  {
-    e.preventDefault(); // Prevents Safari from scrolling!
-    if(e.touches == null || e.touches.length == 0)
-      return;
-    e.clientX = e.touches[0].clientX;
-    fn(e);
-  }
-
-  function
-  mouseDown(e)
-  {
-    var oldFn1 = document.onmousemove, oldFn2 = document.onmouseup,
-        oldFn3 = document.ontouchmove, oldFn4 = document.ontouchend;
-
-    if(maxX == 0)
-      init();
-    lastX = e.clientX;
-
-    function
-    mouseMove(e)
-    {
-      var diff = e.clientX-lastX; lastX = e.clientX;
-      offX += diff;
-      if(offX < 0) offX = 0;
-      if(offX > maxX) offX = maxX;
-      val = min+(offX/maxX * (max-min));
-      val = Math.floor(Math.floor(val/stp)*stp);
-      sh.innerHTML = val;
-      sh.setAttribute('style', 'left:'+offX+'px;');
-      if(cmd && cmd.substring(0,3) == "js:") {
-        eval(cmd.substring(3).replace('%',val));
-      }
-    }
-    document.onmousemove = mouseMove;
-    document.ontouchmove = function(e) { touchFn(e, mouseMove); }
-
-    document.onmouseup = document.ontouchend = function(e)
-    {
-      document.onmousemove = oldFn1; document.onmouseup  = oldFn2;
-      document.ontouchmove = oldFn3; document.ontouchend = oldFn4;
-      if(cmd) {
-        if(cmd.substring(0,3) != "js:") {
-          document.location = cmd.replace('%',val);
-        }
-      } else {
-        slider.nextSibling.setAttribute('value', val);
-      }
-    };
-  };
-
-  sh.onselectstart = function() { return false; }
-  sh.onmousedown = mouseDown;
-  sh.ontouchstart = function(e) { touchFn(e, mouseDown); }
-}
-
-
-function
-setTime(el,name,val)
-{
-  var el = el.parentNode.parentNode.firstChild;
-  var v = el.value.split(":");
-  v[name] = ''+val;
-  if(v[0].length < 2) v[0] = '0'+v[0];
-  if(v[1].length < 2) v[1] = '0'+v[1];
-  el.value = v[0]+":"+v[1];
-  el.setAttribute('value', el.value);
-}
-
-function
-addTime(el,cmd)
-{
-  var par = el.parentNode;
-  var v = par.firstChild.value;
-  var brOff = par.innerHTML.indexOf("<br>");
-
-  if(brOff > 0) {
-    par.innerHTML = par.innerHTML.substring(0, brOff).replace('"-"','"+"');
-    if(cmd)
-      document.location = cmd.replace('%',v);
-    return;
-  }
-
-  el.setAttribute('value', '-');
-  if(v.indexOf(":") < 0)
-    par.firstChild.value = v = "12:00";
-  var val = v.split(":");
-
-  for(var i = 0; i < 2; i++) {
-    par.appendChild(document.createElement('br'));
-
-    var sl = document.createElement('div');
-    sl.innerHTML = '<div class="slider" min="0" stp='+(i==0?1:5)+
-                      ' max='+(i==0?23:55)+
-                      ' cmd="js:setTime(slider,'+i+',%)"'+
-                      '><div class="handle">'+val[i]+
-                   '</div></div>';
-    par.appendChild(sl);
-    sl.setAttribute('class', par.getAttribute('class'));
-
-    Slider(sl.firstChild, val[i]);
-  }
-}
-
 /*************** Select **************/
 /** Change attr/set argument type to input:text or select **/
 function
@@ -277,61 +123,54 @@ FW_selChange(sel, list, elName)
     }
   }
   var el = document.getElementsByName(elName)[0];
-  var name = el.getAttribute('name');
 
   var qFn, qArg;
   var devName="";
   if(elName.indexOf("val.attr")==0) devName = elName.substring(8);
-  if(elName.indexOf("val.set")==0) devName = elName.substring(7);
+  if(elName.indexOf("val.set") ==0) devName = elName.substring(7);
 
+  var o;
   if(value==undefined) {
-    newEl = document.createElement('input');
-    newEl.type='text'; newEl.size=30; 
-    qFn = 'qArg.setAttribute("value", "%")';
-    qArg = newEl;
-
+    o = new Object();
+    o.newEl = document.createElement('input');
+    o.newEl.type='text';
+    o.newEl.size=30; 
+    o.qFn = 'qArg.setAttribute("value", "%")';
+    o.qArg = o.newEl;
 
   } else {
     var vArr = value.split(","); 
-    if(vArr.length == 4 && vArr[0] == "slider") {
-      var min=parseFloat(vArr[1]),
-          stp=parseFloat(vArr[2]),
-          max=parseFloat(vArr[3]);
-      newEl = document.createElement('div');
-      newEl.innerHTML=
-        '<div class="slider" id="slider.'+devName+'" min="'+min+'" stp="'+stp+
-                  '" max="'+max+'"><div class="handle">'+min+'</div></div>'+
-        '<input type="hidden" name="'+name+'" value="'+min+'">';
-      Slider(newEl.firstChild, undefined);
-      qFn = 'FW_querySetSlider(qArg, "%")';
-      qArg = newEl.firstChild;
 
-    } else if(vArr.length == 1 && vArr[0] == "time") {
-      newEl = document.createElement('div');
-      newEl.innerHTML='<input name="'+name+'" type="text" size="5">'+
-              '<input type="button" value="+" onclick="addTime(this)">';
-
-    } else {
-      newEl = document.createElement('select');
-      for(var j=0; j < vArr.length; j++) {
-        newEl.options[j] = new Option(vArr[j], vArr[j]);
+    for(var w in FW_widgets) {
+      if(FW_widgets[w].selChange) {
+        o = FW_widgets[w].selChange(elName, devName, vArr);
+        if(o)
+          break;
       }
-      qFn = 'FW_querySetSelected(qArg, "%")';
-      qArg = newEl;
+    }
+
+    if(!o) {
+      o = new Object();
+      o.newEl = document.createElement('select');
+      for(var j=0; j < vArr.length; j++) {
+        o.newEl.options[j] = new Option(vArr[j], vArr[j]);
+      }
+      o.qFn = 'FW_querySetSelected(qArg, "%")';
+      o.qArg = o.newEl;
     }
 
 
   }
 
-  newEl.setAttribute('class', el.getAttribute('class'));
-  newEl.setAttribute('name', name);
-  el.parentNode.replaceChild(newEl, el);
+  o.newEl.setAttribute('class', el.getAttribute('class'));
+  o.newEl.setAttribute('name', elName);
+  el.parentNode.replaceChild(o.newEl, el);
 
-  if((typeof qFn == "string")) {
+  if((typeof o.qFn == "string")) {
     if(elName.indexOf("val.attr")==0)
-      FW_queryValue('{AttrVal("'+devName+'","'+sel+'","")}', qFn, qArg);
+      FW_queryValue('{AttrVal("'+devName+'","'+sel+'","")}', o.qFn, o.qArg);
     if(elName.indexOf("val.set")==0)
-      FW_queryValue('{ReadingsVal("'+devName+'","'+sel+'","")}', qFn, qArg);
+      FW_queryValue('{ReadingsVal("'+devName+'","'+sel+'","")}', o.qFn, o.qArg);
   }
 }
 
@@ -360,11 +199,4 @@ FW_querySetSelected(el, val)
   for(var j=0;j<el.options.length;j++)
     if(el.options[j].value == val)
       el.selectedIndex = j;
-}
-
-function
-FW_querySetSlider(el, val)
-{
-  val = val.replace(/[^\d\.]/g, ""); // remove non numbers
-  Slider(el, val);
 }

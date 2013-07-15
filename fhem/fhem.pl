@@ -2401,6 +2401,7 @@ DoTrigger($$@)
       my $r = CallFn($n, "NotifyFn", $defs{$n}, $hash);
       $ret .= $r if($r);
     }
+    delete($hash->{NTFY_TRIGGERTIME});
 
     ################
     # Inform
