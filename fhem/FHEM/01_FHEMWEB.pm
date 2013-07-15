@@ -72,11 +72,11 @@ use vars qw(%FW_hiddenroom); # hash of hidden rooms, used by weblink
 use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by weblink
 use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by weblink
 use vars qw(%FW_webArgs); # all arguments specified in the GET
+use vars qw(@FW_fhemwebjs);# List of fhemweb*js scripts to load
 
 my $FW_zlib_checked;
 my $FW_use_zlib = 1;
 my $FW_activateInform = 0;
-my @FW_fhemwebjs;
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
