@@ -33,8 +33,10 @@ FW_doUpdate()
     var d = lines[i].split("<<", 3);    // Complete arg
     if(d.length != 3)
       continue;
-    var el = document.getElementById(d[0]);
-    if(el) {
+
+    var elArr = document.querySelectorAll("[informId="+d[0]+"]");
+    for (var k=0; k<elArr.length; k++){
+      el = elArr[k];
       if(el.nodeName.toLowerCase() == "select") {
         // dropdown: set the selected index to the current value
         for(var j=0;j<el.options.length;j++)
@@ -114,7 +116,9 @@ FW_longpoll()
         room=sa[i];
     }
   }
-  var query = document.location.pathname+"?"+room+"&XHR=1&inform=1";
+  // Needed when using multiple FF windows
+  var timestamp = "&timestamp="+new Date().getTime();
+  var query = document.location.pathname+"?"+room+"&XHR=1&inform=1"+timestamp;
   FW_pollConn.open("GET", query, true);
   FW_pollConn.onreadystatechange = FW_doUpdate;
   FW_pollConn.send(null);

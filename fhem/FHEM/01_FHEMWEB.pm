@@ -700,11 +700,9 @@ FW_makeTable($$$@)
     if($n eq "DEF" && !$FW_hiddenroom{input}) {
       FW_makeEdit($name, $n, $val);
 
-    } 
-	else {
-
+    } else {
       FW_pO "<td><div class=\"dname\">$n</div></td>";
-      if(ref($val)) {#handle readings
+      if(ref($val)) { #handle readings
         my ($v, $t) = ($val->{VAL}, $val->{TIME});
         $v = FW_htmlEscape($v);
         if($FW_ss) {
@@ -712,42 +710,43 @@ FW_makeTable($$$@)
           FW_pO "<td><div class=\"dval\">$v$t</div></td>";
         } else {		
           $t = "" if(!$t);
-          FW_pO "<td><div id=\"$name-$n\">$v</div></td>";
-          FW_pO "<td><div id=\"$name-$n-ts\">$t</div></td>";
+          FW_pO "<td><div informId=\"$name-$n\">$v</div></td>";
+          FW_pO "<td><div informId=\"$name-$n-ts\">$t</div></td>";
         }
-      } 
-	  else {
+      } else {
         $val = FW_htmlEscape($val);
-		# if possible provide link to reference
-		if ($n eq "room"){
-		  my @tmp;
+        # if possible provide link to reference
+        if ($n eq "room"){
+          my @tmp;
           push @tmp,FW_pH("room=$_" , $_ ,0,"",1,1)foreach(split(",",$val));
-		  FW_pO "<td><div class=\"dval\">"
+          FW_pO "<td><div class=\"dval\">"
 		        .join(",",@tmp)
 		        ."</div></td>";	
-		}
-		elsif ($n eq "webCmd"){
-		  my @tmp;
+        } elsif ($n eq "webCmd"){
+          my @tmp;
           push @tmp,FW_pH("cmd.$name=set $name $_&detail=$name" , $_ ,0,"",1,1)foreach(split(":",$val));
-		  FW_pO "<td><div id=\"$name-$n\">"
+          FW_pO "<td><div name=\"$name-$n\">"
 		       .join(":",@tmp)
 		       ."</div></td>";	
-		}	
-		elsif ($n =~ m/^fp_(.*)/ && $defs{$1}){#special for Floorplan
-		  FW_pH "detail=$1", $val,1;
-		}
-		else{
-		  my @tmp;
+        } elsif ($n =~ m/^fp_(.*)/ && $defs{$1}){#special for Floorplan
+          FW_pH "detail=$1", $val,1;
+
+        } else {
+          my @tmp;
           foreach(split(",",$val)){
-		    if ($defs{$_}){ push @tmp, FW_pH( "detail=$_", $_ ,0,"",1,1);}
-			else{		    push @tmp, $_;}
-		  }
-		  FW_pO "<td><div class=\"dval\">"
+          if($defs{$_}) {
+            push @tmp, FW_pH( "detail=$_", $_ ,0,"",1,1);
+          } else {
+            push @tmp, $_;}
+          }
+	  FW_pO "<td><div class=\"dval\">"
 		        .join(",",@tmp)
 		        ."</div></td>";				
-	    }
+        }
       }
+
     }
+
     FW_pH "cmd.$name=$cmd $name $n&amp;detail=$name", $cmd, 1
         if($cmd && !$FW_ss);
     FW_pO "</tr>";
@@ -990,7 +989,7 @@ FW_roomOverview($)
       my ($l1, $l2) = ($list1[$idx], $list2[$idx]);
       if(!$l1) {
         FW_pO "</table></td></tr>" if($idx);
-        FW_pO "<tr><td><table id=\"room\">"
+        FW_pO "<tr><td><table class=\"room\">"
           if($idx<int(@list1)-1);
 
       } else {
@@ -1106,7 +1105,7 @@ FW_showRoom()
 
       my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
 
-      FW_pO "<td id=\"$d\">$txt</td>";
+      FW_pO "<td informId=\"$d\">$txt</td>";
 
 
       ######
@@ -1812,7 +1811,7 @@ FW_displayFileList($@)
 {
   my ($heading,@files)= @_;
   FW_pO "$heading<br>";
-  FW_pO "<table class=\"block\" id=\"at\">";
+  FW_pO "<table class=\"block fileList\">";
   my $row = 0;
   foreach my $f (@files) {
     FW_pO "<tr class=\"" . ($row?"odd":"even") . "\">";
@@ -1871,7 +1870,7 @@ FW_style($$)
 
   } elsif($a[1] eq "select") {
     my @fl = grep { $_ !~ m/floorplan/ } FW_fileList("$FW_cssdir/.*style.css");
-    FW_pO "$start<table class=\"block\" id=\"at\">";
+    FW_pO "$start<table class=\"block fileList\">";
     my $row = 0;
     foreach my $file (@fl) {
       next if($file =~ m/svg_/);

@@ -25,7 +25,6 @@ consUpdate()
       p.parentElement.parentElement.scrollTop = p.scrollHeight; // html tag
     else
       p.parentElement.scrollTop = p.scrollHeight; // body tag
-    console.log("P4:"+p.scrollHeight);
   }
 }
 
@@ -37,7 +36,10 @@ consFill()
     document.body.removeChild(errdiv);
 
   consConn = new XMLHttpRequest();
-  consConn.open("GET", document.location.pathname+"?XHR=1&inform=console", true);
+  // Needed when using multiple FF windows
+  var timestamp = "&timestamp="+new Date().getTime();
+  var query = document.location.pathname+"?XHR=1&inform=console"+timestamp;
+  consConn.open("GET", query, true);
   consConn.onreadystatechange = consUpdate;
   consConn.send(null);
 }

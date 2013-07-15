@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: longpoll in multiple browserwindows, some css ids changed to class
   - feature: fhem.pl: version command added
   - feature: LightScene: add html overview of all configured scenes in
              detail view. allow usage of overview in a weblink.
