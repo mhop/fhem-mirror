@@ -95,6 +95,7 @@ CUL_Initialize($)
 
 # Normal devices
   $hash->{DefFn}   = "CUL_Define";
+  $hash->{FingerprintFn} = "CUL_FingerprintFn";
   $hash->{UndefFn} = "CUL_Undef";
   $hash->{GetFn}   = "CUL_Get";
   $hash->{SetFn}   = "CUL_Set";
@@ -107,6 +108,17 @@ CUL_Initialize($)
 
   $hash->{ShutdownFn} = "CUL_Shutdown";
 
+}
+
+sub
+CUL_FingerprintFn($$)
+{
+  my ($name, $msg) = @_;
+ 
+  # Store only the "relevant" part, as the CUL won't compute the checksum
+  $msg = substr($msg, 8) if($msg =~ m/^81/ && length($msg) > 8);
+ 
+  return ($name, $msg);
 }
 
 #####################################

@@ -100,12 +100,24 @@ FHZ_Initialize($)
 
 # Normal devices
   $hash->{DefFn}   = "FHZ_Define";
+  $hash->{FingerprintFn} = "FHZ_FingerprintFn";
   $hash->{UndefFn} = "FHZ_Undef";
   $hash->{GetFn}   = "FHZ_Get";
   $hash->{SetFn}   = "FHZ_Set";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                    "showtime:1,0 model:fhz1000,fhz1300 loglevel:0,1,2,3,4,5,6 ".
                    "fhtsoftbuffer:1,0 addvaltrigger";
+}
+
+sub
+FHZ_FingerprintFn($$)
+{
+  my ($name, $msg) = @_;
+ 
+  # Store only the "relevant" part, as the CUL won't compute the checksum
+  $msg = substr($msg, 8) if($msg =~ m/^81/ && length($msg) > 8);
+ 
+  return ($name, $msg);
 }
 
 #####################################
