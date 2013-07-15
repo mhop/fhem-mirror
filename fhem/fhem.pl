@@ -49,7 +49,8 @@ sub AnalyzePerlCommand($$);
 sub AssignIoPort($);
 sub AttrVal($$$);
 sub CallFn(@);
-sub CheckDuplicate($$);
+sub CheckDuplicate($$@);
+sub rejectDuplicate($$$);
 sub CommandChain($$);
 sub Dispatch($$$);
 sub DoTrigger($$@);
@@ -2592,20 +2593,8 @@ Dispatch($$$)
 
   Log 5, "$name dispatch $dmsg";
 
-  my ($isdup, $idx) = CheckDuplicate($name, $dmsg);
-  if($isdup) {
-    my $found = $duplicate{$idx}{FND};
-    foreach my $found (@{$found}) {
-      if($addvals) {
-        foreach my $av (keys %{$addvals}) {
-          $defs{$found}{"${name}_$av"} = $addvals->{$av};
-        }
-      }
-      $defs{$found}{"${name}_MSGCNT"}++;
-      $defs{$found}{"${name}_TIME"} = TimeNow();
-    }
-    return $duplicate{$idx}{FND};
-  }
+  my ($isdup, $idx) = CheckDuplicate($name, $dmsg, $iohash->{FingerprintFn});
+  return rejectDuplicate($name,$idx,$addvals) if($isdup);
 
   my @found;
 
@@ -2615,6 +2604,11 @@ Dispatch($$$)
   foreach my $m (@{$clientArray}) {
     # Module is not loaded or the message is not for this module
     next if($dmsg !~ m/$modules{$m}{Match}/i);
+
+    if( my $ffn = $modules{$m}{FingerprintFn} ) {
+      (my $isdup, $idx) = CheckDuplicate($name, $dmsg, $ffn);
+      return rejectDuplicate($name,$idx,$addvals) if($isdup);
+    }
 
     no strict "refs"; $readingsUpdateDelayTrigger = 1;
     @found = &{$modules{$m}{ParseFn}}($hash,$dmsg);
@@ -2703,12 +2697,17 @@ Dispatch($$$)
 }
 
 sub
-CheckDuplicate($$)
+CheckDuplicate($$@)
 {
-  my ($ioname, $msg) = @_;
+  my ($ioname, $msg, $ffn) = @_;
 
-  # Store only the "relevant" part, as the CUL won't compute the checksum
-  $msg = substr($msg, 8) if($msg =~ m/^81/ && length($msg) > 8);
+  if($ffn) {
+    no strict "refs";
+    ($ioname,$msg) = &{$ffn}($ioname,$msg);
+    use strict "refs";
+    return (0, undef) if( !defined($msg) );
+    #Debug "got $ffn ". $ioname .":". $msg;
+  }
 
   my $now = gettimeofday();
   my $lim = $now-AttrVal("global","dupTimeout", 0.5);
@@ -2718,16 +2717,39 @@ CheckDuplicate($$)
       delete($duplicate{$oidx});
 
     } elsif($duplicate{$oidx}{MSG} eq $msg &&
+            $duplicate{$oidx}{ION} eq "") {
+      return (1, $oidx);
+
+    } elsif($duplicate{$oidx}{MSG} eq $msg &&
             $duplicate{$oidx}{ION} ne $ioname) {
       return (1, $oidx);
 
     }
   }
+  #Debug "is unique";
   $duplicate{$duplidx}{ION} = $ioname;
   $duplicate{$duplidx}{MSG} = $msg;
   $duplicate{$duplidx}{TIM} = $now;
   $duplidx++;
   return (0, $duplidx-1);
+}
+
+sub
+rejectDuplicate($$$)
+{
+  #Debug "is duplicate";
+  my ($name,$idx,$addvals) = @_;
+  my $found = $duplicate{$idx}{FND};
+  foreach my $found (@{$found}) {
+    if($addvals) {
+      foreach my $av (keys %{$addvals}) {
+        $defs{$found}{"${name}_$av"} = $addvals->{$av};
+      }
+    }
+    $defs{$found}{"${name}_MSGCNT"}++;
+    $defs{$found}{"${name}_TIME"} = TimeNow();
+  }
+  return $duplicate{$idx}{FND};
 }
 
 sub
