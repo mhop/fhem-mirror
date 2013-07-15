@@ -135,7 +135,7 @@ HUEDevice_colorpickerFn($$$)
   } else {
     my $c = "\"$FW_ME?cmd=set $d $cmd %$srf\"";
     return '<td align="center">'.
-             "<input class='color {pickerMode:'$mode'}' value='#$cv' onchange='setColor(this,\"$mode\",$c)'\"/>".
+             "<input class='color {pickerMode:'$mode'}' value='#$cv' onchange='colorpicker_setColor(this,\"$mode\",$c)'\"/>".
            '</td>';
   }
 }
