@@ -24,11 +24,11 @@ table.block tr.sel { background: #cac8cf; }
 table.block td {border: 0px solid none;}
 
 div#menu table { width:100%; }
-table#room { background: #eee; width: 100%; border: 1px solid lightgray; border-radius:3px; border-spacing:0px;}
-table#room td { border-top: 1px solid #fff; border-bottom: 1px solid #ddd; padding: 5px 10px 4px; font-weight:bold; font-size:1.2em}
-table#room a { color: #455667; text-decoration: none; }
-table#room a:hover { color: #1f1f1f; }
-table#room tr.sel { background: #cac8cf; }
+table.room { background: #eee; width: 100%; border: 1px solid lightgray; border-radius:3px; border-spacing:0px;}
+table.room td { border-top: 1px solid #fff; border-bottom: 1px solid #ddd; padding: 5px 10px 4px; font-weight:bold; font-size:1.2em}
+table.room a { color: #455667; text-decoration: none; }
+table.room a:hover { color: #1f1f1f; }
+table.room tr.sel { background: #cac8cf; }
 
 input { outline:none; border:1px solid white; color: #344556; padding:2px; border-radius:1px;}
 input:focus { border: 1px solid red; }

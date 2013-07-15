@@ -25,14 +25,13 @@ table.block tr.odd { background: #F0F0D8; }
 table.block tr.sel { background: #F0F0D8; }
 table { border-radius:8px; }
 
-table#room { border:1px solid gray; width: 100%; background: #D7FFFF; }
-table#room tr.sel { background: #A0FFFF; }
+table.room { border:1px solid gray; width: 100%; background: #D7FFFF; }
+table.room tr.sel { background: #A0FFFF; }
 
 #right { position:absolute; top:20px; left:180px; }
 
 h2,h3,h4 { color:#52865D; line-height:1.3;
            margin-top:1.5em; font-family:Arial,Sans-serif; }
-div#block { border:1px solid gray; background: #F8F8E0; padding:0.7em; }
 div.dist { padding-top:0.3em; }
 button.dist { margin:10px; background:transparent; border:0px; cursor:pointer; }
 

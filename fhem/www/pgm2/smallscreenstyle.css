@@ -50,9 +50,6 @@ table.block tr.sel { background: #F0F0D8; }
 table.block td { width: 150px; };
 table { -moz-border-radius:8px; border-radius:8px; }
 
-table#room { display:none; }
-table#room tr.sel { background: #A0FFFF; }
-
 #menu #block { visibility: hidden; }
 #right { position:absolute; top:85px; left: 0px; right: 0px;
            font-family:Arial, sans-serif; font-size:16px; }
