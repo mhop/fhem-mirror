@@ -16,6 +16,7 @@ CUL_RFR_Initialize($)
 
   $hash->{Match}     = "^[0-9A-F]{4}U.";
   $hash->{DefFn}     = "CUL_RFR_Define";
+  $hash->{FingerprintFn} = "RFR_FingerprintFn";
   $hash->{UndefFn}   = "CUL_RFR_Undef";
   $hash->{ParseFn}   = "CUL_RFR_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 model:CUL,CUN,CUR " .
@@ -27,6 +28,17 @@ CUL_RFR_Initialize($)
   $hash->{noRawInform} = 1;     # Our message was already sent as raw.
 }
 
+
+sub
+RFR_FingerprintFn($$)
+{
+  my ($name, $msg) = @_;
+ 
+  # Store only the "relevant" part, as the CUL won't compute the checksum
+  $msg = substr($msg, 8) if($msg =~ m/^81/ && length($msg) > 8);
+ 
+  return ($name, $msg);
+}
 
 #####################################
 sub
