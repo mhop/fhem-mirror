@@ -217,6 +217,21 @@ while(1)
 					
 							$child_handles{$client} = $new_thread;
 						}
+						elsif(lc($buf) =~ /^\s*now\s*$/)
+                                                {
+                                                        print timestamp()."received now command from client ".$client->peerhost()."\n" if($opt_v);
+
+                                                        if(defined($child_handles{$client}))
+                                                        {
+                                                                print timestamp()."signalling thread ".$child_handles{$client}->tid()." for an instant test for client ".$client->peerhos$
+                                                                $child_handles{$client}->kill('HUP');
+                                                                $client->send("command accepted\n");
+                                                        }
+                                                        else
+                                                        {
+                                                                $client->send("no command running\n");
+                                                        }
+                                                }
 						elsif(lc($buf) =~ /^\s*stop\s*$/)
 						{
 							print timestamp()."received stop command from client ".$client->peerhost()."\n" if($opt_v); 
@@ -319,6 +334,9 @@ local $SIG{KILL} = sub {threads->exit();};
 my ($write_handle, $address, $timeout) = @_;
 my $return;
 my $hcitool;
+my $nextrun = gettimeofday();
+
+local $SIG{HUP} = sub {$nextrun = gettimeofday();};
 
 	if($address and $timeout)
 	{
@@ -326,6 +344,8 @@ my $hcitool;
 		{
 				if($write_handle)
 				{
+				    if($nextrun <= gettimeofday())
+                                    {
 					{
 					    lock($querylocker);
 					    if($querylocker gt (time() - 10))
@@ -354,7 +374,8 @@ my $hcitool;
 					    $write_handle->send("absence\n");
 					}
 
-					sleep $timeout;
+					$nextrun = gettimeofday() + $timeout;
+				    }
 				}
 	
 			
