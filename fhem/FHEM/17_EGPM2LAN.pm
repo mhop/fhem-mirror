@@ -1,5 +1,5 @@
 ############################################## 
-# $Id: EGPM2LAN.pm 2891 2013-07-14 19:03:51Z alexus $ 
+# $Id: EGPM2LAN.pm 2891 2013-07-15 19:12:50Z alexus $ 
 #
 #  based / modified Version 98_EGPMS2LAN from ericl
 #
@@ -68,7 +68,7 @@ EGPM2LAN_Set($@)
 	  {  #switch single Socket
        EGPM2LAN_Switch($hash, $setcommand, $params, $logLevel);
     }
-	  EGPM2LAN_Statusrequest($hash, $logLevel); 
+    EGPM2LAN_Statusrequest($hash, $logLevel); 
   }   
   elsif($setcommand eq "toggle") 
   { 
@@ -81,8 +81,8 @@ EGPM2LAN_Set($@)
     	{
     	   $newcommand="on";
     	}
-      my @cmd = ($name,$newcommand,$params);
-  	  EGPM2LAN_Set($hash,@cmd);
+      EGPM2LAN_Switch($hash, $newcommand, $params, $logLevel);
+	    EGPM2LAN_Statusrequest($hash, $logLevel); 
     } 
   } 
   elsif($setcommand eq "statusrequest") 
@@ -161,7 +161,7 @@ sub EGPM2LAN_GetDeviceInfo($$) {
   { 
     my $socketname = trim($1);
     $socketname =~ s/ /_/g;    #remove spaces
-	  push(@socketlist, $socketname); 
+    push(@socketlist, $socketname); 
   }
 
   #check 4 dublicate Names
@@ -185,6 +185,7 @@ sub EGPM2LAN_Statusrequest($$) {
   my $name = $hash->{NAME}; 
   
   my $response = CustomGetFileFromURL($hash, "http://".$hash->{IP}."/", 10, undef, 0, $logLevel); 
+  #Log 1,$response;
 	if(defined($response) && $response =~ /.,.,.,./) 
         { 
           my $powerstatestring = $&; 
@@ -222,8 +223,8 @@ sub EGPM2LAN_Statusrequest($$) {
 		   }
 		   else
 		   {
-			Log 2, "EGPM2LAN: Autocreate disabled in globals section";
-            		$attr{$name}{autocreate} = "off"; 
+			 Log 2, "EGPM2LAN: Autocreate disabled in globals section";
+       $attr{$name}{autocreate} = "off"; 
 		   }
 		}
 
@@ -234,12 +235,12 @@ sub EGPM2LAN_Statusrequest($$) {
 		   readingsSingleUpdate($defptr, "state", ($powerstates[$index-1] ? "on" : "off") ,0);
 		   $defptr->{DEVICENAME} = $hash->{DEVICENAME};
 		   $defptr->{SOCKETNAME} = $socketlist[$index-1];
-   	   	}
+   	}
 
          	readingsBulkUpdate($hash, $index."_".$socketlist[$index-1], ($powerstates[$index-1] ? "on" : "off"));
-            } 
-            readingsBulkUpdate($hash, "state", $newstatestring);
-            readingsEndUpdate($hash, 0);
+        } 
+        readingsBulkUpdate($hash, "state", $newstatestring);
+        readingsEndUpdate($hash, 0);
 
 	    #everything is fine
 	    return $powerstatestring;
@@ -251,7 +252,7 @@ sub EGPM2LAN_Statusrequest($$) {
         }
 	else
 	{
-           readingsSingleUpdate($hash, "state", "Login failed",0);
+     $hash->{STATE} = "Login failed";
 	   Log $logLevel, "EGPM2LAN: Login failed";
 	}
    #something went wrong :-( 
@@ -283,7 +284,7 @@ EGPM2LAN_Define($$)
   { 
     $hash->{PASSWORD} = "";
   }
-  my $result = EGPM2LAN_Login($hash, 4);
+  my $result = EGPM2LAN_Login($hash, 3);
   if($result == 1)
   { 
     #delayed auto-create 
@@ -309,19 +310,39 @@ EGPM2LAN_Define($$)
   <ul>
     <code>define &lt;name&gt; EGPM2LAN &lt;IP-Address&gt; [&lt;Password&gt;]</code><br>
     <br>
-    Defines an <a href="http://energenie.com/item.aspx?id=7557" >Energenie EG-PM2-LAN</a> device to switch up to 4 sockets over the network.
-    If you have more than one device, it is helpful to connect and set names for your sockets over the web-interface.
-    Name Settings will be adopted to FHEM and helps you to identify the sockets later.
-<br>
-</ul>
+    Creates a Gembird &reg; <a href="http://energenie.com/item.aspx?id=7557" >Energenie EG-PM2-LAN</a> device to switch up to 4 sockets over the network.
+    If you have more than one device, it is helpful to connect and set names for your sockets over the web-interface first.
+    The name settings will be adopted to FHEM and helps you to identify the sockets. Please make sure that you&acute;re logged off from the Energenie web-interface otherwise you can&acute;t control it with FHEM at the same time.
+</ul><br>
+  <a name="EGPM2LANset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; &lt;[on|off|toggle]&gt &lt;socketnr.&gt;</code><br>
+    Switch the socket on or off.<br>
+    <br>
+    <code>set &lt;name&gt; &lt;[on|off]&gt &lt;all&gt;</code><br>
+    Switch all available sockets on or off.<br>
+    <br>
+    <code>set &lt;name&gt; &lt;staterequest&gt;</code><br>
+    Update the device information and the state of all sockets.<br>
+    If <a href="#autocreate">autocreate</a> is enabled, an <a href="#EGPM">EGPM</a> device will be created for each socket.<br>
+    <br>
+    <code>set &lt;name&gt; &lt;clearreadings&gt;</code><br>
+    Removes all readings from the list to get rid of old socketnames.
+  </ul>
+  <br>
   <a name="EGPM2LANget"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
   <a name="EGPM2LANattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li>
+    <li>stateDisplay</li>
+	  Default: <b>socketNumer</b> changes between <b>socketNumer</b> and <b>socketName</b> in front of the current state. Call <b>set statusrequest</b> to update all states.
     <li>autocreate</li>
+    Default: <b>on</b> <a href="#EGPM">EGPM</a>-devices will be created automatically with a <b>set</b>-command.
+	  Change this attribute to value <b>off</b> to avoid that mechanism.
+    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
