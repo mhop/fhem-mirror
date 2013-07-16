@@ -223,7 +223,8 @@ while(1)
 
                                                         if(defined($child_handles{$client}))
                                                         {
-                                                                print timestamp()."signalling thread ".$child_handles{$client}->tid()." for an instant test for client ".$client->peerhos$
+                                                                print timestamp()."signalling thread ".$child_handles{$client}->tid()." for an instant test for client ".$client->peerhost()."\n" if($opt_v);
+
                                                                 $child_handles{$client}->kill('HUP');
                                                                 $client->send("command accepted\n");
                                                         }
