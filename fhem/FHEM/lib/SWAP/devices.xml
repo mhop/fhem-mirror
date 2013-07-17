@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<devices>
+  <developer id="1" name="panStamp">
+    <dev id="1" name="temphum" label="Dual Temperature/Humidity sensor"/>
+    <dev id="2" name="chronos" label="SWAP-enabled Chronos watch"/>
+    <dev id="3" name="rgbdriver" label="RGB driver board"/>
+    <dev id="4" name="temp" label="Temperature sensor"/>
+    <dev id="5" name="temppress" label="Dual Temperature-Barometric pressure sensor"/>
+    <dev id="6" name="bininps" label="Binary/Counter input module"/>
+    <dev id="7" name="binouts" label="Binary/PWM output module"/>
+    <dev id="8" name="lcddriver" label="Alphanumeric 2x16 LCD driver"/>
+    <dev id="9" name="pulsegen" label="Programmable pulse generator"/>
+    <dev id="10" name="pulsecounter" label="Pulse counter"/>
+    <dev id="11" name="meter" label="Energy meter"/>
+    <dev id="12" name="binouts2" label="Advanced Binary/PWM output module + repeater"/>
+    <dev id="13" name="respira" label="Respira sensor for CO and NO2"/>
+    <dev id="14" name="soilmoisture" label="Soil moisture sensor"/>
+  </developer>
+  <developer id="17" name="Robomotic">
+    <dev id="1" name="EmmaTI" label="Emma watch"/>
+    <dev id="2" name="SeismoFloor" label="Floor sensor"/>
+    <dev id="3" name="EnvPIR" label="Environment and motion sensor"/>
+    <dev id="4" name="Repeater" label="Robomotic repeater"/>
+    <dev id="5" name="LuminoPod" label="Luminosity sensor"/>
+  </developer>
+	<developer id="22" name="Luka Mustafa - Musti">
+		<dev id="1" name="sfpddm" label="SFP DDM monitoring system"/>
+	</developer>
+  <developer id="25" name="IulianV">
+		<dev id="1" name="onewire" label="OneWire Temperature DS18B20x3"/>
+  </developer>
+  <developer id="27" name="Miom">
+    <dev id="1" name="temphumlight" label="Temperature/Humidity and Light sensor"/>
+  </developer>
+  <developer id="29" name="panMillenium">
+    <dev id="1" name="panmillenium1" label="Crouzet Millenium 3 wireless interface by panSTamp"/>
+  </developer>
+  <developer id="34" name="justme">
+    <dev id="3" name="rgbdriver" label="RGB driver board with IR"/>
+    <dev id="4294967295" name="streamtest" label="PanStream Test"/>
+    <dev id="15" name="panfirmata" label="PanStream Firmata"/>
+  </developer>
+</devices>

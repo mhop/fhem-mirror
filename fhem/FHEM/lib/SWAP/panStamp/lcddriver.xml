@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<device>
+  <developer>panStamp</developer>
+  <product>Alphanumeric 2x16 LCD driver</product>
+  <pwrdownmode>false</pwrdownmode>
+  <regular>
+    <reg name="LCD line 0" id="11">
+      <endpoint name="LCD Line 0" type="str" dir="out">
+        <size>16</size>
+      </endpoint>
+    </reg>
+    <reg name="LCD line 1" id="12">
+      <endpoint name="LCD Line 1" type="str" dir="out">
+        <size>16</size>
+      </endpoint>
+    </reg>
+    <reg name="Backlight" id="13">
+      <endpoint name="Backlight level" type="bin" dir="out">
+        <size>0.1</size>
+      </endpoint>
+    </reg>
+    <reg name="Binary states" id="14">
+      <endpoint name="Binary 0" type="bin" dir="inp">
+        <position>0.7</position>
+        <size>0.1</size>
+      </endpoint>
+      <endpoint name="Binary 1" type="bin" dir="inp">
+        <position>0.6</position>
+        <size>0.1</size>
+      </endpoint>
+      <endpoint name="Binary 2" type="bin" dir="inp">
+        <position>0.5</position>
+        <size>0.1</size>
+      </endpoint>
+      <endpoint name="Binary 3" type="bin" dir="inp">
+        <position>0.4</position>
+        <size>0.1</size>
+      </endpoint>
+    </reg>
+  </regular>
+</device>
+

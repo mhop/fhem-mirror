@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: new module 34_SWAP for generic SWAP protocoll support using
+             a panStick and 34_panStamp as IODevice(by justme1968)
+  - feature: new module 34_panStamp to use a panStick as a RF modem
+             for panStamps using the SWAP protocoll (by justme1968)
   - feature: EGPM2LAN module added for Gembird (R) Energenie LAN Support
   - feature: FHEMWEB use widget module to update colorpicker in longpoll
   - feature: FHEMWEB widget (slider/etc) javascript handler modularized
