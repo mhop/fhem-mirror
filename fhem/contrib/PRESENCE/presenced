@@ -34,6 +34,7 @@ use File::Basename;
 use Getopt::Long;
 use threads;
 use threads::shared;
+use Time::HiRes qw(gettimeofday);
 
 use warnings;
 use strict;
