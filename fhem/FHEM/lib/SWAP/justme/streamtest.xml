@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<device>
+  <developer>justme</developer>
+  <product>PanStream Test</product>
+  <pwrdownmode>false</pwrdownmode>
+  <regular>
+    <reg name="PanStream" id="11">
+      <endpoint name="Stream" type="stream" dir="inp">
+        <size>32</size>
+      </endpoint>
+    </reg>
+  </regular>
+</device>

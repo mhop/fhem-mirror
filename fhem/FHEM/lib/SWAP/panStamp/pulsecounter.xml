@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<device>
+  <developer>panStamp</developer>
+  <product>Pulse counter</product>
+  <pwrdownmode>true</pwrdownmode>
+  <regular>
+    <reg name="Voltage supply" id="11">
+      <endpoint name="Voltage" type="num" dir="inp">
+        <size>2</size>
+        <units>
+          <unit name="V" factor="0.001" offset="0"/>
+        </units>
+      </endpoint>
+    </reg>
+    <reg name="Counter register" id="12">
+      <endpoint name="Pulse counter" type="num" dir="inp">
+        <position>0</position>
+        <size>4</size>
+      </endpoint>
+    </reg>
+  </regular>
+</device>
+

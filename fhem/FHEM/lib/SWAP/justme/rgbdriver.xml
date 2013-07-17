@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+<device>
+  <developer>justme</developer>
+  <product>RGB LED controller</product>
+  <pwrdownmode>false</pwrdownmode>
+    <config>
+    <reg name="PowerOn" id="14">
+      <param name="PowerOnState" type="num" dir="out">
+        <size>5</size>
+      </param>
+      <param name="State" type="num" dir="out">
+        <position>0</position>
+        <size>1</size>
+        <default>0</default>
+        <verif>(0|1|2|3)</verif>
+      </param>
+      <param name="Brightness" type="num" dir="out">
+        <position>1</position>
+        <size>1</size>
+      </param>
+      <param name="Color" type="num" dir="out">
+        <position>2</position>
+        <size>3</size>
+      </param>
+    </reg>
+    <reg name="Repeater mode" id="16">
+      <param name="Maximum hop" type="num">
+        <size>1</size>
+        <default>0</default>
+        <verif>([1-9]|1[0-5])</verif>
+      </param>
+    </reg>
+  </config>
+  <regular>
+    <reg name="RGB" id="11">
+      <endpoint name="RGBlevel" type="num" dir="out">
+        <size>3</size>
+      </endpoint>
+      <endpoint name="Red" type="num" dir="out">
+        <size>1</size>
+      </endpoint>
+      <endpoint name="Green" type="num" dir="out">
+        <position>1</position>
+        <size>1</size>
+      </endpoint>
+      <endpoint name="Blue" type="num" dir="out">
+        <position>2</position>
+        <size>1</size>
+      </endpoint>
+    </reg>
+    <reg name="IR" id="12">
+      <endpoint name="IRCommand" type="num" dir="inp">
+        <size>5</size>
+      </endpoint>
+      <endpoint name="Type" type="num" dir="inp">
+        <position>0</position>
+        <size>1</size>
+      </endpoint>
+      <endpoint name="Value" type="num" dir="inp">
+        <position>1</position>
+        <size>4</size>
+      </endpoint>
+    </reg>
+    <reg name="Temp" id="13">
+      <endpoint name="InternalTemperature" type="num" dir="inp">
+        <size>4</size>
+        <units>
+          <unit name="C" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+    </reg>
+    <reg name="Cmd" id="15">
+      <endpoint name="Command" type="num" dir="out">
+        <size>6</size>
+      </endpoint>
+      <endpoint name="Cmd" type="num" dir="out">
+        <position>0</position>
+        <size>1</size>
+      </endpoint>
+      <endpoint name="Args" type="num" dir="out">
+        <position>1</position>
+        <size>5</size>
+      </endpoint>
+    </reg>
+  </regular>
+</device>

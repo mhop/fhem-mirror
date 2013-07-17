@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<device>
+  <developer>Developer_name</developer>
+  <product>Product name or short description</product>
+  <!-- pwrdownmode: power-down flag. If true, this device sleeps between transmissions.
+  Otherwise, it continuously listens to the SWAP network -->
+  <pwrdownmode>true/false</pwrdownmode>
+  <!-- Configuration section -->
+  <config>
+    <!-- Configuration register. Register ID's start from 11 -->
+    <reg name="Register name" id="reg_id">
+      <!-- Configuration parameter -->
+      <!-- Type of parameter: "bin": Binary, "num": Number, "str": String -->
+      <param name="Parameter name" type="bin|num|str">
+        <!-- position: byte.bit (format: B.b or B) position of the parameter within the register -->
+        <position>B.b</position>
+        <!-- size: size in bytes.bits (format: B.b or B) of the parameter within the register -->
+        <size>B.b</size>
+        <!-- default: default value -->
+        <default>default value</default>
+      </param>
+    </reg>
+  </config>
+  <!-- Regular endpoint section. Here comes sensor readings, actuator states, etc. -->
+  <regular>
+    <!-- Regular register. Register ID's start from 11 -->
+    <reg name="Register name" id="reg_id">
+      <!-- Endpoint -->
+      <!-- Type of endpoint: "bin": Binary, "num": Number, "str": String -->
+      <!-- Direction: "inp": input, "out": output -->
+      <endpoint name="Endpoint name" type="bin|num|str" dir="inp|out">
+        <!-- position: byte.bit (format: B.b or B) position of the endpoint within the register -->
+        <position>B.b</position>
+        <!-- size: size in bytes.bits (format: B.b or B) of the endpoint within the register -->
+        <size>B.b</size>
+        <!-- units: list of units for this endpoint -->
+        <units>
+          <!-- unit. Value to be displayed = factor * (endpoint value) + offset name -->
+          <unit name="name" factor="+-F.f" offset="+-O.o"/>
+        </units>
+      </endpoint>
+    </reg>
+  </regular>
+</device>

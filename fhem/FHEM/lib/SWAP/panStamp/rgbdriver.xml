@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<device>
+  <developer>panStamp</developer>
+  <product>RGB LED controller</product>
+  <pwrdownmode>false</pwrdownmode>
+  <regular>
+    <reg name="RGB" id="11">
+      <endpoint name="RGBlevel" type="num" dir="out">
+        <size>3</size>
+      </endpoint>
+      <endpoint name="Red" type="num" dir="out">
+        <position>0</position>
+        <size>1</size>
+      </endpoint>
+      <endpoint name="Green" type="num" dir="out">
+        <position>1</position>
+        <size>1</size>
+      </endpoint>
+      <endpoint name="Blue" type="num" dir="out">
+        <position>2</position>
+        <size>1</size>
+      </endpoint>
+    </reg>
+  </regular>
+</device>

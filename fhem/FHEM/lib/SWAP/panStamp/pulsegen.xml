@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<device>
+  <developer>panStamp</developer>
+  <product>Programmable pulse generator</product>
+  <pwrdownmode>false</pwrdownmode>
+  <regular>
+    <reg name="Output frequency 0" id="11">
+      <endpoint name="Frequency 0" type="num" dir="out">
+        <position>0</position>
+        <size>1</size>
+      </endpoint>
+    </reg>
+    <reg name="Output frequency 1" id="12">
+      <endpoint name="Frequency 1" type="num" dir="out">
+        <position>0</position>
+        <size>1</size>
+      </endpoint>
+    </reg>
+    <reg name="Output frequency 2" id="13">
+      <endpoint name="Frequency 2" type="num" dir="out">
+        <position>0</position>
+        <size>1</size>
+      </endpoint>
+    </reg>
+    <reg name="Output frequency 3" id="14">
+      <endpoint name="Frequency 3" type="num" dir="out">
+        <position>0</position>
+        <size>1</size>
+      </endpoint>
+    </reg>
+  </regular>
+</device>
+

@@ -1,0 +1,617 @@
+<?xml version="1.0"?>
+<device>
+  <developer>panStamp</developer>
+  <product>Energy meter</product>
+  <pwrdownmode>false</pwrdownmode>
+  <config>
+    <reg name="Channel 0 calibration" id="18">
+      <param name="Chanel 0 - Voltage transformer scale (x100)" type="num">
+        <position>0</position>
+        <size>2</size>
+        <default>1700</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 0 - Current transformer scale (x100)" type="num">
+        <position>2</position>
+        <size>2</size>
+        <default>500</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 0 - Power factor offset (x100)" type="num">
+        <position>4</position>
+        <size>1</size>
+        <default>0</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 0 - Enable" type="bin">
+        <position>5</position>
+        <size>1</size>
+        <default>1</default>
+      </param>
+    </reg>
+    <reg name="Channel 1 calibration" id="19">
+      <param name="Chanel 1 - Voltage transformer scale (x100)" type="num">
+        <position>0</position>
+        <size>2</size>
+        <default>1700</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 1 - Current transformer scale (x100)" type="num">
+        <position>2</position>
+        <size>2</size>
+        <default>500</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 1 - Power factor offset (x100)" type="num">
+        <position>4</position>
+        <size>1</size>
+        <default>0</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 1 - Enable" type="bin">
+        <position>5</position>
+        <size>1</size>
+        <default>1</default>
+      </param>
+    </reg>
+    <reg name="Channel 2 calibration" id="20">
+      <param name="Chanel 2 - Voltage transformer scale (x100)" type="num">
+        <position>0</position>
+        <size>2</size>
+        <default>1700</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 2 - Current transformer scale (x100)" type="num">
+        <position>2</position>
+        <size>2</size>
+        <default>500</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 2 - Power factor offset (x100)" type="num">
+        <position>4</position>
+        <size>1</size>
+        <default>0</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 2 - Enable" type="bin">
+        <position>5</position>
+        <size>1</size>
+        <default>1</default>
+      </param>
+    </reg>
+    <reg name="Channel 3 calibration" id="21">
+      <param name="Chanel 3 - Voltage transformer scale (x100)" type="num">
+        <position>0</position>
+        <size>2</size>
+        <default>1700</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 3 - Current transformer scale (x100)" type="num">
+        <position>2</position>
+        <size>2</size>
+        <default>500</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 3 - Power factor offset (x100)" type="num">
+        <position>4</position>
+        <size>1</size>
+        <default>0</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 3 - Enable" type="bin">
+        <position>5</position>
+        <size>1</size>
+        <default>1</default>
+      </param>
+    </reg>
+    <reg name="Channel 4 calibration" id="22">
+      <param name="Chanel 4 - Voltage transformer scale (x100)" type="num">
+        <position>0</position>
+        <size>2</size>
+        <default>1700</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 4 - Current transformer scale (x100)" type="num">
+        <position>2</position>
+        <size>2</size>
+        <default>500</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 4 - Power factor offset (x100)" type="num">
+        <position>4</position>
+        <size>1</size>
+        <default>0</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 4 - Enable" type="bin">
+        <position>5</position>
+        <size>1</size>
+        <default>1</default>
+      </param>
+    </reg>
+    <reg name="Channel 5 calibration" id="23">
+      <param name="Chanel 5 - Voltage transformer scale (x100)" type="num">
+        <position>0</position>
+        <size>2</size>
+        <default>1700</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 5 - Current transformer scale (x100)" type="num">
+        <position>2</position>
+        <size>2</size>
+        <default>500</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 5 - Power factor offset (x100)" type="num">
+        <position>4</position>
+        <size>1</size>
+        <default>0</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 5 - Enable" type="bin">
+        <position>5</position>
+        <size>1</size>
+        <default>1</default>
+      </param>
+    </reg>
+    <reg name="Channel 6 calibration" id="24">
+      <param name="Chanel 6 - Voltage transformer scale (x100)" type="num">
+        <position>0</position>
+        <size>2</size>
+        <default>1700</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 6 - Current transformer scale (x100)" type="num">
+        <position>2</position>
+        <size>2</size>
+        <default>500</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 6 - Power factor offset (x100)" type="num">
+        <position>4</position>
+        <size>1</size>
+        <default>0</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Chanel 6 - Enable" type="bin">
+        <position>5</position>
+        <size>1</size>
+        <default>1</default>
+      </param>
+    </reg>
+    <reg name="Pulse counter 0 calibration" id="28">
+      <param name="Counter 0 - Initial value (x100)" type="num">
+        <position>0</position>
+        <size>4</size>
+        <default>0</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Counter 0 - Counts per unit step" type="num">
+        <position>4</position>
+        <size>2</size>
+        <default>1</default>
+        <verif>^(\d*)$</verif>
+      </param>
+    </reg>
+    <reg name="Pulse counter 1 calibration" id="29">
+      <param name="Counter 1 - Initial value (x100)" type="num">
+        <position>0</position>
+        <size>4</size>
+        <default>0</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Counter 1 - Counts per unit step" type="num">
+        <position>4</position>
+        <size>2</size>
+        <default>1</default>
+        <verif>^(\d*)$</verif>
+      </param>
+    </reg>
+    <reg name="Pulse counter 2 calibration" id="30">
+      <param name="Counter 2 - Initial value (x100)" type="num">
+        <position>0</position>
+        <size>4</size>
+        <default>0</default>
+        <verif>^(\d*)$</verif>
+      </param>
+      <param name="Counter 2 - Counts per unit step" type="num">
+        <position>4</position>
+        <size>2</size>
+        <default>1</default>
+        <verif>^(\d*)$</verif>
+      </param>
+    </reg>
+  </config>
+  <regular>
+    <reg name="Energy channel 0" id="11">
+      <endpoint name="AC frequency 0" type="num" dir="inp">
+        <position>0</position>
+        <size>1</size>
+        <units>
+          <unit name="Hz" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="RMS Voltage 0" type="num" dir="inp">
+        <position>1</position>
+        <size>2</size>
+        <units>
+          <unit name="V" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="RMS Current 0" type="num" dir="inp">
+        <position>3</position>
+        <size>2</size>
+        <units>
+          <unit name="A" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Apparent power 0" type="num" dir="inp">
+        <position>5</position>
+        <size>2</size>
+        <units>
+          <unit name="VA" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Active power 0" type="num" dir="inp">
+        <position>7</position>
+        <size>2</size>
+        <units>
+          <unit name="W" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Power factor 0" type="num" dir="inp">
+        <position>9</position>
+        <size>1</size>
+        <units>
+          <unit name="" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Energy consumption 0" type="num" dir="inp">
+        <position>10</position>
+        <size>4</size>
+        <units>
+          <unit name="KWh" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+    </reg>
+    <reg name="Energy channel 1" id="12">
+      <endpoint name="AC frequency 1" type="num" dir="inp">
+        <position>0</position>
+        <size>1</size>
+        <units>
+          <unit name="Hz" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="RMS Voltage 1" type="num" dir="inp">
+        <position>1</position>
+        <size>2</size>
+        <units>
+          <unit name="V" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="RMS Current 1" type="num" dir="inp">
+        <position>3</position>
+        <size>2</size>
+        <units>
+          <unit name="A" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Apparent power 1" type="num" dir="inp">
+        <position>5</position>
+        <size>2</size>
+        <units>
+          <unit name="VA" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Active power 1" type="num" dir="inp">
+        <position>7</position>
+        <size>2</size>
+        <units>
+          <unit name="W" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Power factor 1" type="num" dir="inp">
+        <position>9</position>
+        <size>1</size>
+        <units>
+          <unit name="" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Energy consumption 1" type="num" dir="inp">
+        <position>10</position>
+        <size>4</size>
+        <units>
+          <unit name="KWh" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+    </reg>
+    <reg name="Energy channel 2" id="13">
+      <endpoint name="AC frequency 2" type="num" dir="inp">
+        <position>0</position>
+        <size>1</size>
+        <units>
+          <unit name="Hz" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="RMS Voltage 2" type="num" dir="inp">
+        <position>1</position>
+        <size>2</size>
+        <units>
+          <unit name="V" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="RMS Current 2" type="num" dir="inp">
+        <position>3</position>
+        <size>2</size>
+        <units>
+          <unit name="A" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Apparent power 2" type="num" dir="inp">
+        <position>5</position>
+        <size>2</size>
+        <units>
+          <unit name="VA" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Active power 2" type="num" dir="inp">
+        <position>7</position>
+        <size>2</size>
+        <units>
+          <unit name="W" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Power factor 2" type="num" dir="inp">
+        <position>9</position>
+        <size>1</size>
+        <units>
+          <unit name="" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Energy consumption 2" type="num" dir="inp">
+        <position>10</position>
+        <size>4</size>
+        <units>
+          <unit name="KWh" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+    </reg>
+    <reg name="Energy channel 3" id="14">
+      <endpoint name="AC frequency 3" type="num" dir="inp">
+        <position>0</position>
+        <size>1</size>
+        <units>
+          <unit name="Hz" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="RMS Voltage 3" type="num" dir="inp">
+        <position>1</position>
+        <size>2</size>
+        <units>
+          <unit name="V" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="RMS Current 3" type="num" dir="inp">
+        <position>3</position>
+        <size>2</size>
+        <units>
+          <unit name="A" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Apparent power 3" type="num" dir="inp">
+        <position>5</position>
+        <size>2</size>
+        <units>
+          <unit name="VA" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Active power 3" type="num" dir="inp">
+        <position>7</position>
+        <size>2</size>
+        <units>
+          <unit name="W" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Power factor 3" type="num" dir="inp">
+        <position>9</position>
+        <size>1</size>
+        <units>
+          <unit name="" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Energy consumption 3" type="num" dir="inp">
+        <position>10</position>
+        <size>4</size>
+        <units>
+          <unit name="KWh" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+    </reg>
+    <reg name="Energy channel 4" id="15">
+      <endpoint name="AC frequency 4" type="num" dir="inp">
+        <position>0</position>
+        <size>1</size>
+        <units>
+          <unit name="Hz" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="RMS Voltage 4" type="num" dir="inp">
+        <position>1</position>
+        <size>2</size>
+        <units>
+          <unit name="V" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="RMS Current 4" type="num" dir="inp">
+        <position>3</position>
+        <size>2</size>
+        <units>
+          <unit name="A" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Apparent power 4" type="num" dir="inp">
+        <position>5</position>
+        <size>2</size>
+        <units>
+          <unit name="VA" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Active power 4" type="num" dir="inp">
+        <position>7</position>
+        <size>2</size>
+        <units>
+          <unit name="W" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Power factor 4" type="num" dir="inp">
+        <position>9</position>
+        <size>1</size>
+        <units>
+          <unit name="" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Energy consumption 4" type="num" dir="inp">
+        <position>10</position>
+        <size>4</size>
+        <units>
+          <unit name="KWh" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+    </reg>
+    <reg name="Energy channel 5" id="16">
+      <endpoint name="AC frequency 5" type="num" dir="inp">
+        <position>0</position>
+        <size>1</size>
+        <units>
+          <unit name="Hz" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="RMS Voltage 5" type="num" dir="inp">
+        <position>1</position>
+        <size>2</size>
+        <units>
+          <unit name="V" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="RMS Current 5" type="num" dir="inp">
+        <position>3</position>
+        <size>2</size>
+        <units>
+          <unit name="A" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Apparent power 5" type="num" dir="inp">
+        <position>5</position>
+        <size>2</size>
+        <units>
+          <unit name="VA" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Active power 5" type="num" dir="inp">
+        <position>7</position>
+        <size>2</size>
+        <units>
+          <unit name="W" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Power factor 5" type="num" dir="inp">
+        <position>9</position>
+        <size>1</size>
+        <units>
+          <unit name="" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Energy consumption 5" type="num" dir="inp">
+        <position>10</position>
+        <size>4</size>
+        <units>
+          <unit name="KWh" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+    </reg>
+    <reg name="Energy channel 6" id="17">
+      <endpoint name="AC frequency 6" type="num" dir="inp">
+        <position>0</position>
+        <size>1</size>
+        <units>
+          <unit name="Hz" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="RMS Voltage 6" type="num" dir="inp">
+        <position>1</position>
+        <size>2</size>
+        <units>
+          <unit name="V" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="RMS Current 6" type="num" dir="inp">
+        <position>3</position>
+        <size>2</size>
+        <units>
+          <unit name="A" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Apparent power 6" type="num" dir="inp">
+        <position>5</position>
+        <size>2</size>
+        <units>
+          <unit name="VA" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Active power 6" type="num" dir="inp">
+        <position>7</position>
+        <size>2</size>
+        <units>
+          <unit name="W" factor="1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Power factor 6" type="num" dir="inp">
+        <position>9</position>
+        <size>1</size>
+        <units>
+          <unit name="" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Energy consumption 6" type="num" dir="inp">
+        <position>10</position>
+        <size>4</size>
+        <units>
+          <unit name="KWh" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+    </reg>
+    <reg name="Pulse counter 0" id="25">
+      <endpoint name="Counter 0" type="num" dir="inp">
+        <position>0</position>
+        <size>4</size>
+        <units>
+          <unit name="KWh" factor="0.01" offset="0"/>
+          <unit name="lpm" factor="0.01" offset="0"/>
+          <unit name="gpm" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+    </reg>
+    <reg name="Pulse counter 1" id="26">
+      <endpoint name="Counter 1" type="num" dir="inp">
+        <position>0</position>
+        <size>4</size>
+        <units>
+          <unit name="KWh" factor="0.01" offset="0"/>
+          <unit name="lpm" factor="0.01" offset="0"/>
+          <unit name="gpm" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+    </reg>
+    <reg name="Pulse counter 2" id="27">
+      <endpoint name="Counter 2" type="num" dir="inp">
+        <position>0</position>
+        <size>4</size>
+        <units>
+          <unit name="KWh" factor="0.01" offset="0"/>
+          <unit name="lpm" factor="0.01" offset="0"/>
+          <unit name="gpm" factor="0.01" offset="0"/>
+        </units>
+      </endpoint>
+    </reg>
+  </regular>
+</device>
