@@ -162,6 +162,7 @@ sub CUL_HM_reqStatus($){
 sub CUL_HM_autoReadConfig($){
   # will trigger a getConfig and statusrequest for each device assigned.
   #
+  return if (!$modules{CUL_HM}{helper}{autoRdCfgLst});
   while(@{$modules{CUL_HM}{helper}{autoRdCfgLst}}){
     my $name = shift(@{$modules{CUL_HM}{helper}{autoRdCfgLst}});
     my $hash = $defs{$name};
@@ -443,6 +444,8 @@ sub CUL_HM_Parse($$) {##############################
   my $shash = $modules{CUL_HM}{defptr}{$src}; 
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
 
+  
+  
   $respRemoved = 0;  #set to 'no response in this message' at start
   if(!$shash) {      #  Unknown source
     # Generate an UNKNOWN event for pairing requests, ignore everything else
@@ -504,7 +507,7 @@ sub CUL_HM_Parse($$) {##############################
   #----------start valid messages parsing ---------
   my $parse = CUL_HM_parseCommon($mNo,$mFlg,$mTp,$src,$dst,$p);
   push @event, "powerOn"   if($parse eq "powerOn");
-  
+
   if ($parse eq "ACK"){# remember - ACKinfo will be passed on
     push @event, "";
   }
@@ -817,6 +820,16 @@ sub CUL_HM_Parse($$) {##############################
 	    }
 	  }
       push @event, $statemsg;
+	}
+    elsif ($mTp eq "53"){
+      my ($mChn,@dat) = unpack 'A2(A6)*',$p;
+      my %dField = (41=>"temp_T1",42=>"temp_T2",43=>"temp_T1-T2",44=>"temp_T2-T1");
+	  foreach (@dat){
+	    my ($a,$d) = unpack 'A2A4',$_;
+		$d = hex($d);
+		$d -= 0x10000 if($d & 0x4000); 
+        push @event, sprintf("Val_$dField{$a}:%0.1f",$d/10);
+	  }
 	}
   } 
   elsif($st =~ m /^(switch|dimmer|blindActuator)$/) {##########################
@@ -1556,8 +1569,21 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  }
 	}
   }
-  elsif($mTp eq "40"){ #someone is triggere#################
+#  elsif($mTp eq "40"){ #someone is triggered################
+#	CUL_HM_qStateUpdatIfEnab($dst)if (hex($mFlg) & 0x20 && $dhash);
+#  }
+  elsif($mTp =~ m /^4[01]/){ #someone is triggered##########
 	CUL_HM_qStateUpdatIfEnab($dst)if (hex($mFlg) & 0x20 && $dhash);
+    my $cName = CUL_HM_id2Name($src.sprintf("%02X",hex(substr($p,0,2))& 0x3f));
+	my $level = "-";
+	$level = hex(substr($p,4,2))." %" if (length($p)>5);
+	my @peers = split(",",AttrVal($cName,"peerIDs",""));
+	foreach my $peer (@peers){
+	  my $pName = CUL_HM_id2Name($peer);
+	  next if (!$defs{$pName});
+	  CUL_HM_UpdtReadBulk($defs{$pName},1,"trig_$cName:$level",
+	                                      "trigLast:$cName");
+	}
   }
   elsif($mTp eq "70"){ #Time to trigger TC##################
     #send wakeup and process command stack
@@ -4812,6 +4838,10 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	  ValveErrorPosition $vep %<br>
 	  ValveOffset $of %<br>
       time-request<br>
+	  trig_&lt;src&gt; &lt;value&gt; #channel was triggered by &lt;src&gt; channel. 
+	  This event relies on complete reading of channels configuration, otherwise Data can be
+	  incomplete or incorrect.<br>
+	  trigLast &lt;channel&gt; #last receiced trigger<br>
   </li>
   <li><B>HM-CC-VD</B><br>
       $vp %<br>
