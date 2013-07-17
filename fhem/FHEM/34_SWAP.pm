@@ -216,7 +216,7 @@ SWAP_Define($$)
   my $productcode = $a[3];
 
   return "$addr is not a 1 byte hex value" if( $addr !~ /^[\da-f]{2}$/i );
-  return "$addr is not an allowed address" if( $address eq "00" );
+  return "$addr is not an allowed address" if( $addr eq "00" );
 
   return "$reg not allowed" if( $reg && hex($reg) <= 0x0A );
   #return "please define a SWAP device with  $addr first" if( $reg && !$modules{SWAP}{defptr}{$addr} );
