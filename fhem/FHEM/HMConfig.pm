@@ -188,6 +188,7 @@ my %culHmModel=(
   "00A3" => {name=>"HM-LC-Dim1L-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "00A4" => {name=>"HM-LC-Dim1T-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "00A7" => {name=>"HM-Sen-RD-O"             ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1:1,4:1'      ,chn=>"Rain:1:1,Sw:2:2",},
+  "00A8" => {name=>"HM-WDS30-OT2-SM"         ,st=>'THSensor'          ,cyc=>'00:05' ,rxt=>'c:w' ,lst=>'1:1,4:1'      ,chn=>"",},
   "00A9" => {name=>"HM-PB-6-WM55"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:6",},
   #263 167                        HM Smoke Detector Schueco 
   #"HM-RC-Key4-2"
@@ -989,15 +990,15 @@ my %culHmBits = (
                      MODE     => '04,2,$val=hex($val)', 
 					 } }, 
   "12"          => { txt => "HAVE_DATA"},
-  "3E"          => { txt => "SWITCH", params => {
+  "3E"          => { txt => "SWITCH"      , params => {
                      DST      => "00,6", 
                      UNKNOWN  => "06,2", 
                      CHANNEL  => "08,2", 
                      COUNTER  => "10,2", } },
-  "3F"          => { txt => "TimeStamp", params => {
+  "3F"          => { txt => "TimeStamp"   , params => {
                      UNKNOWN  => "00,4", 
                      TIME     => "04,2", } },
-  "40"          => { txt => "REMOTE", params => {
+  "40"          => { txt => "REMOTE"      , params => {
                      BUTTON   => '00,2,$val=(hex($val)&0x3F)',
                      LONG     => '00,2,$val=(hex($val)&0x40)?1:0',
                      LOWBAT   => '00,2,$val=(hex($val)&0x80)?1:0',
@@ -1008,12 +1009,16 @@ my %culHmBits = (
                      LOWBAT   => '00,2,$val=(hex($val)&0x80)?1:0',
                      VALUE    => '02,2,$val=(hex($val))',
                      NEXT     => '04,2,$val=(hex($val))',} },
-  "53"          => { txt => "WaterSensor", params => {
-                     CMD      => "00,2",
-                     SEQ => '02,2,$val=(hex($val))-64', 
-                     V1  => '08,2,$val=(hex($val))', 
-                     V2  => '10,2,$val=(hex($val))', 
-                     V3  => '12,2,$val=(hex($val))'} },
+  "53"          => { txt => "SensorData"  , params => {
+                     CMD => "00,2",
+                     Fld1=> "02,2", 
+                     Val1=> '04,4,$val=(hex($val))', 
+                     Fld2=> "08,2", 
+                     Val2=> '10,4,$val=(hex($val))', 
+                     Fld3=> "14,2", 
+                     Val3=> '16,4,$val=(hex($val))', 
+                     Fld4=> "20,2", 
+                     Val4=> '24,4,$val=(hex($val))'} },
   "58"          => { txt => "ClimateEvent", params => {
                      CMD      => "00,2",
                      ValvePos => '02,2,$val=(hex($val))', } },
