@@ -253,7 +253,20 @@ MAX_Set($@)
 
     if($args[0] eq "auto") {
       #This enables the automatic/schedule mode where the thermostat follows the weekly program
-      $temperature = @args > 1 ? MAX_ParseTemperature($args[1]) : 0;
+
+      #There can be a temperature supplied, which will be kept until the next switch point of the weekly program
+      if(@args > 1) {
+        if($args[1] eq "eco") {
+          $temperature = MAX_ReadingsVal($hash,"ecoTemperature");
+        } elsif($args[1] eq "comfort") {
+          $temperature = MAX_ReadingsVal($hash,"comfortTemperature");
+        } else {
+          $temperature = MAX_ParseTemperature($args[1]);
+        }
+      } else {
+        $temperature = 0; #use temperature from weekly program
+      }
+
       $ctrlmode = 0; #auto
     } elsif($args[0] eq "boost") {
       $temperature = 0;
