@@ -415,6 +415,13 @@ MAXLAN_SendMetadata($)
   }
 }
 
+# Maps [9,61] -> [off,5.0,5.5,...,30.0,on]
+sub
+MAXLAN_ExtractTemperature($)
+{
+  return $_[0] == 61 ? "on" : ($_[0] == 9 ? "off" : sprintf("%2.1f",$_[0]/2));
+}
+
 sub
 MAXLAN_Parse($$)
 {
@@ -546,16 +553,15 @@ MAXLAN_Parse($$)
 
     }elsif($device_types{$devicetype} =~ /HeatingThermostat.*/){
       my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$tempoffset,$windowopentemp,$windowopendur,$boost,$decalcifiction,$maxvalvesetting,$valveoffset,$weekprofile) = unpack("CCCCCCCCCCCH*",substr($bindata,18));
-      #TODO: parse week profile
       my $boostValve = ($boost & 0x1F) * 5;
       my $boostDuration = $boost >> 5;
       #There is some trailing data missing, which maps to the weekly program
-      $comforttemp     /= 2.0; #convert to degree celcius
-      $ecotemp         /= 2.0; #convert to degree celcius
+      $comforttemp     = MAXLAN_ExtractTemperature($comforttemp); #convert to degree celcius
+      $ecotemp         = MAXLAN_ExtractTemperature($ecotemp); #convert to degree celcius
       $tempoffset      = $tempoffset/2.0-3.5; #convert to degree
-      $maxsetpointtemp /= 2.0;
-      $minsetpointtemp /= 2.0;
-      $windowopentemp  /= 2.0;
+      $maxsetpointtemp = MAXLAN_ExtractTemperature($maxsetpointtemp);
+      $minsetpointtemp = MAXLAN_ExtractTemperature($minsetpointtemp);
+      $windowopentemp  = MAXLAN_ExtractTemperature($windowopentemp);
       $windowopendur   *= 5;
       $maxvalvesetting = int($maxvalvesetting*100/255);
       $valveoffset     = int($valveoffset*100/255);
