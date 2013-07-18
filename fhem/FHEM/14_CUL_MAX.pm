@@ -187,7 +187,8 @@ CUL_MAX_Set($@)
       return "Invalid fakeSCaddr attribute set (must not be 000000)" if(CUL_MAX_fakeSCaddr($hash) eq "000000");
 
       my $state = $args[1] ? "12" : "10";
-      return CUL_MAX_Send($hash, "ShutterContactState",$dest,$state, flags => "06", src => CUL_MAX_fakeSCaddr($hash));
+      my $groupid = ReadingsVal($hash,"groupid",0);
+      return CUL_MAX_Send($hash, "ShutterContactState",$dest,$state, groupId => sprintf("%02x",$groupid), flags => ( $groupid ? "04" : "06" ), src => CUL_MAX_fakeSCaddr($hash));
 
     } elsif($setting eq "fakeWT") {
       return "Invalid number of arguments" if(@args != 3);
@@ -553,9 +554,9 @@ CUL_MAX_BroadcastTime(@)
       <li>pairmode<br>
       Sets the CUL_MAX into pairing mode for 60 seconds where it can be paired with other devices (Thermostats, Buttons, etc.). You also have to set the other device into pairing mode manually. (For Thermostats, this is pressing the "Boost" button for 3 seconds, for example).</li>
       <li>fakeSC &lt;device&gt; &lt;open&gt;<br>
-      Sends a fake ShutterContactState message; &lt;open&gt; must be 0 or 1 for "window closed" or "window opened". Make sure you associate the target device with fakeShutterContact beforehand.</li>
+      Sends a fake ShutterContactState message; &lt;open&gt; must be 0 or 1 for "window closed" or "window opened". If the &lt;device&gt; has a non-zero groupId, the fake ShutterContactState message affects all devices with that groupId. Make sure you associate the target device(s) with fakeShutterContact beforehand.</li>
       <li>fakeWT &lt;device&gt; &lt;desiredTemperature&gt; &lt;measuredTemperature&gt;<br>
-      Sends a fake WallThermostatControl message (parameters both may have one digit after the decimal point, for desiredTemperature it may only by 0 or 5). Make sure you associate the target device with fakeWallThermostat beforehand.</li>
+      Sends a fake WallThermostatControl message (parameters both may have one digit after the decimal point, for desiredTemperature it may only by 0 or 5). If the &lt;device&gt; has a non-zero groupId, the fake WallThermostatControl message affects all devices with that groupId. Make sure you associate the target device with fakeWallThermostat beforehand.</li>
   </ul>
   <br>
 
