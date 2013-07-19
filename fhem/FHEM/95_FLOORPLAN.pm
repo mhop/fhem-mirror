@@ -502,14 +502,18 @@ FP_show(){
             $fp_fpimage =~ s/\{state\}/$state/;                                                 # replace {state} by actual device-status
             $txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_fpimage\"/;         # replace icon-link in html
         }
-	    FW_pO "<td informId=\"$d\" colspan=\"$cols\">$txt";
+		if ($style == 3 || $style == 6) {
+		  FW_pO "<td><div informId=\"$d-$text\">$txt</div></td>";                               # reading
+		} else {
+	      FW_pO "<td informId=\"$d\" colspan=\"$cols\">$txt";                                   # state
+		}
 	    FW_pO "</td></tr>";
 	
-	    if ($style == 6) {                                                                          # add ReadingsTimeStamp for style 6
+	    if ($style == 6) {                                                                      # add ReadingsTimeStamp for style 6
 		  $txt="";
-    	  FW_pO "<tr class=\"devicetimestamp fp_$FP_name\" id=\"$d-devicetimestamp\">";           # For css: class=devicetimestamp, id=<devicename>-devicetimestamp
-		  $txt = ReadingsTimestamp($d, $text, "Undefined Reading $d-<b>$text</b>") if ($style == 3 || $style == 6);   # Style3+6 = DeviceReading given in $text
-	      FW_pO "<td informId=\"$d\" colspan=\"$cols\">$txt";
+    	  FW_pO "<tr class=\"devicetimestamp fp_$FP_name\" id=\"$d-devicetimestamp\">";         # For css: class=devicetimestamp, id=<devicename>-devicetimestamp
+		  $txt = ReadingsTimestamp($d, $text, "Undefined Reading $d-<b>$text</b>");             # Style3+6 = DeviceReading given in $text
+          FW_pO "<td><div colspan=\"$cols\" informId=\"$d-$text-ts\">$txt</div></td>";
 	      FW_pO "</td></tr>";
 	    }
 
