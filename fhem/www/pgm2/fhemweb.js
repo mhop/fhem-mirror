@@ -34,7 +34,7 @@ FW_doUpdate()
     var d = lines[i].split("<<", 3);    // Complete arg
     if(d.length != 3)
       continue;
-    var elArr = document.querySelectorAll("[informId="+d[0]+"]");
+    var elArr = document.querySelectorAll("[informId='"+d[0]+"']");
     for(var k=0; k<elArr.length; k++){
       el = elArr[k];
       if(el.nodeName.toLowerCase() == "select") {
