@@ -507,7 +507,10 @@ sub CUL_HM_Parse($$) {##############################
   #----------start valid messages parsing ---------
   my $parse = CUL_HM_parseCommon($mNo,$mFlg,$mTp,$src,$dst,$p);
   push @event, "powerOn"   if($parse eq "powerOn");
-
+  if ($parse =~ s/entities://){#common generated trigger for some entities
+    push @entities,split(",",$parse);
+  }
+  
   if ($parse eq "ACK"){# remember - ACKinfo will be passed on
     push @event, "";
   }
@@ -1578,12 +1581,16 @@ sub CUL_HM_parseCommon(@){#####################################################
 	my $level = "-";
 	$level = hex(substr($p,4,2))." %" if (length($p)>5);
 	my @peers = split(",",AttrVal($cName,"peerIDs",""));
+	my @entities;
 	foreach my $peer (@peers){
 	  my $pName = CUL_HM_id2Name($peer);
+	  $pName = CUL_HM_id2Name(substr($peer,0,6)) if (!$defs{$pName});
 	  next if (!$defs{$pName});
-	  CUL_HM_UpdtReadBulk($defs{$pName},1,"trig_$cName:$level",
-	                                      "trigLast:$cName");
+	  push @entities,CUL_HM_UpdtReadBulk($defs{$pName},1
+	                        ,"trig_$cName:$level"
+	                        ,"trigLast:$cName".(($level ne "-")?":$level":""));
 	}
+	return "entities:".join(",",@entities);
   }
   elsif($mTp eq "70"){ #Time to trigger TC##################
     #send wakeup and process command stack
