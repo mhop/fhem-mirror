@@ -125,17 +125,23 @@ HUEDevice_colorpickerFn($$$)
   my $cv = CommandGet("","$d $cmd");
   $cmd = "" if($cmd eq "state");
   if( $args[1] ) {
-    my $c = "\"$FW_ME?cmd=set $d $cmd$srf\"";
+    my $c = "cmd=set $d $cmd$srf";
+
     return '<td align="center">'.
-             '<a href='. $c .'>'.
+             "<div onClick=\"FW_cmd('$FW_ME?XHR=1&$c')\" style=\"width:32px;height:19px;".
+             'border:1px solid #fff;border-radius:8px;background-color:#'. $args[1] .';"></div>'.
+           '</td>' if( AttrVal($FW_wname, "longpoll", 1));
+
+    return '<td align="center">'.
+             "<a href=\"$FW_ME?$c\">".
                '<div style="width:32px;height:19px;'.
                'border:1px solid #fff;border-radius:8px;background-color:#'. $args[1] .';"></div>'.
              '</a>'.
            '</td>';
   } else {
-    my $c = "\"$FW_ME?cmd=set $d $cmd %$srf\"";
+    my $c = "$FW_ME?XHR=1&cmd=set $d $cmd %$srf";
     return '<td align="center">'.
-             "<input class='color {pickerMode:'$mode'}' value='#$cv' onchange='colorpicker_setColor(this,\"$mode\",$c)'\"/>".
+             "<input id='colorpicker.$d-RGB' class=\"color {pickerMode:'$mode',pickerFaceColor:'transparent',pickerFace:3,pickerBorder:0,pickerInsetColor:'red'}\" value='$cv' onChange='colorpicker_setColor(this,\"$mode\",\"$c\")'>".
            '</td>';
   }
 }
@@ -169,6 +175,8 @@ sub HUEDevice_Define($$)
   $hash->{fhem}{hue} = -1;
   $hash->{fhem}{sat} = -1;
   $hash->{fhem}{xy} = '';
+
+  $hash->{fhem}{percent} = -1;
 
 
   $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
@@ -289,7 +297,7 @@ HUEDevice_SetParam($$@)
     $obj->{'on'}  = JSON::true;
     $obj->{'hue'}  = int($h*256);
     $obj->{'sat'}  = 0+$s;
-    $obj->{'bru'}  = 0+$v;
+    $obj->{'bri'}  = 0+$v;
   } elsif( $cmd eq "effect" ) {
     $obj->{'effect'}  = $value;
   } elsif( $cmd eq "transitiontime" ) {
@@ -582,14 +590,13 @@ HUEDevice_GetUpdate($)
   if( defined($xy) && $xy ne $hash->{fhem}{xy} ) {readingsBulkUpdate($hash,"xy",$xy);}
 
   my $s = '';
+  my $percent;
   if( $on )
     {
       $s = 'on';
       if( $on != $hash->{fhem}{on} ) {readingsBulkUpdate($hash,"onoff",1);}
 
-      my $percent = int( $state->{'bri'} * 100 / 254 );
-      if( $bri != $hash->{fhem}{bri} ) {readingsBulkUpdate($hash,"level", $percent . ' %');}
-      if( $bri != $hash->{fhem}{bri} ) {readingsBulkUpdate($hash,"pct", $percent);}
+      $percent = int( $bri * 100 / 254 );
       if( $percent > 0
           && $percent < 100  ) {
         $s = $dim_values{int($percent/7)};
@@ -599,11 +606,17 @@ HUEDevice_GetUpdate($)
   else
     {
       $s = 'off';
+      $percent = 0;
       if( $on != $hash->{fhem}{on} ) {readingsBulkUpdate($hash,"onoff",0);}
     }
 
+  if( $percent != $hash->{fhem}{percent} ) {readingsBulkUpdate($hash,"level", $percent . ' %');}
+  if( $percent != $hash->{fhem}{percent} ) {readingsBulkUpdate($hash,"pct", $percent);}
+
   if( $s ne $hash->{STATE} ) {readingsBulkUpdate($hash,"state",$s);}
   readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
+
+  CommandTrigger( "", "$name RGB: ".CommandGet("","$name rgb") ); 
 
   $hash->{fhem}{on} = $on;
   $hash->{fhem}{colormode} = $colormode;
@@ -612,6 +625,8 @@ HUEDevice_GetUpdate($)
   $hash->{fhem}{hue} = $hue;
   $hash->{fhem}{sat} = $sat;
   $hash->{fhem}{xy} = $xy;
+
+  $hash->{fhem}{percent} = $percent;
 }
 
 1;
