@@ -2,6 +2,7 @@
 var FW_pollConn;
 var FW_curLine; // Number of the next line in FW_pollConn.responseText to parse
 var FW_widgets = new Object(); // to be filled by fhemweb_*.js
+var FW_leaving;
 
 function
 FW_cmd(arg)     /* see also FW_devState */
@@ -14,7 +15,7 @@ FW_cmd(arg)     /* see also FW_devState */
 function
 FW_doUpdate()
 {
-  if(FW_pollConn.readyState == 4) {
+  if(FW_pollConn.readyState == 4 && !FW_leaving) {
     var errdiv = document.createElement('div');
     errdiv.innerHTML = "Connection lost, reconnecting in 5 seconds...";
     errdiv.setAttribute("id","connect_err");
@@ -199,4 +200,10 @@ FW_querySetSelected(el, val)
   for(var j=0;j<el.options.length;j++)
     if(el.options[j].value == val)
       el.selectedIndex = j;
+}
+
+window.onbeforeunload = function(e)
+{ 
+  FW_leaving = 1;
+  return undefined;
 }
