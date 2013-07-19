@@ -1779,7 +1779,7 @@ sub CUL_HM_Get($@) {
 	  my $eName = CUL_HM_id2Name($e);
 	  push @eNames, $eName if($eName !~ m/_chn:/);
 	}
-	
+
 	foreach my $eName (@eNames){
 	  print aSave "\n#---      entity:".$eName;
 	  my $pIds = AttrVal($eName, "peerIDs", "");
@@ -1790,7 +1790,7 @@ sub CUL_HM_Get($@) {
 	    print aSave "\nset ".$eName." peerBulk ".$pIds;
 	  }
 	  my $ehash = $defs{$eName};
-	  foreach my $read (sort grep(!/^[\.]?RegL_/,keys %{$ehash->{READINGS}})){
+	  foreach my $read (sort grep(/^[\.]?RegL_/,keys %{$ehash->{READINGS}})){
 	    print aSave "\nset ".$eName." regBulk ".$read." "
 		      .ReadingsVal($eName,$read,"");
 		$timestamps .= "\n#        ".ReadingsTimestamp($eName,$read,"")." :".$read;
@@ -4808,7 +4808,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 		'3' includes '2' plus updates on writes to the device<br>
 		'4' includes '3' plus tries to request status if it seems to be missing<br>
 		Execution will be delayed in order to prevent congestion at startup. Therefore the update 
-		of the readings and the display will be delayed depending on the sice of the database.<br>
+		of the readings and the display will be delayed depending on the size of the database.<br>
 		Recommendations and constrains upon usage:<br>
         <ul>
           use this attribute on the device or channel 01. Do not use it separate on each channel 

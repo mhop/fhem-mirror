@@ -449,6 +449,8 @@ sub HMinfo_SetFn($$) {#########################################################
 	       ."\n [<nameFilter>]   : only matiching names are processed - partial names are possible"       
 	       ."\n [<modelsFilter>] : any match in the output are searched. "       
 	       ."\n"       
+           ."\n cpRegs <src:peer> <dst:peer>"   
+           ."\n        copy register for a channel or behavior of channel/peer"   
            ."\n templateChk <entity> <templateName> <peer:[long|short]> [<param1> ...] "   
            ."\n        compare whether register match the template values"   
            ."\n templateDef <entity> <templateName> <param1[:<param2>...] <description> <reg1>:<val1> [<reg2>:<val2>] ... "   
@@ -713,6 +715,52 @@ my %tpl = (
                            ,CtOff           =>"p1"        
                            ,CtValLo         =>"p0"     
                  	}}
+  ,BlStopDnLg        => {p=>""                 ,t=>"Blind: stop drive on any key - for long drive down"
+                    ,reg=>{ ActionType      =>"jmpToTarget"
+                           ,BlJtDlyOff      =>"refOff"
+                           ,BlJtDlyOn       =>"dlyOff"
+                           ,BlJtOff         =>"dlyOff"
+                           ,BlJtOn          =>"dlyOff"
+                           ,BlJtRampOff     =>"rampOff"
+                           ,BlJtRampOn      =>"on"
+                           ,BlJtRefOff      =>"rampOff"
+                           ,BlJtRefOn       =>"on"
+                           ,MultiExec       =>"on"
+				    }}
+  ,BlStopDnSh        => {p=>""                 ,t=>"Blind: stop drive on any key - for short drive down"
+                    ,reg=>{ ActionType      =>"jmpToTarget"
+                           ,BlJtDlyOff      =>"refOff"
+                           ,BlJtDlyOn       =>"dlyOff"
+                           ,BlJtOff         =>"dlyOff"
+                           ,BlJtOn          =>"dlyOff"
+                           ,BlJtRampOff     =>"off"
+                           ,BlJtRampOn      =>"on"
+                           ,BlJtRefOff      =>"rampOff"
+                           ,BlJtRefOn       =>"on"
+					}}
+  ,BlStopUpLg        => {p=>""                 ,t=>"Blind: stop drive on any key - for long drive up"
+                    ,reg=>{ ActionType       =>"jmpToTarget"
+                           ,BlJtDlyOff       =>"dlyOn"
+                           ,BlJtDlyOn        =>"refOn"
+                           ,BlJtOff          =>"dlyOn"
+                           ,BlJtOn           =>"dlyOn"
+                           ,BlJtRampOff      =>"off"
+                           ,BlJtRampOn       =>"rampOn"
+                           ,BlJtRefOff       =>"off"
+                           ,BlJtRefOn        =>"rampOn"
+					}}
+  ,BlStopDnSh        => {p=>""                 ,t=>"Blind: stop drive on any key - for short drive up"
+                    ,reg=>{ ActionType       =>"jmpToTarget"
+                           ,BlJtDlyOff       =>"dlyOn"
+                           ,BlJtDlyOn        =>"refOn"
+                           ,BlJtOff          =>"dlyOn"
+                           ,BlJtOn           =>"dlyOn"
+                           ,BlJtRampOff      =>"off"
+                           ,BlJtRampOn       =>"on"
+                           ,BlJtRefOff       =>"off"
+                           ,BlJtRefOn        =>"rampOn"
+					}}
+
 );
 
 sub HMinfo_templateDef(@){#####################################################
@@ -818,7 +866,7 @@ sub HMinfo_templateList($){####################################################
   my $reply = "";
 #  if(!$templ || !(grep /$templ/,keys%tpl)){# list all templates
   if(!($templ && (grep /$templ/,keys%tpl))){# list all templates
-    foreach (keys%tpl){
+    foreach (sort keys%tpl){
       $reply .= sprintf("%-16s params:%-24s Info:%s\n"
 	                         ,$_
 	  						 ,$tpl{$_}{p}
@@ -828,7 +876,7 @@ sub HMinfo_templateList($){####################################################
   }
   else{#details about one template
     $reply = sprintf("%-16s params:%-24s Info:%s\n",$templ,$tpl{$templ}{p},$tpl{$templ}{t});
-    foreach (keys %{$tpl{$templ}{reg}}){
+    foreach (sort keys %{$tpl{$templ}{reg}}){
 	  my $val = $tpl{$templ}{reg}{$_};
 	  if ($val =~m /^p(.)$/){
 	    my @a = split(" ",$tpl{$templ}{p});
@@ -841,47 +889,6 @@ sub HMinfo_templateList($){####################################################
 }
 
 sub HMinfo_cpRegs(@){#########################################################
-  # copy level: 
-  #    List11 cpRegs channelSrc channelDst
-  #    List13/4 cpRegs channelSrc:peer channelDst:peer
-  # 
-  # Checks: registerlist of source must appear complete
-  #         Peer must be present in source and destination, list must be complete
-  
-  #description:
-    #  <li><a name="#HMinfocpRegs">cpRegs &lt;src:peer&gt; &lt;dst:peer&gt; </a><br>
-	#      allows to copy register, setting and behavior of a channel to 
-	#      another or for peers from the same or different channels
-	#     <li>src:peer is the source entity. Peer needs to be given if a peer behabior beeds to be copied <\li>
-	#     <li>dst:peer is the destination entity.<\li>
-	#	Examples are
-	#	 set hm cpRegs blindR blindL  # will copy all general register for this channel from the blindR to the blindL entity. 
-	#	 This includes items like drive times. <br>
-	#	 set hm cpRegs blindR:Btn1 blindL:Btn2  # copy behavior of Btn1/blindR relation to Btn2/blindL<br>
-	#	 set hm cpRegs blindR:Btn1 blindR:Btn2  # copy behavior of Btn1/blindR relation to Btn2/blindR, i.e. inside the same Actor<br>
-	#	 <br>
-	#	 Restrictions:<br> 
-	#	 cpRegs will not add any peers or read from the devices. It is up to the user to read register in advance<br>
-	#	 cpRegs is only allowed between identical models<br>
-	#	 peerings of devices must exist. cpRegs will terminate if peers cannot be identified<br>
-	#	 cpRegs estimates that all readings are up-to-date. It is up to the user to ensure and check data consistancy. <br>
-	#	 <br>
-	#
-	#  </li>
-
-  #help
-  #."\n cpRegs <src:peer> <dst:peer>"   
-  #."\n        copy register for a channel or behavior of channel/peer"   
-  
-  #tests
-  #define tc CUL_HM 222222
-  #attr tc model HM-LC-Dim1TPBU-FM
-  #attr tc peerIDs 18208305,22222201
-  #
-  #set hm cpRegs LichtL:FB_01 tc
-  #set hm cpRegs LichtL:FB_Btn_01 tc:FB_Btn_05
-  #set hm cpRegs LichtL:FB_Btn_01 tc:self01
-  
   my ($srcCh,$dstCh) = @_;
   my ($srcP,$dstP,$srcPid,$dstPid,$srcRegLn,$dstRegLn);
   ($srcCh,$srcP) = split(":",$srcCh,2);
@@ -926,9 +933,8 @@ sub HMinfo_cpRegs(@){#########################################################
   # we habe a reglist with termination, source and destination peer is checked. Go copy
   my $srcData = $defs{$srcCh}{READINGS}{$srcRegLn}{VAL};
   $srcData =~ s/00:00//; # remove termination
-  Log 1,"General HMinfo_cpRegs:$srcRegLn->".join("-",split(" ",$srcData));
-#  my $ret = CUL_HM_Set($defs{$dstCh},$dstCh,"regBulk",$srcRegLn,split(" ",$srcData));
-#  return $ret;
+  my ($ret,undef) = CUL_HM_Set($defs{$dstCh},$dstCh,"regBulk",$srcRegLn,split(" ",$srcData));
+  return $ret;
 }
 1;
 =pod
@@ -1040,6 +1046,27 @@ sub HMinfo_cpRegs(@){#########################################################
 		  <li>Protocol relates to set clear msgEvents</li>
 		  <li>Readings relates to set clear readings</li>
 		  <li>Rssi clears all rssi counters </li>
+	  </li>
+      <li><a name="#HMinfocpRegs">cpRegs &lt;src:peer&gt; &lt;dst:peer&gt; </a><br>
+	      allows to copy register, setting and behavior of a channel to 
+	      another or for peers from the same or different channels. Copy therefore is allowed
+		  intra/inter device and intra/inter channel. 
+	     <li>src:peer is the source entity. Peer needs to be given if a peer behabior beeds to be copied <\li>
+	     <li>dst:peer is the destination entity.<\li>
+		Examples are
+		 <code>
+		  set hm cpRegs blindR blindL  # will copy all general register (list 1)for this channel from the blindR to the blindL entity. 
+		  This includes items like drive times. It does not include peers related register (list 3/4) <br>
+		  set hm cpRegs blindR:Btn1 blindL:Btn2  # copy behavior of Btn1/blindR relation to Btn2/blindL<br>
+		  set hm cpRegs blindR:Btn1 blindR:Btn2  # copy behavior of Btn1/blindR relation to Btn2/blindR, i.e. inside the same Actor<br>
+		 </code>
+		 <br>
+		 Restrictions:<br> 
+		 cpRegs will not add any peers or read from the devices. It is up to the user to read register in advance<br>
+		 cpRegs is only allowed between identical models<br>
+		 peerings of devices must exist. cpRegs will terminate if peers cannot be identified<br>
+		 cpRegs estimates that all readings are up-to-date. It is up to the user to ensure and check data consistancy. <br>
+		 <br>
 	  </li>
       <li><a name="#HMinfosaveConfig">saveConfig</a> <a href="HMinfoFilter">[filter]</a><br>
 	      performs a save for all HM register setting and peers. See <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>. 
