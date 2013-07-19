@@ -36,6 +36,7 @@
 # 0025: Added fp_viewport-attribute from Jens (March 03, 2013)
 # 0026: Adapted to FHEMWEB-changes re webCmdFn - fp_setbutton not functional (May 23, 2013)
 # 0027: Added FP_detailFn(), added delete-button in arrange-menu, fixed link for pdf-docu, minor code cleanup, added get config (July 08, 2013)
+# 0028: Implemented informid for longpoll, usage of @FW_fhemwebjs (July 19, 2013)
 #
 ################################################################
 #
@@ -92,6 +93,7 @@ use strict;
 use warnings;
 use vars qw(%data);
 use vars qw($FW_longpoll);
+use vars qw(@FW_fhemwebjs);      # List of fhemweb*js scripts to load - from FHEMWEB
 
 #########################
 # Forward declaration
@@ -357,9 +359,14 @@ FP_htmlHeader($) {
   my $css= AttrVal($FP_name, "stylesheet", $defaultcss);
   FW_pO  "<link href=\"$FW_ME/css/$css\" rel=\"stylesheet\"/>";
   #set sripts
-  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/svg.js\"></script>"
-                        if($FW_plotmode eq "SVG");
-  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/fhemweb.js\"></script>";
+#  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/svg.js\"></script>"
+#                        if($FW_plotmode eq "SVG");
+#  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/fhemweb.js\"></script>";
+  my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
+  FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/svg.js") if($FW_plotmode eq "SVG");
+  foreach my $js (@FW_fhemwebjs) {
+    FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/$js");
+  }
   # FW Extensions
   if(defined($data{FWEXT})) {
     foreach my $k (sort keys %{$data{FWEXT}}) {
@@ -495,14 +502,14 @@ FP_show(){
             $fp_fpimage =~ s/\{state\}/$state/;                                                 # replace {state} by actual device-status
             $txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_fpimage\"/;         # replace icon-link in html
         }
-	    FW_pO "<td colspan=\"$cols\">$txt";
+	    FW_pO "<td informId=\"$d\" colspan=\"$cols\">$txt";
 	    FW_pO "</td></tr>";
 	
 	    if ($style == 6) {                                                                          # add ReadingsTimeStamp for style 6
 		  $txt="";
     	  FW_pO "<tr class=\"devicetimestamp fp_$FP_name\" id=\"$d-devicetimestamp\">";           # For css: class=devicetimestamp, id=<devicename>-devicetimestamp
 		  $txt = ReadingsTimestamp($d, $text, "Undefined Reading $d-<b>$text</b>") if ($style == 3 || $style == 6);   # Style3+6 = DeviceReading given in $text
-	      FW_pO "<td colspan=\"$cols\">$txt";
+	      FW_pO "<td informId=\"$d\" colspan=\"$cols\">$txt";
 	      FW_pO "</td></tr>";
 	    }
 
