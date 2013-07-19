@@ -625,8 +625,9 @@ sub HMinfo_status($){##########################################################
   @protNames = sort keys %all;
   $hash->{ERR__protoNames} = join",",@protNames if(@protNames);
 
-  if (@{$modules{CUL_HM}{helper}{autoRdCfgLst}}>0){
-     $hash->{I_autoReadPend} = join ",",@{$modules{CUL_HM}{helper}{autoRdCfgLst}};
+  if (defined $modules{CUL_HM}{helper}{autoRdCfgLst} &&
+      @{$modules{CUL_HM}{helper}{autoRdCfgLst}}>0){
+    $hash->{I_autoReadPend} = join ",",@{$modules{CUL_HM}{helper}{autoRdCfgLst}};
   }
   else{
     delete $hash->{I_autoReadPend};
@@ -653,18 +654,18 @@ sub HMinfo_status($){##########################################################
 
 
 my %tpl = (
-   autoOff           => {p=>"time"         ,t=>"staircase - auto off after <time>, extend time with each trigger"
+   autoOff           => {p=>"time"             ,t=>"staircase - auto off after <time>, extend time with each trigger"
                     ,reg=>{ OnTime          =>"p0"
                            ,OffTime         =>111600       
 					 }}
   ,motionOnDim       => {p=>"ontime brightness",t=>"Dimmer:on for time if MDIR-brightness below level"
-                    ,reg=>{ CtDlyOn         =>"geLo"        
-                           ,CtDlyOff        =>"geLo"     
-                           ,CtOn            =>"geLo"        
-                           ,CtOff           =>"geLo"        
+                    ,reg=>{ CtDlyOn         =>"ltLo"        
+                           ,CtDlyOff        =>"ltLo"     
+                           ,CtOn            =>"ltLo"        
+                           ,CtOff           =>"ltLo"        
                            ,CtValLo         =>"p1"     
-                           ,CtRampOn        =>"geLo"        
-                           ,CtRampOff       =>"geLo"     
+                           ,CtRampOn        =>"ltLo"        
+                           ,CtRampOff       =>"ltLo"     
                            ,OffTime         =>111600        
                            ,OnTime          =>"p0"   
 						   
@@ -677,10 +678,10 @@ my %tpl = (
                            ,DimJtRampOff    =>"dlyOn" 
 					 }}
   ,motionOnSw        => {p=>"ontime brightness",t=>"Switch:on for time if MDIR-brightness below level"
-                    ,reg=>{ CtDlyOn         =>"geLo"        
-                           ,CtDlyOff        =>"geLo"     
-                           ,CtOn            =>"geLo"        
-                           ,CtOff           =>"geLo"        
+                    ,reg=>{ CtDlyOn         =>"ltLo"        
+                           ,CtDlyOff        =>"ltLo"     
+                           ,CtOn            =>"ltLo"        
+                           ,CtOff           =>"ltLo"        
                            ,CtValLo         =>"p1"     
                            ,OffTime         =>111600        
                            ,OnTime          =>"p0"   
@@ -691,14 +692,21 @@ my %tpl = (
                            ,SwJtDlyOn       =>"on"        
                            ,SwJtDlyOff      =>"dlyOn"        
 					}}
-  ,SwConditionAbove  => {p=>"condition",t=>"Switch:execute only if condition level is above limit"
+  ,SwCondAbove       => {p=>"condition"        ,t=>"Switch:execute only if condition level is above limit"
                     ,reg=>{ CtDlyOn         =>"geLo"        
                            ,CtDlyOff        =>"geLo"     
                            ,CtOn            =>"geLo"        
                            ,CtOff           =>"geLo"        
                            ,CtValLo         =>"p0"     
                  	}}
-  ,SwOnCond          => {p=>"level cond",t=>"switch:execute only if condition level is below limit"
+  ,SwCondBelow       => {p=>"condition"        ,t=>"Switch:execute only if condition level is below limit"
+                    ,reg=>{ CtDlyOn         =>"ltLo"        
+                           ,CtDlyOff        =>"ltLo"     
+                           ,CtOn            =>"ltLo"        
+                           ,CtOff           =>"ltLo"        
+                           ,CtValLo         =>"p0"     
+                 	}}
+  ,SwOnCond          => {p=>"level cond"       ,t=>"switch:execute only if condition [geLo|ltLo] level is below limit"
                     ,reg=>{ CtDlyOn         =>"p1"        
                            ,CtDlyOff        =>"p1"     
                            ,CtOn            =>"p1"        
@@ -866,11 +874,11 @@ sub HMinfo_cpRegs(@){#########################################################
   #."\n        copy register for a channel or behavior of channel/peer"   
   
   #tests
-  #define tc CUM_HM 222222
+  #define tc CUL_HM 222222
   #attr tc model HM-LC-Dim1TPBU-FM
   #attr tc peerIDs 18208305,22222201
   #
-  #set hm cpRegs LichtL:FB_ tc
+  #set hm cpRegs LichtL:FB_01 tc
   #set hm cpRegs LichtL:FB_Btn_01 tc:FB_Btn_05
   #set hm cpRegs LichtL:FB_Btn_01 tc:self01
   
@@ -878,8 +886,8 @@ sub HMinfo_cpRegs(@){#########################################################
   my ($srcP,$dstP,$srcPid,$dstPid,$srcRegLn,$dstRegLn);
   ($srcCh,$srcP) = split(":",$srcCh,2);
   ($dstCh,$dstP) = split(":",$dstCh,2);
-  return "source channel $srcCh undefined"      if ($defs{$srcCh});
-  return "destination channel $srcCh undefined" if ($defs{$dstCh});
+  return "source channel $srcCh undefined"      if (!$defs{$srcCh});
+  return "destination channel $srcCh undefined" if (!$defs{$dstCh});
   #compare source and destination attributes
 #  return "model  not compatible" if (CUL_HM_Get($ehash,$eName,"param","model") ne
 #                                     CUL_HM_Get($ehash,$eName,"param","model"));
@@ -895,7 +903,7 @@ sub HMinfo_cpRegs(@){#########################################################
     elsif($dstP =~ m/(.*)_chn:(..)/) {$dstPid = $defs{$1}->{DEF}.$2;}
     elsif($defs{$dstP})              {$dstPid = $defs{$dstP}{DEF}.$2;}
 	
-	return "invalid peers src:$srcP dst:$dstP" if(!$srcPid || $dstPid);
+	return "invalid peers src:$srcP dst:$dstP" if(!$srcPid || !$dstPid);
 	return "sourcepeer not in peerlist"        if ($attr{$srcCh}{peerIDs} !~ m/$srcPid/);
 	return "destination peer not in peerlist"  if ($attr{$dstCh}{peerIDs} !~ m/$dstPid/);
 
@@ -908,15 +916,15 @@ sub HMinfo_cpRegs(@){#########################################################
 	$dstRegLn .= $dstP;
   }
   else{
-	if   ($defs{$srcCh}{READINGS}{"RegL_01:"})  {$srcRegLn = $defs{$srcCh}{READINGS}{"RegL_01:"}}
-	elsif($defs{$srcCh}{READINGS}{".RegL_01:"}) {$srcRegLn = $defs{$srcCh}{READINGS}{".RegL_01:"}}
+	if   ($defs{$srcCh}{READINGS}{"RegL_01:"})  {$srcRegLn = "RegL_01:"}
+	elsif($defs{$srcCh}{READINGS}{".RegL_01:"}) {$srcRegLn = ".RegL_01:"}
 	$dstRegLn = $srcRegLn;
   }
   return "source register not available"     if (!$srcRegLn);
-  return "regList incomplete"                if ($defs{$srcCh}{READINGS}{$srcRegLn} !~ m/00:00/);
+  return "regList incomplete"                if ($defs{$srcCh}{READINGS}{$srcRegLn}{VAL} !~ m/00:00/);
  
   # we habe a reglist with termination, source and destination peer is checked. Go copy
-  my $srcData = $defs{$srcCh}{READINGS}{$srcRegLn};
+  my $srcData = $defs{$srcCh}{READINGS}{$srcRegLn}{VAL};
   $srcData =~ s/00:00//; # remove termination
   Log 1,"General HMinfo_cpRegs:$srcRegLn->".join("-",split(" ",$srcData));
 #  my $ret = CUL_HM_Set($defs{$dstCh},$dstCh,"regBulk",$srcRegLn,split(" ",$srcData));
