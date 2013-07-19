@@ -3926,6 +3926,7 @@ sub CUL_HM_noDupInString($) {#return string with no duplicates, comma separated
 }
 sub CUL_HM_storeRssi(@){
   my ($name,$peerName,$val) = @_;
+  return if (!$val);
   $defs{$name}{helper}{rssi}{$peerName}{lst} = $val;
   my $rssiP = $defs{$name}{helper}{rssi}{$peerName};
   $rssiP->{min} = $val if (!$rssiP->{min} || $rssiP->{min} > $val);
