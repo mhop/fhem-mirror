@@ -416,12 +416,12 @@ function init_handlers() {
     });
     
     $("#widget_menue_delete").click(function () {
-        $("#label_deletewidget").html("xy");
+        $("#label_deletewidget").html(get_current_widget_id());
         $("#dialog_deletewidget").dialog("open");
     });
     
     $("#widget_menue_edit").click(function () {
-        $("#label_editwidget").html("xy");
+        $("#label_editwidget").html(get_current_widget_id());
         $("#dialog_editwidget").dialog("open");
         $("#widget_menue").hide();
         close_widget_menue = true;

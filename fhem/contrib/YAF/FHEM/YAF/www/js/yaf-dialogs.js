@@ -245,7 +245,7 @@ function init_dialogs() {
                     type: "GET",
                     async: false,
                     url: "../../ajax/global/deleteWidget",
-                    data: "view_id=" + view_id + "&widget_id" + widget_id,
+                    data: "view_id=" + view_id + "&widget_id=" + widget_id,
                     context: document.body,
                     success: function (jsondata) {
                         console.log("widget deleted");
