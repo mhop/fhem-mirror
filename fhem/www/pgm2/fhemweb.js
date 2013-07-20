@@ -170,8 +170,12 @@ FW_selChange(sel, list, elName)
   if((typeof o.qFn == "string")) {
     if(elName.indexOf("val.attr")==0)
       FW_queryValue('{AttrVal("'+devName+'","'+sel+'","")}', o.qFn, o.qArg);
-    if(elName.indexOf("val.set")==0)
-      FW_queryValue('{ReadingsVal("'+devName+'","'+sel+'","")}', o.qFn, o.qArg);
+    if(elName.indexOf("val.set")==0) {
+      qArg = o.qArg;
+      eval(o.qFn.replace("%", ""));
+      // ??? Which readingsVal makes sense as set argument with the same name
+      //FW_queryValue('{ReadingsVal("'+devName+'","'+sel+'","")}', o.qFn, o.qArg);
+    }
   }
 }
 
