@@ -77,6 +77,7 @@ use vars qw(@FW_fhemwebjs);# List of fhemweb*js scripts to load
 my $FW_zlib_checked;
 my $FW_use_zlib = 1;
 my $FW_activateInform = 0;
+my $FW_formmethod = "post";
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
@@ -243,10 +244,19 @@ FW_Read($)
   }
 
   $hash->{BUF} .= $buf;
-  return if($hash->{BUF} !~ m/\n\n$/ && $hash->{BUF} !~ m/\r\n\r\n$/);
-
-  @FW_httpheader = split("[\r\n]", $hash->{BUF});
-
+  if(!$hash->{HDR}) {
+    return if($hash->{BUF} !~ m/^(.*)(\n\n|\r\n\r\n)(.*)$/s);
+    $hash->{HDR} = $1;
+    $hash->{BUF} = $3;
+    if($hash->{HDR} =~ m/Content-Length: ([^\r\n]*)/s) {
+      $hash->{CONTENT_LENGTH} = $1;
+    }
+  }
+  return if($hash->{CONTENT_LENGTH} &&
+            length($hash->{BUF})<$hash->{CONTENT_LENGTH});
+    
+  @FW_httpheader = split("[\r\n]", $hash->{HDR});
+  delete($hash->{HDR});
 
   my @origin = grep /Origin/, @FW_httpheader;
   $FW_headercors = (AttrVal($FW_wname, "CORS", 0) ?
@@ -262,8 +272,9 @@ FW_Read($)
   my $basicAuth = AttrVal($FW_wname, "basicAuth", undef);
   my @headerOptions = grep /OPTIONS/, @FW_httpheader;
   if($basicAuth) {
-    $hash->{BUF} =~ m/Authorization: Basic ([^\r\n]*)/s;
-    my $secret = $1;
+    my @authLine = grep /Authorization: Basic/, @FW_httpheader;
+    my $secret = $authLine[0];
+    $secret =~ s/^Authorization: Basic // if($secret);
     my $pwok = ($secret && $secret eq $basicAuth);
     if($secret && $basicAuth =~ m/^{.*}$/ || $headerOptions[0]) {
       eval "use MIME::Base64";
@@ -280,7 +291,8 @@ FW_Read($)
       print $c "HTTP/1.1 200 OK\r\n",
              $FW_headercors,
              "Content-Length: 0\r\n\r\n";
-      $hash->{BUF}="";
+      delete $hash->{CONTENT_LENGTH};
+      delete $hash->{BUF};
       return;
       exit(1);
     };
@@ -290,7 +302,8 @@ FW_Read($)
              "WWW-Authenticate: Basic realm=\"$msg\"\r\n",
              $FW_headercors,
              "Content-Length: 0\r\n\r\n";
-      $hash->{BUF}="";
+      delete $hash->{CONTENT_LENGTH};
+      delete $hash->{BUF};
       return;
     };
   }
@@ -298,8 +311,10 @@ FW_Read($)
   
   my $now = time();
   @FW_enc = grep /Accept-Encoding/, @FW_httpheader;
-  my ($mode, $arg, $method) = split(" ", $FW_httpheader[0]);
-  $hash->{BUF} = "";
+  my ($method, $arg, $httpvers) = split(" ", $FW_httpheader[0], 3);
+  $arg .= "&".$hash->{BUF} if($hash->{CONTENT_LENGTH});
+  delete $hash->{CONTENT_LENGTH};
+  delete $hash->{BUF};
   $hash->{LASTACCESS} = $now;
 
   $arg = "" if(!defined($arg));
@@ -480,7 +495,8 @@ FW_answerCall($)
   $FW_cmdret = $docmd ? FW_fC($cmd, $cmddev) : "";
 
   # Redirect after a command, to clean the browser URL window
-  if($docmd && !$FW_cmdret && AttrVal($FW_wname, "redirectCmds", 1)) {
+  if($docmd && !$FW_cmdret && $FW_formmethod eq "get" &&
+     AttrVal($FW_wname, "redirectCmds", 1)) {
     my $tgt = $FW_ME;
        if($FW_detail) { $tgt .= "?detail=$FW_detail" }
     elsif($FW_room)   { $tgt .= "?room=$FW_room" }
@@ -621,6 +637,7 @@ FW_digestCgi($)
   #Remove (nongreedy) everything including the first '?'
   $arg =~ s,^.*?[?],,;
   foreach my $pv (split("&", $arg)) {
+    next if($pv eq ""); # happens when post forgot to set FW_ME
     $pv =~ s/\+/ /g;
     $pv =~ s/%([\dA-F][\dA-F])/chr(hex($1))/ige;
     my ($p,$v) = split("=",$pv, 2);
@@ -776,7 +793,7 @@ FW_makeSelect($$$$)
   $selEl = $1 if($list =~ m/([^ ]*):slider,/); # promote a slider if available
   $selEl = "room" if($list =~ m/room:/);
 
-  FW_pO "<form method=\"get\" ".
+  FW_pO "<form method=\"$FW_formmethod\" ".
                 "action=\"$FW_ME$FW_subdir\" autocomplete=\"off\">";
   FW_pO FW_hidden("detail", $d);
   FW_pO FW_hidden("dev.$cmd$d", $d);
@@ -824,7 +841,7 @@ FW_doDetail($)
     use strict "refs";
   }
 
-  FW_pO "<form method=\"get\" action=\"$FW_ME\">";
+  FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME\">";
   FW_pO FW_hidden("detail", $d);
 
   FW_makeSelect($d, "set", getAllSets($d), "set");
@@ -1033,7 +1050,7 @@ FW_roomOverview($)
   # HEADER
   FW_pO "<div id=\"hdr\">";
   FW_pO '<table border="0"><tr><td style="padding:0">';
-  FW_pO "<form method=\"get\" action=\"$FW_ME\">";
+  FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME\">";
   FW_pO FW_hidden("room", "$FW_room") if($FW_room);
   FW_pO FW_textfield("cmd", $FW_ss ? 25 : 40, "maininput");
   FW_pO "</form>";
@@ -1056,7 +1073,8 @@ FW_showRoom()
     $FW_hiddengroup{$r} = 1;
   }
   
-  FW_pO "<form method=\"get\" action=\"$FW_ME\" autocomplete=\"off\">";
+  FW_pO "<form method=\"$FW_formmethod\" ".
+                "action=\"$FW_ME\" autocomplete=\"off\">";
   FW_pO "<div id=\"content\">";
   FW_pO "<table>";  # Need for equal width of subtables
 
@@ -1910,7 +1928,7 @@ FW_style($$)
 
     my $ncols = $FW_ss ? 40 : 80;
     FW_pO "<div id=\"content\">";
-    FW_pO "<form>";
+    FW_pO "<form method=\"$FW_formmethod\">";
     FW_pO     FW_submit("save", "Save $fileName");
     FW_pO     "&nbsp;&nbsp;";
     FW_pO     FW_submit("saveAs", "Save as");
@@ -1991,7 +2009,7 @@ FW_iconTable($$$$)
   }
 
   FW_pO "<div id=\"content\">";
-  FW_pO "<form>";
+  FW_pO "<form method=\"$FW_formmethod\">";
   if($textfield) {
     FW_pO "$textfield:&nbsp;".FW_textfieldv("data",20,"iconTable",".*")."<br>";
   }
@@ -2332,11 +2350,12 @@ FW_makeEdit($$$)
   FW_pO  "</td>";
 
   FW_pO  "</tr><tr><td colspan=\"2\">";
-  FW_pO   "<div id=\"edit\" style=\"display:none\"><form>";
-  FW_pO      FW_hidden("detail", $name);
+  FW_pO   "<div id=\"edit\" style=\"display:none\">";
+  FW_pO   "<form method=\"$FW_formmethod\">";
+  FW_pO       FW_hidden("detail", $name);
   my $cmd = "modify";
   my $ncols = $FW_ss ? 30 : 60;
-  FW_pO     "<textarea name=\"val.${cmd}$name\" ".
+  FW_pO      "<textarea name=\"val.${cmd}$name\" ".
                 "cols=\"$ncols\" rows=\"10\">$val</textarea>";
   FW_pO     "<br>" . FW_submit("cmd.${cmd}$name", "$cmd $name");
   FW_pO   "</form></div>";
@@ -2687,7 +2706,7 @@ FW_dropdownFn()
                FW_hidden("cmd.$d", "set");
     }
 
-    return "<td colspan='2'><form>".
+    return "<td colspan='2'><form method=\"$FW_formmethod\">".
       FW_hidden("arg.$d", $cmd) .
       FW_hidden("dev.$d", $d) .
       ($FW_room ? FW_hidden("room", $FW_room) : "") .
