@@ -188,7 +188,7 @@ my %culHmModel=(
   "00A3" => {name=>"HM-LC-Dim1L-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "00A4" => {name=>"HM-LC-Dim1T-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "00A7" => {name=>"HM-Sen-RD-O"             ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1:1,4:1'      ,chn=>"Rain:1:1,Sw:2:2",},
-  "00A8" => {name=>"HM-WDS30-OT2-SM"         ,st=>'THSensor'          ,cyc=>'00:05' ,rxt=>'c:w' ,lst=>'1:1,4:1'      ,chn=>"",},
+  "00A8" => {name=>"HM-WDS30-OT2-SM"         ,st=>'THSensor'          ,cyc=>'00:05' ,rxt=>'c:w' ,lst=>'p'            ,chn=>"Th:1:2",},
   "00A9" => {name=>"HM-PB-6-WM55"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:6",},
   #263 167                        HM Smoke Detector Schueco 
   #"HM-RC-Key4-2"
@@ -785,6 +785,7 @@ my %culHmSubTypeSets = (# channels of this subtype
 					  ,inhibit    =>"[on|off]"},
   remote           =>{ peerChan   =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"},
   threeStateSensor =>{ peerChan   =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
+  THSensor         =>{ peerChan   =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
   virtual          =>{ peerChan   =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"
 		              ,press      =>"[long|short]..."
                       ,valvePos   =>"<position>"},#acting as TC
