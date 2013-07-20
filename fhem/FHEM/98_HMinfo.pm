@@ -403,7 +403,13 @@ sub HMinfo_SetFn($$) {#########################################################
     return HMinfo_templateSet(@a);
   }
   elsif($cmd eq "templateChk"){##template: see if it applies ------------------
-    return HMinfo_templateChk(@a);
+	my $repl;
+	foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
+	  unshift @a, $dName;
+	  $repl .= HMinfo_templateChk(@a);
+	  shift @a;
+	}
+    return $repl;
   }
   elsif($cmd eq "templateList"){##template: list templates --------------------
     return HMinfo_templateList($a[0]);
@@ -451,7 +457,7 @@ sub HMinfo_SetFn($$) {#########################################################
 	       ."\n"       
            ."\n cpRegs <src:peer> <dst:peer>"   
            ."\n        copy register for a channel or behavior of channel/peer"   
-           ."\n templateChk <entity> <templateName> <peer:[long|short]> [<param1> ...] "   
+           ."\n templateChk [<typeFilter>] <templateName> <peer:[long|short]> [<param1> ...] "   
            ."\n        compare whether register match the template values"   
            ."\n templateDef <entity> <templateName> <param1[:<param2>...] <description> <reg1>:<val1> [<reg2>:<val2>] ... "   
            ."\n        define a template"   
@@ -504,8 +510,10 @@ sub HMinfo_SetFnDly($) {#######################################################
 						 ;
   }
   else{
-	return "autoReadReg clear configCheck param peerCheck peerXref protoEvents models regCheck register rssi saveConfig update";
-  }
+	return "autoReadReg clear configCheck param peerCheck peerXref "
+	      ."protoEvents models regCheck register rssi saveConfig update "
+          ."cpRegs  templateChk templateDef templateList templateSet";
+		   }
   return $ret;
 }
 sub HMinfo_post($) {###########################################################
@@ -722,10 +730,9 @@ my %tpl = (
                            ,BlJtOff         =>"dlyOff"
                            ,BlJtOn          =>"dlyOff"
                            ,BlJtRampOff     =>"rampOff"
-                           ,BlJtRampOn      =>"on"
+                           ,BlJtRampOn      =>"rampOn"
                            ,BlJtRefOff      =>"rampOff"
                            ,BlJtRefOn       =>"on"
-                           ,MultiExec       =>"on"
 				    }}
   ,BlStopDnSh        => {p=>""                 ,t=>"Blind: stop drive on any key - for short drive down"
                     ,reg=>{ ActionType      =>"jmpToTarget"
@@ -745,11 +752,11 @@ my %tpl = (
                            ,BlJtOff          =>"dlyOn"
                            ,BlJtOn           =>"dlyOn"
                            ,BlJtRampOff      =>"off"
-                           ,BlJtRampOn       =>"rampOn"
+                           ,BlJtRampOn       =>"on"
                            ,BlJtRefOff       =>"off"
                            ,BlJtRefOn        =>"rampOn"
 					}}
-  ,BlStopDnSh        => {p=>""                 ,t=>"Blind: stop drive on any key - for short drive up"
+  ,BlStopUpSh        => {p=>""                 ,t=>"Blind: stop drive on any key - for short drive up"
                     ,reg=>{ ActionType       =>"jmpToTarget"
                            ,BlJtDlyOff       =>"dlyOn"
                            ,BlJtDlyOn        =>"refOn"
@@ -789,7 +796,7 @@ sub HMinfo_templateDef(@){#####################################################
 	$tpl{$name}{reg}{$r} = $v;
   }
 }
-sub HMinfo_templateSet(@){########################################################
+sub HMinfo_templateSet(@){#####################################################
   my ($aName,$tmpl,$pSet,@p) = @_;
   $pSet = "" if (!$pSet);
   my ($pName,$pTyp) = split(":",$pSet);
@@ -832,32 +839,48 @@ sub HMinfo_templateSet(@){######################################################
   }
   return "";
 }
-sub HMinfo_templateChk(@){########################################################
+sub HMinfo_templateChk(@){#####################################################
   my ($aName,$tmpl,$pSet,@p) = @_;
   $pSet = "" if (!$pSet);
   my ($pName,$pTyp) = split(":",$pSet);
   return "template undefined $tmpl"                       if(!$tpl{$tmpl});
   return "aktor $aName unknown"                           if(!$defs{$aName});
-  return "give <peer>:[short|long] with peer, not $pSet"  if($pName && $pTyp !~ m/(short|long)/);
-  my $pRnm = $pName?($pName."-".($pSet eq "long"?"lg":"sh")):"";
+  my @pNames;
+  if ($pName eq "all"){
+	my $dId = substr(CUL_HM_name2Id($aName),0,6);
+	foreach (grep !/00000000/,split(",",AttrVal($aName,"peerIDs",""))){
+	  push @pNames,CUL_HM_peerChName($_,$dId,"").":long"  if (!$pTyp || $pTyp ne "short");
+	  push @pNames,CUL_HM_peerChName($_,$dId,"").":short" if (!$pTyp || $pTyp ne "long");
+	}
+  }
+  else{
+    push @pNames,$pSet;
+  }
   my $repl = "";
-  
-  foreach my $rn (keys%{$tpl{$tmpl}{reg}}){
-    my $regV = ReadingsVal($aName,"R-$pRnm$rn",undef);
-	$regV = ReadingsVal($aName,"R-".$rn,undef) if (!defined $regV);
-
-	if (defined $regV){
-	  $regV =~s/ .*//;#strip unit 
-	  my $tplV = $tpl{$tmpl}{reg}{$rn};	
-	  if ($tplV =~m /^p(.)$/) {#replace with User parameter
-	    return "insufficient values - at least ".$tpl{p}." are $1 necessary" if (@p < ($1+1));
-	    $tplV = $p[$1];
+  foreach my $pS (@pNames){
+    ($pName,$pTyp) = split(":",$pS);
+	
+    return "give <peer>:[short|long] with peer, not $pS"  if($pName && $pTyp !~ m/(short|long)/);
+    my $pRnm = $pName?($pName."-".($pS eq "long"?"lg":"sh")):"";
+    my $replPeer="";
+    foreach my $rn (keys%{$tpl{$tmpl}{reg}}){
+      my $regV = ReadingsVal($aName,"R-$pRnm$rn",undef);
+	  $regV = ReadingsVal($aName,"R-".$rn,undef) if (!defined $regV);
+    
+	  if (defined $regV){
+	    $regV =~s/ .*//;#strip unit 
+	    my $tplV = $tpl{$tmpl}{reg}{$rn};	
+	    if ($tplV =~m /^p(.)$/) {#replace with User parameter
+	      return "insufficient values - at least ".$tpl{p}." are $1 necessary" if (@p < ($1+1));
+	      $tplV = $p[$1];
+	    }
+	    $replPeer .= " $rn :$regV should $tplV \n" if ($regV ne $tplV);
 	  }
-	  $repl .= " $rn :$regV should $tplV \n" if ($regV ne $tplV);
-	}
-	else{
-	  $repl .= " reg not found: $rn\n";
-	}
+	  else{
+	    $replPeer .= " reg not found: $rn\n";
+	  }
+    }
+	$repl .= "$aName $pS:".($replPeer?"\n$replPeer":"match\n");
   }
   return ($repl?$repl:"template $tmpl match actor:$aName peer:$pSet");
 }
@@ -1083,16 +1106,29 @@ sub HMinfo_cpRegs(@){#########################################################
 		  leading sh or lg off. <br>
 		  if parameter are used it is necessary to enter p. as value with p0 first, p1 second parameter
 		Examples <br>
-		 set hm HMinfo_templateDef SwOnCond level:cond "my description" CtValLo:p0 CtDlyOn:p1 CtOn:geLo<br>
+		<code>
+		 set hm templateDef SwOnCond level:cond "my description" CtValLo:p0 CtDlyOn:p1 CtOn:geLo<br>
+		</code>
 		 <br>
 	  </li>
       <li><a name="#HMinfotemplateList">templateList [&lt;name&gt;]</a><br>
 	      list defined templates. If no name is given all templates will be listed<br>
 	  </li>
-      <li><a name="#HMinfotemplateChk">templateChk &lt;entity&gt; &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
+      <li><a name="#HMinfotemplateChk">templateChk <a href="HMinfoFilter">[filter]</a> &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
 	     verifies if the register-readings comply to the template <br>
 	     Parameter are identical to <a href="#HMinfotemplateSet">templateSet</a><br>
 	     The procedure will check if the register values match the ones provided by the template
+		Examples <br>
+		<code>
+		 set hm templateChk -f RolloNord BlStopUpLg peerName:long # verify RolloNord peerName, long match template?<br>
+		 set hm templateChk -f RolloNord BlStopUpLg peerName      # verify RolloNord peerName, long and short match template?<br>
+		 set hm templateChk -f RolloNord BlStopUpLg peerName:all  # verify RolloNord peerName, long and short match template?<br>
+		 set hm templateChk -f RolloNord BlStopUpLg all:long      # verify RolloNord all peers,long match template?<br>
+		 set hm templateChk -f RolloNord BlStopUpLg all           # verify RolloNord all peers,long and short match template?<br>
+		 set hm templateChk -f Rollo.*   BlStopUpLg all           # verify all Rollo* all peers,long and short match template?<br>
+		 set hm templateChk BlStopUpLg                            # verify all entities against this template<br>
+		</code>
+		 <br>
 	  </li>
       <li><a name="#HMinfotemplateSet">templateSet &lt;entity&gt; &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
 	      sets a bunch of register accroding to a given template. Parameter may be added depending on 
