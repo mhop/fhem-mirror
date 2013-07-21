@@ -505,7 +505,7 @@ sub CUL_HM_Parse($$) {##############################
   CUL_HM_DumpProtocol("RCV",$iohash,$len,$mNo,$mFlg,$mTp,$src,$dst,$p);
 
   #----------start valid messages parsing ---------
-  my $parse = CUL_HM_parseCommon($mNo,$mFlg,$mTp,$src,$dst,$p);
+  my $parse = CUL_HM_parseCommon($mNo,$mFlg,$mTp,$src,$dst,$p,$st,$model);
   push @event, "powerOn"   if($parse eq "powerOn");
   if ($parse =~ s/entities://){#common generated trigger for some entities
     push @entities,split(",",$parse);
@@ -1353,9 +1353,18 @@ sub CUL_HM_Parse($$) {##############################
   
   return $name ;#general notification to the device
 }
+# translate level to readable
+    my %lvlStr = ( model   =>{ "HM-SEC-WDS"      =>{"00"=>"dry"     ,"64"=>"damp"    ,"C8"=>"wet"        }
+	                          ,"HM-Sen-Wa-Od"    =>{"00"=>"normal"  ,"64"=>"added"   ,"C8"=>"addedStrong"}
+	                          ,"HM-CC-SCD"       =>{"00"=>"normal"  ,"64"=>"added"   ,"C8"=>"addedStrong"}
+	                         }
+				  ,subType =>{ "smokeDetector"   =>{"01"=>"no alarm","C7"=>"tone off","C8"=>"Smoke Alarm"}
+				              ,"threeStateSensor"=>{"00"=>"closed"  ,"64"=>"tilted"  ,"C8"=>"open"}
+				             }
+	              );
 sub CUL_HM_parseCommon(@){#####################################################
   # parsing commands that are device independant
-  my ($mNo,$mFlg,$mTp,$src,$dst,$p) = @_;
+  my ($mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md) = @_;
   my $shash = $modules{CUL_HM}{defptr}{$src}; 
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
   return "" if(!$shash->{DEF});# this should be from ourself 
@@ -1577,7 +1586,14 @@ sub CUL_HM_parseCommon(@){#####################################################
     my $cName = CUL_HM_id2Hash($src.sprintf("%02X",hex(substr($p,0,2))& 0x3f));
 	$cName = $cName->{NAME};
 	my $level = "-";
-	$level = hex(substr($p,4,2))." %" if (length($p)>5);
+
+	if (length($p)>5){
+	  my $l = substr($p,4,2);
+	  if    ($lvlStr{model}{$md}   && $lvlStr{model}{$md}{$l})  {$level = $lvlStr{model}{$md}{$l}}
+	  elsif ($lvlStr{subType}{$st} && $lvlStr{subType}{$st}{$l}){$level = $lvlStr{subType}{$st}{$l}}
+	  else                                                      {$level = hex($l)};
+	} 
+	
 	my @peers = split(",",AttrVal($cName,"peerIDs",""));
 	my @entities;
 	foreach my $peer (@peers){

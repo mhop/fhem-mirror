@@ -859,7 +859,7 @@ my %culHmChanSets = (
   "HM-OU-CFM-PL02" =>{ playTone  => "<MP3No>[,<MP3No>...] [<repeat>]"}
 );
 # clones- - - - - - - - - - - - - - - - - 
-$culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};
+#$culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};
 
 # RC send BCAST to specific address. Is the meaning understood?
 my @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "CFG", "Bit3",
