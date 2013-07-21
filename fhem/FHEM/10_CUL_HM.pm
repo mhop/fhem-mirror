@@ -1572,12 +1572,10 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  }
 	}
   }
-#  elsif($mTp eq "40"){ #someone is triggered################
-#	CUL_HM_qStateUpdatIfEnab($dst)if (hex($mFlg) & 0x20 && $dhash);
-#  }
   elsif($mTp =~ m /^4[01]/){ #someone is triggered##########
 	CUL_HM_qStateUpdatIfEnab($dst)if (hex($mFlg) & 0x20 && $dhash);
-    my $cName = CUL_HM_id2Name($src.sprintf("%02X",hex(substr($p,0,2))& 0x3f));
+    my $cName = CUL_HM_id2Hash($src.sprintf("%02X",hex(substr($p,0,2))& 0x3f));
+	$cName = $cName->{NAME};
 	my $level = "-";
 	$level = hex(substr($p,4,2))." %" if (length($p)>5);
 	my @peers = split(",",AttrVal($cName,"peerIDs",""));
@@ -1585,7 +1583,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 	foreach my $peer (@peers){
 	  my $pName = CUL_HM_id2Name($peer);
 	  $pName = CUL_HM_id2Name(substr($peer,0,6)) if (!$defs{$pName});
-	  next if (!$defs{$pName});
+	  next if (!$defs{$pName});#||substr($peer,0,6) ne $dst
 	  push @entities,CUL_HM_UpdtReadBulk($defs{$pName},1
 	                        ,"trig_$cName:$level"
 	                        ,"trigLast:$cName".(($level ne "-")?":$level":""));
