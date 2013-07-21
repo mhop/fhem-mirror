@@ -1644,6 +1644,9 @@ sub CUL_HM_Get($@) {
   my $isChannel = (length($dst) == 8)?"true":"";
   my $chn = ($isChannel)?substr($dst,6,2):"01";
   $dst = substr($dst,0,6);
+  my $roleC = $hash->{helper}{role}{chn}?1:0; #entity may act in multiple roles
+  my $roleD = $hash->{helper}{role}{dev}?1:0;
+  my $roleV = $hash->{helper}{role}{vrt}?1:0;
 
   my $h = $culHmGlobalGets{$cmd};
   $h = $culHmSubTypeGets{$st}{$cmd} if(!defined($h) && $culHmSubTypeGets{$st});
@@ -1758,7 +1761,8 @@ sub CUL_HM_Get($@) {
               ((($reg->{l} == 3)||($reg->{l} == 4))?"required":""),
               (($reg->{d} != 1)?"exp":""),
 			  $help)
-	        if (!($isChannel && $reg->{l} == 0));
+	        if (($roleD && $reg->{l} == 0)||
+			    ($roleC && $reg->{l} != 0));
 	}
 	
     my $info = sprintf("list: %16s | %-18s | %-8s |%-3s| %s\n",
