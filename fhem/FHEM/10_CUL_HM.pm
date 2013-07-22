@@ -2916,8 +2916,14 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
     CUL_HM_protState($hash,"CMDs_processing...");                         
   }
   else{# no answer expected
-    CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{burstEvtCnt}? 
+	if($hash->{cmdStack} && scalar @{$hash->{cmdStack}}){
+	  CUL_HM_protState($hash,"CMDs_processing..."); 
+      InternalTimer(gettimeofday()+.5, "CUL_HM_ProcessCmdStack", $hash, 0);
+	}
+	else{
+      CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{burstEvtCnt}? 
 	                            ("_events:".$hash->{helper}{burstEvtCnt}):""));
+	}
   }
   if($hash->{cmdStack} && scalar @{$hash->{cmdStack}}){
     $hash->{protCmdPend} = scalar @{$hash->{cmdStack}}." CMDs pending";
