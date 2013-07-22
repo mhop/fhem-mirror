@@ -2589,7 +2589,7 @@ sub CUL_HM_Set($@) {
     my $peerHash;
 	$peerHash = $modules{CUL_HM}{defptr}{$peerDst.$peerChn}if ($modules{CUL_HM}{defptr}{$peerDst.$peerChn});
     $peerHash = $modules{CUL_HM}{defptr}{$peerDst}         if (!$peerHash);
-    return "$peerN not a CUL_HM device"                           if($target && ($target ne "remote") &&(!$peerHash ||$peerHash->{TYPE} ne "CUL_HM"));
+	return "$peerN not a CUL_HM device"                           if($target && ($target ne "remote") &&(!$peerHash ||$peerHash->{TYPE} ne "CUL_HM"));
     return "$single must be single or dual"                       if(defined($single) && ($single !~ m/^(single|dual)$/));
     return "$set must be set or unset"                            if(defined($set)    && ($set    !~ m/^(set|unset)$/));
     return "$target must be [actor|remote|both]"                  if(defined($target) && ($target !~ m/^(actor|remote|both)$/));
@@ -2646,8 +2646,8 @@ sub CUL_HM_Set($@) {
 	    my $peerFlag = CUL_HM_getFlag($peerHash);
         CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",
             $peerFlag,$id,$peerDst,$peerChn,$cmdB,$dst,$b2,$b1 ));
-		CUL_HM_queueAutoRead($peerHash->{name}) 
-		      if (2 < CUL_HM_getAttrInt($peerHash->{name},"autoReadReg"));
+		CUL_HM_queueAutoRead($peerHash->{NAME}) 
+		      if (2 < CUL_HM_getAttrInt($peerHash->{NAME},"autoReadReg"));
 	  }
 	}
 	return ("",1) if ($target && $target eq "remote");#Nothing to transmit for actor
