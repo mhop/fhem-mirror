@@ -2375,11 +2375,13 @@ sub CUL_HM_Set($@) {
 	}
 	elsif($md eq "HM-OU-CFM-PL"){
 	  my %color = (redL =>18,greenL =>34,orangeL =>50,
-	               redS =>17,greenS =>33,orangeS =>49);
+	               redS =>17,greenS =>33,orangeS =>49,
+				   pause=>01);
 	  my @itemList = split(',',$a[2]);
 	  my $repeat = (defined $a[3] && $a[3] =~ m/^(\d+)$/)?$a[3]:1;
       my $itemCnt = int(@itemList);
-	  return "no more then 12 entries please"  if ($itemCnt>12);
+	  return "no more then 10 entries please"      if ($itemCnt>10);
+	  return "at least one entry must be entered"  if ($itemCnt<1);
 	  return "repetition $repeat out of range [1..255]"
           if($repeat < 1 ||	$repeat > 255);
       #<entries><multiply><MP3><MP3>
@@ -2391,8 +2393,11 @@ sub CUL_HM_Set($@) {
         $msgBytes .= sprintf("%02X",$color{$led});
 	  }
 	  # need to fill up empty locations  for LED channel
-	  $msgBytes = substr($msgBytes."000000000000000000000000",0,28);
+	  $msgBytes = substr($msgBytes."000000000000000000",0,(10+2)*2);
       CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.$msgBytes);
+      CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.
+	    "010101010000000000000000")
+		  if ($itemCnt == 1);
 	}
 	else{
 	  return "device for command cannot be identified";
@@ -4564,7 +4569,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
     <li>OutputUnit (HM-OU-CFM-PL)
     <ul>
       <li><B>led &lt;color&gt;[,&lt;color&gt;..] [&lt;repeat&gt..]</B><br>
-        Possible colors are [redL|greenL|yellowL|redS|greenS|yellowS]. A
+        Possible colors are [redL|greenL|yellowL|redS|greenS|yellowS|pause]. A
         sequence of colors can be given separating the color entries by ','.
         White spaces must not be used in the list. 'S' indicates short and
         'L' long ilumination. <br>
