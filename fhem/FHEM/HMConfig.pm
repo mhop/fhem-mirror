@@ -343,6 +343,7 @@ my %culHmRegDefine = (
   batDefectLimit  =>{a=> 19.0,s=>1.0,l=>0,min=>0.1,max=>2       ,c=>'factor'   ,f=>100     ,u=>'Ohm' ,d=>1,t=>"batterie defect detection"},
   transmDevTryMax =>{a=> 20.0,s=>1.0,l=>0,min=>1  ,max=>10      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"max message re-transmit"},
   localResDis     =>{a=> 24.0,s=>1.0,l=>0,min=>1  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"local reset disable"       ,lit=>{off=>0,on=>1}},
+  regL0_1b        =>{a=> 27.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"unknown test on own risk"},
 #un-identified List0
 # addr Dec!!
 # SEC-WM55 02:01 (AES on?)
@@ -664,6 +665,7 @@ my %culHmRegModel = (
                        fillLvlUpThr    =>1,fillLvlLoThr    =>1,
                        expectAES       =>1,peerNeedsBurst  =>1},
   "HM-WDS10-TH-O"   =>{burstRx         =>1},
+  "HM-WDS30-OT2-SM" =>{burstRx         =>1,cyclicInfoMsgDis=>1,localResDis     =>1,regL0_1b        =>1},
   );
 #clones - - - - - - - - - - - - - - -   
 $culHmRegModel{"HM-RC-12-B"}       = $culHmRegModel{"HM-RC-12"};
@@ -683,7 +685,6 @@ $culHmRegModel{"Schueco-263-134"}  = $culHmRegModel{"HM-LC-Dim1T-Pl-2"};
 
 $culHmRegModel{"ASH550I"}          = $culHmRegModel{"HM-WDS10-TH-O"};
 $culHmRegModel{"ASH550"}           = $culHmRegModel{"HM-WDS10-TH-O"};
-$culHmRegModel{"HM-WDS10-TH-O"}    = $culHmRegModel{"HM-WDS10-TH-O"};
 $culHmRegModel{"Schueco_263-158"}  = $culHmRegModel{"HM-WDS10-TH-O"};
 $culHmRegModel{"HM-WDS20-TH-O"}    = $culHmRegModel{"HM-WDS10-TH-O"};
 $culHmRegModel{"HM-WDS40-TH-I"}    = $culHmRegModel{"HM-WDS10-TH-O"};
