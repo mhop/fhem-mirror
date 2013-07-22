@@ -150,6 +150,8 @@ FHEM2FHEM_Read($)
         $defs{$name}{NAME}  = $name;
         $defs{$name}{TYPE}  = $type;
         $defs{$name}{STATE} = $msg;
+        $defs{$name}{FAKEDEVICE} = 1; # Avoid set/attr/delete/etc in notify
+        $defs{$name}{TEMPORARY} = 1;  # Do not save it
         DoTrigger($name, $msg);
         delete($defs{$name});
 

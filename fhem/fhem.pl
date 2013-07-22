@@ -788,7 +788,12 @@ devspec2array($)
   my ($name) = @_;
 
   return "" if(!defined($name));
-  return $name if(defined($defs{$name}));
+  if(defined($defs{$name})) {
+    # FHEM2FHEM LOG mode fake device, avoid local set/attr/etc operations on it
+    return "FHEM2FHEM_FAKE_$name" if($defs{$name}{FAKEDEVICE});
+    return $name;
+  }
+  # FAKE is set by FHEM2FHEM LOG
 
   my ($isattr, @ret);
 
