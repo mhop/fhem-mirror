@@ -67,21 +67,21 @@ TCM_Define($$)
   my $model = $a[2];
   my $baseID;
 
-  return "wrong syntax. Correct is: define <name> TCM [120|310] ".
-                        "{devicename[\@baudrate]|ip:port}"
+  return "TCM: wrong syntax, correct is: define <name> TCM [120|310] ".
+                        "{devicename[\@baudrate]|ip:port|none}"
     if(@a != 4 || $model !~ m/^(120|310)$/);
 
   DevIo_CloseDev($hash);
   my $dev  = $a[3];
+  $hash->{DeviceName} = $dev;
+  $hash->{MODEL} = $model;
 
   if($dev eq "none") {
-    Log 1, "$name device is none, commands will be echoed only";
+    Log 1, "TCM: $name device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
   }
   
-  $hash->{DeviceName} = $dev;
-  $hash->{MODEL} = $model;
   my $ret = DevIo_OpenDev($hash, 0, undef);
   my @getBaseID = ("get", "baseID");
   if (TCM_Get($hash, @getBaseID) =~ /[Ff]{2}[\dA-Fa-f]{6}/ ) {
