@@ -48,8 +48,6 @@ my $yafw_encoding = "UTF-8";
 my $mp   = AttrVal("global", "modpath", ".");	
 my $yaf_www_directory = $mp."/FHEM/YAF/www";
 
-YAF_Config();
-
 ########################################################################################
 #
 # YAF_Initialize - register YAF with FHEM
@@ -62,6 +60,7 @@ sub YAF_Initialize ($) {
 	my ($hash) = @_;
 	
 	$hash->{DefFn} = "YAF_define";
+	$hash->{AttrList} = "views backgrounds refresh_interval";
 	
 	my $name = "YAF";
 	$fhem_url = "/" . $name;
@@ -268,6 +267,7 @@ sub YAF_Request ($@) {
 					my $function = "";
 					$function = $params[4];	
 					if ($function eq "getViews") {
+						YAF_FHEMConfig();
 						my $views = encode_json(YAF_getViews());
 						YAF_Print($views);	
 					}
