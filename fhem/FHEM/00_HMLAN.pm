@@ -64,7 +64,6 @@ sub HMLAN_Initialize($) {
                      "respTime wdStrokeTime:5,10,15,20,25 " .
 					 "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger ".
 					 "wdTimer ".
-					 "hmOvTo ".#General remove
 					 $readingFnAttributes;
 }
 sub HMLAN_Define($$) {#########################################################
@@ -576,10 +575,9 @@ sub HMLAN_condUpdate($$) {#####################################################
   my $name = $hash->{NAME};
   $hash->{helper}{cnd}{$HMcnd} = 0 if (!$hash->{helper}{cnd}{$HMcnd});
   $hash->{helper}{cnd}{$HMcnd}++;
-  if   ($HMcnd == 4){
-    InternalTimer(gettimeofday()+AttrVal($name,"hmOvTo",$HMOvLdRcvr),#General remove Attr, testing only
-                "HMLAN_relOvrLd","Overload:".$name,1);
-  }
+  InternalTimer(gettimeofday()+$HMOvLdRcvr,"HMLAN_relOvrLd","Overload:".$name,1)
+        if   ($HMcnd == 4);
+
   my $HMcndTxt = $HMcond{$HMcnd}?$HMcond{$HMcnd}:"Unknown:$HMcnd";
   Log GetLogLevel($name,2), "HMLAN_Parse: $name new condition $HMcndTxt";
   readingsSingleUpdate($hash,"cond",$HMcndTxt,1);

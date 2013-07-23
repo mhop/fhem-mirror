@@ -424,6 +424,14 @@ sub CUL_HM_Attr(@) {#################################
 }
 
 #+++++++++++++++++ msg receive, parsing++++++++++++++++++++++++++++++++++++++++
+# translate level to readable
+    my %lvlStr = ( md =>{ "HM-SEC-WDS"      =>{"00"=>"dry"     ,"64"=>"damp"    ,"C8"=>"wet"        }
+	                     ,"HM-CC-SCD"       =>{"00"=>"normal"  ,"64"=>"added"   ,"C8"=>"addedStrong"}
+	                    }
+				  ,st =>{ "smokeDetector"   =>{"01"=>"no alarm","C7"=>"tone off","C8"=>"Smoke Alarm"}
+				         ,"threeStateSensor"=>{"00"=>"closed"  ,"64"=>"tilted"  ,"C8"=>"open"}
+		                }
+	              );
 sub CUL_HM_Parse($$) {##############################
   my ($iohash, $msgIn) = @_;
   my $id = CUL_HM_Id($iohash);
@@ -763,16 +771,14 @@ sub CUL_HM_Parse($$) {##############################
     if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
 	    ($mTp eq "10" && $p =~ m/^06/) ||  #or Info_Status message here
 	    ($mTp eq "41"))                { 
-	  my $level = substr($p,4,2);
-	  my %lvl=("00"=>"normal","64"=>"added","C8"=>"addedStrong");
-	  if($model eq "HM-Sen-Wa-Od"){
-        $level = hex($level)/2 ;
-	    push @event, "level:$level %";
-	  }
-	  $level = $lvl{$level}  if($model eq "HM-CC-SCD");
-	  push @event, "state:".$level." %";
-	  
+	  my $lvl = substr($p,4,2);
 	  my $err = hex(substr($p,6,2));
+	  if    ($lvlStr{md}{$model}){$lvl = $lvlStr{md}{$model}{$lvl}}
+	  elsif ($lvlStr{st}{$st})   {$lvl = $lvlStr{st}{$st}{$lvl} }
+	  else                       {$lvl = hex($lvl)/2}
+
+	  push @event, "level:$lvl %" if($model eq "HM-Sen-Wa-Od");
+	  push @event, "state:$lvl %";	  
 	  push @event, "battery:".($err&0x80?"low":"ok") if (defined $err);
 	}  
   }
@@ -1181,12 +1187,11 @@ sub CUL_HM_Parse($$) {##############################
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});	
 	}
 	if (defined($state)){# if state was detected post events
-      my %txt;
-      %txt = ("C8"=>"open", "64"=>"tilted", "00"=>"closed");
-      %txt = ("C8"=>"wet",  "64"=>"damp",   "00"=>"dry")  
-                 if($model eq "HM-SEC-WDS");
-	  my $txt = $txt{$state};
-	  $txt = "unknown:$state" if(!$txt);
+	  my $txt;
+	  if    ($lvlStr{md}{$model}){$txt = $lvlStr{md}{$model}{$state}}
+	  elsif ($lvlStr{st}{$st})   {$txt = $lvlStr{st}{$st}{$state} }
+	  else                       {$txt = "unknown:$state"}
+
 	  push @event, "state:$txt";
 	  push @event, "contact:$txt$target";
     }
@@ -1353,15 +1358,6 @@ sub CUL_HM_Parse($$) {##############################
   
   return $name ;#general notification to the device
 }
-# translate level to readable
-    my %lvlStr = ( model   =>{ "HM-SEC-WDS"      =>{"00"=>"dry"     ,"64"=>"damp"    ,"C8"=>"wet"        }
-	                          ,"HM-Sen-Wa-Od"    =>{"00"=>"normal"  ,"64"=>"added"   ,"C8"=>"addedStrong"}
-	                          ,"HM-CC-SCD"       =>{"00"=>"normal"  ,"64"=>"added"   ,"C8"=>"addedStrong"}
-	                         }
-				  ,subType =>{ "smokeDetector"   =>{"01"=>"no alarm","C7"=>"tone off","C8"=>"Smoke Alarm"}
-				              ,"threeStateSensor"=>{"00"=>"closed"  ,"64"=>"tilted"  ,"C8"=>"open"}
-				             }
-	              );
 sub CUL_HM_parseCommon(@){#####################################################
   # parsing commands that are device independant
   my ($mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md) = @_;
@@ -1589,8 +1585,8 @@ sub CUL_HM_parseCommon(@){#####################################################
 
 	if (length($p)>5){
 	  my $l = substr($p,4,2);
-	  if    ($lvlStr{model}{$md}   && $lvlStr{model}{$md}{$l})  {$level = $lvlStr{model}{$md}{$l}}
-	  elsif ($lvlStr{subType}{$st} && $lvlStr{subType}{$st}{$l}){$level = $lvlStr{subType}{$st}{$l}}
+	  if    ($lvlStr{md}{$md} && $lvlStr{md}{$md}{$l}){$level = $lvlStr{md}{$md}{$l}}
+	  elsif ($lvlStr{st}{$st} && $lvlStr{st}{$st}{$l}){$level = $lvlStr{st}{$st}{$l}}
 	  else                                                      {$level = hex($l)};
 	} 
 	
