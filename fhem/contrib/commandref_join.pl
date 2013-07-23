@@ -71,9 +71,11 @@ foreach my $lang (@lang) {
     my $line = 0;
     my $docCount = 0;
     my $hasLink = 0;
+    my $dosMode = 0;
     while(my $l = <MOD>) {
       $line++;
 
+      $dosMode = 1 if($l =~ m/^=begin html$suffix.*\r/);
       if($l =~ m/^=begin html$suffix$/) {
         $l = <MOD>;    # skip one line, to be able to repeat join+split
         print "$lang $mod: nonempty line after =begin html ignored\n"
@@ -97,8 +99,11 @@ foreach my $lang (@lang) {
       }
     }
     close(MOD);
-    print "$lang $mod: No document text found\n" if(!$suffix && !$docCount);
-    print "$lang $mod: No <a name=\"$mod\"> link\n"
+    print "*** $lang $mods{$mod}: ignoring text due to DOS encoding\n"
+        if($dosMode);
+    print "*** $lang $mods{$mod}: No document text found\n"
+        if(!$suffix && !$docCount && !$dosMode);
+    print "$lang $mods{$mod}: No <a name=\"$mod\"> link\n"
         if(!$suffix && $docCount && !$hasLink);
 
     foreach $tag (TAGS) {
