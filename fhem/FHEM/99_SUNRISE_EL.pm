@@ -451,7 +451,8 @@ isday</pre>
 
   <b>Get</b> <ul>N/A</ul><br>
 
-  <b>Attributes</b> <ul>
+  <b>Attributes</b><br>
+  <ul>
     <a name="latitude"></a>
     <li>latitude<br>
       If set, this latitude is used to calculate sunset/sunrise<br>
@@ -463,6 +464,10 @@ isday</pre>
         If set, this longitude is used to calculate sunset/sunrise<br>
         Notation need to be in decimal format (for example Berlin = 13.400)
         As default Frankfurt/Main, Germany (8.686) is used.
+        </li><br>
+    <a name="altitude"></a>
+    <li>altitude<br>
+        Used by other modules.
         </li><br>
     Note: these are global attributes, e.g.<br>
     <ul>
