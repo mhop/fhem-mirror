@@ -113,6 +113,10 @@ DbLog_ParseEvent($$$)
   #default
   if(!defined($reading)) { $reading = ""; }
   if(!defined($value))   { $value   = ""; }
+  if( $value eq "" ) {
+    $reading= "state";
+    $value= $event;
+  }
 
   # the interpretation of the argument depends on the device type
   # EMEM, M232Counter, M232Voltage return plain numbers
@@ -120,10 +124,28 @@ DbLog_ParseEvent($$$)
      ($type eq "M232Counter") ||
      ($type eq "EMEM")) {
   }
+  #OneWire 
+  elsif(($type eq "OWMULTI")) {
+    if(int(@parts)>1) {
+      $reading = "data";
+      $value = $event;
+    } else {
+      @parts = split(/\|/, AttrVal($device, $reading."VUnit", ""));
+      $unit = $parts[1] if($parts[1]);
+      if(lc($reading) =~ m/temp/) {
+        $value=~ s/ \(Celsius\)//;
+        $value=~ s/([-\.\d]+).*/$1/;
+        $unit= "°C";
+      }
+      elsif(lc($reading) =~ m/(humidity|vwc)/) { 
+        $value=~ s/ \(\%\)//; 
+        $unit= "%"; 
+      }
+    }
+  }
   # Onewire
   elsif(($type eq "OWAD") ||
-        ($type eq "OWSWITCH") ||
-        ($type eq "OWMULTI")) {
+        ($type eq "OWSWITCH")) {
       if(int(@parts)>1) {
         $reading = "data";
         $value = $event;
@@ -132,6 +154,13 @@ DbLog_ParseEvent($$$)
         $unit = $parts[1] if($parts[1]);
       }
   }
+
+  # MAX
+  elsif(($type eq "MAX")) {
+    $unit= "°C" if(lc($reading) =~ m/temp/);
+    $unit= "%"   if(lc($reading) eq "valveposition");
+  }
+
   # FS20
   elsif(($type eq "FS20") ||
         ($type eq "X10")) {
@@ -145,6 +174,7 @@ DbLog_ParseEvent($$$)
       $reading= "data";
     }
   }
+
   # FHT
   elsif($type eq "FHT") {
     if($reading =~ m(-from[12]\ ) || $reading =~ m(-to[12]\ )) {
@@ -231,6 +261,7 @@ DbLog_ParseEvent($$$)
     # remove trailing %  
     $value=~ s/ \%$//;
   }
+
   # BS
   elsif($type eq "BS") {
     if($event =~ m(brightness:.*)) {
@@ -240,6 +271,7 @@ DbLog_ParseEvent($$$)
       $unit= "lux";
     }
   }
+
   # RFXTRX Lighting
   elsif($type eq "TRX_LIGHT") {
     if($reading =~ m/^level (\d+)/) {
@@ -247,6 +279,7 @@ DbLog_ParseEvent($$$)
         $reading= "level";
     }
   }
+
   # RFXTRX Sensors
   elsif($type eq "TRX_WEATHER") {
     if($reading eq "energy_current") { $value=~ s/ W//; }
@@ -260,6 +293,7 @@ DbLog_ParseEvent($$$)
       }
     }
   }
+
   # Weather
   elsif($type eq "WEATHER") {
     if($event =~ m(^wind_condition)) {
@@ -288,8 +322,8 @@ DbLog_ParseEvent($$$)
     }
   }
 
-   # DUMMY
-  elsif($type eq "DUMMY") {
+  # Dummy
+  elsif($type eq "DUMMY")  {
     if( $value eq "" ) {
       $reading= "data";
       $value= $event;
