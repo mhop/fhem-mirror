@@ -1,3 +1,4 @@
+- Removed XML::LibXML configuration and implemented persistent configuration in FHEM config (marcproe)
 - Added widget fhttk (marcproe)
 - Added widget fht80 (marcproe)
 - Added control_yaf.txt to support update
