@@ -841,10 +841,12 @@ sub HMinfo_templateSet(@){#####################################################
 }
 sub HMinfo_templateChk(@){#####################################################
   my ($aName,$tmpl,$pSet,@p) = @_;
-  $pSet = "" if (!$pSet);
+  $pSet = "" if (!$pSet || $pSet eq "none");
   my ($pName,$pTyp) = split(":",$pSet);
-  return "template undefined $tmpl"                       if(!$tpl{$tmpl});
-  return "aktor $aName unknown"                           if(!$defs{$aName});
+  return "template undefined $tmpl\n"                     if(!$tpl{$tmpl});
+  return "aktor $aName unknown\n"                         if(!$defs{$aName});
+  return "give <peer>:[short|long|all] wrong:$pTyp\n"     if($pTyp && $pTyp !~ m/(short|long|all)/);
+  
   my @pNames;
   if ($pName eq "all"){
 	my $dId = substr(CUL_HM_name2Id($aName),0,6);
@@ -853,34 +855,46 @@ sub HMinfo_templateChk(@){#####################################################
 	  push @pNames,CUL_HM_peerChName($_,$dId,"").":short" if (!$pTyp || $pTyp ne "long");
 	}
   }
+  elsif(($pName && !$pTyp) || $pTyp eq "all"){
+    push @pNames,$pName.":long";
+    push @pNames,$pName.":short";
+  }
   else{
     push @pNames,$pSet;
   }
+
   my $repl = "";
   foreach my $pS (@pNames){
     ($pName,$pTyp) = split(":",$pS);
-	
-    return "give <peer>:[short|long] with peer, not $pS"  if($pName && $pTyp !~ m/(short|long)/);
-    my $pRnm = $pName?($pName."-".($pS eq "long"?"lg":"sh")):"";
     my $replPeer="";
-    foreach my $rn (keys%{$tpl{$tmpl}{reg}}){
-      my $regV = ReadingsVal($aName,"R-$pRnm$rn",undef);
-	  $regV = ReadingsVal($aName,"R-".$rn,undef) if (!defined $regV);
-    
-	  if (defined $regV){
-	    $regV =~s/ .*//;#strip unit 
-	    my $tplV = $tpl{$tmpl}{reg}{$rn};	
-	    if ($tplV =~m /^p(.)$/) {#replace with User parameter
-	      return "insufficient values - at least ".$tpl{p}." are $1 necessary" if (@p < ($1+1));
-	      $tplV = $p[$1];
+	
+	if($pName && (grep !/$pName/,ReadingsVal($aName,"peerList" ,undef))){
+      $replPeer="  no peer:$pName\n";
+	}
+	else{
+      my $pRnm = $pName?($pName."-".($pS eq "long"?"lg":"sh")):"";
+      foreach my $rn (keys%{$tpl{$tmpl}{reg}}){
+        my $regV = ReadingsVal($aName,"R-$pRnm$rn" ,undef);
+        $regV    = ReadingsVal($aName,".R-$pRnm$rn",undef) if (!defined $regV);
+	    $regV    = ReadingsVal($aName,"R-".$rn     ,undef) if (!defined $regV);
+	    $regV    = ReadingsVal($aName,".R-".$rn    ,undef) if (!defined $regV);
+      
+	    if (defined $regV){
+	      $regV =~s/ .*//;#strip unit 
+	      my $tplV = $tpl{$tmpl}{reg}{$rn};	
+	      if ($tplV =~m /^p(.)$/) {#replace with User parameter
+	        return "insufficient data - at least ".$tpl{p}." are $1 necessary"
+			                                               if (@p < ($1+1));
+	        $tplV = $p[$1];
+	      }
+	      $replPeer .= "  $rn :$regV should $tplV \n" if ($regV ne $tplV);
 	    }
-	    $replPeer .= " $rn :$regV should $tplV \n" if ($regV ne $tplV);
-	  }
-	  else{
-	    $replPeer .= " reg not found: $rn\n";
-	  }
-    }
-	$repl .= "$aName $pS:".($replPeer?"\n$replPeer":"match\n");
+	    else{
+	      $replPeer .= "  reg not found: $rn\n";
+	    }
+      }
+	}
+	$repl .= "$aName $pS-> ".($replPeer?"failed\n$replPeer":"match\n");
   }
   return ($repl?$repl:"template $tmpl match actor:$aName peer:$pSet");
 }
@@ -1117,16 +1131,18 @@ sub HMinfo_cpRegs(@){#########################################################
       <li><a name="#HMinfotemplateChk">templateChk <a href="HMinfoFilter">[filter]</a> &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
 	     verifies if the register-readings comply to the template <br>
 	     Parameter are identical to <a href="#HMinfotemplateSet">templateSet</a><br>
-	     The procedure will check if the register values match the ones provided by the template
+	     The procedure will check if the register values match the ones provided by the template<br>
+		 If no peer is necessary use <B>none</B> to skip this entry<br>
 		Examples <br>
 		<code>
-		 set hm templateChk -f RolloNord BlStopUpLg peerName:long # verify RolloNord peerName, long match template?<br>
-		 set hm templateChk -f RolloNord BlStopUpLg peerName      # verify RolloNord peerName, long and short match template?<br>
-		 set hm templateChk -f RolloNord BlStopUpLg peerName:all  # verify RolloNord peerName, long and short match template?<br>
-		 set hm templateChk -f RolloNord BlStopUpLg all:long      # verify RolloNord all peers,long match template?<br>
-		 set hm templateChk -f RolloNord BlStopUpLg all           # verify RolloNord all peers,long and short match template?<br>
-		 set hm templateChk -f Rollo.*   BlStopUpLg all           # verify all Rollo* all peers,long and short match template?<br>
-		 set hm templateChk BlStopUpLg                            # verify all entities against this template<br>
+		 set hm templateChk -f RolloNord BlStopUpLg none         1 2 # verify RolloNord, no peer, parameter 1 and 2 given<br>
+		 set hm templateChk -f RolloNord BlStopUpLg peerName:long    # verify RolloNord peerName, long match template?<br>
+		 set hm templateChk -f RolloNord BlStopUpLg peerName         # verify RolloNord peerName, long and short match template?<br>
+		 set hm templateChk -f RolloNord BlStopUpLg peerName:all     # verify RolloNord peerName, long and short match template?<br>
+		 set hm templateChk -f RolloNord BlStopUpLg all:long         # verify RolloNord all peers,long match template?<br>
+		 set hm templateChk -f RolloNord BlStopUpLg all              # verify RolloNord all peers,long and short match template?<br>
+		 set hm templateChk -f Rollo.*   BlStopUpLg all              # verify each Rollo* all peers,long and short match template?<br>
+		 set hm templateChk BlStopUpLg                               # verify each entities against this template<br>
 		</code>
 		 <br>
 	  </li>
