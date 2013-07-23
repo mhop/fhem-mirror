@@ -237,7 +237,7 @@ CUL_WS_Parse($$)
       }
 
       $sgn = ($firstbyte&8) ? -1 : 1;
-      $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
+      $tmp = sprintf("%0.1f", $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1});
       $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
       $val = "T: $tmp  H: $hum";
       $devtype = "S300TH";
