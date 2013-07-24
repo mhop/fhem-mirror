@@ -51,6 +51,33 @@ sub LISTENLIVE_Define($$);
 sub LISTENLIVE_GetStatus($;$);
 sub LISTENLIVE_Undefine($$);
 
+sub HMT350_RCLayout();
+sub HMT350_RCmakenotify($$);
+
+%HMT350_RCtranslate = (
+power	=>	"POWER",
+mute	=>	"MUTE",
+home	=>	"HOME",
+volplus	=>	"VOLp",
+tvout	=>	"OK",
+up		=>	"UP",
+rewind	=>	"REWIND",
+left	=>	"LEFT",
+ok		=>	"OK",
+right	=>	"RIGHT",
+down	=>	"DOWN",
+ret		=>	"RETURN",
+volmin	=>	"VOLm",
+stop	=>	"STOP",
+pageup	=>	"PAGEUP",
+pause	=>	"PAUSE",
+itv		=> 	"ITV",
+pagedn	=>	"PAGEDOWN",
+menu	=>	"MENU",
+fav		=>	"OK",
+fmradio	=>	"FMRADIO",
+);
+
 ###################################
 sub
 LISTENLIVE_Initialize($)
@@ -64,6 +91,9 @@ LISTENLIVE_Initialize($)
 
   $hash->{AttrList}  = "do_not_notify:0,1 loglevel:0,1,2,3,4,5 ".
                       $readingFnAttributes;
+                      
+	$data{RC_layout}{HMT350}		=	"HMT350_RClayout";
+	$data{RC_makenotify}{LISTENLIVE}	=	"HMT350_RCmakenotify";
 }
 
 ###################################
@@ -95,6 +125,13 @@ LISTENLIVE_Set($@)
 
 	given ($area){
 
+		when("rc"){
+			$g = "raw";
+			$c = $HMT350_RCtranslate{$doit};
+			Log $loglevel, "LISTENLIVE $name rc_translate: >$area $doit< translated to: >$g $c<";
+			fhem("set $name $g $c");
+			break;
+		}
 #
 # AREA = user <userDefFunction>
 # ruft eine userdefinierte Funktion, z.B. aus 99_myUtils.pm auf
@@ -701,8 +738,8 @@ LISTENLIVE_Define($$)
 	readingsBulkUpdate($hash, "lastCmd","");
     readingsBulkUpdate($hash, "lastResult","");
     readingsBulkUpdate($hash, "menuPos","11");
-	readingsBulkUpdate($hash, "mute","???"));
-	readingsBulkUpdate($hash, "power","???"));
+	readingsBulkUpdate($hash, "mute","???");
+	readingsBulkUpdate($hash, "power","???");
 	readingsBulkUpdate($hash, "state",$presence);
 	readingsEndUpdate($hash, 1);
     
@@ -885,7 +922,53 @@ LISTENLIVE_Undefine($$)
   return undef;
 }
 
+#####################################
+sub HMT350_RCmakenotify($$) {
+	my $loglevel = GetLogLevel($name, 3) unless(defined($loglevel));
+	my ($nam, $ndev) = @_;
+	my $nname="notify_$nam";
+
+	my $cmd = "$nname notify $nam set $ndev rc \$EVENT";
+	my $ret = CommandDefine(undef, $cmd);
+
+	if($ret)
+	{
+		Log 2, "remotecontrol ERROR $ret";
+	}
+	else
+	{
+		Log $loglevel, "remotecontrol HMT350: $nname created as notify";
+	}
+
+	return "Notify created: $nname";
+}
+
+#####################################
+sub HMT350_RClayout() {
+	my @row;
+	my $rownum = 0;
+
+	$row[$rownum]="power:POWEROFF,:blank,:blank,:blank,mute:MUTE"; $rownum++;
+	$row[$rownum]="home:HOMEsym,:blank,volplus:VOLUP,:blank,:TVout"; $rownum++;
+	$row[$rownum]=":blank,:blank,up:UP,:blank,:blank"; $rownum++;
+	$row[$rownum]="rewind:REWIND,left:LEFT,ok:OK,right:RIGHT,forward:FF"; $rownum++;
+	$row[$rownum]=":blank,:blank,down:DOWN,:blank,:blank"; $rownum++;
+	$row[$rownum]="ret:RETURN,:blank,volmin:VOLDOWN,:blank,stop:STOP"; $rownum++;
+	
+	$row[$rownum]=":blank,:blank,:blank,:blank,:blank"; $rownum++;
+
+	$row[$rownum]="raw+PGUP:PAGEUP,:blank,raw+PAUSE:PAUSE,:blank,raw+ITV:ITV"; $rownum++;
+	$row[$rownum]="raw+PGDN:PAGEDOWN,:blank,raw+MENU:MENU,:blank,raw+IRADIO:IRADIO"; $rownum++;
+	$row[$rownum]=":FAV,:blank,raw+REPEAT:REPEAT,:blank,raw+FMRADIO:FMRADIO"; $rownum++;
+
+	$row[19]="attr rc_iconpath icons/remotecontrol";
+	$row[20]="attr rc_iconprefix black_btn_";
+	return @row;
+}
+
 1;
+
+### ENDE ######
 
 =pod
 =begin html
