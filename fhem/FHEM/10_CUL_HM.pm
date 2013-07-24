@@ -2589,8 +2589,8 @@ sub CUL_HM_Set($@) {
     return "$target must be [actor|remote|both]"                  if(defined($target) && ($target !~ m/^(actor|remote|both)$/));
 	return "use climate chan to pair TC"                          if( $md eq "HM-CC-TC" && $chn ne "02");
 	return "use - single [set|unset] actor - for smoke detector"  if( $st eq "smokeDetector"       && (!$single || $single ne "single" || $target ne "actor"));
-	return "use - single - for ".$st                              if(($st eq "threeStateSensor"||
-	                                                                  $st eq "motionDetector" )    && (!$single || $single ne "single"));
+	return "use - single - for ".$st                              if(($st =~ m/(threeStateSensor|thermostat|motionDetector)/)
+	                                                                      && (!$single || $single ne "single"));
 
 	$single = ($single eq "single")?1:"";#default to dual
 	$set = ($set && $set eq "unset")?0:1;
@@ -2612,20 +2612,22 @@ sub CUL_HM_Set($@) {
 	my $pSt = CUL_HM_Get($peerHash,$peerHash->{NAME},"param","subType");
 	if (!$target || $target =~ m/^(remote|both)$/){
 	  my $burst = ($pSt eq "thermostat"?"0101":"0100");#set burst for target 
+	  my $pnb = 1 if ($culHmRegModel{$md}{peerNeedsBurst}|| #supported?
+	                  $culHmRegType{$st}{peerNeedsBurst});
       for(my $i = 1; $i <= $nrCh2Pair; $i++) {
         my $b = ($i==1 ? $b1 : $b2);		
   	    if ($st eq "virtual"){
 		  my $btnName = CUL_HM_id2Name($dst.sprintf("%02X",$b));
 		  return "button ".$b." not defined for virtual remote ".$name
 		      if (!defined $attr{$btnName});
-		  CUL_HM_ID2PeerList ($btnName,$peerDst.$peerChn,$set); #update peerlist
+		  CUL_HM_ID2PeerList ($btnName,$peerDst.$peerChn,$set); #upd. peerlist
 	    }
 		else{
 		  my $bStr = sprintf("%02X",$b);
   	      CUL_HM_PushCmdStack($hash, 
   	            "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerChn}00");
   	      CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,hex($peerChn),4,$burst)
-				   if($md ne "HM-CC-TC");
+				   if($pnb);
 		  CUL_HM_queueAutoRead($name) 
 		           if (2 < CUL_HM_getAttrInt($name,"autoReadReg"));
 	    }
