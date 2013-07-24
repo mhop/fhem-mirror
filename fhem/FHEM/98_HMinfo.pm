@@ -756,7 +756,13 @@ my %tpl = (
                            ,BlJtRefOff       =>"off"
                            ,BlJtRefOn        =>"rampOn"
 					}}
-  ,BlStopUpSh        => {p=>""                 ,t=>"Blind: stop drive on any key - for short drive up"
+  ,BlStopUpSh        => {p=>""                 ,t=>"Blind: stop drive on
+
+
+
+reload 10_CUL_HM
+reload 98_HMinfo
+  any key - for short drive up"
                     ,reg=>{ ActionType       =>"jmpToTarget"
                            ,BlJtDlyOff       =>"dlyOn"
                            ,BlJtDlyOn        =>"refOn"
@@ -777,6 +783,15 @@ sub HMinfo_templateDef(@){#####################################################
     delete $tpl{$name};
     return;
   }
+  # get description if marked wir ""
+  if ($desc =~ m/^"/){
+    foreach (@regs){
+      $desc .= " ".(shift @regs);
+	  last if ($desc =~ m/"$/);
+	}
+	$desc =~ s/"//g;
+  }
+
   return "$name already defined, delete it first" if($tpl{$name});
   return "insufficient parameter" if(@regs < 1);
   $tpl{$name}{p} = "";
