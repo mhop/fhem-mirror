@@ -567,7 +567,7 @@ sub CUL_HM_Parse($$) {##############################
     if($mTp eq "70" && $p =~ m/^(....)(..)/) { # weather event
 	  $chn = '01'; # fix definition
       my (    $t,      $h) =  (hex($1), hex($2));# temp is 15 bit signed
-      $t = ($t & 0x3fff)/10*(($t & 0x4000)?-1:1);
+      $t = sprintf("%2.1f",($t & 0x3fff)/10*(($t & 0x4000)?-1:1));
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
 	  push @entities,CUL_HM_UpdtReadBulk($chnHash,1,"state:T: $t H: $h", 
 	                                                "measured-temp:$t",
@@ -2388,12 +2388,10 @@ sub CUL_HM_Set($@) {
 	    }
         $msgBytes .= sprintf("%02X",$color{$led});
 	  }
+	  $msgBytes .= "01" if ($itemCnt == 1 && $repeat == 1);#add pause to term LED
 	  # need to fill up empty locations  for LED channel
 	  $msgBytes = substr($msgBytes."000000000000000000",0,(10+2)*2);
       CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.$msgBytes);
-      CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.
-	    "010101010000000000000000")
-		  if ($itemCnt == 1);
 	}
 	else{
 	  return "device for command cannot be identified";
@@ -4214,7 +4212,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	  </li>
 	  <li><B>inhibit [on|off]</B><br>
          Block / unblock all changes to the actor channel, i.e. actor state is frozen 
-		 untill inhibit is set off again. Inhibit can be executed on any actor channel 
+		 until inhibit is set off again. Inhibit can be executed on any actor channel 
 		 but obviously not on sensors - would not make any sense.<br>
 		 Practically it can be used to suspend any notifies as well as peered channel action 
 		 temporarily without the need to delete them. <br>
@@ -4731,7 +4729,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 		 Recommended work-order for device 'HMdev':<br>
 		 set HMdev clear msgEvents  # clear old events to better check flow<br>
 		 set HMdev getConfig        # read device & channel inforamtion<br>
-		 # wait untill operation is complete<br>
+		 # wait until operation is complete<br>
 		 # protState should be CMDs_done<br>
 		 #           there shall be no warnings amongst prot... variables<br>
 		 get configSave myActorFile<br>
