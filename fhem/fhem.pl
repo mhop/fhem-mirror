@@ -205,7 +205,7 @@ $modules{Global}{AttrList} =
   "archivecmd apiversion archivedir configfile lastinclude logfile " .
   "modpath nrarchive pidfilename port statefile title userattr " .
   "verbose:1,2,3,4,5 mseclog:1,0 version nofork:1,0 logdir holiday2we " .
-  "autoload_undefined_devices:1,0 dupTimeout latitude longitude altitude" .
+  "autoload_undefined_devices:1,0 dupTimeout latitude longitude altitude " .
   "backupcmd backupdir backupsymlink backup_before_update " .
   "exclude_from_update motd updatebranch uniqueID ".
   "sendStatistics:onUpdate,manually,never updateInBackground:1,0 ".
