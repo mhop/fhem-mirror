@@ -25,9 +25,23 @@
 #
 ##############################################################################
 #	Changelog:
-#	2013-07-21	Logging vereinheitlich
+#
+#	2013-07-21
+#				Logging vereinheitlich
 #				Meldungen komplett auf englisch umgestellt
 #				pod (EN) erstellt
+#
+#	2013-07-25	
+#				Anbindung an remotecontrol
+#				Bereitstellung von Standardlayout und makenotify
+#				neue commandGroup rc für Zugriff von 95_remotecontrol
+#				Übersetzungstabelle für remoteCommands definiert
+#
+#				Beginn Redesign des Command-Parsing
+#					neues Parsing für power erstellt
+#					neues Parsing für reset erstellt
+#					neues Parsing für cursor erstellt
+#					neues Parsing für audio erstellt
 #
 ##############################################################################
 
@@ -82,477 +96,209 @@ fmradio	=>	"FMRADIO",
 sub
 LISTENLIVE_Initialize($)
 {
-  my ($hash) = @_;
-
-  $hash->{GetFn}     = "LISTENLIVE_Get";
-  $hash->{SetFn}     = "LISTENLIVE_Set";
-  $hash->{DefFn}     = "LISTENLIVE_Define";
-  $hash->{UndefFn}   = "LISTENLIVE_Undefine";
-
-  $hash->{AttrList}  = "do_not_notify:0,1 loglevel:0,1,2,3,4,5 ".
-                      $readingFnAttributes;
-                      
+	my ($hash) = @_;
+	$hash->{GetFn}		=	"LISTENLIVE_Get";
+	$hash->{SetFn}		=	"LISTENLIVE_Set";
+	$hash->{DefFn}		=	"LISTENLIVE_Define";
+	$hash->{UndefFn}	=	"LISTENLIVE_Undefine";
+	$hash->{AttrList}	=	"do_not_notify:0,1 loglevel:0,1,2,3,4,5 ".
+							$readingFnAttributes;
 	$data{RC_layout}{HMT350}		=	"HMT350_RClayout";
-	$data{RC_makenotify}{LISTENLIVE}	=	"HMT350_RCmakenotify";
+	$data{RC_makenotify}{LISTENLIVE}=	"HMT350_RCmakenotify";
 }
 
 ###################################
 sub
 LISTENLIVE_Set($@)
 {
-    my ($hash, @a) = @_;
-    my $name = $hash->{NAME};
-    my $address = $hash->{helper}{ADDRESS};
+	my ($hash, @a) = @_;
+	my $name = $hash->{NAME};
+	my $address = $hash->{helper}{ADDRESS};
 	my $loglevel = GetLogLevel($name, 3);
-    my $result;
-    my $response;
-    my $command;
-       
-    return "No Argument given!\n\n".LISTENLIVE_HelpSet() if(!defined($a[1]));     
-    
-    my $pstat = $hash->{READINGS}{power}{VAL};
+	my $result;
+	my $response;
+
+	return "No Argument given!\n\n".LISTENLIVE_HelpSet() if(!defined($a[1]));
+
+	my %powerGroup	=	(on => "POWER", off => "POWER");
+	my %muteGroup	=	(on => "MUTE", off => "MUTE");
+	my %cursorGroup	=	(left => "LEFT", right => "RIGHT", up => "UP", down => "DOWN",
+							home => "HOME", enter => "OK", ok => "OK", "exit" => "RETURN");
+	my %audioGroup	=	(mute => "MUTE", unmute => "MUTE", volp => "VOLp", volm => "VOLm");
+
+	my $pstat = $hash->{READINGS}{power}{VAL};
 	my $mute  = $hash->{READINGS}{mute}{VAL};
 
 #	my @b = split(/\./, $a[1]);
-#	my $area = $b[0];
-#	my $doit = $b[1];
-#	if(!defined($doit) && defined($a[2])) { $doit = $a[2]; }
+#	my $cmdGroup = $b[0];
+#	my $cmd = $b[1];
+#	if(!defined($cmd) && defined($a[2])) { $cmd = $a[2]; }
 
-	my $area = $a[1];
-	my $doit = $a[2];
+	my $cmdGroup = $a[1];
+	my $cmd = $a[2];
 
-    my $usage = "Unknown argument, choose one of help statusRequest power:on,off audio:volp,volm,mute,unmute cursor:up,down,left,right,enter,exit,home,ok reset:power,mute,menupos app:weather raw user";
+	my $usage = "Unknown argument, choose one of help statusRequest power:on,off audio:volp,volm,mute,unmute cursor:up,down,left,right,enter,exit,home,ok reset:power,mute,menupos app:weather raw user";
 
-	given ($area){
+	given ($cmdGroup){
+
+#
+# commandGroup = rc
+# verarbeitet Steuerbefehle aus 95_remotecontrol
+#
 
 		when("rc"){
+
 			$g = "raw";
-			$c = $HMT350_RCtranslate{$doit};
-			Log $loglevel, "LISTENLIVE $name rc_translate: >$area $doit< translated to: >$g $c<";
+			$c = $HMT350_RCtranslate{$cmd};
+			Log $loglevel, "LISTENLIVE $name rc_translate: >$cmdGroup $cmd< translated to: >$g $c<";
 			fhem("set $name $g $c");
 			break;
 		}
+
 #
-# AREA = user <userDefFunction>
+# commandGroup = user <userDefFunction>
 # ruft eine userdefinierte Funktion, z.B. aus 99_myUtils.pm auf
 #
 
 		when("user"){
-			if(defined($doit)){
-				Log $loglevel, "LISTENLIVE $name input: $area $doit";
-				$result = &{$doit};
+
+			if(defined($cmd)){
+				Log $loglevel, "LISTENLIVE $name input: $cmdGroup $cmd";
+				$result = &{$cmd};
 				readingsBeginUpdate($hash);
-		   		readingsBulkUpdate($hash, "lastCmd","$area $doit");
-			   	readingsBulkUpdate($hash, "lastResult",$result);
-			   	readingsEndUpdate($hash, 1);
+				readingsBulkUpdate($hash, "lastCmd","$cmdGroup $cmd");
+				readingsBulkUpdate($hash, "lastResult",$result);
+				readingsEndUpdate($hash, 1);
+			} else {
+				return $usage;
 			}
-			else
-			{ return $usage; }
 			break;
-		} # end user
+		}
 
 #
-# AREA = raw <command>
+# commandGroup = raw <command>
 # sendet einfach das <command> per http an das Gerät
-# und schreibt die Rückmeldung in das Reading "rawresult"
-# (hauptsächlich für Debugging vorgesehen)
 #
 
 		when("raw"){
-			if(defined($doit)){
-				Log $loglevel, "LISTENLIVE $name input: $area $doit";
-				$result = LISTENLIVE_SendCommand($hash, $doit);
+		
+			if(defined($cmd)){
+				Log $loglevel, "LISTENLIVE $name input: $cmdGroup $cmd";
+				$result = LISTENLIVE_SendCommand($hash, $cmd);
 				if($result =~  m/OK/){
 					readingsBeginUpdate($hash);
-				   	readingsBulkUpdate($hash, "lastCmd","$area $doit");
-	    			readingsBulkUpdate($hash, "lastResult",$result);
-			   		readingsEndUpdate($hash, 1);
+					readingsBulkUpdate($hash, "lastCmd","$cmdGroup $cmd");
+					readingsBulkUpdate($hash, "lastResult",$result);
+					readingsEndUpdate($hash, 1);
+				} else {
+					LISTENLIVE_rbuError($hash, $cmdGroup, $cmd);
 				}
-				else
-				{
-					LISTENLIVE_rbuError($hash, $area, $doit);
-				}
+			} else {
+				return $usage;
 			}
-			else
-     		{ return $usage; }
 			break;
-		} # end raw
+		}
 
 #
-# AREA = reset <power>|<mute>|<menupos>
-# sendet gnadenlos ein POWER oder MUTE oder setzt 
-# die MENUPOS auf 11 (oben links), damit man eine Chance hat,
-# den Gerätestatus zu synchronisieren
+# commandGroup = reset <power>|<mute>
+# setzt den Status von power und mute auf unbekannt,
+# der nächste Befehl setzt den Status dann neu
 #
 
 		when("reset"){
-			given($doit){
-				when("power"){
-					Log $loglevel, "LISTENLIVE $name input: $area $doit";
-					readingsBeginUpdate($hash);
-				   	readingsBulkUpdate($hash, "lastCmd","$area $doit");
-	    			readingsBulkUpdate($hash, "lastResult","OK");
-    				readingsBulkUpdate($hash, "power","???");
-					readingsEndUpdate($hash, 1);
-					break;
-				} # end reset.power
 		
-				when("mute"){
-					Log $loglevel, "LISTENLIVE $name input: $area $doit";
-    				readingsBeginUpdate($hash);
-				   	readingsBulkUpdate($hash, "lastCmd","$area $doit");
-    				readingsBulkUpdate($hash, "lastResult","OK");
-					readingsBulkUpdate($hash, "mute","???");
-					readingsEndUpdate($hash, 1);
-					break;
-				} # end reset.mute
-		
-				when("menupos"){
-					Log $loglevel, "LISTENLIVE $name input: $area $doit";
-					$result = LISTENLIVE_SendCommand($hash, "HOME");
-					if($result =~  m/OK/){
-		    			readingsBeginUpdate($hash);
-					   	readingsBulkUpdate($hash, "lastCmd","$area $doit");
-	    				readingsBulkUpdate($hash, "lastResult",$result);
-    					readingsBulkUpdate($hash, "menuPos","11");
-	   					readingsEndUpdate($hash, 1);
-					}
-					else
-					{
-						LISTENLIVE_rbuError($hash, $area, $doit);
-					}
-					break;
-				} # end reset.menupos
-
-				default:
-	        		{ return $usage; }
-	
-			} # end doit
-
-		} # end area.reset
+			Log $loglevel, "LISTENLIVE $name input: $cmdGroup $cmd";
+			readingsBeginUpdate($hash);
+			readingsBulkUpdate($hash, "lastCmd","$cmdGroup $cmd");
+			readingsBulkUpdate($hash, "lastResult","OK");
+			readingsBulkUpdate($hash, $cmd,"???");
+			readingsEndUpdate($hash, 1);
+			break;
+		}
 
 #
-# AREA power <on>|<off>
-# Es wird vor dem Senden geprüft, ob der Befehl Sinn macht,
-# da der gleiche Befehl für das Ein- und Ausschalten
-# verwendet wird.
-# Ein "power on" wird bei einem eingeschalteten Gerät nicht gesendet
-# Ein "power off" wird bei einem ausgeschalteten Gerät nicht gesendet
-# Als Basis für die Entscheidung dient das Reading power
+# commandGroup power <on>|<off>
+# Es wird vor dem Senden geprüft, ob der Befehl Sinn macht
 #
 
 		when("power"){
-			given ($doit){
-				when("on") {
-					if($pstat ne "on"){ 
-						Log $loglevel, "LISTENLIVE $name input: $area $doit";
-						$result = LISTENLIVE_SendCommand($hash, "POWER");
-						if($result =~  m/OK/)
-						{
-			    			readingsBeginUpdate($hash);
-						   	readingsBulkUpdate($hash, "lastCmd","$area $doit");
-	    					readingsBulkUpdate($hash, "lastResult",$result);
-	    					readingsBulkUpdate($hash, "power","on");
-	    					readingsEndUpdate($hash, 1);
-						}
-						else
-						{
-							LISTENLIVE_rbuError($hash, $area, $doit);
-						}
-					}
-					else
-        			{
-        				LISTENLIVE_rbuError($hash, $area, $doit, " => device already on!");
-        			}
-        			break;
-		      	} # end power.on
 
-				when("off") {
-    		    	if($pstat ne "off")
-    		    	{
-						Log $loglevel, "LISTENLIVE $name input: $area $doit";
-						$result = LISTENLIVE_SendCommand($hash, "POWER");
-		    		    if($result =~  m/OK/){
-							readingsBeginUpdate($hash);
-					   		readingsBulkUpdate($hash, "lastCmd","$area $doit");
-	    					readingsBulkUpdate($hash, "lastResult",$result);
-							readingsBulkUpdate($hash, "power","off");
-    	        			readingsEndUpdate($hash, 1);
-        				}
-        				else
-        				{
-							LISTENLIVE_rbuError($hash, $area, $doit);
-        				}
-					}
-					else
-        			{
-        				LISTENLIVE_rbuError($hash, $area, $doit, " => device already off!");
-        			}
-        			break;
-	      		} # end power.off
-
-			default:
-        		{ return $usage; }
-
-			} # end power.doit
-
-		} # end area.power
+			Log $loglevel, "LISTENLIVE $name input: $cmdGroup $cmd";
+			if($pstat ne $cmd) {
+				$xCmd = $powerGroup{$cmd};
+				$result = LISTENLIVE_SendCommand($hash, $xCmd);
+				if($result =~  m/OK/){
+					readingsBeginUpdate($hash);
+					readingsBulkUpdate($hash, "lastCmd","$cmdGroup $cmd");
+					readingsBulkUpdate($hash, "lastResult",$result);
+					readingsBulkUpdate($hash, "power",$cmd);
+					readingsEndUpdate($hash, 1);
+				} else {
+					LISTENLIVE_rbuError($hash, $cmdGroup, $cmd);
+				}
+			} else {
+				LISTENLIVE_rbuError($hash, $cmdGroup, $cmd, " => device already $cmd!");
+			}
+			break;
+		}
 
 #
-# AREA audio <mute>|<unmute>|<volp>|<volm>
+# commandGroup audio <mute>|<unmute>|<volp>|<volm>
 #
 
 		when("audio"){
-			given($doit){
-		
-				when("mute"){
-					if($mute ne "on"){ 
-						Log $loglevel, "LISTENLIVE $name input: $area $doit";
-						$result = LISTENLIVE_SendCommand($hash, "MUTE");
-						if($result =~  m/OK/){
-			    			readingsBeginUpdate($hash);
-						   	readingsBulkUpdate($hash, "lastCmd","$area $doit");
-	    					readingsBulkUpdate($hash, "lastResult",$result);
-	    					readingsBulkUpdate($hash, "mute","on");
-							readingsEndUpdate($hash, 1);
-						}
-						else
-						{
-						LISTENLIVE_rbuError($hash, $area, $doit);
-						}
-					}
-					else
-					{
-						LISTENLIVE_rbuError($hash, $area, $doit, "Already muted!");
-        			}
-        			break;
-				} # end mute
 
-				when("unmute"){
-					if($mute ne "off"){ 
-						Log $loglevel, "LISTENLIVE $name input: $area $doit";
-						$result = LISTENLIVE_SendCommand($hash, "MUTE");
-						if($result =~  m/OK/){
-			    			readingsBeginUpdate($hash);
-	    					readingsBulkUpdate($hash, "lastCmd",$a[1]);
-	    					readingsBulkUpdate($hash, "lastResult",$result);
-	    					readingsBulkUpdate($hash, "mute","off");
-			    			readingsEndUpdate($hash, 1);
-						}
-						else
-						{
-							LISTENLIVE_rbuError($hash, $area, $doit);
-						}
-					}
-					else
-					{
-						LISTENLIVE_rbuError($hash, $area, $doit, "Already unmuted!");
-        			}
-        			break;
-				} # end unmute
-
-				when("volp"){
-					Log $loglevel, "LISTENLIVE $name input: $area $doit";
-					$result = LISTENLIVE_SendCommand($hash, "VOLp");
-					if($result =~  m/OK/){
-						readingsBeginUpdate($hash);
-    					readingsBulkUpdate($hash, "lastCmd","$area $doit");
-    					readingsBulkUpdate($hash, "lastResult",$result);
-	   					readingsEndUpdate($hash, 1);
-					}
-					else
-					{
-						LISTENLIVE_rbuError($hash, $area, $doit);
-					}
-					break;
-				} # end volp
-		
-				when("volm"){
-					Log $loglevel, "LISTENLIVE $name input: $area $doit";
-					$result = LISTENLIVE_SendCommand($hash, "VOLm");
-					if($result =~  m/OK/){
-						readingsBeginUpdate($hash);
-	  					readingsBulkUpdate($hash, "lastCmd","$area $doit");
-    					readingsBulkUpdate($hash, "lastResult",$result);
-	   					readingsEndUpdate($hash, 1);
-					}
-					else
-					{
-						LISTENLIVE_rbuError($hash, $area, $doit);
-					}
-					break;
-				} # end volm
-		
-				default:
-	        		{ return $usage; }
-		
-			} # end audio.doit
-
-		} # end area.audio
+			Log $loglevel, "LISTENLIVE $name input: $cmdGroup $cmd";
+			if($mute ne $cmd) {
+				$xCmd = $audioGroup{$cmd};
+				$result = LISTENLIVE_SendCommand($hash, $xCmd);
+				if($result =~  m/OK/){
+					readingsBeginUpdate($hash);
+					readingsBulkUpdate($hash, "lastCmd","$cmdGroup $cmd");
+					readingsBulkUpdate($hash, "lastResult",$result);
+#
+# ToDo: set mute state
+#
+					readingsEndUpdate($hash, 1);
+				} else {
+					LISTENLIVE_rbuError($hash, $cmdGroup, $cmd);
+				}
+			} else {
+				LISTENLIVE_rbuError($hash, $cmdGroup, $cmd, " => no action required!");
+			}
+			break;
+		}
 
 #
-# AREA cursor <up>|<down>|<left>|<right>|home|<enter>|<ok>|<exit>
+# commandGroup cursor <up>|<down>|<left>|<right>|home|<enter>|<ok>|<exit>
 #
 
 		when("cursor"){
-			given($doit){
 
-				when("up"){
-					Log $loglevel, "LISTENLIVE $name $area $doit";
-					$result = LISTENLIVE_SendCommand($hash, "UP");
-					if($result =~  m/OK/){
-						readingsBeginUpdate($hash);
-	   					readingsBulkUpdate($hash, "lastCmd",$a[1]);
-    					readingsBulkUpdate($hash, "lastResult",$result);
-						readingsBulkUpdate($hash, "menuPos",$hash->{READINGS}{menuPos}{VAL}-10);
-	   					readingsEndUpdate($hash, 1);
-    					return undef;
-					}
-					else
-					{
-						LISTENLIVE_rbuError($hash, $area, $doit);
-					}
-					break;
-				} # end up
-		
-				when("down"){
-					Log $loglevel, "LISTENLIVE $name input: $area $doit";
-					$result = LISTENLIVE_SendCommand($hash, "DOWN");
-					if($result =~  m/OK/){
-						readingsBeginUpdate($hash);
-	   					readingsBulkUpdate($hash, "lastCmd",$a[1]);
-    					readingsBulkUpdate($hash, "lastResult",$result);
-    					readingsBulkUpdate($hash, "menuPos",$hash->{READINGS}{menuPos}{VAL}+10);
-			   			readingsEndUpdate($hash, 1);
-    					return undef;
-					}
-					else
-					{
-						LISTENLIVE_rbuError($hash, $area, $doit);
-					}
-					break;
-				} # end down
-		
-				when("left"){
-					Log $loglevel, "LISTENLIVE $name input: $area $doit";
-					$result = LISTENLIVE_SendCommand($hash, "LEFT");
-					if($result =~  m/OK/){
-						readingsBeginUpdate($hash);
-	   					readingsBulkUpdate($hash, "lastCmd",$a[1]);
-    					readingsBulkUpdate($hash, "lastResult",$result);
-    					readingsBulkUpdate($hash, "menuPos",$hash->{READINGS}{menuPos}{VAL}-1);
-			   			readingsEndUpdate($hash, 1);
-    					return undef;
-					}
-					else
-					{
-						LISTENLIVE_rbuError($hash, $area, $doit);
-					}
-					break;
-				} # end left
-		
-				when("right"){
-					Log $loglevel, "LISTENLIVE $name input: $area $doit";
-					$result = LISTENLIVE_SendCommand($hash, "RIGHT");
-					if($result =~  m/OK/){
-						readingsBeginUpdate($hash);
-	   					readingsBulkUpdate($hash, "lastCmd",$a[1]);
-    					readingsBulkUpdate($hash, "lastResult",$result);
-		    			readingsBulkUpdate($hash, "menuPos",$hash->{READINGS}{menuPos}{VAL}+1);
-	   					readingsEndUpdate($hash, 1);
-    					return undef;
-					}
-					else
-					{
-						LISTENLIVE_rbuError($hash, $area, $doit);
-					}
-					break;
-				} # end right
-
-				when("home"){
-					Log $loglevel, "LISTENLIVE $name input: $area $doit";
-					$result = LISTENLIVE_SendCommand($hash, "HOME");
-					if($result =~  m/OK/){
-						readingsBeginUpdate($hash);
-	   					readingsBulkUpdate($hash, "lastCmd",$a[1]);
-    					readingsBulkUpdate($hash, "lastResult",$result);
-    					readingsBulkUpdate($hash, "menuPos","11");
-			   			readingsEndUpdate($hash, 1);
-    					return undef;
-					}
-					else
-					{
-						LISTENLIVE_rbuError($hash, $area, $doit)
-					}
-					break;
-				} # end home
-
-				when("enter"){
-					Log $loglevel, "LISTENLIVE $name input: $area $doit";
-					$result = LISTENLIVE_SendCommand($hash, "OK");
-					if($result =~  m/OK/){
-						readingsBeginUpdate($hash);
-	   					readingsBulkUpdate($hash, "lastCmd",$a[1]);
-    					readingsBulkUpdate($hash, "lastResult",$result);
-   						readingsEndUpdate($hash, 1);
-   						return undef;
-					}
-					else
-					{
-						LISTENLIVE_rbuError($hash, $area, $doit);
-					}
-					break;
-				} # end enter
-
-				when("ok"){
-					Log $loglevel, "LISTENLIVE $name input: $area $doit";
-					$result = LISTENLIVE_SendCommand($hash, "OK");
-					if($result =~  m/OK/){
-						readingsBeginUpdate($hash);
-	   					readingsBulkUpdate($hash, "lastCmd",$a[1]);
-    					readingsBulkUpdate($hash, "lastResult",$result);
-	   					readingsEndUpdate($hash, 1);
-    					return undef;
-					}
-					else
-					{
-						LISTENLIVE_rbuError($hash, $area, $doit);
-					}
-					break;
-				} # end ok
-
-				when("exit"){
-					Log $loglevel, "LISTENLIVE $name input: $area $doit";
-					$result = LISTENLIVE_SendCommand($hash, "EXIT");
-					if($result =~  m/OK/){
-						readingsBeginUpdate($hash);
-	   					readingsBulkUpdate($hash, "lastCmd",$a[1]);
-    					readingsBulkUpdate($hash, "lastResult",$result);
-	   					readingsEndUpdate($hash, 1);
-    					return undef;
-					}
-					else
-					{
-						LISTENLIVE_rbuError($hash, $area, $doit);
-					}
-				} # end cursor.exit
-
-				default:
-	        		{ return $usage; }
-				
-			} # end cursor.doit
-	
-		} # end area.cursor
+			Log $loglevel, "LISTENLIVE: $name input: $cmdGroup $cmd";
+			$xCmd = $cursorGroup{$cmd};
+			$result = LISTENLIVE_SendCommand($hash, $xCmd);
+			if($result =~  m/OK/){
+				readingsBeginUpdate($hash);
+				readingsBulkUpdate($hash, "lastCmd","$cmdGroup $cmd");
+				readingsBulkUpdate($hash, "lastResult",$result);
+				readingsEndUpdate($hash, 1);
+			} else {
+				LISTENLIVE_rbuError($hash, $cmdGroup, $cmd);
+			}
+			break;
+		}
 
 #
 # AREA app
 #
 
 		when ("app"){
-			given($doit){
-	
+
+			given($cmd){
+
 				when("weather"){
-					Log $loglevel, "LISTENLIVE $name input: $area $doit";
+					Log $loglevel, "LISTENLIVE $name input: $cmdGroup $cmd";
 					$result = LISTENLIVE_SendCommand($hash, "HOME");
 					select(undef, undef, undef, 0.2);
 					$result = LISTENLIVE_SendCommand($hash, "DOWN");
@@ -564,93 +310,61 @@ LISTENLIVE_Set($@)
 					$result = LISTENLIVE_SendCommand($hash, "OK");
 
 					readingsBeginUpdate($hash);
-   					readingsBulkUpdate($hash, "lastCmd",$a[1]);
-   					readingsBulkUpdate($hash, "lastResult","done");
-   			 		readingsBulkUpdate($hash, "menuPos", "32");
-	   				readingsEndUpdate($hash, 1);
+					readingsBulkUpdate($hash, "lastCmd",$a[1]);
+					readingsBulkUpdate($hash, "lastResult","done");
+					readingsEndUpdate($hash, 1);
 				} # end doit.weather
-	
+
 				default:
-	        		{ return $usage; }
+					{ return $usage; }
+			}
+		}
 
-			} # end doit
+		when("statusRequest")	{ break; } # wird automatisch aufgerufen!
+		when("present")			{ break; }
+		when("absent")			{ break; }
+		when("online")			{ break; }
+		when("offline")			{ break; }
+		when("help")			{ return LISTENLIVE_HelpSet(); }
+		when("?")				{ return $usage; }
+		default:				{ return $usage; }
 
-		} # end area.app
+	}
 
-		when("statusRequest") {	break; } # wird automatisch aufgerufen!
-
-		when("?")		{ return $usage; }
-
-		when("help")	{ return LISTENLIVE_HelpSet(); }
-
-		when("present")	{ break; }
-		when("absent")	{ break; }
-		when("online")	{ break; }
-		when("offline")	{ break; }
-
-		default:		{ return $usage; }
-
-	} # end area
-    
-# Call the GetStatus() Function to retrieve the new values
 	LISTENLIVE_GetStatus($hash, 1);
-    
-	return $response;    
+
+	return $response;
 }
 
 ###################################
 sub
 LISTENLIVE_Get($@){
-    my ($hash, @a) = @_;
-    my $name = $hash->{NAME};
-    my $address = $hash->{helper}{ADDRESS};
-    my $response;
-       
-    return "No Argument given" if(!defined($a[1]));     
+	my ($hash, @a) = @_;
+	my $name = $hash->{NAME};
+	my $address = $hash->{helper}{ADDRESS};
+	my $response;
 
-	my @b = split(/\./, $a[1]);
-	my $area = $b[0];
-	my $doit = $b[1];
+	return "No Argument given" if(!defined($a[1]));
 
-    my $usage = "Unknown argument $a[1], choose one of help list:commands";
+	my $cmdGroup	=	$a[1];
+	my $cmd			=	$a[2];
 
-	given($area){
-		
-		when("list"){
-
-			given("$doit"){
-				
-				when("commands"){
-					$response = LISTENLIVE_HelpGet();
-					break;
-				}
-				
-				default: { return $usage; }
-
-			}	# end area.list.doit
-
-		}	# end area.list
-
-		when("?")	{ return $usage; }			
-
-		when("help"){ $response = LISTENLIVE_HelpGet(); }
-
-		default:	{ return $usage; }
-
-	} # end area
-
-return $response;
+	given($cmdGroup){
+		when("?")		{ return $usage; }
+		when("help")	{ $response = LISTENLIVE_HelpGet(); }
+		default:		{ return $usage; }
+	}
+	return $response;
 }
 
 ###################################
 sub
 LISTENLIVE_GetStatus($;$){
+	my ($hash, $local) = @_;
+	my $name = $hash->{NAME};
+	my $presence;
 
-    my ($hash, $local) = @_;
-    my $name = $hash->{NAME};
-    my $presence;
-
-    $local = 0 unless(defined($local));
+	$local = 0 unless(defined($local));
 
 	if($hash->{helper}{ADDRESS} ne "none")
 	{
@@ -667,99 +381,90 @@ LISTENLIVE_GetStatus($;$){
 	readingsBulkUpdate($hash, "state", $presence);
 	readingsEndUpdate($hash, 1);
 
-    InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "LISTENLIVE_GetStatus", $hash, 0) unless($local == 1);
-    return $hash->{STATE};
-
+	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "LISTENLIVE_GetStatus", $hash, 0) unless($local == 1);
+	return $hash->{STATE};
 }
 
 #############################
 sub
-LISTENLIVE_Define($$)
-{
-    my ($hash, $def) = @_;
-    my @a = split("[ \t][ \t]*", $def);
-    my $name = $hash->{NAME};
-       
-    if(! @a >= 4)
-    {
+LISTENLIVE_Define($$){
+	my ($hash, $def) = @_;
+	my @a = split("[ \t][ \t]*", $def);
+	my $name = $hash->{NAME};
+
+	if(! @a >= 4){
 		my $msg = "wrong syntax: define <name> LISTENLIVE <ip-or-hostname>[:<port>] [<interval>]";
-		 Log 2, $msg;
+		Log 2, $msg;
 		return $msg;
-    }
+	}
 
 # Attribut eventMap festlegen (schönere Optik im Frontend)  
-    $attr{$name}{"eventMap"} = "absent:offline present:online";
+	$attr{$name}{"eventMap"} = "absent:offline present:online";
 
 # Adresse in IP und Port zerlegen
 	my @address = split(":", $a[2]);
-    $hash->{helper}{ADDRESS} = $address[0];
+	$hash->{helper}{ADDRESS} = $address[0];
 
 # falls kein Port angegeben, Standardport 8080 verwenden
 	$address[1] = "8080" unless(defined($address[1]));  
 	$hash->{helper}{PORT} = $address[1];
-        
+
 # falls kein Intervall angegeben, Standardintervall 60 verwenden
 	my $interval = $a[3];
 	$interval = "60" unless(defined($interval));
 	$hash->{helper}{INTERVAL} = $interval;
 
-	if($address[0] ne "none")
-	{
+	if($address[0] ne "none"){
 		# PRESENCE aus device pres_+NAME lesen
 		my $presence = ReadingsVal("pres_".$name,"state","noPresence");
 	
-		if($presence eq "noPresence")	# PRESENCE nicht vorhanden
-		{ 
+		if($presence eq "noPresence"){
 			$cmd = "pres_$name PRESENCE lan-ping $address[0]";
 			$ret = CommandDefine(undef, $cmd);
-			if($ret)
-			{
+			if($ret){
 				Log 2, "LISTENLIVE ERROR $ret";
-			}
-			else
-			{
+			} else {
 				Log 3, "LISTENLIVE $name PRESENCE pres_$name created.";
 			}
-		}
-		else
-		{
+		} else {
 			Log 3, "LISTENLIVE $name PRESENCE pres_$name found.";
 		}	
-	}
-	else	# Gerät ist als dummy definiert
-	{
+	} else {
+	# Gerät ist als dummy definiert
 		$presence = "present";	# dummy immer als online melden
 	}
 	
-	$presence = ReplaceEventMap($name, $presence, 1);	
+	$presence = ReplaceEventMap($name, $presence, 1);
 
-# Readings anlegen und füllen	    
+# Readings anlegen und füllen
 	readingsBeginUpdate($hash);
+#	readingsBulkUpdate($hash, "currentMedia","");
 	readingsBulkUpdate($hash, "lastCmd","");
-    readingsBulkUpdate($hash, "lastResult","");
-    readingsBulkUpdate($hash, "menuPos","11");
+	readingsBulkUpdate($hash, "lastResult","");
+#	readingsBulkUpdate($hash, "menuPos","11");
 	readingsBulkUpdate($hash, "mute","???");
+#	readingsBulkUpdate($hash, "playStatus","");
 	readingsBulkUpdate($hash, "power","???");
+#	readingsBulkUpdate($hash, "presence",$presence);
 	readingsBulkUpdate($hash, "state",$presence);
 	readingsEndUpdate($hash, 1);
-    
-    $hash->{helper}{AVAILABLE} = 1;    
-    InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "LISTENLIVE_GetStatus", $hash, 0);
 
-return;
+	$hash->{helper}{AVAILABLE} = 1;
+	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "LISTENLIVE_GetStatus", $hash, 0);
+
+	return;
 }
 
 #############################
 sub
-LISTENLIVE_SendCommand($$;$)
-{
-    my ($hash, $command, $loglevel) = @_;
-    my $name = $hash->{NAME};
-    my $address = $hash->{helper}{ADDRESS};
-    my $port = $hash->{helper}{PORT};
-    my $response = "";
-    my $modus = "dummy";
-    my ($socket,$client_socket);
+LISTENLIVE_SendCommand($$;$){
+	my ($hash, $command, $loglevel) = @_;
+	my $name = $hash->{NAME};
+	my $address = $hash->{helper}{ADDRESS};
+	my $port = $hash->{helper}{PORT};
+	my $response = "";
+	my $modus = "dummy";
+	my ($socket,$client_socket);
 
 	$loglevel = GetLogLevel($name, 3) unless(defined($loglevel));
 	Log $loglevel, "LISTENLIVE $name command: $command";
@@ -767,81 +472,47 @@ LISTENLIVE_SendCommand($$;$)
 	if (Value("$name") eq "online" && $hash->{helper}{ADDRESS} ne "none")	{ $modus = "online"; }
 	if (Value("$name") eq "offline") 										{ $modus = "offline"; }
 
-	given($modus)
-	{
-		when("online")
-		{
-			#
-			# Create a socket object for the communication with the radio
-			#
+	given($modus) {
+		when("online") {
 			$socket = new IO::Socket::INET (
 				PeerHost => $address,
 				PeerPort => $port,
 				Proto => 'tcp',
 			) or die "ERROR in Socket Creation : $!\n";
-
-			#
-			# Send the given command into the socket
-			#
 			$socket->send($command);
-
-			#
-			# get the radio some time to execute the command (300ms )
-			#
 			usleep(30000);
-
-			#
-			# get the answer of the radio
-			#
 			$socket->recv($response, 2);
-
-
-			if($response !~  m/OK/)
-	    	{	
-	    		Log 2, "LISTENLIVE $name error: $response";
-	    	}
-			else
-	    	{
-	    		Log $loglevel, "LISTENLIVE $name response: $response";
-	    	}
-
+			if($response !~  m/OK/)	{ Log 2,			"LISTENLIVE $name error: $response"; }
+			else 					{ Log $loglevel,	"LISTENLIVE $name response: $response"; }
 			$socket->close();
-    
 			$hash->{helper}{AVAILABLE} = (defined($response) ? 1 : 0);
 		}
 
-		when("offline")
-		{
+		when("offline") {
 			Log 2, "LISTENLIVE $name error: device offline!";
 			$response = "device offline!";
 		}
 
 		default:
-		{
-			$response = "OK";
-		}
+			{ $response = "OK"; }
 	}
-
 	return $response;
 }
 
 sub
-LISTENLIVE_rbuError($$;$$)
-{
-    my ($hash, $area, $doit, $parameter) = @_;
-	Log 2, "LISTENLIVE $hash->{NAME} error: $area $doit $parameter";
+LISTENLIVE_rbuError($$;$$){
+	my ($hash, $cmdGroup, $cmd, $parameter) = @_;
+	Log 2, "LISTENLIVE $hash->{NAME} error: $cmdGroup $cmd $parameter";
 
 	readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash, "lastCmd","$area $doit $parameter");
-    readingsBulkUpdate($hash, "lastResult","Error: $area $doit $parameter");
+	readingsBulkUpdate($hash, "lastCmd","$cmdGroup $cmd $parameter");
+	readingsBulkUpdate($hash, "lastResult","Error: $cmdGroup $cmd $parameter");
 	readingsEndUpdate($hash, 1);
 	return undef;
 }
 
-
 sub
-LISTENLIVE_HelpGet()
-{
+LISTENLIVE_HelpGet(){
 my $helptext =
 'get <device> <commandGroup> [<command>]
 
@@ -853,8 +524,7 @@ return $helptext;
 }
 
 sub
-LISTENLIVE_HelpSet()
-{
+LISTENLIVE_HelpSet(){
 my $helptext =
 'set <device> <commandGroup> [<command>]
 
@@ -875,7 +545,6 @@ set llradio cursor down
 set llradio cursor left
 set llradio cursor up
 set llradio cursor right
-
 set llradio cursor enter
 set llradio cursor exit
 set llradio cursor home
@@ -892,7 +561,6 @@ set llradio raw <command>
 
 
 commandGroup "reset"
-set llradio reset menupos
 set llradio reset mute
 set llradio reset power
 
@@ -913,13 +581,10 @@ return $helptext;
 
 #############################
 sub
-LISTENLIVE_Undefine($$)
-{
-  my($hash, $name) = @_;
-  
-  # Stop the internal GetStatus-Loop and exist
-  RemoveInternalTimer($hash);
-  return undef;
+LISTENLIVE_Undefine($$){
+	my($hash, $name) = @_;
+	RemoveInternalTimer($hash);
+	return undef;
 }
 
 #####################################
@@ -927,19 +592,10 @@ sub HMT350_RCmakenotify($$) {
 	my $loglevel = GetLogLevel($name, 3) unless(defined($loglevel));
 	my ($nam, $ndev) = @_;
 	my $nname="notify_$nam";
-
 	my $cmd = "$nname notify $nam set $ndev rc \$EVENT";
 	my $ret = CommandDefine(undef, $cmd);
-
-	if($ret)
-	{
-		Log 2, "remotecontrol ERROR $ret";
-	}
-	else
-	{
-		Log $loglevel, "remotecontrol HMT350: $nname created as notify";
-	}
-
+	if($ret)	{ Log 2,			"remotecontrol ERROR $ret"; }
+	else		{ Log $loglevel,	"remotecontrol HMT350: $nname created as notify"; }
 	return "Notify created: $nname";
 }
 
@@ -954,15 +610,14 @@ sub HMT350_RClayout() {
 	$row[$rownum]="rewind:REWIND,left:LEFT,ok:OK,right:RIGHT,forward:FF"; $rownum++;
 	$row[$rownum]=":blank,:blank,down:DOWN,:blank,:blank"; $rownum++;
 	$row[$rownum]="ret:RETURN,:blank,volmin:VOLDOWN,:blank,stop:STOP"; $rownum++;
-	
 	$row[$rownum]=":blank,:blank,:blank,:blank,:blank"; $rownum++;
-
 	$row[$rownum]="raw+PGUP:PAGEUP,:blank,raw+PAUSE:PAUSE,:blank,raw+ITV:ITV"; $rownum++;
 	$row[$rownum]="raw+PGDN:PAGEDOWN,:blank,raw+MENU:MENU,:blank,raw+IRADIO:IRADIO"; $rownum++;
 	$row[$rownum]=":FAV,:blank,raw+REPEAT:REPEAT,:blank,raw+FMRADIO:FMRADIO"; $rownum++;
 
 	$row[19]="attr rc_iconpath icons/remotecontrol";
 	$row[20]="attr rc_iconprefix black_btn_";
+
 	return @row;
 }
 
