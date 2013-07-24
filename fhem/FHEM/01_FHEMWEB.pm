@@ -495,8 +495,7 @@ FW_answerCall($)
   $FW_cmdret = $docmd ? FW_fC($cmd, $cmddev) : "";
 
   # Redirect after a command, to clean the browser URL window
-  if($docmd && !$FW_cmdret && $FW_formmethod eq "get" &&
-     AttrVal($FW_wname, "redirectCmds", 1)) {
+  if($docmd && !$FW_cmdret && AttrVal($FW_wname, "redirectCmds", 1)) {
     my $tgt = $FW_ME;
        if($FW_detail) { $tgt .= "?detail=$FW_detail" }
     elsif($FW_room)   { $tgt .= "?room=$FW_room" }
