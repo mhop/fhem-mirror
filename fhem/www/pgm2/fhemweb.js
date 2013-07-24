@@ -201,9 +201,15 @@ FW_queryValue(cmd, qFn, qArg)
 function
 FW_querySetSelected(el, val)
 {
+  if(typeof el == 'string')
+    el = document.getElementById(el);
   for(var j=0;j<el.options.length;j++)
-    if(el.options[j].value == val)
+    if(el.options[j].value == val) {
       el.selectedIndex = j;
+      if(el.onchange)
+        el.onchange();
+      return;
+    }
 }
 
 window.onbeforeunload = function(e)

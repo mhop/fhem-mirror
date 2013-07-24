@@ -724,7 +724,14 @@ FW_makeTable($$$@)
       FW_makeEdit($name, $n, $val);
 
     } else {
-      FW_pO "<td><div class=\"dname\">$n</div></td>";
+      if( $title eq "Attributes" ) {
+        FW_pO "<td><div class=\"dname\">".
+                "<a onClick='FW_querySetSelected(\"sel.attr$name\",\"$n\")'>".
+              "$n</a></div></td>";
+      } else {
+         FW_pO "<td><div class=\"dname\">$n</div></td>";
+      }
+
       if(ref($val)) { #handle readings
         my ($v, $t) = ($val->{VAL}, $val->{TIME});
         $v = FW_htmlEscape($v);
@@ -738,33 +745,27 @@ FW_makeTable($$$@)
         }
       } else {
         $val = FW_htmlEscape($val);
-        # if possible provide link to reference
+
+        # if possible provide som links
         if ($n eq "room"){
-          my @tmp;
-          push @tmp,FW_pH("room=$_" , $_ ,0,"",1,1)foreach(split(",",$val));
-          FW_pO "<td><div class=\"dval\">"
-		        .join(",",@tmp)
-		        ."</div></td>";	
+          FW_pO "<td><div class=\"dval\">".
+                join(",", map { FW_pH("room=$_",$_,0,"",1,1) } split(",",$val)).
+                "</div></td>";	
+
         } elsif ($n eq "webCmd"){
-          my @tmp;
-          push @tmp,FW_pH("cmd.$name=set $name $_&detail=$name" , $_ ,0,"",1,1)foreach(split(":",$val));
-          FW_pO "<td><div name=\"$name-$n\">"
-		       .join(":",@tmp)
-		       ."</div></td>";	
-        } elsif ($n =~ m/^fp_(.*)/ && $defs{$1}){#special for Floorplan
+          my $lc = "detail=$name&cmd.$name=set $name";
+          FW_pO "<td><div name=\"$name-$n\">".
+                  join(":", map {FW_pH("$lc $_",$_,0,"",1,1)} split(":",$val) ).
+                "</div></td>";	
+
+        } elsif ($n =~ m/^fp_(.*)/ && $defs{$1}){ #special for Floorplan
           FW_pH "detail=$1", $val,1;
 
         } else {
-          my @tmp;
-          foreach(split(",",$val)){
-          if($defs{$_}) {
-            push @tmp, FW_pH( "detail=$_", $_ ,0,"",1,1);
-          } else {
-            push @tmp, $_;}
-          }
-	  FW_pO "<td><div class=\"dval\">"
-		        .join(",",@tmp)
-		        ."</div></td>";				
+	  FW_pO "<td><div class=\"dval\">".
+	        join(",", map { ($_ ne $name && $defs{$_}) ?
+                    FW_pH( "detail=$_", $_ ,0,"",1,1) : $_ } split(",",$val)).
+		"</div></td>";				
         }
       }
 
@@ -798,7 +799,7 @@ FW_makeSelect($$$$)
   FW_pO FW_hidden("dev.$cmd$d", $d);
   FW_pO FW_submit("cmd.$cmd$d", $cmd, $class);
   FW_pO "<div class=\"$class downText\">&nbsp;$d&nbsp;</div>";
-  FW_pO FW_select("","arg.$cmd$d",\@al, $selEl, $class,
+  FW_pO FW_select("sel.$cmd$d","arg.$cmd$d",\@al, $selEl, $class,
         "FW_selChange(this.options[selectedIndex].text,'$list','val.$cmd$d')");
   FW_pO FW_textfield("val.$cmd$d", 30, $class);
   # Initial setting
