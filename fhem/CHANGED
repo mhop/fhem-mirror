@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: 95_remotecontrol does not require a weblink anymore (UliM)
   - feature: optional sleep parameter quiet
   - feature: additional buttons for use with 95_remotecontrol
   - feature: new module 71_LISTENLIVE.pm for use with media players (betateilchen)
