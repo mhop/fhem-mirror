@@ -474,7 +474,7 @@ my %culHmRegDefine = (
 #CC-TC                                                                                        
 
 #--- list 3, link level for actor - mainly in short/long hash, only specials here------------------
-  lgMultiExec     =>{a=>138.5,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"multiple execution per repeat of long trigger"    ,lit=>{off=>0,on=>1}},
+  lgMultiExec     =>{a=>138.5,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"multiple execution per repeat of long trigger"    ,lit=>{off=>0,on=>1}},
 
 #--- list 4, link level for Button ------------------                                                                                     
   peerNeedsBurst  =>{a=>  1.0,s=>0.1,l=>4,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"peer expects burst",lit=>{off=>0,on=>1}},

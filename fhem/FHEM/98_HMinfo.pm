@@ -730,7 +730,7 @@ my %tpl = (
                            ,BlJtOff         =>"dlyOff"
                            ,BlJtOn          =>"dlyOff"
                            ,BlJtRampOff     =>"rampOff"
-                           ,BlJtRampOn      =>"rampOn"
+                           ,BlJtRampOn      =>"on"
                            ,BlJtRefOff      =>"rampOff"
                            ,BlJtRefOn       =>"on"
 				    }}
@@ -752,17 +752,11 @@ my %tpl = (
                            ,BlJtOff          =>"dlyOn"
                            ,BlJtOn           =>"dlyOn"
                            ,BlJtRampOff      =>"off"
-                           ,BlJtRampOn       =>"on"
+                           ,BlJtRampOn       =>"rampOn"
                            ,BlJtRefOff       =>"off"
                            ,BlJtRefOn        =>"rampOn"
 					}}
-  ,BlStopUpSh        => {p=>""                 ,t=>"Blind: stop drive on
-
-
-
-reload 10_CUL_HM
-reload 98_HMinfo
-  any key - for short drive up"
+  ,BlStopUpSh        => {p=>""                 ,t=>"Blind: stop drive on"
                     ,reg=>{ ActionType       =>"jmpToTarget"
                            ,BlJtDlyOff       =>"dlyOn"
                            ,BlJtDlyOn        =>"refOn"
@@ -773,7 +767,6 @@ reload 98_HMinfo
                            ,BlJtRefOff       =>"off"
                            ,BlJtRefOn        =>"rampOn"
 					}}
-
 );
 
 sub HMinfo_templateDef(@){#####################################################
@@ -882,18 +875,16 @@ sub HMinfo_templateChk(@){#####################################################
   foreach my $pS (@pNames){
     ($pName,$pTyp) = split(":",$pS);
     my $replPeer="";
-	
 	if($pName && (grep !/$pName/,ReadingsVal($aName,"peerList" ,undef))){
       $replPeer="  no peer:$pName\n";
 	}
 	else{
-      my $pRnm = $pName?($pName."-".($pS eq "long"?"lg":"sh")):"";
+      my $pRnm = $pName?($pName."-".($pTyp eq "long"?"lg":"sh")):"";
       foreach my $rn (keys%{$tpl{$tmpl}{reg}}){
         my $regV = ReadingsVal($aName,"R-$pRnm$rn" ,undef);
         $regV    = ReadingsVal($aName,".R-$pRnm$rn",undef) if (!defined $regV);
 	    $regV    = ReadingsVal($aName,"R-".$rn     ,undef) if (!defined $regV);
 	    $regV    = ReadingsVal($aName,".R-".$rn    ,undef) if (!defined $regV);
-      
 	    if (defined $regV){
 	      $regV =~s/ .*//;#strip unit 
 	      my $tplV = $tpl{$tmpl}{reg}{$rn};	
