@@ -138,7 +138,6 @@ sub CUL_HM_Initialize($) {
 					   "autoReadReg:1_restart,0_off,2_pon-restart,3_onChange,4_reqStatus ".
 					   "expert:0_off,1_on,2_full ".
 
-                       "hmClass:obsolete devInfo:obsolete ". #unused
 					   ".stc .devInfo ".
                        $readingFnAttributes;
   my @modellist;
@@ -182,6 +181,7 @@ sub CUL_HM_updateConfig($){
   # it will also be called after each manual definition
   # Purpose is to parse attributes and read config
   foreach my $name (@{$modules{CUL_HM}{helper}{updtCfgLst}}){
+    CUL_HM_Attr
     my $hash = $defs{$name};
 	my $id = $hash->{DEF};
     my $chn = substr($id."00",6,2);
@@ -193,11 +193,7 @@ sub CUL_HM_updateConfig($){
 	  # --- set default attrubutes if missing ---
       $attr{$name}{expert}= AttrVal($name,"expert","2_full") 
 	        if ($hash->{helper}{role}{dev});
-	  
-	  # convert variables, delete obsolete, move to hidden level
-      $attr{$name}{".devInfo"} = $attr{$name}{devInfo} if($attr{$name}{devInfo});#todo Updt4 remove
-	  delete $attr{$name}{devInfo};                                              #todo Updt4 remove
-	  delete $attr{$name}{hmClass};                                              #todo Updt4 remove
+	  CUL_HM_Attr("attr",$name,"expert",$attr{$name}{expert});#need update after readings are available
 	}
 	else{
 	  $attr{$name}{"event-on-change-reading"} = AttrVal($name, "event-on-change-reading", ".*");
