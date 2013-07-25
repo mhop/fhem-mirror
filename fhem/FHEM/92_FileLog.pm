@@ -260,11 +260,12 @@ FileLog_fhemwebFn($$$$)
 {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
 
-  return "<div id=\"$d\" align=\"center\" class=\"col2\">$defs{$d}{STATE}</div>"
-        if($FW_ss && $pageHash);
+  return "<div id=\"$d\" align=\"center\" class=\"FileLog col2\">".
+                "$defs{$d}{STATE}</div>" if($FW_ss && $pageHash);
 
   my $row = 0;
-  my $ret = sprintf("<table class=\"%swide\">", $pageHash ? "" : "block ");
+  my $ret = sprintf("<table class=\"FileLog %swide\">",
+                        $pageHash ? "" : "block ");
   foreach my $f (FW_fileList($defs{$d}{logfile})) {
     my $class = (!$pageHash ? (($row++&1)?"odd":"even") : "");
     $ret .= "<tr class=\"$class\">";

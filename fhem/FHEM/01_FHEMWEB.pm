@@ -25,7 +25,7 @@ sub FW_logWrapper($);
 sub FW_makeEdit($$$);
 sub FW_makeImage(@);
 sub FW_makeTable($$$@);
-sub FW_makeTableFromArray($@);
+sub FW_makeTableFromArray($$@);
 sub FW_pF($@);
 sub FW_pH(@);
 sub FW_pHPlain(@);
@@ -702,7 +702,9 @@ FW_makeTable($$$@)
 
   return if(!$hash || !int(keys %{$hash}));
   FW_pO $title;
-  FW_pO "<table class=\"block wide\">";
+  my $titleid = lc($title);
+  $titleid =~ s/[^A-Za-z]/_/g;
+  FW_pO "<table class=\"block wide $titleid\">";
   my $si = AttrVal("global", "showInternalValues", 0);
 
   my $row = 1;
@@ -823,7 +825,7 @@ FW_doDetail($)
   if($FW_ss) { # FS20MS2 special: on and off, is not the same as toggle
     my $webCmd = AttrVal($d, "webCmd", undef);
     if($webCmd) {
-      FW_pO "<table>";
+      FW_pO "<table class=\"webcmd\">";
       foreach my $cmd (split(":", $webCmd)) {
         FW_pO "<tr>";
         FW_pH "cmd.$d=set $d $cmd&detail=$d", $cmd, 1, "col1";
@@ -865,7 +867,7 @@ FW_doDetail($)
     }
   }
   FW_pO "</form>";
-  FW_makeTableFromArray("Probably associated with", @dob);
+  FW_makeTableFromArray("Probably associated with", "assoc", @dob,);
 
   FW_pO "</td></tr></table>";
 
@@ -879,13 +881,13 @@ FW_doDetail($)
 
 ##############################
 sub
-FW_makeTableFromArray($@) {
-  my ($txt,@obj) = @_;
+FW_makeTableFromArray($$@) {
+  my ($txt,$class,@obj) = @_;
   if (@obj>0) {
     my $row=1;
     FW_pO "<br>";
     FW_pO "$txt";
-    FW_pO '<table class="block wide">';
+    FW_pO '<table class="block wide $class">';
     foreach (sort @obj) {
       FW_pF "<tr class=\"%s\"><td>", ($row&1)?"odd":"even";
       $row++;
@@ -934,8 +936,8 @@ FW_roomOverview($)
   my (@list1, @list2);
   push(@list1, ""); push(@list2, "");
   if(!$FW_hiddenroom{save} && !$FW_hiddenroom{"Save config"}) {
-    push(@list1, "Save config"); push(@list2, "$FW_ME?cmd=save");
-    push(@list1, ""); push(@list2, "");
+    push(@list1, "Save config");
+    push(@list2, "$FW_ME?cmd=save");
   }
      
   ########################
@@ -1009,12 +1011,15 @@ FW_roomOverview($)
 
   } else {
 
+    my $tblnr = 1;
     foreach(my $idx = 0; $idx < @list1; $idx++) {
       my ($l1, $l2) = ($list1[$idx], $list2[$idx]);
       if(!$l1) {
         FW_pO "</table></td></tr>" if($idx);
-        FW_pO "<tr><td><table class=\"room\">"
-          if($idx<int(@list1)-1);
+        if($idx<int(@list1)-1) {
+          FW_pO "<tr><td><table class=\"room roomBlock$tblnr\">";
+          $tblnr++;
+        }
 
       } else {
         my $td = "<td>";
@@ -1049,7 +1054,7 @@ FW_roomOverview($)
   ##############
   # HEADER
   FW_pO "<div id=\"hdr\">";
-  FW_pO '<table border="0"><tr><td style="padding:0">';
+  FW_pO '<table border="0" class="header"><tr><td style="padding:0">';
   FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME\">";
   FW_pO FW_hidden("room", "$FW_room") if($FW_room);
   FW_pO FW_textfield("cmd", $FW_ss ? 25 : 40, "maininput");
@@ -1076,7 +1081,7 @@ FW_showRoom()
   FW_pO "<form method=\"$FW_formmethod\" ".
                 "action=\"$FW_ME\" autocomplete=\"off\">";
   FW_pO "<div id=\"content\">";
-  FW_pO "<table>";  # Need for equal width of subtables
+  FW_pO "<table class=\"roomoverview\">";  # Need for equal width of subtables
 
   my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
   
@@ -1834,7 +1839,9 @@ sub
 FW_displayFileList($@)
 {
   my ($heading,@files)= @_;
-  FW_pO "$heading<br>";
+  my $hid = lc($heading);
+  $hid =~ s/[^A-Za-z]/_/g;
+  FW_pO "<div class=\"fileList $hid\">$heading</div>";
   FW_pO "<table class=\"block fileList\">";
   my $row = 0;
   foreach my $f (@files) {
@@ -2041,10 +2048,6 @@ FW_pH(@)
   my $ret;
 
   $link = ($link =~ m,^/,) ? $link : "$FW_ME$FW_subdir?$link";
-  #actually 'div' should be removed if no class is defined
-  #  as I can't check all code for consistancy I add nonl instead
-  $class = ($class)?" class=\"$class\"":"";
-  $txt =  "<div$class>$txt</div>" if (!$nonl);
   
   # Using onclick, as href starts safari in a webapp.
   # Known issue: the pointer won't change
@@ -2053,6 +2056,12 @@ FW_pH(@)
   } else {
     $ret = "<a href=\"$link\">$txt</a>";
   }
+
+  #actually 'div' should be removed if no class is defined
+  #  as I can't check all code for consistancy I add nonl instead
+  $class = ($class)?" class=\"$class\"":"";
+  $ret = "<div$class>$ret</div>" if (!$nonl);
+
   $ret = "<td>$ret</td>" if($td);
   return $ret if($doRet);
   FW_pO $ret;
@@ -2502,8 +2511,6 @@ FW_devState($$@)
 
   }
 
-  my $style = AttrVal($d, "devStateStyle", "");
-  $txt = "<div id=\"$d\" $style class=\"col2\">$txt</div>";
 
   if($hasOnOff) {
     # Have to cover: "on:An off:Aus", "A0:Aus AI:An Aus:off An:on"
@@ -2535,6 +2542,9 @@ FW_devState($$@)
 
     }
   }
+
+  my $style = AttrVal($d, "devStateStyle", "");
+  $txt = "<div id=\"$d\" $style class=\"col2\">$txt</div>";
 
   my $type = $defs{$d}{TYPE};
   my $sfn = $modules{$type}{FW_summaryFn};
