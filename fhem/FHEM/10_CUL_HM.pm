@@ -181,7 +181,6 @@ sub CUL_HM_updateConfig($){
   # it will also be called after each manual definition
   # Purpose is to parse attributes and read config
   foreach my $name (@{$modules{CUL_HM}{helper}{updtCfgLst}}){
-    CUL_HM_Attr
     my $hash = $defs{$name};
 	my $id = $hash->{DEF};
     my $chn = substr($id."00",6,2);
