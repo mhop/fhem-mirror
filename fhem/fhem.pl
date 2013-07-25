@@ -265,7 +265,7 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
   "shutdown"=> { Fn=>"CommandShutdown",
 	    Hlp=>"[restart],terminate the server" },
   "sleep"  => { Fn=>"CommandSleep",
-            Hlp=>"<sec>,sleep for sec, 3 decimal places" },
+            Hlp=>"<sec> [quiet],sleep for sec, 3 decimal places" },
   "trigger" => { Fn=>"CommandTrigger",
             Hlp=>"<devspec> <state>,trigger notify command" },
   "update" => {
@@ -2071,20 +2071,36 @@ CommandInform($$)
 
 #####################################
 sub
+WakeUpFn($)
+{
+  my $h = shift;
+  $evalSpecials = $h->{evalSpecials};
+  my $ret = AnalyzeCommandChain(undef, $h->{cmd});
+  Log 2, "After sleep: $ret" if($ret && !$h->{quiet});
+}
+
+
+sub
 CommandSleep($$)
 {
   my ($cl, $param) = @_;
+  my ($sec, $quiet) = split(" ", $param);
 
-  return "Cannot interpret $param as seconds" if($param !~ m/^[0-9\.]+$/);
-  Log 4, "sleeping for $param";
+  return "Argument missing" if(!defined($sec));
+  return "Cannot interpret $sec as seconds" if($sec !~ m/^[0-9\.]+$/);
+  return "Second parameter must be quiet" if($quiet && $quiet ne "quiet");
 
-  if(!$cl && @cmdList && $param && $init_done) {
-    my %h = (cmd=>join(";", @cmdList), evalSpecials=>$evalSpecials);
-    InternalTimer(gettimeofday()+$param, "WakeUpFn", \%h, 0);
+  Log 4, "sleeping for $sec";
+
+  if(!$cl && @cmdList && $sec && $init_done) {
+    my %h = (cmd          => join(";", @cmdList),
+             evalSpecials => $evalSpecials,
+             quiet        => $quiet);
+    InternalTimer(gettimeofday()+$sec, "WakeUpFn", \%h, 0);
     @cmdList=();
 
   } else {
-    select(undef, undef, undef, $param);
+    select(undef, undef, undef, $sec);
 
   }
   return undef;
@@ -2112,16 +2128,6 @@ CommandVersion($$)
     return join("\n", @ret);
   }
 }
-
-sub
-WakeUpFn($)
-{
-  my $h = shift;
-  $evalSpecials = $h->{evalSpecials};
-  my $ret = AnalyzeCommandChain(undef, $h->{cmd});
-  Log 2, "After sleep: $ret" if($ret);
-}
-
 
 #####################################
 # Return the time to the next event (or undef if there is none)

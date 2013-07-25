@@ -948,18 +948,24 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="sleep"></a>
 <h3>sleep</h3>
 <ul>
-  <code>sleep &lt;sec&gt;</code>
+  <code>sleep &lt;sec&gt; [quiet]</code>
   <br><br>
-  Sleep for a given amount, millisecond accuracy.
+  Sleep for a given amount, millisecond accuracy.<br>
+  When called in a notify/at/etc, then nonempty return values of the following
+  commands is logged to the global logfile with loglevel 2.<br>
+  If quiet is specified, then skip this logging.
   <br><br>
   Example:
   <ul>
     <code>sleep 0.5</code><br>
-    <code>define n3 notify btn3.* set lamp toggle;;sleep 0.5;;set lamp toggle</code>
+    <code>define n3 notify btn3.* set lamp toggle;;sleep 0.5;;set lamp
+          toggle</code><br>
+    <code>define a3 at +*00:05 set Windsensor 1w_measure;; sleep 2 quiet;; get
+          Windsensor 1w_temp</code>
   </ul>
   <br>
   Note: sleep followed by another command and issued in at/notify/etc is not
-  blocking fhem.<br>
+  blocking fhem<br>
 </ul>
 
 <a name="version"></a>

@@ -958,9 +958,9 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <ul>
   <code>shutdown [restart]</code>
   <br><br>
-  Der Befehl f&auml;hrt den Server herunter (nach dem sichern der <a href="#statefile">state information
-  </a>). Er triggert das global:SHUTDOWN Ereignis.  Wenn der optionale 
-  Parameterv restart angegeben, versucht FHEM von selbst wieder zu starten.
+  Der Befehl f&auml;hrt den Server herunter (nach dem sichern aller <a
+  href="#statefile">Ger&auml;testati</a>). Er triggert das global:SHUTDOWN
+  Ereignis.  Mit der optionalen Parameter restart startet FHEM danach neu.
   <br><br>
   Beispiel:
   <ul>
@@ -976,10 +976,8 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   <code>trigger &lt;devspec&gt; &lt;state&gt;</code>
   <br><br>
   Triggert eine <a href="#notify">notify</a> Definition.
-  Lesen Sie bitte den Abschnitt <a href="#devspec">Device specification</a>&nbsp; f&uuml;r 
-  Details zu
-  &lt;devspec&gt;.
-
+  Siehe <a href="#devspec">Ger&auml;te-Spezifikation (devspec)</a>&nbsp;
+  f&uuml;r Details zu &lt;devspec&gt;.
   <br><br>
   Beispiel:
   <ul>
@@ -990,18 +988,25 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <a name="sleep"></a>
 <h3>sleep</h3>
 <ul>
-  <code>sleep &lt;sec&gt;</code>
+  <code>sleep &lt;sec&gt; [quiet]</code>
   <br><br>
-  Stoppt die Befehlsabarbeitung f&uuml;r die angegebene Anzahl von Millisekunden.
+  Wartet f&uuml;r die angegebene Anzahl von Millisekunden.<br>
+  Falls sleep in at/notify/etc aufgerufen wurde, und die nachfolgenden
+  Kommandos einen nicht leeren Text zur&uuml;ckgeliefert haben, dann wird dieser
+  Text mit loglevel 2 protokolliert.<br>
+  quiet vermeidet diese Protokollierung.
   <br><br>
-  Beispiel:
+  Beispiele:
   <ul>
     <code>sleep 0.5</code><br>
-    <code>define n3 notify btn3.* set lamp toggle;;sleep 0.5;;set lamp toggle</code>
+    <code>define n3 notify btn3.* set lamp toggle;;sleep 0.5;;set lamp
+          toggle</code><br>
+    <code>define a3 at +*00:05 set Windsensor 1w_measure;; sleep 2 quiet;; get
+          Windsensor 1w_temp</code>
   </ul>
   <br>
-  Bemerkung: sleep gefolgt von einem weiteren Befehl und angegeben in at/notify/etc 
-  blockiert die Abarbeitung von FHHM nicht.<br>
+  Bemerkung: sleep gefolgt von weiteren Befehlen und aufgerufen in
+  at/notify/etc blockiert die Abarbeitung von FHEM nicht.<br>
 </ul>
 
 <a name="version"></a>
@@ -1222,10 +1227,10 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 
     <a name="statefile"></a>
     <li>statefile<br>
-        Dieses Attribut legt den Namen der Datei fest, in die 
-    Statusinformationen und verschiedene <a href="#at">at</a> Information 
-    gespeichert werden&nbsp; bevor der Server heruntergefahren wird. Fall diese 
-    Datei nicht angegeben wird, so werden keinerlei Informationen gesichert.
+    Dieses Attribut legt den Namen der Datei fest, in die 
+    Statusinformationen aller Ger&auml;te gespeichert werden&nbsp; bevor der
+    Server heruntergefahren wird. Falls diese Datei nicht angegeben wird, so
+    werden keinerlei Informationen gesichert.
     </li><br>
 
     <a name="title"></a>
