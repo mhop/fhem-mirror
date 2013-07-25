@@ -102,11 +102,11 @@ FW_showWeblink($$$$)
 sub
 weblink_FwDetail($@)
 {
-  my ($d, $text)= @_;
+  my ($d, $text, $nobr)= @_;
   return "" if(AttrVal($d, "group", ""));
   my $alias= AttrVal($d, "alias", $d);
 
-  my $ret = "<br>";
+  my $ret = ($nobr ? "" : "<br>");
   $ret .= "$text " if($text);
   $ret .= FW_pHPlain("detail=$d", $alias) if(!$FW_subdir);
   $ret .= "<br>";
@@ -267,8 +267,10 @@ weblink_FwFn($$$$)
       my $arg="$FW_ME?cmd=showlog $d $va[0] $va[1] $va[2]$wl";
       if(AttrVal($d,"plotmode",$FW_plotmode) eq "SVG") {
         my ($w, $h) = split(",", AttrVal($d,"plotsize",$FW_plotsize));
+        $ret .= "<div class=\"SVGplot\">";
         $ret .= "<embed src=\"$arg\" type=\"image/svg+xml\" " .
               "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
+        $ret .= "</div>";
 
       } else {
         $ret .= "<img src=\"$arg\"/>";
@@ -280,7 +282,7 @@ weblink_FwFn($$$$)
         $ret .= "<br>";
 
       } else {
-        $ret .= weblink_FwDetail($d) if(!$FW_hiddenroom{detail});
+        $ret .= weblink_FwDetail($d, "", 1) if(!$FW_hiddenroom{detail});
 
       }
 
@@ -371,7 +373,7 @@ wl_PEdit($$$$)
   my $ret .= "<br><form autocomplete=\"off\" action=\"$FW_ME/weblinkDetails\">";
   $ret .= FW_hidden("detail", $d);
   $ret .= FW_hidden("gplotName", $gp);
-  $ret .= "<table class=\"block wide\">";
+  $ret .= "<table class=\"block wide plotEditor\">";
   $ret .= "<tr class=\"even\">";
   $ret .= "<td>Plot title</td>";
   $ret .= "<td>".wl_txt("title", "", $conf{title}, 32)."</td>";
