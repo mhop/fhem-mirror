@@ -3,7 +3,6 @@
 package main;
 use strict;
 use warnings;
-use POSIX;
 
 sub HMinfo_Initialize($$);
 sub HMinfo_Define($$);
@@ -17,7 +16,6 @@ sub HMinfo_SetFnDly($);
 sub HMinfo_post($);
 
 use Blocking;
-
 
 sub HMinfo_Initialize($$) {####################################################
   my ($hash) = @_;
@@ -223,14 +221,14 @@ sub HMinfo_SetFn($$) {#########################################################
 	my @entities;
 	foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
 	  next if (!substr(AttrVal($dName,"autoReadReg","0"),0,1));
-	  
       my @arr;
-      if(!$modules{CUL_HM}{helper}{updtCfgLst}){
-        $modules{CUL_HM}{helper}{updtCfgLst} = \@arr;
+      if(!$modules{CUL_HM}{helper}{autoRdCfgLst}){
+        $modules{CUL_HM}{helper}{autoRdCfgLst} = \@arr;
       }
-	  push @{$modules{CUL_HM}{helper}{updtCfgLst}}, $dName;
-	  RemoveInternalTimer("updateConfig");
-      InternalTimer(gettimeofday()+5,"CUL_HM_autoReadConfig", "updateConfig", 0);
+	  push @{$modules{CUL_HM}{helper}{autoRdCfgLst}}, $dName;
+	  $defs{$dName}{autoRead} = "scheduled";
+	  RemoveInternalTimer("autoRdCfg");
+	  InternalTimer(gettimeofday()+5,"CUL_HM_autoReadConfig","autoRdCfg",0);
 	  push @entities,$dName;
 	}
 	return $cmd." done:" ."\n cleared"  ."\n    ".(join "\n    ",sort @entities)
@@ -1086,16 +1084,20 @@ sub HMinfo_cpRegs(@){#########################################################
 	  </li>
       <li><a name="#HMinfoclear">clear [Protocol|Readings|Rssi]</a> <a href="HMinfoFilter">[filter]</a><br>
 	      executes a set clear ...  on all HM entities<br>
+		  <ul>
 		  <li>Protocol relates to set clear msgEvents</li>
 		  <li>Readings relates to set clear readings</li>
 		  <li>Rssi clears all rssi counters </li>
+		  </ul>
 	  </li>
       <li><a name="#HMinfocpRegs">cpRegs &lt;src:peer&gt; &lt;dst:peer&gt; </a><br>
 	      allows to copy register, setting and behavior of a channel to 
 	      another or for peers from the same or different channels. Copy therefore is allowed
 		  intra/inter device and intra/inter channel. 
-	     <li>src:peer is the source entity. Peer needs to be given if a peer behabior beeds to be copied <\li>
-	     <li>dst:peer is the destination entity.<\li>
+		  <ul>
+	     <li>src:peer is the source entity. Peer needs to be given if a peer behabior beeds to be copied </li>
+	     <li>dst:peer is the destination entity.</li>
+		  </ul>
 		Examples are
 		 <code>
 		  set hm cpRegs blindR blindL  # will copy all general register (list 1)for this channel from the blindR to the blindL entity. 
