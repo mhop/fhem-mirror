@@ -363,6 +363,16 @@ SWAP_Set($@)
   return "\"set $name $cmd\" needs one argument"  if( $cnt < 2 && ( $cmd eq 'regGet' ) );
   return "\"set $name $cmd\" needs two arguments" if( $cnt < 3 && ( $cmd eq 'regSet' ) );
 
+  if( ($cmd eq "regSet" || $cmd eq "regGet") && $arg !~ m/^[\da-f]{2}(\.([\da-f]+))?$/i ) {
+    foreach my $reg ( sort { $a <=> $b } keys ( %default_registers ) ) {
+      my $register = $default_registers{$reg};
+      if( $register->{name} =~ m/^$arg$/i ) {
+        $arg = sprintf("%02X", $reg);
+        last;
+      }
+    }
+  }
+
   if( $cmd eq "regSet" ) {
     $arg =~ m/^([\da-f]{2})(\.([\da-f]+))?$/i;
     return "$arg is not a valid register name for $cmd" if( !defined($1) );
@@ -993,11 +1003,13 @@ SWAP_Attr(@)
   <b>Set</b>
   <ul>
     <li>regGet &lt;reg&gt;<br>
-        request status message from register &lt;reg&gt;.
+        request status message for register id &lt;reg&gt;.
+        for system registers the register name can be used instead if the two digit register id in hex.
         </li><br>
 
     <li>regSet &lt;reg&gt; &lt;data&gt;<br>
-        write &lt;data&gt; to register &lt;reg&gt;.
+        write &lt;data&gt; to register id &lt;reg&gt;.
+        for system registers the register name can be used instead if the twi digit register id in hex.
         </li><br>
 
     <li>regSet &lt;reg&gt;.&lt;ep&gt &lt;data&gt;<br>
