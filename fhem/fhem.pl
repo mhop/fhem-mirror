@@ -3171,7 +3171,7 @@ evalStateFormat($)
     # Substitute reading names with their values, leave the rest untouched.
     $st = $sr;
     my $r = $hash->{READINGS};
-    $st =~ s/\b([A-Za-z_\.-]+)\b/($r->{$1} ? $r->{$1}{VAL} : $1)/ge;
+    $st =~ s/\b([A-Za-z\d_\.-]+)\b/($r->{$1} ? $r->{$1}{VAL} : $1)/ge;
 
   }
   $hash->{STATE} = ReplaceEventMap($name, $st, 1) if(defined($st));
