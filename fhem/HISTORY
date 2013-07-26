@@ -530,3 +530,6 @@
   
 - Sun Jul 14 2013 (Alexus)
   - Added new module "EGPM2LAN" and "EGPM"
+  
+- Fri Jul 26 2013 (Dirk)
+  - Added new module "I2C_BMP180"
