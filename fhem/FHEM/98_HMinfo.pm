@@ -1028,7 +1028,7 @@ sub HMinfo_cpRegs(@){#########################################################
 		</ul>
 	    and/or a filter for <b>names</b>:<br>
 	    <ul>
-		    <li>-f - filter   :regexp to filter entity names </li>
+		    <li>-f &lt;filter&gt;  :regexp to filter entity names </li>
         </ul>
 	    Example:<br>
 	    <ul><code>
@@ -1090,31 +1090,30 @@ sub HMinfo_cpRegs(@){#########################################################
 		  <li>Rssi clears all rssi counters </li>
 		  </ul>
 	  </li>
+      <li><a name="#HMinfosaveConfig">saveConfig</a> <a href="HMinfoFilter">[filter]</a><br>
+	      performs a save for all HM register setting and peers. See <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>. 
+	  </li>
+		 <br>
       <li><a name="#HMinfocpRegs">cpRegs &lt;src:peer&gt; &lt;dst:peer&gt; </a><br>
 	      allows to copy register, setting and behavior of a channel to 
 	      another or for peers from the same or different channels. Copy therefore is allowed
-		  intra/inter device and intra/inter channel. 
-		  <ul>
-	     <li>src:peer is the source entity. Peer needs to be given if a peer behabior beeds to be copied </li>
-	     <li>dst:peer is the destination entity.</li>
-		  </ul>
-		Examples are
-		 <code>
+		  intra/inter device and intra/inter channel. <br>
+	     <b>src:peer</b> is the source entity. Peer needs to be given if a peer behabior beeds to be copied <br>
+	     <b>dst:peer</b> is the destination entity.<br>
+		 Example<br>
+		 <ul><code>
 		  set hm cpRegs blindR blindL  # will copy all general register (list 1)for this channel from the blindR to the blindL entity. 
 		  This includes items like drive times. It does not include peers related register (list 3/4) <br>
 		  set hm cpRegs blindR:Btn1 blindL:Btn2  # copy behavior of Btn1/blindR relation to Btn2/blindL<br>
 		  set hm cpRegs blindR:Btn1 blindR:Btn2  # copy behavior of Btn1/blindR relation to Btn2/blindR, i.e. inside the same Actor<br>
-		 </code>
+		 </code></ul>
 		 <br>
 		 Restrictions:<br> 
-		 cpRegs will not add any peers or read from the devices. It is up to the user to read register in advance<br>
-		 cpRegs is only allowed between identical models<br>
-		 peerings of devices must exist. cpRegs will terminate if peers cannot be identified<br>
-		 cpRegs estimates that all readings are up-to-date. It is up to the user to ensure and check data consistancy. <br>
-		 <br>
-	  </li>
-      <li><a name="#HMinfosaveConfig">saveConfig</a> <a href="HMinfoFilter">[filter]</a><br>
-	      performs a save for all HM register setting and peers. See <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>. 
+		 <ul>
+		 cpRegs will <u>not add any peers</u> or read from the devices. It is up to the user to read register in advance<br>
+		 cpRegs is only allowed between <u>identical models</u><br>
+		 cpRegs expets that all <u>readings are up-to-date</u>. It is up to the user to ensure data consistancy.<br>
+		 </ul>
 	  </li>
       <li><a name="#HMinfotemplateDef">templateDef &lt;name&gt; &lt;param&gt; &lt;desc&gt; &lt;reg1:val1&gt; [&lt;reg2:val2&gt;] ...</a><br>
 	      define a template.<br>
@@ -1127,52 +1126,52 @@ sub HMinfo_cpRegs(@){#########################################################
 		  In case the register is from link set and can destinguist between long and short it is necessary to leave the
 		  leading sh or lg off. <br>
 		  if parameter are used it is necessary to enter p. as value with p0 first, p1 second parameter
-		Examples <br>
-		<code>
+		<br>
+		Example<br>
+		<ul><code>
 		 set hm templateDef SwOnCond level:cond "my description" CtValLo:p0 CtDlyOn:p1 CtOn:geLo<br>
-		</code>
-		 <br>
+		</code></ul>
 	  </li>
       <li><a name="#HMinfotemplateList">templateList [&lt;name&gt;]</a><br>
 	      list defined templates. If no name is given all templates will be listed<br>
 	  </li>
-      <li><a name="#HMinfotemplateChk">templateChk <a href="HMinfoFilter">[filter]</a> &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
+      <li><a name="#HMinfotemplateChk">templateChk <a href="HMinfoFilter">[filter] &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
 	     verifies if the register-readings comply to the template <br>
 	     Parameter are identical to <a href="#HMinfotemplateSet">templateSet</a><br>
 	     The procedure will check if the register values match the ones provided by the template<br>
-		 If no peer is necessary use <B>none</B> to skip this entry<br>
-		Examples <br>
-		<code>
-		 set hm templateChk -f RolloNord BlStopUpLg none         1 2 # verify RolloNord, no peer, parameter 1 and 2 given<br>
-		 set hm templateChk -f RolloNord BlStopUpLg peerName:long    # verify RolloNord peerName, long match template?<br>
-		 set hm templateChk -f RolloNord BlStopUpLg peerName         # verify RolloNord peerName, long and short match template?<br>
-		 set hm templateChk -f RolloNord BlStopUpLg peerName:all     # verify RolloNord peerName, long and short match template?<br>
-		 set hm templateChk -f RolloNord BlStopUpLg all:long         # verify RolloNord all peers,long match template?<br>
-		 set hm templateChk -f RolloNord BlStopUpLg all              # verify RolloNord all peers,long and short match template?<br>
-		 set hm templateChk -f Rollo.*   BlStopUpLg all              # verify each Rollo* all peers,long and short match template?<br>
-		 set hm templateChk BlStopUpLg                               # verify each entities against this template<br>
-		</code>
-		 <br>
+		 If no peer is necessary use <b>none</b> to skip this entry<br>
+		Example to verify settings<br>
+		<ul><code>
+		 set hm templateChk -f RolloNord BlStopUpLg none         1 2 # RolloNord, no peer, parameter 1 and 2 given<br>
+		 set hm templateChk -f RolloNord BlStopUpLg peerName:long    # RolloNord peerName, long only<br>
+		 set hm templateChk -f RolloNord BlStopUpLg peerName         # RolloNord peerName, long and short<br>
+		 set hm templateChk -f RolloNord BlStopUpLg peerName:all     # RolloNord peerName, long and short<br>
+		 set hm templateChk -f RolloNord BlStopUpLg all:long         # RolloNord any peer, long only<br>
+		 set hm templateChk -f RolloNord BlStopUpLg all              # RolloNord any peer,long and short<br>
+		 set hm templateChk -f Rollo.*   BlStopUpLg all              # each Rollo* any peer,long and short<br>
+		 set hm templateChk BlStopUpLg                               # each entities<br>
+		</code></ul>
 	  </li>
       <li><a name="#HMinfotemplateSet">templateSet &lt;entity&gt; &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
 	      sets a bunch of register accroding to a given template. Parameter may be added depending on 
 		  the template setup. <br>
-		  templateSet will collect and accumulate all changes. Finally the results are written streamlined.
-	     <li>entity: peer is the source entity. Peer needs to be given if a peer behabior beeds to be copied <\li>
-	     <li>template: one of the programmed template<\li>
-	     <li>peer: [long|short]:if necessary a peer needs to be given. If no peer is used enter '0'.
-		          with a peer it should be given whether it is for long or short keypress
-		   <\li>
-	     <li>param: number and meaning of parameter depends on the given template<\li>
-		Examples could be (templates not provided, just theoretical)<br>
+		  templateSet will collect and accumulate all changes. Finally the results are written streamlined.<br>
+	     <b>entity:</b> peer is the source entity. Peer needs to be given if a peer behabior beeds to be copied <br>
+	     <b>template:</b> one of the programmed template<br>
+	     <b>peer:</b> [long|short]:if necessary a peer needs to be given. If no peer is used enter '0'.
+		          with a peer it should be given whether it is for long or short keypress<br>
+	     <b>param:</b> number and meaning of parameter depends on the given template<br>
+		Example could be (templates not provided, just theoretical)<br>
+		<ul><code>
 		 set hm templateSet Licht1 staircase FB1:short 20  <br>
 		 set hm templateSet Licht1 staircase FB1:long 100  <br>
-		 <br>
-		 Restrictions:<br> 
+		</code></ul>
+		Restrictions:<br> 
+		<ul>
 		 User must ensure to read configuration prior to execution.<br>
 		 templateSet may not setup a complete register block but only a part if it. This is up to template design.<br>
 		 <br>
-	
+		</ul>
 	  </li>
     </ul>  
   </ul>
@@ -1189,10 +1188,10 @@ sub HMinfo_cpRegs(@){#########################################################
 	    Warnings: list of readings that shall be screend and counted based on current presence. 
 		I.e. counter is the number of entities with this reading and the same value. 
 		Readings to be searched are separated by comma. <br>
-		Example: <br>
-		<code>
+		Example:<br>
+		<ul><code>
            attr hm sumStatus battery,sabotageError<br>
-        </code>
+        </code></ul>
 		will cause a reading like<br>
 		W_sum_batterie ok:5 low:3<br>
 		W_sum_sabotageError on:1<br>
@@ -1205,15 +1204,18 @@ sub HMinfo_cpRegs(@){#########################################################
 		Here user can add reading<b>values</b> that are <b>not displayed</b>. I.e. the value is the
 		good-condition that will not be counted.<br>
 		This way user must not know all error values but it is sufficient to supress known non-ciritical ones. 
-		Example: <br>
-		<code>
+		<br>
+		Example:<br>
+		<ul><code>
            attr hm sumERROR battery:ok,sabotageError:off,overheat:off,Activity:alive:unknown<br>
-        </code>
+        </code></ul>
 		will cause a reading like<br>
+		<ul><code>
 		ERR_batterie low:3<br>
 		ERR_sabotageError on:1<br>
 		ERR_overheat on:3<br>
 		ERR_Activity dead:5<br>
+		</code></ul>
 	</li>
    </ul>
    <br>
@@ -1241,18 +1243,17 @@ sub HMinfo_cpRegs(@){#########################################################
         W_sum_&lt;reading&gt;: count of readings as defined in attribut 
 		<a href="#HMinfosumStatus">sumStatus</a>. </li>
     Example:<br>
-	<li><code>
-      ERR___rssiCrit LightKittchen,WindowDoor,Remote12
-      ERR__protocol NACK:2 ResendFail:5 CmdDel:2 CmdPend:1
-      ERR__protoNames LightKittchen,WindowDoor,Remote12,Ligth1,Light5
-      ERR_battery: low:2;
-      ERR_names: remote1,buttonClara,
-      I_rssiMinLevel 99&gt;:3 80&lt;:0 60&lt;:7 59&lt;:4
-      W_sum_battery: ok:5;low:2;
-      W_sum_overheat: off:7;
-      C_sumDefined: entities:23 device:11 channel:16 virtual:5;
-	</code></li>
-
+	<ul><code>
+      ERR___rssiCrit LightKittchen,WindowDoor,Remote12<br>
+      ERR__protocol NACK:2 ResendFail:5 CmdDel:2 CmdPend:1<br>
+      ERR__protoNames LightKittchen,WindowDoor,Remote12,Ligth1,Light5<br>
+      ERR_battery: low:2;<br>
+      ERR_names: remote1,buttonClara,<br>
+      I_rssiMinLevel 99&gt;:3 80&lt;:0 60&lt;:7 59&lt;:4<br>
+      W_sum_battery: ok:5;low:2;<br>
+      W_sum_overheat: off:7;<br>
+      C_sumDefined: entities:23 device:11 channel:16 virtual:5;<br>
+	</code></ul>
    </ul>
 </ul>
 =end html
