@@ -102,7 +102,11 @@ sub WOL_GetUpdate($)
   
   my $ip = $hash->{IP};
   #if (system("ping -q -c 1 $ip > /dev/null") == 0)
-  if (`ping -c 1 $ip` =~ m/100/)
+  ####
+  #changed 2013-07-27 by UliM
+  #based on Thread http://forum.fhem.de/index.php?t=msg&th=11823&goto=69801&rid=86#msg_69801
+ #if (`ping -c 1 $ip`      =~ m/100/)
+  if (`ping -c 1 -w 1 $ip` =~ m/100%/)
   {
     $hash->{READINGS}{state}{VAL} = "off";
     $hash->{READINGS}{isRunning}{VAL} = "false";
