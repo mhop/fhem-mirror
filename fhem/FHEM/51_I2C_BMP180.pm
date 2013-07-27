@@ -229,34 +229,24 @@ sub I2C_BMP180_Set($@) {
 		);
 
 		my $altitude = AttrVal('global', 'altitude', 0);
-		my $txtAltitude = '';
-		my $pressureNN = 0;
 		
-		# if altitude given
-		if ($altitude != 0) {
-			# simple barometric height formula
-			$pressureNN = sprintf(
-				'%.' . AttrVal($hash->{NAME}, 'roundPressureDecimal', 1) . 'f',
-				$pressure + ($altitude / 8.5)
-			);
-			
-			$txtAltitude = ' in ' . $altitude . ' m, Pressure-NN: ' . $pressureNN . ' hPa';
-		}
-
+		# simple barometric height formula
+		my $pressureNN = sprintf(
+			'%.' . AttrVal($hash->{NAME}, 'roundPressureDecimal', 1) . 'f',
+			$pressure + ($altitude / 8.5)
+		);
+		
 		readingsBeginUpdate($hash);
 		readingsBulkUpdate(
 			$hash,
 			'state',
-			'Temp: ' . $temperature . ' °C , Pressure: ' . $pressure . ' hPa' . $txtAltitude,
-			0
+			'T: ' . $temperature . ' P: ' . $pressure . ' P-NN: ' . $pressureNN
 		);
 		readingsBulkUpdate($hash, 'temperature', $temperature);
 		readingsBulkUpdate($hash, 'pressure', $pressure);
 
-		# if altitude given
-		if ($altitude >= 0) {
-			readingsBulkUpdate($hash, 'pressure-nn', $pressureNN);
-		}
+		readingsBulkUpdate($hash, 'pressure-nn', $pressureNN);
+		readingsBulkUpdate($hash, 'altitude', $altitude, 0);
 
 		readingsEndUpdate($hash, 1);
 	}
