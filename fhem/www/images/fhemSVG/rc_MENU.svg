@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   version="1.0"
+   width="468pt"
+   height="468pt"
+   viewBox="0 0 468 468"
+   id="svg2"
+   inkscape:version="0.48.4 r9939"
+   sodipodi:docname="menu.svg">
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1858"
+     inkscape:window-height="1057"
+     id="namedview10"
+     showgrid="false"
+     inkscape:zoom="0.4034188"
+     inkscape:cx="930.58833"
+     inkscape:cy="-224.20054"
+     inkscape:window-x="1734"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg2" />
+  <defs
+     id="defs12" />
+  <metadata
+     id="metadata4">
+Created by potrace 1.8, written by Peter Selinger 2001-2007
+<rdf:RDF>
+  <cc:Work
+     rdf:about="">
+    <dc:format>image/svg+xml</dc:format>
+    <dc:type
+       rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+    <dc:title></dc:title>
+  </cc:Work>
+</rdf:RDF>
+</metadata>
+  <g
+     transform="matrix(0.189474,0,0,-0.189474,0,468)"
+     id="g6">
+    <path
+       d="M 395,2455 C 244,2422 112,2322 57,2200 5,2083 6,2112 2,1260 0,702 2,446 10,400 43,208 198,52 398,11 c 71,-15 1628,-15 1692,0 174,40 322,190 365,370 22,94 22,1579 0,1683 -21,98 -66,187 -127,252 -61,64 -113,98 -201,128 -61,21 -75,21 -867,23 -640,1 -817,-1 -865,-12 z m 1737,-163 c 74,-36 132,-95 170,-170 l 23,-47 0,-840 0,-840 -28,-57 c -37,-76 -96,-134 -171,-169 l -63,-29 -839,2 -839,3 -50,27 C 273,204 196,285 167,348 l -22,47 0,840 0,840 27,52 c 53,100 128,162 227,189 35,10 236,12 856,11 l 810,-2 67,-33 z"
+       id="path8" />
+  </g>
+  <g
+     style="font-size:133.91072083px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Arial;-inkscape-font-specification:Arial Bold"
+     id="text2993">
+    <path
+       d="m 46.803013,284.86215 0,-95.85601 28.966039,0 17.392702,65.38609 17.196546,-65.38609 29.03142,0 0,95.85601 -17.98117,0 0,-75.45555 -19.02736,75.45555 -18.635034,0 -18.961967,-75.45555 0,75.45555 z"
+       style=""
+       id="path2998" />
+    <path
+       d="m 158.74401,284.86215 0,-95.85601 71.07468,0 0,16.21575 -51.7204,0 0,21.25048 48.12417,0 0,16.15037 -48.12417,0 0,26.08905 53.55121,0 0,16.15036 z"
+       style=""
+       id="path3000" />
+    <path
+       d="m 248.38834,284.86215 0,-95.85601 18.8312,0 39.23165,64.01298 0,-64.01298 17.98118,0 0,95.85601 -19.41967,0 -38.64318,-62.5091 0,62.5091 z"
+       style=""
+       id="path3002" />
+    <path
+       d="m 344.83283,189.00614 19.35429,0 0,51.91656 c -3e-5,8.23868 0.23972,13.57854 0.71924,16.01959 0.8282,3.92319 2.80068,7.07262 5.91745,9.44829 3.11669,2.37571 7.37768,3.56356 12.78298,3.56354 5.49237,2e-5 9.63349,-1.12244 12.42335,-3.36738 2.78975,-2.2449 4.46799,-5.00201 5.03473,-8.27134 0.56662,-3.26928 0.84996,-8.69632 0.85002,-16.28114 l 0,-53.02812 19.35429,0 0,50.34729 c -9e-5,11.50799 -0.52318,19.63765 -1.56927,24.38901 -1.04626,4.75141 -2.97515,8.76175 -5.78667,12.03105 -2.81168,3.26931 -6.57137,5.87385 -11.2791,7.81363 -4.70786,1.93979 -10.85415,2.90968 -18.43888,2.90968 -9.15409,0 -16.09591,-1.05707 -20.82547,-3.17122 -4.72962,-2.11415 -8.46752,-4.86036 -11.21371,-8.23865 -2.74623,-3.37827 -4.55525,-6.92001 -5.42705,-10.62524 -1.26414,-5.49241 -1.89621,-13.60027 -1.8962,-24.32363 z"
+       style=""
+       id="path3004" />
+  </g>
+</svg>
