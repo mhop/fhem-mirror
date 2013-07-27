@@ -1410,7 +1410,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  $success = "yes";
 	  $reply = "ACK"; 
 	}
-	readingsSingleUpdate($chnhash,"CommandAccepted",$success,1);
+	readingsSingleUpdate($chnhash,"CommandAccepted",$success,0);
     CUL_HM_ProcessCmdStack($shash) 
 	      if($dhash->{DEF} && (CUL_HM_IOid($shash) eq $dhash->{DEF}));
 	$ret = $reply;
@@ -2963,7 +2963,7 @@ sub CUL_HM_protState($$){
   my ($hash,$state) = @_;
   $hash->{protState} = $state;
   my $name = $hash->{NAME};
-  readingsSingleUpdate($hash,"state",$state,1)if (!$hash->{helper}{role}{chn});
+  readingsSingleUpdate($hash,"state",$state,0)if (!$hash->{helper}{role}{chn});
   Log GetLogLevel($name,6),"CUL_HM $name protEvent:$state".
             ($hash->{cmdStack}?" pending:".scalar @{$hash->{cmdStack}}:"");
 
