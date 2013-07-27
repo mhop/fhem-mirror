@@ -985,21 +985,21 @@ sub HMinfo_cpRegs(@){#########################################################
 <h3>HMinfo</h3>
 <ul>
   <tr><td>
-  HMinfo is a module that shall support in getting an overview of 
+  HMinfo is a module to support getting an overview  of 
   eQ-3 HomeMatic devices as defines in <a href="#CUL_HM">CUL_HM</a>. <br><br>
   <B>Status information and counter</B><br>
-  hminfo tries to give an overview on the CUL_HM installed base including current conditions. 
-  Readings and counter will not be updates automatically due to performance issues. <br>
+  HMinfo gives an overview on the CUL_HM installed base including current conditions. 
+  Readings and counter will not be updated automatically  due to performance issues. <br>
   Command <a href="#HMinfoupdate">update</a> must be used to refresh the values. 
   <ul><code>
            set hm update<br>
   </code></ul>
-  Webview of HMinfo will provide details, mainly based counter drivern, on how 
-  many CUL_HM entities experience certain conditions. Areas provided are 
+  Webview of HMinfo will provide details, basically counter about how 
+  many CUL_HM entities experience exceptional conditions. Areas provided are 
   <li>Action Detector status</li>
-  <li>CUL_HM related IO devices with their condition</li>
+  <li>CUL_HM related IO devices and condition</li>
   <li>Device protocol events which are related to communication errors</li>
-  <li>count of certain readings (e.g. batterie) with their condition - <a href="HMinfoattr">attribut controlled</a></li>
+  <li>count of certain readings (e.g. batterie) and conditions - <a href="HMinfoattr">attribut controlled</a></li>
   <li>count of error condition in readings (e.g. overheat, motorError) - <a href="HMinfoattr">attribut controlled</a></li>  
   
   <br>
@@ -1009,8 +1009,7 @@ sub HMinfo_cpRegs(@){#########################################################
   
   Commands will be executed on all HM entities of the installation. 
   If applicable and evident execution is restricted to related entities. 
-  This means that rssi is executed only on devices, never channels since 
-  they never have support rssi values.<br><br>
+  In fact, rssi is executed on devices only because channels do not support rssi values.<br><br>
   <a name="HMinfoFilter"><b>Filter</b></a>
   <ul>  can be applied as following:<br><br>
         <code>set &lt;name&gt; &lt;cmd&gt; &lt;filter&gt; [&lt;param&gt;]</code><br>
@@ -1041,7 +1040,7 @@ sub HMinfo_cpRegs(@){#########################################################
   <a name="HMinfodefine"><b>Define</b></a>
   <ul>
     <code>define &lt;name&gt; HMinfo</code><br> 
-    Just one entity needs to be defines, no parameter are necessary.<br> 	
+    Just one entity needs to be defined without any parameter.<br> 	
   </ul>
   <br>
 
