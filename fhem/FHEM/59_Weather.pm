@@ -466,7 +466,7 @@ WeatherIconIMGTag($) {
 
 #####################################
 sub
-WeatherAsHtml($)
+WeatherAsHtmlV($)
 {
 
   my ($d) = @_;
@@ -476,8 +476,8 @@ WeatherAsHtml($)
 
   my $width= int(ICONSCALE*ICONWIDTH);
       
-  my $ret = sprintf("<table><tr><th width=%d></th><th></th></tr>", $width);
-  $ret .= sprintf('<tr><td width=%d>%s</td><td>%s<br>%s°C  %s%%<br>%s</td></tr>',
+  my $ret = sprintf('<table class="weather"><tr><th width=%d></th><th></th></tr>', $width);
+  $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue">%s<br>%s°C  %s%%<br>%s</td></tr>',
         $width,
         WeatherIconIMGTag(ReadingsVal($d, "icon", "")),
         ReadingsVal($d, "condition", ""),
@@ -485,10 +485,46 @@ WeatherAsHtml($)
         ReadingsVal($d, "wind_condition", ""));
 
   for(my $i=1; $i<=5; $i++) {
-    #  Yahoo provides 5 days since June 2013 (previouly 2 days)
-    #next if (ReadingsVal($d, "fc${i}_code", "") eq ""); # MH skip non existent entries
+    $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherMin">min %s°C</span> <span class="weatherMax">max %s°C</span></td></tr>',
+        $width,
+        WeatherIconIMGTag(ReadingsVal($d, "fc${i}_icon", "")),
+        ReadingsVal($d, "fc${i}_day_of_week", ""),
+        ReadingsVal($d, "fc${i}_condition", ""),
+        ReadingsVal($d, "fc${i}_low_c", ""), ReadingsVal($d, "fc${i}_high_c", ""));
+  }
+      
+  $ret .= "</table>";
+  return $ret;
+}
 
-    $ret .= sprintf('<tr><td width=%d>%s</td><td>%s: %s<br>min %s°C max %s°C</td></tr>',
+sub
+WeatherAsHtml($)
+{
+  WeatherAsHtmlV(@_);
+}
+
+sub
+WeatherAsHtmlH($)
+{
+
+  my ($d) = @_;
+  $d = "<none>" if(!$d);
+  return "$d is not a Weather instance<br>"
+        if(!$defs{$d} || $defs{$d}{TYPE} ne "Weather");
+
+  my $width= int(ICONSCALE*ICONWIDTH);
+      
+  my $ret = sprintf('<table class="weather"><tr><th width=%d></th><th></th><th></th><th></th></tr><tr>', $width);
+  $ret .= sprintf('<td><table><tr><td class="weatherIcon" width=%d>%s</td></tr><tr><td class="weatherValue">%s<br>%s°C  %s%%<br>%s</td></tr></table></td>',
+        $width,
+        WeatherIconIMGTag(ReadingsVal($d, "icon", "")),
+        ReadingsVal($d, "condition", ""),
+        ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""),
+        ReadingsVal($d, "wind_condition", ""));
+        
+
+  for(my $i=1; $i<=5; $i++) {
+    $ret .= sprintf('<td><table><tr><td class="weatherIcon" width=%d>%s</td></tr><tr><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherMin">min %s°C</span> <span class="weatherMax">max %s°C</span></td></tr></table></td>',
         $width,
         WeatherIconIMGTag(ReadingsVal($d, "fc${i}_icon", "")),
         ReadingsVal($d, "fc${i}_day_of_week", ""),
@@ -496,10 +532,9 @@ WeatherAsHtml($)
         ReadingsVal($d, "fc${i}_low_c", ""), ReadingsVal($d, "fc${i}_high_c", ""));
   }
 
-  $ret .= "</table>";
+  $ret .= "</tr></table>";
   return $ret;
 }
-
 #####################################
 
 
@@ -542,6 +577,16 @@ WeatherAsHtml($)
       define MyWeather Weather 673513
       define Forecast Weather 673513 1800
      </pre>
+     
+    The module provides three additional functions <code>WeatherAsHtml</code>, <code>WeatherAsHtmlV</code> and
+    <code>WeatherAsHtmlH</code>. The former two functions are identical: they return the HTML code for a
+    vertically arranged weather forecast. The latter returns the HTML code for a horizontally arranged weather forecast.<br><br>
+    Example:
+    <pre>
+      define MyWeatherWeblink weblink htmlCode { WeatherAsHtmlH("MyWeather") }
+    </pre>
+
+     
   </ul>
   <br>
 
@@ -560,8 +605,8 @@ WeatherAsHtml($)
   <ul>
     <code>get &lt;name&gt; &lt;reading&gt;</code><br><br>
 
-    Valid readings and their meaning (? can be one of 1, 2 and stands
-    for today, tomorrow):<br>
+    Valid readings and their meaning (? can be one of 1, 2, 3, 4, 5 and stands
+    for today, tomorrow, etc.):<br>
     <table>
     <tr><td>city</td><td>name of town returned for location</td></tr>
     <tr><td>code</td><td>current condition code</td></tr>
