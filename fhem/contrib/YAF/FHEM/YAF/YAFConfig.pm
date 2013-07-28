@@ -31,6 +31,7 @@ my $yaf_version=0.41;
 
 my %fhemwidgets;
 my %fhemviews;
+my $isInit = 0;
 
 #######################################################################################
 #
@@ -44,7 +45,7 @@ my %fhemviews;
 sub YAF_FHEMConfig { #this is called via ajax when the page is loaded.
 		#get the views
 		my $views = AttrVal("yaf","views",undef);
-		if(defined $views) {
+		if(defined $views and $isInit == 0) {
 			foreach my $view (split (/;/,$views)) {
 				my @aview = split(/,/,$view);
 				$fhemviews{$aview[0]} = $aview[1];
@@ -67,6 +68,9 @@ sub YAF_FHEMConfig { #this is called via ajax when the page is loaded.
 		} else {
 			return 0;
 		}
+		Log 3, "YAF initialized";
+		$isInit = 1;
+		return 1;
 }
 
 #######################################################################################
@@ -453,6 +457,7 @@ sub YAF_setWidgetPosition{
 # viewId - The view id to search
 # widgetId - The widget id
 # attributeName - name of the attribute properties to search for
+# default - Value to return on undefined
 #
 # @return The value property if successful, otherwise 0
 #
@@ -462,7 +467,12 @@ sub YAF_getWidgetAttribute{
 		my $viewId = $_[0];
 		my $widgetId = $_[1];
 		my $attributeName = $_[2];
+		my $default = (defined $_[3]) ? $_[3] : 0;
 
+		if($isInit == 0) {						#after a restart of fhem the config hashes might be empty, because they are filled while
+			YAF_FHEMConfig();					#loading the "yaf.htm" page. However, when restarting FHEM without reloading the page, there
+		}										#will be lots of errors. Since this method is called by any update method, we check if YAF
+												#is initialized and load the config, if not.
 		my $retAttr = "";
 		my $widgetName = "";
 
@@ -470,7 +480,7 @@ sub YAF_getWidgetAttribute{
 			$widgetName = $fhemwidgets{$viewId}{$widgetId};
 		}
 
-		if("fhemname" eq $attributeName) {					#special case: get the fhemname
+		if("fhemname" eq $attributeName) {						#special case: get the fhemname
 			$retAttr = $widgetName;								#the key is the name of the device
 		} else {
 			my $attrString = AttrVal($widgetName,"yaf_$viewId",undef);
@@ -488,7 +498,7 @@ sub YAF_getWidgetAttribute{
 		if(length $retAttr > 0) {
 			return $retAttr;											#return the found config
 		} else {
-			return 0;
+			return $default;
 		}
 }
 
@@ -505,7 +515,7 @@ sub YAF_getRefreshTime{
 		if (defined $ret) {
 			return $ret;
 		} else {
-			Log 1,"YAF_getRefreshTime: refresh_interval attribute was not found (so it was created with a default value)";
+			Log 1,"YAF_getRefreshTime: refresh_interval attribute was not found (so it will be created with a default value)";
 			fhem("attr yaf refresh_interval 60");
 			fhem("save");
 			return 60;
@@ -527,7 +537,7 @@ sub YAF_setRefreshTime{
 			#fhem("save");
 			return 1;
 		} else {
-			Log 1,"YAF_setRefreshTime: no valid refresh value or refresh node was not found";
+			Log 1,"YAF_setRefreshTime: no valid refresh value or refresh attribute was not found";
 			return 0;
 		}
 }
