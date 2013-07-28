@@ -69,28 +69,36 @@ sub HMT350_RCLayout();
 sub HMT350_RCmakenotify($$);
 
 %HMT350_RCtranslate = (
-power	=>	"POWER",
-mute	=>	"MUTE",
-home	=>	"HOME",
-volplus	=>	"VOLp",
-tvout	=>	"OK",
-up		=>	"UP",
-rewind	=>	"REWIND",
-left	=>	"LEFT",
-ok		=>	"OK",
-right	=>	"RIGHT",
-down	=>	"DOWN",
-ret		=>	"RETURN",
-volmin	=>	"VOLm",
-stop	=>	"STOP",
-pageup	=>	"PAGEUP",
-pause	=>	"PAUSE",
-itv		=> 	"ITV",
-pagedn	=>	"PAGEDOWN",
-menu	=>	"MENU",
-fav		=>	"OK",
-fmradio	=>	"FMRADIO",
+home		=>	"HOME",
+volplus		=>	"VOLp",
+volmin		=>	"VOLm",
+pageup		=>	"PAGEUP",
+pagedn		=>	"PAGEDOWN",
 );
+
+# %HMT350_RCtranslate = (
+# power		=>	"POWER",
+# mute		=>	"MUTE",
+# home		=>	"HOME",
+# volplus		=>	"VOLp",
+# tvout		=>	"OK",
+# up			=>	"UP",
+# rewind		=>	"REWIND",
+# left		=>	"LEFT",
+# ok			=>	"OK",
+# right		=>	"RIGHT",
+# down		=>	"DOWN",
+# "return"	=>	"RETURN",
+# volmin		=>	"VOLm",
+# stop		=>	"STOP",
+# pageup		=>	"PAGEUP",
+# pause		=>	"PAUSE",
+# itv			=> 	"ITV",
+# pagedn		=>	"PAGEDOWN",
+# menu		=>	"MENU",
+# fav			=>	"OK",
+# fmradio		=>	"FMRADIO",
+# );
 
 ###################################
 sub
@@ -149,8 +157,14 @@ LISTENLIVE_Set($@)
 		when("rc"){
 
 			$g = "raw";
-			$c = $HMT350_RCtranslate{$cmd};
-			Log $loglevel, "LISTENLIVE $name rc_translate: >$cmdGroup $cmd< translated to: >$g $c<";
+			# prüfen ob Befehl in Kleinbuchstaben,
+			# wenn ja => übersetzen!
+			if($cmd eq lc($cmd)){
+				$c = $HMT350_RCtranslate{$cmd};
+				Log $loglevel, "LISTENLIVE $name rc_translate: >$cmdGroup $cmd< translated to: >$g $c<";
+			} else {
+				$c = $cmd;
+			}
 			fhem("set $name $g $c");
 			break;
 		}
@@ -604,16 +618,16 @@ sub HMT350_RClayout() {
 	my @row;
 	my $rownum = 0;
 
-	$row[$rownum]="power:POWEROFF,:blank,:blank,:blank,mute:MUTE"; $rownum++;
+	$row[$rownum]="power:POWEROFF,:blank,:blank,:blank,MUTE"; $rownum++;
 	$row[$rownum]="home:HOMEsym,:blank,volplus:VOLUP,:blank,:TVout"; $rownum++;
-	$row[$rownum]=":blank,:blank,up:UP,:blank,:blank"; $rownum++;
-	$row[$rownum]="rewind:REWIND,left:LEFT,ok:OK,right:RIGHT,forward:FF"; $rownum++;
-	$row[$rownum]=":blank,:blank,down:DOWN,:blank,:blank"; $rownum++;
-	$row[$rownum]="ret:RETURN,:blank,volmin:VOLDOWN,:blank,stop:STOP"; $rownum++;
+	$row[$rownum]=":blank,:blank,UP,:blank,:blank"; $rownum++;
+	$row[$rownum]="REWIND,LEFT,OK,RIGHT,forward:FF"; $rownum++;
+	$row[$rownum]=":blank,:blank,DOWN,:blank,:blank"; $rownum++;
+	$row[$rownum]="RETURN,:blank,volmin:VOLDOWN,:blank,STOP"; $rownum++;
 	$row[$rownum]=":blank,:blank,:blank,:blank,:blank"; $rownum++;
-	$row[$rownum]="raw+PGUP:PAGEUP,:blank,raw+PAUSE:PAUSE,:blank,raw+ITV:ITV"; $rownum++;
-	$row[$rownum]="raw+PGDN:PAGEDOWN,:blank,raw+MENU:MENU,:blank,raw+IRADIO:IRADIO"; $rownum++;
-	$row[$rownum]=":FAV,:blank,raw+REPEAT:REPEAT,:blank,raw+FMRADIO:FMRADIO"; $rownum++;
+	$row[$rownum]="PAGEUP,:blank,PAUSE,:blank,ITV"; $rownum++;
+	$row[$rownum]="PAGEDOWN,:blank,MENU,:blank,IRADIO"; $rownum++;
+	$row[$rownum]=":FAV,:blank,REPEAT,:blank,FMRADIO"; $rownum++;
 
 	$row[19]="attr rc_iconpath icons/remotecontrol";
 	$row[20]="attr rc_iconprefix black_btn_";
@@ -721,7 +735,7 @@ statusRequest
   </ul>
   <br>
 <br><br>
-  <a name="YAMAHA_AVRattr"></a>
+  <a name="LISTENLIVEattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#loglevel">loglevel</a></li>
@@ -845,7 +859,7 @@ statusRequest
   </ul>
   <br>
 <br><br>
-  <a name="YAMAHA_AVRattr"></a>
+  <a name="LISTENLIVEattr"></a>
   <b>Attribute</b>
   <ul>
     <li><a href="#loglevel">loglevel</a></li>
