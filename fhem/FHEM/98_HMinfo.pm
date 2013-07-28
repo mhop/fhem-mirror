@@ -776,11 +776,14 @@ sub HMinfo_templateDef(@){#####################################################
   }
   # get description if marked wir ""
   if ($desc =~ m/^"/){
+    my $cnt = 0;
     foreach (@regs){
-      $desc .= " ".(shift @regs);
+      $desc .= " ".$_;
+	  $cnt++;
 	  last if ($desc =~ m/"$/);
 	}
 	$desc =~ s/"//g;
+	splice @regs,0,$cnt;
   }
 
   return "$name already defined, delete it first" if($tpl{$name});
