@@ -693,6 +693,8 @@ SWAP_Parse($$)
 {
   my ($hash, $msg) = @_;
 
+  return undef if( $msg !~ m/^[\dA-F]{12,}$/ );
+
   my $dest = substr($msg, 0, 2);
   my $src = substr($msg, 2, 2);
   my $hop = substr($msg, 4, 1);
