@@ -136,21 +136,22 @@ panStamp_Set($@)
 {
   my ($hash, @a) = @_;
 
-  return "\"set panStamp\" needs at least one parameter" if(@a < 2);
-
   my $name = shift @a;
   my $cmd = shift @a;
   my $arg = join("", @a);
-  my $ll = GetLogLevel($name,3);
 
-  my $list = "raw";
+  my $list = "discover raw";
   return $list if( $cmd eq '?' );
 
   if($cmd eq "raw") {
-    return "Expecting a 0-padded hex number"
-        if((length($arg)&1) == 1 && $cmd ne "raw");
-    Log $ll, "set $name $cmd $arg";
+    return "\"set panStamp $cmd\" needs exactly one parameter" if(@_ != 4);
+    return "Expecting a even length hex number" if((length($arg)&1) == 1 || $arg !~ m/^[\dA-F]{12,}$/ );
+    Log GetLogLevel($name,4), "set $name $cmd $arg";
     panStamp_SimpleWrite($hash, $arg);
+
+  } elsif($cmd eq "discover") {
+    Log GetLogLevel($name,4), "set $name $cmd";
+    panStamp_SimpleWrite($hash, "00".$hash->{address}."0000010000" );
 
   } else {
     return "Unknown argument $cmd, choose one of ".$list;
@@ -221,7 +222,7 @@ panStamp_DoInit($)
   $hash->{syncword} = sprintf( "%04s", $val );
 
   panStamp_SimpleWrite($hash, "ATCH=$hash->{channel}" );
-  ($err, $val) = panStamp_ReadAnswer($hash, "address", 0, undef);
+  ($err, $val) = panStamp_ReadAnswer($hash, "channel", 0, undef);
   return "$name: $err" if($err && ($err !~ m/Timeout/));
 
   panStamp_SimpleWrite($hash, "ATCH?" );
@@ -241,7 +242,7 @@ panStamp_DoInit($)
   panStamp_SimpleWrite($hash, "ATO" );
   panStamp_ReadAnswer($hash, "data mode?", 0, undef);
 
-  panStamp_SimpleWrite($hash, "00010000010000" );
+  panStamp_SimpleWrite($hash, "00".$hash->{address}."0000010000" );
 
   $hash->{STATE} = "Initialized";
 
@@ -347,7 +348,7 @@ panStamp_Write($$$)
   my ($hash,$addr,$msg) = @_;
 
   Log 5, "$hash->{NAME} sending $addr $msg";
-  my $bstring = $addr.$hash->{"address"}.$msg;
+  my $bstring = $addr.$hash->{address}.$msg;
 
   panStamp_AddQueue($hash, $bstring);
   #panStamp_SimpleWrite($hash, $bstring);
