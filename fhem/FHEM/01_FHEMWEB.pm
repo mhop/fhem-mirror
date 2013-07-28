@@ -173,7 +173,9 @@ FW_Define($$)
   return "Usage: define <name> FHEMWEB [IPV6:]<tcp-portnr> [global]"
         if($port !~ m/^(IPV6:)?\d+$/ || ($global && $global ne "global"));
 
-  FW_readIcons("default");
+  foreach my $pe ("fhemSVG", "openautomation", "default") {
+    FW_readIcons($pe);
+  }
         
   my $ret = TcpServer_Open($hash, $port, $global);
 
@@ -2432,6 +2434,7 @@ FW_Notify($$)
         push @data, "$dn-$readingName-ts<<$tn<<$tn";
       }
     }
+
   } elsif($filter eq "console") {
     if($dev->{CHANGED}) {    # It gets deleted sometimes (?)
       my $tn = TimeNow();
@@ -2445,10 +2448,11 @@ FW_Notify($$)
         push @data,("$tn $dt $dn ".$dev->{CHANGED}[$i]."<br>");
       }
     }
+
   }
 
   if(@data) {
-    # Collect multiple changes (e.g. from noties) into one message
+    # Collect multiple changes (e.g. from notifiees) into one message
     $ntfy->{INFORMBUF} .= join("\n", map { s/\n/ /gm; $_ } @data)."\n";
     RemoveInternalTimer($ln);
     if(length($ntfy->{INFORMBUF}) > 1024) {
