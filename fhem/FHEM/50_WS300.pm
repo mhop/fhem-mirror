@@ -291,7 +291,10 @@ WS300_Parse($$)
           # state
 	  $val = "T: $t  H: $h  Bat: $b  LR: $l";
 	  $def->{STATE} = $val;
+          $hash->{".updateTimestamp"};
           readingsBulkUpdate($def, 'state', $val);
+
+          $def->{CHANGETIME}[0] = $tm;
           # temperature
           readingsBulkUpdate($def, $txt[0], $t);
           # humidity
@@ -310,10 +313,10 @@ WS300_Parse($$)
           readingsBeginUpdate($def);
           # state
           $val = "T: $t  H: $h  W: $wind  R: $rain  IR: $ir  Bat: $b  LR: $l";
-	  $def->{STATE} = $val;
+          $def->{STATE} = $val;
+          $hash->{".updateTimestamp"};
           readingsBulkUpdate($def, 'state', $val);
 
-          $def->{CHANGED}[0] = $val;
           $def->{CHANGETIME}[0] = $tm;
           # temperature
           readingsBulkUpdate($def, $txt[0], $t);
@@ -414,6 +417,9 @@ WS300_Parse($$)
     # state
     $val = "T: $t  H: $h  P: $press  Willi: $willi";
     $def->{STATE} = $val;
+
+    $hash->{".updateTimestamp"};
+    $def->{CHANGETIME}[0] = $tm;
     readingsBulkUpdate($def, 'state', $val);
     # temperature
     readingsBulkUpdate($def, $txt[0], $t);
@@ -673,3 +679,4 @@ NEXTPOLL:
 
 =end html
 =cut
+
