@@ -422,6 +422,10 @@ sub CUL_HM_Attr(@) {#################################
 # translate level to readable
     my %lvlStr = ( md =>{ "HM-SEC-WDS"      =>{"00"=>"dry"     ,"64"=>"damp"    ,"C8"=>"wet"        }
 	                     ,"HM-CC-SCD"       =>{"00"=>"normal"  ,"64"=>"added"   ,"C8"=>"addedStrong"}
+	                     ,"HM-Sen-RD-O"     =>{"00"=>"dry"                      ,"C8"=>"rain"}
+	                    }
+                  ,mdCh=>{ "HM-Sen-RD-O01"   =>{"00"=>"dry"                      ,"C8"=>"rain"}
+	                      ,"HM-Sen-RD-O02"   =>{"00"=>"on"                       ,"C8"=>"off"}
 	                    }
 				  ,st =>{ "smokeDetector"   =>{"01"=>"no alarm","C7"=>"tone off","C8"=>"Smoke Alarm"}
 				         ,"threeStateSensor"=>{"00"=>"closed"  ,"64"=>"tilted"  ,"C8"=>"open"}
@@ -834,6 +838,34 @@ sub CUL_HM_Parse($$) {##############################
 		$d -= 0x10000 if($d & 0x4000); 
         push @event, sprintf("Val_$dField{$a}:%0.1f",$d/10);
 	  }
+	}
+  } 
+  elsif($st eq "sensRain") {###################################################
+    if (($mTp eq "02" && $p =~ m/^01/) || #Ack_Status
+	    ($mTp eq "10" && $p =~ m/^06/))	{ #Info_Status
+
+      my ($subType,$chn,$val,$err) = ($1,hex($2),$3,hex($4)) 
+ 	                     if($p =~ m/^(..)(..)(..)(..)/);
+	  $chn = sprintf("%02X",$chn&0x3f);
+	  my $chId = $src.$chn;
+      $shash = $modules{CUL_HM}{defptr}{$chId} 
+	                         if($modules{CUL_HM}{defptr}{$chId});
+	  my $mdCh = $model.$chn;
+	  if($lvlStr{mdCh}{$mdCh} &&  $lvlStr{mdCh}{$mdCh}{$val}){
+	    $val = $lvlStr{mdCh}{$mdCh}{$val};
+      }
+	  else{
+	    $val = hex($val)/2;
+	  }
+	  push @event, "state:$val";
+	}
+    elsif ($mTp eq "41")	{ #event
+      my ($chn,$bno) = (hex($1),hex($2)) if($p =~ m/^(..)(..)/);
+	  $chn = sprintf("%02X",$chn&0x3f);
+	  my $chId = $src.$chn;
+      $shash = $modules{CUL_HM}{defptr}{$chId} 
+	                         if($modules{CUL_HM}{defptr}{$chId});
+	  push @event,"trigger:$bno";
 	}
   } 
   elsif($st =~ m /^(switch|dimmer|blindActuator)$/) {##########################

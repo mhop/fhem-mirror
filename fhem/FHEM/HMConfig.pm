@@ -195,7 +195,7 @@ my %culHmModel=(
   "00A4" => {name=>"HM-LC-Dim1T-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
   "00A5" => {name=>"HM-RC-Sec4-2"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"Btn:1:2,BTN_T:3:1,BTN_A:4:1",},#only 1 and 2 canbe peered???
   "00A6" => {name=>"HM-RC-Key4-2"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"Btn:1:2,BTN_T:3:1,BTN_A:4:1",},#only 1 and 2 canbe peered???
-  "00A7" => {name=>"HM-Sen-RD-O"             ,st=>''                  ,cyc=>''      ,rxt=>''       ,lst=>'1:1,4:1'      ,chn=>"Rain:1:1,Sw:2:2",},
+  "00A7" => {name=>"HM-Sen-RD-O"             ,st=>'sensRain'          ,cyc=>''      ,rxt=>''       ,lst=>'1:1,4:1'      ,chn=>"Rain:1:1,Heating:2:2",},
   "00A8" => {name=>"HM-WDS30-OT2-SM"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"Th:1:4,Weather:5:5",},
   "00A9" => {name=>"HM-PB-6-WM55"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:6",},
   "00AB" => {name=>"HM-LC-SW4-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"Sw:1:4",},
@@ -580,10 +580,11 @@ my %culHmRegType = (
 					   peerNeedsBurst  =>1
 			           },
   threeStateSensor  =>{cyclicInfoMsg   =>1,                    transmDevTryMax =>1,
-					                                          ,transmitTryMax  =>1,
+					                                           transmitTryMax  =>1,
                        peerNeedsBurst  =>1,expectAES       =>1
 					   },
-  tipTronic         =>{cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,localResDis     =>1,RS485IdleTime   =>1,}
+  sensRain          =>{transmDevTryMax =>1,localResDis     =>1},
+  tipTronic         =>{cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,localResDis     =>1,RS485IdleTime   =>1}
 );
 #clones - - - - - - - - - - - - - - -   
 $culHmRegType{pushButton}     = $culHmRegType{remote};
@@ -764,6 +765,7 @@ my %culHmRegChan = (# if channelspecific then enter them here
 						 },
   "Schueco_263-xxx02" =>{transmitTryMax  =>1,eventDlyTime    =>1},
   "Schueco_263-xxx03" =>{ttJtOn          =>1,ttJtOff         =>1},
+  "HM-Sen-RD-O01"     =>{eventFilterTime =>1,transmitTryMax  =>1,peerNeedsBurst  =>1,expectAES       =>1},
 					  );
 #clones - - - - - - - - - - - - - - -   
 $culHmRegChan{"HM-RC-19-B12"}     = $culHmRegChan{"HM-RC-1912"};
@@ -908,12 +910,18 @@ my %culHmChanSets = (
                        controlMode    => "[manual|auto|central|party]",
                        decalcDay      => "day",       
                        sysTime        => ""	  },
-  "HM-SEC-WIN01"   =>{ stop         =>"",
-                       level        =>"<level> <relockDly> <speed>..."},
-  "HM-OU-CFM-PL01" =>{ led       => "<color>[,<color>...] [<repeat>]"},
-  "HM-OU-CFM-PL02" =>{ playTone  => "<MP3No>[,<MP3No>...] [<repeat>]"},
+  "HM-SEC-WIN01"   =>{ stop           =>"",
+                       level          =>"<level> <relockDly> <speed>..."},
+  "HM-OU-CFM-PL01" =>{ led            => "<color>[,<color>...] [<repeat>]"},
+  "HM-OU-CFM-PL02" =>{ playTone       => "<MP3No>[,<MP3No>...] [<repeat>]"},
 
-  "WDF-solar01"    =>{ peerChan   =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"}
+  "WDF-solar01"    =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
+  "HM-Sen-RD-O01"  =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
+  "HM-Sen-RD-O02"  =>{ "on-for-timer" =>"<sec>"
+                      ,"on-till"      =>"<time>"
+		              ,on             =>""
+					  ,off            =>""
+					  ,toggle         =>""}
 );
 # clones- - - - - - - - - - - - - - - - - 
 #$culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};
