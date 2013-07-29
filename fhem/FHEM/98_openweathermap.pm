@@ -33,6 +33,10 @@
 #
 ##############################################################################
 #	Changelog:
+#	2013-07-28	initial release
+#	2013-07-29	fixed some typos
+#				added "set <name> send"
+#
 
 package main;
 
@@ -93,6 +97,11 @@ OWO_Set($@){
 	
 	given($cmd){
 		when("?")		{ return $usage; }
+
+		when("send"){
+			OWO_GetStatus($hash,1);
+			return;
+		}
 
 		when("stationByName"){
 			$urlString = $urlString."?q=";
@@ -293,7 +302,7 @@ OWO_Define($$){
 	readingsEndUpdate($hash, 1);
 
 	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "OWO_GetStatus", $hash, 0);
-	Log 3, "openweather: $name created";
+	Log 3, "openweather $name created";
 
 	return;
 }
@@ -464,6 +473,7 @@ OWO_isday($$){
 			<li>you can use all task alone, in any combination or all together</li>
 		</ul><br/>
 
+		<a name="owoconfiguration1"></a>
 		<li>1. providing your own weather data to owo network</li>
 		<br/>
 		<ul><code>
@@ -474,6 +484,7 @@ OWO_isday($$){
 			attr myWeather owoSrc00 temp:sensorname:temperature<br/>
 		</code></ul><br/>
 
+		<a name="owoconfiguration2"></a>
 		<li>2. set a weather station from owo network as data source for your fhem installation</li>
 		<br/>
 		<ul><code>
@@ -492,6 +503,7 @@ OWO_isday($$){
 		</ul>
 		<br/>
 
+		<a name="owoconfiguration3"></a>
 		<li>3. get weather data from a selected weather station once (e.g. to do own presentations)</li>
 		<br/>
 		<ul><code>
@@ -517,7 +529,21 @@ OWO_isday($$){
 	<b>Set-Commands</b><br/>
 	<ul>
 		<br/>
+		<code>set &lt;name&gt; send</code><br/>
+		<br/>
+		<ul>start an update cycle manually:
+			<ul>
+				<li>send own data</li>
+				<li>update c_* readings from "set" station (if defined)</li>
+				<br/>
+				<li>does not affect or re-trigger running timer cycles!</li>
+				<li>main purpose: for debugging and testing</li>
+			</ul>
+		</ul>
+		<br/><br/>
 		<code>set &lt;name&gt; &lt;stationById stationId&gt;|&lt;stationByName stationName&gt;|&lt;stationByGeo> [lat lon]&gt;</code>
+		<br/><br/>
+		<ul>see description above: <a href="#owoconfiguration2">Configuration task 2</a></ul>
 		<br/><br/>
 	</ul>
 	<br/><br/>
@@ -525,9 +551,11 @@ OWO_isday($$){
 	<b>Get-Commands</b><br/>
 	<ul>
 		<br/>
-		<code>set &lt;name&gt; &lt;stationById stationId&gt;|&lt;stationByName stationName&gt;|&lt;stationByGeo> [lat lon]&gt;</code>
+		<code>get &lt;name&gt; &lt;stationById stationId&gt;|&lt;stationByName stationName&gt;|&lt;stationByGeo> [lat lon]&gt;</code>
 		<br/><br/>
-		Used exactly as the "Set" command, but with two differences:<br/><br/>
+		<ul>see description above: <a href="#owoconfiguration3">Configuration task 3</a></ul>
+		<br/>
+		Used exactly as the "set" command, but with two differences:<br/><br/>
 		<ul>
 			<li>all generated readings use prefix "g_" instead of "c_"</li>
 			<li>readings will not be updated automatically</li>
@@ -562,7 +590,7 @@ OWO_isday($$){
 		<li><b>owoSrc00 ... owoSrc19</b></li>
 		Each of this attributes contains information about weather data to be sent in format <code>owoParam:sensorName:readingName:offset</code><br/>
 		Example: <code>attr owo owoSrc00 temp:outside:temperature</code> will define an attribut owoSrc00, and <br/>
-		reading "temperature" from device "outside" will be sent to owo network als paramater "temp" (which indicates current temperature)<br>
+		reading "temperature" from device "outside" will be sent to owo network als paramater "temp" (which indicates current temperature)<br/>
 		Parameter "offset" will be added to the read value (e.g. necessary to send dewpoint - use offset 273.15 to send correct value)
 	</ul>
 	<br/><br/>
