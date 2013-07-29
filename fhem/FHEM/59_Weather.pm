@@ -500,7 +500,8 @@ WeatherAsHtmlV($)
 sub
 WeatherAsHtml($)
 {
-  WeatherAsHtmlV(@_);
+  my ($d) = @_;
+  WeatherAsHtmlV($d);
 }
 
 sub
