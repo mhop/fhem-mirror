@@ -1400,7 +1400,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   #                  9610
   if(  $shash->{cmdStack}           && 
       ((hex($mFlg) & 0xA2) == 0x82) && 
-	  (CUL_HM_getRxType($shash) & 0x08)){ #wakeup #####
+	  (CUL_HM_getRxType($shash) & 0x18)){ #wakeup or lazy Config #####General
 	#send wakeup and process command stack
     CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IOid($shash).$src);
 	CUL_HM_ProcessCmdStack($shash);
@@ -2448,8 +2448,7 @@ sub CUL_HM_Set($@) {
 	}
     CUL_HM_PushCmdStack($hash,$msg) if ($msg);
   } 
-  elsif($cmd eq "mode") { ####################################################
-    #"[auto|manu|party|boost|comfort|lower] ... <temp> <startTime> <endTime>"}#General only for one channel??
+  elsif($cmd eq "mode") { #####################################################
 	return "select one of auto,manu,party,boost,comfort,lower"
                 if ($a[2] !~ m/^(auto|manu|party|boost|comfort|lower)$/);
     my ($temp,$party);
@@ -3267,6 +3266,7 @@ sub CUL_HM_getRxType($) { #in:hash(chn or dev) out:binary coded Rx type
       $rxtEntity |= ($rxtOfModel =~ m/b/)?0x02:0;#burst
       $rxtEntity |= ($rxtOfModel =~ m/c/)?0x04:0;#config
       $rxtEntity |= ($rxtOfModel =~ m/w/)?0x08:0;#wakeup
+      $rxtEntity |= ($rxtOfModel =~ m/l/)?0x10:0;#lazyConfig
 	}
 	$rxtEntity = 1 if (!$rxtEntity);#always
 	$hash->{helper}{rxType} = $rxtEntity;

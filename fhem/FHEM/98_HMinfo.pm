@@ -365,6 +365,7 @@ sub HMinfo_SetFn($$) {#########################################################
 	  $mode =~ s/c/config/;
 	  $mode =~ s/w/wakeup/;
 	  $mode =~ s/b/burst/;
+	  $mode =~ s/l/lazyConf/;
 	  $mode =~ s/:/,/;
 	  $mode = "normal" if (!$mode);
 	  my $list = $th{$_}{lst};
@@ -375,7 +376,7 @@ sub HMinfo_SetFn($$) {#########################################################
 	    my ($n,$s,$e) = split(":",$_);
 	    $chan .= $s.(($s eq $e)?"":("-".$e))." ".$n.", ";
 	  }
-	  push @model,sprintf("%-16s %-24s %4s %-13s %-5s %-5s %s"
+	  push @model,sprintf("%-16s %-24s %4s %-15s %-5s %-5s %s"
 						  ,$th{$_}{st}
 	                      ,$th{$_}{name}
 	                      ,$_
@@ -386,7 +387,7 @@ sub HMinfo_SetFn($$) {#########################################################
 						  );  
 	}
 	$ret = $cmd.($filter?" filtered":"").":$filter\n  " 
-	       .sprintf("%-16s %-24s %4s %-13s %-5s %-5s %s\n  "
+	       .sprintf("%-16s %-24s %4s %-15s %-5s %-5s %s\n  "
 						  ,"subType"
 	                      ,"name"
 	                      ,"ID"
@@ -807,13 +808,13 @@ sub HMinfo_templateDef(@){#####################################################
 }
 sub HMinfo_templateSet(@){#####################################################
   my ($aName,$tmpl,$pSet,@p) = @_;
-  $pSet = "" if (!$pSet);
+  $pSet = ":" if (!$pSet || $pSet eq "none");
   my ($pName,$pTyp) = split(":",$pSet);
   return "template undefined $tmpl"                       if(!$tpl{$tmpl});
   return "aktor $aName unknown"                           if(!$defs{$aName});
   return "exec set $aName getConfig first"                if(!(grep /RegL_/,keys%{$defs{$aName}{READINGS}}));
   return "give <peer>:[short|long] with peer, not $pSet"  if($pName && $pTyp !~ m/(short|long)/);
-  $pSet = $pTyp eq "long"?"lg":"sh";
+  $pSet = $pTyp ? ($pTyp eq "long"?"lg":"sh"):"";
   my $aHash = $defs{$aName};
   
   my @regCh;
@@ -828,7 +829,8 @@ sub HMinfo_templateSet(@){#####################################################
 	return "Device doesn't support $regN - template $tmpl not applicable" if ($ret =~ m/failed:/);
 	return "peer necessary for template"                                  if ($ret =~ m/peer required/ && !$pName);
     return "Device doesn't support literal $regV for reg $regN"           if ($ret =~ m/literal:/ && $ret !~ m/\b$regV\b/);
-	my ($min,$max) = ($1,$2) if ($ret =~ m/range:(.*) to (._?) /);
+	my ($min,$max) = ($1,$2) if ($ret =~ m/range:(.*) to (.*) :/);
+	$max =~ s/([0-9\.]+).*/$1/;
 	return "$regV out of range:  $min to $max"                            if ($min && ($regV < $min || $regV > $max));
 	push @regCh,"$regN,$regV";
   }
