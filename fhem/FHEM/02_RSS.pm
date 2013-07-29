@@ -201,8 +201,8 @@ RSS_returnRSS($) {
 sub
 RSS_xy($$$) {
   my ($S,$x,$y)= @_;
-  if($x<1) { $x*= $S->width; }
-  if($y<1) { $y*= $S->height; }
+  if($x<=1) { $x*= $S->width; }
+  if($y<=1) { $y*= $S->height; }
   return($x,$y);
 }
 
@@ -285,6 +285,13 @@ RSS_itemImg {
   $S->copyResampled($I,$x,$y,0,0,$swidth,$sheight,$width,$height);
 }  
 
+sub
+RSS_itemLine {
+  my ($S,$x1,$y1,$x2,$y2,%params)= @_;
+  ($x1,$y1)= RSS_xy($S,$x1,$y1);
+  ($x2,$y2)= RSS_xy($S,$x2,$y2);
+  $S->line($x1,$y1,$x2,$y2,RSS_color($S,$params{rgb}));  
+}
 
 ##################
 sub
@@ -298,7 +305,7 @@ RSS_evalLayout($$@) {
   $params{pt}= 12;
   $params{rgb}= "ffffff";
 
-  my ($x,$y,$scale,$text,$imgtype,$srctype,$arg,$format);
+  my ($x,$y,$x1,$y1,$x2,$y2,$scale,$text,$imgtype,$srctype,$arg,$format);
   
   my $cont= "";
   foreach my $line (@layout) {
@@ -326,6 +333,9 @@ RSS_evalLayout($$@) {
             my $txt= AnalyzePerlCommand(undef, $text);
             #Log 5, "$name: ($x,$y) $txt";
             RSS_itemText($S,$x,$y,$txt,%params);
+          } elsif($cmd eq "line") {
+            ($x1,$y1,$x2,$y2)= split("[ \t]+", $def, 4);
+            RSS_itemLine($S,$x1,$y1,$x2,$y2,%params);
           } elsif($cmd eq "time") {
             ($x,$y)= split("[ \t]+", $def, 2);
             RSS_itemTime($S,$x,$y,%params);
@@ -380,63 +390,67 @@ RSS_returnJPEG($) {
     # set the background
     #
     # check if background directory is set
-    my $bgdir= AttrVal($name,"bg","");
-    goto SKIPBG unless($bgdir ne "");
-
-    my $bgnr; # item number
-    if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{bgnr})) {
-        $bgnr= $defs{$name}{fhem}{bgnr};
-    } else {
-        $bgnr= 0;
-    }
-    # check if at least tmin seconds have passed
-    my $t0= 0;
-    my $tmin= AttrVal($name,"tmin",0);
-    if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{t})) {
-      $t0= $defs{$name}{fhem}{t};
-    }
-    my $t1= time();
-    if($t1-$t0>= $tmin) {
-      $defs{$name}{fhem}{t}= $t1;
-      $bgnr++;
-    }
-    # detect pictures
-    goto SKIPBG unless(opendir(BGDIR, $bgdir));
-    my @bgfiles= grep {$_ !~ /^\./} readdir(BGDIR);
-    closedir(BGDIR);
-    # get item number
-    if($#bgfiles>=0) {
-      if($bgnr > $#bgfiles) { $bgnr= 0; }
-      $defs{$name}{fhem}{bgnr}= $bgnr;
-      my $bgfile= $bgdir . "/" . $bgfiles[$bgnr];
-      my $bg= newFromJpeg GD::Image($bgfile);
-      my ($bgwidth,$bgheight)= $bg->getBounds();
-      if($bgwidth != $width or $bgheight != $height) {
-        # we need to resize
-        my ($w,$h);
-        my ($u,$v)= ($bgwidth/$width, $bgheight/$height);
-        if($u>$v) {
-            $w= $width;
-            $h= $bgheight/$u;
-        } else {
-            $h= $height;
-            $w= $bgwidth/$v;
-        }
-        # create empty image
-        $S= GD::Image->newTrueColor($width,$height);
-        $S->colorAllocate(0,0,0); # black is the background
-        $S->copyResized($bg,($width-$w)/2,($height-$h)/2,0,0,$w,$h,$bgwidth,$bgheight);
-      } else {
-        # size is as required, we take the original
-        $S= $bg;
-      }
-    } else {
-      # no background, we create an empty background
-      $S= GD::Image->newTrueColor($width,$height);
-      $S->colorAllocate(0,0,0); # black is the background
-    }
-    SKIPBG:
-
+    my $bgdir= AttrVal($name,"bg","undef");
+	if(defined($bgdir)){
+		my $bgnr; # item number
+		if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{bgnr})) {
+			$bgnr= $defs{$name}{fhem}{bgnr};
+		} else {
+			$bgnr= 0;
+		}
+		# check if at least tmin seconds have passed
+		my $t0= 0;
+		my $tmin= AttrVal($name,"tmin",0);
+		if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{t})) {
+			$t0= $defs{$name}{fhem}{t};
+		}
+		my $t1= time();
+		if($t1-$t0>= $tmin) {
+			$defs{$name}{fhem}{t}= $t1;
+			$bgnr++;
+		}
+		# detect pictures
+		if(opendir(BGDIR, $bgdir)){
+			my @bgfiles= grep {$_ !~ /^\./} readdir(BGDIR);
+			closedir(BGDIR);
+			# get item number
+			if($#bgfiles>=0) {
+				if($bgnr > $#bgfiles) { $bgnr= 0; }
+				$defs{$name}{fhem}{bgnr}= $bgnr;
+				my $bgfile= $bgdir . "/" . $bgfiles[$bgnr];
+				my $bg= newFromJpeg GD::Image($bgfile);
+				my ($bgwidth,$bgheight)= $bg->getBounds();
+				if($bgwidth != $width or $bgheight != $height) {
+					# we need to resize
+					my ($w,$h);
+					my ($u,$v)= ($bgwidth/$width, $bgheight/$height);
+					if($u>$v) {
+						$w= $width;
+						$h= $bgheight/$u;
+					} else {
+						$h= $height;
+						$w= $bgwidth/$v;
+					}
+					# create empty image
+					$S= GD::Image->newTrueColor($width,$height);
+					$S->colorAllocate(0,0,0); # black is the background
+					$S->copyResized($bg,($width-$w)/2,($height-$h)/2,0,0,$w,$h,$bgwidth,$bgheight);
+				} else {
+					# size is as required, we take the original
+					$S= $bg;
+				}
+			} else {#      # no background, we create an empty background
+				$S= GD::Image->newTrueColor($width,$height);
+				$S->colorAllocate(0,0,0); # black is the background
+			}
+		} else {	# not opendir(BGDIR)
+			$S= GD::Image->newTrueColor($width,$height);
+			$S->colorAllocate(0,0,0); # black is the background
+		}
+	} else {	# not defined $bgdir
+		$S= GD::Image->newTrueColor($width,$height);
+		$S->colorAllocate(0,0,0); # black is the background
+	}
     #
     # evaluate layout
     #
@@ -599,7 +613,7 @@ RSS_CGI(){
     Everything after a # is treated as a comment and ignored. You can fold long lines by
     putting a \ at the end.<p>
 
-    <i>Layout control commands</i>
+    <i>Layout control commands</i><p>
     <ul>
     <li>font &lt;font&gt;<br>Sets the font. &lt;font&gt; is the name of a TrueType font (e.g.
     <code>Arial</code>) or the full path to a TrueType font
@@ -613,7 +627,7 @@ RSS_CGI(){
     <li>pt &lt;pt&gt;<br>Sets the font size in points.</li><br>
     </ul>
 
-    <i>Item placement commands</i>
+    <i>Item placement commands</i><p>
     <ul>
     <li>text &lt;x&gt; &lt;y&gt; &lt;text&gt;<br>Renders the text &lt;text&gt; at the
     position (&lt;x&gt;, &lt;y&gt;) using the current font, font size and color.
@@ -626,6 +640,7 @@ RSS_CGI(){
     <li>time &lt;x&gt; &lt;y&gt;<br>Renders the current time in HH:MM format.</li><br>
     <li>seconds &lt;x&gt; &lt;y&gt; &lt;format&gt<br>Renders the curent seconds. Maybe usefull for a RSS Clock. With option colon a : </li><br>
     <li>date &lt;x&gt; &lt;y&gt;<br>Renders the current date in DD:MM:YYY format.</li><br>
+    <li>line &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt;<br>Draws a line from position (&lt;x1&gt;, &lt;y1&gt;) to position (&lt;x2&gt;, &lt;y2&gt;).</li><br>
     <li>img &lt;x&gt; &lt;y&gt; &lt;s&gt; &lt;imgtype&gt; &lt;srctype&gt; &lt;arg&gt; <br>Renders a picture at the
     position (&lt;x&gt;, &lt;y&gt;). The &lt;imgtype&gt; is one of <code>gif</code>, <code>jpeg</code>, <code>png</code>.
     The picture is scaled by the factor &lt;s&gt; (a decimal value). If &lt;srctype&gt; is <code>file</code>, the picture
