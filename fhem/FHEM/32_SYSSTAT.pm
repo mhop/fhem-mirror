@@ -17,7 +17,7 @@ SYSSTAT_Initialize($)
   $hash->{UndefFn}  = "SYSSTAT_Undefine";
   $hash->{GetFn}    = "SYSSTAT_Get";
   $hash->{AttrFn}   = "SYSSTAT_Attr";
-  $hash->{AttrList} = "filesystems raspberrycpufreq:1 raspberrytemperature:0,1,2 showpercent:1 useregex:1 ssh_user loglevel:0,1,2,3,4,5,6 ".
+  $hash->{AttrList} = "filesystems raspberrycpufreq:1 raspberrytemperature:0,1,2 showpercent:1 uptime:1 useregex:1 ssh_user loglevel:0,1,2,3,4,5,6 ".
                        $readingFnAttributes;
 }
 
@@ -223,6 +223,12 @@ SYSSTAT_GetUpdate($)
     readingsBulkUpdate($hash,"cpufreq",$freq);
   }
 
+  if( AttrVal($name, "uptime", "0") > 0 ) {
+    my $uptime = SYSSTAT_getUptime($hash);
+    readingsBulkUpdate($hash,"uptime",$uptime);
+  }
+
+
   readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
 }
 
@@ -341,6 +347,18 @@ SYSSTAT_getPiFreq( $ )
   return $freq / 1000;
 }
 
+sub
+SYSSTAT_getUptime( $ )
+{
+  my ($hash) = @_;
+
+  my $uptime = SYSSTAT_readCmd($hash,"uptime",0);
+
+  $uptime = $1 if( $uptime =~ m/up\s+([\d:]*)/ );
+
+  return $uptime;
+}
+
 
 1;
 
@@ -434,6 +452,8 @@ SYSSTAT_getPiFreq( $ )
     <li>raspberrycpufreq<br>
       If set and > 0 the raspberry pi on chip termal sensor is read.<br>
       If set to 2 a geometric average over the last 4 values is created.</li>
+    <li>uptime<br>
+      If set and > 0 the system uptime is read.<br>
     <li>useregex<br>
       If set the entries of the filesystems list are treated as regex.</li>
     <li>ssh_user<br>
