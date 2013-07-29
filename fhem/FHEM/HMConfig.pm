@@ -319,6 +319,9 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   CtValHi         =>{a=>  5.0,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Condition value high for CT table" },
   CtRefOn         =>{a=> 28.0,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from refOn"    ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
   CtRefOff        =>{a=> 28.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from refOff"   ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
+
+  CtrlRc          =>{a=> 46  ,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from refOff"   ,lit=>{no=>0,tempSh=>1,auto=>2,auto_tempSh=>3,manu_tempSh=>4,boost=>5,toggle=>6}},
+  TempRC          =>{a=> 45  ,s=>0.6,l=>3,min=>5  ,max=>30      ,c=>''         ,f=>''      ,u=>'C'   ,d=>0,t=>"Jmp on condition from refOff"},
 );
 
 my %culHmRegDefine = (
@@ -355,9 +358,12 @@ my %culHmRegDefine = (
   lowBatLimit     =>{a=> 18.0,s=>1.0,l=>0,min=>10 ,max=>12      ,c=>'factor'   ,f=>10      ,u=>'V'   ,d=>1,t=>"low batterie limit, step .1V"},
   lowBatLimitBA   =>{a=> 18.0,s=>1.0,l=>0,min=>5  ,max=>15      ,c=>'factor'   ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
   lowBatLimitFS   =>{a=> 18.0,s=>1.0,l=>0,min=>2  ,max=>3       ,c=>'factor'   ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
+  lowBatLimitRT   =>{a=> 18.0,s=>1.0,l=>0,min=>2  ,max=>2.5     ,c=>'factor'   ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
   batDefectLimit  =>{a=> 19.0,s=>1.0,l=>0,min=>0.1,max=>2       ,c=>'factor'   ,f=>100     ,u=>'Ohm' ,d=>1,t=>"batterie defect detection"},
   transmDevTryMax =>{a=> 20.0,s=>1.0,l=>0,min=>1  ,max=>10      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"max message re-transmit"},
   localResDis     =>{a=> 24.0,s=>1.0,l=>0,min=>1  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"local reset disable"       ,lit=>{off=>0,on=>1}},
+  globalBtnLock   =>{a=> 25.0,s=>1.0,l=>0,min=>1  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"global button lock"        ,lit=>{off=>0,on=>200}},
+  modusBtnLock    =>{a=> 25.0,s=>1.0,l=>0,min=>1  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"mode button lock"          ,lit=>{off=>0,on=>200}},
   paramSel        =>{a=> 27.0,s=>1.0,l=>0,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"data transfered to peer"   ,lit=>{off=>0,T1=>1,T2=>2,T1_T2=>3,T2_T1=>4}},
   RS485IdleTime   =>{a=> 29.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s'   ,d=>0,t=>"Idle Time"},
 #un-identified List0
@@ -513,12 +519,47 @@ my %culHmRegDefine = (
   "party-temp"    =>{a=>  6  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Party"},
   decalMin        =>{a=>  8  ,s=>0.3,l=>5,min=>0  ,max=>50      ,c=>'factor'   ,f=>0.1     ,u=>'min' ,d=>1,t=>"Decalc min"},
   decalHr         =>{a=>  8.3,s=>0.5,l=>5,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Decalc hour"},
+
   partyEndHr      =>{a=> 97  ,s=>0.6,l=>6,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Party end Hour"},
   partyEndMin     =>{a=> 97.7,s=>0.1,l=>6,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>'min' ,d=>1,t=>"Party end min"   ,lit=>{"00"=>0,"30"=>1}},
   partyEndDay     =>{a=> 98  ,s=>1  ,l=>6,min=>0  ,max=>200     ,c=>''         ,f=>''      ,u=>'d'   ,d=>1,t=>"Party end Day"},
 #Thermal-cc-VD                                                                                  
   valveOffset     =>{a=>  9  ,s=>0.5,l=>5,min=>0  ,max=>25      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve offset"},             # size actually 0.5
   valveErrorPos   =>{a=> 10  ,s=>1  ,l=>5,min=>0  ,max=>99      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve position when error"},# size actually 0.7
+
+  btnNoBckLight   =>{a=>  9.4,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"button response without backlight",lit=>{off=>0,on=>1}},
+  tempComfort     =>{a=>  1  ,s=>0.6,l=>7,min=>15 ,max=>30      ,c=>''         ,f=>'2'     ,u=>''    ,d=>1,t=>"comfort temperatur"},
+  tempLowering    =>{a=>  2  ,s=>0.6,l=>7,min=>5  ,max=>25      ,c=>''         ,f=>'2'     ,u=>''    ,d=>1,t=>"lowering temperatur"},
+  tempMin         =>{a=>  3  ,s=>0.6,l=>7,min=>4.5,max=>25      ,c=>''         ,f=>'2'     ,u=>''    ,d=>1,t=>"minimum temperatur"},
+  tempMax         =>{a=>  4  ,s=>0.6,l=>7,min=>15 ,max=>30.5    ,c=>''         ,f=>'2'     ,u=>''    ,d=>1,t=>"maximum temperatur"},
+  tempFallWinOpen =>{a=>  5  ,s=>0.6,l=>7,min=>5  ,max=>30      ,c=>''         ,f=>'2'     ,u=>''    ,d=>1,t=>"lowering temp whenWindow is opened"},
+  tempFallWinPerio=>{a=>  6  ,s=>0.4,l=>7,min=>0  ,max=>60      ,c=>''         ,f=>'0.2'   ,u=>'min' ,d=>1,t=>"period lowering when window is open"},
+  decalcWeekday   =>{a=>  7  ,s=>0.3,l=>7,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"decalcification day"      ,lit=>{Sat=>0,Sun=>1,Mon=>2,Tue=>3,Wed=>4,Thu=>5,Fri=>6}},
+  decalcTime      =>{a=>  8  ,s=>0.6,l=>7,min=>0  ,max=>1410    ,c=>''         ,f=>'0.033' ,u=>''    ,d=>1,t=>"decalcification time"},
+  tempOffset      =>{a=>  9  ,s=>0.4,l=>7,min=>0  ,max=>15      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"temperature offset",lit=>{"-3.5K"=>0,"-3.0K"=>1,"-2.5K"=>2,"-2.0K"=>3,"-1.5K"=>4,"-1.0K"=>5,"-0.5K"=>6, 
+                                                                                                                                        "0.0K"=>7, "0.5K"=>8, "1.0K"=>10, "1.5K"=>11, "2.0K"=>12, "2.5K"=>13, "3.0K"=>14, "3.5K"=>15}},
+  boostPos        =>{a=> 10.0,s=>0.5,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>'0.2'   ,u=>'%'   ,d=>1,t=>"boost period [min]"},
+  boostPeriod     =>{a=> 10.5,s=>0.3,l=>7,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"boost position"           ,lit=>{0=>0,5=>1,10=>2,15=>3,20=>4,25=>5,30=>6}},
+  boostAftWinOpen =>{a=> 14.5,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"boost after window opened",lit=>{off=>0,on=>1}},
+                                    
+  daylightSaveTime=>{a=> 14  ,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"set daylight saving time",lit=>{off=>0,on=>1}},
+  regAdaptive     =>{a=> 14.1,s=>0.2,l=>7,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"adaptive regulation: offDef, offdetrmine, on",lit=>{off=>0,offDeter=>1,on=>2}},
+  showInfo        =>{a=> 14.3,s=>0.2,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"show date or time"                           ,lit=>{time=>0,date=>1}},
+  noMinMan4Manu   =>{a=> 14.6,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"min/max is irrelevant for manual mode"       ,lit=>{off=>0,on=>1}},
+  showWeekday     =>{a=> 14.7,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"show weekday"                                ,lit=>{off=>0,on=>1}},
+  valveOffset     =>{a=> 11  ,s=>0.7,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"offset for valve"},
+  valveMaxPos     =>{a=> 12  ,s=>0.7,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"valve maximum position"},
+  valveErrPos     =>{a=> 13  ,s=>0.7,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"valve error position"},
+                                    
+  modePrioManu    =>{a=> 18.3,s=>0.3,l=>7,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"allow tempChange for manual by...",lit=>{RT_SC=>0,all=>1,RT_CCU=>3,CCU=>4,self=>5}},
+  modePrioParty   =>{a=> 18.0,s=>0.3,l=>7,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"allow tempChange for party by..." ,lit=>{RT_SC=>0,all=>1,RT_CCU=>3,CCU=>4,self=>5}},
+                                    
+  reguIntI        =>{a=>202.0,s=>1  ,l=>7,min=>10 ,max=>20      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"regulator I-param internal mode"},
+  reguIntP        =>{a=>203.0,s=>1  ,l=>7,min=>25 ,max=>35      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"regulator P-param internal mode"},
+  reguIntPstart   =>{a=>204.0,s=>1  ,l=>7,min=>5  ,max=>45      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"regulator P-param internal mode start value"},
+  reguExtI        =>{a=>205.0,s=>1  ,l=>7,min=>10 ,max=>20      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"regulator I-param extern mode"},
+  reguExtP        =>{a=>206.0,s=>1  ,l=>7,min=>25 ,max=>35      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"regulator P-param extern mode"},
+  reguExtPstart   =>{a=>207.0,s=>1  ,l=>7,min=>5  ,max=>45      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"regulator P-param extern mode start value"},
   );
   
 my %culHmRegGeneral = (
@@ -592,6 +633,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
 my %culHmRegModel = (
   "HM-RC-12"        =>{backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1},
   "HM-RC-19"        =>{backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1,backAtCharge    =>1,language =>1},
+  "HM-RC-4-2"       =>{localResDis     =>1},
  
   "HM-LC-Bl1PBU-FM" =>{transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,localResDis     =>1},
 
@@ -631,7 +673,26 @@ my %culHmRegModel = (
 		               DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1,
 		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1	
                       },
+
   "HM-CC-VD"        =>{valveOffset     =>1,valveErrorPos   =>1},
+  "HM-CC-TC"        =>{backlOnTime     =>1,backlOnMode     =>1,btnLock         =>1},
+  "HM-CC-RT-DN"     =>{btnLock         =>1,localResDis     =>1,globalBtnLock   =>1,modusBtnLock    =>1,
+                       cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,
+                       burstRx         =>1,lowBatLimitRT   =>1,backOnTime      =>1,
+					   
+					   btnNoBckLight   =>1,
+                       tempComfort     =>1,tempLowering    =>1,tempMin         =>1,tempMax         =>1,
+                       tempFallWinOpen =>1,tempFallWinPerio=>1,tempOffset      =>1,
+                       decalcWeekday   =>1,decalcTime      =>1,
+                       boostPos        =>1,boostPeriod     =>1,boostAftWinOpen =>1,
+                       daylightSaveTime=>1,regAdaptive     =>1,
+                       showInfo        =>1,noMinMan4Manu   =>1,showWeekday     =>1,
+                       valveOffset     =>1,valveMaxPos     =>1,valveErrPos     =>1,
+                       modePrioManu    =>1,modePrioParty   =>1,
+                       reguIntI        =>1,reguIntP        =>1,reguIntPstart   =>1,
+                       reguExtI        =>1,reguExtP        =>1,reguExtPstart   =>1
+                      },
+					  
   "HM-PB-4DIS-WM"   =>{peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1},
   "HM-WDS100-C6-O"  =>{stormUpThresh   =>1,stormLowThresh  =>1},
   "KS550"           =>{stormUpThresh   =>1,stormLowThresh  =>1},
@@ -653,7 +714,6 @@ my %culHmRegModel = (
 			           ActionType      =>1,
 					   ActTypeMp3      =>1,ActNum          =>1,Intense         =>1,lgMultiExec     =>1},
   "HM-SEC-MDIR"     =>{                    sabotageMsg     =>1},
-  "HM-CC-TC"        =>{backlOnTime     =>1,backlOnMode     =>1,btnLock         =>1},
   "HM-CC-SCD"       =>{peerNeedsBurst  =>1,expectAES       =>1,
                                                                transmitTryMax  =>1,evtFltrTime     =>1,
                        msgScdPosA      =>1,msgScdPosB      =>1,msgScdPosC      =>1,msgScdPosD      =>1},
@@ -692,7 +752,6 @@ my %culHmRegModel = (
                        expectAES       =>1,peerNeedsBurst  =>1},
   "HM-WDS10-TH-O"   =>{burstRx         =>1},
   "HM-WDS30-OT2-SM" =>{burstRx         =>1,cyclicInfoMsgDis=>1,localResDis     =>1,paramSel        =>1},
-  "HM-RC-4-2"       =>{localResDis     =>1},
   );
 #clones - - - - - - - - - - - - - - -   
 $culHmRegModel{"HM-RC-12-B"}       = $culHmRegModel{"HM-RC-12"};
@@ -766,6 +825,8 @@ my %culHmRegChan = (# if channelspecific then enter them here
   "Schueco_263-xxx02" =>{transmitTryMax  =>1,eventDlyTime    =>1},
   "Schueco_263-xxx03" =>{ttJtOn          =>1,ttJtOff         =>1},
   "HM-Sen-RD-O01"     =>{eventFilterTime =>1,transmitTryMax  =>1,peerNeedsBurst  =>1,expectAES       =>1},
+  "HM-CC-RT-DN03"     =>{tempFallWinOpen =>1,shCtValLo       =>1},
+  "HM-CC-RT-DN06"     =>{CtrlRc          =>1,TempRC          =>1},
 					  );
 #clones - - - - - - - - - - - - - - -   
 $culHmRegChan{"HM-RC-19-B12"}     = $culHmRegChan{"HM-RC-1912"};
@@ -874,12 +935,13 @@ my %culHmModelSets = (# channels of this subtype-------------
   "HM-PB-4DIS-WM"=>{ text         => "<txt1> <txt2>..."
                       #text       => "<btn> [on|off] <txt1> <txt2>...", old style will not be offered anymore
 				   },
-  "HM-OU-LED16"  =>{ led          =>"[off|red|green|orange]"
-		            ,ilum         =>"[0-15] [0-127]"},
+  "HM-OU-LED16"  =>{ led          => "[off|red|green|orange]"
+		            ,ilum         => "[0-15] [0-127]"},
   "HM-OU-CFM-PL" =>{ press        => "[long|short] [on|off] ..."
-                    ,inhibit      =>"[on|off]"},
+                    ,inhibit      => "[on|off]"},
   "HM-Sys-sRP-Pl"=>{ setRepeat    => "[no1..36] <sendName> <recName> [bdcast-yes|no]"
-					,inhibit      =>"[on|off]"},
+					,inhibit      => "[on|off]"},
+  "HM-CC-RT-DN"  =>{ mode         => "[auto|manu|party|boost|comfort|lower] ... <temp> <startTime> <endTime>"}#General only for one channel??
 );
 # clones- - - - - - - - - - - - - - - - - 
 $culHmModelSets{"HM-RC-19-B"}  = $culHmModelSets{"HM-RC-19"};
@@ -887,33 +949,33 @@ $culHmModelSets{"HM-RC-19-SW"} = $culHmModelSets{"HM-RC-19"};
 #%{$culHmModelSets{"HM-RC-19-SW"}} = %{$culHmModelSets{"HM-RC-19"}}; copy
 
 my %culHmChanSets = (
-  "HM-CC-TC00"     =>{ "day-temp"     => "[on,off,6.0..30.0]",
-                       "night-temp"   => "[on,off,6.0..30.0]",
-                       "party-temp"   => "[on,off,6.0..30.0]",
-                       "desired-temp" => "[on,off,6.0..30.0]", 
-                       sysTime        => ""	  },
-  "HM-CC-TC02"     =>{ peerChan       => "<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]",
-                       "day-temp"     => "[on,off,6.0..30.0]",
-                       "night-temp"   => "[on,off,6.0..30.0]",
-                       "party-temp"   => "[on,off,6.0..30.0]",
-                       "desired-temp" => "[on,off,6.0..30.0]", 
-                       tempListSat    => "HH:MM temp ...",
-                       tempListSun    => "HH:MM temp ...",
-                       tempListMon    => "HH:MM temp ...",
-                       tempListTue    => "HH:MM temp ...",
-                       tempListThu    => "HH:MM temp ...",
-                       tempListWed    => "HH:MM temp ...",
-                       tempListFri    => "HH:MM temp ...",
-                       displayMode    => "[temp-only|temp-hum]",
-                       displayTemp    => "[actual|setpoint]",
-                       displayTempUnit => "[celsius|fahrenheit]",
-                       controlMode    => "[manual|auto|central|party]",
-                       decalcDay      => "day",       
-                       sysTime        => ""	  },
+  "HM-CC-TC00"     =>{ "day-temp"     =>"[on,off,6.0..30.0]",
+                       "night-temp"   =>"[on,off,6.0..30.0]",
+                       "party-temp"   =>"[on,off,6.0..30.0]",
+                       "desired-temp" =>"[on,off,6.0..30.0]", 
+                       sysTime        =>""	  },
+  "HM-CC-TC02"     =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]",
+                       "day-temp"     =>"[on,off,6.0..30.0]",
+                       "night-temp"   =>"[on,off,6.0..30.0]",
+                       "party-temp"   =>"[on,off,6.0..30.0]",
+                       "desired-temp" =>"[on,off,6.0..30.0]", 
+                       tempListSat    =>"HH:MM temp ...",
+                       tempListSun    =>"HH:MM temp ...",
+                       tempListMon    =>"HH:MM temp ...",
+                       tempListTue    =>"HH:MM temp ...",
+                       tempListThu    =>"HH:MM temp ...",
+                       tempListWed    =>"HH:MM temp ...",
+                       tempListFri    =>"HH:MM temp ...",
+                       displayMode    =>"[temp-only|temp-hum]",
+                       displayTemp    =>"[actual|setpoint]",
+                       displayTempUnit=>"[celsius|fahrenheit]",
+                       controlMode    =>"[manual|auto|central|party]",
+                       decalcDay      =>"day",       
+                       sysTime        =>""	  },
   "HM-SEC-WIN01"   =>{ stop           =>"",
                        level          =>"<level> <relockDly> <speed>..."},
-  "HM-OU-CFM-PL01" =>{ led            => "<color>[,<color>...] [<repeat>]"},
-  "HM-OU-CFM-PL02" =>{ playTone       => "<MP3No>[,<MP3No>...] [<repeat>]"},
+  "HM-OU-CFM-PL01" =>{ led            =>"<color>[,<color>...] [<repeat>]"},
+  "HM-OU-CFM-PL02" =>{ playTone       =>"<MP3No>[,<MP3No>...] [<repeat>]"},
 
   "WDF-solar01"    =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
   "HM-Sen-RD-O01"  =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
