@@ -85,7 +85,7 @@ sub
 OWO_Set($@){
 	my ($hash, @a)	= @_;
 	my $name		= $hash->{NAME};
-	my $usage		= "Unknown argument, choose one of stationById stationByGeo stationByName";
+	my $usage		= "Unknown argument, choose one of stationById stationByGeo stationByName send";
 	my $response;
 	
 	return "No Argument given" if(!defined($a[1]));
@@ -359,7 +359,7 @@ UpdateReadings($$$){
 	readingsBulkUpdate($hash, $prefix."pressureAbs",  $jsonWeather->{main}{pressure});
 	readingsBulkUpdate($hash, $prefix."pressureRel",  $jsonWeather->{main}{sea_level});
 	readingsBulkUpdate($hash, $prefix."windSpeed",    $jsonWeather->{wind}{speed});
-	readingsBulkUpdate($hash, $prefix."windDir",      int($jsonWeather->{wind}{deg}));
+	readingsBulkUpdate($hash, $prefix."windDir",      $jsonWeather->{wind}{deg});
 	readingsBulkUpdate($hash, $prefix."clouds",       $jsonWeather->{clouds}{all});
 	readingsBulkUpdate($hash, $prefix."rain3h",       $jsonWeather->{rain}{"3h"});
 	readingsBulkUpdate($hash, $prefix."snow3h",       $jsonWeather->{snow}{"3h"});
