@@ -843,6 +843,7 @@ sub HMinfo_templateSet(@){#####################################################
 	foreach (split(" ",$aHash->{helper}{shadowReg}{$regl})){
 	  push @new, $_ if ($cur !~ m/$_/);
 	}
+	next if (!@new); # nothing to write
     my ($ret,undef) = CUL_HM_Set($aHash,$aName,"regBulk",$regl,@new);
     return $ret if ($ret);
   }
@@ -1071,14 +1072,14 @@ sub HMinfo_cpRegs(@){#########################################################
 	  </li>
 	  
       <li><a name="#HMinfoconfigCheck">configCheck</a> <a href="HMinfoFilter">[filter]</a><br>
-	      performs a consistancy check of HM settings. It includes regCheck and peerCheck
+	      performs a consistency check of HM settings. It includes regCheck and peerCheck
 	  </li>
       <li><a name="#HMinfopeerCheck">peerCheck</a> <a href="HMinfoFilter">[filter]</a><br>
-	      performs a consistancy check on peers. If a peer is set in one channel 
+	      performs a consistency check on peers. If a peer is set in one channel 
 	  	this funktion will search wether the peer also exist on the opposit side.
 	  </li>
       <li><a name="#HMinforegCheck">regCheck</a> <a href="HMinfoFilter">[filter]</a><br>
-	      performs a consistancy check on register readings for completeness
+	      performs a consistency check on register readings for completeness
 	  </li>
 
       <li><a name="#HMinfoautoReadReg">autoReadReg</a> <a href="HMinfoFilter">[filter]</a><br>
@@ -1114,7 +1115,7 @@ sub HMinfo_cpRegs(@){#########################################################
 		 <ul>
 		 cpRegs will <u>not add any peers</u> or read from the devices. It is up to the user to read register in advance<br>
 		 cpRegs is only allowed between <u>identical models</u><br>
-		 cpRegs expets that all <u>readings are up-to-date</u>. It is up to the user to ensure data consistancy.<br>
+		 cpRegs expets that all <u>readings are up-to-date</u>. It is up to the user to ensure data consistency.<br>
 		 </ul>
 	  </li>
       <li><a name="#HMinfotemplateDef">templateDef &lt;name&gt; &lt;param&gt; &lt;desc&gt; &lt;reg1:val1&gt; [&lt;reg2:val2&gt;] ...</a><br>
@@ -1231,7 +1232,7 @@ sub HMinfo_cpRegs(@){#########################################################
 
     <li><b>ERR__protocol:</b> Error:count of non-recoverable protocol events per device. 
 	    Those events are NACK, IOerr, ResendFail, CmdDel, CmdPend.<br>
-        Coutned are the number of device with those events, not the number of events!</li>
+        Counted are the number of device with those events, not the number of events!</li>
     <li><b>ERR__protoNames:</b> Error:name-list of devices with non-recoverable protocol events</li>
     <li><b>I_HM_IOdevices:</b> Info:list of IO devices used by CUL_HM entities</li>
     <li><b>I_actTotal:</b> Info:action detector state, count of devices with ceratin states</li>

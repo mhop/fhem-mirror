@@ -851,7 +851,7 @@ sub CUL_HM_Parse($$) {##############################
       $shash = $modules{CUL_HM}{defptr}{$chId} 
 	                         if($modules{CUL_HM}{defptr}{$chId});
 	  my $mdCh = $model.$chn;
-	  if($lvlStr{mdCh}{$mdCh} &&  $lvlStr{mdCh}{$mdCh}{$val}){
+	  if($lvlStr{mdCh}{$mdCh} && $lvlStr{mdCh}{$mdCh}{$val}){
 	    $val = $lvlStr{mdCh}{$mdCh}{$val};
       }
 	  else{
@@ -1532,7 +1532,8 @@ sub CUL_HM_parseCommon(@){#####################################################
 		}
 
 		my $peer = $shash->{helper}{respWait}{forPeer};
-		my $regLN = ((CUL_HM_getAttrInt($chnName,"expert") == 2)?"":".")."RegL_".$list.":".$peer;
+		my $regLNp = "RegL_$list:$peer";# pure, no expert
+		my $regLN = ((CUL_HM_getAttrInt($chnName,"expert") == 2)?"":".").$regLNp;
 		readingsSingleUpdate($chnHash,$regLN,
 		             ReadingsVal($chnName,$regLN,"")." ".$data,0);
 		if ($data =~m/00:00$/){ # this was the last message in the block
@@ -1542,7 +1543,8 @@ sub CUL_HM_parseCommon(@){#####################################################
 		                    CUL_HM_getRegFromStore($name,"pairCentral",0,""),0);
 		  }		  
 		  CUL_HM_respPendRm($shash);
-		  delete $chnHash->{helper}{shadowReg}{$regLN};#remove shadowhash
+		  delete $chnHash->{helper}{shadowReg}{$regLNp};   #rm shadow
+		  delete $chnHash->{helper}{shadowReg}{".$regLNp"};#rm shadow
 		  # peer Channel name from/for user entry. <IDorName> <deviceID> <ioID>
 		  CUL_HM_updtRegDisp($chnHash,$list,
 		        CUL_HM_peerChId($peer,
@@ -1558,7 +1560,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  my($chn,$peerID,$list,$data) = ($1,$2,$3,$4) if($p =~ m/^04(..)(........)(..)(.*)/);
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
 	  $chnHash = $shash if(!$chnHash); # will add param to dev if no chan
-	  my $regLN = ((CUL_HM_getAttrInt($chnHash->{NAME},"expert") == 2)?"":".")."RegL_".$list.":".CUL_HM_id2Name($peerID);
+	  my $regLN = ((CUL_HM_getAttrInt($chnHash->{NAME},"expert") == 2)?"":".")."RegL_$list:".CUL_HM_id2Name($peerID);
       $regLN =~ s/broadcast//;
 	  $regLN =~ s/ /_/g; #remove blanks
 
@@ -3083,7 +3085,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
 
   # --store pending changes in shadow to handle bit manipulations cululativ--
   $peerAddr = "000000" if(!$peerAddr);
-  my $peerN = ($peerAddr ne "000000")?CUL_HM_id2Name($peerAddr.$peerChn):"";
+  my $peerN = ($peerAddr ne "000000")?CUL_HM_peerChName($peerAddr.$peerChn,$dst,""):"";
   $peerN =~ s/broadcast//;
   $peerN =~ s/ /_/g;#remote blanks
   my $regLN = ((CUL_HM_getAttrInt($hash->{NAME},"expert") == 2)?"":".").
