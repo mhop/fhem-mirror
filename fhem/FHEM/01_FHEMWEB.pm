@@ -974,10 +974,8 @@ FW_roomOverview($)
   my @list = (
      "Everything",    "$FW_ME?room=all",
      "",              "",
-     "Howto",         "$FW_ME/docs/HOWTO.html",
      "Commandref",    "$FW_ME/docs/commandref.html",
-     "Wiki",          "http://fhemwiki.de",
-     "Forum",         "http://forum.fhem.de",
+     "Remote doc",    "http://fhem.de/fhem.html#Documentation",
      "Edit files",    "$FW_ME?cmd=style%20list",
      "Select style",  "$FW_ME?cmd=style%20select",
      "Event monitor", "$FW_ME?cmd=style%20eventMonitor",
@@ -1028,12 +1026,7 @@ FW_roomOverview($)
 
       } else {
         my $td = "<td>";
-        if($l1 eq "Forum") { # Ugly hack.
-          $FW_RET = substr($FW_RET, 0, length($FW_RET)-12); # Remove last /tr
-          $td = " / ";
-        } else {
-          FW_pF "<tr%s>", $l1 eq $FW_room ? " class=\"sel\"" : "";
-        }
+        FW_pF "<tr%s>", $l1 eq $FW_room ? " class=\"sel\"" : "";
 
         # image tag if we have an icon, else empty
         my $icoName = "ico$l1";
@@ -2505,7 +2498,7 @@ FW_devState($$@)
     $cmdList = "desired-temp" if(!$cmdList);
 
   } elsif($allSets =~ m/\bdesiredTemperature:/) {
-    $txt = ReadingsVal($d, "temperature", "");
+    $txt = ReadingsVal($d, "temperature", "");  # ignores stateFormat!!!
     $txt =~ s/ .*//;
     $txt .= "&deg;C";
     $cmdList = "desiredTemperature" if(!$cmdList);
