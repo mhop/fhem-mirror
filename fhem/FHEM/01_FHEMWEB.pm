@@ -940,18 +940,21 @@ FW_roomOverview($)
   if(!$FW_hiddenroom{save} && !$FW_hiddenroom{"Save config"}) {
     push(@list1, "Save config");
     push(@list2, "$FW_ME?cmd=save");
+    push(@list1, ""); push(@list2, "");
   }
      
   ########################
   # Show FW Extensions in the menu
   if(defined($data{FWEXT})) {
+    my $cnt = 0;
     foreach my $k (sort keys %{$data{FWEXT}}) {
       my $h = $data{FWEXT}{$k};
       next if($h !~ m/HASH/ || !$h->{LINK} || !$h->{NAME});
       push(@list1, $h->{NAME});
       push(@list2, $FW_ME ."/".$h->{LINK});
+      $cnt++;
     }
-    if(@list1 > 1) {
+    if($cnt > 0) {
       push(@list1, ""); push(@list2, "");
     }
   }
