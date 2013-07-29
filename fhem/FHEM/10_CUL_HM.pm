@@ -2448,6 +2448,53 @@ sub CUL_HM_Set($@) {
 	}
     CUL_HM_PushCmdStack($hash,$msg) if ($msg);
   } 
+  elsif($cmd eq "mode") { ####################################################
+    #"[auto|manu|party|boost|comfort|lower] ... <temp> <startTime> <endTime>"}#General only for one channel??
+	return "select one of auto,manu,party,boost,comfort,lower"
+                if ($a[2] !~ m/^(auto|manu|party|boost|comfort|lower)$/);
+    my ($temp,$party);
+	if ($a[2] =~ m/^(auto|boost|comfort|lower)$/){
+	  return "no additional params for $a[2]" if ($a[3]);
+	}
+	if($a[2] eq "manu"){
+	  return "temperatur for manu  4.5 to 30.5 C"
+	            if (!$a[3] || $a[3] < 4.5 || $a[3] > 30.5);
+	  $temp = $a[3]*2;
+	}
+	elsif($a[2] eq "party"){
+	  return "temperatur for manu  5 to 30 C"
+	            if (!$a[3] || $a[3] < 5 || $a[3] > 30);
+	  $temp = $a[3]*2;	  
+	  # party format 03.8.2013 11:30 5.8.2013 12:00
+	  my ($sd,$sm,$sy) = split('.',$a[4]);
+	  return "wrong start day $sd" if ($sd < 0 || $sd > 31);
+	  return "wrong start month $sm" if ($sm < 0 || $sm > 12);
+	  return "wrong start year $sy" if ($sy < 0 || $sy > 99);
+
+	  my ($sh,$smin) = split(':',$a[5]);
+	  return "wrong start hour $sh" if ($sh < 0 || $sh > 23);
+	  return "wrong start minute $smin, ony 00 or 30" if ($smin != 0 && $smin != 30);
+      $sh = $sh * 2 + $smin/30;
+	  
+	  my ($ed,$em,$ey) = split('.',$a[6]);
+	  return "wrong end day $ed"   if ($ed < 0 || $ed > 31);
+	  return "wrong end month $em" if ($em < 0 || $em > 12);
+	  return "wrong end year $ey"  if ($ey < 0 || $ey > 99);
+	  my ($eh,$emin) = split(':',$a[7]);
+	  return "wrong end hour $eh" if ($eh < 0 || $eh > 23);
+	  return "wrong end minute $emin, ony 00 or 30" if ($emin != 0 && $emin != 30);
+      $eh = $eh * 2 + $emin/30;
+	  
+	  $party = sprintf("%02X%02X%02X%02X%02X%02X%02X",
+	                    $sh,$sd,$sy,$eh,$ed,$ey,($sm*16+$em));
+	}
+	my %mCmd = (auto=>0,manu=>1,party=>2,boost=>3,comfort=>4,lower=>5);
+    readingsSingleUpdate($hash,"modeSet","set_".$a[2],1);
+	my $msg = '8'.($mCmd{$a[2]}).$chn;
+	$msg .= sprintf("%02X",$temp) if ($temp);
+	$msg .= $party if ($party);
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$msg);
+  }
   elsif($cmd eq "desired-temp") { #############################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'0202'.
 	                                                   CUL_HM_convTemp($a[2]));
@@ -2678,7 +2725,7 @@ sub CUL_HM_Set($@) {
 	return ("",1) if ($target && $target eq "remote");#Nothing to transmit for actor
     $devHash = $peerHash; # Exchange the hash, as the switch is always alive.
   }
-  
+ 
   readingsSingleUpdate($hash,"state",$state,1) if($state);
 
   $rxType = CUL_HM_getRxType($devHash);
