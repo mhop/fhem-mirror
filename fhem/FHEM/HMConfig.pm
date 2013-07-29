@@ -184,7 +184,7 @@ my %culHmModel=(
   "0092" => {name=>"Schueco_263-144"         ,st=>'switch'            ,cyc=>''      ,rxt=>'c'      ,lst=>'4'            ,chn=>"",}, # HM Switch Interface 3 switches 
   "0093" => {name=>"Schueco_263-158"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",}, #
   "0094" => {name=>"IS-WDS-TH-OD-S-R3"       ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",}, #
-  "0095" => {name=>"HM-CC-RT-DN"             ,st=>'thermostat'        ,cyc=>''      ,rxt=>'c:w'    ,lst=>'3:3p.6p,7:0.4',chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,ClimRT_tr:4:4,ClimRT_r:5:5,rCtrl:6:6"}, #
+  "0095" => {name=>"HM-CC-RT-DN"             ,st=>'thermostat'        ,cyc=>''      ,rxt=>'c:w'    ,lst=>'3:3p.6p,7:0.3.4',chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,ClimRT_tr:4:4,ClimRT_r:5:5,rCtrl:6:6"}, #
   "0096" => {name=>"WDF-solar"               ,st=>'blindActuatorSol'  ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"win:1:1,blind_2:3",}, #
   "009B" => {name=>"Schueco_263-xxx"         ,st=>'tipTronic'         ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1:1.2,3:1p.3p',chn=>"act:1:1,sen:2:2,sec:3:3",}, #
   "009F" => {name=>"HM-Sen-Wa-Od"            ,st=>'sensor'            ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",}, #capacitive filling level sensor
@@ -383,7 +383,7 @@ my %culHmRegDefine = (
 
   driveDown       =>{a=> 11.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
   driveUp         =>{a=> 13.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
-  driveTurn       =>{a=> 15.0,s=>1.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"Engine uncharge time, typically 0.5s. Do NOT set to 0 if operated with engine"},
+  driveTurn       =>{a=> 15.0,s=>1.0,l=>1,min=>0  ,max=>25.5    ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"Engine uncharge time, typically 0.5s. Do NOT set to 0 if operated with engine"},
   refRunCounter   =>{a=> 16.0,s=>1.0,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"reference run counter"},
 #remote mainly                                                                                      
   longPress       =>{a=>  4.4,s=>0.4,l=>1,min=>0.3,max=>1.8     ,c=>'m10s3'    ,f=>''      ,u=>'s'   ,d=>0,t=>"time to detect key long press"},
