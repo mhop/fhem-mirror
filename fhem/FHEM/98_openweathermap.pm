@@ -334,7 +334,9 @@ UpdateReadings($$$){
 		$jsonWeather = $json->decode($response);
 	} catch {
 		Log $loglevel, "openweather $name error: JSPON decode";
-		return;
+		return undef;
+	} finally {
+		return undef;
 	};
 
 	readingsBeginUpdate($hash);
