@@ -452,6 +452,7 @@ SWAP_Set($@)
     #}
 
     if( $hash->{product}->{pwrdownmode} == 1
+        && $hash->{"SWAP_03-SystemState"} ne "01"
         && $hash->{"SWAP_03-SystemState"} ne "03" ) {
       SWAP_PushCmdStack($hash, $addr, COMMAND, sprintf("%02X",$reg), sprintf("%02s",$arg2) );
     } else {
@@ -465,7 +466,7 @@ SWAP_Set($@)
 #
 #      $addr = sprintf( "%02s", $arg2 );
 #
-#      $hash->{DEF} = $addr;
+#      $hash->{DEF} =~ s/^../$addr/;
 #      $hash->{addr} = $addr;
 #      $hash->{"SWAP_09-DeviceAddress"} = $addr;
 #
@@ -689,6 +690,19 @@ SWAP_updateReadings($$$)
   }
 }
 sub
+SWAP_findFreeAddress($$)
+{
+  my ($hash, $orig) = @_;
+
+  for( my $addr = 0xF0; $addr < 0xFF; $addr++ ) {
+    next if( $modules{SWAP}{defptr}{$addr} );
+
+    return sprintf( "%02X", $addr );
+  }
+
+  return $orig;
+}
+sub
 SWAP_Parse($$)
 {
   my ($hash, $msg) = @_;
@@ -730,7 +744,7 @@ SWAP_Parse($$)
 
       my $addr = $data;
 
-      $rhash->{DEF} = $addr;
+      $rhash->{DEF} =~ s/^../$addr/;
       $rhash->{addr} = $addr;
       $rhash->{"SWAP_09-DeviceAddress"} = $addr;
 
@@ -756,6 +770,8 @@ SWAP_Parse($$)
   if( !$modules{SWAP}{defptr}{$raddr} ) {
     Log 3, "SWAP Unknown device $rname, please define it";
     return undef if( $raddr eq "00" );
+
+    $rname = SWAP_findFreeAddress($hash,$raddr) if( $raddr eq "FF" ); #use next free addr as name -> consistent name after change below
     return "UNDEFINED SWAP_$rname SWAP_$data $raddr $data" if( $reg == 0x00 && defined($modules{"SWAP_$data"}) );
     return "UNDEFINED SWAP_$rname SWAP $raddr $data" if( $reg == 0x00 );
     return "UNDEFINED SWAP_$rname SWAP $raddr";
@@ -789,6 +805,7 @@ SWAP_Parse($$)
 
   my @list;
   push(@list, $rname);
+
   if( $reg <= 0x0A ) {
     if( defined( $default_registers{$reg}->{endpoints} ) ) {
       my $i = 0;
@@ -801,6 +818,21 @@ SWAP_Parse($$)
       }
     } else {
       $rhash->{"SWAP_".$rid."-".$default_registers{$reg}->{name}} = $data;
+    }
+
+    if( $reg == 0x09
+        && $data eq "FF" ) {
+      my $addr = SWAP_findFreeAddress($hash,$data);
+      if( $addr ne $data ) {
+        Log 3, "SWAP $rname: changing 09-DeviceAddress from default $data to $addr";
+        SWAP_Set( $rhash, $rname, "regSet", "09", "$addr" ); #device should already have consistent name from autocreate above
+      }
+    } elsif( $reg == 0x0A
+             && $data eq "FFFF"
+             && $rhash->{product}->{pwrdownmode} == 1 ) {
+      Log 3, "SWAP $rname: changing 0A-PeriodicTxInterval from default FFFF to 0384 (900 seconds)";
+      SWAP_Set( $rhash, $rname, "regSet", "0A", "0384" );
+
     }
   } else {
     SWAP_updateReadings( $rhash, $rid, $data );
@@ -986,7 +1018,12 @@ SWAP_Attr(@)
   This typicaly happens during device startup after a reset.
 
   <br><br>
-  Note: This module requires XML::Simple.<br>
+  Notes:
+  <ul>
+    <li> This module requires XML::Simple.</li>
+    <li>Devices with the default address FF will be changed to the first free address in the range F0-FE.</li>
+    <li>For power-down devices the default transmit intervall of FFFF will be changed to 0384 (900 seconds).</li>
+  </ul>
 
   <br>
   <br>
@@ -995,7 +1032,6 @@ SWAP_Attr(@)
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; SWAP &lt;ID&gt;</code> <br>
-    <br>
     <br>
     The ID is a 2 digit hex number to identify the moth in the panStamp network.
   </ul>
