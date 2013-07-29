@@ -237,6 +237,7 @@ OWO_GetStatus($;$){
 			$paraVal = AttrVal($name, $paraName, undef);
 			if(defined($paraVal)){
 				($p, $s, $v, $o) = split(":", AttrVal($name, $paraName, ""));
+				$o = 0 if(!defined($o));
 				$v = ReadingsVal($s, $v, "?") + $o;
 				$dataString = $dataString."&$p=$v";
 				Log $loglevel, "openweather $name reading: $paraName $p $s $v";
@@ -354,9 +355,9 @@ UpdateReadings($$$){
 	readingsBulkUpdate($hash, $prefix."stationId",    $jsonWeather->{id});
 	readingsBulkUpdate($hash, $prefix."lastRxCode",   $jsonWeather->{cod});
 	readingsBulkUpdate($hash, $prefix."stationName",  $jsonWeather->{name});
-	readingsBulkUpdate($hash, $prefix."humidity",     int($jsonWeather->{main}{humidity}));
-	readingsBulkUpdate($hash, $prefix."pressureAbs",  int($jsonWeather->{main}{pressure}));
-	readingsBulkUpdate($hash, $prefix."pressureRel",  int($jsonWeather->{main}{sea_level}));
+	readingsBulkUpdate($hash, $prefix."humidity",     $jsonWeather->{main}{humidity});
+	readingsBulkUpdate($hash, $prefix."pressureAbs",  $jsonWeather->{main}{pressure});
+	readingsBulkUpdate($hash, $prefix."pressureRel",  $jsonWeather->{main}{sea_level});
 	readingsBulkUpdate($hash, $prefix."windSpeed",    $jsonWeather->{wind}{speed});
 	readingsBulkUpdate($hash, $prefix."windDir",      int($jsonWeather->{wind}{deg}));
 	readingsBulkUpdate($hash, $prefix."clouds",       $jsonWeather->{clouds}{all});
