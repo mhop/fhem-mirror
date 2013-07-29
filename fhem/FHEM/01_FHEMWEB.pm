@@ -381,7 +381,7 @@ FW_answerCall($)
   $FW_ss = ($FW_sp =~ m/smallscreen/);
   $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
   @FW_iconDirs = grep { $_ } split(":", AttrVal($FW_wname, "iconPath",
-                                "$FW_sp:fhemSVG:openautomation:default"));
+                                "$FW_sp:default:fhemSVG:openautomation"));
 
   # /icons/... => current state of ...
   # also used for static images: unintended, but too late to change
@@ -2976,9 +2976,8 @@ FW_ActivateInform()
     <li>iconPath<br>
       colon separated list of directories where the icons are read from.
       The directories start in the fhem/www/images directory. The default is
-      $styleSheetPrefix:fhemSVG:openautomation:default<br>
-      Set it to fhemSVG:openautomation to get only SVG images, or to default
-      to get the "old-style" images.
+      $styleSheetPrefix:default:fhemSVG:openautomation<br>
+      Set it to fhemSVG:openautomation to get only SVG images.
       </li>
       <br>
 
