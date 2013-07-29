@@ -2976,8 +2976,9 @@ FW_ActivateInform()
     <li>iconPath<br>
       colon separated list of directories where the icons are read from.
       The directories start in the fhem/www/images directory. The default is
-      $stylesheetPrefix:default<br>
-      Set it to openautomation only to get a lot of SVG images.
+      $styleSheetPrefix:fhemSVG:openautomation:default<br>
+      Set it to fhemSVG:openautomation to get only SVG images, or to default
+      to get the "old-style" images.
       </li>
       <br>
 
