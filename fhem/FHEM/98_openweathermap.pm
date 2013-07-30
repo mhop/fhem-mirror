@@ -39,6 +39,7 @@
 #	2013-07-30	replaced: try/catch by eval
 #				added: some more logging
 #				added: delete some station readings before update
+#				added: attribute owoSendUrl
 #
 
 package main;
