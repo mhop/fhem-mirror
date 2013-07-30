@@ -3146,7 +3146,7 @@ FW_ActivateInform()
 
         The first specified command is looked up in the "set device ?" list
         (see the <a href="#setList">setList</a> attribute for dummy devices).
-        If <b>there</b> it contains some known modifiers (semicolon, followed
+        If <b>there</b> it contains some known modifiers (colon, followed
         by a comma separated list), then a different widget will be displayed:
         <ul>
           <li>if the modifier is ":time", then a javascript driven timepicker is
