@@ -73,7 +73,7 @@ openweathermap_Initialize($)
 	$hash->{AttrFn}		=	"OWO_Attr";
 
 	$hash->{AttrList}	=	"do_not_notify:0,1 loglevel:0,1,2,3,4,5 ".
-							"owoGetUrl owoInterval:600,900,1800,3600 ".
+							"owoGetUrl owoSendUrl owoInterval:600,900,1800,3600 ".
 							"owoApiKey owoStation owoUser ".
 							"owoDebug:0,1 owoRaw:0,1 owoTimestamp:0,1 ".
 							"owoSrc00 owoSrc01 owoSrc02 owoSrc03 owoSrc04 ".
@@ -101,7 +101,7 @@ OWO_Set($@){
 	
 	given($cmd){
 		when("?")		{ return $usage; }
-
+		
 		when("send"){
 			OWO_GetStatus($hash,1);
 			return;
@@ -228,11 +228,15 @@ OWO_GetStatus($;$){
 
 	if(defined($user) && defined($station)){
 		Log $loglevel, "openweather $name started: SendData";
+
 		my $lat			= AttrVal("global", "latitude", "?");
 		my $lon			= AttrVal("global", "longitude", "?");
 		my $alt			= AttrVal("global", "altitude", "?");
 
-		my $urlString = "http://$user:$pass\@openweathermap.org/data/post";
+		my $urlString = AttrVal($name, "owoSendUrl", "http://openweathermap.org/data/post");
+		my ($p1, $p2) = split("//", $urlString);
+		$urlString = $p1."//$user:$pass\@".$p2;
+
 		my $dataString = "name=$station&lat=$lat&long=$lon&alt=$alt";
 
 		my ($count, $paraName, $paraVal, $p, $s, $v, $o);
@@ -298,9 +302,10 @@ OWO_Define($$){
 	$hash->{helper}{INTERVAL} = 1800;
 	$hash->{helper}{AVAILABLE} = 1;
 
-	$attr{$name}{"owoDebug"} = 1;
-	$attr{$name}{"owoInterval"} = 1800;
-	$attr{$name}{"owoGetUrl"} = "http://api.openweathermap.org/data/2.5/weather";
+	$attr{$name}{"owoDebug"}	= 1;
+	$attr{$name}{"owoInterval"}	= 1800;
+	$attr{$name}{"owoGetUrl"}	= "http://api.openweathermap.org/data/2.5/weather";
+	$attr{$name}{"owoSendUrl"}	= "http://openweathermap.org/data/post";
 
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, "state","defined");
@@ -596,6 +601,8 @@ OWO_isday($$){
 		&lt;user:password&gt; - define your username and password for owo access here<br/>
 		<li><b>owoRaw</b></li>
 		&lt;0|1&gt; - defines wether JSON date from owo will be shown in a reading (e.g. to use it for own presentations)<br/>
+		<li><b>owoSendUrl</b></li>
+		Current URL to post your own data. If this url changes, you can correct it here unless updated version of 98_openweather becomes available.<br/>
 		<li><b>owoTimestamp</b></li>
 		&lt;0|1&gt; - defines whether date/time readings show timestamps or localtime-formatted informations<br/>
 		<li><b>owoSrc00 ... owoSrc19</b></li>
