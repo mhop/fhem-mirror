@@ -34,8 +34,11 @@
 ##############################################################################
 #	Changelog:
 #	2013-07-28	initial release
-#	2013-07-29	fixed some typos
-#				added "set <name> send"
+#	2013-07-29	fixed: some typos in documentation
+#				added: "set <name> send"
+#	2013-07-30	replaced: try/catch by eval
+#				added: some more logging
+#				added: delete some station readings before update
 #
 
 package main;
@@ -45,7 +48,7 @@ use warnings;
 use POSIX;
 use HttpUtils;
 use JSON qw/decode_json/;
-use Try::Tiny;
+#use Try::Tiny;
 use feature qw/say switch/;
 
 sub OWO_Set($@);
@@ -70,8 +73,9 @@ openweathermap_Initialize($)
 	$hash->{AttrFn}		=	"OWO_Attr";
 
 	$hash->{AttrList}	=	"do_not_notify:0,1 loglevel:0,1,2,3,4,5 ".
-							"owoApiKey owoDebug:0,1 owoGetUrl owoInterval ".
-							"owoStation owoUser owoRaw:0,1 owoTimestamp:0,1 ".
+							"owoGetUrl owoInterval:600,900,1800,3600 ".
+							"owoApiKey owoStation owoUser ".
+							"owoDebug:0,1 owoRaw:0,1 owoTimestamp:0,1 ".
 							"owoSrc00 owoSrc01 owoSrc02 owoSrc03 owoSrc04 ".
 							"owoSrc05 owoSrc06 owoSrc07 owoSrc08 owoSrc09 ".
 							"owoSrc10 owoSrc11 owoSrc12 owoSrc13 owoSrc14 ".
@@ -325,54 +329,58 @@ UpdateReadings($$$){
 	$url .= "&APPID=".AttrVal($name, "owoApiKey", "");
 	$response = GetFileFromURL("$url");
 	
-	if(AttrVal($name, "owoDebug", 1) == 1){
-		Log $loglevel, "openweather $name response:\n$response";
-	}
-
-	my $json = JSON->new->allow_nonref;
-	try {
-		$jsonWeather = $json->decode($response);
-	} catch {
-		Log $loglevel, "openweather $name error: JSPON decode";
-		return undef;
-	} finally {
-		return undef;
-	};
-
-	readingsBeginUpdate($hash);
-	if(AttrVal($name, "owoRaw", 0) == 1){
-		readingsBulkUpdate($hash, $prefix."rawData",  $response);
+	if(defined($response)){
+		if(AttrVal($name, "owoDebug", 1) == 1){
+			Log $loglevel, "openweather $name response:\n$response";
+		}
+		my $json = JSON->new->allow_nonref;
+		eval {$jsonWeather = $json->decode($response)}; warn $@ if $@;
 	} else {
-		readingsBulkUpdate($hash, $prefix."rawData",  "not requested");
+		Log $loglevel, "openweather $name error: no response from server";
 	}
-	if(AttrVal($name, "owoTimestamp", 0) == 1){
-		readingsBulkUpdate($hash, $prefix."lastWx",   $jsonWeather->{dt});
-		readingsBulkUpdate($hash, $prefix."sunrise",  $jsonWeather->{sys}{sunrise});
-		readingsBulkUpdate($hash, $prefix."sunset",   $jsonWeather->{sys}{sunset});
-	} else {
-		readingsBulkUpdate($hash, $prefix."lastWx",   localtime($jsonWeather->{dt}));
-		readingsBulkUpdate($hash, $prefix."sunrise",  localtime($jsonWeather->{sys}{sunrise}));
-		readingsBulkUpdate($hash, $prefix."sunset",   localtime($jsonWeather->{sys}{sunset}));
-	}
-	readingsBulkUpdate($hash, $prefix."stationId",    $jsonWeather->{id});
-	readingsBulkUpdate($hash, $prefix."lastRxCode",   $jsonWeather->{cod});
-	readingsBulkUpdate($hash, $prefix."stationName",  $jsonWeather->{name});
-	readingsBulkUpdate($hash, $prefix."humidity",     $jsonWeather->{main}{humidity});
-	readingsBulkUpdate($hash, $prefix."pressureAbs",  $jsonWeather->{main}{pressure});
-	readingsBulkUpdate($hash, $prefix."pressureRel",  $jsonWeather->{main}{sea_level});
-	readingsBulkUpdate($hash, $prefix."windSpeed",    $jsonWeather->{wind}{speed});
-	readingsBulkUpdate($hash, $prefix."windDir",      $jsonWeather->{wind}{deg});
-	readingsBulkUpdate($hash, $prefix."clouds",       $jsonWeather->{clouds}{all});
-	readingsBulkUpdate($hash, $prefix."rain3h",       $jsonWeather->{rain}{"3h"});
-	readingsBulkUpdate($hash, $prefix."snow3h",       $jsonWeather->{snow}{"3h"});
-	readingsBulkUpdate($hash, $prefix."stationLat",   sprintf("%.4f",$jsonWeather->{coord}{lat}));
-	readingsBulkUpdate($hash, $prefix."stationLon",   sprintf("%.4f",$jsonWeather->{coord}{lon}));
-	readingsBulkUpdate($hash, $prefix."temperature",  sprintf("%.1f",$jsonWeather->{main}{temp}-273.15));
-	readingsBulkUpdate($hash, $prefix."tempMin",      sprintf("%.1f",$jsonWeather->{main}{temp_min}-273.15));
-	readingsBulkUpdate($hash, $prefix."tempMax",      sprintf("%.1f",$jsonWeather->{main}{temp_max}-273.15));
-	readingsBulkUpdate($hash, "state",                "active");
-	readingsEndUpdate($hash, 1);
 
+	if(defined($jsonWeather)){
+		my @possibleReadings = ("sunrise", "sunset", "humidity", "pressureAbs", "pressureRel", "windSpeed", "windDir",
+								"clouds", "rain3h", "snow3h", "temperature", "tempMin", "tempMax");
+
+		foreach(@possibleReadings) { CommandDeleteReading($name, $prefix.$_); }
+							
+		readingsBeginUpdate($hash);
+		if(AttrVal($name, "owoRaw", 0) == 1){
+			readingsBulkUpdate($hash, $prefix."rawData",  $response);
+		} else {
+			readingsBulkUpdate($hash, $prefix."rawData",  "not requested");
+		}
+		if(AttrVal($name, "owoTimestamp", 0) == 1){
+			readingsBulkUpdate($hash, $prefix."lastWx",   $jsonWeather->{dt});
+			readingsBulkUpdate($hash, $prefix."sunrise",  $jsonWeather->{sys}{sunrise});
+			readingsBulkUpdate($hash, $prefix."sunset",   $jsonWeather->{sys}{sunset});
+		} else {
+			readingsBulkUpdate($hash, $prefix."lastWx",   localtime($jsonWeather->{dt}));
+			readingsBulkUpdate($hash, $prefix."sunrise",  localtime($jsonWeather->{sys}{sunrise}));
+			readingsBulkUpdate($hash, $prefix."sunset",   localtime($jsonWeather->{sys}{sunset}));
+		}
+		readingsBulkUpdate($hash, $prefix."stationId",    $jsonWeather->{id});
+		readingsBulkUpdate($hash, $prefix."lastRxCode",   $jsonWeather->{cod});
+		readingsBulkUpdate($hash, $prefix."stationName",  $jsonWeather->{name});
+		readingsBulkUpdate($hash, $prefix."humidity",     $jsonWeather->{main}{humidity});
+		readingsBulkUpdate($hash, $prefix."pressureAbs",  $jsonWeather->{main}{pressure});
+		readingsBulkUpdate($hash, $prefix."pressureRel",  $jsonWeather->{main}{sea_level});
+		readingsBulkUpdate($hash, $prefix."windSpeed",    $jsonWeather->{wind}{speed});
+		readingsBulkUpdate($hash, $prefix."windDir",      $jsonWeather->{wind}{deg});
+		readingsBulkUpdate($hash, $prefix."clouds",       $jsonWeather->{clouds}{all});
+		readingsBulkUpdate($hash, $prefix."rain3h",       $jsonWeather->{rain}{"3h"});
+		readingsBulkUpdate($hash, $prefix."snow3h",       $jsonWeather->{snow}{"3h"});
+		readingsBulkUpdate($hash, $prefix."stationLat",   sprintf("%.4f",$jsonWeather->{coord}{lat}));
+		readingsBulkUpdate($hash, $prefix."stationLon",   sprintf("%.4f",$jsonWeather->{coord}{lon}));
+		readingsBulkUpdate($hash, $prefix."temperature",  sprintf("%.1f",$jsonWeather->{main}{temp}-273.15));
+		readingsBulkUpdate($hash, $prefix."tempMin",      sprintf("%.1f",$jsonWeather->{main}{temp_min}-273.15));
+		readingsBulkUpdate($hash, $prefix."tempMax",      sprintf("%.1f",$jsonWeather->{main}{temp_max}-273.15));
+		readingsBulkUpdate($hash, "state",                "active");
+		readingsEndUpdate($hash, 1);
+	} else { 
+		Log $loglevel, "openweather $name error: update not possible!"; 
+	}
 	return;
 }
 
