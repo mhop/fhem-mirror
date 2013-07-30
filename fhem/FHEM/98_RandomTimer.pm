@@ -478,7 +478,6 @@ sub RandomTimer_disable($) {
         </pre>
     </li>
   </ul>
-</ul>
 
-=end html_DE
+=end html
 =cut
