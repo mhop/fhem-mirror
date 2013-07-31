@@ -889,7 +889,7 @@ FW_makeTableFromArray($$@) {
     my $row=1;
     FW_pO "<br>";
     FW_pO "$txt";
-    FW_pO '<table class="block wide $class">';
+    FW_pO "<table class=\"block wide $class\">";
     foreach (sort @obj) {
       FW_pF "<tr class=\"%s\"><td>", ($row&1)?"odd":"even";
       $row++;
@@ -1025,7 +1025,6 @@ FW_roomOverview($)
         }
 
       } else {
-        my $td = "<td>";
         FW_pF "<tr%s>", $l1 eq $FW_room ? " class=\"sel\"" : "";
 
         # image tag if we have an icon, else empty
@@ -1035,8 +1034,9 @@ FW_roomOverview($)
         my $icon = FW_iconName($icoName) ?
                         FW_makeImage($icoName,$icoName,"icon")."&nbsp;" : "";
 
+        # Force external browser if FHEMWEB is installed as an offline app.
         if($l2 =~ m/.html$/ || $l2 =~ m/^http/) {
-           FW_pO "$td<a href=\"$l2\">$icon$l1</a></td>";
+           FW_pO "<td><div><a href=\"$l2\">$icon$l1</a></div></td>";
         } else {
           FW_pH $l2, "$icon$l1", 1;
         }
