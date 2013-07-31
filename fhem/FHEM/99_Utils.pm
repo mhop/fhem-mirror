@@ -146,7 +146,7 @@ sub UntoggleDirect($)
 sub UntoggleIndirect($$$)
 {
   my ($sender, $actor, $dimvalue) = @_;
-  Log 4, "UntoggleDirect($sender, $actor, $dimvalue)";
+  Log 4, "UntoggleIndirect($sender, $actor, $dimvalue)";
   if (Value($sender) eq "toggle")
   {
     if (Value($actor) eq "off") {fhem ("set ".$actor." on")}
@@ -171,3 +171,71 @@ sub UntoggleIndirect($$$)
 
 
 1;
+
+=pod
+=begin html
+
+<a name="Utils"></a>
+<h3>Utils</h3>
+<ul>
+	<br/>
+	This is a collection of functions that can be used module-independant in all your own development<br/>
+	</br>
+	<pre>
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# IMPORTANT: do not insert your own functions inside
+# the file 99_Utils.pm!
+#
+# This file will be overwritten during an FHEM update and all
+# your own inserts will be lost.
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#
+# To avoid this, we recommend following procedure:
+#
+# 1. Create your own file 99_myUtils.pm from the template below
+# 2. Put this file inside the ./FHEM directory
+# 3. Put your own functions into this new file
+#
+<br/>
+<code>
+# start-of-template
+package main;
+
+use strict;
+use warnings;
+use POSIX;
+
+sub
+myUtils_Initialize($$)
+{
+	my ($hash) = @_;
+}
+
+# start with your own functions below this line
+
+
+# behind your last function, we need the following
+1;
+# end-of-template
+</code>
+</pre>
+</br>
+	<b>Defined functions</b><br/><br/>
+	<ul>
+		<li><b>abstime2rel()</b><br>???</li><br/>
+		<li><b>ltrim()</b><br>returns string without leading spaces</li><br/>
+		<li><b>max()</b><br>returns the highest value from a given list (sorted alphanumeric)</li><br/>
+		<li><b>maxNum()</b><br>returns the highest value from a given list (sorted numeric)</li><br/>
+		<li><b>min()</b><br>returns the lowest value from a given list (sorted alphanumeric)</li><br/>
+		<li><b>minNum()</b><br>returns the lowest value from a given list (sorted numeric)</li><br/>
+		<li><b>rtrim()</b><br>returns string without trailing spaces</li><br/>
+		<li><b>time_str2num()</b><br>???</li><br/>
+		<li><b>trim()</b><br>returns string without leading and without trailing spaces</li><br/>
+		<li><b>UntoggleDirect()</b><br>For devices paired directly, converts state 'toggle' into 'on' or 'off'</li><br/>
+		<li><b>UntoggleIndirect()</b><br>For devices paired indirectly, switches the target device 'on' or 'off' <br/>
+		also when a 'toggle' was sent from the source device</li><br/>
+	</ul>
+</ul>
+=end html
+=cut
+
