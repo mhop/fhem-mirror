@@ -1383,7 +1383,7 @@ sub CUL_HM_Parse($$) {##############################
     DoTrigger($_, undef) if ($_ ne $name);
   }
   
-  return $name ;#general notification to the device
+  return $name ;
 }
 sub CUL_HM_parseCommon(@){#####################################################
   # parsing commands that are device independant
@@ -1400,7 +1400,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   #                  9610
   if(  $shash->{cmdStack}           && 
       ((hex($mFlg) & 0xA2) == 0x82) && 
-	  (CUL_HM_getRxType($shash) & 0x18)){ #wakeup or lazy Config #####General
+	  (CUL_HM_getRxType($shash) & 0x08)){ #wakeup 
 	#send wakeup and process command stack
     CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IOid($shash).$src);
 	CUL_HM_ProcessCmdStack($shash);
@@ -1658,7 +1658,7 @@ sub CUL_HM_queueAutoRead($){
     @arr = CUL_HM_noDup((@{$modules{CUL_HM}{helper}{autoRdCfgLst}}, $name));
   }
   else{
-    my @arr = ($name);
+    @arr = ($name);
   }
   $modules{CUL_HM}{helper}{autoRdCfgLst} =\@arr;
   $defs{$name}{autoRead} = "scheduled";
@@ -3166,8 +3166,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
   }
   CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$chn."06");
   CUL_HM_queueAutoRead($hash->{NAME}) 
-        if (2 < CUL_HM_getAttrInt($hash->{NAME},"autoReadReg"));
-  
+        if (2 < CUL_HM_getAttrInt($hash->{NAME},"autoReadReg"));  
 }
 sub CUL_HM_Resend($) {#resend a message if there is no answer
   my $hash = shift;
