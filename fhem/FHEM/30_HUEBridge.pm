@@ -513,7 +513,7 @@ HUEBridge_HTTP_Request($$$@)
     <li>statusRequest<br>
     Update bridge status.</li>
     <li>swupdate<br>
-    Update bridge status.</li>
+    Update bridge firmware. This command is only available if a new firmware is available (indicated by updatestate with a value of 2. The version and release date is shown in the reading swupdate. </li>
   </ul><br>
 </ul><br>
 
