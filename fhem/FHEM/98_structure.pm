@@ -27,6 +27,8 @@ use strict;
 use warnings;
 #use Data::Dumper;
 
+sub structure_getChangedDevice($);
+
 
 #####################################
 sub
@@ -101,12 +103,28 @@ structure_Undef($$)
 # returns the unique keys of the given array
 # @my_array = ("one","two","three","two","three");
 # print join(" ", @my_array), "\n";
-# print join(" ", uniq(@my_array)), "\n";
+# print join(" ", structure_uniq(@my_array)), "\n";
 
-sub uniq {
-    return keys %{{ map { $_ => 1 } @_ }};
+sub
+structure_uniq
+{
+  return keys %{{ map { $_ => 1 } @_ }};
 }
 
+
+#############################
+# returns the really changed Device
+#############################
+
+sub
+structure_getChangedDevice($) 
+{
+  my ($dev) = @_;
+  my $lastDevice = ReadingsVal($dev, "LastDevice", undef);
+  $dev = structure_getChangedDevice($lastDevice)
+        if($lastDevice && $defs{$dev}->{TYPE} eq "structure");
+  return $dev;
+}
 
 #############################
 sub structure_Notify($$)
@@ -266,7 +284,7 @@ sub structure_Notify($$)
     last if($minprio == 1);
   } #foreach
 
-  @clientstate = uniq(@clientstate);# eleminiere alle Dubletten
+  @clientstate = structure_uniq(@clientstate);# eleminiere alle Dubletten
 
   #ermittle Endstatus
   my $newState = "undefined";
@@ -285,7 +303,11 @@ sub structure_Notify($$)
 
   Log GetLogLevel($me,5), "Update structure '$me' to $newState" .
               " because device $dev->{NAME} has changed";
-  readingsSingleUpdate($hash, "state", $newState, 1);
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "LastDevice", $dev->{NAME});
+  readingsBulkUpdate($hash, "LastDevice_Abs", structure_getChangedDevice($dev->{NAME}));
+  readingsBulkUpdate($hash, "state", $newState);
+  readingsEndUpdate($hash, 1);
 
   delete($hash->{INNTFY});
   undef;
