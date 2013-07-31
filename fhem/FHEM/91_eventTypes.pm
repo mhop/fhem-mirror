@@ -1,6 +1,7 @@
 ##############################################
 # $Id: 91_eventTypes.pm 2982 2013-03-24 17:47:28Z rudolfkoenig $
 package main;
+use IO::File;
 
 use strict;
 use warnings;
