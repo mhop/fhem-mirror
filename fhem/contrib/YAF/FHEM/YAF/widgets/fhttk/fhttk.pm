@@ -70,9 +70,11 @@ sub fhttk_get_widgetcss() {
 
 sub fhttk_get_widgetjs() {
 		my $output = '
-				function endsWith(str, suffix) {
+				function fhttk_endsWith(str, suffix) {
 					return str.indexOf(suffix, str.length - suffix.length) !== -1;
 				}
+						function fhttk_on_click(view_id, widget_id) {
+		}
 				function fhttk_update_widget(view_id, widget_id) {
 			$.ajax({
 								type: "GET",
@@ -83,7 +85,7 @@ sub fhttk_get_widgetjs() {
 								success: function(get_state) {
 										var widget = $("#widget_"+view_id+"_"+widget_id);
 										$("#widget_"+view_id+"_"+widget_id).attr("title",get_state);
-										if (endsWith(get_state,"Open")) {
+										if (fhttk_endsWith(get_state,"Open")) {
 												if (widget.hasClass("widget_fhttk_closed")) {
 														widget.removeClass("widget_fhttk_closed");
 												}
@@ -92,7 +94,7 @@ sub fhttk_get_widgetjs() {
 												}
 												widget.html("<span />");
 										}
-										else if (endsWith(get_state,"Closed")) {
+										else if (fhttk_endsWith(get_state,"Closed")) {
 												if (!widget.hasClass("widget_fhttk_closed")) {
 														widget.addClass("widget_fhttk_closed");
 												}

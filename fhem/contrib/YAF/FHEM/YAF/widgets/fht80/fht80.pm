@@ -71,6 +71,8 @@ sub fht80_get_widgetcss() {
 sub fht80_get_widgetjs() {
 
 	my $output = '
+		function fht80_on_click(view_id, widget_id) {
+		}
 		function fht80_update_widget(view_id, widget_id) {
             $.ajax({
 		 		type: "GET",
@@ -206,8 +208,8 @@ sub fht80_get_temp() {
 	my $desi = 			fht80_isdef($defs{$fhemname}{READINGS}{"desired-temp"}{VAL}, "");
 	my $battery = 		fht80_isdef($defs{$fhemname}{READINGS}{battery}{VAL}, "");
 	my $nomode = 		YAF_getWidgetAttribute($viewid, $widgetid, "nomode", 0);
-	my $labeltype = 	YAF_getWidgetAttribute($viewid, $widgetid, "labeltype", "");	
-	$ret[1] = 			YAF_getWidgetAttribute($viewid, $widgetid, "size", 1);		#we don't process the size, so put it in the return array right away.	
+	my $labeltype = 	YAF_getWidgetAttribute($viewid, $widgetid, "labeltype", "");
+	$ret[1] = 			YAF_getWidgetAttribute($viewid, $widgetid, "size", 1);		#we don't process the size, so put it in the return array right away.
 
 	#process data
 	my $label = "";
