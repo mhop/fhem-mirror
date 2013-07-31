@@ -61,7 +61,7 @@ SYSSTAT_Define($$)
   return undef;
 }
 sub
-SYSSTAT_InitSys( $ )
+SYSSTAT_InitSys($)
 {
   my ($hash) = @_;
 
@@ -146,8 +146,9 @@ SYSSTAT_Attr($$$)
   return;
 }
 
-sub SYSSTAT_getLoadAVG( $ );
-sub SYSSTAT_getPiTemp( $ );
+sub SYSSTAT_getLoadAVG($);
+sub SYSSTAT_getPiTemp($);
+sub SYSSTAT_getUptime($);
 sub
 SYSSTAT_GetUpdate($)
 {
@@ -233,7 +234,7 @@ SYSSTAT_GetUpdate($)
 }
 
 sub
-SYSSTAT_getLoadAVG( $ )
+SYSSTAT_getLoadAVG($ )
 {
   my ($hash) = @_;
 
@@ -328,7 +329,7 @@ SYSSTAT_readFile($$$)
 }
 
 sub
-SYSSTAT_getPiTemp( $ )
+SYSSTAT_getPiTemp($)
 {
   my ($hash) = @_;
 
@@ -338,7 +339,7 @@ SYSSTAT_getPiTemp( $ )
 }
 
 sub
-SYSSTAT_getPiFreq( $ )
+SYSSTAT_getPiFreq($)
 {
   my ($hash) = @_;
 
@@ -348,13 +349,14 @@ SYSSTAT_getPiFreq( $ )
 }
 
 sub
-SYSSTAT_getUptime( $ )
+SYSSTAT_getUptime($)
 {
   my ($hash) = @_;
 
   my $uptime = SYSSTAT_readCmd($hash,"uptime",0);
 
-  $uptime = $1 if( $uptime =~ m/up\s+([\d:]*)/ );
+  $uptime = $1 if( $uptime =~ m/up\s((\d+\D+,\s)?[\d:]+)/ );
+  $uptime = "0 days, $uptime" if( !$2);
 
   return $uptime;
 }
