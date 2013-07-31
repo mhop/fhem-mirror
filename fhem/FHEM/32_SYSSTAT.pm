@@ -17,7 +17,7 @@ SYSSTAT_Initialize($)
   $hash->{UndefFn}  = "SYSSTAT_Undefine";
   $hash->{GetFn}    = "SYSSTAT_Get";
   $hash->{AttrFn}   = "SYSSTAT_Attr";
-  $hash->{AttrList} = "filesystems raspberrycpufreq:1 raspberrytemperature:0,1,2 showpercent:1 uptime:1 useregex:1 ssh_user loglevel:0,1,2,3,4,5,6 ".
+  $hash->{AttrList} = "filesystems raspberrycpufreq:1 raspberrytemperature:0,1,2 showpercent:1 uptime:1,2 useregex:1 ssh_user loglevel:0,1,2,3,4,5,6 ".
                        $readingFnAttributes;
 }
 
@@ -352,11 +352,24 @@ sub
 SYSSTAT_getUptime($)
 {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
 
   my $uptime = SYSSTAT_readCmd($hash,"uptime",0);
 
-  $uptime = $1 if( $uptime =~ m/up\s((\d+\D+,\s)?[\d:]+)/ );
+  $uptime = $1 if( $uptime =~ m/up\s+(((\d+)\D+,\s+)?(\d+):(\d+))/ ); 
   $uptime = "0 days, $uptime" if( !$2);
+
+  if( AttrVal($name, "uptime", "0") == 2 ) {
+    my $days = $3?$3:0;
+    my $hours = $4; 
+    my $minutes = $5; 
+ 
+    $uptime = $days * 24; 
+    $uptime += $hours;
+    $uptime *= 60; 
+    $uptime += $minutes;
+    $uptime *= 60; 
+  }
 
   return $uptime;
 }
@@ -456,6 +469,7 @@ SYSSTAT_getUptime($)
       If set to 2 a geometric average over the last 4 values is created.</li>
     <li>uptime<br>
       If set and > 0 the system uptime is read.<br>
+      If set to 2 the uptime is displayed in seconds.</li>
     <li>useregex<br>
       If set the entries of the filesystems list are treated as regex.</li>
     <li>ssh_user<br>
