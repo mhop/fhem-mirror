@@ -688,8 +688,16 @@ SWAP_updateReadings($$$)
     readingsBeginUpdate($hash);
     foreach my $endpoint (@{$hash->{product}->{registers}->{$reg}->{endpoints}}) {
       my $position = 0;
-      $position = $endpoint->{position} * 2 if( defined($endpoint->{position}) );
-      my $value = substr($data, $position, $endpoint->{size}*2);
+      my $value = "";
+      $position = $endpoint->{position} if( defined($endpoint->{position}) );
+      if( $position =~ m/^(\d+)\.(\d+)$/ ) {
+        my $byte = hex( substr( $data, length($data) - 2 - $1*2, 2 ) );
+        my $mask = 0x01 << $2;
+        $value = "0";
+        $value = "1" if( $byte & $mask );
+      } else {
+        $value = substr($data, $position*2, $endpoint->{size}*2);
+      }
       readingsBulkUpdate($hash, SWAP_regName($rid,$i,$endpoint), $value);
       ++$i;
     }
