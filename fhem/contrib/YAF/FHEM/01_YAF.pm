@@ -360,6 +360,12 @@ sub YAF_Request ($@) {
 							YAF_Print("0");
 						}
 					}
+					#-- save config
+					elsif($function eq "saveconfig"){
+						fhem("save");
+						Log 3, "Saved running config";
+						YAF_Print("1");
+					}
 					else {
 						YAF_Print("0");	
 					}				

@@ -66,6 +66,7 @@
 			
 			// Initialisiert die Oberfläche
 			function init() {
+				$.ajaxSetup({ cache: false });
 				init_tabs();
 				init_menue();
 				$("#widget_menue").hide();
