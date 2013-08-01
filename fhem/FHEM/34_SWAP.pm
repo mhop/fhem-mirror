@@ -158,7 +158,7 @@ readDeviceXML($$)
       my $_endpoint = $product->{registers}->{$id}->{endpoints}->[$i] = {};
       $_endpoint->{name} = $param->{name};
       $_endpoint->{name} =~ s/ /_/g;
-      $_endpoint->{position} = 0+$param->{position} if( defined($param->{position}) );
+      $_endpoint->{position} = $param->{position} if( defined($param->{position}) );
       $_endpoint->{size} = 0+$param->{size} if( defined($param->{size}) );
       $_endpoint->{direction} = OUT;
       $_endpoint->{type} = $map->{$param->{type}};
@@ -177,7 +177,7 @@ readDeviceXML($$)
       my $_endpoint = $product->{registers}->{$id}->{endpoints}->[$i] = {};
       $_endpoint->{name} = $endpoint->{name};
       $_endpoint->{name} =~ s/ /_/g;
-      $_endpoint->{position} = 0+$endpoint->{position} if( defined($endpoint->{position}) );
+      $_endpoint->{position} = $endpoint->{position} if( defined($endpoint->{position}) );
       $_endpoint->{size} = 0+$endpoint->{size} if( defined($endpoint->{size}) );
       $_endpoint->{direction} = $map->{$endpoint->{dir}};
       $_endpoint->{type} = $map->{$endpoint->{type}};
@@ -400,7 +400,12 @@ SWAP_Set($@)
         return "endpint $1.$3 is readonly" if( $hash->{product}->{registers}->{$reg}->{endpoints}->[$ep]->{direction} != OUT );
 
         my $len = $hash->{product}->{registers}->{$reg}->{endpoints}->[$ep]->{size};
-        return "value has to be ". $len ." byte(s) in size" if( $len*2 != length( $arg2 ) );
+        if( $len =~ m/^(\d+)\.(\d+)$/ ) {
+          return "only single bit endpoints are supported" if( $2 != 1 );
+          return "value has to 0 or 1" if( $arg2 ne "0" && $arg2 ne "1" );
+        } else {
+          return "value has to be ". $len ." byte(s) in size" if( $len*2 != length( $arg2 ) );
+        }
       } else {
         my $len = $hash->{product}->{registers}->{$reg}->{endpoints}->[0]->{size};
         return "value has to be ". $len ." byte(s) in size" if( $len*2 != length( $arg2 ) );
@@ -437,7 +442,16 @@ SWAP_Set($@)
           $endpoint = $hash->{product}->{registers}->{$reg}->{endpoints}->[$ep];
 
           if( defined( $endpoint->{position} ) ) {
-            substr( $value, $endpoint->{position}*2, $endpoint->{size}*2, $arg2 );
+            if( $endpoint->{position} =~ m/^(\d+)\.(\d+)$/ ) {
+              my $byte = hex( substr( $value, length($value) - 2 - $1*2, 2 ) );
+              my $mask = 0x01 << $2;
+              $byte &= ~$mask if( $arg2 eq "0" );
+              $byte |=  $mask if( $arg2 eq "1" );
+              $byte &= 0xFF;
+              substr( $value, length($value) - 2 - $1*2, 2 , sprintf("%02X",$byte) );
+            } else {
+              substr( $value, $endpoint->{position}*2, $endpoint->{size}*2, $arg2 );
+            }
 
             $arg2 = $value;
           }
