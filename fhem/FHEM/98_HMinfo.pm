@@ -591,7 +591,7 @@ sub HMinfo_status($){##########################################################
 	}
   }
   #====== collection finished - start data preparation======
-  delete $hash->{$_} foreach (grep(/^(ERR|W_sum_)/,keys%{$hash}));# remove old 
+  delete $hash->{$_} foreach (grep(/^(ERR|W_)/,keys%{$hash}));# remove old 
 
   foreach my $read(grep {defined $sum{$_}} @crit){       #--- disp crt count
     $hash->{"W_sum_".$read} = "";
