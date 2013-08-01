@@ -420,16 +420,16 @@ sub CUL_HM_Attr(@) {#################################
 
 #+++++++++++++++++ msg receive, parsing++++++++++++++++++++++++++++++++++++++++
 # translate level to readable
-    my %lvlStr = ( md =>{ "HM-SEC-WDS"      =>{"00"=>"dry"     ,"64"=>"damp"    ,"C8"=>"wet"        }
-	                     ,"HM-CC-SCD"       =>{"00"=>"normal"  ,"64"=>"added"   ,"C8"=>"addedStrong"}
-	                     ,"HM-Sen-RD-O"     =>{"00"=>"dry"                      ,"C8"=>"rain"}
-	                    }
+    my %lvlStr = ( md  =>{ "HM-SEC-WDS"      =>{"00"=>"dry"     ,"64"=>"damp"    ,"C8"=>"wet"        }
+	                      ,"HM-CC-SCD"       =>{"00"=>"normal"  ,"64"=>"added"   ,"C8"=>"addedStrong"}
+	                      ,"HM-Sen-RD-O"     =>{"00"=>"dry"                      ,"C8"=>"rain"}
+	                     }
                   ,mdCh=>{ "HM-Sen-RD-O01"   =>{"00"=>"dry"                      ,"C8"=>"rain"}
 	                      ,"HM-Sen-RD-O02"   =>{"00"=>"on"                       ,"C8"=>"off"}
-	                    }
-				  ,st =>{ "smokeDetector"   =>{"01"=>"no alarm","C7"=>"tone off","C8"=>"Smoke Alarm"}
-				         ,"threeStateSensor"=>{"00"=>"closed"  ,"64"=>"tilted"  ,"C8"=>"open"}
-		                }
+	                     }
+				  ,st  =>{ "smokeDetector"   =>{"01"=>"no alarm","C7"=>"tone off","C8"=>"Smoke Alarm"}
+				          ,"threeStateSensor"=>{"00"=>"closed"  ,"64"=>"tilted"  ,"C8"=>"open"}
+		                 }
 	              );
 sub CUL_HM_Parse($$) {##############################
   my ($iohash, $msgIn) = @_;
@@ -457,11 +457,11 @@ sub CUL_HM_Parse($$) {##############################
   if(!$shash) {      #  Unknown source
     # Generate an UNKNOWN event for pairing requests, ignore everything else
     if($mTp eq "00") {
-      my $model = substr($p, 2, 4);
-	  $model = $culHmModel{$model}{name}  ?
-	            $culHmModel{$model}{name} :
-				"ID_".$model;
-	  my $sname = "CUL_HM_".$model."_$src";
+      my $md = substr($p, 2, 4);
+	  $md = $culHmModel{$md}{name}  ?
+	            $culHmModel{$md}{name} :
+				"ID_".$md;
+	  my $sname = "CUL_HM_".$md."_$src";
 	  $sname =~ s/-/_/g;
       Log 3, "CUL_HM Unknown device $sname, please define it";
       return "UNDEFINED $sname CUL_HM $src $msg";
@@ -477,8 +477,8 @@ sub CUL_HM_Parse($$) {##############################
   my $target = " (to $dname)";
   my @event;    #events to be posted for main entity
   my @entities; #additional entities with events to be notifies
-  my $st    = AttrVal($name, "subType", "");
-  my $model = AttrVal($name, "model"  , "");
+  my $st = AttrVal($name, "subType", "");
+  my $md = AttrVal($name, "model"  , "");
   my $tn = TimeNow();
   CUL_HM_storeRssi($name,
                    "at_".((hex($mFlg)&0x40)?"rpt_":"").$ioName,# repeater?
@@ -512,7 +512,7 @@ sub CUL_HM_Parse($$) {##############################
   CUL_HM_DumpProtocol("RCV",$iohash,$len,$mNo,$mFlg,$mTp,$src,$dst,$p);
 
   #----------start valid messages parsing ---------
-  my $parse = CUL_HM_parseCommon($mNo,$mFlg,$mTp,$src,$dst,$p,$st,$model);
+  my $parse = CUL_HM_parseCommon($mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md);
   push @event, "powerOn"   if($parse eq "powerOn");
   if ($parse =~ s/entities://){#common generated trigger for some entities
     push @entities,split(",",$parse);
@@ -530,7 +530,7 @@ sub CUL_HM_Parse($$) {##############################
   elsif($mTp eq "12") {#$lcm eq "09A112" Another fhem request (HAVE_DATA)
     ;
   } 
-  elsif($model =~ m/^(KS550|HM-WDS100-C6-O)$/) { ##############################
+  elsif($md =~ m/^(KS550|HM-WDS100-C6-O)$/) { ##############################
 
     if($mTp eq "70" && $p =~ m/^(....)(..)(....)(....)(..)(..)(..)/) {
 
@@ -561,7 +561,7 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "unknown:$p";
     }
   } 
-  elsif($model eq "HM-CC-TC") { ###############################################
+  elsif($md eq "HM-CC-TC") { ###############################################
     my ($sType,$chn) = ($1,$2) if($p && $p =~ m/^(..)(..)/);
     if($mTp eq "70" && $p =~ m/^(....)(..)/) { # weather event
 	  $chn = '01'; # fix definition
@@ -728,7 +728,7 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "time-request";
     } 
   } 
-  elsif($model eq "HM-CC-VD") { ###############################################
+  elsif($md eq "HM-CC-VD") { ###############################################
     if($mTp eq "02" && $p =~ m/^(..)(..)(..)(..)/) {#subtype+chn+value+err
       my ($chn,$vp, $err) = (hex($2),hex($3), hex($4));
   	  $chn = sprintf("%02X",$chn&0x3f);
@@ -766,22 +766,22 @@ sub CUL_HM_Parse($$) {##############################
 	  }
     }
   } 
-  elsif($model =~ m/^(HM-Sen-Wa-Od|HM-CC-SCD)$/){ #############################
+  elsif($md =~ m/^(HM-Sen-Wa-Od|HM-CC-SCD)$/){ #############################
     if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
 	    ($mTp eq "10" && $p =~ m/^06/) ||  #or Info_Status message here
 	    ($mTp eq "41"))                { 
 	  my $lvl = substr($p,4,2);
 	  my $err = hex(substr($p,6,2));
-	  if    ($lvlStr{md}{$model}){$lvl = $lvlStr{md}{$model}{$lvl}}
+	  if    ($lvlStr{md}{$md}){$lvl = $lvlStr{md}{$md}{$lvl}}
 	  elsif ($lvlStr{st}{$st})   {$lvl = $lvlStr{st}{$st}{$lvl} }
 	  else                       {$lvl = hex($lvl)/2}
 
-	  push @event, "level:$lvl %" if($model eq "HM-Sen-Wa-Od");
+	  push @event, "level:$lvl %" if($md eq "HM-Sen-Wa-Od");
 	  push @event, "state:$lvl %";	  
 	  push @event, "battery:".($err&0x80?"low":"ok") if (defined $err);
 	}  
   }
-  elsif($st eq "KFM100"   && $model eq "KFM-Sensor") { ########################
+  elsif($st eq "KFM100"   && $md eq "KFM-Sensor") { ########################
     if ($mTp eq "53"){
       if($p =~ m/.14(.)0200(..)(..)(..)/) {
         my ($seq, $k_v1, $k_v2, $k_v3) = (hex($1),$2,hex($3),hex($4));
@@ -817,11 +817,11 @@ sub CUL_HM_Parse($$) {##############################
       $t = sprintf("%0.1f", $t/10);
       my $statemsg = "state:T: $t";
       push @event, "temperature:$t";#temp is always there
-	  if ($model !~ m/^(S550IA|HM-WDS30-T-O)$/){#ignore only-temp sensors
+	  if ($md !~ m/^(S550IA|HM-WDS30-T-O)$/){#ignore only-temp sensors
         my $h =  hex(substr($p,4,2));
         $statemsg .= " H: $h";
         push @event, "humidity:$h";
-	    if ($model eq "HM-WDC7000"){#airpressure sensor
+	    if ($md eq "HM-WDC7000"){#airpressure sensor
           my $ap = hex(substr($p,6,4));
           $statemsg .= " AP: $ap";
           push @event, "airpress:$ap";
@@ -850,7 +850,7 @@ sub CUL_HM_Parse($$) {##############################
 	  my $chId = $src.$chn;
       $shash = $modules{CUL_HM}{defptr}{$chId} 
 	                         if($modules{CUL_HM}{defptr}{$chId});
-	  my $mdCh = $model.$chn;
+	  my $mdCh = $md.$chn;
 	  if($lvlStr{mdCh}{$mdCh} && $lvlStr{mdCh}{$mdCh}{$val}){
 	    $val = $lvlStr{mdCh}{$mdCh}{$val};
       }
@@ -860,12 +860,13 @@ sub CUL_HM_Parse($$) {##############################
 	  push @event, "state:$val";
 	}
     elsif ($mTp eq "41")	{ #event
-      my ($chn,$bno) = (hex($1),hex($2)) if($p =~ m/^(..)(..)/);
-	  $chn = sprintf("%02X",$chn&0x3f);
+      my ($chn,$bno,$val) = unpack('(A2)*',$p);
+	  my $mdCh = $md.$chn;
+	  $chn = sprintf("%02X",hex($chn)&0x3f);
 	  my $chId = $src.$chn;
       $shash = $modules{CUL_HM}{defptr}{$chId} 
 	                         if($modules{CUL_HM}{defptr}{$chId});
-	  push @event,"trigger:$bno";
+	  push @event,"trigger:".hex($bno).":".$lvlStr{mdCh}{$mdCh}{$val}.$target;
 	}
   } 
   elsif($st =~ m /^(switch|dimmer|blindActuator)$/) {##########################
@@ -934,14 +935,14 @@ sub CUL_HM_Parse($$) {##############################
 		 #        info from it is likely a power on!
 	    push @event,"powerOn"   if($chn eq "03");
 	  }
-	  elsif ($model eq "HM-SEC-SFA-SM"){ # && $chn eq "00")
+	  elsif ($md eq "HM-SEC-SFA-SM"){ # && $chn eq "00")
 	    push @entities,
   	        CUL_HM_UpdtReadBulk(CUL_HM_getDeviceHash($shash),1,
 		        "powerError:"   .(($err&0x02) ? "on":"off"),
 	            "sabotageError:".(($err&0x04) ? "on":"off"),
 	            "battery:".(($err&0x08)?"critical":($err&0x80?"low":"ok")));
 	  }
-	  elsif ($model eq "HM-LC-SW1-BA-PCB"){
+	  elsif ($md eq "HM-LC-SW1-BA-PCB"){
 	    push @event,"battery:" . (($err&0x80) ? "low" : "ok" );
 	  }
     }
@@ -1025,7 +1026,7 @@ sub CUL_HM_Parse($$) {##############################
 	      ($mTp eq "10" && $mI[0] eq "06")){    #    or Info_Status message
       my ($msgChn,$msgState) = ((hex($mI[1])&0x1f),$mI[2]) if (@mI > 2);
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.sprintf("%02X",$msgChn)};
-	  if ($model eq "HM-OU-LED16") {
+	  if ($md eq "HM-OU-LED16") {
 	    #special: all LEDs map to device state
         my $devState = ReadingsVal($name,"color","00000000");
 		if($parse eq "powerOn"){# reset LEDs after power on
@@ -1068,7 +1069,7 @@ sub CUL_HM_Parse($$) {##############################
  	      }
 		}
 	  }
-	  elsif ($model eq "HM-OU-CFM-PL"){
+	  elsif ($md eq "HM-OU-CFM-PL"){
 	    if ($chnHash){
 	      $shash = $chnHash;
 	      my $val = hex($mI[2])/2;
@@ -1086,7 +1087,7 @@ sub CUL_HM_Parse($$) {##############################
       ($state, $err) = ($1, hex($2));
 	  my $bright = hex($state);
       push @event, "brightness:".$bright;
-	  if ($model eq "HM-Sec-MDIR"){
+	  if ($md eq "HM-Sec-MDIR"){
 	    push @event, "sabotageError:".(($err&0x0E)?"on":"off");   
 	  }
 	  else{
@@ -1202,9 +1203,9 @@ sub CUL_HM_Parse($$) {##############################
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});
 	  push @event, "alive:yes";
 	  push @event, "battery:". (($err&0x80)?"low"  :"ok"  );
-	  if (   $model eq "HM-SEC-SC" ||
-	         $model eq "HM-Sec-RHS"){push @event, "sabotageError:".(($err&0x0E)?"on":"off");
-	  }elsif($model ne "HM-SEC-WDS"){push @event, "cover:"        .(($err&0x0E)?"open" :"closed");
+	  if (   $md eq "HM-SEC-SC" ||
+	         $md eq "HM-Sec-RHS"){push @event, "sabotageError:".(($err&0x0E)?"on":"off");
+	  }elsif($md ne "HM-SEC-WDS"){push @event, "cover:"        .(($err&0x0E)?"open" :"closed");
 	  }
 	}
 	elsif($mTp eq "41"){
@@ -1215,7 +1216,7 @@ sub CUL_HM_Parse($$) {##############################
 	}
 	if (defined($state)){# if state was detected post events
 	  my $txt;
-	  if    ($lvlStr{md}{$model}){$txt = $lvlStr{md}{$model}{$state}}
+	  if    ($lvlStr{md}{$md}){$txt = $lvlStr{md}{$md}{$state}}
 	  elsif ($lvlStr{st}{$st})   {$txt = $lvlStr{st}{$st}{$state} }
 	  else                       {$txt = "unknown:$state"}
 
@@ -2217,6 +2218,9 @@ sub CUL_HM_Set($@) {
 	if($st eq "blindActuator") { # need to stop blind to protect relais
 	  CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'03'.$chn)
 	}
+	elsif ($md eq "HM-Sen-RD-O"){# on<->off for this sensor...
+	  $lvl = ($lvl eq "00")?"C8":"00";
+	}
     CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."02$chn$lvl".'0000');
 	$hash = $chnHash; # report to channel if defined
   }
@@ -2234,7 +2238,8 @@ sub CUL_HM_Set($@) {
 	return "please enter the duration in seconds" 
 	      if (!defined $duration || $duration !~ m/^[+-]?\d+(\.\d+)?$/);
     my $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'C80000'.$tval);
+	my $lvl = ($md eq "HM-Sen-RD-O")?"00":"C8";
+    CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."02$chn$lvl"."C80000$tval");
  	$hash = $chnHash; # report to channel if defined
   } 
   elsif($cmd eq "lock") { #####################################################
@@ -2765,8 +2770,8 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
   my($name,$hash,$p) = @_;
   my($fw,$mId,$serNo,$stc,$devInfo) = ($1,$2,$3,$4,$5) 
 	                   if($p =~ m/(..)(.{4})(.{20})(.{2})(.*)/);
-  my $model = $culHmModel{$mId}{name} ? $culHmModel{$mId}{name}:"unknown";
-  $attr{$name}{model}    = $model;
+  my $md = $culHmModel{$mId}{name} ? $culHmModel{$mId}{name}:"unknown";
+  $attr{$name}{model}    = $md;
   $attr{$name}{subType}  = $culHmModel{$mId}{st};
   $attr{$name}{serialNr} = pack('H*',$serNo);
   #expert level attributes
@@ -2791,9 +2796,9 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
         my $chnName = $name."_".$chnTpName.(($chnStart == $chnEnd)?
 	                            '':'_'.sprintf("%02d",$chnNoTyp));
 		InternalTimer($startime++,"CUL_HM_infoUpdtChanData",
-		"$chnName,$chnId,$model",0);
+		"$chnName,$chnId,$md",0);
       }
-	  $attr{CUL_HM_id2Name($chnId)}{model} = $model;
+	  $attr{CUL_HM_id2Name($chnId)}{model} = $md;
 	  $chnNoTyp++;
 	}
   }
