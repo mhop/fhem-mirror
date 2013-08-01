@@ -377,7 +377,7 @@ function init_menue() {
 
 	$("#button_saveconfig").button({
 		icons: {
-			secondary: "ui-icon-pencil"
+			secondary: "ui-icon-disk"
 		}
 	});
 }
@@ -422,8 +422,29 @@ function init_handlers() {
 	});
 
 	$("#button_saveconfig").click(function () {
-		window.location.href = "../../../../fhem?cmd=save";
-		return false;
+		//window.location.href = "../../../../fhem?cmd=save";
+		//return false;
+		$.ajax({
+			type: "GET",
+			async: true,
+			url: "../../ajax/global/saveconfig",
+			context: document.body,
+			success: function (jsondata) {
+				//console.log("Config saved " + jsondata);
+				$("#button_saveconfig").button({
+					icons: {
+						secondary: "ui-icon-check"
+					}
+				});
+				var timeoutID = window.setTimeout(function () {			
+					$("#button_saveconfig").button({
+						icons: {
+							secondary: "ui-icon-disk"
+						}
+					});
+				},3000);
+			}
+		});		
 	});
 
 	$("#widget_menue_delete").click(function () {
