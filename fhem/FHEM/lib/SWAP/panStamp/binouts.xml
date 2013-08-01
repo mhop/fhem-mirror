@@ -5,6 +5,9 @@
   <pwrdownmode>false</pwrdownmode>
   <regular>
     <reg name="Binary outputs" id="11">
+      <endpoint name="Binary outputs" type="bin" dir="out">
+        <size>1</size>
+      </endpoint>
       <endpoint name="Binary 0" type="bin" dir="out">
         <position>0.7</position>
         <size>0.1</size>
@@ -39,6 +42,9 @@
       </endpoint>
     </reg>
     <reg name="PWM outputs" id="12">
+      <endpoint name="PWM outputs" type="num" dir="out">
+        <size>4</size>
+      </endpoint>
       <endpoint name="PWM output 0" type="num" dir="out">
         <position>3</position>
         <size>1</size>
