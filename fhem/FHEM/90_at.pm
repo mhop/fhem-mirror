@@ -196,6 +196,7 @@ at_Attr(@)
     RemoveInternalTimer($hash);
     InternalTimer($ttime, "at_Exec", $hash, 0);
     $hash->{TRIGGERTIME} = $ttime;
+    $hash->{TRIGGERTIME_FMT} = FmtDateTime($ttime);
     $hash->{STATE} = "Next: " . FmtTime($ttime);
   }
 
