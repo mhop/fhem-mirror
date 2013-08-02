@@ -137,7 +137,7 @@ sub CUL_HM_Initialize($) {
                        "actCycle actStatus ".
 					   "autoReadReg:1_restart,0_off,2_pon-restart,3_onChange,4_reqStatus ".
 					   "expert:0_off,1_on,2_full ".
-
+                       "param ".
 					   ".stc .devInfo ".
                        $readingFnAttributes;
   my @modellist;
@@ -413,9 +413,28 @@ sub CUL_HM_Attr(@) {#################################
 	# Add to ActionDetector. Wait a little - config might not be finished
 	$updtReq = 1; 
   }
+  elsif($attrName eq "param"){
+    my $hash = CUL_HM_name2Hash($name);
+    my $md  = CUL_HM_Get($hash,$name,"param","model");
+	my $chn = substr(CUL_HM_hash2Id($hash),6,2);
+    if ($md eq "HM-Sen-RD-O" && $chn eq "02"){
+	  delete $hash->{helper}{param};
+	  my @param = split ",",$attrVal;
+	  foreach (@param){
+        if    ($_ eq "offAtPon"){$hash->{helper}{param}{offAtPon} = 1}
+        elsif ($_ eq "onAtRain"){$hash->{helper}{param}{onAtRain} = 1}
+		else {return "param $_ unknown, use offAtPon or onAtRain";}
+	  }
+	}
+	else{
+	  return "attribut param not defined for this entity";
+	}
+  }
 
   CUL_HM_queueUpdtCfg($name) if ($updtReq);
   return;
+  
+  
 }
 
 #+++++++++++++++++ msg receive, parsing++++++++++++++++++++++++++++++++++++++++
@@ -530,7 +549,7 @@ sub CUL_HM_Parse($$) {##############################
   elsif($mTp eq "12") {#$lcm eq "09A112" Another fhem request (HAVE_DATA)
     ;
   } 
-  elsif($md =~ m/^(KS550|HM-WDS100-C6-O)$/) { ##############################
+  elsif($md =~ m/^(KS550|HM-WDS100-C6-O)$/) { #################################
 
     if($mTp eq "70" && $p =~ m/^(....)(..)(....)(....)(..)(..)(..)/) {
 
@@ -561,7 +580,7 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "unknown:$p";
     }
   } 
-  elsif($md eq "HM-CC-TC") { ###############################################
+  elsif($md eq "HM-CC-TC") { ##################################################
     my ($sType,$chn) = ($1,$2) if($p && $p =~ m/^(..)(..)/);
     if($mTp eq "70" && $p =~ m/^(....)(..)/) { # weather event
 	  $chn = '01'; # fix definition
@@ -728,7 +747,7 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "time-request";
     } 
   } 
-  elsif($md eq "HM-CC-VD") { ###############################################
+  elsif($md eq "HM-CC-VD") { ##################################################
     if($mTp eq "02" && $p =~ m/^(..)(..)(..)(..)/) {#subtype+chn+value+err
       my ($chn,$vp, $err) = (hex($2),hex($3), hex($4));
   	  $chn = sprintf("%02X",$chn&0x3f);
@@ -766,7 +785,7 @@ sub CUL_HM_Parse($$) {##############################
 	  }
     }
   } 
-  elsif($md =~ m/^(HM-Sen-Wa-Od|HM-CC-SCD)$/){ #############################
+  elsif($md =~ m/^(HM-Sen-Wa-Od|HM-CC-SCD)$/){ ################################
     if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
 	    ($mTp eq "10" && $p =~ m/^06/) ||  #or Info_Status message here
 	    ($mTp eq "41"))                { 
@@ -781,7 +800,7 @@ sub CUL_HM_Parse($$) {##############################
 	  push @event, "battery:".($err&0x80?"low":"ok") if (defined $err);
 	}  
   }
-  elsif($st eq "KFM100"   && $md eq "KFM-Sensor") { ########################
+  elsif($st eq "KFM100"   && $md eq "KFM-Sensor") { ###########################
     if ($mTp eq "53"){
       if($p =~ m/.14(.)0200(..)(..)(..)/) {
         my ($seq, $k_v1, $k_v2, $k_v3) = (hex($1),$2,hex($3),hex($4));
@@ -841,6 +860,9 @@ sub CUL_HM_Parse($$) {##############################
 	}
   } 
   elsif($st eq "sensRain") {###################################################
+    my $hHash = CUL_HM_id2Hash($src."02");# hash for heating
+	my $pon = 0;# power on if mNo == 0 and heating status plus second msg
+	            # status or trigger from rain channel 
     if (($mTp eq "02" && $p =~ m/^01/) || #Ack_Status
 	    ($mTp eq "10" && $p =~ m/^06/))	{ #Info_Status
 
@@ -858,8 +880,24 @@ sub CUL_HM_Parse($$) {##############################
 	    $val = hex($val)/2;
 	  }
 	  push @event, "state:$val";
+	  
+	  if ($mNo eq "00" && $chn eq "02" && $val eq "on"){
+	    $hHash->{helper}{pOn} = 1;
+	  }
+	  elsif ($mNo eq "01" && $chn eq "01" && 
+	         $hHash->{helper}{pOn} && $hHash->{helper}{pOn} == 1){
+		$pon = 1;
+	  }
+	  else{
+	    delete $hHash->{helper}{pOn};
+		my $hHash = CUL_HM_id2Hash($src."02");# hash for heating
+		if ($chn eq "01" &&
+		    $hHash->{helper}{param} && $hHash->{helper}{param}{onAtRain}){
+	      CUL_HM_Set($hHash,$hHash->{NAME},$val eq "rain"?"on":"off");
+		}
+	  }
 	}
-    elsif ($mTp eq "41")	{ #event
+    elsif ($mTp eq "41")	{ #eventonAtRain
       my ($chn,$bno,$val) = unpack('(A2)*',$p);
 	  my $mdCh = $md.$chn;
 	  $chn = sprintf("%02X",hex($chn)&0x3f);
@@ -867,6 +905,16 @@ sub CUL_HM_Parse($$) {##############################
       $shash = $modules{CUL_HM}{defptr}{$chId} 
 	                         if($modules{CUL_HM}{defptr}{$chId});
 	  push @event,"trigger:".hex($bno).":".$lvlStr{mdCh}{$mdCh}{$val}.$target;
+	  if ($mNo eq "01" && $bno eq "01" &&
+	      $hHash->{helper}{pOn} && $hHash->{helper}{pOn} == 1){
+		$pon = 1;
+	  }
+	  delete $shash->{helper}{pOn};
+	}
+	if ($pon){# we have power ON, perform action
+	  push @entities,CUL_HM_UpdtReadSingle($dhash,'powerOn',"",1);
+	  CUL_HM_Set($hHash,$hHash->{NAME},"off")
+		         if ($hHash && $hHash->{helper}{param}{offAtPon});
 	}
   } 
   elsif($st =~ m /^(switch|dimmer|blindActuator)$/) {##########################
@@ -4886,6 +4934,8 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
         These attributes are set automatically after a successful pairing.
         They are not supposed to be set by hand, and are necessary in order to
         correctly interpret device messages or to be able to send them.</li>
+    <li><a name="param">param</a><br>
+        param defines model specific behavior or functions. See models for details</li>
     <li><a name="rawToReadable">rawToReadable</a><br>
         Used to convert raw KFM100 values to readable data, based on measured
         values. E.g.  fill slowly your container, while monitoring the
@@ -4922,6 +4972,15 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
         </li>
   </ul>
   <br>
+  <a name="CUL_HMparams"></a>
+  <b>available paramter "param"</b>
+  <ul>
+  <li><B>HM-Sen-RD-O</B><br>
+  offAtPon: heat channel only: force heating off after powerOn<br>
+  onAtRain: heat channel only: force heating on while status changes to 'rain' and off when it changes to 'dry'<br>
+  </li>
+  
+  </ul>
   <a name="CUL_HMevents"></a>
   <b>Generated events:</b>
   <ul>
