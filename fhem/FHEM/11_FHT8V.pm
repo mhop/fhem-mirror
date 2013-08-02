@@ -135,7 +135,7 @@ FHT8V_Get($@)
   <a name="FHT8Vdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; FHT &lt;housecode&gt; [IODev]</code>
+    <code>define &lt;name&gt; FHT &lt;housecode&gt; [IODev|FHTID]</code>
     <br><br>
 
     <code>&lt;housecode&gt;</code> is a four digit hex number,
@@ -151,7 +151,11 @@ FHT8V_Get($@)
     <code>&lt;IODev&gt;</code> must be specified if the last defined CUL device
     is not the one to use. Usually this is done voa the <a
     href="#IODev">IODev</a> attribute, but as the address checked is performed
-    at the definition, we must use an exception here.
+    at the definition, we must use an exception here.<br>
+
+    As an alternative you can specify the FHTID of the assigned IODev device
+    (instead of the IODev itself), this method is needed if you are using FHT8V
+    through FHEM2FHEM.
     <br>
 
     Examples:
