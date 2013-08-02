@@ -425,7 +425,7 @@ sub CUL_HM_Attr(@) {#################################
 	                      ,"HM-Sen-RD-O"     =>{"00"=>"dry"                      ,"C8"=>"rain"}
 	                     }
                   ,mdCh=>{ "HM-Sen-RD-O01"   =>{"00"=>"dry"                      ,"C8"=>"rain"}
-	                      ,"HM-Sen-RD-O02"   =>{"00"=>"on"                       ,"C8"=>"off"}
+	                      ,"HM-Sen-RD-O02"   =>{"00"=>"off"                      ,"C8"=>"on"}
 	                     }
 				  ,st  =>{ "smokeDetector"   =>{"01"=>"no alarm","C7"=>"tone off","C8"=>"Smoke Alarm"}
 				          ,"threeStateSensor"=>{"00"=>"closed"  ,"64"=>"tilted"  ,"C8"=>"open"}
@@ -773,8 +773,8 @@ sub CUL_HM_Parse($$) {##############################
 	  my $lvl = substr($p,4,2);
 	  my $err = hex(substr($p,6,2));
 	  if    ($lvlStr{md}{$md}){$lvl = $lvlStr{md}{$md}{$lvl}}
-	  elsif ($lvlStr{st}{$st})   {$lvl = $lvlStr{st}{$st}{$lvl} }
-	  else                       {$lvl = hex($lvl)/2}
+	  elsif ($lvlStr{st}{$st}){$lvl = $lvlStr{st}{$st}{$lvl} }
+	  else                    {$lvl = hex($lvl)/2}
 
 	  push @event, "level:$lvl %" if($md eq "HM-Sen-Wa-Od");
 	  push @event, "state:$lvl %";	  
@@ -2218,9 +2218,6 @@ sub CUL_HM_Set($@) {
 	if($st eq "blindActuator") { # need to stop blind to protect relais
 	  CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'03'.$chn)
 	}
-	elsif ($md eq "HM-Sen-RD-O"){# on<->off for this sensor...
-	  $lvl = ($lvl eq "00")?"C8":"00";
-	}
     CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."02$chn$lvl".'0000');
 	$hash = $chnHash; # report to channel if defined
   }
@@ -2238,8 +2235,7 @@ sub CUL_HM_Set($@) {
 	return "please enter the duration in seconds" 
 	      if (!defined $duration || $duration !~ m/^[+-]?\d+(\.\d+)?$/);
     my $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
-	my $lvl = ($md eq "HM-Sen-RD-O")?"00":"C8";
-    CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."02$chn$lvl"."C80000$tval");
+    CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."02$chn"."C80000$tval");
  	$hash = $chnHash; # report to channel if defined
   } 
   elsif($cmd eq "lock") { #####################################################
