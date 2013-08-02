@@ -1,0 +1,75 @@
+<?xml version="1.0"?>
+<device>
+  <developer>panStamp</developer>
+  <product>Binary/PWM output module</product>
+  <pwrdownmode>false</pwrdownmode>
+  <regular>
+      <reg name="Voltage supply" id="11">
+        <endpoint name="Voltage" type="num" dir="inp">
+          <size>2</size>
+          <units>
+            <unit name="V" factor="0.001" offset="0"/>
+          </units>
+        </endpoint>
+    </reg>
+    <reg name="Binary outputs" id="12">
+      <endpoint name="Binary outputs" type="bin" dir="out">
+        <size>1</size>
+      </endpoint>
+      <endpoint name="Binary 0" type="bin" dir="out">
+        <position>0.7</position>
+        <size>0.1</size>
+      </endpoint>
+      <endpoint name="Binary 1" type="bin" dir="out">
+        <position>0.6</position>
+        <size>0.1</size>
+      </endpoint>
+      <endpoint name="Binary 2" type="bin" dir="out">
+        <position>0.5</position>
+        <size>0.1</size>
+      </endpoint>
+      <endpoint name="Binary 3" type="bin" dir="out">
+        <position>0.4</position>
+        <size>0.1</size>
+      </endpoint>
+      <endpoint name="Binary 4" type="bin" dir="out">
+        <position>0.3</position>
+        <size>0.1</size>
+      </endpoint>
+      <endpoint name="Binary 5" type="bin" dir="out">
+        <position>0.2</position>
+        <size>0.1</size>
+      </endpoint>
+      <endpoint name="Binary 6" type="bin" dir="out">
+        <position>0.1</position>
+        <size>0.1</size>
+      </endpoint>
+      <endpoint name="Binary 7" type="bin" dir="out">
+        <position>0.0</position>
+        <size>0.1</size>
+      </endpoint>
+    </reg>
+    <reg name="PWM outputs" id="13">
+      <endpoint name="PWM outputs" type="num" dir="out">
+        <size>4</size>
+      </endpoint>
+      <endpoint name="PWM output 0" type="num" dir="out">
+        <position>3</position>
+        <size>1</size>
+      </endpoint>
+      <endpoint name="PWM output 1" type="num" dir="out">
+        <position>2</position>
+        <size>1</size>
+      </endpoint>
+      <endpoint name="PWM output 2" type="num" dir="out">
+        <position>1</position>
+        <size>1</size>
+      </endpoint>
+      <endpoint name="PWM output 3" type="num" dir="out">
+        <position>0</position>
+        <size>1</size>
+      </endpoint>
+    </reg>
+  </regular>
+</device>
+
