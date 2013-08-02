@@ -484,10 +484,10 @@ IT_Parse($$)
   <b>Generated events:</b>
   <ul>
      From an IT device you can receive one of the following events.
-     <li>on
-     <li>off
-     <li>dimdown
-     <li>dimup<br>
+     <li>on</li>
+     <li>off</li>
+     <li>dimdown</li>
+     <li>dimup<br></li>
       Which event is sent is device dependent and can sometimes configured on
      the device.
   </ul>
