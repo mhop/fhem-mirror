@@ -104,6 +104,9 @@
 	        	<div class="menue_block">
 	            	<button id="button_back" class="menue_button">Zu FHEM</button>
 	            </div>
+				<div class="menue_block">
+		            <button id="button_saveconfig" class="menue_button">Config speichern</button>
+	            </div>				
 	            <div class="menue_block">
 	            	<button id="button_settings" class="menue_button">Einstellungen</button>
 	            </div>
@@ -119,9 +122,6 @@
 		                <input type="radio" id="button_switchmode_0" name="radio" checked="checked"/><label for="button_switchmode_0" style="width: 118px;">Live</label>
 		                <input type="radio" id="button_switchmode_1" name="radio"/><label for="button_switchmode_1" style="width: 118px;">Bearbeiten</label>
 		            </div>
-	            </div>
-				<div class="menue_block">
-		            <button id="button_saveconfig" class="menue_button">Config speichern</button>
 	            </div>
 	        </div>
 	        <div id="content">
@@ -178,6 +178,7 @@
 	    <div id="dialog_editwidget" title="Widget bearbeiten">
 	    	<div class="loading_animation" id="dialog_editwidget_loading"></div>
 	    	<p>Widget "<span><b id="label_editwidget"></b></span>" bearbeiten:</p>
+			<div id="dialog_editwidget_setup_form" />
 		</div>
 		
 	    <div id="dialog_deletewidget" title="Widget löschen">

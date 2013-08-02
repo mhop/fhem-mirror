@@ -29,7 +29,7 @@ UPD 2013-05-15_20:00:00 19226 FHEM/YAF/www/img/background.png
 UPD 2013-05-15_20:00:00 831 FHEM/YAF/www/img/lamp_on.png
 UPD 2013-08-01_11:10:00 12433 FHEM/YAF/www/js/yaf-basics.js
 UPD 2013-07-31_15:30:00 10727 FHEM/YAF/www/js/yaf-dialogs.js
-UPD 2013-08-01_11:10:00 7547 FHEM/YAF/www/yaf.htm
+UPD 2013-08-02_22:15:00 7596 FHEM/YAF/www/yaf.htm
 UPD 2013-05-15_20:00:00 3433 FHEM/YAF/www/js/combobox.js
 UPD 2013-05-15_20:00:00 4593 FHEM/YAF/www/js/jquery.ui.touch-punch.min.js
 UPD 2013-05-15_20:00:00 237176 FHEM/YAF/www/js/jquery-ui-1.9.1.custom.min.js
