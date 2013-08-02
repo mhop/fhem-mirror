@@ -414,15 +414,15 @@ CUL_IR_Attr(@)
         arguments are:
         <ul>
         <li>OFF<br>
-            Switching off the reception of IR signals. This is the default.
+            Switching off the reception of IR signals. This is the default.</li>
 
         <li>ON<br>
             Switching on the reception of IR signals. This is WITHOUT filtering repetitions. This is
-            not recommended as many remote controls do repeat their signals.
+            not recommended as many remote controls do repeat their signals.</li>
 
         <li>ON_NR<br>
             Switching on the reception of IR signals with filtering of repetitions. This is
-            the recommended modus operandi.
+            the recommended modus operandi.</li>
         </ul>
     </li><br>
 
