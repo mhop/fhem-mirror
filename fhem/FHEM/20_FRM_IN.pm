@@ -210,7 +210,7 @@ FRM_IN_Undef($$)
     Depending on the attribute 'count-mode' every rising or falling edge (or both) is counted.</li>
     <li>alarm<br>
     returns the current state of 'alarm'. Values are 'on' and 'off' (Defaults to 'off')<br>
-    'alarm' doesn't clear itself, has to be set to 'off' eplicitly./li>
+    'alarm' doesn't clear itself, has to be set to 'off' eplicitly.</li>
     <li>state<br>
     returns the 'state' reading</li>
   </ul><br>
