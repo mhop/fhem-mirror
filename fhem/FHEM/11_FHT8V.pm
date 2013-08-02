@@ -25,20 +25,27 @@ FHT8V_Define($$)
   my @a = split("[ \t][ \t]*", $def);
   my $n = $a[0];
 
-  return "wrong syntax: define <name> FHT8V housecode [IODev]" if(@a < 3);
+  return "wrong syntax: define <name> FHT8V housecode [IODev|FHTID]" if(@a < 3);
   return "wrong housecode format: specify a 4 digit hex value "
   		if(($a[2] !~ m/^[a-f0-9]{4}$/i));
-  if(@a > 3) {
+
+  my $fhtid;
+  if(@a > 3 && $defs{$a[3]}) {
     $hash->{IODev} = $defs{$a[3]};
+
   } else {
     AssignIoPort($hash);
+    $fhtid = $a[3] if($a[3]);
   }
+
   return "$n: No IODev found" if(!$hash->{IODev});
-  return "$n: Wrong IODev, has no FHTID" if(!$hash->{IODev}->{FHTID});
+  $fhtid = $hash->{IODev}->{FHTID} if(!$fhtid);
+
+  return "$n: Wrong IODev $hash->{IODev}{NAME}, has no FHTID" if(!$fhtid);
 
   #####################
   # Check if the address corresponds to the CUL
-  my $ioaddr = hex($hash->{IODev}->{FHTID});
+  my $ioaddr = hex($fhtid);
   my $myaddr = hex($a[2]);
   my ($io1, $io0) = (int($ioaddr/255), $ioaddr % 256);
   my ($my1, $my0) = (int($myaddr/255), $myaddr % 256);
