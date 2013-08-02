@@ -651,12 +651,12 @@ eib_name2hex($)
   <ul>
     <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt; g&lt;groupnr&gt;]</code><br>
     where value one of:
-	<li><b>on</b> switch on device
-	<li><b>off</b> switch off device
-	<li><b>on-for-timer</b> <secs> switch on the device for the given time. After the specified seconds a switch off command is sent.
-	<li><b>on-till</b> <time spec> switches the device on. The device will be switched off at the given time.
-    <li><b>raw</b> <hexvalue> sends the given value as raw data to the device.
-    <li><b>value</b> <decimal value> transforms the value according to the chosen model and send the result to the device.
+	<li><b>on</b> switch on device</li>
+	<li><b>off</b> switch off device</li>
+	<li><b>on-for-timer</b> <secs> switch on the device for the given time. After the specified seconds a switch off command is sent.</li>
+	<li><b>on-till</b> <time spec> switches the device on. The device will be switched off at the given time.</li>
+    <li><b>raw</b> <hexvalue> sends the given value as raw data to the device.</li>
+    <li><b>value</b> <decimal value> transforms the value according to the chosen model and send the result to the device.</li>
 
     <br>Example:
     <ul><code>
@@ -667,7 +667,6 @@ eib_name2hex($)
       set lamp1 raw 234578<br>
       set lamp1 value 23.44<br>
     </code></ul>
-    </li>
 
 	When as last argument a g&lt;groupnr&gt; is present, the command will be sent
 	to the EIB group indexed by the groupnr (starting by 1, in the order as given in Define).
