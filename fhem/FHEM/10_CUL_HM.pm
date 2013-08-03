@@ -880,7 +880,8 @@ sub CUL_HM_Parse($$) {##############################
 	    $val = hex($val)/2;
 	  }
 	  push @event, "state:$val";
-	  
+ 	  push @event, "level:".($val eq "off"?"0 %":"100 %");
+ 	  
 	  if ($mNo eq "00" && $chn eq "02" && $val eq "on"){
 	    $hHash->{helper}{pOn} = 1;
 	  }
@@ -1905,7 +1906,6 @@ sub CUL_HM_Set($@) {
   my $act = join(" ", @a[1..$#a]);
   my $ret;
   return "no set value specified" if(@a < 2);
-
   my $name    = $hash->{NAME};
   my $devName = $hash->{device}?$hash->{device}:$name;
   my $st      = AttrVal($devName, "subType", "");
@@ -4065,7 +4065,7 @@ sub CUL_HM_setAttrIfCh($$$$) {
 }
 sub CUL_HM_noDup(@) {#return list with no duplicates
   my %all;
-  $all{$_}=0 for @_;
+  $all{$_}=0 foreach (grep !/^$/,@_);
   delete $all{""}; #remove empties if present
   return (sort keys %all);
 }
