@@ -301,7 +301,15 @@ sub CUL_HM_Define($$) {##############################
 	$devHash->{"channel_$chn"} = $name;  #reference in device as well
     $attr{$name}{model} = AttrVal($devName, "model", undef);
     $hash->{helper}{role}{chn}=1;
-	delete $devHash->{helper}{role}{chn} if($chn eq "01");#device no longer
+	if($chn eq "01"){
+	  $attr{$name}{peerIDs} = AttrVal($devName, "peerIDs", "");
+	  $hash->{REAGINDS}{peerList}{VAL} = ReadingsVal($devName,"peerList","");
+	  $hash->{peerList} = $devHash->{peerList} if($devHash->{peerList});
+	  
+	  delete $devHash->{helper}{role}{chn};#device no longer
+	  delete $devHash->{peerList};
+	  delete $devHash->{REAGINDS}{peerList};
+	}
   }
   else{# define a device
     $hash->{helper}{role}{dev}=1;
@@ -356,6 +364,7 @@ sub CUL_HM_Attr(@) {#################################
   my ($cmd,$name, $attrName,$attrVal) = @_;
   my @hashL;
   my $updtReq = 0;
+  my $hash = CUL_HM_name2Hash($name);
   if   ($attrName eq "expert"){#[0,1,2]
     $attr{$name}{expert} = $attrVal;
 	my $eHash = $defs{$name};
@@ -414,7 +423,6 @@ sub CUL_HM_Attr(@) {#################################
 	$updtReq = 1; 
   }
   elsif($attrName eq "param"){
-    my $hash = CUL_HM_name2Hash($name);
     my $md  = CUL_HM_Get($hash,$name,"param","model");
 	my $chn = substr(CUL_HM_hash2Id($hash),6,2);
     if ($md eq "HM-Sen-RD-O" && $chn eq "02"){
@@ -429,6 +437,9 @@ sub CUL_HM_Attr(@) {#################################
 	else{
 	  return "attribut param not defined for this entity";
 	}
+  }
+  elsif($attrName eq "peerIDs" &&!$hash->{helper}{role}{chn}){#only for chan
+    return "$attrName not usable for devices";
   }
 
   CUL_HM_queueUpdtCfg($name) if ($updtReq);
@@ -1213,7 +1224,7 @@ sub CUL_HM_Parse($$) {##############################
       push @event,"state:"        .($alarmList?"smoke-Alarm":"off" );
       push @event,"smoke_detect:" .($alarmList?$alarmList   :"none");
 	  #--- check out teamstatus, members might be shy ---
-	  my $peerList = ReadingsVal($name,"peerList","");
+	  my $peerList = $shash->{peerList}?$shash->{peerList}:"";
 	  foreach my $pNm (split(",",$peerList)){
 		CUL_HM_qStateUpdatIfEnab($pNm,1)if ($pNm);
 	  }
@@ -1878,8 +1889,11 @@ sub CUL_HM_Get($@) {
 	  my $pIds = AttrVal($eName, "peerIDs", "");
 	  my $timestamps = "\n#     timestamp of the readings for reference";
 	  if ($pIds){
-	    print aSave "\n# Peer Names:".ReadingsVal($eName,"peerList","");
-		$timestamps .= "\n#        ".ReadingsTimestamp($eName,"peerList","")." :peerList";
+	    print aSave "\n# Peer Names:"
+		            .($defs{$name}{peerList}?$defs{$name}{peerList}:"");
+		$timestamps .= "\n#        "
+					  .($defs{$eName}{peerList}?$defs{$eName}{peerList}:"")
+					  ." :peerList";
 	    print aSave "\nset ".$eName." peerBulk ".$pIds;
 	  }
 	  my $ehash = $defs{$eName};
@@ -2991,6 +3005,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
     	my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"}; 
     	$chnhash = $hash if (!$chnhash);
     	delete $chnhash->{READINGS}{peerList};#empty old list
+    	delete $chnhash->{peerList};#empty old list
 	    delete $chnhash->{helper}{peerIDsRaw};
 	    $attr{$chnhash->{NAME}}{peerIDs} = '';
 	    return;
@@ -3261,9 +3276,11 @@ sub CUL_HM_ID2PeerList ($$$) {
   $attr{$name}{peerIDs} = $peerIDs;                 # make it public
   if ($peerNames){
     readingsSingleUpdate($hash,"peerList",$peerNames,0) ;
+    $hash->{peerList} = $peerNames;
   }
   else{ 
     delete $hash->{READINGS}{peerList};
+    delete $hash->{peerList};
   }
 }
 sub CUL_HM_peerChId($$$) {# in:<IDorName> <deviceID> <ioID>, out:channelID
