@@ -993,14 +993,15 @@ my %culHmChanSets = (
                        level          =>"<level> <relockDly> <speed>..."},
   "HM-OU-CFM-PL01" =>{ led            =>"<color>[,<color>...] [<repeat>]"},
   "HM-OU-CFM-PL02" =>{ playTone       =>"<MP3No>[,<MP3No>...] [<repeat>]"},
-
+                                      
   "WDF-solar01"    =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
   "HM-Sen-RD-O01"  =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
   "HM-Sen-RD-O02"  =>{ "on-for-timer" =>"<sec>"
                       ,"on-till"      =>"<time>"
 		              ,on             =>""
 					  ,off            =>""
-					  ,toggle         =>""}
+					  ,toggle         =>""
+					  ,statusRequest  =>""}
 );
 # clones- - - - - - - - - - - - - - - - - 
 #$culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};
