@@ -130,8 +130,7 @@ LISTENLIVE_Set($@)
 
 	my %powerGroup	=	(on => "POWER", off => "POWER");
 	my %muteGroup	=	(on => "MUTE", off => "MUTE");
-	my %cursorGroup	=	(left => "LEFT", right => "RIGHT", up => "UP", down => "DOWN",
-							home => "HOME", enter => "OK", ok => "OK", "exit" => "RETURN");
+	my %cursorGroup	=	(left => "LEFT", right => "RIGHT", up => "UP", down => "DOWN", home => "HOME", enter => "OK", ok => "OK", "exit" => "RETURN");
 	my %audioGroup	=	(mute => "MUTE", unmute => "MUTE", volp => "VOLp", volm => "VOLm");
 
 	my $pstat = $hash->{READINGS}{power}{VAL};
@@ -313,6 +312,8 @@ LISTENLIVE_Set($@)
 
 				when("weather"){
 					Log $loglevel, "LISTENLIVE $name input: $cmdGroup $cmd";
+					$result = LISTENLIVE_SendCommand($hash, "POWER");
+					select(undef, undef, undef, 1.0);
 					$result = LISTENLIVE_SendCommand($hash, "HOME");
 					select(undef, undef, undef, 0.2);
 					$result = LISTENLIVE_SendCommand($hash, "DOWN");
@@ -381,22 +382,21 @@ LISTENLIVE_GetStatus($;$){
 	$local = 0 unless(defined($local));
 
 	if($hash->{helper}{ADDRESS} ne "none")
-	{
-		$presence = ReadingsVal("pres_".$name,"state","noPresence");
-	}
+	{ $presence = ReadingsVal("pres_".$name,"state","absent"); }
 	else
-	{
-		$presence = "present";
-	}
+	{ $presence = "present"; }
 
-	$presence = ReplaceEventMap($name, $presence, 1);
-	
+	if($presence eq "absent") { $presence = "offline";}
+	else { $presence = "online"; }
+
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, "state", $presence);
 	readingsEndUpdate($hash, 1);
 
+	$hash->{STATE} = $presence;
+
 	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "LISTENLIVE_GetStatus", $hash, 0) unless($local == 1);
-	return $hash->{STATE};
+	return 1;
 }
 
 #############################
@@ -405,15 +405,13 @@ LISTENLIVE_Define($$){
 	my ($hash, $def) = @_;
 	my @a = split("[ \t][ \t]*", $def);
 	my $name = $hash->{NAME};
+	my $presence;
 
 	if(! @a >= 4){
 		my $msg = "wrong syntax: define <name> LISTENLIVE <ip-or-hostname>[:<port>] [<interval>]";
 		Log 2, $msg;
 		return $msg;
 	}
-
-# Attribut eventMap festlegen (schönere Optik im Frontend)  
-	$attr{$name}{"eventMap"} = "absent:offline present:online";
 
 # Adresse in IP und Port zerlegen
 	my @address = split(":", $a[2]);
@@ -430,7 +428,7 @@ LISTENLIVE_Define($$){
 
 	if($address[0] ne "none"){
 		# PRESENCE aus device pres_+NAME lesen
-		my $presence = ReadingsVal("pres_".$name,"state","noPresence");
+		$presence = ReadingsVal("pres_".$name,"state","noPresence");
 	
 		if($presence eq "noPresence"){
 			$cmd = "pres_$name PRESENCE lan-ping $address[0]";
@@ -443,27 +441,30 @@ LISTENLIVE_Define($$){
 		} else {
 			Log 3, "LISTENLIVE $name PRESENCE pres_$name found.";
 		}	
+		$presence = "absent";
 	} else {
 	# Gerät ist als dummy definiert
 		$presence = "present";	# dummy immer als online melden
 	}
 	
-	$presence = ReplaceEventMap($name, $presence, 1);
+
+	if($presence eq "absent") {
+		$presence = "offline";
+	} else {
+		$presence = "online";
+	}
 
 # Readings anlegen und füllen
 	readingsBeginUpdate($hash);
-#	readingsBulkUpdate($hash, "currentMedia","");
 	readingsBulkUpdate($hash, "lastCmd","");
 	readingsBulkUpdate($hash, "lastResult","");
-#	readingsBulkUpdate($hash, "menuPos","11");
 	readingsBulkUpdate($hash, "mute","???");
-#	readingsBulkUpdate($hash, "playStatus","");
 	readingsBulkUpdate($hash, "power","???");
-#	readingsBulkUpdate($hash, "presence",$presence);
 	readingsBulkUpdate($hash, "state",$presence);
 	readingsEndUpdate($hash, 1);
 
 	$hash->{helper}{AVAILABLE} = 1;
+	$hash->{STATE} = $presence;
 	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "LISTENLIVE_GetStatus", $hash, 0);
 
 	return;
@@ -488,17 +489,19 @@ LISTENLIVE_SendCommand($$;$){
 
 	given($modus) {
 		when("online") {
-			$socket = new IO::Socket::INET (
-				PeerHost => $address,
-				PeerPort => $port,
-				Proto => 'tcp',
-			) or die "ERROR in Socket Creation : $!\n";
-			$socket->send($command);
-			usleep(30000);
-			$socket->recv($response, 2);
-			if($response !~  m/OK/)	{ Log 2,			"LISTENLIVE $name error: $response"; }
-			else 					{ Log $loglevel,	"LISTENLIVE $name response: $response"; }
-			$socket->close();
+			eval {
+				$socket = new IO::Socket::INET (
+					PeerHost => $address,
+					PeerPort => $port,
+						Proto => 'tcp',
+				) or die "ERROR in Socket Creation : $!\n";
+				$socket->send($command);
+				usleep(30000);
+				$socket->recv($response, 2);
+				if($response !~  m/OK/)	{ Log 2,			"LISTENLIVE $name error: $response"; }
+				else 					{ Log $loglevel,	"LISTENLIVE $name response: $response"; }
+				$socket->close();
+			}; warn $@ if $@;
 			$hash->{helper}{AVAILABLE} = (defined($response) ? 1 : 0);
 		}
 
@@ -741,8 +744,6 @@ statusRequest
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li><a href="#eventMap">eventMap</a>
-	The attribute eventMap <code>absent:offline present:online</code> is created automagically.</li>
   </ul>
   <br><br>
   <b>Generated Readings/Events:</b><br>
@@ -865,8 +866,6 @@ statusRequest
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li><a href="#eventMap">eventMap</a>
-	Die eventMap <code>absent:offline present:online</code> wird bei der Definition des Ger&auml;tes automatisch angelegt.</li>
   </ul>
   <br><br>
   <b>Generierte Readings/Events:</b><br>
