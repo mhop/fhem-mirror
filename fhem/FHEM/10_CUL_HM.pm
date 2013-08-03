@@ -883,6 +883,13 @@ sub CUL_HM_Parse($$) {##############################
 	  my $chId = $src.$chn;
       $shash = $modules{CUL_HM}{defptr}{$chId} 
 	                         if($modules{CUL_HM}{defptr}{$chId});
+	  if ($err&0x40 && $chn eq "02"){
+        push @event, "timedOn:running";
+	  }
+	  else{
+        push @event, "timedOn:off";
+	  }
+	  
 	  my $mdCh = $md.$chn;
 	  if($lvlStr{mdCh}{$mdCh} && $lvlStr{mdCh}{$mdCh}{$val}){
 	    $val = $lvlStr{mdCh}{$mdCh}{$val};
@@ -924,7 +931,7 @@ sub CUL_HM_Parse($$) {##############################
 	  delete $shash->{helper}{pOn};
 	}
 	if ($pon){# we have power ON, perform action
-	  push @entities,CUL_HM_UpdtReadSingle($dhash,'powerOn',"",1);
+	  push @entities,CUL_HM_UpdtReadSingle($dhash,'powerOn',"-",1);
 	  CUL_HM_Set($hHash,$hHash->{NAME},"off")
 		         if ($hHash && $hHash->{helper}{param}{offAtPon});
 	}
@@ -979,6 +986,12 @@ sub CUL_HM_Parse($$) {##############################
       $eventName = "motor"   if($st eq "blindActuator");
 	  $eventName = "dim"     if($st eq "dimmer");
 	  my $action; #determine action
+	  if ($err&0x40){
+        push @event, "timedOn:running";
+	  }
+	  else{
+        push @event, "timedOn:off" if ($shash->{READINGS}{timedOn});
+	  }
 	  if ($st ne "switch"){
         push @event, "$eventName:up:$vs"   if(($err&0x30) == 0x10);
         push @event, "$eventName:down:$vs" if(($err&0x30) == 0x20);
@@ -5138,6 +5151,14 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	  $val<br>
 	  powerOn [on|off|$val]<br>
       [unknown|motor|dim] [up|down|stop]:$val<br>
+  	  timedOn [running|off]<br> # on is temporary - e.g. started with on-for-timer
+  </li>
+  <li><B>sensRain</B><br>
+	  $val<br>
+	  powerOn <br>
+      level <val><br>
+  	  timedOn [running|off]<br> # on is temporary - e.g. started with on-for-timer
+	  trigger [Long|Short]_$no trigger event from channel<br>
   </li>
   <li><B>smokeDetector</B><br>
       [off|smoke-Alarm|alive]             # for team leader<br>
