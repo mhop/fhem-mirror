@@ -24,6 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
+#
 #	Changelog:
 #
 #	2013-07-21
@@ -42,6 +43,9 @@
 #					neues Parsing für reset erstellt
 #					neues Parsing für cursor erstellt
 #					neues Parsing für audio erstellt
+#
+#	2013-08-03
+#				Fixed: Fehlermeldungen wegen ReplaceEventMap
 #
 ##############################################################################
 
