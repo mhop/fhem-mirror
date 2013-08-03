@@ -854,11 +854,10 @@ my %culHmModelGets = (
 ##############################---set---########################################
 my %culHmGlobalSets = (# all but virtuals
   regBulk       => "<list>:<peer> <addr1:data1> <addr2:data2> ...",
-  statusRequest => "",
-  getRegRaw     =>"[List0|List1|List2|List3|List4|List5|List6] ... [<PeerChannel>]",
+  getRegRaw     => "[List0|List1|List2|List3|List4|List5|List6] ... [<PeerChannel>]",
   getConfig     => "",
-  regSet        =>"<regName> <value> ... [<peerChannel>]",
-  clear         =>"[readings|msgEvents]",
+  regSet        => "<regName> <value> ... [<peerChannel>]",
+  clear         => "[readings|msgEvents]",
 );
 my %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
   raw      	    => "data ...",
@@ -877,55 +876,75 @@ my %culHmGlobalSetsChn = (# all channels but virtuals
 );
 my %culHmSubTypeSets = (# channels of this subtype
   switch           =>{ "on-for-timer"=>"<sec>"
-                      ,"on-till"  =>"<time>"
-		              ,on         =>""
-					  ,off        =>""
-					  ,toggle     =>""
-					  ,press      =>"[long|short] [on|off] ..."
-					  ,inhibit    =>"[on|off]"},
+                      ,"on-till"     =>"<time>"
+		              ,on            =>""
+					  ,off           =>""
+					  ,toggle        =>""
+					  ,press         =>"[long|short] [on|off] ..."
+					  ,inhibit       =>"[on|off]"
+					  ,statusRequest =>""},
   dimmer           =>{ "on-for-timer"=>"<sec>"
-                      ,"on-till"  =>"<time>"
-		              ,on         =>""
-					  ,off        =>""
-					  ,toggle     =>""
-					  ,pct        =>"<value> ... [<ontime>] [<ramptime>]"
-					  ,stop       =>""
-					  ,press      =>"[long|short] [on|off] ..."
-					  ,up         =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
-					  ,down       =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
-					  ,inhibit    =>"[on|off]"},
-  blindActuator    =>{ on         =>""
-                      ,off        =>""
-                      ,toggle     =>""
-                      ,pct        =>"[<value>] ... [<ontime>]"
-					  ,stop       =>""
-					  ,press      =>"[long|short] [on|off] ..."
-					  ,up         =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
-					  ,down       =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
-					  ,inhibit    =>"[on|off]"},
-  remote           =>{ peerChan   =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"},
-  threeStateSensor =>{ peerChan   =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
-  THSensor         =>{ peerChan   =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
-  virtual          =>{ peerChan   =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"
-		              ,press      =>"[long|short]..."
-                      ,valvePos   =>"<position>"},#acting as TC
-  smokeDetector    =>{ test       =>""
-                      ,alarmOn    =>""
-					  ,alarmOff   =>""
-		              ,peerChan   =>"<btnNumber> <actChn> ... single [set|unset] actor"},
-  winMatic         =>{ matic      =>"<btn>"
-                      ,keydef     =>"<btn> <txt1> <txt2>"
-                      ,create     =>"<txt>"
-					  ,inhibit    =>"[on|off]"},
-  keyMatic         =>{ lock       =>""
-  	                  ,unlock     =>"[<sec>] ..."
-  	                  ,open       =>"[<sec>] ..."
-  	                  ,inhibit    =>"[on|off]"},
+                      ,"on-till"     =>"<time>"
+		              ,on            =>""
+					  ,off           =>""
+					  ,toggle        =>""
+					  ,pct           =>"<value> ... [<ontime>] [<ramptime>]"
+					  ,stop          =>""
+					  ,press         =>"[long|short] [on|off] ..."
+					  ,up            =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+					  ,down          =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+					  ,inhibit       =>"[on|off]"
+					  ,statusRequest =>""},
+  blindActuator    =>{ on            =>""
+                      ,off           =>""
+                      ,toggle        =>""
+                      ,pct           =>"[<value>] ... [<ontime>]"
+					  ,stop          =>""
+					  ,press         =>"[long|short] [on|off] ..."
+					  ,up            =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+					  ,down          =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+					  ,inhibit       =>"[on|off]"
+					  ,statusRequest =>""},
+  remote           =>{ peerChan      =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"},
+  threeStateSensor =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
+					  ,statusRequest =>""},
+  THSensor         =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
+					  ,statusRequest =>""},
+  virtual          =>{ peerChan      =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"
+		              ,press         =>"[long|short]..."
+                      ,valvePos      =>"<position>"},#acting as TC
+  smokeDetector    =>{ test          =>""
+                      ,alarmOn       =>""
+					  ,alarmOff      =>""
+		              ,peerChan      =>"<btnNumber> <actChn> ... single [set|unset] actor"
+					  ,statusRequest =>""},
+  winMatic         =>{ matic         =>"<btn>"
+                      ,keydef        =>"<btn> <txt1> <txt2>"
+                      ,create        =>"<txt>"
+					  ,inhibit       =>"[on|off]"
+					  ,statusRequest =>""},
+  keyMatic         =>{ lock          =>""
+  	                  ,unlock        =>"[<sec>] ..."
+  	                  ,open          =>"[<sec>] ..."
+  	                  ,inhibit       =>"[on|off]"
+					  ,statusRequest =>""},
+  repeater         =>{ setRepeat     => "[no1..36] <sendName> <recName> [bdcast-yes|no]"
+					  ,inhibit       => "[on|off]"
+					  ,statusRequest =>""},
+  outputUnit       =>{ statusRequest =>""},
 );
 # clones- - - - - - - - - - - - - - - - - 
-$culHmSubTypeSets{pushButton}     = $culHmSubTypeSets{remote};
-$culHmSubTypeSets{swi}            = $culHmSubTypeSets{remote};
-$culHmSubTypeSets{motionDetector} = $culHmSubTypeSets{threeStateSensor};
+$culHmSubTypeSets{pushButton}      = $culHmSubTypeSets{remote};
+$culHmSubTypeSets{swi}             = $culHmSubTypeSets{remote};
+
+$culHmSubTypeSets{sensor}          = $culHmSubTypeSets{outputUnit};
+$culHmSubTypeSets{thermostat}      = $culHmSubTypeSets{outputUnit};
+$culHmSubTypeSets{KFM100}          = $culHmSubTypeSets{outputUnit};
+$culHmSubTypeSets{blindActuatorSol}= $culHmSubTypeSets{outputUnit};
+$culHmSubTypeSets{tipTronic}       = $culHmSubTypeSets{outputUnit};
+
+$culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
+#  sensRain    ( no statusrequest)     
 
 my %culHmModelSets = (# channels of this subtype-------------
   "HM-CC-VD"     =>{ valvePos     => "position"},
@@ -939,8 +958,6 @@ my %culHmModelSets = (# channels of this subtype-------------
 		            ,ilum         => "[0-15] [0-127]"},
   "HM-OU-CFM-PL" =>{ press        => "[long|short] [on|off] ..."
                     ,inhibit      => "[on|off]"},
-  "HM-Sys-sRP-Pl"=>{ setRepeat    => "[no1..36] <sendName> <recName> [bdcast-yes|no]"
-					,inhibit      => "[on|off]"},
   "HM-CC-RT-DN"  =>{ mode         => "[auto|manu|party|boost|comfort|lower] ... <temp> <startTime> <endTime>"}#General only for one channel??
 );
 # clones- - - - - - - - - - - - - - - - - 
