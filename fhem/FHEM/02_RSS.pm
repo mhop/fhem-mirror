@@ -323,7 +323,8 @@ RSS_evalLayout($$@) {
           my ($cmd, $def)= split("[ \t]+", $line, 2);
           #Log 5, "CMD= \"$cmd\", DEF= \"$def\"";
           if($cmd eq "rgb") {
-            $params{rgb}= $def;
+            $def= "\"$def\"" if(length($def) == 6 && $def =~ /[[:xdigit:]]{6}/);
+            $params{rgb}= AnalyzePerlCommand(undef, $def);
           } elsif($cmd eq "font") {
             $params{font}= $def;
           } elsif($cmd eq "pt") {
@@ -379,8 +380,9 @@ RSS_returnJPEG($) {
   # create the image
   #
   my $S;
-#  my $S= GD::Image->newTrueColor($width,$height);
-#  $S->colorAllocate(0,0,0); # black is the background
+  # let's create a blank image, we will need it in most cases. 
+  $S= GD::Image->newTrueColor($width,$height);
+  $S->colorAllocate(0,0,0); # black is the background
 
   # wrap to make problems with GD non-lethal
 
@@ -431,25 +433,15 @@ RSS_returnJPEG($) {
 						$h= $height;
 						$w= $bgwidth/$v;
 					}
-					# create empty image
-					$S= GD::Image->newTrueColor($width,$height);
-					$S->colorAllocate(0,0,0); # black is the background
 					$S->copyResized($bg,($width-$w)/2,($height-$h)/2,0,0,$w,$h,$bgwidth,$bgheight);
 				} else {
-					# size is as required, we take the original
+					# size is as required
+					# kill the predefined image and take the original
+					$S = undef;
 					$S= $bg;
 				}
-			} else {#      # no background, we create an empty background
-				$S= GD::Image->newTrueColor($width,$height);
-				$S->colorAllocate(0,0,0); # black is the background
 			}
-		} else {	# not opendir(BGDIR)
-			$S= GD::Image->newTrueColor($width,$height);
-			$S->colorAllocate(0,0,0); # black is the background
 		}
-	} else {	# not defined $bgdir
-		$S= GD::Image->newTrueColor($width,$height);
-		$S->colorAllocate(0,0,0); # black is the background
 	}
     #
     # evaluate layout
@@ -622,7 +614,8 @@ RSS_CGI(){
 
     <li>rgb &lt;color&gt;<br>Sets the color. &lt;color&gt; is a 6-digit hex number, every 2 digits
     determining the red, green and blue color components as in HTML color codes (e.g.
-    <code>FF0000</code> for red, <code>C0C0C0</code> for light gray).</li><br>
+    <code>FF0000</code> for red, <code>C0C0C0</code> for light gray). You can use
+    <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;color&gt.</li><br>
 
     <li>pt &lt;pt&gt;<br>Sets the font size in points.</li><br>
     </ul>
