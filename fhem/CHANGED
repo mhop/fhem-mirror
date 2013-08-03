@@ -2,7 +2,7 @@
 - SVN
   - feature: SYSSTAT: allow (remote) monitoring system uptime
   - feature: new module 98_openweathermap.pm added (betateilchen)
-  - feature: WeatherAsHtmlH() added to 59_Weather.pm (Boris)
+  - feature: WeatherAsHtmlH(), WeatherAsHtmlD() added to 59_Weather.pm (Boris)
   - feature: new module I2C_BMP180 for reading I2C digital pressure sensor BMP180
     or BMP085 connected to Raspberry Pi (Dirk)
   - feature: new module 35_SWAP_0000002200000003 for panstamp rgb led driver

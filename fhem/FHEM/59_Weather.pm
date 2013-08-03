@@ -514,28 +514,57 @@ WeatherAsHtmlH($)
         if(!$defs{$d} || $defs{$d}{TYPE} ne "Weather");
 
   my $width= int(ICONSCALE*ICONWIDTH);
+  
+  
+  
+  my $format= '<td><table border=1><tr><td class="weatherIcon" width=%d>%s</td></tr><tr><td class="weatherValue">%s</td></tr><tr><td class="weatherValue">%s°C %s%%</td></tr><tr><td class="weatherValue">%s</td></tr></table></td>';
       
-  my $ret = sprintf('<table class="weather"><tr><th width=%d></th><th></th><th></th><th></th></tr><tr>', $width);
-  $ret .= sprintf('<td><table><tr><td class="weatherIcon" width=%d>%s</td></tr><tr><td class="weatherValue">%s<br>%s°C  %s%%<br>%s</td></tr></table></td>',
-        $width,
-        WeatherIconIMGTag(ReadingsVal($d, "icon", "")),
-        ReadingsVal($d, "condition", ""),
-        ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""),
-        ReadingsVal($d, "wind_condition", ""));
-        
-
+  my $ret = '<table class="weather">';
+  
+  # icons
+  $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "icon", "")));
   for(my $i=1; $i<=5; $i++) {
-    $ret .= sprintf('<td><table><tr><td class="weatherIcon" width=%d>%s</td></tr><tr><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherMin">min %s°C</span> <span class="weatherMax">max %s°C</span></td></tr></table></td>',
-        $width,
-        WeatherIconIMGTag(ReadingsVal($d, "fc${i}_icon", "")),
-        ReadingsVal($d, "fc${i}_day_of_week", ""),
-        ReadingsVal($d, "fc${i}_condition", ""),
-        ReadingsVal($d, "fc${i}_low_c", ""), ReadingsVal($d, "fc${i}_high_c", ""));
+    $ret .= sprintf('<td class="weatherIcon" width=%d>%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "fc${i}_icon", "")));
   }
-
+  $ret .= '</tr>';
+  
+  # condition
+  $ret .= sprintf('<tr><td class="weatherDay">%s</td>', ReadingsVal($d, "condition", ""));
+  for(my $i=1; $i<=5; $i++) {
+    $ret .= sprintf('<td class="weatherDay">%s: %s</td>', ReadingsVal($d, "fc${i}_day_of_week", ""),
+        ReadingsVal($d, "fc${i}_condition", ""));
+  }
+  $ret .= '</tr>';
+  
+  # temp/hum | min
+  $ret .= sprintf('<tr><td class="weatherMin">%s°C %s%%</td>', ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""));
+  for(my $i=1; $i<=5; $i++) {
+    $ret .= sprintf('<td class="weatherMin">min %s°C</td>', ReadingsVal($d, "fc${i}_low_c", ""));
+  }
+  $ret .= '</tr>';
+  
+  # wind | max
+  $ret .= sprintf('<tr><td class="weatherMax">%s</td>', ReadingsVal($d, "wind_condition", ""));
+  for(my $i=1; $i<=5; $i++) {
+    $ret .= sprintf('<td class="weatherMax">max %s°C</td>', ReadingsVal($d, "fc${i}_high_c", ""));
+  }
   $ret .= "</tr></table>";
+
   return $ret;
 }
+
+sub
+WeatherAsHtmlD($)
+{
+  my ($d) = @_;
+  if($FW_ss) {
+    WeatherAsHtmlV($d);
+  } else {
+    WeatherAsHtmlH($d);
+  }
+}
+
+
 #####################################
 
 
@@ -579,9 +608,10 @@ WeatherAsHtmlH($)
       define Forecast Weather 673513 1800
      </pre>
      
-    The module provides three additional functions <code>WeatherAsHtml</code>, <code>WeatherAsHtmlV</code> and
-    <code>WeatherAsHtmlH</code>. The former two functions are identical: they return the HTML code for a
-    vertically arranged weather forecast. The latter returns the HTML code for a horizontally arranged weather forecast.<br><br>
+    The module provides four additional functions <code>WeatherAsHtml</code>, <code>WeatherAsHtmlV</code>, <code>WeatherAsHtmlH</code> and
+    <code>WeatherAsHtmlD</code>. The former two functions are identical: they return the HTML code for a
+    vertically arranged weather forecast. The third function returns the HTML code for a horizontally arranged weather forecast. The 
+    latter function dynamically picks the orientation depending on wether a smallscreen style is set (vertical layout) or not (horizontal layout).<br><br>
     Example:
     <pre>
       define MyWeatherWeblink weblink htmlCode { WeatherAsHtmlH("MyWeather") }
