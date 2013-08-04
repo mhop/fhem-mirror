@@ -1000,8 +1000,7 @@ my %culHmChanSets = (
                       ,"on-till"      =>"<time>"
 		              ,on             =>""
 					  ,off            =>""
-					  ,toggle         =>""
-					  ,statusRequest  =>""}
+					  ,toggle         =>""}
 );
 # clones- - - - - - - - - - - - - - - - - 
 #$culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};

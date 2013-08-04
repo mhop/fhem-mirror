@@ -471,7 +471,6 @@ sub CUL_HM_Parse($$) {##############################
   my ($len,$mNo,$mFlg,$mTp,$src,$dst,$p) = ($1,$2,$3,$4,$5,$6,$7);
   $p = "" if(!defined($p));
   my @mI = unpack '(A2)*',$p; # split message info to bytes
-
   if ($msgStat){
     return "" if($msgStat eq 'NACK');#discard if lowlevel error
   }
@@ -874,6 +873,7 @@ sub CUL_HM_Parse($$) {##############################
     my $hHash = CUL_HM_id2Hash($src."02");# hash for heating
 	my $pon = 0;# power on if mNo == 0 and heating status plus second msg
 	            # status or trigger from rain channel 
+	my $devHash = $shash;
     if (($mTp eq "02" && $p =~ m/^01/) || #Ack_Status
 	    ($mTp eq "10" && $p =~ m/^06/))	{ #Info_Status
 
@@ -898,7 +898,8 @@ sub CUL_HM_Parse($$) {##############################
 	    $val = hex($val)/2;
 	  }
 	  push @event, "state:$val";
- 	  push @event, "level:".($val eq "off"?"0 %":"100 %");
+ 	  CUL_HM_UpdtReadSingle($shash,'.level',#store level invisible
+	                                 ($val eq "off"?"0 %":"100 %"),0);
  	  
 	  if ($mNo eq "00" && $chn eq "02" && $val eq "on"){
 	    $hHash->{helper}{pOn} = 1;
@@ -931,7 +932,7 @@ sub CUL_HM_Parse($$) {##############################
 	  delete $shash->{helper}{pOn};
 	}
 	if ($pon){# we have power ON, perform action
-	  push @entities,CUL_HM_UpdtReadSingle($dhash,'powerOn',"-",1);
+	  push @entities,CUL_HM_UpdtReadSingle($devHash,'powerOn',"-",1);
 	  CUL_HM_Set($hHash,$hHash->{NAME},"off")
 		         if ($hHash && $hHash->{helper}{param}{offAtPon});
 	}
@@ -1547,11 +1548,12 @@ sub CUL_HM_parseCommon(@){#####################################################
 		my $chnhash = $modules{CUL_HM}{defptr}{$src.$chn}; 
 		$chnhash = $shash if (!$chnhash);
 	    my $chnNname = $chnhash->{NAME};
-		my @peers = substr($p,2,) =~ /(.{8})/g;
+	    my (undef,@peers) = unpack 'A2(A8)*',$p;
+        $_ = '00000000' foreach (grep /^000000/,@peers);#correct bad term(6 chars) from rain sens)
 	    $chnhash->{helper}{peerIDsRaw}.= ",".join",",@peers;
 		
     	CUL_HM_ID2PeerList ($chnNname,$_,1) foreach (@peers);
-		if ($p =~ m/000000..$/) {# last entry, peerList is complete
+		if (grep /00000000/,@peers) {# last entry, peerList is complete
           CUL_HM_respPendRm($shash);		  
 		  # check for request to get List3 data
 		  my $reqPeer = $chnhash->{helper}{getCfgList};
@@ -1559,7 +1561,8 @@ sub CUL_HM_parseCommon(@){#####################################################
 		    my $flag = CUL_HM_getFlag($shash);
 		    my $id = CUL_HM_IOid($shash);
 		    my $listNo = "0".$chnhash->{helper}{getCfgListNo};
-		    my @peerID = split(",",($attr{$chnNname}{peerIDs}?$attr{$chnNname}{peerIDs}:""));
+		    my @peerID = split(",",($attr{$chnNname}{peerIDs}?
+			                        $attr{$chnNname}{peerIDs}:""));
 		    foreach my $peer (grep (!/00000000/,@peerID)){
 			  $peer .="01" if (length($peer) == 6); # add the default
 			  if ($peer &&($peer eq $reqPeer || $reqPeer eq "all")){
@@ -3685,7 +3688,8 @@ sub CUL_HM_secSince2000() {#####################
 }
 sub CUL_HM_getChnLvl($){# in: name out: vit or phys level
   my $name = shift;
-  my $curVal = ReadingsVal($name,"level",0);
+  my $curVal = ReadingsVal($name,"level",undef);
+  $curVal = ReadingsVal($name,".level",0)if (!defined $curVal);
   $curVal =~ s/set_//;
   $curVal =~ s/ .*//;#strip unit
   return $curVal;
@@ -4095,6 +4099,7 @@ sub CUL_HM_setAttrIfCh($$$$) {
 }
 sub CUL_HM_noDup(@) {#return list with no duplicates
   my %all;
+  return "" if (scalar(@_) == 0);
   $all{$_}=0 foreach (grep !/^$/,@_);
   delete $all{""}; #remove empties if present
   return (sort keys %all);
