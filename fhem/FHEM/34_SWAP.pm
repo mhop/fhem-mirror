@@ -794,6 +794,7 @@ SWAP_Parse($$)
     return undef if( $raddr eq "00" );
 
     $rname = SWAP_findFreeAddress($hash,$raddr) if( $raddr eq "FF" ); #use next free addr as name -> consistent name after change below
+    ($developers,$products) = SWAP_loadDevices() if( $reg == 0x00 && defined($modules{"SWAP_$data"}) );
     return "UNDEFINED SWAP_$rname SWAP_$data $raddr $data" if( $reg == 0x00 && defined($modules{"SWAP_$data"}) );
     return "UNDEFINED SWAP_$rname SWAP $raddr $data" if( $reg == 0x00 );
     return "UNDEFINED SWAP_$rname SWAP $raddr";
