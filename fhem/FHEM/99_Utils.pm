@@ -16,8 +16,14 @@ sub
 time_str2num($)
 {
   my ($str) = @_;
-  my @a = split("[- :]", $str);
-  return mktime($a[5],$a[4],$a[3],$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
+  my @a;
+  if($str ne "") {
+    @a = split("[- :]", $str);
+    return mktime($a[5],$a[4],$a[3],$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
+  } else {
+    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+    return mktime($sec, $min, $hour, $mday, $mon, $year, 0, 0, -1);
+  }
 }
 
 sub
