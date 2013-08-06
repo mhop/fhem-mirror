@@ -97,6 +97,7 @@ sub redirectStdinStdErr();
 sub setGlobalAttrBeforeFork($);
 sub setReadingsVal($$$$);
 sub evalStateFormat($);
+sub latin1ToUtf8($);
 
 sub CommandAttr($$);
 sub CommandDefaultAttr($$);
@@ -3418,6 +3419,15 @@ computeClientArray($$)
 
   $hash->{".clientArray"} = \@a;
   return \@a;
+}
+
+sub
+latin1ToUtf8($)
+{
+  # http://perldoc.perl.org/perluniintro.html, UNICODE IN OLDER PERLS
+  my ($s)= @_;
+  $s =~ s/([\x80-\xFF])/chr(0xC0|ord($1)>>6).chr(0x80|ord($1)&0x3F)/eg;
+  return $s;
 }
 
 1;
