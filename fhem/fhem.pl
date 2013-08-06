@@ -3421,12 +3421,20 @@ computeClientArray($$)
   return \@a;
 }
 
+# http://perldoc.perl.org/perluniintro.html, UNICODE IN OLDER PERLS
 sub
 latin1ToUtf8($)
 {
-  # http://perldoc.perl.org/perluniintro.html, UNICODE IN OLDER PERLS
   my ($s)= @_;
   $s =~ s/([\x80-\xFF])/chr(0xC0|ord($1)>>6).chr(0x80|ord($1)&0x3F)/eg;
+  return $s;
+}
+
+sub
+utf8ToLatin1($)
+{
+  my ($s)= @_;
+  $s =~ s/([\xC2\xC3])([\x80-\xBF])/chr(ord($1)<<6&0xC0|ord($2)&0x3F)/eg;
   return $s;
 }
 
