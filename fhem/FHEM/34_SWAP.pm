@@ -746,10 +746,11 @@ SWAP_findFreeAddress($$)
 {
   my ($hash, $orig) = @_;
 
-  for( my $addr = 0xF0; $addr < 0xFF; $addr++ ) {
+  for( my $i = 0xF0; $i < 0xFF; $i++ ) {
+    my $addr = sprintf( "%02X", $i );
     next if( $modules{SWAP}{defptr}{$addr} );
 
-    return sprintf( "%02X", $addr );
+    return $addr;
   }
 
   return $orig;
