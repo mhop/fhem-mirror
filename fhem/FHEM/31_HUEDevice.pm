@@ -534,6 +534,7 @@ HUEDevice_GetUpdate($)
   my $state = $result->{'state'};
 
   my $on        = $state->{on};
+  my $reachable = $state->{reachable};
   my $colormode = $state->{'colormode'};
   my $bri       = $state->{'bri'};
   my $ct        = $state->{'ct'};
@@ -555,6 +556,7 @@ HUEDevice_GetUpdate($)
   if( defined($hue) && $hue != $hash->{fhem}{hue} ) {readingsBulkUpdate($hash,"hue",$hue);}
   if( defined($sat) && $sat != $hash->{fhem}{sat} ) {readingsBulkUpdate($hash,"sat",$sat);}
   if( defined($xy) && $xy ne $hash->{fhem}{xy} ) {readingsBulkUpdate($hash,"xy",$xy);}
+  if( defined($reachable) && $reachable ne $hash->{fhem}{reachable} ) {readingsBulkUpdate($hash,"reachable",$reachable);}
 
   my $s = '';
   my $percent;
@@ -580,12 +582,15 @@ HUEDevice_GetUpdate($)
   if( $percent != $hash->{fhem}{percent} ) {readingsBulkUpdate($hash,"level", $percent . ' %');}
   if( $percent != $hash->{fhem}{percent} ) {readingsBulkUpdate($hash,"pct", $percent);}
 
+  $s = 'off' if( !$reachable );
+
   if( $s ne $hash->{STATE} ) {readingsBulkUpdate($hash,"state",$s);}
   readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
 
   CommandTrigger( "", "$name RGB: ".CommandGet("","$name rgb") ); 
 
   $hash->{fhem}{on} = $on;
+  $hash->{fhem}{reachable} = $reachable;
   $hash->{fhem}{colormode} = $colormode;
   $hash->{fhem}{bri} = $bri;
   $hash->{fhem}{ct} = $ct;
