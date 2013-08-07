@@ -201,8 +201,7 @@ telnet-Prompt eingegeben werden:
 SHELL-Kommandos werden im Hintergrund ausgef&uuml;hrt, 
 PERL-Ausdr&uuml;cke und FHEM-Kommandos werden im Haupt-"thread" ausgef&uuml;hrt. Um 
 PERL-Ausdr&uuml;cke leichter eingeben zu k&ouml;nnen, sind einige Spezialfunktionen und 
-Variablen verf&uuml;gbar. Lesen Sie sich bitte die Abschnitte
-<a href="file:///C:/Inetpub/wwwroot/www.fhem.de/commandref_frame_DE.html#perl" style="color: #278727; text-decoration: underline; text-underline: single">
+Variablen verf&uuml;gbar. Lesen Sie sich bitte die Abschnitte <a href="#perl">
 Perl special</a> zum besseren Verst&auml;ndnis durch.</p>
 <p>Um FHEM-Befehle in einen SHELL-Script zu triggern (dies ist 
 eine "andere" M&ouml;glichkeit), benutzen Sie bitte die oben beschriebene Client-Form 
@@ -251,16 +250,13 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <a name="devspec"></a>
 <h3>Ger&auml;te-Spezifikation (devspec)</h3>
 <ul>
-  Die Befehle
+  Befehle wie
     <a href="#attr">attr</a>,
-    <a href="#deleteattr">deleteattr</a>,<a href="#delete">delete</a>,
-    <a href="#get">get</a>,
-    <a href="#list">list</a>,
     <a href="#set">set</a>,
-    <a href="#setstate">setstate</a>,<a href="file:///C:/Inetpub/wwwroot/www.fhem.de/commandref_frame_DE.html#setstate"><span style="text-decoration: underline">
-  </span></a>k&ouml;nnen eine komplexere 
-  Ger&auml;tespezifikation als Argumente enthalten, die auch eine Anzahl von Ger&auml;ten 
-  betreffen kann. Eine Ger&auml;tespezifikation (Kurzfassung) kann z.B. so aussehen:
+    <a href="#get">get</a>, usw.
+  k&ouml;nnen eine komplexere Ger&auml;tespezifikation als Argumente enthalten,
+  die auch eine Anzahl von Ger&auml;ten betreffen kann. Eine
+  Ger&auml;tespezifikation (Kurzfassung) kann z.B. so aussehen:
   <ul>
   <li>ein einzelner Ger&auml;tename. Dies ist der 
   meist vorkommende Fall.</li>
@@ -322,11 +318,15 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   <code>attr &lt;devspec&gt; &lt;attrname&gt; [&lt;value&gt;] </code><br>
 
   <br>
-   Dieser Befehl setzt ein Attribut f&uuml;r ein Ger&auml;t welches mit <a href="#define">define</a> definiert wurde. Sie k&ouml;nnen auch 
-  Ihre eigenen Attribute definieren, um sie in anderen Applikationen anzuwenden. 
-  Geben Sie "&lt;attr &lt;name&gt; ?" ein, um eine Liste verf&uuml;gbarer Attribute 
-  anzuzeigen. Bitte lesen Sie das Kapitel <a href="#devspec">Device specification</a>&nbsp; 
-  um Detail-Informationen zu &lt;devspec&gt; zu erhalten.
+   Dieser Befehl setzt ein Attribut f&uuml;r ein Ger&auml;t welches mit <a
+   href="#define">define</a> definiert wurde. Sie k&ouml;nnen auch Ihre eigenen
+   Attribute definieren, um sie in anderen Applikationen anzuwenden.  Geben Sie
+   "&lt;attr &lt;name&gt; ?" ein, um eine Liste verf&uuml;gbarer Attribute
+   anzuzeigen. 
+
+  Siehe den Abschnitt &uuml;ber <a href="#devspec">Ger&auml;te-Spezifikation</a>
+  f&uuml;r Details der &lt;devspec&gt;.<br>
+
   <p>Attribute, die f&uuml;r 
   alle Ger&auml;te anwendbar sind: </p>
   <ul>
@@ -553,13 +553,14 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <ul>
   <code>delete &lt;devspec&gt;</code> <br>
   <br>
-  L&ouml;scht etwas was mit dem <a href="#define">define</a> Befehl erstellt worden
-  ist.
-  Lesen Sie sich bitte den Abschnitt <a href="#devspec">Device specification</a>&nbsp; f&uuml;r
-  Details von
-  &lt;devspec&gt; durch.<br>
-  Nach dem l&ouml;schen, wird das globale Ereignis "DELETED" erzeugt. Lesen Sie bitte
-  den Abschnitt zu &quot;notify&quot; f&uuml;r genauere Informationen durch.<br>
+  L&ouml;scht etwas was mit dem <a href="#define">define</a> Befehl erstellt
+  worden ist.<br>
+
+  Siehe den Abschnitt &uuml;ber <a href="#devspec">Ger&auml;te-Spezifikation</a>
+  f&uuml;r Details der &lt;devspec&gt;.<br>
+
+  Nach dem l&ouml;schen, wird das globale Ereignis "DELETED" erzeugt.<br>
+
   Beispiel:
   <ul>
     <code>delete lamp</code><br>
@@ -572,12 +573,11 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <ul>
   <code>deleteattr &lt;devspec&gt; [&lt;attrname&gt;]</code> <br>
   <br>
-  L&ouml;scht entweder ein einzelnes Attribut (siehe Abschnitt <a href="#attr">attr</a> )
-  oder alle Attribute eines Ger&auml;tes (falls kein&nbsp; &lt;attrname&gt; angegeben 
-  wird).
-  Lesen Sie bitte den&nbsp; <a href="#devspec">Device specification</a> 
-  Abschnitt f&uuml;r
-  &lt;devspec&gt; durch.<br>
+  L&ouml;scht entweder ein einzelnes Attribut (siehe Abschnitt <a
+  href="#attr">attr</a> ) oder alle Attribute eines Ger&auml;tes (falls
+  kein &lt;attrname&gt; angegeben wird).<br>
+  Siehe den Abschnitt &uuml;ber <a href="#devspec">Ger&auml;te-Spezifikation</a>
+  f&uuml;r Details der &lt;devspec&gt;.<br>
   <br>
 
   Beispiele:
@@ -593,17 +593,49 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <ul>
   <code>deletereading &lt;devspec&gt; &lt;readingname&gt;</code> <br>
   <br>
-  Delete the reading &lt;readingname&gt;
-  for a device. &lt;readingname&gt; is a perl regular expression that must match the whole name of the reading.
-  Use with greatest care! FHEM might crash if you delete vital readings of a device.
-  See the <a href="#devspec">Device specification</a> section for details on
-  &lt;devspec&gt;.<br>
+  Entfernt das Reading &lt;readingname&gt; f&uuml;r das spezifizierte
+  Ger&auml;t.  &lt;readingname&gt; ist ein perl Regular-Expression, was den
+  vollst&auml;ndigen Namen des Readings erfassen muss.
+
+  Mit gr&ouml;&szlig;ter Sorgfalt verwenden! FHEM kann abst&uuml;rzen, falls
+  man lebenswichtige Readings entfernt.<br>
+
+  Siehe den Abschnitt &uuml;ber <a href="#devspec">Ger&auml;te-Spezifikation</a>
+  f&uuml;r Details der &lt;devspec&gt;.<br>
   <br>
 
-  Examples:
+  Beispiele:
   <ul>
     <code>deletereading mySensor temp1</code><br>
     <code>deletereading mySensor temp\d+</code><br>
+  </ul>
+  <br>
+</ul>
+
+<a name="displayattr"></a>
+<h3>displayattr</h3>
+<ul>
+  <code>displayattr &lt;devspec&gt; [&lt;attrname&gt;]</code> <br>
+  <br>
+  Zeigt entweder den Wert eines Attributes an (falls &lt;attrname&gt;
+  spezifiziert wurde) oder alle Attribute eines Ger&auml;tes.
+
+  Siehe den Abschnitt &uuml;ber <a href="#devspec">Ger&auml;te-Spezifikation</a>
+  f&uuml;r Details der &lt;devspec&gt;.<br>
+
+  Falls mehrere Ger&auml;te spezifiziert wurden, dann enth&auml;lt die Ausgabe
+  den Namen der Ger&auml;te.
+  <br>
+
+  Beispiele:
+  <ul>
+    <code>
+    fhem&gt; di WEB<br>
+    menuEntries AlarmOn,/fhem?cmd=set%20alarm%20on<br>
+    room Misc.<br>
+    fhem&gt di WEB room<br>
+    Misc.<br>
+    </code>
   </ul>
   <br>
 </ul>
@@ -617,10 +649,8 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   Antwort. Eine allgemeine Liste m&ouml;glicher Paramter erhalten Sie mit<ul>
     <code>get &lt;device&gt; ?</code>
   </ul>
-  Lesen Sie den Abschnitt <a href="#devspec">Device specification</a> f&uuml;r 
-  Details zu
-  &lt;devspec&gt; durch.<br>
-  <br>
+  Siehe den Abschnitt &uuml;ber <a href="#devspec">Ger&auml;te-Spezifikation</a>
+  f&uuml;r Details der &lt;devspec&gt;.<br>
   Jedes Ger&auml;t hat unterschiedliche &quot;get&quot;-Parameter. Lesen Sie Details bitte im 
   zugeh&ouml;rigen Abschnitt nach.<br>
   <br>
@@ -685,13 +715,13 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   <code>list [devspec] [value]</code>
   <br><br>
   Auflistung aller &quot;definitions&quot;, &quot;notify&quot; und &quot;at&quot;-Definitionen. Dies ist eines 
-  der wenigen Befehle, die im Normalfall eine Zeichenkette ausgeben. Bitte lesen 
-  Sie den Abschnitt <a href="#devspec">Device specification</a> f&uuml;r Details zu
-  &lt;devspec&gt;.
+  der wenigen Befehle, die im Normalfall eine Zeichenkette ausgeben.<br>
+  Siehe den Abschnitt &uuml;ber <a href="#devspec">Ger&auml;te-Spezifikation</a>
+  f&uuml;r Details der &lt;devspec&gt;.<br>
+  
   <br>
-  Wenn value angegeben ist, der von ( DEF, TYPE, usw) oder
-  reading (actuator, measured-temp) f&uuml;r alle Ger&auml;te die in devspec angegeben 
-  sind.
+  Wenn value angegeben ist, der von ( DEF, TYPE, usw) oder reading (actuator,
+  measured-temp) f&uuml;r alle Ger&auml;te die in devspec angegeben sind.
   <br><br>
   Beispiel:
   <pre><code>  fhem&gt; list
@@ -870,9 +900,10 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   <ul>
     <code>set &lt;name&gt; ?</code>
   </ul>
-  Lesen Sie bitte den Abschnitt <a href="#devspec">Device specification</a>
-  f&uuml;r Details zu &lt;devspec&gt;. Der &quot;set&quot;-Befehl gibt nur bei
-  Fehler einen Wert zur&uuml;ck.
+  Siehe den Abschnitt &uuml;ber <a href="#devspec">Ger&auml;te-Spezifikation</a>
+  f&uuml;r Details der &lt;devspec&gt;.<br>
+
+  Der &quot;set&quot;-Befehl gibt nur bei Fehler einen Wert zur&uuml;ck.
   <br><br>
   Jedes Ger&auml;t hat verschiedene Parameter die mit &quot;set&quot; gesetzt
   werden k&ouml;nnen.  Lesen Sie bitte den entsprechenden Abschnitt f&uuml;r
@@ -936,11 +967,10 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   Der Befehl setzt den "STATUS&quot; f&uuml;r <code>&lt;name&gt;</code> , wie im Befehl
   <a href="#list">list</a> beschrieben, auf den Wert <code>&lt;value&gt;</code> 
   ohne an das Ger&auml;t ein Signal zu senden. Dieser Befehl wird auch im <a href="#statefile">statefile</a> 
-  benutzt.
-  Lesen Sie bitte den Abschnitt <a href="#devspec">Device specification</a>&nbsp; f&uuml;r 
-  Details zu
-  &lt;devspec&gt;.
-  <br><br>
+  benutzt.<br>
+  Siehe den Abschnitt &uuml;ber <a href="#devspec">Ger&auml;te-Spezifikation</a>
+  f&uuml;r Details der &lt;devspec&gt;.<br>
+  <br>
   Examples:
   <ul>
     setstate lamp on
@@ -975,10 +1005,10 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <ul>
   <code>trigger &lt;devspec&gt; &lt;state&gt;</code>
   <br><br>
-  Triggert eine <a href="#notify">notify</a> Definition.
-  Siehe <a href="#devspec">Ger&auml;te-Spezifikation (devspec)</a>&nbsp;
-  f&uuml;r Details zu &lt;devspec&gt;.
-  <br><br>
+  Triggert eine <a href="#notify">notify</a> Definition.<br>
+  Siehe den Abschnitt &uuml;ber <a href="#devspec">Ger&auml;te-Spezifikation</a>
+  f&uuml;r Details der &lt;devspec&gt;.<br>
+  <br>
   Beispiel:
   <ul>
     <code>trigger btn3 on</code>

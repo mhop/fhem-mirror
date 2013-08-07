@@ -38,6 +38,7 @@
       <a href="#delete">delete</a> &nbsp;
       <a href="#deleteattr">deleteattr</a> &nbsp;
       <a href="#deletereading">deletereading</a> &nbsp;
+      <a href="#displayattr">displayattr</a> &nbsp;
       <a href="#fheminfo">fheminfo</a> &nbsp;
       <a href="#get">get</a> &nbsp;
       <a href="#getstate">getstate</a> &nbsp;
@@ -250,6 +251,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   The commands
     <a href="#attr">attr</a>,
     <a href="#deleteattr">deleteattr</a>,
+    <a href="#displayattr">displayattr</a>,
     <a href="#delete">delete</a>,
     <a href="#get">get</a>,
     <a href="#list">list</a>,
@@ -569,6 +571,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <br>
 </ul>
 
+
 <a name="deletereading"></a>
 <h3>deletereading</h3>
 <ul>
@@ -585,6 +588,33 @@ A line ending with \ will be concatenated with the next one, so long lines
   <ul>
     <code>deletereading mySensor temp1</code><br>
     <code>deletereading mySensor temp\d+</code><br>
+  </ul>
+  <br>
+</ul>
+
+
+<a name="displayattr"></a>
+<h3>displayattr</h3>
+<ul>
+  <code>displayattr &lt;devspec&gt; [&lt;attrname&gt;]</code> <br>
+  <br>
+  Display either the value of a single attribute (see the <a href="#attr">attr</a> command)
+  or all attributes for a device (if no &lt;attrname&gt; is defined).
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.<br>
+  If more then one device is specified, then the device name will also included
+  in the output.
+  <br>
+
+  Examples:
+  <ul>
+    <code>
+    fhem&gt; di WEB<br>
+    menuEntries AlarmOn,/fhem?cmd=set%20alarm%20on<br>
+    room Misc.<br>
+    fhem&gt di WEB room<br>
+    Misc.<br>
+    </code>
   </ul>
   <br>
 </ul>
