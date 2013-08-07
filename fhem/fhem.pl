@@ -231,6 +231,8 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
             Hlp=>"<devspec> [<attrname>],delete user defined reading for <devspec>" },
   "delete"  => { Fn=>"CommandDelete",
 	    Hlp=>"<devspec>,delete the corresponding definition(s)"},
+  "displayattr"=> { Fn=>"CommandDisplayAttr",
+	    Hlp=>"<devspec> [attrname],display attributes" },
   "get"     => { Fn=>"CommandGet",
 	    Hlp=>"<devspec> <type dependent>,request data from <devspec>" },
   "help"    => { Fn=>"CommandHelp",
@@ -1483,6 +1485,42 @@ CommandDeleteAttr($$)
       delete($attr{$sdev});
     } else {
       delete($attr{$sdev}{$a[1]}) if(defined($attr{$sdev}));
+    }
+
+  }
+
+  return join("\n", @rets);
+}
+
+#############
+sub
+CommandDisplayAttr($$)
+{
+  my ($cl, $def) = @_;
+
+  my @a = split(" ", $def, 2);
+  return "Usage: displayattr <name> [<attrname>]\n$namedef" if(@a < 1);
+
+  my @rets;
+  my @devspec = devspec2array($a[0]);
+
+  foreach my $sdev (@devspec) {
+
+    if(!defined($defs{$sdev})) {
+      push @rets, "Please define $sdev first";
+      next;
+    }
+
+    my $ap = $attr{$sdev};
+    next if(!$ap);
+    my $d = (@devspec > 1 ? "$sdev " : "");
+
+    if(defined($a[1])) {
+      push @rets, "$d$ap->{$a[1]}" if(defined($ap->{$a[1]}));
+
+    } else {
+      push @rets, map { "$d$_ $ap->{$_}" } sort keys %{$ap};
+
     }
 
   }
