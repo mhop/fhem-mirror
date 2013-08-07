@@ -849,6 +849,8 @@ FW_doDetail($)
   FW_pO FW_hidden("detail", $d);
 
   FW_makeSelect($d, "set", getAllSets($d), "set");
+  FW_makeSelect($d, "get", getAllGets($d), "set");
+
   FW_makeTable("Internals", $d, $h);
   FW_makeTable("Readings", $d, $h->{READINGS});
 

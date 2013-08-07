@@ -108,7 +108,7 @@ EMGZ_Get($@)
   my $msg;
 
   if($a[1] ne "status" && int(@a) != 2) {
-    return "unknown get value, valid is status";
+    return "unknown argument $a[1], choose one of status";
   }
   $hash->{LOCAL} = 1;
   my $v = EMGZ_GetStatus($hash);
