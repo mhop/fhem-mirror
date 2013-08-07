@@ -148,7 +148,7 @@ readDeviceXML($$)
   my $device = XMLin($file_name, KeyAttr => {}, ForceArray => [ 'reg', 'param', 'endpoint', 'unit', ]);
 
   $product->{pwrdownmode} = $device->{pwrdownmode} eq "true"?1:0;
-  foreach my $register (@{$device->{config}->{reg}}){
+  foreach my $register (@{$device->{config}->{reg}}) {
     my $id = $register->{id};
     $product->{registers}->{$id} = { name => $register->{name}, type => "config" };
 
@@ -167,9 +167,13 @@ readDeviceXML($$)
       ++$i;
     }
   }
-  foreach my $register (@{$device->{regular}->{reg}}){
+
+  foreach my $register (@{$device->{regular}->{reg}}) {
     my $id = $register->{id};
-    $product->{registers}->{$id} = { name => $register->{name}, type => "regular" };
+    $product->{registers}->{$id} = { name => $register->{name},
+                                     hwmask => $register->{hwmask},
+                                     swversion => $register->{swversion},
+                                     type => "regular" };
 
     my $i = 0;
     foreach my $endpoint (@{$register->{endpoint}}){
@@ -379,27 +383,34 @@ SWAP_Set($@)
 
     my $reg = hex($1);
     if( $reg <= 0x0A ) {
-      return "register $arg is readonly" if( !defined($default_registers{$reg}->{direction}) );
-      my $len = $default_registers{$reg}->{size};
+      my $register = $default_registers{$reg};
+      return "register $arg is readonly" if( !defined($register->{direction}) );
+      my $len = $register->{size};
       return "value has to be ". $len ." byte(s) in size" if( $len*2 != length( $arg2 ) );
     } else {
       return "register $arg is not known" if( $hash->{reg} && hex($hash->{reg}) != $reg );
-      return "register $arg is not known" if( !defined($hash->{product}->{registers}->{$reg}) );
-      return "register $arg is readonly" if( $hash->{product}->{registers}->{$reg}->{endpoints}->[0]->{direction} != OUT );
+      my $register = $hash->{product}->{registers}->{$reg};
+      return "register $arg is not known" if( !defined($register) );
+      return "register $arg is readonly" if( $register->{endpoints}->[0]->{direction} != OUT );
+
+      my $hwversion = $hash->{"SWAP_01-HardwareVersion"};
+      return "register $arg is unused with HardwareVersion $hwversion" if( $hwversion && $register->{hwmask} && ($hwversion & $register->{hwmask}) != $register->{hwmask} );
+      my $swversion = $hash->{"SWAP_02-FirmwareVersion"};
+      return "register $arg is not available with FirmwareVersion $swversion" if( $swversion && $register->{swversion} && hex($swversion) < hex($register->{swversion}) );
 
       if( defined($3) ) {
         my $ep = hex($3);
 
         #return "can't write endpoint for sleeping devices" if( $hash->{product}->{pwrdownmode} == 1 );
 
-        return "endpoint $1.0 is not known" if( !defined($hash->{product}->{registers}->{$reg}->{endpoints}->[0]) );
-        my $endpoint = $hash->{product}->{registers}->{$reg}->{endpoints}->[0];
+        return "endpoint $1.0 is not known" if( !defined($register->{endpoints}->[0]) );
+        my $endpoint = $register->{endpoints}->[0];
         return "reading for $1 is not available" if( !defined(ReadingsVal( $name, $1."-".$endpoint->{name}, undef)) );
 
-        return "endpoint $1.$3 is not known" if( !defined($hash->{product}->{registers}->{$reg}->{endpoints}->[$ep]) );
-        return "endpint $1.$3 is readonly" if( $hash->{product}->{registers}->{$reg}->{endpoints}->[$ep]->{direction} != OUT );
+        return "endpoint $1.$3 is not known" if( !defined($register->{endpoints}->[$ep]) );
+        return "endpint $1.$3 is readonly" if( $register->{endpoints}->[$ep]->{direction} != OUT );
 
-        my $len = $hash->{product}->{registers}->{$reg}->{endpoints}->[$ep]->{size};
+        my $len = $register->{endpoints}->[$ep]->{size};
         if( $len =~ m/^(\d+)\.(\d+)$/ ) {
           return "only single bit endpoints are supported" if( $2 != 1 );
           return "value has to 0 or 1" if( $arg2 ne "0" && $arg2 ne "1" );
@@ -407,7 +418,7 @@ SWAP_Set($@)
           return "value has to be ". $len ." byte(s) in size" if( $len*2 != length( $arg2 ) );
         }
       } else {
-        my $len = $hash->{product}->{registers}->{$reg}->{endpoints}->[0]->{size};
+        my $len = $register->{endpoints}->[0]->{size};
         return "value has to be ". $len ." byte(s) in size" if( $len*2 != length( $arg2 ) );
       }
     }
@@ -417,6 +428,14 @@ SWAP_Set($@)
 
     my $reg = hex($1);
     return "register $arg is not known" if( $hash->{reg} && hex($hash->{reg}) != $reg );
+
+    my $register = $hash->{product}->{registers}->{$reg};
+    return "register $arg is not known" if( !defined($register) );
+
+    my $hwversion = $hash->{"SWAP_01-HardwareVersion"};
+    return "register $arg is unused with HardwareVersion $hwversion" if( $hwversion && $register->{hwmask} && ($hwversion & $register->{hwmask}) != $register->{hwmask} );
+    my $swversion = $hash->{"SWAP_02-FirmwareVersion"};
+    return "register $arg is not available with FirmwareVersion $swversion" if( $swversion && $register->{swversion} && hex($swversion) < hex($register->{swversion}) );
   }
 
   readingsSingleUpdate($hash, "state", "set-".$cmd, 1) if( $cmd ne "?" );
@@ -501,8 +520,14 @@ SWAP_Set($@)
       SWAP_Send($hash, $addr, QUERY, sprintf( "%02X", $reg ) );
     }
 
+    my $hwversion = $hash->{"SWAP_01-HardwareVersion"};
+    my $swversion = $hash->{"SWAP_02-FirmwareVersion"};
     if( defined($hash->{product}->{registers} ) ) {
       foreach my $reg ( sort { $a <=> $b } keys ( %{$hash->{product}->{registers}} ) ) {
+        my $register = $hash->{product}->{registers}->{$reg};
+        next if( $hwversion && $register->{hwmask} && ($hwversion & $register->{hwmask}) != $register->{hwmask} );
+        next if( $swversion && $register->{swversion} && hex($swversion) < hex($register->{swversion}) );
+
         next if( $hash->{reg} && hex($hash->{reg}) != $reg );
         SWAP_Send($hash, $addr, QUERY, sprintf( "%02X", $reg ) );
       }
@@ -555,7 +580,7 @@ SWAP_Get($@)
     $list .= " " . join(" ", sort keys %{$gl});
   }
 
-  return $list if( $cmd eq '?' );
+  return "Unknown argument $cmd, choose one of $list" if( $cmd eq '?' );
 
   if( $cmd eq 'regList' || $cmd eq 'regListAll' ) {
     my $ret = "";
@@ -581,10 +606,15 @@ SWAP_Get($@)
       }
     }
 
+    my $hwversion = $hash->{"SWAP_01-HardwareVersion"};
+    my $swversion = $hash->{"SWAP_02-FirmwareVersion"};
     if( defined($hash->{product}->{registers} ) ) {
       foreach my $reg ( sort { $a <=> $b } keys ( %{$hash->{product}->{registers}} ) ) {
         next if( $hash->{reg} && hex($hash->{reg}) != $reg );
         my $register = $hash->{product}->{registers}->{$reg};
+
+        next if( $hwversion && $register->{hwmask} && ($hwversion & $register->{hwmask}) != $register->{hwmask} );
+        next if( $swversion && $register->{swversion} && hex($swversion) < hex($register->{swversion}) );
 
         my $i = 0;
         foreach my $endpoint ( @{$register->{endpoints}} ) {
@@ -626,7 +656,7 @@ SWAP_Get($@)
     return Dumper $products;
   }
 
-  return "Unknown argument $cmd, choose one of ".$list;
+  return "Unknown argument $cmd, choose one of $list";
 }
 
 sub
