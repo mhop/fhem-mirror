@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: new module 55_GDS.pm added (betateilchen)
   - feature: HUEDevice: special svg icon for unreachable (hard switched off) devices
   - feature: FHEMWEB detail screen with get dropdown
   - feature: displayattr command added
