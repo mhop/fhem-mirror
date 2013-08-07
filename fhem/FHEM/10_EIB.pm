@@ -173,6 +173,9 @@ sub
 EIB_Get($@)
 {
   my ($hash, @a) = @_;
+
+  return "" if($a[1] && $a[1] eq "?");  # Temporary hack for FHEMWEB
+
   IOWrite($hash, "B", "r" . $hash->{GROUP});
   return "Current value for $hash->{NAME} ($hash->{GROUP}) requested.";	  
 }
