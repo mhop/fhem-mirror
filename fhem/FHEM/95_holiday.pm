@@ -210,7 +210,8 @@ holiday_Get($@)
     $arg = sprintf("%02d-%02d", $a[4]+1, $a[3]);
 
   } else {
-    return "wrong argument: need MM-DD/yesterday/today/tomorrow"
+    return "unknown argument $a[1], ".
+                "choose one of yesterday today tomorrow MM-DD";
 
   }
   return holiday_refresh($hash->{NAME}, $arg);

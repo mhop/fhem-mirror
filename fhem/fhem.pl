@@ -88,6 +88,7 @@ sub devspec2array($);
 sub doGlobalDef($);
 sub fhem($@);
 sub fhz($);
+sub getAllGets($);
 sub getAllSets($);
 sub readingsBeginUpdate($);
 sub readingsBulkUpdate($$$@);
@@ -1501,6 +1502,7 @@ CommandDisplayAttr($$)
   my @a = split(" ", $def, 2);
   return "Usage: displayattr <name> [<attrname>]\n$namedef" if(@a < 1);
 
+Log 1, "DA: $cl->{NAME}";
   my @rets;
   my @devspec = devspec2array($a[0]);
 
@@ -1767,6 +1769,18 @@ getAllAttr($)
   $list .= " " . $attr{global}{userattr}
         if($attr{global}{userattr});
   return $list;
+}
+
+#####################################
+sub
+getAllGets($)
+{
+  my $d = shift;
+  
+  my $a2 = CommandGet(undef, "$d ?");
+  return "" if($a2 !~ m/unknown.*choose one of /i);
+  $a2 =~ s/.*choose one of //;
+  return $a2;
 }
 
 #####################################

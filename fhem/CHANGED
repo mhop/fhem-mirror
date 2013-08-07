@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: FHEMWEB detail screen with get dropdown
   - feature: displayattr command added
   - feature: SYSSTAT: allow (remote) monitoring system uptime
   - feature: new module 98_openweathermap.pm added (betateilchen)
