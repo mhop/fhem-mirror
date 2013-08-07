@@ -230,9 +230,9 @@ OWO_GetStatus($;$){
 	if(defined($user) && defined($station)){
 		Log $loglevel, "openweather $name started: SendData";
 
-		my $lat			= AttrVal("global", "latitude", "?");
-		my $lon			= AttrVal("global", "longitude", "?");
-		my $alt			= AttrVal("global", "altitude", "?");
+		my $lat			= AttrVal("global", "latitude", "");
+		my $lon			= AttrVal("global", "longitude", "");
+		my $alt			= AttrVal("global", "altitude", "");
 
 		my $urlString = AttrVal($name, "owoSendUrl", "http://openweathermap.org/data/post");
 		my ($p1, $p2) = split("//", $urlString);
