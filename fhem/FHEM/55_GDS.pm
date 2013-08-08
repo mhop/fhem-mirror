@@ -25,6 +25,16 @@
 #
 ##############################################################################
 #	Changelog:
+#
+#	2013-08-07	initial release
+#
+#	2013-08-08	added	logging
+#				added	firewall/proxy support
+#				fixed	XMLin missing parameter 
+#				added	:noArg to setlist-definitions
+#				added	AttrFn
+#				modi	retrieval of VHDL messages 30-33
+#
 
 package main;
 
