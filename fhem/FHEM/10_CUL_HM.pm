@@ -2040,7 +2040,7 @@ sub CUL_HM_Set($@) {
     $l2 =~ s/(.)/sprintf(" %02X:%02X",$s++,ord($1))/ge;
 
 	@a = ($a[0],"regBulk","RegL_01:",split(" ",$l1.$l2));
-  } 
+  }
 
   $cmd = $a[1];# get converted command
   
@@ -2186,7 +2186,7 @@ sub CUL_HM_Set($@) {
 		return "wrong addr or data:".$ad if (hex($addr)>255 || hex($data)>255);
 	  }
 	  $chn = 0 if ($list == 0);
-      CUL_HM_pushConfig($hash,$id,$dst,$chn,$peerID,$peerChn,$list,$adList);
+      CUL_HM_pushConfig($hash,$id,$dst,hex($chn),$peerID,$peerChn,$list,$adList);
 	}
   } 
   elsif($cmd eq "regSet") { ############################################### reg
