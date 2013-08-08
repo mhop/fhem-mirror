@@ -36,8 +36,15 @@ use Net::FTP;
 use List::MoreUtils 'first_index'; 
 use XML::Simple;
 
+sub GDS_Define($$$);
+sub GDS_Undef($$);
+sub GDS_Set($@);
+sub GDS_Get($@);
+sub GDS_Attr(@);
+
 sub getListStationsDropdown();
 sub buildCAPList();
+
 
 my $bulaList = "Baden-Württemberg,Bayern,Berlin,Brandenburg,Bremen,".
 				"Hamburg,Hessen,Mecklenburg-Vorpommern,Niedersachsen,".
@@ -188,12 +195,12 @@ sub GDS_Initialize($) {
 	$hash->{UndefFn}	=	"GDS_Undef";
 	$hash->{GetFn}		=	"GDS_Get";
 	$hash->{SetFn}		=	"GDS_Set";
+	$hash->{AttrFn}		=	"GDS_Attr";
 	$hash->{AttrList}	=	"loglevel:0,1,2,3,4,5 ".
 							"gdsFwName gdsFwType:0,1,2,3,4,5,6,7 ".
 							"gdsAll:0,1 gdsDebug:0,1 gdsLong:0,1 gdsPolygon:0,1 ".
 							$readingFnAttributes;
 }
-
 
 sub GDS_Define($$$) {
 	my ($hash, $def) = @_;
@@ -216,7 +223,6 @@ sub GDS_Define($$$) {
 	return undef;
 }
 
-
 sub GDS_Undef($$) {
 	my ($hash, $arg) = @_;
 
@@ -224,6 +230,20 @@ sub GDS_Undef($$) {
 	return undef;
 }
 
+sub GDS_Attr(@){
+	my @a = @_;
+	my $hash = $defs{$a[1]};
+	my (undef, $name, $attrName, $attrValue) = @a;
+	given($attrName){
+		when("gdsDebug"){
+			CommandDeleteReading(undef, "$name _dF.*") if($attrValue != 1);
+			break;
+			}
+
+		default {$attr{$name}{$attrName} = $attrValue;}
+	}
+	return "";
+}
 
 sub GDS_GetUpdate($) {
 	my ($hash) = @_;
@@ -241,7 +261,6 @@ sub GDS_GetUpdate($) {
 
 	return 1;
 }
-
 
 sub GDS_Get($@) {
 	my ($hash, @a) = @_;
@@ -321,7 +340,6 @@ sub GDS_Get($@) {
 	}
 	return $result;
 }
-
 
 sub GDS_Set($@) {
 	my ($hash, @a) = @_;
