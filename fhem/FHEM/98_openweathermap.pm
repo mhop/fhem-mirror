@@ -40,6 +40,7 @@
 #				added: some more logging
 #				added: delete some station readings before update
 #				added: attribute owoSendUrl
+#	2013-08-08	added: proxy support by reading env-Settings
 #
 
 package main;
@@ -49,8 +50,12 @@ use warnings;
 use POSIX;
 use HttpUtils;
 use JSON qw/decode_json/;
-#use Try::Tiny;
 use feature qw/say switch/;
+
+require LWP::UserAgent;			# test
+my $ua = LWP::UserAgent->new;	# test
+$ua->timeout(10);				# test
+$ua->env_proxy;					# test
 
 sub OWO_Set($@);
 sub OWO_Get($@);
@@ -258,7 +263,8 @@ OWO_GetStatus($;$){
 
 		my $sendString = $urlString."?".$dataString;
 		if(AttrVal($name, "owoDebug",1) == 0){
-			GetFileFromURL($sendString);
+#			GetFileFromURL($sendString);
+			$ua->get($sendString);
 			Log $loglevel, "openweather $name sending: $dataString";
 		} else {
 			Log $loglevel, "openweather $name debug:   $dataString";
@@ -331,16 +337,15 @@ UpdateReadings($$$){
 	my $name = $hash->{NAME};
 	my $loglevel = AttrVal($name, "loglevel", 3);
 	my ($jsonWeather, $response);
-
 	$url .= "&APPID=".AttrVal($name, "owoApiKey", "");
-	$response = GetFileFromURL("$url");
-	
+#	$response = GetFileFromURL("$url");
+	$response = $ua->get("$url");
 	if(defined($response)){
 		if(AttrVal($name, "owoDebug", 1) == 1){
 			Log $loglevel, "openweather $name response:\n$response";
 		}
 		my $json = JSON->new->allow_nonref;
-		eval {$jsonWeather = $json->decode($response)}; warn $@ if $@;
+		eval {$jsonWeather = $json->decode($response->decoded_content)}; warn $@ if $@;
 	} else {
 		Log $loglevel, "openweather $name error: no response from server";
 	}
