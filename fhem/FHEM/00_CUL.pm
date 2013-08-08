@@ -379,8 +379,10 @@ CUL_Get($@)
   my $type = $hash->{TYPE};
 
   return "\"get $type\" needs at least one parameter" if(@a < 2);
-  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %gets)
-  	if(!defined($gets{$a[1]}));
+  if(!defined($gets{$a[1]})) {
+    my @cList = map { $_ =~ m/^(file|raw)$/ ? $_ : "$_:noArg" } sort keys %gets;
+    return "Unknown argument $a[1], choose one of " . join(" ", @cList);
+  }
 
   my $arg = ($a[2] ? $a[2] : "");
   my ($msg, $err);

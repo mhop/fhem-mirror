@@ -39,13 +39,19 @@ a img { border-style:none; }
 .col2 { text-align:center; }
 
 /* detail-selector & slider */
+.makeTable { display:inline; float:left; clear:left;
+             margin-top:10px; margin-bottom:20px;}
+.makeSelect { display:inline; float:left; clear:left; }
+
 select {  margin-left:5px; margin-right:5px; }
-.set,.attr { margin-bottom:5px; float:left; }
+.get,.set,.attr { margin-bottom:5px; float:left; }
 .slider { float:left; width:250px; height:26px; }
-.set .slider { background:#F0F0D8; border-radius:8px; }
+
+/* detail only */
+.makeSelect .slider {background:#F0F0D8; border-radius:8px;}
+
 /* timepicker */
 .set .set { margin-bottom:2px; margin-top:3px; }
-.changed { color:red; }
 
 .handle { position:relative; cursor:pointer; width:50px;
           height:20px; line-height:20px; 
@@ -64,3 +70,5 @@ svg.on,svg.FS20_on { fill:orange; }
 .rc_button            { padding: 5px 7px;}
 .rc_button img        { border-style: solid; border-width: 1px; border-color: transparent; }
 .rc_button img:active { border-color: gray; }
+
+.changed { color:red; }
