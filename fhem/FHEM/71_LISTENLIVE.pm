@@ -51,7 +51,7 @@
 
 package main;
 
-#use strict;
+use strict;
 use warnings;
 use POSIX;
 use CGI qw(:standard);
@@ -72,7 +72,7 @@ sub LISTENLIVE_Undefine($$);
 sub HMT350_RCLayout();
 sub HMT350_RCmakenotify($$);
 
-%HMT350_RCtranslate = (
+my %HMT350_RCtranslate = (
 home		=>	"HOME",
 volplus		=>	"VOLp",
 volmin		=>	"VOLm",
@@ -148,7 +148,9 @@ LISTENLIVE_Set($@)
 	my $cmdGroup = $a[1];
 	my $cmd = $a[2];
 
-	my $usage = "Unknown argument, choose one of help statusRequest power:on,off audio:volp,volm,mute,unmute cursor:up,down,left,right,enter,exit,home,ok reset:power,mute,menupos app:weather raw user";
+	my $usage =	"Unknown argument, choose one of help:noArg statusRequest:noArg ".
+				"power:on,off audio:volp,volm,mute,unmute cursor:up,down,left,right,enter,exit,home,ok ".
+				"reset:power,mute,menupos app:weather raw user";
 
 	given ($cmdGroup){
 
@@ -159,6 +161,7 @@ LISTENLIVE_Set($@)
 
 		when("rc"){
 
+			my ($c, $g); 
 			$g = "raw";
 			# prüfen ob Befehl in Kleinbuchstaben,
 			# wenn ja => übersetzen!
@@ -181,6 +184,7 @@ LISTENLIVE_Set($@)
 
 			if(defined($cmd)){
 				Log $loglevel, "LISTENLIVE $name input: $cmdGroup $cmd";
+				no strict 'refs';
 				$result = &{$cmd};
 				readingsBeginUpdate($hash);
 				readingsBulkUpdate($hash, "lastCmd","$cmdGroup $cmd");
@@ -240,6 +244,7 @@ LISTENLIVE_Set($@)
 
 		when("power"){
 
+			my $xCmd;
 			Log $loglevel, "LISTENLIVE $name input: $cmdGroup $cmd";
 			if($pstat ne $cmd) {
 				$xCmd = $powerGroup{$cmd};
@@ -249,6 +254,9 @@ LISTENLIVE_Set($@)
 					readingsBulkUpdate($hash, "lastCmd","$cmdGroup $cmd");
 					readingsBulkUpdate($hash, "lastResult",$result);
 					readingsBulkUpdate($hash, "power",$cmd);
+					if($cmd eq "on"){
+					readingsBulkUpdate($hash, "mute", "off");
+					}
 					readingsEndUpdate($hash, 1);
 				} else {
 					LISTENLIVE_rbuError($hash, $cmdGroup, $cmd);
@@ -267,15 +275,17 @@ LISTENLIVE_Set($@)
 
 			Log $loglevel, "LISTENLIVE $name input: $cmdGroup $cmd";
 			if($mute ne $cmd) {
-				$xCmd = $audioGroup{$cmd};
+				my $xCmd = $audioGroup{$cmd};
 				$result = LISTENLIVE_SendCommand($hash, $xCmd);
 				if($result =~  m/OK/){
 					readingsBeginUpdate($hash);
 					readingsBulkUpdate($hash, "lastCmd","$cmdGroup $cmd");
 					readingsBulkUpdate($hash, "lastResult",$result);
-#
-# ToDo: set mute state
-#
+					if($cmd eq "mute"){
+					readingsBulkUpdate($hash, "mute", "on");
+					} else {
+					readingsBulkUpdate($hash, "mute", "off");
+					}
 					readingsEndUpdate($hash, 1);
 				} else {
 					LISTENLIVE_rbuError($hash, $cmdGroup, $cmd);
@@ -291,9 +301,9 @@ LISTENLIVE_Set($@)
 #
 
 		when("cursor"){
-
+		
 			Log $loglevel, "LISTENLIVE: $name input: $cmdGroup $cmd";
-			$xCmd = $cursorGroup{$cmd};
+			my $xCmd = $cursorGroup{$cmd};
 			$result = LISTENLIVE_SendCommand($hash, $xCmd);
 			if($result =~  m/OK/){
 				readingsBeginUpdate($hash);
@@ -361,7 +371,7 @@ LISTENLIVE_Get($@){
 	my ($hash, @a) = @_;
 	my $name = $hash->{NAME};
 	my $address = $hash->{helper}{ADDRESS};
-	my $response;
+	my ($response, $usage);
 
 	return "No Argument given" if(!defined($a[1]));
 
@@ -409,7 +419,7 @@ LISTENLIVE_Define($$){
 	my ($hash, $def) = @_;
 	my @a = split("[ \t][ \t]*", $def);
 	my $name = $hash->{NAME};
-	my $presence;
+	my ($cmd, $presence, $ret);
 
 	if(! @a >= 4){
 		my $msg = "wrong syntax: define <name> LISTENLIVE <ip-or-hostname>[:<port>] [<interval>]";
@@ -610,13 +620,13 @@ LISTENLIVE_Undefine($$){
 
 #####################################
 sub HMT350_RCmakenotify($$) {
-	my $loglevel = GetLogLevel($name, 3) unless(defined($loglevel));
+#	my $loglevel = GetLogLevel($name, 3) unless(defined($loglevel));
 	my ($nam, $ndev) = @_;
 	my $nname="notify_$nam";
 	my $cmd = "$nname notify $nam set $ndev rc \$EVENT";
 	my $ret = CommandDefine(undef, $cmd);
-	if($ret)	{ Log 2,			"remotecontrol ERROR $ret"; }
-	else		{ Log $loglevel,	"remotecontrol HMT350: $nname created as notify"; }
+	if($ret)	{ Log 2,	"remotecontrol ERROR $ret"; }
+	else		{ Log 3,	"remotecontrol HMT350: $nname created as notify"; }
 	return "Notify created: $nname";
 }
 
