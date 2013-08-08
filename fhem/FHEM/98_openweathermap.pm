@@ -219,7 +219,7 @@ sub
 OWO_GetStatus($;$){
 	my ($hash, $local) = @_;
 	my $name = $hash->{NAME};
-	my $loglevel = AttrVal($name, "loglevel", 3);
+	my $loglevel = GetLogLevel($name,3);
 	$local = 0 unless(defined($local));
 
 	$attr{$name}{"owoInterval"} = 600 if(AttrVal($name,"owoInterval",0) < 600);
@@ -335,7 +335,7 @@ sub
 UpdateReadings($$$){
 	my ($hash, $url, $prefix) = @_;
 	my $name = $hash->{NAME};
-	my $loglevel = AttrVal($name, "loglevel", 3);
+	my $loglevel = GetLogLevel($name,3);
 	my ($jsonWeather, $response);
 	$url .= "&APPID=".AttrVal($name, "owoApiKey", "");
 #	$response = GetFileFromURL("$url");

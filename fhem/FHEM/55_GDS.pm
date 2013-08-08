@@ -6,7 +6,7 @@
 #	An FHEM Perl module to retrieve data from "Deutscher Wetterdienst"
 #
 #	Copyright: betateilchen ®
-#	e-mail   : fhem.development@betateilchen.de
+#	e-mail: fhem.development@betateilchen.de
 #
 #	This file is part of fhem.
 #
@@ -207,7 +207,7 @@ sub GDS_Define($$$) {
 	my @a = split("[ \t][ \t]*", $def);
 
 	return "syntax: define <name> GDS <username> <password>" if(int(@a) != 4 ); 
-
+	my $name = $hash->{NAME};
 	$hash->{helper}{USER}		= $a[2];
 	$hash->{helper}{PASS}		= $a[3];
 	$hash->{helper}{URL}		= "ftp-outgoing2.dwd.de";
@@ -217,7 +217,7 @@ sub GDS_Define($$$) {
 	$sList = getListStationsDropdown();
 	retrieveFile($hash,"alerts");
 	($aList, undef) = buildCAPList();
-
+	Log 3, "GDS $name created";
 	$hash->{STATE} = "active";
 
 	return undef;
@@ -466,18 +466,18 @@ sub setHelp(){
 #
 
 sub buildCAPList(){
-	my $xml = new XML::Simple;
-	$alertsXml = undef;
-	$alertsXml = $xml->XMLin('/tmp/alerts', KeyAttr => {}, ForceArray => [ 'info', 'eventCode', 'area', 'geocode' ]);
-	my $info	= 0;
-	my $area	= 0;
-	my $record	= 0;
-	my $n		= 0;
+	my $xml			= new XML::Simple;
+	$alertsXml		= undef;
+	$alertsXml		= $xml->XMLin('/tmp/alerts', KeyAttr => {}, ForceArray => [ 'info', 'eventCode', 'area', 'geocode' ]);
+	my $info		= 0;
+	my $area		= 0;
+	my $record		= 0;
+	my $n			= 0;
 	my ($capCity, $capCell, $capExit, @a, $list);
 
-	%capCityHash = ();
-	%capCellHash = ();
-	$aList = undef;
+	%capCityHash	= ();
+	%capCellHash	= ();
+	$aList			= undef;
 	
 	while(1) {
 		$area = 0;
@@ -508,9 +508,10 @@ sub buildCAPList(){
 
 sub decodeCAPData($$){
 	my ($hash, $datensatz) = @_;
-	my $name = $hash->{NAME};
-	my $info = int($datensatz/100);
-	my $area = $datensatz-$info*100;
+	my $name		= $hash->{NAME};
+	my $loglevel	= GetLogLevel($name,3);
+	my $info		= int($datensatz/100);
+	my $area		= $datensatz-$info*100;
 
 	my (%readings, @dummy, $i, $k, $n, $v, $t);
 
@@ -518,6 +519,8 @@ sub decodeCAPData($$){
 	my $_gdsDebug	= AttrVal($name,"gdsDebug", 0);
 	my $_gdsLong	= AttrVal($name,"gdsLong", 0);
 	my $_gdsPolygon	= AttrVal($name,"gdsPolygon", 0);
+
+	Log $loglevel, "GDS $name: Decoding CAP record #".$datensatz;
 
 # topLevel informations
 	@dummy = split(/\./, $alertsXml->{identifier});
@@ -628,6 +631,7 @@ sub retrieveTextWarn($@){
 sub retrieveConditions($$@){
 	my ($hash, $prefix, @a) = @_;
 	my $name		= $hash->{NAME};
+	my $loglevel	= GetLogLevel($name,3);
 	my $user		= $hash->{helper}{USER};
 	my $pass		= $hash->{helper}{PASS};
 	(my $myStation	= utf8ToLatin1($a[2])) =~ s/_/ /g; # replace underscore in stationName by space
@@ -636,6 +640,8 @@ sub retrieveConditions($$@){
 	my (%alignment, $dataFile, $decodeDummy, $debug, @files, $found, $ftp, $item, $line, %pos, %wx, $wx, %cread, $k, $v);
 
 	$debug = AttrVal($name, "gdsDebug", 0);
+
+	Log $loglevel, "GDS $name: Retrieving conditions data";
 	
 	($dataFile, $found) = retrieveFile($hash,"conditions");
 	open WXDATA, "/tmp/conditions";
@@ -697,6 +703,7 @@ sub retrieveFile($$;$){
 #
 	my ($hash, $request, $parameter) = @_;
 	my $name		= $hash->{NAME};
+	my $loglevel	= GetLogLevel($name,3);
 	my $user		= $hash->{helper}{USER};
 	my $pass		= $hash->{helper}{PASS};
 	my $proxyName	= AttrVal($name, "gdsProxyName", "");
@@ -730,6 +737,8 @@ sub retrieveFile($$;$){
 			break;
 			}
 	}
+
+	Log $loglevel, "GDS $name: retrieving $dir".$dwd." from DWD server";
 
 	$found = 0;
 	eval {
