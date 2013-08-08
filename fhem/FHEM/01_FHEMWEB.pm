@@ -142,6 +142,7 @@ FHEMWEB_Initialize($)
 
   $data{webCmdFn}{slider}     = "FW_sliderFn";
   $data{webCmdFn}{timepicker} = "FW_timepickerFn";
+  $data{webCmdFn}{noArg}      = "FW_noArg";
   $data{webCmdFn}{"~dropdown"}= "FW_dropdownFn"; # Should be the last
 }
 
@@ -703,10 +704,11 @@ FW_makeTable($$$@)
   my($title, $name, $hash, $cmd) = (@_);
 
   return if(!$hash || !int(keys %{$hash}));
+  my $class = lc($title);
+  $class =~ s/[^A-Za-z]/_/g;
+  FW_pO "<div class='makeTable wide'>";
   FW_pO $title;
-  my $titleid = lc($title);
-  $titleid =~ s/[^A-Za-z]/_/g;
-  FW_pO "<table class=\"block wide $titleid\">";
+  FW_pO "<table class=\"block wide $class\">";
   my $si = AttrVal("global", "showInternalValues", 0);
 
   my $row = 1;
@@ -758,7 +760,7 @@ FW_makeTable($$$@)
 
         } elsif ($n eq "webCmd"){
           my $lc = "detail=$name&cmd.$name=set $name";
-          FW_pO "<td><div name=\"$name-$n\">".
+          FW_pO "<td><div name=\"$name-$n\" class=\"dval\">".
                   join(":", map {FW_pH("$lc $_",$_,0,"",1,1)} split(":",$val) ).
                 "</div></td>";	
 
@@ -780,7 +782,7 @@ FW_makeTable($$$@)
     FW_pO "</tr>";
   }
   FW_pO "</table>";
-  FW_pO "<br>";
+  FW_pO "</div>";
   
 }
 
@@ -797,6 +799,7 @@ FW_makeSelect($$$$)
   $selEl = $1 if($list =~ m/([^ ]*):slider,/); # promote a slider if available
   $selEl = "room" if($list =~ m/room:/);
 
+  FW_pO "<div class='makeSelect'>";
   FW_pO "<form method=\"$FW_formmethod\" ".
                 "action=\"$FW_ME$FW_subdir\" autocomplete=\"off\">";
   FW_pO FW_hidden("detail", $d);
@@ -809,7 +812,7 @@ FW_makeSelect($$$$)
   # Initial setting
   FW_pO "<script type=\"text/javascript\">" .
         "FW_selChange('$selEl','$list','val.$cmd$d')</script>";
-  FW_pO "</form><br><br>";
+  FW_pO "</form></div>";
 }
 
 ##############################
@@ -849,7 +852,7 @@ FW_doDetail($)
   FW_pO FW_hidden("detail", $d);
 
   FW_makeSelect($d, "set", getAllSets($d), "set");
-  FW_makeSelect($d, "get", getAllGets($d), "set");
+  FW_makeSelect($d, "get", getAllGets($d), "get");
 
   FW_makeTable("Internals", $d, $h);
   FW_makeTable("Readings", $d, $h->{READINGS});
@@ -2671,6 +2674,15 @@ FW_sliderFn($$$$$)
 }
 
 sub
+FW_noArg($$$$$)
+{
+  my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
+
+  return undef if($values !~ m/^noArg$/);
+  return "";
+}
+
+sub
 FW_timepickerFn()
 {
   my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
@@ -3151,6 +3163,8 @@ FW_ActivateInform()
         If <b>there</b> it contains some known modifiers (colon, followed
         by a comma separated list), then a different widget will be displayed:
         <ul>
+          <li>if the modifier is ":noArg", then no further input field is
+            displayed </li>
           <li>if the modifier is ":time", then a javascript driven timepicker is
             displayed.</li>
           <li>if the modifier is of the form

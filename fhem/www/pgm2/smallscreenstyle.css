@@ -59,9 +59,13 @@ div.block { border:1px solid gray; background: #F8F8E0; padding:0.7em; }
 div.dist { padding-top:0.3em; }
 button.dist { margin:5px; background:transparent; border:0px; cursor:pointer; }
 
-.set,.attr { margin-bottom:5px; float:left;}
+.makeTable { display:inline; float:left; clear:left;
+             margin-top:10px; margin-bottom:20px;}
+.makeSelect { display:inline; float:left; clear:left; }
+
+.set,.get,.attr { margin-bottom:5px; float:left;}
 .slider { float:right; width:320px; height:26px; }
-.set .slider { background:#F0F0D8; }
+.set .slider,.get slider,.attr .slider { background:#F0F0D8; }
 .handle { position:relative; cursor:pointer; width:50px;
           height:20px; line-height:20px;
           -webkit-user-select:none; -moz-user-select:none; -user-select:none;
@@ -69,3 +73,5 @@ button.dist { margin:5px; background:transparent; border:0px; cursor:pointer; }
 
 svg { height:32px; width:32px; fill:#278727; }
 g.on { fill:red; }
+
+.changed { color:red; }
