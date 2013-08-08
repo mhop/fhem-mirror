@@ -138,6 +138,7 @@ sub HUEDevice_Define($$)
   $hash->{INTERVAL} = $interval;
 
   $hash->{fhem}{on} = -1;
+  $hash->{fhem}{reachable} = '';
   $hash->{fhem}{colormode} = '';
   $hash->{fhem}{bri} = -1;
   $hash->{fhem}{ct} = -1;
