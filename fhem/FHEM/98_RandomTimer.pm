@@ -80,17 +80,16 @@ sub RandomTimer_Define($$)
 
    get_switchmode($hash);
 
-  $hash->{NAME}         = $name;
-  $hash->{TIMESPEC}     = $timespec_start;
-  $hash->{TSPEC}        = $tspec;
-  $hash->{DEVICE}       = $device;
-  $hash->{STOPTIME}     = $timespec_stop;
-  $hash->{TIMETOSWITCH} = $timeToSwitch;
-  $hash->{REP}          = $rep;
-  $hash->{S_REP}        = $srep;
-  $hash->{REL}          = $rel;
-  $hash->{S_REL}        = $srel;
-  $hash->{COMMAND}      = "off";
+  $hash->{NAME}           = $name;
+  $hash->{DEVICE}         = $device;
+  $hash->{TIMESPEC_START} = $timespec_start;
+  $hash->{TIMESPEC_STOP}  = $timespec_stop;
+  $hash->{TIMETOSWITCH}   = $timeToSwitch;
+  $hash->{REP}            = $rep;
+  $hash->{REL}            = $rel;
+  $hash->{S_REP}          = $srep;
+  $hash->{S_REL}          = $srel;
+  $hash->{COMMAND}        = "off";
 
   delete $hash->{STARTTIME};
   delete $hash->{ABSCHALTZEIT};
@@ -106,7 +105,12 @@ sub RandomTimer_Define($$)
 sub RandomTimer_ExecRepeater($)
 {
   my ($hash) = @_;
-  my $tspec = $hash->{TSPEC};
+  my $timespec_start = $hash->{TIMESPEC_START};
+
+  return "Wrong timespec_start <$timespec_start>, use \"[+][*]<time or func>\""
+     if($timespec_start !~ m/^(\+)?(\*)?(.*)$/i);
+  my ($rel, $rep, $tspec) = ($1, $2, $3);
+
   my ($err, $thour, $tmin, $tsec, $fn);
   if (!defined $hash->{STARTTIME}) {
      ($err, $thour, $tmin, $tsec, $fn) = GetTimeSpec($tspec);
@@ -134,6 +138,7 @@ sub RandomTimer_ExecRepeater($)
 
     my $midnight  =  $now + 24*3600 -(3600*$hour + 60*$min + $sec);
     $timeToExec = max ($timeToStop, $midnight) + 5*60;
+    $hash->{STATE}     = strftime("%H:%M:%S",localtime($timeToStart));
     delete $hash->{STARTTIME};
 
   } else {
@@ -145,11 +150,10 @@ sub RandomTimer_ExecRepeater($)
         $function = "RandomTimer_Exec";
 
     }
+    $hash->{STATE}     = strftime("%H:%M:%S",localtime($timeToExec));
   }
 
   Log $logLevel, "[".$hash->{NAME}. "]"." Next Timer ".strftime("%d.%m.%Y  %H:%M:%S",localtime($timeToExec));
-
-  $hash->{STATE}     = strftime("%H:%M:%S",localtime($timeToExec));
 
   delete $hash->{ABSCHALTZEIT};
   RemoveInternalTimer($hash);
@@ -275,11 +279,10 @@ sub abschaltUhrZeitErmitteln ($)
    my ($hash) = @_;
    my($sec,$min,$hour)=localtime(time);
 
-   my $stoptime  = $hash->{STOPTIME};
-   #my $starttime = $hash->{STARTTIME};
+   my $timespec_stop  = $hash->{TIMESPEC_STOP};
 
-  Log (3, "Wrong stoptime <$stoptime>, use \"[+][*]<time or func>\"" )
-     if($stoptime !~ m/^(\+)?(\*)?(.*)$/i);
+  Log (3, "Wrong timespec_stop <$timespec_stop>, use \"[+][*]<time or func>\"" )
+     if($timespec_stop !~ m/^(\+)?(\*)?(.*)$/i);
   my ($srel, $srep, $stspec) = ($1, $2, $3);
   my ($err, $h, $m, $s, $fn) = GetTimeSpec($stspec);
   Log (3, $err) if($err);
@@ -372,7 +375,7 @@ sub RandomTimer_disable($) {
 <h1>RandomTimer</h1>
    <h2>Define</h2>
        <ul>
-          <code><font size="+3">define &lt;name&gt; RandomTimer  &lt;timespec_start&gt; &lt;device&gt; &lt;timespec_stop&gt; [&lt;timeToSwitch&gt;]</font></code><br>
+          <code><font size="+2">define &lt;name&gt; RandomTimer  &lt;timespec_start&gt; &lt;device&gt; &lt;timespec_stop&gt; [&lt;timeToSwitch&gt;]</font></code><br>
          <br>
          Defines a device, that imitates the random switch functionality of a timer clock, like a <b>FS20 ZSU</b>.
          The idea to create it, came from the problem, that is was always a little bit tricky to install a timer clock before
