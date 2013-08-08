@@ -61,7 +61,7 @@ panStamp_Define($$)
 
   if(@a < 3 || @a > 6) {
     my $msg = "wrong syntax: define <name> panStamp {devicename[\@baudrate] ".
-                        "| devicename\@directio} [<address> [<channel> [<syncword>";
+                        "| devicename\@directio} [<address> [<channel> [<syncword>]]]";
     Log 2, $msg;
     return $msg;
   }
