@@ -303,12 +303,12 @@ sub CUL_HM_Define($$) {##############################
     $hash->{helper}{role}{chn}=1;
 	if($chn eq "01"){
 	  $attr{$name}{peerIDs} = AttrVal($devName, "peerIDs", "");
-	  $hash->{REAGINDS}{peerList}{VAL} = ReadingsVal($devName,"peerList","");
+	  $hash->{READINGS}{peerList}{VAL} = ReadingsVal($devName,"peerList","");
 	  $hash->{peerList} = $devHash->{peerList} if($devHash->{peerList});
 	  
 	  delete $devHash->{helper}{role}{chn};#device no longer
 	  delete $devHash->{peerList};
-	  delete $devHash->{REAGINDS}{peerList};
+	  delete $devHash->{READINGS}{peerList};
 	}
   }
   else{# define a device
@@ -898,6 +898,11 @@ sub CUL_HM_Parse($$) {##############################
 	    $val = hex($val)/2;
 	  }
 	  push @event, "state:$val";
+	  if ($val eq "dry"){
+ 	    CUL_HM_UpdtReadSingle($shash,'lastRain',
+		                      ReadingsTimestamp($shash,'state',""),0)
+			if (ReadingsVal($shash,'state',"") eq "rain");
+	  }
  	  CUL_HM_UpdtReadSingle($shash,'.level',#store level invisible
 	                                 ($val eq "off"?"0 %":"100 %"),0);
  	  
