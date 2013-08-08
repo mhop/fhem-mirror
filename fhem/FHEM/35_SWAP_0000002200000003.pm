@@ -90,18 +90,20 @@ SWAP_0000002200000003_devStateIcon($@)
   my $name = $hash->{NAME};
   my $rgb = CommandGet("","$name rgb");
   $rgb = $state if( $state );
-  $state = ReadingsVal($name,"state","off") if( !$state );
+  $state = ReadingsVal($name,"state","unknown") if( !$state );
 
   return undef if( !defined($attr{$name}{ProductCode}) );
   return undef if( $attr{$name}{ProductCode} ne '0000002200000003' );
+
+  return ".*:light_question" if( $state eq "unknown" || $state =~m/^set/ );
 
   return undef if( $state eq "off" );
 
   my ($pct,$RGB) = SWAP_0000002200000003_rgbToPct($rgb);
   my $s = $dim_values{int($pct/7)};
 
-  return ".*:$s@#".$RGB.":toggle" if( $pct < 100 && AttrVal($name, "color-icons", 0) == 2 );
-  return ".*:on@#".$rgb.":toggle" if( AttrVal($name, "color-icons", 0) != 0 );
+  return ".*:$s@#".$RGB.":toggle" if( $pct < 100 && AttrVal($name, "color-icons", 2) == 2 );
+  return ".*:on@#".$rgb.":toggle" if( AttrVal($name, "color-icons", 2) != 0 );
 
   return ".*:on@#".$rgb.":toggle";
 
@@ -123,7 +125,7 @@ sub
 SWAP_0000002200000003_Watchdog($)
 {
   my ($hash) = @_;
-  readingsSingleUpdate($hash, "state", "off", 1);
+  readingsSingleUpdate($hash, "state", "unknown", 1);
 }
 
 sub
