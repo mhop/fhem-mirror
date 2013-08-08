@@ -2191,7 +2191,7 @@ sub CUL_HM_Set($@) {
   } 
   elsif($cmd eq "regSet") { ############################################### reg
     #set <name> regSet <regName> <value> [<peerChn>] [prep]
-	#prep is internal use only. It allowes to prepare shadowreg only but supress
+	#prep is internal use only. It allowes to prepare shadowReg only but supress
 	#writing. Application necessarily needs to execute writing subsequent.
 	my (undef,undef,$regName,$data,$peerChnIn,$prep) = @a;
 	$state = "";
@@ -3239,7 +3239,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
     }
   }
   $chnhash->{helper}{shadowReg}{$regLN} = $regs;
-  return if ($prep);#prepare shadowreg only. More data to come. 
+  return if ($prep);#prepare shadowReg only. More data to come. 
                     #Application takes care about execution
   CUL_HM_updtRegDisp($hash,$list,$peerAddr.$peerChn);
   CUL_HM_PushCmdStack($hash, "++".$flag.'01'.$src.$dst.$chn.'05'.
@@ -3766,6 +3766,11 @@ sub CUL_HM_4DisText($) {# convert text for 4dis
   my $name = $hash->{NAME};
   my $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")."RegL_";
   my $reg1 = ReadingsVal($name,$regLN."01:" ,"");
+  my $pref = "";
+  if ($hash->{helper}{shadowReg}{$regLN."01:"}){
+    $pref = "set_";
+    $reg1 = $hash->{helper}{shadowReg}{$regLN."01:"};
+  }
   my %txt;
   foreach my $sAddr (54,70){
     my $txtHex = $reg1;  #one row
@@ -3778,8 +3783,8 @@ sub CUL_HM_4DisText($) {# convert text for 4dis
     my @ch = split(",",$txtHex,12);
     foreach (@ch){$txt{$sAddr}.=chr(hex($_))};
   }  
-  CUL_HM_UpdtReadBulk($hash,1,"text1:".$txt{54},
-                              "text2:".$txt{70});
+  CUL_HM_UpdtReadBulk($hash,1,"text1:".$pref.$txt{54},
+                              "text2:".$pref.$txt{70});
   return "text1:".$txt{54}."\n".
          "text2:".$txt{70}."\n";
 }
