@@ -35,7 +35,6 @@ use Time::HiRes qw(gettimeofday);
 use Net::FTP;
 use List::MoreUtils 'first_index'; 
 use XML::Simple;
-#use Data::Dumper;
 
 sub getListStationsDropdown();
 sub buildCAPList();
