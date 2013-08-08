@@ -241,6 +241,7 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
   "include" => { Fn=>"CommandInclude",
 	    Hlp=>"<filename>,read the commands from <filenname>" },
   "inform" => { Fn=>"CommandInform",
+            ClientFilter => "telnet",
 	    Hlp=>"{on|timer|raw|off},echo all events to this client" },
   "iowrite" => { Fn=>"CommandIOWrite",
             Hlp=>"<iodev> <data>,write raw data with iodev" },
@@ -249,8 +250,10 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
   "modify"  => { Fn=>"CommandModify",
 	    Hlp=>"device <options>,modify the definition (e.g. at, notify)" },
   "quit"    => { Fn=>"CommandQuit",
+            ClientFilter => "telnet",
 	    Hlp=>",end the client session" },
   "exit"    => { Fn=>"CommandQuit",
+            ClientFilter => "telnet",
 	    Hlp=>",end the client session" },
   "reload"  => { Fn=>"CommandReload",
 	    Hlp=>"<module-name>,reload the given module (e.g. 99_PRIV)" },
@@ -772,9 +775,13 @@ AnalyzeCommand($$)
     map { $fn = $_ if(lc($fn) eq lc($_)); } keys %modules;
     $fn = LoadModule($fn);
     $fn = lc($fn) if(defined($cmds{lc($fn)}));
-    return "Unknown command $fn, try help" if(!defined($cmds{$fn}));
+    return "Unknown command $fn, try help." if(!defined($cmds{$fn}));
   }
 
+  if($cl && $cmds{$fn}{ClientFilter} &&
+     $cl->{TYPE} !~ m/$cmds{$fn}{ClientFilter}/) {
+    return "This command ($fn) is not valid for this input channel.";
+  }
 
   $param = "" if(!defined($param));
   no strict "refs";
@@ -866,8 +873,9 @@ CommandHelp($$)
 
   for my $cmd (sort keys %cmds) {
     next if(!$cmds{$cmd}{Hlp});
+    next if($cl && $cmds{$cmd}{ClientFilter} &&
+            $cl->{TYPE} !~ m/$cmds{$cmd}{ClientFilter}/);
     my @a = split(",", $cmds{$cmd}{Hlp}, 2);
-
     $str .= sprintf("%-9s %-25s %s\n", $cmd, $a[0], $a[1]);
   }
   return $str;
