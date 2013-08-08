@@ -682,8 +682,8 @@ sub retrieveConditions($$@){
 
 	if(length($wx{"Station"})){
 		$cread{$prefix."_stationName"}	= $wx{"Station"};
-		$cread{$prefix."_altitude"}		= $wx{"Luftd."};
-		$cread{$prefix."_pressure-nn"}	= $wx{"H\xF6he"};
+		$cread{$prefix."_altitude"}		= $wx{"H\xF6he"};
+		$cread{$prefix."_pressure-nn"}	= $wx{"Luftd."};
 		$cread{$prefix."_temperature"}	= $wx{"TT"};
 		$cread{$prefix."_tempMin"}		= $wx{"Tmin"};
 		$cread{$prefix."_tempMax"}		= $wx{"Tmax"};
