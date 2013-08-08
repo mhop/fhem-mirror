@@ -251,7 +251,7 @@ sub GDS_Get($@) {
 
 	$hash->{LOCAL} = 1;
 
-	my $usage = "Unknown argument $command, choose one of help rereadcfg ".
+	my $usage = "Unknown argument $command, choose one of help:noArg rereadcfg:noArg ".
 				"list:stations,data ".
 				"alerts:".$aList." ".
 				"conditions:".$sList." ".
@@ -326,7 +326,7 @@ sub GDS_Get($@) {
 sub GDS_Set($@) {
 	my ($hash, @a) = @_;
 	my $name = $hash->{NAME};
-	my $usage =	"Unknown argument, choose one of clear help rereadcfg update ".
+	my $usage =	"Unknown argument, choose one of clear:noArg help:noArg rereadcfg:noArg update:noArg ".
 				"conditions:".$sList." ";
 
 	my $command		= lc($a[1]);
