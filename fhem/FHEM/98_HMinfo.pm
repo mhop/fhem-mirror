@@ -201,7 +201,7 @@ sub HMinfo_SetFn($$) {#########################################################
 	$filter = shift @a;
   }
 
-  if   ($cmd eq "?" )         {##actionImmediate: clear parameter--------------
+  if   (!$cmd ||$cmd eq "?" ) {##actionImmediate: clear parameter--------------
 	return "autoReadReg clear configCheck param peerCheck peerXref protoEvents models regCheck register rssi saveConfig update";
   }
   elsif($cmd eq "clear" )     {##actionImmediate: clear parameter--------------

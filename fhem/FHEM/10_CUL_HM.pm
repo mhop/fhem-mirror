@@ -898,11 +898,15 @@ sub CUL_HM_Parse($$) {##############################
 	    $val = hex($val)/2;
 	  }
 	  push @event, "state:$val";
-	  if ($val eq "dry"){
- 	    CUL_HM_UpdtReadSingle($shash,'lastRain',
-		                      ReadingsTimestamp($shash,'state',""),0)
-			if (ReadingsVal($shash,'state',"") eq "rain");
-	  }
+
+	  if ($val eq "rain"){#--- handle lastRain---
+        $shash->{helper}{lastRain} = $tn;
+      }	  
+	  elsif ($val eq "dry" && $shash->{helper}{lastRain}){
+ 	    CUL_HM_UpdtReadSingle($shash,'lastRain',$shash->{helper}{lastRain},0);
+        delete $shash->{helper}{lastRain};
+      }	  
+
  	  CUL_HM_UpdtReadSingle($shash,'.level',#store level invisible
 	                                 ($val eq "off"?"0 %":"100 %"),0);
  	  
@@ -986,7 +990,6 @@ sub CUL_HM_Parse($$) {##############################
       push @event,"deviceMsg:$vs$target" if($chn ne "00");
 	  push @event,"state:".(($physLvl ne $val." %")?"chn:$vs phys:$physLvl":
 	                                                $vs);
-
       my $eventName = "unknown"; # different names for events
       $eventName = "switch"  if($st eq "switch");
       $eventName = "motor"   if($st eq "blindActuator");
