@@ -706,7 +706,7 @@ sub retrieveFile($$;$){
 		when("warnings"){
 			$dwd = $bula2dwd{$parameter};
 			$dir = $dwd2Dir{$dwd};
-			$dwd = "VHDL3?_".$dwd."*";
+			$dwd = "VHDL30_".$dwd."*";
 			$dir = "gds/specials/warnings/".$dir."/";
 			$targetFile = "/tmp/".$request;
 			break;
