@@ -429,13 +429,16 @@ SWAP_Set($@)
     my $reg = hex($1);
     return "register $arg is not known" if( $hash->{reg} && hex($hash->{reg}) != $reg );
 
-    my $register = $hash->{product}->{registers}->{$reg};
-    return "register $arg is not known" if( !defined($register) );
+    if( $reg <= 0x0A ) {
+    } else {
+      my $register = $hash->{product}->{registers}->{$reg};
+      return "register $arg is not known" if( !defined($register) );
 
-    my $hwversion = $hash->{"SWAP_01-HardwareVersion"};
-    return "register $arg is unused with HardwareVersion $hwversion" if( $hwversion && $register->{hwmask} && ($hwversion & $register->{hwmask}) != $register->{hwmask} );
-    my $swversion = $hash->{"SWAP_02-FirmwareVersion"};
-    return "register $arg is not available with FirmwareVersion $swversion" if( $swversion && $register->{swversion} && hex($swversion) < hex($register->{swversion}) );
+      my $hwversion = $hash->{"SWAP_01-HardwareVersion"};
+      return "register $arg is unused with HardwareVersion $hwversion" if( $hwversion && $register->{hwmask} && ($hwversion & $register->{hwmask}) != $register->{hwmask} );
+      my $swversion = $hash->{"SWAP_02-FirmwareVersion"};
+      return "register $arg is not available with FirmwareVersion $swversion" if( $swversion && $register->{swversion} && hex($swversion) < hex($register->{swversion}) );
+    }
   }
 
   readingsSingleUpdate($hash, "state", "set-".$cmd, 1) if( $cmd ne "?" );
