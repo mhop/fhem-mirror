@@ -95,7 +95,7 @@ sub
 OWO_Set($@){
 	my ($hash, @a)	= @_;
 	my $name		= $hash->{NAME};
-	my $usage		= "Unknown argument, choose one of stationById stationByGeo stationByName send";
+	my $usage		= "Unknown argument, choose one of stationById stationByGeo stationByName send:noArg";
 	my $response;
 	
 	return "No Argument given" if(!defined($a[1]));
