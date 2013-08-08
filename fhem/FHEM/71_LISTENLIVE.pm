@@ -1,27 +1,27 @@
 # $Id$
 ##############################################################################
 #
-#     71_LISTENLIVE.pm
-#     An FHEM Perl module for controlling ListenLive-enabled Mediaplayers
-#     via network connection.
+#	71_LISTENLIVE.pm
+#	An FHEM Perl module for controlling ListenLive-enabled Mediaplayers
+#	via network connection.
 #
-#     Copyright: betateilchen ®
-#     e-mail   : fhem.development@betateilchen.de
+#	Copyright: betateilchen ®
+#	e-mail: fhem.development@betateilchen.de
 #
-#     This file is part of fhem.
+#	This file is part of fhem.
 #
-#     Fhem is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 2 of the License, or
-#     (at your option) any later version.
+#	Fhem is free software: you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation, either version 2 of the License, or
+#	(at your option) any later version.
 #
-#     Fhem is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
+#	Fhem is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
 #
-#     You should have received a copy of the GNU General Public License
-#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#	You should have received a copy of the GNU General Public License
+#	along with fhem. If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
 #
