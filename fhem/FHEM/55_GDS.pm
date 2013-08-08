@@ -190,6 +190,7 @@ sub GDS_Initialize($) {
 	$hash->{GetFn}		=	"GDS_Get";
 	$hash->{SetFn}		=	"GDS_Set";
 	$hash->{AttrList}	=	"loglevel:0,1,2,3,4,5 ".
+							"gdsFwName gdsFwType:0,1,2,3,4,5,6,7 ".
 							"gdsAll:0,1 gdsDebug:0,1 gdsLong:0,1 gdsPolygon:0,1 ".
 							$readingFnAttributes;
 }
@@ -380,7 +381,6 @@ sub GDS_Set($@) {
 	return $result;
 }
 
-
 ####################################################################################################
 #
 # Routines used by "get"
@@ -427,7 +427,6 @@ sub getListStationsText($@){
 	return join("\n", @a);
 }
 
-
 ####################################################################################################
 #
 # Routines used by "set"
@@ -443,7 +442,6 @@ sub setHelp(){
 			"set <name> help\n";
 }
 
-
 ####################################################################################################
 #
 # some tools
@@ -453,7 +451,7 @@ sub setHelp(){
 sub buildCAPList(){
 	my $xml = new XML::Simple;
 	$alertsXml = undef;
-	$alertsXml = $xml->XMLin('/tmp/alerts', ForceArray => [ 'info', 'eventCode', 'area', 'geocode' ]);
+	$alertsXml = $xml->XMLin('/tmp/alerts', KeyAttr => {}, ForceArray => [ 'info', 'eventCode', 'area', 'geocode' ]);
 	my $info	= 0;
 	my $area	= 0;
 	my $record	= 0;
@@ -618,7 +616,7 @@ sub retrieveConditions($$@){
 	(my $myStation	= utf8ToLatin1($a[2])) =~ s/_/ /g; # replace underscore in stationName by space
 	my $searchLen	= length($myStation);
 
-	my (%alignment, $dataFile, $decodeDummy, $debug, @files, $found, $ftp, $item, $line, %pos, %wx, $wx);
+	my (%alignment, $dataFile, $decodeDummy, $debug, @files, $found, $ftp, $item, $line, %pos, %wx, $wx, %cread, $k, $v);
 
 	$debug = AttrVal($name, "gdsDebug", 0);
 	
@@ -643,37 +641,33 @@ sub retrieveConditions($$@){
 		$wx{$item} = &readItem($line, $pos{$item}, $alignment{$item}, $item);
 	}
 
-	CommandDeleteReading(undef, "$name $prefix"."_.*");
+	%cread = ();
+	$cread{"_copyright"} = "Quelle: Deutscher Wetterdienst";
 
-	$decodeDummy = latin1ToUtf8($wx{"Station"});
-
-	readingsBeginUpdate($hash);
-	readingsBulkUpdate($hash, "_copyright",		"Quelle: Deutscher Wetterdienst");
-	readingsBulkUpdate($hash, "_dF_".$prefix, $dataFile) if($debug);
-	if(length($decodeDummy) > 1){
-		readingsBulkUpdate($hash, "_copyright", "Quelle: Deutscher Wetterdienst");
-		readingsBulkUpdate($hash, $prefix."_stationName",	$decodeDummy); $decodeDummy = undef;
-		readingsBulkUpdate($hash, $prefix."_altitude",		$wx{"H\xF6he"});
-		readingsBulkUpdate($hash, $prefix."_pressure-nn",	$wx{"Luftd."});
-		readingsBulkUpdate($hash, $prefix."_temperature",	$wx{"TT"});
-		readingsBulkUpdate($hash, $prefix."_tempMin",		$wx{"Tmin"});
-		readingsBulkUpdate($hash, $prefix."_tempMax",		$wx{"Tmax"});
-		readingsBulkUpdate($hash, $prefix."_rain1h",			$wx{"RR1"});
-		readingsBulkUpdate($hash, $prefix."_rain24h",		$wx{"RR24"});
-		readingsBulkUpdate($hash, $prefix."_snow",			$wx{"SSS"});
-		readingsBulkUpdate($hash, $prefix."_windDir",		$wx{"DD"});
-		readingsBulkUpdate($hash, $prefix."_windSpeed",		$wx{"FF"});
-		readingsBulkUpdate($hash, $prefix."_windPeak",		$wx{"FX"});
-		$decodeDummy = latin1ToUtf8($wx{"Wetter\/Wolken"}) if($wx{"Wetter\/Wolken"});
-		readingsBulkUpdate($hash, $prefix."_weather",		$decodeDummy); $decodeDummy = undef;
-		$decodeDummy = latin1ToUtf8($wx{"B\xF6en"}) if($wx{"B\xF6en"});
-		readingsBulkUpdate($hash, $prefix."_windGust",		$decodeDummy); $decodeDummy = undef;
+	if(length($wx{"Station"})){
+		$cread{$prefix."_stationName"}	= $wx{"Station"};
+		$cread{$prefix."_altitude"}		= $wx{"Luftd."};
+		$cread{$prefix."_pressure-nn"}	= $wx{"H\xF6he"};
+		$cread{$prefix."_temperature"}	= $wx{"TT"};
+		$cread{$prefix."_tempMin"}		= $wx{"Tmin"};
+		$cread{$prefix."_tempMax"}		= $wx{"Tmax"};
+		$cread{$prefix."_rain1h"}		= $wx{"RR1"};
+		$cread{$prefix."_rain24h"}		= $wx{"RR24"};
+		$cread{$prefix."_snow"}			= $wx{"SSS"};
+		$cread{$prefix."_windDir"}		= $wx{"DD"};
+		$cread{$prefix."_windSpeed"}	= $wx{"FF"};
+		$cread{$prefix."_windPeak"}		= $wx{"FX"};
+		$cread{$prefix."_weather"}		= $wx{"Wetter\/Wolken"};
+		$cread{$prefix."_windGust"}		= $wx{"B\xF6en"};
 	} else {
-		readingsBulkUpdate($hash, "_copyright", "Quelle: Deutscher Wetterdienst");
-		readingsBulkUpdate($hash, $prefix."_stationName",	"unknown: $myStation"); $decodeDummy = undef;
+		$cread{$prefix."_stationName"}	= "unknown: $myStation";
 	}
+
+	CommandDeleteReading(undef, "$name $prefix"."_.*");
+	readingsBeginUpdate($hash);
+	while(($k, $v) = each %cread) { readingsBulkUpdate($hash, $k, latin1ToUtf8($v)); }
 	readingsEndUpdate($hash, 1);
-	
+
 	$hash->{STATE} = "active";
 	
 	return ;
@@ -685,12 +679,14 @@ sub retrieveFile($$;$){
 # parameter = additional selector, e.g. Bundesland
 #
 	my ($hash, $request, $parameter) = @_;
-	my $name = $hash->{NAME};
-	my $user = $hash->{helper}{USER};
-	my $pass = $hash->{helper}{PASS};
-	my $debug = AttrVal($name, "gdsDebug",0);
-	my ($dwd, $dir, $ftp, @files, $dataFile, $targetFile, $found, $readingName);
+	my $name		= $hash->{NAME};
+	my $user		= $hash->{helper}{USER};
+	my $pass		= $hash->{helper}{PASS};
+	my $proxyName	= AttrVal($name, "gdsProxyName", "");
+	my $proxyType	= AttrVal($name, "gdsProxyType", "");
+	my $debug		= AttrVal($name, "gdsDebug",0);
 
+	my ($dwd, $dir, $ftp, @files, $dataFile, $targetFile, $found, $readingName);
 
 	given($request){
 
@@ -720,7 +716,11 @@ sub retrieveFile($$;$){
 
 	$found = 0;
 	eval {
-		$ftp = Net::FTP->new("ftp-outgoing2.dwd.de", Debug => 0);
+		$ftp = Net::FTP->new(	"ftp-outgoing2.dwd.de", 
+								Debug => 0,
+								Timeout => 360,
+								FirewallType => $proxyType,
+								Firewall => $proxyName);
 		if(defined($ftp)){
 			$ftp->login($user, $pass);
 			$ftp->cwd("$dir");
@@ -736,6 +736,10 @@ sub retrieveFile($$;$){
 			}
 			$ftp->quit;
 		}
+		readingsBeginUpdate($hash);
+		readingsBulkUpdate($hash, "_copyright",		"Quelle: Deutscher Wetterdienst");
+		readingsBulkUpdate($hash, "_dF_".$request, $dataFile) if(AttrVal($name, "gdsDebug", 0));
+		readingsEndUpdate($hash, 1);
 	};
 	return ($dataFile, $found);
 }
@@ -930,6 +934,9 @@ sub sepLine($) {
 		<li><b>gdsDebug</b> - defines filter for debug informations</li>
 		<li><b>gdsLong</b> - show long text fields "description" and "instruction" from alert message in readings</li>
 		<li><b>gdsPolygon</b> - show polygon data from alert message in a reading</li>
+		<br/>
+		<li><b>gdsFwName</b> - define firewall hostname in format &lt;hostname&gt;:&lt;port&gt;</li>
+		<li><b>gdsFwType</b> - define firewall type in a value 0..7 please refer to <a href="http://search.cpan.org/~gbarr/libnet-1.22/Net/Config.pm#NetConfig_VALUES">cpan documentation</a> for further informations regarding firewall settings.</li>
 
 	</ul>
 	<br/><br/>
