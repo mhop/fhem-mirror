@@ -323,11 +323,14 @@ sub GDS_Get($@) {
 			}
 
 		when("warnings"){
-			(undef, $found) = retrieveFile($hash, $command, $parameter);
-			if($found){
-				$result = retrieveTextWarn($hash,@a);
-			} else {
-				$result = "Keine Warnmeldung für $parameter gefunden.";
+			my $vhdl;
+			$result= "Warnlageberichte für $parameter";
+			for ($vhdl=30; $vhdl <=33; $vhdl++){
+				(undef, $found) = retrieveFile($hash, $command, $parameter, $vhdl);
+				if($found){
+					$result .= "\n".sepLine(70);
+					$result .= retrieveTextWarn($hash,@a);
+				}
 			}
 			break;
 			}
@@ -696,12 +699,12 @@ sub retrieveConditions($$@){
 	return ;
 }
 
-sub retrieveFile($$;$){
+sub retrieveFile($$;$$){
 #
 # request = type, e.g. alerts, conditions, warnings
 # parameter = additional selector, e.g. Bundesland
 #
-	my ($hash, $request, $parameter) = @_;
+	my ($hash, $request, $parameter, $parameter2) = @_;
 	my $name		= $hash->{NAME};
 	my $loglevel	= GetLogLevel($name,3);
 	my $user		= $hash->{helper}{USER};
@@ -731,7 +734,7 @@ sub retrieveFile($$;$){
 		when("warnings"){
 			$dwd = $bula2dwd{$parameter};
 			$dir = $dwd2Dir{$dwd};
-			$dwd = "VHDL30_".$dwd."*";
+			$dwd = "VHDL".$parameter2."_".$dwd."*";
 			$dir = "gds/specials/warnings/".$dir."/";
 			$targetFile = "/tmp/".$request;
 			break;
