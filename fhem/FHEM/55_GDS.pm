@@ -215,6 +215,7 @@ sub GDS_Initialize($) {
 sub GDS_Define($$$) {
 	my ($hash, $def) = @_;
 	my @a = split("[ \t][ \t]*", $def);
+	my $found;
 
 	return "syntax: define <name> GDS <username> <password>" if(int(@a) != 4 ); 
 	my $name = $hash->{NAME};
@@ -223,10 +224,18 @@ sub GDS_Define($$$) {
 	$hash->{helper}{URL}		= "ftp-outgoing2.dwd.de";
 	$hash->{helper}{INTERVAL}	= 3600;
 
-	retrieveFile($hash,"conditions");
-	$sList = getListStationsDropdown();
+	(undef, $found) = retrieveFile($hash,"conditions");
+	if($found){
+		$sList = getListStationsDropdown()
+	} else {
+		Log 2, "GDS $name: No datafile (conditions) found";
+	}
 	retrieveFile($hash,"alerts");
-	($aList, undef) = buildCAPList();
+	if($found){
+		($aList, undef) = buildCAPList();
+	} else {
+		Log 2, "GDS $name: No datafile (alerts) found";
+	}
 	Log 3, "GDS $name created";
 	$hash->{STATE} = "active";
 
