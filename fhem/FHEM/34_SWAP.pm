@@ -305,9 +305,9 @@ SWAP_Set($@)
   my $ll = GetLogLevel($name,3);
 
   my $list = "regGet regSet";
-  $list .= " statusRequest";
-  $list .= " readDeviceXML";
-  $list .= " clearUnconfirmed";
+  $list .= " statusRequest:noArg";
+  $list .= " readDeviceXML:noArg";
+  $list .= " clearUnconfirmed:noArg";
 
   if( my $sl = $modules{$hash->{TYPE}}{SWAP_SetList} ) {
 
@@ -328,7 +328,12 @@ SWAP_Set($@)
       }
     }
 
-    $list .= " " . join(" ", sort keys %{$sl});
+    foreach my $cmd ( sort keys ( %{$sl} ) ) {
+      $list .= " ";
+      $list .= $cmd;
+      $list .= ":noArg" if( !$sl->{$cmd} );
+    }
+    #$list .= " " . join(" ", sort keys %{$sl});
   }
 
   if( $hash->{reg} ) {

@@ -165,8 +165,8 @@ HUEBridge_Set($@)
     $hash->{STATE} = "updating";
     return "starting update";
   } else {
-    my $list = "statusRequest";
-    $list .= " swupdate" if( defined($hash->{updatestate}) && $hash->{updatestate} == 2 );
+    my $list = "statusRequest:noArg";
+    $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} == 2 );
     return "Unknown argument $cmd, choose one of $list";
   }
 }
