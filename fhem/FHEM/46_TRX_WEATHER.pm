@@ -400,8 +400,8 @@ sub TRX_WEATHER_common_anemometer {
   my $dir = $bytes->[5]*256 + $bytes->[6];
   my $dirname = $TRX_WEATHER_winddir_name[$dir/22.5];
 
-  my $avspeed = $bytes->[7]*256 + $bytes->[8];
-  my $speed = $bytes->[9]*256 + $bytes->[10];
+  my $avspeed = ($bytes->[7]*256 + $bytes->[8]) / 10;
+  my $speed = ($bytes->[9]*256 + $bytes->[10]) / 10;
 
   if ($dev_type eq "TFA_WIND") {
   	TRX_WEATHER_temperature($bytes, $dev_str, \@res, 11); 
