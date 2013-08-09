@@ -320,7 +320,11 @@ sub GDS_Get($@) {
 				$datensatz = $capCityHash{$parameter};
 			}
 			CommandDeleteReading(undef, "$name a_.*");
-			decodeCAPData($hash, $datensatz);
+			if($datensatz){
+				decodeCAPData($hash, $datensatz);
+			} else {
+				$result = "Keine Warnmeldung für die gesuchte Region vorhanden.";
+			}
 			break;
 			}
 
@@ -352,10 +356,6 @@ sub GDS_Get($@) {
 				}
 			}
 			break;
-			}
-
-		when("map"){
-			$result = "<html><body><img src=\"/tmp/Deutschland_20130806_2215.jpg\" ></body></html>";
 			}
 
 		default { return $usage; };
@@ -514,6 +514,7 @@ sub buildCAPList(){
 			$capCity =~ s/\s/_/g;
 			$capCityHash{$capCity} = $n;
 			$capCellHash{"$capCell"} = $n;
+Log 1, "I: $info A: $area City: $capCity Cell: $capCell";
 			$area++;
 			$record++;
 			$capCity = undef;
