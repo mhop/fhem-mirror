@@ -80,7 +80,7 @@ speedtest_Set($$@)
     return undef;
   }
 
-  my $list = "statusRequest";
+  my $list = "statusRequest:noArg";
   return "Unknown argument $cmd, choose one of $list";
 }
 
