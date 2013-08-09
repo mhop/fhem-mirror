@@ -647,9 +647,10 @@ SWAP_Get($@)
     my $ret;
 
     foreach my $params (@{$hash->{sentList}}) {
-      $ret .= $params->[0] ."\t". $params->[1] ."\t". $params->[2] ."\t". ($params->[3]?$params->[3]:"") ."\n";
-      #$ret .= $params->[0] ."\t". $function_codes{$params->[1]} ."\t". $params->[2] ."\t". ($params->[3]?$params->[3]:"") ."\n";
+      #$ret .= " ". $params->[0] ."\t". $params->[1] ."\t". $params->[2] ."\t". ($params->[3]?$params->[3]:"") ."\n";
+      $ret .= " ". $params->[0] ."\t". $function_codes{$params->[1]} ."\t ". $params->[2] ."\t". ($params->[3]?$params->[3]:"") ."\n";
     }
+    $ret = "addr.\t  type\treg.\tdata\n". $ret if( $ret );
 
     $ret = "no unconfirmed messages" if( !$ret );
     return $ret;
