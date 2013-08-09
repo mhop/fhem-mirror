@@ -580,7 +580,7 @@ SWAP_Get($@)
       }
     }
     
-    foreach my $cmd ( sort { $a <=> $b } keys ( %{$gl} ) ) {
+    foreach my $cmd ( sort keys ( %{$gl} ) ) {
       $list .= " ";
       $list .= $cmd;
       $list .= ":noArg" if( !$gl->{$cmd} );
