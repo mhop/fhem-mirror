@@ -128,12 +128,24 @@ YAMAHA_AVR_GetStatus($;$)
     {
 	readingsBulkUpdate($hash, "volume_level", ($1 / 10 ** $2));
 	readingsBulkUpdate($hash, "mute", lc($3));
+        $hash->{helper}{USE_SHORT_VOL_CMD} = "0";
     }
+    elsif($return =~ /<Vol><Lvl><Val>(.+)<\/Val><Exp>(.+)<\/Exp><Unit>.+<\/Unit><\/Lvl><Mute>(.+)<\/Mute>.*<\/Vol>/)
+    {
+        readingsBulkUpdate($hash, "volume_level", ($1 / 10 ** $2));
+        readingsBulkUpdate($hash, "mute", lc($3));
+	$hash->{helper}{USE_SHORT_VOL_CMD} = "1";
+    }
+
     
     # (only available in zones other than mainzone) absolute or relative volume change to the mainzone
     if($return =~ /<Volume>.*?<Output>(.+?)<\/Output>.*?<\/Volume>/)
     {
 	readingsBulkUpdate($hash, "output", lc($1));
+    }
+    elsif($return =~ /<Vol>.*?<Output>(.+?)<\/Output>.*?<\/Vol>/)
+    {
+        readingsBulkUpdate($hash, "output", lc($1));
     }
     else
     {
@@ -188,7 +200,7 @@ YAMAHA_AVR_Get($@)
     }
     else
     {
-	return "Unknown argument $what, choose one of power input input_name volume_level mute".(exists($hash->{READINGS}{output})?" output":"");
+	return "Unknown argument $what, choose one of power:noArg input:noArg input_name:noArg volume_level:noArg mute:noArg".(exists($hash->{READINGS}{output})?" output:noArg":"");
     }
 }
 
@@ -215,8 +227,11 @@ YAMAHA_AVR_Set($@)
     return "No Argument given" if(!defined($a[1]));     
     
     my $what = $a[1];
-    my $usage = "Unknown argument $what, choose one of on off volume:slider,-80,1,16 input:".$inputs_comma." mute:on,off remoteControl:setup,up,down,left,right,return,option,display,enter scene:".$scenes_comma." statusRequest";
+    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg volume:slider,-80,1,16 input:".$inputs_comma." mute:on,off remoteControl:setup,up,down,left,right,return,option,display,enter ".(defined($hash->{helper}{SCENES})?"scene:".$scenes_comma." ":"")."statusRequest:noArg";
 
+    # Depending on the status response, use the short or long Volume command
+
+    my $volume_cmd = (exists($hash->{helper}{USE_SHORT_VOL_CMD}) and $hash->{helper}{USE_SHORT_VOL_CMD} eq "1" ? "Vol" : "Volume");
 
     if($what eq "on")
     {
@@ -344,11 +359,11 @@ YAMAHA_AVR_Set($@)
 	    {
 		if( $a[2] eq "on")
 		{
-		    $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Volume><Mute>On</Mute></Volume></$zone></YAMAHA_AV>");
+		    $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Mute>On</Mute></$volume_cmd></$zone></YAMAHA_AV>");
 		}
 		elsif($a[2] eq "off")
 		{
-		    $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Volume><Mute>Off</Mute></Volume></$zone></YAMAHA_AV>"); 
+		    $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Mute>Off</Mute></$volume_cmd></$zone></YAMAHA_AV>"); 
 		}
 		else
 		{
@@ -397,7 +412,8 @@ YAMAHA_AVR_Set($@)
 			{
 			    Log GetLogLevel($name, 4), "YAMAHA_AVR: set volume to ".($current_volume + ($diff * $step))." dB";
 			
-			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Volume><Lvl><Val>".(($current_volume + ($diff * $step))*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></$zone></YAMAHA_AV>");
+			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".(($current_volume + ($diff * 
+$step))*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>");
 			
 			    Log GetLogLevel($name, 4), "YAMAHA_AVR: sleeping for ".sprintf("%.3f", $sleep)." seconds" unless ($time == 0);
 			    sleep $sleep unless ($time == 0);
@@ -407,7 +423,8 @@ YAMAHA_AVR_Set($@)
 		
 		# Set the desired volume
 		Log GetLogLevel($name, 4), "YAMAHA_AVR: set volume to ".$a[2]." dB";
-		$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Volume><Lvl><Val>".($a[2]*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></$zone></YAMAHA_AV>");
+		$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV 
+cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($a[2]*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>");
 		if(not $result =~ /RC="0"/)
 		{
 			# if the returncode isn't 0, than the command was not successful
@@ -741,6 +758,12 @@ sub YAMAHA_AVR_getModel($)
         $hash->{MODEL} = $1;
         $hash->{SYSTEM_ID} = $2;
         $hash->{FIRMWARE} = $3;
+    }
+    elsif(defined($response) and $response =~ /<Model_Name>(.+?)<\/Model_Name>.*<System_ID>(.+?)<\/System_ID>.*<Version>.*<Main>(.+?)<\/Main>.*<Sub>(.+?)<\/Sub>.*<\/Version>/)
+    {
+        $hash->{MODEL} = $1;
+        $hash->{SYSTEM_ID} = $2;
+        $hash->{FIRMWARE} = $3."  ".$4;
     }
     else
     {
