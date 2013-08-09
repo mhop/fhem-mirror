@@ -446,7 +446,7 @@ LightScene_Get($@)
     return $ret;
   }
 
-  return "Unknown argument $cmd, choose one of html:noArg scenes:noArg scene:".join(",", sort keys %{$hash->{SCENES}})};
+  return "Unknown argument $cmd, choose one of html:noArg scenes:noArg scene:".join(",", sort keys %{$hash->{SCENES}});
 }
 
 1;
