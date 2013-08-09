@@ -64,23 +64,41 @@ my $bulaList = "Baden-Württemberg,Bayern,Berlin,Brandenburg,Bremen,".
 #
 # Bundesländer den entsprechenden Dienststellen zuordnen
 #
-my %bula2dwd = (
-	"Baden-Württemberg" => "DWSG",
-	"Bayern" => "DWMG",
-	"Berlin" => "DWPG",
-	"Brandenburg" => "DWPG",
-	"Bremen" => "DWHG",
-	"Hamburg" => "DWHH",
-	"Hessen" => "DWOH",
-	"Mecklenburg-Vorpommern" => "DWPH",
-	"Niedersachsen" => "DWHG",
-	"Nordrhein-Westfalen" => "DWEH",
-	"Rheinland-Pfalz" => "DWOI",
-	"Saarland" => "DWOI",
-	"Sachsen" => "DWLG",
-	"Sachsen-Anhalt" => "DWLH",
-	"Schleswig-Holstein" => "DWHH",
-	"Thüringen" => "DWLI" );
+my %bula2bulaShort = (
+	"baden-württemberg"			=> "bw",
+	"bayern"					=> "by",
+	"berlin"					=> "be",
+	"brandenburg"				=> "bb",
+	"bremen"					=> "hb",
+	"hamburg"					=> "hh",
+	"hessen" 					=> "he",
+	"mecklenburg-vorpommern"	=> "mv",
+	"niedersachsen"				=> "ni",
+	"nordrhein-westfalen"		=> "nw",
+	"rheinland-pfalz"			=> "rp",
+	"saarland"					=> "sl",
+	"sachsen"					=> "sn",
+	"sachsen-anhalt"			=> "st",
+	"schleswig-holstein"		=> "sh",
+	"thüringen"					=> "th" );
+
+my %bulaShort2dwd = (
+	bw => "DWSG",
+	by => "DWMG",
+	be => "DWPG",
+	bb => "DWPG",
+	hb => "DWHG",
+	hh => "DWHH",
+	he => "DWOH",
+	mv => "DWPH",
+	ni => "DWHG",
+	nw => "DWEH",
+	rp => "DWOI",
+	sl => "DWOI",
+	sn => "DWLG",
+	st => "DWLH",
+	sh => "DWHH",
+	th => "DWLI" );
 
 #
 # Dienststellen den entsprechenden Serververzeichnissen zuordnen
@@ -125,55 +143,55 @@ my %dwd2Name = (
 	SU => "Stuttgart"
 );
 
-my %iiList = (
-	"31" => "Gewitter",
-	"33" => "Starkes Gewitter",
-	"34" => "Starkes Gewitter",
-	"36" => "Starkes Gewitter",
-	"38" => "Starkes Gewitter",
-	"40" => "Schweres Gewitter",
-	"41" => "Schweres Gewitter mit extremen Orkanböen",
-	"42" => "Schweres Gewitter",
-	"44" => "Schweres Gewitter",
-	"45" => "Schweres Gewitter mit extremen Orkanböen",
-	"46" => "Schweres Gewitter",
-	"48" => "Schweres Gewitter",
-	"49" => "Schweres Gewitter mit extremen Orkanböen",
-	"51" => "Windböen",
-	"52" => "Sturmböen",
-	"53" => "Schwere Sturmböen",
-	"54" => "Orkanartige Böen",
-	"55" => "Orkanböen",
-	"56" => "Extreme Orkanböen",
-	"59" => "Nebel",
-	"61" => "Starkregen",
-	"62" => "Heftiger Starkregen",
-	"63" => "Dauerregen",
-	"64" => "Ergiebiger Dauerregen",
-	"65" => "Extrem ergiebiger Dauerregen",
-	"66" => "Extrem heftiger Starkregen",
-	"70" => "Schneefall",
-	"71" => "Schneefall",
-	"72" => "Starker Schneefall",
-	"73" => "Extrem starker Schneefall",
-	"74" => "Schneeverwehung",
-	"75" => "Starke Schneeverwehung",
-	"76" => "Schneeverwehung",
-	"77" => "Starke Schneeverwehung",
-	"78" => "Extrem starke Schneeverwehung",
-	"81" => "Frost",
-	"82" => "Strenger Frost",
-	"83" => "Glätte",
-	"84" => "Glätte",
-	"85" => "Glatteis",
-	"86" => "Glätte",
-	"87" => "Glätte",
-	"88" => "Tauwetter",
-	"89" => "Starkes Tauwetter",
-	"94" => "Schweres Gewitter",
-	"95" => "Schweres Gewitter mit extrem heftigem Starkregen",
-	"96" => "Schweres Gewitter mit extrem heftigem Starkregen"
-);
+# my %iiList = (
+# 	"31" => "Gewitter",
+# 	"33" => "Starkes Gewitter",
+# 	"34" => "Starkes Gewitter",
+# 	"36" => "Starkes Gewitter",
+# 	"38" => "Starkes Gewitter",
+# 	"40" => "Schweres Gewitter",
+# 	"41" => "Schweres Gewitter mit extremen Orkanböen",
+# 	"42" => "Schweres Gewitter",
+# 	"44" => "Schweres Gewitter",
+# 	"45" => "Schweres Gewitter mit extremen Orkanböen",
+# 	"46" => "Schweres Gewitter",
+# 	"48" => "Schweres Gewitter",
+# 	"49" => "Schweres Gewitter mit extremen Orkanböen",
+# 	"51" => "Windböen",
+# 	"52" => "Sturmböen",
+# 	"53" => "Schwere Sturmböen",
+# 	"54" => "Orkanartige Böen",
+# 	"55" => "Orkanböen",
+# 	"56" => "Extreme Orkanböen",
+# 	"59" => "Nebel",
+# 	"61" => "Starkregen",
+# 	"62" => "Heftiger Starkregen",
+# 	"63" => "Dauerregen",
+# 	"64" => "Ergiebiger Dauerregen",
+# 	"65" => "Extrem ergiebiger Dauerregen",
+# 	"66" => "Extrem heftiger Starkregen",
+# 	"70" => "Schneefall",
+# 	"71" => "Schneefall",
+# 	"72" => "Starker Schneefall",
+# 	"73" => "Extrem starker Schneefall",
+# 	"74" => "Schneeverwehung",
+# 	"75" => "Starke Schneeverwehung",
+# 	"76" => "Schneeverwehung",
+# 	"77" => "Starke Schneeverwehung",
+# 	"78" => "Extrem starke Schneeverwehung",
+# 	"81" => "Frost",
+# 	"82" => "Strenger Frost",
+# 	"83" => "Glätte",
+# 	"84" => "Glätte",
+# 	"85" => "Glatteis",
+# 	"86" => "Glätte",
+# 	"87" => "Glätte",
+# 	"88" => "Tauwetter",
+# 	"89" => "Starkes Tauwetter",
+# 	"94" => "Schweres Gewitter",
+# 	"95" => "Schweres Gewitter mit extrem heftigem Starkregen",
+# 	"96" => "Schweres Gewitter mit extrem heftigem Starkregen"
+# );
 
 my ($alertsXml, %capCityHash, %capCellHash);
 
@@ -347,14 +365,14 @@ sub GDS_Get($@) {
 
 		when("warnings"){
 			my $vhdl;
-			$result= "Warnlageberichte für $parameter";
 			for ($vhdl=30; $vhdl <=33; $vhdl++){
 				(undef, $found) = retrieveFile($hash, $command, $parameter, $vhdl);
 				if($found){
-					$result .= "\n".sepLine(70);
 					$result .= retrieveTextWarn($hash,@a);
+					$result .= "\n".sepLine(70);
 				}
 			}
+			$result .= "\n\n";
 			break;
 			}
 
@@ -752,7 +770,10 @@ sub retrieveFile($$;$$){
 			}
 
 		when("warnings"){
-			$dwd = $bula2dwd{$parameter};
+			if(length($parameter) != 2){
+				$parameter = $bula2bulaShort{lc($parameter)};
+			}
+			$dwd = $bulaShort2dwd{lc($parameter)};
 			$dir = $dwd2Dir{$dwd};
 			$dwd = "VHDL".$parameter2."_".$dwd."*";
 			$dir = "gds/specials/warnings/".$dir."/";
