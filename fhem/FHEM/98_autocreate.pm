@@ -170,6 +170,8 @@ autocreate_Notify($$)
       $hash = $defs{$name};
       $nrcreated++;
       my $room = replace_wildcards($hash, AttrVal($me, "device_room", "%TYPE"));
+      # preserve room for createlog
+      $room = $attr{$name}{room} if($attr{$name} && $attr{$name}{room}); 
       $attr{$name}{room} = $room if($room);
 
       # BlackList processing
