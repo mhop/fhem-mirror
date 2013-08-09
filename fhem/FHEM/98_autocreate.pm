@@ -30,7 +30,7 @@ my %flogpar = (
 
   # Oregon sensors: 
   # * temperature
-  "(THR128|THWR288A|THN132N).*"
+  "(THR128|THWR288A|THN132N|THGR132N).*"
       => { GPLOT => "temp4:Temp,",  FILTER => "%NAME" },
   # * temperature, humidity
   "(THGR228N|THGR810|THGR918|THGR328N|RTGR328N|WTGR800_T|WT450H).*"
