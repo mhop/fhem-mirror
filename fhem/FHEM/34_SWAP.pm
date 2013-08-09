@@ -564,7 +564,7 @@ SWAP_Get($@)
 
   return "\"get $name\" needs at least one parameter" if(@_ < 3);
 
-  my $list = "listUnconfirmed regList deviceXML products";
+  my $list = "listUnconfirmed:noArg regList:noArg regListAll:noArg deviceXML:noArg products:noArg";
 
   if( my $gl = $modules{$hash->{TYPE}}{SWAP_GetList} ) {
 
@@ -579,8 +579,13 @@ SWAP_Get($@)
         return $ret;
       }
     }
-
-    $list .= " " . join(" ", sort keys %{$gl});
+    
+    foreach my $cmd ( sort { $a <=> $b } keys ( %{$gl} ) ) {
+      $list .= " ";
+      $list .= $cmd;
+      $list .= ":noArg" if( !$gl->{$cmd} );
+    }
+    #$list .= " " . join(" ", sort keys %{$gl});
   }
 
   return "Unknown argument $cmd, choose one of $list" if( $cmd eq '?' );
