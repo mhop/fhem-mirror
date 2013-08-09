@@ -412,8 +412,7 @@ YAMAHA_AVR_Set($@)
 			{
 			    Log GetLogLevel($name, 4), "YAMAHA_AVR: set volume to ".($current_volume + ($diff * $step))." dB";
 			
-			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".(($current_volume + ($diff * 
-$step))*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>");
+			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".(($current_volume + ($diff * $step))*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>");
 			
 			    Log GetLogLevel($name, 4), "YAMAHA_AVR: sleeping for ".sprintf("%.3f", $sleep)." seconds" unless ($time == 0);
 			    sleep $sleep unless ($time == 0);
@@ -423,8 +422,7 @@ $step))*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMA
 		
 		# Set the desired volume
 		Log GetLogLevel($name, 4), "YAMAHA_AVR: set volume to ".$a[2]." dB";
-		$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV 
-cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($a[2]*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>");
+		$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($a[2]*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>");
 		if(not $result =~ /RC="0"/)
 		{
 			# if the returncode isn't 0, than the command was not successful
