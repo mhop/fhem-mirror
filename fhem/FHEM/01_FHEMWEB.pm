@@ -892,7 +892,7 @@ FW_makeTableFromArray($$@) {
   my ($txt,$class,@obj) = @_;
   if (@obj>0) {
     my $row=1;
-    FW_pO "<br>";
+    FW_pO "<div class='makeTable wide'>";
     FW_pO "$txt";
     FW_pO "<table class=\"block wide $class\">";
     foreach (sort @obj) {
@@ -902,7 +902,7 @@ FW_makeTableFromArray($$@) {
       FW_pO "</td><td>$defs{$_}{TYPE}</td><td> </td>";
       FW_pO "</tr>";
     }
-    FW_pO "</table><br>";
+    FW_pO "</table></div>";
   }
 }
 
