@@ -455,7 +455,7 @@ HUEDevice_Get($@)
     return HUEDevice_devStateIcon($hash);
   }
 
-  return "Unknown argument $cmd, choose one of rgb RGB devStateIcon";
+  return "Unknown argument $cmd, choose one of rgb:noArg RGB:noArg devStateIcon:noArg";
 }
 
 

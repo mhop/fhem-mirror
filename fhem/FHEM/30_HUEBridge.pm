@@ -187,7 +187,7 @@ HUEBridge_Get($@)
     }
     return $ret;
   } else {
-    return "Unknown argument $cmd, choose one of devices";
+    return "Unknown argument $cmd, choose one of devices:noArg";
   }
 }
 
