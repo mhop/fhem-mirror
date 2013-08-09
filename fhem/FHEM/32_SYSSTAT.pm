@@ -112,7 +112,7 @@ SYSSTAT_Get($@)
     return $ret;
   }
 
-  return "Unknown argument $cmd, choose one of filesystems";
+  return "Unknown argument $cmd, choose one of filesystems:noArg";
 }
 
 sub
