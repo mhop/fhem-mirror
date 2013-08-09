@@ -74,6 +74,8 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 #
+# Due to RFXCOM SDK requirements this code may only be used with a RFXCOM device.
+#
 # Some code was derived and modified from xpl-perl 
 # from the following two files:
 #	xpl-perl/lib/xPL/Utils.pm:
@@ -565,8 +567,28 @@ sub TRX_WEATHER_common_temphydro {
   my $dev_str = $dev_type;
   if (TRX_WEATHER_use_longid($longids,$dev_type)) {
   	$dev_str .= $DOT.sprintf("%02x", $bytes->[3]);
-  }
-  if ($bytes->[4] > 0) {
+  } elsif ($dev_type eq "TFATS34C") {
+  	Log 1,"TRX_WEATHER: TFA";
+	if ($bytes->[3] > 0x20 && $bytes->[3] <= 0x3F) {
+  	Log 1,"TRX_WEATHER: TFA 1";
+		$dev_str .= $DOT."1"; 
+	} elsif ($bytes->[3] >= 0x40 && $bytes->[3] <= 0x5F) {
+  	Log 1,"TRX_WEATHER: TFA 2";
+		$dev_str .= $DOT."2"; 
+	} elsif ($bytes->[3] >= 0x60 && $bytes->[3] <= 0x7F) {
+  	Log 1,"TRX_WEATHER: TFA 3";
+		$dev_str .= $DOT."3"; 
+	} elsif ($bytes->[3] >= 0xA0 && $bytes->[3] <= 0xBF) {
+  	Log 1,"TRX_WEATHER: TFA 4";
+		$dev_str .= $DOT."4"; 
+	} elsif ($bytes->[3] >= 0xC0 && $bytes->[3] <= 0xDF) {
+  	Log 1,"TRX_WEATHER: TFA 5";
+		$dev_str .= $DOT."5"; 
+	} else {
+  	Log 1,"TRX_WEATHER: TFA 9";
+		$dev_str .= $DOT."9"; 
+	}
+  } elsif ($bytes->[4] > 0) {
   	$dev_str .= $DOT.sprintf("%d", $bytes->[4]);
   }
 
