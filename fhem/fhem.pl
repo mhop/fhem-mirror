@@ -1286,7 +1286,7 @@ CommandGet($$)
 
     $a[0] = $sdev;
     my $ret = CallFn($sdev, "GetFn", $defs{$sdev}, @a);
-    push @rets, $ret if($ret);
+    push @rets, $ret if(defined($ret) && $ret ne "");
   }
   return join("\n", @rets);
 }
