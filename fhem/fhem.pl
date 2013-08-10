@@ -99,6 +99,8 @@ sub setGlobalAttrBeforeFork($);
 sub setReadingsVal($$$$);
 sub evalStateFormat($);
 sub latin1ToUtf8($);
+sub Log($$);
+sub Log3($$$);
 
 sub CommandAttr($$);
 sub CommandDefaultAttr($$);
@@ -569,21 +571,30 @@ GetLogLevel(@)
 
 
 ################################################
+# the new Log with integrated loglevel checking
 sub
-Log($$)
+Log3($$$)
 {
-  my ($loglevel, $text) = @_;
+  my ($dev, $loglevel, $text) = @_;
+     
+  if(defined($dev) &&
+     defined($attr{$dev}) &&
+     defined (my $devlevel = $attr{$dev}{loglevel})) {
+    return if($loglevel > $devlevel);
 
-  return if($loglevel > $attr{global}{verbose});
+  } else {
+    return if($loglevel > $attr{global}{verbose});
 
-  my @t = localtime;
+  }
+
+  my ($seconds, $microseconds) = gettimeofday();
+  my @t = localtime($seconds);
   my $nfile = ResolveDateWildcards($attr{global}{logfile}, @t);
   OpenLogfile($nfile) if(!$currlogfile || $currlogfile ne $nfile);
 
   my $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d",
           $t[5]+1900,$t[4]+1,$t[3], $t[2],$t[1],$t[0]);
   if($attr{global}{mseclog}) {
-    my ($seconds, $microseconds) = gettimeofday();
     $tim .= sprintf(".%03d", $microseconds/1000);
   }
 
@@ -593,6 +604,14 @@ Log($$)
     print "$tim $loglevel: $text\n";
   }
   return undef;
+}
+
+################################################
+sub
+Log($$)
+{
+  my ($loglevel, $text) = @_;
+  Log3(undef, $loglevel, $text);
 }
 
 
@@ -2707,8 +2726,7 @@ Dispatch($$$)
             }
 
           } else {
-            Log GetLogLevel($name,3),
-                "$name: Unknown $mname device detected, " .
+            Log3 $name, 3, "$name: Unknown $mname device detected, " .
                         "define one to get detailed information.";
             return undef;
 
@@ -2718,7 +2736,7 @@ Dispatch($$$)
     }
     if(!int(@found)) {
       DoTrigger($name, "UNKNOWNCODE $dmsg");
-      Log GetLogLevel($name,3), "$name: Unknown code $dmsg, help me!";
+      Log3 $name, 3, "$name: Unknown code $dmsg, help me!";
       return undef;
     }
   }

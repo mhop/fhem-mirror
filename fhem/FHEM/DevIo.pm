@@ -82,8 +82,8 @@ DevIo_SimpleWrite($$$)
   return if(!$hash);
 
   my $name = $hash->{NAME};
-  my $ll5 = GetLogLevel($name,5);
-  Log $ll5, "SW: $msg";
+print LOG "DS: $name\n";
+  Log3 $name, 5, "SW: $msg";
 
   $msg = pack('H*', $msg) if($ishex);
   $hash->{USBDev}->write($msg)    if($hash->{USBDev});
