@@ -246,15 +246,15 @@ sub GDS_Define($$$) {
 	if($found){
 		$sList = getListStationsDropdown()
 	} else {
-		Log 2, "GDS $name: No datafile (conditions) found";
+		Log3($name, 2, "GDS $name: No datafile (conditions) found");
 	}
 	retrieveFile($hash,"alerts");
 	if($found){
 		($aList, undef) = buildCAPList();
 	} else {
-		Log 2, "GDS $name: No datafile (alerts) found";
+		Log3($name, 3, "GDS $name: No datafile (alerts) found");
 	}
-	Log 3, "GDS $name created";
+	Log3($name, 3, "GDS $name created");
 	$hash->{STATE} = "active";
 
 	return undef;
@@ -365,6 +365,9 @@ sub GDS_Get($@) {
 
 		when("warnings"){
 			my $vhdl;
+			$result =	"VHDL30 = current     / VHDL31 = weekend or holiday\n".
+						"VHDL32 = preliminary / VHDL33 = cancel VHDL32\n".
+						sepLine(70);
 			for ($vhdl=30; $vhdl <=33; $vhdl++){
 				(undef, $found) = retrieveFile($hash, $command, $parameter, $vhdl);
 				if($found){
@@ -532,7 +535,6 @@ sub buildCAPList(){
 			$capCity =~ s/\s/_/g;
 			$capCityHash{$capCity} = $n;
 			$capCellHash{"$capCell"} = $n;
-Log 1, "I: $info A: $area City: $capCity Cell: $capCell";
 			$area++;
 			$record++;
 			$capCity = undef;
@@ -550,7 +552,6 @@ Log 1, "I: $info A: $area City: $capCity Cell: $capCell";
 sub decodeCAPData($$){
 	my ($hash, $datensatz) = @_;
 	my $name		= $hash->{NAME};
-	my $loglevel	= GetLogLevel($name,3);
 	my $info		= int($datensatz/100);
 	my $area		= $datensatz-$info*100;
 
@@ -561,7 +562,7 @@ sub decodeCAPData($$){
 	my $_gdsLong	= AttrVal($name,"gdsLong", 0);
 	my $_gdsPolygon	= AttrVal($name,"gdsPolygon", 0);
 
-	Log $loglevel, "GDS $name: Decoding CAP record #".$datensatz;
+	Log3($name, 3, "GDS $name: Decoding CAP record #".$datensatz);
 
 # topLevel informations
 	@dummy = split(/\./, $alertsXml->{identifier});
@@ -672,17 +673,16 @@ sub retrieveTextWarn($@){
 sub retrieveConditions($$@){
 	my ($hash, $prefix, @a) = @_;
 	my $name		= $hash->{NAME};
-	my $loglevel	= GetLogLevel($name,3);
 	my $user		= $hash->{helper}{USER};
 	my $pass		= $hash->{helper}{PASS};
 	(my $myStation	= utf8ToLatin1($a[2])) =~ s/_/ /g; # replace underscore in stationName by space
 	my $searchLen	= length($myStation);
 
-	my (%alignment, $dataFile, $decodeDummy, $debug, @files, $found, $ftp, $item, $line, %pos, %wx, $wx, %cread, $k, $v);
+	my ($debug, $dataFile, $found, $line, $item, %pos, %alignment, %wx, %cread, $k, $v);
 
 	$debug = AttrVal($name, "gdsDebug", 0);
 
-	Log $loglevel, "GDS $name: Retrieving conditions data";
+	Log3($name, 3, "GDS $name: Retrieving conditions data");
 	
 	($dataFile, $found) = retrieveFile($hash,"conditions");
 	open WXDATA, "/tmp/conditions";
@@ -744,7 +744,6 @@ sub retrieveFile($$;$$){
 #
 	my ($hash, $request, $parameter, $parameter2) = @_;
 	my $name		= $hash->{NAME};
-	my $loglevel	= GetLogLevel($name,3);
 	my $user		= $hash->{helper}{USER};
 	my $pass		= $hash->{helper}{PASS};
 	my $proxyName	= AttrVal($name, "gdsProxyName", "");
@@ -782,7 +781,7 @@ sub retrieveFile($$;$$){
 			}
 	}
 
-	Log $loglevel, "GDS $name: retrieving $dir".$dwd." from DWD server";
+	Log3($name, 3, "GDS $name: retrieving $dir".$dwd." from DWD server");
 
 	$found = 0;
 	eval {
@@ -988,7 +987,7 @@ sub sepLine($) {
 				<li>report type VHDL30 = regular report, issued daily</li>
 				<li>report type VHDL31 = regular report, issued before weekend or national holiday</li>
 				<li>report type VHDL32 = preliminary report, issued on special conditions</li>
-				<li>report type VHDL33 = cancel report, issued if necessary to cancel report types 30-32</li>
+				<li>report type VHDL33 = cancel report, issued if necessary to cancel VHDL32</li>
 			</ul>
 		</ul>
 	</ul>
