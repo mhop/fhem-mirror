@@ -201,6 +201,8 @@ my %culHmModel=(
   "00AB" => {name=>"HM-LC-SW4-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "00AF" => {name=>"HM-OU-CM-PCB"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"",},
   "00B2" => {name=>"HM-SEC-WDS-2"            ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",},
+  "8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
+  "8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",},
   #263 167                        HM Smoke Detector Schueco 
   #"HM-RC-Key4-2"
   #"HM-RC-Sec4-2"
@@ -456,7 +458,8 @@ my %culHmRegDefine = (
   brightFilter    =>{a=>  2.4,s=>0.4,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"brightness filter - ignore light at night"},
   eventDlyTime    =>{a=> 33  ,s=>1  ,l=>1,min=>0  ,max=>7620    ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>1,t=>"event delay time"},
   ledOnTime       =>{a=> 34  ,s=>1  ,l=>1,min=>0  ,max=>1.275   ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>0,t=>"LED ontime"},
-  eventFilterTime =>{a=> 35  ,s=>0.7,l=>1,min=>0  ,max=>7620    ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
+  eventFilterTime =>{a=> 35  ,s=>1  ,l=>1,min=>0  ,max=>7620    ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
+  eventFilterTimeB=>{a=> 35  ,s=>1  ,l=>1,min=>5  ,max=>7620    ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
 # - different range
   evtFltrTime     =>{a=> 35.0,s=>1  ,l=>1,min=>600,max=>1200    ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
 
@@ -728,7 +731,7 @@ my %culHmRegModel = (
                        msgScPosA       =>1,msgScPosB       =>1,
 					                       ledOnTime       =>1,eventFilterTime =>1},
   "HM-SEC-WDS"      =>{msgWdsPosA      =>1,msgWdsPosB      =>1,msgWdsPosC      =>1,
-					                                           eventFilterTime =>1},
+					                                           eventFilterTimeB=>1},
   "HM-SEC-SFA-SM"   =>{cyclicInfoMsg   =>1,sabotageMsg     =>1,transmDevTryMax =>1,
                        lowBatLimit     =>1,batDefectLimit  =>1,
                                                                transmitTryMax  =>1},
@@ -824,7 +827,7 @@ my %culHmRegChan = (# if channelspecific then enter them here
 						 },
   "Schueco_263-xxx02" =>{transmitTryMax  =>1,eventDlyTime    =>1},
   "Schueco_263-xxx03" =>{ttJtOn          =>1,ttJtOff         =>1},
-  "HM-Sen-RD-O01"     =>{eventFilterTime =>1,transmitTryMax  =>1,peerNeedsBurst  =>1,expectAES       =>1},
+  "HM-Sen-RD-O01"     =>{eventFilterTimeB=>1,transmitTryMax  =>1,peerNeedsBurst  =>1,expectAES       =>1},
   "HM-CC-RT-DN03"     =>{tempFallWinOpen =>1,shCtValLo       =>1},
   "HM-CC-RT-DN06"     =>{CtrlRc          =>1,TempRC          =>1},
 					  );

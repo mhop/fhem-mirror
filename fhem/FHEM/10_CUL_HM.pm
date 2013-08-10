@@ -5118,6 +5118,9 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
       brightness $b<br>
       unknown $p<br>
   </li>
+  <li><B>HM-Sen-RD-O</B><br>
+    lastRain: timestamp # no trigger generated<br>
+  </li>
   <li><B>THSensor  and HM-WDC7000</B><br>
       T: $t H: $h AP: $ap<br>
       temperature $t<br>
