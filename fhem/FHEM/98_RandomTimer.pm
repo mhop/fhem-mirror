@@ -18,6 +18,11 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
+#     define t1 RandomTimer  *23:01:10 Zirkulation 23:02:10  100; attr   t1 loglevel 3;
+#     define t2 RandomTimer  *23:01:20 Zirkulation 23:03:20  100; attr   t2 loglevel 3;
+#     define t3 RandomTimer  *23:01:30 Zirkulation 23:04:30  100; attr   t3 loglevel 3;
+#     define t4 RandomTimer  *23:01:40 Zirkulation 23:02:40  100; attr   t4 loglevel 3;
+#
 ##############################################################################
 package main;
 
@@ -129,7 +134,7 @@ sub RandomTimer_ExecRepeater($)
   my ($shour, $smin, $ssec) = split(/:/, $stopTime);
 
   my $timeToStart = $now + 3600*($thour-$hour) + 60*($tmin-$min) + ($tsec-$sec);
-  my $timeToStop  = $now + 3600*($shour-$hour) + 60*($smin-$min) - ($ssec-$sec);
+  my $timeToStop  = $now + 3600*($shour-$hour) + 60*($smin-$min) + ($ssec-$sec);
   $timeToStop += 24*3600 if ($timeToStart>=$timeToStop);
 
   my $timeToExec;
@@ -137,7 +142,7 @@ sub RandomTimer_ExecRepeater($)
   if ($now > $timeToStop) {
 
     my $midnight  =  $now + 24*3600 -(3600*$hour + 60*$min + $sec);
-    $timeToExec = max ($timeToStop, $midnight) + 5*60;
+    $timeToExec   = max ($timeToStop, $midnight) + 5*60;
     $hash->{STATE}     = strftime("%H:%M:%S",localtime($timeToStart));
     delete $hash->{STARTTIME};
 
@@ -145,15 +150,13 @@ sub RandomTimer_ExecRepeater($)
     if ($now < $timeToStart) {
         $timeToExec = $timeToStart;
     } else {
-        $timeToExec = $now + 5;
-        $timeToExec = $now;
+        $timeToExec = $now + 1;
         $function = "RandomTimer_Exec";
-
     }
     $hash->{STATE}     = strftime("%H:%M:%S",localtime($timeToExec));
   }
 
-  Log $logLevel, "[".$hash->{NAME}. "]"." Next Timer ".strftime("%d.%m.%Y  %H:%M:%S",localtime($timeToExec));
+  Log $logLevel, "[".$hash->{NAME}. "]"." Next timer ".strftime("%d.%m.%Y  %H:%M:%S",localtime($timeToExec));
 
   delete $hash->{ABSCHALTZEIT};
   RemoveInternalTimer($hash);
