@@ -2722,13 +2722,9 @@ FW_dropdownFn()
     my $fpname = $FW_wname;
     $fpname =~ s/.*floorplan\/(\w+)$/$1/;  #allow usage of attr fp_setbutton
     my $fwsel;
-    if(AttrVal($fpname,'fp_setbutton',1)) {
-      $fwsel = FW_select("$d-$cmd","val.$d", \@tv, $txt, "dropdown").
-               FW_submit("cmd.$d", "set");
-    } else {
-      $fwsel = FW_select("$d-$cmd","val.$d", \@tv, $txt,"dropdown","submit()").
-               FW_hidden("cmd.$d", "set");
-    }
+    $fwsel = ($cmd eq "state" ? "" : "$cmd&nbsp;") .
+             FW_select("$d-$cmd","val.$d", \@tv, $txt,"dropdown","submit()").
+             FW_hidden("cmd.$d", "set");
 
     return "<td colspan='2'><form method=\"$FW_formmethod\">".
       FW_hidden("arg.$d", $cmd) .
