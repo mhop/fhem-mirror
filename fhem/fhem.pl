@@ -2878,7 +2878,8 @@ ReplaceEventMap($$$)
   my $changed;
   my @emList = EventMapAsList($em);
   foreach my $rv (@emList) {
-    my ($re, $val) = split(":", $rv, 2); # Real-Event-Regexp:GivenName
+    # Real-Event-Regexp:GivenName[:modifier]
+    my ($re, $val, $modifier) = split(":", $rv, 3);
     next if(!defined($val));
     if($dir) {  # event -> GivenName
       if($str =~ m/$re/) {
