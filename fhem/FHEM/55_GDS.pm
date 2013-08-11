@@ -1152,12 +1152,6 @@ sub initDropdownLists($){
 		<ul>Retrieve alert message for selected region from DWD server</ul>
 		<br/>
 
-		<code>get &lt;name&gt; caplist</code>
-		<br/><br/>
-		<ul>Retrieve list showing all defined warning regions.<br/>
-			You can find your WARNCELLID with this list.</ul>
-		<br/>
-
 		<code>get &lt;name&gt; conditions &lt;stationName&gt;</code>
 		<br/><br/>
 		<ul>Retrieve current conditions at selected station</ul>
@@ -1178,14 +1172,13 @@ sub initDropdownLists($){
 		<ul>Show a help text with available commands</ul>
 		<br/>
 
-		<code>get &lt;name&gt; list data</code>
+		<code>get &lt;name&gt; list capstationlist|data|stations</code>
 		<br/><br/>
-		<ul>List current conditions for all available stations in one single table</ul>
-		<br/>
-
-		<code>get &lt;name&gt; list stations</code>
-		<br/><br/>
-		<ul>List all available stations that provide conditions data</ul>
+		<ul>
+			<li><b>capstationlist:</b> Retrieve list showing all defined warning regions. You can find your WARNCELLID with this list.</li>
+			<li><b>data:</b> List current conditions for all available stations in one single table</li>
+			<li><b>stations:</b> List all available stations that provide conditions data</li>
+		</ul>
 		<br/>
 
 		<code>get &lt;name&gt; radarmap &lt;region&gt;</code>
