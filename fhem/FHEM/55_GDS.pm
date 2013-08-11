@@ -102,7 +102,7 @@ sub GDS_Initialize($) {
 	CommandDefine(undef, "gds_web HTTPSRV gds /tmp/ GDS Files");
 	createIndexFile();
 	fillMappingTables();
-	initDropdownLists
+	initDropdownLists();
 	
 }
 
