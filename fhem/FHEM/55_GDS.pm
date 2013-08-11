@@ -25,7 +25,6 @@
 #
 ####################################################################################################
 
-
 package main;
 
 use strict;
@@ -38,7 +37,7 @@ use List::MoreUtils 'first_index';
 use XML::Simple;
 use HttpUtils;
 require LWP::UserAgent;
-
+use Data::Dumper;
 
 sub GDS_Define($$$);
 sub GDS_Undef($$);
@@ -50,6 +49,7 @@ sub GDS_Attr(@);
 my ($bulaList, $cmapList, %rmapList, $fmapList, %bula2bulaShort, %bulaShort2dwd, %dwd2Dir, %dwd2Name,
 	$alertsXml, %capCityHash, %capCellHash, $sList, $aList);
 
+my $tempDir = "/tmp/";
 
 ####################################################################################################
 #
@@ -60,6 +60,8 @@ my ($bulaList, $cmapList, %rmapList, $fmapList, %bula2bulaShort, %bulaShort2dwd,
 
 sub GDS_Initialize($) {
 	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	my $found;
 
 	$hash->{DefFn}		=	"GDS_Define";
 	$hash->{UndefFn}	=	"GDS_Undef";
@@ -71,38 +73,62 @@ sub GDS_Initialize($) {
 							"gdsAll:0,1 gdsDebug:0,1 gdsLong:0,1 gdsPolygon:0,1 ".
 							$readingFnAttributes;
 
-	CommandDefine(undef, "gds_web HTTPSRV gds /tmp/ GDS Files");
-	createIndexFile();
-	fillMappingTables();
-	initDropdownLists();
-	
+	fillMappingTables($hash);
+	initDropdownLists($hash);
+	createIndexFile($hash);
+
+	if($name){
+		(undef, $found) = retrieveFile($hash,"conditions");
+		if($found){
+			$sList = getListStationsDropdown($hash)
+		} else {
+			Log3($name, 2, "GDS $name: No datafile (conditions) found");
+		}
+
+		(undef, $found) = retrieveFile($hash,"alerts");
+		if($found){
+			($aList, undef) = buildCAPList($hash);
+		} else {
+			Log3($name, 2, "GDS $name: No datafile (alerts) found");
+		}
+	}
 }
 
 sub GDS_Define($$$) {
 	my ($hash, $def) = @_;
 	my @a = split("[ \t][ \t]*", $def);
-	my $found;
+	my ($found, $dummy);
 
 	return "syntax: define <name> GDS <username> <password>" if(int(@a) != 4 ); 
 	my $name = $hash->{NAME};
+
 	$hash->{helper}{USER}		= $a[2];
 	$hash->{helper}{PASS}		= $a[3];
 	$hash->{helper}{URL}		= "ftp-outgoing2.dwd.de";
 	$hash->{helper}{INTERVAL}	= 3600;
 
+	Log3($name, 3, "GDS $name created");
+
+	$dummy = "gds_web_".$name;
+	CommandDefine(undef, $dummy." HTTPSRV ".$name." ".$tempDir." GDS ".$name." Files");
+	$attr{$dummy}{"directoryindex"} = $name.".html";
+	
+	fillMappingTables($hash);
+	initDropdownLists($hash);
+	createIndexFile($hash);
+
 	(undef, $found) = retrieveFile($hash,"conditions");
 	if($found){
-		$sList = getListStationsDropdown()
+		$sList = getListStationsDropdown($hash)
 	} else {
 		Log3($name, 2, "GDS $name: No datafile (conditions) found");
 	}
 	retrieveFile($hash,"alerts");
 	if($found){
-		($aList, undef) = buildCAPList();
+		($aList, undef) = buildCAPList($hash);
 	} else {
 		Log3($name, 3, "GDS $name: No datafile (alerts) found");
 	}
-	Log3($name, 3, "GDS $name created");
 	$hash->{STATE} = "active";
 
 	return undef;
@@ -111,6 +137,7 @@ sub GDS_Define($$$) {
 sub GDS_Undef($$) {
 	my ($hash, $arg) = @_;
 	my $name = $hash->{NAME};
+	CommandDelete(undef, "gds_web_".$name);
 	RemoveInternalTimer($hash);
 	return undef;
 }
@@ -143,11 +170,11 @@ sub GDS_Set($@) {
 		when("rereadcfg"){
 			eval {
 				retrieveFile($hash,"conditions");
-				$sList = getListStationsDropdown();
+				$sList = getListStationsDropdown($hash);
 			}; 
 			eval {
 				retrieveFile($hash,"alerts");
-				($aList, undef) = buildCAPList();
+				($aList, undef) = buildCAPList($hash);
 			}; 
 			break;
 			}
@@ -181,9 +208,8 @@ sub GDS_Get($@) {
 	$hash->{LOCAL} = 1;
 
 	my $usage = "Unknown argument $command, choose one of help:noArg rereadcfg:noArg ".
-				"list:stations,data ".
+				"list:stations,capstations,data ".
 				"alerts:".$aList." ".
-				"caplist:noArg ".
 				"conditions:".$sList." ".
 				"conditionsmap:".$cmapList." ".
 				"forecastsmap:".$fmapList." ".
@@ -194,41 +220,6 @@ sub GDS_Get($@) {
 	my ($result, $datensatz, $found);
 
 	given($command) {
-
-		when("caplist"){
-			my (%capHash, $file, $csv, @columns, $err, $key);
-
-			$file = '/tmp/caplist.csv';
-			$csv = Text::CSV->new( { binary => 1 } );
-			$csv->sep_char (";");
-
-			# prüfen, ob CSV schon vorhanden,
-			# falls nicht: vom Server holen
-			if (!-e "/tmp/caplist.csv"){
-				retrieveFile($hash, $command);
-			}
-
-			# CSV öffnen und parsen
-			open (CSV, "<", $file) or die $!;
-			while (<CSV>) {
-				next if ($. == 1);
-				if ($csv->parse($_)) {
-					@columns = $csv->fields();
-					$capHash{latin1ToUtf8($columns[4])} = $columns[0];
-				} else {
-					$err = $csv->error_input;
-					print "Failed to parse line: $err";
-				}
-			}
-			close CSV;
-
-			# Ausgabe sortieren und zusammenstellen
-			foreach $key (sort keys %capHash) {
-				$result .= $capHash{$key}."\t".$key."\n";
-			}
-
-			break;
-		}
 
 		when("conditionsmap"){
 			# retrieve map: current conditions
@@ -262,9 +253,10 @@ sub GDS_Get($@) {
 
 		when("list"){
 			given($parameter){
-				when("data")		{ $result = getListData($hash,@a); break; }
-				when("stations")	{ $result = getListStationsText($hash,@a); break; }
-				default				{ $usage = "get <name> list <parameter>"; return $usage; }
+				when("capstations")	{ $result = getListCapStations($hash,$parameter); break,}
+				when("data")		{ $result = getListData($hash); break; }
+				when("stations")	{ $result = getListStationsText($hash); break; }
+				default				{ $usage  = "get <name> list <parameter>"; return $usage; }
 			}
 			break;
 			}
@@ -292,24 +284,24 @@ sub GDS_Get($@) {
 		when("rereadcfg"){
 			eval {
 				retrieveFile($hash,"conditions");
-				$sList = getListStationsDropdown();
+				$sList = getListStationsDropdown($hash);
 			}; 
 			eval {
 				retrieveFile($hash,"alerts");
-				($aList, undef) = buildCAPList();
+				($aList, undef) = buildCAPList($hash);
 			}; 
 			break;
 			}
 
 		when("warnings"){
 			my $vhdl;
-			$result =	"          VHDL30 = current     | VHDL31 = weekend or holiday\n".
-						"          VHDL32 = preliminary | VHDL33 = cancel VHDL32\n".
+			$result =	"     VHDL30 = current          |     VHDL31 = weekend or holiday\n".
+						"     VHDL32 = preliminary      |     VHDL33 = cancel VHDL32\n".
 						sepLine(31)."+".sepLine(38);
 			for ($vhdl=30; $vhdl <=33; $vhdl++){
 				(undef, $found) = retrieveFile($hash, $command, $parameter, $vhdl,1);
 				if($found){
-					$result .= retrieveTextWarn($hash,@a);
+					$result .= retrieveTextWarn($hash);
 					$result .= "\n".sepLine(70);
 				}
 			}
@@ -373,10 +365,12 @@ sub getHelp(){
 			"get <name> warnings <region>\n";
 }
 
-sub getListData($@){
-	my ($line, @a);
+sub getListData($){
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
 
-	open WXDATA, "/tmp/conditions";
+	my ($line, @a);
+	open WXDATA, $tempDir.$name."_conditions";
 	while (chomp($line = <WXDATA>)) {
 		push @a, latin1ToUtf8($line);
 	}
@@ -385,10 +379,12 @@ sub getListData($@){
 	return join("\n", @a);
 }
 
-sub getListStationsText($@){
-	my ($line, @a);
+sub getListStationsText($){
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
 
-	open WXDATA, "/tmp/conditions";
+	my ($line, @a);
+	open WXDATA, $tempDir.$name."_conditions";
 	while (chomp($line = <WXDATA>)) {
 		push @a, substr(latin1ToUtf8($line),0,19);
 	}
@@ -403,6 +399,41 @@ sub getListStationsText($@){
 	return join("\n", @a);
 }
 
+sub getListCapStations($$){
+	my ($hash, $command) = @_;
+	my (%capHash, $file, $csv, @columns, $err, $key, $cList);
+
+	$file = $tempDir.'capstations.csv';
+	$csv = Text::CSV->new( { binary => 1 } );
+	$csv->sep_char (";");
+
+	# prüfen, ob CSV schon vorhanden,
+	# falls nicht: vom Server holen
+	if (!-e $tempDir."caplist.csv"){
+		retrieveFile($hash, $command);
+	}
+
+	# CSV öffnen und parsen
+	open (CSV, "<", $file) or die $!;
+	while (<CSV>) {
+		next if ($. == 1);
+		if ($csv->parse($_)) {
+			@columns = $csv->fields();
+			$capHash{latin1ToUtf8($columns[4])} = $columns[0];
+		} else {
+			$err = $csv->error_input;
+			print "Failed to parse line: $err";
+		}
+	}
+	close CSV;
+
+	# Ausgabe sortieren und zusammenstellen
+	foreach $key (sort keys %capHash) {
+		$cList .= $capHash{$key}."\t".$key."\n";
+	}
+	return $cList;
+}
+
 sub setHelp(){
 	return	"Use one of the following commands:\n".
 			sepLine(35)."\n".
@@ -413,10 +444,13 @@ sub setHelp(){
 			"set <name> help\n";
 }
 
-sub buildCAPList(){
+sub buildCAPList(@){
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	
 	my $xml			= new XML::Simple;
 	$alertsXml		= undef;
-	$alertsXml		= $xml->XMLin('/tmp/alerts', KeyAttr => {}, ForceArray => [ 'info', 'eventCode', 'area', 'geocode' ]);
+	$alertsXml		= $xml->XMLin($tempDir.$name.'_alerts', KeyAttr => {}, ForceArray => [ 'info', 'eventCode', 'area', 'geocode' ]);
 	my $info		= 0;
 	my $area		= 0;
 	my $record		= 0;
@@ -565,9 +599,12 @@ sub findCAPWarnCellId($$){
 	}
 }
 
-sub retrieveTextWarn($@){
+sub retrieveTextWarn($){
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	
 	my ($line, @a);
-	open WXDATA, "/tmp/warnings";
+	open WXDATA, $tempDir.$name."_warnings";
 	while (chomp($line = <WXDATA>)) { push @a, latin1ToUtf8($line); }
 	close WXDATA;
 	return join("", @a);
@@ -588,7 +625,7 @@ sub retrieveConditions($$@){
 	Log3($name, 3, "GDS $name: Retrieving conditions data");
 	
 	($dataFile, $found) = retrieveFile($hash,"conditions");
-	open WXDATA, "/tmp/conditions";
+	open WXDATA, $tempDir.$name."_conditions";
 	while (chomp($line = <WXDATA>)) {
 		map {s/\r//g;} ($line);
 		if ($line =~ /Station/) {		# Header line... find out data positions
@@ -662,24 +699,24 @@ sub retrieveFile($$;$$$){
 
 	given($request){
 
-		when("caplist"){
+		when("capstations"){
 			$dir = "gds/help/";
 			$dwd = "legend_warnings_CAP_WarnCellsID.csv";
-			$targetFile = "/tmp/caplist.csv";
+			$targetFile = $tempDir.$request.".csv";
 			break;
 		}
 
 		when("conditionsmap"){
 			$dir = "gds/specials/observations/maps/germany/";
 			$dwd = $parameter."*";
-			$targetFile = "/tmp/cmap.jpg";
+			$targetFile = $tempDir.$name."_".$request.".jpg";
 			break;
 		}
 
 		when("forecastsmap"){
 			$dir = "gds/specials/forecasts/maps/germany/";
 			$dwd = $parameter."*";
-			$targetFile = "/tmp/fmap.jpg";
+			$targetFile = $tempDir.$name."_".$request.".jpg";
 			break;
 		}
 
@@ -689,28 +726,28 @@ sub retrieveFile($$;$$$){
 			}
 			$dwd = "Schilder".$dwd2Dir{$bulaShort2dwd{lc($parameter)}}.".jpg";
 			$dir = "gds/specials/warnings/maps/";
-			$targetFile = "/tmp/wmap.jpg";
+			$targetFile = $tempDir.$name."_".$request.".jpg";
 			break;
 		}
 
 		when("radarmap"){
 			$dir = "gds/specials/radar/".$parameter2;
 			$dwd = "Webradar_".$parameter."*";
-			$targetFile = "/tmp/rmap.jpg";
+			$targetFile = $tempDir.$name."_".$request.".jpg";
 			break;
 		}
 
 		when("alerts"){
 			$dir = "gds/specials/warnings/xml/PVW/";
 			$dwd = "Z_CAP*";
-			$targetFile = "/tmp/".$request;
+			$targetFile = $tempDir.$name."_".$request;
 			break;
 			}
 
 		when("conditions"){
 			$dir = "gds/specials/observations/tables/germany/";
 			$dwd = "*";
-			$targetFile = "/tmp/".$request;
+			$targetFile = $tempDir.$name."_".$request;
 			break;
 			}
 
@@ -722,12 +759,12 @@ sub retrieveFile($$;$$$){
 			$dir = $dwd2Dir{$dwd};
 			$dwd = "VHDL".$parameter2."_".$dwd."*";
 			$dir = "gds/specials/warnings/".$dir."/";
-			$targetFile = "/tmp/".$request;
+			$targetFile = $tempDir.$name."_".$request;
 			break;
 			}
 	}
 
-	Log3($name, 3, "GDS $name: searching $dir".$dwd." on DWD server");
+	Log3($name, 3, "GDS $name: searching for $dir".$dwd." on DWD server");
 	$urlString .= $dir;
 
 	$found = 0;
@@ -766,10 +803,12 @@ sub retrieveFile($$;$$$){
 	return ($dataFile, $found);
 }
 
-sub getListStationsDropdown(){
+sub getListStationsDropdown($){
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
 	my ($line, $liste, @a);
 
-	open WXDATA, "/tmp/conditions";
+	open WXDATA, $tempDir.$name."_conditions";
 	while (chomp($line = <WXDATA>)) {
 		push @a, trim(substr(latin1ToUtf8($line),0,19));
 	}
@@ -809,20 +848,25 @@ sub sepLine($) {
 	return $output;
 }
 
-sub createIndexFile(){
-	my $text =	"<html><head></head><body>".
-				"<a href=\"/fhem/gds/cmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Wetterlage</a><br/>".
-				"<a href=\"/fhem/gds/fmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Vorhersage</a><br/>".
-				"<a href=\"/fhem/gds/wmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Warnungen</a><br/>".
-				"<a href=\"/fhem/gds/rmap.jpg\" target=\"blank\">Aktuelle Radarkarte</a><br/>".
-				"</body></html>";
-	open	(DATEI, ">/tmp/index.html") or die $!;
-	print	 DATEI $text;
-	close	(DATEI);
+sub createIndexFile($){
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+
+	if($name){
+		my $text =	"<html><head></head><body>".
+					"<a href=\"/fhem/".$name."/".$name."_conditionsmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Wetterlage</a><br/>".
+					"<a href=\"/fhem/".$name."/".$name."_forecastsmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Vorhersage</a><br/>".
+					"<a href=\"/fhem/".$name."/".$name."_warningsmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Warnungen</a><br/>".
+					"<a href=\"/fhem/".$name."/".$name."_radarmap.jpg\" target=\"blank\">Aktuelle Radarkarte</a><br/>".
+					"</body></html>";
+		open	(DATEI, ">".$tempDir.$name.".html") or die $!;
+		print	 DATEI $text;
+		close	(DATEI);
+	}
 	return;
 }
 
-sub fillMappingTables(){
+sub fillMappingTables($){
 
 	$bulaList =	"Baden-Württemberg,Bayern,Berlin,Brandenburg,Bremen,".
 				"Hamburg,Hessen,Mecklenburg-Vorpommern,Niedersachsen,".
@@ -963,18 +1007,22 @@ sub fillMappingTables(){
 return;
 }
 
-sub initDropdownLists(){
-	if (-e "/tmp/conditions"){
-		$sList = getListStationsDropdown();
+sub initDropdownLists($){
+	my($hash) = @_;
+	my $name = $hash->{NAME};
+
+	if ($name && -e $tempDir.$name."_conditions"){
+		$sList = getListStationsDropdown($hash);
 	} else {
 		$sList = "please_use_rereadcfg_first";
 	}
 
-	if (-e "/tmp/alerts"){
-		($aList, undef) = buildCAPList();
+	if ($name && -e $tempDir.$name."_alerts"){
+		($aList, undef) = buildCAPList($hash);
 	} else {
 		$aList = "please_use_rereadcfg_first";
 	}
+
 	return;
 }
 
