@@ -34,13 +34,15 @@
 ##############################################################################
 #	Changelog:
 #	2013-07-28	initial release
-#	2013-07-29	fixed: some typos in documentation
-#				added: "set <name> send"
-#	2013-07-30	replaced: try/catch by eval
-#				added: some more logging
-#				added: delete some station readings before update
-#				added: attribute owoSendUrl
-#	2013-08-08	added: proxy support by reading env-Settings
+#	2013-07-29	fixed:	some typos in documentation
+#				added:	"set <name> send"
+#	2013-07-30	modi:	replaced try/catch by eval
+#				added:	some more logging
+#				added:	delete some station readings before update
+#				added:	attribute owoSendUrl
+#	2013-08-08	added:	proxy support by reading env-Settings
+#	2013-08-11	modi:	switched from GetLogLevel() to Log3()
+#				fixed:	useJSON (due to Fritzbox problems)
 #
 
 package main;
@@ -49,7 +51,8 @@ use strict;
 use warnings;
 use POSIX;
 use HttpUtils;
-use JSON qw/decode_json/;
+#use JSON; #qw/decode_json/;
+use JSON;
 use feature qw/say switch/;
 
 require LWP::UserAgent;			# test
@@ -219,7 +222,6 @@ sub
 OWO_GetStatus($;$){
 	my ($hash, $local) = @_;
 	my $name = $hash->{NAME};
-	my $loglevel = GetLogLevel($name,3);
 	$local = 0 unless(defined($local));
 
 	$attr{$name}{"owoInterval"} = 600 if(AttrVal($name,"owoInterval",0) < 600);
@@ -233,7 +235,7 @@ OWO_GetStatus($;$){
 	my $station		= AttrVal($name, "owoStation", undef);
 
 	if(defined($user) && defined($station)){
-		Log $loglevel, "openweather $name started: SendData";
+		Log3($name, 3, "openweather $name started: SendData");
 
 		my $lat			= AttrVal("global", "latitude", "");
 		my $lon			= AttrVal("global", "longitude", "");
@@ -254,7 +256,7 @@ OWO_GetStatus($;$){
 				$o = 0 if(!defined($o));
 				$v = ReadingsVal($s, $v, "?") + $o;
 				$dataString = $dataString."&$p=$v";
-				Log $loglevel, "openweather $name reading: $paraName $p $s $v";
+				Log3($name, 3, "openweather $name reading: $paraName $p $s $v");
 				readingsSingleUpdate($hash, "my_".$p, $v, 1);
 			}
 		}
@@ -263,11 +265,10 @@ OWO_GetStatus($;$){
 
 		my $sendString = $urlString."?".$dataString;
 		if(AttrVal($name, "owoDebug",1) == 0){
-#			GetFileFromURL($sendString);
 			$ua->get($sendString);
-			Log $loglevel, "openweather $name sending: $dataString";
+			Log3($name, 3, "openweather $name sending: $dataString");
 		} else {
-			Log $loglevel, "openweather $name debug:   $dataString";
+			Log3($name, 3, "openweather $name debug:   $dataString");
 		}
 	
 		readingsBeginUpdate($hash);
@@ -290,7 +291,7 @@ OWO_GetStatus($;$){
 	my $cId = ReadingsVal($name,"c_stationId", undef);
 	if(defined($cId)){
 		my $cName = ReadingsVal($name,"stationName", "");
-		Log $loglevel, "openweather $name retrievingStationData Id: $cId Name: $cName";
+		Log3($name, 3, "openweather $name retrievingStationData Id: $cId Name: $cName");
 		fhem("set $name stationById $cId");# if($cId ne "");
 	}
 
@@ -319,7 +320,7 @@ OWO_Define($$){
 	readingsEndUpdate($hash, 1);
 
 	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "OWO_GetStatus", $hash, 0);
-	Log 3, "openweather $name created";
+	Log3($name, 3, "openweather $name created");
 
 	return;
 }
@@ -335,19 +336,18 @@ sub
 UpdateReadings($$$){
 	my ($hash, $url, $prefix) = @_;
 	my $name = $hash->{NAME};
-	my $loglevel = GetLogLevel($name,3);
 	my ($jsonWeather, $response);
 	$url .= "&APPID=".AttrVal($name, "owoApiKey", "");
 #	$response = GetFileFromURL("$url");
 	$response = $ua->get("$url");
 	if(defined($response)){
 		if(AttrVal($name, "owoDebug", 1) == 1){
-			Log $loglevel, "openweather $name response:\n$response";
+			Log3($name, 3, "openweather $name response:\n$response");
 		}
 		my $json = JSON->new->allow_nonref;
 		eval {$jsonWeather = $json->decode($response->decoded_content)}; warn $@ if $@;
 	} else {
-		Log $loglevel, "openweather $name error: no response from server";
+		Log3($name, 3, "openweather $name error: no response from server");
 	}
 
 	if(defined($jsonWeather)){
@@ -358,7 +358,7 @@ UpdateReadings($$$){
 							
 		readingsBeginUpdate($hash);
 		if(AttrVal($name, "owoRaw", 0) == 1){
-			readingsBulkUpdate($hash, $prefix."rawData",  $response);
+			readingsBulkUpdate($hash, $prefix."rawData",  $response->decoded_content);
 		} else {
 			readingsBulkUpdate($hash, $prefix."rawData",  "not requested");
 		}
@@ -390,7 +390,7 @@ UpdateReadings($$$){
 		readingsBulkUpdate($hash, "state",                "active");
 		readingsEndUpdate($hash, 1);
 	} else { 
-		Log $loglevel, "openweather $name error: update not possible!"; 
+		Log3($name, 3, "openweather $name error: update not possible!"); 
 	}
 	return;
 }
