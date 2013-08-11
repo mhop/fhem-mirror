@@ -227,9 +227,11 @@ FB_CALLMONITOR_Read($)
     {
      Log GetLogLevel($name, 2), "$name: given local area code '$area_code' is not an area code. therefore will be ignored";
     }
-   
    }
-   
+
+   # Remove trailing hash sign and everything afterwards
+   $external_number =~ s/#.*$//;
+  
    $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $external_number) if(defined($external_number) and AttrVal($name, "reverse-search", "none") ne "none");
    
    readingsBeginUpdate($hash);
