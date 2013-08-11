@@ -35,6 +35,22 @@
 #				added	AttrFn
 #				modi	retrieval of VHDL messages 30-33
 #
+#	2013-08-09	added	more logging
+#				fixed	missing error message if WARNCELLID does not exist
+#				update	commandref
+#
+#	2013-08-10	added	some more tolerance on text inputs
+#				changed	switched from GetLogList to Log3
+#
+#	2013-08-11	added	retrieval for condition maps
+#				added	retrieval for forecast maps
+#				added	retrieval for warning maps
+#				added	retrieval for radar maps
+#
+#				changed	use LWP::ua for some file transfers instead of ftp
+#						due to transfer errors on image files
+#						use parameter #5 = 1 in RetrieveFile for ftp
+#
 
 package main;
 
@@ -45,6 +61,9 @@ use Time::HiRes qw(gettimeofday);
 use Net::FTP;
 use List::MoreUtils 'first_index'; 
 use XML::Simple;
+use HttpUtils;
+require LWP::UserAgent;
+
 
 sub GDS_Define($$$);
 sub GDS_Undef($$);
@@ -56,10 +75,55 @@ sub getListStationsDropdown();
 sub buildCAPList();
 
 
-my $bulaList = "Baden-Württemberg,Bayern,Berlin,Brandenburg,Bremen,".
+my $bulaList =	"Baden-Württemberg,Bayern,Berlin,Brandenburg,Bremen,".
 				"Hamburg,Hessen,Mecklenburg-Vorpommern,Niedersachsen,".
 				"Nordrhein-Westfalen,Rheinland-Pfalz,Saarland,Sachsen,".
 				"Sachsen-Anhalt,Schleswig-Holstein,Thüringen";
+
+my $cmapList =	"Deutschland,Mitte,Nordost,Nordwest,Ost,Suedost,Suedwest,West";
+
+my %rmapList = (
+	Deutschland	=> "",
+	Mitte		=> "central/",
+	Nordost		=> "northeast/",
+	Nordwest	=> "northwest/",
+	Ost			=> "east/",
+	Suedost		=> "southeast/",
+	Suedwest	=> "southwest/",
+	West		=> "west/");
+
+my $fmapList =	"Deutschland_heute_frueh,Deutschland_heute_mittag,Deutschland_heute_spaet,Deutschland_heute_nacht,".
+				"Deutschland_morgen_frueh,Deutschland_morgen_spaet,".
+				"Deutschland_ueberm_frueh,Deutschland_ueberm_spaet,".
+				"Deutschland_tag4_frueh,Deutschland_tag4_spaet".
+				"Mitte_heute_frueh,Mitte_heute_mittag,Mitte_heute_spaet,Mitte_heute_nacht,".
+				"Mitte_morgen_frueh,Mitte_morgen_spaet,".
+				"Mitte_ueberm_frueh,Mitte_ueberm_spaet,".
+				"Mitte_tag4_frueh,Mitte_tag4_spaet".
+				"Nordost_heute_frueh,Nordost_heute_mittag,Nordost_heute_spaet,Nordost_heute_nacht,".
+				"Nordost_morgen_frueh,Nordost_morgen_spaet,".
+				"Nordost_ueberm_frueh,Nordost_ueberm_spaet,".
+				"Nordost_tag4_frueh,Nordost_tag4_spaet".
+				"Nordwest_heute_frueh,Nordwest_heute_mittag,Nordwest_heute_spaet,Nordwest_heute_nacht,".
+				"Nordwest_morgen_frueh,Nordwest_morgen_spaet,".
+				"Nordwest_ueberm_frueh,Nordwest_ueberm_spaet,".
+				"Nordwest_tag4_frueh,Nordwest_tag4_spaet".
+				"Ost_heute_frueh,Ost_heute_mittag,Ost_heute_spaet,Ost_heute_nacht,".
+				"Ost_morgen_frueh,Ost_morgen_spaet,".
+				"Ost_ueberm_frueh,Ost_ueberm_spaet,".
+				"Ost_tag4_frueh,Ost_tag4_spaet".
+				"Suedost_heute_frueh,Suedost_heute_mittag,Suedost_heute_spaet,Suedost_heute_nacht,".
+				"Suedost_morgen_frueh,Suedost_morgen_spaet,".
+				"Suedost_ueberm_frueh,Suedost_ueberm_spaet,".
+				"Suedost_tag4_frueh,Suedost_tag4_spaet".
+				"Suedwest_heute_frueh,Suedwest_heute_mittag,Suedwest_heute_spaet,Suedwest_heute_nacht,".
+				"Suedwest_morgen_frueh,Suedwest_morgen_spaet,".
+				"Suedwest_ueberm_frueh,Suedwest_ueberm_spaet,".
+				"Suedwest_tag4_frueh,Suedwest_tag4_spaet".
+				"West_heute_frueh,West_heute_mittag,West_heute_spaet,West_heute_nacht,".
+				"West_morgen_frueh,West_morgen_spaet,".
+				"West_ueberm_frueh,West_ueberm_spaet,".
+				"West_tag4_frueh,West_tag4_spaet";
 
 #
 # Bundesländer den entsprechenden Dienststellen zuordnen
@@ -80,7 +144,9 @@ my %bula2bulaShort = (
 	"sachsen"					=> "sn",
 	"sachsen-anhalt"			=> "st",
 	"schleswig-holstein"		=> "sh",
-	"thüringen"					=> "th" );
+	"thüringen"					=> "th",
+	"deutschland"				=> "xde",
+	"bodensee"					=> "xbo" );
 
 my %bulaShort2dwd = (
 	bw => "DWSG",
@@ -98,7 +164,9 @@ my %bulaShort2dwd = (
 	sn => "DWLG",
 	st => "DWLH",
 	sh => "DWHH",
-	th => "DWLI" );
+	th => "DWLI",
+	xde => "xde",
+	xbo => "xbo" );
 
 #
 # Dienststellen den entsprechenden Serververzeichnissen zuordnen
@@ -128,7 +196,9 @@ my %dwd2Dir = (
 	DWOF => "OF", # Offenbach
 	DWTR => "OF", # Offenbach
 	DWSU => "SU", # Stuttgart
-	DWMS => "MS" # München
+	DWMS => "MS",
+	xde  => "D",
+	xbo  => "Bodensee" # München
 #	???? => "FG" # Freiburg
 );
 
@@ -142,56 +212,6 @@ my %dwd2Name = (
 	PD => "Potsdam",
 	SU => "Stuttgart"
 );
-
-# my %iiList = (
-# 	"31" => "Gewitter",
-# 	"33" => "Starkes Gewitter",
-# 	"34" => "Starkes Gewitter",
-# 	"36" => "Starkes Gewitter",
-# 	"38" => "Starkes Gewitter",
-# 	"40" => "Schweres Gewitter",
-# 	"41" => "Schweres Gewitter mit extremen Orkanböen",
-# 	"42" => "Schweres Gewitter",
-# 	"44" => "Schweres Gewitter",
-# 	"45" => "Schweres Gewitter mit extremen Orkanböen",
-# 	"46" => "Schweres Gewitter",
-# 	"48" => "Schweres Gewitter",
-# 	"49" => "Schweres Gewitter mit extremen Orkanböen",
-# 	"51" => "Windböen",
-# 	"52" => "Sturmböen",
-# 	"53" => "Schwere Sturmböen",
-# 	"54" => "Orkanartige Böen",
-# 	"55" => "Orkanböen",
-# 	"56" => "Extreme Orkanböen",
-# 	"59" => "Nebel",
-# 	"61" => "Starkregen",
-# 	"62" => "Heftiger Starkregen",
-# 	"63" => "Dauerregen",
-# 	"64" => "Ergiebiger Dauerregen",
-# 	"65" => "Extrem ergiebiger Dauerregen",
-# 	"66" => "Extrem heftiger Starkregen",
-# 	"70" => "Schneefall",
-# 	"71" => "Schneefall",
-# 	"72" => "Starker Schneefall",
-# 	"73" => "Extrem starker Schneefall",
-# 	"74" => "Schneeverwehung",
-# 	"75" => "Starke Schneeverwehung",
-# 	"76" => "Schneeverwehung",
-# 	"77" => "Starke Schneeverwehung",
-# 	"78" => "Extrem starke Schneeverwehung",
-# 	"81" => "Frost",
-# 	"82" => "Strenger Frost",
-# 	"83" => "Glätte",
-# 	"84" => "Glätte",
-# 	"85" => "Glatteis",
-# 	"86" => "Glätte",
-# 	"87" => "Glätte",
-# 	"88" => "Tauwetter",
-# 	"89" => "Starkes Tauwetter",
-# 	"94" => "Schweres Gewitter",
-# 	"95" => "Schweres Gewitter mit extrem heftigem Starkregen",
-# 	"96" => "Schweres Gewitter mit extrem heftigem Starkregen"
-# );
 
 my ($alertsXml, %capCityHash, %capCellHash);
 
@@ -228,6 +248,8 @@ sub GDS_Initialize($) {
 							"gdsFwName gdsFwType:0,1,2,3,4,5,6,7 ".
 							"gdsAll:0,1 gdsDebug:0,1 gdsLong:0,1 gdsPolygon:0,1 ".
 							$readingFnAttributes;
+
+	CommandDefine(undef, "gds_web HTTPSRV gds /tmp/ GDS Files");
 }
 
 sub GDS_Define($$$) {
@@ -262,7 +284,7 @@ sub GDS_Define($$$) {
 
 sub GDS_Undef($$) {
 	my ($hash, $arg) = @_;
-
+	my $name = $hash->{NAME};
 	RemoveInternalTimer($hash);
 	return undef;
 }
@@ -311,12 +333,42 @@ sub GDS_Get($@) {
 				"list:stations,data ".
 				"alerts:".$aList." ".
 				"conditions:".$sList." ".
+				"conditionsmap:".$cmapList." ".
+				"forecastsmap:".$fmapList." ".
+				"radarmap:".$cmapList." ".
+				"warningsmap:"."Deutschland,Bodensee,".$bulaList." ".
 				"warnings:".$bulaList;
 
 
 	my ($result, $datensatz, $found);
 
 	given($command) {
+
+		when("conditionsmap"){
+# retrieve map: current conditions
+			retrieveFile($hash,$command,$parameter);
+			break;
+		}
+
+		when("forecastsmap"){
+# retrieve map: forecasts
+			retrieveFile($hash,$command,$parameter);
+			break;
+		}
+
+		when("warningsmap"){
+# retrieve map: warnings
+			retrieveFile($hash,$command,$parameter);
+			break;
+		}
+
+		when("radarmap"){
+# retrieve map: radar
+			$parameter = ucfirst($parameter);
+			retrieveFile($hash,$command,$parameter,$rmapList{$parameter});
+			break;
+			}
+
 		when("help"){
 			$result = getHelp();
 			break;
@@ -365,11 +417,11 @@ sub GDS_Get($@) {
 
 		when("warnings"){
 			my $vhdl;
-			$result =	"VHDL30 = current     / VHDL31 = weekend or holiday\n".
-						"VHDL32 = preliminary / VHDL33 = cancel VHDL32\n".
-						sepLine(70);
+			$result =	"          VHDL30 = current     | VHDL31 = weekend or holiday\n".
+						"          VHDL32 = preliminary | VHDL33 = cancel VHDL32\n".
+						sepLine(31)."+".sepLine(38);
 			for ($vhdl=30; $vhdl <=33; $vhdl++){
-				(undef, $found) = retrieveFile($hash, $command, $parameter, $vhdl);
+				(undef, $found) = retrieveFile($hash, $command, $parameter, $vhdl,1);
 				if($found){
 					$result .= retrieveTextWarn($hash,@a);
 					$result .= "\n".sepLine(70);
@@ -662,12 +714,10 @@ sub findCAPWarnCellId($$){
 
 sub retrieveTextWarn($@){
 	my ($line, @a);
-
 	open WXDATA, "/tmp/warnings";
 	while (chomp($line = <WXDATA>)) { push @a, latin1ToUtf8($line); }
 	close WXDATA;
-
-	return join("\n", @a);
+	return join("", @a);
 }
 
 sub retrieveConditions($$@){
@@ -737,12 +787,12 @@ sub retrieveConditions($$@){
 	return ;
 }
 
-sub retrieveFile($$;$$){
+sub retrieveFile($$;$$$){
 #
 # request = type, e.g. alerts, conditions, warnings
 # parameter = additional selector, e.g. Bundesland
 #
-	my ($hash, $request, $parameter, $parameter2) = @_;
+	my ($hash, $request, $parameter, $parameter2, $useFtp) = @_;
 	my $name		= $hash->{NAME};
 	my $user		= $hash->{helper}{USER};
 	my $pass		= $hash->{helper}{PASS};
@@ -751,8 +801,44 @@ sub retrieveFile($$;$$){
 	my $debug		= AttrVal($name, "gdsDebug",0);
 
 	my ($dwd, $dir, $ftp, @files, $dataFile, $targetFile, $found, $readingName);
+	
+	my $urlString =	"ftp://$user:$pass\@ftp-outgoing2.dwd.de/";
+	my $ua = LWP::UserAgent->new;	# test
+	$ua->timeout(10);				# test
+	$ua->env_proxy;					# test
 
 	given($request){
+
+		when("conditionsmap"){
+			$dir = "gds/specials/observations/maps/germany/";
+			$dwd = $parameter."*";
+			$targetFile = "/tmp/cmap.jpg";
+			break;
+		}
+
+		when("forecastsmap"){
+			$dir = "gds/specials/forecasts/maps/germany/";
+			$dwd = $parameter."*";
+			$targetFile = "/tmp/fmap.jpg";
+			break;
+		}
+
+		when("warningsmap"){
+			if(length($parameter) != 2){
+				$parameter = $bula2bulaShort{lc($parameter)};
+			}
+			$dwd = "Schilder".$dwd2Dir{$bulaShort2dwd{lc($parameter)}}.".jpg";
+			$dir = "gds/specials/warnings/maps/";
+			$targetFile = "/tmp/wmap.jpg";
+			break;
+		}
+
+		when("radarmap"){
+			$dir = "gds/specials/radar/".$parameter2;
+			$dwd = "Webradar_".$parameter."*";
+			$targetFile = "/tmp/rmap.jpg";
+			break;
+		}
 
 		when("alerts"){
 			$dir = "gds/specials/warnings/xml/PVW/";
@@ -781,11 +867,12 @@ sub retrieveFile($$;$$){
 			}
 	}
 
-	Log3($name, 3, "GDS $name: retrieving $dir".$dwd." from DWD server");
+	Log3($name, 3, "GDS $name: searching $dir".$dwd." on DWD server");
+	$urlString .= $dir;
 
 	$found = 0;
 	eval {
-		$ftp = Net::FTP->new(	"ftp-outgoing2.dwd.de", 
+		$ftp = Net::FTP->new(	"ftp-outgoing2.dwd.de",
 								Debug => 0,
 								Timeout => 360,
 								FirewallType => $proxyType,
@@ -798,7 +885,13 @@ sub retrieveFile($$;$$){
 			if(@files){
 				@files = sort(@files);
 				$dataFile = $files[-1];
-				$ftp->get($files[-1], $targetFile);
+				$urlString .= $dataFile;
+				Log3($name, 3, "GDS $name: retrieving $urlString");
+				if($useFtp){
+					$ftp->get($files[-1], $targetFile);
+				} else {
+					$ua->get($urlString,':content_file' => $targetFile);
+				}
 				$found = 1;
 			} else { 
 				$found = 0;
