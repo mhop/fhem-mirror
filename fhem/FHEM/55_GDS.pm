@@ -46,10 +46,10 @@
 #				added	retrieval for forecast maps
 #				added	retrieval for warning maps
 #				added	retrieval for radar maps
-#
 #				modi	use LWP::ua for some file transfers instead of ftp
 #						due to transfer errors on image files
 #						use parameter #5 = 1 in RetrieveFile for ftp
+#				added	get <name> caplist
 #
 ####################################################################################################
 
@@ -60,6 +60,7 @@ use strict;
 use warnings;
 use feature qw/say switch/;
 use Time::HiRes qw(gettimeofday);
+use Text::CSV;
 use Net::FTP;
 use List::MoreUtils 'first_index'; 
 use XML::Simple;
@@ -210,6 +211,7 @@ sub GDS_Get($@) {
 	my $usage = "Unknown argument $command, choose one of help:noArg rereadcfg:noArg ".
 				"list:stations,data ".
 				"alerts:".$aList." ".
+				"caplist:noArg ".
 				"conditions:".$sList." ".
 				"conditionsmap:".$cmapList." ".
 				"forecastsmap:".$fmapList." ".
@@ -220,6 +222,41 @@ sub GDS_Get($@) {
 	my ($result, $datensatz, $found);
 
 	given($command) {
+
+		when("caplist"){
+			my (%capHash, $file, $csv, @columns, $err, $key);
+
+			$file = '/tmp/caplist.csv';
+			$csv = Text::CSV->new( { binary => 1 } );
+			$csv->sep_char (";");
+
+			# prüfen, ob CSV schon vorhanden,
+			# falls nicht: vom Server holen
+			if (!-e "/tmp/caplist.csv"){
+				retrieveFile($hash, $command);
+			}
+
+			# CSV öffnen und parsen
+			open (CSV, "<", $file) or die $!;
+			while (<CSV>) {
+				next if ($. == 1);
+				if ($csv->parse($_)) {
+					@columns = $csv->fields();
+					$capHash{latin1ToUtf8($columns[4])} = $columns[0];
+				} else {
+					$err = $csv->error_input;
+					print "Failed to parse line: $err";
+				}
+			}
+			close CSV;
+
+			# Ausgabe sortieren und zusammenstellen
+			foreach $key (sort keys %capHash) {
+				$result .= $capHash{$key}."\t".$key."\n";
+			}
+
+			break;
+		}
 
 		when("conditionsmap"){
 			# retrieve map: current conditions
@@ -653,6 +690,13 @@ sub retrieveFile($$;$$$){
 
 	given($request){
 
+		when("caplist"){
+			$dir = "gds/help/";
+			$dwd = "legend_warnings_CAP_WarnCellsID.csv";
+			$targetFile = "/tmp/caplist.csv";
+			break;
+		}
+
 		when("conditionsmap"){
 			$dir = "gds/specials/observations/maps/germany/";
 			$dwd = $parameter."*";
@@ -730,7 +774,7 @@ sub retrieveFile($$;$$$){
 				@files = sort(@files);
 				$dataFile = $files[-1];
 				$urlString .= $dataFile;
-				Log3($name, 3, "GDS $name: retrieving $urlString");
+				Log3($name, 3, "GDS $name: retrieving $dataFile");
 				if($useFtp){
 					$ftp->get($files[-1], $targetFile);
 				} else {
