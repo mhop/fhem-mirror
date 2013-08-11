@@ -1,5 +1,5 @@
 # $Id$
-##############################################################################
+####################################################################################################
 #
 #	55_GDS.pm
 #
@@ -23,7 +23,7 @@
 #	You should have received a copy of the GNU General Public License
 #	along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-##############################################################################
+####################################################################################################
 #	Changelog:
 #
 #	2013-08-07	initial release
@@ -40,17 +40,19 @@
 #				update	commandref
 #
 #	2013-08-10	added	some more tolerance on text inputs
-#				changed	switched from GetLogList to Log3
+#				modi	switched from GetLogList to Log3
 #
 #	2013-08-11	added	retrieval for condition maps
 #				added	retrieval for forecast maps
 #				added	retrieval for warning maps
 #				added	retrieval for radar maps
 #
-#				changed	use LWP::ua for some file transfers instead of ftp
+#				modi	use LWP::ua for some file transfers instead of ftp
 #						due to transfer errors on image files
 #						use parameter #5 = 1 in RetrieveFile for ftp
 #
+####################################################################################################
+
 
 package main;
 
@@ -71,170 +73,17 @@ sub GDS_Set($@);
 sub GDS_Get($@);
 sub GDS_Attr(@);
 
-sub getListStationsDropdown();
-sub buildCAPList();
 
-
-my $bulaList =	"Baden-Württemberg,Bayern,Berlin,Brandenburg,Bremen,".
-				"Hamburg,Hessen,Mecklenburg-Vorpommern,Niedersachsen,".
-				"Nordrhein-Westfalen,Rheinland-Pfalz,Saarland,Sachsen,".
-				"Sachsen-Anhalt,Schleswig-Holstein,Thüringen";
-
-my $cmapList =	"Deutschland,Mitte,Nordost,Nordwest,Ost,Suedost,Suedwest,West";
-
-my %rmapList = (
-	Deutschland	=> "",
-	Mitte		=> "central/",
-	Nordost		=> "northeast/",
-	Nordwest	=> "northwest/",
-	Ost			=> "east/",
-	Suedost		=> "southeast/",
-	Suedwest	=> "southwest/",
-	West		=> "west/");
-
-my $fmapList =	"Deutschland_heute_frueh,Deutschland_heute_mittag,Deutschland_heute_spaet,Deutschland_heute_nacht,".
-				"Deutschland_morgen_frueh,Deutschland_morgen_spaet,".
-				"Deutschland_ueberm_frueh,Deutschland_ueberm_spaet,".
-				"Deutschland_tag4_frueh,Deutschland_tag4_spaet".
-				"Mitte_heute_frueh,Mitte_heute_mittag,Mitte_heute_spaet,Mitte_heute_nacht,".
-				"Mitte_morgen_frueh,Mitte_morgen_spaet,".
-				"Mitte_ueberm_frueh,Mitte_ueberm_spaet,".
-				"Mitte_tag4_frueh,Mitte_tag4_spaet".
-				"Nordost_heute_frueh,Nordost_heute_mittag,Nordost_heute_spaet,Nordost_heute_nacht,".
-				"Nordost_morgen_frueh,Nordost_morgen_spaet,".
-				"Nordost_ueberm_frueh,Nordost_ueberm_spaet,".
-				"Nordost_tag4_frueh,Nordost_tag4_spaet".
-				"Nordwest_heute_frueh,Nordwest_heute_mittag,Nordwest_heute_spaet,Nordwest_heute_nacht,".
-				"Nordwest_morgen_frueh,Nordwest_morgen_spaet,".
-				"Nordwest_ueberm_frueh,Nordwest_ueberm_spaet,".
-				"Nordwest_tag4_frueh,Nordwest_tag4_spaet".
-				"Ost_heute_frueh,Ost_heute_mittag,Ost_heute_spaet,Ost_heute_nacht,".
-				"Ost_morgen_frueh,Ost_morgen_spaet,".
-				"Ost_ueberm_frueh,Ost_ueberm_spaet,".
-				"Ost_tag4_frueh,Ost_tag4_spaet".
-				"Suedost_heute_frueh,Suedost_heute_mittag,Suedost_heute_spaet,Suedost_heute_nacht,".
-				"Suedost_morgen_frueh,Suedost_morgen_spaet,".
-				"Suedost_ueberm_frueh,Suedost_ueberm_spaet,".
-				"Suedost_tag4_frueh,Suedost_tag4_spaet".
-				"Suedwest_heute_frueh,Suedwest_heute_mittag,Suedwest_heute_spaet,Suedwest_heute_nacht,".
-				"Suedwest_morgen_frueh,Suedwest_morgen_spaet,".
-				"Suedwest_ueberm_frueh,Suedwest_ueberm_spaet,".
-				"Suedwest_tag4_frueh,Suedwest_tag4_spaet".
-				"West_heute_frueh,West_heute_mittag,West_heute_spaet,West_heute_nacht,".
-				"West_morgen_frueh,West_morgen_spaet,".
-				"West_ueberm_frueh,West_ueberm_spaet,".
-				"West_tag4_frueh,West_tag4_spaet";
-
-#
-# Bundesländer den entsprechenden Dienststellen zuordnen
-#
-my %bula2bulaShort = (
-	"baden-württemberg"			=> "bw",
-	"bayern"					=> "by",
-	"berlin"					=> "be",
-	"brandenburg"				=> "bb",
-	"bremen"					=> "hb",
-	"hamburg"					=> "hh",
-	"hessen" 					=> "he",
-	"mecklenburg-vorpommern"	=> "mv",
-	"niedersachsen"				=> "ni",
-	"nordrhein-westfalen"		=> "nw",
-	"rheinland-pfalz"			=> "rp",
-	"saarland"					=> "sl",
-	"sachsen"					=> "sn",
-	"sachsen-anhalt"			=> "st",
-	"schleswig-holstein"		=> "sh",
-	"thüringen"					=> "th",
-	"deutschland"				=> "xde",
-	"bodensee"					=> "xbo" );
-
-my %bulaShort2dwd = (
-	bw => "DWSG",
-	by => "DWMG",
-	be => "DWPG",
-	bb => "DWPG",
-	hb => "DWHG",
-	hh => "DWHH",
-	he => "DWOH",
-	mv => "DWPH",
-	ni => "DWHG",
-	nw => "DWEH",
-	rp => "DWOI",
-	sl => "DWOI",
-	sn => "DWLG",
-	st => "DWLH",
-	sh => "DWHH",
-	th => "DWLI",
-	xde => "xde",
-	xbo => "xbo" );
-
-#
-# Dienststellen den entsprechenden Serververzeichnissen zuordnen
-#
-my %dwd2Dir = (
-	DWSG => "SU", # Stuttgart
-	DWMG => "MS", # München
-	DWPG => "PD", # Potsdam
-	DWHG => "HA", # Hamburg
-	DWHH => "HA", # Hamburg
-	DWOH => "OF", # Offenbach
-	DWPH => "PD", # Potsdam
-	DWHG => "HA", # Hamburg
-	DWEH => "EM", # Essen
-	DWOI => "OF", # Offenbach
-	DWLG => "LZ", # Leipzig
-	DWLH => "LZ", # Leipzig
-	DWLI => "LZ", # Leipzig
-	DWHC => "HA", # Hamburg
-	DWHB => "HA", # Hamburg
-	DWPD => "PD", # Potsdam
-	DWRW => "PD", # Potsdam
-	DWEM => "EM", # Essen
-	LSAX => "LZ", # Leipzig
-	LSNX => "LZ", # Leipzig
-	THLX => "LZ", # Leipzig
-	DWOF => "OF", # Offenbach
-	DWTR => "OF", # Offenbach
-	DWSU => "SU", # Stuttgart
-	DWMS => "MS",
-	xde  => "D",
-	xbo  => "Bodensee" # München
-#	???? => "FG" # Freiburg
-);
-
-my %dwd2Name = (
-	EM => "Essen",
-	FG => "Freiburg",
-	HA => "Hamburg",
-	LZ => "Leipzig",
-	MS => "München",
-	OF => "Offenbach",
-	PD => "Potsdam",
-	SU => "Stuttgart"
-);
-
-my ($alertsXml, %capCityHash, %capCellHash);
-
-my $sList;
-if (-e "/tmp/conditions"){
-	$sList = getListStationsDropdown();
-} else {
-	$sList = "please_use_rereadcfg_first";
-}
-
-my ($aList, $numCAPCount);
-if (-e "/tmp/alerts"){
-	($aList, $numCAPCount) = buildCAPList();
-} else {
-	$aList = "please_use_rereadcfg_first";
-	$numCAPCount = 0;
-}
+my ($bulaList, $cmapList, %rmapList, $fmapList, %bula2bulaShort, %bulaShort2dwd, %dwd2Dir, %dwd2Name,
+	$alertsXml, %capCityHash, %capCellHash, $sList, $aList);
 
 
 ####################################################################################################
 #
 # Main routines
 #
+####################################################################################################
+
 
 sub GDS_Initialize($) {
 	my ($hash) = @_;
@@ -251,6 +100,9 @@ sub GDS_Initialize($) {
 
 	CommandDefine(undef, "gds_web HTTPSRV gds /tmp/ GDS Files");
 	createIndexFile();
+	fillMappingTables();
+	initDropdownLists
+	
 }
 
 sub GDS_Define($$$) {
@@ -290,36 +142,61 @@ sub GDS_Undef($$) {
 	return undef;
 }
 
-sub GDS_Attr(@){
-	my @a = @_;
-	my $hash = $defs{$a[1]};
-	my (undef, $name, $attrName, $attrValue) = @a;
-	given($attrName){
-		when("gdsDebug"){
-			CommandDeleteReading(undef, "$name _dF.*") if($attrValue != 1);
+sub GDS_Set($@) {
+	my ($hash, @a) = @_;
+	my $name = $hash->{NAME};
+	my $usage =	"Unknown argument, choose one of clear:noArg help:noArg rereadcfg:noArg update:noArg ".
+				"conditions:".$sList." ";
+
+	my $command		= lc($a[1]);
+	my $parameter	= $a[2] if(defined($a[2]));
+
+	my ($result, $next);
+
+	$hash->{LOCAL} = 1;
+	$hash->{STATE} = "active";
+
+	given($command) {
+		when("clear"){
+			CommandDeleteReading(undef, "$name a_.*");
+			CommandDeleteReading(undef, "$name c_.*");
+			CommandDeleteReading(undef, "$name g_.*");
+			}
+		when("help"){
+			$result = setHelp();
 			break;
 			}
 
-		default {$attr{$name}{$attrName} = $attrValue;}
+		when("rereadcfg"){
+			eval {
+				retrieveFile($hash,"conditions");
+				$sList = getListStationsDropdown();
+			}; 
+			eval {
+				retrieveFile($hash,"alerts");
+				($aList, undef) = buildCAPList();
+			}; 
+			break;
+			}
+
+		when("update"){
+			RemoveInternalTimer($hash);
+			GDS_GetUpdate($hash);
+			break;
+			}
+
+		when("conditions"){
+			retrieveConditions($hash, "c", @a);
+			$next = gettimeofday()+$hash->{helper}{INTERVAL};
+			readingsSingleUpdate($hash, "c_nextUpdate", localtime($next), 1);
+			RemoveInternalTimer($hash);
+			InternalTimer($next, "GDS_GetUpdate", $hash, 1);
+			break;
+			}
+
+		default { return $usage; };
 	}
-	return "";
-}
-
-sub GDS_GetUpdate($) {
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-	my (@a, $next);
-
-	push @a, undef;
-	push @a, undef;
-	push @a, ReadingsVal($name, "c_stationName", "");
-	retrieveConditions($hash, "c", @a);
-
-	$next = gettimeofday()+$hash->{helper}{INTERVAL};
-	readingsSingleUpdate($hash, "c_nextUpdate", localtime($next), 1);
-	InternalTimer($next, "GDS_GetUpdate", $hash, 1);
-
-	return 1;
+	return $result;
 }
 
 sub GDS_Get($@) {
@@ -340,31 +217,30 @@ sub GDS_Get($@) {
 				"warningsmap:"."Deutschland,Bodensee,".$bulaList." ".
 				"warnings:".$bulaList;
 
-
 	my ($result, $datensatz, $found);
 
 	given($command) {
 
 		when("conditionsmap"){
-# retrieve map: current conditions
+			# retrieve map: current conditions
 			retrieveFile($hash,$command,$parameter);
 			break;
 		}
 
 		when("forecastsmap"){
-# retrieve map: forecasts
+			# retrieve map: forecasts
 			retrieveFile($hash,$command,$parameter);
 			break;
 		}
 
 		when("warningsmap"){
-# retrieve map: warnings
+			# retrieve map: warnings
 			retrieveFile($hash,$command,$parameter);
 			break;
 		}
 
 		when("radarmap"){
-# retrieve map: radar
+			# retrieve map: radar
 			$parameter = ucfirst($parameter);
 			retrieveFile($hash,$command,$parameter,$rmapList{$parameter});
 			break;
@@ -437,67 +313,45 @@ sub GDS_Get($@) {
 	return $result;
 }
 
-sub GDS_Set($@) {
-	my ($hash, @a) = @_;
-	my $name = $hash->{NAME};
-	my $usage =	"Unknown argument, choose one of clear:noArg help:noArg rereadcfg:noArg update:noArg ".
-				"conditions:".$sList." ";
-
-	my $command		= lc($a[1]);
-	my $parameter	= $a[2] if(defined($a[2]));
-
-	my ($result, $next);
-
-	$hash->{LOCAL} = 1;
-	$hash->{STATE} = "active";
-
-	given($command) {
-		when("clear"){
-			CommandDeleteReading(undef, "$name a_.*");
-			CommandDeleteReading(undef, "$name c_.*");
-			CommandDeleteReading(undef, "$name g_.*");
-			}
-		when("help"){
-			$result = setHelp();
+sub GDS_Attr(@){
+	my @a = @_;
+	my $hash = $defs{$a[1]};
+	my (undef, $name, $attrName, $attrValue) = @a;
+	given($attrName){
+		when("gdsDebug"){
+			CommandDeleteReading(undef, "$name _dF.*") if($attrValue != 1);
 			break;
 			}
 
-		when("rereadcfg"){
-			eval {
-				retrieveFile($hash,"conditions");
-				$sList = getListStationsDropdown();
-			}; 
-			eval {
-				retrieveFile($hash,"alerts");
-				($aList, undef) = buildCAPList();
-			}; 
-			break;
-			}
-
-		when("update"){
-			RemoveInternalTimer($hash);
-			GDS_GetUpdate($hash);
-			break;
-			}
-
-		when("conditions"){
-			retrieveConditions($hash, "c", @a);
-			$next = gettimeofday()+$hash->{helper}{INTERVAL};
-			readingsSingleUpdate($hash, "c_nextUpdate", localtime($next), 1);
-			RemoveInternalTimer($hash);
-			InternalTimer($next, "GDS_GetUpdate", $hash, 1);
-			break;
-			}
-
-		default { return $usage; };
+		default {$attr{$name}{$attrName} = $attrValue;}
 	}
-	return $result;
+	return "";
 }
+
+sub GDS_GetUpdate($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	my (@a, $next);
+
+	push @a, undef;
+	push @a, undef;
+	push @a, ReadingsVal($name, "c_stationName", "");
+	retrieveConditions($hash, "c", @a);
+
+	$next = gettimeofday()+$hash->{helper}{INTERVAL};
+	readingsSingleUpdate($hash, "c_nextUpdate", localtime($next), 1);
+	InternalTimer($next, "GDS_GetUpdate", $hash, 1);
+
+	return 1;
+}
+
 
 ####################################################################################################
 #
-# Routines used by "get"
+#	Tools
 #
+####################################################################################################
+
 
 sub getHelp(){
 	return	"Use one of the following commands:\n".
@@ -540,11 +394,6 @@ sub getListStationsText($@){
 	return join("\n", @a);
 }
 
-####################################################################################################
-#
-# Routines used by "set"
-#
-
 sub setHelp(){
 	return	"Use one of the following commands:\n".
 			sepLine(35)."\n".
@@ -554,12 +403,6 @@ sub setHelp(){
 			"set <name> update\n".
 			"set <name> help\n";
 }
-
-####################################################################################################
-#
-# some tools
-# called by various routines
-#
 
 sub buildCAPList(){
 	my $xml			= new XML::Simple;
@@ -963,6 +806,163 @@ sub createIndexFile(){
 	return;
 }
 
+sub fillMappingTables(){
+
+	$bulaList =	"Baden-Württemberg,Bayern,Berlin,Brandenburg,Bremen,".
+				"Hamburg,Hessen,Mecklenburg-Vorpommern,Niedersachsen,".
+				"Nordrhein-Westfalen,Rheinland-Pfalz,Saarland,Sachsen,".
+				"Sachsen-Anhalt,Schleswig-Holstein,Thüringen";
+
+	$cmapList =	"Deutschland,Mitte,Nordost,Nordwest,Ost,Suedost,Suedwest,West";
+
+	%rmapList = (
+	Deutschland	=> "",
+	Mitte		=> "central/",
+	Nordost		=> "northeast/",
+	Nordwest	=> "northwest/",
+	Ost			=> "east/",
+	Suedost		=> "southeast/",
+	Suedwest	=> "southwest/",
+	West		=> "west/");
+
+	$fmapList =	"Deutschland_heute_frueh,Deutschland_heute_mittag,Deutschland_heute_spaet,Deutschland_heute_nacht,".
+				"Deutschland_morgen_frueh,Deutschland_morgen_spaet,".
+				"Deutschland_ueberm_frueh,Deutschland_ueberm_spaet,".
+				"Deutschland_tag4_frueh,Deutschland_tag4_spaet".
+				"Mitte_heute_frueh,Mitte_heute_mittag,Mitte_heute_spaet,Mitte_heute_nacht,".
+				"Mitte_morgen_frueh,Mitte_morgen_spaet,".
+				"Mitte_ueberm_frueh,Mitte_ueberm_spaet,".
+				"Mitte_tag4_frueh,Mitte_tag4_spaet".
+				"Nordost_heute_frueh,Nordost_heute_mittag,Nordost_heute_spaet,Nordost_heute_nacht,".
+				"Nordost_morgen_frueh,Nordost_morgen_spaet,".
+				"Nordost_ueberm_frueh,Nordost_ueberm_spaet,".
+				"Nordost_tag4_frueh,Nordost_tag4_spaet".
+				"Nordwest_heute_frueh,Nordwest_heute_mittag,Nordwest_heute_spaet,Nordwest_heute_nacht,".
+				"Nordwest_morgen_frueh,Nordwest_morgen_spaet,".
+				"Nordwest_ueberm_frueh,Nordwest_ueberm_spaet,".
+				"Nordwest_tag4_frueh,Nordwest_tag4_spaet".
+				"Ost_heute_frueh,Ost_heute_mittag,Ost_heute_spaet,Ost_heute_nacht,".
+				"Ost_morgen_frueh,Ost_morgen_spaet,".
+				"Ost_ueberm_frueh,Ost_ueberm_spaet,".
+				"Ost_tag4_frueh,Ost_tag4_spaet".
+				"Suedost_heute_frueh,Suedost_heute_mittag,Suedost_heute_spaet,Suedost_heute_nacht,".
+				"Suedost_morgen_frueh,Suedost_morgen_spaet,".
+				"Suedost_ueberm_frueh,Suedost_ueberm_spaet,".
+				"Suedost_tag4_frueh,Suedost_tag4_spaet".
+				"Suedwest_heute_frueh,Suedwest_heute_mittag,Suedwest_heute_spaet,Suedwest_heute_nacht,".
+				"Suedwest_morgen_frueh,Suedwest_morgen_spaet,".
+				"Suedwest_ueberm_frueh,Suedwest_ueberm_spaet,".
+				"Suedwest_tag4_frueh,Suedwest_tag4_spaet".
+				"West_heute_frueh,West_heute_mittag,West_heute_spaet,West_heute_nacht,".
+				"West_morgen_frueh,West_morgen_spaet,".
+				"West_ueberm_frueh,West_ueberm_spaet,".
+				"West_tag4_frueh,West_tag4_spaet";
+
+#
+# Bundesländer den entsprechenden Dienststellen zuordnen
+#
+	%bula2bulaShort = (
+	"baden-württemberg"			=> "bw",
+	"bayern"					=> "by",
+	"berlin"					=> "be",
+	"brandenburg"				=> "bb",
+	"bremen"					=> "hb",
+	"hamburg"					=> "hh",
+	"hessen" 					=> "he",
+	"mecklenburg-vorpommern"	=> "mv",
+	"niedersachsen"				=> "ni",
+	"nordrhein-westfalen"		=> "nw",
+	"rheinland-pfalz"			=> "rp",
+	"saarland"					=> "sl",
+	"sachsen"					=> "sn",
+	"sachsen-anhalt"			=> "st",
+	"schleswig-holstein"		=> "sh",
+	"thüringen"					=> "th",
+	"deutschland"				=> "xde",
+	"bodensee"					=> "xbo" );
+
+	%bulaShort2dwd = (
+	bw => "DWSG",
+	by => "DWMG",
+	be => "DWPG",
+	bb => "DWPG",
+	hb => "DWHG",
+	hh => "DWHH",
+	he => "DWOH",
+	mv => "DWPH",
+	ni => "DWHG",
+	nw => "DWEH",
+	rp => "DWOI",
+	sl => "DWOI",
+	sn => "DWLG",
+	st => "DWLH",
+	sh => "DWHH",
+	th => "DWLI",
+	xde => "xde",
+	xbo => "xbo" );
+
+#
+# Dienststellen den entsprechenden Serververzeichnissen zuordnen
+#
+	%dwd2Dir = (
+	DWSG => "SU", # Stuttgart
+	DWMG => "MS", # München
+	DWPG => "PD", # Potsdam
+	DWHG => "HA", # Hamburg
+	DWHH => "HA", # Hamburg
+	DWOH => "OF", # Offenbach
+	DWPH => "PD", # Potsdam
+	DWHG => "HA", # Hamburg
+	DWEH => "EM", # Essen
+	DWOI => "OF", # Offenbach
+	DWLG => "LZ", # Leipzig
+	DWLH => "LZ", # Leipzig
+	DWLI => "LZ", # Leipzig
+	DWHC => "HA", # Hamburg
+	DWHB => "HA", # Hamburg
+	DWPD => "PD", # Potsdam
+	DWRW => "PD", # Potsdam
+	DWEM => "EM", # Essen
+	LSAX => "LZ", # Leipzig
+	LSNX => "LZ", # Leipzig
+	THLX => "LZ", # Leipzig
+	DWOF => "OF", # Offenbach
+	DWTR => "OF", # Offenbach
+	DWSU => "SU", # Stuttgart
+	DWMS => "MS", # München
+	xde  => "D",
+	xbo  => "Bodensee");
+#	???? => "FG" # Freiburg);
+
+	%dwd2Name = (
+	EM => "Essen",
+	FG => "Freiburg",
+	HA => "Hamburg",
+	LZ => "Leipzig",
+	MS => "München",
+	OF => "Offenbach",
+	PD => "Potsdam",
+	SU => "Stuttgart");
+
+return;
+}
+
+sub initDropdownLists(){
+	if (-e "/tmp/conditions"){
+		$sList = getListStationsDropdown();
+	} else {
+		$sList = "please_use_rereadcfg_first";
+	}
+
+	if (-e "/tmp/alerts"){
+		($aList, undef) = buildCAPList();
+	} else {
+		$aList = "please_use_rereadcfg_first";
+	}
+	return;
+}
+
+
 1;
 
 
@@ -970,13 +970,12 @@ sub createIndexFile(){
 #
 # Further informations
 #
-
 # DWD's data format is unpleasant to read, 
 # since the data columns change depending on the available data
 # (e.g. the SSS column for snow disappears when there is no snow).
 # It's also in ISO8859-1, i.e. it contains non-ASCII characters. To
 # avoid problems, we need some conversion subs in this program.
-
+#
 # Höhe  : m über NN
 # Luftd.: reduzierter Luftdruck auf Meereshöhe in hPa
 # TT    : Lufttemperatur in Grad Celsius
@@ -989,12 +988,16 @@ sub createIndexFile(){
 # FF    : Windgeschwindigkeit letztes 10-Minutenmittel in km/h
 # FX    : höchste Windspitze im Bezugszeitraum in km/h
 # ---   : Wert nicht vorhanden
+#
+####################################################################################################
 
 
 ####################################################################################################
 #
 # Documentation 
 #
+####################################################################################################
+
 
 =pod
 =begin html
