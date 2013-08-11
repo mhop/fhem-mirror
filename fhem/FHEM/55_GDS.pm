@@ -24,34 +24,6 @@
 #	along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 ####################################################################################################
-#	Changelog:
-#
-#	2013-08-07	initial release
-#
-#	2013-08-08	added	logging
-#				added	firewall/proxy support
-#				fixed	XMLin missing parameter 
-#				added	:noArg to setlist-definitions
-#				added	AttrFn
-#				modi	retrieval of VHDL messages 30-33
-#
-#	2013-08-09	added	more logging
-#				fixed	missing error message if WARNCELLID does not exist
-#				update	commandref
-#
-#	2013-08-10	added	some more tolerance on text inputs
-#				modi	switched from GetLogList to Log3
-#
-#	2013-08-11	added	retrieval for condition maps
-#				added	retrieval for forecast maps
-#				added	retrieval for warning maps
-#				added	retrieval for radar maps
-#				modi	use LWP::ua for some file transfers instead of ftp
-#						due to transfer errors on image files
-#						use parameter #5 = 1 in RetrieveFile for ftp
-#				added	get <name> caplist
-#
-####################################################################################################
 
 
 package main;
@@ -1012,6 +984,39 @@ sub initDropdownLists(){
 
 ####################################################################################################
 #
+# Documentation 
+#
+####################################################################################################
+#
+#	Changelog:
+#
+#	2013-08-07	initial release
+#
+#	2013-08-08	added	logging
+#				added	firewall/proxy support
+#				fixed	XMLin missing parameter 
+#				added	:noArg to setlist-definitions
+#				added	AttrFn
+#				modi	retrieval of VHDL messages 30-33
+#
+#	2013-08-09	added	more logging
+#				fixed	missing error message if WARNCELLID does not exist
+#				update	commandref
+#
+#	2013-08-10	added	some more tolerance on text inputs
+#				modi	switched from GetLogList to Log3
+#
+#	2013-08-11	added	retrieval for condition maps
+#				added	retrieval for forecast maps
+#				added	retrieval for warning maps
+#				added	retrieval for radar maps
+#				modi	use LWP::ua for some file transfers instead of ftp
+#						due to transfer errors on image files
+#						use parameter #5 = 1 in RetrieveFile for ftp
+#				added	get <name> caplist
+#
+####################################################################################################
+#
 # Further informations
 #
 # DWD's data format is unpleasant to read, 
@@ -1034,14 +1039,6 @@ sub initDropdownLists(){
 # ---   : Wert nicht vorhanden
 #
 ####################################################################################################
-
-
-####################################################################################################
-#
-# Documentation 
-#
-####################################################################################################
-
 
 =pod
 =begin html
@@ -1107,9 +1104,25 @@ sub initDropdownLists(){
 		<ul>Retrieve alert message for selected region from DWD server</ul>
 		<br/>
 
+		<code>get &lt;name&gt; caplist</code>
+		<br/><br/>
+		<ul>Retrieve list showing all defined warning regions.<br/>
+			You can find your WARNCELLID with this list.</ul>
+		<br/>
+
 		<code>get &lt;name&gt; conditions &lt;stationName&gt;</code>
 		<br/><br/>
 		<ul>Retrieve current conditions at selected station</ul>
+		<br/>
+
+		<code>get &lt;name&gt; conditionsmap &lt;region&gt;</code>
+		<br/><br/>
+		<ul>Retrieve map (imagefile) showing current conditions at selected station</ul>
+		<br/>
+
+		<code>get &lt;name&gt; forecastsmap &lt;stationName&gt;</code>
+		<br/><br/>
+		<ul>Retrieve map (imagefile) showing forecasts for selected region</ul>
 		<br/>
 
 		<code>get &lt;name&gt; help</code>
@@ -1125,6 +1138,11 @@ sub initDropdownLists(){
 		<code>get &lt;name&gt; list stations</code>
 		<br/><br/>
 		<ul>List all available stations that provide conditions data</ul>
+		<br/>
+
+		<code>get &lt;name&gt; radarmap &lt;region&gt;</code>
+		<br/><br/>
+		<ul>Retrieve map (imagefile) containig radar view from selected region</ul>
 		<br/>
 
 		<code>get &lt;name&gt; rereadcfg</code>
@@ -1143,6 +1161,14 @@ sub initDropdownLists(){
 				<li>report type VHDL33 = cancel report, issued if necessary to cancel VHDL32</li>
 			</ul>
 		</ul>
+		<br/>
+
+		<code>get &lt;name&gt; warningssmap &lt;region&gt;</code>
+		<br/><br/>
+		<ul>Retrieve map (imagefile) containig current warnings for selected region marked with symbols</ul>
+		<br/><br/>
+		<b>All downloaded mapfiles</b> can be found inside "GDS Files" area in left navigation bar.
+
 	</ul>
 	<br/><br/>
 
@@ -1177,9 +1203,8 @@ sub initDropdownLists(){
 	<ul>
 
 		<li>Module uses following additional Perl modules:<br/><br/>
-		<ul>Net::FTP, List::MoreUtils, XML::Simple</ul><br/><br/>
-		If not installed in your environment, please install with<br/><br/>
-		<ul><code>cpan install moduleName</code></ul></li>
+		<ul>Net::FTP, List::MoreUtils, XML::Simple, Text::CSV</ul><br/><br/>
+		If not already installed in your environment, please install them using appropriate commands from your environment.</li>
 		<br/><br/>
 		<li>Have fun!</li><br/>
 
