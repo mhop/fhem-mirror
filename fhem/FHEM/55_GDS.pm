@@ -250,6 +250,7 @@ sub GDS_Initialize($) {
 							$readingFnAttributes;
 
 	CommandDefine(undef, "gds_web HTTPSRV gds /tmp/ GDS Files");
+	createIndexFile();
 }
 
 sub GDS_Define($$$) {
@@ -949,6 +950,18 @@ sub sepLine($) {
 	return $output;
 }
 
+sub createIndexFile(){
+	my $text =	"<html><head></head><body>".
+				"<a href=\"/fhem/gds/cmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Wetterlage</a><br/>".
+				"<a href=\"/fhem/gds/fmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Vorhersage</a><br/>".
+				"<a href=\"/fhem/gds/wmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Warnungen</a><br/>".
+				"<a href=\"/fhem/gds/rmap.jpg\" target=\"blank\">Aktuelle Radarkarte</a><br/>".
+				"</body></html>";
+	open	(DATEI, ">/tmp/index.html") or die $!;
+	print	 DATEI $text;
+	close	(DATEI);
+	return;
+}
 
 1;
 
