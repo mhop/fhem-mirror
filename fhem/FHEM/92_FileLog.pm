@@ -367,12 +367,12 @@ FileLog_Get($@)
 {
   my ($hash, @a) = @_;
   
-  return "Usage: get $a[0] <infile> <outfile> <from> <to> <column_spec>...\n".
+  return "Usage: get $a[0] <infile> <outfile> <from> <to> [<column_spec>...]\n".
          "  where column_spec is <col>:<regexp>:<default>:<fn>\n" .
          "  see the FileLogGrep entries in he .gplot files\n" .
          "  <infile> is without direcory, - means the current file\n" .
          "  <outfile> is a prefix, - means stdout\n"
-        if(int(@a) < 5);
+        if(int(@a) < 4);
   shift @a;
   my $inf  = shift @a;
   my $outf = shift @a;
@@ -427,6 +427,18 @@ FileLog_Get($@)
 
   my $ifh = new IO::File $inf if($inf);
   seekTo($inf, $ifh, $hash, $from) if($ifh);
+
+  # Return the the plain file data, $outf is ignored
+  if(!@a) {
+    return "" if(!$ifh);
+    my $out = "";
+    while(my $l = <$ifh>) {
+      next if($l lt $from);
+      last if($l gt $to);
+      $out .= $l;
+    }
+    return $out;
+  }
 
   #############
   # Digest the input.
@@ -687,7 +699,6 @@ seekTo($$$$)
   my $upper = $fh->tell;
 
   my ($lower, $next, $last) = (0, $upper/2, 0);
-  my $div = 2;
   while() {                                             # Binary search
     $fh->seek($next, 0);
     my $data = <$fh>;
@@ -705,9 +716,9 @@ seekTo($$$$)
 
       # If the second line is longer then the first,
       # binary search will never get it: 
-      if($next eq $last && $data ge $ts && $div < 8192) {
-        $last = 0;
-        $div *= 2;
+      if($next eq $last && $data ge $ts) {
+        $last = seekBackOneLine($fh, $next);
+        last;
       }
     }
     if($next eq $last) {
@@ -717,9 +728,9 @@ seekTo($$$$)
 
     $last = $next;
     if(!$data || $data lt $ts) {
-      ($lower, $next) = ($next, int(($next+$upper)/$div));
+      ($lower, $next) = ($next, int(($next+$upper)/2));
     } else {
-      ($upper, $next) = ($next, int(($lower+$next)/$div));
+      ($upper, $next) = ($next, int(($lower+$next)/2));
     }
   }
   $hash->{pos}{"$fname:$ts"} = $last;
