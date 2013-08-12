@@ -37,7 +37,7 @@ use List::MoreUtils 'first_index';
 use XML::Simple;
 use HttpUtils;
 require LWP::UserAgent;
-use Data::Dumper;
+#use Data::Dumper;
 
 sub GDS_Define($$$);
 sub GDS_Undef($$);
@@ -624,7 +624,7 @@ sub retrieveConditions($$@){
 
 	Log3($name, 3, "GDS $name: Retrieving conditions data");
 	
-	($dataFile, $found) = retrieveFile($hash,"conditions");
+	($dataFile, $found) = retrieveFile($hash,"conditions",undef,undef,1);
 	open WXDATA, $tempDir.$name."_conditions";
 	while (chomp($line = <WXDATA>)) {
 		map {s/\r//g;} ($line);
@@ -745,6 +745,7 @@ sub retrieveFile($$;$$$){
 			}
 
 		when("conditions"){
+			$useFtp = 1;
 			$dir = "gds/specials/observations/tables/germany/";
 			$dwd = "*";
 			$targetFile = $tempDir.$name."_".$request;
@@ -752,6 +753,7 @@ sub retrieveFile($$;$$$){
 			}
 
 		when("warnings"){
+			$useFtp = 1;
 			if(length($parameter) != 2){
 				$parameter = $bula2bulaShort{lc($parameter)};
 			}
@@ -785,8 +787,10 @@ sub retrieveFile($$;$$$){
 				$urlString .= $dataFile;
 				Log3($name, 3, "GDS $name: retrieving $dataFile");
 				if($useFtp){
+					Log3($name, 3, "GDS $name: using FTP for retrieval");
 					$ftp->get($files[-1], $targetFile);
 				} else {
+					Log3($name, 3, "GDS $name: using HTTP for retrieval");
 					$ua->get($urlString,':content_file' => $targetFile);
 				}
 				$found = 1;
