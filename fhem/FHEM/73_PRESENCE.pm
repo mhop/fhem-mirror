@@ -959,12 +959,12 @@ PRESENCE_ProcessAbortedScan($)
     Checks for a bluetooth device with the help of presenced or collectord. They can be installed where-ever you like, just must be accessible via network.
      The given device will be checked for presence status.<br>
     <br>
-    <code>define &lt;name&gt; PRESENCE lan-bluetooth &lt;ip-address&gt;[:port] &lt;bluetooth-address&gt; [ &lt;check-interval&gt; ]</code><br>
+    <code>define &lt;name&gt; PRESENCE lan-bluetooth &lt;bluetooth-address&gt; &lt;ip-address&gt;[:port]  [ &lt;check-interval&gt; ]</code><br>
     <br>
     The default port is 5111 (presenced). Alternatly you can use port 5222 (collectord)<br>
     <br>
     <u>Example</u><br><br>
-    <code>define iPhone PRESENCE lan-bluetooth 127.0.0.1:5222 0a:4f:36:d8:f9:89</code><br><br>
+    <code>define iPhone PRESENCE lan-bluetooth 0a:4f:36:d8:f9:89 127.0.0.1:5222</code><br><br>
     <u>presenced</u><br><br>
     <ul>The presence is a perl network daemon, which provides presence checks of multiple bluetooth devices over network. 
     It listens on TCP port 5111 for incoming connections from a FHEM PRESENCE instance or a running collectord.<br>
@@ -1180,11 +1180,11 @@ Options:
     welche eine Standard-Perl-Umgebung bereitstellt und &uuml;ber Netzwerk erreichbar ist.
     <br>
     <br>
-    <code>define &lt;name&gt; PRESENCE lan-bluetooth &lt;IP-Adresse&gt;[:Port] &lt;Bluetooth-Adresse&gt; [ &lt;Interval&gt; ]</code><br>
+    <code>define &lt;name&gt; PRESENCE lan-bluetooth &lt;Bluetooth-Adresse&gt; &lt;IP-Adresse&gt;[:Port] [ &lt;Interval&gt; ]</code><br>
     <br>
     Der Standardport ist 5111 (presenced). Alternativ kann man den Port 5222 (collectord) nutzen. Generell ist der Port aber frei w&auml;hlbar.<br><br>
     <u>Beispiel</u><br><br>
-    <code>define iPhone PRESENCE lan-bluetooth 127.0.0.1:5222 0a:4f:36:d8:f9:8</code><br><br>
+    <code>define iPhone PRESENCE lan-bluetooth 0a:4f:36:d8:f9:89 127.0.0.1:5222</code><br><br>
     <u>presenced</u><br><br>
     <ul>Der presenced ist ein Perl Netzwerk Dienst, welcher eine Bluetooth-Anwesenheitserkennung von ein oder mehreren Ger&auml;ten &uuml;ber Netzwerk bereitstellt. 
     Dieser lauscht standardm&auml;&szlig;ig auf TCP Port 5111 nach eingehenden Verbindungen von dem PRESENCE Modul oder einem collectord.<br>
