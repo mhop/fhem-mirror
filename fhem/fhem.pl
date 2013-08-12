@@ -1529,7 +1529,6 @@ CommandDisplayAttr($$)
   my @a = split(" ", $def, 2);
   return "Usage: displayattr <name> [<attrname>]\n$namedef" if(@a < 1);
 
-Log 1, "DA: $cl->{NAME}";
   my @rets;
   my @devspec = devspec2array($a[0]);
 
