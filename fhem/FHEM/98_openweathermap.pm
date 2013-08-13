@@ -53,6 +53,7 @@
 #				added:	attribute owoProxy for proxy configuration
 #
 #	2013-08-13	added:	new reading for html response on "send"
+#				added:	new reading for html response on "get/set"
 #
 
 package main;
