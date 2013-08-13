@@ -3,6 +3,7 @@
   - change:  EnOcean: Manufacturer Specific Applications (EEP A5-3F-7F), Shutter:
              readings position and anglePos are updated automatically, if command
              position is sent and the reading state was changed manually to open or closed
+  - bugfix:  EnOcean: profile MD15 now sends current temperature values
   - feature: EnOcean: subtype roomSensorControl.05 (Room Sensor and Control Unit):
              actor commands added
   - feature: EnOcean: new sensor device Heating/Cooling Relay
