@@ -73,6 +73,8 @@ sub GDS_Initialize($) {
 							"gdsAll:0,1 gdsDebug:0,1 gdsLong:0,1 gdsPolygon:0,1 ".
 							$readingFnAttributes;
 
+	$tempDir = "c:\\temp\\" if($^O eq "MSWin32");
+
 	fillMappingTables($hash);
 	initDropdownLists($hash);
 	createIndexFile($hash);
@@ -107,12 +109,12 @@ sub GDS_Define($$$) {
 	$hash->{helper}{URL}		= "ftp-outgoing2.dwd.de";
 	$hash->{helper}{INTERVAL}	= 3600;
 
-	Log3($name, 3, "GDS $name created");
+	Log3($name, 3, "GDS $name: created");
+	Log3($name, 3, "GDS $name: tempDir=".$tempDir);
 
 	$dummy = "gds_web_".$name;
 	CommandDefine(undef, $dummy." HTTPSRV ".$name." ".$tempDir." GDS ".$name." Files");
 	$attr{$dummy}{"directoryindex"} = $name.".html";
-	
 	fillMappingTables($hash);
 	initDropdownLists($hash);
 	createIndexFile($hash);
@@ -282,14 +284,9 @@ sub GDS_Get($@) {
 			}
 
 		when("rereadcfg"){
-			eval {
-				retrieveFile($hash,"conditions");
-				$sList = getListStationsDropdown($hash);
-			}; 
-			eval {
-				retrieveFile($hash,"alerts");
-				($aList, undef) = buildCAPList($hash);
-			}; 
+			retrieveFile($hash,"conditions");
+			retrieveFile($hash,"alerts");
+			initDropdownLists($hash);
 			break;
 			}
 
@@ -571,7 +568,8 @@ sub decodeCAPData($$){
 
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, "_copyright", "Quelle: Deutscher Wetterdienst");
-	while(($k, $v) = each %readings) { readingsBulkUpdate($hash, $k, latin1ToUtf8($v)); }
+	while(($k, $v) = each %readings){
+		readingsBulkUpdate($hash, $k, latin1ToUtf8($v)) if(defined($v)); }
 	readingsEndUpdate($hash, 1);
 
 	return;
@@ -605,7 +603,8 @@ sub retrieveTextWarn($){
 	
 	my ($line, @a);
 	open WXDATA, $tempDir.$name."_warnings";
-	while (chomp($line = <WXDATA>)) { push @a, latin1ToUtf8($line); }
+	while (chomp($line = <WXDATA>)) { 
+		push @a, latin1ToUtf8($line); }
 	close WXDATA;
 	return join("", @a);
 }
@@ -669,7 +668,8 @@ sub retrieveConditions($$@){
 
 	CommandDeleteReading(undef, "$name $prefix"."_.*");
 	readingsBeginUpdate($hash);
-	while(($k, $v) = each %cread) { readingsBulkUpdate($hash, $k, latin1ToUtf8($v)); }
+	while(($k, $v) = each %cread) { 
+	readingsBulkUpdate($hash, $k, latin1ToUtf8($v)) if(defined($v)); }
 	readingsEndUpdate($hash, 1);
 
 	$hash->{STATE} = "active";
@@ -1015,18 +1015,24 @@ sub initDropdownLists($){
 	my($hash) = @_;
 	my $name = $hash->{NAME};
 
-	if ($name && -e $tempDir.$name."_conditions"){
-		$sList = getListStationsDropdown($hash);
-	} else {
-		$sList = "please_use_rereadcfg_first";
-	}
+	if ($name){
+		if(-e $tempDir.$name."_conditions"){
+			$sList = getListStationsDropdown($hash);
+		} else {
+			Log3($name, 3, "GDS $name: no datafile (conditions) found"); 
+			$sList = "please_use_rereadcfg_first";
+		}
 
-	if ($name && -e $tempDir.$name."_alerts"){
-		($aList, undef) = buildCAPList($hash);
+		if (-e $tempDir.$name."_alerts"){
+			($aList, undef) = buildCAPList($hash);
+		} else {
+			Log3($name, 3, "GDS $name: no datafile (alerts) found"); 
+			$aList = "please_use_rereadcfg_first";
+		}
 	} else {
 		$aList = "please_use_rereadcfg_first";
+		$sList = $aList;
 	}
-
 	return;
 }
 
@@ -1067,6 +1073,9 @@ sub initDropdownLists($){
 #						use parameter #5 = 1 in RetrieveFile for ftp
 #				added	get <name> caplist
 #
+#	2013-08-13	fixed	some minor bugs to prevent annoying console messages
+#				added	support for fhem installtions running on windows-based systems
+#
 ####################################################################################################
 #
 # Further informations
@@ -1098,6 +1107,18 @@ sub initDropdownLists($){
 <a name="GDS"></a>
 <h3>GDS</h3>
 <ul>
+
+	<b>Prerequesits</b>
+	<ul>
+	
+		<br/>
+		Module uses following additional Perl modules:<br/><br/>
+		<code>Net::FTP, List::MoreUtils, XML::Simple, Text::CSV</code><br/><br/>
+		If not already installed in your environment, please install them using appropriate commands from your environment.
+
+	</ul>
+	<br/><br/>
+	
 	<a name="GDSdefine"></a>
 	<b>Define</b>
 	<ul>
@@ -1248,7 +1269,7 @@ sub initDropdownLists($){
 	<ul>
 
 		<li>Module uses following additional Perl modules:<br/><br/>
-		<ul>Net::FTP, List::MoreUtils, XML::Simple, Text::CSV</ul><br/><br/>
+		<code>Net::FTP, List::MoreUtils, XML::Simple, Text::CSV</code><br/><br/>
 		If not already installed in your environment, please install them using appropriate commands from your environment.</li>
 		<br/><br/>
 		<li>Have fun!</li><br/>
