@@ -2696,7 +2696,7 @@ Dispatch($$$)
     next if($dmsg !~ m/$modules{$m}{Match}/i);
 
     if( my $ffn = $modules{$m}{FingerprintFn} ) {
-      (my $isdup, $idx) = CheckDuplicate($name, $dmsg, $ffn);
+      ($isdup, $idx) = CheckDuplicate($name, $dmsg, $ffn);
       return rejectDuplicate($name,$idx,$addvals) if($isdup);
     }
 
@@ -2780,7 +2780,8 @@ Dispatch($$$)
     }
   }
 
-  $duplicate{$idx}{FND} = \@found;
+  $duplicate{$idx}{FND} = \@found 
+        if(defined($idx) && defined($duplicate{$idx}));
 
   return \@found;
 }
