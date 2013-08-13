@@ -262,6 +262,7 @@ sub
 OWO_GetStatus($;$){
 	my ($hash, $local) = @_;
 	my $name = $hash->{NAME};
+	my $htmlDummy;
 	$local = 0 unless(defined($local));
 
 	$attr{$name}{"owoInterval"} = 600 if(AttrVal($name,"owoInterval",0) < 600);
@@ -275,7 +276,7 @@ OWO_GetStatus($;$){
 	my $station		= AttrVal($name, "owoStation", undef);
 
 	if(defined($user) && defined($station)){
-		Log3($name, 3, "openweather $name started: SendData");
+		Log3($name, 3, "openweather $name: started: SendData");
 
 		my $lat			= AttrVal("global", "latitude", "");
 		my $lon			= AttrVal("global", "longitude", "");
@@ -296,7 +297,7 @@ OWO_GetStatus($;$){
 				$o = 0 if(!defined($o));
 				$v = ReadingsVal($s, $v, "?") + $o;
 				$dataString = $dataString."&$p=$v";
-				Log3($name, 3, "openweather $name reading: $paraName $p $s $v");
+				Log3($name, 3, "openweather $name: reading: $paraName $p $s $v");
 				readingsSingleUpdate($hash, "my_".$p, $v, 1);
 			}
 		}
@@ -305,13 +306,15 @@ OWO_GetStatus($;$){
 
 		my $sendString = $urlString."?".$dataString;
 		if(AttrVal($name, "owoDebug",1) == 0){
-			$ua->get($sendString);
-			Log3($name, 3, "openweather $name sending: $dataString");
+			Log3($name, 3, "openweather $name: sending: $dataString");
+			$htmlDummy = $ua->get($sendString);
+			Log3($name, 3, "openweather $name: htmlResponse: ".$htmlDummy->status_line);
 		} else {
-			Log3($name, 3, "openweather $name debug:   $dataString");
+			Log3($name, 3, "openweather $name: debug:   $dataString");
 		}
-	
+
 		readingsBeginUpdate($hash);
+		readingsBulkUpdate($hash, "_myHtmlResponse", $htmlDummy->status_line);
 		readingsBulkUpdate($hash, "state","active");
 		if(AttrVal($name, "owoTimestamp", 0) == 1){
 			readingsBulkUpdate($hash, "my_lastSent", time);
@@ -319,6 +322,7 @@ OWO_GetStatus($;$){
 			readingsBulkUpdate($hash, "my_lastSent", localtime(time));
 		}
 		readingsEndUpdate($hash, 1);
+		CommandDeleteReading(undef, "$name my_.*") if $htmlDummy->is_error;
 	}
 
 ##### end of send job
@@ -331,7 +335,7 @@ OWO_GetStatus($;$){
 	my $cId = ReadingsVal($name,"c_stationId", undef);
 	if(defined($cId)){
 		my $cName = ReadingsVal($name,"stationName", "");
-		Log3($name, 3, "openweather $name retrievingStationData Id: $cId Name: $cName");
+		Log3($name, 3, "openweather $name: retrievingStationData: Id: $cId Name: $cName");
 		fhem("set $name stationById $cId");# if($cId ne "");
 	}
 
@@ -360,7 +364,7 @@ OWO_Define($$){
 	readingsEndUpdate($hash, 1);
 
 	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "OWO_GetStatus", $hash, 0);
-	Log3($name, 3, "openweather $name created");
+	Log3($name, 3, "openweather $name: created");
 
 	return;
 }
@@ -384,10 +388,10 @@ UpdateReadings($$$){
 	$response = $ua->get("$url");
 	if(defined($response)){
 		if(AttrVal($name, "owoDebug", 1) == 1){
-			Log3($name, 3, "openweather $name response:\n".$response->decoded_content);
+			Log3($name, 3, "openweather $name: response:\n".$response->decoded_content);
 		}
 	} else {
-		Log3($name, 3, "openweather $name error: no response from server");
+		Log3($name, 3, "openweather $name: error: no response from server");
 	}
 
 	CommandDeleteReading(undef, "$name $prefix.*");
@@ -404,6 +408,7 @@ UpdateReadings($$$){
 				readingsBulkUpdate($hash, $prefix."rawData", $response->decoded_content);
 			}
 			readingsBulkUpdate($hash, "_dataSource",			"www.openweathermap.org");
+			readingsBulkUpdate($hash, "_decodedWith",			"XML");
 			readingsBulkUpdate($hash, $prefix."lastWx",			$jsonWeather->{lastupdate}{value});
 			readingsBulkUpdate($hash, $prefix."sunrise",		$jsonWeather->{city}{sun}{rise});
 			readingsBulkUpdate($hash, $prefix."sunset",			$jsonWeather->{city}{sun}{set});
@@ -448,6 +453,7 @@ UpdateReadings($$$){
 				readingsBulkUpdate($hash, $prefix."sunset",   localtime($jsonWeather->{sys}{sunset}));
 			}
 			readingsBulkUpdate($hash, "_dataSource",			"www.openweathermap.org");
+			readingsBulkUpdate($hash, "_decodedWith",			"JSON");
 			readingsBulkUpdate($hash, $prefix."stationId",    $jsonWeather->{id});
 			readingsBulkUpdate($hash, $prefix."lastRxCode",   $jsonWeather->{cod});
 			readingsBulkUpdate($hash, $prefix."stationName",  $jsonWeather->{name});
