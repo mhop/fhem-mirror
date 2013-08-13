@@ -37,7 +37,6 @@ use List::MoreUtils 'first_index';
 use XML::Simple;
 use HttpUtils;
 require LWP::UserAgent;
-#use Data::Dumper;
 
 sub GDS_Define($$$);
 sub GDS_Undef($$);
@@ -567,7 +566,7 @@ sub decodeCAPData($$){
 	$readings{a_ceiling}		= $alertsXml->{info}[$info]{area}[$area]{ceiling}		if($_gdsAll);
 
 	readingsBeginUpdate($hash);
-	readingsBulkUpdate($hash, "_copyright", "Quelle: Deutscher Wetterdienst");
+	readingsBulkUpdate($hash, "_dataSource", "Quelle: Deutscher Wetterdienst");
 	while(($k, $v) = each %readings){
 		readingsBulkUpdate($hash, $k, latin1ToUtf8($v)) if(defined($v)); }
 	readingsEndUpdate($hash, 1);
@@ -645,7 +644,7 @@ sub retrieveConditions($$@){
 	}
 
 	%cread = ();
-	$cread{"_copyright"} = "Quelle: Deutscher Wetterdienst";
+	$cread{"_dataSource"} = "Quelle: Deutscher Wetterdienst";
 
 	if(length($wx{"Station"})){
 		$cread{$prefix."_stationName"}	= $wx{"Station"};
@@ -800,7 +799,7 @@ sub retrieveFile($$;$$$){
 			$ftp->quit;
 		}
 		readingsBeginUpdate($hash);
-		readingsBulkUpdate($hash, "_copyright",		"Quelle: Deutscher Wetterdienst");
+		readingsBulkUpdate($hash, "_dataSource",		"Quelle: Deutscher Wetterdienst");
 		readingsBulkUpdate($hash, "_dF_".$request, $dataFile) if(AttrVal($name, "gdsDebug", 0));
 		readingsEndUpdate($hash, 1);
 	};
