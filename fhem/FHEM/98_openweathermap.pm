@@ -33,16 +33,24 @@
 #
 ##############################################################################
 #	Changelog:
+#
 #	2013-07-28	initial release
+#
 #	2013-07-29	fixed:	some typos in documentation
 #				added:	"set <name> send"
+#
 #	2013-07-30	modi:	replaced try/catch by eval
 #				added:	some more logging
 #				added:	delete some station readings before update
 #				added:	attribute owoSendUrl
+#
 #	2013-08-08	added:	proxy support by reading env-Settings
+#
 #	2013-08-11	modi:	switched from GetLogLevel() to Log3()
-#				fixed:	useJSON (due to Fritzbox problems)
+#				fixed:	use JSON (due to Fritzbox problems)
+#
+#	2013-08-12	added:	XML for decoding, controlled by attribute owoUseXml
+#				added:	attribute owoProxy for proxy configuration
 #
 
 package main;
@@ -50,15 +58,41 @@ package main;
 use strict;
 use warnings;
 use POSIX;
-use HttpUtils;
-#use JSON; #qw/decode_json/;
+
+##############################################################################
+#
+# IMPORTANT !
+#
+# This module can handle JSON and XML data to decode weather data.
+#
+# If you do not have JSON installed on your system or if you CAN NOT install
+# JSON (e.g. on Fritzbox) you MUST NOT deactivate the following "use JSON".
+#
+# Instead, create a dummy file named "JSON.pm" an put it 
+# into your Perl installation directory.
+# This file should contain only one line of coding, that will be
+#
+# 	return 1;
+#
+# After this you can  restart fhem and create an owo device. 
+# You MUST set attribute "owoUseXml" to 1 in this device,
+# before retrieving any data via owo API
+#
+##############################################################################
+#
+
 use JSON;
+use XML::Simple;
+
+#
+##############################################################################
+
 use feature qw/say switch/;
 
 require LWP::UserAgent;			# test
-my $ua = LWP::UserAgent->new;	# test
-$ua->timeout(10);				# test
-$ua->env_proxy;					# test
+my	$ua = LWP::UserAgent->new;	# test
+	$ua->timeout(10);				# test
+	$ua->env_proxy;					# test
 
 sub OWO_Set($@);
 sub OWO_Get($@);
@@ -83,7 +117,7 @@ openweathermap_Initialize($)
 
 	$hash->{AttrList}	=	"do_not_notify:0,1 loglevel:0,1,2,3,4,5 ".
 							"owoGetUrl owoSendUrl owoInterval:600,900,1800,3600 ".
-							"owoApiKey owoStation owoUser ".
+							"owoApiKey owoProxy owoStation owoUser owoUseXml:1,0 ".
 							"owoDebug:0,1 owoRaw:0,1 owoTimestamp:0,1 ".
 							"owoSrc00 owoSrc01 owoSrc02 owoSrc03 owoSrc04 ".
 							"owoSrc05 owoSrc06 owoSrc07 owoSrc08 owoSrc09 ".
@@ -209,6 +243,12 @@ OWO_Attr(@){
 			RemoveInternalTimer($hash);
 			InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "OWO_GetStatus", $hash, 0);
 			break;
+		}
+
+		when("owoProxy"){
+			if($attrValue ne ""){
+				$ua->proxy(['http'], $attrValue);
+			}
 		}
 
 		default {
@@ -337,60 +377,98 @@ UpdateReadings($$$){
 	my ($hash, $url, $prefix) = @_;
 	my $name = $hash->{NAME};
 	my ($jsonWeather, $response);
+
+	my $xmlMode = AttrVal($name, "owoUseXml", "");
+	$url .= "&mode=xml" if($xmlMode eq "1");
 	$url .= "&APPID=".AttrVal($name, "owoApiKey", "");
-#	$response = GetFileFromURL("$url");
 	$response = $ua->get("$url");
 	if(defined($response)){
 		if(AttrVal($name, "owoDebug", 1) == 1){
-			Log3($name, 3, "openweather $name response:\n$response");
+			Log3($name, 3, "openweather $name response:\n".$response->decoded_content);
 		}
-		my $json = JSON->new->allow_nonref;
-		eval {$jsonWeather = $json->decode($response->decoded_content)}; warn $@ if $@;
 	} else {
 		Log3($name, 3, "openweather $name error: no response from server");
 	}
 
-	if(defined($jsonWeather)){
-		my @possibleReadings = ("sunrise", "sunset", "humidity", "pressureAbs", "pressureRel", "windSpeed", "windDir",
-								"clouds", "rain3h", "snow3h", "temperature", "tempMin", "tempMax");
+	CommandDeleteReading(undef, "$name $prefix.*");
 
-		foreach(@possibleReadings) { CommandDeleteReading($name, $prefix.$_); }
-							
-		readingsBeginUpdate($hash);
-		if(AttrVal($name, "owoRaw", 0) == 1){
-			readingsBulkUpdate($hash, $prefix."rawData",  $response->decoded_content);
-		} else {
-			readingsBulkUpdate($hash, $prefix."rawData",  "not requested");
+	if($xmlMode eq "1"){
+		Log3($name, 3, "openweather $name: decoding XML");
+		my $xml			= new XML::Simple;
+		$jsonWeather	= undef;
+		$jsonWeather	= $xml->XMLin($response->decoded_content, KeyAttr => { 'current' } );
+
+		if(defined($jsonWeather)){
+			readingsBeginUpdate($hash);
+			if(AttrVal($name, "owoRaw", 0) == 1){
+				readingsBulkUpdate($hash, $prefix."rawData", $response->decoded_content);
+			}
+			readingsBulkUpdate($hash, "_dataSource",			"www.openweathermap.org");
+			readingsBulkUpdate($hash, $prefix."lastWx",			$jsonWeather->{lastupdate}{value});
+			readingsBulkUpdate($hash, $prefix."sunrise",		$jsonWeather->{city}{sun}{rise});
+			readingsBulkUpdate($hash, $prefix."sunset",			$jsonWeather->{city}{sun}{set});
+			readingsBulkUpdate($hash, $prefix."stationId",		$jsonWeather->{city}{id});
+			readingsBulkUpdate($hash, $prefix."stationName",	$jsonWeather->{city}{name});
+			readingsBulkUpdate($hash, $prefix."stationCountry",	$jsonWeather->{city}{country});
+			readingsBulkUpdate($hash, $prefix."stationLat",		sprintf("%.4f",$jsonWeather->{city}{coord}{lat}));
+			readingsBulkUpdate($hash, $prefix."stationLon",		sprintf("%.4f",$jsonWeather->{city}{coord}{lon}));
+			readingsBulkUpdate($hash, $prefix."temperature",	sprintf("%.1f",$jsonWeather->{temperature}{value}-273.15));
+			readingsBulkUpdate($hash, $prefix."tempMin",		sprintf("%.1f",$jsonWeather->{temperature}{min}-273.15));
+			readingsBulkUpdate($hash, $prefix."tempMax",		sprintf("%.1f",$jsonWeather->{temperature}{max}-273.15));
+			readingsBulkUpdate($hash, $prefix."humidity",		$jsonWeather->{humidity}{value});
+			readingsBulkUpdate($hash, $prefix."pressure",		$jsonWeather->{pressure}{value});
+#			readingsBulkUpdate($hash, $prefix."pressureRel",	$jsonWeather->{main}{sea_level});
+			readingsBulkUpdate($hash, $prefix."windSpeed",		$jsonWeather->{wind}{speed}{value});
+			readingsBulkUpdate($hash, $prefix."windDir",		$jsonWeather->{wind}{direction}{value});
+			readingsBulkUpdate($hash, $prefix."clouds",			$jsonWeather->{clouds}{value});
+			readingsBulkUpdate($hash, $prefix."rain3h",			$jsonWeather->{rain}{"3h"});
+			readingsBulkUpdate($hash, $prefix."snow3h",			$jsonWeather->{snow}{"3h"});
+			readingsBulkUpdate($hash, "state", "active");
+			readingsEndUpdate($hash, 1);
+		} else { 
+			Log3($name, 3, "openweather $name error: update not possible!"); 
 		}
-		if(AttrVal($name, "owoTimestamp", 0) == 1){
-			readingsBulkUpdate($hash, $prefix."lastWx",   $jsonWeather->{dt});
-			readingsBulkUpdate($hash, $prefix."sunrise",  $jsonWeather->{sys}{sunrise});
-			readingsBulkUpdate($hash, $prefix."sunset",   $jsonWeather->{sys}{sunset});
-		} else {
-			readingsBulkUpdate($hash, $prefix."lastWx",   localtime($jsonWeather->{dt}));
-			readingsBulkUpdate($hash, $prefix."sunrise",  localtime($jsonWeather->{sys}{sunrise}));
-			readingsBulkUpdate($hash, $prefix."sunset",   localtime($jsonWeather->{sys}{sunset}));
+	} else {
+		Log3($name, 3, "openweather $name: decoding JSON");
+		my $json = JSON->new->allow_nonref;
+		eval {$jsonWeather = $json->decode($response->decoded_content)}; warn $@ if $@;
+
+		if(defined($jsonWeather)){
+			readingsBeginUpdate($hash);
+			if(AttrVal($name, "owoRaw", 0) == 1){
+				readingsBulkUpdate($hash, $prefix."rawData",  $response->decoded_content);
+			}
+			if(AttrVal($name, "owoTimestamp", 0) == 1){
+				readingsBulkUpdate($hash, $prefix."lastWx",   $jsonWeather->{dt});
+				readingsBulkUpdate($hash, $prefix."sunrise",  $jsonWeather->{sys}{sunrise});
+				readingsBulkUpdate($hash, $prefix."sunset",   $jsonWeather->{sys}{sunset});
+			} else {
+				readingsBulkUpdate($hash, $prefix."lastWx",   localtime($jsonWeather->{dt}));
+				readingsBulkUpdate($hash, $prefix."sunrise",  localtime($jsonWeather->{sys}{sunrise}));
+				readingsBulkUpdate($hash, $prefix."sunset",   localtime($jsonWeather->{sys}{sunset}));
+			}
+			readingsBulkUpdate($hash, "_dataSource",			"www.openweathermap.org");
+			readingsBulkUpdate($hash, $prefix."stationId",    $jsonWeather->{id});
+			readingsBulkUpdate($hash, $prefix."lastRxCode",   $jsonWeather->{cod});
+			readingsBulkUpdate($hash, $prefix."stationName",  $jsonWeather->{name});
+			readingsBulkUpdate($hash, $prefix."humidity",     $jsonWeather->{main}{humidity});
+			readingsBulkUpdate($hash, $prefix."pressureAbs",  $jsonWeather->{main}{pressure});
+			readingsBulkUpdate($hash, $prefix."pressureRel",  $jsonWeather->{main}{sea_level});
+			readingsBulkUpdate($hash, $prefix."windSpeed",    $jsonWeather->{wind}{speed});
+			readingsBulkUpdate($hash, $prefix."windDir",      $jsonWeather->{wind}{deg});
+			readingsBulkUpdate($hash, $prefix."clouds",       $jsonWeather->{clouds}{all});
+			readingsBulkUpdate($hash, $prefix."rain3h",       $jsonWeather->{rain}{"3h"});
+			readingsBulkUpdate($hash, $prefix."snow3h",       $jsonWeather->{snow}{"3h"});
+			readingsBulkUpdate($hash, $prefix."stationLat",   sprintf("%.4f",$jsonWeather->{coord}{lat}));
+			readingsBulkUpdate($hash, $prefix."stationLon",   sprintf("%.4f",$jsonWeather->{coord}{lon}));
+			readingsBulkUpdate($hash, $prefix."temperature",  sprintf("%.1f",$jsonWeather->{main}{temp}-273.15));
+			readingsBulkUpdate($hash, $prefix."tempMin",      sprintf("%.1f",$jsonWeather->{main}{temp_min}-273.15));
+			readingsBulkUpdate($hash, $prefix."tempMax",      sprintf("%.1f",$jsonWeather->{main}{temp_max}-273.15));
+			readingsBulkUpdate($hash, "state", "active");
+			readingsEndUpdate($hash, 1);
+		} else { 
+			Log3($name, 3, "openweather $name error: update not possible!"); 
 		}
-		readingsBulkUpdate($hash, $prefix."stationId",    $jsonWeather->{id});
-		readingsBulkUpdate($hash, $prefix."lastRxCode",   $jsonWeather->{cod});
-		readingsBulkUpdate($hash, $prefix."stationName",  $jsonWeather->{name});
-		readingsBulkUpdate($hash, $prefix."humidity",     $jsonWeather->{main}{humidity});
-		readingsBulkUpdate($hash, $prefix."pressureAbs",  $jsonWeather->{main}{pressure});
-		readingsBulkUpdate($hash, $prefix."pressureRel",  $jsonWeather->{main}{sea_level});
-		readingsBulkUpdate($hash, $prefix."windSpeed",    $jsonWeather->{wind}{speed});
-		readingsBulkUpdate($hash, $prefix."windDir",      $jsonWeather->{wind}{deg});
-		readingsBulkUpdate($hash, $prefix."clouds",       $jsonWeather->{clouds}{all});
-		readingsBulkUpdate($hash, $prefix."rain3h",       $jsonWeather->{rain}{"3h"});
-		readingsBulkUpdate($hash, $prefix."snow3h",       $jsonWeather->{snow}{"3h"});
-		readingsBulkUpdate($hash, $prefix."stationLat",   sprintf("%.4f",$jsonWeather->{coord}{lat}));
-		readingsBulkUpdate($hash, $prefix."stationLon",   sprintf("%.4f",$jsonWeather->{coord}{lon}));
-		readingsBulkUpdate($hash, $prefix."temperature",  sprintf("%.1f",$jsonWeather->{main}{temp}-273.15));
-		readingsBulkUpdate($hash, $prefix."tempMin",      sprintf("%.1f",$jsonWeather->{main}{temp_min}-273.15));
-		readingsBulkUpdate($hash, $prefix."tempMax",      sprintf("%.1f",$jsonWeather->{main}{temp_max}-273.15));
-		readingsBulkUpdate($hash, "state",                "active");
-		readingsEndUpdate($hash, 1);
-	} else { 
-		Log3($name, 3, "openweather $name error: update not possible!"); 
 	}
 	return;
 }
@@ -464,6 +542,17 @@ OWO_isday($$){
 <h3>openweathermap</h3>
 <ul>
 
+	<b>Prerequisits</b>
+	<ul>
+		<br/>
+		<li>Module uses following additional Perl modules:<br/><br/>
+		<code>XML::Simple, JSON</code><br/><br/>
+		If not already installed in your environment, please install them using appropriate commands from your environment.</li><br/>
+		<li>please check global attributes latitude, longitude and altitude are set correctly</li>
+		<li>you can use all task alone, in any combination or all together</li>
+	</ul>
+	<br/><br/>
+
 	<a name="openweathermapdefine"></a>
 	<b>Define</b>
 	<ul>
@@ -487,14 +576,6 @@ OWO_isday($$){
 
 	<b>Configuration of your owo tasks</b><br/><br/>
 	<ul>
-
-		<li>Prerequisits</li>
-		<br/>
-		<ul>
-			<li>please check global attributes latitude, longitude and altitude are set correctly</li>
-			<li>you can use all task alone, in any combination or all together</li>
-		</ul><br/>
-
 		<a name="owoconfiguration1"></a>
 		<li>1. providing your own weather data to owo network</li>
 		<br/>
@@ -601,12 +682,14 @@ OWO_isday($$){
 		&lt;intervalSeconds&gt; - define the interval used for sending own weather data and for updating SET station. Default = 1800sec. If deleted, default will be used.<br/>
 		<b>Please do not set interval below 600 seconds! This regulation is defined by openweathermap.org.</b><br/>
 		Values below 600 will be corrected to 600.<br/>
+		<li><b>owoProxy</b></li>
+		&lt;proxyAddress&gt; - define a proxy server address, please give full url and port, e.g. http://192.168.111.222:8080<br/>
 		<li><b>owoStation</b></li>
 		&lt;yourStationName&gt; - define the station name to be used in "my stats" in owo account<br/>
 		<li><b>owoUser</b></li>
 		&lt;user:password&gt; - define your username and password for owo access here<br/>
 		<li><b>owoRaw</b></li>
-		&lt;0|1&gt; - defines wether JSON date from owo will be shown in a reading (e.g. to use it for own presentations)<br/>
+		&lt;0|1&gt; - defines wether JSON date from owo will be shown in an additional reading (e.g. to use it for own presentations)<br/>
 		<li><b>owoSendUrl</b></li>
 		Current URL to post your own data. If this url changes, you can correct it here unless updated version of 98_openweather becomes available.<br/>
 		<li><b>owoTimestamp</b></li>
@@ -616,6 +699,8 @@ OWO_isday($$){
 		Example: <code>attr owo owoSrc00 temp:outside:temperature</code> will define an attribut owoSrc00, and <br/>
 		reading "temperature" from device "outside" will be sent to owo network als paramater "temp" (which indicates current temperature)<br/>
 		Parameter "offset" will be added to the read value (e.g. necessary to send dewpoint - use offset 273.15 to send correct value)
+		<li><b>owoUseXml</b></li>
+		&lt;0|1&gt; - defines wether data must be decoded from XML, e.g. JSON not available on Fritzbox<br/>
 	</ul>
 	<br/><br/>
 	<b>Generated Readings/Events:</b><br/><br/>
