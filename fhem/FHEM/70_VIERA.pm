@@ -1,4 +1,5 @@
-﻿##############################################################################
+﻿# $Id: 70_VIERA.pm  $
+##############################################################################
 #
 # 70_VIERA.pm
 #
@@ -7,9 +8,13 @@
 # written 2013 by Tobias Vaupel <fhem at 622 mbit dot de>
 #
 #
-# Version = 1.10
+# Version = 1.11
 #
 # Version  History:
+# - 1.11 - 2013-08-13
+# -- added "noArg" at get/set-command
+# -- changed format of return() in VIERA_Get() for get-command dropdown menu in FHEMWEB
+#
 # - 1.10 - 2013-06-29
 # -- Added support for module 95_remotecontrol
 # -- New functions: sub VIERA_RClayout_TV(); sub VIERA_RCmakenotify($$);
@@ -113,14 +118,6 @@ sub VIERA_Initialize($){
   $data{RC_makenotify}{VIERA} = "VIERA_RCmakenotify";
 }
 
-sub VIERA_Undefine($$){
-  my($hash, $name) = @_;
-  
-  # Stop the internal GetStatus-Loop and exist
-  RemoveInternalTimer($hash);
-  return undef;
-}
-
 sub VIERA_Define($$){
   my ($hash, $def) = @_;
   my @args = split("[ \t][ \t]*", $def);
@@ -149,38 +146,93 @@ sub VIERA_Define($$){
   return undef;
 }
 
-sub connection($$){
-  my $tmp =  shift ;
-  my $TV = shift;
-  my $buffer = "";
-  my $tmp2 = "";
-  my $sock = new IO::Socket::INET (
-    PeerAddr => $TV,
-    PeerPort => '55000',
-    Proto => 'tcp',
-    Timeout => 2
-  );
+sub VIERA_Set($@){
+  my ($hash, @a) = @_;
+  my $name = $hash->{NAME};
+  my $host = $hash->{helper}{HOST};
+  my $count = @a;
+  my $ret = "";
+  my $key = "";
+  my $tab = "";
+  my $usage = "choose one of off:noArg mute:on,off volume:slider,0,1,100 remoteControl:" . join(",", sort keys %VIERA_remoteControl_args);
+  $usage =~ s/(NRC_|-ONOFF)//g;
   
-  #Log 5, "VIERA: connection message: $tmp";
   
-  if(defined ($sock)){
-    print $sock $tmp;
-    my $buff ="";
-
-    while ((read $sock, $buff, 1) > 0){
-      $buffer .= $buff;
-    }
+  return "VIERA: No argument given, $usage" if(!defined($a[1]));
+  my $what = $a[1];  
+  
+  return "VIERA: No state given, $usage" if(!defined($a[2]) && $what ne "off");
+  my $state = $a[2];
+  
+  
+  if($what eq "mute"){
+    Log GetLogLevel($name, 3), "VIERA: Set mute $state";
     
-    my @tmp2 = split (/\n/,$buffer);
-    #Log 4, "VIERA: $TV response: $tmp2[0]";
-    #Log 5, "VIERA: $TV buffer response: $buffer";
-    $sock->close();
-    return $buffer;
+    if ($state eq "on") {$state = 1;} else {$state = 0;}
+    $ret = connection(VIERA_BuildXML_RendCtrl($hash, "Set", "Mute", $state), $host);
+  }
+  elsif($what eq "volume"){
+    if($state < 0 || $state > 100){
+      return "Range is too high! Use Value 0 till 100 for volume.";
+    }
+    Log GetLogLevel($name, 3), "VIERA: Set volume $state";
+    $ret = connection(VIERA_BuildXML_RendCtrl($hash, "Set", "Volume", $state), $host);
+  }
+  elsif($what eq "remoteControl"){
+    if($state eq "?"){
+      $usage = "choose one of the states:\n";
+      foreach $key (sort keys %VIERA_remoteControl_args){
+        if(length($key) < 17){ $tab = "\t\t"; }else{ $tab = "\t"; }
+        $usage .= "$key $tab=> $VIERA_remoteControl_args{$key}\n";
+      }
+      $usage =~ s/(NRC_|-ONOFF)//g;
+      return $usage;
+    }
+    else{
+      $state = uc($state);
+      Log GetLogLevel($name, 3), "VIERA: Set remoteControl $state";   
+      $ret = connection(VIERA_BuildXML_NetCtrl($hash,$state), $host);
+    }
+  }
+  elsif($what eq "off"){
+    Log GetLogLevel($name, 3), "VIERA: Set off";   
+    $ret = connection(VIERA_BuildXML_NetCtrl($hash,"POWER"), $host);
   }
   else{
-    #Log 4, "VIERA: $TV: not able to open socket";
-    return undef;
+    Log GetLogLevel($name, 3), "VIERA: $usage";
+    return "Unknown argument $what, $usage";
   }
+  return;
+}
+
+sub VIERA_Get($@){
+  my ($hash, @a) = @_;
+  my $what;
+  my $usage = "choose one of mute:noArg volume:noArg";
+
+  return "VIERA: No argument given, $usage" if(int(@a) != 2);
+
+  $what = $a[1];
+
+  if($what =~ /^(volume|mute)$/) {
+    if (defined($hash->{READINGS}{$what})) {
+      return $hash->{READINGS}{$what}{VAL};
+    }
+    else{
+      return "no such reading: $what";
+    }
+  }
+  else{
+    return "Unknown argument $what, $usage";
+  }
+}
+
+sub VIERA_Undefine($$){
+  my($hash, $name) = @_;
+  
+  # Stop the internal GetStatus-Loop and exist
+  RemoveInternalTimer($hash);
+  return undef;
 }
 
 sub VIERA_GetStatus($;$){
@@ -230,84 +282,38 @@ sub VIERA_GetStatus($;$){
   return $hash->{STATE};
 }
 
-sub VIERA_Get($@){
-  my ($hash, @a) = @_;
-  my $what;
+sub connection($$){
+  my $tmp =  shift ;
+  my $TV = shift;
+  my $buffer = "";
+  my $tmp2 = "";
+  my $sock = new IO::Socket::INET (
+    PeerAddr => $TV,
+    PeerPort => '55000',
+    Proto => 'tcp',
+    Timeout => 2
+  );
+  
+  #Log 5, "VIERA: connection message: $tmp";
+  
+  if(defined ($sock)){
+    print $sock $tmp;
+    my $buff ="";
 
-  return "argument is missing" if(int(@a) != 2);
-
-  $what = $a[1];
-
-  if($what =~ /^(volume|mute)$/) {
-    if (defined($hash->{READINGS}{$what})) {
-      return $hash->{READINGS}{$what}{VAL};
+    while ((read $sock, $buff, 1) > 0){
+      $buffer .= $buff;
     }
-    else{
-      return "no such reading: $what";
-    }
-  }
-  else{
-    return "Unknown argument $what, choose one of param: volume, mute";
-  }
-}
-
-sub VIERA_Set($@){
-  my ($hash, @a) = @_;
-  my $name = $hash->{NAME};
-  my $host = $hash->{helper}{HOST};
-  my $count = @a;
-  my $ret = "";
-  my $key = "";
-  my $tab = "";
-  my $usage = "choose one of off mute:on,off volume:slider,0,1,100 remoteControl:" . join(",", sort keys %VIERA_remoteControl_args);
-  $usage =~ s/(NRC_|-ONOFF)//g;
-  
-  
-  return "VIERA: No argument given, $usage" if(!defined($a[1]));
-  my $what = $a[1];  
-  
-  return "VIERA: No state given, $usage" if(!defined($a[2]) && $what ne "off");
-  my $state = $a[2];
-  
-  
-  if($what eq "mute"){
-    Log GetLogLevel($name, 3), "VIERA: Set mute $state";
     
-    if ($state eq "on") {$state = 1;} else {$state = 0;}
-    $ret = connection(VIERA_BuildXML_RendCtrl($hash, "Set", "Mute", $state), $host);
-  }
-  elsif($what eq "volume"){
-    if($state < 0 || $state > 100){
-      return "Range is too high! Use Value 0 till 100 for volume.";
-    }
-    Log GetLogLevel($name, 3), "VIERA: Set volume $state";
-    $ret = connection(VIERA_BuildXML_RendCtrl($hash, "Set", "Volume", $state), $host);
-  }
-  elsif($what eq "remoteControl"){
-    if($state eq "?"){
-      $usage = "choose one of the states:\n";
-      foreach $key (sort keys %VIERA_remoteControl_args){
-        if(length($key) < 17){ $tab = "\t\t"; }else{ $tab = "\t"; }
-        $usage .= "$key $tab=> $VIERA_remoteControl_args{$key}\n";
-      }
-      $usage =~ s/(NRC_|-ONOFF)//g;
-      return $usage;
-    }
-    else{
-      $state = uc($state);
-      Log GetLogLevel($name, 3), "VIERA: Set remoteControl $state";   
-      $ret = connection(VIERA_BuildXML_NetCtrl($hash,$state), $host);
-    }
-  }
-  elsif($what eq "off"){
-    Log GetLogLevel($name, 3), "VIERA: Set off";   
-    $ret = connection(VIERA_BuildXML_NetCtrl($hash,"POWER"), $host);
+    my @tmp2 = split (/\n/,$buffer);
+    #Log 4, "VIERA: $TV response: $tmp2[0]";
+    #Log 5, "VIERA: $TV buffer response: $buffer";
+    $sock->close();
+    return $buffer;
   }
   else{
-    Log GetLogLevel($name, 3), "VIERA: $usage";
-    return "Unknown argument $what, $usage";
+    #Log 4, "VIERA: $TV: not able to open socket";
+    return undef;
   }
-  return;
 }
 
 #####################################
