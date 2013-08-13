@@ -52,6 +52,8 @@
 #	2013-08-12	added:	XML for decoding, controlled by attribute owoUseXml
 #				added:	attribute owoProxy for proxy configuration
 #
+#	2013-08-13	added:	new reading for html response on "send"
+#
 
 package main;
 
@@ -395,6 +397,8 @@ UpdateReadings($$$){
 	}
 
 	CommandDeleteReading(undef, "$name $prefix.*");
+	readingsSingleUpdate($hash, "_$prefix"."HtmlResponse", $response->status_line, 1);
+
 
 	if($xmlMode eq "1"){
 		Log3($name, 3, "openweather $name: decoding XML");
