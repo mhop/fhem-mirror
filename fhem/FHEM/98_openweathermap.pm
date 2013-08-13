@@ -314,7 +314,7 @@ OWO_GetStatus($;$){
 		}
 
 		readingsBeginUpdate($hash);
-		readingsBulkUpdate($hash, "_myHtmlResponse", $htmlDummy->status_line);
+		readingsBulkUpdate($hash, "_my_HtmlResponse", $htmlDummy->status_line);
 		readingsBulkUpdate($hash, "state","active");
 		if(AttrVal($name, "owoTimestamp", 0) == 1){
 			readingsBulkUpdate($hash, "my_lastSent", time);
@@ -336,7 +336,7 @@ OWO_GetStatus($;$){
 	if(defined($cId)){
 		my $cName = ReadingsVal($name,"stationName", "");
 		Log3($name, 3, "openweather $name: retrievingStationData: Id: $cId Name: $cName");
-		fhem("set $name stationById $cId");# if($cId ne "");
+		fhem("set $name stationById $cId");
 	}
 
 ##### end of update job
