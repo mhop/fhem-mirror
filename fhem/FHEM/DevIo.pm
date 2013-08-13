@@ -82,7 +82,6 @@ DevIo_SimpleWrite($$$)
   return if(!$hash);
 
   my $name = $hash->{NAME};
-print LOG "DS: $name\n";
   Log3 $name, 5, "SW: $msg";
 
   $msg = pack('H*', $msg) if($ishex);
