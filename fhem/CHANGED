@@ -1,5 +1,15 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - change:  EnOcean: Manufacturer Specific Applications (EEP A5-3F-7F), Shutter:
+             readings position and anglePos are updated automatically, if command
+             position is sent and the reading state was changed manually to open or closed
+  - feature: EnOcean: subtype roomSensorControl.05 (Room Sensor and Control Unit):
+             actor commands added
+  - feature: EnOcean: new sensor device Heating/Cooling Relay
+  - feature: EnOcean: new attr sensorMode, temperatureRefDev, humidityRefDev
+  - feature: EnOcean: EEP: MSC basic functions implemented (no teach-in)
+  - feature: EnOcean: 4BS teach-in with EEP number and Manufacturer ID
+  - bugfix:  EnOcean: subtypes tempSensor.??: calculations corrected
   - feature: new module 55_GDS.pm added (betateilchen)
   - feature: HUEDevice: special svg icon for unreachable (hard switched off) devices
   - feature: FHEMWEB detail screen with get dropdown
