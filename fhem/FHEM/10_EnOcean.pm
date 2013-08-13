@@ -12,20 +12,23 @@ sub EnOcean_Initialize($);
 sub EnOcean_Parse($$);
 sub EnOcean_Set($@);
 sub EnOcean_MD15Cmd($$$);
+sub EnOcean_CheckSenderID($$$);
 sub EnOcean_SndRadio($$$$$$$);
 sub EnOcean_ReadingScaled($$$$);
 sub EnOcean_TimerSet($);
 sub EnOcean_Undef($$);
 
 my %EnO_rorgname = ("F6" => "switch",  # RPS, org 05
-                    "D5" =>" contact", # 1BS, org 06
+                    "D5" => "contact", # 1BS, org 06
                     "A5" => "sensor",  # 4BS, org 07
-                    "D2" => "vld",     # VLD
+                    "D1" => "MSC",     # MSC
+                    "D2" => "VLD",     # VLD
+                    "D4" => "UTE",     # UTE
                    );
 my @EnO_ptm200btn = ("AI", "A0", "BI", "B0", "CI", "C0", "DI", "D0");
 my %EnO_ptm200btn;
 
-# Gateway Commands
+# Gateway commands
 my @EnO_gwCmd = ("switching", "dimming", "setpointShift", "setpointBasic", "controlVar", "fanStage", "blindCmd");
 my %EnO_gwCmd = (
   "switching"     => 1,
@@ -37,8 +40,7 @@ my %EnO_gwCmd = (
   "blindCmd"      => 7,
 );
 
-# Some Manufacturers (e.g. Jaeger Direkt) also sell EnOcean products without an
-# entry in the table below. This table is only needed for 4BS category devices.
+# Some Manufacturers (e.g. Jaeger Direkt) also sell EnOcean products without an entry in the table below.
 my %EnO_manuf = (
   "001" => "Peha",
   "002" => "Thermokon",
@@ -173,14 +175,14 @@ my %EnO_subType = (
   "F6.10.00" => "windowHandle",
   1          => "switch",
   2          => "sensor",
-  3          => "vld",
-  4          => "FRW",
-  5          => "PM101",
-  6          => "raw",
+  3          => "FRW",
+  4          => "PM101",
+  5          => "raw",
 );
 
 my @EnO_models = qw (
   other
+  FAE14 FHK14
   FSB14 FSB61 FSB70
   FSM12 FSM61
   FT55
@@ -203,21 +205,23 @@ EnOcean_Initialize($)
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 " .
                        "actualTemp angleMax:slider,-180,20,180 angleMin:slider,-180,20,180 " .
-                       "angleTime:0,1,2,3,4,5,6 destinationID dimValueOn " .
+                       "angleTime:0,1,2,3,4,5,6 comMode:biDir,uniDir destinationID " .
+                       "devChannel dimValueOn " .
+                       "gwCmd:" . join(",", sort @EnO_gwCmd) . " humidityRefDev " .
+                       "manufID:" . join(",", sort keys %EnO_manuf) . " " . 
                        "model:" . join(",", @EnO_models) . " " .
-                       "gwCmd:" . join(",", sort @EnO_gwCmd) . " " .
-                       "manufID:" . join(",", keys %EnO_manuf) . " " . 
                        "rampTime repeatingAllowed:yes,no " .
                        "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin " .
-                       "securityLevel:unencrypted " .
-                       "shutTime shutTimeCloses subDef subDef0 subDefI " .
+                       "securityLevel:unencrypted sensorMode:switch,pushbutton " .
+                       "shutTime shutTimeCloses subDef " .
+                       "subDef0 subDefI " .
                        "subType:" . join(",", sort grep { !$subTypeList{$_}++ } values %EnO_subType) . " " .
                        "subTypeSet:" . join(",", sort grep { !$subTypeSetList{$_}++ } values %EnO_subType) . " " .
                        "switchMode:switch,pushbutton " .
-                       "switchType:direction,universal,central " .
+                       "switchType:direction,universal,central temperatureRefDev " .
                        $readingFnAttributes;
 
-  for(my $i=0; $i<@EnO_ptm200btn;$i++) {
+  for (my $i = 0; $i < @EnO_ptm200btn; $i++) {
     $EnO_ptm200btn{$EnO_ptm200btn[$i]} = "$i:30";
   }
   $EnO_ptm200btn{released} = "0:20";
@@ -232,7 +236,7 @@ EnOcean_Define($$)
   my @a = split("[ \t][ \t]*", $def);
   my $name = $hash->{NAME};
   return "wrong syntax: define <name> EnOcean 8-digit-hex-code"
-    if(int(@a)!=3 || $a[2] !~ m/^[A-F0-9]{8}$/i);
+    if(int(@a) != 3 || $a[2] !~ m/^[A-F0-9]{8}$/i);
 
   $modules{EnOcean}{defptr}{uc($a[2])} = $hash;
   AssignIoPort($hash);
@@ -271,17 +275,308 @@ EnOcean_Set($@)
   if ($subDef !~ m/^[\dA-F]{8}$/) {return "SenderID $subDef wrong, choose <8-digit-hex-code>.";}
   my $switchMode = AttrVal($name, "switchMode", "switch");
   my $tn = TimeNow();
+  # control set actions
+  # $updateState = -1: no set commands available e. g. sensors
+  #                 0: execute set commands
+  #                 1: execute set commands and and update reading state
+  #                 2: execute set commands delayed
   my $updateState = 1;
   shift @a;
 
-  for(my $i = 0; $i < @a; $i++) {
+  for (my $i = 0; $i < @a; $i++) {
     my $cmd = $a[$i];
 
-    if($st eq "MD15") {
-    # Battery Powered Actuator (EEP A5-20-01)
-    # [Kieback&Peter MD15-FTL-xx]
-    # See also http://www.oscat.de/community/index.php/topic,985.30.html
-    # Maintenance commands (runInit, liftSet, valveOpen, valveClosed)
+    if ($st eq "roomSensorControl.05") {
+      # Room Sensor and Control Unit (EEP A5-10-01 ... A5-10-0D)
+      # [Eltako FTF55D, FTF55H, Thermokon SR04 *, Thanos SR *, untested]
+      # $db[3] is the fan speed or night reduction for Eltako
+      # $db[2] is the setpoint where 0x00 = min ... 0xFF = max or
+      # reference temperature for Eltako where 0x00 = 0°C ... 0xFF = 40°C
+      # $db[1] is the temperature where 0x00 = +40°C ... 0xFF = 0°C
+      # $db[1]_bit_1 is blocking the aditional Room Sensor and Control Unit for Eltako FVS
+      # $db[0]_bit_0 is the slide switch
+      $rorg = "A5";
+      # primarily temperature from the reference device then the attribute actualTemp is read
+      my $temperatureRefDev = AttrVal($name, "temperatureRefDev", undef);
+      my $actualTemp = AttrVal($name, "actualTemp", 20);
+      $actualTemp = ReadingsVal($temperatureRefDev, "temperature", 20) if (defined $temperatureRefDev); 
+      $actualTemp = 20 if ($actualTemp !~ m/^[+-]?\d+(\.\d+)?$/);
+      $actualTemp = 0 if ($actualTemp < 0);
+      $actualTemp = 40 if ($actualTemp > 40);
+      readingsSingleUpdate($hash, "temperature", $actualTemp, 1);
+      my $setCmd = 8;
+      if ($manufID eq "00D") {
+        # EEP A5-10-06 plus DB3 [Eltako FVS]
+        my $setpointTemp = ReadingsVal($name, "setpointTemp", 20);
+        my $nightReduction = ReadingsVal($name, "nightReduction", 0);
+        my $block = ReadingsVal($name, "block", "unlock");
+        if ($cmd eq "teach") {
+          # teach-in EEP A5-10-06 plus "FVS", Manufacturer "Eltako"
+          $data = "40370D85";
+          CommandDeleteReading(undef, "$name .*");
+        } elsif ($cmd eq "desired-temp" || $cmd eq "setpointTemp") {
+          #
+          if (defined $a[1]) {
+            if (($a[1] =~ m/^[+-]?\d+(\.\d+)?$/) && ($a[1] >= 0) && ($a[1] <= 40)) {
+              $setpointTemp = $a[1];
+              shift(@a);
+            } else {
+              return "Usage: $a[1] is not numeric or out of range";
+            }
+          }          
+          if (defined $a[1]) {
+            if (($a[1] =~ m/^(lock|unlock)$/) ) {
+              $block = $a[1];
+              shift(@a);
+            } else {
+              return "Usage: $a[1] is unknown";
+            }
+          }          
+          readingsSingleUpdate($hash, "setpointTemp", $setpointTemp, 1);
+          readingsSingleUpdate($hash, "nightReduction", $nightReduction, 1);
+          readingsSingleUpdate($hash, "block", $block, 1);
+          readingsSingleUpdate($hash, "state", "T: $actualTemp SPT: $setpointTemp NR: $nightReduction", 1);
+          if ($nightReduction == 5) {
+            $nightReduction = 31;
+          } elsif ($nightReduction == 4) {
+            $nightReduction = 25;
+          } elsif ($nightReduction == 3) {
+            $nightReduction = 19;
+          } elsif ($nightReduction == 2) {
+            $nightReduction = 12;
+          } elsif ($nightReduction == 1) {
+            $nightReduction = 6;
+          } else {
+            $nightReduction = 0;
+          }
+          $actualTemp = (40 - $actualTemp) / 40 * 255;
+          $setpointTemp = $setpointTemp * 255 / 40;
+          # control of the aditional Room Sensor and Control Unit
+          if ($block eq "lock") {
+            # temperature setting is locked
+            $setCmd = 0x0D;
+          } else {
+            # setpointTemp may be subject to change at +/-3 K
+            $setCmd = 0x0F;              
+          }
+          $updateState = 0;
+          $data = sprintf "%02X%02X%02X%02X", $nightReduction, $setpointTemp, $actualTemp, $setCmd;
+          
+        } elsif ($cmd eq "nightReduction") {
+          # 
+          if (defined $a[1]) {
+            if ($a[1] =~ m/^[0-5]$/) {
+              $nightReduction = $a[1];
+              shift(@a);
+            } else {
+              return "Usage: $a[1] is not numeric or out of range";
+            }
+          }
+          if (defined $a[1]) {
+            if (($a[1] =~ m/^(lock|unlock)$/) ) {
+              $block = $a[1];
+              shift(@a);
+            } else {
+              return "Usage: $a[1] is unknown";
+            }
+          }          
+          readingsSingleUpdate($hash, "setpointTemp", $setpointTemp, 1);
+          readingsSingleUpdate($hash, "nightReduction", $nightReduction, 1);
+          readingsSingleUpdate($hash, "block", $block, 1);
+          readingsSingleUpdate($hash, "state", "T: $actualTemp SPT: $setpointTemp NR: $nightReduction", 1);
+          if ($nightReduction == 5) {
+            $nightReduction = 31;
+          } elsif ($nightReduction == 4) {
+            $nightReduction = 25;
+          } elsif ($nightReduction == 3) {
+            $nightReduction = 19;
+          } elsif ($nightReduction == 2) {
+            $nightReduction = 12;
+          } elsif ($nightReduction == 1) {
+            $nightReduction = 6;
+          } else {
+            $nightReduction = 0;
+          }
+          $actualTemp = (40 - $actualTemp) / 40 * 255;
+          $setpointTemp = $setpointTemp * 255 / 40;
+          # control of the aditional Room Sensor and Control Unit
+          if ($block eq "lock") {
+            # temperature setting is locked
+            $setCmd = 0x0D;
+          } else {
+            # setpointTemp may be subject to change at +/-3 K
+            $setCmd = 0x0F;              
+          }
+          $updateState = 0;
+          $data = sprintf "%02X%02X%02X%02X", $nightReduction, $setpointTemp, $actualTemp, $setCmd;
+        
+        } else {
+          return "Unknown argument " . $cmd . ", choose one of desired-temp nightReduction:0,1,2,3,4,5 setpointTemp teach"
+        }
+        
+      } else {
+        # EEP A5-10-02
+        my $setpoint = ReadingsVal($name, "setpoint", 128);
+        my $setpointScaled = ReadingsVal($name, "setpointScaled", undef);
+        my $fanStage = ReadingsVal($name, "fanStage", "auto");
+        my $switch = ReadingsVal($name, "switch", "off");
+        $setCmd |= 1 if ($switch eq "on");
+        if ($cmd eq "teach") {
+          # teach-in EEP A5-10-02, Manufacturer "Multi user Manufacturer ID"
+          $data = "4017FF80";
+          CommandDeleteReading(undef, "$name .*");
+        } elsif ($cmd eq "fanStage") {
+          #
+          if (defined $a[1] && ($a[1] =~ m/^[0-3]$/ || $a[1] eq "auto")) {
+            $fanStage = $a[1];
+            shift(@a);
+            readingsSingleUpdate($hash, "setpointScaled", $setpointScaled, 1) if (defined $setpointScaled);
+            readingsSingleUpdate($hash, "setpoint", $setpoint, 1);
+            readingsSingleUpdate($hash, "fanStage", $fanStage, 1);
+            readingsSingleUpdate($hash, "switch", $switch, 1);
+            readingsSingleUpdate($hash, "state", "T: $actualTemp SP: $setpoint F: $fanStage SW: $switch", 1);
+            if ($fanStage eq "auto"){
+              $fanStage = 255;
+            } elsif ($fanStage == 0) {
+              $fanStage = 209;            
+            } elsif ($fanStage == 1) {
+               $fanStage = 189;           
+            } elsif ($fanStage == 2) {
+              $fanStage = 164;            
+            } else {
+              $fanStage = 144;            
+            }
+          } else {
+            return "Usage: $a[1] is not numeric, out of range or unknown";
+          }
+          $actualTemp = (40 - $actualTemp) / 40 * 255;
+          $updateState = 0;
+          $data = sprintf "%02X%02X%02X%02X", $fanStage, $setpoint, $actualTemp, $setCmd;
+          
+        } elsif ($cmd eq "setpoint") {
+          #
+          if (defined $a[1]) {
+            if (($a[1] =~ m/^[+-]?\d+(\.\d+)?$/) && ($a[1] >= 0) && ($a[1] <= 255)) {
+              $setpoint = $a[1];
+              shift(@a);
+              if (defined $setpointScaled) {
+                $setpointScaled = EnOcean_ReadingScaled($hash, $setpoint, 0, 255);
+              }
+            } else {
+              return "Usage: $a[1] is not numeric or out of range";
+            }
+
+          }
+          readingsSingleUpdate($hash, "setpointScaled", $setpointScaled, 1) if (defined $setpointScaled);
+          readingsSingleUpdate($hash, "setpoint", $setpoint, 1);
+          readingsSingleUpdate($hash, "fanStage", $fanStage, 1);
+          readingsSingleUpdate($hash, "switch", $switch, 1);
+          readingsSingleUpdate($hash, "state", "T: $actualTemp SP: $setpoint F: $fanStage SW: $switch", 1);
+          if ($fanStage eq "auto"){
+            $fanStage = 255;
+          } elsif ($fanStage == 0) {
+            $fanStage = 209;            
+          } elsif ($fanStage == 1) {
+            $fanStage = 189;           
+          } elsif ($fanStage == 2) {
+            $fanStage = 164;            
+          } else {
+            $fanStage = 144;            
+          }
+          $actualTemp = (40 - $actualTemp) / 40 * 255;
+          $updateState = 0;
+          $data = sprintf "%02X%02X%02X%02X", $fanStage, $setpoint, $actualTemp, $setCmd;
+          
+        } elsif ($cmd eq "setpointScaled") {
+          #
+          if (defined $a[1]) {
+            my $scaleMin = AttrVal($name, "scaleMin", undef);
+            my $scaleMax = AttrVal($name, "scaleMax", undef);
+            my ($rangeMin, $rangeMax);
+            if (defined $scaleMax && defined $scaleMin &&
+                $scaleMax =~ m/^[+-]?\d+(\.\d+)?$/ && $scaleMin =~ m/^[+-]?\d+(\.\d+)?$/) {
+              if ($scaleMin > $scaleMax) {
+                ($rangeMin, $rangeMax)= ($scaleMax, $scaleMin);
+              } else {
+                ($rangeMin, $rangeMax)= ($scaleMin, $scaleMax);
+              }
+            } else {
+              return "Usage: Attributes scaleMin and/or scaleMax not defined or not numeric.";            
+            }
+            if ($a[1] =~ m/^[+-]?\d+(\.\d+)?$/ && $a[1] >= $rangeMin && $a[1] <= $rangeMax) {
+              $setpointScaled = $a[1];
+              shift(@a);
+              $setpoint = sprintf "%d", 255 * $scaleMin/($scaleMin-$scaleMax) - 255/($scaleMin-$scaleMax) * $setpointScaled;
+            } else {
+              return "Usage: $a[1] is not numeric or out of range";
+            }
+          }
+          readingsSingleUpdate($hash, "setpointScaled", $setpointScaled, 1);
+          readingsSingleUpdate($hash, "setpoint", $setpoint, 1);
+          readingsSingleUpdate($hash, "fanStage", $fanStage, 1);
+          readingsSingleUpdate($hash, "switch", $switch, 1);
+          readingsSingleUpdate($hash, "state", "T: $actualTemp SP: $setpoint F: $fanStage SW: $switch", 1);
+          if ($fanStage eq "auto"){
+            $fanStage = 255;
+          } elsif ($fanStage == 0) {
+            $fanStage = 209;            
+          } elsif ($fanStage == 1) {
+            $fanStage = 189;           
+          } elsif ($fanStage == 2) {
+            $fanStage = 164;            
+          } else {
+            $fanStage = 144;            
+          }
+          $actualTemp = (40 - $actualTemp) / 40 * 255;
+          $updateState = 0;
+          $data = sprintf "%02X%02X%02X%02X", $fanStage, $setpoint, $actualTemp, $setCmd;
+          
+        } elsif ($cmd eq "switch") {
+          #
+          if (defined $a[1]) {
+            if ($a[1] eq "on") {
+              $switch = $a[1];
+              $setCmd |= 1;    
+              shift(@a);
+            } elsif ($a[1] eq "off"){            
+              $switch = $a[1];
+              shift(@a);
+            } else {
+              return "Usage: $a[1] is unknown";
+            }
+          }
+          readingsSingleUpdate($hash, "setpointScaled", $setpointScaled, 1) if (defined $setpointScaled);
+          readingsSingleUpdate($hash, "setpoint", $setpoint, 1);
+          readingsSingleUpdate($hash, "fanStage", $fanStage, 1);
+          readingsSingleUpdate($hash, "switch", $switch, 1);
+          readingsSingleUpdate($hash, "state", "T: $actualTemp SP: $setpoint F: $fanStage SW: $switch", 1);
+          if ($fanStage eq "auto"){
+            $fanStage = 255;
+          } elsif ($fanStage == 0) {
+            $fanStage = 209;            
+          } elsif ($fanStage == 1) {
+            $fanStage = 189;           
+          } elsif ($fanStage == 2) {
+            $fanStage = 164;            
+          } else {
+            $fanStage = 144;            
+          }
+          $actualTemp = (40 - $actualTemp) / 40 * 255;
+          $updateState = 0;
+          $data = sprintf "%02X%02X%02X%02X", $fanStage, $setpoint, $actualTemp, $setCmd;
+          
+        } else {
+          return "Unknown argument " . $cmd . ", choose one of fanStage:auto,0,1,2,3 setpoint setpointScaled switch:on,off teach"
+        }
+        
+      }
+      Log $ll2, "EnOcean: set $name $cmd";
+    
+    } elsif ($st eq "MD15") {
+      # Battery Powered Actuator (EEP A5-20-01)
+      # [Kieback&Peter MD15-FTL-xx]
+      # See also http://www.oscat.de/community/index.php/topic,985.30.html
+      # Maintenance commands (runInit, liftSet, valveOpen, valveClosed)
       $rorg = "A5";
       my %sets = (
         "desired-temp" => "\\d+(\\.\\d)?",
@@ -295,17 +590,17 @@ EnOcean_Set($@)
       );
       my $re = $sets{$a[0]};
       return "Unknown argument $cmd, choose one of ".join(" ", sort keys %sets)
-        if(!defined($re));
+        if (!defined($re));
       return "Need a parameter" if ($re && @a < 2);
-      return "Argument $a[1] is incorrect (expect $re)"
-        if ($re && $a[1] !~ m/^$re$/);
+      return "Argument $a[1] is incorrect (expect $re)" if ($re && $a[1] !~ m/^$re$/);
 
+      $updateState = 2;
       $hash->{CMD} = $cmd;
       $hash->{READINGS}{CMD}{TIME} = $tn;
       $hash->{READINGS}{CMD}{VAL} = $cmd;
 
       my $arg = "true";
-      if($re) {
+      if ($re) {
         $arg = $a[1];
         shift(@a);
       }
@@ -340,7 +635,9 @@ EnOcean_Set($@)
         # Switching
         $gwCmdID = 1;
         if($cmd eq "teach") {
-          $data = sprintf "%02X000000", $gwCmdID;
+          # teach-in EEP A5-38-08, Manufacturer "Multi user Manufacturer ID"
+          #$data = sprintf "%02X000000", $gwCmdID;
+          $data = "E047FF80";
         } elsif ($cmd eq "on" || $cmd eq "B0") {
           $setCmd = 9;
           if ($a[1]) {
@@ -374,8 +671,8 @@ EnOcean_Set($@)
         my $sendDimCmd = 0;
         $setCmd = 9;
         if ($cmd eq "teach") {
-          $setCmd = 0;
-          $data = sprintf "%02X000000", $gwCmdID;
+          # teach-in EEP A5-38-08, Manufacturer "Multi user Manufacturer ID"
+          $data = "E047FF80";
         } elsif ($cmd eq "dim") {
           return "Usage: $cmd dim/% [rampTime/s lock|unlock]"
             if(@a < 2 || $a[1] < 0 || $a[1] > 100 || $a[1] !~ m/^[+-]?\d+$/);
@@ -458,11 +755,11 @@ EnOcean_Set($@)
           my $cmdList = "dim:slider,0,1,100 B0 BI teach";
           return SetExtensions ($hash, $cmdList, $name, @a);
         }
-        if($sendDimCmd) {
+        if ($sendDimCmd) {
           if (defined $a[1]) {
             return "Usage: $cmd dim/% [rampTime/s lock|unlock]" if (($a[1] ne "lock") && ($a[1] ne "unlock"));
             if ($manufID eq "OOD") {
-              # Eltako devices: block dimming value
+              # Eltako devices: lock dimming value
               if ($a[1] eq "lock") { $setCmd = $setCmd | 4; }
             } else {
               # Dimming value relative
@@ -483,7 +780,8 @@ EnOcean_Set($@)
       } elsif ($gwCmd eq "setpointShift") {
         $gwCmdID = 3;
         if ($cmd eq "teach") {
-          $data = sprintf "%02X000000", $gwCmdID;
+          # teach-in EEP A5-38-08, Manufacturer "Multi user Manufacturer ID"
+          $data = "E047FF80";
         } elsif ($cmd eq "shift") {
           if (($a[1] =~ m/^[+-]?\d+(\.\d+)?$/) && ($a[1] >= -12.7) && ($a[1] <= 12.8)) {
             $updateState = 0;
@@ -499,7 +797,8 @@ EnOcean_Set($@)
       } elsif ($gwCmd eq "setpointBasic") {
         $gwCmdID = 4;
         if($cmd eq "teach") {
-          $data = sprintf "A5%02X000000", $gwCmdID;
+          # teach-in EEP A5-38-08, Manufacturer "Multi user Manufacturer ID"
+          $data = "E047FF80";
         } elsif ($cmd eq "basic") {
           if (($a[1] =~ m/^[+-]?\d+(\.\d+)?$/) && ($a[1] >= 0) && ($a[1] <= 51.2)) {
             $updateState = 0;
@@ -516,7 +815,8 @@ EnOcean_Set($@)
         $gwCmdID = 5;
         my $controlVar = ReadingsVal($name, "controlVar", 0);
         if($cmd eq "teach") {
-          $data = printf "A5%02X000000", $gwCmdID;
+          # teach-in EEP A5-38-08, Manufacturer "Multi user Manufacturer ID"
+          $data = "E047FF80";
         } elsif ($cmd eq "presence") {
           if ($a[1] eq "standby") {
             $setCmd = 0x0A;
@@ -577,7 +877,8 @@ EnOcean_Set($@)
       } elsif ($gwCmd eq "fanStage") {
         $gwCmdID = 6;
         if($cmd eq "teach") {
-          $data = sprintf "%02X000000", $gwCmdID;
+          # teach-in EEP A5-38-08, Manufacturer "Multi user Manufacturer ID"
+          $data = "E047FF80";
         } elsif ($cmd eq "stage") {
           if ($a[1] eq "auto") {
             $updateState = 0;
@@ -621,8 +922,12 @@ EnOcean_Set($@)
         $setCmd = $blindFuncID << 4 | 8;
 
         if($blindFuncID == 255) {
-          # teach
-          $setCmd = 0;
+          # teach-in EEP A5-38-08, Manufacturer "Multi user Manufacturer ID"
+          $gwCmdID = 0xE0;
+          $blindParam1 = 0x47;
+          $blindParam2 = 0xFF;
+          $setCmd = 0x80;
+          #$setCmd = 0;
         } elsif ($blindFuncID == 0) {
           # status
           $updateState = 0;
@@ -680,7 +985,6 @@ EnOcean_Set($@)
           } else {
             return "Usage: $cmd variable is not numeric or out of range.";
           }
-          ##
           readingsSingleUpdate($hash, "runTimeUp", $blindParam1, 1);
           readingsSingleUpdate($hash, "runTimeDown", $blindParam2, 1);
           $updateState = 0;
@@ -710,7 +1014,6 @@ EnOcean_Set($@)
             return "Usage: $cmd variable is not numeric or out of range.";
           }
           if ($blindParam1 > $blindParam2) {($blindParam1, $blindParam2) = ($blindParam2, $blindParam1);}
-          ##
           readingsSingleUpdate($hash, "positionMin", $blindParam1, 1);
           readingsSingleUpdate($hash, "positionMax", $blindParam2, 1);
           $updateState = 0;
@@ -728,7 +1031,6 @@ EnOcean_Set($@)
           } else {
             return "Usage: $cmd variable is not numeric or out of range.";
           }
-          ##
           readingsSingleUpdate($hash, "angleMin", $a[1], 1);
           readingsSingleUpdate($hash, "angleMax", $a[2], 1);
           splice (@a, 0, 2);
@@ -751,7 +1053,7 @@ EnOcean_Set($@)
       } else {
         return "Unknown Gateway command " . $cmd . ", choose one of ". join(" ", sort keys %EnO_gwCmd);
       }
-      Log $ll2, "EnOcean: set $name $cmd $setCmd";
+      Log $ll2, "EnOcean: set $name $cmd";
 
     } elsif ($st eq "manufProfile") {
       if ($manufID eq "00D") {
@@ -781,12 +1083,15 @@ EnOcean_Set($@)
         $shutTime = 255 if ($shutTime > 255);
         $shutTime = 1 if ($shutTime < 1);
         if ($cmd eq "teach") {
+          # teach-in EEP A5-3F-7F, Manufacturer "Eltako"
+          CommandDeleteReading(undef, "$name .*");
           $data = "FFF80D80";
         } elsif ($cmd eq "stop") {
           # stop
           # delete readings, as they are undefined
           CommandDeleteReading(undef, "$name anglePos");
           CommandDeleteReading(undef, "$name position");
+          readingsSingleUpdate($hash, "endPosition", "not_reached", 1);
           readingsSingleUpdate($hash, "state", "stop", 1);
           $shutCmd = 0;
         } elsif ($cmd eq "opens") {
@@ -795,6 +1100,8 @@ EnOcean_Set($@)
           readingsSingleUpdate($hash, "anglePos", $anglePos, 1);
           $position = 0;
           readingsSingleUpdate($hash, "position", $position, 1);
+          readingsSingleUpdate($hash, "endPosition", "open", 1);
+          $cmd = "open";
           $shutTime = $shutTimeCloses;
           $shutCmd = 1;
           $updateState = 0;
@@ -804,12 +1111,14 @@ EnOcean_Set($@)
           readingsSingleUpdate($hash, "anglePos", $anglePos, 1);
           $position = 100;
       	  readingsSingleUpdate($hash, "position", $position, 1);
+          readingsSingleUpdate($hash, "endPosition", "closed", 1);
+          $cmd = "closed";
           $shutTime = $shutTimeCloses;
           $shutCmd = 2;
           $updateState = 0;
-        } elsif ($cmd eq "up" || $cmd eq "B0") {
+        } elsif ($cmd eq "up") {
           # up
-          if(defined $a[1]) {
+          if (defined $a[1]) {
             if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] <= 255) {
               $position -= $a[1] / $shutTime * 100;
               if ($angleTime) {
@@ -823,7 +1132,11 @@ EnOcean_Set($@)
               if ($position <= 0) {
                 $anglePos = 0;
                 $position = 0;
+                readingsSingleUpdate($hash, "endPosition", "open", 1);
+                $cmd = "open";
               }
+              readingsSingleUpdate($hash, "endPosition", "not_reached", 1);
+              $cmd = "not_reached";
               $shutTime = $a[1];
               shift(@a);
            } else {
@@ -832,13 +1145,15 @@ EnOcean_Set($@)
           } else {
             $anglePos = 0;
             $position = 0;
+            readingsSingleUpdate($hash, "endPosition", "open", 1);
+            $cmd = "open";
           }
           readingsSingleUpdate($hash, "anglePos", sprintf("%d", $anglePos), 1);
       	  readingsSingleUpdate($hash, "position", sprintf("%d", $position), 1);
           $shutCmd = 1;
-        } elsif ($cmd eq "down" || $cmd eq "BI") {
+        } elsif ($cmd eq "down") {
           # down
-          if(defined $a[1]) {
+          if (defined $a[1]) {
             if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] < 255) {
               $position += $a[1] / $shutTime * 100;
               if ($angleTime) {              
@@ -852,15 +1167,21 @@ EnOcean_Set($@)
               if($position > 100) { 
                 $anglePos = $angleMax;
                 $position = 100;
+                readingsSingleUpdate($hash, "endPosition", "closed", 1);
+                $cmd = "closed";
               }
-             $shutTime = $a[1];
-             shift(@a);
+              readingsSingleUpdate($hash, "endPosition", "not_reached", 1);
+              $cmd = "not_reached";
+              $shutTime = $a[1];
+              shift(@a);
             } else {
               return "Usage: $a[1] is not numeric or out of range";
             }
           } else {
             $anglePos = $angleMax;
             $position = 100;
+            readingsSingleUpdate($hash, "endPosition", "closed", 1);
+            $cmd = "closed";
           }
           readingsSingleUpdate($hash, "anglePos", sprintf("%d", $anglePos), 1);
           readingsSingleUpdate($hash, "position", sprintf("%d", $position), 1);
@@ -871,6 +1192,17 @@ EnOcean_Set($@)
           } elsif ($angleTime > 0 && !defined $anglePos){
             return "Slats angle position unknown, please first opens the blinds completely."
           } else {
+            # check actual shutter position
+            my $actualState = ReadingsVal($name, "state", undef);
+            if (defined $actualState) {
+              if ($actualState eq "open") {
+                $position = 0;
+                $anglePos = 0;              
+              } elsif ($actualState eq "closed") {
+                $position = 100;
+                $anglePos = $angleMax;
+              }
+            }
             my $anglePosLast = $anglePos;
             my $shutTimeSet = $shutTime;
             if (defined $a[2]) {
@@ -927,6 +1259,16 @@ EnOcean_Set($@)
                   $shutCmd = 0;
                 }             
               }
+              if ($position == 0) {
+                readingsSingleUpdate($hash, "endPosition", "open", 1);
+                $cmd = "open";
+              } elsif ($position == 100) {
+                readingsSingleUpdate($hash, "endPosition", "closed", 1);
+                $cmd = "closed";
+              } else {
+                readingsSingleUpdate($hash, "endPosition", "not_reached", 1);
+                $cmd = "not_reached";
+              }
               readingsSingleUpdate($hash, "anglePos", sprintf("%d", $anglePos), 1);
               readingsSingleUpdate($hash, "position", sprintf("%d", $position), 1);
               shift(@a);
@@ -937,7 +1279,7 @@ EnOcean_Set($@)
         } else {
           return "Unknown argument " . $cmd . ", choose one of closes down opens position:slider,0,5,100 stop teach up"
         }
-        if($shutCmd || $cmd eq "stop") {
+        if ($shutCmd || $cmd eq "stop") {
           $updateState = 0;
           $data = sprintf "%02X%02X%02X%02X", 0, $shutTime, $shutCmd, 8;
         }
@@ -963,7 +1305,6 @@ EnOcean_Set($@)
 
     } elsif ($st eq "raw") {
       # sent raw data
-      # to do: optional data
       if ($cmd eq "4BS"){
         # 4BS Telegram
         if ($a[1] && $a[1] =~ m/^[\dA-F]{8}$/) {
@@ -988,6 +1329,23 @@ EnOcean_Set($@)
         } else {
           return "Wrong parameter, choose RPS <data 1 Byte hex> [status 1 Byte hex]";
         }
+      } elsif ($cmd eq "MSC") {
+        # MSC Telegram
+        if ($a[1] && $a[1] =~ m/^[\dA-F]{2,28}$/ && !(length($a[1]) % 2)) {
+          $data = $a[1];
+          $rorg = "D1";
+        } else {
+          return "Wrong parameter, choose MSC <data 1 ... 14 Byte hex> [status 1 Byte hex]";
+        }
+      } elsif ($cmd eq "UTE") {
+        # UTE Telegram
+        if ($a[1] && $a[1] =~ m/^[\dA-F]{7}$/) {
+          $data = $a[1];
+          $rorg = "D4";
+        } else {
+          return "Wrong parameter, choose UTE <data 7 Byte hex> [status 1 Byte hex]";
+        }
+
       } elsif ($cmd eq "VLD") {
         # VLD Telegram
         if ($a[1] && $a[1] =~ m/^[\dA-F]{2,28}$/ && !(length($a[1]) % 2)) {
@@ -996,23 +1354,9 @@ EnOcean_Set($@)
         } else {
           return "Wrong parameter, choose VLD <data 1 ... 14 Byte hex> [status 1 Byte hex]";
         }
-      } elsif ($cmd eq "timer") {
-        ### test
-        if ($a[1] && $a[1] =~ m/^[\d]{2}$/) {
-          $data = "09";
-          $rorg = "F6";
-          
-          readingsSingleUpdate($hash, "test", 127, 1);          
-          readingsSingleUpdate($hash, "testScaled", EnOcean_ReadingScaled($hash, 127, 0, 255), 1) ;
 
-          my @timerCmd = ($name, "RPS", "08");
-          my %par = (hash => $hash, timerCmd => \@timerCmd);
-          InternalTimer(gettimeofday() + $a[1], "EnOcean_TimerSet", \%par, 0);
-        } else {
-          return "Wrong parameter, choose timer <time/s>";
-        }
       } else {
-        return "Unknown argument $cmd, choose one of 1BS 4BS RPS VLD timer";
+        return "Unknown argument $cmd, choose one of 1BS 4BS MSC RPS UTE VLD test";
       }
       if ($a[2]) {
         if ($a[2] !~ m/^[\dA-F]{2}$/) {
@@ -1025,15 +1369,15 @@ EnOcean_Set($@)
       readingsSingleUpdate($hash, "RORG", $cmd, 1);
       readingsSingleUpdate($hash, "dataSent", $data, 1);
       readingsSingleUpdate($hash, "statusSent", $status, 1);
-      Log $ll2, "EnOcean: set $name $cmd";
+      Log $ll2, "EnOcean: set $name $cmd $data $status";
       shift(@a);     
-      
-    } else {
-    # Rocker Switch, simulate a PTM200 switch module
+
+    } elsif ($st eq "switch") {
+      # Rocker Switch, simulate a PTM200 switch module
       # separate first and second action
       my ($c1,$c2) = split(",", $cmd, 2);
       # check values
-      if(!defined($EnO_ptm200btn{$c1}) || ($c2 && !defined($EnO_ptm200btn{$c2}))) {
+      if (!defined($EnO_ptm200btn{$c1}) || ($c2 && !defined($EnO_ptm200btn{$c2}))) {
         my $list = join(" ", sort keys %EnO_ptm200btn);
         return SetExtensions($hash, $list, $name, @a);
       }
@@ -1101,8 +1445,16 @@ EnOcean_Set($@)
         $rorg = "F6";
         Log $ll2, "EnOcean: set $name $cmd";
       }
+    
+    } else {
+      # subtype does not support set commands
+      $updateState = -1;
+      return;
+          
     }
-    if($st ne "MD15") {
+
+    # send commands
+    if($updateState != 2) {
       EnOcean_SndRadio(undef, $hash, $rorg, $data, $subDef, $status, $destinationID);
       if ($switchMode eq "pushbutton") {
         $data = "00";
@@ -1117,6 +1469,7 @@ EnOcean_Set($@)
     # next commands will be sent with a delay
     select(undef, undef, undef, 0.2);
   }
+
   # set reading state if acknowledge is not expected
   $subDef = AttrVal($name, "subDef", undef);
   if($updateState == 1 || !defined $subDef) {
@@ -1164,7 +1517,7 @@ EnOcean_Parse($$)
     my $event = "state";
     my $nu =  ((hex($status) & 0x10) >> 4);
     # unused flags (AFAIK)
-    #push @event, "1:T21:".((hex($status)&0x20)>>5);
+    #push @event, "1:T21:".((hex($status) & 0x20) >> 5);
     #push @event, "1:NU:$nu";
 
     if ($nu) {
@@ -1173,6 +1526,7 @@ EnOcean_Parse($$)
       $msg  = $EnO_ptm200btn[($db[0] & 0xE0) >> 5];
       $msg .= ",".$EnO_ptm200btn[($db[0] & 0x0E) >> 1] if ($db[0] & 1);
       $msg .= " released" if (!($db[0] & 0x10));
+      push @event, "3:buttons:" . ($db[0] & 0x10 ? "pressed" : "released");
 
     } else {
       if ($db[0] == 112) {
@@ -1194,7 +1548,9 @@ EnOcean_Parse($$)
           $msg = (($db[0] & 0x10) ? "pressed" : "released");
         }
       }
+      push @event, "3:buttons:" . ($db[0] & 0x10 ? "pressed" : "released");
     }
+    
     if ($st eq "FRW") {
       # smoke detector Eltako FRW, untested
       if ($msg =~ m/A0$/) {
@@ -1207,6 +1563,44 @@ EnOcean_Parse($$)
         push @event, "3:battery:ok";
         $msg = "off";
       }
+
+    } elsif ($model eq "FAE14" || $model eq "FHK14") {
+      # heating/cooling relay FAE14, FHK14, untested
+      $event = "controllerMode";
+      if ($msg =~ m/A0$/) {
+        # night reduction 2 K
+        push @event, "3:energyHoldOff:holdoff";
+        $msg = "auto";
+      } elsif ($msg =~ m/AI$/) {
+        # off
+        push @event, "3:energyHoldOff:normal";
+        $msg = "off";
+      } elsif ($msg =~ m/B0$/) {
+        # on
+        push @event, "3:energyHoldOff:normal";
+        $msg = "auto";
+      } elsif ($msg =~ m/BI$/) {
+        # night reduction 4 K
+        push @event, "3:energyHoldOff:holdoff";
+        $msg = "auto";
+      }
+
+    } elsif ($st eq "manufProfile" && $manufID eq "00D") {
+      # shutter
+      if ($msg =~ m/B0$/) {
+        # open
+        push @event, "3:endPosition:open";
+        $msg = "open";
+      } elsif ($msg =~ m/BI$/) {
+        # closed
+        push @event, "3:endPosition:closed";
+        $msg = "closed";
+      } elsif ($msg =~ m/released$/) {
+        # not reached or not available
+        push @event, "3:endPosition:not_reached";
+        $msg = "not_reached";
+      }
+
     } else {
       if ($msg =~ m/A0$/) {
         push @event, "3:channelA:A0";
@@ -1232,41 +1626,42 @@ EnOcean_Parse($$)
                            $model ne "FT55" && $model ne "FSB14" &&
                            $model ne "FSB61" && $model ne "FSB70" &&
                            $model ne "FSM12" && $model ne "FSM61" &&
-                           $model ne "FTS12" && $model ne "slats");
+                           $model ne "FTS12" &&
+                           AttrVal($name, "sensorMode", "switch") ne "pushbutton");
     }
     push @event, "3:$event:$msg";
 
   } elsif ($rorg eq "D5") {
-  # 1BS Telegram
+  # 1BS telegram
   # Single Input Contact (EEP D5-00-01)
   # [Eltako FTK, STM-250]
     push @event, "3:state:" . ($db[0] & 1 ? "closed" : "open");
     push @event, "3:learnBtn:on" if (!($db[0] & 8));
 
   } elsif ($rorg eq "A5") {
-  # 4BS Telegram
+  # 4BS telegram
     if (($db[0] & 0x08) == 0) {
-    # teach-in telegram
+    # Teach-In telegram
       if ($db[0] & 0x80) {
-        # teach-in telegram with EEP and Manufacturer ID
+        # Teach-In telegram with EEP and Manufacturer ID
         my $fn = sprintf "%02X", ($db[3] >> 2);
         my $tp = sprintf "%02X", ((($db[3] & 3) << 5) | ($db[2] >> 3));
         my $mf = sprintf "%03X", ((($db[2] & 7) << 8) | $db[1]);
         # manufID to account for vendor-specific features
         $attr{$name}{manufID} = $mf;
         $mf = $EnO_manuf{$mf} if($EnO_manuf{$mf});
-        my $m = "teach-in:EEP A5-$fn-$tp Manufacturer: $mf";
-        Log 1, $m;
-        push @event, "3:$m";
+        Log 1, "EnOcean: $name teach-in EEP A5-$fn-$tp Manufacturer: $mf";
+        push @event, "3:teach-in:EEP A5-$fn-$tp Manufacturer: $mf";
         my $st = "A5.$fn.$tp";
         $st = $EnO_subType{$st} if($EnO_subType{$st});
         $attr{$name}{subType} = $st;
 
         if ("$fn.$tp" eq "20.01" && $iohash->{pair}) {
-          # bidirectional teach-in for EEP A5-20-01 (MD15)
+          # bidirectional Teach-In for EEP A5-20-01 (MD15)
+          $attr{$name}{comMode} = "biDir";          
+          $attr{$name}{destinationID} = "unicast";
           # SenderID = BaseID
           $attr{$name}{subDef} = "00000000";
-          $attr{$name}{destinationID} = "unicast";
           # next commands will be sent with a delay, max 10 s
           select(undef, undef, undef, 0.1);
           # teach-in response
@@ -1315,31 +1710,31 @@ EnOcean_Parse($$)
       # Temperature Sensor with with different ranges (EEP A5-02-01 ... A5-02-1B)
       # $db[1] is the temperature where 0x00 = max °C ... 0xFF = min °C
       my $temp;
-      $temp = sprintf "%0.1f", -40 - $db[1] / 6.375 if ($st eq "tempSensor.01");
-      $temp = sprintf "%0.1f", -30 - $db[1] / 6.375 if ($st eq "tempSensor.02");
-      $temp = sprintf "%0.1f", -20 - $db[1] / 6.375 if ($st eq "tempSensor.03");
-      $temp = sprintf "%0.1f", -10 - $db[1] / 6.375 if ($st eq "tempSensor.04");
-      $temp = sprintf "%0.1f",   0 - $db[1] / 6.375 if ($st eq "tempSensor.05");
-      $temp = sprintf "%0.1f",  10 - $db[1] / 6.375 if ($st eq "tempSensor.06");
-      $temp = sprintf "%0.1f",  20 - $db[1] / 6.375 if ($st eq "tempSensor.07");
-      $temp = sprintf "%0.1f",  30 - $db[1] / 6.375 if ($st eq "tempSensor.08");
-      $temp = sprintf "%0.1f",  40 - $db[1] / 6.375 if ($st eq "tempSensor.09");
-      $temp = sprintf "%0.1f",  50 - $db[1] / 6.375 if ($st eq "tempSensor.0A");
-      $temp = sprintf "%0.1f",  60 - $db[1] / 6.375 if ($st eq "tempSensor.0B");
-      $temp = sprintf "%0.1f", -60 - $db[1] / 3.1875 if ($st eq "tempSensor.10");
-      $temp = sprintf "%0.1f", -50 - $db[1] / 3.1875 if ($st eq "tempSensor.11");
-      $temp = sprintf "%0.1f", -40 - $db[1] / 3.1875 if ($st eq "tempSensor.12");
-      $temp = sprintf "%0.1f", -30 - $db[1] / 3.1875 if ($st eq "tempSensor.13");
-      $temp = sprintf "%0.1f", -20 - $db[1] / 3.1875 if ($st eq "tempSensor.14");
-      $temp = sprintf "%0.1f", -10 - $db[1] / 3.1875 if ($st eq "tempSensor.15");
-      $temp = sprintf "%0.1f",   0 - $db[1] / 3.1875 if ($st eq "tempSensor.16");
-      $temp = sprintf "%0.1f",  10 - $db[1] / 3.1875 if ($st eq "tempSensor.17");
-      $temp = sprintf "%0.1f",  20 - $db[1] / 3.1875 if ($st eq "tempSensor.18");
-      $temp = sprintf "%0.1f",  30 - $db[1] / 3.1875 if ($st eq "tempSensor.19");
-      $temp = sprintf "%0.1f",  40 - $db[1] / 3.1875 if ($st eq "tempSensor.1A");
-      $temp = sprintf "%0.1f",  50 - $db[1] / 3.1875 if ($st eq "tempSensor.1B");
-      $temp = sprintf "%0.2f",  -10 - (($db[2] << 8) | $db[1]) / 19.98 if ($st eq "tempSensor.20");
-      $temp = sprintf "%0.1f",  -40 - (($db[2] << 8) | $db[1]) / 6.3 if ($st eq "tempSensor.30");
+      $temp = sprintf "%0.1f",   0 - $db[1] / 6.375 if ($st eq "tempSensor.01");
+      $temp = sprintf "%0.1f",  10 - $db[1] / 6.375 if ($st eq "tempSensor.02");
+      $temp = sprintf "%0.1f",  20 - $db[1] / 6.375 if ($st eq "tempSensor.03");
+      $temp = sprintf "%0.1f",  30 - $db[1] / 6.375 if ($st eq "tempSensor.04");
+      $temp = sprintf "%0.1f",  40 - $db[1] / 6.375 if ($st eq "tempSensor.05");
+      $temp = sprintf "%0.1f",  50 - $db[1] / 6.375 if ($st eq "tempSensor.06");
+      $temp = sprintf "%0.1f",  60 - $db[1] / 6.375 if ($st eq "tempSensor.07");
+      $temp = sprintf "%0.1f",  70 - $db[1] / 6.375 if ($st eq "tempSensor.08");
+      $temp = sprintf "%0.1f",  80 - $db[1] / 6.375 if ($st eq "tempSensor.09");
+      $temp = sprintf "%0.1f",  90 - $db[1] / 6.375 if ($st eq "tempSensor.0A");
+      $temp = sprintf "%0.1f", 100 - $db[1] / 6.375 if ($st eq "tempSensor.0B");
+      $temp = sprintf "%0.1f",  20 - $db[1] / 3.1875 if ($st eq "tempSensor.10");
+      $temp = sprintf "%0.1f",  30 - $db[1] / 3.1875 if ($st eq "tempSensor.11");
+      $temp = sprintf "%0.1f",  40 - $db[1] / 3.1875 if ($st eq "tempSensor.12");
+      $temp = sprintf "%0.1f",  50 - $db[1] / 3.1875 if ($st eq "tempSensor.13");
+      $temp = sprintf "%0.1f",  60 - $db[1] / 3.1875 if ($st eq "tempSensor.14");
+      $temp = sprintf "%0.1f",  70 - $db[1] / 3.1875 if ($st eq "tempSensor.15");
+      $temp = sprintf "%0.1f",  80 - $db[1] / 3.1875 if ($st eq "tempSensor.16");
+      $temp = sprintf "%0.1f",  90 - $db[1] / 3.1875 if ($st eq "tempSensor.17");
+      $temp = sprintf "%0.1f", 100 - $db[1] / 3.1875 if ($st eq "tempSensor.18");
+      $temp = sprintf "%0.1f", 110 - $db[1] / 3.1875 if ($st eq "tempSensor.19");
+      $temp = sprintf "%0.1f", 120 - $db[1] / 3.1875 if ($st eq "tempSensor.1A");
+      $temp = sprintf "%0.1f", 130 - $db[1] / 3.1875 if ($st eq "tempSensor.1B");
+      $temp = sprintf "%0.2f", 41.2 - (($db[2] << 8) | $db[1]) / 20 if ($st eq "tempSensor.20");
+      $temp = sprintf "%0.1f", 62.3 - (($db[2] << 8) | $db[1]) / 10 if ($st eq "tempSensor.30");
       push @event, "3:temperature:$temp";
       push @event, "3:state:$temp";
 
@@ -1494,20 +1889,20 @@ EnOcean_Parse($$)
 
     } elsif ($st eq "roomSensorControl.05") {
       # Room Sensor and Control Unit (EEP A5-10-01 ... A5-10-0D)
-      # [Eltako FTF55D, FTF55H, Thermokon SR04 *, Thanos SR *, untested]
+      # [Eltako FTF55, FTR55D, FTR55H, Thermokon SR04 *, Thanos SR *, untested]
       # $db[3] is the fan speed or night reduction for Eltako
       # $db[2] is the setpoint where 0x00 = min ... 0xFF = max or
       # reference temperature for Eltako where 0x00 = 0°C ... 0xFF = 40°C
       # $db[1] is the temperature where 0x00 = +40°C ... 0xFF = 0°C
-      # $db[0] bit D0 is the occupy button, pushbutton or slide switch
+      # $db[0]_bit_0 is the occupy button, pushbutton or slide switch
       my $temp = sprintf "%0.1f", 40 - $db[1] / 6.375;
       if ($manufID eq "00D") {
         my $nightReduction = 0;
         $nightReduction = 1 if ($db[3] == 0x06);
-        $nightReduction = 2 if ($db[3] == 0x0c);
+        $nightReduction = 2 if ($db[3] == 0x0C);
         $nightReduction = 3 if ($db[3] == 0x13);
         $nightReduction = 4 if ($db[3] == 0x19);
-        $nightReduction = 5 if ($db[3] == 0x1f);
+        $nightReduction = 5 if ($db[3] == 0x1F);
         my $setpointTemp = sprintf "%0.1f", $db[2] / 6.375;
         push @event, "3:state:T: $temp SPT: $setpointTemp NR: $nightReduction";
         push @event, "3:nightReduction:$nightReduction";
@@ -1520,7 +1915,7 @@ EnOcean_Parse($$)
         $fspeed = "auto" if ($db[3] >= 210);
         my $switch = $db[0] & 1;
         push @event, "3:state:T: $temp SP: $db[2] F: $fspeed SW: $switch";
-        push @event, "3:fan:$fspeed";
+        push @event, "3:fanStage:$fspeed";
         push @event, "3:switch:$switch";
         push @event, "3:setpoint:$db[2]";
         my $setpointScaled = EnOcean_ReadingScaled($hash, $db[2], 0, 255);
@@ -2088,11 +2483,11 @@ EnOcean_Parse($$)
       }
       my $endPosition = ($db[1] & 0x0C) >> 2;
       if ($endPosition == 0) {
-        push @event, "3:endPosition:not available";
-        push @event, "3:state:not available";
+        push @event, "3:endPosition:not_available";
+        push @event, "3:state:not_available";
       } elsif ($endPosition == 1) {
-        push @event, "3:endPosition:not reached";
-        push @event, "3:state:not reached";
+        push @event, "3:endPosition:not_reached";
+        push @event, "3:state:not_reached";
       } elsif ($endPosition == 2) {
         push @event, "3:endPosition:open";
         push @event, "3:state:open";
@@ -2102,7 +2497,7 @@ EnOcean_Parse($$)
       }
       my $shutterState = $db[1] & 3;
       if (($db[1] & 3) == 0) {
-        push @event, "3:shutterState:not available";
+        push @event, "3:shutterState:not_available";
       } elsif (($db[1] & 3) == 1) {
         push @event, "3:shutterState:stopped";
       } elsif (($db[1] & 3) == 2){
@@ -2119,7 +2514,7 @@ EnOcean_Parse($$)
       # $db[2] the contents of the variable depends on the parameter mode
       # $db[1] the contents of the variable depends on the parameter mode
       # $db[0]_bit_7 is the Service Mode where 0 = no, 1 = yes
-      # $db[0]_bit_6 is the operating hours flag where 0 = not available, 1 = available
+      # $db[0]_bit_6 is the operating hours flag where 0 = not_available, 1 = available
       # $db[0]_bit_5 ... $db[0]_bit_4 is the Error State (alarm)
       # $db[0]_bit_2 ... $db[0]_bit_1 is the parameter mode
       # $db[0]_bit_0 is the lighting status where 0 = off, 1 = on
@@ -2169,7 +2564,6 @@ EnOcean_Parse($$)
       # $db[0]_bit_2 is the Data type where 0 = cumulative value, 1 = current value
       # $db[0]_bit_1 ... $db[0]_bit_0 is the Divisor where 0 = x/1, 1 = x/10,
       # 2 = x/100, 3 = x/1000
-      # my $meterReading = hex sprintf "%02x%02x%02x", $db[3], $db[2], $db[1];
       my $dataType = ($db[0] & 4) >> 2;
       my $divisor = $db[0] & 3;
       if ($divisor == 3) {
@@ -2197,7 +2591,7 @@ EnOcean_Parse($$)
         }
       } elsif ($st eq "autoMeterReading.01") {
         # Automated meter reading (AMR), Electricity (EEP A5-12-01)
-        # [Eltako FSS12, FWZ12, DSZ14DRS, DSZ14WDRS]
+        # [Eltako FSS12, FWZ12, DSZ14DRS, DSZ14WDRS, DWZ61]
         # $db[0]_bit_7 ... $db[0]_bit_4 is the Tariff info
         # $db[0]_bit_2 is the Data type where 0 = cumulative value kWh,
         # 1 = current value W
@@ -2213,7 +2607,7 @@ EnOcean_Parse($$)
             $serialNumber = printf "S-%01x%01x", $db[3] >> 4, $db[3] & 0x0F;
           } else {
             # last 4 digits of the serial number
-            $serialNumber = substr (ReadingsVal($name, "serialNumber", "S---"), 0, 4);
+            $serialNumber = substr(ReadingsVal($name, "serialNumber", "S---"), 0, 4);
             $serialNumber = printf "%4c%01x%01x%01x%01x", $serialNumber,
                             $db[2] >> 4, $db[2] & 0x0F, $db[3] >> 4, $db[3] & 0x0F;
           }
@@ -2417,7 +2811,7 @@ EnOcean_Parse($$)
           push @event, "3:state:auto";
         }
       } else {
-          push @event, "3:state:Gateway Command ID $db[3] unknown.";
+        push @event, "3:state:Gateway Command ID $db[3] unknown.";
       }
 
     } elsif ($st eq "manufProfile") {
@@ -2434,6 +2828,19 @@ EnOcean_Parse($$)
         push @event, "3:input2:$input2";
         push @event, "3:input3:$input3";
         push @event, "3:state:I1: $input1 I2: $input2 I3: $input3";
+        
+      } elsif ($manufID eq "00D") {
+        # [Eltako FVS telegram for shutters]
+        my $state;
+        if ($db[1] == 1) {
+          $state = "up";
+        } elsif ($db[1] == 2) {
+          $state = "down";
+        } else {
+          $state = "stop";
+        }
+        push @event, "3:state:$state";
+      
       } else {
         # Unknown Application
         push @event, "3:state:Manufacturer Specific Application unknown";
@@ -2444,7 +2851,7 @@ EnOcean_Parse($$)
       push @event, "3:state:RORG: $rorg DATA: $data STATUS: $status ODATA: $odata";
     
     } else {
-    # unknown devices
+      # unknown devices
       push @event, "3:state:$db[3]";
       push @event, "3:sensor1:$db[3]";
       push @event, "3:sensor2:$db[2]";
@@ -2455,8 +2862,26 @@ EnOcean_Parse($$)
       push @event, "3:D0:".(($db[0] & 1) ? 1:0);
     }
 
+  } elsif ($rorg eq "D1") {
+    # MSC telegram
+    if ($st eq "test") {
+    
+    } elsif ($st eq "raw") {
+      # raw
+      push @event, "3:state:RORG: $rorg DATA: $data STATUS: $status ODATA: $odata";
+      push @event, "3:manufID:" . substr($data, 0, 3);
+      # display data bytes $db[0] ... $db[x]
+      for (my $dbCntr = 0; $dbCntr <= $#db; $dbCntr++) {
+        push @event, "3:DB_" . $dbCntr . ":" . $db[$dbCntr];
+      }  
+    } else {
+      # unknown devices
+      push @event, "3:manufID:" . substr($data, 0, 3);
+      push @event, "3:state:$data";
+    }
+    
   } elsif ($rorg eq "D2") {
-  # VLD Telegram
+    # VLD telegram
     if ($st eq "test") {
     
     } elsif ($st eq "raw") {
@@ -2465,12 +2890,80 @@ EnOcean_Parse($$)
       # display data bytes $db[0] ... $db[x]
       for (my $dbCntr = 0; $dbCntr <= $#db; $dbCntr++) {
         push @event, "3:DB_" . $dbCntr . ":" . $db[$dbCntr];
-      }  
-    
+      }    
     } else {
-    # unknown devices
+      # unknown devices
       push @event, "3:state:$data";
     }
+  } elsif ($rorg eq "D4") {
+    # UTE - Universal Uni- und Bidirectional Teach-In
+    if (!($db[6] & 1)) {
+      # Teach-In Query telegram received
+      my $rorg = sprintf "%02X", $db[0];
+      my $func = sprintf "%02X", $db[1];
+      my $type = sprintf "%02X", $db[2];
+      my $mid = sprintf "%03X", ((($db[3] & 7) << 8) | $db[4]);
+      my $comMode = $db[6] & 0x80 ? "biDir" : "uniDir";
+      my $devChannel = sprintf "%02X", $db[5];
+      my $subType = "$rorg.$func.$type";
+      my $teachInReq = ($db[6] & 0x30) >> 4;
+      if ($teachInReq == 0) {
+      # Teach-In Request
+        if($EnO_subType{$subType}) {
+          # EEP Teach-In
+          $subType = $EnO_subType{$subType};
+          $attr{$name}{subType} = $subType;
+          $attr{$name}{manufID} = $mid;
+          $mid = $EnO_manuf{$mid} if($EnO_manuf{$mid});
+          Log 1, "EnOcean: $name teach-in EEP $rorg-$func-$type Manufacturer: $mid";
+          push @event, "3:teach-in:EEP $rorg-$func-$type Manufacturer: $mid";
+          $attr{$name}{devChannel} = $devChannel;
+          $attr{$name}{comMode} = $comMode;
+          if (!($db[6] & 0x40)) {
+            # EEP Teach-In-Response expected
+            # send EEP Teach-In-Response message
+            $data = (sprintf "%02X", $db[6] & 0x80 | 0x11) . substr($data, -1, 12);
+            my $subDef = "00000000";
+            if ($comMode eq "biDir") {
+              ### select a free SenderID
+              $subDef = EnOcean_CheckSenderID("getNextID", $defs{$hash->{NAME}}{IODev}{NAME}, $subDef);
+            } 
+            $attr{$name}{subDef} = $subDef;
+            # command will be sent with a delay
+            select(undef, undef, undef, 0.1);
+            EnOcean_SndRadio(undef, $hash, $rorg, $data, $subDef, "00", $id);
+          }
+          # store attr subType, manufID ...
+          CommandSave(undef, undef);          
+        } else {
+          # EEP type not supported
+          # send EEP Teach-In Response message
+          $data = (sprintf "%02X", $db[6] & 0x80 | 0x31) . substr($data, -1, 12);
+          # command will be sent with a delay
+          select(undef, undef, undef, 0.1);
+          EnOcean_SndRadio(undef, $hash, $rorg, $data, "00000000", "00", $id);        
+        }
+
+      } elsif ($teachInReq == 1) {
+        # Teach-In Deletion Request
+        # send EEP Teach-In Deletion Response message
+        $data = (sprintf "%02X", $db[6] & 0x80 | 0x21) . substr($data, -1, 12);
+        # command will be sent with a delay
+        select(undef, undef, undef, 0.1);
+        EnOcean_SndRadio(undef, $hash, $rorg, $data, AttrVal($name, "subDef", "00000000"), "00", $id);
+        ### device erst am Ende der Parse-Routine loeschen!  
+        #CommandDelete(undef, $name);
+        
+      } elsif ($teachInReq == 2) {
+        # Deletion of Teach-In or Teach-In Request, not specified
+      
+      }
+      
+    } else {
+      # Teach-In Respose telegram received
+      # no action
+    }
+  
   }
 
   readingsBeginUpdate($hash);
@@ -2493,16 +2986,27 @@ EnOcean_MD15Cmd($$$)
   if($cmd) {
     my $msg; # Unattended
     my $arg1 = ReadingsVal($name, $cmd, 0); # Command-Argument
+    # primarily temperature from the reference device, secondly the attribute actualTemp
+    # and thirdly from the MD15 measured temperature device is read
+    my $temperatureRefDev = AttrVal($name, "temperatureRefDev", undef);
+    my $actualTemp = AttrVal($name, "actualTemp", $db_1 * 40 / 255);
+    $actualTemp = ReadingsVal($temperatureRefDev, "temperature", 20) if (defined $temperatureRefDev); 
+    $actualTemp = 20 if ($actualTemp !~ m/^[+-]?\d+(\.\d+)?$/);
+    $actualTemp = 0 if ($actualTemp < 0);
+    $actualTemp = 40 if ($actualTemp > 40);
+    readingsSingleUpdate($hash, "temperature", (sprintf "%0.1f", $actualTemp), 1);
+    
     if($cmd eq "actuator") {
-#      $msg = sprintf("%02X000000", $arg1);
-      $msg = sprintf "%02X7F0008", $arg1;
+      #$msg = sprintf("%02X000000", $arg1);
+      #$msg = sprintf "%02X7F0008", $arg1;
+      $msg = sprintf "%02X000008", $arg1;
     } elsif($cmd eq "desired-temp") {
-#      $msg = sprintf "%02X%02X0400", $arg1*255/40, AttrVal($name, "actualTemp", ($db_1*40/255)) * 255/40;
-#      $msg = sprintf "%02X%02X0408", $arg1*255/40, AttrVal($name, "actualTemp", (255 - $db_1)*40/255) *255/40;
-#      $msg = sprintf "%02X7F0408", $arg1*255/40;
-       $msg = sprintf "%02X%02X0408", $arg1*255/40, AttrVal($name, "actualTemp", 127);
+      #$msg = sprintf "%02X%02X0400", $arg1*255/40, AttrVal($name, "actualTemp", ($db_1*40/255)) * 255/40;
+      #$msg = sprintf "%02X%02X0408", $arg1*255/40, AttrVal($name, "actualTemp", (255 - $db_1)*40/255) *255/40;
+      #$msg = sprintf "%02X7F0408", $arg1*255/40;
+      $msg = sprintf "%02X%02X0408", $arg1 * 255 / 40, (40 - $actualTemp) * 255 / 40;
     } elsif($cmd eq "initialize") {
-#      $msg = sprintf("00006400");
+      #$msg = sprintf("00006400");
       $msg = "00006408";
     # Maintenance commands
     } elsif($cmd eq "runInit") {
@@ -2525,15 +3029,116 @@ EnOcean_MD15Cmd($$$)
   }
 }
 
+# Check SenderIDs
+sub
+EnOcean_CheckSenderID($$$)
+{
+  my ($ctrl, $IODev, $senderID) = @_;
+  if (!defined $IODev) {
+    my (@listIODev, %listIODev);
+    foreach my $dev (keys %defs) {
+      next if ($defs{$dev}{TYPE} ne "EnOcean");
+      push(@listIODev, $defs{$dev}{IODev}{NAME});
+    }
+    @listIODev = sort grep(!$listIODev{$_}++, @listIODev);    
+    if (@listIODev == 1) {
+      $IODev = $listIODev[0];
+    }
+  }
+  my $unusedID = 0;
+  $unusedID = hex($defs{$IODev}{BaseID}) if ($defs{$IODev}{BaseID});
+  my $IDCntr1;
+  my $IDCntr2;
+  if ($unusedID == 0) {
+    $IDCntr1 = 0;
+    $IDCntr2 = 0;
+  } else {
+    $IDCntr1 = $unusedID + 1;
+    $IDCntr2 = $unusedID + 127;  
+  }
+
+  if ($ctrl eq "getBaseID") {
+    # get TCM BaseID of the EnOcean device 
+    if ($defs{$IODev}{BaseID}) {
+      $senderID = $defs{$IODev}{BaseID}
+    } else {
+      $senderID = "0" x 8;
+    }
+
+  } elsif ($ctrl eq "getUsedID") {
+    # find and sort used SenderIDs
+    my @listID;
+    my %listID;
+    foreach my $dev (keys %defs) {
+      next if ($defs{$dev}{TYPE} ne "EnOcean");
+      push(@listID, grep(hex($_) >= $IDCntr1 && hex($_) <= $IDCntr2, $defs{$dev}{DEF}));
+      push(@listID, $attr{$dev}{subDef}) if ($attr{$dev}{subDef});
+      push(@listID, $attr{$dev}{subDefI}) if ($attr{$dev}{subDefI});
+      push(@listID, $attr{$dev}{subDef0}) if ($attr{$dev}{subDef0});
+    }
+    $senderID = join(",", sort grep(!$listID{$_}++, @listID));    
+    
+  } elsif ($ctrl eq "getFreeID") {
+    # find and sort free SenderIDs
+    my (@freeID, @listID, %listID, @intersection, @difference, %count, $element);
+    for (my $IDCntr = $IDCntr1; $IDCntr <= $IDCntr2; $IDCntr++) {
+      push(@freeID, sprintf "%08X", $IDCntr);
+    }
+    foreach my $dev (keys %defs) {
+      next if ($defs{$dev}{TYPE} ne "EnOcean");
+      push(@listID, grep(hex($_) >= $IDCntr1 && hex($_) <= $IDCntr2, $defs{$dev}{DEF}));
+      push(@listID, $attr{$dev}{subDef}) if ($attr{$dev}{subDef});
+      push(@listID, $attr{$dev}{subDefI}) if ($attr{$dev}{subDefI});
+      push(@listID, $attr{$dev}{subDef0}) if ($attr{$dev}{subDef0});
+    }
+    @listID = sort grep(!$listID{$_}++, @listID);
+    foreach $element (@listID, @freeID) {
+      $count{$element}++
+    }
+    foreach $element (keys %count) {
+      push @{$count{$element} > 1 ? \@intersection : \@difference }, $element;
+    }
+    $senderID = ":" . join(",", sort @difference);
+    
+  } elsif ($ctrl eq "getNextID") {
+    # get next free SenderID
+    my (@freeID, @listID, %listID, @intersection, @difference, %count, $element);
+    for (my $IDCntr = $IDCntr1; $IDCntr <= $IDCntr2; $IDCntr++) {
+      push(@freeID, sprintf "%08X", $IDCntr);
+    }
+    foreach my $dev (keys %defs) {
+      next if ($defs{$dev}{TYPE} ne "EnOcean");
+      push(@listID, grep(hex($_) >= $IDCntr1 && hex($_) <= $IDCntr2, $defs{$dev}{DEF}));
+      push(@listID, $attr{$dev}{subDef}) if ($attr{$dev}{subDef});
+      push(@listID, $attr{$dev}{subDefI}) if ($attr{$dev}{subDefI});
+      push(@listID, $attr{$dev}{subDef0}) if ($attr{$dev}{subDef0});
+    }
+    @listID = sort grep(!$listID{$_}++, @listID);
+    foreach $element (@listID, @freeID) {
+      $count{$element}++
+    }
+    foreach $element (keys %count) {
+      push @{$count{$element} > 1 ? \@intersection : \@difference }, $element;
+    }
+    @difference = sort @difference;
+    $senderID = $difference[0];    
+  
+  } else {
+  
+  }
+  return $senderID;
+}
+
 # send EnOcean ESP3 Packet Type Radio
 sub
 EnOcean_SndRadio($$$$$$$)
 {
   my ($ctrl, $hash, $rorg, $data, $senderID, $status, $destinationID) = @_;
+  my $ll2 = GetLogLevel($hash->{NAME}, 2);
   my $odata = "";
   my $odataLength = 0;
   if (AttrVal($hash->{NAME}, "repeatingAllowed", "yes") eq "no") {
-    $status = substr ($status, 0, 1) . "F";
+    $status = substr($status, 0, 1) . "F";
   }
   my $securityLevel = AttrVal($hash->{NAME}, "securityLevel", 0);
   if ($securityLevel eq "unencrypted") {$securityLevel = 0;}
@@ -2559,7 +3164,7 @@ EnOcean_ReadingScaled($$$$)
   my $scaleMin = AttrVal($name, "scaleMin", undef);
   my $scaleMax = AttrVal($name, "scaleMax", undef);
   if (defined $scaleMax && defined $scaleMin &&
-      $scaleMax =~ m/^[+-]?\d+(\.\d+)?$/ && $scaleMax =~ m/^[+-]?\d+(\.\d+)?$/) {
+      $scaleMax =~ m/^[+-]?\d+(\.\d+)?$/ && $scaleMin =~ m/^[+-]?\d+(\.\d+)?$/) {
     $valScaled = ($readingMin*$scaleMax-$scaleMin*$readingMax)/
                  ($readingMin-$readingMax)+
                  ($scaleMin-$scaleMax)/($readingMin-$readingMax)*$readingVal;
@@ -2616,18 +3221,18 @@ EnOcean_Undef($$)
   <a href="#EnOceanattr">attributes</a>, the behavior of the devices can be
   changed separately.
   <br><br>
-  The teach-in procedure depends on the type of the devices. Switches (EEP RORG
-  F6) and contacts (EEP RORG D5) are recognized when receiving the first message.
+  The teach-in procedure depends on the type of the devices. Switches (EEP RPS)
+  and contacts (EEP 1BS) are recognized when receiving the first message.
   Contacts can also send a teach-in telegram. Fhem not need this telegram.
-  Sensors (EEP RORG A5) has to send a teach-in telegram. The profile-less
-  A5 teach-in procedure transfers no EEP profile identifier and no manufacturer
+  Sensors (EEP 4BS) has to send a teach-in telegram. The profile-less
+  4BS teach-in procedure transfers no EEP profile identifier and no manufacturer
   ID. In this case Fhem does not recognize the device automatically. The proper
   device type must be set manually, use the <a href="#EnOceanattr">attributes</a>
   <a href="#subType">subType</a>, <a href="#manufID">manufID</a> and/or
   <a href="#model">model</a>. If the EEP profile identifier and the manufacturer
-  ID are sent the device is clearly identifiable. FHEM automatically assigns
-  these devices to the correct profile. Some A5 devices must be paired
-  bidirectional, see <a href="#pairForSec">Bidirectional A5 Teach-In</a>.<br><br>
+  ID are sent the device is clearly identifiable. Fhem automatically assigns
+  these devices to the correct profile. Some 4BS, VLD or MSC devices must be paired
+  bidirectional, see <a href="#pairForSec">Bidirectional Teach-In / Teach-Out</a>.<br><br>
   Fhem supports many of most common EnOcean profiles and manufacturer-specific
   devices. Additional profiles and devices can be added if required.
   <br><br>
@@ -2656,17 +3261,17 @@ EnOcean_Undef($$)
     In order to control devices, you cannot reuse the SenderIDs/
     DestinationID of other devices (like remotes), instead you have to create
     your own, which must be in the allowed SenderID range of the underlying Fhem
-    IO device, see <a href="#TCM">TCM</a> <a name="BaseID">BaseID</a>, LastID. For this first query the
+    IO device, see <a href="#TCM">TCM</a> BaseID, LastID. For this first query the
     <a href="#TCM">TCM</a> with the <code>get &lt;tcm&gt; baseID</code> command
     for the BaseID. You can use up to 127 IDs starting with the BaseID + 1 shown there.
     The BaseID is used for A5 devices with a bidectional teach-in only. If you
     are using an Fhem SenderID outside of the allowed range, you will see an
     ERR_ID_RANGE message in the Fhem log.<br>
-    In order to control bidirectional F6 devices (switches, actors) with
+    In order to control bidirectional RPS devices (switches, actors) with
     additional SenderIDs you can use the attributes <a href="#subDef">subDef</a>,
     <a href="#subDef0">subDef0</a> and <a href="#subDefI">subDefI</a>.<br>
-    Fhem communicates unicast with the BaseID, if the A5 devices are teached-in with the
-    <a href="#pairForSec"> Bidirectional A5 Teach-In</a> procedure. In this case
+    Fhem communicates unicast with the BaseID, if the 4BS devices are teached-in with the
+    <a href="#pairForSec"> Bidirectional Teach-In / Teach-Out</a> procedure. In this case
     Fhem send telegrams with its SenderID (BaseID) and the DestinationID of the
     device.<br><br>
   </ul>
@@ -2674,14 +3279,14 @@ EnOcean_Undef($$)
   <a name="EnOceanset"></a>
   <b>Set</b>
   <ul>
-    <li><a name="pairForSec">Bidirectional A5 Teach-In</a>
+    <li><a name="pairForSec">Bidirectional Teach-In / Teach-Out</a>
     <ul>
     <code>set &lt;name&gt; pairForSec &lt;t/s&gt;</code>
     <br><br>
     Set the EnOcean Transceiver module (TCM Modul) in the bidirectional pairing
     mode. A device, which is then also put in this state is to paired with
-    Fhem bidirectional. Bidirectional pearing is only used for some EEP A5-xx-xx,
-    e. g. EEP A5-20-01 (Battery Powered Actuator).
+    Fhem bidirectional. Bidirectional pearing is used for some 4BS, VLD and MSC devices,
+    e. g. EEP 4BS, RORG A5-20-01 (Battery Powered Actuator).
     <br>
     <code>name</code> is the name of the TCM Module . <code>t/s</code> is the
     time for the teach-in period.
@@ -2753,6 +3358,62 @@ EnOcean_Undef($$)
           initiate teach-in mode</li>
     </ul></li>
         The attr subType must be contact. The attribute must be set manually.
+    <br><br>
+
+    <li>Room Sensor and Control Unit (EEP A5-10-02)<br>
+        [Thermokon SR04 PTS]<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+      <li>teach<br>
+          initiate teach-in</li>
+      <li>setpoint [0 ... 255]<br>
+          Set the actuator to the specifed setpoint.</li>
+      <li>setpointScaled [&lt;floating-point number&gt;]<br>
+          Set the actuator to the scaled setpoint.</li>
+      <li>fanStage [auto|0|1|2|3]<br>
+          Set fan stage</li>
+      <li>switch [on|off]<br>
+          Set switch</li>
+    </ul><br>
+      The actual temperature will be taken from the temperature reported by
+      a temperature reference device <a href="#temperatureRefDev">temperatureRefDev</a>
+      primarily or from the attribute <a href="#actualTemp">actualTemp</a> if it is set.<br>
+      The scaling of the setpoint adjustment is device- and vendor-specific. Set the
+      attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
+      <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled setting
+      setpointScaled.<br>
+      The attr subType must be roomSensorControl.05. The attribute must be set manually. 
+    </li>
+    <br><br>
+
+    <li>Room Sensor and Control Unit (A5-10-06 plus night reduction)<br>
+        [Eltako FVS]<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+      <li>teach<br>
+          initiate teach-in</li>
+      <li>desired-temp [t/&#176C [lock|unlock]]<br>
+          Set the desired temperature.</li>
+      <li>nightReduction [t/K [lock|unlock]]<br>
+          Set night reduction</li>
+      <li>setpointTemp [t/&#176C [lock|unlock]]<br>
+          Set the desired temperature</li>
+    </ul><br>
+      The actual temperature will be taken from the temperature reported by
+      a temperature reference device <a href="#temperatureRefDev">temperatureRefDev</a>
+      primarily or from the attribute <a href="#actualTemp">actualTemp</a> if it is set.<br>
+      This profil can be used with a further Room Sensor and Control Unit Eltako FTR55*
+      to control a heating/cooling relay FHK12, FHK14 or FHK61. If Fhem and FTR55*
+      is teached in, the temperature control of the FTR55* can be either blocked
+      or to a setpoint deviation of +/- 3 K be limited. For this use the optional parameter
+      [block] = lock|unlock, unlock is default.<br>
+      The attr subType must be roomSensorControl.05 and attr manufID must be 00D.
+      The attributes must be set manually. 
+    </li>
     <br><br>
 
     <li>Battery Powered Actuator (EEP A5-20-01)<br>
@@ -2888,7 +3549,7 @@ EnOcean_Undef($$)
         <li>shift 1/K <br>
           issue Setpoint shift</li>
      </ul><br>
-        Setpoint Range: T = -12.7 K ... 12.8 K<br>
+        Shift Range: T = -12.7 K ... 12.8 K<br>
         The attr subType must be gateway and gwCmd must be setpointShift.
         This is done if the device was created by autocreate.<br>
      </li>
@@ -3045,14 +3706,14 @@ EnOcean_Undef($$)
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
     where <code>value</code> is
-      <li>RPS|1BS|4BS|VLD data [status]<br>
+      <li>1BS|4BS|MSC|RPS|UTE|VLD data [status]<br>
         sent data telegram</li>
     </ul><br>
+    [data] = &lt;1-byte hex ... 28-byte hex&gt;<br>
+    [status] = 0x00 ... 0xFF<br>
     With the help of this command data messages in hexadecimal format can be sent.
-    Telegram types (RORG) RPS, 1BS, 4BS and VLD are supported. For further information,
+    Telegram types (RORG) 1BS, 4BS, RPS, MSC, UTE and VLD are supported. For further information,
     see <a href="http://www.enocean-alliance.org/eep/">EnOcean Equipment Profiles (EEP)</a>. 
-    <br>
-    Set attr subType to raw manually.
     </li>
     <br><br>
   </ul></ul>
@@ -3066,22 +3727,36 @@ EnOcean_Undef($$)
   <ul>
     <ul>
     <li><a name="actualTemp">actualTemp</a> t/&#176C<br>
-      The value of the actual temperature, used when controlling MD15 devices.
-      Should by filled via a notify from a distinct temperature sensor. If
-      absent, the reported temperature from the MD15 is used.
+      The value of the actual temperature, used by a Room Sensor and Control Unit
+      or when controlling Battery Powered Actuators (MD15 devices). Should by
+      filled via a notify from a distinct temperature sensor.<br>
+      If absent, the reported temperature from the MD15 is used.
     </li>
     <li><a name="angleMax">angleMax</a> &alpha;s/&#176, [&alpha;s] = -180 ... 180, 90 is default.<br>
       Slat angle end position maximum.<br>
-      angleMax is supported for shutter.<br>
+      angleMax is supported for shutter.
     </li>
     <li><a name="angleMin">angleMin</a> &alpha;o/&#176, [&alpha;o] = -180 ... 180, -90 is default.<br>
       Slat angle end position minimum.<br>
-      angleMin is supported for shutter.<br>
+      angleMin is supported for shutter.
     </li>
     <li><a name="angleTime">angleTime</a> t/s, [angleTime] = 0 ... 6, 0 is default.<br>
       Runtime value for the sunblind reversion time. Select the time to revolve
       the sunblind from one slat angle end position to the other end position.<br>
-      angleTime is supported for shutter.<br>
+      angleTime is supported for shutter.
+    </li>
+    <li><a name="comMode">comMode</a> biDir|uniDir, [comMode] = uniDir is default.<br>
+      Communication Mode between an enabled EnOcean device and Fhem.<br>
+      Unidirectional communication means a point-to-multipoint communication
+      relationship. The EnOcean device e. g. sensors does not know the unique
+      Fhem SenderID.<br>
+      Bidirectional communication means a point-to-point communication
+      relationship between an enabled EnOcean device and Fhem. It requires all parties
+      involved to know the unique Sender ID of their partners. Bidirectional communication
+      needs a teach-in / teach-out process, see <a href="#pairForSec">Bidirectional Teach-In / Teach-Out</a>.
+    </li>
+    <li><a name="devChannel">devChannel</a> 00 ... FF, [devChannel] = FF is default<br>
+      Number of the individual device channel, FF = all channels supported by the device 
     </li>
     <li><a name="destinationID">destinationID</a> multicast|unicast|00000000 ... FFFFFFFF,
       [destinationID] = multicast is default<br>
@@ -3105,6 +3780,10 @@ EnOcean_Undef($$)
     <li><a name="gwCmd">gwCmd</a> switching|dimming|setpointShift|setpointBasic|controlVar|fanStage|blindCmd<br>
       Gateway Command Type, see <a href="#Gateway">Gateway</a> profile
       </li>
+    <li><a name="humidityRefDev">humidityRefDev</a> <name><br>
+      Name of the device whose reference value is read. The reference values is
+      the reading humidity.
+    </li>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#IODev">IODev</a></li>
     <li><a href="#loglevel">loglevel</a></li>
@@ -3132,6 +3811,11 @@ EnOcean_Undef($$)
     <li><a name="securityLevel">securityLevel</a> unencrypted, [securityLevel] = unencrypted is default<br>
       Type of Encryption
     </li>
+    <li><a name="sensorMode">switchMode</a> switch|pushbutton,
+      [sensorMode] = switch is default.<br>
+      The status "released" will be shown in the reading state if the
+      attribute is set to "pushbutton".
+    </li>
     <li><a href="#showtime">showtime</a></li>
     <li><a name="shutTime">shutTime</a> t/s, [shutTime] = 1 ... 255, 255 is default.<br>
       Use the attr shutTime to set the time delay to the position "Halt" in
@@ -3153,9 +3837,7 @@ EnOcean_Undef($$)
       devices, instead you have to create your own, which must be in the
       allowed ID-Range of the underlying IO device. For this first query the
       <a href="#TCM">TCM</a> with the "<code>get &lt;tcm&gt; idbase</code>" command. You can use
-      up to 128 IDs starting with the base shown there.<br>
-      subDef is supported for switches, staircase off-delay timer, dimmer and
-      shutter.
+      up to 128 IDs starting with the base shown there.
       </li>
     <li><a name="subDef0">subDef0</a> &lt;EnOcean SenderID&gt;,
       [subDef0] = [def] is default.<br>
@@ -3208,6 +3890,10 @@ EnOcean_Undef($$)
       <code>central</code> and define the Attributes
       <a href="#subDef0">subDef0</a> and <a href="#subDefI">subDefI</a>.
       </li>
+    <li><a name="temperatureRefDev">temperatureRefDev</a> <name><br>
+      Name of the device whose reference value is read. The reference values is
+      the reading temperature.
+    </li>
     <li><a href="#webCmd">webCmd</a></li>
     </ul>
   </ul>
@@ -3229,8 +3915,8 @@ EnOcean_Undef($$)
          <li>DI</li>
          <li>&lt;BtnX,BtnY&gt; First and second action where BtnX and BtnY is
              one of the above, e.g. A0,BI or D0,CI</li>
-         <li>buttons: released</li>
-         <li>buttons: &lt;BtnX&gt; released</li>
+         <li>buttons: pressed|released</li>
+         <li>state: &lt;BtnX&gt; released</li>
      </ul><br>
          Switches (remote controls) or actors with more than one
          (pair) keys may have multiple channels e. g. B0/BI, A0/AI with one
@@ -3246,6 +3932,7 @@ EnOcean_Undef($$)
          <li>B0</li>
          <li>BI</li>
          <li>released</li>
+         <li>buttons: pressed|released</li>         
          <li>state: A0|AI|B0|BI|released</li>
      </ul><br>
          The status of the device may become "released", this
@@ -3261,9 +3948,25 @@ EnOcean_Undef($$)
          <li>off</li>
          <li>alarm: smoke-alarm|off</li>
          <li>battery: low|ok</li>
+         <li>buttons: pressed|released</li>         
          <li>state: smoke-alarm|off</li>
      </ul><br>
         Set attr subType to FRW manually.
+     </li>
+     <br><br>
+
+     <li>Heating/Cooling Relay (EEP F6-02-01 ... F6-02-02)<br>
+         [Eltako FAE14, FHK14, untested]<br>
+     <ul>
+         <li>controllerMode: auto|off</li>
+         <li>energyHoldOff: normal|holdoff</li>
+         <li>buttons: pressed|released</li>         
+     </ul><br>
+        Set attr subType to switch and model to FAE14|FHK14 manually. In addition
+        every telegram received from a teached-in temperature sensor (e.g. FTR55H)
+        is repeated as a confirmation telegram from the Heating/Cooling Relay
+        FAE14, FHK14. In this case set attr subType to e. g. roomSensorControl.05
+        and attr manufID to 00D.
      </li>
      <br><br>
 
@@ -3272,6 +3975,7 @@ EnOcean_Undef($$)
      <ul>
          <li>keycard inserted</li>
          <li>keycard removed</li>
+         <li>buttons: pressed|released</li>         
          <li>state: keycard inserted|keycard removed</li>
      </ul><br>
          Set attr subType to keycard manually.
@@ -3285,6 +3989,7 @@ EnOcean_Undef($$)
          <li>open</li>
          <li>tilted</li>
          <li>open from tilted</li>
+         <li>buttons: pressed|released</li>         
          <li>state: closed|open|tilted|open from tilted</li>
      </ul><br>
         The device windowHandle should be created by autocreate.
@@ -3501,7 +4206,7 @@ EnOcean_Undef($$)
          [Eltako FTF55, FTR55*, Thermokon SR04 *, Thanos SR *]<br>
      <ul>
        <li>T: t/&#176C SP: 0 ... 255 F: 0|1|2|3|auto SW: 0|1</li>
-       <li>fan: 0|1|2|3|auto</li>
+       <li>fanStage: 0|1|2|3|auto</li>
        <li>switch: 0|1</li>
        <li>setpoint: 0 ... 255</li>
        <li>setpointScaled: &lt;floating-point number&gt;</li>
@@ -3509,15 +4214,17 @@ EnOcean_Undef($$)
        <li>state: T: t/&#176C SP: 0 ... 255 F: 0|1|2|3|auto SW: 0|1</li><br>
        Alternatively for Eltako devices
        <li>T: t/&#176C SPT: t/&#176C NR: t/&#176C</li>
-       <li>nightReduction: t/&#176C</li>
+       <li>block: lock|unlock</li>
+       <li>nightReduction: t/K</li>
        <li>setpointTemp: t/&#176C</li>
        <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 40 &#176C)</li>
-       <li>state: T: t/&#176C SPT: t/&#176C NR: t/&#176C</li><br>
+       <li>state: T: t/&#176C SPT: t/&#176C NR: t/K</li><br>
      </ul><br>
        The scaling of the setpoint adjustment is device- and vendor-specific. Set the
-       attributes <a href="#scaleMax">scaleMax</a> and <a href="#scaleMin">scaleMin</a>
-       for the additional scaled reading setpointScaled. Use attribut
-       <a href="#userReadings">userReadings</a> to adjust the scaling alternatively.<br>
+       attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
+       <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled reading
+       setpointScaled. Use attribut <a href="#userReadings">userReadings</a> to
+       adjust the scaling alternatively.<br>
        The attr subType must be roomSensorControl.05 and attr
        manufID must be 00D for Eltako Devices. This is done if the device was
        created by autocreate.
@@ -3536,9 +4243,10 @@ EnOcean_Undef($$)
        <li>state: T: t/&#176C H: rH/% SP: 0 ... 255 SW: 0|1</li>
      </ul><br>
        The scaling of the setpoint adjustment is device- and vendor-specific. Set the
-       attributes <a href="#scaleMax">scaleMax</a> and <a href="#scaleMin">scaleMin</a>
-       for the additional scaled reading setpointScaled. Use attribut
-       <a href="#userReadings">userReadings</a> to adjust the scaling alternatively.<br>
+       attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
+       <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled reading
+       setpointScaled. Use attribut <a href="#userReadings">userReadings</a> to
+       adjust the scaling alternatively.<br>
        The attr subType must be roomSensorControl.01. This is
        done if the device was created by autocreate.
      </li>
@@ -3555,9 +4263,10 @@ EnOcean_Undef($$)
        <li>state: T: t/&#176C SP: 0 ... 63 P: absent|present</li>
      </ul><br>
        The scaling of the setpoint adjustment is device- and vendor-specific. Set the
-       attributes <a href="#scaleMax">scaleMax</a> and <a href="#scaleMin">scaleMin</a>
-       for the additional scaled reading setpointScaled. Use attribut
-       <a href="#userReadings">userReadings</a> to adjust the scaling alternatively.<br>
+       attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
+       <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled reading
+       setpointScaled. Use attribut <a href="#userReadings">userReadings</a> to
+       adjust the scaling alternatively.<br>
        The attr subType must be roomSensorControl.02. This is done if the device was
        created by autocreate.
      </li>
@@ -3672,9 +4381,10 @@ EnOcean_Undef($$)
        <li>state: T: t/&#176C F: 0|1|2|3|auto SP: 0 ... 255 P: absent|present|disabled</li>
      </ul><br>
        The scaling of the setpoint adjustment is device- and vendor-specific. Set the
-       attributes <a href="#scaleMax">scaleMax</a> and <a href="#scaleMin">scaleMin</a>
-       for the additional scaled reading setpointScaled. Use attribut
-       <a href="#userReadings">userReadings</a> to adjust the scaling alternatively.<br>
+       attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
+       <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled reading
+       setpointScaled. Use attribut <a href="#userReadings">userReadings</a> to
+       adjust the scaling alternatively.<br>
        The attr subType must be roomSensorControl.1F. This is done if the device was
        created by autocreate.
      </li>
@@ -3723,15 +4433,15 @@ EnOcean_Undef($$)
      <li><a name="Blind Status">Blind Status</a> (EEP A5-11-03)<br>
          [untested, experimental status]<br>
      <ul>
-       <li>open|closed|not reached|not available</li>
+       <li>open|closed|not_reached|not_available</li>
        <li>alarm: on|off|no endpoints defined|not used</li>
        <li>anglePos: &alpha;/&#176 (Sensor Range: &alpha; = -360 &#176 ... 360 &#176)</li>
-       <li>endPosition: open|closed|not reached|not available</li>
+       <li>endPosition: open|closed|not_reached|not_available</li>
        <li>position: pos/% (Sensor Range: pos = 0 % ... 100 %)</li>
-       <li>serviceOn: yes|no</li>
-       <li>shutterState: opens|closes|stopped|not available</li>
        <li>positionMode: normal|inverse</li>
-       <li>state: open|closed|not reached|not available</li>
+       <li>serviceOn: yes|no</li>
+       <li>shutterState: opens|closes|stopped|not_available</li>
+       <li>state: open|closed|not_reached|not_available</li>
      </ul><br>
         The attr subType must be shutterCtrlState.01 This is done if the device was
         created by autocreate.<br>
@@ -4019,18 +4729,27 @@ EnOcean_Undef($$)
          Shutter (EEP F6-02-01 ... F6-02-02)<br>
          [Eltako FSB12, FSB14, FSB61, FSB70]<br>
      <ul>
-        <li>B0<br>
-            The status of the device will become "B0" after the TOP endpoint is
-            reached, or it has finished an "up" or "position 0" command.</li>
-        <li>BI<br>
-            The status of the device will become "BI" if the BOTTOM endpoint is
+        <li>teach<br>
+            Teach-In is sent</li>
+        <li>open<br>
+            The status of the device will become "open" after the TOP endpoint is
+            reached, or it has finished an "opens" or "position 0" command.</li>
+        <li>closed<br>
+            The status of the device will become "closed" if the BOTTOM endpoint is
             reached</li>
         <li>stop<br>
             The status of the device become "stop" if stop command is sent.</li>
-        <li>released<br>
-            The status of the device become "released" between one of the endpoints.</li>
-        <li>state: B0|BI|stop|released</li>
+        <li>not_reached<br>
+            The status of the device become "not_reached" between one of the endpoints.</li>
+        <li>anglePos: &alpha;/&#176 (Sensor Range: &alpha; = -180 &#176 ... 180 &#176)</li>
+        <li>buttons: pressed|released</li>
+        <li>endPosition: open|closed|not_reached|not_available</li>
+        <li>position: pos/% (Sensor Range: pos = 0 % ... 100 %)</li>
+        <li>state: open|closed|not_reached|stop|teach</li>
      </ul><br>
+        The values of the reading position and anglePos are updated automatically,
+        if the command position is sent and the reading state was changed
+        manually to open or closed.<br>
         Set attr subType to manufProfile, attr manufID to 00D and attr model to
         FSB14|FSB61|FSB70 manually.
      </li>
@@ -4039,14 +4758,15 @@ EnOcean_Undef($$)
     <li><a name="RAW Command">RAW Command</a><br>
         <br>
     <ul>
-       <li>RORG: RPS|1BS|4BS</li>
-       <li>dataSent: data (Range: 0x00 ... 0xFF or 0x00000000 ... 0xFFFFFFFF)</li>
+       <li>RORG: 1BS|4BS|MCS|RPS|UTE|VLD</li>
+       <li>dataSent: data (Range: 1-byte hex ... 28-byte hex)</li>
        <li>statusSent: status (Range: 0x00 ... 0xFF)</li>
        <li>state: RORG: rorg DATA: data STATUS: status ODATA: odata</li>
     </ul><br>
     With the help of this command data messages in hexadecimal format can be sent and received.
-    The telegram type (RORG) 4BS can be received. For further information,
-    see <a href="http://www.enocean-alliance.org/eep/">EnOcean Equipment Profiles (EEP)</a>. 
+    The telegram types (RORG) 1BS and RPS are always received protocol-specific.
+    For further information, see
+    <a href="http://www.enocean-alliance.org/eep/">EnOcean Equipment Profiles (EEP)</a>. 
     <br>
     Set attr subType to raw manually.
     </li>
