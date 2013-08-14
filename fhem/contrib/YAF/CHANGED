@@ -1,3 +1,4 @@
+- Added foundation for modify dialog and modify dialog for generic widget (marcproe)
 - Added Conig Save button (marcproe)
 - Added widget generic (marcproe)
 - Removed XML::LibXML configuration and implemented persistent configuration in FHEM config (marcproe)
