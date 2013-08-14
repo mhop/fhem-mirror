@@ -13,7 +13,6 @@ sub FW_IconURL($);
 sub FW_iconName($);
 sub FW_iconPath($);
 sub FW_answerCall($);
-sub FW_calcWeblink($$);
 sub FW_dev2image($;$);
 sub FW_devState($$@);
 sub FW_digestCgi($);
@@ -36,26 +35,20 @@ sub FW_returnFileAsStream($$$$$);
 sub FW_roomOverview($);
 sub FW_select($$$$$@);
 sub FW_serveSpecial($$$$);
-sub FW_showLog($);
 sub FW_showRoom();
 sub FW_style($$);
 sub FW_submit($$@);
-sub FW_substcfg($$$$$$);
 sub FW_textfield($$$);
 sub FW_textfieldv($$$$);
 sub FW_updateHashes();
-sub FW_zoomLink($$$);
 
-use vars qw($FW_dir);     # base directory for web server: the first available
-                          # from $modpath/www, $modpath/FHEM
-use vars qw($FW_icondir); # icon base directory for web server: the first
-                          # available from $FW_dir/icons, $FW_dir
-use vars qw($FW_cssdir);  # css directory for web server: the first available
-                          # from $FW_dir/css, $FW_dir
-use vars qw($FW_gplotdir);# gplot directory for web server: the first
-                          # available from $FW_dir/gplot,$FW_dir
+use vars qw($FW_dir);     # base directory for web server
+use vars qw($FW_icondir); # icon base directory
+use vars qw($FW_cssdir);  # css directory
+use vars qw($FW_gplotdir);# gplot directory
 use vars qw($MW_dir);     # moddir (./FHEM), needed by edit Files in new
                           # structure
+
 use vars qw($FW_ME);      # webname (default is fhem), used by 97_GROUP/weblink
 use vars qw($FW_ss);      # is smallscreen, needed by 97_GROUP/95_VIEW
 use vars qw($FW_tp);      # is touchpad (iPad / etc)
@@ -64,6 +57,7 @@ use vars qw($FW_sp);      # stylesheetPrefix
 # global variables, also used by 97_GROUP/95_VIEW/95_FLOORPLAN
 use vars qw(%FW_types);   # device types,
 use vars qw($FW_RET);     # Returned data (html)
+use vars qw($FW_RETTYPE); # image/png or the like
 use vars qw($FW_wname);   # Web instance
 use vars qw($FW_subdir);  # Sub-path in URL, used by FLOORPLAN/weblink
 use vars qw(%FW_pos);     # scroll position
@@ -73,6 +67,9 @@ use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by weblink
 use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by weblink
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 use vars qw(@FW_fhemwebjs);# List of fhemweb*js scripts to load
+use vars qw($FW_detail);   # currently selected device for detail view
+use vars qw($FW_cmdret);   # Returned data by the fhem call
+use vars qw($FW_room);      # currently selected room
 
 my $FW_zlib_checked;
 my $FW_use_zlib = 1;
@@ -84,14 +81,10 @@ my $FW_formmethod = "post";
 # Note: for delivering SVG plots we fork
 my @FW_httpheader; # HTTP header, line by line
 my @FW_enc;        # Accepted encodings (browser header)
-my $FW_cmdret;     # Returned data by the fhem call
 my $FW_data;       # Filecontent from browser when editing a file
-my $FW_detail;     # currently selected device for detail view
-my %FW_devs;       # hash of from/to entries per device
 my %FW_icons;      # List of icons
 my @FW_iconDirs;   # Directory search order for icons
 my $FW_RETTYPE;    # image/png or the like
-my $FW_room;       # currently selected room
 my %FW_rooms;      # hash of all rooms
 my %FW_types;      # device types, for sorting
 my %FW_hiddengroup;# hash of hidden groups
@@ -214,7 +207,6 @@ FW_Read($)
   $FW_cname = $name;
   $FW_subdir = "";
 
-  my $ll = GetLogLevel($FW_wname,4);
   my $c = $hash->{CD};
   if(!$FW_zlib_checked) {
     $FW_zlib_checked = 1;
@@ -223,18 +215,15 @@ FW_Read($)
       eval { require Compress::Zlib; };
       if($@) {
         $FW_use_zlib = 0;
-        Log 1, $@;
-        Log 1, "$FW_wname: Can't load Compress::Zlib, deactivating compression";
+        Log3 $FW_wname, 1, $@;
+        Log3 $FW_wname, 1,
+               "$FW_wname: Can't load Compress::Zlib, deactivating compression";
         $attr{$FW_wname}{fwcompress} = 0;
       }
     }
   }
 
-  # This is a hack... Dont want to do it each time after a fork.
-  if(!$modules{SVG}{LOADED} && -f "$attr{global}{modpath}/FHEM/98_SVG.pm") {
-    my $ret = CommandReload(undef, "98_SVG");
-    Log 1, $ret if($ret);
-  }
+
 
   # Data from HTTP Client
   my $buf;
@@ -242,7 +231,7 @@ FW_Read($)
 
   if(!defined($ret) || $ret <= 0) {
     CommandDelete(undef, $name);
-    Log($ll, "Connection closed for $name");
+    Log3 $FW_wname, 4, "Connection closed for $name";
     return;
   }
 
@@ -282,12 +271,12 @@ FW_Read($)
     if($secret && $basicAuth =~ m/^{.*}$/ || $headerOptions[0]) {
       eval "use MIME::Base64";
       if($@) {
-        Log 1, $@;
+        Log3 $FW_wname, 1, $@;
 
       } else {
         my ($user, $password) = split(":", decode_base64($secret));
         $pwok = eval $basicAuth;
-        Log 1, "basicAuth expression: $@" if($@);
+        Log3 $FW_wname, 1, "basicAuth expression: $@" if($@);
       }
     }
     if($headerOptions[0]) {
@@ -321,7 +310,7 @@ FW_Read($)
   $hash->{LASTACCESS} = $now;
 
   $arg = "" if(!defined($arg));
-  Log $ll, "HTTP $name GET $arg";
+  Log3 $FW_wname, 4, "HTTP $name GET $arg";
   my $pid;
   if(AttrVal($FW_wname, "plotfork", undef)) {
     # Process SVG rendering as a parallel process
@@ -344,7 +333,7 @@ FW_Read($)
   my $length = length($FW_RET);
   my $expires = ($cacheable?
                         ("Expires: ".localtime($now+900)." GMT\r\n") : "");
-  Log $ll, "$arg / RL: $length / $FW_RETTYPE / $compressed / $expires";
+  Log3 $FW_wname, 4, "$arg / RL:$length / $FW_RETTYPE / $compressed / $expires";
   print $c "HTTP/1.1 200 OK\r\n",
            "Content-Length: $length\r\n",
            $expires, $compressed, $FW_headercors,
@@ -423,7 +412,7 @@ FW_answerCall($)
 
   } else {
     my $c = $me->{CD};
-    Log 4, "$FW_wname: redirecting $arg to $FW_ME";
+    Log3 $FW_wname, 4, "$FW_wname: redirecting $arg to $FW_ME";
     print $c "HTTP/1.1 302 Found\r\n",
              "Content-Length: 0\r\n", $FW_headercors,
              "Location: $FW_ME\r\n\r\n";
@@ -453,8 +442,6 @@ FW_answerCall($)
   my $docmd = 0;
   $docmd = 1 if($cmd &&
                 $cmd !~ /^showlog/ &&
-                $cmd !~ /^logwrapper/ &&
-                $cmd !~ /^toweblink/ &&
                 $cmd !~ /^style / &&
                 $cmd !~ /^edit/);
 
@@ -474,28 +461,31 @@ FW_answerCall($)
   }
 
   ##############################
-  # Axels FHEMWEB modules...
+  # FHEMWEB extensions (FLOORPLOAN, SVG_WriteGplot, etc)
+  my $FW_contentFunc;
   if(defined($data{FWEXT})) {
     foreach my $k (sort keys %{$data{FWEXT}}) {
       my $h = $data{FWEXT}{$k};
-      next if($arg !~ m/^$k/ || $h !~ m/HASH/ || !$h->{FUNC});
+      next if($arg !~ m/^$k/);
+      $FW_contentFunc = $h->{CONTENTFUNC};
+      next if($h !~ m/HASH/ || !$h->{FUNC});
+      #Returns undef as FW_RETTYPE if it already sent a HTTP header
       no strict "refs";
-      #Returns undef if it already sent a HTTP header
-      my $localType;
-      ($localType, $FW_RET) = &{$h->{FUNC}}($arg);
+      ($FW_RETTYPE, $FW_RET) = &{$h->{FUNC}}($arg);
       use strict "refs";
-      if($FW_RET && $FW_RET eq "continue") { # Continue displaying the data
-        $FW_RET="";
-        last;
-      }
-      $FW_RETTYPE = $localType;
       return defined($FW_RETTYPE) ? 0 : -1;
     }
   }
 
 
   #Now execute the command
-  $FW_cmdret = $docmd ? FW_fC($cmd, $cmddev) : "";
+  $FW_cmdret = "";
+  if($docmd) {
+    $FW_cmdret = FW_fC($cmd, $cmddev);
+    if($cmd =~ m/^define +([^ ]+) /) { # "redirect" after define to details
+      $FW_detail = $1;
+    }
+  }
 
   # Redirect after a command, to clean the browser URL window
   if($docmd && !$FW_cmdret && AttrVal($FW_wname, "redirectCmds", 1)) {
@@ -511,25 +501,6 @@ FW_answerCall($)
   }
 
   FW_updateHashes();
-  if($cmd =~ m/^showlog /) {
-    FW_showLog($cmd);
-    return 0;
-  }
-
-  if($cmd =~ m/^toweblink (.*)$/) {
-    my @aa = split(":", $1);
-    my $max = 0;
-    for my $d (keys %defs) {
-      $max = ($1+1) if($d =~ m/^wl_(\d+)$/ && $1 >= $max);
-    }
-    $defs{$aa[0]}{currentlogfile} =~ m,([^/]*)$,;
-    $aa[2] = "CURRENT" if($1 eq $aa[2]);
-    $FW_cmdret = FW_fC("define wl_$max weblink fileplot $aa[0]:$aa[1]:$aa[2]");
-    if(!$FW_cmdret) {
-      $FW_detail = "wl_$max";
-      FW_updateHashes();
-    }
-  }
 
   my $t = AttrVal("global", "title", "Home, Sweet Home");
 
@@ -605,11 +576,19 @@ FW_answerCall($)
   }
 
   FW_roomOverview($cmd);
+  if($FW_contentFunc) {
+    no strict "refs";
+    my $ret = &{$FW_contentFunc}($arg);
+    use strict "refs";
+    return $ret if($ret);
+  }
+
      if($cmd =~ m/^style /)    { FW_style($cmd,undef);    }
-  elsif($cmd =~ /^logwrapper/) { return FW_logWrapper($cmd); }
   elsif($FW_detail)            { FW_doDetail($FW_detail); }
   elsif($FW_room)              { FW_showRoom();           }
-  elsif(!$FW_cmdret && AttrVal("global", "motd", "none") ne "none") {
+  elsif(!$FW_cmdret &&
+        !$FW_contentFunc &&
+        AttrVal("global", "motd", "none") ne "none") {
     my $motd = AttrVal("global","motd",undef);
     $motd =~ s/\n/<br>/g;
     FW_pO "<div id=\"content\">$motd</div>";
@@ -671,6 +650,7 @@ FW_digestCgi($)
 }
 
 #####################
+# create FW_rooms && FW_types
 sub
 FW_updateHashes()
 {
@@ -991,7 +971,8 @@ FW_roomOverview($)
   if($defs{$lfn}) { # Add the current Logfile to the list if defined
     my @l = FW_fileList($defs{$lfn}{logfile});
     my $fn = pop @l;
-    splice @list, 4,0, ("Logfile","$FW_ME?cmd=logwrapper%20$lfn%20text%20$fn");
+    splice @list, 4,0, ("Logfile",
+                      "$FW_ME/FileLog_logWrapper?dev=$lfn&type=text&file=$fn");
   }
 
   my @me = split(",", AttrVal($FW_wname, "menuEntries", ""));
@@ -1243,7 +1224,7 @@ FW_returnFileAsStream($$$$$)
   }
 
   if(!open(FH, $path)) {
-    Log 2, "FHEMWEB $FW_wname $path: $!";
+    Log3 $FW_wname, 2, "FHEMWEB $FW_wname $path: $!";
     FW_pO "<div id=\"content\">$path: $!</div>";
     return 0;
   }
@@ -1279,329 +1260,6 @@ FW_returnFileAsStream($$$$$)
   return -1;
 }
 
-######################
-# Show the content of the log (plain text), or an image and offer a link
-# to convert it to a weblink
-# If text and no reverse required, try to return the data as a stream;
-sub
-FW_logWrapper($)
-{
-  my ($cmd) = @_;
-  my (undef, $d, $type, $file) = split(" ", $cmd, 4);
-  if(defined($type) && $type eq "text") {
-    $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
-    my $path = "$1/$file";
-    $path =~ s/%L/$attr{global}{logdir}/g
-        if($path =~ m/%/ && $attr{global}{logdir});
-    $path = AttrVal($d,"archivedir","") . "/$file" if(!-f $path);
-
-    FW_pO "<div id=\"content\">";
-    FW_pO "<div class=\"tiny\">" if($FW_ss);
-    FW_pO "<pre class=\"log\">";
-    my $suffix = "</pre>".($FW_ss ? "</div>" : "")."</div>";
-
-    my $reverseLogs = AttrVal($FW_wname, "reverseLogs", 0);
-    if(!$reverseLogs) {
-      $suffix .= "</body></html>";
-      return FW_returnFileAsStream($path, $suffix, "text/html", 1, 0);
-    }
-
-    if(!open(FH, $path)) {
-      FW_pO "<div id=\"content\">$path: $!</div></body></html>";
-      return 0;
-    }
-    my $cnt = join("", reverse <FH>);
-    close(FH);
-    $cnt = FW_htmlEscape($cnt);
-    FW_pO $cnt;
-    FW_pO $suffix;
-
-  } else {
-    FW_pO "<div id=\"content\">";
-    FW_pO "<br>";
-    FW_pO FW_zoomLink("cmd=$cmd;zoom=-1", "Zoom-in", "zoom in");
-    FW_pO FW_zoomLink("cmd=$cmd;zoom=1",  "Zoom-out","zoom out");
-    FW_pO FW_zoomLink("cmd=$cmd;off=-1",  "Prev",    "prev");
-    FW_pO FW_zoomLink("cmd=$cmd;off=1",   "Next",    "next");
-    FW_pO "<table><tr><td>";
-    FW_pO "<td>";
-    my $logtype = $defs{$d}{TYPE};
-    my $wl = "&amp;pos=" . join(";", map {"$_=$FW_pos{$_}"} keys %FW_pos);
-    my $arg = "$FW_ME?cmd=showlog $logtype $d $type $file$wl";
-    if(AttrVal($d,"plotmode",$FW_plotmode) eq "SVG") {
-      my ($w, $h) = split(",", AttrVal($d,"plotsize",$FW_plotsize));
-      FW_pO "<embed src=\"$arg\" type=\"image/svg+xml\" " .
-                    "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
-
-    } else {
-      FW_pO "<img src=\"$arg\"/>";
-    }
-
-    FW_pO "<br>";
-    FW_pH "cmd=toweblink $d:$type:$file", "Convert to weblink";
-    FW_pO "</td>";
-    FW_pO "</td></tr></table>";
-    FW_pO "</div>";
-
-  }
-  FW_pO "</body></html>";
-  return 0;
-}
-
-sub
-FW_readgplotfile($$$)
-{
-  my ($wl, $gplot_pgm, $file) = @_;
-
-  ############################
-  # Read in the template gnuplot file.  Digest the #FileLog lines.  Replace
-  # the plot directive with our own, as we offer a file for each line
-  my (@filelog, @data, $plot);
-
-  my $wltype = "";
-  $wltype = $defs{$wl}{WLTYPE} if($defs{$wl} && $defs{$wl}{WLTYPE});
-
-  open(FH, $gplot_pgm) || return (FW_fatal("$gplot_pgm: $!"), undef);
-  while(my $l = <FH>) {
-    $l =~ s/\r//g;
-    my $plotfn = undef;
-    if($l =~ m/^#FileLog (.*)$/ &&
-       ($wltype eq "fileplot" || $wl eq "FileLog")) {
-      $plotfn = $1;
-    } elsif ($l =~ m/^#DbLog (.*)$/ && 
-       ($wltype eq "dbplot" || $wl eq "DbLog")) {
-      $plotfn = $1;
-    } elsif($l =~ "^plot" || $plot) {
-      $plot .= $l;
-    } else {
-      push(@data, $l);
-    }
-    
-    if($plotfn) {
-      my $specval = AttrVal($wl, "plotfunction", undef);
-      if ($specval) {
-        my @spec = split(" ",$specval);
-        my $spec_count=1;
-        foreach (@spec) {
-          $plotfn =~ s/<SPEC$spec_count>/$_/g;
-          $spec_count++;
-        }
-      }
-      push(@filelog, $plotfn);
-    }
-  }
-  close(FH);
-
-  return (undef, \@data, $plot, \@filelog);
-}
-
-sub
-FW_substcfg($$$$$$)
-{
-  my ($splitret, $wl, $cfg, $plot, $file, $tmpfile) = @_;
-
-  # interpret title and label as a perl command and make
-  # to all internal values e.g. $value.
-
-  my $oll = $attr{global}{verbose};
-  $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
-
-  if($file eq "CURRENT") {
-    my @a = split(":", $defs{$wl}{LINK});
-    $file = $defs{$a[0]}{currentlogfile};
-    $file =~ s+.*/++;
-  }
-  my $fileesc = $file;
-  $fileesc =~ s/\\/\\\\/g;      # For Windows, by MarkusRR
-  my $title = AttrVal($wl, "title", "\"$fileesc\"");
-
-  $title = AnalyzeCommand($FW_chash, "{ $title }");
-  my $label = AttrVal($wl, "label", undef);
-  my @g_label;
-  if ($label) {
-    @g_label = split("::",$label);
-    foreach (@g_label) {
-      $_ = AnalyzeCommand($FW_chash, "{ $_ }");
-    }
-  }
-  $attr{global}{verbose} = $oll;
-
-  my $gplot_script = join("", @{$cfg});
-  $gplot_script .=  $plot if(!$splitret);
-
-  $gplot_script =~ s/<OUT>/$tmpfile/g;
-  $gplot_script =~ s/<IN>/$file/g;
-
-  my $ps = AttrVal($wl,"plotsize",$FW_plotsize);
-  $gplot_script =~ s/<SIZE>/$ps/g;
-
-  $gplot_script =~ s/<TL>/$title/g;
-  my $g_count=1; 
-  if ($label) {
-    foreach (@g_label) {
-      $gplot_script =~ s/<L$g_count>/$_/g;
-      $plot =~ s/<L$g_count>/$_/g;
-      $g_count++;
-    }
-  }
-
-  $plot =~ s/\r//g;             # For our windows friends...
-  $gplot_script =~ s/\r//g;
-
-  if($splitret == 1) {
-    my @ret = split("\n", $gplot_script); 
-    return (\@ret, $plot);
-  } else {
-    return $gplot_script;
-  }
-}
-
-
-######################
-# Generate an image from the log via gnuplot or SVG
-sub
-FW_showLog($)
-{
-  my ($cmd) = @_;
-  my (undef, $wl, $d, $type, $file) = split(" ", $cmd, 5);
-
-  my $pm = AttrVal($wl,"plotmode",$FW_plotmode);
-
-  my $gplot_pgm = "$FW_gplotdir/$type.gplot";
-
-  if(!-r $gplot_pgm) {
-    my $msg = "Cannot read $gplot_pgm";
-    Log 1, $msg;
-
-    if($pm =~ m/SVG/) { # FW_fatal for SVG:
-      $FW_RETTYPE = "image/svg+xml";
-      FW_pO '<svg xmlns="http://www.w3.org/2000/svg">';
-      FW_pO '<text x="20" y="20">'.$msg.'</text>';
-      FW_pO '</svg>';
-      return;
-
-    } else {
-      return FW_fatal($msg);
-
-    }
-  }
-  FW_calcWeblink($d,$wl);
-
-  if($pm =~ m/gnuplot/) {
-
-    my $tmpfile = "/tmp/file.$$";
-    my $errfile = "/tmp/gnuplot.err";
-
-    if($pm eq "gnuplot" || !$FW_devs{$d}{from}) {
-
-      # Looking for the logfile....
-      $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
-      my $path = "$1/$file";
-      $path = AttrVal($d,"archivedir","") . "/$file" if(!-f $path);
-      return FW_fatal("Cannot read $path") if(!-r $path);
-
-      my ($err, $cfg, $plot, undef) = FW_readgplotfile($wl, $gplot_pgm, $file);
-      return $err if($err);
-      my $gplot_script = FW_substcfg(0, $wl, $cfg, $plot, $file,$tmpfile);
-
-      my $fr = AttrVal($wl, "fixedrange", undef);
-      if($fr) {
-        $fr =~ s/ /\":\"/;
-        $fr = "set xrange [\"$fr\"]\n";
-        $gplot_script =~ s/(set timefmt ".*")/$1\n$fr/;
-      }
-
-      open(FH, "|gnuplot >> $errfile 2>&1");# feed it to gnuplot
-      print FH $gplot_script;
-      close(FH);
-
-    } elsif($pm eq "gnuplot-scroll") {
-
-
-      my ($err, $cfg, $plot, $flog) = FW_readgplotfile($wl, $gplot_pgm, $file);
-      return $err if($err);
-
-
-      # Read the data from the filelog
-      my ($f,$t)=($FW_devs{$d}{from}, $FW_devs{$d}{to});
-      my $oll = $attr{global}{verbose};
-      $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
-      my @path = split(" ", FW_fC("get $d $file $tmpfile $f $t " .
-                                  join(" ", @{$flog})));
-      $attr{global}{verbose} = $oll;
-
-
-      # replace the path with the temporary filenames of the filelog output
-      my $i = 0;
-      $plot =~ s/\".*?using 1:[^ ]+ /"\"$path[$i++]\" using 1:2 "/gse;
-      my $xrange = "set xrange [\"$f\":\"$t\"]\n";
-      foreach my $p (@path) {   # If the file is empty, write a 0 line
-        next if(!-z $p);
-        open(FH, ">$p");
-        print FH "$f 0\n";
-        close(FH);
-      }
-
-      my $gplot_script = FW_substcfg(0, $wl, $cfg, $plot, $file, $tmpfile);
-
-      open(FH, "|gnuplot >> $errfile 2>&1");# feed it to gnuplot
-      print FH $gplot_script, $xrange, $plot;
-      close(FH);
-      foreach my $p (@path) {
-        unlink($p);
-      }
-    }
-    $FW_RETTYPE = "image/png";
-    open(FH, "$tmpfile.png");         # read in the result and send it
-    binmode (FH); # necessary for Windows
-    FW_pO join("", <FH>);
-    close(FH);
-    unlink("$tmpfile.png");
-
-  } elsif($pm eq "SVG") {
-
-    my ($err, $cfg, $plot, $flog) = FW_readgplotfile($wl, $gplot_pgm, $file);
-    return $err if($err);
-
-    my ($f,$t)=($FW_devs{$d}{from}, $FW_devs{$d}{to});
-    $f = 0 if(!$f);     # From the beginning of time...
-    $t = 9 if(!$t);     # till the end
-
-    my $ret;
-    if(!$modules{SVG}{LOADED}) {
-      $ret = CommandReload(undef, "98_SVG");
-      Log 1, $ret if($ret);
-    }
-    Log 5, "plotcommand: get $d $file INT $f $t " . join(" ", @{$flog});
-
-    $FW_RETTYPE = "image/svg+xml";
-
-    (my $cachedate = TimeNow()) =~ s/ /_/g;
-    my $SVGcache = (AttrVal($FW_wname, "SVGcache", undef) && $t lt $cachedate);
-    my $cDir = "$FW_dir/SVGcache";
-    my $cName = "$cDir/$wl-$f-$t.svg";
-    if($SVGcache && open(CFH, $cName)) {
-      FW_pO join("", <CFH>);
-      close(CFH);
-
-    } else {
-      FW_fC("get $d $file INT $f $t " . join(" ", @{$flog}), 1);
-      ($cfg, $plot) = FW_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
-      $ret = SVG_render($wl, $f, $t, $cfg,
-                        $internal_data, $plot, $FW_wname, $FW_cssdir, $flog);
-      FW_pO $ret;
-      if($SVGcache) {
-        mkdir($cDir) if(! -d $cDir);
-        if(open(CFH, ">$cName")) {
-          print CFH $ret;
-          close(CFH);
-        }
-      }
-    }
-
-  }
-
-}
 
 ##################
 sub
@@ -1665,176 +1323,6 @@ FW_submit($$@)
   $class = ($class ? "class=\"$class\"" : "");
   my $s ="<input type=\"submit\" name=\"$n\" value=\"$v\" $class/>";
   return $s;
-}
-
-##################
-# Generate the zoom and scroll images with links if appropriate
-sub
-FW_zoomLink($$$)
-{
-  my ($cmd, $img, $alt) = @_;
-
-  my $prf;
-  $cmd =~ m/^(.*);([^;]*)$/;
-  ($prf, $cmd) = ($1, $2) if($2);
-  my ($d,$off) = split("=", $cmd, 2);
-
-  my $val = $FW_pos{$d};
-  $cmd = ($FW_detail ? "detail=$FW_detail":
-                        ($prf ? $prf : "room=$FW_room")) . "&amp;pos=";
-
-  if($d eq "zoom") {
-
-    my $n = 0;
-    my @FW_zoom = ("hour","qday","day","week","month","year");
-    my %FW_zoom = map { $_, $n++ } @FW_zoom;
-
-    $val = "day" if(!$val);
-    $val = $FW_zoom{$val};
-    return "" if(!defined($val) || $val+$off < 0 || $val+$off >= int(@FW_zoom));
-    $val = $FW_zoom[$val+$off];
-    return "" if(!$val);
-
-    # Approximation of the next offset.
-    my $w_off = $FW_pos{off};
-    $w_off = 0 if(!$w_off);
-
-    if ($val eq "hour") {
-      $w_off =              $w_off*6;
-    } elsif($val eq "qday") {
-      $w_off = ($off < 0) ? $w_off*4 : int($w_off/6);
-    } elsif($val eq "day") {
-      $w_off = ($off < 0) ? $w_off*7 : int($w_off/4);
-    } elsif($val eq "week") {
-      $w_off = ($off < 0) ? $w_off*4 : int($w_off/7);
-    } elsif($val eq "month") {
-      $w_off = ($off < 0) ? $w_off*12: int($w_off/4);
-    } elsif($val eq "year") {
-      $w_off =                         int($w_off/12);
-    }
-    $cmd .= "zoom=$val;off=$w_off";
-
-  } else {
-
-    return "" if((!$val && $off > 0) || ($val && $val+$off > 0)); # no future
-    $off=($val ? $val+$off : $off);
-    my $zoom=$FW_pos{zoom};
-    $zoom = 0 if(!$zoom);
-    $cmd .= "zoom=$zoom;off=$off";
-
-  }
-
-  return "&nbsp;&nbsp;".FW_pHPlain("$cmd", FW_makeImage($img, $alt));
-}
-
-##################
-# Calculate either the number of scrollable weblinks (for $d = undef) or
-# for the device the valid from and to dates for the given zoom and offset
-sub
-FW_calcWeblink($$)
-{
-  my ($d,$wl) = @_;
-
-  my $pm = AttrVal($d,"plotmode",$FW_plotmode);
-  return if($pm eq "gnuplot");
-
-  my $frx;
-  if($defs{$wl}) {
-    my $fr = AttrVal($wl, "fixedrange", undef);
-    if($fr) {
-      #klaus fixed range day, week, month or year
-      if($fr eq "day" || $fr eq "week" || $fr eq "month" || $fr eq "year" ) {
-        $frx=$fr;
-
-      } else {
-        my @range = split(" ", $fr);
-        my @t = localtime;
-        $FW_devs{$d}{from} = ResolveDateWildcards($range[0], @t);
-        $FW_devs{$d}{to} = ResolveDateWildcards($range[1], @t); 
-        return;
-      }
-    }
-  }
-
-  my $off = $FW_pos{$d};
-  $off = 0 if(!$off);
-  $off += $FW_pos{off} if($FW_pos{off});
-
-  my $now = time();
-  my $zoom = $FW_pos{zoom};
-  $zoom = "day" if(!$zoom);
-  $zoom = $frx if ($frx); #for fixedrange {day|week|...} klaus
-
-
-  if($zoom eq "hour") {
-    my $t = $now + $off*3600;
-    my @l = localtime($t);
-    $FW_devs{$d}{from}
-        = sprintf("%04d-%02d-%02d_%02d:00:00",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
-    @l = localtime($t+3600);
-    $FW_devs{$d}{to}
-        = sprintf("%04d-%02d-%02d_%02d:00:01",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
-
-  } elsif($zoom eq "qday") {
-    my $t = $now + $off*21600;
-    my @l = localtime($t);
-    $l[2] = int($l[2]/6)*6;
-    $FW_devs{$d}{from} =
-        sprintf("%04d-%02d-%02d_%02d:00:00",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
-    @l = localtime($t+21600);
-    $l[2] = int($l[2]/6)*6;
-    $FW_devs{$d}{to} =
-        sprintf("%04d-%02d-%02d_%02d:00:01",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
-
-  } elsif($zoom eq "day") {
-    my $t = $now + $off*86400;
-    my @l = localtime($t);
-    $FW_devs{$d}{from} =
-        sprintf("%04d-%02d-%02d_00:00:00",$l[5]+1900,$l[4]+1,$l[3]);
-    @l = localtime($t+86400);
-    $FW_devs{$d}{to} =
-        sprintf("%04d-%02d-%02d_00:00:01",$l[5]+1900,$l[4]+1,$l[3]);
-
-  } elsif($zoom eq "week") {
-    my @l = localtime($now);
-    my $start = (AttrVal($FW_wname, "endPlotToday", undef) ? 6 : $l[6]);
-    my $t = $now - ($start*86400) + ($off*86400)*7;
-    @l = localtime($t);
-    $FW_devs{$d}{from} = 
-        sprintf("%04d-%02d-%02d_00:00:00",$l[5]+1900,$l[4]+1,$l[3]);
-    @l = localtime($t+7*86400);
-    $FW_devs{$d}{to} = 
-        sprintf("%04d-%02d-%02d_00:00:01",$l[5]+1900,$l[4]+1,$l[3]);
-
- } elsif($zoom eq "month") {
-    my ($endDay, @l);
-    if(AttrVal($FW_wname, "endPlotToday", undef)) {
-      @l = localtime($now+86400);
-      $endDay = $l[3];
-      $off--;
-    } else {
-      @l = localtime($now);
-      $endDay = 1;
-    }
-    while($off < -12) { # Correct the year
-      $off += 12; $l[5]--;
-    }
-    $l[4] += $off;
-    $l[4] += 12, $l[5]-- if($l[4] < 0);
-    $FW_devs{$d}{from} =
-        sprintf("%04d-%02d-%02d_00:00:00", $l[5]+1900, $l[4]+1,$endDay);
-    $l[4]++;
-    $l[4] = 0, $l[5]++ if($l[4] == 12);
-    $FW_devs{$d}{to} =
-        sprintf("%04d-%02d-%02d_00:00:01", $l[5]+1900, $l[4]+1,$endDay);
-
-  } elsif($zoom eq "year") {
-    my @l = localtime($now);
-    $l[5] += $off;
-    $FW_devs{$d}{from} = sprintf("%04d-01-01_00:00:00", $l[5]+1900);
-    $FW_devs{$d}{to}   = sprintf("%04d-01-01_00:00:01", $l[5]+1901);
-
-  }
 }
 
 ##################
@@ -2077,12 +1565,13 @@ FW_pHPlain(@)
 {
   my ($link, $txt, $td) = @_;
 
+  $link = "?$link" if($link !~ m+^/+);
   my $ret = "";
   $ret .= "<td>" if($td);
   if($FW_ss || $FW_tp) {
-    $ret .= "<a onClick=\"location.href='$FW_ME$FW_subdir?$link'\">$txt</a>";
+    $ret .= "<a onClick=\"location.href='$FW_ME$FW_subdir$link'\">$txt</a>";
   } else {
-    $ret .= "<a href=\"$FW_ME$FW_subdir?$link\">$txt</a>";
+    $ret .= "<a href=\"$FW_ME$FW_subdir$link\">$txt</a>";
   }
   $ret .= "</td>" if($td);
   return $ret;
@@ -2301,7 +1790,7 @@ FW_dev2image($;$)
   my $devStateIcon = AttrVal($name, "devStateIcon", undef);
   if(defined($devStateIcon) && $devStateIcon =~ m/^{.*}$/) {
     my ($html, $link) = eval $devStateIcon;
-    Log 1, "devStateIcon $name: $@" if($@);
+    Log3 $FW_wname, 1, "devStateIcon $name: $@" if($@);
     return ($html, $link, 1) if(defined($html) && $html =~ m/^<.*>$/s);
     $devStateIcon = $html;
   }
@@ -2632,7 +2121,7 @@ FW_closeOldClients()
     next if(!$defs{$dev}{TYPE} || $defs{$dev}{TYPE} ne "FHEMWEB" ||
             !$defs{$dev}{LASTACCESS} || $defs{$dev}{inform} ||
             ($now - $defs{$dev}{LASTACCESS}) < 60);
-    Log 4, "Closing connection $dev";
+    Log3 $FW_wname, 4, "Closing connection $dev";
     FW_Undef($defs{$dev}, "");
     delete $defs{$dev};
   }
