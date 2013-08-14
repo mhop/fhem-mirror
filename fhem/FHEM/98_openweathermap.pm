@@ -310,7 +310,7 @@ OWO_GetStatus($;$){
 		my $sendString = $urlString."?".$dataString;
 		if(AttrVal($name, "owoDebug",1) == 0){
 			Log3($name, 3, "owo $name: sending: $dataString");
-			$htmlDummy = $ua->get($sendString);
+			$htmlDummy = $ua->post($sendString);
 			Log3($name, 3, "owo $name: htmlResponse: ".$htmlDummy->status_line);
 		} else {
 			Log3($name, 3, "owo $name: debug:   $dataString");
@@ -318,6 +318,7 @@ OWO_GetStatus($;$){
 
 		readingsBeginUpdate($hash);
 		readingsBulkUpdate($hash, "_httpResponse_my", $htmlDummy->status_line) if $htmlDummy;
+		readingsBulkUpdate($hash, "my_response", $htmlDummy->decoded_content) if $htmlDummy;
 		readingsBulkUpdate($hash, "state","active");
 		if(AttrVal($name, "owoTimestamp", 0) == 1){
 			readingsBulkUpdate($hash, "my_lastSent", time);
@@ -391,6 +392,16 @@ UpdateReadings($$$){
 	$url .= "&mode=xml" if($xmlMode eq "1");
 	$url .= "&APPID=".AttrVal($name, "owoApiKey", "");
 	eval {$response = $ua->get("$url")};
+
+#
+#	error handling for not found stations (error 404 from server)
+#
+	if($response->decoded_content =~ m/error/i){
+		CommandDeleteReading(undef, "$name $prefix.*");
+		readingsSingleUpdate($hash, "_httpResponse_".substr($prefix,0,1), $response->decoded_content, 1);
+		return;
+	}
+
 	if(defined($response)){
 		if(AttrVal($name, "owoDebug", 1) == 1){
 			Log3($name, 3, "owo $name: response:\n".$response->decoded_content);
@@ -402,7 +413,6 @@ UpdateReadings($$$){
 
 	CommandDeleteReading(undef, "$name $prefix.*");
 	readingsSingleUpdate($hash, "_httpResponse_".substr($prefix,0,1), $response->status_line, 1);
-
 
 	if($xmlMode eq "1" && $response->is_success){
 		Log3($name, 3, "owo $name: decoding XML");
