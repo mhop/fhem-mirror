@@ -179,7 +179,6 @@ sub YAF_editView{
 
 		#save new config
 		fhem ("attr yaf views $newview");
-		#fhem("save");
 
 		return 1;
 }
@@ -252,8 +251,6 @@ sub YAF_deleteView{
 			fhem ("attr global userattr $newuserattr");
 		}
 
-		#fhem("save");
-
 		return 1;
 }
 
@@ -298,7 +295,6 @@ sub YAF_addView{
 		fhem ("attr yaf views $newview");
 		fhem ("attr yaf backgrounds $newbackground");
 		fhem ("attr global userattr $newuserattr");
-		#fhem("save");
 		return 1;
 }
 
@@ -354,7 +350,6 @@ sub YAF_addWidget{
 				$newId = 0;
 			} else {
 				fhem("attr $fhemname yaf_$viewId $widgetString");
-				#fhem("save");
 			}
 
 			return $newId;
@@ -383,7 +378,6 @@ sub YAF_deleteWidget{
 		delete $fhemwidgets{$viewId}{$widgetId};
 
 		fhem("deleteattr $widgetname yaf_$viewId");
-		#fhem("save");
 
 		return 1;
 }
@@ -446,7 +440,6 @@ sub YAF_setWidgetPosition{
 		}
 
 		fhem("attr $widgetname yaf_$viewId $newattr");
-		#fhem("save");
 }
 
 #######################################################################################
@@ -494,7 +487,6 @@ sub YAF_getWidgetAttribute{
 				}
 			}
 		}
-
 		if(length $retAttr > 0) {
 			return $retAttr;											#return the found config
 		} else {
@@ -517,7 +509,6 @@ sub YAF_getRefreshTime{
 		} else {
 			Log 1,"YAF_getRefreshTime: refresh_interval attribute was not found (so it will be created with a default value)";
 			fhem("attr yaf refresh_interval 60");
-			fhem("save");
 			return 60;
 		}
 }
@@ -534,7 +525,6 @@ sub YAF_setRefreshTime{
 
 		if($newRefreshInterval =~ /^\d+$/) {
 			fhem("attr yaf refresh_interval $newRefreshInterval");
-			#fhem("save");
 			return 1;
 		} else {
 			Log 1,"YAF_setRefreshTime: no valid refresh value or refresh attribute was not found";
@@ -542,4 +532,29 @@ sub YAF_setRefreshTime{
 		}
 }
 
+sub YAF_setWidgetAttribute{
+		my $viewId = $_[0];
+		my $widgetId = $_[1];
+		my $key = $_[2];
+		my $val = $_[3];
+
+		my $widgetname = $fhemwidgets{$viewId}{$widgetId};
+		my %attrhash = ();
+
+		foreach my $attrs (split (/,/,AttrVal($widgetname, "yaf_".$viewId, undef))) {
+			my @attr = split(/=/,$attrs);
+			$attrhash{$attr[0]} = $attr[1];
+		}
+
+		$attrhash{$key} = $val;
+
+		my $newattr = "id=" . $widgetId . ",";
+		foreach my $ckey (keys %attrhash) {
+			if ($ckey ne "id" and defined $attrhash{$ckey}) {
+				$newattr .= $ckey."=".$attrhash{$ckey}.",";
+			}
+		}
+
+		fhem("attr $widgetname yaf_$viewId $newattr");
+}
 1;

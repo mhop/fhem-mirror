@@ -36,34 +36,28 @@
 		<script type="text/javascript" src="js/jquery.ui.touch-punch.min.js"></script>
 		<script type="text/javascript" src="js/yaf-dialogs.js"></script>
 		<script type="text/javascript" src="js/yaf-basics.js"></script>
-		
+
 		<script>
-		
-	
 			// Array mit den Namen und den zugehörigen Id's der Sichten
 			var views = new Array();
 			var widgets = new Array();
 			var current_view_id = null;
 			var current_widget_id = null;
 			var refreshTime = null;
-			
+
 			// Modus in der Sich YAF befindet
 			// modus=0: Live Modus
-			// modus=1: Positionierungs Modus 
+			// modus=1: Positionierungs Modus
 			var view_mode = 0;
 			var widgetWasMoved = false;
 			var close_widget_menue = true;
-			
+
 			// Speichert die Id der View, die gelöscht werden soll
 			var delete_view_id = null;
 			var edit_view_name = null;
 			var edit_view_id = null;
 			var add_widget_name = null;
-			
-			
-		
-			
-			
+
 			// Initialisiert die Oberfläche
 			function init() {
 				$.ajaxSetup({ cache: false });
@@ -76,23 +70,22 @@
 				init_RefreshWidgets();
 				if(window.location != window.parent.location) {
 					$('#menue').toggle();
-				}				
+				}
 				return;
 			}
-		
 			
 			###widget_js###
-			
-			$(document).ready(function() {	
+
+			$(document).ready(function() {
 				init();
 			});
-			
-			$(document).keydown(function(e){				
-				if (e.keyCode == 32) { 
+
+			$(document).keydown(function(e){
+				if (e.keyCode == 32) {
 				   $('#menue').toggle();
 				   return false;
 				}
-			});			
+			});
 		</script>
 		<style>
 	 		###widget_css###
@@ -106,7 +99,7 @@
 	            </div>
 				<div class="menue_block">
 		            <button id="button_saveconfig" class="menue_button">Config speichern</button>
-	            </div>				
+	            </div>
 	            <div class="menue_block">
 	            	<button id="button_settings" class="menue_button">Einstellungen</button>
 	            </div>
@@ -131,30 +124,30 @@
                         <button id="widget_menue_delete" class="widget_menue"></button>
                     </div>
 	            	<div id="tabs_error"></div>
-	                <ul id="views">              
+	                <ul id="views">
 	                </ul>
 	            </div>
-	            
+
 	        </div>
 	    </div>
-	    
+
 	    <div id="dialog_addview" title="Sicht hinzufügen">
 	    	<div class="loading_animation" id="dialog_addview_loading"></div>
 	    	<p>Hier können Sie YAF eine neue Sicht hinzufügen.</p>
 			<label>Name: </label><input id="dialog_addview_name" name="dialog_addview_name"/>
-		</div> 
+		</div>
 
 	    <div id="dialog_editview" title="Sicht bearbeiten">
 	    	<div class="loading_animation" id="dialog_addview_loading"></div>
 	    	<p>Hier können Sie die bestehende Sicht ändern.</p>
 			<label>Name: </label><input id="dialog_editview_name" name="dialog_editview_name" value="" />
-		</div> 
-				
+		</div>
+
 	    <div id="dialog_deleteview" title="Sicht löschen">
 	    	<div class="loading_animation" id="dialog_deleteview_loading"></div>
 	    	<p>Sind Sie sicher, dass Sie die Sicht "<span><b id="label_deleteview"></b></span>" löschen Möchten? Es gehen alle Widgets verloren, die auf dieser Sicht verankert sind!</p>
 		</div>
-		
+
 	     <div id="dialog_manageviews" title="Sichten verwalten">
 	 		<div class="loading_animation" id="dialog_manageviews_loading"></div>
 	    	<p>Hier können Sie einzelne Sichten löschen oder bearbeiten. Gelöschte Sichten können nicht wiederhergestellt werden!</p>
@@ -167,25 +160,25 @@
 	    	<p>Hier können Sie Widgets zur ausgewählten Sicht hinzufügen.</p>
 			<table id="dialog_addwidget_table">
 			</table>
-		</div>	
-		
+		</div>
+
 	    <div id="dialog_addwidget_setup" title="Widget hinzufügen">
 	 		<div class="loading_animation" id="dialog_addwidget_setup_loading"></div>
 	    	<p>Widget vom Typ <b id="dialog_addwidget_setup_widget"></b> hinzufügen: </p>
 			<div id="dialog_addwidget_setup_form" />
 		</div>
-		
+
 	    <div id="dialog_editwidget" title="Widget bearbeiten">
 	    	<div class="loading_animation" id="dialog_editwidget_loading"></div>
 	    	<p>Widget "<span><b id="label_editwidget"></b></span>" bearbeiten:</p>
 			<div id="dialog_editwidget_setup_form" />
 		</div>
-		
+
 	    <div id="dialog_deletewidget" title="Widget löschen">
 	    	<div class="loading_animation" id="dialog_deletewidget_loading"></div>
 	    	<p>Sind Sie sicher, dass Sie das Widget "<span><b id="label_deletewidget"></b></span>" löschen möchten?</p>
 		</div>
-		
+
 	     <div id="dialog_settings" title="Einstellungen">
 	 		<div class="loading_animation" id="dialog_settings_loading"></div>
 	    	<p>Einstellungen</p>

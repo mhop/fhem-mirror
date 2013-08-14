@@ -422,15 +422,12 @@ function init_handlers() {
 	});
 
 	$("#button_saveconfig").click(function () {
-		//window.location.href = "../../../../fhem?cmd=save";
-		//return false;
 		$.ajax({
 			type: "GET",
 			async: true,
 			url: "../../ajax/global/saveconfig",
 			context: document.body,
 			success: function (jsondata) {
-				//console.log("Config saved " + jsondata);
 				$("#button_saveconfig").button({
 					icons: {
 						secondary: "ui-icon-check"
