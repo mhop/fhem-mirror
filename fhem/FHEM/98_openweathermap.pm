@@ -279,7 +279,7 @@ OWO_GetStatus($;$){
 	my $station		= AttrVal($name, "owoStation", undef);
 
 	if(defined($user) && defined($station)){
-		Log3($name, 3, "openweather $name: started: SendData");
+		Log3($name, 3, "owo $name: started: SendData");
 
 		my $lat			= AttrVal("global", "latitude", "");
 		my $lon			= AttrVal("global", "longitude", "");
@@ -300,7 +300,7 @@ OWO_GetStatus($;$){
 				$o = 0 if(!defined($o));
 				$v = ReadingsVal($s, $v, "?") + $o;
 				$dataString = $dataString."&$p=$v";
-				Log3($name, 3, "openweather $name: reading: $paraName $p $s $v");
+				Log3($name, 3, "owo $name: reading: $paraName $p $s $v");
 				readingsSingleUpdate($hash, "my_".$p, $v, 1);
 			}
 		}
@@ -309,15 +309,15 @@ OWO_GetStatus($;$){
 
 		my $sendString = $urlString."?".$dataString;
 		if(AttrVal($name, "owoDebug",1) == 0){
-			Log3($name, 3, "openweather $name: sending: $dataString");
+			Log3($name, 3, "owo $name: sending: $dataString");
 			$htmlDummy = $ua->get($sendString);
-			Log3($name, 3, "openweather $name: htmlResponse: ".$htmlDummy->status_line);
+			Log3($name, 3, "owo $name: htmlResponse: ".$htmlDummy->status_line);
 		} else {
-			Log3($name, 3, "openweather $name: debug:   $dataString");
+			Log3($name, 3, "owo $name: debug:   $dataString");
 		}
 
 		readingsBeginUpdate($hash);
-		readingsBulkUpdate($hash, "_my_HtmlResponse", $htmlDummy->status_line);
+		readingsBulkUpdate($hash, "_httpResponse_my", $htmlDummy->status_line) if $htmlDummy;
 		readingsBulkUpdate($hash, "state","active");
 		if(AttrVal($name, "owoTimestamp", 0) == 1){
 			readingsBulkUpdate($hash, "my_lastSent", time);
@@ -338,7 +338,7 @@ OWO_GetStatus($;$){
 	my $cId = ReadingsVal($name,"c_stationId", undef);
 	if(defined($cId)){
 		my $cName = ReadingsVal($name,"stationName", "");
-		Log3($name, 3, "openweather $name: retrievingStationData: Id: $cId Name: $cName");
+		Log3($name, 3, "owo $name: retrievingStationData: Id: $cId Name: $cName");
 		fhem("set $name stationById $cId");
 	}
 
@@ -367,7 +367,7 @@ OWO_Define($$){
 	readingsEndUpdate($hash, 1);
 
 	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "OWO_GetStatus", $hash, 0);
-	Log3($name, 3, "openweather $name: created");
+	Log3($name, 3, "owo $name: created");
 
 	return;
 }
@@ -388,24 +388,25 @@ UpdateReadings($$$){
 	my $xmlMode = AttrVal($name, "owoUseXml", "");
 	$url .= "&mode=xml" if($xmlMode eq "1");
 	$url .= "&APPID=".AttrVal($name, "owoApiKey", "");
-	$response = $ua->get("$url");
+	eval {$response = $ua->get("$url")};
 	if(defined($response)){
 		if(AttrVal($name, "owoDebug", 1) == 1){
-			Log3($name, 3, "openweather $name: response:\n".$response->decoded_content);
+			Log3($name, 3, "owo $name: response:\n".$response->decoded_content);
 		}
 	} else {
-		Log3($name, 3, "openweather $name: error: no response from server");
+		Log3($name, 3, "owo $name: error: no response from server");
+		return;
 	}
 
 	CommandDeleteReading(undef, "$name $prefix.*");
-	readingsSingleUpdate($hash, "_$prefix"."HtmlResponse", $response->status_line, 1);
+	readingsSingleUpdate($hash, "_httpResponse_".substr($prefix,0,1), $response->status_line, 1);
 
 
-	if($xmlMode eq "1"){
-		Log3($name, 3, "openweather $name: decoding XML");
+	if($xmlMode eq "1" && $response->is_success){
+		Log3($name, 3, "owo $name: decoding XML");
 		my $xml			= new XML::Simple;
 		$jsonWeather	= undef;
-		$jsonWeather	= $xml->XMLin($response->decoded_content, KeyAttr => { 'current' } );
+		$jsonWeather	= $xml->XMLin($response->decoded_content, KeyAttr => 'current' );
 
 		if(defined($jsonWeather)){
 			readingsBeginUpdate($hash);
@@ -436,10 +437,12 @@ UpdateReadings($$$){
 			readingsBulkUpdate($hash, "state", "active");
 			readingsEndUpdate($hash, 1);
 		} else { 
-			Log3($name, 3, "openweather $name error: update not possible!"); 
+			Log3($name, 3, "owo $name error: update not possible!"); 
 		}
-	} else {
-		Log3($name, 3, "openweather $name: decoding JSON");
+	}
+	
+	if($xmlMode ne "1" && $response->is_success){
+		Log3($name, 3, "owo $name: decoding JSON");
 		my $json = JSON->new->allow_nonref;
 		eval {$jsonWeather = $json->decode($response->decoded_content)}; warn $@ if $@;
 
@@ -478,7 +481,7 @@ UpdateReadings($$$){
 			readingsBulkUpdate($hash, "state", "active");
 			readingsEndUpdate($hash, 1);
 		} else { 
-			Log3($name, 3, "openweather $name error: update not possible!"); 
+			Log3($name, 3, "owo $name error: update not possible!"); 
 		}
 	}
 	return;
@@ -591,22 +594,22 @@ OWO_isday($$){
 		<li>1. providing your own weather data to owo network</li>
 		<br/>
 		<ul><code>
-			define myWeather openweather<br/>
-			attr myWeather owoUser myuser:mypassword<br/>
-			attr myWeather owoStation myStationName<br/>
-			attr myWeather owoInterval 600<br/>
-			attr myWeather owoSrc00 temp:sensorname:temperature<br/>
+			define owo openweathermap<br/>
+			attr owo owoUser myuser:mypassword<br/>
+			attr owo owoStation myStationName<br/>
+			attr owo owoInterval 600<br/>
+			attr owo owoSrc00 temp:sensorname:temperature<br/>
 		</code></ul><br/>
 
 		<a name="owoconfiguration2"></a>
 		<li>2. set a weather station from owo network as data source for your fhem installation</li>
 		<br/>
 		<ul><code>
-			set myWeather stationByName Leimen
+			set owo stationByName Leimen
 			<br/><br/>
-			set myWeather stationById 2879241
+			set owo stationById 2879241
 			<br/><br/>
-			set myWeather stationByGeo 49.3511 8.6894
+			set owo stationByGeo 49.3511 8.6894
 		</code></ul>
 		<br/><br/>
 		<ul>
@@ -621,11 +624,11 @@ OWO_isday($$){
 		<li>3. get weather data from a selected weather station once (e.g. to do own presentations)</li>
 		<br/>
 		<ul><code>
-			get myWeather stationByName Leimen
+			get owo stationByName Leimen
 			<br/><br/>
-			get myWeather stationById 2879241
+			get owo stationById 2879241
 			<br/><br/>
-			get myWeather stationByGeo 49.3511 8.6894
+			get owo stationByGeo 49.3511 8.6894
 		</code></ul>
 		<br/><br/>
 		<ul>
@@ -725,9 +728,6 @@ OWO_isday($$){
 	<br/><br/>
 	<b>Author's notes</b><br/><br/>
 	<ul>
-		<li>Module uses Perl JSON to decode weather data. If not installed in your environment, please install with<br/><br/>
-		<ul><code>cpan install JSON</code></ul></li>
-		<br/>
 		<li>further informations about sending your own weather data to owo: <a href="http://openweathermap.org/stations">Link</a></li>
 		<li>further informations about owo location search: <a href="http://openweathermap.org/API">Link</a></li>
 		<li>further informations about owo weather data: <a href="http://bugs.openweathermap.org/projects/api/wiki/Weather_Data">Link</a></li>
