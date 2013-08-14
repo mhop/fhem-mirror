@@ -568,24 +568,24 @@ sub TRX_WEATHER_common_temphydro {
   if (TRX_WEATHER_use_longid($longids,$dev_type)) {
   	$dev_str .= $DOT.sprintf("%02x", $bytes->[3]);
   } elsif ($dev_type eq "TFATS34C") {
-  	Log 1,"TRX_WEATHER: TFA";
+  	#Log 1,"TRX_WEATHER: TFA";
 	if ($bytes->[3] > 0x20 && $bytes->[3] <= 0x3F) {
-  	Log 1,"TRX_WEATHER: TFA 1";
+  	#Log 1,"TRX_WEATHER: TFA 1";
 		$dev_str .= $DOT."1"; 
 	} elsif ($bytes->[3] >= 0x40 && $bytes->[3] <= 0x5F) {
-  	Log 1,"TRX_WEATHER: TFA 2";
+  	#Log 1,"TRX_WEATHER: TFA 2";
 		$dev_str .= $DOT."2"; 
 	} elsif ($bytes->[3] >= 0x60 && $bytes->[3] <= 0x7F) {
-  	Log 1,"TRX_WEATHER: TFA 3";
+  	#Log 1,"TRX_WEATHER: TFA 3";
 		$dev_str .= $DOT."3"; 
 	} elsif ($bytes->[3] >= 0xA0 && $bytes->[3] <= 0xBF) {
-  	Log 1,"TRX_WEATHER: TFA 4";
+  	#Log 1,"TRX_WEATHER: TFA 4";
 		$dev_str .= $DOT."4"; 
 	} elsif ($bytes->[3] >= 0xC0 && $bytes->[3] <= 0xDF) {
-  	Log 1,"TRX_WEATHER: TFA 5";
+  	#Log 1,"TRX_WEATHER: TFA 5";
 		$dev_str .= $DOT."5"; 
 	} else {
-  	Log 1,"TRX_WEATHER: TFA 9";
+  	#Log 1,"TRX_WEATHER: TFA 9";
 		$dev_str .= $DOT."9"; 
 	}
   } elsif ($bytes->[4] > 0) {
