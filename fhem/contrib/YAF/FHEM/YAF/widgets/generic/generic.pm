@@ -72,8 +72,26 @@ sub generic_get_widgetjs() {
 					}
 					return str.indexOf(suffix, str.length - suffix.length) !== -1;
 				}
+
 				function generic_on_click(view_id, widget_id) {
+					$.ajax({
+						type: "GET",
+						async: true,
+						url: "../../ajax/widget/generic/on_click",
+						data: "view_id="+view_id+"&widget_id="+widget_id,
+						context: document.body,
+						success: function(data){
+								var mydata = jQuery.parseJSON(data);
+								if(mydata[0] == "redirect") {
+									window.location.href = mydata[1];
+								} else {
+									generic_update_widget(view_id, widget_id);
+								}
+
+						}
+					});
 				}
+
                 function generic_update_widget(view_id, widget_id) {
 					$.ajax({
 						type: "GET",
@@ -188,6 +206,25 @@ sub generic_get_addwidget_setup_html() {
 		# return encode_json(\@ret);
 # }
 
+sub generic_get_editwidget_setup_html() {
+		my $viewId = $_GET{"view_id"};
+		my $widgetId = $_GET{"widget_id"};
+		my $output = "";
+
+		my $fhemname = YAF_getWidgetAttribute($viewId, $widgetId, "fhemname", "");
+		my $labeltype = YAF_getWidgetAttribute($viewId, $widgetId, "labeltype","");
+		my $statetype = YAF_getWidgetAttribute($viewId, $widgetId, "statetype","");
+		my $showlabel = YAF_getWidgetAttribute($viewId, $widgetId, "showlabel","1");
+		my $showicon = YAF_getWidgetAttribute($viewId, $widgetId, "showicon","1");
+
+		$output .= "<label title='Name des Devices'>Name:</label><input class='input_edit_widget' disabled='disabled' name='fhemname' value='" . $fhemname . "' /><br />";
+		$output .= "<label title='Welches Attributfeld soll als Label des Widgets gezeigt werden?'>Label (Attribut):</label><input class='input_edit_widget' name='labeltype' value='" . $labeltype . "' /><br />";
+		$output .= "<label title='Welches Reading soll als Status gezeigt werden?'>Status (Reading):</label><input class='input_edit_widget' name='statetype' value='" . $statetype . "' /><br />";
+		$output .= "<label title='Soll das Label angezeigt werden?'>Label anzeigen? (1/0):</label><input class='input_edit_widget' name='showlabel' value='" . $showlabel . "' /><br />";
+		$output .= "<label title='Soll das Icon angezeigt werden?'>Icon anzeigen? (1/0):</label><input class='input_edit_widget' name='showicon' value='" . $showicon . "' /><br />";
+		return $output;
+}
+
 ########################################################################################
 #
 # generic_get_addwidget_prepare_attributes -
@@ -231,15 +268,18 @@ sub generic_getwidget_html() {
 ########################################################################################
 
 sub generic_get_state() {
-        my $fhemname = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "fhemname");
-		my $labeltype = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "labeltype","");
-		my $statetype = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "statetype","");
-		my $showlabel = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "showlabel","1");
-		my $showicon = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "showicon","1");
+		my $viewId = $_GET{"view_id"};
+		my $widgetId = $_GET{"widget_id"};
+
+        my $fhemname = YAF_getWidgetAttribute($viewId, $widgetId, "fhemname", "");
+		my $labeltype = YAF_getWidgetAttribute($viewId, $widgetId, "labeltype","");
+		my $statetype = YAF_getWidgetAttribute($viewId, $widgetId, "statetype","");
+		my $showlabel = YAF_getWidgetAttribute($viewId, $widgetId, "showlabel","1");
+		my $showicon = YAF_getWidgetAttribute($viewId, $widgetId, "showicon","1");
 
 		my $d = $defs{$fhemname};
 		my $state = $d->{STATE};
-		my $iconpath = "/fhem/images/default/";
+		my $iconpath = "";
 		my @ret = ();
 
 		if(!defined $state) {
@@ -251,8 +291,9 @@ sub generic_get_state() {
 			if(defined $devStateIcon) {
 				foreach my $entry (split (/ /,$devStateIcon)) {
 					my @keyval = split(/:/,$entry);
-					if($keyval[0] =~ $state) {
-						$iconpath .= $keyval[1] . ".png";
+					my $regex = $keyval[0];
+					if($state =~ m/$regex/) {
+						$iconpath = "/fhem/images/default/" . $keyval[1] . ".png";
 					}
 				}
 				$ret[1] = $iconpath;
@@ -266,7 +307,7 @@ sub generic_get_state() {
 			$ret[0] =~ s/( )/&nbsp;/g;
 
 			if($statetype ne "") {
-				$ret[2] = generic_isdef($defs{$fhemname}{READINGS}{$statetype}{VAL}, "no-reading");
+				$ret[2] = ReadingsVal($fhemname, $statetype, "no-reading");
 			} else {
 				$ret[2] = $state;
 			}
@@ -289,8 +330,30 @@ sub generic_get_state() {
 		}
 }
 
-sub generic_isdef() {
-	return ((defined $_[0]) ? $_[0] : $_[1]);
+sub generic_on_click() {
+		my $fhemname = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "fhemname");
+		my $d = $defs{$fhemname};
+		my $clicklink = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "clicklink", "");
+		my @ret = ();
+		if($clicklink ne "") {
+			if($clicklink eq "_detail") {
+				$ret[0] = "redirect";
+				$ret[1] = "/fhem?detail=" . $fhemname;
+
+			} else {
+				$ret[0] = "redirect";
+				$ret[1] = $clicklink;
+			}
+			return encode_json(\@ret);
+		}
+		my $setstate = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "_".$d->{STATE}, "");
+
+		if($setstate ne "") {
+			fhem("set " . $fhemname . " " . $setstate);
+			return encode_json(\@ret);
+		}
+
 }
+
 1;
 

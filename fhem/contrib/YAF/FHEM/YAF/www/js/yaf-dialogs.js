@@ -265,16 +265,53 @@ function init_dialogs() {
 	$("#dialog_editwidget").dialog({
 		autoOpen: false,
 		resizable: true,
-		height: 300,
-		width: 400,
+		height: 400,
+		width: 500,
 		modal: true,
 		buttons: {
-			"Speichern": function (ui) {
+			"Speichern": function (ui) {				
+				var keys = new Array();
+				var vals = new Array();
+				
+				keys[0] = "id";
+				vals[0] = current_widget_id;
+				
+				$('.input_edit_widget').each(function(i, obj) {
+					keys[i+1] = obj.name;
+					vals[i+1] = obj.value;
+				});				
+				
+				$.ajax({
+					type: "GET",
+					async: false,
+					url: "../../ajax/global/editWidget",
+					data: "view_id="+current_view_id+"&widget_id="+current_widget_id+"&keys="+keys+"&vals="+vals,
+					context: document.body,
+					success: function (jsondata) {
+						
+					}
+				});	
 				$(this).dialog("close");
 			},
 			"Abbrechen": function () {
 				$(this).dialog("close");
 			}
+		},
+		open: function (event, ui) {
+			$("#dialog_addwidget_loading").show();
+			$.ajax({
+				type: "GET",
+				async: false,
+				url: "../../ajax/widget/generic/get_editwidget_setup_html",
+				data: "view_id="+current_view_id+"&widget_id="+current_widget_id,
+				context: document.body,
+				success: function (jsondata) {
+					//var myform = jQuery.parseJSON(jsondata);
+
+					$("#dialog_editwidget_setup_form").html(jsondata);
+					$("#dialog_addwidget_loading").hide();
+				}
+			});
 		}
 	});
 

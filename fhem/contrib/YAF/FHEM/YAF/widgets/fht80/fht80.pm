@@ -165,6 +165,11 @@ sub fht80_get_addwidget_prepare_attributes() {
 	return $output;
 }
 
+sub fht80_get_editwidget_setup_html() {
+	my $output = "";
+	$output .= "TEST!";
+	return $output;
+}
 ########################################################################################
 #
 # fht80t_getwidget_html - HTML code for this widget. DO WE NEED THIS ? SEE ABOVE
@@ -201,12 +206,12 @@ sub fht80_get_temp() {
 	}
 
 	# get all the needed data
-	my $temp = 			fht80_isdef($defs{$fhemname}{READINGS}{temperature}{VAL}, 0);
-	my $temptimestamp = fht80_isdef($defs{$fhemname}{READINGS}{temperature}{TIME}, "");
-	my $actuator = 		fht80_isdef($defs{$fhemname}{READINGS}{actuator}{VAL}, "");
-	my $mode = 			fht80_isdef($defs{$fhemname}{READINGS}{mode}{VAL}, "none");
-	my $desi = 			fht80_isdef($defs{$fhemname}{READINGS}{"desired-temp"}{VAL}, "");
-	my $battery = 		fht80_isdef($defs{$fhemname}{READINGS}{battery}{VAL}, "");
+	my $temp = 			ReadingsVal($fhemname, "temperature", 0);
+	my $temptimestamp = ReadingsTimestamp($fhemname, "temperature", "big-bang");
+	my $actuator = 		ReadingsVal($fhemname, "actuator", "");
+	my $mode = 			ReadingsVal($fhemname, "mode", "none");
+	my $desi = 			ReadingsVal($fhemname, "desired-temp", "");
+	my $battery = 		ReadingsVal($fhemname, "battery", "");
 	my $nomode = 		YAF_getWidgetAttribute($viewid, $widgetid, "nomode", 0);
 	my $labeltype = 	YAF_getWidgetAttribute($viewid, $widgetid, "labeltype", "");
 	$ret[1] = 			YAF_getWidgetAttribute($viewid, $widgetid, "size", 1);		#we don't process the size, so put it in the return array right away.
@@ -237,9 +242,5 @@ sub fht80_get_temp() {
 	}
 
 	return encode_json(\@ret);
-}
-
-sub fht80_isdef() {
-	return ((defined $_[0]) ? $_[0] : $_[1]);
 }
 1;
