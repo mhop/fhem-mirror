@@ -265,7 +265,8 @@ at_State($$$$)
       The optional <code>{N}</code> after the * indicates,that the command
       should be repeated <i>N-times</i> only.<br>
       &lt;timedet&gt; is either HH:MM, HH:MM:SS or {perlfunc()}, where perlfunc
-      must return a HH:MM or HH:MM:SS date.
+      must return a HH:MM or HH:MM:SS date. Note: {perlfunc()} may not contain
+      any spaces or tabs.
     </ul>
     <br>
 
