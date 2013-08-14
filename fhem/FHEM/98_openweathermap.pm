@@ -325,7 +325,9 @@ OWO_GetStatus($;$){
 			readingsBulkUpdate($hash, "my_lastSent", localtime(time));
 		}
 		readingsEndUpdate($hash, 1);
-		CommandDeleteReading(undef, "$name my_.*") if $htmlDummy->is_error;
+		if(defined($htmlDummy)){
+			CommandDeleteReading(undef, "$name my_.*") if $htmlDummy->is_error;
+		}
 	}
 
 ##### end of send job
