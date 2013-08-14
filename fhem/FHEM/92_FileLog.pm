@@ -5,9 +5,21 @@ package main;
 use strict;
 use warnings;
 use IO::File;
-#use Devel::Size qw(size total_size);
-use vars qw($FW_ss);      # is smallscreen
+
+# This block is only needed when FileLog is loaded bevore FHEMWEB
+sub FW_pO(@);
+sub FW_pH(@);
 use vars qw($FW_ME);      # webname (default is fhem), needed by 97_GROUP
+use vars qw($FW_RET);     # Returned data (html)
+use vars qw($FW_RETTYPE); 
+use vars qw($FW_cmdret);  # error msg forwarding from toSVG
+use vars qw($FW_detail);  # for redirect after toSVG
+use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by weblink
+use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by weblink
+use vars qw($FW_ss);      # is smallscreen
+use vars qw($FW_wname);   # Web instance
+use vars qw(%FW_pos);     # scroll position
+use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 sub seekTo($$$$);
 
@@ -30,6 +42,8 @@ FileLog_Initialize($)
 
   $hash->{FW_summaryFn} = "FileLog_fhemwebFn";
   $hash->{FW_detailFn}  = "FileLog_fhemwebFn";
+  $data{FWEXT}{"/FileLog_toSVG"}{CONTENTFUNC} = "FileLog_toSVG";
+  $data{FWEXT}{"/FileLog_logWrapper"}{CONTENTFUNC} = "FileLog_logWrapper";
 }
 
 
@@ -254,6 +268,15 @@ FileLog_Set($@)
   return undef;
 }
 
+sub
+FileLog_loadSVG()
+{
+  if(!$modules{SVG}{LOADED} && -f "$attr{global}{modpath}/FHEM/98_SVG.pm") {
+    my $ret = CommandReload(undef, "98_SVG");
+    Log 1, $ret if($ret);
+  }
+}
+
 #########################
 sub
 FileLog_fhemwebFn($$$$)
@@ -277,7 +300,7 @@ FileLog_fhemwebFn($$$$)
       }
       my ($lt, $name) = split(":", $ln);
       $name = $lt if(!$name);
-      $ret .= FW_pH("cmd=logwrapper $d $lt $f",
+      $ret .= FW_pH("$FW_ME/FileLog_logWrapper&dev=$d&type=$lt&file=$f",
                     "<div class=\"dval\">$name</div>", 1, "dval", 1);
     }
     $ret .= "</tr>";
@@ -337,15 +360,116 @@ FileLog_fhemwebFn($$$$)
   $ret .= "</table>";
 
   my $newIdx=1;
-  while($defs{"wl_${d}_$newIdx"}) {
+  while($defs{"SVG_${d}_$newIdx"}) {
     $newIdx++;
   }
-  my $name = "wl_${d}_$newIdx";
-  $ret .= FW_pH("cmd=define $name weblink fileplot $d:template:CURRENT;".
+  my $name = "SVG_${d}_$newIdx";
+  $ret .= FW_pH("cmd=define $name SVG $d:template:CURRENT;".
                      "set $name copyGplotFile&detail=$name",
-                "<div class=\"dval\">Create new SVG plot</div>", 0, "dval", 1);
+                "<div class=\"dval\">Create SVG plot</div>", 0, "dval", 1);
 
   return $ret;
+}
+
+###################################
+sub
+FileLog_toSVG($)
+{
+  my ($arg) = @_;
+  FW_digestCgi($arg);
+  return("text/html;", "bad url: cannot create SVG def")
+    if(!defined($FW_webArgs{arg}));
+
+  my @aa = split(":", $FW_webArgs{arg});
+  my $max = 0;
+  for my $d (keys %defs) {
+    $max = ($1+1) if($d =~ m/^SVG_(\d+)$/ && $1 >= $max);
+  }
+  $defs{$aa[0]}{currentlogfile} =~ m,([^/]*)$,;
+  $aa[2] = "CURRENT" if($1 eq $aa[2]);
+  $FW_cmdret = FW_fC("define SVG_$max SVG $aa[0]:$aa[1]:$aa[2]");
+  $FW_detail = "SVG_$max" if(!$FW_cmdret);
+  return;
+}
+
+######################
+# Show the content of the log (plain text), or an image and offer a link
+# to convert it to an SVG instance
+# If text and no reverse required, try to return the data as a stream;
+sub
+FileLog_logWrapper($)
+{
+  my ($cmd) = @_;
+
+  my $d    = $FW_webArgs{dev};
+  my $type = $FW_webArgs{type};
+  my $file = $FW_webArgs{file};
+  my $ret = "";
+
+  if(!$d || !$type || !$file) {
+    FW_pO '<div id="content">FileLog_logWrapper: bad arguments</div>';
+    return 0;
+  }
+
+  if(defined($type) && $type eq "text") {
+    $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
+    my $path = "$1/$file";
+    $path =~ s/%L/$attr{global}{logdir}/g
+        if($path =~ m/%/ && $attr{global}{logdir});
+    $path = AttrVal($d,"archivedir","") . "/$file" if(!-f $path);
+
+    FW_pO "<div id=\"content\">";
+    FW_pO "<div class=\"tiny\">" if($FW_ss);
+    FW_pO "<pre class=\"log\">";
+    my $suffix = "</pre>".($FW_ss ? "</div>" : "")."</div>";
+
+    my $reverseLogs = AttrVal($FW_wname, "reverseLogs", 0);
+    if(!$reverseLogs) {
+      $suffix .= "</body></html>";
+      return FW_returnFileAsStream($path, $suffix, "text/html", 1, 0);
+    }
+
+    if(!open(FH, $path)) {
+      FW_pO "<div id=\"content\">$path: $!</div></body></html>";
+      return 0;
+    }
+    my $cnt = join("", reverse <FH>);
+    close(FH);
+    $cnt = FW_htmlEscape($cnt);
+    FW_pO $cnt;
+    FW_pO $suffix;
+
+  } else {
+    FileLog_loadSVG();
+    FW_pO "<div id=\"content\">";
+    FW_pO "<br>";
+    FW_pO SVG_zoomLink("$cmd;zoom=-1", "Zoom-in", "zoom in");
+    FW_pO SVG_zoomLink("$cmd;zoom=1",  "Zoom-out","zoom out");
+    FW_pO SVG_zoomLink("$cmd;off=-1",  "Prev",    "prev");
+    FW_pO SVG_zoomLink("$cmd;off=1",   "Next",    "next");
+    FW_pO "<table><tr><td>";
+    FW_pO "<td>";
+    my $logtype = $defs{$d}{TYPE};
+    my $wl = "&amp;pos=" . join(";", map {"$_=$FW_pos{$_}"} keys %FW_pos);
+    my $arg = "$FW_ME/SVG_showLog&dev=$logtype&logdev=$d".
+                "&gplotfile=$type&logfile=$file$wl";
+    if(AttrVal($d,"plotmode",$FW_plotmode) eq "SVG") {
+      my ($w, $h) = split(",", AttrVal($d,"plotsize",$FW_plotsize));
+      FW_pO "<embed src=\"$arg\" type=\"image/svg+xml\" " .
+                    "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
+
+    } else {
+      FW_pO "<img src=\"$arg\"/>";
+    }
+
+    FW_pO "<br>";
+    FW_pH "$FW_ME/FileLog_toSVG&arg=$d:$type:$file", "Create SVG instance";
+    FW_pO "</td>";
+    FW_pO "</td></tr></table>";
+    FW_pO "</div>";
+
+  }
+  return 0;
 }
 
 
