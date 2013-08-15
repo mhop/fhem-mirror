@@ -33,6 +33,7 @@ FW_doUpdate()
   var devs = new Array();
   for(var i=FW_curLine; i < lines.length; i++) {
     var d = lines[i].split("<<", 3);    // Complete arg
+    //console.log("Got "+lines[i]);
     if(d.length != 3)
       continue;
     var elArr = document.querySelectorAll("[informId='"+d[0]+"']");

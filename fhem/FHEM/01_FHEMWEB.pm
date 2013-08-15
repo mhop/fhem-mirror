@@ -1284,7 +1284,7 @@ FW_select($$$$$@)
 {
   my ($id, $n, $va, $def, $class, $jSelFn) = @_;
   $jSelFn = ($jSelFn ? "onchange=\"$jSelFn\"" : "");
-  $id = ($id ? "id=\"$id\"" : "");
+  $id = ($id ? "id=\"$id\" informId=\"$id\"" : "");
   my $s = "<select $jSelFn $id name=\"$n\" class=\"$class\">";
   foreach my $v (@{$va}) {
     if($def && $v eq $def) {
