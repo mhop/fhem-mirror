@@ -380,7 +380,7 @@ local $SIG{HUP} = sub {$nextrun = gettimeofday();};
 				    }
 				}
 	
-			sleep 0.1;
+			sleep 1;
 		}
 	}
 }
