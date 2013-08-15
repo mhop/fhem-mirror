@@ -1,0 +1,51 @@
+Install FHEM:
+  Download the latest fhem-X.Y.tar.gz package from http://fhem.de#Download
+  (currently it is fhem-5.4.tar.gz), and unpack it into a directory where you
+  have at least 350MB+ free space. I will use F:\tmp for this purpose, after
+  unpacking the .tar.gz file we will have a new directory F:\tmp\fhem-5.4
+
+
+Install perl:
+  Download a Strawberry perl Portable-Edition (this version won't
+  generate Registry-Entries, and can be installed on USB disks) from
+  http://strawberryperl.com/releases.html, and extract it into the previously
+  created directory, in our case F:\tmp\fhem-5.4
+  My file was called strawberry-perl-5.16.2.1-32bit-portable.zip
+
+
+Start FHEM:
+  Open a command line window (cmd), change to the previous directory, and start
+  FHEM:
+    C:> F:
+    F:> cd \tmp\fhem-5.4
+    F:\tmp\fhem-5.4> mkdir log
+    F:\tmp\fhem-5.4> perl\bin\perl fhem.pl fhem.cfg
+  Note:
+    There is no visible output and the command won't terminate.
+    You probably have to confirm a Firewall exception (Do not block), as FHEM
+    opens a Web-Server Port.
+
+
+Connect to the FHEM Web frontend (FHEMWEB):
+  Start your browser (Firefox,Chrome or Safari are preferred) and open
+    http://localhost:8083/fhem
+  You'll see a smiling House-Icon on a light-yellow background.
+
+
+Update FHEM to get access to the latest development version (recommended but
+not mandatory):
+  In the browser window, on the FHEMWEB page, in the command line (upper text
+  input field, right of the smiling house icon), type in the following 4
+  commands one-by-one, confirming each one with Enter:
+     notice confirm update-20130127-001
+     attr global backup_before_update 0
+     save
+     update
+  Note:
+  - the last command will take a while (around a minute), and after finished
+    it will ask you to "shutdown restart". Ignore this, and just type
+    shutdown in the FHEMWEB command line.
+  - Switch to the command line window, and restart FHEM with the last command,
+    i.e. arrow up and RETURN or type in 
+       perl\bin\perl fhem.pl fhem.cfg
+    again.
