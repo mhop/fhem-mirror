@@ -481,6 +481,7 @@ sub buildCAPList(@){
 	@a = sort(@a);
 	$list = join(",", @a);
 	$list =~ s/\s/_/g;
+	$list = "No_alerts_published!" if !$record;
 	return ($list, $record);
 }
 
