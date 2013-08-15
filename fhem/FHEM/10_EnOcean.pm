@@ -757,17 +757,13 @@ EnOcean_Set($@)
         }
         if ($sendDimCmd) {
           if (defined $a[1]) {
-            return "Usage: $cmd dim/% [rampTime/s lock|unlock]" if (($a[1] ne "lock") && ($a[1] ne "unlock"));
-            if ($manufID eq "OOD") {
-              # Eltako devices: lock dimming value
-              if ($a[1] eq "lock") { $setCmd = $setCmd | 4; }
-            } else {
-              # Dimming value relative
-              $setCmd = $setCmd | 4;
-            }
+            return "Usage: $cmd dim/% [rampTime/s lock|unlock]" if ($a[1] ne "lock" && $a[1] ne "unlock");
+            # Eltako devices: lock dimming value
+            if ($manufID eq "OOD" && $a[1] eq "lock" ) {$setCmd = $setCmd | 4;}
             shift(@a);
           } else {
-            if ($manufID ne "OOD") { $setCmd = $setCmd | 4; }
+            # Dimming value relative
+            if ($manufID ne "OOD") {$setCmd = $setCmd | 4;}
           }
           if ($dimVal > 100) { $dimVal = 100; }
           if ($dimVal <= 0) { $dimVal = 0; $setCmd = 8; }
