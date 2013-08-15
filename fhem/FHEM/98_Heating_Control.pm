@@ -257,6 +257,7 @@ Heating_Control_Update($)
   my $nowSwitch  = 0;
 
   my $loglevel   = GetLogLevel ($hash->{NAME}, 5);
+  #   $loglevel   = 3;
 
   my $startIdx;
   for (my $d=-1; $d>=-7; $d--) {
@@ -348,7 +349,9 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
         }
      }
      Heating_Control_Update($hash);
+     Log 3, "Heating_Control_Update() for $hash->{NAME} done!";
   }
+  Log 3, "Heating_Control_SetAllTemps() done!";
 }
 
 sub SortNumber {
