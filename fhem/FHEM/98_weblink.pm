@@ -18,7 +18,6 @@ weblink_Initialize($)
   $hash->{FW_summaryFn} = "weblink_FwFn";
   $hash->{FW_detailFn}  = "weblink_FwFn";
   $hash->{FW_atPageEnd} = 1;
-  $data{FWEXT}{"/weblinkDetails"}{FUNC} = "weblink_WriteGplot";
 }
 
 
@@ -111,7 +110,7 @@ weblink_FwFn($$$$)
 
     my @lines = split(" ", $link);
     my $row = 1;
-    my $ret = "<table>";
+    $ret = "<table>";
     $ret .= "<tr><td><div class=\"devType\"><a href=\"/fhem?detail=$d\">".AttrVal($d, "alias", $d)."</a></div></td></tr>";
     $ret .= "<tr><td><table class=\"block wide\">";
     foreach my $line (@lines) {
@@ -162,7 +161,6 @@ weblink_FwFn($$$$)
     }
                 
     my $row = 1;
-    my $ret = "";
     $ret .= "<table>";
     $ret .= "<tr><td><div class=\"devType\"><a href=\"/fhem?detail=$d\">".AttrVal($d, "alias", $d)."</a></div></td></tr>" if( $show_heading );
     $ret .= "<tr><td><table class=\"block wide\">";
