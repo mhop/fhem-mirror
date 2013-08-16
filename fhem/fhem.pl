@@ -3333,7 +3333,7 @@ readingsEndUpdate($$)
   if($dotrigger && $init_done) {
     DoTrigger($name, undef, 0) if(!$readingsUpdateDelayTrigger);
   } else {
-    delete($hash->{CHANGED});
+    delete($hash->{CHANGED}) if(!defined($hash->{INTRIGGER}));
   }
   
   return undef;
