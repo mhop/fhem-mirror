@@ -38,7 +38,7 @@ BlockingCall($$@)
     foreach my $d (sort keys %defs) {
       my $h = $defs{$d};
       next if(!$h->{TYPE} || $h->{TYPE} ne "telnet" || $h->{SNAME});
-      next if($attr{$d}{SSL} || $attr{$d}{password});
+      next if($attr{$d}{SSL} || $attr{$d}{password} || $attr{$d}{allowfrom});
       next if($h->{DEF} =~ m/IPV6/);
       $telnetDevice = $d;
       last;
