@@ -37,7 +37,6 @@ use Math::Trig;
 
 sub Twilight_calc($$$$$$$);
 sub Twilight_getWeatherHorizon($);
-sub Twilight_GetUpdate($);
 sub Twilight_my_gmt_offset();
 sub Twilight_midnight_seconds();
 
@@ -84,9 +83,9 @@ sub Twilight_Get($@)
   my ($hash, @a) = @_;
   return "argument is missing" if(int(@a) != 2);
 
-  $hash->{LOCAL} = 1;
-  Twilight_GetUpdate($hash);
-  delete $hash->{LOCAL};
+  #$hash->{LOCAL} = 1;
+  #Twilight_GetUpdate($hash);
+  #delete $hash->{LOCAL};
   my $reading= $a[1];
   my $value;
 
@@ -451,11 +450,8 @@ sub Twilight_sunpos($)
   $dSeconds = 0;
 
   ############################
-  # If set in global, use longitude/latitude
-  # from global, otherwise set Frankfurt/Germany as
-  # default
-  my $dLongitude = AttrVal("global", "longitude", "8.686");
-  my $dLatitude  = AttrVal("global", "latitude", "50.112");
+  my $dLongitude = $hash->{LONGITUDE};
+  my $dLatitude  = $hash->{LATITUDE};
   Log 5, "Compute sunpos for latitude $dLatitude , longitude $dLongitude";
 
   my $pi=3.14159265358979323846;
