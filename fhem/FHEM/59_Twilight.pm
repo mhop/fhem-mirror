@@ -142,6 +142,7 @@ sub Twilight_Define($$)
      return "Argument Indoor_Horizon is not a valid number";}
   }
    
+  $hash->{WEATHER_HORIZON}  = 0;
   $hash->{INDOOR_HORIZON} = $indoor_horizon;
   $hash->{LATITUDE}       = $latitude;
   $hash->{LONGITUDE}      = $longitude;
