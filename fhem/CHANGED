@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - change:  YAMAHA_AVR: changed several readings/commands and introduced new 
+             volume handling. please see the commandref for more details
   - change:  weblink fileplot/dbplot converted to SVG device (+FHEMWEB cleanup)
   - change:  VIERA: Added support for get dropdown
   - change:  EnOcean: Manufacturer Specific Applications (EEP A5-3F-7F), Shutter:
