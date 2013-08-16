@@ -1,3 +1,4 @@
+# $Id
 ##############################################################################
 #
 #     98_RandomTimer_Initialize.pm
@@ -135,7 +136,8 @@ sub RandomTimer_ExecRepeater($)
 
   my $timeToStart = $now + 3600*($thour-$hour) + 60*($tmin-$min) + ($tsec-$sec);
   my $timeToStop  = $now + 3600*($shour-$hour) + 60*($smin-$min) + ($ssec-$sec);
-  $timeToStop += 24*3600 if ($timeToStart>=$timeToStop);
+  $timeToStop    += 24*3600 if ($timeToStart>=$timeToStop);
+  $hash->{STATE}  = strftime("%H:%M:%S",localtime($timeToStart));
 
   my $timeToExec;
   my $function = "RandomTimer_ExecRepeater";
@@ -143,7 +145,6 @@ sub RandomTimer_ExecRepeater($)
 
     my $midnight  =  $now + 24*3600 -(3600*$hour + 60*$min + $sec);
     $timeToExec   = max ($timeToStop, $midnight) + 5*60;
-    $hash->{STATE}     = strftime("%H:%M:%S",localtime($timeToStart));
     delete $hash->{STARTTIME};
 
   } else {
@@ -153,7 +154,6 @@ sub RandomTimer_ExecRepeater($)
         $timeToExec = $now + 1;
         $function = "RandomTimer_Exec";
     }
-    $hash->{STATE}     = strftime("%H:%M:%S",localtime($timeToExec));
   }
 
   Log $logLevel, "[".$hash->{NAME}. "]"." Next timer ".strftime("%d.%m.%Y  %H:%M:%S",localtime($timeToExec));
