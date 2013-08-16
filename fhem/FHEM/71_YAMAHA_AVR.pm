@@ -7,14 +7,6 @@
 #     within all Yamaha AV-Receivers, this module should work
 #     with any receiver which has an ethernet or wlan connection.
 #
-#     Currently supported are:  power (on|off)
-#                               input (hdmi1|hdmi2|...)
-#                               volume (-50 ... 10)
-#                               mute (on|off)
-#
-#     Of course there are more possibilities than these 4 commands.
-#     But in my oppinion these are the most relevant usecases within fhem.
-#
 #     Copyright by Markus Bloch
 #     e-mail: Notausstieg0309@googlemail.com
 #
@@ -41,7 +33,7 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday sleep);
 use HttpUtils;
-
+ 
 sub YAMAHA_AVR_Get($@);
 sub YAMAHA_AVR_Define($$);
 sub YAMAHA_AVR_GetStatus($;$);
@@ -61,7 +53,7 @@ YAMAHA_AVR_Initialize($)
   $hash->{DefFn}     = "YAMAHA_AVR_Define";
   $hash->{UndefFn}   = "YAMAHA_AVR_Undefine";
 
-  $hash->{AttrList}  = "do_not_notify:0,1 loglevel:0,1,2,3,4,5 volume-smooth-change:0,1 volume-smooth-time:0,1,2,3,4,5 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
+  $hash->{AttrList}  = "do_not_notify:0,1 loglevel:0,1,2,3,4,5 volume-smooth-change:0,1 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
                       $readingFnAttributes;
 }
 
@@ -85,8 +77,8 @@ YAMAHA_AVR_GetStatus($;$)
 	YAMAHA_AVR_getModel($hash);
     }
 
-    # get all available inputs and scenes if nothing is available
-    if((not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0) or (not defined($hash->{helper}{SCENES}) or length($hash->{helper}{SCENES}) == 0))
+    # get all available inputs if nothing is available
+    if(not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0)
     {
 	YAMAHA_AVR_getInputs($hash);
     }
@@ -105,6 +97,7 @@ YAMAHA_AVR_GetStatus($;$)
     
     if(not defined($return) or $return eq "")
     {
+	readingsSingleUpdate($hash, "state", "absent", 1);
 	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0) unless($local == 1);
 	return;
     }
@@ -114,27 +107,31 @@ YAMAHA_AVR_GetStatus($;$)
     if($return =~ /<Power>(.+)<\/Power>/)
     {
        $power = $1;
-       readingsBulkUpdate($hash, "power", lc($power));
+       
        if($power eq "Standby")
        {
-	    $power = "Off";
+	    $power = "off";
        }
-       
-       readingsBulkUpdate($hash,"state",lc($power));
+       readingsBulkUpdate($hash, "power", lc($power));
+       readingsBulkUpdate($hash, "state", lc($power));
     }
     
     # current volume and mute status
     if($return =~ /<Volume><Lvl><Val>(.+)<\/Val><Exp>(.+)<\/Exp><Unit>.+<\/Unit><\/Lvl><Mute>(.+)<\/Mute>.*<\/Volume>/)
     {
-	readingsBulkUpdate($hash, "volume_level", ($1 / 10 ** $2));
-	readingsBulkUpdate($hash, "mute", lc($3));
+		readingsBulkUpdate($hash, "volumeStraight", ($1 / 10 ** $2));
+		readingsBulkUpdate($hash, "volume", YAMAHA_AVR_volume_abs2rel(($1 / 10 ** $2)));
+		readingsBulkUpdate($hash, "mute", lc($3));
+		
         $hash->{helper}{USE_SHORT_VOL_CMD} = "0";
     }
     elsif($return =~ /<Vol><Lvl><Val>(.+)<\/Val><Exp>(.+)<\/Exp><Unit>.+<\/Unit><\/Lvl><Mute>(.+)<\/Mute>.*<\/Vol>/)
     {
-        readingsBulkUpdate($hash, "volume_level", ($1 / 10 ** $2));
+        readingsBulkUpdate($hash, "volumeStraight", ($1 / 10 ** $2));
+		readingsBulkUpdate($hash, "volume", YAMAHA_AVR_volume_abs2rel(($1 / 10 ** $2)));
         readingsBulkUpdate($hash, "mute", lc($3));
-	$hash->{helper}{USE_SHORT_VOL_CMD} = "1";
+		
+		$hash->{helper}{USE_SHORT_VOL_CMD} = "1";
     }
 
     
@@ -162,7 +159,7 @@ YAMAHA_AVR_GetStatus($;$)
     # input name as it is displayed on the receivers front display
     if($return =~ /<Input>.*?<Title>\s*(.+?)\s*<\/Title>.*<\/Input>/)
     {
-	readingsBulkUpdate($hash, "input_name", $1);
+	readingsBulkUpdate($hash, "inputName", $1);
     }
     
     readingsEndUpdate($hash, 1);
@@ -185,7 +182,7 @@ YAMAHA_AVR_Get($@)
     
     $what = $a[1];
     
-    if($what =~ /^(power|input|input_name|output|volume_level|mute)$/)
+    if($what =~ /^(power|input|inputName|output|volume|mute)$/)
     {
         YAMAHA_AVR_GetStatus($hash, 1);
 
@@ -200,7 +197,7 @@ YAMAHA_AVR_Get($@)
     }
     else
     {
-	return "Unknown argument $what, choose one of power:noArg input:noArg input_name:noArg volume_level:noArg mute:noArg".(exists($hash->{READINGS}{output})?" output:noArg":"");
+	return "Unknown argument $what, choose one of power:noArg input:noArg inputName:noArg volume:noArg mute:noArg".(exists($hash->{READINGS}{output})?" output:noArg":"");
     }
 }
 
@@ -214,6 +211,7 @@ YAMAHA_AVR_Set($@)
     my $address = $hash->{helper}{ADDRESS};
     my $result = "";
     my $command;
+	my $target_volume;
     my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
     
     my $inputs_piped = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{INPUTS}), 0) : "" ;
@@ -227,266 +225,283 @@ YAMAHA_AVR_Set($@)
     return "No Argument given" if(!defined($a[1]));     
     
     my $what = $a[1];
-    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg volume:slider,-80,1,16 input:".$inputs_comma." mute:on,off remoteControl:setup,up,down,left,right,return,option,display,enter ".(defined($hash->{helper}{SCENES})?"scene:".$scenes_comma." ":"")."statusRequest:noArg";
+    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg volumeStraight:slider,-80,1,16 volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg input:".$inputs_comma." mute:on,off remoteControl:setup,up,down,left,right,return,option,display,enter ".(defined($hash->{helper}{SCENES})?"scene:".$scenes_comma." ":"")."statusRequest:noArg";
 
     # Depending on the status response, use the short or long Volume command
 
     my $volume_cmd = (exists($hash->{helper}{USE_SHORT_VOL_CMD}) and $hash->{helper}{USE_SHORT_VOL_CMD} eq "1" ? "Vol" : "Volume");
 
-    if($what eq "on")
-    {
-	$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>On</Power></Power_Control></$zone></YAMAHA_AV>");
 
-	if($result =~ /RC="0"/ and $result =~ /<Power><\/Power>/)
-	{
-	    # As the receiver startup takes about 5 seconds, the status will be already set, if the return code of the command is 0.
-	    readingsBeginUpdate($hash);
-	    readingsBulkUpdate($hash, "power", "on");
-	    readingsBulkUpdate($hash, "state","on");
-	    readingsEndUpdate($hash, 1);
-	    return undef;
-	}
-	else
-	{
-	    return "Could not set power to on";
-	}
-
-    }
-    elsif($what eq "off")
-    {
-	$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>Standby</Power></Power_Control></$zone></YAMAHA_AV>");
-	
-	if(not $result =~ /RC="0"/)
-	{
-		# if the returncode isn't 0, than the command was not successful
-		return "Could not set power to off";
-	}
-
-    }
-    elsif($what eq "input")
-    {
-	if(defined($a[2]))
-	{
-	    if($hash->{READINGS}{power}{VAL} eq "on")
-	    {
-		if(not $inputs_piped eq "")
+		if($what eq "on")
 		{
-		    if($a[2] =~ /^($inputs_piped)$/)
-		    {
-			$command = YAMAHA_AVR_getInputParam($hash, $a[2]);
-			if(defined($command) and length($command) > 0)
+		
+			$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>On</Power></Power_Control></$zone></YAMAHA_AV>");
+
+			if($result =~ /RC="0"/ and $result =~ /<Power><\/Power>/)	
 			{
-			    $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Input><Input_Sel>".$command."</Input_Sel></Input></$zone></YAMAHA_AV>");
+				# As the receiver startup takes about 5 seconds, the status will be already set, if the return code of the command is 0.
+				readingsBeginUpdate($hash);
+				readingsBulkUpdate($hash, "power", "on");
+				readingsBulkUpdate($hash, "state","on");
+				readingsEndUpdate($hash, 1);
+				return undef;
 			}
 			else
 			{
-			    return "invalid input: ".$a[2];
+				return "Could not set power to on";
 			}
-
+		
+		}
+		elsif($what eq "off")
+		{
+			$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>Standby</Power></Power_Control></$zone></YAMAHA_AV>");
+			
 			if(not $result =~ /RC="0"/)
 			{
-			    # if the returncode isn't 0, than the command was not successful
-			    return "Could not set input to ".$a[2].".";
+				# if the returncode isn't 0, than the command was not successful
+				return "Could not set power to off";
 			}
-		    }
-		    else
-		    {
-			return $usage;
-		    }
-	        }
-	        else
-	        {
-	    	    return "No inputs are avaible. Please try an statusUpdate.";
-	        }
-	    }
-	    else
-	    {
-		return "input can only be used when device is powered on";
-	    }
-	}
-	else
-	{
-	    return $inputs_piped eq "" ? "No inputs are available. Please try an statusUpdate." : "No input parameter was given";
-	}
-
-    }
-    elsif($what eq "scene")
-    {
-	if(defined($a[2]))
-	{
-	    
-		if(not $scenes_piped eq "")
+			
+		}
+		elsif($what eq "input")
 		{
-		    if($a[2] =~ /^($scenes_piped)$/)
-		    {
-			$command = YAMAHA_AVR_getSceneName($hash, $a[2]);
-			if(defined($command) and length($command) > 0)
+			if(defined($a[2]))
 			{
-			    $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Scene><Scene_Sel>".$command."</Scene_Sel></Scene></$zone></YAMAHA_AV>");
+				if($hash->{READINGS}{power}{VAL} eq "on")
+				{
+					if(not $inputs_piped eq "")
+					{
+						if($a[2] =~ /^($inputs_piped)$/)
+						{
+							$command = YAMAHA_AVR_getInputParam($hash, $a[2]);
+							if(defined($command) and length($command) > 0)
+							{
+								$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Input><Input_Sel>".$command."</Input_Sel></Input></$zone></YAMAHA_AV>");
+							}
+							else
+							{
+								return "invalid input: ".$a[2];
+							}
+							
+							if(not $result =~ /RC="0"/)
+							{
+								# if the returncode isn't 0, than the command was not successful
+								return "Could not set input to ".$a[2].".";
+							}
+						}
+						else
+						{
+							return $usage;
+						}
+					}
+					else
+					{
+						return "No inputs are avaible. Please try an statusUpdate.";
+					}
+				}
+				else
+				{
+					return "input can only be used when device is powered on";
+				}
 			}
 			else
 			{
-			    return "invalid input: ".$a[2];
+				return $inputs_piped eq "" ? "No inputs are available. Please try an statusUpdate." : "No input parameter was given";
 			}
-
-			if(not $result =~ /RC="0"/)
+		}
+		elsif($what eq "scene")
+		{
+			if(defined($a[2]))
 			{
-			    # if the returncode isn't 0, than the command was not successful
-			    return "Could not set scene to ".$a[2].".";
+				
+				if(not $scenes_piped eq "")
+				{
+					if($a[2] =~ /^($scenes_piped)$/)
+					{
+					$command = YAMAHA_AVR_getSceneName($hash, $a[2]);
+					if(defined($command) and length($command) > 0)
+					{
+						$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Scene><Scene_Sel>".$command."</Scene_Sel></Scene></$zone></YAMAHA_AV>");
+					}
+					else
+					{
+						return "invalid input: ".$a[2];
+					}
+
+					if(not $result =~ /RC="0"/)
+					{
+						# if the returncode isn't 0, than the command was not successful
+						return "Could not set scene to ".$a[2].".";
+					}
+					}
+					else
+					{
+					return $usage;
+					}
+				}
+				else
+				{
+					return "No scenes are avaible. Please try an statusUpdate.";
+				}
 			}
-		    }
-		    else
-		    {
+			else
+			{
+				return $scenes_piped eq "" ? "No scenes are available. Please try an statusUpdate." : "No scene parameter was given";
+			}
+		}
+			
+	    elsif($what eq "mute")
+	    {
+			if(defined($a[2]))
+			{
+				if($hash->{READINGS}{power}{VAL} eq "on")
+				{
+					if( $a[2] eq "on")
+					{
+					    $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Mute>On</Mute></$volume_cmd></$zone></YAMAHA_AV>");
+					}
+					elsif($a[2] eq "off")
+					{
+					    $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Mute>Off</Mute></$volume_cmd></$zone></YAMAHA_AV>"); 
+					}
+					else
+					{
+					    return $usage;
+					}
+					
+					if(not $result =~ /RC="0"/)
+					{
+						# if the returncode isn't 0, than the command was not successful
+						return "Could not set mute to ".$a[2].".";
+					}    
+			    }
+			    else
+			    {
+					return "mute can only used when device is powered on";
+			    }
+			}
+	    }
+	    elsif($what =~ /(volumeStraight|volume|volumeUp|volumeDown)/)
+	    {
+			
+			if($what eq "volume" and $a[2] >= 0 &&  $a[2] <= 100)
+			{
+				$target_volume = YAMAHA_AVR_volume_rel2abs($a[2]);
+			}
+			elsif($what eq "volumeDown")
+			{
+				$target_volume = YAMAHA_AVR_volume_rel2abs($hash->{READINGS}{volume}{VAL} - 1);
+			}
+			elsif($what eq "volumeUp")
+			{
+				$target_volume = YAMAHA_AVR_volume_rel2abs($hash->{READINGS}{volume}{VAL} + 1);
+			}
+			else
+			{
+				$target_volume = $a[2];
+			}
+			
+			if(defined($target_volume) && $target_volume >= -80.5 && $target_volume < 16.5)
+			{
+			    if($hash->{READINGS}{power}{VAL} eq "on")
+			    {
+					if(AttrVal($name, "volume-smooth-change", "0") eq "1")
+					{
+					    my $diff = int(($target_volume - $hash->{READINGS}{volumeStraight}{VAL}) / AttrVal($hash->{NAME}, "volume-smooth-steps", 5) / 0.5) * 0.5;
+					    my $steps = AttrVal($name, "volume-smooth-steps", 5);
+					    my $current_volume = $hash->{READINGS}{volumeStraight}{VAL};
+
+					    if($diff > 0)
+					    {
+					        Log GetLogLevel($name, 4), "YAMAHA_AVR: use smooth volume change (with $steps steps of +$diff volume change)";
+					    }
+					    else
+					    {
+						Log GetLogLevel($name, 4), "YAMAHA_AVR: use smooth volume change (with $steps steps of $diff volume change)";
+					    }
+				
+					    # Only if a volume reading exists and smoohing is really needed (step difference is not zero)
+					    if(defined($hash->{READINGS}{volumeStraight}{VAL}) and $diff != 0)
+					    {
+							for(my $step = 1; $step <= $steps; $step++)
+							{
+								Log GetLogLevel($name, 4), "YAMAHA_AVR: set volume to ".($current_volume + ($diff * $step))." dB";
+						
+								YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".(($current_volume + ($diff * $step))*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>");
+						 
+							}
+					    }
+					}
+					
+					# Set the desired volume
+					Log GetLogLevel($name, 4), "YAMAHA_AVR: set volume to ".$target_volume." dB";
+					$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($target_volume*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>");
+					if(not $result =~ /RC="0"/)
+					{
+						# if the returncode isn't 0, than the command was not successful
+						return "Could not set volume to ".$target_volume.".";
+					}    
+			    
+			    }
+			    else
+			    {
+				return "volume can only be used when device is powered on";
+			    }
+			}
+	    }
+	    elsif($what eq "remoteControl")
+	    {
+			if($a[2] eq "up")
+			{
+			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Up</Cursor></List_Control></$zone></YAMAHA_AV>");
+			}
+			elsif($a[2] eq "down")
+			{
+			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Down</Cursor></List_Control></$zone></YAMAHA_AV>");
+			}
+			elsif($a[2] eq "left")
+			{
+			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Left</Cursor></List_Control></$zone></YAMAHA_AV>");
+			}
+			elsif($a[2] eq "right")
+			{
+			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Right</Cursor></List_Control></$zone></YAMAHA_AV>");
+			}
+			elsif($a[2] eq "display")
+			{
+			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Menu_Control>Display</Menu_Control></List_Control></$zone></YAMAHA_AV>");
+			}
+			elsif($a[2] eq "return")
+			{
+			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Return</Cursor></List_Control></$zone></YAMAHA_AV>");
+			}
+			elsif($a[2] eq "enter")
+			{
+			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Sel</Cursor></List_Control></$zone></YAMAHA_AV>");
+			}
+			elsif($a[2] eq "setup")
+			{
+			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Menu_Control>On Screen</Menu_Control></List_Control></$zone></YAMAHA_AV");
+			}
+			elsif($a[2] eq "option")
+			{
+			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Menu_Control>Option</Menu_Control></List_Control></$zone></YAMAHA_AV>");
+			}
+			else
+			{
+			    return $usage;
+			}
+	    }
+		elsif($what eq "statusRequest")
+		{
+			# Will be executed anyway on the end of the function
+			
+		}
+	    else
+	    {
 			return $usage;
-		    }
-	        }
-	        else
-	        {
-	    	    return "No scenes are avaible. Please try an statusUpdate.";
-	        }
-	}
-	else
-	{
-	    return $scenes_piped eq "" ? "No inputs are available. Please try an statusUpdate." : "No input parameter was given";
-	}
-
-    }
-    elsif($what eq "mute")
-    {
-	if(defined($a[2]))
-	{
-	    if($hash->{READINGS}{power}{VAL} eq "on")
-	    {
-		if( $a[2] eq "on")
-		{
-		    $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Mute>On</Mute></$volume_cmd></$zone></YAMAHA_AV>");
-		}
-		elsif($a[2] eq "off")
-		{
-		    $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Mute>Off</Mute></$volume_cmd></$zone></YAMAHA_AV>"); 
-		}
-		else
-		{
-		    return $usage;
-		}
-		
-		if(not $result =~ /RC="0"/)
-		{
-			# if the returncode isn't 0, than the command was not successful
-			return "Could not set mute to ".$a[2].".";
-		}    
 	    }
-	    else
-	    {
-		return "mute can only used when device is powered on";
-	    }
-	}
-    }
-    elsif($what eq "volume")
-    {
-	if(defined($a[2]) && $a[2] >= -80 && $a[2] < 16)
-	{
-	    if($hash->{READINGS}{power}{VAL} eq "on")
-	    {
-		if(AttrVal($name, "volume-smooth-change", "0") eq "1")
-		{
-		    my $diff = int(($a[2] - $hash->{READINGS}{volume_level}{VAL}) / AttrVal($hash->{NAME}, "volume-smooth-steps", 5) / 0.5) * 0.5;
-		    my $steps = AttrVal($name, "volume-smooth-steps", 5);
-		    my $current_volume = $hash->{READINGS}{volume_level}{VAL};
-		    my $time = AttrVal($name, "volume-smooth-time", 0);
-		    my $sleep = $time / $steps;
-
-		    if($diff > 0)
-		    {
-		        Log GetLogLevel($name, 4), "YAMAHA_AVR: use smooth volume change (with $steps steps of +$diff volume change each ".sprintf("%.3f", $sleep)." seconds)";
-		    }
-		    else
-		    {
-			Log GetLogLevel($name, 4), "YAMAHA_AVR: use smooth volume change (with $steps steps of $diff volume change each ".sprintf("%.3f", $sleep)." seconds)";
-		    }
 	
-		    # Only if a volume reading exists and smoohing is really needed (step difference is not zero)
-		    if(defined($hash->{READINGS}{volume_level}{VAL}) and $diff != 0)
-		    {
-			for(my $step = 1; $step <= $steps; $step++)
-			{
-			    Log GetLogLevel($name, 4), "YAMAHA_AVR: set volume to ".($current_volume + ($diff * $step))." dB";
-			
-			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".(($current_volume + ($diff * $step))*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>");
-			
-			    Log GetLogLevel($name, 4), "YAMAHA_AVR: sleeping for ".sprintf("%.3f", $sleep)." seconds" unless ($time == 0);
-			    sleep $sleep unless ($time == 0);
-			}
-		    }
-		}
-		
-		# Set the desired volume
-		Log GetLogLevel($name, 4), "YAMAHA_AVR: set volume to ".$a[2]." dB";
-		$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($a[2]*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>");
-		if(not $result =~ /RC="0"/)
-		{
-			# if the returncode isn't 0, than the command was not successful
-			return "Could not set volume to ".$a[2].".";
-		}    
-	    
-	    }
-	    else
-	    {
-		return "volume can only be used when device is powered on";
-	    }
-	}
-    }
-    elsif($what eq "remoteControl")
-    {
-	if($a[2] eq "up")
-	{
-	    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Up</Cursor></List_Control></$zone></YAMAHA_AV>");
-	}
-	elsif($a[2] eq "down")
-	{
-	    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Down</Cursor></List_Control></$zone></YAMAHA_AV>");
-	}
-	elsif($a[2] eq "left")
-	{
-	    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Left</Cursor></List_Control></$zone></YAMAHA_AV>");
-	}
-	elsif($a[2] eq "right")
-	{
-	    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Right</Cursor></List_Control></$zone></YAMAHA_AV>");
-	}
-	elsif($a[2] eq "display")
-	{
-	    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Menu_Control>Display</Menu_Control></List_Control></$zone></YAMAHA_AV>");
-	}
-	elsif($a[2] eq "return")
-	{
-	    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Return</Cursor></List_Control></$zone></YAMAHA_AV>");
-	}
-	elsif($a[2] eq "enter")
-	{
-	    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Sel</Cursor></List_Control></$zone></YAMAHA_AV>");
-	}
-	elsif($a[2] eq "setup")
-	{
-	    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Menu_Control>On Screen</Menu_Control></List_Control></$zone></YAMAHA_AV");
-	}
-	elsif($a[2] eq "option")
-	{
-	    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Menu_Control>Option</Menu_Control></List_Control></$zone></YAMAHA_AV>");
-	}
-	else
-	{
-	    return $usage;
-	}
-    }
-    elsif($what eq "statusRequest")
-    {
-	# Will be executed on the end of this function anyway, so no need to call it specificly
-    }
-    else
-    {
-	return $usage;
-    }
     
     # Call the GetStatus() Function to retrieve the new values after setting something (with local flag, so the internal timer is not getting interupted)
     YAMAHA_AVR_GetStatus($hash, 1);
@@ -560,8 +575,12 @@ YAMAHA_AVR_Define($$)
     #
     # own attribute values will be overwritten anyway when all attr-commands are executed from fhem.cfg
     $attr{$name}{"volume-smooth-change"} = "1" unless(defined($attr{$name}{"volume-smooth-change"}));
-    
-    $hash->{helper}{AVAILABLE} = 1;
+
+    unless(exists($hash->{helper}{AVAILABLE}) and ($hash->{helper}{AVAILABLE} == 0))
+    {
+    	$hash->{helper}{AVAILABLE} = 1;
+    	readingsSingleUpdate($hash, "presence", "present", 1);
+    }
 
     # start the status update timer
     InternalTimer(gettimeofday()+2, "YAMAHA_AVR_GetStatus", $hash, 0);
@@ -598,11 +617,21 @@ YAMAHA_AVR_SendCommand($$;$)
     
     unless(defined($response))
     {
-	Log GetLogLevel($name, 3), "YAMAHA_AVR: could not execute command on device $name. Please turn on your device in case of deactivated network standby or check for correct hostaddress." if (defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
+	
+	if((not exists($hash->{helper}{AVAILABLE})) or (exists($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1))
+	{
+	    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not execute command on device $name. Please turn on your device in case of deactivated network standby or check for correct hostaddress.";
+	    readingsSingleUpdate($hash, "presence", "absent", 1);
+	}
     }
     else
     {
-	Log GetLogLevel($name, 3), "YAMAHA_AVR: device $name reappeared" if (defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 0);
+	if (defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 0)
+	{
+	    Log GetLogLevel($name, 3), "YAMAHA_AVR: device $name reappeared";
+	    readingsSingleUpdate($hash, "presence", "present", 1);
+	                
+	}
     }
     
     $hash->{helper}{AVAILABLE} = (defined($response) ? 1 : 0);
@@ -765,7 +794,7 @@ sub YAMAHA_AVR_getModel($)
     }
     else
     {
-	return undef;
+		return undef;
     }
     
     # query the description url which contains all zones
@@ -808,6 +837,23 @@ sub YAMAHA_AVR_getModel($)
     return 0;
 }
 
+sub YAMAHA_AVR_volume_rel2abs($)
+{
+	my ($percentage) = @_;
+	
+	#  0 - 100% -equals 80.5 to 16.5 dB
+	return int((($percentage / 100 * 97) - 80.5) / 0.5) * 0.5;
+}
+
+
+sub YAMAHA_AVR_volume_abs2rel($)
+{
+	my ($absolute) = @_;
+	
+	# -80.5 to 16.5 dB equals 0 - 100%
+	return int(($absolute + 80.5) / 97 * 100);
+
+}
 
 #############################
 # queries all available inputs and scenes
@@ -849,13 +895,13 @@ sub YAMAHA_AVR_getInputs($)
 	
     
     # query all available scenes
-    $response = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Scene><Scene_Sel_Item>GetParam</Scene_Sel_Item></Scene></$zone></YAMAHA_AV>");
+    $response = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Scene><Scene_Sel_Item>GetParam</Scene_Sel_Item></Scene></$zone></YAMAHA_AV>", 5);
     
-    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get the available scenes from device $name. Please turn on the device or check for correct hostaddress!!!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
-    
+	delete($hash->{helper}{SCENES}) if(defined($hash->{helper}{SCENES}));
+  
     return undef unless (defined($response));
     
-    delete($hash->{helper}{SCENES}) if(defined($hash->{helper}{SCENES}));
+  
     
     # get all available scenes from response
     while($response =~ /<Item_\d+>.*?<Param>(.+?)<\/Param>.*?<RW>(\w+)<\/RW>.*?<\/Item_\d+>/gc)
@@ -948,32 +994,19 @@ sub YAMAHA_AVR_getInputs($)
     Currently, the following commands are defined; the available inputs are depending on the used receiver.
     The module only offers the real available inputs and scenes. The following input commands are just an example and can differ.
 <br><br>
-<ul><code>on<br>
-off<br>
-input hdmi1<br>
-input hdmi2<br>
-input hdmi3<br>
-input hdmi4<br>
-input av1<br>
-input av2<br>
-input av3<br>
-input av3<br>
-input av4<br>
-input av5<br>
-input av6<br>
-input usb<br>
-input airplay<br>
-input tuner<br>
-input v-aux<br>
-input audio<br>
-input server<br>
-scene scene1<br>
-scene scene2<br>
-scene scene3<br>
-scene scene4<br>
-volume -80..16        # (volume between -80 and +16 dB)<br>
-mute on<br>
-mute off</code></ul>
+<ul>
+<li><b>on</b> &nbsp;&nbsp;-&nbsp;&nbsp; powers on the device</li>
+<li><b>off</b> &nbsp;&nbsp;-&nbsp;&nbsp; shuts down the device </li>
+<li><b>input</b> hdm1,hdmX,... &nbsp;&nbsp;-&nbsp;&nbsp; selects the input channel (only the real available inputs were given)</li>
+<li><b>scene</b> scene1,sceneX &nbsp;&nbsp;-&nbsp;&nbsp; select the scene</li>
+<li><b>volume</b> 0...100 &nbsp;&nbsp;-&nbsp;&nbsp; set the volume level in percentage</li>
+<li><b>volumeStraight</b> -80...15 &nbsp;&nbsp;-&nbsp;&nbsp; set the volume level in decibel</li>
+<li><b>volumeUp</b> &nbsp;&nbsp;-&nbsp;&nbsp; increases the volume level by 1%</li>
+<li><b>volumeDown</b> &nbsp;&nbsp;-&nbsp;&nbsp; decreases the volume level by 1%</li>
+<li><b>mute</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; activates volume mute</li>
+<li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current status of the device</li>
+<li><b>remoteControl</b> up,down,... &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands as listed below</li>
+</ul>
 </ul><br><br>
 <u>Remote control (not in all zones available, depending on your model)</u><br><br>
 <ul>
@@ -1037,9 +1070,11 @@ mute off</code></ul>
     Currently, the following commands are defined and return the current state of the receiver.<br><br>
 <ul><code>power<br>
 input<br>
-input_name<br>
+inputName<br>
 mute<br>
-volume_level<br>
+volume<br>
+volumeStraight<br>
+presence<br>
 output        # only available in zones other than mainzone</code></ul><br><br>
   </ul>
   <a name="YAMAHA_AVRattr"></a>
@@ -1055,27 +1090,24 @@ output        # only available in zones other than mainzone</code></ul><br><br>
 	Possible values: 0 => off , 1 => on<br><br>
     <li><a name="volume-smooth-steps">volume-smooth-steps</a></li>
 	Optional attribute to define the number of volume changes between the
-        current and the desired volume. Default value is 5 steps<br><br>
-    <li><a name="volume-smooth-time">volume-smooth-time</a></li>
-       Optional attribute to define the time window for the volume smoothing in seconds.
-       For example the value 2 means the smooth process in general should take 2 seconds.
-       The value 0 means "as fast as possible". Default value is 0.
+        current and the desired volume. Default value is 5 steps<br>
   </ul>
   <br>
   <b>Generated Readings/Events:</b><br>
   <ul>
   <li><b>input</b> - The selected input source according to the FHEM input commands</li>
-  <li><b>input_name</b> - The input description as seen on the receiver display</li>
+  <li><b>inputName</b> - The input description as seen on the receiver display</li>
   <li><b>mute</b> - Reports the mute status of the receiver or zone (can be "on" or "off")</li>
-  <li><b>power</b> - Reports the power status of the receiver or zone (can be "on" or "standby")</li>
-  <li><b>volume_level</b> - Reports the current volume level of the receiver or zone (between -80.0 and +15 dB)</li>
+  <li><b>power</b> - Reports the power status of the receiver or zone (can be "on" or "off")</li>
+  <li><b>presence</b> - Reports the presence status of the receiver or zone (can be "absent" or "present"). In case of an absent device, it cannot be controlled via FHEM anymore.</li>
+  <li><b>volume</b> - Reports the current volume level of the receiver or zone in percentage values (between 0 and 100 %)</li>
+  <li><b>volumeStraight</b> - Reports the current volume level of the receiver or zone in decibel values (between -80.5 and +15.5 dB)</li>
+  <li><b>state</b> - Reports the current power state and an absence of the device (can be "on", "off" or "absent")</li>
   </ul>
 <br>
-  <b>Implementator's note</b>
+  <b>Implementator's note</b><br>
   <ul>
-    The module is only usable if you activate "Network Standby" on your receiver.<br><br>
-    Technically there are many more commands and readings possible, but I think
-    these are the main usecases within FHEM.
+    The module is only usable if you activate "Network Standby" on your receiver. Otherwise it is not possible to communicate with the receiver when it is turned off.
   </ul>
   <br>
 </ul>
@@ -1148,34 +1180,20 @@ output        # only available in zones other than mainzone</code></ul><br><br>
     Die folgenden Eing&auml;nge stehen beispielhaft an einem RX-V473 Receiver zur Verf&uuml;gung.
     Aktuell stehen folgende Kommandos zur Verf&uuml;gung.
 <br><br>
-<ul><code>
-on<br>
-off<br>
-input hdmi1<br>
-input hdmi2<br>
-input hdmi3<br>
-input hdmi4<br>
-input av1<br>
-input av2<br>
-input av3<br>
-input av3<br>
-input av4<br>
-input av5<br>
-input av6<br>
-input usb<br>
-input airplay<br>
-input tuner<br>
-input v-aux<br>
-input audio<br>
-input server<br>
-scene scene1<br>
-scene scene2<br>
-scene scene3<br>
-scene scene4<br>
-volume -80..16          # (Lautst&auml;rke zwischen -80 und +16 dB)<br>
-mute on<br>
-mute off</code></ul><br><br>
-
+<ul>
+<li><b>on</b> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver ein</li>
+<li><b>off</b> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver aus</li>
+<li><b>input</b> hdm1,hdmX,... &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt den Eingangskanal (es werden nur die tats&auml;chlich verf&uuml;gbaren Eing&auml;nge angeboten)</li>
+<li><b>scene</b> scene1,sceneX &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt eine vorgefertigte Szene aus</li>
+<li><b>volume</b> 0...100 &nbsp;&nbsp;-&nbsp;&nbsp; Setzt die Lautst&auml;rke in Prozent (0 bis 100%)</li>
+<li><b>volumeStraight</b> -87...15 &nbsp;&nbsp;-&nbsp;&nbsp; Setzt die Lautst&auml;rke in Dezibel (-80.5 bis 15.5 dB) so wie sie am Receiver auch verwendet wird.</li>
+<li><b>volumeUp</b> &nbsp;&nbsp;-&nbsp;&nbsp; Erh&ouml;ht die Lautst&auml;rke um 1%</li>
+<li><b>volumeDown</b> &nbsp;&nbsp;-&nbsp;&nbsp; Veringert die Lautst&auml;rke um 1%</li>
+<li><b>mute</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver stumm</li>
+<li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; Fragt den aktuell Status des Receivers ab</li>
+<li><b>remoteControl</b> up,down,... &nbsp;&nbsp;-&nbsp;&nbsp; Sendet Fernbedienungsbefehle wie im n&auml;chsten Abschnitt beschrieben</li>
+</ul>
+<br><br>
 </ul>
 <u>Fernbedienung (je nach Modell nicht in allen Zonen verf&uuml;gbar)</u><br><br>
 <ul>
@@ -1235,11 +1253,13 @@ mute off</code></ul><br><br>
     <br><br>
     Aktuell stehen folgende Parameter zur Verf&uuml;gung welche den aktuellen Status des Receivers zur&uuml;ck geben.<br><br>
      <ul>
-     <li><code>power</code> - Betriebszustand des Receiveres/Zone (on oder standby)</li>
+     <li><code>power</code> - Betriebszustand des Receiveres/Zone (on oder off)</li>
+	 <li><code>presence</code> - Empfangsbereitschaft des Receivers (absent oder present)</li>
      <li><code>input</code> - Gew&auml;hlter Eingang</li>
-     <li><code>input_name</code> - Bezeichnung des gew&auml;hlten Einganges wie im Display des Receivers</li>
+     <li><code>inputName</code> - Bezeichnung des gew&auml;hlten Einganges wie im Display des Receivers</li>
      <li><code>mute</code> - Lautlos an oder aus (on oder off)</li>
-     <li><code>volume_level</code> - Lautst&auml;rkepegel in dB</li>
+     <li><code>volume</code> - Lautst&auml;rkepegel in %</li>
+	 <li><code>volumeStraight</code> - Lautst&auml;rkepegel in dB</li>
      </ul>
   </ul>
   <br>
@@ -1256,27 +1276,24 @@ mute off</code></ul><br><br>
 	M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br><br>
     <li><a name="volume-smooth-steps">volume-smooth-steps</a></li>
 	Optionales Attribut, welches angibt, wieviele Schritte zur weichen Lautst&auml;rkeanpassung
-	 durchgef&uuml;hrt werden sollen. Standartwert ist 5 Anpassungschritte<br><br>
-    <li><a name="volume-smooth-time">volume-smooth-time</a></li>
-	Optionales Attrribut welches das Zeitfenster in Sekunden f&uuml;r die Anpassung angibt.
-       Als Beispiel bedeutet der Wert 2 dass innerhalb von 2 Sekunden die Lautst&auml;rkeanpassung durchgef&uuml;hrt werden soll.
-       Der Wert 0 bedeutet, dass die Anpassung so schnell wie m&ouml;glich geschehen soll. Der Standardwert ist 0.
+	 durchgef&uuml;hrt werden sollen. Standartwert ist 5 Anpassungschritte
   </ul>
   <br>
   <b>Generierte Readings/Events:</b><br>
   <ul>
   <li><b>input</b> - Der ausgew&auml;hlte Eingang entsprechend dem FHEM-Kommando</li>
-  <li><b>input_name</b> - Die Eingangsbezeichnung, so wie sie am Receiver eingestellt wurde und auf dem Display erscheint</li>
+  <li><b>inputName</b> - Die Eingangsbezeichnung, so wie sie am Receiver eingestellt wurde und auf dem Display erscheint</li>
   <li><b>mute</b> - Der aktuelle Stumm-Status("on" =&gt; Stumm, "off" =&gt; Laut)</li>
   <li><b>power</b> - Der aktuelle Betriebsstatuse ("on" =&gt; an, "off" =&gt; aus)</li>
-  <li><b>volume_level</b> - Der aktuelle Lautst&auml;rkepegel (zwischen -80.0 und +15 dB)</li>
+  <li><b>presence</b> - Die aktuelle Empfangsbereitschaft ("present" =&gt; empfangsbereit, "absent" =&gt; nicht empfangsbereits, z.B. Stromausfall)</li>
+  <li><b>volume</b> - Der aktuelle Lautst&auml;rkepegel in Prozent (zwischen 0 und 100 %)</li>
+  <li><b>volumeStraight</b> - Der aktuelle Lautst&auml;rkepegel in Dezibel (zwischen -80.0 und +15 dB)</li>
+  <li><b>state</b> - Der aktuelle Schaltzustand (power-Reading) oder die Abwesenheit des Ger&auml;tes (m&ouml;gliche Werte: "on", "off" oder "absent")</li>
   </ul>
 <br>
   <b>Hinweise des Autors</b>
   <ul>
-    Dieses Modul ist nur nutzbar, wenn die Option "Network Standby" am Receiver aktiviert ist.<br><br>
-    Technisch gesehen sind viel mehr Kommandos und R&uuml;ckgabewerte m&ouml;glich, aber dies sind meiner
-    Meinung nach die wichtigsten innerhalb von FHEM.
+    Dieses Modul ist nur nutzbar, wenn die Option "Network Standby" am Receiver aktiviert ist. Ansonsten ist die Steuerung nur im eingeschalteten Zustand m&ouml;glich.
   </ul>
   <br>
 </ul>
