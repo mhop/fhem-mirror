@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - change:  VIERA: changed several readings/commands according to 
+             DevelopmentGuidelinesAV. See FHEM Wiki and commandref for more details.
   - change:  YAMAHA_AVR: changed several readings/commands and introduced new 
              volume handling. please see the commandref for more details
   - change:  weblink fileplot/dbplot converted to SVG device (+FHEMWEB cleanup)
