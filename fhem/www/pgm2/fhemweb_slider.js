@@ -7,7 +7,6 @@ FW_sliderUpdateLine(d)
     if(k == 1)
       name = name+"-"+d[1].replace(/[ \d].*$/,'');
     el = document.getElementById(name);
-
     if(el) {
       var doSet = 1;    // Only set the "state" slider in the detail view
       if(el.parentNode.getAttribute("name") == "val.set"+d[0]) {
@@ -18,8 +17,8 @@ FW_sliderUpdateLine(d)
       }
 
       if(doSet) {
-        var val = d[1].replace(/^.*?(\d+).*/g, "$1"); // get first number
-        if(!val.match(/\d+/))
+        var val = d[1].replace(/^.*?([.\-\d]+).*/g, "$1"); // get first number
+        if(!val.match(/[.\-\d]+/))
           val = 0;
         FW_sliderCreate(el, val);
       }
@@ -133,7 +132,7 @@ FW_sliderSelChange(name, devName, vArr)
 function
 FW_querySetSlider(el, val)
 {
-  val = val.replace(/[^\d\.]/g, ""); // remove non numbers
+  val = val.replace(/[^\d.\-]/g, ""); // remove non numbers
   FW_sliderCreate(el, val);
 }
 

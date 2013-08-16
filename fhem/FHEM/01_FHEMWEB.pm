@@ -2149,7 +2149,7 @@ FW_sliderFn($$$$$)
   my $cv = ReadingsVal($d, $cmd, Value($d));
   my $id = ($cmd eq "state") ? "" : "-$cmd";
   $cmd = "" if($cmd eq "state");
-  $cv =~ s/.*?(\d+).*/$1/; # get first number
+  $cv =~ s/.*?([.\-\d]+).*/$1/; # get first number
   $cv = 0 if($cv !~ m/\d/);
   return "<td colspan='2'>".
            "<div class='slider' id='slider.$d$id' min='$min' stp='$stp' ".
