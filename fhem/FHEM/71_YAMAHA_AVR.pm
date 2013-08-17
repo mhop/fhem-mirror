@@ -53,7 +53,7 @@ YAMAHA_AVR_Initialize($)
   $hash->{DefFn}     = "YAMAHA_AVR_Define";
   $hash->{UndefFn}   = "YAMAHA_AVR_Undefine";
 
-  $hash->{AttrList}  = "do_not_notify:0,1 loglevel:0,1,2,3,4,5 volume-smooth-change:0,1 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
+  $hash->{AttrList}  = "do_not_notify:0,1 loglevel:0,1,2,3,4,5 volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 volume-smooth-change:0,1 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
                       $readingFnAttributes;
 }
 
@@ -74,32 +74,32 @@ YAMAHA_AVR_GetStatus($;$)
     # get the model informations and available zones if no informations are available
     if(not defined($hash->{ACTIVE_ZONE}) or not defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
     {
-	YAMAHA_AVR_getModel($hash);
+		YAMAHA_AVR_getModel($hash);
     }
 
     # get all available inputs if nothing is available
     if(not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0)
     {
-	YAMAHA_AVR_getInputs($hash);
+		YAMAHA_AVR_getInputs($hash);
     }
     
     my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
     
     if(not defined($zone))
     {
-	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0) unless($local == 1);
-	return "No Zone available";
+		InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0) unless($local == 1);
+		return "No Zone available";
     }
     
     my $return = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>");
     
-    Log GetLogLevel($name, 4), "YAMAHA_AVR: GetStatus-Request returned: $return" if(defined($return));
+    Log3 $name, 4, "YAMAHA_AVR: GetStatus-Request returned: $return" if(defined($return));
     
     if(not defined($return) or $return eq "")
     {
-	readingsSingleUpdate($hash, "state", "absent", 1);
-	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0) unless($local == 1);
-	return;
+		readingsSingleUpdate($hash, "state", "absent", 1);
+		InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0) unless($local == 1);
+		return;
     }
     
     readingsBeginUpdate($hash);
@@ -108,10 +108,10 @@ YAMAHA_AVR_GetStatus($;$)
     {
        $power = $1;
        
-       if($power eq "Standby")
-       {
-	    $power = "off";
-       }
+		if($power eq "Standby")
+		{	
+			$power = "off";
+		}
        readingsBulkUpdate($hash, "power", lc($power));
        readingsBulkUpdate($hash, "state", lc($power));
     }
@@ -138,35 +138,35 @@ YAMAHA_AVR_GetStatus($;$)
     # (only available in zones other than mainzone) absolute or relative volume change to the mainzone
     if($return =~ /<Volume>.*?<Output>(.+?)<\/Output>.*?<\/Volume>/)
     {
-	readingsBulkUpdate($hash, "output", lc($1));
+		readingsBulkUpdate($hash, "output", lc($1));
     }
     elsif($return =~ /<Vol>.*?<Output>(.+?)<\/Output>.*?<\/Vol>/)
     {
-        readingsBulkUpdate($hash, "output", lc($1));
+		readingsBulkUpdate($hash, "output", lc($1));
     }
     else
     {
-       # delete the reading if this information is not available
-       delete($hash->{READINGS}{output}) if(defined($hash->{READINGS}{output}));
+		# delete the reading if this information is not available
+		delete($hash->{READINGS}{output}) if(defined($hash->{READINGS}{output}));
     }
     
     # current input same as the corresponding set command name
     if($return =~ /<Input_Sel>(.+)<\/Input_Sel>/)
     {
-	readingsBulkUpdate($hash, "input", YAMAHA_AVR_InputParam2Fhem(lc($1), 0));
+		readingsBulkUpdate($hash, "input", YAMAHA_AVR_InputParam2Fhem(lc($1), 0));
     }
     
     # input name as it is displayed on the receivers front display
     if($return =~ /<Input>.*?<Title>\s*(.+?)\s*<\/Title>.*<\/Input>/)
     {
-	readingsBulkUpdate($hash, "inputName", $1);
+		readingsBulkUpdate($hash, "inputName", $1);
     }
     
     readingsEndUpdate($hash, 1);
     
     InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0) unless($local == 1);
     
-    Log GetLogLevel($name,4), "YAMAHA_AVR $name: $hash->{STATE}";
+    Log3 $name, 4, "YAMAHA_AVR $name: ".$hash->{STATE};
     
     return $hash->{STATE};
 }
@@ -182,22 +182,22 @@ YAMAHA_AVR_Get($@)
     
     $what = $a[1];
     
-    if($what =~ /^(power|input|inputName|output|volume|mute)$/)
+    if($what =~ /^(power|input|inputName|output|volume|volumeStraight|mute)$/)
     {
         YAMAHA_AVR_GetStatus($hash, 1);
 
         if(defined($hash->{READINGS}{$what}))
         {
-	    return $hash->{READINGS}{$what}{VAL};
-	}
-	else
-	{
-	    return "no such reading: $what";
-	}
+			return $hash->{READINGS}{$what}{VAL};
+		}
+		else
+		{
+			return "no such reading: $what";
+		}
     }
     else
     {
-	return "Unknown argument $what, choose one of power:noArg input:noArg inputName:noArg volume:noArg mute:noArg".(exists($hash->{READINGS}{output})?" output:noArg":"");
+		return "Unknown argument $what, choose one of power:noArg input:noArg inputName:noArg volume:noArg mute:noArg".(exists($hash->{READINGS}{output})?" output:noArg":"");
     }
 }
 
@@ -225,7 +225,7 @@ YAMAHA_AVR_Set($@)
     return "No Argument given" if(!defined($a[1]));     
     
     my $what = $a[1];
-    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg volumeStraight:slider,-80,1,16 volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg input:".$inputs_comma." mute:on,off remoteControl:setup,up,down,left,right,return,option,display,enter ".(defined($hash->{helper}{SCENES})?"scene:".$scenes_comma." ":"")."statusRequest:noArg";
+    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg volumeStraight:slider,-80,1,16 volume:slider,0,1,100 volumeUp volumeDown input:".$inputs_comma." mute:on,off remoteControl:setup,up,down,left,right,return,option,display,enter ".(defined($hash->{helper}{SCENES})?"scene:".$scenes_comma." ":"")."statusRequest:noArg";
 
     # Depending on the status response, use the short or long Volume command
 
@@ -318,25 +318,25 @@ YAMAHA_AVR_Set($@)
 				{
 					if($a[2] =~ /^($scenes_piped)$/)
 					{
-					$command = YAMAHA_AVR_getSceneName($hash, $a[2]);
-					if(defined($command) and length($command) > 0)
-					{
-						$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Scene><Scene_Sel>".$command."</Scene_Sel></Scene></$zone></YAMAHA_AV>");
-					}
-					else
-					{
-						return "invalid input: ".$a[2];
-					}
+						$command = YAMAHA_AVR_getSceneName($hash, $a[2]);
+						if(defined($command) and length($command) > 0)
+						{
+							$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Scene><Scene_Sel>".$command."</Scene_Sel></Scene></$zone></YAMAHA_AV>");
+						}
+						else
+						{
+							return "invalid input: ".$a[2];
+						}
 
-					if(not $result =~ /RC="0"/)
-					{
-						# if the returncode isn't 0, than the command was not successful
-						return "Could not set scene to ".$a[2].".";
-					}
+						if(not $result =~ /RC="0"/)
+						{
+							# if the returncode isn't 0, than the command was not successful
+							return "Could not set scene to ".$a[2].".";
+						}
 					}
 					else
 					{
-					return $usage;
+						return $usage;
 					}
 				}
 				else
@@ -390,11 +390,11 @@ YAMAHA_AVR_Set($@)
 			}
 			elsif($what eq "volumeDown")
 			{
-				$target_volume = YAMAHA_AVR_volume_rel2abs($hash->{READINGS}{volume}{VAL} - 1);
+				$target_volume = YAMAHA_AVR_volume_rel2abs($hash->{READINGS}{volume}{VAL} - ((defined($a[2]) and $a[2] =~ /^\d+$/) ? $a[2] : AttrVal($hash->{NAME}, "volumeSteps",5)));
 			}
 			elsif($what eq "volumeUp")
 			{
-				$target_volume = YAMAHA_AVR_volume_rel2abs($hash->{READINGS}{volume}{VAL} + 1);
+				$target_volume = YAMAHA_AVR_volume_rel2abs($hash->{READINGS}{volume}{VAL} + ((defined($a[2]) and $a[2] =~ /^\d+$/) ? $a[2] : AttrVal($hash->{NAME}, "volumeSteps",5)));
 			}
 			else
 			{
@@ -413,11 +413,11 @@ YAMAHA_AVR_Set($@)
 
 					    if($diff > 0)
 					    {
-					        Log GetLogLevel($name, 4), "YAMAHA_AVR: use smooth volume change (with $steps steps of +$diff volume change)";
+					        Log3 $name, 4, "YAMAHA_AVR: use smooth volume change (with $steps steps of +$diff volume change)";
 					    }
 					    else
 					    {
-						Log GetLogLevel($name, 4), "YAMAHA_AVR: use smooth volume change (with $steps steps of $diff volume change)";
+							Log3 $name, 4, "YAMAHA_AVR: use smooth volume change (with $steps steps of $diff volume change)";
 					    }
 				
 					    # Only if a volume reading exists and smoohing is really needed (step difference is not zero)
@@ -425,7 +425,7 @@ YAMAHA_AVR_Set($@)
 					    {
 							for(my $step = 1; $step <= $steps; $step++)
 							{
-								Log GetLogLevel($name, 4), "YAMAHA_AVR: set volume to ".($current_volume + ($diff * $step))." dB";
+								Log3 $name, 4, "YAMAHA_AVR: set volume to ".($current_volume + ($diff * $step))." dB";
 						
 								YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".(($current_volume + ($diff * $step))*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>");
 						 
@@ -434,7 +434,7 @@ YAMAHA_AVR_Set($@)
 					}
 					
 					# Set the desired volume
-					Log GetLogLevel($name, 4), "YAMAHA_AVR: set volume to ".$target_volume." dB";
+					Log3 $name, 4, "YAMAHA_AVR: set volume to ".$target_volume." dB";
 					$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($target_volume*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>");
 					if(not $result =~ /RC="0"/)
 					{
@@ -445,7 +445,7 @@ YAMAHA_AVR_Set($@)
 			    }
 			    else
 			    {
-				return "volume can only be used when device is powered on";
+					return "volume can only be used when device is powered on";
 			    }
 			}
 	    }
@@ -494,8 +494,7 @@ YAMAHA_AVR_Set($@)
 	    }
 		elsif($what eq "statusRequest")
 		{
-			# Will be executed anyway on the end of the function
-			
+			# Will be executed anyway on the end of the function			
 		}
 	    else
 	    {
@@ -539,36 +538,36 @@ YAMAHA_AVR_Define($$)
     }
     else
     {
-	$hash->{helper}{SELECTED_ZONE} = "mainzone";
+		$hash->{helper}{SELECTED_ZONE} = "mainzone";
     }
     
     # if an update interval was given which is greater than zero, use it.
     if(defined($a[4]) and $a[4] > 0)
     {
-	$hash->{helper}{INTERVAL}=$a[4];
+		$hash->{helper}{INTERVAL}=$a[4];
     }
     else
     {
-	$hash->{helper}{INTERVAL}=30;
+		$hash->{helper}{INTERVAL}=30;
     }
     
     
     # In case of a redefine, check the zone parameter if the specified zone exist, otherwise use the main zone
     if(defined($hash->{helper}{ZONES}) and length($hash->{helper}{ZONES}) > 0)
     {
-	if(defined(YAMAHA_AVR_getZoneName($hash, lc $hash->{helper}{SELECTED_ZONE})))
-	{
-    
-	    $hash->{ACTIVE_ZONE} = lc $hash->{helper}{SELECTED_ZONE};
-	    YAMAHA_AVR_getInputs($hash);
+		if(defined(YAMAHA_AVR_getZoneName($hash, lc $hash->{helper}{SELECTED_ZONE})))
+		{
 	    
-	}
-	else
-	{
-	    Log GetLogLevel($name, 2), "YAMAHA_AVR: selected zone >>".$hash->{helper}{SELECTED_ZONE}."<< is not available on device ".$hash->{NAME}.". Using Main Zone instead";
-	    $hash->{ACTIVE_ZONE} = "mainzone";
-	    YAMAHA_AVR_getInputs($hash);
-	}
+		    $hash->{ACTIVE_ZONE} = lc $hash->{helper}{SELECTED_ZONE};
+		    YAMAHA_AVR_getInputs($hash);
+		    
+		}
+		else
+		{
+		    Log3 $name, 2, "YAMAHA_AVR: selected zone >>".$hash->{helper}{SELECTED_ZONE}."<< is not available on device ".$hash->{NAME}.". Using Main Zone instead";
+		    $hash->{ACTIVE_ZONE} = "mainzone";
+		    YAMAHA_AVR_getInputs($hash);
+		}
     }
     
     # set the volume-smooth-change attribute only if it is not defined, so no user values will be overwritten
@@ -583,6 +582,7 @@ YAMAHA_AVR_Define($$)
     }
 
     # start the status update timer
+	RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+2, "YAMAHA_AVR_GetStatus", $hash, 0);
   
   return undef;
@@ -605,33 +605,32 @@ YAMAHA_AVR_SendCommand($$;$)
     my $address = $hash->{helper}{ADDRESS};
     my $response;
    
-    $loglevel = GetLogLevel($hash->{NAME}, 3) unless(defined($loglevel));
+    $loglevel = 3;
      
-    Log GetLogLevel($name, 5), "YAMAHA_AVR: execute on $name: $command";
+    Log3 $name, 5, "YAMAHA_AVR: execute on $name: $command";
     
     # In case any URL changes must be made, this part is separated in this function".
     
     $response = CustomGetFileFromURL(0, "http://".$address."/YamahaRemoteControl/ctrl", 4, "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$command, 0, ($hash->{helper}{AVAILABLE} ? $loglevel : 5));
     
-    Log GetLogLevel($name, 5), "YAMAHA_AVR: got response for $name: $response" if(defined($response));
+    Log3 $name, 5, "YAMAHA_AVR: got response for $name: $response" if(defined($response));
     
     unless(defined($response))
     {
 	
-	if((not exists($hash->{helper}{AVAILABLE})) or (exists($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1))
-	{
-	    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not execute command on device $name. Please turn on your device in case of deactivated network standby or check for correct hostaddress.";
-	    readingsSingleUpdate($hash, "presence", "absent", 1);
-	}
+		if((not exists($hash->{helper}{AVAILABLE})) or (exists($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1))
+		{
+			Log3 $name, 3, "YAMAHA_AVR: could not execute command on device $name. Please turn on your device in case of deactivated network standby or check for correct hostaddress.";
+			readingsSingleUpdate($hash, "presence", "absent", 1);
+		}
     }
     else
     {
-	if (defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 0)
-	{
-	    Log GetLogLevel($name, 3), "YAMAHA_AVR: device $name reappeared";
-	    readingsSingleUpdate($hash, "presence", "present", 1);
-	                
-	}
+		if (defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 0)
+		{
+			Log3 $name, 3, "YAMAHA_AVR: device $name reappeared";
+			readingsSingleUpdate($hash, "presence", "present", 1);            
+		}
     }
     
     $hash->{helper}{AVAILABLE} = (defined($response) ? 1 : 0);
@@ -646,7 +645,7 @@ YAMAHA_AVR_Undefine($$)
 {
   my($hash, $name) = @_;
   
-  # Stop the internal GetStatus-Loop and exist
+  # Stop the internal GetStatus-Loop and exit
   RemoveInternalTimer($hash);
   return undef;
 }
@@ -687,23 +686,22 @@ sub YAMAHA_AVR_Param2Fhem($$)
 # Returns the Yamaha Zone Name for the FHEM like zone attribute
 sub YAMAHA_AVR_getZoneName($$)
 {
-   my ($hash, $zone) = @_;
-   my $item;
+	my ($hash, $zone) = @_;
+	my $item;
    
-   return undef if(not defined($hash->{helper}{ZONES}));
+	return undef if(not defined($hash->{helper}{ZONES}));
    
-   my @commands = split("\\|", $hash->{helper}{ZONES});
+	my @commands = split("\\|", $hash->{helper}{ZONES});
 
-    foreach $item (@commands)
+	foreach $item (@commands)
     {
-	if(YAMAHA_AVR_Param2Fhem($item, 0) eq $zone)
-	{
-	    return $item;
-	}
-    
+		if(YAMAHA_AVR_Param2Fhem($item, 0) eq $zone)
+		{
+			return $item;
+		}
     }
     
-    return undef;
+	return undef;
     
 }
 
@@ -711,20 +709,19 @@ sub YAMAHA_AVR_getZoneName($$)
 # Returns the Yamaha Parameter Name for the FHEM like aquivalents
 sub YAMAHA_AVR_getSceneName($$)
 {
-   my ($hash, $scene) = @_;
-   my $item;
+	my ($hash, $scene) = @_;
+	my $item;
    
-   return undef if(not defined($hash->{helper}{SCENES}));
-   
-   my @commands = split("\\|", $hash->{helper}{SCENES});
+	return undef if(not defined($hash->{helper}{SCENES}));
+  
+	my @commands = split("\\|", $hash->{helper}{SCENES});
 
     foreach $item (@commands)
     {
-	if(YAMAHA_AVR_Param2Fhem($item, 0) eq $scene)
-	{
-	    return $item;
-	}
-    
+		if(YAMAHA_AVR_Param2Fhem($item, 0) eq $scene)
+		{
+			return $item;
+		}
     }
     
     return undef;
@@ -735,17 +732,16 @@ sub YAMAHA_AVR_getSceneName($$)
 # Returns the Yamaha Parameter Name for the FHEM like input channel
 sub YAMAHA_AVR_getInputParam($$)
 {
-   my ($hash, $command) = @_;
-   my $item;
-   my @commands = split("\\|", $hash->{helper}{INPUTS});
+	my ($hash, $command) = @_;
+	my $item;
+	my @commands = split("\\|", $hash->{helper}{INPUTS});
 
     foreach $item (@commands)
     {
-	if(lc(YAMAHA_AVR_InputParam2Fhem($item, 0)) eq $command)
-	{
-	    return $item;
-	}
-    
+		if(lc(YAMAHA_AVR_InputParam2Fhem($item, 0)) eq $command)
+		{
+			return $item;
+		}
     }
     
     return undef;
@@ -764,21 +760,20 @@ sub YAMAHA_AVR_getModel($)
     
     $response = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Unit_Desc>GetParam</Unit_Desc></System></YAMAHA_AV>");
 
-    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get unit description url from device $name. Please turn on the device or check for correct hostaddress!"  if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
-    
+    Log3 $name, 3, "YAMAHA_AVR: could not get unit description url from device $name. Please turn on the device or check for correct hostaddress!"  if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1); 
     
     if(defined($response) and $response =~ /<URL>(.+?)<\/URL>/)
     { 
-       $desc_url = $1;
+		$desc_url = $1;
     }
     else
     {
-       $desc_url = "/YamahaRemoteControl/desc.xml";
+		$desc_url = "/YamahaRemoteControl/desc.xml";
     }
     
     $response = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>");
     
-    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get system configuration from device $name. Please turn on the device or check for correct hostaddress!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
+    Log3 $name, 3, "YAMAHA_AVR: could not get system configuration from device $name. Please turn on the device or check for correct hostaddress!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
     
     if(defined($response) and $response =~ /<Model_Name>(.+?)<\/Model_Name>.*<System_ID>(.+?)<\/System_ID>.*<Version>(.+?)<\/Version>/)
     {
@@ -798,9 +793,9 @@ sub YAMAHA_AVR_getModel($)
     }
     
     # query the description url which contains all zones
-    $response = CustomGetFileFromURL(0, "http://".$address.$desc_url, 4, undef, 0, ($hash->{helper}{AVAILABLE} ? GetLogLevel($name, 3) : 5));
+    $response = CustomGetFileFromURL(0, "http://".$address.$desc_url, 4, undef, 0, ($hash->{helper}{AVAILABLE} ?  3 : 5));
     
-    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get unit description from device $name. Please turn on the device or check for correct hostaddress!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
+    Log3 $name, 3, "YAMAHA_AVR: could not get unit description from device $name. Please turn on the device or check for correct hostaddress!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
     
     return undef unless(defined($response));
 
@@ -824,15 +819,13 @@ sub YAMAHA_AVR_getModel($)
     # if explicitly given in the define command, set the desired zone
     if(defined(YAMAHA_AVR_getZoneName($hash, lc $hash->{helper}{SELECTED_ZONE})))
     {
-    
-	Log GetLogLevel($name, 4), "YAMAHA_AVR: using zone ".YAMAHA_AVR_getZoneName($hash, lc $hash->{helper}{SELECTED_ZONE});
-	$hash->{ACTIVE_ZONE} = lc $hash->{helper}{SELECTED_ZONE};
-    
+		Log3 $name, 4, "YAMAHA_AVR: using zone ".YAMAHA_AVR_getZoneName($hash, lc $hash->{helper}{SELECTED_ZONE});
+		$hash->{ACTIVE_ZONE} = lc $hash->{helper}{SELECTED_ZONE};
     }
     else
     {
-	Log GetLogLevel($name, 2), "YAMAHA_AVR: selected zone >>".$hash->{helper}{SELECTED_ZONE}."<< is not available on device $name. Using Main Zone instead";
-	$hash->{ACTIVE_ZONE} = "mainzone";
+		Log3 $name, 2, "YAMAHA_AVR: selected zone >>".$hash->{helper}{SELECTED_ZONE}."<< is not available on device $name. Using Main Zone instead";
+		$hash->{ACTIVE_ZONE} = "mainzone";
     }
     return 0;
 }
@@ -852,7 +845,6 @@ sub YAMAHA_AVR_volume_abs2rel($)
 	
 	# -80.5 to 16.5 dB equals 0 - 100%
 	return int(($absolute + 80.5) / 97 * 100);
-
 }
 
 #############################
@@ -871,7 +863,7 @@ sub YAMAHA_AVR_getInputs($)
     my $response = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></$zone></YAMAHA_AV>");
     
     
-    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get the available inputs from device $name. Please turn on the device or check for correct hostaddress!!!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
+    Log3 $name, 3, "YAMAHA_AVR: could not get the available inputs from device $name. Please turn on the device or check for correct hostaddress!!!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
     
     return undef unless (defined($response));
 
@@ -884,11 +876,10 @@ sub YAMAHA_AVR_getInputs($)
 	{
 	    if(defined($hash->{helper}{INPUTS}) and length($hash->{helper}{INPUTS}) > 0)
 	    {
-	      $hash->{helper}{INPUTS} .= "|";
+			$hash->{helper}{INPUTS} .= "|";
 	    }
 	  
-	      $hash->{helper}{INPUTS} .= $1;
-	    
+			$hash->{helper}{INPUTS} .= $1;
 	}
 	
 	$hash->{helper}{INPUTS} = join("|", sort split("\\|", $hash->{helper}{INPUTS}));
@@ -901,21 +892,20 @@ sub YAMAHA_AVR_getInputs($)
   
     return undef unless (defined($response));
     
-  
+ 
     
     # get all available scenes from response
     while($response =~ /<Item_\d+>.*?<Param>(.+?)<\/Param>.*?<RW>(\w+)<\/RW>.*?<\/Item_\d+>/gc)
     {
       # check if the RW-value is "W" (means: writeable => can be set through FHEM)
-      if($2 eq "W")
-      {
-        if(defined($hash->{helper}{SCENES}) and length($hash->{helper}{SCENES}) > 0)
-	{
-        $hash->{helper}{SCENES} .= "|";
-	}
-  
-        $hash->{helper}{SCENES} .= $1;
-      }
+		if($2 eq "W")
+		{
+			if(defined($hash->{helper}{SCENES}) and length($hash->{helper}{SCENES}) > 0)
+			{
+				$hash->{helper}{SCENES} .= "|";
+			}
+			$hash->{helper}{SCENES} .= $1;
+		}
     }
 
 }
@@ -1001,8 +991,8 @@ sub YAMAHA_AVR_getInputs($)
 <li><b>scene</b> scene1,sceneX &nbsp;&nbsp;-&nbsp;&nbsp; select the scene</li>
 <li><b>volume</b> 0...100 &nbsp;&nbsp;-&nbsp;&nbsp; set the volume level in percentage</li>
 <li><b>volumeStraight</b> -80...15 &nbsp;&nbsp;-&nbsp;&nbsp; set the volume level in decibel</li>
-<li><b>volumeUp</b> &nbsp;&nbsp;-&nbsp;&nbsp; increases the volume level by 1%</li>
-<li><b>volumeDown</b> &nbsp;&nbsp;-&nbsp;&nbsp; decreases the volume level by 1%</li>
+<li><b>volumeUp</b> [0-100] &nbsp;&nbsp;-&nbsp;&nbsp; increases the volume level by 5% or the value of attribute volumeSteps (optional the increasing level can be given as argument, which will be used instead)</li>
+<li><b>volumeDown</b> [0-100] &nbsp;&nbsp;-&nbsp;&nbsp; decreases the volume level by 5% or the value of attribute volumeSteps (optional the decreasing level can be given as argument, which will be used instead)</li>
 <li><b>mute</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; activates volume mute</li>
 <li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current status of the device</li>
 <li><b>remoteControl</b> up,down,... &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands as listed below</li>
@@ -1090,7 +1080,9 @@ output        # only available in zones other than mainzone</code></ul><br><br>
 	Possible values: 0 => off , 1 => on<br><br>
     <li><a name="volume-smooth-steps">volume-smooth-steps</a></li>
 	Optional attribute to define the number of volume changes between the
-        current and the desired volume. Default value is 5 steps<br>
+    current and the desired volume. Default value is 5 steps<br><br>
+	<li><a name="volume-smooth-steps">volumeSteps</a></li>
+	Optional attribute to define the default increasing and decreasing level for the volumeUp and volumeDown set command. Default value is 5%<br>
   </ul>
   <br>
   <b>Generated Readings/Events:</b><br>
@@ -1187,8 +1179,8 @@ output        # only available in zones other than mainzone</code></ul><br><br>
 <li><b>scene</b> scene1,sceneX &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt eine vorgefertigte Szene aus</li>
 <li><b>volume</b> 0...100 &nbsp;&nbsp;-&nbsp;&nbsp; Setzt die Lautst&auml;rke in Prozent (0 bis 100%)</li>
 <li><b>volumeStraight</b> -87...15 &nbsp;&nbsp;-&nbsp;&nbsp; Setzt die Lautst&auml;rke in Dezibel (-80.5 bis 15.5 dB) so wie sie am Receiver auch verwendet wird.</li>
-<li><b>volumeUp</b> &nbsp;&nbsp;-&nbsp;&nbsp; Erh&ouml;ht die Lautst&auml;rke um 1%</li>
-<li><b>volumeDown</b> &nbsp;&nbsp;-&nbsp;&nbsp; Veringert die Lautst&auml;rke um 1%</li>
+<li><b>volumeUp</b> [0...100] &nbsp;&nbsp;-&nbsp;&nbsp; Erh&ouml;ht die Lautst&auml;rke um 5% oder entsprechend dem Attribut volumeSteps (optional kann der Wert auch als Argument angehangen werden, dieser hat dann Vorang) </li>
+<li><b>volumeDown</b> [0...100] &nbsp;&nbsp;-&nbsp;&nbsp; Veringert die Lautst&auml;rke um 5% oder entsprechend dem Attribut volumeSteps (optional kann der Wert auch als Argument angehangen werden, dieser hat dann Vorang) </li>
 <li><b>mute</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver stumm</li>
 <li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; Fragt den aktuell Status des Receivers ab</li>
 <li><b>remoteControl</b> up,down,... &nbsp;&nbsp;-&nbsp;&nbsp; Sendet Fernbedienungsbefehle wie im n&auml;chsten Abschnitt beschrieben</li>
@@ -1276,9 +1268,11 @@ output        # only available in zones other than mainzone</code></ul><br><br>
 	M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br><br>
     <li><a name="volume-smooth-steps">volume-smooth-steps</a></li>
 	Optionales Attribut, welches angibt, wieviele Schritte zur weichen Lautst&auml;rkeanpassung
-	 durchgef&uuml;hrt werden sollen. Standartwert ist 5 Anpassungschritte
-  </ul>
+	durchgef&uuml;hrt werden sollen. Standartwert ist 5 Anpassungschritte<br><br>
+	<li><a name="volumeSteps">volumeSteps</a></li>
+	Optionales Attribut, welches den Standartwert zur Lautst&auml;rkenerh&ouml;hung (volumeUp) und Lautst&auml;rkenveringerung (volumeDown) konfiguriert. Standartwert ist 5%<br>
   <br>
+  </ul>
   <b>Generierte Readings/Events:</b><br>
   <ul>
   <li><b>input</b> - Der ausgew&auml;hlte Eingang entsprechend dem FHEM-Kommando</li>
