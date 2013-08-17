@@ -640,18 +640,26 @@ EnOcean_Set($@)
           $data = "E047FF80";
         } elsif ($cmd eq "on" || $cmd eq "B0") {
           $setCmd = 9;
+          readingsSingleUpdate($hash, "block", "unlock", 1);
           if ($a[1]) {
             return "Usage: $cmd [lock|unlock]" if (($a[1] ne "lock") && ($a[1] ne "unlock"));
-            $setCmd = $setCmd | 4 if ($a[1] eq "lock");
+            if ($a[1] eq "lock") {
+              $setCmd = $setCmd | 4 ;
+              readingsSingleUpdate($hash, "block", "lock", 1);
+            }
             shift(@a);
           }
           $updateState = 0;
           $data = sprintf "%02X%04X%02X", $gwCmdID, $time, $setCmd;
         } elsif ($cmd eq "off" || $cmd eq "BI") {
           $setCmd = 8;
+          readingsSingleUpdate($hash, "block", "unlock", 1);
           if ($a[1]) {
             return "Usage: $cmd [lock|unlock]" if (($a[1] ne "lock") && ($a[1] ne "unlock"));
-            $setCmd = $setCmd | 4 if ($a[1] eq "lock");
+            if ($a[1] eq "lock") {
+              $setCmd = $setCmd | 4 ;
+              readingsSingleUpdate($hash, "block", "lock", 1);
+            }
             shift(@a);
           }
           $updateState = 0;
@@ -672,7 +680,9 @@ EnOcean_Set($@)
         $setCmd = 9;
         if ($cmd eq "teach") {
           # teach-in EEP A5-38-08, Manufacturer "Multi user Manufacturer ID"
-          $data = "E047FF80";
+          #$data = "E047FF80";
+          # teach-in Eltako
+          $data = "02000000";
         } elsif ($cmd eq "dim") {
           return "Usage: $cmd dim/% [rampTime/s lock|unlock]"
             if(@a < 2 || $a[1] < 0 || $a[1] > 100 || $a[1] !~ m/^[+-]?\d+$/);
@@ -743,7 +753,7 @@ EnOcean_Set($@)
               $dimVal = $dimValueOn;
             }
           }
-          $sendDimCmd = 1
+          $sendDimCmd = 1;
 
         } elsif ($cmd eq "off" || $cmd eq "BI") {
           $dimVal = 0;
@@ -756,14 +766,18 @@ EnOcean_Set($@)
           return SetExtensions ($hash, $cmdList, $name, @a);
         }
         if ($sendDimCmd) {
+          readingsSingleUpdate($hash, "block", "unlock", 1);
           if (defined $a[1]) {
             return "Usage: $cmd dim/% [rampTime/s lock|unlock]" if ($a[1] ne "lock" && $a[1] ne "unlock");
             # Eltako devices: lock dimming value
-            if ($manufID eq "OOD" && $a[1] eq "lock" ) {$setCmd = $setCmd | 4;}
+            if ($manufID eq "00D" && $a[1] eq "lock" ) {
+              $setCmd = $setCmd | 4;
+              readingsSingleUpdate($hash, "block", "lock", 1);
+            }
             shift(@a);
           } else {
             # Dimming value relative
-            if ($manufID ne "OOD") {$setCmd = $setCmd | 4;}
+            if ($manufID ne "00D") {$setCmd = $setCmd | 4;}
           }
           if ($dimVal > 100) { $dimVal = 100; }
           if ($dimVal <= 0) { $dimVal = 0; $setCmd = 8; }
@@ -4620,7 +4634,7 @@ EnOcean_Undef($$)
        <li>off</li>
        <li>executeTime: t/s (Sensor Range: t = 0.1 s ... 6553.5 s or 0 if no time specified)</li>
        <li>executeType: duration|delay</li>
-       <li>lock: lock|unlock</li>
+       <li>block: lock|unlock</li>
        <li>state: on|off</li>
      </ul><br>
         The attr subType must be gateway and gwCmd must be switching. This is done if the device was
@@ -4635,6 +4649,7 @@ EnOcean_Undef($$)
      <ul>
        <li>on</li>
        <li>off</li>
+       <li>block: lock|unlock</li>
        <li>dimValue: dim/% (Sensor Range: dim = 0 % ... 100 %)</li>
        <li>dimValueLast: dim/%<br>
            Last value received from the bidirectional dimmer.</li>
