@@ -4,11 +4,11 @@ package main;
 
 =pod
 ### Usage:
-sub TestBlocking() { BlockingCall("DoSleep", 5, "SleepDone", 8, "AbortFn", "AbortArg"); }
+sub TestBlocking   { BlockingCall("DoSleep", {h=>$defs{CUL}, to=>3,cmd=>"CmdTxt"}, 
+                     "SleepDone", 8, "AbortFn", "AbortArg"); }
 sub DoSleep($)     { sleep(shift); return "I'm done"; }
 sub SleepDone($)   { Log 1, "SleepDone: " . shift; }
 sub AbortFn($)     { Log 1, "Aborted: " . shift; }
-sub TestBlocking2() { BlockingCall("DoSleep", 5, "SleepDone", 2, "AbortFn", "AbortArg"); }
 =cut
 
 
@@ -38,7 +38,8 @@ BlockingCall($$@)
     foreach my $d (sort keys %defs) {
       my $h = $defs{$d};
       next if(!$h->{TYPE} || $h->{TYPE} ne "telnet" || $h->{SNAME});
-      next if($attr{$d}{SSL} || $attr{$d}{password} || $attr{$d}{allowfrom});
+      next if($attr{$d}{SSL} || $attr{$d}{password} ||
+              AttrVal($d, "allowfrom", "127.0.0.1") ne "127.0.0.1");
       next if($h->{DEF} =~ m/IPV6/);
       $telnetDevice = $d;
       last;
@@ -51,6 +52,7 @@ BlockingCall($$@)
       CommandAttr(undef, "$tName room hidden");
       $telnetDevice = $tName;
       $defs{$tName}{TEMPORARY} = 1;
+      $attr{$tName}{allowfrom} = "127.0.0.1";
     }
   }
 
