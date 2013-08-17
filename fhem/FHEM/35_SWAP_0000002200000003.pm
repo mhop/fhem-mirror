@@ -351,8 +351,6 @@ SWAP_0000002200000003_Get($@)
   <ul>
     <code>define &lt;name&gt; SWAP_0000002200000003 &lt;ID&gt; 0000002200000003</code> <br>
     <br>
-    <br>
-    The ID is a 2 digit hex number to identify the mote in the panStamp network.
   </ul>
   <br>
 
@@ -385,7 +383,7 @@ SWAP_0000002200000003_Get($@)
     <li>storeIR # &lt;code&gt; &lt;command&gt;<br>
         </li><br>
 
-    <li>getIR #|all<br>
+    <li>getIR # | all<br>
         read content of IR regisgter # or all IR registers
         </li><br>
 
@@ -397,10 +395,12 @@ SWAP_0000002200000003_Get($@)
         starts an endless fading loop over all fading registers [#1..#2]
         </li><br>
 
-    <li>getFade #|all<br>
+    <li>getFade # | all<br>
         read content of fade regisgter # or all fade regisgters
         </li><br>
-  </ul>
+
+    <li><a href="#setExtensions"> set extensions</a> are supported.</li>
+  </ul><br>
 
   <a name="SWAP_0000002200000003_Get"></a>
   <b>Get</b>
@@ -415,15 +415,17 @@ SWAP_0000002200000003_Get($@)
     <li>listFade<br>
         list all fade registers. use getFade first.
         </li><br>
-  </ul>
+  </ul><br>
 
   <a name="SWAP_0000002200000003_Attr"></a>
   <b>Attributes</b>
   <ul>
+    <li>color-icon<br>
+      1 -> use lamp color as icon color and 100% shape as icon shape<br>
+      2 -> use lamp color scaled to full brightness as icon color and dim state as icon shape</li>
     <li>ProductCode<br>
       must be 0000002200000003</li><br>
-  </ul>
-  <br>
+  </ul><br>
 </ul>
 
 =end html
