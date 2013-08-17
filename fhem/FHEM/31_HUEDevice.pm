@@ -689,6 +689,7 @@ HUEDevice_GetUpdate($)
       <li>transitiontime &lt;time&gt;<br>
         set the transitiontime to &lt;time&gt; 1/10s</li>
       <li>rgb &lt;rrggbb&gt;</li>
+      <li><a href="#setExtensions"> set extensions</a> are supported.</li>
       <br>
       Note:
         <ul>
@@ -712,13 +713,13 @@ HUEDevice_GetUpdate($)
   <b>Attributes</b>
   <ul>
     <li>color-icon<br>
-    1 -> use lamp color as icon color and 100% shape as icon shape<br>
-    2 -> use lamp color scaled to full brightness as icon color and dim state as icon shape</li>
+      1 -> use lamp color as icon color and 100% shape as icon shape<br>
+      2 -> use lamp color scaled to full brightness as icon color and dim state as icon shape</li>
     <li>subType<br>
       colordimmer, dimmer or switch, default is initialized according to device model.</li>
-      <li>devStateIcon<br>
+    <li>devStateIcon<br>
       will be initialized to <code>{(HUEDevice_devStateIcon($name),"toggle")}</code> to show device color as default in room overview.</li>
-      <li>webCmd<br>
+    <li>webCmd<br>
       will be initialized to <code>rgb:rgb FF0000:rgb C8FF12:rgb 0000FF:toggle:on:off</code> to show colorpicker and 3 color preset buttons in room overview.</li>
   </ul>
 
