@@ -20,7 +20,7 @@ telnet_Initialize($)
   $hash->{UndefFn} = "telnet_Undef";
   $hash->{AttrFn}  = "telnet_Attr";
   $hash->{NotifyFn}= "telnet_SecurityCheck";
-  $hash->{AttrList} = "loglevel:0,1,2,3,4,5,6 globalpassword password ".
+  $hash->{AttrList} = "globalpassword password ".
                         "allowfrom SSL connectTimeout connectInterval ".
                         "encoding:utf8,latin1";
   $hash->{ActivateInformFn} = "telnet_ActivateInform";
@@ -80,7 +80,7 @@ telnet_ClientConnect($)
   $hash->{DEF} =~ m/^(IPV6:)?(.*):(\d+)$/;
   my ($isIPv6, $server, $port) = ($1, $2, $3);
 
-  Log GetLogLevel($name,4), "$name: Connecting to $server:$port...";
+  Log3 $name, 4, "$name: Connecting to $server:$port...";
   my @opts = (
         PeerAddr => "$server:$port",
         Timeout => AttrVal($name, "connectTimeout", 2),
@@ -100,7 +100,7 @@ telnet_ClientConnect($)
     $selectlist{$name} = $hash;
     $hash->{STATE} = "Connected";
     RemoveInternalTimer($hash);
-    Log(GetLogLevel($name,3), "$name: connected to $server:$port");
+    Log3 $name, 3, "$name: connected to $server:$port";
 
   } else {
     telnet_ClientDisconnect($hash, 1);
@@ -122,9 +122,9 @@ telnet_ClientDisconnect($$)
   InternalTimer(gettimeofday()+AttrVal($name, "connectInterval", 60),
                 "telnet_ClientConnect", $hash, 0);
   if($connect) {
-    Log GetLogLevel($name,4), "$name: Connect failed.";
+    Log3 $name, 4, "$name: Connect failed.";
   } else {
-    Log GetLogLevel($name,3), "$name: Disconnected";
+    Log3 $name, 3, "$name: Disconnected";
   }
 }
 
@@ -150,7 +150,7 @@ telnet_Define($$$)
   if($isServer) {
     my $ret = TcpServer_Open($hash, $port, $global);
     if($ret && !$init_done) {
-      Log 1, "$ret. Exiting.";
+      Log3 $name, 1, "$ret. Exiting.";
       exit(1);
     }
     return $ret;
@@ -233,7 +233,7 @@ telnet_Read($)
         if($pw =~ m/^{.*}$/) {  # Expression as pw
           my $password = $cmd;
           $ret = eval $pw;
-          Log 1, "password expression: $@" if($@);
+          Log3 $name, 1, "password expression: $@" if($@);
         }
 
         if($ret) {
@@ -313,7 +313,7 @@ telnet_Attr(@)
     TcpServer_SetSSL($hash);
     if($hash->{CD}) {
       my $ret = IO::Socket::SSL->start_SSL($hash->{CD});
-      Log 1, "$hash->{NAME} start_SSL: $ret" if($ret);
+      Log3 $a[1], 1, "$hash->{NAME} start_SSL: $ret" if($ret);
     }
   }
   return undef;
@@ -402,9 +402,6 @@ telnet_ActivateInform($)
   <a name="telnetattr"></a>
   <b>Attributes:</b>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li>
-    <br>
-
     <a name="password"></a>
     <li>password<br>
         Specify a password, which has to be entered as the very first string

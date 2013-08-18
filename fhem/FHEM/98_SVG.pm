@@ -199,12 +199,12 @@ SVG_sel($$$@)
 }
 
 sub
-SVG_getRegFromFile($)
+SVG_getRegFromFile($$)
 {
-  my ($fName) = @_;
+  my ($wName, $fName) = @_;
   my $fh = new IO::File $fName;
   if(!$fh) {
-    Log 1, "$fName: $!";
+    Log3 $wName, 1, "$fName: $!";
     return (3, "NoFile", "NoFile");
   }
   $fh->seek(0, 2); # Go to the end
@@ -284,7 +284,7 @@ SVG_PEdit($$$$)
   $ret .= "<td>Input:Column,Regexp,DefaultValue,Function</td>";
   $ret .=" <td>Y-Axis,Plot-Type,Style,Width</td></tr>";
 
-  my ($colnums, $colregs, $coldata) = SVG_getRegFromFile($file);
+  my ($colnums, $colregs, $coldata) = SVG_getRegFromFile($FW_wname, $file);
   $colnums = join(",", 3..$colnums);
 
   my %tickh;
@@ -918,7 +918,7 @@ SVG_render($$$$$$$$$)
     SVG_pO join("", <FH>);
     close(FH);
   } else {
-    Log 0, "Can't open $parent_dir/svg_style.css"
+    Log3 $name, 0, "Can't open $parent_dir/svg_style.css"
   }
   SVG_pO "]]></style>";
 
@@ -929,7 +929,7 @@ SVG_render($$$$$$$$$)
     SVG_pO join("", <FH>);
     close(FH);
   } else {
-    Log 0, "Can't open $parent_dir/svg_defs.svg"
+    Log3 $name, 0, "Can't open $parent_dir/svg_defs.svg"
   }
 
   ######################
@@ -1168,7 +1168,7 @@ SVG_render($$$$$$$$$)
     $hstep{$a}   = $step;
     $axdrawn{$a} = 0;
     
-    #Log 2, "Axis $a has interval [$hmin{$a},$hmax{$a}], step $hstep{$a}, tics $htics{$a}\n";
+    #Log3 $name, 2, "Axis $a has interval [$hmin{$a},$hmax{$a}], step $hstep{$a}, tics $htics{$a}\n";
   }
 
   #-- run through all axes for drawing (each only once !) 

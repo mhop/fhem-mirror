@@ -16,8 +16,8 @@ TcpServer_Open($$$)
     $port = $1;
     eval "require IO::Socket::INET6; use Socket6;";
     if($@) {
-      Log 1, $@;
-      Log 1, "$name: Can't load INET6, falling back to IPV4";
+      Log3 $hash, 1, $@;
+      Log3 $hash, 1, "$name: Can't load INET6, falling back to IPV4";
     } else {
       $hash->{IPV6} = 1;
     }
@@ -43,7 +43,7 @@ TcpServer_Open($$$)
   $hash->{PORT} = $hash->{SERVERSOCKET}->sockport();
 
   $selectlist{"$name.$port"} = $hash;
-  Log(3, "$name: port ". $hash->{PORT} ." opened");
+  Log3 $hash, 3, "$name: port ". $hash->{PORT} ." opened";
   return undef;
 }
 
@@ -53,10 +53,9 @@ TcpServer_Accept($$)
   my ($hash, $type) = @_;
 
   my $name = $hash->{NAME};
-  my $ll = GetLogLevel($name,4);
   my @clientinfo = $hash->{SERVERSOCKET}->accept();
   if(!@clientinfo) {
-    Log 1, "Accept failed ($name: $!)";
+    Log3 $name, 1, "Accept failed ($name: $!)";
     return undef;
   }
   $hash->{CONNECTS}++;
@@ -73,7 +72,7 @@ TcpServer_Accept($$)
     if($caddr !~ m/$af/) {
       my $hostname = gethostbyaddr($iaddr, AF_INET);
       if(!$hostname || $hostname !~ m/$af/) {
-        Log 1, "Connection refused from $caddr:$port";
+        Log3 $name, 1, "Connection refused from $caddr:$port";
         close($clientinfo[0]);
         return undef;
       }
@@ -90,7 +89,7 @@ TcpServer_Accept($$)
       SSL_cert_file => "$mp/certs/server-cert.pem",
       });
     if(!$ret && $! ne "Socket is not connected") {
-      Log 1, "$type SSL/HTTPS error: $!";
+      Log3 $name, 1, "$type SSL/HTTPS error: $!";
       close($clientinfo[0]);
       return undef;
     }
@@ -112,7 +111,7 @@ TcpServer_Accept($$)
   $selectlist{$nhash{NAME}} = \%nhash;
 
 
-  Log($ll, "Connection accepted from $nhash{NAME}");
+  Log3 $name, 4, "Connection accepted from $nhash{NAME}";
   return \%nhash;
 }
 
@@ -122,8 +121,8 @@ TcpServer_SetSSL($)
   my ($hash) = @_; 
   eval "require IO::Socket::SSL";
   if($@) {
-    Log 1, $@;
-    Log 1, "Can't load IO::Socket::SSL, falling back to HTTP";
+    Log3 $hash, 1, $@;
+    Log3 $hash, 1, "Can't load IO::Socket::SSL, falling back to HTTP";
   } else {
     $hash->{SSL} = 1;
   }

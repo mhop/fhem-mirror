@@ -22,7 +22,7 @@ CUL_EM_Initialize($)
   $hash->{UndefFn}   = "CUL_EM_Undef";
   $hash->{ParseFn}   = "CUL_EM_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 " .
-                        "model:EMEM,EMWZ,EMGZ loglevel ignore:0,1 ".
+                        "model:EMEM,EMWZ,EMGZ ignore:0,1 ".
                         $readingFnAttributes;
 }
 
@@ -117,7 +117,7 @@ CUL_EM_Parse($$)
     my $c= 0;                           # count changes
     my %readings;
 
-    Log GetLogLevel($n,5), "CUL_EM $n: $val";
+    Log3 $n, 5, "CUL_EM $n: $val";
     $readings{RAW} = $val;
 
     #
@@ -175,7 +175,7 @@ CUL_EM_Parse($$)
 
     ###################################
     # Start CUMULATE day and month
-    Log GetLogLevel($n,4), "CUL_EM $n: $val";
+    Log3 $n, 4, "CUL_EM $n: $val";
     my $tsecs_prev;
 
     #----- get previous tsecs
@@ -207,7 +207,7 @@ CUL_EM_Parse($$)
         $val = sprintf("CUM_DAY: %0.3f CUM: %0.3f COST: %0.2f",
                         $total-$cmv[3], $total, ($total-$cmv[3])*$cost);
         $readings{cum_day} = $val;
-        Log GetLogLevel($n,3), "CUL_EM $n: $val";
+        Log3 $n, 3, "CUL_EM $n: $val";
 
 
         if( (localtime($tsecs_prev))[4] != (localtime($tsecs))[4] ) {
@@ -224,7 +224,7 @@ CUL_EM_Parse($$)
             $val = sprintf("CUM_MONTH: %0.3f CUM: %0.3f COST: %0.2f",
                        $total-$cmv[3], $total,($total-$cmv[3])*$cost+$basicfee);
             $readings{cum_month} = $val;
-            Log GetLogLevel($n,3), "CUL_EM $n: $val";
+            Log3 $n, 3, "CUL_EM $n: $val";
 
           }
         }
@@ -242,7 +242,7 @@ CUL_EM_Parse($$)
 
   } else {
 
-    Log 1, "CUL_EM detected, Code $cde $val";
+    Log3 $hash, 1, "CUL_EM detected, Code $cde $val";
     return "UNDEFINED CUL_EM_$cde CUL_EM $cde";
 
   }
@@ -316,7 +316,6 @@ CUL_EM_Parse($$)
     <li><a href="#ignore">ignore</a></li><br>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
-    <li><a href="#loglevel">loglevel</a></li><br>
     <li><a href="#model">model</a> (EMEM,EMWZ,EMGZ)</li><br>
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#eventMap">eventMap</a></li><br>

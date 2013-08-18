@@ -183,7 +183,7 @@ ZWave_Initialize($)
   $hash->{ParseFn}   = "ZWave_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ".
     "ignore:1,0 dummy:1,0 showtime:1,0 classes ".
-    "loglevel:0,1,2,3,4,5,6 $readingFnAttributes " .
+    "$readingFnAttributes " .
     "model:".join(",", sort @zwave_models);
   map { $zwave_id2class{$zwave_class{$_}{id}} = $_ } keys %zwave_class;
 }
@@ -225,11 +225,11 @@ ZWave_Define($$)
       my $ctrlId = $1 if($homeReading && $homeReading =~ m/CtrlNodeId:(..)/);
 
       if($ctrlId) {
-        Log 1, "Adding the controller $ctrlId to association group 1";
+        Log3 $name, 1, "Adding the controller $ctrlId to association group 1";
         IOWrite($hash, "00", "130a04850101${ctrlId}05");
 
       } else {
-        Log 1, "Cannot associate $name, missing controller id";
+        Log3 $name, 1, "Cannot associate $name, missing controller id";
       }
     }
   }
@@ -276,7 +276,7 @@ ZWave_Cmd($$@)
 
   }
 
-  Log GetLogLevel($name,2), "ZWave $type $name $cmd";
+  Log3 $name, 2, "ZWave $type $name $cmd";
 
   ################################
   # ZW_SEND_DATA,nodeId,CMD,ACK|AUTO_ROUTE
@@ -438,11 +438,11 @@ ZWave_Parse($$@)
   my $homeId = $iodev->{homeId};
   my $ioName = $iodev->{NAME};
   if(!$homeId) {
-    Log 1, "ERROR: $ioName homeId is not set!" if(!$iodev->{errReported});
+    Log3 $ioName, 1, "ERROR: $ioName homeId is not set!"
+        if(!$iodev->{errReported});
     $iodev->{errReported} = 1;
     return;
   }
-  my $ll4 = AttrVal($ioName, "loglevel", 4);
 
   return "" if($msg !~ m/00(..)(..)(..)(..*)/); # Ignore unknown commands 
   my ($cmd, $callbackid, $id, $arg) = ($1, $2, $3, $4);
@@ -473,11 +473,11 @@ ZWave_Parse($$@)
   if($evt) {
     return "$cmd $evt" if($local);
     DoTrigger($ioName, "$cmd $evt");
-    Log $ll4, "$ioName $cmd $evt";
+    Log3 $ioName, 4, "$ioName $cmd $evt";
     return "";
 
   } else {
-    Log $ll4, "$ioName $cmd $id ($arg)";
+    Log3 $ioName, 4, "$ioName $cmd $id ($arg)";
 
   }
 
@@ -496,7 +496,7 @@ ZWave_Parse($$@)
   my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
   if(!$hash) {
     $id = hex($id);
-    Log 3, "Unknown ZWave device $homeId $id, please define it";
+    Log3 $ioName, 3, "Unknown ZWave device $homeId $id, please define it";
     return "";
   }
 
@@ -504,7 +504,7 @@ ZWave_Parse($$@)
   my $className = $zwave_id2class{$class} ? $zwave_id2class{$class} : "UNKNOWN";
   my $ptr = $zwave_class{$className}{parse} if($zwave_class{$className}{parse});
   if(!$ptr) {
-    Log $ll4, "$hash->{NAME}: Unknown message ($className $arg)";
+    Log3 $ioName, 4, "$hash->{NAME}: Unknown message ($className $arg)";
     return "";
   }
 
@@ -729,7 +729,6 @@ ZWave_Undef($$)
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><a href="#classes">classes</a>

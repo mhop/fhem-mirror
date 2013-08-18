@@ -37,7 +37,7 @@ weblink_Define($$)
   }
 
   if($wltype eq "fileplot" || $wltype eq "dbplot") {
-    Log 1, "Converting weblink $name ($wltype) to SVG";
+    Log3 $name, 1, "Converting weblink $name ($wltype) to SVG";
     my $newm = LoadModule("SVG");
     return "Cannot load module SVG" if($newm eq "UNDEFINED");
     $hash->{TYPE} = "SVG";

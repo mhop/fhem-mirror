@@ -60,7 +60,7 @@ average_Notify($$)
     # Filtering
     next if(!defined($s));
     my ($evName, $val) = split(" ", $s, 2); # resets $1
-# Log 1,"mytestavg pre-filter: ".$devName.$evName." s=".$s; 
+# Log3 $avgName, 1,"mytestavg pre-filter: ".$devName.$evName." s=".$s; 
     next if($devName !~ m/^$re$/ && "$devName:$s" !~ m/^$re$/ || $s =~ m/_avg_/);
     if(defined($1)) {
       my $reArg = $1;
@@ -73,7 +73,7 @@ average_Notify($$)
     next if(!defined($val) || $val !~ m/^(-?\d+\.?\d*)/);
     $val = $1;
 
-# Log 1,"mytestavg pst-filter: ".$devName.$evName." val=".$val; 
+# Log3 $avgName, 1,"mytestavg pst-filter: ".$devName.$evName." val=".$val; 
 
     ################
     # Avg computing

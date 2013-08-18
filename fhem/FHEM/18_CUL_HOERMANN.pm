@@ -13,8 +13,7 @@ CUL_HOERMANN_Initialize($)
   $hash->{Match}     = "^R..........";
   $hash->{DefFn}     = "CUL_HOERMANN_Define";
   $hash->{ParseFn}   = "CUL_HOERMANN_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
-                        "showtime:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:1,0";
 
 }
 
@@ -50,11 +49,11 @@ CUL_HOERMANN_Parse($$)
     $def->{CHANGED}[0] = "toggle";
     $def->{READINGS}{state}{TIME} = TimeNow();
     $def->{READINGS}{state}{VAL} = "toggle";
-    Log GetLogLevel($name,4), "CUL_HOERMANN $name toggle";
+    Log3 $name, 4, "CUL_HOERMANN $name toggle";
     return $name;
 
   } else {
-    Log 3, "CUL_HOERMANN Unknown device $cde, please define it";
+    Log3 $hash, 3, "CUL_HOERMANN Unknown device $cde, please define it";
     return "UNDEFINED CUL_HOERMANN_$cde CUL_HOERMANN $cde";
   }
 }
@@ -92,7 +91,6 @@ CUL_HOERMANN_Parse($$)
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
   </ul>
   <br>
 </ul>

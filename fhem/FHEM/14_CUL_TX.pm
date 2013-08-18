@@ -17,8 +17,7 @@ CUL_TX_Initialize($)
   $hash->{DefFn}     = "CUL_TX_Define";
   $hash->{UndefFn}   = "CUL_TX_Undef";
   $hash->{ParseFn}   = "CUL_TX_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
-                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 " .
+  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 " .
                         $readingFnAttributes;
 }
 
@@ -40,7 +39,6 @@ CUL_TX_Define($$)
 
   $modules{CUL_TX}{defptr}{$a[2]} = $hash;
   $hash->{STATE} = "Defined";
-  Log 4, "CUL_TX defined  $a[0] $a[2]";
 
   return undef;
 }
@@ -68,21 +66,20 @@ CUL_TX_Parse($$)
   my $id3 = (hex($a[3])<<3) + (hex($a[4])>>1);
 
   if($a[5] ne $a[8] || $a[6] ne $a[9]) {
-    Log 4, "CUL_TX $id3 ($msg) data error";
+    Log3 $hash, 4, "CUL_TX $id3 ($msg) data error";
     return "";
   }
 
   my $def = $modules{CUL_TX}{defptr}{$id3};
   if(!$def) {
-    Log 2, "CUL_TX Unknown device $id3, please define it";
+    Log3 $hash, 2, "CUL_TX Unknown device $id3, please define it";
     return "UNDEFINED CUL_TX_$id3 CUL_TX $id3" if(!$def);
   }
   my $now = time();
 
   my $name = $def->{NAME};
 
-  my $ll4 = GetLogLevel($name,4);
-  Log $ll4, "CUL_TX $name $id3 ($msg)";
+  Log3 $name, 4, "CUL_TX $name $id3 ($msg)";
 
   my ($msgtype, $val);
   my $valraw = ($a[5].$a[6].".".$a[7]);
@@ -94,7 +91,7 @@ CUL_TX_Parse($$)
     $def->{lastT} = $now;
     $msgtype = "temperature";
     $val = sprintf("%2.1f", ($valraw - 50 + $def->{corr}) );
-    Log $ll4, "CUL_TX $msgtype $name $id3 T: $val F: $id2";
+    Log3 $name, 4, "CUL_TX $msgtype $name $id3 T: $val F: $id2";
 
   } elsif ($type eq "E") {
     if($now - $def->{lastH} < $def->{minsecs} ) {
@@ -103,11 +100,10 @@ CUL_TX_Parse($$)
     $def->{lastH} = $now;
     $msgtype = "humidity";
     $val = $valraw;
-    Log $ll4, "CUL_TX $msgtype $name $id3 H: $val F: $id2";
+    Log3 $name, 4, "CUL_TX $msgtype $name $id3 H: $val F: $id2";
 
   } else {
-    my $ll2 = GetLogLevel($name,4);
-    Log $ll2, "CUL_TX $type $name $id3 ($msg) unknown type";
+    Log3 $name, 2, "CUL_TX $type $name $id3 ($msg) unknown type";
     return "";
 
   }
@@ -180,7 +176,6 @@ CUL_TX_Parse($$)
     <li><a href="#ignore">ignore</a></li><br>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
-    <li><a href="#loglevel">loglevel</a></li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>

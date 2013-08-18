@@ -14,7 +14,6 @@ sub
 LIRC_Initialize($)
 {
   my ($hash) = @_;
-  Log 1, "LIRC_Initialize";
 
 # Provider
   $hash->{ReadFn}  = "LIRC_Read";
@@ -24,7 +23,7 @@ LIRC_Initialize($)
 # Consumer
   $hash->{DefFn}   = "LIRC_Define";
   $hash->{UndefFn} = "LIRC_Undef";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= "";
 }
 
 #####################################
@@ -43,7 +42,7 @@ LIRC_Define($$)
   my $name = $a[0];
   my $config = $a[2];
 
-  Log 3, "LIRC opening $name device $config";
+  Log3 $name, 3, "LIRC opening $name device $config";
   my $lirc = Lirc::Client->new({
         prog    => 'fhem',
         rcfile  => "$config", 
@@ -51,7 +50,7 @@ LIRC_Define($$)
         fake    => 0,
     });
   return "Can't open $config: $!\n" if(!$lirc);
-  Log 3, "LIRC opened $name device $config";
+  Log3 $name, 3, "LIRC opened $name device $config";
 
   my $select = IO::Select->new();
   $select->add( $lirc->sock );
@@ -95,7 +94,7 @@ LIRC_Read($)
     my @codes = $lirc->next_codes;    # should not block
     my $name = $hash->{NAME};
     for my $code (@codes){
-      Log GetLogLevel($name,3), "LIRC $name $code";
+      Log3 $name, 3, "LIRC $name $code";
       DoTrigger($name, $code);
     }
   }
@@ -160,7 +159,6 @@ LIRC_Ready($)
   <a name="LIRCattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li>
   </ul><br>
 </ul>
 

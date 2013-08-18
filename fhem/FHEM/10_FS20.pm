@@ -129,7 +129,7 @@ FS20_Initialize($)
   $hash->{ParseFn}   = "FS20_Parse";
   $hash->{AttrList}  = "IODev follow-on-for-timer:1,0 follow-on-timer ".
                        "do_not_notify:1,0 ignore:1,0 dummy:1,0 showtime:1,0 ".
-                       "loglevel:0,1,2,3,4,5,6 $readingFnAttributes " .
+                       "$readingFnAttributes " .
                        "model:".join(",", sort keys %models);
 }
 
@@ -425,7 +425,7 @@ FS20_Parse($$)
 
     my $dev_four = hex2four($dev);
     my $btn_four = hex2four($btn);
-    Log 3, "FS20 Unknown device $dev ($dev_four), " .
+    Log3 $hash, 3, "FS20 Unknown device $dev ($dev_four), " .
                 "Button $btn ($btn_four) Code $cde ($v), please define it";
     return "UNDEFINED FS20_$dev$btn FS20 $dev $btn";
   }
@@ -673,7 +673,6 @@ four2hex($$)
         </li><br>
 
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 

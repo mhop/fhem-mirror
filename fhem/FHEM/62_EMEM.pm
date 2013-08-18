@@ -19,7 +19,7 @@ EMEM_Initialize($)
   $hash->{GetFn}     = "EMEM_Get";
   $hash->{DefFn}     = "EMEM_Define";
 
-  $hash->{AttrList}  = "IODev dummy:1,0 model:EM1000EM loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev dummy:1,0 model:EM1000EM";
 }
 
 ###################################
@@ -40,13 +40,13 @@ EMEM_GetStatus($)
   my $d = IOWrite($hash, sprintf("7a%02x", $dnr-1));
   if(!defined($d)) {
     my $msg = "EMEM $name read error (GetStatus 1)";
-    Log GetLogLevel($name,2), $msg;
+    Log3 $name, 2, $msg;
     return $msg;
   }
 
   if($d eq ((pack('H*',"00") x 45) . pack('H*',"FF") x 6)) {
     my $msg = "EMEM no device no. $dnr present";
-    Log GetLogLevel($name,2), $msg;
+    Log3 $name, 2, $msg;
     return $msg;
   }
 
@@ -58,7 +58,7 @@ EMEM_GetStatus($)
 
   if($cur_power > 30) { # 20Amp x 3 Phase
     my $msg = "EMEM Bogus reading: curr. power is reported to be $cur_power, setting to -1";
-    Log GetLogLevel($name,2), $msg;
+    Log3 $name, 2, $msg;
     #return $msg;
     $cur_power = -1.0;
   }
@@ -93,7 +93,7 @@ EMEM_GetStatus($)
   }
 
   $hash->{STATE} = "$cur_power kW";
-  Log GetLogLevel($name,4), "EMEM $name: $cur_power kW / $vals{energy_kWh} kWh";
+  Log3 $name, 4, "EMEM $name: $cur_power kW / $vals{energy_kWh} kWh";
 
   return $hash->{STATE};
 }
@@ -183,7 +183,6 @@ EMEM_Define($$)
   <ul>
     <li><a href="#model">model</a> (EM1000EM)</li>
     <li><a href="#attrdummy">dummy</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#IODev">IODev</a></li><br>
   </ul>
   <br>

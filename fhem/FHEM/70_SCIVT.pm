@@ -21,7 +21,7 @@ SCIVT_Initialize($)
   $hash->{DefFn}   = "SCIVT_Define";
   $hash->{GetFn}   = "SCIVT_Get";
   $hash->{SetFn}   = "SCIVT_Set";
-  $hash->{AttrList}= "model:SCD10,SCD20,SCD30 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= "model:SCD10,SCD20,SCD30";
 }
 
 #####################################
@@ -37,14 +37,14 @@ SCIVT_Define($$)
 
   my $dev = $a[2];
 
-  Log 1, "SCIVT device is none, commands will be echoed only"
+  Log3 $hash, 1, "SCIVT device is none, commands will be echoed only"
     if($dev eq "none");
 
   if($dev ne "none") {
-    Log 3, "SCIVT opening device $dev";
+    Log3 $hash, 3, "SCIVT opening device $dev";
     my $po = new Device::SerialPort ($dev);
     return "SCIVT Can't open $dev: $!" if(!$po);
-    Log 2, "SCIVT opened device $dev";
+    Log3 $hash, 2, "SCIVT opened device $dev";
     $po->close();
   }
 
@@ -75,7 +75,7 @@ SCIVT_Set($@)
 my ($hash, @a) = @_;
  return "\"set SCIVT\" needs at least two parameter" if(@a < 3);
 my $name = $hash->{NAME};
-Log GetLogLevel($name,4), "SCIVT Set request $a[1] $a[2], old: Timer:$hash->{Timer} Cmd: $hash->{Cmd}"; 
+Log3 $name, 4, "SCIVT Set request $a[1] $a[2], old: Timer:$hash->{Timer} Cmd: $hash->{Cmd}"; 
 
 return "Unknown argument $a[1], choose one of " . join(" ", sort keys %sets)
   	if(!defined($sets{$a[1]}));
@@ -113,7 +113,7 @@ if($type eq "cmd")
 
 DoTrigger($name, undef) if($init_done);
 
-Log GetLogLevel($name,3), "SCIVT Set result Timer:$hash->{Timer} sec Cmd:$hash->{Cmd}";  
+Log3 $name, 3, "SCIVT Set result Timer:$hash->{Timer} sec Cmd:$hash->{Cmd}";  
 return "SCIVT => Timer:$hash->{Timer} Cmd:$hash->{Cmd}";
 }
 
@@ -131,7 +131,7 @@ if($a[1] eq "data")
    $v = SCIVT_GetLine($hash->{DeviceName}, $hash->{Cmd});
    if(!defined($v)) 
       {
-      Log GetLogLevel($name,2), "SCIVT Get $a[1] error";
+      Log3 $name, 2, "SCIVT Get $a[1] error";
       return "$a[0] $a[1] => Error";
       }
    $v =~ s/[\r\n]//g;                          # Delete the NewLine
@@ -150,7 +150,7 @@ else
       }
    }
 
-Log GetLogLevel($name,3), "SCIVT Get $a[1] $v";
+Log3 $name, 3, "SCIVT Get $a[1] $v";
 return "$a[0] $a[1] => $v";
 }
 
@@ -170,26 +170,26 @@ my $result = SCIVT_GetLine($hash->{DeviceName}, $hash->{Cmd});
 
 if(!defined($result)) 
    {
-   Log GetLogLevel($name,4), "SCIVT read error, retry $hash->{DeviceName}, $hash->{Cmd}";
+   Log3 $name, 4, "SCIVT read error, retry $hash->{DeviceName}, $hash->{Cmd}";
    $result = SCIVT_GetLine($hash->{DeviceName}, $hash->{Cmd});
    }
 
 if(!defined($result)) 
    {
-   Log GetLogLevel($name,2), "SCIVT read error, abort $hash->{DeviceName}, $hash->{Cmd}";
+   Log3 $name, 2, "SCIVT read error, abort $hash->{DeviceName}, $hash->{Cmd}";
    $hash->{STATE} = "timeout";
    return $hash->{STATE};
    }
 if (length($result) < 10)
    {
-   Log GetLogLevel($name,2), "SCIVT incomplete line ($result)";
+   Log3 $name, 2, "SCIVT incomplete line ($result)";
    $hash->{STATE} = "incomplete";
    }
 else
    {
    $result =~ s/^.*R://;
    $result =~ s/[\r\n ]//g;   
-   Log GetLogLevel($name,3), "SCIVT $result (raw)";
+   Log3 $name, 3, "SCIVT $result (raw)";
    $result=~ s/,/./g;
    my @data = split(";", $result);
 
@@ -223,7 +223,7 @@ my ($dev,$cmd) = @_;
 
   my $serport = new Device::SerialPort ($dev);
   if(!$serport) {
-    Log 1, "SCIVT: Can't open $dev: $!";
+    Log3 undef, 1, "SCIVT: Can't open $dev: $!";
     return undef;
   }
   $serport->reset_error();
@@ -267,7 +267,7 @@ my ($dev,$cmd) = @_;
 
 DONE:
   $serport->close();
-  Log 3, "SCIVT $rm";
+  Log3 undef, 3, "SCIVT $rm";
   return undef;
 }
 
@@ -318,7 +318,6 @@ DONE:
   <a name="SVICTattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (SCD)</li>
   </ul>
   <br>

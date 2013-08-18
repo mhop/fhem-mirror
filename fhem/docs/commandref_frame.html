@@ -321,6 +321,21 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   Attributes used by all devices:
   <ul>
+    <a name="verbose"></a>
+    <li>verbose<br>
+        Set the verbosity level. Possible values:
+        <ul>
+          <li>0 - server start/stop
+          <li>1 - error messages or unknown packets
+          <li>2 - major events/alarms.
+          <li>3 - commands sent out will be logged.
+          <li>4 - you'll see whats received by the different devices.
+          <li>5 - debugging.</li>
+        </ul>
+        The value for the <a href="#global">global</a> device is a default for
+        other devices without own verbose attribute set.
+    </li>
+
     <a name="comment"></a>
     <li>comment<br>
         Add an arbitrary comment.
@@ -1242,20 +1257,6 @@ A line ending with \ will be concatenated with the next one, so long lines
         A space separated list which contains the names of additional
         attributes. Without specifying them you will not be able to set them
         (in order to prevent typos).
-    </li><br>
-
-    <a name="verbose"></a>
-    <li>verbose<br>
-        Set the verbosity level. Possible values:
-        <ul>
-          <li>0 - server start/stop
-          <li>1 - error messages or unknown packets
-          <li>2 - major events/alarms.
-          <li>3 - commands sent out will be logged.
-          <li>4 - you'll see whats received by the different devices.
-          <li>5 - debugging.</li>
-        </ul>
-        Recommended level is 3 for normal use.
     </li><br>
 
     <a name="dupTimeout"></a>

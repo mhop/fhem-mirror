@@ -66,7 +66,8 @@ CustomGetFileFromURL($$@)
 
   my $displayurl= $quiet ? "<hidden>" : $url;
   if($url !~ /^(http|https):\/\/(([^:\/]+):([^:\/]+)@)?([^:\/]+)(:\d+)?(\/.*)$/) {
-    Log $loglevel, "CustomGetFileFromURL $displayurl: malformed or unsupported URL";
+    Log3 undef, $loglevel, 
+        "CustomGetFileFromURL $displayurl: malformed or unsupported URL";
     return undef;
   }
   
@@ -88,7 +89,7 @@ CustomGetFileFromURL($$@)
   if($protocol eq "https") {
     eval "use IO::Socket::SSL";
     if($@) {
-      Log $loglevel, $@;
+      Log3 undef, $loglevel, $@;
     } else {
       $conn = IO::Socket::SSL->new(PeerAddr=>"$host:$port", Timeout=>$timeout);
     }
@@ -96,7 +97,8 @@ CustomGetFileFromURL($$@)
     $conn = IO::Socket::INET->new(PeerAddr=>"$host:$port", Timeout=>$timeout);
   }
   if(!$conn) {
-    Log $loglevel, "CustomGetFileFromURL $displayurl: Can't connect to $protocol://$host:$port\n";
+    Log3 undef, $loglevel,
+        "CustomGetFileFromURL $displayurl: Can't connect to $protocol://$host:$port\n";
     undef $conn;
     return undef;
   }
@@ -122,7 +124,7 @@ CustomGetFileFromURL($$@)
     vec($rin, $conn->fileno(), 1) = 1;
     my $nfound = select($rout=$rin, undef, undef, $timeout);
     if($nfound <= 0) {
-      Log $loglevel, "CustomGetFileFromURL $displayurl: Select timeout/error: $!";
+      Log3 undef, $loglevel, "CustomGetFileFromURL $displayurl: Select timeout/error: $!";
       undef $conn;
       return undef;
     }
@@ -135,20 +137,21 @@ CustomGetFileFromURL($$@)
   $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
   my @header= split("\r\n", $1);
   my $hostpath= $quiet ? "<hidden>" : $host . $path;
-  Log 4, "CustomGetFileFromURL $displayurl: Got data, length: ".length($ret);
+  Log3 undef, 4,
+        "CustomGetFileFromURL $displayurl: Got data, length: ".length($ret);
   if(!length($ret)) {
-    Log 4, "CustomGetFileFromURL $displayurl: Zero length data, header follows...";
+    Log3 undef, 4, "CustomGetFileFromURL $displayurl: Zero length data, header follows...";
     for (@header) {
-        Log 4, "CustomGetFileFromURL $displayurl: $_";
+      Log3 undef, 4, "CustomGetFileFromURL $displayurl: $_";
     }
   }
   undef $conn;
   return $ret;
 }
 
+
 ##################
 # Compatibility mode
-
 sub
 GetFileFromURL($@)
 {

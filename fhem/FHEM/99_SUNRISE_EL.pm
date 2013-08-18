@@ -78,7 +78,7 @@ sr_alt($$$$$$$)
    # default
    $long = AttrVal("global", "longitude", "8.686");
    $lat  = AttrVal("global", "latitude", "50.112");
-   Log 5, "Compute sunrise/sunset for latitude $lat , longitude $long";
+   Log3 undef, 5, "Compute sunrise/sunset for latitude $lat , longitude $long";
  
 
   my $nt = time;

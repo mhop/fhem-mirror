@@ -41,7 +41,7 @@ FBDECT_Initialize($)
   $hash->{ParseFn}   = "FBDECT_Parse";
   $hash->{AttrList}  = 
     "IODev do_not_notify:1,0 ignore:1,0 dummy:1,0 showtime:1,0 ".
-    "loglevel:0,1,2,3,4,5,6 $readingFnAttributes " .
+    "$readingFnAttributes " .
     "model:".join(",", sort @fbdect_models);
 }
 
@@ -144,7 +144,7 @@ FBDECT_Parse($$@)
 
   my $mt = substr($msg, 0, 2);
   if($mt ne "07" && $mt ne "04") {
-    Log 1, "FBDECT: unknown message type $mt";
+    Log3 $ioName, 1, "FBDECT: unknown message type $mt";
     return "";  # Nobody else is able to handle this
   }
 
@@ -152,7 +152,7 @@ FBDECT_Parse($$@)
   my $hash = $modules{FBDECT}{defptr}{$id};
   if(!$hash) {
     my $ret = "UNDEFINED FBDECT_$id FBDECT $id switch";
-    Log 3, "$ret, please define it";
+    Log3 $ioName, 3, "$ret, please define it";
     DoTrigger("global", $ret);
     return "";
   }
@@ -276,7 +276,6 @@ FBDECT_Undef($$)
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
@@ -357,7 +356,6 @@ FBDECT_Undef($$)
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>

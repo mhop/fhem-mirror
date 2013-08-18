@@ -155,8 +155,7 @@ ZWDongle_Initialize($)
   $hash->{DefFn}   = "ZWDongle_Define";
   $hash->{SetFn}   = "ZWDongle_Set";
   $hash->{GetFn}   = "ZWDongle_Get";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
-                     "model:ZWDongle loglevel:0,1,2,3,4,5,6 ";
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 model:ZWDongle";
 }
 
 #####################################
@@ -185,7 +184,8 @@ ZWDongle_Define($$)
 
   if($dev =~ m/none:(.*)/) {
     $hash->{homeId} = $1;
-    Log 1, "$name device is none (homeId:$1), commands will be echoed only";
+    Log3 $name, 1, 
+        "$name device is none (homeId:$1), commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
 
@@ -404,7 +404,6 @@ ZWDongle_Read($@)
   return "" if(!defined($buf));
 
   my $name = $hash->{NAME};
-  my $ll5 = GetLogLevel($name,5);
 
   $buf = unpack('H*', $buf);
   # The dongle looses data over USB for some commands(?), and dropping the old
@@ -415,7 +414,7 @@ ZWDongle_Read($@)
   $hash->{READ_TS} = $ts;      # Flush old data.
 
 
-  Log 5, "ZWDongle/RAW: $data/$buf";
+  Log3 $name, 5, "ZWDongle/RAW: $data/$buf";
   $data .= $buf;
   my $msg;
 
@@ -427,12 +426,12 @@ ZWDongle_Read($@)
       next;
     }
     if($fb eq "15") {   # NACK
-      Log 1, "$name: NACK received";
+      Log3 $name, 1, "$name: NACK received";
       $data = substr($data, 2);
       next;
     }
     if($fb ne "01") {   # SOF
-      Log 1, "$name: SOF missing (got $fb instead of 01)";
+      Log3 $name, 1, "$name: SOF missing (got $fb instead of 01)";
       last;
     }
 
@@ -446,11 +445,11 @@ ZWDongle_Read($@)
 
     my $ccs = ZWDongle_CheckSum("$len$msg");    # Computed Checksum
     if($rcs ne $ccs) {
-      Log 1, "$name: wrong checksum: received $rcs, computed $ccs";
+      Log3 $name, 1, "$name: wrong checksum: received $rcs, computed $ccs";
       next;
     }
     DevIo_SimpleWrite($hash, "06", 1);          # Send ACK
-    Log $ll5, "ZWDongle_Read $name: $msg";
+    Log3 $name, 5, "ZWDongle_Read $name: $msg";
     last if(defined($local) && (!defined($regexp) || ($msg =~ m/$regexp/)));
     ZWDongle_Parse($hash, $name, $msg);
     $msg = undef;
@@ -621,7 +620,6 @@ ZWDongle_Ready($)
   <ul>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a></li>
   </ul>
   <br>

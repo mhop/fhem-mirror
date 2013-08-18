@@ -111,7 +111,7 @@ FHEMWEB_Initialize($)
   $hash->{NotifyFn}= "FW_SecurityCheck";
   $hash->{ActivateInformFn} = "FW_ActivateInform";
   $hash->{AttrList}= 
-    "loglevel:0,1,2,3,4,5,6 webname fwcompress:0,1 ".
+    "webname fwcompress:0,1 ".
     "plotmode:gnuplot,gnuplot-scroll,SVG plotsize endPlotToday:1,0 plotfork ".
     "stylesheetPrefix touchpad:deprecated smallscreen:deprecated ".
     "basicAuth basicAuthMsg hiddenroom hiddengroup HTTPS allowfrom CORS:0,1 ".
@@ -175,7 +175,7 @@ FW_Define($$)
 
   # Make sure that fhem only runs once
   if($ret && !$init_done) {
-    Log 1, "$ret. Exiting.";
+    Log3 $hash, 1, "$ret. Exiting.";
     exit(1);
   }
 
@@ -351,7 +351,6 @@ FW_serveSpecial($$$$)
 
   $file = "$FW_sp$file" if($ext eq "css" && -f "$dir/$FW_sp$file.$ext");
   $FW_RETTYPE = ext2MIMEType($ext);
-  #Log 1, "Serving $dir/$file.$ext as $FW_RETTYPE, cacheable:$cacheable";
   return FW_returnFileAsStream("$dir/$file.$ext", "",
                                         $FW_RETTYPE, 0, $cacheable);
 }
@@ -645,7 +644,7 @@ FW_digestCgi($)
   $cmd.=" $arg{$c}" if(defined($arg{$c}) &&
                        ($arg{$c} ne "state" || $cmd !~ m/^set/));
   $cmd.=" $val{$c}" if(defined($val{$c}));
-#Log 1, "GOT:$arg -> CMD:$cmd";
+#Log3 $FW_wname, 1, "GOT:$arg -> CMD:$cmd";
   return ($cmd, $c);
 }
 
@@ -2278,13 +2277,13 @@ FW_ActivateInform()
   <b>Get</b>
   <ul>
     <li>icon &lt;logical icon&gt;<br>
-
         returns the absolute path to the logical icon. Example:
         <ul>
           <code>get myFHEMWEB icon FS20.on<br>
           /data/Homeautomation/fhem/FHEM/FS20.on.png
           </code>
         </ul>
+        </li>
     <li>pathlist<br>
         return FHEMWEB specific directories, where files for given types are
         located
@@ -2429,8 +2428,6 @@ FW_ActivateInform()
     </li>
 
     <li><a href="#allowfrom">allowfrom</a></li>
-    </li><br>
-    <li><a href="#loglevel">loglevel</a></li>
     </li><br>
 
     <a name="stylesheetPrefix"></a>

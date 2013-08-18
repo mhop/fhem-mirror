@@ -29,8 +29,7 @@ FHEM2FHEM_Initialize($)
 # Normal devices
   $hash->{DefFn}   = "FHEM2FHEM_Define";
   $hash->{UndefFn} = "FHEM2FHEM_Undef";
-  $hash->{AttrList}= "dummy:1,0 " .
-                     "loglevel:0,1,2,3,4,5,6 ";
+  $hash->{AttrList}= "dummy:1,0";
 }
 
 #####################################
@@ -43,7 +42,7 @@ FHEM2FHEM_Define($$)
   if(@a < 4 || @a > 5 || !($a[3] =~ m/^(LOG|RAW):(.*)$/)) {
     my $msg = "wrong syntax: define <name> FHEM2FHEM host[:port][:SSL] ".
                         "[LOG:regexp|RAW:device] {portpasswort}";
-    Log 2, $msg;
+    Log3 $hash, 2, $msg;
     return $msg;
   }
 
@@ -131,14 +130,14 @@ FHEM2FHEM_Read($)
   }
 
   my $data = $hash->{PARTIAL};
-  Log 5, "FHEM2FHEM/RAW: $data/$buf";
+  Log3 $hash, 5, "FHEM2FHEM/RAW: $data/$buf";
   $data .= $buf;
 
   while($data =~ m/\n/) {
     my $rmsg;
     ($rmsg,$data) = split("\n", $data, 2);
     $rmsg =~ s/\r//;
-    Log GetLogLevel($name,4), "$name: $rmsg";
+    Log3 $name, 4, "$name: $rmsg";
 
     if($hash->{informType} eq "LOG") {
       my ($type, $name, $msg) = split(" ", $rmsg, 3);
@@ -209,7 +208,7 @@ FHEM2FHEM_OpenDev($$)
   my $name = $hash->{NAME};
 
   $hash->{PARTIAL} = "";
-  Log 3, "FHEM2FHEM opening $name at $dev"
+  Log3 $name, 3, "FHEM2FHEM opening $name at $dev"
         if(!$reopen);
 
   # This part is called every time the timeout (5sec) is expired _OR_
@@ -223,7 +222,7 @@ FHEM2FHEM_OpenDev($$)
   my $conn;
   if($hash->{SSL}) {
     eval "use IO::Socket::SSL";
-    Log 1, $@ if($@);
+    Log3 $name, 1, $@ if($@);
     $conn = IO::Socket::SSL->new(PeerAddr => "$dev") if(!$@);
   } else {
     $conn = IO::Socket::INET->new(PeerAddr => $dev);
@@ -233,7 +232,7 @@ FHEM2FHEM_OpenDev($$)
     delete($hash->{NEXT_OPEN})
 
   } else {
-    Log(3, "Can't connect to $dev: $!") if(!$reopen);
+    Log3($name, 3, "Can't connect to $dev: $!") if(!$reopen);
     $readyfnlist{"$name.$dev"} = $hash;
     $hash->{STATE} = "disconnected";
     $hash->{NEXT_OPEN} = time()+60;
@@ -246,9 +245,9 @@ FHEM2FHEM_OpenDev($$)
   $selectlist{"$name.$dev"} = $hash;
 
   if($reopen) {
-    Log 1, "FHEM2FHEM $dev reappeared ($name)";
+    Log3 $name, 1, "FHEM2FHEM $dev reappeared ($name)";
   } else {
-    Log 3, "FHEM2FHEM device opened ($name)";
+    Log3 $name, 3, "FHEM2FHEM device opened ($name)";
   }
 
   $hash->{STATE}= "connected";
@@ -268,7 +267,7 @@ FHEM2FHEM_Disconnected($)
   my $name = $hash->{NAME};
 
   return if(!defined($hash->{FD}));                 # Already deleted
-  Log 1, "$dev disconnected, waiting to reappear";
+  Log3 $name, 1, "$dev disconnected, waiting to reappear";
   FHEM2FHEM_CloseDev($hash);
   $readyfnlist{"$name.$dev"} = $hash;               # Start polling
   $hash->{STATE} = "disconnected";
@@ -376,7 +375,6 @@ FHEM2FHEM_SimpleRead($)
   <b>Attributes</b>
   <ul>
     <li><a href="#dummy">dummy</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
   </ul>
 
 </ul>

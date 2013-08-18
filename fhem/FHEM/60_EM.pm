@@ -34,7 +34,7 @@ EM_Initialize($)
   $hash->{UndefFn} = "EM_Undef";
   $hash->{GetFn}   = "EM_Get";
   $hash->{SetFn}   = "EM_Set";
-  $hash->{AttrList}= "model:em1010pc dummy:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= "model:em1010pc dummy:1,0 ";
 }
 
 #####################################
@@ -50,12 +50,12 @@ EM_Define($$)
   my $dev = $a[2];
 
   if($dev eq "none") {
-    Log 1, "EM device is none, commands will be echoed only";
+    Log3 $name, 1, "EM device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
   }
 
-  Log 3, "EM opening device $dev";
+  Log3 $name, 3, "EM opening device $dev";
   if ( $^O =~ /Win/) {
    eval ("use Win32::SerialPort;");
     $po = new Win32::SerialPort ($dev);
@@ -65,7 +65,7 @@ EM_Define($$)
   }
   
   return "Can't open $dev: $!" if(!$po);
-  Log 3, "EM opened device $dev";
+  Log3 $name, 3, "EM opened device $dev";
   $po->close();
 
   $hash->{DeviceName} = $dev;
@@ -85,7 +85,7 @@ EM_Undef($$)
        $defs{$d}{IODev} == $hash)
       {
         my $lev = ($reread_active ? 4 : 2);
-        Log GetLogLevel($name, $lev), "deleting port for $d";
+        Log3 $name, $lev, "deleting port for $d";
         delete $defs{$d}{IODev};
       }
   }
@@ -290,7 +290,7 @@ EmGetData($$)
     }
     
   if(!$serport) {
-    Log 1, "EM: Can't open $dev: $!";
+    Log3 undef, 1, "EM: Can't open $dev: $!";
     return undef;
   }
   $serport->reset_error();
@@ -305,7 +305,7 @@ EmGetData($$)
           goto DONE;
         }
   }
-  Log 4, "EM: Sending " . unpack('H*', $d);
+  Log3 undef, 4, "EM: Sending " . unpack('H*', $d);
 
   $rm = "EM: timeout reading the answer";
   for(my $rep = 0; $rep < 3; $rep++) {
@@ -330,7 +330,7 @@ EmGetData($$)
           ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags)=$serport->status;
           last if $InBytes>0;
         }
-        Log 5,"EM: read returned $InBytes Bytes($i trys)";
+        Log3 undef, 5,"EM: read returned $InBytes Bytes($i trys)";
         last if ($InBytes<1);
         $buf = $serport->input();
         
@@ -372,14 +372,14 @@ EmGetData($$)
         if(!EmCrcCheck($retval,$l-7)) { $rm = "EM Bad CRC";         goto DONE; }
         $serport->close();
         my $data=substr($retval, 4, $l-7);
-        Log 5,"EM: returned ".unpack("H*",$data);
+        Log3 undef, 5,"EM: returned ".unpack("H*",$data);
         return $data;
       }
     }
   }
 
 DONE:
-  Log 5,$rm;
+  Log3 undef, 5,$rm;
   $serport->close();
   return undef;
 }
@@ -476,7 +476,6 @@ EmGetDevData($)
   <ul>
     <li><a href="#model">model</a> (em1010pc)</li>
     <li><a href="#attrdummy">dummy</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
   </ul>
   <br>
 </ul>

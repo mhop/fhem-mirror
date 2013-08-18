@@ -21,7 +21,7 @@ EMWZ_Initialize($)
   $hash->{SetFn}     = "EMWZ_Set";
   $hash->{DefFn}     = "EMWZ_Define";
 
-  $hash->{AttrList}  = "IODev dummy:1,0 model:EM1000WZ loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev dummy:1,0 model:EM1000WZ";
 }
 
 
@@ -43,14 +43,14 @@ EMWZ_GetStatus($)
   my $d = IOWrite($hash, sprintf("7a%02x", $dnr-1));
   if(!defined($d)) {
     my $msg = "EMWZ $name read error (GetStatus 1)";
-    Log GetLogLevel($name,2), $msg;
+    Log3 $name, 2, $msg;
     return $msg;
   }
 
 
   if($d eq ((pack('H*',"00") x 45) . pack('H*',"FF") x 6)) {
     my $msg = "EMWZ no device no. $dnr present";
-    Log GetLogLevel($name,2), $msg;
+    Log3 $name, 2, $msg;
     return $msg;
   }
 
@@ -58,7 +58,7 @@ EMWZ_GetStatus($)
   my $ec=w($d,49) / 10;
   if($ec <= 0) {
     my $msg = "EMWZ read error (GetStatus 2)";
-    Log GetLogLevel($name,2), $msg;
+    Log3 $name, 2, $msg;
     return $msg;
   }
   my $cur_energy = $pulses / $ec;       # ec = U/kWh
@@ -66,7 +66,7 @@ EMWZ_GetStatus($)
 
   if($cur_power > 30) { # 20Amp x 3 Phase
     my $msg = "EMWZ Bogus reading: curr. power is reported to be $cur_power";
-    Log GetLogLevel($name,2), $msg;
+    Log3 $name, 2, $msg;
     return $msg;
   }
 
@@ -99,7 +99,7 @@ EMWZ_GetStatus($)
   }
 
   $hash->{STATE} = "$cur_power kW";
-  Log GetLogLevel($name,4), "EMWZ $name: $cur_power kW / $vals{energy}";
+  Log3 $name, 4, "EMWZ $name: $cur_power kW / $vals{energy}";
 
   return $hash->{STATE};
 }
@@ -152,13 +152,13 @@ EMWZ_Set($@)
   my $ret = IOWrite($hash, $msg);
   if(!defined($ret)) {
     my $msg = "EMWZ $name read error (Set)";
-    Log GetLogLevel($name,2), $msg;
+    Log3 $name, 2, $msg;
     return $msg;
   }
 
   if(ord(substr($ret,0,1)) != 6) {
     $ret = "EMWZ Error occured: " .  unpack('H*', $ret);
-    Log GetLogLevel($name,2), $ret;
+    Log3 $name, 2, $ret;
     return $ret;
   }
 
@@ -245,7 +245,6 @@ EMWZ_Define($$)
   <ul>
     <li><a href="#model">model</a> (EM1000WZ)</li>
     <li><a href="#attrdummy">dummy</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#IODev">IODev</a></li><br>
   </ul>
   <br>

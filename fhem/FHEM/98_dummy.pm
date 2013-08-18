@@ -12,7 +12,7 @@ dummy_Initialize($)
 
   $hash->{SetFn}     = "dummy_Set";
   $hash->{DefFn}     = "dummy_Define";
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 setList ". $readingFnAttributes;
+  $hash->{AttrList}  = "setList ". $readingFnAttributes;
 }
 
 ###################################
@@ -27,7 +27,7 @@ dummy_Set($@)
   return "Unknown argument ?, choose one of $setList" if($a[0] eq "?");
 
   my $v = join(" ", @a);
-  Log GetLogLevel($name,4), "dummy set $name $v";
+  Log3 $name, 4, "dummy set $name $v";
 
   readingsSingleUpdate($hash,"state",$v,1);
   return undef;
@@ -84,7 +84,6 @@ dummy_Define($$)
   <a name="dummyattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a name="setList">setList</a><br>
         Space separated list of commands, which will be returned upon "set name ?",
         so the FHEMWEB frontend can construct a dropdown and offer on/off

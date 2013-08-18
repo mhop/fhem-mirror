@@ -17,7 +17,7 @@ PID_Initialize($)
   $hash->{DefFn}   = "PID_Define";
   $hash->{SetFn}   = "PID_Set";
   $hash->{NotifyFn} = "PID_Notify";
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 roundValveValue:0,1";
+  $hash->{AttrList} = "disable:0,1 roundValveValue:0,1";
 }
 
 
@@ -39,7 +39,7 @@ PID_Define($$$)
   my ($sensor, $reading, $regexp) = split(":", $a[2], 3);
   if(!$defs{$sensor}) {
     my $msg = "$pn: Unknown sensor device $sensor specified";
-    Log 2, $msg;
+    Log3 $pn, 2, $msg;
     return $msg;
   }
   $pid->{sensor} = $sensor;
@@ -50,7 +50,7 @@ PID_Define($$$)
       $regexp = '([\\d\\.]*)';
     } else {
       my $msg = "$pn: Unknown sensor type $t, specify regexp";
-      Log 2, $msg;
+      Log3 $pn, 2, $msg;
       return $msg;
     }
   }
@@ -64,7 +64,7 @@ PID_Define($$$)
   my ($p_p, $p_i, $p_d) = (0, 0, 0);
   if(!$defs{$actor}) {
     my $msg = "$pn: Unknown actor device $actor specified";
-    Log 2, $msg;
+    Log3 $pn, 2, $msg;
     return $msg;
   }
   $pid->{actor} = $actor;
@@ -79,7 +79,7 @@ PID_Define($$$)
       $p_d = 15.0/2.55;
     } else {
       my $msg = "$pn: Unknown actor type $t, specify command:min:max";
-      Log 2, $msg;
+      Log3 $pn, 2, $msg;
       return $msg;
     }
   }
@@ -122,7 +122,7 @@ PID_Set($@)
   } elsif ($arg eq "desired" ) {
     return "Set desired needs a numeric parameter"
         if(@a != 3 || $a[2] !~ m/^[\d\.]*$/);
-    Log GetLogLevel($pn,3), "PID set $pn $arg $a[2]";
+    Log3 $pn, 3, "PID set $pn $arg $a[2]";
     PID_sv($pid, 'desired', $a[2]);
     PID_setValue($pid);
 
@@ -199,7 +199,7 @@ PID_setValue($)
   $inStr = $defs{$sensor}{READINGS}{$reading}{VAL}
     if($defs{$sensor}{READINGS} && $defs{$sensor}{READINGS}{$reading});
   if(!$inStr) {
-    Log GetLogLevel($pn,4), "PID $pn: no $reading yet for $sensor";
+    Log3 $pn, 4, "PID $pn: no $reading yet for $sensor";
     return;
   }
   $inStr =~ m/$re/;
@@ -220,14 +220,14 @@ PID_setValue($)
   my $a =  PID_saturate($pid, $p + $i + $d);
   PID_sv($pid, 'actuation', $a);
 
-  Log GetLogLevel($pn,4), sprintf("PID $pn: p:%.2f i:%.2f d:%.2f", $p, $i, $d);
+  Log3 $pn, 4, sprintf("PID $pn: p:%.2f i:%.2f d:%.2f", $p, $i, $d);
 
   # Hack to round.
   my ($satMin, $satMax) = ($pid->{satMin}, $pid->{satMax});
   $a = int($a) if(AttrVal($pn, "roundValveValue", ($satMax-$satMin >= 100)));
 
   my $ret = fhem sprintf("set %s %s %g", $pid->{actor}, $pid->{command}, $a);
-  Log GetLogLevel($pn,1), "output of $pn command: $ret" if($ret);
+  Log3 $pn, 1, "output of $pn command: $ret" if($ret);
   $pid->{STATE} = "$in (delta $delta)";
 }
 
@@ -304,7 +304,6 @@ PID_setValue($)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <a name="roundValveValue"></a>
     <li>roundValveValue<br>
         round the valve value to an integer, of the attribute is set to 1.

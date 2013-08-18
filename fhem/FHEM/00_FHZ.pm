@@ -105,7 +105,7 @@ FHZ_Initialize($)
   $hash->{GetFn}   = "FHZ_Get";
   $hash->{SetFn}   = "FHZ_Set";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
-                   "showtime:1,0 model:fhz1000,fhz1300 loglevel:0,1,2,3,4,5,6 ".
+                   "showtime:1,0 model:fhz1000,fhz1300 ".
                    "fhtsoftbuffer:1,0 addvaltrigger";
 }
 
@@ -140,7 +140,7 @@ FHZ_Ready($)
     }
     return undef if(!$po);
 
-    Log 1, "USB device $dev reappeared";
+    Log3 $name, 1, "USB device $dev reappeared";
     $hash->{PortObj} = $po;
     if($^O !~ m/Win/) {
       $hash->{FD} = $po->FILENO;
@@ -178,7 +178,7 @@ FHZ_Set($@)
 
   my $v = join(" ", @a);
   my $name = $hash->{NAME};
-  Log GetLogLevel($name,2), "FHZ set $v";
+  Log3 $name, 2, "FHZ set $v";
 
   if($a[1] eq "initfull") {
 
@@ -244,13 +244,13 @@ FHZ_Get($@)
 
   my $v = join(" ", @a);
   my $name = $hash->{NAME};
-  Log GetLogLevel($name,2), "FHZ get $v";
+  Log3 $name, 2, "FHZ get $v";
 
   FHZ_ReadAnswer($hash, "Flush", 0);
   FHZ_Write($hash, $fn, $arg) if(!IsDummy($hash->{NAME}));
 
   my $msg = FHZ_ReadAnswer($hash, $a[1], 1.0);
-  Log 5, "GET Got: $msg" if(defined($msg));
+  Log3 $name, 5, "GET Got: $msg" if(defined($msg));
   return $msg if(!$msg || $msg !~ /^81..c9..0102/);
 
   if($a[1] eq "serial") {
@@ -348,14 +348,14 @@ FHZ_Define($$)
   $attr{$name}{fhtsoftbuffer} = 0;
 
   if($dev eq "none") {
-    Log 1, "FHZ device is none, commands will be echoed only";
+    Log3 $name, 1, "FHZ device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
   }
 
   $hash->{DeviceName} = $dev;
   $hash->{PARTIAL} = "";
-  Log 3, "FHZ opening FHZ device $dev";
+  Log3 $name, 3, "FHZ opening FHZ device $dev";
   if($^O =~ m/Win/) {
    require Win32::SerialPort;
    $po = new Win32::SerialPort ($dev);
@@ -365,12 +365,12 @@ FHZ_Define($$)
   }
   if(!$po) {
     my $msg = "Can't open $dev: $!";
-    Log(3, $msg) if($hash->{MOBILE});
+    Log3($name, 3, $msg) if($hash->{MOBILE});
     return $msg if(!$hash->{MOBILE});
     $readyfnlist{"$name.$dev"} = $hash;
     return "";
   }
-  Log 3, "FHZ opened FHZ device $dev";
+  Log3 $name, 3, "FHZ opened FHZ device $dev";
 
   $hash->{PortObj} = $po;
   if($^O !~ m/Win/) {
@@ -397,7 +397,7 @@ FHZ_Undef($$)
        $defs{$d}{IODev} == $hash)
       {
         my $lev = ($reread_active ? 4 : 2);
-        Log GetLogLevel($name,$lev), "deleting port for $d";
+        Log3 $name, $lev, "deleting port for $d";
         delete $defs{$d}{IODev};
       }
   }
@@ -426,7 +426,7 @@ FHZ_Parse($$)
   }
 
   if(!$type) {
-    Log 4, "FHZ $name unknown: $omsg";
+    Log3 $name, 4, "FHZ $name unknown: $omsg";
     $hash->{CHANGED}[0] = "$msg";
     return $hash->{NAME};
   }
@@ -436,7 +436,7 @@ FHZ_Parse($$)
     $msg = substr($msg, 4, 2);
   }
 
-  Log 4, "FHZ $name $type: $msg";
+  Log3 $name, 4, "FHZ $name $type: $msg";
   $hash->{CHANGED}[0] = "$type: $msg";
   return $hash->{NAME};
 }
@@ -503,13 +503,13 @@ FHZ_ReadAnswer($$$)
 
     }
 
-    Log 4, "FHZ/RAW: " . unpack('H*',$buf);
+    Log3 $hash, 4, "FHZ/RAW: " . unpack('H*',$buf);
     $mfhzdata .= $buf;
     next if(length($mfhzdata) < 2);
 
     my $len = ord(substr($mfhzdata,1,1)) + 2;
     if($len>20) {
-      Log 4, "Oversized message (" . unpack('H*',$mfhzdata) .
+      Log3 $hash, 4, "Oversized message (" . unpack('H*',$mfhzdata) .
       				"), dropping it ...";
       return undef;
     }
@@ -555,7 +555,7 @@ FHZ_XmitLimitCheck($$)
   if(@b > 163) {          # Maximum nr of transmissions per hour (unconfirmed).
 
     my $me = $hash->{NAME};
-    Log GetLogLevel($me,2), "FHZ TRANSMIT LIMIT EXCEEDED";
+    Log3 $me, 2, "FHZ TRANSMIT LIMIT EXCEEDED";
     DoTrigger($me, "TRANSMIT LIMIT EXCEEDED");
 
   } else {
@@ -574,7 +574,7 @@ FHZ_Write($$$)
   my ($hash,$fn,$msg) = @_;
 
   if(!$hash || !defined($hash->{PortObj})) {
-    Log 5, "FHZ device $hash->{NAME} is not active, cannot send";
+    Log3 $hash, 5, "FHZ device $hash->{NAME} is not active, cannot send";
     return;
   }
 
@@ -589,7 +589,7 @@ FHZ_Write($$$)
 
 
   my $bstring = FHZ_CompleteMsg($fn, $msg);
-  Log 5, "Sending " . unpack('H*', $bstring);
+  Log3 $hash, 5, "Sending " . unpack('H*', $bstring);
 
   if(!$hash->{QUEUE}) {
 
@@ -637,7 +637,7 @@ FHZ_Reopen($)
 
   my $dev = $hash->{DeviceName};
   $hash->{PortObj}->close();
-  Log 1, "USB device $dev closed";
+  Log3 $hash, 1, "USB device $dev closed";
   for(;;) {
       sleep(5);
       if($^O =~ m/Win/) {
@@ -646,7 +646,7 @@ FHZ_Reopen($)
         $hash->{PortObj} = new Device::SerialPort($dev);
       }
       if($hash->{PortObj}) {
-        Log 1, "USB device $dev reopened";
+        Log3 $hash, 1, "USB device $dev reopened";
         $hash->{FD} = $hash->{PortObj}->FILENO if($^O !~ m/Win/);
         FHZ_DoInit($hash->{NAME}, $hash->{ttytype}, $hash->{PortObj});
         return;
@@ -665,7 +665,7 @@ FHZ_Close($)
   my $name = $hash->{NAME};
 
   $hash->{PortObj}->close();
-  Log 1, "USB device $dev closed";
+  Log3 $name, 1, "USB device $dev closed";
   delete($hash->{PortObj});
   delete($hash->{FD});
   delete($selectlist{"$name.$dev"});
@@ -722,7 +722,7 @@ FHZ_Read($)
   if(!defined($buf) || length($buf) == 0) {
 
     my $dev = $hash->{DeviceName};
-    Log 1, "USB device $dev disconnected, waiting to reappear";
+    Log3 $name, 1, "USB device $dev disconnected, waiting to reappear";
     delete($hash->{FD});
     $hash->{PortObj}->close();
     delete($hash->{PortObj});
@@ -740,7 +740,7 @@ FHZ_Read($)
 
 
   my $fhzdata = $hash->{PARTIAL};
-  Log 4, "FHZ/RAW: " . unpack('H*',$buf) .
+  Log3 $name, 4, "FHZ/RAW: " . unpack('H*',$buf) .
       " (Unparsed: " . unpack('H*', $fhzdata) . ")";
   $fhzdata .= $buf;
 
@@ -751,18 +751,18 @@ FHZ_Read($)
     my $si = index($fhzdata, $msgstart);
     if($si) {
       if($si == -1) {
-	Log(5, "Bogus message received, no start character found");
+	Log3 $name, 5, "Bogus message received, no start character found";
 	$fhzdata = "";
 	last;
       } else {
-	Log(5, "Bogus message received, skipping to start character");
+	Log3 $name, 5, "Bogus message received, skipping to start character";
 	$fhzdata = substr($fhzdata, $si);
       }
     }
 
     my $len = ord(substr($fhzdata,1,1)) + 2;
     if($len>20) {
-      Log 4,
+      Log3 $name, 4,
 	 "Oversized message (" . unpack('H*',$fhzdata) . "), dropping it ...";
       $fhzdata = "";
       next;
@@ -788,7 +788,7 @@ FHZ_Read($)
 
     } else {
 
-      Log 4, "Bad CRC message, skipping it (Bogus message follows)";
+      Log3 $name, 4, "Bad CRC message, skipping it (Bogus message follows)";
       $fhzdata = substr($fhzdata, 2);
 
     }
@@ -865,7 +865,7 @@ FHZ_Read($)
       <li>In order to set the time of your FHT's, schedule this command every
       minute:<br>
       <code>define fhz_timer at +*00:01:00 set FHZ time</code><br>
-      See the <a href="#loglevel">loglevel</a> to prevent logging of
+      See the <a href="#verbose">verbose</a> to prevent logging of
           this command.
       </li>
       <li>FHTcode is a two digit hex number (from 00 to 63?) and sets the
@@ -953,6 +953,9 @@ FHZ_Read($)
 
     <a name="loglevel"></a>
     <li>loglevel<br>
+    <b>Note:</b>Deprecated! The module maintainer is encouraged to replace it
+    with verbose.<br><br>
+
     Set the device loglevel to e.g. 6 if you do not wish messages from a
     given device to appear in the global logfile (FHZ/FS20/FHT).  E.g. to
     set the FHT time, you should schedule "set FHZ time" every minute, but

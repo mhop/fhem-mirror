@@ -67,7 +67,7 @@ NetIO230B_Initialize($)
   $hash->{SetFn}     = "NetIO230B_Set";
   $hash->{GetFn}     = "NetIO230B_Get";
   $hash->{DefFn}     = "NetIO230B_Define";
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "";
 
 }
 
@@ -99,7 +99,7 @@ NetIO230B_Set($@)
 		$result = NetIO230B_Request($hash, "set", join("",@values));
 	}
 
-	Log 3, "NetIO230B set @a => $result";
+	Log3 $hash, 3, "NetIO230B set @a => $result";
 
 	return undef;
 }
@@ -110,7 +110,7 @@ NetIO230B_Get($@)
 {
 	my ($hash, @a) = @_;
 	my $result = NetIO230B_Request($hash, "get");
-	Log 3, "NetIO230B get @a => $result";
+	Log3 $hash, 3, "NetIO230B get @a => $result";
 
 	return $hash->{STATE};
 }
@@ -134,7 +134,7 @@ NetIO230B_Request($@)
 	my $response = GetFileFromURL("http://"."$hash->{HOST}/tgi/control.tgi?l=p:". $hash->{USER}.":".$hash->{PASS}."&p=".$parm, $timeout, undef, $noshutdown );
 	if(!$response or length($response)==0)
 	{
-		Log 3, "NetIO230B_Request failed: ".$log;
+		Log3 $hash, 3, "NetIO230B_Request failed: ".$log;
 		return("");
   	}
 
@@ -173,7 +173,7 @@ NetIO230B_Request($@)
 	# debug output
 	#my %k = %{$hash->{READINGS}};
 	#foreach my $r (sort keys %k) {
-	#	Log 1,  "$r  S: $k{$r}{VAL}  T: $k{$r}{TIME}";
+	#	Log3 $hash, 1,  "$r  S: $k{$r}{VAL}  T: $k{$r}{TIME}";
 	#}
 
     return $response;
@@ -188,7 +188,7 @@ NetIO230B_Define($$)
 	my @a = split("[ \t][ \t]*", $def);
 	my $paramCount = int(@a);
 
-	Log 3, "Wrong syntax: use 'define <name> NetIO230B <ip-address>:<portnumber> [<socket_number> <username> <password>]' or 'define <name> NetIO230B <ip-address>:<portnumber> [<socket_number> <configfilename>]'" if(int(@a) < 4);  #5 = mit user/pass #4 = mit config
+	Log3 $hash, 3, "Wrong syntax: use 'define <name> NetIO230B <ip-address>:<portnumber> [<socket_number> <username> <password>]' or 'define <name> NetIO230B <ip-address>:<portnumber> [<socket_number> <configfilename>]'" if(int(@a) < 4);  #5 = mit user/pass #4 = mit config
 
 	#provide some default settings
 	$hash->{CONFIGFILEPATH} = "/var/log/fhem/netio.conf"; #default file path is /var/log/fhem/netio.conf
@@ -233,7 +233,7 @@ NetIO230B_Define($$)
 			$hash->{PASS} = $config{password} if (defined($config{password}));
 		} else {
 
-			Log 3, "NetIO230B: Configuration could not be read. Trying default values...\n";
+			Log3 $hash, 3, "NetIO230B: Configuration could not be read. Trying default values...\n";
 		}
 
 	} else {
@@ -242,9 +242,9 @@ NetIO230B_Define($$)
 		$hash->{PASS} = $a[PARAM_PASS] if defined($a[PARAM_PASS]);
 	}
 	
-	Log 1,"NetIO230B: Invalid device-address! Please use an address in the format: <ip-address>:<portnumber>" unless ($hash->{HOST} =~ m/^(.+):([0-9]+)$/);
+	return "NetIO230B: Invalid device-address! Please use an address in the format: <ip-address>:<portnumber>" unless ($hash->{HOST} =~ m/^(.+):([0-9]+)$/);
 
-	Log 3, "NetIO230B: device opened at host: $hash->{HOST} => @a\n";
+	Log3 $hash, 3, "NetIO230B: device opened at host: $hash->{HOST} => @a\n";
 
 	return undef;
 }
@@ -270,7 +270,7 @@ NetIO230B_GetConfiguration($)
 
 	if(!open(CONFIGFILE, $configfilename))
 	{
-		Log 3, "NetIO230B: Cannot open settings file '$configfilename'.";
+		Log3 $hash, 3, "NetIO230B: Cannot open settings file '$configfilename'.";
 		return ();
 	 }
 	my @configfile=<CONFIGFILE>;

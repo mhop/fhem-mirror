@@ -70,7 +70,8 @@ SetExtensions($$@)
     my $hms_till = sprintf("%02d:%02d:%02d", $hr, $min, $sec);
     my $hms_now  = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
     if($hms_now ge $hms_till) {
-      Log 4, "$cmd: won't switch as now ($hms_now) is later than $hms_till";
+      Log $hash, 4,
+        "$cmd: won't switch as now ($hms_now) is later than $hms_till";
       return "";
     }
     DoSet($name, $cmd1);
