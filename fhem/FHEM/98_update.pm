@@ -28,6 +28,7 @@ use warnings;
 use HttpUtils;
 use File::Copy qw(cp mv);
 use Blocking;
+use FhemUtils::release;                                               
 
 sub CommandUpdate($$);
 sub update_CheckFhemRelease($$$);
@@ -47,10 +48,6 @@ sub update_WriteLocalControlFile($$$$$);
 sub
 update_Initialize($$)
 {
-  if(!eval "require FhemUtils::release") {
-    require release;
-  }
-
   foreach my $pack (split(" ",uc($UPDATE{packages}))) {
     $UPDATE{$pack}{control} = "controls_".lc($pack).".txt";
   }
@@ -60,6 +57,7 @@ update_Initialize($$)
     Hlp => "[development|stable] [<file>|check|fhem],update Fhem",
   );
   $cmds{update} = \%hash;
+
 }
 
 ########################################

@@ -435,8 +435,9 @@ if($motd eq "$sc_text\n\n") {
   }
 }
 
+my $osuser = "os $^O, user ".(getlogin || getpwuid($<) || "unknown");
 Log 0, "Server started with ".int(keys %defs).
-        " defined entities (version $attr{global}{version}, pid $$)";
+        " defined entities (version $attr{global}{version}, $osuser, pid $$)";
 
 ################################################
 # Main Loop
@@ -1879,22 +1880,7 @@ GlobalAttr($$)
 
     opendir(DH, $modpath) || return "Can't read $modpath: $!";
     push @INC, $modpath if(!grep(/$modpath/, @INC));
-    eval { 
-      use vars qw($DISTRIB_DESCRIPTION);
-      # start of fix
-      # "Use of uninitialized value" after a fresh 5.2 installation and first
-      # time "updatefhem" release.pm does not reside in FhemUtils (what it
-      # should), so we load it from $modpath
-      if(-e "$modpath/FhemUtils/release.pm") {
-        require "FhemUtils/release.pm";
-      } elsif(-e "$modpath/release.pm") {
-        require "release.pm";
-      } else {
-        $DISTRIB_DESCRIPTION = "unknown";
-      }
-      # end of fix
-      $attr{global}{version} = "$DISTRIB_DESCRIPTION, $cvsid";
-    };
+    $attr{global}{version} = $cvsid;
     my $counter = 0;
 
     foreach my $m (sort readdir(DH)) {
