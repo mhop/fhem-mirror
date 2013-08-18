@@ -533,10 +533,18 @@ PRESENCE_DoLocalPingScan($)
     }
     else
     {
-	$temp = qx(ping -c $count $device);
-	
-	Log3 $name, 5, "PRESENCE ($name) - ping command returned with output:\n$temp";
-	$return = "$name|$local|".($temp =~ /\d+ [Bb]ytes (from|von)/ ? "present" : "absent");
+		$temp = qx(ping -c $count $device);
+		
+		chomp $temp;
+		if($temp ne "")
+		{
+			Log3 $name, 5, "PRESENCE ($name) - ping command returned with output:\n$temp";
+			$return = "$name|$local|".($temp =~ /\d+ [Bb]ytes (from|von)/ ? "present" : "absent");
+		}
+		else
+		{	
+			$return = "$name|$local|error|Could not execute ping command: \"ping -c $count $device\"";
+		}
     }
 
     return $return;
