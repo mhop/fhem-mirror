@@ -1,15 +1,13 @@
-body     { background-color: #444444; font-family:Verdana; font-size:9px; background-image:url(../icons/darklogo); background-repeat:no-repeat; }
-body[id~=Media]     { background-color: #A5A5A5; font-family:Verdana; font-size:9px; background-image:url(../icons/Media.bak); background-repeat:no-repeat; }
+body     { background-color: #444444; font-family:Arial, Helvetica, sans-serif; font-size:13px; background-image:url(../icons/darklogo); background-repeat:no-repeat; }
+body[id~=Media]     { background-color: #A5A5A5; font-family:Arial, Helvetica, sans-serif; font-size:13px; background-image:url(../icons/Media.bak); background-repeat:no-repeat; }
 
 #backimg {position:absolute; top:15px; left:190px;}
 #logo    { position:absolute; top: 10px; left: 10px; width:180px;  height:600px; background-image:url(../icons/darklogo); visibility:hidden;}
 #fpmenu.fp_arrange   { position:absolute; bottom:20px; left:30px; min-width:310px; font-size:9px; border:1px solid #CCCCCC; background: #111111; -moz-border-radius:8px; border-radius:8px; border-spacing: 6px; padding: 6px;
 					 box-shadow:5px 5px 5px #000; }
 
-#menu    { position:absolute; top:180px; left:30px; width:140px; -moz-border-radius:8px; border-radius:8px; border-spacing: 6px; padding-bottom: 6px; padding-top: 6px;}
-#menu.floorplan   { position:absolute; top:180px; left:30px; width:128px; font-size:12px; border:1px solid #CCCCCC; background: #111111; box-shadow:5px 5px 5px #000; padding: 6px;}
-
-
+#menu    { position:absolute; top:180px; left:30px; width:128px; -moz-border-radius:8px; border-radius:8px; border-spacing: 6px; padding-bottom: 6px; padding-top: 6px;}
+#menu.floorplan  { position:absolute; top:180px; left:30px; width:128px; font-size:13px; border:1px solid #CCCCCC; background: #111111; box-shadow:5px 5px 5px #000; padding: 6px;}
 
 #hdr     { position:absolute; top:15px; left:190px; border:1px solid #CCCCCC; background: #111111; -moz-border-radius:8px; border-radius:8px; border-spacing: 6px; padding: 6px;
 	box-shadow:5px 5px 5px #000; margin-bottom: 10px;}
@@ -17,7 +15,8 @@ body[id~=Media]     { background-color: #A5A5A5; font-family:Verdana; font-size:
 #startcontent {position:absolute; top:20px; left:200px; text-align:left; font-size: 16px; color:gray; } 
 #connect_err { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:40px; z-index: 10; }
 
-a { color:#CCCCCC; }
+a { color:#CCCCCC; text-decoration:none;}
+td {padding-left: 3px; padding-right: 3px; padding-top: 3px; padding-bottom: 3px;}
 
 img { -moz-border-radius:8px; border-radius:8px;}
 
@@ -25,7 +24,6 @@ table { -moz-border-radius:8px; border-radius:8px; }
 table tr.sel { backround: #333333;}
 table a:hover {color: #ffffff;}
 
-	.fp_Peter       { border:1px solid gray; }
 	.devicename     { font-size: 14px; text-align:center; color: #111111; }
 	.devicestate    { text-align:center; color: #111111; }
 	.devicecommands { font-size:14px; text-align:center; color: #111111; }

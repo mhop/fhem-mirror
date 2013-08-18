@@ -11,13 +11,13 @@ a:hover { color: #ffffff; }
 .wide { width:100%; }
 
 table.block { border:1px solid #ffffff; width: 100%;
-              background: #333333; box-shadow:5px 5px 5px #000; }
+              background: #333333; box-shadow:5px 5px 5px #000;}
 table.block tr.odd { background: #111111; }
 table.block tr.sel { background: red; }
 table { border-radius:8px; border-spacing: 0px;
-       padding-bottom: 6px; padding-top: 6px;}
+       padding-bottom: 6px; padding-top: 6px; }
 
-table.room { background: #111111; width: 140px;}
+table.room { background: #111111; width: 140px; border:1px solid #CCCCCC; box-shadow:5px 5px 5px #000;}
 table.room a { color: #CCCCCC; text-decoration: none; }
 table.room a:hover { color: #ffffff; }        
 table.room tr.sel { background: red; }
