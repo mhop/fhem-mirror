@@ -67,8 +67,7 @@ sub GDS_Initialize($) {
 	$hash->{GetFn}		=	"GDS_Get";
 	$hash->{SetFn}		=	"GDS_Set";
 	$hash->{AttrFn}		=	"GDS_Attr";
-	$hash->{AttrList}	=	"loglevel:0,1,2,3,4,5 ".
-							"gdsFwName gdsFwType:0,1,2,3,4,5,6,7 ".
+	$hash->{AttrList}	=	"gdsFwName gdsFwType:0,1,2,3,4,5,6,7 ".
 							"gdsAll:0,1 gdsDebug:0,1 gdsLong:0,1 gdsPolygon:0,1 ".
 							$readingFnAttributes;
 
@@ -1241,7 +1240,6 @@ sub initDropdownLists($){
 	<a name="GDSattr"></a>
 	<b>Attributes</b><br/><br/>
 	<ul>
-		<li><a href="#loglevel">loglevel</a></li>
 		<li><a href="#do_not_notify">do_not_notify</a></li>
 		<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 		<br/>
