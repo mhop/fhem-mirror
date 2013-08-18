@@ -21,9 +21,33 @@ telnet_Initialize($)
   $hash->{AttrFn}  = "telnet_Attr";
   $hash->{NotifyFn}= "telnet_SecurityCheck";
   $hash->{AttrList} = "loglevel:0,1,2,3,4,5,6 globalpassword password ".
-                        "allowfrom SSL connectTimeout connectInterval";
+                        "allowfrom SSL connectTimeout connectInterval ".
+                        "encoding:utf8,latin1";
   $hash->{ActivateInformFn} = "telnet_ActivateInform";
 
+  my %lhash = ( Fn=>"CommandTelnetEncoding",
+                ClientFilter => "telnet",
+                Hlp=>"[utf8|latin1],query and set the character encoding for the current telnet session" );
+  $cmds{encoding} = \%lhash;
+}
+sub
+CommandTelnetEncoding($$)
+{
+  my ($hash, $param) = @_;
+
+  my $ret = "";
+
+  if( !$param ) {
+    $ret = "current encoding is $hash->{encoding}";
+  } elsif( $param eq "utf8" || $param eq "latin1"  ) {
+    $hash->{encoding} = $param;
+    syswrite($hash->{CD}, sprintf("%c%c%c", 255, 253, 0) );
+    $ret = "encoding changed to $param";
+  } else {
+    $ret = "unknown encoding >>$param<<";
+  }
+
+  return $ret;
 }
 
 #####################################
@@ -160,6 +184,9 @@ telnet_Read($)
   if($hash->{SERVERSOCKET}) {   # Accept and create a child
     my $chash = TcpServer_Accept($hash, "telnet");
     return if(!$chash);
+    $chash->{encoding} = AttrVal($name, "encoding", "utf8");
+    syswrite($chash->{CD}, sprintf("%c%c%c", 255, 253, 0) ) if( AttrVal($name, "encoding", "") ); #DO BINARY
+    $chash->{CD}->flush();
     syswrite($chash->{CD}, sprintf("%c%c%cPassword: ", 255, 251, 1)) # WILL ECHO
         if(telnet_pw($name, $chash->{NAME}));
     return;
@@ -224,6 +251,9 @@ telnet_Read($)
       }
     }
     $gotCmd = 1;
+    if( $cmd =~ s/\xff(\xfb|\xfd)(.)// ) {
+      #syswrite($hash->{CD}, sprintf("%c%c%c", 255, (ord($1)==253?251:253), ord($2)));
+    }
     if($cmd) {
       if($cmd =~ m/\\ *$/) {                     # Multi-line
         $hash->{prevlines} .= $cmd . "\n";
@@ -232,6 +262,7 @@ telnet_Read($)
           $cmd = $hash->{prevlines} . $cmd;
           undef($hash->{prevlines});
         }
+        $cmd = latin1ToUtf8($cmd) if( $hash->{encoding} eq "latin1" );
         $ret = AnalyzeCommandChain($hash, $cmd);
         push @ret, $ret if(defined($ret));
       }
@@ -251,6 +282,7 @@ telnet_Read($)
   $ret .= ($hash->{prevlines} ? "> " : "fhem> ")
           if($gotCmd && $hash->{prompt} && !$hash->{rcvdQuit});
   if($ret) {
+    $ret = utf8ToLatin1($ret) if( $hash->{encoding} eq "latin1" );
     $ret =~ s/\n/\r\n/g if($pw);  # only for DOS telnet 
     for(;;) {
       my $l = syswrite($hash->{CD}, $ret);
@@ -430,6 +462,11 @@ telnet_ActivateInform($)
     <li>connectInterval<br>
         After closing a connection, or if a connection cannot be estblished,
         try to connect again after this many seconds. Default is 60.
+        </li><br>
+
+    <a name="encoding"></a>
+    <li>encoding<br>
+        Sets the encoding for the data send to the client. Possible values are latin1 and utf8. Default is utf8.
         </li><br>
 
 
