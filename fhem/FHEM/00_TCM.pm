@@ -316,10 +316,10 @@ TCM_Read($)
           PacketType    => $packetType,
           SubTelNum     => hex($1),
           DestinationID => $2,
-          RSSI          => hex($3),
+          RSSI          => -hex($3),
           SecurityLevel => hex($4),
         );
-        $hash->{RSSI} = hex($3);
+        $hash->{RSSI} = -hex($3);
         
         if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
           Log $ll5, "TCM: $name Telegram from $id blocked.";        
@@ -760,9 +760,10 @@ TCM_Undef($$)
 <ul>
   The TCM module serves an USB or TCP/IP connected TCM120 or TCM310 EnOcean
   Transceiver module. These are mostly packaged together with a serial to USB
-  chip and an antenna, e.g. the BSC BOR contains the TCM120, the EUL from
-  busware contains a TCM310.  See also the datasheet available from <a
-  href="http://www.enocean.com">www.enocean.com</a>.
+  chip and an antenna, e.g. the BSC BOR contains the TCM120, the <a
+  href="http://www.enocean.com/de/enocean_module/usb-300-oem/">USB 300</a> from
+  EnOcean and the EUL from busware contains a TCM310. See also the datasheet
+  available from <a href="http://www.enocean.com">www.enocean.com</a>.
   <br>
   As the TCM120 and the TCM310 speak completely different protocols, this
   module implements 2 drivers in one. It is the "physical" part for the <a
@@ -779,12 +780,12 @@ TCM_Undef($$)
   <ul>
     <code>define &lt;name&gt; TCM [120|310] &lt;device&gt;</code> <br>
     <br>
-    First you have to specify the type of the EnOcean Transceiver Chip , i.e
+    First you have to specify the type of the EnOcean Transceiver Chip, i.e
     either 120 for the TCM120 or 310 for the TCM310.<br><br>
     <code>device</code> can take the same parameters (@baudrate, @directio,
     TCP/IP, none) like the <a href="#CULdefine">CUL</a>, but you probably have
     to specify the baudrate: the TCM120 should be opened with 9600 Baud, the
-    TCM310 with 57600 baud.
+    TCM310 with 57600 baud.<br>
     Example:
     <ul><code>
       define BscBor TCM 120 /dev/ttyACM0@9600<br>
