@@ -113,7 +113,7 @@ LISTENLIVE_Initialize($)
 	$hash->{SetFn}		=	"LISTENLIVE_Set";
 	$hash->{DefFn}		=	"LISTENLIVE_Define";
 	$hash->{UndefFn}	=	"LISTENLIVE_Undefine";
-	$hash->{AttrList}	=	"do_not_notify:0,1 loglevel:0,1,2,3,4,5 ".
+	$hash->{AttrList}	=	"do_not_notify:0,1 ".
 							$readingFnAttributes;
 	$data{RC_layout}{HMT350}		=	"HMT350_RClayout";
 	$data{RC_makenotify}{LISTENLIVE}=	"HMT350_RCmakenotify";
@@ -755,7 +755,6 @@ statusRequest
   <a name="LISTENLIVEattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>

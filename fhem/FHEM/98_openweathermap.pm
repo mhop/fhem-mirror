@@ -118,7 +118,7 @@ openweathermap_Initialize($)
 	$hash->{UndefFn}	=	"OWO_Undefine";
 	$hash->{AttrFn}		=	"OWO_Attr";
 
-	$hash->{AttrList}	=	"do_not_notify:0,1 loglevel:0,1,2,3,4,5 ".
+	$hash->{AttrList}	=	"do_not_notify:0,1 ".
 							"owoGetUrl owoSendUrl owoInterval:600,900,1800,3600 ".
 							"owoApiKey owoProxy owoStation owoUser owoUseXml:1,0 ".
 							"owoDebug:0,1 owoRaw:0,1 owoTimestamp:0,1 ".
@@ -694,7 +694,6 @@ OWO_isday($$){
 	<a name="openweathermapattr"></a>
 	<b>Attributes</b><br/><br/>
 	<ul>
-		<li><a href="#loglevel">loglevel</a></li>
 		<li><a href="#do_not_notify">do_not_notify</a></li>
 		<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 		<br/>
