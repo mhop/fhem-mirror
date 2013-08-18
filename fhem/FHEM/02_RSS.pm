@@ -98,7 +98,7 @@ RSS_Set() {
   my $name = $a[0];
 
   # usage check
-  my $usage= "Unknown argument, choose one of rereadcfg";
+  my $usage= "Unknown argument, choose one of rereadcfg:noArg";
   if((@a == 2) && ($a[1] eq "rereadcfg")) {
      RSS_readLayout($hash);
      return undef;
