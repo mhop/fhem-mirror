@@ -383,14 +383,17 @@ telnet_ActivateInform($)
         IAC requests to supress echo while entering the password.
         Also all returned lines are terminated with \r\n.
         Example:<br>
+        <ul>
         <code>
         attr tPort password secret<br>
-        attr tPort password {use FritzBoxUtils;;FB_checkPw("localhost","$password") }<br>
+        attr tPort password {"$password" eq "secret"}
         </code>
-        or if you defined multiple users on the Fritzbox:<br>
-        <code>
-        attr tPort password {use FritzBoxUtils;;FB_checkPw("localhost","$user", "$password") }<br>
-        </code>
+        </ul>
+        Note: if this attribute is set, you have to specify a password as the
+        first argument when using fhem.pl in client mode:
+        <ul>
+          perl fhem.pl localhost:7072 secret "set lamp on"
+        </ul>
         </li><br>
 
     <a name="globalpassword"></a>
