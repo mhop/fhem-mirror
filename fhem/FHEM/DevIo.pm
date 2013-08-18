@@ -147,7 +147,7 @@ DevIo_OpenDev($$$)
       delete($hash->{NEXT_OPEN})
 
     } else {
-      Log3 $name, 3, "Can't connect to $dev: $!") if(!$reopen);
+      Log3 $name, 3, "Can't connect to $dev: $!" if(!$reopen);
       $readyfnlist{"$name.$dev"} = $hash;
       $hash->{STATE} = "disconnected";
       $hash->{NEXT_OPEN} = time()+60;
