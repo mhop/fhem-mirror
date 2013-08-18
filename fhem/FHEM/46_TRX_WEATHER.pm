@@ -602,7 +602,11 @@ sub TRX_WEATHER_common_temphydro {
 
   TRX_WEATHER_temperature($bytes, $dev_str, \@res, 5);
   TRX_WEATHER_humidity($bytes, $dev_str, \@res, 7); 
-  TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 9);
+  if ($dev_type eq "THGR918") {
+  	TRX_WEATHER_battery($bytes, $dev_str, \@res, 9);
+  } else {
+  	TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 9);
+  }
   return @res;
 }
 
