@@ -29,7 +29,7 @@ Start FHEM:
 Connect to the FHEM Web frontend (FHEMWEB):
   Start your browser (Firefox,Chrome or Safari are preferred) and open
     http://localhost:8083/fhem
-  You'll see a smiling House-Icon on a light-yellow background.
+  You'll see a smiling-house icon on a light-yellow background.
 
 
 Update FHEM to get access to the latest development version (recommended but
