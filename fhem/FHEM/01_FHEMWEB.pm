@@ -2076,7 +2076,7 @@ FW_Get($@)
            "gplot directory:      $FW_gplotdir";
 
   } else {
-    return "Unknown argument $arg choose one of icon pathlist";
+    return "Unknown argument $arg choose one of icon pathlist:noArg";
 
   }
 }
@@ -2090,8 +2090,9 @@ FW_Set($@)
   my %cmd = ("rereadicons" => 1, "clearSvgCache" => 1);
 
   return "no set value specified" if(@a < 2);
-  return ("Unknown argument $a[1], choose one of ".join(" ", sort keys %cmd))
-        if(!$cmd{$a[1]});
+  return ("Unknown argument $a[1], choose one of ".
+        join(" ", map { "$_:noArg" } sort keys %cmd))
+    if(!$cmd{$a[1]});
 
   if($a[1] eq "rereadicons") {
     my @dirs = keys %FW_icons;
