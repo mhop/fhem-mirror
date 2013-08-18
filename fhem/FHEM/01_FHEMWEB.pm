@@ -236,6 +236,13 @@ FW_Read($)
   }
 
   $hash->{BUF} .= $buf;
+  if($defs{$FW_wname}{SSL}) {
+    while($c->pending()) {
+      sysread($c, $buf, 1024);
+      $hash->{BUF} .= $buf;
+    }
+  }
+
   if(!$hash->{HDR}) {
     return if($hash->{BUF} !~ m/^(.*)(\n\n|\r\n\r\n)(.*)$/s);
     $hash->{HDR} = $1;
