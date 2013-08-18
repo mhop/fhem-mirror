@@ -286,10 +286,10 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
 
 ###################################################
 # Start the program
-if(int(@ARGV) != 1 && int(@ARGV) != 2) {
+if(int(@ARGV) < 1) {
   print "Usage:\n";
   print "as server: fhem configfile\n";
-  print "as client: fhem [host:]port cmd\n";
+  print "as client: fhem [host:]port cmd cmd cmd...\n";
   CommandHelp(undef, undef);
   exit(1);
 }
@@ -324,15 +324,20 @@ if($^O !~ m/Win/ && $< == 0) {
 
 ###################################################
 # Client code
-if(int(@ARGV) == 2) {
+if(int(@ARGV) > 1) {
   my $buf;
-  my $addr = $ARGV[0];
-  $addr = "localhost:$addr" if($ARGV[0] !~ m/:/);
+  my $addr = shift @ARGV;
+  $addr = "localhost:$addr" if($addr !~ m/:/);
   my $client = IO::Socket::INET->new(PeerAddr => $addr);
   die "Can't connect to $addr\n" if(!$client);
-  syswrite($client, "$ARGV[1] ; quit\n");
+  for(my $i=0; $i < int(@ARGV); $i++) {
+    syswrite($client, $ARGV[$i]."\n");
+  }
   shutdown($client, 1);
   while(sysread($client, $buf, 256) > 0) {
+    $buf =~ s/\xff\xfb\x01Password: //;
+    $buf =~ s/\xff\xfc\x01\r\n//;
+    $buf =~ s/\xff\xfd\x00//;
     print($buf);
   }
   exit(0);
@@ -576,6 +581,8 @@ sub
 Log3($$$)
 {
   my ($dev, $loglevel, $text) = @_;
+
+  $dev = $dev->{NAME} if(defined($dev) && ref($dev) eq "HASH");
      
   if(defined($dev) &&
      defined($attr{$dev}) &&
