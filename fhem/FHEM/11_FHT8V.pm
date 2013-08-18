@@ -13,7 +13,7 @@ FHT8V_Initialize($)
   $hash->{DefFn}     = "FHT8V_Define";
   $hash->{SetFn}     = "FHT8V_Set";
   $hash->{GetFn}     = "FHT8V_Get";
-  $hash->{AttrList}  = "IODev dummy:1,0 ignore:1,0 loglevel:0,1,2,3,4,5,6 ".
+  $hash->{AttrList}  = "IODev dummy:1,0 ignore:1,0 ".
                          $readingFnAttributes;
 }
 
@@ -76,16 +76,16 @@ FHT8V_Set($@)
   if($arg eq "valve" ) {
     return "Set valve needs a numeric parameter between 0 and 100"
         if(@a != 3 || $a[2] !~ m/^\d+$/ || $a[2] < 0 || $a[2] > 100);
-    Log GetLogLevel($n,3), "FHT8V set $n $arg $a[2]";
+    Log3 $n, 3, "FHT8V set $n $arg $a[2]";
     $hash->{STATE} = sprintf("%d %%", $a[2]);
     IOWrite($hash, "", sprintf("T%s0026%02X", $hash->{addr}, $a[2]*2.55));
 
   } elsif ($arg eq "pair" ) {
-    Log GetLogLevel($n,3), "FHT8V set $n $arg";
+    Log3 $n, 3, "FHT8V set $n $arg";
     IOWrite($hash, "", sprintf("T%s002f00", $hash->{addr}));
 
   } elsif ($arg eq "decalc" ) {
-    Log GetLogLevel($n,3), "FHT8V set $n $arg";
+    Log3 $n, 3, "FHT8V set $n $arg";
     $hash->{STATE} = "lime-protection";
     IOWrite($hash, "", sprintf("T%s000A00", $hash->{addr}));
 
@@ -195,7 +195,6 @@ FHT8V_Get($@)
     <li><a href="#IODev">IODev</a></li>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#ignore">ignore</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#eventMap">eventMap</a></li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>

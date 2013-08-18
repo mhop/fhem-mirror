@@ -38,7 +38,7 @@ HMS_Initialize($)
   $hash->{DefFn}     = "HMS_Define";
   $hash->{UndefFn}   = "HMS_Undef";
   $hash->{ParseFn}   = "HMS_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:hms100-t,hms100-tf,hms100-wd,hms100-mg,hms100-tfk,rm100-2,hms100-co,hms100-fit loglevel:0,1,2,3,4,5,6 ignore:0,1 $readingFnAttributes";
+  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:hms100-t,hms100-tf,hms100-wd,hms100-mg,hms100-tfk,rm100-2,hms100-co,hms100-fit ignore:0,1 $readingFnAttributes";
 }
 
 #####################################
@@ -83,7 +83,7 @@ HMS_Parse($$)
 #                        810e047f0214a001a81f000001000000 HMS100TFK
   my $val = substr($msg, 24, 8) if(length($msg) == 32);
   if(!defined($val)) {
-    Log 3, "Strange HMS message $msg";
+    Log3 $hash, 3, "Strange HMS message $msg";
     return "";
   }
 
@@ -99,12 +99,13 @@ HMS_Parse($$)
   # a wildcard too for each type:  100<device-code>,
   my $odev = $dev;
   if(!defined($modules{HMS}{defptr}{$dev})) {
-    Log 4, "HMS device $dev not defined, using the wildcard device 100$cde";
+    Log3 $hash, 4,
+        "HMS device $dev not defined, using the wildcard device 100$cde";
     $dev = "100$cde";
   }
 
   if(!defined($modules{HMS}{defptr}{$dev})) {
-    Log 3, "Unknown HMS device $dev/$odev, please define it";
+    Log3 $hash, 3, "Unknown HMS device $dev/$odev, please define it";
     $type = "HMS" if(!$type);
     $type =~ s/-//; # RM100-2, - is special in fhem names
     return "UNDEFINED ${type}_$odev HMS $odev";
@@ -210,12 +211,12 @@ HMS_Parse($$)
 
   } else {
 
-    Log 3, "HMS Device $dev (Unknown type: $type)";
+    Log3 $name, 3, "HMS Device $dev (Unknown type: $type)";
     return "";
 
   }
 
-  Log GetLogLevel($name,4), "HMS Device $dev ($type: $val)";
+  Log3 $name, 4, "HMS Device $dev ($type: $val)";
 
   readingsBeginUpdate($def);
   my $max = int(@txt);
@@ -298,7 +299,6 @@ HMS_Parse($$)
   <ul>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#IODev">IODev</a></li>
     <li><a href="#eventMap">eventMap</a></li>

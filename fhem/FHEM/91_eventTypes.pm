@@ -18,7 +18,7 @@ eventTypes_Initialize($)
   $hash->{GetFn}    = "eventTypes_Get";
   $hash->{SetFn}    = "eventTypes_Set";
   $hash->{AttrFn}   = "eventTypes_Attr";
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList} = "disable:0,1";
 }
 
 
@@ -60,7 +60,6 @@ eventTypes_Notify($$)
 
   my $t = $eventSrc->{TYPE};
   my $n = $eventSrc->{NAME};
-  my $ll4 = GetLogLevel($ln, 4);
 
   my $ret = "";
   foreach my $oe (@{$eventSrc->{CHANGED}}) {
@@ -68,7 +67,7 @@ eventTypes_Notify($$)
     my $ne = $oe;
     $ne =~ s/\b-?\d*\.?\d+\b/.*/g;
     $ne =~ s/set_\d+/set_.*/;   # HM special :/
-    Log $ll4, "$ln: $t $n $oe -> $ne";
+    Log3 $ln, 4, "$ln: $t $n $oe -> $ne";
     $modules{eventTypes}{ldata}{$n}{$ne}++;
   }
   return undef;
@@ -182,7 +181,6 @@ eventTypes_Get($@)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
   </ul>
   <br>
 

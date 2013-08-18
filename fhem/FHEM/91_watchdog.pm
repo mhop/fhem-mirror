@@ -15,8 +15,7 @@ watchdog_Initialize($)
   $hash->{DefFn} = "watchdog_Define";
   $hash->{UndefFn} = "watchdog_Undef";
   $hash->{NotifyFn} = "watchdog_Notify";
-  $hash->{AttrList} = "disable:0,1 regexp1WontReactivate:0,1 ".
-                        "loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList} = "disable:0,1 regexp1WontReactivate:0,1";
 }
 
 
@@ -124,7 +123,7 @@ watchdog_Trigger($)
     return "";
   }
 
-  Log(GetLogLevel($name,3), "Watchdog $name triggered");
+  Log3 $name, 3, "Watchdog $name triggered";
   my $exec = SemicolonEscape($watchdog->{CMD});;
   $watchdog->{STATE} = "triggered";
   
@@ -132,7 +131,7 @@ watchdog_Trigger($)
   $watchdog->{READINGS}{Triggered}{VAL} = $watchdog->{STATE};
   
   my $ret = AnalyzeCommandChain(undef, $exec);
-  Log(GetLogLevel($name,3), $ret) if($ret);
+  Log3 $name, 3, $ret if($ret);
 }
 
 sub
@@ -228,7 +227,6 @@ watchdog_Undef($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a name="regexp1WontReactivate">regexp1WontReactivate</a><br>
         When a watchdog is active, a second event matching regexp1 will
         normally reset the timeout. Set this attribute to prevents this.

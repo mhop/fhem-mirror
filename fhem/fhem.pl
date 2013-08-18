@@ -50,7 +50,6 @@ sub AssignIoPort($);
 sub AttrVal($$$);
 sub CallFn(@);
 sub CheckDuplicate($$@);
-sub rejectDuplicate($$$);
 sub CommandChain($$);
 sub Dispatch($$$);
 sub DoTrigger($$@);
@@ -64,11 +63,12 @@ sub HandleArchiving($);
 sub HandleTimeout();
 sub IOWrite($@);
 sub InternalTimer($$$$);
+sub IsDisabled($);
 sub IsDummy($);
 sub IsIgnored($);
-sub IsDisabled($);
 sub LoadModule($);
 sub Log($$);
+sub Log3($$$);
 sub OpenLogfile($);
 sub PrintHash($$);
 sub ReadingsVal($$$);
@@ -86,21 +86,20 @@ sub addToAttrList($);
 sub createInterfaceDefinitions();
 sub devspec2array($);
 sub doGlobalDef($);
+sub evalStateFormat($);
 sub fhem($@);
 sub fhz($);
 sub getAllGets($);
 sub getAllSets($);
+sub latin1ToUtf8($);
 sub readingsBeginUpdate($);
 sub readingsBulkUpdate($$$@);
 sub readingsEndUpdate($$);
 sub readingsSingleUpdate($$$$);
 sub redirectStdinStdErr();
+sub rejectDuplicate($$$);
 sub setGlobalAttrBeforeFork($);
 sub setReadingsVal($$$$);
-sub evalStateFormat($);
-sub latin1ToUtf8($);
-sub Log($$);
-sub Log3($$$);
 
 sub CommandAttr($$);
 sub CommandDefaultAttr($$);
@@ -176,7 +175,8 @@ use vars qw(%inform);	        # Used by telnet_ActivateInform
 
 use vars qw($reread_active);
 
-my $AttrList = "room group comment alias eventMap userReadings";
+my $AttrList = "verbose:0,1,2,3,4,5 room group comment alias ".
+                "eventMap userReadings";
 
 my %comments;			# Comments from the include files
 my $ipv6;			# Using IPV6
@@ -208,7 +208,7 @@ $modules{Global}{LOADED} = 1;
 $modules{Global}{AttrList} =
   "archivecmd apiversion archivedir configfile lastinclude logfile " .
   "modpath nrarchive pidfilename port statefile title userattr " .
-  "verbose:1,2,3,4,5 mseclog:1,0 version nofork:1,0 logdir holiday2we " .
+  "mseclog:1,0 version nofork:1,0 logdir holiday2we " .
   "autoload_undefined_devices:1,0 dupTimeout latitude longitude altitude " .
   "backupcmd backupdir backupsymlink backup_before_update " .
   "exclude_from_update motd updatebranch uniqueID ".
@@ -586,7 +586,7 @@ Log3($$$)
      
   if(defined($dev) &&
      defined($attr{$dev}) &&
-     defined (my $devlevel = $attr{$dev}{loglevel})) {
+     defined (my $devlevel = $attr{$dev}{verbose})) {
     return if($loglevel > $devlevel);
 
   } else {
@@ -2330,7 +2330,7 @@ CommandChain($$)
   my $oid = $init_done;
 
   $init_done = 0;       # Rudi: ???
-  $attr{global}{verbose} = 1;
+  $attr{global}{verbose} = 1; # ???
   foreach my $cmd (@{$list}) {
     for(my $n = 0; $n < $retry; $n++) {
       Log 1, sprintf("Trying again $cmd (%d out of %d)", $n+1,$retry) if($n>0);

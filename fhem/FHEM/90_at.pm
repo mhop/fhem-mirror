@@ -16,8 +16,7 @@ at_Initialize($)
   $hash->{UndefFn}  = "at_Undef";
   $hash->{AttrFn}   = "at_Attr";
   $hash->{StateFn}  = "at_State";
-  $hash->{AttrList} = "disable:0,1 skip_next:0,1 loglevel:0,1,2,3,4,5,6 ".
-                      "alignTime";
+  $hash->{AttrList} = "disable:0,1 skip_next:0,1 alignTime";
 }
 
 
@@ -120,8 +119,7 @@ at_Exec($)
 
   return if($hash->{DELETED});           # Just deleted
   my $name = $hash->{NAME};
-  my $ll5 = GetLogLevel($name,5);
-  Log $ll5, "exec at command $name";
+  Log3 $name, 5, "exec at command $name";
 
   if(defined($attr{$name})) {
     $skip    = 1 if($attr{$name} && $attr{$name}{skip_next});
@@ -132,7 +130,7 @@ at_Exec($)
   my (undef, $command) = split("[ \t]+", $hash->{DEF}, 2);
   $command = SemicolonEscape($command);
   my $ret = AnalyzeCommandChain(undef, $command) if(!$skip && !$disable);
-  Log GetLogLevel($name,3), "$name: $ret" if($ret);
+  Log3 $name, 3, "$name: $ret" if($ret);
 
   return if($hash->{DELETED});           # Deleted in the Command
 
@@ -150,7 +148,7 @@ at_Exec($)
 
   if($count) {
     $def =~ s/{\d+}/{$count}/ if($def =~ m/^\+?\*{\d+}/);  # Replace the count
-    Log $ll5, "redefine at command $name as $def";
+    Log3 $name, 5, "redefine at command $name as $def";
 
     $data{AT_RECOMPUTE} = 1;                 # Tell sunrise compute the next day
     CommandDefine(undef, "$name at $def");   # Recompute the next TRIGGERTIME

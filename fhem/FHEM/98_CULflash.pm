@@ -80,9 +80,9 @@ CommandCULflash($$)
     CUL_SimpleWrite($defs{$cul}, "B01");
     sleep(4);     # B01 needs 2 seconds for the reset
   }
-  Log 1, "CULflash $cmd";
+  Log3 undef, 1, "CULflash $cmd";
   my $result = `$cmd`;
-  Log 1, "CULflash $result";
+  Log3 undef, 1, "CULflash $result";
   return $result;
 }
 

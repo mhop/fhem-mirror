@@ -96,8 +96,7 @@ autocreate_Initialize($)
   $hash->{DefFn} = "autocreate_Define";
   $hash->{NotifyFn} = "autocreate_Notify";
   $hash->{AttrFn}   = "autocreate_Attr";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 " . 
-                     "autosave filelog device_room weblink weblink_room " .
+  $hash->{AttrList}= "autosave filelog device_room weblink weblink_room " .
                      "disable ignoreTypes";
   my %ahash = ( Fn=>"CommandCreateLog",
                 Hlp=>"<device>,create log/weblink for <device>" );
@@ -136,7 +135,6 @@ autocreate_Notify($$)
   my ($ntfy, $dev) = @_;
 
   my $me = $ntfy->{NAME};
-  my ($ll1, $ll2) = (GetLogLevel($me,1), GetLogLevel($me,2));
   my $max = int(@{$dev->{CHANGED}});
   my $ret = "";
   my $nrcreated;
@@ -160,10 +158,10 @@ autocreate_Notify($$)
       ####################
       if(!$hash) {
         $cmd = "$name $type $arg";
-        Log $ll2, "autocreate: define $cmd";
+        Log3 $me, 2, "autocreate: define $cmd";
         $ret = CommandDefine(undef, $cmd);
         if($ret) {
-          Log $ll1, "ERROR: $ret";
+          Log3 $me, 1, "ERROR: $ret";
           last;
         }
       }
@@ -195,10 +193,10 @@ autocreate_Notify($$)
         last;
       }
       $cmd = "$flname FileLog $fl $filter";
-      Log $ll2, "autocreate: define $cmd";
+      Log3 $me, 2, "autocreate: define $cmd";
       $ret = CommandDefine(undef, $cmd);
       if($ret) {
-        Log $ll1, "ERROR: $ret";
+        Log3 $me, 1, "ERROR: $ret";
         last;
       }
       $attr{$flname}{room} = $room if($room);
@@ -223,10 +221,10 @@ autocreate_Notify($$)
         $wnr++;
         delete($defs{$wlname});   # If we are re-creating it with createlog.
         $cmd = "$wlname weblink fileplot $flname:$gplotfile:CURRENT";
-        Log $ll2, "autocreate: define $cmd";
+        Log3 $me, 2, "autocreate: define $cmd";
         $ret = CommandDefine(undef, $cmd);
         if($ret) {
-          Log $ll1, "ERROR: $ret";
+          Log3 $me, 1, "ERROR: $ret";
           last;
         }
         $attr{$wlname}{room} = $room if($room);
@@ -251,7 +249,7 @@ autocreate_Notify($$)
         $hash->{DEF} =~ s/$old/$new/g;
 
         rename($oldlogfile, $hash->{currentlogfile});
-        Log $ll2, "autocreate: renamed FileLog_$old to FileLog_$new";
+        Log3 $me, 2, "autocreate: renamed FileLog_$old to FileLog_$new";
         $nrcreated++;
       }
 
@@ -261,7 +259,7 @@ autocreate_Notify($$)
         $hash->{LINK} =~ s/$old/$new/g;
         $hash->{DEF} =~ s/$old/$new/g;
         $attr{"weblink_$new"}{label} =~ s/$old/$new/g;
-        Log $ll2, "autocreate: renamed weblink_$old to weblink_$new";
+        Log3 $me, 2, "autocreate: renamed weblink_$old to weblink_$new";
         $nrcreated++;
       }
     }
@@ -378,7 +376,7 @@ CommandUsb($$)
 
   require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
-  Log 1, "usb $n starting";
+  Log3 undef, 1, "usb $n starting";
   ################
   # First try to flash unflashed CULs
   if($^O eq "linux") {
@@ -394,7 +392,7 @@ CommandUsb($$)
       $culType = "CUL_V2" if($lsusb =~ m/03eb:2ffa/);
       if($culType) {
         $msg = "$culType: flash it with: CULflash none $culType";
-        Log 2, $msg; $ret .= $msg . "\n";
+        Log3 undef, 2, $msg; $ret .= $msg . "\n";
         if(!$scan) {
           AnalyzeCommand(undef, "culflash none $culType"); # Enable autoload
           sleep(4);      # Leave time for linux to load th drivers
@@ -413,7 +411,7 @@ CommandUsb($$)
           $PARAM =~ s/[^A-Za-z0-9]//g;
           my $name = $thash->{NAME};
           $msg = "### $dev: checking if it is a $name";
-          Log 4, $msg; $ret .= $msg . "\n";
+          Log3 undef, 4, $msg; $ret .= $msg . "\n";
 
           # Check if it already used
           foreach my $d (keys %defs) {
@@ -421,7 +419,7 @@ CommandUsb($$)
                $defs{$d}{DeviceName} =~ m/$dev/ &&
                $defs{$d}{FD}) {
               $msg = "already used by the $d fhem device";
-              Log 4, $msg; $ret .= $msg . "\n";
+              Log3 undef, 4, $msg; $ret .= $msg . "\n";
               goto NEXTDEVICE;
             }
           }
@@ -434,7 +432,7 @@ CommandUsb($$)
           if(!defined($hash->{USBDev})) {
             DevIo_CloseDev($hash);      # remove the ReadyFn loop
             $msg = "cannot open the device";
-            Log 4, $msg; $ret .= $msg . "\n";
+            Log3 undef, 4, $msg; $ret .= $msg . "\n";
             goto NEXTDEVICE;
           }
 
@@ -453,7 +451,7 @@ CommandUsb($$)
 
           if($answer !~ m/$thash->{response}/) {
             $msg = "got wrong answer for a $name";
-            Log 4, $msg; $ret .= $msg . "\n";
+            Log3 undef, 4, $msg; $ret .= $msg . "\n";
             next;
           }
 
@@ -461,10 +459,10 @@ CommandUsb($$)
           $define =~ s/PARAM/$PARAM/g;
           $define =~ s,DEVICE,$dir/$dev,g;
           $msg = "create as a fhem device with: define $define";
-          Log 4, $msg; $ret .= $msg . "\n";
+          Log3 undef, 4, $msg; $ret .= $msg . "\n";
 
           if(!$scan) {
-            Log 1, "define $define";
+            Log3 undef, 1, "define $define";
             CommandDefine($cl, $define);
           }
 
@@ -474,7 +472,7 @@ CommandUsb($$)
     }
 NEXTDEVICE:
   }
-  Log 1, "usb $n end";
+  Log3 undef, 1, "usb $n end";
   return ($scan ? $ret : undef);
 }
 

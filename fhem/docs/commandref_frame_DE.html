@@ -331,36 +331,57 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   <p>Attribute, die f&uuml;r 
   alle Ger&auml;te anwendbar sind: </p>
   <ul>
+    <a name="verbose"></a>
+    <li>verbose<br>
+      Setzt den Schwellwert f&uuml;r die Logfile-Meldungen.
+      M&ouml;gliche Werte sind:
+      <ul>
+        <li>0 - Server start/stop
+        </li><li>1 - Fehlermeldungen oder unbekannte Pakete 
+        </li><li>2 - bedeutende Ereigbisse/Alarme.
+        </li><li>3 - ausgesendete Kommandos werden gelogged.
+        </li><li>4 - von den einzelnen Ger&auml;ten empfangene Daten.
+        </li><li>5 - Fehlersuche.</li>
+      </ul>
+      Der f&uuml;r die <a href="#global">global</a> Instanz gesetzte Wert gilt
+      als Voreinstellung f&uuml;r die Instanzen, die dieses Attribut nicht
+      gesetzt haben.
+    </li>
+
     <a name="comment"></a>
     <li>comment<br>
         F&uuml;gt einen beliebigen Kommentar hinzu.
+
     <a name="alias"></a>
     </li><li>alias<br>
-     Wird in FHEMWEB benutzt, um ein en anderen Namen f&uuml;r ein Ger&auml;t anzuzeigen 
-    z.B. wenn Sonderzeichen/Leerzeichen nicht in der Ger&auml;tedefinition verwendet 
-    werden k&ouml;nnen.
+       Wird in FHEMWEB benutzt, um ein en anderen Namen f&uuml;r ein Ger&auml;t
+       anzuzeigen z.B. wenn Sonderzeichen/Leerzeichen nicht in der
+       Ger&auml;tedefinition verwendet werden k&ouml;nnen.
+
     <a name="room"></a>
     </li><li>room<br>
-     Filtert/gruppiert Ger&auml;te. Verwendbar unter web-pgm2 und web-pgm3.
-     Ein Ger&auml;te kann zu mehr als einem Raum zugeordnet werden. In diesem Fall 
-    m&uuml;ssen die Raumzuordnungen&nbsp; durch Kommata getrennt angegeben werden.<br>
-        Ger&auml;te, die dem Raum mit der Bezeichnung "hidden" zugeordnet werden, 
-    erscheinen nicht auf der Webseite, es sei denn Sie ber&uuml;cksichtigen <a href="#hiddenroom"> FHEMWEB attribute to selectively disable
-        rooms for certain FHEMWEB instances.
-        </a></li><a href="#hiddenroom">
+       Filtert/gruppiert Ger&auml;te.
+       Ein Ger&auml;t kann zu mehr als einem Raum zugeordnet werden. In diesem
+       Fall m&uuml;ssen die Raumzuordnungen durch Kommata getrennt
+       angegeben werden.<br>
+       Ger&auml;te, die dem Raum mit der Bezeichnung "hidden" zugeordnet
+       werden, erscheinen nicht auf der Webseite.
 
-    </a><a name="group"></a>
+    <a name="group"></a>
     <li>group<br>
-        Ger&auml;tegruppen, anwendbar unter web-pgm2 (Modul <a href="#FHEMWEB">FHEMWEB</a>) zeigt Ger&auml;te die in die gleiche Gruppe geh&ouml;ren auch in einer 
-    gemeinsamen Box an. Das benutzt man, um sp&auml;ter Ger&auml;te zu gruppieren. Ein 
-    Ger&auml;t kann zu mehr als einer Gruppe geh&ouml;ren. In diesem Fall m&uuml;ssen die 
-    entsprechenden Gruppen, durch Kommata getrennt, eingetragen werden<p>
-    Wenn dieses Attribut nicht gesetzt ist, wird der in der Ger&auml;tegruppe 
-    gesetzte Ger&auml;tetyp verwendet.&nbsp;</li><a name="showtime"></a></p>
+       Ger&auml;tegruppen. FHEMWEB zeigt Ger&auml;te die in die gleiche Gruppe
+       geh&ouml;ren auch in einer gemeinsamen Box an.  Ein Ger&auml;t kann zu
+       mehr als einer Gruppe geh&ouml;ren. In diesem Fall m&uuml;ssen die
+       entsprechenden Gruppen durch Kommata getrennt eingetragen werden. Wenn
+       dieses Attribut nicht gesetzt ist, wird der in der Ger&auml;tegruppe
+       gesetzte Ger&auml;tetyp verwendet.
+      </li>
+
+    <a name="showtime"></a>
     <li>showtime<br>
-    Wird im Webfrontend pgm2 verwendet, um die Zeit der letzten Aktivit&auml;t 
-    anstelle des Status in der Gesamtansicht anzuzeigen. N&uuml;tzlich z.B. f&uuml;r FS20 
-    PIRI Ger&auml;te.</span>
+      Wird im FHEMWEB verwendet, um die Zeit der letzten Aktivit&auml;t
+      anstelle des Status in der Gesamtansicht anzuzeigen.  N&uuml;tzlich z.B.
+      f&uuml;r FS20 PIRI Ger&auml;te.</span>
     </li>
 
     <br><br>
@@ -1300,21 +1321,6 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
         Enth&auml;lt eine durch Leerzeichen getrennte Liste in welcher die Namen 
     zus&auml;tzlicher Attribute aufgef&uuml;hrt sind. Diese m&uuml;ssen zuerst in dieser Liste 
     definiert werden, bevor sie angewendet werden k&ouml;nnen.
-    </li><br>
-
-    <a name="verbose"></a>
-    <li>verbose<br>
-      Setzt den Wert f&uuml;r die H&auml;ufigkeit/Intensit&auml;t von
-      Nachrichten. M&ouml;gliche Werte sind:
-      <ul>
-        <li>0 - Server start/stop
-        </li><li>1 - Fehlermeldungen oder unbekannte Pakete 
-        </li><li>2 - bedeutende Ereigbisse/Alarme.
-        </li><li>3 - ausgesendete Kommandos werden gelogged.
-        </li><li>4 - Sie sehen was von den einzelnen Ger&auml;ten empfangen wird.
-        </li><li>5 - Fehlersuche.</li>
-      </ul>
-      Es wird der Wert 3 f&uuml;r den Normalgebrauch empfohlen.
     </li><br>
 
     <a name="dupTimeout"></a>

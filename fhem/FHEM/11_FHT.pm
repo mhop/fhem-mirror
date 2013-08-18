@@ -186,7 +186,7 @@ FHT_Initialize($)
   $hash->{UndefFn}   = "FHT_Undef";
   $hash->{ParseFn}   = "FHT_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 model:fht80b dummy:1,0 " .
-                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 retrycount " .
+                       "showtime:1,0 retrycount " .
                        "minfhtbuffer lazy tmpcorr ignore:1,0 ".
                        $readingFnAttributes;
 }
@@ -300,7 +300,7 @@ FHT_Set($@)
     	$cmd ne "report1" && $cmd ne "report2" && $cmd ne "refreshvalues" &&
     	defined($readings->{$cmd}) && $readings->{$cmd}{VAL} eq $val) {
     	$ret .= "Lazy mode ignores $cmd";
-    	Log GetLogLevel($name,2), "Lazy mode ignores $cmd $val";
+    	Log3 $name, 2, "Lazy mode ignores $cmd $val";
 
     } else {
 	$ncmd++;
@@ -331,7 +331,7 @@ FHT_Set($@)
   } else {
 
     IOWrite($hash, "04", $arg);
-    Log GetLogLevel($name,2), "FHT set $name $allcmd";
+    Log3 $name, 2, "FHT set $name $allcmd";
 
   }
 
@@ -364,7 +364,7 @@ FHT_Define($$)
 
      if($l2 == $i2 && $l1 >= $i1 && $l1 <= $i1+7) {
        my $err = "$a[0]: CODE collides with the FHTID of the corresponding CUL";
-       Log 1, $err;
+       Log3 $a[0], 1, $err;
        return $err;
      }
   }
@@ -372,7 +372,7 @@ FHT_Define($$)
   $modules{FHT}{defptr}{$a[2]} = $hash;
   $attr{$a[0]}{retrycount} = 3;
 
-  #Log GetLogLevel($a[0],2),"Asking the FHT device $a[0]/$a[2] to send its data";
+  #Log3 $a[0], 2, "Asking the FHT device $a[0]/$a[2] to send its data";
   #FHT_Set($hash, ($a[0], "report1", "255", "report2", "255"));
 
   return undef;
@@ -407,7 +407,7 @@ FHT_Parse($$)
       return "" if($dp->{addr} eq $dev);
     }
 
-    Log 3, "FHT Unknown device $dev, please define it";
+    Log3 $hash, 3, "FHT Unknown device $dev, please define it";
     return "UNDEFINED FHT_$dev FHT $dev";
   }
 
@@ -416,11 +416,10 @@ FHT_Parse($$)
   return "" if(IsIgnored($name));
 
   my $io = $def->{IODev};
-  my $ll4 = GetLogLevel($name,4);
 
   # Short message
   if(length($msg) < 26)  {
-    Log $ll4,"FHT Short message. Device $name, Message: $msg";
+    Log3 $name, 4, "FHT Short message. Device $name, Message: $msg";
     return "";
   }
 
@@ -430,7 +429,7 @@ FHT_Parse($$)
   } elsif(!$val || $cde eq "65" || $cde eq "66") {
     # This is a confirmation message. We reformat it so that
     # it looks like a real message, and let the rest parse it
-    Log $ll4, "FHT $name confirmation: $cde";
+    Log3 $name, 4, "FHT $name confirmation: $cde";
     $val = substr($msg, 22, 2);
     $confirm = 1;
   }
@@ -439,7 +438,7 @@ FHT_Parse($$)
 
   my $cmd = $codes{$cde};
   if(!$cmd) {
-    Log $ll4, "FHT $name (Unknown: $cde => $val)";
+    Log3 $name, 4, "FHT $name (Unknown: $cde => $val)";
     readingsSingleUpdate($def, "unknown_$cde", $val, 1);
     return $name;
   }
@@ -554,16 +553,16 @@ FHT_Parse($$)
 
     # set additional warnings and trigger notify
     readingsBulkUpdate($def, "battery", $valBattery);
-    Log $ll4, "FHT $name battery: $valBattery";
+    Log3 $name, 4, "FHT $name battery: $valBattery";
 
     readingsBulkUpdate($def, "lowtemp", $valLowTemp);
-    Log $ll4, "FHT $name lowtemp: $valLowTemp";
+    Log3 $name, 4, "FHT $name lowtemp: $valLowTemp";
 
     readingsBulkUpdate($def, "window", $valWindow);
-    Log $ll4, "FHT $name window: $valWindow";
+    Log3 $name, 4, "FHT $name window: $valWindow";
 
     readingsBulkUpdate($def, "windowsensor", $valSensor);
-    Log $ll4, "FHT $name windowsensor: $valSensor";
+    Log3 $name, 4, "FHT $name windowsensor: $valSensor";
   }
 
   $cmd = "FHZ:$cmd" if(substr($msg,24,1) eq "7");
@@ -574,7 +573,7 @@ FHT_Parse($$)
     readingsBulkUpdate($def, "temperature", $val); # For dewpoint
   }    
 
-  Log $ll4, "FHT $name $cmd: $val";
+  Log3 $name, 4, "FHT $name $cmd: $val";
 
   #
   # now we are done with updating readings
@@ -589,10 +588,10 @@ FHT_Parse($$)
       my $h = $io->{SOFTBUFFER}{$key};
       my $hcmd = $h->{CMD};
       my $hname = $h->{HASH}->{NAME};
-      Log $ll4, "FHT softbuffer check: $hname / $hcmd";
+      Log3 $name, 4, "FHT softbuffer check: $hname / $hcmd";
       if($hname eq $name && $hcmd =~ m/^$cmd $val/) {
         $found = $key;
-        Log $ll4, "FHT softbuffer found";
+        Log3 $name, 4, "FHT softbuffer found";
         last;
       }
     }
@@ -622,7 +621,7 @@ doSoftBuffer($)
       next if($now-$h->{SENDTIME} < $retryafter);
       my $retry = $attr{$name}{retrycount};
       if($h->{NSENT} > $retry) {
-        Log GetLogLevel($name,2), "$name set $h->{CMD}: ".
+        Log3 $name, 2, "$name set $h->{CMD}: ".
                           "no confirmation after $h->{NSENT} tries, giving up";
         delete($io->{SOFTBUFFER}{$key});
         next;
@@ -638,7 +637,7 @@ doSoftBuffer($)
       $arg =~ s/,(....),/$1:/;
       $arg = uc($arg);
       if($cul =~ m/$arg/) {
-        Log GetLogLevel($name,3), "fhtsoftbuffer: $name set $h->{CMD} ".
+        Log3 $name, 3, "fhtsoftbuffer: $name set $h->{CMD} ".
                 "is still in the culfw buffer, wont send it again";
         $h->{SENDTIME} = $now;
         $h->{NSENT}++;
@@ -651,7 +650,7 @@ doSoftBuffer($)
 
     next if($fhzbuflen < $arglen || $fhzbuflen < getFhtMin($io));
     IOWrite($h->{HASH}, "04", $h->{ARG});
-    Log GetLogLevel($name,2), "FHT set $name $h->{CMD}";
+    Log3 $name, 2, "FHT set $name $h->{CMD}";
 
     $fhzbuflen -= $arglen;
     $h->{SENDTIME} = $now;
@@ -698,7 +697,7 @@ getFhtBuffer($)
   for(;;) {
     return 0 if(!defined($io->{FD}));    # Avoid crash if the CUL/FHZ is absent
     my $msg = CallFn($io->{NAME}, "GetFn", $io, (" ", "fhtbuf"));
-    Log 5, "getFhtBuffer: $count $msg";
+    Log3 $io, 5, "getFhtBuffer: $count $msg";
     return hex($1) if($msg && $msg =~ m/=> ([0-9A-F]+)$/i);
     return 0 if($count++ >= 5);
   }
@@ -988,7 +987,6 @@ getFhtBuffer($)
 
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (fht80b)</li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#IODev">IODev</a></li>

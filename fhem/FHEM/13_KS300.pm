@@ -20,7 +20,8 @@ KS300_Initialize($)
   $hash->{DefFn}     = "KS300_Define";
   $hash->{UndefFn}   = "KS300_Undef";
   $hash->{ParseFn}   = "KS300_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:ks300 loglevel:0,1 rainadjustment:0,1 ignore:0,1";
+  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:ks300 ".
+                        "rainadjustment:0,1 ignore:0,1";
 }
 
 #####################################
@@ -77,7 +78,7 @@ KS300_Parse($$)
   # CRC, they seem to contain partial data (e.g. temp/wind/hum but not rain)
   # They are suppressed as of now.
   if(hex($a[3]) != 13) {
-    Log 4, "Strange KS300 message received, won't decode ($msg)";
+    Log3 $hash, 4, "Strange KS300 message received, won't decode ($msg)";
     return "";
   }
 
@@ -223,13 +224,13 @@ KS300_Parse($$)
     # Negative temp
     $v[4] = -$v[4] if($v[8] & 8);
 
-    Log GetLogLevel($def->{NAME},4), "KS300 $dev: $msg";
+    Log3 $def, 4, "KS300 $dev: $msg";
 
     my $max = int(@v);
 
     # For logging/summary
     my $val = "T: $v[4]  H: $v[3]  W: $v[2]  R: $v[1]  IR: $v[5]";
-    Log GetLogLevel($def->{NAME},4), "KS300 $dev: $val";
+    Log3 $def, 4, "KS300 $dev: $val";
     $def->{STATE} = $val;
     $def->{CHANGED}[0] = $val;
 
@@ -324,7 +325,7 @@ KS300_Parse($$)
 
   } else {
 
-    Log 4, "KS300 detected: $msg";
+    Log3 $hash, 4, "KS300 detected: $msg";
     return "UNDEFINED KS300 KS300 1234";
 
   }
@@ -389,7 +390,6 @@ KS300_Parse($$)
     <li><a href="#eventMap">eventMap</a></li><br>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (ks300)</li>
     <li>rainadjustment<br>
         If this attribute is set, fhem automatically accounts for rain counter

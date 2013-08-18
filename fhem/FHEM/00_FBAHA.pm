@@ -33,7 +33,7 @@ FBAHA_Initialize($)
   $hash->{DefFn}   = "FBAHA_Define";
   $hash->{GetFn}   = "FBAHA_Get";
   $hash->{SetFn}   = "FBAHA_Set";
-  $hash->{AttrList}= "dummy:1,0 loglevel:0,1,2,3,4,5,6 ";
+  $hash->{AttrList}= "dummy:1,0";
 }
 
 
@@ -83,7 +83,7 @@ FBAHA_Set($@)
         my ($i,$p) = ($1,$2,$3);
         my $msg = "UNDEFINED FBDECT_$i FBDECT $i $p";
         DoTrigger("global", $msg, 1);
-        Log 3, "$msg, please define it";
+        Log3 $name, 3, "$msg, please define it";
       }
     }
   }
@@ -94,7 +94,7 @@ FBAHA_Set($@)
     FBAHA_Write($hash, "00", "00010001");              # REGISTER
     my ($err, $data) = FBAHA_ReadAnswer($hash, "REGISTER", "^01");
     if($err) {
-      Log 1, $err;
+      Log3 $name, 1, $err;
       $hash->{STATE} = "???";
       return $err;
     }
@@ -102,11 +102,12 @@ FBAHA_Set($@)
     if($data =~ m/^01030010(........)/) {
       $hash->{STATE} = "Initialized";
       $hash->{HANDLE} = $1;
-      Log 1, "FBAHA $hash->{NAME} registered with handle: $hash->{HANDLE}";
+      Log3 $name, 1,
+        "FBAHA $hash->{NAME} registered with handle: $hash->{HANDLE}";
 
     } else {
       my $msg = "Got bogus answer for REGISTER request: $data";
-      Log 1, $msg;
+      Log3 $name, 1, $msg;
       $hash->{STATE} = "???";
       return $msg;
 
@@ -246,7 +247,6 @@ FBAHA_Read($@)
   return "" if(!defined($buf));
 
   my $name = $hash->{NAME};
-  my $ll5 = GetLogLevel($name,5);
 
   $buf = unpack('H*', $buf);
   my $data = ($hash->{PARTIAL} ? $hash->{PARTIAL} : "");
@@ -257,14 +257,14 @@ FBAHA_Read($@)
     delete($hash->{READ_TS});
   }
 
-  Log $ll5, "FBAHA/RAW: $data/$buf";
+  Log3 $name, 5, "FBAHA/RAW: $data/$buf";
   $data .= $buf;
 
   my $msg;
   while(length($data) >= 16) {
     my $len = hex(substr($data, 4,4))*2;
     if($len < 16 || $len > 10240) { # Out of Sync
-      Log 1, "FBAHA: resetting buffer as we are out of sync ($len)";
+      Log3 $name, 1, "FBAHA: resetting buffer as we are out of sync ($len)";
       $hash->{PARTIAL} = "";
       return "";
     }
@@ -393,7 +393,6 @@ FBAHA_Ready($)
   <b>Attributes</b>
   <ul>
     <li><a href="#dummy">dummy</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
   </ul>
   <br>
 
@@ -477,7 +476,6 @@ FBAHA_Ready($)
   <b>Attributes</b>
   <ul>
     <li><a href="#dummy">dummy</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
   </ul>
   <br>
 

@@ -26,7 +26,7 @@ CUL_WS_Initialize($)
   $hash->{AttrFn}    = "CUL_WS_Attr";
   $hash->{ParseFn}   = "CUL_WS_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 ".
-                       "model:S300TH,KS300 loglevel ignore:0,1 ".
+                       "model:S300TH,KS300 ignore:0,1 ".
                        $readingFnAttributes;
 }
 
@@ -115,7 +115,7 @@ CUL_WS_Parse($$)
   my $def = $modules{CUL_WS}{defptr}{$hash->{NAME} . "." . $cde};
   $def = $modules{CUL_WS}{defptr}{$cde} if(!$def);
   if(!$def) {
-    Log 1, "CUL_WS UNDEFINED $type sensor detected, code $cde";
+    Log3 $hash, 1, "CUL_WS UNDEFINED $type sensor detected, code $cde";
     return "UNDEFINED CUL_WS_$cde CUL_WS $cde";
   }
 
@@ -232,7 +232,8 @@ CUL_WS_Parse($$)
     if(@a == 9 && int(@a) > 8) {                 #  S300TH
       # Sanity check
       if (!($msg =~ /^K[0-9A-F]\d\d\d\d\d\d\d$/ )) {
-        Log GetLogLevel($name,1), "Error: S300TH CUL_WS Cannot decode $msg (sanitycheck). Malformed";
+        Log3 $name, 1,
+            "Error: S300TH CUL_WS Cannot decode $msg (sanitycheck). Malformed";
         return "";
       }
 
@@ -280,10 +281,10 @@ CUL_WS_Parse($$)
   }
 
   if(!$val) {
-    Log GetLogLevel($name,1), "CUL_WS Cannot decode $msg";
+    Log3 $name, 1, "CUL_WS Cannot decode $msg";
     return "";
   }
-  Log GetLogLevel($name,4), "CUL_WS $devtype $name: $val";
+  Log3 $name, 4, "CUL_WS $devtype $name: $val";
 
   # Sanity checks
   if($NotifyTemperature &&
@@ -294,7 +295,8 @@ CUL_WS_Parse($$)
                $hash->{READINGS}{temperature}{VAL};
     my $diff = ($NotifyTemperature - $tval)+0;
     if($diff < -15.0 || $diff > 15.0) {
-      Log 2, "$name: Temp difference ($diff) too large: $val, skipping it";
+      Log3 $name, 2,
+        "$name: Temp difference ($diff) too large: $val, skipping it";
       $hash->{READINGS}{strangetemp}{VAL} = $NotifyTemperature;
       $hash->{READINGS}{strangetemp}{TIME} = TimeNow();
       return "";
@@ -303,7 +305,7 @@ CUL_WS_Parse($$)
   delete $hash->{READINGS}{strangetemp} if($hash->{READINGS});
 
   if(defined($hum) && ($hum < 0 || $hum > 100)) {
-    Log 1, "BOGUS: $name reading: $val, skipping it";
+    Log3 $name, 1, "BOGUS: $name reading: $val, skipping it";
     return "";
   }
 
@@ -392,7 +394,6 @@ CUL_WS_Attr(@)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#eventMap">eventMap</a></li>
     <li><a href="#ignore">ignore</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (S300,KS300,WS7000)</li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>

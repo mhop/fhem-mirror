@@ -37,8 +37,7 @@ FileLog_Initialize($)
   $hash->{NotifyFn} = "FileLog_Log";
   $hash->{AttrFn}   = "FileLog_Attr";
   # logtype is used by the frontend
-  $hash->{AttrList} = "disable:0,1 logtype nrarchive archivedir archivecmd ".
-                      "loglevel";
+  $hash->{AttrList} = "disable:0,1 logtype nrarchive archivedir archivecmd";
 
   $hash->{FW_summaryFn} = "FileLog_fhemwebFn";
   $hash->{FW_detailFn}  = "FileLog_fhemwebFn";
@@ -107,7 +106,7 @@ FileLog_Switch($)
     HandleArchiving($log);
     $fh = new IO::File ">>$cn";
     if(!defined($fh)) {
-      Log(0, "Can't open $cn");
+      Log3 $log, 0, "Can't open $cn";
       return;
     }
     $log->{currentlogfile} = $cn;
@@ -273,7 +272,7 @@ FileLog_loadSVG()
 {
   if(!$modules{SVG}{LOADED} && -f "$attr{global}{modpath}/FHEM/98_SVG.pm") {
     my $ret = CommandReload(undef, "98_SVG");
-    Log 1, $ret if($ret);
+    Log3 undef, 1, $ret if($ret);
   }
 }
 
@@ -505,7 +504,6 @@ FileLog_Get($@)
   my $internal;
 
   my $name = $hash->{NAME};
-  my $ll = GetLogLevel($name,4);
 
   if($outf eq "INT") {
     $outf = "-";
@@ -547,7 +545,7 @@ FileLog_Get($@)
     }
     $inf = $linf;
   }
-  Log $ll, "$name get: Input file $inf, from:$from  to:$to";
+  Log3 $name, 4, "$name get: Input file $inf, from:$from  to:$to";
 
   my $ifh = new IO::File $inf if($inf);
   seekTo($inf, $ifh, $hash, $from) if($ifh);
@@ -776,8 +774,9 @@ RESCAN:
     $data{"currval$j"} = $lastv[$i];
     $data{"currdate$j"} = $lastd[$i];
 
-    Log $ll, "$name get: line $j, regexp:".$d[$i]->{re}.", col:".$d[$i]->{col}.
-                ", output lines:".$data{"cnt$j"};
+    Log3 $name, 4,
+        "$name get: line $j, regexp:".$d[$i]->{re}.", col:".$d[$i]->{col}.
+        ", output lines:".$data{"cnt$j"};
 
   }
   if($internal) {
@@ -1048,7 +1047,6 @@ seekTo($$$$)
         </li><br>
 
     <li><a href="#disable">disable</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
 
     <a name="logtype"></a>
     <li>logtype<br>

@@ -101,10 +101,9 @@ CUL_Initialize($)
   $hash->{SetFn}   = "CUL_Set";
   $hash->{AttrFn}  = "CUL_Attr";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
-                     "showtime:1,0 model:CUL,CUN,CUR loglevel:0,1,2,3,4,5,6 " . 
-                     "sendpool addvaltrigger " .
-					 "rfmode:SlowRF,HomeMatic,MAX hmId ".
-					 "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger";
+                     "showtime:1,0 model:CUL,CUN,CUR " . 
+                     "sendpool addvaltrigger rfmode:SlowRF,HomeMatic,MAX hmId ".
+		     "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger";
 
   $hash->{ShutdownFn} = "CUL_Shutdown";
 
@@ -131,7 +130,7 @@ CUL_Define($$)
   if(@a < 4 || @a > 5) {
     my $msg = "wrong syntax: define <name> CUL {none | devicename[\@baudrate] ".
                         "| devicename\@directio | hostname:port} <FHTID>";
-    Log 2, $msg;
+    Log3 undef, 2, $msg;
     return $msg;
   }
 
@@ -1238,7 +1237,6 @@ CUL_Attr(@)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#attrdummy">dummy</a></li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (CUL,CUN,CUR)</li>
     <li><a name="sendpool">sendpool</a><br>
         If using more than one CUL/CUN for covering a large area, sending

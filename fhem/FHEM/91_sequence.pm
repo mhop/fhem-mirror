@@ -15,7 +15,7 @@ sequence_Initialize($)
   $hash->{DefFn} = "sequence_Define";
   $hash->{UndefFn} = "sequence_Undef";
   $hash->{NotifyFn} = "sequence_Notify";
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList} = "disable:0,1";
 }
 
 
@@ -71,13 +71,13 @@ sequence_Notify($$)
 
     RemoveInternalTimer($ln);
     my $idx = $hash->{IDX} + 2;
-    Log GetLogLevel($ln,5), "sequence $ln matched $idx";
+    Log3 $ln, 5, "sequence $ln matched $idx";
     my @d = split("[ \t]+", $hash->{DEF});
 
 
     if($idx > $hash->{MAX}) {   # Last element reached
 
-      Log GetLogLevel($ln,5), "sequence $ln triggered";
+      Log3 $ln, 5, "sequence $ln triggered";
       DoTrigger($ln, "trigger");
       $idx  = 0;
 
@@ -104,7 +104,7 @@ sequence_Trigger($)
   my @d = split("[ \t]+", $hash->{DEF});
   $hash->{RE} = $d[0];
   $hash->{IDX} = 0;
-  Log GetLogLevel($ln,5), "sequence $ln timeout";
+  Log3 $ln, 5, "sequence $ln timeout";
 }
 
 sub
@@ -155,7 +155,6 @@ sequence_Undef($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
   </ul>
   <br>
 

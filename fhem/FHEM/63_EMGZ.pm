@@ -21,7 +21,7 @@ EMGZ_Initialize($)
   $hash->{SetFn}     = "EMGZ_Set";
   $hash->{DefFn}     = "EMGZ_Define";
 
-  $hash->{AttrList}  = "IODev dummy:1,0 model:EM1000GZ loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev dummy:1,0 model:EM1000GZ";
 }
 
 
@@ -43,14 +43,14 @@ EMGZ_GetStatus($)
   my $d = IOWrite($hash, sprintf("7a%02x", $dnr-1));
   if(!defined($d)) {
     my $msg = "EMGZ $name read error (GetStatus 1)";
-    Log GetLogLevel($name,2), $msg;
+    Log3 $name, 2, $msg;
     return $msg;
   }
 
 
   if($d eq ((pack('H*',"00") x 45) . pack('H*',"FF") x 6)) {
     my $msg = "EMGZ no device no. $dnr present";
-    Log GetLogLevel($name,2), $msg;
+    Log3 $name, 2, $msg;
     return $msg;
   }
 
@@ -63,7 +63,7 @@ EMGZ_GetStatus($)
 
   if($cur_power > 30) { 		# depending on "Anschlussleistung" 
     my $msg = "EMGZ Bogus reading: curr. power is reported to be $cur_power";
-    Log GetLogLevel($name,2), $msg;
+    Log3 $name, 2, $msg;
     return $msg;
   }
 
@@ -93,7 +93,7 @@ EMGZ_GetStatus($)
   }
 
   $hash->{STATE} = "$cur_power m3ph";
-  Log GetLogLevel($name,4), "EMGZ $name: $cur_power m3ph / $vals{act_flow_m3}";
+  Log3 $name, 4, "EMGZ $name: $cur_power m3ph / $vals{act_flow_m3}";
 
   return $hash->{STATE};
 }
@@ -139,13 +139,13 @@ EMGZ_Set($@)
   my $ret = IOWrite($hash, $msg);
   if(!defined($ret)) {
     $msg = "EMWZ $name read error (Set)";
-    Log GetLogLevel($name,2), $msg;
+    Log3 $name, 2, $msg;
     return $msg;
   }
 
   if(ord(substr($ret,0,1)) != 6) {
     $ret = "EMGZ Error occured: " .  unpack('H*', $ret);
-    Log GetLogLevel($name,2), $ret;
+    Log3 $name, 2, $ret;
     return $ret;
   }
 
@@ -222,7 +222,6 @@ EMGZ_Define($$)
   <ul>
     <li><a href="#model">model</a> (EM1000GZ)</li>
     <li><a href="#attrdummy">dummy</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#IODev">IODev</a></li><br>
   </ul>
   <br>

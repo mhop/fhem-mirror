@@ -14,7 +14,7 @@ notify_Initialize($)
   $hash->{DefFn} = "notify_Define";
   $hash->{NotifyFn} = "notify_Exec";
   $hash->{AttrFn}   = "notify_Attr";
-  $hash->{AttrList} = "disable:0,1 forwardReturnValue:0,1 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList} = "disable:0,1 forwardReturnValue:0,1";
 }
 
 
@@ -68,7 +68,7 @@ notify_Exec($$)
       $found = ("$n:$s" =~ m/^$re$/);
     }
     if($found) {
-      Log GetLogLevel($ln, 5), "Triggering $ln";
+      Log3 $ln, 5, "Triggering $ln";
       my (undef, $exec) = split("[ \t]+", $ntfy->{DEF}, 2);
 
       my %specials= (
@@ -79,7 +79,7 @@ notify_Exec($$)
       $exec= EvalSpecials($exec, %specials);
 
       my $r = AnalyzeCommandChain(undef, $exec);
-      Log GetLogLevel($ln, 3), "$ln return value: $r" if($r);
+      Log3 $ln, 3, "$ln return value: $r" if($r);
       $ret .= " $r" if($r);
     }
   }
@@ -219,7 +219,6 @@ notify_Attr(@)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <a name="forwardReturnValue"></a>
     <li>forwardReturnValue<br>
         Forward the return value of the executed command to the caller,

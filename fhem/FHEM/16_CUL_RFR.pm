@@ -20,7 +20,7 @@ CUL_RFR_Initialize($)
   $hash->{UndefFn}   = "CUL_RFR_Undef";
   $hash->{ParseFn}   = "CUL_RFR_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 model:CUL,CUN,CUR " .
-                       "loglevel:0,1,2,3,4,5,6 ignore:0,1 addvaltrigger";
+                       "ignore:0,1 addvaltrigger";
 
   $hash->{WriteFn}   = "CUL_RFR_Write";
   $hash->{GetFn}     = "CUL_Get";
@@ -93,7 +93,7 @@ CUL_RFR_Parse($$)
   my $cde = "${id}${rid}";
 
   if(!$modules{CUL_RFR}{defptr}{$cde}) {
-    Log 1, "CUL_RFR detected, Id $id, Router $rid, MSG $smsg";
+    Log3 $iohash, 1, "CUL_RFR detected, Id $id, Router $rid, MSG $smsg";
     return "UNDEFINED CUL_RFR_$id CUL_RFR $id $rid";
   }
   my $hash = $modules{CUL_RFR}{defptr}{$cde};
