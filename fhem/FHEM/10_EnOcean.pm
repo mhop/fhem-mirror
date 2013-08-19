@@ -303,7 +303,6 @@ EnOcean_Set($@)
       $actualTemp = 20 if ($actualTemp !~ m/^[+-]?\d+(\.\d+)?$/);
       $actualTemp = 0 if ($actualTemp < 0);
       $actualTemp = 40 if ($actualTemp > 40);
-      readingsSingleUpdate($hash, "temperature", $actualTemp, 1);
       my $setCmd = 8;
       if ($manufID eq "00D") {
         # EEP A5-10-06 plus DB3 [Eltako FVS]
@@ -332,6 +331,7 @@ EnOcean_Set($@)
               return "Usage: $a[1] is unknown";
             }
           }          
+          readingsSingleUpdate($hash, "temperature", $actualTemp, 1);
           readingsSingleUpdate($hash, "setpointTemp", $setpointTemp, 1);
           readingsSingleUpdate($hash, "nightReduction", $nightReduction, 1);
           readingsSingleUpdate($hash, "block", $block, 1);
@@ -380,6 +380,7 @@ EnOcean_Set($@)
               return "Usage: $a[1] is unknown";
             }
           }          
+          readingsSingleUpdate($hash, "temperature", $actualTemp, 1);
           readingsSingleUpdate($hash, "setpointTemp", $setpointTemp, 1);
           readingsSingleUpdate($hash, "nightReduction", $nightReduction, 1);
           readingsSingleUpdate($hash, "block", $block, 1);
@@ -430,6 +431,7 @@ EnOcean_Set($@)
           if (defined $a[1] && ($a[1] =~ m/^[0-3]$/ || $a[1] eq "auto")) {
             $fanStage = $a[1];
             shift(@a);
+            readingsSingleUpdate($hash, "temperature", $actualTemp, 1);
             readingsSingleUpdate($hash, "setpointScaled", $setpointScaled, 1) if (defined $setpointScaled);
             readingsSingleUpdate($hash, "setpoint", $setpoint, 1);
             readingsSingleUpdate($hash, "fanStage", $fanStage, 1);
@@ -467,6 +469,7 @@ EnOcean_Set($@)
             }
 
           }
+          readingsSingleUpdate($hash, "temperature", $actualTemp, 1);
           readingsSingleUpdate($hash, "setpointScaled", $setpointScaled, 1) if (defined $setpointScaled);
           readingsSingleUpdate($hash, "setpoint", $setpoint, 1);
           readingsSingleUpdate($hash, "fanStage", $fanStage, 1);
@@ -511,6 +514,7 @@ EnOcean_Set($@)
               return "Usage: $a[1] is not numeric or out of range";
             }
           }
+          readingsSingleUpdate($hash, "temperature", $actualTemp, 1);
           readingsSingleUpdate($hash, "setpointScaled", $setpointScaled, 1);
           readingsSingleUpdate($hash, "setpoint", $setpoint, 1);
           readingsSingleUpdate($hash, "fanStage", $fanStage, 1);
@@ -545,6 +549,7 @@ EnOcean_Set($@)
               return "Usage: $a[1] is unknown";
             }
           }
+          readingsSingleUpdate($hash, "temperature", $actualTemp, 1);
           readingsSingleUpdate($hash, "setpointScaled", $setpointScaled, 1) if (defined $setpointScaled);
           readingsSingleUpdate($hash, "setpoint", $setpoint, 1);
           readingsSingleUpdate($hash, "fanStage", $fanStage, 1);
