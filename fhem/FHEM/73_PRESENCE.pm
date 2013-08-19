@@ -51,7 +51,7 @@ PRESENCE_Initialize($)
   $hash->{DefFn}   = "PRESENCE_Define";
   $hash->{UndefFn} = "PRESENCE_Undef";
   $hash->{AttrFn}  = "PRESENCE_Attr";
-  $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 fritzbox_repeater:0,1 loglevel:1,2,3,4,5 ping_count:1,2,3,4,5,6,7,8,9,10 ".$readingFnAttributes;
+  $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 fritzbox_repeater:0,1 ping_count:1,2,3,4,5,6,7,8,9,10 ".$readingFnAttributes;
   
 }
 
@@ -1083,7 +1083,6 @@ Options:
   <a name="PRESENCEattr"></a>
   <b>Attributes</b><br><br>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a>disable</a></li>
@@ -1305,7 +1304,6 @@ Options:
   <a name="PRESENCEattr"></a>
   <b>Attributes</b><br><br>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a>disable</a></li>
