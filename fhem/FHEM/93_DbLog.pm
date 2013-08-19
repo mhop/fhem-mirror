@@ -30,8 +30,9 @@ DbLog_Initialize($)
   $hash->{NotifyFn} = "DbLog_Log";
   $hash->{GetFn}    = "DbLog_Get";
   $hash->{AttrFn}   = "DbLog_Attr";
-  $hash->{AttrList} = "disable:0,1 loglevel:0,5 DbLogType:Current,History,Current/History";
+  $hash->{AttrList} = "disable:0,1 DbLogType:Current,History,Current/History";
 
+  addToAttrList("DbLogExclude");
 }
 
 ###############################################################
@@ -361,6 +362,7 @@ DbLog_Log($$)
   my $re = $log->{REGEXP};
   my $max = int(@{$dev->{CHANGED}});
   my $ts_0 = TimeNow();
+  my $DbLogExclude = AttrVal($dev->{NAME}, "DbLogExclude", undef);
 
   my $dbh= $log->{DBH};
   $dbh->{RaiseError} = 1;
@@ -393,6 +395,9 @@ DbLog_Log($$)
           $unit = AttrVal("$n", "unit", "");
         }
 
+        #keine Readings loggen die in DbLogExclude explizit ausgeschlossen sind
+        next if($DbLogExclude && $reading =~ m/^$DbLogExclude$/);
+
         my @is= ($ts, $n, $t, $s, $reading, $value, $unit);
 
         # insert into history
@@ -413,7 +418,7 @@ DbLog_Log($$)
     $dbh->commit();
   };
   if ($@) {
-    Log 2, "DbLog: Failed to insert new readings into database: $@";
+    Log3 $dev->{NAME}, 2, "DbLog: Failed to insert new readings into database: $@";
     $dbh->{RaiseError} = 0;  
     $dbh->rollback();
     # reconnect
@@ -475,7 +480,7 @@ DbLog_Connect($)
 
   my $configfilename= $hash->{CONFIGURATION};
   if(!open(CONFIG, $configfilename)) {
-    Log 1, "Cannot open database configuration file $configfilename.";
+    Log3 $hash->{NAME}, 1, "Cannot open database configuration file $configfilename.";
     return 0; }
   my @config=<CONFIG>;
   close(CONFIG);
@@ -498,18 +503,18 @@ DbLog_Connect($)
     $hash->{DBMODEL}="SQLITE";
   } else {
     $hash->{DBMODEL}="unknown";
-    Log 3, "Unknown dbmodel type in configuration file $configfilename.";
-    Log 3, "Only Mysql, Postgresql, Oracle, SQLite are fully supported.";
-    Log 3, "It may cause SQL-Erros during generating plots.";
+    Log3 $hash->{NAME}, 3, "Unknown dbmodel type in configuration file $configfilename.";
+    Log3 $hash->{NAME}, 3, "Only Mysql, Postgresql, Oracle, SQLite are fully supported.";
+    Log3 $hash->{NAME}, 3, "It may cause SQL-Erros during generating plots.";
   }
 
-  Log 3, "Connecting to database $dbconn with user $dbuser";
+  Log3 $hash->{NAME}, 3, "Connecting to database $dbconn with user $dbuser";
   my $dbh = DBI->connect_cached("dbi:$dbconn", $dbuser, $dbpassword);
   if(!$dbh) {
-    Log 2, "Can't connect to $dbconn: $DBI::errstr";
+    Log3 $hash->{NAME}, 2, "Can't connect to $dbconn: $DBI::errstr";
     return 0;
   }
-  Log 3, "Connection to db $dbconn established";
+  Log3 $hash->{NAME}, 3, "Connection to db $dbconn established";
   $hash->{DBH}= $dbh;
   
   if ($hash->{DBMODEL} eq "SQLITE") {
@@ -526,10 +531,10 @@ DbLog_Connect($)
   # this makes sure that the connection doesnt get lost due to other modules
   my $dbhf = DBI->connect_cached("dbi:$dbconn", $dbuser, $dbpassword);
   if(!$dbhf) {
-    Log 2, "Can't connect to $dbconn: $DBI::errstr";
+    Log3 $hash->{NAME}, 2, "Can't connect to $dbconn: $DBI::errstr";
     return 0;
   }
-  Log 3, "Connection to db $dbconn established";
+  Log3 $hash->{NAME}, 3, "Connection to db $dbconn established";
   $hash->{DBHF}= $dbhf;
 
   return 1;
@@ -541,13 +546,13 @@ DbLog_Connect($)
 #
 ################################################################
 sub
-DbLog_ExecSQL1($$)
+DbLog_ExecSQL1($$$)
 {
-  my ($dbh,$sql)= @_;
+  my ($hash,$dbh,$sql)= @_;
 
   my $sth = $dbh->do($sql);
   if(!$sth) {
-    Log 2, "DBLog error: " . $DBI::errstr;
+    Log3 $hash->{NAME}, 2, "DBLog error: " . $DBI::errstr;
     return 0;
   }
   return $sth;
@@ -557,23 +562,23 @@ sub
 DbLog_ExecSQL($$)
 {
   my ($hash,$sql)= @_;
-  Log GetLogLevel($hash->{NAME},5), "Executing $sql";
+  Log3 $hash->{NAME}, 4, "Executing $sql";
   my $dbh= $hash->{DBH};
-  my $sth = DbLog_ExecSQL1($dbh,$sql);
+  my $sth = DbLog_ExecSQL1($hash,$dbh,$sql);
   if(!$sth) {
     #retry
     $dbh->disconnect();
     if(!DbLog_Connect($hash)) {
-      Log 2, "DBLog reconnect failed.";
+      Log3 $hash->{NAME}, 2, "DBLog reconnect failed.";
       return 0;
     }
     $dbh= $hash->{DBH};
-    $sth = DbLog_ExecSQL1($dbh,$sql);
+    $sth = DbLog_ExecSQL1($hash,$dbh,$sql);
     if(!$sth) {
-      Log 2, "DBLog retry failed.";
+      Log3 $hash->{NAME}, 2, "DBLog retry failed.";
       return 0;
     }
-    Log 2, "DBLog retry ok.";
+    Log3 $hash->{NAME}, 2, "DBLog retry ok.";
   }
   return $sth;
 }
@@ -694,7 +699,7 @@ DbLog_Get($@)
           AND TIMESTAMP < $sqlspec{to_timestamp}
         ORDER BY TIMESTAMP";
 
-    Log GetLogLevel($hash->{NAME},5), "Executing $stm";
+    Log3 $hash->{NAME}, 5, "Executing $stm";
 
     my $sth= $dbh->prepare($stm) ||
       return "Cannot prepare statement $stm: $DBI::errstr";
@@ -727,7 +732,7 @@ DbLog_Get($@)
         eval("$readings[$i]->[4]");
         $sql_value = $val;
         $sql_timestamp = $ts;
-        if($@) {Log 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@";}
+        if($@) {Log3 $hash->{NAME}, 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@";}
         $out_tstamp = $sql_timestamp;
         $writeout=1;
       }
@@ -1157,16 +1162,6 @@ sub chartQuery($@) {
     }
     return $jsonstring;
 }
-################################################################
-
-
-# reload 93_DbLog.pm
-# get DbLog_Bewaesserung - - 2012-06-22 2012-06-23 KS300:temperature:: KS300:humidity::
-# get DbLog - - 2012-11-10_10 2012-11-10_20 KS300:rain:0:delta-h
-# http://tulpemd.dyndns.org/fhem?cmd=showlog weblink_Bodenfeuchte_1 DbLog_Bodenfeuchte myDbLogtest null
-#
-# FileLog
-# get FileLog_KS300 KS300-2012-11.log - 2012-11-10 2012-11-22 10:IR\x3a:0:delta-d
 
 1;
 
@@ -1397,7 +1392,19 @@ sub chartQuery($@) {
     <br><br>
   </ul>
   <a name="DbLogattr"></a>
-  <b>Attributes</b> <ul>N/A</ul><br>
+  <b>Attributes</b> 
+  <ul><b>DbLogExclude</b>
+    <br>
+    If DbLog is using a new Attribute DbLogExclude will be propagated
+    to all Devices. DbLogExclue will work as regexp to exclude 
+    defined readings to log.
+    <br>
+    <b>Example</b>
+    <ul>
+      <code>attr MyDevice1 DbLogExclude .*</code>
+      <code>attr MyDevice2 DbLogExclude (floorplantext|MyUserReading)</code>
+    </ul>
+  </ul><br>
 </ul>
 
 =end html
@@ -1646,7 +1653,20 @@ sub chartQuery($@) {
   </ul>
 
   <a name="DbLogattr"></a>
-  <b>Attributes</b> <ul>N/A</ul><br>
+  <b>Attribute</b>
+  <ul><b>DbLogExclude</b>
+    <br>
+    Wenn DbLog genutzt wird, wird in alle Devices das Attribut <i>DbLogExclude</i>
+    propagiert. Der Wert des Attributes wird als Regexp ausgewertet und schließt die 
+    damit matchenden Readings von einem Logging aus.
+    <br>
+    <b>Beispiele</b>
+    <ul>
+      <code>attr MyDevice1 DbLogExclude .*</code>
+      <code>attr MyDevice2 DbLogExclude (floorplantext|MyUserReading)</code>
+    </ul>
+  </ul><br>
+
 </ul>
 
 =end html_DE
