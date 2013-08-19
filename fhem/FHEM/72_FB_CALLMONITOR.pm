@@ -94,7 +94,7 @@ FB_CALLMONITOR_Initialize($)
   
  
   
-  $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 unique-call-ids:0,1 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,internal,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at,none reverse-search-cache:0,1 reverse-search-phonebook-file ".
+  $hash->{AttrList}= "do_not_notify:0,1 unique-call-ids:0,1 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,internal,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at,none reverse-search-cache:0,1 reverse-search-phonebook-file ".
                         $readingFnAttributes;
 }
 
@@ -764,7 +764,6 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <a name="FB_CALLMONITORattr"></a>
   <b>Attributes</b><br><br>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><a name="reverse-search">reverse-search</a> (all|internal|klicktel.de|dasoertliche.de|search.ch|dasschnelle.at|none)</li>
@@ -863,7 +862,6 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <a name="FB_CALLMONITORattr"></a>
   <b>Attribute</b><br><br>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><a name="reverse-search">reverse-search</a> (all|internal|klicktel.de|dasoertliche.de|search.ch|dasschnelle.at|none)</li>
