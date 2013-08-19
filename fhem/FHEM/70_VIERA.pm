@@ -8,9 +8,13 @@
 # written 2013 by Tobias Vaupel <fhem at 622 mbit dot de>
 #
 #
-# Version = 1.20
+# Version = 1.21
 #
 # Version  History:
+# - 1.21 - 2013-08-19
+# -- Log() deprecated/replaced by Log3()
+# -- GetStatus() is called after set volume/mute to update readings immediately
+#
 # - 1.20 - 2013-08-16
 # -- added support according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV
 #
@@ -117,7 +121,7 @@ sub VIERA_Define($$){
 
   if(int(@args) < 3 && int(@args) > 4) {
     my $msg = "wrong syntax: define <name> VIERA <host> [<interval>]";
-    Log GetLogLevel($name, 2), $msg;
+    Log3 $name, 2, "VIERA: $msg";
     return $msg;
   }
 
@@ -132,7 +136,7 @@ sub VIERA_Define($$){
   }
 
   CommandAttr(undef,$name.' webCmd off') if( !defined( AttrVal($hash->{NAME}, "webCmd", undef) ) );
-  Log GetLogLevel($name, 2), "VIERA: defined with host: $hash->{helper}{HOST} and interval: $hash->{helper}{INTERVAL}";
+  Log3 $name, 2, "VIERA: defined with host: $hash->{helper}{HOST} and interval: $hash->{helper}{INTERVAL}";
   InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "VIERA_GetStatus", $hash, 0);
 
   return undef;
@@ -158,36 +162,40 @@ sub VIERA_Set($@){
   
   given($what) {
     when("mute"){
-      Log GetLogLevel($name, 3), "VIERA: Set mute $state";
+      Log3 $name, 3, "VIERA: Set mute $state";
       if ($state eq "on") {$state = 1;} else {$state = 0;}
       VIERA_connection(VIERA_BuildXML_RendCtrl($hash, "Set", "Mute", $state), $host);
+      VIERA_GetStatus($hash, 1);
       break;
     }
     
     when("volume"){
       return "VIERA: Volume range is too high! Use Value 0 till 100 for volume." if($state < 0 || $state > 100);
-      Log GetLogLevel($name, 3), "VIERA: Set volume $state";
+      Log3 $name, 3, "VIERA: Set volume $state";
       VIERA_connection(VIERA_BuildXML_RendCtrl($hash, "Set", "Volume", $state), $host);
+      VIERA_GetStatus($hash, 1);
       break;
     }
     
     when("volumeup"){
       return "VIERA: Volume range is too high!" if(ReadingsVal($name, "volume", "0") > 100);
-      Log GetLogLevel($name, 3), "VIERA: Set volumeUp";
+      Log3 $name, 3, "VIERA: Set volumeUp";
       VIERA_connection(VIERA_BuildXML_NetCtrl($hash,"VOLUP"), $host);
+      VIERA_GetStatus($hash, 1);
       break;
     }
     
     when("volumedown"){
       return "VIERA: Volume range is too low!" if(ReadingsVal($name, "volume", "0") < 1);
-      Log GetLogLevel($name, 3), "VIERA: Set volumeDown";
+      Log3 $name, 3, "VIERA: Set volumeDown";
       VIERA_connection(VIERA_BuildXML_NetCtrl($hash,"VOLDOWN"), $host);
+      VIERA_GetStatus($hash, 1);
       break;
     }
     
     when("channel"){
       return "VIERA: Channel is too high or low!" if($state < 1 || $state > 9999);
-      Log GetLogLevel($name, 3), "VIERA: Set channel $state";
+      Log3 $name, 3, "VIERA: Set channel $state";
       for(my $i = 0; $i <= length($state)-1; $i++) {
         VIERA_connection(VIERA_BuildXML_NetCtrl($hash,"D" . substr($state, $i, 1)), $host);
         sleep 0.1;
@@ -197,13 +205,13 @@ sub VIERA_Set($@){
     } 
    
     when("channelup"){
-      Log GetLogLevel($name, 3), "VIERA: Set channelUp";
+      Log3 $name, 3, "VIERA: Set channelUp";
       VIERA_connection(VIERA_BuildXML_NetCtrl($hash,"CH_UP"), $host);
       break;
     }
     
     when("channeldown"){
-      Log GetLogLevel($name, 3), "VIERA: Set channelDown";
+      Log3 $name, 3, "VIERA: Set channelDown";
       VIERA_connection(VIERA_BuildXML_NetCtrl($hash,"CH_DOWN"), $host);
       break;
     }
@@ -220,21 +228,21 @@ sub VIERA_Set($@){
       }
       else{
         $state = uc($state);
-        Log GetLogLevel($name, 3), "VIERA: Set remoteControl $state";   
+        Log3 $name, 3, "VIERA: Set remoteControl $state";   
         VIERA_connection(VIERA_BuildXML_NetCtrl($hash,$state), $host);
       }
       break;
     }
 
     when("off"){
-      Log GetLogLevel($name, 3), "VIERA: Set off";   
+      Log3 $name, 3, "VIERA: Set off";   
       VIERA_connection(VIERA_BuildXML_NetCtrl($hash,"POWER"), $host);
       break;
     }
 
     when("statusrequest"){
-      Log GetLogLevel($name, 3), "VIERA: Set statusRequest";
-      VIERA_GetStatus($hash);
+      Log3 $name, 3, "VIERA: Set statusRequest";
+      VIERA_GetStatus($hash, 1);
       break;
     }
     
@@ -244,7 +252,7 @@ sub VIERA_Set($@){
     }
 
     default{
-      Log GetLogLevel($name, 3), "VIERA: Unknown argument $what, $usage";
+      Log3 $name, 3, "VIERA: Unknown argument $what, $usage";
       return "Unknown argument $what, $usage";
     };
   }
@@ -287,14 +295,16 @@ sub VIERA_GetStatus($;$){
   my $name = $hash->{NAME};
   my $host = $hash->{helper}{HOST};
   
-  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "VIERA_GetStatus", $hash, 0);
+  #if $local is set to 1 just fetch informations from device without interupting InternalTimer
+  $local = 0 unless(defined($local));
+  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "VIERA_GetStatus", $hash, 0) unless($local == 1);
   
   return "" if(!defined($hash->{helper}{HOST}) or !defined($hash->{helper}{INTERVAL}));
   
   my $returnVol = VIERA_connection(VIERA_BuildXML_RendCtrl($hash, "Get", "Volume", ""), $host);
-  Log GetLogLevel($name, 5), "VIERA: GetStatusVol-Request returned: $returnVol" if(defined($returnVol));
+  Log3 $name, 5, "VIERA: GetStatusVol-Request returned: $returnVol" if(defined($returnVol));
   if(not defined($returnVol) or $returnVol eq "") {
-    Log GetLogLevel($name, 4), "VIERA: GetStatusVol-Request NO SOCKET!";
+    Log3 $name, 4, "VIERA: GetStatusVol-Request NO SOCKET!";
     if( ReadingsVal($name,"state","absent") ne "absent") {
       readingsBeginUpdate($hash);
       readingsBulkUpdate($hash, "state", "absent");
@@ -306,9 +316,9 @@ sub VIERA_GetStatus($;$){
   }
 
   my $returnMute = VIERA_connection(VIERA_BuildXML_RendCtrl($hash, "Get", "Mute", ""), $host);
-  Log GetLogLevel($name, 5), "VIERA: GetStatusMute-Request returned: $returnMute" if(defined($returnMute));
+  Log3 $name, 5, "VIERA: GetStatusMute-Request returned: $returnMute" if(defined($returnMute));
   if(not defined($returnMute) or $returnMute eq "") {
-    Log GetLogLevel($name, 4), "VIERA: GetStatusMute-Request NO SOCKET!";
+    Log3 $name, 4, "VIERA: GetStatusMute-Request NO SOCKET!";
     if( ReadingsVal($name,"state","absent") ne "absent") {
       readingsBeginUpdate($hash);
       readingsBulkUpdate($hash, "state", "absent");
@@ -321,14 +331,14 @@ sub VIERA_GetStatus($;$){
   
   readingsBeginUpdate($hash);
   if($returnVol =~ /<CurrentVolume>(.+)<\/CurrentVolume>/){
-    Log GetLogLevel($name, 4), "VIERA: GetStatus-Set reading volume to $1";
+    Log3 $name, 4, "VIERA: GetStatus-Set reading volume to $1";
     if( $1 != ReadingsVal($name, "volume", "0") ) {readingsBulkUpdate($hash, "volume", $1);}
   }
   
   if($returnMute =~ /<CurrentMute>(.+)<\/CurrentMute>/){
     my $myMute = $1;
     if ($myMute == 0) { $myMute = "off"; } else { $myMute = "on";}
-    Log GetLogLevel($name, 4), "VIERA: GetStatus-Set reading mute to $myMute";
+    Log3 $name, 4, "VIERA: GetStatus-Set reading mute to $myMute";
     if( $myMute ne ReadingsVal($name, "mute", "0") ) {readingsBulkUpdate($hash, "mute", $myMute);}
   }
   if( ReadingsVal($name,"state","absent") ne "on") {
@@ -338,7 +348,7 @@ sub VIERA_GetStatus($;$){
   }
   readingsEndUpdate($hash, 1);
   
-  #Log GetLogLevel($name,4), "VIERA $name: $hash->{STATE}";
+  #Log3 $name, 4, "VIERA $name: $hash->{STATE}";
   return $hash->{STATE};
 }
 
@@ -354,7 +364,7 @@ sub VIERA_connection($$){
     Timeout => 2
   );
   
-  #Log 5, "VIERA: connection message: $tmp";
+  #Log3 $name, 5, "VIERA: connection message: $tmp";
   
   if(defined ($sock)){
     print $sock $tmp;
@@ -365,13 +375,13 @@ sub VIERA_connection($$){
     }
     
     my @tmp2 = split (/\n/,$buffer);
-    #Log 4, "VIERA: $TV response: $tmp2[0]";
-    #Log 5, "VIERA: $TV buffer response: $buffer";
+    #Log3 $name, 4, "VIERA: $TV response: $tmp2[0]";
+    #Log3 $name, 5, "VIERA: $TV buffer response: $buffer";
     $sock->close();
     return $buffer;
   }
   else{
-    #Log 4, "VIERA: $TV: not able to open socket";
+    #Log3 $name, 4, "VIERA: $TV: not able to open socket";
     return undef;
   }
 }
@@ -383,7 +393,7 @@ sub VIERA_RCmakenotify($$) {
   my $nname="notify_$nam";
   
   fhem("define $nname notify $nam set $ndev remoteControl ".'$EVENT',1);
-  Log 2, "[remotecontrol:VIERA] Notify created: $nname";
+  Log3 undef, 2, "[remotecontrol:VIERA] Notify created: $nname";
   return "Notify created by VIERA: $nname";
 }
 
@@ -426,7 +436,6 @@ sub VIERA_BuildXML_NetCtrl($$){
   my $head = "";
   my $size = "";
   
-  #Log 1, "DEBUG: $command, $host";
   $callsoap .= "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
   $callsoap .= "<s:Envelope s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\" xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\">";
   $callsoap .= "<s:Body>";
@@ -447,6 +456,7 @@ sub VIERA_BuildXML_NetCtrl($$){
 
   $message .= $head;
   $message .= $callsoap;
+  Log3 $hash, 5, "VIERA: Building XML SOAP (NetworkControl) for command $command to host $host:\n$message";
   return $message;
 }
 
@@ -459,7 +469,7 @@ sub VIERA_BuildXML_RendCtrl($$$$){
   my $head = "";
   my $size = "";
   
-  #Log 1, "DEBUG: $command with $value to $host";
+  Log3 $hash, 5, "DEBUG: $command with $value to $host";
 
   $callsoap .= "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n";
   $callsoap .= "<s:Envelope s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\" xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\">\r\n";
@@ -483,6 +493,7 @@ sub VIERA_BuildXML_RendCtrl($$$$){
 
   $message .= $head;
   $message .= $callsoap;
+  Log3 $hash, 5, "VIERA: Building XML SOAP (RenderingControl) for command $command with value $value to host $host:\n$message";
   return $message;
 }
 1;
