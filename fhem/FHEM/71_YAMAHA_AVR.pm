@@ -53,7 +53,7 @@ YAMAHA_AVR_Initialize($)
   $hash->{DefFn}     = "YAMAHA_AVR_Define";
   $hash->{UndefFn}   = "YAMAHA_AVR_Undefine";
 
-  $hash->{AttrList}  = "do_not_notify:0,1 loglevel:0,1,2,3,4,5 volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 volume-smooth-change:0,1 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
+  $hash->{AttrList}  = "do_not_notify:0,1 volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 volume-smooth-change:0,1 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
                       $readingFnAttributes;
 }
 
@@ -1071,7 +1071,6 @@ output        # only available in zones other than mainzone</code></ul><br><br>
   <b>Attributes</b>
   <ul>
   
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a name="volume-smooth-change">volume-smooth-change</a></li>
@@ -1259,7 +1258,6 @@ output        # only available in zones other than mainzone</code></ul><br><br>
   <b>Attribute</b>
   <ul>
   
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a name="volume-smooth-change">volume-smooth-change</a></li>
