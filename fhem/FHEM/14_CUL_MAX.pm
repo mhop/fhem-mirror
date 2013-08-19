@@ -248,6 +248,12 @@ CUL_MAX_Parse($$)
   Log $ll5, "CUL_MAX_Parse: len $len, msgcnt $msgcnt, msgflag $msgFlag, msgTypeRaw $msgType, src $src, dst $dst, groupid $groupid, payload $payload";
   my $isToMe = ($dst eq $shash->{addr}) ? 1 : 0; # $isToMe is true if that packet was directed at us
 
+  #Set RSSI on MAX device
+  if(exists($modules{MAX}{defptr}{$src}) && exists($hash->{RSSI})) {
+    Log 5, "CUL_MAX_Parse: rssi: $hash->{RSSI}";
+    $modules{MAX}{defptr}{$src}{RSSI} = $hash->{RSSI};
+  }
+
   if(exists($msgId2Cmd{$msgTypeRaw})) {
 
     if($msgType eq "Ack") {
