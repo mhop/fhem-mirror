@@ -109,7 +109,7 @@ sub VIERA_Initialize($){
   $hash->{SetFn}              = "VIERA_Set";
   $hash->{GetFn}              = "VIERA_Get";
   $hash->{UndefFn}            = "VIERA_Undefine";
-  $hash->{AttrList}           = "loglevel:0,1,2,3,4,5 " . $readingFnAttributes;
+  $hash->{AttrList}           = $readingFnAttributes;
   $data{RC_layout}{VIERA_TV}  = "VIERA_RClayout_TV";
   $data{RC_makenotify}{VIERA} = "VIERA_RCmakenotify";
 }
