@@ -139,11 +139,27 @@ MAX_CheckIODev($)
   return !defined($hash->{IODev}) || ($hash->{IODev}{TYPE} ne "MAXLAN" && $hash->{IODev}{TYPE} ne "CUL_MAX");
 }
 
-#Idenitify for numeric values and maps "on" and "off" to their temperatures
+#Identify for numeric values and maps "on" and "off" to their temperatures
 sub
 MAX_ParseTemperature($)
 {
   return $_[0] eq "on" ? 30.5 : ($_[0] eq "off" ? 4.5 :$_[0]);
+}
+
+# Print number in format "0.0", pass "on" and "off" verbatim, convert 30.5 and 4.5 to "on" and "off"
+# Used for "desiredTemperature", "ecoTemperature" etc. but not "temperature"
+sub
+MAX_SerializeTemperature($)
+{
+  if($_[0] ~~ ["on","off"]) {
+    return $_[0];
+  } elsif($_[0] == 4.5) {
+    return "off";
+  } elsif($_[0] == 30.5) {
+    return "on";
+  } else {
+    return sprintf("%2.1f",$_[0]);
+  }
 }
 
 sub
@@ -492,7 +508,7 @@ MAX_Set($@)
     Log GetLogLevel($hash->{NAME}, 5), "New weekProfile: " . MAX_ReadingsVal($hash, ".weekProfile");
 
   }else{
-    my $templist = "off,".join(",",map { sprintf("%2.1f",$_/2) }  (10..60)) . ",on";
+    my $templist = join(",",map { MAX_SerializeTemperature($_/2) }  (9..61));
     my $ret = "Unknown argument $setting, choose one of wakeUp factoryReset groupid";
 
     my $assoclist;
@@ -509,7 +525,7 @@ MAX_Set($@)
 
     if($hash->{type} =~ /HeatingThermostat.*/) {
       #Create numbers from 4.5 to 30.5
-      my $templistOffset = join(",",map { sprintf("%2.1f",($_-7)/2) }  (0..14));
+      my $templistOffset = join(",",map { MAX_SerializeTemperature(($_-7)/2) }  (0..14));
       my $boostDurVal = join(",", values(%boost_durations));
       return "$ret associate:$assoclist deassociate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset";
 
@@ -627,9 +643,9 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
     #The formatting of desiredTemperature must match with in MAX_Set:$templist
     #Sometime we get an MAX_Parse MAX,1,ThermostatState,01090d,180000000000, where desiredTemperature is 0 - ignore it
-    readingsBulkUpdate($shash, "desiredTemperature", sprintf("%2.1f",$desiredTemperature)) if($desiredTemperature != 0);
+    readingsBulkUpdate($shash, "desiredTemperature", MAX_SerializeTemperature($desiredTemperature)) if($desiredTemperature != 0);
     if($measuredTemperature ne "") {
-      readingsBulkUpdate($shash, "temperature", sprintf("%2.1f",$measuredTemperature));
+      readingsBulkUpdate($shash, "temperature", MAX_SerializeTemperature($measuredTemperature));
       if($shash->{type} =~ /HeatingThermostatPlus/ and $hash->{TYPE} eq "MAXLAN") {
         readingsBulkUpdate($shash, "valveposition", int($valveposition*MAX_ReadingsVal($shash,"maxValveSetting")/100));
       } else {
@@ -682,7 +698,7 @@ MAX_Parse($$)
     }
 
     #This formatting must match with in MAX_Set:$templist
-    readingsBulkUpdate($shash, "desiredTemperature", sprintf("%2.1f",$desiredTemperature));
+    readingsBulkUpdate($shash, "desiredTemperature", MAX_SerializeTemperature($desiredTemperature));
 
   }elsif($msgtype eq "ShutterContactState"){
     my $bits = pack("H2",$args[0]);
@@ -717,15 +733,15 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "connection", $connected);
 
   } elsif($msgtype ~~ ["HeatingThermostatConfig", "WallThermostatConfig"]) {
-    readingsBulkUpdate($shash, "ecoTemperature", sprintf("%2.1f",$args[0]));
-    readingsBulkUpdate($shash, "comfortTemperature", sprintf("%2.1f",$args[1]));
-    readingsBulkUpdate($shash, "maximumTemperature", sprintf("%2.1f",$args[2]));
-    readingsBulkUpdate($shash, "minimumTemperature", sprintf("%2.1f",$args[3]));
+    readingsBulkUpdate($shash, "ecoTemperature", MAX_SerializeTemperature($args[0]));
+    readingsBulkUpdate($shash, "comfortTemperature", MAX_SerializeTemperature($args[1]));
+    readingsBulkUpdate($shash, "maximumTemperature", MAX_SerializeTemperature($args[2]));
+    readingsBulkUpdate($shash, "minimumTemperature", MAX_SerializeTemperature($args[3]));
     if($shash->{type} =~ /HeatingThermostat.*/) {
       readingsBulkUpdate($shash, "boostValveposition", $args[4]);
       readingsBulkUpdate($shash, "boostDuration", $boost_durations{$args[5]});
-      readingsBulkUpdate($shash, "measurementOffset", sprintf("%2.1f",$args[6]));
-      readingsBulkUpdate($shash, "windowOpenTemperature", sprintf("%2.1f",$args[7]));
+      readingsBulkUpdate($shash, "measurementOffset", MAX_SerializeTemperature($args[6]));
+      readingsBulkUpdate($shash, "windowOpenTemperature", MAX_SerializeTemperature($args[7]));
       readingsBulkUpdate($shash, "windowOpenDuration", $args[8]);
       readingsBulkUpdate($shash, "maxValveSetting", $args[9]);
       readingsBulkUpdate($shash, "valveOffset", $args[10]);
