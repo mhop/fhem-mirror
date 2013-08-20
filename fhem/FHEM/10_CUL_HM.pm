@@ -863,13 +863,11 @@ sub CUL_HM_Parse($$) {##############################
 	}
     elsif ($mTp eq "53"){
       my ($mChn,@dat) = unpack 'A2(A6)*',$p;
-      my %dField = (41=>"temp_T1",42=>"temp_T2",43=>"temp_T1-T2",44=>"temp_T2-T1");# General todo remove
 	  foreach (@dat){
 	    my ($a,$d) = unpack 'A2A4',$_;
 		$d = hex($d);
 		$d -= 0x10000 if($d & 0xC000); 
 		$d = sprintf("%0.1f",$d/10);
-        push @event, "Val_$dField{$a}$d" if ($dField{$a});# General todo remove
 
 		my $chId = $src.sprintf("02X",hex($a) & 0x6);
 		if($modules{CUL_HM}{defptr}{$chId}){
