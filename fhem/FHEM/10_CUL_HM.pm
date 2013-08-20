@@ -841,6 +841,9 @@ sub CUL_HM_Parse($$) {##############################
   } 
   elsif($st eq "THSensor") { ##################################################
     if ($mTp eq "70"){
+	  my $chn = 1;
+	  $chn = 5  if ($md eq "HM-WDS30-OT2-SM");
+	  $chn = 10 if ($md =~  m/^(WS550|WS888|HM-WDC7000)/);#todo use channel correct
       my $t =  hex(substr($p,0,4));
       $t -= 32768 if($t > 1638.4);
       $t = sprintf("%0.1f", $t/10);
@@ -860,12 +863,22 @@ sub CUL_HM_Parse($$) {##############################
 	}
     elsif ($mTp eq "53"){
       my ($mChn,@dat) = unpack 'A2(A6)*',$p;
-      my %dField = (41=>"temp_T1",42=>"temp_T2",43=>"temp_T1-T2",44=>"temp_T2-T1");
+      my %dField = (41=>"temp_T1",42=>"temp_T2",43=>"temp_T1-T2",44=>"temp_T2-T1");# General todo remove
 	  foreach (@dat){
 	    my ($a,$d) = unpack 'A2A4',$_;
 		$d = hex($d);
-		$d -= 0x10000 if($d & 0x4000); 
-        push @event, sprintf("Val_$dField{$a}:%0.1f",$d/10);
+		$d -= 0x10000 if($d & 0xC000); 
+		$d = sprintf("%0.1f",$d/10);
+        push @event, "Val_$dField{$a}$d" if ($dField{$a});# General todo remove
+
+		my $chId = $src.sprintf("02X",hex($a) & 0x6);
+		if($modules{CUL_HM}{defptr}{$chId}){
+	      push @entities,CUL_HM_UpdtReadSingle($modules{CUL_HM}{defptr}{$chId}
+		                                     ,'state',$d,1);
+		}
+		else{
+          push @event, "Chan_$a:$d"; # General todo Implement this, remote t1-t2
+		}
 	  }
 	}
   } 
@@ -2222,13 +2235,15 @@ sub CUL_HM_Set($@) {
     return"invalid value. use:". join(",",keys%{$reg->{lit}}) 
 	        if ($reg->{c} eq 'lit' && !defined($reg->{lit}{$data}));
 	
+	$data *= $reg->{f} if($reg->{f});# obey factor befor possible conversion
 	my $conversion = $reg->{c};
+	
 	if (!$conversion){;# do nothing
-	}elsif($conversion eq "factor"){$data *= $reg->{f};# use factor
-	}elsif($conversion eq "fltCvT"){$data = CUL_HM_fltCvT($data);
-	}elsif($conversion eq "m10s3") {$data = $data*10-3;
-	}elsif($conversion eq "hex")   {$data = hex($data);
-	}elsif($conversion eq "lit")   {$data = $reg->{lit}{$data};
+	}elsif($conversion eq "fltCvT"  ){$data = CUL_HM_fltCvT($data);
+	}elsif($conversion eq "fltCvT60"){$data = CUL_HM_fltCvT60($data);
+	}elsif($conversion eq "m10s3")   {$data = $data*10-3;
+	}elsif($conversion eq "hex")     {$data = hex($data);
+	}elsif($conversion eq "lit")     {$data = $reg->{lit}{$data};
 	}else{return " conversion undefined - please contact admin";
 	}
 	
@@ -3564,13 +3579,14 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
 
   $data = ($data>>$pos) & (0xffffffff>>(32-$size));
   if (!$conversion){                ;# do nothing
-  } elsif($conversion eq "factor"){$data /= $factor;
-  } elsif($conversion eq "lit"   ){$data = $reg->{litInv}{$data}?$reg->{litInv}{$data}:"undef lit";
-  } elsif($conversion eq "fltCvT"){$data = CUL_HM_CvTflt($data);
-  } elsif($conversion eq "m10s3" ){$data = ($data+3)/10;
-  } elsif($conversion eq "hex"   ){$data = sprintf("0x%X",$data);
+  } elsif($conversion eq "lit"     ){$data = $reg->{litInv}{$data}?$reg->{litInv}{$data}:"undef lit";
+  } elsif($conversion eq "fltCvT"  ){$data = CUL_HM_CvTflt($data);
+  } elsif($conversion eq "fltCvT60"){$data = CUL_HM_CvTflt60($data);
+  } elsif($conversion eq "m10s3"   ){$data = ($data+3)/10;
+  } elsif($conversion eq "hex"     ){$data = sprintf("0x%X",$data);
   } else { return " conversion undefined - please contact admin";
   } 
+  $data /= $factor if ($factor);# obey factor after possible conversion
   return $convFlg.$data.$unit;
 }
 sub CUL_HM_updtRegDisp($$$) {
@@ -3624,8 +3640,6 @@ sub CUL_HM_updtRegDisp($$$) {
 #############################
 #+++++++++++++++++ parameter cacculations +++++++++++++++++++++++++++++++++++++
 my @culHmTimes8 = ( 0.1, 1, 5, 10, 60, 300, 600, 3600 );
-my %fltCvT = (0.1=>3.1,1=>31,5=>155,10=>310,60=>1860,300=>9300,
-              600=>18600,3600=>111601);
 sub CUL_HM_encodeTime8($) {#####################
   my $v = shift;
   return "00" if($v < 0.1);
@@ -3746,6 +3760,26 @@ sub CUL_HM_initRegHash() { #duplicate short and long press register
     }
   }
 }
+
+my %fltCvT60 = (1=>127,60=>7620);
+sub CUL_HM_fltCvT60($) { # float -> config time
+  my ($inValue) = @_;
+  my $exp = 0;
+  my $div2;
+  foreach my $div(sort{$a <=> $b} keys %fltCvT60){
+    $div2 = $div;
+	last if ($inValue < $fltCvT60{$div});
+	$exp++;
+  }
+  return ($exp << 7)+int($inValue/$div2+.1);
+}
+sub CUL_HM_CvTflt60($) { # config time -> float
+  my ($inValue) = @_;
+  return ($inValue & 0x7f)*((sort {$a <=> $b} keys(%fltCvT60))[$inValue >> 7]);
+}
+
+my %fltCvT = (0.1=>3.1,1=>31,5=>155,10=>310,60=>1860,300=>9300,
+              600=>18600,3600=>111601);
 sub CUL_HM_fltCvT($) { # float -> config time
   my ($inValue) = @_;
   my $exp = 0;
