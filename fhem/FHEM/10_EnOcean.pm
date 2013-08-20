@@ -311,7 +311,7 @@ EnOcean_Set($@)
         my $block = ReadingsVal($name, "block", "unlock");
         if ($cmd eq "teach") {
           # teach-in EEP A5-10-06 plus "FVS", Manufacturer "Eltako"
-          $data = "40370D85";
+          $data = "40300D85";
           CommandDeleteReading(undef, "$name .*");
         } elsif ($cmd eq "desired-temp" || $cmd eq "setpointTemp") {
           #
