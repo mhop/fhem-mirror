@@ -216,14 +216,6 @@ sub structure_Notify($$)
   foreach my $d (sort keys %{ $hash->{CONTENT} }) {
     next if(!$defs{$d});
 
-    # wenn zum Device das "structexclude" gesetzt ist, wird dieses nicht
-    # beruecksichtigt
-    if($attr{$d} && $attr{$d}{structexclude}) {
-      my $se = $attr{$d}{structexclude};
-      next if($me =~ m/$se/);
-    }
-
-
     # Status des Devices gemaess den Regeln des gesetztes StrukturAttr
     # umformatieren
     if($attr{$d} && $attr{$d}{$devmap}) {
