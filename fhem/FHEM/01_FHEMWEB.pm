@@ -70,11 +70,13 @@ use vars qw(@FW_fhemwebjs);# List of fhemweb*js scripts to load
 use vars qw($FW_detail);   # currently selected device for detail view
 use vars qw($FW_cmdret);   # Returned data by the fhem call
 use vars qw($FW_room);      # currently selected room
+use vars qw($FW_formmethod);
+
+$FW_formmethod = "post";
 
 my $FW_zlib_checked;
 my $FW_use_zlib = 1;
 my $FW_activateInform = 0;
-my $FW_formmethod = "post";
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.

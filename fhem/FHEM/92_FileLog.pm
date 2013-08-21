@@ -21,7 +21,7 @@ use vars qw($FW_wname);   # Web instance
 use vars qw(%FW_pos);     # scroll position
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
-sub seekTo($$$$);
+sub FileLog_seekTo($$$$);
 
 #####################################
 sub
@@ -39,8 +39,9 @@ FileLog_Initialize($)
   # logtype is used by the frontend
   $hash->{AttrList} = "disable:0,1 logtype nrarchive archivedir archivecmd";
 
-  $hash->{FW_summaryFn} = "FileLog_fhemwebFn";
-  $hash->{FW_detailFn}  = "FileLog_fhemwebFn";
+  $hash->{FW_summaryFn}     = "FileLog_fhemwebFn";
+  $hash->{FW_detailFn}      = "FileLog_fhemwebFn";
+  $hash->{SVG_sampleDataFn} = "FileLog_sampleDataFn";
   $data{FWEXT}{"/FileLog_toSVG"}{CONTENTFUNC} = "FileLog_toSVG";
   $data{FWEXT}{"/FileLog_logWrapper"}{CONTENTFUNC} = "FileLog_logWrapper";
 }
@@ -548,7 +549,7 @@ FileLog_Get($@)
   Log3 $name, 4, "$name get: Input file $inf, from:$from  to:$to";
 
   my $ifh = new IO::File $inf if($inf);
-  seekTo($inf, $ifh, $hash, $from) if($ifh);
+  FileLog_seekTo($inf, $ifh, $hash, $from) if($ifh);
 
   # Return the the plain file data, $outf is ignored
   if(!@a) {
@@ -808,7 +809,7 @@ seekBackOneLine($$)
 
 ###################################
 sub
-seekTo($$$$)
+FileLog_seekTo($$$$)
 {
   my ($fname, $fh, $hash, $ts) = @_;
 
@@ -858,6 +859,70 @@ seekTo($$$$)
   }
   $hash->{pos}{"$fname:$ts"} = $last;
 
+}
+
+sub
+FileLog_addTics($$)
+{
+  my ($in, $p) = @_;
+  return if(!$in || $in !~ m/^\((.*)\)$/);
+  map { $p->{"\"$2\""}=1 if(m/^ *([^ ]+) ([^ ]+) */); } split(",",$1);
+}
+
+sub
+FileLog_sampleDataFn($$$$$)
+{
+  my ($flName, $flog, $max, $conf, $wName) = @_;
+  my $desc = "Input:Column,Regexp,DefaultValue,Function";
+
+  my $fName = $defs{$flName}{currentlogfile};
+  my $fh = new IO::File $fName;
+  if(!$fh) {
+    $fName = "<undefined>" if(!defined($fName));
+    Log3 $wName, 1, "FileLog get sample data: $fName: $!";
+    return ($desc, undef, "");
+  }
+  $fh->seek(0, 2); # Go to the end
+  my $sz = $fh->tell;
+  $fh->seek($sz > 65536 ? $sz-65536 : 0, 0);
+  my $data;
+  $data = <$fh> if($sz > 65536); # discard the first/partial line
+  my $maxcols = 0;
+  my %h;
+  while($data = <$fh>) {
+    my @cols = split(" ", $data);
+    next if(@cols < 3);
+    $maxcols = @cols if(@cols > $maxcols);
+    $cols[2] = "*" if($cols[2] =~ m/^[-\.\d]+$/);
+    $h{"$cols[1].$cols[2]"} = $data;
+    $h{"$cols[1].*"} = "" if($cols[2] ne "*");
+  }
+  $fh->close();
+
+  my $colnums = $maxcols+1;
+  my $colregs = join(",", sort keys %h);
+  my $example = join("<br>", grep /.+/,map { $h{$_} } sort keys %h);
+
+  $colnums = join(",", 3..$colnums);
+
+  my %tickh;
+  FileLog_addTics($conf->{ytics}, \%tickh);
+  FileLog_addTics($conf->{y2tics}, \%tickh);
+  $colnums = join(",", sort keys %tickh).",$colnums" if(%tickh);
+
+  $max = 8 if($max > 8);
+  my @htmlArr;
+  for(my $r=0; $r < $max; $r++) {
+    my @f = split(":", ($flog->[$r] ? $flog->[$r] : ":::"), 4);
+    my $ret = "";
+    $ret .= SVG_sel("par_${r}_0", $colnums, $f[0]);
+    $ret .= SVG_sel("par_${r}_1", $colregs, $f[1]);
+    $ret .= SVG_txt("par_${r}_2", "", $f[2], 1);
+    $ret .= SVG_txt("par_${r}_3", "", $f[3], 6);
+    push @htmlArr, $ret;
+  }
+
+  return ($desc, \@htmlArr, $example);
 }
 
 1;
