@@ -63,8 +63,8 @@ use vars qw($FW_subdir);  # Sub-path in URL, used by FLOORPLAN/weblink
 use vars qw(%FW_pos);     # scroll position
 use vars qw($FW_cname);   # Current connection name
 use vars qw(%FW_hiddenroom); # hash of hidden rooms, used by weblink
-use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by weblink
-use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by weblink
+use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by SVG
+use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by SVG
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 use vars qw(@FW_fhemwebjs);# List of fhemweb*js scripts to load
 use vars qw($FW_detail);   # currently selected device for detail view
@@ -2350,7 +2350,7 @@ FW_ActivateInform()
     <li>plotsize<br>
         the default size of the plot, in pixels, separated by comma:
         width,height. You can set individual sizes by setting the plotsize of
-        the weblink. Default is 800,160 for desktop, and 480,160 for
+        the SVG. Default is 800,160 for desktop, and 480,160 for
         smallscreen.
         </li><br>
 
@@ -2360,19 +2360,6 @@ FW_ActivateInform()
         to the current timestamp). The files are written to the www/SVGcache
         directory. Default is off.<br>
         See also the clearSvgCache command for clearing the cache.
-        </li><br>
-
-    <a name="fixedrange"></a>
-    <li>fixedrange<br>
-        Can be applied to weblink devices (FHEMWEB).<br>
-        Contains two time specs in the form YYYY-MM-DD separated by a space.
-        In plotmode gnuplot-scroll or SVG the given time-range will be used,
-        and no scrolling for this weblinks will be possible. Needed e.g. for
-        looking at last-years data without scrolling.<br><br>
-        If the value is one of day, week, month, year than set the zoom level
-        for this weblink independently of the user specified zoom-level.
-        This is useful for pages with multiple plots: one of the plots is best
-        viewed in with the default (day) zoom, the other one with a week zoom.
         </li><br>
 
     <a name="endPlotToday"></a>
@@ -2409,12 +2396,7 @@ FW_ActivateInform()
         accepted.
         Example:<br>
         <code>
-        attr WEB basicAuth { "$user:$password" eq "admin:secret" }<br>
-        attr WEB basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") }<br>
-        </code>
-        or if you defined multiple users on the Fritzbox:<br>
-        <code>
-        attr WEB basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$user", "$password") }<br>
+          attr WEB basicAuth { "$user:$password" eq "admin:secret" }<br>
         </code>
     </li><br>
 
