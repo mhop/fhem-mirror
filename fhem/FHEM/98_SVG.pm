@@ -16,8 +16,8 @@ use vars qw($FW_cssdir);  # css directory
 use vars qw($FW_detail);  # currently selected device for detail view
 use vars qw($FW_dir);     # base directory for web server
 use vars qw($FW_gplotdir);# gplot directory for web server: the first
-use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by weblink
-use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by weblink
+use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by SVG
+use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by SVG
 use vars qw($FW_room);    # currently selected room
 use vars qw($FW_subdir);  # Sub-path in URL, used by FLOORPLAN/weblink
 use vars qw($FW_wname);   # Web instance
@@ -27,7 +27,7 @@ use vars qw(%FW_webArgs); # all arguments specified in the GET
 use vars qw($FW_formmethod);
 
 my $SVG_RET;        # Returned data (SVG)
-sub SVG_calcWeblink($$);
+sub SVG_calcOffsets($$);
 sub SVG_doround($$$);
 sub SVG_fmtTime($$);
 sub SVG_pO($);
@@ -48,7 +48,7 @@ SVG_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn} = "SVG_Define";
-  $hash->{AttrList} = "fixedrange plotsize label title plotfunction";
+  $hash->{AttrList} = "fixedrange startDate plotsize label title plotfunction";
   $hash->{SetFn}    = "SVG_Set";
   $hash->{FW_summaryFn} = "SVG_FwFn";
   $hash->{FW_detailFn}  = "SVG_FwFn";
@@ -537,10 +537,10 @@ SVG_substcfg($$$$$$)
 }
 
 ##################
-# Calculate either the number of scrollable weblinks (for $d = undef) or
+# Calculate either the number of scrollable SVGs (for $d = undef) or
 # for the device the valid from and to dates for the given zoom and offset
 sub
-SVG_calcWeblink($$)
+SVG_calcOffsets($$)
 {
   my ($d,$wl) = @_;
 
@@ -569,7 +569,14 @@ SVG_calcWeblink($$)
   $off = 0 if(!$off);
   $off += $FW_pos{off} if($FW_pos{off});
 
-  my $now = time();
+  my $now;
+  my $st = AttrVal($wl, "startDate", undef);
+  if($st) {
+    $now = mktime(0,0,12,$3,$2-1,$1-1900,0,0,-1)
+      if($st =~ m/(\d\d\d\d)-(\d\d)-(\d\d)/);
+  }
+  $now = time() if(!$now);
+
   my $zoom = $FW_pos{zoom};
   $zoom = "day" if(!$zoom);
   $zoom = $frx if ($frx); #for fixedrange {day|week|...} klaus
@@ -677,7 +684,7 @@ SVG_showLog($)
 
     }
   }
-  SVG_calcWeblink($d,$wl);
+  SVG_calcOffsets($d,$wl);
 
   if($pm =~ m/gnuplot/) {
 
@@ -1494,9 +1501,27 @@ SVG_pO($)
   <a name="SVGattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#fixedrange">fixedrange</a></li>
-    <li><a href="#plotsize">plotsize</a></li>
-    <li><a href="#plotmode">plotmode</a></li>
+    <a name="fixedrange"></a>
+    <li>fixedrange<br>
+        Contains two time specs in the form YYYY-MM-DD separated by a space.
+        In plotmode gnuplot-scroll or SVG the given time-range will be used,
+        and no scrolling for this weblinks will be possible. Needed e.g. for
+        looking at last-years data without scrolling.<br><br>
+        If the value is one of day, week, month, year than set the zoom level
+        for this weblink independently of the user specified zoom-level.
+        This is useful for pages with multiple plots: one of the plots is best
+        viewed in with the default (day) zoom, the other one with a week zoom.
+        </li><br>
+
+    <a name="startDate"></a>
+    <li>startDate<br>
+        Set the start date for the plot. Used for demo installations.
+        </li><br>
+
+    <li><a href="#plotsize">plotsize</a></li><br>
+
+    <li><a href="#plotmode">plotmode</a></li><br>
+
     <a name="label"></a>
     <li>label<br>
       Double-Colon separated list of values. The values will be used to replace
