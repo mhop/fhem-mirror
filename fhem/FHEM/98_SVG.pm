@@ -24,13 +24,14 @@ use vars qw($FW_wname);   # Web instance
 use vars qw(%FW_hiddenroom); # hash of hidden rooms, used by weblink
 use vars qw(%FW_pos);     # scroll position
 use vars qw(%FW_webArgs); # all arguments specified in the GET
+use vars qw($FW_formmethod);
 
 my $SVG_RET;        # Returned data (SVG)
 sub SVG_calcWeblink($$);
 sub SVG_doround($$$);
 sub SVG_fmtTime($$);
 sub SVG_pO($);
-sub SVG_readgplotfile($$$);
+sub SVG_readgplotfile($$);
 sub SVG_render($$$$$$$$$);
 sub SVG_showLog($);
 sub SVG_substcfg($$$$$$);
@@ -198,60 +199,27 @@ SVG_sel($$$@)
   return FW_select($v,$v,\@al,$c, "set", $fnData);
 }
 
-sub
-SVG_getRegFromFile($$)
-{
-  my ($wName, $fName) = @_;
-  my $fh = new IO::File $fName;
-  if(!$fh) {
-    Log3 $wName, 1, "$fName: $!";
-    return (3, "NoFile", "NoFile");
-  }
-  $fh->seek(0, 2); # Go to the end
-  my $sz = $fh->tell;
-  $fh->seek($sz > 65536 ? $sz-65536 : 0, 0);
-  my $data;
-  $data = <$fh> if($sz > 65536); # discard the first/partial line
-  my $maxcols = 0;
-  my %h;
-  while($data = <$fh>) {
-    my @cols = split(" ", $data);
-    next if(@cols < 3);
-    $maxcols = @cols if(@cols > $maxcols);
-    $cols[2] = "*" if($cols[2] =~ m/^[-\.\d]+$/);
-    $h{"$cols[1].$cols[2]"} = $data;
-    $h{"$cols[1].*"} = "" if($cols[2] ne "*");
-  }
-  $fh->close();
-  return ($maxcols+1, 
-                join(",", sort keys %h),
-                join("<br>", grep /.+/,map { $h{$_} } sort keys %h)),
-  close(FH);
-}
-
-sub
-SVG_addTics($$)
-{
-  my ($in, $p) = @_;
-  return if(!$in || $in !~ m/^\((.*)\)$/);
-  map { $p->{"\"$2\""}=1 if(m/^ *([^ ]+) ([^ ]+) */); } split(",",$1);
-}
-
 ############################
 # gnuplot file "editor"
 sub
 SVG_PEdit($$$$)
 {
   my ($FW_wname,$d,$room,$pageHash) = @_;
+
+  my $ld = $defs{$d}{LOGDEVICE};
+  my $ldt = $defs{$ld}{TYPE};
+
   my $gp = "$FW_gplotdir/$defs{$d}{GPLOTFILE}.gplot";
-  my $file = $defs{$defs{$d}{LOGDEVICE}}{currentlogfile};
   
-  my ($err, $cfg, $plot, $flog) = SVG_readgplotfile($d, $gp, $file);
+  my ($err, $cfg, $plot, $flog) = SVG_readgplotfile($d, $gp);
   my %conf = SVG_digestConf($cfg, $plot);
 
-  my $ret .= "<br><form autocomplete=\"off\" action=\"$FW_ME/SVG_WriteGplot\">";
+  my $ret = "<br>";
+  $ret .= "<form method=\"$FW_formmethod\" autocomplete=\"off\" ".
+                "action=\"$FW_ME/SVG_WriteGplot\">";
   $ret .= FW_hidden("detail", $d);
   $ret .= FW_hidden("gplotName", $gp);
+  $ret .= FW_hidden("logdevicetype", $ldt);
   $ret .= "<table class=\"block wide plotEditor\">";
   $ret .= "<tr class=\"even\">";
   $ret .= "<td>Plot title</td>";
@@ -280,32 +248,32 @@ SVG_PEdit($$$$)
   $ret .= "<td>".SVG_txt("y2tics","right", $conf{y2tics}, 16)."</td>";
   $ret .= "</tr>";
 
-  $ret .= "<tr class=\"odd\"><td>Diagramm label</td>";
-  $ret .= "<td>Input:Column,Regexp,DefaultValue,Function</td>";
-  $ret .=" <td>Y-Axis,Plot-Type,Style,Width</td></tr>";
-
-  my ($colnums, $colregs, $coldata) = SVG_getRegFromFile($FW_wname, $file);
-  $colnums = join(",", 3..$colnums);
-
-  my %tickh;
-  SVG_addTics($conf{ytics}, \%tickh);
-  SVG_addTics($conf{y2tics}, \%tickh);
-  $colnums = join(",", sort keys %tickh).",$colnums" if(%tickh);
-
   my $max = @{$conf{lType}}+1;
   $max = 8 if($max > 8);
+  my ($desc, $htmlArr, $example) = ("Spec", undef, "");
+  if($modules{$ldt}{SVG_sampleDataFn}) {
+    no strict "refs";
+    ($desc, $htmlArr, $example) = 
+        &{$modules{$ldt}{SVG_sampleDataFn}}($ld, $flog, $max,\%conf, $FW_wname);
+    use strict "refs";
+  } else {
+    my @htmlArr; 
+    @htmlArr = map { SVG_txt("par_${_}_0","",$flog->[$_] ? $flog->[$_]:"",20) }
+                   (0..$max-1);
+    $htmlArr = \@htmlArr;
+  }
+
+  $ret .= "<tr class=\"odd\"><td>Diagramm label</td>";
+  $ret .= "<td>$desc</td>";
+  $ret .=" <td>Y-Axis,Plot-Type,Style,Width</td></tr>";
+
   my $r = 0;
   for($r=0; $r < $max; $r++) {
     $ret .= "<tr class=\"".(($r&1)?"odd":"even")."\"><td>";
     $ret .= SVG_txt("title_${r}", "", !$conf{lTitle}[$r]&&$r<($max-1) ? 
                                       "notitle" : $conf{lTitle}[$r], 12);
     $ret .= "</td><td>";
-    my @f = split(":", ($flog->[$r] ? $flog->[$r] : ":::"), 4);
-    $ret .= SVG_sel("cl_${r}", $colnums, $f[0]);
-    $ret .= SVG_sel("re_${r}", $colregs, $f[1]);
-    $ret .= SVG_txt("df_${r}", "", $f[2], 1);
-    $ret .= SVG_txt("fn_${r}", "", $f[3], 6);
-
+    $ret .= $htmlArr->[$r] if($htmlArr && @{$htmlArr} > $r);
     $ret .= "</td><td>";
     my $v = $conf{lAxis}[$r];
     $ret .= SVG_sel("axes_${r}", "left,right", 
@@ -328,7 +296,7 @@ SVG_PEdit($$$$)
     $ret .= "</td></tr>";
   }
   $ret .= "<tr class=\"".(($r++&1)?"odd":"even")."\"><td colspan=\"3\">";
-  $ret .= "Example lines for input:<br>$coldata</td></tr>";
+  $ret .= "Example lines for input:<br>$example</td></tr>";
 
   $ret .= "<tr class=\"".(($r++&1)?"odd":"even")."\"><td colspan=\"3\">";
   $ret .= FW_submit("submit", "Write .gplot file")."</td></tr>";
@@ -405,7 +373,7 @@ SVG_WriteGplot($)
   my ($arg) = @_;
   FW_digestCgi($arg);
 
-  if(!defined($FW_webArgs{cl_0})) {
+  if(!defined($FW_webArgs{par_0_0})) {
     FW_pO "missing data in logfile: won't write incomplete .gplot definition";
     return 0;
   }
@@ -422,7 +390,7 @@ SVG_WriteGplot($)
     FW_pO "SVG_WriteGplot: Can't write $fName";
     return 0;
   }
-  print FH "# Created by FHEMWEB, ".TimeNow()."\n";
+  print FH "# Created by FHEM/98_SVG.pm, ".TimeNow()."\n";
   print FH "set terminal png transparent size <SIZE> crop\n";
   print FH "set output '<OUT>.png'\n";
   print FH "set xdata time\n";
@@ -439,15 +407,15 @@ SVG_WriteGplot($)
   print FH "set y2range $FW_webArgs{y2range}\n" if($FW_webArgs{y2range});
   print FH "\n";
 
+  my $ld = $FW_webArgs{logdevicetype};
   my @plot;
   for(my $i=0; $i <= 8; $i++) {
     next if(!$FW_webArgs{"title_$i"});
-    my $re = $FW_webArgs{"re_$i"};
-    $re = "" if(!defined($re));
-    $re =~ s/:/\\x3a/g;
-    print FH "#FileLog ". $FW_webArgs{"cl_$i"} .":$re:".
-                          $FW_webArgs{"df_$i"} .":".
-                          $FW_webArgs{"fn_$i"} ."\n";
+    my $prf = "par_${i}_";
+    my @v = map {$FW_webArgs{"$prf$_"}} grep {$FW_webArgs{"$prf$_"}} (0..9);
+    my $r = @v > 1 ? join(":", map { s/:/\\x3a/g; $_ } @v) : $v[0];
+
+    print FH "#$ld $r\n";
     push @plot, "\"<IN>\" using 1:2 axes ".
                 ($FW_webArgs{"axes_$i"} eq "right" ? "x1y2" : "x1y1").
                 ($FW_webArgs{"title_$i"} eq "notitle" ? " notitle" :
@@ -464,9 +432,9 @@ SVG_WriteGplot($)
 }
 
 sub
-SVG_readgplotfile($$$)
+SVG_readgplotfile($$)
 {
-  my ($wl, $gplot_pgm, $file) = @_;
+  my ($wl, $gplot_pgm) = @_;
 
   ############################
   # Read in the template gnuplot file.  Digest the #FileLog lines.  Replace
@@ -518,7 +486,8 @@ SVG_substcfg($$$$$$)
   my $oll = $attr{global}{verbose};
   $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
 
-  if($file eq "CURRENT") {
+  my $ldt = $defs{$defs{$wl}{LOGDEVICE}}{TYPE};
+  if($file eq "CURRENT" && $ldt eq "FileLog") {
     $file = $defs{$defs{$wl}{LOGDEVICE}}{currentlogfile};
     $file =~ s+.*/++;
   }
@@ -722,7 +691,7 @@ SVG_showLog($)
       $path = AttrVal($d,"archivedir","") . "/$file" if(!-f $path);
       return ($FW_RETTYPE, "Cannot read $path") if(!-r $path);
 
-      my ($err, $cfg, $plot, undef) = SVG_readgplotfile($wl, $gplot_pgm, $file);
+      my ($err, $cfg, $plot, undef) = SVG_readgplotfile($wl, $gplot_pgm);
       return ($FW_RETTYPE, $err) if($err);
       my $gplot_script = SVG_substcfg(0, $wl, $cfg, $plot, $file,$tmpfile);
 
@@ -738,7 +707,7 @@ SVG_showLog($)
       close(FH);
 
     } elsif($pm eq "gnuplot-scroll") {
-      my ($err, $cfg, $plot, $flog) = SVG_readgplotfile($wl, $gplot_pgm, $file);
+      my ($err, $cfg, $plot, $flog) = SVG_readgplotfile($wl, $gplot_pgm);
       return ($FW_RETTYPE, $err) if($err);
 
       # Read the data from the filelog
@@ -777,18 +746,13 @@ SVG_showLog($)
     unlink("$tmpfile.png");
 
   } elsif($pm eq "SVG") {
-    my ($err, $cfg, $plot, $flog) = SVG_readgplotfile($wl, $gplot_pgm, $file);
+    my ($err, $cfg, $plot, $flog) = SVG_readgplotfile($wl, $gplot_pgm);
     return ($FW_RETTYPE, $err) if($err);
 
     my ($f,$t)=($SVG_devs{$d}{from}, $SVG_devs{$d}{to});
     $f = 0 if(!$f);     # From the beginning of time...
     $t = 9 if(!$t);     # till the end
 
-    my $ret;
-    if(!$modules{SVG}{LOADED}) {
-      $ret = CommandReload(undef, "98_SVG");
-      Log3 $FW_wname, 1, $ret if($ret);
-    }
     Log3 $FW_wname, 5,
         "plotcommand: get $d $file INT $f $t " . join(" ", @{$flog});
 
@@ -805,7 +769,7 @@ SVG_showLog($)
     } else {
       FW_fC("get $d $file INT $f $t " . join(" ", @{$flog}), 1);
       ($cfg, $plot) = SVG_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
-      $ret = SVG_render($wl, $f, $t, $cfg,
+      my $ret = SVG_render($wl, $f, $t, $cfg,
                         $internal_data, $plot, $FW_wname, $FW_cssdir, $flog);
       FW_pO $ret;
       if($SVGcache) {
@@ -1176,6 +1140,8 @@ SVG_render($$$$$$$$$)
     next if( $axdrawn{$a} );
     $axdrawn{$a}=1;
    
+    next if(!defined($hmin{$a})); # Bogus case
+
     #-- safeguarding against pathological data
     if( !$hstep{$a} ){
         $hmax{$a} = $hmin{$a}+1;
