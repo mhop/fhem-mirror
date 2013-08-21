@@ -23,6 +23,7 @@ my %culHmGlobalGets       =HMConfig::HMConfig_getHash("culHmGlobalGets");
 my %culHmSubTypeGets      =HMConfig::HMConfig_getHash("culHmSubTypeGets");
 my %culHmModelGets        =HMConfig::HMConfig_getHash("culHmModelGets");
 my %culHmGlobalSetsDevice =HMConfig::HMConfig_getHash("culHmGlobalSetsDevice");
+my %culHmSubTypeDevSets   =HMConfig::HMConfig_getHash("culHmSubTypeDevSets");
 my %culHmGlobalSetsChn    =HMConfig::HMConfig_getHash("culHmGlobalSetsChn");
 my %culHmGlobalSets       =HMConfig::HMConfig_getHash("culHmGlobalSets");
 my %culHmGlobalSetsVrtDev =HMConfig::HMConfig_getHash("culHmGlobalSetsVrtDev");
@@ -419,7 +420,8 @@ sub CUL_HM_Attr(@) {#################################
   }
   elsif($attrName eq "actCycle"){#"000:00" or 'off'
     return if (CUL_HM_name2Id($name) eq $K_actDetID);
-	# Add to ActionDetector. Wait a little - config might not be finished
+	return "attribut not allowed for channels" 
+	                if (!$hash->{helper}{role}{dev});
 	$updtReq = 1; 
   }
   elsif($attrName eq "param"){
@@ -444,8 +446,6 @@ sub CUL_HM_Attr(@) {#################################
 
   CUL_HM_queueUpdtCfg($name) if ($updtReq);
   return;
-  
-  
 }
 
 #+++++++++++++++++ msg receive, parsing++++++++++++++++++++++++++++++++++++++++
@@ -543,6 +543,8 @@ sub CUL_HM_Parse($$) {##############################
   #----------start valid messages parsing ---------
   my $parse = CUL_HM_parseCommon($mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md);
   push @event, "powerOn"   if($parse eq "powerOn");
+  push @event, ""          if($parse eq "parsed"); # msg is parsed but may
+                                                   # be processed further 
   if ($parse =~ s/entities://){#common generated trigger for some entities
     push @entities,split(",",$parse);
   }
@@ -875,7 +877,7 @@ sub CUL_HM_Parse($$) {##############################
 		                                     ,'state',$d,1);
 		}
 		else{
-          push @event, "Chan_$a:$d"; # General todo Implement this, remote t1-t2
+          push @event, "Chan_$a:$d"; 
 		}
 	  }
 	}
@@ -1676,6 +1678,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  if ($lN =~ s/00:00//){$lN .= " 00:00"};
       readingsSingleUpdate($chnHash,$regLN,$lN,0);
 	  CUL_HM_updtRegDisp($chnHash,$list,$peerID);
+	  $ret= "parsed";
 	}  
 	elsif($subType eq "06"){ #reply to status request=======================
 	  my $rssi = substr($p,8,2);# --calculate RSSI
@@ -1826,7 +1829,7 @@ sub CUL_HM_Get($@) {
 	  push @regArr, keys %{$culHmRegType{$st}} if($culHmRegType{$st}); 
 	  push @regArr, keys %{$culHmRegModel{$md}} if($culHmRegModel{$md}); 
 	  push @regArr, keys %{$culHmRegChan{$md.$chn}} if($culHmRegChan{$md.$chn}); 
-	  
+
 	  my @peers; # get all peers we have a reglist 
 	  my @listWp; # list that require peers
 	  foreach my $readEntry (keys %{$hash->{READINGS}}){
@@ -1840,11 +1843,13 @@ sub CUL_HM_Get($@) {
 	  my @regValList; #storage of results
 	  my $regHeader = "list:peer\tregister         :value\n";
 	  foreach my $regName (@regArr){
+	    Log 1,"Gegeral process $regName";
 	    my $regL  = $culHmRegDefine{$regName}->{l};
 		my @peerExe = (grep (/$regL/,@listWp))?@peers:("00000000");
 		foreach my $peer(@peerExe){
 		  next if($peer eq "");
 	      my $regVal= CUL_HM_getRegFromStore($name,$regName,0,$peer);#determine
+	    Log 1,"Gegeral get $regName p:$peer v:$regVal";
 		  my $peerN = CUL_HM_id2Name($peer);
 		  $peerN = "      " if ($peer  eq "00000000");
 		  push @regValList,sprintf("   %d:%s\t%-16s :%s\n",
@@ -1888,22 +1893,22 @@ sub CUL_HM_Get($@) {
 	foreach my $regName (@regArr){
 	  my $reg  = $culHmRegDefine{$regName};	  
 	  my $help = $reg->{t};
-	  my ($min,$max) = ($reg->{min},$reg->{max});
+	  my ($min,$max) = ($reg->{min},"to ".$reg->{max});
 	  if (defined($reg->{lit})){
 	    $help .= " options:".join(",",keys%{$reg->{lit}});
-	    $min =$max ="-";
+	    $min = "";
+		$max = "literal";
 	  }
-	  push @rI,sprintf("%4d: %-16s | %3s to %-11s | %8s |%-3s| %s\n",
+	  push @rI,sprintf("%4d: %-16s | %3s %-14s | %8s | %s\n",
 			  $reg->{l},$regName,$min,$max.$reg->{u},
               ((($reg->{l} == 3)||($reg->{l} == 4))?"required":""),
-              (($reg->{d} != 1)?"exp":""),
 			  $help)
 	        if (($roleD && $reg->{l} == 0)||
 			    ($roleC && $reg->{l} != 0));
 	}
 	
-    my $info = sprintf("list: %16s | %-18s | %-8s |%-3s| %s\n",
-	                 "register","range","peer","exp","description");
+    my $info = sprintf("list: %16s | %-18s | %-8s | %s\n",
+	                 "register","range","peer","description");
 	foreach(sort(@rI)){$info .= $_;}
 	return $info;
   }
@@ -1970,14 +1975,16 @@ sub CUL_HM_Set($@) {
   my $roleD = $hash->{helper}{role}{dev}?1:0;
   my $roleV = $hash->{helper}{role}{vrt}?1:0;
   my $mdCh = $md.($isChannel?$chn:"00"); # chan specific commands?
-  my $h = $culHmGlobalSets{$cmd}     if(                $st ne "virtual");
-  $h = $culHmGlobalSetsVrtDev{$cmd}  if(!defined($h) &&($st eq "virtual"||!$st)  && $roleD);
-  $h = $culHmGlobalSetsDevice{$cmd}  if(!defined($h) && $st ne "virtual"         && $roleD);
-  $h = $culHmGlobalSetsChn{$cmd}     if(!defined($h) && $st ne "virtual"         && $roleC);
-  $h = $culHmSubTypeSets{$st}{$cmd}  if(!defined($h) && $culHmSubTypeSets{$st}   && $roleC);
-  $h = $culHmModelSets{$md}{$cmd}    if(!defined($h) && $culHmModelSets{$md}  );
-  $h = $culHmChanSets{$md."00"}{$cmd}if(!defined($h) && $culHmChanSets{$md."00"} && $roleD);
-  $h = $culHmChanSets{$md.$chn}{$cmd}if(!defined($h) && $culHmChanSets{$md.$chn} && $roleC);
+  my $id = CUL_HM_IOid($hash);
+  my $h = $culHmGlobalSets{$cmd}      if(                $st ne "virtual");
+  $h = $culHmGlobalSetsVrtDev{$cmd}   if(!defined($h) &&($st eq "virtual"||!$st)  && $roleD);
+  $h = $culHmGlobalSetsDevice{$cmd}   if(!defined($h) && $st ne "virtual"         && $roleD);
+  $h = $culHmSubTypeDevSets{$st}{$cmd}if(!defined($h) && $st ne "virtual"         && $roleD);
+  $h = $culHmGlobalSetsChn{$cmd}      if(!defined($h) && $st ne "virtual"         && $roleC);
+  $h = $culHmSubTypeSets{$st}{$cmd}   if(!defined($h) && $culHmSubTypeSets{$st}   && $roleC);
+  $h = $culHmModelSets{$md}{$cmd}     if(!defined($h) && $culHmModelSets{$md}  );
+  $h = $culHmChanSets{$md."00"}{$cmd} if(!defined($h) && $culHmChanSets{$md."00"} && $roleD);
+  $h = $culHmChanSets{$md.$chn}{$cmd} if(!defined($h) && $culHmChanSets{$md.$chn} && $roleC);
 
   my @h;
   @h = split(" ", $h) if($h);
@@ -1987,14 +1994,16 @@ sub CUL_HM_Set($@) {
   } 
   elsif(!defined($h)) {
     my @arr;
-    @arr = keys %culHmGlobalSets               if( $st ne "virtual");
-    push @arr, keys %culHmGlobalSetsVrtDev     if(($st eq "virtual"||!$st)  && $roleD);
-    push @arr, keys %culHmGlobalSetsDevice     if( $st ne "virtual"         && $roleD);
-    push @arr, keys %culHmGlobalSetsChn        if( $st ne "virtual"         && $roleC);
-    push @arr, keys %{$culHmSubTypeSets{$st}}  if( $culHmSubTypeSets{$st}   && $roleC);
-    push @arr, keys %{$culHmModelSets{$md}}    if( $culHmModelSets{$md});
-    push @arr, keys %{$culHmChanSets{$md."00"}}if( $culHmChanSets{$md."00"} && $roleD);
-    push @arr, keys %{$culHmChanSets{$md.$chn}}if( $culHmChanSets{$md.$chn} && $roleC);
+    @arr = keys %culHmGlobalSets                 if( $st ne "virtual");
+    push @arr, keys %culHmGlobalSetsVrtDev       if(($st eq "virtual"||!$st)  && $roleD);
+    push @arr, keys %culHmGlobalSetsDevice       if( $st ne "virtual"         && $roleD);
+    push @arr, keys %{$culHmSubTypeDevSets{$st}} if( $st ne "virtual"         && $roleD);
+    push @arr, keys %culHmGlobalSetsChn          if( $st ne "virtual"         && $roleC);
+    push @arr, keys %{$culHmSubTypeSets{$st}}    if( $culHmSubTypeSets{$st}   && $roleC);
+    push @arr, keys %{$culHmModelSets{$md}}      if( $culHmModelSets{$md});
+    push @arr, keys %{$culHmChanSets{$md."00"}}  if( $culHmChanSets{$md."00"} && $roleD);
+    push @arr, keys %{$culHmChanSets{$md.$chn}}  if( $culHmChanSets{$md.$chn} && $roleC);
+	@arr = CUL_HM_noDup(@arr);
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr); 
 
     $usg =~ s/ pct/ pct:slider,0,1,100/;
@@ -2055,6 +2064,28 @@ sub CUL_HM_Set($@) {
 
 	@a = ($a[0],"regBulk","RegL_01:",split(" ",$l1.$l2));
   }
+  elsif($cmd eq "partyMode") { ################################################
+    my $days = $a[3]; 
+	my ($eH,$eM)  = split(':',$a[2]); 
+	return "use 00 or 30 minutes only" if ($eM !~ m/^(00|30)$/);
+	return "hour must be between 0 and 23" if ($eH lt 0 || $eH gt 23);
+	return "days must be between 0 and 200" if ($days lt 0 || $days gt 200);
+	$eH += 128 if ($eM eq "30");
+	my $cHash = CUL_HM_id2Hash($dst."02");
+	$cHash->{helper}{partyReg} = sprintf("61%02X62%02X0000",$eH,$days);
+	$cHash->{helper}{partyReg} =~ s/(..)(..)/ $1:$2/g;
+	if ($cHash->{READINGS}{"RegL_06:"}){#remove old settings
+	  $cHash->{READINGS}{"RegL_06:"}{VAL} =~ s/ 61:.*//;
+	  $cHash->{READINGS}{"RegL_06:"}{VAL} =~ s/ 00:00//;
+	  $cHash->{READINGS}{"RegL_06:"}{VAL} .= $cHash->{helper}{partyReg};
+	}
+	else{
+	  $cHash->{READINGS}{"RegL_06:"}{VAL} = $cHash->{helper}{partyReg};
+	}
+	CUL_HM_pushConfig($hash,$id,$dst,2,"000000","00",6,
+	                  sprintf("61%02X62%02X",$eH,$days));
+    splice @a,1,3, ("regSet","controlMode","party");
+  } 
 
   $cmd = $a[1];# get converted command
   
@@ -2062,7 +2093,6 @@ sub CUL_HM_Set($@) {
   my $chnHash = (!$isChannel && $modules{CUL_HM}{defptr}{$dst."01"})?
                  $modules{CUL_HM}{defptr}{$dst."01"}:$hash;
   my $devHash = CUL_HM_getDeviceHash($hash);
-  my $id = CUL_HM_IOid($hash);
   my $state = "set_".join(" ", @a[1..(int(@a)-1)]);
 
   if   ($cmd eq "raw") {  #####################################################
@@ -2235,7 +2265,6 @@ sub CUL_HM_Set($@) {
 	
 	$data *= $reg->{f} if($reg->{f});# obey factor befor possible conversion
 	my $conversion = $reg->{c};
-	
 	if (!$conversion){;# do nothing
 	}elsif($conversion eq "fltCvT"  ){$data = CUL_HM_fltCvT($data);
 	}elsif($conversion eq "fltCvT60"){$data = CUL_HM_fltCvT60($data);
@@ -2824,6 +2853,9 @@ sub CUL_HM_Set($@) {
 	return ("",1) if ($target && $target eq "remote");#Nothing to transmit for actor
     $devHash = $peerHash; # Exchange the hash, as the switch is always alive.
   }
+  else{
+    return "$cmd not impelmented - contact sysop";
+  }
  
   readingsSingleUpdate($hash,"state",$state,1) if($state);
 
@@ -2946,7 +2978,8 @@ sub CUL_HM_Pair(@) {
 sub CUL_HM_getConfig($$$$$){
   my ($hash,$chnhash,$id,$dst,$chn) = @_;
   my $flag = CUL_HM_getFlag($hash);
-  foreach my $readEntry (grep /^[\.]?(RegL_|R-)/,keys %{$chnhash->{READINGS}}){
+#  foreach my $readEntry (grep /^[\.]?(RegL_|R-)/,keys %{$chnhash->{READINGS}}){
+  foreach my $readEntry (grep /^[\.]?(RegL_)/,keys %{$chnhash->{READINGS}}){
 	  delete $chnhash->{READINGS}{$readEntry};
   }
   my $lstAr = $culHmModel{CUL_HM_getMId($hash)}{lst};
@@ -3549,8 +3582,8 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
 			  .($peerId?CUL_HM_peerChName($peerId,
 			                              substr(CUL_HM_name2Id($name),0,6),
 										  CUL_HM_IOid($hash)):"");
-	$regLN =~ s/broadcast//;
   }
+  $regLN =~ s/broadcast//;
 
   my $data=0;
   my $convFlg = "";# confirmation flag - indicates data not confirmed by device
@@ -3829,6 +3862,18 @@ sub CUL_HM_TCtempReadings($) {# parse TC readings
   my $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")."RegL_";
   my $reg5 = ReadingsVal($name,$regLN."05:" ,"");
   my $reg6 = ReadingsVal($name,$regLN."06:" ,"");
+
+  if (ReadingsVal($name,"R-controlMode","") =~ m/^party/){
+    if (   $reg6                # ugly handling to add vanishing party register
+        && $reg6 !~ m/ 61:/ 
+        && $hash->{helper}{partyReg}){
+      $hash->{READINGS}{"RegL_06:"}{VAL} =~s/ 00:00/$hash->{helper}{partyReg}/;
+    }
+   }
+  else{
+    delete $hash->{helper}{partyReg};
+  }
+
   my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
   $reg5 =~ s/.* 0B://;     #remove register up to addr 11 from list 5
   my $tempRegs = $reg5.$reg6;  #one row
@@ -4746,11 +4791,10 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
           22.5, thereafter until midnight, 19 degrees celsius is desired.<br>
 		  <code> set th tempListSat 06:00 19 23:00 22.5 24:00 19<br></code>
           </li>
-      <li><B>displayMode [temp-only|temp-hum]</B><br></li>
-      <li><B>displayTemp [actual|setpoint]</B><br></li>
-      <li><B>displayTempUnit [celsius|fahrenheit]</B><br></li>
-      <li><B>controlMode [manual|auto|central|party]</B><br></li>
-      <li><B>decalcDay &lt;day&gt;</B></li>
+      <li><B>partyMode &lt;HH:MM&gt;&lt;durationDays&gt;</B><br>
+	  set control mode to party and device ending time. Add the time it ends 
+	  and the <b>number of days</b> it shall last. If it shall end next day '1' 
+	  must be entered<br>	  </li>
       <li><B>systime</B><br>
           set time in climate channel to system time</li>
     </ul><br>
