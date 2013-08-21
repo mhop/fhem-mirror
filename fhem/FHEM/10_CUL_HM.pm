@@ -871,13 +871,13 @@ sub CUL_HM_Parse($$) {##############################
 		$d -= 0x10000 if($d & 0xC000); 
 		$d = sprintf("%0.1f",$d/10);
 
-		my $chId = $src.sprintf("02X",hex($a) & 0x6);
+		my $chId = sprintf("%02X",hex($a) & 0x3f);
 		if($modules{CUL_HM}{defptr}{$chId}){
-	      push @entities,CUL_HM_UpdtReadSingle($modules{CUL_HM}{defptr}{$chId}
+	      push @entities,CUL_HM_UpdtReadSingle($modules{CUL_HM}{defptr}{$src.$chId}
 		                                     ,'state',$d,1);
 		}
 		else{
-          push @event, "Chan_$a:$d"; 
+          push @event, "Chan_$chId:$d"; 
 		}
 	  }
 	}
@@ -1988,7 +1988,7 @@ sub CUL_HM_Set($@) {
 
   my @h;
   @h = split(" ", $h) if($h);
-
+  
   if(!defined($h) && defined($culHmSubTypeSets{$st}{pct}) && $cmd =~ m/^\d+/) {
 	splice @a, 1, 0,"pct";#insert the actual command
   } 
