@@ -529,9 +529,9 @@ my %culHmRegDefine = (
   decalMin        =>{a=>  8  ,s=>0.3,l=>5,min=>0  ,max=>50      ,c=>''         ,f=>0.1     ,u=>'min' ,d=>1,t=>"Decalc min"},
   decalHr         =>{a=>  8.3,s=>0.5,l=>5,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Decalc hour"},
 
-  partyEndHr      =>{a=> 97  ,s=>0.6,l=>6,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Party end Hour"},
-  partyEndMin     =>{a=> 97.7,s=>0.1,l=>6,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>'min' ,d=>1,t=>"Party end min"   ,lit=>{"00"=>0,"30"=>1}},
-  partyEndDay     =>{a=> 98  ,s=>1  ,l=>6,min=>0  ,max=>200     ,c=>''         ,f=>''      ,u=>'d'   ,d=>1,t=>"Party end Day"},
+  partyEndHr      =>{a=> 97  ,s=>0.6,l=>6,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Party end hour. Use cmd partyMode to set"},
+  partyEndMin     =>{a=> 97.7,s=>0.1,l=>6,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>'min' ,d=>1,t=>"Party end min. Use cmd partyMode to set"   ,lit=>{"00"=>0,"30"=>1}},
+  partyEndDay     =>{a=> 98  ,s=>1  ,l=>6,min=>0  ,max=>200     ,c=>''         ,f=>''      ,u=>'d'   ,d=>1,t=>"Party duration days. Use cmd partyMode to set"},
 #Thermal-cc-VD                                                                                  
   valveOffset     =>{a=>  9  ,s=>0.5,l=>5,min=>0  ,max=>25      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve offset"},             # size actually 0.5
   valveErrorPos   =>{a=> 10  ,s=>1  ,l=>5,min=>0  ,max=>99      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve position when error"},# size actually 0.7
@@ -879,6 +879,22 @@ my %culHmGlobalSetsDevice = (# all devices but virtuals
   unpair   	    => "",
   getSerial     => "",
 );
+
+my %culHmSubTypeDevSets = (# device of this subtype
+  switch           =>{ statusRequest =>""},
+  dimmer           =>{ statusRequest =>""},
+  blindActuator    =>{ statusRequest =>""},
+#  remote           =>{ },
+  threeStateSensor =>{ statusRequest =>""},
+  THSensor         =>{ statusRequest =>""},
+#  virtual          =>{ },
+  smokeDetector    =>{ statusRequest =>""},
+  winMatic         =>{ statusRequest =>""},
+  keyMatic         =>{ statusRequest =>""},
+  repeater         =>{ statusRequest =>""},
+  outputUnit       =>{ statusRequest =>""},
+);
+
 my %culHmGlobalSetsChn = (# all channels but virtuals
   sign     	    => "[on|off]",
   peerBulk      => "<peer1,peer2,...>",
@@ -980,24 +996,25 @@ my %culHmChanSets = (
                        "party-temp"   =>"[on,off,6.0..30.0]",
                        "desired-temp" =>"[on,off,6.0..30.0]", 
                        sysTime        =>""	  },
-  "HM-CC-TC02"     =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]",
-                       "day-temp"     =>"[on,off,6.0..30.0]",
-                       "night-temp"   =>"[on,off,6.0..30.0]",
-                       "party-temp"   =>"[on,off,6.0..30.0]",
-                       "desired-temp" =>"[on,off,6.0..30.0]", 
-                       tempListSat    =>"HH:MM temp ...",
-                       tempListSun    =>"HH:MM temp ...",
-                       tempListMon    =>"HH:MM temp ...",
-                       tempListTue    =>"HH:MM temp ...",
-                       tempListThu    =>"HH:MM temp ...",
-                       tempListWed    =>"HH:MM temp ...",
-                       tempListFri    =>"HH:MM temp ...",
-                       displayMode    =>"[temp-only|temp-hum]",
-                       displayTemp    =>"[actual|setpoint]",
-                       displayTempUnit=>"[celsius|fahrenheit]",
-                       controlMode    =>"[manual|auto|central|party]",
-                       decalcDay      =>"day",       
-                       sysTime        =>""	  },
+  "HM-CC-TC02"     =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
+                      ,"day-temp"     =>"[on,off,6.0..30.0]"
+                      ,"night-temp"   =>"[on,off,6.0..30.0]"
+                      ,"party-temp"   =>"[on,off,6.0..30.0]"
+                      ,"desired-temp" =>"[on,off,6.0..30.0]" 
+                      ,tempListSat    =>"HH:MM temp ..."
+                      ,tempListSun    =>"HH:MM temp ..."
+                      ,tempListMon    =>"HH:MM temp ..."
+                      ,tempListTue    =>"HH:MM temp ..."
+                      ,tempListThu    =>"HH:MM temp ..."
+                      ,tempListWed    =>"HH:MM temp ..."
+                      ,tempListFri    =>"HH:MM temp ..."
+                      ,partyMode      =>"HH:MM durationDays"
+#                      ,displayMode    =>"[temp-only|temp-hum]"
+#                      ,displayTemp    =>"[actual|setpoint]"
+#                      ,displayTempUnit=>"[celsius|fahrenheit]"
+#                      ,controlMode    =>"[manual|auto|central|party]"
+#                      ,decalcDay      =>"day",       
+                      ,sysTime        =>""	  },
   "HM-SEC-WIN01"   =>{ stop           =>"",
                        level          =>"<level> <relockDly> <speed>..."},
   "HM-OU-CFM-PL01" =>{ led            =>"<color>[,<color>...] [<repeat>]"},
@@ -1193,16 +1210,20 @@ sub HMConfig_getHash($){
   return %culHmRegType          if($hn eq "culHmRegType"         );
   return %culHmRegModel         if($hn eq "culHmRegModel"        );
   return %culHmRegChan          if($hn eq "culHmRegChan"         );
+  
   return %culHmGlobalGets       if($hn eq "culHmGlobalGets"      );
   return %culHmSubTypeGets      if($hn eq "culHmSubTypeGets"     );
   return %culHmModelGets        if($hn eq "culHmModelGets"       );
+  
   return %culHmGlobalSetsDevice if($hn eq "culHmGlobalSetsDevice");
+  return %culHmSubTypeDevSets   if($hn eq "culHmSubTypeDevSets"  );
   return %culHmGlobalSetsChn    if($hn eq "culHmGlobalSetsChn"   );
   return %culHmGlobalSets       if($hn eq "culHmGlobalSets"      );
   return %culHmGlobalSetsVrtDev if($hn eq "culHmGlobalSetsVrtDev");
   return %culHmSubTypeSets      if($hn eq "culHmSubTypeSets"     );
   return %culHmModelSets        if($hn eq "culHmModelSets"       );
   return %culHmChanSets         if($hn eq "culHmChanSets"        );
+  
   return %culHmBits             if($hn eq "culHmBits"            );
   return @culHmCmdFlags         if($hn eq "culHmCmdFlags"        );
   return $K_actDetID            if($hn eq "K_actDetID"           );
