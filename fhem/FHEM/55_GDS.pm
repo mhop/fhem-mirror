@@ -129,7 +129,7 @@ sub GDS_Define($$$) {
 	} else {
 		Log3($name, 3, "GDS $name: No datafile (alerts) found");
 	}
-	$hash->{STATE} = "active";
+	readingsSingleUpdate($hash, "state", "active",1);
 
 	return undef;
 }
@@ -154,7 +154,6 @@ sub GDS_Set($@) {
 	my ($result, $next);
 
 	$hash->{LOCAL} = 1;
-	$hash->{STATE} = "active";
 
 	given($command) {
 		when("clear"){
@@ -671,8 +670,6 @@ sub retrieveConditions($$@){
 	readingsBulkUpdate($hash, $k, latin1ToUtf8($v)) if(defined($v)); }
 	readingsEndUpdate($hash, 1);
 
-	$hash->{STATE} = "active";
-	
 	return ;
 }
 
