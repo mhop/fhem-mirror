@@ -405,11 +405,10 @@ sub
 structure_Attr($@)
 {
   my ($type, @list) = @_;
+  my %ignore = ("alias"=>1, "room"=>1, "group"=>1, "icon"=>1,
+                "devStateIcon"=>1, "webCmd"=>1, "stateFormat"=>1 );
 
-  return undef if($list[1] eq "alias" ||
-                  $list[1] eq "room" ||
-                  $list[1] =~ m/clientstate/ ||
-                  $list[1] eq "loglevel");
+  return undef if($ignore{$list[1]} || $list[1] =~ m/clientstate/);
 
   my $me = $list[0];
   my $hash = $defs{$me};
