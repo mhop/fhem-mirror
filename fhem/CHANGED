@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: setreading command added
   - change:  DbLog: by using DbLog a new Attribute DbLogExclude will be propagated
              to all Devices. DbLogExclue will work as regexp to exclude 
              defined readings to log

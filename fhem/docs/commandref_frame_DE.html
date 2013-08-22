@@ -55,6 +55,7 @@
       <a href="#save">save</a> &nbsp;
       <a href="#set">set</a> &nbsp;
       <a href="#setdefaultattr">setdefaultattr</a> &nbsp;
+      <a href="#setreading">setreading</a> &nbsp;
       <a href="#setstate">setstate</a> &nbsp;
       <a href="#shutdown">shutdown</a> &nbsp;
       <a href="#sleep">sleep</a> &nbsp;
@@ -981,26 +982,40 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 </ul>
 
 
+<a name="setreading"></a>
+<h3>setreading</h3>
+<ul>
+  <code>setstate &lt;devspec&gt; &lt;reading&gt; &lt;value&gt;</code>
+  <br><br>
+  Der Befehl setzt das Reading &lt;reading&gt; auf den Wert &lt;value&gt; ohne
+  Signale an das betroffene Ger&auml;t zu senden, generiert aber Ereignisse und
+  die &uuml;bliche eventMap und stateFormat Umwandlung wird auch
+  durchgef&uuml;hrt.
+  <br>
+  Siehe den Abschnitt &uuml;ber <a href="#devspec">Ger&auml;te-Spezifikation</a>
+  f&uuml;r Details der &lt;devspec&gt;.<br>
+  <br>
+  Beispiel:
+  <ul>
+    setreading lampe state on
+  </ul>
+</ul>
+
 <a name="setstate"></a>
 <h3>setstate</h3>
 <ul>
   <code>setstate &lt;devspec&gt; &lt;value&gt;</code>
   <br><br>
-  Der Befehl setzt den "STATUS&quot; f&uuml;r <code>&lt;name&gt;</code> , wie im Befehl
-  <a href="#list">list</a> beschrieben, auf den Wert <code>&lt;value&gt;</code> 
-  ohne an das Ger&auml;t ein Signal zu senden. Dieser Befehl wird auch im <a href="#statefile">statefile</a> 
-  benutzt.<br>
+  Der Befehl setzt den STATE Eintrag des Ger&aauml;tes direkt, ohne Ereignisse zu
+  generieren oder ein Signal an das Ger&auml;t zu senden. Dieser Eintrag ist
+  ma&szlig;gebend f&uuml;r die Status-Anzeige in diversen Frontends.
+  Dieser Befehl wird auch im <a href="#statefile">statefile</a> benutzt.<br>
   Siehe den Abschnitt &uuml;ber <a href="#devspec">Ger&auml;te-Spezifikation</a>
   f&uuml;r Details der &lt;devspec&gt;.<br>
   <br>
-  Examples:
+  Beispiel:
   <ul>
-    setstate lamp on
-  </ul>
-  Note:
-  <ul>
-    <li>The statefile uses another version of this command, don't be surprised.
-    </li>
+    setstate lampe An
   </ul>
 </ul>
 
@@ -1025,9 +1040,11 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <a name="trigger"></a>
 <h3>trigger</h3>
 <ul>
-  <code>trigger &lt;devspec&gt; &lt;state&gt;</code>
+  <code>trigger &lt;devspec&gt; &lt;event&gt;</code>
   <br><br>
-  Triggert eine <a href="#notify">notify</a> Definition.<br>
+  Generiert das Ereignis &lt;event&gt;, was z.Bsp. ein <a
+  href="#notify">notify</a> ansto&szlig;en kann, oder den FileLog zum
+  protokollieren dieser Zeile bewegen kann.<br>
   Siehe den Abschnitt &uuml;ber <a href="#devspec">Ger&auml;te-Spezifikation</a>
   f&uuml;r Details der &lt;devspec&gt;.<br>
   <br>

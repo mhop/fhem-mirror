@@ -56,6 +56,7 @@
       <a href="#save">save</a> &nbsp;
       <a href="#set">set</a> &nbsp;
       <a href="#setdefaultattr">setdefaultattr</a> &nbsp;
+      <a href="#setreading">setreading</a> &nbsp;
       <a href="#setstate">setstate</a> &nbsp;
       <a href="#shutdown">shutdown</a> &nbsp;
       <a href="#sleep">sleep</a> &nbsp;
@@ -257,6 +258,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <a href="#get">get</a>,
     <a href="#list">list</a>,
     <a href="#set">set</a>,
+    <a href="#setreading">setreading</a>,
     <a href="#setstate">setstate</a>,
     <a href="#trigger">trigger</a>
   can take a more complex device specification as argument, which will be
@@ -936,26 +938,37 @@ A line ending with \ will be concatenated with the next one, so long lines
 </ul>
 
 
+<a name="setreading"></a>
+<h3>setreading</h3>
+<ul>
+  <code>setreading &lt;devspec&gt; &lt;reading&gt; &lt;value&gt;</code>
+  <br><br>
+  Set the reading &lt;reading&gt; for the device <code>&lt;name&gt;</code> to
+  &lt;value&gt; without sending out commands to the device, but triggering
+  events and eventMap/stateFormat transformations as usual.
+  <br><br>
+  Examples:
+  <ul>
+    setreading lamp state on
+  </ul>
+</ul>
+
 <a name="setstate"></a>
 <h3>setstate</h3>
 <ul>
   <code>setstate &lt;devspec&gt; &lt;value&gt;</code>
   <br><br>
-  Set the "STATE" for <code>&lt;name&gt;</code> as shown in paranthesis in the
-  <a href="#list">list</a> command
-  to <code>&lt;value&gt;</code> without sending any signals to the device
-  itself. This command is also used in the <a href="#statefile">statefile</a>.
+  Set the STATE entry for the device specified by <code>&lt;devspec&gt;</code>,
+  which is used for displaying the device state in different frontends.
+  No signals will be sent to the device, no events will be generated, and no
+  eventMap or stateFormat translation will be done either.
+  This command is also used in the <a href="#statefile">statefile</a>.
   See the <a href="#devspec">Device specification</a> section for details on
   &lt;devspec&gt;.
   <br><br>
   Examples:
   <ul>
     setstate lamp on
-  </ul>
-  Note:
-  <ul>
-    <li>The statefile uses another version of this command, don't be surprised.
-    </li>
   </ul>
 </ul>
 
