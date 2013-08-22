@@ -267,6 +267,8 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
 	    Hlp=>"[configfile],write the configfile and the statefile" },
   "set"     => { Fn=>"CommandSet",
 	    Hlp=>"<devspec> <type dependent>,transmit code for <devspec>" },
+  "setreading" => { Fn=>"CommandSetReading",
+	    Hlp=>"<devspec> <reading> <value>,set reading for <devspec>" },
   "setstate"=> { Fn=>"CommandSetstate",
 	    Hlp=>"<devspec> <state>,set the state shown in the command list" },
   "setdefaultattr" => { Fn=>"CommandDefaultAttr",
@@ -1594,6 +1596,27 @@ CommandDeleteReading($$)
 
   return join("\n", @rets);
 }
+
+sub
+CommandSetReading($$)
+{
+  my ($cl, $def) = @_;
+
+  my @a = split(" ", $def, 3);
+  return "Usage: setreading <name> <reading> <value>\n$namedef" if(@a != 3);
+
+  my @rets;
+  foreach my $sdev (devspec2array($a[0])) {
+
+    if(!defined($defs{$sdev})) {
+      push @rets, "Please define $sdev first";
+      next;
+    }
+    readingsSingleUpdate($defs{$sdev}, $a[1], $a[2], 1);
+  }
+  return undef;
+}
+
 
 #############
 sub
