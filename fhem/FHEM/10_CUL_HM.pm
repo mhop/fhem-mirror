@@ -872,7 +872,7 @@ sub CUL_HM_Parse($$) {##############################
 		$d = sprintf("%0.1f",$d/10);
 
 		my $chId = sprintf("%02X",hex($a) & 0x3f);
-		if($modules{CUL_HM}{defptr}{$chId}){
+		if($modules{CUL_HM}{defptr}{$src.$chId}){
 	      push @entities,CUL_HM_UpdtReadSingle($modules{CUL_HM}{defptr}{$src.$chId}
 		                                     ,'state',$d,1);
 		}
