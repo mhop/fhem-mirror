@@ -2,6 +2,7 @@ FS20.off   light_light_dim_00.svg
 FS20.on    light_light_dim_100.svg
 off        light_light_dim_00.svg
 on         light_light_dim_100.svg
+on-for-timer light_light_dim_100.svg
         
 Aus        light_light_dim_00.svg
 An         light_light_dim_100.svg
