@@ -412,7 +412,8 @@ SVG_WriteGplot($)
   for(my $i=0; $i <= 8; $i++) {
     next if(!$FW_webArgs{"title_$i"});
     my $prf = "par_${i}_";
-    my @v = map {$FW_webArgs{"$prf$_"}} grep {$FW_webArgs{"$prf$_"}} (0..9);
+    my @v = map {$FW_webArgs{"$prf$_"}}
+            grep {defined($FW_webArgs{"$prf$_"})} (0..9);
     my $r = @v > 1 ? join(":", map { s/:/\\x3a/g; $_ } @v) : $v[0];
 
     print FH "#$ld $r\n";
