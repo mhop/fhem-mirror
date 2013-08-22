@@ -254,7 +254,7 @@ FS20_Set($@)
     $modules{FS20}{ldata}{$name} = $to;
     Log3 $name, 4, "Follow: +$to setstate $name $newState";
     CommandDefine(undef, $name."_timer at +$to ".
-        "setstate $name $newState; trigger $name $newState");
+      "{readingsSingleUpdate(\$defs{'$name'},'state','$newState', 1); undef}");
   }
 
   ##########################
@@ -410,7 +410,7 @@ FS20_Parse($$)
         my $to = sprintf("%02d:%02d:%02d", $dur/3600, ($dur%3600)/60, $dur%60);
         Log3 $n, 4, "Follow: +$to setstate $n $newState";
         CommandDefine(undef, $n."_timer at +$to ".
-            "setstate $n $newState; trigger $n $newState");
+          "{readingsSingleUpdate(\$defs{'$n'},'state','$newState', 1); undef}");
         $modules{FS20}{ldata}{$n} = $to;
       }
 
