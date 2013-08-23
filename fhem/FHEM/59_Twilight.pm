@@ -1,4 +1,4 @@
-# $Id$
+# $Id
 ##############################################################################
 #
 #     59_Twilight.pm
@@ -356,6 +356,10 @@ sub Twilight_fireEvent($)
       $nextEventTime  = strftime("%H:%M:%S",localtime($hash->{TW}{$nextEvent}{TIME})) if ($hash->{TW}{$nextEvent}{TIME} ne "nan");
    Log 3, "[".$hash->{NAME}."] " . sprintf  ("%-10s state=%-2s light=%-2s nextEvent=%-10s %-14s  deg=%+.1f°",$sx_name, $state, $light, $nextEvent, strftime("%d.%m.%Y  %H:%M:%S",localtime($hash->{TW}{$nextEvent}{TIME})), $deg);
 
+   my $eventTime  = $hash->{TW}{$sx_name}{TIME};
+   my $now        = time();
+   my $delta      = abs ($now - $eventTime);
+
    $hash->{STATE} = $state;
    readingsBeginUpdate($hash);
    readingsBulkUpdate ($hash, "light",           $light);
@@ -364,7 +368,9 @@ sub Twilight_fireEvent($)
    readingsBulkUpdate ($hash, "nextEvent",       $nextEvent);
    readingsBulkUpdate ($hash, "nextEventTime",   $nextEventTime);
 
-   readingsEndUpdate  ($hash, defined($hash->{LOCAL} ? 0 : 1));
+   my $doNotTrigger  = $hash->{LOCAL};
+      $doNotTrigger  = $doNotTrigger   ||   ($delta > 5);
+   readingsEndUpdate  ($hash, !$doNotTrigger);
 
 }
 #
