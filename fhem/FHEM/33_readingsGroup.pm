@@ -1,5 +1,5 @@
 
-# $Id: 31_readingsGroup.pm 3641 2013-08-09 12:51:30Z justme1968 $
+# $Id$
 
 package main;
 
