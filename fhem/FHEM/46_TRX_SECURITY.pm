@@ -81,7 +81,6 @@ TRX_SECURITY_Initialize($)
   $hash->{UndefFn}   = "TRX_SECURITY_Undef";
   $hash->{ParseFn}   = "TRX_SECURITY_Parse";
   $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 ".
-                       "loglevel:0,1,2,3,4,5,6 ".
                        $readingFnAttributes;
 
 }
@@ -134,7 +133,7 @@ TRX_SECURITY_Set($@)
 	}
   	my $error = "Unknown command $command, choose one of $l"; 
 
-	Log 4, $error;
+	Log3 $hash, 1, "TRX_SECURITY_Set() ".$error if ($command ne "?" );
 	return $error;
   }
 
@@ -160,15 +159,15 @@ TRX_SECURITY_Set($@)
                 $id2 = $2;
                 $id3 = $3;
   	} else {
-		Log 4,"TRX_SECURITY_Set lightning1 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
+		Log3 $hash, 1,"TRX_SECURITY_Set() lightning1 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
 		return "error set name=$name  deviceid=$deviceid";
   	}
 
 	# lightning1
   	$hex_prefix = sprintf "0820";
   	$hex_command = sprintf "%02x%02x%02s%02s%02s%02x00", $device_type_num & 0xff, $seqnr, $id1, $id2, $id3, $cmnd; 
-  	Log 1,"TRX_SECURITY_Set name=$name device_type=$device_type, deviceid=$deviceid id1=$id1, id2=$id2, id3=$id3, command=$command" if ($TRX_SECURITY_debug == 1);
-  	Log 1,"TRX_SECURITY_Set hexline=$hex_prefix$hex_command" if ($TRX_SECURITY_debug == 1);
+  	Log3 $hash, 1,"TRX_SECURITY_Set() name=$name device_type=$device_type, deviceid=$deviceid id1=$id1, id2=$id2, id3=$id3, command=$command";
+  	Log3 $hash, 5,"TRX_SECURITY_Set() hexline=$hex_prefix$hex_command";
 
   	if ($device_type ne "KD101") {
 	  	my $sensor = "";
@@ -217,7 +216,7 @@ TRX_SECURITY_Define($$)
   my $a = int(@a);
 
   if(int(@a) != 5 && int(@a) != 7) {
-	Log 1,"TRX_SECURITY wrong syntax '@a'. \nCorrect syntax is  'define <name> TRX_SECURITY <type> <deviceid> <devicelog> [<deviceid2> <devicelog2>]'";
+	Log3 $hash, 1,"TRX_SECURITY_Define() wrong syntax '@a'. \nCorrect syntax is  'define <name> TRX_SECURITY <type> <deviceid> <devicelog> [<deviceid2> <devicelog2>]'";
 	return "wrong syntax: define <name> TRX_SECURITY <type> <deviceid> <devicelog> [<deviceid2> <devicelog2>]";
   }
 	
@@ -240,7 +239,7 @@ TRX_SECURITY_Define($$)
   my $device_name = "TRX".$DOT.$my_type.$DOT.$deviceid;
 
   if ($type ne "DS10A" && $type ne "SD90" && $type ne "MS10A" && $type ne "MS14A" && $type ne "KR18" && $type ne "KD101" && $type ne "VISONIC_WINDOW" & $type ne "VISONIC_MOTION" & $type ne "VISONIC_REMOTE" && $type ne "GD18" && $type ne "WD18") {
-  	Log 1,"TRX_SECURITY define: wrong type: $type";
+  	Log3 $hash, 1,"TRX_SECURITY_Define() wrong type: $type";
   	return "TRX_SECURITY: wrong type: $type";
   }
 
@@ -282,8 +281,8 @@ TRX_SECURITY_Undef($$)
 
 
 #####################################
-sub TRX_SECURITY_parse_X10Sec {
-  my $bytes = shift;
+sub TRX_SECURITY_parse_X10Sec($$) {
+  my ($hash, $bytes) = @_;
 
   my $error;
 
@@ -317,18 +316,18 @@ sub TRX_SECURITY_parse_X10Sec {
       ($dev_type, $dev_reading ) = @$rec;
     } else {
 	$error = "TRX_SECURITY: x10_devtype wrong for subtype=$subtype";
-	Log 1, $error;
+	Log3 $hash, 1, "TRX_SECURITY_parse_X10Sec() ".$error;
   	return "";
     }
   } else {
  	$error = "TRX_SECURITY: error undefined subtype=$subtype";
-	Log 1, $error;
+	Log3 $hash, 1, "TRX_SECURITY_parse_X10Sec() ".$error;
   	return "";
   }
 
   #--------------
   my $device_name = "TRX".$DOT.$dev_type.$DOT.$device;
-  Log 4, "device_name=$device_name";
+  Log3 $hash, 5, "TRX_SECURITY_parse_X10Sec() device_name=$device_name";
 
   my $firstdevice = 1;
   my $def = $modules{TRX_SECURITY}{defptr}{$device_name};
@@ -336,8 +335,8 @@ sub TRX_SECURITY_parse_X10Sec {
   	$firstdevice = 0;
 	$def = $modules{TRX_SECURITY}{defptr2}{$device_name};
 	if (!$def) {
-	Log 1, "UNDEFINED $device_name TRX_SECURITY $dev_type $device $dev_reading";
-        	Log 3, "TRX_SECURITY: TRX_SECURITY Unknown device $device_name, please define it";
+	Log3 $hash, 1, "TRX_SECURITY_parse_X10Sec() UNDEFINED $device_name TRX_SECURITY $dev_type $device $dev_reading";
+        	Log3 $hash, 3, "TRX_SECURITY_parse_X10Sec() Unknown device $device_name, please define it";
        		return "UNDEFINED $device_name TRX_SECURITY $dev_type $device $dev_reading";
 	}
   }
@@ -407,7 +406,7 @@ sub TRX_SECURITY_parse_X10Sec {
       $command = $rec;
     }
   } else {
-    Log 1, "TRX_SECURITY: undefined command cmd=$data device-nr=$device, hex=$hexdata";
+    Log3 $hash, 1, "TRX_SECURITY_parse_X10Sec() undefined command cmd=$data device-nr=$device, hex=$hexdata";
     return "";
   }
 
@@ -416,18 +415,18 @@ sub TRX_SECURITY_parse_X10Sec {
 	if ($battery_level == 0x9) { $battery = 'batt_ok'}
 	elsif ($battery_level == 0x0) { $battery = 'batt_low'}
 	else {
-		Log 1,"TRX_SECURITY: X10Sec unkown battery_level=$battery_level";
+		Log3 $hash, 1,"TRX_SECURITY_parse_X10Sec() unkown battery_level=$battery_level";
 	}
   }
 
   if ($trx_rssi == 1) {
   	$rssi = sprintf("%d", ($bytes->[7] & 0xf0) >> 4);
-	#Log 1, "TRX_SECURITY: $name devn=$device_name rssi=$rssi";
+	Log3 $hash, 5, "TRX_SECURITY_parse_X10Sec() $name devn=$device_name rssi=$rssi";
   }
 
   my $current = "";
 
-  Log 1, "TRX_SECURITY: $name devn=$device_name first=$firstdevice subtype=$subtype command=$command, delay=$delay, batt=$battery cmd=$hexdata" if ($TRX_SECURITY_debug == 1);
+  Log3 $hash, 5, "TRX_SECURITY_parse_X10Sec() $name devn=$device_name first=$firstdevice subtype=$subtype command=$command, delay=$delay, batt=$battery cmd=$hexdata";
 
 
   my $n = 0;
@@ -532,17 +531,17 @@ TRX_SECURITY_Parse($$)
   $trx_rssi = 0;
   if (defined($attr{$iohash->{NAME}}{rssi})) {
   	$trx_rssi = $attr{$iohash->{NAME}}{rssi};
-  	#Log 1,"TRX_SECURITY_Parse: attr rssi = $trx_rssi";
+  	Log3 $iohash, 5,"TRX_SECURITY_Parse() attr rssi = $trx_rssi";
   }
 
   my $time = time();
   # convert to binary
   my $msg = pack('H*', $hexline);
   if ($time_old ==0) {
-  	Log 5, "TRX_SECURITY: decoding delay=0 hex=$hexline";
+  	Log3 $iohash, 5, "TRX_SECURITY_Parse() decoding delay=0 hex=$hexline";
   } else {
   	my $time_diff = $time - $time_old ;
-  	Log 5, "TRX_SECURITY: decoding delay=$time_diff hex=$hexline";
+  	Log3 $iohash, 5, "TRX_SECURITY_Parse() decoding delay=$time_diff hex=$hexline";
   }
   $time_old = $time;
 
@@ -560,15 +559,15 @@ TRX_SECURITY_Parse($$)
 
   my $type = $rfxcom_data_array[0];
 
-  #Log 1, "TRX_SECURITY: X10Sec num_bytes=$num_bytes hex=$hexline type=$type" if ($TRX_SECURITY_debug == 1);
+  Log3 $iohash, 5, "TRX_SECURITY_Parse() X10Sec num_bytes=$num_bytes hex=$hexline type=$type";
   my $res = "";
   if ($type == 0x20) {
-	Log 1, "TRX_SECURITY: X10Sec num_bytes=$num_bytes hex=$hexline" if ($TRX_SECURITY_debug == 1);
-        $res = TRX_SECURITY_parse_X10Sec(\@rfxcom_data_array);
-  	Log 1, "TRX_SECURITY: unsupported hex=$hexline" if ($res eq "");
+	Log3 $iohash, 5, "TRX_SECURITY_Parse() X10Sec num_bytes=$num_bytes hex=$hexline";
+        $res = TRX_SECURITY_parse_X10Sec($iohash, \@rfxcom_data_array);
+  	Log3 $iohash, 1, "TRX_SECURITY_Parse() unsupported hex=$hexline" if ($res eq "");
 	return $res;
   } else {
-	Log 0, "TRX_SECURITY: not implemented num_bytes=$num_bytes hex=$hexline";
+	Log3 $iohash, 0, "TRX_SECURITY_Parse() not implemented num_bytes=$num_bytes hex=$hexline";
   }
 
   return "";

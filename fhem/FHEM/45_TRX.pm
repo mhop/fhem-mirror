@@ -68,7 +68,7 @@ TRX_Initialize($)
   $hash->{UndefFn} = "TRX_Undef";
   $hash->{GetFn}   = "TRX_Get";
   $hash->{StateFn} = "TRX_SetState";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 do_not_init:1,0 addvaltrigger:1,0 longids rssi:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 do_not_init:1,0 addvaltrigger:1,0 longids rssi:1,0";
   $hash->{ShutdownFn} = "TRX_Shutdown";
 }
 
@@ -79,8 +79,12 @@ TRX_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  return "wrong syntax: define <name> TRX devicename [noinit]"
-    if(@a != 3 && @a != 4);
+
+  if (@a != 3 && @a != 4) {
+  	my $msg = "wrong syntax: define <name> TRX devicename [noinit]";
+  	Log3 undef, 2, $msg;
+  	return $msg;
+  }
 
   DevIo_CloseDev($hash);
 
@@ -89,14 +93,14 @@ TRX_Define($$)
   my $opt = $a[3] if(@a == 4);;
 
   if($dev eq "none") {
-    Log 1, "TRX: $name device is none, commands will be echoed only";
+    Log3 $name, 1, "TRX: $name device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
   }
 
   if(defined($opt)) {
     if($opt eq "noinit") {
-      Log 1, "TRX: $name no init is done";
+      Log3 $name, 1 , "TRX: $name no init is done";
       $attr{$name}{do_not_init} = 1;
     } else {
       return "wrong syntax: define <name> TRX devicename [noinit]"
@@ -111,17 +115,16 @@ TRX_Define($$)
 #####################################
 # Input is hexstring
 sub
-TRX_Write($$$)
+TRX_Write($$)
 {
   my ($hash,$fn,$msg) = @_;
   my $name = $hash->{NAME};
-  my $ll5 = GetLogLevel($name,5);
 
   return if(!defined($fn));
 
   my $bstring;
   $bstring = "$fn$msg";
-  Log $ll5, "$hash->{NAME} sending $bstring";
+  Log3 $name, 5, "$hash->{NAME} sending $bstring";
 
   DevIo_SimpleWrite($hash, $bstring, 1);
 }
@@ -140,7 +143,7 @@ TRX_Undef($$)
        $defs{$d}{IODev} == $hash)
       {
         my $lev = ($reread_active ? 4 : 2);
-        Log GetLogLevel($name,$lev), "deleting port for $d";
+        Log3 $name, $lev, "deleting port for $d";
         delete $defs{$d}{IODev};
       }
   }
@@ -166,9 +169,10 @@ TRX_Get($@)
   my $msg;
   my $name=$a[0];
   my $reading= $a[1];
+
   $msg="$name => No Get function ($reading) implemented";
-    Log 1,$msg;
-    return $msg;
+  Log3 $name, 1,$msg if ($reading ne "?");
+  return $msg;
 }
 
 #####################################
@@ -210,7 +214,7 @@ TRX_DoInit($)
 
 
   if(defined($attr{$name}) && defined($attr{$name}{"do_not_init"})) {
-    	Log 1, "TRX: defined with noinit. Do not send init string to device.";
+    	Log3 $name, 1, "TRX: defined with noinit. Do not send init string to device.";
   	$hash->{STATE} = "Initialized";
 
         # Reset the counter
@@ -234,14 +238,14 @@ TRX_DoInit($)
   $buf = DevIo_TimeoutRead($hash, 0.1);
 
   if (! $buf) {
-    	Log 1, "TRX: Initialization Error: No character read";
+    	Log3 $name, 1, "TRX: Initialization Error: No character read";
 	return "TRX: Initialization Error $name: no char read";
   } elsif ($buf !~ m/\x0d\x01\x00.........../) {
 	my $hexline = unpack('H*', $buf);
-    	Log 1, "TRX: Initialization Error hexline='$hexline'";
+    	Log3 $name, 1, "TRX: Initialization Error hexline='$hexline'";
 	return "TRX: Initialization Error %name expected char=0x2c, but char=$char received.";
   } else {
-    	Log 1, "TRX: Init OK";
+    	Log3 $name,1, "TRX: Init OK";
   	$hash->{STATE} = "Initialized";
 	# Analyse result and display it:
 	if ($buf =~ m/\x0d\x01\x00(.)(.)(.)(.)(.)(.)(.)(.)(.)(.)(.)/) {
@@ -295,8 +299,8 @@ TRX_DoInit($)
 		$status .= "ARC " if ($msg5 & 0x02); 
 		$status .= "X10 " if ($msg5 & 0x01); 
 		my $hexline = unpack('H*', $buf);
-    		Log 4, "TRX: Init status hexline='$hexline'";
-    		Log 1, "TRX: Init status: '$status'";
+    		Log3 $name, 4, "TRX: Init status hexline='$hexline'";
+    		Log3 $name, 1, "TRX: Init status: '$status'";
 	}
   }
   #
@@ -328,11 +332,11 @@ TRX_Read($)
   }
 
   my $TRX_data = $hash->{PARTIAL};
-  #Log 5, "TRX/RAW: $TRX_data/$mybuf";
+  Log3 $name, 5, "TRX/RAW: $TRX_data/$mybuf";
   $TRX_data .= $mybuf;
 
-  #my $hexline = unpack('H*', $TRX_data);
-  #Log 1, "TRX: TRX_Read '$hexline'";
+  my $hexline = unpack('H*', $TRX_data);
+  Log3 $name, 5, "TRX: TRX_Read '$hexline'";
 
   # first char as byte represents number of bytes of the message
   my $num_bytes = ord(substr($TRX_data,0,1));
@@ -342,15 +346,15 @@ TRX_Read($)
     my $rmsg;
     $rmsg = substr($TRX_data, 0, $num_bytes+1);
     #my $hexline = unpack('H*', $rmsg);
-    #Log 1, "TRX_Read rmsg '$hexline'";
+    Log3 $name, 5, "TRX_Read rmsg '$hexline'";
     $TRX_data = substr($TRX_data, $num_bytes+1);;
     #$hexline = unpack('H*', $TRX_data);
-    #Log 1, "TRX_Read TRX_data '$hexline'";
+    Log3 $name, 5, "TRX_Read TRX_data '$hexline'";
     #
     TRX_Parse($hash, $hash, $name, unpack('H*', $rmsg));
     $num_bytes = ord(substr($TRX_data,0,1));
   }
-  #Log 1, "TRX_Read END";
+  Log3 $name, 5, "TRX_Read END";
 
   $hash->{PARTIAL} = $TRX_data;
 }
@@ -360,22 +364,20 @@ TRX_Parse($$$$)
 {
   my ($hash, $iohash, $name, $rmsg) = @_;
 
-  #Log 1, "TRX_Parse1 '$rmsg'";
-  Log 5, "TRX_Parse1 '$rmsg'";
+  Log3 $name, 5, "TRX_Parse1 '$rmsg'";
 
   my %addvals;
   # Parse only if message is different within 2 seconds 
   # (some Oregon sensors always sends the message twice, X10 security sensors even sends the message five times)
   if (("$last_rmsg" ne "$rmsg") || (time() - $last_time) > 1) { 
-    #Log 1, "TRX_Dispatch '$rmsg'";
+    Log3 $name, 1, "TRX_Dispatch '$rmsg'";
     %addvals = (RAWMSG => $rmsg);
     Dispatch($hash, $rmsg, \%addvals); 
     $hash->{"${name}_MSGCNT"}++;
     $hash->{"${name}_TIME"} = TimeNow();
     $hash->{RAWMSG} = $rmsg;
   } else { 
-    #Log 1, "TRX_Dispatch '$rmsg' dup";
-    #Log 1, "<-duplicate->";
+    Log3 $name, 1, "TRX_Dispatch '$rmsg' dup";
   }
 
   $last_rmsg = $rmsg;

@@ -32,9 +32,6 @@ package main;
 use strict;
 use warnings;
 
-# Debug this module? YES = 1, NO = 0
-my $TRX_ELSE_debug = 0;
-
 my $time_old = 0;
 
 my $DOT = q{_};
@@ -48,10 +45,10 @@ TRX_ELSE_Initialize($)
   $hash->{DefFn}     = "TRX_ELSE_Define";
   $hash->{UndefFn}   = "TRX_ELSE_Undef";
   $hash->{ParseFn}   = "TRX_ELSE_Parse";
-  $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 loglevel:0,1,2,3,4,5,6 ".
+  $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 ".
                        $readingFnAttributes;
 
-  Log 1, "TRX_ELSE: Initialize" if ($TRX_ELSE_debug == 1);
+  Log3 $hash, 5, "TRX_ELSE_Initialize() Initialize";
 }
 
 #####################################
@@ -61,8 +58,8 @@ TRX_ELSE_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-	my $a = int(@a);
-	#print "a0 = $a[0]";
+  my $a = int(@a);
+
   return "wrong syntax: define <name> TRX_ELSE code" if(int(@a) != 3);
 
   my $name = $a[0];
@@ -93,16 +90,16 @@ TRX_ELSE_Parse($$)
 
   my $time = time();
   if ($time_old ==0) {
-  	Log 5, "TRX_ELSE: decoding delay=0 hex=$msg";
+  	Log3 $hash, 5, "TRX_ELSE_Parse() decoding delay=0 hex=$msg";
   } else {
   	my $time_diff = $time - $time_old ;
-  	Log 5, "TRX_ELSE: decoding delay=$time_diff hex=$msg";
+  	Log3 $hash, 5, "TRX_ELSE_Parse() decoding delay=$time_diff hex=$msg";
   }
   $time_old = $time;
 
   # convert to binary
   my $bin_msg = pack('H*', $msg);
-  #Log 1, "TRX_ELSE: 2 hex=$hexline";
+  Log3 $hash, 5, "TRX_ELSE_Parse() 2 hex=$msg";
 
   # convert string to array of bytes. Skip length byte
   my @rfxcom_data_array = ();
@@ -118,17 +115,16 @@ TRX_ELSE_Parse($$)
 
   my $type = $rfxcom_data_array[0];
 
-  Log 1, "TRX_ELSE: num_bytes=$num_bytes hex=$msg type=$type" if ($TRX_ELSE_debug == 1);
+  Log3 $hash, 5, "TRX_ELSE_Parse() num_bytes=$num_bytes hex=$msg type=$type";
   my $res = "";
   if ($type == 0x02) {
 	my $subtype = $rfxcom_data_array[1];
 	my $msg = $rfxcom_data_array[3];
 	if (($msg != 0x00) && ($msg != 0x01)) {
-  		Log 0, "TRX_ELSE: error transmit NACK=".sprintf("%02x",$msg);
+  		Log3 $hash, 1, "TRX_ELSE_Parse() error transmit NACK=".sprintf("%02x",$msg);
 	} 
   	return "";
   } 
-  #Log 0, "TRX_ELSE: hex=$msg";
 
   my $type_hex = sprintf("%02x", $type);
 
@@ -136,7 +132,7 @@ TRX_ELSE_Parse($$)
 
   my $def = $modules{TRX_ELSE}{defptr}{$device_name};
   if (!$def) {
-	Log 3, "TRX_ELSE: Unknown device $device_name, please define it";
+	Log3 $hash, 3, "TRX_ELSE: Unknown device $device_name, please define it";
     	return "UNDEFINED $device_name TRX_ELSE $type_hex";
 
   }
