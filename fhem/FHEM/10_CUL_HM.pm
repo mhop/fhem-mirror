@@ -2064,6 +2064,9 @@ sub CUL_HM_Set($@) {
 
 	@a = ($a[0],"regBulk","RegL_01:",split(" ",$l1.$l2));
   }
+  elsif($cmd =~ m /(displayMode|displayTemp|displayTempUnit|controlMode|decalcDay)/) {
+    splice @a,1,3, ("regSet",$a[1],$a[2]);
+  }
   elsif($cmd eq "partyMode") { ################################################
     my $days = $a[3]; 
 	my ($eH,$eM)  = split(':',$a[2]); 

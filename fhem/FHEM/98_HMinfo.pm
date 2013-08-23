@@ -62,8 +62,7 @@ sub HMinfo_getParam(@) { ######################################################
     push @paramList,sprintf("%-20s",($para eq "undefined"?"-":$para));
 	$found = 1 if ($para ne "undefined") ;
   }
-  return $found,sprintf("%-20s: %s",$eName,join "\t|",@paramList);
-  return sprintf("%-20s: %s",$eName,join "\t|",@paramList);
+  return $found,sprintf("%-20s\t: %s",$eName,join "\t|",@paramList);
 }
 sub HMinfo_regCheck(@) { ######################################################
   my @entities = @_;
@@ -240,10 +239,14 @@ sub HMinfo_SetFn($$) {#########################################################
 	  my $id = $defs{$dName}{DEF};
       my ($found,$para) = HMinfo_getParam($id,"protState","protCmdPend","protSnd",
 	                          "protLastRcv","protResndFail","protResnd","protNack");
-	  $para =~ s/ last_at//g;
+	  $para =~ s/( last_at|20..-|\|)//g;
+      my @pl = split "\t",$para;
+	  $_ =~ s/\s+$|//g foreach (@pl);
+	  $para = sprintf("%-20s%-22s|%-18s|%-18s|%-14s|%-18s|%-18s|%-18s",
+	                  $pl[0],$pl[1],$pl[2],$pl[3],$pl[4],$pl[5],$pl[6],$pl[7]);
       push @paramList,$para;
 	}
-	my $hdr = sprintf("%-20s:%-23s|%-23s|%-23s|%-23s|%-23s|%-23s|%-23s",
+	my $hdr = sprintf("%-20s:%-21s|%-18s|%-18s|%-14s|%-18s|%-18s|%-18s",
 	                  "name","protState","protCmdPend","protSnd",
 	                  "protLastRcv","protResndFail","protResnd","protNack");
 	$ret = $cmd." done:" ."\n    ".$hdr  ."\n    ".(join "\n    ",sort @paramList)

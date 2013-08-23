@@ -1009,11 +1009,11 @@ my %culHmChanSets = (
                       ,tempListWed    =>"HH:MM temp ..."
                       ,tempListFri    =>"HH:MM temp ..."
                       ,partyMode      =>"HH:MM durationDays"
-#                      ,displayMode    =>"[temp-only|temp-hum]"
-#                      ,displayTemp    =>"[actual|setpoint]"
-#                      ,displayTempUnit=>"[celsius|fahrenheit]"
-#                      ,controlMode    =>"[manual|auto|central|party]"
-#                      ,decalcDay      =>"day",       
+                      ,displayMode    =>"[temp-only|temp-hum]"
+                      ,displayTemp    =>"[actual|setpoint]"
+                      ,displayTempUnit=>"[celsius|fahrenheit]"
+                      ,controlMode    =>"[manual|auto|central|party]"
+                      ,decalcDay      =>"day",       
                       ,sysTime        =>""	  },
   "HM-SEC-WIN01"   =>{ stop           =>"",
                        level          =>"<level> <relockDly> <speed>..."},
