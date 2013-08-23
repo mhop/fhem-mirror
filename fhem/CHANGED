@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII
 - SVN
+  - feature: new module 33_readingsGroup to display a collection of readings from
+             on or more devices. this will replace weblink readings. (by justme1968)
   - feature: setreading command added
   - change:  DbLog: by using DbLog a new Attribute DbLogExclude will be propagated
              to all Devices. DbLogExclue will work as regexp to exclude 
@@ -43,7 +45,7 @@
              (betateilchen)
   - feature: use xhr for colorupdates by colorpicker and rgb presets
   - feature: new module 34_SWAP for generic SWAP protocoll support using
-             a panStick and 34_panStamp as IODevice(by justme1968)
+             a panStick and 34_panStamp as IODevice (by justme1968)
   - feature: new module 34_panStamp to use a panStick as a RF modem
              for panStamps using the SWAP protocoll (by justme1968)
   - feature: EGPM2LAN module added for Gembird (R) Energenie LAN Support
