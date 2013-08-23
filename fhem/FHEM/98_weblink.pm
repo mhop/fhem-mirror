@@ -194,6 +194,7 @@ weblink_FwFn($$$$)
       }
     }
     $ret .= "</table></td></tr>";
+    $ret .= "<tr><td><div class=\"devType\"><a style=\"color:#ff8888\" href=\"/fhem/docs/commandref.html#readingsGroup\">weblink readings is deprecated. please use readingsGroup instead.</a></div></td></tr>";
     $ret .= "</table>";
     $ret .= "</br>";
     
@@ -213,7 +214,7 @@ weblink_FwFn($$$$)
   <a name="weblinkdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; weblink [link|image|iframe|htmlCode|cmdList|readings]
+    <code>define &lt;name&gt; weblink [link|image|iframe|htmlCode|cmdList]
                 &lt;argument&gt;</code>
     <br><br>
     This is a placeholder device used with FHEMWEB to be able to add user
@@ -226,29 +227,13 @@ weblink_FwFn($$$$)
       <code>define hr weblink htmlCode &lt;hr&gt</code><br>
       <code>define w_Frlink weblink htmlCode { WeatherAsHtml("w_Frankfurt") }</code><br>
       <code>define systemCommands weblink cmdList pair:Pair:set+cul2+hmPairForSec+60 restart:Restart:shutdown+restart update:UpdateCheck:update+check</code><br>
-      <code>define wl_SystemStatus weblink readings sysstat *nostate *notime  {{ 'load' => 'Systemauslastung', 'temperature' => 'Systemtemperatur in &amp;deg;;C'}}</code><br>
-      <code>define wlHeizung weblink readings t1:temperature t2:temperature t3:temperature *notime {{ 't1.temperature' => 'Vorlauf', 't2.temperature' => 'R&amp;uuml;;cklauf', 't3.temperature' => 'Zirkulation'}}</code>
     </ul>
     <br>
 
     Notes:
     <ul>
       <li>For cmdList &lt;argument&gt; consist of a list of space separated icon:label:cmd triples.</li>
-      <li>For readings &lt;argument&gt; consist of one or more &lt;device&gt;[:regex] pairs,
-          zero or more of the modifiers *noheading, *notime and *nostate and as the last argument an optional {} expression that should return
-          a perl hash to map reading names to display names.
-      <ul>
-          <li>&lt;device&gt;<br>
-          the device(s) from which the readings should be taken</li>
-          <li>regex<br>
-          an optional regex to select the readings that should be displayed.</li>
-          <li>*noheading<br>don't display the table heading</li>
-          <li>*notime<br>don't display the reading timestamp</li>
-          <li>*nostate<br>don't include the state reading, other readings can be excluded with a regex of the form:<code>^((?!reading).)*$</code></li>
-          <li>{...}<br>
-          a perl expression that returns a hash that maps the reading name to the display name. keys can be either the name of the reading or &lt;device&gt;.&lt;reading&gt;. $NAME is replaced by the device name</li>
-          </li>
-      </ul>
+      <li>The readings type is deprecated. Use <a href="#readingGroup">readingGroup</a> instead.</li>
     </ul>
   </ul>
 

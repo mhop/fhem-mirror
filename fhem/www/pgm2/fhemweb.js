@@ -33,7 +33,7 @@ FW_doUpdate()
   var devs = new Array();
   for(var i=FW_curLine; i < lines.length; i++) {
     var d = lines[i].split("<<", 3);    // Complete arg
-    //console.log("Got "+lines[i]);
+    console.log("Got "+lines[i]);
     if(d.length != 3)
       continue;
     var elArr = document.querySelectorAll("[informId='"+d[0]+"']");
@@ -48,7 +48,7 @@ FW_doUpdate()
 
       } else {
         el.innerHTML=d[2];
-        if(d[0].indexOf("-") >= 0)  // readings / timestamps
+        if(d[0].match(/-ts$/))  // timestamps
           el.setAttribute('class', 'changed');
 
       }
