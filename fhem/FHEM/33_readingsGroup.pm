@@ -177,13 +177,15 @@ readingsGroup_2html($)
           $value_style = "" if( !$value_style );
         }
 
-        my $m = "$name$separator$n";
+        my $a = AttrVal($name, "alias", $name);
+        my $m = "$a$separator$n";
         $m = $mapping->{$n} if( defined($mapping) && defined($mapping->{$n}) );
         $m = $mapping->{$name.".".$n} if( defined($mapping) && defined($mapping->{$name.".".$n}) );
         $m =~ s/\%DEVICE/$name/g;
         $m =~ s/\%READING/$n/g;
-        $ret .= "<td><div $name_style class=\"dname\"><a href=\"/fhem?detail=$name\">$m</a></div></td>";
+        $m =~ s/\%ALIAS/$a/g;
 
+        $ret .= "<td><div $name_style class=\"dname\"><a href=\"/fhem?detail=$name\">$m</a></div></td>";
         $ret .= "<td><div $value_style\">$v</div></td>";
         $ret .= "<td><div></div>$fmtDateTime</td>" if( $show_time );
       }
@@ -219,13 +221,15 @@ readingsGroup_2html($)
           $value_style = "" if( !$value_style );
         }
 
-        my $m = "$name$separator$n";
+        my $a = AttrVal($name, "alias", $name);
+        my $m = "$a$separator$n";
         $m = $mapping->{$n} if( defined($mapping) && defined($mapping->{$n}) );
         $m = $mapping->{$name.".".$n} if( defined($mapping) && defined($mapping->{$name.".".$n}) );
         $m =~ s/\%DEVICE/$name/g;
         $m =~ s/\%READING/$n/g;
-        $ret .= "<td><div $name_style class=\"dname\"><a href=\"/fhem?detail=$name\">$m</a></div></td>";
+        $m =~ s/\%ALIAS/$a/g;
 
+        $ret .= "<td><div $name_style class=\"dname\"><a href=\"/fhem?detail=$name\">$m</a></div></td>";
         $ret .= "<td><div $value_style informId=\"$d-$name.$n\">$v</div></td>";
         $ret .= "<td><div $timestamp_style informId=\"$d-$name.$n-ts\">$t</div></td>" if( $show_time );
       }
@@ -411,11 +415,11 @@ readingsGroup_Get($@)
       <li>mapping<br>
         A perl expression enclosed in {} that returns a hash that maps reading names to the displayed name.
         The Keys can be either the name of the reading or &lt;device&gt;.&lt;reading&gt;.
-        %DEVICE and %READING are replaced by the device name and reading name respectively, e.g:<br>
+        %DEVICE, %ALIAS and %READING are replaced by the device name, device alias and reading name respectively, e.g:<br>
           <code>attr temperatures mapping {temperature => "%DEVICE Temperatur"}</code>
         </li>
       <li>separator<br>
-        The separator to use between the device name and the reading name if no mapping is given. Defaults to ':'
+        The separator to use between the device alias and the reading name if no mapping is given. Defaults to ':'
         a space can be enteread as <code>&amp;nbsp;</code></li>
       <li>style<br>
         Specify an HTML style for the readings table, e.g.:<br>
