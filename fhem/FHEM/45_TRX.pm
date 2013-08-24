@@ -171,7 +171,7 @@ TRX_Get($@)
   my $reading= $a[1];
 
   $msg="$name => No Get function ($reading) implemented";
-  Log3 $name, 1,$msg if ($reading ne "?");
+  Log3 $name, 1, $msg if ($reading ne "?");
   return $msg;
 }
 
@@ -364,20 +364,20 @@ TRX_Parse($$$$)
 {
   my ($hash, $iohash, $name, $rmsg) = @_;
 
-  Log3 $name, 5, "TRX_Parse1 '$rmsg'";
+  #Log3 $hash, 5, "TRX_Parse() '$rmsg'";
 
   my %addvals;
   # Parse only if message is different within 2 seconds 
   # (some Oregon sensors always sends the message twice, X10 security sensors even sends the message five times)
   if (("$last_rmsg" ne "$rmsg") || (time() - $last_time) > 1) { 
-    Log3 $name, 1, "TRX_Dispatch '$rmsg'";
+    Log3 $hash, 5, "TRX_Parse() '$rmsg'";
     %addvals = (RAWMSG => $rmsg);
     Dispatch($hash, $rmsg, \%addvals); 
     $hash->{"${name}_MSGCNT"}++;
     $hash->{"${name}_TIME"} = TimeNow();
     $hash->{RAWMSG} = $rmsg;
   } else { 
-    Log3 $name, 1, "TRX_Dispatch '$rmsg' dup";
+    Log3 $hash, 5, "TRX_Parse() '$rmsg' dup";
   }
 
   $last_rmsg = $rmsg;
