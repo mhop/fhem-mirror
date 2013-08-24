@@ -30,7 +30,7 @@ ESA2000_Initialize($)
   $hash->{DefFn}     = "ESA2000_Define";
   $hash->{UndefFn}   = "ESA2000_Undef";
   $hash->{ParseFn}   = "ESA2000_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 loglevel:0,1,2,3,4,5,6 ignore:0,1 ".
+  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 ignore:0,1 ".
                        "model:esa2000-led,esa2000-wz,esa2000-s0,esa1000wz-ir,esa1000wz-s0,esa1000wz-led,esa1000gas base_1 base_2 ".
                        $readingFnAttributes;
 }
@@ -101,10 +101,10 @@ ESA2000_Parse($$)
   my $cde = substr($msg, 7, 4);
   my $val = substr($msg, 11, 22);
 
-  Log 5, "ESA2000 msg $msg";
-  Log 5, "ESA2000 seq $seq";
-  Log 5, "ESA2000 device $dev";
-  Log 5, "ESA2000 code $cde";
+  Log3 $hash, 5, "ESA2000 msg $msg";
+  Log3 $hash, 5, "ESA2000 seq $seq";
+  Log3 $hash, 5, "ESA2000 device $dev";
+  Log3 $hash, 5, "ESA2000 code $cde";
 
   my $type = "";
   foreach my $c (keys %codes) {
@@ -116,7 +116,7 @@ ESA2000_Parse($$)
   }
 
   if(!defined($modules{ESA2000}{defptr}{$dev})) {
-    Log 3, "Unknown ESA2000 device $dev, please define it";
+    Log3 $hash, 3, "Unknown ESA2000 device $dev, please define it";
     $type = "ESA2000" if(!$type);
     return "UNDEFINED ${type}_$dev ESA2000 $dev";
   }
@@ -147,7 +147,7 @@ ESA2000_Parse($$)
 
   } else {
 
-    Log 3, "ESA2000 Device $dev (Unknown type: $type)";
+    Log3 $name, 3, "ESA2000 Device $dev (Unknown type: $type)";
     return "";
 
   }
@@ -253,7 +253,7 @@ ESA2000_Parse($$)
   #
   readingsBeginUpdate($def);
 
-  Log GetLogLevel($name,4), "ESA2000 $name: $val";
+  Log3 $name, 4, "ESA2000 $name: $val";
 
   if ( (defined($def->{READINGS}{"sequence"}{VAL}) ? $def->{READINGS}{"sequence"}{VAL} : "") ne $v[1] ) {
     my $max = int(@txt);
@@ -267,7 +267,7 @@ ESA2000_Parse($$)
     readingsBulkUpdate($def, "state", $val);
 
   } else {
-    Log GetLogLevel($name,4), "ESA2000/DISCARDED $name: $val";
+    Log3 $name, 4, "ESA2000/DISCARDED $name: $val";
   }
   #
   # now we are done with updating readings
@@ -285,8 +285,7 @@ ESA2000_Parse($$)
 <a name="ESA2000"></a>
 <h3>ESA2000</h3>
 <ul>
-  The ESA2000 module interprets ESA2000 type of messages received by the CUL,
-  currently only for ESA2000 LED devices.
+  The ESA2000 module interprets ESA1000 or ESA2000 type of messages received by the CUL.
   <br><br>
 
   <a name="ESA2000define"></a>
@@ -313,8 +312,7 @@ ESA2000_Parse($$)
     <li><a href="#ignore">ignore</a></li><br>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
-    <li><a href="#loglevel">loglevel</a></li><br>
-    <li><a href="#model">model</a>esa2000-led, esa2000-wz, esa2000-s0, esa1000wz-ir, esa1000wz-s0, esa1000wz-led, esa1000gas</li><br>
+    <li><a href="#model">model</a> (esa2000-led, esa2000-wz, esa2000-s0, esa1000wz-ir, esa1000wz-s0, esa1000wz-led, esa1000gas)</li><br>
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
   </ul>
