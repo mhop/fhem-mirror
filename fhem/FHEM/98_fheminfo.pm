@@ -25,6 +25,7 @@ package main;
 use strict;
 use warnings;
 use Config;
+use FhemUtils::release;                                               
 
 sub CommandFheminfo($$);
 
@@ -32,10 +33,6 @@ sub CommandFheminfo($$);
 sub
 fheminfo_Initialize($$)
 {
-  if(!eval "require FhemUtils::release") {
-    require release;
-  }
-
   my %hash = (
     Fn  => "CommandFheminfo",
     Hlp => "[send],show or send Fhem statistics",
