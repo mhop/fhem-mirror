@@ -1178,28 +1178,28 @@ TRX_WEATHER_Parse($$)
  	#print "!> i=".$i."\n";
 	#printf "%s\t",$i->{device};
 	if ($i->{type} eq "temp") { 
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." Temperatur ".$i->{current}." ".$i->{units};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name Temperatur ".$i->{current}." ".$i->{units};
 			$val .= "T: ".$i->{current}." ";
 
 			$sensor = "temperature";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
   	} 
 	elsif ($i->{type} eq "chilltemp") { 
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." windchill ".$i->{current}." ".$i->{units};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name windchill ".$i->{current}." ".$i->{units};
 			$val .= "CT: ".$i->{current}." ";
 
 			$sensor = "windchill";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
   	} 
 	elsif ($i->{type} eq "humidity") { 
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." Luftfeuchtigkeit ".$i->{current}.$i->{units};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name Luftfeuchtigkeit ".$i->{current}.$i->{units};
 			$val .= "H: ".$i->{current}." ";
 
 			$sensor = "humidity";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "battery") { 
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." Batterie ".$i->{current};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name Batterie ".$i->{current};
 			my $tmp_battery = $i->{current};
 			my @words = split(/\s+/,$i->{current});
 			$val .= "BAT: ".$words[0]." "; #use only first word
@@ -1208,7 +1208,7 @@ TRX_WEATHER_Parse($$)
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "pressure") { 
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." Luftdruck ".$i->{current}." ".$i->{units}." Vorhersage=".$i->{forecast};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name Luftdruck ".$i->{current}." ".$i->{units}." Vorhersage=".$i->{forecast};
 			# do not add it due to problems with hms.gplot
 			$val .= "P: ".$i->{current}." ";
 
@@ -1219,7 +1219,7 @@ TRX_WEATHER_Parse($$)
 			readingsBulkUpdate($def, $sensor, $i->{forecast});
 	}
 	elsif ($i->{type} eq "speed") { 
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." wind_speed ".$i->{current}." wind_avspeed ".$i->{average};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name wind_speed ".$i->{current}." wind_avspeed ".$i->{average};
 			$val .= "W: ".$i->{current}." ";
 			$val .= "WA: ".$i->{average}." ";
 
@@ -1230,7 +1230,7 @@ TRX_WEATHER_Parse($$)
 			readingsBulkUpdate($def, $sensor, $i->{average});
 	}
 	elsif ($i->{type} eq "direction") { 
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." wind_dir ".$i->{current}." ".$i->{string};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name wind_dir ".$i->{current}." ".$i->{string};
 			$val .= "WD: ".$i->{current}." ";
 			$val .= "WDN: ".$i->{string}." ";
 
@@ -1238,28 +1238,28 @@ TRX_WEATHER_Parse($$)
 			readingsBulkUpdate($def, $sensor, $i->{current} . " " . $i->{string});
 	}
 	elsif ($i->{type} eq "rain") { 
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." rain ".$i->{current};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name rain ".$i->{current};
 			$val .= "RR: ".$i->{current}." ";
 
 			$sensor = "rain_rate";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "train") { 
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." train ".$i->{current};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name train ".$i->{current};
 			$val .= "TR: ".$i->{current}." ";
 
 			$sensor = "rain_total";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "flip") { 
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." flip ".$i->{current};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name flip ".$i->{current};
 			$val .= "F: ".$i->{current}." ";
 
 			$sensor = "rain_flip";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "uv") { 
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." uv_val ".$i->{current}." uv_risk ".$i->{risk};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name uv_val ".$i->{current}." uv_risk ".$i->{risk};
 			$val .= "UV: ".$i->{current}." ";
 			$val .= "UVR: ".$i->{risk}." ";
 
@@ -1273,9 +1273,9 @@ TRX_WEATHER_Parse($$)
 			my $energy_current = $i->{current};
 			if (defined($def->{scale_current})) {
 				$energy_current = $energy_current * $def->{scale_current};
-				Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." scale_current=".$def->{scale_current};			
+				Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name scale_current=".$def->{scale_current};			
 			}
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." energy_current=".$energy_current;			
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name energy_current=".$energy_current;			
 			$val .= "ECUR: ".$energy_current." ";
 
 			$sensor = "energy_current";
@@ -1285,9 +1285,9 @@ TRX_WEATHER_Parse($$)
 			my $energy_current = $i->{current};
 			if (defined($def->{scale_current})) {
 				$energy_current = $energy_current * $def->{scale_current};
-				Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." energy_ch1 scale_current=".$def->{scale_current};			
+				Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name energy_ch1 scale_current=".$def->{scale_current};			
 			}
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." CH1 energy_current=".$energy_current;			
+			Log3 $name, 5, "TRX_WEATHER: device=$device_name CH1 energy_current=$energy_current";			
 			$val .= "CH1: ".$energy_current." ";
 
 			$sensor = "energy_ch1";
@@ -1297,9 +1297,9 @@ TRX_WEATHER_Parse($$)
 			my $energy_current = $i->{current};
 			if (defined($def->{scale_current})) {
 				$energy_current = $energy_current * $def->{scale_current};
-				Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." energy_ch2 scale_current=".$def->{scale_current};			
+				Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name energy_ch2 scale_current=".$def->{scale_current};			
 			}
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." CH2 energy_current=".$energy_current;			
+			Log3 $device_name, 5, "TRX_WEATHER: name=$name device=$device_name CH2 energy_current=$energy_current";			
 			$val .= "CH2: ".$energy_current." ";
 
 			$sensor = "energy_ch2";
@@ -1309,9 +1309,9 @@ TRX_WEATHER_Parse($$)
 			my $energy_current = $i->{current};
 			if (defined($def->{scale_current})) {
 				$energy_current = $energy_current * $def->{scale_current};
-				Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." energy_ch3 scale_current=".$def->{scale_current};			
+				Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name energy_ch3 scale_current=".$def->{scale_current};			
 			}
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." CH3 energy_current=".$energy_current;			
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name CH3 energy_current=".$energy_current;			
 			$val .= "CH3: ".$energy_current." ";
 
 			$sensor = "energy_ch3";
@@ -1321,45 +1321,45 @@ TRX_WEATHER_Parse($$)
 			my $energy_total = $i->{current};
 			if (defined($def->{scale_total}) && defined($def->{add_total})) {
 				$energy_total = sprintf("%.4f",$energy_total * $def->{scale_total} + $def->{add_total});
-				Log3 $iohash, 1, "TRX_WEATHER: device=".$device_name." energy_total scale_total=".$def->{scale_total};			
+				Log3 $name, 1, "TRX_WEATHER: name=$name device=$device_name energy_total scale_total=".$def->{scale_total};			
 			}
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." energy_total=".$energy_total;			
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name energy_total=$energy_total";			
 			$val .= "ESUM: ".$energy_total." ";
 
 			$sensor = "energy_total";
 			readingsBulkUpdate($def, $sensor, $energy_total." ".$i->{units});
 	}
 	elsif ($i->{type} eq "weight") { 
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." weight ".$i->{current};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name weight ".$i->{current};
 			$val .= "W: ".$i->{current}." ";
 
 			$sensor = "weight";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "hexline") { 
-			Log3 $iohash, 5, "TRX_WEATHER: hexline=".$device_name." train ".$i->{current};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name hexline ".$i->{current};
 			$sensor = "hexline";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "rssi") { 
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." rssi ".$i->{current};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name rssi ".$i->{current};
 			$sensor = "rssi";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "date") { 
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." date ".$i->{current};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name date ".$i->{current};
 			$val .= $i->{current}." ";
 			$sensor = "date";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "time") { 
-			Log3 $iohash, 5, "TRX_WEATHER: device=".$device_name." time ".$i->{current};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name time ".$i->{current};
 			$val .= $i->{current}." ";
 			$sensor = "time";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	else { 
-		Log3 $iohash, 1, "TRX_WEATHER: device=".$device_name. " UNKNOWN Type: ".$i->{type}." Value: ".$i->{current} 
+		Log3 $name, 1, "TRX_WEATHER: name=$name device=$device_name UNKNOWN Type: ".$i->{type}." Value: ".$i->{current} 
 	}
   }
 
