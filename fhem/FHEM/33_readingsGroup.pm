@@ -123,9 +123,9 @@ readingsGroup_2html($)
   my $value_style = AttrVal( $d, "valueStyle", "" );
   my $timestamp_style = AttrVal( $d, "timestampStyle", "" );
 
-  my $mapping = AttrVal( $d, "mapping", undef);
-  $mapping = eval $mapping if( $mapping );
-  $mapping = undef if( ref($mapping) ne 'HASH' );
+  my $mapping = AttrVal( $d, "mapping", "");
+  $mapping = eval $mapping if( $mapping =~ m/^{.*}$/ );
+  #$mapping = undef if( ref($mapping) ne 'HASH' );
 
   my $devices = $hash->{DEVICES};
 
@@ -179,11 +179,18 @@ readingsGroup_2html($)
 
         my $a = AttrVal($name, "alias", $name);
         my $m = "$a$separator$n";
-        $m = $mapping->{$n} if( defined($mapping) && defined($mapping->{$n}) );
-        $m = $mapping->{$name.".".$n} if( defined($mapping) && defined($mapping->{$name.".".$n}) );
-        $m =~ s/\%DEVICE/$name/g;
-        $m =~ s/\%READING/$n/g;
-        $m =~ s/\%ALIAS/$a/g;
+
+        if( $mapping ) {
+          if( ref($mapping) eq 'HASH' ) {
+            $m = $mapping->{$n} if( defined($mapping) && defined($mapping->{$n}) );
+            $m = $mapping->{$name.".".$n} if( defined($mapping) && defined($mapping->{$name.".".$n}) );
+          } else {
+            $m = $mapping;
+          }
+          $m =~ s/\%DEVICE/$name/g;
+          $m =~ s/\%READING/$n/g;
+          $m =~ s/\%ALIAS/$a/g;
+        }
 
         $ret .= "<td><div $name_style class=\"dname\"><a href=\"/fhem?detail=$name\">$m</a></div></td>";
         $ret .= "<td><div $value_style\">$v</div></td>";
@@ -223,11 +230,18 @@ readingsGroup_2html($)
 
         my $a = AttrVal($name, "alias", $name);
         my $m = "$a$separator$n";
-        $m = $mapping->{$n} if( defined($mapping) && defined($mapping->{$n}) );
-        $m = $mapping->{$name.".".$n} if( defined($mapping) && defined($mapping->{$name.".".$n}) );
-        $m =~ s/\%DEVICE/$name/g;
-        $m =~ s/\%READING/$n/g;
-        $m =~ s/\%ALIAS/$a/g;
+
+        if( $mapping ) {
+          if( ref($mapping) eq 'HASH' ) {
+            $m = $mapping->{$n} if( defined($mapping) && defined($mapping->{$n}) );
+            $m = $mapping->{$name.".".$n} if( defined($mapping) && defined($mapping->{$name.".".$n}) );
+          } else {
+            $m = $mapping;
+          }
+          $m =~ s/\%DEVICE/$name/g;
+          $m =~ s/\%READING/$n/g;
+          $m =~ s/\%ALIAS/$a/g;
+        }
 
         $ret .= "<td><div $name_style class=\"dname\"><a href=\"/fhem?detail=$name\">$m</a></div></td>";
         $ret .= "<td><div $value_style informId=\"$d-$name.$n\">$v</div></td>";
@@ -413,9 +427,10 @@ readingsGroup_Get($@)
       <li>notime<br>
         If set to 1 the reading timestamp is not displayed.</li>
       <li>mapping<br>
-        A perl expression enclosed in {} that returns a hash that maps reading names to the displayed name.
-        The Keys can be either the name of the reading or &lt;device&gt;.&lt;reading&gt;.
+        Can be a simple string or a perl expression enclosed in {} that returns a hash that maps reading names to the displayed name.
+        The keys can be either the name of the reading or &lt;device&gt;.&lt;reading&gt;.
         %DEVICE, %ALIAS and %READING are replaced by the device name, device alias and reading name respectively, e.g:<br>
+          <code>attr temperatures mapping %READING in %ALIAS</code>
           <code>attr temperatures mapping {temperature => "%DEVICE Temperatur"}</code>
         </li>
       <li>separator<br>
