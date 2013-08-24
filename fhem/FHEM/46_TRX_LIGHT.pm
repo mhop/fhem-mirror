@@ -595,7 +595,7 @@ sub TRX_LIGHT_parse_X10 ($$)
   my $name = $def->{NAME};
   return "" if(IsIgnored($name));
 
-  Log3 $hash, 5, "TRX_LIGHT_parse_X10() $name devn=$device_name first=$firstdevice command=$command, cmd=$hexdata";
+  Log3 $name, 5, "TRX_LIGHT_parse_X10() $name devn=$device_name first=$firstdevice command=$command, cmd=$hexdata";
 
   my $n = 0;
   my $tm = TimeNow();
@@ -640,7 +640,7 @@ sub TRX_LIGHT_parse_X10 ($$)
 	readingsBulkUpdate($def, $sensor, $current);
   } else {
 	$error = sprintf "TRX_LIGHT: error unknown sensor type=%x device_type=%s devn=%s first=%d command=%s", $type, $device_type, $device_name, $firstdevice, $command;
-	Log3 $hash, 1, "TRX_LIGHT_parse_X10() ".$error;
+	Log3 $name, 1, "TRX_LIGHT_parse_X10() ".$error;
 	return $error;
   }
 
@@ -744,7 +744,7 @@ sub TRX_LIGHT_parse_PT2262 ($$)
   my $name = $def->{NAME};
   return "" if(IsIgnored($name));
 
-  Log3 $hash, 1, "TRX_LIGHT_parse_PT2262() $name devn=$device_name command=$command, cmd=$hexdata";
+  Log3 $name, 1, "TRX_LIGHT_parse_PT2262() $name devn=$device_name command=$command, cmd=$hexdata";
 
   my $n = 0;
   my $val = "";
@@ -767,10 +767,10 @@ sub TRX_LIGHT_parse_PT2262 ($$)
 	$command_codes .= ",";
 	#if ($command_codes =~ /$command_rest:(.*),/o ) {
 	if ($command_codes =~ /$command_rest:([a-z|A-Z]*),/ ) {
-		Log3 $hash, 5,"PT2262: found=$1"; 
+		Log3 $name, 5,"PT2262: found=$1"; 
 		$command = $1;
 	}
-	Log3 $hash, 1,"TRX_LIGHT_parse_PT2262() readingsBulkUpdate($def, $sensor, $command)";
+	Log3 $name, 1,"TRX_LIGHT_parse_PT2262() readingsBulkUpdate($def, $sensor, $command)";
 	$val = $command;
   	readingsBulkUpdate($def, $sensor, $val);
   }

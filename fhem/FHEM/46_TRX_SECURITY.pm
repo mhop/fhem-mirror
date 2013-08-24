@@ -133,7 +133,7 @@ TRX_SECURITY_Set($@)
 	}
   	my $error = "Unknown command $command, choose one of $l"; 
 
-	Log3 $hash, 1, "TRX_SECURITY_Set() ".$error if ($command ne "?" );
+	Log3 $name, 1, "TRX_SECURITY_Set() ".$error if ($command ne "?" );
 	return $error;
   }
 
@@ -159,15 +159,15 @@ TRX_SECURITY_Set($@)
                 $id2 = $2;
                 $id3 = $3;
   	} else {
-		Log3 $hash, 1,"TRX_SECURITY_Set() lightning1 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
+		Log3 $name, 1,"TRX_SECURITY_Set() lightning1 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
 		return "error set name=$name  deviceid=$deviceid";
   	}
 
 	# lightning1
   	$hex_prefix = sprintf "0820";
   	$hex_command = sprintf "%02x%02x%02s%02s%02s%02x00", $device_type_num & 0xff, $seqnr, $id1, $id2, $id3, $cmnd; 
-  	Log3 $hash, 1,"TRX_SECURITY_Set() name=$name device_type=$device_type, deviceid=$deviceid id1=$id1, id2=$id2, id3=$id3, command=$command";
-  	Log3 $hash, 5,"TRX_SECURITY_Set() hexline=$hex_prefix$hex_command";
+  	Log3 $name, 1,"TRX_SECURITY_Set() name=$name device_type=$device_type, deviceid=$deviceid id1=$id1, id2=$id2, id3=$id3, command=$command";
+  	Log3 $name, 5,"TRX_SECURITY_Set() hexline=$hex_prefix$hex_command";
 
   	if ($device_type ne "KD101") {
 	  	my $sensor = "";
@@ -406,7 +406,7 @@ sub TRX_SECURITY_parse_X10Sec($$) {
       $command = $rec;
     }
   } else {
-    Log3 $hash, 1, "TRX_SECURITY_parse_X10Sec() undefined command cmd=$data device-nr=$device, hex=$hexdata";
+    Log3 $name, 1, "TRX_SECURITY_parse_X10Sec() undefined command cmd=$data device-nr=$device, hex=$hexdata";
     return "";
   }
 
@@ -415,18 +415,18 @@ sub TRX_SECURITY_parse_X10Sec($$) {
 	if ($battery_level == 0x9) { $battery = 'batt_ok'}
 	elsif ($battery_level == 0x0) { $battery = 'batt_low'}
 	else {
-		Log3 $hash, 1,"TRX_SECURITY_parse_X10Sec() unkown battery_level=$battery_level";
+		Log3 $name, 1,"TRX_SECURITY_parse_X10Sec() unkown battery_level=$battery_level";
 	}
   }
 
   if ($trx_rssi == 1) {
   	$rssi = sprintf("%d", ($bytes->[7] & 0xf0) >> 4);
-	Log3 $hash, 5, "TRX_SECURITY_parse_X10Sec() $name devn=$device_name rssi=$rssi";
+	Log3 $name, 5, "TRX_SECURITY_parse_X10Sec() $name devn=$device_name rssi=$rssi";
   }
 
   my $current = "";
 
-  Log3 $hash, 5, "TRX_SECURITY_parse_X10Sec() $name devn=$device_name first=$firstdevice subtype=$subtype command=$command, delay=$delay, batt=$battery cmd=$hexdata";
+  Log3 $name, 5, "TRX_SECURITY_parse_X10Sec() $name devn=$device_name first=$firstdevice subtype=$subtype command=$command, delay=$delay, batt=$battery cmd=$hexdata";
 
 
   my $n = 0;
