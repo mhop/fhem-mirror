@@ -252,6 +252,11 @@ readingsGroup_Notify($$)
   my ($hash,$dev) = @_;
   my $name  = $hash->{NAME};
 
+  if( grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) ) {
+    readingsGroup_updateDevices($hash);
+    return undef;
+  }
+
   return if($dev->{NAME} eq $name);
 
   my $devices = $hash->{DEVICES};
