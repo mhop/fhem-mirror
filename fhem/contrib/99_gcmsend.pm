@@ -21,9 +21,7 @@ sub
 gcmsend_set {
   my ($hash, @a) = @_;
   my $v = @a[1];
-  Log 3, $v;
   if ($v eq "delete_saved_states") {
-    Log 3, $hash->{STATES}{'mat_halogen'};
     $hash->{STATES} = {};
     return "deleted";
   } else {
@@ -93,9 +91,8 @@ sub gcmsend_message($$$) {
   if (! $response->is_success) {
     Log 3, "error during request: " . $response->status_line;
     $hash->{STATE} = $response->status_line;
-  } elsif ($hash->{STATE} != "OK") {
-    $hash->{STATE} = "OK";
   }
+  $hash->{STATE} = "OK";
   return undef;
 }
 
