@@ -4,7 +4,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2005-2012
+#  (c) 2005-2013
 #  Copyright: Rudolf Koenig (r dot koenig at koeniglich dot de)
 #  All rights reserved
 #
@@ -24,8 +24,6 @@
 #  GNU General Public License for more details.
 #
 #  This copyright notice MUST APPEAR in all copies of the script!
-#  Thanks for Tosti's site (<http://www.tosti.com/FHZ1000PC.html>)
-#  for inspiration.
 #
 #  Homepage:  http://fhem.de
 #
@@ -59,6 +57,7 @@ sub FmtDateTime($);
 sub FmtTime($);
 sub GetLogLevel(@);
 sub GetTimeSpec($);
+sub GlobalAttr($$$$);
 sub HandleArchiving($);
 sub HandleTimeout();
 sub IOWrite($@);
@@ -174,6 +173,7 @@ use vars qw(%addNotifyCB);	# Used by event enhancers (e.g. avarage)
 use vars qw(%inform);	        # Used by telnet_ActivateInform
 
 use vars qw($reread_active);
+use vars qw($winService);       # the Windows Service object
 
 my $AttrList = "verbose:0,1,2,3,4,5 room group comment alias ".
                 "eventMap userReadings";
@@ -292,6 +292,10 @@ if(int(@ARGV) < 1) {
   print "Usage:\n";
   print "as server: fhem configfile\n";
   print "as client: fhem [host:]port cmd cmd cmd...\n";
+  if($^O =~ m/Win/) {
+    print "install as windows service: fhem.pl configfile -i\n";
+    print "uninstall the windows service: fhem.pl -u\n";
+  }
   CommandHelp(undef, undef);
   exit(1);
 }
@@ -326,7 +330,7 @@ if($^O !~ m/Win/ && $< == 0) {
 
 ###################################################
 # Client code
-if(int(@ARGV) > 1) {
+if(int(@ARGV) > 1 && $ARGV[$#ARGV] ne "-i") {
   my $buf;
   my $addr = shift @ARGV;
   $addr = "localhost:$addr" if($addr !~ m/:/);
@@ -349,27 +353,30 @@ if(int(@ARGV) > 1) {
 
 
 ###################################################
-# for debugging
-sub
-Debug($) {
-  my $msg= shift;
-  Log 1, "DEBUG>" . $msg;
+# Windows Service Support: install/remove or start the fhem service
+if($^O =~ m/Win/) {
+  (my $dir = $0) =~ s+[/\\][^/\\]*$++; # Find the FHEM directory
+  chdir($dir);
+  $winService = eval {require FHEM::WinService; FHEM::WinService->new(\@ARGV);};
+  if((!$winService || $@) && ($ARGV[$#ARGV] eq "-i" || $ARGV[$#ARGV] eq "-u")) {
+    print "Cannot initialize FHEM::WinService: $@, exiting.\n";
+    exit 0;
+  }
 }
-###################################################
-
+$winService ||= {};
 
 ###################################################
 # Server initialization
 doGlobalDef($ARGV[0]);
 
 # As newer Linux versions reset serial parameters after fork, we parse the
-# config file after the fork. Since need some global attr parameters before, we
+# config file after the fork. But we need some global attr parameters before, so we
 # read them here.
 setGlobalAttrBeforeFork($attr{global}{configfile});
 
+Log 1, $_ for eval{@{$winService->{ServiceLog}};};
+
 if($^O =~ m/Win/ && !$attr{global}{nofork}) {
-  Log 1, "Forcing 'attr global nofork' on WINDOWS";
-  Log 1, "set it in the config file to avoid this message";
   $attr{global}{nofork}=1;
 }
 
@@ -457,8 +464,10 @@ while (1) {
   }
   $timeout = $readytimeout if(keys(%readyfnlist) &&
                               (!defined($timeout) || $timeout > $readytimeout));
+  $timeout = 5 if $winService->{AsAService} && $timeout > 5;
   my $nfound = select($rout=$rin, undef, undef, $timeout);
 
+  $winService->{serviceCheck}->() if($winService->{serviceCheck});
   CommandShutdown(undef, undef) if($sig_term);
 
   if($nfound < 0) {
@@ -965,9 +974,10 @@ OpenLogfile($)
   close(LOG);
   $logopened=0;
   $currlogfile = $param;
-  if($currlogfile eq "-") {
 
-    open LOG, '>&STDOUT'    or die "Can't dup stdout: $!";
+  # STDOUT is closed in windows services per default
+  if(!$winService->{AsAService} && $currlogfile eq "-") {
+    open LOG, '>&STDOUT' || die "Can't dup stdout: $!";
 
   } else {
 
@@ -1213,7 +1223,12 @@ CommandShutdown($$)
   WriteStatefile();
   unlink($attr{global}{pidfilename}) if($attr{global}{pidfilename});
   if($param && $param eq "restart") {
-    system("(sleep 2; exec $^X $0 $attr{global}{configfile})&");
+    if ($^O !~ m/Win/) {
+      system("(sleep 2; exec $^X $0 $attr{global}{configfile})&");
+    } elsif ($winService->{AsAService}) {
+      # use the OS SCM to stop and start the service
+      exec('cmd.exe /C net stop fhem & net start fhem');
+    }
   }
   exit(0);
 }
@@ -1871,7 +1886,7 @@ getAllSets($)
 }
 
 sub
-GlobalAttr($$)
+GlobalAttr($$$$)
 {
   my ($type, $me, $name, $val) = @_;
 
@@ -3531,6 +3546,12 @@ utf8ToLatin1($)
   my ($s)= @_;
   $s =~ s/([\xC2\xC3])([\x80-\xBF])/chr(ord($1)<<6&0xC0|ord($2)&0x3F)/eg;
   return $s;
+}
+
+sub
+Debug($) {
+  my $msg= shift;
+  Log 1, "DEBUG>" . $msg;
 }
 
 1;

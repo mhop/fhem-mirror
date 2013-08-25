@@ -91,11 +91,12 @@ dist:
 	cp -r fhem.pl fhem.cfg CHANGED HISTORY Makefile README.SVN\
 		FHEM contrib docs www webfrontend .f
 	mkdir .f/log
+	touch .f/log/empty_file.txt
 	(cd .f; perl contrib/commandref_join.pl)
 	find .f -name .svn -print | xargs rm -rf
 	find .f -name \*.orig -print | xargs rm -f
 	find .f -name .#\* -print | xargs rm -f
-	find .f -type f -print | grep -v Makefile |\
+	find .f -type f -print | grep -v Makefile | grep -v SWAP |\
 		xargs perl -pi -e 's/=VERS=/$(VERS)/g;s/=DATE=/$(DATE)/g'
 	mv .f $(DESTDIR)
 	tar cf - $(DESTDIR) | gzip > $(DESTDIR).tar.gz
