@@ -96,6 +96,7 @@ sub gcmsend_message($$$) {
   } elsif ($hash->{STATE} != "OK") {
     $hash->{STATE} = "OK";
   }
+  return undef;
 }
 
 sub gcmsend_notify($$)
