@@ -1,11 +1,13 @@
-# Add changes at the top of the list. Keep it in ASCII
+# Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 - SVN
-  - feature: new module 33_readingsGroup to display a collection of readings from
-             on or more devices. this will replace weblink readings. (by justme1968)
+  - feature: install FHEM as Windows service by T.E., see docs/HOWTO_Windows.txt
+  - feature: new module 33_readingsGroup to display a collection of readings
+             from one or more devices. this will replace weblink readings.
+             (by justme1968)
   - feature: setreading command added
-  - change:  DbLog: by using DbLog a new Attribute DbLogExclude will be propagated
-             to all Devices. DbLogExclue will work as regexp to exclude 
-             defined readings to log
+  - change:  DbLog: by using DbLog a new Attribute DbLogExclude will be
+             propagated to all Devices. DbLogExclue will work as regexp to
+             exclude defined readings to log
   - change:  loglevel attribute deprecated/replaced by the verbose attribute
   - change:  VIERA: changed several readings/commands according to
              DevelopmentGuidelinesAV. See FHEM Wiki and commandref for more
