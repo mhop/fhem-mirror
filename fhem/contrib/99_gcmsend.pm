@@ -114,7 +114,7 @@ sub gcmsend_notify($$)
     $dev->{STATES} = {};
   }
 
-  my $stateFilter =  AttrVal($name, "stateFilter", "");
+  my $stateFilter =  AttrVal($ntfy->{NAME}, "stateFilter", "");
 
   my $states = $ntfy->{STATES};
   if (!$states->{$name}) {
@@ -138,7 +138,7 @@ sub gcmsend_notify($$)
     }
 
     if (
-      ($stateFilter != "" && $value =~ m/$stateFilter/) &&
+      ($stateFilter eq "" || $value =~ m/$stateFilter/) &&
       (! $deviceStates->{$key} || !($deviceStates->{$key} eq $value))
     ) {
       $deviceStates->{$key} = $value;
@@ -149,7 +149,6 @@ sub gcmsend_notify($$)
       $val .= "$key:$value";
     }  
   } 
-
   if ($count > 0) {
     gcmsend_message($ntfy, $name, $val);
   }
