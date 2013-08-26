@@ -141,7 +141,7 @@ readingsGroup_2html($)
     my $name = $h->{NAME};
     next if( !$h );
 
-    if( $regex =~ m/\+(.*)/ ) {
+    if( $regex && $regex =~ m/\+(.*)/ ) {
       $regex = $1;
 
       my $now = gettimeofday();
@@ -243,7 +243,7 @@ readingsGroup_2html($)
           $m =~ s/\%ALIAS/$a/g;
         }
 
-        $ret .= "<td><div $name_style class=\"dname\"><a href=\"/fhem?detail=$name\">$m</a></div></td>";
+        $ret .= "<td><div $name_style class=\"xdname\"><a href=\"/fhem?detail=$name\">$m</a></div></td>";
         $ret .= "<td><div $value_style informId=\"$d-$name.$n\">$v</div></td>";
         $ret .= "<td><div $timestamp_style informId=\"$d-$name.$n-ts\">$t</div></td>" if( $show_time );
       }
@@ -430,7 +430,7 @@ readingsGroup_Get($@)
         Can be a simple string or a perl expression enclosed in {} that returns a hash that maps reading names to the displayed name.
         The keys can be either the name of the reading or &lt;device&gt;.&lt;reading&gt;.
         %DEVICE, %ALIAS and %READING are replaced by the device name, device alias and reading name respectively, e.g:<br>
-          <code>attr temperatures mapping %READING in %ALIAS</code>
+          <code>attr temperatures mapping %DEVICE-%READING</code>
           <code>attr temperatures mapping {temperature => "%DEVICE Temperatur"}</code>
         </li>
       <li>separator<br>
@@ -453,7 +453,8 @@ readingsGroup_Get($@)
           <code>attr temperatures valueStyle {($DEVICE =~ m/aussen/)?'style="color:green"':'style="color:red"'}</code>
     </ul>
       Note: The perl expressions are evaluated only once during html creation and will not reflect value updates with longpoll.
-      Refresh the page to update the dynamic style.
+      Refresh the page to update the dynamic style. For nameStyle the collor attribut is not working at the moment,
+      font-... and background do work.
 
 </ul>
 
