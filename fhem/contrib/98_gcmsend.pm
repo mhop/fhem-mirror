@@ -139,7 +139,8 @@ sub gcmsend_notify($$)
 
     if (
       ($stateFilter eq "" || $value =~ m/$stateFilter/) &&
-      (! $deviceStates->{$key} || !($deviceStates->{$key} eq $value))
+      (! $deviceStates->{$key} || !($deviceStates->{$key} eq $value)) && 
+      (!($value eq ""))
     ) {
       $deviceStates->{$key} = $value;
       if ($count != 0) {
