@@ -43,7 +43,7 @@ my ($hash) = @_;
  $hash->{StateFn}  = "STV_SetState";
  $hash->{SetFn}    = "STV_Set";
  $hash->{AttrFn}   = "STV_Attr";
- $hash->{AttrList} = "MAC loglevel:0,1,2,3,4,5";
+ $hash->{AttrList} = "MAC";
 }
 
 sub 
@@ -133,8 +133,7 @@ if ( $hash->{Port} != 55000 && $hash->{Port} != 52235 ){
 	return "[STV] Port is not supported";
 }
 
-
- Log 3, "[STV] defined with host: $hash->{Host} port: $hash->{Port} MAC: $hash->{MAC}";
+ Log3 undef, 3, "[STV] defined with host: $hash->{Host} port: $hash->{Port} MAC: $hash->{MAC}";
  $hash->{STATE} = 'Initialized';
  return undef;
 }
@@ -142,7 +141,7 @@ if ( $hash->{Port} != 55000 && $hash->{Port} != 52235 ){
 sub connection($$)
 {
 	my $tmp =  shift ; 
- 	Log 4, "[STV] connection message: $tmp";
+	Log3 undef, 4, "[STV] connection message: $tmp";
 	my $TV = shift;
 	my $buffer = "";
 	my $tmp2 = "";
@@ -160,12 +159,11 @@ sub connection($$)
 			$buffer .= $buff;
 		}
 		@tmp2 = split (/\n/,$buffer);
- 		Log 3, "[STV] $TV response: $tmp2[0]";
- 		Log 4, "[STV] $TV buffer response: $buffer";
+
 		$sock->close();
- 		Log 4, "[STV] $TV: socket closed";
+		Log3 undef, 4, "[STV] $TV: socket closed";
 	}else{
- 		Log 4, "[STV] $TV: not able to close socket";
+		Log3 undef, 4, "[STV] $TV: not able to close socket";
 	}
 }
 
@@ -188,13 +186,13 @@ sub STV_55000($$$)
   
   #### MAC überprüfen wenn nicht gültig vom attribute übernehmen.
   if ($mymac !~ /^\w\w:\w\w:\w\w:\w\w|\w\w:\w\w:\w\w:\w\w$/) {
-	  Log 3, "[STV] mymac: $mymac invalid format";
+	  Log3 $name, 3, "[STV] mymac: $mymac invalid format";
   }else{
 	  # command-line help
 	  if (!$tv|!$tvip|!$myip|!$mymac) {
 		return "[STV] Error - Parameter missing:\nmodel, tvip, myip, mymac.";
 	  }
-	  Log GetLogLevel($name,5), "[STV] opening socket with tvip: $tvip, cmd: $cmd";
+	  Log3 $name, 5, "[STV] opening socket with tvip: $tvip, cmd: $cmd";
 	  my $sock = new IO::Socket::INET (
 	  PeerAddr => $tvip,
 	  PeerPort => $port,
@@ -202,10 +200,6 @@ sub STV_55000($$$)
 	  Timout => 5
 	  );
 	if (defined ($sock)){
-		 #  Log GetLogLevel($name,3), "[STV] Could not create socket. Aborting." unless $sock;
-		 #  die "Could not create socket: $!\n" unless $sock;
-		 # return "Could not create socket: $!\n" unless $sock;
-		 # Log GetLogLevel($name,3), "[STV] Could not create socket. Aborting.";
 		  my $messagepart1 = chr(0x64) . chr(0x00) . chr(length(encode_base64($myip, ""))) . chr(0x00) . encode_base64($myip, "") . chr(length(encode_base64($mymac, ""))) . chr(0x00) . encode_base64($mymac, "") . chr(length(encode_base64($remotename, ""))) . chr(0x00) . encode_base64($remotename, "");
 		  my $part1 = chr(0x00) . chr(length($appstring)) . chr(0x00) . $appstring . chr(length($messagepart1)) . chr(0x00) . $messagepart1;
 		  print $sock $part1;
@@ -225,7 +219,7 @@ sub STV_55000($$$)
 		  else {
 			foreach my $argnum (0 .. $#ARGV) {
 			  # Send remote key(s)
-			  Log GetLogLevel($name,4), "[STV] sending ".uc($ARGV[$argnum]);
+			  #Log4 $name, 4, "[STV] sending ".uc($ARGV[$argnum]);
 			  my $key = "KEY_" . uc($ARGV[$argnum]);
 			  my $messagepart3 = chr(0x00) . chr(0x00) . chr(0x00) . chr(length(encode_base64($key, ""))) . chr(0x00) . encode_base64($key, "");
 			  my $part3 = chr(0x00) . chr(length($tvappstring)) . chr(0x00) . $tvappstring . chr(length($messagepart3)) . chr(0x00) . $messagepart3;
@@ -237,7 +231,7 @@ sub STV_55000($$$)
 
 		  close($sock);
 	}else{
-		Log GetLogLevel($name,3), "[STV] Could not create socket. Aborting." unless $sock;
+		#Log5 $name, 3, "[STV] Could not create socket. Aborting." unless $sock;
 	}
   }
 }
@@ -251,7 +245,6 @@ sub STV_52235($@$@)
   my $TV = $hash->{Host};
   my $count = @a;
   my $arg    = lc($a[2]);      # mute volume
-#Log 1, "name: $name host: $TV count: $count 0 $a[0] 1 $a[1] 2 $a[2]";	
   my $cont1  = ucfirst($arg);  # Mute
   my $cont2 = ""; 
   my $cont3 = "";
@@ -291,7 +284,7 @@ if ( $arg eq "volume")
 	if ( $cont2 > 0 and $cont2 < 100 ){
 		$kind = 1;
 	}else {
-		Log 3, "[STV] $name Volume: not correct";	
+		Log3 $name, 3, "[STV] $name Volume: not correct";	
 		$kind = 0;
 	}
 }
