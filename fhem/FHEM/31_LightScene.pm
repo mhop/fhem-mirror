@@ -6,9 +6,12 @@ package main;
 use strict;
 use warnings;
 use POSIX;
-use JSON;
+#use JSON;
+use Data::Dumper;
 
 use vars qw(%FW_webArgs); # all arguments specified in the GET
+
+my $LightScene_hasJSON = 1;
 
 sub LightScene_Initialize($)
 {
@@ -21,6 +24,9 @@ sub LightScene_Initialize($)
   $hash->{GetFn}    = "LightScene_Get";
 
   $hash->{FW_detailFn}  = "LightScene_detailFn";
+
+  eval "use JSON";
+  $LightScene_hasJSON = 0 if($@);
 }
 
 sub LightScene_Define($$)
@@ -245,13 +251,21 @@ LightScene_Save()
     my $t = localtime;
     print FH "#$t\n";
 
-    print FH encode_json($hash) if( defined($hash) );
+    if( $LightScene_hasJSON ) {
+      print FH encode_json($hash) if( defined($hash) );
+    } else {
+      my $dumper = Data::Dumper->new([]);
+      $dumper->Terse(1);
+
+      $dumper->Values([$hash]);
+      print FH $dumper->Dump;
+    }
 
     close(FH);
   } else {
 
     my $msg = "LightScene_Save: Cannot open $statefile: $!";
-    Log 1, $msg;
+    Log3 undef, 1, $msg;
   }
 
   return undef;
@@ -265,25 +279,27 @@ LightScene_Load($)
   my $statefile = myStatefileName();
 
   if(open(FH, "<$statefile")) {
-    my $json;
+    my $encoded;
     while (my $line = <FH>) {
       chomp $line;
       next if($line =~ m/^#.*$/);
-      $json .= $line;
+      $encoded .= $line;
     }
 
     close(FH);
 
-    return if( !defined($json) );
+    return if( !defined($encoded) );
 
-    my $decoded = decode_json( $json );
-
-    if( defined($decoded->{$hash->{NAME}}) ) {
-      $hash->{SCENES} = $decoded->{$hash->{NAME}};
+    my $decoded;
+    if( $LightScene_hasJSON ) {
+      $decoded = decode_json( $encoded );
+    } else {
+      $decoded = eval $encoded;
     }
+    $hash->{SCENES} = $decoded->{$hash->{NAME}} if( defined($decoded->{$hash->{NAME}}) );
   } else {
     my $msg = "LightScene_Load: Cannot open $statefile: $!";
-    Log 1, $msg;
+    Log3 undef, 1, $msg;
   }
   return undef;
 }
@@ -323,7 +339,7 @@ LightScene_Set($@)
   foreach my $d (sort keys %{ $hash->{CONTENT} }) {
     next if(!$defs{$d});
     if($defs{$d}{INSET}) {
-      Log 1, "ERROR: endless loop detected for $d in " . $hash->{NAME};
+      Log3 $name, 1, "ERROR: endless loop detected for $d in " . $hash->{NAME};
       next;
     }
 
@@ -402,7 +418,7 @@ LightScene_Set($@)
   }
 
   delete($hash->{INSET});
-  Log GetLogLevel($hash->{NAME},5), "SET: $ret" if($ret);
+  Log3 $hash, 5, "SET: $ret" if($ret);
 
   return $ret;
 
