@@ -515,7 +515,7 @@ PRESENCE_DoLocalPingScan($)
     if($^O =~ m/(Win|cygwin)/)
     {
 	eval "require Net::Ping;";
-	my $pingtool = Net::Ping->new("syn");
+	my $pingtool = Net::Ping->new("tcp");
 
 	if($pingtool)
 	{

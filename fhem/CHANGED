@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 - SVN
+  - change:  PRESENCE: changing ping method for Windows systems to "tcp"
   - feature: install FHEM as Windows service by T.E., see docs/HOWTO_Windows.txt
   - feature: new module 33_readingsGroup to display a collection of readings
              from one or more devices. this will replace weblink readings.
