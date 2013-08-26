@@ -226,7 +226,8 @@ myStatefileName()
 {
   my $statefile = $attr{global}{statefile};
   $statefile = substr $statefile,0,rindex($statefile,'/')+1;
-  return $statefile ."LightScenes.save";
+  return $statefile ."LightScenes.save" if( $LightScene_hasJSON );
+  return $statefile ."LightScenes.dd.save";
 }
 my $LightScene_LastSaveTime="";
 sub
@@ -285,7 +286,6 @@ LightScene_Load($)
       next if($line =~ m/^#.*$/);
       $encoded .= $line;
     }
-
     close(FH);
 
     return if( !defined($encoded) );
