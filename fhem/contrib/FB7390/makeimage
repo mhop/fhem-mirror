@@ -17,7 +17,7 @@ mkdir fhem/FHEM fhem/docs
 cd ..
 
 cp install var
-cp startfhem startfhemAsRoot var/fhem
+cp backup.sh startfhem startfhemAsRoot var/fhem
 cp fhemcmd.sh var/fhem/FHEM
 
 
@@ -29,22 +29,17 @@ cp fhem.cfg fhem.pl ../var/fhem
 cp -rp FHEM/* ../var/fhem/FHEM
 cp docs/*.html docs/*.jpg ../var/fhem/docs
 cp -rp www ../var/fhem
+rm -rf ../var/fhem/www/frontend
 
 cd ..
 rm -rf $fw
 
 
 echo Packing again
-cd var/fhem
-cat >> fhem.cfg << 'EOF'
-#FB_checkPw does not for FB-OS > 5.22
-#attr WEB basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
-#attr WEBphone basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
-#attr WEBtablet basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
-#attr telnetPort globalpassword {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
+cd var
+cat >> fhem/fhem.cfg << EOF
+attr global backupcmd backup.sh
 EOF
-
-cd ..
 tar zcf fhem.tar.gz fhem
 rm -rf fhem
 

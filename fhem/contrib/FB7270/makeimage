@@ -18,19 +18,13 @@ tar zxf ../../$fw.tar.gz
 
 cd $fw
 cp -rp fhem.pl fhem.cfg FHEM docs www ../fhem
+rm -rf ../fhem/www/frontend
 cd ..
 rm -rf $fw
 
 rm -rf fhem/docs/*.{odg,pdf,man,txt}
 cp fhemcmd.sh fhem/FHEM
-cp startfhem fhem
-cat >> fhem/fhem.cfg << 'EOF'
-#attr WEB basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
-#attr WEBphone basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
-#attr WEBtablet basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
-#attr telnetPort password {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
-EOF
-
+cp backup.sh startfhem fhem
 
 echo Packing again
 zip -qr $fw-fb7270.zip fhem
