@@ -128,13 +128,15 @@ sub gcmsend_notify($$)
     my @keyValue = split(":", $dev->{CHANGED}[$i]);
     my $length = int($keyValue);
 
+    my $change = $dev->{CHANGED}[$i]; 
+    my $position = index($change, ':');
 
-    if ($length == 0) {
+    if ($position == -1) {
       $key = "state";
       $value = $keyValue[0];
     } else {
-      $key = @keyValue[0];
-      $value = @keyValue[1];
+      $key = substr($change, 0, $position);
+      $value = substr($change, $position + 2, length($change));
     }
 
     if (
