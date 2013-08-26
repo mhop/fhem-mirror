@@ -46,31 +46,32 @@ my ($hash) = @_;
  $hash->{GetFn}    = "energy_Get";
  $hash->{StateFn}  = "energy_State";	
  $hash->{SetFn}    = "energy_Set";	
- $hash->{AttrList} = "loglevel:0,1,2,3,4,5";
 }
 
 sub
 energy_State($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
-	Log 4, "time: $tim";
-	Log 4, "name: $vt";
-	Log 4, "value: $val";
+	#Log 4, "time: $tim";
+	#Log 4, "name: $vt";
+	#Log 4, "value: $val";
 	$hash->{READINGS}{$vt}{VAL} = $val;
 	$hash->{READINGS}{$vt}{TIME} = TimeNow();
-	Log 4, "$hash->{NAME} VAL: $hash->{READINGS}{$vt}{VAL}";
+	#Log 4, "$hash->{NAME} VAL: $hash->{READINGS}{$vt}{VAL}";
+	Log3 $hash, 4, "time: $tim name: $vt value: $val";
   return undef;
 }
 sub
 energy_Set($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
-	Log 4, "time: $tim";
-	Log 4, "name: $vt";
-	Log 4, "value: $val";
+	#Log 4, "time: $tim";
+	#Log 4, "name: $vt";
+	#Log 4, "value: $val";
 	$hash->{READINGS}{$vt}{VAL} = $val;
 	$hash->{READINGS}{$vt}{TIME} = TimeNow();
-	Log 4, "$hash->{NAME} VAL: $hash->{READINGS}{$vt}{VAL}";
+	#Log 4, "$hash->{NAME} VAL: $hash->{READINGS}{$vt}{VAL}";
+	Log3 $hash, 4, "time: $tim name: $vt value: $val";
  if ( $vt eq "?"){
  	return "Unknown argument ?, choose one of DAYPOWER MONTHPOWER YEARPOWER TOTALPOWER";
  }
@@ -95,7 +96,8 @@ energy_Define($$)
  $hash->{Interval} = int(@args) >= 5 ? int($args[4]) : 300;
  $hash->{Timeout}  = int(@args) >= 6 ? int($args[5]) : 4;
 
- Log 4, "$hash->{NAME} will read from SML at $hash->{Host}:$hash->{Port} " ;
+ #Log 4, "$hash->{NAME} will read from SML at $hash->{Host}:$hash->{Port} " ;
+ Log3 $hash, 4, "$hash->{NAME} will read from SML at $hash->{Host}:$hash->{Port} " ;
  $hash->{Invalid}    = -1;    # default value for invalid readings
  $hash->{Rereads}    =  2;    # number of retries when reading curPwr of 0
  $hash->{UseSVTime}  = '';    # use the SV time as timestamp (else: TimeNow())
@@ -112,9 +114,9 @@ energy_Define($$)
 
  energy_Update($hash);
 
- Log 3, "$hash->{NAME} will read from SML at $hash->{Host}:$hash->{Port} " .
-       ($hash->{Interval} ? "every $hash->{Interval} seconds" : "for every 'get $hash->{NAME} <key>' request");
-
+ #Log 3, "$hash->{NAME} will read from SML at $hash->{Host}:$hash->{Port} " .
+ #      ($hash->{Interval} ? "every $hash->{Interval} seconds" : "for every 'get $hash->{NAME} <key>' request");
+Log3 $hash, 3, "$hash->{NAME} will read from SML at $hash->{Host}:$hash->{Port} " ; 
  return undef;
 }
 
@@ -127,8 +129,9 @@ energy_Update($)
   InternalTimer(gettimeofday() + $hash->{Interval}, "energy_Update", $hash, 0);
  }
 
- Log 4, "$hash->{NAME} tries to contact SML at $hash->{Host}:$hash->{Port}";
-
+ #Log 4, "$hash->{NAME} tries to contact SML at $hash->{Host}:$hash->{Port}";
+ Log3 $hash, 4, "$hash->{NAME} tries to contact SML at $hash->{Host}:$hash->{Port}";
+ 
  my $success  = 0;
  my %readings = ();
  my $timenow  = TimeNow();
@@ -150,8 +153,8 @@ energy_Update($)
  my $max = 0;
  my $log = "";
 
-Log 4, "$hash->{NAME} $url";
-
+#Log 4, "$hash->{NAME} $url";
+Log3 $hash, 4, "$hash->{NAME} $url";
 $socket = new IO::Socket::INET (
               PeerAddr => $ip,
               PeerPort => $port,
@@ -160,10 +163,10 @@ $socket = new IO::Socket::INET (
               Timeout  => $timeout
               );
 
-Log 4, "$hash->{NAME} socket new";
+Log3 $hash, 4, "$hash->{NAME} socket new";
 if (defined ($socket) and $socket and $socket->connected())
 {
-  	Log 4, "$hash->{NAME} Connected ...";
+  	Log3 $hash, 4,  "$hash->{NAME} Connected ...";
 	print $socket "GET $url HTTP/1.0\r\n\r\n";
 	$socket->autoflush(1);
 	while ((read $socket, $buf, 1024) > 0)
@@ -172,14 +175,14 @@ if (defined ($socket) and $socket and $socket->connected())
       		$message .= $buf;
 	}
 	$socket->close();
-	Log 4, "$hash->{NAME} Socket closed";
+	Log3 $hash, 4, "$hash->{NAME} Socket closed";
 
 	@array = split(/\n/,$message);
 	foreach (@array){
  	    if ( $_ =~ /<v>(.*)<\/v>/ ){
-			Log 5, "$hash->{NAME} got fresh values from $ip ($1)";
+			Log3 $hash, 5, "$hash->{NAME} got fresh values from $ip ($1)";
 			if ( $1 eq "NaN" ){
-				Log 5, "$hash->{NAME} NaN fehler ($1) summary: $summary";
+				Log3 $hash, 5, "$hash->{NAME} NaN fehler ($1) summary: $summary";
 			}else{
 				$last = $1;
 				$counts++ ;
@@ -193,17 +196,17 @@ if (defined ($socket) and $socket and $socket->connected())
       		if ( $1 eq "true" )
       	    	{
           	     $success = 1;
-          	     Log 4, "$hash->{NAME} error from the $ip ($1)";
+          	     Log3 $hash, 4, "$hash->{NAME} error from the $ip ($1)";
       	    	}
   	    }
 	}
 }else{
-  	Log 3, "$hash->{NAME} Cannot open socket ...";
+  	Log3 $hash, 3, "$hash->{NAME} Cannot open socket ...";
         $success = 1;
       	return 0;
 }
 
-Log 5, "reading done.";
+Log3 $hash, 5, "reading done.";
 if ( $success == 0 and $summary > 0 and $counts > 0)
 {
 	$avg = $summary/$counts;
@@ -228,16 +231,16 @@ if ( $success == 0 and $summary > 0 and $counts > 0)
      }else{   
     	my ($dateLast, $monthLast, $dayLast, $hourLast, $minLast, $secLast) = $hash->{READINGS}{DAYPOWER}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)/;
     	my ($powLast) = $hash->{READINGS}{DAYPOWER}{VAL} =~ /^(.*)$/;
-    	Log 4, "$hash->{NAME} myhour: $dateLast $monthLast $dayLast $hourLast $minLast $secLast $powLast";
+    	Log3 $hash, 4, "$hash->{NAME} myhour: $dateLast $monthLast $dayLast $hourLast $minLast $secLast $powLast";
     	$hash->{READINGS}{DAYPOWER}{TIME} = $timenow;
     	if ( $dayLast eq $day ){ # es ist der gleiche Tag
     		$powLast += $newpower ;
     		$hash->{READINGS}{DAYPOWER}{VAL} = $powLast;
-    		Log 4, "$hash->{NAME} same day timenow: $timenow newpower $newpower powlast $powLast";
+    		Log3 $hash, 4, "$hash->{NAME} same day timenow: $timenow newpower $newpower powlast $powLast";
     		$log .= " day: $powLast";
     	}else{					# es ist eine Tag vergangen
     		$hash->{READINGS}{DAYPOWER}{VAL} = $newpower;
-    		Log 4, "$hash->{NAME} new day timenow: $timenow newpower $newpower powlast $powLast";
+    		Log3 $hash, 4, "$hash->{NAME} new day timenow: $timenow newpower $newpower powlast $powLast";
     		$log .= " day: $newpower";
     	}
       }
@@ -247,16 +250,16 @@ if ( $success == 0 and $summary > 0 and $counts > 0)
      }else{   
     	my ($dateLast, $monthLast, $dayLast, $hourLast, $minLast, $secLast) = $hash->{READINGS}{MONTHPOWER}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)/;
     	my ($powLast) = $hash->{READINGS}{MONTHPOWER}{VAL} =~ /^(.*)$/;
-    	Log 4, "$hash->{NAME} myhour: $dateLast $monthLast $dayLast $hourLast $minLast $secLast $powLast";
+    	Log3 $hash, 4, "$hash->{NAME} myhour: $dateLast $monthLast $dayLast $hourLast $minLast $secLast $powLast";
     	$hash->{READINGS}{MONTHPOWER}{TIME} = $timenow;
     	if ( $monthLast eq $month ){ # es ist der gleiche Monat
     		$powLast += $newpower ;
     		$hash->{READINGS}{MONTHPOWER}{VAL} = $powLast;
-    		Log 4, "$hash->{NAME} Gleicher Monat timenow: $timenow newpower $newpower powlast $powLast";
+    		Log3 $hash, 4, "$hash->{NAME} Gleicher Monat timenow: $timenow newpower $newpower powlast $powLast";
     		$log .= " month: $powLast";
     	}else{					# es ist eine Monat vergangen
     		$hash->{READINGS}{MONTHPOWER}{VAL} = $newpower;
-    		Log 4, "$hash->{NAME} Neuer Monat timenow: $timenow newpower $newpower powlast $powLast";
+    		Log3 $hash, 4, "$hash->{NAME} Neuer Monat timenow: $timenow newpower $newpower powlast $powLast";
     		$log .= " month: $newpower";
     	}
       }    
@@ -266,16 +269,16 @@ if ( $success == 0 and $summary > 0 and $counts > 0)
      }else{   
     	my ($dateLast, $monthLast, $dayLast, $hourLast, $minLast, $secLast) = $hash->{READINGS}{YEARPOWER}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)/;
     	my ($powLast) = $hash->{READINGS}{YEARPOWER}{VAL} =~ /^(.*)$/;
-    	Log 4, "$hash->{NAME} myhour: $dateLast $monthLast $dayLast $hourLast $minLast $secLast $powLast";
+    	Log3 $hash, 4, "$hash->{NAME} myhour: $dateLast $monthLast $dayLast $hourLast $minLast $secLast $powLast";
     	$hash->{READINGS}{YEARPOWER}{TIME} = $timenow;
     	if ( $yearhLast eq $year ){ # es ist das gleiche Jahr
     		$powLast += $newpower ;
     		$hash->{READINGS}{YEARPOWER}{VAL} = $powLast;
-    		Log 4, "$hash->{NAME} Gleiches Jahr timenow: $timenow newpower $newpower powlast $powLast";
+    		Log3 $hash, 4, "$hash->{NAME} Gleiches Jahr timenow: $timenow newpower $newpower powlast $powLast";
     		$log .= " year: $powLast";
     	}else{					# es ist eine Jahr vergangen
     		$hash->{READINGS}{YEARPOWER}{VAL} = $newpower;
-    		Log 4, "$hash->{NAME} Neues Jahr timenow: $timenow newpower $newpower powlast $powLast";
+    		Log3 $hash, 4, "$hash->{NAME} Neues Jahr timenow: $timenow newpower $newpower powlast $powLast";
     		$log .= " year: $newpower";
     	}
       }    
@@ -286,16 +289,16 @@ if ( $success == 0 and $summary > 0 and $counts > 0)
      }else{   
     	my ($dateLast, $monthLast, $dayLast, $hourLast, $minLast, $secLast) = $hash->{READINGS}{TOTALPOWER}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)/;
     	my ($powLast) = $hash->{READINGS}{TOTALPOWER}{VAL} =~ /^(.*)$/;
-    	Log 4, "$hash->{NAME} total: $dateLast $monthLast $dayLast $hourLast $minLast $secLast $powLast";
+    	Log3 $hash, 4, "$hash->{NAME} total: $dateLast $monthLast $dayLast $hourLast $minLast $secLast $powLast";
     	$powLast += $newpower ;
     	$hash->{READINGS}{TOTALPOWER}{VAL} = $powLast;
     	$log .= " total: $powLast";
      }
      push @{$hash->{CHANGED}}, $log;
      DoTrigger($hash->{NAME}, undef) if ($init_done);
-     Log 4, "$hash->{NAME} write log file: $log";
+     Log3 $hash, 4, "$hash->{NAME} write log file: $log";
 }else{
-     Log 3, "$hash->{NAME} can't update - device send a error";
+     Log3 $hash, 3, "$hash->{NAME} can't update - device send a error";
 }
 
 return undef;
@@ -322,7 +325,7 @@ energy_Update($hash) unless $hash->{Interval};
  if ( $get eq "?"){
  return "Unknown argument ?, choose one of minPower maxPower lastPower avgPower DAYPOWER MONTHPOWER YEARPOWER TOTALPOWER";
  }
- Log 3, "$args[0] $get => $val";
+ Log3 $hash, 3, "$args[0] $get => $val";
 
  return $val;
 }
