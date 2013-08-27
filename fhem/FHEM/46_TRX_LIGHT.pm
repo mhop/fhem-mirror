@@ -637,7 +637,7 @@ sub TRX_LIGHT_parse_X10 ($$)
 
 	$sensor = $firstdevice == 1 ? $def->{TRX_LIGHT_devicelog} : $def->{TRX_LIGHT_devicelog2};
 	$val .= $current;
-	readingsBulkUpdate($def, $sensor, $current);
+	if ($sensor ne "none") { readingsBulkUpdate($def, $sensor, $current); }
   } else {
 	$error = sprintf "TRX_LIGHT: error unknown sensor type=%x device_type=%s devn=%s first=%d command=%s", $type, $device_type, $device_name, $firstdevice, $command;
 	Log3 $name, 1, "TRX_LIGHT_parse_X10() ".$error;
@@ -772,7 +772,7 @@ sub TRX_LIGHT_parse_PT2262 ($$)
 	}
 	Log3 $name, 1,"TRX_LIGHT_parse_PT2262() readingsBulkUpdate($def, $sensor, $command)";
 	$val = $command;
-  	readingsBulkUpdate($def, $sensor, $val);
+  	if ($sensor ne "none") { readingsBulkUpdate($def, $sensor, $val); }
   }
 
   readingsBulkUpdate($def, "state", $val);
@@ -887,7 +887,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     <br>
     <code>&lt;devicelog&gt;</code>
     <ul>
-    is the name of the Reading used to report. Suggested: "motion" for motion sensors.
+    is the name of the Reading used to report. Suggested: "motion" for motion sensors. If you use "none" then no additional Reading is reported. Just the state is used to report the change.
     </ul>
     <br>
     <code>&lt;deviceid2&gt;</code>
@@ -897,7 +897,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     <br>
     <code>&lt;devicelog2&gt;</code>
     <ul>
-    is optional for the name used for the Reading of <code>&lt;deviceid2&gt;</code>.
+    is optional for the name used for the Reading of <code>&lt;deviceid2&gt;</code>.If you use "none" then no addional Reading is reported. Just the state is used to report the change.
     </ul>
     <br>
     <code>&lt;commandcodes&gt;</code>
