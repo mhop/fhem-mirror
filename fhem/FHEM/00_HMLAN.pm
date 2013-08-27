@@ -322,12 +322,14 @@ sub HMLAN_Parse($$) {##########################################################
 	#    00 01= ack that HMLAN waited for
 	#    00 02= msg send, no ack requested
 	#    00 08= nack - ack was requested, msg repeated 3 times, still no ack
-	#    00 21= ??(seen with 'R')
-	#    00 30= ??
+	#    00 21= ??(seen with 'R') - see below
+	#    00 2x= should: AES was accepted, here is the response
+	#    00 30= should: AES response failed
+	#    00 40= ??(seen with 'E') after 0100
 	#    00 41= ??(seen with 'R')
 	#    00 50= ??(seen with 'R')
 	#    00 81= ??
-	#    01 xx= ?? (seen with 'E')
+	#    01 xx= ?? 0100 AES response send (gen autoMsgSent)
 	#    02 xx= prestate to 04xx. Message is still sent. This is a warning
 	#    04 xx= nothing sent anymore. Any restart unsuccessful except power
 	# 
@@ -339,14 +341,21 @@ sub HMLAN_Parse($$) {##########################################################
     my $stat = hex($mFld[1]);
     my $HMcnd =$stat >>8; #high = HMLAN cond
 	$stat &= 0xff;        # low byte related to message format
-	
+
+	if ($HMcnd == 0x01){#HMLAN responded to AES request
+#	  $CULinfo = "AESresp";# General needs approval
+	}
 	if ($stat){# message with status information
 	  HMLAN_condUpdate($hash,$HMcnd)if ($hash->{helper}{HMcnd} != $HMcnd);
 
 	  $hash->{helper}{$dst}{flg} = 0;#got response => unblock sending
       if ($stat & 0x0A){#08 and 02 dont need to go to CUL, internal ack only
-	    Log $ll5, "HMLAN_Parse: $name no ACK from Device"   if($stat & 0x08);
+	    Log $ll5, "HMLAN_Parse: $name no ACK from $dst"   if($stat & 0x08);
 	    return;
+	  }elsif (($stat & 0x70) == 0x30){Log $ll5, "HMLAN_Parse: $name AES code rejected for $dst $stat";
+		                              $CULinfo = "AESerrReject"; 
+	  }elsif (($stat & 0x70) == 0x20){$CULinfo = "AESok";
+	  }elsif (($stat & 0x70) == 0x40){;#$CULinfo = "???";
 	  }
     }
 
@@ -358,7 +367,7 @@ sub HMLAN_Parse($$) {##########################################################
     $hash->{"${name}_MSGCNT"}++;
     $hash->{"${name}_TIME"} = TimeNow();
 
-	my $dly = 0;
+	my $dly = 0; #--------- calc messageDelay ----------
     if ($hash->{helper}{ref} && $hash->{helper}{ref}{drft}){
       my $ref = $hash->{helper}{ref};#shortcut
       my $sysC = int(time()*1000);   #current systime in ms
