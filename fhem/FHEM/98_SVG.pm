@@ -414,7 +414,9 @@ SVG_WriteGplot($)
     my $prf = "par_${i}_";
     my @v = map {$FW_webArgs{"$prf$_"}}
             grep {defined($FW_webArgs{"$prf$_"})} (0..9);
-    my $r = @v > 1 ? join(":", map { s/:/\\x3a/g; $_ } @v) : $v[0];
+    my $r = @v > 1 ?
+            join(":", map { $v[$_] =~ s/:/\\x3a/g if($_<$#v); $v[$_] } 0..$#v) :
+            $v[0];
 
     print FH "#$ld $r\n";
     push @plot, "\"<IN>\" using 1:2 axes ".
