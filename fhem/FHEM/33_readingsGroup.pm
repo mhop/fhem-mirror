@@ -186,7 +186,10 @@ readingsGroup_2html($)
         if( $value_format ) {
           my $value_format = $value_format;
           if( ref($value_format) eq 'HASH' ) {
-            $value_format = $value_format->{$n};
+            my $vf;
+            $vf = $value_format->{$n} if( defined($value_format->{$n}) );
+            $vf = $value_format->{$name.".".$n} if( defined($value_format->{$name.".".$n}) );
+            $value_format = $vf;
           } elsif( $value_format =~ m/^{.*}$/) {
             my $DEVICE = $name;
             my $READING = $n;
@@ -250,7 +253,10 @@ readingsGroup_2html($)
         if( $value_format ) {
           my $value_format = $value_format;
           if( ref($value_format) eq 'HASH' ) {
-            $value_format = $value_format->{$n};
+            my $vf;
+            $vf = $value_format->{$n} if( defined($value_format->{$n}) );
+            $vf = $value_format->{$name.".".$n} if( defined($value_format->{$name.".".$n}) );
+            $value_format = $vf;
           } elsif( $value_format =~ m/^{.*}$/) {
             my $DEVICE = $name;
             my $READING = $n;
@@ -360,6 +366,28 @@ readingsGroup_Notify($$)
         next if( $dev->{NAME} ne $h->{NAME} );
         my $regex = @{$device}[1];
         next if( defined($regex) && $reading !~ m/^$regex$/);
+
+        my $value_format = AttrVal( $name, "valueFormat", "" );
+        if( $value_format =~ m/^{.*}$/ ) {
+          my $vf = eval $value_format;
+          $value_format = $vf if( $vf );
+        }
+        if( $value_format ) {
+          my $value_format = $value_format;
+          if( ref($value_format) eq 'HASH' ) {
+            my $vf;
+            $vf = $value_format->{$reading} if( defined($value_format->{$reading}) );
+            $vf = $value_format->{$dev->{NAME}.".".$reading} if( defined($value_format->{$dev->{NAME}.".".$reading}) );
+            $value_format = $vf;
+            } elsif( $value_format =~ m/^{.*}$/) {
+            my $DEVICE = $dev->{NAME};
+            my $READING = $reading;
+            my $VALUE = $value;
+            $value_format = eval $value_format;
+          }
+          $value = sprintf( $value_format, $value ) if( $value_format );
+        }
+
         CommandTrigger( "", "$name $dev->{NAME}.$reading: $value" );
       }
     }
