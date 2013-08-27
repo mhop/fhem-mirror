@@ -89,6 +89,8 @@ FHEM/32_speedtest.pm         justme1968           http://forum.fhem.de Sonstiges
 FHEM/34_panStamp.pm          justme1968           http://forum.fhem.de Sonstiges Systeme
 FHEM/34_SWAP.pm              justme1968           http://forum.fhem.de Sonstiges Systeme
 FHEM/35_SWAP_0000002200000003.pm              justme1968           http://forum.fhem.de Sonstiges Systeme
+FHEM/36_JeeLink.pm           justme1968           http://forum.fhem.de Sonstiges Systeme
+FHEM/36_PCA301.pm            justme1968           http://forum.fhem.de Sonstiges Systeme
 FHEM/40_RFXCOM.pm            wherzig              http://forum.fhem.de RFXTRX
 FHEM/41_OREGON.pm            wherzig              http://forum.fhem.de Sonstiges
 FHEM/42_RFXMETER.pm          wherzig              http://forum.fhem.de RFXTRX
