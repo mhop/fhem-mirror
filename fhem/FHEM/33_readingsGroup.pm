@@ -17,7 +17,7 @@ sub readingsGroup_Initialize($)
   $hash->{UndefFn}  = "readingsGroup_Undefine";
   #$hash->{SetFn}    = "readingsGroup_Set";
   $hash->{GetFn}    = "readingsGroup_Get";
-  $hash->{AttrList} = "mapping separator style nameStyle valueStyle timestampStyle noheading:1 notime:1 nostate:1";
+  $hash->{AttrList} = "mapping separator style nameStyle valueStyle valueFormat timestampStyle noheading:1 notime:1 nostate:1";
 
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
@@ -123,6 +123,12 @@ readingsGroup_2html($)
   my $value_style = AttrVal( $d, "valueStyle", "" );
   my $timestamp_style = AttrVal( $d, "timestampStyle", "" );
 
+  my $value_format = AttrVal( $d, "valueFormat", "" );
+  if( $value_format =~ m/^{.*}$/ ) {
+    my $vf = eval $value_format;
+    $value_format = $vf if( $vf );
+  }
+
   my $mapping = AttrVal( $d, "mapping", "");
   $mapping = eval $mapping if( $mapping =~ m/^{.*}$/ );
   #$mapping = undef if( ref($mapping) ne 'HASH' );
@@ -177,6 +183,19 @@ readingsGroup_2html($)
           $value_style = "" if( !$value_style );
         }
 
+        if( $value_format ) {
+          my $value_format = $value_format;
+          if( ref($value_format) eq 'HASH' ) {
+            $value_format = $value_format->{$n};
+          } elsif( $value_format =~ m/^{.*}$/) {
+            my $DEVICE = $name;
+            my $READING = $n;
+            my $VALUE = $v;
+            $value_format = eval $value_format;
+          }
+          $v = sprintf( $value_format, $v ) if( $value_format );
+        }
+
         my $a = AttrVal($name, "alias", $name);
         my $m = "$a$separator$n";
 
@@ -226,6 +245,19 @@ readingsGroup_2html($)
           my $VALUE = $v;
           $value_style = eval $value_style;
           $value_style = "" if( !$value_style );
+        }
+
+        if( $value_format ) {
+          my $value_format = $value_format;
+          if( ref($value_format) eq 'HASH' ) {
+            $value_format = $value_format->{$n};
+          } elsif( $value_format =~ m/^{.*}$/) {
+            my $DEVICE = $name;
+            my $READING = $n;
+            my $VALUE = $v;
+            $value_format = eval $value_format;
+          }
+          $v = sprintf( $value_format, $v ) if( $value_format );
         }
 
         my $a = AttrVal($name, "alias", $name);
@@ -445,6 +477,12 @@ readingsGroup_Get($@)
       <li>valueStyle<br>
         Specify an HTML style for the reading values, e.g.:<br>
           <code>attr temperatures valueStyle style="text-align:right"</code></li>
+      <li>valueFormat<br>
+        Specify an sprintf style format string used to display the reading values. Can be given as a string,
+        a perl expression returninga hash or a perl expression returning a string, e.g.:<br>
+          <code>attr temperatures valueFormat %.1f &deg;C"</code></li>
+          <code>attr temperatures valueFormat { temperature => "%.1f &deg;C", humidity => "%.1f %" }</code></li>
+          <code>attr temperatures valueFormat { ($READING eq 'temperature')?"%.1f &deg;C":undef }</code></li>
     </ul><br>
 
       The nameStyle and valueStyle attributes can also contain a perl expression enclosed in {} that returns the style string to use. The perl code can use $DEVICE,$READING and $VALUE, e.g.:<br>
