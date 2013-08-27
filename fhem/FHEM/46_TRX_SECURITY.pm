@@ -182,7 +182,7 @@ TRX_SECURITY_Set($@)
 
 		# Now set the devicelog:
 	  	$sensor = $hash->{TRX_SECURITY_devicelog};
-		readingsBulkUpdate($hash, $sensor, $command);
+		if ($sensor ne "none") { readingsBulkUpdate($hash, $sensor, $command); }
 
 		# Set battery
 	  	$sensor = "battery";
@@ -462,7 +462,7 @@ sub TRX_SECURITY_parse_X10Sec($$) {
   	if ($firstdevice == 1) {
 		$val .= $current;
   	}
-	readingsBulkUpdate($def, $sensor, $current);
+	if ($sensor ne "none") { readingsBulkUpdate($def, $sensor, $current); }
 
 	# KD101 does not show normal, so statechange does not make sense
   	if (($def->{STATE} ne $val) && ($device_type ne "KD101")) { 
@@ -611,7 +611,7 @@ TRX_SECURITY_Parse($$)
     <br>
     <code>&lt;devicelog&gt;</code>
     <ul>
-    is the name of the Reading used to report. Suggested: "Window" or "Door" for ds10a, "motion" for motion sensors, "smoke" for sd90.
+    is the name of the Reading used to report. Suggested: "Window" or "Door" for ds10a, "motion" for motion sensors, "smoke" for sd90. If you use "none" then no additional Reading is reported. Just the state is used to report the change.
     </ul>
     <br>
     <code>&lt;deviceid2&gt;</code>
@@ -621,7 +621,7 @@ TRX_SECURITY_Parse($$)
     <br>
     <code>&lt;devicelog2&gt;</code>
     <ul>
-    is optional for the name used for the Reading of <code>&lt;deviceid2&gt;</code>.
+    is optional for the name used for the Reading of <code>&lt;deviceid2&gt;</code>. If you use "none" then no additional Reading is reported. Just the state is used to report the change.
     </ul>
     <br>
       Example: <br>
