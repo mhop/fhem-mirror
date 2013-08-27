@@ -138,7 +138,7 @@ sub CUL_HM_Initialize($) {
                        "actCycle actStatus ".
 					   "autoReadReg:1_restart,0_off,2_pon-restart,3_onChange,4_reqStatus ".
 					   "expert:0_off,1_on,2_full ".
-                       "param ".
+                       "param msgRepeat ".
 					   ".stc .devInfo ".
                        $readingFnAttributes;
   my @modellist;
@@ -440,8 +440,12 @@ sub CUL_HM_Attr(@) {#################################
 	  return "attribut param not defined for this entity";
 	}
   }
-  elsif($attrName eq "peerIDs" &&!$hash->{helper}{role}{chn}){#only for chan
+  elsif($attrName eq "peerIDs"   &&!$hash->{helper}{role}{chn}){#only for chan
     return "$attrName not usable for devices";
+  }
+  elsif($attrName eq "msgRepeat"){
+    return "$attrName not usable for channels" if(!$hash->{helper}{role}{dev});#only for device
+	return "value $attrVal ignored, must be an integer" if ($attrVal !~ m/^(\d+)$/);
   }
 
   CUL_HM_queueUpdtCfg($name) if ($updtReq);
@@ -3334,7 +3338,8 @@ sub CUL_HM_Resend($) {#resend a message if there is no answer
   my $hash = shift;
   my $name = $hash->{NAME};
   return if(!$hash->{helper}{respWait}{reSent});      # Double timer?
-  if($hash->{helper}{respWait}{reSent} >= 3) {
+  my $rep = AttrVal($name,"msgRepeat",3);
+  if($hash->{helper}{respWait}{reSent} > $rep) {
   	CUL_HM_eventP($hash,"ResndFail");
 	readingsSingleUpdate($hash,"state","MISSING ACK",1);
 	CUL_HM_ProcessCmdStack($hash); # continue processing commands if any
@@ -5088,6 +5093,8 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
         correctly interpret device messages or to be able to send them.</li>
     <li><a name="param">param</a><br>
         param defines model specific behavior or functions. See models for details</li>
+    <li><a name="msgRepeat">msgRepeat</a><br>
+        defines number of repetitions if a device doesn't answer in time</li>
     <li><a name="rawToReadable">rawToReadable</a><br>
         Used to convert raw KFM100 values to readable data, based on measured
         values. E.g.  fill slowly your container, while monitoring the
