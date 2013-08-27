@@ -514,21 +514,20 @@ PRESENCE_DoLocalPingScan($)
 
     if($^O =~ m/(Win|cygwin)/)
     {
-	eval "require Net::Ping;";
-	my $pingtool = Net::Ping->new("tcp");
+	
 
-	if($pingtool)
-	{
-	    $retcode = $pingtool->ping($device, 5);
-	    
-	    Log3 $name, 5, "PRESENCE ($name) - pingtool returned $retcode";
-	    
-	    $return = "$name|$local|".($retcode ? "present" : "absent"); 
-	}
-	else
-	{
-	    $return = "$name|$local|error|Could not create a Net::Ping object.";
-	}
+		$temp = qx(ping -n $count $device);
+		
+		chomp $temp;
+		if($temp ne "")
+		{
+			Log3 $name, 5, "PRESENCE ($name) - ping command returned with output:\n$temp";
+			$return = "$name|$local|".($temp =~ /(Reply from|Antwort von) .* [Bb]ytes=\d+ .* TTL=\d+/ ? "present" : "absent");
+		}
+		else
+		{	
+			$return = "$name|$local|error|Could not execute ping command: \"ping -n $count $device\"";
+		}
 
     }
     else
