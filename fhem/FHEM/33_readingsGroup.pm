@@ -490,7 +490,7 @@ readingsGroup_Get($@)
         Can be a simple string or a perl expression enclosed in {} that returns a hash that maps reading names to the displayed name.
         The keys can be either the name of the reading or &lt;device&gt;.&lt;reading&gt;.
         %DEVICE, %ALIAS and %READING are replaced by the device name, device alias and reading name respectively, e.g:<br>
-          <code>attr temperatures mapping %DEVICE-%READING</code>
+          <code>attr temperatures mapping %DEVICE-%READING</code><br>
           <code>attr temperatures mapping {temperature => "%DEVICE Temperatur"}</code>
         </li>
       <li>separator<br>
