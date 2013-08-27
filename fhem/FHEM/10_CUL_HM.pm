@@ -480,7 +480,10 @@ sub CUL_HM_Parse($$) {##############################
   my $shash = $modules{CUL_HM}{defptr}{$src}; 
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
 
-  
+  if ($msgStat){
+    $shash->{"protEvt_$msgStat"} = 0 if (!$shash->{"protEvt_$msgStat"});
+	$shash->{"protEvt_$msgStat"}++;
+  }
   
   $respRemoved = 0;  #set to 'no response in this message' at start
   if(!$shash) {      #  Unknown source
@@ -869,7 +872,7 @@ sub CUL_HM_Parse($$) {##############################
 	    my ($a,$d) = unpack 'A2A4',$_;
 		$d = hex($d);
 		$d -= 0x10000 if($d & 0xC000); 
-		$d = sprintf("%0.1f",$d/10);
+		$d = sprintf("T: %0.1f",$d/10);
 
 		my $chId = sprintf("%02X",hex($a) & 0x3f);
 		if($modules{CUL_HM}{defptr}{$src.$chId}){
@@ -1471,7 +1474,7 @@ sub CUL_HM_Parse($$) {##############################
 
   CUL_HM_ProcessCmdStack($shash) if ($respRemoved); # cont if complete
   #------------ process events ------------------
-  push @event, "noReceiver:src:$src ".$mFlg.$mTp." $p" if(!@event);
+  push @event, "noReceiver:src:$src ".$mFlg.$mTp." $p" if(!@event && !@entities);
   CUL_HM_UpdtReadBulk($shash,1,@event); #events to the channel
   $defs{$shash->{NAME}}{EVENTS}++;  # count events for channel
   push @entities,$shash->{NAME};
@@ -1501,12 +1504,7 @@ sub CUL_HM_parseCommon(@){#####################################################
     CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IOid($shash).$src);
 	CUL_HM_ProcessCmdStack($shash);
   }
-  
-  if ($shash->{helper}{respWait}{mNo}             && 
-	  $shash->{helper}{respWait}{mNo} eq $mNo ){
-	#response we waited for - stop Waiting
-	CUL_HM_respPendRm($shash);
-  }
+  my $repeat;
   if   ($mTp eq "02"){# Ack/Nack ###########################
 
 	#see if the channel is defined separate - otherwise go for chief
@@ -1533,6 +1531,20 @@ sub CUL_HM_parseCommon(@){#####################################################
 						(-1)*(hex($rssi)))
 			if ($rssi && $rssi ne '00' && $rssi ne'80');
 	  $reply = "ACKStatus"; 
+	  if ($shash->{helper}{tmdOn}){
+        my $timedOn = hex(substr($p,6,2))&0x40?1:0;
+		if (not hex(substr($p,6,2))&0x40){# not timed on, we have to repeat
+          my ($pre,$nbr,$msg) = unpack 'A4A2A*',$shash->{helper}{respWait}{cmd};
+          $shash->{helper}{respWait}{cmd} = sprintf("%s%02X%s",$pre,hex($nbr)+1,$msg);
+		  # General changes pending aproval
+#	      CUL_HM_eventP($shash,"TimedOn");
+#	      $success = "no";
+#		  $repeat = 1;
+#	      $reply = "NACK"; 
+		  Log 1,"General missed timedOn for ".$chnhash->{NAME};
+		}
+	  }
+
 	}
 	else{	  #ACK
 	  $success = "yes";
@@ -1735,6 +1747,14 @@ sub CUL_HM_parseCommon(@){#####################################################
 #  	CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IOid($shash).$src);
 #	CUL_HM_ProcessCmdStack($shash);
   }
+
+  if ($shash->{helper}{respWait}{mNo}             && 
+	  $shash->{helper}{respWait}{mNo} eq $mNo     &&
+	  !$repeat){
+	#response we waited for - stop Waiting
+	CUL_HM_respPendRm($shash);
+  }
+
   return $ret;
 }
 sub CUL_HM_queueUpdtCfg($){
@@ -2366,6 +2386,7 @@ sub CUL_HM_Set($@) {
 	return "please enter the duration in seconds" 
 	      if (!defined $duration || $duration !~ m/^[+-]?\d+(\.\d+)?$/);
     my $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
+	return "timer value to low" if ($tval eq "0000");
     CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."02$chn"."C80000$tval");
  	$hash = $chnHash; # report to channel if defined
   } 
@@ -2781,7 +2802,7 @@ sub CUL_HM_Set($@) {
     #peerChan <btnN> <device> ... [single|dual] [set|unset] [actor|remote|both]
 	my ($bNo,$peerN,$single,$set,$target) = ($a[2],$a[3],$a[4],$a[5],$a[6]);
 	$state = "";
-	return "$bNo is not a button number"                          if(($bNo < 1) && $roleD);
+	return "$bNo is not a button number"                          if(($bNo < 1) && !$roleC);
 	my $peerDst = CUL_HM_name2Id($peerN);
 	$peerDst .= "01" if( length($peerDst)==6);
     return "please enter peer"                                    if(!$peerDst);
@@ -2803,7 +2824,7 @@ sub CUL_HM_Set($@) {
 	$set = ($set && $set eq "unset")?0:1;
 
 	my ($b1,$b2,$nrCh2Pair);
-	$b1 = (!$roleD) ? hex($chn) : ($single?$bNo : ($bNo*2 - 1));
+	$b1 = ($roleC) ? hex($chn) : ($single?$bNo : ($bNo*2 - 1));
 	if ($single){
 	  $b2 = $b1;
 	  $b1 = 0 if ($st eq "smokeDetector");
@@ -3088,7 +3109,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
 	    $peer = ($peer ne "00000000")?CUL_HM_peerChName($peer,$dst,""):"";
 	    #--- set messaging items
 	    $hash->{helper}{respWait}{Pending}= "RegisterRead";
-     	  $hash->{helper}{respWait}{PendCmd}= $cmd;
+     	$hash->{helper}{respWait}{PendCmd}= $cmd;
 	    $hash->{helper}{respWait}{forChn} = $chn;
 	    $hash->{helper}{respWait}{forList}= $list;
 	    $hash->{helper}{respWait}{forPeer}= $peer;
@@ -3120,6 +3141,9 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
     elsif($mTp eq '11' && $chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
       CUL_HM_qStateUpdatIfEnab($dst);
     }
+	if ($mTp eq "11" && $p =~ m/02........(....)/){
+	  $hash->{helper}{tmdOn} = $1 if ($1 ne "0000");
+	}
   
     $hash->{helper}{respWait}{cmd}    = $cmd;
     $hash->{helper}{respWait}{mNo}    = $mNo; #mNo we wait to ack
@@ -3189,6 +3213,7 @@ sub CUL_HM_protState($$){
 sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
   my ($hash) =  @_;  
   delete ($hash->{helper}{respWait});
+  delete $hash->{helper}{tmdOn};
   RemoveInternalTimer($hash);          # remove resend-timer
   RemoveInternalTimer("respPend:$hash->{DEF}");# remove responsePending timer
   $respRemoved = 1;
@@ -3698,13 +3723,13 @@ sub CUL_HM_decodeTime8($) {#####################
 sub CUL_HM_encodeTime16($) {####################
   my $v = shift;
   return "0000" if($v < 0.05 || $v !~ m/^[+-]?\d+(\.\d+)?$/);
-  
+
   my $ret = "FFFF";
   my $mul = 10;
   for(my $i = 0; $i < 32; $i++) {
     if($v*$mul < 0x7ff) {
-     $ret=sprintf("%04X", ((($v*$mul)<<5)+$i));
-     last;
+      $ret=sprintf("%04X", ((($v*$mul)<<5)+$i));
+      last;
     }
     $mul /= 2;
   }
