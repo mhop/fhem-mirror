@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 - SVN
+  - feature: new modules JeeLink and PCA301 and for the ELV PCA 301 power
+             meter with a JeeLabs JeeLink as RF modem. The matching JeeNode
+             sketch can be found in .../contrib/36_PCA301-pcaSerial.zip
+             (by justme1968)
   - change:  PRESENCE: changing ping method for Windows systems to "tcp"
   - feature: install FHEM as Windows service by T.E., see docs/HOWTO_Windows.txt
   - feature: new module 33_readingsGroup to display a collection of readings
