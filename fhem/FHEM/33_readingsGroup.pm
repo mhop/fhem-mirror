@@ -480,7 +480,7 @@ readingsGroup_Get($@)
       <li>valueFormat<br>
         Specify an sprintf style format string used to display the reading values. Can be given as a string,
         a perl expression returninga hash or a perl expression returning a string, e.g.:<br>
-          <code>attr temperatures valueFormat %.1f &deg;C"</code></li>
+          <code>attr temperatures valueFormat %.1f &deg;C</code></li>
           <code>attr temperatures valueFormat { temperature => "%.1f &deg;C", humidity => "%.1f %" }</code></li>
           <code>attr temperatures valueFormat { ($READING eq 'temperature')?"%.1f &deg;C":undef }</code></li>
     </ul><br>
