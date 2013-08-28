@@ -1146,7 +1146,7 @@ sub CUL_HM_Parse($$) {##############################
 			for(my $cCnt = 0;$cCnt<16;$cCnt++){# go for all channels
 			  my $cH = $modules{CUL_HM}{defptr}{$src.sprintf("%02X",$cCnt+1)};
 			  next if (!$cH);
-			  if (ReadingsVal($cH->{NAME},"color","") ne $leds[$cCnt]) {
+			  if (ReadingsVal($cH->{NAME},"state","") ne $leds[$cCnt]) {
                 push @entities,CUL_HM_UpdtReadBulk($cH,1,"color:".$leds[$cCnt],
 		                                                "state:".$leds[$cCnt]);			    
 			  }
@@ -2549,9 +2549,10 @@ sub CUL_HM_Set($@) {
 		CUL_HM_UpdtReadBulk($hash,1,"color:".$col4all,
 		                            "state:set_".$col4all);
         CUL_HM_PushCmdStack($hash,"++".$flag."11".$id.$dst."8100".$col4all);
-	  }else{# operating on a channel
+	  }
+	  else{# operating on a channel
   	    return "$a[2] unknown. use: ".join(" ",sort keys(%color))
-	       if (!defined($color{$a[2]}) );
+	          if (!defined($color{$a[2]}) );
         CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.'0'.$color{$a[2]});
 	  }
 	}
