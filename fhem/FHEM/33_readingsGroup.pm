@@ -360,6 +360,12 @@ readingsGroup_Notify($$)
         $value = $s;
       }
 
+      my $value_format = AttrVal( $name, "valueFormat", "" );
+      if( $value_format =~ m/^{.*}$/ ) {
+        my $vf = eval $value_format;
+        $value_format = $vf if( $vf );
+      }
+
       foreach my $device (@{$devices}) {
         my $h = $defs{@{$device}[0]};
         next if( !$h );
@@ -367,11 +373,6 @@ readingsGroup_Notify($$)
         my $regex = @{$device}[1];
         next if( defined($regex) && $reading !~ m/^$regex$/);
 
-        my $value_format = AttrVal( $name, "valueFormat", "" );
-        if( $value_format =~ m/^{.*}$/ ) {
-          my $vf = eval $value_format;
-          $value_format = $vf if( $vf );
-        }
         if( $value_format ) {
           my $value_format = $value_format;
           if( ref($value_format) eq 'HASH' ) {
