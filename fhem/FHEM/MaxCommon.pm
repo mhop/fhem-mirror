@@ -2,7 +2,7 @@ package MaxCommon;
 
 require Exporter;
 @ISA = qw(Exporter);
-@EXPORT = qw(%device_types %msgId2Cmd %msgCmd2Id $defaultWeekProfile);
+@EXPORT = qw(%device_types %msgId2Cmd %msgCmd2Id $defaultWeekProfile MAX_ParseTemperature validTemperature);
 
 %device_types = (
   0 => "Cube",
@@ -51,5 +51,14 @@ require Exporter;
 %msgCmd2Id = reverse %msgId2Cmd;
 
 $defaultWeekProfile = "444855084520452045204520452045204520452045204520452044485508452045204520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc5514452045204520452045204520452045204520";
+
+sub validTemperature { return $_[0] eq "on" || $_[0] eq "off" || ($_[0] ~~ /^\d+(\.[05])?$/ && $_[0] >= 5 && $_[0] <= 30); }
+
+#Identify for numeric values and maps "on" and "off" to their temperatures
+sub
+MAX_ParseTemperature($)
+{
+  return $_[0] eq "on" ? 30.5 : ($_[0] eq "off" ? 4.5 :$_[0]);
+}
 
 1;
