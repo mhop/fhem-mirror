@@ -25,7 +25,6 @@ my %boost_durationsInv = reverse %boost_durations;
 my %decalcDays = (0 => "Sat", 1 => "Sun", 2 => "Mon", 3 => "Tue", 4 => "Wed", 5 => "Thu", 6 => "Fri");
 my %decalcDaysInv = reverse %decalcDays;
 
-sub validTemperature { return $_[0] eq "on" || $_[0] eq "off" || ($_[0] ~~ /^\d+(\.[05])?$/ && $_[0] >= 5 && $_[0] <= 30); }
 sub validWindowOpenDuration { return $_[0] ~~ /^\d+$/ && $_[0] >= 0 && $_[0] <= 60; }
 sub validMeasurementOffset { return $_[0] ~~ /^-?\d+(\.[05])?$/ && $_[0] >= -3.5 && $_[0] <= 3.5; }
 sub validBoostDuration { return $_[0] ~~ /^\d+$/ && exists($boost_durationsInv{$_[0]}); }
@@ -137,13 +136,6 @@ MAX_CheckIODev($)
 {
   my $hash = shift;
   return !defined($hash->{IODev}) || ($hash->{IODev}{TYPE} ne "MAXLAN" && $hash->{IODev}{TYPE} ne "CUL_MAX");
-}
-
-#Identify for numeric values and maps "on" and "off" to their temperatures
-sub
-MAX_ParseTemperature($)
-{
-  return $_[0] eq "on" ? 30.5 : ($_[0] eq "off" ? 4.5 :$_[0]);
 }
 
 # Print number in format "0.0", pass "on" and "off" verbatim, convert 30.5 and 4.5 to "on" and "off"
