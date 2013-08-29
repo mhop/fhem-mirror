@@ -26,7 +26,7 @@ CUL_WS_Initialize($)
   $hash->{AttrFn}    = "CUL_WS_Attr";
   $hash->{ParseFn}   = "CUL_WS_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 ".
-                       "model:S300TH,KS300 ignore:0,1 ".
+                       "model:S300TH,KS300,ASH2200 ignore:0,1 ".
                        $readingFnAttributes;
 }
 
@@ -394,7 +394,7 @@ CUL_WS_Attr(@)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#eventMap">eventMap</a></li>
     <li><a href="#ignore">ignore</a></li>
-    <li><a href="#model">model</a> (S300,KS300,WS7000)</li>
+    <li><a href="#model">model</a> (S300,KS300,ASH2200)</li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
