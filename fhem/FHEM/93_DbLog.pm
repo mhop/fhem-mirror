@@ -362,8 +362,9 @@ DbLog_Log($$)
   my $re = $log->{REGEXP};
   my $max = int(@{$dev->{CHANGED}});
   my $ts_0 = TimeNow();
+  my $now = gettimeofday(); # get timestamp in seconds since epoch
   my $DbLogExclude = AttrVal($dev->{NAME}, "DbLogExclude", undef);
-
+  
   my $dbh= $log->{DBH};
   $dbh->{RaiseError} = 1;
   
@@ -396,7 +397,31 @@ DbLog_Log($$)
         }
 
         #keine Readings loggen die in DbLogExclude explizit ausgeschlossen sind
-        next if($DbLogExclude && $reading =~ m/^$DbLogExclude$/);
+        my $DoIt = 1;
+        if($DbLogExclude) {
+          # Bsp: "(temperature|humidity):300 battery:3600"
+          my @v1 = split(/,/, $DbLogExclude);
+          for (my $i=0; $i<int(@v1); $i++) {
+            my @v2 = split(/:/, $v1[$i]);
+            $DoIt = 0 if(!$v2[1] && $reading =~ m/^$v2[0]$/); #Reading matcht auf Regexp, kein MinIntervall angegeben
+            if(($reading =~ m/^$v2[0]$/) && ($v2[1] =~ m/^(\d+)$/)) {
+              #Regexp matcht und MinIntervall ist angegeben
+              my $lt = $defs{$dev->{NAME}}{'.userReadings'}{$reading}{"DBLOG_".$log->{NAME}}{TIME};
+              my $lv = $defs{$dev->{NAME}}{'.userReadings'}{$reading}{"DBLOG_".$log->{NAME}}{VALUE};
+              $lt = 0 if(!$lt);
+              $lv = "" if(!$lv);
+
+              if(($now-$lt < $v2[1]) && ($lv eq $value)) {
+                # innerhalb MinIntervall und LastValue=Value
+                $DoIt = 0;
+              }
+            }
+          }
+        }
+        next if($DoIt == 0);
+
+        $defs{$dev->{NAME}}{'.userReadings'}{$reading}{"DBLOG_".$log->{NAME}}{TIME}  = $now;
+        $defs{$dev->{NAME}}{'.userReadings'}{$reading}{"DBLOG_".$log->{NAME}}{VALUE} = $value;
 
         my @is= ($ts, $n, $t, $s, $reading, $value, $unit);
 
@@ -1395,14 +1420,20 @@ sub chartQuery($@) {
   <b>Attributes</b> 
   <ul><b>DbLogExclude</b>
     <br>
-    If DbLog is using a new Attribute DbLogExclude will be propagated
-    to all Devices. DbLogExclue will work as regexp to exclude 
-    defined readings to log.
+    <ul>
+      <code>
+      set &lt;device&gt; DbLogExclude regex:MinInterval [regex:MinInterval] ...
+      </code>
+    </ul>
+    A new Attribute DbLogExclude will be propagated
+    to all Devices if DBLog is used. DbLogExclude will work as regexp to exclude 
+    defined readings to log. If a MinInterval is set, the logentry is dropped if the 
+    defined interval is not reached and value vs. lastvalue is eqal .
     <br>
     <b>Example</b>
     <ul>
       <code>attr MyDevice1 DbLogExclude .*</code>
-      <code>attr MyDevice2 DbLogExclude (floorplantext|MyUserReading)</code>
+      <code>attr MyDevice2 DbLogExclude state (floorplantext|MyUserReading):300,battery:3600</code>
     </ul>
   </ul><br>
 </ul>
@@ -1655,15 +1686,23 @@ sub chartQuery($@) {
   <a name="DbLogattr"></a>
   <b>Attribute</b>
   <ul><b>DbLogExclude</b>
+    <ul>
+      <code>
+      set &lt;device&gt; DbLogExclude regex:MinInterval [regex:MinInterval] ...
+      </code>
+    </ul>
     <br>
     Wenn DbLog genutzt wird, wird in alle Devices das Attribut <i>DbLogExclude</i>
     propagiert. Der Wert des Attributes wird als Regexp ausgewertet und schließt die 
-    damit matchenden Readings von einem Logging aus.
+    damit matchenden Readings von einem Logging aus. Einzelne Regexp werden durch 
+    Leerzeichen getrennt. Ist MinIntervall angegeben, so wird der Logeintrag nur
+    dann nicht geloggt, wenn das Intervall noch nicht erreicht und der Wert des 
+    Readings sich nicht verändert hat.
     <br>
     <b>Beispiele</b>
     <ul>
       <code>attr MyDevice1 DbLogExclude .*</code>
-      <code>attr MyDevice2 DbLogExclude (floorplantext|MyUserReading)</code>
+      <code>attr MyDevice2 DbLogExclude state (floorplantext|MyUserReading):300,battery:3600</code>
     </ul>
   </ul><br>
 
