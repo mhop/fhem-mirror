@@ -11,7 +11,7 @@ sub HMinfo_regCheck(@);
 sub HMinfo_peerCheck(@);
 sub HMinfo_peerCheck(@);
 sub HMinfo_getEntities(@);
-sub HMinfo_SetFn($$);
+sub HMinfo_SetFn($@);
 sub HMinfo_SetFnDly($);
 sub HMinfo_post($);
 
@@ -22,8 +22,10 @@ sub HMinfo_Initialize($$) {####################################################
 
   $hash->{DefFn}     = "HMinfo_Define";
   $hash->{SetFn}     = "HMinfo_SetFn";
+  $hash->{AttrFn}    = "HMinfo_Attr";
   $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 ".
 					   "sumStatus sumERROR ".
+					   "autoUpdate ".
                        $readingFnAttributes;
 
 }
@@ -51,6 +53,33 @@ sub HMinfo_Define($$){#########################################################
 							;
   return;
 }
+sub HMinfo_Attr(@) {#################################
+  my ($cmd,$name, $attrName,$attrVal) = @_;
+  my @hashL;
+  my $hash = $defs{$name};
+  
+  if   ($attrName eq "autoUpdate"){# 00:00 hh:mm
+	delete $hash->{helper}{autoUpdate};
+	return if ($cmd eq "del");
+    my ($h,$m) = split":",$attrVal;
+	return "please enter time [hh:mm]" if (!defined $h||!defined $m);
+	my $sec = $h*3600+$m*60;
+	return "give at least one minute" if ($sec < 60);
+	$hash->{helper}{autoUpdate} = $sec;
+	InternalTimer(gettimeofday()+$sec,"HMinfo_autoUpdate","sUpdt:".$name,0);
+  }
+  return;
+}
+sub HMinfo_autoUpdate($){#in:name, send status-request
+  my $name = shift;
+  (undef,$name)=split":",$name,2;
+  HMinfo_SetFn($defs{$name},$name,"update") if ($name);
+  return if (!defined $defs{$name}{helper}{autoUpdate});
+  InternalTimer(gettimeofday()+$defs{$name}{helper}{autoUpdate},
+                "HMinfo_autoUpdate","sUpdt:".$name,0);
+}
+
+
 sub HMinfo_getParam(@) { ######################################################
   my ($id,@param) = @_;
   my @paramList;
@@ -185,7 +214,7 @@ use warnings;
   return sort(@names);
 }
 
-sub HMinfo_SetFn($$) {#########################################################
+sub HMinfo_SetFn($@) {#########################################################
   my ($hash,$name,$cmd,@a) = @_;
   my ($opt,$optEmpty,$filter) = ("",1,"");
   my $ret;
@@ -537,7 +566,7 @@ sub HMinfo_status($){##########################################################
   my $name = $hash->{NAME};
   my ($nbrE,$nbrD,$nbrC,$nbrV) = (0,0,0,0);# count entities and types
   #--- used for status
-  my @crit = split ",",$attr{$name}{sumStatus};#prepare event
+  my @info = split ",",$attr{$name}{sumStatus};#prepare event
   my %sum;
   #--- used for error counts
   my @erro = split ",",$attr{$name}{sumERROR};
@@ -551,11 +580,13 @@ sub HMinfo_status($){##########################################################
   }
   #--- used for IO, protocol  and communication (e.g. rssi)
   my @IOdev;
-  my %prot = (NACK =>0,IOerr =>0,ResendFail  =>0,CmdDel  =>0,CmdPend =>0);
-  my @protNames;     # devices with current protocol events
+  my %protE  = (NACK =>0,IOerr =>0,ResndFail  =>0,CmdDel  =>0);
+  my %protW = (Resnd =>0,CmdPend =>0);
+  my @protNamesE;    # devices with current protocol events
+  my @protNamesW;    # devices with current protocol events
   my @Anames;        # devices with ActionDetector events
   my %rssiMin;
-  my %rssiMinCnt = ("99>"=>0,"80<"=>0,"60>"=>0,"59<"=>0);
+  my %rssiMinCnt = ("99>"=>0,"80>"=>0,"60>"=>0,"59<"=>0);
   my @rssiNames; #entities with ciritcal RSSI
   my @shdwNames; #entites with shadowRegs, i.e. unconfirmed register ->W_unconfRegs
 
@@ -566,7 +597,7 @@ sub HMinfo_status($){##########################################################
     $nbrC++ if ($ehash->{helper}{role}{chn});
     $nbrV++ if ($ehash->{helper}{role}{vrt});
 	push @shdwNames,$eName if (keys %{$ehash->{helper}{shadowReg}});
-	foreach my $read (grep {$ehash->{READINGS}{$_}} @crit){       #---- count critical readings
+	foreach my $read (grep {$ehash->{READINGS}{$_}} @info){       #---- count critical readings
 	  my $val = $ehash->{READINGS}{$read}{VAL};
 	  $sum{$read}{$val} =0 if (!$sum{$read}{$val});
       $sum{$read}{$val}++;
@@ -582,9 +613,13 @@ sub HMinfo_status($){##########################################################
 	  $nbrD++;
 	  push @IOdev,$ehash->{IODev}{NAME} if($ehash->{IODev});
 	  push @Anames,$eName if ($attr{$eName}{actStatus} && $attr{$eName}{actStatus} ne "alive");
-      foreach (grep {$ehash->{"prot".$_}} keys %prot){#protocol events reported
-	    $prot{$_}++;
-		push @protNames,$eName;
+      foreach (grep {$ehash->{"prot".$_}} keys %protE){#protocol events reported
+	    $protE{$_}++;
+		push @protNamesE,$eName;
+	  }
+      foreach (grep {$ehash->{"prot".$_}} keys %protW){#protocol events reported
+	    $protW{$_}++;
+		push @protNamesW,$eName;
 	  }
 	  $rssiMin{$eName} = 0;
       foreach (keys %{$ehash->{helper}{rssi}}){
@@ -594,26 +629,31 @@ sub HMinfo_status($){##########################################################
 	}
   }
   #====== collection finished - start data preparation======
-  delete $hash->{$_} foreach (grep(/^(ERR|W_)/,keys%{$hash}));# remove old 
-
-  foreach my $read(grep {defined $sum{$_}} @crit){       #--- disp crt count
-    $hash->{"W_sum_".$read} = "";
-    $hash->{"W_sum_".$read} .= "$_:$sum{$read}{$_};"foreach(keys %{$sum{$read}});
+  delete $hash->{$_} foreach (grep(/^(ERR|W_|I_|C_)/,keys%{$hash}));# remove old 
+  my @updates;
+  foreach my $read(grep {defined $sum{$_}} @info){       #--- disp crt count
+	my $d;
+	$d .= "$_:$sum{$read}{$_};"foreach(keys %{$sum{$read}});
+	push @updates,"I_sum_$read:".$d;
   }
   foreach my $read(grep {defined $err{$_}} keys %errFlt){#--- disp err count
-    $hash->{"ERR_".$read} = "";
-    $hash->{"ERR_".$read} .= "$_:$err{$read}{$_};"foreach(keys %{$err{$read}});
+    my $d;
+	$d .= "$_:$err{$read}{$_};"foreach(keys %{$err{$read}});
+	push @updates,"ERR_$read:".$d;
   }
 
   my %allE; # remove duplicates
   $allE{$_}=0 foreach (grep !//, @errNames);
   @errNames = sort keys %allE;
   $hash->{ERR_names} = join",",@errNames if(@errNames);# and name entities
+#  push @updates,":".$hash->{ERR_names} if(@errNames);
 
-  $hash->{C_sumDefined} = "entities:$nbrE device:$nbrD channel:$nbrC virtual:$nbrV";
+  push @updates,"C_sumDefined:"."entities:$nbrE device:$nbrD channel:$nbrC virtual:$nbrV";
   # ------- display status of action detector ------
-  $hash->{I_actTotal} = $modules{CUL_HM}{defptr}{"000000"}{STATE};
-  $hash->{ERRactNames} = join",",@Anames;
+  push @updates,"I_actTotal:".$modules{CUL_HM}{defptr}{"000000"}{STATE};
+#  push @updates,"ERR_actTotal:".$modules{CUL_HM}{defptr}{"000000"}{STATE};
+  $hash->{ERRactNames} = join",",@Anames if (@Anames);
+#  push @updates,":".$hash->{ERRactNames} if(@Anames);
   
   # ------- what about IO devices??? ------
   my %tmp; # remove duplicates
@@ -621,28 +661,39 @@ sub HMinfo_status($){##########################################################
   delete $tmp{""}; #remove empties if present
   @IOdev = sort keys %tmp;
   foreach (grep {$defs{$_}{READINGS}{cond}} @IOdev){
-    $_ .= ":".$defs{$_}{READINGS}{cond}{VAL};
+    $_ .= " :".$defs{$_}{READINGS}{cond}{VAL};
   }
   $hash->{I_HM_IOdevices}= join",",@IOdev;
+#  push @updates,":".$hash->{I_HM_IOdevices};
   
   # ------- what about protocol events ------
   # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
   # additional variables are protCmdDel,protCmdPend,protState,protLastRcv
   my @tp;
-  push @tp,"$_:$prot{$_}" foreach (grep {$prot{$_}} keys(%prot));
-  $hash->{ERR__protocol}   = join",",@tp        if(@tp);
+  push @tp,"$_:$protE{$_}" foreach (grep {$protE{$_}} keys(%protE));
+  push @updates,"ERR__protocol:".join",",@tp        if(@tp);
+  my @tpw;
+  push @tpw,"$_:$protW{$_}" foreach (grep {$protW{$_}} keys(%protW));
+  push @updates,"W__protocol:".join",",@tpw       if(@tpw);
 
   my %all; # remove duplicates
-  $all{$_}=0 foreach (grep !//,@protNames);
-  @protNames = sort keys %all;
-  $hash->{ERR__protoNames} = join",",@protNames if(@protNames);
+  $all{$_}=0 foreach (grep !//,@protNamesE);
+  @protNamesE = sort keys %all;
+  $hash->{ERR__protoNames} = join",",@protNamesE if(@protNamesE);
+#  push @updates,":".$hash->{ERR__protoNames} if(@protNamesE);
+
+  $all{$_}=0 foreach (grep !//,@protNamesW);
+  @protNamesW = sort keys %all;
+  $hash->{W__protoNames} = join",",@protNamesW if(@protNamesW);
+#  push @updates,":".$hash->{W__protoNames} if(@protNamesW);
 
   if (defined $modules{CUL_HM}{helper}{autoRdCfgLst} &&
       @{$modules{CUL_HM}{helper}{autoRdCfgLst}}>0){
     $hash->{I_autoReadPend} = join ",",@{$modules{CUL_HM}{helper}{autoRdCfgLst}};
+    push @updates,"I_autoReadPend:". scalar @{$modules{CUL_HM}{helper}{autoRdCfgLst}};
   }
   else{
-    delete $hash->{I_autoReadPend};
+#    delete $hash->{I_autoReadPend};
   }
   
   # ------- what about rssi low readings ------
@@ -651,16 +702,33 @@ sub HMinfo_status($){##########################################################
     elsif ($rssiMin{$_}> -80) {$rssiMinCnt{"60>"}++;}
     elsif ($rssiMin{$_}< -99) {$rssiMinCnt{"99>"}++;
 	                           push @rssiNames,$_  ;}
-    else                      {$rssiMinCnt{"80<"}++;}
+    else                      {$rssiMinCnt{"80>"}++;}
   }
   
-  $hash->{I_rssiMinLevel} = "";
-  $hash->{I_rssiMinLevel} .= "$_:$rssiMinCnt{$_} " foreach (sort keys %rssiMinCnt);
+  my $d ="";
+  $d .= "$_:$rssiMinCnt{$_} " foreach (sort keys %rssiMinCnt);
+  push @updates,"I_rssiMinLevel:".$d;
   $hash->{ERR___rssiCrit} = join(",",@rssiNames) if (@rssiNames);
+#  push @updates,":".$hash->{ERR___rssiCrit} if(@rssiNames);
   # ------- what about others ------
   $hash->{W_unConfRegs} = join(",",@shdwNames) if (@shdwNames > 0);
+#  push @updates,":".$hash->{W_unConfRegs} if(@shdwNames > 0);  
   # ------- update own status ------
   $hash->{STATE} = "updated:".TimeNow();
+  my $updt = join",",@updates;
+  foreach (grep /^(W_|I_|ERR)/,keys%{$hash->{READINGS}}){
+	delete $hash->{READINGS}{$_} if ($updt !~ m /$_/);
+  }
+  readingsBeginUpdate($hash);
+  foreach my $rd (@updates){
+    next if (!$rd);
+    my ($rdName, $rdVal) = split(":",$rd, 2);
+	next if (defined $hash->{READINGS}{$rdName} && 
+	         $hash->{READINGS}{$rdName}{VAL} eq $rdVal);
+	readingsBulkUpdate($hash,$rdName, 
+	                         ((defined($rdVal) && $rdVal ne "")?$rdVal:"-"));
+  }
+  readingsEndUpdate($hash,1);
   return;
 }
 
@@ -1208,6 +1276,14 @@ sub HMinfo_cpRegs(@){#########################################################
 		Setting is meant to give user a fast overview of parameter that are expected to be system critical<br>
 	</li>
     <li><a name="#HMinfosumERROR">sumERROR</a>
+	    retriggers the command update periodically.<br>
+		Example:<br>
+		<ul><code>
+           attr hm autoUpdate 00:10<br>
+        </code></ul>
+		will trigger the update every 10 min<br>
+	</li>
+    <li><a name="#HMinfoautoUpdate">autoUpdate</a>
 	    Similar to sumStatus but with a focus on error conditions in the system. 
 		Here user can add reading<b>values</b> that are <b>not displayed</b>. I.e. the value is the
 		good-condition that will not be counted.<br>
