@@ -2372,7 +2372,7 @@ sub CUL_HM_Set($@) {
     my $lvl = ($cmd eq 'on')  ? 'C8':
 	         (($cmd eq 'off') ? '00':(CUL_HM_getChnLvl($name) != 0 ?"00":"C8"));
 	if($st eq "blindActuator") { # need to stop blind to protect relais
-#General	  CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'03'.$chn)
+	  CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'03'.$chn)
 	}
     CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."02$chn$lvl".'0000');
 	$hash = $chnHash; # report to channel if defined
@@ -2426,7 +2426,7 @@ sub CUL_HM_Set($@) {
       $rval = CUL_HM_encodeTime16((@a > 4)?$a[4]:2.5);# rampTime 0.0..85825945.6, 0=immediate
 	}
 	elsif($st eq "blindActuator") { # need to stop blind to protect relais
-#General	  CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'03'.$chn)
+	  CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'03'.$chn)
 	}
     CUL_HM_PushCmdStack($hash,sprintf("++%s11%s%s02%s%02X%s%s",
 	                                 $flag,$id,$dst,$chn,$lvl*2,$rval,$tval));
