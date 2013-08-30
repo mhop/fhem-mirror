@@ -69,6 +69,7 @@ sub GDS_Initialize($) {
 	$hash->{AttrFn}		=	"GDS_Attr";
 	$hash->{AttrList}	=	"gdsFwName gdsFwType:0,1,2,3,4,5,6,7 ".
 							"gdsAll:0,1 gdsDebug:0,1 gdsLong:0,1 gdsPolygon:0,1 ".
+							"gdsSetCond ".
 							$readingFnAttributes;
 
 	$tempDir = "c:\\temp\\" if($^O eq "MSWin32");
@@ -317,7 +318,10 @@ sub GDS_Attr(@){
 			CommandDeleteReading(undef, "$name _dF.*") if($attrValue != 1);
 			break;
 			}
-
+		when("gdsSetCond"){
+			fhem("define gdsDummy at +00:00:30 set $name conditions $attrValue");
+			break;
+			}
 		default {$attr{$name}{$attrName} = $attrValue;}
 	}
 	return "";
@@ -1242,6 +1246,7 @@ sub initDropdownLists($){
 		<br/>
 		<li><b>gdsAll</b> - defines filter for "all data" from alert message</li>
 		<li><b>gdsDebug</b> - defines filter for debug informations</li>
+		<li><b>gdsSetCond</b> - defines conditions area to be used after system restart</li>
 		<li><b>gdsLong</b> - show long text fields "description" and "instruction" from alert message in readings</li>
 		<li><b>gdsPolygon</b> - show polygon data from alert message in a reading</li>
 		<br/>
