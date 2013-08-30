@@ -1427,13 +1427,14 @@ sub chartQuery($@) {
     </ul>
     A new Attribute DbLogExclude will be propagated
     to all Devices if DBLog is used. DbLogExclude will work as regexp to exclude 
-    defined readings to log. If a MinInterval is set, the logentry is dropped if the 
+    defined readings to log. Each individual regexp-group are separated by comma. 
+    If a MinInterval is set, the logentry is dropped if the 
     defined interval is not reached and value vs. lastvalue is eqal .
     <br>
     <b>Example</b>
     <ul>
       <code>attr MyDevice1 DbLogExclude .*</code>
-      <code>attr MyDevice2 DbLogExclude state (floorplantext|MyUserReading):300,battery:3600</code>
+      <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300,battery:3600</code>
     </ul>
   </ul><br>
 </ul>
@@ -1695,14 +1696,14 @@ sub chartQuery($@) {
     Wenn DbLog genutzt wird, wird in alle Devices das Attribut <i>DbLogExclude</i>
     propagiert. Der Wert des Attributes wird als Regexp ausgewertet und schließt die 
     damit matchenden Readings von einem Logging aus. Einzelne Regexp werden durch 
-    Leerzeichen getrennt. Ist MinIntervall angegeben, so wird der Logeintrag nur
+    Kommata getrennt. Ist MinIntervall angegeben, so wird der Logeintrag nur
     dann nicht geloggt, wenn das Intervall noch nicht erreicht und der Wert des 
     Readings sich nicht verändert hat.
     <br>
     <b>Beispiele</b>
     <ul>
       <code>attr MyDevice1 DbLogExclude .*</code>
-      <code>attr MyDevice2 DbLogExclude state (floorplantext|MyUserReading):300,battery:3600</code>
+      <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300,battery:3600</code>
     </ul>
   </ul><br>
 
