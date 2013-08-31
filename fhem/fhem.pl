@@ -735,6 +735,7 @@ AnalyzePerlCommand($$)
     $value{$d} = $defs{$d}{STATE}
   }
   my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+  my $hms = sprintf("%02d:%02d:%02d", $hour, $min, $sec);
   my $we = (($wday==0 || $wday==6) ? 1 : 0);
   if(!$we) {
     my $h2we = $attr{global}{holiday2we};
