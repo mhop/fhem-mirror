@@ -1391,7 +1391,8 @@ FW_style($$)
     my $cfgFileName = $1;
     FW_displayFileList("config file", $cfgFileName);
     FW_displayFileList("Own modules and helper files",
-        FW_fileList("$MW_dir/^(.*sh|[0-9][0-9].*Util.*pm|.*cfg|.*holiday)\$"));
+        FW_fileList("$MW_dir/^(.*sh|[0-9][0-9].*Util.*pm|.*cfg|.*holiday".
+                                  "|.*layout)\$"));
     FW_displayFileList("styles",
         FW_fileList("$FW_cssdir/^.*(css|svg)\$"));
     FW_displayFileList("gplot files",
