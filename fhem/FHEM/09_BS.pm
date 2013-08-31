@@ -22,7 +22,7 @@ BS_Initialize($)
   $hash->{UndefFn}   = "BS_Undef";
   $hash->{ParseFn}   = "BS_Parse";
   $hash->{AttrList}  = "do_not_notify:1,0 showtime:0,1 ".
-                       "ignore:1,0 model:BS loglevel:0,1,2,3,4,5,6 " . $readingFnAttributes;
+                       "ignore:1,0 model:BS " . $readingFnAttributes;
 
 }
 
@@ -85,7 +85,7 @@ BS_Parse($$)
   my $def= $modules{BS}{defptr}{$dev};
   if(!defined($def)) {
     $sensor =~ s/^0//; 
-    Log 3, "BS Unknown device $sensor, please define it";
+    Log3 $hash, 3, "BS Unknown device $sensor, please define it";
     return "UNDEFINED BS_$sensor BS $sensor";
   }
 
@@ -112,7 +112,7 @@ BS_Parse($$)
 
   readingsBeginUpdate($def);
   readingsBulkUpdate($def, "state", $state);
-  #Log GetLogLevel($name, 4), "BS $name: $state";
+  #Debug "BS $name: $state";
   readingsBulkUpdate($def, "brightness", $brightness);
   readingsBulkUpdate($def, "lux", $lux);
   readingsBulkUpdate($def, "flags", $flags);
@@ -186,7 +186,6 @@ BS_Parse($$)
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (bs)</li>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>

@@ -111,7 +111,7 @@ OWServer_Initialize($)
   $hash->{GetFn}   = "OWServer_Get";
   $hash->{SetFn}   = "OWServer_Set";
 # $hash->{AttrFn}  = "OWServer_Attr";
-  $hash->{AttrList}= "nonblocking loglevel:0,1,2,3,4,5";
+  $hash->{AttrList}= "nonblocking " . $readingFnAttributes;
 }
 
 #####################################
@@ -152,7 +152,7 @@ OWServer_Undef($$)
        $defs{$d}{IODev} == $hash)
       {
         my $lev = ($reread_active ? 4 : 2);
-        Log GetLogLevel($name,$lev), "deleting OWServer for $d";
+        Log3 $name, $lev, "deleting OWServer for $d";
         delete $defs{$d}{IODev};
       }
   }
@@ -182,10 +182,10 @@ OWServer_OpenDev($)
 
   OWServer_CloseDev($hash);
   my $protocol= $hash->{fhem}{protocol};
-  Log 3, "$name: Opening connection to OWServer $protocol...";
+  Log3 $name, 3, "$name: Opening connection to OWServer $protocol...";
   my $owserver= OWNet->new($protocol);
   if($owserver) {
-    Log 3, "$name: Successfully connected to $protocol.";
+    Log3 $name, 3, "$name: Successfully connected to $protocol.";
     $hash->{fhem}{owserver}= $owserver;
     readingsSingleUpdate($hash, "state", "CONNECTED", 1);
     my $ret  = OWServer_DoInit($hash);
@@ -249,7 +249,7 @@ OWServer_Read($@)
 
     my $pid= fork;
     if(!defined($pid)) {
-      Log 1, "OWServer: Cannot fork: $!";
+      Log3 $hash, 1, "OWServer: Cannot fork: $!";
       return undef;
     }
 
@@ -258,14 +258,14 @@ OWServer_Read($@)
       close READER;
       $ret= OWNet::read($hash->{DEF},$path);
       $ret =~ s/^\s+//g if(defined($ret));
-      Log 5, "OWServer child read $path: $ret";
+      Log3 $hash, 5, "OWServer child read $path: $ret";
       delete $hash->{".path"};
       print WRITER $ret;
       close WRITER;
       exit 0;
     }
 
-    Log 5, "OWServer child ID for reading '$path' is $pid";
+    Log3 $hash, 5, "OWServer child ID for reading '$path' is $pid";
     close WRITER;
     chomp($ret= <READER>);
     close READER;
@@ -286,7 +286,7 @@ sub
 OWServer_TimeoutChild($)
 {
   my $pid= shift;
-  Log 1, "OWServer: Terminated child $pid" if($pid && kill(9, $pid));
+  Log3 undef, 1, "OWServer: Terminated child $pid" if($pid && kill(9, $pid));
 }
 
 #####################################
@@ -360,20 +360,20 @@ OWServer_Autocreate($)
     my $address= substr($device,1);
     my $family= substr($address,0,2);
     if(!exists $owfamily{$family}) {
-      Log 2, "$name: Autocreate: unknown familycode '$family' found. Please report this!";
+      Log3 $name, 2, "$name: Autocreate: unknown familycode '$family' found. Please report this!";
       next;
     } else {
       my $type= $owserver->read($device . "/type");
       my $owtype= $owfamily{$family};
       if($owtype !~ m/$type/) {
-        Log 2, "$name: Autocreate: type '$type' not defined in familycode '$family'. Please report this!";
+        Log3 $name, 2, "$name: Autocreate: type '$type' not defined in familycode '$family'. Please report this!";
         next;
       } else {
         foreach my $d (keys %defs) {
           next if($defs{$d}{TYPE} ne "OWDevice");
           if(defined($defs{$d}{fhem}) &&
              defined($defs{$d}{fhem}{address}) && $defs{$d}{fhem}{address} eq $address) {
-            Log 5, "$name address '$address' already defined as '$defs{$d}{NAME}'";
+            Log3 $name, 5, "$name address '$address' already defined as '$defs{$d}{NAME}'";
             next;
           } else {
             my $id= substr($address,3);
@@ -381,13 +381,13 @@ OWServer_Autocreate($)
             if(defined($defs{$devname}) || grep {$_ eq $address} @defined) {
               next;
             } else {
-              Log 5, "$name create new device '$devname' for address '$address'";
+              Log3 $name, 5, "$name create new device '$devname' for address '$address'";
               my $interval= ($family eq "81") ? "" : " 60";
               my $define= "$devname OWDevice $address" . $interval;
               my $cmdret;
               $cmdret= CommandDefine(undef,$define);
               if($cmdret) {
-                Log 1, "$name: Autocreate: An error occurred while creating device for address '$address': $cmdret";
+                Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for address '$address': $cmdret";
               } else {
                 $cmdret= CommandAttr(undef,"$devname room OWDevice");
               }
@@ -607,7 +607,6 @@ OWServer_Set($@)
     Example:<br>
     <code> attr &lt;name&gt; nonblocking 1</code>
     </li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#eventMap">eventMap</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>

@@ -25,7 +25,7 @@ M232Voltage_Initialize($)
   $hash->{GetFn}     = "M232Voltage_Get";
   $hash->{DefFn}     = "M232Voltage_Define";
 
-  $hash->{AttrList}  = "dummy:1,0 model:M232Voltage loglevel:0,1,2,3,4,5";
+  $hash->{AttrList}  = "dummy:1,0 model:M232Voltage";
 }
 
 ###################################
@@ -43,7 +43,7 @@ M232Voltage_GetStatus($)
   my $d = IOWrite($hash, "a" . $hash->{INPUT});
   if(!defined($d)) {
     my $msg = "M232Voltage $name read error";
-    Log GetLogLevel($name,2), $msg;
+    Log3 $name, 2, $msg;
     return $msg;
   }
 
@@ -60,7 +60,7 @@ M232Voltage_GetStatus($)
   }
 
   $hash->{STATE} = $value;
-  Log GetLogLevel($name,4), "M232Voltage $name: $value $hash->{UNIT}";
+  Log3 $name, 4, "M232Voltage $name: $value $hash->{UNIT}";
 
   return $hash->{STATE};
 }
@@ -160,7 +160,6 @@ M232Voltage_Define($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#attrdummy">dummy</a></li><br>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (M232Voltage)</li>
   </ul>
   <br>

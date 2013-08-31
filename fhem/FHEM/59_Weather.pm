@@ -128,7 +128,7 @@ sub Weather_Initialize($) {
   $hash->{UndefFn} = "Weather_Undef";
   $hash->{GetFn}   = "Weather_Get";
   $hash->{SetFn}   = "Weather_Set";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5 localicons ".
+  $hash->{AttrList}= "localicons ".
                       $readingFnAttributes;
 
 }
@@ -165,7 +165,7 @@ sub Weather_UpdateReading($$$$) {
 
   my ($hash,$prefix,$key,$value)= @_;
 
-  #Log 1, "DEBUG WEATHER: $prefix $key $value";
+  #Debug "DEBUG WEATHER: $prefix $key $value";
 
   my $unitsystem= $hash->{READINGS}{unit_system}{VAL};
   
@@ -232,7 +232,7 @@ sub Weather_RetrieveData($)
 
 
   foreach my $l (split("<",$xml)) {
-          #Log 1, "DEBUG WEATHER: line=\"$l\"";
+          #Debug "DEBUG WEATHER: line=\"$l\"";
           next if($l eq "");                   # skip empty lines
           $l =~ s/(\/|\?)?>$//;                # strip off /> and >
           my ($tag,$value)= split(" ", $l, 2); # split tag data=..... at the first blank
@@ -344,7 +344,7 @@ sub Weather_GetUpdate($)
   my $humidity= $hash->{READINGS}{humidity}{VAL};
   my $wind= $hash->{READINGS}{wind}{VAL};
   my $val= "T: $temperature  H: $humidity  W: $wind";
-  Log GetLogLevel($hash->{NAME},4), "Weather ". $hash->{NAME} . ": $val";
+  Log3 $hash, 4, "Weather ". $hash->{NAME} . ": $val";
   readingsBulkUpdate($hash, "state", $val);
   readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1)); # DoTrigger, because sub is called by a timer instead of dispatch
       

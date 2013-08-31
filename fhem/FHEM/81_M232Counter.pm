@@ -28,7 +28,7 @@ M232Counter_Initialize($)
   $hash->{SetFn}     = "M232Counter_Set";
   $hash->{DefFn}     = "M232Counter_Define";
 
-  $hash->{AttrList}  = "dummy:1,0 model:M232Counter loglevel:0,1,2,3,4,5";
+  $hash->{AttrList}  = "dummy:1,0 model:M232Counter";
 }
 
 ###################################
@@ -47,7 +47,7 @@ M232Counter_GetStatus($)
   my $d = IOWrite($hash, "z");
   if(!defined($d)) {
     my $msg = "M232Counter $name tick count read error";
-    Log GetLogLevel($name,2), $msg;
+    Log3 $name, 2, $msg;
     return $msg;
   }
 
@@ -96,7 +96,7 @@ M232Counter_GetStatus($)
     my $ret = IOWrite($hash, "Z1");
     if(!defined($ret)) {
       my $msg = "M232Counter $name reset error";
-      Log GetLogLevel($name,2), $msg;
+      Log3 $name, 2, $msg;
       return $msg;
     }
   }
@@ -143,7 +143,7 @@ M232Counter_GetStatus($)
   }
 
   $hash->{STATE} = $value;
-  Log GetLogLevel($name,4), "M232Counter $name: $value $hash->{UNIT}";
+  Log3 $name, 4, "M232Counter $name: $value $hash->{UNIT}";
 
   return $hash->{STATE};
 }
@@ -192,7 +192,7 @@ M232Counter_Calibrate($@)
   my $ret = IOWrite($hash, "Z1");
   if(!defined($ret)) {
     my $rm = "M232Counter $name read error";
-    Log GetLogLevel($name,2), $rm;
+    Log3 $name, 2, $rm;
   }
 
   return $rm;
@@ -331,7 +331,6 @@ M232Counter_Define($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#attrdummy">dummy</a></li><br>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (M232Counter)</li>
   </ul>
   <br>
