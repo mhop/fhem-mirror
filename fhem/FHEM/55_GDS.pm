@@ -186,6 +186,7 @@ sub GDS_Set($@) {
 			}
 
 		when("conditions"){
+			readingsSingleUpdate($hash, "state", "active",1);
 			retrieveConditions($hash, "c", @a);
 			$next = gettimeofday()+$hash->{helper}{INTERVAL};
 			readingsSingleUpdate($hash, "c_nextUpdate", localtime($next), 1);
