@@ -352,7 +352,7 @@ OWDevice_Initialize($)
   $hash->{UndefFn}   = "OWDevice_Undef";
   $hash->{AttrFn}    = "OWDevice_Attr";
 
-  $hash->{AttrList}  = "IODev uncached trimvalues polls interfaces model loglevel:0,1,2,3,4,5 ".  
+  $hash->{AttrList}  = "IODev uncached trimvalues polls interfaces model ".  
                        $readingFnAttributes;
 }
 
@@ -397,7 +397,7 @@ OWDevice_ReadFromServer($$@)
      !$iohash->{TYPE} ||
      !$modules{$iohash->{TYPE}} ||
      !$modules{$iohash->{TYPE}}{ReadFn}) {
-    Log 5, "No I/O device or ReadFn found for $dev";
+    Log3 $hash, 5, "No I/O device or ReadFn found for $dev";
     return;
   }
 
@@ -431,7 +431,7 @@ OWDevice_ReadValue($$) {
           if(defined($value)) {
             $value= trim($value) if(AttrVal($hash,"trimvalues",1));
           } else {
-            Log 3, $hash->{NAME} . ": reading $reading did not return a value";
+            Log3 $hash, 3, $hash->{NAME} . ": reading $reading did not return a value";
           }
         }
         
@@ -517,14 +517,14 @@ OWDevice_Attr($@)
         if($attrName eq "polls") {
             my @polls= split(",", $attrVal);
             $hash->{fhem}{polls}= \@polls;
-            Log 5, "$name: polls: " . join(" ", @polls);
+            Log3 $name, 5, "$name: polls: " . join(" ", @polls);
         } elsif($attrName eq "interfaces") {
             if($attrVal ne "") {
               $hash->{fhem}{interfaces}= join(";",split(",",$attrVal));
-              Log 5, "$name: interfaces: " . $hash->{fhem}{interfaces};
+              Log3 $name, 5, "$name: interfaces: " . $hash->{fhem}{interfaces};
             } else {
               delete $hash->{fhem}{interfaces} if(defined($hash->{fhem}{interfaces}));
-              Log 5, "$name: no interfaces";
+              Log3 $name, 5, "$name: no interfaces";
             }
         }
 }        
@@ -613,15 +613,15 @@ OWDevice_Define($$)
 
         AssignIoPort($hash) if(!defined($hash->{IODev}->{NAME}));
         if(defined($hash->{IODev}->{NAME})) {
-          Log 4, "$name: I/O device is " . $hash->{IODev}->{NAME};
+          Log3 $name,  4, "$name: I/O device is " . $hash->{IODev}->{NAME};
         } else {
-          Log 1, "$name: no I/O device";
+          Log3 $name, 1, "$name: no I/O device";
         }
 
         $hash->{fhem}{address}= $a[2];
         if($#a == 3) {
           $hash->{fhem}{interval}= $a[3];
-          Log 5, "$name: polling every $a[3] seconds";
+          Log3 $name, 5, "$name: polling every $a[3] seconds";
         }
         my ($interface, $gettersref, $settersref, $pollsref, $stateref, $alerting)= OWDevice_GetDetails($hash);
         my @getters= @{$gettersref};
@@ -630,18 +630,18 @@ OWDevice_Define($$)
         my @state= @{$stateref};
         if($interface ne "") {
           $hash->{fhem}{interfaces}= $interface;
-          Log 5, "$name: interfaces: $interface";
+          Log3 $name, 5, "$name: interfaces: $interface";
         }
         $hash->{fhem}{getters}= $gettersref;
-        Log 5, "$name: getters: " . join(" ", @getters);
+        Log3 $name, 5, "$name: getters: " . join(" ", @getters);
         $hash->{fhem}{setters}= $settersref;
-        Log 5, "$name: setters: " . join(" ", @setters);
+        Log3 $name, 5, "$name: setters: " . join(" ", @setters);
         $hash->{fhem}{polls}= $pollsref;
-        Log 5, "$name: polls: " . join(" ", @polls);
+        Log3 $name, 5, "$name: polls: " . join(" ", @polls);
         $hash->{fhem}{state}= $stateref;
-        Log 5, "$name: state: " . join(" ", @state);
+        Log3 $name, 5, "$name: state: " . join(" ", @state);
         $hash->{fhem}{alerting}= $alerting;
-        Log 5, "$name: alerting: $alerting";
+        Log3 $name, 5, "$name: alerting: $alerting";
 
         $hash->{fhem}{bus}= OWDevice_ReadFromServer($hash,"find",$hash->{fhem}{address});
         $attr{$name}{model}= OWDevice_ReadValue($hash, "type");
@@ -810,7 +810,6 @@ OWDevice_Define($$)
     <li>polls: a comma-separated list of readings to poll. This supersedes the list of default readings to poll.</li>
     <li>interfaces: supersedes the interfaces exposed by that device.</li>
     <li>model: preset with device type, e.g. DS18S20.</li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#eventMap">eventMap</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>

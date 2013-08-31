@@ -39,7 +39,7 @@ RSS_Initialize($) {
     my ($hash) = @_;
     $hash->{DefFn}   = "RSS_Define";
     #$hash->{AttrFn}  = "RSS_Attr";
-    $hash->{AttrList}= "loglevel:0,1,2,3,4,5 size bg tmin";
+    $hash->{AttrList}= "size bg tmin";
     $hash->{SetFn}   = "RSS_Set";
 
 
@@ -281,7 +281,6 @@ RSS_itemImg {
   my ($width,$height)= $I->getBounds();
   my ($swidth,$sheight)= (int($scale*$width), int($scale*$height));
   #Debug "RSS placing $arg ($swidth x $sheight) at ($x,$y)";
-  Log 5, "RSS placing $arg ($swidth x $sheight) at ($x,$y)";
   $S->copyResampled($I,$x,$y,0,0,$swidth,$sheight,$width,$height);
 }  
 
@@ -318,10 +317,10 @@ RSS_evalLayout($$@) {
           if($line=~ s/\\$//) { $cont= $line; undef $line; }
           next unless($line);
           $cont= "";
-          #Log 5, "$name: evaluating >$line<";
+          #Debug "$name: evaluating >$line<";
           # split line into command and definition
           my ($cmd, $def)= split("[ \t]+", $line, 2);
-          #Log 5, "CMD= \"$cmd\", DEF= \"$def\"";
+          ##Debug, "CMD= \"$cmd\", DEF= \"$def\"";
           if($cmd eq "rgb") {
             $def= "\"$def\"" if(length($def) == 6 && $def =~ /[[:xdigit:]]{6}/);
             $params{rgb}= AnalyzePerlCommand(undef, $def);
@@ -332,7 +331,7 @@ RSS_evalLayout($$@) {
           } elsif($cmd eq "text") {
             ($x,$y,$text)= split("[ \t]+", $def, 3);
             my $txt= AnalyzePerlCommand(undef, $text);
-            #Log 5, "$name: ($x,$y) $txt";
+            #Debug "$name: ($x,$y) $txt";
             RSS_itemText($S,$x,$y,$txt,%params);
           } elsif($cmd eq "line") {
             ($x1,$y1,$x2,$y2)= split("[ \t]+", $def, 4);
@@ -351,7 +350,7 @@ RSS_evalLayout($$@) {
             my $arg= AnalyzePerlCommand(undef, $arg);
             RSS_itemImg($S,$x,$y,$scale,$imgtype,$srctype,$arg,%params);
           } else {
-            Log 1, "$name: Illegal command $cmd in layout definition.";
+            Log3 $name, 1, "$name: Illegal command $cmd in layout definition.";
           }  
             
   }

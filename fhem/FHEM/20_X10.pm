@@ -132,8 +132,7 @@ X10_Initialize($)
   $hash->{UndefFn}   = "X10_Undef";
   $hash->{ParseFn}   = "X10_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 " .
-                       "dummy:1,0 showtime:1,0 model:lm12,lm15,am12,tm13 " .
-                       "loglevel:0,1,2,3,4,5,6";
+                       "dummy:1,0 showtime:1,0 model:lm12,lm15,am12,tm13";
 
 }
 
@@ -174,7 +173,7 @@ X10_StateMachine($$$$)
     $bright= $hash->{BRIGHT};
   } else {
     $bright= 0; }
-  #Log 1, $hash->{NAME} . " initial state ($onoff,$bright)";
+  #Log3 $hash, 1, $hash->{NAME} . " initial state ($onoff,$bright)";
 
   if($onoff) {
     # initial state (on,bright)
@@ -202,7 +201,7 @@ X10_StateMachine($$$$)
       if($bright< 0) { $bright= 0 };
     }
   }
-  #Log 1, $hash->{NAME} . " final state ($onoff,$bright)";
+  #Log3 $hash,  1, $hash->{NAME} . " final state ($onoff,$bright)";
 
   $hash->{ONOFF}= $onoff;
   $hash->{BRIGHT}= $bright;
@@ -237,7 +236,7 @@ X10_Do_On_Till($@)
   my $hms_till = sprintf("%02d:%02d:%02d", $hr, $min, $sec);
   my $hms_now = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
   if($hms_now ge $hms_till) {
-    Log 4, "on-till: won't switch as now ($hms_now) is later than $hms_till";
+    Log3 $hash, 4, "on-till: won't switch as now ($hms_now) is later than $hms_till";
     return "";
   }
 
@@ -289,7 +288,7 @@ X11_Write($$$)
   undef $function; # do not use after this point
   my $prefix= "X10 device $name:";
 
-  Log 5, "$prefix sending X10:$housecode;$unitcode;$x10func $dim";
+  Log3 $name, 5, "$prefix sending X10:$housecode;$unitcode;$x10func $dim";
 
   my ($hc_b, $hu_b, $hf_b);
   my ($hc, $hu, $hf);
@@ -371,7 +370,7 @@ X10_Set($@)
   X11_Write($hash, $function, $dim) if(!IsDummy($a[0]));
 
   my $v = join(" ", @a);
-  Log GetLogLevel($a[0],2), "X10 set $v";
+  Log3 $a[0], 2, "X10 set $v";
   (undef, $v) = split(" ", $v, 2);      # Not interested in the name...
 
   my $tn = TimeNow();
@@ -475,7 +474,7 @@ X10_Parse($$)
     }
     # no units for that housecode
     if($unitcodes eq "") {
-      Log 3, "X10 No units with housecode $housecode, command $command, " .
+      Log3 $hash, 3, "X10 No units with housecode $housecode, command $command, " .
              "please define one";
       push(@list,
              "UNDEFINED X10_$housecode X10 lm15 $housecode ?");
@@ -489,7 +488,7 @@ X10_Parse($$)
   if(!int(@unitcodes)) {
     # command without unitcodes, this happens when a single on/off is sent
     # but no unit was previously selected
-    Log 3, "X10 No unit selected for housecode $housecode, command $command";
+    Log3 $hash, 3, "X10 No unit selected for housecode $housecode, command $command";
     push(@list,
              "UNDEFINED X10_$housecode X10 lm15 $housecode ?");
     return @list;
@@ -517,10 +516,10 @@ X10_Parse($$)
         $h->{READINGS}{state}{TIME} = $tn;
         $h->{READINGS}{state}{VAL} = $value;
 	X10_StateMachine($h, $tn, $function, $arg);
-        Log GetLogLevel($name,2), "X10 $name $value";
+        Log3 $hash, 2, "X10 $name $value";
         push(@list, $name);
     } else {
-        Log 3, "X10 Unknown device $housecode $unitcode, command $command, " .
+        Log3 $hash, 3, "X10 Unknown device $housecode $unitcode, command $command, " .
                "please define it";
         push(@list,
              "UNDEFINED X10_$housecode X10 lm15 $housecode $unitcode");
@@ -643,7 +642,6 @@ X10_Parse($$)
     <li><a href="#attrdummy">dummy</a></li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#model">model</a> (lm12,lm15,am12,tm13)</li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#eventMap">eventMap</a></li><br>
   </ul>

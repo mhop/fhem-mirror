@@ -32,7 +32,7 @@ M232_Initialize($)
   $hash->{UndefFn} = "M232_Undef";
   $hash->{GetFn}   = "M232_Get";
   $hash->{SetFn}   = "M232_Set";
-  $hash->{AttrList}= "model:m232 loglevel:0,1,2,3,4,5";
+  $hash->{AttrList}= "model:m232";
 }
 
 #####################################
@@ -46,17 +46,17 @@ M232_Define($$)
 
   my $dev = $a[2];
   if($dev eq "none") {
-    Log 1, "M232 device is none, commands will be echoed only";
+    Log3 $hash, 1, "M232 device is none, commands will be echoed only";
     return undef;
   }
 
-  Log 3, "M232 opening device $dev";
+  Log3 $hash, 3, "M232 opening device $dev";
   my $po;
 	if ($^O eq 'MSWin32') {
 		eval ("use Win32::SerialPort;");
 		if ($@) {
                    $hash->{STATE} = "error using Modul Win32::SerialPort";
-                   Log 1,"Error using Device::SerialPort";
+                   Log3 $hash, 1,"Error using Device::SerialPort";
                    return "Can't use Win32::SerialPort $@\n";
                 }
                 $po = new Win32::SerialPort ($dev, 1);
@@ -65,18 +65,18 @@ M232_Define($$)
 		eval ("use Device::SerialPort;");
 		if ($@) {
                    $hash->{STATE} = "error using Modul Device::SerialPort";
-                   Log 1,"Error using Device::SerialPort";
+                   Log3 $hash, 1,"Error using Device::SerialPort";
                    return "Can't Device::SerialPort $@\n";
                 }
 		$po = new Device::SerialPort ($dev, 1);
 	}
 	if (!$po) {
                    $hash->{STATE} = "error opening device";
-                   Log 1,"Error opening Serial Device $dev";
+                   Log3 $hash, 1,"Error opening Serial Device $dev";
                    return "Can't open Device $dev: $^E\n";
 	}
   
-  Log 3, "M232 opened device $dev";
+  Log3 $hash, 3, "M232 opened device $dev";
   $po->close();
 
   $hash->{DeviceName} = $dev;
@@ -96,7 +96,7 @@ M232_Undef($$)
        $defs{$d}{IODev} == $hash)
       {
         my $lev = ($reread_active ? 4 : 2);
-        Log GetLogLevel($name,$lev), "deleting port for $d";
+        Log3 $hash, $lev, "deleting port for $d";
         delete $defs{$d}{IODev};
       }
   }
@@ -272,7 +272,7 @@ M232GetData($$)
     $serport=new Device::SerialPort ($dev, 1);
   }
   if(!$serport) {
-    Log 3, "M232: Can't open $dev: $!";
+    Log3 $hash, 3, "M232: Can't open $dev: $!";
     return undef;
   }
   $serport->reset_error();
@@ -283,7 +283,7 @@ M232GetData($$)
   $serport->handshake('none');
   $serport->write_settings;
   $hash->{po}=$serport;
-  Log 4, "M232: Sending $d";
+  Log3 $hash, 4, "M232: Sending $d";
 
   my $rm = "M232: ?";
 
@@ -319,7 +319,7 @@ M232GetData($$)
 
       if($out eq $MSGACK) {
       	$rm= "M232: acknowledged";
-	Log 4, "M232: return value \'" . $retval . "\'";
+	Log3 $hash, 4, "M232: return value \'" . $retval . "\'";
 	$status= "ACK";
       } elsif($out eq $MSGNACK) {
         $rm= "M232: not acknowledged";
@@ -340,7 +340,7 @@ DONE:
   $serport->close();
   undef $serport;
   delete $hash->{po} if exists($hash->{po});
-  Log 4, $rm;
+  Log3 $hash, 4, $rm;
   return $ret;
 }
 
@@ -423,7 +423,6 @@ DONE:
   <a name="M232attr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (m232)</li>
   </ul>
   <br>

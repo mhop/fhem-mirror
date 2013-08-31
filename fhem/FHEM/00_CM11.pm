@@ -102,7 +102,7 @@ CM11_Initialize($)
   $hash->{SetFn}   = "CM11_Set";
   $hash->{StateFn} = "CM11_SetState";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
-                     "model:CM11 loglevel:0,1,2,3,4,5,6";
+                     "model:CM11";
 }
 #####################################
 sub
@@ -152,8 +152,7 @@ CM11_Reopen($)
 	my $name = $hash->{NAME};
   my $dev = $hash->{DeviceName};
   $hash->{PortObj}->close();
-#  Log 1, "Device $dev closed";
-	Log3($name, 1, "Device $dev closed");
+  Log3($name, 1, "Device $dev closed");
   for(;;) {
       sleep(5);
       if($^O =~ m/Win/) {
@@ -162,8 +161,7 @@ CM11_Reopen($)
         $hash->{PortObj} = new Device::SerialPort($dev);
       }
       if($hash->{PortObj}) {
-#        Log 1, "Device $dev reopened";
-		Log3($name, 1, "Device $dev reopened");
+	Log3($name, 1, "Device $dev reopened");
         $hash->{FD} = $hash->{PortObj}->FILENO if($^O !~ m/Win/);
         CM11_DoInit($hash->{NAME}, $hash->{ttytype}, $hash->{PortObj});
         return;
@@ -193,16 +191,14 @@ CM11_Define($$)
   $hash->{STATE} = "defined";
 
   if($dev eq "none") {
-#    Log 1, "CM11 device is none, commands will be echoed only";
-	Log3($name, 1, "CM11 device is none, commands will be echoed only");
+    Log3($name, 1, "CM11 device is none, commands will be echoed only");
     $attr{$name}{dummy} = 1;
     return undef;
   }
 
   $hash->{DeviceName} = $dev;
   $hash->{PARTIAL} = "";
-#  Log 3, "CM11 opening CM11 device $dev";	
-	Log3($name, 3, "CM11 opening CM11 device $dev");
+  Log3($name, 3, "CM11 opening CM11 device $dev");
   if ($^O=~/Win/) {
    require Win32::SerialPort;
    $po = new Win32::SerialPort ($dev);
@@ -212,14 +208,12 @@ CM11_Define($$)
   }
   if(!$po) {
     my $msg = "Can't open $dev: $!";
-#    Log(3, $msg) if($hash->{MOBILE});
-	Log3($name, 3, $msg) if($hash->{MOBILE});
+    Log3($name, 3, $msg) if($hash->{MOBILE});
     return $msg if(!$hash->{MOBILE});
     $readyfnlist{"$name.$dev"} = $hash;
     return "";
   }
-#  Log 3, "CM11 opened CM11 device $dev";
-Log3($name, 3, "CM11 opened CM11 device $dev");
+  Log3($name, 3, "CM11 opened CM11 device $dev");
 
   $hash->{PortObj} = $po;
   if( $^O !~ /Win/ ) {
@@ -249,8 +243,7 @@ CM11_Undef($$)
        $defs{$d}{IODev} == $hash)
       {
         my $lev = ($reread_active ? 4 : 2);
-#		Log GetLogLevel($name,$lev), "deleting port for $d";
-		Log3($name, $lev, "deleting port for $d");
+	Log3($name, $lev, "deleting port for $d");
         delete $defs{$d}{IODev};
       }
   }
@@ -273,8 +266,7 @@ CM11_LogReadWrite($@)
 {
   my ($rw,$hash, $msg, $trlr) = @_;
   my $name= $hash->{NAME};
-#  Log GetLogLevel($name,5),
-	Log3($name, 5, "CM11 device " . $name . ": $rw " .
+  Log3($name, 5, "CM11 device " . $name . ": $rw " .
 		sprintf("%2d: ", length($msg)) . unpack("H*", $msg));
 }
 
@@ -323,14 +315,12 @@ CM11_ReadDirect($$)
       $nfound = select($rin, undef, undef, $to);
       if($nfound < 0) {
         next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
-#        Log GetLogLevel($name,3), "$prefix Select error $nfound / $!";
-		Log3($name, 3, "$prefix Select error $nfound / $!");
+	Log3($name, 3, "$prefix Select error $nfound / $!");
         return undef;
       }
   }
   if(!$nfound) {
-#      Log GetLogLevel($name,3), "$prefix Timeout reading $arg";
-		Log3($name, 3, "$prefix Timeout reading $arg");
+      Log3($name, 3, "$prefix Timeout reading $arg");
       return undef;
   }
 
@@ -349,8 +339,7 @@ CM11_Write($$$)
   my $prefix= "CM11 device $name:";
 
   if(!$hash || !defined($hash->{PortObj})) {
-#    Log GetLogLevel($name,3),
-		Log3($name, 3, "$prefix device is not active, cannot send");
+      Log3($name, 3, "$prefix device is not active, cannot send");
     return;
 
   }
@@ -377,15 +366,12 @@ CM11_Write($$$)
 
     my $checksum_r= unpack('C', $checksum);
     if($checksum_w ne $checksum_r) {
-#      Log 5,
-		Log3($name, 5, "$prefix wrong checksum (send: $checksum_w, received: $checksum_r)");
+      Log3($name, 5, "$prefix wrong checksum (send: $checksum_w, received: $checksum_r)");
       return 0 if(!$try);
       my $nexttry= 6-$try;
-#      Log 5,
-		Log3($name, 5, "$prefix retrying (" . $nexttry . "/5)");
+      Log3($name, 5, "$prefix retrying (" . $nexttry . "/5)");
     } else {
-#      Log 5, "$prefix checksum correct, OK for transmission";
-		Log3($name, 5, "$prefix checksum correct, OK for transmission");
+      Log3($name, 5, "$prefix checksum correct, OK for transmission");
       last;
     }
   }
@@ -397,12 +383,10 @@ CM11_Write($$$)
   my $ready= CM11_ReadDirect($hash, "ready");
   return 0 if(!defined($ready)); # read failure
   if($ready ne $msg_ifrdy) {
-#      Log GetLogLevel($name,3),
-		Log3($name, 3, "$prefix strange ready signal (" . unpack('C', $ready) . ")");
+      Log3($name, 3, "$prefix strange ready signal (" . unpack('C', $ready) . ")");
       return 0
   } else {
-#      Log 5, "$prefix ready";
-		Log3($name, 5, "$prefix ready");
+      Log3($name, 5, "$prefix ready");
   }
 
   # we are fine
@@ -438,17 +422,14 @@ sub CM11_Get($@)
 
   my $v = join(" ", @a);
   my $name = $hash->{NAME};
-#  Log GetLogLevel($name,2), "CM11 get $v";
   Log3($name, 2, "CM11 get $v");
 
   my $statusmsg= CM11_GetInterfaceStatus($hash);
   if(!defined($statusmsg)) {
 	$v= "error";
-#	Log 2, "CM11 error, device is irresponsive."
 	Log3($name, 2, "CM11 error, device is irresponsive.")
   } else {
 	my $msg= unpack("H*", $statusmsg);
-#  	Log 5, "CM11 got ". $msg;
   	Log3($name, 5, "CM11 got ". $msg);
 
 	if($a[1] eq "fwrev") {
@@ -487,8 +468,7 @@ CM11_Set($@)
 
   my $v = join(" ", @a);
   my $name = $hash->{NAME};
-#  Log GetLogLevel($name,2), "CM11 set $v";
-	Log3($name, 2, "CM11 set $v");
+  Log3($name, 2, "CM11 set $v");
 
   if($a[1] eq "reopen") {
     CM11_Reopen($hash);
@@ -555,7 +535,6 @@ CM11_Read($)
   # USB troubleshooting
   if(!defined($buf) || length($buf) == 0) {
     my $dev = $hash->{DeviceName};
-#    Log 1, "USB device $dev disconnected, waiting to reappear";
     Log3($name, 1, "USB device $dev disconnected, waiting to reappear");
     $hash->{PortObj}->close();
     DoTrigger($name, "DISCONNECTED");
@@ -577,8 +556,7 @@ CM11_Read($)
   # concatenate yet unparsed message and newly received data
   my $x10data = $hash->{PARTIAL} . $buf;
   CM11_LogRead($hash,$buf);
-#  Log 5, "$prefix Data: " . unpack('H*',$x10data);
-	Log3($name, 5, "$prefix Data: " . unpack('H*',$x10data));
+  Log3($name, 5, "$prefix Data: " . unpack('H*',$x10data));
 
   # normally the while loop will run only once
   while(length($x10data) > 0) {
@@ -590,7 +568,6 @@ CM11_Read($)
 
         # to start with, a single 0x5a is received
 	if( substr($x10data,0,1) eq $msg_pollpc ) {	# CM11 polls PC
-#		Log 5, "$prefix start of message";
 		Log3($name, 5, "$prefix start of message");
 		CM11_SimpleWrite($hash, $msg_pollack);	# PC ready
 		$x10data= substr($x10data,1);		# $x10data now empty
@@ -611,16 +588,13 @@ CM11_Read($)
 
         # a single 0xa5 is a power-fail macro download poll
         if( substr($x10data,0,1) eq $msg_pollpcpf ) {     # CM11 polls PC
-#                Log 5, "$prefix power-fail poll";
-				Log3($name, 5, "$prefix power-fail poll");
+		Log3($name, 5, "$prefix power-fail poll");
                 # the documentation wrongly says that the macros should be downloaded
                 # in fact, the time must be set!
                 if(CM11_SetInterfaceTime($hash)) {
-#                  Log 5, "$prefix power-fail poll satisfied";
-					Log3($name, 5, "$prefix power-fail poll satisfied");
+                  Log3($name, 5, "$prefix power-fail poll satisfied");
                 } else {
-#                  Log 5, "$prefix power-fail poll satisfaction failed";
-					Log3($name, 5, "$prefix power-fail poll satisfaction failed");
+                  Log3($name, 5, "$prefix power-fail poll satisfaction failed");
                 }
                 $x10data= substr($x10data,1);             # $x10data now empty
                 next;
@@ -628,8 +602,7 @@ CM11_Read($)
 
         # a single 0x55 is a leftover from a failed transmission
         if( substr($x10data,0,1) eq $msg_ifrdy ) {      # CM11 polls PC
-#                Log 5, "$prefix skipping leftover ready signal";
-					Log3($name, 5, "$prefix skipping leftover ready signal");
+		Log3($name, 5, "$prefix skipping leftover ready signal");
                 $x10data= substr($x10data,1);
                 next;
         }
@@ -648,7 +621,6 @@ CM11_Read($)
 
         # $x10data now contains $len data bytes
 	my $databytes= unpack('H*', substr($x10data,0));
-#	Log 5, "$prefix message complete " .
 	Log3($name, 5, "$prefix message complete " .
                "(length $len, mask $mask, data $databytes)");
 
@@ -686,7 +658,6 @@ CM11_Read($)
                                             unpack("H*", $command);
 			}
 			$hash->{$housecode_func}= $x10func;
-#			Log 5, "$prefix $housecode_func: " .
 			Log3($name, 5, "$prefix $housecode_func: " .
                                 $hash->{$housecode_func});
 			# dispatch message to clients
@@ -713,7 +684,6 @@ CM11_Read($)
 				$unitcodes= "";
 			}
 			$hash->{$housecode_unit}= "$unitcodes$unitcode";
-#			Log 5, "$prefix $housecode_unit: " .
 			Log3($name, 5, "$prefix $housecode_unit: " .
                                 $hash->{$housecode_unit});
 		}
@@ -745,8 +715,7 @@ CM11_Ready($$)
     }
     return undef if(!$po);
 
-#    Log 1, "USB device $dev reappeared";
-	Log3($name, 1, "USB device $dev reappeared");
+    Log3($name, 1, "USB device $dev reappeared");
     $hash->{PortObj} = $po;
     if( $^O !~ /Win/ ) {
       $hash->{FD} = $po->FILENO;
@@ -838,7 +807,6 @@ CM11_Ready($$)
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#attrdummy">dummy</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (CM11)</li>
   </ul>
   <br>

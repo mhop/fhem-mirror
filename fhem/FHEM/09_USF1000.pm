@@ -26,7 +26,7 @@ USF1000_Initialize($)
   $hash->{UndefFn}   = "USF1000_Undef";
   $hash->{ParseFn}   = "USF1000_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:0,1 " .
-                        "model:usf1000s loglevel:0,1,2,3,4,5,6 " . $readingFnAttributes;
+                        "model:usf1000s " . $readingFnAttributes;
 
 }
 
@@ -92,7 +92,7 @@ USF1000_Parse($$)
   my ($hash, $msg) = @_;	# hash points to the FHZ, not to the USF1000
 
   if(!defined($modules{USF1000}{defptr}{$dev})) {
-    Log 3, "USF1000 Unknown device, please define it";
+    Log3 $hash, 3, "USF1000 Unknown device, please define it";
     return "UNDEFINED USF1000 USF1000 cylv 1 1 0.5";
   }
 
@@ -150,7 +150,6 @@ USF1000_Parse($$)
                 readingsBulkUpdate($def, "level", $flevel);
                 readingsBulkUpdate($def, "volume", $volume);
 		
-		#Log GetLogLevel($name, 4), "USF1000 $name: $state";
 		#Debug "USF1000 $name: $state";
 
 	}
@@ -241,7 +240,6 @@ USF1000_Parse($$)
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (usf1000s)</li>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>

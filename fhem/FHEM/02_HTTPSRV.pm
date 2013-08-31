@@ -19,7 +19,7 @@ HTTPSRV_addExtension($$$$) {
     my ($name,$func,$link,$friendlyname)= @_;
   
     my $url = "/$link";
-    Log 3, "Registering HTTPSRV $name for URL $url...";
+    Log3 $name, 3, "Registering HTTPSRV $name for URL $url...";
     $data{FWEXT}{$url}{deviceName}= $name;
     $data{FWEXT}{$url}{FUNC} = $func;
     $data{FWEXT}{$url}{LINK} = $link;
@@ -32,7 +32,7 @@ HTTPSRV_removeExtension($) {
 
     my $url = "/$link";
     my $name= $data{FWEXT}{$url}{deviceName};
-    Log 3, "Unregistering HTTPSRV $name for URL $url...";
+    Log3 $name, 3, "Unregistering HTTPSRV $name for URL $url...";
     delete $data{FWEXT}{$url};
 }
 
@@ -44,7 +44,7 @@ HTTPSRV_Initialize($) {
     $hash->{DefFn}     = "HTTPSRV_Define";
     $hash->{UndefFn}   = "HTTPSRV_Undef";
     #$hash->{AttrFn}    = "HTTPSRV_Attr";
-    $hash->{AttrList}  = "loglevel:0,1,2,3,4,5 directoryindex";
+    $hash->{AttrList}  = "directoryindex";
     #$hash->{SetFn}     = "HTTPSRV_Set";
 
     return undef;
