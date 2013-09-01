@@ -516,13 +516,13 @@ PRESENCE_DoLocalPingScan($)
     {
 	
 
-		$temp = qx(ping -n $count $device);
+		$temp = qx(ping -n $count -4 $device);
 		
 		chomp $temp;
 		if($temp ne "")
 		{
 			Log3 $name, 5, "PRESENCE ($name) - ping command returned with output:\n$temp";
-			$return = "$name|$local|".($temp =~ /(Reply from|Antwort von) .* [Bb]ytes=\d+ .* TTL=\d+/ ? "present" : "absent");
+			$return = "$name|$local|".($temp =~ /TTL=\d+/ ? "present" : "absent");
 		}
 		else
 		{	
