@@ -9,7 +9,8 @@
              meter with a JeeLabs JeeLink as RF modem. The matching JeeNode
              sketch can be found in .../contrib/36_PCA301-pcaSerial.zip
              (by justme1968)
-  - change:  PRESENCE: changing ping method for Windows systems to "tcp"
+  - change:  PRESENCE: using ping command line utility to check presence on Windows
+             based machines.
   - feature: install FHEM as Windows service by T.E., see docs/HOWTO_Windows.txt
   - feature: new module 33_readingsGroup to display a collection of readings
              from one or more devices. this will replace weblink readings.
