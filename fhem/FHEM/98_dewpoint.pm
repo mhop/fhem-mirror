@@ -292,6 +292,9 @@ dewpoint_Notify($$)
 		if ($lastval =~ /BAT:/) {	
 			$current = $lastval;
 			$current =~ s/BAT:/$sensor: $dewpoint BAT:/g;
+		} elsif ($lastval =~ /<</) {	
+			$current = $lastval;
+			$current =~ s/<</$sensor:$dewpoint   <</g;
 		} else {
 			$current = $lastval." ".$sensor.": ".$dewpoint;
 		}
