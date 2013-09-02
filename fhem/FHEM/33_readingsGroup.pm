@@ -290,7 +290,7 @@ readingsGroup_2html($)
   }
   $ret .= "</table></td></tr>";
   $ret .= "</table>";
-  $ret .= "</br>";
+  #$ret .= "</br>";
 
   return $ret;
 }
@@ -309,6 +309,10 @@ readingsGroup_Notify($$)
   my $name  = $hash->{NAME};
 
   if( grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) ) {
+    readingsGroup_updateDevices($hash);
+    return undef;
+  }
+  elsif( grep(m/^REREADCFG$/, @{$dev->{CHANGED}}) ) {
     readingsGroup_updateDevices($hash);
     return undef;
   }
@@ -401,9 +405,15 @@ sub
 readingsGroup_Set($@)
 {
   my ($hash, $name, $cmd, $param, @a) = @_;
-  my $ret = "";
 
-  return undef;
+  my $list = "refresh:noArgs";
+
+  if( $cmd eq "refresh" ) {
+    readingsGroup_updateDevices($hash);
+    return undef;
+  }
+
+  return "Unknown argument $cmd, choose one of $list";
 }
 
 sub
