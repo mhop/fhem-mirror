@@ -84,10 +84,10 @@ SWAP_Initialize($)
   $hash->{FingerprintFn}   = "SWAP_Fingerprint";
   $hash->{ParseFn}   = "SWAP_Parse";
   $hash->{AttrFn}    = "SWAP_Attr";
-  $hash->{AttrList}  = "IODev ".
-                       "ignore:1,0 ".
-                       "loglevel:0,1,2,3,4,5,6 $readingFnAttributes " .
-                       "ProductCode:".join(",", sort keys %{$products});
+  $hash->{AttrList}  = "IODev".
+                       " ignore:1,0".
+                       " $readingFnAttributes" .
+                       " ProductCode:".join(",", sort keys %{$products});
 
   #$hash->{FW_summaryFn} = "SWAP_summaryFn";
 }
@@ -101,7 +101,7 @@ SWAP_loadDevices()
   my $file_name = "$attr{global}{modpath}/FHEM/lib/SWAP/devices.xml";
 
   if( ! -e $file_name ){
-    Log 2, "could not read $file_name";
+    Log3 undef, 2, "could not read $file_name";
     return ($_developers,$_products);
   }
 
@@ -141,7 +141,7 @@ readDeviceXML($$)
 
   if( ! -e $file_name ) {
     $product = undef;
-    Log 2, "could not read $file_name";
+    Log3 undef, 2, "could not read $file_name";
     return;
   }
 
@@ -206,7 +206,7 @@ SWAP_Define($$)
 
   if(@a != 3 && @a != 4 ) {
     my $msg = "wrong syntax: define <name> SWAP <addr>[.<reg>] [<ProductCode>]";
-    Log 2, $msg;
+    Log3 undef, 2, $msg;
     return $msg;
   }
 
@@ -249,9 +249,9 @@ SWAP_Define($$)
   AssignIoPort($hash);
   $hash->{TYPE} = $type;
   if(defined($hash->{IODev}->{NAME})) {
-    Log 3, "$name: I/O device is " . $hash->{IODev}->{NAME};
+    Log3 $name, 3, "$name: I/O device is " . $hash->{IODev}->{NAME};
   } else {
-    Log 1, "$name: no I/O device";
+    Log3 $name, 1, "$name: no I/O device";
   }
 
   CommandAttr(undef, "$name ProductCode $productcode") if( $productcode );
@@ -302,7 +302,6 @@ SWAP_Set($@)
   my $arg = $aa[1];
   my $arg2 = $aa[2];
   my $arg3 = $aa[3];
-  my $ll = GetLogLevel($name,3);
 
   my $list = "regGet regSet";
   $list .= " statusRequest:noArg";
@@ -700,7 +699,7 @@ SWAP_readDeviceXML($$)
   if( defined($developer->{name}) && defined($product->{name}) ) {
     readDeviceXML( $products->{$productcode}, "$attr{global}{modpath}/FHEM/lib/SWAP/$developer->{name}/$product->{name}.xml" );
   } else {
-    Log 2, "no device xml found for productcode $productcode";
+    Log3 $hash->{NAME}, 2, "no device xml found for productcode $productcode";
   }
 }
 
@@ -773,6 +772,7 @@ sub
 SWAP_Parse($$)
 {
   my ($hash, $msg) = @_;
+  my $name = $hash->{NAME};
 
   return undef if( $msg !~ m/^[\dA-F]{12,}$/ );
 
@@ -804,7 +804,7 @@ SWAP_Parse($$)
   if( $reg == 0x09
       && $func == STATUS
       && $raddr ne $data ) {
-    Log 4, "addr change: ". $raddr ." -> ". $data;
+    Log3 $name, 4, "addr change: ". $raddr ." -> ". $data;
 
     if( defined( $modules{SWAP}{defptr}{$raddr} ) ) {
       delete( $modules{SWAP}{defptr}{$raddr} );
@@ -825,17 +825,17 @@ SWAP_Parse($$)
 
   if( defined($rhash->{SWAP_nonce})
       && hex($nonce) == hex($rhash->{SWAP_nonce}) ) {
-    Log 4, "DUP: ". $sname ." -> ". $dname ." ($hop,$secu-$nonce): ". $function_codes{$func} . " ". $rname . " ". $regname . ($data?":":"") . $data;
+    Log3 $name, 4, "DUP: ". $sname ." -> ". $dname ." ($hop,$secu-$nonce): ". $function_codes{$func} . " ". $rname . " ". $regname . ($data?":":"") . $data;
     return $rname;
   }
 
-  Log 4, $sname ." -> ". $dname ." ($hop,$secu-$nonce): ". $function_codes{$func} . " ". $rname . " ". $regname . ($data?":":"") . $data;
+  Log3 $name, 4, $sname ." -> ". $dname ." ($hop,$secu-$nonce): ". $function_codes{$func} . " ". $rname . " ". $regname . ($data?":":"") . $data;
 
   return $rname if( $raddr eq "01" );
   return $rname if( $func == QUERY );
 
   if( !$modules{SWAP}{defptr}{$raddr} ) {
-    Log 3, "SWAP Unknown device $rname, please define it";
+    Log3 $name, 3, "SWAP Unknown device $rname, please define it";
     return undef if( $raddr eq "00" );
 
     $rname = SWAP_findFreeAddress($hash,$raddr) if( $raddr eq "FF" ); #use next free addr as name -> consistent name after change below
@@ -892,13 +892,13 @@ SWAP_Parse($$)
         && $data eq "FF" ) {
       my $addr = SWAP_findFreeAddress($hash,$data);
       if( $addr ne $data ) {
-        Log 3, "SWAP $rname: changing 09-DeviceAddress from default $data to $addr";
+        Log3 $rname, 3, "SWAP $rname: changing 09-DeviceAddress from default $data to $addr";
         SWAP_Set( $rhash, $rname, "regSet", "09", "$addr" ); #device should already have consistent name from autocreate above
       }
     } elsif( $reg == 0x0A
              && $data eq "FFFF"
              && $rhash->{product}->{pwrdownmode} == 1 ) {
-      Log 3, "SWAP $rname: changing 0A-PeriodicTxInterval from default FFFF to 0384 (900 seconds)";
+      Log3 $rname, 3, "SWAP $rname: changing 0A-PeriodicTxInterval from default FFFF to 0384 (900 seconds)";
       SWAP_Set( $rhash, $rname, "regSet", "0A", "0384" );
 
     }

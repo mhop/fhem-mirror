@@ -43,7 +43,7 @@ panStamp_Initialize($)
   #$hash->{GetFn}   = "panStamp_Get";
   $hash->{SetFn}   = "panStamp_Set";
   #$hash->{AttrFn}  = "panStamp_Attr";
-  $hash->{AttrList}= "model:panStamp loglevel:0,1,2,3,4,5,6";
+  #$hash->{AttrList}= "";
 
   $hash->{ShutdownFn} = "panStamp_Shutdown";
 }
@@ -62,7 +62,7 @@ panStamp_Define($$)
   if(@a < 3 || @a > 6) {
     my $msg = "wrong syntax: define <name> panStamp {devicename[\@baudrate] ".
                         "| devicename\@directio} [<address> [<channel> [<syncword>]]]";
-    Log 2, $msg;
+    Log3 undef, 2, $msg;
     return $msg;
   }
 
@@ -81,7 +81,9 @@ panStamp_Define($$)
   DevIo_CloseDev($hash);
 
   my $name = $a[0];
+
   my $dev = $a[2];
+  $dev .= "\@38400" if( $dev !~ m/\@/ );
 
   $hash->{address} = uc($address);
   $hash->{channel} = uc($channel);
@@ -111,7 +113,7 @@ panStamp_Undef($$)
        $defs{$d}{IODev} == $hash)
       {
         my $lev = ($reread_active ? 4 : 2);
-        Log GetLogLevel($name,$lev), "deleting port for $d";
+        Log3 $name, $lev, "deleting port for $d";
         delete $defs{$d}{IODev};
       }
   }
@@ -146,11 +148,11 @@ panStamp_Set($@)
   if($cmd eq "raw") {
     return "\"set panStamp $cmd\" needs exactly one parameter" if(@_ != 4);
     return "Expecting a even length hex number" if((length($arg)&1) == 1 || $arg !~ m/^[\dA-F]{12,}$/ );
-    Log GetLogLevel($name,4), "set $name $cmd $arg";
+    Log3 $name, 4, "set $name $cmd $arg";
     panStamp_SimpleWrite($hash, $arg);
 
   } elsif($cmd eq "discover") {
-    Log GetLogLevel($name,4), "set $name $cmd";
+    Log3 $name, 4, "set $name $cmd";
     panStamp_SimpleWrite($hash, "00".$hash->{address}."0000010000" );
 
   } else {
@@ -297,7 +299,7 @@ panStamp_ReadAnswer($$$$)
     }
 
     if($buf) {
-      Log 5, "panStamp/RAW (ReadAnswer): $buf";
+      Log3 $hash->{NAME}, 5, "panStamp/RAW (ReadAnswer): $buf";
       $mpandata .= $buf;
     }
 
@@ -329,7 +331,7 @@ panStamp_XmitLimitCheck($$)
   if(@b > 163) {          # 163 comes from fs20. todo: verify if correct for panstamp modulation
 
     my $name = $hash->{NAME};
-    Log GetLogLevel($name,2), "panStamp TRANSMIT LIMIT EXCEEDED";
+    Log3 $name, 2, "panStamp TRANSMIT LIMIT EXCEEDED";
     DoTrigger($name, "TRANSMIT LIMIT EXCEEDED");
 
   } else {
@@ -346,8 +348,10 @@ sub
 panStamp_Write($$$)
 {
   my ($hash,$addr,$msg) = @_;
+  my $name = $hash->{NAME};
 
-  Log 5, "$hash->{NAME} sending $addr $msg";
+  Log3 $name, 5, "$name sending $msg";
+
   my $bstring = $addr.$hash->{address}.$msg;
 
   panStamp_AddQueue($hash, $bstring);
@@ -432,7 +436,7 @@ panStamp_Read($)
   my $name = $hash->{NAME};
 
   my $pandata = $hash->{PARTIAL};
-  Log 5, "panStamp/RAW: $pandata/$buf";
+  Log3 $name, 5, "panStamp/RAW: $pandata/$buf";
   $pandata .= $buf;
 
   while($pandata =~ m/\n/) {
@@ -455,7 +459,7 @@ panStamp_Parse($$$$)
   $rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74));
   my $lqi = hex(substr($dmsg, 3, 2));
   $dmsg = substr($dmsg, 6, $l-6);
-  Log GetLogLevel($name,5), "$name: $dmsg $rssi $lqi";
+  Log3 $name, 5, "$name: $dmsg $rssi $lqi";
 
   next if(!$dmsg || length($dmsg) < 1);            # Bogus messages
 
@@ -501,8 +505,7 @@ panStamp_SimpleWrite(@)
   return if(!$hash);
 
   my $name = $hash->{NAME};
-  my $ll5 = GetLogLevel($name,5);
-  Log $ll5, "SW: $msg";
+  Log3 $name, 5, "SW: $msg";
 
   $msg .= "\r" unless($nocr);
 
