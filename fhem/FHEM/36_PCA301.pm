@@ -25,8 +25,9 @@ PCA301_Initialize($)
   $hash->{FingerprintFn}   = "PCA301_Fingerprint";
   $hash->{ParseFn}   = "PCA301_Parse";
   $hash->{AttrFn}    = "PCA301_Attr";
-  $hash->{AttrList}  = "IODev".
-                       " $readingFnAttributes";
+  $hash->{AttrList}  = "IODev"
+                       ." readonly:1"
+                       ." $readingFnAttributes";
 }
 
 sub
@@ -69,7 +70,7 @@ PCA301_Define($$)
     Log3 $name, 1, "$name: no I/O device";
   }
 
-  $attr{$name}{devStateIcon} = 'on:on:toggle off:off:toggle .*:light_question:off' if( !defined( $attr{$name}{devStateIcon} ) );
+  $attr{$name}{devStateIcon} = 'on:on:toggle off:off:toggle set.*:light_question:off' if( !defined( $attr{$name}{devStateIcon} ) );
   $attr{$name}{webCmd} = 'on:off:toggle:statusRequest' if( !defined( $attr{$name}{webCmd} ) );
   CommandAttr( undef, "$name userReadings consumptionTotal:consumption monotonic {ReadingsVal(\$name,'consumption',0)}" ) if( !defined( $attr{$name}{userReadings} ) );
 
@@ -106,7 +107,10 @@ PCA301_Set($@)
   my $arg2 = $aa[2];
   my $arg3 = $aa[3];
 
-  my $list = "identify:noArg off:noArg on:noArg toggle:noArg reset:noArg statusRequest:noArg";
+  my $readonly = AttrVal($name, "readonly", "0" );
+
+  my $list = "identify:noArg reset:noArg statusRequest:noArg";
+  $list .= " off:noArg on:noArg toggle:noArg" if( $readonly eq "0" );
 
   if( $cmd eq 'toggle' ) {
     $cmd = ReadingsVal($name,"state","on") eq "off" ? "on" :"off";
@@ -208,6 +212,7 @@ PCA301_Parse($$)
     my $state = $data==0x00?"off":"on";
     my $power = ($bytes[6]*256 + $bytes[7]) / 10.0;
     my $consumption = ($bytes[8]*256 + $bytes[9]) / 100.0;
+    $state = $power if( AttrVal($rname, "readonly", "0" ) ne "0" );
     readingsBeginUpdate($rhash);
     readingsBulkUpdate($rhash, "power", $power) if( $data != 0x00 || ReadingsVal($rname,"power","") != $power );
     readingsBulkUpdate($rhash, "consumption", $consumption) if( ReadingsVal($rname,"consumption","") != $consumption );
@@ -303,6 +308,8 @@ PCA301_Attr(@)
   <a name="PCA301_Attr"></a>
   <b>Attributes</b>
   <ul>
+    <li>readonly<br>
+    if set to a value != 0 all switching commands (on, off, toggle, ...) will be disabled.</li>
   </ul><br>
 </ul>
 
