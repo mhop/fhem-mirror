@@ -429,7 +429,6 @@ MAX_Set($@)
         return "No MAX device with address $dest" if(!exists($modules{MAX}{defptr}{$dest}));
       }
       $destType = MAX_TypeToTypeId($modules{MAX}{defptr}{$dest}{type});
-      Log 2, "Warning: Device do not have same groupid" if($hash->{groupid} != $modules{MAX}{defptr}{$dest}{groupid});
     }
 
     Log GetLogLevel($hash->{NAME}, 5), "Using dest $dest, destType $destType";
@@ -670,6 +669,8 @@ MAX_Parse($$)
         $untilStr = MAX_ParseDateTime($null1,$heaterTemperature,$null2)->{str};
         $heaterTemperature = "";
       }
+
+      $heaterTemperature = "" if(!defined($heaterTemperature));
 
       Log GetLogLevel($shash->{NAME}, 5), "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, displayActualTemperature $displayActualTemperature, heaterTemperature $heaterTemperature, untilStr $untilStr";
       $shash->{rferror} = $rferror;
