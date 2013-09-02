@@ -15,8 +15,7 @@ speedtest_Initialize($)
   $hash->{DefFn}    = "speedtest_Define";
   $hash->{UndefFn}  = "speedtest_Undefine";
   $hash->{SetFn}    = "speedtest_Set";
-  $hash->{AttrList} = "loglevel:0,1,2,3,4,5,6 ".
-                      "checks-till-disable ".
+  $hash->{AttrList} = "checks-till-disable ".
                       "disable:0,1 ".
                       "path ".
                        $readingFnAttributes;
@@ -127,9 +126,9 @@ speedtest_DoSpeedtest($)
   $cmd .= "/speedtest-cli --simple";
   $cmd .= " --server $server" if( $server );
 
-  Log GetLogLevel($name, 5), "starting speedtest";
+  Log3 $name, 5, "starting speedtest";
   my $speedstr = qx($cmd);
-  Log GetLogLevel($name, 5), "speedtest done";
+  Log3 $name, 5, "speedtest done";
   my @speedarr = split(/\n/, $speedstr);
 
   for( my $i = 0; $i < 3; ++$i )
@@ -153,7 +152,7 @@ speedtest_SpeedtestDone($)
 
   return if($hash->{helper}{DISABLED});
 
-  Log GetLogLevel($hash->{NAME}, 5), "speedtest_SpeedtestDone: $string";
+  Log3 $hash, 5, "speedtest_SpeedtestDone: $string";
 
   readingsBeginUpdate($hash);
 
