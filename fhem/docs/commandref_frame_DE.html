@@ -3,8 +3,11 @@
 <html>
 
 <head>
-  <title>FHEM reference</title>
-  <link rel="stylesheet" type="text/css" href="../www/pgm2/style.css" />
+  <title>FHEM Referenz</title>
+  <script type="text/javascript" src="fhemdoc.js"></script>
+  <noscript>
+    <link rel="stylesheet" type="text/css" href="../www/pgm2/style.css" />
+  </noscript>
   <meta http-equiv="Content-type" content="text/html; charset=UTF-8">
   <link rel="shortcut icon" href="/fhem/icons/favicon.ico"/>
 
@@ -1397,15 +1400,17 @@ bitte die Funktion fhem(),
       define n1 notify piri:on { fhem "set light on" }
       <p>&nbsp;</p>
     </ul>
-    Bemerkung: Wenn diese Funktion einen wert zur&uuml;ck liefert, wird dieser in der 
-allgemeinen Logdatei gespeichert.. Benutzen sie &quot;1&quot; als zweites Argument um 
-dieses speichern zu verhindern. Sinnvoll ist dieses Argument bei der Abfrage von 
-Werten mittels "get...".
+    Bemerkung: Wenn diese Funktion einen wert zur&uuml;ck liefert, wird dieser
+    in der allgemeinen Logdatei gespeichert.. Benutzen sie &quot;1&quot; als
+    zweites Argument um dieses speichern zu verhindern. Sinnvoll ist dieses
+    Argument bei der Abfrage von Werten mittels "get...".
     <br>
     <br>
+  </li>
 
-  </li><li>Notify kann auch dazu verwendet werden, um Macros manuell auszuf&uuml;hren. 
-Verwenden Sie den <a href="#trigger">trigger</a>-Befehl um das Makro zu starten:<br>
+  <li>Notify kann auch dazu verwendet werden, um Macros manuell
+    auszuf&uuml;hren.  Verwenden Sie den <a href="#trigger">trigger</a>-Befehl
+    um das Makro zu starten:<br>
     <ul>
       define MyMacro notify MyMacro { Log 1, "Hello"}<br>
       trigger MyMacro<br>
@@ -1413,18 +1418,22 @@ Verwenden Sie den <a href="#trigger">trigger</a>-Befehl um das Makro zu starten:
       trigger MyMacro MyArg<br>
     </ul>
     <br>
+  </li>
 
+  <li>Um die Verwendung von Datum und Zeitangaben zu vereinfachen, wurden die
+    Variablen $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst
+    f&uuml;r die Verwendung in PERL-&quot;oneliners&quot; eingef&uuml;hrt (s.
+    unter perldoc -f localtime). Ausnahmen: $month hat einen Wertebereich von 1
+    to 12 und $year ist korrigiert von 1900.
+    Weiterhin enth&auml;t $hms die Zeit in dem HH:MM:SS Format.
+    <br>
 
-  </li><li>Um die Verwendung von Datum und Zeitangaben zu vereinfachen, wurden 
-die Variablen $sec, $min, $hour,
-    $mday, $month, $year, $wday, $yday, $isdst f&uuml;r die Verwendung in PERL-&quot;oneliners&quot; 
-eingef&uuml;hrt (s. unter perldoc -f localtime). Ausnahmen: $month hat einen 
-Wertebereich von 1 to 12 und $year ist korrigiert von 1900.<br>
-    Die weitere Variabe $we hat den Wert 1 wenn der abgefragte Tag auf ein 
-Wochenende f&auml;llt (Z.B. $wday == 0 [Sonntag] oder
-    $wday == 6 [Samstag]), und 0 f&uuml;r die anderen Wochentage. Wenn man das 
-allgemeine <a href="#holiday2we">holida2we</a> Attribut setzt, dann ist $we 
-ebenfalls 1 bei Urlaubstagen.<br>
+    Die Variabe $we hat den Wert 1 wenn der abgefragte Tag auf ein Wochenende
+    f&auml;llt (Z.B. $wday == 0 [Sonntag] oder $wday == 6 [Samstag]), und 0
+    f&uuml;r die anderen Wochentage. Wenn man das global <a
+    href="#holiday2we">holida2we</a> Attribut setzt, dann ist $we ebenfalls 1
+    bei Urlaubstagen.<br>
+
     <ul>
       define n2 notify piri:on { if($hour &gt; 18 || $hour &lt; 5) {
         fhem "set light on" } }<br>
@@ -1439,10 +1448,10 @@ ebenfalls 1 bei Urlaubstagen.<br>
     wie jede mit 99 beginnende Datei automatisch geladen):
     <ul>
       <li>min(a,b), max(a,b)</li>
-      <li>time_str2num("YYYY-MM-DD HH:MM:SS") gibt einen numerischen Wert zur&uuml;ck,
-          der die Berechnung von Zeitdifferenzen vereinfacht</li>
+      <li>time_str2num("YYYY-MM-DD HH:MM:SS") gibt einen numerischen Wert
+        zur&uuml;ck, der die Berechnung von Zeitdifferenzen vereinfacht</li>
       <li>abstime2rel("HH:MM:SS") wandelt absolute in relative Zeitangaben um
-          </li>
+        </li>
     </ul>
     </li>
 
