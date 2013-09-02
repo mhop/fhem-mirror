@@ -3,8 +3,11 @@
 <html>
 
 <head>
-  <title>fhem reference</title>
-  <link rel="stylesheet" type="text/css" href="../www/pgm2/style.css" />
+  <title>FHEM reference</title>
+  <script type="text/javascript" src="fhemdoc.js"></script>
+  <noscript>
+    <link rel="stylesheet" type="text/css" href="../www/pgm2/style.css" />
+  </noscript>
   <meta http-equiv="Content-type" content="text/html;charset=ISO-8859-1"/>
   <link rel="shortcut icon" href="/fhem/icons/favicon.ico"/>
 </head>
@@ -1345,7 +1348,9 @@ A line ending with \ will be concatenated with the next one, so long lines
   <li>To make date and time handling easier, the variables $sec, $min, $hour,
     $mday, $month, $year, $wday, $yday, $isdst are available in the perl
     oneliners (see also perldoc -f localtime). Exceptions: $month is in the
-    range of 1 to 12, and $year is corrected by 1900 (as I would expect).<br>
+    range of 1 to 12, and $year is corrected by 1900 (as I would expect).
+    Additionally the variable $hms contains the time in the HH:MM:SS format.
+    <br>
     Additionally the variabe $we is 1 if it is weekend (i.e $wday == 0 or
     $wday == 6), and 0 otherwise. If the <a href="#holiday2we">holida2we</a>
     global attribute is set, $we is 1 for holidays too.<br>
