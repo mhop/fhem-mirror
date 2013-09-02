@@ -414,6 +414,9 @@ JeeLink_Parse($$$$)
   #Log3, $name, 5, "$name: $dmsg $rssi $lqi";
 
   next if(!$dmsg || length($dmsg) < 1);            # Bogus messages
+  next if($dmsg =~ m/^\[pcaSerial/ );              # ignore startup messages
+  next if($dmsg =~ m/^Available commands:/ );      # ignore startup messages
+  next if($dmsg =~ m/^  .* - / );                  # ignore startup messages
   next if($dmsg =~ m/^-> ack/ );                   # ignore send ack
 
   $hash->{"${name}_MSGCNT"}++;
