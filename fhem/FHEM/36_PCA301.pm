@@ -110,7 +110,7 @@ PCA301_Set($@)
   my $readonly = AttrVal($name, "readonly", "0" );
 
   my $list = "identify:noArg reset:noArg statusRequest:noArg";
-  $list .= " off:noArg on:noArg toggle:noArg" if( $readonly eq "0" );
+  $list .= " off:noArg on:noArg toggle:noArg" if( !$readonly );
 
   if( $cmd eq 'toggle' ) {
     $cmd = ReadingsVal($name,"state","on") eq "off" ? "on" :"off";
@@ -214,7 +214,7 @@ PCA301_Parse($$)
     my $state = $data==0x00?"off":"on";
     my $power = ($bytes[6]*256 + $bytes[7]) / 10.0;
     my $consumption = ($bytes[8]*256 + $bytes[9]) / 100.0;
-    $state = $power if( !$readonly );
+    $state = $power if( $readonly );
     readingsBeginUpdate($rhash);
     readingsBulkUpdate($rhash, "power", $power) if( $data != 0x00 || ReadingsVal($rname,"power","") != $power );
     readingsBulkUpdate($rhash, "consumption", $consumption) if( ReadingsVal($rname,"consumption","") != $consumption );
