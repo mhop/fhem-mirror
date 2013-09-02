@@ -29,7 +29,7 @@ sub HUEBridge_Initialize($)
   $hash->{SetFn}    = "HUEBridge_Set";
   $hash->{GetFn}    = "HUEBridge_Get";
   $hash->{UndefFn}  = "HUEBridge_Undefine";
-  $hash->{AttrList}= "key loglevel:0,1,2,3,4,5";
+  $hash->{AttrList}= "key";
 }
 
 sub
@@ -250,7 +250,7 @@ HUEBridge_Autocreate($)
         next if($defs{$d}{TYPE} ne "HUEDevice");
         if(defined($defs{$d}{fhem}) &&
            defined($defs{$d}{fhem}{id}) && $defs{$d}{fhem}{id} eq $id) {
-          Log 5, "$name id '$id' already defined as '$defs{$d}{NAME}'";
+          Log3 $name, 5, "$name id '$id' already defined as '$defs{$d}{NAME}'";
           $found = 1;
           last;
         }
@@ -260,11 +260,11 @@ HUEBridge_Autocreate($)
       my $devname= "HUEDevice" . $id;
       my $define= "$devname HUEDevice $id";
 
-      Log 5, "$name create new device '$devname' for address '$id'";
+      Log3 $name, 5, "$name create new device '$devname' for address '$id'";
 
       my $cmdret= CommandDefine(undef,$define);
       if($cmdret) {
-        Log 1, "$name: Autocreate: An error occurred while creating device for id '$id': $cmdret";
+        Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for id '$id': $cmdret";
       } else {
         $cmdret= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
         $cmdret= CommandAttr(undef,"$devname room HUEDevice");
@@ -278,9 +278,10 @@ HUEBridge_Autocreate($)
 sub HUEBridge_ProcessResponse($$)
 {
   my ($hash,$obj) = @_;
+  my $name = $hash->{NAME};
 
-  #Log 3, ref($obj);
-  #Log 3, "Receiving: " . Dumper $obj;
+  #Log3 $name, 3, ref($obj);
+  #Log3 $name, 3, "Receiving: " . Dumper $obj;
 
   if( ref($obj) eq 'ARRAY' )
     {
@@ -290,7 +291,7 @@ sub HUEBridge_ProcessResponse($$)
 
           $hash->{STATE} = $error;
 
-          Log 3, $error;
+          Log3 $name, 3, $error;
         }
 
       return ($obj->[0]);
@@ -321,7 +322,7 @@ HUEBridge_Call($$$)
 {
   my ($hash,$path,$obj) = @_;
 
-  #Log 3, "Sending: " . Dumper $obj;
+  #Log3 $name, 3, "Sending: " . Dumper $obj;
 
   my $json = undef;
   $json = encode_json($obj) if $obj;
@@ -333,6 +334,8 @@ HUEBridge_Call($$$)
 sub HUEBridge_HTTP_Call($$$)
 {
   my ($hash,$path,$obj) = @_;
+  my $name = $hash->{NAME};
+
   my $uri = "http://" . $hash->{Host} . "/api";
   my $method = 'GET';
   if( defined($obj) ) {
@@ -341,17 +344,17 @@ sub HUEBridge_HTTP_Call($$$)
       if( $hash->{STATE} eq 'Pairing' ) {
           $method = 'POST';
       } else {
-        $uri .= "/" . AttrVal($hash->{NAME}, "key", "");
+        $uri .= "/" . AttrVal($name, "key", "");
       }
     } else {
-      $uri .= "/" . AttrVal($hash->{NAME}, "key", "");
+      $uri .= "/" . AttrVal($name, "key", "");
     }
   if( defined $path) {
     $uri .= "/" . $path;
   }
-  #Log 3, "Url: " . $uri;
+  #Log3 $name, 3, "Url: " . $uri;
   my $ret = HUEBridge_HTTP_Request(0,$uri,$method,undef,$obj,undef);
-  #Log 3, Dumper $ret;
+  #Log3 $name, 3, Dumper $ret;
   if( !defined($ret) ) {
     return undef;
   } elsif($ret eq '') {
@@ -378,7 +381,7 @@ HUEBridge_HTTP_Request($$$@)
 
   my $displayurl= $quiet ? "<hidden>" : $url;
   if($url !~ /^(http|https):\/\/([^:\/]+)(:\d+)?(\/.*)$/) {
-    Log 1, "HUEBridge_HTTP_Request $displayurl: malformed or unsupported URL";
+    Log3 undef, 1, "HUEBridge_HTTP_Request $displayurl: malformed or unsupported URL";
     return undef;
   }
 
@@ -396,7 +399,7 @@ HUEBridge_HTTP_Request($$$@)
   if($protocol eq "https") {
     eval "use IO::Socket::SSL";
     if($@) {
-      Log 1, $@;
+      Log3 undef, 1, $@;
     } else {
       $conn = IO::Socket::SSL->new(PeerAddr=>"$host:$port", Timeout=>$timeout);
     }
@@ -404,7 +407,7 @@ HUEBridge_HTTP_Request($$$@)
     $conn = IO::Socket::INET->new(PeerAddr=>"$host:$port", Timeout=>$timeout);
   }
   if(!$conn) {
-    Log 1, "HUEBridge_HTTP_Request $displayurl: Can't connect to $protocol://$host:$port\n";
+    Log3 undef, 1, "HUEBridge_HTTP_Request $displayurl: Can't connect to $protocol://$host:$port\n";
     undef $conn;
     return undef;
   }
@@ -428,7 +431,7 @@ HUEBridge_HTTP_Request($$$@)
     vec($rin, $conn->fileno(), 1) = 1;
     my $nfound = select($rout=$rin, undef, undef, $timeout);
     if($nfound <= 0) {
-      Log 1, "HUEBridge_HTTP_Request $displayurl: Select timeout/error: $!";
+      Log3 undef, 1, "HUEBridge_HTTP_Request $displayurl: Select timeout/error: $!";
       undef $conn;
       return undef;
     }
@@ -441,11 +444,11 @@ HUEBridge_HTTP_Request($$$@)
   $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
   my @header= split("\r\n", $1);
   my $hostpath= $quiet ? "<hidden>" : $host . $path;
-  Log 5, "HUEBridge_HTTP_Request $displayurl: Got data, length: ".length($ret);
+  Log3 undef, 5, "HUEBridge_HTTP_Request $displayurl: Got data, length: ".length($ret);
   if(!length($ret)) {
-    Log 4, "HUEBridge_HTTP_Request $displayurl: Zero length data, header follows...";
+    Log3 undef, 4, "HUEBridge_HTTP_Request $displayurl: Zero length data, header follows...";
     for (@header) {
-        Log 4, "HUEBridge_HTTP_Request $displayurl: $_";
+        Log3 undef, 4, "HUEBridge_HTTP_Request $displayurl: $_";
     }
   }
   undef $conn;

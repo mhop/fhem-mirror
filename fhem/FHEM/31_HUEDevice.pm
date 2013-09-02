@@ -22,6 +22,7 @@ my %hueModels = (
   LLC005 => {name => 'LivingColors Bloom'   ,type => 'Color Light'            ,subType => 'colordimmer',},
   LLC006 => {name => 'LivingColors Iris'    ,type => 'Color Light'            ,subType => 'colordimmer',},
   LLC007 => {name => 'LivingColors Bloom'   ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LST001 => {name => 'LightStrips'          ,type => 'Color Light'            ,subType => 'colordimmer',},
   LWB001 => {name => 'LivingWhites Bulb'    ,type => 'Dimmable light'         ,subType => 'dimmer',},
   LWL001 => {name => 'LivingWhites Outlet'  ,type => 'Dimmable plug-in unit'  ,subType => 'dimmer',},
 );
@@ -107,7 +108,6 @@ HUEDevice_devStateIcon($)
 sub
 HUEDevice_summaryFn($$$$)
 {
-Log 3, "HUEDevice_summaryFn";
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash   = $defs{$d};
   my $name = $hash->{NAME};
@@ -145,6 +145,8 @@ sub HUEDevice_Define($$)
   $hash->{fhem}{hue} = -1;
   $hash->{fhem}{sat} = -1;
   $hash->{fhem}{xy} = '';
+  $hash->{fhem}{alert} = '';
+  $hash->{fhem}{effect} = '';
 
   $hash->{fhem}{percent} = -1;
 
@@ -153,9 +155,9 @@ sub HUEDevice_Define($$)
 
   AssignIoPort($hash);
   if(defined($hash->{IODev}->{NAME})) {
-    Log 3, "$name: I/O device is " . $hash->{IODev}->{NAME};
+    Log3 $name, 3, "$name: I/O device is " . $hash->{IODev}->{NAME};
   } else {
-    Log 1, "$name: no I/O device";
+    Log3 $name, 1, "$name: no I/O device";
   }
 
   #HUEDevice_GetUpdate($hash);
@@ -231,19 +233,19 @@ HUEDevice_SetParam($$@)
   } elsif( $cmd eq "rgb" && $value =~ m/^(..)(..)(..)/) {
     # calculation from http://www.everyhue.com/vanilla/discussion/94/rgb-to-xy-or-hue-sat-values/p1
     my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
-#Log 3, "rgb: ". $r . " " . $g ." ". $b;
+#Log3 $name, 3, "rgb: ". $r . " " . $g ." ". $b;
 
     my $X =  1.076450 * $r - 0.237662 * $g + 0.161212 * $b;
     my $Y =  0.410964 * $r + 0.554342 * $g + 0.034694 * $b;
     my $Z = -0.010954 * $r - 0.013389 * $g + 1.024343 * $b;
-#Log 3, "XYZ: ". $X . " " . $Y ." ". $Y;
+#Log3 $name, 3, "XYZ: ". $X . " " . $Y ." ". $Y;
 
     if( $X != 0
         || $Y != 0
         || $Z != 0 ) {
       my $x = $X / ($X + $Y + $Z);
       my $y = $Y / ($X + $Y + $Z);
-#Log 3, "xyY:". $x . " " . $y ." ". $Y;
+#Log3 $name, 3, "xyY:". $x . " " . $y ." ". $Y;
 
       #$x = 0 if( $x < 0 );
       #$x = 1 if( $x > 1 );
@@ -268,6 +270,8 @@ HUEDevice_SetParam($$@)
     $obj->{'hue'}  = int($h*256);
     $obj->{'sat'}  = 0+$s;
     $obj->{'bri'}  = 0+$v;
+  } elsif( $cmd eq "alert" ) {
+    $obj->{'alert'}  = $value;
   } elsif( $cmd eq "effect" ) {
     $obj->{'effect'}  = $value;
   } elsif( $cmd eq "transitiontime" ) {
@@ -319,7 +323,7 @@ HUEDevice_Set($@)
   }
 
   my $list = "off:noArg on:noArg toggle:noArg statusRequest:noArg";
-  $list .= " pct:slider,0,1,100 bri:slider,0,1,254" if( AttrVal($name, "subType", "colordimmer") =~ m/dimmer/ );
+  $list .= " pct:slider,0,1,100 bri:slider,0,1,254 alert:none,select,lselect" if( AttrVal($name, "subType", "colordimmer") =~ m/dimmer/ );
   #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/dimmer/ );
   $list .= " rgb:colorpicker,RGB color:slider,2000,1,6500 ct:slider,154,1,500 hue:slider,0,1,65535 sat:slider,0,1,254 xy effect:none,colorloop" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
   return SetExtensions($hash, $list, $name, @aa);
@@ -468,26 +472,26 @@ HUEDevice_ReadFromServer($@)
 {
   my ($hash,@a) = @_;
 
-  my $dev = $hash->{NAME};
+  my $name = $hash->{NAME};
   no strict "refs";
   my $ret;
-  unshift(@a,$dev);
+  unshift(@a,$name);
   $ret = IOWrite($hash, @a);
   use strict "refs";
   return $ret;
-  return if(IsDummy($dev) || IsIgnored($dev));
+  return if(IsDummy($name) || IsIgnored($name));
   my $iohash = $hash->{IODev};
   if(!$iohash ||
      !$iohash->{TYPE} ||
      !$modules{$iohash->{TYPE}} ||
      !$modules{$iohash->{TYPE}}{ReadFn}) {
-    Log 5, "No I/O device or ReadFn found for $dev";
+    Log3 $name, 5, "No I/O device or ReadFn found for $name";
     return;
   }
 
   no strict "refs";
   #my $ret;
-  unshift(@a,$dev);
+  unshift(@a,$name);
   $ret = &{$modules{$iohash->{TYPE}}{ReadFn}}($iohash, @a);
   use strict "refs";
   return $ret;
@@ -545,6 +549,8 @@ HUEDevice_GetUpdate($)
   my $sat       = $state->{'sat'};
   my $xy        = undef;
      $xy        = $state->{'xy'}->[0] .",". $state->{'xy'}->[1] if( defined($state->{'xy'}) );
+  my $alert = $state->{alert};
+  my $effect = $state->{effect};
 
   if( defined($colormode) && $colormode ne $hash->{fhem}{colormode} ) {readingsBulkUpdate($hash,"colormode",$colormode);}
   if( defined($bri) && $bri != $hash->{fhem}{bri} ) {readingsBulkUpdate($hash,"bri",$bri);}
@@ -560,6 +566,8 @@ HUEDevice_GetUpdate($)
   if( defined($sat) && $sat != $hash->{fhem}{sat} ) {readingsBulkUpdate($hash,"sat",$sat);}
   if( defined($xy) && $xy ne $hash->{fhem}{xy} ) {readingsBulkUpdate($hash,"xy",$xy);}
   if( defined($reachable) && $reachable ne $hash->{fhem}{reachable} ) {readingsBulkUpdate($hash,"reachable",$reachable);}
+  if( defined($alert) && $alert ne $hash->{fhem}{alert} ) {readingsBulkUpdate($hash,"alert",$alert);}
+  if( defined($effect) && $effect ne $hash->{fhem}{effect} ) {readingsBulkUpdate($hash,"effect",$effect);}
 
   my $s = '';
   my $percent;
@@ -600,6 +608,8 @@ HUEDevice_GetUpdate($)
   $hash->{fhem}{hue} = $hue;
   $hash->{fhem}{sat} = $sat;
   $hash->{fhem}{xy} = $xy;
+  $hash->{fhem}{alert} = $alert;
+  $hash->{fhem}{effect} = $effect;
 
   $hash->{fhem}{percent} = $percent;
 }
@@ -685,6 +695,7 @@ HUEDevice_GetUpdate($)
         set saturation to &lt;value&gt;; range is 0-254.</li>
       <li>xy &lt;x&gt;,&lt;y&gt;<br>
         set the xy color coordinates to &lt;x&gt;,&lt;y&gt;</li>
+      <li>alert [none|select|lselect]</li>
       <li>effect [none|colorloop]</li>
       <li>transitiontime &lt;time&gt;<br>
         set the transitiontime to &lt;time&gt; 1/10s</li>
