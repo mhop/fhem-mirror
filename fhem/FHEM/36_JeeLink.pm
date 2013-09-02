@@ -132,8 +132,8 @@ JeeLink_Set($@)
   return $list if( $cmd eq '?' );
 
   if($cmd eq "raw") {
-    return "\"set JeeLink $cmd\" needs exactly one parameter" if(@_ != 4);
-    return "Expecting a even length hex number" if((length($arg)&1) == 1 || $arg !~ m/^[\dA-F]{12,}$/ );
+    #return "\"set JeeLink $cmd\" needs exactly one parameter" if(@_ != 4);
+    #return "Expecting a even length hex number" if((length($arg)&1) == 1 || $arg !~ m/^[\dA-F]{12,}$/ );
     Log3 $name, 4, "set $name $cmd $arg";
     JeeLink_SimpleWrite($hash, $arg);
 
