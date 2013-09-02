@@ -116,10 +116,10 @@ PCA301_Set($@)
     $cmd = ReadingsVal($name,"state","on") eq "off" ? "on" :"off";
   }
 
-  if( $cmd eq 'off' ) {
+  if( !$readonly && $cmd eq 'off' ) {
     readingsSingleUpdate($hash, "state", "set-$cmd", 1);
     PCA301_Send( $hash, 0x05, 0x00 );
-  } elsif( $cmd eq 'on' ) {
+  } elsif( !$readonly && $cmd eq 'on' ) {
     readingsSingleUpdate($hash, "state", "set-$cmd", 1);
     PCA301_Send( $hash, 0x05, 0x01 );
   } elsif( $cmd eq 'statusRequest' ) {
@@ -208,11 +208,13 @@ PCA301_Parse($$)
 
   $rhash->{PCA301_lastRcv} = TimeNow();
 
+  my $readonly = AttrVal($name, "readonly", "0" );
+
   if( $cmd eq 0x04 ) {
     my $state = $data==0x00?"off":"on";
     my $power = ($bytes[6]*256 + $bytes[7]) / 10.0;
     my $consumption = ($bytes[8]*256 + $bytes[9]) / 100.0;
-    $state = $power if( AttrVal($rname, "readonly", "0" ) ne "0" );
+    $state = $power if( !$readonly );
     readingsBeginUpdate($rhash);
     readingsBulkUpdate($rhash, "power", $power) if( $data != 0x00 || ReadingsVal($rname,"power","") != $power );
     readingsBulkUpdate($rhash, "consumption", $consumption) if( ReadingsVal($rname,"consumption","") != $consumption );
