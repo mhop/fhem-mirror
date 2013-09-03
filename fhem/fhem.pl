@@ -74,7 +74,6 @@ sub ReadingsVal($$$);
 sub RemoveInternalTimer($);
 sub ReplaceEventMap($$$);
 sub ResolveDateWildcards($@);
-sub SecondsTillTomorrow($);
 sub SemicolonEscape($);
 sub SignalHandling();
 sub TimeNow();
