@@ -98,6 +98,7 @@ sub redirectStdinStdErr();
 sub rejectDuplicate($$$);
 sub setGlobalAttrBeforeFork($);
 sub setReadingsVal($$$$);
+sub utf8ToLatin1($);
 
 sub CommandAttr($$);
 sub CommandDefaultAttr($$);
