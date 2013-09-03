@@ -60,7 +60,17 @@ readingsGroup_updateDevices($)
     } else {
       my @device = split(":", $param);
 
-      if( defined($defs{$device[0]}) ) {
+      if($device[0] =~ m/(.*)=(.*)/) {
+        my ($lattr,$re) = ($1, $2);
+        foreach my $d (sort keys %defs) {
+          next if( IsIgnored($d) );
+          next if( !defined($defs{$d}{$lattr}) );
+          next if( $defs{$d}{$lattr} !~ m/^$re$/);
+          $list{$d} = 1;
+          push @devices, [$d,$device[1]];
+        }
+      }
+      elsif( defined($defs{$device[0]}) ) {
         $list{$device[0]} = 1;
         push @devices, [@device];
       } else {
@@ -454,7 +464,8 @@ readingsGroup_Get($@)
 
     Notes:
     <ul>
-      <li>If regex starts with a + it will be matched against the internal values of the device instead of the readinsg.</li>
+      <li>&lt;device&gt; can be of the form INTERNAL=VALUE where INTERNAL is an internal value and VALUE is a regex.</li>
+      <li>If regex starts with a + it will be matched against the internal values of the device instead of the readings.</li>
       <li>For internal values no longpoll update is possible. Refresh the page to update the values.</li>
     </ul><br>
 
@@ -464,6 +475,9 @@ readingsGroup_Get($@)
         define batteries readingsGroup .*:battery</code><br>
       <br>
         <code>define temperatures readingsGroup s300th.*:temperature</code><br>
+        <code>define temperatures readingsGroup TYPE=CUL_WS.*:temperature</code><br>
+      <br>
+        <code>define culRSSI readingsGroup cul_RSSI=.*:+cul_RSSI</code><br>
       <br>
         <code>define heizung readingsGroup t1:temperature t2:temperature t3:temperature<br>
         attr heizung notime 1<br>
