@@ -85,7 +85,7 @@ FHEM/30_HUEBridge.pm         justme1968           http://forum.fhem.de Sonstige 
 FHEM/31_HUEDevice.pm         justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/31_LightScene.pm        justme1968           http://forum.fhem.de Automatisierung
 FHEM/32_SYSSTAT.pm           justme1968           http://forum.fhem.de Unterstützende Dienste
-FHEM/33_readingsGroup.pm     justme1968           http://forum.fhem.de Automatisierung
+FHEM/33_readingsGroup.pm     justme1968           http://forum.fhem.de Frontends
 FHEM/32_speedtest.pm         justme1968           http://forum.fhem.de Sonstiges
 FHEM/34_panStamp.pm          justme1968           http://forum.fhem.de Sonstiges Systeme
 FHEM/34_SWAP.pm              justme1968           http://forum.fhem.de Sonstiges Systeme
