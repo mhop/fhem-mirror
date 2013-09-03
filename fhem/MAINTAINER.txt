@@ -56,6 +56,7 @@ FHEM/16_CUL_RFR.pm           rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/17_EGPM2LAN.pm          alexus               http://forum.fhem.de Sonstiges
 FHEM/17_SIS_PMS.pm           painseeker           http://forum.fhem.de Sonstiges
 FHEM/18_CUL_HOERMANN.pm      rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/19_Revolt.pm            martinppp/mehf       http://forum.fhem.de SlowRF
 FHEM/20_FRM_AD.pm            ntruchsess           http://forum.fhem.de Sonstiges
 FHEM/20_FRM_I2C.pm           ntruchsess           http://forum.fhem.de Sonstiges
 FHEM/20_FRM_IN.pm            ntruchsess           http://forum.fhem.de Sonstiges
