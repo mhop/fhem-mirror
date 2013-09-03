@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 - SVN
+  - feature: new module Revolt for Revolt NC-5462 power metering devices.
+             (by mehf)
   - feature: HUEDevice: added alert command
   - change:  The DBLOG propagated Attribute DbLogExclude will work as 
              regexp to exclude defined readings to log. 
