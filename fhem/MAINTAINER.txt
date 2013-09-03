@@ -124,7 +124,7 @@ FHEM/70_STV.pm               bentele              http://forum.fhem.de Sonstiges
 FHEM/70_TellStick.pm         real-wusel           http://forum.fhem.de Sonstiges
 FHEM/70_USBWX.pm             wherzig              http://forum.fhem.de Sonstiges
 FHEM/70_VIERA.pm             teevau               http://forum.fhem.de Sonstiges
-FHEM/70_WS3600.pm            painseeker           http://forum.fhem.de Sonstiges
+FHEM/70_WS3600.pm            Josch                http://forum.fhem.de Sonstiges
 FHEM/71_LISTENLIVE.pm        betateilchen         http://forum.fhem.de Multimedia
 FHEM/71_YAMAHA_AVR.pm        markusbloch          http://forum.fhem.de Multimedia
 FHEM/72_FB_CALLMONITOR.pm    markusbloch          http://forum.fhem.de Unterstützende Dienste
