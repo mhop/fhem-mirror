@@ -40,17 +40,17 @@ readingsGroup_updateDevices($)
     # for backwards compatibility with weblink readings
     if( $param eq '*noheading' ) {
       $attr{$hash->{NAME}}{noheading} = 1;
-      $hash->{DEF} =~ s/(\s*)$param((:\S+)?\s*)/ /g;
+      $hash->{DEF} =~ s/(\s*)\\$param((:\S+)?\s*)/ /g;
       $hash->{DEF} =~ s/^ //;
       $hash->{DEF} =~ s/ $//;
     } elsif( $param eq '*notime' ) {
       $attr{$hash->{NAME}}{notime} = 1;
-      $hash->{DEF} =~ s/(\s*)$param((:\S+)?\s*)/ /g;
+      $hash->{DEF} =~ s/(\s*)\\$param((:\S+)?\s*)/ /g;
       $hash->{DEF} =~ s/^ //;
       $hash->{DEF} =~ s/ $//;
     } elsif( $param eq '*nostate' ) {
       $attr{$hash->{NAME}}{nostate} = 1;
-      $hash->{DEF} =~ s/(\s*)$param((:\S+)?\s*)/ /g;
+      $hash->{DEF} =~ s/(\s*)\\$param((:\S+)?\s*)/ /g;
       $hash->{DEF} =~ s/^ //;
       $hash->{DEF} =~ s/ $//;
     } elsif( $param =~ m/^{/) {
@@ -222,6 +222,10 @@ readingsGroup_2html($)
           $m =~ s/\%DEVICE/$name/g;
           $m =~ s/\%READING/$n/g;
           $m =~ s/\%ALIAS/$a/g;
+
+          $m =~ s/\$DEVICE/$name/g;
+          $m =~ s/\$READING/$n/g;
+          $m =~ s/\$ALIAS/$a/g;
         }
 
         $ret .= "<td><div $name_style class=\"dname\"><a href=\"/fhem?detail=$name\">$m</a></div></td>";
@@ -289,6 +293,10 @@ readingsGroup_2html($)
           $m =~ s/\%DEVICE/$name/g;
           $m =~ s/\%READING/$n/g;
           $m =~ s/\%ALIAS/$a/g;
+
+          $m =~ s/\$DEVICE/$name/g;
+          $m =~ s/\$READING/$n/g;
+          $m =~ s/\$ALIAS/$a/g;
         }
 
         $ret .= "<td><div $name_style class=\"xdname\"><a href=\"/fhem?detail=$name\">$m</a></div></td>";
@@ -515,7 +523,7 @@ readingsGroup_Get($@)
         Can be a simple string or a perl expression enclosed in {} that returns a hash that maps reading names to the displayed name.
         The keys can be either the name of the reading or &lt;device&gt;.&lt;reading&gt;.
         %DEVICE, %ALIAS and %READING are replaced by the device name, device alias and reading name respectively, e.g:<br>
-          <code>attr temperatures mapping %DEVICE-%READING</code><br>
+          <code>attr temperatures mapping $DEVICE-$READING</code><br>
           <code>attr temperatures mapping {temperature => "%DEVICE Temperatur"}</code>
         </li>
       <li>separator<br>
