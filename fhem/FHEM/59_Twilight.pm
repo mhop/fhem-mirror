@@ -73,8 +73,7 @@ sub Twilight_Initialize($)
   $hash->{DefFn}   = "Twilight_Define";
   $hash->{UndefFn} = "Twilight_Undef";
   $hash->{GetFn}   = "Twilight_Get";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5 ".
-                      $readingFnAttributes;
+  $hash->{AttrList}= $readingFnAttributes;
 }
 #
 #
@@ -236,7 +235,7 @@ sub Twilight_TwilightTimes($$)
     ($hash->{TW}{$sr}{TIME}, $hash->{TW}{$ss}{TIME})=
        Twilight_calc($latitude, $longitude, $deg, $declination, $timezone, $midseconds, $timediff);
 
-    Log 3, "$hash->{TW}{$sr}{NAME},  $hash->{TW}{$ss}{NAME} are not defined(nan)"      if ($hash->{TW}{$sr}{TIME} eq "nan");
+    Log3 $hash, 3, "$hash->{TW}{$sr}{NAME},  $hash->{TW}{$ss}{NAME} are not defined(nan)"      if ($hash->{TW}{$sr}{TIME} eq "nan");
     $hash->{TW}{$sr}{TIME} += 0.01*$idx                                                if ($hash->{TW}{$sr}{TIME} ne "nan");
     $hash->{TW}{$ss}{TIME} -= 0.01*$idx                                                if ($hash->{TW}{$ss}{TIME} ne "nan");
 
@@ -349,12 +348,10 @@ sub Twilight_fireEvent($)
    my $light    = $hash->{TW}{$sx_name}{LIGHT};
    my $state    = $hash->{TW}{$sx_name}{STATE};
 
-   my $ll = GetLogLevel ($hash->{NAME}, 5);
-   
    my $nextEvent      = $hash->{TW}{$sx_name}{NEXTE};
    my $nextEventTime  = "undefined";
       $nextEventTime  = strftime("%H:%M:%S",localtime($hash->{TW}{$nextEvent}{TIME})) if ($hash->{TW}{$nextEvent}{TIME} ne "nan");
-   Log 3, "[".$hash->{NAME}."] " . sprintf  ("%-10s state=%-2s light=%-2s nextEvent=%-10s %-14s  deg=%+.1f°",$sx_name, $state, $light, $nextEvent, strftime("%d.%m.%Y  %H:%M:%S",localtime($hash->{TW}{$nextEvent}{TIME})), $deg);
+   Log3 $hash, 4, "[".$hash->{NAME}."] " . sprintf  ("%-10s state=%-2s light=%-2s nextEvent=%-10s %-14s  deg=%+.1f°",$sx_name, $state, $light, $nextEvent, strftime("%d.%m.%Y  %H:%M:%S",localtime($hash->{TW}{$nextEvent}{TIME})), $deg);
 
    my $eventTime  = $hash->{TW}{$sx_name}{TIME};
    my $now        = time();
@@ -368,7 +365,7 @@ sub Twilight_fireEvent($)
    readingsBulkUpdate ($hash, "nextEvent",       $nextEvent);
    readingsBulkUpdate ($hash, "nextEventTime",   $nextEventTime);
 
-   my $doNotTrigger  = $hash->{LOCAL};
+   my $doNotTrigger  = ((defined($hash->{LOCAL})) ? 1 : 0);
       $doNotTrigger  = $doNotTrigger   ||   ($delta > 5);
    readingsEndUpdate  ($hash, !$doNotTrigger);
 
@@ -400,7 +397,6 @@ sub Twilight_getWeatherHorizon($)
   my $hash=shift; # 0
 
   my $mod = "[".$hash->{NAME} ."] ";
-  my $ll = GetLogLevel ($hash->{NAME}, 5);
   my @a_current = (25,25,25,25,20,10,10,10,10,10,
                    10, 7, 7, 7, 5,10,10, 6, 6, 6,
                    10, 6 ,6, 6, 6, 6, 6, 5, 5, 3,
@@ -411,7 +407,6 @@ sub Twilight_getWeatherHorizon($)
   my $location=$hash->{WEATHER};
   my $url = "http://weather.yahooapis.com/forecastrss?w=".$location."&u=c";
   my $xml = GetFileFromURL($url, 3, undef, 1);
-  #Log $ll, $mod. "xml:\n" .$xml;
 
   my $current, my $cond, my $temp, my $aktTemp;
   if($xml=~/text="(.*)"(\ *)code="(.*)"(\ *)temp="(.*)"(\ *)date/){
@@ -433,7 +428,7 @@ sub Twilight_getWeatherHorizon($)
    }
   }
 
-  Log 3, "[$hash->{NAME}] "
+  Log3 $hash, 3, "[$hash->{NAME}] "
     ."No Weather location found at yahoo weather for location ID: $location\n"
     ."=======\n"
     .$xml
@@ -460,7 +455,7 @@ sub Twilight_sunpos($)
   ############################
   my $dLongitude = $hash->{LONGITUDE};
   my $dLatitude  = $hash->{LATITUDE};
-  Log 5, "Compute sunpos for latitude $dLatitude , longitude $dLongitude";
+  Log3 $hash, 5, "Compute sunpos for latitude $dLatitude , longitude $dLongitude";
 
   my $pi=3.14159265358979323846;
   my $twopi=(2*$pi);

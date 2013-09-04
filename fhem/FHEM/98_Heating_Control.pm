@@ -38,7 +38,7 @@ Heating_Control_Initialize($)
   $hash->{UndefFn} = "Heating_Control_Undef";
   $hash->{GetFn}   = "Heating_Control_Get";
   $hash->{UpdFn}   = "Heating_Control_Update";
-  $hash->{AttrList}= "disable:0,1 loglevel:0,1,2,3,4,5 ".
+  $hash->{AttrList}= "disable:0,1".
                         $readingFnAttributes;
 }
 
@@ -188,7 +188,7 @@ Heating_Control_Define($$)
       if(!($time =~  m/^[0-2][0-9]:[0-5][0-9]$/g));
 
     for (my $d=0; $d<@days; $d++) {
-      #Log 3, "Switchingtime: $switchingtimes[$i] : $days[$d] -> $time -> $para ";
+      #Log3 $hash, 3, "Switchingtime: $switchingtimes[$i] : $days[$d] -> $time -> $para ";
       $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$time} = $para;
     }
   }
@@ -255,9 +255,6 @@ Heating_Control_Update($)
   my $nextSwitch = 0;
   my $nowSwitch  = 0;
 
-  my $loglevel   = GetLogLevel ($hash->{NAME}, 5);
-  #   $loglevel   = 3;
-
   my $startIdx;
   for (my $d=-1; $d>=-7; $d--) {
      my $wd = ($d+$wday) % 7;
@@ -277,7 +274,7 @@ Heating_Control_Update($)
         my $next = $now + $secondsToSwitch;
 
         if ($secondsToSwitch<=10 && $secondsToSwitch>=-20) {
-           Log $loglevel, $mod." Jetzt:".strftime('%d.%m.%Y %H:%M:%S',localtime($now))." -> Next: ".strftime('%d.%m.%Y %H:%M:%S',localtime($next))." -> Temp: $hash->{helper}{SWITCHINGTIME}{$wd}{$st} ".$secondsToSwitch;
+           Log3 $hash,  4, $mod." Jetzt:".strftime('%d.%m.%Y %H:%M:%S',localtime($now))." -> Next: ".strftime('%d.%m.%Y %H:%M:%S',localtime($next))." -> Temp: $hash->{helper}{SWITCHINGTIME}{$wd}{$st} ".$secondsToSwitch;
         }
         if ($secondsToSwitch<=0) {
           $newDesTemperature =  $hash->{helper}{SWITCHINGTIME}{$wd}{$st};
@@ -297,8 +294,8 @@ Heating_Control_Update($)
   my $command;
   
   #$nextSwitch += get_SummerTimeOffset($now, $nextSwitch);
-  Log $loglevel, $mod .strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch))." ; AktDesiredTemp: $AktDesiredTemp ; newDesTemperature: $newDesTemperature";
-  Log $loglevel, $mod .strftime('%d.%m.%Y %H:%M:%S',localtime($nextSwitch));
+  Log3 $hash, 4, $mod .strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch))." ; AktDesiredTemp: $AktDesiredTemp ; newDesTemperature: $newDesTemperature";
+  Log3 $hash, 4, $mod .strftime('%d.%m.%Y %H:%M:%S',localtime($nextSwitch));
 
   if ($nowSwitch gt "" && $AktDesiredTemp ne $newDesTemperature ) {
     if (defined $hash->{helper}{CONDITION}) {
@@ -314,9 +311,9 @@ Heating_Control_Update($)
     $command =~ s/@/$hash->{DEVICE}/g;
     $command =~ s/%/$newDesTemperature/g;
     $command = SemicolonEscape($command);
-    Log $loglevel, $mod."command: $command";
+    Log3 $hash, 4, $mod."command: $command";
     my $ret  = AnalyzeCommandChain(undef, $command);
-    Log GetLogLevel($name,3), $ret if($ret);
+    Log3 ($hash, 3, $ret) if($ret);
   }
 
   my $active = 1;
@@ -348,9 +345,9 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
         }
      }
      Heating_Control_Update($hash);
-     Log 3, "Heating_Control_Update() for $hash->{NAME} done!";
+     Log3 undef, 3, "Heating_Control_Update() for $hash->{NAME} done!";
   }
-  Log 3, "Heating_Control_SetAllTemps() done!";
+  Log3 undef,  3, "Heating_Control_SetAllTemps() done!";
 }
 
 sub SortNumber {
@@ -448,7 +445,6 @@ sub SortNumber {
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
     <li><a href="#stateFormat">stateFormat</a></li>
@@ -541,7 +537,6 @@ sub SortNumber {
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
     <li><a href="#stateFormat">stateFormat</a></li>
