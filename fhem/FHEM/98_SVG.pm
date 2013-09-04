@@ -64,13 +64,14 @@ SVG_Define($$)
   my ($hash, $def) = @_;
   my ($name, $type, $arg) = split("[ \t]+", $def, 3);
   
-  if(!$arg || $arg !~ m/^(.*):(.*):(.*)$/) {
+  if(!$arg ||
+     !($arg =~ m/^(.*):(.*):(.*)$/ || $arg =~ m/^(.*):(.*)$/)) {
     return "Usage: define <name> SVG <logdevice>:<gnuplot-file>:<logfile>";
   }
 
   $hash->{LOGDEVICE} = $1;
   $hash->{GPLOTFILE} = $2;
-  $hash->{LOGFILE}   = $3;
+  $hash->{LOGFILE}   = ($3 ? $3 : "CURRENT");
   $hash->{STATE} = "initialized";
 
   return undef;
