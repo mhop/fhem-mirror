@@ -47,7 +47,7 @@ my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42); # rAmpl(dB)
 
 my $clientsSlowRF = ":FS20:FHT.*:KS300:USF1000:BS:HMS: " .
                     ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_RFR:CUL_HOERMANN: " .
-                    ":ESA2000:CUL_IR:CUL_TX:";
+                    ":ESA2000:CUL_IR:CUL_TX:Revolt:IT:";
 
 my $clientsHomeMatic = ":CUL_HM:HMS:CUL_IR:";  # OneWire emulated as HMS on a CUNO
 
@@ -68,6 +68,8 @@ my %matchListSlowRF = (
     "C:ESA2000"   => "^S................................\$",
     "D:CUL_IR"    => "^I............",
     "E:CUL_TX"    => "^TX[A-F0-9]{10}",
+    "F:Revolt"    => "^r......................\$",
+    "G:IT"        => "^i......\$",
 );
 my %matchListHomeMatic = (
     "1:CUL_HM" => "^A....................",
@@ -853,7 +855,7 @@ CUL_Parse($$$$$)
   my $rssi;
 
   my $dmsg = $rmsg;
-  if($dmsg =~ m/^[AFTKEHRStZ]([A-F0-9][A-F0-9])+$/) { # RSSI
+  if($dmsg =~ m/^[AFTKEHRStZri]([A-F0-9][A-F0-9])+$/) { # RSSI
     my $l = length($dmsg);
     $rssi = hex(substr($dmsg, $l-2, 2));
     $dmsg = substr($dmsg, 0, $l-2);
@@ -919,7 +921,10 @@ CUL_Parse($$$$$)
       $dmsg = lc($dmsg);
     }
     # Other K... Messages ar sent to CUL_WS
-
+  } elsif($fn eq "r" && $len >= 23) {              # Revolt
+    $dmsg = lc($dmsg);
+  } elsif($fn eq "i" && $len >= 7) {              # IT
+    $dmsg = lc($dmsg);
   } elsif($fn eq "S" && $len >= 33) {              # CUL_ESA / ESA2000 / Native
     ;
   } elsif($fn eq "E" && $len >= 11) {              # CUL_EM / Native
