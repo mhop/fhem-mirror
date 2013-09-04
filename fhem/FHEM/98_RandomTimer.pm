@@ -19,10 +19,10 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#     define t1 RandomTimer  *23:01:10 Zirkulation 23:02:10  100; attr   t1 loglevel 3;
-#     define t2 RandomTimer  *23:01:20 Zirkulation 23:03:20  100; attr   t2 loglevel 3;
-#     define t3 RandomTimer  *23:01:30 Zirkulation 23:04:30  100; attr   t3 loglevel 3;
-#     define t4 RandomTimer  *23:01:40 Zirkulation 23:02:40  100; attr   t4 loglevel 3;
+#     define t1 RandomTimer  *23:01:10 Zirkulation 23:02:10  100; attr   t1 verbose 5;
+#     define t2 RandomTimer  *23:01:20 Zirkulation 23:03:20  100; attr   t2 verbose 5;
+#     define t3 RandomTimer  *23:01:30 Zirkulation 23:04:30  100; attr   t3 verbose 5;
+#     define t4 RandomTimer  *23:01:40 Zirkulation 23:02:40  100; attr   t4 verbose 5;
 #
 ##############################################################################
 package main;
@@ -38,7 +38,7 @@ sub RandomTimer_Initialize($)
 
   $hash->{DefFn}     = "RandomTimer_Define";
   $hash->{UndefFn}   = "RandomTimer_Undef";
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 onCmd offCmd switchmode disable:0,1 disableCond ".
+  $hash->{AttrList}  = "onCmd offCmd switchmode disable:0,1 disableCond ".
                        $readingFnAttributes;
 }
 #
@@ -126,8 +126,6 @@ sub RandomTimer_ExecRepeater($)
     ($thour, $tmin, $tsec) = split(/:/, $hash->{STARTTIME});
   }
 
-  my $logLevel = GetLogLevel ($hash->{NAME}, 5);
-
   my $now = time();
   my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime($now);
 
@@ -156,7 +154,7 @@ sub RandomTimer_ExecRepeater($)
     }
   }
 
-  Log $logLevel, "[".$hash->{NAME}. "]"." Next timer ".strftime("%d.%m.%Y  %H:%M:%S",localtime($timeToExec));
+  Log3 $hash, 4, "[".$hash->{NAME}. "]"." Next timer ".strftime("%d.%m.%Y  %H:%M:%S",localtime($timeToExec));
 
   delete $hash->{ABSCHALTZEIT};
   RemoveInternalTimer($hash);
@@ -170,7 +168,6 @@ sub RandomTimer_Exec($)
 {
   my ($hash) = @_;
 
-  my $ll = GetLogLevel ($hash->{NAME}, 5);
   my $now1 = time();
   my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime($now1);
 
@@ -181,14 +178,14 @@ sub RandomTimer_Exec($)
         $hash->{COMMAND} = "off";
         $hash->{STATE}   = "off";
         fhem ("set $hash->{DEVICE} $hash->{COMMAND}");
-        Log 3, "[".$hash->{NAME}. "]" . " $hash->{DEVICE} disabled - going down ...";
+        Log3 $hash, 3, "[".$hash->{NAME}. "]" . " $hash->{DEVICE} disabled - going down ...";
         delete $hash->{ABSCHALTZEIT};
      } else {
-       Log $ll, "[".$hash->{NAME}. "]" . " $hash->{DEVICE} timer disabled - no start";
+       Log3 $hash, 4, "[".$hash->{NAME}. "]" . " $hash->{DEVICE} timer disabled - no start";
      }
      if ($hash->{REP} gt "") {
         my $midnight = $now1 + 24*3600 - (3600*$hour + 60*$min + $sec);
-        Log $ll, "[".$hash->{NAME}. "]"." Next Timer ".strftime("%d.%m.%Y  %H:%M:%S",localtime($midnight));
+        Log3 $hash, 4, "[".$hash->{NAME}. "]"." Next Timer ".strftime("%d.%m.%Y  %H:%M:%S",localtime($midnight));
         InternalTimer($midnight,      "RandomTimer_ExecRepeater_verzoegert",     $hash, 0);
      }
      return;
@@ -208,10 +205,8 @@ sub RandomTimer_Exec($)
      }
   }
 
-  my $logLevel = GetLogLevel ($hash->{NAME}, 5);
-
   if ($now ge $hash->{ABSCHALTZEIT})  {
-    Log 3, "[".$hash->{NAME}."]"." $hash->{DEVICE} going down ...";
+    Log3 $hash, 3, "[".$hash->{NAME}."]"." $hash->{DEVICE} going down ...";
     $hash->{COMMAND} = "off";
     $hash->{STATE}   = "off";
     fhem ("set $hash->{DEVICE} $hash->{COMMAND}");
@@ -284,11 +279,11 @@ sub abschaltUhrZeitErmitteln ($)
 
    my $timespec_stop  = $hash->{TIMESPEC_STOP};
 
-  Log (3, "Wrong timespec_stop <$timespec_stop>, use \"[+][*]<time or func>\"" )
+  Log3 ($hash, 3, "Wrong timespec_stop <$timespec_stop>, use \"[+][*]<time or func>\"" )
      if($timespec_stop !~ m/^(\+)?(\*)?(.*)$/i);
   my ($srel, $srep, $stspec) = ($1, $2, $3);
   my ($err, $h, $m, $s, $fn) = GetTimeSpec($stspec);
-  Log (3, $err) if($err);
+  Log3 ($hash, 3, $err) if($err);
   $h -=24  if ($h >= 24);
 
   if ($hash->{S_REL}) {
@@ -311,10 +306,8 @@ sub toggleDevice ($)
 
     my $sigma = ($hash->{COMMAND} eq "on") ? $hash->{SIGMAON} : $hash->{SIGMAOFF};
 
-    my $logLevel = GetLogLevel ($hash->{NAME}, 5);
-
     my $zufall = int(rand(1000));
-    Log $logLevel,  "[".$hash->{NAME}."]"." $hash->{COMMAND} $sigma $zufall";
+    Log3 $hash, 4,  "[".$hash->{NAME}."]"." Zustand:$hash->{COMMAND} sigma:$sigma random:$zufall";
 
     if ($zufall <= $sigma ) {
        $hash->{COMMAND}  = ($hash->{COMMAND} eq "on") ? "off" : "on";
@@ -327,10 +320,10 @@ sub toggleDevice ($)
        }
        $command =~ s/@/$hash->{DEVICE}/g;
        $command = SemicolonEscape($command);
-       Log $logLevel, "[".$hash->{NAME}. "]"." command: $command";
+       Log3 $hash, 4, "[".$hash->{NAME}. "]"." command: $command";
 
        my $ret  = AnalyzeCommandChain(undef, $command);
-       Log GetLogLevel($hash->{NAME},3), $ret if($ret);
+       Log3 ($hash, 3, $ret)                  if($ret);
     }
     $hash->{STATE} = $hash->{COMMAND};
 }
@@ -347,7 +340,7 @@ sub get_switchmode ($) {
    my $switchmode = AttrVal($hash->{NAME}, $attr, $default);
 
    if(!($switchmode =~  m/^([0-9]{3,3})\/([0-9]{3,3})$/i)) {
-      Log 1, $mod . "invalid switchMode <$switchmode>, use 999/999";
+      Log3 undef, 3, $mod . "invalid switchMode <$switchmode>, use 999/999";
       $attr{$hash->{NAME}}{$attr} = $default;
    } else {
       my ($sigmaoff, $sigmaon) = ($1, $2);
@@ -360,7 +353,6 @@ sub get_switchmode ($) {
 sub RandomTimer_disable($) {
 
    my ($hash) = @_;
-   my $logLevel = GetLogLevel ($hash->{NAME}, 5);
 
    my $disable     = AttrVal($hash->{NAME}, "disable",     0 );
    my $disableCond = AttrVal($hash->{NAME}, "disableCond", "");
