@@ -208,7 +208,7 @@ PCA301_Parse($$)
 
   $rhash->{PCA301_lastRcv} = TimeNow();
 
-  my $readonly = AttrVal($name, "readonly", "0" );
+  my $readonly = AttrVal($rname, "readonly", "0" );
 
   if( $cmd eq 0x04 ) {
     my $state = $data==0x00?"off":"on";
