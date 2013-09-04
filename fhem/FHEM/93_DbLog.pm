@@ -404,10 +404,10 @@ DbLog_Log($$)
           for (my $i=0; $i<int(@v1); $i++) {
             my @v2 = split(/:/, $v1[$i]);
             $DoIt = 0 if(!$v2[1] && $reading =~ m/^$v2[0]$/); #Reading matcht auf Regexp, kein MinIntervall angegeben
-            if(($reading =~ m/^$v2[0]$/) && ($v2[1] =~ m/^(\d+)$/)) {
+            if(($v2[1] && $reading =~ m/^$v2[0]$/) && ($v2[1] =~ m/^(\d+)$/)) {
               #Regexp matcht und MinIntervall ist angegeben
-              my $lt = $defs{$dev->{NAME}}{'.userReadings'}{$reading}{"DBLOG_".$log->{NAME}}{TIME};
-              my $lv = $defs{$dev->{NAME}}{'.userReadings'}{$reading}{"DBLOG_".$log->{NAME}}{VALUE};
+              my $lt = $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$log->{NAME}}{TIME};
+              my $lv = $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$log->{NAME}}{VALUE};
               $lt = 0 if(!$lt);
               $lv = "" if(!$lv);
 
@@ -420,8 +420,8 @@ DbLog_Log($$)
         }
         next if($DoIt == 0);
 
-        $defs{$dev->{NAME}}{'.userReadings'}{$reading}{"DBLOG_".$log->{NAME}}{TIME}  = $now;
-        $defs{$dev->{NAME}}{'.userReadings'}{$reading}{"DBLOG_".$log->{NAME}}{VALUE} = $value;
+        $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$log->{NAME}}{TIME}  = $now;
+        $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$log->{NAME}}{VALUE} = $value;
 
         my @is= ($ts, $n, $t, $s, $reading, $value, $unit);
 
