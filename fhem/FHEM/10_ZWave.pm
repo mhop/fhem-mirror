@@ -66,8 +66,8 @@ my %zwave_class = (
   SCENE_ACTUATOR_CONF      => { id => '2C', },
   SCENE_CONTROLLER_CONF    => { id => '2D', },
   ZIP_ADV_SERVICES         => { id => '2F', },
-  SCENE_ACTIVATION         => { id => '2b', },
-  ZIP_CLIENT               => { id => '2e', },
+  SCENE_ACTIVATION         => { id => '2B', },
+  ZIP_CLIENT               => { id => '2E', },
   SENSOR_BINARY            => { id => '30', 
     get   => { sbStatus    => "02",       },
     parse => { "03300300"  => "state:closed",
@@ -120,9 +120,9 @@ my %zwave_class = (
   LOCK                     => { id => '76', },
   NODE_NAMING              => { id => '77', },
   GROUPING_NAME            => { id => '7B', },
-  FIRMWARE_UPDATE_MD       => { id => '7a', },
+  FIRMWARE_UPDATE_MD       => { id => '7A', },
   REMOTE_ASSOCIATION_ACTIVATE => { id => '7c', },
-  REMOTE_ASSOCIATION       => { id => '7d', },
+  REMOTE_ASSOCIATION       => { id => '7D', },
   BATTERY                  => { id => '80',
     get   => { battery     => "02" },
     parse => { "038003(..)"=> '"battery:".hex($1)." %"' }, },
@@ -151,7 +151,7 @@ my %zwave_class = (
   GEOGRAPHIC_LOCATION      => { id => '8C', },
   COMPOSITE                => { id => '8D', },
   MULTI_CMD                => { id => '8F', },
-  TIME                     => { id => '8a', },
+  TIME                     => { id => '8A', },
   MULTI_CHANNEL_ASSOCIATION=> { id => '8E', }, # aka MULTI_INSTANCE_ASSOCIATION
   ENERGY_PRODUCTION        => { id => '90', },
   MANUFACTURER_PROPRIETARY => { id => '91', },
@@ -168,8 +168,8 @@ my %zwave_class = (
   SENSOR_ALARM             => { id => '9C', },
   SENSOR_CONFIGURATION     => { id => '9E', },
   SILENCE_ALARM            => { id => '9d', },
-  MARK                     => { id => 'ef', },
-  NON_INTEROPERABLE        => { id => 'f0', },
+  MARK                     => { id => 'EF', },
+  NON_INTEROPERABLE        => { id => 'F0', },
   );
 my %zwave_cmdArgs = (
   dim => "slider,0,1,100",
@@ -190,7 +190,7 @@ ZWave_Initialize($)
     "ignore:1,0 dummy:1,0 showtime:1,0 classes ".
     "$readingFnAttributes " .
     "model:".join(",", sort @zwave_models);
-  map { $zwave_id2class{$zwave_class{$_}{id}} = $_ } keys %zwave_class;
+  map { $zwave_id2class{uc($zwave_class{$_}{id})} = $_ } keys %zwave_class;
 }
 
 
@@ -394,7 +394,8 @@ ZWave_SetClasses($$$$)
 
   my @classes;
   for my $classId (grep /../, split(/(..)/, lc($classes))) {
-    push @classes, $zwave_id2class{$classId} if($zwave_id2class{$classId});
+    push @classes, $zwave_id2class{uc($classId)} ? 
+        $zwave_id2class{uc($classId)} : "UNKNOWN_".uc($classId);
   }
   my $name = $def->{NAME};
   $attr{$name}{classes} = join(" ", @classes) if(@classes);
@@ -418,7 +419,8 @@ ZWave_mcCapability($$)
 
   my @classes;
   for my $classId (@l) {
-    push @classes, $zwave_id2class{$classId} if($zwave_id2class{$classId});
+    push @classes, $zwave_id2class{uc($classId)} ? 
+        $zwave_id2class{uc($classId)} : "UNKNOWN_".uc($classId);
   }
   return "mcCapability_$chid:no classes" if(!@classes);
 
@@ -506,7 +508,8 @@ ZWave_Parse($$@)
   }
 
 
-  my $className = $zwave_id2class{$class} ? $zwave_id2class{$class} : "UNKNOWN";
+  my $className = $zwave_id2class{uc($class)} ?
+                $zwave_id2class{uc($class)} : "UNKNOWN_".uc($class);
   my $ptr = $zwave_class{$className}{parse} if($zwave_class{$className}{parse});
   if(!$ptr) {
     Log3 $ioName, 4, "$hash->{NAME}: Unknown message ($className $arg)";
