@@ -472,7 +472,7 @@ readingsGroup_Get($@)
 
     Notes:
     <ul>
-      <li>&lt;device&gt; can be of the form INTERNAL=VALUE where INTERNAL is an internal value and VALUE is a regex.</li>
+      <li>&lt;device&gt; can be of the form INTERNAL=VALUE where INTERNAL is the name of an internal value and VALUE is a regex.</li>
       <li>If regex starts with a + it will be matched against the internal values of the device instead of the readings.</li>
       <li>For internal values no longpoll update is possible. Refresh the page to update the values.</li>
     </ul><br>
