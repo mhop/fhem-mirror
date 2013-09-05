@@ -81,6 +81,9 @@ my %zwave_class = (
   HRV_STATUS               => { id => '37', },
   THERMOSTAT_HEATING       => { id => '38', },
   HRV_CONTROL              => { id => '39', },
+  METER_TBL_CONFIG         => { id => '3C', },
+  METER_TBL_MONITOR        => { id => '3D', },
+  METER_TBL_PUSH           => { id => '3E', },
   THERMOSTAT_MODE          => { id => '40', },
   THERMOSTAT_OPERATING_STATE => { id => '42', },
   THERMOSTAT_SETPOINT      => { id => '43', },
@@ -88,9 +91,11 @@ my %zwave_class = (
   THERMOSTAT_FAN_STATE     => { id => '45', },
   CLIMATE_CONTROL_SCHEDULE => { id => '46', },
   THERMOSTAT_SETBACK       => { id => '47', },
+  DOOR_LOCK_LOGGING        => { id => '4C', },
+  SCHEDULE_ENTRY_LOCK      => { id => '4E', },
   BASIC_WINDOW_COVERING    => { id => '50', },
   MTP_WINDOW_COVERING      => { id => '51', },
-  MULTI_CHANNEL            => { id => '60',     # Version 2!
+  MULTI_CHANNEL            => { id => '60',  # Version 2, aka MULTI_INSTANCE
     get   => { mcEndpoints => "07",     # Endpoints
                mcCapability=> "09%02x"},
     parse => { "^046008(..)(..)" => '"mcEndpoints:total ".hex($2).'.
@@ -147,7 +152,7 @@ my %zwave_class = (
   COMPOSITE                => { id => '8D', },
   MULTI_CMD                => { id => '8F', },
   TIME                     => { id => '8a', },
-  MULTI_CHANNEL_ASSOCIATION=> { id => '8E', },
+  MULTI_CHANNEL_ASSOCIATION=> { id => '8E', }, # aka MULTI_INSTANCE_ASSOCIATION
   ENERGY_PRODUCTION        => { id => '90', },
   MANUFACTURER_PROPRIETARY => { id => '91', },
   SCREEN_MD                => { id => '92', },
