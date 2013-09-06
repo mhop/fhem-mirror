@@ -62,12 +62,12 @@ my %zwave_class = (
   SWITCH_ALL               => { id => '27', },
   SWITCH_TOGGLE_BINARY     => { id => '28', },
   SWITCH_TOGGLE_MULTILEVEL => { id => '29', },
-  CHIMNEY_FAN              => { id => '2A', },
-  SCENE_ACTUATOR_CONF      => { id => '2C', },
-  SCENE_CONTROLLER_CONF    => { id => '2D', },
-  ZIP_ADV_SERVICES         => { id => '2F', },
-  SCENE_ACTIVATION         => { id => '2B', },
-  ZIP_CLIENT               => { id => '2E', },
+  CHIMNEY_FAN              => { id => '2a', },
+  SCENE_ACTIVATION         => { id => '2b', },
+  SCENE_ACTUATOR_CONF      => { id => '2c', },
+  SCENE_CONTROLLER_CONF    => { id => '2d', },
+  ZIP_CLIENT               => { id => '2e', },
+  ZIP_ADV_SERVICES         => { id => '2f', },
   SENSOR_BINARY            => { id => '30', 
     get   => { sbStatus    => "02",       },
     parse => { "03300300"  => "state:closed",
@@ -81,18 +81,22 @@ my %zwave_class = (
   HRV_STATUS               => { id => '37', },
   THERMOSTAT_HEATING       => { id => '38', },
   HRV_CONTROL              => { id => '39', },
-  METER_TBL_CONFIG         => { id => '3C', },
-  METER_TBL_MONITOR        => { id => '3D', },
-  METER_TBL_PUSH           => { id => '3E', },
+  METER_TBL_CONFIG         => { id => '3c', },
+  METER_TBL_MONITOR        => { id => '3d', },
+  METER_TBL_PUSH           => { id => '3e', },
   THERMOSTAT_MODE          => { id => '40', },
-  THERMOSTAT_OPERATING_STATE => { id => '42', },
-  THERMOSTAT_SETPOINT      => { id => '43', },
+  THERMOSTAT_OPERATING_STATE=>{ id => '42', },
+  THERMOSTAT_SETPOINT      => { id => '43',
+    get   => { setpoint => "02" },
+    parse => { "064303(..)(..)(....)" => 'sprintf("temperature:%0.1f %s %s", '.
+                 'hex($3)/(10**int(hex($2)/32)), '.
+                 'hex($2)&8 ? "F":"C", $1==1 ? "heating":"cooling")' }, },
   THERMOSTAT_FAN_MODE      => { id => '44', },
   THERMOSTAT_FAN_STATE     => { id => '45', },
   CLIMATE_CONTROL_SCHEDULE => { id => '46', },
   THERMOSTAT_SETBACK       => { id => '47', },
-  DOOR_LOCK_LOGGING        => { id => '4C', },
-  SCHEDULE_ENTRY_LOCK      => { id => '4E', },
+  DOOR_LOCK_LOGGING        => { id => '4c', },
+  SCHEDULE_ENTRY_LOCK      => { id => '4e', },
   BASIC_WINDOW_COVERING    => { id => '50', },
   MTP_WINDOW_COVERING      => { id => '51', },
   MULTI_CHANNEL            => { id => '60',  # Version 2, aka MULTI_INSTANCE
@@ -119,10 +123,10 @@ my %zwave_class = (
   PROTECTION               => { id => '75', },
   LOCK                     => { id => '76', },
   NODE_NAMING              => { id => '77', },
-  GROUPING_NAME            => { id => '7B', },
-  FIRMWARE_UPDATE_MD       => { id => '7A', },
-  REMOTE_ASSOCIATION_ACTIVATE => { id => '7c', },
-  REMOTE_ASSOCIATION       => { id => '7D', },
+  FIRMWARE_UPDATE_MD       => { id => '7a', },
+  GROUPING_NAME            => { id => '7b', },
+  REMOTE_ASSOCIATION_ACTIVATE=>{id => '7c', },
+  REMOTE_ASSOCIATION       => { id => '7d', },
   BATTERY                  => { id => '80',
     get   => { battery     => "02" },
     parse => { "038003(..)"=> '"battery:".hex($1)." %"' }, },
@@ -147,12 +151,12 @@ my %zwave_class = (
   INDICATOR                => { id => '87', },
   PROPRIETARY              => { id => '88', },
   LANGUAGE                 => { id => '89', },
-  TIME_PARAMETERS          => { id => '8B', },
-  GEOGRAPHIC_LOCATION      => { id => '8C', },
-  COMPOSITE                => { id => '8D', },
-  MULTI_CMD                => { id => '8F', },
-  TIME                     => { id => '8A', },
-  MULTI_CHANNEL_ASSOCIATION=> { id => '8E', }, # aka MULTI_INSTANCE_ASSOCIATION
+  TIME                     => { id => '8a', },
+  TIME_PARAMETERS          => { id => '8b', },
+  GEOGRAPHIC_LOCATION      => { id => '8c', },
+  COMPOSITE                => { id => '8d', },
+  MULTI_CHANNEL_ASSOCIATION=> { id => '8e', }, # aka MULTI_INSTANCE_ASSOCIATION
+  MULTI_CMD                => { id => '8f', }, # Handled in Parse
   ENERGY_PRODUCTION        => { id => '90', },
   MANUFACTURER_PROPRIETARY => { id => '91', },
   SCREEN_MD                => { id => '92', },
@@ -163,13 +167,14 @@ my %zwave_class = (
   AV_CONTENT_SEARCH_MD     => { id => '97', },
   SECURITY                 => { id => '98', },
   AV_TAGGING_MD            => { id => '99', },
-  IP_CONFIGURATION         => { id => '9A', },
-  ASSOCIATION_COMMAND_CONFIGURATION => { id => '9B', },
-  SENSOR_ALARM             => { id => '9C', },
-  SENSOR_CONFIGURATION     => { id => '9E', },
+  IP_CONFIGURATION         => { id => '9a', },
+  ASSOCIATION_COMMAND_CONFIGURATION
+                           => { id => '9b', },
+  SENSOR_ALARM             => { id => '9c', },
   SILENCE_ALARM            => { id => '9d', },
-  MARK                     => { id => 'EF', },
-  NON_INTEROPERABLE        => { id => 'F0', },
+  SENSOR_CONFIGURATION     => { id => '9e', },
+  MARK                     => { id => 'ef', },
+  NON_INTEROPERABLE        => { id => 'f0', },
   );
 my %zwave_cmdArgs = (
   dim => "slider,0,1,100",
@@ -190,7 +195,7 @@ ZWave_Initialize($)
     "ignore:1,0 dummy:1,0 showtime:1,0 classes ".
     "$readingFnAttributes " .
     "model:".join(",", sort @zwave_models);
-  map { $zwave_id2class{uc($zwave_class{$_}{id})} = $_ } keys %zwave_class;
+  map { $zwave_id2class{lc($zwave_class{$_}{id})} = $_ } keys %zwave_class;
 }
 
 
@@ -380,6 +385,7 @@ ZWave_ParseMeter($)
   return "$txt:$v3 $unit";
 }
 
+
 sub
 ZWave_SetClasses($$$$)
 {
@@ -394,8 +400,8 @@ ZWave_SetClasses($$$$)
 
   my @classes;
   for my $classId (grep /../, split(/(..)/, lc($classes))) {
-    push @classes, $zwave_id2class{uc($classId)} ? 
-        $zwave_id2class{uc($classId)} : "UNKNOWN_".uc($classId);
+    push @classes, $zwave_id2class{lc($classId)} ? 
+        $zwave_id2class{lc($classId)} : "UNKNOWN_".lc($classId);
   }
   my $name = $def->{NAME};
   $attr{$name}{classes} = join(" ", @classes) if(@classes);
@@ -419,8 +425,8 @@ ZWave_mcCapability($$)
 
   my @classes;
   for my $classId (@l) {
-    push @classes, $zwave_id2class{uc($classId)} ? 
-        $zwave_id2class{uc($classId)} : "UNKNOWN_".uc($classId);
+    push @classes, $zwave_id2class{lc($classId)} ? 
+        $zwave_id2class{lc($classId)} : "UNKNOWN_".uc($classId);
   }
   return "mcCapability_$chid:no classes" if(!@classes);
 
@@ -497,9 +503,6 @@ ZWave_Parse($$@)
     $id = "$id$1";
     $arg = sprintf("%02x$3", length($3)/2);
   }
-
-  return if($arg !~ m/^..(..)/);
-  my $class = $1;
   my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
   if(!$hash) {
     $id = hex($id);
@@ -507,21 +510,40 @@ ZWave_Parse($$@)
     return "";
   }
 
-
-  my $className = $zwave_id2class{uc($class)} ?
-                $zwave_id2class{uc($class)} : "UNKNOWN_".uc($class);
-  my $ptr = $zwave_class{$className}{parse} if($zwave_class{$className}{parse});
-  if(!$ptr) {
-    Log3 $ioName, 4, "$hash->{NAME}: Unknown message ($className $arg)";
-    return "";
-  }
-
   my @event;
-  foreach my $k (keys %{$ptr}) {
-    if($arg =~ m/$k/) {
-      my $val = $ptr->{$k};
-      $val = eval $val if(index($val, '$') >= 0);
-      push @event, $val;
+  my @args = ($arg); # MULTI_CMD handling
+
+  while(@args) {
+    $arg = shift(@args);
+
+    return if($arg !~ m/^..(..)/);
+    my $class = $1;
+
+    my $className = $zwave_id2class{lc($class)} ?
+                  $zwave_id2class{lc($class)} : "UNKNOWN_".uc($class);
+    if($className eq "MULTI_CMD") {
+       my ($ncmd, $off) = (0, 4);
+       while(length($arg) > $off*2) {
+         my $l = hex(substr($arg, $off*2, 2))+1;
+         push @args, substr($arg, $off*2, $l*2);
+         $off += $l;
+       }
+       next;
+    }
+
+    my $ptr = $zwave_class{$className}{parse}
+                        if($zwave_class{$className}{parse});
+    if(!$ptr) {
+      Log3 $hash, 4, "$hash->{NAME}: Unknown message ($className $arg)";
+      next;
+    }
+
+    foreach my $k (keys %{$ptr}) {
+      if($arg =~ m/$k/) {
+        my $val = $ptr->{$k};
+        $val = eval $val if(index($val, '$') >= 0);
+        push @event, $val;
+      }
     }
   }
 
