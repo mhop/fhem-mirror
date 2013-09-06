@@ -17,7 +17,7 @@ sub readingsGroup_Initialize($)
   $hash->{UndefFn}  = "readingsGroup_Undefine";
   #$hash->{SetFn}    = "readingsGroup_Set";
   $hash->{GetFn}    = "readingsGroup_Get";
-  $hash->{AttrList} = "mapping separator style nameStyle valueStyle valueFormat timestampStyle noheading:1 notime:1 nostate:1";
+  $hash->{AttrList} = "nameIcons mapping separator style nameStyle valueStyle valueFormat timestampStyle noheading:1 notime:1 nostate:1";
 
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
@@ -113,6 +113,30 @@ sub readingsGroup_Undefine($$)
   return undef;
 }
 
+sub lookup($$$$$)
+{
+  my($mapping,$name,$alias,$reading,$default) = @_;
+
+  if( $mapping ) {
+    if( ref($mapping) eq 'HASH' ) {
+      $default = $mapping->{$name} if( defined($mapping) && defined($mapping->{$name}) );
+      $default = $mapping->{$reading} if( defined($mapping) && defined($mapping->{$reading}) );
+      $default = $mapping->{$name.".".$reading} if( defined($mapping) && defined($mapping->{$name.".".$reading}) );
+    } else {
+      $default = $mapping;
+    }
+
+    $default =~ s/\%ALIAS/$alias/g;
+    $default =~ s/\%DEVICE/$name/g;
+    $default =~ s/\%READING/$reading/g;
+
+    $default =~ s/\$ALIAS/$alias/g;
+    $default =~ s/\$READING/$name/g;
+    $default =~ s/\$DEVICE/$reading/g;
+  }
+
+  return $default;
+}
 sub
 readingsGroup_2html($)
 {
@@ -142,6 +166,11 @@ readingsGroup_2html($)
   my $mapping = AttrVal( $d, "mapping", "");
   $mapping = eval $mapping if( $mapping =~ m/^{.*}$/ );
   #$mapping = undef if( ref($mapping) ne 'HASH' );
+
+  my $nameIcons = AttrVal( $d, "nameIcons", "");
+  $nameIcons = eval $nameIcons if( $nameIcons =~ m/^{.*}$/ );
+  #$nameIcons = undef if( ref($nameIcons) ne 'HASH' );
+
 
   my $devices = $hash->{DEVICES};
 
@@ -173,9 +202,6 @@ readingsGroup_2html($)
 
         my $v = FW_htmlEscape($val);
 
-        $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
-        $row++;
-
         my $name_style = $name_style;
         if(defined($name_style) && $name_style =~ m/^{.*}$/) {
           my $DEVICE = $name;
@@ -206,29 +232,24 @@ readingsGroup_2html($)
             my $VALUE = $v;
             $value_format = eval $value_format;
           }
+
+          next if( !defined($value_format) );
+
           $v = sprintf( $value_format, $v ) if( $value_format );
         }
 
         my $a = AttrVal($name, "alias", $name);
         my $m = "$a$separator$n";
+        my $txt = lookup($mapping,$name,$a,$n,$m);
 
-        if( $mapping ) {
-          if( ref($mapping) eq 'HASH' ) {
-            $m = $mapping->{$n} if( defined($mapping) && defined($mapping->{$n}) );
-            $m = $mapping->{$name.".".$n} if( defined($mapping) && defined($mapping->{$name.".".$n}) );
-          } else {
-            $m = $mapping;
-          }
-          $m =~ s/\%DEVICE/$name/g;
-          $m =~ s/\%READING/$n/g;
-          $m =~ s/\%ALIAS/$a/g;
-
-          $m =~ s/\$DEVICE/$name/g;
-          $m =~ s/\$READING/$n/g;
-          $m =~ s/\$ALIAS/$a/g;
+        if( my $icon = lookup($nameIcons,$name,$a,$n,$m) ) {
+          $txt = FW_makeImage( $icon, $txt, "icon" );
         }
 
-        $ret .= "<td><div $name_style class=\"dname\"><a href=\"/fhem?detail=$name\">$m</a></div></td>";
+        $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
+        $row++;
+
+        $ret .= "<td><div $name_style class=\"dname\"><a href=\"/fhem?detail=$name\">$txt</a></div></td>";
         $ret .= "<td><div $value_style\">$v</div></td>";
         $ret .= "<td><div></div>$fmtDateTime</td>" if( $show_time );
       }
@@ -244,9 +265,6 @@ readingsGroup_2html($)
         $v = FW_htmlEscape($v);
         $t = "" if(!$t);
 
-        $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
-        $row++;
-
         my $name_style = $name_style;
         if(defined($name_style) && $name_style =~ m/^{.*}$/) {
           my $DEVICE = $name;
@@ -277,29 +295,24 @@ readingsGroup_2html($)
             my $VALUE = $v;
             $value_format = eval $value_format;
           }
+
+          next if( !defined($value_format) );
+
           $v = sprintf( $value_format, $v ) if( $value_format );
         }
 
         my $a = AttrVal($name, "alias", $name);
         my $m = "$a$separator$n";
+        my $txt = lookup($mapping,$name,$a,$n,$m);
 
-        if( $mapping ) {
-          if( ref($mapping) eq 'HASH' ) {
-            $m = $mapping->{$n} if( defined($mapping) && defined($mapping->{$n}) );
-            $m = $mapping->{$name.".".$n} if( defined($mapping) && defined($mapping->{$name.".".$n}) );
-          } else {
-            $m = $mapping;
-          }
-          $m =~ s/\%DEVICE/$name/g;
-          $m =~ s/\%READING/$n/g;
-          $m =~ s/\%ALIAS/$a/g;
-
-          $m =~ s/\$DEVICE/$name/g;
-          $m =~ s/\$READING/$n/g;
-          $m =~ s/\$ALIAS/$a/g;
+        if( my $icon = lookup($nameIcons,$name,$a,$n,$m) ) {
+          $txt = FW_makeImage( $icon, $txt, "icon" );
         }
 
-        $ret .= "<td><div $name_style class=\"xdname\"><a href=\"/fhem?detail=$name\">$m</a></div></td>";
+        $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
+        $row++;
+
+        $ret .= "<td><div $name_style class=\"dname\"><a href=\"/fhem?detail=$name\">$txt</a></div></td>";
         $ret .= "<td><div $value_style informId=\"$d-$name.$n\">$v</div></td>";
         $ret .= "<td><div $timestamp_style informId=\"$d-$name.$n-ts\">$t</div></td>" if( $show_time );
       }
@@ -539,7 +552,8 @@ readingsGroup_Get($@)
         Specify an HTML style for the reading values, e.g.:<br>
           <code>attr temperatures valueStyle style="text-align:right"</code></li>
       <li>valueFormat<br>
-        Specify an sprintf style format string used to display the reading values. Can be given as a string,
+        Specify an sprintf style format string used to display the reading values. If the format string is undef
+        this reading will be skipped. Can be given as a string,
         a perl expression returninga hash or a perl expression returning a string, e.g.:<br>
           <code>attr temperatures valueFormat %.1f &deg;C</code></br>
           <code>attr temperatures valueFormat { temperature => "%.1f &deg;C", humidity => "%.1f %" }</code></br>
