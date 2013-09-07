@@ -131,8 +131,8 @@ sub lookup($$$$$)
     $default =~ s/\%READING/$reading/g;
 
     $default =~ s/\$ALIAS/$alias/g;
-    $default =~ s/\$READING/$name/g;
-    $default =~ s/\$DEVICE/$reading/g;
+    $default =~ s/\$DEVICE/$name/g;
+    $default =~ s/\$READING/$reading/g;
   }
 
   return $default;
@@ -242,8 +242,10 @@ readingsGroup_2html($)
         my $m = "$a$separator$n";
         my $txt = lookup($mapping,$name,$a,$n,$m);
 
-        if( my $icon = lookup($nameIcons,$name,$a,$n,$m) ) {
-          $txt = FW_makeImage( $icon, $txt, "icon" );
+        if( $nameIcons ) {
+          if( my $icon = lookup($nameIcons,$name,$a,$n,"") ) {
+            $txt = FW_makeImage( $icon, $txt, "icon" );
+          }
         }
 
         $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
@@ -305,8 +307,10 @@ readingsGroup_2html($)
         my $m = "$a$separator$n";
         my $txt = lookup($mapping,$name,$a,$n,$m);
 
-        if( my $icon = lookup($nameIcons,$name,$a,$n,$m) ) {
-          $txt = FW_makeImage( $icon, $txt, "icon" );
+        if( $nameIcons ) {
+          if( my $icon = lookup($nameIcons,$name,$a,$n,"") ) {
+            $txt = FW_makeImage( $icon, $txt, "icon" );
+          }
         }
 
         $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
@@ -558,6 +562,10 @@ readingsGroup_Get($@)
           <code>attr temperatures valueFormat %.1f &deg;C</code></br>
           <code>attr temperatures valueFormat { temperature => "%.1f &deg;C", humidity => "%.1f %" }</code></br>
           <code>attr temperatures valueFormat { ($READING eq 'temperature')?"%.1f &deg;C":undef }</code></li>
+      <li>nameIcon<br>
+        Specify an icon to be used instead of the reading name. Can be a simple string or a perl expression enclosed
+        in {} that returns a hash that maps reading names to the icon name. e.g.:<br>
+          <code>attr devices nameIcon $DEVICE</code></li>
     </ul><br>
 
       The nameStyle and valueStyle attributes can also contain a perl expression enclosed in {} that returns the style string to use. The perl code can use $DEVICE,$READING and $VALUE, e.g.:<br>
