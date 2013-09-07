@@ -301,7 +301,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   <li>
   die Befehlszeile kann die selbe Ger&auml;tebezeichnung mehrfach enthalten z.B.: &quot;set 
   lamp1-lamp3, lamp3 on&quot;.
-  Lamp3 wird hier zwei Mal eingeschalten.</span></li>
+  Lamp3 wird hier zwei Mal eingeschalten.</li>
   <li>um Strukturen mit komplexeren Anforderungen zu realisieren lesen Sie bitte 
   den Abschnitt zu <a href="#structure">
       structure</a>.
@@ -386,13 +386,11 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     <li>showtime<br>
       Wird im FHEMWEB verwendet, um die Zeit der letzten Aktivit&auml;t
       anstelle des Status in der Gesamtansicht anzuzeigen.  N&uuml;tzlich z.B.
-      f&uuml;r FS20 PIRI Ger&auml;te.</span>
+      f&uuml;r FS20 PIRI Ger&auml;te.
     </li>
 
-    <br><br>
-
     <a name="readingFnAttributes"></a>
-    <b>readingFnAttribute</b><br>
+    <h4>readingFnAttribute</h4>
     Die folgenden Attribute werden bei Modulen verwendet, die standardisierte
     "readings" Aktualisierung der fhem.pl benutzen. Informieren Sie sich in der
     Liste der Modulattribute wenn Sie wissen m&ouml;chten ob dies
@@ -422,10 +420,11 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
     "readings".  Wenn gesetzt, erzeugen nur Ver&auml;nderungen der gelisteten
     "readings" ein Ereignis. Wenn die aktualiserten Werte der gelisteten
-    "readings" identisch sind, wird kein Ereignis generiert.</li><p> Die
-    unterschiedlichen Bedeutungen von event-on-update-reading und
-    event-on-change-reading sind folgende</span>:
-    <ul>
+    "readings" identisch sind, wird kein Ereignis generiert.</li>
+
+    Die unterschiedlichen Bedeutungen von event-on-update-reading und
+    event-on-change-reading sind folgende:
+    <ol>
     <li>Wenn beide Attribute nicht gesetzt sind erzeugt jede Aktualisierung
         eines jeden "readings" eines Ger&auml;tes ein Ereignis.</li>
     <li>Wenn eines der Attribute gesetzt ist, erzeugen nur Updates oder
@@ -434,7 +433,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     <li>Wenn ein "reading" in event-on-update-reading aufgef&uuml;hrt ist,
         erzeugt eine Aktualisierung ein Ereignis unabh&auml;ngig ob das
         "reading" auch in event-on-change-reading aufgelistet ist.</li>
-    </ul><br></li>
+    </ol>
 
     <a name="event-min-interval"></a>
     <li>event-min-interval<br>
@@ -442,7 +441,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     "readings:minInterval" Paare. readings kann ein regexp sein. Ein Event wird
     nur dann generiert, falls seit dem letzten Auftreten des gleichen Events
     mindestens minInterval Sekunden vergangen sind.
-    </li><br>
+    </li>
 
     <a name="userReadings"></a>
     <li>userReadings<br>

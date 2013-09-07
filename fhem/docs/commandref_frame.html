@@ -377,12 +377,13 @@ A line ending with \ will be concatenated with the next one, so long lines
         devices.
     </li>
 
-    <br>
     <a name="readingFnAttributes"></a>
-    <b>readingFnAttributes</b><br>
+    <h4>readingFnAttributes</h4>
     The following attributes are honored by the modules that make use
     of the standardized readings updating mechanism in fhem.pl. Check the
     modules attribute list if you want to know if it is supporting it.
+    <br>
+    <br>
 
     <a name="stateFormat"></a>
     <li>stateFormat<br>
@@ -409,17 +410,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     expressions in that list. If set, only changes of the listed readings
     create events. In other words, if a reading listed here is updated with the
     new value identical to the old value, no event is created.
-    </li><br>
-
-    <a name="event-min-interval"></a>
-    <li>event-min-interval<br>
-    This attribute takes a comma-separated list of reading:minInterval pairs.
-    You may use regular expressions for reading. Events will only be
-    generated, if at least minInterval seconds elapsed since the last reading
-    of the matched type.
-    </li><br>
-
-
+    </li>
     The precedence of event-on-update-reading and event-on-change-reading is as
     follows:
     <ol>
@@ -430,7 +421,15 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li>If a reading is listed in event-on-update-reading, an update of the
         reading creates an event no matter whether the reading is also listed
         in event-on-change-reading.</li>
-    </ol><br>
+    </ol>
+
+    <a name="event-min-interval"></a>
+    <li>event-min-interval<br>
+    This attribute takes a comma-separated list of reading:minInterval pairs.
+    You may use regular expressions for reading. Events will only be
+    generated, if at least minInterval seconds elapsed since the last reading
+    of the matched type.
+    </li>
 
     <a name="userReadings"></a>
     <li>userReadings<br>
