@@ -2713,7 +2713,7 @@ Dispatch($$$)
   my $iohash = $modules{$hash->{TYPE}}; # The phyiscal device module pointer
   my $name = $hash->{NAME};
 
-  Log 5, "$name dispatch $dmsg";
+  Log3 $hash, 5, "$name dispatch $dmsg";
 
   my ($isdup, $idx) = CheckDuplicate($name, $dmsg, $iohash->{FingerprintFn});
   return rejectDuplicate($name,$idx,$addvals) if($isdup);
@@ -3336,12 +3336,12 @@ readingsEndUpdate($$)
           $result= $deltav/$deltat;
         }
       } elsif($modifier eq "offset") {
-        $oldvalue= 0 if( !defined($oldvalue) );
+        $oldvalue = $value if( !defined($oldvalue) );
         $result = ReadingsVal($name,$userReading,0);
         $result += $oldvalue if( $value < $oldvalue );
       } elsif($modifier eq "monotonic") {
-        $oldvalue= 0 if( !defined($oldvalue) );
-        $result = ReadingsVal($name,$userReading,0);
+        $oldvalue = $value if( !defined($oldvalue) );
+        $result = ReadingsVal($name,$userReading,$value);
         $result += $value - $oldvalue if( $value > $oldvalue );
       } 
       readingsBulkUpdate($hash,$userReading,$result,1) if(defined($result));
