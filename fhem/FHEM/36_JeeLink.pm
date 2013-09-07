@@ -415,10 +415,10 @@ JeeLink_Parse($$$$)
 
   next if(!$dmsg || length($dmsg) < 1);            # Bogus messages
   return if($dmsg =~ m/^Available commands:/ );    # ignore startup messages
-  return if($dmsg =~ m/^  .* - / );                # ignore startup messages
+  return if($dmsg =~ m/^  / );                     # ignore startup messages
   return if($dmsg =~ m/^-> ack/ );                 # ignore send ack
 
-  if($dmsg =~ m/^\[pcaSerial/ ) {
+  if($dmsg =~ m/^\[/ ) {
     $hash->{VERSION} = $dmsg;
     return;
   }
