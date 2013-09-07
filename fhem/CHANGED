@@ -1,4 +1,5 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
+  - feature: readingsGroup: new attribute nameIcon
   - feature: readingsGroup: allow device selecton by TYPE=xxx
   - feature: new module Revolt for Revolt NC-5462 power metering devices.
              (by mehf)
