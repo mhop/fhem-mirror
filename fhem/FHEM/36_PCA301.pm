@@ -216,8 +216,8 @@ PCA301_Parse($$)
     my $consumption = ($bytes[8]*256 + $bytes[9]) / 100.0;
     $state = $power if( $readonly );
     readingsBeginUpdate($rhash);
-    readingsBulkUpdate($rhash, "power", $power) if( $data != 0x00 || ReadingsVal($rname,"power",0) != $power );
-    readingsBulkUpdate($rhash, "consumption", $consumption) if( ReadingsVal($rname,"consumption",0) != $consumption );
+    readingsBulkUpdate($rhash, "power", $power) if( $data != 0x00 );
+    readingsBulkUpdate($rhash, "consumption", $consumption) if( $data != 0x00 );
     readingsBulkUpdate($rhash, "state", $state) if( Value($rname) ne $state );
     readingsEndUpdate($rhash,1);
   } elsif( $cmd eq 0x05 ) {
