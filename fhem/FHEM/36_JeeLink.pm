@@ -414,10 +414,14 @@ JeeLink_Parse($$$$)
   #Log3, $name, 5, "$name: $dmsg $rssi $lqi";
 
   next if(!$dmsg || length($dmsg) < 1);            # Bogus messages
-  return if($dmsg =~ m/^\[pcaSerial/ );              # ignore startup messages
-  return if($dmsg =~ m/^Available commands:/ );      # ignore startup messages
-  return if($dmsg =~ m/^  .* - / );                  # ignore startup messages
-  return if($dmsg =~ m/^-> ack/ );                   # ignore send ack
+  return if($dmsg =~ m/^Available commands:/ );    # ignore startup messages
+  return if($dmsg =~ m/^  .* - / );                # ignore startup messages
+  return if($dmsg =~ m/^-> ack/ );                 # ignore send ack
+
+  if($dmsg =~ m/^\[pcaSerial/ ) {
+    $hash->{VERSION} = $dmsg;
+    return;
+  }
 
   $hash->{"${name}_MSGCNT"}++;
   $hash->{"${name}_TIME"} = TimeNow();
