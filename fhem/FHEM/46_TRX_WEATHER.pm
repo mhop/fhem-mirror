@@ -577,7 +577,8 @@ sub TRX_WEATHER_common_temphydro {
   	#Log3 undef, 1,"TRX_WEATHER: TFA 9";
 		$dev_str .= $DOT."9"; 
 	}
-  } elsif ($bytes->[4] > 0) {
+  }
+  if ($dev_type ne "TFATS34C" && $bytes->[4] > 0) {
   	$dev_str .= $DOT.sprintf("%d", $bytes->[4]);
   }
 
