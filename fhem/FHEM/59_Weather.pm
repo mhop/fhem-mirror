@@ -142,7 +142,7 @@ sub Weather_Initialize($) {
   $hash->{AttrList}= "localicons ".
                       $readingFnAttributes;
 
-  Weather_DebugCodes();                    
+  #Weather_DebugCodes();                    
 }
 
 ###################################
