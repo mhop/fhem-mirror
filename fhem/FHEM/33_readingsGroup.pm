@@ -17,7 +17,7 @@ sub readingsGroup_Initialize($)
   $hash->{UndefFn}  = "readingsGroup_Undefine";
   #$hash->{SetFn}    = "readingsGroup_Set";
   $hash->{GetFn}    = "readingsGroup_Get";
-  $hash->{AttrList} = "nameIcons mapping separator style nameStyle valueStyle valueFormat timestampStyle noheading:1 notime:1 nostate:1";
+  $hash->{AttrList} = "nameIcons mapping separator style nameStyle valueStyle valueFormat timestampStyle noheading:1 nolinks:1 notime:1 nostate:1";
 
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
@@ -148,6 +148,7 @@ readingsGroup_2html($)
   my $d = $hash->{NAME};
 
   my $show_heading = !AttrVal( $d, "noheading", "0" );
+  my $show_links = !AttrVal( $d, "nolinks", "0" );
   my $show_state = !AttrVal( $d, "nostate", "0" );
   my $show_time = !AttrVal( $d, "notime", "0" );
 
@@ -178,7 +179,9 @@ readingsGroup_2html($)
 
   my $row = 1;
   $ret .= "<table>";
-  $ret .= "<tr><td><div class=\"devType\"><a href=\"/fhem?detail=$d\">".AttrVal($d, "alias", $d)."</a></div></td></tr>" if( $show_heading );
+  my $txt = AttrVal($d, "alias", $d);
+  $txt = "<a href=\"/fhem?detail=$d\">$txt</a>" if( $show_links );
+  $ret .= "<tr><td><div class=\"devType\">$txt</a></div></td></tr>" if( $show_heading );
   $ret .= "<tr><td><table $style class=\"block wide\">";
   foreach my $device (@{$devices}) {
     my $h = $defs{@{$device}[0]};
@@ -251,7 +254,8 @@ readingsGroup_2html($)
         $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
         $row++;
 
-        $ret .= "<td><div $name_style class=\"dname\"><a href=\"/fhem?detail=$name\">$txt</a></div></td>";
+        $txt = "<a href=\"/fhem?detail=$name\">$txt</a>" if( $show_links );
+        $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>";
         $ret .= "<td><div $value_style\">$v</div></td>";
         $ret .= "<td><div></div>$fmtDateTime</td>" if( $show_time );
       }
@@ -316,7 +320,8 @@ readingsGroup_2html($)
         $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
         $row++;
 
-        $ret .= "<td><div $name_style class=\"dname\"><a href=\"/fhem?detail=$name\">$txt</a></div></td>";
+        $txt = "<a href=\"/fhem?detail=$name\">$txt</a>" if( $show_links );
+        $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>";
         $ret .= "<td><div $value_style informId=\"$d-$name.$n\">$v</div></td>";
         $ret .= "<td><div $timestamp_style informId=\"$d-$name.$n-ts\">$t</div></td>" if( $show_time );
       }
@@ -532,6 +537,8 @@ readingsGroup_Get($@)
     <ul>
       <li>noheading<br>
         If set to 1 the readings table will have no heading.</li>
+      <li>nolinks<br>
+        Disables the html links from the heading and the reading names.</li>
       <li>nostate<br>
         If set to 1 the state reading is excluded.</li>
       <li>notime<br>
