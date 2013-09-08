@@ -55,9 +55,9 @@ my @YahooCodes_en = (
        'scattered snow showers', 'heavy snow', 'partly cloudy', 'thundershowers', 'snow showers', 'isolated thundershowers');
 
 my @YahooCodes_de = (
-       'Tornado', 'schwerer Sturm', 'Sturm', 'schwere Gewitter', 'Gewitter', 'Regen und Schnee',
+       'Tornado', 'schwerer Sturm', 'Orkan', 'schwere Gewitter', 'Gewitter', 'Regen und Schnee',
        'Regen und Graupel', 'Schnee und Graupel', 'Eisregen', 'Nieselregen', 'gefrierender Regen' ,'Schauer',
-       'Schauer', 'Schneetreiben', 'leichter Schneeschauer', 'Schneeverwehungen', 'Schnee', 'Hagel',
+       'Schauer', 'Schneetreiben', 'leichte Schneeschauer', 'Schneeverwehungen', 'Schnee', 'Hagel',
        'Graupel', 'Staub', 'Nebel', 'Dunst', 'Smog', 'Sturm',
        'windig', 'kalt', 'wolkig',
        'überwiegend wolkig', # night
@@ -66,8 +66,8 @@ my @YahooCodes_de = (
        'teilweise wolkig', # day
        'klar', # night
        'sonnig',
-       'bewölkt', # night
-       'bewölkt', # day
+       'schön', # night
+       'schön', # day
        'Regen und Hagel',
        'heiß', 'einzelne Gewitter', 'vereinzelt Gewitter', 'vereinzelt Gewitter', 'vereinzelt Schauer', 'starker Schneefall',
        'vereinzelt Schneeschauer', 'starker Schneefall', 'teilweise wolkig', 'Gewitterregen', 'Schneeschauer', 'vereinzelt Gewitter');
@@ -76,7 +76,7 @@ my @YahooCodes_nl = (
        'tornado', 'zware storm', 'orkaan', 'hevig onweer', 'onweer',
        'regen en sneeuw',
        'regen en ijzel', 'sneeuw en ijzel', 'aanvriezende motregen',
-       'motregen', 'aanvriezende regen' ,'regenbuien',
+       'motregen', 'aanvriezende regen' ,'buien',
        'buien', 'sneeuw windstoten', 'lichte sneeuwbuien',
        'stuifsneeuw', 'sneeuw', 'hagel',
        'ijzel', 'stof', 'mist', 'waas', 'smog', 'heftig',
@@ -87,8 +87,8 @@ my @YahooCodes_nl = (
        'gedeeltelijk bewolkt', # day
        'helder', #night
        'zonnig',
-       'bewolkt', #night
-       'bewolkt', #day
+       'mooi', #night
+       'mooi', #day
        'regen en hagel',
        'heet', 'plaatselijk onweer', 'af en toe onweer', 'af en toe onweer', 'af en toe regenbuien', 'hevige sneeuwval',
        'af en toe sneeuwbuien', 'hevige sneeuwval', 'deels bewolkt',
@@ -112,12 +112,23 @@ my %wdays_txt_nl = ('Mon' => 'Maa', 'Tue' => 'Din', 'Wed'=> 'Woe', 'Thu' => 'Don
 my @iconlist = (
        'storm', 'storm', 'storm', 'thunderstorm', 'thunderstorm', 'rainsnow',
        'sleet', 'snow', 'drizzle', 'drizzle', 'icy' ,'chance_of_rain',
-       'chance_of_rain', 'snowflurries', 'chance_of_snow', 'heavysnow', 'snow', 'heavyrain',
+       'chance_of_rain', 'snowflurries', 'chance_of_snow', 'heavysnow', 'snow', 'sleet',
        'sleet', 'dust', 'fog', 'haze', 'smoke', 'flurries',
        'windy', 'icy', 'cloudy', 'mostlycloudy_night', 'mostlycloudy', 'partly_cloudy_night',
-       'partly_cloudy', 'clear', 'sunny', 'mostly_clear_night', 'overcast', 'heavyrain',
+       'partly_cloudy', 'clear', 'sunny', 'mostly_clear_night', 'clear', 'heavyrain',
        'clear', 'scatteredthunderstorms', 'scatteredthunderstorms', 'scatteredthunderstorms', 'scatteredshowers', 'heavysnow',
        'chance_of_snow', 'heavysnow', 'partly_cloudy', 'heavyrain', 'chance_of_snow', 'scatteredshowers');
+
+###################################
+sub Weather_DebugCodes() {
+
+  Debug "Weather Code List, see http://developer.yahoo.com/weather/#codes";
+  for(my $c= 0; $c<= 47; $c++) {
+    Debug sprintf("%2d %30s %30s %30s %30s", $c, $iconlist[$c], $YahooCodes_en[$c], $YahooCodes_de[$c], $YahooCodes_nl[$c]);
+  }
+
+}
+
 
 #####################################
 sub Weather_Initialize($) {
@@ -131,6 +142,7 @@ sub Weather_Initialize($) {
   $hash->{AttrList}= "localicons ".
                       $readingFnAttributes;
 
+  #Weather_DebugCodes();                    
 }
 
 ###################################
