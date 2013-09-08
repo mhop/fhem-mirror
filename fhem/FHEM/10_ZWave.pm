@@ -72,7 +72,13 @@ my %zwave_class = (
     get   => { sbStatus    => "02",       },
     parse => { "03300300"  => "state:closed",
                "033003ff"  => "state:open",  },},
-  SENSOR_MULTILEVEL        => { id => '31', },
+  SENSOR_MULTILEVEL        => { id => '31', 
+    get   => { smStatus    => "04" },
+    parse => { "06310501(..)(....)" => 'sprintf("temperature:%0.1f %s",'.
+                      'hex($2)/(10**int(hex($1)/32)), '.
+                      'hex($1)&8 ? "F":"C")',
+               "05310505(..)(..)" => 'sprintf("humidity:%0.1f %%", '.
+                      'hex($2)/(10**int(hex($1)/32)))'},},
   METER                    => { id => '32',
     parse => { "..3202(.*)"=> 'ZWave_ParseMeter($1)' }, },
   ZIP_ADV_SERVER           => { id => '33', },
@@ -130,7 +136,8 @@ my %zwave_class = (
   BATTERY                  => { id => '80',
     get   => { battery     => "02" },
     parse => { "038003(..)"=> '"battery:".hex($1)." %"' }, },
-  CLOCK                    => { id => '81', },
+  CLOCK                    => { id => '81',
+    parse => { "028105"=> "clock:get" }, },
   HAIL                     => { id => '82', },
   WAKE_UP                  => { id => '84', 
     set   => { wakeupInterval => "04%06x%02x" },
@@ -701,6 +708,11 @@ ZWave_Undef($$)
     return the status of the node, as state:open or state:closed.
     </li>
 
+  <br><br><b>Class SENSOR_MULTILEVEL</b>
+  <li>smStatus<br>
+    request data from the node (temperature/humidity/etc)
+    </li>
+
   <br><br><b>Class CONFIGURATION</b>
   <li>config cfgAddress<br>
     return the value of the configuration parameter cfgAddress. The value is
@@ -733,6 +745,11 @@ ZWave_Undef($$)
   <li>version<br>
     return the version information of this node in the form:<br>
     Lib A Prot x.y App a.b
+    </li>
+
+  <br><br><b>Class THERMOSTAT_SETPOINT</b>
+  <li>setpoint<br>
+    request the setpoint
     </li>
 
   <br><br><b>Class MULTI_CHANNEL</b>
@@ -789,6 +806,11 @@ ZWave_Undef($$)
   <li>state:open</li>
   <li>state:closed</li>
 
+  <br><br><b>Class SENSOR_MULTILEVEL</b>
+  <li>temperature:$temp [C|F]</li>
+  <li>humidity:$hum %</li>
+
+
   <br><br><b>Class METER</b>
   <li>power:val [kWh|kVAh|W|pulseCount]</li>
   <li>gas:val [m3|feet3|pulseCount]</li>
@@ -813,9 +835,15 @@ ZWave_Undef($$)
   <br><br><b>Class VERSION</b>
   <li>version:Lib A Prot x.y App a.b</li>
 
+  <br><br><b>Class THERMOSTAT_SETPOINT</b>
+  <li>temperature:$temp [C|F] [heating|cooling]</li>
+
   <br><br><b>Class MULTI_CHANNEL</b>
   <li>endpoints:total X $dynamic $identical</li>
   <li>mcCapability_X:class1 class2 ...</li>
+
+  <br><br><b>Class CLOCK</b>
+  <li>clock:get</li>
 
   </ul>
 </ul>
