@@ -264,22 +264,39 @@ sub HMinfo_SetFn($@) {#########################################################
   }
   elsif($cmd eq "protoEvents"){##print protocol-events-------------------------
 	my @paramList;
+	my @IOlist;
 	foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
 	  my $id = $defs{$dName}{DEF};
-      my ($found,$para) = HMinfo_getParam($id,"protState","protCmdPend","protSnd",
-	                          "protLastRcv","protResndFail","protResnd","protNack");
+      my ($found,$para) = HMinfo_getParam($id
+	                         ,"protState","protCmdPend"
+	                         ,"protSnd","protLastRcv","protResnd"
+							 ,"protResndFail","protNack","protIOerr");
 	  $para =~ s/( last_at|20..-|\|)//g;
       my @pl = split "\t",$para;
 	  $_ =~ s/\s+$|//g foreach (@pl);
-	  $para = sprintf("%-20s%-22s|%-18s|%-18s|%-14s|%-18s|%-18s|%-18s",
-	                  $pl[0],$pl[1],$pl[2],$pl[3],$pl[4],$pl[5],$pl[6],$pl[7]);
-      push @paramList,$para;
+	  push @paramList, sprintf("%-20s%-22s|%-18s|%-18s|%-14s|%-18s|%-18s|%-18s|%-18s",
+	                  $pl[0],$pl[1],$pl[2],$pl[3],$pl[4],$pl[5],$pl[6],$pl[7],$pl[8]);
+	  push @IOlist,$defs{$pl[0]}{IODev}->{NAME};
 	}
-	my $hdr = sprintf("%-20s:%-21s|%-18s|%-18s|%-14s|%-18s|%-18s|%-18s",
-	                  "name","protState","protCmdPend","protSnd",
-	                  "protLastRcv","protResndFail","protResnd","protNack");
+	my $hdr = sprintf("%-20s:%-21s|%-18s|%-18s|%-14s|%-18s|%-18s|%-18s|%-18s",
+	                         ,"name"
+	                         ,"protState","protCmdPend"
+	                         ,"protSnd","protLastRcv","protResnd"
+							 ,"protResndFail","protNack","protIOerr");
 	$ret = $cmd." done:" ."\n    ".$hdr  ."\n    ".(join "\n    ",sort @paramList)
 	       ;
+	$ret .= "\n\n    CUL_HM queue:$modules{CUL_HM}{prot}{rspPend}";
+	$ret .= "\n    autoRegRead pending:".
+	            join(",",@{$modules{CUL_HM}{helper}{autoRdCfgLst}}) 
+			if ($modules{CUL_HM}{helper}{autoRdCfgLst});
+	@IOlist = HMinfo_noDup(@IOlist);
+	foreach(@IOlist){
+	  $_ .= ":".$defs{$_}{STATE}.
+	        (defined $defs{$_}{helper}{q}{answerPend}?
+			  " pending=".$defs{$_}{helper}{q}{answerPend} :
+			  "");
+	}
+	$ret .= "\n    IODevs:".(join"\n           ",HMinfo_noDup(@IOlist));
   }
   elsif($cmd eq "rssi")       {##print RSSI protocol-events--------------------
 	my @rssiList;
@@ -642,18 +659,13 @@ sub HMinfo_status($){##########################################################
 	push @updates,"ERR_$read:".$d;
   }
 
-  my %allE; # remove duplicates
-  $allE{$_}=0 foreach (grep !//, @errNames);
-  @errNames = sort keys %allE;
+  @errNames = grep !/^$/,HMinfo_noDup(@errNames);
   $hash->{ERR_names} = join",",@errNames if(@errNames);# and name entities
-#  push @updates,":".$hash->{ERR_names} if(@errNames);
 
   push @updates,"C_sumDefined:"."entities:$nbrE device:$nbrD channel:$nbrC virtual:$nbrV";
   # ------- display status of action detector ------
   push @updates,"I_actTotal:".$modules{CUL_HM}{defptr}{"000000"}{STATE};
-#  push @updates,"ERR_actTotal:".$modules{CUL_HM}{defptr}{"000000"}{STATE};
   $hash->{ERRactNames} = join",",@Anames if (@Anames);
-#  push @updates,":".$hash->{ERRactNames} if(@Anames);
   
   # ------- what about IO devices??? ------
   my %tmp; # remove duplicates
@@ -664,7 +676,6 @@ sub HMinfo_status($){##########################################################
     $_ .= " :".$defs{$_}{READINGS}{cond}{VAL};
   }
   $hash->{I_HM_IOdevices}= join",",@IOdev;
-#  push @updates,":".$hash->{I_HM_IOdevices};
   
   # ------- what about protocol events ------
   # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
@@ -676,16 +687,11 @@ sub HMinfo_status($){##########################################################
   push @tpw,"$_:$protW{$_}" foreach (grep {$protW{$_}} keys(%protW));
   push @updates,"W__protocol:".join",",@tpw       if(@tpw);
 
-  my %all; # remove duplicates
-  $all{$_}=0 foreach (grep !//,@protNamesE);
-  @protNamesE = sort keys %all;
+  @protNamesE = grep !/^$/,HMinfo_noDup(@protNamesE);;
   $hash->{ERR__protoNames} = join",",@protNamesE if(@protNamesE);
-#  push @updates,":".$hash->{ERR__protoNames} if(@protNamesE);
 
-  $all{$_}=0 foreach (grep !//,@protNamesW);
-  @protNamesW = sort keys %all;
+  @protNamesW = grep !/^$/,HMinfo_noDup(@protNamesW);
   $hash->{W__protoNames} = join",",@protNamesW if(@protNamesW);
-#  push @updates,":".$hash->{W__protoNames} if(@protNamesW);
 
   if (defined $modules{CUL_HM}{helper}{autoRdCfgLst} &&
       @{$modules{CUL_HM}{helper}{autoRdCfgLst}}>0){
@@ -1054,6 +1060,14 @@ sub HMinfo_cpRegs(@){#########################################################
   my ($ret,undef) = CUL_HM_Set($defs{$dstCh},$dstCh,"regBulk",$srcRegLn,split(" ",$srcData));
   return $ret;
 }
+sub HMinfo_noDup(@) {#return list with no duplicates
+  my %all;
+  return "" if (scalar(@_) == 0);
+  $all{$_}=0 foreach (grep !/^$/,@_);
+  delete $all{""}; #remove empties if present
+  return (sort keys %all);
+}
+
 1;
 =pod
 =begin html

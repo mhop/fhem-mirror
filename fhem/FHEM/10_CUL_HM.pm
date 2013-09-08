@@ -117,6 +117,12 @@ sub CUL_HM_putHash($);
 
 # ----------------modul globals-----------------------
 my $respRemoved; # used to control trigger of stack processing
+my $IOpoll     = 0.2;# poll speed to scan IO device out of order
+my $IOpolltout = 60; # poll timeout - stop poll and discard if to late
+
+my $maxPendCmds = 10;  #number of parallel requests
+my $autoConfDly = 5;   # delay autoConf readings
+
                  # need to take care that ACK is first
 #+++++++++++++++++ startup, init, definition+++++++++++++++++++++++++++++++++++
 sub CUL_HM_Initialize($) {
@@ -148,10 +154,14 @@ sub CUL_HM_Initialize($) {
   $hash->{AttrList}  .= " model:"  .join(",", sort @modellist);
   $hash->{AttrList}  .= " subType:".join(",",
                CUL_HM_noDup(map { $culHmModel{$_}{st} } keys %culHmModel));
+
+  $hash->{prot}{rspPend} = 0;#count Pending responses
+
   CUL_HM_initRegHash();
 }
 
 sub CUL_HM_reqStatus($){
+ return if(!defined$modules{CUL_HM}{helper}{reqStatus});
   while(@{$modules{CUL_HM}{helper}{reqStatus}}){
     my $name = shift(@{$modules{CUL_HM}{helper}{reqStatus}});
 	CUL_HM_Set($defs{$name},$name,"statusRequest");
@@ -171,7 +181,9 @@ sub CUL_HM_autoReadConfig($){
 	  CUL_HM_Set($hash,$name,"getSerial");
 	  CUL_HM_Set($hash,$name,"getConfig");
 	  CUL_HM_Set($hash,$name,"statusRequest");
-	  InternalTimer(gettimeofday()+15,"CUL_HM_autoReadConfig","autoRdCfg",0);
+	  InternalTimer(gettimeofday()+$autoConfDly
+	                ,"CUL_HM_autoReadConfig"
+					,"autoRdCfg",0);
 	  last;
 	}
   }
@@ -542,7 +554,6 @@ sub CUL_HM_Parse($$) {##############################
     return $name; #return something to please dispatcher
   }
   $shash->{lastMsg} = $msgX;
-#  $iohash->{HM_CMDNR} = hex($mNo) if($dst eq $id);# updt message cnt to rec
   delete $shash->{helper}{rpt};# new message, rm recent ack
   my @ack; # ack and responses, might be repeated
   
@@ -553,10 +564,15 @@ sub CUL_HM_Parse($$) {##############################
   push @event, "powerOn"   if($parse eq "powerOn");
   push @event, ""          if($parse eq "parsed"); # msg is parsed but may
                                                    # be processed further 
-  if ($parse =~ s/entities://){#common generated trigger for some entities
-    push @entities,split(",",$parse);
+  foreach my $r (split";",$parse){
+    if ($r =~ s/entities://){#common generated trigger for some entities
+      push @entities,split(",",$r);
+    }
+	else{
+	  $parse = $r;
+	}
   }
-  
+
   if ($parse eq "ACK"){# remember - ACKinfo will be passed on
     push @event, "";
   }
@@ -904,12 +920,8 @@ sub CUL_HM_Parse($$) {##############################
 	  my $chId = $src.$chn;
       $shash = $modules{CUL_HM}{defptr}{$chId} 
 	                         if($modules{CUL_HM}{defptr}{$chId});
-	  if ($err&0x40 && $chn eq "02"){
-        push @event, "timedOn:running";
-	  }
-	  else{
-        push @event, "timedOn:off";
-	  }
+							 
+      push @event, "timedOn:".(($err&0x40 && $chn eq "02")?"running":"off");
 	  
 	  my $mdCh = $md.$chn;
 	  if($lvlStr{mdCh}{$mdCh} && $lvlStr{mdCh}{$mdCh}{$val}){
@@ -1016,12 +1028,8 @@ sub CUL_HM_Parse($$) {##############################
       $eventName = "motor"   if($st eq "blindActuator");
 	  $eventName = "dim"     if($st eq "dimmer");
 	  my $action; #determine action
-	  if ($err&0x40){
-        push @event, "timedOn:running";
-	  }
-	  else{
-        push @event, "timedOn:off" if ($shash->{READINGS}{timedOn});
-	  }
+      push @event, "timedOn:".($err&0x40)?"running":"off";
+
 	  if ($st ne "switch"){
         push @event, "$eventName:up:$vs"   if(($err&0x30) == 0x10);
         push @event, "$eventName:down:$vs" if(($err&0x30) == 0x20);
@@ -1537,19 +1545,16 @@ sub CUL_HM_parseCommon(@){#####################################################
 			if ($rssi && $rssi ne '00' && $rssi ne'80');
 	  $reply = "ACKStatus"; 
 	  if ($shash->{helper}{tmdOn}){
-        my $timedOn = hex(substr($p,6,2))&0x40?1:0;
-		if (not hex(substr($p,6,2))&0x40){# not timed on, we have to repeat
+		if (not hex(substr($p,6,2))&0x40){# not timedOn, we have to repeat
           my ($pre,$nbr,$msg) = unpack 'A4A2A*',$shash->{helper}{respWait}{cmd};
-          $shash->{helper}{respWait}{cmd} = sprintf("%s%02X%s",$pre,hex($nbr)+1,$msg);
-		  # General changes pending aproval
-#	      CUL_HM_eventP($shash,"TimedOn");
-#	      $success = "no";
-#		  $repeat = 1;
-#	      $reply = "NACK"; 
-		  Log 1,"General missed timedOn for ".$chnhash->{NAME};
+          $shash->{helper}{respWait}{cmd} = sprintf("%s%02X%s",
+		                                            $pre,hex($nbr)+1,$msg);
+	      CUL_HM_eventP($shash,"TimedOn");
+	      $success = "no";
+		  $repeat = 1;
+	      $reply = "NACK"; 
 		}
 	  }
-
 	}
 	else{	  #ACK
 	  $success = "yes";
@@ -1592,7 +1597,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 		
     	CUL_HM_ID2PeerList ($chnNname,$_,1) foreach (@peers);
 		if (grep /00000000/,@peers) {# last entry, peerList is complete
-          CUL_HM_respPendRm($shash);		  
+          CUL_HM_respPendRm($shash);	  
 		  # check for request to get List3 data
 		  my $reqPeer = $chnhash->{helper}{getCfgList};
 		  if ($reqPeer){
@@ -1664,10 +1669,14 @@ sub CUL_HM_parseCommon(@){#####################################################
 		  CUL_HM_updtRegDisp($chnHash,$list,
 		        CUL_HM_peerChId($peer,
 						substr($chnHash->{DEF},0,6),"00000000"));
+		  $ret = "done;entities:$chnName";
 		}
 		else{
 		  CUL_HM_respPendToutProlong($shash);#wasn't last - reschedule timer
+		  $ret = "done";
 		}
+	  }
+	  else{#response without request - discard
 		$ret = "done";
 	  }
 	}  
@@ -1868,13 +1877,11 @@ sub CUL_HM_Get($@) {
 	  my @regValList; #storage of results
 	  my $regHeader = "list:peer\tregister         :value\n";
 	  foreach my $regName (@regArr){
-	    Log 1,"Gegeral process $regName";
 	    my $regL  = $culHmRegDefine{$regName}->{l};
 		my @peerExe = (grep (/$regL/,@listWp))?@peers:("00000000");
 		foreach my $peer(@peerExe){
 		  next if($peer eq "");
 	      my $regVal= CUL_HM_getRegFromStore($name,$regName,0,$peer);#determine
-	    Log 1,"Gegeral get $regName p:$peer v:$regVal";
 		  my $peerN = CUL_HM_id2Name($peer);
 		  $peerN = "      " if ($peer  eq "00000000");
 		  push @regValList,sprintf("   %d:%s\t%-16s :%s\n",
@@ -2013,6 +2020,7 @@ sub CUL_HM_Set($@) {
 
   my @h;
   @h = split(" ", $h) if($h);
+  my @postCmds=(); #Commands to be appended after regSet (ugly...)
   
   if(!defined($h) && defined($culHmSubTypeSets{$st}{pct}) && $cmd =~ m/^\d+/) {
 	splice @a, 1, 0,"pct";#insert the actual command
@@ -2091,13 +2099,14 @@ sub CUL_HM_Set($@) {
   }
   elsif($cmd =~ m /(displayMode|displayTemp|displayTempUnit|controlMode|decalcDay)/) {
     splice @a,1,3, ("regSet",$a[1],$a[2]);
+	push @postCmds,"++803F$id${dst}0204".sprintf("%02X",CUL_HM_secSince2000());
   }
   elsif($cmd eq "partyMode") { ################################################
     my $days = $a[3]; 
 	my ($eH,$eM)  = split(':',$a[2]); 
 	return "use 00 or 30 minutes only" if ($eM !~ m/^(00|30)$/);
 	return "hour must be between 0 and 23" if ($eH lt 0 || $eH gt 23);
-	return "days must be between 0 and 200" if ($days lt 0 || $days gt 200);
+	return "days must be between 0 and 200" if ($days < 0 || $days > 200);
 	$eH += 128 if ($eM eq "30");
 	my $cHash = CUL_HM_id2Hash($dst."02");
 	$cHash->{helper}{partyReg} = sprintf("61%02X62%02X0000",$eH,$days);
@@ -2113,6 +2122,7 @@ sub CUL_HM_Set($@) {
 	CUL_HM_pushConfig($hash,$id,$dst,2,"000000","00",6,
 	                  sprintf("61%02X62%02X",$eH,$days));
     splice @a,1,3, ("regSet","controlMode","party");
+	push @postCmds,"++803F$id${dst}0204".sprintf("%02X",CUL_HM_secSince2000());
   } 
 
   $cmd = $a[1];# get converted command
@@ -2136,7 +2146,8 @@ sub CUL_HM_Set($@) {
 	  delete $hash->{READINGS};
 	}
 	elsif($sect eq "msgEvents"){
-	  CUL_HM_respPendRm($hash);
+	  CUL_HM_respPendRm($hash);		  
+
 	  delete ($hash->{helper}{burstEvtCnt});
 	  delete ($hash->{cmdStack});
 	  delete ($hash->{EVENTS});
@@ -2144,6 +2155,11 @@ sub CUL_HM_Set($@) {
 	  my $protLastRcv = $hash->{protLastRcv} if ($hash->{protLastRcv});
       delete ($hash->{$_}) foreach (grep(/^prot/,keys %{$hash}));
 	  $hash->{protLastRcv} = $protLastRcv if ($protLastRcv);
+	  if ($modules{CUL_HM}{$hash->{IODev}{NAME}} && 
+	      $modules{CUL_HM}{$hash->{IODev}{NAME}}{pendDev}){
+		@{$modules{CUL_HM}{$hash->{IODev}{NAME}}{pendDev}} = 
+		      grep !/$name/,@{$modules{CUL_HM}{$hash->{IODev}{NAME}}{pendDev}};
+	  }
 	  CUL_HM_protState($hash,"Info_Cleared");
 	}
 	elsif($sect eq "rssi"){
@@ -2352,6 +2368,8 @@ sub CUL_HM_Set($@) {
 	$cHash = $hash if (!$cHash);
     CUL_HM_pushConfig($cHash,$id,$dst,$lChn,$peerId,hex($peerChn),$list
 	                 ,$addrData,$prep);
+
+    CUL_HM_PushCmdStack($hash,$_) foreach(@postCmds);#ugly commands after regSet
   } 
   elsif($cmd eq "level") { ####################################################
 	#level        =>"<level> <relockDly> <speed>..."
@@ -2371,9 +2389,6 @@ sub CUL_HM_Set($@) {
   elsif($cmd =~ m/^(on|off|toggle)$/) { #######################################
     my $lvl = ($cmd eq 'on')  ? 'C8':
 	         (($cmd eq 'off') ? '00':(CUL_HM_getChnLvl($name) != 0 ?"00":"C8"));
-	if($st eq "blindActuator") { # need to stop blind to protect relais
-	  CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'03'.$chn)
-	}
     CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."02$chn$lvl".'0000');
 	$hash = $chnHash; # report to channel if defined
   }
@@ -2424,9 +2439,6 @@ sub CUL_HM_Set($@) {
 	if ($st eq "dimmer"){# at least blind cannot stand ramp time...
       $tval = $a[3]?CUL_HM_encodeTime16($a[3]):"FFFF";# onTime 0.05..85825945.6, 0=forever
       $rval = CUL_HM_encodeTime16((@a > 4)?$a[4]:2.5);# rampTime 0.0..85825945.6, 0=immediate
-	}
-	elsif($st eq "blindActuator") { # need to stop blind to protect relais
-	  CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'03'.$chn)
 	}
     CUL_HM_PushCmdStack($hash,sprintf("++%s11%s%s02%s%02X%s%s",
 	                                 $flag,$id,$dst,$chn,$lvl*2,$rval,$tval));
@@ -2797,7 +2809,8 @@ sub CUL_HM_Set($@) {
 	}
 	else{#serve internal channels for actor
 	  my $pChn = $chn; # simple device, only one button per channel
-	  $pChn = (($vChn && $vChn eq "off")?-1:0) + $chn*2 if($st eq 'blindActuator'||$st eq 'dimmer');
+	  $pChn = (($vChn && $vChn eq "off")?-1:0) + $chn*2 
+	          if($st eq 'blindActuator'||$st eq 'dimmer');
       CUL_HM_PushCmdStack($hash, sprintf("++%s3E%s%s%s40%02X%02X",$flag,
 	                                 $id,$dst,$dst,
                                      $pChn+(($mode && $mode eq "long")?64:0),
@@ -3053,16 +3066,81 @@ sub CUL_HM_getConfig($$$$$){
 }
 
 #+++++++++++++++++ Protocol stack, sending, repeat+++++++++++++++++++++++++++++
+sub CUL_HM_sndIfOpen($) {
+  my(undef,$io) = split(':',$_[0]);
+  RemoveInternalTimer("sndIfOpen:$io");# should not be necessary, but
+  my $ioHash = $defs{$io};
+  if (   $ioHash->{STATE} ne "opened" 
+      ||(defined $ioHash->{XmitOpen} && $ioHash->{XmitOpen} == 0) 
+#	  ||$modules{CUL_HM}{prot}{rspPend}>=$maxPendCmds
+	   ){#still no send allowed
+    if ($modules{CUL_HM}{$io}{tmrStart} < gettimeofday() - $IOpolltout){
+	  # we need to clean up - this is way to long Stop delay
+	  if ($modules{CUL_HM}{$io}{pendDev}) {
+        while(@{$modules{CUL_HM}{$io}{pendDev}}){
+	      my $name = shift(@{$modules{CUL_HM}{$io}{pendDev}});
+          CUL_HM_eventP($defs{$name},"IOerr");
+		}
+	  }
+	  $modules{CUL_HM}{$io}{tmr} = 0;
+	}
+	else{
+   	  InternalTimer(gettimeofday()+$IOpoll,"CUL_HM_sndIfOpen",
+	                                "sndIfOpen:$io", 0);	
+	}
+  }
+  else{
+    $modules{CUL_HM}{$io}{tmr} = 0;
+	my $name = shift(@{$modules{CUL_HM}{$io}{pendDev}});
+	CUL_HM_ProcessCmdStack($defs{$name});
+	if (@{$modules{CUL_HM}{$io}{pendDev}}){#tmr = 0, clearing queue slowly
+   	  InternalTimer(gettimeofday()+$IOpoll,"CUL_HM_sndIfOpen",
+	                                "sndIfOpen:$io", 0);
+	}
+  }
+}
 sub CUL_HM_SndCmd($$) {
   my ($hash, $cmd) = @_;
   $hash = CUL_HM_getDeviceHash($hash); 
   my $io = $hash->{IODev};
   return if(!$io);  
-  if ($io->{helper}{HMcnd} && $io->{helper}{HMcnd} == 4){#io in overload, dont send
-    CUL_HM_eventP($hash,"IOerr");
+  my $ioName = $io->{NAME};
+  if ((hex substr($cmd,2,2) & 0x20) && (  # check for commands with resp-req
+           $io->{STATE} ne "opened"       # we need to queue
+        || $modules{CUL_HM}{$ioName}{tmr} # queue already running
+        ||(defined $io->{XmitOpen} && $io->{XmitOpen} == 0)#overload, dont send
+#	    ||$modules{CUL_HM}{prot}{rspPend}>=$maxPendCmds
+	    )
+	  ){
+
+	# shall we delay commands if IO device is not present?
+	# it could cause trouble if light switches on after a long period
+	# repetition will be stopped after 1min forsecurity reason. 
+    my @arr = ();
+    $hash->{cmdStack} = \@arr if(!$hash->{cmdStack});
+    unshift (@{$hash->{cmdStack}}, $cmd);#pushback cmd, wait for opportunitiy
+
+	# push device to list
+	if (!defined $modules{CUL_HM}{$ioName}{tmr}){
+	  # some setup work for this timer
+	  $modules{CUL_HM}{$ioName}{tmr} = 0; 
+	  my @arr2 = ();
+      $modules{CUL_HM}{$ioName}{pendDev} = \@arr2
+	          if (!$modules{CUL_HM}{$ioName}{pendDev});
+	}
+    @{$modules{CUL_HM}{$ioName}{pendDev}} = 
+	      CUL_HM_noDup(@{$modules{CUL_HM}{$ioName}{pendDev}},$hash->{NAME});
+	CUL_HM_respPendRm($hash);#rm timer - we are out
+
+	if ($modules{CUL_HM}{$ioName}{tmr} != 1){# need to stat timer
+	  my $tn = gettimeofday();
+   	  InternalTimer($tn+$IOpoll, "CUL_HM_sndIfOpen", "sndIfOpen:$ioName", 0);
+      $modules{CUL_HM}{$ioName}{tmr} = 1;
+      $modules{CUL_HM}{$ioName}{tmrStart} = $tn; # abort if to long
+	}
 	return;
   }
-
+  
   $cmd =~ m/^(..)(.*)$/;
   my ($mn, $cmd2) = ($1, $2);
 
@@ -3079,9 +3157,22 @@ sub CUL_HM_SndCmd($$) {
   }
   $cmd = sprintf("As%02X%02X%s", length($cmd2)/2+1, $mn, $cmd2);
   IOWrite($hash, "", $cmd);
+  CUL_HM_eventP($hash,"Snd");	  
   CUL_HM_responseSetup($hash,$cmd);	
   $cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/;
   CUL_HM_DumpProtocol("SND", $io, ($1,$2,$3,$4,$5,$6,$7));
+}
+sub CUL_HM_respWaitSu ($@){ #setup response for multi-message response
+  my ($hash,@a)=@_;
+  my $hashW = $hash->{helper}{respWait};
+  $modules{CUL_HM}{prot}{rspPend}++ if(!$hashW->{PendCmd} && 
+                                    !$hashW->{cmd});
+  foreach (@a){
+	my ($f,$d)=split ":",$_;
+	  $hashW->{$f}=$d;
+	}
+  if ($hashW->{cmd}){InternalTimer(gettimeofday()+rand(40)/10+1,"CUL_HM_Resend"      , $hash, 0);}
+  else{              InternalTimer(gettimeofday()+rand(20)/10+4,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);}
 }
 sub CUL_HM_responseSetup($$) {#store all we need to handle the response
  #setup repeatTimer and cmdStackControll
@@ -3089,18 +3180,14 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
   my ($mNo,$mFlg,$mTp,$dst,$p) = ($2,hex($3),$4,$6,$7)
       if ($cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/);
   my ($chn,$subType) = ($1,$2) if($p =~ m/^(..)(..)/); 
-  my $rTo = rand(20)/10+4; #default response timeout
+#  my $rTo = rand(20)/10+4; #default response timeout
   if (($mFlg & 0x20) && ($dst ne '000000')){
     if   ($mTp eq "01" && $subType){ 
       if ($subType eq "03"){ #PeerList-------------
     	#--- remember request params in device level
-    	$hash->{helper}{respWait}{Pending} = "PeerList";
-    	$hash->{helper}{respWait}{PendCmd} = $cmd;
-    	$hash->{helper}{respWait}{forChn} = substr($p,0,2);#channel info we await
-        
-        # define timeout - holdup cmdStack until response complete or timeout
-    	InternalTimer(gettimeofday()+$rTo, "CUL_HM_respPendTout", "respPend:$dst", 0);
-	    
+		CUL_HM_respWaitSu ($hash,"Pending:PeerList"
+		                        ,"PendCmd:$cmd" ,"forChn:".substr($p,0,2));
+								
     	#--- remove readings in channel
     	my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"}; 
     	$chnhash = $hash if (!$chnhash);
@@ -3114,14 +3201,9 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
         my ($peer, $list) = ($1,$2) if ($p =~ m/..04(........)(..)/);
 	    $peer = ($peer ne "00000000")?CUL_HM_peerChName($peer,$dst,""):"";
 	    #--- set messaging items
-	    $hash->{helper}{respWait}{Pending}= "RegisterRead";
-     	$hash->{helper}{respWait}{PendCmd}= $cmd;
-	    $hash->{helper}{respWait}{forChn} = $chn;
-	    $hash->{helper}{respWait}{forList}= $list;
-	    $hash->{helper}{respWait}{forPeer}= $peer;
-        
-        # define timeout - holdup cmdStack until response complete or timeout
-	    InternalTimer(gettimeofday()+$rTo,"CUL_HM_respPendTout","respPend:$dst", 0);
+		CUL_HM_respWaitSu ($hash,"Pending:RegisterRead"
+		                        ,"PendCmd:$cmd" ,"forChn:$chn"
+								,"forList:$list","forPeer:$peer");
 	    #--- remove channel entries that will be replaced
         my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
         $chnhash = $hash if(!$chnhash);   
@@ -3147,16 +3229,13 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
     elsif($mTp eq '11' && $chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
       CUL_HM_qStateUpdatIfEnab($dst);
     }
-	if ($mTp eq "11" && $p =~ m/02........(....)/){
-	  $hash->{helper}{tmdOn} = $1 if ($1 ne "0000");
+	if ($mTp eq "11" && $p =~ m/02..(..)....(....)/){#lvl ne 0 and timer on
+	  $hash->{helper}{tmdOn} = $2 if ($1 ne "00" && $2 != m/(0000|FFFF)/);
 	}
   
-    $hash->{helper}{respWait}{cmd}    = $cmd;
-    $hash->{helper}{respWait}{mNo}    = $mNo; #mNo we wait to ack
-    $hash->{helper}{respWait}{reSent} = 1;
-    
-    InternalTimer(gettimeofday()+rand(40)/10+1, "CUL_HM_Resend", $hash, 0);
-    CUL_HM_protState($hash,"CMDs_processing...");                         
+	CUL_HM_respWaitSu ($hash,"cmd:$cmd","mNo:$mNo","reSent:1");
+
+	CUL_HM_protState($hash,"CMDs_processing...");                         
   }
   else{# no answer expected
 	if($hash->{cmdStack} && scalar @{$hash->{cmdStack}}){
@@ -3218,6 +3297,8 @@ sub CUL_HM_protState($$){
 }
 sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
   my ($hash) =  @_;  
+  $modules{CUL_HM}{prot}{rspPend}-- if(  $hash->{helper}{respWait}{cmd} 
+	                                   ||$hash->{helper}{respWait}{PendCmd});
   delete ($hash->{helper}{respWait});
   delete $hash->{helper}{tmdOn};
   RemoveInternalTimer($hash);          # remove resend-timer
@@ -3232,7 +3313,7 @@ sub CUL_HM_respPendTout($) {
 	my $pendCmd = $hash->{helper}{respWait}{Pending};# secure before remove
 
     my $pendRsndCnt = $hash->{helper}{respWait}{PendingRsend};
-	$pendRsndCnt = 1 if (!$pendRsndCnt);
+	$pendRsndCnt = 1 if (!$pendRsndCnt);       #already one send done
 	if ($pendRsndCnt < 5 &&                    # some retries
 	    (CUL_HM_getRxType($hash) & 0x03) != 0){# to slow for wakeup and config
       my $name = $hash->{NAME};
@@ -3276,7 +3357,6 @@ sub CUL_HM_ProcessCmdStack($) {
                           !$hash->{helper}{respWait}{Pending}){
     if(@{$hash->{cmdStack}}) {
       CUL_HM_SndCmd($hash, shift @{$hash->{cmdStack}});
-	  CUL_HM_eventP($hash,"Snd");	  
     }
     elsif(!@{$hash->{cmdStack}}) {
       delete($hash->{cmdStack});
