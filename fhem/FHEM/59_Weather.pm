@@ -66,8 +66,8 @@ my @YahooCodes_de = (
        'teilweise wolkig', # day
        'klar', # night
        'sonnig',
-       'schön', # night
-       'schön', # day
+       'heiter', # night
+       'heiter', # day
        'Regen und Hagel',
        'heiß', 'einzelne Gewitter', 'vereinzelt Gewitter', 'vereinzelt Gewitter', 'vereinzelt Schauer', 'starker Schneefall',
        'vereinzelt Schneeschauer', 'starker Schneefall', 'teilweise wolkig', 'Gewitterregen', 'Schneeschauer', 'vereinzelt Gewitter');
@@ -142,7 +142,7 @@ sub Weather_Initialize($) {
   $hash->{AttrList}= "localicons ".
                       $readingFnAttributes;
 
-  #Weather_DebugCodes();                    
+  Weather_DebugCodes();                    
 }
 
 ###################################
