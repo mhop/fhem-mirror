@@ -24,7 +24,6 @@ sub HMLAN_DoInit($);
 sub HMLAN_KeepAlive($);
 sub HMLAN_secSince2000();
 sub HMLAN_relOvrLd($);
-sub HMLAN_relOvrLd($);
 sub HMLAN_condUpdate($$);
 
 my $debug = 1; # set 1 for better log readability
@@ -34,8 +33,10 @@ my %sets = ( "hmPairForSec" => "HomeMatic"
 my %HMcond = ( 0  =>'ok'
               ,2  =>'Warning-HighLoad'
 			  ,4  =>'ERROR-Overload'
+			  ,253=>'disconnected'
 			  ,254=>'Overload-released'
 			  ,255=>'init');
+			  
 my $HMOvLdRcvr = 6*60;# time HMLAN needs to recover from overload
 
 sub HMLAN_Initialize($) {
@@ -63,6 +64,7 @@ sub HMLAN_Initialize($) {
                      "hmId hmKey " .
                      "respTime wdStrokeTime:5,10,15,20,25 " .
 					 "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger ".
+					 "hmLanQlen:1_min,2_low,3_normal,4_high,5_critical ".
 					 "wdTimer ".
 					 $readingFnAttributes;
 }
@@ -87,7 +89,17 @@ sub HMLAN_Define($$) {#########################################################
     return undef;
   }
   $attr{$name}{wdTimer} = 25;
+  $attr{$name}{hmLanQlen} = "1_min"; #max message queue length in HMLan
+  no warnings 'numeric';
+  $hash->{helper}{q}{hmLanQlen} = int($attr{$name}{hmLanQlen})+0; 
+  use warnings 'numeric';
   $hash->{DeviceName} = $dev;
+  
+  $hash->{helper}{q}{answerPend} = 0;#pending answers from LANIf
+  my @arr = ();
+  @{$hash->{helper}{q}{apIDs}} = \@arr;
+  
+  HMLAN_condUpdate($hash,253);#set disconnected
   my $ret = DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
   return $ret;
 }
@@ -119,6 +131,16 @@ sub HMLAN_Attr(@) {#################################
   if   ($attrName eq "wdTimer"){#allow between 5 and 25 second
     return "select wdTimer between 5 and 25 seconds" if ($aVal>25 || $aVal<5);
     $attr{$name}{wdTimer} = $aVal;
+  }
+  elsif($attrName eq "hmLanQlen"){
+	if ($cmd eq "set"){
+      no warnings 'numeric';
+      $defs{$name}{helper}{q}{hmLanQlen} = int($aVal)+0; 
+      use warnings 'numeric';
+	}
+	else{
+	  $defs{$name}{helper}{q}{hmLanQlen} = 1;
+	}
   }
   return;
 }
@@ -176,6 +198,7 @@ sub HMLAN_ReadAnswer($$$) {# This is a direct read for commands like get
       next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
       my $err = $!;
       DevIo_Disconnected($hash);
+	  HMLAN_condUpdate($hash,253);
       return("HMLAN_ReadAnswer $arg: $err", undef);
     }
     return ("Timeout reading answer for get $arg", undef) if($nfound == 0);
@@ -346,8 +369,11 @@ sub HMLAN_Parse($$) {##########################################################
 #	  $CULinfo = "AESresp";# General needs approval
 	}
 	if ($stat){# message with status information
-	  HMLAN_condUpdate($hash,$HMcnd)if ($hash->{helper}{HMcnd} != $HMcnd);
+	  HMLAN_condUpdate($hash,$HMcnd)if ($hash->{helper}{q}{HMcndN} != $HMcnd);
 
+	  if    ($stat & 0x03 && $dst eq $attr{$name}{hmId}){HMLAN_qResp($hash,$src,0);}
+	  elsif ($stat & 0x08 && $src eq $attr{$name}{hmId}){HMLAN_qResp($hash,$dst,0);}
+	  
 	  $hash->{helper}{$dst}{flg} = 0;#got response => unblock sending
       if ($stat & 0x0A){#08 and 02 dont need to go to CUL, internal ack only
 	    Log $ll5, "HMLAN_Parse: $name no ACK from $dst"   if($stat & 0x08);
@@ -356,7 +382,7 @@ sub HMLAN_Parse($$) {##########################################################
 		                              $CULinfo = "AESerrReject"; 
 	  }elsif (($stat & 0x70) == 0x20){$CULinfo = "AESok";
 	  }elsif (($stat & 0x70) == 0x40){;#$CULinfo = "???";
-	  }
+	  }	  
     }
 
     my $rssi = hex($mFld[4])-65536;
@@ -390,7 +416,7 @@ sub HMLAN_Parse($$) {##########################################################
 	# we ack ourself an long as logic is uncertain - also possible is 'A6' for RHS
 	if (hex($flg)&0x4){#not sure: 4 oder 2 ? 
 	  my $wait = 0.100 - $dly/1000;
-	  $hash->{helper}{nextSend}{$src} = gettimeofday() + $wait if ($wait > 0);
+	  $hash->{helper}{$src}{nextSend} = gettimeofday() + $wait if ($wait > 0);
 	}
 	if (hex($flg)&0xA4 == 0xA4 && $hash->{owner} eq $dst){
 	  Log $ll5, "HMLAN_Parse: $name ACK config";
@@ -418,8 +444,8 @@ sub HMLAN_Parse($$) {##########################################################
     $hash->{owner} = $mFld[4];
     $hash->{uptime} = HMLAN_uptime($mFld[5],$hash);
    	$hash->{assignIDsReport}=hex($mFld[6]);
-    $hash->{helper}{keepAliveRec} = 1;
-    $hash->{helper}{keepAliveRpt} = 0;
+    $hash->{helper}{q}{keepAliveRec} = 1;
+    $hash->{helper}{q}{keepAliveRpt} = 0;
     Log $ll5, 'HMLAN_Parse: '.$name.                 ' V:'.$mFld[1]
 	                               .' sNo:'.$mFld[2].' d:'.$mFld[3]
 								   .' O:'  .$mFld[4].' t:'.$mFld[5].' IDcnt:'.$mFld[6];
@@ -446,6 +472,8 @@ sub HMLAN_SimpleWrite(@) {#####################################################
   my ($hash, $msg, $nonl) = @_;
 
   return if(!$hash || AttrVal($hash->{NAME}, "dummy", undef));
+  HMLAN_condUpdate($hash,253) if ($hash->{STATE} eq "disconnected");#closed?
+  
   my $name = $hash->{NAME};
   my $ll5 = GetLogLevel($name,5);
   my $len = length($msg);
@@ -453,34 +481,44 @@ sub HMLAN_SimpleWrite(@) {#####################################################
   # It is not possible to answer befor 100ms
 
   if ($len>51){
-    return if($hash->{helper}{HMcnd} && $hash->{helper}{HMcnd} == 4);#overload
+    if($hash->{helper}{q}{HMcndN}){
+	  my $HMcnd = $hash->{helper}{q}{HMcndN};
+	  return if ($HMcnd == 4 || $HMcnd == 253);# no send if overload or disconnect
+    }
+
     my $dst = substr($msg,46,6);
-    if ($hash->{helper}{nextSend}{$dst}){
-      my $DevDelay = $hash->{helper}{nextSend}{$dst} - gettimeofday();
+	my $hDst = $hash->{helper}{$dst};# shortcut
+    if ($hDst->{nextSend}){
+      my $DevDelay = $hDst->{nextSend} - gettimeofday();
       select(undef, undef, undef, (($DevDelay > 0.1)?0.1:$DevDelay))
 	        if ($DevDelay > 0.01);
-	  delete $hash->{helper}{nextSend}{$dst};
+	  delete $hDst->{nextSend};
     }
 	if ($dst ne $attr{$name}{hmId}){  #delay send if answer is pending
-	  if ( $hash->{helper}{$dst}{flg} &&                #HMLAN's ack pending
-          ($hash->{helper}{$dst}{to} > gettimeofday())){#won't wait forever!
-	    $hash->{helper}{$dst}{msg} = $msg;              #postpone  message
+	  if ( $hDst->{flg} &&                #HMLAN's ack pending
+          ($hDst->{to} > gettimeofday())){#won't wait forever!
+	    $hDst->{msg} = $msg;              #postpone  message
 	    Log $ll5,"HMLAN_Delay: $name $dst";
 	    return;
 	  }
       my $flg = substr($msg,36,2);
-	  $hash->{helper}{$dst}{flg} = (hex($flg)&0x20)?1:0;
-      $hash->{helper}{$dst}{to} = gettimeofday() + 2;# flag timeout after 2 sec
-	  $hash->{helper}{$dst}{msg} = "";
+	  $hDst->{flg} = (hex($flg)&0x20)?1:0;# answer expected?
+      $hDst->{to} = gettimeofday() + 2;# flag timeout after 2 sec
+	  $hDst->{msg} = "";
+
+	  if ($hDst->{flg} == 1 &&
+          substr($msg,40,6) eq $attr{$name}{hmId}){
+		HMLAN_qResp($hash,$dst,1);
+	  }	  
 	}
     if ($len > 52){#channel information included, send sone kind of clearance
 	  my $chn = substr($msg,52,2);
-	  if ($hash->{helper}{$dst}{chn} && $hash->{helper}{$dst}{chn} ne $chn){
-	    my $updt = $hash->{helper}{$dst}{newChn};
+	  if ($hDst->{chn} && $hDst->{chn} ne $chn){
+	    my $updt = $hDst->{newChn};
         Log $ll5, 'HMLAN_Send:  '.$name.' S:'.$updt; 
 	    syswrite($hash->{TCPDev}, $updt."\r\n")     if($hash->{TCPDev});
 	  }
-	  $hash->{helper}{$dst}{chn} = $chn;
+	  $hDst->{chn} = $chn;
 	} 
     $msg =~ m/(.{9}).(..).(.{8}).(..).(.{8}).(..)(....)(.{6})(.{6})(.*)/;
 	Log $ll5, 'HMLAN_Send:  '.$name.' S:'.$1
@@ -519,12 +557,12 @@ sub HMLAN_DoInit($) {##########################################################
   HMLAN_SimpleWrite($hash, "T$s2000,04,00,00000000");
   delete $hash->{helper}{ref};
 
-  $hash->{helper}{HMcnd} = 0xff; # init HMLAN xmit cond, will force reading
+  HMLAN_condUpdate($hash,0xff);
   RemoveInternalTimer( "Overload:".$name);
 
   foreach (keys %lhash){delete ($lhash{$_})};# clear IDs - HMLAN might have a reset 
-  $hash->{helper}{keepAliveRec} = 1; # ok for first time
-  $hash->{helper}{keepAliveRpt} = 0; # ok for first time
+  $hash->{helper}{q}{keepAliveRec} = 1; # ok for first time
+  $hash->{helper}{q}{keepAliveRpt} = 0; # ok for first time
 
   RemoveInternalTimer( "keepAliveCk:".$name);# avoid duplicate timer
   RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
@@ -535,7 +573,7 @@ sub HMLAN_KeepAlive($) {#######################################################
   my($in ) = shift;
   my(undef,$name) = split(':',$in);
   my $hash = $defs{$name};
-  $hash->{helper}{keepAliveRec} = 0; # reset indicator
+  $hash->{helper}{q}{keepAliveRec} = 0; # reset indicator
 
   return if(!$hash->{FD});
   HMLAN_SimpleWrite($hash, "K");
@@ -550,17 +588,18 @@ sub HMLAN_KeepAliveCheck($) {##################################################
   my($in ) = shift;
   my(undef,$name) = split(':',$in);
   my $hash = $defs{$name};
-  if ($hash->{helper}{keepAliveRec} != 1){# no answer
-    if ($hash->{helper}{keepAliveRpt} >2){# give up here
+  if ($hash->{helper}{q}{keepAliveRec} != 1){# no answer
+    if ($hash->{helper}{q}{keepAliveRpt} >2){# give up here
       DevIo_Disconnected($hash);
+	  HMLAN_condUpdate($hash,253);
     }
     else{
-      $hash->{helper}{keepAliveRpt}++;
+      $hash->{helper}{q}{keepAliveRpt}++;
 	  HMLAN_KeepAlive("keepAlive:".$name);#repeat
     }
   }
   else{
-    $hash->{helper}{keepAliveRpt}=0;
+    $hash->{helper}{q}{keepAliveRpt}=0;
   }
 
 }
@@ -575,26 +614,76 @@ sub HMLAN_secSince2000() {#####################################################
         - 7200;            # HM Special
   return $t;
 }
+sub HMLAN_qResp($$$) {#response-waiting queue##################################
+  my($hash,$id,$cmd) = @_;
+  my $hashQ = $hash->{helper}{q};
+  if ($cmd){
+    $hashQ->{answerPend} ++;
+	push @{$hashQ->{apIDs}},$id;
+	$hash->{XmitOpen} = 0 if ($hashQ->{answerPend} >= $hashQ->{hmLanQlen});
+  }
+  else{
+    $hashQ->{answerPend}-- if ($hashQ->{answerPend}>0);
+	@{$hashQ->{apIDs}}=grep !/$id/,@{$hashQ->{apIDs}};
+	$hash->{XmitOpen} = 1 
+	        if (($hashQ->{answerPend} < $hashQ->{hmLanQlen}) &&
+			    !($hashQ->{HMcndN} == 4 || 
+				  $hashQ->{HMcndN} == 253)
+			   );
+  }
+	
+#  Log 1,"General max:$hashQ->{hmLanQlen} cmd:$cmd"
+#		   ."/".$hash->{XmitOpen}
+#           ." :".$hashQ->{answerPend}
+#		   ."/".@{$hashQ->{apIDs}}
+#		   .":".join("-",@{$hashQ->{apIDs}})
+#		   .":$debug" ;
+}
 sub HMLAN_relOvrLd($) {########################################################
   my(undef,$name) = split(':',$_[0]);
   HMLAN_condUpdate($defs{$name},0xFE);
+  $defs{$name}{STATE} = "opened";
 }
 sub HMLAN_condUpdate($$) {#####################################################
   my($hash,$HMcnd) = @_;
   my $name = $hash->{NAME};
-  $hash->{helper}{cnd}{$HMcnd} = 0 if (!$hash->{helper}{cnd}{$HMcnd});
-  $hash->{helper}{cnd}{$HMcnd}++;
-  InternalTimer(gettimeofday()+$HMOvLdRcvr,"HMLAN_relOvrLd","Overload:".$name,1)
-        if   ($HMcnd == 4);
+  my $hashCnd = $hash->{helper}{cnd};#short to helper
+  my $hashQ   = $hash->{helper}{q};#short to helper
+  $hashCnd->{$HMcnd} = 0 if (!$hashCnd->{$HMcnd});
+  $hashCnd->{$HMcnd}++;
+  if ($HMcnd == 4){#HMLAN needs a rest. Supress all sends exept keep alive
+    InternalTimer(gettimeofday()+$HMOvLdRcvr,"HMLAN_relOvrLd","Overload:".$name,1);
+    $hash->{STATE} = "overload";
+  }
 
   my $HMcndTxt = $HMcond{$HMcnd}?$HMcond{$HMcnd}:"Unknown:$HMcnd";
   Log GetLogLevel($name,2), "HMLAN_Parse: $name new condition $HMcndTxt";
-  readingsSingleUpdate($hash,"cond",$HMcndTxt,1);
   my $txt;
-  $txt .= $HMcond{$_}.":".$hash->{helper}{cnd}{$_}." "
-                            foreach (keys%{$hash->{helper}{cnd}});
-  readingsSingleUpdate($hash,"Xmit-Events",$txt,1);
-  $hash->{helper}{HMcnd} = $HMcnd;
+  $txt .= $HMcond{$_}.":".$hashCnd->{$_}." "
+                            foreach (keys%{$hashCnd});
+
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash,"cond",$HMcndTxt);
+  readingsBulkUpdate($hash,"Xmit-Events",$txt);
+  readingsBulkUpdate($hash,"prot_".$HMcndTxt,"last");
+  readingsEndUpdate($hash,1);
+
+  $hashQ->{HMcndN} = $HMcnd;
+  
+  if ($HMcnd == 4 || $HMcnd == 253) {#transmission down
+    $hashQ->{answerPend} = 0;
+	@{$hashQ->{apIDs}} = ();     #clear Q-status
+    $hash->{XmitOpen} = 0;         #deny transmit
+  }
+  elsif ($HMcnd == 255) {#reset counter after init
+    $hashQ->{answerPend} = 0;
+	@{$hashQ->{apIDs}} = ();     #clear Q-status
+    $hash->{XmitOpen} = 1;         #deny transmit
+  }
+  else{
+    $hash->{XmitOpen} = 1 
+	    if($hashQ->{answerPend} < $hashQ->{hmLanQlen});#allow transmit
+  }	
 }
 
 1;
@@ -660,9 +749,16 @@ sub HMLAN_condUpdate($$) {#####################################################
 		Define max response time of the HMLAN adapter in seconds. Default is 1 sec.<br/>
 		Longer times may be used as workaround in slow/instable systems or LAN configurations.</li>
 		<li><a href="#wdTimer">wdTimer</a><br>
-		Time in sec to trigger HMLAN. Values between 5 and 25 are allowed, 25 is default.<br/>
-		It is <B>not recommended</B> to change this timer. If problems are detected with <br/>
+		Time in sec to trigger HMLAN. Values between 5 and 25 are allowed, 25 is default.<br>
+		It is <B>not recommended</B> to change this timer. If problems are detected with <br>
 		HLMLAN disconnection it is advisable to resolve the root-cause of the problem and not symptoms.</li>
+		<li><a href="#hmLanQlen">hmLanQlen</a><br>
+		defines queuelength of HMLAN interface. This is therefore the number of 
+		simultanously send messages. increasing values may cause higher transmission speed. 
+		It may also cause retransmissions up to data loss.<br>
+		Effects can be observed by watching protocol events<br>
+		1 - is a conservatibe value, and is default<br>
+		5 - is critical length, likely cause message loss</li>
 	</ul>
 </ul>
 
