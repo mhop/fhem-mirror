@@ -57,7 +57,7 @@ TCM_Initialize($)
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 loglevel:0,1,2,3,4,5,6 blockSenderID:own,no";
 }
 
-#####################################
+# Define
 sub
 TCM_Define($$)
 {
@@ -95,7 +95,7 @@ TCM_Define($$)
 }
 
 
-#####################################
+# Write
 # Input is header and data (HEX), without CRC
 sub
 TCM_Write($$$)
@@ -152,8 +152,8 @@ TCM_Write($$$)
   DevIo_SimpleWrite($hash, $bstring, 1);
 }
 
-#####################################
-# Used in the TCM120 / ESP2
+# ESP2 CRC
+# Used in the TCM120
 sub
 TCM_CSUM($)
 {
@@ -169,8 +169,7 @@ TCM_CSUM($)
   return sprintf("%02X", $sum & 0xFF);
 }
 
-#####################################
-# Used in the TCM310 / ESP3
+# ESP3 CRC-Table
 my @u8CRC8Table = (
   0x00, 0x07, 0x0e, 0x09, 0x1c, 0x1b, 0x12, 0x15, 0x38, 0x3f, 0x36, 0x31, 0x24,
   0x23, 0x2a, 0x2d, 0x70, 0x77, 0x7e, 0x79, 0x6c, 0x6b, 0x62, 0x65, 0x48, 0x4f,
@@ -193,6 +192,8 @@ my @u8CRC8Table = (
   0x98, 0x9f, 0x8a, 0x8D, 0x84, 0x83, 0xde, 0xd9, 0xd0, 0xd7, 0xc2, 0xc5, 0xcc,
   0xcb, 0xe6, 0xe1, 0xe8, 0xef, 0xfa, 0xfd, 0xf4, 0xf3 );
 
+# ESP3 CRC
+# Used in the TCM310
 sub
 TCM_CRC8($)
 {
@@ -208,7 +209,7 @@ TCM_CRC8($)
   return sprintf("%02X", $crc);
 }
 
-#####################################
+# Read
 # called from the global loop, when the select for hash->{FD} reports data
 sub
 TCM_Read($)
@@ -228,8 +229,8 @@ TCM_Read($)
   my $data = $hash->{PARTIAL} . uc(unpack('H*', $buf));
   Log $ll5, "$name/RAW: $data";
 
-  #############################
   if($hash->{MODEL} == 120) {
+    # TCM 120
 
     while($data =~ m/^A55A(.B.{20})(..)/) {
       my ($net, $crc) = ($1, $2);
@@ -276,8 +277,8 @@ TCM_Read($)
       $data = "" if($data !~ m/^A55A/);
     }
 
-  #############################
-  } else {                              # TCM310 / ESP3
+  } else {
+    # TCM310 / ESP3
 
     while($data =~ m/^55(....)(..)(..)(..)/) {
       my ($l1, $l2, $packetType, $crc) = (hex($1), hex($2), hex($3), $4);
@@ -331,34 +332,37 @@ TCM_Read($)
         # packet type RESPONSE
         my $rc = substr($mdata, 0, 2);
         my %codes = (
-          "00" => "RET_OK",
-          "01" => "RET_ERROR",
-          "02" => "RET_NOT_SUPPORTED",
-          "03" => "RET_WRONG_PARAM",
-          "04" => "RET_OPERATION_DENIED",
+          "00" => "OK",
+          "01" => "ERROR",
+          "02" => "NOT_SUPPORTED",
+          "03" => "WRONG_PARAM",
+          "04" => "OPERATION_DENIED",
+          "82" => "FLASH_HW_ERROR",
+          "90" => "BASEID_OUT_OF_RANGE",
+          "91" => "BASEID_MAX_REACHED",
         );
         $rc = $codes{$rc} if($codes{$rc});
-        Log (($rc eq "RET_OK") ? $ll5 : $ll2, "TCM: $name RESPONSE: $rc");
+        Log (($rc eq "OK") ? $ll5 : $ll2, "TCM: $name RESPONSE: $rc");
 
       } elsif($packetType == 3) {
         # packet type RADIO_SUB_TEL
-        Log $ll2, "TCM: $name unknown packet type $packetType: $data";
+        Log $ll2, "TCM: $name packet type RADIO_SUB_TEL not supported: $data";
 
       } elsif($packetType == 4) {
         # packet type EVENT
-        Log $ll2, "TCM: $name unknown packet type $packetType: $data";
+        Log $ll2, "TCM: $name packet type EVENT not supported: $data";
 
       } elsif($packetType == 5) {
         # packet type COMMON_COMMAND
-        Log $ll2, "TCM: $name unknown packet type $packetType: $data";
+        Log $ll2, "TCM: $name packet type COMMON_COMMAND not supported: $data";
 
       } elsif($packetType == 6) {
         # packet type SMART_ACK_COMMAND
-        Log $ll2, "TCM: $name unknown packet type $packetType: $data";
+        Log $ll2, "TCM: $name packet type SMART_ACK_COMMAND not supported: $data";
 
       } elsif($packetType == 7) {
         # packet type REMOTE_MAN_COMMAND
-        Log $ll2, "TCM: $name unknown packet type $packetType: $data";
+        Log $ll2, "TCM: $name packet type REMOTE_MAN_COMMAND not supported: $data";
 
       } else {
         Log $ll2, "TCM: $name unknown packet type $packetType: $data";
@@ -377,7 +381,7 @@ TCM_Read($)
   $hash->{PARTIAL} = $data;
 }
 
-#####################################
+# Parse Table TCM 120
 my %parsetbl120 = (
   "8B08" => { msg=>"ERR_SYNTAX_H_SEQ" },
   "8B09" => { msg=>"ERR_SYNTAX_LENGTH" },
@@ -399,6 +403,7 @@ my %parsetbl120 = (
               expr=>'sprintf("%s, ID:%02x%02x", $a[2]?"on":"off", $a[3], $a[4])' },
 );
 
+# Parse TCM 120
 sub
 TCM_Parse120($$$)
 {
@@ -435,13 +440,19 @@ TCM_Parse120($$$)
   return $msg;
 }
 
+# Parse Table TCM 310
 my %rc310 = (
+  "00" => "OK",
   "01" => "ERROR",
   "02" => "NOT_SUPPORTED",
   "03" => "WRONG_PARAM",
   "04" => "OPERATION_DENIED",
+  "82" => "FLASH_HW_ERROR",
+  "90" => "BASEID_OUT_OF_RANGE",
+  "91" => "BASEID_MAX_REACHED",
 );
 
+# Parse TCM 310
 sub
 TCM_Parse310($$$)
 {
@@ -473,7 +484,7 @@ TCM_Parse310($$$)
 }
 
 
-#####################################
+# Ready
 sub
 TCM_Ready($)
 {
@@ -488,6 +499,7 @@ TCM_Ready($)
   return ($InBytes>0);
 }
 
+# Get commands TCM 120
 my %gets120 = (
   "sensitivity"  => "AB48",
   "idbase"       => "AB58",
@@ -496,24 +508,37 @@ my %gets120 = (
   "sw_ver"       => "AB4B",
 );
 
+# Get commands TCM 310
 my %gets310 = (
-  "sw_ver"   => {cmd         => "03",
-                 APPVersion  => "1,4",
-                 APIVersion  => "5,4",
-                 ChipID      => "9,4",
-                 ChipVersion => "13,4",
-                 Desc        => "17,16,STR",},
-  "idbase"   => {cmd                  => "08",
-                 BaseID               => "1,4",
-                 RemainingWriteCycles => "5,1",},
-  "baseID"   => {cmd                  => "08",
-                 BaseID               => "1,4",
-                 RemainingWriteCycles => "5,1",},
-  "repeater" => {cmd       => "10",
-                 repEnable => "1,1",
-                 repLevel  => "2,1",},
+  "sw_ver"       => {cmd         => "03",
+                     APPVersion  => "1,4",
+                     APIVersion  => "5,4",
+                     ChipID      => "9,4",
+                     ChipVersion => "13,4",
+                     Desc        => "17,16,STR",},
+  "version"      => {cmd         => "03",
+                     APPVersion  => "1,4",
+                     APIVersion  => "5,4",
+                     ChipID      => "9,4",
+                     ChipVersion => "13,4",
+                     Desc        => "17,16,STR",},
+  "idbase"       => {cmd                  => "08",
+                     BaseID               => "1,4",
+                     RemainingWriteCycles => "5,1",},
+  "baseID"       => {cmd                  => "08",
+                     BaseID               => "1,4",
+                     RemainingWriteCycles => "5,1",},
+  "repeater"     => {cmd       => "0A",
+                     repEnable => "1,1",
+                     repLevel  => "2,1",},
+#  "secureDev"    => {cmd       => "1B01",
+#                     SLF   => "1,1",
+#                     devID => "2,4",},
+  "numSecureDev" => {cmd    => "1D",
+                     number => "1,1",},
 );
 
+# Get
 sub
 TCM_Get($@)
 {
@@ -524,8 +549,8 @@ TCM_Get($@)
   my $cmd = $a[1];
   my ($err, $msg);
 
-  #################################### TCM120
   if($hash->{MODEL} eq "120") {
+    # TCM 120
     my $rawcmd = $gets120{$cmd};
     return "Unknown argument $cmd, choose one of " .
         join(" ", sort keys %gets120) if(!defined($rawcmd));
@@ -536,8 +561,8 @@ TCM_Get($@)
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
     $msg = TCM_Parse120($hash, $msg, 1) if(!$err);
 
-  #################################### TCM310
   } else {
+    # TCM 310
     my $cmdhash = $gets310{$cmd};
     return "Unknown argument $cmd, choose one of " .
         join(" ", sort keys %gets310) if(!defined($cmdhash));
@@ -559,7 +584,7 @@ TCM_Get($@)
 
 }
 
-########################
+# RemovePair
 sub
 TCM_RemovePair($)
 {
@@ -568,28 +593,33 @@ TCM_RemovePair($)
   CommandDeleteReading(undef, "$hash->{NAME} pair");
 }
 
+# Set commands TCM 120
 my %sets120 = (    # Name, Data to send to the CUL, Regexp for the answer
-  "pairForSec"   => { cmd=>"AB18", arg=>"\\d+" },
-  "idbase"       => { cmd=>"AB18", arg=>"FF[8-9A-F][0-9A-F]{5}" },
-  "baseID"       => { cmd=>"AB18", arg=>"FF[8-9A-F][0-9A-F]{5}" },
-  "sensitivity"  => { cmd=>"AB08", arg=>"0[01]" },
-  "sleep"        => { cmd=>"AB09" },
-  "wake"         => { cmd=>"" }, # Special
-  "reset"        => { cmd=>"AB0A" },
-  "modem_on"     => { cmd=>"AB28", arg=>"[0-9A-F]{4}" },
-  "modem_off"    => { cmd=>"AB2A" },
+  "pairForSec"   => { cmd => "AB18", arg => "\\d+" },
+  "idbase"       => { cmd => "AB18", arg => "FF[8-9A-F][0-9A-F]{5}" },
+  "baseID"       => { cmd => "AB18", arg => "FF[8-9A-F][0-9A-F]{5}" },
+  "sensitivity"  => { cmd => "AB08", arg => "0[01]" },
+  "sleep"        => { cmd => "AB09" },
+  "wake"         => { cmd => "" }, # Special
+  "reset"        => { cmd => "AB0A" },
+  "modem_on"     => { cmd => "AB28", arg => "[0-9A-F]{4}" },
+  "modem_off"    => { cmd => "AB2A" },
 );
 
+# Set commands TCM 310
 my %sets310 = (
-  "pairForSec"   => { cmd=>"AB18", arg=>"\\d+" },
-  "idbase"       => { cmd=>"07", arg=>"FF[8-9A-F][0-9A-F]{5}" },
-  "baseID"       => { cmd=>"07", arg=>"FF[8-9A-F][0-9A-F]{5}" },
-# The following 3 does not seem to work / dont get an answer
-#  "sleep"        => { cmd=>"01", arg=>"00[0-9A-F]{6}" },
-#  "reset"        => { cmd=>"02" },
-#  "bist"         => { cmd=>"06", BIST_Result=>"1,1", },
+  "pairForSec"   => { cmd => "AB18", arg=> "\\d+" },
+  "sleep"        => { cmd => "01", arg => "00[0-9A-F]{6}" },
+  "reset"        => { cmd => "02" },
+  "bist"         => { cmd => "06", BIST_Result => "1,1", },
+  "idbase"       => { cmd => "07", arg => "FF[8-9A-F][0-9A-F]{5}" },
+  "baseID"       => { cmd => "07", arg => "FF[8-9A-F][0-9A-F]{5}" },
+  "repeater"     => { cmd => "09", arg => "0[0-1]0[0-2]" },  
+  "maturity"     => { cmd => "10", arg => "0[0-1]" },  
+  "subtel"       => { cmd => "11", arg => "0[0-1]" },  
 );
 
+# Set
 sub
 TCM_Set($@)
 {
@@ -622,8 +652,8 @@ TCM_Set($@)
     return;
   }
 
-  ##############################
   if($hash->{MODEL} eq "120") {
+    # TCM 120
     if($cmdHex eq "") {            # wake is very special
       DevIo_SimpleWrite($hash, "AA", 1);
       return "";
@@ -635,8 +665,8 @@ TCM_Set($@)
     $msg = TCM_Parse120($hash, $msg, 1)
       if(!$err);
 
-  ##############################
-  } else {              # TCM310
+  } else {
+    # TCM310
     TCM_Write($hash, sprintf("%04X0005", length($cmdHex)/2), $cmdHex);
     ($err, $msg) = TCM_ReadAnswer($hash, "set $cmd");
     $msg = TCM_Parse310($hash, $msg, $cmdhash)
@@ -652,6 +682,7 @@ TCM_Set($@)
 }
 
 
+# ReadAnswer
 sub
 TCM_ReadAnswer($$)
 {
@@ -696,6 +727,7 @@ TCM_ReadAnswer($$)
       Log $ll5, "TCM/RAW (ReadAnswer): $data";
 
       if($hash->{MODEL} eq "120") {
+        # TCM 120
         if(length($data) >= 28) {
           return ("$arg: Bogus answer received: $data", undef)
                 if($data !~ m/^A55A(.B.{20})(..)/);
@@ -708,13 +740,17 @@ TCM_ReadAnswer($$)
           return (undef, $net);
         }
 
-      } else {  # 310
-        if(length($data) >= 7) {
+      } else {
+        # TCM 310
+        if(length($data) >= 14) {
           return ("$arg: Bogus answer received: $data", undef)
                 if($data !~ m/^55(....)(..)(..)(..)(.*)(..)$/);
           my ($dlen, $olen, $ptype, $hcrc, $data, $dcrc) = ($1,$2,$3,$4,$5,$6);
-          next if(length($data) < hex($dlen)+hex($olen)+6);
-
+          ### ???
+          # next if(length($data) < hex($dlen)+hex($olen)+6);
+          # next if(length($data) < 2 * hex($dlen) + 2 * hex($olen) + 6);
+          next if(length($data) < 2*hex($dlen));
+          
           my $myhcrc = TCM_CRC8("$dlen$olen$ptype");
           return ("wrong header checksum: got $hcrc, computed $myhcrc", undef)
             if($hcrc ne $myhcrc);
@@ -730,6 +766,7 @@ TCM_ReadAnswer($$)
   }
 }
 
+# Undef
 sub
 TCM_Undef($$)
 {
@@ -774,6 +811,10 @@ TCM_Undef($$)
   The address range used by your transceiver module, can be found in the
   parameters BaseID and LastID.
   <br><br>
+  The transceiver moduls do not always support all commands. The supported range
+  of commands depends on the hardware and the firmware version. A firmware update
+  is usually not provided.
+  <br><br>
 
   <a name="TCMdefine"></a>
   <b>Define</b>
@@ -796,42 +837,90 @@ TCM_Undef($$)
   <br>
 
   <a name="TCMset"></a>
-  <b>Set </b>
-  <ul>
-    <li>baseID<br>
-        Set the BaseID.<br>
-        Note: The firmware executes this command only up to then times to prevent misuse.
-        </li>
-    <li>idbase<br>
-        Set the BaseID.<br>
-        Note: The firmware executes this command only up to then times to prevent misuse.
-        </li>
-    <li>modem_off</li>
-    <li>modem_on</li>
-    <li>reset</li>
-    <li>sensitivity</li>
-    <li>sleep</li>
-    <li>wake</li><br>
-    For details see the datasheet available from <a href="http://www.enocean.com">www.enocean.com</a>.
-    If you do not understand it, than you probably don't need it :)
+  <b>Set</b><br>
+  <ul><b>TCM 120</b><br>
+    <li>idbase [FF800000 ... FFFFFF80]<br>
+      Set the BaseID.<br>
+      Note: The firmware executes this command only up to then times to prevent misuse.</li>
+    <li>modem_off<br>
+      Deactivates TCM modem functionality</li>
+    <li>modem_on [0000 ... FFFF]<br>
+      Activates TCM modem functionality and sets the modem ID</li>
+    <li>pairForSec &lt;t/s&gt;<br>
+      Set Fhem in teach-in mode.<br>
+      The command is only required to teach-in bidirectional actuators
+      e. g. EEP 4BS, RORG A5-20-01 (Battery Powered Actuator),
+      see <a href="#pairForSec"> Bidirectional Teach-In / Teach-Out</a>.</li>
+    <li>reset<br>
+      Reset the device</li>
+    <li>sensitivity [00|01]<br>
+      Set the TCM radio sensitivity: low = 00, high = 01</li>
+    <li>sleep<br>
+      Enter the energy saving mode</li>
+    <li>wake<br>
+      Wakes up from sleep mode</li>
+    <br><br>
+    For details see the TCM 120 User Manual available from <a href="http://www.enocean.com">www.enocean.com</a>.
+  <br><br>
+  </ul>
+  <ul><b>TCM 310</b><br>
+    <li>baseID [FF800000 ... FFFFFF80]<br>
+      Set the BaseID.<br>
+      Note: The firmware executes this command only up to then times to prevent misuse.</li>
+    <li>bist<br>
+      Perform Flash BIST operation (Built-in-self-test).</li>
+    <li>maturity [00|01]<br>
+      Waiting till end of maturity time before received radio telegrams will transmit:
+      radio telegrams are send immediately = 00, after the maturity time is elapsed = 01</li>
+    <li>pairForSec &lt;t/s&gt;<br>
+      Set Fhem in teach-in mode.<br>
+      The command is only required to teach-in bidirectional actuators
+      e. g. EEP 4BS, RORG A5-20-01 (Battery Powered Actuator),
+      see <a href="#pairForSec"> Bidirectional Teach-In / Teach-Out</a>.</li>
+    <li>reset<br>
+      Reset the device</li>
+    <li>repeater [0000|0101|0102]<br>
+      Set Repeater Level: off = 0000, 1 = 0101, 2 = 0102.</li>
+    <li>sleep &lt;t/10 ms&gt; (Range: 00000000 ... 00FFFFFF)<br>
+      Enter the energy saving mode</li>
+    <li>subtel [00|01]<br>
+      Transmitting additional subtelegram info: Enable = 01, Disable = 00</li>
+    <br><br>
+    For details see the EnOcean Serial Protocol 3 (ESP3) available from
+    <a href="http://www.enocean.com">www.enocean.com</a>.
 <br><br>
   </ul>
 
   <a name="TCMget"></a>
-  <b>Get</b>
-  <ul>
-    <li>baseID<br>
-      Get the BaseID. You need this command in order to control EnOcean devices,
-      see the <a href="#EnOceandefine">EnOcean</a> paragraph.
-      </li>
+  <b>Get</b><br>
+  <ul><b>TCM 120</b><br>
     <li>idbase<br>
       Get the BaseID. You need this command in order to control EnOcean devices,
       see the <a href="#EnOceandefine">EnOcean</a> paragraph.
       </li>
-    <li>modem_status</li>
-    <li>sensitivity</li>
-    <li>sw_ver</li><br>
-    For details see the datasheet available from <a href="http://www.enocean.com">www.enocean.com</a>
+    <li>modem_status<br>
+      Requests the current modem status.</li>
+    <li>sensitivity<br>
+      Get the TCM radio sensitivity, low = 00, high = 01</li>
+    <li>sw_ver<br>
+      Read the device SW version / HW version, chip-ID, etc.</li>
+    <br><br>
+    For details see the TCM 120 User Manual available from <a href="http://www.enocean.com">www.enocean.com</a>.
+    <br><br>
+  </ul>
+  <ul><b>TCM 310</b><br>
+    <li>baseID<br>
+      Get the BaseID. You need this command in order to control EnOcean devices,
+      see the <a href="#EnOceandefine">EnOcean</a> paragraph.</li>
+    <li>numSecureDev<br>
+      Read number of teached in secure devices.</li>
+    <li>repeater<br>
+      Read Repeater Level: off = 0000, 1 = 0101, 2 = 0102.</li>
+    <li>version<br>
+      Read the device SW version / HW version, chip-ID, etc.</li>
+    <br><br>
+    For details see the EnOcean Serial Protocol 3 (ESP3) available from
+    <a href="http://www.enocean.com">www.enocean.com</a>.
     <br><br>
   </ul>
 
