@@ -1,4 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
+  - feature: TCM: new commands added
+  - bugfix:  TCM: TCM_ReadAnswer(): response error corrected 
   - feature: readingsGroup: new attribute nolinks
   - feature: readingsGroup: new attribute nameIcon
   - feature: readingsGroup: allow device selecton by TYPE=xxx
