@@ -3070,7 +3070,7 @@ sub CUL_HM_sndIfOpen($) {
   my(undef,$io) = split(':',$_[0]);
   RemoveInternalTimer("sndIfOpen:$io");# should not be necessary, but
   my $ioHash = $defs{$io};
-  if (   $ioHash->{STATE} ne "opened" 
+  if (   $ioHash->{STATE} != m/^(opened|Initialized)$/ 
       ||(defined $ioHash->{XmitOpen} && $ioHash->{XmitOpen} == 0) 
 #	  ||$modules{CUL_HM}{prot}{rspPend}>=$maxPendCmds
 	   ){#still no send allowed
@@ -3105,9 +3105,9 @@ sub CUL_HM_SndCmd($$) {
   my $io = $hash->{IODev};
   return if(!$io);  
   my $ioName = $io->{NAME};
-  if ((hex substr($cmd,2,2) & 0x20) && (  # check for commands with resp-req
-           $io->{STATE} ne "opened"       # we need to queue
-        || $modules{CUL_HM}{$ioName}{tmr} # queue already running
+  if ((hex substr($cmd,2,2) & 0x20) && (                   # check for commands with resp-req
+           $io->{STATE} != m/^(opened|Initialized)$/       # we need to queue
+        || $modules{CUL_HM}{$ioName}{tmr}                  # queue already running
         ||(defined $io->{XmitOpen} && $io->{XmitOpen} == 0)#overload, dont send
 #	    ||$modules{CUL_HM}{prot}{rspPend}>=$maxPendCmds
 	    )
