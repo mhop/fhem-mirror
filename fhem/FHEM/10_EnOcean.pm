@@ -203,7 +203,7 @@ EnOcean_Initialize($)
   $hash->{ParseFn}   = "EnOcean_Parse";
   $hash->{SetFn}     = "EnOcean_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
-                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 " .
+                       "showtime:1,0 " .
                        "actualTemp angleMax:slider,-180,20,180 angleMin:slider,-180,20,180 " .
                        "angleTime:0,1,2,3,4,5,6 comMode:biDir,uniDir destinationID " .
                        "devChannel dimValueOn " .
@@ -262,7 +262,6 @@ EnOcean_Set($@)
   } elsif ($destinationID !~ m/^[\dA-F]{8}$/) {
     return "DestinationID $destinationID wrong, choose <8-digit-hex-code>.";
   }
-  my $ll2 = GetLogLevel($name, 2);
   my $manufID = AttrVal($name, "manufID", "");
   my $model = AttrVal($name, "model", "");
   my $rorg;
@@ -575,7 +574,7 @@ EnOcean_Set($@)
         }
         
       }
-      Log $ll2, "EnOcean: set $name $cmd";
+      Log3 $name, 2, "EnOcean: set $name $cmd";
     
     } elsif ($st eq "MD15") {
       # Battery Powered Actuator (EEP A5-20-01)
@@ -1068,7 +1067,7 @@ EnOcean_Set($@)
       } else {
         return "Unknown Gateway command " . $cmd . ", choose one of ". join(" ", sort keys %EnO_gwCmd);
       }
-      Log $ll2, "EnOcean: set $name $cmd";
+      Log3 $name, 2, "EnOcean: set $name $cmd";
 
     } elsif ($st eq "manufProfile") {
       if ($manufID eq "00D") {
@@ -1298,7 +1297,7 @@ EnOcean_Set($@)
           $updateState = 0;
           $data = sprintf "%02X%02X%02X%02X", 0, $shutTime, $shutCmd, 8;
         }
-        Log $ll2, "EnOcean: set $name $cmd";
+        Log3 $name, 2, "EnOcean: set $name $cmd";
       }
 
     } elsif ($st eq "contact") {
@@ -1316,7 +1315,7 @@ EnOcean_Set($@)
         return "Unknown argument $cmd, choose one of open closed teach";
       }
       $data = sprintf "%02X", $setCmd;
-      Log $ll2, "EnOcean: set $name $cmd";
+      Log3 $name, 2, "EnOcean: set $name $cmd";
 
     } elsif ($st eq "raw") {
       # sent raw data
@@ -1384,7 +1383,7 @@ EnOcean_Set($@)
       readingsSingleUpdate($hash, "RORG", $cmd, 1);
       readingsSingleUpdate($hash, "dataSent", $data, 1);
       readingsSingleUpdate($hash, "statusSent", $status, 1);
-      Log $ll2, "EnOcean: set $name $cmd $data $status";
+      Log3 $name, 2, "EnOcean: set $name $cmd $data $status";
       shift(@a);     
 
     } elsif ($st eq "switch") {
@@ -1458,7 +1457,7 @@ EnOcean_Set($@)
       if ($sendCmd ne "no") {
         $data = sprintf "%02X", $switchCmd;
         $rorg = "F6";
-        Log $ll2, "EnOcean: set $name $cmd";
+        Log3 $name, 2, "EnOcean: set $name $cmd";
       }
     
     } else {
@@ -1477,7 +1476,7 @@ EnOcean_Set($@)
         $status = "20";
         # next commands will be sent with a delay
         select(undef, undef, undef, 0.2);
-	Log $ll2, "EnOcean: set $name released";
+	Log3 $name, 2, "EnOcean: set $name released";
         EnOcean_SndRadio(undef, $hash, $rorg, $data, $subDef, $status, $destinationID);
       }
     }
@@ -1518,11 +1517,10 @@ EnOcean_Parse($$)
     $dbCntr++;
   }  
   my @event;
-  my $ll4 = GetLogLevel($name, 4);
   my $model = AttrVal($name, "model", "");
   my $manufID = AttrVal($name, "manufID", "");
   my $st = AttrVal($name, "subType", "");
-  Log $ll4, "EnOcean: $name PacketType: $packetType RORG:$rorg DATA:$data ID:$id STATUS:$status";
+  Log3 $name, 4, "EnOcean: $name PacketType: $packetType RORG:$rorg DATA:$data ID:$id STATUS:$status";
 
   if ($rorg eq "F6") {
     # RPS Telegram (PTM200)
@@ -3149,7 +3147,6 @@ sub
 EnOcean_SndRadio($$$$$$$)
 {
   my ($ctrl, $hash, $rorg, $data, $senderID, $status, $destinationID) = @_;
-  my $ll2 = GetLogLevel($hash->{NAME}, 2);
   my $odata = "";
   my $odataLength = 0;
   if (AttrVal($hash->{NAME}, "repeatingAllowed", "yes") eq "no") {
@@ -3166,6 +3163,7 @@ EnOcean_SndRadio($$$$$$$)
   my $header = sprintf "%04X%02X01", (length($data)/2 + 6), $odataLength;
   $data = $rorg . $data . $senderID . $status . $odata;
   IOWrite($hash, $header, $data);
+  Log3 $hash->{NAME}, 4, "EnOcean: IOWrite $hash->{NAME} Header: $header Data: $data";
 }
 
 # Scale Readings
@@ -3801,7 +3799,6 @@ EnOcean_Undef($$)
     </li>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#IODev">IODev</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a></li>
     <li><a name="rampTime">rampTime</a> t/s or relative, [rampTime] = 1 is default.<br>
       No ramping or for Eltako dimming speed set on the dimmer if [rampTime] = 0.<br>
