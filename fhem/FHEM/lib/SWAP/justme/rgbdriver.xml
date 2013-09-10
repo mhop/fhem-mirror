@@ -82,7 +82,7 @@
         <size>5</size>
       </endpoint>
     </reg>
-    <reg name="Temp" id="17" hwmask="01">
+    <reg name="Bri" id="17" hwmask="01">
       <endpoint name="Brightness" type="num" dir="inp">
         <size>2</size>
       </endpoint>
