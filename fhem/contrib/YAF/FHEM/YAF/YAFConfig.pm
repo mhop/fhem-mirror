@@ -461,6 +461,7 @@ sub YAF_getWidgetAttribute{
 		my $widgetId = $_[1];
 		my $attributeName = $_[2];
 		my $default = (defined $_[3]) ? $_[3] : 0;
+		my $regex = (defined $_[4]) ? $_[4] : 0;
 
 		if($isInit == 0) {						#after a restart of fhem the config hashes might be empty, because they are filled while
 			YAF_FHEMConfig();					#loading the "yaf.htm" page. However, when restarting FHEM without reloading the page, there
@@ -481,8 +482,14 @@ sub YAF_getWidgetAttribute{
 				my @tokens = split(/,/,$attrString);
 				foreach my $akey (@tokens) {					#cycle through the other values
 					my @skey = split(/=/, $akey);				#split them for =
-					if($skey[0] eq $attributeName) {			#the first value is the key, if it is the wanted attribute
-						$retAttr = $skey[1];					#return it.
+					if($regex == 0) {
+						if($skey[0] eq $attributeName) {			#the first value is the key, if it is the wanted attribute
+							$retAttr = $skey[1];					#return it.
+						}
+					} else {
+						if($attributeName =~ $skey[0]) {
+							$retAttr = $skey[1];
+						}
 					}
 				}
 			}
