@@ -2666,8 +2666,9 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$msg);
   }
   elsif($cmd eq "desired-temp") { #############################################
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'0202'.
-	                                                   CUL_HM_convTemp($a[2]));
+    my $temp = CUL_HM_convTemp($a[2]);
+	return $temp if($temp !~ m/Invalid/);
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'0202'.$temp);
     my $chnHash = CUL_HM_id2Hash($dst."02");
 	my $mode = ReadingsVal($chnHash->{NAME},"R-controlMode","");
 	$mode =~ s/set_//;#consider set as given
@@ -2692,8 +2693,9 @@ sub CUL_HM_Set($@) {
       return "$a[$idx] is not in HH:MM format"
                                 if($a[$idx] !~ m/^([0-2]\d):([0-5]\d)/);
       my ($h, $m) = ($1, $2);
-      $data .= sprintf("%02X%02X%02X%s", $addr, $h*6+($m/10), $addr+1,
-	                                              CUL_HM_convTemp($a[$idx+1]));
+      my $temp = CUL_HM_convTemp($a[$idx+1]);
+	  return $temp if($temp !~ m/Invalid/);
+      $data .= sprintf("%02X%02X%02X%s", $addr, $h*6+($m/10), $addr+1,$temp);
       $addr += 2;
       $hash->{TEMPLIST}{$wd}{($idx-2)/2}{HOUR} = $h;
       $hash->{TEMPLIST}{$wd}{($idx-2)/2}{MINUTE} = $m;
