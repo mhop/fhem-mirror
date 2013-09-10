@@ -27,6 +27,7 @@ PCA301_Initialize($)
   $hash->{AttrFn}    = "PCA301_Attr";
   $hash->{AttrList}  = "IODev"
                        ." readonly:1"
+                       ." forceOn:1"
                        ." $readingFnAttributes";
 }
 
@@ -158,6 +159,13 @@ PCA301_Fingerprint($$)
   return ( "", $msg );
 }
 
+sub
+PCA301_ForceOn($)
+{
+  my ($hash) = @_;
+
+  PCA301_Send( $hash, 0x05, 0x01 );
+}
 
 sub
 PCA301_Parse($$)
@@ -209,21 +217,28 @@ PCA301_Parse($$)
   $rhash->{PCA301_lastRcv} = TimeNow();
 
   my $readonly = AttrVal($rname, "readonly", "0" );
+  my $state = "";
 
   if( $cmd eq 0x04 ) {
-    my $state = $data==0x00?"off":"on";
+    $state = $data==0x00?"off":"on";
     my $power = ($bytes[6]*256 + $bytes[7]) / 10.0;
     my $consumption = ($bytes[8]*256 + $bytes[9]) / 100.0;
-    $state = $power if( $readonly );
+    my $state = $state; $state = $power if( $readonly );
     readingsBeginUpdate($rhash);
     readingsBulkUpdate($rhash, "power", $power) if( $data != 0x00 );
     readingsBulkUpdate($rhash, "consumption", $consumption) if( $data != 0x00 );
     readingsBulkUpdate($rhash, "state", $state) if( Value($rname) ne $state );
     readingsEndUpdate($rhash,1);
   } elsif( $cmd eq 0x05 ) {
-    my $state = $data==00?"off":"on";
+    $state = $data==0x00?"off":"on";
 
     readingsSingleUpdate($rhash, "state", $state, 1)
+  }
+
+  if( AttrVal($rname, "forceOn", 0 ) == 1
+      && $state eq "off"  ) {
+    readingsSingleUpdate($rhash, "state", "set-forceOn", 1);
+    InternalTimer(gettimeofday()+3, "PCA301_ForceOn", $rhash, 0);
   }
 
   return @list;
@@ -312,6 +327,8 @@ PCA301_Attr(@)
   <ul>
     <li>readonly<br>
     if set to a value != 0 all switching commands (on, off, toggle, ...) will be disabled.</li>
+    <li>forceOn<br>
+    try to switch on the device whenever an off status is received.</li>
   </ul><br>
 </ul>
 
