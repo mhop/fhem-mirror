@@ -346,13 +346,13 @@ sub generic_on_click() {
 			}
 			return encode_json(\@ret);
 		}
-		my $setstate = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "_".$d->{STATE}, "");
+		my $setstate = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "_".$d->{STATE}, "",1);
 
 		if($setstate ne "") {
 			fhem("set " . $fhemname . " " . $setstate);
+			$ret[0] = "setstate";
 			return encode_json(\@ret);
 		}
-
 }
 
 1;

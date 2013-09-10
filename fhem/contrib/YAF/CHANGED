@@ -1,3 +1,4 @@
+- Added regex capability for generic widget onclick function
 - Added foundation for modify dialog and modify dialog for generic widget (marcproe)
 - Added Conig Save button (marcproe)
 - Added widget generic (marcproe)
