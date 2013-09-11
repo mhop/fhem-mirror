@@ -1,4 +1,5 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
+  - feature: new module 32_mailcheck.pm (by justme1968)
   - feature: TCM: new commands added
   - bugfix:  TCM: TCM_ReadAnswer(): response error corrected 
   - feature: readingsGroup: new attribute nolinks
