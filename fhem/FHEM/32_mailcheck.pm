@@ -355,7 +355,10 @@ mailcheck_Read($)
 <a name="mailcheck"></a>
 <h3>mailcheck</h3>
 <ul>
-  Watches a mailbox with imap idle.<br><br>
+  Watches a mailbox with imap idle and for each new mail triggers an event with the subject of this mail.<br><br>
+  This can be used to send mails *to* FHEM and react to them from a notify. Application scenarios are for example
+  a geofencing apps on mobile phones, networked devices that inform about warning or failure conditions by e-mail or
+  (with a little logic in FHEM) the absence of regular status messages from such devices and so on.<br><br>
 
   Notes:
   <ul>
@@ -369,7 +372,7 @@ mailcheck_Read($)
     <code>define &lt;name&gt; mailcheck &lt;host&gt; &lt;user&gt; [&lt;folder&gt;]</code><br>
     <br>
 
-    Defines a mailcheck device that waits for new messages and triggers an event with the mail subject.<br><br>
+    Defines a mailcheck device.<br><br>
 
     Examples:
     <ul>
