@@ -574,7 +574,7 @@ EnOcean_Set($@)
         }
         
       }
-      Log3 $name, 2, "EnOcean: set $name $cmd";
+      Log3 $name, 2, "EnOcean set $name $cmd";
     
     } elsif ($st eq "MD15") {
       # Battery Powered Actuator (EEP A5-20-01)
@@ -1067,7 +1067,7 @@ EnOcean_Set($@)
       } else {
         return "Unknown Gateway command " . $cmd . ", choose one of ". join(" ", sort keys %EnO_gwCmd);
       }
-      Log3 $name, 2, "EnOcean: set $name $cmd";
+      Log3 $name, 2, "EnOcean set $name $cmd";
 
     } elsif ($st eq "manufProfile") {
       if ($manufID eq "00D") {
@@ -1297,7 +1297,7 @@ EnOcean_Set($@)
           $updateState = 0;
           $data = sprintf "%02X%02X%02X%02X", 0, $shutTime, $shutCmd, 8;
         }
-        Log3 $name, 2, "EnOcean: set $name $cmd";
+        Log3 $name, 2, "EnOcean set $name $cmd";
       }
 
     } elsif ($st eq "contact") {
@@ -1315,7 +1315,7 @@ EnOcean_Set($@)
         return "Unknown argument $cmd, choose one of open closed teach";
       }
       $data = sprintf "%02X", $setCmd;
-      Log3 $name, 2, "EnOcean: set $name $cmd";
+      Log3 $name, 2, "EnOcean set $name $cmd";
 
     } elsif ($st eq "raw") {
       # sent raw data
@@ -1383,7 +1383,7 @@ EnOcean_Set($@)
       readingsSingleUpdate($hash, "RORG", $cmd, 1);
       readingsSingleUpdate($hash, "dataSent", $data, 1);
       readingsSingleUpdate($hash, "statusSent", $status, 1);
-      Log3 $name, 2, "EnOcean: set $name $cmd $data $status";
+      Log3 $name, 2, "EnOcean set $name $cmd $data $status";
       shift(@a);     
 
     } elsif ($st eq "switch") {
@@ -1457,7 +1457,7 @@ EnOcean_Set($@)
       if ($sendCmd ne "no") {
         $data = sprintf "%02X", $switchCmd;
         $rorg = "F6";
-        Log3 $name, 2, "EnOcean: set $name $cmd";
+        Log3 $name, 2, "EnOcean set $name $cmd";
       }
     
     } else {
@@ -1476,7 +1476,7 @@ EnOcean_Set($@)
         $status = "20";
         # next commands will be sent with a delay
         select(undef, undef, undef, 0.2);
-	Log3 $name, 2, "EnOcean: set $name released";
+	Log3 $name, 2, "EnOcean set $name released";
         EnOcean_SndRadio(undef, $hash, $rorg, $data, $subDef, $status, $destinationID);
       }
     }
@@ -1500,12 +1500,14 @@ EnOcean_Parse($$)
   my (undef, $packetType, $rorg, $data, $id, $status, $odata) = split(":", $msg);
   my $rorgname = $EnO_rorgname{$rorg};
   if (!$rorgname) {
-    Log 2, "EnOcean: RORG ($rorg) received from $id unknown.";
+    #Log 2, "EnOcean RORG ($rorg) received from $id unknown.";
+    Log3 undef, 2, "EnOcean RORG ($rorg) received from $id unknown.";
     return "";
   }
   my $hash = $modules{EnOcean}{defptr}{$id};
   if (!$hash) {
-    Log 3, "EnOcean: Unknown device with ID $id, please define it";
+    #Log 3, "EnOcean Unknown device with ID $id, please define it";
+    Log3 undef, 3, "EnOcean Unknown device with ID $id, please define it";
     return "UNDEFINED EnO_${rorgname}_$id EnOcean $id";
   }
   my $name = $hash->{NAME};
@@ -1520,7 +1522,7 @@ EnOcean_Parse($$)
   my $model = AttrVal($name, "model", "");
   my $manufID = AttrVal($name, "manufID", "");
   my $st = AttrVal($name, "subType", "");
-  Log3 $name, 4, "EnOcean: $name PacketType: $packetType RORG:$rorg DATA:$data ID:$id STATUS:$status";
+  Log3 $name, 5, "EnOcean $name PacketType: $packetType RORG:$rorg DATA:$data ID:$id STATUS:$status";
 
   if ($rorg eq "F6") {
     # RPS Telegram (PTM200)
@@ -1663,7 +1665,8 @@ EnOcean_Parse($$)
         # manufID to account for vendor-specific features
         $attr{$name}{manufID} = $mf;
         $mf = $EnO_manuf{$mf} if($EnO_manuf{$mf});
-        Log 1, "EnOcean: $name teach-in EEP A5-$fn-$tp Manufacturer: $mf";
+        #Log 1, "EnOcean $name teach-in EEP A5-$fn-$tp Manufacturer: $mf";
+        Log3 undef, 1, "EnOcean $name teach-in EEP A5-$fn-$tp Manufacturer: $mf";
         push @event, "3:teach-in:EEP A5-$fn-$tp Manufacturer: $mf";
         my $st = "A5.$fn.$tp";
         $st = $EnO_subType{$st} if($EnO_subType{$st});
@@ -2928,7 +2931,8 @@ EnOcean_Parse($$)
           $attr{$name}{subType} = $subType;
           $attr{$name}{manufID} = $mid;
           $mid = $EnO_manuf{$mid} if($EnO_manuf{$mid});
-          Log 1, "EnOcean: $name teach-in EEP $rorg-$func-$type Manufacturer: $mid";
+          #Log 1, "EnOcean $name teach-in EEP $rorg-$func-$type Manufacturer: $mid";
+          Log3 undef, 1, "EnOcean $name teach-in EEP $rorg-$func-$type Manufacturer: $mid";
           push @event, "3:teach-in:EEP $rorg-$func-$type Manufacturer: $mid";
           $attr{$name}{devChannel} = $devChannel;
           $attr{$name}{comMode} = $comMode;
@@ -3163,7 +3167,7 @@ EnOcean_SndRadio($$$$$$$)
   my $header = sprintf "%04X%02X01", (length($data)/2 + 6), $odataLength;
   $data = $rorg . $data . $senderID . $status . $odata;
   IOWrite($hash, $header, $data);
-  Log3 $hash->{NAME}, 4, "EnOcean: IOWrite $hash->{NAME} Header: $header Data: $data";
+  Log3 $hash->{NAME}, 4, "EnOcean IOWrite $hash->{NAME} Header: $header Data: $data";
 }
 
 # Scale Readings
@@ -3524,7 +3528,7 @@ EnOcean_Undef($$)
         <li><a href="#setExtensions">set extensions</a> are supported.</li>
      </ul><br>
         rampTime Range: t = 1 s ... 255 s or 0 if no time specified,
-        for Eltako: t = 1 = fast dimming ... 255 = slow dimming or 0 = dimming speed on the dimmer used)<br>
+        for Eltako: t = 1 = fast dimming ... 255 = slow dimming or 0 = dimming speed on the dimmer used<br>
         The attr subType must be gateway and gwCmd must be dimming. This is done if the device was
         created by autocreate.<br>
         For Eltako devices attributes must be set manually. Use the sensor type "PC/FVS" for Eltako devices.
