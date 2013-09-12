@@ -31,6 +31,7 @@ my $yaf_version=0.41;
 
 my %fhemwidgets;
 my %fhemviews;
+my %fhemviewbgs;
 my $isInit = 0;
 
 #######################################################################################
@@ -45,11 +46,17 @@ my $isInit = 0;
 sub YAF_FHEMConfig { #this is called via ajax when the page is loaded.
 		#get the views
 		my $views = AttrVal("yaf","views",undef);
+		my $backgrounds = AttrVal("yaf", "backgrounds", undef);
 		if(defined $views and $isInit == 0) {
 			foreach my $view (split (/;/,$views)) {
 				my @aview = split(/,/,$view);
 				$fhemviews{$aview[0]} = $aview[1];
 			}
+			
+			foreach my $bg (split (/;/,$backgrounds)) {
+				my @abg = split(/,/,$bg);
+				$fhemviewbgs{$abg[0]} = $abg[3];
+			}			
 
 			my $retAttr = "";
 			foreach my $viewId (keys %fhemviews) {
@@ -89,6 +96,7 @@ sub YAF_getViews{
 		foreach my $view (keys %fhemviews){
 				$viewsArray[$index][0] = $view;
 				$viewsArray[$index][1] = $fhemviews{$view};
+				$viewsArray[$index][2] = $fhemviewbgs{$view};
 				$index++;
 		}
 
@@ -159,26 +167,40 @@ sub YAF_getView{
 sub YAF_editView{
 		my $viewId = $_[0];
 		my $viewName = $_[1];
+		my $viewImage = $_[2];
 
 		my %viewhash = ();
+		my %viewbghash = ();
 
 		#load current config
 		foreach my $views (split(/;/,AttrVal("yaf","views",undef))) {
 			my @view = split(/,/,$views);
 			$viewhash{$view[0]} = $view[1];
 		}
+		
+		foreach my $bgs (split(/;/,AttrVal("yaf","backgrounds",undef))) {
+			my @bg = split(/,/,$bgs);
+			$viewbghash{$bg[0]} = $bg[3];
+		}
 
 		#set new config value
 		$viewhash{$viewId} = $viewName;
+		$viewbghash{$viewId} = $viewImage;
 
 		#create new config
 		my $newview = "";
 		foreach my $key (keys %viewhash) {
 			$newview .= $key . "," . $viewhash{$key} . ";;";
 		}
+		
+		my $newbg = "";
+		foreach my $key (keys %viewbghash) {
+			$newbg .= $key . ",1,1," . $viewbghash{$key} . ";;";
+		}		
 
 		#save new config
 		fhem ("attr yaf views $newview");
+		fhem ("attr yaf backgrounds $newbg");
 
 		return 1;
 }
