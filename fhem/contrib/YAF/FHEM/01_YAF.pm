@@ -301,7 +301,7 @@ sub YAF_Request ($@) {
 					#-- changes the name of a View
 					elsif ($function eq "editView") {
 						if ($_GET{"id"} && $_GET{"name"}) {
-							YAF_Print(YAF_editView($_GET{"id"}, $_GET{"name"}));
+							YAF_Print(YAF_editView($_GET{"id"}, $_GET{"name"}, $_GET{"image"}));
 						}
 						else {
 							YAF_Print("0");

@@ -1,4 +1,5 @@
-- Added regex capability for generic widget onclick function
+- path to background image is now configurable via the YAF interface (marcproe)
+- Added regex capability for generic widget onclick function (marcproe)
 - Added foundation for modify dialog and modify dialog for generic widget (marcproe)
 - Added Conig Save button (marcproe)
 - Added widget generic (marcproe)

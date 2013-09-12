@@ -80,7 +80,7 @@ function load_views(callback) {
 		context: document.body,
 		success: function (jsondata) {
 			views = jQuery.parseJSON(jsondata);
-			//console.log(views);
+			console.log(views);
 			if (callback) {
 				callback();
 			}

@@ -99,7 +99,7 @@ function init_dialogs() {
 					type: "GET",
 					async: true,
 					url: "../../ajax/global/editView",
-					data: "id=" + edit_view_id + "&name=" + $("#dialog_editview_name").val(),
+					data: "id=" + edit_view_id + "&name=" + $("#dialog_editview_name").val() + "&image=" + $("#dialog_editview_image").val(),
 					context: document.body,
 					success: function (jsondata) {
 						load_views(show_views);
@@ -115,7 +115,6 @@ function init_dialogs() {
 			}
 		}
 	});
-
 
 	$("#dialog_addwidget").dialog({
 		autoOpen: false,
@@ -315,7 +314,6 @@ function init_dialogs() {
 		}
 	});
 
-
 	$("#dialog_manageviews").dialog({
 		autoOpen: false,
 		resizable: true,
@@ -330,7 +328,7 @@ function init_dialogs() {
 		open: function (event, ui) {
 			$("#dialog_manageviews-table").html("<colgroup><col class=\"col1\"><col class=\"col2\"><col class=\"col3\"></colgroup>");
 			$.each(views, function (index, view) {
-				$("#dialog_manageviews-table").append("<tr id=\"manageviews_tr_" + view[0] + "\"><td>" + view[1] + "</td><td><button id=\"button_edit_" + view[0] + "\" class=\"button_edit\">&nbsp;</button></td><td><button class=\"button_delete\" id=\"button_edit_" + view[0] + "\">&nbsp;</button></td></tr>");
+				$("#dialog_manageviews-table").append("<tr id=\"manageviews_tr_" + view[0] + "\"><td>" + view[1] + "&nbsp;&nbsp;&nbsp;<img width=\"40\" src=\"" + view[2] + "\" id=\"image_edit_" + view[0] + "\" /></td><td><button id=\"button_edit_" + view[0] + "\" class=\"button_edit\">&nbsp;</button></td><td><button class=\"button_delete\" id=\"button_edit_" + view[0] + "\">&nbsp;</button></td></tr>" );
 			});
 			$(".button_edit").button({
 				icons: {
@@ -352,9 +350,18 @@ function init_dialogs() {
 				return false;
 			});
 			$(".button_edit").click(function (ui) {
-				edit_view_name = $(ui.currentTarget.parentNode.parentNode.firstChild).html();
+			
 				edit_view_id = $(ui.currentTarget).attr("id").substr(12);
+				
+				$.each(views, function (index, view) { //this is quite ineffective and should be redone
+					if(view[0] == edit_view_id) {
+						edit_view_name = view[1];
+						edit_view_image = view[2];
+					}
+				});			
+				
 				$("#dialog_editview_name").val(edit_view_name);
+				$("#dialog_editview_image").val(edit_view_image);
 				$("#dialog_editview").dialog("open");
 				return false;
 			});
