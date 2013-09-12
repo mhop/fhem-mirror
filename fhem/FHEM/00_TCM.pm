@@ -77,7 +77,8 @@ TCM_Define($$)
   $hash->{MODEL} = $model;
 
   if($dev eq "none") {
-    Log 1, "TCM: $name device is none, commands will be echoed only";
+    #Log 1, "TCM: $name device is none, commands will be echoed only";
+    Log3 undef, 1, "TCM $name device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
   }
@@ -115,12 +116,12 @@ TCM_Write($$$)
       # command with ESP3 format
       my $packetType = hex(substr($fn, 6, 2));
       if ($packetType != 1) {
-        Log3 $name, 2, "TCM120 $name: Packet Type not supported.";
+        Log3 $name, 2, "TCM $name: Packet Type not supported.";
         return;
       }
       my $odataLen = hex(substr($fn, 4, 2));
       if ($odataLen != 0) {
-        Log3 $name, 2, "TCM120 $name: Radio Telegram with optional Data not supported.";
+        Log3 $name, 2, "TCM $name: Radio Telegram with optional Data not supported.";
         return;
       }    
       #my $mdataLen = hex(substr($fn, 0, 4));
@@ -133,7 +134,7 @@ TCM_Write($$$)
       if($rorgmap{$rorg}) {
         $rorg = $rorgmap{$rorg};
       } else {
-        Log3 $name, 2, "TCM120 $name: unknown RORG mapping for $rorg";
+        Log3 $name, 2, "TCM $name: unknown RORG mapping for $rorg";
       }
       if ($rorg eq "05" || $rorg eq "06") {
         $bstring = "6B" . $rorg . substr ($msg, 2, 2) . "000000" . substr ($msg, 4);    
@@ -146,7 +147,7 @@ TCM_Write($$$)
     # TCM 310 (ESP3)
     $bstring = "55" . $fn . TCM_CRC8($fn) . $msg . TCM_CRC8($msg);
   }
-  Log3 $name, 5, "TCM: $name sending $bstring";
+  Log3 $name, 5, "TCM $name sending $bstring";
   DevIo_SimpleWrite($hash, $bstring, 1);
 }
 
@@ -223,7 +224,7 @@ TCM_Read($)
   my $lastID = hex $hash->{LastID};
 
   my $data = $hash->{PARTIAL} . uc(unpack('H*', $buf));
-  Log3 $name, 5, "TCM: $name/RAW: $data";
+  Log3 $name, 5, "TCM $name RAW: $data";
 
   if($hash->{MODEL} == 120) {
     # TCM 120
@@ -234,7 +235,7 @@ TCM_Read($)
       my $rest = substr($data, 28);
 
       if($crc ne $mycrc) {
-        Log3 $name, 2, "TCM: $name wrong checksum: got $crc, computed $mycrc" ;
+        Log3 $name, 2, "TCM $name wrong checksum: got $crc, computed $mycrc" ;
         $data = $rest;
         next;
       }
@@ -248,14 +249,15 @@ TCM_Read($)
         if($orgmap{$org}) {
           $org = $orgmap{$org};
         } else {
-          Log 1, "TCM120: unknown ORG mapping for $org";
+          #Log 1, "TCM120: unknown ORG mapping for $org";
+          Log3 undef, 1, "TCM unknown ORG mapping for $org";
         }
         if ($org ne "A5") {
           # extract db_0
           $d1 = substr($d1, 0, 2);
         }
         if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
-          Log3 $name, 5, "TCM: $name Telegram from $id blocked.";        
+          Log3 $name, 5, "TCM $name Telegram from $id blocked.";        
         } else {
           Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status", undef);
         }
@@ -291,14 +293,14 @@ TCM_Read($)
 
       my $mycrc = TCM_CRC8($hdr);
       if($mycrc ne $crc) {
-        Log3 $name, 2, "TCM: $name wrong header checksum: got $crc, computed $mycrc" ;
+        Log3 $name, 2, "TCM $name wrong header checksum: got $crc, computed $mycrc" ;
         $data = $rest;
         next;
       }
       $mycrc = TCM_CRC8($mdata . $odata);
       $crc  = substr($data, -2);
       if($mycrc ne $crc) {
-        Log3 $name, 2, "TCM: $name wrong data checksum: got $crc, computed $mycrc" ;
+        Log3 $name, 2, "TCM $name wrong data checksum: got $crc, computed $mycrc" ;
         $data = $rest;
         next;
       }
@@ -319,7 +321,7 @@ TCM_Read($)
         $hash->{RSSI} = -hex($3);
         
         if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
-          Log3 $name, 5, "TCM: $name Telegram from $id blocked.";        
+          Log3 $name, 5, "TCM $name Telegram from $id blocked.";        
         } else {
           Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:$odata", \%addvals);
         }
@@ -338,31 +340,31 @@ TCM_Read($)
           "91" => "BASEID_MAX_REACHED",
         );
         $rc = $codes{$rc} if($codes{$rc});
-        #Log (($rc eq "OK") ? $ll5 : $ll2, "TCM: $name RESPONSE: $rc");
-        Log3 ($name, ($rc eq "OK") ? 5 : 2, "TCM: $name RESPONSE: $rc");
+        #Log (($rc eq "OK") ? $ll5 : $ll2, "TCM $name RESPONSE: $rc");
+        Log3 ($name, ($rc eq "OK") ? 5 : 2, "TCM $name RESPONSE: $rc");
 
       } elsif($packetType == 3) {
         # packet type RADIO_SUB_TEL
-        Log3 $name, 2, "TCM: $name packet type RADIO_SUB_TEL not supported: $data";
+        Log3 $name, 2, "TCM $name packet type RADIO_SUB_TEL not supported: $data";
 
       } elsif($packetType == 4) {
         # packet type EVENT
-        Log3 $name, 2, "TCM: $name packet type EVENT not supported: $data";
+        Log3 $name, 2, "TCM $name packet type EVENT not supported: $data";
 
       } elsif($packetType == 5) {
         # packet type COMMON_COMMAND
-        Log3 $name, 2, "TCM: $name packet type COMMON_COMMAND not supported: $data";
+        Log3 $name, 2, "TCM $name packet type COMMON_COMMAND not supported: $data";
 
       } elsif($packetType == 6) {
         # packet type SMART_ACK_COMMAND
-        Log3 $name, 2, "TCM: $name packet type SMART_ACK_COMMAND not supported: $data";
+        Log3 $name, 2, "TCM $name packet type SMART_ACK_COMMAND not supported: $data";
 
       } elsif($packetType == 7) {
         # packet type REMOTE_MAN_COMMAND
         Log3 $name, 2, "TCM: $name packet type REMOTE_MAN_COMMAND not supported: $data";
 
       } else {
-        Log3 $name, 2, "TCM: $name unknown packet type $packetType: $data";
+        Log3 $name, 2, "TCM $name unknown packet type $packetType: $data";
 
       }
 
@@ -407,7 +409,7 @@ TCM_Parse120($$$)
   my ($hash,$rawmsg,$ret) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 5, "TCM: Parse $rawmsg";
+  Log3 $name, 5, "TCM Parse $rawmsg";
 
   my $msg = "";
   my $cmd = $parsetbl120{substr($rawmsg, 0, 4)};
@@ -431,7 +433,7 @@ TCM_Parse120($$$)
 
   }
 
-  Log3 $name, 2, "TCM: $name $msg" if(!$ret);
+  Log3 $name, 2, "TCM $name $msg" if(!$ret);
   return $msg;
 }
 
@@ -453,7 +455,7 @@ TCM_Parse310($$$)
 {
   my ($hash,$rawmsg,$ptr) = @_;
   my $name = $hash->{NAME};
-  Log3 $name, 5, "TCM: Parse $rawmsg";
+  Log3 $name, 5, "TCM Parse $rawmsg";
   my $rc = substr($rawmsg, 0, 2);
   my $msg = "";
 
@@ -472,7 +474,7 @@ TCM_Parse310($$$)
     $msg = join(",", @ans);
   }
 
-  Log3 $name, 2, "TCM: $name $msg";
+  Log3 $name, 2, "TCM $name $msg";
   return $msg;
 }
 
@@ -568,7 +570,8 @@ TCM_Get($@)
   }
 
   if($err) {
-    Log 1, $err;
+    #Log 1, $err;
+    Log3 undef, 1, $err;
     return $err;
   }
   $hash->{READINGS}{$cmd}{VAL} = $msg;
@@ -668,7 +671,8 @@ TCM_Set($@)
   }
 
   if($err) {
-    Log 1, $err;
+    #Log 1, $err;
+    Log3 undef, 1, $err;
     return $err;
   }
   return $msg;
@@ -716,7 +720,7 @@ TCM_ReadAnswer($$)
 
     if(defined($buf)) {
       $data .= uc(unpack('H*', $buf));
-      Log3 $name, 5, "TCM/RAW (ReadAnswer): $data";
+      Log3 $name, 5, "TCM RAW ReadAnswer: $data";
 
       if($hash->{MODEL} eq "120") {
         # TCM 120
@@ -771,7 +775,8 @@ TCM_Undef($$)
        $defs{$d}{IODev} == $hash)
       {
         my $lev = ($reread_active ? 4 : 2);
-        Log GetLogLevel($name,$lev), "deleting port for $d";
+        #Log GetLogLevel($name,$lev), "deleting port for $d";
+        Log3 $name, $lev, "TCM deleting port for $d";
         delete $defs{$d}{IODev};
       }
   }
