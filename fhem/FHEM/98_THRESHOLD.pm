@@ -613,13 +613,14 @@ THRESHOLD_setValue($$)
 	<br>
 	 <li><b>target_value</b> (optional)<br>
 	  number: Initial value, if no value is specified, it must be set with "set desired value".<br>
-	  else:<sensorname>:<reading>, an additional sensor can be specified, which sets the target value dynamically
-	  Defaultwert: no value
+	  else:&lt;sensorname&gt;:&lt;reading&gt, an additional sensor can be specified, which sets the target value dynamically.<br>
+	  default value: no value
 	</li>
 	<br>
 	<li><b>offset</b> (optional)<br>
-	  Offset zum Sollwert<br>
-	  Damit errechnet sich die Sollwertobergrenze = Sollwert+offset und die Sollwertuntergrenze = Sollwert-Hysterese+offset.<br>
+	  Offset to desired value<br>
+	  This results:<br>
+	  threshold_max = desired_value + offset and threshold_min = desired_value - hysteresis + offset<br>
 	  Defaultwert: 0<br>
 	</li>
 	<br>
@@ -899,19 +900,19 @@ THRESHOLD_setValue($$)
 	</li>
 	<br>
 	<li><b>hysteresis</b> (optional)<br>
-	Hysterese, daraus errechnet sich die Untergrenze = Sollwert - hysteresis + offset<br>
+	Hysterese, daraus errechnet sich die Untergrenze = Sollwert - hysteresis<br>
 	Defaultwert: 1 bei Temperaturen, 10 bei Feuchtigkeit<br>
 	</li>
 	<br>
 	<li><b>target_value</b> (optional)<br>
-	  bei Zahl: Initial-Sollwert , wenn kein Wert vorgegeben wird, muss er mit "set desired value" gesetzt werden, daraus berechnet sich die Obergrenze = Sollwert + offset<br>
-	  sonst: <sensorname>:<reading>, hier kann ein weiterer Sensor angegeben werden, der den Sollwert dynamisch vorgibt<br> 
+	  bei Zahl: Initial-Sollwert, wenn kein Wert vorgegeben wird, muss er mit "set desired value" gesetzt werden.<br>
+	  sonst: &lt;sensorname&gt;:&lt;reading&gt, hier kann ein weiterer Sensor angegeben werden, der den Sollwert dynamisch vorgibt.<br> 
 	  Defaultwert: kein<br>
 	</li>
 	<br>
 	<li><b>offset</b> (optional)<br>
 	  Offset zum Sollwert<br>
-	  Damit errechnet sich die Sollwertobergrenze = Sollwert+offset und die Sollwertuntergrenze = Sollwert-Hysterese+offset.<br>
+	  Damit errechnet sich: die Sollwertobergrenze = Sollwert + offset und die Sollwertuntergrenze = Sollwert - Hysterese + offset<br>
 	  Defaultwert: 0<br>
 	</li>
 	<br>
