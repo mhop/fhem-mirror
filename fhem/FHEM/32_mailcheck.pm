@@ -10,6 +10,7 @@ use warnings;
 
 use Mail::IMAPClient;
 use IO::Socket::SSL;
+use IO::Socket::INET;
 use IO::File;
 use IO::Handle;
 
@@ -31,6 +32,7 @@ mailcheck_Initialize($)
                       "disable:1 ".
                       "intervall ".
                       "logfile ".
+                      "nossl:1 ".
                       $readingFnAttributes;
 }
 
@@ -93,10 +95,16 @@ mailcheck_Connect($)
 
   return undef if( AttrVal($name, "disable", 0 ) == 1 );
 
-  my $socket = IO::Socket::SSL->new(
-     PeerAddr => $hash->{Host},
-     PeerPort => 993, #AttrVal($name, "port", 993).
-   );
+  my $socket;
+  if( AttrVal($name, "nossl", 0) ) {
+    $socket = IO::Socket::INET->new( PeerAddr => $hash->{Host},
+                                     PeerPort => 143, #AttrVal($name, "port", 143)
+                                   );
+  } else {
+    $socket = IO::Socket::SSL->new( PeerAddr => $hash->{Host},
+                                    PeerPort => 993, #AttrVal($name, "port", 993)
+                                  );
+  }
 
   if($socket) {
     $hash->{STATE} = "Connected";
@@ -148,6 +156,9 @@ mailcheck_Connect($)
     } else {
       mailcheck_Disconnect($hash);
     }
+  } else {
+    #$hash->{STATE} = "Connected";
+    Log3 $name, 3, "$name: failed to connect to $hash->{Host}";
   }
 }
 sub
@@ -362,7 +373,7 @@ mailcheck_Read($)
 
   Notes:
   <ul>
-    <li>Mail::IMAPClient and IO::Socket::SSL hast to be installed on the FHEM host.</li>
+    <li>Mail::IMAPClient and IO::Socket::SSL and IO::Socket::INET hast to be installed on the FHEM host.</li>
     <li>Probably only works reliably if no other mail programm is marking messages as read at the same time.</li>
   </ul><br>
 
@@ -403,7 +414,9 @@ mailcheck_Read($)
       1 -> delete message after Subject reading is created</li>
     <li>intervall<br>
       the intervall in seconds used to trigger an update on the connection.
-      if idle is supported the defailt is 600, without idle support the default is 60. the minimum is 60.</li><br>
+      if idle is supported the defailt is 600, without idle support the default is 60. the minimum is 60.</li>
+    <li>nossl<br>
+      1 -> don't use ssl.</li><br>
     <li>debug<br>
       1 -> enables debug output. default target is stdout.</li>
     <li>logfile<br>
