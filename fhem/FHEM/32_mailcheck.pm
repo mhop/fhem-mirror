@@ -292,6 +292,15 @@ mailcheck_Attr($$$)
           $client->Debug_fh(*STDERR) if( $client );
         }
     }
+  } elsif( $attrName eq "disable" ) {
+    my $hash = $defs{$name};
+    if( $cmd eq "set" && $attrVal ne "0" ) {
+      mailcheck_Disconnect($hash);
+    } else {
+      $attr{$name}{$attrName} = 0;
+      mailcheck_Disconnect($hash);
+      mailcheck_Connect($hash);
+    }
   }
 
   if( $cmd eq "set" ) {
@@ -417,6 +426,8 @@ mailcheck_Read($)
       if idle is supported the defailt is 600, without idle support the default is 60. the minimum is 60.</li>
     <li>nossl<br>
       1 -> don't use ssl.</li><br>
+    <li>disable<br>
+      1 -> disconnect and stop polling</li>
     <li>debug<br>
       1 -> enables debug output. default target is stdout.</li>
     <li>logfile<br>
