@@ -7,6 +7,13 @@ use strict;
 use warnings;
 
 sub
+FHEM_colorpickerInit()
+{
+  $data{webCmdFn}{colorpicker} = "FHEM_colorpickerFn";
+  $data{FWEXT}{colorpicker}{SCRIPT} = "/jscolor/jscolor.js";
+}
+
+sub
 FHEM_colorpickerFn($$$)
 {
   my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;

@@ -73,8 +73,7 @@ SWAP_0000002200000003_Initialize($)
 
   #$hash->{FW_summaryFn} = "SWAP_0000002200000003_summaryFn";
 
-  $data{webCmdFn}{colorpicker} = "FHEM_colorpickerFn";
-  $data{FWEXT}{"/"}{SCRIPT} = "/jscolor/jscolor.js";
+  FHEM_colorpickerInit();
 
   return $ret;
 }
