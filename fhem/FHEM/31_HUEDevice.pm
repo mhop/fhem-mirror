@@ -66,8 +66,7 @@ sub HUEDevice_Initialize($)
 
   #$hash->{FW_summaryFn} = "HUEDevice_summaryFn";
 
-  $data{webCmdFn}{colorpicker} = "FHEM_colorpickerFn";
-  $data{FWEXT}{"/"}{SCRIPT} = "/jscolor/jscolor.js";
+  FHEM_colorpickerInit();
 }
 
 sub
@@ -531,7 +530,7 @@ HUEDevice_GetUpdate($)
 
   if( !defined( $attr{$name}{webCmd} ) ) {
     $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb 98FF23:rgb 0000ff:toggle:on:off' if( $attr{$name}{subType} eq "colordimmer" );
-    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb C8FF12:rgb 0000ff:toggle:on:off' if( AttrVal($name, "model", "") eq "LCT001" );
+    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb DEFF26:rgb 0000ff:toggle:on:off' if( AttrVal($name, "model", "") eq "LCT001" );
     $attr{$name}{webCmd} = 'pct:toggle:on:off' if( $attr{$name}{subType} eq "dimmer" );
     $attr{$name}{webCmd} = 'toggle:on:off' if( $attr{$name}{subType} eq "switch" );
   }
