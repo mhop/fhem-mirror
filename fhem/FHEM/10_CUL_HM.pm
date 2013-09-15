@@ -2667,7 +2667,7 @@ sub CUL_HM_Set($@) {
   }
   elsif($cmd eq "desired-temp") { #############################################
     my $temp = CUL_HM_convTemp($a[2]);
-	return $temp if($temp !~ m/Invalid/);
+	return $temp if($temp =~ m/Invalid/);
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'0202'.$temp);
     my $chnHash = CUL_HM_id2Hash($dst."02");
 	my $mode = ReadingsVal($chnHash->{NAME},"R-controlMode","");
