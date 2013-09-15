@@ -426,14 +426,13 @@ sub TRX_SECURITY_parse_X10Sec($$) {
 
   my $current = "";
 
-  Log3 $name, 5, "TRX_SECURITY_parse_X10Sec() $name devn=$device_name first=$firstdevice subtype=$subtype command=$command, delay=$delay, batt=$battery cmd=$hexdata";
-
-
   my $n = 0;
   my $tm = TimeNow();
   my $val = "";
 
   my $device_type = uc($def->{TRX_SECURITY_type});
+
+  Log3 $name, 5, "TRX_SECURITY_parse_X10Sec() $name devn=$device_name first=$firstdevice subtype=$subtype device_type=$device_type command=$command, delay=$delay, batt=$battery cmd=$hexdata";
 
   my $sensor = "";
 
@@ -479,7 +478,7 @@ sub TRX_SECURITY_parse_X10Sec($$) {
 
 	$current = "Security-Panic" if ($command eq "alert");
 
-	my @cmd_split = split(/-/, $command);
+	my @cmd_split = split(/-/, $current);
 	$sensor = $cmd_split[0];
 	$current = $cmd_split[1];
 	readingsBulkUpdate($def, $sensor, $current);
