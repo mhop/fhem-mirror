@@ -7,6 +7,12 @@ use strict;
 use warnings;
 
 sub
+Color_Initialize()
+{
+  FHEM_colorpickerInit();
+}
+
+sub
 FHEM_colorpickerInit()
 {
   $data{webCmdFn}{colorpicker} = "FHEM_colorpickerFn";
