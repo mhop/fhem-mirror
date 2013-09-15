@@ -262,7 +262,11 @@ OWServer_Read($@)
       delete $hash->{".path"};
       print WRITER $ret;
       close WRITER;
-      exit 0;
+      # see http://forum.fhem.de/index.php?t=tree&goto=94670
+      # changed from
+      # exit 0;
+      # to
+      POSIX::_exit(0);
     }
 
     Log3 $hash, 5, "OWServer child ID for reading '$path' is $pid";
