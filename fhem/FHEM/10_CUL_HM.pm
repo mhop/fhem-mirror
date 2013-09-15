@@ -2694,7 +2694,7 @@ sub CUL_HM_Set($@) {
                                 if($a[$idx] !~ m/^([0-2]\d):([0-5]\d)/);
       my ($h, $m) = ($1, $2);
       my $temp = CUL_HM_convTemp($a[$idx+1]);
-	  return $temp if($temp !~ m/Invalid/);
+	  return $temp if($temp =~ m/Invalid/);
       $data .= sprintf("%02X%02X%02X%s", $addr, $h*6+($m/10), $addr+1,$temp);
       $addr += 2;
       $hash->{TEMPLIST}{$wd}{($idx-2)/2}{HOUR} = $h;
