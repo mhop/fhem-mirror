@@ -1,3 +1,4 @@
+- added webcam widget (marcproe)
 - path to background image is now configurable via the YAF interface (marcproe)
 - Added regex capability for generic widget onclick function (marcproe)
 - Added foundation for modify dialog and modify dialog for generic widget (marcproe)
