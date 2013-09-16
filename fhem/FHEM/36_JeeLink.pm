@@ -24,6 +24,7 @@ my %matchListPCA301 = (
     "1:PCA301" => "^\\S+\\s+24",
     "2:EC3000" => "^\\S+\\s+22",
     "3:RoomNode" => "^\\S+\\s+11",
+    "4:LaCrosse" => "^\\S+\\s+9 ",
 );
 
 sub
