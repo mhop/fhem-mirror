@@ -193,7 +193,6 @@ mailcheck_Undefine($$)
   my ($hash, $arg) = @_;
 
   mailcheck_Disconnect($hash);
-  close( $hash->{FH} );
 
   return undef;
 }
