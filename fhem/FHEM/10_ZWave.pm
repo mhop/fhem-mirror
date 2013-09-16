@@ -90,7 +90,16 @@ my %zwave_class = (
   METER_TBL_CONFIG         => { id => '3c', },
   METER_TBL_MONITOR        => { id => '3d', },
   METER_TBL_PUSH           => { id => '3e', },
-  THERMOSTAT_MODE          => { id => '40', },
+  THERMOSTAT_MODE          => { id => '40',
+    set   => { tmOff       => "0100",
+               tmHeating   => "0101",
+               tmCooling   => "010b",
+               tmManual    => "011f", },
+   get   => { thermostatMode => "02", },
+   parse => { "03400300"  => "state:off",
+              "0340030b"  => "state:cooling",
+              "03400301"  => "state:heating",
+              "0340031f"  => "state:manual",  }, } ,
   THERMOSTAT_OPERATING_STATE=>{ id => '42', },
   THERMOSTAT_SETPOINT      => { id => '43',
     get   => { setpoint => "02" },
@@ -634,10 +643,31 @@ ZWave_Undef($$)
   <b>Note</b>: devices with on/off functionality support the <a
       href="#setExtensions"> set extensions</a>.
 
+  <br><br><b>Class ASSOCIATION</b>
+  <li>associationAdd groupId nodeId ...<br>
+  Add the specified list of nodeIds to the assotion group groupId.<br> Note:
+  upon creating a fhem-device for the first time fhem will automatically add
+  the controller to the first association group of the node corresponding to
+  the fhem device, i.e it issues a "set name associationAdd 1
+  controllerNodeId"</li>
+
+  <li>associationDel groupId nodeId ...<br>
+  Remove the specified list of nodeIds from the assotion group groupId.</li>
+
   <br><br><b>Class BASIC</b>
   <li>basicValue value<br>
     Send value (0-255) to this device. The interpretation is device dependent,
     e.g. for a SWITCH_BINARY device 0 is off and anything else is on.</li>
+
+  <br><br><b>Class CONFIGURATION</b>
+  <li>configByte cfgAddress 8bitValue<br>
+      configWord cfgAddress 16bitValue<br>
+      configLong cfgAddress 32bitValue<br>
+    Send a configuration value for the parameter cfgAddress. cfgAddress and
+    value is node specific.</li>
+  <li>configDefault cfgAddress<br>
+    Reset the configuration parameter for the cfgAddress parameter to its
+    default value.  See the device documentation to determine this value.</li>
 
   <br><br><b>Class SWITCH_BINARY</b>
   <li>on<br>
@@ -654,31 +684,19 @@ ZWave_Undef($$)
   <li>dim value<br>
     dim to the requested value (0..100)</li>
 
-  <br><br><b>Class CONFIGURATION</b>
-  <li>configByte cfgAddress 8bitValue<br>
-      configWord cfgAddress 16bitValue<br>
-      configLong cfgAddress 32bitValue<br>
-    Send a configuration value for the parameter cfgAddress. cfgAddress and
-    value is node specific.</li>
-  <li>configDefault cfgAddress<br>
-    Reset the configuration parameter for the cfgAddress parameter to its
-    default value.  See the device documentation to determine this value.</li>
+  <br><br><b>Class THERMOSTAT_MODE</b>
+  <li>tmOff</li>
+  <li>tmCooling</li>
+  <li>tmHeating</li>
+  <li>tmManual<br>
+    set the thermostat mode to off, cooling, heating or manual.
+    </li>
 
   <br><br><b>Class WAKE_UP</b>
   <li>wakeupInterval value<br>
   Set the wakeup interval of battery operated devices to the given value in
   seconds. Upon wakeup the device sends a wakeup notification.</li>
 
-  <br><br><b>Class ASSOCIATION</b>
-  <li>associationAdd groupId nodeId ...<br>
-  Add the specified list of nodeIds to the assotion group groupId.<br> Note:
-  upon creating a fhem-device for the first time fhem will automatically add
-  the controller to the first association group of the node corresponding to
-  the fhem device, i.e it issues a "set name associationAdd 1
-  controllerNodeId"</li>
-
-  <li>associationDel groupId nodeId ...<br>
-  Remove the specified list of nodeIds from the assotion group groupId.</li>
   </ul>
   <br>
 
@@ -686,53 +704,9 @@ ZWave_Undef($$)
   <b>Get</b>
   <ul>
 
-  <br><b>Class BASIC</b>
-  <li>basicStatus<br>
-    return the status of the node as basicReport:XY. The value (XY) depends on
-    the node, e.g a SWITCH_BINARY device report 00 for off and FF (255) for on.
-    </li>
-
-  <br><br><b>Class SWITCH_BINARY</b>
-  <li>swbStatus<br>
-    return the status of the node, as state:on or state:off.
-    </li>
-
-  <br><br><b>Class SWITCH_MULTILEVEL</b>
-  <li>swmStatus<br>
-    return the status of the node, as state:on, state:off or state:dim value.
-    </li>
-
-
-  <br><br><b>Class SENSOR_BINARY</b>
-  <li>sbStatus<br>
-    return the status of the node, as state:open or state:closed.
-    </li>
-
-  <br><br><b>Class SENSOR_MULTILEVEL</b>
-  <li>smStatus<br>
-    request data from the node (temperature/humidity/etc)
-    </li>
-
-  <br><br><b>Class CONFIGURATION</b>
-  <li>config cfgAddress<br>
-    return the value of the configuration parameter cfgAddress. The value is
-    device specific.
-    </li>
-
   <br><br><b>Class ALARM</b>
   <li>alarm alarmId<br>
     return the value for alarmId. The value is device specific.
-    </li>
-
-  <br><br><b>Class BATTERY</b>
-  <li>battery<br>
-    return the charge of the battery in %, as battery:value %
-    </li>
-
-  <br><br><b>Class WAKE_UP</b>
-  <li>wakeupInterval<br>
-    return the wakeup interval in seconds, in the form<br>
-    wakeupReport:interval seconds target id
     </li>
 
   <br><br><b>Class ASSOCIATION</b>
@@ -741,15 +715,21 @@ ZWave_Undef($$)
     assocGroup_X:Max Y, Nodes id,id...
     </li>
 
-  <br><br><b>Class VERSION</b>
-  <li>version<br>
-    return the version information of this node in the form:<br>
-    Lib A Prot x.y App a.b
+  <br><b>Class BASIC</b>
+  <li>basicStatus<br>
+    return the status of the node as basicReport:XY. The value (XY) depends on
+    the node, e.g a SWITCH_BINARY device report 00 for off and FF (255) for on.
     </li>
 
-  <br><br><b>Class THERMOSTAT_SETPOINT</b>
-  <li>setpoint<br>
-    request the setpoint
+  <br><br><b>Class BATTERY</b>
+  <li>battery<br>
+    return the charge of the battery in %, as battery:value %
+    </li>
+
+  <br><br><b>Class CONFIGURATION</b>
+  <li>config cfgAddress<br>
+    return the value of the configuration parameter cfgAddress. The value is
+    device specific.
     </li>
 
   <br><br><b>Class MULTI_CHANNEL</b>
@@ -763,6 +743,48 @@ ZWave_Undef($$)
     mcCapability_02:SWITCH_BINARY<br>
     <b>Note:</b> This is the best way to create the secondary nodes of a
     MULTI_CHANNEL device. The device is only created for channel 2 or greater.
+    </li>
+
+  <br><br><b>Class SENSOR_BINARY</b>
+  <li>sbStatus<br>
+    return the status of the node, as state:open or state:closed.
+    </li>
+
+  <br><br><b>Class SENSOR_MULTILEVEL</b>
+  <li>smStatus<br>
+    request data from the node (temperature/humidity/etc)
+    </li>
+
+  <br><br><b>Class SWITCH_BINARY</b>
+  <li>swbStatus<br>
+    return the status of the node, as state:on or state:off.
+    </li>
+
+  <br><br><b>Class SWITCH_MULTILEVEL</b>
+  <li>swmStatus<br>
+    return the status of the node, as state:on, state:off or state:dim value.
+    </li>
+
+  <br><br><b>Class THERMOSTAT_MODE</b>
+  <li>thermostatMode<br>
+    request the mode
+    </li>
+
+  <br><br><b>Class THERMOSTAT_SETPOINT</b>
+  <li>setpoint<br>
+    request the setpoint
+    </li>
+
+  <br><br><b>Class VERSION</b>
+  <li>version<br>
+    return the version information of this node in the form:<br>
+    Lib A Prot x.y App a.b
+    </li>
+
+  <br><br><b>Class WAKE_UP</b>
+  <li>wakeupInterval<br>
+    return the wakeup interval in seconds, in the form<br>
+    wakeupReport:interval seconds target id
     </li>
 
   </ul>
@@ -790,17 +812,32 @@ ZWave_Undef($$)
   <b>Generated events:</b>
   <ul>
 
+  <br><br><b>Class ALARM</b>
+  <li>alarm_type_X:level Y</li>
+
+  <br><br><b>Class ASSOCIATION</b>
+  <li>assocGroup_X:Max Y Nodes A,B,...</li>
+
   <br><b>Class BASIC</b>
   <li>basicReport:XY</li>
 
-  <br><br><b>Class SWITCH_BINARY</b>
-  <li>state:on</li>
-  <li>state:off</li>
+  <br><br><b>Class BATTERY</b>
+  <li>battery:chargelevel %</li>
 
-  <br><br><b>Class SWITCH_MULTILEVEL</b>
-  <li>state:on</li>
-  <li>state:off</li>
-  <li>state:dim value</li>
+  <br><br><b>Class CLOCK</b>
+  <li>clock:get</li>
+
+  <br><br><b>Class CONFIGURATION</b>
+  <li>config_X:Y</li>
+
+  <br><br><b>Class METER</b>
+  <li>power:val [kWh|kVAh|W|pulseCount]</li>
+  <li>gas:val [m3|feet3|pulseCount]</li>
+  <li>water:val [m3|feet3|USgallons|pulseCount]</li>
+
+  <br><br><b>Class MULTI_CHANNEL</b>
+  <li>endpoints:total X $dynamic $identical</li>
+  <li>mcCapability_X:class1 class2 ...</li>
 
   <br><br><b>Class SENSOR_BINARY</b>
   <li>state:open</li>
@@ -811,39 +848,30 @@ ZWave_Undef($$)
   <li>humidity:$hum %</li>
 
 
-  <br><br><b>Class METER</b>
-  <li>power:val [kWh|kVAh|W|pulseCount]</li>
-  <li>gas:val [m3|feet3|pulseCount]</li>
-  <li>water:val [m3|feet3|USgallons|pulseCount]</li>
+  <br><br><b>Class SWITCH_BINARY</b>
+  <li>state:on</li>
+  <li>state:off</li>
 
-  <br><br><b>Class CONFIGURATION</b>
-  <li>config_X:Y</li>
+  <br><br><b>Class SWITCH_MULTILEVEL</b>
+  <li>state:on</li>
+  <li>state:off</li>
+  <li>state:dim value</li>
 
-  <br><br><b>Class ALARM</b>
-  <li>alarm_type_X:level Y</li>
-
-  <br><br><b>Class BATTERY</b>
-  <li>battery:chargelevel %</li>
-
-  <br><br><b>Class WAKE_UP</b>
-  <li>wakeup:notification</li>
-  <li>wakeupReport:interval:X target:Y</li>
-
-  <br><br><b>Class ASSOCIATION</b>
-  <li>assocGroup_X:Max Y Nodes A,B,...</li>
-
-  <br><br><b>Class VERSION</b>
-  <li>version:Lib A Prot x.y App a.b</li>
+  <br><br><b>Class THERMOSTAT_MODE</b>
+  <li>off</li>
+  <li>cooling</li>
+  <li>heating</li>
+  <li>manual</li>
 
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
   <li>temperature:$temp [C|F] [heating|cooling]</li>
 
-  <br><br><b>Class MULTI_CHANNEL</b>
-  <li>endpoints:total X $dynamic $identical</li>
-  <li>mcCapability_X:class1 class2 ...</li>
+  <br><br><b>Class VERSION</b>
+  <li>version:Lib A Prot x.y App a.b</li>
 
-  <br><br><b>Class CLOCK</b>
-  <li>clock:get</li>
+  <br><br><b>Class WAKE_UP</b>
+  <li>wakeup:notification</li>
+  <li>wakeupReport:interval:X target:Y</li>
 
   </ul>
 </ul>
