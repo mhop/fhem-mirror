@@ -101,6 +101,7 @@ sub HMLAN_Define($$) {#########################################################
   
   HMLAN_condUpdate($hash,253);#set disconnected
   $hash->{STATE} = "disconnected";
+
   my $ret = DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
   return $ret;
 }
@@ -546,7 +547,8 @@ sub HMLAN_DoInit($) {##########################################################
   my $key = AttrVal($name, "hmKey", "");        # 36(!) hex digits
 
   my $s2000 = sprintf("%02X", HMLAN_secSince2000());
-
+  delete $hash->{READINGS}{state};
+  
   HMLAN_SimpleWrite($hash, "A$id") if($id);
   HMLAN_SimpleWrite($hash, "C");
   HMLAN_SimpleWrite($hash, "Y01,01,$key");
