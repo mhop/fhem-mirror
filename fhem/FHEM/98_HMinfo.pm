@@ -1290,14 +1290,6 @@ sub HMinfo_noDup(@) {#return list with no duplicates
 		Setting is meant to give user a fast overview of parameter that are expected to be system critical<br>
 	</li>
     <li><a name="#HMinfosumERROR">sumERROR</a>
-	    retriggers the command update periodically.<br>
-		Example:<br>
-		<ul><code>
-           attr hm autoUpdate 00:10<br>
-        </code></ul>
-		will trigger the update every 10 min<br>
-	</li>
-    <li><a name="#HMinfoautoUpdate">autoUpdate</a>
 	    Similar to sumStatus but with a focus on error conditions in the system. 
 		Here user can add reading<b>values</b> that are <b>not displayed</b>. I.e. the value is the
 		good-condition that will not be counted.<br>
@@ -1314,6 +1306,14 @@ sub HMinfo_noDup(@) {#return list with no duplicates
 		ERR_overheat on:3<br>
 		ERR_Activity dead:5<br>
 		</code></ul>
+	</li>
+    <li><a name="#HMinfoautoUpdate">autoUpdate</a>
+	    retriggers the command update periodically.<br>
+		Example:<br>
+		<ul><code>
+           attr hm autoUpdate 00:10<br>
+        </code></ul>
+		will trigger the update every 10 min<br>
 	</li>
    </ul>
    <br>
