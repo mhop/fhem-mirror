@@ -166,7 +166,7 @@ TRX_SECURITY_Set($@)
 	# lightning1
   	$hex_prefix = sprintf "0820";
   	$hex_command = sprintf "%02x%02x%02s%02s%02s%02x00", $device_type_num & 0xff, $seqnr, $id1, $id2, $id3, $cmnd; 
-  	Log3 $name, 1,"TRX_SECURITY_Set() name=$name device_type=$device_type, deviceid=$deviceid id1=$id1, id2=$id2, id3=$id3, command=$command";
+  	Log3 $name, 5,"TRX_SECURITY_Set() name=$name device_type=$device_type, deviceid=$deviceid id1=$id1, id2=$id2, id3=$id3, command=$command";
   	Log3 $name, 5,"TRX_SECURITY_Set() hexline=$hex_prefix$hex_command";
 
   	if ($device_type ne "KD101") {
@@ -415,7 +415,7 @@ sub TRX_SECURITY_parse_X10Sec($$) {
 	if ($battery_level == 0x9) { $battery = 'batt_ok'}
 	elsif ($battery_level == 0x0) { $battery = 'batt_low'}
 	else {
-		Log3 $name, 1,"TRX_SECURITY_parse_X10Sec() unkown battery_level=$battery_level";
+		Log3 $name, 1,"TRX_SECURITY_parse_X10Sec() unknown battery_level=$battery_level";
 	}
   }
 
@@ -566,7 +566,7 @@ TRX_SECURITY_Parse($$)
   	Log3 $iohash, 1, "TRX_SECURITY_Parse() unsupported hex=$hexline" if ($res eq "");
 	return $res;
   } else {
-	Log3 $iohash, 0, "TRX_SECURITY_Parse() not implemented num_bytes=$num_bytes hex=$hexline";
+	Log3 $iohash, 1, "TRX_SECURITY_Parse() not implemented num_bytes=$num_bytes hex=$hexline";
   }
 
   return "";
