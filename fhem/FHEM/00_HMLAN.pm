@@ -100,6 +100,7 @@ sub HMLAN_Define($$) {#########################################################
   @{$hash->{helper}{q}{apIDs}} = \@arr;
   
   HMLAN_condUpdate($hash,253);#set disconnected
+  $hash->{STATE} = "disconnected";
   my $ret = DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
   return $ret;
 }
@@ -161,7 +162,6 @@ sub HMLAN_Set($@) {############################################################
         if(!$arg || $arg !~ m/^\d+$/);
     $hash->{hmPair} = 1;
     InternalTimer(gettimeofday()+$arg, "HMLAN_RemoveHMPair", "hmPairForSec:".$hash, 1);
-
   } 
   elsif($type eq "hmPairSerial") { ################################
     return "Usage: set $name hmPairSerial <10-character-serialnumber>"
@@ -173,9 +173,8 @@ sub HMLAN_Set($@) {############################################################
     HMLAN_Write($hash, undef, sprintf("As15%02X8401%s000000010A%s",
                     $hash->{HM_CMDNR}, $id, unpack('H*', $arg)));
     $hash->{hmPairSerial} = $arg;
-
   }
-  return undef;
+  return ("",1);# no not generate trigger outof command
 }
 sub HMLAN_ReadAnswer($$$) {# This is a direct read for commands like get
   my ($hash, $arg, $regexp) = @_;
@@ -672,13 +671,13 @@ sub HMLAN_condUpdate($$) {#####################################################
   
   if ($HMcnd == 4 || $HMcnd == 253) {#transmission down
     $hashQ->{answerPend} = 0;
-	@{$hashQ->{apIDs}} = ();     #clear Q-status
+	@{$hashQ->{apIDs}} = ();       #clear Q-status
     $hash->{XmitOpen} = 0;         #deny transmit
   }
   elsif ($HMcnd == 255) {#reset counter after init
     $hashQ->{answerPend} = 0;
-	@{$hashQ->{apIDs}} = ();     #clear Q-status
-    $hash->{XmitOpen} = 1;         #deny transmit
+	@{$hashQ->{apIDs}} = ();       #clear Q-status
+    $hash->{XmitOpen} = 1;         #allow transmit
   }
   else{
     $hash->{XmitOpen} = 1 
