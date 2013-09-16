@@ -177,6 +177,9 @@ sub webcam_get_state() {
 		my $hover = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "hover", "0");
 		my $proto = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "protocol", "http");
 		my $width = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "width", "100");
+		my $user = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "user");
+		my $pass = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "pass");
+		my $login = "";
 		
 		my $address = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "address", $defs{$fhemname}{ADDRESS});
 		
@@ -185,9 +188,12 @@ sub webcam_get_state() {
 		if(!defined $name) {																		#if alias is defined, use it as name
 			$name = $fhemname;
 		}
+		if($user && $pass) {
+			$login = $user . ":" . $pass . "@";
+		}
 		if(defined $d) {
 			if(lc $showm eq "img") {
-				my $ret = "<img style=\"border:1px solid black;\" src=\"".$proto."://".$address.$spath."\" width=\"".$width."\">";
+				my $ret = "<img style=\"border:1px solid black;\" src=\"" . $proto . "://" . $login . $address . $spath . "\" width=\"" . $width . "\">";
 				return $ret;
 			}
 		} else {
