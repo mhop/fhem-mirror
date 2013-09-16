@@ -770,7 +770,7 @@ sub TRX_LIGHT_parse_PT2262 ($$)
 		Log3 $name, 5,"PT2262: found=$1"; 
 		$command = $1;
 	}
-	Log3 $name, 1,"TRX_LIGHT_parse_PT2262() readingsBulkUpdate($def, $sensor, $command)";
+	Log3 $name, 5,"TRX_LIGHT_parse_PT2262() readingsBulkUpdate($def, $sensor, $command)";
 	$val = $command;
   	if ($sensor ne "none") { readingsBulkUpdate($def, $sensor, $val); }
   }
@@ -817,12 +817,11 @@ TRX_LIGHT_Parse($$)
   #Log3 $iohash, 5, "TRX_LIGHT: num_bytes=$num_bytes hex=$hexline type=$type";
   my $res = "";
   if ($type == 0x10 || $type == 0x11 || $type == 0x12 || $type == 0x14) {
-	Log3 $iohash, 1, "TRX_LIGHT_Parse() X10 num_bytes=$num_bytes hex=$hexline";
+	Log3 $iohash, 5, "TRX_LIGHT_Parse() X10 num_bytes=$num_bytes hex=$hexline";
         $res = TRX_LIGHT_parse_X10($iohash, \@rfxcom_data_array);
   	Log3 $iohash, 1, "TRX_LIGHT_Parse() unsupported hex=$hexline" if ($res eq "");
 	return $res;
   } elsif ($type == 0x13) {
-	#Log3 $iohash, 1, "TRX_LIGHT_Parse() Lighting4/PT2262 num_bytes=$num_bytes hex=$hexline";
 	Log3 $iohash, 5, "TRX_LIGHT_Parse()Lighting4/PT2262 num_bytes=$num_bytes hex=$hexline";
         $res = TRX_LIGHT_parse_PT2262($iohash, \@rfxcom_data_array);
   	Log3 $iohash, 1, "TRX_LIGHT_Parse() unsupported hex=$hexline" if ($res eq "");
