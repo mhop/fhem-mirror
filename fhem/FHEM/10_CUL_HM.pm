@@ -218,7 +218,8 @@ sub CUL_HM_updateConfig($){
     my $st  = CUL_HM_Get($hash,$name,"param","subType");
     my $md  = CUL_HM_Get($hash,$name,"param","model");
     if ("HM-CC-TC" eq $md){
-	  $hash->{helper}{role}{chn} = 1 if (length($id) == 6); #tc special 
+	  $hash->{helper}{role}{chn} = 1 if (length($id) == 6); #tc special
+	  $attr{$name}{stateFormat} = "last:trigLast" if ($chn eq "03");
 	}
 	elsif ("dimmer"  eq $st) {#setup virtual dimmer channels
 	  my $mId = CUL_HM_getMId($hash);
@@ -1260,18 +1261,20 @@ sub CUL_HM_Parse($$) {##############################
 			           );
 	  }
 	  # - - - - - - now handle the team - - - - - - 
-	  $shash->{helper}{alarmList} = "" if (!$shash->{helper}{alarmList});
-	  if ($state eq "01") { # clear Alarm for one sensor
-		$shash->{helper}{alarmList} =~ s/",".$dst//;
+	  my @alarmArry;
+	  @alarmArry = split(",",$shash->{helper}{alarmList}) 
+	        if ($shash->{helper}{alarmList});
+	  if ($state eq "01") { # clear alarm for sensor
+		@alarmArry = grep !/$dst/,@alarmArry;
 	  }
 	  else{                 # add alarm for Sensor
-		$shash->{helper}{alarmList} .= ",".$dst;
+		@alarmArry = CUL_HM_noDup(@alarmArry,$dst);
 	  }
 	  my $alarmList;        # make alarm ID list readable
-	  foreach(split(",",$shash->{helper}{alarmList})){
+	  foreach(@alarmArry){
 	    $alarmList .= CUL_HM_id2Name($_)."," if ($_);
 	  }
-	  $shash->{helper}{alarmList} = ""  if (!$alarmList);
+	  $shash->{helper}{alarmList} = join",",@alarmArry;
       push @event,"state:"        .($alarmList?"smoke-Alarm":"off" );
       push @event,"smoke_detect:" .($alarmList?$alarmList   :"none");
 	  #--- check out teamstatus, members might be shy ---
