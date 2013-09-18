@@ -137,7 +137,8 @@ FHEMWEB_Initialize($)
 
   $data{webCmdFn}{slider}     = "FW_sliderFn";
   $data{webCmdFn}{timepicker} = "FW_timepickerFn";
-  $data{webCmdFn}{noArg}      = "FW_noArg";
+  $data{webCmdFn}{noArg}      = "FW_noArgFn";
+  $data{webCmdFn}{textField}  = "FW_textFieldFn";
   $data{webCmdFn}{"~dropdown"}= "FW_dropdownFn"; # Should be the last
 }
 
@@ -2147,6 +2148,8 @@ FW_htmlEscape($)
   return $txt;
 }
 
+###########################
+# Widgets START
 sub
 FW_sliderFn($$$$$)
 {
@@ -2173,7 +2176,7 @@ FW_sliderFn($$$$$)
 }
 
 sub
-FW_noArg($$$$$)
+FW_noArgFn($$$$$)
 {
   my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
 
@@ -2233,6 +2236,29 @@ FW_dropdownFn()
   }
   return undef;
 }
+
+sub
+FW_textFieldFn($$$$)
+{
+  my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
+
+  my @args = split("[ \t]+", $cmd);
+
+  return undef if($values !~ m/^textField$/);
+  return "" if($cmd =~ m/ /);
+  my $srf = $FW_room ? "&room=$FW_room" : "";
+  my $cv = ReadingsVal($d, $cmd, "");
+  my $id = ($cmd eq "state") ? "" : "-$cmd";
+
+  my $c = "$FW_ME?XHR=1&cmd=setreading $d $cmd %$srf";
+  return '<td align="center">'.
+           "<div>$cmd:<input id='textField.$d$id' type='text' value='$cv' ".
+                        "onChange='textField_setText(this,\"$c\")'></div>".
+         '</td>';
+}
+
+# Widgets END
+###########################
 
 sub 
 FW_ActivateInform()
@@ -2642,6 +2668,7 @@ FW_ActivateInform()
             displayed </li>
           <li>if the modifier is ":time", then a javascript driven timepicker is
             displayed.</li>
+          <li>if the modifier is ":textField", an input field is displayed.</li>
           <li>if the modifier is of the form
           ":slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;", then a javascript
           driven slider is displayed</li>
