@@ -65,11 +65,12 @@ mailcheck_Define($$)
   $hash->{Folder} = "INBOX";
   $hash->{Folder} = $folder if( $folder );
 
-  if( $hash->{STATE} eq "???" ) {
-    $hash->{STATE} = "Initialized";
-  } elsif( $hash->{STATE} ne "???" ) {
+  if( $init_done ) {
+    delete $modules{mailcheck}->{NotifyFn};
     mailcheck_Disconnect($hash);
     mailcheck_Connect($hash);
+  } elsif( $hash->{STATE} ne "???" ) {
+    $hash->{STATE} = "Initialized";
   }
 
   return undef;
@@ -81,7 +82,7 @@ mailcheck_Notify($$)
   my ($hash,$dev) = @_;
 
   if( grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) ) {
-    delete $hash->{NotifyFn};
+    delete $modules{mailcheck}->{NotifyFn};
 
     mailcheck_Connect($hash);
   }
