@@ -61,35 +61,8 @@ package main;
 use strict;
 use warnings;
 use POSIX;
-
-##############################################################################
-#
-# IMPORTANT !
-#
-# This module can handle JSON and XML data to decode weather data.
-#
-# If you do not have JSON installed on your system or if you CAN NOT install
-# JSON (e.g. on Fritzbox) you MUST NOT deactivate the following "use JSON".
-#
-# Instead, create a dummy file named "JSON.pm" an put it 
-# into your Perl installation directory.
-# This file should contain only one line of coding, that will be
-#
-# 	return 1;
-#
-# After this you can  restart fhem and create an owo device. 
-# You MUST set attribute "owoUseXml" to 1 in this device,
-# before retrieving any data via owo API
-#
-##############################################################################
-#
-
-use JSON;
 use XML::Simple;
-
-#
-##############################################################################
-
+eval {require JSON};
 use feature qw/say switch/;
 
 require LWP::UserAgent;			# test
@@ -361,6 +334,7 @@ OWO_Define($$){
 	$hash->{helper}{AVAILABLE} = 1;
 
 	$attr{$name}{"owoDebug"}	= 1;
+	$attr{$name}{"owoUseXml"}	= 1;
 	$attr{$name}{"owoInterval"}	= 1800;
 	$attr{$name}{"owoGetUrl"}	= "http://api.openweathermap.org/data/2.5/weather";
 	$attr{$name}{"owoSendUrl"}	= "http://openweathermap.org/data/post";
