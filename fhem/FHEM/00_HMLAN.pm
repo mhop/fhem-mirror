@@ -368,6 +368,7 @@ sub HMLAN_Parse($$) {##########################################################
 	if ($HMcnd == 0x01){#HMLAN responded to AES request
 #	  $CULinfo = "AESresp";# General needs approval
 	}
+
 	if ($stat){# message with status information
 	  HMLAN_condUpdate($hash,$HMcnd)if ($hash->{helper}{q}{HMcndN} != $HMcnd);
 
@@ -380,6 +381,7 @@ sub HMLAN_Parse($$) {##########################################################
 	    return;
 	  }elsif (($stat & 0x70) == 0x30){Log $ll5, "HMLAN_Parse: $name AES code rejected for $dst $stat";
 		                              $CULinfo = "AESerrReject"; 
+									  HMLAN_qResp($hash,$src,0);
 	  }elsif (($stat & 0x70) == 0x20){$CULinfo = "AESok";
 	  }elsif (($stat & 0x70) == 0x40){;#$CULinfo = "???";
 	  }	  
