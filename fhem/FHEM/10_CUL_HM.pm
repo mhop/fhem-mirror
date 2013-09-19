@@ -489,20 +489,14 @@ sub CUL_HM_Parse($$) {##############################
   my ($len,$mNo,$mFlg,$mTp,$src,$dst,$p) = ($1,$2,$3,$4,$5,$6,$7);
   $p = "" if(!defined($p));
   my @mI = unpack '(A2)*',$p; # split message info to bytes
-  if ($msgStat){
-    return "" if($msgStat eq 'NACK');#discard if lowlevel error
-  }
-  return "" if($src eq $id);#discard mirrored messages
+
+  return "" if(  ($msgStat && $msgStat eq 'NACK')# lowlevel error
+               ||($src eq $id));                 # mirrored messages
   
   # $shash will be replaced for multichannel commands
   my $shash = $modules{CUL_HM}{defptr}{$src}; 
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
 
-  if ($msgStat){
-    $shash->{"protEvt_$msgStat"} = 0 if (!$shash->{"protEvt_$msgStat"});
-	$shash->{"protEvt_$msgStat"}++;
-  }
-  
   $respRemoved = 0;  #set to 'no response in this message' at start
   if(!$shash) {      #  Unknown source
     # Generate an UNKNOWN event for pairing requests, ignore everything else
@@ -518,6 +512,7 @@ sub CUL_HM_Parse($$) {##############################
     }
    return "";
   }
+  CUL_HM_eventP($shash,"Evt_$msgStat")if ($msgStat);#log io-events
   CUL_HM_eventP($shash,"Rcv");
   my $name = $shash->{NAME};
   my $dname = ($dst eq "000000") ? "broadcast" :
@@ -1534,7 +1529,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 	my $reply;
 	my $success;
 
-	if ($subType =~ m/^8/){	  #NACK
+	if   ($subType =~ m/^8/){#NACK
 	  $success = "no";
 	  CUL_HM_eventP($shash,"Nack");
 	  $reply = "NACK"; 
@@ -1559,13 +1554,19 @@ sub CUL_HM_parseCommon(@){#####################################################
 		}
 	  }
 	}
-	else{	  #ACK
+	elsif($subType eq "04"){ #ACK-AES, interim########
+      #$success = ""; #result not final, another response should come
+	  $reply = "done"; 
+	}
+	else{	                 #ACK
 	  $success = "yes";
 	  $reply = "ACK"; 
 	}
-	readingsSingleUpdate($chnhash,"CommandAccepted",$success,0);
-    CUL_HM_ProcessCmdStack($shash) 
+	if($success){#do we have a final ack?
+	  readingsSingleUpdate($chnhash,"CommandAccepted",$success,0);
+      CUL_HM_ProcessCmdStack($shash) 
 	      if($dhash->{DEF} && (CUL_HM_IOid($shash) eq $dhash->{DEF}));
+	}
 	$ret = $reply;
   }
   elsif($mTp eq "00"){######################################
@@ -3273,13 +3274,13 @@ sub CUL_HM_eventP($$) {#handle protocol events
   my ($evntCnt,undef) = split(' last_at:',$evnt);
   $nAttr->{"prot".$evntType} = ++$evntCnt." last_at:".TimeNow();
   
-  if ($evntType ne "Snd"){#count unusual events
+  if ($evntType !~ m/(Snd|Evt_AESok)/){#count abnormal events
     $hash->{helper}{burstEvtCnt}=0 if(!defined $hash->{helper}{burstEvtCnt});
     $hash->{helper}{burstEvtCnt}++;
   }
   if ($evntType =~ m/(Nack|ResndFail|IOerr)/){
     if (  (CUL_HM_getRxType($hash) & 0x03) == 0 #to slow for wakeup and config
-	    || $evntType eq "IOerr"){            #IO problem
+	    || $evntType eq "IOerr"){               #IO problem
       $nAttr->{protCmdDel} = 0 if(!$nAttr->{protCmdDel});
       $nAttr->{protCmdDel} += scalar @{$hash->{cmdStack}} if ($hash->{cmdStack});
       delete($hash->{cmdStack});
