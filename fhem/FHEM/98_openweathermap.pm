@@ -547,7 +547,8 @@ OWO_isday($$){
 		<br/>
 		<li>Module uses following additional Perl modules:<br/><br/>
 		<code>XML::Simple, JSON</code><br/><br/>
-		If not already installed in your environment, please install them using appropriate commands from your environment.</li><br/>
+		If not already installed in your environment, please install them using appropriate commands from your environment.<br/>
+		Use of JSON is optional. You can activate it by setting attribute owoUseXml to 0</li><br/>
 		<li>please check global attributes latitude, longitude and altitude are set correctly</li>
 		<li>you can use all task alone, in any combination or all together</li>
 	</ul>
