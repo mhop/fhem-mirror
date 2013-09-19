@@ -84,7 +84,25 @@ my %zwave_class = (
   ZIP_ADV_SERVER           => { id => '33', },
   ZIP_ADV_CLIENT           => { id => '34', },
   METER_PULSE              => { id => '35', },
-  HRV_STATUS               => { id => '37', },
+  HRV_STATUS               => { id => '37', 
+    get   => { hrvStatus    => "01%02x",
+               hrvStatusSupported => "03",},
+    parse => { "0637020042(....)" =>
+                   'sprintf("outdoorTemperature: %0.1f C", s2Hex($1)/100)',
+               "0637020142(....)" =>
+                   'sprintf("supplyAirTemperature: %0.1f C", s2Hex($1)/100)',
+               "0637020242(....)" =>
+                   'sprintf("exhaustAirTemperature: %0.1f C", s2Hex($1)/100)',
+               "0637020342(....)" =>
+                   'sprintf("dischargeAirTemperature: %0.1f C",s2Hex($1)/100)',
+               "0637020442(....)" =>
+                   'sprintf("indoorTemperature: %0.1f C", s2Hex($1)/100)',
+               "0537020501(..)" =>
+                   'sprintf("indoorHumidity: %s %%", hex($1))',
+               "0537020601(..)" =>
+                   'sprintf("remainingFilterLife: %s %%", hex($1))',
+               "033704(..)" =>
+                   'sprintf("supportedStatus: %b", hex($1))', },},
   THERMOSTAT_HEATING       => { id => '38', },
   HRV_CONTROL              => { id => '39', },
   METER_TBL_CONFIG         => { id => '3c', },
@@ -594,6 +612,17 @@ ZWave_Undef($$)
   return undef;
 }
 
+
+#####################################
+# 2-byte signed hex
+sub
+s2Hex($)
+{
+  my ($p) = @_;
+  $p = hex($p);
+  return ($p > 32767 ? -(65536-$p) : $p);
+}
+
 1;
 
 =pod
@@ -732,6 +761,14 @@ ZWave_Undef($$)
     device specific.
     </li>
 
+  <br><br><b>HRV_STATUS</b>
+  <li>hrvStatus<br>
+    report the current status (temperature, etc)
+    </li>
+  <li>hrvStatusSupported<br>
+    report the supported status fields as a bitfield.
+    </li>
+
   <br><br><b>Class MULTI_CHANNEL</b>
   <li>mcEndpoints<br>
     return the list of endpoints available, e.g.:<br>
@@ -830,6 +867,16 @@ ZWave_Undef($$)
   <br><br><b>Class CONFIGURATION</b>
   <li>config_X:Y</li>
 
+  <br><br><b>Class HRV_STATUS</b>
+  <li>outdoorTemperature: %0.1f C</li>
+  <li>supplyAirTemperature: %0.1f C</li>
+  <li>exhaustAirTemperature: %0.1f C</li>
+  <li>dischargeAirTemperature: %0.1f C</li>
+  <li>indoorTemperature: %0.1f C</li>
+  <li>indoorHumidity: %s %</li>
+  <li>remainingFilterLife: %s %</li>
+  <li>supportedStatus: %b</li>
+
   <br><br><b>Class METER</b>
   <li>power:val [kWh|kVAh|W|pulseCount]</li>
   <li>gas:val [m3|feet3|pulseCount]</li>
@@ -846,7 +893,6 @@ ZWave_Undef($$)
   <br><br><b>Class SENSOR_MULTILEVEL</b>
   <li>temperature:$temp [C|F]</li>
   <li>humidity:$hum %</li>
-
 
   <br><br><b>Class SWITCH_BINARY</b>
   <li>state:on</li>
