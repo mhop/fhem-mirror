@@ -84,7 +84,10 @@ mailcheck_Notify($$)
   if( grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) ) {
     delete $modules{mailcheck}->{NotifyFn};
 
-    mailcheck_Connect($hash);
+    foreach my $d (keys %defs) {
+      next if($defs{$d}{TYPE} ne "mailcheck");
+      mailcheck_Connect($defs{$d});
+    }
   }
 }
 
