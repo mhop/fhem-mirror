@@ -817,6 +817,35 @@ sub CUL_HM_Parse($$) {##############################
 	  }
     }
   } 
+  elsif($md eq "HM-CC-RT-DN") { ###############################################
+    if($mTp eq "10" && $p =~ m/^0A(....)(..)(..)(..)/) {#info-level
+      my ($chn,$setTemp,$actTemp,$err,$bat,$vp,$ctrlMode) = 
+	      ("04",hex($1),hex($1),hex($2),hex($2),hex($3), hex($4));
+	  $setTemp    =(($setTemp    >>10) & 0x3f )/2;
+	  $actTemp    =(($actTemp        ) & 0x3ff)/10;
+	  $err        = ($err        >> 5) & 0x7  ;
+	  $bat        =(($bat            ) & 0x1f)/10+1.5;
+	  $vp         = ($vp             ) & 0x7f ;
+	  $ctrlMode   = ($ctrlMode   >> 6) & 0x3  ;
+
+ 	  $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
+	                         if($modules{CUL_HM}{defptr}{"$src$chn"});	  
+
+      my %ctlTbl=( 0=>"auto", 1=>"manu", 2=>"party",3=>"boost");
+      my %errTbl=( 0=>"ok", 1=>"ValveTight", 2=>"adjustRangeTooLarge"
+                  ,3=>"adjustRangeTooSmall" , 4=>"communicationERR"         
+                  ,5=>"unknown" , 6=>"lowBat" , 7=>"ValveErrorPosition" );
+
+      push @event, "motorErr:$errTbl{$err}";
+	  push @event, "battery:".($err&0x80?"low":"ok");  
+	  push @event, "batteryLevel:$bat V";  
+      push @event, "measured-temp:$actTemp";
+      push @event, "desired-temp:$setTemp";
+	  push @event, "ValvePosition:$vp %";
+      push @event, "mode:$ctlTbl{$ctrlMode}";
+      push @event, "state:$actTemp C, $vp %";
+    }
+  } 
   elsif($md =~ m/^(HM-Sen-Wa-Od|HM-CC-SCD)$/){ ################################
     if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
 	    ($mTp eq "10" && $p =~ m/^06/) ||  #or Info_Status message here
@@ -2638,9 +2667,11 @@ sub CUL_HM_Set($@) {
 	elsif($a[2] eq "party"){
 	  return "temperatur for manu  5 to 30 C"
 	            if (!$a[3] || $a[3] < 5 || $a[3] > 30);
+	  return "enter date like party 3 03.8.13 11:30 5.8.13 12:00"
+	            if (!$a[7] );
 	  $temp = $a[3]*2;	  
-	  # party format 03.8.2013 11:30 5.8.2013 12:00
-	  my ($sd,$sm,$sy) = split('.',$a[4]);
+	  # party format 03.8.13 11:30 5.8.13 12:00
+	  my ($sd,$sm,$sy) = split('\.',$a[4]);
 	  return "wrong start day $sd" if ($sd < 0 || $sd > 31);
 	  return "wrong start month $sm" if ($sm < 0 || $sm > 12);
 	  return "wrong start year $sy" if ($sy < 0 || $sy > 99);
@@ -2650,7 +2681,7 @@ sub CUL_HM_Set($@) {
 	  return "wrong start minute $smin, ony 00 or 30" if ($smin != 0 && $smin != 30);
       $sh = $sh * 2 + $smin/30;
 	  
-	  my ($ed,$em,$ey) = split('.',$a[6]);
+	  my ($ed,$em,$ey) = split('\.',$a[6]);
 	  return "wrong end day $ed"   if ($ed < 0 || $ed > 31);
 	  return "wrong end month $em" if ($em < 0 || $em > 12);
 	  return "wrong end year $ey"  if ($ey < 0 || $ey > 99);
