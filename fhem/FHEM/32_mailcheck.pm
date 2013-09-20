@@ -387,6 +387,8 @@ mailcheck_Read($)
   <ul>
     <li>Mail::IMAPClient and IO::Socket::SSL and IO::Socket::INET hast to be installed on the FHEM host.</li>
     <li>Probably only works reliably if no other mail programm is marking messages as read at the same time.</li>
+    <li>If you experience a hanging system caused by regular forced disconnects of your internet provider you
+        can disable and enable the mailcheck instance with an <a href="#at">at</a>.</li>
   </ul><br>
 
   <a name="mailcheck_Define"></a>
