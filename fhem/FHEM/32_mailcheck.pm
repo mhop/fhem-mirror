@@ -394,7 +394,7 @@ mailcheck_Read($)
   <a name="mailcheck_Define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; mailcheck &lt;host&gt; &lt;user&gt; [&lt;folder&gt;]</code><br>
+    <code>define &lt;name&gt; mailcheck &lt;host&gt; &lt;user&gt; &lt;password&gt; [&lt;folder&gt;]</code><br>
     <br>
 
     Defines a mailcheck device.<br><br>
