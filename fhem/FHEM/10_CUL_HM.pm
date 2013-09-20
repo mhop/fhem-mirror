@@ -2749,9 +2749,9 @@ sub CUL_HM_Set($@) {
         $temp = CUL_HM_convTemp($temp);
 	    return $temp if($temp =~ m/Invalid/);
 		$hByte = $h*6+($m/10);
-		$lByte = $temp;
+		$lByte = hex($temp);
 	  }
-      $data .= sprintf("%02X%02X%02X%s", $addr, $hByte, $addr+1,$hByte);
+      $data .= sprintf("%02X%02X%02X%02X", $addr, $hByte, $addr+1,$lByte);
       $addr += 2;
 
       $hash->{TEMPLIST}{$wd}{($idx-2)/2}{HOUR} = $h;
@@ -4120,7 +4120,7 @@ sub CUL_HM_RTtempReadings($) {# parse RT temperature readings
                 ($hash->{helper}{shadowReg}{$regLN."07:"} ?"set":"verified"));
   for (my $day = 0;$day<7;$day++){
 	my $dayRead = "";
-    for (my $idx = 0;$idx<($day+1) *13;$idx++){
+    for (my $idx = $day *13;$idx<($day+1) *13;$idx++){
 	  my $entry = sprintf(" %s %3.01f",$time[$idx],$temp[$idx]);
   	  $setting .= "Temp set: ".$days[$day].$entry." C\n";
   	  $dayRead .= $entry;
