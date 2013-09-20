@@ -190,7 +190,8 @@ my %culHmModel=(
   "0092" => {name=>"Schueco_263-144"         ,st=>'switch'            ,cyc=>''      ,rxt=>'c'      ,lst=>'4'            ,chn=>"",}, # HM Switch Interface 3 switches 
   "0093" => {name=>"Schueco_263-158"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",}, #
   "0094" => {name=>"IS-WDS-TH-OD-S-R3"       ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",}, #
-  "0095" => {name=>"HM-CC-RT-DN"             ,st=>'thermostat'        ,cyc=>''      ,rxt=>'c:w'    ,lst=>'3:3p.6p,7:4'  ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,ClimRT_tr:4:4,ClimRT_r:5:5,rCtrl:6:6"}, #
+  "0095" => {name=>"HM-CC-RT-DN"             ,st=>'thermostat'        ,cyc=>''      ,rxt=>'c:w'    ,lst=>'p:1p.2p.5p.6p,3:3p.6p,7:4'
+                                                                                                                        ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,ClimRT_tr:4:4,ClimaTeam:5:5,remote:6:6"}, #
   "0096" => {name=>"WDF-solar"               ,st=>'blindActuatorSol'  ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"win:1:1,blind_2:3",}, #
   "009B" => {name=>"Schueco_263-xxx"         ,st=>'tipTronic'         ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1:1.2,3:1p.3p',chn=>"act:1:1,sen:2:2,sec:3:3",}, #
   "009F" => {name=>"HM-Sen-Wa-Od"            ,st=>'sensor'            ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",}, #capacitive filling level sensor
@@ -543,8 +544,8 @@ my %culHmRegDefine = (
   tempMax         =>{a=>  4  ,s=>0.6,l=>7,min=>15 ,max=>30.5    ,c=>''         ,f=>'2'     ,u=>''    ,d=>1,t=>"maximum temperatur"},
   tempFallWinOpen =>{a=>  5  ,s=>0.6,l=>7,min=>5  ,max=>30      ,c=>''         ,f=>'2'     ,u=>''    ,d=>1,t=>"lowering temp whenWindow is opened"},
   tempFallWinPerio=>{a=>  6  ,s=>0.4,l=>7,min=>0  ,max=>60      ,c=>''         ,f=>'0.2'   ,u=>'min' ,d=>1,t=>"period lowering when window is open"},
-  decalcWeekday   =>{a=>  7  ,s=>0.3,l=>7,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"decalcification day"      ,lit=>{Sat=>0,Sun=>1,Mon=>2,Tue=>3,Wed=>4,Thu=>5,Fri=>6}},
-  decalcTime      =>{a=>  8  ,s=>0.6,l=>7,min=>0  ,max=>1410    ,c=>''         ,f=>'0.033' ,u=>''    ,d=>1,t=>"decalcification time"},
+  decalcWeekday   =>{a=>  7  ,s=>0.3,l=>7,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"decalc day"      ,lit=>{Sat=>0,Sun=>1,Mon=>2,Tue=>3,Wed=>4,Thu=>5,Fri=>6}},
+  decalcTime      =>{a=>  8  ,s=>0.6,l=>7,min=>0  ,max=>1410    ,c=>''         ,f=>'0.00055',u=>'h'  ,d=>1,t=>"decalc hour"},
   tempOffset      =>{a=>  9  ,s=>0.4,l=>7,min=>0  ,max=>15      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"temperature offset",lit=>{"-3.5K"=>0,"-3.0K"=>1,"-2.5K"=>2,"-2.0K"=>3,"-1.5K"=>4,"-1.0K"=>5,"-0.5K"=>6, 
                                                                                                                                         "0.0K"=>7, "0.5K"=>8, "1.0K"=>10, "1.5K"=>11, "2.0K"=>12, "2.5K"=>13, "3.0K"=>14, "3.5K"=>15}},
   btnNoBckLight   =>{a=>  9.4,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"button response without backlight",lit=>{off=>0,on=>1}},
@@ -689,6 +690,7 @@ my %culHmRegModel = (
   "HM-CC-RT-DN"     =>{btnLock         =>1,localResDis     =>1,globalBtnLock   =>1,modusBtnLock    =>1,
                        cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,
                        burstRx         =>1,lowBatLimitRT   =>1,backOnTime      =>1,
+					   sign            =>1
                       },
 					  
   "HM-PB-4DIS-WM"   =>{peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1},
@@ -964,7 +966,6 @@ $culHmSubTypeSets{pushButton}      = $culHmSubTypeSets{remote};
 $culHmSubTypeSets{swi}             = $culHmSubTypeSets{remote};
 
 $culHmSubTypeSets{sensor}          = $culHmSubTypeSets{outputUnit};
-$culHmSubTypeSets{thermostat}      = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{KFM100}          = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{blindActuatorSol}= $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{tipTronic}       = $culHmSubTypeSets{outputUnit};
@@ -984,7 +985,8 @@ my %culHmModelSets = (# channels of this subtype-------------
 		            ,ilum         => "[0-15] [0-127]"},
   "HM-OU-CFM-PL" =>{ press        => "[long|short] [on|off] ..."
                     ,inhibit      => "[on|off]"},
-  "HM-CC-RT-DN"  =>{ mode         => "[auto|manu|party|boost|comfort|lower] ... <temp> <startTime> <endTime>"}#General only for one channel??
+  "HM-CC-TC"     =>{ statusRequest =>""},
+  "HM-CC-VD"     =>{ statusRequest =>""},
 );
 # clones- - - - - - - - - - - - - - - - - 
 $culHmModelSets{"HM-RC-19-B"}  = $culHmModelSets{"HM-RC-19"};
@@ -1027,7 +1029,17 @@ my %culHmChanSets = (
                       ,"on-till"      =>"<time>"
 		              ,on             =>""
 					  ,off            =>""
-					  ,toggle         =>""}
+					  ,toggle         =>""},
+  "HM-CC-RT-DN04"  =>{ mode         => "[auto|manu|party|boost|comfort|lower] ... <temp> <startTime> <endTime>"
+                      ,tempListSat    =>"HH:MM temp ..."
+                      ,tempListSun    =>"HH:MM temp ..."
+                      ,tempListMon    =>"HH:MM temp ..."
+                      ,tempListTue    =>"HH:MM temp ..."
+                      ,tempListThu    =>"HH:MM temp ..."
+                      ,tempListWed    =>"HH:MM temp ..."
+                      ,tempListFri    =>"HH:MM temp ..."
+                     }
+
 );
 # clones- - - - - - - - - - - - - - - - - 
 #$culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};
@@ -1080,6 +1092,10 @@ my %culHmBits = (
                      PARAM_LIST     => "12,2", } },
   "01;p11=06"   => { txt => "CONFIG_END", params => {
                      CHANNEL => "0,2", } },
+  "01;p11=07"   => { txt => "CONFIG_WRITE_INDEX", params => {
+                     CHANNEL => "0,2",
+					 ADDR => "4,2",
+                     DATA => '6,,$val =~ s/(..)/ $1/g', } },
   "01;p11=08"   => { txt => "CONFIG_WRITE_INDEX", params => {
                      CHANNEL => "0,2",
                      DATA => '4,,$val =~ s/(..)(..)/ $1:$2/g', } },
@@ -1197,6 +1213,8 @@ my %culHmBits = (
   "58"          => { txt => "ClimateEvent", params => {
                      CMD      => "00,2",
                      ValvePos => '02,2,$val=(hex($val))', } },
+  "59"          => { txt => "Climate unknown", params => {
+                     CMD      => "00,2", } },
   "70"          => { txt => "WeatherEvent", params => {
                      TEMP     => '00,4,$val=((hex($val)&0x3FFF)/10)*((hex($val)&0x4000)?-1:1)',
                      HUM      => '04,2,$val=(hex($val))', } },

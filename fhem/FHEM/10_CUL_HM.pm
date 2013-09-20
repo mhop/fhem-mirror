@@ -396,7 +396,8 @@ sub CUL_HM_Attr(@) {#################################
 	  	  if ($rdEntry =~m /^R-/){
 	  	    my $reg = $rdEntry;
 	  	    $reg =~ s/.*-//;
-	  	    $rdEntryNew = ".".$rdEntry if($culHmRegDefine{$reg}{d} eq '0' );
+	  	    $rdEntryNew = ".".$rdEntry if($culHmRegDefine{$reg} &&
+			                              $culHmRegDefine{$reg}{d} eq '0' );
 	  	  }
 	  	  next if (!defined($rdEntryNew)); # no change necessary
           delete $hash->{READINGS}{$rdEntryNew};
@@ -2711,33 +2712,54 @@ sub CUL_HM_Set($@) {
 	      if($mode =~ m/central/);
   } 
   elsif($cmd =~ m/^tempList(...)/) { ###################################### reg
-    my %day2off = ( "Sat"=>"5 0B", "Sun"=>"5 3B", "Mon"=>"5 6B",
-                    "Tue"=>"5 9B", "Wed"=>"5 CB", "Thu"=>"6 01",
-                    "Fri"=>"6 31");
     my $wd = $1;
-    my ($list,$addr) = split(" ", $day2off{$wd});
-    $addr = hex($addr);
+	$state= "";
+    my ($list,$addr,$prgChn);
+	if ($md eq "HM-CC-RT-DN"){
+      my %day2off = ( "Sat"=>"20", "Sun"=>"46", "Mon"=>"72", "Tue"=>"98", 
+	                  "Wed"=>"124","Thu"=>"150","Fri"=>"176");
+	  ($list,$addr,$prgChn) = (7,$day2off{$wd},0);
+	}
+	else{
+      my %day2off = ( "Sat"=>"5 0B", "Sun"=>"5 3B", "Mon"=>"5 6B",
+                      "Tue"=>"5 9B", "Wed"=>"5 CB", "Thu"=>"6 01",
+                      "Fri"=>"6 31");
+      ($list,$addr,$prgChn) = split(" ", $day2off{$wd},2);
+      $addr = hex($addr);
+	}
 
-    return "To few arguments"                   if(@a < 4);
-    return "To many arguments, max is 24 pairs" if(@a > 50);
-    return "Bad format, use HH:MM TEMP ..."     if(@a % 2);
-    return "Last time spec must be 24:00"       if($a[@a-2] ne "24:00");
+    return "To few arguments"                if(@a < 4);
+    return "To many arguments, max 24 pairs" if(@a > (($md eq "HM-CC-RT-DN")?28:50));
+    return "Bad format, use HH:MM TEMP ..."  if(@a % 2);
+    return "Last time spec must be 24:00"    if($a[@a-2] ne "24:00");
 	
     my ($data,$msg) = ("","");
     for(my $idx = 2; $idx < @a; $idx += 2) {
       return "$a[$idx] is not in HH:MM format"
                                 if($a[$idx] !~ m/^([0-2]\d):([0-5]\d)/);
       my ($h, $m) = ($1, $2);
-      my $temp = CUL_HM_convTemp($a[$idx+1]);
-	  return $temp if($temp =~ m/Invalid/);
-      $data .= sprintf("%02X%02X%02X%s", $addr, $h*6+($m/10), $addr+1,$temp);
+	  my ($hByte,$lByte);
+	  my $temp = $a[$idx+1];
+	  if ($md eq "HM-CC-RT-DN"){
+	    $temp = (int($temp*2)<<9) + ($h*12+($m/5));
+		$hByte = $temp>>8;
+		$lByte = $temp & 0xff;
+	  }
+	  else{
+        $temp = CUL_HM_convTemp($temp);
+	    return $temp if($temp =~ m/Invalid/);
+		$hByte = $h*6+($m/10);
+		$lByte = $temp;
+	  }
+      $data .= sprintf("%02X%02X%02X%s", $addr, $hByte, $addr+1,$hByte);
       $addr += 2;
+
       $hash->{TEMPLIST}{$wd}{($idx-2)/2}{HOUR} = $h;
       $hash->{TEMPLIST}{$wd}{($idx-2)/2}{MINUTE} = $m;
       $hash->{TEMPLIST}{$wd}{($idx-2)/2}{TEMP} = $a[$idx+1];
       $msg .= sprintf(" %02d:%02d %.1f", $h, $m, $a[$idx+1]);
     }
-    CUL_HM_pushConfig($hash, $id, $dst, 2,0,0,$list, $data);
+    CUL_HM_pushConfig($hash, $id, $dst, $prgChn,0,0,$list, $data);
 	readingsSingleUpdate($hash,"tempList$wd",$msg,0);
   } 
   elsif($cmd eq "sysTime") { ##################################################
@@ -3812,6 +3834,9 @@ sub CUL_HM_updtRegDisp($$$) {
     CUL_HM_TCtempReadings($hash)  if (($list == 5 ||$list == 6) && 
                       substr($hash->{DEF},6,2) eq "02");
   }
+  if ($md eq "HM-CC-RT-DN"){#handle temperature readings
+    CUL_HM_RTtempReadings($hash)  if ($list == 7);
+  }
   if ($md eq "HM-PB-4DIS-WM"){#add text
     CUL_HM_4DisText($hash)  if ($list == 1) ;
   }
@@ -4008,7 +4033,7 @@ sub CUL_HM_4DisText($) {# convert text for 4dis
   return "text1:".$txt{54}."\n".
          "text2:".$txt{70}."\n";
 }
-sub CUL_HM_TCtempReadings($) {# parse TC readings
+sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
   my ($hash)=@_;
   my $name = $hash->{NAME};
   my $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")."RegL_";
@@ -4065,6 +4090,45 @@ sub CUL_HM_TCtempReadings($) {# parse TC readings
     }
     CUL_HM_UpdtReadBulk(CUL_HM_getDeviceHash($hash),1,@histVals) if (@histVals);
   }
+  return $setting;
+}
+sub CUL_HM_RTtempReadings($) {# parse RT temperature readings
+  my ($hash)=@_;
+  my $name = $hash->{NAME};
+  my $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")."RegL_";
+  my $tempRegs = ReadingsVal($name,$regLN."07:" ,"");
+
+  my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
+  
+  $tempRegs =~ s/.* 14://;     #remove register up to addr 20 from list
+  $tempRegs =~ s/ 00:00/ /g;   #remove regline termination
+  $tempRegs =~ s/ ..://g;     #remove addr Info
+  $tempRegs =~ s/ //g;         #blank
+  my @time;
+  my @temp;
+  foreach (unpack '(A4)*',$tempRegs){
+    my $h = hex($_);
+	push @temp,($h >> 9)/2;
+	$h = ($h & 0x1ff) * 5;
+	$h = sprintf("%02d:%02d",int($h / 60),($h%60));
+    push @time,$h;
+  }
+  return "reglist incomplete\n" if (scalar( @time )<91);
+  my $setting;
+  my @changedRead;
+  push (@changedRead,"tempList_State:".
+                ($hash->{helper}{shadowReg}{$regLN."07:"} ?"set":"verified"));
+  for (my $day = 0;$day<7;$day++){
+	my $dayRead = "";
+    for (my $idx = 0;$idx<($day+1) *13;$idx++){
+	  my $entry = sprintf(" %s %3.01f",$time[$idx],$temp[$idx]);
+  	  $setting .= "Temp set: ".$days[$day].$entry." C\n";
+  	  $dayRead .= $entry;
+      last if ($time[$idx] eq "24:00");
+    }
+	push (@changedRead,"tempList".$days[$day].":".$dayRead);
+  }  
+  CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
   return $setting;
 }
 sub CUL_HM_repReadings($) {# for repeater in:hash, out: string with peers
