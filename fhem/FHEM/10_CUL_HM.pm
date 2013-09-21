@@ -121,7 +121,7 @@ my $IOpoll     = 0.2;# poll speed to scan IO device out of order
 my $IOpolltout = 60; # poll timeout - stop poll and discard if to late
 
 my $maxPendCmds = 10;  #number of parallel requests
-my $autoConfDly = 5;   # delay autoConf readings
+my $autoConfDly = 10;  # delay autoConf readings
 
                  # need to take care that ACK is first
 #+++++++++++++++++ startup, init, definition+++++++++++++++++++++++++++++++++++
@@ -829,7 +829,9 @@ sub CUL_HM_Parse($$) {##############################
 	  $bat        =(($bat            ) & 0x1f)/10+1.5;
 	  $vp         = ($vp             ) & 0x7f ;
 	  $ctrlMode   = ($ctrlMode   >> 6) & 0x3  ;
-
+      $actTemp = sprintf("%2.1f",$actTemp);
+	  
+	  my $dHash = $shash;
  	  $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});	  
 
@@ -838,13 +840,15 @@ sub CUL_HM_Parse($$) {##############################
                   ,5=>"unknown" , 6=>"lowBat" , 7=>"ValveErrorPosition" );
 
       push @event, "motorErr:$errTbl{$err}";
-	  push @event, "battery:".($err&0x80?"low":"ok");  
-	  push @event, "batteryLevel:$bat V";  
       push @event, "measured-temp:$actTemp";
       push @event, "desired-temp:$setTemp";
 	  push @event, "ValvePosition:$vp %";
       push @event, "mode:$ctlTbl{$ctrlMode}";
-      push @event, "state:$actTemp C, $vp %";
+      push @event, "state:T:$actTemp desired:$setTemp valve:$vp %";
+      push @entities,CUL_HM_UpdtReadBulk($dHash,1
+	                                        ,"battery:".($err&0x80?"low":"ok")
+	                                        ,"batteryLevel:$bat V"
+											);
     }
     elsif($mTp eq "59" && $p =~ m/^(..)/) {#inform team about new value
 	  my $setTemp = int(hex($1)/4)/2;
