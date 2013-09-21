@@ -190,7 +190,7 @@ my %culHmModel=(
   "0092" => {name=>"Schueco_263-144"         ,st=>'switch'            ,cyc=>''      ,rxt=>'c'      ,lst=>'4'            ,chn=>"",}, # HM Switch Interface 3 switches 
   "0093" => {name=>"Schueco_263-158"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",}, #
   "0094" => {name=>"IS-WDS-TH-OD-S-R3"       ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",}, #
-  "0095" => {name=>"HM-CC-RT-DN"             ,st=>'thermostat'        ,cyc=>''      ,rxt=>'c:w'    ,lst=>'p:1p.2p.5p.6p,3:3p.6p,7:4'
+  "0095" => {name=>"HM-CC-RT-DN"             ,st=>'thermostat'        ,cyc=>''      ,rxt=>'c:w:b'  ,lst=>'p:1p.2p.5p.6p,3:3p.6p,7:4'
                                                                                                                         ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,ClimRT_tr:4:4,ClimaTeam:5:5,remote:6:6"}, #
   "0096" => {name=>"WDF-solar"               ,st=>'blindActuatorSol'  ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"win:1:1,blind_2:3",}, #
   "009B" => {name=>"Schueco_263-xxx"         ,st=>'tipTronic'         ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1:1.2,3:1p.3p',chn=>"act:1:1,sen:2:2,sec:3:3",}, #
@@ -330,7 +330,7 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   CtRefOff        =>{a=> 28.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from refOff"   ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
 
   CtrlRc          =>{a=> 46  ,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from refOff"   ,lit=>{no=>0,tempSh=>1,auto=>2,auto_tempSh=>3,manu_tempSh=>4,boost=>5,toggle=>6}},
-  TempRC          =>{a=> 45  ,s=>0.6,l=>3,min=>5  ,max=>30      ,c=>''         ,f=>''      ,u=>'C'   ,d=>0,t=>"Jmp on condition from refOff"},
+  TempRC          =>{a=> 45  ,s=>0.6,l=>3,min=>5  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>0,t=>"Jmp on condition from refOff"},
 );
 
 my %culHmRegDefine = (
@@ -1030,7 +1030,7 @@ my %culHmChanSets = (
 		              ,on             =>""
 					  ,off            =>""
 					  ,toggle         =>""},
-  "HM-CC-RT-DN04"  =>{ mode         => "[auto|manu|party|boost|comfort|lower] ... <temp> <startTime> <endTime>"
+  "HM-CC-RT-DN04"  =>{ mode           => "[auto|manu|party|boost|comfort|lower] ... <temp> <startTime> <endTime>"
                       ,tempListSat    =>"HH:MM temp ..."
                       ,tempListSun    =>"HH:MM temp ..."
                       ,tempListMon    =>"HH:MM temp ..."
@@ -1038,8 +1038,9 @@ my %culHmChanSets = (
                       ,tempListThu    =>"HH:MM temp ..."
                       ,tempListWed    =>"HH:MM temp ..."
                       ,tempListFri    =>"HH:MM temp ..."
-                     }
-
+					  ,"desired-temp" =>"[on,off,6.0..30.0]"
+                     },
+  "HM-CC-RT-DN05"  =>{ peerChan      =>"<btnNumber> <actChn> ... [single] [set|unset] [actor|remote|both]"},
 );
 # clones- - - - - - - - - - - - - - - - - 
 #$culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};
