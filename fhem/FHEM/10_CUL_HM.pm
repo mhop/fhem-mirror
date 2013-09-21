@@ -819,6 +819,7 @@ sub CUL_HM_Parse($$) {##############################
     }
   } 
   elsif($md eq "HM-CC-RT-DN") { ###############################################
+    my %ctlTbl=( 0=>"auto", 1=>"manu", 2=>"party",3=>"boost");
     if($mTp eq "10" && $p =~ m/^0A(....)(..)(..)(..)/) {#info-level
       my ($chn,$setTemp,$actTemp,$err,$bat,$vp,$ctrlMode) = 
 	      ("04",hex($1),hex($1),hex($2),hex($2),hex($3), hex($4));
@@ -832,7 +833,6 @@ sub CUL_HM_Parse($$) {##############################
  	  $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});	  
 
-      my %ctlTbl=( 0=>"auto", 1=>"manu", 2=>"party",3=>"boost");
       my %errTbl=( 0=>"ok", 1=>"ValveTight", 2=>"adjustRangeTooLarge"
                   ,3=>"adjustRangeTooSmall" , 4=>"communicationERR"         
                   ,5=>"unknown" , 6=>"lowBat" , 7=>"ValveErrorPosition" );
@@ -846,6 +846,20 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "mode:$ctlTbl{$ctrlMode}";
       push @event, "state:$actTemp C, $vp %";
     }
+    elsif($mTp eq "59" && $p =~ m/^(..)/) {#inform team about new value
+	  my $setTemp = int(hex($1)/4)/2;
+	  my $ctrlMode = hex($1)&0x3;
+      push @event, "desired-temp:$setTemp";
+      push @event, "mode:$ctlTbl{$ctrlMode}";
+
+#General check impack
+	  my $tHash = $modules{CUL_HM}{defptr}{$dst."04"};
+      push @entities,CUL_HM_UpdtReadBulk($tHash,1
+	                                        ,"desired-temp:$setTemp"
+											,"mode:$ctlTbl{$ctrlMode}"
+											)
+	        if ($tHash);
+	  }
   } 
   elsif($md =~ m/^(HM-Sen-Wa-Od|HM-CC-SCD)$/){ ################################
     if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
@@ -2016,7 +2030,7 @@ sub CUL_HM_Get($@) {
 
   Log GetLogLevel($name,4), "CUL_HM get $name " . join(" ", @a[1..$#a]);
 
-  CUL_HM_ProcessCmdStack($devHash) if ($rxType & 0x03);#burst/all
+  CUL_HM_ProcessCmdStack($devHash) if ($rxType & 0x83);#burst/all/pre
   return "";
 }
 
@@ -2702,14 +2716,22 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$msg);
   }
   elsif($cmd eq "desired-temp") { #############################################
-    my $temp = CUL_HM_convTemp($a[2]);
-	return $temp if($temp =~ m/Invalid/);
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'0202'.$temp);
-    my $chnHash = CUL_HM_id2Hash($dst."02");
-	my $mode = ReadingsVal($chnHash->{NAME},"R-controlMode","");
-	$mode =~ s/set_//;#consider set as given
-	readingsSingleUpdate($chnHash,"desired-temp-cent",$a[2],1) 
-	      if($mode =~ m/central/);
+	if ($md eq "HM-CC-RT-DN"){
+	  my $temp = ($a[2] eq "off")?9:($a[2] eq "on"?61:$a[2]*2);
+	  return "invalid temp:$a[2]" if($temp <9 ||$temp > 60);
+	  $temp = sprintf ("%02X",$temp);
+      CUL_HM_PushCmdStack($hash,'++'.$flag."11$id$dst"."8604$temp");
+	}
+	else{
+	  my $temp = CUL_HM_convTemp($a[2]);
+	  return $temp if($temp =~ m/Invalid/);
+      CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'0202'.$temp);
+      my $chnHash = CUL_HM_id2Hash($dst."02");
+	  my $mode = ReadingsVal($chnHash->{NAME},"R-controlMode","");
+	  $mode =~ s/set_//;#consider set as given
+	  readingsSingleUpdate($chnHash,"desired-temp-cent",$a[2],1) 
+	        if($mode =~ m/central/);
+	}
   } 
   elsif($cmd =~ m/^tempList(...)/) { ###################################### reg
     my $wd = $1;
@@ -2881,19 +2903,29 @@ sub CUL_HM_Set($@) {
 	my ($bNo,$peerN,$single,$set,$target) = ($a[2],$a[3],$a[4],$a[5],$a[6]);
 	$state = "";
 	return "$bNo is not a button number"                          if(($bNo < 1) && !$roleC);
-	my $peerDst = CUL_HM_name2Id($peerN);
-	$peerDst .= "01" if( length($peerDst)==6);
-    return "please enter peer"                                    if(!$peerDst);
-	my $peerChn = substr($peerDst,6,2);
-	$peerDst = substr($peerDst,0,6);
-    my $peerHash;
+	my $peerId = CUL_HM_name2Id($peerN);
+    return "please enter peer"                                    if(!$peerId);
+	$peerId .= "01" if( length($peerId)==6);
+	
+	my ($peerChn,$peerBtn,$peerHash,$myBtn);	 
+	my $peerDst = substr($peerId,0,6);
+
+	if ($md eq "HM-CC-RT-DN" && $chn eq "05" ){# rt team peers cross from 05 to 04
+	  $myBtn = $peerBtn = "04";
+	  $peerChn = "05";
+	}
+	else{ # normal devices
+	  $peerBtn = $peerChn = substr($peerId,6,2);	# chan peeredd to remote
+	  $myBtn = $chn;
+	}
 	$peerHash = $modules{CUL_HM}{defptr}{$peerDst.$peerChn}if ($modules{CUL_HM}{defptr}{$peerDst.$peerChn});
     $peerHash = $modules{CUL_HM}{defptr}{$peerDst}         if (!$peerHash);
+	
 	return "$peerN not a CUL_HM device"                           if($target && ($target ne "remote") &&(!$peerHash ||$peerHash->{TYPE} ne "CUL_HM"));
     return "$single must be single or dual"                       if(defined($single) && ($single !~ m/^(single|dual)$/));
     return "$set must be set or unset"                            if(defined($set)    && ($set    !~ m/^(set|unset)$/));
     return "$target must be [actor|remote|both]"                  if(defined($target) && ($target !~ m/^(actor|remote|both)$/));
-	return "use climate chan to pair TC"                          if( $md eq "HM-CC-TC" && $chn ne "02");
+	return "use climate chan to pair TC"                          if( $md eq "HM-CC-TC" && $myBtn ne "02");
 	return "use - single [set|unset] actor - for smoke detector"  if( $st eq "smokeDetector"       && (!$single || $single ne "single" || $target ne "actor"));
 	return "use - single - for ".$st                              if(($st =~ m/(threeStateSensor|thermostat|motionDetector)/)
 	                                                                      && (!$single || $single ne "single"));
@@ -2902,7 +2934,7 @@ sub CUL_HM_Set($@) {
 	$set = ($set && $set eq "unset")?0:1;
 
 	my ($b1,$b2,$nrCh2Pair);
-	$b1 = ($roleC) ? hex($chn) : ($single?$bNo : ($bNo*2 - 1));
+	$b1 = ($roleC) ? hex($myBtn) : ($single?$bNo : ($bNo*2 - 1));
 	if ($single){
 	  $b2 = $b1;
 	  $b1 = 0 if ($st eq "smokeDetector");
@@ -2926,13 +2958,13 @@ sub CUL_HM_Set($@) {
 		  my $btnName = CUL_HM_id2Name($dst.sprintf("%02X",$b));
 		  return "button ".$b." not defined for virtual remote ".$name
 		      if (!defined $attr{$btnName});
-		  CUL_HM_ID2PeerList ($btnName,$peerDst.$peerChn,$set); #upd. peerlist
+		  CUL_HM_ID2PeerList ($btnName,$peerDst.$peerBtn,$set); #upd. peerlist
 	    }
 		else{
 		  my $bStr = sprintf("%02X",$b);
   	      CUL_HM_PushCmdStack($hash, 
-  	            "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerChn}00");
-  	      CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,hex($peerChn),4,$burst)
+  	            "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerBtn}00");
+  	      CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,hex($peerBtn),4,$burst)
 				   if($pnb);
 		  CUL_HM_queueAutoRead($name) 
 		           if (2 < CUL_HM_getAttrInt($name,"autoReadReg"));
@@ -2963,7 +2995,7 @@ sub CUL_HM_Set($@) {
 
   $rxType = CUL_HM_getRxType($devHash);
   Log GetLogLevel($name,2), "CUL_HM set $name $act";
-  CUL_HM_ProcessCmdStack($devHash) if($rxType & 0x03);#all/burst
+  CUL_HM_ProcessCmdStack($devHash) if($rxType & 0x83);#all/burst/pre
   return ("",1);# no not generate trigger outof command
 }
 
@@ -3576,6 +3608,7 @@ sub CUL_HM_getRxType($) { #in:hash(chn or dev) out:binary coded Rx type
       $rxtEntity |= ($rxtOfModel =~ m/c/)?0x04:0;#config
       $rxtEntity |= ($rxtOfModel =~ m/w/)?0x08:0;#wakeup
       $rxtEntity |= ($rxtOfModel =~ m/l/)?0x10:0;#lazyConfig
+      $rxtEntity |= ($rxtOfModel =~ m/p/)?0x80:0;#pre-burst-wakeup (works for rt - others?)
 	}
 	$rxtEntity = 1 if (!$rxtEntity);#always
 	$hash->{helper}{rxType} = $rxtEntity;
