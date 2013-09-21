@@ -280,7 +280,7 @@ PCA301_Attr(@)
 
   It can be integrated in to FHEM via a <a href="#JeeLink">JeeLink</a> as the IODevice.<br><br>
 
-  The JeeNode sketch required for this module can be found in .../contrib/36_PCA301-pcaSerial.zip.<br><br>
+  The JeeNode sketch required for this module can be found in .../contrib/arduino/36_PCA301-pcaSerial.zip.<br><br>
 
   <a name="PCA301Define"></a>
   <b>Define</b>
