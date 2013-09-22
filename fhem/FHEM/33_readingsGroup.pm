@@ -225,7 +225,7 @@ readingsGroup_2html($)
         if( $value_format ) {
           my $value_format = $value_format;
           if( ref($value_format) eq 'HASH' ) {
-            my $vf;
+            my $vf ="";
             $vf = $value_format->{$n} if( defined($value_format->{$n}) );
             $vf = $value_format->{$name.".".$n} if( defined($value_format->{$name.".".$n}) );
             $value_format = $vf;
@@ -291,7 +291,7 @@ readingsGroup_2html($)
         if( $value_format ) {
           my $value_format = $value_format;
           if( ref($value_format) eq 'HASH' ) {
-            my $vf;
+            my $vf ="";
             $vf = $value_format->{$n} if( defined($value_format->{$n}) );
             $vf = $value_format->{$name.".".$n} if( defined($value_format->{$name.".".$n}) );
             $value_format = $vf;
@@ -420,7 +420,7 @@ readingsGroup_Notify($$)
         if( $value_format ) {
           my $value_format = $value_format;
           if( ref($value_format) eq 'HASH' ) {
-            my $vf;
+            my $vf = "";
             $vf = $value_format->{$reading} if( defined($value_format->{$reading}) );
             $vf = $value_format->{$dev->{NAME}.".".$reading} if( defined($value_format->{$dev->{NAME}.".".$reading}) );
             $value_format = $vf;
