@@ -18,13 +18,14 @@ tar zxf ../../$fw.tar.gz
 
 cd $fw
 cp -rp fhem.pl fhem.cfg FHEM docs www ../fhem
+cp -rp README_DEMO.txt fhem.cfg.demo demolog ../fhem
 rm -rf ../fhem/www/frontend
 cd ..
 rm -rf $fw
 
 rm -rf fhem/docs/*.{odg,pdf,man,txt}
 cp fhemcmd.sh fhem/FHEM
-cp backup.sh startfhem fhem
+cp backup.sh startfhem* fhem
 
 echo Packing again
 zip -qr $fw-fb7270.zip fhem

@@ -12,12 +12,12 @@ echo Extracting the fritzbox template
 tar xf ../../priv/fritzbox7390_template.tar
 cd var
 tar zxf fhem.tar.gz
-rm -rf fhem/FHEM www docs
+rm -rf fhem/FHEM fhem/www fhem/docs
 mkdir fhem/FHEM fhem/docs
 cd ..
 
 cp install var
-cp backup.sh startfhem startfhemAsRoot var/fhem
+cp backup.sh startfhem* var/fhem
 cp fhemcmd.sh var/fhem/FHEM
 
 
@@ -29,6 +29,7 @@ cp fhem.cfg fhem.pl ../var/fhem
 cp -rp FHEM/* ../var/fhem/FHEM
 cp docs/*.html docs/*.jpg ../var/fhem/docs
 cp -rp www ../var/fhem
+cp -rp README_DEMO.txt fhem.cfg.demo demolog ../var/fhem
 rm -rf ../var/fhem/www/frontend
 
 cd ..
@@ -37,10 +38,10 @@ rm -rf $fw
 
 echo Packing again
 cd var
-cat >> fhem/fhem.cfg << EOF
-attr global backupcmd backup.sh
-EOF
-tar zcf fhem.tar.gz fhem
+#cat >> fhem/fhem.cfg << EOF
+#attr global backupcmd backup.sh
+#EOF
+tar cf - fhem | gzip -9 > fhem.tar.gz
 rm -rf fhem
 
 cd ..

@@ -1,5 +1,5 @@
-VERS=5.4
-DATE=2013-04-08
+VERS=5.5
+DATE=2013-09-22
 
 RELATIVE_PATH=YES
 BINDIR=/opt/fhem
@@ -7,13 +7,7 @@ MODDIR=$(BINDIR)
 VARDIR=$(BINDIR)/log
 MANDIR=$(BINDIR)/docs
 ETCDIR=$(BINDIR)
-
-# Old variant
-#BINDIR=/usr/bin
-#MODDIR=/usr/share/fhem
-#VARDIR=/var/log/fhem
-#MANDIR=/usr/share/man/man1
-#ETCDIR=/etc
+DEMODIR=$(BINDIR)
 
 # Used for .deb package creation
 RBINDIR=$(ROOT)$(BINDIR)
@@ -21,9 +15,10 @@ RMODDIR=$(ROOT)$(MODDIR)
 RVARDIR=$(ROOT)$(VARDIR)
 RMANDIR=$(ROOT)$(MANDIR)
 RETCDIR=$(ROOT)$(ETCDIR)
+RDEMODIR=$(ROOT)$(DEMODIR)
 
 # Destination Directories
-DEST=$(RETCDIR) $(RBINDIR) $(RMODDIR) $(RMANDIR) $(RVARDIR)
+DEST=$(RETCDIR) $(RBINDIR) $(RMODDIR) $(RMANDIR) $(RVARDIR) $(RDEMODIR)
 
 DESTDIR=fhem-$(VERS)
 
@@ -57,10 +52,12 @@ install:
 	@rm fhem.cfg.install
 	@cp fhem.pl $(RBINDIR)
 	@cp -rp FHEM docs www contrib $(RMODDIR)
+	@cp -rp README_DEMO.txt demolog fhem.cfg.demo $/RDEMODIR)
 	@cp docs/fhem.man $(RMANDIR)/fhem.pl.1
 	@gzip -f -9 $(RMANDIR)/fhem.pl.1
 	@echo "- cleanup: removing .svn leftovers"
 	@find $(RMODDIR) -name .svn -print | xargs rm -rf
+	@find $(RMODDIR) -name svn-commit\* -print | xargs rm -rf
 	@echo
 	@echo "Installation of fhem completed!"
 	@echo
@@ -73,7 +70,8 @@ backup:
 	@echo "Saving fhem to the .backup directory in the current directory"
 	@-if [ ! -e .backup ]; then mkdir .backup; fi;
 	@tar czf .backup/fhem-backup_`date +%y%m%d%H%M`.tar.gz \
-		$(RETCDIR)/fhem* $(RBINDIR)/fhem* $(RDOCDIR) $(RMODDIR) $(RMANDIR)/fhem* $(RVARDIR)
+		$(RETCDIR)/fhem* $(RBINDIR)/fhem* $(RDOCDIR)\
+                $(RMODDIR) $(RMANDIR)/fhem* $(RVARDIR)
 
 uninstall:backup
 	@echo
@@ -89,18 +87,20 @@ uninstall:backup
 dist:
 	mkdir .f
 	cp -r fhem.pl fhem.cfg CHANGED HISTORY Makefile README.SVN\
+                demolog fhem.cfg.demo README_DEMO.txt\
 		FHEM contrib docs www webfrontend .f
 	mkdir .f/log
 	touch .f/log/empty_file.txt
 	(cd .f; perl contrib/commandref_join.pl)
 	find .f -name .svn -print | xargs rm -rf
+	find .f -name svn-commit\* -print | xargs rm -rf
 	find .f -name \*.orig -print | xargs rm -f
 	find .f -name .#\* -print | xargs rm -f
 	find .f -type f -print | grep -v Makefile | grep -v SWAP |\
 		xargs perl -pi -e 's/=VERS=/$(VERS)/g;s/=DATE=/$(DATE)/g'
+	rm -rf .f/www/SVGcache
 	mv .f $(DESTDIR)
 	tar cf - $(DESTDIR) | gzip > $(DESTDIR).tar.gz
-	mv $(DESTDIR)/docs/*.html .
 	rm -rf $(DESTDIR)
 
 dist-clean:
