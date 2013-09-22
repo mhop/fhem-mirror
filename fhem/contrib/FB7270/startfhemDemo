@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# On the Fritzbox 7270 V1/V2 with missing df replace home with the hardcoded
+# path.
+root=`df | sed -n -e '/ftp\//s/.*ftp\///p'`
+home=/var/InternerSpeicher/$root/fhem
+
+cd $home
+
+PATH=$home:$PATH
+export PATH
+
+export LD_LIBRARY_PATH=$home/lib
+export PERL5LIB=$home/lib/perl5/site_perl/5.12.2/mips-linux:$home/lib/perl5/site_perl/5.12.2:$home/lib/perl5/5.12.2/mips-linux:$home/lib/perl5/5.12.2
+
+perl fhem.pl fhem.cfg.demo

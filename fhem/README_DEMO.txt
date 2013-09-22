@@ -6,6 +6,8 @@ HOWTO:
   Start FHEM with a demo configuration with 
     perl fhem.pl fhem.cfg.demo
   (typed in a terminal) and point your browser to http://YourFhemHost:8083
+  Use the startfhemDemo skript on the FritzBox.
+
 
 Stopping:
   - type shutdown in the browser command window, followed by RETURN
