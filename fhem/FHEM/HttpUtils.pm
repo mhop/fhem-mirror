@@ -63,6 +63,10 @@ CustomGetFileFromURL($$@)
   my ($quiet, $url, $timeout, $data, $noshutdown, $loglevel) = @_;
   $timeout = 4.0 if(!defined($timeout));
   $loglevel = 1 if(!$loglevel);
+  
+  my $redirects= 0;
+  
+  RETRY:
 
   my $displayurl= $quiet ? "<hidden>" : $url;
   if($url !~ /^(http|https):\/\/(([^:\/]+):([^:\/]+)@)?([^:\/]+)(:\d+)?(\/.*)$/) {
@@ -136,6 +140,24 @@ CustomGetFileFromURL($$@)
 
   $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
   my @header= split("\r\n", $1);
+  my @header0= split(" ", $header[0]);
+  my $code= $header0[1];
+  Log3 undef, 4, "CustomGetFileFromURL $displayurl: Code $code ($header[0])";
+  if($code==301) {
+    # redirect
+    my @header1= split(" ", $header[1]);
+    my $location= $header1[1];
+    Log3 undef, 4, "CustomGetFileFromURL $displayurl: Redirect";
+    
+    $redirects++;
+    if($redirects> 5) {
+      Log3 undef, 2, "CustomGetFileFromURL $displayurl: Too many redirects";
+    } else {
+      $url= $location;
+      goto RETRY;
+    }
+  }
+  
   my $hostpath= $quiet ? "<hidden>" : $host . $path;
   Log3 undef, 4,
         "CustomGetFileFromURL $displayurl: Got data, length: ".length($ret);
