@@ -289,6 +289,9 @@ sub HMinfo_SetFn($@) {#########################################################
 	$ret .= "\n    autoRegRead pending:".
 	            join(",",@{$modules{CUL_HM}{helper}{autoRdCfgLst}}) 
 			if ($modules{CUL_HM}{helper}{autoRdCfgLst});
+	$ret .= "\n    status request pending:".
+	            join(",",@{$modules{CUL_HM}{helper}{reqStatus}}) 
+			if ($modules{CUL_HM}{helper}{reqStatus});
 	@IOlist = HMinfo_noDup(@IOlist);
 	foreach(@IOlist){
 	  $_ .= ":".$defs{$_}{STATE}.
@@ -420,7 +423,8 @@ sub HMinfo_SetFn($@) {#########################################################
 	  $mode =~ s/w/wakeup/;
 	  $mode =~ s/b/burst/;
 	  $mode =~ s/l/lazyConf/;
-	  $mode =~ s/:/,/;
+	  $mode =~ s/\bf\b/burstCond/;
+	  $mode =~ s/:/,/g;
 	  $mode = "normal" if (!$mode);
 	  my $list = $th{$_}{lst};
 	  $list =~ s/.://g;
@@ -430,7 +434,7 @@ sub HMinfo_SetFn($@) {#########################################################
 	    my ($n,$s,$e) = split(":",$_);
 	    $chan .= $s.(($s eq $e)?"":("-".$e))." ".$n.", ";
 	  }
-	  push @model,sprintf("%-16s %-24s %4s %-15s %-5s %-5s %s"
+	  push @model,sprintf("%-16s %-24s %4s %-24s %-5s %-5s %s"
 						  ,$th{$_}{st}
 	                      ,$th{$_}{name}
 	                      ,$_
@@ -441,7 +445,7 @@ sub HMinfo_SetFn($@) {#########################################################
 						  );  
 	}
 	$ret = $cmd.($filter?" filtered":"").":$filter\n  " 
-	       .sprintf("%-16s %-24s %4s %-15s %-5s %-5s %s\n  "
+	       .sprintf("%-16s %-24s %4s %-24s %-5s %-5s %s\n  "
 						  ,"subType"
 	                      ,"name"
 	                      ,"ID"
