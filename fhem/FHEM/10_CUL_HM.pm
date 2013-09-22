@@ -634,8 +634,13 @@ sub CUL_HM_Parse($$) {##############################
          (    $1, hex($2));
       $vp = int($vp/2.56+0.5);   # valve position in %
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
-  	  push @entities,CUL_HM_UpdtReadSingle($chnHash,"state","$vp %",1)
-	        if($chnHash);
+	  if($chnHash){
+  	    push @entities,CUL_HM_UpdtReadSingle($chnHash,"state","$vp %",1);
+	    if ($chnHash->{helper}{needUpdate}){
+	      CUL_HM_stateUpdat(":".$chnHash->{NAME});
+		  delete $chnHash->{helper}{needUpdate};
+	    }
+	  }
       push @event, "actuator:$vp %";
 
       # Set the valve state too, without an extra trigger
@@ -661,6 +666,7 @@ sub CUL_HM_Parse($$) {##############################
 #	    readingsSingleUpdate($chnHash,"desired-temp-cent",$dTemp,1) if($mode =~ m /central/ && $mTp eq '02');
 #		removed - shall not be changed automatically - change is  only temporary
 #       CUL_HM_Set($chnHash,$chnName,"desired-temp",$dTemp)         if($mode =~ m /central/ && $mTp eq '10');
+        $chnHash->{helper}{needUpdate} = 1                          if($mode =~ m /central/ && $mTp eq '10');
        }
       push @event, "desired-temp:" .$dTemp;
 	  push @event, "battery:".($err&0x80?"low":"ok");  
@@ -2034,7 +2040,7 @@ sub CUL_HM_Get($@) {
 
   Log GetLogLevel($name,4), "CUL_HM get $name " . join(" ", @a[1..$#a]);
 
-  CUL_HM_ProcessCmdStack($devHash) if ($rxType & 0x83);#burst/all/pre
+  CUL_HM_ProcessCmdStack($devHash) if ($rxType & 0x03);#burst/all
   return "";
 }
 
@@ -2048,7 +2054,6 @@ sub CUL_HM_Set($@) {
   my $devName = $hash->{device}?$hash->{device}:$name;
   my $st      = AttrVal($devName, "subType", "");
   my $md      = AttrVal($devName, "model"  , "");
-  my $rxType = CUL_HM_getRxType($hash);
   my $flag = CUL_HM_getFlag($hash); #set burst flag
   my $cmd = $a[1];
   my $dst = $hash->{DEF};
@@ -3040,9 +3045,9 @@ sub CUL_HM_Set($@) {
  
   readingsSingleUpdate($hash,"state",$state,1) if($state);
 
-  $rxType = CUL_HM_getRxType($devHash);
+  my $rxType = CUL_HM_getRxType($devHash);
   Log GetLogLevel($name,2), "CUL_HM set $name $act";
-  CUL_HM_ProcessCmdStack($devHash) if($rxType & 0x83);#all/burst/pre
+  CUL_HM_ProcessCmdStack($devHash) if($rxType & 0x03);#all/burst
   return ("",1);# no not generate trigger outof command
 }
 
@@ -3655,7 +3660,7 @@ sub CUL_HM_getRxType($) { #in:hash(chn or dev) out:binary coded Rx type
       $rxtEntity |= ($rxtOfModel =~ m/c/)?0x04:0;#config
       $rxtEntity |= ($rxtOfModel =~ m/w/)?0x08:0;#wakeup
       $rxtEntity |= ($rxtOfModel =~ m/l/)?0x10:0;#lazyConfig
-      $rxtEntity |= ($rxtOfModel =~ m/p/)?0x80:0;#pre-burst-wakeup (works for rt - others?)
+      $rxtEntity |= ($rxtOfModel =~ m/f/)?0x80:0;#burstOptional
 	}
 	$rxtEntity = 1 if (!$rxtEntity);#always
 	$hash->{helper}{rxType} = $rxtEntity;
