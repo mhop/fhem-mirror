@@ -844,7 +844,7 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "desired-temp:$setTemp";
 	  push @event, "ValvePosition:$vp %";
       push @event, "mode:$ctlTbl{$ctrlMode}";
-      push @event, "state:T:$actTemp desired:$setTemp valve:$vp %";
+      push @event, "state:T: $actTemp desired: $setTemp valve: $vp %";
       push @entities,CUL_HM_UpdtReadBulk($dHash,1
 	                                        ,"battery:".($err&0x80?"low":"ok")
 	                                        ,"batteryLevel:$bat V"
@@ -2900,6 +2900,49 @@ sub CUL_HM_Set($@) {
 	                                 $id,$dst,$dst,
                                      $pChn+(($mode && $mode eq "long")?64:0),
 									 $pressCnt));                                     
+	}
+  } 
+  elsif($cmd eq "postEvent") { ################################################
+    my (undef,undef,$cond) = @a;
+	if ($cond =~ m/[+-]?\d+/){
+	  return "condition value:$cond above 200 illegal" if ($cond > 200);
+	}
+	else{
+	  my $val;
+	  my @keys;
+	  foreach my $tp (keys %lvlStr){
+	    foreach my $mk (keys %{$lvlStr{$tp}}){
+	      foreach (keys %{$lvlStr{$tp}{$mk}}){
+	        $val = hex($_) if ($cond eq $lvlStr{$tp}{$mk}{$_});
+	  	    push @keys,$lvlStr{$tp}{$mk}{$_};
+	      }
+	    }
+	  }
+	  return "cond:$cond not allowed. choose one of:[0..200],"
+	        .join(",",sort @keys)
+	    if (!defined $val);
+	  $cond = $val;
+	}
+	my $pressCnt = (!$hash->{helper}{count}?1:$hash->{helper}{count}+1)%256;
+	$hash->{helper}{count}=$pressCnt;# remember for next round
+    
+	my @peerList;
+	if ($st eq 'virtual'){#serve all peers of virtual button
+	  foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
+	    push (@peerList,substr($peer,0,6));
+	  }
+	  @peerList = CUL_HM_noDup(@peerList);
+	  push @peerList,'00000000' if (!@peerList);#send to broadcast if no peer
+	  foreach my $peer (sort @peerList){
+	    my $peerFlag = $peer eq '00000000'?'A4':
+	                                       CUL_HM_getFlag(CUL_HM_id2Hash($peer));
+	    $peerFlag =~ s/0/4/;# either 'A4' or 'B4'
+        CUL_HM_PushCmdStack($hash, sprintf("++%s41%s%s%02X%02X%02X"
+	                   ,$peerFlag,$dst,$peer
+					   ,$chn
+					   ,$pressCnt
+					   ,$cond));
+	  }
 	}
   } 
   elsif($cmd eq "peerChan") { ############################################# reg
@@ -4985,6 +5028,12 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
          implementation will not specify the duration for long. Only one trigger
          will be sent of type "long".
 	   </li>
+       <li><B>postEvent &lt;[0..200]&gt;<a name="CUL_HMpostEvents"></a></B>
+         simulates an event. A value must be given between 0 and 200.<br>
+		 Alternally a literal ca be given as used by other sensors. enter <br>
+		 postEvent ?<br>
+		 to get options<br>
+	   </li>
        </ul>
     </li>   
     <li>smokeDetector<br>
@@ -5370,7 +5419,8 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
       humidity $h<br>
       actuator $vp %<br>
 	  desired-temp $dTemp<br>
-	  desired-temp-manu $dTemp<br>
+	  desired-temp-manu $dTemp #temperature if switchen to manual mode<br>
+	  desired-temp-cent $dTemp #temperature if switchen to central mode<br>
 	  windowopen-temp-%d  %.1f (sensor:%s)<br>
 	  tempList$wd  hh:mm $t hh:mm $t ...<br>
       displayMode temp-[hum|only]<br>

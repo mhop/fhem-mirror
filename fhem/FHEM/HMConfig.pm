@@ -190,7 +190,7 @@ my %culHmModel=(
   "0092" => {name=>"Schueco_263-144"         ,st=>'switch'            ,cyc=>''      ,rxt=>'c'      ,lst=>'4'            ,chn=>"",}, # HM Switch Interface 3 switches 
   "0093" => {name=>"Schueco_263-158"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",}, #
   "0094" => {name=>"IS-WDS-TH-OD-S-R3"       ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",}, #
-  "0095" => {name=>"HM-CC-RT-DN"             ,st=>'thermostat'        ,cyc=>''      ,rxt=>'c:w:b'  ,lst=>'p:1p.2p.5p.6p,3:3p.6p,7:4'
+  "0095" => {name=>"HM-CC-RT-DN"             ,st=>'thermostat'        ,cyc=>''      ,rxt=>'c:w'    ,lst=>'p:1p.2p.5p.6p,3:3p.6p,7:4'
                                                                                                                         ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,ClimRT_tr:4:4,ClimaTeam:5:5,remote:6:6"}, #
   "0096" => {name=>"WDF-solar"               ,st=>'blindActuatorSol'  ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"win:1:1,blind_2:3",}, #
   "009B" => {name=>"Schueco_263-xxx"         ,st=>'tipTronic'         ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1:1.2,3:1p.3p',chn=>"act:1:1,sen:2:2,sec:3:3",}, #
@@ -940,6 +940,7 @@ my %culHmSubTypeSets = (# channels of this subtype
 					  ,statusRequest =>""},
   virtual          =>{ peerChan      =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"
 		              ,press         =>"[long|short]..."
+                      ,postEvent     =>"<condition>"
                       ,valvePos      =>"<position>"},#acting as TC
   smokeDetector    =>{ test          =>""
                       ,alarmOn       =>""
@@ -999,7 +1000,7 @@ my %culHmChanSets = (
                        "party-temp"   =>"[on,off,6.0..30.0]",
                        "desired-temp" =>"[on,off,6.0..30.0]", 
                        sysTime        =>""	  },
-  "HM-CC-TC02"     =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
+  "HM-CC-TC02"     =>{ peerChan       =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"
                       ,"day-temp"     =>"[on,off,6.0..30.0]"
                       ,"night-temp"   =>"[on,off,6.0..30.0]"
                       ,"party-temp"   =>"[on,off,6.0..30.0]"
@@ -1023,8 +1024,8 @@ my %culHmChanSets = (
   "HM-OU-CFM-PL01" =>{ led            =>"<color>[,<color>...] [<repeat>]"},
   "HM-OU-CFM-PL02" =>{ playTone       =>"<MP3No>[,<MP3No>...] [<repeat>]"},
                                       
-  "WDF-solar01"    =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
-  "HM-Sen-RD-O01"  =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
+  "WDF-solar01"    =>{ peerChan       =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"},
+  "HM-Sen-RD-O01"  =>{ peerChan       =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"},
   "HM-Sen-RD-O02"  =>{ "on-for-timer" =>"<sec>"
                       ,"on-till"      =>"<time>"
 		              ,on             =>""
@@ -1040,7 +1041,7 @@ my %culHmChanSets = (
                       ,tempListFri    =>"HH:MM temp ..."
 					  ,"desired-temp" =>"[on,off,6.0..30.0]"
                      },
-  "HM-CC-RT-DN05"  =>{ peerChan      =>"<btnNumber> <actChn> ... [single] [set|unset] [actor|remote|both]"},
+  "HM-CC-RT-DN05"  =>{ peerChan       =>" 0 <actChn> ... [single] [set|unset] [actor|remote|both]"},
 );
 # clones- - - - - - - - - - - - - - - - - 
 #$culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};
