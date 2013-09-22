@@ -1,0 +1,149 @@
+attr global autoload_undefined_devices 1
+attr global backup_before_update 0
+attr global logfile -
+attr global modpath .
+attr global motd FHEM demo version
+attr global room System
+attr global sendStatistics never
+attr global statefile ./demolog/fhem.save
+attr global updateInBackground 1
+attr global userattr Light Light_map devStateIcon devStateStyle icon sortby structexclude webCmd
+attr global verbose 3
+
+define telnetPort telnet 7072 global
+attr telnetPort room System
+
+define WEB FHEMWEB 8083 global
+attr WEB iconPath openautomation:fhemSVG
+attr WEB room System
+
+define WEBphone FHEMWEB 8084 global
+attr WEBphone room System
+attr WEBphone stylesheetPrefix smallscreen
+
+define WEBtablet FHEMWEB 8085 global
+attr WEBtablet iconPath openautomation:fhemSVG
+attr WEBtablet room System
+attr WEBtablet stylesheetPrefix ios7
+
+# Fake FileLog entry, to access the fhem log from FHEMWEB 
+define Logfile FileLog ./log/fhem-%Y-%m.log fakelog
+attr Logfile room System
+
+define autocreate autocreate
+attr autocreate room System
+define et eventTypes demolog/eventTypes.txt
+attr et room System
+define CUL_0 CUL none 0000
+attr CUL_0 dummy 1
+attr CUL_0 room System
+define Outdoor FS20 1234 11
+attr Outdoor Light AllLights
+attr Outdoor group Single Lights
+attr Outdoor icon light_outdoor
+attr Outdoor room Light
+define Office FS20 1234 12
+attr Office Light AllLights
+attr Office group Single Lights
+attr Office icon light_office
+attr Office model fs20st
+attr Office room Light
+define Livingroom FS20 1234 13
+attr Livingroom Light AllLights
+attr Livingroom eventMap off:dim0% on:dim100%
+attr Livingroom group Single Lights
+attr Livingroom icon light_pendant_light
+attr Livingroom model fs20di
+attr Livingroom room Light
+attr Livingroom webCmd dim
+define AllLights structure Light Alarm Livingroom Office Outdoor
+attr AllLights devStateIcon undefined:light_question
+attr AllLights group Structure
+attr AllLights icon light_light
+attr AllLights room Light
+define Alarm FS20 1234 14
+attr Alarm Light AllLights
+attr Alarm follow-on-for-timer 1
+attr Alarm group Single Lights
+attr Alarm icon light_wall_2
+attr Alarm room Light
+attr Alarm webCmd blink 5 1
+define Garden KS300 1234
+attr Garden group Sensors
+attr Garden room Sensors
+define Log.Garden FileLog demolog/garden.log Sens.Out:T:.*
+attr Log.Garden room Sensors
+define Cellar CUL_WS 1 -1 -3.5
+attr Cellar group Sensors
+attr Cellar room Sensors
+define SVG_01_Garden SVG Log.Garden:SVG_01_Garden:CURRENT
+attr SVG_01_Garden label "Temp: Min $data{min1}, Max $data{max1}, Last $data{currval1}"
+attr SVG_01_Garden room Sensors
+attr SVG_01_Garden startDate 2013-08-13
+define Log.Cellar FileLog demolog/cellar.log Cellar:T:.*
+attr Log.Cellar room Sensors
+define SVG_02_Cellar SVG Log.Cellar:SVG_02_Cellar:CURRENT
+attr SVG_02_Cellar label "Temp: Min $data{min1}, Max $data{max1}, Last $data{currval1}"
+attr SVG_02_Cellar room Sensors
+attr SVG_02_Cellar startDate 2013-08-13
+define Log.Dewpoint FileLog demolog/dewpoint.log .*dewpoint.*
+attr Log.Dewpoint room Sensors
+define dew_all dewpoint dewpoint .*
+attr dew_all group Helper
+attr dew_all room Sensors
+define SVG_03_Dewpoint SVG Log.Dewpoint:SVG_03_Dewpoint:CURRENT
+attr SVG_03_Dewpoint room Sensors
+attr SVG_03_Dewpoint startDate 2013-08-13
+define sunRise at *{sunrise()} set Office on
+attr sunRise group Timer
+attr sunRise icon weather_sunrise
+attr sunRise room Light
+define sunSet at *{sunset()} set Office off
+attr sunSet group Timer
+attr sunSet icon weather_sunset
+attr sunSet room Light
+define outdoorNotifier notify Outdoor:.* set Office $EVENT
+attr outdoorNotifier group Notify
+attr outdoorNotifier icon light_ceiling_light
+attr outdoorNotifier room Light
+
+define Projector dummy
+attr Projector devStateIcon on:control_on_off:off off:control_home:on
+attr Projector group AV
+attr Projector room Cinema
+attr Projector setList on:noArg off:noArg
+attr Projector webCmd on:off
+define TV dummy
+attr TV devStateIcon on:control_on_off:off off:control_home:on
+attr TV group AV
+attr TV room Cinema
+attr TV setList on:noArg off:noArg
+attr TV webCmd on:off
+define Screen dummy
+attr Screen devStateIcon down:fts_garage_door_100:up up:fts_garage_door_10:down
+attr Screen group AV
+attr Screen room Cinema
+attr Screen setList up:noArg down:noArg
+attr Screen webCmd down:up
+define CeilingLight FS20 0001 01
+attr CeilingLight eventMap off:dim0% on:dim100%
+attr CeilingLight group Light
+attr CeilingLight icon light_ceiling_light
+attr CeilingLight model dummyDimmer
+attr CeilingLight room Cinema
+attr CeilingLight webCmd on:off:dim
+define ReadingLight FS20 0001 02
+attr ReadingLight eventMap off:dim0% on:dim100%
+attr ReadingLight group Light
+attr ReadingLight icon light_floor_lamp
+attr ReadingLight room Cinema
+attr ReadingLight webCmd on:off:dim
+define wlCinema weblink htmlCode {LightScene_2html("lcCinema")}
+attr wlCinema room Cinema
+define lcCinema LightScene Projector Screen TV CeilingLight ReadingLight
+attr lcCinema alias Scenes
+attr lcCinema devStateIcon AllOff:control_home Break:rc_PAUSE Cinema:scene_cinema WatchTV:it_television
+attr lcCinema group Control
+attr lcCinema icon scene_scene
+attr lcCinema room Cinema
+attr lcCinema webCmd scene

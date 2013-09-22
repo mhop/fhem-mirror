@@ -1,0 +1,20 @@
+# Created by FHEM/98_SVG.pm, 2013-08-22 23:22:34
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<L1>'
+set ytics 
+set y2tics 
+set grid
+set ylabel "Rain (mm)"
+set y2label "Temperature"
+
+#FileLog 4:Garden.T\x3a:15:
+#FileLog 10:Garden.T\x3a:0:delta-h
+#FileLog 10:Garden.T\x3a:0:delta-d
+
+plot "<IN>" using 1:2 axes x1y2 title 'Temperature' ls l0 lw 1 with histeps,\
+     "<IN>" using 1:2 axes x1y1 title 'Rain/hour' ls l1fill lw 1 with histeps,\
+     "<IN>" using 1:2 axes x1y1 title 'Rain/day' ls l2 lw 1 with histeps

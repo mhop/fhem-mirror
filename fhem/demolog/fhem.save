@@ -1,0 +1,64 @@
+#Mon Aug 26 18:01:39 2013
+setstate Alarm on
+setstate Alarm 2013-08-23 07:42:48 state on
+setstate AllLights on
+setstate AllLights 2013-08-25 14:23:20 LastDevice Office
+setstate AllLights 2013-08-25 14:23:20 LastDevice_Abs Office
+setstate AllLights 2013-08-25 14:23:20 state on
+setstate CeilingLight dim0%
+setstate CeilingLight 2013-08-26 18:01:06 state off
+setstate Cellar T: 21.1  H: 54.6
+setstate Cellar 2013-08-13 08:00:48 DEVFAMILY WS300
+setstate Cellar 2013-08-13 08:00:48 DEVTYPE S300TH
+setstate Cellar 2013-08-13 08:00:48 dewpoint 11.6
+setstate Cellar 2013-08-13 08:00:48 humidity 54.6
+setstate Cellar 2013-08-13 08:00:48 state T: 21.1  H: 54.6
+setstate Cellar 2013-08-13 08:00:48 temperature 21.1
+setstate Garden T: 18.3  H: 72  W: 0.5  R: 81.9  IR: no
+setstate Garden 2013-08-13 08:03:17 avg_day T: 17.2  H: 73  W: 0.0  R: 0.0
+setstate Garden 2013-08-13 00:02:53 avg_month T: 21.0  H: 33  W: 30.1  R: 30.4
+setstate Garden 2013-08-13 08:03:17 cum_day 2013-08-13 00:02:53 T: 494797  H: 2112387  W: 502.6  R: 81.9
+setstate Garden 2013-08-13 00:02:53 cum_month 17 T: 336.9  H: 574  W: 511.5  R: 30.4
+setstate Garden 2013-08-13 15:03:17 dewpoint 13.2
+setstate Garden 2013-08-13 15:03:17 humidity 72
+setstate Garden 2013-08-13 15:03:17 israining no
+setstate Garden 2013-08-13 15:03:17 rain 81.9
+setstate Garden 2013-08-13 15:03:17 rain_raw 321
+setstate Garden 2013-08-13 15:03:17 rain_raw_adj 321
+setstate Garden 2013-08-13 15:03:17 state T: 18.3  H: 72  W: 0.5  R: 81.9  IR: no
+setstate Garden 2013-08-13 15:03:17 temperature 18.3
+setstate Garden 2013-08-13 15:03:17 tsecs 1376805797
+setstate Garden 2013-08-13 15:03:17 unknown1 a
+setstate Garden 2013-08-13 15:03:17 unknown2 7
+setstate Garden 2013-08-13 15:03:17 unknown3 1
+setstate Garden 2013-08-13 15:03:17 wind 0.5
+setstate Livingroom dim100%
+setstate Livingroom 2013-08-23 07:57:21 state on
+setstate Log.Cellar active
+setstate Log.Dewpoint active
+setstate Log.Garden active
+setstate Logfile active
+setstate Office on
+setstate Office 2013-08-25 14:23:20 state on
+setstate Outdoor on
+setstate Outdoor 2013-08-25 14:23:20 state on
+setstate Projector off
+setstate Projector 2013-08-26 18:01:06 state off
+setstate ReadingLight dim12%
+setstate ReadingLight 2013-08-26 18:01:06 state dim12%
+setstate SVG_01_Garden initialized
+setstate SVG_02_Cellar initialized
+setstate SVG_03_Dewpoint initialized
+setstate Screen up
+setstate Screen 2013-08-26 18:01:06 state up
+setstate TV on
+setstate TV 2013-08-26 18:01:06 state on
+setstate autocreate active
+setstate dew_all active
+setstate et active
+setstate global <no definition>
+setstate lcCinema WatchTV
+setstate outdoorNotifier active
+setstate sunRise Next: 05:55:41
+setstate sunSet Next: 20:59:15
+setstate wlCinema initialized
