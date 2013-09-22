@@ -1,0 +1,106 @@
+425 Alarm off
+376 Alarm on
+55 Alarm on-for-timer .*
+819 AllLights LastDevice: Alarm
+26 AllLights LastDevice: Livingroom
+26 AllLights LastDevice: Office
+20 AllLights LastDevice: Outdoor
+819 AllLights LastDevice_Abs: Alarm
+26 AllLights LastDevice_Abs: Livingroom
+26 AllLights LastDevice_Abs: Office
+20 AllLights LastDevice_Abs: Outdoor
+426 AllLights off
+33 AllLights on
+477 AllLights undefined
+406 CUL_0 TRANSMIT LIMIT EXCEEDED
+11 CeilingLight dim0%
+19 CeilingLight dim37%
+33 CeilingLight off
+1 Lamp1 on
+6 Livingroom dim0%
+1 Livingroom dim06%
+12 Livingroom dim100%
+1 Livingroom dim18%
+1 Livingroom dim37%
+3 Livingroom dim50%
+1 Livingroom dim62%
+1 Livingroom dim68%
+3 Livingroom dim75%
+2 Livingroom dim87%
+20 Livingroom off
+22 Livingroom on
+1 Office dim100%
+1 Office dim50%
+1 Office dim75%
+1 Office dim93%
+31 Office off
+35 Office on
+28 Outdoor off
+29 Outdoor on
+5 Outdoor on-for-timer .*
+29 Projector off
+17 Projector on
+7 ReadingLight dim0%
+13 ReadingLight dim12%
+19 ReadingLight dim37%
+24 ReadingLight off
+1 SVG_01_Garden copyGplotFile
+1 SVG_02_Cellar copyGplotFile
+1 SVG_03_Dewpoint copyGplotFile
+1 SVG_Log.Cellar_1 copyGplotFile
+2 SVG_Log.Dewpoint_1 copyGplotFile
+1 SVG_Log.Garden_1 copyGplotFile
+17 Screen down
+30 Screen up
+1 Sens.Out T: .*  H: .*  W: .*  R: .*  IR: no
+31 TV off
+14 TV on
+50 global DEFINED Alarm_timer
+1 global DEFINED AllLights
+1 global DEFINED CUL_0
+1 global DEFINED Lamp1
+1 global DEFINED Lamp2
+1 global DEFINED Lamp3
+1 global DEFINED Lamp4
+1 global DEFINED Light3
+1 global DEFINED Log.Cellar
+1 global DEFINED Log.Dewpoint
+1 global DEFINED Log.Out
+1 global DEFINED OutSens
+4 global DEFINED Outdoor_timer
+1 global DEFINED SVG_Log.Cellar_1
+2 global DEFINED SVG_Log.Dewpoint_1
+1 global DEFINED SVG_Log.Garden_1
+1 global DEFINED Sens.Cellar
+1 global DEFINED alarmToggler
+1 global DEFINED dew_all
+741 global DEFINED minuteTimer
+1 global DEFINED outdoorNotify
+1 global DEFINED sunRise
+1 global DEFINED sunSet
+50 global DELETED Alarm_timer
+4 global DELETED Outdoor_timer
+1 global DELETED SVG_Log.Dewpoint_1
+1 global DELETED alarmToggler
+741 global DELETED minuteTimer
+29 global INITIALIZED
+1 global RENAMED Lamp1 Outdoor
+1 global RENAMED Lamp2 Office
+1 global RENAMED Lamp3 Livingroom
+1 global RENAMED Lamp4 Alarm
+1 global RENAMED Light3 Alarm
+1 global RENAMED Log.Out Log.Garden
+1 global RENAMED OutSens Sens.Out
+1 global RENAMED SVG_Log.Cellar_1 SVG_02_Cellar
+1 global RENAMED SVG_Log.Dewpoint_1 SVG_03_Dewpoint
+1 global RENAMED SVG_Log.Garden_1 SVG_01_Garden
+1 global RENAMED Sens.Cellar Cellar
+1 global RENAMED Sens.Out Garden
+1 global RENAMED outdoorNotify outdoorNotifier
+42 global SAVE
+29 global SHUTDOWN
+15 lcCinema scene AllOff
+19 lcCinema scene Break
+16 lcCinema scene Cinema
+13 lcCinema scene WatchTV
+740 minuteTimer 

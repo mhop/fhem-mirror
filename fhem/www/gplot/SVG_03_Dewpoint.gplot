@@ -1,0 +1,18 @@
+# Created by FHEM/98_SVG.pm, 2013-08-22 22:35:46
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<TL>'
+set ytics 
+set y2tics 
+set grid y2tics
+set ylabel "Temperature"
+set y2label "Temperature"
+
+#FileLog 4:Cellar.dewpoint\x3a:10
+#FileLog 4:Garden.dewpoint\x3a:10
+
+plot "<IN>" using 1:2 axes x1y2 title 'Cellar' ls l0 lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y2 title 'Garden' ls l1 lw 1 with lines

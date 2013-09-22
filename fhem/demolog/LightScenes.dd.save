@@ -1,0 +1,30 @@
+#Mon Aug 26 16:36:31 2013
+{
+          'lcCinema' => {
+                          'Break' => {
+                                       'CeilingLight' => 'dim37%',
+                                       'ReadingLight' => 'dim37%'
+                                     },
+                          'Cinema' => {
+                                        'Screen' => 'down',
+                                        'Projector' => 'on',
+                                        'CeilingLight' => 'off',
+                                        'ReadingLight' => 'off',
+                                        'TV' => 'off'
+                                      },
+                          'WatchTV' => {
+                                         'Screen' => 'up',
+                                         'Projector' => 'off',
+                                         'CeilingLight' => 'off',
+                                         'ReadingLight' => 'dim12%',
+                                         'TV' => 'on'
+                                       },
+                          'AllOff' => {
+                                        'Screen' => 'up',
+                                        'Projector' => 'off',
+                                        'CeilingLight' => 'off',
+                                        'ReadingLight' => 'off',
+                                        'TV' => 'off'
+                                      }
+                        }
+        }

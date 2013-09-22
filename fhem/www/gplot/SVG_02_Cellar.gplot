@@ -1,0 +1,18 @@
+# Created by FHEM/98_SVG.pm, 2013-08-22 22:27:58
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<L1>'
+set ytics 
+set y2tics 
+set grid
+set ylabel "Humidity"
+set y2label "Temperature"
+
+#FileLog 4:Cellar.T\x3a:10
+#FileLog 6:Cellar.T\x3a:10
+
+plot "<IN>" using 1:2 axes x1y2 title 'Temperature' ls l0 lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y1 title 'Humidity' ls l2fill lw 1 with lines
