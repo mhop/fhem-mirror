@@ -1,8 +1,8 @@
-body     { background-color: #444444; font-family:Arial, Helvetica, sans-serif; font-size:13px; background-image:url(../icons/darklogo); background-repeat:no-repeat; }
+body     { background-color: #444444; font-family:Arial, Helvetica, sans-serif; font-size:13px; background-image:url(../images/default/fhemicon_dark.png); background-repeat:no-repeat; }
 body[id~=Media]     { background-color: #A5A5A5; font-family:Arial, Helvetica, sans-serif; font-size:13px; background-image:url(../icons/Media.bak); background-repeat:no-repeat; }
 
 #backimg {position:absolute; top:15px; left:190px;}
-#logo    { position:absolute; top: 10px; left: 10px; width:180px;  height:600px; background-image:url(../icons/darklogo); visibility:hidden;}
+#logo    { position:absolute; top: 10px; left: 10px; width:180px;  height:600px; background-image:url(../images/default/fhemicon_dark.png); visibility:hidden;}
 #fpmenu.fp_arrange   { position:absolute; bottom:20px; left:30px; min-width:310px; font-size:9px; border:1px solid #CCCCCC; background: #111111; -moz-border-radius:8px; border-radius:8px; border-spacing: 6px; padding: 6px;
 					 box-shadow:5px 5px 5px #000; }
 

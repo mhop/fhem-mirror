@@ -404,6 +404,7 @@ FW_answerCall($)
     $dir =~ s,www/,,g; # Want commandref.html to work from file://...
 
     my $file = $ofile;
+    $file =~ s/\?.*//; # Remove timestamp of CSS reloader
     if($file =~ m/^(.*)\.([^.]*)$/) {
       $file = $1; $ext = $2;
     }
@@ -1002,7 +1003,7 @@ FW_roomOverview($)
     foreach(my $idx = 0; $idx < @list1; $idx++) {
       next if(!$list1[$idx]);
       my $sel = ($list1[$idx] eq $FW_room ? " selected=\"selected\""  : "");
-      FW_pO "<option value=$list2[$idx]$sel>$list1[$idx]</option>";
+      FW_pO "<option value='$list2[$idx]$sel'>$list1[$idx]</option>";
     }
     FW_pO "</select></td>";
     FW_pO "</tr>";
@@ -1511,7 +1512,7 @@ FW_iconTable($$$$)
       $imgName =~ s/\.[^.]*$//; # Cut extension
       next if(!$FW_icons{$style}{$imgName}); # Dont cut it twice: FS20.on.png
       next if($FW_icons{$style}{$imgName} !~ m/$imgName/); # Skip alias
-      next if($imgName=~m+^(weather/|shutter.*big|fhemicon|favicon|darklogo)+);
+      next if($imgName=~m+^(weather/|shutter.*big|fhemicon|favicon|ws_.*_kl)+);
       $icoList{$imgName} = 1;
     }
   }
