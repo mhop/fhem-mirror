@@ -375,7 +375,12 @@ sub HMinfo_SetFn($@) {#########################################################
 	  my ($found,$para) = HMinfo_getParam($id,@a);
       push @paramList,$para if($found || $optEmpty);
 	}
-	$ret = $cmd." done:" ."\n param list"  ."\n    ".(join "\n    ",sort @paramList)
+    my $prtHdr = "entity              \t: ";
+    $prtHdr .= sprintf("%-20s \t|",$_)foreach (@a);
+	$ret = $cmd." done:" 
+	           ."\n param list"  ."\n    "
+			   .$prtHdr          ."\n    "
+			   .(join "\n    ",sort @paramList)
 	       ;
   }
   elsif($cmd eq "regCheck")   {##check register--------------------------------
