@@ -637,8 +637,13 @@ sub CUL_HM_Parse($$) {##############################
 	  if($chnHash){
   	    push @entities,CUL_HM_UpdtReadSingle($chnHash,"state","$vp %",1);
 	    if ($chnHash->{helper}{needUpdate}){
-	      CUL_HM_stateUpdat(":".$chnHash->{NAME});
-		  delete $chnHash->{helper}{needUpdate};
+		  if ($chnHash->{helper}{needUpdate} == 1){
+		    $chnHash->{helper}{needUpdate}++;
+		  }
+		  else{
+	        CUL_HM_stateUpdat(":".$chnHash->{NAME});
+		    delete $chnHash->{helper}{needUpdate};
+		  }
 	    }
 	  }
       push @event, "actuator:$vp %";
