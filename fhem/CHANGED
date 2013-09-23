@@ -1,4 +1,5 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
+  - feature: new module 70_ENIGMA2.pm added (by loredo)
   - change:  CustomGetFileFromURL() in HttpUtils.pm now reacts to 
              "301 Moved Permanently" return code
   - change:  changed exit to POSIX::_exit in 10_OWServer.pm
