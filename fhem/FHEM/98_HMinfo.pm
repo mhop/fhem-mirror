@@ -1021,7 +1021,7 @@ sub HMinfo_templateList($){####################################################
   return $reply;
 }
 
-sub HMinfo_cpRegs(@){#########################################################
+sub HMinfo_cpRegs(@){##########################################################
   my ($srcCh,$dstCh) = @_;
   my ($srcP,$dstP,$srcPid,$dstPid,$srcRegLn,$dstRegLn);
   ($srcCh,$srcP) = split(":",$srcCh,2);
