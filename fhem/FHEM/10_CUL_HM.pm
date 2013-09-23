@@ -2968,10 +2968,12 @@ sub CUL_HM_Set($@) {
 	  @peerList = CUL_HM_noDup(@peerList);
 	  push @peerList,'00000000' if (!@peerList);#send to broadcast if no peer
 	  foreach my $peer (sort @peerList){
-	    my $peerFlag = $peer eq '00000000'?'A4':
-	                                       CUL_HM_getFlag(CUL_HM_id2Hash($peer));
+	    my $pHash = CUL_HM_id2Hash($peer);
+	    my $peerFlag = $peer eq '00000000'?'A4':CUL_HM_getFlag($pHash);
 	    $peerFlag =~ s/0/4/;# either 'A4' or 'B4'
-        CUL_HM_PushCmdStack($hash, sprintf("++%s41%s%s%02X%02X%02X"
+        CUL_HM_SndCmd($hash, "++B412$dst".substr($peer,0,6_)) 
+		      if (CUL_HM_getRxType($pHash) & 0x80);
+        CUL_HM_SndCmd($hash, sprintf("++%s41%s%s%02X%02X%02X"
 	                   ,$peerFlag,$dst,$peer
 					   ,$chn
 					   ,$pressCnt
