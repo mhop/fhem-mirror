@@ -676,7 +676,7 @@ sub ENIGMA2_Set($@) {
         }
         return "No argument given, choose one of".$commandKeys;
       }
-      my $request = ENIGMA2_GetRemotecontrolCommand($a[2]);
+      my $request = ENIGMA2_GetRemotecontrolCommand(uc($a[2]));
       if ($request ne "") {
         $cmd = "command=".ENIGMA2_GetRemotecontrolCommand($a[2]);
       } else {
@@ -1318,9 +1318,9 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
     <li><b>play</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; starts/resumes playback</li>
     <li><b>pause</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; pauses current playback or enables timeshift</li>
     <li><b>stop</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; stops current playback</li>
-    <li><b>input</b> 1...9999,servicereference &nbsp;&nbsp;-&nbsp;&nbsp; zap to a specific channel; can be a real channel number from bouquet or service reference ID</li>
+    <li><b>input</b> tv,radio &nbsp;&nbsp;-&nbsp;&nbsp; switches between tv and radio mode</li>
     <li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current status of the device</li>
-    <li><b>remoteControl</b> up,down,... &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands; see remoteControl help</li>
+    <li><b>remoteControl</b> UP,DOWN,... &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands; see remoteControl help</li>
     <li><b>showText</b> text &nbsp;&nbsp;-&nbsp;&nbsp; sends info message to screen to be displayed for 8 seconds</li>
     <li><b>msg</b> yesno,info... &nbsp;&nbsp;-&nbsp;&nbsp; allows more complex messages as showText, see commands as listed below</li>
     </ul>
