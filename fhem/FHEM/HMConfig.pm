@@ -104,8 +104,8 @@ my %culHmModel=(
                                                                                                                         ,chn=>"Btn:1:17,Disp:18:18",},
   "0038" => {name=>"HM-RC-19-B"              ,st=>'remote'            ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,4:1p.2p.3p.4p.5p.6p.7p.8p.9p.10p.11p.12p.13p.14p.15p.16p'
                                                                                                                         ,chn=>"Btn:1:17,Disp:18:18",},
-  "0039" => {name=>"HM-CC-TC"                ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p:2p,5:2.3p,6:2',chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3",},
-  "003A" => {name=>"HM-CC-VD"                ,st=>'thermostat'        ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'p,5'          ,chn=>"",},
+  "0039" => {name=>"HM-CC-TC"                ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:2p,5:2.3p,6:2',chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3",},
+  "003A" => {name=>"HM-CC-VD"                ,st=>'thermostat'        ,cyc=>'28:00' ,rxt=>'c:w:f'  ,lst=>'p,5'          ,chn=>"",},
   "003B" => {name=>"HM-RC-4-B"               ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:4",},
   "003C" => {name=>"HM-WDS20-TH-O"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",},
   "003D" => {name=>"HM-WDS10-TH-O"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",},
@@ -545,7 +545,7 @@ my %culHmRegDefine = (
   tempFallWinOpen =>{a=>  5  ,s=>0.6,l=>7,min=>5  ,max=>30      ,c=>''         ,f=>'2'     ,u=>''    ,d=>1,t=>"lowering temp whenWindow is opened"},
   tempFallWinPerio=>{a=>  6  ,s=>0.4,l=>7,min=>0  ,max=>60      ,c=>''         ,f=>'0.2'   ,u=>'min' ,d=>1,t=>"period lowering when window is open"},
   decalcWeekday   =>{a=>  7  ,s=>0.3,l=>7,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"decalc day"      ,lit=>{Sat=>0,Sun=>1,Mon=>2,Tue=>3,Wed=>4,Thu=>5,Fri=>6}},
-  decalcTime      =>{a=>  8  ,s=>0.6,l=>7,min=>0  ,max=>1410    ,c=>''         ,f=>'0.00055',u=>'h'  ,d=>1,t=>"decalc hour"},
+  decalcTime      =>{a=>  8  ,s=>0.6,l=>7,min=>0  ,max=>1410    ,c=>''         ,f=>'0.0333',u=>'min' ,d=>1,t=>"decalc hour"},
   tempOffset      =>{a=>  9  ,s=>0.4,l=>7,min=>0  ,max=>15      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"temperature offset",lit=>{"-3.5K"=>0,"-3.0K"=>1,"-2.5K"=>2,"-2.0K"=>3,"-1.5K"=>4,"-1.0K"=>5,"-0.5K"=>6, 
                                                                                                                                         "0.0K"=>7, "0.5K"=>8, "1.0K"=>10, "1.5K"=>11, "2.0K"=>12, "2.5K"=>13, "3.0K"=>14, "3.5K"=>15}},
   btnNoBckLight   =>{a=>  9.4,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"button response without backlight",lit=>{off=>0,on=>1}},
@@ -685,8 +685,8 @@ my %culHmRegModel = (
 		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1	
                       },
 
-  "HM-CC-VD"        =>{valveOffset     =>1,valveErrorPos   =>1},
-  "HM-CC-TC"        =>{backlOnTime     =>1,backlOnMode     =>1,btnLock         =>1},
+  "HM-CC-VD"        =>{burstRx         =>1,valveOffset     =>1,valveErrorPos   =>1},
+  "HM-CC-TC"        =>{burstRx         =>1,backlOnTime     =>1,backlOnMode     =>1,btnLock         =>1},
   "HM-CC-RT-DN"     =>{btnLock         =>1,localResDis     =>1,globalBtnLock   =>1,modusBtnLock    =>1,
                        cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,
                        burstRx         =>1,lowBatLimitRT   =>1,backOnTime      =>1,

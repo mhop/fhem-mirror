@@ -121,7 +121,7 @@ my $IOpoll     = 0.2;# poll speed to scan IO device out of order
 my $IOpolltout = 60; # poll timeout - stop poll and discard if to late
 
 my $maxPendCmds = 10;  #number of parallel requests
-my $autoConfDly = 10;  # delay autoConf readings
+my $autoConfDly = 15;  # delay autoConf readings
 
                  # need to take care that ACK is first
 #+++++++++++++++++ startup, init, definition+++++++++++++++++++++++++++++++++++
@@ -862,7 +862,6 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "desired-temp:$setTemp";
       push @event, "mode:$ctlTbl{$ctrlMode}";
 
-#General check impack
 	  my $tHash = $modules{CUL_HM}{defptr}{$dst."04"};
       push @entities,CUL_HM_UpdtReadBulk($tHash,1
 	                                        ,"desired-temp:$setTemp"
@@ -1573,16 +1572,21 @@ sub CUL_HM_parseCommon(@){#####################################################
   if   ($mTp eq "02"){# Ack/Nack ###########################
 
 	#see if the channel is defined separate - otherwise go for chief
-    my $subType = substr($p,0,2);
-    my $chn = sprintf("%02X",hex(substr($p,2,2))&0x3f);
-    #mark timing on the channel, not the device
-	my $HMid = $chn?$src.$chn:$src;
-    my $chnhash = $modules{CUL_HM}{defptr}{$HMid};
-    $chnhash = $shash if(!$chnhash);
-   
+    my $subType = substr($p,0,2);  
 	my $reply;
 	my $success;
 
+	if ($shash->{helper}{respWait}{wakeup}){
+	  if ($shash->{helper}{respWait}{mNo} eq $mNo &&
+		  $subType eq "00"		){
+		$shash->{protCondBurst} = "on";
+	  }
+	  else{
+		$shash->{protCondBurst} = "off";
+		return "done";
+	  }
+	}
+	
 	if   ($subType =~ m/^8/){#NACK
 	  $success = "no";
 	  CUL_HM_eventP($shash,"Nack");
@@ -1617,6 +1621,10 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  $reply = "ACK"; 
 	}
 	if($success){#do we have a final ack?
+      #mark timing on the channel, not the device
+      my $chn = sprintf("%02X",hex(substr($p,2,2))&0x3f);
+      my $chnhash = $modules{CUL_HM}{defptr}{$chn?$src.$chn:$src};
+      $chnhash = $shash if(!$chnhash);
 	  readingsSingleUpdate($chnhash,"CommandAccepted",$success,0);
       CUL_HM_ProcessCmdStack($shash) 
 	      if($dhash->{DEF} && (CUL_HM_IOid($shash) eq $dhash->{DEF}));
@@ -2193,8 +2201,8 @@ sub CUL_HM_Set($@) {
   if   ($cmd eq "raw") {  #####################################################
     return "Usage: set $a[0] $cmd data [data ...]" if(@a < 3);
 	$state = "";
-    for (my $i = 2; $i < @a; $i++) {
-      CUL_HM_PushCmdStack($hash, $a[$i]);
+    foreach (@a[2..$#a]) {
+	  CUL_HM_PushCmdStack($hash, $_);
     }
   } 
   elsif($cmd eq "clear") { ####################################################
@@ -3047,7 +3055,16 @@ sub CUL_HM_Set($@) {
 
   my $rxType = CUL_HM_getRxType($devHash);
   Log GetLogLevel($name,2), "CUL_HM set $name $act";
-  CUL_HM_ProcessCmdStack($devHash) if($rxType & 0x03);#all/burst
+  if($rxType & 0x03){#all/burst
+    CUL_HM_ProcessCmdStack($devHash);
+  }
+  elsif(($rxType & 0x80)                &&  #burstConditional - have a try
+        $devHash->{cmdStack}            && 
+		!$hash->{helper}{respWait}{cmd} && 
+        !$hash->{helper}{respWait}{Pending}
+		){
+    CUL_HM_SndCmd($devHash,"++B412$id$dst");
+  }
   return ("",1);# no not generate trigger outof command
 }
 
@@ -3252,7 +3269,6 @@ sub CUL_HM_SndCmd($$) {
            $io->{STATE} !~ m/^(opened|Initialized)$/       # we need to queue
         || $modules{CUL_HM}{$ioName}{tmr}                  # queue already running
         ||(defined $io->{XmitOpen} && $io->{XmitOpen} == 0)#overload, dont send
-#	    ||$modules{CUL_HM}{prot}{rspPend}>=$maxPendCmds
 	    )
 	  ){
 
@@ -3307,15 +3323,15 @@ sub CUL_HM_SndCmd($$) {
 }
 sub CUL_HM_respWaitSu ($@){ #setup response for multi-message response
   my ($hash,@a)=@_;
-  my $hashW = $hash->{helper}{respWait};
-  $modules{CUL_HM}{prot}{rspPend}++ if(!$hashW->{PendCmd} && 
-                                    !$hashW->{cmd});
+#  my $hashW = $hash->{helper}{respWait};
+  $modules{CUL_HM}{prot}{rspPend}++ if(!$hash->{helper}{respWait}{PendCmd} && 
+                                       !$hash->{helper}{respWait}{cmd});
   foreach (@a){
 	my ($f,$d)=split ":",$_;
-	  $hashW->{$f}=$d;
-	}
-  if ($hashW->{cmd}){InternalTimer(gettimeofday()+rand(40)/10+1,"CUL_HM_Resend"      , $hash, 0);}
-  else{              InternalTimer(gettimeofday()+rand(20)/10+4,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);}
+	$hash->{helper}{respWait}{$f}=$d;
+  }
+  if ($hash->{helper}{respWait}{cmd}){InternalTimer(gettimeofday()+rand(40)/10+1,"CUL_HM_Resend"      , $hash, 0);}
+  else{                               InternalTimer(gettimeofday()+rand(20)/10+4,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);}
 }
 sub CUL_HM_responseSetup($$) {#store all we need to handle the response
  #setup repeatTimer and cmdStackControll
@@ -3326,7 +3342,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
 #  my $rTo = rand(20)/10+4; #default response timeout
   if (($mFlg & 0x20) && ($dst ne '000000')){
     if   ($mTp eq "01" && $subType){ 
-      if ($subType eq "03"){ #PeerList-------------
+      if   ($subType eq "03"){ #PeerList-----------
     	#--- remember request params in device level
 		CUL_HM_respWaitSu ($hash,"Pending:PeerList"
 		                        ,"PendCmd:$cmd" ,"forChn:".substr($p,0,2));
@@ -3372,6 +3388,12 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
     elsif($mTp eq '11' && $chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
       CUL_HM_qStateUpdatIfEnab($dst);
     }
+	elsif($mTp eq '12'){#wakeup
+	  # response setup - do not repeat, set counter to 250
+	  CUL_HM_respWaitSu ($hash,"cmd:$cmd","mNo:$mNo","reSent:250","wakeup:1");
+	  return;
+	}
+
 	if ($mTp eq "11" && $p =~ m/02..(..)....(....)/){#lvl ne 0 and timer on
 	  $hash->{helper}{tmdOn} = $2 if ($1 ne "00" && $2 !~ m/(0000|FFFF)/);
 	}
@@ -3444,7 +3466,7 @@ sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
 	                                   ||$hash->{helper}{respWait}{PendCmd});
   delete ($hash->{helper}{respWait});
   delete $hash->{helper}{tmdOn};
-  RemoveInternalTimer($hash);          # remove resend-timer
+  RemoveInternalTimer($hash);                  # remove resend-timer
   RemoveInternalTimer("respPend:$hash->{DEF}");# remove responsePending timer
   $respRemoved = 1;
 }
@@ -3565,9 +3587,15 @@ sub CUL_HM_Resend($) {#resend a message if there is no answer
   return if(!$hash->{helper}{respWait}{reSent});      # Double timer?
   my $rep = AttrVal($name,"msgRepeat",3);
   if($hash->{helper}{respWait}{reSent} > $rep) {
-  	CUL_HM_eventP($hash,"ResndFail");
-	readingsSingleUpdate($hash,"state","MISSING ACK",1);
-	CUL_HM_ProcessCmdStack($hash); # continue processing commands if any
+    if (!$hash->{helper}{respWait}{wakeup}){
+  	  CUL_HM_eventP($hash,"ResndFail");
+	  readingsSingleUpdate($hash,"state","MISSING ACK",1);
+	  CUL_HM_ProcessCmdStack($hash); # continue processing commands if any
+	}
+	else{# do not count problems with wakeup try, just wait
+	  CUL_HM_respPendRm($hash);
+	  $hash->{protCondBurst} = "off";
+	}
   }
   else {
   	CUL_HM_eventP($hash,"Resnd");
@@ -3660,7 +3688,7 @@ sub CUL_HM_getRxType($) { #in:hash(chn or dev) out:binary coded Rx type
       $rxtEntity |= ($rxtOfModel =~ m/c/)?0x04:0;#config
       $rxtEntity |= ($rxtOfModel =~ m/w/)?0x08:0;#wakeup
       $rxtEntity |= ($rxtOfModel =~ m/l/)?0x10:0;#lazyConfig
-      $rxtEntity |= ($rxtOfModel =~ m/f/)?0x80:0;#burstOptional
+      $rxtEntity |= ($rxtOfModel =~ m/f/)?0x80:0;#burstConditional
 	}
 	$rxtEntity = 1 if (!$rxtEntity);#always
 	$hash->{helper}{rxType} = $rxtEntity;
@@ -4214,6 +4242,12 @@ sub CUL_HM_RTtempReadings($) {# parse RT temperature readings
 	push (@changedRead,"tempList".$days[$day].":".$dayRead);
   }  
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
+
+  my $wHash = $modules{CUL_HM}{defptr}{substr($hash->{DEF},0,6)."03"};
+  CUL_HM_UpdtReadBulk($wHash,1,
+        "R-tempFallWinOpen:" .ReadingsVal($name,"R-tempFallWinOpen" ,"unknown"),
+        "R-tempFallWinPerio:".ReadingsVal($name,"R-tempFallWinPerio","unknown"),
+        "R-boostAftWinOpen:" .ReadingsVal($name,"R-boostAftWinOpen" ,"unknown"));
   return $setting;
 }
 sub CUL_HM_repReadings($) {# for repeater in:hash, out: string with peers
