@@ -978,7 +978,7 @@ my %culHmModelSets = (# channels of this subtype-------------
   "HM-CC-VD"     =>{ valvePos     => "position"},
   "HM-RC-19"     =>{ service      => "<count>"
 		            ,alarm        => "<count>"
-		            ,display      => "<text> [comma,no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
+		            ,display      => "<text> [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
   "HM-PB-4DIS-WM"=>{ text         => "<txt1> <txt2>..."
                       #text       => "<btn> [on|off] <txt1> <txt2>...", old style will not be offered anymore
 				   },
@@ -995,16 +995,16 @@ $culHmModelSets{"HM-RC-19-SW"} = $culHmModelSets{"HM-RC-19"};
 #%{$culHmModelSets{"HM-RC-19-SW"}} = %{$culHmModelSets{"HM-RC-19"}}; copy
 
 my %culHmChanSets = (
-  "HM-CC-TC00"     =>{ "day-temp"     =>"[on,off,6.0..30.0]",
-                       "night-temp"   =>"[on,off,6.0..30.0]",
-                       "party-temp"   =>"[on,off,6.0..30.0]",
-                       "desired-temp" =>"[on,off,6.0..30.0]", 
+  "HM-CC-TC00"     =>{ "day-temp"     =>"[on|off|6.0..30.0]",
+                       "night-temp"   =>"[on|off|6.0..30.0]",
+                       "party-temp"   =>"[on|off|6.0..30.0]",
+                       "desired-temp" =>"[on|off|6.0..30.0]", 
                        sysTime        =>""	  },
   "HM-CC-TC02"     =>{ peerChan       =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"
-                      ,"day-temp"     =>"[on,off,6.0..30.0]"
-                      ,"night-temp"   =>"[on,off,6.0..30.0]"
-                      ,"party-temp"   =>"[on,off,6.0..30.0]"
-                      ,"desired-temp" =>"[on,off,6.0..30.0]" 
+                      ,"day-temp"     =>"[on|off|6.0..30.0]"
+                      ,"night-temp"   =>"[on|off|6.0..30.0]"
+                      ,"party-temp"   =>"[on|off|6.0..30.0]"
+                      ,"desired-temp" =>"[on|off|6.0..30.0]" 
                       ,tempListSat    =>"HH:MM temp ..."
                       ,tempListSun    =>"HH:MM temp ..."
                       ,tempListMon    =>"HH:MM temp ..."
@@ -1039,7 +1039,7 @@ my %culHmChanSets = (
                       ,tempListThu    =>"HH:MM temp ..."
                       ,tempListWed    =>"HH:MM temp ..."
                       ,tempListFri    =>"HH:MM temp ..."
-					  ,"desired-temp" =>"[on,off,6.0..30.0]"
+					  ,"desired-temp" =>"[on|off|5.0..30.0]"
                      },
   "HM-CC-RT-DN05"  =>{ peerChan       =>" 0 <actChn> ... [single] [set|unset] [actor|remote|both]"},
 );
