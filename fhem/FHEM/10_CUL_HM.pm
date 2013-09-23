@@ -2096,28 +2096,44 @@ sub CUL_HM_Set($@) {
 	splice @a, 1, 0,"pct";#insert the actual command
   } 
   elsif(!defined($h)) {
-    my @arr;
-    @arr = keys %culHmGlobalSets                 if( $st ne "virtual");
-    push @arr, keys %culHmGlobalSetsVrtDev       if(($st eq "virtual"||!$st)  && $roleD);
-    push @arr, keys %culHmGlobalSetsDevice       if( $st ne "virtual"         && $roleD);
-    push @arr, keys %{$culHmSubTypeDevSets{$st}} if( $st ne "virtual"         && $roleD);
-    push @arr, keys %culHmGlobalSetsChn          if( $st ne "virtual"         && $roleC);
-    push @arr, keys %{$culHmSubTypeSets{$st}}    if( $culHmSubTypeSets{$st}   && $roleC);
-    push @arr, keys %{$culHmModelSets{$md}}      if( $culHmModelSets{$md});
-    push @arr, keys %{$culHmChanSets{$md."00"}}  if( $culHmChanSets{$md."00"} && $roleD);
-    push @arr, keys %{$culHmChanSets{$md.$chn}}  if( $culHmChanSets{$md.$chn} && $roleC);
-	@arr = CUL_HM_noDup(@arr);
-    my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr); 
-
+    my @arr1 = ();
+	
+	if( $st ne "virtual")                  {foreach(keys %culHmGlobalSets            ){push @arr1,"$_:$culHmGlobalSets{$_}"            }};
+    if(($st eq "virtual"||!$st)  && $roleD){foreach(keys %culHmGlobalSetsVrtDev      ){push @arr1,"$_:$culHmGlobalSetsVrtDev{$_}"      }};
+    if( $st ne "virtual"         && $roleD){foreach(keys %culHmGlobalSetsDevice      ){push @arr1,"$_:$culHmGlobalSetsDevice{$_}"      }};
+    if( $st ne "virtual"         && $roleD){foreach(keys %{$culHmSubTypeDevSets{$st}}){push @arr1,"$_:${$culHmSubTypeDevSets{$st}}{$_}"}};
+    if( $st ne "virtual"         && $roleC){foreach(keys %culHmGlobalSetsChn         ){push @arr1,"$_:$culHmGlobalSetsChn{$_}"         }};
+    if( $culHmSubTypeSets{$st}   && $roleC){foreach(keys %{$culHmSubTypeSets{$st}}   ){push @arr1,"$_:${$culHmSubTypeSets{$st}}{$_}"   }};
+    if( $culHmModelSets{$md})              {foreach(keys %{$culHmModelSets{$md}}     ){push @arr1,"$_:${$culHmModelSets{$md}}{$_}"     }};
+    if( $culHmChanSets{$md."00"} && $roleD){foreach(keys %{$culHmChanSets{$md."00"}} ){push @arr1,"$_:".${$culHmChanSets{$md."00"}}{$_}}};
+    if( $culHmChanSets{$md.$chn} && $roleC){foreach(keys %{$culHmChanSets{$md.$chn}} ){push @arr1,"$_:".${$culHmChanSets{$md.$chn}}{$_}}};
+	@arr1 = CUL_HM_noDup(@arr1);
+	foreach(@arr1){
+	  my ($cmd,$val) = split(":",$_,2);
+	  if (!$val               || 
+	      $val !~ m/^\[.*\]$/ ||
+		  $val =~ m/\[.*\[/   ||
+		  $val =~ m/(\<|\>)]/  
+		  ){
+	    $_ = $cmd;
+	  }
+	  else{
+	    $val =~ s/(\[|\])//g;
+		my @vArr = split('\|',$val);
+		foreach (@vArr){
+		  if ($_ =~ m/(.*)\.\.(.*)/ ){
+		    my @list = map { ($_.".0", $_+0.5) } ($1..$2);
+			pop @list;
+			$_ = join(",",@list);
+		  }
+		}
+	    $_ = "$cmd:".join(",",@vArr);
+	  }
+	}
+    my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr1); 
     $usg =~ s/ pct/ pct:slider,0,1,100/;
     $usg =~ s/ virtual/ virtual:slider,1,1,40/;
 
-	if($md eq "HM-CC-TC") {
-      my @list = map { ($_.".0", $_+0.5) } (6..30);
-      pop @list;
-      my $list = "on,off," . join(",",@list);
-      $usg =~ s/-temp/-temp:$list/g;
-    }
     return $usg;
   } 
   elsif($h eq "" && @a != 2) {
@@ -3393,7 +3409,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
     elsif($mTp eq '11' && $chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
       CUL_HM_qStateUpdatIfEnab($dst);
     }
-	elsif($mTp eq '12'){#wakeup
+	elsif($mTp eq '12' && $mFlg & 0x10){#wakeup with burst
 	  # response setup - do not repeat, set counter to 250
 	  CUL_HM_respWaitSu ($hash,"cmd:$cmd","mNo:$mNo","reSent:250","wakeup:1");
 	  return;
@@ -3404,7 +3420,6 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
 	}
   
 	CUL_HM_respWaitSu ($hash,"cmd:$cmd","mNo:$mNo","reSent:1");
-
 	CUL_HM_protState($hash,"CMDs_processing...");                         
   }
   else{# no answer expected
