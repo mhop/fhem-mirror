@@ -2450,6 +2450,9 @@ sub CUL_HM_Set($@) {
 	    $addrData.=sprintf("%02X",$addr+$cnt).substr($dataStr,$cnt*2,2);
 	  }
 	}
+
+    $lChn = "00" if($list == 7);#face to send
+
 	my $cHash = CUL_HM_id2Hash($dst.($chn eq '00'?"":$chn));
 	$cHash = $hash if (!$cHash);
     CUL_HM_pushConfig($cHash,$id,$dst,$lChn,$peerId,hex($peerChn),$list
@@ -3392,7 +3395,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
     
 	    $peer ="" if($list !~ m/^0[34]$/);
 	    #empty val since reading will be cumulative 
-	    my $rlName = ((CUL_HM_getAttrInt($hash->{NAME},"expert") == 2)?"":".")."RegL_".$list.":".$peer;
+	    my $rlName = ((CUL_HM_getAttrInt($chnhash->{NAME},"expert") == 2)?"":".")."RegL_".$list.":".$peer;
         $chnhash->{READINGS}{$rlName}{VAL}=""; 
         delete ($chnhash->{READINGS}{$rlName}{TIME}); 
 	    return;
