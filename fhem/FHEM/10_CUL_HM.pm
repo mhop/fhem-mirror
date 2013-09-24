@@ -839,6 +839,7 @@ sub CUL_HM_Parse($$) {##############################
 	  $err        = ($err        >> 5) & 0x7  ;
 	  $bat        =(($bat            ) & 0x1f)/10+1.5;
 	  $vp         = ($vp             ) & 0x7f ;
+	  my $uk0     = ($ctrlMode       ) & 0x3f ;#unknown
 	  $ctrlMode   = ($ctrlMode   >> 6) & 0x3  ;
       $actTemp = sprintf("%2.1f",$actTemp);
 	  
@@ -855,6 +856,8 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "desired-temp:$setTemp";
 	  push @event, "ValvePosition:$vp %";
       push @event, "mode:$ctlTbl{$ctrlMode}";
+      push @event, "unknown0:$uk0";
+      push @event, "unknown1:".$2 if ($p =~ m/^0A(.10)(.*)/);
       push @event, "state:T: $actTemp desired: $setTemp valve: $vp %";
       push @entities,CUL_HM_UpdtReadBulk($dHash,1
 	                                        ,"battery:".($err&0x80?"low":"ok")
@@ -2228,8 +2231,20 @@ sub CUL_HM_Set($@) {
   } 
   elsif($cmd eq "clear") { ####################################################
     my (undef,undef,$sect) = @a;
-	if ($sect eq "readings"){
-	  delete $hash->{READINGS};
+	if   ($sect eq "readings"){
+	  my @cH = ($hash);
+	  push @cH,$defs{$hash->{$_}} foreach(grep /^channel/,keys %{$hash});
+
+	  delete $_->{READINGS}foreach (@cH);
+	}
+	elsif($sect eq "register"){
+	  my @cH = ($hash);
+	  push @cH,$defs{$hash->{$_}} foreach(grep /^channel/,keys %{$hash});
+
+	  foreach my $h(@cH){
+	    delete $h->{READINGS}{$_}
+		     foreach (grep /^(\.?)(R-|RegL)/,keys %{$h->{READINGS}});
+	  }
 	}
 	elsif($sect eq "msgEvents"){
 	  CUL_HM_respPendRm($hash);		  
@@ -3084,10 +3099,10 @@ sub CUL_HM_Set($@) {
   if($rxType & 0x03){#all/burst
     CUL_HM_ProcessCmdStack($devHash);
   }
-  elsif(($rxType & 0x80)                &&  #burstConditional - have a try
-        $devHash->{cmdStack}            && 
-		!$hash->{helper}{respWait}{cmd} && 
-        !$hash->{helper}{respWait}{Pending}
+  elsif(($rxType & 0x80)                   &&  #burstConditional - have a try
+        $devHash->{cmdStack}               && 
+		!$devHash->{helper}{respWait}{cmd} && 
+        !$devHash->{helper}{respWait}{Pending}
 		){
     CUL_HM_SndCmd($devHash,"++B412$id$dst");
   }
@@ -3503,9 +3518,10 @@ sub CUL_HM_respPendTout($) {
 	my $pendCmd = $hash->{helper}{respWait}{Pending};# secure before remove
 
     my $pendRsndCnt = $hash->{helper}{respWait}{PendingRsend};
-	$pendRsndCnt = 1 if (!$pendRsndCnt);       #already one send done
-	if ($pendRsndCnt < 5 &&                    # some retries
-	    (CUL_HM_getRxType($hash) & 0x03) != 0){# to slow for wakeup and config
+	$pendRsndCnt = 1 if (!$pendRsndCnt);          #already one send done
+	if ($pendRsndCnt < 5 &&                       # some retries
+	    ((CUL_HM_getRxType($hash) & 0x03) != 0 || # to slow for wakeup/config
+		 ($hash->{protCondBurst}&&$hash->{protCondBurst} eq "on" ))){
       my $name = $hash->{NAME};
       Log GetLogLevel($name,4),"CUL_HM_Resend: ".$name. " nr ".$pendRsndCnt;
 	  $hash->{helper}{respWait}{PendingRsend} = $pendRsndCnt + 1;
@@ -4745,10 +4761,11 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 
      Universal commands (available to most hm devices):
      <ul>
-	 <li><B>clear &lt;[readings|msgEvents]&gt;</B><a name="CUL_HMclear"></a><br>
+	 <li><B>clear &lt;[readings|register|msgEvents]&gt;</B><a name="CUL_HMclear"></a><br>
          A set of variables can be removed.<br>
 		 <ul>
 		 readings: all readings will be deleted. Any new reading will be added usual. May be used to eliminate old data<br>
+		 register: all captured register-readings in FHEM will be removed. This has NO impact to the values in the device.<br>
 		 msgEvents:  all message event counter will be removed. Also commandstack will be cleared. <br>
 		 rssi:  collected rssi values will be cleared. <br>
 		 </ul>

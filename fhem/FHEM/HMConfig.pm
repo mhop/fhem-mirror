@@ -559,7 +559,7 @@ my %culHmRegDefine = (
   daylightSaveTime=>{a=> 14  ,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"set daylight saving time",lit=>{off=>0,on=>1}},
   regAdaptive     =>{a=> 14.1,s=>0.2,l=>7,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"adaptive regulation: offDef, offdetrmine, on",lit=>{off=>0,offDeter=>1,on=>2}},
   showInfo        =>{a=> 14.3,s=>0.2,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"show date or time"                           ,lit=>{time=>0,date=>1}},
-  noMinMan4Manu   =>{a=> 14.6,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"min/max is irrelevant for manual mode"       ,lit=>{off=>0,on=>1}},
+  noMinMax4Manu   =>{a=> 14.6,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"min/max is irrelevant for manual mode"       ,lit=>{off=>0,on=>1}},
   showWeekday     =>{a=> 14.7,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"show weekday"                                ,lit=>{off=>0,on=>1}},
                                     
   modePrioManu    =>{a=> 18.3,s=>0.3,l=>7,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"allow tempChange for manual by...",lit=>{RT_SC=>0,all=>1,RT_CCU=>3,CCU=>4,self=>5}},
@@ -832,7 +832,7 @@ my %culHmRegChan = (# if channelspecific then enter them here
                          decalcWeekday   =>1,decalcTime      =>1,
                          boostPos        =>1,boostPeriod     =>1,boostAftWinOpen =>1,
                          daylightSaveTime=>1,regAdaptive     =>1,
-                         showInfo        =>1,noMinMan4Manu   =>1,showWeekday     =>1,
+                         showInfo        =>1,noMinMax4Manu   =>1,showWeekday     =>1,
                          valveOffset     =>1,valveMaxPos     =>1,valveErrPos     =>1,
                          modePrioManu    =>1,modePrioParty   =>1,
                          reguIntI        =>1,reguIntP        =>1,reguIntPstart   =>1,
@@ -869,7 +869,7 @@ my %culHmGlobalSets = (# all but virtuals
   getRegRaw     => "[List0|List1|List2|List3|List4|List5|List6] ... [<PeerChannel>]",
   getConfig     => "",
   regSet        => "<regName> <value> ... [<peerChannel>]",
-  clear         => "[readings|msgEvents]",
+  clear         => "[readings|register|rssi|msgEvents]",
 );
 my %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
   raw      	    => "data ...",
