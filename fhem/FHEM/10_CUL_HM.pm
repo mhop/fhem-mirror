@@ -1815,7 +1815,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  my $l = substr($p,4,2);
 	  if    ($lvlStr{md}{$md} && $lvlStr{md}{$md}{$l}){$level = $lvlStr{md}{$md}{$l}}
 	  elsif ($lvlStr{st}{$st} && $lvlStr{st}{$st}{$l}){$level = $lvlStr{st}{$st}{$l}}
-	  else                                                      {$level = hex($l)};
+	  else                                            {$level = hex($l)};
 	} 
 	
 	my @peers = split(",",AttrVal($cName,"peerIDs",""));
@@ -1923,11 +1923,8 @@ sub CUL_HM_Get($@) {
 	return $attr{$name}{$a[2]}              if ($attr{$name}{$a[2]});
 	return $hash->{READINGS}{$a[2]}{VAL}    if ($hash->{READINGS}{$a[2]});
 	return $attr{$devName}{$a[2]}           if ($attr{$devName}{$a[2]});
-	return $devHash->{READINGS}{$a[2]}{VAL} if ($devHash->{READINGS}{$a[2]});
 	return $hash->{$a[2]}                   if ($hash->{$a[2]});
-	return $devHash->{$a[2]}                if ($devHash->{$a[2]});
 	return $hash->{helper}{$a[2]}           if ($hash->{helper}{$a[2]} && ref($hash->{helper}{$a[2]}) ne "HASH");
-	return $devHash->{helper}{$a[2]}        if ($devHash->{helper}{$a[2]});
 	return "undefined";
   }
   elsif($cmd eq "reg") {  #####################################################
@@ -2978,25 +2975,32 @@ sub CUL_HM_Set($@) {
 	my $pressCnt = (!$hash->{helper}{count}?1:$hash->{helper}{count}+1)%256;
 	$hash->{helper}{count}=$pressCnt;# remember for next round
     
-	my @peerList;
-	if ($st eq 'virtual'){#serve all peers of virtual button
-	  foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
-	    push (@peerList,substr($peer,0,6));
-	  }
-	  @peerList = CUL_HM_noDup(@peerList);
-	  push @peerList,'00000000' if (!@peerList);#send to broadcast if no peer
-	  foreach my $peer (sort @peerList){
-	    my $pHash = CUL_HM_id2Hash($peer);
-	    my $peerFlag = $peer eq '00000000'?'A4':CUL_HM_getFlag($pHash);
-	    $peerFlag =~ s/0/4/;# either 'A4' or 'B4'
-        CUL_HM_SndCmd($hash, "++B412$dst".substr($peer,0,6_)) 
-		      if (CUL_HM_getRxType($pHash) & 0x80);
-        CUL_HM_SndCmd($hash, sprintf("++%s41%s%s%02X%02X%02X"
-	                   ,$peerFlag,$dst,$peer
-					   ,$chn
-					   ,$pressCnt
-					   ,$cond));
-	  }
+	my @peerLChn = split(',',AttrVal($name,"peerIDs",""));
+	my @peerDev;
+	push (@peerDev,substr($_,0,6)) foreach (@peerLChn);
+    @peerDev = CUL_HM_noDup(@peerDev);#only once per device!
+	
+	push @peerDev,'000000' if (!@peerDev);#send to broadcast if no peer
+	foreach my $peer (@peerDev){
+	  my $pHash = CUL_HM_id2Hash($peer);
+	  my $peerFlag = $peer eq '00000000'?'A4':CUL_HM_getFlag($pHash);
+	  $peerFlag =~ s/0/4/;# either 'A4' or 'B4'
+      CUL_HM_SndCmd($hash, "++B412$dst".substr($peer,0,6_)) 
+	         if (CUL_HM_getRxType($pHash) & 0x80);
+      CUL_HM_SndCmd($hash, sprintf("++%s41%s%s%02X%02X%02X"
+	                 ,$peerFlag,$dst,$peer
+			         ,$chn
+			         ,$pressCnt
+			         ,$cond));
+	}
+
+	foreach my $peer (@peerLChn){#inform each channel
+	  my $pName = CUL_HM_id2Name($peer);
+	  $pName = CUL_HM_id2Name(substr($peer,0,6)) if (!$defs{$pName});
+	  next if (!$defs{$pName});
+	  CUL_HM_UpdtReadBulk($defs{$pName},1
+	                        ,"trig_$name:$cond"
+	                        ,"trigLast:$name:$cond");
 	}
   } 
   elsif($cmd eq "peerChan") { ############################################# reg
