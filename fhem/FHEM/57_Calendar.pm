@@ -792,10 +792,29 @@ sub Calendar_GetUpdate($) {
   $hash->{fhem}{lastUpdate}= FmtDateTime($t);
   
   Log3 $hash, 4, "Calendar " . $hash->{NAME} . ": Updating...";
+  my $type = $hash->{fhem}{type};
   my $url= $hash->{fhem}{url};
   
-  my $ics= GetFileFromURLQuiet($url);
-  #my $ics= CustomGetFileFromURL(0, $url, undef, undef, 1);
+  my $ics;
+  
+  if($type eq "url"){ 
+    $ics= GetFileFromURLQuiet($url) if($type eq "url");
+  } elsif($type eq "file") {
+    if(open(ICSFILE, $url)) {
+      while(<ICSFILE>) { 
+        $ics .= $_; 
+      }
+      close(ICSFILE);
+    } else {
+      Log3 $hash, 1, "Calendar " . $hash->{NAME} . ": Could not open file $url"; 
+      return 0;
+    }
+  } else {
+    # this case never happens by virtue of _Define, so just
+    die "Software Error";
+  }
+    
+  
   if(!defined($ics)) {
     Log3 $hash, 1, "Calendar " . $hash->{NAME} . ": Could not retrieve file at URL";
     return 0;
@@ -888,7 +907,7 @@ sub Calendar_Get($@) {
   my $cmd= $a[1];
   if(grep(/^$cmd$/, ("text","full","summary","location","alarm","start","end"))) {
 
-    return "argument is missing" if($#a != 2);
+    return "argument is missing" if($#a < 2);
     my $reading= $a[2];
     
     # $reading is alarmed, all, changed, deleted, new, started, updated
@@ -912,7 +931,12 @@ sub Calendar_Get($@) {
         push @texts, $event->startTime() if $cmd eq "start";
         push @texts, $event->endTime() if $cmd eq "end";
       }
-    }  
+    }
+    if(defined($a[3])) {
+      my $keep= $a[3];
+      return "Argument $keep is not a number." unless($keep =~ /\d+/);
+      splice @texts, $keep if($#texts>= 0);  
+    }
     return join("\n", @texts);
     
   } elsif($cmd eq "find") {
@@ -940,17 +964,20 @@ sub Calendar_Define($$) {
 
   my @a = split("[ \t][ \t]*", $def);
 
-  return "syntax: define <name> Calendar ical url <URL> [interval]"
-    if(($#a < 4 && $#a > 5) || ($a[2] ne 'ical') || ($a[3] ne 'url'));
+  return "syntax: define <name> Calendar ical url <URL> [interval]\n".\
+         "        define <name> Calendar ical file <FILENAME> [interval]"
+    if(($#a < 4 && $#a > 5) || ($a[2] ne 'ical') || (($a[3] ne 'url') && ($a[3] ne 'file')));
 
   $hash->{STATE} = "Initialized";
 
   my $name      = $a[0];
+  my $type      = $a[3];
   my $url       = $a[4];
   my $interval  = 3600;
   
   $interval= $a[5] if($#a==5);
    
+  $hash->{fhem}{type}= $type;
   $hash->{fhem}{url}= $url;
   $hash->{fhem}{interval}= $interval;
   $hash->{fhem}{events}= Calendar::Events->new();
@@ -991,21 +1018,24 @@ sub Calendar_Undef($$) {
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; Calendar ical url &lt;URL&gt; [&lt;interval&gt;]</code><br>
+    <code>define &lt;name&gt; Calendar ical file &lt;FILENAME&gt; [&lt;interval&gt;]</code><br>
     <br>
     Defines a calendar device.<br><br>
 
-    A calendar device periodically gathers calendar events from the source calendar at the given URL. The file at the given URL
-    must be in ICal format.<br><br>
+    A calendar device periodically gathers calendar events from the source calendar at the given URL or from a file. 
+    The file must be in ICal format.<br><br>
 
     If the URL
     starts with <code>https://</code>, the perl module IO::Socket::SSL must be installed
     (use <code>cpan -i IO::Socket::SSL</code>).<br><br>
 
     Note for users of Google Calendar: You can literally use the private ICal URL from your Google Calendar.
-    Google App accounts do not work since requests to the URL
-    get redirected first and the fhem mechanism for retrieving data via http/https cannot handle this. If your Google Calendar
+    <!--Google App accounts do not work since requests to the URL
+    get redirected first and the fhem mechanism for retrieving data via http/https cannot handle this. -->
+    If your Google Calendar
     URL starts with <code>https://</code> and the perl module IO::Socket::SSL is not installed on your system, you can
-    replace it by <code>http://</code>.<br><br>
+    replace it by <code>http://</code> if and only if there is no redirection to the <code>https://</code> URL. 
+    Check with your browser first if unsure.<br><br>
 
     The optional parameter <code>interval</code> is the time between subsequent updates
     in seconds. It defaults to 3600 (1 hour).<br><br>
@@ -1014,6 +1044,7 @@ sub Calendar_Undef($$) {
     <pre>
       define MyCalendar Calendar ical url https://www.google.com&shy;/calendar/ical/john.doe%40example.com&shy;/private-foo4711/basic.ics
       define YourCalendar Calendar ical url http://www.google.com&shy;/calendar/ical/jane.doe%40example.com&shy;/private-bar0815/basic.ics 86400
+      define SomeCalendar Calendar ical file /home/johndoe/calendar.ics
       </pre>
   </ul>
   <br>
@@ -1032,12 +1063,13 @@ sub Calendar_Undef($$) {
   <a name="Calendarget"></a>
   <b>Get</b>
   <ul>
-    <code>get &lt;name&gt; full|text|summary|location|alarm|start|end &lt;reading&gt|&lt;uid&gt;</code><br><br>
+    <code>get &lt;name&gt; full|text|summary|location|alarm|start|end &lt;reading&gt|&lt;uid&gt; [max]</code><br><br>
 
     Returns, line by line, the full state or a textual representation or the summary (subject, title) or the
     location or the alarm time or the start time or the end time
     of the calendar event(s) listed in the
-    reading &lt;reading&gt or identified by the UID &lt;uid&gt.<br><br>
+    reading &lt;reading&gt or identified by the UID &lt;uid&gt. The optional parameter <code>max</code> limits
+    the number of returned lines.<br><br>
 
     <code>get &lt;name&gt; find &lt;regexp&gt;</code><br><br>
 
