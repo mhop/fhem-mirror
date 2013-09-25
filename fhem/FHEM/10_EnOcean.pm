@@ -287,7 +287,7 @@ EnOcean_Set($@)
 
     if ($st eq "roomSensorControl.05") {
       # Room Sensor and Control Unit (EEP A5-10-01 ... A5-10-0D)
-      # [Eltako FTF55D, FTF55H, Thermokon SR04 *, Thanos SR *, untested]
+      # [Eltako FTR55D, FTR55H, Thermokon SR04 *, Thanos SR *, untested]
       # $db[3] is the fan speed or night reduction for Eltako
       # $db[2] is the setpoint where 0x00 = min ... 0xFF = max or
       # reference temperature for Eltako where 0x00 = 0°C ... 0xFF = 40°C
@@ -1905,7 +1905,7 @@ EnOcean_Parse($$)
 
     } elsif ($st eq "roomSensorControl.05") {
       # Room Sensor and Control Unit (EEP A5-10-01 ... A5-10-0D)
-      # [Eltako FTF55, FTR55D, FTR55H, Thermokon SR04 *, Thanos SR *, untested]
+      # [Eltako FTR55D, FTR55H, Thermokon SR04 *, Thanos SR *, untested]
       # $db[3] is the fan speed or night reduction for Eltako
       # $db[2] is the setpoint where 0x00 = min ... 0xFF = max or
       # reference temperature for Eltako where 0x00 = 0°C ... 0xFF = 40°C
@@ -4025,7 +4025,7 @@ EnOcean_Undef($$)
      <br><br>
 
      <li>Temperature Sensors with with different ranges (EEP A5-02-01 ... A5-02-30)<br>
-         [Thermokon SR65, untested]<br>
+         [Eltako FTF55, Thermokon SR65 ...]<br>
      <ul>
        <li>t/&#176C</li>
        <li>temperature: t/&#176C (Sensor Range: t = &lt;t min&gt; &#176C ... &lt;t max&gt; &#176C)</li>
@@ -4219,7 +4219,7 @@ EnOcean_Undef($$)
      <br><br>
 
     <li>Room Sensor and Control Unit (EEP A5-10-01 ... A5-10-0D)<br>
-         [Eltako FTF55, FTR55*, Thermokon SR04 *, Thanos SR *]<br>
+         [Eltako FTR55*, Thermokon SR04 *, Thanos SR *]<br>
      <ul>
        <li>T: t/&#176C SP: 0 ... 255 F: 0|1|2|3|auto SW: 0|1</li>
        <li>fanStage: 0|1|2|3|auto</li>
