@@ -877,6 +877,11 @@ sub CUL_HM_Parse($$) {##############################
 											)
 	        if ($tHash);
 	  }
+    elsif($mTp eq "3F" && $id eq $dst) {       # Timestamp request
+      my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
+      push @ack,$shash,"++803F$id${src}0204$s2000";
+      push @event, "time-request";
+    } 
   } 
   elsif($md =~ m/^(HM-Sen-Wa-Od|HM-CC-SCD)$/){ ################################
     if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
@@ -923,7 +928,7 @@ sub CUL_HM_Parse($$) {##############################
 	}
   } 
   elsif($st eq "THSensor") { ##################################################
-    if ($mTp eq "70"){
+    if    ($mTp eq "70"){
 	  my $chn = 1;
 	  $chn = 5  if ($md eq "HM-WDS30-OT2-SM");
 	  $chn = 10 if ($md =~  m/^(WS550|WS888|HM-WDC7000)/);#todo use channel correct
@@ -2840,7 +2845,7 @@ sub CUL_HM_Set($@) {
   elsif($cmd eq "sysTime") { ##################################################
     $state = "";
 	my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
-    CUL_HM_PushCmdStack($hash,"++803F$id${dst}0204$s2000");
+    CUL_HM_PushCmdStack($hash,"++A03F$id${dst}0204$s2000");
   } 
   elsif($cmd eq "valvePos") { #################################################
 	return "only number <= 100  or 'off' allowed" 
@@ -2985,7 +2990,7 @@ sub CUL_HM_Set($@) {
 	  my $pHash = CUL_HM_id2Hash($peer);
 	  my $peerFlag = $peer eq '00000000'?'A4':CUL_HM_getFlag($pHash);
 	  $peerFlag =~ s/0/4/;# either 'A4' or 'B4'
-      CUL_HM_SndCmd($hash, "++B412$dst".substr($peer,0,6)) 
+      CUL_HM_SndCmd($hash, "++B112$dst".substr($peer,0,6)) 
 	         if (CUL_HM_getRxType($pHash) & 0x80);
       CUL_HM_SndCmd($hash, sprintf("++%s41%s%s%02X%02X%02X"
 	                 ,$peerFlag,$dst,$peer
@@ -3108,7 +3113,7 @@ sub CUL_HM_Set($@) {
 		!$devHash->{helper}{respWait}{cmd} && 
         !$devHash->{helper}{respWait}{Pending}
 		){
-    CUL_HM_SndCmd($devHash,"++B412$id$dst");
+    CUL_HM_SndCmd($devHash,"++B112$id$dst");
   }
   return ("",1);# no not generate trigger outof command
 }
