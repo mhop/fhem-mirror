@@ -321,7 +321,7 @@ my @usbtable = (
 
     { NAME      => "TCM310",
       matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)",
-                    "ttyUSB(.*)", "ttyACM(.*)"],
+                    "ttyUSB(.*)", "ttyACM(.*)", "ttyAMA(.*)"],
       DeviceName=> "DEVICE\@57600",
       request   => pack("H*", "5500010005700838"),   # get idbase
       response  => "^\x55\x00\x05\x01",
