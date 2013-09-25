@@ -217,7 +217,7 @@ sub CUL_HM_updateConfig($){
 
     my $st  = CUL_HM_Get($hash,$name,"param","subType");
     my $md  = CUL_HM_Get($hash,$name,"param","model");
-    if ("HM-CC-TC" eq $md){
+    if ($md =~ /(HM-CC-TC|HM-CC-RT-DN)/){
 	  $hash->{helper}{role}{chn} = 1 if (length($id) == 6); #tc special
 	  $attr{$name}{stateFormat} = "last:trigLast" if ($chn eq "03");
 	}
@@ -2985,7 +2985,7 @@ sub CUL_HM_Set($@) {
 	  my $pHash = CUL_HM_id2Hash($peer);
 	  my $peerFlag = $peer eq '00000000'?'A4':CUL_HM_getFlag($pHash);
 	  $peerFlag =~ s/0/4/;# either 'A4' or 'B4'
-      CUL_HM_SndCmd($hash, "++B412$dst".substr($peer,0,6_)) 
+      CUL_HM_SndCmd($hash, "++B412$dst".substr($peer,0,6)) 
 	         if (CUL_HM_getRxType($pHash) & 0x80);
       CUL_HM_SndCmd($hash, sprintf("++%s41%s%s%02X%02X%02X"
 	                 ,$peerFlag,$dst,$peer
