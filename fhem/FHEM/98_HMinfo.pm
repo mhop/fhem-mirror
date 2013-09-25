@@ -234,9 +234,10 @@ sub HMinfo_SetFn($@) {#########################################################
   }
   elsif($cmd eq "clear" )     {##actionImmediate: clear parameter--------------
     my ($type) = @a;
-	$opt .= "d" if ($type ne "Readings");# readings apply to all, others device only
+	$opt .= "d" if ($type !~ m/(readings|register)/);# readings apply to all, others device only
 	my @entities;
-	return "unknown parameter - use Protocol,readings or rssi" if ($type !~ m/^(Protocol|readings|rssi)$/);
+	return "unknown parameter - use Protocol, readings, register or rssi" 
+	      if ($type !~ m/^(Protocol|readings|register|rssi)$/);
 	$type = "msgEvents" if ($type eq "Protocol");# translate parameter
 	foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
 	  push @entities,$dName;
@@ -504,8 +505,9 @@ sub HMinfo_SetFn($@) {#########################################################
 		   ."\n ---clear status---"                    
 	       ."\n clear [<typeFilter>] [Protocol|Readings|Rssi]"       
 	       ."\n       Protocol     # delete all protocol-events"       
-	       ."\n       Readings     # delete all readings"       
-	       ."\n       Rssi         # delete all rssi data"       
+	       ."\n       readings     # delete all readings"       
+	       ."\n       register     # delete all register-readings"       
+	       ."\n       rssi         # delete all rssi data"       
 		   ."\n ---help---"                    
 	       ."\n help                            #"       
 		   ."\n ***footnote***"

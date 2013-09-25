@@ -1031,6 +1031,8 @@ my %culHmChanSets = (
 		              ,on             =>""
 					  ,off            =>""
 					  ,toggle         =>""},
+  "HM-CC-RT-DN00"  =>{ sysTime        =>""},
+  "HM-CC-RT-DN02"  =>{ sysTime        =>""},
   "HM-CC-RT-DN04"  =>{ mode           => "[auto|manu|party|boost|comfort|lower] ... <temp> <startTime> <endTime>"
                       ,tempListSat    =>"HH:MM temp ..."
                       ,tempListSun    =>"HH:MM temp ..."
@@ -1040,6 +1042,7 @@ my %culHmChanSets = (
                       ,tempListWed    =>"HH:MM temp ..."
                       ,tempListFri    =>"HH:MM temp ..."
 					  ,"desired-temp" =>"[on|off|5.0..30.0]"
+					  ,sysTime        =>""
                      },
   "HM-CC-RT-DN05"  =>{ peerChan       =>" 0 <actChn> ... [single] [set|unset] [actor|remote|both]"},
 );
