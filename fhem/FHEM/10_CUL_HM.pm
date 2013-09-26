@@ -2812,7 +2812,8 @@ sub CUL_HM_Set($@) {
       my %day2off = ( "Sat"=>"5 0B", "Sun"=>"5 3B", "Mon"=>"5 6B",
                       "Tue"=>"5 9B", "Wed"=>"5 CB", "Thu"=>"6 01",
                       "Fri"=>"6 31");
-      ($list,$addr,$prgChn) = split(" ", $day2off{$wd},2);
+      ($list,$addr) = split(" ", $day2off{$wd},2);
+	  $prgChn = 2;
       $addr = hex($addr);
 	}
 
