@@ -898,7 +898,7 @@ sub CUL_HM_Parse($$) {##############################
 	  push @event, "battery:".($err&0x80?"low":"ok") if (defined $err);
 	}  
   }
-  elsif($st eq "KFM100"   && $md eq "KFM-Sensor") { ###########################
+  elsif($md eq "KFM-Sensor") { ################################################
     if ($mTp eq "53"){
       if($p =~ m/.14(.)0200(..)(..)(..)/) {
         my ($seq, $k_v1, $k_v2, $k_v3) = (hex($1),$2,hex($3),hex($4));
@@ -961,14 +961,16 @@ sub CUL_HM_Parse($$) {##############################
 	    my ($a,$d) = unpack 'A2A4',$_;
 		$d = hex($d);
 		$d -= 0x10000 if($d & 0xC000); 
-		$d = sprintf("T: %0.1f",$d/10);
+		$d = sprintf("%0.1f",$d/10);
 		my $chId = sprintf("%02X",hex($a) & 0x3f);
-		if($modules{CUL_HM}{defptr}{$src.$chId}){
-	      push @entities,CUL_HM_UpdtReadSingle($modules{CUL_HM}{defptr}{$src.$chId}
-		                                     ,'state',$d,1);
+		my $chnHash = $modules{CUL_HM}{defptr}{$src.$chId};									 
+		if ($chnHash){
+		  push @entities,CUL_HM_UpdtReadBulk($chnHash,1
+		                                      ,"state:T: $d"
+	                                          ,"temperature:$d");
 		}
 		else{
-          push @event, "Chan_$chId:$d"; 
+          push @event, "Chan_$chId:T: $d"; 
 		}
 	  }
 	}
@@ -2410,7 +2412,7 @@ sub CUL_HM_Set($@) {
 		   .(($reg->{l} == 3)?" peer required":"")." : ".$reg->{t}."\n"
 		          if ($data eq "?");
 	return "value:".$data." out of range for Reg \"".$regName."\""
-	        if (!($reg->{c} eq 'lit'||$reg->{c} eq 'hex')&&
+	        if (!($reg->{c} =~ m/^(lit|hex|min2time)$/)&&
 			    ($data < $reg->{min} ||$data > $reg->{max})); # none number
     return"invalid value. use:". join(",",keys%{$reg->{lit}}) 
 	        if ($reg->{c} eq 'lit' && !defined($reg->{lit}{$data}));
@@ -2420,6 +2422,7 @@ sub CUL_HM_Set($@) {
 	if (!$conversion){;# do nothing
 	}elsif($conversion eq "fltCvT"  ){$data = CUL_HM_fltCvT($data);
 	}elsif($conversion eq "fltCvT60"){$data = CUL_HM_fltCvT60($data);
+	}elsif($conversion eq "min2time"){$data = CUL_HM_time2min($data);
 	}elsif($conversion eq "m10s3")   {$data = $data*10-3;
 	}elsif($conversion eq "hex")     {$data = hex($data);
 	}elsif($conversion eq "lit")     {$data = $reg->{lit}{$data};
@@ -3959,6 +3962,7 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   } elsif($conversion eq "lit"     ){$data = $reg->{litInv}{$data}?$reg->{litInv}{$data}:"undef lit";
   } elsif($conversion eq "fltCvT"  ){$data = CUL_HM_CvTflt($data);
   } elsif($conversion eq "fltCvT60"){$data = CUL_HM_CvTflt60($data);
+  } elsif($conversion eq "min2time"){$data = CUL_HM_min2time($data);
   } elsif($conversion eq "m10s3"   ){$data = ($data+3)/10;
   } elsif($conversion eq "hex"     ){$data = sprintf("0x%X",$data);
   } else { return " conversion undefined - please contact admin";
@@ -4174,6 +4178,19 @@ sub CUL_HM_fltCvT($) { # float -> config time
 sub CUL_HM_CvTflt($) { # config time -> float
   my ($inValue) = @_;
   return ($inValue & 0x1f)*((sort {$a <=> $b} keys(%fltCvT))[$inValue >> 5]);
+}
+sub CUL_HM_min2time($) { # minutes -> time
+  my $min = shift;
+  $min = $min * 30;
+  return sprintf("%02d:%02d",int($min/60),$min%60);
+}
+sub CUL_HM_time2min($) { # minutes -> time
+  my $time = shift;
+  my ($h,$m) = split ":",$time;
+  $m = ($h*60 + $m)/30;
+  $m = 0 if($m < 0);
+  $m = 47 if($m > 47);
+  return $m;
 }
 
 sub CUL_HM_4DisText($) {# convert text for 4dis

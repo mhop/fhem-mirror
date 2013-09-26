@@ -6,6 +6,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday time);
+use Digest::MD5 qw(md5);
 
 sub HMLAN_Initialize($);
 sub HMLAN_Define($$);
@@ -61,7 +62,7 @@ sub HMLAN_Initialize($) {
   $hash->{UndefFn} = "HMLAN_Undef";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "loglevel:0,1,2,3,4,5,6 addvaltrigger " . 
-                     "hmId hmKey " .
+                     "hmId hmKey hmKey2 hmKey3 " .
                      "respTime wdStrokeTime:5,10,15,20,25 " .
 					 "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger ".
 					 "hmLanQlen:1_min,2_low,3_normal,4_high,5_critical ".
@@ -143,6 +144,26 @@ sub HMLAN_Attr(@) {#################################
 	else{
 	  $defs{$name}{helper}{q}{hmLanQlen} = 1;
 	}
+  }
+  elsif($attrName =~ m /^hmKey/){
+    my $retVal= "";
+    if ($cmd eq "set"){
+	  $attr{$name}{$attrName} = ($aVal =~ m /^[0-9A-Fa-f]{32}$/ )?
+	                             $aVal:
+		  					     unpack('H*', md5($aVal));
+	  $retVal = "$attrName set to $attr{$name}{$attrName}";
+	}
+	else{
+	  delete $attr{$name}{$attrName};
+	}
+	my ($k1,$k2,$k3) =( AttrVal($name,"hmKey","")
+	                   ,AttrVal($name,"hmKey2","")
+	                   ,AttrVal($name,"hmKey3","")
+					   );	
+	HMLAN_SimpleWrite($defs{$name}, "Y01,".($k1?"01,$k1":"00,"));
+	HMLAN_SimpleWrite($defs{$name}, "Y02,".($k2?"02,$k2":"00,"));
+	HMLAN_SimpleWrite($defs{$name}, "Y03,".($k3?"03,$k3":"00,"));
+	return $retVal;
   }
   return;
 }
@@ -747,6 +768,13 @@ sub HMLAN_condUpdate($$) {#####################################################
 		<li><a href="#loglevel">loglevel</a></li><br>
 		<li><a href="#addvaltrigger">addvaltrigger</a></li><br>
 		<li><a href="#hmId">hmId</a></li><br>
+		<li><a href="#hmKey">hmKey</a></li><br>
+		<li><a href="#hmKey2">hmKey2</a></li><br>
+		<li><a href="#hmKey3">hmKey3</a><br>
+		AES keys for the HMLAN adapter. <br>
+		The key is converted to a hash. If a hash is given directly it is not converted but taken directly.
+	    Therefore the original key cannot be converted back<br>
+		</li>
 		<li><a href="#hmProtocolEvents">hmProtocolEvents</a></li><br>
 		<li><a href="#respTime">respTime</a><br>
 		Define max response time of the HMLAN adapter in seconds. Default is 1 sec.<br/>
