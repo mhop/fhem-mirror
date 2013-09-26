@@ -329,11 +329,11 @@ sub HMinfo_SetFn($@) {#########################################################
 	    my $dispDest = $dest;
 	    if ($dest =~ m/^at_(.*)/){
 		  $dispName = $1;
-		  $dispName =~ s/^rpt_//;
+#		  $dispName =~ s/^rpt_//;
 		  $dispDest = (($dest =~ m/^to_rpt_/)?"rep_":"").$dName;
 		}
-		push @rssiList,sprintf("%-15s %-15s %6.1f %6.1f %6.1f<%6.1f %3s"
-		                       ,$dispName,$dispDest
+		push @rssiList,sprintf("%-15s:%-15s %-15s %6.1f %6.1f %6.1f<%6.1f %5s"
+		                       ,$dName,$dispName,$dispDest
 							   ,$defs{$dName}{helper}{rssi}{$dest}{lst}
 		                       ,$defs{$dName}{helper}{rssi}{$dest}{avg}
 		                       ,$defs{$dName}{helper}{rssi}{$dest}{min}
@@ -342,7 +342,7 @@ sub HMinfo_SetFn($@) {#########################################################
 							   );
 	  }
 	}
-	$ret = $cmd." done:"."\n    "."receive         from             last   avg      min<max    count"
+	$ret = $cmd." done:"."\n    "."Device         :receive         from             last   avg      min<max    count"
 	                    ."\n    ".(join "\n    ",sort @rssiList)
 	                     ;
   }
