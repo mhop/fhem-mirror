@@ -24,10 +24,10 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0
+# Version: 1.0.0
 #
 # Version History:
-# - 1.00 - 2013-09-23
+# - 1.0.0 - 2013-09-23
 # -- First release
 #
 ##############################################################################
@@ -48,6 +48,11 @@ sub ENIGMA2_Undefine($$);
 
 
 
+#########################
+# Forward declaration for remotecontrol module
+sub ENIGMA2_RClayout_TV();
+sub ENIGMA2_RCmakenotify($$);
+
 ###################################
 sub ENIGMA2_Initialize($) {
   my ($hash) = @_;
@@ -59,6 +64,20 @@ sub ENIGMA2_Initialize($) {
 
   $hash->{AttrList}  = "".
                       $readingFnAttributes;
+
+  $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG}  = "ENIGMA2_RClayout_DM800_SVG";
+  $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800}  = "ENIGMA2_RClayout_DM800";
+  $data{RC_layout}{ENIGMA2_DreamMultimedia_DM8000_DM800se_SVG}  = "ENIGMA2_RClayout_DM8000_SVG";
+  $data{RC_layout}{ENIGMA2_DreamMultimedia_DM8000_DM800se}  = "ENIGMA2_RClayout_DM8000";
+  $data{RC_layout}{ENIGMA2_DreamMultimedia_RC10_SVG}  = "ENIGMA2_RClayout_RC10_SVG";
+  $data{RC_layout}{ENIGMA2_DreamMultimedia_RC10}  = "ENIGMA2_RClayout_RC10";
+#  $data{RC_layout}{ENIGMA2_VUplus_Solo2_SVG}  = "ENIGMA2_RClayout_VUplusSolo2_SVG";
+#  $data{RC_layout}{ENIGMA2_VUplus_Solo2}  = "ENIGMA2_RClayout_VUplusSolo2";
+  $data{RC_layout}{ENIGMA2_VUplus_Duo2_SVG}  = "ENIGMA2_RClayout_VUplusDuo2_SVG";
+  $data{RC_layout}{ENIGMA2_VUplus_Duo2}  = "ENIGMA2_RClayout_VUplusDuo2";
+#  $data{RC_layout}{ENIGMA2_VUplus_Ultimo_SVG}  = "ENIGMA2_RClayout_VUplusUltimo_SVG";
+#  $data{RC_layout}{ENIGMA2_VUplus_Ultimo}  = "ENIGMA2_RClayout_VUplusUltimo";
+  $data{RC_makenotify}{ENIGMA2} = "ENIGMA2_RCmakenotify";
 }
 
 #####################################
@@ -92,7 +111,7 @@ sub ENIGMA2_GetStatus($;$) {
       $serviceinfo = ENIGMA2_SendCommand($hash, "subservices", "");
       $signalinfo = ENIGMA2_SendCommand($hash, "signal", "");
       $vol = ENIGMA2_SendCommand($hash, "vol", "");
-      if (ref($serviceinfo) eq "HASH" && defined($serviceinfo->{e2service})) {
+      if (ref($serviceinfo) eq "HASH" && defined($serviceinfo->{e2service}{e2servicereference}) && $serviceinfo->{e2service}{e2servicereference} ne "") {
         $eventinfo = ENIGMA2_SendCommand($hash, "epgservicenow", "sRef=".urlEncode($serviceinfo->{e2service}{e2servicereference}));
       }
     }
@@ -276,16 +295,21 @@ sub ENIGMA2_GetStatus($;$) {
 
     # servicereference + input + currentMedia
     if (ref($serviceinfo) eq "HASH" && defined($serviceinfo->{e2service})) {
-      if (!defined($hash->{READINGS}{servicereference}{VAL}) || $hash->{READINGS}{servicereference}{VAL} ne $serviceinfo->{e2service}{e2servicereference}) {
-        readingsBulkUpdate($hash, "servicereference", $serviceinfo->{e2service}{e2servicereference}, 1);
-        readingsBulkUpdate($hash, "currentMedia", $serviceinfo->{e2service}{e2servicereference}, 1);
+      if ($serviceinfo->{e2service}{e2servicereference} ne "") {
+        if (!defined($hash->{READINGS}{servicereference}{VAL}) || $hash->{READINGS}{servicereference}{VAL} ne $serviceinfo->{e2service}{e2servicereference}) {
+          readingsBulkUpdate($hash, "servicereference", $serviceinfo->{e2service}{e2servicereference}, 1);
+          readingsBulkUpdate($hash, "currentMedia", $serviceinfo->{e2service}{e2servicereference}, 1);
 
-        my @servicetype = split(/:/, $serviceinfo->{e2service}{e2servicereference});
-        if ($servicetype[2] eq "2") {
-          readingsBulkUpdate($hash, "input", "radio", 1);
-        } else {
-          readingsBulkUpdate($hash, "input", "tv", 1);
+          my @servicetype = split(/:/, $serviceinfo->{e2service}{e2servicereference});
+          if ($servicetype[2] eq "2") {
+            readingsBulkUpdate($hash, "input", "radio", 1);
+          } else {
+            readingsBulkUpdate($hash, "input", "tv", 1);
+          }
         }
+      } elsif($hash->{READINGS}{servicereference}{VAL} ne "-") {
+        readingsBulkUpdate($hash, "servicereference", "-", 1);
+        readingsBulkUpdate($hash, "currentMedia", "-", 1);
       }
     }
 
@@ -466,31 +490,12 @@ sub ENIGMA2_Set($@) {
 		# Will be executed anyway on the end of the function			
   # toogle
   } elsif($a[1] eq "toogle") {
-    if($hash->{READINGS}{state}{VAL} ne "absent") {
-      if($hash->{READINGS}{state}{VAL} eq "off") {
-        $cmd = "newstate=4";
-    		readingsBeginUpdate($hash);
-        if (!defined($hash->{READINGS}{power}{VAL}) || $hash->{READINGS}{power}{VAL} ne "on") {
-    		  readingsBulkUpdate($hash, "power", "on");
-        }
-        if (!defined($hash->{READINGS}{state}{VAL}) || $hash->{READINGS}{state}{VAL} ne "on") {
-    		  readingsBulkUpdate($hash, "state", "on");
-        }
-    		readingsEndUpdate($hash, 1);
-      } else {
-        $cmd = "newstate=5";
-    		readingsBeginUpdate($hash);
-        if (!defined($hash->{READINGS}{power}{VAL}) || $hash->{READINGS}{power}{VAL} ne "off") {
-    		  readingsBulkUpdate($hash, "power", "off");
-        }
-        if (!defined($hash->{READINGS}{state}{VAL}) || $hash->{READINGS}{state}{VAL} ne "off") {
-    		  readingsBulkUpdate($hash, "state", "off");
-        }
-    		readingsEndUpdate($hash, 1);
-      }
-      $result = ENIGMA2_SendCommand($hash, "powerstate", $cmd);
+    if($hash->{READINGS}{power}{VAL} eq "off") {
+      ENIGMA2_Set($hash, "on");
+      return undef;
     } else {
-      return "Device needs to be reachable to toogle powerstate.";
+      ENIGMA2_Set($hash, "off");
+      return undef;
     }
 
   # shutdown
@@ -676,9 +681,14 @@ sub ENIGMA2_Set($@) {
         }
         return "No argument given, choose one of".$commandKeys;
       }
+
       my $request = ENIGMA2_GetRemotecontrolCommand(uc($a[2]));
-      if ($request ne "") {
-        $cmd = "command=".ENIGMA2_GetRemotecontrolCommand($a[2]);
+
+      if ($request eq "POWER") {
+        ENIGMA2_Set($hash, "toogle");
+        return undef;
+      } elsif ($request ne "") {
+          $cmd = "command=".ENIGMA2_GetRemotecontrolCommand($a[2]);
       } else {
         my $commandKeys = "";
         for (sort keys %{ ENIGMA2_GetRemotecontrolCommand("GetRemotecontrolCommands") } ) {
@@ -686,6 +696,7 @@ sub ENIGMA2_Set($@) {
         }
         return "Unknown argument ".$a[2].", choose one of".$commandKeys;
       }
+
       $result = ENIGMA2_SendCommand($hash, "remotecontrol", $cmd);
     } else {
       return "Device needs to be reachable to be controlled remotely.";
@@ -946,6 +957,270 @@ sub ENIGMA2_wake ($) {
   }
 
   return 1;
+}
+
+#####################################
+# Callback from 95_remotecontrol for command makenotify.
+sub ENIGMA2_RCmakenotify($$) {
+  my ($nam, $ndev) = @_;
+  my $nname="notify_$nam";
+  
+  fhem("define $nname notify $nam set $ndev remoteControl ".'$EVENT',1);
+  Log3 undef, 2, "[remotecontrol:ENIGMA2] Notify created: $nname";
+  return "Notify created by ENIGMA2: $nname";
+}
+
+#####################################
+# RC layouts
+
+# Dreambox DM500 + DM800 with SVG
+sub ENIGMA2_RClayout_DM800_SVG() {
+  my @row;
+
+  $row[0]=":rc_BLANK.svg,:rc_BLANK.svg,POWER:rc_POWER.svg";
+  $row[1]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+  $row[2]="1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
+  $row[3]="4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
+  $row[4]="7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
+  $row[5]="LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
+  $row[6]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+  $row[7]="VOLUMEUP:rc_VOLPLUS.svg,MUTE:rc_MUTE.svg,CHANNELUP:rc_UP.svg";
+  $row[8]="VOLUMEDOWN:rc_VOLMINUS.svg,EXIT:rc_EXIT.svg,CHANNELDOWN:rc_DOWN.svg";
+  $row[9]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+  $row[10]="INFO:rc_INFO.svg,UP:rc_UP.svg,MENU:rc_MENU.svg";
+  $row[11]="LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
+  $row[12]="AUDIO:rc_AUDIO.svg,DOWN:rc_DOWN.svg,VIDEO:rc_VIDEO.svg";
+  $row[13]=":rc_BLANK.svg,EXIT:rc_EXIT.svg,:rc_BLANK.svg";
+
+  $row[14]="RED:rc_REWred.svg,GREEN:rc_PLAYgreen.svg,YELLOW:rc_PAUSEyellow.svg,BLUE:rc_FFblue.svg";
+  $row[15]="TV:rc_TVstop.svg,RADIO:rc_RADIOred.svg,TEXT:rc_TEXT.svg,HELP:rc_HELP.svg";
+
+  $row[16]="attr rc_iconpath icons/remotecontrol";
+  $row[17]="attr rc_iconprefix black_btn_";
+  return @row;
+}
+
+# Dreambox DM500 + DM800 with PNG
+sub ENIGMA2_RClayout_DM800() {
+  my @row;
+
+  $row[0]=":blank,:blank,POWER:POWEROFF";
+  $row[1]=":blank,:blank,:blank";
+
+  $row[2]="1,2,3";
+  $row[3]="4,5,6";
+  $row[4]="7,8,9";
+  $row[5]="LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
+  $row[6]=":blank,:blank,:blank";
+
+  $row[7]="VOLUMEUP:VOLUP,MUTE,CHANNELUP:CHUP2";
+  $row[8]="VOLUMEDOWN:VOLDOWN,EXIT,CHANNELDOWN:CHDOWN2";
+  $row[9]=":blank,:blank,:blank";
+
+  $row[10]="INFO,UP,MENU";
+  $row[11]="LEFT,OK,RIGHT";
+  $row[12]="AUDIO,DOWN,VIDEO";
+  $row[13]=":blank,:blank,:blank";
+
+  $row[14]="RED:REWINDred,GREEN:PLAYgreen,YELLOW:PAUSEyellow,BLUE:FFblue";
+  $row[15]="TV:TVstop,RADIO:RADIOred,TEXT,HELP";
+
+  $row[16]="attr rc_iconpath icons/remotecontrol";
+  $row[17]="attr rc_iconprefix black_btn_";
+  return @row;
+}
+
+# Dreambox DM800se + DM8000 with SVG
+sub ENIGMA2_RClayout_DM8000_SVG() {
+  my @row;
+
+  $row[0]=":rc_BLANK.svg,:rc_BLANK.svg,POWER:rc_POWER.svg";
+  $row[1]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+  $row[2]="1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
+  $row[3]="4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
+  $row[4]="7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
+  $row[5]="LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
+  $row[6]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+  $row[7]="VOLUMEUP:rc_VOLPLUS.svg,MUTE:rc_MUTE.svg,CHANNELUP:rc_UP.svg";
+  $row[8]="VOLUMEDOWN:rc_VOLMINUS.svg,EXIT:rc_EXIT.svg,CHANNELDOWN:rc_DOWN.svg";
+  $row[9]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+  $row[10]="INFO:rc_INFO.svg,UP:rc_UP.svg,MENU:rc_MENU.svg";
+  $row[11]="LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
+  $row[12]="AUDIO:rc_AUDIO.svg,DOWN:rc_DOWN.svg,VIDEO:rc_VIDEO.svg";
+  $row[13]=":rc_BLANK.svg,EXIT:rc_EXIT.svg,:rc_BLANK.svg";
+
+  $row[14]="RED:rc_RED.svg,GREEN:rc_GREEN.svg,YELLOW:rc_YELLOW.svg,BLUE:rc_BLUE.svg";
+  $row[15]="REWIND:rc_REW.svg,PLAY:rc_PLAY.svg,STOP:rc_STOP.svg,FASTFORWARD:rc_FF.svg";
+  $row[16]="TV:rc_TV.svg,RADIO:rc_RADIO.svg,TEXT:rc_TEXT.svg,RECORD:rc_REC.svg";
+
+  $row[17]="attr rc_iconpath icons/remotecontrol";
+  $row[18]="attr rc_iconprefix black_btn_";
+  return @row;
+}
+
+# Dreambox DM800se + DM8000 with PNG
+sub ENIGMA2_RClayout_DM8000() {
+  my @row;
+
+  $row[0]=":blank,:blank,POWER:POWEROFF";
+  $row[1]=":blank,:blank,:blank";
+
+  $row[2]="1,2,3";
+  $row[3]="4,5,6";
+  $row[4]="7,8,9";
+  $row[5]="LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
+  $row[6]=":blank,:blank,:blank";
+
+  $row[7]="VOLUMEUP:VOLUP,MUTE,CHANNELUP:CHUP2";
+  $row[8]="VOLUMEDOWN:VOLDOWN,EXIT,CHANNELDOWN:CHDOWN2";
+  $row[9]=":blank,:blank,:blank";
+
+  $row[10]="INFO,UP,MENU";
+  $row[11]="LEFT,OK,RIGHT";
+  $row[12]="AUDIO,DOWN,VIDEO";
+  $row[13]=":blank,:blank,:blank";
+
+  $row[14]="RED,GREEN,YELLOW,BLUE";
+  $row[15]="REWIND,PLAY,STOP,FASTFORWARD:FF";
+  $row[16]="TV,RADIO,TEXT,RECORD:REC";
+
+  $row[17]="attr rc_iconpath icons/remotecontrol";
+  $row[18]="attr rc_iconprefix black_btn_";
+  return @row;
+}
+
+# Dreambox RC10 with SVG
+sub ENIGMA2_RClayout_RC10_SVG() {
+  my @row;
+
+  $row[0]=":rc_BLANK.svg,:rc_BLANK.svg,POWER:rc_POWER.svg";
+  $row[1]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+  $row[2]="1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
+  $row[3]="4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
+  $row[4]="7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
+  $row[5]="LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
+  $row[6]="RED:rc_RED.svg,GREEN:rc_GREEN.svg,YELLOW:rc_YELLOW.svg,BLUE:rc_BLUE.svg";
+  $row[7]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+  $row[8]="INFO:rc_INFO.svg,UP:rc_UP.svg,MENU:rc_MENU.svg";
+  $row[9]="LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
+  $row[10]="AUDIO:rc_AUDIO.svg,DOWN:rc_DOWN.svg,VIDEO:rc_VIDEO.svg";
+  $row[11]=":rc_BLANK.svg,EXIT:rc_EXIT.svg,:rc_BLANK.svg";
+
+  $row[12]="VOLUMEUP:rc_VOLPLUS.svg,:rc_BLANK.svg,CHANNELUP:rc_UP.svg";
+  $row[13]="VOLUMEDOWN:rc_VOLMINUS.svg,MUTE:rc_MUTE.svg,CHANNELDOWN:rc_DOWN.svg";
+  $row[14]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+  $row[15]="REWIND:rc_REW.svg,PLAY:rc_PLAY.svg,STOP:rc_STOP.svg,FASTFORWARD:rc_FF.svg";
+  $row[16]="TV:rc_TV.svg,RADIO:rc_RADIO.svg,TEXT:rc_TEXT.svg,RECORD:rc_REC.svg";
+
+  $row[17]="attr rc_iconpath icons";
+  $row[18]="attr rc_iconprefix rc_";
+  return @row;
+}
+
+# Dreambox RC10 with PNG
+sub ENIGMA2_RClayout_RC10() {
+  my @row;
+
+  $row[0]=":blank,:blank,POWER:POWEROFF";
+  $row[1]=":blank,:blank,:blank";
+
+  $row[2]="1,2,3";
+  $row[3]="4,5,6";
+  $row[4]="7,8,9";
+  $row[5]="LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
+  $row[6]="RED,GREEN,YELLOW,BLUE";
+  $row[7]=":blank,:blank,:blank";
+
+  $row[8]="INFO,UP,MENU";
+  $row[9]="LEFT,OK,RIGHT";
+  $row[10]="AUDIO,DOWN,VIDEO";
+  $row[11]=":blank,EXIT,:blank";
+
+  $row[12]="VOLUMEUP:VOLUP,:blank,CHANNELUP:CHUP2";
+  $row[13]="VOLUMEDOWN:VOLDOWN,MUTE,CHANNELDOWN:CHDOWN2";
+  $row[14]=":blank,:blank,:blank";
+
+  $row[15]="REWIND,PLAY,STOP,FASTFORWARD:FF";
+  $row[16]="TV,RADIO,TEXT,RECORD:REC";
+
+  $row[17]="attr rc_iconpath icons/remotecontrol";
+  $row[18]="attr rc_iconprefix black_btn_";
+  return @row;
+}
+
+# VU+ Duo2 with SVG
+sub ENIGMA2_RClayout_VUplusDuo2_SVG() {
+  my @row;
+
+  $row[0]=":rc_BLANK.svg,MUTE:rc_MUTE.svg,POWER:rc_POWER.svg";
+  $row[1]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+  $row[2]="REWIND:rc_REW.svg,PLAY:rc_PLAY.svg,FASTFORWARD:rc_FF.svg";
+  $row[3]="RECORD:rc_REC.svg,STOP:rc_STOP.svg,VIDEO:rc_VIDEO.svg";
+  $row[4]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+  $row[5]="TV:rc_TV.svg,AUDIO:rc_AUDIO.svg,RADIO:rc_RADIO.svg";
+  $row[6]="TEXT:rc_TEXT.svg,HELP:rc_HELP.svg,AV:rc_AV.svg";
+  $row[7]="INFO:rc_EPG.svg,MENU:rc_MENU.svg,EXIT:rc_EXIT.svg";
+  $row[8]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+  $row[9]="VOLUMEUP:rc_VOLPLUS.svg,UP:rc_UP.svg,CHANNELUP:rc_PLUS.svg";
+  $row[10]="LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
+  $row[11]="VOLUMEDOWN:rc_VOLMINUS.svg,DOWN:rc_DOWN.svg,CHANNELDOWN:rc_MINUS.svg";
+
+  $row[12]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+
+  $row[13]="RED:rc_RED.svg,GREEN:rc_GREEN.svg,YELLOW:rc_YELLOW.svg,BLUE:rc_BLUE.svg";
+  $row[14]="1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
+  $row[15]="4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
+  $row[16]="7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
+  $row[17]="LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
+
+  $row[18]="attr rc_iconpath icons";
+  $row[19]="attr rc_iconprefix rc_";
+  return @row;
+}
+
+# VU+ Duo2 with PNG
+sub ENIGMA2_RClayout_VUplusDuo2() {
+  my @row;
+
+  $row[0]=":blank,:MUTE,POWER:POWEROFF";
+  $row[1]=":blank,:blank,:blank";
+
+  $row[2]="REWIND,PLAY,FASTFORWARD:FF";
+  $row[3]="RECORD:REC,STOP,VIDEO";
+  $row[4]=":blank,:blank,:blank";
+
+  $row[5]="TV,AUDIO,RADIO:RADIO";
+  $row[6]="TEXT,HELP,AV";
+  $row[7]="INFO,MENU,EXIT";
+  $row[8]=":blank,:blank,:blank";
+
+  $row[9]="VOLUMEUP:VOLUP,UP,CHANNELUP:CHUP2";
+  $row[10]="LEFT,OK,RIGHT";
+  $row[11]="VOLUMEDOWN:VOLDOWN,DOWN,CHANNELDOWN:CHDOWN2";
+
+  $row[12]=":blank,:blank,:blank";
+
+  $row[13]="RED,GREEN,YELLOW,BLUE";
+  $row[14]="1,2,3";
+  $row[15]="4,5,6";
+  $row[16]="7,8,9";
+  $row[17]="LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
+
+  $row[18]="attr rc_iconpath icons/remotecontrol";
+  $row[19]="attr rc_iconprefix black_btn_";
+  return @row;
 }
 
 ###################################
