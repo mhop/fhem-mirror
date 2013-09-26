@@ -856,7 +856,7 @@ FW_doDetail($)
   ## dependent objects
   my @dob;  # dependent objects - triggered by current device
   foreach my $dn (sort keys %defs) { 
-    next if($dn eq $d);
+    next if(!$dn || $dn eq $d);
     my $dh = $defs{$dn};
     if(($dh->{DEF} && $dh->{DEF} =~ m/\b$d\b/) ||
        ($h->{DEF}  && $h->{DEF}  =~ m/\b$dn\b/)) {

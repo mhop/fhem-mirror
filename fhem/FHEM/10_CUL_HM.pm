@@ -930,14 +930,20 @@ sub CUL_HM_Parse($$) {##############################
   elsif($st eq "THSensor") { ##################################################
     if    ($mTp eq "70"){
 	  my $chn = 1;
-	  $chn = 5  if ($md eq "HM-WDS30-OT2-SM");
 	  $chn = 10 if ($md =~  m/^(WS550|WS888|HM-WDC7000)/);#todo use channel correct
       my $t =  hex(substr($p,0,4));
       $t -= 32768 if($t > 1638.4);
       $t = sprintf("%0.1f", $t/10);
       my $statemsg = "state:T: $t";
       push @event, "temperature:$t";#temp is always there
-	  if ($md !~ m/^(S550IA|HM-WDS30-T-O)$/){#ignore only-temp sensors
+	  if ($md eq "HM-WDS30-OT2-SM"){
+	    $chn = 5;
+		my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
+		push @entities,CUL_HM_UpdtReadBulk($chnHash,1,$statemsg, 
+	                                                "temperature:$t")
+				  if ($chnHash);
+	  }
+	  elsif ($md !~ m/^(S550IA|HM-WDS30-T-O)$/){#skip temp-only sens
         my $h =  hex(substr($p,4,2));
         $statemsg .= " H: $h";
         push @event, "humidity:$h";
@@ -956,7 +962,6 @@ sub CUL_HM_Parse($$) {##############################
 		$d = hex($d);
 		$d -= 0x10000 if($d & 0xC000); 
 		$d = sprintf("T: %0.1f",$d/10);
-
 		my $chId = sprintf("%02X",hex($a) & 0x3f);
 		if($modules{CUL_HM}{defptr}{$src.$chId}){
 	      push @entities,CUL_HM_UpdtReadSingle($modules{CUL_HM}{defptr}{$src.$chId}
@@ -2589,6 +2594,9 @@ sub CUL_HM_Set($@) {
       return "entry must be between 1 and 36" if ($eNo < 1 || $eNo > 36);	
 	  my $sndID = CUL_HM_name2Id($sId);
 	  my $recID = CUL_HM_name2Id($rId);
+	  $sndID = AttrVal($sId,"hmId","");
+      if ($sndID !~ m/(^[0-9A-F]{6})$/){$sndID = AttrVal($sId,"hmId","");};	
+	  if ($recID !~ m/(^[0-9A-F]{6})$/){$recID = AttrVal($rId,"hmId","");};
       return "sender ID $sId unknown:".$sndID    if ($sndID !~ m/(^[0-9A-F]{6})$/);	
       return "receiver ID $rId unknown:".$recID  if ($recID !~ m/(^[0-9A-F]{6})$/);	
       return "broadcast must be yes or now"      if ($bCst  !~ m/^(yes|no)$/);
@@ -4320,17 +4328,21 @@ sub CUL_HM_repReadings($) {# for repeater in:hash, out: string with peers
 	push @pB,$b;
   }
   my @readList;
-  for (my $n=0;$n<36;$n++){
-    push @readList,"repPeer_$n:undefined" ;
-  }
+  push @readList,"repPeer_$_:undefined" for(0..35);#set default empty
 
   my @retL;
   foreach my$pId(sort keys %pCnt){
 	my ($pdID,$bdcst,$no) = unpack('A6A2A2',$pId);
 	my $fNo = $no-1;#shorthand field number, often used
 	my $sName = CUL_HM_id2Name($pdID);
+	
+	if ($sName eq $pdID && $pD[$fNo]){
+	  $sName = $defs{$pD[$fNo]}->{IODev}{NAME}
+	        if($attr{$defs{$pD[$fNo]}->{IODev}{NAME}}{hmId} eq $pdID);
+	}
 	my $eS = sprintf("%02d %-15s %-15s %-3s %-4s",
-	           $no,$sName
+	           $no
+			  ,$sName
 		      ,((!$pS[$fNo] || $pS[$fNo] ne $sName)?"unknown":" dst>$pD[$fNo]")
 		      ,($bdcst eq "01"?"yes":"no ")
 	          ,($pB[$fNo] && (  ($bdcst eq "01" && $pB[$fNo] eq "y")
