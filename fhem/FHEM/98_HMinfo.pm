@@ -34,7 +34,7 @@ sub HMinfo_Define($$){#########################################################
   my @a = split("[ \t][ \t]*", $def);
   my $name = $hash->{NAME};
   $hash->{Version} = "01";
-  $attr{$name}{webCmd} = "update:protoEvents:rssi:peerXref:configCheck:models";
+  $attr{$name}{webCmd} = "update:protoEvents short:rssi:peerXref:configCheck:models";
   $attr{$name}{sumStatus} =  "battery"
                             .",sabotageError"
 							.",powerError"
@@ -88,7 +88,7 @@ sub HMinfo_getParam(@) { ######################################################
   my $found = 0;
   foreach (@param){
     my $para = CUL_HM_Get($ehash,$eName,"param",$_);
-    push @paramList,sprintf("%-20s",($para eq "undefined"?"-":$para));
+    push @paramList,sprintf("%-15s",($para eq "undefined"?"-":$para));
 	$found = 1 if ($para ne "undefined") ;
   }
   return $found,sprintf("%-20s\t: %s",$eName,join "\t|",@paramList);
@@ -264,26 +264,45 @@ sub HMinfo_SetFn($@) {#########################################################
 						 ;
   }
   elsif($cmd eq "protoEvents"){##print protocol-events-------------------------
+	my ($type) = @a;
 	my @paramList;
 	my @IOlist;
 	foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
 	  my $id = $defs{$dName}{DEF};
-      my ($found,$para) = HMinfo_getParam($id
+      my ($found,$para) = HMinfo_getParam($id,
 	                         ,"protState","protCmdPend"
 	                         ,"protSnd","protLastRcv","protResnd"
 							 ,"protResndFail","protNack","protIOerr");
 	  $para =~ s/( last_at|20..-|\|)//g;
       my @pl = split "\t",$para;
-	  $_ =~ s/\s+$|//g foreach (@pl);
-	  push @paramList, sprintf("%-20s%-22s|%-18s|%-18s|%-14s|%-18s|%-18s|%-18s|%-18s",
+	  foreach (@pl){
+	    $_ =~ s/\s+$|//g ;
+	    $_ =~ s/CMDs_//;
+	    $_ =~ s/..-.. ..:..:..//g if ($type eq "short");
+	    $_ =~ s/CMDs // if ($type eq "short");
+	  }
+	  if ($type eq "short"){
+	    push @paramList, sprintf("%-20s%-17s|%-9s|%-9s|%-9s|%-9s|%-9s|%-9s",
+	                  $pl[0],$pl[1],$pl[2],$pl[3],$pl[5],$pl[6],$pl[7],$pl[8]);
+	  }
+	  else{
+	    push @paramList, sprintf("%-20s%-17s|%-18s|%-18s|%-14s|%-18s|%-18s|%-18s|%-18s",
 	                  $pl[0],$pl[1],$pl[2],$pl[3],$pl[4],$pl[5],$pl[6],$pl[7],$pl[8]);
+	  }
 	  push @IOlist,$defs{$pl[0]}{IODev}->{NAME};
 	}
-	my $hdr = sprintf("%-20s:%-21s|%-18s|%-18s|%-14s|%-18s|%-18s|%-18s|%-18s",
+		
+	
+	my $hdr = sprintf("%-20s:%-16s|%-18s|%-18s|%-14s|%-18s|%-18s|%-18s|%-18s",
 	                         ,"name"
-	                         ,"protState","protCmdPend"
-	                         ,"protSnd","protLastRcv","protResnd"
-							 ,"protResndFail","protNack","protIOerr");
+	                         ,"State","CmdPend"
+	                         ,"Snd","LastRcv","Resnd"
+							 ,"ResndFail","Nack","IOerr");
+	$hdr = sprintf("%-20s:%-16s|%-9s|%-9s|%-9s|%-9s|%-9s|%-9s",
+	                         ,"name"
+	                         ,"State","CmdPend"
+	                         ,"Snd","Resnd"
+							 ,"ResndFail","Nack","IOerr") if ($type eq "short");
 	$ret = $cmd." done:" ."\n    ".$hdr  ."\n    ".(join "\n    ",sort @paramList)
 	       ;
 	$ret .= "\n\n    CUL_HM queue:$modules{CUL_HM}{prot}{rspPend}";
@@ -495,7 +514,7 @@ sub HMinfo_SetFn($@) {#########################################################
 	       ."\n register [<typeFilter>]                        # devicefilter parse devicename. Partial strings supported"  
 	       ."\n peerXref [<typeFilter>]                        # peer cross-reference"
 	       ."\n models [<typeFilter>]                          # list of models incl native parameter"
-	       ."\n protoEvents [<typeFilter>]                     # protocol status - names can be filtered"
+	       ."\n protoEvents [<typeFilter>] [short|long]        # protocol status - names can be filtered"
 	       ."\n param [<typeFilter>] [<param1>] [<param2>] ... # displays params for all entities as table"   
 	       ."\n rssi [<typeFilter>]                            # displays receive level of the HM devices"   
 	       ."\n       last: most recent"
@@ -569,7 +588,8 @@ sub HMinfo_SetFnDly($) {#######################################################
 						 ;
   }
   else{
-	return "autoReadReg clear configCheck param peerCheck peerXref "
+	return "autoReadReg clear "
+          ."configCheck param peerCheck peerXref "
 	      ."protoEvents models regCheck register rssi saveConfig update "
           ."cpRegs  templateChk templateDef templateList templateSet";
 		   }
