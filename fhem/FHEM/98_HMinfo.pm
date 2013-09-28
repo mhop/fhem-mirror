@@ -158,10 +158,15 @@ sub HMinfo_peerCheck(@) { #####################################################
 	else{# work on a valid list:
 	  foreach (split",",$peerIDs){
 		next if ($_ eq "00000000" ||$_ =~m /$devId/);
+		my $cId = $id;
+		if ($md eq "HM-CC-RT-DN" && $id =~ m/05$/){ # special RT climate
+		  $_ =~ s/04$/05/;  # have to compare with clima_team, not clima
+		  $cId =~ s/05$/04/;# will find 04 in peerlist, not 05
+		}
 	    my $pName = CUL_HM_id2Name($_);
 		$pName =~s/_chn:01//;           #channel 01 could be covered by device
 		my $pPlist = AttrVal($pName,"peerIDs","");
-	    push @peerIDsNoPeer,$eName." p:".$pName if ($pPlist !~ m/$id/);
+	    push @peerIDsNoPeer,$eName." p:".$pName if ($pPlist !~ m/$cId/);
 	  }
 	}
   }

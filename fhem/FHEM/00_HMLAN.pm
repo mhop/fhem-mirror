@@ -148,21 +148,34 @@ sub HMLAN_Attr(@) {#################################
   elsif($attrName =~ m /^hmKey/){
     my $retVal= "";
     if ($cmd eq "set"){
-	  $attr{$name}{$attrName} = ($aVal =~ m /^[0-9A-Fa-f]{32}$/ )?
-	                             $aVal:
-		  					     unpack('H*', md5($aVal));
+	  my $kno = ($attrName eq "hmKey")?1:substr($attrName,5,1);
+	  my ($no,$val) = (sprintf("%02X",$kno),$aVal);
+	  if ($aVal =~ m/:/){#number given
+	    ($no,$val) = split ":",$aVal;
+		return "illegal number:$no" if (hex($no) < 1 || hex($no) > 255 || length($no) != 2);
+	  }
+	  $attr{$name}{$attrName} = "$no:".
+	                           (($val =~ m /^[0-9A-Fa-f]{32}$/ )?
+	                             $val:
+		  					     unpack('H*', md5($val)));
 	  $retVal = "$attrName set to $attr{$name}{$attrName}";
 	}
 	else{
 	  delete $attr{$name}{$attrName};
 	}
-	my ($k1,$k2,$k3) =( AttrVal($name,"hmKey","")
-	                   ,AttrVal($name,"hmKey2","")
-	                   ,AttrVal($name,"hmKey3","")
+	my ($k1no,$k1,$k2no,$k2,$k3no,$k3) 
+	     =( "01",AttrVal($name,"hmKey","") 
+	       ,"02",AttrVal($name,"hmKey2","")
+	       ,"03",AttrVal($name,"hmKey3","")
 					   );	
-	HMLAN_SimpleWrite($defs{$name}, "Y01,".($k1?"01,$k1":"00,"));
-	HMLAN_SimpleWrite($defs{$name}, "Y02,".($k2?"02,$k2":"00,"));
-	HMLAN_SimpleWrite($defs{$name}, "Y03,".($k3?"03,$k3":"00,"));
+				
+	if ($k1 =~ m/:/){($k1no,$k1) = split(":",$k1);}
+	if ($k2 =~ m/:/){($k2no,$k2) = split(":",$k2);}
+	if ($k3 =~ m/:/){($k3no,$k3) = split(":",$k3);}
+	
+	HMLAN_SimpleWrite($defs{$name}, "Y01,".($k1?"$k1no,$k1":"00,"));
+	HMLAN_SimpleWrite($defs{$name}, "Y02,".($k2?"$k2no,$k2":"00,"));
+	HMLAN_SimpleWrite($defs{$name}, "Y03,".($k3?"$k3no,$k3":"00,"));
 	return $retVal;
   }
   return;
@@ -567,17 +580,24 @@ sub HMLAN_DoInit($) {##########################################################
   my $name = $hash->{NAME};
 
   my $id  = AttrVal($name, "hmId", undef);
-  my $key = AttrVal($name, "hmKey", "");        # 36(!) hex digits
-
+  my ($k1no,$k1,$k2no,$k2,$k3no,$k3) 
+	     =( "01",AttrVal($name,"hmKey","") 
+	       ,"02",AttrVal($name,"hmKey2","")
+	       ,"03",AttrVal($name,"hmKey3","")
+					   );	
+				
+  if ($k1 =~ m/:/){($k1no,$k1) = split(":",$k1);}
+  if ($k2 =~ m/:/){($k2no,$k2) = split(":",$k2);}
+  if ($k3 =~ m/:/){($k3no,$k3) = split(":",$k3);}
+  
   my $s2000 = sprintf("%02X", HMLAN_secSince2000());
   delete $hash->{READINGS}{state};
   
   HMLAN_SimpleWrite($hash, "A$id") if($id);
   HMLAN_SimpleWrite($hash, "C");
-  HMLAN_SimpleWrite($hash, "Y01,01,$key");
-  HMLAN_SimpleWrite($hash, "Y02,00,");
-  HMLAN_SimpleWrite($hash, "Y03,00,");
-  HMLAN_SimpleWrite($hash, "Y03,00,");
+  HMLAN_SimpleWrite($defs{$name}, "Y01,".($k1?"$k1no,$k1":"00,"));
+  HMLAN_SimpleWrite($defs{$name}, "Y02,".($k2?"$k2no,$k2":"00,"));
+  HMLAN_SimpleWrite($defs{$name}, "Y03,".($k3?"$k3no,$k3":"00,"));
   HMLAN_SimpleWrite($hash, "T$s2000,04,00,00000000");
   delete $hash->{helper}{ref};
 

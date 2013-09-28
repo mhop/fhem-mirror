@@ -64,7 +64,6 @@ sub CUL_HM_respPendToutProlong($);
 sub CUL_HM_PushCmdStack($$);
 sub CUL_HM_ProcessCmdStack($);
 sub CUL_HM_pushConfig($$$$$$$$@);
-sub CUL_HM_Resend($);
 sub CUL_HM_ID2PeerList ($$$);
 sub CUL_HM_peerChId($$$);
 sub CUL_HM_peerChName($$$);
@@ -328,6 +327,7 @@ sub CUL_HM_Define($$) {##############################
   else{# define a device
     $hash->{helper}{role}{dev}=1;
     $hash->{helper}{role}{chn}=1;# take role of chn 01 until it is defined
+	CUL_HM_prtInit ($hash);
     AssignIoPort($hash);
   }
   $modules{CUL_HM}{defptr}{$HMid} = $hash;
@@ -831,7 +831,7 @@ sub CUL_HM_Parse($$) {##############################
   } 
   elsif($md eq "HM-CC-RT-DN") { ###############################################
     my %ctlTbl=( 0=>"auto", 1=>"manu", 2=>"party",3=>"boost");
-    if($mTp eq "10" && $p =~ m/^0A(....)(..)(..)(..)/) {#info-level
+    if   ($mTp eq "10" && $p =~ m/^0A(....)(..)(..)(..)/) {#info-level
       my ($chn,$setTemp,$actTemp,$err,$bat,$vp,$ctrlMode) = 
 	      ("04",hex($1),hex($1),hex($2),hex($2),hex($3), hex($4));
 	  $setTemp    =(($setTemp    >>10) & 0x3f )/2;
@@ -851,6 +851,10 @@ sub CUL_HM_Parse($$) {##############################
                   ,3=>"adjustRangeTooSmall" , 4=>"communicationERR"         
                   ,5=>"unknown" , 6=>"lowBat" , 7=>"ValveErrorPosition" );
 
+     "measured-temp:$actTemp";
+     "desired-temp:$setTemp";
+	 "ValvePosition:$vp %";
+
       push @event, "motorErr:$errTbl{$err}";
       push @event, "measured-temp:$actTemp";
       push @event, "desired-temp:$setTemp";
@@ -862,6 +866,9 @@ sub CUL_HM_Parse($$) {##############################
       push @entities,CUL_HM_UpdtReadBulk($dHash,1
 	                                        ,"battery:".($err&0x80?"low":"ok")
 	                                        ,"batteryLevel:$bat V"
+                                            ,"measured-temp:$actTemp" # values to please HCS
+                                            ,"desired-temp:$setTemp"
+	                                        ,"actuator:$vp %"
 											);
     }
     elsif($mTp eq "59" && $p =~ m/^(..)/) {#inform team about new value
@@ -1319,7 +1326,7 @@ sub CUL_HM_Parse($$) {##############################
 	  #C7: tone off
 	  #01: no alarm
 	  my ($No,$state) = (substr($p,2,2),substr($p,4,2));
-	  if(($dhash && $dname ne $name) && # update source(ID is reported in $dst...)
+	  if(($dhash && $dname ne $name) && # update source(ID reported in $dst)
 	     (!$dhash->{helper}{alarmNo} || $dhash->{helper}{alarmNo} ne $No)){
 		$dhash->{helper}{alarmNo} = $No;
 		push @entities,
@@ -1518,8 +1525,8 @@ sub CUL_HM_Parse($$) {##############################
 	                     sprintf("%02X",$vp*2)."0000";
 	}
 	elsif($mTp eq "02"){
-	  if ($dhash->{helper}{respWait}{mNo}             && 
-	      $dhash->{helper}{respWait}{mNo} eq $mNo ){
+	  if ($dhash->{helper}{prt}{rspWait}{mNo}             && 
+	      $dhash->{helper}{prt}{rspWait}{mNo} eq $mNo ){
 	    #ack we waited for - stop Waiting
 	    CUL_HM_respPendRm($dhash);
 	  } 
@@ -1575,8 +1582,8 @@ sub CUL_HM_parseCommon(@){#####################################################
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
   return "" if(!$shash->{DEF});# this should be from ourself 
   my $ret = "";
-  my $pendType = $shash->{helper}{respWait}{Pending}? 
-                           $shash->{helper}{respWait}{Pending}:"";
+  my $pendType = $shash->{helper}{prt}{rspWait}{Pending}? 
+                           $shash->{helper}{prt}{rspWait}{Pending}:"";
   #------------ parse message flag for start processing command Stack
   # TC wakes up with 8270, not with A258
   # VD wakes up with 8202 
@@ -1596,13 +1603,16 @@ sub CUL_HM_parseCommon(@){#####################################################
 	my $reply;
 	my $success;
 
-	if ($shash->{helper}{respWait}{wakeup}){
-	  if ($shash->{helper}{respWait}{mNo} eq $mNo &&
+	if ($shash->{helper}{prt}{rspWait}{wakeup}){
+	  if ($shash->{helper}{prt}{rspWait}{mNo} eq $mNo &&
 		  $subType eq "00"		){
 		$shash->{protCondBurst} = "on";
+		$shash->{helper}{prt}{awake}=2;#awake
 	  }
 	  else{
+	  
 		$shash->{protCondBurst} = "off";
+		$shash->{helper}{prt}{awake}=3;#reject
 		return "done";
 	  }
 	}
@@ -1622,8 +1632,8 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  $reply = "ACKStatus"; 
 	  if ($shash->{helper}{tmdOn}){
 		if (not hex(substr($p,6,2))&0x40){# not timedOn, we have to repeat
-          my ($pre,$nbr,$msg) = unpack 'A4A2A*',$shash->{helper}{respWait}{cmd};
-          $shash->{helper}{respWait}{cmd} = sprintf("%s%02X%s",
+          my ($pre,$nbr,$msg) = unpack 'A4A2A*',$shash->{helper}{prt}{rspWait}{cmd};
+          $shash->{helper}{prt}{rspWait}{cmd} = sprintf("%s%02X%s",
 		                                            $pre,hex($nbr)+1,$msg);
 	      CUL_HM_eventP($shash,"TimedOn");
 	      $success = "no";
@@ -1653,7 +1663,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   }
   elsif($mTp eq "00"){######################################
     if ($pendType eq "PairSerial"){
-	  if($shash->{helper}{respWait}{forChn} = substr($p,6,20)){
+	  if($shash->{helper}{prt}{rspWait}{forChn} = substr($p,6,20)){
 	    CUL_HM_respPendRm($shash);
 	  }
 	} 
@@ -1673,7 +1683,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 	}
 	elsif($subType eq "01"){ #storePeerList#################
 	  if ($pendType eq "PeerList"){
-		my $chn = $shash->{helper}{respWait}{forChn};
+		my $chn = $shash->{helper}{prt}{rspWait}{forChn};
 		my $chnhash = $modules{CUL_HM}{defptr}{$src.$chn}; 
 		$chnhash = $shash if (!$chnhash);
 	    my $chnNname = $chnhash->{NAME};
@@ -1711,12 +1721,12 @@ sub CUL_HM_parseCommon(@){#####################################################
 	}
 	elsif($subType eq "02" ||$subType eq "03"){ #ParamResp==================
 	  if ($pendType eq "RegisterRead"){
-		my $chnSrc = $src.$shash->{helper}{respWait}{forChn};
+		my $chnSrc = $src.$shash->{helper}{prt}{rspWait}{forChn};
 		my $chnHash = $modules{CUL_HM}{defptr}{$chnSrc}; 
 		$chnHash = $shash if (!$chnHash);
 		my $chnName = $chnHash->{NAME};
 		my ($format,$data) = ($1,$2) if ($p =~ m/^(..)(.*)/);
-		my $list = $shash->{helper}{respWait}{forList};
+		my $list = $shash->{helper}{prt}{rspWait}{forList};
 		$list = "00" if (!$list); #use the default
 		if ($format eq "02"){ # list 2: format aa:dd aa:dd ...
 		  $data =~ s/(..)(..)/ $1:$2/g;
@@ -1737,7 +1747,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 		  }
 		}
 
-		my $peer = $shash->{helper}{respWait}{forPeer};
+		my $peer = $shash->{helper}{prt}{rspWait}{forPeer};
 		my $regLNp = "RegL_$list:$peer";# pure, no expert
 		my $regLN = ((CUL_HM_getAttrInt($chnName,"expert") == 2)?"":".").$regLNp;
 		readingsSingleUpdate($chnHash,$regLN,
@@ -1801,7 +1811,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  @{$modules{CUL_HM}{helper}{reqStatus}} = grep { $_ ne $shash->{NAME} }
                                        @{$modules{CUL_HM}{helper}{reqStatus}};
       if ($pendType eq "StatusReq"){#it is the answer to our request
-		my $chnSrc = $src.$shash->{helper}{respWait}{forChn};
+		my $chnSrc = $src.$shash->{helper}{prt}{rspWait}{forChn};
 		my $chnhash = $modules{CUL_HM}{defptr}{$chnSrc}; 
 		$chnhash = $shash if (!$chnhash);
 		CUL_HM_respPendRm($shash);
@@ -1848,8 +1858,8 @@ sub CUL_HM_parseCommon(@){#####################################################
 #	CUL_HM_ProcessCmdStack($shash);
   }
 
-  if ($shash->{helper}{respWait}{mNo}             && 
-	  $shash->{helper}{respWait}{mNo} eq $mNo     &&
+  if ($shash->{helper}{prt}{rspWait}{mNo}             && 
+	  $shash->{helper}{prt}{rspWait}{mNo} eq $mNo     &&
 	  !$repeat){
 	#response we waited for - stop Waiting
 	CUL_HM_respPendRm($shash);
@@ -3122,9 +3132,10 @@ sub CUL_HM_Set($@) {
   }
   elsif(($rxType & 0x80)                   &&  #burstConditional - have a try
         $devHash->{cmdStack}               && 
-		!$devHash->{helper}{respWait}{cmd} && 
-        !$devHash->{helper}{respWait}{Pending}
+		!$devHash->{helper}{prt}{rspWait}{cmd}
 		){
+#	Log 1,"General !!!!!! wakeup but stack processing $name" if($devHash->{helper}{prt}{sProc});
+	$hash->{helper}{prt}{awake}=1;# start wakeup
     CUL_HM_SndCmd($devHash,"++B112$id$dst");
   }
   return ("",1);# no not generate trigger outof command
@@ -3288,6 +3299,208 @@ sub CUL_HM_getConfig($$$$$){
 }
 
 #+++++++++++++++++ Protocol stack, sending, repeat+++++++++++++++++++++++++++++
+sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
+  my ($hash,$src,$dst,$chn,$peerAddr,$peerChn,$list,$content,$prep) = @_;
+  my $flag = CUL_HM_getFlag($hash);
+  my $tl = length($content);
+
+  $chn     = sprintf("%02X",$chn);
+  $peerChn = sprintf("%02X",$peerChn);
+  $list    = sprintf("%02X",$list);
+
+  # --store pending changes in shadow to handle bit manipulations cululativ--
+  $peerAddr = "000000" if(!$peerAddr);
+  my $peerN = ($peerAddr ne "000000")?CUL_HM_peerChName($peerAddr.$peerChn,$dst,""):"";
+  $peerN =~ s/broadcast//;
+  $peerN =~ s/ /_/g;#remote blanks
+  my $regLN = ((CUL_HM_getAttrInt($hash->{NAME},"expert") == 2)?"":".").
+              "RegL_".$list.":".$peerN;
+  #--- copy data from readings to shadow
+  my $chnhash = $modules{CUL_HM}{defptr}{$dst.$chn};
+  $chnhash = $hash if (!$chnhash);
+  if (!$chnhash->{helper}{shadowReg} ||
+      !$chnhash->{helper}{shadowReg}{$regLN}){
+	$chnhash->{helper}{shadowReg}{$regLN} = 
+	           ReadingsVal($chnhash->{NAME},$regLN,"");
+  }
+  #--- update with ne value
+  my $regs = $chnhash->{helper}{shadowReg}{$regLN};
+  for(my $l = 0; $l < $tl; $l+=4) { #substitute changed bytes in shadow
+    my $addr = substr($content,$l,2);
+    my $data = substr($content,$l+2,2);
+    if(!$regs || !($regs =~ s/$addr:../$addr:$data/)){
+      $regs .= " ".$addr.":".$data;
+    }
+  }
+  $chnhash->{helper}{shadowReg}{$regLN} = $regs;
+  return if ($prep);#prepare shadowReg only. More data to come. 
+                    #Application takes care about execution
+  CUL_HM_updtRegDisp($hash,$list,$peerAddr.$peerChn);
+  CUL_HM_PushCmdStack($hash, "++".$flag.'01'.$src.$dst.$chn.'05'.
+                                        $peerAddr.$peerChn.$list);
+  for(my $l = 0; $l < $tl; $l+=28) {
+    my $ml = $tl-$l < 28 ? $tl-$l : 28;
+    CUL_HM_PushCmdStack($hash, "++A001".$src.$dst.$chn."08".
+	                                 substr($content,$l,$ml));
+  }
+  CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$chn."06");
+  CUL_HM_queueAutoRead($hash->{NAME}) 
+        if (2 < CUL_HM_getAttrInt($hash->{NAME},"autoReadReg"));  
+}
+sub CUL_HM_PushCmdStack($$) {
+  my ($chnhash, $cmd) = @_;
+  my @arr = ();
+  my $hash = CUL_HM_getDeviceHash($chnhash);
+  my $name = $hash->{NAME};
+  if(!$hash->{cmdStack}){
+    $hash->{cmdStack} = \@arr;
+	delete ($hash->{helper}{burstEvtCnt}) if (!$hash->{helper}{prt}{rspWait});
+  }
+  push(@{$hash->{cmdStack}}, $cmd);
+  my $entries = scalar @{$hash->{cmdStack}};
+  $hash->{protCmdPend} = $entries." CMDs_pending";
+  CUL_HM_protState($hash,"CMDs_pending") if(!$hash->{helper}{prt}{rspWait}{cmd});
+}
+sub CUL_HM_ProcessCmdStack($) {
+  my ($chnhash) = @_;
+  my $hash = CUL_HM_getDeviceHash($chnhash);
+#  Log 1,"General proc starting $hash->{NAME}" if($hash->{cmdStack} && !$hash->{helper}{prt}{sProc});
+#  Log 1,"General proc ERROR $hash->{NAME}" if($hash->{helper}{prt}{rspWait}{cmd} && !$hash->{helper}{prt}{sProc});
+  # General need to add wakeup here. Only one wakeup per stack processing! 
+  
+  if($hash->{cmdStack} && !$hash->{helper}{prt}{rspWait}{cmd}){
+    if(@{$hash->{cmdStack}}) {
+#      Log 1,"General proc send $hash->{NAME}";
+      CUL_HM_SndCmd($hash, shift @{$hash->{cmdStack}});
+    }
+    elsif(!@{$hash->{cmdStack}}) {
+      delete($hash->{cmdStack});
+      delete($hash->{protCmdPend}); 
+	  #-- update info ---
+	  CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{burstEvtCnt}? 
+	                            ("_events:".$hash->{helper}{burstEvtCnt}):""));
+    }
+  }
+  return;
+}
+
+sub CUL_HM_prtInit ($){ #setup protocol variables after define
+  my ($hash)=@_;
+  $hash->{helper}{prt}{sProc} = 0; # stack not being processed by now
+}
+sub CUL_HM_respWaitSu ($@){ #setup response for multi-message response
+  # single commands
+  # cmd: single msg that needs to be ACKed
+  # mNo: number of message (needs to be in ACK)
+  # mNoWu: number of message if wakeup 
+  # reSent: number of resends already done - usually init with 1
+  # wakeup: was wakeup message (burst devices)
+  #
+  # commands with multi-message answer
+  # PendCmd: command message
+  # Pending: type of answer we are awaiting
+  # forChn:  which channel are we working on?
+  # forList: which list are we waiting for? (optional)
+  # forPeer: which peer are we waiting for? (optional)
+  my ($hash,@a)=@_;
+  my $mHsh = $hash->{helper}{prt};
+  $modules{CUL_HM}{prot}{rspPend}++ if(!$mHsh->{rspWait}{cmd});
+  foreach (@a){
+	my ($f,$d)=split ":",$_;
+	$mHsh->{rspWait}{$f}=$d;
+  }
+  my $to = gettimeofday() + (($mHsh->{rspWait}{Pending})?rand(20)/10+4:
+				                                         rand(40)/10+1);
+  InternalTimer($to,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);                       
+ }
+sub CUL_HM_responseSetup($$) {#store all we need to handle the response
+ #setup repeatTimer and cmdStackControll
+  my ($hash,$cmd) =  @_;
+  my ($mNo,$mFlg,$mTp,$dst,$p) = ($2,hex($3),$4,$6,$7)
+      if ($cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/);
+  my ($chn,$subType) = ($1,$2) if($p =~ m/^(..)(..)/); 
+#  my $rTo = rand(20)/10+4; #default response timeout
+  if (($mFlg & 0x20) && ($dst ne '000000')){
+    if   ($mTp eq "01" && $subType){ 
+      if   ($subType eq "03"){ #PeerList-----------
+    	#--- remember request params in device level
+		CUL_HM_respWaitSu ($hash,"Pending:PeerList"
+		                        ,"cmd:$cmd" ,"forChn:".substr($p,0,2)
+								,"reSent:1");
+								
+    	#--- remove readings in channel
+    	my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"}; 
+    	$chnhash = $hash if (!$chnhash);
+    	delete $chnhash->{READINGS}{peerList};#empty old list
+    	delete $chnhash->{peerList};#empty old list
+	    delete $chnhash->{helper}{peerIDsRaw};
+	    $attr{$chnhash->{NAME}}{peerIDs} = '';
+	    return;
+      }
+      elsif($subType eq "04"){ #RegisterRead-------
+        my ($peer, $list) = ($1,$2) if ($p =~ m/..04(........)(..)/);
+	    $peer = ($peer ne "00000000")?CUL_HM_peerChName($peer,$dst,""):"";
+	    #--- set messaging items
+		CUL_HM_respWaitSu ($hash,"Pending:RegisterRead"
+		                        ,"cmd:$cmd" ,"forChn:$chn"
+								,"forList:$list","forPeer:$peer"
+								,"reSent:1");
+	    #--- remove channel entries that will be replaced
+        my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
+        $chnhash = $hash if(!$chnhash);   
+    
+	    $peer ="" if($list !~ m/^0[34]$/);
+	    #empty val since reading will be cumulative 
+	    my $rlName = ((CUL_HM_getAttrInt($chnhash->{NAME},"expert") == 2)?"":".")."RegL_".$list.":".$peer;
+        $chnhash->{READINGS}{$rlName}{VAL}=""; 
+        delete ($chnhash->{READINGS}{$rlName}{TIME}); 
+	    return;
+      }
+#      elsif($subType eq "0A"){ #Pair Serial----------
+# 	   #--- set messaging items
+# 	   $hash->{helper}{prt}{rspWait}{Pending} = "PairSerial";
+#    	  $hash->{helper}{prt}{rspWait}{cmd} = $cmd;
+# 	   $hash->{helper}{prt}{rspWait}{forChn} = substr($p,4,20);
+#        
+#        # define timeout - holdup cmdStack until response complete or timeout
+# 	   InternalTimer(gettimeofday()+$rTo, "CUL_HM_respPendTout", "respPend:$dst", 0);
+# 	   return;
+#      }
+    }
+    elsif($mTp eq '11' && $chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
+      CUL_HM_qStateUpdatIfEnab($dst);
+    }
+	elsif($mTp eq '12' && $mFlg & 0x10){#wakeup with burst
+	  # response setup - do not repeat, set counter to 250
+	  CUL_HM_respWaitSu ($hash,"cmd:$cmd","mNo:$mNo","reSent:250","wakeup:1");
+	  return;
+	}
+
+	if ($mTp eq "11" && $p =~ m/02..(..)....(....)/){#lvl ne 0 and timer on
+	  $hash->{helper}{tmdOn} = $2 if ($1 ne "00" && $2 !~ m/(0000|FFFF)/);
+	}
+  
+	CUL_HM_respWaitSu ($hash,"cmd:$cmd","mNo:$mNo","reSent:1");
+	CUL_HM_protState($hash,"CMDs_processing...");                         
+  }
+  else{# no answer expected
+	if($hash->{cmdStack} && scalar @{$hash->{cmdStack}}){
+	  CUL_HM_protState($hash,"CMDs_processing..."); 
+      InternalTimer(gettimeofday()+.5, "CUL_HM_ProcessCmdStack", $hash, 0);
+	}
+	else{
+      CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{burstEvtCnt}? 
+	                            ("_events:".$hash->{helper}{burstEvtCnt}):""));
+	}
+  }
+  if($hash->{cmdStack} && scalar @{$hash->{cmdStack}}){
+    $hash->{protCmdPend} = scalar @{$hash->{cmdStack}}." CMDs pending";
+  }
+  else{
+    delete($hash->{protCmdPend});
+  }
+}
+
 sub CUL_HM_sndIfOpen($) {
   my(undef,$io) = split(':',$_[0]);
   RemoveInternalTimer("sndIfOpen:$io");# should not be necessary, but
@@ -3383,103 +3596,58 @@ sub CUL_HM_SndCmd($$) {
   $cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/;
   CUL_HM_DumpProtocol("SND", $io, ($1,$2,$3,$4,$5,$6,$7));
 }
-sub CUL_HM_respWaitSu ($@){ #setup response for multi-message response
-  my ($hash,@a)=@_;
-#  my $hashW = $hash->{helper}{respWait};
-  $modules{CUL_HM}{prot}{rspPend}++ if(!$hash->{helper}{respWait}{PendCmd} && 
-                                       !$hash->{helper}{respWait}{cmd});
-  foreach (@a){
-	my ($f,$d)=split ":",$_;
-	$hash->{helper}{respWait}{$f}=$d;
-  }
-  if ($hash->{helper}{respWait}{cmd}){InternalTimer(gettimeofday()+rand(40)/10+1,"CUL_HM_Resend"      , $hash, 0);}
-  else{                               InternalTimer(gettimeofday()+rand(20)/10+4,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);}
-}
-sub CUL_HM_responseSetup($$) {#store all we need to handle the response
- #setup repeatTimer and cmdStackControll
-  my ($hash,$cmd) =  @_;
-  my ($mNo,$mFlg,$mTp,$dst,$p) = ($2,hex($3),$4,$6,$7)
-      if ($cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/);
-  my ($chn,$subType) = ($1,$2) if($p =~ m/^(..)(..)/); 
-#  my $rTo = rand(20)/10+4; #default response timeout
-  if (($mFlg & 0x20) && ($dst ne '000000')){
-    if   ($mTp eq "01" && $subType){ 
-      if   ($subType eq "03"){ #PeerList-----------
-    	#--- remember request params in device level
-		CUL_HM_respWaitSu ($hash,"Pending:PeerList"
-		                        ,"PendCmd:$cmd" ,"forChn:".substr($p,0,2));
-								
-    	#--- remove readings in channel
-    	my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"}; 
-    	$chnhash = $hash if (!$chnhash);
-    	delete $chnhash->{READINGS}{peerList};#empty old list
-    	delete $chnhash->{peerList};#empty old list
-	    delete $chnhash->{helper}{peerIDsRaw};
-	    $attr{$chnhash->{NAME}}{peerIDs} = '';
-	    return;
-      }
-      elsif($subType eq "04"){ #RegisterRead-------
-        my ($peer, $list) = ($1,$2) if ($p =~ m/..04(........)(..)/);
-	    $peer = ($peer ne "00000000")?CUL_HM_peerChName($peer,$dst,""):"";
-	    #--- set messaging items
-		CUL_HM_respWaitSu ($hash,"Pending:RegisterRead"
-		                        ,"PendCmd:$cmd" ,"forChn:$chn"
-								,"forList:$list","forPeer:$peer");
-	    #--- remove channel entries that will be replaced
-        my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
-        $chnhash = $hash if(!$chnhash);   
-    
-	    $peer ="" if($list !~ m/^0[34]$/);
-	    #empty val since reading will be cumulative 
-	    my $rlName = ((CUL_HM_getAttrInt($chnhash->{NAME},"expert") == 2)?"":".")."RegL_".$list.":".$peer;
-        $chnhash->{READINGS}{$rlName}{VAL}=""; 
-        delete ($chnhash->{READINGS}{$rlName}{TIME}); 
-	    return;
-      }
-#      elsif($subType eq "0A"){ #Pair Serial----------
-# 	   #--- set messaging items
-# 	   $hash->{helper}{respWait}{Pending} = "PairSerial";
-#    	  $hash->{helper}{respWait}{PendCmd} = $cmd;
-# 	   $hash->{helper}{respWait}{forChn} = substr($p,4,20);
-#        
-#        # define timeout - holdup cmdStack until response complete or timeout
-# 	   InternalTimer(gettimeofday()+$rTo, "CUL_HM_respPendTout", "respPend:$dst", 0);
-# 	   return;
-#      }
-    }
-    elsif($mTp eq '11' && $chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
-      CUL_HM_qStateUpdatIfEnab($dst);
-    }
-	elsif($mTp eq '12' && $mFlg & 0x10){#wakeup with burst
-	  # response setup - do not repeat, set counter to 250
-	  CUL_HM_respWaitSu ($hash,"cmd:$cmd","mNo:$mNo","reSent:250","wakeup:1");
-	  return;
-	}
 
-	if ($mTp eq "11" && $p =~ m/02..(..)....(....)/){#lvl ne 0 and timer on
-	  $hash->{helper}{tmdOn} = $2 if ($1 ne "00" && $2 !~ m/(0000|FFFF)/);
-	}
+sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
+  my ($hash) =  @_;  
+  $modules{CUL_HM}{prot}{rspPend}-- if($hash->{helper}{prt}{rspWait}{cmd});
+  delete ($hash->{helper}{prt}{rspWait});
+  delete $hash->{helper}{tmdOn};
+  RemoveInternalTimer($hash);                  # remove resend-timer
+  RemoveInternalTimer("respPend:$hash->{DEF}");# remove responsePending timer
+  $respRemoved = 1;
+}
+sub CUL_HM_respPendTout($) {
+  my ($HMid) =  @_; 
+  (undef,$HMid) = split(":",$HMid,2); 
+  my $hash = $modules{CUL_HM}{defptr}{$HMid}; 
+  my $pHash = $hash->{helper}{prt};#shortcut
   
-	CUL_HM_respWaitSu ($hash,"cmd:$cmd","mNo:$mNo","reSent:1");
-	CUL_HM_protState($hash,"CMDs_processing...");                         
-  }
-  else{# no answer expected
-	if($hash->{cmdStack} && scalar @{$hash->{cmdStack}}){
-	  CUL_HM_protState($hash,"CMDs_processing..."); 
-      InternalTimer(gettimeofday()+.5, "CUL_HM_ProcessCmdStack", $hash, 0);
+  if ($hash && $hash->{DEF} ne '000000'){
+    my $name = $hash->{NAME};
+    $pHash->{awake} = 0 if (defined $pHash->{awake});# set to asleep
+    return if(!$pHash->{rspWait}{reSent});      # Double timer?
+	
+	if ($pHash->{rspWait}{reSent} > AttrVal($hash->{NAME},"msgRepeat",3)
+	     &&(  ((CUL_HM_getRxType($hash) & 0x03) != 0)#to slow for wakeup/config
+		    ||($hash->{protCondBurst}&&$hash->{protCondBurst} eq "on" ))){
+	  if ($pHash->{rspWait}{wakeup}){	    
+	    CUL_HM_respPendRm($hash);# do not count problems with wakeup try, just wait
+	    $hash->{protCondBurst} = "off";
+	  }
+      else{
+        my $pendCmd = ($pHash->{rspWait}{Pending}
+							            ?"RESPONSE TIMEOUT:".$pHash->{rspWait}{Pending}
+										:"MISSING ACK");# save before remove
+        CUL_HM_eventP($hash,"ResndFail");
+	    readingsSingleUpdate($hash,"state",$pendCmd,1);
+	    CUL_HM_ProcessCmdStack($hash); # continue processing commands if any
+	  }
 	}
 	else{
-      CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{burstEvtCnt}? 
-	                            ("_events:".$hash->{helper}{burstEvtCnt}):""));
+	  CUL_HM_eventP($hash,"Resnd");
+      IOWrite($hash, "", $pHash->{rspWait}{cmd});
+      $pHash->{rspWait}{reSent}++;
+      Log GetLogLevel($name,4),"CUL_HM_Resend: ".$name. " nr ".$pHash->{rspWait}{reSent};
+	  InternalTimer(gettimeofday()+rand(20)/10+4,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);
 	}
   }
-  if($hash->{cmdStack} && scalar @{$hash->{cmdStack}}){
-    $hash->{protCmdPend} = scalar @{$hash->{cmdStack}}." CMDs pending";
-  }
-  else{
-    delete($hash->{protCmdPend});
-  }
 }
+sub CUL_HM_respPendToutProlong($) {#used when device sends part responses
+  my ($hash) =  @_;  
+  RemoveInternalTimer("respPend:$hash->{DEF}");
+  InternalTimer(gettimeofday()+1, "CUL_HM_respPendTout", "respPend:$hash->{DEF}", 0);
+}
+
 sub CUL_HM_eventP($$) {#handle protocol events
   # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
   # additional variables are protCmdDel,protCmdPend,protState,protLastRcv
@@ -3519,153 +3687,17 @@ sub CUL_HM_protState($$){
   Log GetLogLevel($name,6),"CUL_HM $name protEvent:$state".
             ($hash->{cmdStack}?" pending:".scalar @{$hash->{cmdStack}}:"");
 
-  DoTrigger($name, undef) if ($state =~ m/^CMDs_done/);
-}
-sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
-  my ($hash) =  @_;  
-  $modules{CUL_HM}{prot}{rspPend}-- if(  $hash->{helper}{respWait}{cmd} 
-	                                   ||$hash->{helper}{respWait}{PendCmd});
-  delete ($hash->{helper}{respWait});
-  delete $hash->{helper}{tmdOn};
-  RemoveInternalTimer($hash);                  # remove resend-timer
-  RemoveInternalTimer("respPend:$hash->{DEF}");# remove responsePending timer
-  $respRemoved = 1;
-}
-sub CUL_HM_respPendTout($) {
-  my ($HMid) =  @_;  
-  $HMid =~ s/.*://; #remove timer identifier
-  my $hash = $modules{CUL_HM}{defptr}{$HMid};
-  if ($hash && $hash->{DEF} ne '000000'){
-	my $pendCmd = $hash->{helper}{respWait}{Pending};# secure before remove
-
-    my $pendRsndCnt = $hash->{helper}{respWait}{PendingRsend};
-	$pendRsndCnt = 1 if (!$pendRsndCnt);          #already one send done
-	if ($pendRsndCnt < 5 &&                       # some retries
-	    ((CUL_HM_getRxType($hash) & 0x03) != 0 || # to slow for wakeup/config
-		 ($hash->{protCondBurst}&&$hash->{protCondBurst} eq "on" ))){
-      my $name = $hash->{NAME};
-      Log GetLogLevel($name,4),"CUL_HM_Resend: ".$name. " nr ".$pendRsndCnt;
-	  $hash->{helper}{respWait}{PendingRsend} = $pendRsndCnt + 1;
-      CUL_HM_SndCmd($hash,substr($hash->{helper}{respWait}{PendCmd},4));
-	  CUL_HM_eventP($hash,"Resnd");
-	}
-	else{
-      CUL_HM_eventP($hash,"ResndFail");
-	  CUL_HM_ProcessCmdStack($hash); # continue processing commands
-	  readingsSingleUpdate($hash,"state","RESPONSE TIMEOUT:".$pendCmd,1);
-	}
-  }
-}
-sub CUL_HM_respPendToutProlong($) {#used when device sends part responses
-  my ($hash) =  @_;  
-  RemoveInternalTimer("respPend:$hash->{DEF}");
-  InternalTimer(gettimeofday()+1, "CUL_HM_respPendTout", "respPend:$hash->{DEF}", 0);
-}
-sub CUL_HM_PushCmdStack($$) {
-  my ($chnhash, $cmd) = @_;
-  my @arr = ();
-  my $hash = CUL_HM_getDeviceHash($chnhash);
-  my $name = $hash->{NAME};
-  if(!$hash->{cmdStack}){
-    $hash->{cmdStack} = \@arr;
-	delete ($hash->{helper}{burstEvtCnt}) if (!$hash->{helper}{respWait});
-  }
-  push(@{$hash->{cmdStack}}, $cmd);
-  my $entries = scalar @{$hash->{cmdStack}};
-  $hash->{protCmdPend} = $entries." CMDs_pending";
-  CUL_HM_protState($hash,"CMDs_pending")
-        if (!$hash->{helper}{respWait}{cmd} && 
-            !$hash->{helper}{respWait}{Pending});
-}
-sub CUL_HM_ProcessCmdStack($) {
-  my ($chnhash) = @_;
-  my $hash = CUL_HM_getDeviceHash($chnhash);
-  if($hash->{cmdStack} && !$hash->{helper}{respWait}{cmd} && 
-                          !$hash->{helper}{respWait}{Pending}){
-    if(@{$hash->{cmdStack}}) {
-      CUL_HM_SndCmd($hash, shift @{$hash->{cmdStack}});
-    }
-    elsif(!@{$hash->{cmdStack}}) {
-      delete($hash->{cmdStack});
-      delete($hash->{protCmdPend}); 
-	  #-- update info ---
-	  CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{burstEvtCnt}? 
-	                            ("_events:".$hash->{helper}{burstEvtCnt}):""));
-    }
-  }
-  return;
-}
-sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
-  my ($hash,$src,$dst,$chn,$peerAddr,$peerChn,$list,$content,$prep) = @_;
-  my $flag = CUL_HM_getFlag($hash);
-  my $tl = length($content);
-
-  $chn     = sprintf("%02X",$chn);
-  $peerChn = sprintf("%02X",$peerChn);
-  $list    = sprintf("%02X",$list);
-
-  # --store pending changes in shadow to handle bit manipulations cululativ--
-  $peerAddr = "000000" if(!$peerAddr);
-  my $peerN = ($peerAddr ne "000000")?CUL_HM_peerChName($peerAddr.$peerChn,$dst,""):"";
-  $peerN =~ s/broadcast//;
-  $peerN =~ s/ /_/g;#remote blanks
-  my $regLN = ((CUL_HM_getAttrInt($hash->{NAME},"expert") == 2)?"":".").
-              "RegL_".$list.":".$peerN;
-  #--- copy data from readings to shadow
-  my $chnhash = $modules{CUL_HM}{defptr}{$dst.$chn};
-  $chnhash = $hash if (!$chnhash);
-  if (!$chnhash->{helper}{shadowReg} ||
-      !$chnhash->{helper}{shadowReg}{$regLN}){
-	$chnhash->{helper}{shadowReg}{$regLN} = 
-	           ReadingsVal($chnhash->{NAME},$regLN,"");
-  }
-  #--- update with ne value
-  my $regs = $chnhash->{helper}{shadowReg}{$regLN};
-  for(my $l = 0; $l < $tl; $l+=4) { #substitute changed bytes in shadow
-    my $addr = substr($content,$l,2);
-    my $data = substr($content,$l+2,2);
-    if(!$regs || !($regs =~ s/$addr:../$addr:$data/)){
-      $regs .= " ".$addr.":".$data;
-    }
-  }
-  $chnhash->{helper}{shadowReg}{$regLN} = $regs;
-  return if ($prep);#prepare shadowReg only. More data to come. 
-                    #Application takes care about execution
-  CUL_HM_updtRegDisp($hash,$list,$peerAddr.$peerChn);
-  CUL_HM_PushCmdStack($hash, "++".$flag.'01'.$src.$dst.$chn.'05'.
-                                        $peerAddr.$peerChn.$list);
-  for(my $l = 0; $l < $tl; $l+=28) {
-    my $ml = $tl-$l < 28 ? $tl-$l : 28;
-    CUL_HM_PushCmdStack($hash, "++A001".$src.$dst.$chn."08".
-	                                 substr($content,$l,$ml));
-  }
-  CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$chn."06");
-  CUL_HM_queueAutoRead($hash->{NAME}) 
-        if (2 < CUL_HM_getAttrInt($hash->{NAME},"autoReadReg"));  
-}
-sub CUL_HM_Resend($) {#resend a message if there is no answer
-  my $hash = shift;
-  my $name = $hash->{NAME};
-  return if(!$hash->{helper}{respWait}{reSent});      # Double timer?
-  my $rep = AttrVal($name,"msgRepeat",3);
-  if($hash->{helper}{respWait}{reSent} > $rep) {
-    if (!$hash->{helper}{respWait}{wakeup}){
-  	  CUL_HM_eventP($hash,"ResndFail");
-	  readingsSingleUpdate($hash,"state","MISSING ACK",1);
-	  CUL_HM_ProcessCmdStack($hash); # continue processing commands if any
-	}
-	else{# do not count problems with wakeup try, just wait
-	  CUL_HM_respPendRm($hash);
-	  $hash->{protCondBurst} = "off";
-	}
-  }
-  else {
-  	CUL_HM_eventP($hash,"Resnd");
-    IOWrite($hash, "", $hash->{helper}{respWait}{cmd});
-    $hash->{helper}{respWait}{reSent}++;
-    Log GetLogLevel($name,4),"CUL_HM_Resend: ".$name. " nr ".$hash->{helper}{respWait}{reSent};
-    InternalTimer(gettimeofday()+rand(40)/10+1, "CUL_HM_Resend", $hash, 0);#2fast?HMLAN wants 2 sec
-  }
+  if ($state =~ m/^CMDs_done/){   DoTrigger($name, undef);
+	                              $hash->{helper}{prt}{sProc} = 0;
+						  		  $hash->{helper}{prt}{awake} = 0 if (defined$hash->{helper}{prt}{awake}); # asleep
+#	                              Log 1,"General StackFinished $hash->{NAME}";
+                                  }
+  elsif($state =~ m/processing/){ $hash->{helper}{prt}{sProc} = 1;
+#	                              Log 1,"General StackProces $hash->{NAME}";
+								  }
+  elsif($state eq "Info_Cleared"){$hash->{helper}{prt}{sProc} = 0;
+#	                              Log 1,"General StackCleared $hash->{NAME}";
+                                  }
 }
 
 ###################-----------helper and shortcuts--------#####################
@@ -3693,6 +3725,7 @@ sub CUL_HM_ID2PeerList ($$$) {
   }
   $attr{$name}{peerIDs} = $peerIDs;                 # make it public
   if ($peerNames){
+    $peerNames =~ s/_chn:01//g; # channel 01 is part of device
     readingsSingleUpdate($hash,"peerList",$peerNames,0) ;
     $hash->{peerList} = $peerNames;
   }
