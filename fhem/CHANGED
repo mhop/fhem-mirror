@@ -1,5 +1,5 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
-  - feature: new module 55_PIFACE.pm added (betateilchen
+  - feature: new module 55_PIFACE.pm added (betateilchen)
   - feature: Calendar can read from file and limit number of calendar events
              retrieved in get command
   - feature: new module 70_ENIGMA2.pm added (by loredo)
