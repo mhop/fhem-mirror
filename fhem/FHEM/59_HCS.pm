@@ -443,15 +443,15 @@ HCS_getValues($$) {
     my $t = $defs{$d}{TYPE};
     # skipping unneeded devices
     next if($t ne "FHT" && $t ne "CUL_HM");
-    next if($t eq "CUL_HM" && !$attr{$d}{model});
-    next if($t eq "CUL_HM" && $attr{$d}{model}  ne "HM-CC-TC");
-    next if($t eq "CUL_HM" && $attr{$d}{model} eq "HM-CC-TC" && ($attr{$d}{device} || $attr{$d}{chanNo}));
+
+    next if($t eq "CUL_HM" &&(   !$attr{$d}{model}
+	                          ||!(  ($attr{$d}{model} eq "HM-CC-TC"    && !$defs{$d}{device})
+	                              ||($attr{$d}{model} eq "HM-CC-RT-DN" && !$defs{$d}{device}))));
 
     $devs{$d}{actuator}     = ReadingsVal($d,"actuator","n/a");
-    if ($devs{$d}{actuator} =~ m/^\d+\s*%$/) {
-      $devs{$d}{actuator} =~ s/(\s+|%)//g;
-    } else {
-      $devs{$d}{actuator} = 0;
+	
+    if ($devs{$d}{actuator} =~ m/^\d+\s*%$/) { $devs{$d}{actuator} =~ s/(\s+|%)//g;
+    } else {                                   $devs{$d}{actuator} = 0;
     }
     $devs{$d}{excluded}     = ($exclude =~ m/$d/) ? 1 : 0;
     $devs{$d}{ignored}      = ($attr{$d}{ignore} && $attr{$d}{ignore} == 1) ? 1 : 0;
