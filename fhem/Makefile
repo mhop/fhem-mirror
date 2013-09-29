@@ -52,7 +52,7 @@ install:
 	@rm fhem.cfg.install
 	@cp fhem.pl $(RBINDIR)
 	@cp -rp FHEM docs www contrib $(RMODDIR)
-	@cp -rp README_DEMO.txt demolog fhem.cfg.demo $/RDEMODIR)
+	@cp -rp README_DEMO.txt demolog fhem.cfg.demo $(RDEMODIR)
 	@cp docs/fhem.man $(RMANDIR)/fhem.pl.1
 	@gzip -f -9 $(RMANDIR)/fhem.pl.1
 	@echo "- cleanup: removing .svn leftovers"
