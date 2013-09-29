@@ -843,8 +843,8 @@ FP_pOfill($@) {
   the device on or off by clicking on it. A background-picture can be used - use e.g. a floorplan of your house, or any picture.
   Use floorplanstyle.css to adapt the representation.<br>
   Step-by-step setup guides are available in
-  <a href="http://sourceforge.net/p/fhem/code/HEAD/tree/trunk/fhem/docs/fhem-floorplan-installation-guide.pdf">english</a> and
-  <a href="http://sourceforge.net/p/fhem/code/HEAD/tree/trunk/fhem/docs/fhem-floorplan-installation-guide_de.pdf">german</a>. <br>
+  <a href="http://sourceforge.net/p/fhem/code/HEAD/tree/trunk/fhem/docs/fhem-floorplan-installation-guide.pdf?format=raw">english</a> and
+  <a href="http://sourceforge.net/p/fhem/code/HEAD/tree/trunk/fhem/docs/fhem-floorplan-installation-guide_de.pdf?format=raw">german</a>. <br>
   <br>
 
   <a name="FLOORPLANdefine"></a>
@@ -1002,8 +1002,8 @@ FP_pOfill($@) {
   des Geräts durch klicken erlaubt. Ein Hintergrundbild kann verwendet werden - z.B. ein Grundriss oder jegliches andere Bild.
   Mit floorplanstyle.css kann die Formatierung angepasst werden.<br>
   Eine Schritt-für-Schritt-Anleitung zur Einrichtung ist verfügbar in
-  <a href="http://sourceforge.net/p/fhem/code/HEAD/tree/trunk/fhem/docs/fhem-floorplan-installation-guide.pdf">Englisch</a> und
-  <a href="http://sourceforge.net/p/fhem/code/HEAD/tree/trunk/fhem/docs/fhem-floorplan-installation-guide_de.pdf">Deutsch</a>. <br>
+  <a href="http://sourceforge.net/p/fhem/code/HEAD/tree/trunk/fhem/docs/fhem-floorplan-installation-guide.pdf?format=raw">Englisch</a> und
+  <a href="http://sourceforge.net/p/fhem/code/HEAD/tree/trunk/fhem/docs/fhem-floorplan-installation-guide_de.pdf?format=raw">Deutsch</a>. <br>
   <br>
 
   <a name="FLOORPLANdefine"></a>
