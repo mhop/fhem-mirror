@@ -83,7 +83,7 @@
 1 global DELETED SVG_Log.Dewpoint_1
 1 global DELETED alarmToggler
 741 global DELETED minuteTimer
-29 global INITIALIZED
+31 global INITIALIZED
 1 global RENAMED Lamp1 Outdoor
 1 global RENAMED Lamp2 Office
 1 global RENAMED Lamp3 Livingroom
@@ -98,7 +98,7 @@
 1 global RENAMED Sens.Out Garden
 1 global RENAMED outdoorNotify outdoorNotifier
 42 global SAVE
-29 global SHUTDOWN
+31 global SHUTDOWN
 15 lcCinema scene AllOff
 19 lcCinema scene Break
 16 lcCinema scene Cinema

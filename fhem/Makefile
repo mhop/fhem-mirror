@@ -1,5 +1,5 @@
 VERS=5.5
-DATE=2013-09-22
+DATE=2013-09-29
 
 RELATIVE_PATH=YES
 BINDIR=/opt/fhem
@@ -100,7 +100,7 @@ dist:
 		xargs perl -pi -e 's/=VERS=/$(VERS)/g;s/=DATE=/$(DATE)/g'
 	rm -rf .f/www/SVGcache
 	mv .f $(DESTDIR)
-	tar cf - $(DESTDIR) | gzip > $(DESTDIR).tar.gz
+	tar cf - $(DESTDIR) | gzip -9 > $(DESTDIR).tar.gz
 	rm -rf $(DESTDIR)
 
 dist-clean:
