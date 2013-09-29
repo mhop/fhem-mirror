@@ -62,10 +62,10 @@ select {  border:0px none; margin-left:5px; margin-right:5px; }
 .handle { position:relative; cursor:pointer; width:50px; 
           height:20px; line-height:20px;
           -webkit-user-select:none; -moz-user-select:none; -user-select:none;
-          border:2px solid; color:white; text-align:center; }
+          border:2px solid; color:#309bbd; text-align:center; }
 .downText { margin-top:8px; font-weight:bold; }
 
-svg { height:32px; width:32px; fill:#fff; }
+svg { height:32px; width:32px; fill:#309bbd; }
 g.on { fill:red; }
 div[id*="Kalender-"] { width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 div[id*="disp"] { width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

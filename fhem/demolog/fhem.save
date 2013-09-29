@@ -1,4 +1,4 @@
-#Mon Aug 26 18:01:39 2013
+#Thu Sep 26 12:28:55 2013
 setstate Alarm on
 setstate Alarm 2013-08-23 07:42:48 state on
 setstate AllLights on
@@ -57,8 +57,7 @@ setstate autocreate active
 setstate dew_all active
 setstate et active
 setstate global <no definition>
-setstate lcCinema WatchTV
 setstate outdoorNotifier active
-setstate sunRise Next: 05:55:41
-setstate sunSet Next: 20:59:15
+setstate sunRise Next: 06:44:33
+setstate sunSet Next: 19:49:35
 setstate wlCinema initialized
