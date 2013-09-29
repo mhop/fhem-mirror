@@ -37,6 +37,7 @@
 # 0026: Adapted to FHEMWEB-changes re webCmdFn - fp_setbutton not functional (May 23, 2013)
 # 0027: Added FP_detailFn(), added delete-button in arrange-menu, fixed link for pdf-docu, minor code cleanup, added get config (July 08, 2013)
 # 0028: Implemented informid for longpoll, usage of @FW_fhemwebjs (July 19, 2013)
+# 0029: Fixed floorplan-specific icons and eliminated FHT-text "desired-temp" - both due to changes in fhemweb (Sep 29, 2013)
 #
 ################################################################
 #
@@ -496,14 +497,16 @@ FP_show(){
             my $state = ReadingsVal($d, "state", undef);
 	    $fp_image =~ s/\{state\}/$state/;                                                       # replace {state} by actual device-status
             $txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_image\"/;           # replace icon-link in html
+            $txt =~ s/\<img\ (.*) src\=\"(.*)\"/\<img\ $1 src\=\"\/fhem\/images\/default\/$fp_image\"/;           # replace icon-link in html (new)
         }
         if ($fp_fpimage) {
             my $state = ReadingsVal($d, "state", undef);
             $fp_fpimage =~ s/\{state\}/$state/;                                                 # replace {state} by actual device-status
             $txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_fpimage\"/;         # replace icon-link in html
+            $txt =~ s/\<img\ (.*) src\=\"(.*)\"/\<img\ $1 src\=\"\/fhem\/images\/default\/$fp_fpimage\"/;     # replace icon-link in html (new)
         }
 		if ($style == 3 || $style == 6) {
-		  FW_pO "<td><div informId=\"$d-$text\">$txt</div></td>";                               # reading
+		  FW_pO "<td><div informId=\"$d-$text\">$txt</div>";                                    # reading
 		} else {
 	      FW_pO "<td informId=\"$d\" colspan=\"$cols\">$txt";                                   # state
 		}
@@ -513,7 +516,8 @@ FP_show(){
 		  $txt="";
     	  FW_pO "<tr class=\"devicetimestamp fp_$FP_name\" id=\"$d-devicetimestamp\">";         # For css: class=devicetimestamp, id=<devicename>-devicetimestamp
 		  $txt = ReadingsTimestamp($d, $text, "Undefined Reading $d-<b>$text</b>");             # Style3+6 = DeviceReading given in $text
-          FW_pO "<td><div colspan=\"$cols\" informId=\"$d-$text-ts\">$txt</div></td>";
+#          FW_pO "<td><div colspan=\"$cols\" informId=\"$d-$text-ts\">$txt</div></td>";
+		  FW_pO "<td><div colspan=\"$cols\" informId=\"$d-$text-ts\">$txt</div>";
 	      FW_pO "</td></tr>";
 	    }
 
@@ -539,6 +543,7 @@ FP_show(){
                                                  $d, $FW_room, $cmd, $values);
               use strict "refs";
               if(defined($htmlTxt)) {
+			    $htmlTxt =~ s/>desired-temp/>/;  #mod20130929
 				FW_pO $htmlTxt;
                 $firstIdx = 1;
                 last;
