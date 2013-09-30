@@ -400,7 +400,7 @@ sub HMLAN_Parse($$) {##########################################################
 	$stat &= 0xff;        # low byte related to message format
 
 	if ($HMcnd == 0x01){#HMLAN responded to AES request
-#	  $CULinfo = "AESresp";# General needs approval
+	  $CULinfo = "AESKey-".$mFld[3];
 	}
 
 	if ($stat){# message with status information

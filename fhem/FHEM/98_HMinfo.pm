@@ -287,7 +287,7 @@ sub HMinfo_SetFn($@) {#########################################################
 	    $_ =~ s/CMDs // if ($type eq "short");
 	  }
 	  if ($type eq "short"){
-	    push @paramList, sprintf("%-20s%-17s|%-9s|%-9s|%-9s|%-9s|%-9s|%-9s",
+	    push @paramList, sprintf("%-20s%-17s|%-10s|%-10s|%-10s|%-10s|%-10s|%-10s",
 	                  $pl[0],$pl[1],$pl[2],$pl[3],$pl[5],$pl[6],$pl[7],$pl[8]);
 	  }
 	  else{
@@ -303,7 +303,7 @@ sub HMinfo_SetFn($@) {#########################################################
 	                         ,"State","CmdPend"
 	                         ,"Snd","LastRcv","Resnd"
 							 ,"ResndFail","Nack","IOerr");
-	$hdr = sprintf("%-20s:%-16s|%-9s|%-9s|%-9s|%-9s|%-9s|%-9s",
+	$hdr = sprintf("%-20s:%-16s|%-10s|%-10s|%-10s|%-10s|%-10s|%-10s",
 	                         ,"name"
 	                         ,"State","CmdPend"
 	                         ,"Snd","Resnd"
