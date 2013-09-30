@@ -37,7 +37,7 @@ use constant  { STATUS  => '00',
                 COMMAND => '02',
                 BIN    => 1,
                 NUM    => 2,
-                STRING => 3,
+                STR => 3,
                 STREAM => 4,
                 IN  => 1,
                 OUT => 2,  };
@@ -134,7 +134,7 @@ readDeviceXML($$)
   my ($product, $file_name) = @_;
   my $map = { bin => BIN,
               num => NUM,
-              string => STRING,
+              str => STR,
               stream => STREAM,
               inp => IN,
               out => OUT, };
@@ -583,7 +583,7 @@ SWAP_Get($@)
         return $ret;
       }
     }
-    
+
     foreach my $cmd ( sort keys ( %{$gl} ) ) {
       $list .= " ";
       $list .= $cmd;
@@ -740,6 +740,14 @@ SWAP_updateReadings($$$)
         $value = "1" if( $byte & $mask );
       } else {
         $value = substr($data, $position*2, $endpoint->{size}*2);
+      }
+      if( $endpoint->{type} == STR ) {
+        my $v = "";
+        for( my $i = 0; $i < length($value)-6; $i+=2 ) {
+          $v .= sprintf( "%c", hex(substr($value, $i, 2)) );
+        }
+        #$value = $v;
+        readingsBulkUpdate($hash, lc($endpoint->{name}), $v);
       }
       readingsBulkUpdate($hash, SWAP_regName($rid,$i,$endpoint), $value);
       ++$i;

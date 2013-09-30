@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<device>
+  <developer>justMe</developer>
+  <product>ePaper Display</product>
+  <pwrdownmode>false</pwrdownmode>
+  <regular>
+      <reg name="Text" id="11">
+        <endpoint name="Text" type="str" dir="out">
+          <size>18</size>
+        </endpoint>
+    </reg>
+    <reg name="Cmd" id="12">
+      <endpoint name="Command" type="num" dir="out">
+        <size>3</size>
+      </endpoint>
+      <endpoint name="Cmd" type="num" dir="out">
+        <position>0</position>
+        <size>1</size>
+      </endpoint>
+      <endpoint name="Args" type="num" dir="out">
+        <position>1</position>
+        <size>2</size>
+      </endpoint>
+    </reg>
+    <reg name="Size" id="13">
+      <endpoint name="Size" type="num" dir="in">
+        <size>6</size>
+      </endpoint>
+      <endpoint name="width" type="num" dir="in">
+        <position>0</position>
+        <size>2</size>
+      </endpoint>
+      <endpoint name="height" type="num" dir="in">
+        <position>2</position>
+        <size>2</size>
+      </endpoint>
+      <endpoint name="segmentHeight" type="num" dir="in">
+        <position>4</position>
+        <size>1</size>
+      </endpoint>
+      <endpoint name="numSegments" type="num" dir="in">
+        <position>5</position>
+        <size>1</size>
+      </endpoint>
+    </reg>
+  </regular>
+</device>
+
