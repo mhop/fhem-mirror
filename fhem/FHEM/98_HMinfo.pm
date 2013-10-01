@@ -96,33 +96,60 @@ sub HMinfo_getParam(@) { ######################################################
 sub HMinfo_regCheck(@) { ######################################################
   my @entities = @_;
   my @regIncompl;
+  my @regMissing;
   my @peerRegsFail;
+ 
+  my %th = CUL_HM_putHash("culHmModel");
+
   foreach my $eName (@entities){
     my $ehash = $defs{$eName};
     my $devId = substr($defs{$eName}{DEF},0,6);
-    my @peerIdInReg;
-    foreach my $rdEntry (keys %{$ehash->{READINGS}}){
-      next if ($rdEntry !~m /^[\.]?RegL_(.*)/);
-	  push @regIncompl,$eName.":".$rdEntry if ($ehash->{READINGS}{$rdEntry}{VAL} !~ m/00:00/);
-	  my $peer = $rdEntry;
-	  $peer =~ s/.*RegL_..://;
-	  $peer =~ s/^self/$devId/;
-	  next if (!$peer);  
-	  push @peerIdInReg,CUL_HM_name2Id($peer);
-    }
-	#- - - -  check whether peer is required - - - - 
-	my $st = CUL_HM_Get($defs{$eName},$eName,"param","subType");
-	if ($st !~ m/(thermostat|smokeDetector)/){
-      my $peerLinReg = (join ",",sort @peerIdInReg);
-      $peerLinReg .= "," if ($peerLinReg);
-      my $peerIDs = AttrVal($eName,"peerIDs","");
-      $peerIDs =~ s/00000000,//;
-      push @peerRegsFail,$eName." - found:".$peerLinReg." expected:".$peerIDs 
-                         if ($peerLinReg ne $peerIDs);
+	my $chn = (length($defs{$eName}{DEF}) == 8)?substr($defs{$eName}{DEF},6,2)
+	                                           :"";
+	my @pNames = split(",",($ehash->{peerList}?$ehash->{peerList}:""));
+	#ReadingsVal($eName,"peerList",""));
+	
+	$chn = "01" if (!$chn && $ehash->{helper}{role}{chn});
+	my @lsNo;
+    push @lsNo,"0:" if ($ehash->{helper}{role}{dev});
+	if ($chn){
+	  my $mId = $modules{CUL_HM}{defptr}{$devId}{helper}{mId};
+	  foreach my $ls (split ",",$th{$mId}{lst}){
+		my ($l,$c) = split":",$ls;
+	    if ($l ne "p"){# ignore peer-only entries
+		  if ($c){
+		    my $chNo = hex($chn);
+			push @lsNo,"$l:" if($c =~ m/$chNo/ && $c !~ m/($chNo)p/ );
+		    if ($c =~ m/($chNo)p/ && scalar(@pNames)){
+			  push @lsNo,"$l:$_" foreach (@pNames);
+			}
+		  }
+		  else{
+		    if ($l == 3 || $l == 4){push @lsNo,"$l:$_" foreach (@pNames);
+			}else{                  push @lsNo,"$l:" ;}
+		  }
+		}
+	  }
 	}
+
+    my $ex = AttrVal($eName,"expert","");
+	$ex = AttrVal($modules{CUL_HM}{defptr}{$devId},"expert","")if(!$ex);
+    my $pre = ($ex =~ m/2/)?"":".";
+
+	my @mReg = ();
+	my @iReg = ();
+	  
+    foreach my $ln (@lsNo){# check non-peer lists
+	  next if (!$ln || $ln eq "");
+	  my $rNm = $pre."RegL_0".$ln;
+	  if    (!$ehash->{READINGS}{$rNm}){                 push @mReg, $rNm;}
+	  elsif ( $ehash->{READINGS}{$rNm}{VAL} !~ m/00:00/){push @iReg, $rNm;}
+	}
+	push @regMissing,$eName.":\t".join(",",@mReg) if (scalar @mReg);
+	push @regIncompl,$eName.":\t".join(",",@iReg) if (scalar @iReg);
   }
-  return  "\n incomplete register set\n    " .(join "\n    ",sort @regIncompl)
-         ."\n missing Peer Registerset\n    ".(join "\n    ",sort @peerRegsFail)
+  return  "\n\n missing register list\n    "   .(join "\n    ",sort @regMissing)
+         ."\n\n incomplete register list\n    ".(join "\n    ",sort @regIncompl)
          ;
 }
 sub HMinfo_peerCheck(@) { #####################################################
@@ -170,9 +197,9 @@ sub HMinfo_peerCheck(@) { #####################################################
 	  }
 	}
   }
-  return  "\n incomplete list"  ."\n    ".(join "\n    ",sort @peerIDsFail)
-         ."\n empty list"       ."\n    ".(join "\n    ",sort @peerIDsEmpty)
-         ."\n peer not verified"."\n    ".(join "\n    ",sort @peerIDsNoPeer)
+  return  "\n\n incomplete peer list"."\n    ".(join "\n    ",sort @peerIDsFail)
+         ."\n\n empty peer list"     ."\n    ".(join "\n    ",sort @peerIDsEmpty)
+         ."\n\n peer not verified "  ."\n    ".(join "\n    ",sort @peerIDsNoPeer)
          ;
 }
 sub HMinfo_getEntities(@) { ###################################################
@@ -235,7 +262,9 @@ sub HMinfo_SetFn($@) {#########################################################
   }
 
   if   (!$cmd ||$cmd eq "?" ) {##actionImmediate: clear parameter--------------
-	return "autoReadReg clear configCheck param peerCheck peerXref protoEvents models regCheck register rssi saveConfig update";
+	return "autoReadReg clear configCheck param peerCheck peerXref ".
+	      ."protoEvents models regCheck register rssi saveConfig update "
+          ."templateSet templateChk templateList templateDef cpRegs update";
   }
   elsif($cmd eq "clear" )     {##actionImmediate: clear parameter--------------
     my ($type) = @a;
@@ -277,7 +306,7 @@ sub HMinfo_SetFn($@) {#########################################################
       my ($found,$para) = HMinfo_getParam($id,
 	                         ,"protState","protCmdPend"
 	                         ,"protSnd","protLastRcv","protResnd"
-							 ,"protResndFail","protNack","protIOerr");
+							 ,"protCmdDel","protResndFail","protNack","protIOerr");
 	  $para =~ s/( last_at|20..-|\|)//g;
       my @pl = split "\t",$para;
 	  foreach (@pl){
@@ -287,27 +316,27 @@ sub HMinfo_SetFn($@) {#########################################################
 	    $_ =~ s/CMDs // if ($type eq "short");
 	  }
 	  if ($type eq "short"){
-	    push @paramList, sprintf("%-20s%-17s|%-10s|%-10s|%-10s|%-10s|%-10s|%-10s",
-	                  $pl[0],$pl[1],$pl[2],$pl[3],$pl[5],$pl[6],$pl[7],$pl[8]);
+	    push @paramList, sprintf("%-20s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",
+	                  $pl[0],$pl[1],$pl[2],$pl[3],$pl[5],$pl[6],$pl[7],$pl[8],$pl[9]);
 	  }
 	  else{
-	    push @paramList, sprintf("%-20s%-17s|%-18s|%-18s|%-14s|%-18s|%-18s|%-18s|%-18s",
-	                  $pl[0],$pl[1],$pl[2],$pl[3],$pl[4],$pl[5],$pl[6],$pl[7],$pl[8]);
+	    push @paramList, sprintf("%-20s%-17s|%-18s|%-18s|%-14s|%-18s#%-18s|%-18s|%-18s|%-18s",
+	                  $pl[0],$pl[1],$pl[2],$pl[3],$pl[4],$pl[5],$pl[6],$pl[7],$pl[8],$pl[9]);
 	  }
 	  push @IOlist,$defs{$pl[0]}{IODev}->{NAME};
 	}
 		
 	
-	my $hdr = sprintf("%-20s:%-16s|%-18s|%-18s|%-14s|%-18s|%-18s|%-18s|%-18s",
+	my $hdr = sprintf("%-20s:%-16s|%-18s|%-18s|%-14s|%-18s#%-18s|%-18s|%-18s|%-18s",
 	                         ,"name"
 	                         ,"State","CmdPend"
 	                         ,"Snd","LastRcv","Resnd"
-							 ,"ResndFail","Nack","IOerr");
-	$hdr = sprintf("%-20s:%-16s|%-10s|%-10s|%-10s|%-10s|%-10s|%-10s",
+							 ,"CmdDel","ResndFail","Nack","IOerr");
+	$hdr = sprintf("%-20s:%-16s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",
 	                         ,"name"
 	                         ,"State","CmdPend"
 	                         ,"Snd","Resnd"
-							 ,"ResndFail","Nack","IOerr") if ($type eq "short");
+							 ,"CmdDel","ResndFail","Nack","IOerr") if ($type eq "short");
 	$ret = $cmd." done:" ."\n    ".$hdr  ."\n    ".(join "\n    ",sort @paramList)
 	       ;
 	$ret .= "\n\n    CUL_HM queue:$modules{CUL_HM}{prot}{rspPend}";
