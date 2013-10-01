@@ -30,12 +30,13 @@ select   { font-family:Helvetica; font-weight:300; font-size:16px; }
 }
 
 .devType { padding-top:20px; }
+.devType table.block { padding-bottom:20px; }
 
 a { color: #147bff; text-decoration:none; cursor: pointer; }
 
 img {  border-style: none; }
 
-#.wide { width: 100%; }
+.wide { width: 100%; } 
 
 table { border-radius:2px; margin: 0; padding: 0px; border-spacing: 0px; border-collapse:collapse; }
 
@@ -48,10 +49,10 @@ table.room td:hover { background: #d9d9d9; }
 
 table.roomBlock1 tr { border: 0; }
 
-table.room a { display: block; width: 100%; height: 100%; padding: 6px 0 6px 6px; }
+table.room a { display: block; padding: 6px 0 6px 50px; }
 table.block a { display: block; width: 100%; height: 100%; }
 
-table.block { width:750px; background: #fff; }
+table.block { width:790px; background: #fff; }
 table.block a { color: #151515; }
 table.block tr { width: 100%; border-bottom: 1px solid #cbcbcb; }
 table.block tr:last-child { border: 0; }
@@ -61,7 +62,7 @@ table.block td { padding:3px; }
 
 table.assoc a { color: #147bff; }
 
-table.fileList { width:750px; }
+table.fileList { width:790px; }
 table.fileList td { padding:5px; padding-left: 7px; } 
 table.fileList td:hover { background: #d9d9d9; }
 
@@ -112,7 +113,6 @@ pre { white-space: pre-wrap; }
 /* ==============     SVG      ============== */ 
 
 svg      { height:32px; width:32px; fill:#1c7efb; }
-table.room td a { margin-left: 50px; }
 table.room svg.icon { margin-left: -43px; margin-right:20px; }
 
 svg.icon { margin-left: 7px; margin-right:20px; }
