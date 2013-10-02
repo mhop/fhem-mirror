@@ -975,23 +975,29 @@ $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
 #  sensRain    ( no statusrequest)     
 
 my %culHmModelSets = (# channels of this subtype-------------
-  "HM-CC-VD"     =>{ valvePos     => "position"},
-  "HM-RC-19"     =>{ service      => "<count>"
-		            ,alarm        => "<count>"
-		            ,display      => "<text> [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
-  "HM-PB-4DIS-WM"=>{ text         => "<txt1> <txt2>..."
-                      #text       => "<btn> [on|off] <txt1> <txt2>...", old style will not be offered anymore
-				   },
-  "HM-OU-LED16"  =>{ led          => "[off|red|green|orange]"
-		            ,ilum         => "[0-15] [0-127]"},
-  "HM-OU-CFM-PL" =>{ press        => "[long|short] [on|off] ..."
-                    ,inhibit      => "[on|off]"},
-  "HM-CC-TC"     =>{ statusRequest =>""},
-  "HM-CC-VD"     =>{ statusRequest =>""},
+  "HM-CC-VD"       =>{ valvePos     => "position"},
+  "HM-RC-19"       =>{ service      => "<count>"
+		              ,alarm        => "<count>"
+		              ,display      => "<text> [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
+  "HM-PB-4DIS-WM"  =>{ text         => "<txt1> <txt2>..."
+                        #text       => "<btn> [on|off] <txt1> <txt2>...", old style will not be offered anymore
+				     },
+  "HM-OU-LED16"    =>{ led          => "[off|red|green|orange]"
+		              ,ilum         => "[0-15] [0-127]"},
+  "HM-OU-CFM-PL"   =>{ "on-for-timer"=>"<sec>"
+                      ,"on-till"     =>"<time>"
+		              ,on            =>""
+					  ,off           =>""
+					  ,toggle        =>""
+					  ,press         =>"[long|short] [on|off] ..."
+					  ,inhibit       =>"[on|off]"},
+  "HM-CC-TC"       =>{ statusRequest =>""},
+  "HM-CC-VD"       =>{ statusRequest =>""},
 );
 # clones- - - - - - - - - - - - - - - - - 
 $culHmModelSets{"HM-RC-19-B"}  = $culHmModelSets{"HM-RC-19"};
 $culHmModelSets{"HM-RC-19-SW"} = $culHmModelSets{"HM-RC-19"};
+$culHmModelSets{"HM-OU-CM-PCB"} = $culHmModelSets{"HM-OU-CFM-PL"};
 #%{$culHmModelSets{"HM-RC-19-SW"}} = %{$culHmModelSets{"HM-RC-19"}}; copy
 
 my %culHmChanSets = (

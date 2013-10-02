@@ -88,7 +88,7 @@ sub HMinfo_getParam(@) { ######################################################
   my $found = 0;
   foreach (@param){
     my $para = CUL_HM_Get($ehash,$eName,"param",$_);
-    push @paramList,sprintf("%-15s",($para eq "undefined"?"-":$para));
+    push @paramList,sprintf("%-15s",($para eq "undefined"?" -":$para));
 	$found = 1 if ($para ne "undefined") ;
   }
   return $found,sprintf("%-20s\t: %s",$eName,join "\t|",@paramList);
@@ -262,7 +262,7 @@ sub HMinfo_SetFn($@) {#########################################################
   }
 
   if   (!$cmd ||$cmd eq "?" ) {##actionImmediate: clear parameter--------------
-	return "autoReadReg clear configCheck param peerCheck peerXref ".
+	return "autoReadReg clear configCheck param peerCheck peerXref "
 	      ."protoEvents models regCheck register rssi saveConfig update "
           ."templateSet templateChk templateList templateDef cpRegs update";
   }

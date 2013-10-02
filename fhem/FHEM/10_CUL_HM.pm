@@ -3479,7 +3479,8 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
     elsif($mTp eq '11' && $chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
       CUL_HM_qStateUpdatIfEnab($dst);
       if ($p =~ m/02..(..)....(....)/){#lvl ne 0 and timer on
- 	    $hash->{helper}{tmdOn} = $2 if ($1 ne "00" && $2 !~ m/(0000|FFFF)/)
+ 	    $hash->{helper}{tmdOn} = $2 if ($1 ne "00" && $2 !~ m/(0000|FFFF)/);
+	    CUL_HM_respWaitSu ($hash,"cmd:$cmd","mNo:$mNo","reSent:1","timedOn:1");
 	  }
     }
 	elsif($mTp eq '12' && $mFlg & 0x10){#wakeup with burst
