@@ -831,15 +831,17 @@ my %culHmRegChan = (# if channelspecific then enter them here
   "HM-CC-RT-DN03"     =>{tempFallWinOpen =>1,shCtValLo       =>1},
   "HM-CC-RT-DN04"     =>{btnNoBckLight   =>1,
                          tempComfort     =>1,tempLowering    =>1,tempMin         =>1,tempMax         =>1,
-                         tempFallWinOpen =>1,tempFallWinPerio=>1,tempOffset      =>1,
+                         tempOffset      =>1,
                          decalcWeekday   =>1,decalcTime      =>1,
-                         boostPos        =>1,boostPeriod     =>1,boostAftWinOpen =>1,
+                         boostPos        =>1,boostPeriod     =>1,
                          daylightSaveTime=>1,regAdaptive     =>1,
                          showInfo        =>1,noMinMax4Manu   =>1,showWeekday     =>1,
                          valveOffset     =>1,valveMaxPos     =>1,valveErrPos     =>1,
                          modePrioManu    =>1,modePrioParty   =>1,
                          reguIntI        =>1,reguIntP        =>1,reguIntPstart   =>1,
-                         reguExtI        =>1,reguExtP        =>1,reguExtPstart   =>1
+                         reguExtI        =>1,reguExtP        =>1,reguExtPstart   =>1,
+                         winOpnTemp      =>1,winOpnPeriod    =>1,winOpnBoost     =>1,winOpnMode      =>1,
+						 winOpnDetFall   =>1
 						 },
   "HM-CC-RT-DN06"     =>{CtrlRc          =>1,TempRC          =>1},
 					  );
