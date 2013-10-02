@@ -1609,7 +1609,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 		  $subType eq "00"		){
 		my $params;
 		$params .= "$_:$shash->{helper}{prt}{rspWaitSec}{$_}" foreach (keys%{$shash->{helper}{prt}{rspWaitSec}});
-		if ($shash->{helper}{prt}{awake}==4){#re-wakeup
+		if ($shash->{helper}{prt}{awake} && $shash->{helper}{prt}{awake}==4){#re-wakeup
 		  delete $shash->{helper}{prt}{rspWait};#clear wakeup values
   		  $shash->{helper}{prt}{rspWait}{$_} = $shash->{helper}{prt}{rspWaitSec}{$_} 
 		          foreach (keys%{$shash->{helper}{prt}{rspWaitSec}});	#back to original message		
@@ -4049,7 +4049,8 @@ sub CUL_HM_updtRegDisp($$$) {
 			                              substr(CUL_HM_name2Id($name),0,6),
 										  CUL_HM_IOid($hash)):"");
   foreach my $rgN (@regArr){
-    next if ($culHmRegDefine{$rgN}->{l} ne $listNo);
+    next if (!$culHmRegDefine{$rgN}->{l}           ||
+	          $culHmRegDefine{$rgN}->{l} ne $listNo);
     my $rgVal = CUL_HM_getRegFromStore($name,$rgN,$list,$peerId,$regLN);	
 	next if (!$rgVal || $rgVal eq "invalid");
 	my $rdN = ((!$expLvl && !$culHmRegDefine{$rgN}->{d})?".":"").$pReg.$rgN;
@@ -4374,9 +4375,12 @@ sub CUL_HM_RTtempReadings($) {# parse RT temperature readings
 
   my $wHash = $modules{CUL_HM}{defptr}{substr($hash->{DEF},0,6)."03"};
   CUL_HM_UpdtReadBulk($wHash,1,
-        "R-tempFallWinOpen:" .ReadingsVal($name,"R-tempFallWinOpen" ,"unknown"),
-        "R-tempFallWinPerio:".ReadingsVal($name,"R-tempFallWinPerio","unknown"),
-        "R-boostAftWinOpen:" .ReadingsVal($name,"R-boostAftWinOpen" ,"unknown"));
+        "R-winOpnTemp:"  .ReadingsVal($name,"R-winOpnTemp"  ,"unknown"),
+        "R-winOpnPeriod:".ReadingsVal($name,"R-winOpnPeriod","unknown"),
+        "R-winOpnBoost:" .ReadingsVal($name,"R-winOpnBoost" ,"unknown"),
+		"R-winOpnMode:"  .ReadingsVal($name,"R-winOpnMode:" ,"unknown"),
+        "R-winOpnBoost:" .ReadingsVal($name,"R-winOpnBoost:","unknown")
+		);
   return $setting;
 }
 sub CUL_HM_repReadings($) {# for repeater in:hash, out: string with peers
