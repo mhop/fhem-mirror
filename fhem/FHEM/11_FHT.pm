@@ -718,10 +718,10 @@ getFhtBuffer($)
   <a name="FHTdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; FHT &lt;housecode&gt;</code>
+    <code>define &lt;name&gt; FHT &lt;fhtaddress&gt;</code>
     <br><br>
 
-    <code>&lt;housecode&gt;</code> is a four digit hex number,
+    <code>&lt;fhtaddress&gt;</code> is a four digit hex number,
     corresponding to the address of the FHT80b device.
     <br>
 
@@ -809,7 +809,7 @@ getFhtBuffer($)
           <br>
 
       <li>The FHT is very economical (or lazy), it accepts one message from the
-          FHZ1x00 every 115+x seconds, where x depends on the housecode. Don't
+          FHZ1x00 every 115+x seconds, where x depends on the fhtaddress. Don't
           be surprised if your command is only accepted 10 minutes later by the
           device. FHT commands are buffered in the FHZ1x00/CUL till they are
           sent to the FHT, see the related <code>fhtbuf</code> entry in the
