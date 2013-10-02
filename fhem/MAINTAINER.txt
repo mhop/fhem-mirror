@@ -163,7 +163,7 @@ FHEM/98_CULflash.pm          rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/98_HMinfo.pm            martinp876           http://forum.fhem.de Sonstiges
 FHEM/98_Heating_Control.pm   dietmar63            http://forum.fhem.de Unterstützende Dienste
 FHEM/98_JsonList.pm          mfr69bs              http://forum.fhem.de Automatisierung
-FHEM/98_PID.pm               rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/98_PID.pm               betateilchen         http://forum.fhem.de Automatisierung
 FHEM/98_RandomTimer.pm       dietmar63            http://forum.fhem.de Unterstützende Dienste
 FHEM/98_SVG.pm               rudolfkoenig         http://forum.fhem.de Frontends
 FHEM/98_THRESHOLD.pm         damian-s             http://forum.fhem.de Automatisierung
