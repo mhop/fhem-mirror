@@ -160,29 +160,31 @@ sub HMinfo_peerCheck(@) { #####################################################
   my %th = CUL_HM_putHash("culHmModel");
   foreach my $eName (@entities){
 	my $ehash = $defs{$eName};
+	next if (!$ehash->{helper}{role}{chn});#device has no channels
+	
 	my $id = $defs{$eName}{DEF};
 	my $devId = substr($id,0,6);
 	my $st = AttrVal(CUL_HM_id2Name($devId),"subType","");# from Master
     my $md = AttrVal(CUL_HM_id2Name($devId),"model","");
 	my $peerIDs = AttrVal($eName,"peerIDs",undef);
+	
 	if (!$peerIDs){                # no peers - is this correct?
-	  next if (length($id) == 6 && $ehash->{channel_01});#device with channels - no peers on device level
-	  next if ($st eq "virtual");                        # virtuals may not have peers
-	  
-	  my $list;
-      foreach (keys %th){
-        $list = $th{$_}{lst} if ($th{$_}{name} eq $md);
-      }
-      
-	  # should not be empty for SD
-	  # should not be empty for entities with List 3 or 4
-	  push @peerIDsEmpty,"empty critical: "    .$eName  if ($st eq "smokeDetector");
-	  push @peerIDsEmpty,"empty: "    .$eName           if($list =~ m/[34]/);        #those should have peers
+	  next if ($st eq "virtual");            # virtuals may not have peers
+      my ($mId) = grep {$th{$_}{name} eq $md} keys %th;
+	  my $cNo = (length ($id) == 8)?substr($id,7,1)."p":"1p";
+      foreach my $ls (split ",",$th{$mId}{lst}){
+		my ($l,$c) = split":",$ls;
+        if (  ($l =~ m/^(p|3|4)$/ && !$c )  # 3,4,p without chanspec
+		    ||($c && $c =~ m/$cNo/       )){   
+		  push @peerIDsEmpty,"empty: ".$eName;
+		}
+	  }
 	}
 	elsif($peerIDs !~ m/00000000/ && $st ne "virtual"){#peerList incomplete
 	  push @peerIDsFail,"incomplete: ".$eName.":".$peerIDs;
 	}
 	else{# work on a valid list:
+	  next if ($st eq "repeater");
 	  foreach (split",",$peerIDs){
 		next if ($_ eq "00000000" ||$_ =~m /$devId/);
 		my $cId = $id;
@@ -197,8 +199,8 @@ sub HMinfo_peerCheck(@) { #####################################################
 	  }
 	}
   }
-  return  "\n\n incomplete peer list"."\n    ".(join "\n    ",sort @peerIDsFail)
-         ."\n\n empty peer list"     ."\n    ".(join "\n    ",sort @peerIDsEmpty)
+  return  "\n\n peer list not read"  ."\n    ".(join "\n    ",sort @peerIDsEmpty)
+         ."\n\n peer list incomplete"."\n    ".(join "\n    ",sort @peerIDsFail)
          ."\n\n peer not verified "  ."\n    ".(join "\n    ",sort @peerIDsNoPeer)
          ;
 }

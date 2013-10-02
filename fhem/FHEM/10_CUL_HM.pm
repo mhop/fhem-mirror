@@ -4345,7 +4345,7 @@ sub CUL_HM_RTtempReadings($) {# parse RT temperature readings
   
   $tempRegs =~ s/.* 14://;     #remove register up to addr 20 from list
   $tempRegs =~ s/ 00:00/ /g;   #remove regline termination
-  $tempRegs =~ s/ ..://g;     #remove addr Info
+  $tempRegs =~ s/ ..://g;      #remove addr Info
   $tempRegs =~ s/ //g;         #blank
   my @time;
   my @temp;

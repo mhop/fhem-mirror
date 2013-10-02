@@ -485,7 +485,7 @@ my %culHmRegDefine = (
 
 #  logicCombination=>{a=> 89.0,s=>0.5,l=>1,min=>0  ,max=>16      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"".
 #		                                                                                                      "inactive=>unused\n".
-#                                                                                                              "or      =>max(state,chan)\n".
+#                                                                                                             "or      =>max(state,chan)\n".
 #					                                                                                          "and     =>min(state,chan)\n".
 #					                                                                                          "xor     =>0 if both are != 0, else max\n".
 #					                                                                                          "nor     =>100-max(state,chan)\n".
@@ -538,19 +538,19 @@ my %culHmRegDefine = (
   valveOffset     =>{a=>  9  ,s=>0.5,l=>5,min=>0  ,max=>25      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve offset"},             # size actually 0.5
   valveErrorPos   =>{a=> 10  ,s=>1  ,l=>5,min=>0  ,max=>99      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve position when error"},# size actually 0.7
 
-  tempComfort     =>{a=>  1  ,s=>0.6,l=>7,min=>15 ,max=>30      ,c=>''         ,f=>'2'     ,u=>''    ,d=>1,t=>"comfort temperatur"},
-  tempLowering    =>{a=>  2  ,s=>0.6,l=>7,min=>5  ,max=>25      ,c=>''         ,f=>'2'     ,u=>''    ,d=>1,t=>"lowering temperatur"},
-  tempMin         =>{a=>  3  ,s=>0.6,l=>7,min=>4.5,max=>25      ,c=>''         ,f=>'2'     ,u=>''    ,d=>1,t=>"minimum temperatur"},
-  tempMax         =>{a=>  4  ,s=>0.6,l=>7,min=>15 ,max=>30.5    ,c=>''         ,f=>'2'     ,u=>''    ,d=>1,t=>"maximum temperatur"},
-  winOpnTemp      =>{a=>  5  ,s=>0.6,l=>7,min=>5  ,max=>30      ,c=>''         ,f=>'2'     ,u=>''    ,d=>1,t=>"lowering temp whenWindow is opened"},
+  tempComfort     =>{a=>  1  ,s=>0.6,l=>7,min=>15 ,max=>30      ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>1,t=>"comfort temperatur"},
+  tempLowering    =>{a=>  2  ,s=>0.6,l=>7,min=>5  ,max=>25      ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>1,t=>"lowering temperatur"},
+  tempMin         =>{a=>  3  ,s=>0.6,l=>7,min=>4.5,max=>25      ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>1,t=>"minimum temperatur"},
+  tempMax         =>{a=>  4  ,s=>0.6,l=>7,min=>15 ,max=>30.5    ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>1,t=>"maximum temperatur"},
+  winOpnTemp      =>{a=>  5  ,s=>0.6,l=>7,min=>5  ,max=>30      ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>1,t=>"lowering temp whenWindow is opened"},
   winOpnPeriod    =>{a=>  6  ,s=>0.4,l=>7,min=>0  ,max=>60      ,c=>''         ,f=>'0.2'   ,u=>'min' ,d=>1,t=>"period lowering when window is open"},
   decalcWeekday   =>{a=>  7  ,s=>0.3,l=>7,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"decalc at day"      ,lit=>{Sat=>0,Sun=>1,Mon=>2,Tue=>3,Wed=>4,Thu=>5,Fri=>6}},
   decalcTime      =>{a=>  8  ,s=>0.6,l=>7,min=>0  ,max=>1410    ,c=>'min2time' ,f=>''      ,u=>''    ,d=>1,t=>"decalc at hour"},
   tempOffset      =>{a=>  9  ,s=>0.4,l=>7,min=>0  ,max=>15      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"temperature offset",lit=>{"-3.5K"=>0,"-3.0K"=>1,"-2.5K"=>2,"-2.0K"=>3,"-1.5K"=>4,"-1.0K"=>5,"-0.5K"=>6, 
                                                                                                                                         "0.0K"=>7, "0.5K"=>8, "1.0K"=>10, "1.5K"=>11, "2.0K"=>12, "2.5K"=>13, "3.0K"=>14, "3.5K"=>15}},
   btnNoBckLight   =>{a=>  9.4,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"button response without backlight",lit=>{off=>0,on=>1}},
-  boostPos        =>{a=> 10.0,s=>0.5,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>'0.2'   ,u=>'%'   ,d=>1,t=>"boost period [min]"},
-  boostPeriod     =>{a=> 10.5,s=>0.3,l=>7,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"boost position"                              ,lit=>{0=>0,5=>1,10=>2,15=>3,20=>4,25=>5,30=>6}},
+  boostPos        =>{a=> 10.0,s=>0.5,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>'0.2'   ,u=>'%'   ,d=>1,t=>"valve boost position"},
+  boostPeriod     =>{a=> 10.5,s=>0.3,l=>7,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>'min' ,d=>1,t=>"boost period [min]"                          ,lit=>{0=>0,5=>1,10=>2,15=>3,20=>4,25=>5,30=>6}},
   valveOffset     =>{a=> 11  ,s=>0.7,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"offset for valve"},
   valveMaxPos     =>{a=> 12  ,s=>0.7,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"valve maximum position"},
   valveErrPos     =>{a=> 13  ,s=>0.7,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"valve error position"},
@@ -565,7 +565,7 @@ my %culHmRegDefine = (
   modePrioParty   =>{a=> 18.0,s=>0.3,l=>7,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"allow tempChange for party by..."            ,lit=>{RT_SC=>0,all=>1,RT_CCU=>3,CCU=>4,self=>5}},
   modePrioManu    =>{a=> 18.3,s=>0.3,l=>7,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"allow tempChange for manual by..."           ,lit=>{RT_SC=>0,all=>1,RT_CCU=>3,CCU=>4,self=>5}},
 
-  winOpnMode      =>{a=> 19.5,s=>0.3,l=>7,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"enable internal Windoe open in modes: "      ,lit=>{off=>0,auto=>1,auto_manu=>2,auto_party=>3,on=>4}},
+  winOpnMode      =>{a=> 19.5,s=>0.3,l=>7,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"enable internal Windoe open in modes: "      ,lit=>{off=>0,auto=>1,auto_manu=>2,auto_party=>3,on=>4}},
   winOpnDetFall   =>{a=> 19.0,s=>0.5,l=>7,min=>0.5,max=>2.5     ,c=>''         ,f=>'10'    ,u=>'K'   ,d=>1,t=>"detect Window Open if temp falls more then..."},
                                     
   reguIntI        =>{a=>202.0,s=>1  ,l=>7,min=>10 ,max=>20      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"regulator I-param internal mode"},
