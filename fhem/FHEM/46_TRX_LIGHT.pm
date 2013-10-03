@@ -216,6 +216,7 @@ TRX_LIGHT_Set($@)
 
   if (	lc($hash->{TRX_LIGHT_devicelog}) eq "window" || lc($hash->{TRX_LIGHT_devicelog}) eq "door" || 
    	lc($hash->{TRX_LIGHT_devicelog}) eq "motion" ||
+ 	lc($hash->{TRX_LIGHT_devicelog}) eq "ring" ||
 	lc($hash->{TRX_LIGHT_devicelog}) eq "lightsensor" || lc($hash->{TRX_LIGHT_devicelog}) eq "photosensor" ||
 	lc($hash->{TRX_LIGHT_devicelog}) eq "lock"
       ) {
@@ -618,6 +619,8 @@ sub TRX_LIGHT_parse_X10 ($$)
 		$command = ($command eq "on") ? "dark" : "bright" ;
   } elsif (lc($def->{TRX_LIGHT_devicelog}) eq "lock") {
                 $command = ($command eq "on") ? "Closed" : "Open" ;
+  } elsif (lc($def->{TRX_LIGHT_devicelog}) eq "ring") {
+		$command = ($command eq "on") ? "normal" : "alert" ;
   }
 
   readingsBeginUpdate($def);
