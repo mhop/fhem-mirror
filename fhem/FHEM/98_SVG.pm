@@ -445,9 +445,9 @@ SVG_readgplotfile($$)
   # the plot directive with our own, as we offer a file for each line
   my (@filelog, @data, $plot);
 
-  my $ldType = $wl;
-  $ldType = $defs{$defs{$wl}{LOGDEVICE}}{TYPE}
+  my $ldType = $defs{$defs{$wl}{LOGDEVICE}}{TYPE}
      if($defs{$wl}{LOGDEVICE} && $defs{$defs{$wl}{LOGDEVICE}});
+  $ldType = $wl if(!$ldType);
 
   open(FH, $gplot_pgm) || return (FW_fatal("$gplot_pgm: $!"), undef);
   while(my $l = <FH>) {
