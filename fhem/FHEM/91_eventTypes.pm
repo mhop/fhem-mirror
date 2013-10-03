@@ -39,6 +39,10 @@ eventTypes_Define($$)
     while(my $l = <$fh>) {
       chomp($l);
       my @a = split(" ", $l, 3);
+      if(@a != 3) {
+        Log3 undef, 2, "eventTypes: $f: bogus line $l";
+        next;
+      }
       $modules{eventTypes}{ldata}{$a[1]}{$a[2]} = $a[0];
     }
     close($fh);
@@ -60,6 +64,7 @@ eventTypes_Notify($$)
 
   my $t = $eventSrc->{TYPE};
   my $n = $eventSrc->{NAME};
+  return if(!defined($n) || !defined($t));
 
   my $ret = "";
   foreach my $oe (@{$eventSrc->{CHANGED}}) {
@@ -67,6 +72,7 @@ eventTypes_Notify($$)
     my $ne = $oe;
     $ne =~ s/\b-?\d*\.?\d+\b/.*/g;
     $ne =~ s/set_\d+/set_.*/;   # HM special :/
+    next if(!defined($ne) || $ne eq "");
     Log3 $ln, 4, "$ln: $t $n $oe -> $ne";
     $modules{eventTypes}{ldata}{$n}{$ne}++;
   }
