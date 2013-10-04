@@ -220,7 +220,7 @@ autocreate_Notify($$)
         $wlname .= "_$wnr" if($wnr > 1);
         $wnr++;
         delete($defs{$wlname});   # If we are re-creating it with createlog.
-        $cmd = "$wlname SVG fileplot $flname:$gplotfile:CURRENT";
+        $cmd = "$wlname SVG $flname:$gplotfile:CURRENT";
         Log3 $me, 2, "autocreate: define $cmd";
         $ret = CommandDefine(undef, $cmd);
         if($ret) {

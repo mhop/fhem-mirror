@@ -73,6 +73,7 @@ SVG_Define($$)
   $hash->{GPLOTFILE} = $2;
   $hash->{LOGFILE}   = ($3 ? $3 : "CURRENT");
   $hash->{STATE} = "initialized";
+  $hash->{LOGDEVICE} =~ s/^fileplot //; # Autocreate bug.
 
   return undef;
 }
@@ -491,6 +492,7 @@ SVG_substcfg($$$$$$)
   $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
 
   my $ldt = $defs{$defs{$wl}{LOGDEVICE}}{TYPE};
+  $ldt = "" if(!defined($ldt));
   if($file eq "CURRENT" && $ldt eq "FileLog") {
     $file = $defs{$defs{$wl}{LOGDEVICE}}{currentlogfile};
     $file =~ s+.*/++;
