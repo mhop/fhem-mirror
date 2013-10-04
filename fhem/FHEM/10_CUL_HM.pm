@@ -3975,8 +3975,7 @@ sub CUL_HM_updtRegDisp($$$) {
 			                              substr(CUL_HM_name2Id($name),0,6),
 										  CUL_HM_IOid($hash)):"");
   foreach my $rgN (@regArr){
-    next if (!$culHmRegDefine{$rgN}->{l}           ||
-	          $culHmRegDefine{$rgN}->{l} ne $listNo);
+    next if ($culHmRegDefine{$rgN}->{l} ne $listNo);
     my $rgVal = CUL_HM_getRegFromStore($name,$rgN,$list,$peerId,$regLN);	
 	next if (!$rgVal || $rgVal eq "invalid");
 	my $rdN = ((!$expLvl && !$culHmRegDefine{$rgN}->{d})?".":"").$pReg.$rgN;
