@@ -202,11 +202,13 @@ sub CUL_HM_updateConfig($){
       my $actCycle = AttrVal($name,"actCycle",undef);
 	  CUL_HM_ActAdd($id,$actCycle) if ($actCycle);# add to ActionDetect?
 	  # --- set default attrubutes if missing ---
-      $attr{$name}{expert}= AttrVal($name,"expert","2_full") 
-	        if ($hash->{helper}{role}{dev});
+      if ($hash->{helper}{role}{dev}){
+	    $attr{$name}{expert}     = AttrVal($name,"expert"     ,"2_full");
+	    $attr{$name}{autoReadReg}= AttrVal($name,"autoReadReg","4_reqStatus");
+	  }
 	  CUL_HM_Attr("attr",$name,"expert",$attr{$name}{expert});#need update after readings are available
 	}
-	else{
+	else{# Action Detector only
 	  $attr{$name}{"event-on-change-reading"} = AttrVal($name, "event-on-change-reading", ".*");
 	  delete $hash->{helper}{role};
 	  $hash->{helper}{role}{vrt} = 1;
@@ -2689,8 +2691,8 @@ sub CUL_HM_Set($@) {
 	my $subtype = ($cmd eq "alarm")?"81":"82";
     CUL_HM_PushCmdStack($hash,
           sprintf("++%s11%s%s%s%s%02X",$flag,$id,$dst,$subtype,$chn, $a[2]));
-  } 
-  elsif($cmd eq "led") { ######################################################
+  }
+  elsif($cmd eq "led") { ######################################################  
 	if ($md eq "HM-OU-LED16"){
 	  my %color=(off=>0,red=>1,green=>2,orange=>3);
 	  if (length($hash->{DEF}) == 6){# command called for a device, not a channel
@@ -2765,8 +2767,13 @@ sub CUL_HM_Set($@) {
 	}
     CUL_HM_PushCmdStack($hash,$msg) if ($msg);
   } 
-  elsif($cmd eq "mode") { #####################################################
-	return "select one of auto,manu,party,boost,comfort,lower"
+  elsif($cmd =~ m/^(mode|mode-manu|mode-party)$/) { ###########################
+    my $mode = length($a[1]<5)?$a[1]:substr($a[1],5);
+    if (length$a[1] > 4){
+	  splice @a,2,0,substr($a[1],5);
+      $a[3] = ($a[3] eq "off")?4.5:($a[3] eq "on"?30.5:$a[3]);
+	}
+    return "select one of auto,manu,party,boost,comfort,lower"
                 if ($a[2] !~ m/^(auto|manu|party|boost|comfort|lower)$/);
     my ($temp,$party);
 	if ($a[2] =~ m/^(auto|boost|comfort|lower)$/){
@@ -2778,28 +2785,28 @@ sub CUL_HM_Set($@) {
 	  $temp = $a[3]*2;
 	}
 	elsif($a[2] eq "party"){
-	  return "temperatur for manu  5 to 30 C"
-	            if (!$a[3] || $a[3] < 5 || $a[3] > 30);
-	  return "enter date like party 3 03.8.13 11:30 5.8.13 12:00"
-	            if (!$a[7] );
+	  return  "use party <temp> <from-time> <from-date> <to-time> <to-date>\n"
+             ."temperatur: 5 to 30 C\n"
+			 ."date format: party 10 03.8.13 11:30 5.8.13 12:00"
+	            if (!$a[3] || $a[3] < 5 || $a[3] > 30 || !$a[7] );
 	  $temp = $a[3]*2;	  
 	  # party format 03.8.13 11:30 5.8.13 12:00
 	  my ($sd,$sm,$sy) = split('\.',$a[4]);
-	  return "wrong start day $sd" if ($sd < 0 || $sd > 31);
+	  my ($sh,$smin)   = split(':' ,$a[5]);
+	  my ($ed,$em,$ey) = split('\.',$a[6]);
+	  my ($eh,$emin)   = split(':' ,$a[7]);
+	  
+	  return "wrong start day $sd"   if ($sd < 0 || $sd > 31);
 	  return "wrong start month $sm" if ($sm < 0 || $sm > 12);
-	  return "wrong start year $sy" if ($sy < 0 || $sy > 99);
-
-	  my ($sh,$smin) = split(':',$a[5]);
-	  return "wrong start hour $sh" if ($sh < 0 || $sh > 23);
+	  return "wrong start year $sy"  if ($sy < 0 || $sy > 99);
+	  return "wrong start hour $sh"  if ($sh < 0 || $sh > 23);
 	  return "wrong start minute $smin, ony 00 or 30" if ($smin != 0 && $smin != 30);
       $sh = $sh * 2 + $smin/30;
 	  
-	  my ($ed,$em,$ey) = split('\.',$a[6]);
 	  return "wrong end day $ed"   if ($ed < 0 || $ed > 31);
 	  return "wrong end month $em" if ($em < 0 || $em > 12);
 	  return "wrong end year $ey"  if ($ey < 0 || $ey > 99);
-	  my ($eh,$emin) = split(':',$a[7]);
-	  return "wrong end hour $eh" if ($eh < 0 || $eh > 23);
+	  return "wrong end hour $eh"  if ($eh < 0 || $eh > 23);
 	  return "wrong end minute $emin, ony 00 or 30" if ($emin != 0 && $emin != 30);
       $eh = $eh * 2 + $emin/30;
 	  
@@ -2807,7 +2814,7 @@ sub CUL_HM_Set($@) {
 	                    $sh,$sd,$sy,$eh,$ed,$ey,($sm*16+$em));
 	}
 	my %mCmd = (auto=>0,manu=>1,party=>2,boost=>3,comfort=>4,lower=>5);
-    readingsSingleUpdate($hash,"modeSet","set_".$a[2],1);
+    readingsSingleUpdate($hash,"mode","set_".$a[2],1);
 	my $msg = '8'.($mCmd{$a[2]}).$chn;
 	$msg .= sprintf("%02X",$temp) if ($temp);
 	$msg .= $party if ($party);
@@ -2881,7 +2888,6 @@ sub CUL_HM_Set($@) {
       $msg .= sprintf(" %02d:%02d %.1f", $h, $m, $a[$idx+1]);
     }
     CUL_HM_pushConfig($hash, $id, $dst, $prgChn,0,0,$list, $data);
-	readingsSingleUpdate($hash,"tempList$wd",$msg,0);
   } 
   elsif($cmd eq "sysTime") { ##################################################
     $state = "";
@@ -4338,41 +4344,62 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
 sub CUL_HM_RTtempReadings($) {# parse RT temperature readings
   my ($hash)=@_;
   my $name = $hash->{NAME};
-  my $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")."RegL_";
-  my $tempRegs = ReadingsVal($name,$regLN."07:" ,"");
-
-  my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
+  my $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")."RegL_07:";
+  my $tempRegs = ReadingsVal($name,$regLN,"");
+  my $stmpRegs = ($hash->{helper}{shadowReg}{$regLN})? # need to compare actual data
+                   ($hash->{helper}{shadowReg}{$regLN})
+				   :$tempRegs;
+  return "reglist incomplete\n" if ($tempRegs !~ m/00:00/);
   
+  my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
+
   $tempRegs =~ s/.* 14://;     #remove register up to addr 20 from list
   $tempRegs =~ s/ 00:00/ /g;   #remove regline termination
   $tempRegs =~ s/ ..://g;      #remove addr Info
   $tempRegs =~ s/ //g;         #blank
-  my @time;
-  my @temp;
-  foreach (unpack '(A4)*',$tempRegs){
-    my $h = hex($_);
-	push @temp,($h >> 9)/2;
-	$h = ($h & 0x1ff) * 5;
-	$h = sprintf("%02d:%02d",int($h / 60),($h%60));
-    push @time,$h;
-  }
-  return "reglist incomplete\n" if (scalar( @time )<91);
+  
+  $stmpRegs =~ s/.* 14://;     
+  $stmpRegs =~ s/ 00:00/ /g;   
+  $stmpRegs =~ s/ ..://g;      
+  $stmpRegs =~ s/ //g;         
+
   my $setting;
   my @changedRead;
   push (@changedRead,"tempList_State:".
-                ($hash->{helper}{shadowReg}{$regLN."07:"} ?"set":"verified"));
+                ($hash->{helper}{shadowReg}{$regLN} ?"set":"verified"));
   for (my $day = 0;$day<7;$day++){
 	my $dayRead = "";
-    for (my $idx = $day *13;$idx<($day+1) *13;$idx++){
+	my $pre ="";
+    my @time;
+    my @temp;
+    my $str;
+	if (substr($stmpRegs,$day *13*4,13*4) eq 
+	    substr($tempRegs,$day *13*4,13*4)   ){
+	  $str = substr($tempRegs,$day *13*4,13*4);
+	}
+	else{
+	  $str = substr($stmpRegs,$day *13*4,13*4);
+	  $pre = "set_";
+	}
+    foreach (unpack '(A4)*',$str){
+      my $h = hex($_);
+	  push @temp,($h >> 9)/2;
+	  $h = ($h & 0x1ff) * 5;
+	  $h = sprintf("%02d:%02d",int($h / 60),($h%60));
+      push @time,$h;
+    }
+
+    for (my $idx = 0;$idx<13;$idx++){
 	  my $entry = sprintf(" %s %3.01f",$time[$idx],$temp[$idx]);
   	  $setting .= "Temp set: ".$days[$day].$entry." C\n";
   	  $dayRead .= $entry;
       last if ($time[$idx] eq "24:00");
     }
-	push (@changedRead,"tempList".$days[$day].":".$dayRead);
+	push (@changedRead,"tempList".$days[$day].":".$pre." ".$dayRead);
   }  
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
 
+  # transport some readings to relevant channels (window receivce here)
   my $wHash = $modules{CUL_HM}{defptr}{substr($hash->{DEF},0,6)."03"};
   CUL_HM_UpdtReadBulk($wHash,1,
         "R-winOpnTemp:"  .ReadingsVal($name,"R-winOpnTemp"  ,"unknown"),
@@ -5276,6 +5303,35 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	  must be entered<br>	  </li>
       <li><B>systime</B><br>
           set time in climate channel to system time</li>
+    </ul><br>
+	</li>
+	
+	<li>Climate-Control (HM-CC-RT-DN)
+    <ul>
+	  <li><B>mode &lt;auto|boost|comfort|lower&gt;</B><br></li>
+	  <li><B>mode_manu &lt;temp&gt;</B><br></li>
+	  <li><B>mode_party &lt;temp&gt;&lt;startDate&gt;&lt;startTime&gt;&lt;endDate&gt;&lt;endTime&gt;</B><br>
+	      set control mode to party, define temp and timeframe.<br>	  
+	      example:<br>
+	      <code>set mode_party 15 03.8.13 20:30 5.8.13 11:30</code></li>
+      <li><B>systime</B><br>
+          set time in climate channel to system time</li>
+	  <li><B>desired-temp &lt;temp&gt;</B><br>
+          Set different temperatures. &lt;temp&gt; must be between 6 and 30
+          Celsius, and precision is half a degree.</li>
+	  <li><B>tempListSat HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListSun HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListMon HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListTue HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListThu HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListWed HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListFri HH:MM temp ... 24:00 temp</B><br>
+          Specify a list of temperature intervals. Up to 24 intervals can be
+          specified for each week day, the resolution is 10 Minutes. The
+          last time spec must always be 24:00.<br>
+          Example: until 6:00 temperature shall be 19, from then until 23:00 temperature shall be 
+          22.5, thereafter until midnight, 19 degrees celsius is desired.<br>
+		  <code> set th tempListSat 06:00 19 23:00 22.5 24:00 19<br></code></li>
     </ul><br>
 	</li>
     <li>OutputUnit (HM-OU-LED16)
