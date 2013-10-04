@@ -522,7 +522,8 @@ sub HMLAN_SimpleWrite(@) {#####################################################
 	  return if ($HMcnd == 4 || $HMcnd == 253);# no send if overload or disconnect
     }
 
-    my $dst = substr($msg,46,6);
+    my ($src,$dst) = (substr($msg,40,6),substr($msg,46,6));
+	my $hmId = $attr{$name}{hmId};
 	my $hDst = $hash->{helper}{$dst};# shortcut
     if ($hDst->{nextSend}){
       my $DevDelay = $hDst->{nextSend} - gettimeofday();
@@ -530,21 +531,18 @@ sub HMLAN_SimpleWrite(@) {#####################################################
 	        if ($DevDelay > 0.01);
 	  delete $hDst->{nextSend};
     }
-	if ($dst ne $attr{$name}{hmId}){  #delay send if answer is pending
+	if ($dst ne $hmId){  #delay send if answer is pending
 	  if ( $hDst->{flg} &&                #HMLAN's ack pending
-          ($hDst->{to} > gettimeofday())){#won't wait forever!
+          ($hDst->{to} > gettimeofday())){#won't wait forever! check timeout
 	    $hDst->{msg} = $msg;              #postpone  message
 	    Log $ll5,"HMLAN_Delay: $name $dst";
 	    return;
 	  }
-      my $flg = substr($msg,36,2);
-	  $hDst->{flg} = (hex($flg)&0x20)?1:0;# answer expected?
-      $hDst->{to} = gettimeofday() + 2;# flag timeout after 2 sec
-	  $hDst->{msg} = "";
-
-	  if ($hDst->{flg} == 1 &&
-          substr($msg,40,6) eq $attr{$name}{hmId}){
-		HMLAN_qResp($hash,$dst,1);
+	  if ($src eq $hmId){
+	    $hDst->{flg} = (hex(substr($msg,36,2))&0x20)?1:0;# answer expected?
+        $hDst->{to} = gettimeofday() + 2;# flag timeout after 2 sec
+	    $hDst->{msg} = "";
+		HMLAN_qResp($hash,$dst,1) if ($hDst->{flg} == 1);
 	  }	  
 	}
     if ($len > 52){#channel information included, send sone kind of clearance
@@ -675,13 +673,6 @@ sub HMLAN_qResp($$$) {#response-waiting queue##################################
 				  $hashQ->{HMcndN} == 253)
 			   );
   }
-	
-#  Log 1,"General max:$hashQ->{hmLanQlen} cmd:$cmd"
-#		   ."/".$hash->{XmitOpen}
-#           ." :".$hashQ->{answerPend}
-#		   ."/".@{$hashQ->{apIDs}}
-#		   .":".join("-",@{$hashQ->{apIDs}})
-#		   .":$debug" ;
 }
 sub HMLAN_relOvrLd($) {########################################################
   my(undef,$name) = split(':',$_[0]);
