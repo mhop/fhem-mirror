@@ -90,6 +90,7 @@ CustomGetFileFromURL($$@)
   }
 
   my $conn;
+  my $errstr= "";
   if($protocol eq "https") {
     eval "use IO::Socket::SSL";
     if($@) {
@@ -100,9 +101,10 @@ CustomGetFileFromURL($$@)
   } else {
     $conn = IO::Socket::INET->new(PeerAddr=>"$host:$port", Timeout=>$timeout);
   }
+  $errstr= $@ if(!$conn);
   if(!$conn) {
     Log3 undef, $loglevel,
-        "CustomGetFileFromURL $displayurl: Can't connect to $protocol://$host:$port\n";
+        "CustomGetFileFromURL $displayurl: Can't connect to $protocol://$host:$port, $errstr"; 
     undef $conn;
     return undef;
   }
