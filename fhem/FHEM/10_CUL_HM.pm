@@ -665,11 +665,10 @@ sub CUL_HM_Parse($$) {##############################
     elsif(($mTp eq '02' &&$sType eq '01')||    # ackStatus
 	      ($mTp eq '10' &&$sType eq '06')){    # infoStatus
 	  $chn = substr($p,2,2); 
-	  my $temp = substr($p,4,2);
+	  my $dTemp = hex(substr($p,4,2))/2;
+	  $dTemp = ($dTemp < 6 )?'off':
+	           ($dTemp >30 )?'on' :sprintf("%0.1f", $dTemp);
 	  my $err = hex(substr($p,6,2));
-	  my $dTemp =  ($temp eq '00')?'off':
-	              (($temp eq 'C8')?'on' :
-				                    sprintf("%0.1f", hex($temp)/2));
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
 	  if($chnHash){
 	    my $chnName = $chnHash->{NAME};
@@ -684,101 +683,22 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "desired-temp:" .$dTemp;
 	  push @event, "battery:".($err&0x80?"low":"ok");  
     }
-    elsif($mTp eq "10"){                       # Config change report
-	  $chn = substr($p,2,2);
-      if(   $p =~ m/^0403(......)(..)0505(..)0000/) {# param change
-	    # change of chn 3(window) list 5 register 5 - a peer window changed!
-        my ( $tdev,   $tchan,     $v1) = (($1), hex($2), hex($3));
-	    push @event, sprintf("windowopen-temp-%d: %.1f (sensor:%s)"
-	                        ,$tchan, $v1/2, $tdev);
-							#todo: This will never cleanup if a peer is deleted
+    elsif($mTp eq "10" &&                   # Config change report
+          ($p =~ m/^0402000000000501/)) {   # paramchanged L5
+	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
+      my $dTemp;
+	  if($chnHash){
+	    my $chnName = $chnHash->{NAME};
+        my $mode = ReadingsVal($chnName,"R-controlMode","");	
+        $dTemp = ReadingsVal($chnName,"desired-temp","21.0");
+		if (!$chnHash->{helper}{oldMode} || $chnHash->{helper}{oldMode} ne $mode){
+		  $dTemp = ReadingsVal($chnName,"desired-temp-manu",$dTemp)if ($mode =~ m /manual/);
+		  $dTemp = ReadingsVal($chnName,"desired-temp-cent",$dTemp)if ($mode =~ m /central/);
+		  $chnHash->{helper}{oldMode} = $mode;
+		}
+		push @entities,CUL_HM_UpdtReadSingle($chnHash,"desired-temp",$dTemp,1);
       }
-	  elsif($p =~ m/^0402000000000(.)(..)(..)(..)(..)(..)(..)(..)(..)/) {
-        # param list 5 or 6, 4 value pairs.
-        my ($plist, $o1,    $v1,    $o2,    $v2,    $o3,    $v3,    $o4,    $v4) =
-           (hex($1),hex($2),hex($3),hex($4),hex($5),hex($6),hex($7),hex($8),hex($9));
-
-        my ($dayoff, $maxdays, $basevalue);
-        my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
-
-        if($plist == 5 || $plist == 6) {
-          if($plist == 5) {
-            $dayoff = 0; $maxdays = 5; $basevalue = hex("0B");
-          } 
-		  else {
-            $dayoff = 5; $maxdays = 2; $basevalue = hex("01");
-          }
-          my $idx = ($o1-$basevalue);
-          my $dayidx = int($idx/48);
-          if($idx % 4 == 0 && $dayidx < $maxdays) {
-            $idx -= 48*$dayidx;
-            $idx /= 2;
-            my $ptr = $shash->{TEMPLIST}{$days[$dayidx+$dayoff]};
-            $ptr->{$idx}{HOUR} = int($v1/6);
-            $ptr->{$idx}{MINUTE} = ($v1%6)*10;
-            $ptr->{$idx}{TEMP} = $v2/2;
-            $ptr->{$idx+1}{HOUR} = int($v3/6);
-            $ptr->{$idx+1}{MINUTE} = ($v3%6)*10;
-            $ptr->{$idx+1}{TEMP} = $v4/2;
-          }
-        }
-        foreach my $wd (@days) {
-          my $twentyfour = 0;
-          my $msg = 'tempList'.$wd.':';
-          foreach(my $idx=0; $idx<24; $idx++) {
-            my $ptr = $shash->{TEMPLIST}{$wd}{$idx};
-            if(defined ($ptr->{TEMP}) && $ptr->{TEMP} ne "") {
-              if($twentyfour == 0) {
-                $msg .= sprintf(" %02d:%02d %.1f",
-                                $ptr->{HOUR}, $ptr->{MINUTE}, $ptr->{TEMP});
-              } else {
-                $ptr->{HOUR} = $ptr->{MINUTE} = $ptr->{TEMP} = "";
-              }
-            }
-            if($ptr->{HOUR} && 0+$ptr->{HOUR} == 24) {
-              $twentyfour = 1;  # next value uninteresting, only first counts.
-            }
-      	  }
-          push @event, $msg; # generate one event per day entry
-        }
-      } 
-	  elsif($p =~ m/^04020000000005(..)(..)/) {   # paramchanged L5
-        my ( $o1,    $v1) = (hex($1),hex($2));# only parse list 5 for chn 2
-        my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
-        if($o1 == 1) { ### bitfield containing multiple values...
-		               # MUST be IDENTICAL to the set commands assotiated
-	      my %mode = (0 => "manual",1 => "auto",2 => "central",3 => "party");
-          push @event,'displayMode:temp-'.(($v1 & 1)?"hum"       :"only");
-          push @event,'displayTemp:'     .(($v1 & 2)?"setpoint"  :"actual");
-          push @event,'displayTempUnit:' .(($v1 & 4)?"fahrenheit":"celsius");
-          push @event,'controlMode:'     .($mode{(($v1 & 0x18)>>3)});
-          push @event,'decalcDay:'       .$days[($v1 & 0xE0)>>5];
-	      my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
-          my $dTemp;
-	      if($chnHash){
-	        my $chnName = $chnHash->{NAME};
-            my $mode = ReadingsVal($chnName,"R-controlMode","");	
-            $dTemp = ReadingsVal($chnName,"desired-temp","21.0");
-		    if (!$chnHash->{helper}{oldMode} || $chnHash->{helper}{oldMode} ne $mode){
-		      $dTemp = ReadingsVal($chnName,"desired-temp-manu",$dTemp)if ($mode =~ m /manual/);
-		      $dTemp = ReadingsVal($chnName,"desired-temp-cent",$dTemp)if ($mode =~ m /central/);
-		      $chnHash->{helper}{oldMode} = $mode;
-		    }
-			push @entities,CUL_HM_UpdtReadSingle($chnHash,"desired-temp",$dTemp,1);
-           }
-          push @event, "desired-temp:" .$dTemp;
-        } 
-	    elsif($o1 == 2) {
-	      my %pos = (0=>"Auto",1=>"Closed",2=>"Open",3=>"unknown");		  
-          push @event,"tempValveMode:".$pos{(($v1 & 0xC0)>>6)};
-        } 
-	    else{
-	      push @event,'param-change: offset='.$o1.', value='.$v1;
-	    }
-      }
-	  elsif($p =~ m/^0[23]/){                     # param response
-	    push @event,'';#cannot be handled here as request missing
-	  }
+      push @event, "desired-temp:" .$dTemp;
 	}
     elsif($mTp eq "01"){                       # status reports
       if($p =~ m/^010809(..)0A(..)/) { # TC set valve  for VD => post events to VD
@@ -2185,6 +2105,7 @@ sub CUL_HM_Set($@) {
   #convert 'old' commands to current methodes like regSet and regBulk...
   # Unify the interface
   if($cmd =~ m/^(day|night|party)-temp$/){ #
+    $a[2] = ($a[2] eq "off")?5.5:(($a[2] eq "on")?30:$a[2]);
 	splice @a,1,0,"regSet";# make hash,regSet,reg,value
     ($chn,$isChannel) = ("02","true");#force chn 02
   }
