@@ -204,7 +204,8 @@ sub CUL_HM_updateConfig($){
 	  # --- set default attrubutes if missing ---
       if ($hash->{helper}{role}{dev}){
 	    $attr{$name}{expert}     = AttrVal($name,"expert"     ,"2_full");
-	    $attr{$name}{autoReadReg}= AttrVal($name,"autoReadReg","4_reqStatus");
+	    $attr{$name}{autoReadReg}= AttrVal($name,"autoReadReg","4_reqStatus")
+		    if(CUL_HM_getRxType($hash)&0xEB);
 	  }
 	  CUL_HM_Attr("attr",$name,"expert",$attr{$name}{expert});#need update after readings are available
 	}
@@ -2773,7 +2774,7 @@ sub CUL_HM_Set($@) {
 	  splice @a,2,0,substr($a[1],5);
       $a[3] = ($a[3] eq "off")?4.5:($a[3] eq "on"?30.5:$a[3]);
 	}
-    return "select one of auto,manu,party,boost,comfort,lower"
+    return "select one of auto,boost,comfort,lower of mode_manu, mode_party"
                 if ($a[2] !~ m/^(auto|manu|party|boost|comfort|lower)$/);
     my ($temp,$party);
 	if ($a[2] =~ m/^(auto|boost|comfort|lower)$/){
