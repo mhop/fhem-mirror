@@ -167,7 +167,8 @@ my %zwave_class = (
     parse => { "028105"=> "clock:get" }, },
   HAIL                     => { id => '82', },
   WAKE_UP                  => { id => '84', 
-    set   => { wakeupInterval => "04%06x%02x" },
+    set   => { wakeupInterval => "04%06x%02x",
+               wakeupNoMoreInformation => "08", },
     get   => { wakeupInterval => "05" },
     parse => { "028407"    => 'wakeup:notification',
                "..8406(......)(..)" =>
@@ -723,8 +724,10 @@ s2Hex($)
 
   <br><br><b>Class WAKE_UP</b>
   <li>wakeupInterval value<br>
-  Set the wakeup interval of battery operated devices to the given value in
-  seconds. Upon wakeup the device sends a wakeup notification.</li>
+    Set the wakeup interval of battery operated devices to the given value in
+    seconds. Upon wakeup the device sends a wakeup notification.</li>
+  <li>wakeupNoMoreInformation<br>
+    put a battery driven device into sleep mode. </li>
 
   </ul>
   <br>
