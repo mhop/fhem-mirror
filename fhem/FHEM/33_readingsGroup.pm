@@ -1,5 +1,22 @@
-
 # $Id$
+##############################################################################
+#
+#     This file is part of fhem.
+#
+#     Fhem is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 2 of the License, or
+#     (at your option) any later version.
+#
+#     Fhem is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
 
 package main;
 
@@ -113,9 +130,9 @@ sub readingsGroup_Undefine($$)
   return undef;
 }
 
-sub lookup($$$$$)
+sub lookup($$$$$$$)
 {
-  my($mapping,$name,$alias,$reading,$default) = @_;
+  my($mapping,$name,$alias,$reading,$room,$group,$default) = @_;
 
   if( $mapping ) {
     if( ref($mapping) eq 'HASH' ) {
@@ -129,10 +146,14 @@ sub lookup($$$$$)
     $default =~ s/\%ALIAS/$alias/g;
     $default =~ s/\%DEVICE/$name/g;
     $default =~ s/\%READING/$reading/g;
+    $default =~ s/\%ROOM/$room/g;
+    $default =~ s/\%GROUP/$group/g;
 
     $default =~ s/\$ALIAS/$alias/g;
     $default =~ s/\$DEVICE/$name/g;
     $default =~ s/\$READING/$reading/g;
+    $default =~ s/\$ROOM/$room/g;
+    $default =~ s/\$GROUP/$group/g;
   }
 
   return $default;
@@ -243,10 +264,12 @@ readingsGroup_2html($)
 
         my $a = AttrVal($name, "alias", $name);
         my $m = "$a$separator$n";
-        my $txt = lookup($mapping,$name,$a,$n,$m);
+        my $room = AttrVal($name, "room", "");
+        my $group = AttrVal($name, "group", "");
+        my $txt = lookup($mapping,$name,$a,$n,$room,$group,$m);
 
         if( $nameIcons ) {
-          if( my $icon = lookup($nameIcons,$name,$a,$n,"") ) {
+          if( my $icon = lookup($nameIcons,$name,$a,$n,$room,$group,"") ) {
             $txt = FW_makeImage( $icon, $txt, "icon" );
           }
         }
@@ -309,10 +332,12 @@ readingsGroup_2html($)
 
         my $a = AttrVal($name, "alias", $name);
         my $m = "$a$separator$n";
-        my $txt = lookup($mapping,$name,$a,$n,$m);
+        my $room = AttrVal($name, "room", "");
+        my $group = AttrVal($name, "group", "");
+        my $txt = lookup($mapping,$name,$a,$n,$room,$group,$m);
 
         if( $nameIcons ) {
-          if( my $icon = lookup($nameIcons,$name,$a,$n,"") ) {
+          if( my $icon = lookup($nameIcons,$name,$a,$n,$room,$group,"") ) {
             $txt = FW_makeImage( $icon, $txt, "icon" );
           }
         }
@@ -546,7 +571,8 @@ readingsGroup_Get($@)
       <li>mapping<br>
         Can be a simple string or a perl expression enclosed in {} that returns a hash that maps reading names to the displayed name.
         The keys can be either the name of the reading or &lt;device&gt;.&lt;reading&gt;.
-        %DEVICE, %ALIAS and %READING are replaced by the device name, device alias and reading name respectively, e.g:<br>
+        %DEVICE, %ALIAS, %ROOM, %GROUP and %READING are replaced by the device name, device alias, room attribute, group attribute and reading name respectively. You can
+        also prefix these keywords with $ instead of %. Examples:<br>
           <code>attr temperatures mapping $DEVICE-$READING</code><br>
           <code>attr temperatures mapping {temperature => "%DEVICE Temperatur"}</code>
         </li>
