@@ -120,7 +120,7 @@ my $IOpoll     = 0.2;# poll speed to scan IO device out of order
 my $IOpolltout = 60; # poll timeout - stop poll and discard if to late
 
 my $maxPendCmds = 10;  #number of parallel requests
-my $autoConfDly = 15;  # delay autoConf readings
+my $autoConfDly = 12;  # delay autoConf readings
 
                  # need to take care that ACK is first
 #+++++++++++++++++ startup, init, definition+++++++++++++++++++++++++++++++++++
@@ -1625,9 +1625,6 @@ sub CUL_HM_parseCommon(@){#####################################################
 		$shash->{helper}{prt}{awake}=2;#awake
 	  }
 	  else{
-		if ($shash->{helper}{prt}{awake}==4){#re-wakeup
-		  #General handle rspWaitSec
-		}
 		$shash->{protCondBurst} = "off";
 		$shash->{helper}{prt}{awake}=3;#reject
 		return "done";
@@ -3039,9 +3036,9 @@ sub CUL_HM_Set($@) {
 	  my $pHash = CUL_HM_id2Hash($peer);
 	  my $peerFlag = $peer eq '00000000'?'A4':CUL_HM_getFlag($pHash);
 	  $peerFlag =~ s/0/4/;# either 'A4' or 'B4'
-      CUL_HM_SndCmd($hash, "++B112$dst".substr($peer,0,6)) 
+      CUL_HM_SndCmd($pHash, "++B112$id".substr($peer,0,6)) 
 	         if (CUL_HM_getRxType($pHash) & 0x80);
-      CUL_HM_SndCmd($hash, sprintf("++%s41%s%s%02X%02X%02X"
+      CUL_HM_SndCmd($pHash, sprintf("++%s41%s%s%02X%02X%02X"
 	                 ,$peerFlag,$dst,$peer
 			         ,$chn
 			         ,$pressCnt
@@ -3699,7 +3696,8 @@ sub CUL_HM_eventP($$) {#handle protocol events
     if (  (CUL_HM_getRxType($hash) & 0x03) == 0 #to slow for wakeup and config
 	    || $evntType eq "IOerr"){               #IO problem
       $nAttr->{protCmdDel} = 0 if(!$nAttr->{protCmdDel});
-      $nAttr->{protCmdDel} += scalar @{$hash->{cmdStack}} if ($hash->{cmdStack});
+      $nAttr->{protCmdDel} += scalar @{$hash->{cmdStack}} + 1 
+	        if ($hash->{cmdStack});
       delete($hash->{cmdStack});
       delete($nAttr->{protCmdPend});
 	  CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{burstEvtCnt}? 
