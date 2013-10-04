@@ -31,22 +31,28 @@ eventTypes_Define($$)
 
   return "wrong syntax: define <name> eventTypes filename" if(int(@a) != 3);
 
+  my $cnt = 0;
   my @t = localtime;
   my $f = ResolveDateWildcards($a[2], @t);
   my $fh = new IO::File "$f";
-  
+
   if($fh) {
     while(my $l = <$fh>) {
       chomp($l);
+      next if($l =~ m/ CULHM (SND|RCV) /);
+      next if($l =~ m/ UNKNOWNCODE /);
+      next if($l =~ m/^\d+ global /);
       my @a = split(" ", $l, 3);
       if(@a != 3) {
         Log3 undef, 2, "eventTypes: $f: bogus line $l";
         next;
       }
       $modules{eventTypes}{ldata}{$a[1]}{$a[2]} = $a[0];
+      $cnt++;
     }
     close($fh);
   }
+  Log3 undef, 2, "eventTypes: loaded $cnt events from $f";
 
   $hash->{STATE} = "active";
   return undef;
@@ -64,11 +70,14 @@ eventTypes_Notify($$)
 
   my $t = $eventSrc->{TYPE};
   my $n = $eventSrc->{NAME};
-  return if(!defined($n) || !defined($t));
+  return if(!defined($n) || !defined($t) || $n eq "global");
 
   my $ret = "";
   foreach my $oe (@{$eventSrc->{CHANGED}}) {
     $oe = "" if(!defined($oe));
+    next if($oe =~ m/ CULHM (SND|RCV) /);
+    next if($oe =~ m/ UNKNOWNCODE /);
+
     my $ne = $oe;
     $ne =~ s/\b-?\d*\.?\d+\b/.*/g;
     $ne =~ s/set_\d+/set_.*/;   # HM special :/
