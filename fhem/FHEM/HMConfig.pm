@@ -852,7 +852,7 @@ my %culHmRegChan = (# if channelspecific then enter them here
   "Schueco_263-xxx03" =>{ttJtOn          =>1,ttJtOff         =>1},
   "HM-Sen-RD-O01"     =>{eventFilterTimeB=>1,transmitTryMax  =>1,peerNeedsBurst  =>1,expectAES       =>1,
                          condTxThrhHi    =>1,condTxThrhHi    =>1,highHoldTime    =>1,evntRelFltTime  =>1 },
-  "HM-CC-RT-DN03"     =>{tempFallWinOpen =>1,shCtValLo       =>1},
+  "HM-CC-RT-DN03"     =>{shCtValLo       =>1},
   "HM-CC-RT-DN04"     =>{btnNoBckLight   =>1,
                          tempComfort     =>1,tempLowering    =>1,tempMin         =>1,tempMax         =>1,
                          tempOffset      =>1,
