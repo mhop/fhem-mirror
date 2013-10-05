@@ -533,3 +533,7 @@
   
 - Fri Jul 26 2013 (Dirk)
   - Added new module "I2C_BMP180"
+  
+- Fri Jul 26 2013 (A. Vogt alias baumrasen)
+  - Added new module "WWO"
+  
