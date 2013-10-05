@@ -84,7 +84,7 @@ FHEM/24_NetIO230B.pm         rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
 FHEM/30_HUEBridge.pm         justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/31_HUEDevice.pm         justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/31_LightScene.pm        justme1968           http://forum.fhem.de Automatisierung
-FHEM/32_SYSSTAT.pm           justme1968           http://forum.fhem.de Unterstützende Dienste
+FHEM/32_SYSSTAT.pm           justme1968           http://forum.fhem.de Unterstï¿½tzende Dienste
 FHEM/32_mailcheck.pm         justme1968           http://forum.fhem.de Automatisierung
 FHEM/33_readingsGroup.pm     justme1968           http://forum.fhem.de Frontends
 FHEM/32_speedtest.pm         justme1968           http://forum.fhem.de Sonstiges
@@ -105,12 +105,13 @@ FHEM/46_TRX_WEATHER.pm       wherzig              http://forum.fhem.de RFXTRX
 FHEM/49_IPCAM.pm             mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/50_WS300.pm             Dirk                 http://forum.fhem.de SlowRF
 FHEM/51_I2C_BMP180.pm        Dirk                 http://forum.fhem.de/ Raspberry Pi
-FHEM/55_GDS.pm               betateilchen         http://forum.fhem.de Unterstützende Dienste
+FHEM/55_GDS.pm               betateilchen         http://forum.fhem.de Unterstï¿½tzende Dienste
 FHEM/55_PIFACE.pm            betateilchen         http://forum.fhem.de/ Raspberry Pi
 FHEM/56_POKEYS.pm            axelberner           http://forum.fhem.de Sonstiges
 FHEM/57_Calendar.pm          borisneubert         http://forum.fhem.de Sonstiges
 FHEM/59_HCS.pm               mfr69bs              http://forum.fhem.de Automatisierung
-FHEM/59_Twilight.pm          dietmar63            http://forum.fhem.de Unterstützende Dienste
+FHEM/59_Twilight.pm          dietmar63            http://forum.fhem.de Unterstï¿½tzende Dienste
+FHEM/59_WWO.pm               baumrasen            http://forum.fhem.de Sonstiges
 FHEM/59_Weather.pm           borisneubert         http://forum.fhem.de Sonstiges
 FHEM/60_EM.pm                rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/61_EMWZ.pm              rudolfkoenig         http://forum.fhem.de SlowRF
@@ -131,8 +132,8 @@ FHEM/70_VIERA.pm             teevau               http://forum.fhem.de Sonstiges
 FHEM/70_WS3600.pm            Josch                http://forum.fhem.de Sonstiges
 FHEM/71_LISTENLIVE.pm        betateilchen         http://forum.fhem.de Multimedia
 FHEM/71_YAMAHA_AVR.pm        markusbloch          http://forum.fhem.de Multimedia
-FHEM/72_FB_CALLMONITOR.pm    markusbloch          http://forum.fhem.de Unterstützende Dienste
-FHEM/73_PRESENCE.pm          markusbloch          http://forum.fhem.de Unterstützende Dienste
+FHEM/72_FB_CALLMONITOR.pm    markusbloch          http://forum.fhem.de Unterstï¿½tzende Dienste
+FHEM/73_PRESENCE.pm          markusbloch          http://forum.fhem.de Unterstï¿½tzende Dienste
 FHEM/75_MSG.pm               ruebedo              http://forum.fhem.de Automatisierung
 FHEM/76_MSGFile.pm           ruebedo              http://forum.fhem.de Automatisierung
 FHEM/76_MSGMail.pm           ruebedo              http://forum.fhem.de Automatisierung
@@ -161,10 +162,10 @@ FHEM/95_holiday.pm           rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/95_remotecontrol.pm     ulimaass             http://forum.fhem.de Frontends
 FHEM/98_CULflash.pm          rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/98_HMinfo.pm            martinp876           http://forum.fhem.de Sonstiges
-FHEM/98_Heating_Control.pm   dietmar63            http://forum.fhem.de Unterstützende Dienste
+FHEM/98_Heating_Control.pm   dietmar63            http://forum.fhem.de Unterstï¿½tzende Dienste
 FHEM/98_JsonList.pm          mfr69bs              http://forum.fhem.de Automatisierung
 FHEM/98_PID.pm               betateilchen         http://forum.fhem.de Automatisierung
-FHEM/98_RandomTimer.pm       dietmar63            http://forum.fhem.de Unterstützende Dienste
+FHEM/98_RandomTimer.pm       dietmar63            http://forum.fhem.de Unterstï¿½tzende Dienste
 FHEM/98_SVG.pm               rudolfkoenig         http://forum.fhem.de Frontends
 FHEM/98_THRESHOLD.pm         damian-s             http://forum.fhem.de Automatisierung
 FHEM/98_WOL.pm               klassm               http://forum.fhem.de Sonstiges
