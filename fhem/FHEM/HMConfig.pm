@@ -339,8 +339,8 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   CtRefOn         =>{a=> 28.0,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from refOn"    ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
   CtRefOff        =>{a=> 28.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from refOff"   ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
 
-  CtrlRc          =>{a=> 46  ,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from refOff"   ,lit=>{no=>0,tempSh=>1,auto=>2,auto_tempSh=>3,manu_tempSh=>4,boost=>5,toggle=>6}},
-  TempRC          =>{a=> 45  ,s=>0.6,l=>3,min=>5  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>0,t=>"Jmp on condition from refOff"},
+  CtrlRc          =>{a=> 46  ,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"set mode and/or temperature"   ,lit=>{no=>0,tempOnly=>1,auto=>2,autoAndTemp=>3,manuAndTemp=>4,boost=>5,toggle=>6}},
+  TempRC          =>{a=> 45  ,s=>0.6,l=>3,min=>5  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>0,t=>"temperature reöated to CtrlRc reg"},
 );
 
 my %culHmRegDefine = (
@@ -380,10 +380,10 @@ my %culHmRegDefine = (
   confBtnTime     =>{a=> 21.0,s=>1.0,l=>0,min=>1  ,max=>255     ,c=>''         ,f=>''      ,u=>'min' ,d=>0,t=>"255=permanent"},         
 #repeater                                                                                      
   compMode        =>{a=> 23.0,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"compatibility moden"     ,lit=>{off=>0,on=>1}},
-  localResDis     =>{a=> 24.0,s=>1.0,l=>0,min=>1  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"local reset disable"       ,lit=>{off=>0,on=>1}},
-  globalBtnLock   =>{a=> 25.0,s=>1.0,l=>0,min=>1  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"global button lock"        ,lit=>{off=>0,on=>200}},
-  modusBtnLock    =>{a=> 26.0,s=>1.0,l=>0,min=>1  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"mode button lock"          ,lit=>{off=>0,on=>200}},
-  paramSel        =>{a=> 27.0,s=>1.0,l=>0,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"data transfered to peer"   ,lit=>{off=>0,T1=>1,T2=>2,T1_T2=>3,T2_T1=>4}},
+  localResDis     =>{a=> 24.0,s=>1.0,l=>0,min=>1  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"local reset disable"     ,lit=>{off=>0,on=>1}},
+  globalBtnLock   =>{a=> 25.0,s=>1.0,l=>0,min=>1  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"global button lock"      ,lit=>{off=>0,on=>200}},
+  modusBtnLock    =>{a=> 26.0,s=>1.0,l=>0,min=>1  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"mode button lock"        ,lit=>{off=>0,on=>200}},
+  paramSel        =>{a=> 27.0,s=>1.0,l=>0,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"data transfered to peer" ,lit=>{off=>0,T1=>1,T2=>2,T1_T2=>3,T2_T1=>4}},
   RS485IdleTime   =>{a=> 29.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s'   ,d=>0,t=>"Idle Time"},
 #un-identified List0
 # addr Dec!!
@@ -540,8 +540,8 @@ my %culHmRegDefine = (
   controlMode     =>{a=>  1.3,s=>0.2,l=>5,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{manual=>0,auto=>1,central=>2,party=>3}},
   decalcDay       =>{a=>  1.5,s=>0.3,l=>5,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Decalc weekday"  ,lit=>{Sat=>0,Sun=>1,Mon=>2,Tue=>3,Wed=>4,Thu=>5,Fri=>6}},
   mdTempValve     =>{a=>  2.6,s=>0.2,l=>5,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{auto=>0,close=>1,open=>2}},
-  "day-temp"      =>{a=>  3  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>1,t=>"comfort temp value"},
-  "night-temp"    =>{a=>  4  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>1,t=>"comfort temp value"},
+  "day-temp"      =>{a=>  3  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>1,t=>"comfort or day temperatur"},
+  "night-temp"    =>{a=>  4  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>1,t=>"lower or night temperatur"},
   tempWinOpen     =>{a=>  5  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Win open !chan 3 only!"},
   "party-temp"    =>{a=>  6  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Party"},
   decalMin        =>{a=>  8  ,s=>0.3,l=>5,min=>0  ,max=>50      ,c=>''         ,f=>0.1     ,u=>'min' ,d=>1,t=>"Decalc min"},
@@ -554,8 +554,8 @@ my %culHmRegDefine = (
   valveOffset     =>{a=>  9  ,s=>0.5,l=>5,min=>0  ,max=>25      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve offset"},             # size actually 0.5
   valveErrorPos   =>{a=> 10  ,s=>1  ,l=>5,min=>0  ,max=>99      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve position when error"},# size actually 0.7
 
-  tempComfort     =>{a=>  1  ,s=>0.6,l=>7,min=>15 ,max=>30      ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>1,t=>"comfort temperatur"},
-  tempLowering    =>{a=>  2  ,s=>0.6,l=>7,min=>5  ,max=>25      ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>1,t=>"lowering temperatur"},
+  dayTemp         =>{a=>  1  ,s=>0.6,l=>7,min=>15 ,max=>30      ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>1,t=>"comfort or day temperatur"},
+  nightTemp       =>{a=>  2  ,s=>0.6,l=>7,min=>5  ,max=>25      ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>1,t=>"lower or night temperatur"},
   tempMin         =>{a=>  3  ,s=>0.6,l=>7,min=>4.5,max=>14.5    ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>1,t=>"minimum temperatur"},
   tempMax         =>{a=>  4  ,s=>0.6,l=>7,min=>15 ,max=>30.5    ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>1,t=>"maximum temperatur"},
   winOpnTemp      =>{a=>  5  ,s=>0.6,l=>7,min=>5  ,max=>30      ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>1,t=>"lowering temp whenWindow is opened"},
@@ -1030,15 +1030,9 @@ $culHmModelSets{"HM-OU-CM-PCB"} = $culHmModelSets{"HM-OU-CFM-PL"};
 #%{$culHmModelSets{"HM-RC-19-SW"}} = %{$culHmModelSets{"HM-RC-19"}}; copy
 
 my %culHmChanSets = (
-  "HM-CC-TC00"     =>{ "day-temp"     =>"[on|off|6.0..30.0]",
-                       "night-temp"   =>"[on|off|6.0..30.0]",
-                       "party-temp"   =>"[on|off|6.0..30.0]",
-                       "desired-temp" =>"[on|off|6.0..30.0]", 
-                       sysTime        =>""	  },
+  "HM-CC-TC00"     =>{ "desired-temp" =>"[on|off|6.0..30.0]"
+                      ,sysTime        =>""	  },
   "HM-CC-TC02"     =>{ peerChan       =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"
-                      ,"day-temp"     =>"[on|off|6.0..30.0]"
-                      ,"night-temp"   =>"[on|off|6.0..30.0]"
-                      ,"party-temp"   =>"[on|off|6.0..30.0]"
                       ,"desired-temp" =>"[on|off|6.0..30.0]" 
                       ,tempListSat    =>"HH:MM temp ..."
                       ,tempListSun    =>"HH:MM temp ..."
@@ -1052,7 +1046,6 @@ my %culHmChanSets = (
                       ,displayTemp    =>"[actual|setpoint]"
                       ,displayTempUnit=>"[celsius|fahrenheit]"
                       ,controlMode    =>"[manual|auto|central|party]"
-                      ,decalcDay      =>"day",       
                       ,sysTime        =>""	  },
   "HM-SEC-WIN01"   =>{ stop           =>"",
                        level          =>"<level> <relockDly> <speed>..."},
@@ -1068,9 +1061,9 @@ my %culHmChanSets = (
 					  ,toggle         =>""},
   "HM-CC-RT-DN00"  =>{ sysTime        =>""},
   "HM-CC-RT-DN02"  =>{ sysTime        =>""},
-  "HM-CC-RT-DN04"  =>{ mode           => "[auto|boost|comfort|lower]"
-                      ,"mode-manu"    => "[on|off|5.0..30.0]"
-                      ,"mode-party"   => "<temp> <startDate> <startTime> <enddate> <endTime>"
+  "HM-CC-RT-DN04"  =>{ controlMode    => "[auto|boost|comfort|lower]"
+                      ,controlManu    => "[on|off|5.0..30.0]"
+                      ,controlParty   => "<temp> <startDate> <startTime> <enddate> <endTime>"
                       ,tempListSat    =>"HH:MM temp ..."
                       ,tempListSun    =>"HH:MM temp ..."
                       ,tempListMon    =>"HH:MM temp ..."

@@ -223,6 +223,9 @@ sub CUL_HM_updateConfig($){
 	  $hash->{helper}{role}{chn} = 1 if (length($id) == 6); #tc special
 	  $attr{$name}{stateFormat} = "last:trigLast" if ($chn eq "03");
 	}
+    elsif ($md eq "HM-CC-RT-DN"){
+	  $attr{$name}{stateFormat} = "last:trigLast" if ($chn eq "03");
+	}
 	elsif ("dimmer"  eq $st) {#setup virtual dimmer channels
 	  my $mId = CUL_HM_getMId($hash);
 	  #configure Dimmer virtual channel assotiation
@@ -2104,12 +2107,7 @@ sub CUL_HM_Set($@) {
 
   #convert 'old' commands to current methodes like regSet and regBulk...
   # Unify the interface
-  if($cmd =~ m/^(day|night|party)-temp$/){ #
-    $a[2] = ($a[2] eq "off")?5.5:(($a[2] eq "on")?30:$a[2]);
-	splice @a,1,0,"regSet";# make hash,regSet,reg,value
-    ($chn,$isChannel) = ("02","true");#force chn 02
-  }
-  elsif($cmd eq "sign"){
+  if(   $cmd eq "sign"){
 	splice @a,1,0,"regSet";# make hash,regSet,reg,value 
   }
   elsif($cmd eq "unpair"){
@@ -2143,9 +2141,11 @@ sub CUL_HM_Set($@) {
 
 	@a = ($a[0],"regBulk","RegL_01:",split(" ",$l1.$l2));
   }
-  elsif($cmd =~ m /(displayMode|displayTemp|displayTempUnit|controlMode|decalcDay)/) {
-    splice @a,1,3, ("regSet",$a[1],$a[2]);
-	push @postCmds,"++803F$id${dst}0204".sprintf("%02X",CUL_HM_secSince2000());
+  elsif($cmd =~ m /(displayMode|displayTemp|displayTempUnit|controlMode)/) {
+    if ($md eq "HM-CC-TC"){#controlMode different for RT
+	  splice @a,1,3, ("regSet",$a[1],$a[2]);
+	  push @postCmds,"++803F$id${dst}0204".sprintf("%02X",CUL_HM_secSince2000());
+	}
   }
   elsif($cmd eq "partyMode") { ################################################
     my $days = $a[3]; 
@@ -2686,34 +2686,34 @@ sub CUL_HM_Set($@) {
 	}
     CUL_HM_PushCmdStack($hash,$msg) if ($msg);
   } 
-  elsif($cmd =~ m/^(mode|mode-manu|mode-party)$/) { ###########################
-    my $mode = length($a[1]<5)?$a[1]:substr($a[1],5);
-    if (length$a[1] > 4){
-	  splice @a,2,0,substr($a[1],5);
-      $a[3] = ($a[3] eq "off")?4.5:($a[3] eq "on"?30.5:$a[3]);
+  elsif($cmd =~ m/^(controlMode|controlManu|controlParty)$/) { ################
+    my $mode = $a[1];
+    if ($cmd ne "controlMode"){
+	  $mode = substr($a[1],7);
+      $a[2] = ($a[2] eq "off")?4.5:($a[2] eq "on"?30.5:$a[2]);
 	}
-    return "select one of auto,boost,comfort,lower of mode_manu, mode_party"
-                if ($a[2] !~ m/^(auto|manu|party|boost|comfort|lower)$/);
+    return "select of mode [auto|boost|comfort|lower] or mode-manu, mode-party"
+                if ($mode !~ m/^(auto|manu|party|boost|comfort|lower)$/);
     my ($temp,$party);
-	if ($a[2] =~ m/^(auto|boost|comfort|lower)$/){
-	  return "no additional params for $a[2]" if ($a[3]);
+	if ($mode =~ m/^(auto|boost|comfort|lower)$/){
+	  return "no additional params for $mode" if ($a[3]);
 	}
-	if($a[2] eq "manu"){
+	if($mode eq "manu"){
 	  return "temperatur for manu  4.5 to 30.5 C"
-	            if (!$a[3] || $a[3] < 4.5 || $a[3] > 30.5);
-	  $temp = $a[3]*2;
+	            if (!$a[2] || $a[2] < 4.5 || $a[2] > 30.5);
+	  $temp = $a[2]*2;
 	}
-	elsif($a[2] eq "party"){
+	elsif($mode eq "party"){
 	  return  "use party <temp> <from-time> <from-date> <to-time> <to-date>\n"
              ."temperatur: 5 to 30 C\n"
 			 ."date format: party 10 03.8.13 11:30 5.8.13 12:00"
-	            if (!$a[3] || $a[3] < 5 || $a[3] > 30 || !$a[7] );
-	  $temp = $a[3]*2;	  
+	            if (!$a[2] || $a[2] < 5 || $a[2] > 30 || !$a[6] );
+	  $temp = $a[2]*2;	  
 	  # party format 03.8.13 11:30 5.8.13 12:00
-	  my ($sd,$sm,$sy) = split('\.',$a[4]);
-	  my ($sh,$smin)   = split(':' ,$a[5]);
-	  my ($ed,$em,$ey) = split('\.',$a[6]);
-	  my ($eh,$emin)   = split(':' ,$a[7]);
+	  my ($sd,$sm,$sy) = split('\.',$a[3]);
+	  my ($sh,$smin)   = split(':' ,$a[4]);
+	  my ($ed,$em,$ey) = split('\.',$a[5]);
+	  my ($eh,$emin)   = split(':' ,$a[6]);
 	  
 	  return "wrong start day $sd"   if ($sd < 0 || $sd > 31);
 	  return "wrong start month $sm" if ($sm < 0 || $sm > 12);
@@ -2733,8 +2733,8 @@ sub CUL_HM_Set($@) {
 	                    $sh,$sd,$sy,$eh,$ed,$ey,($sm*16+$em));
 	}
 	my %mCmd = (auto=>0,manu=>1,party=>2,boost=>3,comfort=>4,lower=>5);
-    readingsSingleUpdate($hash,"mode","set_".$a[2],1);
-	my $msg = '8'.($mCmd{$a[2]}).$chn;
+    readingsSingleUpdate($hash,"mode","set_".$mode,1);
+	my $msg = '8'.($mCmd{$mode}).$chn;
 	$msg .= sprintf("%02X",$temp) if ($temp);
 	$msg .= $party if ($party);
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$msg);
@@ -5196,9 +5196,6 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
     <br></li>
     <li>Climate-Control (HM-CC-TC)
     <ul>
-      <li><B>day-temp &lt;temp&gt;</B><br></li>
-      <li><B>night-temp &lt;temp&gt;</B><br></li>
-      <li><B>party-temp &lt;temp&gt;</B><br></li>
       <li><B>desired-temp &lt;temp&gt;</B><br>
           Set different temperatures. &lt;temp&gt; must be between 6 and 30
           Celsius, and precision is half a degree.</li>
@@ -5227,12 +5224,12 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	
 	<li>Climate-Control (HM-CC-RT-DN)
     <ul>
-	  <li><B>mode &lt;auto|boost|comfort|lower&gt;</B><br></li>
-	  <li><B>mode_manu &lt;temp&gt;</B><br></li>
-	  <li><B>mode_party &lt;temp&gt;&lt;startDate&gt;&lt;startTime&gt;&lt;endDate&gt;&lt;endTime&gt;</B><br>
+	  <li><B>controlMode &lt;auto|boost|comfort|lower&gt;</B><br></li>
+	  <li><B>controlManu &lt;temp&gt;</B><br></li>
+	  <li><B>controlParty &lt;temp&gt;&lt;startDate&gt;&lt;startTime&gt;&lt;endDate&gt;&lt;endTime&gt;</B><br>
 	      set control mode to party, define temp and timeframe.<br>	  
 	      example:<br>
-	      <code>set mode_party 15 03.8.13 20:30 5.8.13 11:30</code></li>
+	      <code>set controlParty 15 03.8.13 20:30 5.8.13 11:30</code></li>
       <li><B>systime</B><br>
           set time in climate channel to system time</li>
 	  <li><B>desired-temp &lt;temp&gt;</B><br>
@@ -5579,7 +5576,6 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
       displayTemp [setpoint|actual]<br>
       displayTempUnit [fahrenheit|celsius]<br>
       controlMode [manual|auto|central|party]<br>
-      decalcDay [Sat|Sun|Mon|Tue|Wed|Thu|Fri]<br>
       tempValveMode [Auto|Closed|Open|unknown]<br>
 	  param-change  offset=$o1, value=$v1<br>
       ValveErrorPosition_for_$dname  $vep %<br>
