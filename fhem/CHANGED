@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 
+- 2013-xx-xx (SVN)
+  - feature: RSS amended (read image from pipe, scaling options, line width)
+
 - 2013-09-29 (5.5)
   - feature: new module 55_PIFACE.pm added (betateilchen)
   - feature: Calendar can read from file and limit number of calendar events
