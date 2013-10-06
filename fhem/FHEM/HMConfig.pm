@@ -854,7 +854,7 @@ my %culHmRegChan = (# if channelspecific then enter them here
                          condTxThrhHi    =>1,condTxThrhHi    =>1,highHoldTime    =>1,evntRelFltTime  =>1 },
   "HM-CC-RT-DN03"     =>{shCtValLo       =>1},
   "HM-CC-RT-DN04"     =>{btnNoBckLight   =>1,
-                         tempComfort     =>1,tempLowering    =>1,tempMin         =>1,tempMax         =>1,
+                         dayTemp         =>1,nightTemp       =>1,tempMin         =>1,tempMax         =>1,
                          tempOffset      =>1,
                          decalcWeekday   =>1,decalcTime      =>1,
                          boostPos        =>1,boostPeriod     =>1,
@@ -1045,7 +1045,7 @@ my %culHmChanSets = (
                       ,displayMode    =>"[temp-only|temp-hum]"
                       ,displayTemp    =>"[actual|setpoint]"
                       ,displayTempUnit=>"[celsius|fahrenheit]"
-                      ,controlMode    =>"[manual|auto|central|party]"
+                      ,controlMode    =>"[auto|manual|central|party]"
                       ,sysTime        =>""	  },
   "HM-SEC-WIN01"   =>{ stop           =>"",
                        level          =>"<level> <relockDly> <speed>..."},
@@ -1061,7 +1061,7 @@ my %culHmChanSets = (
 					  ,toggle         =>""},
   "HM-CC-RT-DN00"  =>{ sysTime        =>""},
   "HM-CC-RT-DN02"  =>{ sysTime        =>""},
-  "HM-CC-RT-DN04"  =>{ controlMode    => "[auto|boost|comfort|lower]"
+  "HM-CC-RT-DN04"  =>{ controlMode    => "[auto|boost|day|night]"
                       ,controlManu    => "[on|off|5.0..30.0]"
                       ,controlParty   => "<temp> <startDate> <startTime> <enddate> <endTime>"
                       ,tempListSat    =>"HH:MM temp ..."

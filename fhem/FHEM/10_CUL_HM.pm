@@ -2692,10 +2692,10 @@ sub CUL_HM_Set($@) {
 	  $mode = substr($a[1],7);
       $a[2] = ($a[2] eq "off")?4.5:($a[2] eq "on"?30.5:$a[2]);
 	}
-    return "select of mode [auto|boost|comfort|lower] or mode-manu, mode-party"
-                if ($mode !~ m/^(auto|manu|party|boost|comfort|lower)$/);
+    return "select of mode [auto|boost|day|night] or mode-manu, mode-party"
+                if ($mode !~ m/^(auto|manu|party|boost|day|night)$/);
     my ($temp,$party);
-	if ($mode =~ m/^(auto|boost|comfort|lower)$/){
+	if ($mode =~ m/^(auto|boost|day|night)$/){
 	  return "no additional params for $mode" if ($a[3]);
 	}
 	if($mode eq "manu"){
@@ -2732,7 +2732,7 @@ sub CUL_HM_Set($@) {
 	  $party = sprintf("%02X%02X%02X%02X%02X%02X%02X",
 	                    $sh,$sd,$sy,$eh,$ed,$ey,($sm*16+$em));
 	}
-	my %mCmd = (auto=>0,manu=>1,party=>2,boost=>3,comfort=>4,lower=>5);
+	my %mCmd = (auto=>0,manu=>1,party=>2,boost=>3,day=>4,night=>5);
     readingsSingleUpdate($hash,"mode","set_".$mode,1);
 	my $msg = '8'.($mCmd{$mode}).$chn;
 	$msg .= sprintf("%02X",$temp) if ($temp);
@@ -5224,7 +5224,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	
 	<li>Climate-Control (HM-CC-RT-DN)
     <ul>
-	  <li><B>controlMode &lt;auto|boost|comfort|lower&gt;</B><br></li>
+	  <li><B>controlMode &lt;auto|boost|day|night&gt;</B><br></li>
 	  <li><B>controlManu &lt;temp&gt;</B><br></li>
 	  <li><B>controlParty &lt;temp&gt;&lt;startDate&gt;&lt;startTime&gt;&lt;endDate&gt;&lt;endTime&gt;</B><br>
 	      set control mode to party, define temp and timeframe.<br>	  
