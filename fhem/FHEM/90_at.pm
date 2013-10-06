@@ -20,7 +20,6 @@ at_Initialize($)
 }
 
 
-my $oldattr;
 my $at_stt_sec;
 my $at_stt_day;
 
@@ -96,9 +95,8 @@ at_Define($$)
   RemoveInternalTimer($hash);
   InternalTimer($nt, "at_Exec", $hash, 0);
 
-  $hash->{STATE} = ($oldattr && $oldattr->{disable} ?
-        "disabled" : ("Next: ".FmtTime($nt)));
-  
+  $hash->{STATE} = AttrVal($name, "disable", undef) ?
+                        "disabled" : ("Next: ".FmtTime($nt));
   return undef;
 }
 
@@ -115,16 +113,13 @@ sub
 at_Exec($)
 {
   my ($hash) = @_;
-  my ($skip, $disable) = ("","");
 
   return if($hash->{DELETED});           # Just deleted
   my $name = $hash->{NAME};
   Log3 $name, 5, "exec at command $name";
 
-  if(defined($attr{$name})) {
-    $skip    = 1 if($attr{$name} && $attr{$name}{skip_next});
-    $disable = 1 if($attr{$name} && $attr{$name}{disable});
-  }
+  my $skip    = AttrVal($name, "skip_next", undef);
+  my $disable = AttrVal($name, "disable", undef);
 
   delete $attr{$name}{skip_next} if($skip);
   my (undef, $command) = split("[ \t]+", $hash->{DEF}, 2);
@@ -137,27 +132,20 @@ at_Exec($)
   my $count = $hash->{REP};
   my $def = $hash->{DEF};
 
-  $oldattr = $attr{$name};           # delete removes the attributes too
-
   # Avoid drift when the timespec is relative
   $data{AT_TRIGGERTIME} = $hash->{TRIGGERTIME} if($def =~ m/^\+/);
-
-  my $oldCfgfn = $hash->{CFGFN};
-  my $oldNr    = $hash->{NR};
-  CommandDelete(undef, $name);          # Recreate ourselves
 
   if($count) {
     $def =~ s/{\d+}/{$count}/ if($def =~ m/^\+?\*{\d+}/);  # Replace the count
     Log3 $name, 5, "redefine at command $name as $def";
 
-    $data{AT_RECOMPUTE} = 1;                 # Tell sunrise compute the next day
-    CommandDefine(undef, "$name at $def");   # Recompute the next TRIGGERTIME
-    $hash = $defs{$name};
+    $data{AT_RECOMPUTE} = 1;             # Tell sunrise compute the next day
+    at_Define($hash, "$name at $def");   # Recompute the next TRIGGERTIME
     delete($data{AT_RECOMPUTE});
-    $attr{$name} = $oldattr;
-    $hash->{CFGFN} = $oldCfgfn if($oldCfgfn);
-    $hash->{NR} = $oldNr;
-    $oldattr = undef;
+
+  } else {
+    CommandDelete(undef, $name);          # We are done
+
   }
   delete($data{AT_TRIGGERTIME});
 }
