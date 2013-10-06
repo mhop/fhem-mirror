@@ -2775,6 +2775,11 @@ sub CUL_HM_Set($@) {
       $addr = hex($addr);
 	}
 
+	my $prep = "";
+    if ($a[2] =~ m/^(prep|exec)$/ && $md eq "HM-CC-RT-DN"){
+	  $prep = $a[2];
+	  splice  @a,2,1;#remove prep 
+	}
     return "To few arguments"                if(@a < 4);
     return "To many arguments, max 24 pairs" if(@a > (($md eq "HM-CC-RT-DN")?28:50));
     return "Bad format, use HH:MM TEMP ..."  if(@a % 2);
@@ -2806,7 +2811,7 @@ sub CUL_HM_Set($@) {
       $hash->{TEMPLIST}{$wd}{($idx-2)/2}{TEMP} = $a[$idx+1];
       $msg .= sprintf(" %02d:%02d %.1f", $h, $m, $a[$idx+1]);
     }
-    CUL_HM_pushConfig($hash, $id, $dst, $prgChn,0,0,$list, $data);
+    CUL_HM_pushConfig($hash, $id, $dst, $prgChn,0,0,$list, $data,$prep);
   } 
   elsif($cmd eq "sysTime") { ##################################################
     $state = "";
@@ -3262,10 +3267,10 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
   #--- copy data from readings to shadow
   my $chnhash = $modules{CUL_HM}{defptr}{$dst.$chn};
   $chnhash = $hash if (!$chnhash);
+  my $rRd = ReadingsVal($chnhash->{NAME},$regLN,"");#General
   if (!$chnhash->{helper}{shadowReg} ||
       !$chnhash->{helper}{shadowReg}{$regLN}){
-	$chnhash->{helper}{shadowReg}{$regLN} = 
-	           ReadingsVal($chnhash->{NAME},$regLN,"");
+	$chnhash->{helper}{shadowReg}{$regLN} = $rRd;
   }
   #--- update with ne value
   my $regs = $chnhash->{helper}{shadowReg}{$regLN};
@@ -3276,8 +3281,18 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
       $regs .= " ".$addr.":".$data;
     }
   }
-  $chnhash->{helper}{shadowReg}{$regLN} = $regs;
-  return if ($prep);#prepare shadowReg only. More data to come. 
+  $chnhash->{helper}{shadowReg}{$regLN} = $regs; # update shadow
+  my $change;
+  if ($prep eq "exec"){#update complete registerset
+    foreach (sort split " ",$chnhash->{helper}{shadowReg}{$regLN}){
+	  $change .= $_." " if ($rRd !~ m /$_/);
+	}
+	$change =~ s/(\ |:)//g;
+  }
+  else{
+    $change = $content;# just change actual date
+  }
+  return if ($prep eq "prep");#prepare shadowReg only. More data to come. 
                     #Application takes care about execution
   CUL_HM_updtRegDisp($hash,$list,$peerAddr.$peerChn);
   CUL_HM_PushCmdStack($hash, "++".$flag.'01'.$src.$dst.$chn.'05'.
@@ -3285,7 +3300,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
   for(my $l = 0; $l < $tl; $l+=28) {
     my $ml = $tl-$l < 28 ? $tl-$l : 28;
     CUL_HM_PushCmdStack($hash, "++A001".$src.$dst.$chn."08".
-	                                 substr($content,$l,$ml));
+	                                 substr($change,$l,$ml));
   }
   CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$chn."06");
   CUL_HM_queueAutoRead($hash->{NAME}) 
@@ -5235,19 +5250,29 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	  <li><B>desired-temp &lt;temp&gt;</B><br>
           Set different temperatures. &lt;temp&gt; must be between 6 and 30
           Celsius, and precision is half a degree.</li>
-	  <li><B>tempListSat HH:MM temp ... 24:00 temp</B><br></li>
-      <li><B>tempListSun HH:MM temp ... 24:00 temp</B><br></li>
-      <li><B>tempListMon HH:MM temp ... 24:00 temp</B><br></li>
-      <li><B>tempListTue HH:MM temp ... 24:00 temp</B><br></li>
-      <li><B>tempListThu HH:MM temp ... 24:00 temp</B><br></li>
-      <li><B>tempListWed HH:MM temp ... 24:00 temp</B><br></li>
-      <li><B>tempListFri HH:MM temp ... 24:00 temp</B><br>
+	  <li><B>tempListSat [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListSun [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListMon [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListTue [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListThu [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListWed [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListFri [prep|exec] HH:MM temp ... 24:00 temp</B><br>
           Specify a list of temperature intervals. Up to 24 intervals can be
           specified for each week day, the resolution is 10 Minutes. The
           last time spec must always be 24:00.<br>
+		  The optional parameter [prep|exec] allowes to pack the messages and therefore greatly 
+		  improve data transmission. This is especially helpful if device is operated in wakeup mode.
+		  Usage is to send the commands with paramenter "prep". The data will be accumulated for send. 
+		  The last command must have the parameter "exec" in order to transmitt the information.<br>
           Example: until 6:00 temperature shall be 19, from then until 23:00 temperature shall be 
           22.5, thereafter until midnight, 19 degrees celsius is desired.<br>
-		  <code> set th tempListSat 06:00 19 23:00 22.5 24:00 19<br></code></li>
+		  <code> set th tempListSat 06:00 19 23:00 22.5 24:00 19<br></code>
+		  <br>
+		  <code> set th tempListSat prep 06:00 19 23:00 22.5 24:00 19<br>
+		         set th tempListSun prep 06:00 19 23:00 22.5 24:00 19<br>
+		         set th tempListMon prep 06:00 19 23:00 22.5 24:00 19<br>
+		         set th tempListTue exec 06:00 19 23:00 22.5 24:00 19<br></code>
+		  </li>
     </ul><br>
 	</li>
     <li>OutputUnit (HM-OU-LED16)
