@@ -1061,16 +1061,16 @@ my %culHmChanSets = (
 					  ,toggle         =>""},
   "HM-CC-RT-DN00"  =>{ sysTime        =>""},
   "HM-CC-RT-DN02"  =>{ sysTime        =>""},
-  "HM-CC-RT-DN04"  =>{ controlMode    => "[auto|boost|day|night]"
-                      ,controlManu    => "[on|off|5.0..30.0]"
-                      ,controlParty   => "<temp> <startDate> <startTime> <enddate> <endTime>"
-                      ,tempListSat    =>"HH:MM temp ..."
-                      ,tempListSun    =>"HH:MM temp ..."
-                      ,tempListMon    =>"HH:MM temp ..."
-                      ,tempListTue    =>"HH:MM temp ..."
-                      ,tempListThu    =>"HH:MM temp ..."
-                      ,tempListWed    =>"HH:MM temp ..."
-                      ,tempListFri    =>"HH:MM temp ..."
+  "HM-CC-RT-DN04"  =>{ controlMode    =>"[auto|boost|day|night]"
+                      ,controlManu    =>"[on|off|5.0..30.0]"
+                      ,controlParty   =>"<temp> <startDate> <startTime> <enddate> <endTime>"
+                      ,tempListSat    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListSun    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListMon    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListTue    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListThu    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListWed    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListFri    =>"[prep|exec] HH:MM temp ..."
 					  ,"desired-temp" =>"[on|off|5.0..30.0]"
 					  ,sysTime        =>""
                      },
