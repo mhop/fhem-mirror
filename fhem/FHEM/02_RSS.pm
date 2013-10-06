@@ -274,11 +274,29 @@ RSS_itemImg {
     } else {
       return;
     }
+  } elsif($srctype eq "data") {
+    if($imgtype eq "gif") {
+      $I= GD::Image->newFromGifData($arg);
+    } elsif($imgtype eq "png") {
+      $I= GD::Image->newFromPngData($arg);
+    } elsif($imgtype eq "jpeg") {
+      $I= GD::Image->newFromJpegData($arg);
+    } else {
+      return;
+    }
   } else {
     return;
   }
   ($x,$y)= RSS_xy($S,$x,$y);
   my ($width,$height)= $I->getBounds();
+  if ($scale =~ s/([wh])([\d]*)/$2/) { # get the digit from width/hight to pixel entry
+    #Debug "RSS scale $scale (1: $1 / 2: $2)contais px after Digit - width: $width / height: $height";
+    if ($1 eq "w") {
+	$scale=$scale/$width;
+    } else {
+	$scale=$scale/$height;
+    }
+  }
   my ($swidth,$sheight)= (int($scale*$width), int($scale*$height));
   #Debug "RSS placing $arg ($swidth x $sheight) at ($x,$y)";
   $S->copyResampled($I,$x,$y,0,0,$swidth,$sheight,$width,$height);
@@ -286,9 +304,10 @@ RSS_itemImg {
 
 sub
 RSS_itemLine {
-  my ($S,$x1,$y1,$x2,$y2,%params)= @_;
+  my ($S,$x1,$y1,$x2,$y2,$th,%params)= @_;
   ($x1,$y1)= RSS_xy($S,$x1,$y1);
   ($x2,$y2)= RSS_xy($S,$x2,$y2);
+  $S->setThickness($th);
   $S->line($x1,$y1,$x2,$y2,RSS_color($S,$params{rgb}));  
 }
 
@@ -334,8 +353,9 @@ RSS_evalLayout($$@) {
             #Debug "$name: ($x,$y) $txt";
             RSS_itemText($S,$x,$y,$txt,%params);
           } elsif($cmd eq "line") {
-            ($x1,$y1,$x2,$y2)= split("[ \t]+", $def, 4);
-            RSS_itemLine($S,$x1,$y1,$x2,$y2,%params);
+            ($x1,$y1,$x2,$y2,$format)= split("[ \t]+", $def, 5);
+            $format //= 1; # set format to 1 as default thickness for the line
+            RSS_itemLine($S,$x1,$y1,$x2,$y2, $format,%params);
           } elsif($cmd eq "time") {
             ($x,$y)= split("[ \t]+", $def, 2);
             RSS_itemTime($S,$x,$y,%params);
@@ -632,12 +652,13 @@ RSS_CGI(){
     <li>time &lt;x&gt; &lt;y&gt;<br>Renders the current time in HH:MM format.</li><br>
     <li>seconds &lt;x&gt; &lt;y&gt; &lt;format&gt<br>Renders the curent seconds. Maybe usefull for a RSS Clock. With option colon a : </li><br>
     <li>date &lt;x&gt; &lt;y&gt;<br>Renders the current date in DD:MM:YYY format.</li><br>
-    <li>line &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt;<br>Draws a line from position (&lt;x1&gt;, &lt;y1&gt;) to position (&lt;x2&gt;, &lt;y2&gt;).</li><br>
-    <li>img &lt;x&gt; &lt;y&gt; &lt;s&gt; &lt;imgtype&gt; &lt;srctype&gt; &lt;arg&gt; <br>Renders a picture at the
+    <li>line &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; [&lt;thickness&gt;]<br>Draws a line from position (&lt;x1&gt;, &lt;y1&gt;) to position (&lt;x2&gt;, &lt;y2&gt;) with optional thickness (default=1).</li><br>
+    <li>img &lt;x&gt; &lt;y&gt; &lt;['w' or 'h']s&gt; &lt;imgtype&gt; &lt;srctype&gt; &lt;arg&gt; <br>Renders a picture at the
     position (&lt;x&gt;, &lt;y&gt;). The &lt;imgtype&gt; is one of <code>gif</code>, <code>jpeg</code>, <code>png</code>.
-    The picture is scaled by the factor &lt;s&gt; (a decimal value). If &lt;srctype&gt; is <code>file</code>, the picture
+    The picture is scaled by the factor &lt;s&gt; (a decimal value). If 'w' or 'h' is in front of scale-value the value is used to set width or height to the value in pixel. If &lt;srctype&gt; is <code>file</code>, the picture
     is loaded from the filename &lt;arg&gt;, if &lt;srctype&gt; is <code>url</code>, the picture
-    is loaded from the URL &lt;arg&gt;. You can use
+    is loaded from the URL &lt;arg&gt;, if &lt;srctype&gt; is <code>data</code>, the picture
+    is loaded from Data &lt;arg&gt;. You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;arg&gt. See below for example.
     Notice: do not load the image from URL that is served by fhem as it leads to a deadlock.<br></li>
     <br>
