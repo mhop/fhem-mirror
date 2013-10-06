@@ -174,8 +174,7 @@ FW_selChange(sel, list, elName)
     if(elName.indexOf("val.set")==0) {
       qArg = o.qArg;
       eval(o.qFn.replace("%", ""));
-      // ??? Which readingsVal makes sense as set argument with the same name
-      //FW_queryValue('{ReadingsVal("'+devName+'","'+sel+'","")}', o.qFn, o.qArg);
+      FW_queryValue('{ReadingsVal("'+devName+'","'+sel+'","")}', o.qFn, o.qArg);
     }
   }
 }
