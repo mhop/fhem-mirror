@@ -34,7 +34,7 @@ sub readingsGroup_Initialize($)
   $hash->{UndefFn}  = "readingsGroup_Undefine";
   #$hash->{SetFn}    = "readingsGroup_Set";
   $hash->{GetFn}    = "readingsGroup_Get";
-  $hash->{AttrList} = "nameIcons mapping separator style nameStyle valueStyle valueFormat timestampStyle noheading:1 nolinks:1 notime:1 nostate:1";
+  $hash->{AttrList} = "nameIcon valueIcon mapping separator style nameStyle valueStyle valueFormat timestampStyle noheading:1 nolinks:1 notime:1 nostate:1";
 
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
@@ -86,8 +86,16 @@ readingsGroup_updateDevices($)
           $list{$d} = 1;
           push @devices, [$d,$device[1]];
         }
-      }
-      elsif( defined($defs{$device[0]}) ) {
+      } elsif($device[0] =~ m/(.*)&(.*)/) {
+        my ($lattr,$re) = ($1, $2);
+        foreach my $d (sort keys %attr) {
+          next if( IsIgnored($d) );
+          next if( !defined($attr{$d}{$lattr}) );
+          next if( $attr{$d}{$lattr} !~ m/^$re$/);
+          $list{$d} = 1;
+          push @devices, [$d,$device[1]];
+        }
+      } elsif( defined($defs{$device[0]}) ) {
         $list{$device[0]} = 1;
         push @devices, [@device];
       } else {
@@ -130,15 +138,22 @@ sub readingsGroup_Undefine($$)
   return undef;
 }
 
-sub lookup($$$$$$$)
+sub
+lookup($$$$$$$$)
 {
-  my($mapping,$name,$alias,$reading,$room,$group,$default) = @_;
+  my($mapping,$name,$alias,$reading,$value,$room,$group,$default) = @_;
 
   if( $mapping ) {
     if( ref($mapping) eq 'HASH' ) {
-      $default = $mapping->{$name} if( defined($mapping) && defined($mapping->{$name}) );
-      $default = $mapping->{$reading} if( defined($mapping) && defined($mapping->{$reading}) );
-      $default = $mapping->{$name.".".$reading} if( defined($mapping) && defined($mapping->{$name.".".$reading}) );
+      $default = $mapping->{$name} if( defined($mapping->{$name}) );
+      $default = $mapping->{$reading} if( defined($mapping->{$reading}) );
+      $default = $mapping->{$name.".".$reading} if( defined($mapping->{$name.".".$reading}) );
+    #} elsif( $mapping =~ m/^{.*}$/) {
+    #  my $DEVICE = $name;
+    #  my $READING = $reading;
+    #  my $VALUE = $value;
+    #  $mapping = eval $mapping;
+    #  $default = $mapping if( $mapping );
     } else {
       $default = $mapping;
     }
@@ -146,17 +161,41 @@ sub lookup($$$$$$$)
     $default =~ s/\%ALIAS/$alias/g;
     $default =~ s/\%DEVICE/$name/g;
     $default =~ s/\%READING/$reading/g;
+    $default =~ s/\%VALUE/$value/g;
     $default =~ s/\%ROOM/$room/g;
     $default =~ s/\%GROUP/$group/g;
 
     $default =~ s/\$ALIAS/$alias/g;
     $default =~ s/\$DEVICE/$name/g;
     $default =~ s/\$READING/$reading/g;
+    $default =~ s/\$VALUE/$value/g;
     $default =~ s/\$ROOM/$room/g;
     $default =~ s/\$GROUP/$group/g;
   }
 
   return $default;
+}
+sub
+lookup2($$$$)
+{
+  my($lookup,$name,$reading,$value) = @_;
+
+  return $lookup if( !$lookup );
+
+  if( ref($lookup) eq 'HASH' ) {
+    my $vf ="";
+    $vf = $lookup->{$reading} if( exists($lookup->{$reading}) );
+    $vf = $lookup->{$name.".".$reading} if( exists($lookup->{$name.".".$reading}) );
+    $lookup = $vf;
+  } elsif($lookup =~ m/^{.*}$/) {
+    my $DEVICE = $name;
+    my $READING = $reading;
+    my $VALUE = $value;
+    $lookup = eval $lookup;
+    $lookup = "" if( !$lookup );
+  }
+
+  return $lookup;
 }
 sub
 readingsGroup_2html($)
@@ -189,173 +228,115 @@ readingsGroup_2html($)
   $mapping = eval $mapping if( $mapping =~ m/^{.*}$/ );
   #$mapping = undef if( ref($mapping) ne 'HASH' );
 
-  my $nameIcons = AttrVal( $d, "nameIcons", "");
-  $nameIcons = eval $nameIcons if( $nameIcons =~ m/^{.*}$/ );
-  #$nameIcons = undef if( ref($nameIcons) ne 'HASH' );
+  my $nameIcon = AttrVal( $d, "nameIcon", "");
+  $nameIcon = eval $nameIcon if( $nameIcon =~ m/^{.*}$/ );
+  #$nameIcon = undef if( ref($nameIcon) ne 'HASH' );
+
+  my $valueIcon = AttrVal( $d, "valueIcon", "");
+  $valueIcon = eval $valueIcon if( $valueIcon =~ m/^{.*}$/ );
+  #$valueIcon = undef if( ref($valueIcon) ne 'HASH' );
 
 
   my $devices = $hash->{DEVICES};
 
-  my $ret;
-
   my $row = 1;
+
+  my $ret;
   $ret .= "<table>";
   my $txt = AttrVal($d, "alias", $d);
   $txt = "<a href=\"/fhem?detail=$d\">$txt</a>" if( $show_links );
   $ret .= "<tr><td><div class=\"devType\">$txt</a></div></td></tr>" if( $show_heading );
   $ret .= "<tr><td><table $style class=\"block wide\">";
   foreach my $device (@{$devices}) {
-    my $h = $defs{@{$device}[0]};
-    my $regex = @{$device}[1];
+    my $h = $defs{$device->[0]};
+    my $regex = $device->[1];
     my $name = $h->{NAME};
     next if( !$h );
 
-    if( $regex && $regex =~ m/\+(.*)/ ) {
-      $regex = $1;
-
-      my $now = gettimeofday();
-      my $fmtDateTime = FmtDateTime($now);
+    my @list = (undef);
+    @list = split(",",$regex) if( $regex );
+    my $first = 1;
+    my $multi = @list;
+    my $show_time = $show_time;
+    $show_time = 0 if( $regex && $regex =~ m/,/ );
+    foreach my $regex (@list) {
+      my $h = $h;
+      if( $regex && $regex =~ m/^\+(.*)/ ) {
+        $regex = $1;
+        $show_time = 0;
+      } elsif( $regex && $regex =~ m/^\?(.*)/ ) {
+        $regex = $1;
+        $show_time = 0;
+        $h = $attr{$name};
+      } else {
+        $h = $h->{READINGS};
+      }
 
       foreach my $n (sort keys %{$h}) {
         next if( $n =~ m/^\./);
+        next if( $n eq "state" && !$show_state && (!defined($regex) || $regex ne "state") );
         next if( defined($regex) &&  $n !~ m/^$regex$/);
         my $val = $h->{$n};
 
-        my $r = ref($val);
-        next if($r && ($r ne "HASH" || !defined($hash->{$n}{VAL})));
-
-        my $v = FW_htmlEscape($val);
-
-        my $name_style = $name_style;
-        if(defined($name_style) && $name_style =~ m/^{.*}$/) {
-          my $DEVICE = $name;
-          my $READING = $n;
-          my $VALUE = $v;
-          $name_style = eval $name_style;
-          $name_style = "" if( !$name_style );
-        }
-        my $value_style = $value_style;
-        if(defined($value_style) && $value_style =~ m/^{.*}$/) {
-          my $DEVICE = $name;
-          my $READING = $n;
-          my $VALUE = $v;
-          $value_style = eval $value_style;
-          $value_style = "" if( !$value_style );
+        my ($v, $t);
+        if(ref($val)) {
+          next if( ref($val) ne "HASH" || !defined($val->{VAL}) );
+          ($v, $t) = ($val->{VAL}, $val->{TIME});
+          $v = FW_htmlEscape($v);
+          $t = "" if(!$t);
+        } else {
+          $v = FW_htmlEscape($val);
         }
 
-        if( $value_format ) {
-          my $value_format = $value_format;
-          if( ref($value_format) eq 'HASH' ) {
-            my $vf ="";
-            $vf = $value_format->{$n} if( defined($value_format->{$n}) );
-            $vf = $value_format->{$name.".".$n} if( defined($value_format->{$name.".".$n}) );
-            $value_format = $vf;
-          } elsif( $value_format =~ m/^{.*}$/) {
-            my $DEVICE = $name;
-            my $READING = $n;
-            my $VALUE = $v;
-            $value_format = eval $value_format;
-          }
+        my $name_style = lookup2($name_style,$name,$n,$v);
+        my $value_style = lookup2($value_style,$name,$n,$v);
 
-          next if( !defined($value_format) );
-
-          $v = sprintf( $value_format, $v ) if( $value_format );
-        }
+        my $value_format = lookup2($value_format,$name,$n,$v);
+        next if( !defined($value_format) );
+        $v = sprintf( $value_format, $v ) if( $value_format );
 
         my $a = AttrVal($name, "alias", $name);
         my $m = "$a$separator$n";
         my $room = AttrVal($name, "room", "");
         my $group = AttrVal($name, "group", "");
-        my $txt = lookup($mapping,$name,$a,$n,$room,$group,$m);
+        my $txt = lookup($mapping,$name,$a,$n,$v,$room,$group,$m);
 
-        if( $nameIcons ) {
-          if( my $icon = lookup($nameIcons,$name,$a,$n,$room,$group,"") ) {
+        if( $nameIcon ) {
+          if( my $icon = lookup($nameIcon,$name,$a,$n,$v,$room,$group,"") ) {
             $txt = FW_makeImage( $icon, $txt, "icon" );
           }
         }
 
-        $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
-        $row++;
-
-        $txt = "<a href=\"/fhem?detail=$name\">$txt</a>" if( $show_links );
-        $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>";
-        $ret .= "<td><div $value_style\">$v</div></td>";
-        $ret .= "<td><div></div>$fmtDateTime</td>" if( $show_time );
-      }
-    } else {
-    foreach my $n (sort keys %{$h->{READINGS}}) {
-      next if( $n =~ m/^\./);
-      next if( $n eq "state" && !$show_state );
-      next if( defined($regex) &&  $n !~ m/^$regex$/);
-      my $val = $h->{READINGS}->{$n};
-
-      if(ref($val)) {
-        my ($v, $t) = ($val->{VAL}, $val->{TIME});
-        $v = FW_htmlEscape($v);
-        $t = "" if(!$t);
-
-        my $name_style = $name_style;
-        if(defined($name_style) && $name_style =~ m/^{.*}$/) {
-          my $DEVICE = $name;
-          my $READING = $n;
-          my $VALUE = $v;
-          $name_style = eval $name_style;
-          $name_style = "" if( !$name_style );
-        }
-        my $value_style = $value_style;
-        if(defined($value_style) && $value_style =~ m/^{.*}$/) {
-          my $DEVICE = $name;
-          my $READING = $n;
-          my $VALUE = $v;
-          $value_style = eval $value_style;
-          $value_style = "" if( !$value_style );
-        }
-
-        if( $value_format ) {
-          my $value_format = $value_format;
-          if( ref($value_format) eq 'HASH' ) {
-            my $vf ="";
-            $vf = $value_format->{$n} if( defined($value_format->{$n}) );
-            $vf = $value_format->{$name.".".$n} if( defined($value_format->{$name.".".$n}) );
-            $value_format = $vf;
-          } elsif( $value_format =~ m/^{.*}$/) {
-            my $DEVICE = $name;
-            my $READING = $n;
-            my $VALUE = $v;
-            $value_format = eval $value_format;
-          }
-
-          next if( !defined($value_format) );
-
-          $v = sprintf( $value_format, $v ) if( $value_format );
-        }
-
-        my $a = AttrVal($name, "alias", $name);
-        my $m = "$a$separator$n";
-        my $room = AttrVal($name, "room", "");
-        my $group = AttrVal($name, "group", "");
-        my $txt = lookup($mapping,$name,$a,$n,$room,$group,$m);
-
-        if( $nameIcons ) {
-          if( my $icon = lookup($nameIcons,$name,$a,$n,$room,$group,"") ) {
-            $txt = FW_makeImage( $icon, $txt, "icon" );
+        my $devStateIcon;
+        if( $valueIcon ) {
+          if( my $icon = lookup($valueIcon,$name,$a,$n,$v,$room,$group,"") ) {
+            if( $icon =~ m/^[\%\$]devStateIcon$/ ) {
+              my %extPage = ();
+              my ($allSets, $cmdlist, $txt) = FW_devState($name, $room, \%extPage);
+              $devStateIcon = $txt;
+            } else {
+              $devStateIcon = FW_makeImage( $icon, $v, "icon" );
+            }
           }
         }
 
-        $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
-        $row++;
+        if( $first || $multi == 1 ) {
+          $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
+          $row++;
+        }
 
         $txt = "<a href=\"/fhem?detail=$name\">$txt</a>" if( $show_links );
-        $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>";
-        $ret .= "<td><div $value_style informId=\"$d-$name.$n\">$v</div></td>";
+        $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>" if( $first || $multi == 1 );
+        $ret .= "<td informId=\"$d-$name.$n.icon\">$devStateIcon</td>" if( $devStateIcon );
+        $ret .= "<td><div $value_style informId=\"$d-$name.$n\">$v</div></td>" if( !$devStateIcon );
         $ret .= "<td><div $timestamp_style informId=\"$d-$name.$n-ts\">$t</div></td>" if( $show_time );
+
+        $first = 0;
       }
-    }
     }
   }
   $ret .= "</table></td></tr>";
   $ret .= "</table>";
-  #$ret .= "</br>";
 
   return $ret;
 }
@@ -422,8 +403,10 @@ readingsGroup_Notify($$)
       $reading = "" if( !defined($reading) );
       next if( $reading =~ m/^\./);
       $value = "" if( !defined($value) );
+      my $show_state = 1;
       if( $value eq "" ) {
-        next if( AttrVal( $name, "nostate", "0" ) );
+        $show_state = !AttrVal( $name, "nostate", "0" );
+        #next if( !$show_state );
 
         $reading = "state";
         $value = $s;
@@ -435,30 +418,63 @@ readingsGroup_Notify($$)
         $value_format = $vf if( $vf );
       }
 
+      my $valueIcon = AttrVal( $name, "valueIcon", "");
+      $valueIcon = eval $valueIcon if( $valueIcon =~ m/^{.*}$/ );
+
       foreach my $device (@{$devices}) {
         my $h = $defs{@{$device}[0]};
         next if( !$h );
         next if( $dev->{NAME} ne $h->{NAME} );
         my $regex = @{$device}[1];
-        next if( defined($regex) && $reading !~ m/^$regex$/);
+        my @list = (undef);
+        @list = split(",",$regex) if( $regex );
+        foreach my $regex (@list) {
+          next if( $reading eq "state" && !$show_state && (!defined($regex) || $regex ne "state") );
+          next if( $regex && $regex =~ m/^\+/ );
+          next if( $regex && $regex =~ m/^\?/ );
+          next if( defined($regex) && $reading !~ m/^$regex$/);
 
-        if( $value_format ) {
-          my $value_format = $value_format;
-          if( ref($value_format) eq 'HASH' ) {
-            my $vf = "";
-            $vf = $value_format->{$reading} if( defined($value_format->{$reading}) );
-            $vf = $value_format->{$dev->{NAME}.".".$reading} if( defined($value_format->{$dev->{NAME}.".".$reading}) );
-            $value_format = $vf;
-            } elsif( $value_format =~ m/^{.*}$/) {
-            my $DEVICE = $dev->{NAME};
-            my $READING = $reading;
-            my $VALUE = $value;
-            $value_format = eval $value_format;
+          my $devStateIcon;
+          if( $valueIcon ) {
+            my $n = $h->{NAME};
+            my $a = AttrVal($n, "alias", $n);
+            my $room = AttrVal($n, "room", "");
+            my $group = AttrVal($n, "group", "");
+            if( my $icon = lookup($valueIcon,$n,$a,$reading,$value,$room,$group,"") ) {
+              if( $icon eq "%devStateIcon" ) {
+                my %extPage = ();
+                my ($allSets, $cmdlist, $txt) = FW_devState($n, $room, \%extPage);
+                $devStateIcon = $txt;
+              } else {
+                $devStateIcon = FW_makeImage( $icon, $value, "icon" );
+              }
+            }
+
+            CommandTrigger( "", "$name $n.$reading.icon: $devStateIcon" ) if( $devStateIcon );
+            next if( $devStateIcon );
           }
-          $value = sprintf( $value_format, $value ) if( $value_format );
-        }
 
-        CommandTrigger( "", "$name $dev->{NAME}.$reading: $value" );
+          my $value = $value;
+          if( $value_format ) {
+            my $value_format = $value_format;
+            if( ref($value_format) eq 'HASH' ) {
+              my $vf = "";
+              $vf = $value_format->{$reading} if( exists($value_format->{$reading}) );
+              $vf = $value_format->{$dev->{NAME}.".".$reading} if( exists($value_format->{$dev->{NAME}.".".$reading}) );
+              $value_format = $vf;
+              } elsif( $value_format =~ m/^{.*}$/) {
+              my $DEVICE = $dev->{NAME};
+              my $READING = $reading;
+              my $VALUE = $value;
+              $value_format = eval $value_format;
+            }
+
+            $value = "" if( !defined($value_format) );
+            $value = sprintf( $value_format, $value ) if( $value_format );
+          }
+
+          CommandTrigger( "", "$name $dev->{NAME}.$reading: $value" );
+        }
       }
     }
   }
@@ -520,8 +536,10 @@ readingsGroup_Get($@)
     Notes:
     <ul>
       <li>&lt;device&gt; can be of the form INTERNAL=VALUE where INTERNAL is the name of an internal value and VALUE is a regex.</li>
+      <li>If regex is a comma separatet list the reading values will be shown on a single line.</li>
       <li>If regex starts with a + it will be matched against the internal values of the device instead of the readings.</li>
-      <li>For internal values no longpoll update is possible. Refresh the page to update the values.</li>
+      <li>If regex starts with a ? it will be matched against the attributes of the device instead of the readings.</li>
+      <li>For internal values and attributes longpoll update is not possible. Refresh the page to update the values.</li>
     </ul><br>
 
     Examples:
@@ -543,6 +561,14 @@ readingsGroup_Get($@)
         attr systemStatus notime 1<br>
         attr systemStatus nostate 1<br>
         attr systemStatus mapping { 'load' => 'Systemauslastung', 'temperature' => 'Systemtemperatur in &amp;deg;C'}<br>
+      <br>
+        define Verbrauch readingsGroup TYPE=PCA301:state,power,consumption
+        attr Verbrauch mapping %ALIAS
+        attr Verbrauch nameStyle style="font-weight:bold"
+        attr Verbrauch style style="font-size:20px"
+        attr Verbrauch valueFormat {power => "%.1f W", consumption => "%.2f kWh"}
+        attr Verbrauch valueIcon { state => '%devStateIcon' }
+        attr Verbrauch valueStyle {($READING eq "power" && $VALUE > 150)?'style="color:red"':'style="color:green"'}
       </code><br>
     </ul>
   </ul><br>
@@ -590,25 +616,32 @@ readingsGroup_Get($@)
           <code>attr temperatures valueStyle style="text-align:right"</code></li>
       <li>valueFormat<br>
         Specify an sprintf style format string used to display the reading values. If the format string is undef
-        this reading will be skipped. Can be given as a string,
-        a perl expression returninga hash or a perl expression returning a string, e.g.:<br>
+        this reading will be skipped. Can be given as a string, a perl expression returning a hash or a perl
+        expression returning a string, e.g.:<br>
           <code>attr temperatures valueFormat %.1f &deg;C</code></br>
           <code>attr temperatures valueFormat { temperature => "%.1f &deg;C", humidity => "%.1f %" }</code></br>
           <code>attr temperatures valueFormat { ($READING eq 'temperature')?"%.1f &deg;C":undef }</code></li>
       <li>nameIcon<br>
-        Specify an icon to be used instead of the reading name. Can be a simple string or a perl expression enclosed
+        Specify the icon to be used instead of the reading name. Can be a simple string or a perl expression enclosed
         in {} that returns a hash that maps reading names to the icon name. e.g.:<br>
           <code>attr devices nameIcon $DEVICE</code></li>
+      <li>valueIcon<br>
+        Specify an icon to be used instead of the reading value. Can be a simple string or a perl expression enclosed
+        in {} that returns a hash that maps reading value to the icon name. e.g.:<br>
+          <code>attr devices valueIcon $VALUE</code></br>
+          <code>attr devices valueIcon {state => '%VALUE'}</code></br>
+          <code>attr devices valueIcon {state => '%devStateIcon'}</code></li>
     </ul><br>
 
-      The nameStyle and valueStyle attributes can also contain a perl expression enclosed in {} that returns the style string to use. The perl code can use $DEVICE,$READING and $VALUE, e.g.:<br>
+      The nameStyle and valueStyle attributes can also contain a perl expression enclosed in {} that returns the style
+      string to use. The perl code can use $DEVICE,$READING and $VALUE, e.g.:<br>
     <ul>
           <code>attr batteries valueStyle {($VALUE ne "ok")?'style="color:red"':'style="color:green"'}</code><br>
           <code>attr temperatures valueStyle {($DEVICE =~ m/aussen/)?'style="color:green"':'style="color:red"'}</code>
     </ul>
       Note: The perl expressions are evaluated only once during html creation and will not reflect value updates with longpoll.
-      Refresh the page to update the dynamic style. For nameStyle the collor attribut is not working at the moment,
-      font-... and background do work.
+      Refresh the page to update the dynamic style. For nameStyle the color attribut is not working at the moment,
+      the font-... and background attributes do work.
 
 </ul>
 
