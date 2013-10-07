@@ -301,6 +301,7 @@ sub HMinfo_SetFn($@) {#########################################################
   }
   elsif($cmd eq "protoEvents"){##print protocol-events-------------------------
 	my ($type) = @a;
+	$type = "long" if(!$type);
 	my @paramList;
 	my @IOlist;
 	foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
