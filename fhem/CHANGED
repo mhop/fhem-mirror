@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 
 - 2013-xx-xx (SVN)
+  - feature: YAMAHA_AVR - new remoteControl commands for Tuner Preset 
+             selection
   - feature: RSS amended (read image from pipe, scaling options, line width)
 
 - 2013-09-29 (5.5)

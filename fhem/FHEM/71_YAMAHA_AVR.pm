@@ -225,7 +225,7 @@ YAMAHA_AVR_Set($@)
     return "No Argument given" if(!defined($a[1]));     
     
     my $what = $a[1];
-    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg volumeStraight:slider,-80,1,16 volume:slider,0,1,100 volumeUp volumeDown input:".$inputs_comma." mute:on,off remoteControl:setup,up,down,left,right,return,option,display,enter ".(defined($hash->{helper}{SCENES})?"scene:".$scenes_comma." ":"")."statusRequest:noArg";
+    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg volumeStraight:slider,-80,1,16 volume:slider,0,1,100 volumeUp volumeDown input:".$inputs_comma." mute:on,off remoteControl:setup,up,down,left,right,return,option,display,tunerPresetUp,tunerPresetDown,enter ".(defined($hash->{helper}{SCENES})?"scene:".$scenes_comma." ":"")."statusRequest:noArg";
 
     # Depending on the status response, use the short or long Volume command
 
@@ -486,6 +486,14 @@ YAMAHA_AVR_Set($@)
 			elsif($a[2] eq "option")
 			{
 			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Menu_Control>Option</Menu_Control></List_Control></$zone></YAMAHA_AV>");
+			}
+			elsif($a[2] eq "tunerPresetUp")
+			{
+			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><Preset_Sel>Up</Preset_Sel></Preset></Play_Control></Tuner></YAMAHA_AV>");
+			}
+			elsif($a[2] eq "tunerPresetDown")
+			{
+			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><Preset_Sel>Down</Preset_Sel></Preset></Play_Control></Tuner></YAMAHA_AV>");
 			}
 			else
 			{
@@ -1020,6 +1028,12 @@ sub YAMAHA_AVR_getInputs($)
     remoteControl option<br>
     remoteControl display<br>
     </code></ul><br><br>
+	
+	<u>Tuner Control:</u><br><br>
+	<ul><code>
+	remoteControl tunerPresetUp<br>
+	remoteControl tunerPresetDown<br>
+	</code></ul><br><br>
 
     The button names are the same as on your remote control.<br><br>
     
@@ -1208,7 +1222,12 @@ output        # only available in zones other than mainzone</code></ul><br><br>
     remoteControl option<br>
     remoteControl display<br>
     </code></ul><br><br>
-
+	
+	<u>Radio Steuerung:</u><br><br>
+	<ul><code>
+	remoteControl tunerPresetUp<br>
+	remoteControl tunerPresetDown<br>
+	</code></ul><br><br>
     Die Befehlsnamen entsprechen den Tasten auf der Fernbedienung.<br><br>
     
     Ein typisches Beispiel ist das automatische Einschalten und Abspielen eines Internet Radio Sender:<br><br>
