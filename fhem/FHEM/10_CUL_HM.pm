@@ -2026,6 +2026,7 @@ sub CUL_HM_Set($@) {
   my $ret;
   return "no set value specified" if(@a < 2);
   my $name    = $hash->{NAME};
+  return "device ignored due to attr 'ignore'" if (CUL_HM_getAttrInt($name,"ignore"));
   my $devName = $hash->{device}?$hash->{device}:$name;
   my $st      = AttrVal($devName, "subType", "");
   my $md      = AttrVal($devName, "model"  , "");
@@ -3492,7 +3493,9 @@ sub CUL_HM_SndCmd($$) {
   my ($hash, $cmd) = @_;
   $hash = CUL_HM_getDeviceHash($hash); 
   my $io = $hash->{IODev};
-  return if(!$io);  
+  return if(  !$io 
+            || AttrVal($hash->{NAME},"ignore","")
+			|| AttrVal($hash->{NAME},"dummy",""));  
   my $ioName = $io->{NAME};
   if ((hex substr($cmd,2,2) & 0x20) && (                   # check for commands with resp-req
            $io->{STATE} !~ m/^(opened|Initialized)$/       # we need to queue
@@ -5559,6 +5562,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
         attr KFM100 unit Liter
         </li>
     <li><a name="autoReadReg">autoReadReg</a><br>
+        '0' autoReadReg will be ignored.<br>
         '1' will execute a getConfig for the device automatically after each reboot of FHEM. <br>
 		'2' like '1' plus execute after power_on.<br>
 		'3' includes '2' plus updates on writes to the device<br>
