@@ -918,7 +918,7 @@ my %culHmSubTypeDevSets = (# device of this subtype
   blindActuator    =>{ statusRequest =>""},
 #  remote           =>{ },
   threeStateSensor =>{ statusRequest =>""},
-  THSensor         =>{ statusRequest =>""},
+#  THSensor         =>{ statusRequest =>""}, at least OT/OT2 do not support this 
 #  virtual          =>{ },
   smokeDetector    =>{ statusRequest =>""},
   winMatic         =>{ statusRequest =>""},
@@ -965,8 +965,7 @@ my %culHmSubTypeSets = (# channels of this subtype
   remote           =>{ peerChan      =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"},
   threeStateSensor =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
 					  ,statusRequest =>""},
-  THSensor         =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
-					  ,statusRequest =>""},
+  THSensor         =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
   virtual          =>{ peerChan      =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"
 		              ,press         =>"[long|short]..."
                       ,postEvent     =>"<condition>"

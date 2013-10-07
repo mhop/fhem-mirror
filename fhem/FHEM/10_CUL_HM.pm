@@ -2364,7 +2364,7 @@ sub CUL_HM_Set($@) {
 	return "value:".$data." out of range for Reg \"".$regName."\""
 	        if (!($reg->{c} =~ m/^(lit|hex|min2time)$/)&&
 			    ($data < $reg->{min} ||$data > $reg->{max})); # none number
-    return"invalid value. use:". join(",",keys%{$reg->{lit}}) 
+    return"invalid value. use:". join(",",sort keys%{$reg->{lit}}) 
 	        if ($reg->{c} eq 'lit' && !defined($reg->{lit}{$data}));
 	
 	$data *= $reg->{f} if($reg->{f});# obey factor befor possible conversion
@@ -2461,11 +2461,12 @@ sub CUL_HM_Set($@) {
     if ($cmd eq "on-till"){
 	  # to be extended to handle end date as well
 	  my ($eH,$eM,$eSec)  = split(':',$duration); 
+	  return "please enter time informat hh:mm:ss" if (!$eSec);
 	  $eSec += $eH*3600 + $eM*60;
 	  my @lt = localtime;	  
 	  my $ltSec = $lt[2]*3600+$lt[1]*60+$lt[0];# actually strip of date
 	  $eSec += 3600*24 if ($ltSec > $eSec); # go for the next day
-	  $duration = $eSec - $ltSec;	  
+	  $duration = $eSec - $ltSec;
     }
 	return "please enter the duration in seconds" 
 	      if (!defined $duration || $duration !~ m/^[+-]?\d+(\.\d+)?$/);
@@ -2687,12 +2688,14 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,$msg) if ($msg);
   } 
   elsif($cmd =~ m/^(controlMode|controlManu|controlParty)$/) { ################
-    my $mode = $a[1];
+    my $mode = $a[2];
     if ($cmd ne "controlMode"){
 	  $mode = substr($a[1],7);
       $a[2] = ($a[2] eq "off")?4.5:($a[2] eq "on"?30.5:$a[2]);
 	}
-    return "select of mode [auto|boost|day|night] or mode-manu, mode-party"
+	$mode = lc $mode;
+    return "invalid $mode:select of mode [auto|boost|day|night] or"
+	      ." controlManu,controlParty"
                 if ($mode !~ m/^(auto|manu|party|boost|day|night)$/);
     my ($temp,$party);
 	if ($mode =~ m/^(auto|boost|day|night)$/){
