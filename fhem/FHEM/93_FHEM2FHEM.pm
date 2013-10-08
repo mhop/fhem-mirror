@@ -141,6 +141,7 @@ FHEM2FHEM_Read($)
 
     if($hash->{informType} eq "LOG") {
       my ($type, $name, $msg) = split(" ", $rmsg, 3);
+      next if(!defined($msg)); # Bogus data
       my $re = $hash->{regexp};
       next if($re && !($name =~ m/^$re$/ || "$name:$msg" =~ m/^$re$/));
 
