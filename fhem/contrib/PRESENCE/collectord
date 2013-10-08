@@ -218,6 +218,8 @@ my $log_queue = Thread::Queue->new();
 my $logline;
 
 
+print timestamp()."finished initialization. entering main loop\n" if($opt_v >= 2);
+
 while(1)
 {
 
@@ -237,7 +239,8 @@ while(1)
 	while($status_queue->pending)
 	{
 	    ($uuid,$room,$value,$name) = split(";", $status_queue->dequeue);
-
+	    
+	    print timestamp()."processing state message for device ".(defined($name)?$name." ":"")."in room $room (UUID: $uuid)\n" if($opt_v >=2);
 	    
 	    if(not $value =~ /^(absence|present)$/)
 	    {
@@ -478,7 +481,7 @@ while(1)
 	# in case we have received a process signal, remove the pid file and shutdown
 	if(defined($sig_received))
 	{
-		print timestamp()."Caught $sig_received exiting\n" if($opt_v);
+		print "\r".timestamp()."Caught $sig_received exiting\n" if($opt_v);
 		unlink($opt_P); 
 		print timestamp()."removed PID-File $opt_P\n" if($opt_v);
 		print timestamp()."server shutdown\n" if($opt_v);
@@ -486,7 +489,11 @@ while(1)
 	}
 	
 
+
 }
+
+print timestamp()."leaving main loop\n" if($opt_v >= 2);
+
 ########################################################################################################################
 #
 #   Subroutine definitions
@@ -548,18 +555,17 @@ sub doQuery($$$)
     my $client_socket = undef;
     # if the thread gets a termination signal, the thread must be shutdown by itself
     local $SIG{TERM} = sub { 
-			 $log_queue->enqueue("$room (".threads->tid()."): terminating thread ".threads->tid()." for $address\n");
-			 $client_socket->send("stop\n") if($client_socket);
-			 sleep 2;
+			 $log_queue->enqueue("$room (Thread No. ".threads->tid()."): terminating thread ".threads->tid()." for $address\n");
+			 $client->shutdown() if(defined($client));
 			 $selector->remove($client_socket) if(defined($selector));
-			 close($client_socket) if($client_socket);
+			 close($client_socket) if(defined($client_socket));
 			 $client_socket = undef;
-			 $log_queue->enqueue("$room (".threads->tid()."): exit thread ".threads->tid()."\n");
+			 $log_queue->enqueue("$room (Thread No. ".threads->tid()."): exit thread ".threads->tid()."\n");
 			 threads->exit();
 			};
 			
     local $SIG{HUP} = sub {
-			  $client_socket->send("now\n") if($client_socket);
+			  $client_socket->send("now\n") if(defined($client_socket));
 			  };
     
     
@@ -580,7 +586,7 @@ sub doQuery($$$)
 
     $selector = IO::Select->new($client_socket);
 
-    if($client_socket)
+    if(defined($client_socket))
     {
 
 	# send the given address to the presence daemon
@@ -603,6 +609,7 @@ sub doQuery($$$)
 	    $log_queue->enqueue("$room (Thread No. ".threads->tid().") socket to ".$values{address}.":".$values{port}." did not report anything in expected time, resetting socket (last contact: ".strftime("%Y-%m-%d %H:%M:%S", localtime($last_contact)).")\n");
 	    
 	    $selector->remove($client_socket);
+	    shutdown($client_socket, 2);
 	    close($client_socket);
 	    $client_socket = undef;
 	}
@@ -630,7 +637,7 @@ sub doQuery($$$)
 	    Blocking => 1
 	    ) or ( $reconnect_count++ );
 	    
-	    if($client_socket)
+	    if(defined($client_socket))
 	    {
 		# give a success message
 		$log_queue->enqueue("$room (Thread No. ".threads->tid().") reconnected to ".$values{address}.":".$values{port}." after $reconnect_count tries for device $do_address (UUID: $do_uuid)\n");
@@ -720,6 +727,8 @@ sub doQuery($$$)
 			{	
 				
 				$selector->remove($local_client);
+				
+				shutdown($local_client, 2);
 				close($local_client);
 				$client_socket = undef;
 				
@@ -730,7 +739,7 @@ sub doQuery($$$)
 	}
 	
 	# Sleep for one second to avoid 100% cpu usage 
-	sleep(1);
+	#sleep(1);
     }
 
 }
