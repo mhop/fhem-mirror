@@ -106,7 +106,7 @@ FHEM/49_IPCAM.pm             mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/50_WS300.pm             Dirk                 http://forum.fhem.de SlowRF
 FHEM/51_I2C_BMP180.pm        Dirk                 http://forum.fhem.de/ Raspberry Pi
 FHEM/55_GDS.pm               betateilchen         http://forum.fhem.de Unterstützende Dienste
-FHEM/55_PIFACE.pm            betateilchen         http://forum.fhem.de/ Raspberry Pi
+FHEM/55_PIFACE.pm            betateilchen         http://forum.fhem.de Raspberry Pi
 FHEM/56_POKEYS.pm            axelberner           http://forum.fhem.de Sonstiges
 FHEM/57_Calendar.pm          borisneubert         http://forum.fhem.de Sonstiges
 FHEM/59_HCS.pm               mfr69bs              http://forum.fhem.de Automatisierung
