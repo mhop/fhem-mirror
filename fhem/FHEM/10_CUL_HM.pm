@@ -188,7 +188,7 @@ sub CUL_HM_autoReadConfig($){
 		last;
 	  }
 	}
-	my $tName = ${$modules{CUL_HM}{helper}{autoRdCfgLst}}[0]; # test before remove
+	my $tName = CUL_HM_getDeviceName(${$modules{CUL_HM}{helper}{autoRdCfgLst}}[0]); 
 	my $ioName = $defs{$tName}{IODev}{NAME};
 	if (ReadingsVal($ioName,"cond","") !~ m /^(ok|Overload-released|init)$/
 	    || (  $defs{$ioName}{helper}{q}
