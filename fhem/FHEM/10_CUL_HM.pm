@@ -3403,7 +3403,7 @@ sub CUL_HM_respWaitSu ($@){ #setup response for multi-message response
   my $mHsh = $hash->{helper}{prt};
   $modules{CUL_HM}{prot}{rspPend}++ if(!$mHsh->{rspWait}{cmd});
   foreach (@a){
-	my ($f,$d)=split ":",$_;
+	my ($f,$d)=split ":=",$_;
 	$mHsh->{rspWait}{$f}=$d;
   }
   my $to = gettimeofday() + (($mHsh->{rspWait}{Pending})?rand(20)/10+4:
@@ -3421,9 +3421,9 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
     if   ($mTp eq "01" && $subType){ 
       if   ($subType eq "03"){ #PeerList-----------
     	#--- remember request params in device level
-		CUL_HM_respWaitSu ($hash,"Pending:PeerList"
-		                        ,"cmd:$cmd" ,"forChn:".substr($p,0,2)
-								,"reSent:1");
+		CUL_HM_respWaitSu ($hash,"Pending:=PeerList"
+		                        ,"cmd:=$cmd" ,"forChn:=".substr($p,0,2)
+								,"reSent:=1");
 								
     	#--- remove readings in channel
     	my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"}; 
@@ -3437,41 +3437,43 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
         my ($peer, $list) = ($1,$2) if ($p =~ m/..04(........)(..)/);
 	    $peer = ($peer ne "00000000")?CUL_HM_peerChName($peer,$dst,""):"";
 	    #--- set messaging items
-		CUL_HM_respWaitSu ($hash,"Pending:RegisterRead"
-		                        ,"cmd:$cmd" ,"forChn:$chn"
-								,"forList:$list","forPeer:$peer"
-								,"reSent:1");
+		CUL_HM_respWaitSu ($hash,"Pending:=RegisterRead"
+		                        ,"cmd:=$cmd" ,"forChn:=$chn"
+								,"forList:=$list","forPeer:=$peer"
+								,"reSent:=1");
 	    #--- remove channel entries that will be replaced
         my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
         $chnhash = $hash if(!$chnhash);   
     
 	    $peer ="" if($list !~ m/^0[34]$/);
 	    #empty val since reading will be cumulative 
-	    my $rlName = ((CUL_HM_getAttrInt($chnhash->{NAME},"expert") == 2)?"":".")."RegL_".$list.":".$peer;
+	    my $rlName = ((CUL_HM_getAttrInt($chnhash->{NAME},"expert") == 2)?
+		                                 "":".")."RegL_".$list.":".$peer;
         $chnhash->{READINGS}{$rlName}{VAL}=""; 
         delete ($chnhash->{READINGS}{$rlName}{TIME}); 
       }
       elsif($subType eq "09"){ #SerialRead-------
-		CUL_HM_respWaitSu ($hash,"Pending:SerialRead"
-		                        ,"cmd:$cmd" ,"reSent:1");
+		CUL_HM_respWaitSu ($hash,"Pending:=SerialRead"
+		                        ,"cmd:=$cmd" ,"reSent:=1");
       }
 	  else{
-	    CUL_HM_respWaitSu ($hash,"cmd:$cmd","mNo:$mNo","reSent:1");
+	    CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=1");
 	  }
     }
     elsif($mTp eq '11' && $chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
       CUL_HM_qStateUpdatIfEnab($dst);
       if ($p =~ m/02..(..)....(....)/){#lvl ne 0 and timer on
  	    $hash->{helper}{tmdOn} = $2 if ($1 ne "00" && $2 !~ m/(0000|FFFF)/);
-	    CUL_HM_respWaitSu ($hash,"cmd:$cmd","mNo:$mNo","reSent:1","timedOn:1");
+	    CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo"
+		                        ,"reSent:=1","timedOn:=1");
 	  }
     }
 	elsif($mTp eq '12' && $mFlg & 0x10){#wakeup with burst
 	  # response setup - do not repeat, set counter to 250
-	  CUL_HM_respWaitSu ($hash,"cmd:$cmd","mNo:$mNo","reSent:1","wakeup:1");
+	  CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=1","wakeup:=1");
 	}
 	else{
-	  CUL_HM_respWaitSu ($hash,"cmd:$cmd","mNo:$mNo","reSent:1");
+	  CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=1");
 	}
 
 	CUL_HM_protState($hash,"CMDs_processing...");                         
