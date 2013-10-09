@@ -192,7 +192,7 @@ lookup2($$$$)
     my $READING = $reading;
     my $VALUE = $value;
     $lookup = eval $lookup;
-    $lookup = "" if( !$lookup );
+    $lookup = "" if( $@ );
   }
 
   return $lookup;
