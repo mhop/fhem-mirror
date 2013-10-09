@@ -299,9 +299,11 @@ sub CUL_HM_updateConfig($){
     $webCmd  = AttrVal($name,"webCmd",undef);
     if(!defined $webCmd){
       if    ($st eq "virtual"      ){$webCmd="press short:press long";
-	  }elsif($hash->{helper}{role}{dev} && 
-	        !$hash->{helper}{role}{chn} &&
-			 $md ne "HM-CC-TC"     ){$webCmd="getConfig";
+	  }elsif(( $hash->{helper}{role}{dev} && 
+	          !$hash->{helper}{role}{chn} &&
+			   $md ne "HM-CC-TC")
+		    ||$st eq "repeater"
+			||$md eq "HM-CC-VD"	   ){$webCmd="getConfig";
 	  }elsif($st eq "blindActuator"){$webCmd="toggle:on:off:up:down:stop:statusRequest";
 	  }elsif($st eq "dimmer"       ){$webCmd="toggle:on:off:up:down:statusRequest";
 	  }elsif($st eq "switch"       ){$webCmd="toggle:on:off:statusRequest";
@@ -1361,8 +1363,8 @@ sub CUL_HM_Parse($$) {##############################
 	if (defined($state)){# if state was detected post events
 	  my $txt;
 	  if    ($lvlStr{md}{$md}){$txt = $lvlStr{md}{$md}{$state}}
-	  elsif ($lvlStr{st}{$st})   {$txt = $lvlStr{st}{$st}{$state} }
-	  else                       {$txt = "unknown:$state"}
+	  elsif ($lvlStr{st}{$st}){$txt = $lvlStr{st}{$st}{$state}}
+	  else                    {$txt = "unknown:$state"}
 
 	  push @event, "state:$txt";
 	  push @event, "contact:$txt$target";

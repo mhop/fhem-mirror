@@ -105,7 +105,7 @@ my %culHmModel=(
   "0038" => {name=>"HM-RC-19-B"              ,st=>'remote'            ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,4:1p.2p.3p.4p.5p.6p.7p.8p.9p.10p.11p.12p.13p.14p.15p.16p'
                                                                                                                         ,chn=>"Btn:1:17,Disp:18:18",},
   "0039" => {name=>"HM-CC-TC"                ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:2p,5:2.3p,6:2',chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3",},
-  "003A" => {name=>"HM-CC-VD"                ,st=>'thermostat'        ,cyc=>'28:00' ,rxt=>'c:w:f'  ,lst=>'p,5'          ,chn=>"",},
+  "003A" => {name=>"HM-CC-VD"                ,st=>'thermostat'        ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'p,5'          ,chn=>"",},
   "003B" => {name=>"HM-RC-4-B"               ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:4",},
   "003C" => {name=>"HM-WDS20-TH-O"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",},
   "003D" => {name=>"HM-WDS10-TH-O"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",},
@@ -1003,7 +1003,6 @@ $culHmSubTypeSets{blindActuatorSol}= $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{tipTronic}       = $culHmSubTypeSets{outputUnit};
 
 $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
-#  sensRain    ( no statusrequest)     
 
 my %culHmModelSets = (# channels of this subtype-------------
   "HM-CC-VD"       =>{ valvePos     => "position"},
@@ -1023,7 +1022,6 @@ my %culHmModelSets = (# channels of this subtype-------------
 					  ,press         =>"[long|short] [on|off] ..."
 					  ,inhibit       =>"[on|off]"},
   "HM-CC-TC"       =>{ statusRequest =>""},
-  "HM-CC-VD"       =>{ statusRequest =>""},
 );
 # clones- - - - - - - - - - - - - - - - - 
 $culHmModelSets{"HM-RC-19-B"}  = $culHmModelSets{"HM-RC-19"};
