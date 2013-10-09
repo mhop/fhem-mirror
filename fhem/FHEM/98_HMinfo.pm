@@ -26,6 +26,7 @@ sub HMinfo_Initialize($$) {####################################################
   $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 ".
 					   "sumStatus sumERROR ".
 					   "autoUpdate ".
+					   "hmAutoReadScan ".
                        $readingFnAttributes;
 
 }
@@ -67,6 +68,23 @@ sub HMinfo_Attr(@) {#################################
 	return "give at least one minute" if ($sec < 60);
 	$hash->{helper}{autoUpdate} = $sec;
 	InternalTimer(gettimeofday()+$sec,"HMinfo_autoUpdate","sUpdt:".$name,0);
+  }
+  elsif   ($attrName eq "hmAutoReadScan"){# 00:00 hh:mm
+	if ($cmd eq "del"){
+	  $modules{CUL_HM}{hmAutoReadScan} = 4;# return to default
+	}
+    else{
+	  return "please add plain integer between 1 and 300" 
+	      if (  $attrVal !~ m/^(\d+)$/
+		      ||$attrVal<0
+			  ||$attrVal >300 );
+	  ## implement new timer to CUL_HM
+      $modules{CUL_HM}{hmAutoReadScan}=$attrVal;
+	  RemoveInternalTimer("autoRdCfg");
+	  InternalTimer(gettimeofday()+$modules{CUL_HM}{hmAutoReadScan}
+	                ,"CUL_HM_autoReadConfig"
+					,"autoRdCfg",0);
+	}
   }
   return;
 }
@@ -328,7 +346,6 @@ sub HMinfo_SetFn($@) {#########################################################
 	  }
 	  push @IOlist,$defs{$pl[0]}{IODev}->{NAME};
 	}
-		
 	
 	my $hdr = sprintf("%-20s:%-16s|%-18s|%-18s|%-14s|%-18s#%-18s|%-18s|%-18s|%-18s",
 	                         ,"name"
@@ -343,18 +360,21 @@ sub HMinfo_SetFn($@) {#########################################################
 	$ret = $cmd." done:" ."\n    ".$hdr  ."\n    ".(join "\n    ",sort @paramList)
 	       ;
 	$ret .= "\n\n    CUL_HM queue:$modules{CUL_HM}{prot}{rspPend}";
-	$ret .= "\n    autoRegRead pending:".
-	            join(",",@{$modules{CUL_HM}{helper}{autoRdCfgLst}}) 
+	$ret .= "\n    autoRegRead pending:"
+	           .join(",",@{$modules{CUL_HM}{helper}{autoRdCfgLst}})
+               .($modules{CUL_HM}{helper}{autoRdActive}?" recent:".$modules{CUL_HM}{helper}{autoRdActive}:"")
 			if ($modules{CUL_HM}{helper}{autoRdCfgLst});
 	$ret .= "\n    status request pending:".
 	            join(",",@{$modules{CUL_HM}{helper}{reqStatus}}) 
 			if ($modules{CUL_HM}{helper}{reqStatus});
 	@IOlist = HMinfo_noDup(@IOlist);
 	foreach(@IOlist){
-	  $_ .= ":".$defs{$_}{STATE}.
-	        (defined $defs{$_}{helper}{q}{answerPend}?
+	  $_ .= ":".$defs{$_}{STATE}
+	        .(defined $defs{$_}{helper}{q}{answerPend}?
 			  " pending=".$defs{$_}{helper}{q}{answerPend} :
-			  "");
+			  "")
+			." condition:".ReadingsVal($_,"cond","-")
+			."\n            msgLoad: ".$defs{$_}{msgLoad};
 	}
 	$ret .= "\n    IODevs:".(join"\n           ",HMinfo_noDup(@IOlist));
   }
@@ -1382,6 +1402,15 @@ sub HMinfo_noDup(@) {#return list with no duplicates
            attr hm autoUpdate 00:10<br>
         </code></ul>
 		will trigger the update every 10 min<br>
+	</li>
+    <li><a name="#HMhmAutoReadScan">hmAutoReadScan</a>
+	    defines the time in seconds CUL_HM tries to schedule the next autoRead 
+		from the queue. Despide this timer FHEM will take care that only one device from the queue will be
+		handled at one point in time. With this timer user can stretch timing even further - to up to 300sec
+		min delay between execution. <br>
+		Setting to 1 still obeys the "only one at a time" prinzip.<br>
+		Note that compressing will increase message load while stretch will extent waiting time.
+		data. <br>
 	</li>
    </ul>
    <br>

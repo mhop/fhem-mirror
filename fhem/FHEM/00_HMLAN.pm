@@ -65,6 +65,7 @@ sub HMLAN_Initialize($) {
                      "hmId hmKey hmKey2 hmKey3 " .
                      "respTime wdStrokeTime:5,10,15,20,25 " .
 					 "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger ".
+					 "hmMsgLowLimit ".
 					 "hmLanQlen:1_min,2_low,3_normal,4_high,5_critical ".
 					 "wdTimer ".
 					 $readingFnAttributes;
@@ -91,6 +92,9 @@ sub HMLAN_Define($$) {#########################################################
   }
   $attr{$name}{wdTimer} = 25;
   $attr{$name}{hmLanQlen} = "1_min"; #max message queue length in HMLan
+  $attr{$name}{hmMsgLowLimit} = 550; #max msgs to be send per h - 
+                                     #then block low prio messages
+
   no warnings 'numeric';
   $hash->{helper}{q}{hmLanQlen} = int($attr{$name}{hmLanQlen})+0; 
   use warnings 'numeric';
@@ -99,6 +103,11 @@ sub HMLAN_Define($$) {#########################################################
   $hash->{helper}{q}{answerPend} = 0;#pending answers from LANIf
   my @arr = ();
   @{$hash->{helper}{q}{apIDs}} = \@arr;
+  
+  $hash->{helper}{q}{cap}{$_} = 0 for (0..9);
+  $hash->{helper}{q}{cap}{last} = 0;
+  $hash->{helper}{q}{cap}{sum}  = 0;  
+  HMLAN_UpdtMsgCnt("UpdtMsg:".$name);
   
   HMLAN_condUpdate($hash,253);#set disconnected
   $hash->{STATE} = "disconnected";
@@ -178,6 +187,61 @@ sub HMLAN_Attr(@) {#################################
 	HMLAN_SimpleWrite($defs{$name}, "Y03,".($k3?"$k3no,$k3":"00,"));
 	return $retVal;
   }
+  elsif($attrName eq "hmMsgLowLimit"){
+    if ($cmd eq "del"){
+	  $attr{$name}{hmMsgLowLimit} = 500;# return to default
+	}
+	else{
+	  return "please add plain integer between 100 and 600" 
+	      if (  $aVal !~ m/^(\d+)$/
+		      ||$aVal<100
+			  ||$aVal >300 );
+      $attr{$name}{hmMsgLowLimit} =$aVal;
+	}
+  }
+  return;
+}
+
+sub HMLAN_UpdtMsgCnt($) {#################################
+  # update HMLAN capacity counter
+  # HMLAN will raise high-load after ~610 msgs per hour
+  #                  overload with send-stop after 670 msgs
+  # this count is an approximation and best guess - nevertheless it cannot 
+  # read the real values of HMLAN that might persist e.g. after FHEM reboot
+  my($in ) = shift;
+  my(undef,$name) = split(':',$in);
+
+  HMLAN_UpdtMsgLoad($name,0);
+  InternalTimer(gettimeofday()+100, "HMLAN_UpdtMsgCnt", "UpdtMsg:".$name, 0);
+  return;
+}
+sub HMLAN_UpdtMsgLoad($$) {#################################
+  my($name,$incr) = @_;
+  my $hash = $defs{$name};
+  my $hCap = $hash->{helper}{q}{cap};
+  
+  my $t = int(gettimeofday()/600)%6;# 10 min slices
+
+  if ($hCap->{last} != $t){
+    $hCap->{last} = $t;
+    $hCap->{$t} = 0;
+	   # try to release high-load condition with a dummy message 
+	   # one a while
+    HMLAN_Write($hash,"","As09998112"
+	                     .AttrVal($name,"hmId","999999")
+						 ."000001")
+      if (ReadingsVal($name,"cond","") eq 'Warning-HighLoad');
+  }
+  $hCap->{$hCap->{last}}++  if ($incr);
+
+  my @tl;
+  $hCap->{sum} = 0;
+  for (($t-5)..$t){# we have 6 slices
+    push @tl,$hCap->{$_%6};
+	$hCap->{sum} += $hCap->{$_%6}; # need to recalc incase a slice was removed
+  }
+	  
+  $hash->{msgLoad} = " total 1h:".$hCap->{sum}." recentSteps: ".join("/",reverse @tl);
   return;
 }
 
@@ -525,22 +589,23 @@ sub HMLAN_SimpleWrite(@) {#####################################################
     my ($src,$dst) = (substr($msg,40,6),substr($msg,46,6));
 	my $hmId = $attr{$name}{hmId};
 	my $hDst = $hash->{helper}{$dst};# shortcut
+	my $tn = gettimeofday();
     if ($hDst->{nextSend}){
-      my $DevDelay = $hDst->{nextSend} - gettimeofday();
+      my $DevDelay = $hDst->{nextSend} - $tn;
       select(undef, undef, undef, (($DevDelay > 0.1)?0.1:$DevDelay))
 	        if ($DevDelay > 0.01);
 	  delete $hDst->{nextSend};
     }
 	if ($dst ne $hmId){  #delay send if answer is pending
 	  if ( $hDst->{flg} &&                #HMLAN's ack pending
-          ($hDst->{to} > gettimeofday())){#won't wait forever! check timeout
+          ($hDst->{to} > $tn)){#won't wait forever! check timeout
 	    $hDst->{msg} = $msg;              #postpone  message
 	    Log $ll5,"HMLAN_Delay: $name $dst";
 	    return;
 	  }
 	  if ($src eq $hmId){
 	    $hDst->{flg} = (hex(substr($msg,36,2))&0x20)?1:0;# answer expected?
-        $hDst->{to} = gettimeofday() + 2;# flag timeout after 2 sec
+        $hDst->{to} = $tn + 2;# flag timeout after 2 sec
 	    $hDst->{msg} = "";
 		HMLAN_qResp($hash,$dst,1) if ($hDst->{flg} == 1);
 	  }	  
@@ -565,6 +630,8 @@ sub HMLAN_SimpleWrite(@) {#####################################################
                              .' '        .$8
                              .' '        .$9
                              .' '        .$10;
+
+    HMLAN_UpdtMsgLoad($name,1);
   }
   else{
     Log $ll5, 'HMLAN_Send:  '.$name.' I:'.$msg; 
@@ -598,9 +665,10 @@ sub HMLAN_DoInit($) {##########################################################
   HMLAN_SimpleWrite($defs{$name}, "Y03,".($k3?"$k3no,$k3":"00,"));
   HMLAN_SimpleWrite($hash, "T$s2000,04,00,00000000");
   delete $hash->{helper}{ref};
-
+  
   HMLAN_condUpdate($hash,0xff);
   RemoveInternalTimer( "Overload:".$name);
+  $hash->{helper}{q}{cap}{$_}=0 foreach (keys %{$hash->{helper}{q}{cap}});
 
   foreach (keys %lhash){delete ($lhash{$_})};# clear IDs - HMLAN might have a reset 
   $hash->{helper}{q}{keepAliveRec} = 1; # ok for first time
@@ -778,6 +846,15 @@ sub HMLAN_condUpdate($$) {#####################################################
 		<li><a href="#attrdummy">dummy</a></li><br>
 		<li><a href="#loglevel">loglevel</a></li><br>
 		<li><a href="#addvaltrigger">addvaltrigger</a></li><br>
+		<li><a href="#hmMsgLowLimit">hmMsgLowLimit</a><br>
+		    max number of messages allowed per hour before low-level message queue
+			will be postponed. <br>
+			HMLAN will allow a max of about 670 msgs per hour, then it will block sending.
+			After 610 messages the low-priority queue (currently only CUL_HM autoReadReg)
+			will be postponed anyway until the condition is cleared. <br>
+			The counting of messages can be observed in msgLoad of HMLAN. It is updated every 10 min.
+			Besides the hourly sum the six 10min counter are displayed. 		
+		    </li><br>
 		<li><a href="#hmId">hmId</a></li><br>
 		<li><a href="#hmKey">hmKey</a></li><br>
 		<li><a href="#hmKey2">hmKey2</a></li><br>

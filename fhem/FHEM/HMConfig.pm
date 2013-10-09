@@ -563,7 +563,7 @@ my %culHmRegDefine = (
   decalcWeekday   =>{a=>  7  ,s=>0.3,l=>7,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"decalc at day"      ,lit=>{Sat=>0,Sun=>1,Mon=>2,Tue=>3,Wed=>4,Thu=>5,Fri=>6}},
   decalcTime      =>{a=>  8  ,s=>0.6,l=>7,min=>0  ,max=>1410    ,c=>'min2time' ,f=>''      ,u=>''    ,d=>1,t=>"decalc at hour"},
   tempOffset      =>{a=>  9  ,s=>0.4,l=>7,min=>0  ,max=>15      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"temperature offset",lit=>{"-3.5K"=>0,"-3.0K"=>1,"-2.5K"=>2,"-2.0K"=>3,"-1.5K"=>4,"-1.0K"=>5,"-0.5K"=>6, 
-                                                                                                                                        "0.0K"=>7, "0.5K"=>8, "1.0K"=>10, "1.5K"=>11, "2.0K"=>12, "2.5K"=>13, "3.0K"=>14, "3.5K"=>15}},
+                                                                                                                                        "0.0K"=>7, "0.5K"=>8, "1.0K"=>9, "1.5K"=>10, "2.0K"=>11, "2.5K"=>12, "3.0K"=>13, "3.5K"=>14}},
   btnNoBckLight   =>{a=>  9.4,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"button response without backlight",lit=>{off=>0,on=>1}},
   boostPos        =>{a=> 10.0,s=>0.5,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>'0.2'   ,u=>'%'   ,d=>1,t=>"valve boost position"},
   boostPeriod     =>{a=> 10.5,s=>0.3,l=>7,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>'min' ,d=>1,t=>"boost period [min]"                          ,lit=>{0=>0,5=>1,10=>2,15=>3,20=>4,25=>5,30=>6}},
@@ -909,22 +909,25 @@ my %culHmGlobalSetsDevice = (# all devices but virtuals
   reset    	    => "",
   pair     	    => "",
   unpair   	    => "",
-  getSerial     => "",
 );
 
 my %culHmSubTypeDevSets = (# device of this subtype
-  switch           =>{ statusRequest =>""},
-  dimmer           =>{ statusRequest =>""},
-  blindActuator    =>{ statusRequest =>""},
+  switch           =>{ statusRequest => "",
+                       getSerial     => ""},
+  dimmer           =>{ statusRequest => "",
+                       getSerial     => ""},
+  blindActuator    =>{ statusRequest => "", 
+                       getSerial     => ""},
 #  remote           =>{ },
   threeStateSensor =>{ statusRequest =>""},
 #  THSensor         =>{ statusRequest =>""}, at least OT/OT2 do not support this 
 #  virtual          =>{ },
-  smokeDetector    =>{ statusRequest =>""},
-  winMatic         =>{ statusRequest =>""},
-  keyMatic         =>{ statusRequest =>""},
-  repeater         =>{ statusRequest =>""},
-  outputUnit       =>{ statusRequest =>""},
+  smokeDetector    =>{ statusRequest => ""},
+  winMatic         =>{ statusRequest => ""},
+  keyMatic         =>{ statusRequest => ""},
+  repeater         =>{ statusRequest => "",
+                       getSerial     => ""},
+  outputUnit       =>{ statusRequest => ""},
 );
 
 my %culHmGlobalSetsChn = (# all channels but virtuals
@@ -1030,7 +1033,8 @@ $culHmModelSets{"HM-OU-CM-PCB"} = $culHmModelSets{"HM-OU-CFM-PL"};
 
 my %culHmChanSets = (
   "HM-CC-TC00"     =>{ "desired-temp" =>"[on|off|6.0..30.0]"
-                      ,sysTime        =>""	  },
+                      ,sysTime        =>""	  
+					  ,getSerial      => ""},
   "HM-CC-TC02"     =>{ peerChan       =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"
                       ,"desired-temp" =>"[on|off|6.0..30.0]" 
                       ,tempListSat    =>"HH:MM temp ..."
