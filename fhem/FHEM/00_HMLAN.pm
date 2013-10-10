@@ -34,6 +34,7 @@ my %sets = ( "hmPairForSec" => "HomeMatic"
 my %HMcond = ( 0  =>'ok'
               ,2  =>'Warning-HighLoad'
 			  ,4  =>'ERROR-Overload'
+			  ,252=>'timeout'
 			  ,253=>'disconnected'
 			  ,254=>'Overload-released'
 			  ,255=>'init');
@@ -50,6 +51,7 @@ sub HMLAN_Initialize($) {
   $hash->{WriteFn} = "HMLAN_Write";
   $hash->{ReadyFn} = "HMLAN_Ready";
   $hash->{SetFn}   = "HMLAN_Set";
+  $hash->{NotifyFn}= "HMLAN_Notify";
   $hash->{AttrFn}  = "HMLAN_Attr";
   $hash->{Clients} = ":CUL_HM:";
   my %mc = (
@@ -138,7 +140,17 @@ sub HMLAN_RemoveHMPair($) {####################################################
   my $hash = $defs{$name};
   delete($hash->{hmPair});
 }
-sub HMLAN_Attr(@) {#################################
+sub HMLAN_Notify(@) {##########################################################
+  my ($hash,$dev) = @_;
+  return if ($dev->{NAME} ne $hash->{NAME}); # looking for our own connect/disconnect
+  
+  foreach (grep (m/CONNECTED$/,@{$dev->{CHANGED}})) { # connect/disconnect
+    if    ($_ eq "DISCONNECTED") {HMLAN_condUpdate($hash,253);}
+#    elsif ($_ eq "CONNECTED")    {covered by init;}
+  }
+  return;
+}
+sub HMLAN_Attr(@) {############################################################
   my ($cmd,$name, $attrName,$aVal) = @_;
   if   ($attrName eq "wdTimer"){#allow between 5 and 25 second
     return "select wdTimer between 5 and 25 seconds" if ($aVal>25 || $aVal<5);
@@ -195,14 +207,14 @@ sub HMLAN_Attr(@) {#################################
 	  return "please add plain integer between 100 and 600" 
 	      if (  $aVal !~ m/^(\d+)$/
 		      ||$aVal<100
-			  ||$aVal >300 );
+			  ||$aVal >600 );
       $attr{$name}{hmMsgLowLimit} =$aVal;
 	}
   }
   return;
 }
 
-sub HMLAN_UpdtMsgCnt($) {#################################
+sub HMLAN_UpdtMsgCnt($) {######################################################
   # update HMLAN capacity counter
   # HMLAN will raise high-load after ~610 msgs per hour
   #                  overload with send-stop after 670 msgs
@@ -215,7 +227,7 @@ sub HMLAN_UpdtMsgCnt($) {#################################
   InternalTimer(gettimeofday()+100, "HMLAN_UpdtMsgCnt", "UpdtMsg:".$name, 0);
   return;
 }
-sub HMLAN_UpdtMsgLoad($$) {#################################
+sub HMLAN_UpdtMsgLoad($$) {####################################################
   my($name,$incr) = @_;
   my $hash = $defs{$name};
   my $hCap = $hash->{helper}{q}{cap};
@@ -572,7 +584,6 @@ sub HMLAN_SimpleWrite(@) {#####################################################
   my ($hash, $msg, $nonl) = @_;
 
   return if(!$hash || AttrVal($hash->{NAME}, "dummy", undef));
-  HMLAN_condUpdate($hash,253) if ($hash->{STATE} eq "disconnected");#closed?
   
   my $name = $hash->{NAME};
   my $ll5 = GetLogLevel($name,5);
@@ -700,8 +711,8 @@ sub HMLAN_KeepAliveCheck($) {##################################################
   my $hash = $defs{$name};
   if ($hash->{helper}{q}{keepAliveRec} != 1){# no answer
     if ($hash->{helper}{q}{keepAliveRpt} >2){# give up here
+	  HMLAN_condUpdate($hash,252);# trigger timeout event
       DevIo_Disconnected($hash);
-	  HMLAN_condUpdate($hash,253);
     }
     else{
       $hash->{helper}{q}{keepAliveRpt}++;

@@ -52,7 +52,6 @@ sub CUL_HM_Set($@);
 sub CUL_HM_valvePosUpdt(@);
 sub CUL_HM_infoUpdtDevData($$$);
 sub CUL_HM_infoUpdtChanData(@);
-sub CUL_HM_Pair(@);
 sub CUL_HM_getConfig($$$$$);
 sub CUL_HM_SndCmd($$);
 sub CUL_HM_responseSetup($$);
@@ -140,7 +139,7 @@ sub CUL_HM_Initialize($) {
                        "rawToReadable unit ".#"KFM-Sensor" only
                        "peerIDs repPeers ".
                        "actCycle actStatus ".
-					   "autoReadReg:1_restart,0_off,2_pon-restart,3_onChange,4_reqStatus ".
+					   "autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus ".
 					   "expert:0_off,1_on,2_full ".
                        "param msgRepeat ".
 					   ".stc .devInfo ".
@@ -177,43 +176,40 @@ sub CUL_HM_autoReadConfig($){
     return;
   }
   while(@{$modules{CUL_HM}{helper}{autoRdCfgLst}}){
-  
     if (   $modules{CUL_HM}{helper}{autoRdActive}  # predecisor is stored
 	    && $defs{$modules{CUL_HM}{helper}{autoRdActive}}){
-	  my $dName = CUL_HM_getDeviceName($modules{CUL_HM}{helper}{autoRdActive});
-	  if ($defs{$dName}{helper}{prt}{sProc}){      # predecisor still working
-	    InternalTimer(gettimeofday()+$modules{CUL_HM}{hmAutoReadScan}
-	                ,"CUL_HM_autoReadConfig"
-					,"autoRdCfg",0);
-		last;
-	  }
+	  my $dName = CUL_HM_getDeviceName($modules{CUL_HM}{helper}{autoRdActive});   
+	  last if ($defs{$dName}{helper}{prt}{sProc}); # predecisor still working
 	}
+	
 	my $tName = CUL_HM_getDeviceName(${$modules{CUL_HM}{helper}{autoRdCfgLst}}[0]); 
 	my $ioName = $defs{$tName}{IODev}{NAME};
 	if (ReadingsVal($ioName,"cond","") !~ m /^(ok|Overload-released|init)$/
 	    || (  $defs{$ioName}{helper}{q}
 		   && $defs{$ioName}{helper}{q}{cap}{sum}>AttrVal($ioName,"hmMsgLowLimit",500))){
-	  InternalTimer(gettimeofday()+$modules{CUL_HM}{hmAutoReadScan}
-	                ,"CUL_HM_autoReadConfig"
-					,"autoRdCfg",0);
 	  last;
 	}
     #--- unqueue and process---
     my $name = shift(@{$modules{CUL_HM}{helper}{autoRdCfgLst}});
     my $hash = $defs{$name};
 	delete $hash->{autoRead};
-
+    next if (AttrVal($name,"subType","") eq "virtual");
+	
 	if (0 != CUL_HM_getAttrInt($name,"autoReadReg")){
 	  #CUL_HM_Set($hash,$name,"getSerial");
 	  CUL_HM_Set($hash,$name,"getConfig");
 	  CUL_HM_Set($hash,$name,"statusRequest");
-	  InternalTimer(gettimeofday()+$modules{CUL_HM}{hmAutoReadScan}
-	                ,"CUL_HM_autoReadConfig"
-					,"autoRdCfg",0);
-	  $modules{CUL_HM}{helper}{autoRdActive} = $name;#remember name
+	  my $mId = CUL_HM_getMId($hash);
+	  $modules{CUL_HM}{helper}{autoRdActive} = $name 
+	      if (   CUL_HM_getRxType($hash) & 0xEB     # 0x14 invers, if mode other then config
+              ||(   $culHmModel{$mId}{cyc}
+			     && $culHmModel{$mId}{cyc} !~ m/^28:/));
 	  last;
 	}
   }
+  InternalTimer(gettimeofday()+$modules{CUL_HM}{hmAutoReadScan}
+	                ,"CUL_HM_autoReadConfig"
+					,"autoRdCfg",0);
 }
 sub CUL_HM_updateConfig($){
   # this routine is called 5 sec after the last define of a restart
@@ -230,7 +226,8 @@ sub CUL_HM_updateConfig($){
       my $actCycle = AttrVal($name,"actCycle",undef);
 	  CUL_HM_ActAdd($id,$actCycle) if ($actCycle);# add to ActionDetect?
 	  # --- set default attrubutes if missing ---
-      if ($hash->{helper}{role}{dev}){
+      if (   $hash->{helper}{role}{dev}
+	      && AttrVal($name,"subType","") ne "virtual"){
 	    $attr{$name}{expert}     = AttrVal($name,"expert"     ,"2_full");
 	    $attr{$name}{autoReadReg}= AttrVal($name,"autoReadReg","4_reqStatus")
 		    if(CUL_HM_getRxType($hash)&0xEB);
@@ -1629,17 +1626,37 @@ sub CUL_HM_parseCommon(@){#####################################################
 	$ret = $reply;
   }
   elsif($mTp eq "00"){######################################
-    if ($pendType eq "PairSerial"){
-	  if($shash->{helper}{prt}{rspWait}{forChn} = substr($p,6,20)){
-	    CUL_HM_respPendRm($shash);
-	  }
-	} 
- 	CUL_HM_ProcessCmdStack($shash) if(CUL_HM_getRxType($shash) & 0x04);#config
     CUL_HM_infoUpdtDevData($shash->{NAME}, $shash,$p);#update data
+    
+	
+    my $iohash = $shash->{IODev};
+    my $id = CUL_HM_Id($iohash);
 
-    if(!$shash->{cmdStack} || !(CUL_HM_getRxType($shash) & 0x04)) {
-      CUL_HM_Pair($shash->{NAME}, $shash,$mFlg.$mTp,$src,$dst,$p);
-    }
+    if(  $dst =~ m /(000000|$id)/ #--- see if we need to pair
+       &&($iohash->{hmPair} 
+          ||(    $iohash->{hmPairSerial} 
+		      && $iohash->{hmPairSerial} eq $attr{$shash->{NAME}}{serialNr}))
+	   &&( $mFlg.$mTp ne "0400") ) {
+	  #-- try to pair 
+      Log GetLogLevel($shash->{NAME},3), "CUL_HM pair: $shash->{NAME} "
+	                       ."$attr{$shash->{NAME}}{subType}, "
+	                       ."model $attr{$shash->{NAME}}{model} "
+						   ."serialNr $attr{$shash->{NAME}}{serialNr}";
+	  delete $iohash->{hmPairSerial};
+	  CUL_HM_respPendRm($shash); # remove all pending messages
+	  delete $shash->{cmdStack};
+	  delete $shash->{EVENTS};
+	  delete $shash->{helper}{prt}{rspWait};
+	  delete $shash->{helper}{prt}{rspWaitSec};
+	  
+      my ($idstr, $s) = ($id, 0xA);
+      $idstr =~ s/(..)/sprintf("%02X%s",$s++,$1)/ge;
+      CUL_HM_pushConfig($shash, $id, $src,0,0,0,0, "0201$idstr");
+      CUL_HM_ProcessCmdStack($shash); # start processing immediately
+	}
+	elsif(CUL_HM_getRxType($shash) & 0x04){# nothing to pair - maybe send config
+ 	  CUL_HM_ProcessCmdStack($shash) ;#config
+	}
 	$ret = "done";
   } 
   elsif($mTp eq "10"){######################################
@@ -2056,7 +2073,8 @@ sub CUL_HM_Set($@) {
   my $ret;
   return "no set value specified" if(@a < 2);
   my $name    = $hash->{NAME};
-  return "device ignored due to attr 'ignore'" if (CUL_HM_getAttrInt($name,"ignore"));
+  return "device ignored due to attr 'ignore'" 
+        if (CUL_HM_getAttrInt($name,"ignore"));
   my $devName = $hash->{device}?$hash->{device}:$name;
   my $st      = AttrVal($devName, "subType", "");
   my $md      = AttrVal($devName, "model"  , "");
@@ -3197,47 +3215,12 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
     CUL_HM_ActAdd($hash->{DEF},AttrVal($name,"actCycle",
 	                                         $culHmModel{$mId}{cyc}));
   }
-
 }
 sub CUL_HM_infoUpdtChanData(@) {# verify attributes after reboot
   my($in ) = @_;
   my($chnName,$chnId,$model ) = split(',',$in);
   DoTrigger("global",  'UNDEFINED '.$chnName.' CUL_HM '.$chnId);
   $attr{CUL_HM_id2Name($chnId)}{model} = $model;
-}
-sub CUL_HM_Pair(@) {
-  my ($name, $hash,$cmd,$src,$dst,$p) = @_;
-  my $iohash = $hash->{IODev};
-  my $id = CUL_HM_Id($iohash);
-  my $serNo = $attr{$name}{serialNr};
-
-  Log GetLogLevel($name,3), "CUL_HM pair: $name $attr{$name}{subType}, "
-	                       ."model $attr{$name}{model} serialNr $serNo";
-
-  # Abort if we are not authorized
-  if($dst eq "000000") {
-    if(!$iohash->{hmPair} &&
-       (!$iohash->{hmPairSerial} || $iohash->{hmPairSerial} ne $serNo)) {
-      Log GetLogLevel($name,3),
-        $iohash->{NAME}. " pairing (hmPairForSec) not enabled";
-      return "";
-    }
-  } 
-  elsif($dst ne $id) {
-    return "" ;
-  } 
-  elsif($cmd eq "0400") {     # WDC7000
-    return "" ;
-  } 
-  elsif($iohash->{hmPairSerial}) {
-    delete($iohash->{hmPairSerial});
-  }
-  
-  my ($idstr, $s) = ($id, 0xA);
-  $idstr =~ s/(..)/sprintf("%02X%s",$s++,$1)/ge;
-  CUL_HM_pushConfig($hash, $id, $src,0,0,0,0, "0201$idstr");
-  CUL_HM_ProcessCmdStack($hash); # start processing immediately
-  return "";
 }
 sub CUL_HM_getConfig($$$$$){
   my ($hash,$chnhash,$id,$dst,$chn) = @_;
