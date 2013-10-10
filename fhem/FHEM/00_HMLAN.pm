@@ -526,7 +526,7 @@ sub HMLAN_Parse($$) {##########################################################
 
 	# HMLAN sends ACK for flag 'A0' but not for 'A4'(config mode)- 
 	# we ack ourself an long as logic is uncertain - also possible is 'A6' for RHS
-	if (hex($flg)&0x4){#not sure: 4 oder 2 ? 
+	if (hex($flg)&0x2){#not sure: 4 oder 2 ? 02 works for VD!
 	  my $wait = 0.100 - $dly/1000;
 	  $hash->{helper}{$src}{nextSend} = gettimeofday() + $wait if ($wait > 0);
 	}
