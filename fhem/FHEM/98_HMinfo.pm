@@ -308,7 +308,8 @@ sub HMinfo_SetFn($@) {#########################################################
       if(!$modules{CUL_HM}{helper}{autoRdCfgLst}){
         $modules{CUL_HM}{helper}{autoRdCfgLst} = \@arr;
       }
-	  push @{$modules{CUL_HM}{helper}{autoRdCfgLst}}, $dName;
+	  @{$modules{CUL_HM}{helper}{autoRdCfgLst}} = 
+	         HMinfo_noDup(@{$modules{CUL_HM}{helper}{autoRdCfgLst}}, $dName);
 	  $defs{$dName}{autoRead} = "scheduled";
 	  RemoveInternalTimer("autoRdCfg");
 	  InternalTimer(gettimeofday()+5,"CUL_HM_autoReadConfig","autoRdCfg",0);
