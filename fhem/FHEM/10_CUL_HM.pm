@@ -1252,7 +1252,7 @@ sub CUL_HM_Parse($$) {##############################
       push @event, 'devState_raw'.$d1.':'.$d2;
     }
 	
-	if($id eq $dst && $mFlg.$mTp ne "8002" && $state){
+	if($id eq $dst && hex($mFlg)&0x20 && $state){
       push @ack,$shash,$mNo."8002".$id.$src."0101${state}00";
 	}
   } 
@@ -1542,8 +1542,8 @@ sub CUL_HM_parseCommon(@){#####################################################
   # TC wakes up with 8270, not with A258
   # VD wakes up with 8202 
   #                  9610
-  if(  $shash->{cmdStack}           && 
-      ((hex($mFlg) & 0xA2) == 0x82) && 
+  if(  $shash->{cmdStack}           &&
+      ((hex($mFlg) & 0xA2) == 0x82) &&
 	  (CUL_HM_getRxType($shash) & 0x08)){ #wakeup 
 	#send wakeup and process command stack
     CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IOid($shash).$src);
@@ -1680,7 +1680,6 @@ sub CUL_HM_parseCommon(@){#####################################################
 		
     	CUL_HM_ID2PeerList ($chnNname,$_,1) foreach (@peers);
 		if (grep /00000000/,@peers) {# last entry, peerList is complete
-          CUL_HM_respPendRm($shash);	  
 		  # check for request to get List3 data
 		  my $reqPeer = $chnhash->{helper}{getCfgList};
 		  if ($reqPeer){
@@ -1697,6 +1696,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 			  }
 			}
 		  }
+          CUL_HM_respPendRm($shash);	  
 		  delete $chnhash->{helper}{getCfgList};
 		  delete $chnhash->{helper}{getCfgListNo};
 		}
@@ -3353,8 +3353,6 @@ sub CUL_HM_ProcessCmdStack($) {
       CUL_HM_SndCmd($hash, shift @{$hash->{cmdStack}});
     }
     elsif(!@{$hash->{cmdStack}}) {
-      delete($hash->{cmdStack});
-      delete($hash->{protCmdPend}); 
 	  #-- update info ---
 	  CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{prt}{bErr}? 
 	                            ("_Errors:".$hash->{helper}{prt}{bErr}):""));
@@ -3466,7 +3464,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
 	  CUL_HM_protState($hash,"CMDs_processing..."); 
       InternalTimer(gettimeofday()+.5, "CUL_HM_ProcessCmdStack", $hash, 0);
 	}
-	else{
+	elsif(!$hash->{helper}{prt}{rspWait}{cmd}){
       CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{prt}{bErr}? 
 	                            ("_Errors:".$hash->{helper}{prt}{bErr}):""));
 	}
@@ -3662,8 +3660,6 @@ sub CUL_HM_eventP($$) {#handle protocol events
       $nAttr->{protCmdDel} = 0 if(!$nAttr->{protCmdDel});
       $nAttr->{protCmdDel} += scalar @{$hash->{cmdStack}} 
 	        if ($hash->{cmdStack});
-      delete($hash->{cmdStack});
-      delete($nAttr->{protCmdPend});
 	  CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{prt}{bErr}? 
 	                            ("_Errors:".$hash->{helper}{prt}{bErr}):""));
 	}
@@ -3677,18 +3673,19 @@ sub CUL_HM_protState($$){
   readingsSingleUpdate($hash,"state",$state,0) if (!$hash->{helper}{role}{chn});
   Log GetLogLevel($name,6),"CUL_HM $name protEvent:$state".
             ($hash->{cmdStack}?" pending:".scalar @{$hash->{cmdStack}}:"");
-
-  if ($state =~ m/^CMDs_done/)   {DoTrigger($name, undef);
+  if   ($state =~ m/processing/) {$hash->{helper}{prt}{sProc} = 1;
+								 }
+  elsif($state =~ m/^CMDs_done/) {DoTrigger($name, undef);
+                                  delete($hash->{cmdStack});
+								  delete($hash->{protCmdPend}); 
 	                              $hash->{helper}{prt}{sProc} = 0;
 						  		  $hash->{helper}{prt}{awake} = 0 if (defined$hash->{helper}{prt}{awake}); # asleep
-                                  }
-  elsif($state =~ m/processing/) {$hash->{helper}{prt}{sProc} = 1;
-								  }
+                                 }
   elsif($state eq "Info_Cleared"){$hash->{helper}{prt}{sProc} = 0;
 						  		  $hash->{helper}{prt}{awake} = 0 if (defined$hash->{helper}{prt}{awake}); # asleep
-                                  }
+                                 }
   elsif($state eq "CMDs_pending"){$hash->{helper}{prt}{sProc} = 2;
-                                  }
+                                 }
 }
 
 ###################-----------helper and shortcuts--------#####################
@@ -5643,6 +5640,21 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	  This event relies on complete reading of channels configuration, otherwise Data can be
 	  incomplete or incorrect.<br>
 	  trigLast &lt;channel&gt; #last receiced trigger<br>
+  </li>
+  <li><B>HM-CC-RT-DN</B><br>
+      state:T: $actTemp desired: $setTemp valve: $vp %<br>
+      motorErr: [ok|ValveTight|adjustRangeTooLarge|adjustRangeTooSmall|communicationERR|unknown|lowBat|ValveErrorPosition]
+      measured-temp $actTemp<br>
+      desired-temp $setTemp<br>
+	  ValvePosition $vp %<br>
+      mode  [auto|manu|party|boost]<br>
+      battery [low|ok]<br>
+	  batteryLevel $bat V<br>
+      measured-temp $actTemp<br>
+      desired-temp $setTemp<br>
+	  actuator $vp %<br>
+      time-request<br>
+	  trig_&lt;src&gt; &lt;value&gt; #channel was triggered by &lt;src&gt; channel. 
   </li>
   <li><B>HM-CC-VD</B><br>
       $vp %<br>
