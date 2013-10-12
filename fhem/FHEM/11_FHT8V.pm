@@ -135,7 +135,7 @@ FHT8V_Get($@)
   <a name="FHT8Vdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; FHT &lt;housecode&gt; [IODev|FHTID]</code>
+    <code>define &lt;name&gt; FHT8V &lt;housecode&gt; [IODev|FHTID]</code>
     <br><br>
 
     <code>&lt;housecode&gt;</code> is a four digit hex number,
