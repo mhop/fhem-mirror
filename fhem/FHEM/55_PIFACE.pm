@@ -1,4 +1,4 @@
-# $Id: 
+# $Id$
 ####################################################################################################
 #
 #	55_PIFACE.pm
@@ -87,7 +87,7 @@ sub PIFACE_Set($@){
 		Log3($name, 3, "PIFACE $name: set port $port $val");
 		$cmd = "/usr/local/bin/gpio -p write $adr $val";
 		$cmd = `$cmd`;
-		readingsSingleUpdate($hash, 'out'.$port, $val,1);
+		readingsSingleUpdate($hash, 'out'.$port, $val, 1);
 	} else {
 		$adr = $base + 1;
 		Log3($name, 3, "PIFACE $name: set ports $val");
@@ -106,7 +106,6 @@ sub PIFACE_Set($@){
 		}
 		readingsEndUpdate($hash, 1);
 	}
-	PI_read_outports($hash);
 	return "";
 }
 
@@ -117,26 +116,46 @@ sub PIFACE_Get($@){
 	my $port = $a[1];
 	my ($adr, $cmd, $pin, $pull, $val);
 
-	my $usage = "Unknown argument $port, choose one of ".
+	my $usage = "Unknown argument $port, choose one of 0:noArg ".
 				"1:noArg  2:noArg  3:noArg  4:noArg ".
 				"5:noArg  6:noArg  7:noArg  8:noArg ".
 				"11:noArg  12:noArg  13:noArg  14:noArg ".
-				"15:noArg  16:noArg  17:noArg  18:noArg ";
+				"15:noArg  16:noArg  17:noArg  18:noArg ".
+				"21:noArg  22:noArg  23:noArg  24:noArg ".
+				"25:noArg  26:noArg  27:noArg  28:noArg ";
 	return $usage if $port eq "?";
 
-	if($port eq "0"){
+	if ($port eq "0") {
+		PI_read_outports($hash);
 		PI_read_inports($hash,0);
 		PI_read_inports($hash,1);
-	} else {
-		if (length($port) == 2){
-			$pin  = $port - 10;
-			$adr  = $base + $pin;
-			$cmd = '/usr/local/bin/gpio -p mode '.$adr.' up';
-			$val = `$cmd`;
-		}
+
+	} elsif ($port ~~ [1..8]) {
+	# read inport
+		$adr  = $base + $port;
 		$cmd = '/usr/local/bin/gpio -p read '.$adr;
 		$val = `$cmd`;
 		readingsSingleUpdate($hash, 'in'.$port, $val, 1);
+
+	} elsif ($port ~~ [11..18]) {
+	# read inport with pullup
+		$pin  = $port - 10;
+		$adr  = $base + $pin;
+		$cmd = '/usr/local/bin/gpio -p mode '.$adr.' up';
+		$val = `$cmd`;
+		$cmd = '/usr/local/bin/gpio -p read '.$adr;
+		$val = `$cmd`;
+		readingsSingleUpdate($hash, 'in'.$port, $val, 1);
+
+	} elsif ($port ~~ [21..28]) {
+	# read outport
+		$pin  = $port - 12;
+		$port -= 20;
+		$adr  = $base + $pin;
+		$cmd = '/usr/local/bin/gpio -p read '.$adr;
+		$val = `$cmd`;
+		readingsSingleUpdate($hash, 'out'.$port, $val, 1);
+	
 	}
 
 	return "";
@@ -155,7 +174,7 @@ sub PI_read_outports($){
 		$val = `$cmd`;
 		readingsBulkUpdate($hash, 'out'.$i, $val);
 	}
-	readingsEndUpdate($hash, 1);
+	readingsEndUpdate($hash, 0);
 	return
 }
 
@@ -174,13 +193,13 @@ sub PI_read_inports($;$){
 			$cmd = '/usr/local/bin/gpio -p read '.$port;
 			$val = `$cmd`;
 			$j = 10 + $i;
-			readingsBulkUpdate($hash, 'in'.$j, $val);
+			readingsBulkUpdate($hash, 'in'.$j, chomp($val));
 		} else {
 			$cmd = '/usr/local/bin/gpio -p mode '.$port.' tri';
 			$val = `$cmd`;
 			$cmd = '/usr/local/bin/gpio -p read '.$port;
 			$val = `$cmd`;
-			readingsBulkUpdate($hash, 'in'.$i, $val);
+			readingsBulkUpdate($hash, 'in'.$i, chomp($val));
 		}
 	}
 	readingsEndUpdate($hash, 1);
@@ -258,18 +277,23 @@ sub PI_read_inports($;$){
 		<code>get &lt;name&gt; &lt;port&gt;</code>
 		<br/><br/>
 		<ul>
-			<li>get state of single port with internal pullups <b>off</b><br/><br/>
+			<li>get state of single input port with internal pullups <b>off</b><br/><br/>
 				Example:<br/>
-				get &lt;name&gt; 3 =&gt; get state of port 3<br/></li>
+				get &lt;name&gt; 3 =&gt; get state of input port 3<br/></li>
 			<br/>
-			<li>get state of single port with internal pullups <b>on</b><br/><br/>
+			<li>get state of single input port with internal pullups <b>on</b><br/><br/>
 				Add 10 to port number!<br/><br/>
 				Example:<br/>
-				get &lt;name&gt; 15 =&gt; get state of port 5<br/></li>
-			<br/>
-			<li>get state of all input ports and update readings<br/><br/>
+				get &lt;name&gt; 15 =&gt; get state of input port 5<br/></li>
+			<li>get state of single output port with internal pullups <b>on</b><br/><br/>
+				Add 20 to port number!<br/><br/>
 				Example:<br/>
-				get &lt;name&gt; 0 =&gt; get state of all input ports<br/></li>
+				get &lt;name&gt; 25 =&gt; get state of output port 5<br/></li>
+			<br/>
+			<br/>
+			<li>get state of all input AND output ports and update readings<br/><br/>
+				Example:<br/>
+				get &lt;name&gt; 0 =&gt; get state of all ports<br/></li>
 		</ul>
 
 	</ul>
