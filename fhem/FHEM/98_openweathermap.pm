@@ -54,6 +54,7 @@
 #
 #	2013-08-13	added:	new reading for html response on "send"
 #				added:	new reading for html response on "get/set"
+#	2013-10-12	added:	NotifyFn
 #
 
 package main;
@@ -73,6 +74,7 @@ my	$ua = LWP::UserAgent->new;	# test
 sub OWO_Set($@);
 sub OWO_Get($@);
 sub OWO_Attr(@);
+sub OWO_Notify($$);
 sub OWO_Define($$);
 sub OWO_GetStatus($;$);
 sub OWO_Undefine($$);
@@ -81,14 +83,14 @@ sub OWO_abs2rel($$$);
 sub OWO_isday($$);
 
 ###################################
-sub
-openweathermap_Initialize($)
-{
+
+sub openweathermap_Initialize($) {
 	my ($hash) = @_;
 	$hash->{SetFn}		=	"OWO_Set";
 	$hash->{GetFn}		=	"OWO_Get";
 	$hash->{DefFn}		=	"OWO_Define";
 	$hash->{UndefFn}	=	"OWO_Undefine";
+	$hash->{NotifyFn}	=	"OWO_Notify";
 	$hash->{AttrFn}		=	"OWO_Attr";
 
 	$hash->{AttrList}	=	"do_not_notify:0,1 ".
@@ -102,10 +104,7 @@ openweathermap_Initialize($)
 							$readingFnAttributes;
 }
 
-###################################
-
-sub
-OWO_Set($@){
+sub OWO_Set($@){
 	my ($hash, @a)	= @_;
 	my $name		= $hash->{NAME};
 	my $usage		= "Unknown argument, choose one of stationById stationByGeo stationByName send:noArg";
@@ -154,8 +153,7 @@ OWO_Set($@){
 	return;
 }
 
-sub
-OWO_Get($@){
+sub OWO_Get($@){
 	my ($hash, @a) = @_;
 	my $name = $hash->{NAME};
 	my $usage = "Unknown argument, choose one of stationById stationByGeo stationByName";
@@ -200,8 +198,7 @@ OWO_Get($@){
 #	return $response;
 }
 
-sub
-OWO_Attr(@){
+sub OWO_Attr(@){
 	my @a = @_;
 	my $hash = $defs{$a[1]};
 	my (undef, $name, $attrName, $attrValue) = @a;
@@ -234,8 +231,20 @@ OWO_Attr(@){
 	return "";
 }
 
-sub
-OWO_GetStatus($;$){
+sub OWO_Notify($$) {
+	my ($hash,$dev) = @_;
+
+	if( grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) ) {
+		delete $modules{openweathermap}->{NotifyFn};
+
+		foreach my $d (keys %defs) {
+			next if($defs{$d}{TYPE} ne "openweathermap");
+			OWO_GetStatus($hash);
+		}
+	}
+}
+
+sub OWO_GetStatus($;$){
 	my ($hash, $local) = @_;
 	my $name = $hash->{NAME};
 	my $htmlDummy;
@@ -324,8 +333,7 @@ OWO_GetStatus($;$){
 	return;
 }
 
-sub
-OWO_Define($$){
+sub OWO_Define($$){
 	my ($hash, $def) = @_;
 	my @a = split("[ \t][ \t]*", $def);
 	my $name = $hash->{NAME};
@@ -339,25 +347,28 @@ OWO_Define($$){
 	$attr{$name}{"owoGetUrl"}	= "http://api.openweathermap.org/data/2.5/weather";
 	$attr{$name}{"owoSendUrl"}	= "http://openweathermap.org/data/post";
 
-	readingsBeginUpdate($hash);
-	readingsBulkUpdate($hash, "state","defined");
-	readingsEndUpdate($hash, 1);
+	if( $init_done ) {
+		delete $modules{openweathermap}->{NotifyFn};
+		OWO_GetStatus($hash);
+	} else {
+		readingsSingleUpdate($hash, "state", "defined",1);
+	}
 
-	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "OWO_GetStatus", $hash, 0);
+#	readingsSingleUpdate($hash, "state","defined",1);
+#	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "OWO_GetStatus", $hash, 0);
+
 	Log3($name, 3, "owo $name: created");
 
 	return;
 }
 
-sub
-OWO_Undefine($$){
+sub OWO_Undefine($$){
 	my($hash, $name) = @_;
 	RemoveInternalTimer($hash);
 	return undef;
 }
 
-sub
-UpdateReadings($$$){
+sub UpdateReadings($$$){
 	my ($hash, $url, $prefix) = @_;
 	my $name = $hash->{NAME};
 	my ($jsonWeather, $response);
@@ -473,8 +484,7 @@ UpdateReadings($$$){
 	return;
 }
 
-sub
-OWO_abs2rel($$$){
+sub OWO_abs2rel($$$){
 # Messwerte
 my $Pa   = $_[0];
 my $Temp = $_[1];
@@ -497,8 +507,7 @@ my $Pr = $Pa*exp($xp);
 return int($Pr);
 }
 
-sub
-OWO_isday($$){
+sub OWO_isday($$){
 	my $name = $_[0];
 	my $src  = $_[1];
 	my $response;
