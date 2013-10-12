@@ -36,16 +36,15 @@ sub BBB_BMP180_Define($$);
 sub BBB_BMP180_Undefine($$);
 sub BBB_BMP180_Get($@);
 sub BBB_BMP180_Attr($@);
+sub BBB_BMP180_Notify($$);
 
-#	$next = gettimeofday()+$hash->{helper}{INTERVAL};
-#	readingsSingleUpdate($hash, "c_nextUpdate", localtime($next), 1);
-#	InternalTimer($next, "GDS_GetUpdate", $hash, 1);
-	
+
 sub BBB_BMP180_Initialize($){
 	my ($hash) = @_;
 	$hash->{DefFn}		=	"BBB_BMP180_Define";
 	$hash->{UndefFn}	=	"BBB_BMP180_Undefine";
 	$hash->{GetFn}		=	"BBB_BMP180_Get";
+	$hash->{NotifyFn}	=	"BBB_BMP180_Notify";
 	$hash->{AttrFn}		=	"BBB_BMP180_Attr";
 	$hash->{AttrList}	=	"bbbRoundPressure:0,1 bbbRoundTemperature:0,1 ".
 							"bbbInterval ".
@@ -57,15 +56,31 @@ sub BBB_BMP180_Define($$){
 	my $name = $hash->{NAME};
 	my @a = split("[ \t][ \t]*", $def);
 	Log3($name, 3, "BBB_BMP180 $name: created");
-	readingsSingleUpdate($hash, "state", "active",1);
 
 	$hash->{helper}{i2cbus} = '1';
 	$hash->{helper}{i2cbus} = $a[2] if(defined($a[2]));
 
-	my $next = gettimeofday()+10;
-	InternalTimer($next, "bbb_getValues", $hash, 0);
+	if( $init_done ) {
+		delete $modules{BBB_BMP180}->{NotifyFn};
+		bbb_getValues($hash);
+	} else {
+		readingsSingleUpdate($hash, "state", "active",1);
+	}
 
 	return undef;
+}
+
+sub BBB_BMP180_Notify($$) {
+	my ($hash,$dev) = @_;
+
+	if( grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) ) {
+		delete $modules{BBB_BMP180}->{NotifyFn};
+
+		foreach my $d (keys %defs) {
+			next if($defs{$d}{TYPE} ne "BBB_BMP180");
+			bbb_getValues($hash);
+		}
+	}
 }
 
 sub BBB_BMP180_Undefine($$){
