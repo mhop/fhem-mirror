@@ -110,7 +110,7 @@ sub CUL_HM_noDupInString($);#return string with no duplicates, comma separated
 sub CUL_HM_storeRssi(@);
 sub CUL_HM_stateUpdat($);
 sub CUL_HM_qStateUpdatIfEnab($@);
-sub CUL_HM_getAttrInt($$);
+sub CUL_HM_getAttrInt($@);
 sub CUL_HM_putHash($);
 
 # ----------------modul globals-----------------------
@@ -141,6 +141,7 @@ sub CUL_HM_Initialize($) {
                        "actCycle actStatus ".
 					   "autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus ".
 					   "expert:0_off,1_on,2_full ".
+					   "burstAccess:0_off,1_auto ".
                        "param msgRepeat ".
 					   ".stc .devInfo ".
                        $readingFnAttributes;
@@ -179,14 +180,15 @@ sub CUL_HM_autoReadConfig($){
     if (   $modules{CUL_HM}{helper}{autoRdActive}  # predecisor is stored
 	    && $defs{$modules{CUL_HM}{helper}{autoRdActive}}){
 	  my $dName = CUL_HM_getDeviceName($modules{CUL_HM}{helper}{autoRdActive});   
-	  last if ($defs{$dName}{helper}{prt}{sProc}); # predecisor still working
+	  last if ($defs{$dName}{helper}{prt}{sProc} == 1); # predecisor still working
 	}
 	
 	my $tName = CUL_HM_getDeviceName(${$modules{CUL_HM}{helper}{autoRdCfgLst}}[0]); 
 	my $ioName = $defs{$tName}{IODev}{NAME};
 	if (ReadingsVal($ioName,"cond","") !~ m /^(ok|Overload-released|init)$/
 	    || (  $defs{$ioName}{helper}{q}
-		   && $defs{$ioName}{helper}{q}{cap}{sum}>AttrVal($ioName,"hmMsgLowLimit",500))){
+		   && ($defs{$ioName}{helper}{q}{cap}{sum}/16.8)>
+		       AttrVal($ioName,"hmMsgLowLimit",80))){
 	  last;
 	}
     #--- unqueue and process---
@@ -495,7 +497,18 @@ sub CUL_HM_Attr(@) {#################################
     return "$attrName not usable for channels" if(!$hash->{helper}{role}{dev});#only for device
 	return "value $attrVal ignored, must be an integer" if ($attrVal !~ m/^(\d+)$/);
   }
-
+  elsif($attrName eq "model" && $hash->{helper}{role}{dev}){
+    delete $hash->{helper}{rxType}; # needs new calculation
+	delete $hash->{helper}{mId};
+  }
+  elsif($attrName eq "burstAccess"){
+    return "use burstAccess only for device"                 if (!$hash->{helper}{role}{dev});
+	return "burstAccess only for conditional Burst devices"  if ($culHmModel{$hash->{helper}{mId}}{rxt} !~ m /f/);
+	return "$attrVal not a valid option for burstAccess"     if ($attrVal !~ m/^[01]/);
+	if ($attrVal =~ m/^0/){$hash->{protCondBurst} = "forced_off";}
+	else                  {$hash->{protCondBurst} = "unknown";}
+    delete $hash->{helper}{rxType}; # needs new calculation
+  }
   CUL_HM_queueUpdtCfg($name) if ($updtReq);
   return;
 }
@@ -608,7 +621,7 @@ sub CUL_HM_Parse($$) {##############################
 	}
   }
 
-  if ($parse eq "ACK"){# remember - ACKinfo will be passed on
+  if   ($parse eq "ACK"){# remember - ACKinfo will be passed on
     push @event, "";
   }
   elsif($parse eq "NACK"){
@@ -3771,7 +3784,8 @@ sub CUL_HM_getRxType($) { #in:hash(chn or dev) out:binary coded Rx type
       $rxtEntity |= ($rxtOfModel =~ m/c/)?0x04:0;#config
       $rxtEntity |= ($rxtOfModel =~ m/w/)?0x08:0;#wakeup
       $rxtEntity |= ($rxtOfModel =~ m/l/)?0x10:0;#lazyConfig
-      $rxtEntity |= ($rxtOfModel =~ m/f/)?0x80:0;#burstConditional
+      $rxtEntity |= ($rxtOfModel =~ m/f/)?0x80:0 #burstConditional
+	        if(CUL_HM_getAttrInt($hash->{NAME},"burstAccess",0));
 	}
 	$rxtEntity = 1 if (!$rxtEntity);#always
 	$hash->{helper}{rxType} = $rxtEntity;
@@ -4698,12 +4712,14 @@ sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request after 12 s
 	InternalTimer(gettimeofday()+120,"CUL_HM_reqStatus","CUL_HM_reqStatus", 0);
   }
 }
-sub CUL_HM_getAttrInt($$){#return attrValue as integer
-  my ($name,$attrName) = @_;
+sub CUL_HM_getAttrInt($@){#return attrValue as integer
+  my ($name,$attrName,$default) = @_;
   my $val = $attr{$name}{$attrName}?$attr{$name}{$attrName}:"";
   no warnings 'numeric';
   my $devN = $defs{$name}{device}?$defs{$name}{device}:$name;
-  $val = int($attr{$devN}{$attrName}?$attr{$devN}{$attrName}:0)+0 if($val eq "");
+  $default = 0 if (!defined $default);
+  $val = int($attr{$devN}{$attrName}?$attr{$devN}{$attrName}:$default)+0 
+        if($val eq "");
   use warnings 'numeric';
   return substr($val,0,1);
 }
@@ -5529,7 +5545,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><a href="#actCycle">actCycle</a>
 	     actCycle &lt;[hhh:mm]|off&gt;<br>
-         Supports 'alive' or better 'not alive' detection for devices. [hhh:mm] is the maxumin silent time for the device. Upon no message received in this period an event will be raised "&lt;device&gt; is dead". If the device sends again another notification is posted "&lt;device&gt; is alive". <br>
+         Supports 'alive' or better 'not alive' detection for devices. [hhh:mm] is the maximum silent time for the device. Upon no message received in this period an event will be raised "&lt;device&gt; is dead". If the device sends again another notification is posted "&lt;device&gt; is alive". <br>
 		 This actiondetect will be autocreated for each device with build in cyclic status report.<br>
 		 Controlling entity is a pseudo device "ActionDetector" with HMId "000000".<br>
 		 Due to performance considerations the report latency is set to 600sec (10min). It can be controlled by the attribute "actCycle" of "ActionDetector".<br>
@@ -5565,6 +5581,13 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
         param defines model specific behavior or functions. See models for details</li>
     <li><a name="msgRepeat">msgRepeat</a><br>
         defines number of repetitions if a device doesn't answer in time</li>
+    <li><a name="burstAccess">burstAccess</a><br>
+        can be set for the device entity if the model allowes conditionalBurst. 
+		The attribut will switch off burst operations (0_off) which causes less message load 
+		on HMLAN and therefore reduces the chance of HMLAN overload.<br>
+		Setting it on (1_auto) allowes shorter reaction time of the device. User does not 
+		need to wait for the device to wake up. <br>
+		Note that also the register burstRx needs to be set in the device.</li>
     <li><a name="rawToReadable">rawToReadable</a><br>
         Used to convert raw KFM100 values to readable data, based on measured
         values. E.g.  fill slowly your container, while monitoring the
