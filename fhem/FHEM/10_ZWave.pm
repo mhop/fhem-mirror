@@ -102,9 +102,19 @@ my %zwave_class = (
                "0537020601(..)" =>
                    'sprintf("remainingFilterLife: %s %%", hex($1))',
                "033704(..)" =>
-                   'sprintf("supportedStatus: %b", hex($1))', },},
+                   'sprintf("supportedStatus: %s", ZWave_HrvStatus($1))',
+            },},
   THERMOSTAT_HEATING       => { id => '38', },
-  HRV_CONTROL              => { id => '39', },
+  HRV_CONTROL              => { id => '39', 
+    set   => { bypassOff => "0400",
+               bypassOn  => "04FF",
+               ventilationRate => "07%02x", },
+    get   => { bypass          => "05", 
+                ventilationRate => "08", },  
+    parse => { "033906(..)"=> '($1 eq "00" ? "bypass:off" : '.
+                              '($1 eq "ff" ? "bypass:on"  : '.
+                                            '"bypass:dim ".hex($1)))',
+               "033909(..)"=> 'sprintf("ventilationRate: %s",hex($1))', },},
   METER_TBL_CONFIG         => { id => '3c', },
   METER_TBL_MONITOR        => { id => '3d', },
   METER_TBL_PUSH           => { id => '3e', },
@@ -399,6 +409,23 @@ ZWave_Cmd($$@)
 sub ZWave_Set($@) { return ZWave_Cmd("set", shift, @_); }
 sub ZWave_Get($@) { return ZWave_Cmd("get", shift, @_); }
 
+# returns supported Parameters by hrvStatus
+sub
+ZWave_HrvStatus($)
+{
+  my ($p) = @_;
+  $p = hex($p);
+
+  my @hrv_status = ( "outdoorTemperature", "supplyAirTemperature",
+                     "exhaustAirTemperature", "dischargeAirTemperature",
+                     "indoorTemperature", "indoorHumidity",
+                     "remainingFilterLife" );
+  my @l; 
+  for(my $i=0; $i < 7; $i++) {
+    push @l, "$i = $hrv_status[$i]" if($p & (1<<$i));
+  }
+  return join("\n", @l);
+}
 
 sub
 ZWave_ParseMeter($)
@@ -878,7 +905,7 @@ s2Hex($)
   <li>indoorTemperature: %0.1f C</li>
   <li>indoorHumidity: %s %</li>
   <li>remainingFilterLife: %s %</li>
-  <li>supportedStatus: %b</li>
+  <li>supportedStatus: <list of supported stati></li>
 
   <br><br><b>Class METER</b>
   <li>power:val [kWh|kVAh|W|pulseCount]</li>
