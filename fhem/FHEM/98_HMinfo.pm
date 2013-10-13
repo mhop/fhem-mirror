@@ -315,7 +315,7 @@ sub HMinfo_SetFn($@) {#########################################################
 	  InternalTimer(gettimeofday()+5,"CUL_HM_autoReadConfig","autoRdCfg",0);
 	  push @entities,$dName;
 	}
-	return $cmd." done:" ."\n cleared"  ."\n    ".(join "\n    ",sort @entities)
+	return $cmd." done:" ."\n triggered:"  ."\n    ".(join "\n    ",sort @entities)
 						 ;
   }
   elsif($cmd eq "protoEvents"){##print protocol-events-------------------------
@@ -375,7 +375,7 @@ sub HMinfo_SetFn($@) {#########################################################
 			  " pending=".$defs{$_}{helper}{q}{answerPend} :
 			  "")
 			." condition:".ReadingsVal($_,"cond","-")
-			."\n            msgLoad: ".$defs{$_}{msgLoad};
+			."\n            msgLoadEst: ".$defs{$_}{msgLoadEst};
 	}
 	$ret .= "\n    IODevs:".(join"\n           ",HMinfo_noDup(@IOlist));
   }
