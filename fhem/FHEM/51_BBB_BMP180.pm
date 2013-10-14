@@ -3,7 +3,8 @@
 #
 #	51_BBB_BMP180.pm
 #
-#	An FHEM Perl module for reading air pressure from BMP180 sensor connected on I2C
+#	An FHEM Perl module for reading air pressure from BMP180 sensor connected on I2C.
+#	Developed for use with fhem running on BeagleBoneBlack
 #
 #	Please read commandref for details on prerequisits!
 #
@@ -46,7 +47,8 @@ sub BBB_BMP180_Initialize($){
 	$hash->{GetFn}		=	"BBB_BMP180_Get";
 	$hash->{NotifyFn}	=	"BBB_BMP180_Notify";
 	$hash->{AttrFn}		=	"BBB_BMP180_Attr";
-	$hash->{AttrList}	=	"bbbRoundPressure:0,1 bbbRoundTemperature:0,1 ".
+	$hash->{AttrList}	=	"bbbRoundPressure:0,1 ".
+							"bbbRoundTemperature:0,1 ".
 							"bbbInterval ".
 							$readingFnAttributes;
 }
@@ -60,9 +62,13 @@ sub BBB_BMP180_Define($$){
 	$hash->{helper}{i2cbus} = '1';
 	$hash->{helper}{i2cbus} = $a[2] if(defined($a[2]));
 
+	# check availability
+	my $bmpP = '/sys/bus/i2c/drivers/bmp085/'.$hash->{helper}{i2cbus}.'-0077/pressure0_input';
+	open (IN,"<$bmpP") ||  return "\n   BBB_BMP180: I2C device not found!";
+
 	if( $init_done ) {
 		delete $modules{BBB_BMP180}->{NotifyFn};
-		bbb_getValues($hash);
+		bbb_getValues($hash,undef);
 	} else {
 		readingsSingleUpdate($hash, "state", "active",1);
 	}
@@ -78,9 +84,10 @@ sub BBB_BMP180_Notify($$) {
 
 		foreach my $d (keys %defs) {
 			next if($defs{$d}{TYPE} ne "BBB_BMP180");
-			bbb_getValues($hash);
+			bbb_getValues($hash,undef);
 		}
 	}
+	return;
 }
 
 sub BBB_BMP180_Undefine($$){
@@ -117,7 +124,7 @@ sub BBB_BMP180_Attr($@){
 		when("bbbInterval"){
 			RemoveInternalTimer($hash);
 			my $next = gettimeofday()+$attrValue;
-			InternalTimer($next, "bbb_getValues", $hash, 0);
+			InternalTimer($next, "bbb_getValues", ($hash,undef), 0);
 			break;
 			}
 
@@ -126,10 +133,9 @@ sub BBB_BMP180_Attr($@){
 	return "";
 }
 
-sub bbb_getValues($$){
+sub bbb_getValues($;$){
 	my ($hash,$local) = @_;
 	my $name = $hash->{NAME};
-
 	my $a  = AttrVal('global','altitude',undef);
 	my $t  = bbb_temp($hash);
 	my $pa = bbb_absDruck($hash);
@@ -160,8 +166,7 @@ sub bbb_getValues($$){
 	readingsEndUpdate($hash, 1);
 
 	my $next = gettimeofday()+AttrVal($name,'bbbInterval',300);
-	InternalTimer($next, "bbb_getValues", $hash, 0) unless $local;
-
+	InternalTimer($next, "bbb_getValues", ($hash,undef), 0) unless $local;
 	return;
 }
 
@@ -170,7 +175,7 @@ sub bbb_temp($){
 	my $bmpT = '/sys/bus/i2c/drivers/bmp085/'.$hash->{helper}{i2cbus}.'-0077/temp0_input';
 	my $temp;
 
-	open (IN,"<$bmpT") || die $!;
+	open (IN,"<$bmpT") || Log3($hash, 2, 'BBB_BMP180: I2C device not found!');
 	while (<IN>){
 		$temp = $_;
 		last;
@@ -187,7 +192,7 @@ sub bbb_absDruck($){
 	my $bmpP = '/sys/bus/i2c/drivers/bmp085/'.$hash->{helper}{i2cbus}.'-0077/pressure0_input';
 	my $p;
 
-	open (IN,"<$bmpP") || die $!;
+	open (IN,"<$bmpP") ||  Log3($hash, 2, 'BBB_BMP180: I2C device not found!');
 	while (<IN>){
 		$p = $_;
 		last;
@@ -237,7 +242,7 @@ sub bbb_relDruck($$){
 	<b>Prerequesits</b>
 	<ul>
 		<br/>
-		Module was developed for use with Beaglebone Black, but can be used on other platforms, too.<br/><br/>
+		Module was developed for use with Beaglebone Black.<br/><br/>
 		To create the device, run the following command on system console:<br/><br/>
 		<code>echo bmp085 0x77 > /sys/class/i2c-adapter/i2c-1/new_device</code><br/><br/>
 		To check if successful:<br/><br/>
@@ -258,7 +263,6 @@ sub bbb_relDruck($$){
 		<br/><br/>
 		This module provides air pressure measurement by a BMP180 sensor connected to I2C bus.<br/>
 		Optional parameter [bus] defines number of I2C-bus in your hardware (default = 1).<br/>
-		If you want to use this module with RaspberryPi, you should set bus number to 0.<br/>
 		<br/>
 	</ul>
 	<br/><br/>
