@@ -1001,7 +1001,7 @@ sub HMinfo_templateSet(@){#####################################################
 	push @regCh,"$regN,$regV";
   }
   foreach (@regCh){#Finally write to shadow register.
-	my ($ret,undef) = CUL_HM_Set($aHash,$aName,"regSet",split(",",$_),$pName,"prep");
+	my ($ret,undef) = CUL_HM_Set($aHash,$aName,"regSet","prep",split(",",$_),$pName);
 	return $ret if ($ret);
   }
   foreach my $regl (keys %{$aHash->{helper}{shadowReg}}){#write any existing shadowreg for this entity

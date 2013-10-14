@@ -388,11 +388,11 @@ my %culHmRegDefine = (
 #un-identified List0
 # addr Dec!!
 # SEC-WM55 02:01 (AES on?)
-# CC-RT 02:01 16:00
+# CC-RT    02:01 16:00
 # SEC-WDS  02:01 16:01(sabotage) ?
 # HM-SEC-MDIR  02:01 ?
 # SEC-SC   02:00 ?
-# Blind     9:00 10:00 20:00
+# Blind          9:00 10:00 20:00
 # BL1TPBU  02:01 21:FF
 # Dim1TPBU 02:01 21:FF 22:00
 #Keymatic 3.3 unknown, seen 1 here
@@ -696,7 +696,7 @@ my %culHmRegModel = (
 		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1	
                       },
 
-  "HM-CC-VD"        =>{burstRx         =>1,valveOffset     =>1,valveErrorPos   =>1},
+  "HM-CC-VD"        =>{valveOffset     =>1,valveErrorPos   =>1},
   "HM-CC-TC"        =>{burstRx         =>1,backlOnTime     =>1,backlOnMode     =>1,btnLock         =>1},
   "HM-CC-RT-DN"     =>{btnLock         =>1,localResDis     =>1,globalBtnLock   =>1,modusBtnLock    =>1,
                        cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,
@@ -897,7 +897,7 @@ my %culHmGlobalSets = (# all but virtuals
   regBulk       => "<list>:<peer> <addr1:data1> <addr2:data2> ...",
   getRegRaw     => "[List0|List1|List2|List3|List4|List5|List6] ... [<PeerChannel>]",
   getConfig     => "",
-  regSet        => "<regName> <value> ... [<peerChannel>]",
+  regSet        => "<regName> [prep|exec] <value> ... [<peerChannel>]",
   clear         => "[readings|register|rssi|msgEvents]",
 );
 my %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
@@ -1005,23 +1005,25 @@ $culHmSubTypeSets{tipTronic}       = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
 
 my %culHmModelSets = (# channels of this subtype-------------
-  "HM-CC-VD"       =>{ valvePos     => "position"},
-  "HM-RC-19"       =>{ service      => "<count>"
-		              ,alarm        => "<count>"
-		              ,display      => "<text> [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
-  "HM-PB-4DIS-WM"  =>{ text         => "<txt1> <txt2>..."
-                        #text       => "<btn> [on|off] <txt1> <txt2>...", old style will not be offered anymore
-				     },
-  "HM-OU-LED16"    =>{ led          => "[off|red|green|orange]"
-		              ,ilum         => "[0-15] [0-127]"},
-  "HM-OU-CFM-PL"   =>{ "on-for-timer"=>"<sec>"
-                      ,"on-till"     =>"<time>"
-		              ,on            =>""
-					  ,off           =>""
-					  ,toggle        =>""
-					  ,press         =>"[long|short] [on|off] ..."
-					  ,inhibit       =>"[on|off]"},
-  "HM-CC-TC"       =>{ statusRequest =>""},
+  "HM-CC-VD"       =>{ valvePos       => "position"},
+  "HM-RC-19"       =>{ service        => "<count>"
+		              ,alarm          => "<count>"
+		              ,display        => "<text> [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
+  "HM-PB-4DIS-WM"  =>{ text           => "<txt1> <txt2>..."
+                        #text         => "<btn> [on|off] <txt1> <txt2>...", old style will not be offered anymore
+				     },               
+  "HM-OU-LED16"    =>{ led            => "[off|red|green|orange]"
+		              ,ilum           => "[0-15] [0-127]"},
+  "HM-OU-CFM-PL"   =>{ "on-for-timer" =>"<sec>"
+                      ,"on-till"      =>"<time>"
+		              ,on             =>""
+					  ,off            =>""
+					  ,toggle         =>""
+					  ,press          =>"[long|short] [on|off] ..."
+					  ,inhibit        =>"[on|off]"},
+  "HM-CC-TC"       =>{ statusRequest  =>"",
+                       burstXmit      =>""},
+  "HM-CC-RT-DN"    =>{ burstXmit      =>""},
 );
 # clones- - - - - - - - - - - - - - - - - 
 $culHmModelSets{"HM-RC-19-B"}  = $culHmModelSets{"HM-RC-19"};
@@ -1035,14 +1037,14 @@ my %culHmChanSets = (
 					  ,getSerial      => ""},
   "HM-CC-TC02"     =>{ peerChan       =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"
                       ,"desired-temp" =>"[on|off|6.0..30.0]" 
-                      ,tempListSat    =>"HH:MM temp ..."
-                      ,tempListSun    =>"HH:MM temp ..."
-                      ,tempListMon    =>"HH:MM temp ..."
-                      ,tempListTue    =>"HH:MM temp ..."
-                      ,tempListThu    =>"HH:MM temp ..."
-                      ,tempListWed    =>"HH:MM temp ..."
-                      ,tempListFri    =>"HH:MM temp ..."
-                      ,partyMode      =>"HH:MM durationDays"
+                      ,tempListSat    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListSun    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListMon    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListTue    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListThu    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListWed    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListFri    =>"[prep|exec] HH:MM temp ..."
+                      ,partyMode      =>"[prep|exec] HH:MM durationDays"
                       ,displayMode    =>"[temp-only|temp-hum]"
                       ,displayTemp    =>"[actual|setpoint]"
                       ,displayTempUnit=>"[celsius|fahrenheit]"
