@@ -42,7 +42,7 @@ structure_Initialize($)
   $hash->{SetFn}     = "structure_Set";
   $hash->{AttrFn}    = "structure_Attr";
   $hash->{AttrList}  = "clientstate_priority ".
-                       "clientstate_behavior:relative,absolute,last ".
+                       "clientstate_behavior:relative,relativeKnown,absolute,last ".
                        $readingFnAttributes;
 
   addToAttrList("structexclude");
@@ -98,19 +98,6 @@ structure_Undef($$)
   structure_Attr(@a);
   return undef;
 }
-
-#############################
-# returns the unique keys of the given array
-# @my_array = ("one","two","three","two","three");
-# print join(" ", @my_array), "\n";
-# print join(" ", structure_uniq(@my_array)), "\n";
-
-sub
-structure_uniq
-{
-  return keys %{{ map { $_ => 1 } @_ }};
-}
-
 
 #############################
 # returns the really changed Device
@@ -170,15 +157,10 @@ sub structure_Notify($$)
 
   # lade das Verhalten, Standard ist absolute 
   my $behavior = AttrVal($me, "clientstate_behavior", "absolute");
-  my @clientstate;
+  my %clientstate;
 
-  # hier nur den Struktur-Status anpassen wenn 
-  # a) behavior=absolute oder 
-  # b) behavior=relative UND das Attr clientstate_priority gefaellt ist
   my @structPrio = split(" ", $attr{$me}{clientstate_priority})
         if($attr{$me}{clientstate_priority});
-  return "" if (!@structPrio && $behavior eq "relative");
-
 
   return "" if($hash->{INSET}); # Do not trigger for our own set
 
@@ -188,14 +170,6 @@ sub structure_Notify($$)
   }
   $hash->{INNTFY} = 1;
 
-  # assoziatives Array aus Prioritaetsliste aufbauen
-  # Bsp: Original: "On|An Off|Aus"
-  # wobei der erste Wert der "Oder"-Liste als Status der Struktur uebernommen
-  # wird hier also On oder Off
-  # priority[On]=0
-  # priority[An]=0
-  # priority[Off]=1
-  # priority[Aus]=1 
   my %priority;
   my (@priority, @foo); 
   for (my $i=0; $i<@structPrio; $i++) {
@@ -205,84 +179,58 @@ sub structure_Notify($$)
         $priority[$i+1]=$foo[0];
       }
   }
-  undef @foo;
-  undef @structPrio;
-  #Log3 $me, 1, Dumper(%priority) . "\n";
   
   my $minprio = 99999;
   my $devstate;
 
-  #ueber jedes Device das zu dieser Struktur gehoert
   foreach my $d (sort keys %{ $hash->{CONTENT} }) {
     next if(!$defs{$d});
 
-    # Status des Devices gemaess den Regeln des gesetztes StrukturAttr
-    # umformatieren
     if($attr{$d} && $attr{$d}{$devmap}) {
       my @gruppe = split(" ", $attr{$d}{$devmap});
       my @value;
       for (my $i=0; $i<@gruppe; $i++) {
         @value = split(":", $gruppe[$i]);
-        if(@value == 1) {
-          # nur das zu lesende Reading ist angegeben, zb. bei 1wire Modul
-          # OWSWITCH
-          #Bsp: A --> nur Reading A gehoert zur Struktur
-          #Bsp: A B --> Reading A und B gehoert zur Struktur
+        if(@value == 1) { # Reading
           $devstate = ReadingsVal($d, $value[0], undef);
-          push(@clientstate, $devstate) if(defined($devstate));
 
-        } elsif(@value == 2) {
-          # zustand wenn der Status auf dem in der Struktur definierten
-          # umdefiniert werden muss
-          # bsp: on:An
+        } elsif(@value == 2) { # bsp: on:An
           $devstate = ReadingsVal($d, "state", undef);
           if(defined($devstate) && $devstate eq $value[0]){
             $devstate = $value[1];
-            push(@clientstate, $devstate);
-            $i=99999;
+            $i=99999; # RKO: ??
           }
 
-        } elsif(@value == 3) {
-          # Das zu lesende Reading wurde mit angegeben:
-          # Reading:OriginalStatus:NeuerStatus wenn zb. ein Device mehrere
-          # Readings abbildet, zb. 1wire DS2406, DS2450 Bsp: A:Zu.:Geschlossen
+        } elsif(@value == 3) {  # Reading:OriginalStatus:NeuerStatus 
           $devstate = ReadingsVal($d, $value[0], undef);
           if(defined($devstate) && $devstate eq $value[1]){
             $devstate = $value[2];
-            push(@clientstate, $devstate);
-            # $i=99999; entfernt, wenn Device mehrere Ports/Readings abbildet
-            # wird beim ersten Auftreten sonst nicht weiter geprueft
           }
         }
-        # Log3 $me, 1, "Dev:".$d." Anzahl:".@value." Val:".$value[0]." devstate:
-        # ".$devstate;
-        $minprio = $priority{$devstate}
-                if(defined($devstate) &&
-                   $priority{$devstate} &&
-                   $priority{$devstate} < $minprio);
+        if(defined($devstate)) {
+          return "" if(!$priority{$devstate} && $behavior eq "relativeKnown");
+          $minprio = $priority{$devstate}
+                if($priority{$devstate} && $priority{$devstate} < $minprio);
+          $clientstate{$devstate} = 1;
+        }
       }
+
     } else {
-      # falls kein mapping im Device angegeben wurde
       $devstate = ReadingsVal($d, "state", undef);
-      $minprio = $priority{$devstate}
-               if(defined($devstate) &&
-                  $priority{$devstate} &&
-                  $priority{$devstate} < $minprio);
-      push(@clientstate, $devstate) if(defined($devstate));
+      if(defined($devstate)) {
+        return "" if(!$priority{$devstate} && $behavior eq "relativeKnown");
+        $minprio = $priority{$devstate}
+              if($priority{$devstate} && $priority{$devstate} < $minprio);
+        $clientstate{$devstate} = 1;
+      }
     }
 
-    #besser als 1 kann minprio nicht werden
-    last if($minprio == 1);
-  } #foreach
+  }
 
-  @clientstate = structure_uniq(@clientstate);# eleminiere alle Dubletten
-
-  #ermittle Endstatus
   my $newState = "undefined";
   if($behavior eq "absolute"){
-    # wenn absolute, dann gebe undefinierten Status aus falls die Clients
-    # unterschiedliche Stati haben  
-    $newState = (@clientstate == 1 ? $clientstate[0] : "undefined");
+    my @cKeys = keys %clientstate;
+    $newState = (@cKeys == 1 ? $cKeys[0] : "undefined");
 
   } elsif($behavior eq "relative" && $minprio < 99999) {
     $newState = $priority[$minprio];
@@ -514,6 +462,10 @@ structure_Attr($@)
         <li>relative<br>
           See below for clientstate_priority.
           </li>
+        <li>relativeKnown<br>
+          Like relative, but do not trigger on events not described in
+          clientstate_priority. Needed e.g. for HomeMatic devices.
+          </li>
         <li>last<br>
           The structure state corresponds to the state of the device last changed.
           </li>
@@ -637,23 +589,25 @@ structure_Attr($@)
       Dabei wird das propagieren der Stati der Devices in zwei Gruppen klassifiziert
       und mittels diesem Attribut definiert:
       <ul>
-      <li>absolute</li>
-      <ul>
+      <li>absolute<br>
         Die Struktur wird erst dann den Status der zugef&uuml;gten Devices annehmen,
         wenn alle Devices einen identischen Status vorweisen. Bei unterschiedlichen
         Devictypen kann dies per Attribut &lt;struct_type&gt;_map pro Device
         beinflusst werden. Andernfalls hat die Struktur den Status "undefined".
-      </ul>
-      <li>relative</li>
-      <ul>
+        </li>
+      <li>relative<br>
         S.u. clientstate_priority.
-      </ul>
-      <li>last</li>
-      <ul>
+        </li>
+      <li>relativeKnown<br>
+        wie relative, reagiert aber nicht auf unbekannte, in
+        clientstate_priority nicht beschriebene Ereignisse. Wird f&uuml;r
+        HomeMatic Ger&auml;te ben&ouml;tigt.
+        </li>
+      <li>last<br>
         Die Struktur &uuml;bernimmt den Status des zuletzt ge&auml;nderten Ger&auml;tes.
+        </li>
       </ul>
     </li>
-  </ul>
 
     <a name="clientstate_priority"></a>
     <li>clientstate_priority<br>
