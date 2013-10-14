@@ -52,7 +52,7 @@ sub CUL_HM_Set($@);
 sub CUL_HM_valvePosUpdt(@);
 sub CUL_HM_infoUpdtDevData($$$);
 sub CUL_HM_infoUpdtChanData(@);
-sub CUL_HM_getConfig($$$$$);
+sub CUL_HM_getConfig($);
 sub CUL_HM_SndCmd($$);
 sub CUL_HM_responseSetup($$);
 sub CUL_HM_eventP($$);
@@ -199,8 +199,8 @@ sub CUL_HM_autoReadConfig($){
 	
 	if (0 != CUL_HM_getAttrInt($name,"autoReadReg")){
 	  #CUL_HM_Set($hash,$name,"getSerial");
-	  CUL_HM_Set($hash,$name,"getConfig");
 	  CUL_HM_Set($hash,$name,"statusRequest");
+	  CUL_HM_Set($hash,$name,"getConfig");
 	  my $mId = CUL_HM_getMId($hash);
 	  $modules{CUL_HM}{helper}{autoRdActive} = $name 
 	      if (   CUL_HM_getRxType($hash) & 0xEB     # 0x14 invers, if mode other then config
@@ -298,8 +298,7 @@ sub CUL_HM_updateConfig($){
     $webCmd  = AttrVal($name,"webCmd",undef);
     if(!defined $webCmd){
       if    ($st eq "virtual"      ){$webCmd="press short:press long";
-	  }elsif(( $hash->{helper}{role}{dev} && 
-	          !$hash->{helper}{role}{chn} &&
+	  }elsif((!$hash->{helper}{role}{chn} &&
 			   $md ne "HM-CC-TC")
 		    ||$st eq "repeater"
 			||$md eq "HM-CC-VD"	   ){$webCmd="getConfig";
@@ -311,6 +310,9 @@ sub CUL_HM_updateConfig($){
 	  }elsif($md eq "HM-OU-CFM-PL" ){$webCmd="press short:press long"
 	                                   .($chn eq "02"?":playTone replay":"");
 	  }
+	  if    (!$hash->{helper}{role}{chn} 
+	       && $md eq "HM-CC-RT-DN") {$webCmd.=":burstXmit";}
+		   
 	  if ($webCmd){
 	    my $eventMap  = AttrVal($name,"eventMap",undef);
 	  
@@ -424,43 +426,46 @@ sub CUL_HM_Attr(@) {#################################
     push(@hashL,$eHash);
     foreach my $hash (@hashL){
 	  my $exLvl = CUL_HM_getAttrInt($hash->{NAME},"expert");
-	  if ($exLvl eq "0"){# off
-        foreach my $rdEntry (keys %{$hash->{READINGS}}){
-	      my $rdEntryNew;
-	  	  $rdEntryNew = ".".$rdEntry       if ($rdEntry =~m /^RegL_/);
-	  	  if ($rdEntry =~m /^R-/){
-	  	    my $reg = $rdEntry;
-	  	    $reg =~ s/.*-//;
-	  	    $rdEntryNew = ".".$rdEntry if($culHmRegDefine{$reg} &&
-			                              $culHmRegDefine{$reg}{d} eq '0' );
-	  	  }
-	  	  next if (!defined($rdEntryNew)); # no change necessary
-          delete $hash->{READINGS}{$rdEntryNew};
-          $hash->{READINGS}{$rdEntryNew} = $hash->{READINGS}{$rdEntry};
+	  if    ($exLvl eq "0"){# off
+        foreach my $rdEntry (grep /^RegL_/,keys %{$hash->{READINGS}}){
+          $hash->{READINGS}{".".$rdEntry} = $hash->{READINGS}{$rdEntry};
           delete $hash->{READINGS}{$rdEntry};
+	    }
+        foreach my $rdEntry (grep /^R-/   ,keys %{$hash->{READINGS}}){
+ 		  my $reg = $rdEntry;
+	  	  $reg =~ s/.*-//;
+          next if(!$culHmRegDefine{$reg} || $culHmRegDefine{$reg}{d} eq '1');
+          $hash->{READINGS}{".".$rdEntry} = $hash->{READINGS}{$rdEntry};
+          delete $hash->{READINGS}{$rdEntry};
+	    }
+        foreach my $rdEntry (grep /^RegL_/,keys %{$hash->{helper}{shadowReg}}){
+          $hash->{helper}{shadowReg}{".".$rdEntry} = $hash->{helper}{shadowReg}{$rdEntry};
+          delete $hash->{helper}{shadowReg}{$rdEntry};
 	    }
 	  }
 	  elsif ($exLvl eq "1"){# on: Only register values, no raw data
 	    # move register to visible if available
-        foreach my $rdEntry (keys %{$hash->{READINGS}}){
-	      my $rdEntryNew;
-	  	  $rdEntryNew = substr($rdEntry,1) if ($rdEntry =~m /^\.R-/);
-	  	  $rdEntryNew = ".".$rdEntry       if ($rdEntry =~m /^RegL_/);
-	  	  next if (!$rdEntryNew); # no change necessary
-          delete $hash->{READINGS}{$rdEntryNew};
-          $hash->{READINGS}{$rdEntryNew} = $hash->{READINGS}{$rdEntry};
+        foreach my $rdEntry (grep /^RegL_/,keys %{$hash->{READINGS}}){
+          $hash->{READINGS}{".".$rdEntry} = $hash->{READINGS}{$rdEntry};
           delete $hash->{READINGS}{$rdEntry};
+	    }
+        foreach my $rdEntry (grep /^\.R-/ ,keys %{$hash->{READINGS}}){
+          $hash->{READINGS}{substr($rdEntry,1)} = $hash->{READINGS}{$rdEntry};
+          delete $hash->{READINGS}{$rdEntry};
+	    }
+        foreach my $rdEntry (grep /^RegL_/,keys %{$hash->{helper}{shadowReg}}){
+          $hash->{helper}{shadowReg}{".".$rdEntry} = $hash->{helper}{shadowReg}{$rdEntry};
+          delete $hash->{helper}{shadowReg}{$rdEntry};
 	    }
 	  }
 	  elsif ($exLvl eq "2"){# full - incl raw data
-        foreach my $rdEntry (keys %{$hash->{READINGS}}){
-	      my $rdEntryNew;
-	  	  $rdEntryNew = substr($rdEntry,1) if (($rdEntry =~m /^\.RegL_/) ||
-	  	                                     ($rdEntry =~m /^\.R-/));
-	  	  next if (!$rdEntryNew); # no change necessary
-          delete $hash->{READINGS}{$rdEntryNew};
-          $hash->{READINGS}{$rdEntryNew} = $hash->{READINGS}{$rdEntry};
+        foreach my $rdEntry (grep /^\.R(egL_|-)/,keys %{$hash->{READINGS}}){
+          $hash->{READINGS}{substr($rdEntry,1)} = $hash->{READINGS}{$rdEntry};
           delete $hash->{READINGS}{$rdEntry};
+	    }
+        foreach my $rdEntry (grep /^\.RegL_/    ,keys %{$hash->{helper}{shadowReg}}){
+          $hash->{helper}{shadowReg}{substr($rdEntry,1)} = $hash->{helper}{shadowReg}{$rdEntry};
+          delete $hash->{helper}{shadowReg}{$rdEntry};
 	    }
 	  }
 	  else{;
@@ -2300,6 +2305,9 @@ sub CUL_HM_Set($@) {
   elsif($cmd eq "reset") { ####################################################
 	CUL_HM_PushCmdStack($hash,"++".$flag."11".$id.$dst."0400");
   } 
+  elsif($cmd eq "burstXmit") { ################################################
+    CUL_HM_SndCmd($hash,"++B112$id$dst");
+  } 
   elsif($cmd eq "pair") { #####################################################
 	$state = "";
     my $serialNr = AttrVal($name, "serialNr", undef);
@@ -2320,13 +2328,7 @@ sub CUL_HM_Set($@) {
 	$state = "";
   } 
   elsif($cmd eq "getConfig") { ################################################
-	CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'00040000000000')
-	       if ($roleD);
-	my @chnIdList = CUL_HM_getAssChnIds($name);
-	foreach my $channel (@chnIdList){
-	  my $chnHash = CUL_HM_id2Hash($channel);
-	  CUL_HM_getConfig($hash,$chnHash,$id,$dst,substr($channel,6,2));
-	}
+	CUL_HM_getConfig($hash);
 	$state = "";
   } 
   elsif($cmd eq "peerBulk") { #################################################
@@ -2404,10 +2406,16 @@ sub CUL_HM_Set($@) {
 	}
   } 
   elsif($cmd eq "regSet") { ############################################### reg
-    #set <name> regSet <regName> <value> [<peerChn>] [prep]
+    #set <name> regSet <regName> [prep] <value> [<peerChn>] 
 	#prep is internal use only. It allowes to prepare shadowReg only but supress
 	#writing. Application necessarily needs to execute writing subsequent.
-	my (undef,undef,$regName,$data,$peerChnIn,$prep) = @a;
+	my $prep = "";
+    if ($a[2] =~ m/^(prep|exec)$/){
+	  $prep = $a[2];
+	  splice  @a,2,1;#remove prep 
+	}
+
+	my (undef,undef,$regName,$data,$peerChnIn) = @a;
 	$state = "";
     if (!$culHmRegType{$st}{$regName}      && 
 	    !$culHmRegGeneral{$regName}        &&
@@ -2427,7 +2435,8 @@ sub CUL_HM_Set($@) {
 			)
 		   .(($reg->{l} == 3)?" peer required":"")." : ".$reg->{t}."\n"
 		          if ($data eq "?");
-	return "value:".$data." out of range for Reg \"".$regName."\""
+	return "value:".$data." out of range $reg->{min} to $reg->{max} for Reg \""
+	       .$regName."\""
 	        if (!($reg->{c} =~ m/^(lit|hex|min2time)$/)&&
 			    ($data < $reg->{min} ||$data > $reg->{max})); # none number
     return"invalid value. use:". join(",",sort keys%{$reg->{lit}}) 
@@ -2461,11 +2470,11 @@ sub CUL_HM_Set($@) {
 	
     my ($lChn,$peerId,$peerChn) = ($chn,"000000","00");
 	if (($list == 3) ||($list == 4)){ # peer is necessary for list 3/4
-	  return "Peer not specified" if (!$peerChnIn);
+	  return "Peer not specified" if ($peerChnIn eq "");
 	  $peerId  = CUL_HM_peerChId($peerChnIn,$dst,$id);	  
  	  $peerChn = ((length($peerId) == 8)?substr($peerId,6,2):"01");
       $peerId  = substr($peerId,0,6);	
-      return "Peer not specified" if (!$peerId);	  
+      return "Peer not valid" if (!$peerId);	  
 	}
 	elsif($list == 0){
       $lChn = "00";
@@ -2845,7 +2854,7 @@ sub CUL_HM_Set($@) {
 	}
 
 	my $prep = "";
-    if ($a[2] =~ m/^(prep|exec)$/ && $md eq "HM-CC-RT-DN"){
+    if ($a[2] =~ m/^(prep|exec)$/){
 	  $prep = $a[2];
 	  splice  @a,2,1;#remove prep 
 	}
@@ -3235,51 +3244,59 @@ sub CUL_HM_infoUpdtChanData(@) {# verify attributes after reboot
   DoTrigger("global",  'UNDEFINED '.$chnName.' CUL_HM '.$chnId);
   $attr{CUL_HM_id2Name($chnId)}{model} = $model;
 }
-sub CUL_HM_getConfig($$$$$){
-  my ($hash,$chnhash,$id,$dst,$chn) = @_;
+sub CUL_HM_getConfig($){
+  my $hash = shift;
   my $flag = CUL_HM_getFlag($hash);
-
-  delete $chnhash->{READINGS}{$_}
-            foreach (grep /^[\.]?(RegL_)/,keys %{$chnhash->{READINGS}});
-
-  my $lstAr = $culHmModel{CUL_HM_getMId($hash)}{lst};
-  if($lstAr){
-    my @list = split(",",$lstAr); #get valid lists e.g."1, 5:2.3p ,6:2"
-    my $pReq = 0; # Peer request not issued, do only once for channel
-    foreach my$listEntry (@list){# each list that is define for this channel
-      my ($peerReq,$chnValid)= (0,0);
-      my ($listNo,$chnLst1) = split(":",$listEntry); 
-	  if (!$chnLst1){
-	    $chnValid = 1; #if no entry go for all channels
-	    $peerReq = 1 if($listNo eq 'p' || $listNo==3 ||$listNo==4); #default
-	  }
-	  else{
-	    my @chnLst = split('\.',$chnLst1);
-	    foreach my $lchn (@chnLst){
-	      $peerReq = 1 if ($lchn =~ m/p/);
-	  	  no warnings;#know that lchan may be followed by 'p' causing a warning
-	        $chnValid = 1 if (int($lchn) == hex($chn));
-	  	  use warnings;
-	      last if ($chnValid);
+  my $id = CUL_HM_IOid($hash);
+  my $dst = substr($hash->{DEF},0,6);
+  
+  CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'00040000000000')
+	       if ($hash->{helper}{role}{dev});
+  my @chnIdList = CUL_HM_getAssChnIds($hash->{NAME});
+  foreach my $channel (@chnIdList){
+    my $cHash = CUL_HM_id2Hash($channel);
+    my $chn = substr($channel,6,2);
+    delete $cHash->{READINGS}{$_}
+          foreach (grep /^[\.]?(RegL_)/,keys %{$cHash->{READINGS}});
+    my $lstAr = $culHmModel{CUL_HM_getMId($cHash)}{lst};
+    if($lstAr){
+      my @list = split(",",$lstAr); #get valid lists e.g."1, 5:2.3p ,6:2"
+      my $pReq = 0; # Peer request not issued, do only once for channel
+      foreach my$listEntry (@list){# each list that is define for this channel
+        my ($peerReq,$chnValid)= (0,0);
+        my ($listNo,$chnLst1) = split(":",$listEntry); 
+        if (!$chnLst1){
+          $chnValid = 1; #if no entry go for all channels
+          $peerReq = 1 if($listNo eq 'p' || $listNo==3 ||$listNo==4); #default
         }
-	  }
-	  if ($chnValid){# yes, we will go for a list
-	    if ($peerReq){# need to get the peers first
-          if($listNo ne 'p'){# not if 'only peers'!
-		    $chnhash->{helper}{getCfgList} = "all";
-            $chnhash->{helper}{getCfgListNo} = $listNo;
-		  }
-		  if (!$pReq){#get peers first, but only once per channel
-		    CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s03"
-			                                 ,$flag,$id,$dst,$chn));
-			$pReq = 1;
-		  }
-	    }
-	    else{
-          CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s0400000000%02X"
-		                                    ,$flag,$id,$dst,$chn,$listNo));
-	    }
-	  }	
+        else{
+          my @chnLst = split('\.',$chnLst1);
+          foreach my $lchn (@chnLst){
+            $peerReq = 1 if ($lchn =~ m/p/);
+  	        no warnings;#know that lchan may be followed by 'p' causing a warning
+              $chnValid = 1 if (int($lchn) == hex($chn));
+  	        use warnings;
+            last if ($chnValid);
+          }
+        }
+        if ($chnValid){# yes, we will go for a list
+          if ($peerReq){# need to get the peers first
+            if($listNo ne 'p'){# not if 'only peers'!
+	          $cHash->{helper}{getCfgList} = "all";
+              $cHash->{helper}{getCfgListNo} = $listNo;
+	        }
+	        if (!$pReq){#get peers first, but only once per channel
+	          CUL_HM_PushCmdStack($cHash,sprintf("++%s01%s%s%s03"
+		                                 ,$flag,$id,$dst,$chn));
+		      $pReq = 1;
+	        }
+          }
+          else{
+            CUL_HM_PushCmdStack($cHash,sprintf("++%s01%s%s%s0400000000%02X"
+	                                    ,$flag,$id,$dst,$chn,$listNo));
+          }
+        }	
+      }
     }
   }
 }
@@ -3320,27 +3337,41 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
     }
   }
   $chnhash->{helper}{shadowReg}{$regLN} = $regs; # update shadow
-  my $change;
+  my @changeList;
+  
   if ($prep eq "exec"){#update complete registerset
-    foreach (sort split " ",$chnhash->{helper}{shadowReg}{$regLN}){
-	  $change .= $_." " if ($rRd !~ m /$_/);# filter only changes
-	}
-	$change =~ s/(\ |:)//g;
+	@changeList = keys%{$chnhash->{helper}{shadowReg}};
+  }
+  elsif ($prep eq "prep"){
+    return; #prepare shadowReg only. More data expected. 
   }
   else{
-    $change = $content;# just change actual date
+	push @changeList,$regLN;
   }
-  return if ($prep eq "prep");#prepare shadowReg only. More data to come. 
-                    #Application takes care about execution
-  CUL_HM_updtRegDisp($hash,$list,$peerAddr.$peerChn);
-  CUL_HM_PushCmdStack($hash, "++".$flag.'01'.$src.$dst.$chn.'05'.
+
+  foreach my $nrn(@changeList){
+    my $change;
+	my $nrRd = ReadingsVal($chnhash->{NAME},$nrn,"");
+    foreach (sort split " ",$chnhash->{helper}{shadowReg}{$nrn}){
+	  $change .= $_." " if ($nrRd !~ m /$_/);# filter only changes
+	}
+	next if (!$change);#no changes
+	$change =~ s/(\ |:)//g;
+	my $peerN;
+	($list,$peerN) = ($1,$2) if($nrn =~ m/RegL_(..):(.*)/);
+	if ($peerN){($peerAddr,$peerChn) = unpack('A6A2', CUL_HM_name2Id($peerN,$hash));}
+	else       {($peerAddr,$peerChn) = ('000000','00');}
+  
+    CUL_HM_updtRegDisp($hash,$list,$peerAddr.$peerChn);
+    CUL_HM_PushCmdStack($hash, "++".$flag.'01'.$src.$dst.$chn.'05'.
                                         $peerAddr.$peerChn.$list);
-  for(my $l = 0; $l < $tl; $l+=28) {
-    my $ml = $tl-$l < 28 ? $tl-$l : 28;
-    CUL_HM_PushCmdStack($hash, "++A001".$src.$dst.$chn."08".
+    for(my $l = 0; $l < $tl; $l+=28) {
+      my $ml = $tl-$l < 28 ? $tl-$l : 28;
+      CUL_HM_PushCmdStack($hash, "++A001".$src.$dst.$chn."08".
 	                                 substr($change,$l,$ml));
+    }
+    CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$chn."06");
   }
-  CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$chn."06");
   CUL_HM_queueAutoRead($hash->{NAME}) 
         if (2 < CUL_HM_getAttrInt($hash->{NAME},"autoReadReg"));  
 }
@@ -4709,7 +4740,7 @@ sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request after 12 s
  	@{$modules{CUL_HM}{helper}{reqStatus}}= 
 	           CUL_HM_noDup(@{$modules{CUL_HM}{helper}{reqStatus}},$name);
 	RemoveInternalTimer("CUL_HM_reqStatus");
-	InternalTimer(gettimeofday()+120,"CUL_HM_reqStatus","CUL_HM_reqStatus", 0);
+	InternalTimer(gettimeofday()+10,"CUL_HM_reqStatus","CUL_HM_reqStatus", 0);
   }
 }
 sub CUL_HM_getAttrInt($@){#return attrValue as integer
@@ -5008,10 +5039,15 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	 set myblind regBulk 01 0C:00<br>
 	 </code></ul>
 	 myblind will set the max drive time up for a blind actor to 25,6sec</li>
-     <li><B>regSet &lt;regName&gt; &lt;value&gt; &lt;peerChannel&gt;</B><a name="CUL_HMregSet"></a><br>
+     <li><B>regSet &lt;regName&gt; [prep|exec] &lt;value&gt; &lt;peerChannel&gt;</B><a name="CUL_HMregSet"></a><br>
         For some major register a readable version is implemented supporting
         register names &lt;regName&gt; and value conversionsing. Only a subset
         of register can be supproted.<br>
+		Optional parameter [prep|exec] allowes to pack the messages and therefore greatly 
+		improve data transmission.
+		Usage is to send the commands with paramenter "prep". The data will be accumulated for send. 
+		The last command must have the parameter "exec" in order to transmitt the information.<br>
+
         &lt;value&gt; is the data in human readable manner that will be written
         to the register.<br>
         &lt;peerChannel&gt; is required if this register is defined on a per
@@ -5257,13 +5293,13 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
       <li><B>desired-temp &lt;temp&gt;</B><br>
           Set different temperatures. &lt;temp&gt; must be between 6 and 30
           Celsius, and precision is half a degree.</li>
-      <li><B>tempListSat HH:MM temp ... 24:00 temp</B><br></li>
-      <li><B>tempListSun HH:MM temp ... 24:00 temp</B><br></li>
-      <li><B>tempListMon HH:MM temp ... 24:00 temp</B><br></li>
-      <li><B>tempListTue HH:MM temp ... 24:00 temp</B><br></li>
-      <li><B>tempListThu HH:MM temp ... 24:00 temp</B><br></li>
-      <li><B>tempListWed HH:MM temp ... 24:00 temp</B><br></li>
-      <li><B>tempListFri HH:MM temp ... 24:00 temp</B><br>
+      <li><B>tempListSat [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListSun [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListMon [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListTue [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListThu [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListWed [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+      <li><B>tempListFri [prep|exec] HH:MM temp ... 24:00 temp</B><br>
           Specify a list of temperature intervals. Up to 24 intervals can be
           specified for each week day, the resolution is 10 Minutes. The
           last time spec must always be 24:00.<br>
@@ -5303,7 +5339,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
           Specify a list of temperature intervals. Up to 24 intervals can be
           specified for each week day, the resolution is 10 Minutes. The
           last time spec must always be 24:00.<br>
-		  The optional parameter [prep|exec] allowes to pack the messages and therefore greatly 
+		  Optional parameter [prep|exec] allowes to pack the messages and therefore greatly 
 		  improve data transmission. This is especially helpful if device is operated in wakeup mode.
 		  Usage is to send the commands with paramenter "prep". The data will be accumulated for send. 
 		  The last command must have the parameter "exec" in order to transmitt the information.<br>
