@@ -1,8 +1,6 @@
 ##############################################
 # $Id$
 
-package main;
-
 # by r.koenig at koeniglich.de
 #
 # This modules handles the communication with a TCM120 or TCM310 EnOcean
@@ -18,9 +16,16 @@ package main;
 # Check Stick WriteRadio
 # Check Stick RSS
 
+package main;
+
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
+if( $^O =~ /Win/ ) {
+  require Win32::SerialPort;
+} else {
+  require Device::SerialPort;
+} 
 
 sub TCM_Read($);
 sub TCM_ReadAnswer($$);
@@ -828,6 +833,7 @@ TCM_Undef($$)
     <ul><code>
       define BscBor TCM 120 /dev/ttyACM0@9600<br>
       define TCM310 TCM 310 /dev/ttyACM0@57600<br>
+      define TCM310 TCM 310 COM1@57600 (Windows)<br>
     </code></ul>
 
   </ul>
