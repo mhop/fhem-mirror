@@ -1,32 +1,4 @@
-# $Id$
-####################################################################################################
-#
-#	51_BBB_BMP180.pm
-#
-#	An FHEM Perl module for reading air pressure from BMP180 sensor connected on I2C.
-#	Developed for use with fhem running on BeagleBoneBlack
-#
-#	Please read commandref for details on prerequisits!
-#
-#	Copyright: betateilchen ®
-#	e-mail: fhem.development@betateilchen.de
-#
-#	This file is part of fhem.
-#
-#	Fhem is free software: you can redistribute it and/or modify
-#	it under the terms of the GNU General Public License as published by
-#	the Free Software Foundation, either version 2 of the License, or
-#	(at your option) any later version.
-#
-#	Fhem is distributed in the hope that it will be useful,
-#	but WITHOUT ANY WARRANTY; without even the implied warranty of
-#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#	GNU General Public License for more details.
-#
-#	You should have received a copy of the GNU General Public License
-#	along with fhem.  If not, see <http://www.gnu.org/licenses/>.
-#
-####################################################################################################package main;
+package main;
 
 use strict;
 use warnings;
@@ -36,19 +8,18 @@ use Time::HiRes qw(gettimeofday);
 sub BBB_BMP180_Define($$);
 sub BBB_BMP180_Undefine($$);
 sub BBB_BMP180_Get($@);
-sub BBB_BMP180_Attr($@);
-sub BBB_BMP180_Notify($$);
 
-
+#	$next = gettimeofday()+$hash->{helper}{INTERVAL};
+#	readingsSingleUpdate($hash, "c_nextUpdate", localtime($next), 1);
+#	InternalTimer($next, "GDS_GetUpdate", $hash, 1);
+	
 sub BBB_BMP180_Initialize($){
 	my ($hash) = @_;
 	$hash->{DefFn}		=	"BBB_BMP180_Define";
 	$hash->{UndefFn}	=	"BBB_BMP180_Undefine";
 	$hash->{GetFn}		=	"BBB_BMP180_Get";
-	$hash->{NotifyFn}	=	"BBB_BMP180_Notify";
 	$hash->{AttrFn}		=	"BBB_BMP180_Attr";
-	$hash->{AttrList}	=	"bbbRoundPressure:0,1 ".
-							"bbbRoundTemperature:0,1 ".
+	$hash->{AttrList}	=	"bbbRoundPressure:0,1 bbbRoundTemperature:0,1 ".
 							"bbbInterval ".
 							$readingFnAttributes;
 }
@@ -58,36 +29,15 @@ sub BBB_BMP180_Define($$){
 	my $name = $hash->{NAME};
 	my @a = split("[ \t][ \t]*", $def);
 	Log3($name, 3, "BBB_BMP180 $name: created");
+	readingsSingleUpdate($hash, "state", "active",1);
 
 	$hash->{helper}{i2cbus} = '1';
 	$hash->{helper}{i2cbus} = $a[2] if(defined($a[2]));
 
-	# check availability
-	my $bmpP = '/sys/bus/i2c/drivers/bmp085/'.$hash->{helper}{i2cbus}.'-0077/pressure0_input';
-	open (IN,"<$bmpP") ||  return "\n   BBB_BMP180: I2C device not found!";
-
-	if( $init_done ) {
-		delete $modules{BBB_BMP180}->{NotifyFn};
-		bbb_getValues($hash,undef);
-	} else {
-		readingsSingleUpdate($hash, "state", "active",1);
-	}
+	my $next = gettimeofday()+10;
+	InternalTimer($next, "bbb_getValues", $hash, 0);
 
 	return undef;
-}
-
-sub BBB_BMP180_Notify($$) {
-	my ($hash,$dev) = @_;
-
-	if( grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) ) {
-		delete $modules{BBB_BMP180}->{NotifyFn};
-
-		foreach my $d (keys %defs) {
-			next if($defs{$d}{TYPE} ne "BBB_BMP180");
-			bbb_getValues($hash,undef);
-		}
-	}
-	return;
 }
 
 sub BBB_BMP180_Undefine($$){
@@ -124,7 +74,7 @@ sub BBB_BMP180_Attr($@){
 		when("bbbInterval"){
 			RemoveInternalTimer($hash);
 			my $next = gettimeofday()+$attrValue;
-			InternalTimer($next, "bbb_getValues", ($hash,undef), 0);
+			InternalTimer($next, "bbb_getValues", $hash, 0);
 			break;
 			}
 
@@ -133,9 +83,10 @@ sub BBB_BMP180_Attr($@){
 	return "";
 }
 
-sub bbb_getValues($;$){
+sub bbb_getValues($$){
 	my ($hash,$local) = @_;
 	my $name = $hash->{NAME};
+
 	my $a  = AttrVal('global','altitude',undef);
 	my $t  = bbb_temp($hash);
 	my $pa = bbb_absDruck($hash);
@@ -166,7 +117,8 @@ sub bbb_getValues($;$){
 	readingsEndUpdate($hash, 1);
 
 	my $next = gettimeofday()+AttrVal($name,'bbbInterval',300);
-	InternalTimer($next, "bbb_getValues", ($hash,undef), 0) unless $local;
+	InternalTimer($next, "bbb_getValues", $hash, 0) unless $local;
+
 	return;
 }
 
@@ -175,7 +127,7 @@ sub bbb_temp($){
 	my $bmpT = '/sys/bus/i2c/drivers/bmp085/'.$hash->{helper}{i2cbus}.'-0077/temp0_input';
 	my $temp;
 
-	open (IN,"<$bmpT") || Log3($hash, 2, 'BBB_BMP180: I2C device not found!');
+	open (IN,"<$bmpT") || die $!;
 	while (<IN>){
 		$temp = $_;
 		last;
@@ -192,7 +144,7 @@ sub bbb_absDruck($){
 	my $bmpP = '/sys/bus/i2c/drivers/bmp085/'.$hash->{helper}{i2cbus}.'-0077/pressure0_input';
 	my $p;
 
-	open (IN,"<$bmpP") ||  Log3($hash, 2, 'BBB_BMP180: I2C device not found!');
+	open (IN,"<$bmpP") || die $!;
 	while (<IN>){
 		$p = $_;
 		last;
