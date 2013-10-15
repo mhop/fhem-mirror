@@ -1,3 +1,31 @@
+# $Id$
+##############################################################################
+#
+#	51_BBB_BMP180.pm
+#
+#	An FHEM Perl module to retrieve pressure data from a BMP085/BMP180
+#	sensor connected to I2C bus
+#
+#	Copyright: betateilchen ®
+#	e-mail   : fhem.development@betateilchen.de
+#
+#	This file is part of fhem.
+#
+#	Fhem is free software: you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation, either version 2 of the License, or
+#	(at your option) any later version.
+#
+#	Fhem is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
+#
+#	You should have received a copy of the GNU General Public License
+#	along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
+
 package main;
 
 use strict;
@@ -9,17 +37,14 @@ sub BBB_BMP180_Define($$);
 sub BBB_BMP180_Undefine($$);
 sub BBB_BMP180_Get($@);
 
-#	$next = gettimeofday()+$hash->{helper}{INTERVAL};
-#	readingsSingleUpdate($hash, "c_nextUpdate", localtime($next), 1);
-#	InternalTimer($next, "GDS_GetUpdate", $hash, 1);
-	
 sub BBB_BMP180_Initialize($){
 	my ($hash) = @_;
 	$hash->{DefFn}		=	"BBB_BMP180_Define";
 	$hash->{UndefFn}	=	"BBB_BMP180_Undefine";
 	$hash->{GetFn}		=	"BBB_BMP180_Get";
 	$hash->{AttrFn}		=	"BBB_BMP180_Attr";
-	$hash->{AttrList}	=	"bbbRoundPressure:0,1 bbbRoundTemperature:0,1 ".
+	$hash->{AttrList}	=	"bbbRoundPressure:0,1 ".
+							"bbbRoundTemperature:0,1 ".
 							"bbbInterval ".
 							$readingFnAttributes;
 }
@@ -34,8 +59,18 @@ sub BBB_BMP180_Define($$){
 	$hash->{helper}{i2cbus} = '1';
 	$hash->{helper}{i2cbus} = $a[2] if(defined($a[2]));
 
-	my $next = gettimeofday()+10;
-	InternalTimer($next, "bbb_getValues", $hash, 0);
+	# check sensor presence
+	my $bmpTest = '/sys/bus/i2c/drivers/bmp085/'.$hash->{helper}{i2cbus}.'-0077/pressure0_input';
+	return 'BBB_BMP180: sensor not found!' unless -e $bmpTest;
+	$bmpTest = '/sys/bus/i2c/drivers/bmp085/'.$hash->{helper}{i2cbus}.'-0077/temp0_input';
+	return 'BBB_BMP180: sensor not found!' unless -e $bmpTest;
+
+	if( $init_done ) {
+		delete $modules{openweathermap}->{NotifyFn};
+		bbb_getValues($hash,0);
+	} else {
+		readingsSingleUpdate($hash, "state", "defined",1);
+	}
 
 	return undef;
 }
@@ -83,6 +118,19 @@ sub BBB_BMP180_Attr($@){
 	return "";
 }
 
+sub BBB_BMP180_Notify($$) {
+	my ($hash,$dev) = @_;
+
+	if( grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) ) {
+		delete $modules{BBB_BMP180}->{NotifyFn};
+
+		foreach my $d (keys %defs) {
+			next if($defs{$d}{TYPE} ne "openweathermap");
+			bbb_getValues($hash,0);
+		}
+	}
+}
+
 sub bbb_getValues($$){
 	my ($hash,$local) = @_;
 	my $name = $hash->{NAME};
@@ -106,8 +154,8 @@ sub bbb_getValues($$){
 		$t	= sprintf("%.1f", $t);
 	}
 
-	my $s = "T: $t P: $pa";
-	$s   .= " P-nn: $pr" if(defined($a));
+	my $s	 = "T: $t P: $pa";
+	$s		.= " P-nn: $pr" if(defined($a));
 
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, 'temperature', $t);
@@ -127,7 +175,7 @@ sub bbb_temp($){
 	my $bmpT = '/sys/bus/i2c/drivers/bmp085/'.$hash->{helper}{i2cbus}.'-0077/temp0_input';
 	my $temp;
 
-	open (IN,"<$bmpT") || die $!;
+	open (IN,"<$bmpT");
 	while (<IN>){
 		$temp = $_;
 		last;
@@ -144,7 +192,7 @@ sub bbb_absDruck($){
 	my $bmpP = '/sys/bus/i2c/drivers/bmp085/'.$hash->{helper}{i2cbus}.'-0077/pressure0_input';
 	my $p;
 
-	open (IN,"<$bmpP") || die $!;
+	open (IN,"<$bmpP");
 	while (<IN>){
 		$p = $_;
 		last;
