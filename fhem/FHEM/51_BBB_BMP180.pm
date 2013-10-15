@@ -36,6 +36,7 @@ use Time::HiRes qw(gettimeofday);
 sub BBB_BMP180_Define($$);
 sub BBB_BMP180_Undefine($$);
 sub BBB_BMP180_Get($@);
+sub BBB_BMP180_Notify($$);
 
 sub BBB_BMP180_Initialize($){
 	my ($hash) = @_;
@@ -43,6 +44,7 @@ sub BBB_BMP180_Initialize($){
 	$hash->{UndefFn}	=	"BBB_BMP180_Undefine";
 	$hash->{GetFn}		=	"BBB_BMP180_Get";
 	$hash->{AttrFn}		=	"BBB_BMP180_Attr";
+	$hash->{NotifyFn}	=	"BBB_BMP180_Notify";
 	$hash->{AttrList}	=	"bbbRoundPressure:0,1 ".
 							"bbbRoundTemperature:0,1 ".
 							"bbbInterval ".
