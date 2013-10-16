@@ -25,6 +25,10 @@
 #     define t4 RandomTimer  *23:01:40 Zirkulation 23:02:40  100; attr   t4 verbose 5;
 #
 ##############################################################################
+# 10.09.2013 Svenson : disable direct if attribute changed, add state disabled;
+#                      randomtimer run every day if attribut runonce 0 (default is 1)
+#
+##############################################################################
 package main;
 
 use strict;
@@ -38,7 +42,8 @@ sub RandomTimer_Initialize($)
 
   $hash->{DefFn}     = "RandomTimer_Define";
   $hash->{UndefFn}   = "RandomTimer_Undef";
-  $hash->{AttrList}  = "onCmd offCmd switchmode disable:0,1 disableCond ".
+  $hash->{AttrFn}   =  "RandomTimer_Attr";
+  $hash->{AttrList}  = "onCmd offCmd switchmode disable:0,1 disableCond runonce:0,1 ".
                        $readingFnAttributes;
 }
 #
@@ -187,6 +192,9 @@ sub RandomTimer_Exec($)
         my $midnight = $now1 + 24*3600 - (3600*$hour + 60*$min + $sec);
         Log3 $hash, 4, "[".$hash->{NAME}. "]"." Next Timer ".strftime("%d.%m.%Y  %H:%M:%S",localtime($midnight));
         InternalTimer($midnight,      "RandomTimer_ExecRepeater_verzoegert",     $hash, 0);
+     } else {
+        $hash->{COMMAND} = "off";
+        $hash->{STATE}   = "disabled";
      }
      return;
   }
@@ -211,16 +219,39 @@ sub RandomTimer_Exec($)
     $hash->{STATE}   = "off";
     fhem ("set $hash->{DEVICE} $hash->{COMMAND}");
     delete $hash->{ABSCHALTZEIT};
+
     if ($hash->{REP} gt "") {
        RandomTimer_ExecRepeater($hash);
     } else {
-      fhem ("delete $hash->{NAME}");
+      if ( AttrVal($hash->{NAME}, "runonce", 1) == 1 )
+         { fhem ("delete $hash->{NAME}") ;}
+      else
+         { RandomTimer_ExecRepeater($hash);}
     }
   } else {
     toggleDevice($hash);
     my $secsToNextAbschaltTest = getSecsToNextAbschaltTest($hash);
     InternalTimer(gettimeofday()+$secsToNextAbschaltTest,      "RandomTimer_Exec",     $hash, 0);
   }
+}
+#
+#
+#
+sub RandomTimer_Attr($$$) {
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+ 
+  if( $attrName eq "disable" ) {
+     my $hash = $defs{$name};
+     if( $cmd eq "set" && $attrVal ne "0" ) {
+       $attr{$name}{$attrName} = 1;
+       $hash->{STATE}   = "disabled";
+       RemoveInternalTimer($hash);
+     } else {
+        $attr{$name}{$attrName} = 0;
+        $hash->{STATE}   = "off";
+        RandomTimer_ExecRepeater($hash);
+     }
+  } 
 }
 #
 #
