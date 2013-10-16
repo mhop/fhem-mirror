@@ -38,7 +38,7 @@ Heating_Control_Initialize($)
   $hash->{UndefFn} = "Heating_Control_Undef";
   $hash->{GetFn}   = "Heating_Control_Get";
   $hash->{UpdFn}   = "Heating_Control_Update";
-  $hash->{AttrList}= "disable:0,1".
+  $hash->{AttrList}= "disable:0,1 ".
                         $readingFnAttributes;
 }
 
@@ -78,8 +78,9 @@ Heating_Control_Define($$)
   my @switchingtimes;
   my $conditionOrCommand = "";
 
-  my @Wochentage_de = ("Sonntag","Montag","Dienstag","Mittwoch", "Donnerstag","Freitag","Samstag" );
-  my @Wochentage_en = ("Sunday", "Monday","Tuesday", "Wednesday","Thursday",  "Friday", "Saturday");
+  my @Wochentage_de = ("Sonntag",  "Montag","Dienstag","Mittwoch",  "Donnerstag","Freitag", "Samstag" );
+  my @Wochentage_en = ("Sunday",   "Monday","Tuesday", "Wednesday", "Thursday",  "Friday",  "Saturday");
+  my @Wochentage_fr = ("Dimanche", "Lundi", "Mardi",   "Mercredi",  "Jeudi",     "Vendredi","Samedi");
 
   return "invalid Device, given Device <$device> not found" if(!$defs{$device});
 
@@ -91,6 +92,7 @@ Heating_Control_Define($$)
   for (my $w=0; $w<@Wochentage_de; $w++) {
     delete($hash->{"PROFILE ".($w).": ".$Wochentage_de[$w]}) if($hash->{"PROFILE ".($w).": ".$Wochentage_de[$w]});
     delete($hash->{"PROFILE ".($w).": ".$Wochentage_en[$w]}) if($hash->{"PROFILE ".($w).": ".$Wochentage_en[$w]});
+    delete($hash->{"PROFILE ".($w).": ".$Wochentage_fr[$w]}) if($hash->{"PROFILE ".($w).": ".$Wochentage_fr[$w]});
   }
 
   for(my $i=0; $i<@a; $i++) {
@@ -116,8 +118,9 @@ Heating_Control_Define($$)
      $hash->{helper}{COMMAND} = $conditionOrCommand;
   }
 
-  my $daysRegExp    = "(mo|di|mi|do|fr|sa|so|tu|we|th|su)";
+  my $daysRegExp    = "(mo|di|mi|do|fr|sa|so|tu|we|th|su|lu|ma|me|je|ve)";
   my $daysRegExp_en = "(tu|we|th|su)";
+  my $daysRegExp_fr = "(lu|ma|me|je|ve)";
 
   my %dayNumber=();
   my $idx = 0;
@@ -128,8 +131,12 @@ Heating_Control_Define($$)
   foreach my $day  ("su","mo","tu","we","th","fr","sa") {
      $dayNumber{$day} = $idx; $idx++;
   }
+  $idx = 0;
+  foreach my $day  ("di","lu","ma","me","je","ve","sa") {
+     $dayNumber{$day} = $idx; $idx++;
+  }
 
-  my (@st, @days, $daylist, $time, $para, $englisch);
+  my (@st, @days, $daylist, $time, $para, $englisch, $french);
   for(my $i=0; $i<@switchingtimes; $i++) {
     
     @st = split(/\|/, $switchingtimes[$i]);
@@ -160,6 +167,7 @@ Heating_Control_Define($$)
         my $day = substr($daylist,0,2,"");
         my $del = substr($daylist,0,1,"");
         $englisch = ($day =~  m/^($daysRegExp_en)$/g);
+        $french = ($day =~  m/^($daysRegExp_fr)$/g);
         my @subDays;
         if ($oldDel eq "-" ){
            # von bis Angabe: Mo-Di
@@ -167,9 +175,9 @@ Heating_Control_Define($$)
            my $high = $dayNumber{$day};
            if ($low <= $high) {
               @subDays = ($low .. $high);           
-		      	  } else {
-			          @subDays = ($dayNumber{so} .. $high, $low .. $dayNumber{sa});
-			        }
+           } else {     
+              @subDays = ($dayNumber{so} .. $high, $low .. $dayNumber{sa});
+           }
            @hdays{@subDays}=1;
         } else {
            #einzelner Tag: Sa
@@ -193,16 +201,11 @@ Heating_Control_Define($$)
     }
   }
 
-  #desired-temp des Zieldevices auswaehlen
-  if($defs{$device}{TYPE} eq "MAX") {
-    $hash->{helper}{DESIRED_TEMP_READING} = "desiredTemperature"
-  } else {
-    $hash->{helper}{DESIRED_TEMP_READING} = "desired-temp";
-  }
-
   my $rWochentage;
   if ($englisch) {
      $rWochentage = \@Wochentage_en;
+  } elsif ($french) {
+     $rWochentage = \@Wochentage_fr;
   } else {
      $rWochentage = \@Wochentage_de;
   }
@@ -247,10 +250,10 @@ Heating_Control_Update($)
   my $now    = time() + 5;       # garantiert > als die eingestellte Schlatzeit
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
 
-  my $AktDesiredTemp = ReadingsVal($hash->{DEVICE}, $hash->{helper}{DESIRED_TEMP_READING}, 0);
-     $AktDesiredTemp = sprintf("%.1f", $AktDesiredTemp)   if ($AktDesiredTemp =~ m/^[0-9]{1,3}$/i);
-  my $newDesTemperature  = $AktDesiredTemp;   #default#
-  my $nextDesTemperature = 0;
+  my $aktParam = ReadingsVal($hash->{DEVICE}, $hash->{helper}{DESIRED_TEMP_READING}, 0);
+     $aktParam = sprintf("%.1f", $aktParam)   if ($aktParam =~ m/^[0-9]{1,3}$/i);
+  my $newParam   = $aktParam;   #default#
+  my $nextParam  = 0;
   my $next       = 0;
   my $nextSwitch = 0;
   my $nowSwitch  = 0;
@@ -274,15 +277,15 @@ Heating_Control_Update($)
         my $next = $now + $secondsToSwitch;
 
         if ($secondsToSwitch<=10 && $secondsToSwitch>=-20) {
-           Log3 $hash,  4, $mod." Jetzt:".strftime('%d.%m.%Y %H:%M:%S',localtime($now))." -> Next: ".strftime('%d.%m.%Y %H:%M:%S',localtime($next))." -> Temp: $hash->{helper}{SWITCHINGTIME}{$wd}{$st} ".$secondsToSwitch;
+           Log3 $hash,  4, $mod."Jetzt:".strftime('%d.%m.%Y %H:%M:%S',localtime($now))." -> Next: ".strftime('%d.%m.%Y %H:%M:%S',localtime($next))." -> Param: $hash->{helper}{SWITCHINGTIME}{$wd}{$st} ".$secondsToSwitch;
         }
         if ($secondsToSwitch<=0) {
-          $newDesTemperature =  $hash->{helper}{SWITCHINGTIME}{$wd}{$st};
-          $newDesTemperature =  sprintf("%.1f", $newDesTemperature)   if ($newDesTemperature =~ m/^[0-9]{1,3}$/i);
-          $nowSwitch = $next;
+          $newParam   =  $hash->{helper}{SWITCHINGTIME}{$wd}{$st};
+          $newParam   =  sprintf("%.1f", $newParam)   if ($newParam =~ m/^[0-9]{1,3}$/i);
+          $nowSwitch  = $next;
         } else {
-          $nextDesTemperature = $hash->{helper}{SWITCHINGTIME}{$wd}{$st};
-          $nextDesTemperature =  sprintf("%.1f", $nextDesTemperature) if ($nextDesTemperature =~ m/^[0-9]{1,3}$/i);
+          $nextParam  = $hash->{helper}{SWITCHINGTIME}{$wd}{$st};
+          $nextParam  =  sprintf("%.1f", $nextParam) if ($nextParam =~ m/^[0-9]{1,3}$/i);
           $nextSwitch = $next;
           last;
         }
@@ -294,10 +297,19 @@ Heating_Control_Update($)
   my $command;
   
   #$nextSwitch += get_SummerTimeOffset($now, $nextSwitch);
-  Log3 $hash, 4, $mod .strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch))." ; AktDesiredTemp: $AktDesiredTemp ; newDesTemperature: $newDesTemperature";
+  Log3 $hash, 4, $mod .strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch))." ; AktDesiredTemp: $aktParam ; newDesTemperature: $newParam";
   Log3 $hash, 4, $mod .strftime('%d.%m.%Y %H:%M:%S',localtime($nextSwitch));
 
-  if ($nowSwitch gt "" && $AktDesiredTemp ne $newDesTemperature ) {
+  #modifier des Zieldevices auswaehlen
+  my %modifier = ("MAX"      => "desiredTemperature",
+                  "FHT"      => "desired-temp",
+                  "FS20"     => "",
+                  "HM-CC-VD" => "desired-temp",
+                  "HM-CC-TC" => "desired-temp" );
+  $hash->{helper}{DESIRED_TEMP_READING} = "";
+  $hash->{helper}{DESIRED_TEMP_READING} = $modifier{$defs{$hash->{DEVICE}}{TYPE}};
+
+  if ($nowSwitch gt "" && $aktParam ne $newParam ) {
     if (defined $hash->{helper}{CONDITION}) {
       $command = '{ fhem("set @ '.$hash->{helper}{DESIRED_TEMP_READING}.' %") if' . $hash->{helper}{CONDITION} . '}';
     } elsif (defined $hash->{helper}{COMMAND}) {
@@ -306,14 +318,21 @@ Heating_Control_Update($)
       $command = '{ fhem("set @ '.$hash->{helper}{DESIRED_TEMP_READING}.' %") }';
     }
   }
-    
-  if ($command && AttrVal($hash->{NAME}, "disable", 0) == 0) {
-    $command =~ s/@/$hash->{DEVICE}/g;
-    $command =~ s/%/$newDesTemperature/g;
-    $command = SemicolonEscape($command);
-    Log3 $hash, 4, $mod."command: $command";
-    my $ret  = AnalyzeCommandChain(undef, $command);
-    Log3 ($hash, 3, $ret) if($ret);
+
+  my $secondsSinceSwitch = $nowSwitch - $now;
+  my %vergangenheitNichtSchalten = ("FS20"  => 1);
+  if ($vergangenheitNichtSchalten{$defs{$hash->{DEVICE}}{TYPE}} && $secondsSinceSwitch < -60) {
+     ;
+  } else {
+     if ($command && AttrVal($hash->{NAME}, "disable", 0) == 0) {
+       $newParam =~ s/:/ /g;
+       $command  =~ s/@/$hash->{DEVICE}/g;
+       $command  =~ s/%/$newParam/g;
+       $command  = SemicolonEscape($command);
+       Log3 $hash, 4, $mod."command: $command";
+       my $ret  = AnalyzeCommandChain(undef, $command);
+       Log3 ($hash, 3, $ret) if($ret);
+     }
   }
 
   my $active = 1;
@@ -326,8 +345,8 @@ Heating_Control_Update($)
 
   readingsBeginUpdate($hash);
   readingsBulkUpdate ($hash,  "nextUpdate", strftime("%d.%m.%Y %H:%M:%S",localtime($nextSwitch)));
-  readingsBulkUpdate ($hash,  "nextValue",  $nextDesTemperature);
-  readingsBulkUpdate ($hash,  "state",      $active ? $newDesTemperature : "inactive" );
+  readingsBulkUpdate ($hash,  "nextValue",  $nextParam);
+  readingsBulkUpdate ($hash,  "state",      $active ? $newParam : "inactive" );
   readingsEndUpdate  ($hash,  defined($hash->{LOCAL} ? 0 : 1));
   
   return 1;
