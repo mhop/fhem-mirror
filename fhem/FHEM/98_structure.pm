@@ -208,7 +208,10 @@ sub structure_Notify($$)
           }
         }
         if(defined($devstate)) {
-          return "" if(!$priority{$devstate} && $behavior eq "relativeKnown");
+          if(!$priority{$devstate} && $behavior eq "relativeKnown") {
+            delete($hash->{INNTFY});
+            return "";
+          }
           $minprio = $priority{$devstate}
                 if($priority{$devstate} && $priority{$devstate} < $minprio);
           $clientstate{$devstate} = 1;
@@ -218,7 +221,10 @@ sub structure_Notify($$)
     } else {
       $devstate = ReadingsVal($d, "state", undef);
       if(defined($devstate)) {
-        return "" if(!$priority{$devstate} && $behavior eq "relativeKnown");
+        if(!$priority{$devstate} && $behavior eq "relativeKnown") {
+          delete($hash->{INNTFY});
+          return "";
+        }
         $minprio = $priority{$devstate}
               if($priority{$devstate} && $priority{$devstate} < $minprio);
         $clientstate{$devstate} = 1;
@@ -232,7 +238,7 @@ sub structure_Notify($$)
     my @cKeys = keys %clientstate;
     $newState = (@cKeys == 1 ? $cKeys[0] : "undefined");
 
-  } elsif($behavior eq "relative" && $minprio < 99999) {
+  } elsif($behavior =~ "^relative" && $minprio < 99999) {
     $newState = $priority[$minprio];
 
   } elsif($behavior eq "last"){
@@ -244,7 +250,8 @@ sub structure_Notify($$)
               " because device $dev->{NAME} has changed";
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, "LastDevice", $dev->{NAME});
-  readingsBulkUpdate($hash, "LastDevice_Abs", structure_getChangedDevice($dev->{NAME}));
+  readingsBulkUpdate($hash, "LastDevice_Abs",
+                                structure_getChangedDevice($dev->{NAME}));
   readingsBulkUpdate($hash, "state", $newState);
   readingsEndUpdate($hash, 1);
 
