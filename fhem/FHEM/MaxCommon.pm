@@ -1,5 +1,7 @@
 package MaxCommon;
 
+use v5.10.1;
+
 require Exporter;
 @ISA = qw(Exporter);
 @EXPORT = qw(%device_types %msgId2Cmd %msgCmd2Id $defaultWeekProfile MAX_ParseTemperature validTemperature);
