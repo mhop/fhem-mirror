@@ -38,7 +38,7 @@ my $K_actDetID            =HMConfig::HMConfig_getHash("K_actDetID");
 
 sub CUL_HM_Initialize($);
 sub CUL_HM_reqStatus($);
-sub CUL_HM_autoReadConfig($);
+sub CUL_HM_autoReadConfig();
 sub CUL_HM_updateConfig($);
 sub CUL_HM_Define($$);
 sub CUL_HM_Undef($$);
@@ -46,7 +46,7 @@ sub CUL_HM_Rename($$$);
 sub CUL_HM_Attr(@);
 sub CUL_HM_Parse($$);
 sub CUL_HM_parseCommon(@);
-sub CUL_HM_queueAutoRead($);
+sub CUL_HM_qAutoRead($$);
 sub CUL_HM_Get($@);
 sub CUL_HM_Set($@);
 sub CUL_HM_valvePosUpdt(@);
@@ -139,13 +139,17 @@ sub CUL_HM_Initialize($) {
                        "rawToReadable unit ".#"KFM-Sensor" only
                        "peerIDs repPeers ".
                        "actCycle actStatus ".
-					   "autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus ".
+					   "autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus,8_stateOnly ".
 					   "expert:0_off,1_on,2_full ".
 					   "burstAccess:0_off,1_auto ".
                        "param msgRepeat ".
 					   ".stc .devInfo ".
                        $readingFnAttributes;
   $hash->{hmAutoReadScan} = 4;  # delay autoConf readings
+  
+  #autoReadReg:  
+  #		        ,6_allForce
+  #		        ,4_backUpdt
   
   my @modellist;
   foreach my $model (keys %culHmModel){
@@ -156,63 +160,15 @@ sub CUL_HM_Initialize($) {
                CUL_HM_noDup(map { $culHmModel{$_}{st} } keys %culHmModel));
 
   $hash->{prot}{rspPend} = 0;#count Pending responses
-
+  my @statQArr = ();
+  my @confQArr = ();
+  my @confQWuArr = ();
+  $hash->{helper}{qReqStat}   = \@statQArr;
+  $hash->{helper}{qReqConf}   = \@confQArr;
+  $hash->{helper}{qReqConfWu} = \@confQWuArr;
   CUL_HM_initRegHash();
 }
 
-sub CUL_HM_reqStatus($){
- return if(!defined$modules{CUL_HM}{helper}{reqStatus});
-  while(@{$modules{CUL_HM}{helper}{reqStatus}}){
-    my $name = shift(@{$modules{CUL_HM}{helper}{reqStatus}});
-	CUL_HM_Set($defs{$name},$name,"statusRequest");
-	InternalTimer(gettimeofday()+4,"CUL_HM_reqStatus","CUL_HM_reqStatus",0);
-	last;
-  }
-}
-sub CUL_HM_autoReadConfig($){
-  # will trigger a getConfig and statusrequest for each device assigned.
-  #
-  if (!$modules{CUL_HM}{helper}{autoRdCfgLst}){
-	delete $modules{CUL_HM}{helper}{autoRdActive};
-    return;
-  }
-  while(@{$modules{CUL_HM}{helper}{autoRdCfgLst}}){
-    if (   $modules{CUL_HM}{helper}{autoRdActive}  # predecisor is stored
-	    && $defs{$modules{CUL_HM}{helper}{autoRdActive}}){
-	  my $dName = CUL_HM_getDeviceName($modules{CUL_HM}{helper}{autoRdActive});   
-	  last if ($defs{$dName}{helper}{prt}{sProc} == 1); # predecisor still working
-	}
-	
-	my $tName = CUL_HM_getDeviceName(${$modules{CUL_HM}{helper}{autoRdCfgLst}}[0]); 
-	my $ioName = $defs{$tName}{IODev}{NAME};
-	if (ReadingsVal($ioName,"cond","") !~ m /^(ok|Overload-released|init)$/
-	    || (  $defs{$ioName}{helper}{q}
-		   && ($defs{$ioName}{helper}{q}{cap}{sum}/16.8)>
-		       AttrVal($ioName,"hmMsgLowLimit",80))){
-	  last;
-	}
-    #--- unqueue and process---
-    my $name = shift(@{$modules{CUL_HM}{helper}{autoRdCfgLst}});
-    my $hash = $defs{$name};
-	delete $hash->{autoRead};
-    next if (AttrVal($name,"subType","") eq "virtual");
-	
-	if (0 != CUL_HM_getAttrInt($name,"autoReadReg")){
-	  #CUL_HM_Set($hash,$name,"getSerial");
-	  CUL_HM_Set($hash,$name,"statusRequest");
-	  CUL_HM_Set($hash,$name,"getConfig");
-	  my $mId = CUL_HM_getMId($hash);
-	  $modules{CUL_HM}{helper}{autoRdActive} = $name 
-	      if (   CUL_HM_getRxType($hash) & 0xEB     # 0x14 invers, if mode other then config
-              ||(   $culHmModel{$mId}{cyc}
-			     && $culHmModel{$mId}{cyc} !~ m/^28:/));
-	  last;
-	}
-  }
-  InternalTimer(gettimeofday()+$modules{CUL_HM}{hmAutoReadScan}
-	                ,"CUL_HM_autoReadConfig"
-					,"autoRdCfg",0);
-}
 sub CUL_HM_updateConfig($){
   # this routine is called 5 sec after the last define of a restart
   # this gives FHEM sufficient time to fill in attributes
@@ -323,10 +279,20 @@ sub CUL_HM_updateConfig($){
 	}
 	$attr{$name}{webCmd} = $webCmd if ($webCmd);
 
-    no warnings 'numeric';
-    my $autoRead = int(AttrVal($name,"autoReadReg",0))+0;
-    use warnings 'numeric';
-	CUL_HM_queueAutoRead($name) if (0 != $autoRead);
+	CUL_HM_qStateUpdatIfEnab($name);
+    next if (0 == (0x07 & CUL_HM_getAttrInt($name,"autoReadReg")));
+	if(!CUL_HM_peersValid($name)){
+	  CUL_HM_qAutoRead($name,1);
+	}
+	else{
+	  foreach(CUL_HM_reglUsed($name)){
+	    next if (!$_);
+	    if(ReadingsVal($name,$_,"x") !~ m/00:00/){
+	      CUL_HM_qAutoRead($name,1);
+		  last;
+	    }
+	  }
+	}
   }
   delete $modules{CUL_HM}{helper}{updtCfgLst};
 }
@@ -1044,7 +1010,7 @@ sub CUL_HM_Parse($$) {##############################
         if ($vDim->{idPhy} && 
 		    CUL_HM_id2Hash($vDim->{idPhy})){   #has virt chan
 	      RemoveInternalTimer("sUpdt:".$chId); 
-		  if ($mTp eq "10"){               #valid PhysLevel                         
+		  if ($mTp eq "10"){                   #valid PhysLevel                         
 		    foreach my $tmpKey ("idPhy","idV2","idV3",){#update all virtuals
 			  my $vh = CUL_HM_id2Hash($vDim->{$tmpKey}) if ($vDim->{$tmpKey});
 			  next if (!$vh || $vDim->{$tmpKey} eq $chId);
@@ -1058,8 +1024,7 @@ sub CUL_HM_Parse($$) {##############################
 			$physLvl = $pl." %";
 		  }
 		  else{                                #invalid PhysLevel   
-           InternalTimer(gettimeofday()+3,"CUL_HM_stateUpdat","sUpdt:".
-		                                  $name,0);# update for device!
+		    CUL_HM_stateUpdatDly($name,3);     # update for device!
 		  }
 		}
 	  }
@@ -1082,7 +1047,7 @@ sub CUL_HM_Parse($$) {##############################
         push @event, "$eventName:up:$vs"   if(($err&0x30) == 0x10);
         push @event, "$eventName:down:$vs" if(($err&0x30) == 0x20);
         push @event, "$eventName:stop:$vs" if(($err&0x30) == 0x00);
-		CUL_HM_qStateUpdatIfEnab($name)    if(($err&0x30) != 0x00);
+		CUL_HM_stateUpdatDly($name,120)    if(($err&0x30) != 0x00);
 	  }
 	  if ($st eq "dimmer"){
         push @event,"overload:".(($err&0x02)?"on":"off");
@@ -1560,12 +1525,14 @@ sub CUL_HM_parseCommon(@){#####################################################
   # TC wakes up with 8270, not with A258
   # VD wakes up with 8202 
   #                  9610
-  if(  $shash->{cmdStack}           &&
-      ((hex($mFlg) & 0xA2) == 0x82) &&
-	  (CUL_HM_getRxType($shash) & 0x08)){ #wakeup 
-	#send wakeup and process command stack
-    CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IOid($shash).$src);
-	CUL_HM_ProcessCmdStack($shash);
+
+  if( ((hex($mFlg) & 0xA2) == 0x82) &&
+	  (CUL_HM_getRxType($shash) & 0x08)){ #wakeup and process stack
+	CUL_HM_qPend($shash->{NAME});# stack cmds if waiting
+	if ($shash->{cmdStack}){
+      CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IOid($shash).$src);
+	  CUL_HM_ProcessCmdStack($shash);
+	}
   }
   my $repeat;
   if   ($mTp eq "02"){# Ack/Nack ###########################
@@ -1645,8 +1612,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   }
   elsif($mTp eq "00"){######################################
     CUL_HM_infoUpdtDevData($shash->{NAME}, $shash,$p);#update data
-    
-	
+    	
     my $iohash = $shash->{IODev};
     my $id = CUL_HM_Id($iohash);
 
@@ -1673,6 +1639,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       CUL_HM_ProcessCmdStack($shash); # start processing immediately
 	}
 	elsif(CUL_HM_getRxType($shash) & 0x04){# nothing to pair - maybe send config
+	  CUL_HM_qPend($shash->{NAME});   # stack cmds if waiting
  	  CUL_HM_ProcessCmdStack($shash) ;#config
 	}
 	$ret = "done";
@@ -1813,8 +1780,8 @@ sub CUL_HM_parseCommon(@){#####################################################
                        ($dhash?$dhash->{NAME}:$shash->{IODev}{NAME}),
 					   (-1)*(hex($rssi)))
 			if ($rssi && $rssi ne '00' && $rssi ne'80');
-	  @{$modules{CUL_HM}{helper}{reqStatus}} = grep { $_ ne $shash->{NAME} }
-                                       @{$modules{CUL_HM}{helper}{reqStatus}};
+	  @{$modules{CUL_HM}{helper}{qReqStat}} = grep { $_ ne $shash->{NAME} }
+                                       @{$modules{CUL_HM}{helper}{qReqStat}};
       if ($pendType eq "StatusReq"){#it is the answer to our request
 		my $chnSrc = $src.$shash->{helper}{prt}{rspWait}{forChn};
 		my $chnhash = $modules{CUL_HM}{defptr}{$chnSrc}; 
@@ -1824,9 +1791,10 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  }
 	  else{
 		my ($chn) = ($1) if($p =~ m/^..(..)/);
-		if ($chn eq "00"){
-		  CUL_HM_queueAutoRead($shash->{NAME}) 
-		        if (1 < CUL_HM_getAttrInt($shash->{NAME},"autoReadReg"));
+		if ($chn eq "00"){# this is power on
+		  my $name = $shash->{NAME};
+	      CUL_HM_qStateUpdatIfEnab($name);
+		  CUL_HM_qAutoRead($name,2);
 		  $ret = "powerOn" ;# check dst eq "000000" as well?
 		}
 	  }
@@ -1884,20 +1852,6 @@ sub CUL_HM_queueUpdtCfg($){
   $modules{CUL_HM}{helper}{updtCfgLst} = \@arr;
   RemoveInternalTimer("updateConfig");
   InternalTimer(gettimeofday()+5,"CUL_HM_updateConfig", "updateConfig", 0);
-}
-sub CUL_HM_queueAutoRead($){
-  my $name = shift;
-  my @arr;
-  if ($modules{CUL_HM}{helper}{autoRdCfgLst}){
-    @arr = CUL_HM_noDup((@{$modules{CUL_HM}{helper}{autoRdCfgLst}}, $name));
-  }
-  else{
-    @arr = ($name);
-  }
-  $modules{CUL_HM}{helper}{autoRdCfgLst} =\@arr;
-  $defs{$name}{autoRead} = "scheduled";
-  RemoveInternalTimer("autoRdCfg");
-  InternalTimer(gettimeofday()+5,"CUL_HM_autoReadConfig", "autoRdCfg", 0);
 }
 
 #+++++++++++++++++ get command+++++++++++++++++++++++++++++++++++++++++++++++++
@@ -2288,9 +2242,9 @@ sub CUL_HM_Set($@) {
 		@{$modules{CUL_HM}{$hash->{IODev}{NAME}}{pendDev}} = 
 		      grep !/$name/,@{$modules{CUL_HM}{$hash->{IODev}{NAME}}{pendDev}};
 	  }
-	  @{$modules{CUL_HM}{helper}{autoRdCfgLst}} =
-	          grep !/$name/,@{$modules{CUL_HM}{helper}{autoRdCfgLst}}
-			     if ($modules{CUL_HM}{helper}{autoRdCfgLst});
+	  @{$modules{CUL_HM}{helper}{qReqConf}} =
+	          grep !/$name/,@{$modules{CUL_HM}{helper}{qReqConf}}
+			     if ($modules{CUL_HM}{helper}{qReqConf});
 	  CUL_HM_protState($hash,"Info_Cleared");
 	}
 	elsif($sect eq "rssi"){
@@ -2334,7 +2288,8 @@ sub CUL_HM_Set($@) {
   elsif($cmd eq "peerBulk") { #################################################
 	$state = "";
 	my $pL = $a[2];
-	return "unknown action: $a[3] - use set or unset" if ($a[3] && $a[3] !~ m/^(set|unset)/);
+	return "unknown action: $a[3] - use set or unset" 
+	         if ($a[3] && $a[3] !~ m/^(set|unset)/);
 	my $set = ($a[3] eq "unset")?"02":"01";
 	foreach my $peer (grep(!/^self/,split(',',$pL))){
 	  my $pID = CUL_HM_peerChId($peer,$dst,$id);
@@ -2349,7 +2304,7 @@ sub CUL_HM_Set($@) {
 	  CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chn.$set.
 	                      substr($pID,0,6).$pCh1.$pCh2);
 	}
-	CUL_HM_queueAutoRead($name) if (2 < CUL_HM_getAttrInt($name,"autoReadReg"));
+	CUL_HM_qAutoRead($name,3);
   } 
   elsif($cmd =~ m/^(regBulk|getRegRaw)$/) { ############################### reg
     my ($list,$addr,$data,$peerID);
@@ -3126,8 +3081,7 @@ sub CUL_HM_Set($@) {
   	            "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerBtn}00");
   	      CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,hex($peerBtn),4,$burst)
 				   if($pnb);
-		  CUL_HM_queueAutoRead($name) 
-		           if (2 < CUL_HM_getAttrInt($name,"autoReadReg"));
+		  CUL_HM_qAutoRead($name,3);
 	    }
       }
 	}
@@ -3140,8 +3094,7 @@ sub CUL_HM_Set($@) {
 	    my $peerFlag = CUL_HM_getFlag($peerHash);
         CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",
             $peerFlag,$id,$peerDst,$peerChn,$cmdB,$dst,$b2,$b1 ));
-		CUL_HM_queueAutoRead($peerHash->{NAME}) 
-		      if (2 < CUL_HM_getAttrInt($peerHash->{NAME},"autoReadReg"));
+		CUL_HM_qAutoRead($peerHash->{NAME},3);
 	  }
 	}
 	return ("",1) if ($target && $target eq "remote");#Nothing to transmit for actor
@@ -3358,6 +3311,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
 	next if (!$change);#no changes
 	$change =~ s/(\ |:)//g;
 	my $peerN;
+	
 	($list,$peerN) = ($1,$2) if($nrn =~ m/RegL_(..):(.*)/);
 	if ($peerN){($peerAddr,$peerChn) = unpack('A6A2', CUL_HM_name2Id($peerN,$hash));}
 	else       {($peerAddr,$peerChn) = ('000000','00');}
@@ -3365,15 +3319,15 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
     CUL_HM_updtRegDisp($hash,$list,$peerAddr.$peerChn);
     CUL_HM_PushCmdStack($hash, "++".$flag.'01'.$src.$dst.$chn.'05'.
                                         $peerAddr.$peerChn.$list);
-    for(my $l = 0; $l < $tl; $l+=28) {
+    $tl = length($change);
+	for(my $l = 0; $l < $tl; $l+=28) {
       my $ml = $tl-$l < 28 ? $tl-$l : 28;
       CUL_HM_PushCmdStack($hash, "++A001".$src.$dst.$chn."08".
 	                                 substr($change,$l,$ml));
     }
     CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$chn."06");
   }
-  CUL_HM_queueAutoRead($hash->{NAME}) 
-        if (2 < CUL_HM_getAttrInt($hash->{NAME},"autoReadReg"));  
+  CUL_HM_qAutoRead($hash->{NAME},3);  
 }
 sub CUL_HM_PushCmdStack($$) {
   my ($chnhash, $cmd) = @_;
@@ -3526,7 +3480,7 @@ sub CUL_HM_sndIfOpen($) {
   my(undef,$io) = split(':',$_[0]);
   RemoveInternalTimer("sndIfOpen:$io");# should not be necessary, but
   my $ioHash = $defs{$io};
-  if (   $ioHash->{STATE} !~ m/^(opened|Initialized)$/ 
+  if (   $ioHash->{STATE} ne "opened" 
       ||(defined $ioHash->{XmitOpen} && $ioHash->{XmitOpen} == 0) 
 #	  ||$modules{CUL_HM}{prot}{rspPend}>=$maxPendCmds
 	   ){#still no send allowed
@@ -3641,11 +3595,17 @@ sub CUL_HM_respPendTout($) {
 	
 	if ($pHash->{rspWait}{reSent} > AttrVal($hash->{NAME},"msgRepeat",3) # too much
 	     ||((CUL_HM_getRxType($hash) & 0x83) == 0)){                     #to slow
-      my $pendCmd = ($pHash->{rspWait}{Pending}
+	  if ($hash->{IODev}->{STATE} ne "opened"){
+        CUL_HM_eventP($hash,"IOerr");
+		readingsSingleUpdate($hash,"state","IOerr",1);
+	  }
+	  else{
+        my $pendCmd = ($pHash->{rspWait}{Pending}
 					            ?"RESPONSE TIMEOUT:".$pHash->{rspWait}{Pending}
 								:"MISSING ACK");# save before remove
-      CUL_HM_eventP($hash,"ResndFail");
-	  readingsSingleUpdate($hash,"state",$pendCmd,1);
+	    CUL_HM_eventP($hash,"ResndFail");
+		readingsSingleUpdate($hash,"state",$pendCmd,1);
+	  }	  
 	  CUL_HM_ProcessCmdStack($hash); # continue processing commands if any
 	}
 	else{
@@ -3750,10 +3710,7 @@ sub CUL_HM_ID2PeerList ($$$) {
     next if ($pId !~ m/^[0-9A-F]{8}$/);             #ignore non-channel IDs
 	$peerIDs .= $pId.",";                           #append ID
     next if ($pId eq "00000000");                   # and end detection
-	$peerNames .= (($dId eq substr($pId,0,6))?      #is own channel?
-	                  ("self".substr($pId,6,2)):    #yes, name it 'self'
-	                  (CUL_HM_id2Name($pId)))       #find name otherwise
-				  .",";                             # dont forget separator
+	$peerNames .= CUL_HM_peerChName($pId,$dId,"").","; 
   }
   $attr{$name}{peerIDs} = $peerIDs;                 # make it public
   if ($peerNames){
@@ -4726,23 +4683,133 @@ sub CUL_HM_storeRssi(@){
   $hash->{"rssi_".$peerName} = $rssi;
  return ;
 }
-sub CUL_HM_stateUpdat($){#in:name, send status-request
+
+sub CUL_HM_stateUpdatDly($$){#delayed queue of status-request
+  my ($name,$time) = @_;
+  InternalTimer(gettimeofday()+$time,"CUL_HM_stateUpdat"
+                                ,"sUpdt:".$name,0);
+}
+sub CUL_HM_stateUpdat($){#delay timeout - now queue statusRequest
   my $name = shift;
   (undef,$name)=split":",$name,2;
-  CUL_HM_Set($defs{$name},$name,"statusRequest") if ($name);
+  CUL_HM_qStateUpdatIfEnab($name,1) if ($name);
 }
 sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request after 12 s
    my ($name,$force) = @_;
   $name = CUL_HM_id2Name($name) if ($name =~ m/^[A-F0-9]{6,8}$/i);
   $name =~ s /_chn:..$//;
   return if (!$defs{$name}); #device unknown, ignore
-  if ($force || (CUL_HM_getAttrInt($name,"autoReadReg") > 3)){
- 	@{$modules{CUL_HM}{helper}{reqStatus}}= 
-	           CUL_HM_noDup(@{$modules{CUL_HM}{helper}{reqStatus}},$name);
-	RemoveInternalTimer("CUL_HM_reqStatus");
-	InternalTimer(gettimeofday()+10,"CUL_HM_reqStatus","CUL_HM_reqStatus", 0);
+  if ($force || ((CUL_HM_getAttrInt($name,"autoReadReg") & 0x0f) > 3)){
+    CUL_HM_qEntity($name,$modules{CUL_HM}{helper}{qReqStat});
+	RemoveInternalTimer("CUL_HM_procQs");
+	InternalTimer(gettimeofday()+ .5,"CUL_HM_procQs","CUL_HM_procQs", 0);
   }
 }
+sub CUL_HM_qAutoRead($$){
+  my ($name,$lvl) = @_;
+  return if (!$defs{$name}
+             ||$lvl >= (0x07 & CUL_HM_getAttrInt($name,"autoReadReg")));
+  if (CUL_HM_getRxType($defs{$name}) & 0x1C){#config and wakeup q
+    CUL_HM_qEntity($name,$modules{CUL_HM}{helper}{qReqConfWu});
+  }
+  else{
+    CUL_HM_qEntity($name,$modules{CUL_HM}{helper}{qReqConf});
+  }
+  RemoveInternalTimer("CUL_HM_procQs");
+  InternalTimer(gettimeofday()+ .5,"CUL_HM_procQs","CUL_HM_procQs", 0);
+}
+sub CUL_HM_qEntity($$){
+  my ($name,$q) = @_;
+  return if (AttrVal($name,"subType","") eq "virtual");
+  if ($defs{$name}{helper}{role}{dev}){
+	foreach (grep /channel_/,keys %{$defs{$name}}){# remove potential chn
+	  my $ch = $defs{$name}{$_};
+	  @{$q} = grep !/^$ch$/,@{$q};
+	  delete $defs{$ch}{autoRead};
+	}
+ 	@{$q} = CUL_HM_noDup(@{$q},$name);
+  }
+  elsif (!grep /^$defs{$name}{device}$/,@{$q}){# chn - only if device not in    
+	@{$q} = CUL_HM_noDup(@{$q},$name);
+  }
+}
+
+sub CUL_HM_procQs($){
+  # --- verify send is possible
+  my $next;
+  if (defined $modules{CUL_HM}{helper}{qReqStat}
+      && @{$modules{CUL_HM}{helper}{qReqStat}}){
+    while(@{$modules{CUL_HM}{helper}{qReqStat}}){
+      $next = .5;
+	  my $tName = CUL_HM_getDeviceName(${$modules{CUL_HM}{helper}{qReqStat}}[0]); 
+	  my $ioName = $defs{$tName}{IODev}{NAME};
+	  last if (ReadingsVal($ioName,"cond","") !~ m /^(ok|Overload-released|init)$/);
+      my $name = shift(@{$modules{CUL_HM}{helper}{qReqStat}});
+      last if (CUL_HM_Set($defs{$name},$name,"statusRequest") eq "1"); #skip?
+	}
+  }
+  elsif(defined $modules{CUL_HM}{helper}{qReqConf}
+        && @{$modules{CUL_HM}{helper}{qReqConf}}){
+    $next = $modules{CUL_HM}{hmAutoReadScan};
+	CUL_HM_autoReadConfig();
+  }
+  else{
+    delete $modules{CUL_HM}{helper}{autoRdActive};
+  }
+  InternalTimer(gettimeofday()+$next,"CUL_HM_procQs","CUL_HM_procQs",0)
+      if ($next); 
+}
+sub CUL_HM_autoReadConfig(){
+  return if (!CUL_HM_autoReadReady($modules{CUL_HM}{helper}{qReqConf}));
+
+  my $name = shift(@{$modules{CUL_HM}{helper}{qReqConf}});
+  my $hash = $defs{$name};
+
+  CUL_HM_Set($hash,$name,"getConfig");
+  my $mId = CUL_HM_getMId($hash);
+  $modules{CUL_HM}{helper}{autoRdActive} = $name;
+}
+sub CUL_HM_qPend($){
+  my $name = shift;
+  my $q = $modules{CUL_HM}{helper}{qReqConfWu};
+  return if (!CUL_HM_autoReadReady($q));
+  my $eName = "";
+  if (grep /^$name$/,@{$q}){
+    $eName = $name
+  }
+  else{
+    foreach (grep /channel_/,keys %{$defs{$name}}){
+	  my $ch = $defs{$name}{$_};
+	  if (grep /^$ch$/,@{$q}){
+        $eName = $ch;
+	  }
+	}
+  }
+  if ($eName){
+	@{$q} = grep !/^$eName$/,@{$q};
+	CUL_HM_Set($defs{$eName},$eName,"getConfig");
+  }
+}
+sub CUL_HM_autoReadReady($){# capacity for autoread?
+  my $q = shift;
+  return if (!@{$q});
+  my $mHlp = $modules{CUL_HM}{helper};
+  if (   $mHlp->{autoRdActive}  # predecisor available
+      && $defs{$mHlp->{autoRdActive}}){
+    my $dName = CUL_HM_getDeviceName($mHlp->{autoRdActive});
+    return 0 if ($defs{$dName}{helper}{prt}{sProc} == 1); # predecisor still on
+  }
+  my $tName = CUL_HM_getDeviceName(${$q}[0]);
+  my $ioName = $defs{$tName}{IODev}{NAME};
+  if (  ReadingsVal($ioName,"cond","") !~ m /^(ok|Overload-released|init)$/
+	  || (    $defs{$ioName}{helper}{q}
+		  && ($defs{$ioName}{helper}{q}{cap}{sum}/16.8)>
+		       AttrVal($ioName,"hmMsgLowLimit",40))){
+	return 0;
+  }
+  return 1;
+}
+
 sub CUL_HM_getAttrInt($@){#return attrValue as integer
   my ($name,$attrName,$default) = @_;
   my $val = $attr{$name}{$attrName}?$attr{$name}{$attrName}:"";
@@ -4761,6 +4828,68 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
   return %culHmModel if ($info eq "culHmModel");
 }
 
+sub CUL_HM_peerUsed($) {# are peers expected?
+  my $name = shift;
+  my $hash = $defs{$name};
+  return 0 if (!$hash->{helper}{role}{chn});#device has no channels
+  my $devId = substr($hash->{DEF},0,6);
+  my $peerIDs = AttrVal($name,"peerIDs",undef);
+  return 0 if (AttrVal(CUL_HM_id2Name($devId),"subType","") eq "virtual"); 
+	  
+  my $mId = CUL_HM_getMId($hash);
+  my $cNo = hex(substr($hash->{DEF}."01",6,2))."p"; #default to channel 01
+  foreach my $ls (split ",",$culHmModel{$mId}{lst}){
+	my ($l,$c) = split":",$ls;
+    if (  ($l =~ m/^(p|3|4)$/ && !$c )  # 3,4,p without chanspec
+		||($c && $c =~ m/$cNo/       )){   
+	  return 1;
+	}
+  }
+}
+sub CUL_HM_peersValid($) {# is list valid?
+  my $name = shift;
+  if (CUL_HM_peerUsed($name)
+      && AttrVal($name,"peerIDs","") !~ m/00000000/){
+	return 0;
+  }
+  return 1;
+}
+
+sub CUL_HM_reglUsed($) {# provide data for HMinfo
+  my $name = shift;
+  my $hash = $defs{$name};
+  my $devId = substr($hash->{DEF},0,6);
+  my $chn   = substr($hash->{DEF}."01",6,2);
+  return undef if (AttrVal(CUL_HM_id2Name($devId),"subType","") eq "virtual"); 
+
+  my @pNames;
+  push @pNames,CUL_HM_peerChName($_,$devId,"") 
+             foreach (grep !/00000000/,split(",",AttrVal($name,"peerIDs","")));
+			 
+  my @lsNo;
+  push @lsNo,"0:" if ($hash->{helper}{role}{dev});
+  if ($hash->{helper}{role}{chn}){
+	my $mId = CUL_HM_getMId($hash);
+	foreach my $ls (split ",",$culHmModel{$mId}{lst}){
+	  my ($l,$c) = split":",$ls;
+	  if ($l ne "p"){# ignore peer-only entries
+		if ($c){
+		  my $chNo = hex($chn);
+		  if   ($c =~ m/($chNo)p/){push @lsNo,"$l:$_" foreach (@pNames);}
+		  elsif($c =~ m/$chNo/   ){push @lsNo,"$l:";}
+		}
+		else{
+		  if ($l == 3 || $l == 4){push @lsNo,"$l:$_" foreach (@pNames);
+		  }else{                  push @lsNo,"$l:" ;}
+		}
+	  }
+	}
+  }
+  my $pre = (CUL_HM_getAttrInt($name,"expert") == 2)?"":".";
+  
+  $_ = $pre."RegL_0".$_ foreach (@lsNo);
+  return @lsNo;
+}
 1;
 
 =pod
@@ -5647,6 +5776,8 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 		'2' like '1' plus execute after power_on.<br>
 		'3' includes '2' plus updates on writes to the device<br>
 		'4' includes '3' plus tries to request status if it seems to be missing<br>
+		'8_stateOnly' will only update status information but not configuration
+		               data like register and peer<br>
 		Execution will be delayed in order to prevent congestion at startup. Therefore the update 
 		of the readings and the display will be delayed depending on the size of the database.<br>
 		Recommendations and constrains upon usage:<br>
@@ -5775,7 +5906,8 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
       unknown $p<br>
   </li>
   <li><B>HM-Sen-RD-O</B><br>
-    lastRain: timestamp # no trigger generated<br>
+    lastRain: timestamp # no trigger generated. Begin of previous Rain -
+   	     timestamp of the reading is the end of rain. <br>
   </li>
   <li><B>THSensor  and HM-WDC7000</B><br>
       T: $t H: $h AP: $ap<br>
