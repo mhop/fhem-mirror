@@ -124,18 +124,9 @@ sub PIFACE_Get($@){
 				"25:noArg  26:noArg  27:noArg  28:noArg ";
 	return $usage if $port eq "?";
 
-	if ($port eq "0") {
-	# read all inports and outports
-		PI_read_allports($hash);
-	} elsif ($port ~~ [1..8]) {
-	# read single inport
-		$adr  = $base + $port;
-		$cmd = '/usr/local/bin/gpio -p read '.$adr;
-		$val = `$cmd`;
-		readingsSingleUpdate($hash, 'in'.$port, $val, 1);
-	} elsif ($port ~~ [11..18]) {
-		Log3($name, 3, "PIFACE $name: get inports with internal pullups is DEPRECATED and will be removed in further versions!");
-	# read single inport with pullup
+	if ($port ~~ [11..18]) {
+		Log3($name, 3, "PIFACE $name: get inports with internal pullups is DEPRECATED and may be removed in further versions!");
+		# read single inport with pullup
 		$pin  = $port - 10;
 		$adr  = $base + $pin;
 		$cmd = '/usr/local/bin/gpio -p mode '.$adr.' up';
@@ -143,14 +134,9 @@ sub PIFACE_Get($@){
 		$cmd = '/usr/local/bin/gpio -p read '.$adr;
 		$val = `$cmd`;
 		readingsSingleUpdate($hash, 'in'.$port, $val, 1);
-	} elsif ($port ~~ [21..28]) {
-	# read single outport
-		$pin  = $port - 12;
-		$port -= 20;
-		$adr  = $base + $pin;
-		$cmd = '/usr/local/bin/gpio -p read '.$adr;
-		$val = `$cmd`;
-		readingsSingleUpdate($hash, 'out'.$port, $val, 1);
+	} else {
+		# read all inports and outports
+		PI_read_allports($hash);
 	}
 	return "";
 }
