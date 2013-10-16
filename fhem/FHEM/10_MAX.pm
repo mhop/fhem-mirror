@@ -4,6 +4,7 @@
 #
 package main;
 
+use v5.10.1;
 use strict;
 use warnings;
 use MIME::Base64;
@@ -862,13 +863,13 @@ MAX_Parse($$)
         For devices of type HeatingThermostat only. &lt;value&gt; maybe one of
         <ul>
           <li>degree celcius between 3.5 and 30.5 in 0.5 degree steps</li>
-          <li>"on" or "off" correspondig to 30.5 and 4.5 degree celcius</li>
+          <li>"on" or "off" set the thermostat to full or no heating, respectively</li>
           <li>"eco" or "comfort" using the eco/comfort temperature set on the device (just as the right-most physical button on the device itself does)</li>
           <li>"auto &lt;temperature&gt;". The weekly program saved on the thermostat is processed. If the optional &lt;temperature&gt; is given, it is set as desiredTemperature until the next switch point of the weekly program.</li>
           <li>"boost", activates the boost mode, where for boostDuration minutes the valve is opened up boostValveposition percent.</li>
         </ul>
         All values but "auto" maybe accompanied by the "until" clause, with &lt;data&gt; in format "dd.mm.yyyy HH:MM" (minutes may only be "30" or "00"!)
-        to set a temporary temperature until that date/time. Make sure that the cube has valid system time!</li>
+        to set a temporary temperature until that date/time. Make sure that the cube/device has a correct system time.</li>
     <li>groupid &lt;id&gt;<br>
       For devices of type HeatingThermostat only.
       Writes the given group id the device's memory. To sync all devices in one room, set them to the same groupid greater than zero.</li>

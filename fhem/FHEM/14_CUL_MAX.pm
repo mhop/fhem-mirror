@@ -3,6 +3,8 @@
 # Written by Matthias Gehre, M.Gehre@gmx.de, 2012-2013
 package main;
 
+use v5.10.1;
+
 use strict;
 use warnings;
 use MaxCommon;
