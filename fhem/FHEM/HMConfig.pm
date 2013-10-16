@@ -1021,8 +1021,7 @@ my %culHmModelSets = (# channels of this subtype-------------
 					  ,toggle         =>""
 					  ,press          =>"[long|short] [on|off] ..."
 					  ,inhibit        =>"[on|off]"},
-  "HM-CC-TC"       =>{ statusRequest  =>"",
-                       burstXmit      =>""},
+  "HM-CC-TC"       =>{ burstXmit      =>""},
   "HM-CC-RT-DN"    =>{ burstXmit      =>""},
 );
 # clones- - - - - - - - - - - - - - - - - 
@@ -1033,6 +1032,7 @@ $culHmModelSets{"HM-OU-CM-PCB"} = $culHmModelSets{"HM-OU-CFM-PL"};
 
 my %culHmChanSets = (
   "HM-CC-TC00"     =>{ "desired-temp" =>"[on|off|6.0..30.0]"
+                      ,statusRequest  =>""
                       ,sysTime        =>""	  
 					  ,getSerial      => ""},
   "HM-CC-TC02"     =>{ peerChan       =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"
@@ -1049,6 +1049,7 @@ my %culHmChanSets = (
                       ,displayTemp    =>"[actual|setpoint]"
                       ,displayTempUnit=>"[celsius|fahrenheit]"
                       ,controlMode    =>"[auto|manual|central|party]"
+                      ,statusRequest  =>""
                       ,sysTime        =>""	  },
   "HM-SEC-WIN01"   =>{ stop           =>"",
                        level          =>"<level> <relockDly> <speed>..."},

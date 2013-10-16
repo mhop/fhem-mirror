@@ -39,6 +39,10 @@ my %HMcond = ( 0  =>'ok'
 			  ,254=>'Overload-released'
 			  ,255=>'init');
 			  
+#my %HM STATE= (  =>'opened'
+#                 =>'disconnected'
+#			      =>'overload');
+			  
 my $HMOvLdRcvr = 6*60;# time HMLAN needs to recover from overload
 
 sub HMLAN_Initialize($) {
@@ -104,7 +108,7 @@ sub HMLAN_Define($$) {#########################################################
   my @arr = ();
   @{$hash->{helper}{q}{apIDs}} = \@arr;
   
-  $hash->{helper}{q}{cap}{$_} = 0 for (0..9);
+  $hash->{helper}{q}{cap}{$_}   = 0 for (0..9);
   $hash->{helper}{q}{cap}{last} = 0;
   $hash->{helper}{q}{cap}{sum}  = 0;  
   HMLAN_UpdtMsgCnt("UpdtMsg:".$name);

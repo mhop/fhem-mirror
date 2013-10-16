@@ -80,10 +80,7 @@ sub HMinfo_Attr(@) {#################################
 			  ||$attrVal >300 );
 	  ## implement new timer to CUL_HM
       $modules{CUL_HM}{hmAutoReadScan}=$attrVal;
-	  RemoveInternalTimer("autoRdCfg");
-	  InternalTimer(gettimeofday()+$modules{CUL_HM}{hmAutoReadScan}
-	                ,"CUL_HM_autoReadConfig"
-					,"autoRdCfg",0);
+  	  CUL_HM_queueAutoRead(""); #will restart timer 
 	}
   }
   return;
@@ -96,7 +93,6 @@ sub HMinfo_autoUpdate($){#in:name, send status-request
   InternalTimer(gettimeofday()+$defs{$name}{helper}{autoUpdate},
                 "HMinfo_autoUpdate","sUpdt:".$name,0);
 }
-
 
 sub HMinfo_getParam(@) { ######################################################
   my ($id,@param) = @_;
@@ -121,45 +117,13 @@ sub HMinfo_regCheck(@) { ######################################################
 
   foreach my $eName (@entities){
     my $ehash = $defs{$eName};
-    my $devId = substr($defs{$eName}{DEF},0,6);
-	my $chn = (length($defs{$eName}{DEF}) == 8)?substr($defs{$eName}{DEF},6,2)
-	                                           :"";
-	my @pNames = split(",",($ehash->{peerList}?$ehash->{peerList}:""));
-	#ReadingsVal($eName,"peerList",""));
-	
-	$chn = "01" if (!$chn && $ehash->{helper}{role}{chn});
-	my @lsNo;
-    push @lsNo,"0:" if ($ehash->{helper}{role}{dev});
-	if ($chn){
-	  my $mId = $modules{CUL_HM}{defptr}{$devId}{helper}{mId};
-	  foreach my $ls (split ",",$th{$mId}{lst}){
-		my ($l,$c) = split":",$ls;
-	    if ($l ne "p"){# ignore peer-only entries
-		  if ($c){
-		    my $chNo = hex($chn);
-			push @lsNo,"$l:" if($c =~ m/$chNo/ && $c !~ m/($chNo)p/ );
-		    if ($c =~ m/($chNo)p/ && scalar(@pNames)){
-			  push @lsNo,"$l:$_" foreach (@pNames);
-			}
-		  }
-		  else{
-		    if ($l == 3 || $l == 4){push @lsNo,"$l:$_" foreach (@pNames);
-			}else{                  push @lsNo,"$l:" ;}
-		  }
-		}
-	  }
-	}
 
-    my $ex = AttrVal($eName,"expert","");
-	$ex = AttrVal($modules{CUL_HM}{defptr}{$devId},"expert","")if(!$ex);
-    my $pre = ($ex =~ m/2/)?"":".";
-
+    my @lsNo = CUL_HM_reglUsed($eName);
 	my @mReg = ();
 	my @iReg = ();
-	  
-    foreach my $ln (@lsNo){# check non-peer lists
-	  next if (!$ln || $ln eq "");
-	  my $rNm = $pre."RegL_0".$ln;
+
+    foreach my $rNm (@lsNo){# check non-peer lists
+	  next if (!$rNm || $rNm eq "");
 	  if    (!$ehash->{READINGS}{$rNm}){                 push @mReg, $rNm;}
 	  elsif ( $ehash->{READINGS}{$rNm}{VAL} !~ m/00:00/){push @iReg, $rNm;}
 	}
@@ -177,8 +141,8 @@ sub HMinfo_peerCheck(@) { #####################################################
   my @peerIDsNoPeer;
   my %th = CUL_HM_putHash("culHmModel");
   foreach my $eName (@entities){
-	my $ehash = $defs{$eName};
-	next if (!$ehash->{helper}{role}{chn});#device has no channels
+	next if (!$defs{$eName}{helper}{role}{chn});#device has no channels
+	next if (!CUL_HM_peerUsed($eName));
 	
 	my $id = $defs{$eName}{DEF};
 	my $devId = substr($id,0,6);
@@ -187,18 +151,9 @@ sub HMinfo_peerCheck(@) { #####################################################
 	my $peerIDs = AttrVal($eName,"peerIDs",undef);
 	
 	if (!$peerIDs){                # no peers - is this correct?
-	  next if ($st eq "virtual");            # virtuals may not have peers
-      my ($mId) = grep {$th{$_}{name} eq $md} keys %th;
-	  my $cNo = (length ($id) == 8)?substr($id,7,1)."p":"1p";
-      foreach my $ls (split ",",$th{$mId}{lst}){
-		my ($l,$c) = split":",$ls;
-        if (  ($l =~ m/^(p|3|4)$/ && !$c )  # 3,4,p without chanspec
-		    ||($c && $c =~ m/$cNo/       )){   
-		  push @peerIDsEmpty,"empty: ".$eName;
-		}
-	  }
+	  push @peerIDsEmpty,"empty: ".$eName;
 	}
-	elsif($peerIDs !~ m/00000000/ && $st ne "virtual"){#peerList incomplete
+	elsif($peerIDs !~ m/00000000/){#peerList incomplete
 	  push @peerIDsFail,"incomplete: ".$eName.":".$peerIDs;
 	}
 	else{# work on a valid list:
@@ -304,15 +259,7 @@ sub HMinfo_SetFn($@) {#########################################################
 	my @entities;
 	foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
 	  next if (!substr(AttrVal($dName,"autoReadReg","0"),0,1));
-      my @arr;
-      if(!$modules{CUL_HM}{helper}{autoRdCfgLst}){
-        $modules{CUL_HM}{helper}{autoRdCfgLst} = \@arr;
-      }
-	  @{$modules{CUL_HM}{helper}{autoRdCfgLst}} = 
-	         HMinfo_noDup(@{$modules{CUL_HM}{helper}{autoRdCfgLst}}, $dName);
-	  $defs{$dName}{autoRead} = "scheduled";
-	  RemoveInternalTimer("autoRdCfg");
-	  InternalTimer(gettimeofday()+5,"CUL_HM_autoReadConfig","autoRdCfg",0);
+	  CUL_HM_qAutoRead($dName,1);
 	  push @entities,$dName;
 	}
 	return $cmd." done:" ."\n triggered:"  ."\n    ".(join "\n    ",sort @entities)
@@ -362,12 +309,16 @@ sub HMinfo_SetFn($@) {#########################################################
 	       ;
 	$ret .= "\n\n    CUL_HM queue:$modules{CUL_HM}{prot}{rspPend}";
 	$ret .= "\n    autoRegRead pending:"
-	           .join(",",@{$modules{CUL_HM}{helper}{autoRdCfgLst}})
+	           .join(",",@{$modules{CUL_HM}{helper}{qReqConf}})
                .($modules{CUL_HM}{helper}{autoRdActive}?" recent:".$modules{CUL_HM}{helper}{autoRdActive}:"")
-			if ($modules{CUL_HM}{helper}{autoRdCfgLst});
+			if ($modules{CUL_HM}{helper}{qReqConf});
+	$ret .= "\n    autoRegRead wakeup pending:"
+	           .join(",",@{$modules{CUL_HM}{helper}{qReqConfWu}})
+               .($modules{CUL_HM}{helper}{autoRdActive}?" recent:".$modules{CUL_HM}{helper}{autoRdActive}:"")
+			if ($modules{CUL_HM}{helper}{qReqConfWu});
 	$ret .= "\n    status request pending:".
-	            join(",",@{$modules{CUL_HM}{helper}{reqStatus}}) 
-			if ($modules{CUL_HM}{helper}{reqStatus});
+	            join(",",@{$modules{CUL_HM}{helper}{qReqStat}}) 
+			if ($modules{CUL_HM}{helper}{qReqStat});
 	@IOlist = HMinfo_noDup(@IOlist);
 	foreach(@IOlist){
 	  $_ .= ":".$defs{$_}{STATE}
@@ -782,10 +733,10 @@ sub HMinfo_status($){##########################################################
   @protNamesW = grep !/^$/,HMinfo_noDup(@protNamesW);
   $hash->{W__protoNames} = join",",@protNamesW if(@protNamesW);
 
-  if (defined $modules{CUL_HM}{helper}{autoRdCfgLst} &&
-      @{$modules{CUL_HM}{helper}{autoRdCfgLst}}>0){
-    $hash->{I_autoReadPend} = join ",",@{$modules{CUL_HM}{helper}{autoRdCfgLst}};
-    push @updates,"I_autoReadPend:". scalar @{$modules{CUL_HM}{helper}{autoRdCfgLst}};
+  if (defined $modules{CUL_HM}{helper}{qReqConf} &&
+      @{$modules{CUL_HM}{helper}{qReqConf}}>0){
+    $hash->{I_autoReadPend} = join ",",@{$modules{CUL_HM}{helper}{qReqConf}};
+    push @updates,"I_autoReadPend:". scalar @{$modules{CUL_HM}{helper}{qReqConf}};
   }
   else{
 #    delete $hash->{I_autoReadPend};
@@ -826,7 +777,6 @@ sub HMinfo_status($){##########################################################
   readingsEndUpdate($hash,1);
   return;
 }
-
 
 my %tpl = (
    autoOff           => {p=>"time"             ,t=>"staircase - auto off after <time>, extend time with each trigger"
