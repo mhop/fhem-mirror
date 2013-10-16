@@ -1004,7 +1004,8 @@ sub CUL_HM_Parse($$) {##############################
       $shash = $modules{CUL_HM}{defptr}{$chId} 
 	                         if($modules{CUL_HM}{defptr}{$chId});
 	  my $physLvl;                             #store phys level if available
-	  if($p =~ m/^........(..)(..)$/){         #message with physical level?
+	  if(   $p =~ m/^........(..)(..)$/        #message with physical level?
+	     && $st eq "dimmer"){ 
 	    my $pl = hex($2)/2;
 		my $vDim = $shash->{helper}{vDim};     #shortcut
         if ($vDim->{idPhy} && 
