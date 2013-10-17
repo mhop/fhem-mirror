@@ -1,4 +1,4 @@
-# $Id
+# $Id$
 #  erweitert um die Funktion nas_control        Dietmar Ortmann $
 #
 #     This file is part of fhem.
