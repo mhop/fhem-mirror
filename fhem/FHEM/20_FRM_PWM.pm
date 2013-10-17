@@ -40,7 +40,7 @@ FRM_PWM_Init($$)
 	}
 	my $value = ReadingsVal($name,"value",undef);
 	if (defined $value and AttrVal($hash->{NAME},"restoreOnReconnect","on") eq "on") {
-		FRM_OUT_Set($hash,$value);
+		FRM_PWM_Set($hash,$name,$value);
 	}
 	main::readingsSingleUpdate($hash,"state","Initialized",1);
 	return undef;
