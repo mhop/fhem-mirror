@@ -2261,6 +2261,7 @@ sub CUL_HM_Set($@) {
 	CUL_HM_PushCmdStack($hash,"++".$flag."11".$id.$dst."0400");
   } 
   elsif($cmd eq "burstXmit") { ################################################
+	$hash->{helper}{prt}{wakeup}=1;# start wakeup
     CUL_HM_SndCmd($hash,"++B112$id$dst");
   } 
   elsif($cmd eq "pair") { #####################################################
@@ -2283,6 +2284,8 @@ sub CUL_HM_Set($@) {
 	$state = "";
   } 
   elsif($cmd eq "getConfig") { ################################################
+    CUL_HM_unQEntity($name,$modules{CUL_HM}{helper}{qReqConfWu});
+    CUL_HM_unQEntity($name,$modules{CUL_HM}{helper}{qReqConf});
 	CUL_HM_getConfig($hash);
 	$state = "";
   } 
@@ -2459,7 +2462,7 @@ sub CUL_HM_Set($@) {
 
     $lChn = "00" if($list == 7);#face to send
 
-	my $cHash = CUL_HM_id2Hash($dst.($chn eq '00'?"":$chn));
+	my $cHash = CUL_HM_id2Hash($dst.($lChn eq '00'?"":$lChn));
 	$cHash = $hash if (!$cHash);
     CUL_HM_pushConfig($cHash,$id,$dst,$lChn,$peerId,hex($peerChn),$list
 	                 ,$addrData,$prep);
@@ -3116,7 +3119,7 @@ sub CUL_HM_Set($@) {
         $devHash->{cmdStack}               && 
 		$devHash->{helper}{prt}{sProc} != 1    # not pocessing
 		){
-	$hash->{helper}{prt}{awake}=1;# start wakeup
+	$hash->{helper}{prt}{wakeup}=1;# start wakeup
     CUL_HM_SndCmd($devHash,"++B112$id$dst");
   }
   return ("",1);# no not generate trigger outof command
@@ -3292,7 +3295,6 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
   }
   $chnhash->{helper}{shadowReg}{$regLN} = $regs; # update shadow
   my @changeList;
-  
   if ($prep eq "exec"){#update complete registerset
 	@changeList = keys%{$chnhash->{helper}{shadowReg}};
   }
@@ -3593,9 +3595,15 @@ sub CUL_HM_respPendTout($) {
     my $name = $hash->{NAME};
     $pHash->{awake} = 0 if (defined $pHash->{awake});# set to asleep
     return if(!$pHash->{rspWait}{reSent});      # Double timer?
-	
-	if ($pHash->{rspWait}{reSent} > AttrVal($hash->{NAME},"msgRepeat",3) # too much
-	     ||((CUL_HM_getRxType($hash) & 0x83) == 0)){                     #to slow
+    if ($pHash->{rspWait}{wakeup}){
+	  CUL_HM_respPendRm($hash);# do not count problems with wakeup try, just wait
+	  $hash->{protCondBurst} = "off";
+	  $pHash->{wakeup} = 0;# finished
+	  $pHash->{awake} = 0;# set to asleep
+	  CUL_HM_protState($hash,"CMDs_pending");
+	}
+	elsif ($pHash->{rspWait}{reSent} > AttrVal($hash->{NAME},"msgRepeat",3) # too much
+	     ||((CUL_HM_getRxType($hash) & 0x83) == 0)){                        #to slow
 	  if ($hash->{IODev}->{STATE} ne "opened"){
         CUL_HM_eventP($hash,"IOerr");
 		readingsSingleUpdate($hash,"state","IOerr",1);
@@ -3610,30 +3618,23 @@ sub CUL_HM_respPendTout($) {
 	  CUL_HM_ProcessCmdStack($hash); # continue processing commands if any
 	}
 	else{
-	  if ($pHash->{rspWait}{wakeup}){	    
-	    CUL_HM_respPendRm($hash);# do not count problems with wakeup try, just wait
-	    $hash->{protCondBurst} = "off";
-	    $hash->{helper}{prt}{awake} = 0;# set to asleep
-		CUL_HM_protState($hash,"CMDs_pending");
-	  }
-	  else{
-	    if ($hash->{protCondBurst}&&$hash->{protCondBurst} eq "on" ){
-		  #timeout while conditional burst was active. try re-wakeup
-          $pHash->{rspWait}{reSent}++;
+	  if ($hash->{protCondBurst}&&$hash->{protCondBurst} eq "on" ){
+		#timeout while conditional burst was active. try re-wakeup
+        $pHash->{rspWait}{reSent}++;
 
-		  my (undef,$addr,$msg) = unpack 'A10A12A*',$hash->{helper}{prt}{rspWait}{cmd};		  
-		  $pHash->{rspWaitSec}{$_} = $pHash->{rspWait}{$_} foreach (keys%{$pHash->{rspWait}});			;
-		  CUL_HM_SndCmd($hash,"++B112$addr");
-	      $hash->{helper}{prt}{awake}=4;# start re-wakeup
-		}
-		else{# normal device resend
-	      CUL_HM_eventP($hash,"Resnd");
-          IOWrite($hash, "", $pHash->{rspWait}{cmd});
-          $pHash->{rspWait}{reSent}++;
-          Log GetLogLevel($name,4),"CUL_HM_Resend: ".$name. " nr ".$pHash->{rspWait}{reSent};
-	      InternalTimer(gettimeofday()+rand(20)/10+4,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);
-		}
+		my (undef,$addr,$msg) = unpack 'A10A12A*',$hash->{helper}{prt}{rspWait}{cmd};		  
+		$pHash->{rspWaitSec}{$_} = $pHash->{rspWait}{$_} foreach (keys%{$pHash->{rspWait}});			;
+		CUL_HM_SndCmd($hash,"++B112$addr");
+	    $hash->{helper}{prt}{awake}=4;# start re-wakeup
 	  }
+	  else{# normal device resend
+	    CUL_HM_eventP($hash,"Resnd");
+        IOWrite($hash, "", $pHash->{rspWait}{cmd});
+        $pHash->{rspWait}{reSent}++;
+        Log GetLogLevel($name,4),"CUL_HM_Resend: ".$name. " nr ".$pHash->{rspWait}{reSent};
+	    InternalTimer(gettimeofday()+rand(20)/10+4,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);
+	  }
+#	  }
 	}
   }
 }
@@ -4718,6 +4719,18 @@ sub CUL_HM_qAutoRead($$){
   }
   RemoveInternalTimer("CUL_HM_procQs");
   InternalTimer(gettimeofday()+ .5,"CUL_HM_procQs","CUL_HM_procQs", 0);
+}
+sub CUL_HM_unQEntity($$){
+  my ($name,$q) = @_;
+  return if (AttrVal($name,"subType","") eq "virtual");
+  if ($defs{$name}{helper}{role}{dev}){
+	foreach (grep /channel_/,keys %{$defs{$name}}){# remove potential chn
+	  my $ch = $defs{$name}{$_};
+	  @{$q} = grep !/^$ch$/,@{$q};
+	  delete $defs{$ch}{autoRead};
+	}
+  }
+  @{$q} = grep !/^$name$/,@{$q};
 }
 sub CUL_HM_qEntity($$){
   my ($name,$q) = @_;
