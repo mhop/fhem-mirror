@@ -304,8 +304,7 @@ Heating_Control_Update($)
   my %modifier = ("MAX"      => "desiredTemperature",
                   "FHT"      => "desired-temp",
                   "FS20"     => "",
-                  "HM-CC-VD" => "desired-temp",
-                  "HM-CC-TC" => "desired-temp" );
+                  "CUL_HM"   => "desired-temp");
   $hash->{helper}{DESIRED_TEMP_READING} = "";
   $hash->{helper}{DESIRED_TEMP_READING} = $modifier{$defs{$hash->{DEVICE}}{TYPE}};
 
