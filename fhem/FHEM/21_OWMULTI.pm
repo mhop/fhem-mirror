@@ -372,7 +372,7 @@ sub OWMULTI_Get($@) {
     if(int(@a) != 2);
     
   #-- check argument
-  return "OWMULTI: Get with unknown argument $a[1], choose one of ".join(",", sort keys %gets)
+  return "OWMULTI: Get with unknown argument $a[1], choose one of ".join(" ", sort keys %gets)
     if(!defined($gets{$a[1]}));
   
   #-- get id
