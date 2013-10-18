@@ -861,7 +861,7 @@ sub OWX_Get($@) {
     
   } else {
     return "OWX: Get with unknown argument $a[1], choose one of ". 
-    join(",", sort keys %gets);
+    join(" ", sort keys %gets);
   }
 }
 
