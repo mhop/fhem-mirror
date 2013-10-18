@@ -17,7 +17,7 @@ use Device::Firmata::Base
         baudrate => 57600,
     };
 
-$SERIAL_CLASS = $^O eq 'MSWin32' ? 'Win32::Serialport' 
+$SERIAL_CLASS = $^O eq 'MSWin32' ? 'Win32::SerialPort'
                                  : 'Device::SerialPort';
 eval "require $SERIAL_CLASS";
 
@@ -28,27 +28,21 @@ eval "require $SERIAL_CLASS";
 
 sub open {
 # --------------------------------------------------
-    my ( $pkg, $serial_port, $opts ) = @_;
-
-    my $self = ref $pkg ? $pkg : $pkg->new($opts);
-
-    my $serial_obj = $SERIAL_CLASS->new( $serial_port, 1, 0 ) or return;
-    $self->attach($serial_obj,$opts);
-    $self->{handle}->baudrate($self->{baudrate});
-    $self->{handle}->databits(8);
-    $self->{handle}->stopbits(1);
-
-    return $self;
+  my ( $pkg, $serial_port, $opts ) = @_;
+  my $self = ref $pkg ? $pkg : $pkg->new($opts);
+  my $serial_obj = $SERIAL_CLASS->new( $serial_port, 1, 0 ) or return;
+  $self->attach($serial_obj,$opts);
+  $self->{handle}->baudrate($self->{baudrate});
+  $self->{handle}->databits(8);
+  $self->{handle}->stopbits(1);
+  return $self;
 }
 
 sub attach {
-    my ( $pkg, $serial_obj, $opts ) = @_;
-
-    my $self = ref $pkg ? $pkg : $pkg->new($opts);
-
-    $self->{handle} = $serial_obj;
-
-    return $self;
+  my ( $pkg, $serial_obj, $opts ) = @_;
+  my $self = ref $pkg ? $pkg : $pkg->new($opts);
+  $self->{handle} = $serial_obj;
+  return $self;
 }
 
 =head2 data_write
@@ -59,9 +53,9 @@ Dump a bunch of data into the comm port
 
 sub data_write {
 # --------------------------------------------------
-    my ( $self, $buf ) = @_;
-    $Device::Firmata::DEBUG and print ">".join(",",map{sprintf"%02x",ord$_}split//,$buf)."\n";
-    return $self->{handle}->write( $buf );
+  my ( $self, $buf ) = @_;
+  $Device::Firmata::DEBUG and print ">".join(",",map{sprintf"%02x",ord$_}split//,$buf)."\n";
+  return $self->{handle}->write( $buf );
 }
 
 
@@ -74,12 +68,10 @@ This function is non-blocking
 
 sub data_read {
 # --------------------------------------------------
-    my ( $self, $bytes ) = @_;
-    my ( $count, $string ) = $self->{handle}->read($bytes);
-    if ( $Device::Firmata::DEBUG and $string ) {
-        print "<".join(",",map{sprintf"%02x",ord$_}split//,$string)."\n";
-    }
-    return $string;
+  my ( $self, $bytes ) = @_;
+  my ( $count, $string ) = $self->{handle}->read($bytes);
+  print "<".join(",",map{sprintf"%02x",ord$_}split//,$string)."\n" if ( $Device::Firmata::DEBUG and $string );
+  return $string;
 }
 
 1;

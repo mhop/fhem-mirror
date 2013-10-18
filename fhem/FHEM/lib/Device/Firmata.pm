@@ -11,7 +11,7 @@ use Device::Firmata::Base
 
 =head1 NAME
 
-Device::Firmata - A host interface to Firmata for the arduino platform.
+Device::Firmata - Perl interface to Firmata for the arduino platform.
 
 =head1 VERSION
 
@@ -19,7 +19,7 @@ Version 0.50
 
 =cut
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our $DEBUG = 0;
 
 
@@ -47,13 +47,13 @@ while (1) {
 
 =head2 open
 
-establish communication to the device.  Single argument is the name of the device file mapped to the arduino.  Typicaly '/dev/ttyUSB0'
+establish serial connection with an Arduino micro-controller.  Single argument is the name of the device file mapped to the arduino.  Typically '/dev/ttyUSB0' or 'COM9'
 
 =cut
 
 sub open {
 # --------------------------------------------------
-# Establish a connection with the serial port
+# Establish a connection to Arduino via the serial port
 #
     my ( $self, $serial_port, $opts ) = @_;
 

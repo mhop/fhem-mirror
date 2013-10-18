@@ -9,11 +9,11 @@ Device::Firmata::Error - Error handlers
 
 use strict;
 use Exporter;
-use vars qw/ 
-            @ISA 
-            %ERRORS 
-            @EXPORT 
-            $FIRMATA_ERROR_DEFAULT 
+use vars qw/
+            @ISA
+            %ERRORS
+            @EXPORT
+            $FIRMATA_ERROR_DEFAULT
             @ERROR_STACK
         /;
 use Device::Firmata::Base;
@@ -28,7 +28,7 @@ $FIRMATA_ERROR_DEFAULT = -1;
 =head2 error
 
 The base error reporting system. All errors will be
-stored in this object until the errors flush code is called.
+stored in this object until the error flush code is called.
 This will allow the system to collect all errors that occur
 in various parts of the system in one place. Very useful
 for error reporting since it's a simple call to find
@@ -37,10 +37,10 @@ out the last error.
 Invocation of this function
 
   $err->error( [numerical error level], ErrorMessage, ... parameters ... );
-  
-ErrorMessage can be in the format "KEY" that will be referenced by 
+
+ErrorMessage can be in the format "KEY" that will be referenced by
 Device::Firmata::Base->language or "KEY:Message" where if ->language does
-not map to anything, the error will default to Message 
+not map to anything, the error will default to Message
 
 =cut
 
@@ -71,7 +71,7 @@ sub error {
                          : warn "\@$fn:$pkg:$line". ' : ' .  $text . "\n";
     };
 
-#        warn "Error called wih args: @_ from " . join( " ", caller() ) . "\n";
+#        warn "Error called with args: @_ from " . join( " ", caller() ) . "\n";
 #        require Carp;
 #        Carp::cluck();
 
@@ -90,5 +90,3 @@ sub errors_flush {
 
 
 1;
-
-

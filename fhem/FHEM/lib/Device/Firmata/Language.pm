@@ -9,9 +9,9 @@ Device::Firmata::Language - Localization
 
 use strict;
 use vars qw/
-        $FIRMATA_LOCALE 
+        $FIRMATA_LOCALE
         $FIRMATA_LOCALE_PATH
-        $FIRMATA_LOCALE_MESSAGES 
+        $FIRMATA_LOCALE_MESSAGES
     /;
 use Device::Firmata::Base
     ISA => 'Device::Firmata::Base',
@@ -71,7 +71,6 @@ sub language {
             ( $m ||= {} )->{$1} = $2;
         }
         close $fh;
-
         $m;
     };
 
@@ -88,13 +87,12 @@ sub language {
     my $message_template;
 
 # Get the message template in the following order:
-#   1. The local object if available 
+#   1. The local object if available
 #   2. The global message object
 #   3. The provided default message
 #
     ref $self and $message_template = $self->{messages}{$key};
     $message_template ||= $messages->{$key} || $message;
-
     return sprintf( $message_template, @_ );
 }
 
@@ -104,5 +102,5 @@ __DATA__
 FIRMATA__unhandled        Unhandled attribute '%s' called
 FIRMATA__unknown          Unknown/Unhandled error encountered: %s
 
-FIRMATA__separator , 
+FIRMATA__separator ,
 
