@@ -1,19 +1,16 @@
 package Device::Firmata::Base;
 
 use strict 'vars', 'subs';
-use vars qw/ 
-    $AUTOLOAD 
-
+use vars qw/
+    $AUTOLOAD
     $FIRMATA_DEBUG_LEVEL
     $FIRMATA_ERROR_CLASS
     $FIRMATA_ERROR
-
-    $FIRMATA_ATTRIBS 
-    $FIRMATA_DEBUGGING 
-
-    $FIRMATA_LOCALE 
+    $FIRMATA_ATTRIBS
+    $FIRMATA_DEBUGGING
+    $FIRMATA_LOCALE
     $FIRMATA_LOCALE_PATH
-    $FIRMATA_LOCALE_MESSAGES 
+    $FIRMATA_LOCALE_MESSAGES
 /;
 
 =head1 NAME
@@ -23,49 +20,42 @@ Device::Firmata::Base -- Abstract baseclass for Device::Firmata modules
 =cut
 
 $FIRMATA_DEBUGGING = 1;
-
-$FIRMATA_ATTRIBS = {
-};
+$FIRMATA_ATTRIBS = {};
 $FIRMATA_LOCALE = 'en';
 $FIRMATA_LOCALE_PATH = '.';
-
-$FIRMATA_DEBUG_LEVEL = 0; 
+$FIRMATA_DEBUG_LEVEL = 0;
 $FIRMATA_ERROR_CLASS = 'Device::Firmata::Error';
 
 =head1 METHODS
 
 =head2 import
 
-Ease the use of setting up configuration options
+Ease setting of configuration options
 
-=cut 
+=cut
 
 sub import {
-    my $self = shift;
-    my $pkg  = caller;
+  my $self = shift;
+  my $pkg  = caller;
+  my $config_opts = {
+    debugging       => $FIRMATA_DEBUGGING,
+  };
 
-    my $config_opts = {
-        debugging       => $FIRMATA_DEBUGGING,
-    };
-
-    if ( @_ ) {
-        my $opts = $self->parameters( @_ );
-
-        if ( my $attrs = $opts->{FIRMATA_ATTRIBS} ) {
-            *{$pkg.'::FIRMATA_ATTRIBS'} = \$attrs;
-        }
-
-        unless ( ref *{$pkg.'::ISA'} eq 'ARRAY' and @${$pkg.'::ISA'}) {
-            my @ISA = ref $opts->{ISA} ? @{$opts->{ISA}} :
-                          $opts->{ISA} ? $opts->{ISA} :
-                           __PACKAGE__;
-            *{$pkg.'::ISA'} = \@ISA;
-        }
-
-        use strict;
-
-        $self->SUPER::import( @_ );
+  if ( @_ ) {
+    my $opts = $self->parameters( @_ );
+    if ( my $attrs = $opts->{FIRMATA_ATTRIBS} ) {
+      *{$pkg.'::FIRMATA_ATTRIBS'} = \$attrs;
     }
+
+    unless ( ref *{$pkg.'::ISA'} eq 'ARRAY' and @${$pkg.'::ISA'}) {
+      my @ISA = ref $opts->{ISA} ? @{$opts->{ISA}} :
+        $opts->{ISA} ? $opts->{ISA} :
+         __PACKAGE__;
+      *{$pkg.'::ISA'} = \@ISA;
+    }
+    use strict;
+    $self->SUPER::import( @_ );
+  }
 }
 
 =head2 new
@@ -92,7 +82,7 @@ sub new {
 
 =head2 create
 
-A soft new as some objects will override new and 
+A soft new as some objects will override new and
 we don't want to cause problems but still want
 to invoice our creation code
 
@@ -137,7 +127,7 @@ sub init_instance_attribs {
 
 =head2 init_class_attribs
 
-=cut 
+=cut
 
 sub init_class_attribs {
 # --------------------------------------------------
@@ -196,7 +186,7 @@ sub parameters {
 
     @_ % 2 or $_[0]->warn( "Even number of elements were not passed to call.", join( " ", caller() )  );
 
-    shift; 
+    shift;
 
     return {@_};
 }
@@ -268,7 +258,6 @@ sub error {
 # Handle any error messages
 #
     my $self = shift;
-
     if ( @_ ) {
         my $err_msg = $self->init_error->error(@_);
         $self->{error} = $err_msg;
@@ -395,4 +384,3 @@ sub object_load {
 
 
 1;
-
