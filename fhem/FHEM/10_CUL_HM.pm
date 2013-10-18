@@ -473,11 +473,13 @@ sub CUL_HM_Attr(@) {#################################
 	delete $hash->{helper}{mId};
   }
   elsif($attrName eq "burstAccess"){
-    return "use burstAccess only for device"                 if (!$hash->{helper}{role}{dev});
-	return "burstAccess only for conditional Burst devices"  if ($culHmModel{$hash->{helper}{mId}}{rxt} !~ m /f/);
-	return "$attrVal not a valid option for burstAccess"     if ($attrVal !~ m/^[01]/);
-	if ($attrVal =~ m/^0/){$hash->{protCondBurst} = "forced_off";}
-	else                  {$hash->{protCondBurst} = "unknown";}
+    if ($cmd eq "set"){
+      return "use burstAccess only for device"                 if (!$hash->{helper}{role}{dev});
+	  return "$attrVal not a valid option for burstAccess"     if ($attrVal !~ m/^[01]/);
+	  if ($attrVal =~ m/^0/){$hash->{protCondBurst} = "forced_off";}
+	  else                  {$hash->{protCondBurst} = "unknown";}
+	}
+	else{                    $hash->{protCondBurst} = "forced_off";}
     delete $hash->{helper}{rxType}; # needs new calculation
   }
   CUL_HM_queueUpdtCfg($name) if ($updtReq);
@@ -1546,8 +1548,6 @@ sub CUL_HM_parseCommon(@){#####################################################
 	if ($shash->{helper}{prt}{rspWait}{wakeup}){
 	  if ($shash->{helper}{prt}{rspWait}{mNo} eq $mNo &&
 		  $subType eq "00"		){
-		my $params;
-		$params .= "$_:$shash->{helper}{prt}{rspWaitSec}{$_}" foreach (keys%{$shash->{helper}{prt}{rspWaitSec}});
 		if ($shash->{helper}{prt}{awake} && $shash->{helper}{prt}{awake}==4){#re-wakeup
 		  delete $shash->{helper}{prt}{rspWait};#clear wakeup values
   		  $shash->{helper}{prt}{rspWait}{$_} = $shash->{helper}{prt}{rspWaitSec}{$_} 
@@ -1557,11 +1557,11 @@ sub CUL_HM_parseCommon(@){#####################################################
 		  #General set timer
 		  return "done"
 		}
-		$shash->{protCondBurst} = "on";
+		$shash->{protCondBurst} = "on" if ($shash->{protCondBurst} !~ m/forced/);
 		$shash->{helper}{prt}{awake}=2;#awake
 	  }
 	  else{
-		$shash->{protCondBurst} = "off";
+		$shash->{protCondBurst} = "off" if ($shash->{protCondBurst} !~ m/forced/);
 		$shash->{helper}{prt}{awake}=3;#reject
 		return "done";
 	  }
@@ -3119,7 +3119,7 @@ sub CUL_HM_Set($@) {
         $devHash->{cmdStack}               && 
 		$devHash->{helper}{prt}{sProc} != 1    # not pocessing
 		){
-	$hash->{helper}{prt}{wakeup}=1;# start wakeup
+	$hash->{helper}{prt}{wakeup}=1;# start auto-wakeup
     CUL_HM_SndCmd($devHash,"++B112$id$dst");
   }
   return ("",1);# no not generate trigger outof command
@@ -3318,7 +3318,6 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
 	($list,$peerN) = ($1,$2) if($nrn =~ m/RegL_(..):(.*)/);
 	if ($peerN){($peerAddr,$peerChn) = unpack('A6A2', CUL_HM_name2Id($peerN,$hash));}
 	else       {($peerAddr,$peerChn) = ('000000','00');}
-  
     CUL_HM_updtRegDisp($hash,$list,$peerAddr.$peerChn);
     CUL_HM_PushCmdStack($hash, "++".$flag.'01'.$src.$dst.$chn.'05'.
                                         $peerAddr.$peerChn.$list);
@@ -3597,7 +3596,7 @@ sub CUL_HM_respPendTout($) {
     return if(!$pHash->{rspWait}{reSent});      # Double timer?
     if ($pHash->{rspWait}{wakeup}){
 	  CUL_HM_respPendRm($hash);# do not count problems with wakeup try, just wait
-	  $hash->{protCondBurst} = "off";
+	  $hash->{protCondBurst} = "off" if ($hash->{protCondBurst} !~ m/forced/);;
 	  $pHash->{wakeup} = 0;# finished
 	  $pHash->{awake} = 0;# set to asleep
 	  CUL_HM_protState($hash,"CMDs_pending");
@@ -3634,7 +3633,6 @@ sub CUL_HM_respPendTout($) {
         Log GetLogLevel($name,4),"CUL_HM_Resend: ".$name. " nr ".$pHash->{rspWait}{reSent};
 	    InternalTimer(gettimeofday()+rand(20)/10+4,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);
 	  }
-#	  }
 	}
   }
 }
@@ -4370,9 +4368,8 @@ sub CUL_HM_RTtempReadings($) {# parse RT temperature readings
         "R-winOpnTemp:"  .ReadingsVal($name,"R-winOpnTemp"  ,"unknown"),
         "R-winOpnPeriod:".ReadingsVal($name,"R-winOpnPeriod","unknown"),
         "R-winOpnBoost:" .ReadingsVal($name,"R-winOpnBoost" ,"unknown"),
-		"R-winOpnMode:"  .ReadingsVal($name,"R-winOpnMode:" ,"unknown"),
-        "R-winOpnBoost:" .ReadingsVal($name,"R-winOpnBoost:","unknown")
-		);
+		"R-winOpnMode:"  .ReadingsVal($name,"R-winOpnMode"  ,"unknown"),
+		"R-winOpnDetFall:".ReadingsVal($name,"R-winOpnDetFall"  ,"unknown"),);
   return $setting;
 }
 sub CUL_HM_repReadings($) {# for repeater in:hash, out: string with peers
