@@ -922,7 +922,8 @@ update_ListChanges($$$)
     } else {
       my @lines = split(/\015\012|\012|\015/,$changed);
       foreach my $line (@lines) {
-        last if ($line eq "");
+        next if($line =~ m/^#/);
+        last if($line eq "");
         $ret .= $line."\n";
       }
     }
