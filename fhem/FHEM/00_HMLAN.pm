@@ -44,6 +44,7 @@ my %HMcond = ( 0  =>'ok'
 #			      =>'overload');
 			  
 my $HMOvLdRcvr = 6*60;# time HMLAN needs to recover from overload
+my $HMmlSlice = 6; # number of messageload slices per hour (10 = 6min)
 
 sub HMLAN_Initialize($) {
   my ($hash) = @_;
@@ -108,7 +109,7 @@ sub HMLAN_Define($$) {#########################################################
   my @arr = ();
   @{$hash->{helper}{q}{apIDs}} = \@arr;
   
-  $hash->{helper}{q}{cap}{$_}   = 0 for (0..9);
+  $hash->{helper}{q}{cap}{$_}   = 0 for (0..($HMmlSlice-1));
   $hash->{helper}{q}{cap}{last} = 0;
   $hash->{helper}{q}{cap}{sum}  = 0;  
   HMLAN_UpdtMsgCnt("UpdtMsg:".$name);
@@ -231,27 +232,29 @@ sub HMLAN_UpdtMsgLoad($$) {####################################################
   my $hash = $defs{$name};
   my $hCap = $hash->{helper}{q}{cap};
   
-  my $t = int(gettimeofday()/600)%6;# 10 min slices
-
+  my $t = int(gettimeofday()/(3600/$HMmlSlice))%$HMmlSlice;
   if ($hCap->{last} != $t){
     $hCap->{last} = $t;
     $hCap->{$t} = 0;
 	   # try to release high-load condition with a dummy message 
 	   # one a while
-    HMLAN_Write($hash,"","As09998112"
+    if (ReadingsVal($name,"cond","") =~ m /(Warning-HighLoad|ERROR-Overload)/){
+	  $hash->{helper}{recoverTest} = 1;
+      HMLAN_Write($hash,"","As09998112"
 	                     .AttrVal($name,"hmId","999999")
-						 ."000001")
-      if (ReadingsVal($name,"cond","") eq 'Warning-HighLoad');
+						 ."000001");
+	}
   }
   $hCap->{$hCap->{last}}+=$incr  if ($incr);
   my @tl;
   $hCap->{sum} = 0;
-  for (($t-5)..$t){# we have 6 slices
-    push @tl,int($hCap->{$_%6}/16.8);
-	$hCap->{sum} += $hCap->{$_%6}; # need to recalc incase a slice was removed
+  for (($t-$HMmlSlice+1)..$t){# we have 6 slices
+    push @tl,int($hCap->{$_%$HMmlSlice}/16.8);
+	$hCap->{sum} += $hCap->{$_%$HMmlSlice}; # need to recalc incase a slice was removed
   }
 	  
-  $hash->{msgLoadEst} = "1hour:".int($hCap->{sum}/16.8)."% 10min steps: ".join("/",reverse @tl);
+  $hash->{msgLoadEst} = "1hour:".int($hCap->{sum}/16.8)."% "
+                        .(60/$HMmlSlice)."min steps: ".join("/",reverse @tl);
 #testing only           ." :".$hCap->{sum}
   return;
 }
@@ -610,18 +613,18 @@ sub HMLAN_SimpleWrite(@) {#####################################################
   my $len = length($msg);
   
   # It is not possible to answer befor 100ms
-
   if ($len>51){
     if($hash->{helper}{q}{HMcndN}){
 	  my $HMcnd = $hash->{helper}{q}{HMcndN};
-	  return if ($HMcnd == 4 || $HMcnd == 253);# no send if overload or disconnect
+	  return if (  ($HMcnd == 4 || $HMcnd == 253)
+	              && !$hash->{helper}{recoverTest});# no send if overload or disconnect
+	  delete $hash->{helper}{recoverTest}; # test done
     }
-
     $msg =~ m/(.{9}).(..).(.{8}).(..).(.{8}).(..)(..)(..)(.{6})(.{6})(.*)/;
 	my ($s,$stat,$t,$d,$r,$no,$flg,$typ,$src,$dst,$p) = 
 	   ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11);
 
-	my $hmId = $attr{$name}{hmId};
+	my $hmId = AttrVal($name,"hmId","");
 	my $hDst = $hash->{helper}{$dst};# shortcut
 	my $tn = gettimeofday();
     if ($hDst->{nextSend}){
@@ -644,6 +647,7 @@ sub HMLAN_SimpleWrite(@) {#####################################################
 		HMLAN_qResp($hash,$dst,1) if ($hDst->{flg} == 1);
 	  }	  
 	}
+
     if ($len > 52){#channel information included, send sone kind of clearance
 	  my $chn = substr($msg,52,2);
 	  if ($hDst->{chn} && $hDst->{chn} ne $chn){
@@ -677,7 +681,7 @@ sub HMLAN_DoInit($) {##########################################################
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  my $id  = AttrVal($name, "hmId", undef);
+  my $id  = AttrVal($name, "hmId", "999999");
   my ($k1no,$k1,$k2no,$k2,$k3no,$k3) 
 	     =( "01",AttrVal($name,"hmKey","") 
 	       ,"02",AttrVal($name,"hmKey2","")
@@ -691,7 +695,7 @@ sub HMLAN_DoInit($) {##########################################################
   my $s2000 = sprintf("%02X", HMLAN_secSince2000());
   delete $hash->{READINGS}{state};
   
-  HMLAN_SimpleWrite($hash, "A$id") if($id);
+  HMLAN_SimpleWrite($hash, "A$id") if($id ne "999999");
   HMLAN_SimpleWrite($hash, "C");
   HMLAN_SimpleWrite($defs{$name}, "Y01,".($k1?"$k1no,$k1":"00,"));
   HMLAN_SimpleWrite($defs{$name}, "Y02,".($k2?"$k2no,$k2":"00,"));
@@ -700,7 +704,6 @@ sub HMLAN_DoInit($) {##########################################################
   delete $hash->{helper}{ref};
   
   HMLAN_condUpdate($hash,0xff);
-  RemoveInternalTimer( "Overload:".$name);
   $hash->{helper}{q}{cap}{$_}=0 foreach (keys %{$hash->{helper}{q}{cap}});
 
   foreach (keys %lhash){delete ($lhash{$_})};# clear IDs - HMLAN might have a reset 
@@ -710,6 +713,11 @@ sub HMLAN_DoInit($) {##########################################################
   RemoveInternalTimer( "keepAliveCk:".$name);# avoid duplicate timer
   RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
   InternalTimer(gettimeofday()+$attr{$name}{wdTimer}, "HMLAN_KeepAlive", "keepAlive:".$name, 0);
+  # send first message to retrieve HMLAN condition
+  HMLAN_Write($hash,"","As09998112"
+	                     .$id
+						 ."000001");
+
   return undef;
 }
 sub HMLAN_KeepAlive($) {#######################################################
@@ -775,11 +783,7 @@ sub HMLAN_qResp($$$) {#response-waiting queue##################################
 			   );
   }
 }
-sub HMLAN_relOvrLd($) {########################################################
-  my(undef,$name) = split(':',$_[0]);
-  HMLAN_condUpdate($defs{$name},0xFE);
-  $defs{$name}{STATE} = "opened";
-}
+
 sub HMLAN_condUpdate($$) {#####################################################
   my($hash,$HMcnd) = @_;
   my $name = $hash->{NAME};
@@ -788,7 +792,6 @@ sub HMLAN_condUpdate($$) {#####################################################
   $hashCnd->{$HMcnd} = 0 if (!$hashCnd->{$HMcnd});
   $hashCnd->{$HMcnd}++;
   if ($HMcnd == 4){#HMLAN needs a rest. Supress all sends exept keep alive
-    InternalTimer(gettimeofday()+$HMOvLdRcvr,"HMLAN_relOvrLd","Overload:".$name,1);
     $hash->{STATE} = "overload";
   }
 
