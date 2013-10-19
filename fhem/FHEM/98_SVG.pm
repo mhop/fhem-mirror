@@ -589,34 +589,61 @@ SVG_calcOffsets($$)
 
 
   if($zoom eq "hour") {
-    my $t = $now + $off*3600;
-    my @l = localtime($t);
-    $SVG_devs{$d}{from}
-        = sprintf("%04d-%02d-%02d_%02d:00:00",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
-    @l = localtime($t+3600);
-    $SVG_devs{$d}{to}
-        = sprintf("%04d-%02d-%02d_%02d:00:01",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
-
+    if(AttrVal($FW_wname, "endPlotNow", undef) && !$st) {
+      my $t = int(($now + $off*3600 - 3600)/300.0)*300 + 300;
+      my @l = localtime($t);
+      $SVG_devs{$d}{from} =
+          sprintf("%04d-%02d-%02d_%02d:%02d:00",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      @l = localtime($t+3600);
+      $SVG_devs{$d}{to} =
+          sprintf("%04d-%02d-%02d_%02d:%02d:01",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+    } else { 
+      my $t = $now + $off*3600;
+      my @l = localtime($t);
+      $SVG_devs{$d}{from}
+          = sprintf("%04d-%02d-%02d_%02d:00:00",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+      @l = localtime($t+3600);
+      $SVG_devs{$d}{to}
+          = sprintf("%04d-%02d-%02d_%02d:00:01",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+    }
   } elsif($zoom eq "qday") {
-    my $t = $now + $off*21600;
-    my @l = localtime($t);
-    $l[2] = int($l[2]/6)*6;
-    $SVG_devs{$d}{from} =
-        sprintf("%04d-%02d-%02d_%02d:00:00",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
-    @l = localtime($t+21600);
-    $l[2] = int($l[2]/6)*6;
-    $SVG_devs{$d}{to} =
-        sprintf("%04d-%02d-%02d_%02d:00:01",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
-
+    if(AttrVal($FW_wname, "endPlotNow", undef) && !$st) {
+      my $t = int(($now + $off*21600 - 21600)/300.0)*300 + 300;
+      my @l = localtime($t);
+      $SVG_devs{$d}{from} =
+          sprintf("%04d-%02d-%02d_%02d:%02d:00",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      @l = localtime($t+21600);
+      $SVG_devs{$d}{to} =
+          sprintf("%04d-%02d-%02d_%02d:%02d:01",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+    } else { 
+      my $t = $now + $off*21600;
+      my @l = localtime($t);
+      $l[2] = int($l[2]/6)*6;
+      $SVG_devs{$d}{from} =
+          sprintf("%04d-%02d-%02d_%02d:00:00",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+      @l = localtime($t+21600);
+      $l[2] = int($l[2]/6)*6;
+      $SVG_devs{$d}{to} =
+          sprintf("%04d-%02d-%02d_%02d:00:01",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+    }
   } elsif($zoom eq "day") {
-    my $t = $now + $off*86400;
-    my @l = localtime($t);
-    $SVG_devs{$d}{from} =
-        sprintf("%04d-%02d-%02d_00:00:00",$l[5]+1900,$l[4]+1,$l[3]);
-    @l = localtime($t+86400);
-    $SVG_devs{$d}{to} =
-        sprintf("%04d-%02d-%02d_00:00:01",$l[5]+1900,$l[4]+1,$l[3]);
-
+    if(AttrVal($FW_wname, "endPlotNow", undef) && !$st) {
+      my $t = int(($now + $off*86400 - 86400)/900.0)*900 + 900;
+      my @l = localtime($t);
+      $SVG_devs{$d}{from} =
+          sprintf("%04d-%02d-%02d_%02d:%02d:00",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      @l = localtime($t+86400);
+      $SVG_devs{$d}{to} =
+          sprintf("%04d-%02d-%02d_%02d:%02d:01",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+    } else { 
+      my $t = $now + $off*86400;
+      my @l = localtime($t);
+      $SVG_devs{$d}{from} =
+          sprintf("%04d-%02d-%02d_00:00:00",$l[5]+1900,$l[4]+1,$l[3]);
+      @l = localtime($t+86400);
+      $SVG_devs{$d}{to} =
+          sprintf("%04d-%02d-%02d_00:00:01",$l[5]+1900,$l[4]+1,$l[3]);
+    }
   } elsif($zoom eq "week") {
     my @l = localtime($now);
     my $start = (AttrVal($FW_wname, "endPlotToday", undef) ? 6 : $l[6]);
@@ -1513,7 +1540,7 @@ SVG_pO($)
         In plotmode gnuplot-scroll or SVG the given time-range will be used,
         and no scrolling for this weblinks will be possible. Needed e.g. for
         looking at last-years data without scrolling.<br><br>
-        If the value is one of day, week, month, year than set the zoom level
+        If the value is one of day, week, month, year then set the zoom level
         for this weblink independently of the user specified zoom-level.
         This is useful for pages with multiple plots: one of the plots is best
         viewed in with the default (day) zoom, the other one with a week zoom.
