@@ -19,13 +19,7 @@ consUpdate()
   var el = document.getElementById("console");
   if(el) {
     el.innerHTML="Events:<br>"+consConn.responseText;
-    // Scroll to bottom. FF is different from Safari/Chrome
     el.scrollTop = el.scrollHeight;    
-    //var p = el.parentElement; // content div
-    //if(isFF)
-    //  p.parentElement.parentElement.scrollTop = p.scrollHeight; // html tag
-    //else
-    //  p.parentElement.scrollTop = p.scrollHeight; // body tag
   }
 }
 
