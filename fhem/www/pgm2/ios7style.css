@@ -14,7 +14,7 @@ select   { font-family:Helvetica; font-weight:300; font-size:16px; }
 
 #menu    { margin: 20px 0 20px 12px; width:200px; left: 20px; }
 #menu a { color: #151515; }
-
+#console { width:100%; height:100%; position:absolute; overflow-y:auto;}
 #hdr     { position:absolute; top:20px; left:250px; }
 
 #content { position:absolute; top:50px; left:250px; bottom:20px; right:10px; }

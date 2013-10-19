@@ -8,6 +8,7 @@ select   { font-family:Arial, sans-serif; font-size:18px}
             width:120px;  height:132px; background-image:url(../icons/fhemicon.png); }
 #menu    { position:absolute; top:152px;left:10px; width:140px; }
 #hdr     { position:absolute; top:10px; left:160px; }
+#console { width:100%; height:100%; position:absolute; overflow-y:auto;}
 #content { position:absolute; top:50px; left:160px; bottom:20px; right:10px; }
 #connect_err { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:40px; z-index: 10; }
 
