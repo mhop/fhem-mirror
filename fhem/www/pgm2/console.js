@@ -20,11 +20,12 @@ consUpdate()
   if(el) {
     el.innerHTML="Events:<br>"+consConn.responseText;
     // Scroll to bottom. FF is different from Safari/Chrome
-    var p = el.parentElement; // content div
-    if(isFF)
-      p.parentElement.parentElement.scrollTop = p.scrollHeight; // html tag
-    else
-      p.parentElement.scrollTop = p.scrollHeight; // body tag
+    el.scrollTop = el.scrollHeight;    
+    //var p = el.parentElement; // content div
+    //if(isFF)
+    //  p.parentElement.parentElement.scrollTop = p.scrollHeight; // html tag
+    //else
+    //  p.parentElement.scrollTop = p.scrollHeight; // body tag
   }
 }
 

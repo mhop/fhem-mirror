@@ -5,6 +5,7 @@ a img { border:medium none; }
 
 div#logo    { position: fixed; z-index:12000; top:3px; left:5px; float:left; width:24px;height:24px; background:url("../images/default/fhemicon_bright.png") no-repeat;}
 #menu    { position: relative; top: 60px; float:left; width: 25%; padding: 0px 20px 120px;}
+#console { width:100%; height:100%; position:absolute; overflow-y:auto;}
 #hdr     { position: fixed; z-index: 1000; float: left; clear: both; height:32px; width: 100%; -webkit-box-sizing: border-box;  moz-box-sizing: border-box; box-sizing: border-box; background:black; background-image: linear-gradient(#333333,#222222); }
 #content { width:70%; float:right; margin-top:60px; }
 #connect_err { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:40px; z-index: 10; }
