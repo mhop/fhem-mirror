@@ -206,6 +206,10 @@ my %culHmModel=(
   "00A8" => {name=>"HM-WDS30-OT2-SM"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"T1:1:1,T2:2:2,T1_T2:3:3,T2_T1:4:4,Event:5:5",},
   "00A9" => {name=>"HM-PB-6-WM55"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:6",},
   "00AB" => {name=>"HM-LC-SW4-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"Sw:1:4",},
+  "00AC" => {name=>"HM-ES-PMSw1-Pl  "        ,st=>'PwrMeterSwitch'    ,cyc=>'00:10' ,rxt=>''       ,lst=>'1,1:2.3.4.5.6,3:1'
+                                                                                                                        ,chn=>"Sw:1:4,Pwr:2:2,CondP:3:3,CondI:4:4,CondU:5:5,CondF:6:6",},
+  "00AD" => {name=>"HM-TC-IT-WM-W-EU"        ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p:1p.2p.6p.7p,3:3p.6p,1,7:2,8:2,9:2'
+                                                                                                                        ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,remote:6:6,SwitchTr:7:7",},
   "00AF" => {name=>"HM-OU-CM-PCB"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"",},
   "00B1" => {name=>"HM-SEC-SC-2"             ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",},
   "00B2" => {name=>"HM-SEC-WDS-2"            ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",},
@@ -218,6 +222,7 @@ my %culHmModel=(
   "00B9" => {name=>"HM-LC-Dim1T-CV-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "00BA" => {name=>"HM-LC-Dim1T-FM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "00BB" => {name=>"HM-LC-Dim2T-SM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",},#
+  "00BD" => {name=>"HM-CC-RT-DN-BoM"         ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.5p.6p,3:3p.6p,1,7:4'                                                                                                                        ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,ClimRT_tr:4:4,ClimaTeam:5:5,remote:6:6"}, #
   "8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",},
   #263 167                        HM Smoke Detector Schueco 
@@ -810,6 +815,8 @@ $culHmRegModel{"HM-RC-Key4-2"}        = $culHmRegModel{"HM-RC-4-2"};
                                       
 $culHmRegModel{"HM-LC-SW4-BA-PCB"}    = $culHmRegModel{"HM-LC-SW1-BA-PCB"};
 
+$culHmRegModel{"HM-CC-RT-DN-BoM"}     = $culHmRegModel{"HM-CC-RT-DN"};
+
 my %culHmRegChan = (# if channelspecific then enter them here 
   "HM-CC-TC02"        =>{displayMode     =>1,displayTemp     =>1,displayTempUnit =>1,
                          controlMode     =>1,decalcDay       =>1,
@@ -874,6 +881,10 @@ $culHmRegChan{"HM-RC-19-B12"}     = $culHmRegChan{"HM-RC-1912"};
 $culHmRegChan{"HM-RC-19-SW12"}    = $culHmRegChan{"HM-RC-1912"};
 
 $culHmRegChan{"WDF-solar02"}      = $culHmRegType{"dimmer"};
+
+$culHmRegChan{"HM-CC-RT-DN-BoM03"}= $culHmRegType{"HM-CC-RT-DN03"};
+$culHmRegChan{"HM-CC-RT-DN-BoM04"}= $culHmRegType{"HM-CC-RT-DN04"};
+$culHmRegChan{"HM-CC-RT-DN-BoM06"}= $culHmRegType{"HM-CC-RT-DN06"};
 
 ##--------------- Conversion routines for register settings
 
@@ -1082,7 +1093,11 @@ my %culHmChanSets = (
 );
 # clones- - - - - - - - - - - - - - - - - 
 #$culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};
-$culHmChanSets{"WDF-solar02"}     = $culHmSubTypeSets{"blindActuator"};
+$culHmChanSets{"WDF-solar02"}      = $culHmSubTypeSets{"blindActuator"};
+$culHmChanSets{"HM-CC-RT-DN-BoM00"}= $culHmSubTypeSets{"HM-CC-RT-DN00"};
+$culHmChanSets{"HM-CC-RT-DN-BoM02"}= $culHmSubTypeSets{"HM-CC-RT-DN02"};
+$culHmChanSets{"HM-CC-RT-DN-BoM04"}= $culHmSubTypeSets{"HM-CC-RT-DN04"};
+$culHmChanSets{"HM-CC-RT-DN-BoM05"}= $culHmSubTypeSets{"HM-CC-RT-DN05"};
 
 # RC send BCAST to specific address. Is the meaning understood?
 my @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "CFG", "Bit3",

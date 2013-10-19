@@ -206,7 +206,7 @@ sub CUL_HM_updateConfig($){
 	  $hash->{helper}{role}{chn} = 1 if (length($id) == 6); #tc special
 	  $attr{$name}{stateFormat} = "last:trigLast" if ($chn eq "03");
 	}
-    elsif ($md eq "HM-CC-RT-DN"){
+    elsif ($md =~ m/HM-CC-RT-DN/){
 	  $attr{$name}{stateFormat} = "last:trigLast" if ($chn eq "03");
 	}
 	elsif ("dimmer"  eq $st) {#setup virtual dimmer channels
@@ -267,7 +267,7 @@ sub CUL_HM_updateConfig($){
 	                                   .($chn eq "02"?":playTone replay":"");
 	  }
 	  if    (!$hash->{helper}{role}{chn} 
-	       && $md eq "HM-CC-RT-DN") {$webCmd.=":burstXmit";}
+	       && $md =~ m/HM-CC-RT-DN/) {$webCmd.=":burstXmit";}
 		   
 	  if ($webCmd){
 	    my $eventMap  = AttrVal($name,"eventMap",undef);
@@ -404,10 +404,6 @@ sub CUL_HM_Attr(@) {#################################
           $hash->{READINGS}{".".$rdEntry} = $hash->{READINGS}{$rdEntry};
           delete $hash->{READINGS}{$rdEntry};
 	    }
-        foreach my $rdEntry (grep /^RegL_/,keys %{$hash->{helper}{shadowReg}}){
-          $hash->{helper}{shadowReg}{".".$rdEntry} = $hash->{helper}{shadowReg}{$rdEntry};
-          delete $hash->{helper}{shadowReg}{$rdEntry};
-	    }
 	  }
 	  elsif ($exLvl eq "1"){# on: Only register values, no raw data
 	    # move register to visible if available
@@ -419,19 +415,11 @@ sub CUL_HM_Attr(@) {#################################
           $hash->{READINGS}{substr($rdEntry,1)} = $hash->{READINGS}{$rdEntry};
           delete $hash->{READINGS}{$rdEntry};
 	    }
-        foreach my $rdEntry (grep /^RegL_/,keys %{$hash->{helper}{shadowReg}}){
-          $hash->{helper}{shadowReg}{".".$rdEntry} = $hash->{helper}{shadowReg}{$rdEntry};
-          delete $hash->{helper}{shadowReg}{$rdEntry};
-	    }
 	  }
 	  elsif ($exLvl eq "2"){# full - incl raw data
         foreach my $rdEntry (grep /^\.R(egL_|-)/,keys %{$hash->{READINGS}}){
           $hash->{READINGS}{substr($rdEntry,1)} = $hash->{READINGS}{$rdEntry};
           delete $hash->{READINGS}{$rdEntry};
-	    }
-        foreach my $rdEntry (grep /^\.RegL_/    ,keys %{$hash->{helper}{shadowReg}}){
-          $hash->{helper}{shadowReg}{substr($rdEntry,1)} = $hash->{helper}{shadowReg}{$rdEntry};
-          delete $hash->{helper}{shadowReg}{$rdEntry};
 	    }
 	  }
 	  else{;
@@ -773,7 +761,7 @@ sub CUL_HM_Parse($$) {##############################
 	  }
     }
   } 
-  elsif($md eq "HM-CC-RT-DN") { ###############################################
+  elsif($md =~ m/HM-CC-RT-DN/) { ##############################################
     my %ctlTbl=( 0=>"auto", 1=>"manu", 2=>"party",3=>"boost");
     if   ($mTp eq "10" && $p =~ m/^0A(....)(..)(..)(..)/) {#info-level
       my ($chn,$setTemp,$actTemp,$err,$bat,$vp,$ctrlMode) = 
@@ -1733,7 +1721,6 @@ sub CUL_HM_parseCommon(@){#####################################################
 		  }		  
 		  CUL_HM_respPendRm($shash);
 		  delete $chnHash->{helper}{shadowReg}{$regLNp};   #rm shadow
-		  delete $chnHash->{helper}{shadowReg}{".$regLNp"};#rm shadow
 		  # peer Channel name from/for user entry. <IDorName> <deviceID> <ioID>
 		  CUL_HM_updtRegDisp($chnHash,$list,
 		        CUL_HM_peerChId($peer,
@@ -1753,14 +1740,15 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  my($chn,$peerID,$list,$data) = ($1,$2,$3,$4) if($p =~ m/^04(..)(........)(..)(.*)/);
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
 	  $chnHash = $shash if(!$chnHash); # will add param to dev if no chan
-	  my $regLN = ((CUL_HM_getAttrInt($chnHash->{NAME},"expert") == 2)?"":".")."RegL_$list:".CUL_HM_id2Name($peerID);
-      $regLN =~ s/broadcast//;
-	  $regLN =~ s/ /_/g; #remove blanks
+	  my $regLNp = "RegL_$list:".CUL_HM_id2Name($peerID);
+      $regLNp =~ s/broadcast//;
+	  $regLNp =~ s/ /_/g; #remove blanks
+	  my $regLN = ((CUL_HM_getAttrInt($chnHash->{NAME},"expert") == 2)?"":".").$regLNp;
 
 	  $data =~ s/(..)(..)/ $1:$2/g;	  
 	  
 	  my $lN = ReadingsVal($chnHash->{NAME},$regLN,"");
-	  my $shdwReg = $chnHash->{helper}{shadowReg}{$regLN};
+	  my $shdwReg = $chnHash->{helper}{shadowReg}{$regLNp};
 	  foreach my $entry(split(' ',$data)){
 	    my ($a,$d) = split(":",$entry);	
         last if ($a eq "00");		
@@ -1768,7 +1756,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 		}else{  		  $lN .= " ".$entry;}
 		$shdwReg =~ s/ $a:..// if ($shdwReg);# confirmed: remove from shadow
 	  }
-	  $chnHash->{helper}{shadowReg}{$regLN} = $shdwReg;
+	  $chnHash->{helper}{shadowReg}{$regLNp} = $shdwReg;
 	  $lN = join(' ',sort(split(' ',$lN)));# re-order
 	  if ($lN =~ s/00:00//){$lN .= " 00:00"};
       readingsSingleUpdate($chnHash,$regLN,$lN,0);
@@ -2777,7 +2765,7 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$msg);
   }
   elsif($cmd eq "desired-temp") { #############################################
-	if ($md eq "HM-CC-RT-DN"){
+	if ($md =~ m/HM-CC-RT-DN/){
 	  my $temp = ($a[2] eq "off")?9:($a[2] eq "on"?61:$a[2]*2);
 	  return "invalid temp:$a[2]" if($temp <9 ||$temp > 60);
 	  $temp = sprintf ("%02X",$temp);
@@ -2798,7 +2786,7 @@ sub CUL_HM_Set($@) {
     my $wd = $1;
 	$state= "";
     my ($list,$addr,$prgChn);
-	if ($md eq "HM-CC-RT-DN"){
+	if ($md =~ m/HM-CC-RT-DN/){
       my %day2off = ( "Sat"=>"20", "Sun"=>"46", "Mon"=>"72", "Tue"=>"98", 
 	                  "Wed"=>"124","Thu"=>"150","Fri"=>"176");
 	  ($list,$addr,$prgChn) = (7,$day2off{$wd},0);
@@ -2818,7 +2806,7 @@ sub CUL_HM_Set($@) {
 	  splice  @a,2,1;#remove prep 
 	}
     return "To few arguments"                if(@a < 4);
-    return "To many arguments, max 24 pairs" if(@a > (($md eq "HM-CC-RT-DN")?28:50));
+    return "To many arguments, max 24 pairs" if(@a > (($md =~ m/HM-CC-RT-DN/)?28:50));
     return "Bad format, use HH:MM TEMP ..."  if(@a % 2);
     return "Last time spec must be 24:00"    if($a[@a-2] ne "24:00");
 	
@@ -2829,7 +2817,7 @@ sub CUL_HM_Set($@) {
       my ($h, $m) = ($1, $2);
 	  my ($hByte,$lByte);
 	  my $temp = $a[$idx+1];
-	  if ($md eq "HM-CC-RT-DN"){
+	  if ($md =~ m/HM-CC-RT-DN/){
 	    $temp = (int($temp*2)<<9) + ($h*12+($m/5));
 		$hByte = $temp>>8;
 		$lByte = $temp & 0xff;
@@ -3029,7 +3017,7 @@ sub CUL_HM_Set($@) {
 	my ($peerChn,$peerBtn,$peerHash,$myBtn);	 
 	my $peerDst = substr($peerId,0,6);
 
-	if ($md eq "HM-CC-RT-DN" && $chn eq "05" ){# rt team peers cross from 05 to 04
+	if ($md =~ m/HM-CC-RT-DN/ && $chn eq "05" ){# rt team peers cross from 05 to 04
 	  $myBtn = $peerBtn = "04";
 	  $peerChn = "05";
 	}
@@ -3274,18 +3262,19 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
   my $peerN = ($peerAddr ne "000000")?CUL_HM_peerChName($peerAddr.$peerChn,$dst,""):"";
   $peerN =~ s/broadcast//;
   $peerN =~ s/ /_/g;#remote blanks
-  my $regLN = ((CUL_HM_getAttrInt($hash->{NAME},"expert") == 2)?"":".").
-              "RegL_".$list.":".$peerN;
+  my $regLNp = "RegL_".$list.":".$peerN;
+  my $regPre = ((CUL_HM_getAttrInt($hash->{NAME},"expert") == 2)?"":".");
+  my $regLN = $regPre.$regLNp;
   #--- copy data from readings to shadow
   my $chnhash = $modules{CUL_HM}{defptr}{$dst.$chn};
   $chnhash = $hash if (!$chnhash);
   my $rRd = ReadingsVal($chnhash->{NAME},$regLN,"");
   if (!$chnhash->{helper}{shadowReg} ||
-      !$chnhash->{helper}{shadowReg}{$regLN}){
-	$chnhash->{helper}{shadowReg}{$regLN} = $rRd;
+      !$chnhash->{helper}{shadowReg}{$regLNp}){
+	$chnhash->{helper}{shadowReg}{$regLNp} = $rRd;
   }
   #--- update with ne value
-  my $regs = $chnhash->{helper}{shadowReg}{$regLN};
+  my $regs = $chnhash->{helper}{shadowReg}{$regLNp};
   for(my $l = 0; $l < $tl; $l+=4) { #substitute changed bytes in shadow
     my $addr = substr($content,$l,2);
     my $data = substr($content,$l+2,2);
@@ -3293,7 +3282,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
       $regs .= " ".$addr.":".$data;
     }
   }
-  $chnhash->{helper}{shadowReg}{$regLN} = $regs; # update shadow
+  $chnhash->{helper}{shadowReg}{$regLNp} = $regs; # update shadow
   my @changeList;
   if ($prep eq "exec"){#update complete registerset
 	@changeList = keys%{$chnhash->{helper}{shadowReg}};
@@ -3302,12 +3291,12 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
     return; #prepare shadowReg only. More data expected. 
   }
   else{
-	push @changeList,$regLN;
+	push @changeList,$regLNp;
   }
 
   foreach my $nrn(@changeList){
     my $change;
-	my $nrRd = ReadingsVal($chnhash->{NAME},$nrn,"");
+	my $nrRd = ReadingsVal($chnhash->{NAME},$regPre.$nrn,"");
     foreach (sort split " ",$chnhash->{helper}{shadowReg}{$nrn}){
 	  $change .= $_." " if ($nrRd !~ m /$_/);# filter only changes
 	}
@@ -3596,7 +3585,8 @@ sub CUL_HM_respPendTout($) {
     return if(!$pHash->{rspWait}{reSent});      # Double timer?
     if ($pHash->{rspWait}{wakeup}){
 	  CUL_HM_respPendRm($hash);# do not count problems with wakeup try, just wait
-	  $hash->{protCondBurst} = "off" if ($hash->{protCondBurst} !~ m/forced/);;
+	  $hash->{protCondBurst} = "off" if (!$hash->{protCondBurst}||
+	                                      $hash->{protCondBurst} !~ m/forced/);;
 	  $pHash->{wakeup} = 0;# finished
 	  $pHash->{awake} = 0;# set to asleep
 	  CUL_HM_protState($hash,"CMDs_pending");
@@ -3947,7 +3937,6 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
 	$factor = $reg->{f};
 	$unit = " ".$reg->{u};
   }
-
   if(!$regLN){
     $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")
               .sprintf("RegL_%02X:",$list)
@@ -3956,6 +3945,8 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
 										  CUL_HM_IOid($hash)):"");
   }
   $regLN =~ s/broadcast//;
+  my $regLNp = $regLN;
+  $regLNp =~s/^\.//; #remove leading '.' in case ..
 
   my $data=0;
   my $convFlg = "";# confirmation flag - indicates data not confirmed by device
@@ -3963,8 +3954,8 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
     my $addrS = sprintf("%02X",$addr);
 	my ($dReadS,$dReadR) = (undef,"");
     $dReadS = $1 if(   $hash->{helper}{shadowReg}
-	                && $hash->{helper}{shadowReg}{$regLN}
-					&& $hash->{helper}{shadowReg}{$regLN} =~ m/$addrS:(..)/);
+	                && $hash->{helper}{shadowReg}{$regLNp}
+					&& $hash->{helper}{shadowReg}{$regLNp} =~ m/$addrS:(..)/);
     $dReadR = $1 if(  $hash->{READINGS}{$regLN}
 	                &&$hash->{READINGS}{$regLN}{VAL}      =~ m/$addrS:(..)/);	
     my $dRead = $dReadR;
@@ -4033,7 +4024,7 @@ sub CUL_HM_updtRegDisp($$$) {
     CUL_HM_TCtempReadings($hash)  if (($list == 5 ||$list == 6) && 
                       substr($hash->{DEF},6,2) eq "02");
   }
-  if ($md eq "HM-CC-RT-DN"){#handle temperature readings
+  if ($md =~ m/HM-CC-RT-DN/){#handle temperature readings
     CUL_HM_RTtempReadings($hash)  if ($list == 7);
   }
   if ($md eq "HM-PB-4DIS-WM"){#add text
@@ -4221,12 +4212,12 @@ sub CUL_HM_4DisText($) {# convert text for 4dis
   #text2: start at 70 (0x46) length 12 (0x0c)
   my ($hash)=@_;
   my $name = $hash->{NAME};
-  my $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")."RegL_";
-  my $reg1 = ReadingsVal($name,$regLN."01:" ,"");
+  my $regPre = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".");
+  my $reg1 = ReadingsVal($name,$regPre."RegL_01:" ,"");
   my $pref = "";
-  if ($hash->{helper}{shadowReg}{$regLN."01:"}){
+  if ($hash->{helper}{shadowReg}{"RegL_01:"}){
     $pref = "set_";
-    $reg1 = $hash->{helper}{shadowReg}{$regLN."01:"};
+    $reg1 = $hash->{helper}{shadowReg}{"RegL_01:"};
   }
   my %txt;
   foreach my $sAddr (54,70){
@@ -4248,9 +4239,9 @@ sub CUL_HM_4DisText($) {# convert text for 4dis
 sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
   my ($hash)=@_;
   my $name = $hash->{NAME};
-  my $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")."RegL_";
-  my $reg5 = ReadingsVal($name,$regLN."05:" ,"");
-  my $reg6 = ReadingsVal($name,$regLN."06:" ,"");
+  my $regPre = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".");
+  my $reg5 = ReadingsVal($name,$regPre."RegL_05:" ,"");
+  my $reg6 = ReadingsVal($name,$regPre."RegL_06:" ,"");
 
   if (ReadingsVal($name,"R-controlMode","") =~ m/^party/){
     if (   $reg6                # ugly handling to add vanishing party register
@@ -4278,8 +4269,8 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
   my $setting;
   my @changedRead;
   push (@changedRead,"tempList_State:".
-                (($hash->{helper}{shadowReg}{$regLN."05:"} ||
-				  $hash->{helper}{shadowReg}{$regLN."06:"} )?"set":"verified"));
+                (($hash->{helper}{shadowReg}{"RegL_05:"} ||
+				  $hash->{helper}{shadowReg}{"RegL_06:"} )?"set":"verified"));
   for (my $day = 0;$day<7;$day++){
     my $tSpan  = 0;
 	my $dayRead = "";
@@ -4307,10 +4298,10 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
 sub CUL_HM_RTtempReadings($) {# parse RT temperature readings
   my ($hash)=@_;
   my $name = $hash->{NAME};
-  my $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")."RegL_07:";
-  my $tempRegs = ReadingsVal($name,$regLN,"");
-  my $stmpRegs = ($hash->{helper}{shadowReg}{$regLN})? # need to compare actual data
-                   ($hash->{helper}{shadowReg}{$regLN})
+  my $regPre = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".");
+  my $tempRegs = ReadingsVal($name,$regPre."RegL_07:","");
+  my $stmpRegs = ($hash->{helper}{shadowReg}{"RegL_07:"})? # need to compare actual data
+                   ($hash->{helper}{shadowReg}{"RegL_07:"})
 				   :$tempRegs;
   return "reglist incomplete\n" if ($tempRegs !~ m/00:00/);
   
@@ -4329,7 +4320,7 @@ sub CUL_HM_RTtempReadings($) {# parse RT temperature readings
   my $setting;
   my @changedRead;
   push (@changedRead,"tempList_State:".
-                ($hash->{helper}{shadowReg}{$regLN} ?"set":"verified"));
+                ($hash->{helper}{shadowReg}{"RegL_07:"} ?"set":"verified"));
   for (my $day = 0;$day<7;$day++){
 	my $dayRead = "";
 	my $pre ="";
@@ -4717,14 +4708,13 @@ sub CUL_HM_qAutoRead($$){
   RemoveInternalTimer("CUL_HM_procQs");
   InternalTimer(gettimeofday()+ .5,"CUL_HM_procQs","CUL_HM_procQs", 0);
 }
-sub CUL_HM_unQEntity($$){
+sub CUL_HM_unQEntity($$){# remove entity from q - task no longer necesary
   my ($name,$q) = @_;
   return if (AttrVal($name,"subType","") eq "virtual");
   if ($defs{$name}{helper}{role}{dev}){
 	foreach (grep /channel_/,keys %{$defs{$name}}){# remove potential chn
 	  my $ch = $defs{$name}{$_};
 	  @{$q} = grep !/^$ch$/,@{$q};
-	  delete $defs{$ch}{autoRead};
 	}
   }
   @{$q} = grep !/^$name$/,@{$q};
@@ -4736,7 +4726,6 @@ sub CUL_HM_qEntity($$){
 	foreach (grep /channel_/,keys %{$defs{$name}}){# remove potential chn
 	  my $ch = $defs{$name}{$_};
 	  @{$q} = grep !/^$ch$/,@{$q};
-	  delete $defs{$ch}{autoRead};
 	}
  	@{$q} = CUL_HM_noDup(@{$q},$name);
   }
@@ -5456,7 +5445,7 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
     </ul><br>
 	</li>
 	
-	<li>Climate-Control (HM-CC-RT-DN)
+	<li>Climate-Control (HM-CC-RT-DN|HM-CC-RT-DN-BoM)
     <ul>
 	  <li><B>controlMode &lt;auto|boost|day|night&gt;</B><br></li>
 	  <li><B>controlManu &lt;temp&gt;</B><br></li>
@@ -5842,7 +5831,7 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
 	  incomplete or incorrect.<br>
 	  trigLast &lt;channel&gt; #last receiced trigger<br>
   </li>
-  <li><B>HM-CC-RT-DN</B><br>
+  <li><B>HM-CC-RT-DN and HM-CC-RT-DN-BoM</B><br>
       state:T: $actTemp desired: $setTemp valve: $vp %<br>
       motorErr: [ok|ValveTight|adjustRangeTooLarge|adjustRangeTooSmall|communicationERR|unknown|lowBat|ValveErrorPosition]
       measured-temp $actTemp<br>
