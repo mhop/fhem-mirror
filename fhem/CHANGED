@@ -1,6 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
-
-- 2013-xx-xx (SVN)
+# Do not insert empty lines here, update check depends on it.
+- SVN
   - feature: endPlotNow attribute for SVG-Plots (ChrisD)
   - feature: new module 51_BBB_BMP180.pm added (betateilchen)
   - feature: readingsGroup: allow devStateIcon to be displayed
