@@ -114,7 +114,7 @@ FHEMWEB_Initialize($)
   $hash->{ActivateInformFn} = "FW_ActivateInform";
   $hash->{AttrList}= 
     "webname fwcompress:0,1 ".
-    "plotmode:gnuplot,gnuplot-scroll,SVG plotsize endPlotToday:1,0 plotfork ".
+    "plotmode:gnuplot,gnuplot-scroll,SVG plotsize endPlotToday:1,0 endPlotNow:1,0 plotfork ".
     "stylesheetPrefix touchpad:deprecated smallscreen:deprecated ".
     "basicAuth basicAuthMsg hiddenroom hiddengroup HTTPS allowfrom CORS:0,1 ".
     "refresh longpoll:0,1 longpollSVG:1,0 redirectCmds:0,1 reverseLogs:0,1 ".
@@ -1973,7 +1973,12 @@ FW_FlushInform($)
   my $hash = $defs{$name};
   return if(!$hash);
   my $c = $hash->{CD};
-  print $c $hash->{INFORMBUF};
+  #print $c $hash->{INFORMBUF};
+  if(defined($hash->{".WRITEBUFFER"})) {
+    $hash->{".WRITEBUFFER"} .= $hash->{INFORMBUF};
+  } else {
+    $hash->{".WRITEBUFFER"} = $hash->{INFORMBUF};
+  }
   $hash->{INFORMBUF}="";
 }
 
@@ -2392,9 +2397,17 @@ FW_ActivateInform()
 
     <a name="endPlotToday"></a>
     <li>endPlotToday<br>
-        If this FHEMWEB attribute ist set to 1, then week and month plots will
+        If this FHEMWEB attribute is set to 1, then week and month plots will
         end today. Else the current week (starting at Sunday) or the current
         month will be shown.<br>
+        </li><br>
+
+    <a name="endPlotNow"></a>
+    <li>endPlotNow<br>
+        If this FHEMWEB attribute is set to 1, then day and hour plots will
+        end at current time. Else the whole day, the 6 hour period starting at
+        0, 6, 12 or 18 hour or the whole hour will be shown. This attribute
+        is not used if the SVG has the attribute startDate defined.<br>
         </li><br>
 
     <a name="plotfork"></a>
