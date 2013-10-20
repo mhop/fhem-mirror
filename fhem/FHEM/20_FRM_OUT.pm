@@ -16,7 +16,7 @@ FRM_OUT_Initialize($)
   $hash->{SetFn}     = "FRM_OUT_Set";
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_OUT_Init";
-  $hash->{UndefFn}   = "FRM_OUT_Undef";
+  $hash->{UndefFn}   = "FRM_Client_Undef";
   $hash->{StateFn}   = "FRM_OUT_State";
   
   $hash->{AttrList}  = "restoreOnReconnect:on,off restoreOnStartup:on,off IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
@@ -72,12 +72,6 @@ STATEHANDLER: {
 			last;
 		}
 	}
-}
-
-sub
-FRM_OUT_Undef($$)
-{
-  my ($hash, $name) = @_;
 }
 
 1;

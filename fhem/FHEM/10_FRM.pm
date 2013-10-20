@@ -402,6 +402,19 @@ sub
 FRM_Client_Undef($$)
 {
   my ($hash, $name) = @_;
+  my $pin = $hash->{PIN};
+  eval {
+    my $firmata = FRM_Client_FirmataDevice($hash);
+    $firmata->pin_mode($pin,PIN_ANALOG);
+  };
+  if ($@) {
+    eval {
+      my $firmata = FRM_Client_FirmataDevice($hash);
+      $firmata->pin_mode($pin,PIN_INPUT);
+      $firmata->digital_write($pin,0);
+    };
+  }
+  return undef;
 }
 
 sub
