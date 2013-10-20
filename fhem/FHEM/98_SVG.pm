@@ -447,7 +447,7 @@ SVG_readgplotfile($$)
   my (@filelog, @data, $plot);
 
   my $ldType = $defs{$defs{$wl}{LOGDEVICE}}{TYPE}
-     if($defs{$wl}{LOGDEVICE} && $defs{$defs{$wl}{LOGDEVICE}});
+     if($defs{wl} && $defs{$wl}{LOGDEVICE} && $defs{$defs{$wl}{LOGDEVICE}});
   $ldType = $wl if(!$ldType);
 
   open(FH, $gplot_pgm) || return (FW_fatal("$gplot_pgm: $!"), undef);
@@ -491,7 +491,8 @@ SVG_substcfg($$$$$$)
   my $oll = $attr{global}{verbose};
   $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
 
-  my $ldt = $defs{$defs{$wl}{LOGDEVICE}}{TYPE};
+  my $ldt = $defs{$defs{$wl}{LOGDEVICE}}{TYPE}
+        if($defs{$wl} && $defs{$wl}{LOGDEVICE});
   $ldt = "" if(!defined($ldt));
   if($file eq "CURRENT" && $ldt eq "FileLog") {
     $file = $defs{$defs{$wl}{LOGDEVICE}}{currentlogfile};
