@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: rain Module by baumrasen
   - feature: endPlotNow attribute for SVG-Plots (ChrisD)
   - feature: new module 51_BBB_BMP180.pm added (betateilchen)
   - feature: readingsGroup: allow devStateIcon to be displayed
@@ -8,7 +9,8 @@
   - feature: YAMAHA_AVR - new remoteControl commands for Tuner Preset 
              selection
   - feature: RSS amended (read image from pipe, scaling options, line width)
-
+  - feature: WWO Module by baumrasen
+  
 - 2013-09-29 (5.5)
   - feature: new module 55_PIFACE.pm added (betateilchen)
   - feature: Calendar can read from file and limit number of calendar events
