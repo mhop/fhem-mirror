@@ -447,7 +447,7 @@ SVG_readgplotfile($$)
   my (@filelog, @data, $plot);
 
   my $ldType = $defs{$defs{$wl}{LOGDEVICE}}{TYPE}
-     if($defs{wl} && $defs{$wl}{LOGDEVICE} && $defs{$defs{$wl}{LOGDEVICE}});
+     if($defs{$wl} && $defs{$wl}{LOGDEVICE} && $defs{$defs{$wl}{LOGDEVICE}});
   $ldType = $wl if(!$ldType);
 
   open(FH, $gplot_pgm) || return (FW_fatal("$gplot_pgm: $!"), undef);
