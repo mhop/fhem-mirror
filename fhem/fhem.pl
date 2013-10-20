@@ -824,7 +824,7 @@ AnalyzeCommand($$)
 
   $param = "" if(!defined($param));
   no strict "refs";
-  my $ret = &{$cmds{$fn}{Fn} }($cl, $param);
+  my $ret = &{$cmds{$fn}{Fn} }($cl, $param, $fn);
   use strict "refs";
   return undef if(defined($ret) && $ret eq "");
   return $ret;
