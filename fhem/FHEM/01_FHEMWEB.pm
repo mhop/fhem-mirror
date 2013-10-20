@@ -1973,12 +1973,7 @@ FW_FlushInform($)
   my $hash = $defs{$name};
   return if(!$hash);
   my $c = $hash->{CD};
-  #print $c $hash->{INFORMBUF};
-  if(defined($hash->{".WRITEBUFFER"})) {
-    $hash->{".WRITEBUFFER"} .= $hash->{INFORMBUF};
-  } else {
-    $hash->{".WRITEBUFFER"} = $hash->{INFORMBUF};
-  }
+  print $c $hash->{INFORMBUF};
   $hash->{INFORMBUF}="";
 }
 
