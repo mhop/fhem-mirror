@@ -14,7 +14,7 @@ FRM_I2C_Initialize($)
 
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_I2C_Init";
-  $hash->{UndefFn}   = "FRM_I2C_Undef";
+  $hash->{UndefFn}   = "FRM_Client_Undef";
   $hash->{AttrFn}    = "FRM_I2C_Attr";
   
   $hash->{AttrList}  = "IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
@@ -48,12 +48,6 @@ sub FRM_I2C_Attr(@) {
 	if ($command eq "set") {
 		$main::attr{$name}{$attribute}=$value;
 	}
-}
-
-sub
-FRM_I2C_Undef($$)
-{
-  my ($hash, $name) = @_;
 }
 
 1;

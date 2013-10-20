@@ -23,7 +23,6 @@ FRM_AD_Initialize($)
   $hash->{GetFn}     = "FRM_AD_Get";
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_AD_Init";
-  $hash->{UndefFn}   = "FRM_AD_Undef";
   
   $hash->{AttrList}  = "IODev upper-threshold lower-threshold loglevel:0,1,2,3,4,5,6 $main::readingFnAttributes";
 }
@@ -98,12 +97,6 @@ FRM_AD_Get($)
     };
   }
   return undef;
-}
-
-sub
-FRM_AD_Undef($$)
-{
-  my ($hash, $name) = @_;
 }
 
 1;

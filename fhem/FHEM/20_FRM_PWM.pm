@@ -20,7 +20,7 @@ FRM_PWM_Initialize($)
   $hash->{SetFn}     = "FRM_PWM_Set";
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_PWM_Init";
-  $hash->{UndefFn}   = "FRM_PWM_Undef";
+  $hash->{UndefFn}   = "FRM_Client_Undef";
   $hash->{StateFn}   = "FRM_PWM_State";
   
   $hash->{AttrList}  = "restoreOnReconnect:on,off restoreOnStartup:on,off IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
@@ -75,12 +75,6 @@ STATEHANDLER: {
 			last;
 		}
 	}
-}
-
-sub
-FRM_PWM_Undef($$)
-{
-  my ($hash, $name) = @_;
 }
 
 1;

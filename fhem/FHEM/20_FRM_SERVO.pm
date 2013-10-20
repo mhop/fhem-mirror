@@ -20,7 +20,7 @@ FRM_SERVO_Initialize($)
   $hash->{SetFn}     = "FRM_SERVO_Set";
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_SERVO_Init";
-  $hash->{UndefFn}   = "FRM_SERVO_Undef";
+  $hash->{UndefFn}   = "FRM_Client_Undef";
   $hash->{AttrFn}    = "FRM_SERVO_Attr";
   
   $hash->{AttrList}  = "min-pulse max-pulse IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
@@ -74,12 +74,6 @@ FRM_SERVO_Set($@)
     main::readingsSingleUpdate($hash,"state",$value, 1);
   };
   return $@;
-}
-
-sub
-FRM_SERVO_Undef($$)
-{
-  my ($hash, $name) = @_;
 }
 
 1;

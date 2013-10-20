@@ -28,7 +28,6 @@ FRM_LCD_Initialize($)
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_LCD_Init";
   $hash->{SetFn}     = "FRM_LCD_Set";
-  $hash->{UndefFn}   = "FRM_LCD_Undef";
   $hash->{AttrFn}    = "FRM_LCD_Attr";
   $hash->{StateFn}   = "FRM_LCD_State";
   
@@ -205,12 +204,6 @@ STATEHANDLER: {
 			last;
 		}
 	}
-}
-
-sub
-FRM_LCD_Undef($$)
-{
-  my ($hash, $name) = @_;
 }
 
 1;
