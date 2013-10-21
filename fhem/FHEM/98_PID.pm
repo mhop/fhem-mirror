@@ -119,16 +119,15 @@ PID_Set($@)
     my @d = split(' ', $pid->{DEF});
     $pid->{DEF} = "$d[0] $d[1] $a[2] $a[3] $a[4]";
 
-  } elsif ($arg eq "desired" || $arg eq "desired-temp") {
-    return "Set desired|desired-temp needs a numeric parameter"
+  } elsif ($arg eq "desired" ) {
+    return "Set desired needs a numeric parameter"
         if(@a != 3 || $a[2] !~ m/^[\d\.]*$/);
     Log3 $pn, 3, "PID set $pn $arg $a[2]";
     PID_sv($pid, 'desired', $a[2]);
-	PID_sv($pid, 'desired-temp', $a[2]);
     PID_setValue($pid);
 
   } else {
-    return "Unknown argument $a[1], choose one of factors desired desired-temp"
+    return "Unknown argument $a[1], choose one of factors desired"
 
   }
   return "";
@@ -205,7 +204,6 @@ PID_setValue($)
   }
   $inStr =~ m/$re/;
   my $in = $1;
-  PID_sv($pid, 'measured-temp', $in);
    
   my $desired = PID_gv($pid, 'desired');
   return if(!defined($desired));
@@ -288,7 +286,7 @@ PID_setValue($)
       <li>set &lt;name&gt; factors p i d<br>
       Set the p, i and d factors, as described above.
       </li>
-      <li>set &lt;name&gt; desired|desired-temp &lt;value&gt;<br>
+      <li>set &lt;name&gt; desired &lt;value&gt;<br>
       Set the desired value (e.g. temperature). Note: until this value is not
       set, no command is issued.
       </li>
