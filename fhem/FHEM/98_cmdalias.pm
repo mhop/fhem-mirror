@@ -77,7 +77,7 @@ CommandCmdAlias($$$)
   foreach my $n (sort keys %{$a->{Alias}}) {
     my $h = $a->{Alias}{$n};
     next if($h->{InExec});
-    if($param =~ m/$h->{PARAM}/) {
+    if($param =~ m/^$h->{PARAM}$/) {
       my %specials= ("%EVENT" => $param);
       my $exec = EvalSpecials($h->{NEWCMD}, %specials);
       $h->{InExec} = 1;
