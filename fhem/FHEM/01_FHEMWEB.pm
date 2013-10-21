@@ -2218,7 +2218,7 @@ FW_dropdownFn()
       $txt =~ s/ .*//;        # Cut off Celsius
       $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
     } else {
-      $txt = Value($d);
+      $txt = ReadingsVal($d, $cmd, Value($d));
       $txt =~ s/$cmd //;
     }
 
