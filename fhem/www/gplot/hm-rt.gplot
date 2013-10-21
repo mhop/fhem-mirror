@@ -10,21 +10,17 @@ set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
 set ytics nomirror
 set y2tics
-#set ytics
 set title '<L1>'
 set grid xtics y2tics
 
 set y2label "Temperature in C"
-set ylabel "Valve Position (%)"
+set ylabel "Valve position (%)"
 
 #FileLog 4:measured-temp\x3a:0:
 #FileLog 4:desired-temp\x3a:0:
 #FileLog 4:ValvePosition\x3a:0:
 
 plot \
-  "< awk '/measured/{print $1, $4}' <IN>"\
      using 1:2 axes x1y2 title 'Measured temperature' with lines,\
-  "< awk '/desired/{print $1, $4}' <IN>"\
      using 1:2 axes x1y2 title 'Desired temperature' with lines,\
-  "< awk '/actuator/ {print $1, $4+0}' <IN>"\
-     using 1:2 axes x1y1 title 'Actuator (%)' with lines\
+     using 1:2 axes x1y1 title 'Valve position' with lines
