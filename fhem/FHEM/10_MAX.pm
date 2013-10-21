@@ -594,7 +594,7 @@ MAX_Parse($$)
       Log 1, "Device changed serial from $shash->{serial} to $serial" if($shash->{serial} and ($shash->{serial} ne $serial));
       $shash->{serial} = $serial;
     }
-    $shash->{groupid} = $args[2];
+    readingsBulkUpdate($shash, "groupid", $args[2]);
     $shash->{IODev} = $hash;
 
   } elsif($msgtype eq "ThermostatState") {
