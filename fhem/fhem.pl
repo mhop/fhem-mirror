@@ -1918,7 +1918,7 @@ GlobalAttr($$$$)
     my $modpath = "$val/FHEM";
 
     opendir(DH, $modpath) || return "Can't read $modpath: $!";
-    push @INC, $modpath if(!grep(/$modpath/, @INC));
+    push @INC, $modpath if(!grep(/\Q$modpath\E/, @INC));
     $attr{global}{version} = $cvsid;
     my $counter = 0;
 
