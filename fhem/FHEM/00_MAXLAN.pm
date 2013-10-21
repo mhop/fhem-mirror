@@ -659,7 +659,7 @@ MAXLAN_Parse($$)
   } elsif($cmd eq "S"){#Response to s:
     $hash->{dutycycle} = hex($args[0]); #number of command send over the air
     my $discarded = $args[1];
-    $hash->{freememoryslot} = $args[2];
+    $hash->{freememoryslot} = hex($args[2]);
     Log 5, "MAXLAN_Parse: dutycyle $hash->{dutycycle}, freememoryslot $hash->{freememoryslot}";
 
     Log 3, "MAXLAN_Parse: 1% rule: we sent too much, cmd is now in queue" if($hash->{dutycycle} == 100 && $hash->{freememoryslot} > 0);
