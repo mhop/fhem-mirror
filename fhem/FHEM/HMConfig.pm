@@ -24,6 +24,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 #  "42" => { st => "swi",            
 #  "43" => { st => "pushButton",     
 #  "44" => { st => "singleButton",   
+#  "51" => { st => "powerMeter",     
 #  "58" => { st => "thermostat",     
 #  "60" => { st => "KFM100",         
 #  "70" => { st => "THSensor",       
@@ -206,7 +207,7 @@ my %culHmModel=(
   "00A8" => {name=>"HM-WDS30-OT2-SM"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"T1:1:1,T2:2:2,T1_T2:3:3,T2_T1:4:4,Event:5:5",},
   "00A9" => {name=>"HM-PB-6-WM55"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:6",},
   "00AB" => {name=>"HM-LC-SW4-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"Sw:1:4",},
-  "00AC" => {name=>"HM-ES-PMSw1-Pl"          ,st=>'PwrMeterSwitch'    ,cyc=>'00:10' ,rxt=>''       ,lst=>'1,1:2.3.4.5.6,3:1'
+  "00AC" => {name=>"HM-ES-PMSw1-Pl"          ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1,1:2.3.4.5.6,3:1'
                                                                                                                         ,chn=>"Sw:1:4,Pwr:2:2,CondP:3:3,CondI:4:4,CondU:5:5,CondF:6:6",},
   "00AD" => {name=>"HM-TC-IT-WM-W-EU"        ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p:1p.2p.6p.7p,3:3p.6p,1,7:2,8:2,9:2'
                                                                                                                         ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,remote:6:6,SwitchTr:7:7",},
@@ -402,7 +403,7 @@ my %culHmRegDefine = (
 # BL1TPBU  02:01 21:FF
 # Dim1TPBU 02:01 21:FF 22:00
 #Keymatic 3.3 unknown, seen 1 here
-  
+
 #--- list 1, Channel level------------------
 #blindActuator mainly                                                                             
   sign            =>{a=>  8.0,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"signature (AES)",lit=>{off=>0,on=>1}},
@@ -474,6 +475,22 @@ my %culHmRegDefine = (
   caseLength      =>{a=>106.0,s=>2  ,l=>1,min=>100,max=>10000   ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>"case length"},
   meaLength       =>{a=>108.0,s=>2  ,l=>1,min=>110,max=>310     ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>""},
   useCustom       =>{a=>110.0,s=>1  ,l=>1,min=>110,max=>310     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"use custom"      ,lit=>{off=>0,on=>1}},
+
+  averaging       =>{a=>122.0,s=>1  ,l=>1,min=>1    ,max=>16      ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"averaging period"},
+  txMinDly        =>{a=>123.0,s=>0.7,l=>1,min=>0    ,max=>16      ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"min transmit delay"},
+  txThrPwr        =>{a=>124.0,s=>3  ,l=>1,min=>0.01 ,max=>3680    ,c=>''         ,f=>100     ,u=>'W'   ,d=>1,t=>"threshold power"},
+  txThrCur        =>{a=>127.0,s=>2  ,l=>1,min=>1    ,max=>16000   ,c=>''         ,f=>''      ,u=>'mA'  ,d=>1,t=>"threshold current"},
+  txThrVlt        =>{a=>129.0,s=>2  ,l=>1,min=>0.1  ,max=>230     ,c=>''         ,f=>10      ,u=>'V'   ,d=>1,t=>"threshold voltage"},
+  txThrFrq        =>{a=>131.0,s=>1  ,l=>1,min=>0.01 ,max=>2.55    ,c=>''         ,f=>100     ,u=>'Hz'  ,d=>1,t=>"threshold frequency"},
+
+  txThrLoPwr      =>{a=>135.0,s=>4  ,l=>1,min=>0    ,max=>3680    ,c=>''         ,f=>'100'   ,u=>'W'   ,d=>1,t=>"threshold low power"},
+  txThrHiPwr      =>{a=>139.0,s=>4  ,l=>1,min=>0    ,max=>3680    ,c=>''         ,f=>'100'   ,u=>'W'   ,d=>1,t=>"threshold high power"},
+  txThrLoCur      =>{a=>135.0,s=>4  ,l=>1,min=>0    ,max=>16000   ,c=>''         ,f=>'100'   ,u=>'mA'  ,d=>1,t=>"threshold low current"},
+  txThrHiCur      =>{a=>139.0,s=>4  ,l=>1,min=>0    ,max=>16000   ,c=>''         ,f=>'100'   ,u=>'mA'  ,d=>1,t=>"threshold high current"},
+  txThrLoVlt      =>{a=>135.0,s=>4  ,l=>1,min=>115  ,max=>255     ,c=>''         ,f=>'100'   ,u=>'V'   ,d=>1,t=>"threshold low voltage"},
+  txThrHiVlt      =>{a=>139.0,s=>4  ,l=>1,min=>115  ,max=>255     ,c=>''         ,f=>'100'   ,u=>'V'   ,d=>1,t=>"threshold high voltage"},
+  txThrLoFrq      =>{a=>135.0,s=>4  ,l=>1,min=>48.72,max=>51.27   ,c=>''         ,f=>'100'   ,u=>'Hz'  ,d=>1,t=>"threshold low frequency"},
+  txThrHiFrq      =>{a=>139.0,s=>4  ,l=>1,min=>48.72,max=>51.27   ,c=>''         ,f=>'100'   ,u=>'Hz'  ,d=>1,t=>"threshold high frequency"},
 
   evtFltrPeriod   =>{a=>  1.0,s=>0.4,l=>1,min=>0.5,max=>7.5     ,c=>''         ,f=>2       ,u=>'s'   ,d=>1,t=>"event filter period"},
   evtFltrNum      =>{a=>  1.4,s=>0.4,l=>1,min=>1  ,max=>15      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"sensitivity - read each n-th puls"},
@@ -571,6 +588,10 @@ my %culHmRegDefine = (
   tempOffset      =>{a=>  9  ,s=>0.4,l=>7,min=>0  ,max=>15      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"temperature offset",lit=>{"-3.5K"=>0,"-3.0K"=>1,"-2.5K"=>2,"-2.0K"=>3,"-1.5K"=>4,"-1.0K"=>5,"-0.5K"=>6, 
                                                                                                                                         "0.0K"=>7, "0.5K"=>8, "1.0K"=>9, "1.5K"=>10, "2.0K"=>11, "2.5K"=>12, "3.0K"=>13, "3.5K"=>14}},
   btnNoBckLight   =>{a=>  9.4,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"button response without backlight",lit=>{off=>0,on=>1}},
+  showSetTemp     =>{a=>  9.5,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"show set or actual temperature"   ,lit=>{actTemp=>0,setTemp=>1}},
+  showHumitidy    =>{a=>  9.6,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"show temp only or also humidity"  ,lit=>{temp=>0,tempHum=>1}},
+  sendWeatherData =>{a=>  9.7,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"send  weather data"               ,lit=>{off=>0,on=>1}},
+
   boostPos        =>{a=> 10.0,s=>0.5,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>'0.2'   ,u=>'%'   ,d=>1,t=>"valve boost position"},
   boostPeriod     =>{a=> 10.5,s=>0.3,l=>7,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>'min' ,d=>1,t=>"boost period [min]"                          ,lit=>{0=>0,5=>1,10=>2,15=>3,20=>4,25=>5,30=>6}},
   valveOffset     =>{a=> 11  ,s=>0.7,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"offset for valve"},
@@ -583,6 +604,10 @@ my %culHmRegDefine = (
   winOpnBoost     =>{a=> 14.5,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"boost after window closed"                   ,lit=>{off=>0,on=>1}},
   noMinMax4Manu   =>{a=> 14.6,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"min/max is irrelevant for manual mode"       ,lit=>{off=>0,on=>1}},
   showWeekday     =>{a=> 14.7,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"show weekday"                                ,lit=>{off=>0,on=>1}},
+
+  hyst2point      =>{a=> 15.0,s=>0.5,l=>7,min=>0  ,max=>2       ,c=>''         ,f=>'10'    ,u=>'C'   ,d=>1,t=>"hysteresis range",},
+  heatCool        =>{a=> 15.7,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"select heating or cooling"                   ,lit=>{heating=>0,cooling=>1}},
+  weekPrgSel      =>{a=> 16.0,s=>1.0,l=>7,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"select week program"                         ,lit=>{prog1=>0,prog2=>1,prog1=>2}},
 
   modePrioParty   =>{a=> 18.0,s=>0.3,l=>7,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"allow tempChange for party by..."            ,lit=>{RT_SC=>0,all=>1,RT_CCU=>3,CCU=>4,self=>5}},
   modePrioManu    =>{a=> 18.3,s=>0.3,l=>7,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"allow tempChange for manual by..."           ,lit=>{RT_SC=>0,all=>1,RT_CCU=>3,CCU=>4,self=>5}},
@@ -769,7 +794,13 @@ my %culHmRegModel = (
                        expectAES       =>1,peerNeedsBurst  =>1},
   "HM-WDS10-TH-O"   =>{burstRx         =>1},
   "HM-WDS30-OT2-SM" =>{burstRx         =>1,cyclicInfoMsgDis=>1,localResDis     =>1,paramSel        =>1},
+  "HM-TC-IT-WM-W-EU"=>{burstRx         =>1,cyclicInfoMsgDis=>1,localResDis     =>1,cyclicInfoMsg   =>1,
+                       btnLock         =>1,globalBtnLock   =>1,modusBtnLock    =>1,lowBatLimitRT   =>1,
+					   },
+  "HM-ES-PMSw1-Pl"  =>{localResDis     =>1,},
+
   );
+
 #clones - - - - - - - - - - - - - - -   
 $culHmRegModel{"HM-RC-12-B"}          = $culHmRegModel{"HM-RC-12"};
 $culHmRegModel{"HM-RC-12-SW"}         = $culHmRegModel{"HM-RC-12"};
@@ -876,16 +907,51 @@ my %culHmRegChan = (# if channelspecific then enter them here
 						 winOpnDetFall   =>1
 						 },
   "HM-CC-RT-DN06"     =>{CtrlRc          =>1,TempRC          =>1},
-					  );
+  "HM-TC-IT-WM-W-EU02"=>{dayTemp         =>1,nightTemp       =>1,tempMin         =>1,tempMax         =>1,tempOffset      =>1,
+                         hyst2point      =>1,heatCool        =>1,boostPeriod     =>1,winOpnBoost     =>1,
+                         showWeekday     =>1,showInfo        =>1,showSetTemp     =>1,showHumitidy    =>1,
+                         noMinMax4Manu   =>1,daylightSaveTime=>1,sendWeatherData =>1,
+                         modePrioParty   =>1,modePrioManu    =>1,weekPrgSel      =>1,},
+  "HM-ES-PMSw1-Pl02"  =>{averaging       =>1,
+                         txMinDly        =>1,txThrPwr        =>1,txThrCur        =>1,txThrVlt        =>1,txThrFrq        =>1,},
+  "HM-ES-PMSw1-Pl04"  =>{txThrLoPwr      =>1,txThrHiPwr      =>1,
+                         CtDlyOn         =>1,CtDlyOff        =>1,CtOn            =>1,CtOff           =>1,
+                         CtValLo         =>1,CtValHi         =>1,
+                         OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
+                         SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
+                         ActionType      =>1,},
+  "HM-ES-PMSw1-Pl04"  =>{txThrLoCur      =>1,txThrHiCur      =>1,
+                         CtDlyOn         =>1,CtDlyOff        =>1,CtOn            =>1,CtOff           =>1,
+                         CtValLo         =>1,CtValHi         =>1,
+                         OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
+                         SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
+                         ActionType      =>1,},
+  "HM-ES-PMSw1-Pl05"  =>{txThrLoVlt      =>1,txThrHiVlt      =>1,
+                         CtDlyOn         =>1,CtDlyOff        =>1,CtOn            =>1,CtOff           =>1,
+                         CtValLo         =>1,CtValHi         =>1,
+                         OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
+                         SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
+                         ActionType      =>1,},
+  "HM-ES-PMSw1-Pl06"  =>{txThrLoFrq      =>1,txThrHiFrq      =>1,
+                         CtDlyOn         =>1,CtDlyOff        =>1,CtOn            =>1,CtOff           =>1,
+                         CtValLo         =>1,CtValHi         =>1,
+                         OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
+                         SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
+                         ActionType      =>1,},
+  );
+
 #clones - - - - - - - - - - - - - - -   
-$culHmRegChan{"HM-RC-19-B12"}     = $culHmRegChan{"HM-RC-1912"};
-$culHmRegChan{"HM-RC-19-SW12"}    = $culHmRegChan{"HM-RC-1912"};
+$culHmRegChan{"HM-RC-19-B12"}      = $culHmRegChan{"HM-RC-1912"};
+$culHmRegChan{"HM-RC-19-SW12"}     = $culHmRegChan{"HM-RC-1912"};
+                                   
+$culHmRegChan{"WDF-solar02"}       = $culHmRegType{"dimmer"};
+                                   
+$culHmRegChan{"HM-CC-RT-DN-BoM03"} = $culHmRegType{"HM-CC-RT-DN03"};
+$culHmRegChan{"HM-CC-RT-DN-BoM04"} = $culHmRegType{"HM-CC-RT-DN04"};
+$culHmRegChan{"HM-CC-RT-DN-BoM06"} = $culHmRegType{"HM-CC-RT-DN06"};
 
-$culHmRegChan{"WDF-solar02"}      = $culHmRegType{"dimmer"};
-
-$culHmRegChan{"HM-CC-RT-DN-BoM03"}= $culHmRegType{"HM-CC-RT-DN03"};
-$culHmRegChan{"HM-CC-RT-DN-BoM04"}= $culHmRegType{"HM-CC-RT-DN04"};
-$culHmRegChan{"HM-CC-RT-DN-BoM06"}= $culHmRegType{"HM-CC-RT-DN06"};
+$culHmRegChan{"HM-TC-IT-WM-W-EU03"}= $culHmRegType{"HM-CC-RT-DN03"};
+$culHmRegChan{"HM-TC-IT-WM-W-EU06"}= $culHmRegType{"HM-CC-RT-DN06"};
 
 ##--------------- Conversion routines for register settings
 

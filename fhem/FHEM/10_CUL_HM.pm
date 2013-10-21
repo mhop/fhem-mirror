@@ -2420,7 +2420,7 @@ sub CUL_HM_Set($@) {
 	  return "Peer not specified" if ($peerChnIn eq "");
 	  $peerId  = CUL_HM_peerChId($peerChnIn,$dst,$id);	  
  	  $peerChn = ((length($peerId) == 8)?substr($peerId,6,2):"01");
-      $peerId  = substr($peerId,0,6);	
+      $peerId  = substr($peerId,0,6);
       return "Peer not valid" if (!$peerId);	  
 	}
 	elsif($list == 0){
@@ -3194,10 +3194,11 @@ sub CUL_HM_getConfig($){
   my $flag = CUL_HM_getFlag($hash);
   my $id = CUL_HM_IOid($hash);
   my $dst = substr($hash->{DEF},0,6);
+  my $name = $hash->{NAME};
   
   CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'00040000000000')
 	       if ($hash->{helper}{role}{dev});
-  my @chnIdList = CUL_HM_getAssChnIds($hash->{NAME});
+  my @chnIdList = CUL_HM_getAssChnIds($name);
   foreach my $channel (@chnIdList){
     my $cHash = CUL_HM_id2Hash($channel);
     my $chn = substr($channel,6,2);
@@ -3256,7 +3257,6 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
   $peerChn = sprintf("%02X",$peerChn);
   $list    = sprintf("%02X",$list);
   $prep    = "" if (!defined $prep);
-  
   # --store pending changes in shadow to handle bit manipulations cululativ--
   $peerAddr = "000000" if(!$peerAddr);
   my $peerN = ($peerAddr ne "000000")?CUL_HM_peerChName($peerAddr.$peerChn,$dst,""):"";
@@ -3293,7 +3293,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
   else{
 	push @changeList,$regLNp;
   }
-
+  my $changed = 0;# did we write
   foreach my $nrn(@changeList){
     my $change;
 	my $nrRd = ReadingsVal($chnhash->{NAME},$regPre.$nrn,"");
@@ -3303,7 +3303,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
 	next if (!$change);#no changes
 	$change =~ s/(\ |:)//g;
 	my $peerN;
-	
+	$changed = 1;# yes, we did
 	($list,$peerN) = ($1,$2) if($nrn =~ m/RegL_(..):(.*)/);
 	if ($peerN){($peerAddr,$peerChn) = unpack('A6A2', CUL_HM_name2Id($peerN,$hash));}
 	else       {($peerAddr,$peerChn) = ('000000','00');}
@@ -3318,7 +3318,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
     }
     CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$chn."06");
   }
-  CUL_HM_qAutoRead($hash->{NAME},3);  
+  CUL_HM_qAutoRead($hash->{NAME},3) if ($changed);
 }
 sub CUL_HM_PushCmdStack($$) {
   my ($chnhash, $cmd) = @_;
@@ -3832,7 +3832,7 @@ sub CUL_HM_name2Id(@) { #in: name or HMid ==>out: HMid, "" if no match
   return "000000"            if($name eq "broadcast");        #broadcast
   return $defs{$1}->{DEF}.$2 if($name =~ m/(.*)_chn:(..)/);   #<devname> chn:xx
   return $name               if($name =~ m/^[A-F0-9]{6,8}$/i);#was already HMid
-  return $idHash->{DEF}.sprintf("%02X",$1) 
+  return substr($idHash->{DEF},0,6).sprintf("%02X",$1) 
                              if($idHash && ($name =~ m/self(.*)/));
   return "";
 }
