@@ -1033,7 +1033,6 @@ SVG_render($$$$$$$$$)
 
     } else {
       ($d, $v) = split(" ", $l);
-
       $d =  ($tmul ? int((SVG_time_to_sec($d)-$fromsec)*$tmul) : $d);
       if($ld ne $d || $lv ne $v) {              # Saves a lot on year zoomlevel
         $ld = $d; $lv = $v;
@@ -1047,11 +1046,11 @@ SVG_render($$$$$$$$$)
   }
 
   $dxp = $hdx[0];
-  if($dxp && int(@{$dxp}) < 2 && !$tosec) { # not enough data and no range...
+  if(($dxp && int(@{$dxp}) < 2 && !$tosec) ||   # not enough data and no range...
+     (!$tmul && !$dxp)) {
     SVG_pO "</svg>";
     return $SVG_RET;
   }
-
   if(!$tmul) {                     # recompute the x data if no range sepcified
     $fromsec = SVG_time_to_sec($dxp->[0]) if(!$fromsec);
     $tosec = SVG_time_to_sec($dxp->[int(@{$dxp})-1]) if(!$tosec);
