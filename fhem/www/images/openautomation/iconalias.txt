@@ -14,19 +14,19 @@ Zoom-in    control_zoom_in.svg
 
 back       control_centr_arrow_left.svg
 
-dim06%     light_light_dim_00.svg
+dim06%     light_light_dim_10.svg
 dim12%     light_light_dim_10.svg
-dim18%     light_light_dim_10.svg
-dim25%     light_light_dim_20.svg
+dim18%     light_light_dim_20.svg
+dim25%     light_light_dim_30.svg
 dim31%     light_light_dim_30.svg
-dim37%     light_light_dim_30.svg
+dim37%     light_light_dim_40.svg
 dim43%     light_light_dim_40.svg
 dim50%     light_light_dim_50.svg
-dim56%     light_light_dim_50.svg
+dim56%     light_light_dim_60.svg
 dim62%     light_light_dim_60.svg
-dim68%     light_light_dim_60.svg
-dim75%     light_light_dim_70.svg
+dim68%     light_light_dim_70.svg
+dim75%     light_light_dim_80.svg
 dim81%     light_light_dim_80.svg
-dim87%     light_light_dim_80.svg
+dim87%     light_light_dim_90.svg
 dim93%     light_light_dim_90.svg
 dim100%    light_light_dim_100.svg
