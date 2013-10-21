@@ -205,10 +205,12 @@ HUEDevice_SetParam($$@)
     $obj->{'on'}  = JSON::false;
     $obj->{'transitiontime'} = $value / 10 if( defined($value) );
   } elsif($cmd eq "pct") {
+    $value = 3.5 if( $value < 3.5 && AttrVal($name, "model", "") eq "LWL001" );
     $obj->{'on'}  = JSON::true;
     $obj->{'bri'}  = int(2.54 * $value);
     $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
   } elsif($cmd eq "bri") {
+    $value = 8 if( $value < 8 && AttrVal($name, "model", "") eq "LWL001" );
     $obj->{'on'}  = JSON::true;
     $obj->{'bri'}  = 0+$value;
     $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
