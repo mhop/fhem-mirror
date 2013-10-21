@@ -50,7 +50,7 @@ MAXLAN_Initialize($)
 # Normal devices
   $hash->{DefFn}   = "MAXLAN_Define";
   $hash->{UndefFn} = "MAXLAN_Undef";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 set-clock-on-init:1,0 " .
                      "loglevel:0,1,2,3,4,5,6 addvaltrigger "; 
 }
 
