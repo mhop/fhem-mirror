@@ -1214,6 +1214,9 @@ sub
 CommandShutdown($$)
 {
   my ($cl, $param) = @_;
+  return "Usage: shutdown [restart]"
+        if($param && $param ne "restart");
+
   DoTrigger("global", "SHUTDOWN", 1);
   Log 0, "Server shutdown";
 
