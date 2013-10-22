@@ -249,6 +249,10 @@ sub CUL_HM_updateConfig($){
 	  $hash->{helper}{role}{vrt} = 1;
 	}
 
+    if ( $hash->{helper}{role}{dev} && CUL_HM_getRxType($hash)&0x02){#burst dev
+	  #burst devices must restrict retries!
+	  $attr{$name}{msgRepeat} = 1 if (!$attr{$name}{msgRepeat});
+	}
 	# -+-+-+-+-+ add default web-commands
     my $webCmd;
     $webCmd  = AttrVal($name,"webCmd",undef);
@@ -500,7 +504,6 @@ sub CUL_HM_Parse($$) {##############################
 
   return "" if(  ($msgStat && $msgStat eq 'NACK')# lowlevel error
                ||($src eq $id));                 # mirrored messages
-  
   # $shash will be replaced for multichannel commands
   my $shash = $modules{CUL_HM}{defptr}{$src}; 
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
@@ -1647,12 +1650,12 @@ sub CUL_HM_parseCommon(@){#####################################################
 		my $chn = $shash->{helper}{prt}{rspWait}{forChn};
 		my $chnhash = $modules{CUL_HM}{defptr}{$src.$chn}; 
 		$chnhash = $shash if (!$chnhash);
-	    my $chnNname = $chnhash->{NAME};
+	    my $chnName = $chnhash->{NAME};
 	    my (undef,@peers) = unpack 'A2(A8)*',$p;
         $_ = '00000000' foreach (grep /^000000/,@peers);#correct bad term(6 chars) from rain sens)
 	    $chnhash->{helper}{peerIDsRaw}.= ",".join",",@peers;
-		
-    	CUL_HM_ID2PeerList ($chnNname,$_,1) foreach (@peers);
+
+    	CUL_HM_ID2PeerList ($chnName,$_,1) foreach (@peers);
 		if (grep /00000000/,@peers) {# last entry, peerList is complete
 		  # check for request to get List3 data
 		  my $reqPeer = $chnhash->{helper}{getCfgList};
@@ -1660,8 +1663,8 @@ sub CUL_HM_parseCommon(@){#####################################################
 		    my $flag = CUL_HM_getFlag($shash);
 		    my $id = CUL_HM_IOid($shash);
 		    my $listNo = "0".$chnhash->{helper}{getCfgListNo};
-		    my @peerID = split(",",($attr{$chnNname}{peerIDs}?
-			                        $attr{$chnNname}{peerIDs}:""));
+		    my @peerID = split(",",($attr{$chnName}{peerIDs}?
+			                        $attr{$chnName}{peerIDs}:""));
 		    foreach my $peer (grep (!/00000000/,@peerID)){
 			  $peer .="01" if (length($peer) == 6); # add the default
 			  if ($peer &&($peer eq $reqPeer || $reqPeer eq "all")){
@@ -1673,6 +1676,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           CUL_HM_respPendRm($shash);	  
 		  delete $chnhash->{helper}{getCfgList};
 		  delete $chnhash->{helper}{getCfgListNo};
+          CUL_HM_rmOldRegs($chnName);	  
 		}
 		else{
 		  CUL_HM_respPendToutProlong($shash);#wasn't last - reschedule timer
@@ -3086,6 +3090,8 @@ sub CUL_HM_Set($@) {
 	    my $peerFlag = CUL_HM_getFlag($peerHash);
         CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",
             $peerFlag,$id,$peerDst,$peerChn,$cmdB,$dst,$b2,$b1 ));
+		CUL_HM_pushConfig($peerHash,$id,$peerDst,0,0,0,0,"0101")#set burstRx
+				   if(CUL_HM_getRxType($peerHash) & 0x80);      #if conBurst
 		CUL_HM_qAutoRead($peerHash->{NAME},3);
 	  }
 	}
@@ -3579,7 +3585,7 @@ sub CUL_HM_respPendTout($) {
   (undef,$HMid) = split(":",$HMid,2); 
   my $hash = $modules{CUL_HM}{defptr}{$HMid}; 
   my $pHash = $hash->{helper}{prt};#shortcut
-  if ($hash && $hash->{DEF} ne '000000'){
+  if ($hash && $hash->{DEF} ne '000000'){# we know the device
     my $name = $hash->{NAME};
     $pHash->{awake} = 0 if (defined $pHash->{awake});# set to asleep
     return if(!$pHash->{rspWait}{reSent});      # Double timer?
@@ -3593,7 +3599,7 @@ sub CUL_HM_respPendTout($) {
 	}
 	elsif ($pHash->{rspWait}{reSent} > AttrVal($hash->{NAME},"msgRepeat",3) # too much
 	     ||((CUL_HM_getRxType($hash) & 0x83) == 0)){                        #to slow
-	  if ($hash->{IODev}->{STATE} ne "opened"){
+	  if ($hash->{IODev}->{STATE} ne "opened"){#IO errors
         CUL_HM_eventP($hash,"IOerr");
 		readingsSingleUpdate($hash,"state","IOerr",1);
 	  }
@@ -3606,7 +3612,7 @@ sub CUL_HM_respPendTout($) {
 	  }	  
 	  CUL_HM_ProcessCmdStack($hash); # continue processing commands if any
 	}
-	else{
+	else{# manage retries
 	  if ($hash->{protCondBurst}&&$hash->{protCondBurst} eq "on" ){
 		#timeout while conditional burst was active. try re-wakeup
         $pHash->{rspWait}{reSent}++;
@@ -3649,7 +3655,8 @@ sub CUL_HM_eventP($$) {#handle protocol events
   if ($evntType =~ m/(Nack|ResndFail|IOerr)/){# unrecoverable Error
     $hash->{helper}{prt}{bErr}++;
     $nAttr->{protCmdDel}++;
-    if (  (CUL_HM_getRxType($hash) & 0x03) == 0 #to slow for wakeup and config
+    if (  (CUL_HM_getRxType($hash) & 0x01) == 0 #to slow for wakeup and config
+	                                            #no retry for burst either
 	    || $evntType eq "IOerr"){               #IO problem
       $nAttr->{protCmdDel} = 0 if(!$nAttr->{protCmdDel});
       $nAttr->{protCmdDel} += scalar @{$hash->{cmdStack}} 
@@ -4035,6 +4042,24 @@ sub CUL_HM_updtRegDisp($$$) {
   }
 #  CUL_HM_dimLog($hash) if(CUL_HM_Get($hash,$name,"param","subType") eq "dimmer");
 }
+sub CUL_HM_rmOldRegs($){ # remove register i outdated
+  #will remove register for deleted peers
+  my $name = shift;
+  my $hash = $defs{$name};
+  my @pList = split",",$hash->{peerList};
+  my @rpList;
+  foreach(grep /^R-(.*)-/,keys %{$hash->{READINGS}}){
+    push @rpList,$1 if ($_ =~m /^R-(.*)-/);
+  }
+  @rpList = CUL_HM_noDup(@rpList);
+  return if (!@rpList);
+  foreach my $peer(@rpList){
+	next if($hash->{peerList} =~ m /\b$peer\b/);
+	delete $hash->{READINGS}{$_} foreach (grep /^R-$peer-/,keys %{$hash->{READINGS}})
+  }
+}
+
+
 #############################
 #+++++++++++++++++ parameter cacculations +++++++++++++++++++++++++++++++++++++
 my @culHmTimes8 = ( 0.1, 1, 5, 10, 60, 300, 600, 3600 );
@@ -4207,7 +4232,7 @@ sub CUL_HM_time2min($) { # minutes -> time
   return $m;
 }
 
-sub CUL_HM_4DisText($) {# convert text for 4dis
+sub CUL_HM_4DisText($) {      # convert text for 4dis
   #text1: start at 54 (0x36) length 12 (0x0c)
   #text2: start at 70 (0x46) length 12 (0x0c)
   my ($hash)=@_;
@@ -4363,7 +4388,7 @@ sub CUL_HM_RTtempReadings($) {# parse RT temperature readings
 		"R-winOpnDetFall:".ReadingsVal($name,"R-winOpnDetFall"  ,"unknown"),);
   return $setting;
 }
-sub CUL_HM_repReadings($) {# for repeater in:hash, out: string with peers
+sub CUL_HM_repReadings($) {   # parse repeater 
   my ($hash)=@_;
   my %pCnt;
   my $cnt = 0;
