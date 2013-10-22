@@ -10,6 +10,7 @@ set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
 set ytics nomirror
 set y2tics
+set yrange 0:100
 set title '<L1>'
 set grid xtics y2tics
 
