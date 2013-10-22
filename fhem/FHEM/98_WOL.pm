@@ -1,4 +1,4 @@
-# $Id$
+# $Id
 #  erweitert um die Funktion nas_control        Dietmar Ortmann $
 #
 #     This file is part of fhem.
@@ -31,7 +31,7 @@ sub WOL_Initialize($)
   $hash->{SetFn}     = "WOL_Set";
   $hash->{DefFn}     = "WOL_Define";
   $hash->{UndefFn}   = "WOL_Undef";
-  $hash->{AttrList}  = "interval shutdownCmd ".
+  $hash->{AttrList}  = "interval shutdownCmd sysCmd ".
                         $readingFnAttributes;
 }
 #
@@ -181,7 +181,7 @@ sub wake($)
   Log3 $hash, 3, "WOL keeping $name with MAC $mac IP $host busy";
 
   if ($hash->{MODE} eq "BOTH" || $hash->{MODE} eq "EW" ) {
-     wol_by_ew ($mac);
+     wol_by_ew ($hash, $mac);
      readingsBulkUpdate   ($hash, "packet_via_EW", $mac);
   }
   if ($hash->{MODE} eq "BOTH" || $hash->{MODE} eq "UDP" ) {
@@ -220,11 +220,16 @@ sub wol_by_udp {
 }
 #
 #
-# method to wakevia ether-wake
-sub wol_by_ew {
-  my ($mac) = @_;
+# method to wake via system command
+sub wol_by_ew($$) {
+  my ($hash, $mac) = @_;
 
-  my $response = `/usr/bin/ether-wake $mac`;
+  my $sysCmd = AttrVal($hash->{NAME}, "sysCmd", "/usr/bin/ether-wake");
+  if (-e $sysCmd) {
+     my $response = `$sysCmd $mac`;
+  } else {
+     Log3 $hash, 1, "[$hash->{NAME}] system command '$sysCmd' not found";
+  }
 
   return 1;
 }
@@ -300,6 +305,8 @@ So, for example a Buffalo NAS can be kept awake.
   <a name="WOLattr"></a>
   <h4>Attributes</h4>
   <ul>
+    <li><code>attr &lt;name&gt; sysCmd &lt;string&gt;</code>
+                <br>Custom command executed to wakeup a remote machine, i.e. <code>/usr/bin/ether-wake or /usr/bin/wakeonlan</code></li>
     <li><code>attr &lt;name&gt; shutdownCmd &lt;string&gt;</code>
                 <br>Custom command executed to shutdown a remote machine, i.e. <code>sh /path/to/some/shell/script.sh</code></li>
     <li><code>attr &lt;name&gt; interval &lt;seconds&gt;</code></a>
