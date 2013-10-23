@@ -37,6 +37,8 @@ package main;
 # 15.07.2013 Josch state handling improved (shows conn problems)
 # 16.08.2013 Josch Logging improved: Level relative to verbosity level
 # 27.08.2013 Josch Change to Log3, loglevel removed
+# 02.10.2013 Josch check if rawreading defined (empty lines)
+# 22.10.2013 Josch update readings with readingsBulkUpdate()
 use strict;
 use warnings;
 #use Device::SerialPort;
@@ -249,9 +251,9 @@ WS3600_Read($)
   my $AnythingRead = 0;
 
   $hash->{LastRead} = $tn;
+  readingsBeginUpdate($hash);
   if(defined($defs{$name}{READINGS}{"State"})) {
-    $defs{$name}{READINGS}{"State"}{VAL}  = 0xFF;
-    $defs{$name}{READINGS}{"State"}{TIME} = $tn;
+    readingsBulkUpdate($hash,"State", 0xFF);
   }
 
 #  Log 4-GetLogLevel($name,0), "WS3600(Dbg): (4) Info";
@@ -266,26 +268,26 @@ WS3600_Read($)
   foreach my $inputline ( @lines ) {
     $inputline =~ s/\s+$//;
     my ($rawreading, $val, $val2) = split(/ /, $inputline);
+    if(defined($rawreading)) {
     Log3 $name, 4, "WS3600(Dbg): $name read $inputline|$rawreading|$val|$val2";
-    if(defined($TranslatedCodes{$rawreading})) {
-      $reading = $TranslatedCodes{$rawreading};
-      $defs{$name}{READINGS}{$reading}{VAL}  = $val;
-      $defs{$name}{READINGS}{$reading}{TIME} = $tn;
-      $AnythingRead = 1;
-    }
-    # write Date/Time-Records
-    elsif(defined($TranslatedDateTimeCodes{$rawreading})) {
-      $reading = $TranslatedDateTimeCodes{$rawreading};
-      $defs{$name}{READINGS}{$reading}{VAL}  = $val . " " . $val2;
-      $defs{$name}{READINGS}{$reading}{TIME} = $tn;
-      $AnythingRead = 1;
-    }
-    # append Time-Record to Date-Record (managed by same Name)
-    elsif(defined($TranslatedTimeCodes{$rawreading})) {
-      $reading = $TranslatedTimeCodes{$rawreading};
-      $defs{$name}{READINGS}{$reading}{VAL}  .= " " . $val;
-      $defs{$name}{READINGS}{$reading}{TIME} = $tn;
-      $AnythingRead = 1;
+	    if(defined($TranslatedCodes{$rawreading})) {
+	      $reading = $TranslatedCodes{$rawreading};
+              readingsBulkUpdate($hash,$reading, $val);
+	      $AnythingRead = 1;
+	    }
+	    # write Date/Time-Records
+	    elsif(defined($TranslatedDateTimeCodes{$rawreading})) {
+	      $reading = $TranslatedDateTimeCodes{$rawreading};
+              readingsBulkUpdate($hash,$reading, $val . " " . $val2);
+	      $AnythingRead = 1;
+	    }
+	    # append Time-Record to Date-Record (managed by same Name)
+	    elsif(defined($TranslatedTimeCodes{$rawreading})) {
+	      $reading = $TranslatedTimeCodes{$rawreading};
+	      $defs{$name}{READINGS}{$reading}{VAL}  .= " " . $val;
+	      $defs{$name}{READINGS}{$reading}{TIME} = $tn;
+	      $AnythingRead = 1;
+	    }
     }
   }
   if($AnythingRead) {
@@ -297,11 +299,11 @@ WS3600_Read($)
 	                 . " Hi: " . $defs{$name}{READINGS}{"rel-Humidity-inside"}{VAL};
 
     $hash->{CHANGED}[0] = $hash->{STATE};
-    DoTrigger($name, undef);
   }
   else {
     $hash->{STATE} = "no data received";
   }
+  readingsEndUpdate($hash,1);
   # Call us in n seconds again.
   my $nt = gettimeofday() + $hash->{Timer};
   $nt -= $nt % $hash->{Timer};	# round
