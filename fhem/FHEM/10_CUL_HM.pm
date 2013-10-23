@@ -990,6 +990,7 @@ sub CUL_HM_Parse($$) {##############################
     if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
 	    ($mTp eq "10" && $p =~ m/^06/))	{ #    or Info_Status message here
 
+	  my $rSUpdt = 0;# require status update
       my ($subType,$chn,$val,$err) = ($1,hex($2),hex($3)/2,hex($4)) 
  	                     if($p =~ m/^(..)(..)(..)(..)/);
 	  $chn = sprintf("%02X",$chn&0x3f);
@@ -1017,8 +1018,9 @@ sub CUL_HM_Parse($$) {##############################
 			push @event,"phyLevel:$pl %";      #phys level 
 			$physLvl = $pl." %";
 		  }
-		  else{                                #invalid PhysLevel   
-		    CUL_HM_stateUpdatDly($name,3);     # update for device!
+		  else{                                #invalid PhysLevel
+            $rSUpdt = 1;		  
+		    CUL_HM_stateUpdatDly($shash->{NAME},3);     # update to get level
 		  }
 		}
 	  }
@@ -1041,7 +1043,11 @@ sub CUL_HM_Parse($$) {##############################
         push @event, "$eventName:up:$vs"   if(($err&0x30) == 0x10);
         push @event, "$eventName:down:$vs" if(($err&0x30) == 0x20);
         push @event, "$eventName:stop:$vs" if(($err&0x30) == 0x00);
-		CUL_HM_stateUpdatDly($name,120)    if(($err&0x30) != 0x00);
+		if (!$rSUpdt){#dont touch if necessary for dimmer
+		  if(($err&0x30) != 0x00) {CUL_HM_stateUpdatDly($shash->{NAME},120);}
+		  else                    {CUL_HM_unQEntity($shash->{NAME},
+		                                  $modules{CUL_HM}{helper}{qReqStat});}
+		}
 	  }
 	  if ($st eq "dimmer"){
         push @event,"overload:".(($err&0x02)?"on":"off");
@@ -4752,7 +4758,7 @@ sub CUL_HM_stateUpdatDly($$){#delayed queue of status-request
 sub CUL_HM_stateUpdat($){#delay timeout - now queue statusRequest
   my $name = shift;
   (undef,$name)=split":",$name,2;
-  CUL_HM_qStateUpdatIfEnab($name,1) if ($name);
+  CUL_HM_qStateUpdatIfEnab($name) if ($name);
 }
 sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request after 12 s
    my ($name,$force) = @_;
