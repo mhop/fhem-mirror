@@ -1,5 +1,5 @@
 ##############################################
-# $Id$
+# $Id: 98_HMinfo.pm 4101 2013-10-23 14:25:19Z martinp876 $
 package main;
 use strict;
 use warnings;
