@@ -65,7 +65,7 @@ PRESENCE_Define($$)
  
   
   
-  if(defined($a[2]) and defined($a[3]) and not defined($a[7]))
+  if(defined($a[2]) and defined($a[3]))
   {
     if($a[2] eq "local-bluetooth")
     {
