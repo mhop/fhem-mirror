@@ -622,16 +622,29 @@ my %culHmRegDefine = (
   reguExtP        =>{a=>206.0,s=>1  ,l=>7,min=>25 ,max=>35      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"regulator P-param extern mode"},
   reguExtPstart   =>{a=>207.0,s=>1  ,l=>7,min=>5  ,max=>45      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"regulator P-param extern mode start value"},
   );
-  
+     
+#'THSensor'          
+#'thermostat'        
+#'smokeDetector'     
+#'sensor'                          
+#'KFM100'            
+#'AlarmControl'      
+#'singleButton'      
+#'outputUnit'        
+#'repeater'          
+#'blindActuatorSol'  
+#'powerMeter'        
+
 my %culHmRegGeneral = (
-  intKeyVisib=>1,pairCentral=>1,
-	);
+  pairCentral=>1,
+);
 my %culHmRegType = (
   swi               =>{peerNeedsBurst  =>1,expectAES       =>1},
   remote            =>{peerNeedsBurst  =>1,expectAES       =>1,dblPress        =>1,longPress       =>1,
 					   sign            =>1
                       },
-  blindActuator     =>{driveUp         =>1,driveDown       =>1,driveTurn       =>1,refRunCounter   =>1,
+  blindActuator     =>{intKeyVisib     =>1,
+                       driveUp         =>1,driveDown       =>1,driveTurn       =>1,refRunCounter   =>1,
                        sign            =>1,
                        MaxTimeF        =>1,                                    
                        OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
@@ -644,7 +657,8 @@ my %culHmRegType = (
 				       CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,CtRefOff        =>1,
 				       lgMultiExec     =>1
 				       },
-  dimmer            =>{transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction   =>1,
+  dimmer            =>{intKeyVisib     =>1,
+                       transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction   =>1,
                        OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
                        OffDlyBlink     =>1,OnLvlPrio       =>1,OnDlyMode       =>1,
 		               ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1,
@@ -659,7 +673,7 @@ my %culHmRegType = (
 		               OffDlyNewTime   =>1,OffDlyOldTime   =>1,
 		               lgMultiExec     =>1
 		               },
-  switch            =>{sign            =>1,
+  switch            =>{intKeyVisib     =>1,sign            =>1,
                        OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1,
                        SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
                        CtValLo         =>1,CtValHi         =>1,
@@ -686,7 +700,9 @@ my %culHmRegType = (
                        peerNeedsBurst  =>1,expectAES       =>1
 					   },
   sensRain          =>{transmDevTryMax =>1,localResDis     =>1},
-  tipTronic         =>{cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,localResDis     =>1,RS485IdleTime   =>1}
+  tipTronic         =>{cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,localResDis     =>1,RS485IdleTime   =>1},
+  powerMeter        =>{intKeyVisib     =>1},
+  
 );
 #clones - - - - - - - - - - - - - - -   
 $culHmRegType{pushButton}     = $culHmRegType{remote};
@@ -975,7 +991,7 @@ my %culHmGlobalSets = (# all but virtuals
   regBulk       => "<list>:<peer> <addr1:data1> <addr2:data2> ...",
   getRegRaw     => "[List0|List1|List2|List3|List4|List5|List6] ... [<PeerChannel>]",
   getConfig     => "",
-  regSet        => "<regName> [prep|exec] <value> ... [<peerChannel>]",
+  regSet        => "[prep|exec] <regName> <value> ... [<peerChannel>]",
   clear         => "[readings|register|rssi|msgEvents]",
 );
 my %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
@@ -1278,6 +1294,13 @@ my %culHmBits = (
                      STATUS  => '4,2', 
                      UNKNOWN => "6,2",
                      RSSI    => '08,02,$val=(-1)*(hex($val))' } },
+  "10;p01=0A"   => { txt => "INFO_TEMP", params => {
+                     SET     => '2,4,$val=(hex($val)>>10)&0x3F', 
+                     ACT     => '2,4,$val=hex($val)&0x3FF', 
+                     ERR     => "6,2",
+                     VALVE   => "6,2",
+                     MODE    => "6,2" } },
+
   "11;p01=02"   => { txt => "SET"         , params => {
                      CHANNEL  => "02,2", 
                      VALUE    => "04,2", 
