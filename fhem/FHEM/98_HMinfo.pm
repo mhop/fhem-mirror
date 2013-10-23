@@ -946,26 +946,17 @@ sub HMinfo_templateSet(@){#####################################################
 	return "peer necessary for template"                                  if ($ret =~ m/peer required/ && !$pName);
     return "Device doesn't support literal $regV for reg $regN"           if ($ret =~ m/literal:/ && $ret !~ m/\b$regV\b/);
 	my ($min,$max) = ($1,$2) if ($ret =~ m/range:(.*) to (.*) :/);
+	$max = 0 if (!$max);
 	$max =~ s/([0-9\.]+).*/$1/;
-	return "$regV out of range:  $min to $max"                            if ($min && ($regV < $min || $regV > $max));
+	return "$regV out of range:  $min to $max"                            if ($min && ($regV < $min || ($max && $regV > $max)));
 	push @regCh,"$regN,$regV";
   }
   foreach (@regCh){#Finally write to shadow register.
 	my ($ret,undef) = CUL_HM_Set($aHash,$aName,"regSet","prep",split(",",$_),$pName);
 	return $ret if ($ret);
   }
-  foreach my $regl (keys %{$aHash->{helper}{shadowReg}}){#write any existing shadowreg for this entity
-	my @new;
-	my $cur = $aHash->{READINGS}{$regl}{VAL};
-	
-	foreach (split(" ",$aHash->{helper}{shadowReg}{$regl})){
-	  push @new, $_ if ($cur !~ m/$_/);
-	}
-	next if (!@new); # nothing to write
-    my ($ret,undef) = CUL_HM_Set($aHash,$aName,"regBulk",$regl,@new);
-    return $ret if ($ret);
-  }
-  return "";
+  my ($ret,undef) = CUL_HM_Set($aHash,$aName,"regSet","exec",split(",",$regCh[0]),$pName);
+  return $ret;
 }
 sub HMinfo_templateChk(@){#####################################################
   my ($aName,$tmpl,$pSet,@p) = @_;

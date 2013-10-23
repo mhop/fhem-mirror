@@ -1592,6 +1592,15 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  $reply = "ACK"; 
 	}
 
+    if (     $shash->{helper}{prt}{mmcA} 
+	    && @{$shash->{helper}{prt}{mmcA}}
+		&&   $shash->{helper}{prt}{mmcS} == 3){
+	  if ($success eq 'yes'){
+		delete $shash->{helper}{prt}{mmcA};
+		delete $shash->{helper}{prt}{mmcS};
+	  }
+	};
+	
 	if($success){#do we have a final ack?
       #mark timing on the channel, not the device
       my $chn = sprintf("%02X",hex(substr($p,2,2))&0x3f);
@@ -1935,11 +1944,11 @@ sub CUL_HM_Get($@) {
 		}
 	  }
 	  my $addInfo = "";
-	  $addInfo = CUL_HM_TCtempReadings($hash)
-	        if ($md eq "HM-CC-TC" && $chn eq "02");
-		
-      $addInfo = CUL_HM_repReadings($hash) if ($md eq "HM-Sys-sRP-Pl");
-	
+	  if    ($md eq "HM-CC-TC"     && $chn eq "02"){$addInfo = CUL_HM_TCtempReadings($hash)}
+      elsif ($md =~ m/HM-CC-RT-DN/ && $chn eq "04"){$addInfo = CUL_HM_RTtempReadings($hash)}
+      elsif ($md eq "HM-PB-4DIS-WM")               {$addInfo = CUL_HM_4DisText($hash)}
+	  elsif ($md eq "HM-Sys-sRP-Pl")               {$addInfo = CUL_HM_repReadings($hash)}
+
 	  return $name." type:".$st." - \n".
 	         $regHeader.join("",sort(@regValList)).
 			 $addInfo;
@@ -2226,6 +2235,8 @@ sub CUL_HM_Set($@) {
 	  delete $hash->{EVENTS};
 	  delete $hash->{helper}{prt}{rspWait};
 	  delete $hash->{helper}{prt}{rspWaitSec};
+	  delete $hash->{helper}{prt}{mmcA};
+	  delete $hash->{helper}{prt}{mmcS};
 	  #rescue "protLastRcv" for action detector. 
 	  my $protLastRcv = $hash->{protLastRcv} if ($hash->{protLastRcv});
       delete ($hash->{$_}) foreach (grep(/^prot/,keys %{$hash}));
@@ -2357,7 +2368,7 @@ sub CUL_HM_Set($@) {
 	}
   } 
   elsif($cmd eq "regSet") { ############################################### reg
-    #set <name> regSet <regName> [prep] <value> [<peerChn>] 
+    #set <name> regSet [prep] <regName>  <value> [<peerChn>] 
 	#prep is internal use only. It allowes to prepare shadowReg only but supress
 	#writing. Application necessarily needs to execute writing subsequent.
 	my $prep = "";
@@ -3465,6 +3476,33 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
 	}
   }
 
+  my $mmcS = $hash->{helper}{prt}{mmcS}?$hash->{helper}{prt}{mmcS}:0;
+  if ($mTp eq '01'){
+    my ($chn,$sTp) = unpack 'A2A2',$p;
+	my $oCmd = "++".substr($cmd,6);
+	if    ($sTp eq "05"){
+	  my @arr = ($oCmd);
+	  $hash->{helper}{prt}{mmcA}=\@arr;
+	  $hash->{helper}{prt}{mmcS} = 1;
+	}
+	elsif ($sTp =~ m/(07|08)/ && ($mmcS == 1||$mmcS == 2)){
+	  push @{$hash->{helper}{prt}{mmcA}},$oCmd;
+	  $hash->{helper}{prt}{mmcS} = 2;
+	}
+	elsif ($sTp eq "06" && ($mmcS == 2)){
+	  push @{$hash->{helper}{prt}{mmcA}},$oCmd;
+	  $hash->{helper}{prt}{mmcS} = 3;
+	}
+    elsif ($mmcS){ #
+	  delete $hash->{helper}{prt}{mmcA};
+	  delete $hash->{helper}{prt}{mmcS};
+    }
+  }
+  elsif($mmcS){
+    delete $hash->{helper}{prt}{mmcA};
+	delete $hash->{helper}{prt}{mmcS};
+  }
+  
   if($hash->{cmdStack} && scalar @{$hash->{cmdStack}}){
     $hash->{protCmdPend} = scalar @{$hash->{cmdStack}}." CMDs pending";
   }
@@ -3599,6 +3637,13 @@ sub CUL_HM_respPendTout($) {
 	}
 	elsif ($pHash->{rspWait}{reSent} > AttrVal($hash->{NAME},"msgRepeat",3) # too much
 	     ||((CUL_HM_getRxType($hash) & 0x83) == 0)){                        #to slow
+	  if ($pHash->{mmcA}){
+	    #shall we re-insert commands?
+		#unshift  @{$hash->{cmdStack}},@{$pHash->{mmcA}};
+		delete $pHash->{mmcA};
+		delete $pHash->{mmcS};
+	  }
+
 	  if ($hash->{IODev}->{STATE} ne "opened"){#IO errors
         CUL_HM_eventP($hash,"IOerr");
 		readingsSingleUpdate($hash,"state","IOerr",1);
@@ -4031,10 +4076,10 @@ sub CUL_HM_updtRegDisp($$$) {
     CUL_HM_TCtempReadings($hash)  if (($list == 5 ||$list == 6) && 
                       substr($hash->{DEF},6,2) eq "02");
   }
-  if ($md =~ m/HM-CC-RT-DN/){#handle temperature readings
+  elsif ($md =~ m/HM-CC-RT-DN/){#handle temperature readings
     CUL_HM_RTtempReadings($hash)  if ($list == 7);
   }
-  if ($md eq "HM-PB-4DIS-WM"){#add text
+  elsif ($md eq "HM-PB-4DIS-WM"){#add text
     CUL_HM_4DisText($hash)  if ($list == 1) ;
   }
   elsif ($st eq "repeater"){
@@ -4046,6 +4091,7 @@ sub CUL_HM_rmOldRegs($){ # remove register i outdated
   #will remove register for deleted peers
   my $name = shift;
   my $hash = $defs{$name};
+  return if (!$hash->{peerList});# so far only peer-regs are removed
   my @pList = split",",$hash->{peerList};
   my @rpList;
   foreach(grep /^R-(.*)-/,keys %{$hash->{READINGS}}){
@@ -4058,7 +4104,6 @@ sub CUL_HM_rmOldRegs($){ # remove register i outdated
 	delete $hash->{READINGS}{$_} foreach (grep /^R-$peer-/,keys %{$hash->{READINGS}})
   }
 }
-
 
 #############################
 #+++++++++++++++++ parameter cacculations +++++++++++++++++++++++++++++++++++++
@@ -5193,7 +5238,7 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
 	 set myblind regBulk 01 0C:00<br>
 	 </code></ul>
 	 myblind will set the max drive time up for a blind actor to 25,6sec</li>
-     <li><B>regSet &lt;regName&gt; [prep|exec] &lt;value&gt; &lt;peerChannel&gt;</B><a name="CUL_HMregSet"></a><br>
+     <li><B>regSet [prep|exec] &lt;regName&gt; &lt;value&gt; &lt;peerChannel&gt;</B><a name="CUL_HMregSet"></a><br>
         For some major register a readable version is implemented supporting
         register names &lt;regName&gt; and value conversionsing. Only a subset
         of register can be supproted.<br>
