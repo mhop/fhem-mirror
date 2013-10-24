@@ -266,8 +266,10 @@ THRESHOLD_Set($@)
  
   if ($arg eq "desired" ) {
     return "$pn: set desired value:$value, desired value needs a numeric parameter" if(@a != 3 || $value !~ m/^[-\d\.]*$/);
-	return $ret if ($desired_value == $value);
-    Log3 $pn,2, "set $pn $arg $value";
+	if ($desired_value ne "") {
+	  return $ret if ($desired_value == $value);
+    }
+	Log3 $pn,2, "set $pn $arg $value";
 	$mode = "active";
 	$state_format =~ s/\_m/$mode/g;
 	$state_format =~ s/\_dv/$value/g;
@@ -284,7 +286,7 @@ THRESHOLD_Set($@)
 	readingsBulkUpdate   ($hash, "desired_value", $value);
 	readingsEndUpdate    ($hash, 1);
   } elsif ($arg eq "deactivated" ) {
-      return "$pn: set deactivated, set desired value first" if (!$desired_value);
+      return "$pn: set deactivated, set desired value first" if ($desired_value eq "");
 	  $ret=CommandAttr(undef, "$pn disable 1");   
 	  if (!$ret) {
 	    readingsBeginUpdate  ($hash);
@@ -299,7 +301,7 @@ THRESHOLD_Set($@)
 		readingsEndUpdate    ($hash, 1);
 	  }
   } elsif ($arg eq "active" ) {
-      return "$pn: set active, set desired value first" if (!$desired_value);
+      return "$pn: set active, set desired value first" if ($desired_value eq "");
 	  $ret=CommandDeleteAttr(undef, "$pn disable");
 	  if (!$ret) {
 		$mode="active";
@@ -333,7 +335,7 @@ THRESHOLD_Set($@)
   } elsif ($arg eq "hysteresis" ) {
 		return "$pn: set hysteresis value:$value, hysteresis needs a numeric parameter" if (@a != 3  || $value !~ m/^[\d\.]*$/ );
 		$hash->{hysteresis} = $value;
-		if ($desired_value) {
+		if ($desired_value ne "") {
 		  readingsBeginUpdate  ($hash);
 	      readingsBulkUpdate   ($hash, "threshold_min",$desired_value-$hash->{hysteresis}+$offset);
 		  readingsBulkUpdate   ($hash, "threshold_max", $desired_value+$offset);
@@ -344,7 +346,7 @@ THRESHOLD_Set($@)
 	    return "$pn: set offset value:$value, offset needs a numeric parameter" if (@a != 3  || $value !~ m/^[-\d\.]*$/ );
 		$offset = $value;
 	    $hash->{offset} = $offset;
-		if ($desired_value) {
+		if ($desired_value ne "") {
 		  readingsBeginUpdate  ($hash);
 	      readingsBulkUpdate   ($hash, "threshold_min",$desired_value-$hash->{hysteresis}+$offset);
 		  readingsBulkUpdate   ($hash, "threshold_max", $desired_value+$offset);
@@ -388,9 +390,9 @@ THRESHOLD_Notify($$)
   my $name = $dev->{NAME};  
   
   SELECT:{
-  if (($name eq $sensor) and ReadingsVal($pn,"desired_value","")) {last SELECT;}
+  if (($name eq $sensor) and (ReadingsVal($pn,"desired_value","") ne "")) {last SELECT;}
     if ($sensor2) {
-	  if (($name eq $sensor2) and ReadingsVal($pn,"desired_value","")) {last SELECT;}
+	  if (($name eq $sensor2) and (ReadingsVal($pn,"desired_value","") ne "")) {last SELECT;}
     }
     if ($target_sensor) {
 	  if (ReadingsVal($pn,"mode","") eq "external") { 
@@ -626,8 +628,9 @@ THRESHOLD_setValue($$)
 	<br>
 	<br>
 	<li><b>AND|OR</b> (optional)<br>
-	logical operator with an optional second sensor
+	logical operator with an optional second sensor<br>
 	</li>
+	<br>
 	<li><b>sensor2</b> (optional, nur in Verbindung mit AND oder OR)<br>
     the second sensor
 	</li>
@@ -765,7 +768,7 @@ THRESHOLD_setValue($$)
 	It should be heated when the room temperature drops below 21 degrees and the outside temperature is below 15 degrees:<br>
 	<br>
 	<code>define TH_outdoor THRESHOLD outdoor:temperature:0:15</code><br>
-	<code>define TH_room THRESHOLD indoor AND TH_outdoor:state:on heating</code><br>
+	<code>define TH_room THRESHOLD indoor OR TH_outdoor:state:off heating</code><br>
 	<code>set TH_room desired 21</code><br>
 	<br>
 	<br>
@@ -873,7 +876,7 @@ THRESHOLD_setValue($$)
   Das Modul beginnt mit der Steuerung erst dann, wenn ein Sollwert gesetzt wird!<br>
   <br>
   Alternativ kann die Vorgabe des Sollwertes von einem weiteren Sensor kommen. Damit kann eine Steuerung durch den Vergleich zweier Sensoren stattfinden.
-  Typisches Anwendungsbeispiel ist z. B. die Steuerung von Umwelz- oder Zirkulationspumpen.<br>
+  Typisches Anwendungsbeispiel ist z. B. die Steuerung von Umwälz- oder Zirkulationspumpen.<br>
   <br>
   Ebenso können beliebige Wandthermostate (z. B. HM, MAX, FHT) für die Vorgabe der Solltemperatur genutzt werden.<br>
   <br>
@@ -1055,7 +1058,7 @@ THRESHOLD_setValue($$)
 	Es soll geheizt werden, wenn die Zimmertemperatur unter 21 Grad fällt und die Außentemperatur unter 15 Grad ist:<br>
 	<br>
 	<code>define TH_outdoor THRESHOLD outdoor:temperature:0:15</code><br>
-	<code>define TH_room THRESHOLD indoor AND TH_outdoor:state:on heating</code><br>
+	<code>define TH_room THRESHOLD indoor OR TH_outdoor:state:off heating</code><br>
 	<code>set TH_room desired 21</code><br>
 	<br>
 	<br>
