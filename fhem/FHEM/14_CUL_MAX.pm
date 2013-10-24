@@ -429,28 +429,33 @@ CUL_MAX_SendQueueHandler($)
 
     #Send to CUL
     my ($credit10ms) = (CommandGet("","$hash->{IODev}{NAME} credit10ms") =~ /[^ ]* [^ ]* => (.*)/);
-    # We need 1000ms for preamble + len in bits (=hex len * 4) ms for payload. Divide by 10 to get credit10ms units
-    # keep this in sync with culfw's code in clib/rf_moritz.c!
-    my $necessaryCredit = ceil(100*$needPreamble + (length($packet->{packet})*4)/10);
-    Log 5, "needPreamble: $needPreamble, necessaryCredit: $necessaryCredit, credit10ms: $credit10ms";
-    if( defined($credit10ms) && $credit10ms < $necessaryCredit ) {
-      my $waitTime = $necessaryCredit-$credit10ms; #we get one credit10ms every second
-      $timeout += $waitTime;
-      Log 2, "CUL_MAX_SendQueueHandler: Not enough credit! credit10ms is $credit10ms, but we need $necessaryCredit. Waiting $waitTime seconds.";
+    if($credit10ms eq "No answer") {
+      Log 1, "Error in CUL_MAX_SendQueueHandler: CUL $hash->{IODev}{NAME} did not answer request for current credits. Waiting 5 seconds.";
+      $timeout += 5;
     } else {
-      #Update TimeInformation payload. It should reflect the current time when sending,
-      #not the time when it was enqueued. A low credit10ms can defer such a packet for multiple
-      #minutes
-      if( $msgId2Cmd{substr($packet->{packet},6,2)} eq "TimeInformation" ) {
-        Log GetLogLevel($hash->{NAME}, 5), "Updating TimeInformation payload";
-        substr($packet->{packet},22) = CUL_MAX_GetTimeInformationPayload();
-      }
-      IOWrite($hash, "", ($needPreamble ? "Zs" : "Zf") . $packet->{packet});
+      # We need 1000ms for preamble + len in bits (=hex len * 4) ms for payload. Divide by 10 to get credit10ms units
+      # keep this in sync with culfw's code in clib/rf_moritz.c!
+      my $necessaryCredit = ceil(100*$needPreamble + (length($packet->{packet})*4)/10);
+      Log 5, "needPreamble: $needPreamble, necessaryCredit: $necessaryCredit, credit10ms: $credit10ms";
+      if( defined($credit10ms) && $credit10ms < $necessaryCredit ) {
+        my $waitTime = $necessaryCredit-$credit10ms; #we get one credit10ms every second
+        $timeout += $waitTime;
+        Log 2, "CUL_MAX_SendQueueHandler: Not enough credit! credit10ms is $credit10ms, but we need $necessaryCredit. Waiting $waitTime seconds.";
+      } else {
+        #Update TimeInformation payload. It should reflect the current time when sending,
+        #not the time when it was enqueued. A low credit10ms can defer such a packet for multiple
+        #minutes
+        if( $msgId2Cmd{substr($packet->{packet},6,2)} eq "TimeInformation" ) {
+          Log GetLogLevel($hash->{NAME}, 5), "Updating TimeInformation payload";
+          substr($packet->{packet},22) = CUL_MAX_GetTimeInformationPayload();
+        }
+        IOWrite($hash, "", ($needPreamble ? "Zs" : "Zf") . $packet->{packet});
 
-      $packet->{sent} = 1;
-      $packet->{sentTime} = gettimeofday();
-      $timeout += 0.5; #recheck for Ack
-    }
+        $packet->{sent} = 1;
+        $packet->{sentTime} = gettimeofday();
+        $timeout += 0.5; #recheck for Ack
+      }
+    } # $credit10ms ne "No answer"
 
   } elsif( $packet->{sent} == 1 ) { #Already sent it, got no Ack
     if( $packet->{sentTime} + $ackTimeout < gettimeofday() ) {
