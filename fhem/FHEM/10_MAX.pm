@@ -742,11 +742,12 @@ MAX_Parse($$)
       readingsBulkUpdate($shash, "decalcification", "$decalcDays{$args[11]} $args[12]:00");
       readingsBulkUpdate($shash, ".weekProfile", $args[13]);
     } else {
+      #With firmware 18 (opposed to firmware 16), the WallThermostat sends 3 more bytes (6 more hex)
       my ($weekProfile, $unknownBytes) = $args[4] =~ m/^(.{364})(.*)$/;
       readingsBulkUpdate($shash, ".weekProfile", $weekProfile);
       #We still have to find out what $unknownBytes mean, so hopefully
       #we can observe some other values
-      if($unknownBytes ne "071830") {
+      if($unknownBytes ne "071830" and $unknownBytes ne "") {
         Log GetLogLevel($shash->{NAME}, 2), "While parsing weekProfile of WallThermostat: Additional bytes $unknownBytes differ from 071830. Please report to http://forum.fhem.de/index.php?topic=15567";
       }
     }
