@@ -8,7 +8,7 @@ use Device::Firmata::Base
     ISA => 'Device::Firmata::Base',
     FIRMATA_ATTRIBS => {
     };
-
+    
 =head1 NAME
 
 Device::Firmata - Perl interface to Firmata for the arduino platform.
@@ -19,7 +19,7 @@ Version 0.50
 
 =cut
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 our $DEBUG = 0;
 
 
@@ -60,13 +60,29 @@ sub open {
 # We're going to try and create the device connection first...
     my $package = "Device::Firmata::Platform";
     eval "require $package";
-    my $device = $package->open($serial_port,$opts) or die "Could not connect to Firmata Server";
+    my $serialio = "Device::Firmata::IO::SerialIO"; 
+    eval "require $serialio";
+	
+  	my $io = $serialio->open( $serial_port, $opts );
+  	my $platform = $package->attach( $io, $opts ) or die "Could not connect to Firmata Server";
 
-# Figure out what platform we're running on
-    $device->probe;
+	# Figure out what platform we're running on
+    $platform->probe;
 
-    return $device;
+    return $platform;
 }
 
+sub listen {
+# --------------------------------------------------
+# Listen on socket and wait for Arduino to establish a connection
+#
+	my ( $pkg, $ip, $port, $opts ) = @_;
+
+    my $netio = "Device::Firmata::IO::NetIO"; 
+    eval "require $netio";
+	
+  	return $netio->listen( $ip, $port, $opts ) or die "Could not bind to socket";
+  	
+}
 
 1;

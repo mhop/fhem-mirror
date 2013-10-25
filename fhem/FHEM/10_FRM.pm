@@ -14,7 +14,6 @@ BEGIN {
 };
 
 use Device::Firmata::Constants qw/ :all /;
-use Device::Firmata::IO;
 use Device::Firmata::Protocol;
 use Device::Firmata::Platform;
 
