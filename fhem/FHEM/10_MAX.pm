@@ -911,6 +911,7 @@ MAX_Parse($$)
     <li>associate &lt;value&gt;<br>
         Associated one device to another. &lt;value&gt; can be the name of MAX device or its 6-digit hex address.<br>
         Associating a ShutterContact to a {Heating,WallMounted}Thermostat makes it send message to that device to automatically lower temperature to windowOpenTemperature while the shutter is opened. The thermostat must be associated to the ShutterContact, too, to accept those messages.
+        <b>!Attention: After sending this associate command to the ShutterContact, you have to press the button on the ShutterContact to wake it up and accept the command. See the log for a message regarding this!</b>
         Associating HeatingThermostat and WallMountedThermostat makes them sync their desiredTemperature and uses the measured temperature of the
  WallMountedThermostat for control.</li>
     <li>deassociate &lt;value&gt;<br>
