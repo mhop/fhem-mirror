@@ -9,7 +9,6 @@ Device::Firmata::Platform - Platform specifics
 use strict;
 use Time::HiRes qw/time/;
 use Device::Firmata::Constants qw/ :all /;
-use Device::Firmata::IO;
 use Device::Firmata::Protocol;
 use Device::Firmata::Base
   ISA                         => 'Device::Firmata::Base',
@@ -59,14 +58,6 @@ to find out how to connect to the device
 
 =cut
 
-sub open {
-  # --------------------------------------------------
-  my ( $pkg, $port, $opts ) = @_;
-  my $self = ref $pkg ? $pkg : $pkg->new($opts);
-  my $ioport = Device::Firmata::IO->open( $port, $opts ) or return;
-  return $self->attach( $ioport, $opts );
-}
-
 sub attach {
   # --------------------------------------------------
   # Attach to an open IO port and do some basic operations
@@ -81,7 +72,27 @@ sub attach {
 
 sub detach {
   my $self = shift;
-  delete $self->{io};
+  delete $self->{io} if ($self->{io});
+  delete $self->{protocol} if ($self->{protocol});
+  $self->{sysex_data}         = [];
+  $self->{analog_pins}        = [];
+  $self->{ports}              = [];
+  $self->{pins}               = {};
+  $self->{pin_modes}          = {};
+  $self->{digital_observer}   = [];
+  $self->{analog_observer}    = [];
+  $self->{sysex_observer}     = undef;
+  $self->{i2c_observer}       = undef;
+  $self->{onewire_observer}   = [];
+  $self->{scheduler_observer} = undef;
+  $self->{tasks}              = [];
+  $self->{metadata}           = {};
+}
+
+sub close {
+  my $self = shift;
+  $self->{io}->close();
+  $self->detach();
 }
 
 sub system_reset {

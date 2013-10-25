@@ -1,8 +1,8 @@
-package Device::Firmata::IO;
+package Device::Firmata::IO::SerialIO;
 
 =head1 NAME
 
-Device::Firmata::IO - implement the low level serial IO
+Device::Firmata::IO::SerialIO - implement the low level serial IO
 
 =cut
 
