@@ -40,6 +40,8 @@ CUL_MAX_Initialize($)
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
                         "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
                         $readingFnAttributes;
+
+  $hash->{sendQueue} = [];
 }
 
 #############################
