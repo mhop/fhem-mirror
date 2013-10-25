@@ -316,11 +316,14 @@ CUL_MAX_Parse($$)
         return $shash->{NAME};
       }
 
-      if($shash->{pairmode}) {
-        Log 3, "CUL_MAX_Parse: Pairing device $src of type $device_types{$type} with serial $serial";
+      #If $isToMe is true, this device is already paired and just wants to be reacknowledged
+      if($shash->{pairmode} || $isToMe) {
+        Log 3, "CUL_MAX_Parse: " . ($isToMe ? "Re-Pairing" : "Pairing") . " device $src of type $device_types{$type} with serial $serial";
         Dispatch($shash, "MAX,$isToMe,define,$src,$device_types{$type},$serial,0,0", {RAWMSG => $rmsg});
         #Send after dispatch the define, otherwise Send will create an invalid device
         CUL_MAX_Send($shash, "PairPong", $src, "00");
+
+        return $shash->{NAME} if($isToMe); #Skip default values if just rePairing
 
         #This are the default values that a device has after factory reset or pairing
         if($device_types{$type} =~ /HeatingThermostat.*/) {
@@ -328,7 +331,6 @@ CUL_MAX_Parse($$)
         } elsif($device_types{$type} eq "WallMountedThermostat") {
           Dispatch($shash, "MAX,$isToMe,WallThermostatConfig,$src,17,21,30.5,4.5,$defaultWeekProfile", {RAWMSG => $rmsg});
         }
-        #Todo: CUL_MAX_SendTimeInformation($shash, $src); on Ack for our PairPong
       }
     } elsif($msgType ~~ ["ShutterContactState", "WallThermostatState", "WallThermostatControl", "ThermostatState", "PushButtonState"])  {
       Dispatch($shash, "MAX,$isToMe,$msgType,$src,$payload", {RAWMSG => $rmsg});
