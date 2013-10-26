@@ -356,6 +356,15 @@ my @usbtable = (
       response  => "^\x06.*",
       define    => "ZWDongle_PARAM ZWDongle DEVICE\@115200", },
 
+    { NAME      => "FRM",
+      matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)",
+                    "ttyUSB(.*)", "ttyACM(.*)", "ttyAMA(.*)"],
+      DeviceName=> "DEVICE\@57600",
+      init      => pack("H*", "F9"),   # Reset
+      timeout   => 5.0, # StandardFirmata blink takes time
+      request   => pack("H*", "F079F7"),   # Query firmware version and filename START_SYSEX (0xF0), queryFirmware (0x79), END_SYSEX (0xF7)
+      response  => "^\xF0\x79(.*)\xF7",    # Response Sysex xF0 x78 (2 Byte version) (n Byte filename) Endsysex xF7
+      define    => "FRM_PARAM FRM DEVICE\@57600", },
 );
 
 
@@ -418,7 +427,7 @@ CommandUsb($$)
             if($defs{$d}{DeviceName} &&
                $defs{$d}{DeviceName} =~ m/$dev/ &&
                $defs{$d}{FD}) {
-              $msg = "already used by the $d fhem device";
+              $msg = "already used by the fhem device $d";
               Log3 undef, 4, $msg; $ret .= $msg . "\n";
               goto NEXTDEVICE;
             }
@@ -439,7 +448,7 @@ CommandUsb($$)
           # Send reset (optional)
           if(defined($thash->{init})) {
             DevIo_SimpleWrite($hash, $thash->{init}, 0);
-            DevIo_TimeoutRead($hash, 0.5);
+            DevIo_TimeoutRead($hash, $thash->{timeout} ? $thash->{timeout}:0.5);
           }
 
           # Clear the USB buffer
