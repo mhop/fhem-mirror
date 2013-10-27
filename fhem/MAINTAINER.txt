@@ -169,7 +169,7 @@ FHEM/98_PID.pm               betateilchen         http://forum.fhem.de Automatis
 FHEM/98_RandomTimer.pm       dietmar63            http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_SVG.pm               rudolfkoenig         http://forum.fhem.de Frontends
 FHEM/98_THRESHOLD.pm         damian-s             http://forum.fhem.de Automatisierung
-FHEM/98_WOL.pm               klassm               http://forum.fhem.de Sonstiges
+FHEM/98_WOL.pm               dietmar63            http://forum.fhem.de Unterstützende Dienste
 FHEM/98_XmlList.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_autocreate.pm        rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_average.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
