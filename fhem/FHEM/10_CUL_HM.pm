@@ -108,7 +108,6 @@ sub CUL_HM_setAttrIfCh($$$$);
 sub CUL_HM_noDup(@);        #return list with no duplicates
 sub CUL_HM_noDupInString($);#return string with no duplicates, comma separated
 sub CUL_HM_storeRssi(@);
-sub CUL_HM_stateUpdat($);
 sub CUL_HM_qStateUpdatIfEnab($@);
 sub CUL_HM_getAttrInt($@);
 sub CUL_HM_putHash($);
@@ -656,7 +655,7 @@ sub CUL_HM_Parse($$) {##############################
 		    $chnHash->{helper}{needUpdate}++;
 		  }
 		  else{
-	        CUL_HM_stateUpdat(":".$chnHash->{NAME});
+	        CUL_HM_qStateUpdatIfEnab(":".$chnHash->{NAME});
 		    delete $chnHash->{helper}{needUpdate};
 		  }
 	    }
@@ -1044,9 +1043,8 @@ sub CUL_HM_Parse($$) {##############################
         push @event, "$eventName:down:$vs" if(($err&0x30) == 0x20);
         push @event, "$eventName:stop:$vs" if(($err&0x30) == 0x00);
 		if (!$rSUpdt){#dont touch if necessary for dimmer
-		  if(($err&0x30) != 0x00) {CUL_HM_stateUpdatDly($shash->{NAME},120);}
-		  else                    {CUL_HM_unQEntity($shash->{NAME},
-		                                  $modules{CUL_HM}{helper}{qReqStat});}
+		  if(($err&0x30) != 0x00){CUL_HM_stateUpdatDly($shash->{NAME},120);}
+		  else                   {CUL_HM_unQEntity($shash->{NAME},"qReqStat");}
 		}
 	  }
 	  if ($st eq "dimmer"){
@@ -1513,7 +1511,7 @@ sub CUL_HM_Parse($$) {##############################
   return $name ;
 }
 sub CUL_HM_parseCommon(@){#####################################################
-  # parsing commands that are device independant
+  # parsing commands that are device independent
   my ($mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md) = @_;
   my $shash = $modules{CUL_HM}{defptr}{$src}; 
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
@@ -1598,9 +1596,8 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  $reply = "ACK"; 
 	}
 
-    if (     $shash->{helper}{prt}{mmcA} 
-	    && @{$shash->{helper}{prt}{mmcA}}
-		&&   $shash->{helper}{prt}{mmcS} == 3){
+    if (   $shash->{helper}{prt}{mmcS} 
+		&& $shash->{helper}{prt}{mmcS} == 3){
 	  if ($success eq 'yes'){
 		delete $shash->{helper}{prt}{mmcA};
 		delete $shash->{helper}{prt}{mmcS};
@@ -1831,6 +1828,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 	                        ,"trig_$cName:$level"
 	                        ,"trigLast:$cName".(($level ne "-")?":$level":""));
 	}
+
 	return "entities:".join(",",@entities);
   }
   elsif($mTp eq "70"){ #Time to trigger TC##################
@@ -2177,8 +2175,14 @@ sub CUL_HM_Set($@) {
 	}
   }
   elsif($cmd eq "partyMode") { ################################################
-    my $days = $a[3]; 
-	my ($eH,$eM)  = split(':',$a[2]); 
+	my ($eH,$eM,$days,$prep) = ("","","","");
+    if ($a[2] =~ m/^(prep|exec)$/){
+	  $prep = $a[2];
+	  splice  @a,2,1;#remove prep 
+	}
+	$days = $a[3];
+	($eH,$eM)  = split(':',$a[2]); 
+
 	return "use 00 or 30 minutes only" if ($eM !~ m/^(00|30)$/);
 	return "hour must be between 0 and 23" if ($eH lt 0 || $eH gt 23);
 	return "days must be between 0 and 200" if ($days < 0 || $days > 200);
@@ -2195,8 +2199,9 @@ sub CUL_HM_Set($@) {
 	  $cHash->{READINGS}{"RegL_06:"}{VAL} = $cHash->{helper}{partyReg};
 	}
 	CUL_HM_pushConfig($hash,$id,$dst,2,"000000","00",6,
-	                  sprintf("61%02X62%02X",$eH,$days));
+	                  sprintf("61%02X62%02X",$eH,$days),$prep);
     splice @a,1,3, ("regSet","controlMode","party");
+    splice @a,2,0, ($prep) if ($prep);
 	push @postCmds,"++803F$id${dst}0204".sprintf("%02X",CUL_HM_secSince2000());
   } 
 
@@ -2293,8 +2298,8 @@ sub CUL_HM_Set($@) {
 	$state = "";
   } 
   elsif($cmd eq "getConfig") { ################################################
-    CUL_HM_unQEntity($name,$modules{CUL_HM}{helper}{qReqConfWu});
-    CUL_HM_unQEntity($name,$modules{CUL_HM}{helper}{qReqConf});
+    CUL_HM_unQEntity($name,"qReqConfWu");
+    CUL_HM_unQEntity($name,"qReqConf");
 	CUL_HM_getConfig($hash);
 	$state = "";
   } 
@@ -4752,21 +4757,18 @@ sub CUL_HM_storeRssi(@){
 
 sub CUL_HM_stateUpdatDly($$){#delayed queue of status-request
   my ($name,$time) = @_;
-  InternalTimer(gettimeofday()+$time,"CUL_HM_stateUpdat"
-                                ,"sUpdt:".$name,0);
-}
-sub CUL_HM_stateUpdat($){#delay timeout - now queue statusRequest
-  my $name = shift;
-  (undef,$name)=split":",$name,2;
-  CUL_HM_qStateUpdatIfEnab($name) if ($name);
+  CUL_HM_unQEntity($name,"qReqStat");#remove requests, wait for me.
+  RemoveInternalTimer("sUpdt:$name");
+  InternalTimer(gettimeofday()+$time,"CUL_HM_qStateUpdatIfEnab","sUpdt:$name",0);
 }
 sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request after 12 s
-   my ($name,$force) = @_;
+  my ($name,$force) = @_;
+  $name = substr($name,6) if ($name =~ m/^sUpdt:/);
   $name = CUL_HM_id2Name($name) if ($name =~ m/^[A-F0-9]{6,8}$/i);
   $name =~ s /_chn:..$//;
   return if (!$defs{$name}); #device unknown, ignore
   if ($force || ((CUL_HM_getAttrInt($name,"autoReadReg") & 0x0f) > 3)){
-    CUL_HM_qEntity($name,$modules{CUL_HM}{helper}{qReqStat});
+    CUL_HM_qEntity($name,"qReqStat");
 	RemoveInternalTimer("CUL_HM_procQs");
 	InternalTimer(gettimeofday()+ .5,"CUL_HM_procQs","CUL_HM_procQs", 0);
   }
@@ -4775,17 +4777,14 @@ sub CUL_HM_qAutoRead($$){
   my ($name,$lvl) = @_;
   return if (!$defs{$name}
              ||$lvl >= (0x07 & CUL_HM_getAttrInt($name,"autoReadReg")));
-  if (CUL_HM_getRxType($defs{$name}) & 0x1C){#config and wakeup q
-    CUL_HM_qEntity($name,$modules{CUL_HM}{helper}{qReqConfWu});
-  }
-  else{
-    CUL_HM_qEntity($name,$modules{CUL_HM}{helper}{qReqConf});
-  }
+  CUL_HM_qEntity($name,(CUL_HM_getRxType($defs{$name}) & 0x1C)?"qReqConfWu"
+                                                              :"qReqConf");
   RemoveInternalTimer("CUL_HM_procQs");
   InternalTimer(gettimeofday()+ .5,"CUL_HM_procQs","CUL_HM_procQs", 0);
 }
 sub CUL_HM_unQEntity($$){# remove entity from q - task no longer necesary
   my ($name,$q) = @_;
+  $q = $modules{CUL_HM}{helper}{$q};
   return if (AttrVal($name,"subType","") eq "virtual");
   if ($defs{$name}{helper}{role}{dev}){
 	foreach (grep /channel_/,keys %{$defs{$name}}){# remove potential chn
@@ -4797,6 +4796,7 @@ sub CUL_HM_unQEntity($$){# remove entity from q - task no longer necesary
 }
 sub CUL_HM_qEntity($$){
   my ($name,$q) = @_;
+  $q = $modules{CUL_HM}{helper}{$q};
   return if (AttrVal($name,"subType","") eq "virtual");
   if ($defs{$name}{helper}{role}{dev}){
 	foreach (grep /channel_/,keys %{$defs{$name}}){# remove potential chn
@@ -5685,6 +5685,14 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
 	  will rewrite the complete list to the deivce. Data will be taken from attribut repPeer. <br>
 	  attribut repPeer is formated:<br>
 	  src1:dst1:[y/n],src2:dst2:[y/n],src2:dst2:[y/n],...<br>
+	  <br>
+	  Reading repPeer is formated:<br>
+	  Number src dst broadcast verify<br>
+	  number: entry sequence number<br>
+	  src: message source device - read from repeater<br>
+	  dst: message destination device - assembled from attributes<br>
+	  broadcast: shall broadcast be repeated for this source - read from repeater<br>
+	  verify: do attributes and readings match?<br>
     </li>
 	</ul>
 	</li>
