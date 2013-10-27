@@ -247,8 +247,10 @@ sub Twilight_TwilightTimes($$)
     #readingsBulkUpdate($hash, $ss."_el", sunset_abs ("Horizon=$hash->{TW}{$ss}{DEG}"));
 
     my $sr_wea = $hash->{TW}{$sr}{TIME} - time();
-    Twilight_EventsSet($hash, $sr)      if ($whitchTimes ne "Wea" or ($whitchTimes eq "Wea" and $sr_wea > -2*3600));
-    Twilight_EventsSet($hash, $ss);
+    myRemoveInternalTimer($sr, $hash);
+    myRemoveInternalTimer($ss, $hash);
+    myInternalTimer($sr, $hash->{TW}{$sr}{TIME}, "Twilight_fireEvent", $hash, 0)      if($hash->{TW}{$sr}{TIME} ne "nan");
+    myInternalTimer($ss, $hash->{TW}{$ss}{TIME}, "Twilight_fireEvent", $hash, 0)      if($hash->{TW}{$ss}{TIME} ne "nan");
   }
 
   $hash->{TW}{sr_weather}{NEXTE}  = "ss_weather";
@@ -257,23 +259,41 @@ sub Twilight_TwilightTimes($$)
   readingsBulkUpdate  ($hash,"condition",    $hash->{CONDITION});
   readingsBulkUpdate  ($hash,"condition_txt",$hash->{CONDITION_TXT});
 
-  readingsEndUpdate  ($hash, defined($hash->{LOCAL} ? 0 : 1));
+  readingsEndUpdate   ($hash, defined($hash->{LOCAL} ? 0 : 1));
   return 1;
 }
 #
 #
-#
-sub Twilight_EventsSet($$) {
-   my ($hash, $key) = @_;
+sub myInternalTimer($$$$$) {
+   my ($modifier, $tim, $callback, $hash, $waitIfInitNotDone) = @_;
 
-   if (!exists $hash->{SX}{$hash->{TW}{$key}{NAME}}) {
-      my $hashSx = { HASH=>$hash, NAME=>"Twilight_$hash->{TW}{$key}{NAME}", SX_NAME=>"$hash->{TW}{$key}{NAME}" };
-      $hash->{SX}{$hash->{TW}{$key}{NAME}} = $hashSx;
+   my $mHash;
+   if ($modifier eq "") {
+      $mHash = $hash;
+   } else {
+      my $timerName = "$hash->{NAME}_$modifier";
+      if (exists  ($hash->{TIMER}{$timerName})) {
+          $mHash = $hash->{TIMER}{$timerName};
+      } else {
+          $mHash = { HASH=>$hash, NAME=>"$hash->{NAME}_$modifier", MODIFIER=>$modifier};
+          $hash->{TIMER}{$timerName} = $mHash;
+      }
    }
-   my $hashSx = $hash->{SX}{$hash->{TW}{$key}{NAME}};
-   RemoveInternalTimer($hashSx);
-   if ($hash->{TW}{$key}{TIME} ne "nan") {
-      InternalTimer ($hash->{TW}{$key}{TIME},  "Twilight_fireEvent", $hashSx, 0);
+   InternalTimer($tim, $callback, $mHash, $waitIfInitNotDone);
+}
+#
+#
+#
+sub myRemoveInternalTimer($$) {
+   my ($modifier, $hash) = @_;
+
+   my $timerName = "$hash->{NAME}_$modifier";
+   if ($modifier eq "") {
+      RemoveInternalTimer($hash);
+   } else {
+      my $myHash = $hash->{TIMER}{$timerName};
+      delete $hash->{TIMER}{$timerName};
+      RemoveInternalTimer($myHash);
    }
 }
 #
@@ -314,24 +334,16 @@ sub Twilight_StandardTimerSet($) {
   my ($hash) = @_;
   my $midnight = time() - Twilight_midnight_seconds() + 24*3600 + 30;
 
-  RemoveInternalTimer         ($hash);
-  InternalTimer($midnight,    "Twilight_Midnight", $hash, 0);
-  Twilight_WeatherTimerSet    ($hash);
+  myRemoveInternalTimer    ("", $hash);
+  myInternalTimer          ("", $midnight,    "Twilight_Midnight", $hash, 0);
+  Twilight_WeatherTimerSet ($hash);
 }
 #
 sub Twilight_sunposTimerSet($) {
   my ($hash) = @_;
 
-  $hash->{SP}{SUNPOS} = "sunpos";
-
-  if (!exists $hash->{$hash->{SP}{SUNPOS}}) {
-     my $hashSp = { HASH=>$hash, NAME=>"Twilight_sunpos" };
-     $hash->{$hash->{SP}{SUNPOS}} = $hashSp;
-  }
-  my $hashSp = $hash->{$hash->{SP}{SUNPOS}};
-
-  RemoveInternalTimer($hashSp);
-  InternalTimer (time()+$hash->{SUNPOS_OFFSET},  "Twilight_sunpos", $hashSp, 0);
+  myRemoveInternalTimer("sunpos", $hash);
+  myInternalTimer ("sunpos", time()+$hash->{SUNPOS_OFFSET},  "Twilight_sunpos", $hash, 0);
   $hash->{SUNPOS_OFFSET} = 5*60;
 }
 #
@@ -339,21 +351,21 @@ sub Twilight_sunposTimerSet($) {
 #
 sub Twilight_fireEvent($)
 {
-   my ($hashSx) = @_;
-   my $hash     = $hashSx->{HASH};
-   my $name     = $hashSx->{NAME};
-   my $sx_name  = $hashSx->{SX_NAME};
+   my ($myHash) = @_;
+   my $hash     = $myHash->{HASH};
+   my $name     = $hash->{NAME};
+   my $sx       = $myHash->{MODIFIER};
 
-   my $deg      = $hash->{TW}{$sx_name}{DEG};
-   my $light    = $hash->{TW}{$sx_name}{LIGHT};
-   my $state    = $hash->{TW}{$sx_name}{STATE};
+   my $deg      = $hash->{TW}{$sx}{DEG};
+   my $light    = $hash->{TW}{$sx}{LIGHT};
+   my $state    = $hash->{TW}{$sx}{STATE};
 
-   my $nextEvent      = $hash->{TW}{$sx_name}{NEXTE};
+   my $nextEvent      = $hash->{TW}{$sx}{NEXTE};
    my $nextEventTime  = "undefined";
       $nextEventTime  = strftime("%H:%M:%S",localtime($hash->{TW}{$nextEvent}{TIME})) if ($hash->{TW}{$nextEvent}{TIME} ne "nan");
-   Log3 $hash, 4, "[".$hash->{NAME}."] " . sprintf  ("%-10s state=%-2s light=%-2s nextEvent=%-10s %-14s  deg=%+.1f°",$sx_name, $state, $light, $nextEvent, strftime("%d.%m.%Y  %H:%M:%S",localtime($hash->{TW}{$nextEvent}{TIME})), $deg);
+   Log3 $hash, 4, "[".$hash->{NAME}."] " . sprintf  ("%-10s state=%-2s light=%-2s nextEvent=%-10s %-14s  deg=%+.1f°",$sx, $state, $light, $nextEvent, strftime("%d.%m.%Y  %H:%M:%S",localtime($hash->{TW}{$nextEvent}{TIME})), $deg);
 
-   my $eventTime  = $hash->{TW}{$sx_name}{TIME};
+   my $eventTime  = $hash->{TW}{$sx}{TIME};
    my $now        = time();
    my $delta      = abs ($now - $eventTime);
 
@@ -361,7 +373,7 @@ sub Twilight_fireEvent($)
    readingsBeginUpdate($hash);
    readingsBulkUpdate ($hash, "light",           $light);
    readingsBulkUpdate ($hash, "horizon",         $deg);
-   readingsBulkUpdate ($hash, "aktEvent",        $sx_name);
+   readingsBulkUpdate ($hash, "aktEvent",        $sx);
    readingsBulkUpdate ($hash, "nextEvent",       $nextEvent);
    readingsBulkUpdate ($hash, "nextEventTime",   $nextEventTime);
 
@@ -440,8 +452,8 @@ sub Twilight_getWeatherHorizon($)
 
 sub Twilight_sunpos($)
 {
-  my ($hashSp) = @_;
-  my $hash = $hashSp->{HASH};
+  my ($myHash) = @_;
+  my $hash = $myHash->{HASH};
   my $hashName = $hash->{NAME};
 
   return "" if(AttrVal($hashName, "disable", undef));
