@@ -32,6 +32,11 @@ WeekdayTimer_Initialize($)
 {
   my ($hash) = @_;
 
+  if(!$modules{Heating_Control}{LOADED} && -f "$attr{global}{modpath}/FHEM/98_Heating_Control.pm") {
+    my $ret = CommandReload(undef, "98_Heating_Control");
+    Log3 undef, 1, $ret if($ret);
+  }
+
 # Consumer
   $hash->{DefFn}   = "WeekdayTimer_Define";
   $hash->{UndefFn} = "WeekdayTimer_Undef";
@@ -63,6 +68,14 @@ WeekdayTimer_Undef($$){
 }
 
 sub
+WeekdayTimer_UpdatePerlTime($)
+{
+    my ($hash) = @_;
+
+    Heating_Control_Define($hash, $hash->{NAME} . " " . $hash->{TYPE} . " " . $hash->{DEF} );
+}
+
+sub
 WeekdayTimer_Update($){
 my ($hash) = @_;
   return Heating_Control_Update($hash);
@@ -80,7 +93,9 @@ sub WeekdayTimer_SetAllTemps() {  # {WeekdayTimer_SetAllTemps()}
         }
      }
      WeekdayTimer_Update($hash);
+     Log3 undef, 3, "WeekdayTimer_Update() for $hash->{NAME} done!";
   }
+  Log3 undef,  3, "WeekdayTimer_SetAllTemps() done!";
 }
 
 1;
