@@ -315,8 +315,8 @@ sub Heating_Control_FensterOffen ($) {
   my $mod = "[".$hash->{NAME} ."]";
 
   my %contacts =  ( "CUL_FHTTK" => { "READING" => "Window", "STATUS" => "Open" },
-                    "HM"        => { "READING" => "hmw",    "STATUS" => "hmo" },
-                    "MAX"       => { "READING" => "maxw",   "STATUS" => "maxs"});
+                    "CUL_HM"    => { "READING" => "state",  "STATUS" => "open" },
+                    "MAX"       => { "READING" => "state",  "STATUS" => "open"});
 
   my $fensterKontakte = AttrVal($hash->{NAME}, "windowSensor", "nF");
   Log3 $hash, 5, "$mod list of windowsenors found: '$fensterKontakte'";
