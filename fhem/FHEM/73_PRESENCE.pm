@@ -924,6 +924,12 @@ PRESENCE_ProcessAbortedScan($)
   <li><b>shellscript</b> - A presence check by using an self-written script or binary which returns a presence state</li>
   <li><b>lan-bluetooth</b> - A presence check of a bluetooth device via LAN network by connecting to a presenced or collectord instance</li>
   </ul>
+  <br>
+  Each mode can be optionally configured with a specific check interval and a present check interval.<br><br>
+  <ul>
+  <li>check-interval - The interval in seconds between each presence check. Default value: 30 seconds</li>
+  <li>present-check-interval - The interval in seconds between each presence check in case the device is <i>present</i>. Otherwise the normal check-interval will be used.</li>
+  </ul>
   <br><br>
   <a name="PRESENCEdefine"></a>
   <b>Define</b><br><br>
@@ -1142,6 +1148,12 @@ Options:
   <li><b>function</b> - Eine Erkennung mithilfe einer selbst geschriebenen Perl-Funktion, welche den Anwesenheitsstatus ermittelt.</li>
   <li><b>shellscript</b> - Eine Erkennung mithilfe eines selbst geschriebenen Skriptes oder Programm (egal in welcher Sprache).</li>
   <li><b>lan-bluetooth</b> - Eine Erkennung durch Bluetooth-Abfragen via Netzwerk (LAN/WLAN) in ein oder mehreren R&auml;umen</li>
+  </ul>
+  <br>
+  Jeder Modus kann optional mit spezifischen Pr&uuml;f-Intervallen ausgef&uuml;hrt werden.<br><br>
+  <ul>
+  <li>check-interval - Das normale Pr&uuml;finterval in Sekunden für eine Anwesenheitspr&uuml;fung. Standardwert: 30 Sekunden</li>
+  <li>present-check-interval - Das Pr&uuml;finterval in Sekunden, wenn ein Ger&auml;t anwesend (<i>present</i>) ist. Falls nicht angegeben, wird der Wert aus check-interval verwendet</li>
   </ul>
   <br><br>
   <a name="PRESENCEdefine"></a>
