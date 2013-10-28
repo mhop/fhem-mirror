@@ -1,4 +1,5 @@
-- added webcam widget (marcproe)
+- Added JSON librabry as alternative for JSON::XS (mangei.markus)
+- Added webcam widget (marcproe)
 - path to background image is now configurable via the YAF interface (marcproe)
 - Added regex capability for generic widget onclick function (marcproe)
 - Added foundation for modify dialog and modify dialog for generic widget (marcproe)
