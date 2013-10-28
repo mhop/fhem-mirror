@@ -26,10 +26,17 @@
 ########################################################################################
 package main;
 
-use JSON::XS;
 use strict;
 use warnings;
-use lib qw(YAF);
+
+# JSON::XS verwenden, falls nicht vorhanden auf JSON (in libraries enthalten) zurückfallen
+eval "use JSON::XS;";
+if ($@) {
+	use FindBin;
+	use lib "$FindBin::Bin/FHEM/YAF/libs/json";
+	use JSON;
+}
+
 use YAF::YAFWidgets;
 use YAF::YAFConfig;
 
