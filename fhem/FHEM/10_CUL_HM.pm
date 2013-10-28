@@ -1036,7 +1036,7 @@ sub CUL_HM_Parse($$) {##############################
       $eventName = "motor"   if($st eq "blindActuator");
 	  $eventName = "dim"     if($st eq "dimmer");
 	  my $action; #determine action
-      push @event, "timedOn:".($err&0x40)?"running":"off";
+      push @event, "timedOn:".(($err&0x40)?"running":"off");
 
 	  if ($st ne "switch"){
         push @event, "$eventName:up:$vs"   if(($err&0x30) == 0x10);
@@ -3329,6 +3329,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
 	  $change .= $_." " if ($nrRd !~ m /$_/);# filter only changes
 	}
 	next if (!$change);#no changes
+	$change =~ s/00:00//;
 	$change =~ s/(\ |:)//g;
 	my $peerN;
 	$changed = 1;# yes, we did
@@ -3336,15 +3337,21 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
 	if ($peerN){($peerAddr,$peerChn) = unpack('A6A2', CUL_HM_name2Id($peerN,$hash));}
 	else       {($peerAddr,$peerChn) = ('000000','00');}
     CUL_HM_updtRegDisp($hash,$list,$peerAddr.$peerChn);
-    CUL_HM_PushCmdStack($hash, "++".$flag.'01'.$src.$dst.$chn.'05'.
-                                        $peerAddr.$peerChn.$list);
-    $tl = length($change);
-	for(my $l = 0; $l < $tl; $l+=28) {
-      my $ml = $tl-$l < 28 ? $tl-$l : 28;
-      CUL_HM_PushCmdStack($hash, "++A001".$src.$dst.$chn."08".
-	                                 substr($change,$l,$ml));
-    }
-    CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$chn."06");
+	############partition
+#	my @chSplit = unpack('(A28)*',$change);
+	my @chSplit = unpack('(A1120)*',$change);# makes max 40 lines, 280 byte
+	foreach my $chSpl(@chSplit){
+      CUL_HM_PushCmdStack($hash, "++".$flag.'01'.$src.$dst.$chn.'05'.
+                                          $peerAddr.$peerChn.$list);
+      $tl = length($chSpl);
+	  for(my $l = 0; $l < $tl; $l+=28) {
+        my $ml = $tl-$l < 28 ? $tl-$l : 28;
+        CUL_HM_PushCmdStack($hash, "++A001".$src.$dst.$chn."08".
+	                                   substr($chSpl,$l,$ml));
+      }
+      CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$chn."06");
+	}
+	#########
   }
   CUL_HM_qAutoRead($hash->{NAME},3) if ($changed);
 }
@@ -3656,7 +3663,7 @@ sub CUL_HM_respPendTout($) {
 		delete $pHash->{mmcS};
 	  }
 
-	  if ($hash->{IODev}->{STATE} ne "opened"){#IO errors
+	  if ($hash->{IODev}->{STATE} !~ m/^(opened|Initialized)$/){#IO errors
         CUL_HM_eventP($hash,"IOerr");
 		readingsSingleUpdate($hash,"state","IOerr",1);
 	  }
