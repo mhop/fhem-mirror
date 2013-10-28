@@ -2183,9 +2183,9 @@ sub CUL_HM_Set($@) {
 	$days = $a[3];
 	($eH,$eM)  = split(':',$a[2]); 
 
-	return "use 00 or 30 minutes only" if ($eM !~ m/^(00|30)$/);
-	return "hour must be between 0 and 23" if ($eH lt 0 || $eH gt 23);
-	return "days must be between 0 and 200" if ($days < 0 || $days > 200);
+	return "$eM illegal - use 00 or 30 minutes only"        if ($eM !~ m/^(00|30)$/);
+	return "$eH illegal - hour must be between 0 and 23"    if ($eH < 0 || $eH > 23);
+	return "$days illegal - days must be between 0 and 200" if ($days < 0 || $days > 200);
 	$eH += 128 if ($eM eq "30");
 	my $cHash = CUL_HM_id2Hash($dst."02");
 	$cHash->{helper}{partyReg} = sprintf("61%02X62%02X0000",$eH,$days);
@@ -3581,15 +3581,16 @@ sub CUL_HM_SndCmd($$) {
 	if (!defined $modules{CUL_HM}{$ioName}{tmr}){
 	  # some setup work for this timer
 	  $modules{CUL_HM}{$ioName}{tmr} = 0; 
-	  my @arr2 = ();
-      $modules{CUL_HM}{$ioName}{pendDev} = \@arr2
-	          if (!$modules{CUL_HM}{$ioName}{pendDev});
+	  if (!$modules{CUL_HM}{$ioName}{pendDev}){# generate if not exist
+	    my @arr2 = ();
+        $modules{CUL_HM}{$ioName}{pendDev} = \@arr2;
+	  }
 	}
     @{$modules{CUL_HM}{$ioName}{pendDev}} = 
 	      CUL_HM_noDup(@{$modules{CUL_HM}{$ioName}{pendDev}},$hash->{NAME});
 	CUL_HM_respPendRm($hash);#rm timer - we are out
 
-	if ($modules{CUL_HM}{$ioName}{tmr} != 1){# need to stat timer
+	if ($modules{CUL_HM}{$ioName}{tmr} != 1){# need to start timer
 	  my $tn = gettimeofday();
    	  InternalTimer($tn+$IOpoll, "CUL_HM_sndIfOpen", "sndIfOpen:$ioName", 0);
       $modules{CUL_HM}{$ioName}{tmr} = 1;

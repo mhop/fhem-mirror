@@ -180,9 +180,9 @@ sub HMinfo_peerCheck(@) { #####################################################
 sub HMinfo_getEntities(@) { ###################################################
   my ($filter,$re) = @_;
   my @names;
-  my ($doDev,$doChn,$noVrt,$noPhy,$noAct,$noSen,$doEmp);
+  my ($doDev,$doChn,$doIgn,$noVrt,$noPhy,$noAct,$noSen,$doEmp);
   $doDev=$doChn=$doEmp= 1;
-  $noVrt=$noPhy=$noAct=$noSen = 0;
+  $doIgn=$noVrt=$noPhy=$noAct=$noSen = 0;
   $filter .= "dc" if ($filter !~ m/d/ && $filter !~ m/c/); # add default
   $re = '.' if (!$re);
   if ($filter){# options provided
@@ -193,6 +193,7 @@ use warnings;
 	foreach (@pl){
 	  $doDev = 1 if($_ eq 'd');
 	  $doChn = 1 if($_ eq 'c');
+	  $doIgn = 1 if($_ eq 'i');
 	  $noVrt = 1 if($_ eq 'v');
 	  $noPhy = 1 if($_ eq 'p');
 	  $noAct = 1 if($_ eq 'a');
@@ -207,15 +208,18 @@ use warnings;
     my $eName = $eHash->{NAME};
     my $isChn = (length($id) != 6 || CUL_HM_Get($eHash,$eName,"param","channel_01") eq "undefined")?1:0;
 	my $eMd   = CUL_HM_Get($eHash,$eName,"param","model");
+	my $eIg   = CUL_HM_Get($eHash,$eName,"param","ignore");
+	$eIg = "" if ($eIg eq "undefined");
 	next if (!(($doDev && length($id) == 6) ||
 	           ($doChn && $isChn)));
-	next if  ($noVrt && $eMd =~ m/^virtual/);
-	next if  ($noPhy && $eMd !~ m/^virtual/);
+	next if (!$doIgn && $eIg);
+	next if ( $noVrt && $eMd =~ m/^virtual/);
+	next if ( $noPhy && $eMd !~ m/^virtual/);
 	my $eSt = CUL_HM_Get($eHash,$eName,"param","subType");
 	
-    next if ($noSen && $eSt =~ m/^(THSensor|remote|pushButton|threeStateSensor|sensor|motionDetector|swi)$/);
-    next if ($noAct && $eSt =~ m/^(switch|blindActuator|dimmer|thermostat|smokeDetector|KFM100|outputUnit)$/);
-	next if ($eName !~ m/$re/);
+    next if ( $noSen && $eSt =~ m/^(THSensor|remote|pushButton|threeStateSensor|sensor|motionDetector|swi)$/);
+    next if ( $noAct && $eSt =~ m/^(switch|blindActuator|dimmer|thermostat|smokeDetector|KFM100|outputUnit)$/);
+	next if ( $eName !~ m/$re/);
 	push @names,$eName;
   }
   return sort(@names);
@@ -557,6 +561,7 @@ sub HMinfo_SetFn($@) {#########################################################
 	       ."\n      entities according to list will be processed"       
 	       ."\n      d - device   :include devices"
 	       ."\n      c - channels :include channels"
+	       ."\n      i - ignore   :include devices marked as ignore"
 	       ."\n      v - virtual  :supress fhem virtual"
 	       ."\n      p - physical :supress physical"
 	       ."\n      a - aktor    :supress actor"
