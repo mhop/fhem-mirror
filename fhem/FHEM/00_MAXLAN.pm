@@ -539,6 +539,7 @@ MAXLAN_Parse($$)
 
     $len = $len+1; #The len field itself was not counted
 
+    $groupId = 0 if($device_types{$devicetype} eq "Cube"); #That field does not mean "groupid" for Cube
     Dispatch($hash, "MAX,1,define,$addr,$device_types{$devicetype},$serial,$groupid,1", {RAWMSG => $rmsg});
 
     if($len != length($bindata)) {
