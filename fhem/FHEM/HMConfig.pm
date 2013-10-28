@@ -347,7 +347,7 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   CtRefOff        =>{a=> 28.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from refOff"   ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
 
   CtrlRc          =>{a=> 46  ,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"set mode and/or temperature"   ,lit=>{no=>0,tempOnly=>1,auto=>2,autoAndTemp=>3,manuAndTemp=>4,boost=>5,toggle=>6}},
-  TempRC          =>{a=> 45  ,s=>0.6,l=>3,min=>5  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>0,t=>"temperature reöated to CtrlRc reg"},
+  TempRC          =>{a=> 45  ,s=>0.6,l=>3,min=>5  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>0,t=>"temperature repated to CtrlRc reg"},
 );
 
 my %culHmRegDefine = (
