@@ -93,7 +93,7 @@ sub Heating_Control_Define($$)
   if ($language =~  m/^$langRegExp$/g) {
      $hash->{LANGUAGE} = $language;
   } else {
-     Log3 $hash, 3, "[$name] illegal language: $language, use one of $langRegExp" if (length() == 2);
+     Log3 $hash, 3, "[$name] illegal language: $language, use one of $langRegExp" if (length($language) == 2);
      unshift (@a,$language)    if (length($language) != 2) ;
      $hash->{LANGUAGE} = "de";
   }
@@ -314,13 +314,13 @@ sub Heating_Control_FensterOffen ($) {
   my ($hash) = @_;
   my $mod = "[".$hash->{NAME} ."]";
 
-  my %contacts =  ( "CUL_FHTTK" => { "READING" => "Window", "STATUS" => "Open" },
-                    "CUL_HM"    => { "READING" => "state",  "STATUS" => "open" },
-                    "MAX"       => { "READING" => "state",  "STATUS" => "open"});
+  my %contacts =  ( "CUL_FHTTK" => { "READING" => "Window", "STATUS" => "(Open)"                       },
+                    "CUL_HM"    => { "READING" => "state",  "STATUS" => "(open|tilted)",  "model" => 1 },
+                    "MAX"       => { "READING" => "state",  "STATUS" => "(open)"                       });
 
   my $fensterKontakte = AttrVal($hash->{NAME}, "windowSensor", "nF");
-  Log3 $hash, 5, "$mod list of windowsenors found: '$fensterKontakte'";
   if ($fensterKontakte ne "nF" ) {
+     Log3 $hash, 5, "$mod list of windowsenors found: '$fensterKontakte'";
      my @kontakte = split(/ /, $fensterKontakte);
      foreach my $fk (@kontakte) {
         if(!$defs{$fk}) {
@@ -331,14 +331,15 @@ sub Heating_Control_FensterOffen ($) {
            if (!defined($contacts{$fk_typ})) {
               Log3 $hash, 3, "$mod TYPE '$fk_typ' of $fk not yet supported, $fk ignored - inform maintainer";
            } else {
-              my $reading = $contacts{$fk_typ}{READING};
-              my $status  = $contacts{$fk_typ}{STATUS};
+              my $reading      = $contacts{$fk_typ}{READING};
+              my $statusReg    = $contacts{$fk_typ}{STATUS};
               my $windowStatus = ReadingsVal($fk,$reading,"nF");
               if ($windowStatus eq "nF") {
                  Log3 $hash, 3, "$mod READING '$reading' of $fk not found, $fk ignored - inform maintainer";
               } else {
                  Log3 $hash, 5, "$mod windowsensor '$fk' Reading '$reading' is '$windowStatus'";
-                 if ($windowStatus eq $status) {
+
+                 if ($windowStatus =~  m/^$statusReg$/g) {
                     Log3 $hash, 3, "$mod switch of $hash->{DEVICE} delayed - windowsensor '$fk' Reading '$reading' is '$windowStatus'";
                     InternalTimer  (time()+60, "$hash->{TYPE}_Update", $hash, 0);
                     return 1
@@ -416,15 +417,13 @@ sub Heating_Control_Device_Schalten($$$$) {
   $hash->{helper}{DESIRED_TEMP_READING} = "";
   $hash->{helper}{DESIRED_TEMP_READING} = $modifier{$defs{$hash->{DEVICE}}{TYPE}};
 
-  #if ($nowSwitch gt "" && $aktParam ne $newParam ) {
-    if (defined $hash->{helper}{CONDITION}) {
-      $command = '{ fhem("set @ '.$hash->{helper}{DESIRED_TEMP_READING}.' %") if' . $hash->{helper}{CONDITION} . '}';
-    } elsif (defined $hash->{helper}{COMMAND}) {
-      $command = $hash->{helper}{COMMAND};
-    } else {
-      $command = '{ fhem("set @ '.$hash->{helper}{DESIRED_TEMP_READING}.' %") }';
-    }
-  #}
+  if (defined $hash->{helper}{CONDITION}) {
+    $command = '{ fhem("set @ '.$hash->{helper}{DESIRED_TEMP_READING}.' %") if' . $hash->{helper}{CONDITION} . '}';
+  } elsif (defined $hash->{helper}{COMMAND}) {
+    $command = $hash->{helper}{COMMAND};
+  } else {
+    $command = '{ fhem("set @ '.$hash->{helper}{DESIRED_TEMP_READING}.' %") }';
+  }
 
   #Kommando ausführen
   my $secondsSinceSwitch = $nowSwitch - $now;
@@ -445,7 +444,7 @@ sub Heating_Control_Device_Schalten($$$$) {
   }
 }
 ################################################################################
-sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
+sub Heating_Control_SetAllTemps() {            # {Heating_Control_SetAllTemps()}
 
   foreach my $hc ( sort keys %{$modules{Heating_Control}{defptr}} ) {
      my $hash = $modules{Heating_Control}{defptr}{$hc};
