@@ -25,6 +25,8 @@ sub LightScene_Initialize($)
 
   $hash->{FW_detailFn}  = "LightScene_detailFn";
 
+  addToAttrList("lightSceneParamsToSave");
+
   eval "use JSON";
   $LightScene_hasJSON = 0 if($@);
 }
@@ -345,15 +347,69 @@ LightScene_Set($@)
 
     if( $cmd eq "save" ) {
       my $state = "";
+      my $icon = undef;
       my $type = $defs{$d}->{TYPE};
       $type = "" if( !defined($type) );
 
-      if( $type eq 'CUL_HM' ) {
-        my $subtype = AttrVal($d,"subType","");
+      if( my $toSave = AttrVal($d,"lightSceneParamsToSave","") ) {
+        if( $toSave =~ m/^{.*}$/) {
+          my $DEVICE = $d;
+          $toSave = eval $toSave;
+          $toSave = "state" if( $@ );
+        }
+        my @sets = split(',', $toSave);
+        foreach my $set (@sets) {
+          my $saved = "";
+          my @params = split(':', $set);
+          foreach my $param (@params) {
+            $saved .= " : " if( $saved );
+
+            my $use_get = 0;
+            my $get = $param;
+            my $regex;
+            my $set = $param;
+
+            if( $param =~ /(get\s+)?(\S*)(\s*->\s*(set\s+)?)?(\S*)?/ ) {
+              $use_get = 1 if( $1 );
+              $get = $2 if( $2 );
+              $set = $5 if( $5 );
+            }
+            ($get,$regex) = split('#', $get, 2);
+            $set = "state" if( $set eq "STATE" );
+
+            $saved .= "$set " if( $set ne "state" );
+
+            my $value;
+            if( $use_get ) {
+              $value = CommandGet( "", "$d $get" );
+            } elsif( $get eq "STATE" ) {
+              $value = Value($d);
+            } else {
+              $value = ReadingsVal($d,$get,undef);
+            }
+            $value = eval $regex if( $regex );
+            Log3 $hash, 2, "$name: $@" if($@);
+            $saved .= $value;
+          }
+
+          if( !$state ) {
+            $state = $saved;
+          } else {
+            $state = [$state] if( ref($state) ne 'ARRAY' );
+            push( @{$state}, $saved );
+          }
+        }
+      } elsif( $type eq 'CUL_HM' ) {
+        #my $subtype = AttrVal($d,"subType","");
+        my $subtype = CUL_HM_Get($defs{$d},$d,"param","subType");
         if( $subtype eq "switch" ) {
           $state = Value($d);
         } elsif( $subtype eq "dimmer" ) {
           $state = Value($d);
+          if ( $state =~ m/^(\d+)/ ) {
+            $icon = $state;
+            $state = $1 if ( $state =~ m/^(\d+)/ );
+          }
         } else {
           $state = Value($d);
         }
@@ -391,7 +447,7 @@ LightScene_Set($@)
         $state = Value($d);
       }
 
-      if( $type eq "SWAP_0000002200000003" || $type eq "HUEDevice"  ) {
+      if( $icon || ref($state) eq 'ARRAY' || $type eq "SWAP_0000002200000003" || $type eq "HUEDevice"  ) {
         my %desc;
         $desc{state} = $state;
         my ($icon, $link, $isHtml) = FW_dev2image($d);
@@ -410,8 +466,18 @@ LightScene_Set($@)
       my $state = $hash->{SCENES}{$scene}{$d};
       $state = $state->{state} if( ref($state) eq 'HASH' );
 
-      $ret .= " " if( $ret );
-      $ret .= CommandSet(undef,"$d $state");
+      if( ref($state) eq 'ARRAY' ) {
+        my $r = "";
+        foreach my $entry (@{$state}) {
+          $r .= "," if( $ret );
+          $r .= CommandSet(undef,"$d $entry");
+        }
+        $ret .= " " if( $ret );
+        $ret .= $r;
+      } else {
+        $ret .= " " if( $ret );
+        $ret .= CommandSet(undef,"$d $state");
+      }
     } else {
       $ret = "Unknown argument $cmd, choose one of save scene";
     }
@@ -454,7 +520,16 @@ LightScene_Get($@)
         my $state = $hash->{SCENES}{$scene}{$d};
         $state = $state->{state} if( ref($state) eq 'HASH' );
 
-        $ret .= $d .": ". $state ."\n";
+        if( ref($state) eq 'ARRAY' ) {
+          my $r = "";
+          foreach my $entry (@{$state}) {
+            $r .= ',' if( $r );
+            $r .= $entry;
+          }
+          $ret .= $d .": $r\n";
+        } else {
+          $ret .= $d .": $state\n";
+        }
       }
     } else {
         $ret = "no scene <$scene> defined";
@@ -521,6 +596,21 @@ LightScene_Get($@)
       <li>scene &lt;scene_name&gt;</li>
     </ul><br>
 
+  <a name="LightScene_Attr"></a>
+    <b>Attributes</b>
+    <ul>
+      <li>lightSceneParamsToSave<br>
+      this attribute can be set on the devices to be included in a scene. it is set to a comma separated list of readings
+      that will be saved. multiple readings separated by : are collated in to a single set command (this has to be supported
+      by the device). each reading can have a perl expression appended with '#' that will be used to alter the $value used for
+      the set command. this can for example be used to strip a trailing % from a dimmer state.
+      in addition to reading names the list can also contain expressions of the form <code>abc -> xyz</code>
+      or <code>get cba -> set uvw</code> to map reading abc to set xyz or get cba to set uvw. the list can be given as a
+      string or as a perl expression enclosed in {} that returns this string.<br>
+      <code>attr myReceiver lightSceneParamsToSave volume,channel</code></br>
+      <code>attr myHueDevice lightSceneParamsToSave {(Value($DEVICE) eq "off")?"state":"bri : xy"}</code></li>
+      <code>attr myDimmer lightSceneParamsToSave state#{if($value=~m/(\d+)/){$1}else{$value}}</code></br>
+    </ul><br>
 </ul>
 
 =end html
