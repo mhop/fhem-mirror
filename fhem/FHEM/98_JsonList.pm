@@ -149,6 +149,10 @@ CommandJsonList($$)
 
       my $p = $defs{$d};
       my $t = $p->{TYPE};
+      if(!$t) {
+        Log3 undef, 3, "JsonList: device ($d) without TYPE";
+        next;
+      }
       $t = $q if($q ne "");
 
       #$str .= sprintf("} ") if($t eq $lt);
