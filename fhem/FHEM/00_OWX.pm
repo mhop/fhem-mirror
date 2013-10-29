@@ -194,11 +194,8 @@ sub OWX_Define ($$) {
   #-- check if we are connecting to Arduino (via FRM):
   } elsif ($dev =~ /^\d{1,2}$/) {
   	$hash->{INTERFACE} = "firmata";
-  	if (defined $main::modules{FRM}) {
-    	FRM_Client_Define($hash,$def);
-  	} else {
-  		Log 1,"module FRM not yet loaded, please define an FRM device first.";
-  	}
+  	main::LoadModule("FRM");
+    FRM_Client_Define($hash,$def);
   } else {
     $hash->{DeviceName} = $dev;
     #-- Second step in case of CUNO: See if we can open it

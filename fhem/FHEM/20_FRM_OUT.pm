@@ -3,7 +3,16 @@ package main;
 
 use strict;
 use warnings;
-use Device::Firmata;
+
+#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
+BEGIN {
+	if (!grep(/FHEM\/lib$/,@INC)) {
+		foreach my $inc (grep(/FHEM$/,@INC)) {
+			push @INC,$inc."/lib";
+		};
+	};
+};
+
 use Device::Firmata::Constants  qw/ :all /;
 use SetExtensions;
 
@@ -17,9 +26,11 @@ FRM_OUT_Initialize($)
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_OUT_Init";
   $hash->{UndefFn}   = "FRM_Client_Undef";
+  $hash->{AttrFn}    = "FRM_OUT_Attr";
   $hash->{StateFn}   = "FRM_OUT_State";
   
   $hash->{AttrList}  = "restoreOnReconnect:on,off restoreOnStartup:on,off IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
+  main::LoadModule("FRM");
 }
 
 sub
@@ -72,6 +83,24 @@ STATEHANDLER: {
 			last;
 		}
 	}
+}
+
+sub
+FRM_OUT_Attr($$$$) {
+  my ($command,$name,$attribute,$value) = @_;
+  if ($command eq "set") {
+    ARGUMENT_HANDLER: {
+      $attribute eq "IODev" and do {
+      	my $hash = $main::defs{$name};
+      	if (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $value) {
+        	$hash->{IODev} = $defs{$value};
+      		FRM_Init_Client($hash) if (defined ($hash->{IODev}));
+      	}
+        last;
+      };
+   	  $main::attr{$name}{$attribute}=$value;
+    }
+  }
 }
 
 1;

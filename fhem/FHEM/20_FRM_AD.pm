@@ -3,7 +3,16 @@ package main;
 
 use strict;
 use warnings;
-use Device::Firmata;
+
+#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
+BEGIN {
+	if (!grep(/FHEM\/lib$/,@INC)) {
+		foreach my $inc (grep(/FHEM$/,@INC)) {
+			push @INC,$inc."/lib";
+		};
+	};
+};
+
 use Device::Firmata::Constants  qw/ :all /;
 
 #####################################
@@ -20,11 +29,13 @@ FRM_AD_Initialize($)
 {
   my ($hash) = @_;
 
+  $hash->{AttrFn}    = "FRM_AD_Attr";
   $hash->{GetFn}     = "FRM_AD_Get";
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_AD_Init";
   
   $hash->{AttrList}  = "IODev upper-threshold lower-threshold loglevel:0,1,2,3,4,5,6 $main::readingFnAttributes";
+  main::LoadModule("FRM");
 }
 
 sub
@@ -97,6 +108,23 @@ FRM_AD_Get($)
     };
   }
   return undef;
+}
+
+sub
+FRM_AD_Attr($$$$) {
+  my ($command,$name,$attribute,$value) = @_;
+  if ($command eq "set") {
+    ARGUMENT_HANDLER: {
+      $attribute eq "IODev" and do {
+      	my $hash = $main::defs{$name};
+      	if (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $value) {
+        	$hash->{IODev} = $defs{$value};
+      		FRM_Init_Client($hash) if (defined ($hash->{IODev}));
+      	}
+        last;
+      };
+    }
+  }
 }
 
 1;
