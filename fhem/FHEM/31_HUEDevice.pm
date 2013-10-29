@@ -81,7 +81,7 @@ HUEDevice_devStateIcon($)
 
   return ".*:light_question" if( !$hash->{fhem}{reachable} && AttrVal($name, "color-icons", 0) != 0 );
 
-  return undef
+  return ".*:off:toggle"
          if( ReadingsVal($name,"state","off") eq "off" || ReadingsVal($name,"bri","0") eq 0 );
 
   return undef
