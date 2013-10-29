@@ -1,6 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: LightScene: added attribute lightSceneParamsToSave for
+             device specific configuration of reading/command pairs
+             used to save/restore device state
   - feature: cmdalias added
   - feature: rain Module by baumrasen
   - feature: endPlotNow attribute for SVG-Plots (ChrisD)
