@@ -387,7 +387,7 @@ FRM_forall_clients($$$)
 }
 
 sub
-FRM_Init_Client($$) {
+FRM_Init_Client($@) {
 	my ($hash,$args) = @_;
 	if (!defined $args and defined $hash->{DEF}) {
   		my @a = split("[ \t][ \t]*", $hash->{DEF});
@@ -406,25 +406,15 @@ FRM_Init_Pin_Client($$$) {
   	return $u unless defined $args and int(@$args) > 0;
  	my $pin = @$args[0];
  	
-	foreach my $d ( sort keys %main::defs ) {
-		if ( defined( my $dev = $main::defs{$d} )) {
-			if ( $dev != $hash
-				&& defined( $dev->{IODev} )
-				&& defined( $dev->{PIN} )
-				&& $dev->{IODev} == $hash->{IODev}
-				&& $dev->{PIN} == $pin ) {
-					die "Device $main::defs{$d}{NAME} allready defined for pin $pin";
-				}
-		}
-	}
 	$hash->{PIN} = $pin;
 	eval {
+		FRM_Client_AssignIOPort($hash);
 		FRM_Client_FirmataDevice($hash)->pin_mode($pin,$mode);
 	};
 	if ($@) {
-		main::Log(2,"FRM_Init error setting pin_mode: ".$@);
-		#FRM_Client_Unassign($hash);
-		return "error setting ".$hash->{NAME}." pin_mode for pin ".$pin;
+		$@ =~ /^(.*)( at.*FHEM.*)$/;
+		$hash->{STATE} = "error initializing: ".$1;
+		return "error initializing '".$hash->{NAME}."': ".$1;
 	}
 	return undef;
 }
@@ -437,10 +427,6 @@ FRM_Client_Define($$)
 
   $hash->{STATE}="defined";
   
-  AssignIoPort($hash);
-  if ( defined($hash->{IODev}) && defined($hash->{IODev}->{SNAME})) {
-  	$hash->{IODev} = $main::defs{$hash->{IODev}->{SNAME}};
-  }
   eval {
     FRM_Init_Client($hash,[@a[2..scalar(@a)-1]]);
   };
@@ -472,6 +458,28 @@ FRM_Client_Unassign($)
   my ($dev) = @_;
   delete $dev->{IODev} if defined $dev->{IODev};
   $dev->{STATE}="defined";  
+}
+
+sub
+FRM_Client_AssignIOPort($)
+{
+	my $hash = shift;
+	AssignIoPort($main::defs{$hash->{NAME}});
+	die "unable to assign IODev to '$hash->{NAME}'" unless defined ($hash->{IODev});
+	
+	$hash->{IODev} = $main::defs{$hash->{IODev}->{SNAME}} if (defined($hash->{IODev}->{SNAME}));
+
+	foreach my $d ( sort keys %main::defs ) {
+		if ( defined( my $dev = $main::defs{$d} )) {
+			if ( $dev != $hash
+				&& defined( $dev->{IODev} )
+				&& defined( $dev->{PIN} )
+				&& $dev->{IODev} == $hash->{IODev}
+				&& $dev->{PIN} == $hash->{PIN} ) {
+					die "Device $main::defs{$d}{NAME} allready defined for pin $hash->{PIN}";
+				}
+		}
+	}
 }
 
 sub FRM_Client_FirmataDevice($) {

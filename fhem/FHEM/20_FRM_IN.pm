@@ -3,7 +3,16 @@ package main;
 
 use strict;
 use warnings;
-use Device::Firmata;
+
+#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
+BEGIN {
+	if (!grep(/FHEM\/lib$/,@INC)) {
+		foreach my $inc (grep(/FHEM$/,@INC)) {
+			push @INC,$inc."/lib";
+		};
+	};
+};
+
 use Device::Firmata::Constants  qw/ :all /;
 
 #####################################
@@ -33,6 +42,7 @@ FRM_IN_Initialize($)
   $hash->{UndefFn}   = "FRM_Client_Undef";
   
   $hash->{AttrList}  = "IODev count-mode:none,rising,falling,both count-threshold reset-on-threshold-reached:yes,no internal-pullup:on,off loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
+  main::LoadModule("FRM");
 }
 
 sub
@@ -138,6 +148,14 @@ FRM_IN_Attr($$$$) {
   my ($command,$name,$attribute,$value) = @_;
   if ($command eq "set") {
     ARGUMENT_HANDLER: {
+      $attribute eq "IODev" and do {
+      	my $hash = $main::defs{$name};
+      	if (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $value) {
+        	$hash->{IODev} = $defs{$value};
+      		FRM_Init_Client($hash) if (defined ($hash->{IODev}));
+      	}
+        last;
+      };
       $attribute eq "count-mode" and do {
         if ($value ne "none" and !defined main::ReadingsVal($name,"count",undef)) {
           main::readingsSingleUpdate($main::defs{$name},"count",$sets{count},1);

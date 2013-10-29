@@ -3,7 +3,16 @@ package main;
 
 use strict;
 use warnings;
-use Device::Firmata;
+
+#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
+BEGIN {
+	if (!grep(/FHEM\/lib$/,@INC)) {
+		foreach my $inc (grep(/FHEM$/,@INC)) {
+			push @INC,$inc."/lib";
+		};
+	};
+};
+
 use Device::Firmata::Constants  qw/ :all /;
 
 #####################################
@@ -33,6 +42,7 @@ FRM_LCD_Initialize($)
   
   $hash->{AttrList}  = "restoreOnReconnect:on,off restoreOnStartup:on,off IODev model backLight:on,off blink:on,off autoClear:on,off autoBreak:on,off loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
   #  autoScroll:on,off direction:leftToRight,rightToLeft do not work reliably
+  main::LoadModule("FRM");
 }
 
 sub
@@ -75,13 +85,23 @@ FRM_LCD_Init($)
 	return undef;
 }
 
-sub FRM_LCD_Attr(@) {
-	my ($command,$name,$attribute,$value) = @_;
-	my $hash = $main::defs{$name};
-	if ($command eq "set") {
-		$main::attr{$name}{$attribute}=$value;
-		FRM_LCD_Apply_Attribute($name,$attribute);
-	}
+sub
+FRM_LCD_Attr($$$$) {
+  my ($command,$name,$attribute,$value) = @_;
+  if ($command eq "set") {
+    ARGUMENT_HANDLER: {
+      $attribute eq "IODev" and do {
+      	my $hash = $main::defs{$name};
+      	if (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $value) {
+        	$hash->{IODev} = $defs{$value};
+      		FRM_Init_Client($hash) if (defined ($hash->{IODev}));
+      	}
+        last;
+      };
+      $main::attr{$name}{$attribute}=$value;
+      FRM_LCD_Apply_Attribute($name,$attribute);
+    }
+  }
 }
 
 sub FRM_LCD_Apply_Attribute {
