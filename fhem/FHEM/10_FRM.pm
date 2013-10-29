@@ -209,6 +209,10 @@ sub FRM_Ready($) {
 sub FRM_Tcp_Connection_Close($) {
 	my $hash = shift;
 	TcpServer_Close($hash);
+	if ($hash->{SNAME}) {
+		my $shash = $main::defs{$hash->{SNAME}};
+		$hash->{SocketDevice} = undef if (defined $shash);
+	}
 	my $dev = $hash->{DeviceName};
 	my $name = $hash->{NAME};
 	if (defined $name) {
@@ -361,6 +365,7 @@ sub FRM_DoInit($) {
 	} while (time < $endTicks and !$found);
 	if ($found) {
 		$shash->{FirmataDevice} = $device;
+		$shash->{SocketDevice} = $hash;
 		FRM_apply_attribute($shash,"sampling-interval");
 		FRM_apply_attribute($shash,"i2c-config");
 		FRM_forall_clients($shash,\&FRM_Init_Client,undef);
@@ -549,7 +554,16 @@ sub FRM_string_observer
 sub FRM_poll
 {
 	my ($hash) = @_;
-	if (defined $hash->{FD}) {
+	if (defined $hash->{SocketDevice} and defined $hash->{SocketDevice}->{FD}) {
+		my ($rout, $rin) = ('', '');
+    	vec($rin, $hash->{SocketDevice}->{FD}, 1) = 1;
+    	my $nfound = select($rout=$rin, undef, undef, 0.1);
+    	my $mfound = vec($rout, $hash->{SocketDevice}->{FD}, 1); 
+		if($mfound && defined $hash->{FirmataDevice}) {
+			$hash->{FirmataDevice}->poll();
+		}
+		return $mfound;
+	} elsif (defined $hash->{FD}) {
 		my ($rout, $rin) = ('', '');
     	vec($rin, $hash->{FD}, 1) = 1;
     	my $nfound = select($rout=$rin, undef, undef, 0.1);
