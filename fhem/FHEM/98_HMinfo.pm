@@ -23,11 +23,12 @@ sub HMinfo_Initialize($$) {####################################################
   $hash->{DefFn}     = "HMinfo_Define";
   $hash->{SetFn}     = "HMinfo_SetFn";
   $hash->{AttrFn}    = "HMinfo_Attr";
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 ".
-					   "sumStatus sumERROR ".
-					   "autoUpdate ".
-					   "hmAutoReadScan ".
-                       $readingFnAttributes;
+  $hash->{AttrList}  =  "loglevel:0,1,2,3,4,5,6 "
+					   ."sumStatus sumERROR "
+					   ."autoUpdate "
+					   ."hmAutoReadScan hmIoMaxDly "
+					   ."hmManualOper:0_auto,1_manual "
+                       .$readingFnAttributes;
 
 }
 sub HMinfo_Define($$){#########################################################
@@ -69,7 +70,7 @@ sub HMinfo_Attr(@) {#################################
 	$hash->{helper}{autoUpdate} = $sec;
 	InternalTimer(gettimeofday()+$sec,"HMinfo_autoUpdate","sUpdt:".$name,0);
   }
-  elsif   ($attrName eq "hmAutoReadScan"){# 00:00 hh:mm
+  elsif($attrName eq "hmAutoReadScan"){# 00:00 hh:mm
 	if ($cmd eq "del"){
 	  $modules{CUL_HM}{hmAutoReadScan} = 4;# return to default
 	}
@@ -81,6 +82,29 @@ sub HMinfo_Attr(@) {#################################
 	  ## implement new timer to CUL_HM
       $modules{CUL_HM}{hmAutoReadScan}=$attrVal;
   	  CUL_HM_queueAutoRead(""); #will restart timer 
+	}
+  }
+  elsif($attrName eq "hmIoMaxDly"){# 
+	if ($cmd eq "del"){
+	  $modules{CUL_HM}{hmIoMaxDly} = 60;# return to default
+	}
+    else{
+	  return "please add plain integer between 0 and 3600" 
+	      if (  $attrVal !~ m/^(\d+)$/
+		      ||$attrVal<0
+			  ||$attrVal >3600 );
+	  ## implement new timer to CUL_HM
+      $modules{CUL_HM}{hmIoMaxDly}=$attrVal;
+	}
+  }
+  elsif($attrName eq "hmManualOper"){# 00:00 hh:mm
+	if ($cmd eq "del"){
+	  $modules{CUL_HM}{helper}{hmManualOper} = 0;# default automode
+	}
+    else{
+	  return "please set 0 or 1"  if ($attrVal !~ m/^(0|1)/);
+	  ## implement new timer to CUL_HM
+      $modules{CUL_HM}{helper}{hmManualOper} = substr($attrVal,0,1);
 	}
   }
   return;
@@ -1359,6 +1383,18 @@ sub HMinfo_noDup(@) {#return list with no duplicates
 		Note that compressing will increase message load while stretch will extent waiting time.
 		data. <br>
 	</li>
+    <li><a name="#HMhmIoMaxDly">hmIoMaxDly</a>
+	    max time in seconds CUL_HM stacks messages if the IO device is not ready to send. 
+		If the IO device will not reappear in time all command will be deleted and IOErr will be reported.<br>
+		Note: commands will be executed after the IO device reappears - which could lead to unexpected  
+		activity long after command issue.<br>
+		default is 60sec. max value is 3600sec<br>
+	</li>
+    <li><a name="#HMhmManualOper">hmManualOper</a>
+	    set to 1 will prevent any automatic operation, update or default settings
+		in CUL_HM.<br>
+	</li>
+
    </ul>
    <br>
   <a name="HMinfovariables"><b>Variables</b></a>
