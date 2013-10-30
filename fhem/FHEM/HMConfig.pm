@@ -1342,8 +1342,8 @@ my %culHmBits = (
                      BUTTON   => '00,2,$val=(hex($val)&0x3F)',
                      LONG     => '00,2,$val=(hex($val)&0x40)?1:0',
                      LOWBAT   => '00,2,$val=(hex($val)&0x80)?1:0',
-                     VALUE    => '02,2,$val=(hex($val))',
-                     NEXT     => '04,2,$val=(hex($val))',} },
+                     NBR      => '02,2,$val=(hex($val))',
+                     VALUE    => '04,2,$val=(hex($val))',} },
   "53"          => { txt => "SensorData"  , params => {
                      CMD => "00,2",
                      Fld1=> "02,2", 

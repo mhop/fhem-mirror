@@ -115,7 +115,6 @@ sub CUL_HM_putHash($);
 # ----------------modul globals-----------------------
 my $respRemoved; # used to control trigger of stack processing
 my $IOpoll     = 0.2;# poll speed to scan IO device out of order
-my $IOpolltout = 60; # poll timeout - stop poll and discard if to late
 
 my $maxPendCmds = 10;  #number of parallel requests
 
@@ -144,8 +143,6 @@ sub CUL_HM_Initialize($) {
                        "param msgRepeat ".
 					   ".stc .devInfo ".
                        $readingFnAttributes;
-  $hash->{hmAutoReadScan} = 4;  # delay autoConf readings
-  
   #autoReadReg:  
   #		        ,6_allForce
   #		        ,4_backUpdt
@@ -166,6 +163,9 @@ sub CUL_HM_Initialize($) {
   $hash->{helper}{qReqConf}   = \@confQArr;
   $hash->{helper}{qReqConfWu} = \@confQWuArr;
   CUL_HM_initRegHash();
+  $hash->{hmIoMaxDly}     = 60;# poll timeout - stop poll and discard
+  $hash->{hmAutoReadScan} = 4; # delay autoConf readings
+  $hash->{helper}{hmManualOper} = 0;# default automode
 }
 
 sub CUL_HM_updateConfig($){
@@ -1615,10 +1615,12 @@ sub CUL_HM_parseCommon(@){#####################################################
 	$ret = $reply;
   }
   elsif($mTp eq "00"){######################################
-    CUL_HM_infoUpdtDevData($shash->{NAME}, $shash,$p);#update data
-    	
     my $iohash = $shash->{IODev};
     my $id = CUL_HM_Id($iohash);
+    CUL_HM_infoUpdtDevData($shash->{NAME}, $shash,$p)  
+	           if (!$modules{CUL_HM}{helper}{hmManualOper}#no autoaction
+			       ||$iohash->{hmPair} 
+                   ||$iohash->{hmPairSerial} );  	
 
     if(  $dst =~ m /(000000|$id)/ #--- see if we need to pair
        &&($iohash->{hmPair} 
@@ -1848,6 +1850,10 @@ sub CUL_HM_parseCommon(@){#####################################################
 }
 sub CUL_HM_queueUpdtCfg($){
   my $name = shift;
+  if ($modules{CUL_HM}{helper}{hmManualOper}){ # no update when manual operation
+    delete $modules{CUL_HM}{helper}{updtCfgLst};
+	return;
+  }
   my @arr;
   if ($modules{CUL_HM}{helper}{updtCfgLst}){
     @arr = CUL_HM_noDup((@{$modules{CUL_HM}{helper}{updtCfgLst}}, $name));
@@ -2596,7 +2602,6 @@ sub CUL_HM_Set($@) {
       return "entry must be between 1 and 36" if ($eNo < 1 || $eNo > 36);	
 	  my $sndID = CUL_HM_name2Id($sId);
 	  my $recID = CUL_HM_name2Id($rId);
-	  $sndID = AttrVal($sId,"hmId","");
       if ($sndID !~ m/(^[0-9A-F]{6})$/){$sndID = AttrVal($sId,"hmId","");};	
 	  if ($recID !~ m/(^[0-9A-F]{6})$/){$recID = AttrVal($rId,"hmId","");};
       return "sender ID $sId unknown:".$sndID    if ($sndID !~ m/(^[0-9A-F]{6})$/);	
@@ -3385,12 +3390,12 @@ sub CUL_HM_ProcessCmdStack($) {
   return;
 }
 
-sub CUL_HM_prtInit ($){ #setup protocol variables after define
+sub CUL_HM_prtInit($){ #setup protocol variables after define
   my ($hash)=@_;
   $hash->{helper}{prt}{sProc} = 0; # stack not being processed by now
   $hash->{helper}{prt}{bErr}=0;
 }
-sub CUL_HM_respWaitSu ($@){ #setup response for multi-message response
+sub CUL_HM_respWaitSu($@){ #setup response for multi-message response
   # single commands
   # cmd: single msg that needs to be ACKed
   # mNo: number of message (needs to be in ACK)
@@ -3533,11 +3538,11 @@ sub CUL_HM_sndIfOpen($) {
   my(undef,$io) = split(':',$_[0]);
   RemoveInternalTimer("sndIfOpen:$io");# should not be necessary, but
   my $ioHash = $defs{$io};
-  if (   $ioHash->{STATE} ne "opened" 
+  if (   $ioHash->{STATE} !~ m/^(opened|Initialized)$/ 
       ||(defined $ioHash->{XmitOpen} && $ioHash->{XmitOpen} == 0) 
 #	  ||$modules{CUL_HM}{prot}{rspPend}>=$maxPendCmds
 	   ){#still no send allowed
-    if ($modules{CUL_HM}{$io}{tmrStart} < gettimeofday() - $IOpolltout){
+    if ($modules{CUL_HM}{$io}{tmrStart} < gettimeofday() - $modules{CUL_HM}{hmIoMaxDly}){
 	  # we need to clean up - this is way to long Stop delay
 	  if ($modules{CUL_HM}{$io}{pendDev}) {
         while(@{$modules{CUL_HM}{$io}{pendDev}}){
@@ -3570,10 +3575,10 @@ sub CUL_HM_SndCmd($$) {
             || AttrVal($hash->{NAME},"ignore","")
 			|| AttrVal($hash->{NAME},"dummy",""));  
   my $ioName = $io->{NAME};
-  if ((hex substr($cmd,2,2) & 0x20) && (                   # check for commands with resp-req
-           $io->{STATE} !~ m/^(opened|Initialized)$/       # we need to queue
-        || $modules{CUL_HM}{$ioName}{tmr}                  # queue already running
-        ||(defined $io->{XmitOpen} && $io->{XmitOpen} == 0)#overload, dont send
+  if (  $io->{STATE} !~ m/^(opened|Initialized)$/          # we need to queue
+      ||(hex substr($cmd,2,2) & 0x20) && (                 # check for commands with resp-req
+           $modules{CUL_HM}{$ioName}{tmr}                  # queue already running
+         ||(defined $io->{XmitOpen} && $io->{XmitOpen} == 0)#overload, dont send
 	    )
 	  ){
 
@@ -3582,7 +3587,7 @@ sub CUL_HM_SndCmd($$) {
 	# repetition will be stopped after 1min forsecurity reason. 
     my @arr = ();
     $hash->{cmdStack} = \@arr if(!$hash->{cmdStack});
-    unshift (@{$hash->{cmdStack}}, $cmd);#pushback cmd, wait for opportunitiy
+    unshift (@{$hash->{cmdStack}}, $cmd);#pushback cmd, wait for opportunity
 
 	# push device to list
 	if (!defined $modules{CUL_HM}{$ioName}{tmr}){
@@ -3596,7 +3601,6 @@ sub CUL_HM_SndCmd($$) {
     @{$modules{CUL_HM}{$ioName}{pendDev}} = 
 	      CUL_HM_noDup(@{$modules{CUL_HM}{$ioName}{pendDev}},$hash->{NAME});
 	CUL_HM_respPendRm($hash);#rm timer - we are out
-
 	if ($modules{CUL_HM}{$ioName}{tmr} != 1){# need to start timer
 	  my $tn = gettimeofday();
    	  InternalTimer($tn+$IOpoll, "CUL_HM_sndIfOpen", "sndIfOpen:$ioName", 0);
@@ -3633,6 +3637,8 @@ sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
   $modules{CUL_HM}{prot}{rspPend}-- if($hash->{helper}{prt}{rspWait}{cmd});
   delete ($hash->{helper}{prt}{rspWait});
   delete $hash->{helper}{tmdOn};
+  delete $hash->{helper}{prt}{mmcA};
+  delete $hash->{helper}{prt}{mmcS};
   RemoveInternalTimer($hash);                  # remove resend-timer
   RemoveInternalTimer("respPend:$hash->{DEF}");# remove responsePending timer
   $respRemoved = 1;
@@ -3654,26 +3660,17 @@ sub CUL_HM_respPendTout($) {
 	  $pHash->{awake} = 0;# set to asleep
 	  CUL_HM_protState($hash,"CMDs_pending");
 	}
+	elsif ($hash->{IODev}->{STATE} !~ m/^(opened|Initialized)$/){#IO errors
+      CUL_HM_eventP($hash,"IOdly");
+	  CUL_HM_ProcessCmdStack($hash) if(CUL_HM_getRxType($hash) & 0x03);
+	}
 	elsif ($pHash->{rspWait}{reSent} > AttrVal($hash->{NAME},"msgRepeat",3) # too much
 	     ||((CUL_HM_getRxType($hash) & 0x83) == 0)){                        #to slow
-	  if ($pHash->{mmcA}){
-	    #shall we re-insert commands?
-		#unshift  @{$hash->{cmdStack}},@{$pHash->{mmcA}};
-		delete $pHash->{mmcA};
-		delete $pHash->{mmcS};
-	  }
-
-	  if ($hash->{IODev}->{STATE} !~ m/^(opened|Initialized)$/){#IO errors
-        CUL_HM_eventP($hash,"IOerr");
-		readingsSingleUpdate($hash,"state","IOerr",1);
-	  }
-	  else{
-        my $pendCmd = ($pHash->{rspWait}{Pending}
+      my $pendCmd = ($pHash->{rspWait}{Pending}
 					            ?"RESPONSE TIMEOUT:".$pHash->{rspWait}{Pending}
 								:"MISSING ACK");# save before remove
-	    CUL_HM_eventP($hash,"ResndFail");
-		readingsSingleUpdate($hash,"state",$pendCmd,1);
-	  }	  
+	  CUL_HM_eventP($hash,"ResndFail");
+	  readingsSingleUpdate($hash,"state",$pendCmd,1);
 	  CUL_HM_ProcessCmdStack($hash); # continue processing commands if any
 	}
 	else{# manage retries
@@ -3682,7 +3679,8 @@ sub CUL_HM_respPendTout($) {
         $pHash->{rspWait}{reSent}++;
 
 		my (undef,$addr,$msg) = unpack 'A10A12A*',$hash->{helper}{prt}{rspWait}{cmd};		  
-		$pHash->{rspWaitSec}{$_} = $pHash->{rspWait}{$_} foreach (keys%{$pHash->{rspWait}});			;
+		$pHash->{rspWaitSec}{$_} = $pHash->{rspWait}{$_} 
+		            foreach (keys%{$pHash->{rspWait}});
 		CUL_HM_SndCmd($hash,"++B112$addr");
 	    $hash->{helper}{prt}{awake}=4;# start re-wakeup
 	  }
@@ -3717,16 +3715,24 @@ sub CUL_HM_eventP($$) {#handle protocol events
   $nAttr->{"prot".$evntType} = ++$evntCnt." last_at:".TimeNow();
   
   if ($evntType =~ m/(Nack|ResndFail|IOerr)/){# unrecoverable Error
+	readingsSingleUpdate($hash,"state",$evntType,1);
     $hash->{helper}{prt}{bErr}++;
-    $nAttr->{protCmdDel}++;
-    if (  (CUL_HM_getRxType($hash) & 0x01) == 0 #to slow for wakeup and config
-	                                            #no retry for burst either
-	    || $evntType eq "IOerr"){               #IO problem
-      $nAttr->{protCmdDel} = 0 if(!$nAttr->{protCmdDel});
-      $nAttr->{protCmdDel} += scalar @{$hash->{cmdStack}} 
+    $nAttr->{protCmdDel} = 0 if(!$nAttr->{protCmdDel});
+    $nAttr->{protCmdDel} += scalar @{$hash->{cmdStack}} + 1
 	        if ($hash->{cmdStack});
-	  CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{prt}{bErr}? 
-	                            ("_Errors:".$hash->{helper}{prt}{bErr}):""));
+	CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{prt}{bErr}? 
+	                        ("_Errors:".$hash->{helper}{prt}{bErr}):""));
+	CUL_HM_respPendRm($hash);
+  }
+  elsif($evntType eq "IOdly"){ # IO problem - will see whether it recovers 
+    my $pHash = $hash->{helper}{prt};
+	if ($pHash->{mmcA}){
+	  unshift @{$hash->{cmdStack}},$_ foreach (reverse@{$pHash->{mmcA}});
+	  delete $pHash->{mmcA};
+	  delete $pHash->{mmcS};
+	}
+	else{
+      unshift @{$hash->{cmdStack}}, $pHash->{rspWait}{cmd};#pushback
 	}
 	CUL_HM_respPendRm($hash);
   }
@@ -4804,6 +4810,7 @@ sub CUL_HM_unQEntity($$){# remove entity from q - task no longer necesary
 }
 sub CUL_HM_qEntity($$){
   my ($name,$q) = @_;
+  return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
   $q = $modules{CUL_HM}{helper}{$q};
   return if (AttrVal($name,"subType","") eq "virtual");
   if ($defs{$name}{helper}{role}{dev}){
