@@ -144,7 +144,7 @@ CUL_MAX_Attr(@)
   my ($hash, $action, $name, $attr, $value) = @_;
   if ($action eq "set") {
     return "No such attribute" if($attr !~ ["fakeWTaddr", "fakeSCaddr", "IODev"]);
-    return "Invalid value" if($attr ~~ ["fakeWTaddr", "fakeSCaddr"] && $value !~ /^[0-9a-fA-F]{6}$/);
+    return "Invalid value" if(grep( /^\Q$attr\E$/, ("fakeWTaddr", "fakeSCaddr")) && $value !~ /^[0-9a-fA-F]{6}$/);
   }
 }
 
@@ -174,7 +174,7 @@ CUL_MAX_Set($@)
   } elsif($setting eq "broadcastTime") {
     CUL_MAX_BroadcastTime($hash, 1);
 
-  } elsif($setting ~~ ["fakeSC", "fakeWT"]) {
+  } elsif(grep /^\Q$setting\E$/, ("fakeSC", "fakeWT")) {
     return "Invalid number of arguments" if(@args == 0);
     my $dest = $args[0];
     my $destname;
@@ -337,7 +337,7 @@ CUL_MAX_Parse($$)
           Dispatch($shash, "MAX,$isToMe,WallThermostatConfig,$src,17,21,30.5,4.5,$defaultWeekProfile", {RAWMSG => $rmsg});
         }
       }
-    } elsif($msgType ~~ ["ShutterContactState", "WallThermostatState", "WallThermostatControl", "ThermostatState", "PushButtonState"])  {
+    } elsif(grep /^$msgType$/, ("ShutterContactState", "WallThermostatState", "WallThermostatControl", "ThermostatState", "PushButtonState"))  {
       Dispatch($shash, "MAX,$isToMe,$msgType,$src,$payload", {RAWMSG => $rmsg});
     } else {
       Log $ll5, "Unhandled message $msgType";
