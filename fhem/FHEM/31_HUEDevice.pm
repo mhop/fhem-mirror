@@ -84,19 +84,14 @@ HUEDevice_devStateIcon($)
   return ".*:off:toggle"
          if( ReadingsVal($name,"state","off") eq "off" || ReadingsVal($name,"bri","0") eq 0 );
 
-  return undef
-         if( AttrVal($name, "model", "") eq "LWB001" );
-
-  return undef
-         if( AttrVal($name, "model", "") eq "LWL001" );
-
-  #return '<div style="height:19px;'.
-  #       'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';">'.
-  #       '<img src="/fhem/icons/'.$hash->{STATE}.'" alt="'.$hash->{STATE}.'" title="'.$hash->{STATE}.'">'.
-  #       '</div>' if( ReadingsVal($name,"colormode","") eq "ct" );
-
   my $percent = ReadingsVal($name,"pct","100");
   my $s = $dim_values{int($percent/7)};
+
+  return ".*:$s:toggle"
+         if( AttrVal($name, "model", "") eq "LWB001" );
+
+  return ".*:$s:toggle"
+         if( AttrVal($name, "model", "") eq "LWL001" );
 
   return ".*:$s@#".CommandGet("","$name RGB").":toggle" if( $percent < 100 && AttrVal($name, "color-icons", 0) == 2 );
   return ".*:on@#".CommandGet("","$name rgb").":toggle" if( AttrVal($name, "color-icons", 0) != 0 );
@@ -599,7 +594,7 @@ HUEDevice_GetUpdate($)
   if( $s ne $hash->{STATE} ) {readingsBulkUpdate($hash,"state",$s);}
   readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
 
-  CommandTrigger( "", "$name RGB: ".CommandGet("","$name rgb") ); 
+  CommandTrigger( "", "$name RGB: ".CommandGet("","$name rgb") );
 
   $hash->{fhem}{on} = $on;
   $hash->{fhem}{reachable} = $reachable;
