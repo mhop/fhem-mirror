@@ -86,6 +86,7 @@ HUEDevice_devStateIcon($)
 
   my $percent = ReadingsVal($name,"pct","100");
   my $s = $dim_values{int($percent/7)};
+  $s="on" if( $percent eq "100" );
 
   return ".*:$s:toggle"
          if( AttrVal($name, "model", "") eq "LWB001" );
