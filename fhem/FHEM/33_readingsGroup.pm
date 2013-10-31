@@ -34,7 +34,7 @@ sub readingsGroup_Initialize($)
   $hash->{UndefFn}  = "readingsGroup_Undefine";
   #$hash->{SetFn}    = "readingsGroup_Set";
   $hash->{GetFn}    = "readingsGroup_Get";
-  $hash->{AttrList} = "nameIcon valueIcon mapping separator style nameStyle valueStyle valueFormat timestampStyle noheading:1 nolinks:1 notime:1 nostate:1";
+  $hash->{AttrList} = "disable:1,2,3 nameIcon valueIcon mapping separator style nameStyle valueStyle valueFormat timestampStyle noheading:1 nolinks:1 notime:1 nostate:1";
 
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
@@ -183,7 +183,7 @@ lookup2($$$$)
   return $lookup if( !$lookup );
 
   if( ref($lookup) eq 'HASH' ) {
-    my $vf ="";
+    my $vf = "";
     $vf = $lookup->{$reading} if( exists($lookup->{$reading}) );
     $vf = $lookup->{$name.".".$reading} if( exists($lookup->{$name.".".$reading}) );
     $lookup = $vf;
@@ -209,6 +209,22 @@ readingsGroup_2html($)
 
   my $show_heading = !AttrVal( $d, "noheading", "0" );
   my $show_links = !AttrVal( $d, "nolinks", "0" );
+
+  my $disable = AttrVal($d,"disable", 0);
+  if( AttrVal($d,"disable", 0) > 2 ) {
+    return undef;
+  } elsif( AttrVal($d,"disable", 0) > 1 ) {
+    my $ret;
+    my $txt = AttrVal($d, "alias", $d);
+    $txt = "<a href=\"/fhem?detail=$d\">$txt</a>" if( $show_links );
+    $ret .= "<tr><td><div class=\"devType\">$txt</a></div></td></tr>" if( $show_heading );
+    $ret .= "<tr><td><table class=\"block wide\">";
+    #$ret .= "<div class=\"devType\"><a style=\"color:#ff8888\" href=\"/fhem?detail=$d\">readingsGroup $txt is disabled.</a></div>";
+    $ret .= "<td><div style=\"color:#ff8888;text-align:center\">disabled</div></td>";
+    $ret .= "</table>";
+    return $ret;
+  }
+
   my $show_state = !AttrVal( $d, "nostate", "0" );
   my $show_time = !AttrVal( $d, "notime", "0" );
 
@@ -242,11 +258,12 @@ readingsGroup_2html($)
   my $row = 1;
 
   my $ret;
-  $ret .= "<table>";
+  #$ret .= "<table>";
   my $txt = AttrVal($d, "alias", $d);
   $txt = "<a href=\"/fhem?detail=$d\">$txt</a>" if( $show_links );
   $ret .= "<tr><td><div class=\"devType\">$txt</a></div></td></tr>" if( $show_heading );
   $ret .= "<tr><td><table $style class=\"block wide\">";
+  $ret .= "<tr><td colspan=\"99\"><div style=\"color:#ff8888;text-align:center\">updates disabled</div></tr>" if( $disable > 0 );
   foreach my $device (@{$devices}) {
     my $h = $defs{$device->[0]};
     my $regex = $device->[1];
@@ -257,16 +274,36 @@ readingsGroup_2html($)
     @list = split(",",$regex) if( $regex );
     my $first = 1;
     my $multi = @list;
-    my $show_time = $show_time;
-    $show_time = 0 if( $regex && $regex =~ m/,/ );
-    foreach my $regex (@list) {
+    #foreach my $regex (@list) {
+    for( my $i = 0; $i <= $#list; ++$i ) {
+      my $regex = $list[$i];
+      while ($regex && $regex =~ m/^</ && $regex !~ m/>$/ && $list[++$i] ) {
+        $regex .= ",". $list[$i];
+      }
       my $h = $h;
-      if( $regex && $regex =~ m/^\+(.*)/ ) {
+      if( $regex && $regex =~ m/^<(.*)>$/ ) {
+        my $txt = $1;
+        if( $txt =~ m/^{.*}$/ ) {
+          my $DEVICE = $name;
+          $txt = eval $txt;
+          if( $@ ) {
+            $txt = "<ERROR>";
+            Log3 $d, 3, $d .": ". $regex .": ". $@;
+          }
+        }
+
+        if( $first || $multi == 1 ) {
+          $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
+          $row++;
+        }
+        my $name_style = lookup2($name_style,$name,$1,undef);
+        $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>";
+        $first = 0;
+        next;
+      } elsif( $regex && $regex =~ m/^\+(.*)/ ) {
         $regex = $1;
-        $show_time = 0;
       } elsif( $regex && $regex =~ m/^\?(.*)/ ) {
         $regex = $1;
-        $show_time = 0;
         $h = $attr{$name};
       } else {
         $h = $h->{READINGS};
@@ -284,6 +321,7 @@ readingsGroup_2html($)
           ($v, $t) = ($val->{VAL}, $val->{TIME});
           $v = FW_htmlEscape($v);
           $t = "" if(!$t);
+          $t = "" if( $multi != 1 );
         } else {
           $v = FW_htmlEscape($val);
         }
@@ -297,6 +335,7 @@ readingsGroup_2html($)
 
         my $a = AttrVal($name, "alias", $name);
         my $m = "$a$separator$n";
+        $m = $a if( $multi != 1 );
         my $room = AttrVal($name, "room", "");
         my $group = AttrVal($name, "group", "");
         my $txt = lookup($mapping,$name,$a,$n,$v,$room,$group,$m);
@@ -329,13 +368,15 @@ readingsGroup_2html($)
         $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>" if( $first || $multi == 1 );
         $ret .= "<td informId=\"$d-$name.$n.icon\">$devStateIcon</td>" if( $devStateIcon );
         $ret .= "<td><div $value_style informId=\"$d-$name.$n\">$v</div></td>" if( !$devStateIcon );
-        $ret .= "<td><div $timestamp_style informId=\"$d-$name.$n-ts\">$t</div></td>" if( $show_time );
+        $ret .= "<td><div $timestamp_style informId=\"$d-$name.$n-ts\">$t</div></td>" if( $show_time && $t );
 
         $first = 0;
       }
     }
   }
-  $ret .= "</table></td></tr>";
+  $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
+  $ret .= "<td colspan=\"99\"><div style=\"color:#ff8888;text-align:center\">updates disabled</div></td></tr>" if( $disable > 0 );
+  #$ret .= "</table></td></tr>";
   $ret .= "</table>";
 
   return $ret;
@@ -362,6 +403,8 @@ readingsGroup_Notify($$)
     readingsGroup_updateDevices($hash);
     return undef;
   }
+
+  return if( AttrVal($name,"disable", 0) > 0 );
 
   return if($dev->{NAME} eq $name);
 
@@ -586,6 +629,10 @@ readingsGroup_Get($@)
   <a name="readingsGroup_Attr"></a>
     <b>Attributes</b>
     <ul>
+      <li>disable<br>
+        1 -> disable notify processing and longpoll updates. Notice: this also disables rename and delete handling.<b>
+        2 -> also disable html table creation</li>
+        3 -> also disable html creation completely</li>
       <li>noheading<br>
         If set to 1 the readings table will have no heading.</li>
       <li>nolinks<br>
