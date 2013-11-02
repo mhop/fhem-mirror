@@ -63,8 +63,7 @@ sub Twilight_my_gmt_offset()
   }
   return $hh+($mm/60);
 }
-
-##################################### 
+################################################################################
 sub Twilight_Initialize($)
 {
   my ($hash) = @_;
@@ -96,9 +95,7 @@ sub Twilight_Get($@)
   }
   return "$a[0] $reading => $value";
 }
-#
-#
-#
+################################################################################
 sub Twilight_Define($$)
 {
   my ($hash, $def) = @_;
@@ -154,9 +151,7 @@ sub Twilight_Define($$)
   InternalTimer(time()+1, "Twilight_Midnight", $hash, 0);
   return undef;
 }
-#
-#
-#
+################################################################################
 sub Twilight_Undef($$)
 {
   my ($hash, $arg) = @_;
@@ -169,18 +164,14 @@ sub Twilight_Undef($$)
   RemoveInternalTimer($hash);
   return undef;
 }
-#
-#
-#
+################################################################################
 sub Twilight_midnight_seconds()
 {
   my @time = localtime();
   my $secs = ($time[2] * 3600) + ($time[1] * 60) + $time[0];
   return $secs;
 }
-#
-#
-#
+################################################################################
 sub Twilight_TwilightTimes($$)
 {
   my ($hash, $whitchTimes) = @_;
@@ -262,8 +253,7 @@ sub Twilight_TwilightTimes($$)
   readingsEndUpdate   ($hash, defined($hash->{LOCAL} ? 0 : 1));
   return 1;
 }
-#
-#
+################################################################################
 sub myInternalTimer($$$$$) {
    my ($modifier, $tim, $callback, $hash, $waitIfInitNotDone) = @_;
 
@@ -281,9 +271,7 @@ sub myInternalTimer($$$$$) {
    }
    InternalTimer($tim, $callback, $mHash, $waitIfInitNotDone);
 }
-#
-#
-#
+################################################################################
 sub myRemoveInternalTimer($$) {
    my ($modifier, $hash) = @_;
 
@@ -292,13 +280,13 @@ sub myRemoveInternalTimer($$) {
       RemoveInternalTimer($hash);
    } else {
       my $myHash = $hash->{TIMER}{$timerName};
-      delete $hash->{TIMER}{$timerName};
-      RemoveInternalTimer($myHash);
+      if (defined($myHash)) {
+         delete $hash->{TIMER}{$timerName};
+         RemoveInternalTimer($myHash);
+      }
    }
 }
-#
-#
-#
+################################################################################
 sub Twilight_WeatherTimerSet($)
 {
   my ($hash) = @_;
@@ -311,9 +299,7 @@ sub Twilight_WeatherTimerSet($)
      }
   }
 }
-#
-#
-#
+################################################################################
 sub Twilight_Midnight($)
 {
   my ($hash) = @_;
@@ -321,7 +307,7 @@ sub Twilight_Midnight($)
   Twilight_TwilightTimes      ($hash, "Mid");
   Twilight_StandardTimerSet   ($hash);
 }
-#
+################################################################################
 sub Twilight_WeatherTimerUpdate($)
 {
   my ($hash) = @_;
@@ -329,7 +315,7 @@ sub Twilight_WeatherTimerUpdate($)
   Twilight_TwilightTimes      ($hash, "Wea");
   Twilight_StandardTimerSet   ($hash);
 }
-#
+################################################################################
 sub Twilight_StandardTimerSet($) {
   my ($hash) = @_;
   my $midnight = time() - Twilight_midnight_seconds() + 24*3600 + 30;
@@ -338,7 +324,7 @@ sub Twilight_StandardTimerSet($) {
   myInternalTimer          ("", $midnight,    "Twilight_Midnight", $hash, 0);
   Twilight_WeatherTimerSet ($hash);
 }
-#
+################################################################################
 sub Twilight_sunposTimerSet($) {
   my ($hash) = @_;
 
@@ -346,9 +332,7 @@ sub Twilight_sunposTimerSet($) {
   myInternalTimer ("sunpos", time()+$hash->{SUNPOS_OFFSET},  "Twilight_sunpos", $hash, 0);
   $hash->{SUNPOS_OFFSET} = 5*60;
 }
-#
-#
-#
+################################################################################
 sub Twilight_fireEvent($)
 {
    my ($myHash) = @_;
@@ -382,7 +366,7 @@ sub Twilight_fireEvent($)
    readingsEndUpdate  ($hash, !$doNotTrigger);
 
 }
-#
+################################################################################
 sub Twilight_calc($$$$$$$)
 {
   my ($latitude, $longitude, $horizon, $declination, $timezone, $midseconds, $timediff) = @_;
@@ -403,7 +387,7 @@ sub Twilight_calc($$$$$$$)
 
   return $sunrise, $sunset;
 }
-#
+################################################################################
 sub Twilight_getWeatherHorizon($)
 {
   my $hash=shift; # 0
@@ -449,7 +433,7 @@ sub Twilight_getWeatherHorizon($)
   $hash->{WEATHER_HORIZON}="0";
   $hash->{CONDITION}="-1";
 }
-
+################################################################################
 sub Twilight_sunpos($)
 {
   my ($myHash) = @_;
@@ -464,7 +448,6 @@ sub Twilight_sunpos($)
   $iYear += 100;
   $dSeconds = 0;
 
-  ############################
   my $dLongitude = $hash->{LONGITUDE};
   my $dLatitude  = $hash->{LATITUDE};
   Log3 $hash, 5, "Compute sunpos for latitude $dLatitude , longitude $dLongitude";
@@ -558,8 +541,7 @@ sub Twilight_sunpos($)
 
   return undef;
 }
-
-##########################
+################################################################################
 sub Twilight_CompassPoint($) {
   my ($azimuth) = @_;
 
@@ -602,7 +584,6 @@ sub Twilight_CompassPoint($) {
 }
 
 1;
-
 
 =pod
 =begin html
