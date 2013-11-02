@@ -444,7 +444,7 @@ PRESENCE_DoInit($)
 
     my ($hash) = @_;
 
-    if( not exists($hash->{helper}{DISABLED}) or exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 1)
+    if( not exists($hash->{helper}{DISABLED}) or (exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 0))
     {
 	readingsSingleUpdate($hash, "state", "active",0);
 	DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT_NORMAL}."\n", 0);
