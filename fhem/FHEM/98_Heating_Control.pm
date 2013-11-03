@@ -441,7 +441,7 @@ sub Heating_Control_Device_Schalten($$$$) {
 
   #Kommando ausführen
   my $secondsSinceSwitch = $nowSwitch - $now;
-  if ($nowSwitch gt "" && $aktParam ne $newParam ) {
+  if (defined $hash->{helper}{COMMAND} || ($nowSwitch gt "" && $aktParam ne $newParam )) {
      if (!SwitchInVergangenheit($hash) && $secondsSinceSwitch < -60) {
         Log3 $hash, 5, $mod."no switch in the yesterdays because of the devices type.";
      } else {
