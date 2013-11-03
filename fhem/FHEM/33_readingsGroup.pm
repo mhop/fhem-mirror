@@ -215,12 +215,14 @@ readingsGroup_2html($)
     return undef;
   } elsif( AttrVal($d,"disable", 0) > 1 ) {
     my $ret;
+    $ret .= "<table>";
     my $txt = AttrVal($d, "alias", $d);
     $txt = "<a href=\"/fhem?detail=$d\">$txt</a>" if( $show_links );
     $ret .= "<tr><td><div class=\"devType\">$txt</a></div></td></tr>" if( $show_heading );
     $ret .= "<tr><td><table class=\"block wide\">";
     #$ret .= "<div class=\"devType\"><a style=\"color:#ff8888\" href=\"/fhem?detail=$d\">readingsGroup $txt is disabled.</a></div>";
     $ret .= "<td><div style=\"color:#ff8888;text-align:center\">disabled</div></td>";
+    $ret .= "</table></td></tr>";
     $ret .= "</table>";
     return $ret;
   }
@@ -258,7 +260,7 @@ readingsGroup_2html($)
   my $row = 1;
 
   my $ret;
-  #$ret .= "<table>";
+  $ret .= "<table>";
   my $txt = AttrVal($d, "alias", $d);
   $txt = "<a href=\"/fhem?detail=$d\">$txt</a>" if( $show_links );
   $ret .= "<tr><td><div class=\"devType\">$txt</a></div></td></tr>" if( $show_heading );
@@ -376,7 +378,7 @@ readingsGroup_2html($)
   }
   $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
   $ret .= "<td colspan=\"99\"><div style=\"color:#ff8888;text-align:center\">updates disabled</div></td></tr>" if( $disable > 0 );
-  #$ret .= "</table></td></tr>";
+  $ret .= "</table></td></tr>";
   $ret .= "</table>";
 
   return $ret;
