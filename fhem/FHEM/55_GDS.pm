@@ -449,7 +449,10 @@ sub buildCAPList(@){
 	
 	my $xml			= new XML::Simple;
 	$alertsXml		= undef;
-	$alertsXml		= $xml->XMLin($tempDir.$name.'_alerts', KeyAttr => {}, ForceArray => [ 'info', 'eventCode', 'area', 'geocode' ]);
+	eval	{	
+		$alertsXml		= $xml->XMLin($tempDir.$name.'_alerts', KeyAttr => {}, ForceArray => [ 'info', 'eventCode', 'area', 'geocode' ]);
+		};
+		return (undef,undef) if(!defined($alertsXml));
 	my $info		= 0;
 	my $area		= 0;
 	my $record		= 0;
@@ -1076,6 +1079,8 @@ sub initDropdownLists($){
 #
 #	2013-08-13	fixed	some minor bugs to prevent annoying console messages
 #				added	support for fhem installtions running on windows-based systems
+#
+#	2013-11-03	added	error handling for malformed XML files from GDS
 #
 ####################################################################################################
 #
