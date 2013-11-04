@@ -53,7 +53,7 @@ YAMAHA_AVR_Initialize($)
   $hash->{DefFn}     = "YAMAHA_AVR_Define";
   $hash->{UndefFn}   = "YAMAHA_AVR_Undefine";
 
-  $hash->{AttrList}  = "do_not_notify:0,1 volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 volume-smooth-change:0,1 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
+  $hash->{AttrList}  = "do_not_notify:0,1 request-timeout:1,2,3,4,5 volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 volume-smooth-change:0,1 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
                       $readingFnAttributes;
 }
 
@@ -624,7 +624,7 @@ YAMAHA_AVR_SendCommand($$;$)
     
     # In case any URL changes must be made, this part is separated in this function".
     
-    $response = CustomGetFileFromURL(0, "http://".$address."/YamahaRemoteControl/ctrl", 4, "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$command, 0, ($hash->{helper}{AVAILABLE} ? $loglevel : 5));
+    $response = CustomGetFileFromURL(0, "http://".$address."/YamahaRemoteControl/ctrl", AttrVal($name, "request-timeout", 4) , "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$command, 0, ($hash->{helper}{AVAILABLE} ? $loglevel : 5));
     
     Log3 $name, 5, "YAMAHA_AVR: got response for $name: $response" if(defined($response));
     
@@ -806,7 +806,7 @@ sub YAMAHA_AVR_getModel($)
     }
     
     # query the description url which contains all zones
-    $response = CustomGetFileFromURL(0, "http://".$address.$desc_url, 4, undef, 0, ($hash->{helper}{AVAILABLE} ?  3 : 5));
+    $response = CustomGetFileFromURL(0, "http://".$address.$desc_url, AttrVal($name, "request-timeout", 4), undef, 0, ($hash->{helper}{AVAILABLE} ?  3 : 5));
     
     Log3 $name, 3, "YAMAHA_AVR: could not get unit description from device $name. Please turn on the device or check for correct hostaddress!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
     
@@ -1092,6 +1092,10 @@ output        # only available in zones other than mainzone</code></ul><br><br>
   
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
+	<li><a name="request-timeout">request-timeout</a></li>
+	Optional attribute change the response timeout in seconds for all queries to the receiver.
+	<br><br>
+	Possible values: 1-5 seconds. Default value is 4 seconds.<br><br>
     <li><a name="volume-smooth-change">volume-smooth-change</a></li>
 	Optional attribute to activate a smooth volume change.
 	<br><br>
@@ -1284,6 +1288,10 @@ output        # only available in zones other than mainzone</code></ul><br><br>
   
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
+	<li><a name="request-timeout">request-timeout</a></li>
+	Optionales Attribut. Maximale Dauer einer Anfrage in Sekunden zum Receiver.
+	<br><br>
+	M&ouml;gliche Werte: 1-5 Sekunden. Standartwert ist 4 Sekunden<br><br>
     <li><a name="volume-smooth-change">volume-smooth-change</a></li>
 	Optionales Attribut, welches einen weichen Lautst&auml;rke&uuml;bergang aktiviert..
 	<br><br>
