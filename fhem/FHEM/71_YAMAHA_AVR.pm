@@ -217,6 +217,7 @@ YAMAHA_AVR_Set($@)
     my $inputs_piped = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{INPUTS}), 0) : "" ;
     my $inputs_comma = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{INPUTS}), 1) : "" ;
    
+    
 
     my $scenes_piped = defined($hash->{helper}{SCENES}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{SCENES}), 0) : "" ;
     my $scenes_comma = defined($hash->{helper}{SCENES}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{SCENES}), 1) : "" ;
@@ -451,41 +452,45 @@ YAMAHA_AVR_Set($@)
 	    }
 	    elsif($what eq "remoteControl")
 	    {
+			
+			# the RX-Vx75 series use a different tag name to access the remoteControl commands
+			my $control_tag = ($hash->{MODEL} =~ /RX-V\d75/ ? "Cursor_Control" : "List_Control");
+			
 			if($a[2] eq "up")
 			{
-			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Up</Cursor></List_Control></$zone></YAMAHA_AV>");
+			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Up</Cursor></$control_tag></$zone></YAMAHA_AV>");
 			}
 			elsif($a[2] eq "down")
 			{
-			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Down</Cursor></List_Control></$zone></YAMAHA_AV>");
+			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Down</Cursor></$control_tag></$zone></YAMAHA_AV>");
 			}
 			elsif($a[2] eq "left")
 			{
-			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Left</Cursor></List_Control></$zone></YAMAHA_AV>");
+			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Left</Cursor></$control_tag></$zone></YAMAHA_AV>");
 			}
 			elsif($a[2] eq "right")
 			{
-			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Right</Cursor></List_Control></$zone></YAMAHA_AV>");
+			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Right</Cursor></$control_tag></$zone></YAMAHA_AV>");
 			}
 			elsif($a[2] eq "display")
 			{
-			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Menu_Control>Display</Menu_Control></List_Control></$zone></YAMAHA_AV>");
+			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Menu_Control>Display</Menu_Control></$control_tag></$zone></YAMAHA_AV>");
 			}
 			elsif($a[2] eq "return")
 			{
-			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Return</Cursor></List_Control></$zone></YAMAHA_AV>");
+			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Return</Cursor></$control_tag></$zone></YAMAHA_AV>");
 			}
 			elsif($a[2] eq "enter")
 			{
-			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Sel</Cursor></List_Control></$zone></YAMAHA_AV>");
+			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Sel</Cursor></$control_tag></$zone></YAMAHA_AV>");
 			}
 			elsif($a[2] eq "setup")
 			{
-			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Menu_Control>On Screen</Menu_Control></List_Control></$zone></YAMAHA_AV");
+			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Menu_Control>On Screen</Menu_Control></$control_tag></$zone></YAMAHA_AV>");
 			}
 			elsif($a[2] eq "option")
 			{
-			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Menu_Control>Option</Menu_Control></List_Control></$zone></YAMAHA_AV>");
+			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Menu_Control>Option</Menu_Control></$control_tag></$zone></YAMAHA_AV>");
 			}
 			elsif($a[2] eq "tunerPresetUp")
 			{

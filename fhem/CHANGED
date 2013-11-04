@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - bugfix:  YAMAHA_AVR: fix missing greater-than sign. Use different
+             Control-Tag name for RX-Vx75 series
   - bugfix:  PRESENCE: fixing not working re-initialization when
              disabled attribute is set to 0 in lan-bluetooth mode
   - feature: LightScene: added attribute lightSceneParamsToSave for
