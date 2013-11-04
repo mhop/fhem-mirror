@@ -23,7 +23,7 @@ use strict;
 use warnings;
 use IO::Socket;
 use Time::HiRes qw(gettimeofday);
-
+################################################################################
 sub WOL_Initialize($)
 {
   my ($hash) = @_;
@@ -34,9 +34,7 @@ sub WOL_Initialize($)
   $hash->{AttrList}  = "interval shutdownCmd sysCmd ".
                         $readingFnAttributes;
 }
-#
-#
-#
+################################################################################
 sub WOL_Set($@)
 {
   my ($hash, @a) = @_;
@@ -68,13 +66,11 @@ sub WOL_Set($@)
   InternalTimer(gettimeofday()+5, "WOL_UpdateReadings", $hash, 0);
 
   if ($hash->{STATE} eq "on") {
-      InternalTimer(gettimeofday()+1, "WOL_GetUpdate", $hash, 0);
+      InternalTimer(gettimeofday(), "WOL_GetUpdate", $hash, 0);
   }
   return undef;
 }
-#
-#
-#
+################################################################################
 sub WOL_Define($$)
 {
   my ($hash, $def) = @_;
@@ -120,9 +116,7 @@ sub WOL_Define($$)
   readingsSingleUpdate($hash, "packet_via_UDP", "none",0);
   return undef;
 }
-#
-#
-#
+################################################################################
 sub WOL_Undef($$) {
 
   my ($hash, $arg) = @_;
@@ -130,9 +124,7 @@ sub WOL_Undef($$) {
   RemoveInternalTimer($hash);
   return undef;
 }
-#
-#
-#
+################################################################################
 sub WOL_UpdateReadings($)
 {
   my ($hash) = @_;
@@ -151,9 +143,7 @@ sub WOL_UpdateReadings($)
   readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
   InternalTimer(gettimeofday()+$hash->{INTERVAL}, "WOL_UpdateReadings", $hash, 0);
 }
-#
-#
-#
+################################################################################
 sub WOL_GetUpdate($)
 {
   my ($hash) = @_;
@@ -166,9 +156,7 @@ sub WOL_GetUpdate($)
      InternalTimer(gettimeofday()+$hash->{REPEAT}, "WOL_GetUpdate", $hash, 0);
   }
 }
-#
-#
-#
+################################################################################
 sub wake($)
 {
   my ($hash) = @_;
@@ -190,9 +178,7 @@ sub wake($)
   }
   readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
 }
-
-#
-#
+################################################################################
 # method to wakevia lan, taken from Net::Wake package
 sub wol_by_udp {
   my ($hash, $mac_addr, $host, $port) = @_;
@@ -218,8 +204,7 @@ sub wol_by_udp {
 
   return 1;
 }
-#
-#
+################################################################################
 # method to wake via system command
 sub wol_by_ew($$) {
   my ($hash, $mac) = @_;
