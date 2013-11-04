@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# 01_YAF.pm
+# YAFWebserver.pm
 #
 # YAF - Yet Another Floorplan
 # FHEM Projektgruppe Hochschule Karlsruhe, 2013
@@ -27,12 +27,9 @@ package main;
 use strict;
 use warnings;
 
-# load zlib if possible
-my $zlib_active = 1;
-eval "require Compress::Zlib;";
-if ($@) {
-	$zlib_active = 0;
-}
+use FindBin;
+use lib "$FindBin::Bin/FHEM/YAF/libs";
+use YAFWebserver;
 
 ########################################################################################
 #
@@ -47,6 +44,10 @@ sub YAFWebserver_Initialize($) {
         $hash->{DefFn} = "YAFWebserver_Define";
         $hash->{UndefFn} = "YAFWebserver_Undefine";
         $hash->{ReadFn} = "YAFWebserver_Read";
+        
+        # init new webserver instance
+        $hash->{YAFWEBSERVER} = YAFWebserver->new;
+        $hash->{HEADER_FIELD_HASHMAP} = ();
 }
 
 ########################################################################################
@@ -60,8 +61,8 @@ sub YAFWebserver_Initialize($) {
 sub YAFWebserver_Define($@) {
         my ($hash, $def) = @_;
         my ($name, $type, $port) = split("[ \t]+", $def);
-        # Starting Listening for Webserver Request
-        my $ret = TcpServer_Open($hash, $port, "global");
+        # Open new tcp listening on defined port
+        my $ret = TcpServer_Open($hash, $port, "");
         return $ret;
 }
 
@@ -75,6 +76,7 @@ sub YAFWebserver_Define($@) {
 
 sub YAFWebserver_Undefine($@) {
         my ($hash, $arg) = @_;
+        # Close tcp listening
         return TcpServer_Close($hash);
 }
 
@@ -88,58 +90,92 @@ sub YAFWebserver_Undefine($@) {
 
 sub YAFWebserver_Read($) {
         my ($hash) = @_;
-        my $requested_uri;
+        my $requestedUrl;
         
-        # New ServerSocket
+        # Accept new server sockets
         if($hash->{SERVERSOCKET}) {
                 TcpServer_Accept($hash, "YAFWebserver");
                 return;
         }
         
+        # Received chars stored in $c
         my $c = $hash->{CD};
-        my $buf;
         
-        # Read 1024 Byte of data
+        # Read 1024 byte of data
+        my $buf;
         my $ret = sysread($hash->{CD}, $buf, 1024);
         
         # When there is an error in connection return
-        if(!defined($ret) || $ret <= 0) {
+        if (!defined($ret) || $ret <= 0) {
         	CommandDelete(undef, $hash->{NAME});
-       		return;
+        	return;
         }
         
-        # New Request
+        ########
+        # State: new request / read header
+        ########
         if (!defined($hash->{HTTPSTATE}) || ($hash->{HTTPSTATE} eq "NewRequest")) {
                 # Check if new Request is GET or POST else => break connection
                 if (($buf =~ m/\n\n.*/) || ($buf =~ m/\r\n\r\n.*/)) {   
-                        my $position_end_of_header = 0;
+                        my $position = 0;
                         # Search trim position,to cut header from content
                         if ($buf =~ m/\n\n.*/) {
-                                $position_end_of_header = index($buf,"\n\n")+2; # +2 for \n\n
+                                $position = index($buf,"\n\n")+2; # +2 for \n\n
                         }
                         else {
-                                $position_end_of_header = index($buf, "\r\n\r\n")+4;# +4 for \r\n\r\n
+                                $position = index($buf, "\r\n\r\n")+4;# +4 for \r\n\r\n
                         }
-                        # Hole header is read. Remove header from buffer.
-                        $hash->{HTTPHEADER} .= substr($buf, 0, $position_end_of_header);      
-                        $buf = substr($buf, $position_end_of_header);
-                        # Split header in lines (\r\n)
-                        my @header_array = split("[\r\n]", $hash->{HTTPHEADER});
-                        # look for requested url
-                        my @requested_uri = grep /GET/, @header_array;
-                        my @requested_uri_parts = split(" ", $requested_uri[0]);
-                        $requested_uri = $requested_uri_parts[1];
-                        # Read Content-Length when available
-                        my @content_length_array = grep /Content-Length/, @header_array;
-                        my $content_length = 0;
-                        if (scalar(@content_length_array) > 0) {
-                                $content_length = substr($content_length_array[0],16);                              
-                        }
+                        # header is read. Remove header from buffer.
+                        $hash->{HTTPHEADER} .= substr($buf, 0, $position);      
+                        $buf = substr($buf, $position);
+                        # split header in lines in hashmap
+                        # example header line: Accept-Encoding: gzip,deflate,sdch
+                        # $hash->{HTTPHEADER_VALUEMAP}->{key} => value
+                        my @header_field = split("[\r\n][\r\n]", $hash->{HTTPHEADER});
+                        my @header_field_line_splitted;
+                 		for (my $array_pos = 1; $array_pos < scalar(@header_field); $array_pos++) { 
+                 			@header_field_line_splitted = split(":",$header_field[$array_pos]);
+                 			$hash->{HTTPHEADER_VALUEMAP}->{"$header_field_line_splitted[0]"} = trim($header_field_line_splitted[1]);
+                 		}
+                        # look for request line
+                        # GET / HTTP/1.1
+                        my @header_field_request_splitted = split(" ", $header_field[0]);
+                        $hash->{HTTPHEADER_METHOD} = $header_field_request_splitted[0];
+                        $hash->{HTTPHEADER_URI} = $header_field_request_splitted[1]; 
+                        $hash->{HTTPHEADER_VERSION} = $header_field_request_splitted[2]; 
+                        # consume uri
+                        # \path\to\file.php ? test = 1 & test = 2
+                        # $hash->{GET}->{key} => value                       
+                        my @header_field_uri_splitted = split(/\?/, $hash->{HTTPHEADER_URI});
+						if (scalar(@header_field_uri_splitted) > 1) {
+							my @attributes_array = split("&",$header_field_uri_splitted[1]);
+							my @attribute_pair;
+							foreach (@attributes_array) {
+								@attribute_pair = split("=",$_);
+								$hash->{GET}->{"$attribute_pair[0]"} = $attribute_pair[1]; 
+							}
+						}        
+						# cookie 
+						if ($hash->{HTTPHEADER_VALUEMAP}->{"Cookie"}) {
+							my @cookies_array = split(";", $hash->{HTTPHEADER_VALUEMAP}->{"Cookie"});
+							my @cookies_array_pair;
+							foreach (@cookies_array) {
+								@cookies_array_pair = split("=",$_);
+								my $name = trim($cookies_array_pair[0]);
+								$hash->{COOKIE}->{"$name"} = $cookies_array_pair[1];
+							}
+						}
                         # set content-length
-                        $hash->{HTTPCONTENTLENGTH} = $content_length;
+                      	if ($hash->{HTTPHEADER_VALUEMAP}->{"Content-Length"}) {
+                      		$hash->{HTTPCONTENT_LENGTH} = $hash->{HTTPHEADER_VALUEMAP}->{"Content-Length"};
+                      	}
+                        else {
+                        	$hash->{HTTPCONTENT_LENGTH} = 0;
+                        }
                         # clear HTTPCONTENT
                         $hash->{HTTPCONTENT} = "";
-                        $hash->{HTTPSTATE} = "ReadData";                        
+                        $hash->{HTTPSTATE} = "ReadData";
+                        
                 }
                 else {
                         $hash->{HTTPHEADER} .= $buf;
@@ -147,43 +183,71 @@ sub YAFWebserver_Read($) {
                 }
         }
         
-        # Read Data 
+        ########
+        # State: consume content
+        ########
         if (defined($hash->{HTTPSTATE}) && ($hash->{HTTPSTATE} eq "ReadData")) {
                 $hash->{HTTPCONTENT} .= $buf;
                 # Read hole HTTPCONTENT
-                if (length($hash->{HTTPCONTENT}) >= $hash->{HTTPCONTENTLENGTH}) {
-                        $hash->{HTTPSTATE} = "DoResponse";      
+                if (length($hash->{HTTPCONTENT}) >= $hash->{HTTPCONTENT_LENGTH}) {
+                        $hash->{HTTPSTATE} = "DoResponse";
+                		# content finish
+                		# prepare post var
+                		if (($hash->{HTTPHEADER_VALUEMAP}->{"Content-Type"}) && ($hash->{HTTPHEADER_VALUEMAP}->{"Content-Type"} eq "application/x-www-form-urlencoded")) {
+                			my @attributes_array = split("&",$hash->{HTTPCONTENT});
+							my @attribute_pair;
+							foreach (@attributes_array) {
+								@attribute_pair = split("=",$_);
+								$hash->{POST}->{"$attribute_pair[0]"} = $attribute_pair[1];
+							}
+                		}      
+                		elsif (($hash->{HTTPHEADER_VALUEMAP}->{"Content-Type"}) && ($hash->{HTTPHEADER_VALUEMAP}->{"Content-Type"} =~ m/multipart\/form-data; boundary=*/)) {
+                			$hash->{POST_DIVISOR} = $hash->{HTTPHEADER_VALUEMAP}->{"Content-Type"};
+                			$hash->{POST_DIVISOR} =~ s/multipart\/form-data; boundary=//g;
+                			# add prefix
+                			$hash->{POST_DIVISOR} = "--".$hash->{POST_DIVISOR};
+                			my @post_field_splitted = split($hash->{POST_DIVISOR},$hash->{HTTPCONTENT});
+                			# for every post field
+                			for (my $array_pos = 1; $array_pos < scalar(@post_field_splitted)-1; $array_pos++) {
+                				my @entry_splitted = split("\r\n\r\n",$post_field_splitted[$array_pos]);
+                				# remove last return in value
+                				$entry_splitted[1] = substr($entry_splitted[1],0,length($entry_splitted[1])-2);
+                				# get name
+                				$entry_splitted[0] =~ m/.*name="(.*)".*/;
+                				$hash->{POST}->{"$1"} = $entry_splitted[1];
+                			}
+                		}    
                 }
                 else {
                         return;
                 }
         }
         
-        # Answer Request
+        ########
+        # State: do response
+        ########
         if (defined($hash->{HTTPSTATE}) && ($hash->{HTTPSTATE} eq "DoResponse")) {
-                my ($contentType, $content) = YAF_Request($requested_uri);
+        	my $header = $hash->{HTTPHEADER};
+       		my $content = $hash->{HTTPCONTENT};
+       		
+
+       		my $test3 = "no";
+         	my $response = "header lines: $hash->{HTTPCONTENT_LENGTH}\r\n####################\r\n$header####################\r\n$content\r\n##################\r\n$test3";
                 
-                # files over 30000 chars getting compressed
-                my $header_compressed = "";  
-                if (($zlib_active == 1) && (length($content) > 30000)) {
-                	$content = Compress::Zlib::memGzip($content);
-    				$header_compressed = "Content-Encoding: gzip\r\n";               	
-                }
-    
-    			# send response to client
+
                 print $c "HTTP/1.1 200 OK\r\n",
-                     "Content-Length: ".length($content)."\r\n",
-                     $header_compressed,
-                     "Content-Type: $contentType\r\n\r\n",
-                     $content;
-                     
+                                 "Content-Type: text/plain\r\n",
+                                # "Set-Cookie: test=test4\r\n",
+                     			"Content-Length: ".length($response)."\r\n\r\n",
+                     			$response;
             # Waiting for new Request
             $hash->{HTTPHEADER} = "";
             $hash->{HTTPCONTENT} = "";
             $hash->{HTTPSTATE} = "NewRequest";
-            # End of Request 
-        }     
+                # End of Request 
+        }
+        
         return; 
-} 
+}
 
 1;
