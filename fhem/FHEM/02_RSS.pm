@@ -251,6 +251,7 @@ RSS_itemDate {
 sub
 RSS_itemImg {
   my ($S,$x,$y,$scale,$imgtype,$srctype,$arg,%params)= @_;
+  return unless(defined($arg));
   return if($arg eq "");
   my $I;
   if($srctype eq "url") {
@@ -275,6 +276,7 @@ RSS_itemImg {
       return;
     }
   } elsif($srctype eq "data") {
+    require "98_SVG.pm"; # enable use of plotAsPng() 
     if($imgtype eq "gif") {
       $I= GD::Image->newFromGifData($arg);
     } elsif($imgtype eq "png") {
@@ -658,7 +660,7 @@ RSS_CGI(){
     The picture is scaled by the factor &lt;s&gt; (a decimal value). If 'w' or 'h' is in front of scale-value the value is used to set width or height to the value in pixel. If &lt;srctype&gt; is <code>file</code>, the picture
     is loaded from the filename &lt;arg&gt;, if &lt;srctype&gt; is <code>url</code>, the picture
     is loaded from the URL &lt;arg&gt;, if &lt;srctype&gt; is <code>data</code>, the picture
-    is loaded from Data &lt;arg&gt;. You can use
+    is piped in from data &lt;arg&gt;. You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;arg&gt. See below for example.
     Notice: do not load the image from URL that is served by fhem as it leads to a deadlock.<br></li>
     <br>
@@ -674,6 +676,16 @@ RSS_CGI(){
     text 0.10 0.95 { ReadingsVal("MyWeather","temperature","?"). "C" }<br>
     img 20 530 0.5 png file { "/usr/share/fhem/www/images/weather/" . ReadingsVal("MyWeather","icon","") . ".png" }<br>
     </code>
+    <p>
+    
+    <i>Special uses</i><p>
+    
+    You can display <a href="#SVG">SVG</a> plots with the aid of the helper function <code>plotAsPng()</code> (in 98_SVG.pm). Example:<p>
+    <code>
+    img 20 30 0.6 png data { plotAsPng("mySVGPlot") }
+    </code>
+    <p>
+    This requires the perl module Image::LibRSVG and librsvg. Debian-based systems can install these with <code>apt-get install libimage-librsvg-perl</code>.
 
   </ul>
 

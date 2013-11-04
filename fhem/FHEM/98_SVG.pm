@@ -1480,7 +1480,52 @@ SVG_pO($)
   $SVG_RET .= "\n";
 }
 
+##################
+
+# this is a helper function which creates a PNG image from a given plot
+sub plotAsPng(@) {
+        my (@plotName) = @_;
+        my (@webs, $mimetype, $svgdata, $rsvg, $pngImg);
+        
+        @webs=devspec2array("TYPE=FHEMWEB");
+        foreach(@webs) {
+                if(!InternalVal($_,'TEMPORARY',undef)) {
+                        $FW_wname=InternalVal($_,'NAME','');
+                        last;
+                }
+        }
+        Debug "FW_wname= $FW_wname, plotName= $plotName[0]";
+
+        $FW_RET                 = undef;
+        $FW_webArgs{dev}        = $plotName[0];
+        $FW_webArgs{logdev}     = InternalVal($plotName[0], "LOGDEVICE", "");
+        $FW_webArgs{gplotfile}  = InternalVal($plotName[0], "GPLOTFILE", "");
+        $FW_webArgs{logfile}    = InternalVal($plotName[0], "LOGFILE", "CURRENT"); 
+        $FW_pos{zoom}           = $plotName[1] if $plotName[1];
+        $FW_pos{off}            = $plotName[2] if $plotName[2];
+
+        ($mimetype, $svgdata)   = SVG_showLog("unused");
+        
+        Debug "MIME type= $mimetype";
+        Debug "SVG= $svgdata";
+
+        eval {
+                require Image::LibRSVG;
+                $rsvg = new Image::LibRSVG();
+                $rsvg->loadImageFromString($svgdata);
+                $pngImg = $rsvg->getImageBitmap();
+        };
+        Debug "Error: $@" if($@);
+
+        return $pngImg if $pngImg;
+        return;
+}
+
+##################
+
 1;
+
+##################
 
 =pod
 =begin html
