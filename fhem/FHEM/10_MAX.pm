@@ -6,7 +6,6 @@
 #
 package main;
 
-use v5.10.1;
 use strict;
 use warnings;
 use MIME::Base64;
