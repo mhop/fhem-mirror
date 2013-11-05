@@ -124,6 +124,7 @@ MAXLAN_Disconnect($)
 {
   my $hash = shift;
   Log 5, "MAXLAN_Disconnect";
+  Dispatch($hash, "MAX,1,CubeConnectionState,$hash->{rfaddr},0", {});
   #All operations here are no-op if already disconnected
   DevIo_CloseDev($hash);
   RemoveInternalTimer($hash);
@@ -442,7 +443,8 @@ MAXLAN_Parse($$)
     $hash->{fwversion} = $args[2];
     my $dutycycle = 0;
     if(@args > 5){
-      $dutycycle = $args[5];
+      $dutycycle = hex($args[5]);
+      $hash->{dutycycle} = sprintf("%3.0f %%", $dutycycle);
     }
     my $freememory = 0;
     if(@args > 6){
@@ -476,6 +478,7 @@ MAXLAN_Parse($$)
     Dispatch($hash, "MAX,1,define,$hash->{rfaddr},Cube,$hash->{serial},0,1", {RAWMSG => $rmsg});
     Dispatch($hash, "MAX,1,CubeConnectionState,$hash->{rfaddr},1", {RAWMSG => $rmsg});
     Dispatch($hash, "MAX,1,CubeClockState,$hash->{rfaddr},$clockset", {RAWMSG => $rmsg});
+    Dispatch($hash, "MAX,1,CubeDutyCycleState,$hash->{rfaddr},$dutycycle", {RAWMSG => $rmsg});
     Log $ll5, "MAXLAN_Parse: Got hello, connection ip $args[4], duty cycle $dutycycle, freememory $freememory, clockset $clockset";
 
   } elsif($cmd eq 'M') {
@@ -659,8 +662,9 @@ MAXLAN_Parse($$)
 
   } elsif($cmd eq "S"){#Response to s:
     $hash->{dutycycle} = hex($args[0]); #number of command send over the air
+    Dispatch($hash, "MAX,1,CubeDutyCycleState,$hash->{rfaddr},$hash->{dutycycle}", {RAWMSG => $rmsg});
     my $discarded = $args[1];
-    $hash->{freememoryslot} = hex($args[2]);
+    $hash->{freememoryslot} = $args[2];
     Log 5, "MAXLAN_Parse: dutycyle $hash->{dutycycle}, freememoryslot $hash->{freememoryslot}";
 
     Log 3, "MAXLAN_Parse: 1% rule: we sent too much, cmd is now in queue" if($hash->{dutycycle} == 100 && $hash->{freememoryslot} > 0);
