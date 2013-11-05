@@ -111,6 +111,7 @@ sub CUL_HM_storeRssi(@);
 sub CUL_HM_qStateUpdatIfEnab($@);
 sub CUL_HM_getAttrInt($@);
 sub CUL_HM_putHash($);
+sub CUL_HM_appFromQ($$);
 
 # ----------------modul globals-----------------------
 my $respRemoved; # used to control trigger of stack processing
@@ -157,9 +158,11 @@ sub CUL_HM_Initialize($) {
 
   $hash->{prot}{rspPend} = 0;#count Pending responses
   my @statQArr = ();
+  my @statQWuArr = ();
   my @confQArr = ();
   my @confQWuArr = ();
   $hash->{helper}{qReqStat}   = \@statQArr;
+  $hash->{helper}{qReqStatWu} = \@statQWuArr;
   $hash->{helper}{qReqConf}   = \@confQArr;
   $hash->{helper}{qReqConfWu} = \@confQWuArr;
   CUL_HM_initRegHash();
@@ -333,6 +336,8 @@ sub CUL_HM_Define($$) {##############################
   else{# define a device
     $hash->{helper}{role}{dev}=1;
     $hash->{helper}{role}{chn}=1;# take role of chn 01 until it is defined
+    $hash->{helper}{q}{qReqConf}=""; # queue autoConfig requests for this device
+    $hash->{helper}{q}{qReqStat}=""; # queue autoConfig requests for this device
 	CUL_HM_prtInit ($hash);
     AssignIoPort($hash);
   }
@@ -524,6 +529,9 @@ sub CUL_HM_Parse($$) {##############################
   }
   my @event;    #events to be posted for main entity
   my @entities; #additional entities with events to be notifies
+			   
+  my $name = $shash->{NAME};
+  return if (CUL_HM_getAttrInt($name,"ignore"));
 
   if ($msgStat && $msgStat =~ m/AESKey/){
     push @entities,CUL_HM_UpdtReadSingle($shash,"aesKeyNbr",substr($msgStat,7),1);
@@ -531,7 +539,6 @@ sub CUL_HM_Parse($$) {##############################
   }
   CUL_HM_eventP($shash,"Evt_$msgStat")if ($msgStat);#log io-events
   CUL_HM_eventP($shash,"Rcv");
-  my $name = $shash->{NAME};
   my $dname = ($dst eq "000000") ? "broadcast" :
                                    ($dhash ? $dhash->{NAME} : 
 								             ($dst eq $id ? $ioName : 
@@ -545,7 +552,6 @@ sub CUL_HM_Parse($$) {##############################
                    $myRSSI);
 
   my $msgX = "No:$mNo - t:$mTp s:$src d:$dst ".($p?$p:"");
-
   if($shash->{lastMsg} && $shash->{lastMsg} eq $msgX) { #duplicate -lost 'ack'?
     if(   $shash->{helper}{rpt}                           #was responded
        && $shash->{helper}{rpt}{IO}  eq $ioName           #from same IO
@@ -1019,15 +1025,16 @@ sub CUL_HM_Parse($$) {##############################
 		  }
 		  else{                                #invalid PhysLevel
             $rSUpdt = 1;		  
-		    CUL_HM_stateUpdatDly($shash->{NAME},3);     # update to get level
+		    CUL_HM_stateUpdatDly($shash->{NAME},5);     # update to get level
 		  }
 		}
 	  }
 	  $physLvl = ReadingsVal($name,"phyLevel",$val." %") 
 	        if(!$physLvl);                     #not updated? use old or ignore
       my $vs = ($val==100 ? "on":($val==0 ? "off":"$val %")); # user string...
-	  
+
 	  push @event,"level:$val %";
+	  push @event,"pct:$val"; # duplicate to level - necessary for "slider"
       push @event,"deviceMsg:$vs$target" if($chn ne "00");
 	  push @event,"state:".(($physLvl ne $val." %")?"chn:$vs phys:$physLvl":
 	                                                $vs);
@@ -1526,7 +1533,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 
   if( ((hex($mFlg) & 0xA2) == 0x82) &&
 	  (CUL_HM_getRxType($shash) & 0x08)){ #wakeup and process stack
-	CUL_HM_qPend($shash->{NAME});# stack cmds if waiting
+	CUL_HM_appFromQ($shash->{NAME},"wu");# stack cmds if waiting
 	if ($shash->{cmdStack}){
       CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IOid($shash).$src);
 	  CUL_HM_ProcessCmdStack($shash);
@@ -1645,8 +1652,9 @@ sub CUL_HM_parseCommon(@){#####################################################
       CUL_HM_ProcessCmdStack($shash); # start processing immediately
 	}
 	elsif(CUL_HM_getRxType($shash) & 0x04){# nothing to pair - maybe send config
-	  CUL_HM_qPend($shash->{NAME});   # stack cmds if waiting
- 	  CUL_HM_ProcessCmdStack($shash) ;#config
+	  CUL_HM_appFromQ($shash->{NAME},"cf");   # stack cmds if waiting
+	  if (hex($mFlg)&0x20){CUL_HM_SndCmd($shash,$mNo."8002".$id.$src."00");}
+	  else{ 	           CUL_HM_ProcessCmdStack($shash);} ;#config
 	}
 	$ret = "done";
   } 
@@ -1809,17 +1817,23 @@ sub CUL_HM_parseCommon(@){#####################################################
   }
   elsif($mTp =~ m /^4[01]/){ #someone is triggered##########
 	CUL_HM_qStateUpdatIfEnab($dst)if (hex($mFlg) & 0x20 && $dhash);
-    my $cName = CUL_HM_id2Hash($src.sprintf("%02X",hex(substr($p,0,2))& 0x3f));
+	my $chn = hex(substr($p,0,2));
+	my $long = ($chn & 0x40)?"long":"short";
+	$chn = $chn & 0x3f;
+    my $cName = CUL_HM_id2Hash($src.sprintf("%02X",$chn));
 	$cName = $cName->{NAME};
 	my $level = "-";
-
+    
 	if (length($p)>5){
 	  my $l = substr($p,4,2);
 	  if    ($lvlStr{md}{$md} && $lvlStr{md}{$md}{$l}){$level = $lvlStr{md}{$md}{$l}}
 	  elsif ($lvlStr{st}{$st} && $lvlStr{st}{$st}{$l}){$level = $lvlStr{st}{$st}{$l}}
 	  else                                            {$level = hex($l)};
-	} 
-	
+	}
+	elsif($mTp eq "40"){
+	  $level = $long;
+	}
+
 	my @peers = split(",",AttrVal($cName,"peerIDs",""));
 	my @entities;
 	foreach my $peer (@peers){
@@ -1827,8 +1841,8 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  $pName = CUL_HM_id2Name(substr($peer,0,6)) if (!$defs{$pName});
 	  next if (!$defs{$pName});#||substr($peer,0,6) ne $dst
 	  push @entities,CUL_HM_UpdtReadBulk($defs{$pName},1
-	                        ,"trig_$cName:$level"
-	                        ,"trigLast:$cName".(($level ne "-")?":$level":""));
+	                      ,"trig_$cName:$level"
+	                      ,"trigLast:$cName ".(($level ne "-")?":$level":""));
 	}
 
 	return "entities:".join(",",@entities);
@@ -2263,9 +2277,8 @@ sub CUL_HM_Set($@) {
 		@{$modules{CUL_HM}{$hash->{IODev}{NAME}}{pendDev}} = 
 		      grep !/$name/,@{$modules{CUL_HM}{$hash->{IODev}{NAME}}{pendDev}};
 	  }
-	  @{$modules{CUL_HM}{helper}{qReqConf}} =
-	          grep !/$name/,@{$modules{CUL_HM}{helper}{qReqConf}}
-			     if ($modules{CUL_HM}{helper}{qReqConf});
+	  CUL_HM_unQEntity($name,"qReqConf");
+	  CUL_HM_unQEntity($name,"qReqStat");
 	  CUL_HM_protState($hash,"Info_Cleared");
 	}
 	elsif($sect eq "rssi"){
@@ -2304,7 +2317,6 @@ sub CUL_HM_Set($@) {
 	$state = "";
   } 
   elsif($cmd eq "getConfig") { ################################################
-    CUL_HM_unQEntity($name,"qReqConfWu");
     CUL_HM_unQEntity($name,"qReqConf");
 	CUL_HM_getConfig($hash);
 	$state = "";
@@ -3133,6 +3145,7 @@ sub CUL_HM_Set($@) {
 
   my $rxType = CUL_HM_getRxType($devHash);
   Log GetLogLevel($name,2), "CUL_HM set $name $act";
+  Log 1,"General send $name rxt:$rxType p:".$devHash->{helper}{prt}{sProc};
   if($rxType & 0x03){#all/burst
     CUL_HM_ProcessCmdStack($devHash);
   }
@@ -3905,13 +3918,13 @@ sub CUL_HM_name2Hash($) {#in: name, out:hash
 sub CUL_HM_name2Id(@) { #in: name or HMid ==>out: HMid, "" if no match
   my ($name,$idHash) = @_;
   my $hash = $defs{$name};
-  return $hash->{DEF}        if($hash);                       #name is entity
+  return $hash->{DEF}        if($hash && $hash->{TYPE} eq "CUL_HM");#name is entity
   return "000000"            if($name eq "broadcast");        #broadcast
   return $defs{$1}->{DEF}.$2 if($name =~ m/(.*)_chn:(..)/);   #<devname> chn:xx
   return $name               if($name =~ m/^[A-F0-9]{6,8}$/i);#was already HMid
   return substr($idHash->{DEF},0,6).sprintf("%02X",$1) 
                              if($idHash && ($name =~ m/self(.*)/));
-  return "";
+  return AttrVal($name,"hmId",""); # could be IO device
 }
 sub CUL_HM_id2Name($) { #in: name or HMid out: name
   my ($p) = @_;
@@ -4782,116 +4795,160 @@ sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request after 12 s
   $name =~ s /_chn:..$//;
   return if (!$defs{$name}); #device unknown, ignore
   if ($force || ((CUL_HM_getAttrInt($name,"autoReadReg") & 0x0f) > 3)){
-    CUL_HM_qEntity($name,"qReqStat");
-	RemoveInternalTimer("CUL_HM_procQs");
-	InternalTimer(gettimeofday()+ .5,"CUL_HM_procQs","CUL_HM_procQs", 0);
+    CUL_HM_qEntity($name,"qReqStat") ;
   }
 }
 sub CUL_HM_qAutoRead($$){
   my ($name,$lvl) = @_;
   return if (!$defs{$name}
              ||$lvl >= (0x07 & CUL_HM_getAttrInt($name,"autoReadReg")));
-  CUL_HM_qEntity($name,(CUL_HM_getRxType($defs{$name}) & 0x1C)?"qReqConfWu"
-                                                              :"qReqConf");
-  RemoveInternalTimer("CUL_HM_procQs");
-  InternalTimer(gettimeofday()+ .5,"CUL_HM_procQs","CUL_HM_procQs", 0);
+  CUL_HM_qEntity($name,"qReqConf");
 }
-sub CUL_HM_unQEntity($$){# remove entity from q - task no longer necesary
+sub CUL_HM_unQEntity($$){# remove entity from q 
   my ($name,$q) = @_;
-  $q = $modules{CUL_HM}{helper}{$q};
-  return if (AttrVal($name,"subType","") eq "virtual");
-  if ($defs{$name}{helper}{role}{dev}){
-	foreach (grep /channel_/,keys %{$defs{$name}}){# remove potential chn
-	  my $ch = $defs{$name}{$_};
-	  @{$q} = grep !/^$ch$/,@{$q};
-	}
-  }
-  @{$q} = grep !/^$name$/,@{$q};
-}
-sub CUL_HM_qEntity($$){
-  my ($name,$q) = @_;
-  return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
-  $q = $modules{CUL_HM}{helper}{$q};
-  return if (AttrVal($name,"subType","") eq "virtual");
-  if ($defs{$name}{helper}{role}{dev}){
-	foreach (grep /channel_/,keys %{$defs{$name}}){# remove potential chn
-	  my $ch = $defs{$name}{$_};
-	  @{$q} = grep !/^$ch$/,@{$q};
-	}
- 	@{$q} = CUL_HM_noDup(@{$q},$name);
-  }
-  elsif (!grep /^$defs{$name}{device}$/,@{$q}){# chn - only if device not in    
-	@{$q} = CUL_HM_noDup(@{$q},$name);
-  }
-}
+  
+  my $devN = CUL_HM_getDeviceName($name);
+  return if (AttrVal($devN,"subType","") eq "virtual");
+  my $dq = $defs{$devN}{helper}{q};
+  return if ($dq->{$q} eq "");
 
-sub CUL_HM_procQs($){
-  # --- verify send is possible
-  my $next;
-  if (defined $modules{CUL_HM}{helper}{qReqStat}
-      && @{$modules{CUL_HM}{helper}{qReqStat}}){
-    while(@{$modules{CUL_HM}{helper}{qReqStat}}){
-      $next = .5;
-	  my $tName = CUL_HM_getDeviceName(${$modules{CUL_HM}{helper}{qReqStat}}[0]); 
-	  my $ioName = $defs{$tName}{IODev}{NAME};
-	  last if (ReadingsVal($ioName,"cond","") !~ m /^(ok|Overload-released|init)$/);
-      my $name = shift(@{$modules{CUL_HM}{helper}{qReqStat}});
-      last if (CUL_HM_Set($defs{$name},$name,"statusRequest") eq "1"); #skip?
-	}
-  }
-  elsif(defined $modules{CUL_HM}{helper}{qReqConf}
-        && @{$modules{CUL_HM}{helper}{qReqConf}}){
-    $next = $modules{CUL_HM}{hmAutoReadScan};
-	CUL_HM_autoReadConfig();
+  if ($devN eq $name){#all channels included
+    $dq->{$q}=""; 
   }
   else{
-    delete $modules{CUL_HM}{helper}{autoRdActive};
+    my @chns = split(",",$dq->{$q});
+	my $chn = substr(CUL_HM_name2Id($name),6,2);
+	@chns = grep !/$chn/,@chns;
+	$dq->{$q} = join",",@chns;
   }
+  my $mQ = $q."Wu" if (CUL_HM_getRxType($defs{$name}) & 0x1C);
+  $mQ = $modules{CUL_HM}{helper}{$q};  
+  @{$mQ} = grep !/^$devN$/,@{$mQ} if ($dq->{$q} eq "");
+  RemoveInternalTimer("sUpdt:$name") if ($q eq "qReqStat");#remove delayed
+}
+sub CUL_HM_qEntity($$){  # add to queue
+  my ($name,$q) = @_;
+  return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
+  
+  my $devN = CUL_HM_getDeviceName($name);
+  return if (AttrVal($devN,"subType","") eq "virtual");
+  return if ($defs{$devN}{helper}{q}{$q} eq "00"); #already requesting all
+  if ($devN eq $name){#config for all device
+    $defs{$devN}{helper}{q}{$q}="00"; 
+  }
+  else{
+	$defs{$devN}{helper}{q}{$q} = CUL_HM_noDupInString(
+	                                  $defs{$devN}{helper}{q}{$q}
+	                                  .",".substr(CUL_HM_name2Id($name),6,2));
+  }
+
+  $q .= "Wu" if (CUL_HM_getRxType($defs{$name}) & 0x1C);#normal or wakeup q?
+  $q = $modules{CUL_HM}{helper}{$q};
+  @{$q} = CUL_HM_noDup(@{$q},$devN);
+
+  my $wT = (@{$modules{CUL_HM}{helper}{qReqStat}})?
+                              "1":
+							  $modules{CUL_HM}{hmAutoReadScan};
+  RemoveInternalTimer("CUL_HM_procQs");
+  InternalTimer(gettimeofday()+ $wT,"CUL_HM_procQs","CUL_HM_procQs", 0);
+}
+
+sub CUL_HM_procQs($){#process non-wakeup queues
+  # --- verify send is possible
+
+  my $mq = $modules{CUL_HM}{helper};
+  foreach my $q ("qReqStat","qReqConf"){
+    if   (@{$mq->{$q}}){
+	  my $devN = ${$mq->{$q}}[0]; 
+	  my $ioName = $defs{$devN}{IODev}{NAME};
+	  if (   (   ReadingsVal($ioName,"cond","") =~ m /^(ok|Overload-released|init)$/
+	          && $q eq "qReqStat")
+		   ||(   CUL_HM_autoReadReady($ioName)
+	          && $q eq "qReqConf")){
+        my $dq = $defs{$devN}{helper}{q};
+        my @chns = split(",",$dq->{$q});
+	    if (@chns > 1){$dq->{$q} = join ",",@chns[1..@chns];}
+	    else{          $dq->{$q} = "";
+	                   @{$mq->{$q}} = grep !/^$devN$/,@{$mq->{$q}};
+	    }
+		my $dId = CUL_HM_name2Id($devN);
+	    my $eN=($chns[0]ne "00")?CUL_HM_id2Name($dId.$chns[0]):$devN;
+		if ($q eq "qReqConf"){
+          $mq->{autoRdActive} = $devN;
+	      CUL_HM_Set($defs{$eN},$eN,"getConfig");
+		}
+		else{
+ 	      CUL_HM_Set($defs{$eN},$eN,"statusRequest");
+		}
+	  }
+	  last; # execute only one!
+    }
+  }
+
+  delete $mq->{autoRdActive} 
+        if ($mq->{autoRdActive} &&
+            $defs{$mq->{autoRdActive}}{helper}{prt}{sProc} != 1);
+  my $next;# how long to wait for next timer
+  if    (@{$mq->{qReqStat}}){$next = 1}
+  elsif (@{$mq->{qReqConf}}){$next = $modules{CUL_HM}{hmAutoReadScan}}
+  
   InternalTimer(gettimeofday()+$next,"CUL_HM_procQs","CUL_HM_procQs",0)
       if ($next); 
 }
-sub CUL_HM_autoReadConfig(){
-  return if (!CUL_HM_autoReadReady($modules{CUL_HM}{helper}{qReqConf}));
-
-  my $name = shift(@{$modules{CUL_HM}{helper}{qReqConf}});
-  my $hash = $defs{$name};
-
-  CUL_HM_Set($hash,$name,"getConfig");
-  my $mId = CUL_HM_getMId($hash);
-  $modules{CUL_HM}{helper}{autoRdActive} = $name;
-}
-sub CUL_HM_qPend($){
-  my $name = shift;
-  my $q = $modules{CUL_HM}{helper}{qReqConfWu};
-  return if (!CUL_HM_autoReadReady($q));
-  my $eName = "";
-  if (grep /^$name$/,@{$q}){
-    $eName = $name
-  }
-  else{
-    foreach (grep /channel_/,keys %{$defs{$name}}){
-	  my $ch = $defs{$name}{$_};
-	  if (grep /^$ch$/,@{$q}){
-        $eName = $ch;
+sub CUL_HM_appFromQ($$){#stack commands if pend in WuQ 
+  my ($name,$reason) = @_;
+  my $devN = CUL_HM_getDeviceName($name); 
+  my $dId = CUL_HM_name2Id($devN);
+  my $dq = $defs{$devN}{helper}{q};
+  if ($reason eq "cf"){# reason is config. add all since User has control
+    foreach my $q ("qReqStat","qReqConf"){
+      if ($dq->{$q} ne ""){# need update
+ 	    my @eName;
+	    if ($dq->{$q} eq "00"){
+		  push @eName,$devN;
+		}
+		else{
+          my @chns = split(",",$dq->{$q});
+	      push @eName,CUL_HM_id2Name($dId.$_)foreach (@chns);
+		}
+	    $dq->{$q} = "";
+	    @{$modules{CUL_HM}{helper}{$q."Wu"}} = 
+	                grep !/^$devN$/,@{$modules{CUL_HM}{helper}{$q."Wu"}};
+        foreach my $eN(@eName){
+          next if (!$eN);
+	      CUL_HM_Set($defs{$eN},$eN,"getConfig")     if ($q eq "qReqConf");
+	      CUL_HM_Set($defs{$eN},$eN,"statusRequest") if ($q eq "qReqStat");
+        }
 	  }
 	}
   }
-  if ($eName){
-	@{$q} = grep !/^$eName$/,@{$q};
-	CUL_HM_Set($defs{$eName},$eName,"getConfig");
+  elsif($reason eq "wu"){#wakeup - just add one step
+    my $ioName = $defs{$devN}{IODev}{NAME};
+    return if (!CUL_HM_autoReadReady($ioName));# no sufficient performance 
+    foreach my $q ("qReqStat","qReqConf"){
+	  if ($dq->{$q} ne ""){# need update
+        my @chns = split(",",$dq->{$q});
+	    my $nOpen = scalar @chns;
+	    if ($nOpen > 1){$dq->{$q} = join ",",@chns[1..$nOpen];}
+	    else{           $dq->{$q} = "";
+	                  @{$modules{CUL_HM}{helper}{$q."Wu"}} = 
+	                     grep !/^$devN$/,@{$modules{CUL_HM}{helper}{$q."Wu"}};
+	    }
+	    my $eN=($chns[0]ne "00")?CUL_HM_id2Name($dId.$chns[0]):$devN;
+	    CUL_HM_Set($defs{$eN},$eN,"getConfig")     if ($q eq "qReqConf");
+	    CUL_HM_Set($defs{$eN},$eN,"statusRequest") if ($q eq "qReqStat");
+		return;# Only one per step - very defensive. 
+	  }
+	}
   }
 }
-sub CUL_HM_autoReadReady($){# capacity for autoread?
-  my $q = shift;
-  return if (!@{$q});
+sub CUL_HM_autoReadReady($){# capacity for autoread available?
+  my $ioName = shift;
   my $mHlp = $modules{CUL_HM}{helper};
-  if (   $mHlp->{autoRdActive}  # predecisor available
+  if (   $mHlp->{autoRdActive}  # predecessor available
       && $defs{$mHlp->{autoRdActive}}){
-    my $dName = CUL_HM_getDeviceName($mHlp->{autoRdActive});
-    return 0 if ($defs{$dName}{helper}{prt}{sProc} == 1); # predecisor still on
+    return 0 if ($defs{$mHlp->{autoRdActive}}{helper}{prt}{sProc} == 1); # predecessor still on
   }
-  my $tName = CUL_HM_getDeviceName(${$q}[0]);
-  my $ioName = $defs{$tName}{IODev}{NAME};
   if (  ReadingsVal($ioName,"cond","") !~ m /^(ok|Overload-released|init)$/
 	  || (    $defs{$ioName}{helper}{q}
 		  && ($defs{$ioName}{helper}{q}{cap}{sum}/16.8)>
@@ -4929,6 +4986,7 @@ sub CUL_HM_peerUsed($) {# are peers expected?
 	  
   my $mId = CUL_HM_getMId($hash);
   my $cNo = hex(substr($hash->{DEF}."01",6,2))."p"; #default to channel 01
+  return 0 if (!$mId || !$culHmModel{$mId});
   foreach my $ls (split ",",$culHmModel{$mId}{lst}){
 	my ($l,$c) = split":",$ls;
     if (  ($l =~ m/^(p|3|4)$/ && !$c )  # 3,4,p without chanspec
@@ -4958,9 +5016,13 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
              foreach (grep !/00000000/,split(",",AttrVal($name,"peerIDs","")));
 			 
   my @lsNo;
-  push @lsNo,"0:" if ($hash->{helper}{role}{dev});
-  if ($hash->{helper}{role}{chn}){
-	my $mId = CUL_HM_getMId($hash);
+  my $mId = CUL_HM_getMId($hash);
+  return undef if (!$mId || !$culHmModel{$mId});
+  if ($hash->{helper}{role}{dev}){
+    push @lsNo,"0:";
+  }
+  elsif ($hash->{helper}{role}{chn}){
+	
 	foreach my $ls (split ",",$culHmModel{$mId}{lst}){
 	  my ($l,$c) = split":",$ls;
 	  if ($l ne "p"){# ignore peer-only entries
@@ -6078,14 +6140,14 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
       test:from $src<br>
   </li>
   <li><B>threeStateSensor</B><br>
-      [open|tilted|closed]]<br>
+      [open|tilted|closed]<br>
       [wet|damp|dry]                 #HM-SEC-WDS only<br>
-	  cover [open|closed]            #HM-SEC-WDS only<br>
+	  cover [open|closed]            #HM-SEC-WDS and HM-Sec-RHS<br>
 	  alive yes<br>
       battery [low|ok]<br>
       contact [open|tilted|closed]<br>
 	  contact [wet|damp|dry]         #HM-SEC-WDS only<br>
-	  sabotageError [on|off]         #HM-SEC-SC and HM-Sec-RHS only<br>
+	  sabotageError [on|off]         #HM-SEC-SC only<br>
   </li>
   <li><B>winMatic</B><br>
 	  [locked|$value]<br>

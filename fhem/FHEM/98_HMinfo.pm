@@ -336,17 +336,13 @@ sub HMinfo_SetFn($@) {#########################################################
 	$ret = $cmd." done:" ."\n    ".$hdr  ."\n    ".(join "\n    ",sort @paramList)
 	       ;
 	$ret .= "\n\n    CUL_HM queue:$modules{CUL_HM}{prot}{rspPend}";
-	$ret .= "\n    autoRegRead pending:"
-	           .join(",",@{$modules{CUL_HM}{helper}{qReqConf}})
-               .($modules{CUL_HM}{helper}{autoRdActive}?" recent:".$modules{CUL_HM}{helper}{autoRdActive}:"")
-			if ($modules{CUL_HM}{helper}{qReqConf});
-	$ret .= "\n    autoRegRead wakeup pending:"
-	           .join(",",@{$modules{CUL_HM}{helper}{qReqConfWu}})
-               .($modules{CUL_HM}{helper}{autoRdActive}?" recent:".$modules{CUL_HM}{helper}{autoRdActive}:"")
-			if ($modules{CUL_HM}{helper}{qReqConfWu});
-	$ret .= "\n    status request pending:".
-	            join(",",@{$modules{CUL_HM}{helper}{qReqStat}}) 
-			if ($modules{CUL_HM}{helper}{qReqStat});
+	$ret .= "\n";
+	$ret .= "\n    autoReadReg pending:"          .join(",",@{$modules{CUL_HM}{helper}{qReqConf}})
+               .($modules{CUL_HM}{helper}{autoRdActive}?" recent:".$modules{CUL_HM}{helper}{autoRdActive}:" recent:none");
+	$ret .= "\n    status request pending:"       .join(",",@{$modules{CUL_HM}{helper}{qReqStat}}) ;
+	$ret .= "\n    autoReadReg wakeup pending:"   .join(",",@{$modules{CUL_HM}{helper}{qReqConfWu}});
+	$ret .= "\n    status request wakeup pending:".join(",",@{$modules{CUL_HM}{helper}{qReqStatWu}});
+	$ret .= "\n";
 	@IOlist = HMinfo_noDup(@IOlist);
 	foreach(@IOlist){
 	  $_ .= ":".$defs{$_}{STATE}
