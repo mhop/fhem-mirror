@@ -341,8 +341,9 @@ sub HMLAN_Write($$$) {#########################################################
                              substr($msg, 10, 6),
 	  					     substr($msg, 16, 6));
     my $ll5 = GetLogLevel($hash->{NAME},5);						   
-    
-    if ($mtype eq "02" && $src eq $hash->{owner} && length($msg) == 24){
+
+    if (   $mtype eq "02" && $src eq $hash->{owner} && length($msg) == 24 
+	    && $hash->{assignIDs} =~ m/$dst/){
       # Acks are generally send by HMLAN autonomously
       # Special 
       Log $ll5, "HMLAN: Skip ACK" if (!$debug);
@@ -358,7 +359,7 @@ sub HMLAN_Write($$$) {#########################################################
     
     if (!$lhash{$dst} && $dst ne "000000"){
       HMLAN_SimpleWrite($hash, $IDadd);
-	  delete $hash->{helper}{$dst};
+#	  delete $hash->{helper}{$dst};
 	  my $dN = CUL_HM_id2Name($dst);
 	  if (!($dN eq $dst) &&  # name not found
 	      !(CUL_HM_Get(CUL_HM_id2Hash($dst),$dN,"param","rxType") & ~0x04)){#config only
