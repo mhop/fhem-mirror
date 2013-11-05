@@ -383,6 +383,24 @@ sub CUL_HM_Rename($$$) {#############################
 	  $chnHash->{device} = $name;
 	}
   }
+  if ($hash->{helper}{role}{chn}){
+    my $HMidCh = substr($HMid."01",0,8);
+	foreach my $pId (keys %{$modules{CUL_HM}{defptr}}){
+	  my $pH = $modules{CUL_HM}{defptr}{$pId};
+      my $pN = $pH->{NAME};
+	  my $pPeers = AttrVal($pN, "peerIDs", "");
+	  if ($pPeers =~ m/$HMidCh/){
+		CUL_HM_ID2PeerList ($pN,"x",0);
+		foreach my $pR (grep /-$oldName-/,keys%{$pH->{READINGS}}){
+		  my $pRn = $pR;
+		  $pRn =~ s/$oldName/$name/;
+		  $pH->{READINGS}{$pRn}{VAL} = $pH->{READINGS}{$pR}{VAL};
+		  $pH->{READINGS}{$pRn}{TIME} = $pH->{READINGS}{$pR}{TIME};
+		  delete $pH->{READINGS}{$pR};
+		}
+	  }
+	}
+  }
   return;
 }
 sub CUL_HM_Attr(@) {#################################
@@ -1559,7 +1577,8 @@ sub CUL_HM_parseCommon(@){#####################################################
 		  #General set timer
 		  return "done"
 		}
-		$shash->{protCondBurst} = "on" if ($shash->{protCondBurst} !~ m/forced/);
+		$shash->{protCondBurst} = "on" if (   $shash->{protCondBurst}
+		                                   && $shash->{protCondBurst} !~ m/forced/);
 		$shash->{helper}{prt}{awake}=2;#awake
 	  }
 	  else{
@@ -1604,7 +1623,11 @@ sub CUL_HM_parseCommon(@){#####################################################
 	}
 
     if (   $shash->{helper}{prt}{mmcS} 
-		&& $shash->{helper}{prt}{mmcS} == 3){
+		&& $shash->{helper}{prt}{mmcS} == 3){	  
+	  # after write device might need a break
+	  # allow for wake types only - and if commands are pending
+	  $shash->{helper}{prt}{try} = 1 if (CUL_HM_getRxType($shash) & 0x08 #wakeup
+	                                     && $shash->{cmdStack});
 	  if ($success eq 'yes'){
 		delete $shash->{helper}{prt}{mmcA};
 		delete $shash->{helper}{prt}{mmcS};
@@ -3649,8 +3672,8 @@ sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
   $modules{CUL_HM}{prot}{rspPend}-- if($hash->{helper}{prt}{rspWait}{cmd});
   delete ($hash->{helper}{prt}{rspWait});
   delete $hash->{helper}{tmdOn};
-  delete $hash->{helper}{prt}{mmcA};
-  delete $hash->{helper}{prt}{mmcS};
+#  delete $hash->{helper}{prt}{mmcA};
+#  delete $hash->{helper}{prt}{mmcS};
   RemoveInternalTimer($hash);                  # remove resend-timer
   RemoveInternalTimer("respPend:$hash->{DEF}");# remove responsePending timer
   $respRemoved = 1;
@@ -3670,6 +3693,12 @@ sub CUL_HM_respPendTout($) {
 	                                      $hash->{protCondBurst} !~ m/forced/);;
 	  $pHash->{wakeup} = 0;# finished
 	  $pHash->{awake} = 0;# set to asleep
+	  CUL_HM_protState($hash,"CMDs_pending");
+	}
+	elsif ($pHash->{try}){# send was a try - revert and wait for wakeup
+	  unshift (@{$hash->{cmdStack}}, "++".substr($pHash->{rspWait}{cmd},6));
+      delete $pHash->{try};
+	  CUL_HM_respPendRm($hash);# do not count problems with wakeup try, just wait
 	  CUL_HM_protState($hash,"CMDs_pending");
 	}
 	elsif ($hash->{IODev}->{STATE} !~ m/^(opened|Initialized)$/){#IO errors
