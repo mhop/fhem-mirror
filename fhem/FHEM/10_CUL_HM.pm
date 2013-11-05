@@ -3145,7 +3145,6 @@ sub CUL_HM_Set($@) {
 
   my $rxType = CUL_HM_getRxType($devHash);
   Log GetLogLevel($name,2), "CUL_HM set $name $act";
-  Log 1,"General send $name rxt:$rxType p:".$devHash->{helper}{prt}{sProc};
   if($rxType & 0x03){#all/burst
     CUL_HM_ProcessCmdStack($devHash);
   }
