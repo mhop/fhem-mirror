@@ -2,6 +2,8 @@
 # $Id$
 # Written by Matthias Gehre, M.Gehre@gmx.de, 2012-2013
 #
+# Dutycycle included by J. Isleib 2013-09-26
+#
 package main;
 
 use v5.10.1;
@@ -572,7 +574,7 @@ MAX_Parse($$)
     my $devicetype = undef;
     $devicetype = $args[0] if($msgtype eq "define");
     $devicetype = "ShutterContact" if($msgtype eq "ShutterContactState");
-    $devicetype = "Cube" if($msgtype eq "CubeClockState" or $msgtype eq "CubeConnectionState");
+    $devicetype = "Cube" if($msgtype eq "CubeClockState" or $msgtype eq "CubeConnectionState" or $msgtype eq "CubeDutyCycleState");
     $devicetype = "WallMountedThermostat" if(grep /^$msgtype$/, ("WallThermostatConfig","WallThermostatState","WallThermostatControl"));
     $devicetype = "HeatingThermostat" if(grep /^$msgtype$/, ("HeatingThermostatConfig", "ThermostatState"));
     if($devicetype) {
@@ -643,11 +645,11 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "desiredTemperature", MAX_SerializeTemperature($desiredTemperature)) if($desiredTemperature != 0);
     if($measuredTemperature ne "") {
       readingsBulkUpdate($shash, "temperature", MAX_SerializeTemperature($measuredTemperature));
-      if($shash->{type} =~ /HeatingThermostatPlus/ and $hash->{TYPE} eq "MAXLAN") {
-        readingsBulkUpdate($shash, "valveposition", int($valveposition*MAX_ReadingsVal($shash,"maxValveSetting")/100));
-      } else {
-        readingsBulkUpdate($shash, "valveposition", $valveposition);
-      }
+   }
+    if($shash->{type} =~ /HeatingThermostatPlus/ and $hash->{TYPE} eq "MAXLAN") {
+      readingsBulkUpdate($shash, "valveposition", int($valveposition*MAX_ReadingsVal($shash,"maxValveSetting")/100));
+    } else {
+      readingsBulkUpdate($shash, "valveposition", $valveposition);
     }
 
   }elsif(grep /^$msgtype$/,  ("WallThermostatState", "WallThermostatControl" )){
@@ -721,6 +723,7 @@ MAX_Parse($$)
 
     readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
     readingsBulkUpdate($shash, "onoff", $onoff);
+    readingsBulkUpdate($shash, "connection", $gateway);
 
   }elsif($msgtype eq "CubeClockState"){
     my $clockset = $args[0];
@@ -730,6 +733,10 @@ MAX_Parse($$)
     my $connected = $args[0];
 
     readingsBulkUpdate($shash, "connection", $connected);
+
+  } elsif($msgtype eq "CubeDutyCycleState") {
+    my $dutycycle = $args[0];
+    readingsBulkUpdate($shash, "dutycycle", $dutycycle);
 
   } elsif(grep /^$msgtype$/, ("HeatingThermostatConfig", "WallThermostatConfig")) {
     readingsBulkUpdate($shash, "ecoTemperature", MAX_SerializeTemperature($args[0]));
