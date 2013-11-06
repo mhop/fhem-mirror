@@ -89,7 +89,7 @@ my %culHmModel=(
   "0029" => {name=>"HM-RC-12"                ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:12",},
   "002A" => {name=>"HM-RC-12-B"              ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:12",},
   "002B" => {name=>"HM-WS550Tech"            ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'p'            ,chn=>"",},
-  "002C" => {name=>"KS550TECH"               ,st=>'THSensor'          ,cyc=>''      ,rxt=>'c:w'    ,lst=>'1'            ,chn=>"",},
+  "002C" => {name=>"KS550TECH"               ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p,1'          ,chn=>"",},
   "002D" => {name=>"HM-LC-SW4-PCB"           ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"Sw:1:4",},
   "002E" => {name=>"HM-LC-DIM2L-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",},
   "002F" => {name=>"HM-SEC-SC"               ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",},
@@ -505,6 +505,7 @@ my %culHmRegDefine = (
   evtFltrTime     =>{a=> 35.0,s=>1  ,l=>1,min=>600,max=>1200    ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
 
 # weather units                                                                                  
+  sunThresh       =>{a=>  5  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Sunshine threshold"},
   stormUpThresh   =>{a=>  6  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm upper threshold"},
   stormLowThresh  =>{a=>  7  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm lower threshold"},
 # others
@@ -752,7 +753,7 @@ my %culHmRegModel = (
                       },
 					  
   "HM-PB-4DIS-WM"   =>{peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1},
-  "HM-WDS100-C6-O"  =>{stormUpThresh   =>1,stormLowThresh  =>1},
+  "HM-WDS100-C6-O"  =>{burstRx         =>1,sunThresh       =>1,stormUpThresh   =>1,stormLowThresh  =>1},
   "KS550"           =>{stormUpThresh   =>1,stormLowThresh  =>1},
   "HM-OU-LED16"     =>{brightness      =>1,energyOpt       =>1,localResDis     =>1},
   "HM-OU-CFM-PL"    =>{localResetDis   =>1,
@@ -822,7 +823,12 @@ $culHmRegModel{"HM-RC-12-B"}          = $culHmRegModel{"HM-RC-12"};
 $culHmRegModel{"HM-RC-12-SW"}         = $culHmRegModel{"HM-RC-12"};
 $culHmRegModel{"HM-RC-19-B"}          = $culHmRegModel{"HM-RC-19"};
 $culHmRegModel{"HM-RC-19-SW"}         = $culHmRegModel{"HM-RC-19"};
-                                      
+
+$culHmRegModel{"KS550"}               = $culHmRegModel{"HM-WDS100-C6-O"};
+$culHmRegModel{"KS550TECH"}           = $culHmRegModel{"HM-WDS100-C6-O"};
+$culHmRegModel{"KS550LC"}             = $culHmRegModel{"HM-WDS100-C6-O"};
+$culHmRegModel{"KS888"}               = $culHmRegModel{"HM-WDS100-C6-O"};
+                                
 $culHmRegModel{"HM-LC-Dim1L-Pl-2"}    = $culHmRegModel{"HM-LC-Dim1L-Pl"};#rf_d
 $culHmRegModel{"HM-LC-Dim1L-CV"}      = $culHmRegModel{"HM-LC-Dim1L-Pl"};
 $culHmRegModel{"Schueco-263-132"}     = $culHmRegModel{"HM-LC-Dim1L-Pl"};
