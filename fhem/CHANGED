@@ -1,6 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: new module 36_LaCrosse.pm for LaCrosse IT+ temperature and
+             humidity sensors with a JeeLabs JeeLink as RF modem.
+             The matching JeeNode sketch can be found in
+             .../36_LaCrosse-LaCrosseITPlusReader.zip (by ohweh&justme1968)
   - feature: YAMAHA_AVR: new attribute request-timeout.
   - bugfix:  YAMAHA_AVR: fix missing greater-than sign. Use different
              Control-Tag name for RX-Vx75 series
@@ -46,7 +50,7 @@
   - feature: new modules JeeLink and PCA301 and for the ELV PCA 301 power
              meter with a JeeLabs JeeLink as RF modem. The matching JeeNode
              sketch can be found in .../contrib/36_PCA301-pcaSerial.zip
-             (by justme1968)
+             (by ohweh&justme1968)
   - change:  PRESENCE: using ping command line utility to check presence on Windows
              based machines.
   - feature: install FHEM as Windows service by T.E., see docs/HOWTO_Windows.txt
