@@ -445,6 +445,7 @@ MAXLAN_Parse($$)
     if(@args > 5){
       $dutycycle = hex($args[5]);
       $hash->{dutycycle} = sprintf("%3.0f %%", $dutycycle);
+      readingsSingleUpdate( $hash, 'dutycycle', $dutycycle, 1 );
     }
     my $freememory = 0;
     if(@args > 6){
