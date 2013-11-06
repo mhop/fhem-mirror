@@ -2317,6 +2317,7 @@ sub CUL_HM_Set($@) {
 	CUL_HM_PushCmdStack($hash,"++".$flag."11".$id.$dst."0400");
   } 
   elsif($cmd eq "burstXmit") { ################################################
+	$state = "";
 	$hash->{helper}{prt}{wakeup}=1;# start wakeup
     CUL_HM_SndCmd($hash,"++B112$id$dst");
   } 
