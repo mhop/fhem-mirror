@@ -134,9 +134,9 @@ LaCrosse_Parse($$)
     Log3 $name, 3, "LaCrosse Unknown device $rname, please define it";
 
     my $iohash = $rhash->{IODev};
-    return undef if( $iohash->{LaCrossePair} );
+    return undef if( !$iohash->{LaCrossePair} );
 
-    return "UNDEFINED LaCrosse_$rname LaCrosse $raddr" if( $battery_new );
+    return "UNDEFINED LaCrosse_$rname LaCrosse $raddr" if( $battery_new || $iohash->{LaCrossePair} == 2 );
     return undef;
   }
 
@@ -190,7 +190,7 @@ LaCrosse_Attr(@)
 <ul>
 
   <tr><td>
-  FHEM module for LaCrosse IT+ (and TFA 35.1111.IT and possibly Conrad WS9160-IT) Temperature and Humidity sensors.<br><br>
+  FHEM module for LaCrosse Temperature and Humidity sensors.<br><br>
 
   It can be integrated in to FHEM via a <a href="#JeeLink">JeeLink</a> as the IODevice.<br><br>
 
@@ -202,7 +202,7 @@ LaCrosse_Attr(@)
     <code>define &lt;name&gt; LaCrosse &lt;addr&gt;</code> <br>
     <br>
     addr is a 2 digit hex number to identify the LaCrosse device.<br><br>
-    Note: devices are autocreated on reception of the first message with new battery flag set if LaCrossePair is active for the JeeLink IODevice device.<br>
+    Note: devices are autocreated only if LaCrossePairForSec is active for the <a href="#JeeLink">JeeLink</a> IODevice device.<br>
   </ul>
   <br>
 
@@ -219,9 +219,9 @@ LaCrosse_Attr(@)
   <a name="LaCrosse_Readings"></a>
   <b>Readings</b>
   <ul>
-    <li>battery[]<b>
+    <li>battery[]<br>
       ok or low</li>
-    <li>temperature[]<b>
+    <li>temperature[]<br>
       Notice: see the filterThreshold attribute.</li>
     <li>humidity</li>
   </ul><br>
