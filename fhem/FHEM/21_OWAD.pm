@@ -168,6 +168,9 @@ sub OWAD_Initialize ($) {
     $attlist .= " ".$owg_fixed[$i]."High";
   }
   $hash->{AttrList} = $attlist; 
+
+  #make sure OWX is loaded so OWX_CRC is available if running with OWServer
+  main::LoadModule("OWX");	
 }
 
 #########################################################################################

@@ -144,6 +144,9 @@ sub OWSWITCH_Initialize ($) {
   }
  
   $hash->{AttrList} = $attlist; 
+
+  #make sure OWX is loaded so OWX_CRC is available if running with OWServer
+  main::LoadModule("OWX");	
 }
 
 #########################################################################################
