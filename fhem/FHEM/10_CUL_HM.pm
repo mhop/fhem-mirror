@@ -800,7 +800,9 @@ sub CUL_HM_Parse($$) {##############################
 	  my $uk0     = ($ctrlMode       ) & 0x3f ;#unknown
 	  $ctrlMode   = ($ctrlMode   >> 6) & 0x3  ;
       $actTemp = sprintf("%2.1f",$actTemp);
-	  
+	  $setTemp = ($setTemp < 5 )?'off':
+	             ($setTemp >30 )?'on' :$setTemp;
+  
 	  my $dHash = $shash;
  	  $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});	  
@@ -2834,7 +2836,7 @@ sub CUL_HM_Set($@) {
   elsif($cmd eq "desired-temp") { #############################################
 	if ($md =~ m/HM-CC-RT-DN/){
 	  my $temp = ($a[2] eq "off")?9:($a[2] eq "on"?61:$a[2]*2);
-	  return "invalid temp:$a[2]" if($temp <9 ||$temp > 60);
+	  return "invalid temp:$a[2]" if($temp <9 ||$temp > 61);
 	  $temp = sprintf ("%02X",$temp);
       CUL_HM_PushCmdStack($hash,'++'.$flag."11$id$dst"."8604$temp");
 	}
