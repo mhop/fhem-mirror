@@ -18,7 +18,7 @@ sub JeeLink_Write($$);
 
 sub JeeLink_SimpleWrite(@);
 
-my $clientsJeeLink = ":PCA301:EC3000:RoomNode:";
+my $clientsJeeLink = ":PCA301:EC3000:RoomNode:LaCrosse:";
 
 my %matchListPCA301 = (
     "1:PCA301" => "^\\S+\\s+24",
@@ -119,6 +119,13 @@ JeeLink_Shutdown($)
   return undef;
 }
 
+sub
+JeeLink_RemoveLaCrossePair($)
+{
+  my $hash = shift;
+  delete($hash->{LaCrossePair});
+}
+
 #####################################
 sub
 JeeLink_Set($@)
@@ -130,6 +137,7 @@ JeeLink_Set($@)
   my $arg = join("", @a);
 
   my $list = "raw:noArg";
+  $list .= " LaCrossePairForSec";
   return $list if( $cmd eq '?' );
 
   if($cmd eq "raw") {
@@ -137,6 +145,11 @@ JeeLink_Set($@)
     #return "Expecting a even length hex number" if((length($arg)&1) == 1 || $arg !~ m/^[\dA-F]{12,}$/ );
     Log3 $name, 4, "set $name $cmd $arg";
     JeeLink_SimpleWrite($hash, $arg);
+
+  } elsif( $cmd eq "LaCrossePairForSec" ) {
+    return "Usage: set $name LaCrossePairForSec <seconds_active>" if(!$arg || $arg !~ m/^\d+$/);
+    $hash->{LaCrossePair} = 1; 
+    InternalTimer(gettimeofday()+$arg, "JeeLink_RemoveLaCrossePair", $hash, 1);
 
   } else {
     return "Unknown argument $cmd, choose one of ".$list;
@@ -548,6 +561,9 @@ JeeLink_Attr(@)
     <li>raw &lt;datar&gt;<br>
         send &lt;data&gt; as a raw message to the JeeLink to be transmitted over the RF link.
         </li><br>
+    <li>LaCrossePair &lt;sec&gt;<br>
+       enable autocreate of new LaCrosse sensors vor &lt;sec&gt; seconds
+        </li>
   </ul>
 
   <a name="JeeLink_Get"></a>
