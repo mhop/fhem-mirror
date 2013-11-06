@@ -129,8 +129,11 @@ sub OWTHERM_Initialize ($) {
                      "stateAL stateAH ".
                      "tempOffset tempUnit:C,Celsius,F,Fahrenheit,K,Kelvin ".
                      "tempConv:onkick,onread tempLow tempHigh ".
-                     $readingFnAttributes;                
-  }
+                     $readingFnAttributes;              
+
+  #make sure OWX is loaded so OWX_CRC is available if running with OWServer
+  main::LoadModule("OWX");	
+}
   
 ########################################################################################
 #

@@ -1,6 +1,7 @@
 ##############################################
 package main;
 
+use vars qw{%attr %defs}; 
 use strict;
 use warnings;
 
@@ -469,8 +470,12 @@ sub
 FRM_Client_AssignIOPort($)
 {
 	my $hash = shift;
-	AssignIoPort($main::defs{$hash->{NAME}});
-	die "unable to assign IODev to '$hash->{NAME}'" unless defined ($hash->{IODev});
+	my $name = $hash->{NAME};
+	if (my $iodev = AttrVal($name,"IODev",undef)) {
+	  $hash->{IODev} = $defs{$iodev};
+	}
+	AssignIoPort($hash) unless defined($hash->{IODev});
+	die "unable to assign IODev to '$name'" unless defined ($hash->{IODev});
 	
 	$hash->{IODev} = $main::defs{$hash->{IODev}->{SNAME}} if (defined($hash->{IODev}->{SNAME}));
 
@@ -673,7 +678,7 @@ sub FRM_OWX_firmata_to_device
 
 sub FRM_OWX_Verify {
 	my ($hash,$dev) = @_;
-	foreach my $found ($hash->{DEVS}) {
+	foreach my $found (@{$hash->{DEVS}}) {
 		if ($dev eq $found) {
 			return 1;
 		}

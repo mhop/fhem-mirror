@@ -124,7 +124,10 @@ sub OWMULTI_Initialize ($) {
                      "tempOffset tempUnit:C,Celsius,F,Fahrenheit,K,Kelvin ".
                      "VName VUnit VFunction ".
                      $readingFnAttributes;
-  }
+
+  #make sure OWX is loaded so OWX_CRC is available if running with OWServer
+  main::LoadModule("OWX");	
+}
   
 ########################################################################################
 #

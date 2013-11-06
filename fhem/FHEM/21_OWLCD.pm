@@ -121,6 +121,9 @@ sub OWLCD_Initialize ($) {
   my $attlist       = "IODev do_not_notify:0,1 showtime:0,1 loglevel:0,1,2,3,4,5 ".
                       "";
   $hash->{AttrList} = $attlist; 
+
+  #make sure OWX is loaded so OWX_CRC is available if running with OWServer
+  main::LoadModule("OWX");	
 }
 
 #########################################################################################
