@@ -3139,7 +3139,7 @@ sub CUL_HM_Set($@) {
   	      CUL_HM_PushCmdStack($hash, 
   	            "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerBtn}00");
   	      CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,hex($peerBtn),4,$burst)
-				   if($pnb);
+				   if($pnb && $cmd eq "01"); # only if set
 		  CUL_HM_qAutoRead($name,3);
 	    }
       }
@@ -4817,12 +4817,13 @@ sub CUL_HM_stateUpdatDly($$){#delayed queue of status-request
   RemoveInternalTimer("sUpdt:$name");
   InternalTimer(gettimeofday()+$time,"CUL_HM_qStateUpdatIfEnab","sUpdt:$name",0);
 }
-sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request after 12 s
+sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request
   my ($name,$force) = @_;
   $name = substr($name,6) if ($name =~ m/^sUpdt:/);
   $name = CUL_HM_id2Name($name) if ($name =~ m/^[A-F0-9]{6,8}$/i);
   $name =~ s /_chn:..$//;
-  return if (!$defs{$name}); #device unknown, ignore
+  return if (  !$defs{$name}                  #device unknown, ignore
+             || CUL_HM_Set($defs{$name},$name,"help") !~ m/statusRequest/);
   if ($force || ((CUL_HM_getAttrInt($name,"autoReadReg") & 0x0f) > 3)){
     CUL_HM_qEntity($name,"qReqStat") ;
   }
