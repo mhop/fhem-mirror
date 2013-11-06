@@ -134,7 +134,8 @@ JeeLink_Set($@)
 
   my $name = shift @a;
   my $cmd = shift @a;
-  my $arg = join("", @a);
+  my $arg = shift @a;
+  my $arg2 = shift @a;
 
   my $list = "raw:noArg";
   $list .= " LaCrossePairForSec";
@@ -147,8 +148,8 @@ JeeLink_Set($@)
     JeeLink_SimpleWrite($hash, $arg);
 
   } elsif( $cmd eq "LaCrossePairForSec" ) {
-    return "Usage: set $name LaCrossePairForSec <seconds_active>" if(!$arg || $arg !~ m/^\d+$/);
-    $hash->{LaCrossePair} = 1; 
+    return "Usage: set $name LaCrossePairForSec <seconds_active> [ignore_battery]" if(!$arg || $arg !~ m/^\d+$/ || $arg2 ne "ignore_battery");
+    $hash->{LaCrossePair} = $arg2?2:1; 
     InternalTimer(gettimeofday()+$arg, "JeeLink_RemoveLaCrossePair", $hash, 1);
 
   } else {
@@ -561,8 +562,9 @@ JeeLink_Attr(@)
     <li>raw &lt;datar&gt;<br>
         send &lt;data&gt; as a raw message to the JeeLink to be transmitted over the RF link.
         </li><br>
-    <li>LaCrossePair &lt;sec&gt;<br>
-       enable autocreate of new LaCrosse sensors vor &lt;sec&gt; seconds
+    <li>LaCrossePairForSec &lt;sec&gt; [ignore_battery]<br>
+       enable autocreate of new LaCrosse sensors for &lt;sec&gt; seconds. if ignore_battery is not given only sensors
+       sending the 'new battery' flag will be created.
         </li>
   </ul>
 
