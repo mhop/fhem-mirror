@@ -133,10 +133,9 @@ LaCrosse_Parse($$)
   if( !$modules{LaCrosse}{defptr}{$raddr} ) {
     Log3 $name, 3, "LaCrosse Unknown device $rname, please define it";
 
-    my $iohash = $rhash->{IODev};
-    return undef if( !$iohash->{LaCrossePair} );
+    return undef if( !$hash->{LaCrossePair} );
 
-    return "UNDEFINED LaCrosse_$rname LaCrosse $raddr" if( $battery_new || $iohash->{LaCrossePair} == 2 );
+    return "UNDEFINED LaCrosse_$rname LaCrosse $raddr" if( $battery_new || $hash->{LaCrossePair} == 2 );
     return undef;
   }
 

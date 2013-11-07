@@ -148,7 +148,7 @@ JeeLink_Set($@)
     JeeLink_SimpleWrite($hash, $arg);
 
   } elsif( $cmd eq "LaCrossePairForSec" ) {
-    return "Usage: set $name LaCrossePairForSec <seconds_active> [ignore_battery]" if(!$arg || $arg !~ m/^\d+$/ || $arg2 ne "ignore_battery");
+    return "Usage: set $name LaCrossePairForSec <seconds_active> [ignore_battery]" if(!$arg || $arg !~ m/^\d+$/ || ($arg2 && $arg2 ne "ignore_battery") );
     $hash->{LaCrossePair} = $arg2?2:1; 
     InternalTimer(gettimeofday()+$arg, "JeeLink_RemoveLaCrossePair", $hash, 1);
 
