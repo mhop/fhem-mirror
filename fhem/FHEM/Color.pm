@@ -54,4 +54,65 @@ FHEM_colorpickerFn($$$)
   }
 }
 
+package Color;
+require Exporter;
+our @ISA = qw(Exporter);
+our  %EXPORT_TAGS = (all => [qw(RgbToChannels ChannelsToRgb ChannelsToBrightness BrightnessToChannels)]);
+Exporter::export_tags('all');
+
+sub
+RgbToChannels($$) {
+  my ($rgb,$numChannels) = @_;
+  my $nybles = $numChannels << 1;
+  die "$rgb is not the right format" unless( $rgb =~ /^[\da-f]{$nybles}$/i );
+  my @channels = ();
+  foreach my $channel (unpack("(A2)[$numChannels]",$rgb)) {
+    push @channels,hex($channel);
+  }
+  return @channels;
+}
+
+sub
+ChannelsToRgb(@) {
+  my @channels = @_;
+  return sprintf("%02X" x @_, @_);  
+}
+
+sub
+ChannelsToBrightness(@) {
+  my (@channels) = @_;
+  
+  my $max = 0;
+  foreach my $value (@channels) {
+    $max = $value if ($max < $value);
+  }
+  
+  return {
+    bri => 0,
+    channels => \(255 x @channels),
+  } unless ($max > 0);
+  
+  my @bri = ();
+  my $norm = 255/$max;
+  foreach my $value (@channels) {
+    push @bri,int($value*$norm);
+  }
+  
+  return {
+    bri => int($max/2.55),
+    channels  => \@bri,
+  }
+}
+
+sub
+BrightnessToChannels($) {
+  my $arg = shift;
+  my @channels = ();
+  my $bri = $arg->{bri};
+  foreach my $value (@{$arg->{channels}}) {
+    push @channels,$value*$bri/100;
+  }
+  return @channels;
+}
+
 1;
