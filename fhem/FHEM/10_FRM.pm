@@ -38,7 +38,7 @@ sub FRM_Initialize($) {
 	require "$main::attr{global}{modpath}/FHEM/DevIo.pm";
 
 	# Provider
-	$hash->{Clients} = ":FRM_IN:FRM_OUT:FRM_AD:FRM_PWM:FRM_I2C:FRM_SERVO:OWX:FRM_LCD:";
+	$hash->{Clients} = ":FRM_IN:FRM_OUT:FRM_AD:FRM_PWM:FRM_I2C:FRM_SERVO:OWX:FRM_LCD:FRM_RGB:";
 	$hash->{ReadyFn} = "FRM_Ready";  
 	$hash->{ReadFn}  = "FRM_Read";
 
