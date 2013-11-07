@@ -1693,7 +1693,15 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  $ret = "done";
 	}
 	elsif($subType eq "01"){ #storePeerList=================================
+      my $msgValid = 0;
 	  if ($pendType eq "PeerList"){
+		if($shash->{helper}{prt}{rspWait}{mNo} == hex($mNo)){#next message
+		  $shash->{helper}{prt}{rspWait}{mNo}++;
+		  $shash->{helper}{prt}{rspWait}{mNo} &= 0xff;
+		  $msgValid = 1;
+		}
+	  }
+	  if ($msgValid){
 		my $chn = $shash->{helper}{prt}{rspWait}{forChn};
 		my $chnhash = $modules{CUL_HM}{defptr}{$src.$chn}; 
 		$chnhash = $shash if (!$chnhash);
@@ -1730,9 +1738,20 @@ sub CUL_HM_parseCommon(@){#####################################################
 		}
 		$ret = "done";
 	  }
+	  else{#response without request - discard
+		$ret = "done";
+	  }
 	}
 	elsif($subType eq "02" ||$subType eq "03"){ #ParamResp==================
+      my $msgValid = 0;
 	  if ($pendType eq "RegisterRead"){
+		if($shash->{helper}{prt}{rspWait}{mNo} == hex($mNo)){#next message
+		  $shash->{helper}{prt}{rspWait}{mNo}++;
+		  $shash->{helper}{prt}{rspWait}{mNo} &= 0xff;
+		  $msgValid = 1;
+		}
+	  }
+	  if ($msgValid){
 		my $chnSrc = $src.$shash->{helper}{prt}{rspWait}{forChn};
 		my $chnHash = $modules{CUL_HM}{defptr}{$chnSrc}; 
 		$chnHash = $shash if (!$chnHash);
@@ -3471,6 +3490,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
     	#--- remember request params in device level
 		CUL_HM_respWaitSu ($hash,"Pending:=PeerList"
 		                        ,"cmd:=$cmd" ,"forChn:=".substr($p,0,2)
+								,"mNo:=".hex($mNo)
 								,"reSent:=1");
 								
     	#--- remove readings in channel
@@ -3488,6 +3508,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
 		CUL_HM_respWaitSu ($hash,"Pending:=RegisterRead"
 		                        ,"cmd:=$cmd" ,"forChn:=$chn"
 								,"forList:=$list","forPeer:=$peer"
+								,"mNo:=".hex($mNo)
 								,"reSent:=1");
 	    #--- remove channel entries that will be replaced
         my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
