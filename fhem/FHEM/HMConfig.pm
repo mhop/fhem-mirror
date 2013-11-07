@@ -872,94 +872,102 @@ $culHmRegModel{"HM-LC-SW4-BA-PCB"}    = $culHmRegModel{"HM-LC-SW1-BA-PCB"};
 $culHmRegModel{"HM-CC-RT-DN-BoM"}     = $culHmRegModel{"HM-CC-RT-DN"};
 
 my %culHmRegChan = (# if channelspecific then enter them here 
-  "HM-CC-TC02"        =>{displayMode     =>1,displayTemp     =>1,displayTempUnit =>1,
-                         controlMode     =>1,decalcDay       =>1,
-                         "day-temp"      =>1,"night-temp"    =>1,"party-temp"    =>1,
-			             mdTempValve     =>1,partyEndDay     =>1,
-			             partyEndMin     =>1,partyEndHr      =>1,
-			             decalHr         =>1,decalMin        =>1
-                      },    
-  "HM-CC-TC03"        =>{tempWinOpen     =>1, }, #window channel
-  "HM-RC-1912"        =>{msgShowTime     =>1, beepAtAlarm    =>1, beepAtService  =>1,beepAtInfo  =>1,
-                         backlAtAlarm    =>1, backlAtService =>1, backlAtInfo    =>1,
-                         lcdSymb         =>1, lcdLvlInterp   =>1},
-  "HM-OU-CFM-PL01"    =>{ActTypeLed      =>1},
-  "HM-OU-CFM-PL02"    =>{ActTypeMp3      =>1,Intense         =>1},
-  "HM-SEC-WIN01"      =>{setupDir        =>1,pullForce       =>1,pushForce       =>1,tiltMax         =>1,
-                         CtValLo         =>1,CtValHi         =>1,
-                         CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1,
-			             WinJtOn         =>1,WinJtOff        =>1,WinJtRampOn     =>1,WinJtRampOff    =>1,
-                         OnTime          =>1,OffTime         =>1,OffLevelKm      =>1,
-                         OnLevelKm       =>1,OnRampOnSp      =>1,OnRampOffSp     =>1
-                        },
-  "WDF-solar01"       =>{WinJtOn         =>1,WinJtOff        =>1,WinJtRampOn     =>1,WinJtRampOff    =>1,
-                         OffLevel        =>1,OnLevel         =>1,
-                         CtValLo         =>1,CtValHi         =>1,
-                         CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1,
-						 OnRampOnSp      =>1,OnRampOffSp     =>1,
-						 OnTime          =>1,OffTime         =>1
-						},
-  "Schueco_263-xxx01" =>{statusInfoMinDly=>1,statusInfoRandom=>1,
-                         #no long here!!!
-                         shCtValLo       =>1,shCtValHi       =>1,
-                         shCtOn          =>1,shCtDlyOn       =>1,shCtOff         =>1,shCtDlyOff      =>1,
-                         shOnTime        =>1,shOffTime       =>1,shOnDly         =>1,shOffDly        =>1,
-		                 shActionTypeDim =>1,shOnTimeMode    =>1,shOffTimeMode   =>1,
-                         shDimJtOn       =>1,shDimJtOff      =>1,shDimJtDlyOn    =>1,
-                         shDimJtDlyOff   =>1,shDimJtRampOn   =>1,shDimJtRampOff  =>1,
-					     shOnLevel       =>1
+  "HM-CC-TC02"        =>{ displayMode     =>1,displayTemp     =>1,displayTempUnit =>1
+                         ,controlMode     =>1,decalcDay       =>1
+                         ,"day-temp"      =>1,"night-temp"    =>1,"party-temp"    =>1
+			             ,mdTempValve     =>1,partyEndDay     =>1
+			             ,partyEndMin     =>1,partyEndHr      =>1
+			             ,decalHr         =>1,decalMin        =>1
+                         },    
+  "HM-CC-TC03"        =>{ tempWinOpen     =>1 }, #window channel
+  "HM-RC-1912"        =>{ msgShowTime     =>1, beepAtAlarm    =>1, beepAtService  =>1,beepAtInfo  =>1
+                         ,backlAtAlarm    =>1, backlAtService =>1, backlAtInfo    =>1
+                         ,lcdSymb         =>1, lcdLvlInterp   =>1
 						 },
-  "Schueco_263-xxx02" =>{transmitTryMax  =>1,eventDlyTime    =>1},
-  "Schueco_263-xxx03" =>{ttJtOn          =>1,ttJtOff         =>1},
-  "HM-Sen-RD-O01"     =>{eventFilterTimeB=>1,transmitTryMax  =>1,peerNeedsBurst  =>1,expectAES       =>1,
-                         condTxThrhHi    =>1,condTxThrhHi    =>1,highHoldTime    =>1,evntRelFltTime  =>1 },
-  "HM-CC-RT-DN03"     =>{shCtValLo       =>1},
-  "HM-CC-RT-DN04"     =>{btnNoBckLight   =>1,
-                         dayTemp         =>1,nightTemp       =>1,tempMin         =>1,tempMax         =>1,
-                         tempOffset      =>1,
-                         decalcWeekday   =>1,decalcTime      =>1,
-                         boostPos        =>1,boostPeriod     =>1,
-                         daylightSaveTime=>1,regAdaptive     =>1,
-                         showInfo        =>1,noMinMax4Manu   =>1,showWeekday     =>1,
-                         valveOffset     =>1,valveMaxPos     =>1,valveErrPos     =>1,
-                         modePrioManu    =>1,modePrioParty   =>1,
-                         reguIntI        =>1,reguIntP        =>1,reguIntPstart   =>1,
-                         reguExtI        =>1,reguExtP        =>1,reguExtPstart   =>1,
-                         winOpnTemp      =>1,winOpnPeriod    =>1,winOpnBoost     =>1,winOpnMode      =>1,
-						 winOpnDetFall   =>1
+  "HM-OU-CFM-PL01"    =>{ ActTypeLed      =>1},
+  "HM-OU-CFM-PL02"    =>{ ActTypeMp3      =>1,Intense         =>1},
+  "HM-SEC-WIN01"      =>{ setupDir        =>1,pullForce       =>1,pushForce       =>1,tiltMax         =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1
+			             ,WinJtOn         =>1,WinJtOff        =>1,WinJtRampOn     =>1,WinJtRampOff    =>1
+                         ,OnTime          =>1,OffTime         =>1,OffLevelKm      =>1
+                         ,OnLevelKm       =>1,OnRampOnSp      =>1,OnRampOffSp     =>1
+                         },
+  "WDF-solar01"       =>{ WinJtOn         =>1,WinJtOff        =>1,WinJtRampOn     =>1,WinJtRampOff    =>1
+                         ,OffLevel        =>1,OnLevel         =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1
+						 ,OnRampOnSp      =>1,OnRampOffSp     =>1
+						 ,OnTime          =>1,OffTime         =>1
+					     },
+  "Schueco_263-xxx01" =>{ statusInfoMinDly=>1,statusInfoRandom=>1,
+                         ,#no long here!!!
+                         ,shCtValLo       =>1,shCtValHi       =>1
+                         ,shCtOn          =>1,shCtDlyOn       =>1,shCtOff         =>1,shCtDlyOff      =>1
+                         ,shOnTime        =>1,shOffTime       =>1,shOnDly         =>1,shOffDly        =>1
+		                 ,shActionTypeDim =>1,shOnTimeMode    =>1,shOffTimeMode   =>1
+                         ,shDimJtOn       =>1,shDimJtOff      =>1,shDimJtDlyOn    =>1
+                         ,shDimJtDlyOff   =>1,shDimJtRampOn   =>1,shDimJtRampOff  =>1
+					     ,shOnLevel       =>1
 						 },
-  "HM-CC-RT-DN06"     =>{CtrlRc          =>1,TempRC          =>1},
-  "HM-TC-IT-WM-W-EU02"=>{dayTemp         =>1,nightTemp       =>1,tempMin         =>1,tempMax         =>1,tempOffset      =>1,
-                         hyst2point      =>1,heatCool        =>1,boostPeriod     =>1,winOpnBoost     =>1,
-                         showWeekday     =>1,showInfo        =>1,showSetTemp     =>1,showHumitidy    =>1,
-                         noMinMax4Manu   =>1,daylightSaveTime=>1,sendWeatherData =>1,
-                         modePrioParty   =>1,modePrioManu    =>1,weekPrgSel      =>1,},
-  "HM-ES-PMSw1-Pl02"  =>{averaging       =>1,
-                         txMinDly        =>1,txThrPwr        =>1,txThrCur        =>1,txThrVlt        =>1,txThrFrq        =>1,},
-  "HM-ES-PMSw1-Pl04"  =>{txThrLoPwr      =>1,txThrHiPwr      =>1,
-                         CtDlyOn         =>1,CtDlyOff        =>1,CtOn            =>1,CtOff           =>1,
-                         CtValLo         =>1,CtValHi         =>1,
-                         OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
-                         SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
-                         ActionType      =>1,},
-  "HM-ES-PMSw1-Pl04"  =>{txThrLoCur      =>1,txThrHiCur      =>1,
-                         CtDlyOn         =>1,CtDlyOff        =>1,CtOn            =>1,CtOff           =>1,
-                         CtValLo         =>1,CtValHi         =>1,
-                         OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
-                         SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
-                         ActionType      =>1,},
-  "HM-ES-PMSw1-Pl05"  =>{txThrLoVlt      =>1,txThrHiVlt      =>1,
-                         CtDlyOn         =>1,CtDlyOff        =>1,CtOn            =>1,CtOff           =>1,
-                         CtValLo         =>1,CtValHi         =>1,
-                         OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
-                         SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
-                         ActionType      =>1,},
-  "HM-ES-PMSw1-Pl06"  =>{txThrLoFrq      =>1,txThrHiFrq      =>1,
-                         CtDlyOn         =>1,CtDlyOff        =>1,CtOn            =>1,CtOff           =>1,
-                         CtValLo         =>1,CtValHi         =>1,
-                         OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
-                         SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
-                         ActionType      =>1,},
+  "Schueco_263-xxx02" =>{ transmitTryMax  =>1,eventDlyTime    =>1},
+  "Schueco_263-xxx03" =>{ ttJtOn          =>1,ttJtOff         =>1},
+  "HM-Sen-RD-O01"     =>{ eventFilterTimeB=>1,transmitTryMax  =>1,peerNeedsBurst  =>1,expectAES       =>1
+                         ,condTxThrhHi    =>1,condTxThrhHi    =>1,highHoldTime    =>1,evntRelFltTime  =>1 
+						 },
+  "HM-CC-RT-DN03"     =>{ shCtValLo       =>1},
+  "HM-CC-RT-DN04"     =>{ btnNoBckLight   =>1
+                         ,dayTemp         =>1,nightTemp       =>1,tempMin         =>1,tempMax         =>1
+                         ,tempOffset      =>1
+                         ,decalcWeekday   =>1,decalcTime      =>1
+                         ,boostPos        =>1,boostPeriod     =>1
+                         ,daylightSaveTime=>1,regAdaptive     =>1
+                         ,showInfo        =>1,noMinMax4Manu   =>1,showWeekday     =>1
+                         ,valveOffset     =>1,valveMaxPos     =>1,valveErrPos     =>1
+                         ,modePrioManu    =>1,modePrioParty   =>1
+                         ,reguIntI        =>1,reguIntP        =>1,reguIntPstart   =>1
+                         ,reguExtI        =>1,reguExtP        =>1,reguExtPstart   =>1
+                         ,winOpnTemp      =>1,winOpnPeriod    =>1,winOpnBoost     =>1,winOpnMode      =>1
+						 ,winOpnDetFall   =>1
+						 },
+  "HM-CC-RT-DN06"     =>{ CtrlRc          =>1,TempRC          =>1},
+  "HM-TC-IT-WM-W-EU02"=>{ dayTemp         =>1,nightTemp       =>1,tempMin         =>1,tempMax         =>1,tempOffset      =>1
+                         ,hyst2point      =>1,heatCool        =>1,boostPeriod     =>1,winOpnBoost     =>1
+                         ,showWeekday     =>1,showInfo        =>1,showSetTemp     =>1,showHumitidy    =>1
+                         ,noMinMax4Manu   =>1,daylightSaveTime=>1,sendWeatherData =>1
+                         ,modePrioParty   =>1,modePrioManu    =>1,weekPrgSel      =>1
+						 },
+  "HM-ES-PMSw1-Pl02"  =>{ averaging       =>1
+                         ,txMinDly        =>1,txThrPwr        =>1,txThrCur        =>1,txThrVlt        =>1,txThrFrq        =>1
+						 },
+  "HM-ES-PMSw1-Pl04"  =>{ txThrLoPwr      =>1,txThrHiPwr      =>1
+                         ,CtDlyOn         =>1,CtDlyOff        =>1,CtOn            =>1,CtOff           =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
+                         ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
+                         ,ActionType      =>1
+						 },
+  "HM-ES-PMSw1-Pl04"  =>{ txThrLoCur      =>1,txThrHiCur      =>1
+                         ,CtDlyOn         =>1,CtDlyOff        =>1,CtOn            =>1,CtOff           =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
+                         ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
+                         ,ActionType      =>1
+						 },
+  "HM-ES-PMSw1-Pl05"  =>{ txThrLoVlt      =>1,txThrHiVlt      =>1
+                         ,CtDlyOn         =>1,CtDlyOff        =>1,CtOn            =>1,CtOff           =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
+                         ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
+                         ,ActionType      =>1
+						 },
+  "HM-ES-PMSw1-Pl06"  =>{ txThrLoFrq      =>1,txThrHiFrq      =>1
+                         ,CtDlyOn         =>1,CtDlyOff        =>1,CtOn            =>1,CtOff           =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
+                         ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
+                         ,ActionType      =>1
+						 },
   );
 
 #clones - - - - - - - - - - - - - - -   

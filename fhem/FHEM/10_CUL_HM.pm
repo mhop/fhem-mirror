@@ -1653,7 +1653,6 @@ sub CUL_HM_parseCommon(@){#####################################################
 	           if (!$modules{CUL_HM}{helper}{hmManualOper}#no autoaction
 			       ||$iohash->{hmPair} 
                    ||$iohash->{hmPairSerial} );  	
-
     if(  $dst =~ m /(000000|$id)/ #--- see if we need to pair
        &&($iohash->{hmPair} 
           ||(    $iohash->{hmPairSerial} 
@@ -2518,14 +2517,13 @@ sub CUL_HM_Set($@) {
 	else{  #if($list == 1/5/6){
       $lChn = "01" if ($chn eq "00"); #by default select chan 01 for device
 	}
-	
     my $addrData;
 	if ($dLen < 8){# fractional byte see whether we have stored the register
 	  #read full 8 bit!!!
 	  my $rName = CUL_HM_id2Name($dst.$lChn);
 	  $rName =~ s/_chn:.*//;
 	  my $curVal = CUL_HM_getRegFromStore($rName,$addr,$list,$peerId.$peerChn);
-  	  return "cannot calculate value. Please issue set $name getConfig first" 
+  	  return "cannot calculate value. Please issue set $name getConfig first - $curVal" 
 	             if ($curVal !~ m/^(set_|)(\d+)$/);
 	  $curVal = $2; # we expect one byte in int, strap 'set_' possibly
 	  $data = ($curVal & (~($mask<<$bit)))|($data<<$bit);
@@ -4516,11 +4514,11 @@ sub CUL_HM_RTtempReadings($) {# parse RT temperature readings
   # transport some readings to relevant channels (window receivce here)
   my $wHash = $modules{CUL_HM}{defptr}{substr($hash->{DEF},0,6)."03"};
   CUL_HM_UpdtReadBulk($wHash,1,
-        "R-winOpnTemp:"  .ReadingsVal($name,"R-winOpnTemp"  ,"unknown"),
-        "R-winOpnPeriod:".ReadingsVal($name,"R-winOpnPeriod","unknown"),
-        "R-winOpnBoost:" .ReadingsVal($name,"R-winOpnBoost" ,"unknown"),
-		"R-winOpnMode:"  .ReadingsVal($name,"R-winOpnMode"  ,"unknown"),
-		"R-winOpnDetFall:".ReadingsVal($name,"R-winOpnDetFall"  ,"unknown"),);
+        "winOpnTemp:"   .ReadingsVal($name,"R-winOpnTemp"    ,"unknown"),
+        "winOpnPeriod:" .ReadingsVal($name,"R-winOpnPeriod"  ,"unknown"),
+        "winOpnBoost:"  .ReadingsVal($name,"R-winOpnBoost"   ,"unknown"),
+		"winOpnMode:"   .ReadingsVal($name,"R-winOpnMode"    ,"unknown"),
+		"winOpnDetFall:".ReadingsVal($name,"R-winOpnDetFall" ,"unknown"),);
   return $setting;
 }
 sub CUL_HM_repReadings($) {   # parse repeater 
