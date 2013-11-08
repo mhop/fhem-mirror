@@ -292,42 +292,42 @@ FRM_RGB_Attr($$$$) {
   <b>Set</b><br>
   <ul>
   <code>set &lt;name&gt; on</code><br>
-  sets the pulse-width of all configured pins to 100%</ul>
+  sets the pulse-width of all configured pins to 100%</ul><br>
   <ul>
   <code>set &lt;name&gt; off</code><br>
-  sets the pulse-width of all configured pins to 0%</ul>
+  sets the pulse-width of all configured pins to 0%</ul><br>
   <ul>
   <code>set &lt;name&gt; toggle</code><br>
-  toggles in between the last dimmed value, 0% and 100%. If no dimmed value was set before defaults to pulsewidth 50% on all channels</ul>
+  toggles in between the last dimmed value, 0% and 100%. If no dimmed value was set before defaults to pulsewidth 50% on all channels</ul><br>
   <ul>
   <code>set &lt;name&gt; rgb &lt;value&gt;</code><br>
   sets the pulse-width of all channels at once. Also sets the value toggle can switch to<br>
-  Value is encoded as hex-string, 2-digigs per channel (e.g. FFFFFF for reguler rgb)</ul>
+  Value is encoded as hex-string, 2-digigs per channel (e.g. FFFFFF for reguler rgb)</ul><br>
   <ul>
   <code>set &lt;name&gt; pct &lt;value&gt;</code><br>
   dims all channels at once while leving the ratio in between the channels unaltered.<br>
-  Range is 0-100 ('pct' stands for 'percent')</ul>
+  Range is 0-100 ('pct' stands for 'percent')</ul><br>
   <ul>
   <code>set &lt;name&gt; dimUp</code><br>
-  dims all channels up by 10%</ul>
+  dims up by 10%</ul><br>
   <ul>
   <code>set &lt;name&gt; dimDown</code><br>
-  dims all channels down by 10%</ul>
+  dims down by 10%</ul><br>
 
   <a name="FRM_RGBget"></a>
   <b>Get</b><br>
   <ul>
-  <code>get &lth;name&gt; rgb</code><br>
+  <code>get &lt;name&gt; rgb</code><br>
   returns the values set for all channels. Format is hex, 2 nybbles per channel.
-  </ul>
+  </ul><br>
   <ul>
-  <code>get &lth;name&gt; RGB</code><br>
+  <code>get &lt;name&gt; RGB</code><br>
   returns the values set for all channels in normalized format. Format is hex, 2 nybbles per channel. 
   Values are scaled such that the channel with the highest value is set to FF. The real values are calculated
   by multipying each byte with the value of 'pct'.
-  </ul>
+  </ul><br>
   <ul>
-  <code>get &lth;name&gt; pct</code><br>
+  <code>get &lt;name&gt; pct</code><br>
   returns the value of the channel with the highest value scaled to the range of 0-100 (percent).
   </ul><br>
   <a name="FRM_RGBattr"></a>
