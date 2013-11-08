@@ -439,6 +439,7 @@ MAXLAN_Parse($$)
   if ($cmd eq 'H'){ #Hello
     $hash->{serial} = $args[0];
     $hash->{addr} = $args[1];
+    $modules{MAX}{defptr}{$hash->{addr}} = $hash;
     $hash->{fwversion} = $args[2];
     my $dutycycle = 0;
     if(@args > 5){
