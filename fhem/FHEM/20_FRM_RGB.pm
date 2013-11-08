@@ -86,7 +86,7 @@ FRM_RGB_Init($$)
     }
     $hash->{PINS} = \@pins;
     if (! (defined AttrVal($name,"stateFormat",undef))) {
-      $attr{$name}{"stateFormat"} = "value";
+      $attr{$name}{"stateFormat"} = "rgb";
     }
     my $value = ReadingsVal($name,"rgb",undef);
     if (defined $value and AttrVal($hash->{NAME},"restoreOnReconnect","on") eq "on") {
