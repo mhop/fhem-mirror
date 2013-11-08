@@ -607,13 +607,13 @@ readingsGroup_Get($@)
         attr systemStatus nostate 1<br>
         attr systemStatus mapping { 'load' => 'Systemauslastung', 'temperature' => 'Systemtemperatur in &amp;deg;C'}<br>
       <br>
-        define Verbrauch readingsGroup TYPE=PCA301:state,power,consumption
-        attr Verbrauch mapping %ALIAS
-        attr Verbrauch nameStyle style="font-weight:bold"
-        attr Verbrauch style style="font-size:20px"
-        attr Verbrauch valueFormat {power => "%.1f W", consumption => "%.2f kWh"}
-        attr Verbrauch valueIcon { state => '%devStateIcon' }
-        attr Verbrauch valueStyle {($READING eq "power" && $VALUE > 150)?'style="color:red"':'style="color:green"'}
+        define Verbrauch readingsGroup TYPE=PCA301:state,power,consumption<br>
+        attr Verbrauch mapping %ALIAS<br>
+        attr Verbrauch nameStyle style="font-weight:bold"<br>
+        attr Verbrauch style style="font-size:20px"<br>
+        attr Verbrauch valueFormat {power => "%.1f W", consumption => "%.2f kWh"}<br>
+        attr Verbrauch valueIcon { state => '%devStateIcon' }<br>
+        attr Verbrauch valueStyle {($READING eq "power" && $VALUE > 150)?'style="color:red"':'style="color:green"'}<br>
       </code><br>
     </ul>
   </ul><br>
@@ -632,8 +632,8 @@ readingsGroup_Get($@)
     <b>Attributes</b>
     <ul>
       <li>disable<br>
-        1 -> disable notify processing and longpoll updates. Notice: this also disables rename and delete handling.<b>
-        2 -> also disable html table creation</li>
+        1 -> disable notify processing and longpoll updates. Notice: this also disables rename and delete handling.<br>
+        2 -> also disable html table creation<br>
         3 -> also disable html creation completely</li>
       <li>noheading<br>
         If set to 1 the readings table will have no heading.</li>
