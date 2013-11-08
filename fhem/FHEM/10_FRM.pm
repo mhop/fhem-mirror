@@ -848,7 +848,8 @@ sub FRM_OWX_Discover ($) {
   <a href="#FRM_LCD">FRM_LCD</a> output text to LCD attached via I2C<br>
   <a href="#FRM_I2C">FRM_I2C</a> to read data from integrated circutes attached
    to Arduino supporting the <a href="http://en.wikipedia.org/wiki/I%C2%B2C">
-   i2c-protocol</a>.<br><br>
+   i2c-protocol</a>.<br>
+  <a href="#OWX">OWX</a> to read/write sensors and actors on 1-Wire bus.<br><br>
    
   Each client stands for a Pin of the Arduino configured for a specific use 
   (digital/analog in/out) or an integrated circuit connected to Arduino by i2c.<br><br>
@@ -914,8 +915,12 @@ sub FRM_OWX_Discover ($) {
   <a name="FRMset"></a>
   <b>Set</b>
   <ul>
-  N/A<br>
-  </ul><br>
+  <code>set &lt;name&gt; init</code><br>
+  reinitializes the FRM-Client-devices configured for this Arduino</ul><br>
+  <ul>
+  <code>set &lt;name&gt; reset</code><br>
+  does a complete reset of FRM by disconnecting from, reconnecting to and reinitializing the Arduino and FRM internals and all attached FRM-client-devices</ul><br><br>
+  
   <a name="FRMattr"></a>
   <b>Attributes</b><br>
   <ul>
