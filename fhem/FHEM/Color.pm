@@ -63,8 +63,6 @@ Exporter::export_tags('all');
 sub
 RgbToChannels($$) {
   my ($rgb,$numChannels) = @_;
-  my $nybles = $numChannels << 1;
-  die "$rgb is not the right format" unless( $rgb =~ /^[\da-f]{$nybles}$/i );
   my @channels = ();
   foreach my $channel (unpack("(A2)[$numChannels]",$rgb)) {
     push @channels,hex($channel);

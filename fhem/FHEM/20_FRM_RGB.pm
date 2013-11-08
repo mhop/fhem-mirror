@@ -154,6 +154,7 @@ FRM_RGB_Set($@)
       my $arg = $a[0];
       my $numPins = scalar(@{$hash->{PINS}});
       my $nybles = $numPins << 1;
+      die "$arg is not the right format" unless( $arg =~ /^[\da-f]{$nybles}$/i );
       my @channels = RgbToChannels($arg,$numPins);
       FRM_RGB_SetChannels($hash,@channels);
       RGBHANDLER: {
