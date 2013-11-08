@@ -270,35 +270,66 @@ FRM_RGB_Attr($$$$) {
 =pod
 =begin html
 
-<a name="FRM_PWM"></a>
-<h3>FRM_PWM</h3>
+<a name="FRM_RGB"></a>
+<h3>FRM_RGB</h3>
 <ul>
-  represents a pin of an <a href="http://www.arduino.cc">Arduino</a> running <a href="http://www.firmata.org">Firmata</a>
-  configured for analog output.<br>
-  The value set will be output by the specified pin as a pulse-width-modulated signal.<br> 
+  allows to drive LED-controllers and other multichannel-devices that use PWM as input by an <a href="http://www.arduino.cc">Arduino</a> running <a href="http://www.firmata.org">Firmata</a>
+  <br>
+  The value set will be output by the specified pins as pulse-width-modulated signals.<br> 
   Requires a defined <a href="#FRM">FRM</a>-device to work.<br><br> 
   
-  <a name="FRM_PWMdefine"></a>
+  <a name="FRM_RGBdefine"></a>
   <b>Define</b>
   <ul>
-  <code>define &lt;name&gt; FRM_PWM &lt;pin&gt;</code> <br>
-  Defines the FRM_PWM device. &lt;pin&gt> is the arduino-pin to use.
+  <code>define &lt;name&gt; FRM_PWM &lt;pin&gt; &lt;pin&gt; &lt;pin&gt; [pin...]</code> <br>
+  Defines the FRM_RGB device. &lt;pin&gt> are the arduino-pin to use.<br>
+  For rgb-controlled devices first pin drives red, second pin green and third pin blue.
   </ul>
   
   <br>
-  <a name="FRM_PWMset"></a>
+  <a name="FRM_RGBset"></a>
   <b>Set</b><br>
   <ul>
-  <code>set &lt;name&gt; value &lt;value&gt;</code><br>
-  sets the pulse-width of the signal that is output on the configured arduino pin<br>
-  Range is from 0 to 255 (see <a href="http://arduino.cc/en/Reference/AnalogWrite">analogWrite()</a> for details)
-  </ul>
-  <a name="FRM_PWMget"></a>
+  <code>set &lt;name&gt; on</code><br>
+  sets the pulse-width of all configured pins to 100%</ul>
+  <ul>
+  <code>set &lt;name&gt; off</code><br>
+  sets the pulse-width of all configured pins to 0%</ul>
+  <ul>
+  <code>set &lt;name&gt; toggle</code><br>
+  toggles in between the last dimmed value, 0% and 100%. If no dimmed value was set before defaults to pulsewidth 50% on all channels</ul>
+  <ul>
+  <code>set &lt;name&gt; rgb &lt;value&gt;</code><br>
+  sets the pulse-width of all channels at once. Also sets the value toggle can switch to<br>
+  Value is encoded as hex-string, 2-digigs per channel (e.g. FFFFFF for reguler rgb)</ul>
+  <ul>
+  <code>set &lt;name&gt; pct &lt;value&gt;</code><br>
+  dims all channels at once while leving the ratio in between the channels unaltered.<br>
+  Range is 0-100 ('pct' stands for 'percent')</ul>
+  <ul>
+  <code>set &lt;name&gt; dimUp</code><br>
+  dims all channels up by 10%</ul>
+  <ul>
+  <code>set &lt;name&gt; dimDown</code><br>
+  dims all channels down by 10%</ul>
+
+  <a name="FRM_RGBget"></a>
   <b>Get</b><br>
   <ul>
-  N/A
+  <code>get &lth;name&gt; rgb</code><br>
+  returns the values set for all channels. Format is hex, 2 nybbles per channel.
+  </ul>
+  <ul>
+  <code>get &lth;name&gt; RGB</code><br>
+  returns the values set for all channels in normalized format. Format is hex, 2 nybbles per channel. 
+  Values are scaled such that the channel with the highest value is set to FF. The real values are calculated
+  by multipying each byte with the value of 'pct'.
+  </ul>
+  <ul>
+  <code>get &lth;name&gt; pct</code><br>
+  returns the value of the channel with the highest value scaled to the range of 0-100 (percent).
   </ul><br>
-  <a name="FRM_PWMattr"></a>
+  <a name="FRM_RGBattr"></a>
   <b>Attributes</b><br>
   <ul>
       <li>restoreOnStartup &lt;on|off&gt;</li>
