@@ -583,7 +583,7 @@ MAX_Parse($$)
     if($devicetype) {
       return "UNDEFINED MAX_$addr MAX $devicetype $addr";
     } else {
-      Log 2, "Got message for undefined device, and failed to guess type from msg '$msgtype' - ignoring";
+      Log 2, "Got message for undefined device $addr, and failed to guess type from msg '$msgtype' - ignoring";
       return $hash->{NAME};
     }
   }
