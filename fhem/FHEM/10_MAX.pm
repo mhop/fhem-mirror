@@ -769,7 +769,7 @@ MAX_Parse($$)
     if(@args == 0) {
       delete $shash->{ERROR} if(exists($shash->{ERROR}));
     } else {
-      $shash->{ERROR} = join(",",$args[0]);
+      $shash->{ERROR} = join(",",@args);
     }
 
   } elsif($msgtype eq "AckWakeUp") {
