@@ -270,7 +270,7 @@ CUL_MAX_Parse($$)
       return $shash->{NAME} if($src eq CUL_MAX_fakeWTaddr($hash));
       return $shash->{NAME} if($src eq CUL_MAX_fakeSCaddr($hash));
 
-      Dispatch($shash, "MAX,$isToMe,Ack,$src,$payload", {RAWMSG => $rmsg});
+      Dispatch($shash, "MAX,$isToMe,Ack,$src,$payload", {});
 
       return $shash->{NAME} if(!@{$shash->{sendQueue}}); #we are not waiting for any Ack
 
@@ -322,7 +322,7 @@ CUL_MAX_Parse($$)
       #If $isToMe is true, this device is already paired and just wants to be reacknowledged
       if($shash->{pairmode} || $isToMe) {
         Log 3, "CUL_MAX_Parse: " . ($isToMe ? "Re-Pairing" : "Pairing") . " device $src of type $device_types{$type} with serial $serial";
-        Dispatch($shash, "MAX,$isToMe,define,$src,$device_types{$type},$serial,0,0", {RAWMSG => $rmsg});
+        Dispatch($shash, "MAX,$isToMe,define,$src,$device_types{$type},$serial,0,0", {});
         #Send after dispatch the define, otherwise Send will create an invalid device
         CUL_MAX_Send($shash, "PairPong", $src, "00");
 
@@ -330,13 +330,13 @@ CUL_MAX_Parse($$)
 
         #This are the default values that a device has after factory reset or pairing
         if($device_types{$type} =~ /HeatingThermostat.*/) {
-          Dispatch($shash, "MAX,$isToMe,HeatingThermostatConfig,$src,17,21,30.5,4.5,80,5,0,12,15,100,0,0,12,$defaultWeekProfile", {RAWMSG => $rmsg});
+          Dispatch($shash, "MAX,$isToMe,HeatingThermostatConfig,$src,17,21,30.5,4.5,80,5,0,12,15,100,0,0,12,$defaultWeekProfile", {});
         } elsif($device_types{$type} eq "WallMountedThermostat") {
-          Dispatch($shash, "MAX,$isToMe,WallThermostatConfig,$src,17,21,30.5,4.5,$defaultWeekProfile", {RAWMSG => $rmsg});
+          Dispatch($shash, "MAX,$isToMe,WallThermostatConfig,$src,17,21,30.5,4.5,$defaultWeekProfile", {});
         }
       }
     } elsif(grep /^$msgType$/, ("ShutterContactState", "WallThermostatState", "WallThermostatControl", "ThermostatState", "PushButtonState"))  {
-      Dispatch($shash, "MAX,$isToMe,$msgType,$src,$payload", {RAWMSG => $rmsg});
+      Dispatch($shash, "MAX,$isToMe,$msgType,$src,$payload", {});
     } else {
       Log $ll5, "Unhandled message $msgType";
     }
@@ -503,7 +503,7 @@ CUL_MAX_SendQueueHandler($$)
 
   } elsif( $packet->{sent} == 2 ) { #Got ack
     if(defined($packet->{callbackParam})) {
-      Dispatch($hash, "MAX,1,Ack$packet->{cmd},$packet->{dst},$packet->{callbackParam}", {RAWMSG => ""});
+      Dispatch($hash, "MAX,1,Ack$packet->{cmd},$packet->{dst},$packet->{callbackParam}", {});
     }
     splice @{$hash->{sendQueue}}, $pktIdx, 1; #Remove from array
 
