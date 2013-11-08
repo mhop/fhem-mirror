@@ -842,7 +842,10 @@ sub FRM_OWX_Discover ($) {
   <a href="#FRM_IN">FRM_IN</a> for digital input<br>
   <a href="#FRM_OUT">FRM_OUT</a> for digital out<br>
   <a href="#FRM_AD">FRM_AD</a> for analog input<br>
-  <a href="#FRM_PWM">FRM_PWM</a> for analog (pulse_width_modulated) output<br>
+  <a href="#FRM_PWM">FRM_PWM</a> for analog output (pulse_width_modulated)<br>
+  <a href="#FRM_RGB">FRM_RGB</a> control multichannel/RGB-LEDs by pwm<br>
+  <a href="#FRM_SERVO">FRM_SERVO</a> for pwm-controled servos as being used in modelmaking<br>
+  <a href="#FRM_LCD">FRM_LCD</a> output text to LCD attached via I2C<br>
   <a href="#FRM_I2C">FRM_I2C</a> to read data from integrated circutes attached
    to Arduino supporting the <a href="http://en.wikipedia.org/wiki/I%C2%B2C">
    i2c-protocol</a>.<br><br>
@@ -850,9 +853,8 @@ sub FRM_OWX_Discover ($) {
   Each client stands for a Pin of the Arduino configured for a specific use 
   (digital/analog in/out) or an integrated circuit connected to Arduino by i2c.<br><br>
   
-  Note: this module requires the <a href="https://github.com/amimoto/perl-firmata">Device::Firmata</a> module (perl-firmata).
-  You can download it <a href="https://github.com/amimoto/perl-firmata/archive/master.zip">as a single zip</a> file from github.
-  Copy 'lib/Device' (with all subdirectories) to e.g. FHEM directory (or other location within perl include path)<br><br>
+  Note: this module is based on <a href="https://github.com/ntruchsess/perl-firmata">Device::Firmata</a> module (perl-firmata).
+  perl-firmata is included in FHEM-distributions lib-directory. You can download the latest version <a href="https://github.com/amimoto/perl-firmata/archive/master.zip">as a single zip</a> file from github.<br><br>
 
   Note: this module may require the Device::SerialPort or Win32::SerialPort
   module if you attach the device via USB and the OS sets strange default
