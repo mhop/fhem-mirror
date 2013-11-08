@@ -137,7 +137,7 @@ JeeLink_Set($@)
   my $arg = shift @a;
   my $arg2 = shift @a;
 
-  my $list = "raw:noArg";
+  my $list = "raw";
   $list .= " LaCrossePairForSec";
   return $list if( $cmd eq '?' );
 
@@ -208,7 +208,7 @@ JeeLink_DoInit($)
 
   JeeLink_SimpleWrite($hash, "1a" ); # led on
   JeeLink_SimpleWrite($hash, "1q" ); # quiet mode
-  JeeLink_SimpleWrite($hash, "0x" ); # hex mode
+  JeeLink_SimpleWrite($hash, "0x" ); # hex mode off
   JeeLink_SimpleWrite($hash, "0a" ); # led off
 
   JeeLink_SimpleWrite($hash, "l");   # list known devices
@@ -435,6 +435,11 @@ JeeLink_Parse($$$$)
 
   if($dmsg =~ m/^\[/ ) {
     $hash->{VERSION} = $dmsg;
+    return;
+  }
+
+  if( $dmsg =~m/drecvintr exit/ ) {
+    JeeLink_SimpleWrite($hash, "ec", 1);
     return;
   }
 
