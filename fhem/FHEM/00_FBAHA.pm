@@ -263,7 +263,7 @@ FBAHA_Read($@)
   my $msg;
   while(length($data) >= 16) {
     my $len = hex(substr($data, 4,4))*2;
-    if($len < 16 || $len > 10240) { # Out of Sync
+    if($len < 16 || $len > 20480) { # Out of Sync
       Log3 $name, 1, "FBAHA: resetting buffer as we are out of sync ($len)";
       $hash->{PARTIAL} = "";
       return "";
