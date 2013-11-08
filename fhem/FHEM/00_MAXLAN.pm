@@ -124,7 +124,6 @@ MAXLAN_Disconnect($)
 {
   my $hash = shift;
   Log 5, "MAXLAN_Disconnect";
-  Dispatch($hash, "MAX,1,CubeConnectionState,$hash->{rfaddr},0", {});
   #All operations here are no-op if already disconnected
   DevIo_CloseDev($hash);
   RemoveInternalTimer($hash);
@@ -221,7 +220,7 @@ MAXLAN_Set($@)
     my $time = time()-946684774;
     my $rmsg = "v:".$timezones.",".sprintf("%08x",$time);
     my $ret = MAXLAN_Write($hash,$rmsg, "A:");
-    Dispatch($hash, "MAX,1,CubeClockState,$hash->{rfaddr},1", {}) if(!$ret);
+    $hash->{clockset} = 1;
     return $ret;
 
   }elsif($setting eq "factoryReset") {
@@ -439,7 +438,7 @@ MAXLAN_Parse($$)
 
   if ($cmd eq 'H'){ #Hello
     $hash->{serial} = $args[0];
-    $hash->{rfaddr} = $args[1];
+    $hash->{addr} = $args[1];
     $hash->{fwversion} = $args[2];
     my $dutycycle = 0;
     if(@args > 5){
@@ -458,9 +457,9 @@ MAXLAN_Parse($$)
             hour => hex(substr($args[8],0,2)),
             minute => hex(substr($args[8],2,2)),
           };
-    my $clockset = hex($args[9]);
-    #$cubedatetime is only valid if $clockset is 1
-    if($clockset) {
+    $hash->{clockset} = hex($args[9]);
+    #$cubedatetime field is only valid if $clockset is 1
+    if($hash->{clockset}) {
       my ($sec,$min,$hour,$mday,$mon,$year) = localtime(time);
       my $difference = ((((($cubedatetime->{year} - $year-1900)*12
                           + $cubedatetime->{month} - $mon-1)*30
@@ -476,11 +475,7 @@ MAXLAN_Parse($$)
       Log 2, "MAXLAN_Parse: Cube has no time set";
     }
 
-    Dispatch($hash, "MAX,1,define,$hash->{rfaddr},Cube,$hash->{serial},0,1", {});
-    Dispatch($hash, "MAX,1,CubeConnectionState,$hash->{rfaddr},1", {});
-    Dispatch($hash, "MAX,1,CubeClockState,$hash->{rfaddr},$clockset", {});
-    Dispatch($hash, "MAX,1,CubeDutyCycleState,$hash->{rfaddr},$dutycycle", {});
-    Log $ll5, "MAXLAN_Parse: Got hello, connection ip $args[4], duty cycle $dutycycle, freememory $freememory, clockset $clockset";
+    Log $ll5, "MAXLAN_Parse: Got hello, connection ip $args[4], duty cycle $dutycycle, freememory $freememory, clockset $hash->{clockset}";
 
   } elsif($cmd eq 'M') {
     #Metadata, this is basically a readwrite part of the cube's memory.
@@ -543,8 +538,7 @@ MAXLAN_Parse($$)
 
     $len = $len+1; #The len field itself was not counted
 
-    $groupid = 0 if($device_types{$devicetype} eq "Cube"); #That field does not mean "groupid" for Cube
-    Dispatch($hash, "MAX,1,define,$addr,$device_types{$devicetype},$serial,$groupid,1", {});
+    Dispatch($hash, "MAX,1,define,$addr,$device_types{$devicetype},$serial,$groupid,1", {}) if($device_types{$devicetype} ne "Cube");
 
     if($len != length($bindata)) {
       Dispatch($hash, "MAX,1,Error,$addr,Parts of configuration are missing", {});
@@ -593,7 +587,7 @@ MAXLAN_Parse($$)
     }
 
     #Clear Error
-    Dispatch($hash, "MAX,1,Error,$addr", {});
+    Dispatch($hash, "MAX,1,Error,$addr", {}) if($addr ne $hash->{addr}); #don't clear own error
 
     #Check if it is already recorded in devices
     my $found = 0;
@@ -665,7 +659,8 @@ MAXLAN_Parse($$)
 
   } elsif($cmd eq "S"){#Response to s:
     $hash->{dutycycle} = hex($args[0]); #number of command send over the air
-    Dispatch($hash, "MAX,1,CubeDutyCycleState,$hash->{rfaddr},$hash->{dutycycle}", {});
+    readingsSingleUpdate( $hash, 'dutycycle', $hash->{dutycycle}, 1 );
+
     my $discarded = $args[1];
     $hash->{freememoryslot} = $args[2];
     Log 5, "MAXLAN_Parse: dutycyle $hash->{dutycycle}, freememoryslot $hash->{freememoryslot}";
@@ -816,7 +811,7 @@ MAXLAN_RemoveDevice($$)
   <tr><td>
   The MAXLAN is the fhem module for the eQ-3 MAX! Cube LAN Gateway.
   <br><br>
-  The fhem module makes the MAX! "bus" accessible to fhem, automatically detecting paired MAX! devices. (The devices themselves are handled by the <a href="#MAX">MAX</a> module).<br>
+  The fhem module makes the MAX! "bus" accessible to fhem, automatically detecting paired MAX! devices. It also represents properties of the MAX! Cube. The other devices are handled by the <a href="#MAX">MAX</a> module, which uses this module as its backend.<br>
   <br>
 
   <a name="MAXLANdefine"></a>
