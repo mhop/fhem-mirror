@@ -643,7 +643,9 @@ MAXLAN_Parse($$)
         }else{
           Log 2, "MAXLAN_Parse: Got status for unimplemented device type $shash->{type}";
         }
-      } # if($valid)
+      } else {
+        Dispatch($hash, "MAX,1,Error,$addr,Error $errframetype in Msg type L", {});
+      }
       $bindata=substr($bindata,$len+1); #+1 because the len field is not counted
     } # while(length($bindata))
 
