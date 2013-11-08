@@ -6004,8 +6004,7 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
         </li>
   </ul>
   <br>
-  <a name="CUL_HMparams"></a>
-  <b>available paramter "param"</b>
+  <a name="CUL_HMparams"><b>available parameter "param"</b></a>
   <ul>
   <li><B>HM-Sen-RD-O</B><br>
   offAtPon: heat channel only: force heating off after powerOn<br>

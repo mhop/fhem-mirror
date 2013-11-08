@@ -70,11 +70,11 @@ sub HMLAN_Initialize($) {
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "loglevel:0,1,2,3,4,5,6 addvaltrigger " . 
                      "hmId hmKey hmKey2 hmKey3 " .
-                     "respTime wdStrokeTime:5,10,15,20,25 " .
+                     "respTime " .
 					 "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger ".
 					 "hmMsgLowLimit ".
 					 "hmLanQlen:1_min,2_low,3_normal,4_high,5_critical ".
-					 "wdTimer ".
+					 "wdTimer:5,10,15,20,25 ".
 					 $readingFnAttributes;
 }
 sub HMLAN_Define($$) {#########################################################
@@ -97,13 +97,14 @@ sub HMLAN_Define($$) {#########################################################
     $attr{$name}{dummy} = 1;
     return undef;
   }
-  $attr{$name}{wdTimer} = 25;
   $attr{$name}{hmLanQlen} = "1_min"; #max message queue length in HMLan
 
   no warnings 'numeric';
   $hash->{helper}{q}{hmLanQlen} = int($attr{$name}{hmLanQlen})+0; 
   use warnings 'numeric';
   $hash->{DeviceName} = $dev;
+  $hash->{msgKeepAlive} = "";   # delay of trigger Alive messages
+  $hash->{helper}{k}{DlyMax} = 0;
   
   $hash->{helper}{q}{answerPend} = 0;#pending answers from LANIf
   my @arr = ();
@@ -155,10 +156,11 @@ sub HMLAN_Notify(@) {##########################################################
 }
 sub HMLAN_Attr(@) {############################################################
   my ($cmd,$name, $attrName,$aVal) = @_;
-  if   ($attrName eq "wdTimer"){#allow between 5 and 25 second
-    return "select wdTimer between 5 and 25 seconds" if ($aVal>25 || $aVal<5);
+  if   ($attrName eq "wdTimer" && $cmd eq "set"){#allow between 5 and 25 second
+    return "select wdTimer between 5 and 25 seconds" if ($aVal>30 || $aVal<5);
     $attr{$name}{wdTimer} = $aVal;
-  }
+	$defs{$name}{helper}{k}{Start} = 0;
+   }
   elsif($attrName eq "hmLanQlen"){
 	if ($cmd eq "set"){
       no warnings 'numeric';
@@ -710,14 +712,17 @@ sub HMLAN_DoInit($) {##########################################################
   foreach (keys %lhash){delete ($lhash{$_})};# clear IDs - HMLAN might have a reset 
   $hash->{helper}{q}{keepAliveRec} = 1; # ok for first time
   $hash->{helper}{q}{keepAliveRpt} = 0; # ok for first time
-
+  
+  my $tn = gettimeofday();
+  my $wdTimer = AttrVal($name,"wdTimer",25);
+  $hash->{helper}{k}{Start} = $tn;
+  $hash->{helper}{k}{Next} = $tn + $wdTimer;
+ 
   RemoveInternalTimer( "keepAliveCk:".$name);# avoid duplicate timer
   RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
-  InternalTimer(gettimeofday()+$attr{$name}{wdTimer}, "HMLAN_KeepAlive", "keepAlive:".$name, 0);
+  InternalTimer($tn+$wdTimer, "HMLAN_KeepAlive", "keepAlive:".$name, 0);
   # send first message to retrieve HMLAN condition
-  HMLAN_Write($hash,"","As09998112"
-	                     .$id
-						 ."000001");
+  HMLAN_Write($hash,"","As09998112".$id."000001");
 
   return undef;
 }
@@ -729,12 +734,30 @@ sub HMLAN_KeepAlive($) {#######################################################
 
   return if(!$hash->{FD});
   HMLAN_SimpleWrite($hash, "K");
-  $hash->{helper}{ref}{kTs} = int(time()*1000);
-  RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
+  my $tn = gettimeofday();
+  my $wdTimer = AttrVal($name,"wdTimer",25);
+
+  my $kDly =  int(($tn - $hash->{helper}{k}{Next})*1000)/1000;
+  $hash->{helper}{k}{DlyMax} =  $kDly if($hash->{helper}{k}{DlyMax} < $kDly);
+	
+  if ($hash->{helper}{k}{Start}){
+    my $kBuf =  int($hash->{helper}{k}{Start} + 30 - $tn);
+    $hash->{helper}{k}{BufMin} =  $kBuf if($hash->{helper}{k}{BufMin} > $kBuf);
+  }	
+  else{
+    $hash->{helper}{k}{BufMin} =  30;
+  }
+		
+  $hash->{msgKeepAlive} = "dlyMax:".$hash->{helper}{k}{DlyMax}
+                         ." bufferMin:". $hash->{helper}{k}{BufMin};
+  $hash->{helper}{k}{Start} = $tn;
+  $hash->{helper}{k}{Next} = $tn + $wdTimer;
+  $hash->{helper}{ref}{kTs} = int($tn*1000);
+
   my $rt = AttrVal($name,"respTime",1);
-  InternalTimer(gettimeofday()+$rt,"HMLAN_KeepAliveCheck","keepAliveCk:".$name,1);
-  $attr{$name}{wdTimer} = 25 if (!$attr{$name}{wdTimer});
-  InternalTimer(gettimeofday()+$attr{$name}{wdTimer} ,"HMLAN_KeepAlive", "keepAlive:".$name, 1);
+  InternalTimer($tn+$rt,"HMLAN_KeepAliveCheck","keepAliveCk:".$name,1);
+  RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
+  InternalTimer($tn+$wdTimer,"HMLAN_KeepAlive", "keepAlive:".$name, 1);
 }
 sub HMLAN_KeepAliveCheck($) {##################################################
   my($in ) = shift;
@@ -806,7 +829,6 @@ sub HMLAN_condUpdate($$) {#####################################################
   readingsBulkUpdate($hash,"cond",$HMcndTxt);
   readingsBulkUpdate($hash,"Xmit-Events",$txt);
   readingsBulkUpdate($hash,"prot_".$HMcndTxt,"last");
-  readingsEndUpdate($hash,1);
 
   $hashQ->{HMcndN} = $HMcnd;
   
@@ -814,6 +836,10 @@ sub HMLAN_condUpdate($$) {#####################################################
     $hashQ->{answerPend} = 0;
 	@{$hashQ->{apIDs}} = ();       #clear Q-status
     $hash->{XmitOpen} = 0;         #deny transmit
+    readingsBulkUpdate($hash,"prot_keepAlive","last")
+	    if (   $HMcnd == 253 
+		    && $hash->{helper}{k}{Start}
+		    &&(gettimeofday() - 29) > $hash->{helper}{k}{Start});
   }
   elsif ($HMcnd == 255) {#reset counter after init
     $hashQ->{answerPend} = 0;
@@ -824,6 +850,7 @@ sub HMLAN_condUpdate($$) {#####################################################
     $hash->{XmitOpen} = 1 
 	    if($hashQ->{answerPend} < $hashQ->{hmLanQlen});#allow transmit
   }	
+  readingsEndUpdate($hash,1);
 }
 
 1;
@@ -883,7 +910,7 @@ sub HMLAN_condUpdate($$) {#####################################################
 		<li><a href="#attrdummy">dummy</a></li><br>
 		<li><a href="#loglevel">loglevel</a></li><br>
 		<li><a href="#addvaltrigger">addvaltrigger</a></li><br>
-		<li><a href="#hmMsgLowLimit">hmMsgLowLimit</a><br>
+		<li><a name="HMLANhmMsgLowLimit">hmMsgLowLimit</a><br>
 		    max messages level of HMLAN allowed for low-level message queue
 			to be executed. Above this level processing will be postponed.<br>
 			HMLAN will allow a max of messages per hour, it will block sending otherwise.
@@ -894,22 +921,22 @@ sub HMLAN_condUpdate($$) {#####################################################
             has some tolerance. <br>
 		    </li><br>
 		<li><a href="#hmId">hmId</a></li><br>
-		<li><a href="#hmKey">hmKey</a></li><br>
-		<li><a href="#hmKey2">hmKey2</a></li><br>
-		<li><a href="#hmKey3">hmKey3</a><br>
+		<li><a name="HMLANhmKey">hmKey</a></li><br>
+		<li><a name="HMLANhmKey2">hmKey2</a></li><br>
+		<li><a name="HMLANhmKey3">hmKey3</a><br>
 		AES keys for the HMLAN adapter. <br>
 		The key is converted to a hash. If a hash is given directly it is not converted but taken directly.
 	    Therefore the original key cannot be converted back<br>
 		</li>
 		<li><a href="#hmProtocolEvents">hmProtocolEvents</a></li><br>
-		<li><a href="#respTime">respTime</a><br>
+		<li><a name="HMLANrespTime">respTime</a><br>
 		Define max response time of the HMLAN adapter in seconds. Default is 1 sec.<br/>
 		Longer times may be used as workaround in slow/instable systems or LAN configurations.</li>
-		<li><a href="#wdTimer">wdTimer</a><br>
+		<li><a name="HMLAN#wdTimer">wdTimer</a><br>
 		Time in sec to trigger HMLAN. Values between 5 and 25 are allowed, 25 is default.<br>
 		It is <B>not recommended</B> to change this timer. If problems are detected with <br>
 		HLMLAN disconnection it is advisable to resolve the root-cause of the problem and not symptoms.</li>
-		<li><a href="#hmLanQlen">hmLanQlen</a><br>
+		<li><a name="HMLANhmLanQlen">hmLanQlen</a><br>
 		defines queuelength of HMLAN interface. This is therefore the number of 
 		simultanously send messages. increasing values may cause higher transmission speed. 
 		It may also cause retransmissions up to data loss.<br>
@@ -917,6 +944,45 @@ sub HMLAN_condUpdate($$) {#####################################################
 		1 - is a conservatibe value, and is default<br>
 		5 - is critical length, likely cause message loss</li>
 	</ul>
+	<a name="HMLANparameter"><b>parameter</b></a>
+    <ul>
+      <li><B>assignedIDs</B><br>
+	      HMIds that are assigned to HMLAN and will be handled. e.g. ACK will be generated internally</li>
+      <li><B>assignedIDsCnt</B><br>
+	      number of IDs that are assigned to HMLAN by FHEM</li>
+      <li><B>assignedIDsReport</B><br>
+	      number of HMIds that HMLAN reports are assigned. This should be identical 
+		  to assignedIDsCnt</li>
+      <li><B>msgKeepAlive</B><br>
+	      performance of keep-alive messages. <br>
+		  <B>dlyMax</B>: maximum delay of sheduled message-time to actual message send.<br>
+		  <B>bufferMin</B>: minimal buffer left to before HMLAN would likely disconnect 
+		  due to missing keepAlive message. bufferMin will be reset to 30sec if 
+		  attribut wdTimer is changed.<br>
+		  if dlyMax is high (several seconds) or bufferMin goes to "0" (normal is 4) the system 
+		  suffers on internal delays. Reasons for the delay might be explored. As a quick solution 
+		  wdTimer could be decreased to trigger HMLAN faster.</li>
+      <li><B>msgLoadEst</B><br>
+	      estimation of load of HMLAN. As HMLAN has a max capacity of message transmit per hour
+		  FHEM tries to estimate usage - see also 
+		  <a href="#hmMsgLowLimit">hmMsgLowLimit</a><br></li>
+      <li><B>msgParseDly</B><br>
+	      calculates the delay of messages in ms from send in HMLAN until processing in FHEM. 
+          It therefore gives an indication about FHEM system performance. 
+		  </li>
+    </ul>
+	<a name="HMLANreadings"><b>parameter and readings</b></a>
+    <ul>
+      <li><B>prot_disconnect</B>       <br>recent HMLAN disconnect</li>
+      <li><B>prot_init</B>             <br>recent HMLAN init</li>
+      <li><B>prot_keepAlive</B>        <br>HMLAN disconnect likely do to slow keep-alive sending</li>
+      <li><B>prot_ok</B>               <br>recent HMLAN ok condition</li>
+      <li><B>prot_timeout</B>          <br>recent HMLAN timeout</li>
+      <li><B>prot_Warning-HighLoad</B> <br>high load condition entered - HMLAN has about 10% performance left</li>
+      <li><B>prot_ERROR-Overload</B>   <br>overload condition - HMLAN will receive bu tno longer transmitt messages</li>
+      <li><B>prot_Overload-released</B><br>overload condition released - normal operation possible</li>
+    </ul>
+
 </ul>
 
 =end html

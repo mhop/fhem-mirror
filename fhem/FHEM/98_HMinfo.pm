@@ -265,8 +265,11 @@ sub HMinfo_SetFn($@) {#########################################################
   }
 
   if   (!$cmd ||$cmd eq "?" ) {##actionImmediate: clear parameter--------------
-	return "autoReadReg clear configCheck param peerCheck peerXref "
-	      ."protoEvents models regCheck register rssi saveConfig update "
+	return "autoReadReg "
+	      ."clear "
+		  ."configCheck param peerCheck peerXref "
+	      ."protoEvents "
+          ."models regCheck register rssi saveConfig update "
           ."templateSet templateChk templateList templateDef cpRegs update";
   }
   elsif($cmd eq "clear" )     {##actionImmediate: clear parameter--------------
