@@ -97,6 +97,11 @@ MAX_Define($$)
     Log 1, $msg;
     return $msg;
   }
+  if($type eq "Cube") {
+    my $msg = "MAX_Define: Device type 'Cube' is deprecated. All properties have been moved to the MAXLAN device.";
+    Log 1, $msg;
+    return $msg;
+  }
   Log GetLogLevel($hash->{NAME}, 5), "Max_define $type with addr $addr ";
   $hash->{type} = $type;
   $hash->{addr} = $addr;
@@ -571,9 +576,8 @@ MAX_Parse($$)
   if(!$shash)
   {
     my $devicetype = undef;
-    $devicetype = $args[0] if($msgtype eq "define");
+    $devicetype = $args[0] if($msgtype eq "define" and $args[0] ne "Cube");
     $devicetype = "ShutterContact" if($msgtype eq "ShutterContactState");
-    $devicetype = "Cube" if($msgtype eq "CubeClockState" or $msgtype eq "CubeConnectionState" or $msgtype eq "CubeDutyCycleState");
     $devicetype = "WallMountedThermostat" if(grep /^$msgtype$/, ("WallThermostatConfig","WallThermostatState","WallThermostatControl"));
     $devicetype = "HeatingThermostat" if(grep /^$msgtype$/, ("HeatingThermostatConfig", "ThermostatState"));
     if($devicetype) {
@@ -724,19 +728,6 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "onoff", $onoff);
     readingsBulkUpdate($shash, "connection", $gateway);
 
-  }elsif($msgtype eq "CubeClockState"){
-    my $clockset = $args[0];
-    $shash->{clocknotset} = !$clockset;
-
-  }elsif($msgtype eq "CubeConnectionState"){
-    my $connected = $args[0];
-
-    readingsBulkUpdate($shash, "connection", $connected);
-
-  } elsif($msgtype eq "CubeDutyCycleState") {
-    my $dutycycle = $args[0];
-    readingsBulkUpdate($shash, "dutycycle", $dutycycle);
-
   } elsif(grep /^$msgtype$/, ("HeatingThermostatConfig", "WallThermostatConfig")) {
     readingsBulkUpdate($shash, "ecoTemperature", MAX_SerializeTemperature($args[0]));
     readingsBulkUpdate($shash, "comfortTemperature", MAX_SerializeTemperature($args[1]));
@@ -860,7 +851,7 @@ MAX_Parse($$)
     <br><br>
 
     Define an MAX device of type &lt;type&gt; and rf address &lt;addr&gt.
-    The &lt;type&gt; is one of Cube, HeatingThermostat, HeatingThermostatPlus, WallMountedThermostat, ShutterContact, PushButton.
+    The &lt;type&gt; is one of HeatingThermostat, HeatingThermostatPlus, WallMountedThermostat, ShutterContact, PushButton.
     The &lt;addr&gt; is a 6 digit hex number.
     You should never need to specify this by yourself, the <a href="#autocreate">autocreate</a> module will do it for you.<br>
     It's advisable to set event-on-change-reading, like
