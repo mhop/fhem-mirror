@@ -463,9 +463,9 @@ while (1) {
   foreach my $p (keys %selectlist) {
     my $hash = $selectlist{$p};
     vec($rin, $hash->{FD}, 1) = 1
-        if($hash->{FD});
+        if(defined($hash->{FD}));
     vec($win, $hash->{FD}, 1) = 1
-        if($hash->{FD} && defined($hash->{$wbName}));
+        if(defined($hash->{FD}) && defined($hash->{$wbName}));
     vec($ein, $hash->{EXCEPT_FD}, 1) = 1
         if(defined($hash->{"EXCEPT_FD"}));
   }
