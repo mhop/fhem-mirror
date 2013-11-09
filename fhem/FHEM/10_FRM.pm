@@ -485,7 +485,8 @@ FRM_Client_AssignIOPort($)
 				&& defined( $dev->{IODev} )
 				&& defined( $dev->{PIN} )
 				&& $dev->{IODev} == $hash->{IODev}
-				&& $dev->{PIN} == $hash->{PIN} ) {
+				&& grep {$_ == $hash->{PIN}} split(" ",$dev->{PIN}) ) {
+				  delete $hash->{IODev};
 					die "Device $main::defs{$d}{NAME} allready defined for pin $hash->{PIN}";
 				}
 		}
@@ -888,23 +889,27 @@ sub FRM_OWX_Discover ($) {
       defaults for the serial parameters, e.g. some Linux distributions and
       OSX.  <br><br>
       
-      The Arduino has to run 'StandardFirmata'. You can find StandardFirmata
-      in the Arduino-IDE under 'Examples->Firmata->StandardFirmata<br><br>
+      The Arduino has to run either 'StandardFirmata' or 'ConfigurableFirmata'.
+      StandardFirmata supports Digital and Analog-I/O, Servo and I2C. In addition
+      to that ConfigurableFirmata supports 1-Wire, Stepper-motors and allows to
+      connect via ethernet in client mode. <br><br>
+      
+      You can find StandardFirmata in the Arduino-IDE under 'Examples->Firmata->StandardFirmata<br><br>
+      ConfigurableFirmata has to be installed manualy. See <a href="https://github.com/firmata/arduino/tree/configurable/examples/ConfigurableFirmata">
+      ConfigurableFirmata</a> on GitHub or <a href="http://www.fhemwiki.de/wiki/Arduino#Installation_ConfigurableFirmata">FHEM-Wiki</a><br> 
 
     </ul>
     Network-connected devices:<br><ul>
     &lt;port&gt; specifies the port the FRM device listens on. If 'global' is
     specified the socket is bound to all local ip-addresses, otherwise to localhost
     only.<br>
-    The Arduino must run a Version of firmata that connects in client-mode (the
-    connection is initiated by the arduino). The ip-address and port of the fhem-server
-    has to be configured an the arduino, so it knows where to connect to.<br>
+    The Arduino must ConfigurableFirmata. The connection is initiated by the arduino
+    in client-mode. Therefor the ip-address and port of the fhem-server has to be 
+    configured an the arduino, so it knows where to connect to.<br>
     As of now only a single Arduino per FRM-device configured is supported. Multiple
     Arduinos may connect to different FRM-devices configured for different ports.<br>
-    The support for Firmata over ethernet is still experimental. Firmata-ethenet-client
-    can be found here: 
-    <a href="https://github.com/ntruchsess/arduino/blob/configurable_ethernet/examples/ConfigurableEthernetclient/ConfigurableEthernetclient.ino">
-    ConfigurableEthernetclient.ino</a><br>
+    ConfigurableFirmata has to be installed manualy. See <a href="https://github.com/firmata/arduino/tree/configurable/examples/ConfigurableFirmata">
+    ConfigurableFirmata</a> on GitHub or <a href="http://www.fhemwiki.de/wiki/Arduino#Installation_ConfigurableFirmata">FHEM-Wiki</a><br> 
     </ul>
     <br>
     If the device is called none, then no device will be opened, so you
