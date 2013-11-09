@@ -113,81 +113,88 @@ FRM_RGB_Set($@)
   return SetExtensions($hash, join(" ", keys %sets), $name, $cmd, @a) unless @match == 1;
   return "$cmd expects $sets{$match[0]} parameters" unless (@a eq $sets{$match[0]});
 
-  SETHANDLER: {
-    $cmd eq "on" and do {
-      FRM_RGB_SetChannels($hash,(0xFF) x scalar(@{$hash->{PINS}}));
-      $hash->{toggle} = "on";
-      last;
-    };
-    $cmd eq "off" and do {
-      FRM_RGB_SetChannels($hash,(0x00) x scalar(@{$hash->{PINS}}));
-      $hash->{toggle} = "off";
-      last;
-    };
-    $cmd eq "toggle" and do {
-      my $toggle = $hash->{toggle};
-      TOGGLEHANDLER: {
-        $toggle eq "off" and do {
+  eval {
+    SETHANDLER: {
+      $cmd eq "on" and do {
+        FRM_RGB_SetChannels($hash,(0xFF) x scalar(@{$hash->{PINS}}));
+        $hash->{toggle} = "on";
+        last;
+      };
+      $cmd eq "off" and do {
+        FRM_RGB_SetChannels($hash,(0x00) x scalar(@{$hash->{PINS}}));
+        $hash->{toggle} = "off";
+        last;
+      };
+      $cmd eq "toggle" and do {
+        my $toggle = $hash->{toggle};
+        TOGGLEHANDLER: {
+          $toggle eq "off" and do {
+            $hash->{toggle} = "up";
+            FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim}));
+            last;    
+          };
+          $toggle eq "up" and do {
+            FRM_RGB_SetChannels($hash,(0xFF) x @{$hash->{PINS}});
+            $hash->{toggle} = "on";
+            last;
+          };
+          $toggle eq "on" and do {
+            $hash->{toggle} = "down";
+            FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim}));
+            last;    
+          };
+          $toggle eq "down" and do {
+            FRM_RGB_SetChannels($hash,(0x0) x @{$hash->{PINS}});
+            $hash->{toggle} = "off";
+            last;
+          };
+        };
+        last;
+      };
+      $cmd eq "rgb" and do {
+        my $arg = $a[0];
+        my $numPins = scalar(@{$hash->{PINS}});
+        my $nybles = $numPins << 1;
+        die "$arg is not the right format" unless( $arg =~ /^[\da-f]{$nybles}$/i );
+        my @channels = RgbToChannels($arg,$numPins);
+        FRM_RGB_SetChannels($hash,@channels);
+        RGBHANDLER: {
+          $arg =~ /^0{$nybles}$/ and do {
+            $hash->{toggle} = "off";
+            last;
+          };
+          $arg =~ /^f{$nybles}$/i and do {
+            $hash->{toggle} = "on";
+            last;
+          };
           $hash->{toggle} = "up";
-          FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim}));
-          last;    
         };
-        $toggle eq "up" and do {
-          FRM_RGB_SetChannels($hash,(0xFF) x @{$hash->{PINS}});
-          $hash->{toggle} = "on";
-          last;
-        };
-        $toggle eq "on" and do {
-          $hash->{toggle} = "down";
-          FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim}));
-          last;    
-        };
-        $toggle eq "down" and do {
-          FRM_RGB_SetChannels($hash,(0x0) x @{$hash->{PINS}});
-          $hash->{toggle} = "off";
-          last;
-        };
+        $hash->{dim} = ChannelsToBrightness(@channels);
+        last;
       };
-      last;
-    };
-    $cmd eq "rgb" and do {
-      my $arg = $a[0];
-      my $numPins = scalar(@{$hash->{PINS}});
-      my $nybles = $numPins << 1;
-      die "$arg is not the right format" unless( $arg =~ /^[\da-f]{$nybles}$/i );
-      my @channels = RgbToChannels($arg,$numPins);
-      FRM_RGB_SetChannels($hash,@channels);
-      RGBHANDLER: {
-        $arg =~ /^0{$nybles}$/ and do {
-          $hash->{toggle} = "off";
-          last;
-        };
-        $arg =~ /^f{$nybles}$/i and do {
-          $hash->{toggle} = "on";
-          last;
-        };
-        $hash->{toggle} = "up";
+      $cmd eq "pct" and do {
+        $hash->{dim}->{bri} = $a[0];
+        FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim}));
+        last;
       };
-      $hash->{dim} = ChannelsToBrightness(@channels);
-      last;
-    };
-    $cmd eq "pct" and do {
-      $hash->{dim}->{bri} = $a[0];
-      FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim}));
-      last;
-    };
-    $cmd eq "dimUp" and do {
-      $hash->{dim}->{bri} = $hash->{dim}->{bri} > 90 ? 100 : $hash->{dim}->{bri}+10;
-      FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim})); 
-      last; 
-    };
-    $cmd eq "dimDown" and do {
-      $hash->{dim}->{bri} = $hash->{dim}->{bri} < 10 ? 0 : $hash->{dim}->{bri}-10;
-      FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim}));
-      last;
-    };
-  }
-  return undef;
+      $cmd eq "dimUp" and do {
+        $hash->{dim}->{bri} = $hash->{dim}->{bri} > 90 ? 100 : $hash->{dim}->{bri}+10;
+        FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim})); 
+        last; 
+      };
+      $cmd eq "dimDown" and do {
+        $hash->{dim}->{bri} = $hash->{dim}->{bri} < 10 ? 0 : $hash->{dim}->{bri}-10;
+        FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim}));
+        last;
+      };
+    }
+  };
+	if ($@) {
+		$@ =~ /^(.*)( at.*FHEM.*)$/;
+		$hash->{STATE} = "error setting '$cmd': ".$1;
+		return "error setting '$hash->{NAME} $cmd': ".$1;
+	}
+	return undef;
 }
 
 sub
