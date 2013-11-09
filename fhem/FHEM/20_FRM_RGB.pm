@@ -73,29 +73,26 @@ FRM_RGB_Init($$)
   my $ret = FRM_Init_Pin_Client($hash,$args,PIN_PWM);
   return $ret if (defined $ret);
   my @pins = ();
-  eval {
-    my $firmata = FRM_Client_FirmataDevice($hash);
-    $hash->{PIN} = "";
-    foreach my $pin (@{$args}) {
-      $firmata->pin_mode($pin,PIN_PWM);
-      push @pins,{
-        pin     => $pin,
-        "shift" => defined $firmata->{metadata}{pwm_resolutions} ? $firmata->{metadata}{pwm_resolutions}{$pin}-8 : 0,
-      };
-      $hash->{PIN} .= $hash->{PIN} eq "" ? $pin : " $pin";
-    }
-    $hash->{PINS} = \@pins;
-    if (! (defined AttrVal($name,"stateFormat",undef))) {
-      $attr{$name}{"stateFormat"} = "rgb";
-    }
-    my $value = ReadingsVal($name,"rgb",undef);
-    if (defined $value and AttrVal($hash->{NAME},"restoreOnReconnect","on") eq "on") {
-      FRM_RGB_Set($hash,$name,"rgb",$value);
-    }
-  };
-  return $@ if $@;
+  my $firmata = FRM_Client_FirmataDevice($hash);
+  $hash->{PIN} = "";
+  foreach my $pin (@{$args}) {
+    $firmata->pin_mode($pin,PIN_PWM);
+    push @pins,{
+      pin     => $pin,
+      "shift" => defined $firmata->{metadata}{pwm_resolutions} ? $firmata->{metadata}{pwm_resolutions}{$pin}-8 : 0,
+    };
+    $hash->{PIN} .= $hash->{PIN} eq "" ? $pin : " $pin";
+  }
+  $hash->{PINS} = \@pins;
+  if (! (defined AttrVal($name,"stateFormat",undef))) {
+    $attr{$name}{"stateFormat"} = "rgb";
+  }
+  my $value = ReadingsVal($name,"rgb",undef);
+  if (defined $value and AttrVal($hash->{NAME},"restoreOnReconnect","on") eq "on") {
+    FRM_RGB_Set($hash,$name,"rgb",$value);
+  }
   $hash->{toggle} = "off";
-  $hash->{dim} = {
+  $hash->{".dim"} = {
     bri => 50,
     channels => [(255) x @{$hash->{PINS}}],    
   };
@@ -130,7 +127,7 @@ FRM_RGB_Set($@)
         TOGGLEHANDLER: {
           $toggle eq "off" and do {
             $hash->{toggle} = "up";
-            FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim}));
+            FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{".dim"}));
             last;    
           };
           $toggle eq "up" and do {
@@ -140,7 +137,7 @@ FRM_RGB_Set($@)
           };
           $toggle eq "on" and do {
             $hash->{toggle} = "down";
-            FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim}));
+            FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{".dim"}));
             last;    
           };
           $toggle eq "down" and do {
@@ -169,30 +166,30 @@ FRM_RGB_Set($@)
           };
           $hash->{toggle} = "up";
         };
-        $hash->{dim} = ChannelsToBrightness(@channels);
+        $hash->{".dim"} = ChannelsToBrightness(@channels);
         last;
       };
       $cmd eq "pct" and do {
-        $hash->{dim}->{bri} = $a[0];
-        FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim}));
+        $hash->{".dim"}->{bri} = $a[0];
+        FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{".dim"}));
         last;
       };
       $cmd eq "dimUp" and do {
-        $hash->{dim}->{bri} = $hash->{dim}->{bri} > 90 ? 100 : $hash->{dim}->{bri}+10;
-        FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim})); 
+        $hash->{".dim"}->{bri} = $hash->{".dim"}->{bri} > 90 ? 100 : $hash->{".dim"}->{bri}+10;
+        FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{".dim"})); 
         last; 
       };
       $cmd eq "dimDown" and do {
-        $hash->{dim}->{bri} = $hash->{dim}->{bri} < 10 ? 0 : $hash->{dim}->{bri}-10;
-        FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim}));
+        $hash->{".dim"}->{bri} = $hash->{".dim"}->{bri} < 10 ? 0 : $hash->{".dim"}->{bri}-10;
+        FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{".dim"}));
         last;
       };
     }
   };
 	if ($@) {
 		$@ =~ /^(.*)( at.*FHEM.*)$/;
-		$hash->{STATE} = "error setting '$cmd': ".$1;
-		return "error setting '$hash->{NAME} $cmd': ".$1;
+		$hash->{STATE} = "error setting '$cmd': ".(defined $1 ? $1 : $@);
+		return "error setting '$hash->{NAME} $cmd': ".(defined $1 ? $1 : $@);
 	}
 	return undef;
 }
@@ -210,10 +207,10 @@ FRM_RGB_Get($@)
       return ReadingsVal($name,"rgb",undef);
     };
     $cmd eq 'RGB' and do {
-      return ChannelsToRgb(@{$hash->{dim}->{channels}});
+      return ChannelsToRgb(@{$hash->{".dim"}->{channels}});
     };
     $cmd eq 'pct' and do {
-      return $hash->{dim}->{bri};
+      return $hash->{".dim"}->{bri};
       return undef;
     };
   }
@@ -238,25 +235,24 @@ FRM_RGB_SetChannels($$)
     }
     $firmata->analog_write($pin->{pin},$value);
   };
-  readingsSingleUpdate($hash,"rgb",ChannelsToRgb(@channels),1);
-}
-
-sub FRM_RGB_State($$$$)
-{
-	my ($hash, $tim, $sname, $sval) = @_;
-	
-STATEHANDLER: {
-		$sname eq "value" and do {
-			if (AttrVal($hash->{NAME},"restoreOnStartup","on") eq "on") { 
-				FRM_RGB_Set($hash,$hash->{NAME},$sval);
-			}
-			last;
-		}
-	}
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash,"rgb",ChannelsToRgb(@channels),1);
+  readingsBulkUpdate($hash,"pct",(ChannelsToBrightness(@channels))->{bri},1);
+  readingsEndUpdate($hash, 1);
 }
 
 sub
-FRM_RGB_Attr($$$$) {
+FRM_RGB_State($$$$)
+{
+  my ($hash, $tim, $sname, $sval) = @_;
+  if ($sname eq "rgb") {
+    FRM_RGB_Set($hash,$hash->{NAME},$sname,$sval);
+  }
+}
+
+sub
+FRM_RGB_Attr($$$$)
+{
   my ($command,$name,$attribute,$value) = @_;
   if ($command eq "set") {
     ARGUMENT_HANDLER: {
@@ -289,7 +285,7 @@ FRM_RGB_Attr($$$$) {
   <a name="FRM_RGBdefine"></a>
   <b>Define</b>
   <ul>
-  <code>define &lt;name&gt; FRM_PWM &lt;pin&gt; &lt;pin&gt; &lt;pin&gt; [pin...]</code> <br>
+  <code>define &lt;name&gt; FRM_RGB &lt;pin&gt; &lt;pin&gt; &lt;pin&gt; [pin...]</code> <br>
   Defines the FRM_RGB device. &lt;pin&gt> are the arduino-pin to use.<br>
   For rgb-controlled devices first pin drives red, second pin green and third pin blue.
   </ul>
@@ -303,6 +299,8 @@ FRM_RGB_Attr($$$$) {
   <ul>
   <code>set &lt;name&gt; off</code><br>
   sets the pulse-width of all configured pins to 0%</ul><br>
+  <ul>
+  <a href="#setExtensions">set extensions</a> are supported</ul><br>
   <ul>
   <code>set &lt;name&gt; toggle</code><br>
   toggles in between the last dimmed value, 0% and 100%. If no dimmed value was set before defaults to pulsewidth 50% on all channels</ul><br>
@@ -320,7 +318,6 @@ FRM_RGB_Attr($$$$) {
   <ul>
   <code>set &lt;name&gt; dimDown</code><br>
   dims down by 10%</ul><br>
-
   <a name="FRM_RGBget"></a>
   <b>Get</b><br>
   <ul>
