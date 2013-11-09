@@ -324,17 +324,6 @@ sub ts0 {
   return sprintf("%02d.%02d.%2d %02d:%02d", $day,$month+1,$year-100,$hour,$minute);
 }
 
-sub plusNMonths($$) {
-  my ($tm, $n)= @_;
-  my ($second,$minute,$hour,$day,$month,$year,$wday,$yday,$isdst)= localtime($tm);
-  #main::Debug "Adding $n months to $day.$month.$year $hour:$minute:$second= " . ts($tm);
-  $month+= $n;
-  $year+= int($month / 12);
-  $month %= 12;
-  #main::Debug " gives $day.$month.$year $hour:$minute:$second= " . ts(main::fhemTimeLocal($second,$minute,$hour,$day,$month,$year));
-  return main::fhemTimeLocal($second,$minute,$hour,$day,$month,$year);
-}
-
 sub fromVEvent {
   my ($self,$vevent)= @_;
 
@@ -465,6 +454,42 @@ sub endTime {
   return ts($self->{end});
 }
 
+sub DSTOffset($$) {
+  my ($t1,$t2)= @_;
+
+  my @lt1 = localtime($t1);
+  my @lt2 = localtime($t2);
+
+  return 3600 *($lt1[8] - $lt2[8]);
+}
+
+# This function adds $n times $seconds to $t1 (seconds from the epoch).
+# A correction of 3600 seconds (one hour) is applied if and only if
+# one of $t1 and $t1+$n*$seconds falls into wintertime and the other
+# into summertime. Thus, e.g., adding a multiple of 24*60*60 seconds 
+# to 5 o'clock always gives 5 o'clock and not 4 o'clock or 6 o'clock
+# upon a change of summertime to wintertime or vice versa.
+sub plusNSeconds($$$) {
+  my ($t1, $seconds, $n)= @_;
+  $n= 1 unless defined($n);
+  my $t2= $t1+$n*$seconds;
+  return $t2+DSTOffset($t1,$t2);
+}
+
+sub plusNMonths($$) {
+  my ($tm, $n)= @_;
+  my ($second,$minute,$hour,$day,$month,$year,$wday,$yday,$isdst)= localtime($tm);
+  #main::Debug "Adding $n months to $day.$month.$year $hour:$minute:$second= " . ts($tm);
+  $month+= $n;
+  $year+= int($month / 12);
+  $month %= 12;
+  #main::Debug " gives $day.$month.$year $hour:$minute:$second= " . ts(main::fhemTimeLocal($second,$minute,$hour,$day,$month,$year));
+  return main::fhemTimeLocal($second,$minute,$hour,$day,$month,$year);
+}
+
+
+
+
 sub advanceToNextOccurance {
   my ($self) = @_;
   # See RFC 2445 page 39 and following
@@ -480,27 +505,27 @@ sub advanceToNextOccurance {
   do
   {
     if($self->{freq} eq "SECONDLY") {
-      $nextstart += $self->{interval};
+      $nextstart = plusNSeconds($nextstart, 1, $self->{interval});
     } elsif($self->{freq} eq "MINUTELY") {
-      $nextstart += 60*$self->{interval};
+      $nextstart = plusNSeconds($nextstart, 60, $self->{interval});
     } elsif($self->{freq} eq "HOURLY") {
-      $nextstart += 60*60*$self->{interval};
+      $nextstart = plusNSeconds($nextstart, 60*60, $self->{interval});
     } elsif($self->{freq} eq "DAILY") {
-      $nextstart += 60*60*24*$self->{interval};
+      $nextstart = plusNSeconds($nextstart, 24*60*60, $self->{interval});
     } elsif($self->{freq} eq "WEEKLY") {
       # special handling for WEEKLY and BYDAY
       if(exists($self->{byday})) {
         my ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat);
         my $preventloop = 0;        
         do {
-          $nextstart += 60*60*24*$self->{interval};
+          $nextstart = plusNSeconds($nextstart, 24*60*60, $self->{interval});
           ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat) = gmtime($nextstart);
           $preventloop ++;        
         } while(index($self->{byday}, $weekdays[$mwday]) == -1 and $preventloop < 10);
       }
       else {
         # default WEEKLY handling
-        $nextstart += 7*60*60*24*$self->{interval};
+        $nextstart = plusNSeconds($nextstart, 7*24*60*60, $self->{interval});
       }
     } elsif($self->{freq} eq "MONTHLY") {
       # here we ignore BYMONTHDAY as we consider the day of month of $self->{start}

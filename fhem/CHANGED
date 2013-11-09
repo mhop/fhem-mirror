@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - bugfix:  fix issue with DST changes in 57_Calendar.pm
   - feature: new module 36_LaCrosse.pm for LaCrosse IT+ temperature and
              humidity sensors with a JeeLabs JeeLink as RF modem.
              The matching JeeNode sketch can be found in
