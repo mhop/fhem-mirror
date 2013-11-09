@@ -680,9 +680,10 @@ RSS_CGI(){
     
     <i>Special uses</i><p>
     
-    You can display <a href="#SVG">SVG</a> plots with the aid of the helper function <code>plotAsPng()</code> (in 98_SVG.pm). Example:<p>
+    You can display <a href="#SVG">SVG</a> plots with the aid of the helper function <code>plotAsPng(&lt;name&gt;[,&lt;zoom&gt;[,&lt;offset&gt;]])</code> (in 98_SVG.pm). Examples:<p>
     <code>
-    img 20 30 0.6 png data { plotAsPng("mySVGPlot") }
+    img 20 30 0.6 png data { plotAsPng("mySVGPlot") }<BR>
+    img 20 30 0.6 png data { plotAsPng("mySVGPlot","qday",-1) }
     </code>
     <p>
     This requires the perl module Image::LibRSVG and librsvg. Debian-based systems can install these with <code>apt-get install libimage-librsvg-perl</code>.
