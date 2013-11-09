@@ -1494,7 +1494,7 @@ sub plotAsPng(@) {
                         last;
                 }
         }
-        Debug "FW_wname= $FW_wname, plotName= $plotName[0]";
+        #Debug "FW_wname= $FW_wname, plotName= $plotName[0]";
 
         $FW_RET                 = undef;
         $FW_webArgs{dev}        = $plotName[0];
@@ -1506,8 +1506,8 @@ sub plotAsPng(@) {
 
         ($mimetype, $svgdata)   = SVG_showLog("unused");
         
-        Debug "MIME type= $mimetype";
-        Debug "SVG= $svgdata";
+        #Debug "MIME type= $mimetype";
+        #Debug "SVG= $svgdata";
 
         eval {
                 require Image::LibRSVG;
@@ -1515,7 +1515,10 @@ sub plotAsPng(@) {
                 $rsvg->loadImageFromString($svgdata);
                 $pngImg = $rsvg->getImageBitmap();
         };
-        Debug "Error: $@" if($@);
+        Log3 $FW_wname, 1, 
+          "plotAsPng(): Cannot create plot as png image for \"" . 
+          join(" ", @plotName) . "\": $@" 
+          if($@ or !defined($pngImg) or ($pngImg eq ""));
 
         return $pngImg if $pngImg;
         return;
