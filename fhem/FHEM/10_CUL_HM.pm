@@ -1652,7 +1652,7 @@ sub CUL_HM_parseCommon(@){#####################################################
     CUL_HM_infoUpdtDevData($shash->{NAME}, $shash,$p)  
 	           if (!$modules{CUL_HM}{helper}{hmManualOper}#no autoaction
 			       ||$iohash->{hmPair} 
-                   ||$iohash->{hmPairSerial} );  	
+                   ||$iohash->{hmPairSerial} );
     if(  $dst =~ m /(000000|$id)/ #--- see if we need to pair
        &&($iohash->{hmPair} 
           ||(    $iohash->{hmPairSerial} 
@@ -1674,6 +1674,8 @@ sub CUL_HM_parseCommon(@){#####################################################
       $idstr =~ s/(..)/sprintf("%02X%s",$s++,$1)/ge;
       CUL_HM_pushConfig($shash, $id, $src,0,0,0,0, "0201$idstr");
       CUL_HM_ProcessCmdStack($shash); # start processing immediately
+	  CUL_HM_appFromQ($shash->{NAME},"cf");# stack cmds if waiting
+
 	}
 	elsif(CUL_HM_getRxType($shash) & 0x04){# nothing to pair - maybe send config
 	  CUL_HM_appFromQ($shash->{NAME},"cf");   # stack cmds if waiting
@@ -2301,7 +2303,6 @@ sub CUL_HM_Set($@) {
 	  }
 	}
 	elsif($sect eq "msgEvents"){
-	  return if (!$hash->{IODev}{NAME});
 	  CUL_HM_respPendRm($hash);		  
 
 	  $hash->{helper}{prt}{bErr}=0;
@@ -2315,7 +2316,8 @@ sub CUL_HM_Set($@) {
 	  my $protLastRcv = $hash->{protLastRcv} if ($hash->{protLastRcv});
       delete ($hash->{$_}) foreach (grep(/^prot/,keys %{$hash}));
 	  $hash->{protLastRcv} = $protLastRcv if ($protLastRcv);
-	  if ($modules{CUL_HM}{$hash->{IODev}{NAME}} && 
+	  if ($hash->{IODev}{NAME} && 
+	      $modules{CUL_HM}{$hash->{IODev}{NAME}} && 
 	      $modules{CUL_HM}{$hash->{IODev}{NAME}}{pendDev}){
 		@{$modules{CUL_HM}{$hash->{IODev}{NAME}}{pendDev}} = 
 		      grep !/$name/,@{$modules{CUL_HM}{$hash->{IODev}{NAME}}{pendDev}};
@@ -3628,10 +3630,14 @@ sub CUL_HM_SndCmd($$) {
   my ($hash, $cmd) = @_;
   $hash = CUL_HM_getDeviceHash($hash); 
   my $io = $hash->{IODev};
-  return if(  !$io 
-            || AttrVal($hash->{NAME},"ignore","")
+  return if(   AttrVal($hash->{NAME},"ignore","")
 			|| AttrVal($hash->{NAME},"dummy",""));  
   my $ioName = $io->{NAME};
+  if(!$io || !$ioName){
+	CUL_HM_eventP($hash,"IOerr");
+    CUL_HM_UpdtReadSingle($hash,"state","ERR_IOdev_undefined",1);
+	return;
+  };  
   if (  $io->{STATE} !~ m/^(opened|Initialized)$/          # we need to queue
       ||(hex substr($cmd,2,2) & 0x20) && (                 # check for commands with resp-req
            $modules{CUL_HM}{$ioName}{tmr}                  # queue already running
