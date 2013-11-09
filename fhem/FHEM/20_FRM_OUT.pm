@@ -128,6 +128,9 @@ FRM_OUT_Attr($$$$) {
   <ul>
   <code>set &lt;name&gt; on|off</code><br><br>
   </ul>
+  <ul>
+  <a href="#setExtensions">set extensions</a> are supported<br>
+  </ul>
   <a name="FRM_OUTget"></a>
   <b>Get</b><br>
   <ul>
