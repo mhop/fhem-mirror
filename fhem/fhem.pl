@@ -200,6 +200,7 @@ my $namedef =
   "- a range separated by dash (-)\n";
 my @cmdList;                    # Remaining commands in a chain. Used by sleep
 my $evalSpecials;       # Used by EvalSpecials->AnalyzeCommand parameter passing
+my $wbName = ".WRITEBUFFER";
 
 $init_done = 0;
 
@@ -455,17 +456,23 @@ sub MAIN {MAIN:};               #Dummy
 
 my $errcount= 0;
 while (1) {
-  my ($rout, $rin) = ('', '');
+  my ($rout,$rin, $wout,$win, $eout,$ein) = ('','', '','', '','');
 
   my $timeout = HandleTimeout();
 
   foreach my $p (keys %selectlist) {
-    vec($rin, $selectlist{$p}{FD}, 1) = 1;
+    my $hash = $selectlist{$p};
+    vec($rin, $hash->{FD}, 1) = 1
+        if($hash->{FD});
+    vec($win, $hash->{FD}, 1) = 1
+        if($hash->{FD} && defined($hash->{$wbName}));
+    vec($ein, $hash->{EXCEPT_FD}, 1) = 1
+        if(defined($hash->{"EXCEPT_FD"}));
   }
   $timeout = $readytimeout if(keys(%readyfnlist) &&
                               (!defined($timeout) || $timeout > $readytimeout));
   $timeout = 5 if $winService->{AsAService} && $timeout > 5;
-  my $nfound = select($rout=$rin, undef, undef, $timeout);
+  my $nfound = select($rout=$rin, $wout=$win, $eout=$ein, $timeout);
 
   $winService->{serviceCheck}->() if($winService->{serviceCheck});
   CommandShutdown(undef, undef) if($sig_term);
@@ -503,11 +510,32 @@ while (1) {
   # reported by select, but is used by unix too, to check if the device is
   # attached again.
   foreach my $p (keys %selectlist) {
-    next if(!$selectlist{$p} || !$selectlist{$p}{NAME}); # due to rereadcfg/del
+    my $hash = $selectlist{$p};
+    next if(!$hash || !$hash->{NAME}); # due to rereadcfg/del
 
-    CallFn($selectlist{$p}{NAME}, "ReadFn", $selectlist{$p})
-      if(vec($rout, $selectlist{$p}{FD}, 1));
+    CallFn($hash->{NAME}, "ReadFn", $hash)
+      if(vec($rout, $hash->{FD}, 1));
+
+    my $wb = $hash->{$wbName};
+    if(defined($wb) && vec($wout, $hash->{FD}, 1)) {
+      my $ret = syswrite($hash->{CD}, $wb);
+      if(!$ret || $ret < 0) {
+        Log 4, "Write error to $p, deleting $hash->{NAME}";
+        CommandDelete(undef, $hash->{NAME});
+      } else {
+        if($ret == length($wb)) {
+          delete($hash->{$wbName});
+        } else {
+          $hash->{$wbName} = substr($wb, $ret);
+        }
+      }
+    }
+
+    if(defined($hash->{"EXCEPT_FD"}) && vec($eout, $hash->{EXCEPT_FD}, 1)) {
+      CallFn($hash->{NAME}, "ExceptFn", $hash);
+    }
   }
+
   foreach my $p (keys %readyfnlist) {
     next if(!$readyfnlist{$p});                 # due to rereadcfg / delete
 
@@ -1528,7 +1556,7 @@ CommandDeleteAttr($$)
 
     $a[0] = $sdev;
     
-    if($a[1] eq "userReadings") {
+    if($a[1] && $a[1] eq "userReadings") {
       delete($defs{$sdev}{'.userReadings'});
     }
 
@@ -2534,7 +2562,8 @@ DoTrigger($$@)
     if($hash->{CHANGED}) {    # It gets deleted sometimes (?)
       $max = int(@{$hash->{CHANGED}}); # can be enriched in the notifies
       foreach my $c (keys %inform) {
-        if(!$defs{$c} || $defs{$c}{NR} != $inform{$c}{NR}) {
+        my $dc = $defs{$c};
+        if(!$dc || $dc->{NR} != $inform{$c}{NR}) {
           delete($inform{$c});
           next;
         }
@@ -2548,9 +2577,8 @@ DoTrigger($$@)
         for(my $i = 0; $i < $max; $i++) {
           my $state = $hash->{CHANGED}[$i];
           next if($re && !($dev =~ m/$re/ || "$dev:$state" =~ m/$re/));
-          syswrite($defs{$c}{CD},
-            ($inform{$c}{type} eq "timer" ? "$tn " : "") .
-            "$hash->{TYPE} $dev $state\n");
+          addToWritebuffer($dc,($inform{$c}{type} eq "timer" ? "$tn " : "").
+                                "$hash->{TYPE} $dev $state\n");
         }
       }
     }
@@ -3556,6 +3584,18 @@ sub
 Debug($) {
   my $msg= shift;
   Log 1, "DEBUG>" . $msg;
+}
+
+sub
+addToWritebuffer($$)
+{
+  my ($hash, $txt) = @_;
+
+  if(!$hash->{$wbName}) {
+    $hash->{$wbName} = $txt;
+  } elsif(length($hash->{$wbName}) < 102400) {
+    $hash->{$wbName} .= $txt;
+  }
 }
 
 1;
