@@ -49,7 +49,7 @@ FHEM_colorpickerFn($$$)
   } else {
     my $c = "$FW_ME?XHR=1&cmd=set $d $cmd %$srf";
     return '<td align="center">'.
-             "<input id='colorpicker.$d-RGB' class=\"color {pickerMode:'$mode',pickerFaceColor:'transparent',pickerFace:3,pickerBorder:0,pickerInsetColor:'red'}\" value='$cv' onChange='colorpicker_setColor(this,\"$mode\",\"$c\")'>".
+             "<input maxlength='6' size='6' id='colorpicker.$d-RGB' class=\"color {pickerMode:'$mode',pickerFaceColor:'transparent',pickerFace:3,pickerBorder:0,pickerInsetColor:'red'}\" value='$cv' onChange='colorpicker_setColor(this,\"$mode\",\"$c\")'>".
            '</td>';
   }
 }
