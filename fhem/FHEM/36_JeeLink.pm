@@ -149,7 +149,7 @@ JeeLink_Set($@)
 
   } elsif( $cmd eq "LaCrossePairForSec" ) {
     return "Usage: set $name LaCrossePairForSec <seconds_active> [ignore_battery]" if(!$arg || $arg !~ m/^\d+$/ || ($arg2 && $arg2 ne "ignore_battery") );
-    $hash->{LaCrossePair} = $arg2?2:1; 
+    $hash->{LaCrossePair} = $arg2?2:1;
     InternalTimer(gettimeofday()+$arg, "JeeLink_RemoveLaCrossePair", $hash, 1);
 
   } else {
@@ -205,13 +205,6 @@ JeeLink_DoInit($)
   my $val;
 
   #JeeLink_Clear($hash);
-
-  JeeLink_SimpleWrite($hash, "1a" ); # led on
-  JeeLink_SimpleWrite($hash, "1q" ); # quiet mode
-  JeeLink_SimpleWrite($hash, "0x" ); # hex mode off
-  JeeLink_SimpleWrite($hash, "0a" ); # led off
-
-  JeeLink_SimpleWrite($hash, "l");   # list known devices
 
   $hash->{STATE} = "Initialized";
 
@@ -435,10 +428,21 @@ JeeLink_Parse($$$$)
 
   if($dmsg =~ m/^\[/ ) {
     $hash->{VERSION} = $dmsg;
+
+    if( $dmsg =~m /pcaSerial/ ) {
+      JeeLink_SimpleWrite($hash, "1a" ); # led on
+      JeeLink_SimpleWrite($hash, "1q" ); # quiet mode
+      JeeLink_SimpleWrite($hash, "0x" ); # hex mode off
+      JeeLink_SimpleWrite($hash, "0a" ); # led off
+      JeeLink_SimpleWrite($hash, "l" );  # list known devices
+    } elsif( $dmsg =~m /ec3kSerial/ ) {
+      JeeLink_SimpleWrite($hash, "ec", 1);
+    }
+
     return;
   }
 
-  if( $dmsg =~m/drecvintr exit/ ) {
+  if( $dmsg =~m /drecvintr exit/ ) {
     JeeLink_SimpleWrite($hash, "ec", 1);
     return;
   }
