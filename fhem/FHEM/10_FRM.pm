@@ -863,22 +863,20 @@ sub FRM_OWX_Discover ($) {
   parameters for serial devices.<br><br>
   
   <a name="FRMdefine"></a>
-  <b>Define</b>
-  <ul>
+  <b>Define</b><br>
+  <ul><br>
   <code>define &lt;name&gt; FRM {&lt;device&gt; | &lt;port&gt; [global]}</code> <br>
-  Specifies the FRM device.   </ul>
-  
-    <br>
-    <ul>
-    USB-connected devices:<br><ul>
-      &lt;device&gt; specifies the serial port to communicate with the Arduino.
+  Specifies the FRM device.<br>
+  <br>
+  <li>USB-connected devices:<br><br>
+      <code>&lt;device&gt;</code> specifies the serial port to communicate with the Arduino.
       The name of the serial-device depends on your distribution, under
       linux the cdc_acm kernel module is responsible, and usually a
       /dev/ttyACM0 device will be created. If your distribution does not have a
       cdc_acm module, you can force usbserial to handle the Arduino by the
-      following command:<ul>modprobe usbserial vendor=0x03eb
-      product=0x204b</ul>In this case the device is most probably
-      /dev/ttyUSB0.<br><br>
+      following command:<br>
+      <code>modprobe usbserial vendor=0x03eb product=0x204b</code></br>
+      In this case the device is most probably /dev/ttyUSB0.<br><br>
 
       You can also specify a baudrate if the device name contains the @
       character, e.g.: /dev/ttyACM0@38400<br><br>
@@ -896,35 +894,42 @@ sub FRM_OWX_Discover ($) {
       
       You can find StandardFirmata in the Arduino-IDE under 'Examples->Firmata->StandardFirmata<br><br>
       ConfigurableFirmata has to be installed manualy. See <a href="https://github.com/firmata/arduino/tree/configurable/examples/ConfigurableFirmata">
-      ConfigurableFirmata</a> on GitHub or <a href="http://www.fhemwiki.de/wiki/Arduino#Installation_ConfigurableFirmata">FHEM-Wiki</a><br> 
-
-    </ul>
-    Network-connected devices:<br><ul>
-    &lt;port&gt; specifies the port the FRM device listens on. If 'global' is
-    specified the socket is bound to all local ip-addresses, otherwise to localhost
-    only.<br>
-    The Arduino must ConfigurableFirmata. The connection is initiated by the arduino
-    in client-mode. Therefor the ip-address and port of the fhem-server has to be 
-    configured an the arduino, so it knows where to connect to.<br>
-    As of now only a single Arduino per FRM-device configured is supported. Multiple
-    Arduinos may connect to different FRM-devices configured for different ports.<br>
-    ConfigurableFirmata has to be installed manualy. See <a href="https://github.com/firmata/arduino/tree/configurable/examples/ConfigurableFirmata">
-    ConfigurableFirmata</a> on GitHub or <a href="http://www.fhemwiki.de/wiki/Arduino#Installation_ConfigurableFirmata">FHEM-Wiki</a><br> 
-    </ul>
-    <br>
-    If the device is called none, then no device will be opened, so you
-    can experiment without hardware attached.<br>
+      ConfigurableFirmata</a> on GitHub or <a href="http://www.fhemwiki.de/wiki/Arduino_Firmata#Installation_ConfigurableFirmata">FHEM-Wiki</a><br> 
+  </li>
+  <br>
+  <li>Network-connected devices:<br><br>
+      <code>&lt;port&gt;</code> specifies the port the FRM device listens on. If <code>global</code> is
+      specified the socket is bound to all local ip-addresses, otherwise to localhost
+      only.<br>
+      The Arduino must ConfigurableFirmata. The connection is initiated by the arduino
+      in client-mode. Therefor the ip-address and port of the fhem-server has to be 
+      configured an the arduino, so it knows where to connect to.<br>
+      As of now only a single Arduino per FRM-device configured is supported. Multiple
+      Arduinos may connect to different FRM-devices configured for different ports.<br>
+      ConfigurableFirmata has to be installed manualy. See <a href="https://github.com/firmata/arduino/tree/configurable/examples/ConfigurableFirmata">
+      ConfigurableFirmata</a> on GitHub or <a href="http://www.fhemwiki.de/wiki/Arduino_Firmata#Installation_ConfigurableFirmata">FHEM-Wiki</a><br> 
+  </li>
+  <br>
+  <li>
+	  If the device is called none, then no device will be opened, so you
+	  can experiment without hardware attached.<br>
+  </li>
   </ul>
   
   <br>
   <a name="FRMset"></a>
   <b>Set</b>
   <ul>
-  <code>set &lt;name&gt; init</code><br>
-  reinitializes the FRM-Client-devices configured for this Arduino</ul><br>
-  <ul>
-  <code>set &lt;name&gt; reset</code><br>
-  does a complete reset of FRM by disconnecting from, reconnecting to and reinitializing the Arduino and FRM internals and all attached FRM-client-devices</ul><br><br>
+  <li>
+    <code>set &lt;name&gt; init</code><br>
+    reinitializes the FRM-Client-devices configured for this Arduino
+  </li><br>
+  <li>
+    <code>set &lt;name&gt; reset</code><br>
+    does a complete reset of FRM by disconnecting from, reconnecting to and reinitializing the Arduino and FRM internals and all attached FRM-client-devices
+  </li>
+  </ul>
+  <br><br>
   
   <a name="FRMattr"></a>
   <b>Attributes</b><br>
