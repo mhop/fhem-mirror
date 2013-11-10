@@ -3160,7 +3160,7 @@ sub CUL_HM_Set($@) {
   	      CUL_HM_PushCmdStack($hash, 
   	            "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerBtn}00");
   	      CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,hex($peerBtn),4,$burst)
-				   if($pnb && $cmd eq "01"); # only if set
+				   if($pnb && $cmdB eq "01"); # only if set
 		  CUL_HM_qAutoRead($name,3);
 	    }
       }
