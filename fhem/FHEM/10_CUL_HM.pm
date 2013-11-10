@@ -549,7 +549,7 @@ sub CUL_HM_Parse($$) {##############################
   my @entities; #additional entities with events to be notifies
 			   
   my $name = $shash->{NAME};
-  return if (CUL_HM_getAttrInt($name,"ignore"));
+  return $name if (CUL_HM_getAttrInt($name,"ignore"));
 
   if ($msgStat && $msgStat =~ m/AESKey/){
     push @entities,CUL_HM_UpdtReadSingle($shash,"aesKeyNbr",substr($msgStat,7),1);
@@ -629,7 +629,7 @@ sub CUL_HM_Parse($$) {##############################
       my $tsgn = ($t & 0x4000);
       $t = ($t & 0x3fff)/10;
       $t = sprintf("%0.1f", $t-1638.4) if($tsgn);
-      my $ir = $r & 0x8000;
+      my $ir = ($r & 0x8000)?1:0;
       $r = ($r & 0x7fff) * 0.295;
       my $wdr = ($w>>14)*22.5;
       $w = ($w & 0x3fff)/10;
