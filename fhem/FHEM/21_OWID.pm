@@ -47,12 +47,12 @@
 ########################################################################################
 package main;
 
-use vars qw{%attr %defs};
+use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.23";
+my $owx_version="3.24";
 #-- declare variables
 my %gets = (
   "present"     => "",
@@ -88,9 +88,10 @@ sub OWID_Initialize ($) {
   $hash->{UndefFn}  = "OWID_Undef";
   $hash->{GetFn}    = "OWID_Get";
   $hash->{SetFn}    = "OWID_Set";
-  my $attlist       = "IODev do_not_notify:0,1 showtime:0,1 model loglevel:0,1,2,3,4,5 ".
+  $hash->{AttrFn}   = "OWID_Attr";
+  $hash->{AttrList} = "IODev do_not_notify:0,1 showtime:0,1 model loglevel:0,1,2,3,4,5 ".
+                      "interval ".
                       $readingFnAttributes;
-  $hash->{AttrList} = $attlist; 
 
   #make sure OWX is loaded so OWX_CRC is available if running with OWServer
   main::LoadModule("OWX");	
@@ -164,10 +165,10 @@ sub OWID_Define ($$) {
   }
   
   #-- determine CRC Code 
-  $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
+  $crc = sprintf("%02X",OWX_CRC($fam.".".$id."00"));
   
   #-- Define device internals
-  $hash->{ROM_ID}     = $fam.".".$id.$crc;
+  $hash->{ROM_ID}     = "$fam.$id.$crc";
   $hash->{OW_ID}      = $id;
   $hash->{OW_FAMILY}  = $fam;
   $hash->{PRESENT}    = 0;
@@ -177,9 +178,6 @@ sub OWID_Define ($$) {
   AssignIoPort($hash);
   if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | !defined($hash->{IODev}->{PRESENT}) ){
     return "OWID: Warning, no 1-Wire I/O device found for $name.";
-  }
-  if( $hash->{IODev}->{PRESENT} != 1 ){
-    return "OWID: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
   }
   $modules{OWID}{defptr}{$id} = $hash;
   #--
@@ -195,6 +193,39 @@ sub OWID_Define ($$) {
   #--
   readingsSingleUpdate($hash,"state","Initialized",1); 
   return undef; 
+}
+
+#######################################################################################
+#
+# OWID_Attr - Set one attribute value for device
+#
+#  Parameter hash = hash of device addressed
+#            a = argument array
+#
+########################################################################################
+
+sub OWID_Attr(@) {
+  my ($do,$name,$key,$value) = @_;
+  
+  my $hash = $defs{$name};
+  my $ret;
+  
+  if ( $do eq "set") {
+  	ARGUMENT_HANDLER: {
+  	  $key eq "interval" and do {
+        # check value
+        return "OWID: Set with short interval, must be > 1" if(int($value) < 1);
+        # update timer
+        $hash->{INTERVAL} = $value;
+        if ($init_done) {
+          RemoveInternalTimer($hash);
+          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWID_GetValues", $hash, 1);
+        }
+  	    last;
+  	  };
+    }
+  }
+  return $ret;
 }
 
 ########################################################################################

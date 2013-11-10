@@ -609,7 +609,7 @@ FRM_OWX_Init($$)
 		$firmata->onewire_config($pin,1);
 	}
 	$hash->{STATE}="Initialized";
-	$firmata->onewire_search($pin);
+	InternalTimer(gettimeofday()+10, "OWX_Discover", $hash,0);
 	return undef;
 }
 

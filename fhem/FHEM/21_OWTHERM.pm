@@ -67,20 +67,13 @@
 ########################################################################################
 package main;
 
-use vars qw{%attr %defs};
+use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
 sub Log($$);
+sub AttrVal($$$);
 
-my $owx_version="3.23";
-#-- temperature globals - always the raw values from/for the device
-my $owg_temp     = "";
-my $owg_th       = "";
-my $owg_tl       = "";
-
-#-- variables for display strings
-my $stateal;
-my $stateah;
+my $owx_version="3.24";
 
 my %gets = (
   "id"          => "",
@@ -101,6 +94,13 @@ my %updates = (
   "present"     => "",
   "temperature" => "",
   "alarm"       => ""
+);
+
+my %convtimes = (
+  9 => 0.1,
+  10 => 0.2,
+  11 => 0.4,
+  12 => 0.8,
 );
 
 ########################################################################################
@@ -129,7 +129,8 @@ sub OWTHERM_Initialize ($) {
                      "stateAL stateAH ".
                      "tempOffset tempUnit:C,Celsius,F,Fahrenheit,K,Kelvin ".
                      "tempConv:onkick,onread tempLow tempHigh ".
-                     $readingFnAttributes;              
+                     "resolution:9,10,11,12 interval ".
+                     $readingFnAttributes;                
 
   #make sure OWX is loaded so OWX_CRC is available if running with OWServer
   main::LoadModule("OWX");	
@@ -209,25 +210,27 @@ sub OWTHERM_Define ($$) {
   }
   
   #-- determine CRC Code
-  $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
+  $crc = sprintf("%02X",OWX_CRC($fam.".".$id."00"));
   
   #-- define device internals
   $hash->{ALARM}      = 0;
   $hash->{OW_ID}      = $id;
   $hash->{OW_FAMILY}  = $fam;
   $hash->{PRESENT}    = 0;
-  $hash->{ROM_ID}     = $fam.".".$id.$crc;
+  $hash->{ROM_ID}     = "$fam.$id.$crc";
   $hash->{INTERVAL}   = $interval;
   $hash->{ERRCOUNT}   = 0;
+
+  #-- temperature globals - always the raw values from/for the device
+  $hash->{".owg_temp"}   = "";
+  $hash->{".owg_th"}     = "";
+  $hash->{".owg_tl"}     = "";
   
   #-- Couple to I/O device, exit if not possible
   AssignIoPort($hash);
   if( !defined($hash->{IODev}->{NAME}) || !defined($hash->{IODev}) ){
     return "OWTHERM: Warning, no 1-Wire I/O device found for $name.";
   }
-  #if( $hash->{IODev}->{PRESENT} != 1 ){
-  #  return "OWTHERM: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
-  #}
   $modules{OWTHERM}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
@@ -249,23 +252,37 @@ sub OWTHERM_Define ($$) {
 ########################################################################################
 
 sub OWTHERM_Attr(@) {
-  my ($do,@a) = @_;
+  my ($do,$name,$key,$value) = @_;
   
-  my $name    = $a[0];
-  my $key     = $a[1];
+  my $hash = $defs{$name};
   my $ret;
   
-  #-- only alarm settings may be modified at runtime for now
-  return undef
-    if( $key !~ m/(.*)(Low|High)/ );
-  #-- safeguard against uninitialized devices
-  return undef
-    if( $main::defs{$name}->{READINGS}{"state"}{VAL} eq "defined" );
+  if ( $do eq "set") {
+  	ARGUMENT_HANDLER: {
+  	  $key eq "interval" and do {
+        # check value
+        return "OWTHERM: Set with short interval, must be > 1" if(int($value) < 1);
+        # update timer
+        $hash->{INTERVAL} = $value;
+        if ($init_done) {
+          RemoveInternalTimer($hash);
+          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
+        }
+  	    last;
+  	  };
+  	  $key eq "resolution" and do {
+        $hash->{".owg_cf"} = $value;
+        last;
+  	  };
+      #-- only alarm settings may be modified at runtime for now
+      $key =~ m/(.*)(Low|High)/  and do {
+        #-- safeguard against uninitialized devices
+        return undef
+          if( $hash->{READINGS}{"state"}{VAL} eq "defined" );
   
-  if( $do eq "set")
-  {
-    $ret = OWTHERM_Set($main::defs{$name},@a);
-  } elsif( $do eq "del"){
+        $ret = OWTHERM_Set($hash,($name,$key,$value));
+      };
+  	};
   }
   return $ret;
 }
@@ -283,14 +300,14 @@ sub OWTHERM_FormatValues($) {
   
   my $name    = $hash->{NAME}; 
   my $interface = $hash->{IODev}->{TYPE};
-  my ($unit,$offset,$factor,$abbr,$vval,$vlow,$vhigh,$statef);
+  my ($unit,$offset,$factor,$abbr,$vval,$vlow,$vhigh,$statef,$stateal,$stateah);
   my $svalue = "";
   
   #-- attributes defined ?
-  $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "&#x25BE;";
-  $stateah = defined($attr{$name}{stateAH}) ? $attr{$name}{stateAH} : "&#x25B4;";
-  $unit    = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
-  $offset  = defined($attr{$name}{"tempOffset"}) ? $attr{$name}{"tempOffset"} : 0.0 ;
+  $stateal = AttrVal($name,"stateAL","&#x25BE;");
+  $stateah = AttrVal($name,"stateAH","&#x25B4;");
+  $unit    = AttrVal($name,"tempUnit","Celsius");
+  $offset  = AttrVal($name,"tempOffset",0.0);
   $factor  = 1.0;
   
   if( $unit eq "Celsius" ){
@@ -313,12 +330,12 @@ sub OWTHERM_FormatValues($) {
   $hash->{tempf}{factor}                     = $factor;
   
   #-- no change in any value if invalid reading
-  return if( $owg_temp eq "");
+  return if( $hash->{".owg_temp"} eq "");
   
   #-- correct values for proper offset, factor 
-  $vval  = ($owg_temp + $offset)*$factor;
-  $vlow   = floor(($owg_tl + $offset)*$factor+0.5);
-  $vhigh  = floor(($owg_th + $offset)*$factor+0.5);
+  $vval  = ($hash->{".owg_temp"} + $offset)*$factor;
+  $vlow   = floor(($hash->{".owg_tl"} + $offset)*$factor+0.5);
+  $vhigh  = floor(($hash->{".owg_th"} + $offset)*$factor+0.5);
   
   $main::attr{$name}{"tempLow"} = $vlow;
   $main::attr{$name}{"tempHigh"} = $vhigh;
@@ -456,10 +473,6 @@ sub OWTHERM_GetValues($@) {
   my $value   = "";
   my $ret     = "";
   
-  #-- check if device needs to be initialized
-  OWTHERM_InitializeDevice($hash)
-    if( $hash->{READINGS}{"state"}{VAL} eq "defined");
-  
   #-- restart timer for updates
   RemoveInternalTimer($hash);
   InternalTimer(time()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
@@ -493,6 +506,10 @@ sub OWTHERM_GetValues($@) {
   }
   $hash->{PRESENT} = 1; 
 
+  #-- check if device needs to be initialized
+  OWTHERM_InitializeDevice($hash)
+    if( $hash->{READINGS}{"state"}{VAL} eq "defined");
+
   $value=OWTHERM_FormatValues($hash);
   Log 5, $value;
   
@@ -516,10 +533,8 @@ sub OWTHERM_InitializeDevice($) {
   my ($unit,$offset,$factor,$abbr,$value,$ret);
   
   #-- attributes defined ?
-  $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "&#x25BE;";
-  $stateah = defined($attr{$name}{stateAH}) ? $attr{$name}{stateAH} : "&#x25B4;";
-  $unit    = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
-  $offset  = defined($attr{$name}{"tempOffset"}) ? $attr{$name}{"tempOffset"} : 0.0 ;
+  $unit    = AttrVal($name,"tempUnit","Celsius");
+  $offset  = AttrVal($name,"tempOffset",0.0);
   $factor  = 1.0;
   
   if( $unit eq "Celsius" ){
@@ -560,40 +575,32 @@ sub OWTHERM_InitializeDevice($) {
     }
   }  
   
-  #-- Set the attribute values if defined
-  if(  defined($attr{$name}{"tempLow"}) ){
-    $value = $attr{$name}{"tempLow"};
-    $a[1] = "tempLow"; 
-    $a[2] = floor($value/$factor-$offset+0.5);
-    #-- put into device
-    #-- OWX interface
-    if( $interface eq "OWX" ){
-      $ret = OWXTHERM_SetValues($hash,@a);
-    #-- OWFS interface
-    }elsif( $interface eq "OWServer" ){
-      $ret = OWFSTHERM_SetValues($hash,@a);
-    } 
-    #-- process results
-    if( defined($ret)  ){
-      return "OWTHERM: Could not initialize device $name, reason: ".$ret;
-    }
+  my $args = {};
+  
+  if ( defined($attr{$name}{resolution}) ) {
+  	$args->{resolution} = $attr{$name}{resolution};
   }
+  
+  #-- Set the attribute values if defined
+  if( defined($attr{$name}{"tempLow"}) ){
+  	$args->{tempLow} = floor($attr{$name}{"tempLow"}/$factor-$offset+0.5); 
+  }
+  
   if( defined($attr{$name}{"tempHigh"}) ){
-    $value = $attr{$name}{"tempHigh"};
-    $a[1] = "tempHigh"; 
-    $a[2] = floor($value/$factor-$offset+0.5);
-    #-- put into device
-    #-- OWX interface
-    if( $interface eq "OWX" ){
-      $ret = OWXTHERM_SetValues($hash,@a);
-    #-- OWFS interface
-    }elsif( $interface eq "OWServer" ){
-      $ret = OWFSTHERM_SetValues($hash,@a);
-    } 
-    #-- process results
-    if( defined($ret)  ){
-      return "OWTHERM: Could not initialize device $name, reason: ".$ret;
-    }
+  	$args->{tempHigh} = floor($attr{$name}{"tempHigh"}/$factor-$offset+0.5);
+  }
+  
+  #-- put into device
+  #-- OWX interface
+  if( $interface eq "OWX" ){
+    $ret = OWXTHERM_SetValues($hash,$args);
+  #-- OWFS interface
+  }elsif( $interface eq "OWServer" ){
+    $ret = OWFSTHERM_SetValues($hash,$args);
+  } 
+  #-- process results
+  if( defined($ret)  ){
+    return "OWTHERM: Could not initialize device $name, reason: ".$ret;
   }
   #-- Set state to initialized
   readingsSingleUpdate($hash,"state","initialized",1);
@@ -631,14 +638,7 @@ sub OWTHERM_Set($@) {
 
   #-- set new timer interval
   if($key eq "interval") {
-    # check value
-    return "OWTHERM: Set with short interval, must be > 1"
-      if(int($value) < 1);
-    # update timer
-    $hash->{INTERVAL} = $value;
-    RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
-    return undef;
+  	return OWTHERM_Attr("set",@a);
   }
 
   #-- set tempLow or tempHigh
@@ -652,8 +652,8 @@ sub OWTHERM_Set($@) {
     $value = floor($value+0.5);
     
     #-- First we have to read the current data, because alarms may not be set independently
-    $owg_tl = floor($main::attr{$name}{"tempLow"}/$factor-$offset+0.5);
-    $owg_th = floor($main::attr{$name}{"tempHigh"}/$factor-$offset+0.5);
+    $hash->{".owg_tl"} = floor($main::attr{$name}{"tempLow"}/$factor-$offset+0.5);
+    $hash->{".owg_th"} = floor($main::attr{$name}{"tempHigh"}/$factor-$offset+0.5);
     
     #-- find upper and lower boundaries for given offset/factor
     my $mmin = floor((-55+$offset)*$factor+0.5);
@@ -662,7 +662,9 @@ sub OWTHERM_Set($@) {
       if($value < $mmin || $value > $mmax);
     
     #-- seems to be ok, correcting for offset and factor
-    $a[2]  = floor($value/$factor-$offset+0.5);
+    my $args = {
+      $key => floor($value/$factor-$offset+0.5),
+    };
     #-- put into attribute value
     if( lc($key) eq "templow" ){
       if( $main::attr{$name}{"tempLow"} != $value ){
@@ -677,10 +679,10 @@ sub OWTHERM_Set($@) {
     #-- put into device
     #-- OWX interface
     if( $interface eq "OWX" ){
-      $ret = OWXTHERM_SetValues($hash,@a);
+      $ret = OWXTHERM_SetValues($hash,$args);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
-      $ret = OWFSTHERM_SetValues($hash,@a);
+      $ret = OWFSTHERM_SetValues($hash,$args);
     } else {
       return "OWTHERM: Set with wrong IODev type $interface";
     }
@@ -739,20 +741,22 @@ sub OWFSTHERM_GetValues($) {
   my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
   
+  #-- resolution (set by Attribute 'resolution' on OWFS)
+  my $resolution = defined $hash->{".owg_cf"} ? $hash->{".owg_cf"} : "";
   #-- get values - or should we rather get the uncached ones ?
-  $owg_temp = OWServer_Read($master,"/$owx_add/temperature");
+  $hash->{".owg_temp"} = OWServer_Read($master,"/$owx_add/temperature$resolution");
  
   my $ow_thn   = OWServer_Read($master,"/$owx_add/temphigh");
   my $ow_tln   = OWServer_Read($master,"/$owx_add/templow");
   
   return "no return from OWServer"
-    if( (!defined($owg_temp)) || (!defined($ow_thn)) || (!defined($ow_tln)) );
+    if( (!defined($hash->{".owg_temp"})) || (!defined($ow_thn)) || (!defined($ow_tln)) );
   return "empty return from OWServer"
-    if( ($owg_temp eq "") || ($ow_thn eq "") || ($ow_tln eq "") );
+    if( ($hash->{".owg_temp"} eq "") || ($ow_thn eq "") || ($ow_tln eq "") );
         
   #-- process alarm settings
-  $owg_tl = $ow_tln;
-  $owg_th = $ow_thn;
+  $hash->{".owg_tl"} = $ow_tln;
+  $hash->{".owg_th"} = $ow_thn;
   
   return undef
 }
@@ -765,8 +769,8 @@ sub OWFSTHERM_GetValues($) {
 #
 ########################################################################################
 
-sub OWFSTHERM_SetValues($@) {
-  my ($hash,@a) = @_;
+sub OWFSTHERM_SetValues($$) {
+  my ($hash,$args) = @_;
   
   #-- ID of the device
   my $owx_add = substr($hash->{ROM_ID},0,15);
@@ -775,19 +779,22 @@ sub OWFSTHERM_SetValues($@) {
   my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
   
-  #-- define vars
-  my $key   = $a[1];
-  my $value = $a[2];
-  return undef
-    if( !defined($value));
-  return undef 
-    if( $value eq "");
-    
   #-- $owg_tl and $owg_th are preset and may be changed here
-  $owg_tl = $value if( lc($key) eq "templow" );
-  $owg_th = $value if( lc($key) eq "temphigh");
-  
-  OWServer_Write($master, "/$owx_add/".lc($key),$value );
+  foreach my $key (keys %$args) {
+  	my $value = $args->{$key};
+  	next unless (defined $value and $value ne "");
+    if( lc($key) eq "templow") {
+  	  $hash->{".owg_tl"} = $value;
+    } elsif( lc($key) eq "temphigh") {
+  	  $hash->{".owg_th"} = $value;
+    } elsif( lc($key) eq "resolution") {
+  	  $hash->{".owg_cf"} = $value;
+  	  next;
+    } else {
+      next;
+    }
+    OWServer_Write($master, "/$owx_add/".lc($key),$value);
+  }
   
   return undef
 }
@@ -836,7 +843,7 @@ sub OWXTHERM_GetValues($) {
       return "$owx_dev not accessible";
     } 
     #-- conversion needs some 950 ms - but we may also do it in shorter time !
-    select(undef,undef,undef,1.0);
+    select(undef,undef,undef,$convtimes{AttrVal($name,"resolution",12)});
   }
 
   #-- NOW ask the specific device 
@@ -877,9 +884,9 @@ sub OWXTHERM_GetValues($) {
     #$delta = 0;
       
     #-- 2's complement form = signed bytes
-    $owg_temp = int($lsb/2) + $delta;
+    $hash->{".owg_temp"} = int($lsb/2) + $delta;
     if( $sign !=0 ){
-      $owg_temp = -128+$owg_temp;
+      $hash->{".owg_temp"} = -128+$hash->{".owg_temp"};
     }
 
     $ow_thn = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
@@ -897,9 +904,9 @@ sub OWXTHERM_GetValues($) {
     #$msb   = 7;
       
     #-- 2's complement form = signed bytes
-    $owg_temp = $msb*16+ $lsb/16;   
+    $hash->{".owg_temp"} = $msb*16+ $lsb/16;   
     if( $sign !=0 ){
-      $owg_temp = -128+$owg_temp;
+      $hash->{".owg_temp"} = -128+$hash->{".owg_temp"};
     }
     $ow_thn = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
     $ow_tln = ord($data[4]) > 127 ? 128-ord($data[4]) : ord($data[4]);
@@ -909,9 +916,9 @@ sub OWXTHERM_GetValues($) {
   }
   
   #-- process alarm settings
-  $owg_tl = $ow_tln;
-  $owg_th = $ow_thn;
-  
+  $hash->{".owg_tl"} = $ow_tln;
+  $hash->{".owg_th"} = $ow_thn;
+
   return undef;
 }
 
@@ -924,8 +931,8 @@ sub OWXTHERM_GetValues($) {
 #
 ########################################################################################
 
-sub OWXTHERM_SetValues($@) {
-  my ($hash, @a) = @_;
+sub OWXTHERM_SetValues($$) {
+  my ($hash, $args) = @_;
   
   my ($i,$j,$k);
   
@@ -936,33 +943,33 @@ sub OWXTHERM_SetValues($@) {
   #-- hash of the busmaster
   my $master = $hash->{IODev};
  
-  #-- define vars
-  my $key   = $a[1];
-  my $value = $a[2];
-  return undef
-    if( !defined($value));
-  return undef 
-    if( $value eq "");
+  return undef unless (defined $args->{resolution} or defined $args->{tempLow} or defined $args->{tempHigh});
     
   #-- $owg_tl and $owg_th are preset and may be changed here
-  $owg_tl = $value if( lc($key) eq "templow" );
-  $owg_th = $value if( lc($key) eq "temphigh");
+  foreach my $key (keys %$args) {
+  	$hash->{".owg_tl"} = $args->{$key} if( lc($key) eq "templow");
+  	$hash->{".owg_th"} = $args->{$key} if( lc($key) eq "temphigh");
+  	$hash->{".owg_cf"} = $args->{$key} if( lc($key) eq "resolution");
+  }
 
   #-- put into 2's complement formed (signed byte)
-  my $tlp = $owg_tl < 0 ? 128 - $owg_tl : $owg_tl; 
-  my $thp = $owg_th < 0 ? 128 - $owg_th : $owg_th; 
+  my $tlp = $hash->{".owg_tl"} < 0 ? 128 - $hash->{".owg_tl"} : $hash->{".owg_tl"}; 
+  my $thp = $hash->{".owg_th"} < 0 ? 128 - $hash->{".owg_th"} : $hash->{".owg_th"};
+  #-- resolution is defined in bits 5+6 of configuration register
+  my $cfg = defined $hash->{".owg_cf"} ? (($hash->{".owg_cf"}-9) << 5) | 0x1f : 0x7f;
 
   OWX_Reset($master);
   
   #-- issue the match ROM command \x55 and the write scratchpad command \x4E,
-  #   followed by the write EEPROM command \x48
+  #   followed by 3 bytes of data (alarm_temp_high, alarm_temp_low, config)
+  #   config-byte of 0x7F means 12 bit resolution (750ms convert time)
   #
   #   so far writing the EEPROM does not work properly.
   #   1. \x48 directly appended to the write scratchpad command => command ok, no effect on EEPROM
   #   2. \x48 appended to match ROM => command not ok. 
   #   3. \x48 sent by WriteBytePower after match ROM => command ok, no effect on EEPROM
   
-  my $select=sprintf("\x4E%c%c\x48",$thp,$tlp); 
+  my $select=sprintf("\x4E%c%c%c",$thp,$tlp,$cfg); 
   my $res=OWX_Complex($master,$owx_dev,$select,3);
 
   if( $res eq 0 ){
