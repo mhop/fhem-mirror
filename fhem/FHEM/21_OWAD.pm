@@ -70,12 +70,12 @@
 ########################################################################################
 package main;
 
-use vars qw{%attr %defs};
+use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.23";
+my $owx_version="3.24";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D");
 my @owg_channel = ("A","B","C","D");
@@ -155,6 +155,7 @@ sub OWAD_Initialize ($) {
   $hash->{AttrFn}  = "OWAD_Attr";
   my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2450 loglevel:0,1,2,3,4,5 ".
                 "stateAL0 stateAL1 stateAH0 stateAH1 ".
+                "interval ".
                 $readingFnAttributes;
  
   for( my $i=0;$i<int(@owg_fixed);$i++ ){
@@ -234,10 +235,10 @@ sub OWAD_Define ($$) {
   }
   
   #--   determine CRC Code 
-  $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
+  $crc = sprintf("%02x",OWX_CRC($fam.".".$id."00"));
  
   #-- Define device internals
-  $hash->{ROM_ID}     = $fam.".".$id.$crc;
+  $hash->{ROM_ID}     = "$fam.$id.$crc";
   $hash->{OW_ID}      = $id;
   $hash->{OW_FAMILY}  = $fam;
   $hash->{PRESENT}    = 0;
@@ -277,25 +278,40 @@ sub OWAD_Define ($$) {
 ########################################################################################
 
 sub OWAD_Attr(@) {
-  my ($do,@a) = @_;
+  my ($do,$name,$key,$value) = @_;
   
-  my $name    = $a[0];
-  my $key     = $a[1];
+  my $hash = $defs{$name};
   my $ret;
   
-  #-- only alarm settings may be modified at runtime for now
-  return undef
-    if( $key !~ m/(.*)(Alarm|Low|High)/ );
-  #-- safeguard against uninitialized devices
-  return undef
-    if( $main::defs{$name}->{READINGS}{"state"}{VAL} eq "defined" );
+  if ( $do eq "set") {
+  	ARGUMENT_HANDLER: {
+  	  $key eq "interval" and do {
+        # check value
+        return "OWAD: Set with short interval, must be > 1" if(int($value) < 1);
+        # update timer
+        $hash->{INTERVAL} = $value;
+        if ($init_done) {
+          RemoveInternalTimer($hash);
+          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 1);
+        }
+  	    last;
+  	  };
+      #-- only alarm settings may be modified at runtime for now
+      $key =~ m/(.*)(Alarm|Low|High)/ and do {
+        #-- safeguard against uninitialized devices
+        return undef
+          if( $hash->{READINGS}{"state"}{VAL} eq "defined" );
   
-  if( $do eq "set")
-  {
-    $ret = OWAD_Set($main::defs{$name},@a);
-  } elsif( $do eq "del"){
-     if( $key =~ m/(.*)(Alarm)/ ){
-     }
+        $ret = OWAD_Set($hash,($name,$key,$value));
+        last;
+      };
+  	};
+  } elsif ( $do eq "del" ) {
+  	ARGUMENT_HANDLER: {
+  	  $key =~ m/(.*)(Alarm)/ and do {
+  	  	last;
+  	  };
+  	}
   }
   return $ret;
 }
