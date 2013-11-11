@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - bugfix:  PRESENCE: Fix nonworking initialization in mode "lan-bluetooth"
   - bugfix:  fhem.pl: write-select to avoid blocking in inform/Event Monitor
   - bugfix:  fix issue with DST changes in 57_Calendar.pm
   - feature: new module 36_LaCrosse.pm for LaCrosse IT+ temperature and
