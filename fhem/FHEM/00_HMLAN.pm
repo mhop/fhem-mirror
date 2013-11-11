@@ -105,6 +105,7 @@ sub HMLAN_Define($$) {#########################################################
   $hash->{DeviceName} = $dev;
   $hash->{msgKeepAlive} = "";   # delay of trigger Alive messages
   $hash->{helper}{k}{DlyMax} = 0;
+  $hash->{helper}{k}{BufMin} = 30;
   
   $hash->{helper}{q}{answerPend} = 0;#pending answers from LANIf
   my @arr = ();
@@ -491,15 +492,6 @@ sub HMLAN_Parse($$) {##########################################################
 	  if    ($stat & 0x03 && $dst eq $attr{$name}{hmId}){HMLAN_qResp($hash,$src,0);}
 	  elsif ($stat & 0x08 && $src eq $attr{$name}{hmId}){HMLAN_qResp($hash,$dst,0);}
 	  
-#	  HMLAN_UpdtMsgLoad($name,(($stat & 0x09)?(($stat & 0x08)?2 #2 repetitions
-#	                                                         :1)#one ack
-#	                                         :0)                #no ack
-#							  *((hex($flg)&0x10)?17             #burst=17units
-#							                    :1));           #ACK=1 unit
-#	  HMLAN_UpdtMsgLoad($name,(($stat & 0x08)?2       #2 repetitions
-#	                                         :0)      #one ack
-#							  *((hex($flg)&0x10)?17   #burst=17units
-#							                    :1)); #ACK=1 unit
 	  HMLAN_UpdtMsgLoad($name,((hex($flg)&0x10)?34   #burst=17units *2
 							                   :2))  #ACK=1 unit *2
 		  if (($stat & 0x48) == 8);# reject - but not from repeater
