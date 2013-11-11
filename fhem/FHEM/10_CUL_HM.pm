@@ -1591,6 +1591,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 	}
 	
 	if   ($subType =~ m/^8/){#NACK
+	  #84 : request undefined register
 	  $success = "no";
 	  CUL_HM_eventP($shash,"Nack");
 	  $reply = "NACK"; 
@@ -3214,7 +3215,7 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
 
 #  if ($updtValveCnt++ %2){
 #    $nextTimer = 20;
-#    CUL_HM_PushCmdStack($hash,"++8670".$vDevId."00000000D036");# some weather event - 
+#    CUL_HM_PushCmdStack($hash,"++8670".$vDevId."00000000D036");# some weather event -
 #  }
 #  else{
     my $name = $hash->{NAME};
@@ -3957,6 +3958,8 @@ sub CUL_HM_IOid($) {#in: hash out: id of IO device
   my $dHash = CUL_HM_getDeviceHash($hash);
   my $ioHash = $dHash->{IODev};
   my $fhtid = defined($ioHash->{FHTID}) ? $ioHash->{FHTID} : "0000";
+  return "" if (!$ioHash->{NAME});
+  return AttrVal($ioHash->{NAME},"hmId","F1$fhtid");  
   return $attr{$ioHash->{NAME}}{hmId}?$attr{$ioHash->{NAME}}{hmId}:"F1$fhtid";
 }
 sub CUL_HM_hash2Id($) {#in: id, out:hash
@@ -4918,13 +4921,15 @@ sub CUL_HM_procQs($){#process non-wakeup queues
     if   (@{$mq->{$q}}){
 	  my $devN = ${$mq->{$q}}[0]; 
 	  my $ioName = $defs{$devN}{IODev}{NAME};
-	  if (   (   ReadingsVal($ioName,"cond","") =~ m /^(ok|Overload-released|init)$/
+	  if (   (   $ioName
+              && ReadingsVal($ioName,"cond","") =~ m /^(ok|Overload-released|init)$/
 	          && $q eq "qReqStat")
 		   ||(   CUL_HM_autoReadReady($ioName)
 	          && $q eq "qReqConf")){
         my $dq = $defs{$devN}{helper}{q};
         my @chns = split(",",$dq->{$q});
-	    if (@chns > 1){$dq->{$q} = join ",",@chns[1..@chns];}
+	    my $nOpen = scalar @chns;
+	    if (@chns > 1){$dq->{$q} = join ",",@chns[1..$nOpen-1];}
 	    else{          $dq->{$q} = "";
 	                   @{$mq->{$q}} = grep !/^$devN$/,@{$mq->{$q}};
 	    }
@@ -4986,7 +4991,7 @@ sub CUL_HM_appFromQ($$){#stack commands if pend in WuQ
 	  if ($dq->{$q} ne ""){# need update
         my @chns = split(",",$dq->{$q});
 	    my $nOpen = scalar @chns;
-	    if ($nOpen > 1){$dq->{$q} = join ",",@chns[1..$nOpen];}
+	    if ($nOpen > 1){$dq->{$q} = join ",",@chns[1..$nOpen-1];}
 	    else{           $dq->{$q} = "";
 	                  @{$modules{CUL_HM}{helper}{$q."Wu"}} = 
 	                     grep !/^$devN$/,@{$modules{CUL_HM}{helper}{$q."Wu"}};
@@ -5006,7 +5011,8 @@ sub CUL_HM_autoReadReady($){# capacity for autoread available?
       && $defs{$mHlp->{autoRdActive}}){
     return 0 if ($defs{$mHlp->{autoRdActive}}{helper}{prt}{sProc} == 1); # predecessor still on
   }
-  if (  ReadingsVal($ioName,"cond","") !~ m /^(ok|Overload-released|init)$/
+  if (   !$ioName 
+      || ReadingsVal($ioName,"cond","") !~ m /^(ok|Overload-released|init)$/
 	  || (    $defs{$ioName}{helper}{q}
 		  && ($defs{$ioName}{helper}{q}{cap}{sum}/16.8)>
 		       AttrVal($ioName,"hmMsgLowLimit",40))){
