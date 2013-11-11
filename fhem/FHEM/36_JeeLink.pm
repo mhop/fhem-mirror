@@ -206,7 +206,7 @@ JeeLink_DoInit($)
 
   #JeeLink_Clear($hash);
 
-  $hash->{STATE} = "Initialized";
+  $hash->{STATE} = "Opened";
 
   # Reset the counter
   delete($hash->{XMIT_TIME});
@@ -429,15 +429,19 @@ JeeLink_Parse($$$$)
   if($dmsg =~ m/^\[/ ) {
     $hash->{VERSION} = $dmsg;
 
-    if( $dmsg =~m /pcaSerial/ ) {
-      JeeLink_SimpleWrite($hash, "1a" ); # led on
-      JeeLink_SimpleWrite($hash, "1q" ); # quiet mode
-      JeeLink_SimpleWrite($hash, "0x" ); # hex mode off
-      JeeLink_SimpleWrite($hash, "0a" ); # led off
-      JeeLink_SimpleWrite($hash, "l" );  # list known devices
-    } elsif( $dmsg =~m /ec3kSerial/ ) {
-      JeeLink_SimpleWrite($hash, "ec", 1);
-    }
+    if( $hash->{STATE} eq "Opened" ) {
+      if( $dmsg =~m /pcaSerial/ ) {
+        JeeLink_SimpleWrite($hash, "1a" ); # led on
+        JeeLink_SimpleWrite($hash, "1q" ); # quiet mode
+        JeeLink_SimpleWrite($hash, "0x" ); # hex mode off
+        JeeLink_SimpleWrite($hash, "0a" ); # led off
+        JeeLink_SimpleWrite($hash, "l" );  # list known devices
+      } elsif( $dmsg =~m /ec3kSerial/ ) {
+        JeeLink_SimpleWrite($hash, "ec", 1);
+      }
+
+    $hash->{STATE} = "Initialized";
+   }
 
     return;
   }
