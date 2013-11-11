@@ -1949,32 +1949,12 @@ FW_Notify($$)
         push @data,("$tn $dt $dn ".$dev->{CHANGED}[$i]."<br>");
       }
     }
-
   }
 
   if(@data) {
-    # Collect multiple changes (e.g. from notifiees) into one message
-    $ntfy->{INFORMBUF} .= join("\n", map { s/\n/ /gm; $_ } @data)."\n";
-    RemoveInternalTimer($ln);
-    if(length($ntfy->{INFORMBUF}) > 1024) {
-      FW_FlushInform($ln);
-    } else {
-      InternalTimer(gettimeofday()+0.1, "FW_FlushInform", $ln, 0);
-    }
+     addToWritebuffer($ntfy, join("\n", map { s/\n/ /gm; $_ } @data)."\n");
   }
-
   return undef;
-}
-
-sub
-FW_FlushInform($)
-{
-  my ($name) = @_;
-  my $hash = $defs{$name};
-  return if(!$hash);
-  my $c = $hash->{CD};
-  print $c $hash->{INFORMBUF};
-  $hash->{INFORMBUF}="";
 }
 
 ###################
