@@ -2132,9 +2132,9 @@ CommandSetstate($$)
         next;
       }
 
-	  if(   !$d->{READINGS}{$sname} 
-	     || !$d->{READINGS}{$sname}{TIME} #General
-		 || $d->{READINGS}{$sname}{TIME} lt $tim) {
+      if(!defined($d->{READINGS}{$sname}) ||
+         !defined($d->{READINGS}{$sname}{TIME}) ||
+         $d->{READINGS}{$sname}{TIME} lt $tim) {
         $d->{READINGS}{$sname}{VAL} = $sval;
         $d->{READINGS}{$sname}{TIME} = $tim;
       }
