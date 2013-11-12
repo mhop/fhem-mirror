@@ -54,6 +54,12 @@ readingsGroup_updateDevices($)
   while (@params) {
     my $param = shift(@params);
 
+    while ($param && $param =~ m/^</ && $param !~ m/>$/ ) {
+      my $next = shift(@params);
+      last if( !defined($next) );
+      $param .= " ". $next;
+    }
+
     # for backwards compatibility with weblink readings
     if( $param eq '*noheading' ) {
       $attr{$hash->{NAME}}{noheading} = 1;
@@ -95,6 +101,8 @@ readingsGroup_updateDevices($)
           $list{$d} = 1;
           push @devices, [$d,$device[1]];
         }
+      } elsif($device[0] =~ m/^<.*>$/) {
+        push @devices, [$device[0]];
       } elsif( defined($defs{$device[0]}) ) {
         $list{$device[0]} = 1;
         push @devices, [@device];
@@ -269,6 +277,10 @@ readingsGroup_2html($)
   foreach my $device (@{$devices}) {
     my $h = $defs{$device->[0]};
     my $regex = $device->[1];
+    if( !$h && $device->[0] =~ m/^<.*>$/ ) {
+      $h = $hash if( !$h );
+      $regex = $device->[0];
+    }
     my $name = $h->{NAME};
     next if( !$h );
 
@@ -286,8 +298,10 @@ readingsGroup_2html($)
       if( $regex && $regex =~ m/^<(.*)>$/ ) {
         my $txt = $1;
         if( $txt =~ m/^{.*}$/ ) {
+          my $new_line = $first;
           my $DEVICE = $name;
-          $txt = eval $txt;
+          ($txt,$new_line) = eval $txt;
+          $first = $new_line if( defined($new_line) );
           if( $@ ) {
             $txt = "<ERROR>";
             Log3 $d, 3, $d .": ". $regex .": ". $@;
@@ -581,9 +595,13 @@ readingsGroup_Get($@)
     Notes:
     <ul>
       <li>&lt;device&gt; can be of the form INTERNAL=VALUE where INTERNAL is the name of an internal value and VALUE is a regex.</li>
+      <li>&lt;device&gt; can be of the form &lt;STRING&gt; or &lt;{perl}&gt; where STRING or the string returned by perl is
+          inserted as a line in the readings list. </li>
       <li>If regex is a comma separatet list the reading values will be shown on a single line.</li>
       <li>If regex starts with a + it will be matched against the internal values of the device instead of the readings.</li>
       <li>If regex starts with a ? it will be matched against the attributes of the device instead of the readings.</li>
+      <li>regex can be of the form &lt;STRING&gt; or &lt;{perl}&gt; where STRING or the string returned by perl is
+          inserted as the reading. </li>
       <li>For internal values and attributes longpoll update is not possible. Refresh the page to update the values.</li>
     </ul><br>
 
@@ -605,7 +623,7 @@ readingsGroup_Get($@)
         define systemStatus readingsGroup sysstat<br>
         attr systemStatus notime 1<br>
         attr systemStatus nostate 1<br>
-        attr systemStatus mapping { 'load' => 'Systemauslastung', 'temperature' => 'Systemtemperatur in &amp;deg;C'}<br>
+        attr systemStatus mapping {'load' => 'Systemauslastung', 'temperature' => 'Systemtemperatur in &amp;deg;C'}<br>
       <br>
         define Verbrauch readingsGroup TYPE=PCA301:state,power,consumption<br>
         attr Verbrauch mapping %ALIAS<br>
