@@ -514,10 +514,11 @@ while (1) {
     next if(!$hash || !$hash->{NAME}); # due to rereadcfg/del
 
     CallFn($hash->{NAME}, "ReadFn", $hash)
-      if(vec($rout, $hash->{FD}, 1));
+      if(defined($hash->{FD}) && vec($rout, $hash->{FD}, 1));
+
 
     my $wb = $hash->{$wbName};
-    if(defined($wb) && vec($wout, $hash->{FD}, 1)) {
+    if(defined($wb) && defined($hash->{FD}) && vec($wout, $hash->{FD}, 1)) {
       my $ret = syswrite($hash->{CD}, $wb);
       if(!$ret || $ret < 0) {
         Log 4, "Write error to $p, deleting $hash->{NAME}";
