@@ -306,6 +306,7 @@ readingsGroup_2html($)
             $txt = "<ERROR>";
             Log3 $d, 3, $d .": ". $regex .": ". $@;
           }
+          next if( !defined($txt) );
         }
 
         if( $first || $multi == 1 ) {
@@ -487,7 +488,12 @@ readingsGroup_Notify($$)
         my $regex = @{$device}[1];
         my @list = (undef);
         @list = split(",",$regex) if( $regex );
-        foreach my $regex (@list) {
+        #foreach my $regex (@list) {
+        for( my $i = 0; $i <= $#list; ++$i ) {
+        my $regex = $list[$i];
+          while ($regex && $regex =~ m/^</ && $regex !~ m/>$/ && $list[++$i] ) { 
+            $regex .= ",". $list[$i];
+          }  
           next if( $reading eq "state" && !$show_state && (!defined($regex) || $regex ne "state") );
           next if( $regex && $regex =~ m/^\+/ );
           next if( $regex && $regex =~ m/^\?/ );
@@ -596,13 +602,15 @@ readingsGroup_Get($@)
     <ul>
       <li>&lt;device&gt; can be of the form INTERNAL=VALUE where INTERNAL is the name of an internal value and VALUE is a regex.</li>
       <li>&lt;device&gt; can be of the form &lt;STRING&gt; or &lt;{perl}&gt; where STRING or the string returned by perl is
-          inserted as a line in the readings list. </li>
+          inserted as a line in the readings list. skipped if STRING is undef.</li>
       <li>If regex is a comma separatet list the reading values will be shown on a single line.</li>
       <li>If regex starts with a + it will be matched against the internal values of the device instead of the readings.</li>
       <li>If regex starts with a ? it will be matched against the attributes of the device instead of the readings.</li>
       <li>regex can be of the form &lt;STRING&gt; or &lt;{perl}&gt; where STRING or the string returned by perl is
-          inserted as the reading. </li>
+          inserted as the reading. skipped if STRING is undef.</li>
       <li>For internal values and attributes longpoll update is not possible. Refresh the page to update the values.</li>
+      <li>the &lt;{perl}&gt; expression is limited to expressions without a space. it is best just to call a small sub
+          in 99_myUtils.pm instead of having a compex expression in the define.</li>
     </ul><br>
 
     Examples:
