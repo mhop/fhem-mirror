@@ -506,8 +506,9 @@ sub isHeizung($) {
       } else {
          $setModifier = "";
       }
-  return $setModifier;
+
   }
+  return $setModifier;
 }
 
 ################################################################################
