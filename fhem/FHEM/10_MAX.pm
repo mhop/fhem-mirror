@@ -680,7 +680,6 @@ MAX_Parse($$)
         $untilStr = MAX_ParseDateTime($null1,$heaterTemperature,$null2)->{str};
         $heaterTemperature = "";
       }
-
       $heaterTemperature = "" if(!defined($heaterTemperature));
 
       Log GetLogLevel($shash->{NAME}, 5), "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, displayActualTemperature $displayActualTemperature, heaterTemperature $heaterTemperature, untilStr $untilStr";
@@ -733,28 +732,21 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "comfortTemperature", MAX_SerializeTemperature($args[1]));
     readingsBulkUpdate($shash, "maximumTemperature", MAX_SerializeTemperature($args[2]));
     readingsBulkUpdate($shash, "minimumTemperature", MAX_SerializeTemperature($args[3]));
-    if($shash->{type} =~ /HeatingThermostat.*/) {
-      readingsBulkUpdate($shash, "boostValveposition", $args[4]);
-      readingsBulkUpdate($shash, "boostDuration", $boost_durations{$args[5]});
-      readingsBulkUpdate($shash, "measurementOffset", MAX_SerializeTemperature($args[6]));
-      readingsBulkUpdate($shash, "windowOpenTemperature", MAX_SerializeTemperature($args[7]));
-      readingsBulkUpdate($shash, "windowOpenDuration", $args[8]);
-      readingsBulkUpdate($shash, "maxValveSetting", $args[9]);
-      readingsBulkUpdate($shash, "valveOffset", $args[10]);
-      readingsBulkUpdate($shash, "decalcification", "$decalcDays{$args[11]} $args[12]:00");
-      readingsBulkUpdate($shash, ".weekProfile", $args[13]);
-    } else {
-      #With firmware 18 (opposed to firmware 16), the WallThermostat sends 3 more bytes (6 more hex)
-      my ($weekProfile, $unknownBytes) = $args[4] =~ m/^(.{364})(.*)$/;
-      readingsBulkUpdate($shash, ".weekProfile", $weekProfile);
-      #We still have to find out what $unknownBytes mean, so hopefully
-      #we can observe some other values
-      if($unknownBytes ne "071830" and $unknownBytes ne "") {
-        Log GetLogLevel($shash->{NAME}, 2), "While parsing weekProfile of WallThermostat: Additional bytes $unknownBytes differ from 071830. Please report to http://forum.fhem.de/index.php?topic=15567";
-      }
+    readingsBulkUpdate($shash, ".weekProfile", $args[4]);
+    if(@args >= 4) { #HeatingThermostat and WallThermostat with new firmware
+      readingsBulkUpdate($shash, "boostValveposition", $args[5]);
+      readingsBulkUpdate($shash, "boostDuration", $boost_durations{$args[6]});
+      readingsBulkUpdate($shash, "measurementOffset", MAX_SerializeTemperature($args[7]));
+      readingsBulkUpdate($shash, "windowOpenTemperature", MAX_SerializeTemperature($args[8]));
+    }
+    if(@args >= 8) { #HeatingThermostat
+      readingsBulkUpdate($shash, "windowOpenDuration", $args[9]);
+      readingsBulkUpdate($shash, "maxValveSetting", $args[10]);
+      readingsBulkUpdate($shash, "valveOffset", $args[11]);
+      readingsBulkUpdate($shash, "decalcification", "$decalcDays{$args[12]} $args[13]:00");
     }
 
-   MAX_ParseWeekProfile($shash);
+    MAX_ParseWeekProfile($shash);
 
   } elsif($msgtype eq "Error") {
     if(@args == 0) {

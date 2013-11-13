@@ -552,7 +552,7 @@ MAXLAN_Parse($$)
       #TODO: there is a lot of data left to interpret
 
     }elsif($device_types{$devicetype} =~ /HeatingThermostat.*/){
-      my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$tempoffset,$windowopentemp,$windowopendur,$boost,$decalcifiction,$maxvalvesetting,$valveoffset,$weekprofile) = unpack("CCCCCCCCCCCH*",substr($bindata,18));
+      my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$tempoffset,$windowopentemp,$windowopendur,$boost,$decalcifiction,$maxvalvesetting,$valveoffset,$weekprofile) = unpack("CCCCCCCCCCCH364",substr($bindata,18));
       my $boostValve = ($boost & 0x1F) * 5;
       my $boostDuration = $boost >> 5;
       #There is some trailing data missing, which maps to the weekly program
@@ -568,16 +568,25 @@ MAXLAN_Parse($$)
       my $decalcDay    = ($decalcifiction >> 5) & 0x07;
       my $decalcTime   = $decalcifiction & 0x1F;
       Log $ll5, "comfortemp $comforttemp, ecotemp $ecotemp, boostValve $boostValve, boostDuration $boostDuration, tempoffset $tempoffset, minsetpointtemp $minsetpointtemp, maxsetpointtemp $maxsetpointtemp, windowopentemp $windowopentemp, windowopendur $windowopendur";
-      Dispatch($hash, "MAX,1,HeatingThermostatConfig,$addr,$ecotemp,$comforttemp,$maxsetpointtemp,$minsetpointtemp,$boostValve,$boostDuration,$tempoffset,$windowopentemp,$windowopendur,$maxvalvesetting,$valveoffset,$decalcDay,$decalcTime,$weekprofile", {});
+      Dispatch($hash, "MAX,1,HeatingThermostatConfig,$addr,$ecotemp,$comforttemp,$maxsetpointtemp,$minsetpointtemp,$weekprofile,$boostValve,$boostDuration,$tempoffset,$windowopentemp,$windowopendur,$maxvalvesetting,$valveoffset,$decalcDay,$decalcTime", {});
 
     }elsif($device_types{$devicetype} eq "WallMountedThermostat"){
-      my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$weekprofile) = unpack("CCCCH*",substr($bindata,18));
-      $comforttemp /= 2.0; #convert to degree celcius
-      $ecotemp /= 2.0; #convert to degree celcius
-      $maxsetpointtemp /= 2.0;
-      $minsetpointtemp /= 2.0;
+      my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$weekprofile,$tempoffset,$windowopentemp,$boost) = unpack("CCCCH364CCC",substr($bindata,18));
+      $comforttemp     = MAXLAN_ExtractTemperature($comforttemp);
+      $ecotemp         = MAXLAN_ExtractTemperature($ecotemp);
+      $maxsetpointtemp = MAXLAN_ExtractTemperature($maxsetpointtemp);
+      $minsetpointtemp = MAXLAN_ExtractTemperature($minsetpointtemp);
       Log $ll5, "comfortemp $comforttemp, ecotemp $ecotemp, minsetpointtemp $minsetpointtemp, maxsetpointtemp $maxsetpointtemp";
-      Dispatch($hash, "MAX,1,WallThermostatConfig,$addr,$ecotemp,$comforttemp,$maxsetpointtemp,$minsetpointtemp,$weekprofile", {});
+      if(defined($tempoffset)) { #With firmware 18 (opposed to firmware 16)
+        $tempoffset = $tempoffset/2.0-3.5; #convert to degree
+        my $boostValve = ($boost & 0x1F) * 5;
+        my $boostDuration = $boost >> 5;
+        $windowopentemp  = MAXLAN_ExtractTemperature($windowopentemp);
+        Log $ll5, "tempoffset $tempoffset, boostValve $boostValve, boostDuration $boostDuration, windowOpenTemp $windowopentemp";
+        Dispatch($hash, "MAX,1,WallThermostatConfig,$addr,$ecotemp,$comforttemp,$maxsetpointtemp,$minsetpointtemp,$weekprofile,$boostValve,$boostDuration,$tempoffset,$windowopentemp", {});
+      } else {
+        Dispatch($hash, "MAX,1,WallThermostatConfig,$addr,$ecotemp,$comforttemp,$maxsetpointtemp,$minsetpointtemp,$weekprofile", {});
+      }
 
     }elsif($device_types{$devicetype} eq "ShutterContact"){
       Log 2, "MAXLAN_Parse: ShutterContact send some configuration, but none was expected" if($len > 18);
