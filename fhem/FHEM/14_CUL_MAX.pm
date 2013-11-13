@@ -308,8 +308,9 @@ CUL_MAX_Parse($$)
         Log $ll5, "CUL_MAX_Parse: Got TimeInformation: (in GMT) year $year, mon $month, day $day, hour $hour, min $min, sec $sec, unk ($unk1, $unk2, $unk3)";
       }
     } elsif($msgType eq "PairPing") {
-      my ($unk1,$type,$unk2,$serial) = unpack("CCCa*",pack("H*",$payload));
-      Log $ll5, "CUL_MAX_Parse: Got PairPing (dst $dst, pairmode $shash->{pairmode}), unk1 $unk1, type $type, unk2 $unk2, serial $serial";
+      my ($firmware,$type,$testresult,$serial) = unpack("CCCa*",pack("H*",$payload));
+      #What does testresult mean?
+      Log $ll5, "CUL_MAX_Parse: Got PairPing (dst $dst, pairmode $shash->{pairmode}), firmware $firmware, type $type, testresult $testresult, serial $serial";
 
       #There are two variants of PairPing:
       #1. It has a destination address of "000000" and can be paired to any device.
@@ -322,11 +323,21 @@ CUL_MAX_Parse($$)
       #If $isToMe is true, this device is already paired and just wants to be reacknowledged
       if($shash->{pairmode} || $isToMe) {
         Log 3, "CUL_MAX_Parse: " . ($isToMe ? "Re-Pairing" : "Pairing") . " device $src of type $device_types{$type} with serial $serial";
-        Dispatch($shash, "MAX,$isToMe,define,$src,$device_types{$type},$serial,0,0", {});
+        Dispatch($shash, "MAX,$isToMe,define,$src,$device_types{$type},$serial,0", {});
+
+        #Set firmware and testresult on device
+        my $dhash = CUL_MAX_DeviceHash($src);
+        if(defined($dhash)) {
+          readingsBeginUpdate($dhash);
+          readingsBulkUpdate($dhash, "firmware", $firmware);
+          readingsBulkUpdate($dhash, "testresult", $testresult);
+          readingsEndUpdate($dhash, 1);
+        }
+
         #Send after dispatch the define, otherwise Send will create an invalid device
         CUL_MAX_Send($shash, "PairPong", $src, "00");
 
-        return $shash->{NAME} if($isToMe); #Skip default values if just rePairing
+        return $shash->{NAME} if($isToMe); #if just re-pairing, default values are not restored (I checked)
 
         #This are the default values that a device has after factory reset or pairing
         if($device_types{$type} =~ /HeatingThermostat.*/) {
