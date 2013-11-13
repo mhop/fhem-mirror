@@ -154,10 +154,10 @@ LaCrosse_Parse($$)
         && abs($rhash->{"previousT$channel"} - $temperature) <= AttrVal( $rname, "filterThreshold", 10 ) ) {
       readingsBeginUpdate($rhash);
       readingsBulkUpdate($rhash, "temperature$channel", $temperature);
-      readingsBulkUpdate($rhash, "humidity$channel", $humidity) if( $humidity && $humidity != 99 );
+      readingsBulkUpdate($rhash, "humidity$channel", $humidity) if( $humidity && $humidity <= 99 );
       if( !$channel ) {
         my $state = "T: $temperature";
-        $state .= " H: $humidity" if( $humidity && $humidity != 99 );
+        $state .= " H: $humidity" if( $humidity && $humidity <= 99 );
         readingsBulkUpdate($rhash, "state", $state) if( Value($rname) ne $state );
       }
       readingsBulkUpdate($rhash, "battery$channel", $battery_low?"low":"ok");
