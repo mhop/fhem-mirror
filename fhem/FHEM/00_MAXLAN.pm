@@ -539,7 +539,16 @@ MAXLAN_Parse($$)
 
     $len = $len+1; #The len field itself was not counted
 
-    Dispatch($hash, "MAX,1,define,$addr,$device_types{$devicetype},$serial,$groupid,1", {}) if($device_types{$devicetype} ne "Cube");
+    Dispatch($hash, "MAX,1,define,$addr,$device_types{$devicetype},$serial,$groupid", {}) if($device_types{$devicetype} ne "Cube");
+
+    #Set firmware and testresult on device
+    my $dhash = $modules{MAX}{defptr}{$addr};
+    if(defined($dhash)) {
+      readingsBeginUpdate($dhash);
+      readingsBulkUpdate($dhash, "firmware", $firmware);
+      readingsBulkUpdate($dhash, "testresult", $testresult);
+      readingsEndUpdate($dhash, 1);
+    }
 
     if($len != length($bindata)) {
       Dispatch($hash, "MAX,1,Error,$addr,Parts of configuration are missing", {});
@@ -555,7 +564,6 @@ MAXLAN_Parse($$)
       my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$tempoffset,$windowopentemp,$windowopendur,$boost,$decalcifiction,$maxvalvesetting,$valveoffset,$weekprofile) = unpack("CCCCCCCCCCCH364",substr($bindata,18));
       my $boostValve = ($boost & 0x1F) * 5;
       my $boostDuration = $boost >> 5;
-      #There is some trailing data missing, which maps to the weekly program
       $comforttemp     = MAXLAN_ExtractTemperature($comforttemp); #convert to degree celcius
       $ecotemp         = MAXLAN_ExtractTemperature($ecotemp); #convert to degree celcius
       $tempoffset      = $tempoffset/2.0-3.5; #convert to degree
@@ -661,7 +669,7 @@ MAXLAN_Parse($$)
     }
     my ($type, $addr, $serial) = unpack("CH6a[10]", decode_base64($args[0]));
     Log 2, "MAXLAN_Parse: Paired new device, type $device_types{$type}, addr $addr, serial $serial";
-    Dispatch($hash, "MAX,1,define,$addr,$device_types{$type},$serial,0,1", {});
+    Dispatch($hash, "MAX,1,define,$addr,$device_types{$type},$serial,0", {});
 
     #After a device has been paired, it automatically appears in the "L" and "C" commands,
     MAXLAN_RequestConfiguration($hash,$addr);
