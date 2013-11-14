@@ -333,7 +333,7 @@ RSS_itemImg {
     }
     given ($params{ivalign}) {
             when('center')	{ $y -= $sheight/2;  }
-            when('base')	{ $y -= $sheight; }
+            #when('base')	{ $y -= $sheight; }
             when('bottom')	{ $y -= $sheight; }
             default 		{ } # nothing to do
     }
