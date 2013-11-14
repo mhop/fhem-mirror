@@ -11,8 +11,13 @@ package main;
 use strict;
 use warnings;
 use GD;
+use feature qw/switch/;
 use vars qw(%data);
 use HttpUtils;
+require "98_SVG.pm"; # enable use of plotAsPng() 
+
+my @valid_valign = qw(top center base bottom);
+my @valid_halign = qw(left center right);
 
 # we can 
 # use vars qw(%FW_types);  # device types,
@@ -41,7 +46,6 @@ RSS_Initialize($) {
     #$hash->{AttrFn}  = "RSS_Attr";
     $hash->{AttrList}= "size bg tmin";
     $hash->{SetFn}   = "RSS_Set";
-
 
     RSS_addExtension("RSS_CGI","rss","RSS");
 
@@ -84,6 +88,12 @@ RSS_Define($$) {
   $hash->{fhem}{hostname}= $hostname;
   $hash->{fhem}{filename}= $filename;
 
+  eval "use GD::Text::Align";
+  $hash->{fhem}{useTextAlign} = ($@ ? 0 : 1 );
+  if(!($hash->{fhem}{useTextAlign})) { 
+    Log3 $hash, 1, "Cannot use text alignment: $@";
+  }
+    
   RSS_readLayout($hash);
   
   $hash->{STATE} = $name;
@@ -217,8 +227,21 @@ sub
 RSS_itemText {
   my ($S,$x,$y,$text,%params)= @_;
   return unless(defined($text));
-  ($x,$y)= RSS_xy($S,$x,$y);
-  $S->stringFT(RSS_color($S,$params{rgb}),$params{font},$params{pt},0,$x,$y,$text);
+
+	if($params{useTextAlign}) {
+		($x,$y)= RSS_xy($S,$x,$y);
+		my $align = GD::Text::Align->new($S,
+			color  => RSS_color($S, $params{rgb}),
+			valign => $params{tvalign},
+			halign => $params{thalign},
+			);
+		$align->set_font($params{font}, $params{pt});
+		$align->set_text($text);
+		$align->draw($x, $y, 0);
+	} else {
+		($x,$y)= RSS_xy($S,$x,$y);
+		$S->stringFT(RSS_color($S,$params{rgb}),$params{font},$params{pt},0,$x,$y,$text);
+	}
 }
 
 sub
@@ -227,6 +250,7 @@ RSS_itemTime {
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
   RSS_itemText($S,$x,$y,sprintf("%02d:%02d", $hour, $min),%params);
 }
+
 sub
 RSS_itemSeconds {
    my ($S,$x,$y,$format,%params)= @_;
@@ -237,7 +261,7 @@ RSS_itemSeconds {
   }
   else
   {
-     RSS_itemText($S,$x,$y,sprintf("%02d", $sec),%params);
+    RSS_itemText($S,$x,$y,sprintf("%02d", $sec),%params);
   }
 }
 sub
@@ -276,7 +300,6 @@ RSS_itemImg {
       return;
     }
   } elsif($srctype eq "data") {
-    require "98_SVG.pm"; # enable use of plotAsPng() 
     if($imgtype eq "gif") {
       $I= GD::Image->newFromGifData($arg);
     } elsif($imgtype eq "png") {
@@ -290,18 +313,37 @@ RSS_itemImg {
     return;
   }
   ($x,$y)= RSS_xy($S,$x,$y);
-  my ($width,$height)= $I->getBounds();
-  if ($scale =~ s/([wh])([\d]*)/$2/) { # get the digit from width/hight to pixel entry
-    #Debug "RSS scale $scale (1: $1 / 2: $2)contais px after Digit - width: $width / height: $height";
-    if ($1 eq "w") {
-	$scale=$scale/$width;
-    } else {
-	$scale=$scale/$height;
+  
+  eval {
+    my ($width,$height)= $I->getBounds();
+    if ($scale =~ s/([wh])([\d]*)/$2/) { # get the digit from width/hight to pixel entry
+      #Debug "RSS scale $scale (1: $1 / 2: $2)contais px after Digit - width: $width / height: $height";
+      if ($1 eq "w") {
+          $scale=$scale/$width;
+      } else {
+          $scale=$scale/$height;
+      }
     }
+    my ($swidth,$sheight)= (int($scale*$width), int($scale*$height));
+
+    given ($params{ihalign}) {
+            when('center')      { $x -= $swidth/2;  }
+            when('right')	{ $x -= $swidth;  }
+            default 		{ } # nothing to do
+    }
+    given ($params{ivalign}) {
+            when('center')	{ $y -= $sheight/2;  }
+            when('base')	{ $y -= $sheight; }
+            when('bottom')	{ $y -= $sheight; }
+            default 		{ } # nothing to do
+    }
+
+    #Debug "RSS placing $arg ($swidth x $sheight) at ($x,$y)";
+    $S->copyResampled($I,$x,$y,0,0,$swidth,$sheight,$width,$height);
+  };
+  if($@) {
+    Log3 undef, 2, "RSS: cannot create image $srctype $imgtype '$arg': $@";
   }
-  my ($swidth,$sheight)= (int($scale*$width), int($scale*$height));
-  #Debug "RSS placing $arg ($swidth x $sheight) at ($x,$y)";
-  $S->copyResampled($I,$x,$y,0,0,$swidth,$sheight,$width,$height);
 }  
 
 sub
@@ -324,6 +366,16 @@ RSS_evalLayout($$@) {
   $params{font}= "Arial";
   $params{pt}= 12;
   $params{rgb}= "ffffff";
+  $params{halign} = 'left';
+  $params{valign} = 'base';
+  $params{condition} = '1';
+  # we need two pairs of align parameters
+  # due to different default values for text and img
+  $params{useTextAlign}= $defs{$name}{fhem}{useTextAlign};
+  $params{ihalign} = 'left';
+  $params{ivalign} = 'top';
+  $params{thalign} = 'left';
+  $params{tvalign} = 'base';
 
   my ($x,$y,$x1,$y1,$x2,$y2,$scale,$text,$imgtype,$srctype,$arg,$format);
   
@@ -342,6 +394,8 @@ RSS_evalLayout($$@) {
           # split line into command and definition
           my ($cmd, $def)= split("[ \t]+", $line, 2);
           ##Debug, "CMD= \"$cmd\", DEF= \"$def\"";
+          $params{condition} = AnalyzePerlCommand(undef, $def) if($cmd eq 'condition');
+          next unless($params{condition});
           if($cmd eq "rgb") {
             $def= "\"$def\"" if(length($def) == 6 && $def =~ /[[:xdigit:]]{6}/);
             $params{rgb}= AnalyzePerlCommand(undef, $def);
@@ -349,6 +403,24 @@ RSS_evalLayout($$@) {
             $params{font}= $def;
           } elsif($cmd eq "pt") {
             $params{pt}= $def;
+          } elsif($cmd eq "halign"){
+                my $d = AnalyzePerlCommand(undef, $def);
+                if($d ~~ @valid_halign) { 
+                	#Debug "$name: halign $d found valid in halign_array";
+                        $params{ihalign}= $d;
+                        $params{thalign}= $d;
+                } else {
+                  Log3 $name, 2, "$name: Illegal horizontal alignment $d";
+                }
+          } elsif($cmd eq "valign") {
+                my $d = AnalyzePerlCommand(undef, $def);
+                if( $d ~~ @valid_valign) {
+                #	Debug "$name: valign $d found valid in valign_array";
+                        $params{ivalign}= $d;
+                        $params{tvalign}= $d;
+                } else {
+                  Log3 $name, 2, "$name: Illegal vertical alignment $d";
+                }
           } elsif($cmd eq "text") {
             ($x,$y,$text)= split("[ \t]+", $def, 3);
             my $txt= AnalyzePerlCommand(undef, $text);
@@ -374,7 +446,6 @@ RSS_evalLayout($$@) {
           } else {
             Log3 $name, 1, "$name: Illegal command $cmd in layout definition.";
           }  
-            
   }
 }
 
@@ -627,18 +698,33 @@ RSS_CGI(){
     putting a \ at the end.<p>
 
     <i>Layout control commands</i><p>
+    Notes: 
+    (1) Use double quotes to quote literal text if perl specials are allowed. 
+    (2) Text alignment requires the Perl module GD::Text::Align to be installed. Debian-based systems can install it with <code>apt-get install libgd-text-perl</code>.
+    <p>
+    
     <ul>
-    <li>font &lt;font&gt;<br>Sets the font. &lt;font&gt; is the name of a TrueType font (e.g.
+    <li>font "&lt;font&gt;"<br>Sets the font. &lt;font&gt; is the name of a TrueType font (e.g.
     <code>Arial</code>) or the full path to a TrueType font
     (e.g. <code>/usr/share/fonts/truetype/arial.ttf</code>),
     whatever works on your system.</li><br>
 
-    <li>rgb &lt;color&gt;<br>Sets the color. &lt;color&gt; is a 6-digit hex number, every 2 digits
+    <li>rgb "&lt;color&gt;"<br>Sets the color. &lt;color&gt; is a 6-digit hex number, every 2 digits
     determining the red, green and blue color components as in HTML color codes (e.g.
     <code>FF0000</code> for red, <code>C0C0C0</code> for light gray). You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;color&gt.</li><br>
 
     <li>pt &lt;pt&gt;<br>Sets the font size in points.</li><br>
+    
+    <li>halign "left"|"center"|"right"<br>Sets the horizontal text and image alignment. Defaults to left-aligned. You can use
+    <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> instead of the literal alignment control word.</li><br>
+    
+    <li>valign "top"|"center"|"base"|"bottom"<br>Sets the vertical text and image alignment. Defaults to top-aligned. You can use
+    <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> instead of the literal alignment control word.</li><br>
+    
+    <li>condition &lt;condition&gt;<br>Subsequent layout control and item placement commands except for another condition command 
+    are ignored if and only if &lt;condition&gt;
+    evaluates to false.</li><br>
     </ul>
 
     <i>Item placement commands</i><p>
@@ -669,7 +755,7 @@ RSS_CGI(){
     This is how a layout definition might look like:<p>
     <code>
     font /usr/share/fonts/truetype/arial.ttf # must be a TrueType font<br>
-    rgb c0c0c0 # HTML color notation, RGB<br>
+    rgb "c0c0c0" # HTML color notation, RGB<br>
     pt 48 # font size in points<br>
     time 0.10 0.90<br>
     pt 24<br>
