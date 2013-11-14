@@ -165,6 +165,11 @@ sub CUL_HM_Initialize($) {
   $hash->{helper}{qReqStatWu} = \@statQWuArr;
   $hash->{helper}{qReqConf}   = \@confQArr;
   $hash->{helper}{qReqConfWu} = \@confQWuArr;
+  #statistics
+  $hash->{stat}{s}{dummy}=0;
+  $hash->{stat}{r}{dummy}=0;
+  InternalTimer(gettimeofday()+3600*20,"CUL_HM_statCntRfresh","StatCntRfresh", 0);
+
   CUL_HM_initRegHash();
   $hash->{hmIoMaxDly}     = 60;# poll timeout - stop poll and discard
   $hash->{hmAutoReadScan} = 4; # delay autoConf readings
@@ -189,8 +194,7 @@ sub CUL_HM_updateConfig($){
       if (   $hash->{helper}{role}{dev}
 	      && AttrVal($name,"subType","") ne "virtual"){
 	    $attr{$name}{expert}     = AttrVal($name,"expert"     ,"2_full");
-	    $attr{$name}{autoReadReg}= AttrVal($name,"autoReadReg","4_reqStatus")
-		    if(CUL_HM_getRxType($hash)&0xEB);
+	    $attr{$name}{autoReadReg}= AttrVal($name,"autoReadReg","4_reqStatus");
 	  }
 	  CUL_HM_Attr("attr",$name,"expert",$attr{$name}{expert});#need update after readings are available
 	}
@@ -529,7 +533,8 @@ sub CUL_HM_Parse($$) {##############################
   # $shash will be replaced for multichannel commands
   my $shash = $modules{CUL_HM}{defptr}{$src}; 
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
-
+  CUL_HM_statCnt($ioName,"r");
+  
   $respRemoved = 0;  #set to 'no response in this message' at start
   if(!$shash) {      #  Unknown source
     # Generate an UNKNOWN event for pairing requests, ignore everything else
@@ -1066,12 +1071,14 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "timedOn:".(($err&0x40)?"running":"off");
 
 	  if ($st ne "switch"){
-        push @event, "$eventName:up:$vs"   if(($err&0x30) == 0x10);
-        push @event, "$eventName:down:$vs" if(($err&0x30) == 0x20);
-        push @event, "$eventName:stop:$vs" if(($err&0x30) == 0x00);
+	    my $dir =  $err&0x30;
+        if   ($dir == 0x10){push @event, "$eventName:up:$vs"  ;}
+        elsif($dir == 0x20){push @event, "$eventName:down:$vs";}
+        elsif($dir == 0x00){push @event, "$eventName:stop:$vs";}
+        elsif($dir == 0x30){push @event, "$eventName:err:$vs";}
 		if (!$rSUpdt){#dont touch if necessary for dimmer
-		  if(($err&0x30) != 0x00){CUL_HM_stateUpdatDly($shash->{NAME},120);}
-		  else                   {CUL_HM_unQEntity($shash->{NAME},"qReqStat");}
+		  if($dir != 0x00){CUL_HM_stateUpdatDly($shash->{NAME},120);}
+		  else            {CUL_HM_unQEntity($shash->{NAME},"qReqStat");}
 		}
 	  }
 	  if ($st eq "dimmer"){
@@ -1576,6 +1583,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 		          foreach (keys%{$shash->{helper}{prt}{rspWaitSec}});	#back to original message		
 		  delete $shash->{helper}{prt}{rspWaitSec};
 		  IOWrite($shash, "", $shash->{helper}{prt}{rspWait}{cmd});     # and send
+		  CUL_HM_statCnt($shash->{IODev}{NAME},"s");
 		  #General set timer
 		  return "done"
 		}
@@ -1675,10 +1683,11 @@ sub CUL_HM_parseCommon(@){#####################################################
       $idstr =~ s/(..)/sprintf("%02X%s",$s++,$1)/ge;
       CUL_HM_pushConfig($shash, $id, $src,0,0,0,0, "0201$idstr");
       CUL_HM_ProcessCmdStack($shash); # start processing immediately
+	  CUL_HM_qAutoRead($shash->{NAME},0);
 	  CUL_HM_appFromQ($shash->{NAME},"cf");# stack cmds if waiting
-
 	}
 	elsif(CUL_HM_getRxType($shash) & 0x04){# nothing to pair - maybe send config
+	  CUL_HM_qAutoRead($shash->{NAME},0);
 	  CUL_HM_appFromQ($shash->{NAME},"cf");   # stack cmds if waiting
 	  if (hex($mFlg)&0x20){CUL_HM_SndCmd($shash,$mNo."8002".$id.$src."00");}
 	  else{ 	           CUL_HM_ProcessCmdStack($shash);} ;#config
@@ -2215,7 +2224,7 @@ sub CUL_HM_Set($@) {
   elsif($cmd eq "text") { ################################################# reg
     my ($bn,$l1, $l2) = ($chn,$a[2],$a[3]); # Create CONFIG_WRITE_INDEX string
 	if (!$roleC){# if used on device. 
-      return "$a[2] is not a button number" if($a[2] !~ m/^\d$/ || $a[2] < 1);
+      return "$a[2] is not a button number" if($a[2] !~ m/^\d*$/ || $a[2] < 1);
       return "$a[3] is not on or off" if($a[3] !~ m/^(on|off)$/);
       $bn = $a[2]*2-($a[3] eq "on" ? 0 : 1);
 	  ($l1, $l2) = ($a[4],$a[5]);
@@ -3690,10 +3699,57 @@ sub CUL_HM_SndCmd($$) {
   }
   $cmd = sprintf("As%02X%02X%s", length($cmd2)/2+1, $mn, $cmd2);
   IOWrite($hash, "", $cmd);
+  CUL_HM_statCnt($ioName,"s");
   CUL_HM_eventP($hash,"Snd");	  
   CUL_HM_responseSetup($hash,$cmd);	
   $cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/;
   CUL_HM_DumpProtocol("SND", $io, ($1,$2,$3,$4,$5,$6,$7));
+}
+sub CUL_HM_statCnt($$) {# set msg statistics for (r)ecive (s)end or (u)pdate
+  my ($ioName,$dir) = @_;
+  my $stat   = $modules{CUL_HM}{stat};
+  if (!$stat->{$ioName}){
+    $stat->{r}{$ioName}{h}{$_} = 0 foreach(0..23);
+    $stat->{r}{$ioName}{d}{$_} = 0 foreach(0..6);
+    $stat->{s}{$ioName}{h}{$_} = 0 foreach(0..23);
+    $stat->{s}{$ioName}{d}{$_} = 0 foreach(0..6);
+    $stat->{$ioName}{last} = 0;
+  }
+  my @l = localtime(gettimeofday());
+
+  if ($l[2] != $stat->{$ioName}{last}){#next field
+    my $end = $l[2];
+    if ($l[2] < $stat->{$ioName}{last}){#next day
+	  $end += 24;
+	  my $recentD = ($l[6]+6)%7;
+	  foreach my $ud ("r","s"){
+	    $stat->{$ud}{$ioName}{d}{$recentD} = 0;
+	    $stat->{$ud}{$ioName}{d}{$recentD} += $stat->{$ud}{$ioName}{h}{$_} 
+		            foreach (0..23);
+	  }
+ 	}
+	foreach (($stat->{$ioName}{last}+1)..$end){
+      $stat->{r}{$ioName}{h}{$_%24} = 0;
+      $stat->{s}{$ioName}{h}{$_%24} = 0;
+	}
+    $stat->{$ioName}{last} = $l[2];
+  }
+  $stat->{$dir}{$ioName}{h}{$l[2]}++ if ($dir ne "u");
+}
+sub CUL_HM_statCntRfresh($) {# update statistic once a day
+  my ($ioName,$dir) = @_;
+  foreach (keys %{$modules{CUL_HM}{stat}{r}}){
+    if (!$defs{$ioName}){#IO device is deleted, clear counts
+	  delete $modules{CUL_HM}{stat}{$ioName};
+	  delete $modules{CUL_HM}{stat}{r}{$ioName}{h};
+	  delete $modules{CUL_HM}{stat}{r}{$ioName}{d};
+	  delete $modules{CUL_HM}{stat}{s}{$ioName}{h};
+	  delete $modules{CUL_HM}{stat}{s}{$ioName}{d};
+	  next;
+	}
+    CUL_HM_statCnt($_,"u") if ($_ ne "dummy");
+  }
+  InternalTimer(gettimeofday()+3600*20,"CUL_HM_statCntRfresh","StatCntRfrh",0);
 }
 
 sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
@@ -3757,6 +3813,7 @@ sub CUL_HM_respPendTout($) {
 	  else{# normal device resend
 	    CUL_HM_eventP($hash,"Resnd");
         IOWrite($hash, "", $pHash->{rspWait}{cmd});
+		CUL_HM_statCnt($hash->{IODev}{NAME},"s");
         $pHash->{rspWait}{reSent}++;
         Log GetLogLevel($name,4),"CUL_HM_Resend: ".$name. " nr ".$pHash->{rspWait}{reSent};
 	    InternalTimer(gettimeofday()+rand(20)/10+4,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);
