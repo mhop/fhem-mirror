@@ -50,6 +50,7 @@ h2,h3,h4 { color:#EEE; line-height:1.3; margin-top:1.5em; font-family:Verdana; }
 
 a img { border-style:none; }
 .col2 { text-align:center; }
+tr.column td { padding:0; vertical-align:top;}
 
 /* detail-selector & slider */
 .makeTable { display:inline; float:left; clear:left;

@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: FHEMWEB column attribute
   - feature: new command halign, valign, condition in 02_RSS.pm 
              (Betateilchen & Boris)
   - bugfix:  PRESENCE: Fix nonworking initialization in mode "lan-bluetooth"

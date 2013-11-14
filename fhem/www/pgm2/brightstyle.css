@@ -51,6 +51,7 @@ h2,h3,h4 { color:#777; line-height:1.3; margin-top:1.5em; font-family:Verdana; }
 select.attr,input.attr,select.set,input.set { margin-bottom:10px; }
 a img { border-style:none; }
 .col2 { text-align:center; }
+tr.column td { padding:0; vertical-align:top;}
 
 /* detail-selector & slider */
 select {  border:0px none; margin-left:5px; margin-right:5px; }
