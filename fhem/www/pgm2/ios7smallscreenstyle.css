@@ -19,6 +19,7 @@ select   { font-family:Helvetica; font-weight:300; font-size:16px;}
 a {  color: #151515; }
 img {  border-style: none; }
 .col2 { text-align:center; }
+tr.column td { padding:0; vertical-align:top;}
 
 div.col1 { width: 188px; height: 30px; white-space: nowrap; }
 div.col2 { width: 108px; height: 30px; 
