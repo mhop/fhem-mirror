@@ -733,13 +733,13 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "maximumTemperature", MAX_SerializeTemperature($args[2]));
     readingsBulkUpdate($shash, "minimumTemperature", MAX_SerializeTemperature($args[3]));
     readingsBulkUpdate($shash, ".weekProfile", $args[4]);
-    if(@args >= 4) { #HeatingThermostat and WallThermostat with new firmware
+    if(@args > 5) { #HeatingThermostat and WallThermostat with new firmware
       readingsBulkUpdate($shash, "boostValveposition", $args[5]);
       readingsBulkUpdate($shash, "boostDuration", $boost_durations{$args[6]});
       readingsBulkUpdate($shash, "measurementOffset", MAX_SerializeTemperature($args[7]));
       readingsBulkUpdate($shash, "windowOpenTemperature", MAX_SerializeTemperature($args[8]));
     }
-    if(@args >= 8) { #HeatingThermostat
+    if(@args > 9) { #HeatingThermostat
       readingsBulkUpdate($shash, "windowOpenDuration", $args[9]);
       readingsBulkUpdate($shash, "maxValveSetting", $args[10]);
       readingsBulkUpdate($shash, "valveOffset", $args[11]);
