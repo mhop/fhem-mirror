@@ -249,6 +249,44 @@ use warnings;
   return sort(@names);
 }
 
+sub HMinfo_getMsgStat() { #####################################################
+  my ($hr,$dr,$hs,$ds);
+  $hr  =  sprintf("\n  %-14s:","receive hour");
+  $hs  =  sprintf("\n  %-14s:","send    hour");
+  $dr  =  sprintf("\n  %-14s:","receive day");
+  $ds  =  sprintf("\n  %-14s:","send    day");
+  $hr .=  sprintf("| %02d",$_) foreach (0..23);
+  $hs .=  sprintf("| %02d",$_) foreach (0..23);
+  $dr .=  sprintf("|%4s",$_) foreach ("Mon","Tue","Wed","Thu","Fri","Sat","Sun","# tdy");
+  $ds .=  sprintf("|%4s",$_) foreach ("Mon","Tue","Wed","Thu","Fri","Sat","Sun","# tdy");
+  foreach my $ioD(keys %{$modules{CUL_HM}{stat}{r}}){
+	next if ($ioD eq "dummy");
+	$hr .=  sprintf("\n      %-10s:",$ioD);
+	$hs .=  sprintf("\n      %-10s:",$ioD);
+	$dr .=  sprintf("\n      %-10s:",$ioD);
+	$ds .=  sprintf("\n      %-10s:",$ioD);
+	$hr .=  sprintf("|%3d",$modules{CUL_HM}{stat}{r}{$ioD}{h}{$_}) foreach (0..23);
+	$hs .=  sprintf("|%3d",$modules{CUL_HM}{stat}{s}{$ioD}{h}{$_}) foreach (0..23);
+	$dr .=  sprintf("|%4d",$modules{CUL_HM}{stat}{r}{$ioD}{d}{$_}) foreach (0..6);
+	$ds .=  sprintf("|%4d",$modules{CUL_HM}{stat}{s}{$ioD}{d}{$_}) foreach (0..6);
+
+	my ($tdr,$tds);
+	$tdr += $modules{CUL_HM}{stat}{r}{$ioD}{h}{$_} foreach (0..23);
+	$tds += $modules{CUL_HM}{stat}{s}{$ioD}{h}{$_} foreach (0..23);
+	$dr .=  sprintf("|#%4d",$tdr);
+	$ds .=  sprintf("|#%4d",$tds);
+  }
+  my @l = localtime(gettimeofday());
+  my $tsts = "\n                 |";
+  $tsts .=  "----" foreach (1..$l[2]);  
+  $tsts .=  ">*" ;  
+  return  "msg statistics\n"
+           .$tsts
+	       .$hr.$hs
+		   .$tsts
+		   .$dr.$ds
+	       ;
+}
 sub HMinfo_SetFn($@) {#########################################################
   my ($hash,$name,$cmd,@a) = @_;
   my ($opt,$optEmpty,$filter) = ("",1,"");
@@ -274,17 +312,28 @@ sub HMinfo_SetFn($@) {#########################################################
   }
   elsif($cmd eq "clear" )     {##actionImmediate: clear parameter--------------
     my ($type) = @a;
-	$opt .= "d" if ($type !~ m/(readings|register)/);# readings apply to all, others device only
-	my @entities;
-	return "unknown parameter - use Protocol, readings, register or rssi" 
-	      if ($type !~ m/^(Protocol|readings|register|rssi)$/);
-	$type = "msgEvents" if ($type eq "Protocol");# translate parameter
-	foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
-	  push @entities,$dName;
-	  CUL_HM_Set($defs{$dName},$dName,"clear",$type);
+	if ($type eq "msgStat"){
+	  foreach (keys %{$modules{CUL_HM}{stat}{r}}){
+        next if ($_ ne "dummy");
+	    delete $modules{CUL_HM}{stat}{$_};
+	    delete $modules{CUL_HM}{stat}{r}{$_};
+	    delete $modules{CUL_HM}{stat}{s}{$_};
+      }
+	  return;
 	}
-	return $cmd.$type." done:" ."\n cleared"  ."\n    ".(join "\n    ",sort @entities)
-						 ;
+	else{
+	  return "unknown parameter - use Protocol, readings, msgStat, register or rssi" 
+	        if ($type !~ m/^(Protocol|readings|register|rssi)$/);
+	  $opt .= "d" if ($type !~ m/(readings|register)/);# readings apply to all, others device only
+	  my @entities;
+	  $type = "msgEvents" if ($type eq "Protocol");# translate parameter
+	  foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
+	    push @entities,$dName;
+	    CUL_HM_Set($defs{$dName},$dName,"clear",$type);
+	  }
+	  return $cmd.$type." done:" ."\n cleared"  ."\n    ".(join "\n    ",sort @entities)
+	  					 ;
+	}
   }
   elsif($cmd eq "autoReadReg"){##actionImmediate: re-issue register Read-------
 	my @entities;
@@ -356,6 +405,9 @@ sub HMinfo_SetFn($@) {#########################################################
 			."\n            msgLoadEst: ".$defs{$_}{msgLoadEst};
 	}
 	$ret .= "\n    IODevs:".(join"\n           ",HMinfo_noDup(@IOlist));
+  }
+  elsif($cmd eq "msgStat")    {##print message statistics----------------------
+    $ret = HMinfo_getMsgStat();
   }
   elsif($cmd eq "rssi")       {##print RSSI protocol-events--------------------
 	my @rssiList;
@@ -551,6 +603,7 @@ sub HMinfo_SetFn($@) {#########################################################
 	       ."\n peerXref [<typeFilter>]                        # peer cross-reference"
 	       ."\n models [<typeFilter>]                          # list of models incl native parameter"
 	       ."\n protoEvents [<typeFilter>] [short|long]        # protocol status - names can be filtered"
+		   ."\n msgStat                                        # view message statistic"
 	       ."\n param [<typeFilter>] [<param1>] [<param2>] ... # displays params for all entities as table"   
 	       ."\n rssi [<typeFilter>]                            # displays receive level of the HM devices"   
 	       ."\n       last: most recent"
@@ -558,11 +611,12 @@ sub HMinfo_SetFn($@) {#########################################################
 	       ."\n       range: min to max value"
 	       ."\n       count: number of events in calculation"
 		   ."\n ---clear status---"                    
-	       ."\n clear [<typeFilter>] [Protocol|Readings|Rssi]"       
+	       ."\n clear [<typeFilter>] [Protocol|readings|msgStat|register|rssi]"       
 	       ."\n       Protocol     # delete all protocol-events"       
 	       ."\n       readings     # delete all readings"       
 	       ."\n       register     # delete all register-readings"       
 	       ."\n       rssi         # delete all rssi data"       
+	       ."\n       msgStat      # delete message statistics"       
 		   ."\n ---help---"                    
 	       ."\n help                            #"       
 		   ."\n ***footnote***"
@@ -627,7 +681,7 @@ sub HMinfo_SetFnDly($) {#######################################################
   else{
 	return "autoReadReg clear "
           ."configCheck param peerCheck peerXref "
-	      ."protoEvents models regCheck register rssi saveConfig update "
+	      ."protoEvents msgStat:view,clear models regCheck register rssi saveConfig update "
           ."cpRegs  templateChk templateDef templateList templateSet";
 		   }
   return $ret;
@@ -1230,12 +1284,14 @@ sub HMinfo_noDup(@) {#return list with no duplicates
       <li><a name="#HMinfoautoReadReg">autoReadReg</a> <a href="HMinfoFilter">[filter]</a><br>
 	      schedules a read of the configuration for the CUL_HM devices with attribut autoReadReg set to 1 or higher. 
 	  </li>
-      <li><a name="#HMinfoclear">clear [Protocol|Readings|Rssi]</a> <a href="HMinfoFilter">[filter]</a><br>
+      <li><a name="#HMinfoclear">clear [Protocol|readings|msgStat|register|rssi]</a> <a href="HMinfoFilter">[filter]</a><br>
 	      executes a set clear ...  on all HM entities<br>
 		  <ul>
 		  <li>Protocol relates to set clear msgEvents</li>
-		  <li>Readings relates to set clear readings</li>
-		  <li>Rssi clears all rssi counters </li>
+		  <li>readings relates to set clear readings</li>
+		  <li>rssi clears all rssi counters </li>
+		  <li>msgStat clear HM general message statistics</li>
+		  <li>register clears all register-entries in readings</li>
 		  </ul>
 	  </li>
       <li><a name="#HMinfosaveConfig">saveConfig</a> <a href="HMinfoFilter">[filter]</a><br>

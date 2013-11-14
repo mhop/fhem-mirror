@@ -520,8 +520,9 @@ my %culHmRegDefine = (
 # SEC-WM55 08:01 (AES on?)
 # SEC-WDS  34:0x64 ?
 # SEC-SC   08:00 ?
-# RC19     08:00 ?
+# RC19     08:00 ? RC19 Button 08:08
 # Bl1PBU   08:00 09:00 10:00
+
 
 #  logicCombination=>{a=> 89.0,s=>0.5,l=>1,min=>0  ,max=>16      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"".
 #		                                                                                                      "inactive=>unused\n".
@@ -551,8 +552,8 @@ my %culHmRegDefine = (
 #--- list 4, link level for Button ------------------                                                                                     
   peerNeedsBurst  =>{a=>  1.0,s=>0.1,l=>4,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"peer expects burst",lit=>{off=>0,on=>1}},
   expectAES       =>{a=>  1.7,s=>0.1,l=>4,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"expect AES"        ,lit=>{off=>0,on=>1}},
-  lcdSymb         =>{a=>  2.0,s=>0.1,l=>4,min=>0  ,max=>255     ,c=>'hex'      ,f=>''      ,u=>''    ,d=>0,t=>"bitmask which symbol to display on message"},
-  lcdLvlInterp    =>{a=>  3.0,s=>0.1,l=>4,min=>0  ,max=>255     ,c=>'hex'      ,f=>''      ,u=>''    ,d=>0,t=>"bitmask for symbols"},
+  lcdSymb         =>{a=>  2.0,s=>0.1,l=>4,min=>0  ,max=>8       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"symbol to display on message",lit=>{"none"=>0,"bulb"=>1,"switch"=>2,"window"=>3,"door"=>4,"blind"=>5,"scene"=>6,"phone"=>7,"bell"=>8}},
+  lcdLvlInterp    =>{a=>  3.0,s=>0.1,l=>4,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"bitmask for symbols",lit=>{"none"=>0,"light"=>1,"blind"=>2,"marquee"=>3,"door"=>4,"window"=>5}},
 
   fillLvlUpThr    =>{a=>  4.0,s=>1  ,l=>4,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"fill level upper threshold"},
   fillLvlLoThr    =>{a=>  5.0,s=>1  ,l=>4,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"fill level lower threshold"},
@@ -640,182 +641,182 @@ my %culHmRegGeneral = (
   pairCentral=>1,
 );
 my %culHmRegType = (
-  swi               =>{peerNeedsBurst  =>1,expectAES       =>1},
-  remote            =>{peerNeedsBurst  =>1,expectAES       =>1,dblPress        =>1,longPress       =>1,
-					   sign            =>1
-                      },
-  blindActuator     =>{intKeyVisib     =>1,
-                       driveUp         =>1,driveDown       =>1,driveTurn       =>1,refRunCounter   =>1,
-                       sign            =>1,
-                       MaxTimeF        =>1,                                    
-                       OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
-  	   		           OffLevel        =>1,OnLevel         =>1,                                    
-                       ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1,DriveMode       =>1,
-				       BlJtOn          =>1,BlJtOff         =>1,BlJtDlyOn       =>1,BlJtDlyOff      =>1,
-                       BlJtRampOn      =>1,BlJtRampOff     =>1,BlJtRefOn       =>1,BlJtRefOff      =>1,
-                       CtValLo         =>1,CtValHi         =>1,
-                       CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1,CtRefOn         =>1,
-				       CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,CtRefOff        =>1,
-				       lgMultiExec     =>1
-				       },
-  dimmer            =>{intKeyVisib     =>1,
-                       transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction   =>1,
-                       OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
-                       OffDlyBlink     =>1,OnLvlPrio       =>1,OnDlyMode       =>1,
-		               ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1,
-		               OffLevel        =>1,OnMinLevel      =>1,OnLevel         =>1,               
-                       RampSstep       =>1,RampOnTime      =>1,RampOffTime     =>1,
-		               DimMinLvl       =>1,DimMaxLvl       =>1,DimStep         =>1,
-                       DimJtOn         =>1,DimJtOff        =>1,DimJtDlyOn      =>1,
-                       DimJtDlyOff     =>1,DimJtRampOn     =>1,DimJtRampOff    =>1,
-                       CtValLo         =>1,CtValHi         =>1,
-                       CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1,
-                       CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,
-		               OffDlyNewTime   =>1,OffDlyOldTime   =>1,
-		               lgMultiExec     =>1
-		               },
-  switch            =>{intKeyVisib     =>1,sign            =>1,
-                       OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1,
-                       SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
-                       CtValLo         =>1,CtValHi         =>1,
-                       CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1,
-		               ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1,
- 		               lgMultiExec     =>1
-		               },
-  winMatic          =>{signal          =>1,signalTone      =>1,keypressSignal  =>1},                                  
-  keyMatic          =>{signal          =>1,signalTone      =>1,keypressSignal  =>1,
-			           holdTime        =>1,holdPWM         =>1,setupDir        =>1,setupPosition   =>1,
-			           angelOpen       =>1,angelMax        =>1,angelLocked     =>1,
-			           ledFlashUnlocked=>1,ledFlashLocked  =>1,
-                       CtValLo         =>1,CtValHi         =>1,
-                       CtOn            =>1,CtOff           =>1,
-                       KeyJtOn         =>1,KeyJtOff        =>1,
-					   OnTime          =>1
-			           },
-  motionDetector    =>{evtFltrPeriod   =>1,evtFltrNum      =>1,minInterval     =>1,
-			           captInInterval  =>1,brightFilter    =>1,ledOnTime       =>1,
-					   peerNeedsBurst  =>1
-			           },
-  threeStateSensor  =>{cyclicInfoMsg   =>1,                    transmDevTryMax =>1,
-					                                           transmitTryMax  =>1,
-                       peerNeedsBurst  =>1,expectAES       =>1
-					   },
-  sensRain          =>{transmDevTryMax =>1,localResDis     =>1},
-  tipTronic         =>{cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,localResDis     =>1,RS485IdleTime   =>1},
-  powerMeter        =>{intKeyVisib     =>1},
-  
+  swi                 =>{ peerNeedsBurst  =>1,expectAES       =>1},
+  remote              =>{ peerNeedsBurst  =>1,expectAES       =>1,dblPress        =>1,longPress       =>1
+					     ,sign            =>1
+                        },
+  blindActuator       =>{ intKeyVisib     =>1
+                         ,driveUp         =>1,driveDown       =>1,driveTurn       =>1,refRunCounter   =>1
+                         ,sign            =>1
+                         ,MaxTimeF        =>1
+                         ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
+  	   		             ,OffLevel        =>1,OnLevel         =>1
+                         ,ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1,DriveMode       =>1
+				         ,BlJtOn          =>1,BlJtOff         =>1,BlJtDlyOn       =>1,BlJtDlyOff      =>1
+                         ,BlJtRampOn      =>1,BlJtRampOff     =>1,BlJtRefOn       =>1,BlJtRefOff      =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1,CtRefOn         =>1
+				         ,CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,CtRefOff        =>1
+				         ,lgMultiExec     =>1
+				        },
+  dimmer              =>{ intKeyVisib     =>1
+                         ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction   =>1
+                         ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
+                         ,OffDlyBlink     =>1,OnLvlPrio       =>1,OnDlyMode       =>1
+		                 ,ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1
+		                 ,OffLevel        =>1,OnMinLevel      =>1,OnLevel         =>1
+                         ,RampSstep       =>1,RampOnTime      =>1,RampOffTime     =>1
+		                 ,DimMinLvl       =>1,DimMaxLvl       =>1,DimStep         =>1
+                         ,DimJtOn         =>1,DimJtOff        =>1,DimJtDlyOn      =>1
+                         ,DimJtDlyOff     =>1,DimJtRampOn     =>1,DimJtRampOff    =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1
+                         ,CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1
+		                 ,OffDlyNewTime   =>1,OffDlyOldTime   =>1
+		                 ,lgMultiExec     =>1
+		                },
+  switch              =>{ intKeyVisib     =>1,sign            =>1
+                         ,OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1
+                         ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1
+		                 ,ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1
+ 		                 ,lgMultiExec     =>1
+		                },
+  winMatic            =>{ signal          =>1,signalTone      =>1,keypressSignal  =>1},                                  
+  keyMatic            =>{ signal          =>1,signalTone      =>1,keypressSignal  =>1
+			             ,holdTime        =>1,holdPWM         =>1,setupDir        =>1,setupPosition   =>1
+			             ,angelOpen       =>1,angelMax        =>1,angelLocked     =>1
+			             ,ledFlashUnlocked=>1,ledFlashLocked  =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,CtOn            =>1,CtOff           =>1
+                         ,KeyJtOn         =>1,KeyJtOff        =>1
+					     ,OnTime          =>1
+			            },
+  motionDetector      =>{ evtFltrPeriod   =>1,evtFltrNum      =>1,minInterval     =>1
+			             ,captInInterval  =>1,brightFilter    =>1,ledOnTime       =>1
+					     ,peerNeedsBurst  =>1
+			            },
+  threeStateSensor    =>{ cyclicInfoMsg   =>1,                    transmDevTryMax =>1
+					     ,                                        transmitTryMax  =>1
+                         ,peerNeedsBurst  =>1,expectAES       =>1
+					    },
+  sensRain            =>{ transmDevTryMax =>1,localResDis     =>1},
+  tipTronic           =>{ cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,localResDis     =>1,RS485IdleTime   =>1},
+  powerMeter          =>{ intKeyVisib     =>1},
+                          
 );
 #clones - - - - - - - - - - - - - - -   
 $culHmRegType{pushButton}     = $culHmRegType{remote};
 
 my %culHmRegModel = (
-  "HM-RC-12"        =>{backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1},
-  "HM-RC-19"        =>{backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1,backAtCharge    =>1,language =>1},
-  "HM-RC-4-2"       =>{localResDis     =>1},
+  "HM-RC-12"          =>{ backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1},
+  "HM-RC-19"          =>{ backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1,backAtCharge    =>1,language =>1
+                         ,lcdSymb         =>1, lcdLvlInterp   =>1
+                        },
+  "HM-RC-4-2"         =>{ localResDis     =>1},
  
-  "HM-LC-Bl1PBU-FM" =>{transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,localResDis     =>1},
+  "HM-LC-Bl1PBU-FM"   =>{ transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,localResDis     =>1},
 
-  "HM-LC-Dim1L-Pl"  =>{confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib	   =>1
-                      },
-  "HM-LC-Dim1L-CV-2"=>{confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib	   =>1,
-		               logicCombination=>1,
-		               DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1,
-		               DimElsActionType=>1,
-		               DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1,
-		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1	
-                      },
-  "HM-LC-Dim1PWM-CV"=>{confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,
-		               characteristic  =>1,localResDis     =>1,
-					   logicCombination=>1,
-		               DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1,
-		               DimElsActionType=>1,
-		               DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1,
-		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1	
-                      },
-  "HM-LC-Dim1T-Pl"  =>{confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,
-                       fuseDelay	   =>1
-                      },
-  "HM-LC-Dim1TPBU-FM"=>{                   ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,
-                       fuseDelay	   =>1,localResDis     =>1,
-		               logicCombination=>1,
-		               DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1,
-		               DimElsActionType=>1,
-		               DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1,
-		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1	
-                      },
+  "HM-LC-Dim1L-Pl"    =>{ confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib	   =>1},
+  "HM-LC-Dim1L-CV-2"  =>{ confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib	   =>1
+		                 ,logicCombination=>1
+		                 ,DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1
+		                 ,DimElsActionType=>1
+		                 ,DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1
+		                 ,DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1	
+                        },
+  "HM-LC-Dim1PWM-CV"  =>{ confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
+		                 ,characteristic  =>1,localResDis     =>1
+					     ,logicCombination=>1
+		                 ,DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1
+		                 ,DimElsActionType=>1
+		                 ,DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1
+		                 ,DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1	
+                        },
+  "HM-LC-Dim1T-Pl"    =>{ confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
+                         ,fuseDelay	      =>1
+                       },
+  "HM-LC-Dim1TPBU-FM" =>{                     ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
+                         ,fuseDelay	      =>1,localResDis     =>1
+		                 ,logicCombination=>1
+		                 ,DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1
+		                 ,DimElsActionType=>1
+		                 ,DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1
+		                 ,DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1	
+                        },
 
-  "HM-CC-VD"        =>{valveOffset     =>1,valveErrorPos   =>1},
-  "HM-CC-TC"        =>{burstRx         =>1,backlOnTime     =>1,backlOnMode     =>1,btnLock         =>1},
-  "HM-CC-RT-DN"     =>{btnLock         =>1,localResDis     =>1,globalBtnLock   =>1,modusBtnLock    =>1,
-                       cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,
-                       burstRx         =>1,lowBatLimitRT   =>1,backOnTime      =>1,
-					   sign            =>1
-                      },
+  "HM-CC-VD"          =>{ valveOffset     =>1,valveErrorPos   =>1},
+  "HM-CC-TC"          =>{ burstRx         =>1,backlOnTime     =>1,backlOnMode     =>1,btnLock         =>1},
+  "HM-CC-RT-DN"       =>{ btnLock         =>1,localResDis     =>1,globalBtnLock   =>1,modusBtnLock    =>1
+                         ,cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1
+                         ,burstRx         =>1,lowBatLimitRT   =>1,backOnTime      =>1
+					     ,sign            =>1
+                        },
 					  
-  "HM-PB-4DIS-WM"   =>{peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1},
-  "HM-WDS100-C6-O"  =>{burstRx         =>1,sunThresh       =>1,stormUpThresh   =>1,stormLowThresh  =>1},
-  "KS550"           =>{stormUpThresh   =>1,stormLowThresh  =>1},
-  "HM-OU-LED16"     =>{brightness      =>1,energyOpt       =>1,localResDis     =>1},
-  "HM-OU-CFM-PL"    =>{localResetDis   =>1,
-  			           OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1,
-			           OnTimeMode      =>1,OffTimeMode     =>1, 
-                       SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
-                       CtValLo         =>1,CtValHi         =>1,
-                       CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1,
-			           ActionType      =>1,ActNum          =>1,lgMultiExec     =>1},
-  "HM-OU-CF-PL"     =>{ActTypeOuCf     =>1,ActNum          =>1},
-  "HM-OU-CM-PCB"    =>{localResetDis   =>1,
-  			           OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1,
-			           OnTimeMode      =>1,OffTimeMode     =>1, 
-                       SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
-                       CtValLo         =>1,CtValHi         =>1,
-                       CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1,
-			           ActionType      =>1,
-					   ActTypeMp3      =>1,ActNum          =>1,Intense         =>1,lgMultiExec     =>1},
-  "HM-SEC-MDIR"     =>{                    sabotageMsg     =>1},
-  "HM-CC-SCD"       =>{peerNeedsBurst  =>1,expectAES       =>1,
-                                                               transmitTryMax  =>1,evtFltrTime     =>1,
-                       msgScdPosA      =>1,msgScdPosB      =>1,msgScdPosC      =>1,msgScdPosD      =>1},
-  "HM-SEC-RHS"      =>{msgRhsPosA      =>1,msgRhsPosB      =>1,msgRhsPosC      =>1,
-                                           ledOnTime       =>1,eventDlyTime    =>1},
-  "HM-SEC-SC"       =>{                    sabotageMsg     =>1,
-                       msgScPosA       =>1,msgScPosB       =>1,
-					                       ledOnTime       =>1,eventDlyTime    =>1},
-  "HM-SCI-3-FM"     =>{msgScPosA       =>1,msgScPosB       =>1,
-					                                           eventDlyTime    =>1},
-  "HM-SEC-TIS"      =>{                    sabotageMsg     =>1,
-                       msgScPosA       =>1,msgScPosB       =>1,
-					                       ledOnTime       =>1,eventFilterTime =>1},
-  "HM-SEC-WDS"      =>{msgWdsPosA      =>1,msgWdsPosB      =>1,msgWdsPosC      =>1,
-					                                           eventFilterTimeB=>1},
-  "HM-SEC-SFA-SM"   =>{cyclicInfoMsg   =>1,sabotageMsg     =>1,transmDevTryMax =>1,
-                       lowBatLimit     =>1,batDefectLimit  =>1,
-                                                               transmitTryMax  =>1},
-  "HM-Dis-TD-T"     =>{lowBatLimitFS   =>1,ledMode         =>1},
-  "HM-LC-SW1-BA-PCB"=>{lowBatLimitBA   =>1,ledMode         =>1},
-  "HM-Sys-sRP-Pl"   =>{compMode        =>1},
-  "KFM-Display"     =>{CtDlyOn         =>1,CtDlyOff        =>1,
-                       CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1,
-                       CtValLo         =>1,CtValHi         =>1,
-                       ActionType      =>1,OffTimeMode     =>1,OnTimeMode      =>1,
-                       DimJtOn         =>1,DimJtOff        =>1,DimJtDlyOn      =>1,DimJtDlyOff     =>1,
-                       DimJtRampOn     =>1,DimJtRampOff    =>1,
-                       lgMultiExec     =>1
-					   },
-  "HM-Sen-Wa-Od"    =>{cyclicInfoMsgDis=>1,                    transmDevTryMax =>1,localResDis     =>1,
-                                           ledOnTime       =>1,transmitTryMax  =>1,
-                       waterUppThr     =>1,waterlowThr     =>1,caseDesign      =>1,caseHigh        =>1,
-                       fillLevel       =>1,caseWidth       =>1,caseLength      =>1,meaLength       =>1,
-                       useCustom       =>1,					   
-                       fillLvlUpThr    =>1,fillLvlLoThr    =>1,
-                       expectAES       =>1,peerNeedsBurst  =>1},
-  "HM-WDS10-TH-O"   =>{burstRx         =>1},
-  "HM-WDS30-OT2-SM" =>{burstRx         =>1,cyclicInfoMsgDis=>1,localResDis     =>1,paramSel        =>1},
-  "HM-TC-IT-WM-W-EU"=>{burstRx         =>1,cyclicInfoMsgDis=>1,localResDis     =>1,cyclicInfoMsg   =>1,
-                       btnLock         =>1,globalBtnLock   =>1,modusBtnLock    =>1,lowBatLimitRT   =>1,
-					   },
-  "HM-ES-PMSw1-Pl"  =>{localResDis     =>1,},
-
+  "HM-PB-4DIS-WM"     =>{ peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1},
+  "HM-WDS100-C6-O"    =>{ burstRx         =>1,sunThresh       =>1,stormUpThresh   =>1,stormLowThresh  =>1},
+  "KS550"             =>{ stormUpThresh   =>1,stormLowThresh  =>1},
+  "HM-OU-LED16"       =>{ brightness      =>1,energyOpt       =>1,localResDis     =>1},
+  "HM-OU-CFM-PL"      =>{ localResetDis   =>1
+  			             ,OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1
+			             ,OnTimeMode      =>1,OffTimeMode     =>1,
+                         ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1
+			             ,ActionType      =>1,ActNum          =>1,lgMultiExec     =>1},
+  "HM-OU-CF-PL"       =>{ ActTypeOuCf     =>1,ActNum          =>1},
+  "HM-OU-CM-PCB"      =>{ localResetDis   =>1,
+  			             ,OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1
+			             ,OnTimeMode      =>1,OffTimeMode     =>1,
+                         ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1
+			             ,ActionType      =>1
+					     ,ActTypeMp3      =>1,ActNum          =>1,Intense         =>1,lgMultiExec     =>1},
+  "HM-SEC-MDIR"       =>{                     sabotageMsg     =>1},
+  "HM-CC-SCD"         =>{ peerNeedsBurst  =>1,expectAES       =>1
+                         ,                                        transmitTryMax  =>1,evtFltrTime     =>1
+                         ,msgScdPosA      =>1,msgScdPosB      =>1,msgScdPosC      =>1,msgScdPosD      =>1},
+  "HM-SEC-RHS"        =>{ msgRhsPosA      =>1,msgRhsPosB      =>1,msgRhsPosC      =>1
+                         ,                    ledOnTime       =>1,eventDlyTime    =>1},
+  "HM-SEC-SC"         =>{                     sabotageMsg     =>1
+                         ,msgScPosA       =>1,msgScPosB       =>1
+					     ,                    ledOnTime       =>1,eventDlyTime    =>1},
+  "HM-SCI-3-FM"       =>{ msgScPosA       =>1,msgScPosB       =>1
+					     ,                                        eventDlyTime    =>1},
+  "HM-SEC-TIS"        =>{                     sabotageMsg     =>1
+                         ,msgScPosA       =>1,msgScPosB       =>1
+					     ,                    ledOnTime       =>1,eventFilterTime =>1},
+  "HM-SEC-WDS"        =>{ msgWdsPosA      =>1,msgWdsPosB      =>1,msgWdsPosC      =>1
+					     ,                                        eventFilterTimeB=>1},
+  "HM-SEC-SFA-SM"     =>{ cyclicInfoMsg   =>1,sabotageMsg     =>1,transmDevTryMax =>1
+                         ,lowBatLimit     =>1,batDefectLimit  =>1
+                         ,                                        transmitTryMax  =>1},
+  "HM-Dis-TD-T"       =>{ lowBatLimitFS   =>1,ledMode         =>1},
+  "HM-LC-SW1-BA-PCB"  =>{ lowBatLimitBA   =>1,ledMode         =>1},
+  "HM-Sys-sRP-Pl"     =>{ compMode        =>1},
+  "KFM-Display"       =>{ CtDlyOn         =>1,CtDlyOff        =>1
+                         ,CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,ActionType      =>1,OffTimeMode     =>1,OnTimeMode      =>1
+                         ,DimJtOn         =>1,DimJtOff        =>1,DimJtDlyOn      =>1,DimJtDlyOff     =>1
+                         ,DimJtRampOn     =>1,DimJtRampOff    =>1
+                         ,lgMultiExec     =>1
+					      },
+  "HM-Sen-Wa-Od"      =>{ cyclicInfoMsgDis=>1,                    transmDevTryMax =>1,localResDis     =>1
+                         ,                    ledOnTime       =>1,transmitTryMax  =>1
+                         ,waterUppThr     =>1,waterlowThr     =>1,caseDesign      =>1,caseHigh        =>1
+                         ,fillLevel       =>1,caseWidth       =>1,caseLength      =>1,meaLength       =>1
+                         ,useCustom       =>1,				   
+                         ,fillLvlUpThr    =>1,fillLvlLoThr    =>1
+                         ,expectAES       =>1,peerNeedsBurst  =>1},
+  "HM-WDS10-TH-O"     =>{ burstRx         =>1},
+  "HM-WDS30-OT2-SM"   =>{ burstRx         =>1,cyclicInfoMsgDis=>1,localResDis     =>1,paramSel        =>1},
+  "HM-TC-IT-WM-W-EU"  =>{ burstRx         =>1,cyclicInfoMsgDis=>1,localResDis     =>1,cyclicInfoMsg   =>1
+                         ,btnLock         =>1,globalBtnLock   =>1,modusBtnLock    =>1,lowBatLimitRT   =>1
+					    },
+  "HM-ES-PMSw1-Pl"    =>{ localResDis     =>1},
   );
 
 #clones - - - - - - - - - - - - - - -   
@@ -882,7 +883,6 @@ my %culHmRegChan = (# if channelspecific then enter them here
   "HM-CC-TC03"        =>{ tempWinOpen     =>1 }, #window channel
   "HM-RC-1912"        =>{ msgShowTime     =>1, beepAtAlarm    =>1, beepAtService  =>1,beepAtInfo  =>1
                          ,backlAtAlarm    =>1, backlAtService =>1, backlAtInfo    =>1
-                         ,lcdSymb         =>1, lcdLvlInterp   =>1
 						 },
   "HM-OU-CFM-PL01"    =>{ ActTypeLed      =>1},
   "HM-OU-CFM-PL02"    =>{ ActTypeMp3      =>1,Intense         =>1},
@@ -1027,15 +1027,15 @@ my %culHmSubTypeDevSets = (# device of this subtype
   blindActuator    =>{ statusRequest => "", 
                        getSerial     => ""},
 #  remote           =>{ },
-  threeStateSensor =>{ statusRequest =>""},
+#  threeStateSensor =>{ statusRequest =>""},
 #  THSensor         =>{ statusRequest =>""}, at least OT/OT2 do not support this 
 #  virtual          =>{ },
-#  smokeDetector    =>{ statusRequest => ""},
+#  smokeDetector    =>{ statusRequest => ""},#not SCD
   winMatic         =>{ statusRequest => ""},
   keyMatic         =>{ statusRequest => ""},
   repeater         =>{ statusRequest => "",
                        getSerial     => ""},
-  outputUnit       =>{ statusRequest => ""},
+  outputUnit       =>{ statusRequest => ""},# also LED16? proof
 );
 
 my %culHmGlobalSetsChn = (# all channels but virtuals
@@ -1075,17 +1075,18 @@ my %culHmSubTypeSets = (# channels of this subtype
 					  ,statusRequest =>""},
   remote           =>{ peerChan      =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"},
   threeStateSensor =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
-					  ,statusRequest =>""},
+#					  ,statusRequest =>""
+					  },
   THSensor         =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
   virtual          =>{ peerChan      =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"
 		              ,press         =>"[long|short]..."
                       ,postEvent     =>"<condition>"
-                      ,valvePos      =>"<position>"},#acting as TC
+#                      ,valvePos      =>"<position>"
+					  },#acting as TC
   smokeDetector    =>{ test          =>""
                       ,alarmOn       =>""
 					  ,alarmOff      =>""
-		              ,peerChan      =>"<btnNumber> <actChn> ... single [set|unset] actor"
-					  ,statusRequest =>""},
+		              ,peerChan      =>"<btnNumber> <actChn> ... single [set|unset] actor"},
   winMatic         =>{ matic         =>"<btn>"
                       ,keydef        =>"<btn> <txt1> <txt2>"
                       ,create        =>"<txt>"
@@ -1109,6 +1110,7 @@ $culHmSubTypeSets{sensor}          = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{KFM100}          = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{blindActuatorSol}= $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{tipTronic}       = $culHmSubTypeSets{outputUnit};
+$culHmSubTypeSets{powerMeter}      = $culHmSubTypeSets{outputUnit};
 
 $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
 
@@ -1131,6 +1133,7 @@ my %culHmModelSets = (# channels of this subtype-------------
 					  ,inhibit        =>"[on|off]"},
   "HM-CC-TC"       =>{ burstXmit      =>""},
   "HM-CC-RT-DN"    =>{ burstXmit      =>""},
+  "HM-CC-RT-DN-BoM"=>{ statusRequest  =>""},
 );
 # clones- - - - - - - - - - - - - - - - - 
 $culHmModelSets{"HM-RC-19-B"}  = $culHmModelSets{"HM-RC-19"};
