@@ -36,17 +36,21 @@ Ext.application({
             success: function(response){
                 Ext.getBody().unmask();
                 FHEM.info = Ext.decode(response.responseText);
-                
                 FHEM.version = FHEM.info.Results[0].devices[0].ATTR.version;
-                
+                FHEM.dblogDevices = [];
                 Ext.each(FHEM.info.Results, function(result) {
                     //TODO: get more specific here...
                     if (result.list === "DbLog" && result.devices[0].NAME) {
                         FHEM.dblogname = result.devices[0].NAME;
+                        Ext.each(result.devices, function(dblogdev) {
+                            FHEM.dblogDevices.push({"DEVICE": dblogdev.REGEXP});
+                        });
                     }
                 });
                 if (!FHEM.dblogname && Ext.isEmpty(FHEM.dblogname) && FHEM.dblogname != "undefined") {
                     Ext.Msg.alert("Error", "Could not find a DbLog Configuration. Do you have DbLog already running?");
+                } else if (FHEM.dblogDevices.length === 0) {
+                    Ext.Msg.alert("Error", "Could not find any DbLog-FHEM-devices, do you have setup DbLog correctly?");
                 } else {
                     Ext.create("FHEM.view.Viewport", {
                         hidden: true
