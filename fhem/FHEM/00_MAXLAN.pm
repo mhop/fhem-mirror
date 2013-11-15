@@ -571,8 +571,8 @@ MAXLAN_Parse($$)
       $minsetpointtemp = MAXLAN_ExtractTemperature($minsetpointtemp);
       $windowopentemp  = MAXLAN_ExtractTemperature($windowopentemp);
       $windowopendur   *= 5;
-      $maxvalvesetting = int($maxvalvesetting*100/255);
-      $valveoffset     = int($valveoffset*100/255);
+      $maxvalvesetting = int($maxvalvesetting*100/255 + 0.5); # + 0.5 for correct rounding
+      $valveoffset     = int($valveoffset*100/255 + 0.5); # + 0.5 for correct rounding
       my $decalcDay    = ($decalcifiction >> 5) & 0x07;
       my $decalcTime   = $decalcifiction & 0x1F;
       Log $ll5, "comfortemp $comforttemp, ecotemp $ecotemp, boostValve $boostValve, boostDuration $boostDuration, tempoffset $tempoffset, minsetpointtemp $minsetpointtemp, maxsetpointtemp $maxsetpointtemp, windowopentemp $windowopentemp, windowopendur $windowopendur";
