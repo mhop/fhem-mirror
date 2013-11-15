@@ -631,12 +631,11 @@ MAXLAN_Parse($$)
       my $unkbit1 = vec($bits1,0,1);
       my $initialized = vec($bits1,1,1); #I never saw this beeing 0
       my $answer = vec($bits1,2,1); #answer to what?
-      my $rferror1 = vec($bits1,3,1); # if 1 then see errframetype
+      my $error = vec($bits1,3,1); # if 1 then see errframetype
       my $valid = vec($bits1,4,1); #is the status following the common header valid
-      my $unkbit2 = vec($bits1,5,1);
-      my $unkbit3 = vec($bits1,6,2);
+      my $unkbit2 = vec($bits1,5,3);
   
-      Log 5, "len $len, addr $addr, initialized $initialized, valid $valid, rferror $rferror1, errframetype $errframetype, answer $answer, unkbit ($unkbit1,$unkbit2,$unkbit3)";
+      Log 5, "len $len, addr $addr, initialized $initialized, valid $valid, error $error, errframetype $errframetype, answer $answer, unkbit ($unkbit1,$unkbit2)";
 
       my $payload = unpack("H*",substr($bindata,6,$len-6+1)); #+1 because the len field is not counted
       if($valid) {
@@ -658,6 +657,18 @@ MAXLAN_Parse($$)
       } else {
         Dispatch($hash, "MAX,1,Error,$addr,Error $errframetype in Msg type L", {});
       }
+
+      my $dhash = $modules{MAX}{defptr}{$addr};
+      if(defined($dhash)) {
+        readingsBeginUpdate($dhash);
+        readingsBulkUpdate($dhash, "MAXLAN_initialized", $initialized);
+        readingsBulkUpdate($dhash, "MAXLAN_error", $error);
+        readingsBulkUpdate($dhash, "MAXLAN_errorType", $errframetype);
+        readingsBulkUpdate($dhash, "MAXLAN_valid", $valid);
+        readingsBulkUpdate($dhash, "MAXLAN_isAnswer", $answer);
+        readingsEndUpdate($dhash, 1);
+      }
+
       $bindata=substr($bindata,$len+1); #+1 because the len field is not counted
     } # while(length($bindata))
 
