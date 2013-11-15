@@ -329,7 +329,7 @@ CUL_MAX_Parse($$)
         my $dhash = CUL_MAX_DeviceHash($src);
         if(defined($dhash)) {
           readingsBeginUpdate($dhash);
-          readingsBulkUpdate($dhash, "firmware", $firmware);
+          readingsBulkUpdate($dhash, "firmware", sprintf("%u.%u",int($firmware/16),$firmware%16));
           readingsBulkUpdate($dhash, "testresult", $testresult);
           readingsEndUpdate($dhash, 1);
         }

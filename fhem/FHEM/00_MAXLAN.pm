@@ -545,7 +545,7 @@ MAXLAN_Parse($$)
     my $dhash = $modules{MAX}{defptr}{$addr};
     if(defined($dhash)) {
       readingsBeginUpdate($dhash);
-      readingsBulkUpdate($dhash, "firmware", $firmware);
+      readingsBulkUpdate($dhash, "firmware", sprintf("%u.%u",int($firmware/16),$firmware%16));
       readingsBulkUpdate($dhash, "testresult", $testresult);
       readingsEndUpdate($dhash, 1);
     }
