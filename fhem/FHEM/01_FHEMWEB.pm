@@ -1110,12 +1110,14 @@ FW_showRoom()
   # attribute)
   my @devs= grep { ($FW_rooms{$FW_room}{$_}||$FW_room eq "all") &&
                       !IsIgnored($_) } keys %defs;
-  my (%group, @atEnds);
+  my (%group, @atEnds, %usuallyAtEnd);
   foreach my $dev (@devs) {
-    if($modules{$defs{$dev}{TYPE}}{FW_atPageEnd} &&
-       !AttrVal($dev, "group", undef)) {
-      push @atEnds, $dev;
-      next;
+    if($modules{$defs{$dev}{TYPE}}{FW_atPageEnd}) {
+      $usuallyAtEnd{$dev} = 1;
+      if(!AttrVal($dev, "group", undef)) {
+        push @atEnds, $dev;
+        next;
+      }
     }
     foreach my $grp (split(",", AttrVal($dev, "group", $FW_types{$dev}))) {
       next if($FW_hiddengroup{$grp}); 
@@ -1156,13 +1158,14 @@ FW_showRoom()
         if($FW_hiddenroom{detail}) {
           FW_pO "<td><div class=\"col1\">$icon$devName</div></td>";
         } else {
-          FW_pH "detail=$d", "$icon$devName", 1, "col1";
+          FW_pH "detail=$d", "$icon$devName", 1, "col1" if(!$usuallyAtEnd{$d});
         }
         $row++;
 
         my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
 
-        FW_pO "<td informId=\"$d\">$txt</td>";
+        my $colSpan = ($usuallyAtEnd{$d} ? ' colspan="2"' : '');
+        FW_pO "<td informId=\"$d\"$colSpan>$txt</td>";
 
         ######
         # Commands, slider, dropdown
