@@ -627,15 +627,17 @@ MAXLAN_Parse($$)
     $bindata  = decode_base64($args[0]) if(@args > 0);
     #The L command consists of blocks of states (one for each device)
     while(length($bindata)){
-      my ($len,$addr,$errframetype,$bits1) = unpack("CH6Ca",$bindata);
+      my ($len,$addr,$errCmd,$bits1) = unpack("CH6H2a",$bindata);
+      $errCmd = uc($errCmd);
       my $unkbit1 = vec($bits1,0,1);
       my $initialized = vec($bits1,1,1); #I never saw this beeing 0
       my $answer = vec($bits1,2,1); #answer to what?
       my $error = vec($bits1,3,1); # if 1 then see errframetype
       my $valid = vec($bits1,4,1); #is the status following the common header valid
-      my $unkbit2 = vec($bits1,5,3);
+      my $unkbit2 = vec($bits1,5,2);
+      my $unkbit3 = vec($bits1,7,1);
   
-      Log 5, "len $len, addr $addr, initialized $initialized, valid $valid, error $error, errframetype $errframetype, answer $answer, unkbit ($unkbit1,$unkbit2)";
+      Log 5, "len $len, addr $addr, initialized $initialized, valid $valid, error $error, errCmd $errCmd, answer $answer, unkbit ($unkbit1,$unkbit2,$unkbit3)";
 
       my $payload = unpack("H*",substr($bindata,6,$len-6+1)); #+1 because the len field is not counted
       if($valid) {
@@ -654,8 +656,6 @@ MAXLAN_Parse($$)
         }else{
           Log 2, "MAXLAN_Parse: Got status for unimplemented device type $shash->{type}";
         }
-      } else {
-        Dispatch($hash, "MAX,1,Error,$addr,Error $errframetype in Msg type L", {});
       }
 
       my $dhash = $modules{MAX}{defptr}{$addr};
@@ -663,7 +663,7 @@ MAXLAN_Parse($$)
         readingsBeginUpdate($dhash);
         readingsBulkUpdate($dhash, "MAXLAN_initialized", $initialized);
         readingsBulkUpdate($dhash, "MAXLAN_error", $error);
-        readingsBulkUpdate($dhash, "MAXLAN_errorType", $errframetype);
+        readingsBulkUpdate($dhash, "MAXLAN_errorInCommand", $error ? (exists($msgId2Cmd{$errCmd}) ? $msgId2Cmd{$errCmd} : $errCmd) : "");
         readingsBulkUpdate($dhash, "MAXLAN_valid", $valid);
         readingsBulkUpdate($dhash, "MAXLAN_isAnswer", $answer);
         readingsEndUpdate($dhash, 1);
