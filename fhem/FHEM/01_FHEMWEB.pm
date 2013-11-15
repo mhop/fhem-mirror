@@ -138,9 +138,9 @@ FHEMWEB_Initialize($)
     refresh
     reverseLogs:0,1
     roomIcons
-    smallscreen:deprecated
+    smallscreen:unused
     stylesheetPrefix
-    touchpad:deprecated
+    touchpad:unused
     webname
   );
   use warnings 'qw';
@@ -2030,8 +2030,8 @@ FW_devState($$@)
   my $state = $defs{$d}{STATE};
   $state = "" if(!defined($state));
 
-  $hasOnOff = ($allSets =~ m/(^| )on( |$)/ &&
-               $allSets =~ m/(^| )off( |$)/);
+  $hasOnOff = ($allSets =~ m/(^| )on(:[^ ]*)?( |$)/ &&
+               $allSets =~ m/(^| )off(:[^ ]*)?( |$)/);
   my $txt = $state;
   if(defined(AttrVal($d, "showtime", undef))) {
     my $v = $defs{$d}{READINGS}{state}{TIME};
