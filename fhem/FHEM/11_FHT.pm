@@ -189,6 +189,8 @@ FHT_Initialize($)
                        "showtime:1,0 retrycount " .
                        "minfhtbuffer lazy tmpcorr ignore:1,0 ".
                        $readingFnAttributes;
+  $hash->{AutoCreate}=
+           { "FHT.*" => { GPLOT => "fht:Temp/Act,", FILTER => "%NAME" } };
 }
 
 

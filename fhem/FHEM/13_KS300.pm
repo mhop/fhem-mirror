@@ -22,6 +22,11 @@ KS300_Initialize($)
   $hash->{ParseFn}   = "KS300_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:ks300 ".
                         "rainadjustment:0,1 ignore:0,1";
+  $hash->{AutoCreate}=
+    { "KS300.*" => {
+         GPLOT => "temp4rain10:Temp/Rain,hum6wind8:Wind/Hum,",
+         FILTER => "%NAME:T:.*" } };
+
 }
 
 #####################################

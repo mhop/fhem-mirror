@@ -28,6 +28,8 @@ CUL_WS_Initialize($)
   $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 ".
                        "model:S300TH,KS300,ASH2200 ignore:0,1 ".
                        $readingFnAttributes;
+  $hash->{AutoCreate}=
+    { "CUL_WS.*" => { GPLOT => "temp4hum6:Temp/Hum,",  FILTER=>"%NAME:T:.*" } };
 }
 
 

@@ -43,6 +43,11 @@ FBDECT_Initialize($)
     "IODev do_not_notify:1,0 ignore:1,0 dummy:1,0 showtime:1,0 ".
     "$readingFnAttributes " .
     "model:".join(",", sort @fbdect_models);
+  $hash->{AutoCreate}= 
+        { "FBDECT.*" => { 
+             GPLOT => "power4:Power,",
+             FILTER => "%NAME:power\\x3a.*",
+             ATTR => "event-min-interval:power:120" } };
 }
 
 
