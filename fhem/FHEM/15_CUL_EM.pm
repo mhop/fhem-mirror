@@ -24,6 +24,8 @@ CUL_EM_Initialize($)
   $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 " .
                         "model:EMEM,EMWZ,EMGZ ignore:0,1 ".
                         $readingFnAttributes;
+  $hash->{AutoCreate}=
+        { "CUL_EM.*" => { GPLOT => "power8:Power,", FILTER => "%NAME:CNT.*" } };
 }
 
 #####################################

@@ -19,6 +19,8 @@ CUL_TX_Initialize($)
   $hash->{ParseFn}   = "CUL_TX_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 " .
                         $readingFnAttributes;
+  $hash->{AutoCreate}=
+        { "CUL_TX.*" => { GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME" } };
 }
 
 #############################

@@ -115,6 +115,8 @@ CUL_FHTTK_Initialize($)
   $hash->{ParseFn}   = "CUL_FHTTK_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:0,1 " .
                         "model:FHT80TF loglevel:0,1,2,3,4,5,6";
+  $hash->{AutoCreate}=
+     { "CUL_FHTTK.*" => { GPLOT => "fht80tf:Window,", FILTER => "%NAME" } };
 }
 
 

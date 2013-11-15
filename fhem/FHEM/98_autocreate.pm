@@ -12,22 +12,6 @@ use warnings;
 # - check "UNDEFINED" parameters for BS/USF1000/X10
 
 my %flogpar = (
-  "CUL_EM.*"
-      => { GPLOT => "power8:Power,", FILTER => "%NAME:CNT.*" },
-  "CUL_WS.*"
-      => { GPLOT => "temp4hum6:Temp/Hum,",  FILTER => "%NAME:T:.*" },
-  "CUL_FHTTK.*"
-      => { GPLOT => "fht80tf:Window,", FILTER => "%NAME" },
-  "FHT.*"
-      => { GPLOT => "fht:Temp/Act,", FILTER => "%NAME" },
-  "HMS100TFK_.*"
-      => { GPLOT => "fht80tf:Contact,", FILTER => "%NAME" },
-  "HMS100T[F]?_.*"
-      => { GPLOT => "temp4hum6:Temp/Hum,", FILTER => "%NAME:T:.*" },
-  "KS300.*"
-      => { GPLOT => "temp4rain10:Temp/Rain,hum6wind8:Wind/Hum,",
-           FILTER => "%NAME:T:.*" },
-
   # Oregon sensors: 
   # * temperature
   "(THR128|THWR288A|THN132N|THGR132N).*"
@@ -72,14 +56,6 @@ my %flogpar = (
            FILTER => "%NAME:T:.*" },
   "CUL_HM_HM-CC-TC.*"
       => { GPLOT => "temp4hum6:Temp/Hum,", FILTER => "%NAME:T:.*" },
-
-  # Lacrosse TX
-  "CUL_TX.*"
-      => { GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME" },
-
-  "FBDECT.*"
-      => { GPLOT => "power4:Power,", FILTER => "%NAME:power\\x3a.*",
-           ATTR => "event-min-interval:power:120" },
 );
 
 # Do not create FileLog for the following devices.
@@ -181,26 +157,32 @@ autocreate_Notify($$)
 
       ####################
       my $fl = replace_wildcards($hash, AttrVal($me, "filelog", ""));
-      next if(!$fl);
       my $flname = "FileLog_$name";
-      delete($defs{$flname});   # If we are re-creating it with createlog.
+      delete($defs{$flname}) if($fl); # If we are re-creating it with createlog.
       my ($gplot, $filter, $devattr) = ("", $name, "");
-      foreach my $k (keys %flogpar) {
+
+      my $fp = $modules{$hash->{TYPE}}{AutoCreate};
+      $fp = \%flogpar if(!$fp);
+      
+      foreach my $k (keys %{$fp}) {
         next if($name  !~ m/^$k$/);
-        $gplot = $flogpar{$k}{GPLOT};
-        $filter = replace_wildcards($hash, $flogpar{$k}{FILTER});
-        $devattr = $flogpar{$k}{ATTR};
+        $gplot = $fp->{$k}{GPLOT};
+        $filter = replace_wildcards($hash, $fp->{$k}{FILTER});
+        $devattr = $fp->{$k}{ATTR};
         last;
       }
-      $cmd = "$flname FileLog $fl $filter";
-      Log3 $me, 2, "autocreate: define $cmd";
-      $ret = CommandDefine(undef, $cmd);
-      if($ret) {
-        Log3 $me, 1, "ERROR: $ret";
-        last;
+
+      if($fl) {
+        $cmd = "$flname FileLog $fl $filter";
+        Log3 $me, 2, "autocreate: define $cmd";
+        $ret = CommandDefine(undef, $cmd);
+        if($ret) {
+          Log3 $me, 1, "ERROR: $ret";
+          last;
+        }
+        $attr{$flname}{room} = $room if($room);
+        $attr{$flname}{logtype} = "${gplot}text";
       }
-      $attr{$flname}{room} = $room if($room);
-      $attr{$flname}{logtype} = "${gplot}text";
       if($devattr) {
         foreach my $attrNV (split(" ", $devattr)) {
           my ($an, $av) = split(":", $attrNV, 2);
@@ -209,7 +191,7 @@ autocreate_Notify($$)
       }
 
       ####################
-      next if(!AttrVal($me, "weblink", 1) || !$gplot);
+      next if(!AttrVal($me, "weblink", 1) || !$gplot || !$fl);
       $room = replace_wildcards($hash, AttrVal($me, "weblink_room", "Plots"));
       my $wnr = 1;
       foreach my $wdef (split(/,/, $gplot)) {

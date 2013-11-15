@@ -39,6 +39,12 @@ HMS_Initialize($)
   $hash->{UndefFn}   = "HMS_Undef";
   $hash->{ParseFn}   = "HMS_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:hms100-t,hms100-tf,hms100-wd,hms100-mg,hms100-tfk,rm100-2,hms100-co,hms100-fit ignore:0,1 $readingFnAttributes";
+  $hash->{AutoCreate}= {
+      "HMS100TFK_.*" => 
+        { GPLOT => "fht80tf:Contact,", FILTER => "%NAME" },
+      "HMS100T[F]?_.*" =>
+        { GPLOT => "temp4hum6:Temp/Hum,", FILTER => "%NAME:T:.*" }
+  };
 }
 
 #####################################
