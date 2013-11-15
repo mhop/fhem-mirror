@@ -1032,7 +1032,7 @@ Ext.define('FHEM.controller.ChartController', {
                 axis : axisside,
                 xField : 'TIMESTAMP',
                 yField : yfield,
-                title: axis.title,
+                title: title,
                 showInLegend: true,
                 smooth: 0,
                 highlight: true,
@@ -1378,6 +1378,9 @@ Ext.define('FHEM.controller.ChartController', {
      * loading saved chart data and trigger the load of the chart
      */
     loadsavedchart: function(treeview, record) {
+        if (!record.raw.data) {
+            record.raw.data = record.raw;
+        }
         var me = this;
         if (record.raw.data && record.raw.data.TYPE && record.raw.data.TYPE === "savedchart") {
             var name = record.raw.data.NAME,
@@ -1564,7 +1567,7 @@ Ext.define('FHEM.controller.ChartController', {
                 Ext.Msg.alert("Error", "The Chart could not be loaded! RawChartdata was: <br>" + chartdata);
             }
             
-        } else if (record.raw.data.template) {
+        } else if (record.raw.data && record.raw.data.template) {
             //seems we have clicked on a template chart, resetting the form...
             me.resetFormFields();
             if (me.getChart()) {

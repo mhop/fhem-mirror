@@ -22,15 +22,11 @@ Ext.define('FHEM.view.TableDataGridPanel', {
         me.tablestore = Ext.create('FHEM.store.TableDataStore');
 
         me.devicestore = Ext.create('FHEM.store.DeviceStore', {
+            data: FHEM.dblogDevices,
             proxy: {
-                type: 'ajax',
-                noCache: false,
-                method: 'POST',
-                url: '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+getdevices&XHR=1',
+                type: 'memory',
                 reader: {
-                    type: 'json',
-                    root: 'data',
-                    totalProperty: 'totalCount'
+                    type: 'json'
                 }
             },
             autoLoad: true
