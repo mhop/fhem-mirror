@@ -2223,12 +2223,13 @@ sub CUL_HM_Set($@) {
   } 
   elsif($cmd eq "text") { ################################################# reg
     my ($bn,$l1, $l2) = ($chn,$a[2],$a[3]); # Create CONFIG_WRITE_INDEX string
-	if (!$roleC){# if used on device. 
+	if ($roleD){# if used on device. 
       return "$a[2] is not a button number" if($a[2] !~ m/^\d*$/ || $a[2] < 1);
       return "$a[3] is not on or off" if($a[3] !~ m/^(on|off)$/);
       $bn = $a[2]*2-($a[3] eq "on" ? 0 : 1);
 	  ($l1, $l2) = ($a[4],$a[5]);
-	}
+	  $chn = sprintf("%02X",$bn)
+	  }
 	else{
 	  return "to many parameter. Try set $a[0] text $a[2] $a[3]" if($a[4]);
 	}
