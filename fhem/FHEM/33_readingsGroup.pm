@@ -348,7 +348,11 @@ readingsGroup_2html($)
 
         my $value_format = lookup2($value_format,$name,$n,$v);
         next if( !defined($value_format) );
-        $v = sprintf( $value_format, $v ) if( $value_format );
+        if(  $value_format =~ m/%/ ) {
+          $v = sprintf( $value_format, $v );
+        } elsif( $value_format ) {
+          $v = $value_format;
+        }
 
         my $a = AttrVal($name, "alias", $name);
         my $m = "$a$separator$n";
@@ -491,9 +495,9 @@ readingsGroup_Notify($$)
         #foreach my $regex (@list) {
         for( my $i = 0; $i <= $#list; ++$i ) {
         my $regex = $list[$i];
-          while ($regex && $regex =~ m/^</ && $regex !~ m/>$/ && $list[++$i] ) { 
+          while ($regex && $regex =~ m/^</ && $regex !~ m/>$/ && $list[++$i] ) {
             $regex .= ",". $list[$i];
-          }  
+          }
           next if( $reading eq "state" && !$show_state && (!defined($regex) || $regex ne "state") );
           next if( $regex && $regex =~ m/^\+/ );
           next if( $regex && $regex =~ m/^\?/ );
@@ -521,21 +525,15 @@ readingsGroup_Notify($$)
 
           my $value = $value;
           if( $value_format ) {
-            my $value_format = $value_format;
-            if( ref($value_format) eq 'HASH' ) {
-              my $vf = "";
-              $vf = $value_format->{$reading} if( exists($value_format->{$reading}) );
-              $vf = $value_format->{$dev->{NAME}.".".$reading} if( exists($value_format->{$dev->{NAME}.".".$reading}) );
-              $value_format = $vf;
-              } elsif( $value_format =~ m/^{.*}$/) {
-              my $DEVICE = $dev->{NAME};
-              my $READING = $reading;
-              my $VALUE = $value;
-              $value_format = eval $value_format;
-            }
+            my $value_format = lookup2($value_format,$dev->{NAME},$reading,$value);
 
-            $value = "" if( !defined($value_format) );
-            $value = sprintf( $value_format, $value ) if( $value_format );
+            if( !defined($value_format) ) {
+              $value = "";
+            } elsif( $value_format =~ m/%/ ) {
+              $value = sprintf( $value_format, $value );
+            } elsif( $value_format ) {
+              $value = $value_format;
+            }
           }
 
           CommandTrigger( "", "$name $dev->{NAME}.$reading: $value" );
