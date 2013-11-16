@@ -133,7 +133,7 @@ sub CUL_HM_Initialize($) {
   $hash->{RenameFn}  = "CUL_HM_Rename";
   $hash->{AttrFn}    = "CUL_HM_Attr";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:1,0 dummy:1,0 ".
-                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
+                       "showtime:1,0 ".
                        "serialNr firmware ".
                        "rawToReadable unit ".#"KFM-Sensor" only
                        "peerIDs repPeers ".
@@ -545,7 +545,7 @@ sub CUL_HM_Parse($$) {##############################
 				"ID_".$md;
 	  my $sname = "CUL_HM_".$md."_$src";
 	  $sname =~ s/-/_/g;
-      Log 3, "CUL_HM Unknown device $sname, please define it";
+      Log3 undef, 3, "CUL_HM Unknown device $sname, please define it";
       return "UNDEFINED $sname CUL_HM $src $msg";
     }
    return "";
@@ -586,10 +586,10 @@ sub CUL_HM_Parse($$) {##############################
 	  my $i=0;
 	  $shash->{helper}{rpt}{ts} = gettimeofday();
       CUL_HM_SndCmd(${$ack}[$i++],${$ack}[$i++]) while ($i<@{$ack});
-      Log GetLogLevel($name,4), "CUL_HM $name dup: repeat ack, dont process";
+      Log3 $name,4,"CUL_HM $name dup: repeat ack, dont process";
 	}
 	else{
-      Log GetLogLevel($name,4), "CUL_HM $name dup: dont process";
+      Log3 $name,4,"CUL_HM $name dup: dont process";
 	}
     return $name; #return something to please dispatcher
   }
@@ -1529,7 +1529,7 @@ sub CUL_HM_Parse($$) {##############################
 	$sRptHash->{ts}  = gettimeofday();
 	my $i=0;
     CUL_HM_SndCmd($ack[$i++],$ack[$i++])while ($i<@ack);
-    Log GetLogLevel($name,6), "CUL_HM $name sent ACK:".(int(@ack));
+    Log3 $name,6,"CUL_HM $name sent ACK:".(int(@ack));
   }
 
   CUL_HM_ProcessCmdStack($shash) if ($respRemoved); # cont if complete
@@ -1668,10 +1668,10 @@ sub CUL_HM_parseCommon(@){#####################################################
 		      && $iohash->{hmPairSerial} eq $attr{$shash->{NAME}}{serialNr}))
 	   &&( $mFlg.$mTp ne "0400") ) {
 	  #-- try to pair 
-      Log GetLogLevel($shash->{NAME},3), "CUL_HM pair: $shash->{NAME} "
-	                       ."$attr{$shash->{NAME}}{subType}, "
-	                       ."model $attr{$shash->{NAME}}{model} "
-						   ."serialNr $attr{$shash->{NAME}}{serialNr}";
+      Log3 $shash,3, "CUL_HM pair: $shash->{NAME} "
+	                ."$attr{$shash->{NAME}}{subType}, "
+	                ."model $attr{$shash->{NAME}}{model} "
+					."serialNr $attr{$shash->{NAME}}{serialNr}";
 	  delete $iohash->{hmPairSerial};
 	  CUL_HM_respPendRm($shash); # remove all pending messages
 	  delete $shash->{cmdStack};
@@ -2113,7 +2113,7 @@ sub CUL_HM_Get($@) {
 	close(aSave);
   }
 
-  Log GetLogLevel($name,4), "CUL_HM get $name " . join(" ", @a[1..$#a]);
+  Log3 $name,4,"CUL_HM get $name " . join(" ", @a[1..$#a]);
 
   CUL_HM_ProcessCmdStack($devHash) if ($rxType & 0x03);#burst/all
   return "";
@@ -3200,7 +3200,7 @@ sub CUL_HM_Set($@) {
   readingsSingleUpdate($hash,"state",$state,1) if($state);
 
   my $rxType = CUL_HM_getRxType($devHash);
-  Log GetLogLevel($name,2), "CUL_HM set $name $act";
+  Log3 $name,2,"CUL_HM set $name $act";
   if($rxType & 0x03){#all/burst
     CUL_HM_ProcessCmdStack($devHash);
   }
@@ -3816,7 +3816,7 @@ sub CUL_HM_respPendTout($) {
         IOWrite($hash, "", $pHash->{rspWait}{cmd});
 		CUL_HM_statCnt($hash->{IODev}{NAME},"s");
         $pHash->{rspWait}{reSent}++;
-        Log GetLogLevel($name,4),"CUL_HM_Resend: ".$name. " nr ".$pHash->{rspWait}{reSent};
+        Log3 $name,4,"CUL_HM_Resend: ".$name. " nr ".$pHash->{rspWait}{reSent};
 	    InternalTimer(gettimeofday()+rand(20)/10+4,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);
 	  }
 	}
@@ -3870,7 +3870,7 @@ sub CUL_HM_protState($$){
   $hash->{protState} = $state;
   my $name = $hash->{NAME};
   readingsSingleUpdate($hash,"state",$state,0) if (!$hash->{helper}{role}{chn});
-  Log GetLogLevel($name,6),"CUL_HM $name protEvent:$state".
+  Log3 $name,6,"CUL_HM $name protEvent:$state".
             ($hash->{cmdStack}?" pending:".scalar @{$hash->{cmdStack}}:"");
   if   ($state =~ m/processing/) {$hash->{helper}{prt}{sProc} = 1;
 								 }
@@ -4122,7 +4122,7 @@ sub CUL_HM_DumpProtocol($$@) {
   $src=CUL_HM_id2Name($src);
   $dst=CUL_HM_id2Name($dst);
   my $msg ="$prefix L:$len N:$cnt F:$msgFlags CMD:$mTp SRC:$src DST:$dst $p$txt ($msgFlLong)";
-  Log GetLogLevel($iname, 4), $msg;
+  Log3 $iname,4,$msg;
   DoTrigger($iname, $msg) if($hmProtocolEvents > 2);
 }
 
@@ -4736,7 +4736,7 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
   $actHash->{helper}{peers} = CUL_HM_noDupInString(
                        ($actHash->{helper}{peers}?$actHash->{helper}{peers}:"")
                        .",$devId");
-  Log 3,"Device ".$devName." added to ActionDetector with "
+  Log3 $actHash, 3,"Device ".$devName." added to ActionDetector with "
       .$cycleString." time";
   #run ActionDetector
   RemoveInternalTimer("ActionDetector");
@@ -4756,8 +4756,7 @@ sub CUL_HM_ActDel($) {# delete HMid for activity supervision
   my $peerIDs = $actHash->{helper}{peers};
   $peerIDs =~ s/$devId//g if($peerIDs); 
   $actHash->{helper}{peers} = CUL_HM_noDupInString($peerIDs);
-  Log 3,"Device ".$devName
-                                     ." removed from ActionDetector";
+  Log3 $actHash,3,"Device ".$devName." removed from ActionDetector";
   RemoveInternalTimer("ActionDetector");
   CUL_HM_ActCheck();
   return;
@@ -4816,7 +4815,7 @@ sub CUL_HM_ActCheck() {# perform supervision
 	if ($oldState ne $state){
 	  readingsSingleUpdate($devHash,"Activity",$state,1);
 	  $attr{$devName}{actStatus} = $state;
-	  Log 4,"Device ".$devName." is ".$state;
+	  Log3 $actHash,4,"Device ".$devName." is ".$state;
 	}
     push @event, "status_".$devName.":".$state;
   }
@@ -5988,7 +5987,6 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><a href="#actCycle">actCycle</a>
 	     actCycle &lt;[hhh:mm]|off&gt;<br>

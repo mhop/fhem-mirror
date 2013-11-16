@@ -68,13 +68,14 @@ sub HMLAN_Initialize($) {
   $hash->{DefFn}   = "HMLAN_Define";
   $hash->{UndefFn} = "HMLAN_Undef";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
-                     "loglevel:0,1,2,3,4,5,6 addvaltrigger " . 
+                     "addvaltrigger " . 
                      "hmId hmKey hmKey2 hmKey3 " .
                      "respTime " .
 					 "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger ".
 					 "hmMsgLowLimit ".
 					 "hmLanQlen:1_min,2_low,3_normal,4_high,5_critical ".
 					 "wdTimer:5,10,15,20,25 ".
+					 "logIDs ".
 					 $readingFnAttributes;
 }
 sub HMLAN_Define($$) {#########################################################
@@ -83,7 +84,7 @@ sub HMLAN_Define($$) {#########################################################
 
   if(@a != 3) {
     my $msg = "wrong syntax: define <name> HMLAN ip[:port]";
-    Log 2, $msg;
+    Log3 $hash, 2, $msg;
     return $msg;
   }
   DevIo_CloseDev($hash);
@@ -93,7 +94,7 @@ sub HMLAN_Define($$) {#########################################################
   $dev .= ":1000" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
 
   if($dev eq "none") {
-    Log 1, "$name device is none, commands will be echoed only";
+    Log3 $hash, 1, "$name device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
   }
@@ -115,7 +116,11 @@ sub HMLAN_Define($$) {#########################################################
   $hash->{helper}{q}{cap}{last} = 0;
   $hash->{helper}{q}{cap}{sum}  = 0;  
   HMLAN_UpdtMsgCnt("UpdtMsg:".$name);
-  
+  $defs{$name}{helper}{log}{all} = 0;# selective log support
+  $defs{$name}{helper}{log}{sys} = 0;
+  my @al = ();
+  @{$defs{$name}{helper}{log}{ids}} = \@al;
+
   HMLAN_condUpdate($hash,253);#set disconnected
   $hash->{STATE} = "disconnected";
 
@@ -131,8 +136,7 @@ sub HMLAN_Undef($$) {##########################################################
        defined($defs{$d}{IODev}) &&
        $defs{$d}{IODev} == $hash)
       {
-        my $lev = ($reread_active ? 4 : 2);
-        Log GetLogLevel($name,$lev), "deleting port for $d";
+        Log3 $hash, 2, "deleting port for $d";
         delete $defs{$d}{IODev};
       }
   }
@@ -156,13 +160,13 @@ sub HMLAN_Notify(@) {##########################################################
   return;
 }
 sub HMLAN_Attr(@) {############################################################
-  my ($cmd,$name, $attrName,$aVal) = @_;
-  if   ($attrName eq "wdTimer" && $cmd eq "set"){#allow between 5 and 25 second
+  my ($cmd,$name, $aName,$aVal) = @_;
+  if   ($aName eq "wdTimer" && $cmd eq "set"){#allow between 5 and 25 second
     return "select wdTimer between 5 and 25 seconds" if ($aVal>30 || $aVal<5);
     $attr{$name}{wdTimer} = $aVal;
 	$defs{$name}{helper}{k}{Start} = 0;
    }
-  elsif($attrName eq "hmLanQlen"){
+  elsif($aName eq "hmLanQlen"){
 	if ($cmd eq "set"){
       no warnings 'numeric';
       $defs{$name}{helper}{q}{hmLanQlen} = int($aVal)+0; 
@@ -172,23 +176,23 @@ sub HMLAN_Attr(@) {############################################################
 	  $defs{$name}{helper}{q}{hmLanQlen} = 1;
 	}
   }
-  elsif($attrName =~ m /^hmKey/){
+  elsif($aName =~ m /^hmKey/){
     my $retVal= "";
     if ($cmd eq "set"){
-	  my $kno = ($attrName eq "hmKey")?1:substr($attrName,5,1);
+	  my $kno = ($aName eq "hmKey")?1:substr($aName,5,1);
 	  my ($no,$val) = (sprintf("%02X",$kno),$aVal);
 	  if ($aVal =~ m/:/){#number given
 	    ($no,$val) = split ":",$aVal;
 		return "illegal number:$no" if (hex($no) < 1 || hex($no) > 255 || length($no) != 2);
 	  }
-	  $attr{$name}{$attrName} = "$no:".
+	  $attr{$name}{$aName} = "$no:".
 	                           (($val =~ m /^[0-9A-Fa-f]{32}$/ )?
 	                             $val:
 		  					     unpack('H*', md5($val)));
-	  $retVal = "$attrName set to $attr{$name}{$attrName}";
+	  $retVal = "$aName set to $attr{$name}{$aName}";
 	}
 	else{
-	  delete $attr{$name}{$attrName};
+	  delete $attr{$name}{$aName};
 	}
 	my ($k1no,$k1,$k2no,$k2,$k3no,$k3) 
 	     =( "01",AttrVal($name,"hmKey","") 
@@ -205,14 +209,53 @@ sub HMLAN_Attr(@) {############################################################
 	HMLAN_SimpleWrite($defs{$name}, "Y03,".($k3?"$k3no,$k3":"00,"));
 	return $retVal;
   }
-  elsif($attrName eq "hmMsgLowLimit"){
+  elsif($aName eq "hmMsgLowLimit"){
     if ($cmd eq "set"){
 	  return "hmMsgLowLimit:please add integer between 10 and 120" 
 	      if (  $aVal !~ m/^(\d+)$/
 		      ||$aVal<10
 			  ||$aVal >120 );
-      $attr{$name}{hmMsgLowLimit} =$aVal;
 	}
+  }
+  elsif($aName eq "hmId"){
+    if ($cmd eq "set"){
+	  return "wrong syntax: hmId must be 6-digit-hex-code (3 byte)" 
+	    if ($aVal !~ m/^[A-F0-9]{6}$/i);
+	}
+  }
+  elsif($aName eq "logIDs"){
+    if ($cmd eq "set"){
+	  my @ids = split",",$aVal;
+	  my @idName;
+	  if (grep /sys/,@ids){
+	    push @idName,"sys";
+		$defs{$name}{helper}{log}{sys}=1;
+	  }
+	  else{
+	    $defs{$name}{helper}{log}{sys}=0;
+	  }
+	  if (grep /all/,@ids){
+	    push @idName,"all";
+	    $defs{$name}{helper}{log}{all}=1;
+	  }
+	  else{
+	    $defs{$name}{helper}{log}{all}=0;
+	    $_=substr(CUL_HM_name2Id($_),0,6) foreach(grep !/^$/,@ids);
+	    $_="" foreach(grep !/^[A-F0-9]{6}$/,@ids);
+	    @ids = HMLAN_noDup(@ids);
+	    push @idName,CUL_HM_id2Name($_) foreach(@ids);
+	  }
+	  $attr{$name}{$aName} = join(",",@idName);
+	  @{$defs{$name}{helper}{log}{ids}}=@ids;
+	} 
+	else{
+	  my @ids = ();
+	  $defs{$name}{helper}{log}{sys}=0;
+	  $defs{$name}{helper}{log}{all}=0;
+	  @{$defs{$name}{helper}{log}{ids}}=@ids;
+    }
+	return "logging set to $attr{$name}{$aName}" 
+	    if ($attr{$name}{$aName} ne $aVal);
   }
   return;
 }
@@ -272,7 +315,6 @@ sub HMLAN_Set($@) {############################################################
   my $name = shift @a;
   my $type = shift @a;
   my $arg = join("", @a);
-  my $ll = GetLogLevel($name,3);
   if($type eq "hmPairForSec") { ####################################
     return "Usage: set $name hmPairForSec <seconds_active>"
         if(!$arg || $arg !~ m/^\d+$/);
@@ -321,7 +363,7 @@ sub HMLAN_ReadAnswer($$$) {# This is a direct read for commands like get
     return ("No data", undef) if(!defined($buf));
 
     if($buf) {
-      Log 5, "HMLAN/RAW (ReadAnswer): $buf";
+      Log3 $hash, 5, "HMLAN/RAW (ReadAnswer): $buf";
       $mdata .= $buf;
     }
     if($mdata =~ m/\r\n/) {
@@ -343,13 +385,12 @@ sub HMLAN_Write($$$) {#########################################################
     my ($mtype,$src,$dst) = (substr($msg, 8, 2),
                              substr($msg, 10, 6),
 	  					     substr($msg, 16, 6));
-    my $ll5 = GetLogLevel($hash->{NAME},5);						   
 
     if (   $mtype eq "02" && $src eq $hash->{owner} && length($msg) == 24 
 	    && $hash->{assignIDs} =~ m/$dst/){
       # Acks are generally send by HMLAN autonomously
       # Special 
-      Log $ll5, "HMLAN: Skip ACK" if (!$debug);
+      Log3 $hash, 5, "HMLAN: Skip ACK" if (!$debug);
 	  return;
     }
 #   my $IDHM  = '+'.$dst.',01,00,F1EF'; #used by HMconfig - meanning??
@@ -387,10 +428,9 @@ sub HMLAN_Read($) {############################################################
   my $buf = DevIo_SimpleRead($hash);
   return "" if(!defined($buf));
   my $name = $hash->{NAME};
-  my $ll5 = GetLogLevel($name,5);
   
   my $hmdata = $hash->{PARTIAL};
-  Log $ll5, "HMLAN/RAW: $hmdata/$buf" if (!$debug);
+  Log3 $hash, 5, "HMLAN/RAW: $hmdata/$buf" if (!$debug);
   $hmdata .= $buf;
 
   while($hmdata =~ m/\n/) {
@@ -434,7 +474,6 @@ sub HMLAN_uptime($@) {#########################################################
 sub HMLAN_Parse($$) {##########################################################
   my ($hash, $rmsg) = @_;
   my $name = $hash->{NAME};
-  my $ll5 = GetLogLevel($name,5);
   my @mFld = split(',', $rmsg);
   my $letter = substr($mFld[0],0,1); # get leading char
   
@@ -443,7 +482,10 @@ sub HMLAN_Parse($$) {##########################################################
 
 	my ($mNo,$flg,$type,$src,$dst,$p) = unpack('A2A2A2A6A6A*',$mFld[5]);
     my $CULinfo = "";
-    Log $ll5, "HMLAN_Parse: $name R:".$mFld[0]
+	
+	my @logIds = ("150B94","172A85");
+    Log3 $hash,  HMLAN_getVerbLvl ($hash,$src,$dst,"5")
+	                , "HMLAN_Parse: $name R:".$mFld[0]
 	                               .(($mFld[0] =~ m/^E/)?'  ':'')
 	                               .' stat:' .$mFld[1]
 	                               .' t:'    .$mFld[2]
@@ -499,9 +541,11 @@ sub HMLAN_Parse($$) {##########################################################
 	  
 	  $hash->{helper}{$dst}{flg} = 0;#got response => unblock sending
       if ($stat & 0x0A){#08 and 02 dont need to go to CUL, internal ack only
-	    Log $ll5, "HMLAN_Parse: $name no ACK from $dst"   if($stat & 0x08);
+	    Log3 $hash, HMLAN_getVerbLvl ($hash,$src,$dst,"5")
+		          , "HMLAN_Parse: $name no ACK from $dst"   if($stat & 0x08);
 	    return;
-	  }elsif (($stat & 0x70) == 0x30){Log $ll5, "HMLAN_Parse: $name AES code rejected for $dst $stat";
+	  }elsif (($stat & 0x70) == 0x30){Log3 $hash, HMLAN_getVerbLvl ($hash,$src,$dst,"5")
+	                                            , "HMLAN_Parse: $name AES code rejected for $dst $stat";
 		                              $CULinfo = "AESerrReject"; 
 									  HMLAN_qResp($hash,$src,0);
 	  }elsif (($stat & 0x70) == 0x20){$CULinfo = "AESok";
@@ -549,14 +593,16 @@ sub HMLAN_Parse($$) {##########################################################
 	  $hash->{helper}{$src}{nextSend} = gettimeofday() + $wait if ($wait > 0);
 	}
 	if (hex($flg)&0xA4 == 0xA4 && $hash->{owner} eq $dst){
-	  Log $ll5, "HMLAN_Parse: $name ACK config";
+	  Log3 $hash, HMLAN_getVerbLvl ($hash,$src,$dst,"5")
+	            , "HMLAN_Parse: $name ACK config";
 	  HMLAN_Write($hash,undef, "As15".$mNo."8002".$dst.$src."00");
 	}
 	
     if ($letter eq 'R' && $hash->{helper}{$src}{flg}){
 	  $hash->{helper}{$src}{flg} = 0;                 #release send-holdoff
 	  if ($hash->{helper}{$src}{msg}){                #send delayed msg if any
-	    Log $ll5,"HMLAN_SdDly: $name $src";
+	    Log3 $hash, HMLAN_getVerbLvl ($hash,$src,$dst,"5")
+		          ,"HMLAN_SdDly: $name $src";
 		HMLAN_SimpleWrite($hash, $hash->{helper}{$src}{msg});
 	  }
 	  $hash->{helper}{$src}{msg} = "";                #clear message
@@ -576,14 +622,15 @@ sub HMLAN_Parse($$) {##########################################################
    	$hash->{assignIDsReport}=hex($mFld[6]);
     $hash->{helper}{q}{keepAliveRec} = 1;
     $hash->{helper}{q}{keepAliveRpt} = 0;
-    Log $ll5, 'HMLAN_Parse: '.$name.                 ' V:'.$mFld[1]
+    Log3 $hash, ($hash->{helper}{log}{sys}?0:5)
+	          , 'HMLAN_Parse: '.$name.                 ' V:'.$mFld[1]
 	                               .' sNo:'.$mFld[2].' d:'.$mFld[3]
 								   .' O:'  .$mFld[4].' t:'.$mFld[5].' IDcnt:'.$mFld[6];
     my $myId = AttrVal($name, "hmId", "");
 	$myId = $attr{$name}{hmId} = $mFld[4] if (!$myId);
 	
     if($mFld[4] ne $myId && !AttrVal($name, "dummy", 0)) {
-      Log 1, 'HMLAN setting owner to '.$myId.' from '.$mFld[4];
+      Log3 $hash, 1, 'HMLAN setting owner to '.$myId.' from '.$mFld[4];
       HMLAN_SimpleWrite($hash, "A$myId");
     }
   }
@@ -591,7 +638,7 @@ sub HMLAN_Parse($$) {##########################################################
     # Ack from the HMLAN
   } 
   else {
-    Log $ll5, "$name Unknown msg >$rmsg<";
+    Log3 $hash, 5, "$name Unknown msg >$rmsg<";
   }
 }
 sub HMLAN_Ready($) {###########################################################
@@ -604,7 +651,6 @@ sub HMLAN_SimpleWrite(@) {#####################################################
   return if(!$hash || AttrVal($hash->{NAME}, "dummy", undef));
   
   my $name = $hash->{NAME};
-  my $ll5 = GetLogLevel($name,5);
   my $len = length($msg);
   
   # It is not possible to answer befor 100ms
@@ -632,7 +678,7 @@ sub HMLAN_SimpleWrite(@) {#####################################################
 	  if ( $hDst->{flg} &&                #HMLAN's ack pending
           ($hDst->{to} > $tn)){#won't wait forever! check timeout
 	    $hDst->{msg} = $msg;              #postpone  message
-	    Log $ll5,"HMLAN_Delay: $name $dst";
+	    Log3 $hash, HMLAN_getVerbLvl($hash,$src,$dst,"5"),"HMLAN_Delay: $name $dst";
 	    return;
 	  }
 	  if ($src eq $hmId){
@@ -647,12 +693,14 @@ sub HMLAN_SimpleWrite(@) {#####################################################
 	  my $chn = substr($msg,52,2);
 	  if ($hDst->{chn} && $hDst->{chn} ne $chn){
 	    my $updt = $hDst->{newChn};
-        Log $ll5, 'HMLAN_Send:  '.$name.' S:'.$updt; 
+        Log3 $hash,  HMLAN_getVerbLvl($hash,$src,$dst,"5")
+		          , 'HMLAN_Send:  '.$name.' S:'.$updt; 
 	    syswrite($hash->{TCPDev}, $updt."\r\n")     if($hash->{TCPDev});
 	  }
 	  $hDst->{chn} = $chn;
 	} 
-	Log $ll5, 'HMLAN_Send:  '.$name.' S:'.$s
+	Log3 $hash,  HMLAN_getVerbLvl($hash,$src,$dst,"5")
+	        , 'HMLAN_Send:  '.$name.' S:'.$s
                              .' stat:  ' .$stat
                              .' t:'      .$t
                              .' d:'      .$d
@@ -665,8 +713,8 @@ sub HMLAN_SimpleWrite(@) {#####################################################
 
     HMLAN_UpdtMsgLoad($name,(hex($flg)&0x10)?17:1);#burst counts 
   }
-  else{
-    Log $ll5, 'HMLAN_Send:  '.$name.' I:'.$msg; 
+  else{   
+    Log3 $hash, ($hash->{helper}{log}{sys}?0:5), 'HMLAN_Send:  '.$name.' I:'.$msg; 
   }
   
   $msg .= "\r\n" unless($nonl);
@@ -812,7 +860,7 @@ sub HMLAN_condUpdate($$) {#####################################################
   }
 
   my $HMcndTxt = $HMcond{$HMcnd}?$HMcond{$HMcnd}:"Unknown:$HMcnd";
-  Log GetLogLevel($name,2), "HMLAN_Parse: $name new condition $HMcndTxt";
+  Log3 $hash, 1, "HMLAN_Parse: $name new condition $HMcndTxt";
   my $txt;
   $txt .= $HMcond{$_}.":".$hashCnd->{$_}." "
                             foreach (keys%{$hashCnd});
@@ -845,6 +893,19 @@ sub HMLAN_condUpdate($$) {#####################################################
   readingsEndUpdate($hash,1);
 }
 
+sub HMLAN_noDup(@) {#return list with no duplicates
+  my %all;
+  return "" if (scalar(@_) == 0);
+  $all{$_}=0 foreach (grep !/^$/,@_);
+  delete $all{""}; #remove empties if present
+  return (sort keys %all);
+}
+sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
+  my ($hash,$src,$dst,$def) = @_;
+  return ($hash->{helper}{log}{all}||
+	      (grep /($src|$dst)/,@{$hash->{helper}{log}{ids}}))?0:$def;
+}
+
 1;
 
 =pod
@@ -870,8 +931,7 @@ sub HMLAN_condUpdate($$) {#####################################################
 	</ul>
 	<br/><br/>
 
-	<a name="HMLANdefine"></a>
-	<b>Define</b>
+	<a name="HMLANdefine"><b>Define</b></a>	
 	<ul>
 		<code>define &lt;name&gt; HMLAN &lt;ip-address&gt;[:port]</code><br>
 		<br>
@@ -880,28 +940,33 @@ sub HMLAN_condUpdate($$) {#####################################################
 	</ul>
 	<br><br>
 
-	<a name="HMLANset"></a>
-	<b>Set</b>
+	<a name="HMLANset"><b>Set</b></a>	
 	<ul>
 		<li><a href="#hmPairForSec">hmPairForSec</a></li>
 		<li><a href="#hmPairSerial">hmPairSerial</a></li>
 	</ul>
 	<br><br>
 
-	<a name="HMLANget"></a>
-	<b>Get</b>
+	<a name="HMLANget"><b>Get</b></a>
 	<ul>
 		N/A
 	</ul>
 	<br><br>
 
-	<a name="HMLANattr"></a>
-	<b>Attributes</b>
+	<a name="HMLANattr"><b>Attributes</b></a>
 	<ul>
 		<li><a href="#do_not_notify">do_not_notify</a></li><br>
 		<li><a href="#attrdummy">dummy</a></li><br>
-		<li><a href="#loglevel">loglevel</a></li><br>
 		<li><a href="#addvaltrigger">addvaltrigger</a></li><br>
+		<li><a href="#HMLANlogIDs">logIDs</a><br>
+		   enables selective logging of HMLAN messages. A list of HMIds or names can be
+		   entered, comma separated, which shall be logged.<br>
+		   The attribute only allows device-IDs, not channel IDs. 
+		   Channel-IDs will be modified to device-IDs automatically. 
+		   <b>all</b> will log raw messages for all HMIds<br>
+		   <b>sys</b> will log system related messages like keep-alive<br>
+		   in order to enable all messages set "<b>all,sys</b>"<br>
+		</li>
 		<li><a name="HMLANhmMsgLowLimit">hmMsgLowLimit</a><br>
 		    max messages level of HMLAN allowed for low-level message queue
 			to be executed. Above this level processing will be postponed.<br>
