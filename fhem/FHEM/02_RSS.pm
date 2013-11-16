@@ -16,6 +16,8 @@ use vars qw(%data);
 use HttpUtils;
 require "98_SVG.pm"; # enable use of plotAsPng() 
 
+my @cmd_halign= qw(halign thalign ihalign);
+my @cmd_valign= qw(valign tvalign ivalign);
 my @valid_valign = qw(top center base bottom);
 my @valid_halign = qw(left center right);
 
@@ -333,7 +335,7 @@ RSS_itemImg {
     }
     given ($params{ivalign}) {
             when('center')	{ $y -= $sheight/2;  }
-            #when('base')	{ $y -= $sheight; }
+            when('base')	{ $y -= $sheight; }
             when('bottom')	{ $y -= $sheight; }
             default 		{ } # nothing to do
     }
@@ -403,21 +405,19 @@ RSS_evalLayout($$@) {
             $params{font}= $def;
           } elsif($cmd eq "pt") {
             $params{pt}= $def;
-          } elsif($cmd eq "halign"){
+          } elsif($cmd ~~ @cmd_halign) {
                 my $d = AnalyzePerlCommand(undef, $def);
                 if($d ~~ @valid_halign) { 
-                	#Debug "$name: halign $d found valid in halign_array";
-                        $params{ihalign}= $d;
-                        $params{thalign}= $d;
+                        $params{ihalign}= $d unless($cmd eq "thalign");
+                        $params{thalign}= $d unless($cmd eq "ihalign");
                 } else {
                   Log3 $name, 2, "$name: Illegal horizontal alignment $d";
                 }
-          } elsif($cmd eq "valign") {
+          } elsif($cmd ~~ @cmd_valign) {
                 my $d = AnalyzePerlCommand(undef, $def);
                 if( $d ~~ @valid_valign) {
-                #	Debug "$name: valign $d found valid in valign_array";
-                        $params{ivalign}= $d;
-                        $params{tvalign}= $d;
+                        $params{ivalign}= $d unless($cmd eq "tvalign");
+                        $params{tvalign}= $d unless($cmd eq "ivalign");
                 } else {
                   Log3 $name, 2, "$name: Illegal vertical alignment $d";
                 }
@@ -716,10 +716,10 @@ RSS_CGI(){
 
     <li>pt &lt;pt&gt;<br>Sets the font size in points.</li><br>
     
-    <li>halign "left"|"center"|"right"<br>Sets the horizontal text and image alignment. Defaults to left-aligned. You can use
+    <li>thalign|ihalign|halign "left"|"center"|"right"<br>Sets the horizontal alignment of text, image or both. Defaults to left-aligned. You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> instead of the literal alignment control word.</li><br>
     
-    <li>valign "top"|"center"|"base"|"bottom"<br>Sets the vertical text and image alignment. Defaults to top-aligned. You can use
+    <li>tvalign|ivalign|valign "top"|"center"|"base"|"bottom"<br>Sets the vertical alignment of text, image or both. Defaults to top-aligned. You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> instead of the literal alignment control word.</li><br>
     
     <li>condition &lt;condition&gt;<br>Subsequent layout control and item placement commands except for another condition command 
