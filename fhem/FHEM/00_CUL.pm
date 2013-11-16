@@ -104,8 +104,9 @@ CUL_Initialize($)
   $hash->{AttrFn}  = "CUL_Attr";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "showtime:1,0 model:CUL,CUN,CUR " . 
-                     "sendpool addvaltrigger rfmode:SlowRF,HomeMatic,MAX hmId ".
-		     "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger";
+                     "sendpool addvaltrigger rfmode:SlowRF,HomeMatic,MAX ".
+					 "hmId ".
+		             "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger";
 
   $hash->{ShutdownFn} = "CUL_Shutdown";
 
@@ -1005,17 +1006,15 @@ CUL_SimpleWrite(@)
 sub
 CUL_Attr(@)
 {
-  my @a = @_;
+  my ($cmd,$name,$aName,$aVal) = @_;
+  if($aName eq "rfmode") {
 
-  if($a[2] eq "rfmode") {
-
-    my $name = $a[1];
     my $hash = $defs{$name};
 
-    $a[3] = "SlowRF" if(!$a[3] || ($a[3] ne "HomeMatic" && $a[3] ne "MAX"));
-    my $msg = $hash->{NAME} . ": Mode $a[3] not supported";
+    $aVal = "SlowRF" if(!$aVal || ($aVal ne "HomeMatic" && $aVal ne "MAX"));
+    my $msg = $hash->{NAME} . ": Mode $aVal not supported";
 
-    if($a[3] eq "HomeMatic") {
+    if($aVal eq "HomeMatic") {
       return if($hash->{initString} =~ m/Ar/);
       if(($hash->{CMDS} =~ m/A/) || IsDummy($hash->{NAME})) {
         $hash->{Clients} = $clientsHomeMatic;
@@ -1024,11 +1023,11 @@ CUL_Attr(@)
         $hash->{initString} = "X21\nAr";  # X21 is needed for RSSI reporting
         CUL_SimpleWrite($hash, $hash->{initString});
       } else {
-	Log3 $name, 2, $msg;
+	    Log3 $name, 2, $msg;
         return $msg;
       }
 
-    } elsif($a[3] eq "MAX") {
+    } elsif($aVal eq "MAX") {
       return if($hash->{initString} =~ m/Zr/);
       if(($hash->{CMDS} =~ m/Z/) || IsDummy($hash->{NAME})) {
         $hash->{Clients} = $clientsMAX;
@@ -1049,12 +1048,15 @@ CUL_Attr(@)
       CUL_SimpleWrite($hash, "Ax") if ($hash->{CMDS} =~ m/A/); # reset AskSin
       CUL_SimpleWrite($hash, "Zx") if ($hash->{CMDS} =~ m/Z/); # reset Moritz
       CUL_SimpleWrite($hash, $hash->{initString});
-
     }
 
-    Log3 $name, 2, "Switched $name rfmode to $a[3]";
+    Log3 $name, 2, "Switched $name rfmode to $aVal";
     delete $hash->{".clientArray"};
-
+  } elsif($aName eq "hmId"){
+    if ($cmd eq "set"){
+	  return "wrong syntax: hmId must be 6-digit-hex-code (3 byte)" 
+	       if ($aVal !~ m/^[A-F0-9]{6}$/i);
+	}    
   }
  
   return undef;

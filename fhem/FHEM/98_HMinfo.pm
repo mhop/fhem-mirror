@@ -689,10 +689,10 @@ sub HMinfo_SetFnDly($) {#######################################################
 sub HMinfo_post($) {###########################################################
   my ($name,$childName) = (split":",$_);
   foreach (keys %{$defs{$name}{helper}{child}}){
-    Log 1,"General still running: $_ ".$defs{$name}{helper}{child}{$_};
+    Log3 $name, 1,"General still running: $_ ".$defs{$name}{helper}{child}{$_};
   }
   delete $defs{$name}{helper}{child}{$childName};
-  Log 1,"General deleted $childName now++++++++++++++";
+  Log3 $name, 1,"General deleted $childName now++++++++++++++";
   return "finished";
 }
 sub HMinfo_status($){##########################################################
