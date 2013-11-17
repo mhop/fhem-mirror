@@ -1,3 +1,7 @@
+0.45:
+- Added some Logs for debug (mangei.markus)
+
+older version 0.45:
 - Added JSON librabry as alternative for JSON::XS (mangei.markus)
 - Added webcam widget (marcproe)
 - path to background image is now configurable via the YAF interface (marcproe)

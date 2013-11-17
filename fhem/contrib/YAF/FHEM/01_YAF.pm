@@ -50,7 +50,7 @@ use vars qw($FW_dir);
 sub YAF_Request($@);
 
 my $fhem_url;
-my $yaf_version=0.41;
+my $yaf_version=0.45;
 my $yafw_encoding = "UTF-8";
 my $mp   = AttrVal("global", "modpath", ".");
 my $yaf_www_directory = $mp."/FHEM/YAF/www";
@@ -127,7 +127,9 @@ sub YAF_LoadResource($@) {
 	# Extension
 	my @filenameSplitted = split(/\./, $filename);
 	my $extension = $filenameSplitted[scalar(@filenameSplitted)-1];
-	#Log 1,"YAF_LoadResource absoluteFilePath $absoluteFilePath filename $filename extension $extension";
+	
+	# Log for debug
+	Log 1,"YAF_LoadResource: absoluteFilePath = $absoluteFilePath; filename = $filename; extension = $extension";
 
 	# Datei laden
 	if ((-f $absoluteFilePath) && open($fh, "<", $absoluteFilePath)) {
@@ -140,7 +142,7 @@ sub YAF_LoadResource($@) {
 	else {
 		# Datei nicht gefunden
 		Log 1,"YAF_LoadResource: file $filename not found";
-		return YAF_NotFound($absoluteFilePath);
+		return YAF_NotFound($absoluteFilePath, $file_local);
 	}
 	close($fh);
 
@@ -206,7 +208,6 @@ sub YAF_define ($@) {
 
 sub YAF_LoadView($@) {
 	my ($view) = @_;
-	YAF_Print("ddd");
 	return ("text/html; charset=$yafw_encoding", $FW_RET);
 }
 
@@ -222,7 +223,10 @@ sub YAF_Request ($@) {
 	my ($htmlarg) = @_;
 	# %20 durch Leerzeichen ersetzen
 	$htmlarg =~ s/%20/ /g;
-
+	
+	# Log for debug
+    Log 1,"YAF_Request: htmlarg: $htmlarg";
+    
 	# GET Parameter
 	my @params = split(/\?/, $htmlarg);
 
@@ -390,7 +394,9 @@ sub YAF_Request ($@) {
 						YAF_Print("1");
 					}
 					else {
+						Log 3, "Error in saving config";
 						YAF_Print("0");
+						
 					}
 				}
 				else {
@@ -438,6 +444,8 @@ sub YAF_Request ($@) {
 sub YAF_NotFound{
 		my $file = $_[0];
 		YAF_Print("Error 404: $file");
+        YAF_Print("\n");
+        YAF_Print("Absolute path: $file\n");	 	
 		YAF_Print("\n");
 		return ("text/html; charset=$yafw_encoding", $FW_RET);
 }
