@@ -142,7 +142,7 @@ sub YAF_LoadResource($@) {
 	else {
 		# Datei nicht gefunden
 		Log 1,"YAF_LoadResource: file $filename not found";
-		return YAF_NotFound($absoluteFilePath, $file_local);
+		return YAF_NotFound($absoluteFilePath);
 	}
 	close($fh);
 
