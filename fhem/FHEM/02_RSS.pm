@@ -211,10 +211,23 @@ RSS_returnRSS($) {
 ##################
 
 sub
-RSS_xy($$$) {
-  my ($S,$x,$y)= @_;
-  if($x<=1) { $x*= $S->width; }
-  if($y<=1) { $y*= $S->height; }
+RSS_xy {
+  my ($S,$x,$y,%params)= @_;
+  #Debug "RSS_xy on enter: (x,y)= ($x,$y)";
+  
+  $x = $params{x} if($x eq 'x');
+  $y = $params{y} if($y eq 'y');
+  
+  #$x = AnalyzePerlCommand(undef, $x);
+  #$y = AnalyzePerlCommand(undef, $y);
+  
+  if((-1 < $x) && ($x < 1)) { $x*= $S->width; }
+  if((-1 < $y) && ($y < 1)) { $y*= $S->height; }
+  
+  $params{x} = $x;
+  $params{y} = $y;
+  
+  #Debug "RSS_xy on exit: (x,y)= ($x,$y)";
   return($x,$y);
 }
 
@@ -231,7 +244,7 @@ RSS_itemText {
   return unless(defined($text));
 
 	if($params{useTextAlign}) {
-		($x,$y)= RSS_xy($S,$x,$y);
+		($x,$y)= RSS_xy($S,$x,$y,%params);
 		my $align = GD::Text::Align->new($S,
 			color  => RSS_color($S, $params{rgb}),
 			valign => $params{tvalign},
@@ -241,7 +254,7 @@ RSS_itemText {
 		$align->set_text($text);
 		$align->draw($x, $y, 0);
 	} else {
-		($x,$y)= RSS_xy($S,$x,$y);
+		($x,$y)= RSS_xy($S,$x,$y,%params);
 		$S->stringFT(RSS_color($S,$params{rgb}),$params{font},$params{pt},0,$x,$y,$text);
 	}
 }
@@ -314,7 +327,7 @@ RSS_itemImg {
   } else {
     return;
   }
-  ($x,$y)= RSS_xy($S,$x,$y);
+  ($x,$y)= RSS_xy($S,$x,$y,%params);
   
   eval {
     my ($width,$height)= $I->getBounds();
@@ -351,8 +364,8 @@ RSS_itemImg {
 sub
 RSS_itemLine {
   my ($S,$x1,$y1,$x2,$y2,$th,%params)= @_;
-  ($x1,$y1)= RSS_xy($S,$x1,$y1);
-  ($x2,$y2)= RSS_xy($S,$x2,$y2);
+  ($x1,$y1)= RSS_xy($S,$x1,$y1,%params);
+  ($x2,$y2)= RSS_xy($S,$x2,$y2,%params);
   $S->setThickness($th);
   $S->line($x1,$y1,$x2,$y2,RSS_color($S,$params{rgb}));  
 }
@@ -370,7 +383,7 @@ RSS_evalLayout($$@) {
   $params{rgb}= "ffffff";
   $params{halign} = 'left';
   $params{valign} = 'base';
-  $params{condition} = '1';
+  $params{condition} = 1;
   # we need two pairs of align parameters
   # due to different default values for text and img
   $params{useTextAlign}= $defs{$name}{fhem}{useTextAlign};
@@ -378,6 +391,9 @@ RSS_evalLayout($$@) {
   $params{ivalign} = 'top';
   $params{thalign} = 'left';
   $params{tvalign} = 'base';
+  $params{x}= 0;
+  $params{y}= 0;
+  
 
   my ($x,$y,$x1,$y1,$x2,$y2,$scale,$text,$imgtype,$srctype,$arg,$format);
   
@@ -395,9 +411,16 @@ RSS_evalLayout($$@) {
           #Debug "$name: evaluating >$line<";
           # split line into command and definition
           my ($cmd, $def)= split("[ \t]+", $line, 2);
-          ##Debug, "CMD= \"$cmd\", DEF= \"$def\"";
-          $params{condition} = AnalyzePerlCommand(undef, $def) if($cmd eq 'condition');
+          #Debug "CMD= \"$cmd\", DEF= \"$def\"";
+          
+          # separate condition handling
+          if($cmd eq 'condition') {
+            $params{condition} = AnalyzePerlCommand(undef, $def);
+            next;
+          }  
           next unless($params{condition});
+          
+          
           if($cmd eq "rgb") {
             $def= "\"$def\"" if(length($def) == 6 && $def =~ /[[:xdigit:]]{6}/);
             $params{rgb}= AnalyzePerlCommand(undef, $def);
@@ -405,6 +428,16 @@ RSS_evalLayout($$@) {
             $params{font}= $def;
           } elsif($cmd eq "pt") {
             $params{pt}= $def;
+          } elsif($cmd eq "moveto") {
+            my ($tox,$toy)= split('[ \t]+', $def, 2);
+            my ($x,$y)= RSS_xy($S, $tox,$toy);
+            $params{x} = $x;
+            $params{y} = $y;
+          } elsif($cmd eq "moveby") {
+            my ($byx,$byy)= split('[ \t]+', $def, 2);
+            my ($x,$y)= RSS_xy($S, $byx,$byy);
+            $params{x} += $x;
+            $params{y} += $y;
           } elsif($cmd ~~ @cmd_halign) {
                 my $d = AnalyzePerlCommand(undef, $def);
                 if($d ~~ @valid_halign) { 
@@ -443,6 +476,7 @@ RSS_evalLayout($$@) {
             ($x,$y,$scale,$imgtype,$srctype,$arg)= split("[ \t]+", $def,6);
             my $arg= AnalyzePerlCommand(undef, $arg);
             RSS_itemImg($S,$x,$y,$scale,$imgtype,$srctype,$arg,%params);
+          } elsif($cmd eq 'condition') {
           } else {
             Log3 $name, 1, "$name: Illegal command $cmd in layout definition.";
           }  
@@ -697,13 +731,30 @@ RSS_CGI(){
     Everything after a # is treated as a comment and ignored. You can fold long lines by
     putting a \ at the end.<p>
 
-    <i>Layout control commands</i><p>
-    Notes: 
-    (1) Use double quotes to quote literal text if perl specials are allowed. 
-    (2) Text alignment requires the Perl module GD::Text::Align to be installed. Debian-based systems can install it with <code>apt-get install libgd-text-perl</code>.
+    <i>General notes</i><br> 
+    <ol>
+    <li>Use double quotes to quote literal text if perl specials are allowed.</li> 
+    <li>Text alignment requires the Perl module GD::Text::Align to be installed. Debian-based systems can install it with <code>apt-get install libgd-text-perl</code>.</li>
+    </ol>
+    <p>
+    <i>Notes on coordinates</i><br>
+    <ol>
+    <li>(0,0) is the upper left corner.</li>
+    <li>Coordinates equal or greater than 1 are considered to be absolute pixels, coordinates between 0 and 1 are considered to
+    be relative to the total width or height of the picture.</li>
+    <li>Literal <code>x</code> and <code>y</code> evaluate to the most recently used x- and y-coordinate. See also moveto and moveby below.</li>
+    <!--<li>You can use <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for x and for y.</li>-->
+    </ol>
     <p>
     
+    
+    <i>Layout control commands</i><p>
+    
     <ul>
+    <li>moveto &lt;x&gt; &lt;y&gt;<br>Moves most recently used x- and y-coordinate to the given absolute or relative position.</li><br>
+
+    <li>moveby &lt;x&gt; &lt;y&gt;<br>Moves most recently used x- and y-coordinate by the given absolute or relative amounts.</li><br>
+    
     <li>font "&lt;font&gt;"<br>Sets the font. &lt;font&gt; is the name of a TrueType font (e.g.
     <code>Arial</code>) or the full path to a TrueType font
     (e.g. <code>/usr/share/fonts/truetype/arial.ttf</code>),
@@ -719,7 +770,8 @@ RSS_CGI(){
     <li>thalign|ihalign|halign "left"|"center"|"right"<br>Sets the horizontal alignment of text, image or both. Defaults to left-aligned. You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> instead of the literal alignment control word.</li><br>
     
-    <li>tvalign|ivalign|valign "top"|"center"|"base"|"bottom"<br>Sets the vertical alignment of text, image or both. Defaults to top-aligned. You can use
+    <li>tvalign|ivalign|valign "top"|"center"|"base"|"bottom"<br>Sets the vertical alignment of text, image or both. Defaults to base-aligned for text and
+    top-aligned for image. You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> instead of the literal alignment control word.</li><br>
     
     <li>condition &lt;condition&gt;<br>Subsequent layout control and item placement commands except for another condition command 
@@ -731,9 +783,7 @@ RSS_CGI(){
     <ul>
     <li>text &lt;x&gt; &lt;y&gt; &lt;text&gt;<br>Renders the text &lt;text&gt; at the
     position (&lt;x&gt;, &lt;y&gt;) using the current font, font size and color.
-    (0,0) is the upper left corner. Coordinates equal or
-    greater than 1 are considered to be pixels, coordinates between 0 and 1 are considered to
-    be relative to the total width or height of the picture. You can use
+    You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;text&gt; to fully
     access device readings and do some programming on the fly. See below for examples.</li><br>
 
@@ -752,6 +802,7 @@ RSS_CGI(){
     <br>
     </ul>
 
+    <i>Example</i><p>
     This is how a layout definition might look like:<p>
     <code>
     font /usr/share/fonts/truetype/arial.ttf # must be a TrueType font<br>
@@ -760,6 +811,8 @@ RSS_CGI(){
     time 0.10 0.90<br>
     pt 24<br>
     text 0.10 0.95 { ReadingsVal("MyWeather","temperature","?"). "C" }<br>
+    moveby 0 -25<br>
+    text x y "Another text"<br>
     img 20 530 0.5 png file { "/usr/share/fhem/www/images/weather/" . ReadingsVal("MyWeather","icon","") . ".png" }<br>
     </code>
     <p>
