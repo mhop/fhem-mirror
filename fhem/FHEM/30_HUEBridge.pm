@@ -407,7 +407,7 @@ HUEBridge_HTTP_Request($$$@)
     $conn = IO::Socket::INET->new(PeerAddr=>"$host:$port", Timeout=>$timeout);
   }
   if(!$conn) {
-    Log3 undef, 1, "HUEBridge_HTTP_Request $displayurl: Can't connect to $protocol://$host:$port\n";
+    Log3 undef, 1, "HUEBridge_HTTP_Request $displayurl: Can't connect to $protocol://$host:$port";
     undef $conn;
     return undef;
   }
