@@ -186,7 +186,7 @@ autocreate_Notify($$)
       if($devattr) {
         foreach my $attrNV (split(" ", $devattr)) {
           my ($an, $av) = split(":", $attrNV, 2);
-          $attr{$name}{$an} = $av;
+          CommandAttr(undef, "$name $an $av");
         }
       }
 
