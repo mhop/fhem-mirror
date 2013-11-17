@@ -34,7 +34,7 @@ FRM_AD_Initialize($)
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_AD_Init";
   
-  $hash->{AttrList}  = "IODev upper-threshold lower-threshold loglevel:0,1,2,3,4,5,6 $main::readingFnAttributes";
+  $hash->{AttrList}  = "IODev upper-threshold lower-threshold $main::readingFnAttributes";
   main::LoadModule("FRM");
 }
 
@@ -62,10 +62,10 @@ sub
 FRM_AD_observer
 {
 	my ($pin,$old,$new,$hash) = @_;
-	main::Log(6,"onAnalogMessage for pin ".$pin.", old: ".(defined $old ? $old : "--").", new: ".(defined $new ? $new : "--"));
+	my $name = $hash->{NAME};
+	Log3 $name,6,"onAnalogMessage for pin ".$pin.", old: ".(defined $old ? $old : "--").", new: ".(defined $new ? $new : "--");
 	main::readingsBeginUpdate($hash);
 	main::readingsBulkUpdate($hash,"reading",$new,1);
-	my $name = $hash->{NAME};
 	my $upperthresholdalarm = ReadingsVal($name,"alarm-upper-threshold","off");
     if ( $new < AttrVal($name,"upper-threshold",1024) ) {
       if ( $upperthresholdalarm eq "on" ) {

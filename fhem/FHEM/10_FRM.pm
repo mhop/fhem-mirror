@@ -49,7 +49,7 @@ sub FRM_Initialize($) {
 	$hash->{SetFn}    = "FRM_Set";
 	$hash->{AttrFn}   = "FRM_Attr";
   
-	$hash->{AttrList} = "model:nano dummy:1,0 loglevel:0,1,2,3,4,5,6 sampling-interval i2c-config $main::readingFnAttributes";
+	$hash->{AttrList} = "model:nano dummy:1,0 sampling-interval i2c-config $main::readingFnAttributes";
 }
 
 #####################################
@@ -78,7 +78,7 @@ sub FRM_Define($$) {
 	DevIo_CloseDev($hash);	
 
 	if ( $dev eq "none" ) {
-		Log (GetLogLevel($hash->{NAME}), "FRM device is none, commands will be echoed only");
+		Log3 $name,3,"device is none, commands will be echoed only";
 		$main::attr{$name}{dummy} = 1;
 		return undef;
 	}
@@ -242,8 +242,7 @@ sub FRM_Attr(@) {
 	if ($command eq "set") {
 		$main::attr{$name}{$attribute}=$value;
 		if ($attribute eq "sampling-interval" 
-			or $attribute eq "i2c-config" 
-			or $attribute eq "loglevel" ) {
+			or $attribute eq "i2c-config") {
 			FRM_apply_attribute($main::defs{$name},$attribute);
 		}
 	}
@@ -274,11 +273,7 @@ sub FRM_apply_attribute {
 				} else {
 					$err = "Error, arduino doesn't support I2C";
 				}
-				Log (GetLogLevel($hash->{NAME},2),$err) if ($err);
-			}
-		} elsif ($attribute eq "loglevel") {
-			if (defined $firmata->{io}) {
-				$firmata->{io}->{loglevel} = AttrVal($name,$attribute,5);
+				Log3 $name,2,$err if ($err);
 			}
 		}
 	}
@@ -308,7 +303,7 @@ sub FRM_DoInit($) {
 			$device->{protocol}->{protocol_version} = $device->{metadata}{firmware_version};
 			$main::defs{$name}{firmware} = $device->{metadata}{firmware};
 			$main::defs{$name}{firmware_version} = $device->{metadata}{firmware_version};
-			Log (3, "Firmata Firmware Version: ".$device->{metadata}{firmware}." ".$device->{metadata}{firmware_version});
+			Log3 $name,3,"Firmata Firmware Version: ".$device->{metadata}{firmware}." ".$device->{metadata}{firmware_version};
 			$device->analog_mapping_query();
 			$device->capability_query();
 			do {
@@ -358,7 +353,7 @@ sub FRM_DoInit($) {
 		} else {
 			select (undef,undef,undef,0.01);
 			if (time > $queryTicks) {
-				Log (3, "querying Firmata Firmware Version");
+				Log3 $name,3,"querying Firmata Firmware Version";
 				$device->firmware_version_query();
 				$queryTicks++;
 			}
@@ -372,7 +367,7 @@ sub FRM_DoInit($) {
 		FRM_forall_clients($shash,\&FRM_Init_Client,undef);
 		return undef;
 	}
-	Log (3, "no response from Firmata, closing DevIO");
+	Log3 $name,3,"no response from Firmata, closing DevIO";
 	DevIo_Disconnected($hash);
 	delete $hash->{FirmataDevice};
 	return "FirmataDevice not responding";
@@ -399,9 +394,10 @@ FRM_Init_Client($@) {
   		my @a = split("[ \t][ \t]*", $hash->{DEF});
   		$args = \@a;
 	}
-	my $ret = CallFn($hash->{NAME},"InitFn",$hash,$args);
+	my $name = $hash->{NAME};
+	my $ret = CallFn($name,"InitFn",$hash,$args);
 	if ($ret) {
-		Log (GetLogLevel($hash->{NAME},2),"error initializing ".$hash->{NAME}.": ".$ret);
+		Log3 $name,2,"error initializing ".$hash->{NAME}.": ".$ret;
 	}
 }
 
@@ -507,21 +503,22 @@ sub new {
 	my ($class,$hash) = @_;
 	return bless {
 		hash => $hash,
-		loglevel => main::GetLogLevel($hash->{NAME},5),
 	}, $class;
 }
 
 sub data_write {
    	my ( $self, $buf ) = @_;
-    main::Log ($self->{loglevel}, ">".join(",",map{sprintf"%02x",ord$_}split//,$buf));
-   	main::DevIo_SimpleWrite($self->{hash},$buf,undef);
+   	my $hash = $self->{hash};
+    main::Log3 $hash->{NAME},5,">".join(",",map{sprintf"%02x",ord$_}split//,$buf);
+   	main::DevIo_SimpleWrite($hash,$buf,undef);
 }
 
 sub data_read {
     my ( $self, $bytes ) = @_;
-    my $string = main::DevIo_SimpleRead($self->{hash});
+   	my $hash = $self->{hash};
+    my $string = main::DevIo_SimpleRead($hash);
     if (defined $string ) {
-   	    main::Log ($self->{loglevel},"<".join(",",map{sprintf"%02x",ord$_}split//,$string));
+   	    main::Log3 $hash->{NAME},5,"<".join(",",map{sprintf"%02x",ord$_}split//,$string);
    	}
     return $string;
 }
@@ -532,7 +529,7 @@ sub
 FRM_i2c_observer
 {
 	my ($data,$hash) = @_;
-	Log GetLogLevel($hash->{NAME},5),"onI2CMessage address: '".$data->{address}."', register: '".$data->{register}."' data: '".$data->{data}."'";
+	Log3 $hash->{NAME},5,"onI2CMessage address: '".$data->{address}."', register: '".$data->{register}."' data: '".$data->{data}."'";
 	FRM_forall_clients($hash,\&FRM_i2c_update_device,$data);
 }
 
@@ -553,7 +550,7 @@ sub FRM_i2c_update_device
 sub FRM_string_observer
 {
 	my ($string,$hash) = @_;
-	Log (GetLogLevel($hash->{NAME},3), "received String_data: ".$string);
+	Log3 $hash->{NAME},3,"received String_data: ".$string;
 	readingsSingleUpdate($hash,"error",$string,1);
 }
 
