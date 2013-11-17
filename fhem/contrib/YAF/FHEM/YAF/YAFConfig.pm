@@ -27,7 +27,7 @@ package main;
 use strict;
 use warnings;
 
-my $yaf_version=0.41;
+my $yaf_version=0.45;
 
 my %fhemwidgets;
 my %fhemviews;
