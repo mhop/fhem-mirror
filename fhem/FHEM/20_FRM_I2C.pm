@@ -26,7 +26,7 @@ FRM_I2C_Initialize($)
   $hash->{UndefFn}   = "FRM_Client_Undef";
   $hash->{AttrFn}    = "FRM_I2C_Attr";
   
-  $hash->{AttrList}  = "IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
+  $hash->{AttrList}  = "IODev $main::readingFnAttributes";
   main::LoadModule("FRM");
 }
 

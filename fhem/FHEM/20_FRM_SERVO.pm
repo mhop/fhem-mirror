@@ -32,7 +32,7 @@ FRM_SERVO_Initialize($)
   $hash->{UndefFn}   = "FRM_Client_Undef";
   $hash->{AttrFn}    = "FRM_SERVO_Attr";
   
-  $hash->{AttrList}  = "min-pulse max-pulse IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
+  $hash->{AttrList}  = "min-pulse max-pulse IODev $main::readingFnAttributes";
   main::LoadModule("FRM");
 }
 

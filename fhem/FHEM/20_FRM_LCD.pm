@@ -40,7 +40,8 @@ FRM_LCD_Initialize($)
   $hash->{AttrFn}    = "FRM_LCD_Attr";
   $hash->{StateFn}   = "FRM_LCD_State";
   
-  $hash->{AttrList}  = "restoreOnReconnect:on,off restoreOnStartup:on,off IODev model backLight:on,off blink:on,off autoClear:on,off autoBreak:on,off loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
+  $hash->{AttrList}  = "restoreOnReconnect:on,off restoreOnStartup:on,off IODev model"
+  ." backLight:on,off blink:on,off autoClear:on,off autoBreak:on,off $main::readingFnAttributes";
   #  autoScroll:on,off direction:leftToRight,rightToLeft do not work reliably
   main::LoadModule("FRM");
 }

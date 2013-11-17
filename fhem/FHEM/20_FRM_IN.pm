@@ -41,7 +41,7 @@ FRM_IN_Initialize($)
   $hash->{InitFn}    = "FRM_IN_Init";
   $hash->{UndefFn}   = "FRM_Client_Undef";
   
-  $hash->{AttrList}  = "IODev count-mode:none,rising,falling,both count-threshold reset-on-threshold-reached:yes,no internal-pullup:on,off loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
+  $hash->{AttrList}  = "IODev count-mode:none,rising,falling,both count-threshold reset-on-threshold-reached:yes,no internal-pullup:on,off $main::readingFnAttributes";
   main::LoadModule("FRM");
 }
 
@@ -69,8 +69,8 @@ sub
 FRM_IN_observer
 {
 	my ($pin,$old,$new,$hash) = @_;
-	main::Log(6,"onDigitalMessage for pin ".$pin.", old: ".(defined $old ? $old : "--").", new: ".(defined $new ? $new : "--"));
-	my $name = $hash->{NAME};
+	my $name = $hash->{NAME}; 
+	Log3 $name,5,"onDigitalMessage for pin ".$pin.", old: ".(defined $old ? $old : "--").", new: ".(defined $new ? $new : "--");
 	my $changed = ((!(defined $old)) or ($old != $new));
 	main::readingsBeginUpdate($hash);
 	if ($changed) { 
