@@ -345,7 +345,7 @@ at_State($$$$)
         <ul>
         # Make sure that it chimes when the new hour begins<br>
         define at2 at +*01:00 set Chime on-for-timer 1<br>
-        attr atr2 alignTime 00:00<br>
+        attr at2 alignTime 00:00<br>
         </ul>
         </li><br>
 
