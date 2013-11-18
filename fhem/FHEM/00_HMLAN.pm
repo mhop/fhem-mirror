@@ -151,11 +151,18 @@ sub HMLAN_RemoveHMPair($) {####################################################
 }
 sub HMLAN_Notify(@) {##########################################################
   my ($hash,$dev) = @_;
-  return if ($dev->{NAME} ne $hash->{NAME}); # looking for our own connect/disconnect
-  
-  foreach (grep (m/CONNECTED$/,@{$dev->{CHANGED}})) { # connect/disconnect
-    if    ($_ eq "DISCONNECTED") {HMLAN_condUpdate($hash,253);}
-#    elsif ($_ eq "CONNECTED")    {covered by init;}
+  if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED$/,@{$dev->{CHANGED}})){
+	if ($hash->{helper}{attrPend}){
+	  my $aVal = AttrVal($hash->{NAME},"logIDs","");
+	  HMLAN_Attr("set",$hash->{NAME},"logIDs",$aVal) if($aVal);
+	  delete $hash->{helper}{attrPend};
+	}
+  }
+  elsif ($dev->{NAME} eq $hash->{NAME}){
+    foreach (grep (m/CONNECTED$/,@{$dev->{CHANGED}})) { # connect/disconnect
+      if    ($_ eq "DISCONNECTED") {HMLAN_condUpdate($hash,253);}
+#      elsif ($_ eq "CONNECTED")    {covered by init;}
+    }
   }
   return;
 }
@@ -225,28 +232,34 @@ sub HMLAN_Attr(@) {############################################################
   }
   elsif($aName eq "logIDs"){
     if ($cmd eq "set"){
-	  my @ids = split",",$aVal;
-	  my @idName;
-	  if (grep /sys/,@ids){
-	    push @idName,"sys";
-		$defs{$name}{helper}{log}{sys}=1;
+	  if ($init_done){
+	    my @ids = split",",$aVal;
+	    my @idName;
+	    if (grep /sys/,@ids){
+	      push @idName,"sys";
+		  $defs{$name}{helper}{log}{sys}=1;
+	    }
+	    else{
+	      $defs{$name}{helper}{log}{sys}=0;
+	    }
+	    if (grep /all/,@ids){
+	      push @idName,"all";
+	      $defs{$name}{helper}{log}{all}=1;
+	    }
+	    else{
+	      $defs{$name}{helper}{log}{all}=0;
+	      $_=substr(CUL_HM_name2Id($_),0,6) foreach(grep !/^$/,@ids);
+	      $_="" foreach(grep !/^[A-F0-9]{6}$/,@ids);
+	      @ids = HMLAN_noDup(@ids);
+	      push @idName,CUL_HM_id2Name($_) foreach(@ids);
+	    }
+	    $attr{$name}{$aName} = join(",",@idName);
+	    @{$defs{$name}{helper}{log}{ids}}=@ids;
 	  }
 	  else{
-	    $defs{$name}{helper}{log}{sys}=0;
+	    $defs{$name}{helper}{attrPend} = 1;
+		return;
 	  }
-	  if (grep /all/,@ids){
-	    push @idName,"all";
-	    $defs{$name}{helper}{log}{all}=1;
-	  }
-	  else{
-	    $defs{$name}{helper}{log}{all}=0;
-	    $_=substr(CUL_HM_name2Id($_),0,6) foreach(grep !/^$/,@ids);
-	    $_="" foreach(grep !/^[A-F0-9]{6}$/,@ids);
-	    @ids = HMLAN_noDup(@ids);
-	    push @idName,CUL_HM_id2Name($_) foreach(@ids);
-	  }
-	  $attr{$name}{$aName} = join(",",@idName);
-	  @{$defs{$name}{helper}{log}{ids}}=@ids;
 	} 
 	else{
 	  my @ids = ();
