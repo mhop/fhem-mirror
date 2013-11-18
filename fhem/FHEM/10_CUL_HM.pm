@@ -3135,7 +3135,8 @@ sub CUL_HM_Set($@) {
 	return "use - single [set|unset] actor - for smoke detector"  if( $st eq "smokeDetector"       && (!$single || $single ne "single" || $target ne "actor"));
 	return "use - single - for ".$st                              if(($st =~ m/(threeStateSensor|thermostat|motionDetector)/)
 	                                                                      && (!$single || $single ne "single"));
-
+	my $pSt = CUL_HM_Get($peerHash,$peerHash->{NAME},"param","subType");
+	
 	$single = ($single eq "single")?1:"";#default to dual
 	$set = ($set && $set eq "unset")?0:1;
 
@@ -3143,17 +3144,17 @@ sub CUL_HM_Set($@) {
 	$b1 = ($roleC) ? hex($myBtn) : ($single?$bNo : ($bNo*2 - 1));
 	if ($single){
 	  $b2 = $b1;
-	  $b1 = 0 if ($st eq "smokeDetector");
+	  $b1 = 0 if ($st eq "smokeDetector" ||$pSt eq "smokeDetector");
 	  $nrCh2Pair = 1;
 	}
 	else{
 	  $b2 = $b1 + 1;
 	  $nrCh2Pair = 2;
 	}
+	$target = "both" if ($st eq "virtual" && $pSt eq "smokeDetector");
 	my $cmdB = ($set)?"01":"02";# do we set or remove?
 
     # First the remote (one loop for on, one for off)
-	my $pSt = CUL_HM_Get($peerHash,$peerHash->{NAME},"param","subType");
 	if (!$target || $target =~ m/^(remote|both)$/){
 	  my $burst = ($pSt eq "thermostat"?"0101":"0100");#set burst for target 
 	  my $pnb = 1 if ($culHmRegModel{$md}{peerNeedsBurst}|| #supported?
