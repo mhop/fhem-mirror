@@ -75,10 +75,11 @@ my %zwave_class = (
   SENSOR_MULTILEVEL        => { id => '31', 
     get   => { smStatus    => "04" },
     parse => { "06310501(..)(....)" => 'sprintf("temperature:%0.1f %s",'.
-                      'hex($2)/(10**int(hex($1)/32)), '.
-                      'hex($1)&8 ? "F":"C")',
+                      'hex($2)/(10**int(hex($1)/32)), hex($1)&8 ? "F":"C")',
+               "06310504(..)(....)" => 'sprintf("power:%0.1f %s",'.
+                      'hex($2)/(10**int(hex($1)/32)), hex($1)&8 ? "Btu/h":"W")',
                "05310505(..)(..)" => 'sprintf("humidity:%0.1f %%", '.
-                      'hex($2)/(10**int(hex($1)/32)))'},},
+                      'hex($2)/(10**int(hex($1)/32)))', },},
   METER                    => { id => '32',
     parse => { "..3202(.*)"=> 'ZWave_ParseMeter($1)' }, },
   ZIP_ADV_SERVER           => { id => '33', },
@@ -923,6 +924,7 @@ s2Hex($)
   <br><br><b>Class SENSOR_MULTILEVEL</b>
   <li>temperature:$temp [C|F]</li>
   <li>humidity:$hum %</li>
+  <li>power:$pow [Btu/h|W]</li>
 
   <br><br><b>Class SWITCH_BINARY</b>
   <li>state:on</li>
