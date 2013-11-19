@@ -2829,19 +2829,23 @@ Dispatch($$$)
 
     } else {
       if($defs{$found}) {
-        $defs{$found}{MSGCNT}++;
-        my $avtrigger = ($attr{$name} && $attr{$name}{addvaltrigger});
-        if($addvals) {
-          foreach my $av (keys %{$addvals}) {
-            $defs{$found}{"${name}_$av"} = $addvals->{$av};
-            push(@{$defs{$found}{CHANGED}}, "$av: $addvals->{$av}")
-              if($avtrigger);
+        if(!$defs{$found}{".noDispatchVars"}) { # CUL_HM special
+          $defs{$found}{MSGCNT}++;
+          my $avtrigger = ($attr{$name} && $attr{$name}{addvaltrigger});
+          if($addvals) {
+            foreach my $av (keys %{$addvals}) {
+              $defs{$found}{"${name}_$av"} = $addvals->{$av};
+              push(@{$defs{$found}{CHANGED}}, "$av: $addvals->{$av}")
+                if($avtrigger);
+            }
           }
+          $defs{$found}{"${name}_MSGCNT"}++;
+          $defs{$found}{"${name}_TIME"} = TimeNow();
+          $defs{$found}{LASTInputDev} = $name;
         }
-        $defs{$found}{"${name}_MSGCNT"}++;
-        $defs{$found}{"${name}_TIME"} = TimeNow();
-        $defs{$found}{LASTInputDev} = $name;
+        delete($defs{$found}{".noDispatchVars"});
       }
+
       DoTrigger($found, undef);
     }
   }
