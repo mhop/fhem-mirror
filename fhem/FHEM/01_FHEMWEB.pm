@@ -1221,7 +1221,7 @@ FW_parseColumns()
   my %columns;
   my $colNo = -1;
 
-  foreach my $roomgroup (split("[ \t][ \t]*", AttrVal($FW_wname,"column",""))) {
+  foreach my $roomgroup (split("[ \t\r\n]+", AttrVal($FW_wname,"column",""))) {
     my ($room, $groupcolumn)=split(":",$roomgroup);
     last if(!defined($room) || !defined($groupcolumn));
     next if($room ne $FW_room);

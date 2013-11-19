@@ -17,6 +17,7 @@ table.block tr.odd { background: #111111; }
 table.block tr.sel { background: red; }
 table { border-radius:8px; border-spacing: 0px;
        padding-bottom: 6px; padding-top: 6px; }
+table.column { border-spacing: 5px; }
 
 table.room { background: #111111; width: 140px; border:1px solid #CCCCCC; box-shadow:5px 5px 5px #000;}
 table.room a { color: #CCCCCC; text-decoration: none; }

@@ -979,7 +979,7 @@ CommandInclude($$)
     $l =~ s/[\r\n]//g;
 
     if($l =~ m/^(.*)\\ *$/) {		# Multiline commands
-      $bigcmd .= "$1\\\n";
+      $bigcmd .= "$1\n";
     } else {
       my $tret = AnalyzeCommandChain($cl, $bigcmd . $l);
       push @ret, $tret if(defined($tret));
@@ -1215,6 +1215,7 @@ CommandSave($$)
       my $def = $defs{$d}{DEF};
       if(defined($def)) {
         $def =~ s/;/;;/g;
+        $def =~ s/\n/\\\n/g;
         print $fh "define $d $defs{$d}{TYPE} $def\n";
       } else {
         print $fh "define $d $defs{$d}{TYPE}\n";
