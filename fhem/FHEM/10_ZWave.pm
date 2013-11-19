@@ -440,10 +440,11 @@ ZWave_ParseMeter($)
   my $size  = ($v2 >> 0) & 0x7;
   my @txt = ("undef", "power", "gas", "water");
   my $txt = ($v1 > $#txt ? "undef" : $txt[$v1]);
-  my %unit = (power => ["kWh", "kVAh", "W", "pulseCount"],
+  my %unit = (energy => ["kWh", "kVAh", "W", "pulseCount"],
               gas   => ["m3",  "feet3", "undef", "pulseCount"],
               water => ["m3",  "feet3", "USgallons", "pulseCount"]);
   my $unit = $txt eq "undef" ? "undef" : $unit{$txt}[$scale];
+  $txt = "power" if ($unit == "W");
   $v3 = hex(substr($v3, 0, 2*$size))/$prec;
   return "$txt:$v3 $unit";
 }
@@ -909,9 +910,10 @@ s2Hex($)
   <li>supportedStatus: <list of supported stati></li>
 
   <br><br><b>Class METER</b>
-  <li>power:val [kWh|kVAh|W|pulseCount]</li>
+  <li>energy:val [kWh|kVAh|pulseCount]</li>
   <li>gas:val [m3|feet3|pulseCount]</li>
   <li>water:val [m3|feet3|USgallons|pulseCount]</li>
+  <li>power:val W</li>
 
   <br><br><b>Class MULTI_CHANNEL</b>
   <li>endpoints:total X $dynamic $identical</li>
