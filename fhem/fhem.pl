@@ -44,7 +44,7 @@ sub AnalyzeCommand($$);
 sub AnalyzeCommandChain($$);
 sub AnalyzeInput($);
 sub AnalyzePerlCommand($$);
-sub AssignIoPort($);
+sub AssignIoPort($;$);
 sub AttrVal($$$);
 sub CallFn(@);
 sub CheckDuplicate($$@);
@@ -1471,10 +1471,15 @@ CommandModify($$)
 #############
 # internal
 sub
-AssignIoPort($)
+AssignIoPort($;$)
 {
-  my ($hash) = @_;
+  my ($hash, $proposed) = @_;
 
+  if($proposed && $defs{$proposed}) {
+    $hash->{IODev} = $defs{$proposed};
+    delete($defs{$proposed}{".clientArray"});
+    return;
+  }
   # Set the I/O device, search for the last compatible one.
   for my $p (sort { $defs{$b}{NR} <=> $defs{$a}{NR} } keys %defs) {
 
