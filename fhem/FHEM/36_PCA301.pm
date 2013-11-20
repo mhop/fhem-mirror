@@ -216,6 +216,14 @@ PCA301_Parse($$)
 
   $rhash->{PCA301_lastRcv} = TimeNow();
 
+  if( $rhash->{channel} != $channel ) {
+    Log3 $rname, 3, "PCA301 $rname, channel changed from $rhash->{channel} to $channel";
+
+    $rhash->{channel} = $channel;
+    $rhash->{DEF} = "$rhash->{addr} $rhash->{channel}";
+    CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
+  }
+
   my $readonly = AttrVal($rname, "readonly", "0" );
   my $state = "";
 
