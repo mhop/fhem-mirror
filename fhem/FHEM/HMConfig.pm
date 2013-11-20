@@ -90,7 +90,7 @@ my %culHmModel=(
   "002A" => {name=>"HM-RC-12-B"              ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:12",},
   "002B" => {name=>"HM-WS550Tech"            ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'p'            ,chn=>"",},
   "002C" => {name=>"KS550TECH"               ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p,1'          ,chn=>"",},
-  "002D" => {name=>"HM-LC-SW4-PCB"           ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'3'            ,chn=>"Sw:1:4",},
+  "002D" => {name=>"HM-LC-SW4-PCB"           ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"Sw:1:4",},
   "002E" => {name=>"HM-LC-DIM2L-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",},
   "002F" => {name=>"HM-SEC-SC"               ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",},# remove wakeup - need retest
   "0030" => {name=>"HM-SEC-RHS"              ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",},# remove wakeup - need retest
