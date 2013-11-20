@@ -191,7 +191,7 @@ my %culHmModel=(
   "0092" => {name=>"Schueco_263-144"         ,st=>'switch'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,3'          ,chn=>"",}, # HM Switch Interface 3 switches
   "0093" => {name=>"Schueco_263-158"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",}, #
   "0094" => {name=>"IS-WDS-TH-OD-S-R3"       ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",}, #
-  "0095" => {name=>"HM-CC-RT-DN"             ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.5p.6p,3:3p.6p,1,7:4'
+  "0095" => {name=>"HM-CC-RT-DN"             ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.5p.6p,3:3p.6p,1,7:3p.4'
                                                                                                                         ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,ClimRT_tr:4:4,ClimaTeam:5:5,remote:6:6"}, #
   "0096" => {name=>"WDF-solar"               ,st=>'blindActuatorSol'  ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"win:1:1,blind:2:3",}, #
   "009B" => {name=>"Schueco_263-xxx"         ,st=>'tipTronic'         ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1:1.2,3:1p.3p',chn=>"act:1:1,sen:2:2,sec:3:3",}, #
@@ -223,7 +223,7 @@ my %culHmModel=(
   "00B9" => {name=>"HM-LC-Dim1T-CV-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "00BA" => {name=>"HM-LC-Dim1T-FM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "00BB" => {name=>"HM-LC-Dim2T-SM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",},#
-  "00BD" => {name=>"HM-CC-RT-DN-BoM"         ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.5p.6p,3:3p.6p,1,7:4'
+  "00BD" => {name=>"HM-CC-RT-DN-BoM"         ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.5p.6p,3:3p.6p,1,7:3p.4'
                                                                                                                         ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,ClimRT_tr:4:4,ClimaTeam:5:5,remote:6:6"}, #
   "8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",},
@@ -915,7 +915,8 @@ my %culHmRegChan = (# if channelspecific then enter them here
   "HM-Sen-RD-O01"     =>{ eventFilterTimeB=>1,transmitTryMax  =>1,peerNeedsBurst  =>1,expectAES       =>1
                          ,condTxThrhHi    =>1,condTxThrhHi    =>1,highHoldTime    =>1,evntRelFltTime  =>1
                          },
-  "HM-CC-RT-DN03"     =>{ shCtValLo       =>1},
+  "HM-CC-RT-DN03"     =>{ shCtValLo       =>1
+                         ,winOpnTemp      =>1},
   "HM-CC-RT-DN04"     =>{ btnNoBckLight   =>1
                          ,dayTemp         =>1,nightTemp       =>1,tempMin         =>1,tempMax         =>1
                          ,tempOffset      =>1

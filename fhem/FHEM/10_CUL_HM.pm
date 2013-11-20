@@ -1727,14 +1727,17 @@ sub CUL_HM_parseCommon(@){#####################################################
           if ($reqPeer){
             my $flag = CUL_HM_getFlag($shash);
             my $id = CUL_HM_IOid($shash);
-            my $listNo = "0".$chnhash->{helper}{getCfgListNo};
             my @peerID = split(",",($attr{$chnName}{peerIDs}?
                                     $attr{$chnName}{peerIDs}:""));
-            foreach my $peer (grep (!/00000000/,@peerID)){
-              $peer .="01" if (length($peer) == 6); # add the default
-              if ($peer &&($peer eq $reqPeer || $reqPeer eq "all")){
-                CUL_HM_PushCmdStack($shash,sprintf("++%s01%s%s%s04%s%s",
-                        $flag,$id,$src,$chn,$peer,$listNo));# List3 or 4
+            foreach my $l (split ",",$chnhash->{helper}{getCfgListNo}){
+              next if (!$l);
+              my $listNo = "0".$l;
+              foreach my $peer (grep (!/00000000/,@peerID)){
+                $peer .="01" if (length($peer) == 6); # add the default
+                if ($peer &&($peer eq $reqPeer || $reqPeer eq "all")){
+                  CUL_HM_PushCmdStack($shash,sprintf("++%s01%s%s%s04%s%s",
+                          $flag,$id,$src,$chn,$peer,$listNo));# List3 or 4
+                }
               }
             }
           }
@@ -2516,10 +2519,11 @@ sub CUL_HM_Set($@) {
                                            8-int($reg->{s}+0.99)*2,);
 
     my ($lChn,$peerId,$peerChn) = ($chn,"000000","00");
-    if (($list == 3) ||($list == 4)){ # peer is necessary for list 3/4
+    if (($list == 3) ||($list == 4)   # peer is necessary for list 3/4
+        ||($list == 7 && $peerChnIn)){# and possible for List 7
       return "Peer not specified" if ($peerChnIn eq "");
       $peerId  = CUL_HM_peerChId($peerChnIn,$dst,$id);
-       $peerChn = ((length($peerId) == 8)?substr($peerId,6,2):"01");
+      $peerChn = ((length($peerId) == 8)?substr($peerId,6,2):"01");
       $peerId  = substr($peerId,0,6);
       return "Peer not valid" if (!$peerId);
     }
@@ -2535,7 +2539,7 @@ sub CUL_HM_Set($@) {
       my $rName = CUL_HM_id2Name($dst.$lChn);
       $rName =~ s/_chn:.*//;
       my $curVal = CUL_HM_getRegFromStore($rName,$addr,$list,$peerId.$peerChn);
-        return "cannot calculate value. Please issue set $name getConfig first - $curVal"
+      return "cannot calculate value. Please issue set $name getConfig first - $curVal"
                  if ($curVal !~ m/^(set_|)(\d+)$/);
       $curVal = $2; # we expect one byte in int, strap 'set_' possibly
       $data = ($curVal & (~($mask<<$bit)))|($data<<$bit);
@@ -2547,7 +2551,7 @@ sub CUL_HM_Set($@) {
       }
     }
 
-    $lChn = "00" if($list == 7);#face to send
+    $lChn = "00" if($list == 7 && $peerChnIn eq "");#face to send
 
     my $cHash = CUL_HM_id2Hash($dst.($lChn eq '00'?"":$lChn));
     $cHash = $hash if (!$cHash);
@@ -3309,7 +3313,8 @@ sub CUL_HM_getConfig($){
     if($lstAr){
       my @list = split(",",$lstAr); #get valid lists e.g."1, 5:2.3p ,6:2"
       my $pReq = 0; # Peer request not issued, do only once for channel
-      foreach my$listEntry (@list){# each list that is define for this channel
+      $cHash->{helper}{getCfgListNo}= "";
+      foreach my $listEntry (@list){# each list that is define for this channel
         my ($peerReq,$chnValid)= (0,0);
         my ($listNo,$chnLst1) = split(":",$listEntry);
         if (!$chnLst1){
@@ -3319,10 +3324,10 @@ sub CUL_HM_getConfig($){
         else{
           my @chnLst = split('\.',$chnLst1);
           foreach my $lchn (@chnLst){
-            $peerReq = 1 if ($lchn =~ m/p/);
-              no warnings;#know that lchan may be followed by 'p' causing a warning
-              $chnValid = 1 if (int($lchn) == hex($chn));
-              use warnings;
+            no warnings;#know that lchan may be followed by 'p' causing a warning
+            $chnValid = 1 if (int($lchn) == hex($chn));
+            use warnings;
+            $peerReq = 1 if ($chnValid && $lchn =~ m/p/);
             last if ($chnValid);
           }
         }
@@ -3330,7 +3335,7 @@ sub CUL_HM_getConfig($){
           if ($peerReq){# need to get the peers first
             if($listNo ne 'p'){# not if 'only peers'!
               $cHash->{helper}{getCfgList} = "all";
-              $cHash->{helper}{getCfgListNo} = $listNo;
+              $cHash->{helper}{getCfgListNo} .= ",".$listNo;
             }
             if (!$pReq){#get peers first, but only once per channel
               CUL_HM_PushCmdStack($cHash,sprintf("++%s01%s%s%s03"
@@ -3525,11 +3530,12 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
         my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
         $chnhash = $hash if(!$chnhash);
 
-        $peer ="" if($list !~ m/^0[34]$/);
+        $peer ="" if($list !~ m/^0[347]$/);
         #empty val since reading will be cumulative
         my $rlName = ((CUL_HM_getAttrInt($chnhash->{NAME},"expert") == 2)?
                                          "":".")."RegL_".$list.":".$peer;
         $chnhash->{READINGS}{$rlName}{VAL}="";
+        my $chnHash = $modules{CUL_HM}{defptr}{$dst.$chn};
         delete ($chnhash->{READINGS}{$rlName}{TIME});
       }
       elsif($subType eq "09"){ #SerialRead-------
@@ -4232,7 +4238,7 @@ sub CUL_HM_updtRegDisp($$$) {
                       substr($hash->{DEF},6,2) eq "02");
   }
   elsif ($md =~ m/HM-CC-RT-DN/){#handle temperature readings
-    CUL_HM_RTtempReadings($hash)  if ($list == 7);
+    CUL_HM_RTtempReadings($hash)  if ($list == 7 && $chn eq "04");
   }
   elsif ($md eq "HM-PB-4DIS-WM"){#add text
     CUL_HM_4DisText($hash)  if ($list == 1) ;
@@ -4581,11 +4587,11 @@ sub CUL_HM_RTtempReadings($) {# parse RT temperature readings
   # transport some readings to relevant channels (window receivce here)
   my $wHash = $modules{CUL_HM}{defptr}{substr($hash->{DEF},0,6)."03"};
   CUL_HM_UpdtReadBulk($wHash,1,
-        "winOpnTemp:"   .ReadingsVal($name,"R-winOpnTemp"    ,"unknown"),
-        "winOpnPeriod:" .ReadingsVal($name,"R-winOpnPeriod"  ,"unknown"),
-        "winOpnBoost:"  .ReadingsVal($name,"R-winOpnBoost"   ,"unknown"),
-        "winOpnMode:"   .ReadingsVal($name,"R-winOpnMode"    ,"unknown"),
-        "winOpnDetFall:".ReadingsVal($name,"R-winOpnDetFall" ,"unknown"),);
+        "winOpnTemp-int:".ReadingsVal($name,"R-winOpnTemp"    ,"unknown"),
+        "winOpnPeriod:"  .ReadingsVal($name,"R-winOpnPeriod"  ,"unknown"),
+        "winOpnBoost:"   .ReadingsVal($name,"R-winOpnBoost"   ,"unknown"),
+        "winOpnMode:"    .ReadingsVal($name,"R-winOpnMode"    ,"unknown"),
+        "winOpnDetFall:" .ReadingsVal($name,"R-winOpnDetFall" ,"unknown"),);
   return $setting;
 }
 sub CUL_HM_repReadings($) {   # parse repeater
