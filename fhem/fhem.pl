@@ -2074,6 +2074,7 @@ CommandAttr($$)
       $hash->{IODev} = $defs{$ioname};
       $hash->{NR} = $devcount++
         if($defs{$ioname}{NR} > $hash->{NR});
+      delete($defs{$ioname}{".clientArray"}); # Force a recompute
     }
     if($a[1] eq "stateFormat" && $init_done) {
       evalStateFormat($hash);
@@ -2745,18 +2746,18 @@ sub
 Dispatch($$$)
 {
   my ($hash, $dmsg, $addvals) = @_;
-  my $iohash = $modules{$hash->{TYPE}}; # The phyiscal device module pointer
+  my $module = $modules{$hash->{TYPE}};
   my $name = $hash->{NAME};
 
   Log3 $hash, 5, "$name dispatch $dmsg";
 
-  my ($isdup, $idx) = CheckDuplicate($name, $dmsg, $iohash->{FingerprintFn});
+  my ($isdup, $idx) = CheckDuplicate($name, $dmsg, $module->{FingerprintFn});
   return rejectDuplicate($name,$idx,$addvals) if($isdup);
 
   my @found;
 
   my $clientArray = $hash->{".clientArray"};
-  $clientArray = computeClientArray($hash, $iohash) if(!$clientArray);
+  $clientArray = computeClientArray($hash, $module) if(!$clientArray);
 
   foreach my $m (@{$clientArray}) {
     # Module is not loaded or the message is not for this module
@@ -2774,7 +2775,7 @@ Dispatch($$$)
   }
 
   if(!int(@found)) {
-    my $h = $hash->{MatchList}; $h = $iohash->{MatchList} if(!$h);
+    my $h = $hash->{MatchList}; $h = $module->{MatchList} if(!$h);
     if(defined($h)) {
       foreach my $m (sort keys %{$h}) {
         if($dmsg =~ m/$h->{$m}/) {
@@ -2809,7 +2810,7 @@ Dispatch($$$)
 
   ################
   # Inform raw
-  if(!$iohash->{noRawInform}) {
+  if(!$module->{noRawInform}) {
     foreach my $c (keys %inform) {
       if(!$defs{$c} || $defs{$c}{NR} != $inform{$c}{NR}) {
         delete($inform{$c});
@@ -3550,12 +3551,13 @@ fhemTimeLocal($$$$$$) {
     return $t-fhemTzOffset($t);
 }
 
+# compute the list of defined logical modules for a physical module
 sub
 computeClientArray($$)
 {
-  my ($hash, $iohash) = @_;
+  my ($hash, $module) = @_;
   my @a = ();
-  my @mRe = split(":", $hash->{Clients} ? $hash->{Clients}:$iohash->{Clients});
+  my @mRe = split(":", $hash->{Clients} ? $hash->{Clients}:$module->{Clients});
 
   foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
                   grep { defined($modules{$_}{ORDER}) } keys %modules) {
