@@ -530,6 +530,7 @@ sub HMLAN_Parse($$) {##########################################################
     #  parameter 'cond'- condition of the IO device
     #  Cond text
     #     0 ok
+    #     1 comes with AES, also seen with wakeup long-sleep devices
     #     2 Warning-HighLoad
     #     4 Overload condition - no send anymore
     #
@@ -550,7 +551,6 @@ sub HMLAN_Parse($$) {##########################################################
       HMLAN_UpdtMsgLoad($name,((hex($flg)&0x10)?34   #burst=17units *2
                                                :2))  #ACK=1 unit *2
           if (($stat & 0x48) == 8);# reject - but not from repeater
-
 
       $hash->{helper}{$dst}{flg} = 0;#got response => unblock sending
       if ($stat & 0x0A){#08 and 02 dont need to go to CUL, internal ack only
@@ -601,7 +601,7 @@ sub HMLAN_Parse($$) {##########################################################
 
     # HMLAN sends ACK for flag 'A0' but not for 'A4'(config mode)-
     # we ack ourself an long as logic is uncertain - also possible is 'A6' for RHS
-    if (hex($flg)&0x2){#not sure: 4 oder 2 ? 02 works for VD!
+    if (hex($flg)&0x02){#not sure: 4 oder 2 ? 02 works for VD!
       my $wait = 0.100 - $dly/1000;
       $hash->{helper}{$src}{nextSend} = gettimeofday() + $wait if ($wait > 0);
     }
