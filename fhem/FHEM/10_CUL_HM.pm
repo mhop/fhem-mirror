@@ -1531,7 +1531,6 @@ sub CUL_HM_Parse($$) {##############################
     CUL_HM_SndCmd($ack[$i++],$ack[$i++])while ($i<@ack);
     Log3 $name,6,"CUL_HM $name sent ACK:".(int(@ack));
   }
-
   CUL_HM_ProcessCmdStack($shash) if ($respRemoved); # cont if complete
   #------------ process events ------------------
   push @event, "noReceiver:src:$src ".$mFlg.$mTp." $p" if(!@event && !@entities);
@@ -1578,7 +1577,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           $subType eq "00"){
         if ($shash->{helper}{prt}{awake} && $shash->{helper}{prt}{awake}==4){#re-wakeup
           delete $shash->{helper}{prt}{rspWait};#clear wakeup values
-            $shash->{helper}{prt}{rspWait}{$_} = $shash->{helper}{prt}{rspWaitSec}{$_}
+          $shash->{helper}{prt}{rspWait}{$_} = $shash->{helper}{prt}{rspWaitSec}{$_}
                   foreach (keys%{$shash->{helper}{prt}{rspWaitSec}});   #back to original message
           delete $shash->{helper}{prt}{rspWaitSec};
           IOWrite($shash, "", $shash->{helper}{prt}{rspWait}{cmd});     # and send
@@ -3456,9 +3455,11 @@ sub CUL_HM_ProcessCmdStack($) {
     }
     elsif(!@{$hash->{cmdStack}}) {
       #-- update info ---
-      CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{prt}{bErr}?
-                                ("_Errors:".$hash->{helper}{prt}{bErr}):""));
+      CUL_HM_protState($hash,"CMDs_done");
     }
+  }
+  elsif($hash->{helper}{prt}{sProc} != 0){
+    CUL_HM_protState($hash,"CMDs_done");                                    
   }
   return;
 }
@@ -3486,6 +3487,7 @@ sub CUL_HM_respWaitSu($@){ #setup response for multi-message response
   my $mHsh = $hash->{helper}{prt};
   $modules{CUL_HM}{prot}{rspPend}++ if(!$mHsh->{rspWait}{cmd});
   foreach (@a){
+    next if (!$_);
     my ($f,$d)=split ":=",$_;
     $mHsh->{rspWait}{$f}=$d;
   }
@@ -3548,11 +3550,12 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
     }
     elsif($mTp eq '11' && $chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
 #      CUL_HM_qStateUpdatIfEnab($dst.$subType);# subtype actually is channel
+      my $to = "";
       if ($p =~ m/02..(..)....(....)/){#lvl ne 0 and timer on
-         $hash->{helper}{tmdOn} = $2 if ($1 ne "00" && $2 !~ m/(0000|FFFF)/);
-        CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo"
-                                ,"reSent:=1","timedOn:=1");
+        $hash->{helper}{tmdOn} = $2 if ($1 ne "00" && $2 !~ m/(0000|FFFF)/);
+        $to = "timedOn:=1";
       }
+      CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=1",$to);
     }
     elsif($mTp eq '12' && $mFlg & 0x10){#wakeup with burst
       # response setup - do not repeat, set counter to 250
@@ -3570,8 +3573,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       InternalTimer(gettimeofday()+.5, "CUL_HM_ProcessCmdStack", $hash, 0);
     }
     elsif(!$hash->{helper}{prt}{rspWait}{cmd}){
-      CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{prt}{bErr}?
-                                ("_Errors:".$hash->{helper}{prt}{bErr}):""));
+      CUL_HM_protState($hash,"CMDs_done");
     }
   }
 
@@ -3854,8 +3856,7 @@ sub CUL_HM_eventP($$) {#handle protocol events
     $nAttr->{protCmdDel} = 0 if(!$nAttr->{protCmdDel});
     $nAttr->{protCmdDel} += scalar @{$hash->{cmdStack}} + 1
             if ($hash->{cmdStack});
-    CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{prt}{bErr}?
-                            ("_Errors:".$hash->{helper}{prt}{bErr}):""));
+    CUL_HM_protState($hash,"CMDs_done");
     CUL_HM_respPendRm($hash);
   }
   elsif($evntType eq "IOdly"){ # IO problem - will see whether it recovers
@@ -3873,24 +3874,34 @@ sub CUL_HM_eventP($$) {#handle protocol events
 }
 sub CUL_HM_protState($$){
   my ($hash,$state) = @_;
-  $hash->{protState} = $state;
   my $name = $hash->{NAME};
-  readingsSingleUpdate($hash,"state",$state,0) if (!$hash->{helper}{role}{chn});
+  if   ($state =~ m/processing/) {
+    $hash->{helper}{prt}{sProc} = 1;
+  }
+  elsif($state =~ m/^CMDs_done/) {
+    $state .= ($hash->{helper}{prt}{bErr}?
+                            ("_Errors:".$hash->{helper}{prt}{bErr})
+                            :"");
+    delete($hash->{cmdStack});
+    delete($hash->{protCmdPend});
+    $hash->{helper}{prt}{bErr}  = 0;
+    $hash->{helper}{prt}{sProc} = 0;
+    $hash->{helper}{prt}{awake} = 0 if (defined $hash->{helper}{prt}{awake});
+  }
+  elsif($state eq "Info_Cleared"){
+    $hash->{helper}{prt}{sProc} = 0;
+    $hash->{helper}{prt}{awake} = 0 if (defined $hash->{helper}{prt}{awake});
+  }
+  elsif($state eq "CMDs_pending"){
+    $hash->{helper}{prt}{sProc} = 2;
+  }
+  $hash->{protState} = $state;
+  if (!$hash->{helper}{role}{chn}){
+    readingsSingleUpdate($hash,"state",$state,0);
+    DoTrigger($name, undef);
+  }
   Log3 $name,6,"CUL_HM $name protEvent:$state".
             ($hash->{cmdStack}?" pending:".scalar @{$hash->{cmdStack}}:"");
-  if   ($state =~ m/processing/) {$hash->{helper}{prt}{sProc} = 1;
-                                 }
-  elsif($state =~ m/^CMDs_done/) {DoTrigger($name, undef);
-                                  delete($hash->{cmdStack});
-                                  delete($hash->{protCmdPend});
-                                  $hash->{helper}{prt}{sProc} = 0;
-                                    $hash->{helper}{prt}{awake} = 0 if (defined$hash->{helper}{prt}{awake}); # asleep
-                                 }
-  elsif($state eq "Info_Cleared"){$hash->{helper}{prt}{sProc} = 0;
-                                    $hash->{helper}{prt}{awake} = 0 if (defined$hash->{helper}{prt}{awake}); # asleep
-                                 }
-  elsif($state eq "CMDs_pending"){$hash->{helper}{prt}{sProc} = 2;
-                                 }
 }
 
 ###################-----------helper and shortcuts--------#####################
@@ -5075,7 +5086,7 @@ sub CUL_HM_autoReadReady($){# capacity for autoread available?
     return 0 if ($defs{$mHlp->{autoRdActive}}{helper}{prt}{sProc} == 1); # predecessor still on
   }
   if (   !$ioName
-      || ReadingsVal($ioName,"cond","") !~ m /^(ok|Overload-released|init)$/
+      || ReadingsVal($ioName,"cond","init") !~ m /^(ok|Overload-released|init)$/#default init for CUL
       || (    $defs{$ioName}{helper}{q}
           && ($defs{$ioName}{helper}{q}{cap}{sum}/16.8)>
                AttrVal($ioName,"hmMsgLowLimit",40))){
