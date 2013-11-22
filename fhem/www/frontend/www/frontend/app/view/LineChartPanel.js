@@ -74,11 +74,15 @@ Ext.define('FHEM.view.LineChartPanel', {
         var me = this;
         
         me.devicestore = Ext.create('FHEM.store.DeviceStore', {
-            data: FHEM.dblogDevices,
             proxy: {
-                type: 'memory',
+                type: 'ajax',
+                noCache: false,
+                method: 'POST',
+                url: '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+getdevices&XHR=1',
                 reader: {
-                    type: 'json'
+                    type: 'json',
+                    root: 'data',
+                    totalProperty: 'totalCount'
                 }
             },
             autoLoad: true
