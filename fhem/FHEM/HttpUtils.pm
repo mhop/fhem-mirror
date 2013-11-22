@@ -62,7 +62,7 @@ CustomGetFileFromURL($$@)
 {
   my ($quiet, $url, $timeout, $data, $noshutdown, $loglevel) = @_;
   $timeout = 4.0 if(!defined($timeout));
-  $loglevel = 1 if(!$loglevel);
+  $loglevel = 4 if(!$loglevel);
   
   my $redirects= 0;
   
