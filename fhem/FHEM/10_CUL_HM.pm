@@ -3172,7 +3172,7 @@ sub CUL_HM_Set($@) {
         else{
           my $bStr = sprintf("%02X",$b);
             CUL_HM_PushCmdStack($hash,
-                  "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerBtn}00");
+                 "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerBtn}00");
             CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,hex($peerBtn),4,$burst)
                    if($pnb && $cmdB eq "01"); # only if set
           CUL_HM_qAutoRead($name,3);
@@ -3180,21 +3180,24 @@ sub CUL_HM_Set($@) {
       }
     }
     if (!$target || $target =~ m/^(actor|both)$/ ){
-      if ($pSt eq "virtual"){
-        CUL_HM_ID2PeerList ($peerN,$dst.sprintf("%02X",$b2),$set); #update peerlist
-        CUL_HM_ID2PeerList ($peerN,$dst.sprintf("%02X",$b1),$set) if ($b1 & !$single);
-      }
-      else{
-        my $peerFlag = CUL_HM_getFlag($peerHash);
-        CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",
-            $peerFlag,$id,$peerDst,$peerChn,$cmdB,$dst,$b2,$b1 ));
-        CUL_HM_pushConfig($peerHash,$id,$peerDst,0,0,0,0,"0101")#set burstRx
-                   if(CUL_HM_getRxType($peerHash) & 0x80);      #if conBurst
-        CUL_HM_qAutoRead($peerHash->{NAME},3);
+      if ($modules{CUL_HM}{defptr}{$peerDst}){# is defined or ID only?
+        if ($pSt eq "virtual"){
+          CUL_HM_ID2PeerList ($peerN,$dst.sprintf("%02X",$b2),$set);
+          CUL_HM_ID2PeerList ($peerN,$dst.sprintf("%02X",$b1),$set) 
+                if ($b1 & !$single);
+        }
+        else{
+          my $peerFlag = CUL_HM_getFlag($peerHash);
+          CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",
+              $peerFlag,$id,$peerDst,$peerChn,$cmdB,$dst,$b2,$b1 ));
+          CUL_HM_pushConfig($peerHash,$id,$peerDst,0,0,0,0,"0101")#set burstRx
+                     if(CUL_HM_getRxType($peerHash) & 0x80);      #if conBurst
+          CUL_HM_qAutoRead($peerHash->{NAME},3);
+        }
+      $devHash = $peerHash; # Exchange the hash, as the switch is always alive.
       }
     }
-    return ("",1) if ($target && $target eq "remote");#Nothing to transmit for actor
-    $devHash = $peerHash; # Exchange the hash, as the switch is always alive.
+    return ("",1) if ($target && $target eq "remote");#Nothing for actor
   }
   else{
     return "$cmd not impelmented - contact sysop";
