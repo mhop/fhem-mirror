@@ -216,7 +216,7 @@ PCA301_Parse($$)
 
   $rhash->{PCA301_lastRcv} = TimeNow();
 
-  if( $rhash->{channel} != $channel ) {
+  if( $rhash->{channel} ne $channel ) {
     Log3 $rname, 3, "PCA301 $rname, channel changed from $rhash->{channel} to $channel";
 
     $rhash->{channel} = $channel;
