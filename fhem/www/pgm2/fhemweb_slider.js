@@ -1,4 +1,5 @@
 /*************** SLIDER **************/
+
 function
 FW_sliderUpdateLine(d)
 {
@@ -31,7 +32,7 @@ function
 FW_sliderCreate(slider, curr)
 {
   var sh = slider.firstChild;
-  var lastX=-1, offX=0, maxX=0, val=-1;
+  var lastX=-1, offX=0, maxX=0, val;
   var min = parseFloat(slider.getAttribute("min"));
   var stp = parseFloat(slider.getAttribute("stp"));
   var max = parseFloat(slider.getAttribute("max"));
@@ -93,10 +94,12 @@ FW_sliderCreate(slider, curr)
       document.ontouchmove = oldFn3; document.ontouchend = oldFn4;
       if(cmd) {
         if(cmd.substring(0,3) != "js:") {
-          document.location = cmd.replace('%',val);
+          if(typeof val != "undefined")
+            document.location = cmd.replace('%',val);
         }
       } else {
-        slider.nextSibling.setAttribute('value', val);
+        if(typeof val != "undefined")
+          slider.nextSibling.setAttribute('value', val);
       }
     };
   };
