@@ -81,8 +81,6 @@ JeeLink_Define($$)
 
   $hash->{DeviceName} = $dev;
 
-  $hash->{nonce} = 0;
-
   my $ret = DevIo_OpenDev($hash, 0, "JeeLink_DoInit");
   return $ret;
 }
@@ -437,7 +435,7 @@ JeeLink_Parse($$$$)
         JeeLink_SimpleWrite($hash, "0a" ); # led off
         JeeLink_SimpleWrite($hash, "l" );  # list known devices
       } elsif( $dmsg =~m /ec3kSerial/ ) {
-        JeeLink_SimpleWrite($hash, "ec", 1);
+        #JeeLink_SimpleWrite($hash, "ec");
       }
 
     $hash->{STATE} = "Initialized";
@@ -447,7 +445,7 @@ JeeLink_Parse($$$$)
   }
 
   if( $dmsg =~m /drecvintr exit/ ) {
-    JeeLink_SimpleWrite($hash, "ec", 1);
+    JeeLink_SimpleWrite($hash, "ec");
     return;
   }
 
