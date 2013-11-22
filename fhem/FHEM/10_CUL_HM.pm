@@ -3449,17 +3449,13 @@ sub CUL_HM_PushCmdStack($$) {
 sub CUL_HM_ProcessCmdStack($) {
   my ($chnhash) = @_;
   my $hash = CUL_HM_getDeviceHash($chnhash);
-  if($hash->{cmdStack} && !$hash->{helper}{prt}{rspWait}{cmd}){
-    if(@{$hash->{cmdStack}}) {
+  if (!$hash->{helper}{prt}{rspWait}{cmd}){
+    if($hash->{cmdStack} && @{$hash->{cmdStack}}){
       CUL_HM_SndCmd($hash, shift @{$hash->{cmdStack}});
     }
-    elsif(!@{$hash->{cmdStack}}) {
-      #-- update info ---
-      CUL_HM_protState($hash,"CMDs_done");
+    elsif($hash->{helper}{prt}{sProc} != 0){
+      CUL_HM_protState($hash,"CMDs_done");                                    
     }
-  }
-  elsif($hash->{helper}{prt}{sProc} != 0){
-    CUL_HM_protState($hash,"CMDs_done");                                    
   }
   return;
 }
