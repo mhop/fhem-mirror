@@ -1477,6 +1477,7 @@ AssignIoPort($;$)
 
   if($proposed && $defs{$proposed}) {
     $hash->{IODev} = $defs{$proposed};
+    $attr{$hash->{NAME}}{IODev} = $proposed;
     delete($defs{$proposed}{".clientArray"});
     return;
   }
