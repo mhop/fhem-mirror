@@ -129,12 +129,14 @@ OWServer_Define($$)
   }
 
   my $protocol = $a[2];
-  
-  OWServer_CloseDev($hash);
 
   $hash->{fhem}{protocol}= $protocol;
 
-  OWServer_OpenDev($hash);
+  if( $init_done ) {
+    delete $modules{OWServer}{NotifyFn};
+    OWServer_OpenDev($hash);
+  }
+
   return undef;
 }
 
@@ -209,7 +211,10 @@ OWServer_Notify($$)
   delete $modules{OWServer}{NotifyFn};
   delete $hash->{NTFY_ORDER} if($hash->{NTFY_ORDER});
 
-  OWServer_DoInit($hash);
+  foreach my $d (keys %defs) {
+    next if($defs{$d}{TYPE} ne "OWServer");
+    OWServer_OpenDev($hash);
+  }
 
   return undef;
 }
@@ -228,7 +233,7 @@ OWServer_DoInit($)
     readingsEndUpdate($hash,1);
   }
   readingsSingleUpdate($hash, "state", "Initialized", 1);
-  OWServer_Autocreate($hash) if($init_done);
+  OWServer_Autocreate($hash);
   return undef;
 }
 
@@ -346,17 +351,17 @@ OWServer_Autocreate($)
     next if($defs{$d}{TYPE} ne "autocreate");
     return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
   }
-  
+
   my $owserver= $hash->{fhem}{owserver};
 
   my @dir= split(",", $owserver->dir("/"));
   my @devices= grep { m/^\/[0-9a-f]{2}.[0-9a-f]{12}$/i } @dir;
 
-  my @defined = ();
+  my %defined = ();
   foreach my $d (keys %defs) {
     next if($defs{$d}{TYPE} ne "OWDevice");
     if(defined($defs{$d}{fhem}) && defined($defs{$d}{fhem}{address})) {
-      push(@defined,$defs{$d}{fhem}{address});
+      $defined{$defs{$d}{fhem}{address}} = $d;
     }
   }
 
@@ -372,31 +377,21 @@ OWServer_Autocreate($)
       if($owtype !~ m/$type/) {
         Log3 $name, 2, "$name: Autocreate: type '$type' not defined in familycode '$family'. Please report this!";
         next;
+      } elsif( defined($defined{$address}) ) {
+        Log3 $name, 5, "$name address '$address' already defined as '$defined{$address}'";
+        next;
       } else {
-        foreach my $d (keys %defs) {
-          next if($defs{$d}{TYPE} ne "OWDevice");
-          if(defined($defs{$d}{fhem}) &&
-             defined($defs{$d}{fhem}{address}) && $defs{$d}{fhem}{address} eq $address) {
-            Log3 $name, 5, "$name address '$address' already defined as '$defs{$d}{NAME}'";
-            next;
-          } else {
-            my $id= substr($address,3);
-            my $devname= $type . "_" . $id;
-            if(defined($defs{$devname}) || grep {$_ eq $address} @defined) {
-              next;
-            } else {
-              Log3 $name, 5, "$name create new device '$devname' for address '$address'";
-              my $interval= ($family eq "81") ? "" : " 60";
-              my $define= "$devname OWDevice $address" . $interval;
-              my $cmdret;
-              $cmdret= CommandDefine(undef,$define);
-              if($cmdret) {
-                Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for address '$address': $cmdret";
-              } else {
-                $cmdret= CommandAttr(undef,"$devname room OWDevice");
-              }
-            }
-          }
+        my $id= substr($address,3);
+        my $devname= $type . "_" . $id;
+        Log3 $name, 5, "$name create new device '$devname' for address '$address'";
+        my $interval= ($family eq "81") ? "" : " 60";
+        my $define= "$devname OWDevice $address" . $interval;
+        my $cmdret;
+        $cmdret= CommandDefine(undef,$define);
+        if($cmdret) {
+          Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for address '$address': $cmdret";
+        } else {
+          $cmdret= CommandAttr(undef,"$devname room OWDevice");
         }
       }
     }
@@ -530,7 +525,7 @@ OWServer_Set($@)
     to the owserver configuration file
     on the remote host.
     <br><br>
-    
+
   </ul>
 
   <a name="OWServerset"></a>
