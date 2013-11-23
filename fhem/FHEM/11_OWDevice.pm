@@ -353,6 +353,7 @@ OWDevice_Initialize($)
   $hash->{AttrFn}    = "OWDevice_Attr";
 
   $hash->{AttrList}  = "IODev uncached trimvalues polls interfaces model ".  
+                       "resolution:9,10,11,12 ".
                        $readingFnAttributes;
 }
 
@@ -425,8 +426,13 @@ OWDevice_ReadValue($$) {
         my $address= $hash->{fhem}{address};
         my $interface= $hash->{fhem}{interfaces};
         my $cache= (AttrVal($hash->{NAME},"uncached","")) ? "/uncached" : "";
-        my $value= OWDevice_ReadFromServer($hash,"read","$cache/$address/$reading");
-        #Debug "/$address/$reading => $value";  
+        my $path = "$cache/$address/$reading";
+        $path .= AttrVal($hash->{NAME},"resolution","") if( $reading eq "temperature" );
+        my ($seconds, $microseconds) = gettimeofday();
+        my $value= OWDevice_ReadFromServer($hash,"read",$path);
+        my ($seconds2, $microseconds2) = gettimeofday();
+        #my $msec = sprintf( "%03d msec", (($seconds2-$seconds)*1000000 + $microseconds2-$microseconds)/1000 );
+        #Debug "$path => $value; $msec";  
         if($interface ne "id") {
           if(defined($value)) {
             $value= trim($value) if(AttrVal($hash,"trimvalues",1));
@@ -810,6 +816,9 @@ OWDevice_Define($$)
     <li>polls: a comma-separated list of readings to poll. This supersedes the list of default readings to poll.</li>
     <li>interfaces: supersedes the interfaces exposed by that device.</li>
     <li>model: preset with device type, e.g. DS18S20.</li>
+    <li>resolution: resolution of temperature reading in bits, can be 9, 10, 11 or 12. 
+    Lower resolutions allow for faster retrieval of values from the bus. 
+    Particularly reasonable for large 1-wire installations to reduce busy times for FHEM.</li>
     <li><a href="#eventMap">eventMap</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
