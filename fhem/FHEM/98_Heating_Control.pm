@@ -155,15 +155,10 @@ sub Heating_Control_Define($$)
 
   my $now = time();
   if (!defined($hash->{PERLTIMEUPDATEMODE})) {
-     RemoveInternalTimer($hash);
-     InternalTimer ($now+1, "$hash->{TYPE}_Update", $hash, 0);
-  }  else {
-     ;
-  }
-
-  if (!defined($hash->{PERLTIMEUPDATEMODE})) {
      Heating_Control_UpdatePerlTime($hash);
   }
+  RemoveInternalTimer($hash);
+  InternalTimer ($now+1, "$hash->{TYPE}_Update", $hash, 0);
 
   readingsBeginUpdate  ($hash);
   readingsBulkUpdate   ($hash, "nextUpdate",   strftime("Heute, %H:%M:%S",localtime($now+30)));
@@ -506,7 +501,6 @@ sub isHeizung($) {
       } else {
          $setModifier = "";
       }
-
   }
   return $setModifier;
 }
