@@ -615,6 +615,7 @@ OWServer_Set($@)
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br><br>
+  Note: unset <code>nonblocking</code> if you experience lockups of FHEM.
 
 </ul>
 
