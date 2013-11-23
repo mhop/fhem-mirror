@@ -152,16 +152,16 @@ sub Twilight_Define($$)
   return undef;
 }
 ################################################################################
-sub Twilight_Undef($$)
-{
+sub Twilight_Undef($$) {
   my ($hash, $arg) = @_;
 
-  RemoveInternalTimer($hash->{$hash->{SP}{SUNPOS}});
   foreach my $key (keys %{$hash->{TW}}) {
-     my $hashSx = $hash->{$hash->{TW}{$key}{NAME}};
-     RemoveInternalTimer($hashSx);
+     myRemoveInternalTimer($key, $hash);
   }
-  RemoveInternalTimer($hash);
+  myRemoveInternalTimer    ("",         $hash);
+  myRemoveInternalTimer    ("perlTime", $hash);
+  myRemoveInternalTimer    ("sunpos",   $hash);
+
   return undef;
 }
 ################################################################################
@@ -287,30 +287,16 @@ sub myRemoveInternalTimer($$) {
    }
 }
 ################################################################################
-sub Twilight_WeatherTimerSet($)
-{
-  my ($hash) = @_;
-  my $now    = time();
-
-  foreach my $key ("ss_weather", "sr_weather" ) {
-     my $tim = $hash->{TW}{$key}{TIME};
-     if ($tim-60*60>$now) {
-        InternalTimer     ($tim - 60*60, "Twilight_WeatherTimerUpdate", $hash, 0);
-     }
-  }
-}
-################################################################################
-sub Twilight_Midnight($)
-{
+sub Twilight_Midnight($) {
   my ($hash) = @_;
 
   Twilight_TwilightTimes      ($hash, "Mid");
   Twilight_StandardTimerSet   ($hash);
 }
-################################################################################
-sub Twilight_WeatherTimerUpdate($)
-{
-  my ($hash) = @_;
+################################ ################################################
+sub Twilight_WeatherTimerUpdate($) {
+   my ($myHash) = @_;
+   my $hash     = $myHash->{HASH};
 
   Twilight_TwilightTimes      ($hash, "Wea");
   Twilight_StandardTimerSet   ($hash);
@@ -320,16 +306,30 @@ sub Twilight_StandardTimerSet($) {
   my ($hash) = @_;
   my $midnight = time() - Twilight_midnight_seconds() + 24*3600 + 30;
 
-  myRemoveInternalTimer    ("", $hash);
-  myInternalTimer          ("", $midnight,    "Twilight_Midnight", $hash, 0);
-  Twilight_WeatherTimerSet ($hash);
+  myRemoveInternalTimer       ("", $hash);
+  myInternalTimer             ("", $midnight,    "Twilight_Midnight", $hash, 0);
+  Twilight_WeatherTimerSet    ($hash);
+}
+################################################################################
+sub Twilight_WeatherTimerSet($) {
+  my ($hash) = @_;
+  my $now    = time();
+
+  myRemoveInternalTimer    ("perlTime", $hash);
+  foreach my $key ("ss_weather", "sr_weather" ) {
+     my $tim = $hash->{TW}{$key}{TIME};
+     if ($tim-60*60>$now) {
+        myInternalTimer       ("perlTime", $tim-60*60, "Twilight_WeatherTimerUpdate", $hash, 0);
+     }
+  }
 }
 ################################################################################
 sub Twilight_sunposTimerSet($) {
   my ($hash) = @_;
 
-  myRemoveInternalTimer("sunpos", $hash);
-  myInternalTimer ("sunpos", time()+$hash->{SUNPOS_OFFSET},  "Twilight_sunpos", $hash, 0);
+  myRemoveInternalTimer       ("sunpos", $hash);
+  myInternalTimer             ("sunpos", time()+$hash->{SUNPOS_OFFSET},  "Twilight_sunpos", $hash, 0);
+
   $hash->{SUNPOS_OFFSET} = 5*60;
 }
 ################################################################################
@@ -450,7 +450,7 @@ sub Twilight_sunpos($)
 
   my $dLongitude = $hash->{LONGITUDE};
   my $dLatitude  = $hash->{LATITUDE};
-  Log3 $hash, 5, "Compute sunpos for latitude $dLatitude , longitude $dLongitude";
+  Log3 $hash, 5, "Compute sunpos for latitude $dLatitude , longitude $dLongitude" if($dHours == 0 && $dMinutes <= 6 );
 
   my $pi=3.14159265358979323846;
   my $twopi=(2*$pi);
