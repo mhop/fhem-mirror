@@ -3163,7 +3163,8 @@ sub CUL_HM_Set($@) {
                       $culHmRegType{$st}{peerNeedsBurst});
       for(my $i = 1; $i <= $nrCh2Pair; $i++) {
         my $b = ($i==1 ? $b1 : $b2);
-          if ($st eq "virtual"){
+        $b = $b2 if ($pSt eq "smokeDetector");
+        if ($st eq "virtual"){
           my $btnName = CUL_HM_id2Name($dst.sprintf("%02X",$b));
           return "button ".$b." not defined for virtual remote ".$name
               if (!defined $attr{$btnName});
@@ -3171,9 +3172,10 @@ sub CUL_HM_Set($@) {
         }
         else{
           my $bStr = sprintf("%02X",$b);
-            CUL_HM_PushCmdStack($hash,
+          CUL_HM_PushCmdStack($hash,
                  "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerBtn}00");
-            CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,hex($peerBtn),4,$burst)
+          CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,
+                              hex($peerBtn),4,$burst)
                    if($pnb && $cmdB eq "01"); # only if set
           CUL_HM_qAutoRead($name,3);
         }
