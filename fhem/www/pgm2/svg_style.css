@@ -28,3 +28,11 @@ polyline { stroke:black; fill:none; }
 .l4fill{ stroke:#ff0; fill:url(#gr_4); }  text.l4fill{ stroke:none; fill:#ff0; }
 .l5fill{ stroke:#0ff; fill:url(#gr_5); }  text.l5fill{ stroke:none; fill:#0ff; }
 .l6fill{ stroke:#000; fill:url(#gr_6); }  text.l6fill{ stroke:none; fill:#000; }
+
+.l0dot   { stroke:red;   stroke-dasharray:2,4; }  text.ldot { stroke:none; fill:red; } 
+.l1dot   { stroke:green; stroke-dasharray:2,4; }  text.ldot { stroke:none; fill:green; } 
+
+.l0fill_stripe {stroke:red; fill:url(#gr0_stripe);}   text.l0fill_stripe {stroke:none; fill:red;}
+.l1fill_stripe {stroke:green; fill:url(#gr1_stripe);} text.l1fill_stripe {stroke:none; fill:green;}
+
+.l0fill_gyr {stroke:red; fill:url(#gr0_gyr);} text.l0fill_gyr {stroke:none; fill:red;}

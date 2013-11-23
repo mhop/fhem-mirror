@@ -37,6 +37,7 @@ sub SVG_showLog($);
 sub SVG_substcfg($$$$$$);
 sub SVG_time_align($$);
 sub SVG_time_to_sec($);
+sub SVG_openFile($$$);
 
 my ($SVG_lt, $SVG_ltstr);
 my %SVG_devs;       # hash of from/to entries per device
@@ -269,6 +270,13 @@ SVG_PEdit($$$$)
   $ret .= "<td>$desc</td>";
   $ret .=" <td>Y-Axis,Plot-Type,Style,Width</td></tr>";
 
+  my @lineStyles;
+  if(SVG_openFile($FW_cssdir,
+                  AttrVal($FW_wname,"stylesheetPrefix",""), "svg_style.css")) {
+    map { push(@lineStyles,$1) if($_ =~ m/^\.(l[^{ ]*)/) } <FH>;
+    close(FH);
+  }
+
   my $r = 0;
   for($r=0; $r < $max; $r++) {
     $ret .= "<tr class=\"".(($r&1)?"odd":"even")."\"><td>";
@@ -287,8 +295,7 @@ SVG_PEdit($$$$)
       $ls =~ s/class=//g;
       $ls =~ s/"//g; 
     }
-    $ret .= SVG_sel("style_${r}", "l0,l1,l2,l3,l4,l5,l6,l7,l8,".
-                    "l0fill,l1fill,l2fill,l3fill,l4fill,l5fill,l6fill", $ls);
+    $ret .= SVG_sel("style_${r}", join(",", @lineStyles), $ls);
     my $lw = $conf{lWidth}[$r]; 
     if($lw) {
       $lw =~ s/.*stroke-width://g;
@@ -593,68 +600,68 @@ SVG_calcOffsets($$)
     if(AttrVal($FW_wname, "endPlotNow", undef) && !$st) {
       my $t = int(($now + $off*3600 - 3600)/300.0)*300 + 300;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} =
-          sprintf("%04d-%02d-%02d_%02d:%02d:00",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      $SVG_devs{$d}{from} = sprintf("%04d-%02d-%02d_%02d:%02d:00",
+                                        $l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
       @l = localtime($t+3600);
-      $SVG_devs{$d}{to} =
-          sprintf("%04d-%02d-%02d_%02d:%02d:01",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      $SVG_devs{$d}{to} = sprintf("%04d-%02d-%02d_%02d:%02d:01",
+                                        $l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
     } else { 
       my $t = $now + $off*3600;
       my @l = localtime($t);
-      $SVG_devs{$d}{from}
-          = sprintf("%04d-%02d-%02d_%02d:00:00",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+      $SVG_devs{$d}{from} = sprintf("%04d-%02d-%02d_%02d:00:00",
+                                        $l[5]+1900,$l[4]+1,$l[3],$l[2]);
       @l = localtime($t+3600);
-      $SVG_devs{$d}{to}
-          = sprintf("%04d-%02d-%02d_%02d:00:01",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+      $SVG_devs{$d}{to} = sprintf("%04d-%02d-%02d_%02d:00:01",
+                                        $l[5]+1900,$l[4]+1,$l[3],$l[2]);
     }
   } elsif($zoom eq "qday") {
     if(AttrVal($FW_wname, "endPlotNow", undef) && !$st) {
       my $t = int(($now + $off*21600 - 21600)/300.0)*300 + 300;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} =
-          sprintf("%04d-%02d-%02d_%02d:%02d:00",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      $SVG_devs{$d}{from} = sprintf("%04d-%02d-%02d_%02d:%02d:00",
+                                        $l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
       @l = localtime($t+21600);
-      $SVG_devs{$d}{to} =
-          sprintf("%04d-%02d-%02d_%02d:%02d:01",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      $SVG_devs{$d}{to} = sprintf("%04d-%02d-%02d_%02d:%02d:01",
+                                        $l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
     } else { 
       my $t = $now + $off*21600;
       my @l = localtime($t);
       $l[2] = int($l[2]/6)*6;
-      $SVG_devs{$d}{from} =
-          sprintf("%04d-%02d-%02d_%02d:00:00",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+      $SVG_devs{$d}{from} = sprintf("%04d-%02d-%02d_%02d:00:00",
+                                        $l[5]+1900,$l[4]+1,$l[3],$l[2]);
       @l = localtime($t+21600);
       $l[2] = int($l[2]/6)*6;
-      $SVG_devs{$d}{to} =
-          sprintf("%04d-%02d-%02d_%02d:00:01",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+      $SVG_devs{$d}{to} = sprintf("%04d-%02d-%02d_%02d:00:01",
+                                        $l[5]+1900,$l[4]+1,$l[3],$l[2]);
     }
   } elsif($zoom eq "day") {
     if(AttrVal($FW_wname, "endPlotNow", undef) && !$st) {
       my $t = int(($now + $off*86400 - 86400)/900.0)*900 + 900;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} =
-          sprintf("%04d-%02d-%02d_%02d:%02d:00",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      $SVG_devs{$d}{from} = sprintf("%04d-%02d-%02d_%02d:%02d:00",
+                                        $l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
       @l = localtime($t+86400);
-      $SVG_devs{$d}{to} =
-          sprintf("%04d-%02d-%02d_%02d:%02d:01",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      $SVG_devs{$d}{to} = sprintf("%04d-%02d-%02d_%02d:%02d:01",
+                                        $l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
     } else { 
       my $t = $now + $off*86400;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} =
-          sprintf("%04d-%02d-%02d_00:00:00",$l[5]+1900,$l[4]+1,$l[3]);
+      $SVG_devs{$d}{from} = sprintf("%04d-%02d-%02d_00:00:00",
+                                        $l[5]+1900,$l[4]+1,$l[3]);
       @l = localtime($t+86400);
-      $SVG_devs{$d}{to} =
-          sprintf("%04d-%02d-%02d_00:00:01",$l[5]+1900,$l[4]+1,$l[3]);
+      $SVG_devs{$d}{to} = sprintf("%04d-%02d-%02d_00:00:01",
+                                        $l[5]+1900,$l[4]+1,$l[3]);
     }
   } elsif($zoom eq "week") {
     my @l = localtime($now);
     my $start = (AttrVal($FW_wname, "endPlotToday", undef) ? 6 : $l[6]);
     my $t = $now - ($start*86400) + ($off*86400)*7;
     @l = localtime($t);
-    $SVG_devs{$d}{from} = 
-        sprintf("%04d-%02d-%02d_00:00:00",$l[5]+1900,$l[4]+1,$l[3]);
+    $SVG_devs{$d}{from} = sprintf("%04d-%02d-%02d_00:00:00",
+                                        $l[5]+1900,$l[4]+1,$l[3]);
     @l = localtime($t+7*86400);
-    $SVG_devs{$d}{to} = 
-        sprintf("%04d-%02d-%02d_00:00:01",$l[5]+1900,$l[4]+1,$l[3]);
+    $SVG_devs{$d}{to} = sprintf("%04d-%02d-%02d_00:00:01",
+                                        $l[5]+1900,$l[4]+1,$l[3]);
 
  } elsif($zoom eq "month") {
     my ($endDay, @l);
@@ -874,6 +881,20 @@ SVG_digestConf($$)
   return %conf;
 }
 
+sub
+SVG_openFile($$$)
+{
+  my ($dir, $prf, $fName) = @_;
+  my $baseStyle = $prf;
+  $baseStyle =~ s/(touchpad|smallscreen)//;
+  if(open(FH, "$dir/${prf}$fName") ||
+     open(FH, "$dir/${baseStyle}$fName") ||
+     open(FH, "$dir/$fName")) {
+    return 1;
+  }
+  return 0;
+}
+
 #####################################
 sub
 SVG_render($$$$$$$$$)
@@ -917,12 +938,8 @@ SVG_render($$$$$$$$$)
          'xmlns:xlink="http://www.w3.org/1999/xlink" '.$flog.'>';
 
   my $prf = AttrVal($parent_name, "stylesheetPrefix", "");
-  my $baseStyle = $prf; $baseStyle =~ s/(touchpad|smallscreen)//;
-
   SVG_pO "<style type=\"text/css\"><![CDATA[";
-  if(open(FH, "$parent_dir/${prf}svg_style.css") ||
-     open(FH, "$parent_dir/${baseStyle}svg_style.css") ||
-     open(FH, "$parent_dir/svg_style.css")) {
+  if(SVG_openFile($parent_dir, $prf, "svg_style.css")) {
     SVG_pO join("", <FH>);
     close(FH);
   } else {
@@ -932,9 +949,7 @@ SVG_render($$$$$$$$$)
 
   ######################
   # gradient definitions
-  if(open(FH, "$parent_dir/${prf}svg_defs.svg") ||
-     open(FH, "$parent_dir/${baseStyle}svg_defs.svg") ||
-     open(FH, "$parent_dir/svg_defs.svg")) {
+  if(SVG_openFile($parent_dir, $prf, "svg_defs.svg")) {
     SVG_pO join("", <FH>);
     close(FH);
   } else {
