@@ -917,8 +917,11 @@ SVG_render($$$$$$$$$)
          'xmlns:xlink="http://www.w3.org/1999/xlink" '.$flog.'>';
 
   my $prf = AttrVal($parent_name, "stylesheetPrefix", "");
+  my $baseStyle = $prf; $baseStyle =~ s/(touchpad|smallscreen)//;
+
   SVG_pO "<style type=\"text/css\"><![CDATA[";
   if(open(FH, "$parent_dir/${prf}svg_style.css") ||
+     open(FH, "$parent_dir/${baseStyle}svg_style.css") ||
      open(FH, "$parent_dir/svg_style.css")) {
     SVG_pO join("", <FH>);
     close(FH);
@@ -930,6 +933,7 @@ SVG_render($$$$$$$$$)
   ######################
   # gradient definitions
   if(open(FH, "$parent_dir/${prf}svg_defs.svg") ||
+     open(FH, "$parent_dir/${baseStyle}svg_defs.svg") ||
      open(FH, "$parent_dir/svg_defs.svg")) {
     SVG_pO join("", <FH>);
     close(FH);
