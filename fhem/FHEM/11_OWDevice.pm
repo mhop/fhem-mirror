@@ -349,6 +349,7 @@ OWDevice_Initialize($)
   $hash->{GetFn}     = "OWDevice_Get";
   $hash->{SetFn}     = "OWDevice_Set";
   $hash->{DefFn}     = "OWDevice_Define";
+  $hash->{NotifyFn}  = "OWDevice_Notify";
   $hash->{UndefFn}   = "OWDevice_Undef";
   $hash->{AttrFn}    = "OWDevice_Attr";
 
@@ -505,6 +506,7 @@ OWDevice_UpdateValues($) {
           readingsBulkUpdate($hash,"state",$state,0);
           readingsEndUpdate($hash,1);
         }
+        RemoveInternalTimer($hash);
         InternalTimer(int(gettimeofday())+$hash->{fhem}{interval}, "OWDevice_UpdateValues", $hash, 0)
           if(defined($hash->{fhem}{interval}));
 
@@ -664,9 +666,35 @@ OWDevice_Define($$)
           readingsBulkUpdate($hash,"location",$location);
           readingsEndUpdate($hash,1);
         }
-        OWDevice_UpdateValues($hash) if(defined($hash->{fhem}{interval}));
+
+        if( $init_done ) {
+          delete $modules{OWDevice}{NotifyFn};
+          OWDevice_UpdateValues($hash) if(defined($hash->{fhem}{interval}));
+        }
 
         return undef;
+}
+
+sub
+OWDevice_Notify($$)
+{
+  my ($hash,$dev) = @_;
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+
+  return if($dev->{NAME} ne "global" ||
+            !grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}));
+
+  return if($attr{$name} && $attr{$name}{disable});
+
+  delete $modules{OWDevice}{NotifyFn};
+
+  foreach my $d (keys %defs) {
+    next if($defs{$d}{TYPE} ne "OWDevice");
+    OWDevice_UpdateValues($defs{$d}) if(defined($defs{$d}->{fhem}{interval}));
+  }
+
+  return undef;
 }
 ###################################
 
