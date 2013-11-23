@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   version="1.1"
+   width="585"
+   height="585"
+   viewBox="0 0 468 468"
+   id="svg2">
+  <title
+     id="title3840">Fisch-Icon</title>
+  <metadata
+     id="metadata8">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title>Fisch-Icon</dc:title>
+        <dc:creator>
+          <cc:Agent>
+            <dc:title />
+          </cc:Agent>
+        </dc:creator>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs6" />
+  <path
+     d="m 3.9625,267.625 0,2 0,158.075 0,2.025 1.225,0 457.6,0 1.25,0 0,-2.025 0,-158.075 0,-2 -1.25,0 -457.6,0 -1.225,0 z m 11.3,12 437.475,0 0,119.25 -48.575,0 c 0,0 -107.33413,0.0506 -170.025,-51.35 -62.69088,-51.40077 -170.3,-51.45 -170.3,-51.45 l -48.575,0 0,-16.45 z"
+     id="path3886"
+     style="font-size:medium;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-indent:0;text-align:start;text-decoration:none;line-height:normal;letter-spacing:normal;word-spacing:normal;text-transform:none;direction:ltr;block-progression:tb;writing-mode:lr-tb;text-anchor:start;baseline-shift:baseline;color:#000000;fill:#000000;fill-opacity:1;stroke:none;stroke-width:10.39999962;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate;font-family:Sans;-inkscape-font-specification:Sans" />
+  <path
+     d="m 24.192994,231.10831 0,-184.451326 107.136426,0 c 0,0 34.78439,1.56104 53.75228,33.87125 9.94046,16.93568 45.65266,122.967506 45.65266,122.967506 L 304.19084,46.656984 c 0,0 36.25701,0 84.6783,0 75.28265,0 54.6653,91.393606 25.21202,91.393606 -2.79806,0 -5.43418,-0.0884 -3.68165,-0.0884 50.07062,0 42.14771,93.14613 -12.32623,93.14613 -124.99984,0 -124.82312,0 -124.82312,0 l 14.91814,-29.63011 c 0,0 58.90656,-0.19138 94.79548,-0.19138 28.17203,0 39.95332,-49.33432 -10.85361,-49.33432 -8.09962,0 -24.85859,-0.0883 -24.85859,-0.0883 l 12.51771,-29.8215 c 0,0 18.95311,-0.27979 22.84105,-0.27979 28.70219,0 38.83414,-44.180036 -3.32822,-44.180036 -31.66232,0 -52.45639,0 -52.45639,0 l -71.79237,153.525426 -48.598,0 L 154.1558,95.991184 c 0,0 -6.80372,-18.4083 -34.06286,-18.4083 -16.00776,0 -58.346976,0 -58.346976,0 l 0,123.703936 c 0,0 18.21693,0 54.120506,0 30.01287,0 47.86158,-31.66232 47.86158,-31.66232 6.27358,15.68388 13.99033,32.76684 13.99033,32.76684 0,0 -20.07241,28.71697 -45.28444,28.71697 -7.9229,0 -108.240946,0 -108.240946,0"
+     id="path38864"
+     style="fill:#000000;fill-rule:nonzero;stroke:none" />
+</svg>
