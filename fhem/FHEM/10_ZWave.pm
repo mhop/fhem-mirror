@@ -438,13 +438,13 @@ ZWave_ParseMeter($)
   my $prec  = $prectab[($v2 >> 5) & 0x7];
   my $scale = ($v2 >> 3) & 0x3;
   my $size  = ($v2 >> 0) & 0x7;
-  my @txt = ("undef", "power", "gas", "water");
+  my @txt = ("undef", "energy", "gas", "water");
   my $txt = ($v1 > $#txt ? "undef" : $txt[$v1]);
   my %unit = (energy => ["kWh", "kVAh", "W", "pulseCount"],
               gas   => ["m3",  "feet3", "undef", "pulseCount"],
               water => ["m3",  "feet3", "USgallons", "pulseCount"]);
   my $unit = $txt eq "undef" ? "undef" : $unit{$txt}[$scale];
-  $txt = "power" if ($unit == "W");
+  $txt = "power" if ($unit eq "W");
   $v3 = hex(substr($v3, 0, 2*$size))/$prec;
   return "$txt:$v3 $unit";
 }
