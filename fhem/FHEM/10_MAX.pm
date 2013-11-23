@@ -770,7 +770,16 @@ MAX_Parse($$)
 
   } elsif(grep /^$msgtype$/, ("AckConfigValve", "AckConfigTemperatures", "AckSetDisplayActualTemperature" )) {
 
-    readingsBulkUpdate($shash, $args[0], $args[1]);
+    if($args[0] == "windowOpenTemperature"
+    || $args[0] == "comfortTemperature"
+    || $args[0] == "ecoTemperature"
+    || $args[0] == "maximumTemperature"
+    || $args[0] == "minimumTemperature" ) {
+      readingsBulkUpdate($shash, $args[0], MAX_SerializeTemperature($args[1]));
+    } else {
+      #displayActualTemperature, boostDuration, boostValveSetting, maxValve, decalcification, valveOffset
+      readingsBulkUpdate($shash, $args[0], $args[1]);
+    }
 
   } elsif(grep /^$msgtype$/, ("AckSetGroupId", "AckRemoveGroupId" )) {
 
