@@ -307,7 +307,7 @@ sub HMinfo_SetFn($@) {#########################################################
           ."clear "
           ."configCheck param peerCheck peerXref "
           ."protoEvents "
-          ."models regCheck register rssi saveConfig update "
+          ."models msgStat regCheck register rssi saveConfig update "
           ."templateSet templateChk templateList templateDef cpRegs update";
   }
   elsif($cmd eq "clear" )     {##actionImmediate: clear parameter--------------
