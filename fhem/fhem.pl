@@ -795,7 +795,7 @@ AnalyzeCommand($$)
 {
   my ($cl, $cmd) = @_;
 
-  $cmd =~ s/^(\\\n|[ \t])*//;# Strip space or \\n at the begginning
+  $cmd =~ s/^(\n|[ \t])*//;# Strip space or \n at the begginning
   $cmd =~ s/[ \t]*$//;
 
   Log 5, "Cmd: >$cmd<";
