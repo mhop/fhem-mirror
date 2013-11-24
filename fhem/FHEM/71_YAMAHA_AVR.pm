@@ -624,7 +624,7 @@ YAMAHA_AVR_SendCommand($$;$)
     
     # In case any URL changes must be made, this part is separated in this function".
     
-    $response = CustomGetFileFromURL(0, "http://".$address."/YamahaRemoteControl/ctrl", AttrVal($name, "request-timeout", 4) , "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$command, 0, ($hash->{helper}{AVAILABLE} ? $loglevel : 5));
+    $response = CustomGetFileFromURL(0, "http://".$address."/YamahaRemoteControl/ctrl", AttrVal($name, "request-timeout", 4) , "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$command, 0, ($hash->{helper}{AVAILABLE} ? undef : 5));
     
     Log3 $name, 5, "YAMAHA_AVR: got response for $name: $response" if(defined($response));
     
@@ -806,7 +806,7 @@ sub YAMAHA_AVR_getModel($)
     }
     
     # query the description url which contains all zones
-    $response = CustomGetFileFromURL(0, "http://".$address.$desc_url, AttrVal($name, "request-timeout", 4), undef, 0, ($hash->{helper}{AVAILABLE} ?  3 : 5));
+    $response = CustomGetFileFromURL(0, "http://".$address.$desc_url, AttrVal($name, "request-timeout", 4), undef, 0, ($hash->{helper}{AVAILABLE} ?  undef : 5));
     
     Log3 $name, 3, "YAMAHA_AVR: could not get unit description from device $name. Please turn on the device or check for correct hostaddress!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
     
