@@ -207,8 +207,8 @@ my %culHmModel=(
   "00A8" => {name=>"HM-WDS30-OT2-SM"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"T1:1:1,T2:2:2,T1_T2:3:3,T2_T1:4:4,Event:5:5",},
   "00A9" => {name=>"HM-PB-6-WM55"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:6",},
   "00AB" => {name=>"HM-LC-SW4-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"Sw:1:4",},
-  "00AC" => {name=>"HM-ES-PMSw1-Pl"          ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1,1:2.3.4.5.6,3:1'
-                                                                                                                        ,chn=>"Sw:1:4,Pwr:2:2,CondP:3:3,CondI:4:4,CondU:5:5,CondF:6:6",},
+  "00AC" => {name=>"HM-ES-PMSw1-Pl"          ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
+                                                                                                                        ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"},
   "00AD" => {name=>"HM-TC-IT-WM-W-EU"        ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p:1p.2p.6p.7p,3:3p.6p,1,7:2,8:2,9:2'
                                                                                                                         ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,remote:6:6,SwitchTr:7:7",},
   "00AF" => {name=>"HM-OU-CM-PCB"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"",},
@@ -477,21 +477,28 @@ my %culHmRegDefine = (
   meaLength       =>{a=>108.0,s=>2  ,l=>1,min=>110,max=>310     ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>""},
   useCustom       =>{a=>110.0,s=>1  ,l=>1,min=>110,max=>310     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"use custom"      ,lit=>{off=>0,on=>1}},
 
-  averaging       =>{a=>122.0,s=>1  ,l=>1,min=>1    ,max=>16      ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"averaging period"},
-  txMinDly        =>{a=>123.0,s=>0.7,l=>1,min=>0    ,max=>16      ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"min transmit delay"},
-  txThrPwr        =>{a=>124.0,s=>3  ,l=>1,min=>0.01 ,max=>3680    ,c=>''         ,f=>100     ,u=>'W'   ,d=>1,t=>"threshold power"},
-  txThrCur        =>{a=>127.0,s=>2  ,l=>1,min=>1    ,max=>16000   ,c=>''         ,f=>''      ,u=>'mA'  ,d=>1,t=>"threshold current"},
-  txThrVlt        =>{a=>129.0,s=>2  ,l=>1,min=>0.1  ,max=>230     ,c=>''         ,f=>10      ,u=>'V'   ,d=>1,t=>"threshold voltage"},
-  txThrFrq        =>{a=>131.0,s=>1  ,l=>1,min=>0.01 ,max=>2.55    ,c=>''         ,f=>100     ,u=>'Hz'  ,d=>1,t=>"threshold frequency"},
+  averaging       =>{a=>122.0,s=>1  ,l=>1,min=>1    ,max=>16    ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"averaging period"},
+  txMinDly        =>{a=>123.0,s=>0.7,l=>1,min=>0    ,max=>16    ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"min transmit delay"},
+  txThrPwr        =>{a=>124.0,s=>3  ,l=>1,min=>0.01 ,max=>3680  ,c=>''         ,f=>100     ,u=>'W'   ,d=>1,t=>"threshold power"},
+  txThrCur        =>{a=>127.0,s=>2  ,l=>1,min=>1    ,max=>16000 ,c=>''         ,f=>''      ,u=>'mA'  ,d=>1,t=>"threshold current"},
+  txThrVlt        =>{a=>129.0,s=>2  ,l=>1,min=>0.1  ,max=>230   ,c=>''         ,f=>10      ,u=>'V'   ,d=>1,t=>"threshold voltage"},
+  txThrFrq        =>{a=>131.0,s=>1  ,l=>1,min=>0.01 ,max=>2.55  ,c=>''         ,f=>100     ,u=>'Hz'  ,d=>1,t=>"threshold frequency"},
+                                                                
+  cndTxFalling    =>{a=>132.0,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if falling"                ,lit=>{off=>0,on=>1}},
+  cndTxRising     =>{a=>132.1,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if rising"                 ,lit=>{off=>0,on=>1}},
+  cndTxCycBelow   =>{a=>132.2,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if cond is below threshold",lit=>{off=>0,on=>1}},
+  cndTxCycAbove   =>{a=>132.3,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if cond is above threshold",lit=>{off=>0,on=>1}},
+  cndTxCycAbove   =>{a=>133  ,s=>1  ,l=>1,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"trigger if decission is above"},
+  cndTxCycBelow   =>{a=>134  ,s=>1  ,l=>1,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"trigger if decission is below"},
 
-  txThrLoPwr      =>{a=>135.0,s=>4  ,l=>1,min=>0    ,max=>3680    ,c=>''         ,f=>'100'   ,u=>'W'   ,d=>1,t=>"threshold low power"},
-  txThrHiPwr      =>{a=>139.0,s=>4  ,l=>1,min=>0    ,max=>3680    ,c=>''         ,f=>'100'   ,u=>'W'   ,d=>1,t=>"threshold high power"},
-  txThrLoCur      =>{a=>135.0,s=>4  ,l=>1,min=>0    ,max=>16000   ,c=>''         ,f=>'100'   ,u=>'mA'  ,d=>1,t=>"threshold low current"},
-  txThrHiCur      =>{a=>139.0,s=>4  ,l=>1,min=>0    ,max=>16000   ,c=>''         ,f=>'100'   ,u=>'mA'  ,d=>1,t=>"threshold high current"},
-  txThrLoVlt      =>{a=>135.0,s=>4  ,l=>1,min=>115  ,max=>255     ,c=>''         ,f=>'100'   ,u=>'V'   ,d=>1,t=>"threshold low voltage"},
-  txThrHiVlt      =>{a=>139.0,s=>4  ,l=>1,min=>115  ,max=>255     ,c=>''         ,f=>'100'   ,u=>'V'   ,d=>1,t=>"threshold high voltage"},
-  txThrLoFrq      =>{a=>135.0,s=>4  ,l=>1,min=>48.72,max=>51.27   ,c=>''         ,f=>'100'   ,u=>'Hz'  ,d=>1,t=>"threshold low frequency"},
-  txThrHiFrq      =>{a=>139.0,s=>4  ,l=>1,min=>48.72,max=>51.27   ,c=>''         ,f=>'100'   ,u=>'Hz'  ,d=>1,t=>"threshold high frequency"},
+  txThrLoPwr      =>{a=>135.0,s=>4  ,l=>1,min=>0    ,max=>3680  ,c=>''         ,f=>'100'   ,u=>'W'   ,d=>1,t=>"threshold low power"},
+  txThrHiPwr      =>{a=>139.0,s=>4  ,l=>1,min=>0    ,max=>3680  ,c=>''         ,f=>'100'   ,u=>'W'   ,d=>1,t=>"threshold high power"},
+  txThrLoCur      =>{a=>135.0,s=>4  ,l=>1,min=>0    ,max=>16000 ,c=>''         ,f=>'100'   ,u=>'mA'  ,d=>1,t=>"threshold low current"},
+  txThrHiCur      =>{a=>139.0,s=>4  ,l=>1,min=>0    ,max=>16000 ,c=>''         ,f=>'100'   ,u=>'mA'  ,d=>1,t=>"threshold high current"},
+  txThrLoVlt      =>{a=>135.0,s=>4  ,l=>1,min=>115  ,max=>255   ,c=>''         ,f=>'100'   ,u=>'V'   ,d=>1,t=>"threshold low voltage"},
+  txThrHiVlt      =>{a=>139.0,s=>4  ,l=>1,min=>115  ,max=>255   ,c=>''         ,f=>'100'   ,u=>'V'   ,d=>1,t=>"threshold high voltage"},
+  txThrLoFrq      =>{a=>135.0,s=>4  ,l=>1,min=>48.72,max=>51.27 ,c=>''         ,f=>'100'   ,u=>'Hz'  ,d=>1,t=>"threshold low frequency"},
+  txThrHiFrq      =>{a=>139.0,s=>4  ,l=>1,min=>48.72,max=>51.27 ,c=>''         ,f=>'100'   ,u=>'Hz'  ,d=>1,t=>"threshold high frequency"},
 
   evtFltrPeriod   =>{a=>  1.0,s=>0.4,l=>1,min=>0.5,max=>7.5     ,c=>''         ,f=>2       ,u=>'s'   ,d=>1,t=>"event filter period"},
   evtFltrNum      =>{a=>  1.4,s=>0.4,l=>1,min=>1  ,max=>15      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"sensitivity - read each n-th puls"},
@@ -704,7 +711,7 @@ my %culHmRegType = (
                     },
   sensRain            =>{ transmDevTryMax =>1,localResDis     =>1},
   tipTronic           =>{ cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,localResDis     =>1,RS485IdleTime   =>1},
-  powerMeter          =>{ intKeyVisib     =>1},
+  powerMeter          =>{ intKeyVisib     =>1,localResDis     =>1},
 
 );
 #clones - - - - - - - - - - - - - - -
@@ -817,7 +824,6 @@ my %culHmRegModel = (
   "HM-TC-IT-WM-W-EU"  =>{ burstRx         =>1,cyclicInfoMsgDis=>1,localResDis     =>1,cyclicInfoMsg   =>1
                          ,btnLock         =>1,globalBtnLock   =>1,modusBtnLock    =>1,lowBatLimitRT   =>1
                         },
-  "HM-ES-PMSw1-Pl"    =>{ localResDis     =>1},
   );
 
 #clones - - - - - - - - - - - - - - -
@@ -939,37 +945,36 @@ my %culHmRegChan = (# if channelspecific then enter them here
                          ,noMinMax4Manu   =>1,daylightSaveTime=>1,sendWeatherData =>1
                          ,modePrioParty   =>1,modePrioManu    =>1,weekPrgSel      =>1
                          },
+  "HM-ES-PMSw1-Pl01"  =>{ OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1
+                         ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1
+                         ,ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1
+                         ,lgMultiExec     =>1
+                          },
   "HM-ES-PMSw1-Pl02"  =>{ averaging       =>1
                          ,txMinDly        =>1,txThrPwr        =>1,txThrCur        =>1,txThrVlt        =>1,txThrFrq        =>1
-                         },
-  "HM-ES-PMSw1-Pl04"  =>{ txThrLoPwr      =>1,txThrHiPwr      =>1
-                         ,CtDlyOn         =>1,CtDlyOff        =>1,CtOn            =>1,CtOff           =>1
-                         ,CtValLo         =>1,CtValHi         =>1
-                         ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
-                         ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
-                         ,ActionType      =>1
-                         },
-  "HM-ES-PMSw1-Pl04"  =>{ txThrLoCur      =>1,txThrHiCur      =>1
-                         ,CtDlyOn         =>1,CtDlyOff        =>1,CtOn            =>1,CtOff           =>1
-                         ,CtValLo         =>1,CtValHi         =>1
-                         ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
-                         ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
-                         ,ActionType      =>1
-                         },
-  "HM-ES-PMSw1-Pl05"  =>{ txThrLoVlt      =>1,txThrHiVlt      =>1
-                         ,CtDlyOn         =>1,CtDlyOff        =>1,CtOn            =>1,CtOff           =>1
-                         ,CtValLo         =>1,CtValHi         =>1
-                         ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
-                         ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
-                         ,ActionType      =>1
-                         },
-  "HM-ES-PMSw1-Pl06"  =>{ txThrLoFrq      =>1,txThrHiFrq      =>1
-                         ,CtDlyOn         =>1,CtDlyOff        =>1,CtOn            =>1,CtOff           =>1
-                         ,CtValLo         =>1,CtValHi         =>1
-                         ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
-                         ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
-                         ,ActionType      =>1
-                         },
+                          },
+  "HM-ES-PMSw1-Pl03"  =>{ txThrLoPwr      =>1,txThrHiPwr      =>1,peerNeedsBurst  =>1,expectAES       =>1
+                         ,ledOnTime       =>1,transmitTryMax  =>1,
+                         ,cndTxFalling    =>1,cndTxRising     =>1,
+                         ,cndTxCycBelow   =>1,cndTxCycAbove   =>1,cndTxDecAbove   =>1,cndTxDecBelow   =>1,
+                          },
+  "HM-ES-PMSw1-Pl04"  =>{ txThrLoCur      =>1,txThrHiCur      =>1,peerNeedsBurst  =>1,expectAES       =>1
+                         ,ledOnTime       =>1,transmitTryMax  =>1,
+                         ,cndTxFalling    =>1,cndTxRising     =>1,
+                         ,cndTxCycBelow   =>1,cndTxCycAbove   =>1,cndTxDecAbove   =>1,cndTxDecBelow   =>1,
+                          },
+  "HM-ES-PMSw1-Pl05"  =>{ txThrLoVlt      =>1,txThrHiVlt      =>1,peerNeedsBurst  =>1,expectAES       =>1
+                         ,ledOnTime       =>1,transmitTryMax  =>1,
+                         ,cndTxFalling    =>1,cndTxRising     =>1,
+                         ,cndTxCycBelow   =>1,cndTxCycAbove   =>1,cndTxDecAbove   =>1,cndTxDecBelow   =>1,
+                          },
+  "HM-ES-PMSw1-Pl06"  =>{ txThrLoFrq      =>1,txThrHiFrq      =>1,peerNeedsBurst  =>1,expectAES       =>1
+                         ,ledOnTime       =>1,transmitTryMax  =>1,
+                         ,cndTxFalling    =>1,cndTxRising     =>1,
+                         ,cndTxCycBelow   =>1,cndTxCycAbove   =>1,cndTxDecAbove   =>1,cndTxDecBelow   =>1,
+                          },
   );
 
 #clones - - - - - - - - - - - - - - -
@@ -1144,54 +1149,63 @@ $culHmModelSets{"HM-OU-CM-PCB"} = $culHmModelSets{"HM-OU-CFM-PL"};
 #%{$culHmModelSets{"HM-RC-19-SW"}} = %{$culHmModelSets{"HM-RC-19"}}; copy
 
 my %culHmChanSets = (
-  "HM-CC-TC00"     =>{ "desired-temp" =>"[on|off|6.0..30.0]"
-                      ,statusRequest  =>""
-                      ,sysTime        =>""
-                      ,getSerial      => ""},
-  "HM-CC-TC02"     =>{ peerChan       =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"
-                      ,"desired-temp" =>"[on|off|6.0..30.0]"
-                      ,tempListSat    =>"[prep|exec] HH:MM temp ..."
-                      ,tempListSun    =>"[prep|exec] HH:MM temp ..."
-                      ,tempListMon    =>"[prep|exec] HH:MM temp ..."
-                      ,tempListTue    =>"[prep|exec] HH:MM temp ..."
-                      ,tempListThu    =>"[prep|exec] HH:MM temp ..."
-                      ,tempListWed    =>"[prep|exec] HH:MM temp ..."
-                      ,tempListFri    =>"[prep|exec] HH:MM temp ..."
-                      ,partyMode      =>"[prep|exec] HH:MM durationDays ..."
-                      ,displayMode    =>"[temp-only|temp-hum]"
-                      ,displayTemp    =>"[actual|setpoint]"
-                      ,displayTempUnit=>"[celsius|fahrenheit]"
-                      ,controlMode    =>"[auto|manual|central|party]"
-                      ,statusRequest  =>""
-                      ,sysTime        =>""},
-  "HM-SEC-WIN01"   =>{ stop           =>"",
-                       level          =>"<level> <relockDly> <speed>..."},
-  "HM-OU-CFM-PL01" =>{ led            =>"<color>[,<color>...] [<repeat>]"},
-  "HM-OU-CFM-PL02" =>{ playTone       =>"<MP3No>[,<MP3No>...] [<repeat>]"},
-
-  "WDF-solar01"    =>{ peerChan       =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"},
-  "HM-Sen-RD-O01"  =>{ peerChan       =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"},
-  "HM-Sen-RD-O02"  =>{ "on-for-timer" =>"<sec>"
-                      ,"on-till"      =>"<time>"
-                      ,on             =>""
-                      ,off            =>""
-                      ,toggle         =>""},
-  "HM-CC-RT-DN00"  =>{ sysTime        =>""},
-  "HM-CC-RT-DN02"  =>{ sysTime        =>""},
-  "HM-CC-RT-DN04"  =>{ controlMode    =>"[auto|boost|day|night]"
-                      ,controlManu    =>"[on|off|5.0..30.0]"
-                      ,controlParty   =>"<temp> <startDate> <startTime> <enddate> <endTime>"
-                      ,tempListSat    =>"[prep|exec] HH:MM temp ..."
-                      ,tempListSun    =>"[prep|exec] HH:MM temp ..."
-                      ,tempListMon    =>"[prep|exec] HH:MM temp ..."
-                      ,tempListTue    =>"[prep|exec] HH:MM temp ..."
-                      ,tempListThu    =>"[prep|exec] HH:MM temp ..."
-                      ,tempListWed    =>"[prep|exec] HH:MM temp ..."
-                      ,tempListFri    =>"[prep|exec] HH:MM temp ..."
-                      ,"desired-temp" =>"[on|off|5.0..30.0]"
-                      ,sysTime        =>""
-                     },
-  "HM-CC-RT-DN05"  =>{ peerChan       =>" 0 <actChn> ... [single] [set|unset] [actor|remote|both]"},
+  "HM-CC-TC00"        =>{ "desired-temp" =>"[on|off|6.0..30.0]"
+                         ,statusRequest  =>""
+                         ,sysTime        =>""
+                         ,getSerial      => ""},
+  "HM-CC-TC02"        =>{ peerChan       =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"
+                         ,"desired-temp" =>"[on|off|6.0..30.0]"
+                         ,tempListSat    =>"[prep|exec] HH:MM temp ..."
+                         ,tempListSun    =>"[prep|exec] HH:MM temp ..."
+                         ,tempListMon    =>"[prep|exec] HH:MM temp ..."
+                         ,tempListTue    =>"[prep|exec] HH:MM temp ..."
+                         ,tempListThu    =>"[prep|exec] HH:MM temp ..."
+                         ,tempListWed    =>"[prep|exec] HH:MM temp ..."
+                         ,tempListFri    =>"[prep|exec] HH:MM temp ..."
+                         ,partyMode      =>"[prep|exec] HH:MM durationDays ..."
+                         ,displayMode    =>"[temp-only|temp-hum]"
+                         ,displayTemp    =>"[actual|setpoint]"
+                         ,displayTempUnit=>"[celsius|fahrenheit]"
+                         ,controlMode    =>"[auto|manual|central|party]"
+                         ,statusRequest  =>""
+                         ,sysTime        =>""},
+  "HM-SEC-WIN01"      =>{ stop           =>"",
+                          level          =>"<level> <relockDly> <speed>..."},
+  "HM-OU-CFM-PL01"    =>{ led            =>"<color>[,<color>...] [<repeat>]"},
+  "HM-OU-CFM-PL02"    =>{ playTone       =>"<MP3No>[,<MP3No>...] [<repeat>]"},
+                      
+  "WDF-solar01"       =>{ peerChan       =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"},
+  "HM-Sen-RD-O01"     =>{ peerChan       =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"},
+  "HM-Sen-RD-O02"     =>{ "on-for-timer" =>"<sec>"
+                         ,"on-till"      =>"<time>"
+                         ,on             =>""
+                         ,off            =>""
+                         ,toggle         =>""},
+  "HM-CC-RT-DN00"     =>{ sysTime        =>""},
+  "HM-CC-RT-DN02"     =>{ sysTime        =>""},
+  "HM-CC-RT-DN04"     =>{ controlMode    =>"[auto|boost|day|night]"
+                         ,controlManu    =>"[on|off|5.0..30.0]"
+                         ,controlParty   =>"<temp> <startDate> <startTime> <enddate> <endTime>"
+                         ,tempListSat    =>"[prep|exec] HH:MM temp ..."
+                         ,tempListSun    =>"[prep|exec] HH:MM temp ..."
+                         ,tempListMon    =>"[prep|exec] HH:MM temp ..."
+                         ,tempListTue    =>"[prep|exec] HH:MM temp ..."
+                         ,tempListThu    =>"[prep|exec] HH:MM temp ..."
+                         ,tempListWed    =>"[prep|exec] HH:MM temp ..."
+                         ,tempListFri    =>"[prep|exec] HH:MM temp ..."
+                         ,"desired-temp" =>"[on|off|5.0..30.0]"
+                         ,sysTime        =>""
+                        },
+  "HM-CC-RT-DN05"     =>{ peerChan       =>" 0 <actChn> ... [single] [set|unset] [actor|remote|both]"},
+  "HM-ES-PMSw1-Pl01"  =>{ "on-for-timer" =>"<sec>"
+                         ,"on-till"      =>"<time>"
+                         ,on             =>""
+                         ,off            =>""
+                         ,toggle         =>""
+                         ,press          =>"[long|short] [on|off] ..."
+                         ,inhibit        =>"[on|off]"
+                         ,statusRequest  =>""},
+  "HM-ES-PMSw1-Pl03"  =>{ peerChan       =>" 0 <actChn> ... [single] [set|unset] [actor|remote|both]"},
 );
 # clones- - - - - - - - - - - - - - - - -
 #$culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};
@@ -1200,6 +1214,9 @@ $culHmChanSets{"HM-CC-RT-DN-BoM00"}= $culHmSubTypeSets{"HM-CC-RT-DN00"};
 $culHmChanSets{"HM-CC-RT-DN-BoM02"}= $culHmSubTypeSets{"HM-CC-RT-DN02"};
 $culHmChanSets{"HM-CC-RT-DN-BoM04"}= $culHmSubTypeSets{"HM-CC-RT-DN04"};
 $culHmChanSets{"HM-CC-RT-DN-BoM05"}= $culHmSubTypeSets{"HM-CC-RT-DN05"};
+$culHmChanSets{"HM-ES-PMSw1-Pl04"} = $culHmSubTypeSets{"HM-ES-PMSw1-Pl03"};
+$culHmChanSets{"HM-ES-PMSw1-Pl05"} = $culHmSubTypeSets{"HM-ES-PMSw1-Pl03"};
+$culHmChanSets{"HM-ES-PMSw1-Pl06"} = $culHmSubTypeSets{"HM-ES-PMSw1-Pl03"};
 
 # RC send BCAST to specific address. Is the meaning understood?
 my @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "CFG", "Bit3",
@@ -1380,6 +1397,20 @@ my %culHmBits = (
                      CMD      => "00,2",
                      desTemp  => '02,2,$val=((hex($val)>>2) /2)',
                      mode     => '02,2,$val=(hex($val) & 0x3)',} },
+  "5E"          => { txt => "powerEvntCyc" , params => {
+                     energy   => '00,3,$val=((hex($val)) /10)',
+                     power    => '00,3,$val=((hex($val)) /100)',
+                     current  => '00,3,$val=((hex($val)) /1)',
+                     voltage  => '00,3,$val=((hex($val)) /10)',
+                     frequency=> '00,3,$val=((hex($val)) /100+50)',
+                     } },
+  "5F"          => { txt => "powerEvnt" , params => {
+                     energy   => '00,3,$val=((hex($val)) /10)',
+                     power    => '00,3,$val=((hex($val)) /100)',
+                     current  => '00,3,$val=((hex($val)) /1)',
+                     voltage  => '00,3,$val=((hex($val)) /10)',
+                     frequency=> '00,3,$val=((hex($val)) /100+50)',
+                     } },
   "70"          => { txt => "WeatherEvent", params => {
                      TEMP     => '00,4,$val=((hex($val)&0x3FFF)/10)*((hex($val)&0x4000)?-1:1)',
                      HUM      => '04,2,$val=(hex($val))', } },

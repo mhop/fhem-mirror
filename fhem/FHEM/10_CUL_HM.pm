@@ -1148,6 +1148,37 @@ sub CUL_HM_Parse($$) {##############################
       push @event,"state:$btnName $state$target";
     }
   }
+  elsif($st eq "powerMeter") {##########################
+    if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
+        ($mTp eq "10" && $p =~ m/^06/)) {  #    or Info_Status message here
+
+      my ($subType,$chn,$val,$err) = ($1,hex($2),hex($3)/2,hex($4))
+                          if($p =~ m/^(..)(..)(..)(..)/);
+      $chn = sprintf("%02X",$chn&0x3f);
+      my $chId = $src.$chn;
+      $shash = $modules{CUL_HM}{defptr}{$chId}
+                             if($modules{CUL_HM}{defptr}{$chId});
+      my $vs = ($val==100 ? "on":($val==0 ? "off":"$val %")); # user string...
+
+      push @event,"level:$val %";
+      push @event,"pct:$val"; # duplicate to level - necessary for "slider"
+      push @event,"deviceMsg:$vs$target" if($chn ne "00");
+      my $eventName = "switch";
+      my $action; #determine action
+      push @event, "timedOn:".(($err&0x40)?"running":"off");
+    }
+    elsif ($mTp eq "5E" ||$mTp eq "5F" ) {  #    POWER_EVENT_CYCLIC
+      $shash = $modules{CUL_HM}{defptr}{$src."02"}
+                             if($modules{CUL_HM}{defptr}{$src."02"});
+      my ($eCnt,$P,$I,$U,$F) = unpack 'A6A6A4A4A2',$p;
+      push @event, "energy:"   .(hex($eCnt)&0x7fffff)/10;# 0.0  ..838860.7  Wh
+      push @event, "power:"    . hex($P   )/100;         # 0.0  ..167772.15 W
+      push @event, "current:"  . hex($I   )/1;           # 0.0  ..65535.0   mA
+      push @event, "voltage:"  . hex($U   )/10;          # 0.0  ..6553.5    mV
+      push @event, "frequency:". hex($F   )/100+50;      # 48.72..51.27     Hz
+      push @event, "boot:"     .((hex($eCnt)&0x800000)?"on":"off");
+    }
+  }
   elsif($st eq "repeater"){ ###################################################
     if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
         ($mTp eq "10" && $p =~ m/^06/)) {  #or Info_Status message here
@@ -1757,7 +1788,10 @@ sub CUL_HM_parseCommon(@){#####################################################
     elsif($subType eq "02" ||$subType eq "03"){ #ParamResp==================
       my $msgValid = 0;
       if ($pendType eq "RegisterRead"){
-        if($shash->{helper}{prt}{rspWait}{mNo} == hex($mNo)){#next message
+        if($shash->{helper}{prt}{rspWait}{mNoSeq}){#ignore msgNumber
+          $msgValid = 1;
+        }
+        elsif($shash->{helper}{prt}{rspWait}{mNo} == hex($mNo)){#next message
           $shash->{helper}{prt}{rspWait}{mNo}++;
           $shash->{helper}{prt}{rspWait}{mNo} &= 0xff;
           $msgValid = 1;
@@ -3524,10 +3558,12 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
         my ($peer, $list) = ($1,$2) if ($p =~ m/..04(........)(..)/);
         $peer = ($peer ne "00000000")?CUL_HM_peerChName($peer,$dst,""):"";
         #--- set messaging items
+        my $mNoSeq =(AttrVal($hash->{NAME},"model","") eq "HM-PB-4DIS-WM")?"1":"0";
         CUL_HM_respWaitSu ($hash,"Pending:=RegisterRead"
                                 ,"cmd:=$cmd" ,"forChn:=$chn"
                                 ,"forList:=$list","forPeer:=$peer"
                                 ,"mNo:=".hex($mNo)
+                                ,"mNoSeq:=$mNoSeq"
                                 ,"reSent:=1");
         #--- remove channel entries that will be replaced
         my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
