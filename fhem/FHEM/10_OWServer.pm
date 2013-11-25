@@ -107,6 +107,7 @@ OWServer_Initialize($)
 # Consumer
   $hash->{DefFn}   = "OWServer_Define";
   $hash->{NotifyFn}= "OWServer_Notify";
+  $hash->{NotifyOrderPrefix}= "50a-";
   $hash->{UndefFn} = "OWServer_Undef";
   $hash->{GetFn}   = "OWServer_Get";
   $hash->{SetFn}   = "OWServer_Set";
