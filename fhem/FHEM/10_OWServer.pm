@@ -214,7 +214,7 @@ OWServer_Notify($$)
 
   foreach my $d (keys %defs) {
     next if($defs{$d}{TYPE} ne "OWServer");
-    OWServer_OpenDev($hash);
+    OWServer_OpenDev($defs{$d});
   }
 
   return undef;
