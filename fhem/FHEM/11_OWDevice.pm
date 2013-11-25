@@ -350,6 +350,7 @@ OWDevice_Initialize($)
   $hash->{SetFn}     = "OWDevice_Set";
   $hash->{DefFn}     = "OWDevice_Define";
   $hash->{NotifyFn}  = "OWDevice_Notify";
+  $hash->{NotifyOrderPrefix}= "50b-";
   $hash->{UndefFn}   = "OWDevice_Undef";
   $hash->{AttrFn}    = "OWDevice_Attr";
 
@@ -651,24 +652,9 @@ OWDevice_Define($$)
         $hash->{fhem}{alerting}= $alerting;
         Log3 $name, 5, "$name: alerting: $alerting";
 
-        $hash->{fhem}{bus}= OWDevice_ReadFromServer($hash,"find",$hash->{fhem}{address});
-        $attr{$name}{model}= OWDevice_ReadValue($hash, "type");
-        if($interface eq "id" && !defined($hash->{fhem}{interval})) {
-          my $dir= OWDevice_ReadFromServer($hash,"dir","/");
-          my $present= ($dir =~ m/$hash->{fhem}{address}/) ? 1 :0;
-          my $bus= OWDevice_ReadFromServer($hash,"find",$hash->{fhem}{address});
-          my $location= (defined($bus)) ? $bus :"absent";
-          my $id= OWDevice_Get($hash, $name, "id");
-          readingsBeginUpdate($hash);
-          readingsBulkUpdate($hash,"id",$id);
-          readingsBulkUpdate($hash,"present",$present);
-          readingsBulkUpdate($hash,"state","present: $present",0);
-          readingsBulkUpdate($hash,"location",$location);
-          readingsEndUpdate($hash,1);
-        }
-
         if( $init_done ) {
           delete $modules{OWDevice}{NotifyFn};
+          OWDevice_InitValues($hash);
           OWDevice_UpdateValues($hash) if(defined($hash->{fhem}{interval}));
         }
 
@@ -691,10 +677,34 @@ OWDevice_Notify($$)
 
   foreach my $d (keys %defs) {
     next if($defs{$d}{TYPE} ne "OWDevice");
+    OWDevice_InitValues($defs{$d});
     OWDevice_UpdateValues($defs{$d}) if(defined($defs{$d}->{fhem}{interval}));
   }
 
   return undef;
+}
+sub
+OWDevice_InitValues($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  $hash->{fhem}{bus}= OWDevice_ReadFromServer($hash,"find",$hash->{fhem}{address});
+  $attr{$name}{model}= OWDevice_ReadValue($hash, "type");
+
+  if($hash->{fhem}{interfaces} eq "id" && !defined($hash->{fhem}{interval})) {
+    my $dir= OWDevice_ReadFromServer($hash,"dir","/");
+    my $present= ($dir =~ m/$hash->{fhem}{address}/) ? 1 :0;
+    my $bus= OWDevice_ReadFromServer($hash,"find",$hash->{fhem}{address});
+    my $location= (defined($bus)) ? $bus :"absent";
+    my $id= OWDevice_Get($hash, $name, "id");
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash,"id",$id);
+    readingsBulkUpdate($hash,"present",$present);
+    readingsBulkUpdate($hash,"state","present: $present",0);
+    readingsBulkUpdate($hash,"location",$location);
+    readingsEndUpdate($hash,1);
+  }
 }
 ###################################
 
