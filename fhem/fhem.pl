@@ -511,7 +511,7 @@ while (1) {
   # attached again.
   foreach my $p (keys %selectlist) {
     my $hash = $selectlist{$p};
-    next if(!$hash || !$hash->{NAME}); # due to rereadcfg/del
+    next if(!$hash || !$hash->{NAME} || !$defs{$hash->{NAME}}); # due to delete
 
     CallFn($hash->{NAME}, "ReadFn", $hash)
       if(defined($hash->{FD}) && vec($rout, $hash->{FD}, 1));
