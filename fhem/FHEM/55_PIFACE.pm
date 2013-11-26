@@ -133,6 +133,8 @@ sub PIFACE_Get($@){
 		$val = `$cmd`;
 		$cmd = '/usr/local/bin/gpio -p read '.$adr;
 		$val = `$cmd`;
+		$val =~ s/\n//g;
+		$val =~ s/\r//g;
 		readingsSingleUpdate($hash, 'in'.$port, $val, 1);
 	} else {
 		# read all inports and outports
