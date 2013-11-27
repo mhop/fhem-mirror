@@ -661,7 +661,7 @@ FW_digestCgi($)
     my ($p,$v) = split("=",$pv, 2);
 
     # Multiline: escape the NL for fhem
-    $v =~ s/[\r]\n/\\\n/g if($v && $p && $p ne "data");
+    $v =~ s/[\r]//g if($v && $p && $p ne "data");
     $FW_webArgs{$p} = $v;
 
     if($p eq "detail")       { $FW_detail = $v; }
