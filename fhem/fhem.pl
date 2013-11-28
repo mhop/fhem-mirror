@@ -171,6 +171,8 @@ use vars qw($devcount);	        # To sort the devices
 use vars qw(%defaultattr);    	# Default attributes, used by FHEM2FHEM
 use vars qw(%addNotifyCB);	# Used by event enhancers (e.g. avarage)
 use vars qw(%inform);	        # Used by telnet_ActivateInform
+use vars qw(%intAt);		# Internal at timer hash, global for benchmark
+use vars qw($nextat);           # Time when next timer will be triggered.
 
 use vars qw($reread_active);
 use vars qw($winService);       # the Windows Service object
@@ -185,8 +187,6 @@ my $currcfgfile="";		# current config/include file
 my $logopened = 0;              # logfile opened or using stdout
 my $rcvdquit;			# Used for quit handling in init files
 my $sig_term = 0;		# if set to 1, terminate (saving the state)
-my %intAt;			# Internal at timer hash.
-my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
