@@ -210,6 +210,22 @@ HUEDevice_SetParam($$@)
     $obj->{'on'}  = JSON::true;
     $obj->{'bri'}  = 0+$value;
     $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+  } elsif($cmd eq "dimUp") {
+    my $bri = ReadingsVal($name,"bri","0");
+    $bri += 25;
+    $bri = 254 if( $bri > 254 );
+    $obj->{'on'}  = JSON::true;
+    $obj->{'bri'}  = 0+$bri;
+    $obj->{'transitiontime'} = 1;
+    #$obj->{'transitiontime'} = $value / 10 if( defined($value) );
+  } elsif($cmd eq "dimDown") {
+    my $bri = ReadingsVal($name,"bri","0");
+    $bri -= 25;
+    $bri = 0 if( $bri < 0 );
+    $obj->{'on'}  = JSON::true;
+    $obj->{'bri'}  = 0+$bri;
+    $obj->{'transitiontime'} = 1;
+    #$obj->{'transitiontime'} = $value / 10 if( defined($value) );
   } elsif($cmd eq "ct") {
     $obj->{'on'}  = JSON::true;
     $obj->{'ct'}  = 0+$value;
@@ -321,6 +337,7 @@ HUEDevice_Set($@)
 
   my $list = "off:noArg on:noArg toggle:noArg statusRequest:noArg";
   $list .= " pct:slider,0,1,100 bri:slider,0,1,254 alert:none,select,lselect" if( AttrVal($name, "subType", "colordimmer") =~ m/dimmer/ );
+  $list .= " dimUp:noArg dimDown:noArg" if( AttrVal($name, "subType", "colordimmer") =~ m/dimmer/ );
   #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/dimmer/ );
   $list .= " rgb:colorpicker,RGB color:slider,2000,1,6500 ct:slider,154,1,500 hue:slider,0,1,65535 sat:slider,0,1,254 xy effect:none,colorloop" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
   return SetExtensions($hash, $list, $name, @aa);
@@ -684,6 +701,8 @@ HUEDevice_GetUpdate($)
         set colortemperature to &lt;value&gt; kelvin.</li>
       <li>bri &lt;value&gt;<br>
         set brighness to &lt;value&gt;; range is 1-254.</li>
+      <li>dimUp</li>
+      <li>dimDown</li>
       <li>ct &lt;value&gt;<br>
         set colortemperature to &lt;value&gt; mireds; range is 154-500.</li>
       <li>hue &lt;value&gt;<br>
