@@ -39,7 +39,7 @@
   - feature: RSS amended (read image from pipe, scaling options, line width)
   - feature: WWO Module by baumrasen
   - feature: plotAsPng() in 98_SVG.pm (Boris & betateilchen)
-  
+
 - 2013-09-29 (5.5)
   - feature: new module 55_PIFACE.pm added (betateilchen)
   - feature: Calendar can read from file and limit number of calendar events
