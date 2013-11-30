@@ -492,8 +492,8 @@ sub CUL_HM_Attr(@) {#################################
   }
   elsif($attrName eq "burstAccess"){
     if ($cmd eq "set"){
-      return "use burstAccess only for device"                 if (!$hash->{helper}{role}{dev});
-      return "$attrVal not a valid option for burstAccess"     if ($attrVal !~ m/^[01]/);
+      return "use burstAccess only for device"             if (!$hash->{helper}{role}{dev});
+      return "$attrVal not a valid option for burstAccess" if ($attrVal !~ m/^[01]/);
       if ($attrVal =~ m/^0/){$hash->{protCondBurst} = "forced_off";}
       else                  {$hash->{protCondBurst} = "unknown";}
     }
@@ -1980,7 +1980,6 @@ sub CUL_HM_Get($@) {
   my $st = AttrVal($devName, "subType", "");
   my $md = AttrVal($devName, "model", "");
   my $mId = CUL_HM_getMId($hash);
-  my $rxType = CUL_HM_getRxType($hash);
 
   my $cmd = $a[1];
   my $dst = $hash->{DEF};
@@ -2150,6 +2149,7 @@ sub CUL_HM_Get($@) {
 
   Log3 $name,4,"CUL_HM get $name " . join(" ", @a[1..$#a]);
 
+  my $rxType = CUL_HM_getRxType($hash);
   CUL_HM_ProcessCmdStack($devHash) if ($rxType & 0x03);#burst/all
   return "";
 }
@@ -3123,7 +3123,7 @@ sub CUL_HM_Set($@) {
       my $peerFlag = $peer eq '00000000'?'A4':CUL_HM_getFlag($pHash);
       $peerFlag =~ s/0/4/;# either 'A4' or 'B4'
       CUL_HM_SndCmd($pHash, "++B112$id".substr($peer,0,6))
-             if (CUL_HM_getRxType($pHash) & 0x80);
+             if (CUL_HM_getRxType($pHash) & 0x82);#burst or burstConditional
       CUL_HM_SndCmd($pHash, sprintf("++%s41%s%s%02X%02X%02X"
                      ,$peerFlag,$dst,$peer
                      ,$chn
@@ -3227,7 +3227,7 @@ sub CUL_HM_Set($@) {
           CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",
               $peerFlag,$id,$peerDst,$peerChn,$cmdB,$dst,$b2,$b1 ));
           CUL_HM_pushConfig($peerHash,$id,$peerDst,0,0,0,0,"0101")#set burstRx
-                     if(CUL_HM_getRxType($peerHash) & 0x80);      #if conBurst
+                     if(CUL_HM_getRxType($peerHash) & 0x80); #burstConditional
           CUL_HM_qAutoRead($peerHash->{NAME},3);
         }
       $devHash = $peerHash; # Exchange the hash, as the switch is always alive.
@@ -3834,10 +3834,10 @@ sub CUL_HM_respPendTout($) {
     }
     elsif ($hash->{IODev}->{STATE} !~ m/^(opened|Initialized)$/){#IO errors
       CUL_HM_eventP($hash,"IOdly");
-      CUL_HM_ProcessCmdStack($hash) if(CUL_HM_getRxType($hash) & 0x03);
+      CUL_HM_ProcessCmdStack($hash) if(CUL_HM_getRxType($hash) & 0x03);#burst/all
     }
-    elsif ($pHash->{rspWait}{reSent} > AttrVal($hash->{NAME},"msgRepeat",3) # too much
-         ||((CUL_HM_getRxType($hash) & 0x83) == 0)){                        #to slow
+    elsif ($pHash->{rspWait}{reSent} > AttrVal($hash->{NAME},"msgRepeat",3)#too much
+           ||(!(CUL_HM_getRxType($hash) & 0x83))){#not burst/all/burstConditional,to slow
       my $pendCmd = ($pHash->{rspWait}{Pending}
                                 ?"RESPONSE TIMEOUT:".$pHash->{rspWait}{Pending}
                                 :"MISSING ACK");# save before remove
@@ -3846,10 +3846,9 @@ sub CUL_HM_respPendTout($) {
       CUL_HM_ProcessCmdStack($hash); # continue processing commands if any
     }
     else{# manage retries
+      $pHash->{rspWait}{reSent}++;
       if ($hash->{protCondBurst}&&$hash->{protCondBurst} eq "on" ){
         #timeout while conditional burst was active. try re-wakeup
-        $pHash->{rspWait}{reSent}++;
-
         my (undef,$addr,$msg) = unpack 'A10A12A*',$hash->{helper}{prt}{rspWait}{cmd};
         $pHash->{rspWaitSec}{$_} = $pHash->{rspWait}{$_}
                     foreach (keys%{$pHash->{rspWait}});
@@ -3858,10 +3857,9 @@ sub CUL_HM_respPendTout($) {
       }
       else{# normal device resend
         CUL_HM_eventP($hash,"Resnd");
+        Log3 $name,4,"CUL_HM_Resend: $name nr ".$pHash->{rspWait}{reSent};
         IOWrite($hash, "", $pHash->{rspWait}{cmd});
         CUL_HM_statCnt($hash->{IODev}{NAME},"s");
-        $pHash->{rspWait}{reSent}++;
-        Log3 $name,4,"CUL_HM_Resend: ".$name. " nr ".$pHash->{rspWait}{reSent};
         InternalTimer(gettimeofday()+rand(20)/10+4,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);
       }
     }
@@ -4021,8 +4019,7 @@ sub CUL_HM_getRxType($) { #in:hash(chn or dev) out:binary coded Rx type
       $rxtEntity |= ($rxtOfModel =~ m/c/)?0x04:0;#config
       $rxtEntity |= ($rxtOfModel =~ m/w/)?0x08:0;#wakeup
       $rxtEntity |= ($rxtOfModel =~ m/l/)?0x10:0;#lazyConfig
-      $rxtEntity |= ($rxtOfModel =~ m/f/)?0x80:0 #burstConditional
-            if(CUL_HM_getAttrInt($hash->{NAME},"burstAccess",0));
+      $rxtEntity |= ($rxtOfModel =~ m/f/)?0x80:0;#burstConditional
     }
     $rxtEntity = 1 if (!$rxtEntity);#always
     $hash->{helper}{rxType} = $rxtEntity;
