@@ -144,7 +144,7 @@ sub Twilight_Define($$)
   $hash->{LATITUDE}       = $latitude;
   $hash->{LONGITUDE}      = $longitude;
   $hash->{WEATHER}        = $weather;
-  $hash->{SUNPOS_OFFSET}  = 1;
+  $hash->{SUNPOS_OFFSET}  = 30;
  
   Twilight_sunposTimerSet($hash);
   RemoveInternalTimer($hash);
