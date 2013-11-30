@@ -28,7 +28,7 @@ TcpServer_Open($$$)
     LocalHost => ($global ? undef : "localhost"),
     LocalPort => $port,
     Listen    => 10,
-    Blocking  => 0, # Needed for .WRITEBUFFER@darwin
+    Blocking  => ($^O =~ /Win/ ? 1 : 0), # Needed for .WRITEBUFFER@darwin
     ReuseAddr => 1
   );
   $hash->{STATE} = "Initialized";
