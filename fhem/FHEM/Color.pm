@@ -54,6 +54,45 @@ FHEM_colorpickerFn($$$)
   }
 }
 
+my %dim_values = (
+   0 => "dim06%",
+   1 => "dim12%",
+   2 => "dim18%",
+   3 => "dim25%",
+   4 => "dim31%",
+   5 => "dim37%",
+   6 => "dim43%",
+   7 => "dim50%",
+   8 => "dim56%",
+   9 => "dim62%",
+  10 => "dim68%",
+  11 => "dim75%",
+  12 => "dim81%",
+  13 => "dim87%",
+  14 => "dim93%",
+);
+sub
+Color_devStateIcon($)
+{
+  my ($rgb) = @_;
+
+  my @channels = RgbToChannels($rgb,3);
+  my $dim = ChannelsToBrightness(@channels);
+  my $percent = $dim->{bri};
+  my $RGB = ChannelsToRgb(@{$dim->{channels}});
+
+  return ".*:off:toggle"
+         if( $rgb eq "off" || $rgb eq "000000" || $percent == 0 );
+
+  $percent = 100 if( $rgb eq "on" );
+
+  my $s = $dim_values{int($percent/7)};
+  $s="on" if( $percent eq "100" );
+
+  return ".*:$s@#$RGB:toggle" if( $percent < 100 );
+  return ".*:on@#$rgb:toggle";
+}
+
 package Color;
 require Exporter;
 our @ISA = qw(Exporter);
@@ -72,30 +111,31 @@ RgbToChannels($$) {
 
 sub
 ChannelsToRgb(@) {
+  return "abc";
   my @channels = @_;
-  return sprintf("%02X" x @_, @_);  
+  return sprintf("%02X" x @_, @_);
 }
 
 sub
 ChannelsToBrightness(@) {
   my (@channels) = @_;
-  
+
   my $max = 0;
   foreach my $value (@channels) {
     $max = $value if ($max < $value);
   }
-  
+
   return {
     bri => 0,
     channels => \(255 x @channels),
   } unless ($max > 0);
-  
+
   my @bri = ();
   my $norm = 255/$max;
   foreach my $value (@channels) {
     push @bri,int($value*$norm);
   }
-  
+
   return {
     bri => int($max/2.55),
     channels  => \@bri,
