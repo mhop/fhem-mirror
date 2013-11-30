@@ -95,7 +95,7 @@ Ext.define('FHEM.controller.MainController', {
         
         if (Ext.isDefined(FHEM.version)) {
             var sp = this.getStatustextfield();
-            sp.setText(FHEM.version + "; Frontend Version: 1.0.1 - 2013-11-22");
+            sp.setText(FHEM.version + "; Frontend Version: 1.0.2 - 2013-11-30");
         }
         
         this.setupTree(false);
@@ -145,21 +145,25 @@ Ext.define('FHEM.controller.MainController', {
                     if (result.devices && result.devices.length > 0) {
                         Ext.each(result.devices, function(device) {
                             if (device.ATTR && device.ATTR.room) {
-                                //check if room exists
-                                var resultnode = root.findChild("text", device.ATTR.room, true),
-                                    subnode = {text: device.NAME, leaf: true, data: device};
-                                if (!resultnode) {
-                                    //create roomfolder
-                                    var roomfolder;
-                                    if (device.ATTR.room !== "hidden") {
-                                        roomfolder = {text: device.ATTR.room, leaf: false, expanded: true, children: []};
-                                        roomfolder.children.push(subnode);
-                                        root.appendChild(roomfolder);
+                                //first we check if we have comma separated multiple rooms
+                                var roomArray = device.ATTR.room.split(",");
+                                Ext.each(roomArray, function(room) {
+                                  //check if room exists
+                                    var resultnode = root.findChild("text", room, true),
+                                        subnode = {text: device.NAME, leaf: true, data: device};
+                                    if (!resultnode) {
+                                        //create roomfolder
+                                        var roomfolder;
+                                        if (room !== "hidden") {
+                                            roomfolder = {text: room, leaf: false, expanded: true, children: []};
+                                            roomfolder.children.push(subnode);
+                                            root.appendChild(roomfolder);
+                                        }
+                                    } else {
+                                        resultnode.appendChild(subnode);
+                                        root.appendChild(resultnode);
                                     }
-                                } else {
-                                    resultnode.appendChild(subnode);
-                                    root.appendChild(resultnode);
-                                }
+                                });
                             }
                         }, this);
                     } else {
