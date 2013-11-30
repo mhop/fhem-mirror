@@ -279,7 +279,7 @@ UPD 2013-11-15_03:17:04 9893 www/frontend/app/view/Viewport.js
 UPD 2013-11-22_05:34:29 10042 www/frontend/app/view/TableDataGridPanel.js
 UPD 2013-11-22_05:34:29 28202 www/frontend/app/view/LineChartPanel.js
 UPD 2013-11-15_04:48:21 87082 www/frontend/app/controller/ChartController.js
-UPD 2013-11-22_05:43:24 18375 www/frontend/app/controller/MainController.js
+UPD 2013-11-30_04:29:42 18670 www/frontend/app/controller/MainController.js
 UPD 2013-06-30_11:46:54 5415 www/frontend/app/controller/TableDataController.js
 UPD 2013-04-01_07:04:35 202 www/frontend/app/model/ReadingsModel.js
 UPD 2013-04-01_07:04:36 338 www/frontend/app/model/SavedChartsModel.js
