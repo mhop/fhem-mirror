@@ -493,6 +493,7 @@ sub CUL_HM_Attr(@) {#################################
   elsif($attrName eq "burstAccess"){
     if ($cmd eq "set"){
       return "use burstAccess only for device"             if (!$hash->{helper}{role}{dev});
+      return $name." not a conditional burst model"        if (CUL_HM_getRxType($hash) & 0x80);
       return "$attrVal not a valid option for burstAccess" if ($attrVal !~ m/^[01]/);
       if ($attrVal =~ m/^0/){$hash->{protCondBurst} = "forced_off";}
       else                  {$hash->{protCondBurst} = "unknown";}
@@ -3246,8 +3247,8 @@ sub CUL_HM_Set($@) {
   if($rxType & 0x03){#all/burst
     CUL_HM_ProcessCmdStack($devHash);
   }
-  elsif(($rxType & 0x80)                   &&  #burstConditional - have a try
-        $devHash->{cmdStack}               &&
+  elsif(CUL_HM_getAttrInt($name,"burstAccess")&& #burstConditional - have a try
+        $devHash->{cmdStack}                  &&
         $devHash->{helper}{prt}{sProc} != 1    # not pocessing
         ){
     $hash->{helper}{prt}{wakeup}=1;# start auto-wakeup
