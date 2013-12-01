@@ -1,4 +1,4 @@
-.background { fill:#FFFFE7; font-opacity: 0; }
+.background { fill:#FFFFE7; fill:none; fill-opacity:0.0; }
 
 text       { font-family:Times; font-size:12px; }
 text.title { font-size:16px; }
