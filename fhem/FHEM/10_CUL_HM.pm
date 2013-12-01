@@ -482,9 +482,13 @@ sub CUL_HM_Attr(@) {#################################
     return "$attrName not usable for devices";
   }
   elsif($attrName eq "msgRepeat"){
-    return if ($cmd ne "set");
-    return "$attrName not usable for channels" if(!$hash->{helper}{role}{dev});#only for device
-    return "value $attrVal ignored, must be an integer" if ($attrVal !~ m/^(\d+)$/);
+    if ($cmd eq "set"){
+      return "$attrName not usable for channels" if(!$hash->{helper}{role}{dev});#only for device
+      return "value $attrVal ignored, must be an integer" if ($attrVal !~ m/^(\d+)$/);
+      return "$attrName not supported for model" if(!(CUL_HM_getRxType($hash) & 0xEB)
+                                                    && $attrVal != 1);# no repeat for confign only devices
+    }
+    return;
   }
   elsif($attrName eq "model" && $hash->{helper}{role}{dev}){
     delete $hash->{helper}{rxType}; # needs new calculation
@@ -1667,7 +1671,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         && $shash->{helper}{prt}{mmcS} == 3){
       # after write device might need a break
       # allow for wake types only - and if commands are pending
-      $shash->{helper}{prt}{try} = 1 if (CUL_HM_getRxType($shash) & 0x08 #wakeup
+      $shash->{helper}{prt}{try} = 1 if(CUL_HM_getRxType($shash) & 0x08 #wakeup
                                          && $shash->{cmdStack});
       if ($success eq 'yes'){
         delete $shash->{helper}{prt}{mmcA};
@@ -1682,6 +1686,8 @@ sub CUL_HM_parseCommon(@){#####################################################
       $chnhash = $shash if(!$chnhash);
       readingsSingleUpdate($chnhash,"CommandAccepted",$success,0);
       CUL_HM_ProcessCmdStack($shash) if(CUL_HM_IOid($shash) eq $dst);
+      delete $shash->{helper}{prt}{wuReSent}
+              if (!$shash->{helper}{prt}{mmcS});
     }
     $ret = $reply;
   }
@@ -3123,13 +3129,14 @@ sub CUL_HM_Set($@) {
       my $pHash = CUL_HM_id2Hash($peer);
       my $peerFlag = $peer eq '00000000'?'A4':CUL_HM_getFlag($pHash);
       $peerFlag =~ s/0/4/;# either 'A4' or 'B4'
-      CUL_HM_SndCmd($pHash, "++B112$id".substr($peer,0,6))
+      CUL_HM_PushCmdStack($pHash, "++B112$id".substr($peer,0,6))
              if (CUL_HM_getRxType($pHash) & 0x82);#burst or burstConditional
-      CUL_HM_SndCmd($pHash, sprintf("++%s41%s%s%02X%02X%02X"
+      CUL_HM_PushCmdStack($pHash, sprintf("++%s41%s%s%02X%02X%02X"
                      ,$peerFlag,$dst,$peer
                      ,$chn
                      ,$pressCnt
                      ,$cond));
+      CUL_HM_ProcessCmdStack($pHash);
     }
 
     foreach my $peer (@peerLChn){#inform each channel
@@ -3538,14 +3545,18 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       if ($cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/);
   my ($chn,$subType) = ($1,$2) if($p =~ m/^(..)(..)/);
 
-  if (($mFlg & 0x20) && ($dst ne '000000')){
+  if (($mFlg & 0x20) && ($dst ne '000000')){#msg wants ack
+    my $rss = $hash->{helper}{prt}{wuReSent}
+                       ? $hash->{helper}{prt}{wuReSent}
+                       :1;#resend count - may need preloaded for WU device
+
     if   ($mTp eq "01" && $subType){
       if   ($subType eq "03"){ #PeerList-----------
         #--- remember request params in device level
         CUL_HM_respWaitSu ($hash,"Pending:=PeerList"
                                 ,"cmd:=$cmd" ,"forChn:=".substr($p,0,2)
                                 ,"mNo:=".hex($mNo)
-                                ,"reSent:=1");
+                                ,"reSent:=$rss");
 
         #--- remove readings in channel
         my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
@@ -3565,7 +3576,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
                                 ,"forList:=$list","forPeer:=$peer"
                                 ,"mNo:=".hex($mNo)
                                 ,"mNoSeq:=$mNoSeq"
-                                ,"reSent:=1");
+                                ,"reSent:=$rss");
         #--- remove channel entries that will be replaced
         my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
         $chnhash = $hash if(!$chnhash);
@@ -3580,10 +3591,10 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       }
       elsif($subType eq "09"){ #SerialRead-------
         CUL_HM_respWaitSu ($hash,"Pending:=SerialRead"
-                                ,"cmd:=$cmd" ,"reSent:=1");
+                                ,"cmd:=$cmd" ,"reSent:=$rss");
       }
       else{
-        CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=1");
+        CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=$rss");
       }
     }
     elsif($mTp eq '11' && $chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
@@ -3593,14 +3604,14 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
         $hash->{helper}{tmdOn} = $2 if ($1 ne "00" && $2 !~ m/(0000|FFFF)/);
         $to = "timedOn:=1";
       }
-      CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=1",$to);
+      CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=$rss",$to);
     }
     elsif($mTp eq '12' && $mFlg & 0x10){#wakeup with burst
       # response setup - do not repeat, set counter to 250
-      CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=1","wakeup:=1");
+      CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=$rss","wakeup:=1");
     }
     else{
-      CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=1");
+      CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=$rss");
     }
 
     CUL_HM_protState($hash,"CMDs_processing...");
@@ -3802,7 +3813,8 @@ sub CUL_HM_statCntRfresh($) {# update statistic once a day
 sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
   my ($hash) =  @_;
   $modules{CUL_HM}{prot}{rspPend}-- if($hash->{helper}{prt}{rspWait}{cmd});
-  delete ($hash->{helper}{prt}{rspWait});
+  delete $hash->{helper}{prt}{rspWait};
+  delete $hash->{helper}{prt}{wuReSent};
   delete $hash->{helper}{tmdOn};
 #  delete $hash->{helper}{prt}{mmcA};
 #  delete $hash->{helper}{prt}{mmcS};
@@ -3819,15 +3831,18 @@ sub CUL_HM_respPendTout($) {
     my $name = $hash->{NAME};
     $pHash->{awake} = 0 if (defined $pHash->{awake});# set to asleep
     return if(!$pHash->{rspWait}{reSent});      # Double timer?
-    if ($pHash->{rspWait}{wakeup}){
-      CUL_HM_respPendRm($hash);# do not count problems with wakeup try, just wait
+    if ($pHash->{rspWait}{wakeup}){#wakeup try failed (conditionalBurst)
+      CUL_HM_respPendRm($hash);# don't count problems, was just a try
       $hash->{protCondBurst} = "off" if (!$hash->{protCondBurst}||
                                           $hash->{protCondBurst} !~ m/forced/);;
       $pHash->{wakeup} = 0;# finished
       $pHash->{awake} = 0;# set to asleep
       CUL_HM_protState($hash,"CMDs_pending");
+      # commandstack will be executed when device wakes up itself
     }
-    elsif ($pHash->{try}){# send was a try - revert and wait for wakeup
+    elsif ($pHash->{try}){         #send try failed - revert, wait for wakeup
+      # device might still be busy with writing flash or similar
+      # we have to wait for next wakeup
       unshift (@{$hash->{cmdStack}}, "++".substr($pHash->{rspWait}{cmd},6));
       delete $pHash->{try};
       CUL_HM_respPendRm($hash);# do not count problems with wakeup try, just wait
@@ -3837,8 +3852,8 @@ sub CUL_HM_respPendTout($) {
       CUL_HM_eventP($hash,"IOdly");
       CUL_HM_ProcessCmdStack($hash) if(CUL_HM_getRxType($hash) & 0x03);#burst/all
     }
-    elsif ($pHash->{rspWait}{reSent} > AttrVal($hash->{NAME},"msgRepeat",3)#too much
-           ||(!(CUL_HM_getRxType($hash) & 0x83))){#not burst/all/burstConditional,to slow
+    elsif ($pHash->{rspWait}{reSent} > AttrVal($name,"msgRepeat",3)#too many
+           ||(!(CUL_HM_getRxType($hash) & 0x8B))){#config/lacyConfig cannot retry
       my $pendCmd = ($pHash->{rspWait}{Pending}
                                 ?"RESPONSE TIMEOUT:".$pHash->{rspWait}{Pending}
                                 :"MISSING ACK");# save before remove
@@ -3848,17 +3863,33 @@ sub CUL_HM_respPendTout($) {
     }
     else{# manage retries
       $pHash->{rspWait}{reSent}++;
+      CUL_HM_eventP($hash,"Resnd");
+      Log3 $name,4,"CUL_HM_Resend: $name nr ".$pHash->{rspWait}{reSent};
       if ($hash->{protCondBurst}&&$hash->{protCondBurst} eq "on" ){
         #timeout while conditional burst was active. try re-wakeup
-        my (undef,$addr,$msg) = unpack 'A10A12A*',$hash->{helper}{prt}{rspWait}{cmd};
+        my (undef,$addr,$msg) = unpack 'A10A12A*',
+                                       $hash->{helper}{prt}{rspWait}{cmd};
         $pHash->{rspWaitSec}{$_} = $pHash->{rspWait}{$_}
                     foreach (keys%{$pHash->{rspWait}});
         CUL_HM_SndCmd($hash,"++B112$addr");
         $hash->{helper}{prt}{awake}=4;# start re-wakeup
       }
+      elsif(CUL_HM_getRxType($hash) & 0x08){# wakeup devices
+        #need to fill back command to queue and wait for next wakeup
+        if ($pHash->{mmcA}){#fillback multi-message command
+          unshift @{$hash->{cmdStack}},$_ foreach (reverse@{$pHash->{mmcA}});
+          delete $pHash->{mmcA};
+          delete $pHash->{mmcS};
+        }
+        else{#fillback simple command
+          unshift (@{$hash->{cmdStack}},"++".substr($pHash->{rspWait}{cmd},6));
+        }
+        my $wuReSent = $pHash->{rspWait}{reSent};# save 'invalid' count
+        CUL_HM_respPendRm($hash);#clear
+        CUL_HM_protState($hash,"CMDs_pending");
+        $pHash->{wuReSent} = $wuReSent;# save 'invalid' count
+      }
       else{# normal device resend
-        CUL_HM_eventP($hash,"Resnd");
-        Log3 $name,4,"CUL_HM_Resend: $name nr ".$pHash->{rspWait}{reSent};
         IOWrite($hash, "", $pHash->{rspWait}{cmd});
         CUL_HM_statCnt($hash->{IODev}{NAME},"s");
         InternalTimer(gettimeofday()+rand(20)/10+4,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);
@@ -3903,7 +3934,8 @@ sub CUL_HM_eventP($$) {#handle protocol events
       delete $pHash->{mmcS};
     }
     else{
-      unshift @{$hash->{cmdStack}}, $pHash->{rspWait}{cmd};#pushback
+      unshift (@{$hash->{cmdStack}},"++".substr($pHash->{rspWait}{cmd},6));
+#      unshift @{$hash->{cmdStack}}, $pHash->{rspWait}{cmd};#pushback
     }
     CUL_HM_respPendRm($hash);
   }
@@ -6077,7 +6109,11 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
     <li><a name="param">param</a><br>
         param defines model specific behavior or functions. See models for details</li>
     <li><a name="msgRepeat">msgRepeat</a><br>
-        defines number of repetitions if a device doesn't answer in time</li>
+        defines number of repetitions if a device doesn't answer in time. <br>
+        Devices which donly support config mode no repeat ist allowed. <br>
+        For devices with wakeup mode the device will wait for next wakeup. Lonng delay might be 
+        considered in this case. <br>
+        Repeat for burst devices will impact HMLAN transmission capacity.</li>
     <li><a name="burstAccess">burstAccess</a><br>
         can be set for the device entity if the model allowes conditionalBurst.
         The attribut will switch off burst operations (0_off) which causes less message load
