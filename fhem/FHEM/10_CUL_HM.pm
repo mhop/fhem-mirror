@@ -183,6 +183,8 @@ sub CUL_HM_updateConfig($){
   # Purpose is to parse attributes and read config
   foreach my $name (@{$modules{CUL_HM}{helper}{updtCfgLst}}){
     my $hash = $defs{$name};
+    next if (!$hash->{DEF}); # likely renamed
+    
     my $id = $hash->{DEF};
     my $chn = substr($id."00",6,2);
 
