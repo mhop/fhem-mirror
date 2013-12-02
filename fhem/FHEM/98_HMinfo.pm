@@ -1193,18 +1193,19 @@ sub HMinfo_noDup(@) {#return list with no duplicates
   <B>Status information and counter</B><br>
   HMinfo gives an overview on the CUL_HM installed base including current conditions.
   Readings and counter will not be updated automatically  due to performance issues. <br>
-  Command <a href="#HMinfoupdate">update</a> must be used to refresh the values.
-  <ul><code>
+  Command <a href="#HMinfoupdate">update</a> must be used to refresh the values. 
+  <ul><code><br>
            set hm update<br>
-  </code></ul>
+  </code></ul><br>
   Webview of HMinfo will provide details, basically counter about how
   many CUL_HM entities experience exceptional conditions. Areas provided are
-  <li>Action Detector status</li>
-  <li>CUL_HM related IO devices and condition</li>
-  <li>Device protocol events which are related to communication errors</li>
-  <li>count of certain readings (e.g. batterie) and conditions - <a href="HMinfoattr">attribut controlled</a></li>
-  <li>count of error condition in readings (e.g. overheat, motorError) - <a href="HMinfoattr">attribut controlled</a></li>
-
+  <ul>
+      <li>Action Detector status</li>
+      <li>CUL_HM related IO devices and condition</li>
+      <li>Device protocol events which are related to communication errors</li>
+      <li>count of certain readings (e.g. batterie) and conditions - <a href="#HMinfoattr">attribut controlled</a></li>
+      <li>count of error condition in readings (e.g. overheat, motorError) - <a href="#HMinfoattr">attribut controlled</a></li>
+  </ul>
   <br>
 
   It also allows some HM wide commands such
@@ -1247,7 +1248,6 @@ sub HMinfo_noDup(@) {#return list with no duplicates
   </ul>
   <br>
 
-
   <a name="HMinfoset"><b>Set</b></a>
   <ul>
   even though the commands are more a get funktion they are implemented
@@ -1259,32 +1259,32 @@ sub HMinfo_noDup(@) {#return list with no duplicates
       <li><a name="#HMinfomodels">models</a><br>
           list all HM models that are supported in FHEM
       </li>
-      <li><a name="#HMinfoparam">param</a> <a href="HMinfoFilter">[filter]</a> &lt;name&gt; &lt;name&gt;...<br>
+      <li><a name="#HMinfoparam">param</a> <a href="#HMinfoFilter">[filter]</a> &lt;name&gt; &lt;name&gt;...<br>
           returns a table parameter values (attribute, readings,...)
           for all entities as a table
       </li>
-      <li><a name="#HMinfopeerXref">peerXref</a> <a href="HMinfoFilter">[filter]</a><br>
+      <li><a name="#HMinfopeerXref">peerXref</a> <a href="#HMinfoFilter">[filter]</a><br>
           provides a cross-reference on peerings, a kind of who-with-who summary over HM
       </li>
-      <li><a name="#HMinforegister">register</a> <a href="HMinfoFilter">[filter]</a><br>
+      <li><a name="#HMinforegister">register</a> <a href="#HMinfoFilter">[filter]</a><br>
           provides a tableview of register of an entity
       </li>
 
-      <li><a name="#HMinfoconfigCheck">configCheck</a> <a href="HMinfoFilter">[filter]</a><br>
+      <li><a name="#HMinfoconfigCheck">configCheck</a> <a href="#HMinfoFilter">[filter]</a><br>
           performs a consistency check of HM settings. It includes regCheck and peerCheck
       </li>
-      <li><a name="#HMinfopeerCheck">peerCheck</a> <a href="HMinfoFilter">[filter]</a><br>
+      <li><a name="#HMinfopeerCheck">peerCheck</a> <a href="#HMinfoFilter">[filter]</a><br>
           performs a consistency check on peers. If a peer is set in one channel
           this funktion will search wether the peer also exist on the opposit side.
       </li>
-      <li><a name="#HMinforegCheck">regCheck</a> <a href="HMinfoFilter">[filter]</a><br>
+      <li><a name="#HMinforegCheck">regCheck</a> <a href="#HMinfoFilter">[filter]</a><br>
           performs a consistency check on register readings for completeness
       </li>
 
-      <li><a name="#HMinfoautoReadReg">autoReadReg</a> <a href="HMinfoFilter">[filter]</a><br>
+      <li><a name="#HMinfoautoReadReg">autoReadReg</a> <a href="#HMinfoFilter">[filter]</a><br>
           schedules a read of the configuration for the CUL_HM devices with attribut autoReadReg set to 1 or higher.
       </li>
-      <li><a name="#HMinfoclear">clear [Protocol|readings|msgStat|register|rssi]</a> <a href="HMinfoFilter">[filter]</a><br>
+      <li><a name="#HMinfoclear">clear [Protocol|readings|msgStat|register|rssi]</a> <a href="#HMinfoFilter">[filter]</a><br>
           executes a set clear ...  on all HM entities<br>
           <ul>
           <li>Protocol relates to set clear msgEvents</li>
@@ -1294,7 +1294,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates
           <li>register clears all register-entries in readings</li>
           </ul>
       </li>
-      <li><a name="#HMinfosaveConfig">saveConfig</a> <a href="HMinfoFilter">[filter]</a><br>
+      <li><a name="#HMinfosaveConfig">saveConfig</a> <a href="#HMinfoFilter">[filter]</a><br>
           performs a save for all HM register setting and peers. See <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>.
       </li>
          <br>
@@ -1339,7 +1339,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates
       <li><a name="#HMinfotemplateList">templateList [&lt;name&gt;]</a><br>
           list defined templates. If no name is given all templates will be listed<br>
       </li>
-      <li><a name="#HMinfotemplateChk">templateChk <a href="HMinfoFilter">[filter] &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
+      <li><a name="#HMinfotemplateChk">templateChk <a href="#HMinfoFilter">[filter] &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
          verifies if the register-readings comply to the template <br>
          Parameter are identical to <a href="#HMinfotemplateSet">templateSet</a><br>
          The procedure will check if the register values match the ones provided by the template<br>

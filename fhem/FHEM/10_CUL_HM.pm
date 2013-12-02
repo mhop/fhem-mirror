@@ -5540,7 +5540,7 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
         to the register.<br>
         &lt;peerChannel&gt; is required if this register is defined on a per
         'peerChan' base. It can be set to '0' other wise.See <a
-        href="CUL_HMgetRegRaw">getRegRaw</a>  for full description<br>
+        href="#CUL_HMgetRegRaw">getRegRaw</a>  for full description<br>
         Supported register for a device can be explored using<br>
           <ul><code>set regSet ? 0 0</code></ul>
         Condensed register description will be printed
