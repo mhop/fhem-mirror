@@ -247,8 +247,9 @@ readingsProxy_Get($@)
     my $CMD = $a[0];
     my $ARGS = join(" ", @a[1..$#a]);
 
-    my $get_fn = eval $get_fn;
+    my ($get_fn,$direct_return) = eval $get_fn;
     Log3 $name, 3, $name .": getFn: ". $@ if($@);
+    return $get_fn if($direct_return);
     return undef if( !defined($get_fn) );
     $v = $get_fn if( $get_fn );
   }
@@ -315,6 +316,7 @@ readingsProxy_Get($@)
         has access to $DEVICE, $READING, $CMD and $ARGS.<br>
         undef -> do nothing<br>
         ""    -> pass-through<br>
+        (<value>,1) -> directly return <value>, don't call parent getFn<br>
         everything else -> use this instead</li>
       <li>setFn<br>
         perl expresion that will return the set command forwarded to the parent device.
