@@ -26,6 +26,8 @@ my %fbdect_payload = (
   21 => { n=>"energy",      fmt=>'sprintf("%0.0f Wh",hex($pyld))' },
   22 => { n=>"powerFactor", fmt=>'sprintf("%0.3f", hex($pyld))' },
   23 => { n=>"temperature", fmt=>'sprintf("%0.1f C", hex($pyld)/10)' },
+  35 => { n=>"options",     fmt=>'FBDECT_decodeOptions($pyld)' },
+  37 => { n=>"control",     fmt=>'FBDECT_decodeControl($pyld)' },
 );
 
 
@@ -199,6 +201,64 @@ FBDECT_Parse($$@)
 }
 
 sub
+FBDECT_decodeOptions($)
+{
+  my ($p) = @_;
+  my @opts;
+
+  if(length($p) >= 8) {
+    my $o = hex(substr($p,0,8));
+    push @opts, "powerOnState:".($o==0 ? "off" : ($o==1?"on" : "last"));
+  }
+  if(length($p) >= 16) {
+    my $o = hex(substr($p,8,8));
+    my @lo;
+    push @lo, "none" if($o == 0);
+    push @lo, "webUi"    if($o & 1);
+    push @lo, "remoteFB" if($o & 2);
+    push @lo, "button"   if($o & 4);
+    push @opts, "lock:".join(",", @lo);
+  }
+  return join(",", @opts);
+}
+
+sub
+FBDECT_decodeControl($)
+{
+  my ($p) = @_;
+  my @ctrl;
+
+  for(my $off=8; $off+28<=length($p)/2; $off+=28) {
+    my ($n, $s);
+
+    $s = "on";
+
+    $n = hex(substr($p,($off+ 4)*2,8));
+    $s .= " ".($fbdect_payload{$n} ? $fbdect_payload{$n}{n} : "fn=$n");
+
+    my %tbl = (3=>">", 4=>"=>", 5=>"<", 6=>"<=");
+    $n = hex(substr($p,($off+ 8)*2,8));
+    $s .= " ".($tbl{$n} ? $tbl{$n} : "rel=$n");
+
+    $n = hex(substr($p,($off+12)*2,8));
+    $s .= " $n";
+
+    $n = hex(substr($p,($off+16)*2,8));
+    $s .= " delay:${n}sec";
+
+    $n = hex(substr($p,($off+20)*2,8));
+    $s .= " do:".($fbdect_payload{$n} ? $fbdect_payload{$n}{n} : "fn=$n");
+
+    $n = hex(substr($p,($off+24)*2,8));
+    $s .= " ".($n==0 ? "off" : "on");
+
+    push @ctrl, $s;
+  }
+
+  return join(",", @ctrl);
+}
+
+sub
 FBDECT_decodePayload($)
 {
   my ($d) = @_;
@@ -299,6 +359,8 @@ FBDECT_Undef($$)
     <li>energy: $v Wh</li>
     <li>powerFactor: $v"</li>
     <li>temperature: $v C</li>
+    <li>options: powerOnState:[on|off|last],lock:[none,webUi,remoteFb,button]</li>
+    <li>control: on power < $v delay:$d sec do:state [on|off]</li>
   </ul>
 </ul>
 
@@ -379,6 +441,9 @@ FBDECT_Undef($$)
     <li>energy: $v Wh</li>
     <li>powerFactor: $v"</li>
     <li>temperature: $v C</li>
+    <li>options: powerOnState:[on|off|last],lock:[none,webUi,remoteFb,button]</li>
+    <li>control: on power < $v delay:$d sec do:state [on|off]</li>
+
   </ul>
 </ul>
 =end html_DE
