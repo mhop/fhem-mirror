@@ -1172,12 +1172,12 @@ SVG_render($$$$$$$$$)
     for my $li (0..$#limit-1) {
       my $l = $limit[$li];
       next if($dh > $l*10);
-      $ma = SVG_doround($hmax{$a}, $l, 1);
-      $mi = SVG_doround($hmin{$a}, $l, 0);
+      $ma = $conf{$yra} ? $hmax{$a} : SVG_doround($hmax{$a}, $l, 1);
+      $mi = $conf{$yra} ? $hmin{$a} : SVG_doround($hmin{$a}, $l, 0);
       if(($ma-$mi)/$l >= 7) {    # If more then 7 steps, then choose next
         $l = $limit[$li+1];
-        $ma = SVG_doround($hmax{$a}, $l, 1);
-        $mi = SVG_doround($hmin{$a}, $l, 0);
+        $ma = $conf{$yra} ? $hmax{$a} : SVG_doround($hmax{$a}, $l, 1);
+        $mi = $conf{$yra} ? $hmin{$a} : SVG_doround($hmin{$a}, $l, 0);
       }
       $step = $l;
       last;
