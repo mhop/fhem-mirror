@@ -14,14 +14,16 @@
 #
 #
 # You can send messages via the following command:
-# set <Pushover_device> msg <title> <msg> <device> <priority> <sound>
+# set <Pushover_device> msg <title> <msg> <device> <priority> <sound> [<retry> <expire>]
 #
-# Example:
+# Examples:
 # set Pushover1 msg 'Titel' 'This is a text.' '' 0 ''
+# set Pushover1 msg 'Emergency' 'Security issue in living room.' '' 2 'siren' 30 3600
 #
 # Explantation:
 # If device is empty, the message will be sent to all devices.
 # If sound is empty, the default setting in the app will be used.
+# If priority is higher or equal 2, retry and expire must be defined.
 #
 #
 # For further documentation of these parameters:
@@ -84,40 +86,78 @@ sub Pushover_Set_Message
   my $hash = shift;
   
   my $attr = join(" ", @_);
-  $attr =~ /(".*"|'.*')\s*(".*"|'.*')\s*(".*"|'.*')\s*(\d+)\s*(".*"|'.*')\s*$/s;
   
-  my $title = $1;
-  my $message = $2;
-  my $device = $3;
-  my $priority = $4;
-  my $sound = $5;
+  my $shortExpressionMatched = 0;
+  my $longExpressionMatched = 0;
   
-  if($title =~ /^['"](.*)['"]$/s)
+  if($attr =~ /(".*"|'.*')\s*(".*"|'.*')\s*(".*"|'.*')\s*(\d+)\s*(".*"|'.*')\s*(\d+)\s*(\d+)\s*$/s)
+  {
+    $longExpressionMatched = 1;
+  }
+  elsif($attr =~ /(".*"|'.*')\s*(".*"|'.*')\s*(".*"|'.*')\s*(\d+)\s*(".*"|'.*')\s*$/s)
+  {
+    $shortExpressionMatched = 1;
+  }
+  
+  my $title = "";
+  my $message = "";
+  my $device = "";
+  my $priority = "";
+  my $sound = "";
+  my $retry = "";
+  my $expire = "";
+  
+  if(($shortExpressionMatched == 1) || ($longExpressionMatched == 1))
   {
     $title = $1;
+    $message = $2;
+    $device = $3;
+    $priority = $4;
+    $sound = $5;
+    
+    if($longExpressionMatched == 1)
+    {
+      $retry = $6;
+      $expire = $7;
+    }
+    
+    if($title =~ /^['"](.*)['"]$/s)
+    {
+      $title = $1;
+    }
+    
+    if($message =~ /^['"](.*)['"]$/s)
+    {
+      $message = $1;
+    }
+    
+    if($device =~ /^['"](.*)['"]$/s)
+    {
+      $device = $1;
+    }
+    
+    if($priority =~ /^['"](.*)['"]$/)
+    {
+      $priority = $1;
+    }
+    
+    if($sound =~ /^['"](.*)['"]$/s)
+    {
+      $sound = $1;
+    }
+    
+    if($retry =~ /^['"](.*)['"]$/s)
+    {
+      $retry = $1;
+    }
+    
+    if($expire =~ /^['"](.*)['"]$/s)
+    {
+      $expire = $1;
+    }
   }
   
-  if($message =~ /^['"](.*)['"]$/s)
-  {
-    $message = $1;
-  }
-  
-  if($device =~ /^['"](.*)['"]$/s)
-  {
-    $device = $1;
-  }
-  
-  if($priority =~ /^['"](.*)['"]$/)
-  {
-    $priority = $1;
-  }
-  
-  if($sound =~ /^['"](.*)['"]$/s)
-  {
-    $sound = $1;
-  }
-  
-  if(($title ne "") && ($message ne ""))
+  if((($title ne "") && ($message ne "")) && ((($retry ne "") && ($expire ne "")) || ($priority < 2)))
   {
     my $body = "token=" . $hash->{Token} . "&" .
     "user=" . $hash->{User} . "&" .
@@ -139,11 +179,21 @@ sub Pushover_Set_Message
       $body = $body . "&" . "sound=" . $sound;
     }
     
+    if ($retry ne "")
+    {
+      $body = $body . "&" . "retry=" . $retry;
+    }
+    
+    if ($expire ne "")
+    {
+      $body = $body . "&" . "expire=" . $expire;
+    }
+    
     return Pushover_HTTP_Call($hash, $body);
   }
   else
   {
-    return "Syntax: set <Pushover_device> msg <title> <msg> <device> <priority> <sound>";
+    return "Syntax: set <Pushover_device> msg <title> <msg> <device> <priority> <sound> [<retry> <expire>]";
   }
 }
 
