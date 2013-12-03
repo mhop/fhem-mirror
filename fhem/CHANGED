@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: FB_CALLMONITOR: replace &amp; to & at reverse search
   - feature: new module 33_readingsProxy to make (a subset of) a reading
              from one device available as a new device. can be used to
              separate channels from 1-wire, EnOcean or SWAP multichannel
