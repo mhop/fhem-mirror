@@ -1914,6 +1914,9 @@ sub CUL_HM_parseCommon(@){#####################################################
       }
     }
   }
+  elsif($mTp eq "12"){ #wakeup received - ignore############
+    $ret = "done";
+  }
   elsif($mTp =~ m /^4[01]/){ #someone is triggered##########
     CUL_HM_qStateUpdatIfEnab($dst)if (hex($mFlg) & 0x20 && $dhash);
     my $chn = hex(substr($p,0,2));
