@@ -387,7 +387,7 @@ readingsGroup_2html($)
 
         $txt = "<a href=\"/fhem?detail=$name\">$txt</a>" if( $show_links );
         $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>" if( $first || $multi == 1 );
-        $ret .= "<td informId=\"$d-$name.$n.icon\">$devStateIcon</td>" if( $devStateIcon );
+        $ret .= "<td informId=\"$d-$name.$n\">$devStateIcon</td>" if( $devStateIcon );
         $ret .= "<td><div $value_style informId=\"$d-$name.$n\">$v</div></td>" if( !$devStateIcon );
         $ret .= "<td><div $timestamp_style informId=\"$d-$name.$n-ts\">$t</div></td>" if( $show_time && $t );
 
@@ -503,6 +503,19 @@ readingsGroup_Notify($$)
           next if( $regex && $regex =~ m/^\?/ );
           next if( defined($regex) && $reading !~ m/^$regex$/);
 
+          my $value = $value;
+          if( $value_format ) {
+            my $value_format = lookup2($value_format,$dev->{NAME},$reading,$value);
+
+            if( !defined($value_format) ) {
+              $value = "";
+            } elsif( $value_format =~ m/%/ ) {
+              $value = sprintf( $value_format, $value );
+            } elsif( $value_format ) {
+              $value = $value_format;
+            }
+          }
+
           my $devStateIcon;
           if( $valueIcon ) {
             my $n = $h->{NAME};
@@ -519,21 +532,8 @@ readingsGroup_Notify($$)
               }
             }
 
-            CommandTrigger( "", "$name $n.$reading.icon: $devStateIcon" ) if( $devStateIcon );
+            CommandTrigger( "", "$name $n.$reading: $devStateIcon" ) if( $devStateIcon );
             next if( $devStateIcon );
-          }
-
-          my $value = $value;
-          if( $value_format ) {
-            my $value_format = lookup2($value_format,$dev->{NAME},$reading,$value);
-
-            if( !defined($value_format) ) {
-              $value = "";
-            } elsif( $value_format =~ m/%/ ) {
-              $value = sprintf( $value_format, $value );
-            } elsif( $value_format ) {
-              $value = $value_format;
-            }
           }
 
           CommandTrigger( "", "$name $dev->{NAME}.$reading: $value" );
