@@ -29,6 +29,7 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;
+use vars qw($FW_ss); 
 
 #
 # uses the Yahoo! Weather API: http://developer.yahoo.com/weather/
