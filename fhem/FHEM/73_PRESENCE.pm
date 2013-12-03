@@ -666,6 +666,19 @@ PRESENCE_DoLocalBluetoothScan($)
     my $return;
     my $wait = 1;
     my $ps;
+	
+	my $psargs = "ax";
+	
+	if(qx(ps --help 2>&1) =~ /BusyBox/g)
+	{
+		Log3 $name, 5, "PRESENCE ($name): found busybox variant of ps command, using \"w\" as parameter";
+		$psargs = "w";
+	}
+	else
+	{
+		Log3 $name, 5, "PRESENCE ($name): found standard variant of ps command, using \"ax\" as parameter";
+		$psargs = "ax";
+	}
     
     Log3 $name, 4, "PRESENCE ($name): 'which hcitool' returns: $hcitool";
     chomp $hcitool;
@@ -675,7 +688,7 @@ PRESENCE_DoLocalBluetoothScan($)
     {
         while($wait)
         {   # check if another hcitool process is running
-			$ps = qx(ps ax | grep hcitool | grep -v grep);
+			$ps = qx(ps $psargs | grep hcitool | grep -v grep);
 			if(not $ps =~ /^\s*$/)
 			{
 				# sleep between 1 and 5 seconds and try again
