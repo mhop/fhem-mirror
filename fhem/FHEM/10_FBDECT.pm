@@ -20,6 +20,7 @@ my %fbdect_payload = (
    8 => { n=>"disconnected" },
   10 => { n=>"configChanged" },
   15 => { n=>"state",       fmt=>'hex($pyld)?"on":"off"' },
+  16 => { n=>"relayTimes",  fmt=>'FBDECT_decodeRelayTimes($pyld)' },
   18 => { n=>"current",     fmt=>'sprintf("%0.4f A", hex($pyld)/10000)' },
   19 => { n=>"voltage",     fmt=>'sprintf("%0.3f V", hex($pyld)/1000)' },
   20 => { n=>"power",       fmt=>'sprintf("%0.2f W", hex($pyld)/100)' },
@@ -201,11 +202,21 @@ FBDECT_Parse($$@)
 }
 
 sub
+FBDECT_decodeRelayTimes($)
+{
+  my ($p) = @_;
+  return "unknown"  if(length($p) < 16);
+  return "disabled" if(substr($p, 12, 4) eq "0000");
+  return $p;
+}
+
+sub
 FBDECT_decodeOptions($)
 {
   my ($p) = @_;
   my @opts;
 
+  return "uninitialized" if($p eq "0000ffff");
   if(length($p) >= 8) {
     my $o = hex(substr($p,0,8));
     push @opts, "powerOnState:".($o==0 ? "off" : ($o==1?"on" : "last"));
@@ -229,8 +240,13 @@ FBDECT_decodeControl($)
   my @ctrl;
 
   for(my $off=8; $off+28<=length($p)/2; $off+=28) {
-    my ($n, $s);
 
+    if(substr($p,($off+ 8)*2,24) eq "000000050000000000000000") {
+      push @ctrl, "disabled";
+      next;
+    }
+
+    my ($n, $s);
     $s = "on";
 
     $n = hex(substr($p,($off+ 4)*2,8));
@@ -241,7 +257,7 @@ FBDECT_decodeControl($)
     $s .= " ".($tbl{$n} ? $tbl{$n} : "rel=$n");
 
     $n = hex(substr($p,($off+12)*2,8));
-    $s .= " $n";
+    $s .= sprintf(" %0.2f", $n/100);
 
     $n = hex(substr($p,($off+16)*2,8));
     $s .= " delay:${n}sec";
@@ -359,8 +375,12 @@ FBDECT_Undef($$)
     <li>energy: $v Wh</li>
     <li>powerFactor: $v"</li>
     <li>temperature: $v C</li>
+    <li>options: uninitialized</li>
     <li>options: powerOnState:[on|off|last],lock:[none,webUi,remoteFb,button]</li>
+    <li>control: disabled</li>
     <li>control: on power < $v delay:$d sec do:state [on|off]</li>
+    <li>relaytimes: disabled</li>
+    <li>relaytimes: HEX</li>
   </ul>
 </ul>
 
@@ -441,9 +461,12 @@ FBDECT_Undef($$)
     <li>energy: $v Wh</li>
     <li>powerFactor: $v"</li>
     <li>temperature: $v C</li>
+    <li>options: uninitialized</li>
     <li>options: powerOnState:[on|off|last],lock:[none,webUi,remoteFb,button]</li>
+    <li>control: disabled</li>
     <li>control: on power < $v delay:$d sec do:state [on|off]</li>
-
+    <li>relaytimes: disabled</li>
+    <li>relaytimes: HEX</li>
   </ul>
 </ul>
 =end html_DE
