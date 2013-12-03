@@ -1127,6 +1127,7 @@ WriteStatefile()
        $val ne "Initialized" &&
        $val ne "???") {
       $val =~ s/;/;;/g;
+      $val =~ s/\n/\\\n/g;
       print SFH "setstate $d $val\n"
     }
 
@@ -1148,6 +1149,7 @@ WriteStatefile()
         }
         my $val = $rd->{VAL};
         $val =~ s/;/;;/g;
+        $val =~ s/\n/\\\n/g;
 	print SFH "setstate $d $rd->{TIME} $c $val\n";
       }
     }
