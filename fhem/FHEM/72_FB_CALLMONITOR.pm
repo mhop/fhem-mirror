@@ -530,6 +530,7 @@ sub FB_CALLMONITOR_html2txt($)
 my ($string) = @_;
 
 $string =~ s/&nbsp;/ /g;
+$string =~ s/&amp;/&/g;
 $string =~ s/(\xe4|&auml;)/ä/g;
 $string =~ s/(\xc4|&Auml;)/Ä/g;
 $string =~ s/(\xf6|&ouml;)/ö/g;
