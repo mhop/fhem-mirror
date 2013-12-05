@@ -6,7 +6,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2013
 # 
-# Version 0.1 - November 2013
+# Version 1.0 - December 2013
 #
 # Setup as:
 # define  <name> PT8005 <device>
@@ -58,6 +58,15 @@ my $speed="fast";      # response speed fast or slow
 my $mode ="normal";    # min/max/...
 my $range="50-100 dB"; # measurement range
 my $over ="";          # over/underflow
+
+#-- arrays for averaging (60 values = max. 1 hour)
+my @datarr;
+my @timarr;
+my $arrind=0;
+my $arrmax=60;
+
+#-- arrays for hourly values
+my @hourarr;
 
 #-- These we may get on request
 my %gets = (
@@ -141,7 +150,81 @@ sub PT8005_Define($$) {
   return undef;
 }
 
+#######################################################################################
+#
+# PT8005_Average - Average backwards over given period
+# 
+# Parameter hash, secsincemidnight,period
+#
 ########################################################################################
+
+sub PT8005_Average($$$) {
+
+  my ($hash, $secsincemidnight, $period) = @_;
+  
+  #-- max. 1 hour allowed
+  if( $period>3600 ){
+    Log 1,"PT8005_Average: wrong period, must be <=3600";
+    return 0;
+  }
+
+  my ($minind,$cntind,$oldtime,$ia,$ib,$fa,$fb,$ta,$tb,$fd,$avdata);
+  
+  #-- go backwards until we have period covered (=max. 60 values)
+  $minind=$arrind-1;
+  $cntind=1;
+  $minind+=$arrmax if($minind<0);
+  $oldtime = $timarr[$minind];
+  $oldtime-=86400 if($oldtime > $secsincemidnight); 
+  while( $oldtime > $secsincemidnight-$period ){
+    #Log 1,"===>index $minind is ".($secsincemidnight-$timarr[$minind])." ago";
+    $minind--;
+    $minind+=$arrmax if($minind<0);
+    $oldtime = $timarr[$minind];
+    $oldtime-=86400 if($oldtime > $secsincemidnight); 
+    $cntind++;
+    if( $cntind > $arrmax) {
+       $cntind=$arrmax;
+       Log 1,"PT8005_Average: ERROR, cntind > $arrmax";
+       last;
+    }
+  }
+  #-- now go forwards 
+  #-- first value must be done by hand
+  $ia = $minind;
+  $ib = $minind+1;
+  $ib-=$arrmax if($ib>=$arrmax);
+  $fa = $datarr[$ia];
+  $fb = $datarr[$ib];
+  $ta = $timarr[$ia];
+  $ta-= 86400 if($ta > $secsincemidnight);
+  $tb = $timarr[$ib];
+  $tb-= 86400 if($tb > $secsincemidnight);
+  $fd = $fa + ($fb-$fa)*($secsincemidnight-$period - $ta)/($tb - $ta);
+  $avdata = ($fd + $fb)/2 * ($tb - ($secsincemidnight-$period));
+  #Log 1,"===> interpolated value for data point between $ia and $ib is $fd and avdata=$avdata (tb=$tb, ssm=$secsincemidnight)";  
+  #-- other values can be done automatically
+  for( my $i=1; $i<$cntind; $i++){
+    $ia = $minind+$i;
+    $ia-= $arrmax if($ia>=$arrmax);
+    $ib = $ia+1;
+    $ib-= $arrmax if($ib>=$arrmax);
+    $fa = $datarr[$ia];
+    $fb = $datarr[$ib];
+    $ta = $timarr[$ia];
+    $ta-= 86400 if($ta > $secsincemidnight);
+    $tb = $timarr[$ib];
+    $tb-= 86400 if($tb > $secsincemidnight);
+    $avdata += ($fa + $fb)/2 * ($tb - $ta);
+    #Log 1,"===> adding a new interval between $ia and $ib, new avdata = $avdata (tb=$tb ta=$ta)";  
+  }
+  #-- and now the average for 15 minutes:
+  $avdata = int($avdata/($period/10))/10;
+  
+  return $avdata;
+}
+  
+#########################################################################################
 #
 # PT8005_Cmd - Write command to meter
 # 
@@ -248,6 +331,9 @@ sub PT8005_GetStatus ($) {
   my $nofreq=1;
   my $nodata=1;
   my $loop=0;
+  
+  my $secsincemidnight;
+  my $av15=0;
 
   #-- restart timer for updates
   RemoveInternalTimer($hash);
@@ -279,7 +365,7 @@ sub PT8005_GetStatus ($) {
   select(undef,undef,undef,0.15);
  
   #-- loop for the data 
-  while ( ($nospeed+$norange+$nofreq+$nodata > 0) and ($loop <3) ){
+  while ( ($nodata > 0) and ($loop <3) ){
     #my $string_in=PT8005_Read($hash);
     select(undef,undef,undef,0.02);
     my ($count_in, $string_in) = $serport->read(64);
@@ -350,20 +436,24 @@ sub PT8005_GetStatus ($) {
     #-- data value
     my $in_data = index($string_in,"\xA5\x0D");
     if( $in_data != -1){
-      $nodata=0;
-      $bcd=ord(substr($string_in,$in_data+2,1));
-      $data=(int($bcd/16)*10 + $bcd%16)*10;
-      $bcd=ord(substr($string_in,$in_data+3,1));
-      $data+=(int($bcd/16)*10 + $bcd%16)*0.1;
+      my $s1=substr($string_in,$in_data+2,1);
+      my $s2=substr($string_in,$in_data+3,1);
+      if( ($s1 ne "") && ($s2 ne "") ){ 
+        $nodata = 0;
+        $bcd=ord($s1);
+        $data=(int($bcd/16)*10 + $bcd%16)*10;
+        $bcd=ord($s2);
+        $data+=(int($bcd/16)*10 + $bcd%16)*0.1;
+      }
     } 
   }
-  
+
   #-- sleeping some time
-  select(undef,undef,undef,0.02);
+  select(undef,undef,undef,0.01);
   #-- leave recording mode
   $count_out = $serport->write($SKC{"rec"}); 
   #-- sleeping some time
-  select(undef,undef,undef,0.02);
+  select(undef,undef,undef,0.01);
   #-- 
   $serport->close();
   
@@ -389,11 +479,15 @@ sub PT8005_GetStatus ($) {
   }
   
   #-- put into readings
+  $hash->{READINGS}{"soundlevel"}{UNIT}     = $freq 
+    if( $nofreq ==0 );
+  $hash->{READINGS}{"soundlevel"}{UNITABBR} = $freq
+    if( $nofreq ==0 );
   
-  $hash->{READINGS}{"soundlevel"}{UNIT}     = $freq;
-  $hash->{READINGS}{"soundlevel"}{UNITABBR} = $freq;
-  
-  my $svalue = sprintf("%3.1f %s",$data,$freq);
+  #-- testing for wrong data value 
+  if( $data <=30 ){
+    $nodata=1;
+  };
   
   #-- put into READINGS
   readingsBeginUpdate($hash);
@@ -403,11 +497,25 @@ sub PT8005_GetStatus ($) {
   readingsBulkUpdate($hash,"range",$range)     
     if( $norange ==0 );
   readingsBulkUpdate($hash,"overflow",$over);
-  readingsBulkUpdate($hash,"soundlevel",$data) 
-    if( $nodata ==0 );
-  #-- STATE
-  readingsBulkUpdate($hash,"state",$svalue)    
-    if( $nodata ==0 );
+    
+  if( $nodata==0 ){
+
+    my ($sec, $min, $hour, $day, $month, $year, $wday,$yday,$isdst) = localtime(time);
+    $secsincemidnight = $hour*3600+$min*60+$sec;
+    $datarr[$arrind] = $data;
+    $timarr[$arrind] = $secsincemidnight;    
+     
+    $av15 = PT8005_Average($hash,$secsincemidnight,900);
+    
+    $arrind++;
+    $arrind-=$arrmax if($arrind>=$arrmax);
+    
+    my $svalue = sprintf("%3.1f %s [av15 %3.1f %s]",$data,$freq,$av15,$freq);
+    my $lvalue = sprintf("%3.1f av15  %3.1f ",$data,$av15);
+    readingsBulkUpdate($hash,"state",$svalue);  
+    readingsBulkUpdate($hash,"soundlevel",$lvalue);
+      
+  }  
   readingsEndUpdate($hash,1); 
 }
  
@@ -503,7 +611,7 @@ sub PT8005_Set ($@) {
   $serport->handshake('none');
   $serport->write_settings;
     
-  for(my $i = 0; $i < 4; $i++) {  
+  for(my $i = 0; $i < 3; $i++) {  
     #-- read data and look if it is nonzero
     my ($count_in, $string_in) = $serport->read(1);
     if( $string_in eq "" ){
@@ -512,10 +620,10 @@ sub PT8005_Set ($@) {
       return 1;
     } else {
     #-- leave recording mode
-      select(undef,undef,undef,0.01);
+      select(undef,undef,undef,0.02);
       my $count_out = $serport->write($SKC{"rec"}); 
       #-- sleeping some time
-      select(undef,undef,undef,0.01);
+      select(undef,undef,undef,0.02);
     }
   }
   $serport->close();
