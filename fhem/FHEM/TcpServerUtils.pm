@@ -138,12 +138,15 @@ TcpServer_Close($)
 
   if(defined($hash->{CD})) { # Clients
     close($hash->{CD});
+    delete($hash->{CD}); 
     delete($selectlist{$name});
+    delete($hash->{FD});  # Avoid Read->Close->Write
   }
   if(defined($hash->{SERVERSOCKET})) {          # Server
     close($hash->{SERVERSOCKET});
     $name = $name . "." . $hash->{PORT};
     delete($selectlist{$name});
+    delete($hash->{FD});  # Avoid Read->Close->Write
   }
   return undef;
 }
