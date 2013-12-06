@@ -192,8 +192,16 @@ HUEBridge_Get($@)
       $ret .= $key .": ". $result->{$key}{name} ."\n";
     }
     return $ret;
+  } elsif($cmd eq 'groups') {
+    my $result =  HUEBridge_Call($hash, 'groups', undef);
+    $result->{0} = { name => "Lightset 0", };
+    my $ret = "";
+    foreach my $key ( sort keys %$result ) {
+      $ret .= $key .": ". $result->{$key}{name} ."\n";
+    }
+    return $ret;
   } else {
-    return "Unknown argument $cmd, choose one of devices:noArg";
+    return "Unknown argument $cmd, choose one of devices:noArg groups:noArg";
   }
 }
 
@@ -523,6 +531,8 @@ HUEBridge_HTTP_Request($$$@)
   <ul>
     <li>devices<br>
     list the devices known to the bridge.</li>
+    <li>groups<br>
+    list the groups known to the bridge.</li>
   </ul><br>
 
   <a name="HUEBridge_Set"></a>
