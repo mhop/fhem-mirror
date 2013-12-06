@@ -76,6 +76,7 @@ HUEDevice_devStateIcon($)
   $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
 
   return undef if( !$hash );
+  return undef if( $hash->{fhem}->{group} );
 
   my $name = $hash->{NAME};
 
@@ -116,37 +117,52 @@ sub HUEDevice_Define($$)
 
   my @args = split("[ \t]+", $def);
 
-  return "Usage: define <name> HUEDevice <id> [interval]"  if(@args < 3);
+  $hash->{fhem}->{group} = "";
+  if( $args[2] eq "group" ) {
+    $hash->{fhem}->{group} = "G";
+    splice( @args, 2, 1 );
+  }
+
+
+  return "Usage: define <name> HUEDevice [group] <id> [interval]"  if(@args < 3);
 
   my ($name, $type, $id, $interval) = @args;
 
   $interval= 60 unless defined($interval);
   if( $interval < 10 ) { $interval = 60; }
 
-
   $hash->{STATE} = 'Initialized';
   $hash->{fhem}{interfaces}= "dimmer";
 
-  $hash->{ID} = $id;
-  $hash->{fhem}{id} = $id;
+  $hash->{ID} = $hash->{fhem}->{group}.$id;
 
-  $hash->{INTERVAL} = $interval;
+  return "HUEDevice device $hash->{ID} already used for $modules{HUEDevice}{defptr}{$hash->{ID}}->{NAME}."
+         if( defined($modules{HUEDevice}{defptr}{$hash->{ID}})
+             && $modules{HUEDevice}{defptr}{$hash->{ID}}->{NAME} ne $name );
 
-  $hash->{fhem}{on} = -1;
-  $hash->{fhem}{reachable} = '';
-  $hash->{fhem}{colormode} = '';
-  $hash->{fhem}{bri} = -1;
-  $hash->{fhem}{ct} = -1;
-  $hash->{fhem}{hue} = -1;
-  $hash->{fhem}{sat} = -1;
-  $hash->{fhem}{xy} = '';
-  $hash->{fhem}{alert} = '';
-  $hash->{fhem}{effect} = '';
+  $modules{HUEDevice}{defptr}{$hash->{ID}} = $hash;
 
-  $hash->{fhem}{percent} = -1;
+  if( !$hash->{fhem}->{group} ) {
+    $hash->{INTERVAL} = $interval;
+
+    $hash->{fhem}{on} = -1;
+    $hash->{fhem}{reachable} = '';
+    $hash->{fhem}{colormode} = '';
+    $hash->{fhem}{bri} = -1;
+    $hash->{fhem}{ct} = -1;
+    $hash->{fhem}{hue} = -1;
+    $hash->{fhem}{sat} = -1;
+    $hash->{fhem}{xy} = '';
+    $hash->{fhem}{alert} = '';
+    $hash->{fhem}{effect} = '';
+
+    $hash->{fhem}{percent} = -1;
 
 
-  $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
+    $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
+  } else {
+    $attr{$name}{webCmd} = 'on:off' if( !defined( $attr{$name}{webCmd} ) );
+  }
 
   AssignIoPort($hash);
   if(defined($hash->{IODev}->{NAME})) {
@@ -155,7 +171,7 @@ sub HUEDevice_Define($$)
     Log3 $name, 1, "$name: no I/O device";
   }
 
-  #HUEDevice_GetUpdate($hash);
+  RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+10, "HUEDevice_GetUpdate", $hash, 0);
 
   return undef;
@@ -167,7 +183,7 @@ sub HUEDevice_Undefine($$)
 
   RemoveInternalTimer($hash);
 
-  delete($hash->{fhem}{id});
+  delete($modules{HUEDevice}{defptr}{$hash->{ID}});
 
   return undef;
 }
@@ -322,22 +338,28 @@ HUEDevice_Set($@)
 
 
   if( scalar keys %obj ) {
-    my $result = HUEDevice_ReadFromServer($hash,$hash->{ID}."/state",\%obj);
+    my $result;
+    if( $hash->{fhem}->{group} ) {
+      $result = HUEDevice_ReadFromServer($hash,$hash->{ID}."/action",\%obj);
+    } else {
+      $result = HUEDevice_ReadFromServer($hash,$hash->{ID}."/state",\%obj);
+    }
     if( $result->{'error'} ) {
         $hash->{STATE} = $result->{'error'}->{'description'};
         return undef;
       }
 
-    $hash->{LOCAL} = 1;
-    HUEDevice_GetUpdate($hash);
-    delete $hash->{LOCAL};
+    if( !$hash->{fhem}->{group} ) {
+      RemoveInternalTimer($hash);
+      InternalTimer(gettimeofday()+1, "HUEDevice_GetUpdate", $hash, 1);
+    }
 
     return undef;
   }
 
   my $list = "off:noArg on:noArg toggle:noArg statusRequest:noArg";
   $list .= " pct:slider,0,1,100 bri:slider,0,1,254 alert:none,select,lselect" if( AttrVal($name, "subType", "colordimmer") =~ m/dimmer/ );
-  $list .= " dimUp:noArg dimDown:noArg" if( AttrVal($name, "subType", "colordimmer") =~ m/dimmer/ );
+  $list .= " dimUp:noArg dimDown:noArg" if( !$hash->{fhem}->{group} && AttrVal($name, "subType", "colordimmer") =~ m/dimmer/ );
   #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/dimmer/ );
   $list .= " rgb:colorpicker,RGB color:slider,2000,1,6500 ct:slider,154,1,500 hue:slider,0,1,65535 sat:slider,0,1,254 xy effect:none,colorloop" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
   return SetExtensions($hash, $list, $name, @aa);
@@ -517,6 +539,22 @@ HUEDevice_GetUpdate($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
+  if( $hash->{fhem}->{group} ) {
+    my $result = HUEDevice_ReadFromServer($hash,$hash->{ID});
+
+    if( !defined($result) ) {
+      $hash->{STATE} = "unknown";
+      return;
+    } elsif( $result->{'error'} ) {
+      $hash->{STATE} = $result->{'error'}->{'description'};
+      return;
+    }
+
+    $hash->{lights} = join( ",", @{$result->{lights}} );
+
+    return undef;
+  }
+
   if(!$hash->{LOCAL}) {
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "HUEDevice_GetUpdate", $hash, 1);
@@ -547,7 +585,7 @@ HUEDevice_GetUpdate($)
     $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb 98FF23:rgb 0000ff:toggle:on:off' if( $attr{$name}{subType} eq "colordimmer" );
     $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb DEFF26:rgb 0000ff:toggle:on:off' if( AttrVal($name, "model", "") eq "LCT001" );
     $attr{$name}{webCmd} = 'pct:toggle:on:off' if( $attr{$name}{subType} eq "dimmer" );
-    $attr{$name}{webCmd} = 'toggle:on:off' if( $attr{$name}{subType} eq "switch" );
+    $attr{$name}{webCmd} = 'toggle:on:off' if( $attr{$name}{subType} eq "switch" || $hash->{fhem}->{group} );
   }
 
   readingsBeginUpdate($hash);
@@ -640,19 +678,20 @@ HUEDevice_GetUpdate($)
   <a name="HUEDevice_Define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; HUEDevice &lt;id&gt; [&lt;interval&gt;]</code><br>
+    <code>define &lt;name&gt; HUEDevice [group] &lt;id&gt; [&lt;interval&gt;]</code><br>
     <br>
 
     Defines a device connected to a <a href="#HUEBridge">HUEBridge</a>.<br><br>
 
     This can be a hue bulb, a living colors light or a living whites bulb or dimmer plug.<br><br>
 
-    The device status will be updated every &lt;interval&gt; seconds. The default and minimum is 60.<br><br>
+    The device status will be updated every &lt;interval&gt; seconds. The default and minimum is 60. Groups are updated only on definition and statusRequest<br><br>
 
     Examples:
     <ul>
       <code>define bulb HUEDevice 1</code><br>
       <code>define LC HUEDevice 2</code><br>
+      <code>define allLights HUEDevice group 0</code><br>
     </ul>
   </ul><br>
 
@@ -680,6 +719,7 @@ HUEDevice_GetUpdate($)
     <br>
     Notes:
       <ul>
+      <li>groups have no readings.</li>
       <li>not all readings show the actual device state. all readings not related to the current colormode have to be ignored.</li>
       <li>the actual state of a device controlled by a living colors or living whites remote can be different and will
           be updated after some time.</li>
@@ -693,7 +733,7 @@ HUEDevice_GetUpdate($)
       <li>off [&lt;ramp-time&gt;]</li>
       <li>toggle [&lt;ramp-time&gt;]</li>
       <li>statusRequest<br>
-      Request device status update.</li>
+        Request device status update.</li>
       <li>pct &lt;value&gt; [&lt;ramp-time&gt;]<br>
         dim to &lt;value&gt;<br>
         Note: the FS20 compatible dimXX% commands are also accepted.</li>
