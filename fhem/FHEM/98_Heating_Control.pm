@@ -320,8 +320,9 @@ sub Heating_Control_Update($)
 
   my $active = 1;
   if (defined $hash->{helper}{CONDITION}) {
-     $active = eval ($hash->{helper}{CONDITION});
+     $active = AnalyzeCommandChain(undef, "{".$hash->{helper}{CONDITION}."}");
   }
+
   readingsBeginUpdate($hash);
   readingsBulkUpdate ($hash,  "nextUpdate", strftime("%d.%m.%Y %H:%M:%S",localtime($nextSwitch)));
   readingsBulkUpdate ($hash,  "nextValue",  $nextParam);
@@ -450,13 +451,17 @@ sub Heating_Control_Device_Schalten($$$$) {
 
   Log3 $hash, 4, $mod .strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch))." ; aktParam: $aktParam ; newParam: $newParam";
 
+  my $disabled = AttrVal($hash->{NAME}, "disable", 0);
+  my $disabled_txt = $disabled ? " " : " not";
+  Log3 $hash, 4, $mod . "is$disabled_txt disabled";
+
   #Kommando ausführen
   my $secondsSinceSwitch = $nowSwitch - $now;
   if (defined $hash->{helper}{COMMAND} || ($nowSwitch gt "" && $aktParam ne $newParam )) {
      if (!$setModifier && $secondsSinceSwitch < -60) {
         Log3 $hash, 5, $mod."no switch in the yesterdays because of the devices type.";
      } else {
-        if ($command && AttrVal($hash->{NAME}, "disable", 0) == 0) {
+        if ($command && !$disabled) {
           $newParam =~ s/:/ /g;
           $command  =~ s/@/$hash->{DEVICE}/g;
           $command  =~ s/%/$newParam/g;
