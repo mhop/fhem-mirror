@@ -123,7 +123,7 @@ LaCrosse_Parse($$)
   } else {
     DoTrigger($name, "UNKNOWNCODE $msg");
     Log3 $name, 3, "$name: Unknown code $msg, help me!";
-    return undef;
+    return "";
   }
 
   my $raddr = $addr;
@@ -133,10 +133,10 @@ LaCrosse_Parse($$)
   if( !$modules{LaCrosse}{defptr}{$raddr} ) {
     Log3 $name, 3, "LaCrosse Unknown device $rname, please define it";
 
-    return undef if( !$hash->{LaCrossePair} );
+    return "" if( !$hash->{LaCrossePair} );
 
     return "UNDEFINED LaCrosse_$rname LaCrosse $raddr" if( $battery_new || $hash->{LaCrossePair} == 2 );
-    return undef;
+    return "";
   }
 
   $rhash->{battery_new} = $battery_new;

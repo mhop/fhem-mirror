@@ -196,7 +196,7 @@ PCA301_Parse($$)
   } else {
     DoTrigger($name, "UNKNOWNCODE $msg");
     Log3 $name, 3, "$name: Unknown code $msg, help me!";
-    return undef;
+    return "";
   }
 
   my $raddr = $addr;
