@@ -37,6 +37,9 @@ HUEBridge_Read($@)
 {
   my ($hash,$name,$id,$obj)= @_;
 
+  if( $id =~ m/^G(\d.*)/ ) {
+    return HUEBridge_Call($hash, 'groups/' . $1, $obj);
+  }
   return HUEBridge_Call($hash, 'lights/' . $id, $obj);
 }
 
@@ -164,6 +167,9 @@ HUEBridge_Set($@)
     $hash->{updatestate} = 3;
     $hash->{STATE} = "updating";
     return "starting update";
+  } elsif($cmd eq 'autocreate') {
+    HUEBridge_Autocreate($hash);
+    return undef;
   } else {
     my $list = "statusRequest:noArg";
     $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} == 2 );
@@ -203,6 +209,9 @@ HUEBridge_GetUpdate($)
   }
 
   my $result = HUEBridge_Call($hash, 'config', undef);
+  #my $result = HUEBridge_Call($hash, undef, undef);
+  #Log 3, Dumper $result;
+  #$result = $result->{config};
   $hash->{name} = $result->{name};
   $hash->{swversion} = $result->{swversion};
 
@@ -232,43 +241,49 @@ HUEBridge_Autocreate($)
   }
 
   my $result =  HUEBridge_Call($hash, 'lights', undef);
+  foreach my $key ( keys %$result ) {
+    my $id= $key;
 
-  my @defined = ();
-  foreach my $d (keys %defs) {
-    next if($defs{$d}{TYPE} ne "HUEDevice");
-    if(defined($defs{$d}{fhem}) && defined($defs{$d}{fhem}{id})) {
-      push(@defined,$defs{$d}{fhem}{id});
+    if( defined($modules{HUEDevice}{defptr}{$id}) ) {
+        Log3 $name, 5, "$name: id '$id' already defined as '$modules{HUEDevice}{defptr}{$id}->{NAME}'";
+        next;
+    }
+
+    my $devname= "HUEDevice" . $id;
+    my $define= "$devname HUEDevice $id";
+
+    Log3 $name, 5, "$name: create new device '$devname' for address '$id'";
+
+    my $cmdret= CommandDefine(undef,$define);
+    if($cmdret) {
+      Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for id '$id': $cmdret";
+    } else {
+      $cmdret= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
+      $cmdret= CommandAttr(undef,"$devname room HUEDevice");
     }
   }
 
-  foreach my $key ( keys %$result )
-    {
-      my $id= $key;
+  $result =  HUEBridge_Call($hash, 'groups', undef);
+  $result->{0} = { name => "Lightset 0", };
+  foreach my $key ( keys %$result ) {
+    my $id= $key;
 
-      my $found = 0;
-      foreach my $d (keys %defs) {
-        next if($defs{$d}{TYPE} ne "HUEDevice");
-        if(defined($defs{$d}{fhem}) &&
-           defined($defs{$d}{fhem}{id}) && $defs{$d}{fhem}{id} eq $id) {
-          Log3 $name, 5, "$name id '$id' already defined as '$defs{$d}{NAME}'";
-          $found = 1;
-          last;
-        }
+    if( defined($modules{HUEDevice}{defptr}{'G'.$id}) ) {
+        Log3 $name, 5, "$name: id '$id' already defined as '$modules{HUEDevice}{defptr}{'G'.$id}->{NAME}'";
+        next;
     }
 
-    if( !$found ) {
-      my $devname= "HUEDevice" . $id;
-      my $define= "$devname HUEDevice $id";
+    my $devname= "HUEGroup" . $id;
+    my $define= "$devname HUEDevice group $id";
 
-      Log3 $name, 5, "$name create new device '$devname' for address '$id'";
+    Log3 $name, 5, "$name: create new group '$devname' for address '$id'";
 
-      my $cmdret= CommandDefine(undef,$define);
-      if($cmdret) {
-        Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for id '$id': $cmdret";
-      } else {
-        $cmdret= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
-        $cmdret= CommandAttr(undef,"$devname room HUEDevice");
-      }
+    my $cmdret= CommandDefine(undef,$define);
+    if($cmdret) {
+      Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for id '$id': $cmdret";
+    } else {
+      $cmdret= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
+      $cmdret= CommandAttr(undef,"$devname room HUEDevice");
     }
   }
 
@@ -471,13 +486,13 @@ HUEBridge_HTTP_Request($$$@)
   The actual hue bulbs, living colors or living whites devices are defined as <a href="#HUEDevice">HUEDevice</a> devices.
 
   <br><br>
-  All newly found devices are autocreated at startup and added to the room HUEDevice.
+  All newly found devices and groups are autocreated at startup and added to the room HUEDevice.
 
   <br><br>
   Notes:
   <ul>
     <li>This module needs <code>JSON</code>.<br>
-        Pleease install with '<code>cpan install JSON</code>' or your method of choice.</li>
+        Please install with '<code>cpan install JSON</code>' or your method of choice.</li>
     <li>autocreate only works for the first bridge. devices on other bridges have to be manualy defined.</li>
   </ul>
 
