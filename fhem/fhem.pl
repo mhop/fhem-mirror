@@ -756,7 +756,7 @@ AnalyzePerlCommand($$)
 {
   my ($cl, $cmd) = @_;
 
-  $cmd =~ s/\\ *\n/ /g;               # Multi-line
+  $cmd =~ s/\\ *\n/ /g;               # Multi-line. Probably not needed anymore
 
   # Make life easier for oneliners:
   %value = ();
@@ -877,11 +877,19 @@ devspec2array($)
     my @res;
     foreach my $dName (split(":FILTER=", $name)) {
       my ($n,$op,$re) = ("NAME","=",$dName);
-      ($n,$op,$re) = ($1,$2,$3) if($dName =~ m/^([^!]*)(=|!=)(.*)$/);
+      ($n,$op,$re) = ($1,$2,$3)     if($dName =~ m/^([^!]*)(=|!=)(.*)$/);
+      ($n,$op,$re) = ($1,"eval","") if($dName =~ m/^{(.*)}$/);
 
       @res=();
       foreach my $d (@names) {
         next if($attr{$d} && $attr{$d}{ignore});
+
+        if($op eq "eval") {
+          my $exec = EvalSpecials($n, %{{"%NAME"=>$d}});
+          push @res, $d if(AnalyzePerlCommand(undef, $exec));
+          next;
+        }
+
         my $hash = $defs{$d};
         my $val = $hash->{$n};
         if(!defined($val)) {
