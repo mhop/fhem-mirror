@@ -33,10 +33,16 @@ Ext.define('FHEM.view.TableDataGridPanel', {
                     totalProperty: 'totalCount'
                 }
             },
-            autoLoad: true
+            autoLoad: false
         });
         
         me.on("afterlayout", function() {
+            
+            if (!FHEM.dblogname) {
+                Ext.Msg.alert("Error", "This function is currently only available to users of DbLog!");
+            }
+            
+            me.devicestore.load();
             
             me.add(
                 {
