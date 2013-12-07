@@ -1289,7 +1289,7 @@ Options:
     
     <ul>
     <li>Perl Skript:  <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/collectord" target="_new">collectord</a></li>
-    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig):  <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/collectord-1.3.deb" target="_new">collectord-1.3.deb</a></li>
+    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig):  <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/collectord-1.4.deb" target="_new">collectord-1.4.deb</a></li>
     </ul>
     </ul>
 
