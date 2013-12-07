@@ -30,6 +30,7 @@ my %culHmGlobalSetsVrtDev =HMConfig::HMConfig_getHash("culHmGlobalSetsVrtDev");
 my %culHmSubTypeSets      =HMConfig::HMConfig_getHash("culHmSubTypeSets");
 my %culHmModelSets        =HMConfig::HMConfig_getHash("culHmModelSets");
 my %culHmChanSets         =HMConfig::HMConfig_getHash("culHmChanSets");
+my %culHmFunctSets        =HMConfig::HMConfig_getHash("culHmFunctSets");
 my %culHmBits             =HMConfig::HMConfig_getHash("culHmBits");
 my @culHmCmdFlags         =HMConfig::HMConfig_getHash("culHmCmdFlags");
 my $K_actDetID            =HMConfig::HMConfig_getHash("K_actDetID");
@@ -189,7 +190,7 @@ sub CUL_HM_updateConfig($){
     my $chn = substr($id."00",6,2);
 
     if ($id ne $K_actDetID){# if not action detector
-       CUL_HM_ID2PeerList($name,"",1);       # update peerList out of peerIDs
+      CUL_HM_ID2PeerList($name,"",1);       # update peerList out of peerIDs
       my $actCycle = AttrVal($name,"actCycle",undef);
       CUL_HM_ActAdd($id,$actCycle) if ($actCycle);# add to ActionDetect?
       # --- set default attrubutes if missing ---
@@ -216,6 +217,9 @@ sub CUL_HM_updateConfig($){
     }
     elsif ($md =~ m/HM-CC-RT-DN/){
       $attr{$name}{stateFormat} = "last:trigLast" if ($chn eq "03");
+    }
+    elsif ($md eq "HM-CC-VD"){
+      $hash->{helper}{oldDes} = "0";
     }
     elsif ("dimmer"  eq $st) {#setup virtual dimmer channels
       my $mId = CUL_HM_getMId($hash);
@@ -273,7 +277,7 @@ sub CUL_HM_updateConfig($){
       }elsif($st eq "blindActuator"){$webCmd="toggle:on:off:up:down:stop:statusRequest";
       }elsif($st eq "dimmer"       ){$webCmd="toggle:on:off:up:down:statusRequest";
       }elsif($st eq "switch"       ){$webCmd="toggle:on:off:statusRequest";
-      }elsif($st eq "smokeDetector"){$webCmd="test:alarmOn:alarmOff";
+      }elsif($st eq "smokeDetector"){$webCmd="test:alarmOn:alarmOff:statusRequest";
       }elsif($st eq "keyMatic"     ){$webCmd="lock:inhibit on:inhibit off";
       }elsif($md eq "HM-OU-CFM-PL" ){$webCmd="press short:press long"
                                        .($chn eq "02"?":playTone replay":"");
@@ -480,8 +484,20 @@ sub CUL_HM_Attr(@) {#################################
       return "attribut param not defined for this entity";
     }
   }
-  elsif($attrName eq "peerIDs"   &&!$hash->{helper}{role}{chn}){#only for chan
-    return "$attrName not usable for devices";
+  elsif($attrName eq "peerIDs"){
+    if ($cmd eq "set"){
+      return "$attrName not usable for devices" if(!$hash->{helper}{role}{chn});
+      my $id = $hash->{DEF};
+      if ($id ne $K_actDetID && $attrVal){# if not action detector
+        my @ids = grep /......../,split(",",$attrVal);
+        $attr{$name}{peerIDs} = join",",@ids;
+        CUL_HM_ID2PeerList($name,"",1);       # update peerList out of peerIDs
+      }
+    }
+    else{# delete
+      delete $hash->{peerList};
+      delete $hash->{READINGS}{peerList};
+    }
   }
   elsif($attrName eq "msgRepeat"){
     if ($cmd eq "set"){
@@ -499,7 +515,7 @@ sub CUL_HM_Attr(@) {#################################
   elsif($attrName eq "burstAccess"){
     if ($cmd eq "set"){
       return "use burstAccess only for device"             if (!$hash->{helper}{role}{dev});
-      return $name." not a conditional burst model"        if (CUL_HM_getRxType($hash) & 0x80);
+      return $name." not a conditional burst model"        if (!CUL_HM_getRxType($hash) & 0x80);
       return "$attrVal not a valid option for burstAccess" if ($attrVal !~ m/^[01]/);
       if ($attrVal =~ m/^0/){$hash->{protCondBurst} = "forced_off";}
       else                  {$hash->{protCondBurst} = "unknown";}
@@ -788,15 +804,21 @@ sub CUL_HM_Parse($$) {##############################
 
       #VD hang detection
       my $des = ReadingsVal($name, "ValveDesired", "");
-      $des =~ s/ .*//; # remove unit
-      if ($des ne $vp && ($err&0x30) == 0x00){
-        push @event, "operState:errorTargetNotMet";
-        push @event, "operStateErrCnt:".
+      $des =~ s/ .*//; # remove unit     
+      if (($des < $vp-1 || $des > $vp+1) && ($err&0x30) == 0x00){ 
+        if ($shash->{helper}{oldDes} eq $des){#desired valve position stable
+          push @event, "operState:errorTargetNotMet";
+          push @event, "operStateErrCnt:".
                    (ReadingsVal($name,"operStateErrCnt","0")+1);
+        }
+        else{
+          push @event, "operState:changed";
+        }
       }
       else{
         push @event, "operState:".((($err&0x30) == 0x00)?"onTarget":"adjusting");
       }
+      $shash->{helper}{oldDes} = $des;
     }
   }
   elsif($md =~ m/HM-CC-RT-DN/) { ##############################################
@@ -828,8 +850,8 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "desired-temp:$setTemp";
       push @event, "ValvePosition:$vp %";
       push @event, "mode:$ctlTbl{$ctrlMode}";
-      push @event, "unknown0:$uk0";
-      push @event, "unknown1:".$2 if ($p =~ m/^0A(.10)(.*)/);
+      #push @event, "unknown0:$uk0";
+      #push @event, "unknown1:".$2 if ($p =~ m/^0A(.10)(.*)/);
       push @event, "state:T: $actTemp desired: $setTemp valve: $vp %";
       push @entities,CUL_HM_UpdtReadBulk($dHash,1
                                             ,"battery:".($err&0x80?"low":"ok")
@@ -1202,6 +1224,11 @@ sub CUL_HM_Parse($$) {##############################
     if($mTp eq "02") {# this must be a reflection from what we sent, ignore
       push @event, "";
     }
+    elsif ($mTp eq "40" || $mTp eq "41"){# if channel is SD team we have to act
+
+      push @entities,CUL_HM_parseSDteam($mTp,$src,$dst,$p);
+      push @event, "" if (@entities);
+    }
   }
   elsif($st eq "outputUnit"){ #################################################
     if($mTp eq "40" && @mI == 2){
@@ -1313,61 +1340,19 @@ sub CUL_HM_Parse($$) {##############################
     #Info Level: mTp=0x10 p(..)(..)(..) subtype=06, channel, state (1 byte)
     #Event:      mTp=0x41 p(..)(..)(..) channel   , unknown, state (1 byte)
 
-    if ($mTp eq "10" && $p =~ m/^06..(..)/) {
-      my $state = hex($1);
-      push @event, "battery:". (($state&0x04)?"low"  :"ok"  );
-      push @event, "state:alive";
+    if ($mTp eq "10" && $p =~ m/^06..(..)(..)/) {
+      my ($state,$err) = (hex($1),hex($2));
+      push @event, "battery:".(($err&0x80)?"low"  :"ok"  );
+      push @event, "level:"  .hex($state);
+      push @event, "state:"  .(($state < 2)?"off":"smoke-Alarm");
     }
-    elsif ($mTp eq "40"){ #autonomous event
-      if($dhash){ # the source is in dst
-        my ($state,$trgCnt) = (hex(substr($p,0,2)),hex(substr($p,2,2)));
-        push @entities,CUL_HM_UpdtReadSingle($dhash,'test',"from $dname:$state",1)
-              if (!($state & 1));
-        push @entities,CUL_HM_UpdtReadSingle($dhash,'battery',(($state & 0x04)?"low":"ok"),1)
-              if($state&0x80);
-      }
-      push @event, "";
-    }
-    elsif ($mTp eq "41"){ #Alarm detected
-      #C8: Smoke Alarm
-      #C7: tone off
-      #01: no alarm
-      my ($No,$state) = (substr($p,2,2),substr($p,4,2));
-      if(($dhash && $dname ne $name) && # update source(ID reported in $dst)
-         (!$dhash->{helper}{alarmNo} || $dhash->{helper}{alarmNo} ne $No)){
-        $dhash->{helper}{alarmNo} = $No;
-        push @entities,
-             CUL_HM_UpdtReadBulk($dhash,1,
-                       'state:'.(($state eq "01")?"off":"smoke-Alarm_".$No),
-                          "eventNo:".$No
-                       );
-      }
-      # - - - - - - now handle the team - - - - - -
-      my @alarmArry;
-      @alarmArry = split(",",$shash->{helper}{alarmList})
-            if ($shash->{helper}{alarmList});
-      if ($state eq "01") { # clear alarm for sensor
-        @alarmArry = grep !/$dst/,@alarmArry;
-      }
-      else{                 # add alarm for Sensor
-        @alarmArry = CUL_HM_noDup(@alarmArry,$dst);
-      }
-      my $alarmList;        # make alarm ID list readable
-      foreach(@alarmArry){
-        $alarmList .= CUL_HM_id2Name($_)."," if ($_);
-      }
-      $shash->{helper}{alarmList} = join",",@alarmArry;
-      push @event,"state:"        .($alarmList?"smoke-Alarm":"off" );
-      push @event,"smoke_detect:" .($alarmList?$alarmList   :"none");
-      #--- check out teamstatus, members might be shy ---
-      my $peerList = $shash->{peerList}?$shash->{peerList}:"";
-      foreach my $pNm (split(",",$peerList)){
-        CUL_HM_qStateUpdatIfEnab($pNm,1)if ($pNm);
-      }
+    elsif ($mTp eq "40" || $mTp eq "41"){ #autonomous event
+      push @entities,CUL_HM_parseSDteam($mTp,$src,$dst,$p);
+      push @event, "" if (@entities);
     }
     elsif ($mTp eq "01"){ #Configs
       my $sType = substr($p,0,2);
-      if($sType eq "01"){#add peer to group
+      if   ($sType eq "01"){# add peer to group
         push @event,"SDteam:add_".$dname;
       }
       elsif($sType eq "02"){# remove from group
@@ -1925,7 +1910,6 @@ sub CUL_HM_parseCommon(@){#####################################################
     my $cName = CUL_HM_id2Hash($src.sprintf("%02X",$chn));
     $cName = $cName->{NAME};
     my $level = "-";
-
     if (length($p)>5){
       my $l = substr($p,4,2);
       if    ($lvlStr{md}{$md} && $lvlStr{md}{$md}{$l}){$level = $lvlStr{md}{$md}{$l}}
@@ -1980,6 +1964,72 @@ sub CUL_HM_queueUpdtCfg($){
   $modules{CUL_HM}{helper}{updtCfgLst} = \@arr;
   RemoveInternalTimer("updateConfig");
   InternalTimer(gettimeofday()+5,"CUL_HM_updateConfig", "updateConfig", 0);
+}
+sub CUL_HM_parseSDteam(@){#handle SD team events
+  my ($mTp,$sId,$dId,$p) = @_;
+  
+  my @entities;
+  my $dHash = CUL_HM_id2Hash($dId);
+  my $dName = CUL_HM_id2Name($dId);
+  my $sHash = CUL_HM_id2Hash($sId);
+  my $sName = CUL_HM_hash2Name($sHash);
+  my $st = AttrVal($sName,"subType","");
+  if (AttrVal($sName,"subType","") eq "virtual"){
+    foreach my $cId (CUL_HM_getAssChnIds($sName)){
+      my $cHash = CUL_HM_id2Hash($cId);
+      next if (!$cHash->{sdTeam} || $cHash->{sdTeam} ne "sdLead");
+      my $cName = CUL_HM_id2Name($cId);
+      $sHash = $cHash;
+      $sName = CUL_HM_id2Name($cId);
+      last;
+    }
+  }
+  return () if (!$sHash->{sdTeam} && $sHash->{sdTeam} ne "sdLead");
+
+  if ($mTp eq "40"){ #test
+    my $trgCnt = hex(substr($p,2,2));
+    push @entities,CUL_HM_UpdtReadSingle($sHash,
+                                         'teamCall',"from $dName:$trgCnt",1);
+    foreach (split ",",$attr{$sName}{peerIDs}){
+      my $tHash = CUL_HM_id2Hash($_);
+      push @entities,CUL_HM_UpdtReadSingle($tHash,
+                                            'teamCall',"from $dName:$trgCnt",1);
+    }
+  }
+  elsif ($mTp eq "41"){ #Alarm detected
+    #C8: Smoke Alarm
+    #C7: tone off
+    #01: no alarm
+    my ($No,$state) = (substr($p,2,2),substr($p,4,2));
+    if(($dHash) && # update source(ID reported in $dst)
+       (!$dHash->{helper}{alarmNo} || $dHash->{helper}{alarmNo} ne $No)){
+      $dHash->{helper}{alarmNo} = $No;
+    }
+    else{
+      return ();# duplicate alarm
+    }
+    my ($sVal,$sProsa,$smokeSrc) = (hex($state),"off","-");
+    if ($sVal > 1){
+      $sProsa = "smoke-Alarm_".$No;
+      $smokeSrc = $dName;
+      CUL_HM_UpdtReadSingle($sHash,"recentAlarm",$smokeSrc,1)
+          if($sVal == 200);
+    }
+    push @entities,CUL_HM_UpdtReadBulk($sHash,1     # entry for teamLead
+                                       ,"state:$sProsa"
+                                       ,'level:'.$sVal
+                                       ,"eventNo:".$No
+                                       ,"smoke_detect:".$smokeSrc
+                                       );
+    foreach (split ",",$attr{$sName}{peerIDs}){
+      my $tHash = CUL_HM_id2Hash($_);
+      push @entities,CUL_HM_UpdtReadBulk($tHash,1 
+                                         ,"state:$sProsa"
+                                         ,"smoke_detect:".$smokeSrc
+                                         );
+    }
+  }
+  return @entities;
 }
 
 #+++++++++++++++++ get command+++++++++++++++++++++++++++++++++++++++++++++++++
@@ -2189,6 +2239,7 @@ sub CUL_HM_Set($@) {
   my $roleV = $hash->{helper}{role}{vrt}?1:0;
   my $mdCh = $md.($isChannel?$chn:"00"); # chan specific commands?
   my $id = CUL_HM_IOid($hash);
+  my $fkt = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
   my $h = $culHmGlobalSets{$cmd}      if(                $st ne "virtual");
   $h = $culHmGlobalSetsVrtDev{$cmd}   if(!defined($h) &&($st eq "virtual"||!$st)  && $roleD);
   $h = $culHmGlobalSetsDevice{$cmd}   if(!defined($h) && $st ne "virtual"         && $roleD);
@@ -2197,7 +2248,8 @@ sub CUL_HM_Set($@) {
   $h = $culHmSubTypeSets{$st}{$cmd}   if(!defined($h) && $culHmSubTypeSets{$st}   && $roleC);
   $h = $culHmModelSets{$md}{$cmd}     if(!defined($h) && $culHmModelSets{$md}  );
   $h = $culHmChanSets{$md."00"}{$cmd} if(!defined($h) && $culHmChanSets{$md."00"} && $roleD);
-  $h = $culHmChanSets{$md.$chn}{$cmd} if(!defined($h) && $culHmChanSets{$md.$chn} && $roleC);
+  $h = $culHmChanSets{$md.$chn}{$cmd} if(!defined($h) && $culHmChanSets{$md.$chn} && $roleC); 
+  $h = $culHmFunctSets{$fkt}{$cmd}    if(!defined($h) && $culHmFunctSets{$fkt});
 
   my @h;
   @h = split(" ", $h) if($h);
@@ -2218,6 +2270,7 @@ sub CUL_HM_Set($@) {
     if( $culHmModelSets{$md})              {foreach(keys %{$culHmModelSets{$md}}     ){push @arr1,"$_:${$culHmModelSets{$md}}{$_}"     }};
     if( $culHmChanSets{$md."00"} && $roleD){foreach(keys %{$culHmChanSets{$md."00"}} ){push @arr1,"$_:".${$culHmChanSets{$md."00"}}{$_}}};
     if( $culHmChanSets{$md.$chn} && $roleC){foreach(keys %{$culHmChanSets{$md.$chn}} ){push @arr1,"$_:".${$culHmChanSets{$md.$chn}}{$_}}};
+    if( $culHmFunctSets{$fkt}    && $roleC){foreach(keys %{$culHmFunctSets{$fkt}}    ){push @arr1,"$_:".${$culHmFunctSets{$fkt}}{$_}   }};
     @arr1 = CUL_HM_noDup(@arr1);
     foreach(@arr1){
       my ($cmd,$val) = split(":",$_,2);
@@ -3030,19 +3083,23 @@ sub CUL_HM_Set($@) {
       return 'unknown argument '.$a[3];
     }
   }
-  elsif($cmd eq "test") { #####################################################
+  elsif($cmd eq "teamCall") { #################################################
+    $state = "";
     my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
     $hash->{TESTNR} = $testnr;
-    my $msg = sprintf("++9440%s%s00%02X",$dst,$dst,$testnr);
-    CUL_HM_PushCmdStack($hash, $msg);# repeat non-ack messages 3 times
+    my $tstNo = sprintf("%02X",$testnr);
+    my $msg = "++9440".$dst.$dst."00".$tstNo;
     CUL_HM_PushCmdStack($hash, $msg);
-    CUL_HM_PushCmdStack($hash, $msg);
+    CUL_HM_parseSDteam("40",$dst,$dst,"00".$tstNo);
   }
   elsif($cmd =~ m/alarm(.*)/) { ###############################################
-    my $msg = sprintf("++9441%s%s01%s",$dst,$dst,(($1 eq "On")?"0BC8":"0C01"));
+    $state = "";
+    my $p = (($1 eq "On")?"0BC8":"0C01");
+    my $msg = "++9441".$dst.$dst."01".$p;
     CUL_HM_PushCmdStack($hash, $msg);# repeat non-ack messages 3 times
     CUL_HM_PushCmdStack($hash, $msg);
     CUL_HM_PushCmdStack($hash, $msg);
+    CUL_HM_parseSDteam("41",$dst,$dst,"01".$p);
   }
   elsif($cmd eq "virtual") { ##################################################
       $state = "";
@@ -3077,15 +3134,15 @@ sub CUL_HM_Set($@) {
       foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
         push (@peerList,substr($peer,0,6));
       }
-      @peerList = CUL_HM_noDup(@peerList);
-      push @peerList,'00000000' if (!@peerList);#send to broadcast if no peer
+      @peerList = grep !/^$/,CUL_HM_noDup(@peerList);
+      @peerList = ('000000') if (scalar@peerList == 0);#send to broadcast if no peer
       foreach my $peer (sort @peerList){
-        my $peerFlag = $peer eq '00000000'?'A4':
+        my $peerFlag = $peer eq '000000'?'A4':
                                            CUL_HM_getFlag(CUL_HM_id2Hash($peer));
         $peerFlag =~ s/0/4/;# either 'A4' or 'B4'
         CUL_HM_PushCmdStack($hash, sprintf("++%s40%s%s%02X%02X",
                        $peerFlag,$dst,$peer,
-                       $chn+(($mode && $mode eq "long")?64:0),
+                       hex($chn)+(($mode && $mode eq "long")?64:0),
                        $pressCnt));
       }
     }
@@ -3102,24 +3159,24 @@ sub CUL_HM_Set($@) {
   elsif($cmd eq "postEvent") { ################################################
     #General add thermal event simulator
     my (undef,undef,$cond) = @a;
+    my $cndNo;
     if ($cond =~ m/[+-]?\d+/){
       return "condition value:$cond above 200 illegal" if ($cond > 200);
+      $cndNo = $cond;
     }
     else{
-      my $val;
       my @keys;
       foreach my $tp (keys %lvlStr){
         foreach my $mk (keys %{$lvlStr{$tp}}){
           foreach (keys %{$lvlStr{$tp}{$mk}}){
-            $val = hex($_) if ($cond eq $lvlStr{$tp}{$mk}{$_});
-              push @keys,$lvlStr{$tp}{$mk}{$_};
+            $cndNo = hex($_) if ($cond eq $lvlStr{$tp}{$mk}{$_});
+            push @keys,$lvlStr{$tp}{$mk}{$_};
           }
         }
       }
       return "cond:$cond not allowed. choose one of:[0..200],"
             .join(",",sort @keys)
-        if (!defined $val);
-      $cond = $val;
+        if (!defined $cndNo);
     }
     my $pressCnt = (!$hash->{helper}{count}?1:$hash->{helper}{count}+1)%256;
     $hash->{helper}{count}=$pressCnt;# remember for next round
@@ -3140,7 +3197,7 @@ sub CUL_HM_Set($@) {
                      ,$peerFlag,$dst,$peer
                      ,$chn
                      ,$pressCnt
-                     ,$cond));
+                     ,$cndNo));
       CUL_HM_ProcessCmdStack($pHash);
     }
 
@@ -4000,8 +4057,30 @@ sub CUL_HM_ID2PeerList ($$$) {
   $attr{$name}{peerIDs} = $peerIDs;                 # make it public
   if ($peerNames){
     $peerNames =~ s/_chn:01//g; # channel 01 is part of device
-    readingsSingleUpdate($hash,"peerList",$peerNames,0) ;
+    readingsSingleUpdate($hash,"peerList",$peerNames,0);
     $hash->{peerList} = $peerNames;
+    my $dHash = CUL_HM_getDeviceHash($hash);
+    my $st = AttrVal($dHash->{NAME},"subType","");
+    if ($st eq "virtual"){
+      #if any of the peers is an SD we are team master
+      my $tMstr = 0;
+      foreach (split(",",$peerNames)){
+        $tMstr = 1 if(AttrVal($_,"subType","") eq "smokeDetector");
+      }
+      if($tMstr){$hash->{sdTeam}="sdLead";$hash->{helper}{fkt}="sdLead";}
+      else      {delete $hash->{sdTeam};  delete $hash->{helper}{fkt};}
+    }
+    elsif ($st eq "smokeDetector"){
+      foreach (split(",",$peerNames)){
+        my $tn = ($_ =~ m/self/)?$name:$_;
+        next if (!$defs{$tn});
+        $defs{$tn}{sdTeam} = "sdLead" ;
+      }
+      if($peerNames !~ m/self/){
+        delete $hash->{sdTeam};
+        delete $hash->{helper}{fkt};
+      }
+    }
   }
   else{
     delete $hash->{READINGS}{peerList};
@@ -4804,8 +4883,9 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
   push @entities,$devHash if ($devHash->{channel_01});
   foreach my $ehash (@entities){
     no strict; #convert regardless of content
-    next if (!defined $ehash->{NAME});
+    my $valid = (!defined $ehash->{NAME})?0:1;
     use strict;
+    next if (!$valid);
     my $eName = $ehash->{NAME};
     next if (!$eName);
     foreach my $rName (keys %{$ehash->{READINGS}}){
@@ -5159,7 +5239,7 @@ sub CUL_HM_autoReadReady($){# capacity for autoread available?
   }
   if (   !$ioName
       || ReadingsVal($ioName,"cond","init") !~ m /^(ok|Overload-released|init)$/#default init for CUL
-      || (    $defs{$ioName}{helper}{q}
+      || ( defined $defs{$ioName}{helper}{q}
           && ($defs{$ioName}{helper}{q}{cap}{sum}/16.8)>
                AttrVal($ioName,"hmMsgLowLimit",40))){
     return 0;
@@ -5755,7 +5835,7 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
        itself to the team - i.e. peer it to itself! doing that you have full
        controll over the team and don't need to guess.<br>
      <ul>
-       <li><B>test</B> - execute a network test</li>
+       <li><B>teamCall</B> - execute a network test to all team members</li>
        <li><B>alarmOn</B> - initiate an alarm</li>
        <li><B>alarmOff</B> - switch off the alarm</li>
      </ul>
@@ -6226,7 +6306,7 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
       ValveErrorPosition:$vep %<br>
       ValveOffset:$of %<br>
       ValveDesired:$vp %            # set by TC <br>
-      operState:[errorTargetNotMet|onTarget|adjusting]  # operational condition<br>
+      operState:[errorTargetNotMet|onTarget|adjusting|changed]  # operational condition<br>
       operStateErrCnt:$cnt          # number of failed settings<br>
   </li>
   <li><B>HM-CC-SCD</B><br>
@@ -6345,10 +6425,10 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
       [off|smoke-Alarm|alive]             # for team leader<br>
       [off|smoke-forward|smoke-alarm]     # for team members<br>
       [normal|added|addedStrong]          #HM-CC-SCD<br>
-       SDteam [add|remove]_$dname<br>
+      SDteam [add|remove]_$dname<br>
       battery [low|ok]<br>
       smoke_detect [none|&lt;src&gt;]<br>
-      test:from $src<br>
+      teamCall:from $src<br>
   </li>
   <li><B>threeStateSensor</B><br>
       [open|tilted|closed]<br>

@@ -192,7 +192,7 @@ my %culHmModel=(
   "0093" => {name=>"Schueco_263-158"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",}, #
   "0094" => {name=>"IS-WDS-TH-OD-S-R3"       ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",}, #
   "0095" => {name=>"HM-CC-RT-DN"             ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.5p.6p,3:3p.6p,1,7:3p.4'
-                                                                                                                        ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,ClimRT_tr:4:4,ClimaTeam:5:5,remote:6:6"}, #
+                                                                                                                        ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,Clima:4:4,ClimaTeam:5:5,remote:6:6"}, #
   "0096" => {name=>"WDF-solar"               ,st=>'blindActuatorSol'  ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"win:1:1,blind:2:3",}, #
   "009B" => {name=>"Schueco_263-xxx"         ,st=>'tipTronic'         ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1:1.2,3:1p.3p',chn=>"act:1:1,sen:2:2,sec:3:3",}, #
   "009F" => {name=>"HM-Sen-Wa-Od"            ,st=>'sensor'            ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",}, #capacitive filling level sensor
@@ -224,7 +224,7 @@ my %culHmModel=(
   "00BA" => {name=>"HM-LC-Dim1T-FM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "00BB" => {name=>"HM-LC-Dim2T-SM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",},#
   "00BD" => {name=>"HM-CC-RT-DN-BoM"         ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.5p.6p,3:3p.6p,1,7:3p.4'
-                                                                                                                        ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,ClimRT_tr:4:4,ClimaTeam:5:5,remote:6:6"}, #
+                                                                                                                        ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,Clima:4:4,ClimaTeam:5:5,remote:6:6"}, #
   "8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",},
   #263 167                        HM Smoke Detector Schueco
@@ -1089,11 +1089,8 @@ my %culHmSubTypeSets = (# channels of this subtype
                       ,press         =>"[long|short]..."
                       ,postEvent     =>"<condition>"
 #                      ,valvePos      =>"<position>"
-                      },#acting as TC
-  smokeDetector    =>{ test          =>""
-                      ,alarmOn       =>""
-                      ,alarmOff      =>""
-                      ,peerChan      =>"<btnNumber> <actChn> ... single [set|unset] actor"},
+                      },
+  smokeDetector    =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] actor"},
   winMatic         =>{ matic         =>"<btn>"
                       ,keydef        =>"<btn> <txt1> <txt2>"
                       ,create        =>"<txt>"
@@ -1141,6 +1138,7 @@ my %culHmModelSets = (# channels of this subtype-------------
   "HM-CC-TC"       =>{ burstXmit      =>""},
   "HM-CC-RT-DN"    =>{ burstXmit      =>""},
   "HM-CC-RT-DN-BoM"=>{ statusRequest  =>""},
+  "HM-SEC-SD"      =>{ statusRequest  =>""},
 );
 # clones- - - - - - - - - - - - - - - - -
 $culHmModelSets{"HM-RC-19-B"}  = $culHmModelSets{"HM-RC-19"};
@@ -1209,14 +1207,24 @@ my %culHmChanSets = (
 );
 # clones- - - - - - - - - - - - - - - - -
 #$culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};
-$culHmChanSets{"WDF-solar02"}      = $culHmSubTypeSets{"blindActuator"};
-$culHmChanSets{"HM-CC-RT-DN-BoM00"}= $culHmSubTypeSets{"HM-CC-RT-DN00"};
-$culHmChanSets{"HM-CC-RT-DN-BoM02"}= $culHmSubTypeSets{"HM-CC-RT-DN02"};
-$culHmChanSets{"HM-CC-RT-DN-BoM04"}= $culHmSubTypeSets{"HM-CC-RT-DN04"};
-$culHmChanSets{"HM-CC-RT-DN-BoM05"}= $culHmSubTypeSets{"HM-CC-RT-DN05"};
-$culHmChanSets{"HM-ES-PMSw1-Pl04"} = $culHmSubTypeSets{"HM-ES-PMSw1-Pl03"};
-$culHmChanSets{"HM-ES-PMSw1-Pl05"} = $culHmSubTypeSets{"HM-ES-PMSw1-Pl03"};
-$culHmChanSets{"HM-ES-PMSw1-Pl06"} = $culHmSubTypeSets{"HM-ES-PMSw1-Pl03"};
+$culHmChanSets{"WDF-solar02"}      = $culHmChanSets{"blindActuator"};
+$culHmChanSets{"HM-CC-RT-DN-BoM00"}= $culHmChanSets{"HM-CC-RT-DN00"};
+$culHmChanSets{"HM-CC-RT-DN-BoM02"}= $culHmChanSets{"HM-CC-RT-DN02"};
+$culHmChanSets{"HM-CC-RT-DN-BoM04"}= $culHmChanSets{"HM-CC-RT-DN04"};
+$culHmChanSets{"HM-CC-RT-DN-BoM05"}= $culHmChanSets{"HM-CC-RT-DN05"};
+$culHmChanSets{"HM-ES-PMSw1-Pl04"} = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
+$culHmChanSets{"HM-ES-PMSw1-Pl05"} = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
+$culHmChanSets{"HM-ES-PMSw1-Pl06"} = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
+
+my %culHmFunctSets = (# command depending on function
+  sdLead              =>{ alarmOn       =>""
+                         ,alarmOff      =>""
+                         ,teamCall      =>""
+                        }
+);
+
+                      
+                      
 
 # RC send BCAST to specific address. Is the meaning understood?
 my @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "CFG", "Bit3",
@@ -1438,6 +1446,7 @@ sub HMConfig_getHash($){
   return %culHmSubTypeSets      if($hn eq "culHmSubTypeSets"     );
   return %culHmModelSets        if($hn eq "culHmModelSets"       );
   return %culHmChanSets         if($hn eq "culHmChanSets"        );
+  return %culHmFunctSets        if($hn eq "culHmFunctSets"       );
 
   return %culHmBits             if($hn eq "culHmBits"            );
   return @culHmCmdFlags         if($hn eq "culHmCmdFlags"        );
