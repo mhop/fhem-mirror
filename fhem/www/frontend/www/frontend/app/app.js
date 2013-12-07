@@ -40,11 +40,13 @@ Ext.application({
                 Ext.each(FHEM.info.Results, function(result) {
                     if (result.list === "DbLog" && result.devices[0].NAME) {
                         FHEM.dblogname = result.devices[0].NAME;
-                        return false;
+                    }
+                    if (result.list === "FileLog" && result.devices.length > 0) {
+                        FHEM.filelogs = result.devices;
                     }
                 });
-                if (!FHEM.dblogname && Ext.isEmpty(FHEM.dblogname) && FHEM.dblogname != "undefined") {
-                    Ext.Msg.alert("Error", "Could not find a DbLog Configuration. Do you have DbLog already running?");
+                if ((!FHEM.dblogname || Ext.isEmpty(FHEM.dblogname)) && !FHEM.filelogs) {
+                    Ext.Msg.alert("Error", "Could not find a DbLog or FileLog Configuration. Do you have them already defined?");
                 } else {
                     Ext.create("FHEM.view.Viewport", {
                         hidden: true

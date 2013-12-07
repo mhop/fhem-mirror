@@ -427,25 +427,54 @@ Ext.define('FHEM.view.LineChartPanel', {
                 },
                 items: 
                     [
+                       {
+                           xtype: 'radiogroup',
+                           name: 'datasourceradio',
+                           rowCount: me.getAxiscounter(),
+                           allowBlank: false,
+                           defaults: {
+                               labelWidth: 40,
+                               padding: "0 5px 0 0"
+                           },
+                           items: [
+                               {
+                                   fieldLabel: 'DbLog',
+                                   name: 'logtype' + me.getAxiscounter(),
+                                   inputValue: 'dblog',
+                                   checked: true,
+                                   disabled: !FHEM.dblogname
+                               },
+                               {
+                                   fieldLabel: 'FileLog',
+                                   name: 'logtype' + me.getAxiscounter(),
+                                   inputValue: 'filelog',
+                                   checked: false,
+                                   disabled: !FHEM.filelogs
+                               }
+                           ]
+                        },
                         {  
                           xtype: 'combobox', 
                           name: 'devicecombo',
                           fieldLabel: 'Select Device',
                           labelWidth: 90,
                           store: me.devicestore,
+                          triggerAction: 'all',
                           allowBlank: false,
-                          queryMode: 'local',
                           displayField: 'DEVICE',
                           valueField: 'DEVICE',
                           listeners: {
                               select: function(combo) {
+                                  
                                   var device = combo.getValue(),
                                       readingscombo = combo.up().down('combobox[name=yaxiscombo]'),
-                                      readingsstore = readingscombo.getStore(),
-                                      readingsproxy = readingsstore.getProxy();
+                                      readingsstore = readingscombo.getStore();
                                   
-                                  readingsproxy.url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+' + device + '+getreadings&XHR=1';
-                                  readingsstore.load();
+                                  if (readingsstore && readingsstore.queryMode !== 'local') {
+                                      var readingsproxy = readingsstore.getProxy();
+                                      readingsproxy.url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+' + device + '+getreadings&XHR=1';
+                                      readingsstore.load();
+                                  }
                                   readingscombo.setDisabled(false);
                               }
                           }
@@ -459,6 +488,7 @@ Ext.define('FHEM.view.LineChartPanel', {
                             labelWidth: 90,
                             inputWidth: 110,
                             store: Ext.create('FHEM.store.ReadingsStore', {
+                                queryMode: 'remote',
                                 proxy: {
                                     type: 'ajax',
                                     method: 'POST',
