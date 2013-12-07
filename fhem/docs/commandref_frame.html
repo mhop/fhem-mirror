@@ -279,34 +279,33 @@ A line ending with \ will be concatenated with the next one, so long lines
   <ul>
   <li>a single device name. This is the most common case.</li>
   <li>a list of devices, separated by comma (,)</li>
-  <li>a range of devices, separated by dash (-)</li>
-  <li>a regular expression, if the the spec contains on e of the following
-      characters: ^*[]$</li>
-  <li>an attribute of the device, followed by an equal sign (=) and then a
-      regexp for this attribute. As attribute you can specify either attributes
-      set with the attr command or one of the "internal" attributes DEF, STATE
-      and TYPE.</li>
+  <li>a regular expression</li>
+  <li>a NAME=VALUE pair, where NAME can be an Internal value like TYPE, a
+        Reading-Name or an attribute. VALUE is a regexp. To negate the
+        comparison, use NAME!=VALUE</li>
+  <li>if the spec is followed by the expression :FILTER=NAME=VALUE, then the
+      values found in the first round are filtered by the second expression.
   </ul>
-  Example:
+  Examples:
   <ul>
     <code>set lamp1 on</code><br>
     <code>set lamp1,lamp2,lamp3 on</code><br>
-    <code>set lamp[1-3] on</code><br>
     <code>set lamp.* on</code><br>
-    <code>set lamp1-lamp3 on</code><br>
-    <code>set lamp1-lamp3,lamp3 on</code><br>
     <code>set room=kitchen off</code><br>
+    <code>set room=kitchen:FILTER=STATE=on off</code><br>
+    <code>set room=kitchen:FILTER=STATE!=off off</code><br>
     <code>list disabled=</code><br>
-    <code>list TYPE=FS20</code><br>
+    <code>list TYPE=FS20 STATE</code><br>
   </ul>
   Notes:
   <ul>
-  <li>first the spec is separated by komma, then the range or the regular
-      expression operations are executed.</li>
+  <li>the spec may not contain space characters.</n>
   <li>if there is a device which exactly corresponds to the spec, then
       no special processing is done.</li>
+  <li>first the spec is separated by komma, then the regular expression and
+      filter operations are executed.</li>
   <li>the returned list can contain the same device more than once, so
-      "set lamp1-lamp3,lamp3 on" switches lamp3 twice.</li>
+      "set lamp3,lamp3 on" switches lamp3 twice.</li>
   <li>for more complex structuring demands see the <a href="#structure">
       structure</a> device.
   </ul>
