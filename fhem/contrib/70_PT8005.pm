@@ -6,23 +6,9 @@
 #
 # Prof. Dr. Peter A. Henning, 2013
 # 
-# Version 1.0 - December 2013
+# Version 1.2 - December 2013
 #
-# Setup as:
-# define  <name> PT8005 <device>
-#    
-# where <name> may be replaced by any name string and <device> 
-# is a serial (USB) device or the keyword "emulator".
-# In the latter case, a 4.5 kWP solar installation is simulated
-#
-# get <name> present     => 1 if device present, 0 if not
-# get <name> reading     => measurement for all channels
-#
-# Additional attributes are defined in fhem.cfg as 
-#  attr    pt8005 room Noise
-# Monthly and yearly log file
-#  attr    pt8005 LogM NoiseLogM
-#  attr    pt8005 LogY NoiseLogY
+# setup, set/get functions and attributes see HTML text at bottom
 #
 ########################################################################################
 #
@@ -47,23 +33,25 @@ package main;
 use strict;
 use warnings;
 use Device::SerialPort;
-
-#-- Prototypes to make komodo happy
 use vars qw{%attr %defs};
 sub Log($$);
 
-#-- globals 
+#-- globals on start
 my $freq ="db(A)";     # dB(A) or dB(C)
 my $speed="fast";      # response speed fast or slow
 my $mode ="normal";    # min/max/...
 my $range="50-100 dB"; # measurement range
 my $over ="";          # over/underflow
 
-#-- arrays for averaging (60 values = max. 1 hour)
-my @datarr;
-my @timarr;
+#-- arrays for averaging (max 60 values per hour)
+my @noisearr;
+my @timearr;
 my $arrind=0;
-my $arrmax=60;
+my $arrmax=70;
+my @noisehour;
+my $noisenight="";
+my $noiseday="";
+
 
 #-- arrays for hourly values
 my @hourarr;
@@ -76,6 +64,7 @@ my %gets = (
 
 #-- These occur in a pulldown menu as settable values
 my %sets = (
+  "interval"     => "T",
   "Min/Max"=> "", 
   "off"   => "O",
   "rec"   => "",
@@ -136,7 +125,7 @@ sub PT8005_Define($$) {
   $pt8005_serport->close();  
  
   $hash->{DeviceName}   = $dev;
-  $hash->{INTERVAL}       = 60;        # call every 60 seconds
+  $hash->{interval}     = 60;        # call every 60 seconds
   
   $modules{PT8005}{defptr}{$a[0]} = $hash;
 
@@ -163,29 +152,39 @@ sub PT8005_Average($$$) {
   my ($hash, $secsincemidnight, $period) = @_;
   
   #-- max. 1 hour allowed
-  if( $period>3600 ){
-    Log 1,"PT8005_Average: wrong period, must be <=3600";
-    return 0;
+  if( $period>60*$arrmax ){
+    Log 1,"PT8005_Average: wrong averaging period $period, must be <= ".(60*$arrmax);
+    return "";
   }
 
   my ($minind,$cntind,$oldtime,$ia,$ib,$fa,$fb,$ta,$tb,$fd,$avdata);
   
-  #-- go backwards until we have period covered (=max. 60 values)
+  #-- go backwards until we have period covered (=max. arrmax values)
   $minind=$arrind-1;
   $cntind=1;
   $minind+=$arrmax if($minind<0);
-  $oldtime = $timarr[$minind];
+  $oldtime = $timearr[$minind];
+  #-- no average if the previous time is undefined
+  if( (!defined($oldtime)) || !($oldtime>0) ){
+    Log 4,"PT8005_Average: invalid measurement at index $minind, no average possible";
+    return "";
+  }
   $oldtime-=86400 if($oldtime > $secsincemidnight); 
-  while( $oldtime > $secsincemidnight-$period ){
-    #Log 1,"===>index $minind is ".($secsincemidnight-$timarr[$minind])." ago";
+  while( $oldtime > ($secsincemidnight-$period) ){
+    #Log 1,"===>index $minind is ".($secsincemidnight-$timearr[$minind])." ago";
     $minind--;
     $minind+=$arrmax if($minind<0);
-    $oldtime = $timarr[$minind];
+    $oldtime = $timearr[$minind];
+    #-- no average if the previous time is undefined
+    if( (!defined($oldtime)) || !($oldtime>0) ){
+      Log 4,"PT8005_Average: invalid measurement at index $minind, no average possible";
+      return "";
+    }
     $oldtime-=86400 if($oldtime > $secsincemidnight); 
     $cntind++;
     if( $cntind > $arrmax) {
        $cntind=$arrmax;
-       Log 1,"PT8005_Average: ERROR, cntind > $arrmax";
+       Log 4,"PT8005_Average: ERROR, cntind > $arrmax";
        last;
     }
   }
@@ -194,11 +193,11 @@ sub PT8005_Average($$$) {
   $ia = $minind;
   $ib = $minind+1;
   $ib-=$arrmax if($ib>=$arrmax);
-  $fa = $datarr[$ia];
-  $fb = $datarr[$ib];
-  $ta = $timarr[$ia];
+  $fa = $noisearr[$ia];
+  $fb = $noisearr[$ib];
+  $ta = $timearr[$ia];
   $ta-= 86400 if($ta > $secsincemidnight);
-  $tb = $timarr[$ib];
+  $tb = $timearr[$ib];
   $tb-= 86400 if($tb > $secsincemidnight);
   $fd = $fa + ($fb-$fa)*($secsincemidnight-$period - $ta)/($tb - $ta);
   $avdata = ($fd + $fb)/2 * ($tb - ($secsincemidnight-$period));
@@ -209,16 +208,16 @@ sub PT8005_Average($$$) {
     $ia-= $arrmax if($ia>=$arrmax);
     $ib = $ia+1;
     $ib-= $arrmax if($ib>=$arrmax);
-    $fa = $datarr[$ia];
-    $fb = $datarr[$ib];
-    $ta = $timarr[$ia];
+    $fa = $noisearr[$ia];
+    $fb = $noisearr[$ib];
+    $ta = $timearr[$ia];
     $ta-= 86400 if($ta > $secsincemidnight);
-    $tb = $timarr[$ib];
+    $tb = $timearr[$ib];
     $tb-= 86400 if($tb > $secsincemidnight);
     $avdata += ($fa + $fb)/2 * ($tb - $ta);
     #Log 1,"===> adding a new interval between $ia and $ib, new avdata = $avdata (tb=$tb ta=$ta)";  
   }
-  #-- and now the average for 15 minutes:
+  #-- and now the average for the period
   $avdata = int($avdata/($period/10))/10;
   
   return $avdata;
@@ -324,20 +323,28 @@ sub PT8005_GetStatus ($) {
   my $name = $hash->{NAME};
   
   my ($bcd,$i,$j,$k);
-  my ($hour,$min,$sec,$time);
-  my $data=0.0;
-  my $nospeed=1;
-  my $norange=1;
-  my $nofreq=1;
-  my $nodata=1;
-  my $loop=0;
+
+  my $data    = 0.0;
+  my $nospeed = 1;
+  my $norange = 1;
+  my $nofreq  = 1;
+  my $nodata  = 1;
+  my $loop    = 0;
   
   my $secsincemidnight;
-  my $av15=0;
+  my $av15 = "";
+  my $av60 = "";
+  my $avnight = 0;
+  my $avday   = 0;
+  my $avcnt   = 0;
+  
+  my $svalue;
+  my $lvalue;
+  my $hvalue;
 
   #-- restart timer for updates
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+ $hash->{INTERVAL}, "PT8005_GetStatus", $hash,1);
+  InternalTimer(gettimeofday() + $hash->{interval}, "PT8005_GetStatus", $hash,1);
   #-- check if rec is really off
   PT8005_Unrec($hash);
   
@@ -501,19 +508,94 @@ sub PT8005_GetStatus ($) {
   if( $nodata==0 ){
 
     my ($sec, $min, $hour, $day, $month, $year, $wday,$yday,$isdst) = localtime(time);
+  
     $secsincemidnight = $hour*3600+$min*60+$sec;
-    $datarr[$arrind] = $data;
-    $timarr[$arrind] = $secsincemidnight;    
-     
+    $noisearr[$arrind] = $data;
+    $timearr[$arrind] = $secsincemidnight;    
+    
+    #-- average last 15 minutes
     $av15 = PT8005_Average($hash,$secsincemidnight,900);
+    
+    #-- output
+    if( $av15 ne "" ){
+      $svalue = sprintf("%3.1f %s [av15 %3.1f %s]",$data,$freq,$av15,$freq);
+      $lvalue = sprintf("%3.1f av15  %3.1f ",$data,$av15);
+    }else{
+      $svalue = sprintf("%3.1f %s",$data,$freq);
+      $lvalue = sprintf("%3.1f",$data);
+    }
+    readingsBulkUpdate($hash,"state",$svalue);  
+    readingsBulkUpdate($hash,"soundlevel",$lvalue);
+    
+    #-- average last hour if hour is past
+    my $oldtime = $timearr[
+      $arrind>0 ? $arrind-1 : $arrmax-1];
+    if( defined($oldtime) ){
+      my $oldhour = int($oldtime/3600);
+      if( ($hour == ($oldhour+1)) || ($hour == ($oldhour-23)) ){
+        my $longav    = PT8005_Average($hash,$secsincemidnight,3600+$min*60+$sec);
+        my $shortav   = PT8005_Average($hash,$secsincemidnight,$min*60+$sec);
+        if( ($longav ne "") && ($shortav ne "") ){
+          $av60 = ($longav*(3600+$min*60+$sec)-$shortav*($min*60+$sec))/3600;
+          $noisehour[$hour]=int($av60*10)/10;;
+          Log GetLogLevel($name,4),"PT8005 gives average for hour $oldhour as $av60";
+          #-- output
+          $hvalue = sprintf("%3.1f",$av60);
+          readingsBulkUpdate($hash,"soundav60",$hvalue);
+          
+          #-- check if nightly or daily average
+          if( $hour==6 ){
+              $avnight = 0.0;
+              $avcnt   = 0;
+              if( defined($noisehour[23])){
+                $avnight += $noisehour[23];
+                $avcnt++;
+              }
+              for( my $i=0;$i<=6;$i++ ){
+                if( defined($noisehour[$i])){
+                  $avnight += $noisehour[$i];
+                  $avcnt++;
+                }
+              }
+              if( $avcnt > 0){
+                $noisenight = int($avnight/$avcnt*10)/10;
+                Log GetLogLevel($name,1),"PT8005: Nightly average = $avnight from $avcnt values";
+                #-- output
+                $hvalue = sprintf("%3.1f %s",$noisenight,$freq);
+                readingsBulkUpdate($hash,"soundavnight",$hvalue);
+              } else {
+                $noisenight = "";
+              }
+            } elsif( $oldhour==22 ){
+              $avday = 0.0;
+              $avcnt   = 0;
+              for( my $i=7;$i<=22;$i++ ){
+                if( defined($noisehour[$i])){
+                  $avday += $noisehour[$i];
+                  $avcnt++;
+                }
+              }
+              if( $avcnt > 0){
+                $noiseday = int($avday/$avcnt*10)/10;
+                Log GetLogLevel($name,1),"PT8005: Daily average = $avnight from $avcnt values";
+                #-- output
+                $hvalue = sprintf("%3.1f %s",$noiseday,$freq);
+                readingsBulkUpdate($hash,"soundavday",$hvalue);
+              } else {
+                $noiseday = "";
+              }
+              $hvalue = sprintf("%3.1f %3.1f",$noisenight,$noiseday);
+              readingsBulkUpdate($hash,"soundday",$hvalue);
+            }
+        } else {
+          $noisehour[$hour]=undef;
+          Log GetLogLevel($name,4),"PT8005 NOT calculating new hourly average";
+        }
+      }
+    }
     
     $arrind++;
     $arrind-=$arrmax if($arrind>=$arrmax);
-    
-    my $svalue = sprintf("%3.1f %s [av15 %3.1f %s]",$data,$freq,$av15,$freq);
-    my $lvalue = sprintf("%3.1f av15  %3.1f ",$data,$av15);
-    readingsBulkUpdate($hash,"state",$svalue);  
-    readingsBulkUpdate($hash,"soundlevel",$lvalue);
       
   }  
   readingsEndUpdate($hash,1); 
@@ -545,6 +627,17 @@ sub PT8005_Set ($@) {
       Log GetLogLevel($name,1),"PT8005_Set called with arg $_";
       PT8005_Cmd($hash,$SKC{$_});
     }
+  }
+  
+  #-- Set timer value
+  if( $a[0] eq "interval" ){
+    #-- only values >= 5 secs allowed
+    if( $a[1] >= 5){
+      $hash->{interval} = $a[1];  
+  	  $res = 1;
+  	} else {
+  	  $res = 0;
+  	}
   }
   
   #-- Set frequency curve to db(A) or db(C)
@@ -659,9 +752,42 @@ sub PT8005_Set ($@) {
         </ul>
         <a name="PT8005set"></a>
         <h4>Set</h4>
-        <ul>
-            <li><a name="pt8005_time">
-                   Not yet implemented</a></li>
+          <li><a name="pt8005_interval">
+                    <code>set &lt;name&gt; interval &lt;value&gt;</code>
+                </a>
+                <br />sets the time period between measurements in seconds (default
+                is 60 seconds, minimum is 5 seconds).
+            </li>
+            <li><a name="pt8005_auto">
+                    <code>set &lt;name&gt; auto</code>
+                </a>
+                <br />set the measurement range to auto (30 -130 dB) (displayed in status) 
+            </li>
+             <li><a name="pt8005_freq">
+                    <code>set &lt;name&gt; freq dB(A)|dB(C)</code>
+                </a>
+                <br />set frequency curve to A or C (displayed in status) 
+            </li>
+             <li><a name="pt8005_rec">
+                    <code>set &lt;name&gt; rec</code>
+                </a>
+                <br />toggle the recording mode 
+            </li>
+             <li><a name="pt8005_minmax">
+                    <code>set &lt;name&gt; Min/Max</code>
+                </a>
+                <br />toggle the display between min value, max value and running measurement (displayed in status) 
+            </li>
+             <li><a name="pt8005_dBA/C">
+                    <code>set &lt;name&gt; dBA/C</code>
+                </a>
+                <br />toggle the frequency curve (displayed in status) 
+            </li>
+             <li><a name="pt8005_off">
+                    <code>set &lt;name&gt; off</code>
+                </a>
+                <br />switch off the device 
+            </li>
         </ul>
         <br />
         <a name="PT8005get"></a>
