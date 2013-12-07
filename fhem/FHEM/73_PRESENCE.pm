@@ -262,16 +262,26 @@ PRESENCE_Set($@)
 
     return "No Argument given" if(!defined($a[1]));
    
-    my $usage = (defined($hash->{MODE}) and $hash->{MODE} ne "lan-bluetooth" ? "Unknown argument ".$a[1].", choose one of statusRequest " : undef);
+    my $usage = "Unknown argument ".$a[1].", choose one of statusRequest";
    
     if($a[1] eq "statusRequest")
     {
 		if($hash->{MODE} ne "lan-bluetooth")
 		{
 		    PRESENCE_StartLocalScan($hash, 1);
-		    return "";
+		    return undef;
 		}
-   
+		else
+		{
+			if(exists($hash->{FD}))
+			{
+				DevIo_SimpleWrite($hash, "now\n", 0);
+			}
+			else
+			{
+				return "PRESENCE Definition \"".$hash->{NAME}."\" is not connected to ".$hash->{DeviceName};	
+			}
+		} 
     }
     else
     {
@@ -1063,7 +1073,7 @@ Options:
     
     <ul>
     <li>direct perl script file: <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/collectord" target="_new">collectord</a></li>
-    <li>.deb package for Debian (noarch): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/collectord-1.3.deb" target="_new">collectord-1.3.deb</a></li>
+    <li>.deb package for Debian (noarch): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/collectord-1.4.deb" target="_new">collectord-1.4.deb</a></li>
     </ul>
     </ul><br><br>
 
