@@ -862,8 +862,6 @@ AnalyzeCommand($$)
 sub
 devspec2array($)
 {
-  my %knownattr = ( "DEF"=>1, "STATE"=>1, "TYPE"=>1 );
-
   my ($name) = @_;
 
   return "" if(!defined($name));
@@ -872,59 +870,44 @@ devspec2array($)
     return "FHEM2FHEM_FAKE_$name" if($defs{$name}{FAKEDEVICE});
     return $name;
   }
-  # FAKE is set by FHEM2FHEM LOG
 
-  my ($isattr, @ret);
+  my @ret;
+  foreach my $l (split(",", $name)) {   # List of elements
+    my @names = sort keys %defs;
+    my @res;
+    foreach my $dName (split(":FILTER=", $name)) {
+      my ($n,$op,$re) = ("NAME","=",$dName);
+      ($n,$op,$re) = ($1,$2,$3) if($dName =~ m/^([^!]*)(=|!=)(.*)$/);
 
-  foreach my $l (split(",", $name)) {   # List
-
-    if($l =~ m/(.*)=(.*)/) {
-      my ($lattr,$re) = ($1, $2);
-      if($knownattr{$lattr}) {
-        eval {                          # a bad regexp may shut down fhem.pl
-          foreach my $l (sort keys %defs) {
-              push @ret, $l
-                if($defs{$l}{$lattr} && (!$re || $defs{$l}{$lattr}=~m/^$re$/));
+      @res=();
+      foreach my $d (@names) {
+        next if($attr{$d} && $attr{$d}{ignore});
+        my $hash = $defs{$d};
+        my $val = $hash->{$n};
+        if(!defined($val)) {
+          my $r = $hash->{READINGS};
+          $val = $r->{$n}{VAL} if($r && $r->{$n});
+        }
+        if(!defined($val)) {
+          $val = $attr{$d}{$n} if($attr{$d});
+        }
+        next if(!defined($val));
+        eval { # a bad regexp is deadly
+          if(($op eq  "=" && $val =~ m/^$re$/) ||
+             ($op eq "!=" && $val !~ m/^$re$/)) {
+            push @res, $d 
           }
         };
         if($@) {
           Log 1, "devspec2array $name: $@";
           return $name;
         }
-      } else {
-        foreach my $l (sort keys %attr) {
-          push @ret, $l
-            if($attr{$l}{$lattr} && (!$re || $attr{$l}{$lattr} =~ m/$re/));
-        }
       }
-      $isattr = 1;
-      next;
+      @names = @res;
     }
-
-    my $regok;
-    eval {                              # a bad regexp may shut down fhem.pl
-      if($l =~ m/[*\[\]^\$]/) {         # Regexp
-        push @ret, grep($_ =~ m/^$l$/, sort keys %defs);
-        $regok = 1;
-      }
-    };
-    if($@) {
-      Log 1, "devspec2array $name: $@";
-      return $name;
-    }
-    next if($regok);
-
-    if($l =~ m/-/) {                    # Range
-      my ($lower, $upper) = split("-", $l, 2);
-      push @ret, grep($_ ge $lower && $_ le $upper, sort keys %defs);
-      next;
-    }
-    push @ret, $l;
+    push @ret,@res;
   }
-
-  return $name if(!@ret && !$isattr);             # No match, return the input
-  @ret = grep { !$attr{$_} || !$attr{$_}{ignore} } @ret
-        if($name !~ m/^ignore=/);
+  return $name if(!@ret);
   return @ret;
 }
 
