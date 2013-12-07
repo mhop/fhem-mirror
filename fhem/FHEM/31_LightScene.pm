@@ -352,6 +352,7 @@ LightScene_Set($@)
       $type = "" if( !defined($type) );
 
       if( my $toSave = AttrVal($d,"lightSceneParamsToSave","") ) {
+        $icon = Value($d);
         if( $toSave =~ m/^{.*}$/) {
           my $DEVICE = $d;
           $toSave = eval $toSave;
