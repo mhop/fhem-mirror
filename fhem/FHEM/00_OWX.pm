@@ -162,8 +162,8 @@ sub OWX_Define ($$) {
   
   #-- Dummy 1-Wire ROM identifier, empty device lists
   $hash->{ROM_ID}      = "FF";
-  $hash->{DEVS}        = ();
-  $hash->{ALARMDEVS}   = ();
+  $hash->{DEVS}        = [];
+  $hash->{ALARMDEVS}   = [];
   
   #-- First step: check if we have a directly connected serial interface or a CUNO/COC attached
   if ( $dev =~ m|$owgdevregexp|i){  
@@ -267,7 +267,7 @@ sub OWX_Alarms ($) {
 
   my @owx_alarm_names=();
 
-  $hash->{ALARMDEVS}=();
+  $hash->{ALARMDEVS}=[];
   
   if ($hash->{INTERFACE} eq "firmata") {
   	FRM_OWX_Alarms($hash);
