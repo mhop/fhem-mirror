@@ -1082,7 +1082,7 @@ Options:
   <a name="PRESENCEset"></a>
   <b>Set</b>
   <ul>
-  <li><b>statusRequest</b> - (Only for mode local-bluetooth, lan-ping, function and fritzbox) - Schedules an immediatly check.</li>
+  <li><b>statusRequest</b> - Schedules an immediatly check.</li>
   </ul>
   <br>
 
@@ -1309,7 +1309,7 @@ Options:
   <b>Set</b>
   <ul>
   
-  <li><b>statusRequest</b> - (Nur f&uuml;r Modus local-bluetooth, lan-ping, function und fritzbox) - Startet einen sofortigen Check.</li> 
+  <li><b>statusRequest</b> - Startet einen sofortigen Check.</li> 
   </ul>
   <br>
 
