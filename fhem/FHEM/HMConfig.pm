@@ -609,7 +609,7 @@ my %culHmRegDefine = (
   valveErrPos     =>{a=> 13  ,s=>0.7,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"valve error position"},
 
   daylightSaveTime=>{a=> 14  ,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"set daylight saving time"                    ,lit=>{off=>0,on=>1}},
-  regAdaptive     =>{a=> 14.1,s=>0.2,l=>7,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"adaptive regulation: offDef, offdetrmine, on",lit=>{off=>0,offDeter=>1,on=>2}},
+  regAdaptive     =>{a=> 14.1,s=>0.2,l=>7,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"adaptive regu on or off with default or determined values",lit=>{offDefault=>0,offDeter=>1,on=>2}},
   showInfo        =>{a=> 14.3,s=>0.2,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"show date or time"                           ,lit=>{time=>0,date=>1}},
   winOpnBoost     =>{a=> 14.5,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"boost after window closed"                   ,lit=>{off=>0,on=>1}},
   noMinMax4Manu   =>{a=> 14.6,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"min/max is irrelevant for manual mode"       ,lit=>{off=>0,on=>1}},
