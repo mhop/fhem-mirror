@@ -1,5 +1,5 @@
 ############################################## 
-# $Id: EGPM.pm 2892 2013-07-11 12:47:57Z alexus $ 
+# $Id: EGPM2LAN.pm 2013-12-08 10:11:20Z alexus $ 
 #
 #  (c) 2013 Copyright: Alex Storny (moselking at arcor dot de)
 #  All rights reserved
@@ -33,6 +33,7 @@ EGPM_Initialize($)
   my ($hash) = @_;
 
   $hash->{SetFn}     = "EGPM_Set";
+  $hash->{GetFn}     = "EGPM_Get";
   $hash->{DefFn}     = "EGPM_Define";
   $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6". $readingFnAttributes;
   $hash->{UndefFn}   = "EGPM_Undef";
@@ -48,11 +49,11 @@ EGPM_Set($@)
   my $loglevel = GetLogLevel($name,4);
 
   return "no set value specified" if(int(@a) < 1);
-  return "Unknown argument ?, choose one of off on toggle" if($a[0] eq "?");
+  return "Unknown argument ?, choose one of off:noArg on:noArg toggle:noArg" if($a[0] eq "?");
 
   if(not Value($parent))
   {
-    my $u = "$parent not found. Please define EGPM2LAN device.";
+    my $u = "$parent device not found. Please define EGPM2LAN device.";
     Log $loglevel, $u;
     return $u;
   }
@@ -60,8 +61,35 @@ EGPM_Set($@)
   my $v = join(" ", @a);
   Log $loglevel, "EGPM set $name $v";
   CommandSet(undef,$hash->{IODEV}." $v ".$hash->{SOCKETNR});
-  
   return undef;
+}
+
+###################################
+sub
+EGPM_Get($@)
+{
+    my ($hash, @a) = @_;
+    my $what;
+
+    return "argument is missing" if(int(@a) != 2);
+    
+    $what = $a[1];
+    
+    if($what =~ /^(state)$/)
+    {
+      if(defined($hash->{READINGS}{$what}))
+      {
+			   return $hash->{READINGS}{$what}{VAL};
+		  }
+      else
+		  {
+			   return "reading not found: $what";
+		  }
+    }
+    else
+    {
+		  return "Unknown argument $what, choose one of state:noArg".(exists($hash->{READINGS}{output})?" output:noArg":"");
+    }
 }
 
 #####################################
@@ -117,30 +145,29 @@ EGPM_Undef($$)
 <h3>EGPM Socket</h3>
 <ul>
 
-  Define a Socket from EGPM2LAN Module. If the global Module AUTOCREATE is enabled,
-  this device will be created automatically. For manual Setup, pls. see the description of EGPM2LAN.
+  Defines a Socket from EGPM2LAN Module. If the global Module AUTOCREATE is enabled,
+  this device will be created automatically. For manual Setup, pls. see the description of <a href="#EGPM2LAN">EGPM2LAN</a>.
   <br><br>
 
   <a name="EGPMdefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; EGPM &lt;device&gt; &lt;socket-nr&gt;</code>
-    <br><br>
-
-    Example:
-    <ul>
-      <code>define socket_lamp EGPM mainswitch 1</code><br>
-      <code>set socket_lamp on</code><br>
-    </ul>
+    <br>
   </ul>
   <br>
 
   <a name="EGPMset"></a>
   <b>Set</b>
-  <ul>
-    <code>set &lt;name&gt; &lt;value&gt</code><br>
-    Set any value.
-  </ul>
+  <code>
+    <ul>set &lt;name&gt; &lt;[on|off|toggle]&gt;</code><br>
+    Switches the socket on or of.
+    </ul><br>
+    Example:
+    <ul>
+      <code>define lamp1 EGPM mainswitch 1</code><br>
+      <code>set lamp1 on</code><br>
+    </ul>
   <br>
 
   <a name="EGPMget"></a>
@@ -153,8 +180,64 @@ EGPM_Undef($$)
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
+  <a name="EGPM2LANevents"></a>
+  <b>Generated events</b>
+  <ul>
+  <li>EGPM &lt;name&gt; &lt;[on|off]&gt</li>
+  </ul>
 
 </ul>
 
 =end html
+=begin html_DE
+
+<a name="EGPM"></a>
+<h3>EGPM Steckdose</h3>
+<ul>
+
+  Definiert eine einzelne Netzwerk-Steckdose vom EGPM2LAN. Diese Definition wird beim Einrichten eines EGPM2LAN automatisch erstellt,
+  wenn das globale FHEM-Attribut AUTOCREATE aktiviert wurde. Für weitere Informationen, siehe Beschreibung von <a href="#EGPM2LAN">EGPM2LAN</a>.
+  <br><br>
+
+  <a name="EGPMdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; EGPM &lt;device&gt; &lt;socket-nr&gt;</code>
+    <br>
+  </ul>
+  <br>
+
+  <a name="EGPMset"></a>
+  <b>Set</b>
+  <code>
+    <ul>set &lt;name&gt; &lt;[on|off|toggle]&gt;</code><br>
+    Schaltet die Steckdose ein oder aus.
+    </ul><br>
+    Beispiel:
+    <ul>
+      <code>define lampe1 EGPM steckdose 1</code><br>
+      <code>set lampe1 on</code><br>
+    </ul>
+  <br>
+
+  <a name="EGPMget"></a>
+  <b>Get</b> <ul>N/A</ul>
+  <br>
+
+  <a name="EGPMattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+  <br>
+
+  <a name="EGPM2LANevents"></a>
+  <b>Generated events</b>
+  <ul>
+  <li>EGPM &lt;name&gt; &lt;[on|off]&gt</li>
+  </ul>
+</ul>
+=end html_DE
+
 =cut

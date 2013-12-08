@@ -1,5 +1,5 @@
 ############################################## 
-# $Id: EGPM2LAN.pm 2891 2013-07-15 19:12:50Z alexus $ 
+# $Id: EGPM2LAN.pm 2013-12-08 10:11:20Z alexus $ 
 #
 #  based / modified Version 98_EGPMS2LAN from ericl
 #
@@ -33,10 +33,39 @@ EGPM2LAN_Initialize($)
 { 
   my ($hash) = @_; 
   $hash->{Clients}   = ":EGPM:";
+  $hash->{GetFn}     = "EGPM2LAN_Get";
   $hash->{SetFn}     = "EGPM2LAN_Set"; 
   $hash->{DefFn}     = "EGPM2LAN_Define"; 
   $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 stateDisplay:sockNumber,sockName autocreate:on,off"; 
 } 
+
+###################################
+sub
+EGPM2LAN_Get($@)
+{
+    my ($hash, @a) = @_;
+    my $what;
+
+    return "argument is missing" if(int(@a) != 2);
+    
+    $what = $a[1];
+    
+    if($what =~ /^(state|lastcommand)$/)
+    {
+      if(defined($hash->{READINGS}{$what}))
+      {
+			   return $hash->{READINGS}{$what}{VAL};
+		  }
+      else
+		  {
+			   return "reading not found: $what";
+		  }
+    }
+    else
+    {
+		  return "Unknown argument $what, choose one of state:noArg lastcommand:noArg".(exists($hash->{READINGS}{output})?" output:noArg":"");
+    }
+}
 
 ################################### 
 sub 
@@ -45,7 +74,7 @@ EGPM2LAN_Set($@)
   my ($hash, @a) = @_; 
 
   return "no set value specified" if(int(@a) < 2); 
-  return "Unknown argument $a[1], choose one of on:1,2,3,4,all off:1,2,3,4,all toggle:1,2,3,4 clearreadings statusrequest" if($a[1] eq "?"); 
+  return "Unknown argument $a[1], choose one of on:1,2,3,4,all off:1,2,3,4,all toggle:1,2,3,4 clearreadings:noArg statusrequest:noArg" if($a[1] eq "?"); 
 
   my $name = shift @a; 
   my $setcommand = shift @a; 
@@ -184,7 +213,7 @@ sub EGPM2LAN_Statusrequest($$) {
   my ($hash, $logLevel) = @_;
   my $name = $hash->{NAME}; 
   
-  my $response = CustomGetFileFromURL($hash, "http://".$hash->{IP}."/", 10, undef, 0, $logLevel); 
+  my $response = CustomGetFileFromURL($hash, "http://".$hash->{IP}."/", 10, "", 0, $logLevel); 
   #Log 1,$response;
 	if(defined($response) && $response =~ /.,.,.,./) 
         { 
@@ -198,6 +227,7 @@ sub EGPM2LAN_Statusrequest($$) {
             my $newstatestring;
             my @socketlist = EGPM2LAN_GetDeviceInfo($hash,$response);
             readingsBeginUpdate($hash);
+            
 	    foreach my $powerstate (@powerstates)
             {
                 $index++;
@@ -231,8 +261,11 @@ sub EGPM2LAN_Statusrequest($$) {
 		#Write state 2 related Socket-Object
 		if (defined($defptr))
 		{
-		   Log $logLevel, "Update State of ".$defptr->{NAME};
-		   readingsSingleUpdate($defptr, "state", ($powerstates[$index-1] ? "on" : "off") ,0);
+		   if (ReadingsVal($defptr->{NAME},"state","") ne ($powerstates[$index-1] ? "on" : "off"))
+		   {  #check for chages and update -> trigger event
+		 		  Log $logLevel, "Update State of ".$defptr->{NAME};
+          readingsSingleUpdate($defptr, "state", ($powerstates[$index-1] ? "on" : "off") ,1);
+       }
 		   $defptr->{DEVICENAME} = $hash->{DEVICENAME};
 		   $defptr->{SOCKETNAME} = $socketlist[$index-1];
    	}
@@ -262,7 +295,8 @@ sub EGPM2LAN_Statusrequest($$) {
 sub EGPM2LAN_Logoff($$) {
   my ($hash, $logLevel) = @_; 
 
-  CustomGetFileFromURL($hash, "http://".$hash->{IP}."/login.html", 10, undef, 0, $logLevel);
+                       #$quiet, $url, $timeout, $data, $noshutdown, $loglevel
+  CustomGetFileFromURL($hash, "http://".$hash->{IP}."/login.html", 10, "", 0, $logLevel);
   return 1; 
 } 
 
@@ -312,7 +346,8 @@ EGPM2LAN_Define($$)
     <br>
     Creates a Gembird &reg; <a href="http://energenie.com/item.aspx?id=7557" >Energenie EG-PM2-LAN</a> device to switch up to 4 sockets over the network.
     If you have more than one device, it is helpful to connect and set names for your sockets over the web-interface first.
-    The name settings will be adopted to FHEM and helps you to identify the sockets. Please make sure that you&acute;re logged off from the Energenie web-interface otherwise you can&acute;t control it with FHEM at the same time.
+    The name settings will be adopted to FHEM and helps you to identify the sockets. Please make sure that you&acute;re logged off from the Energenie web-interface otherwise you can&acute;t control it with FHEM at the same time.<b>
+    EG-PMS2-LAN with surge protector feature was not tested until now.
 </ul><br>
   <a name="EGPM2LANset"></a>
   <b>Set</b>
@@ -347,6 +382,7 @@ EGPM2LAN_Define($$)
   </ul>
   <br>
 <br>
+   <br>
 
     Example:
     <ul>
@@ -356,4 +392,62 @@ EGPM2LAN_Define($$)
 </ul>
 
 =end html
+=begin html_DE
+
+<a name="EGPM2LAN"></a>
+<h3>EGPM2LAN</h3>
+<ul>
+  <br>
+  <a name="EGPM2LANdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; EGPM2LAN &lt;IP-Address&gt; [&lt;Password&gt;]</code><br>
+    <br>
+    Das Modul erstellt eine Verbindung zu einer Gembird &reg; <a href="http://energenie.com/item.aspx?id=7557" >Energenie EG-PM2-LAN</a> Steckdosenleiste.
+    Falls mehrere Steckdosenleisten über das Netzwerk gesteuert werden, ist es ratsam, diese zuerst über die Web-Oberfläche zu konfigurieren und die einzelnen Steckdosen zu benennen. Die Namen werden dann automatisch in die
+    Oberfläche von FHEM übernommen. Bitte darauf achten, die Weboberfläche mit <i>Logoff</i> wieder zu verlassen, da der Zugriff sonst blockiert wird.<b>
+</ul><br>
+  <a name="EGPM2LANset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; &lt;[on|off|toggle]&gt &lt;socketnr.&gt;</code><br>
+    Schaltet die gewählte Steckdose ein oder aus.<br>
+    <br>
+    <code>set &lt;name&gt; &lt;[on|off]&gt &lt;all&gt;</code><br>
+    Schaltet alle Steckdosen gleichzeitig ein oder aus.<br>
+    <br>
+    <code>set &lt;name&gt; &lt;staterequest&gt;</code><br>
+    Aktualisiert die Statusinformation der Steckdosenleiste.<br>
+    Wenn das globale Attribut <a href="#autocreate">autocreate</a> aktiviert ist, wird für jede Steckdose ein <a href="#EGPM">EGPM</a>-Eintrag erstellt.<br>
+    <br>
+    <code>set &lt;name&gt; &lt;clearreadings&gt;</code><br>
+    Löscht alle ungültigen Einträge im Abschnitt &lt;readings&gt;.
+  </ul>
+  <br>
+  <a name="EGPM2LANget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="EGPM2LANattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <li>stateDisplay</li>
+	  Default: <b>socketNumer</b> wechselt zwischen <b>socketNumer</b> and <b>socketName</b> für jeden Statuseintrag. Verwende <b>set statusrequest</b>, um die Anzeige zu aktualisieren.
+    <li>autocreate</li>
+    Default: <b>on</b> <a href="#EGPM">EGPM</a>-Einträge werden automatisch mit dem <b>set</b>-command erstellt.
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+  <br>
+<br>
+   <br>
+
+    Beispiel:
+    <ul>
+      <code>define sleiste EGPM2LAN 10.192.192.20 SecretGarden</code><br>
+      <code>set sleiste on 1</code><br>
+    </ul>
+</ul>
+=end html_DE
+
 =cut
+
