@@ -871,13 +871,16 @@ devspec2array($)
     return $name;
   }
 
-  my @ret;
+  my (@ret, $isAttr);
   foreach my $l (split(",", $name)) {   # List of elements
     my @names = sort keys %defs;
     my @res;
     foreach my $dName (split(":FILTER=", $name)) {
-      my ($n,$op,$re) = ("NAME","=",$dName);
-      ($n,$op,$re) = ($1,$2,$3)     if($dName =~ m/^([^!]*)(=|!=)(.*)$/);
+      my ($n,$op,$re) = ("DEVICE","=",$dName);
+      if($dName =~ m/^([^!]*)(=|!=)(.*)$/) {
+        ($n,$op,$re) = ($1,$2,$3);
+        $isAttr = 1;    # Compatibility: return "" instead of $name
+      }
       ($n,$op,$re) = ($1,"eval","") if($dName =~ m/^{(.*)}$/);
 
       @res=();
@@ -915,7 +918,7 @@ devspec2array($)
     }
     push @ret,@res;
   }
-  return $name if(!@ret);
+  return $name if(!@ret && !$isAttr);
   return @ret;
 }
 
