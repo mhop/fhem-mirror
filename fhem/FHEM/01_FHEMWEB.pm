@@ -351,7 +351,7 @@ FW_Read($)
   my $pid;
   if(AttrVal($FW_wname, "plotfork", undef)) {
     # Process SVG rendering as a parallel process
-    return if(($arg =~ m+$FW_ME/SVG_showLog+) && ($pid = fork));
+    return if(($arg =~ m+/SVG_showLog+) && ($pid = fork));
   }
 
   my $cacheable = FW_answerCall($arg);
