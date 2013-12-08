@@ -56,6 +56,8 @@
 #				added:	new reading for html response on "get/set"
 #	2013-10-12	added:	NotifyFn
 #
+#	2013-12-08	fixed:	first try to remove duplicate processing
+#
 
 package main;
 
@@ -251,6 +253,8 @@ sub OWO_GetStatus($;$){
 	$local = 0 unless(defined($local));
 
 	$attr{$name}{"owoInterval"} = 600 if(AttrVal($name,"owoInterval",0) < 600);
+
+	RemoveInternalTimer($hash);
 
 ##### start of send job (own weather data)
 #
