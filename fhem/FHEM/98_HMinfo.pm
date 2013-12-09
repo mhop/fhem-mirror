@@ -201,6 +201,39 @@ sub HMinfo_peerCheck(@) { #####################################################
          ."\n\n peer not verified "  ."\n    ".(join "\n    ",sort @peerIDsNoPeer)
          ;
 }
+sub HMinfo_burstCheck(@) { #####################################################
+  my @entities = @_;
+  my @peerIDsNeed;
+  my @peerIDsCond;
+  my %th = CUL_HM_putHash("culHmModel");
+  foreach my $eName (@entities){
+    next if (!$defs{$eName}{helper}{role}{chn});#device has no channels
+    next if (!CUL_HM_peerUsed($eName));
+    next if (CUL_HM_Get($defs{$eName},$eName,"regList") !~ m/peerNeedsBurst/);
+
+    my $peerIDs = AttrVal($eName,"peerIDs",undef);    
+    next if(!$peerIDs);                # no peers - noting to check 
+
+    my $devId = substr($defs{$eName}{DEF},0,6);
+    foreach (split",",$peerIDs){
+      next if ($_ eq "00000000" ||$_ =~m /$devId/);
+      my $pn = CUL_HM_id2Name($_);
+      $pn =~ s/_chn:/_chn-/; 
+      my $prxt = CUL_HM_getRxType($defs{$pn});
+      
+      next if (!($prxt & 0x82)); # not a burst peer
+      push @peerIDsNeed," $eName for peer $pn" if (ReadingsVal($eName,"R-$pn-peerNeedsBurst","") !~ m /on/);
+      if ($prxt & 0x80){# conditional burst - is it on?
+        my $pDevN = CUL_HM_getDeviceName($pn);
+        push @peerIDsCond," $pDevN for remote $eName" if (ReadingsVal($pDevN,"R-burstRx","") !~ m /on/);
+      }
+    }
+  }
+  return  "\n\n peerNeedsBurst not set"  ."\n    ".(join "\n    ",sort @peerIDsNeed)
+         ."\n\n conditionalBurst not set"."\n    ".(join "\n    ",sort @peerIDsCond)
+  ;
+}
+
 sub HMinfo_getEntities(@) { ###################################################
   my ($filter,$re) = @_;
   my @names;
@@ -505,7 +538,8 @@ sub HMinfo_SetFn($@) {#########################################################
   elsif($cmd eq "configCheck"){##check peers and register----------------------
     my @entities = HMinfo_getEntities($opt."v",$filter);
     $ret = $cmd." done:" .HMinfo_regCheck(@entities)
-                         .HMinfo_peerCheck(@entities);
+                         .HMinfo_peerCheck(@entities)
+                         .HMinfo_burstCheck(@entities);
   }
   elsif($cmd eq "peerXref")   {##print cross-references------------------------
     my @peerPairs;
