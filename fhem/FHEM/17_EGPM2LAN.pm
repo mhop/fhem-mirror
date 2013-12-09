@@ -346,8 +346,8 @@ EGPM2LAN_Define($$)
     <br>
     Creates a Gembird &reg; <a href="http://energenie.com/item.aspx?id=7557" >Energenie EG-PM2-LAN</a> device to switch up to 4 sockets over the network.
     If you have more than one device, it is helpful to connect and set names for your sockets over the web-interface first.
-    The name settings will be adopted to FHEM and helps you to identify the sockets. Please make sure that you&acute;re logged off from the Energenie web-interface otherwise you can&acute;t control it with FHEM at the same time.<b>
-    EG-PMS2-LAN with surge protector feature was not tested until now.
+    The name settings will be adopted to FHEM and helps you to identify the sockets. Please make sure that you&acute;re logged off from the Energenie web-interface otherwise you can&acute;t control it with FHEM at the same time.
+    <b>EG-PMS2-LAN with surge protector feature was not tested until now.</b>
 </ul><br>
   <a name="EGPM2LANset"></a>
   <b>Set</b>
