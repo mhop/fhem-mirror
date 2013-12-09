@@ -875,8 +875,8 @@ devspec2array($)
   foreach my $l (split(",", $name)) {   # List of elements
     my @names = sort keys %defs;
     my @res;
-    foreach my $dName (split(":FILTER=", $name)) {
-      my ($n,$op,$re) = ("DEVICE","=",$dName);
+    foreach my $dName (split(":FILTER=", $l)) {
+      my ($n,$op,$re) = ("NAME","=",$dName);
       if($dName =~ m/^([^!]*)(=|!=)(.*)$/) {
         ($n,$op,$re) = ($1,$2,$3);
         $isAttr = 1;    # Compatibility: return "" instead of $name
@@ -888,7 +888,7 @@ devspec2array($)
         next if($attr{$d} && $attr{$d}{ignore});
 
         if($op eq "eval") {
-          my $exec = EvalSpecials($n, %{{"%NAME"=>$d}});
+          my $exec = EvalSpecials($n, %{{"%DEVICE"=>$d}});
           push @res, $d if(AnalyzePerlCommand(undef, $exec));
           next;
         }
