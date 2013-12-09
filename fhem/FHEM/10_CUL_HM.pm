@@ -3296,8 +3296,10 @@ sub CUL_HM_Set($@) {
           my $peerFlag = CUL_HM_getFlag($peerHash);
           CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",
               $peerFlag,$id,$peerDst,$peerChn,$cmdB,$dst,$b2,$b1 ));
-          CUL_HM_pushConfig($peerHash,$id,$peerDst,0,0,0,0,"0101")#set burstRx
-                     if(CUL_HM_getRxType($peerHash) & 0x80); #burstConditional
+          if(CUL_HM_getRxType($peerHash) & 0x80){
+            my $pDevHash = CUL_HM_id2Hash($peerDst);#put on device
+            CUL_HM_pushConfig($pDevHash,$id,$peerDst,0,0,0,0,"0101");#set burstRx
+          }
           CUL_HM_qAutoRead($peerHash->{NAME},3);
         }
       $devHash = $peerHash; # Exchange the hash, as the switch is always alive.
