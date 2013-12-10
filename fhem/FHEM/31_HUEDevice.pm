@@ -59,6 +59,7 @@ sub HUEDevice_Initialize($)
   $hash->{SetFn}    = "HUEDevice_Set";
   $hash->{GetFn}    = "HUEDevice_Get";
   $hash->{AttrList} = "IODev ".
+                      "delayedUpdate:1 ".
                       "color-icons:1,2 ".
                       "model:".join(",", sort keys %hueModels)." ".
                       "subType:colordimmer,dimmer,switch ".
@@ -234,6 +235,7 @@ HUEDevice_SetParam($$@)
     $obj->{'bri'}  = 0+$bri;
     $obj->{'transitiontime'} = 1;
     #$obj->{'transitiontime'} = $value / 10 if( defined($value) );
+    $defs{$name}->{fhem}->{update_timeout} = 0;
   } elsif($cmd eq "dimDown") {
     my $bri = ReadingsVal($name,"bri","0");
     $bri -= 25;
@@ -242,6 +244,7 @@ HUEDevice_SetParam($$@)
     $obj->{'bri'}  = 0+$bri;
     $obj->{'transitiontime'} = 1;
     #$obj->{'transitiontime'} = $value / 10 if( defined($value) );
+    $defs{$name}->{fhem}->{update_timeout} = 0;
   } elsif($cmd eq "ct") {
     $obj->{'on'}  = JSON::true;
     $obj->{'ct'}  = 0+$value;
@@ -305,6 +308,10 @@ HUEDevice_SetParam($$@)
     $obj->{'effect'}  = $value;
   } elsif( $cmd eq "transitiontime" ) {
     $obj->{'transitiontime'} = 0+$value;
+  } elsif( $cmd eq "delayedUpdate" ) {
+    $defs{$name}->{fhem}->{update_timeout} = 1;
+  } elsif( $cmd eq "immediateUpdate" ) {
+    $defs{$name}->{fhem}->{update_timeout} = 0;
   } else {
     return 0;
   }
@@ -318,6 +325,8 @@ HUEDevice_Set($@)
   my ($hash, $name, @aa) = @_;
 
   my %obj;
+
+  $defs{$name}->{fhem}->{update_timeout} =  AttrVal($name, "delayedUpdate", 0);
 
   if( (my $joined = join(" ", @aa)) =~ /:/ ) {
     my @cmds = split(":", $joined);
@@ -349,9 +358,13 @@ HUEDevice_Set($@)
         return undef;
       }
 
-    if( !$hash->{fhem}->{group} ) {
+    if( $defs{$name}->{fhem}->{update_timeout}
+        && !$hash->{fhem}->{group} ) {
       RemoveInternalTimer($hash);
       InternalTimer(gettimeofday()+1, "HUEDevice_GetUpdate", $hash, 1);
+    } else {
+      RemoveInternalTimer($hash);
+      HUEDevice_GetUpdate( $hash );
     }
 
     return undef;
@@ -756,6 +769,8 @@ HUEDevice_GetUpdate($)
       <li>transitiontime &lt;time&gt;<br>
         set the transitiontime to &lt;time&gt; 1/10s</li>
       <li>rgb &lt;rrggbb&gt;</li>
+      <li>delayedUpdate</li>
+      <li>immediateUpdate</li>
       <li><a href="#setExtensions"> set extensions</a> are supported.</li>
       <br>
       Note:
@@ -784,6 +799,9 @@ HUEDevice_GetUpdate($)
       2 -> use lamp color scaled to full brightness as icon color and dim state as icon shape</li>
     <li>subType<br>
       colordimmer, dimmer or switch, default is initialized according to device model.</li>
+    <li>delayedUpdate<br>
+      1 -> the update of the device status after a set command will be delayed for 1 second. usefull if multiple devices will ne switched.
+</li>
     <li>devStateIcon<br>
       will be initialized to <code>{(HUEDevice_devStateIcon($name),"toggle")}</code> to show device color as default in room overview.</li>
     <li>webCmd<br>
