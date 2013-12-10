@@ -7,11 +7,12 @@ use strict;
 use warnings;
 use POSIX;
 #use JSON;
-use Data::Dumper;
+#use Data::Dumper;
 
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 my $LightScene_hasJSON = 1;
+my $LightScene_hasDataDumper = 1;
 
 sub LightScene_Initialize($)
 {
@@ -29,11 +30,16 @@ sub LightScene_Initialize($)
 
   eval "use JSON";
   $LightScene_hasJSON = 0 if($@);
+
+  eval "use Data::Dumper";
+  $LightScene_hasDataDumper = 0 if($@);
 }
 
 sub LightScene_Define($$)
 {
   my ($hash, $def) = @_;
+
+  return "install JSON or Data::Dumper to use LightScene" if( !$LightScene_hasJSON && !$LightScene_hasDataDumper );
 
   my @args = split("[ \t]+", $def);
 
@@ -41,6 +47,9 @@ sub LightScene_Define($$)
 
   my $name = shift(@args);
   my $type = shift(@args);
+
+  $hash->{HAS_JSON} = $LightScene_hasJSON;
+  $hash->{HAS_DataDumper} = $LightScene_hasDataDumper;
 
   my %list;
   foreach my $a (@args) {
@@ -229,7 +238,7 @@ myStatefileName()
   my $statefile = $attr{global}{statefile};
   $statefile = substr $statefile,0,rindex($statefile,'/')+1;
   return $statefile ."LightScenes.save" if( $LightScene_hasJSON );
-  return $statefile ."LightScenes.dd.save";
+  return $statefile ."LightScenes.dd.save" if( $LightScene_hasDataDumper );
 }
 my $LightScene_LastSaveTime="";
 sub
@@ -256,7 +265,7 @@ LightScene_Save()
 
     if( $LightScene_hasJSON ) {
       print FH encode_json($hash) if( defined($hash) );
-    } else {
+    } elsif( $LightScene_hasDataDumper ) {
       my $dumper = Data::Dumper->new([]);
       $dumper->Terse(1);
 
@@ -295,7 +304,7 @@ LightScene_Load($)
     my $decoded;
     if( $LightScene_hasJSON ) {
       $decoded = decode_json( $encoded );
-    } else {
+    } elsif( $LightScene_hasDataDumper ) {
       $decoded = eval $encoded;
     }
     $hash->{SCENES} = $decoded->{$hash->{NAME}} if( defined($decoded->{$hash->{NAME}}) );
