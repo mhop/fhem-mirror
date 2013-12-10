@@ -26,7 +26,10 @@ LaCrosse_Initialize($)
   #$hash->{AttrFn}    = "LaCrosse_Attr";
   $hash->{AttrList}  = "IODev"
                        ." ignore:1"
+                       ." doAverage:1"
+                       ." doDewpoint:1"
                        ." filterThreshold"
+                       ." resolution"
                        ." $readingFnAttributes";
 }
 
@@ -104,6 +107,30 @@ LaCrosse_Fingerprint($$)
 }
 
 sub
+LaCrosse_CalcDewpoint (@) {
+  my ($temp,$hum) = @_;
+
+  my($SDD, $DD, $a, $b, $v, $DP);
+
+  if($temp>=0) {
+    $a = 7.5;
+    $b = 237.3;
+  } else {
+    $a = 7.6;
+    $b = 240.7;
+  }
+
+  $SDD = 6.1078*10**(($a*$temp)/($b+$temp));
+  $DD = $hum/100 * $SDD;
+  $v = log($DD/6.1078)/log(10);
+
+  $DP = ($b*$v)/($a-$v);
+
+  return $DP;
+}
+
+
+sub
 LaCrosse_Parse($$)
 {
   my ($hash, $msg) = @_;
@@ -149,19 +176,46 @@ LaCrosse_Parse($$)
   if( $type == 0x00 ) {
     $channel = "" if( $channel == 1 );
 
+    if( AttrVal( $rname, "doAverage", 0 ) ) {
+      $humidity = ($rhash->{"previousH$channel"}*3+$humidity)/4;
+      $temperature = ($rhash->{"previousT$channel"}*3+$temperature)/4;
+    }
+
     if( defined($rhash->{"previousT$channel"})
         && abs($rhash->{"previousH$channel"} - $humidity) <= AttrVal( $rname, "filterThreshold", 10 )
         && abs($rhash->{"previousT$channel"} - $temperature) <= AttrVal( $rname, "filterThreshold", 10 ) ) {
+
       readingsBeginUpdate($rhash);
+
+      my $temperature = $temperature;
+      my $resolution = AttrVal( $rname, "resolution", 0 );
+      if( $resolution ) {
+        $temperature = int($temperature*10 / $resolution + 0.5) * $resolution / 10;
+        $humidity = int($humidity / $resolution + 0.5) * $resolution;
+      }
+
       readingsBulkUpdate($rhash, "temperature$channel", $temperature);
       readingsBulkUpdate($rhash, "humidity$channel", $humidity) if( $humidity && $humidity <= 99 );
+
+      my $dewpoint;
+      if( AttrVal( $rname, "doDewpoint", 0 ) && $humidity && $humidity <= 99 ) {
+        $dewpoint = LaCrosse_CalcDewpoint($temperature,$humidity);
+        $dewpoint = int($dewpoint*10 + 0.5) / 10;
+        readingsBulkUpdate($rhash, "dewpoint$channel", $dewpoint);
+      }    
+
       if( !$channel ) {
         my $state = "T: $temperature";
         $state .= " H: $humidity" if( $humidity && $humidity <= 99 );
+        $state .= " D: $humidity" if( $dewpoint );
         readingsBulkUpdate($rhash, "state", $state) if( Value($rname) ne $state );
       }
+
       readingsBulkUpdate($rhash, "battery$channel", $battery_low?"low":"ok");
+
       readingsEndUpdate($rhash,1);
+    } else {
+      readingsSingleUpdate($rhash, "battery$channel", $battery_low?"low":"ok" , 1);
     }
 
     $rhash->{"previousH$channel"} = $humidity;
@@ -228,9 +282,15 @@ LaCrosse_Attr(@)
   <a name="LaCrosse_Attr"></a>
   <b>Attributes</b>
   <ul>
+    <li>doAverage<br>
+      use an average of the last 4 values for temperature and humidity readings</li>
+    <li>doDewpoint<br>
+      calculate dewpoint</li>
     <li>filterThreshold<br>
       if the difference between the current and previous temperature is greater than filterThreshold degrees
       the readings for this channel are not updated. the default is 10.</li>
+    <li>resolution<br>
+      the resolution in 1/10 degree for the temperature reading</li>
     <li>ignore<br>
     1 -> ignore this device.</li>
   </ul><br>
