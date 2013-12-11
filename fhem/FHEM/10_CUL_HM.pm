@@ -1581,12 +1581,17 @@ sub CUL_HM_parseCommon(@){#####################################################
   # VD wakes up with 8202
   #                  9610
 
-  if( ((hex($mFlg) & 0xA2) == 0x82) &&
-      (CUL_HM_getRxType($shash) & 0x08)){ #wakeup and process stack
-    CUL_HM_appFromQ($shash->{NAME},"wu");# stack cmds if waiting
-    if ($shash->{cmdStack}){
-      CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IOid($shash).$src);
-      CUL_HM_ProcessCmdStack($shash);
+  if(CUL_HM_getRxType($shash) & 0x08){ #wakeup device
+    if((hex($mFlg) & 0xA2) == 0x82){ #wakeup signal
+      CUL_HM_appFromQ($shash->{NAME},"wu");# stack cmds if waiting
+      if ($shash->{cmdStack}){
+        CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IOid($shash).$src);
+        CUL_HM_ProcessCmdStack($shash);
+      }
+    }
+    elsif($shash->{helper}{prt}{sProc} != 1){ # no wakeup signal, 
+      # this is an autonom message send ACK but dont process further
+      $shash->{helper}{prt}{sleeping} = 1 if(hex($mFlg) & 0x20) ;
     }
   }
   my $repeat;
@@ -3684,8 +3689,13 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
   }
   else{# no answer expected
     if($hash->{cmdStack} && scalar @{$hash->{cmdStack}}){
-      CUL_HM_protState($hash,"CMDs_processing...");
-      InternalTimer(gettimeofday()+.5, "CUL_HM_ProcessCmdStack", $hash, 0);
+      if (!$hash->{helper}{prt}{sleeping}){
+        CUL_HM_protState($hash,"CMDs_processing...");
+        InternalTimer(gettimeofday()+.5, "CUL_HM_ProcessCmdStack", $hash, 0);
+      }
+      else{
+        delete $hash->{helper}{prt}{sleeping};
+      }
     }
     elsif(!$hash->{helper}{prt}{rspWait}{cmd}){
       CUL_HM_protState($hash,"CMDs_done");
