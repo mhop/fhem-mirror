@@ -584,7 +584,7 @@ LightScene_Get($@)
   the scene names ic clickable to activate the scene.<br><br>
 
   A weblink with a scene overview that can be included in any room or a floorplan can be created with:
-   <ul><code>define wlScene weblink htmlCode {LightScene_2html("Scene")}</code></ul>
+   <ul><code>define wlScene weblink htmlCode {LightScene_2html("LightSceneName")}</code></ul>
 
   <a name="LightScene_Set"></a>
     <b>Set</b>
