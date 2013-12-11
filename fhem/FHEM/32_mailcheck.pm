@@ -13,12 +13,22 @@ use IO::Socket::SSL;
 use IO::Socket::INET;
 use IO::File;
 use IO::Handle;
+use Data::Dumper;
+
+my $mailcheck_hasGPG = 1;
+my $mailcheck_hasMIME = 1;
 
 sub
 mailcheck_Initialize($)
 {
   my ($hash) = @_;
 
+
+  eval "use MIME::Parser";
+  $mailcheck_hasMIME = 0 if($@);
+
+  eval "use Mail::GnuPG";
+  $mailcheck_hasGPG = 0 if($@);
   $hash->{ReadFn}   = "mailcheck_Read";
 
   $hash->{DefFn}    = "mailcheck_Define";
@@ -30,10 +40,11 @@ mailcheck_Initialize($)
   $hash->{AttrList} = "debug:1 ".
                       "delete_message:1 ".
                       "disable:1 ".
-                      "intervall ".
+                      "interval ".
                       "logfile ".
-                      "nossl:1 ".
-                      $readingFnAttributes;
+                      "nossl:1 ";
+  $hash->{AttrList} .= "accept_from " if( $mailcheck_hasMIME && $mailcheck_hasGPG );
+  $hash->{AttrList} .= $readingFnAttributes;
 }
 
 #####################################
@@ -64,6 +75,9 @@ mailcheck_Define($$)
 
   $hash->{Folder} = "INBOX";
   $hash->{Folder} = $folder if( $folder );
+
+  $hash->{HAS_GPG} = $mailcheck_hasGPG;
+  $hash->{HAS_MIME} = $mailcheck_hasMIME;
 
   if( $init_done ) {
     delete $modules{mailcheck}->{NotifyFn};
@@ -139,9 +153,9 @@ mailcheck_Connect($)
 
       $hash->{HAS_IDLE} = $client->has_capability("IDLE");
 
-      my $intervall = AttrVal($name, "intervall", 0);
-      $intervall = $hash->{HAS_IDLE}?60*10:60*1 if( !$intervall );
-      $hash->{INTERVAL} = $intervall;
+      my $interval = AttrVal($name, "interval", 0);
+      $interval = $hash->{HAS_IDLE}?60*10:60*1 if( !$interval );
+      $hash->{INTERVAL} = $interval;
 
       RemoveInternalTimer($hash);
       InternalTimer(gettimeofday()+$hash->{INTERVAL}, "mailcheck_poll", $hash, 1);
@@ -258,8 +272,8 @@ mailcheck_Attr($$$)
   my ($cmd, $name, $attrName, $attrVal) = @_;
 
   my $orig = $attrVal;
-  $attrVal = int($attrVal) if($attrName eq "intervall");
-  $attrVal = 60 if($attrName eq "intervall" && $attrVal < 60 && $attrVal != 0);
+  $attrVal = int($attrVal) if($attrName eq "interval");
+  $attrVal = 60 if($attrName eq "interval" && $attrVal < 60 && $attrVal != 0);
 
   if( $attrName eq "debug" ) {
     $attrVal = 1 if($attrVal);
@@ -325,7 +339,6 @@ mailcheck_Read($)
   my $client = $hash->{CLIENT};
 
   my $ret = $client->idle_data();
-  #Log3 $name, 4, Dumper $ret;
 
   if( !defined($ret) || !$ret ) {
     $hash->{tag} = undef;
@@ -343,10 +356,62 @@ mailcheck_Read($)
       if ($msg_count > 0) {
         my $from = $client->get_header($resp, "From");
         $from =~ s/<[^>]*>//g; #strip the email, only display the sender's name
+        Log3 $name, 4, "from: $from";
 
         my $subject = $client->get_header($resp, "Subject");
+        Log3 $name, 4, "subject: $subject";
 
-        readingsSingleUpdate($hash, "Subject", $subject, 1 );
+        my $do_notify = 1;
+        if( $hash->{HAS_MIME} ) {
+          my $message = $client->message_string($resp);
+          Log3 $name, 5, "message: $message";
+          my $parser = new MIME::Parser;
+          my $entity = $parser->parse_data($message);
+          #Log3 $name, 5, "mime: $entity";
+
+          if( my $accept_from = AttrVal($name, "accept_from", "" ) ) {
+            $do_notify = 0;
+            if( $hash->{HAS_GPG} ) {
+              my $gpg = new Mail::GnuPG();
+              if( $gpg->is_signed($entity) ) {
+                my ($result,$keyid,$email) = $gpg->verify( $entity );
+                if( $result == 0 ) {
+                  if( !$keyid && !$email) {
+                    Log3 $name, 4, "signature valid";
+                    my $result = join "", @{$gpg->{last_message}};
+                    ($keyid)  = $result =~ /mittels \S+ ID (.+)$/m;
+                    ($email) = $result =~ /Korrekte Signatur von "(.+)"$/m;
+                    #($email) = $result =~ /(Korrekte|FALSCHE) Signatur von "(.+)"$/m;
+                  }
+                  if( !$keyid || !$email ) {
+                    Log3 $name, 3, "can't parse gpg result. please fix regex in module.";
+                    Log3 $name, 3, Dumper $gpg->{last_message};
+                  }
+
+                  $do_notify = 1 if( ",$accept_from," =~/,$keyid,/i );
+                  Log3 $name, 3, "sender $keyid not allowed" if( !$do_notify );
+                } else {
+                  Log3 $name, 3, "invalid signature";
+                  Log3 $name, 4, Dumper $gpg->{last_message};
+                }
+              } else {
+                Log3 $name, 3, "message not signed";
+              }
+            } elsif( $hash->{HAS_SMIME} ) {
+            } else {
+              Log3 $name, 2, "accept_from is set but Mail::GnuPG and/or S/MIME is not available";
+            }
+          }
+
+          $entity->head->decode();
+          $subject = $entity->head->get('Subject');
+          Log3 $name, 4, "subject decoded: $subject";
+
+        } elsif( my $accept_from = AttrVal($name, "accept_from", "" ) ) {
+          Log3 $name, 2, "accept_from is set but MIME::Parser is not available";
+        }
+
+        readingsSingleUpdate($hash, "Subject", $subject, 1 ) if( $do_notify );
 
         $client->delete_message( $resp ) if( AttrVal($name, "delete_message", 0) == 1 );
       }
@@ -389,6 +454,8 @@ mailcheck_Read($)
     <li>Probably only works reliably if no other mail programm is marking messages as read at the same time.</li>
     <li>If you experience a hanging system caused by regular forced disconnects of your internet provider you
         can disable and enable the mailcheck instance with an <a href="#at">at</a>.</li>
+    <li>If MIME::Parser is installed non ascii subjects will be docoded to utf-8</li>
+    <li>If MIME::Parser and Mail::GnuPG are installed gpg signatures can be checked and mails from unknown senders can be ignored.</li>
   </ul><br>
 
   <a name="mailcheck_Define"></a>
@@ -412,7 +479,7 @@ mailcheck_Read($)
       the subject of the last mail received</li>
   </ul><br>
 
-  <a name="mailcheck_Set"></a>
+  <a name="mailcheck_Get"></a>
   <b>Get</b>
   <ul>
     <li>update<br>
@@ -426,8 +493,8 @@ mailcheck_Read($)
   <ul>
     <li>delete_message<br>
       1 -> delete message after Subject reading is created</li>
-    <li>intervall<br>
-      the intervall in seconds used to trigger an update on the connection.
+    <li>interval<br>
+      the interval in seconds used to trigger an update on the connection.
       if idle is supported the defailt is 600, without idle support the default is 60. the minimum is 60.</li>
     <li>nossl<br>
       1 -> don't use ssl.</li><br>
@@ -437,6 +504,8 @@ mailcheck_Read($)
       1 -> enables debug output. default target is stdout.</li>
     <li>logfile<br>
       set the target for debug messages if debug is enabled.</li>
+    <li>accept_from<br>
+      comma separated list of gpg keys that will be accepted for signed messages. Mail::GnuPG and MIME::Parser have to be installed</li>
   </ul>
 </ul>
 
