@@ -902,7 +902,9 @@ sub CUL_HM_Parse($$) {##############################
         my $v = 128-$k_v2;                  # FIXME: calibrate
         $v += 256 if(!($k_v3 & 1));
         push @event, "rawValue:$v";
-        my $nextSeq = (ReadingsVal($name,"Sequence","") %15)+1;
+        my $nextSeq = ReadingsVal($name,"Sequence","");
+        $nextSeq =~ s/_.*//;
+        $nextSeq = ($nextSeq %15)+1;      
         push @event, "Sequence:$seq".($nextSeq ne $seq?"_seqMiss":"");
 
         my $r2r = AttrVal($name, "rawToReadable", undef);
