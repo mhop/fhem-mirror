@@ -431,11 +431,16 @@ sub HMinfo_SetFn($@) {#########################################################
     @IOlist = HMinfo_noDup(@IOlist);
     foreach(@IOlist){
       $_ .= ":".$defs{$_}{STATE}
-            .(defined $defs{$_}{helper}{q}?
-              " pending=".$defs{$_}{helper}{q}{answerPend} :
-              "")
+            .(defined $defs{$_}{helper}{q}
+                     ? " pending=".$defs{$_}{helper}{q}{answerPend}
+                     : ""
+             )
             ." condition:".ReadingsVal($_,"cond","-")
-            ."\n            msgLoadEst: ".$defs{$_}{msgLoadEst};
+            .(defined $defs{$_}{msgLoadEst}
+                     ? "\n            msgLoadEst: ".$defs{$_}{msgLoadEst}
+                     : ""
+             )
+            ;
     }
     $ret .= "\n    IODevs:".(join"\n           ",HMinfo_noDup(@IOlist));
   }  
