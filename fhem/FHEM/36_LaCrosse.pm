@@ -176,6 +176,14 @@ LaCrosse_Parse($$)
   if( $type == 0x00 ) {
     $channel = "" if( $channel == 1 );
 
+    if( my $resolution = AttrVal( $rname, "resolution", 0 ) ) {
+      $temperature = int($temperature*10 / $resolution + 0.5) * $resolution / 10;
+      $humidity = int($humidity / $resolution + 0.5) * $resolution;
+
+      $temperature = int($temperature*10 + 0.5) / 10;
+      $humidity = int($humidity + 0.5) / 10;
+    }
+
     if( AttrVal( $rname, "doAverage", 0 ) ) {
       $humidity = ($rhash->{"previousH$channel"}*3+$humidity)/4;
       $temperature = ($rhash->{"previousT$channel"}*3+$temperature)/4;
@@ -186,13 +194,6 @@ LaCrosse_Parse($$)
         && abs($rhash->{"previousT$channel"} - $temperature) <= AttrVal( $rname, "filterThreshold", 10 ) ) {
 
       readingsBeginUpdate($rhash);
-
-      my $temperature = $temperature;
-      my $resolution = AttrVal( $rname, "resolution", 0 );
-      if( $resolution ) {
-        $temperature = int($temperature*10 / $resolution + 0.5) * $resolution / 10;
-        $humidity = int($humidity / $resolution + 0.5) * $resolution;
-      }
 
       readingsBulkUpdate($rhash, "temperature$channel", $temperature);
       readingsBulkUpdate($rhash, "humidity$channel", $humidity) if( $humidity && $humidity <= 99 );
@@ -207,7 +208,7 @@ LaCrosse_Parse($$)
       if( !$channel ) {
         my $state = "T: $temperature";
         $state .= " H: $humidity" if( $humidity && $humidity <= 99 );
-        $state .= " D: $humidity" if( $dewpoint );
+        $state .= " D: $dewpoint" if( $dewpoint );
         readingsBulkUpdate($rhash, "state", $state) if( Value($rname) ne $state );
       }
 
