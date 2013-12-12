@@ -215,7 +215,7 @@ FB_CALLMONITOR_Read($)
    $external_number = $array[3] if(not $array[3] eq "0" and $array[1] eq "RING" and $array[3] ne "");
    $external_number = $array[5] if($array[1] eq "CALL" and $array[3] ne "");
   
-   $external_number =~ s/^0// if(AttrVal($name, "remove-leading-zero", "0") eq "1");
+   $external_number =~ s/^0// if(AttrVal($name, "remove-leading-zero", "0") eq "1" and defined($external_number));
   
    if(defined($external_number) and not $external_number =~ /^0/ and $area_code ne "")
    {
