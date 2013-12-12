@@ -1716,8 +1716,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       CUL_HM_qAutoRead($shash->{NAME},0);
       CUL_HM_appFromQ($shash->{NAME},"cf");# stack cmds if waiting
     }
-    elsif(CUL_HM_getRxType($shash) & 0x04){# nothing to pair - maybe send config
-      CUL_HM_qAutoRead($shash->{NAME},0);
+    elsif(CUL_HM_getRxType($shash) & 0x04){#nothing to pair - maybe send config
       CUL_HM_appFromQ($shash->{NAME},"cf");   # stack cmds if waiting
       if (hex($mFlg)&0x20){CUL_HM_SndCmd($shash,$mNo."8002".$id.$src."00");}
       else{                CUL_HM_ProcessCmdStack($shash);} ;#config

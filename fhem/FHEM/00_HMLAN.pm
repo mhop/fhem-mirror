@@ -34,6 +34,7 @@ my %sets = ( "hmPairForSec" => "HomeMatic"
 my %HMcond = ( 0  =>'ok'
               ,2  =>'Warning-HighLoad'
               ,4  =>'ERROR-Overload'
+              ,251=>'dummy'
               ,252=>'timeout'
               ,253=>'disconnected'
               ,254=>'Overload-released'
@@ -134,8 +135,7 @@ sub HMLAN_Undef($$) {##########################################################
   foreach my $d (sort keys %defs) {
     if(defined($defs{$d}) &&
        defined($defs{$d}{IODev}) &&
-       $defs{$d}{IODev} == $hash)
-      {
+       $defs{$d}{IODev} == $hash){
         Log3 $hash, 2, "deleting port for $d";
         delete $defs{$d}{IODev};
       }
@@ -269,6 +269,17 @@ sub HMLAN_Attr(@) {############################################################
     }
     return "logging set to $attr{$name}{$aName}"
         if ($attr{$name}{$aName} ne $aVal);
+  }
+  elsif($aName eq "dummy"){
+    if ($cmd eq "set" && $aVal != 0){
+      RemoveInternalTimer( "keepAliveCk:".$name);
+      RemoveInternalTimer( "keepAlive:".$name);
+      DevIo_CloseDev($defs{$name});
+      HMLAN_condUpdate($defs{$name},251);#set dummy
+    }
+    else{
+      DevIo_OpenDev($defs{$name}, 1, "HMLAN_DoInit");
+    }
   }
   return;
 }
