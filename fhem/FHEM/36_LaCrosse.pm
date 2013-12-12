@@ -179,9 +179,6 @@ LaCrosse_Parse($$)
     if( my $resolution = AttrVal( $rname, "resolution", 0 ) ) {
       $temperature = int($temperature*10 / $resolution + 0.5) * $resolution / 10;
       $humidity = int($humidity / $resolution + 0.5) * $resolution;
-
-      $temperature = int($temperature*10 + 0.5) / 10;
-      $humidity = int($humidity + 0.5) / 10;
     }
 
     if( AttrVal( $rname, "doAverage", 0 ) ) {
@@ -195,15 +192,18 @@ LaCrosse_Parse($$)
 
       readingsBeginUpdate($rhash);
 
-      readingsBulkUpdate($rhash, "temperature$channel", $temperature);
-      readingsBulkUpdate($rhash, "humidity$channel", $humidity) if( $humidity && $humidity <= 99 );
-
       my $dewpoint;
       if( AttrVal( $rname, "doDewpoint", 0 ) && $humidity && $humidity <= 99 ) {
         $dewpoint = LaCrosse_CalcDewpoint($temperature,$humidity);
         $dewpoint = int($dewpoint*10 + 0.5) / 10;
         readingsBulkUpdate($rhash, "dewpoint$channel", $dewpoint);
       }    
+
+      $temperature = int($temperature*10 + 0.5) / 10;
+      $humidity = int($humidity + 0.5) / 10;
+
+      readingsBulkUpdate($rhash, "temperature$channel", $temperature);
+      readingsBulkUpdate($rhash, "humidity$channel", $humidity) if( $humidity && $humidity <= 99 );
 
       if( !$channel ) {
         my $state = "T: $temperature";
