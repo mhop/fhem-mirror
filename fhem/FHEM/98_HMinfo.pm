@@ -1,6 +1,5 @@
 ##############################################
 # $Id$
-
 package main;
 use strict;
 use warnings;
@@ -14,7 +13,6 @@ sub HMinfo_peerCheck(@);
 sub HMinfo_getEntities(@);
 sub HMinfo_SetFn($@);
 sub HMinfo_SetFnDly($);
-sub HMinfo_post($);
 
 use Blocking;
 
@@ -54,6 +52,7 @@ sub HMinfo_Define($$){#########################################################
                             .",smoke_detect:none"
                             .",cover:closed"
                             ;
+  $hash->{nb}{cnt} = 0;
   return;
 }
 sub HMinfo_Attr(@) {#################################
@@ -114,9 +113,9 @@ sub HMinfo_autoUpdate($){#in:name, send status-request
   my $name = shift;
   (undef,$name)=split":",$name,2;
   HMinfo_SetFn($defs{$name},$name,"update") if ($name);
-  return if (!defined $defs{$name}{helper}{autoUpdate});
   InternalTimer(gettimeofday()+$defs{$name}{helper}{autoUpdate},
-                "HMinfo_autoUpdate","sUpdt:".$name,0);
+                "HMinfo_autoUpdate","sUpdt:".$name,0)
+        if (defined $defs{$name}{helper}{autoUpdate});
 }
 
 sub HMinfo_getParam(@) { ######################################################
@@ -202,7 +201,7 @@ sub HMinfo_peerCheck(@) { #####################################################
          ."\n\n peer not verified "  ."\n    ".(join "\n    ",sort @peerIDsNoPeer)
          ;
 }
-sub HMinfo_burstCheck(@) { #####################################################
+sub HMinfo_burstCheck(@) { ####################################################
   my @entities = @_;
   my @peerIDsNeed;
   my @peerIDsCond;
@@ -626,7 +625,7 @@ sub HMinfo_SetFn($@) {#########################################################
     return HMinfo_cpRegs(@a);
   }
   elsif($cmd eq "update")     {##update hm counts -----------------------------
-    return HMinfo_status($hash);
+    $ret = HMinfo_status($hash);
   }
   elsif($cmd eq "help")       {
     $ret = " Unknown argument $cmd, choose one of "
@@ -689,52 +688,50 @@ sub HMinfo_SetFn($@) {#########################################################
            ."\n "
            ;
   }
-  else                        {## go for delayed action
-    $hash->{helper}{childCnt} = 0 if (!$hash->{helper}{childCnt});
-    my $chCnt = ($hash->{helper}{childCnt}+1)%1000;
-    my $childName = "child_".$chCnt;
-
-    return HMinfo_SetFnDly(join(",",($childName,$name,$cmd,$opt,$optEmpty,$filter,@a)));
-  }
-  return $ret;
-}
-
-sub HMinfo_SetFnDly($) {#######################################################
-  my $in = shift;
-  my ($childName,$name,$cmd,$opt,$optEmpty,$filter,@a) = split",",$in;
-  my $ret;
-  my $hash = $defs{$name};
-  if   ($cmd eq "saveConfig") {##action: saveConfig----------------------------
-    my ($file) = @a;
-    my @entities;
-    foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
-      CUL_HM_Get($defs{$dName},$dName,"saveConfig",$file);
-      push @entities,$dName;
-      foreach my $chnId (CUL_HM_getAssChnIds($dName)){
-          my $dName = CUL_HM_id2Name($chnId);
-          push @entities, $dName if($dName !~ m/_chn:/);
-      }
-    }
-    $ret = $cmd." done:" ."\n saved"  ."\n    ".(join "\n    ",sort @entities)
-                         ;
+  elsif($cmd eq "saveConfig") {##action: saveConfig----------------------------
+    my $id = ++$hash->{nb}{cnt};
+    my $bl = BlockingCall("HMinfo_saveConfig", join(",",("$name:$id",$a[0],$opt,$filter)), 
+                          "HMinfo_bpPost", 30, 
+                          "HMinfo_bpAbort", "$name:$id");
+    $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
+    $ret = $cmd." done:" ."\n saved";
   }
   else{
-    return "autoReadReg clear "
+    $ret = "autoReadReg clear "
           ."configCheck param peerCheck peerXref "
           ."protoEvents msgStat:view,clear models regCheck register rssi saveConfig update "
           ."cpRegs  templateChk templateDef templateList templateSet";
-           }
+  }
   return $ret;
 }
-sub HMinfo_post($) {###########################################################
-  my ($name,$childName) = (split":",$_);
-  foreach (keys %{$defs{$name}{helper}{child}}){
-    Log3 $name, 1,"General still running: $_ ".$defs{$name}{helper}{child}{$_};
+
+sub HMinfo_saveConfig($) {#####################################################
+  my ($param) = @_;
+  my ($id,$file,$opt,$filter) = split ",",$param;
+  my @entities;
+  foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
+    CUL_HM_Get($defs{$dName},$dName,"saveConfig",$file);
+    push @entities,$dName;
+    foreach my $chnId (CUL_HM_getAssChnIds($dName)){
+      my $dName = CUL_HM_id2Name($chnId);
+      push @entities, $dName if($dName !~ m/_chn:/);
+    }
   }
-  delete $defs{$name}{helper}{child}{$childName};
-  Log3 $name, 1,"General deleted $childName now++++++++++++++";
-  return "finished";
+  return $id;
 }
+sub HMinfo_bpPost($) {#bp finished#############################################
+  my ($rep) = @_;
+  my ($name,$id) = split(":",$rep);
+  delete $defs{$name}{nb}{$id};
+  return;
+}
+sub HMinfo_bpAbort($) {#bp timeout ############################################
+  my ($rep) = @_;
+  my ($name,$id) = split(":",$rep);
+  delete $defs{$name}{nb}{$id};
+  return;
+}
+
 sub HMinfo_status($){##########################################################
   # - count defined HM entities, selected readings, errors on filtered readings
   # - display Assigned IO devices
