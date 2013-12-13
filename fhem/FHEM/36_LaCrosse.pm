@@ -200,7 +200,7 @@ LaCrosse_Parse($$)
       }    
 
       $temperature = int($temperature*10 + 0.5) / 10;
-      $humidity = int($humidity + 0.5) / 10;
+      $humidity = int($humidity*10 + 0.5) / 10;
 
       readingsBulkUpdate($rhash, "temperature$channel", $temperature);
       readingsBulkUpdate($rhash, "humidity$channel", $humidity) if( $humidity && $humidity <= 99 );
