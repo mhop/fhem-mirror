@@ -404,24 +404,24 @@ EGPM2LAN_Define($$)
     <code>define &lt;name&gt; EGPM2LAN &lt;IP-Address&gt; [&lt;Password&gt;]</code><br>
     <br>
     Das Modul erstellt eine Verbindung zu einer Gembird &reg; <a href="http://energenie.com/item.aspx?id=7557" >Energenie EG-PM2-LAN</a> Steckdosenleiste.
-    Falls mehrere Steckdosenleisten über das Netzwerk gesteuert werden, ist es ratsam, diese zuerst über die Web-Oberfläche zu konfigurieren und die einzelnen Steckdosen zu benennen. Die Namen werden dann automatisch in die
-    Oberfläche von FHEM übernommen. Bitte darauf achten, die Weboberfläche mit <i>Logoff</i> wieder zu verlassen, da der Zugriff sonst blockiert wird.<b>
+    Falls mehrere Steckdosenleisten &uuml;ber das Netzwerk gesteuert werden, ist es ratsam, diese zuerst &uuml;ber die Web-Oberfl&auml;che zu konfigurieren und die einzelnen Steckdosen zu benennen. Die Namen werden dann automatisch in die
+    Oberfl&auml;che von FHEM &uuml;bernommen. Bitte darauf achten, die Weboberfl&auml;che mit <i>Logoff</i> wieder zu verlassen, da der Zugriff sonst blockiert wird.
 </ul><br>
   <a name="EGPM2LANset"></a>
   <b>Set</b>
   <ul>
     <code>set &lt;name&gt; &lt;[on|off|toggle]&gt &lt;socketnr.&gt;</code><br>
-    Schaltet die gewählte Steckdose ein oder aus.<br>
+    Schaltet die gew&auml;hlte Steckdose ein oder aus.<br>
     <br>
     <code>set &lt;name&gt; &lt;[on|off]&gt &lt;all&gt;</code><br>
     Schaltet alle Steckdosen gleichzeitig ein oder aus.<br>
     <br>
     <code>set &lt;name&gt; &lt;staterequest&gt;</code><br>
     Aktualisiert die Statusinformation der Steckdosenleiste.<br>
-    Wenn das globale Attribut <a href="#autocreate">autocreate</a> aktiviert ist, wird für jede Steckdose ein <a href="#EGPM">EGPM</a>-Eintrag erstellt.<br>
+    Wenn das globale Attribut <a href="#autocreate">autocreate</a> aktiviert ist, wird f&uuml;r jede Steckdose ein <a href="#EGPM">EGPM</a>-Eintrag erstellt.<br>
     <br>
     <code>set &lt;name&gt; &lt;clearreadings&gt;</code><br>
-    Löscht alle ungültigen Einträge im Abschnitt &lt;readings&gt;.
+    L&ouml;scht alle ung&uuml;ltigen Eintr&auml;ge im Abschnitt &lt;readings&gt;.
   </ul>
   <br>
   <a name="EGPM2LANget"></a>
@@ -431,9 +431,9 @@ EGPM2LAN_Define($$)
   <b>Attribute</b>
   <ul>
     <li>stateDisplay</li>
-	  Default: <b>socketNumer</b> wechselt zwischen <b>socketNumer</b> and <b>socketName</b> für jeden Statuseintrag. Verwende <b>set statusrequest</b>, um die Anzeige zu aktualisieren.
+	  Default: <b>socketNumer</b> wechselt zwischen <b>socketNumer</b> and <b>socketName</b> f&uuml;r jeden Statuseintrag. Verwende <b>set statusrequest</b>, um die Anzeige zu aktualisieren.
     <li>autocreate</li>
-    Default: <b>on</b> <a href="#EGPM">EGPM</a>-Einträge werden automatisch mit dem <b>set</b>-command erstellt.
+    Default: <b>on</b> <a href="#EGPM">EGPM</a>-Eintr&auml;ge werden automatisch mit dem <b>set</b>-command erstellt.
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
