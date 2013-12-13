@@ -2731,7 +2731,20 @@ sub CUL_HM_Set($@) {
     }
     $lvl = ($lvl > 100)?100:(($lvl < 0)?0:$lvl);
     if ($st eq "dimmer"){# at least blind cannot stand ramp time...
-      $tval = $a[3]?CUL_HM_encodeTime16($a[3]):"FFFF";# onTime 0.05..85825945.6, 0=forever
+      if (!$a[3]){
+        $tval = "FFFF";
+      }
+      elsif ($a[3] =~ m /(..):(..):(..)/){
+        my ($eH,$eM,$eSec)  = ($1,$2,$3);
+        $eSec += $eH*3600 + $eM*60;
+        my @lt = localtime;
+        my $ltSec = $lt[2]*3600+$lt[1]*60+$lt[0];# actually strip of date
+        $eSec += 3600*24 if ($ltSec > $eSec); # go for the next day
+        $tval = CUL_HM_encodeTime16($eSec - $ltSec);
+      }
+      else{
+        $tval = CUL_HM_encodeTime16($a[3]);# onTime 0.05..85825945.6, 0=forever
+      }
       $rval = CUL_HM_encodeTime16((@a > 4)?$a[4]:2.5);# rampTime 0.0..85825945.6, 0=immediate
     }
     CUL_HM_PushCmdStack($hash,sprintf("++%s11%s%s02%s%02X%s%s",
@@ -5725,8 +5738,10 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
          <li><B><a href="#CUL_HMonForTimer">on-for-timer &lt;sec&gt;</a></B> - Dimmer only! <br></li>
          <li><B><a href="#CUL_HMonTill">on-till &lt;time&gt;</a></B> - Dimmer only! <br></li>
          <li><B>stop</B> - stop motion (blind) or dim ramp</li>
-         <li><B>pct &lt;level&gt [&lt;ontime&gt] [&lt;ramptime&gt]</B> - set actor to a desired <B>absolut level</B>.
-                    Optional ontime and ramptime could be given for dimmer.</li>
+         <li><B>pct &lt;level&gt [&lt;ontime&gt] [&lt;ramptime&gt]</B> - set actor to a desired <B>absolut level</B>.<br>
+                    Optional ontime and ramptime could be given for dimmer.<br>
+                    ontime may be time in seconds. It may also be entered as end-time in format hh:mm:ss
+                    </li>
          <li><B>up [changeValue] [&lt;ontime&gt] [&lt;ramptime&gt]</B> dim up one step</li>
          <li><B>down [changeValue] [&lt;ontime&gt] [&lt;ramptime&gt]</B> dim up one step<br>
              changeValue is optional an gives the level to be changed up or down in percent. Granularity is 0.5%, default is 10%. <br>
