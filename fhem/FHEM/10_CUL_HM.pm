@@ -1640,6 +1640,10 @@ sub CUL_HM_parseCommon(@){#####################################################
                         (-1)*(hex($rssi)))
             if ($rssi && $rssi ne '00' && $rssi ne'80');
       $reply = "ACKStatus";
+      
+      my $chnHash = CUL_HM_id2Hash($src.substr($p,2,2));
+      readingsSingleUpdate($chnHash,"recentStateType","ack",0);
+     
       if ($shash->{helper}{tmdOn}){
         if (not hex(substr($p,6,2))&0x40){# not timedOn, we have to repeat
           my ($pre,$nbr,$msg) = unpack 'A4A2A*',$shash->{helper}{prt}{rspWait}{cmd};
@@ -1887,6 +1891,9 @@ sub CUL_HM_parseCommon(@){#####################################################
             if ($rssi && $rssi ne '00' && $rssi ne'80');
       @{$modules{CUL_HM}{helper}{qReqStat}} = grep { $_ ne $shash->{NAME} }
                                        @{$modules{CUL_HM}{helper}{qReqStat}};
+      my $chnHash = CUL_HM_id2Hash($src.substr($p,2,2));
+      readingsSingleUpdate($chnHash,"recentStateType","info",0);
+
       if ($pendType eq "StatusReq"){#it is the answer to our request
         my $chnSrc = $src.$shash->{helper}{prt}{rspWait}{forChn};
         my $chnhash = $modules{CUL_HM}{defptr}{$chnSrc};
@@ -6284,6 +6291,11 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
   <a name="CUL_HMevents"></a>
   <b>Generated events:</b>
   <ul>
+  <li><B>general</B><br>
+      recentStateType:[ack|info] # cannot be used ti trigger notifies<br>
+      <li>ack indicates that some statusinfo is derived from an acknowledge</li>  
+      <li>info indicates an autonomous message from the device</li>  
+      </li>  
   <li><B>HM-CC-TC</B><br>
       T: $t H: $h<br>
         battery:[low|ok]<br>
