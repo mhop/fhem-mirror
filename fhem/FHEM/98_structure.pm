@@ -159,7 +159,7 @@ sub structure_Notify($$)
   my $behavior = AttrVal($me, "clientstate_behavior", "absolute");
   my %clientstate;
 
-  my @structPrio = split(" ", $attr{$me}{clientstate_priority})
+  my @structPrio = attrSplit($attr{$me}{clientstate_priority})
         if($attr{$me}{clientstate_priority});
 
   return "" if($hash->{INSET}); # Do not trigger for our own set
@@ -187,7 +187,7 @@ sub structure_Notify($$)
     next if(!$defs{$d});
 
     if($attr{$d} && $attr{$d}{$devmap}) {
-      my @gruppe = split(" ", $attr{$d}{$devmap});
+      my @gruppe = attrSplit($attr{$d}{$devmap});
       my @value;
       for (my $i=0; $i<@gruppe; $i++) {
         @value = split(":", $gruppe[$i]);
@@ -484,7 +484,7 @@ structure_Attr($@)
         If clientstate_behavior is set to relative, then you have to set the
         attribute "clientstate_priority" with all states of the defined devices
         to this structure in descending order. Each group is delemited by
-        space. Each entry of one group is delimited by "pipe".  The status
+        space or /. Each entry of one group is delimited by "pipe".  The status
         represented by the structure is the first entry of each group.
         Example:<br>
         <ul>
@@ -623,7 +623,7 @@ structure_Attr($@)
       beinflusst. Die Priorit&auml;ten sind in absteigender Reihenfolge anzugeben.
       Dabei k&ouml;nnen Gruppen mit identischer Priorit&auml;t angegeben werden, um zb.
       unterschiedliche Devicetypen zusammenfassen zu k&ouml;nnen. Jede Gruppe wird durch
-      Leerzeichen, jeder Eintrag pro Gruppe durch Pipe getrennt. Der Status der
+      Leerzeichen oder /, jeder Eintrag pro Gruppe durch Pipe getrennt. Der Status der
       Struktur ist der erste Eintrag in der entsprechenden Gruppe.
     </li>
     <br>Beispiel:<br>

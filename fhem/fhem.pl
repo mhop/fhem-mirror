@@ -52,7 +52,6 @@ sub CommandChain($$);
 sub Dispatch($$$);
 sub DoTrigger($$@);
 sub EvalSpecials($%);
-sub EventMapAsList($);
 sub FmtDateTime($);
 sub FmtTime($);
 sub GetLogLevel(@);
@@ -81,6 +80,7 @@ sub WriteStatefile();
 sub XmlEscape($);
 sub addEvent($$);
 sub addToAttrList($);
+sub attrSplit($);
 sub createInterfaceDefinitions();
 sub devspec2array($);
 sub doGlobalDef($);
@@ -1915,7 +1915,7 @@ getAllSets($)
     $em = join(" ", grep { !/ / }
                     map { $_ =~ s/.*?=//s;
                           $_ =~ s/.*?://s; $_ } 
-                    EventMapAsList($em));
+                    attrSplit($em));
     $a2 = "$em $a2";
   }
   return $a2;
@@ -2943,7 +2943,7 @@ addToAttrList($)
 }
 
 sub
-EventMapAsList($)
+attrSplit($)
 {
   my ($em) = @_;
   my $sc = " ";               # Split character
@@ -2968,7 +2968,7 @@ ReplaceEventMap($$$)
 
   my $nstr = join(" ", @{$str}) if(!$dir);
   my $changed;
-  my @emList = EventMapAsList($em);
+  my @emList = attrSplit($em);
   foreach my $rv (@emList) {
     # Real-Event-Regexp:GivenName[:modifier]
     my ($re, $val, $modifier) = split(":", $rv, 3);
