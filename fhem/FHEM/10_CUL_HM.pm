@@ -4908,32 +4908,8 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
 
   $attr{$devName}{actCycle} = $cycleString;
   $attr{$devName}{actStatus}=""; # force trigger
-  # get last reading timestamp-------
-  my $recent = "";
-  my @entities = CUL_HM_getAssChnIds($devName);
-  for (@entities){$_ = CUL_HM_id2Hash($_)}
-  push @entities,$devHash if ($devHash->{channel_01});
-  foreach my $ehash (@entities){
-    no strict; #convert regardless of content
-    my $valid = (!defined $ehash->{NAME})?0:1;
-    use strict;
-    next if (!$valid);
-    my $eName = $ehash->{NAME};
-    next if (!$eName);
-    foreach my $rName (keys %{$ehash->{READINGS}}){
-      next if (!$rName            ||
-             $rName eq "PairedTo" ||                     # derived
-             $rName eq "peerList" ||                     # derived
-             $rName eq "Activity" ||                     # derived
-             $rName =~ m/^[.]?R-/ ||                     # no Regs - those are derived from Reg
-             ReadingsVal($eName,$rName,"") =~ m/^set_/); # ignore setting
-      my $ts = ReadingsTimestamp($eName,$rName,"");
-      $recent = $ts if ($ts gt $recent);
-    }
-  }
   my $actHash = CUL_HM_ActGetCreateHash();
   $actHash->{helper}{$devId}{start} = TimeNow();
-  $actHash->{helper}{$devId}{recent} = $recent;
   $actHash->{helper}{peers} = CUL_HM_noDupInString(
                        ($actHash->{helper}{peers}?$actHash->{helper}{peers}:"")
                        .",$devId");
@@ -4986,8 +4962,7 @@ sub CUL_HM_ActCheck() {# perform supervision
       $state = "switchedOff";
     }
     else{
-      $actHash->{helper}{$devId}{recent} = ReadingsVal($devName,".protLastRcv",0);
-      my $tLast = $actHash->{helper}{$devId}{recent};
+      my $tLast = ReadingsVal($devName,".protLastRcv",0);
       my @t = localtime($tod - $tSec); #time since when a trigger is expected
       my $tSince = sprintf("%04d-%02d-%02d %02d:%02d:%02d",
                              $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
