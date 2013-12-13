@@ -266,7 +266,6 @@ readingsGroup_2html($)
   my $devices = $hash->{DEVICES};
 
   my $row = 1;
-
   my $ret;
   $ret .= "<table>";
   my $txt = AttrVal($d, "alias", $d);
@@ -275,6 +274,7 @@ readingsGroup_2html($)
   $ret .= "<tr><td><table $style class=\"block wide\">";
   $ret .= "<tr><td colspan=\"99\"><div style=\"color:#ff8888;text-align:center\">updates disabled</div></tr>" if( $disable > 0 );
   foreach my $device (@{$devices}) {
+    my $item = 0;
     my $h = $defs{$device->[0]};
     my $regex = $device->[1];
     if( !$h && $device->[0] =~ m/^<.*>$/ ) {
@@ -297,7 +297,11 @@ readingsGroup_2html($)
       my $h = $h;
       if( $regex && $regex =~ m/^<(.*)>$/ ) {
         my $txt = $1;
-        if( $txt =~ m/^{.*}$/ ) {
+        my $readings;
+        if( $txt =~ m/^{(.*)}(#[\w|.*]+)?$/ ) {
+          $txt = "{$1}";
+          $readings = $2;
+
           my $new_line = $first;
           my $DEVICE = $name;
           ($txt,$new_line) = eval $txt;
@@ -313,8 +317,11 @@ readingsGroup_2html($)
           $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
           $row++;
         }
+        $item++;
+        my $inform_id = "";
+        $inform_id = "informId=\"$d-$item.item\"" if( $readings );
         my $name_style = lookup2($name_style,$name,$1,undef);
-        $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>";
+        $ret .= "<td><div $name_style $inform_id class=\"dname\">$txt</div></td>";
         $first = 0;
         next;
       } elsif( $regex && $regex =~ m/^\+(.*)/ ) {
@@ -486,6 +493,7 @@ readingsGroup_Notify($$)
       $valueIcon = eval $valueIcon if( $valueIcon =~ m/^{.*}$/ );
 
       foreach my $device (@{$devices}) {
+        my $item = 0;
         my $h = $defs{@{$device}[0]};
         next if( !$h );
         next if( $dev->{NAME} ne $h->{NAME} );
@@ -501,6 +509,33 @@ readingsGroup_Notify($$)
           next if( $reading eq "state" && !$show_state && (!defined($regex) || $regex ne "state") );
           next if( $regex && $regex =~ m/^\+/ );
           next if( $regex && $regex =~ m/^\?/ );
+          if( $regex && $regex =~ m/^<(.*)>$/ ) {
+            my $txt = $1;
+            my $readings;
+            if( $txt =~ m/^{(.*)}(#([\w|.*]+))?$/ ) {
+              $txt = "{$1}";
+              $readings = $3;
+
+              next if( !$readings );
+              next if( $reading !~ m/^$readings$/);
+
+              my $new_line;
+              my $DEVICE = $name;
+              ($txt,$new_line) = eval $txt;
+              $new_line if( defined($new_line) );
+              if( $@ ) {
+                $txt = "<ERROR>";
+                Log3 $name, 3, $name .": ". $regex .": ". $@;
+              }
+              $txt = "" if( !defined($txt) );
+
+              $item++;
+              CommandTrigger( "", "$name $item.item: $txt" );
+            }
+
+            next;
+          }
+
           next if( defined($regex) && $reading !~ m/^$regex$/);
 
           my $value = $value;
@@ -604,8 +639,9 @@ readingsGroup_Get($@)
       <li>If regex is a comma separatet list the reading values will be shown on a single line.</li>
       <li>If regex starts with a + it will be matched against the internal values of the device instead of the readings.</li>
       <li>If regex starts with a ? it will be matched against the attributes of the device instead of the readings.</li>
-      <li>regex can be of the form &lt;STRING&gt; or &lt;{perl}&gt; where STRING or the string returned by perl is
-          inserted as the reading. skipped if STRING is undef.</li>
+      <li>regex can be of the form &lt;STRING&gt; or &lt;{perl}[#readings]&gt; where STRING or the string returned by perl is
+          inserted as the reading. skipped if STRING is undef. if readings is given the perl expression will be reevaluated
+          during longpoll updates.</li>
       <li>For internal values and attributes longpoll update is not possible. Refresh the page to update the values.</li>
       <li>the &lt;{perl}&gt; expression is limited to expressions without a space. it is best just to call a small sub
           in 99_myUtils.pm instead of having a compex expression in the define.</li>
