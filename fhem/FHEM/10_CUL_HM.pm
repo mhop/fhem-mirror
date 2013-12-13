@@ -2436,10 +2436,8 @@ sub CUL_HM_Set($@) {
       delete $hash->{helper}{prt}{rspWaitSec};
       delete $hash->{helper}{prt}{mmcA};
       delete $hash->{helper}{prt}{mmcS};
-      #rescue "protLastRcv" for action detector.
-      my $protLastRcv = $hash->{protLastRcv} if ($hash->{protLastRcv});
       delete ($hash->{$_}) foreach (grep(/^prot/,keys %{$hash}));
-      $hash->{protLastRcv} = $protLastRcv if ($protLastRcv);
+
       if ($hash->{IODev}{NAME} &&
           $modules{CUL_HM}{$hash->{IODev}{NAME}} &&
           $modules{CUL_HM}{$hash->{IODev}{NAME}}{pendDev}){
@@ -4005,6 +4003,7 @@ sub CUL_HM_eventP($$) {#handle protocol events
   my $nAttr = $hash;
   if ($evntType eq "Rcv"){
     $nAttr->{"protLastRcv"} = TimeNow();
+    readingsSingleUpdate($hash,".protLastRcv",$nAttr->{"protLastRcv"},0);
     return;
   }
 
@@ -4987,9 +4986,7 @@ sub CUL_HM_ActCheck() {# perform supervision
       $state = "switchedOff";
     }
     else{
-      $actHash->{helper}{$devId}{recent} = ($devHash->{"protLastRcv"})?#update recent
-                                            $devHash->{"protLastRcv"}
-                                            :0;
+      $actHash->{helper}{$devId}{recent} = ReadingsVal($devName,".protLastRcv",0);
       my $tLast = $actHash->{helper}{$devId}{recent};
       my @t = localtime($tod - $tSec); #time since when a trigger is expected
       my $tSince = sprintf("%04d-%02d-%02d %02d:%02d:%02d",
