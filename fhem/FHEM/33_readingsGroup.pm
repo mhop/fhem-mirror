@@ -637,8 +637,8 @@ readingsGroup_Get($@)
       <li>&lt;device&gt; can be of the form &lt;STRING&gt; or &lt;{perl}&gt; where STRING or the string returned by perl is
           inserted as a line in the readings list. skipped if STRING is undef.</li>
       <li>If regex is a comma separatet list the reading values will be shown on a single line.</li>
-      <li>If regex starts with a + it will be matched against the internal values of the device instead of the readings.</li>
-      <li>If regex starts with a ? it will be matched against the attributes of the device instead of the readings.</li>
+      <li>If regex starts with a '+' it will be matched against the internal values of the device instead of the readings.</li>
+      <li>If regex starts with a '?' it will be matched against the attributes of the device instead of the readings.</li>
       <li>regex can be of the form &lt;STRING&gt; or &lt;{perl}[#readings]&gt; where STRING or the string returned by perl is
           inserted as the reading. skipped if STRING is undef. if readings is given the perl expression will be reevaluated
           during longpoll updates.</li>
@@ -653,7 +653,7 @@ readingsGroup_Get($@)
         define batteries readingsGroup .*:battery</code><br>
       <br>
         <code>define temperatures readingsGroup s300th.*:temperature</code><br>
-        <code>define temperatures readingsGroup TYPE=CUL_WS.*:temperature</code><br>
+        <code>define temperatures readingsGroup TYPE=CUL_WS:temperature</code><br>
       <br>
         <code>define culRSSI readingsGroup cul_RSSI=.*:+cul_RSSI</code><br>
       <br>
