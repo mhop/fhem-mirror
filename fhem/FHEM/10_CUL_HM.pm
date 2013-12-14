@@ -102,7 +102,7 @@ sub CUL_HM_ActGetCreateHash();
 sub CUL_HM_time2sec($);
 sub CUL_HM_ActAdd($$);
 sub CUL_HM_ActDel($);
-sub CUL_HM_ActCheck();
+sub CUL_HM_ActCheck($);
 sub CUL_HM_UpdtReadBulk(@);
 sub CUL_HM_UpdtReadSingle(@);
 sub CUL_HM_setAttrIfCh($$$$);
@@ -4917,7 +4917,7 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
       .$cycleString." time";
   #run ActionDetector
   RemoveInternalTimer("ActionDetector");
-  CUL_HM_ActCheck();
+  CUL_HM_ActCheck("add");
   return;
 }
 sub CUL_HM_ActDel($) {# delete HMid for activity supervision
@@ -4935,16 +4935,17 @@ sub CUL_HM_ActDel($) {# delete HMid for activity supervision
   $actHash->{helper}{peers} = CUL_HM_noDupInString($peerIDs);
   Log3 $actHash,3,"Device ".$devName." removed from ActionDetector";
   RemoveInternalTimer("ActionDetector");
-  CUL_HM_ActCheck();
+  CUL_HM_ActCheck("del");
   return;
 }
-sub CUL_HM_ActCheck() {# perform supervision
+sub CUL_HM_ActCheck($) {# perform supervision
+  my ($call) = @_;
   my $actHash = CUL_HM_ActGetCreateHash();
   my $tod = int(gettimeofday());
   my $actName = $actHash->{NAME};
   my $peerIDs = $actHash->{helper}{peers}?$actHash->{helper}{peers}:"";
   my @event;
-  my ($cntUnkn,$cntAlive,$cntDead,$cntOff) =(0,0,0,0);
+  my ($cntUnkn,$cntAliv,$cntDead,$cnt_Off) =(0,0,0,0);
 
   foreach my $devId (split(",",$peerIDs)){
     next if (!$devId);
@@ -4953,13 +4954,11 @@ sub CUL_HM_ActCheck() {# perform supervision
       CUL_HM_ActDel($devId);
       next;
     }
-    my $devHash = $defs{$devName};
     my $state;
     my $oldState = AttrVal($devName,"actStatus","unset");
     my (undef,$tSec)=CUL_HM_time2sec($attr{$devName}{actCycle});
     if ($tSec == 0){# detection switched off
-      $cntOff++;
-      $state = "switchedOff";
+      $cnt_Off++; $state = "switchedOff";
     }
     else{
       my $tLast = ReadingsVal($devName,".protLastRcv",0);
@@ -4968,39 +4967,42 @@ sub CUL_HM_ActCheck() {# perform supervision
                              $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
 
       if (!$tLast){                #cannot determine time
-        if ($actHash->{helper}{$devId}{start} lt $tSince){
-          $state = "dead";
-          $cntDead++;
+        if ($actHash->{helper}{$devId}{start} lt $tSince){  
+          $cntDead++; $state = "dead";
         }
         else{
-          $state = "unknown";
-          $cntUnkn++;
+          $cntUnkn++; $state = "unknown";
         }
       }
       elsif ($tSince gt $tLast){    #no message received in window
-        $cntDead++;
-        $state = "dead";
+        if ($actHash->{helper}{$devId}{start} lt $tLast){
+          $cntDead++; $state = "dead";
+        }
+        else{
+          $cntUnkn++; $state = "unknown";
+        }
       }
       else{                         #message in time
-        $cntAlive++;
-        $state = "alive";
+        $cntAliv++; $state = "alive";
       }
     }
     if ($oldState ne $state){
-      readingsSingleUpdate($devHash,"Activity",$state,1);
+      readingsSingleUpdate($defs{$devName},"Activity",$state,1);
       $attr{$devName}{actStatus} = $state;
       Log3 $actHash,4,"Device ".$devName." is ".$state;
     }
     push @event, "status_".$devName.":".$state;
   }
-  push @event, "state:"."alive:".$cntAlive
+  push @event, "state:"."alive:".$cntAliv
                        ." dead:".$cntDead
                        ." unkn:".$cntUnkn
-                       ." off:" .$cntOff;
+                       ." off:" .$cnt_Off;
 
   my $allState = join " ",@event;# search and remove outdated readings
-  foreach (keys %{$actHash->{READINGS}}){
-    delete $actHash->{READINGS}{$_} if ($allState !~ m/$_:/);
+  if ($call eq "ActionDetector"){#delete only in routine call 
+    foreach (keys %{$actHash->{READINGS}}){
+      delete $actHash->{READINGS}{$_} if ($allState !~ m/$_:/);
+    }
   }
 
   CUL_HM_UpdtReadBulk($actHash,1,@event);
