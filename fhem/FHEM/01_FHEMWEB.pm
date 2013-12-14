@@ -549,7 +549,7 @@ FW_answerCall($)
 
   # Enable WebApps
   if($FW_tp || $FW_ss) {
-    my $icon = $FW_ME."/images/default/fhemicon.png";
+    my $icon = $FW_ME."/images/default/fhemicon_ios.png";
     if($FW_ss) {
        FW_pO '<meta name="viewport" '.
                    'content="initial-scale=1.0,user-scalable=1"/>';
