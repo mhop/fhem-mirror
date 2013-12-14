@@ -2,8 +2,6 @@
 # $Id$
 # Written by Matthias Gehre, M.Gehre@gmx.de, 2012-2013
 #
-# Dutycycle included by J. Isleib 2013-09-26
-#
 package main;
 
 use strict;
@@ -369,8 +367,13 @@ MAX_Set($@)
     my $windowOpenTemp = int($h{windowOpenTemperature}*2);
     my $windowOpenTime = int($h{windowOpenDuration}/5);
 
+    my $groupid = MAX_ReadingsVal($hash,"groupid");
     my $payload = sprintf("%02x%02x%02x%02x%02x%02x%02x",$comfort,$eco,$max,$min,$offset,$windowOpenTemp,$windowOpenTime);
-    return ($hash->{IODev}{Send})->($hash->{IODev},"ConfigTemperatures",$hash->{addr},$payload, callbackParam => "$setting,$args[0]")
+    if($setting eq "measurementOffset") {
+      return ($hash->{IODev}{Send})->($hash->{IODev},"ConfigTemperatures",$hash->{addr},$payload, groupId => "00", flags => "00", callbackParam => "$setting,$args[0]");
+    } else {
+      return ($hash->{IODev}{Send})->($hash->{IODev},"ConfigTemperatures",$hash->{addr},$payload, groupId => sprintf("%02x",$groupid), flags => ( $groupid ? "04" : "00" ), callbackParam => "$setting,$args[0]");
+    }
 
   } elsif($setting eq "displayActualTemperature" and $hash->{type} eq "WallMountedThermostat") {
     return "Invalid arg" if($args[0] ne "0" and $args[0] ne "1");
@@ -526,14 +529,24 @@ MAX_Set($@)
       $assoclist = join(",", map { defined($_->{type}) && $_->{type} =~ /HeatingThermostat.*/ ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
     }
 
+    my $templistOffset = join(",",map { MAX_SerializeTemperature(($_-7)/2) }  (0..14));
+    my $boostDurVal = join(",", values(%boost_durations));
     if($hash->{type} =~ /HeatingThermostat.*/) {
-      #Create numbers from 4.5 to 30.5
-      my $templistOffset = join(",",map { MAX_SerializeTemperature(($_-7)/2) }  (0..14));
-      my $boostDurVal = join(",", values(%boost_durations));
-      return "$ret associate:$assoclist deassociate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset";
+      my $shash;
+      my $wallthermo = 0;
+      # check if Wallthermo is in same group
+      foreach my $addr ( keys %{$modules{MAX}{defptr}} ) {
+        $shash = $modules{MAX}{defptr}{$addr};
+        $wallthermo = 1 if((MAX_ReadingsVal($shash,"groupid") eq MAX_ReadingsVal($hash,"groupid")) and $shash->{type} eq "WallMountedThermostat");
+      }
 
+      if ($wallthermo eq 1) {
+        return "$ret associate:$assoclist deassociate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist measurementOffset:$templistOffset windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset";
+      } else {
+        return "$ret associate:$assoclist deassociate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset";
+      }
     } elsif($hash->{type} eq "WallMountedThermostat") {
-      return "$ret associate:$assoclist deassociate:$assoclist displayActualTemperature:0,1 desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist maximumTemperature:$templist";
+      return "$ret associate:$assoclist deassociate:$assoclist displayActualTemperature:0,1 desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist maximumTemperature:$templist minimumTemperature:$templist measurementOffset:$templistOffset windowOpenTemperature:$templist boostDuration:$boostDurVal boostValveposition ";
     } elsif($hash->{type} eq "ShutterContact") {
       return "$ret associate:$assoclist deassociate:$assoclist";
     } else {
