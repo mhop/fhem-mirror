@@ -335,15 +335,8 @@ sub HMinfo_SetFn($@) {#########################################################
     $filter = shift @a;
   }
 
-  if   (!$cmd ||$cmd eq "?" ) {##actionImmediate: clear parameter--------------
-    return "autoReadReg "
-          ."clear "
-          ."configCheck param peerCheck peerXref "
-          ."protoEvents "
-          ."models msgStat regCheck register rssi saveConfig update "
-          ."templateSet templateChk templateList templateDef cpRegs update";
-  }
-  elsif($cmd eq "clear" )     {##actionImmediate: clear parameter--------------
+  $cmd = "?" if(!$cmd);# by default print options
+  if   ($cmd eq "clear" )     {##actionImmediate: clear parameter--------------
     my ($type) = @a;
     if ($type eq "msgStat"){
       foreach (keys %{$modules{CUL_HM}{stat}{r}}){
@@ -455,7 +448,6 @@ sub HMinfo_SetFn($@) {#########################################################
         my $dispDest = $dest;
         if ($dest =~ m/^at_(.*)/){
           $dispName = $1;
-#         $dispName =~ s/^rpt_//;
           $dispDest = (($dest =~ m/^to_rpt_/)?"rep_":"").$dName;
         }
         push @rssiList,sprintf("%-15s:%-15s %-15s %6.1f %6.1f %6.1f<%6.1f %5s"
@@ -697,10 +689,15 @@ sub HMinfo_SetFn($@) {#########################################################
     $ret = $cmd." done:" ."\n saved";
   }
   else{
-    $ret = "autoReadReg clear "
-          ."configCheck param peerCheck peerXref "
-          ."protoEvents msgStat:view,clear models regCheck register rssi saveConfig update "
-          ."cpRegs  templateChk templateDef templateList templateSet";
+    my @cmdLst =     
+           ( "autoReadReg","clear"  #"clear:msgStat,Protocol,readings,register,rssi"
+            ,"configCheck","param","peerCheck","peerXref"
+            ,"protoEvents","msgStat:view,clear","rssi"
+            ,"models"
+            ,"regCheck","register","saveConfig","update"
+            ,"cpRegs"
+            ,"templateChk","templateDef","templateList","templateSet");
+    $ret = join (" ",sort @cmdLst); 
   }
   return $ret;
 }

@@ -1136,8 +1136,10 @@ my %culHmModelSets = (# channels of this subtype-------------
                       ,press          =>"[long|short] [on|off] ..."
                       ,inhibit        =>"[on|off]"},
   "HM-CC-TC"       =>{ burstXmit      =>""},
-  "HM-CC-RT-DN"    =>{ burstXmit      =>""},
-  "HM-CC-RT-DN-BoM"=>{ statusRequest  =>""},
+  "HM-CC-RT-DN"    =>{ burstXmit      =>""
+                      ,inhibit        =>"[on|off]"},
+  "HM-CC-RT-DN-BoM"=>{ statusRequest  =>""
+                      ,inhibit        =>"[on|off]"},
   "HM-SEC-SD"      =>{ statusRequest  =>""},
 );
 # clones- - - - - - - - - - - - - - - - -
