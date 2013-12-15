@@ -24,9 +24,12 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.0
+# Version: 1.0.1
 #
 # Version History:
+# - 1.0.1 - 2013-12-15
+# -- Bugfix release
+#
 # - 1.0.0 - 2013-09-23
 # -- First release
 #
@@ -36,17 +39,16 @@ package main;
 
 use strict;
 use warnings;
-use LWP::UserAgent;
-use HTTP::Request;
 use XML::Simple;
 use IO::Socket;
+use HttpUtils;
+use Encode;
 
-sub ENIGMA2_Define($$);
+sub ENIGMA2_Set($@);
+sub ENIGMA2_Get($@);
 sub ENIGMA2_GetStatus($;$);
+sub ENIGMA2_Define($$);
 sub ENIGMA2_Undefine($$);
-
-
-
 
 #########################
 # Forward declaration for remotecontrol module
@@ -55,795 +57,1066 @@ sub ENIGMA2_RCmakenotify($$);
 
 ###################################
 sub ENIGMA2_Initialize($) {
-  my ($hash) = @_;
+    my ($hash) = @_;
 
-  $hash->{GetFn}     = "ENIGMA2_Get";
-  $hash->{SetFn}     = "ENIGMA2_Set";
-  $hash->{DefFn}     = "ENIGMA2_Define";
-  $hash->{UndefFn}   = "ENIGMA2_Undefine";
+    $hash->{GetFn}   = "ENIGMA2_Get";
+    $hash->{SetFn}   = "ENIGMA2_Set";
+    $hash->{DefFn}   = "ENIGMA2_Define";
+    $hash->{UndefFn} = "ENIGMA2_Undefine";
 
-  $hash->{AttrList}  = "".
-                      $readingFnAttributes;
+    $hash->{AttrList} = "" . $readingFnAttributes;
 
-  $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG}  = "ENIGMA2_RClayout_DM800_SVG";
-  $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800}  = "ENIGMA2_RClayout_DM800";
-  $data{RC_layout}{ENIGMA2_DreamMultimedia_DM8000_DM800se_SVG}  = "ENIGMA2_RClayout_DM8000_SVG";
-  $data{RC_layout}{ENIGMA2_DreamMultimedia_DM8000_DM800se}  = "ENIGMA2_RClayout_DM8000";
-  $data{RC_layout}{ENIGMA2_DreamMultimedia_RC10_SVG}  = "ENIGMA2_RClayout_RC10_SVG";
-  $data{RC_layout}{ENIGMA2_DreamMultimedia_RC10}  = "ENIGMA2_RClayout_RC10";
+    $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG} =
+      "ENIGMA2_RClayout_DM800_SVG";
+    $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800} =
+      "ENIGMA2_RClayout_DM800";
+    $data{RC_layout}{ENIGMA2_DreamMultimedia_DM8000_DM800se_SVG} =
+      "ENIGMA2_RClayout_DM8000_SVG";
+    $data{RC_layout}{ENIGMA2_DreamMultimedia_DM8000_DM800se} =
+      "ENIGMA2_RClayout_DM8000";
+    $data{RC_layout}{ENIGMA2_DreamMultimedia_RC10_SVG} =
+      "ENIGMA2_RClayout_RC10_SVG";
+    $data{RC_layout}{ENIGMA2_DreamMultimedia_RC10} = "ENIGMA2_RClayout_RC10";
+
 #  $data{RC_layout}{ENIGMA2_VUplus_Solo2_SVG}  = "ENIGMA2_RClayout_VUplusSolo2_SVG";
 #  $data{RC_layout}{ENIGMA2_VUplus_Solo2}  = "ENIGMA2_RClayout_VUplusSolo2";
-  $data{RC_layout}{ENIGMA2_VUplus_Duo2_SVG}  = "ENIGMA2_RClayout_VUplusDuo2_SVG";
-  $data{RC_layout}{ENIGMA2_VUplus_Duo2}  = "ENIGMA2_RClayout_VUplusDuo2";
+    $data{RC_layout}{ENIGMA2_VUplus_Duo2_SVG} =
+      "ENIGMA2_RClayout_VUplusDuo2_SVG";
+    $data{RC_layout}{ENIGMA2_VUplus_Duo2} = "ENIGMA2_RClayout_VUplusDuo2";
+
 #  $data{RC_layout}{ENIGMA2_VUplus_Ultimo_SVG}  = "ENIGMA2_RClayout_VUplusUltimo_SVG";
 #  $data{RC_layout}{ENIGMA2_VUplus_Ultimo}  = "ENIGMA2_RClayout_VUplusUltimo";
-  $data{RC_makenotify}{ENIGMA2} = "ENIGMA2_RCmakenotify";
+    $data{RC_makenotify}{ENIGMA2} = "ENIGMA2_RCmakenotify";
 }
 
 #####################################
 sub ENIGMA2_GetStatus($;$) {
-  my ($hash, $local) = @_;
-  my $name = $hash->{NAME};
-  my $interval = $hash->{INTERVAL};
-  my $state='';
-  my $boxinfo;
-  my $serviceinfo;
-  my $eventinfo;
-  my $signalinfo;
-  my $vol;
-  my $changecount = 0;
-  
-  $local = 0 unless(defined($local));
+    my ( $hash, $local ) = @_;
+    my $name     = $hash->{NAME};
+    my $interval = $hash->{INTERVAL};
+    my $state    = '';
+    my $boxinfo;
+    my $serviceinfo;
+    my $eventinfo;
+    my $signalinfo;
+    my $vol;
+    my $changecount = 0;
 
-  InternalTimer(gettimeofday()+$interval, "ENIGMA2_GetStatus", $hash, 0) unless($local == 1);
+    $local = 0 unless ( defined($local) );
 
-  # Read powerstate
-  #
-  my $powerstate = ENIGMA2_SendCommand($hash, "powerstate", "");
+    InternalTimer( gettimeofday() + $interval, "ENIGMA2_GetStatus", $hash, 0 )
+      unless ( $local == 1 );
 
-  if (defined($powerstate) && ref($powerstate) eq "HASH") {
-    if ($powerstate->{e2instandby} eq "true") {
-      $state = "off";
-    } else {
-      $state = "on";
-      # Read Boxinfo
-      $boxinfo = ENIGMA2_SendCommand($hash, "about", "");
-      $serviceinfo = ENIGMA2_SendCommand($hash, "subservices", "");
-      $signalinfo = ENIGMA2_SendCommand($hash, "signal", "");
-      $vol = ENIGMA2_SendCommand($hash, "vol", "");
-      if (ref($serviceinfo) eq "HASH" && defined($serviceinfo->{e2service}{e2servicereference}) && $serviceinfo->{e2service}{e2servicereference} ne "") {
-        $eventinfo = ENIGMA2_SendCommand($hash, "epgservicenow", "sRef=".urlEncode($serviceinfo->{e2service}{e2servicereference}));
-      }
+    # Read powerstate
+    #
+    my $powerstate = ENIGMA2_SendCommand( $hash, "powerstate", "" );
+
+    if ( defined($powerstate) && ref($powerstate) eq "HASH" ) {
+        if ( $powerstate->{e2instandby} eq "true" ) {
+            $state = "off";
+        }
+        else {
+            $state = "on";
+
+            # Read Boxinfo
+            $boxinfo     = ENIGMA2_SendCommand( $hash, "about",       "" );
+            $serviceinfo = ENIGMA2_SendCommand( $hash, "subservices", "" );
+            $signalinfo  = ENIGMA2_SendCommand( $hash, "signal",      "" );
+            $vol         = ENIGMA2_SendCommand( $hash, "vol",         "" );
+
+            #FIXME workaround for option channels
+            if (   ref($serviceinfo) eq "HASH"
+                && ref( $serviceinfo->{e2service} ) eq "ARRAY" )
+            {
+                $serviceinfo = (
+                    e2service => $serviceinfo->{e2service},
+                    e2servicereference =>
+                      $serviceinfo->{e2service}[0]{e2servicereference}
+                );
+            }
+
+            if (   ref($serviceinfo) eq "HASH"
+                && defined( $serviceinfo->{e2service}{e2servicereference} )
+                && $serviceinfo->{e2service}{e2servicereference} ne "" )
+            {
+                $eventinfo = ENIGMA2_SendCommand(
+                    $hash,
+                    "epgservicenow",
+                    "sRef="
+                      . urlEncode(
+                        $serviceinfo->{e2service}{e2servicereference}
+                      )
+                );
+            }
+        }
     }
-  } elsif ($hash->{helper}{AVAILABLE} == 1) {
-    $state = "undefined";
-  } else {
-    $state = "absent";
-  }
-
-  readingsBeginUpdate($hash);
-
-  # Set reading for power
-  #
-  my $readingPower = "off";
-  if ($state eq "on") {
-    $readingPower = "on";
-  }
-  if (!defined($hash->{READINGS}{power}{VAL}) || $hash->{READINGS}{power}{VAL} ne $readingPower) {
-    readingsBulkUpdate($hash, "power", $readingPower, 1);
-  }
-
-  # Set reading for state
-  #
-  if (!defined($hash->{READINGS}{state}{VAL}) || $hash->{READINGS}{state}{VAL} ne $state) {
-    readingsBulkUpdate($hash, "state", $state, 1);
-  }
-
-  # Set reading for Boxinfos
-  #
-  if (ref($boxinfo) eq "HASH") {
-    my $reading;
-    my $e2reading;
-
-    # General
-    foreach ( "enigmaversion",
-              "imageversion",
-              "webifversion",
-              "fpversion",
-              "lanmac",
-              "model",
-              "servicenamespace",
-              "serviceaspect",
-              "serviceprovider",
-              "servicevideosize",
-              "videowidth",
-              "videoheight",
-              "apid",
-              "vpid",
-              "pcrpid",
-              "servicevideosize",
-              "pmtpid",
-              "txtpid",
-              "tsid",
-              "onid",
-              "sid"
-            ) {
-      $reading = $_;
-      $e2reading = "e2".$_;
-
-      if (defined($boxinfo->{e2about}{$e2reading})) {
-        if ($boxinfo->{e2about}{$e2reading} eq "False" || $boxinfo->{e2about}{$e2reading} eq "True") {
-          if (!defined($hash->{READINGS}{$reading}{VAL}) || $hash->{READINGS}{$reading}{VAL} ne lc($boxinfo->{e2about}{$e2reading})) {
-    			  readingsBulkUpdate($hash, $reading, lc($boxinfo->{e2about}{$e2reading}), 1);
-          }
-        } else {
-          if (!defined($hash->{READINGS}{$reading}{VAL}) || $hash->{READINGS}{$reading}{VAL} ne $boxinfo->{e2about}{$e2reading}) {
-    			  readingsBulkUpdate($hash, $reading, $boxinfo->{e2about}{$e2reading}, 1);
-          }
-        }
-      } else {
-        if (!defined($hash->{READINGS}{$reading}{VAL}) || $hash->{READINGS}{$reading}{VAL} ne "-") {
-  			  readingsBulkUpdate($hash, $reading, "-", 1);
-        }
-      }
+    elsif ( $hash->{helper}{AVAILABLE} == 1 ) {
+        $state = "undefined";
+    }
+    else {
+        $state = "absent";
     }
 
-    # servicename + channel
-    $reading = "servicename";
-    $e2reading = "e2".$reading;
-    if (defined($boxinfo->{e2about}{$e2reading})) {
-      if (!defined($hash->{READINGS}{$reading}{VAL}) || $hash->{READINGS}{$reading}{VAL} ne $boxinfo->{e2about}{$e2reading}) {
-			  readingsBulkUpdate($hash, $reading, $boxinfo->{e2about}{$e2reading}, 1);
-			  readingsBulkUpdate($hash, "channel", $boxinfo->{e2about}{$e2reading}, 1);
-      }
-    } else {
-      if (!defined($hash->{READINGS}{$reading}{VAL}) || $hash->{READINGS}{$reading}{VAL} ne "-") {
-			  readingsBulkUpdate($hash, $reading, "-", 1);
-			  readingsBulkUpdate($hash, "channel", "-", 1);
-      }
+    readingsBeginUpdate($hash);
+
+    # Set reading for power
+    #
+    my $readingPower = "off";
+    if ( $state eq "on" ) {
+        $readingPower = "on";
+    }
+    if ( !defined( $hash->{READINGS}{power}{VAL} )
+        || $hash->{READINGS}{power}{VAL} ne $readingPower )
+    {
+        readingsBulkUpdate( $hash, "power", $readingPower, 1 );
     }
 
-    # HDD
-    # multiple
-    if (defined($boxinfo->{e2about}{e2hddinfo}) && ref($boxinfo->{e2about}{e2hddinfo}) eq "ARRAY") {
-      my $i=0;
-      my $arr_size=@{ $boxinfo->{e2about}{e2hddinfo} };
-
-      while ($i < $arr_size) {
-        my $counter = $i + 1;
-        my $readingname = "hdd".$counter."_model";
-        if (!defined($hash->{READINGS}{$readingname}{VAL}) || $hash->{READINGS}{$readingname}{VAL} ne $boxinfo->{e2about}{e2hddinfo}[$i]{model}) {
-          readingsBulkUpdate($hash, $readingname, $boxinfo->{e2about}{e2hddinfo}[$i]{model}, 1);
-        }
-
-        $readingname = "hdd".$counter."_capacity";
-        my @value = split(/ /, $boxinfo->{e2about}{e2hddinfo}[$i]{capacity});
-        if (!defined($hash->{READINGS}{$readingname}{VAL}) || $hash->{READINGS}{$readingname}{VAL} ne $value[0]) {
-          readingsBulkUpdate($hash, $readingname, $value[0], 1);
-        }
-
-        $readingname = "hdd".$counter."_free";
-        @value = split(/ /, $boxinfo->{e2about}{e2hddinfo}[$i]{free});
-        if (!defined($hash->{READINGS}{$readingname}{VAL}) || $hash->{READINGS}{$readingname}{VAL} ne $value[0]) {
-          readingsBulkUpdate($hash, $readingname, $value[0], 1);
-        }
-
-        $i++;
-      }
-    # single
-    } elsif(defined($boxinfo->{e2about}{e2hddinfo}) && ref($boxinfo->{e2about}{e2hddinfo}) eq "HASH") {
-      my $readingname = "hdd1_model";
-      if (!defined($hash->{READINGS}{$readingname}{VAL}) || $hash->{READINGS}{$readingname}{VAL} ne $boxinfo->{e2about}{e2hddinfo}{model}) {
-        readingsBulkUpdate($hash, $readingname, $boxinfo->{e2about}{e2hddinfo}{model}, 1);
-      }
-
-      $readingname = "hdd1_capacity";
-      my @value = split(/ /, $boxinfo->{e2about}{e2hddinfo}{capacity});
-      if (!defined($hash->{READINGS}{$readingname}{VAL}) || $hash->{READINGS}{$readingname}{VAL} ne $value[0]) {
-        readingsBulkUpdate($hash, $readingname, $value[0], 1);
-      }
-
-      $readingname = "hdd1_free";
-      @value = split(/ /, $boxinfo->{e2about}{e2hddinfo}{free});
-      if (!defined($hash->{READINGS}{$readingname}{VAL}) || $hash->{READINGS}{$readingname}{VAL} ne $value[0]) {
-        readingsBulkUpdate($hash, $readingname, $value[0], 1);
-      }
+    # Set reading for state
+    #
+    if ( !defined( $hash->{READINGS}{state}{VAL} )
+        || $hash->{READINGS}{state}{VAL} ne $state )
+    {
+        readingsBulkUpdate( $hash, "state", $state, 1 );
     }
 
-    # Tuner
-    if (defined($boxinfo->{e2about}{e2tunerinfo}{e2nim})) {
-      my %tuner= %{ $boxinfo->{e2about}{e2tunerinfo}{e2nim} };
-      # single
-      if ( defined($tuner{type}) ) {
-        my $tunerRef = \%tuner;
-        my $tuner_name=lc($$tunerRef{name});
-        $tuner_name =~ s/\s/_/g;	
+    # Set reading for Boxinfos
+    #
+    if ( ref($boxinfo) eq "HASH" ) {
+        my $reading;
+        my $e2reading;
 
-        if (!defined($hash->{READINGS}{$tuner_name}{VAL}) || $hash->{READINGS}{$tuner_name}{VAL} ne $$tunerRef{type}) {
-          readingsBulkUpdate($hash, $tuner_name, $$tunerRef{type}, 1);
+        # General
+        foreach (
+            "enigmaversion",    "imageversion",  "webifversion",
+            "fpversion",        "lanmac",        "model",
+            "servicenamespace", "serviceaspect", "serviceprovider",
+            "servicevideosize", "videowidth",    "videoheight",
+            "apid",             "vpid",          "pcrpid",
+            "servicevideosize", "pmtpid",        "txtpid",
+            "tsid",             "onid",          "sid"
+          )
+        {
+            $reading   = $_;
+            $e2reading = "e2" . $_;
+
+            if ( defined( $boxinfo->{e2about}{$e2reading} ) ) {
+                if (   $boxinfo->{e2about}{$e2reading} eq "False"
+                    || $boxinfo->{e2about}{$e2reading} eq "True" )
+                {
+                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                        || $hash->{READINGS}{$reading}{VAL} ne
+                        lc( $boxinfo->{e2about}{$e2reading} ) )
+                    {
+                        readingsBulkUpdate( $hash, $reading,
+                            lc( $boxinfo->{e2about}{$e2reading} ), 1 );
+                    }
+                }
+                else {
+                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                        || $hash->{READINGS}{$reading}{VAL} ne
+                        $boxinfo->{e2about}{$e2reading} )
+                    {
+                        readingsBulkUpdate( $hash, $reading,
+                            $boxinfo->{e2about}{$e2reading}, 1 );
+                    }
+                }
+            }
+            else {
+                if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                    || $hash->{READINGS}{$reading}{VAL} ne "-" )
+                {
+                    readingsBulkUpdate( $hash, $reading, "-", 1 );
+                }
+            }
         }
 
-      # multiple	
-      } else {
-        for (keys %tuner) {
-          my $tuner_name=lc($_);
-          $tuner_name =~ s/\s/_/g;
-          my $tuner_type=$tuner{$_}{type};
-
-          if (!defined($hash->{READINGS}{$tuner_name}{VAL}) || $hash->{READINGS}{$tuner_name}{VAL} ne $tuner_type) {
-            readingsBulkUpdate($hash, $tuner_name, $tuner_type, 1);
-          }
+        # servicename + channel
+        $reading   = "servicename";
+        $e2reading = "e2" . $reading;
+        if ( defined( $boxinfo->{e2about}{$e2reading} ) ) {
+            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                || $hash->{READINGS}{$reading}{VAL} ne
+                $boxinfo->{e2about}{$e2reading} )
+            {
+                readingsBulkUpdate( $hash, $reading,
+                    $boxinfo->{e2about}{$e2reading}, 1 );
+                readingsBulkUpdate( $hash, "channel",
+                    $boxinfo->{e2about}{$e2reading}, 1 );
+            }
         }
-      }
+        else {
+            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                || $hash->{READINGS}{$reading}{VAL} ne "-" )
+            {
+                readingsBulkUpdate( $hash, $reading,  "-", 1 );
+                readingsBulkUpdate( $hash, "channel", "-", 1 );
+            }
+        }
+
+        # HDD
+        # multiple
+        if ( defined( $boxinfo->{e2about}{e2hddinfo} )
+            && ref( $boxinfo->{e2about}{e2hddinfo} ) eq "ARRAY" )
+        {
+            my $i        = 0;
+            my $arr_size = @{ $boxinfo->{e2about}{e2hddinfo} };
+
+            while ( $i < $arr_size ) {
+                my $counter     = $i + 1;
+                my $readingname = "hdd" . $counter . "_model";
+                if ( !defined( $hash->{READINGS}{$readingname}{VAL} )
+                    || $hash->{READINGS}{$readingname}{VAL} ne
+                    $boxinfo->{e2about}{e2hddinfo}[$i]{model} )
+                {
+                    readingsBulkUpdate( $hash, $readingname,
+                        $boxinfo->{e2about}{e2hddinfo}[$i]{model}, 1 );
+                }
+
+                $readingname = "hdd" . $counter . "_capacity";
+                my @value =
+                  split( / /, $boxinfo->{e2about}{e2hddinfo}[$i]{capacity} );
+                if (
+                    !defined( $hash->{READINGS}{$readingname}{VAL} )
+                    || ( ref(@value) eq "ARRAY"
+                        && $hash->{READINGS}{$readingname}{VAL} ne $value[0] )
+                  )
+                {
+                    readingsBulkUpdate( $hash, $readingname, $value[0], 1 );
+                }
+
+                $readingname = "hdd" . $counter . "_free";
+                @value = split( / /, $boxinfo->{e2about}{e2hddinfo}[$i]{free} );
+                if (
+                    !defined( $hash->{READINGS}{$readingname}{VAL} )
+                    || ( ref(@value) eq "ARRAY"
+                        && $hash->{READINGS}{$readingname}{VAL} ne $value[0] )
+                  )
+                {
+                    readingsBulkUpdate( $hash, $readingname, $value[0], 1 );
+                }
+
+                $i++;
+            }
+
+        }
+
+        # single
+        elsif ( defined( $boxinfo->{e2about}{e2hddinfo} )
+            && ref( $boxinfo->{e2about}{e2hddinfo} ) eq "HASH" )
+        {
+            my $readingname = "hdd1_model";
+            if ( !defined( $hash->{READINGS}{$readingname}{VAL} )
+                || $hash->{READINGS}{$readingname}{VAL} ne
+                $boxinfo->{e2about}{e2hddinfo}{model} )
+            {
+                readingsBulkUpdate( $hash, $readingname,
+                    $boxinfo->{e2about}{e2hddinfo}{model}, 1 );
+            }
+
+            $readingname = "hdd1_capacity";
+            my @value = split( / /, $boxinfo->{e2about}{e2hddinfo}{capacity} );
+            if (
+                !defined( $hash->{READINGS}{$readingname}{VAL} )
+                || ( ref(@value) eq "ARRAY"
+                    && $hash->{READINGS}{$readingname}{VAL} ne $value[0] )
+              )
+            {
+                readingsBulkUpdate( $hash, $readingname, $value[0], 1 );
+            }
+
+            $readingname = "hdd1_free";
+            @value = split( / /, $boxinfo->{e2about}{e2hddinfo}{free} );
+            if (
+                !defined( $hash->{READINGS}{$readingname}{VAL} )
+                || ( ref(@value) eq "ARRAY"
+                    && $hash->{READINGS}{$readingname}{VAL} ne $value[0] )
+              )
+            {
+                readingsBulkUpdate( $hash, $readingname, $value[0], 1 );
+            }
+        }
+
+        # Tuner
+        if ( defined( $boxinfo->{e2about}{e2tunerinfo}{e2nim} ) ) {
+            my %tuner = %{ $boxinfo->{e2about}{e2tunerinfo}{e2nim} };
+
+            # single
+            if ( defined( $tuner{type} ) ) {
+                my $tunerRef   = \%tuner;
+                my $tuner_name = lc( $$tunerRef{name} );
+                $tuner_name =~ s/\s/_/g;
+
+                if ( !defined( $hash->{READINGS}{$tuner_name}{VAL} )
+                    || $hash->{READINGS}{$tuner_name}{VAL} ne $$tunerRef{type} )
+                {
+                    readingsBulkUpdate( $hash, $tuner_name, $$tunerRef{type},
+                        1 );
+                }
+
+            }
+
+            # multiple
+            else {
+                for ( keys %tuner ) {
+                    my $tuner_name = lc($_);
+                    $tuner_name =~ s/\s/_/g;
+                    my $tuner_type = $tuner{$_}{type};
+
+                    if ( !defined( $hash->{READINGS}{$tuner_name}{VAL} )
+                        || $hash->{READINGS}{$tuner_name}{VAL} ne $tuner_type )
+                    {
+                        readingsBulkUpdate( $hash, $tuner_name, $tuner_type,
+                            1 );
+                    }
+                }
+            }
+        }
+
+        # Volume
+        if ( ref($vol) eq "HASH" && defined( $vol->{e2current} ) ) {
+            if ( !defined( $hash->{READINGS}{volume}{VAL} )
+                || $hash->{READINGS}{volume}{VAL} ne $vol->{e2current} )
+            {
+                readingsBulkUpdate( $hash, "volume", $vol->{e2current}, 1 );
+            }
+        }
+        if ( ref($vol) eq "HASH" && defined( $vol->{e2ismuted} ) ) {
+            my $muteState = "on";
+            if ( lc( $vol->{e2ismuted} ) eq "false" ) {
+                $muteState = "off";
+            }
+            if ( !defined( $hash->{READINGS}{mute}{VAL} )
+                || $hash->{READINGS}{mute}{VAL} ne $muteState )
+            {
+                readingsBulkUpdate( $hash, "mute", $muteState, 1 );
+            }
+        }
+
+        #FIXME workaround for option channels
+        if (   ref($serviceinfo) eq "HASH"
+            && ref( $serviceinfo->{e2service} ) eq "ARRAY" )
+        {
+            $serviceinfo = (
+                e2service => $serviceinfo->{e2service},
+                e2servicereference =>
+                  $serviceinfo->{e2service}[0]{e2servicereference}
+            );
+        }
+
+        # servicereference + input + currentMedia
+        if ( ref($serviceinfo) eq "HASH"
+            && defined( $serviceinfo->{e2service} ) )
+        {
+            if ( $serviceinfo->{e2service}{e2servicereference} ne "" ) {
+                if ( !defined( $hash->{READINGS}{servicereference}{VAL} )
+                    || $hash->{READINGS}{servicereference}{VAL} ne
+                    $serviceinfo->{e2service}{e2servicereference} )
+                {
+                    readingsBulkUpdate( $hash, "servicereference",
+                        $serviceinfo->{e2service}{e2servicereference}, 1 );
+                    readingsBulkUpdate( $hash, "currentMedia",
+                        $serviceinfo->{e2service}{e2servicereference}, 1 );
+
+                    my @servicetype = split( /:/,
+                        $serviceinfo->{e2service}{e2servicereference} );
+                    if ( ref(@servicetype) eq "ARRAY"
+                        && $servicetype[2] eq "2" )
+                    {
+                        readingsBulkUpdate( $hash, "input", "radio", 1 );
+                    }
+                    else {
+                        readingsBulkUpdate( $hash, "input", "tv", 1 );
+                    }
+                }
+            }
+            elsif ( $hash->{READINGS}{servicereference}{VAL} ne "-" ) {
+                readingsBulkUpdate( $hash, "servicereference", "-", 1 );
+                readingsBulkUpdate( $hash, "currentMedia",     "-", 1 );
+            }
+        }
+
+        # Event
+        if ( ref($eventinfo) eq "HASH" && defined( $eventinfo->{e2event} ) ) {
+            foreach ( "eventstart", "eventduration", "eventdescription", ) {
+                $reading   = $_;
+                $e2reading = "e2" . $_;
+
+                if ( defined( $eventinfo->{e2event}{$e2reading} ) ) {
+                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                        || $hash->{READINGS}{$reading}{VAL} ne
+                        $eventinfo->{e2event}{$e2reading} )
+                    {
+                        readingsBulkUpdate( $hash, $reading,
+                            $eventinfo->{e2event}{$e2reading}, 1 );
+                    }
+                }
+                else {
+                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                        || $hash->{READINGS}{$reading}{VAL} ne "-" )
+                    {
+                        readingsBulkUpdate( $hash, $reading, "-", 1 );
+                    }
+                }
+            }
+
+            # eventtitle + currentTitle
+            $reading   = "eventtitle";
+            $e2reading = "e2" . $reading;
+            if ( defined( $eventinfo->{e2event}{$e2reading} )
+                && $eventinfo->{e2event}{$e2reading} ne "N/A" )
+            {
+                if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                    || $hash->{READINGS}{$reading}{VAL} ne
+                    $eventinfo->{e2event}{$e2reading} )
+                {
+                    readingsBulkUpdate( $hash, $reading,
+                        $eventinfo->{e2event}{$e2reading}, 1 );
+                    readingsBulkUpdate( $hash, "currentTitle",
+                        $eventinfo->{e2event}{$e2reading}, 1 );
+                }
+            }
+            else {
+                if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                    || $hash->{READINGS}{$reading}{VAL} ne
+                    $boxinfo->{e2about}{e2servicename} )
+                {
+                    readingsBulkUpdate( $hash, $reading,
+                        $boxinfo->{e2about}{e2servicename}, 1 );
+                    readingsBulkUpdate( $hash, "currentTitle",
+                        $boxinfo->{e2about}{e2servicename}, 1 );
+                }
+            }
+
+            # eventstart_hr
+            $reading   = "eventstart_hr";
+            $e2reading = "e2eventstart";
+            if ( defined( $eventinfo->{e2event}{$e2reading} )
+                && $eventinfo->{e2event}{$e2reading} ne "0" )
+            {
+                my $timestring =
+                  FmtDateTime( $eventinfo->{e2event}{$e2reading} );
+                if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                    || $hash->{READINGS}{$reading}{VAL} ne $timestring )
+                {
+                    readingsBulkUpdate( $hash, $reading, $timestring, 1 );
+                }
+            }
+            else {
+                if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                    || $hash->{READINGS}{$reading}{VAL} ne "-" )
+                {
+                    readingsBulkUpdate( $hash, $reading, "-", 1 );
+                }
+            }
+        }
+
+        # Signal
+        if ( ref($signalinfo) eq "HASH" && defined( $signalinfo->{e2snrdb} ) ) {
+            foreach ( "snrdb", "snr", "ber", "acg", ) {
+                $reading   = $_;
+                $e2reading = "e2" . $_;
+
+                if ( defined( $signalinfo->{$e2reading} ) ) {
+                    my @value = split( / /, $signalinfo->{$e2reading} );
+                    if ( defined( $value[1] ) || $reading eq "ber" ) {
+                        readingsBulkUpdate( $hash, $reading, $value[0], 1 );
+                    }
+                    else {
+                        readingsBulkUpdate( $hash, $reading, "0", 1 );
+                    }
+                }
+                else {
+                    readingsBulkUpdate( $hash, $reading, "0", 1 );
+                }
+            }
+        }
+
+    }
+    else {
+
+# Set ENIGMA2 online-only readings to "-" in case box is in offline or in standby mode
+        foreach (
+            'servicename',      'servicenamespace',    'serviceaspect',
+            'serviceprovider',  'servicereference',    'videowidth',
+            'videoheight',      'servicevideosize',    'apid',
+            'vpid',             'pcrpid',              'pmtpid',
+            'txtpid',           'tsid',                'onid',
+            'sid',              'mute',                'volume',
+            'channel',          'currentTitle',        'input',
+            'eventcurrenttime', 'eventcurrenttime_hr', 'eventdescription',
+            'eventduration',    'eventstart',          'eventstart_hr',
+            'eventtitle',       'currentMedia',
+          )
+        {
+            if ( !defined( $hash->{READINGS}{$_}{VAL} )
+                || $hash->{READINGS}{$_}{VAL} ne "-" )
+            {
+                readingsBulkUpdate( $hash, $_, "-", 1 );
+            }
+        }
+
+# Set ENIGMA2 online-only readings to "-" in case box is in offline or in standby mode
+        foreach ( 'acg', 'ber', 'snr', 'snrdb', ) {
+            if ( !defined( $hash->{READINGS}{$_}{VAL} )
+                || $hash->{READINGS}{$_}{VAL} ne "0" )
+            {
+                readingsBulkUpdate( $hash, $_, "0", 1 );
+            }
+        }
+
     }
 
-    # Volume
-    if (ref($vol) eq "HASH" && defined($vol->{e2current})) {
-      if (!defined($hash->{READINGS}{volume}{VAL}) || $hash->{READINGS}{volume}{VAL} ne $vol->{e2current}) {
-        readingsBulkUpdate($hash, "volume", $vol->{e2current}, 1);
-      }
-    }
-    if (ref($vol) eq "HASH" && defined($vol->{e2ismuted})) {
-      my $muteState = "on";
-      if (lc($vol->{e2ismuted}) eq "false") {
-        $muteState = "off";
-      }
-      if (!defined($hash->{READINGS}{mute}{VAL}) || $hash->{READINGS}{mute}{VAL} ne $muteState) {
-        readingsBulkUpdate($hash, "mute", $muteState, 1);
-      }
-    }
+    readingsEndUpdate( $hash, 1 );
 
-    # servicereference + input + currentMedia
-    if (ref($serviceinfo) eq "HASH" && defined($serviceinfo->{e2service})) {
-      if ($serviceinfo->{e2service}{e2servicereference} ne "") {
-        if (!defined($hash->{READINGS}{servicereference}{VAL}) || $hash->{READINGS}{servicereference}{VAL} ne $serviceinfo->{e2service}{e2servicereference}) {
-          readingsBulkUpdate($hash, "servicereference", $serviceinfo->{e2service}{e2servicereference}, 1);
-          readingsBulkUpdate($hash, "currentMedia", $serviceinfo->{e2service}{e2servicereference}, 1);
+    Log3 $name, 4, "ENIGMA2 $name: " . $hash->{STATE};
 
-          my @servicetype = split(/:/, $serviceinfo->{e2service}{e2servicereference});
-          if ($servicetype[2] eq "2") {
-            readingsBulkUpdate($hash, "input", "radio", 1);
-          } else {
-            readingsBulkUpdate($hash, "input", "tv", 1);
-          }
-        }
-      } elsif($hash->{READINGS}{servicereference}{VAL} ne "-") {
-        readingsBulkUpdate($hash, "servicereference", "-", 1);
-        readingsBulkUpdate($hash, "currentMedia", "-", 1);
-      }
-    }
-
-    # Event
-    if (ref($eventinfo) eq "HASH" && defined($eventinfo->{e2event})) {
-      foreach ( "eventstart",
-                "eventduration",
-                "eventdescription",
-              ) {
-        $reading = $_;
-        $e2reading = "e2".$_;
-
-        if (defined($eventinfo->{e2event}{$e2reading})) {
-          if (!defined($hash->{READINGS}{$reading}{VAL}) || $hash->{READINGS}{$reading}{VAL} ne $eventinfo->{e2event}{$e2reading}) {
-    			  readingsBulkUpdate($hash, $reading, $eventinfo->{e2event}{$e2reading}, 1);
-          }
-        } else {
-          if (!defined($hash->{READINGS}{$reading}{VAL}) || $hash->{READINGS}{$reading}{VAL} ne "-") {
-    			  readingsBulkUpdate($hash, $reading, "-", 1);
-          }
-        }
-      }
-
-      # eventtitle + currentTitle
-      $reading = "eventtitle";
-      $e2reading = "e2".$reading;
-      if (defined($eventinfo->{e2event}{$e2reading}) && $eventinfo->{e2event}{$e2reading} ne "N/A") {
-        if (!defined($hash->{READINGS}{$reading}{VAL}) || $hash->{READINGS}{$reading}{VAL} ne $eventinfo->{e2event}{$e2reading}) {
-  			  readingsBulkUpdate($hash, $reading, $eventinfo->{e2event}{$e2reading}, 1);
-  			  readingsBulkUpdate($hash, "currentTitle", $eventinfo->{e2event}{$e2reading}, 1);
-        }
-      } else {
-        if (!defined($hash->{READINGS}{$reading}{VAL}) || $hash->{READINGS}{$reading}{VAL} ne $boxinfo->{e2about}{e2servicename}) {
-  			  readingsBulkUpdate($hash, $reading, $boxinfo->{e2about}{e2servicename}, 1);
-  			  readingsBulkUpdate($hash, "currentTitle", $boxinfo->{e2about}{e2servicename}, 1);
-        }
-      }
-
-      # eventstart_hr
-      $reading = "eventstart_hr";
-      $e2reading = "e2eventstart";
-      if (defined($eventinfo->{e2event}{$e2reading}) && $eventinfo->{e2event}{$e2reading} ne "0") {
-        my $timestring = FmtDateTime($eventinfo->{e2event}{$e2reading});
-        if (!defined($hash->{READINGS}{$reading}{VAL}) || $hash->{READINGS}{$reading}{VAL} ne $timestring) {
-  			  readingsBulkUpdate($hash, $reading, $timestring, 1);
-        }
-      } else {
-        if (!defined($hash->{READINGS}{$reading}{VAL}) || $hash->{READINGS}{$reading}{VAL} ne "-") {
-  			  readingsBulkUpdate($hash, $reading, "-", 1);
-        }
-      }
-    }
-
-    # Signal
-    if (ref($signalinfo) eq "HASH" && defined($signalinfo->{e2snrdb})) {
-      foreach ( "snrdb",
-                "snr",
-                "ber",
-                "acg",
-              ) {
-        $reading = $_;
-        $e2reading = "e2".$_;
-
-        if (defined($signalinfo->{$e2reading})) {
-          my @value = split(/ /, $signalinfo->{$e2reading});
-          if (defined($value[1]) || $reading eq "ber") {
-      			readingsBulkUpdate($hash, $reading, $value[0], 1);
-          } else {
-      			readingsBulkUpdate($hash, $reading, "0", 1);
-          }
-        } else {
-  			  readingsBulkUpdate($hash, $reading, "0", 1);
-        }
-      }
-    }
-
-  } else {
-
-    # Set ENIGMA2 online-only readings to "-" in case box is in offline or in standby mode
-    foreach ( 'servicename',
-              'servicenamespace',
-              'serviceaspect',
-              'serviceprovider',
-              'servicereference',
-              'videowidth',
-              'videoheight',
-              'servicevideosize',
-              'apid',
-              'vpid',
-              'pcrpid',
-              'pmtpid',
-              'txtpid',
-              'tsid',
-              'onid',
-              'sid',
-              'mute',
-              'volume',
-              'channel',
-              'currentTitle',
-              'input',
-              'eventcurrenttime',
-              'eventcurrenttime_hr',
-              'eventdescription',
-              'eventduration',
-              'eventstart',
-              'eventstart_hr',
-              'eventtitle',
-              'currentMedia',
-            ) {
-      if (!defined($hash->{READINGS}{$_}{VAL}) || $hash->{READINGS}{$_}{VAL} ne "-") {
-        readingsBulkUpdate($hash, $_, "-", 1);
-      }
-    }
-
-    # Set ENIGMA2 online-only readings to "-" in case box is in offline or in standby mode
-    foreach ( 'acg',
-              'ber',
-              'snr',
-              'snrdb',
-            ) {
-      if (!defined($hash->{READINGS}{$_}{VAL}) || $hash->{READINGS}{$_}{VAL} ne "0") {
-        readingsBulkUpdate($hash, $_, "0", 1);
-      }
-    }
-
-  }
-
-  readingsEndUpdate($hash, 1);
-
-  Log3 $name, 4, "ENIGMA2 $name: ".$hash->{STATE};
-  
-  return $hash->{STATE};
+    return $hash->{STATE};
 }
 
 ###################################
 sub ENIGMA2_Get($@) {
-  my ($hash, @a) = @_;
-  my $what;
+    my ( $hash, @a ) = @_;
+    my $what;
 
-  return "argument is missing" if(int(@a) < 2);
-    
-  $what = $a[1];
+    return "argument is missing" if ( int(@a) < 2 );
 
-  if($what =~ /^(power|input|volume|mute|channel|currentMedia|currentTitle|serviceprovider|servicevideosize)$/) {
-    ENIGMA2_GetStatus($hash, 1);
+    $what = $a[1];
 
-    if(defined($hash->{READINGS}{$what})) {
-			return $hash->{READINGS}{$what}{VAL};
-    } else {
-			return "no such reading: $what";
-		}
+    if ( $what =~
+/^(power|input|volume|mute|channel|currentMedia|currentTitle|serviceprovider|servicevideosize)$/
+      )
+    {
+        ENIGMA2_GetStatus( $hash, 1 );
 
-  # streamUrl
-  } elsif($what eq "streamUrl") {
-    if (defined($a[2]) && $a[2] eq "mobile") {
-      return "http://".$hash->{helper}{ADDRESS}.":".$hash->{helper}{PORT}."/web/stream.m3u?ref=".urlEncode($hash->{READINGS}{servicereference}{VAL})."&device=phone";
-    } else {
-      return "http://".$hash->{helper}{ADDRESS}.":".$hash->{helper}{PORT}."/web/stream.m3u?ref=".urlEncode($hash->{READINGS}{servicereference}{VAL})."&device=etc";
+        if ( defined( $hash->{READINGS}{$what} ) ) {
+            return $hash->{READINGS}{$what}{VAL};
+        }
+        else {
+            return "no such reading: $what";
+        }
     }
-  } else {
-		return "Unknown argument $what, choose one of power:noArg input:noArg volume:noArg mute:noArg channel:noArg currentMedia:noArf currentTitle:noArg serviceprovider:noArg servicevideosize:noArg streamUrl:,mobile ";
-  }
+
+    # streamUrl
+    elsif ( $what eq "streamUrl" ) {
+        if ( defined( $a[2] ) && $a[2] eq "mobile" ) {
+            return
+                "http://"
+              . $hash->{helper}{ADDRESS} . ":"
+              . $hash->{helper}{PORT}
+              . "/web/stream.m3u?ref="
+              . urlEncode( $hash->{READINGS}{servicereference}{VAL} )
+              . "&device=phone";
+        }
+        else {
+            return
+                "http://"
+              . $hash->{helper}{ADDRESS} . ":"
+              . $hash->{helper}{PORT}
+              . "/web/stream.m3u?ref="
+              . urlEncode( $hash->{READINGS}{servicereference}{VAL} )
+              . "&device=etc";
+        }
+    }
+    else {
+        return
+"Unknown argument $what, choose one of power:noArg input:noArg volume:noArg mute:noArg channel:noArg currentMedia:noArf currentTitle:noArg serviceprovider:noArg servicevideosize:noArg streamUrl:,mobile ";
+    }
 }
 
 ###################################
 sub ENIGMA2_Set($@) {
-  my ($hash, @a) = @_;
-  my $name=$hash->{NAME};
-  
-  return "No Argument given" if(!defined($a[1]));
+    my ( $hash, @a ) = @_;
+    my $name = $hash->{NAME};
 
-  my $usage = "Unknown argument ".$a[1].", choose one of statusRequest:noArg toogle:noArg on:noArg off:noArg reboot:noArg restartGui:noArg shutdown:noArg volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg mute:on,off msg remoteControl:UP,DOWN,LEFT,RIGHT,OK,MENU,EPG,ESC,EXIT,RECORD,RED,GREEN,YELLOW,BLUE,AUDIO channel:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30 channelUp:noArg channelDown:noArg input:tv,radio play:noArg pause:noArg stop:noArg showText ";
-  my $cmd='';
-  my $result;
+    return "No Argument given" if ( !defined( $a[1] ) );
 
-  # statusRequest
-  if($a[1] eq "statusRequest") {
-		# Will be executed anyway on the end of the function			
-  # toogle
-  } elsif($a[1] eq "toogle") {
-    if($hash->{READINGS}{power}{VAL} eq "off") {
-      ENIGMA2_Set($hash, "on");
-      return undef;
-    } else {
-      ENIGMA2_Set($hash, "off");
-      return undef;
+    my $usage =
+        "Unknown argument "
+      . $a[1]
+      . ", choose one of statusRequest:noArg toggle:noArg on:noArg off:noArg reboot:noArg restartGui:noArg shutdown:noArg volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg mute:on,off msg remoteControl:UP,DOWN,LEFT,RIGHT,OK,MENU,EPG,ESC,EXIT,RECORD,RED,GREEN,YELLOW,BLUE,AUDIO channel:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30 channelUp:noArg channelDown:noArg input:tv,radio play:noArg pause:noArg stop:noArg showText ";
+    my $cmd = '';
+    my $result;
+
+    # statusRequest
+    if ( $a[1] eq "statusRequest" ) {
+
+        # Will be executed anyway on the end of the function
+
     }
 
-  # shutdown
-  } elsif($a[1] eq "shutdown") {
-    if($hash->{READINGS}{state}{VAL} ne "absent") {
-      $cmd = "newstate=1";
-      $result = ENIGMA2_SendCommand($hash, "powerstate", $cmd);
-  		readingsBeginUpdate($hash);
-      if (!defined($hash->{READINGS}{state}{VAL}) || $hash->{READINGS}{power}{VAL} ne "off") {
-  		  readingsBulkUpdate($hash, "power", "off");
-      }
-      if (!defined($hash->{READINGS}{presence}{VAL}) || $hash->{READINGS}{presence}{VAL} ne "absent") {
-        $hash->{helper}{AVAILABLE} = 0;
-  		  readingsBulkUpdate($hash, "presence", "absent");
-      }
-      if (!defined($hash->{READINGS}{state}{VAL}) || $hash->{READINGS}{state}{VAL} ne "absent") {
-  		  readingsBulkUpdate($hash, "state", "absent");
-      }
-  		readingsEndUpdate($hash, 1);
-    } else {
-      return "Device needs to be ON to set to standby mode.";
-    }
-
-  # reboot
-  } elsif($a[1] eq "reboot") {
-    if($hash->{READINGS}{state}{VAL} ne "absent") {
-      $cmd = "newstate=2";
-      $result = ENIGMA2_SendCommand($hash, "powerstate", $cmd);
-    } else {
-      return "Device needs to be reachable to be rebooted.";
-    }
-
-  # restartGui
-  } elsif($a[1] eq "restartGui") {
-    if($hash->{READINGS}{state}{VAL} eq "on") {
-      $cmd = "newstate=3";
-      $result = ENIGMA2_SendCommand($hash, "powerstate", $cmd);
-    } else {
-      return "Device needs to be ON to restart the GUI.";
-    }
-
-  # on
-  } elsif($a[1] eq "on") {
-    if ($hash->{READINGS}{state}{VAL} eq "absent") {
-      if (defined($hash->{READINGS}{lanmac}{VAL}) && $hash->{READINGS}{lanmac}{VAL} ne "-") {
-        $result = ENIGMA2_wake($hash);
-      } else {
-        return "Device MAC address unknown. Please turn on the device manually once.";
-      }
-    } else {
-      $cmd = "newstate=4";
-      $result = ENIGMA2_SendCommand($hash, "powerstate", $cmd);
-  		readingsBeginUpdate($hash);
-      if (!defined($hash->{READINGS}{power}{VAL}) || $hash->{READINGS}{power}{VAL} ne "on") {
-  		  readingsBulkUpdate($hash, "power", "on");
-      }
-      if (!defined($hash->{READINGS}{state}{VAL}) || $hash->{READINGS}{state}{VAL} ne "on") {
-  		  readingsBulkUpdate($hash, "state", "on");
-      }
-  		readingsEndUpdate($hash, 1);
-      ENIGMA2_GetStatus($hash, 1);
-    }
-
-  # off
-  } elsif($a[1] eq "off") {
-    if($hash->{READINGS}{state}{VAL} ne "absent") {
-      $cmd = "newstate=5";
-      $result = ENIGMA2_SendCommand($hash, "powerstate", $cmd);
-  		readingsBeginUpdate($hash);
-      if (!defined($hash->{READINGS}{power}{VAL}) || $hash->{READINGS}{power}{VAL} ne "off") {
-  		  readingsBulkUpdate($hash, "power", "off");
-      }
-      if (!defined($hash->{READINGS}{state}{VAL}) || $hash->{READINGS}{state}{VAL} ne "off") {
-  		  readingsBulkUpdate($hash, "state", "off");
-      }
-  		readingsEndUpdate($hash, 1);
-    } else {
-      return "Device needs to be reachable to be set to standby mode.";
-    }
-
-  # volume
-  } elsif($a[1] eq "volume") {
-    return "No argument given" if(!defined($a[2]));
-
-    if($hash->{READINGS}{state}{VAL} eq "on") {
-      my $_ = $a[2];
-      if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
-        $cmd = "set=set".$a[2];
-        if (!defined($hash->{READINGS}{volume}{VAL}) || $hash->{READINGS}{volume}{VAL} ne $a[2]) {
-    		  readingsSingleUpdate($hash, "volume", $a[2], 1);
+    # toggle
+    elsif ( $a[1] eq "toggle" ) {
+        if ( $hash->{READINGS}{power}{VAL} eq "off" ) {
+            ENIGMA2_Set( $hash, "on" );
+            return undef;
         }
-      } else {
-        return "Argument does not seem to be a valid integer between 0 and 100";
-      }
-      $result = ENIGMA2_SendCommand($hash, "vol", $cmd);
-    } else {
-      return "Device needs to be ON to adjust volume.";
-    }
-
-  # volumeUp/volumeDown
-  } elsif($a[1] =~ /^(volumeUp|volumeDown)$/) {
-    if($hash->{READINGS}{state}{VAL} eq "on") {
-      if($a[2] eq "volumeUp") {
-        $cmd = "set=up";
-      } else {
-        $cmd = "set=down";
-      }
-      $result = ENIGMA2_SendCommand($hash, "vol", $cmd);
-    } else {
-      return "Device needs to be ON to adjust volume.";
-    }
-
-  # mute
-  } elsif($a[1] eq "mute") {
-    return "No argument given, choose one of on off toogle" if(!defined($a[2]));
-    if($hash->{READINGS}{state}{VAL} eq "on") {
-      if($a[2] eq "off") {
-        if ($hash->{READINGS}{mute}{VAL} ne "off") {
-          $cmd = "set=mute";
-      		readingsSingleUpdate($hash, "mute", $a[2], 1);
+        else {
+            ENIGMA2_Set( $hash, "off" );
+            return undef;
         }
-      } elsif($a[2] eq "on") {
-        if ($hash->{READINGS}{mute}{VAL} ne "on") {
-          $cmd = "set=mute";
-      		readingsSingleUpdate($hash, "mute", $a[2], 1);
+
+    }
+
+    # shutdown
+    elsif ( $a[1] eq "shutdown" ) {
+        if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
+            $cmd = "newstate=1";
+            $result = ENIGMA2_SendCommand( $hash, "powerstate", $cmd );
+            readingsBeginUpdate($hash);
+            if ( !defined( $hash->{READINGS}{state}{VAL} )
+                || $hash->{READINGS}{power}{VAL} ne "off" )
+            {
+                readingsBulkUpdate( $hash, "power", "off" );
+            }
+            if ( !defined( $hash->{READINGS}{presence}{VAL} )
+                || $hash->{READINGS}{presence}{VAL} ne "absent" )
+            {
+                $hash->{helper}{AVAILABLE} = 0;
+                readingsBulkUpdate( $hash, "presence", "absent" );
+            }
+            if ( !defined( $hash->{READINGS}{state}{VAL} )
+                || $hash->{READINGS}{state}{VAL} ne "absent" )
+            {
+                readingsBulkUpdate( $hash, "state", "absent" );
+            }
+            readingsEndUpdate( $hash, 1 );
         }
-      } elsif($a[2] eq "toogle") {
-        $cmd = "set=mute";
-        if ($hash->{READINGS}{mute}{VAL} eq "off") {
-    		  readingsSingleUpdate($hash, "mute", "on", 1);
-        } else {
-    		  readingsSingleUpdate($hash, "mute", "off", 1);
+        else {
+            return "Device needs to be ON to be set to standby mode.";
         }
-      } else {
-        return "Unknown argument ".$a[2];
-      }
-      $result = ENIGMA2_SendCommand($hash, "vol", $cmd);
-    } else {
-      return "Device needs to be ON to mute/unmute audio.";
     }
 
-  # msg
-  } elsif($a[1] eq "msg") {
-    if($hash->{READINGS}{state}{VAL} ne "absent") {
-      return "No 1st argument given, choose one of yesno info message attention " if(!defined($a[2]));
-      return "No 2nd argument given, choose one of timeout " if(!defined($a[3]));
-      return "No 3nd argument given, choose one of messagetext " if(!defined($a[4]));
-      $_ = $a[3];
-      return "Argument ".$_." is not a valid integer between 5 and 49680" if ( !m/^\d+$/ || $_ < 5 || $_ > 49680 );
-      my $i=4;
-      my $text=$a[$i];
-      $i++;
-      if (defined($a[$i])) {
-        my $arr_size=@a;
-        while ($i < $arr_size) {
-          $text = $text ." ". $a[$i];
-          $i++;
+    # reboot
+    elsif ( $a[1] eq "reboot" ) {
+        if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
+            $cmd = "newstate=2";
+            $result = ENIGMA2_SendCommand( $hash, "powerstate", $cmd );
         }
-      }
-      if($a[2] eq "yesno") {
-        $cmd = "type=0&timeout=".$a[3]."&text=".urlEncode($text);
-      } elsif($a[2] eq "info") {
-        $cmd = "type=1&timeout=".$a[3]."&text=".urlEncode($text);
-      } elsif($a[2] eq "message") {
-        $cmd = "type=2&timeout=".$a[3]."&text=".urlEncode($text);
-      } elsif($a[2] eq "attention") {
-        $cmd = "type=3&timeout=".$a[3]."&text=".urlEncode($text);
-      } else {
-        return "Unknown argument ".$a[2].", choose one of yesno info message attention ";
-      }
-      $result = ENIGMA2_SendCommand($hash, "message", $cmd);
-    } else {
-      return "Device needs to be reachable to send a message to screen.";
-    }
-
-  # remoteControl
-  } elsif($a[1] eq "remoteControl") {
-    if($hash->{READINGS}{state}{VAL} ne "absent") {
-      if(!defined($a[2])) {
-        my $commandKeys = "";
-        for (sort keys %{ ENIGMA2_GetRemotecontrolCommand("GetRemotecontrolCommands") } ) {
-          $commandKeys = $commandKeys . " " . $_;
+        else {
+            return "Device needs to be reachable to be rebooted.";
         }
-        return "No argument given, choose one of".$commandKeys;
-      }
+    }
 
-      my $request = ENIGMA2_GetRemotecontrolCommand(uc($a[2]));
-
-      if ($request eq "POWER") {
-        ENIGMA2_Set($hash, "toogle");
-        return undef;
-      } elsif ($request ne "") {
-          $cmd = "command=".ENIGMA2_GetRemotecontrolCommand($a[2]);
-      } else {
-        my $commandKeys = "";
-        for (sort keys %{ ENIGMA2_GetRemotecontrolCommand("GetRemotecontrolCommands") } ) {
-          $commandKeys = $commandKeys . " " . $_;
+    # restartGui
+    elsif ( $a[1] eq "restartGui" ) {
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            $cmd = "newstate=3";
+            $result = ENIGMA2_SendCommand( $hash, "powerstate", $cmd );
         }
-        return "Unknown argument ".$a[2].", choose one of".$commandKeys;
-      }
-
-      $result = ENIGMA2_SendCommand($hash, "remotecontrol", $cmd);
-    } else {
-      return "Device needs to be reachable to be controlled remotely.";
-    }
-
-  # channel
-  } elsif($a[1] eq "channel") {
-    return "No argument given, choose one of channelNumber servicereference " if(!defined($a[2]));
-    if($hash->{READINGS}{state}{VAL} eq "on") {
-      my $_ = $a[2];
-      if ( m/^(\d+):(.*):$/ ) {
-        $result = ENIGMA2_SendCommand($hash, "zap", "sRef=".$_);
-      } elsif ( m/^\d+$/ && $_ > 0 && $_ < 10000 ) {
-        for (split(//, $a[2])) {
-          $cmd = "command=".ENIGMA2_GetRemotecontrolCommand($_);
-          $result = ENIGMA2_SendCommand($hash, "remotecontrol", $cmd);
+        else {
+            return "Device needs to be ON to restart the GUI.";
         }
-        $result = ENIGMA2_SendCommand($hash, "remotecontrol", "command=".ENIGMA2_GetRemotecontrolCommand("OK"));
-      } else {
-        return "Argument ".$_." is not a valid integer between 0 and 9999 or servicereference is invalid";
-      }
-    } else {
-      return "Device needs to be ON to switch to a specific channel.";
     }
 
-  # channelUp/channelDown
-  } elsif($a[1] =~ /^(channelUp|channelDown)$/) {
-    if($hash->{READINGS}{state}{VAL} eq "on") {
-      if($a[1] eq "channelUp") {
-        $cmd = "command=".ENIGMA2_GetRemotecontrolCommand("RIGHT");
-      } else {
-        $cmd = "command=".ENIGMA2_GetRemotecontrolCommand("LEFT");
-      }
-      $result = ENIGMA2_SendCommand($hash, "remotecontrol", $cmd);
-    } else {
-      return "Device needs to be ON to switch channel.";
-    }
-
-  # input
-  } elsif($a[1] eq "input") {
-    if($hash->{READINGS}{state}{VAL} eq "on") {
-      if($a[2] eq "tv" || $a[2] eq "TV") {
-        $cmd = "command=".ENIGMA2_GetRemotecontrolCommand("TV");
-    		readingsSingleUpdate($hash, "input", "tv", 1);
-      } elsif($a[2] eq "radio" || $a[2] eq "RADIO") {
-        $cmd = "command=".ENIGMA2_GetRemotecontrolCommand("RADIO");
-    		readingsSingleUpdate($hash, "input", "radio", 1);
-      } else {
-        return "Argument ".$a[2]." is not a valid, please choose one from tv radio ";
-      }
-      $result = ENIGMA2_SendCommand($hash, "remotecontrol", $cmd);
-    } else {
-      return "Device needs to be ON to switch input.";
-    }
-
-  # play / pause
-  } elsif($a[1] =~ /^(play|pause)$/) {
-    if($hash->{READINGS}{state}{VAL} eq "on") {
-      $cmd = "command=".ENIGMA2_GetRemotecontrolCommand("PLAYPAUSE");
-      $result = ENIGMA2_SendCommand($hash, "remotecontrol", $cmd);
-    } else {
-      return "Device needs to be ON to play or pause video.";
-    }
-
-  # stop
-  } elsif($a[1] eq "stop") {
-    if($hash->{READINGS}{state}{VAL} eq "on") {
-      $cmd = "command=".ENIGMA2_GetRemotecontrolCommand("STOP");
-      $result = ENIGMA2_SendCommand($hash, "remotecontrol", $cmd);
-    } else {
-      return "Device needs to be ON to stop video.";
-    }
-
-  # showText
-  } elsif($a[1] eq "showText") {
-    if($hash->{READINGS}{state}{VAL} ne "absent") {
-      return "No argument given, choose one of messagetext " if(!defined($a[2]));
-      my $i=2;
-      my $text=$a[$i];
-      $i++;
-      if (defined($a[$i])) {
-        my $arr_size=@a;
-        while ($i < $arr_size) {
-          $text = $text ." ". $a[$i];
-          $i++;
+    # on
+    elsif ( $a[1] eq "on" ) {
+        if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
+            if ( defined( $hash->{READINGS}{lanmac}{VAL} )
+                && $hash->{READINGS}{lanmac}{VAL} ne "-" )
+            {
+                $result = ENIGMA2_wake($hash);
+            }
+            else {
+                return
+"Device MAC address unknown. Please turn on the device manually once.";
+            }
         }
-      }
-      $cmd = "type=1&timeout=8&text=".urlEncode($text);
-      $result = ENIGMA2_SendCommand($hash, "message", $cmd);
-    } else {
-      return "Device needs to be reachable to send a message to screen.";
+        else {
+            $cmd = "newstate=4";
+            $result = ENIGMA2_SendCommand( $hash, "powerstate", $cmd );
+            readingsBeginUpdate($hash);
+            if ( !defined( $hash->{READINGS}{power}{VAL} )
+                || $hash->{READINGS}{power}{VAL} ne "on" )
+            {
+                readingsBulkUpdate( $hash, "power", "on" );
+            }
+            if ( !defined( $hash->{READINGS}{state}{VAL} )
+                || $hash->{READINGS}{state}{VAL} ne "on" )
+            {
+                readingsBulkUpdate( $hash, "state", "on" );
+            }
+            readingsEndUpdate( $hash, 1 );
+            ENIGMA2_GetStatus( $hash, 1 );
+        }
     }
 
-  # return usage hint
-  } else {
-    return $usage;
-  }
+    # off
+    elsif ( $a[1] eq "off" ) {
+        if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
+            $cmd = "newstate=5";
+            $result = ENIGMA2_SendCommand( $hash, "powerstate", $cmd );
+            readingsBeginUpdate($hash);
+            if ( !defined( $hash->{READINGS}{power}{VAL} )
+                || $hash->{READINGS}{power}{VAL} ne "off" )
+            {
+                readingsBulkUpdate( $hash, "power", "off" );
+            }
+            if ( !defined( $hash->{READINGS}{state}{VAL} )
+                || $hash->{READINGS}{state}{VAL} ne "off" )
+            {
+                readingsBulkUpdate( $hash, "state", "off" );
+            }
+            readingsEndUpdate( $hash, 1 );
+        }
+        else {
+            return "Device needs to be reachable to be set to standby mode.";
+        }
+    }
 
-  # Call the GetStatus() Function to retrieve the new values after setting something (with local flag, so the internal timer is not getting interupted)
-  if($a[1] ne "shutdown" && $a[1] ne "on" && $a[1] ne "restartGui" && $a[1] ne "reboot") {
-    ENIGMA2_GetStatus($hash, 1);
-  }
+    # volume
+    elsif ( $a[1] eq "volume" ) {
+        return "No argument given" if ( !defined( $a[2] ) );
 
-  return undef;
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            my $_ = $a[2];
+            if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
+                $cmd = "set=set" . $a[2];
+                if ( !defined( $hash->{READINGS}{volume}{VAL} )
+                    || $hash->{READINGS}{volume}{VAL} ne $a[2] )
+                {
+                    readingsSingleUpdate( $hash, "volume", $a[2], 1 );
+                }
+            }
+            else {
+                return
+"Argument does not seem to be a valid integer between 0 and 100";
+            }
+            $result = ENIGMA2_SendCommand( $hash, "vol", $cmd );
+        }
+        else {
+            return "Device needs to be ON to adjust volume.";
+        }
+    }
+
+    # volumeUp/volumeDown
+    elsif ( $a[1] =~ /^(volumeUp|volumeDown)$/ ) {
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            if ( $a[1] eq "volumeUp" ) {
+                $cmd = "set=up";
+            }
+            else {
+                $cmd = "set=down";
+            }
+            $result = ENIGMA2_SendCommand( $hash, "vol", $cmd );
+        }
+        else {
+            return "Device needs to be ON to adjust volume.";
+        }
+    }
+
+    # mute
+    elsif ( $a[1] eq "mute" ) {
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            if ( $a[2] eq "off" ) {
+                if ( $hash->{READINGS}{mute}{VAL} ne "off" ) {
+                    $cmd = "set=mute";
+                    readingsSingleUpdate( $hash, "mute", $a[2], 1 );
+                }
+            }
+            elsif ( $a[2] eq "on" ) {
+                if ( $hash->{READINGS}{mute}{VAL} ne "on" ) {
+                    $cmd = "set=mute";
+                    readingsSingleUpdate( $hash, "mute", $a[2], 1 );
+                }
+            }
+            elsif ( $a[2] eq "toggle" || !defined( $a[2] ) ) {
+                $cmd = "set=mute";
+                if ( $hash->{READINGS}{mute}{VAL} eq "off" ) {
+                    readingsSingleUpdate( $hash, "mute", "on", 1 );
+                }
+                else {
+                    readingsSingleUpdate( $hash, "mute", "off", 1 );
+                }
+            }
+            else {
+                return "Unknown argument " . $a[2];
+            }
+            $result = ENIGMA2_SendCommand( $hash, "vol", $cmd );
+        }
+        else {
+            return "Device needs to be ON to mute/unmute audio.";
+        }
+    }
+
+    # msg
+    elsif ( $a[1] eq "msg" ) {
+        if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
+            return
+"No 1st argument given, choose one of yesno info message attention "
+              if ( !defined( $a[2] ) );
+            return "No 2nd argument given, choose one of timeout "
+              if ( !defined( $a[3] ) );
+            return "No 3nd argument given, choose one of messagetext "
+              if ( !defined( $a[4] ) );
+            $_ = $a[3];
+            return
+                "Argument "
+              . $_
+              . " is not a valid integer between 5 and 49680"
+              if ( !m/^\d+$/ || $_ < 5 || $_ > 49680 );
+            my $i    = 4;
+            my $text = $a[$i];
+            $i++;
+
+            if ( defined( $a[$i] ) ) {
+                my $arr_size = @a;
+                while ( $i < $arr_size ) {
+                    $text = $text . " " . $a[$i];
+                    $i++;
+                }
+            }
+            if ( $a[2] eq "yesno" ) {
+                $cmd = "type=0&timeout=" . $a[3] . "&text=" . urlEncode($text);
+            }
+            elsif ( $a[2] eq "info" ) {
+                $cmd = "type=1&timeout=" . $a[3] . "&text=" . urlEncode($text);
+            }
+            elsif ( $a[2] eq "message" ) {
+                $cmd = "type=2&timeout=" . $a[3] . "&text=" . urlEncode($text);
+            }
+            elsif ( $a[2] eq "attention" ) {
+                $cmd = "type=3&timeout=" . $a[3] . "&text=" . urlEncode($text);
+            }
+            else {
+                return
+                    "Unknown argument "
+                  . $a[2]
+                  . ", choose one of yesno info message attention ";
+            }
+            $result = ENIGMA2_SendCommand( $hash, "message", $cmd );
+        }
+        else {
+            return "Device needs to be reachable to send a message to screen.";
+        }
+    }
+
+    # remoteControl
+    elsif ( $a[1] eq "remoteControl" ) {
+        if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
+            if ( !defined( $a[2] ) ) {
+                my $commandKeys = "";
+                for (
+                    sort keys %{
+                        ENIGMA2_GetRemotecontrolCommand(
+                            "GetRemotecontrolCommands")
+                    }
+                  )
+                {
+                    $commandKeys = $commandKeys . " " . $_;
+                }
+                return "No argument given, choose one of" . $commandKeys;
+            }
+
+            my $request = ENIGMA2_GetRemotecontrolCommand( uc( $a[2] ) );
+
+            if ( $request eq "POWER" ) {
+                ENIGMA2_Set( $hash, "toggle" );
+                return undef;
+            }
+            elsif ( $request ne "" ) {
+                $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand( $a[2] );
+            }
+            else {
+                my $commandKeys = "";
+                for (
+                    sort keys %{
+                        ENIGMA2_GetRemotecontrolCommand(
+                            "GetRemotecontrolCommands")
+                    }
+                  )
+                {
+                    $commandKeys = $commandKeys . " " . $_;
+                }
+                return
+                    "Unknown argument "
+                  . $a[2]
+                  . ", choose one of"
+                  . $commandKeys;
+            }
+
+            $result = ENIGMA2_SendCommand( $hash, "remotecontrol", $cmd );
+        }
+        else {
+            return "Device needs to be reachable to be controlled remotely.";
+        }
+    }
+
+    # channel
+    elsif ( $a[1] eq "channel" ) {
+        return
+          "No argument given, choose one of channelNumber servicereference "
+          if ( !defined( $a[2] ) );
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            my $_ = $a[2];
+            if (m/^(\d+):(.*):$/) {
+                $result = ENIGMA2_SendCommand( $hash, "zap", "sRef=" . $_ );
+            }
+            elsif ( m/^\d+$/ && $_ > 0 && $_ < 10000 ) {
+                for ( split( //, $a[2] ) ) {
+                    $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand($_);
+                    $result =
+                      ENIGMA2_SendCommand( $hash, "remotecontrol", $cmd );
+                }
+                $result = ENIGMA2_SendCommand( $hash, "remotecontrol",
+                    "command=" . ENIGMA2_GetRemotecontrolCommand("OK") );
+            }
+            else {
+                return "Argument " . $_
+                  . " is not a valid integer between 0 and 9999 or servicereference is invalid";
+            }
+        }
+        else {
+            return "Device needs to be ON to switch to a specific channel.";
+        }
+    }
+
+    # channelUp/channelDown
+    elsif ( $a[1] =~ /^(channelUp|channelDown)$/ ) {
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            if ( $a[1] eq "channelUp" ) {
+                $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("RIGHT");
+            }
+            else {
+                $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("LEFT");
+            }
+            $result = ENIGMA2_SendCommand( $hash, "remotecontrol", $cmd );
+        }
+        else {
+            return "Device needs to be ON to switch channel.";
+        }
+    }
+
+    # input
+    elsif ( $a[1] eq "input" ) {
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            if ( $a[2] eq "tv" || $a[2] eq "TV" ) {
+                $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("TV");
+                readingsSingleUpdate( $hash, "input", "tv", 1 );
+            }
+            elsif ( $a[2] eq "radio" || $a[2] eq "RADIO" ) {
+                $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("RADIO");
+                readingsSingleUpdate( $hash, "input", "radio", 1 );
+            }
+            else {
+                return
+                    "Argument "
+                  . $a[2]
+                  . " is not a valid, please choose one from tv radio ";
+            }
+            $result = ENIGMA2_SendCommand( $hash, "remotecontrol", $cmd );
+        }
+        else {
+            return "Device needs to be ON to switch input.";
+        }
+    }
+
+    # play / pause
+    elsif ( $a[1] =~ /^(play|pause)$/ ) {
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("PLAYPAUSE");
+            $result = ENIGMA2_SendCommand( $hash, "remotecontrol", $cmd );
+        }
+        else {
+            return "Device needs to be ON to play or pause video.";
+        }
+    }
+
+    # stop
+    elsif ( $a[1] eq "stop" ) {
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("STOP");
+            $result = ENIGMA2_SendCommand( $hash, "remotecontrol", $cmd );
+        }
+        else {
+            return "Device needs to be ON to stop video.";
+        }
+    }
+
+    # showText
+    elsif ( $a[1] eq "showText" ) {
+        if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
+            return "No argument given, choose one of messagetext "
+              if ( !defined( $a[2] ) );
+            my $i    = 2;
+            my $text = $a[$i];
+            $i++;
+            if ( defined( $a[$i] ) ) {
+                my $arr_size = @a;
+                while ( $i < $arr_size ) {
+                    $text = $text . " " . $a[$i];
+                    $i++;
+                }
+            }
+            $cmd = "type=1&timeout=8&text=" . urlEncode($text);
+            $result = ENIGMA2_SendCommand( $hash, "message", $cmd );
+        }
+        else {
+            return "Device needs to be reachable to send a message to screen.";
+        }
+    }
+
+    # return usage hint
+    else {
+        return $usage;
+    }
+
+  # Call the GetStatus() Function to retrieve the new values after setting
+  # something (with local flag, so the internal timer is not getting interupted)
+    if (   $a[1] ne "shutdown"
+        && $a[1] ne "on"
+        && $a[1] ne "restartGui"
+        && $a[1] ne "reboot" )
+    {
+        ENIGMA2_GetStatus( $hash, 1 );
+    }
+
+    return undef;
 }
 
 ###################################
 sub ENIGMA2_Define($$) {
-  my ($hash, $def) = @_;
-  my @a = split("[ \t][ \t]*", $def);
-  my $name=$hash->{NAME};
+    my ( $hash, $def ) = @_;
+    my @a = split( "[ \t][ \t]*", $def );
+    my $name = $hash->{NAME};
 
-  if (int(@a) < 3) {
-    my $msg = "Wrong syntax: define <name> ENIGMA2 <ip-or-hostname> [<port>] [<poll-interval>] [<http-user] [<http-password>]";
-    Log3 $name, 4, $msg;
-    return $msg;
-  }
+    if ( int(@a) < 3 ) {
+        my $msg =
+"Wrong syntax: define <name> ENIGMA2 <ip-or-hostname> [<port>] [<poll-interval>] [<http-user] [<http-password>]";
+        Log3 $name, 4, $msg;
+        return $msg;
+    }
 
-  my $address = $a[2];
-  $hash->{helper}{ADDRESS} = $address;
+    my $address = $a[2];
+    $hash->{helper}{ADDRESS} = $address;
 
-  # use port 80 if not defined
-  my $port = $a[3]||80;
-  $hash->{helper}{PORT} = $port;
+    # use port 80 if not defined
+    my $port = $a[3] || 80;
+    $hash->{helper}{PORT} = $port;
 
-  # use interval of 75sec if not defined
-  my $interval=$a[4]||75;
-  $hash->{INTERVAL}=$interval;
+    # use interval of 75sec if not defined
+    my $interval = $a[4] || 75;
+    $hash->{INTERVAL} = $interval;
 
-  # set http user if defined
-  my $http_user=$a[5];
-  $hash->{helper}{USER}=$http_user if $http_user;
+    # set http user if defined
+    my $http_user = $a[5];
+    $hash->{helper}{USER} = $http_user if $http_user;
 
-  # set http password if defined
-  my $http_passwd=$a[6];
-  $hash->{helper}{PASSWORD}=$http_passwd if $http_passwd;
+    # set http password if defined
+    my $http_passwd = $a[6];
+    $hash->{helper}{PASSWORD} = $http_passwd if $http_passwd;
 
-  unless(exists($hash->{helper}{AVAILABLE}) and ($hash->{helper}{AVAILABLE} == 0)) {
-  	$hash->{helper}{AVAILABLE} = 1;
-  	readingsSingleUpdate($hash, "presence", "present", 1);
-  }
+    unless ( exists( $hash->{helper}{AVAILABLE} )
+        and ( $hash->{helper}{AVAILABLE} == 0 ) )
+    {
+        $hash->{helper}{AVAILABLE} = 1;
+        readingsSingleUpdate( $hash, "presence", "present", 1 );
+    }
 
-  # start the status update timer
-  RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+2, "ENIGMA2_GetStatus", $hash, 0);
- 
-  return undef;
+    # start the status update timer
+    RemoveInternalTimer($hash);
+    InternalTimer( gettimeofday() + 2, "ENIGMA2_GetStatus", $hash, 0 );
+
+    return undef;
 }
 
 #############################################################################################################
@@ -852,122 +1125,160 @@ sub ENIGMA2_Define($$) {
 #
 ############################################################################################################
 
-
-
 ###################################
 sub ENIGMA2_SendCommand($$;$) {
-	my ($hash, $service, $cmd) = @_;
-  my $name=$hash->{NAME};
-  my $address = $hash->{helper}{ADDRESS};
-  my $port = $hash->{helper}{PORT};
-  $cmd = "" if(!defined($cmd));
+    my ( $hash, $service, $cmd ) = @_;
+    my $name    = $hash->{NAME};
+    my $address = $hash->{helper}{ADDRESS};
+    my $port    = $hash->{helper}{PORT};
 
-  my $http_user = $hash->{helper}{USER} if(defined($hash->{helper}{USER}));
-  my $http_passwd = $hash->{helper}{PASSWORD} if(defined($hash->{helper}{PASSWORD}));
-  my $URL;
-  my $response;
-  my $return;
-  
-  Log3 $name, 5, "ENIGMA2: execute on $name: $service -> $cmd";
+    my $http_user = $hash->{helper}{USER}
+      if ( defined( $hash->{helper}{USER} ) );
+    my $http_passwd = $hash->{helper}{PASSWORD}
+      if ( defined( $hash->{helper}{PASSWORD} ) );
+    my $URL;
+    my $response;
+    my $return;
 
-  if (defined($http_user) && defined($http_passwd)) {
-    $URL="http://".$http_user.":".$http_passwd."@".$address.":".$port."/web/".$service."?".$cmd."&";
-  } elsif (defined($http_user)) {
-    $URL="http://".$http_user."@".$address.":".$port."/web/".$service."?".$cmd."&";
-  } else {
-    $URL="http://".$address.":".$port."/web/".$service."?".$cmd."&";
-  }
-
-  $response = CustomGetFileFromURL(0, $URL, 4, $cmd, 0, 5);
-
-  Log3 $name, 5, "ENIGMA2: got response for $name: $service" if(defined($response));
-
-  unless (defined($response)) {
-	  if((not exists($hash->{helper}{AVAILABLE})) or (exists($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1)) {
-		  Log3 $name, 3, "ENIGMA2: device $name is unavailable";
-		  readingsSingleUpdate($hash, "presence", "absent", 1);
-	  }
-  } else {
-	  if (defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 0) {
-		  Log3 $name, 3, "ENIGMA2: device $name is available";
-		  readingsSingleUpdate($hash, "presence", "present", 1);
+    if ( !defined($cmd) ) {
+        my $cmd = "";
+    }
+    else {
+        $cmd = $cmd . "&";
     }
 
-    if ($response ne "") {
-      my $parser = XML::Simple->new(
-        NormaliseSpace => 2,
-        KeepRoot       => 0,
-        ForceArray     => 0,
-        SuppressEmpty  => 1
-      );
-      $return = $parser->XMLin($response);
+    Log3 $name, 5, "ENIGMA2: execute on $name: $service -> $cmd";
+
+    if ( defined($http_user) && defined($http_passwd) ) {
+        $URL =
+            "http://"
+          . $http_user . ":"
+          . $http_passwd . "@"
+          . $address . ":"
+          . $port . "/web/"
+          . $service . "?"
+          . $cmd;
+    }
+    elsif ( defined($http_user) ) {
+        $URL =
+            "http://"
+          . $http_user . "@"
+          . $address . ":"
+          . $port . "/web/"
+          . $service . "?"
+          . $cmd;
+    }
+    else {
+        $URL =
+          "http://" . $address . ":" . $port . "/web/" . $service . "?" . $cmd;
     }
 
-    $hash->{helper}{AVAILABLE} = (defined($response) ? 1 : 0);
+    $response =
+      Encode::encode_utf8( CustomGetFileFromURL( 0, $URL, 4, $cmd, 0, 5 ) );
 
-    if(ref($return) eq "HASH") {
-      return $return;
-    } else {
-      return $response;
+    Log3 $name, 5, "ENIGMA2: got response for $name: $service"
+      if ( defined($response) );
+
+    unless ( defined($response) ) {
+        if (
+            ( not exists( $hash->{helper}{AVAILABLE} ) )
+            or ( exists( $hash->{helper}{AVAILABLE} )
+                and $hash->{helper}{AVAILABLE} eq 1 )
+          )
+        {
+            Log3 $name, 3, "ENIGMA2: device $name is unavailable";
+            readingsSingleUpdate( $hash, "presence", "absent", 1 );
+        }
     }
-  }
+    else {
+        if ( defined( $hash->{helper}{AVAILABLE} )
+            and $hash->{helper}{AVAILABLE} eq 0 )
+        {
+            Log3 $name, 3, "ENIGMA2: device $name is available";
+            readingsSingleUpdate( $hash, "presence", "present", 1 );
+        }
 
-  $hash->{helper}{AVAILABLE} = (defined($response) ? 1 : 0);
+        if ( $response ne "" ) {
+            my $parser = XML::Simple->new(
+                NormaliseSpace => 2,
+                KeepRoot       => 0,
+                ForceArray     => 0,
+                SuppressEmpty  => 1
+            );
+            $return = $parser->XMLin($response);
+        }
 
-  return undef;
+        $hash->{helper}{AVAILABLE} = ( defined($response) ? 1 : 0 );
+
+        if ( ref($return) eq "HASH" ) {
+            return $return;
+        }
+        else {
+            return $response;
+        }
+    }
+
+    $hash->{helper}{AVAILABLE} = ( defined($response) ? 1 : 0 );
+
+    return undef;
 }
 
 ###################################
 sub ENIGMA2_Undefine($$) {
-  my ($hash, $arg) = @_;
-  
-  # Stop the internal GetStatus-Loop and exit
-  RemoveInternalTimer($hash);
-  return undef;
+    my ( $hash, $arg ) = @_;
+
+    # Stop the internal GetStatus-Loop and exit
+    RemoveInternalTimer($hash);
+    return undef;
 }
 
 ###################################
 sub ENIGMA2_wake ($) {
-  my ($hash) = @_;
-  my $name=$hash->{NAME};
-  my $mac_addr = $hash->{READINGS}{lanmac}{VAL};
-  my $address;
-  my $port;
+    my ($hash)   = @_;
+    my $name     = $hash->{NAME};
+    my $mac_addr = $hash->{READINGS}{lanmac}{VAL};
+    my $address;
+    my $port;
 
-  if ($mac_addr ne "-") {
-    if (! defined $address) { $address = '255.255.255.255' }
-    if (! defined $port || $port !~ /^\d+$/ ) { $port = 9 }
+    if ( $mac_addr ne "-" ) {
+        if ( !defined $address ) { $address = '255.255.255.255' }
+        if ( !defined $port || $port !~ /^\d+$/ ) { $port = 9 }
 
-    my $sock = new IO::Socket::INET(Proto=>'udp') or die "socket : $!";
-    die "Can't create WOL socket" if(!$sock);
-  
-    my $ip_addr = inet_aton($address);
-    my $sock_addr = sockaddr_in($port, $ip_addr);
-    $mac_addr =~ s/://g;
-    my $packet = pack('C6H*', 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, $mac_addr x 16);
+        my $sock = new IO::Socket::INET( Proto => 'udp' ) or die "socket : $!";
+        die "Can't create WOL socket" if ( !$sock );
 
-    setsockopt($sock, SOL_SOCKET, SO_BROADCAST, 1) or die "setsockopt : $!";
-  
-  
-    Log3 $name, 4, "ENIGMA2: Waking up $name by sending Wake-On-Lan magic package to ".$mac_addr;
-    send($sock, $packet, 0, $sock_addr) or die "send : $!";
-    close ($sock);
-  } else {
-    Log3 $name, 3, "ENIGMA2: MAC address for $name unknown. Please turn on manually once.";
-  }
+        my $ip_addr = inet_aton($address);
+        my $sock_addr = sockaddr_in( $port, $ip_addr );
+        $mac_addr =~ s/://g;
+        my $packet =
+          pack( 'C6H*', 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, $mac_addr x 16 );
 
-  return 1;
+        setsockopt( $sock, SOL_SOCKET, SO_BROADCAST, 1 )
+          or die "setsockopt : $!";
+
+        Log3 $name, 4,
+          "ENIGMA2: Waking up $name by sending Wake-On-Lan magic package to "
+          . $mac_addr;
+        send( $sock, $packet, 0, $sock_addr ) or die "send : $!";
+        close($sock);
+    }
+    else {
+        Log3 $name, 3,
+"ENIGMA2: MAC address for $name unknown. Please turn on manually once.";
+    }
+
+    return 1;
 }
 
 #####################################
 # Callback from 95_remotecontrol for command makenotify.
 sub ENIGMA2_RCmakenotify($$) {
-  my ($nam, $ndev) = @_;
-  my $nname="notify_$nam";
-  
-  fhem("define $nname notify $nam set $ndev remoteControl ".'$EVENT',1);
-  Log3 undef, 2, "[remotecontrol:ENIGMA2] Notify created: $nname";
-  return "Notify created by ENIGMA2: $nname";
+    my ( $nam, $ndev ) = @_;
+    my $nname = "notify_$nam";
+
+    fhem( "define $nname notify $nam set $ndev remoteControl " . '$EVENT', 1 );
+    Log3 undef, 2, "[remotecontrol:ENIGMA2] Notify created: $nname";
+    return "Notify created by ENIGMA2: $nname";
 }
 
 #####################################
@@ -975,565 +1286,580 @@ sub ENIGMA2_RCmakenotify($$) {
 
 # Dreambox DM500 + DM800 with SVG
 sub ENIGMA2_RClayout_DM800_SVG() {
-  my @row;
+    my @row;
 
-  $row[0]=":rc_BLANK.svg,:rc_BLANK.svg,POWER:rc_POWER.svg";
-  $row[1]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+    $row[0] = ":rc_BLANK.svg,:rc_BLANK.svg,POWER:rc_POWER.svg";
+    $row[1] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
 
-  $row[2]="1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
-  $row[3]="4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
-  $row[4]="7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
-  $row[5]="LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
-  $row[6]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+    $row[2] = "1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
+    $row[3] = "4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
+    $row[4] = "7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
+    $row[5] = "LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
+    $row[6] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
 
-  $row[7]="VOLUMEUP:rc_VOLPLUS.svg,MUTE:rc_MUTE.svg,CHANNELUP:rc_UP.svg";
-  $row[8]="VOLUMEDOWN:rc_VOLMINUS.svg,EXIT:rc_EXIT.svg,CHANNELDOWN:rc_DOWN.svg";
-  $row[9]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+    $row[7] = "VOLUMEUP:rc_VOLPLUS.svg,MUTE:rc_MUTE.svg,CHANNELUP:rc_UP.svg";
+    $row[8] =
+      "VOLUMEDOWN:rc_VOLMINUS.svg,EXIT:rc_EXIT.svg,CHANNELDOWN:rc_DOWN.svg";
+    $row[9] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
 
-  $row[10]="INFO:rc_INFO.svg,UP:rc_UP.svg,MENU:rc_MENU.svg";
-  $row[11]="LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
-  $row[12]="AUDIO:rc_AUDIO.svg,DOWN:rc_DOWN.svg,VIDEO:rc_VIDEO.svg";
-  $row[13]=":rc_BLANK.svg,EXIT:rc_EXIT.svg,:rc_BLANK.svg";
+    $row[10] = "INFO:rc_INFO.svg,UP:rc_UP.svg,MENU:rc_MENU.svg";
+    $row[11] = "LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
+    $row[12] = "AUDIO:rc_AUDIO.svg,DOWN:rc_DOWN.svg,VIDEO:rc_VIDEO.svg";
+    $row[13] = ":rc_BLANK.svg,EXIT:rc_EXIT.svg,:rc_BLANK.svg";
 
-  $row[14]="RED:rc_REWred.svg,GREEN:rc_PLAYgreen.svg,YELLOW:rc_PAUSEyellow.svg,BLUE:rc_FFblue.svg";
-  $row[15]="TV:rc_TVstop.svg,RADIO:rc_RADIOred.svg,TEXT:rc_TEXT.svg,HELP:rc_HELP.svg";
+    $row[14] =
+"RED:rc_REWred.svg,GREEN:rc_PLAYgreen.svg,YELLOW:rc_PAUSEyellow.svg,BLUE:rc_FFblue.svg";
+    $row[15] =
+"TV:rc_TVstop.svg,RADIO:rc_RADIOred.svg,TEXT:rc_TEXT.svg,HELP:rc_HELP.svg";
 
-  $row[16]="attr rc_iconpath icons/remotecontrol";
-  $row[17]="attr rc_iconprefix black_btn_";
-  return @row;
+    $row[16] = "attr rc_iconpath icons/remotecontrol";
+    $row[17] = "attr rc_iconprefix black_btn_";
+    return @row;
 }
 
 # Dreambox DM500 + DM800 with PNG
 sub ENIGMA2_RClayout_DM800() {
-  my @row;
+    my @row;
 
-  $row[0]=":blank,:blank,POWER:POWEROFF";
-  $row[1]=":blank,:blank,:blank";
+    $row[0] = ":blank,:blank,POWER:POWEROFF";
+    $row[1] = ":blank,:blank,:blank";
 
-  $row[2]="1,2,3";
-  $row[3]="4,5,6";
-  $row[4]="7,8,9";
-  $row[5]="LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
-  $row[6]=":blank,:blank,:blank";
+    $row[2] = "1,2,3";
+    $row[3] = "4,5,6";
+    $row[4] = "7,8,9";
+    $row[5] = "LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
+    $row[6] = ":blank,:blank,:blank";
 
-  $row[7]="VOLUMEUP:VOLUP,MUTE,CHANNELUP:CHUP2";
-  $row[8]="VOLUMEDOWN:VOLDOWN,EXIT,CHANNELDOWN:CHDOWN2";
-  $row[9]=":blank,:blank,:blank";
+    $row[7] = "VOLUMEUP:VOLUP,MUTE,CHANNELUP:CHUP2";
+    $row[8] = "VOLUMEDOWN:VOLDOWN,EXIT,CHANNELDOWN:CHDOWN2";
+    $row[9] = ":blank,:blank,:blank";
 
-  $row[10]="INFO,UP,MENU";
-  $row[11]="LEFT,OK,RIGHT";
-  $row[12]="AUDIO,DOWN,VIDEO";
-  $row[13]=":blank,:blank,:blank";
+    $row[10] = "INFO,UP,MENU";
+    $row[11] = "LEFT,OK,RIGHT";
+    $row[12] = "AUDIO,DOWN,VIDEO";
+    $row[13] = ":blank,:blank,:blank";
 
-  $row[14]="RED:REWINDred,GREEN:PLAYgreen,YELLOW:PAUSEyellow,BLUE:FFblue";
-  $row[15]="TV:TVstop,RADIO:RADIOred,TEXT,HELP";
+    $row[14] = "RED:REWINDred,GREEN:PLAYgreen,YELLOW:PAUSEyellow,BLUE:FFblue";
+    $row[15] = "TV:TVstop,RADIO:RADIOred,TEXT,HELP";
 
-  $row[16]="attr rc_iconpath icons/remotecontrol";
-  $row[17]="attr rc_iconprefix black_btn_";
-  return @row;
+    $row[16] = "attr rc_iconpath icons/remotecontrol";
+    $row[17] = "attr rc_iconprefix black_btn_";
+    return @row;
 }
 
 # Dreambox DM800se + DM8000 with SVG
 sub ENIGMA2_RClayout_DM8000_SVG() {
-  my @row;
+    my @row;
 
-  $row[0]=":rc_BLANK.svg,:rc_BLANK.svg,POWER:rc_POWER.svg";
-  $row[1]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+    $row[0] = ":rc_BLANK.svg,:rc_BLANK.svg,POWER:rc_POWER.svg";
+    $row[1] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
 
-  $row[2]="1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
-  $row[3]="4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
-  $row[4]="7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
-  $row[5]="LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
-  $row[6]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+    $row[2] = "1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
+    $row[3] = "4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
+    $row[4] = "7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
+    $row[5] = "LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
+    $row[6] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
 
-  $row[7]="VOLUMEUP:rc_VOLPLUS.svg,MUTE:rc_MUTE.svg,CHANNELUP:rc_UP.svg";
-  $row[8]="VOLUMEDOWN:rc_VOLMINUS.svg,EXIT:rc_EXIT.svg,CHANNELDOWN:rc_DOWN.svg";
-  $row[9]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+    $row[7] = "VOLUMEUP:rc_VOLPLUS.svg,MUTE:rc_MUTE.svg,CHANNELUP:rc_UP.svg";
+    $row[8] =
+      "VOLUMEDOWN:rc_VOLMINUS.svg,EXIT:rc_EXIT.svg,CHANNELDOWN:rc_DOWN.svg";
+    $row[9] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
 
-  $row[10]="INFO:rc_INFO.svg,UP:rc_UP.svg,MENU:rc_MENU.svg";
-  $row[11]="LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
-  $row[12]="AUDIO:rc_AUDIO.svg,DOWN:rc_DOWN.svg,VIDEO:rc_VIDEO.svg";
-  $row[13]=":rc_BLANK.svg,EXIT:rc_EXIT.svg,:rc_BLANK.svg";
+    $row[10] = "INFO:rc_INFO.svg,UP:rc_UP.svg,MENU:rc_MENU.svg";
+    $row[11] = "LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
+    $row[12] = "AUDIO:rc_AUDIO.svg,DOWN:rc_DOWN.svg,VIDEO:rc_VIDEO.svg";
+    $row[13] = ":rc_BLANK.svg,EXIT:rc_EXIT.svg,:rc_BLANK.svg";
 
-  $row[14]="RED:rc_RED.svg,GREEN:rc_GREEN.svg,YELLOW:rc_YELLOW.svg,BLUE:rc_BLUE.svg";
-  $row[15]="REWIND:rc_REW.svg,PLAY:rc_PLAY.svg,STOP:rc_STOP.svg,FASTFORWARD:rc_FF.svg";
-  $row[16]="TV:rc_TV.svg,RADIO:rc_RADIO.svg,TEXT:rc_TEXT.svg,RECORD:rc_REC.svg";
+    $row[14] =
+      "RED:rc_RED.svg,GREEN:rc_GREEN.svg,YELLOW:rc_YELLOW.svg,BLUE:rc_BLUE.svg";
+    $row[15] =
+"REWIND:rc_REW.svg,PLAY:rc_PLAY.svg,STOP:rc_STOP.svg,FASTFORWARD:rc_FF.svg";
+    $row[16] =
+      "TV:rc_TV.svg,RADIO:rc_RADIO.svg,TEXT:rc_TEXT.svg,RECORD:rc_REC.svg";
 
-  $row[17]="attr rc_iconpath icons/remotecontrol";
-  $row[18]="attr rc_iconprefix black_btn_";
-  return @row;
+    $row[17] = "attr rc_iconpath icons/remotecontrol";
+    $row[18] = "attr rc_iconprefix black_btn_";
+    return @row;
 }
 
 # Dreambox DM800se + DM8000 with PNG
 sub ENIGMA2_RClayout_DM8000() {
-  my @row;
+    my @row;
 
-  $row[0]=":blank,:blank,POWER:POWEROFF";
-  $row[1]=":blank,:blank,:blank";
+    $row[0] = ":blank,:blank,POWER:POWEROFF";
+    $row[1] = ":blank,:blank,:blank";
 
-  $row[2]="1,2,3";
-  $row[3]="4,5,6";
-  $row[4]="7,8,9";
-  $row[5]="LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
-  $row[6]=":blank,:blank,:blank";
+    $row[2] = "1,2,3";
+    $row[3] = "4,5,6";
+    $row[4] = "7,8,9";
+    $row[5] = "LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
+    $row[6] = ":blank,:blank,:blank";
 
-  $row[7]="VOLUMEUP:VOLUP,MUTE,CHANNELUP:CHUP2";
-  $row[8]="VOLUMEDOWN:VOLDOWN,EXIT,CHANNELDOWN:CHDOWN2";
-  $row[9]=":blank,:blank,:blank";
+    $row[7] = "VOLUMEUP:VOLUP,MUTE,CHANNELUP:CHUP2";
+    $row[8] = "VOLUMEDOWN:VOLDOWN,EXIT,CHANNELDOWN:CHDOWN2";
+    $row[9] = ":blank,:blank,:blank";
 
-  $row[10]="INFO,UP,MENU";
-  $row[11]="LEFT,OK,RIGHT";
-  $row[12]="AUDIO,DOWN,VIDEO";
-  $row[13]=":blank,:blank,:blank";
+    $row[10] = "INFO,UP,MENU";
+    $row[11] = "LEFT,OK,RIGHT";
+    $row[12] = "AUDIO,DOWN,VIDEO";
+    $row[13] = ":blank,:blank,:blank";
 
-  $row[14]="RED,GREEN,YELLOW,BLUE";
-  $row[15]="REWIND,PLAY,STOP,FASTFORWARD:FF";
-  $row[16]="TV,RADIO,TEXT,RECORD:REC";
+    $row[14] = "RED,GREEN,YELLOW,BLUE";
+    $row[15] = "REWIND,PLAY,STOP,FASTFORWARD:FF";
+    $row[16] = "TV,RADIO,TEXT,RECORD:REC";
 
-  $row[17]="attr rc_iconpath icons/remotecontrol";
-  $row[18]="attr rc_iconprefix black_btn_";
-  return @row;
+    $row[17] = "attr rc_iconpath icons/remotecontrol";
+    $row[18] = "attr rc_iconprefix black_btn_";
+    return @row;
 }
 
 # Dreambox RC10 with SVG
 sub ENIGMA2_RClayout_RC10_SVG() {
-  my @row;
+    my @row;
 
-  $row[0]=":rc_BLANK.svg,:rc_BLANK.svg,POWER:rc_POWER.svg";
-  $row[1]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+    $row[0] = ":rc_BLANK.svg,:rc_BLANK.svg,POWER:rc_POWER.svg";
+    $row[1] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
 
-  $row[2]="1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
-  $row[3]="4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
-  $row[4]="7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
-  $row[5]="LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
-  $row[6]="RED:rc_RED.svg,GREEN:rc_GREEN.svg,YELLOW:rc_YELLOW.svg,BLUE:rc_BLUE.svg";
-  $row[7]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+    $row[2] = "1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
+    $row[3] = "4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
+    $row[4] = "7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
+    $row[5] = "LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
+    $row[6] =
+      "RED:rc_RED.svg,GREEN:rc_GREEN.svg,YELLOW:rc_YELLOW.svg,BLUE:rc_BLUE.svg";
+    $row[7] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
 
-  $row[8]="INFO:rc_INFO.svg,UP:rc_UP.svg,MENU:rc_MENU.svg";
-  $row[9]="LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
-  $row[10]="AUDIO:rc_AUDIO.svg,DOWN:rc_DOWN.svg,VIDEO:rc_VIDEO.svg";
-  $row[11]=":rc_BLANK.svg,EXIT:rc_EXIT.svg,:rc_BLANK.svg";
+    $row[8]  = "INFO:rc_INFO.svg,UP:rc_UP.svg,MENU:rc_MENU.svg";
+    $row[9]  = "LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
+    $row[10] = "AUDIO:rc_AUDIO.svg,DOWN:rc_DOWN.svg,VIDEO:rc_VIDEO.svg";
+    $row[11] = ":rc_BLANK.svg,EXIT:rc_EXIT.svg,:rc_BLANK.svg";
 
-  $row[12]="VOLUMEUP:rc_VOLPLUS.svg,:rc_BLANK.svg,CHANNELUP:rc_UP.svg";
-  $row[13]="VOLUMEDOWN:rc_VOLMINUS.svg,MUTE:rc_MUTE.svg,CHANNELDOWN:rc_DOWN.svg";
-  $row[14]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+    $row[12] = "VOLUMEUP:rc_VOLPLUS.svg,:rc_BLANK.svg,CHANNELUP:rc_UP.svg";
+    $row[13] =
+      "VOLUMEDOWN:rc_VOLMINUS.svg,MUTE:rc_MUTE.svg,CHANNELDOWN:rc_DOWN.svg";
+    $row[14] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
 
-  $row[15]="REWIND:rc_REW.svg,PLAY:rc_PLAY.svg,STOP:rc_STOP.svg,FASTFORWARD:rc_FF.svg";
-  $row[16]="TV:rc_TV.svg,RADIO:rc_RADIO.svg,TEXT:rc_TEXT.svg,RECORD:rc_REC.svg";
+    $row[15] =
+"REWIND:rc_REW.svg,PLAY:rc_PLAY.svg,STOP:rc_STOP.svg,FASTFORWARD:rc_FF.svg";
+    $row[16] =
+      "TV:rc_TV.svg,RADIO:rc_RADIO.svg,TEXT:rc_TEXT.svg,RECORD:rc_REC.svg";
 
-  $row[17]="attr rc_iconpath icons";
-  $row[18]="attr rc_iconprefix rc_";
-  return @row;
+    $row[17] = "attr rc_iconpath icons";
+    $row[18] = "attr rc_iconprefix rc_";
+    return @row;
 }
 
 # Dreambox RC10 with PNG
 sub ENIGMA2_RClayout_RC10() {
-  my @row;
+    my @row;
 
-  $row[0]=":blank,:blank,POWER:POWEROFF";
-  $row[1]=":blank,:blank,:blank";
+    $row[0] = ":blank,:blank,POWER:POWEROFF";
+    $row[1] = ":blank,:blank,:blank";
 
-  $row[2]="1,2,3";
-  $row[3]="4,5,6";
-  $row[4]="7,8,9";
-  $row[5]="LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
-  $row[6]="RED,GREEN,YELLOW,BLUE";
-  $row[7]=":blank,:blank,:blank";
+    $row[2] = "1,2,3";
+    $row[3] = "4,5,6";
+    $row[4] = "7,8,9";
+    $row[5] = "LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
+    $row[6] = "RED,GREEN,YELLOW,BLUE";
+    $row[7] = ":blank,:blank,:blank";
 
-  $row[8]="INFO,UP,MENU";
-  $row[9]="LEFT,OK,RIGHT";
-  $row[10]="AUDIO,DOWN,VIDEO";
-  $row[11]=":blank,EXIT,:blank";
+    $row[8]  = "INFO,UP,MENU";
+    $row[9]  = "LEFT,OK,RIGHT";
+    $row[10] = "AUDIO,DOWN,VIDEO";
+    $row[11] = ":blank,EXIT,:blank";
 
-  $row[12]="VOLUMEUP:VOLUP,:blank,CHANNELUP:CHUP2";
-  $row[13]="VOLUMEDOWN:VOLDOWN,MUTE,CHANNELDOWN:CHDOWN2";
-  $row[14]=":blank,:blank,:blank";
+    $row[12] = "VOLUMEUP:VOLUP,:blank,CHANNELUP:CHUP2";
+    $row[13] = "VOLUMEDOWN:VOLDOWN,MUTE,CHANNELDOWN:CHDOWN2";
+    $row[14] = ":blank,:blank,:blank";
 
-  $row[15]="REWIND,PLAY,STOP,FASTFORWARD:FF";
-  $row[16]="TV,RADIO,TEXT,RECORD:REC";
+    $row[15] = "REWIND,PLAY,STOP,FASTFORWARD:FF";
+    $row[16] = "TV,RADIO,TEXT,RECORD:REC";
 
-  $row[17]="attr rc_iconpath icons/remotecontrol";
-  $row[18]="attr rc_iconprefix black_btn_";
-  return @row;
+    $row[17] = "attr rc_iconpath icons/remotecontrol";
+    $row[18] = "attr rc_iconprefix black_btn_";
+    return @row;
 }
 
 # VU+ Duo2 with SVG
 sub ENIGMA2_RClayout_VUplusDuo2_SVG() {
-  my @row;
+    my @row;
 
-  $row[0]=":rc_BLANK.svg,MUTE:rc_MUTE.svg,POWER:rc_POWER.svg";
-  $row[1]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+    $row[0] = ":rc_BLANK.svg,MUTE:rc_MUTE.svg,POWER:rc_POWER.svg";
+    $row[1] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
 
-  $row[2]="REWIND:rc_REW.svg,PLAY:rc_PLAY.svg,FASTFORWARD:rc_FF.svg";
-  $row[3]="RECORD:rc_REC.svg,STOP:rc_STOP.svg,VIDEO:rc_VIDEO.svg";
-  $row[4]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+    $row[2] = "REWIND:rc_REW.svg,PLAY:rc_PLAY.svg,FASTFORWARD:rc_FF.svg";
+    $row[3] = "RECORD:rc_REC.svg,STOP:rc_STOP.svg,VIDEO:rc_VIDEO.svg";
+    $row[4] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
 
-  $row[5]="TV:rc_TV.svg,AUDIO:rc_AUDIO.svg,RADIO:rc_RADIO.svg";
-  $row[6]="TEXT:rc_TEXT.svg,HELP:rc_HELP.svg,AV:rc_AV.svg";
-  $row[7]="INFO:rc_EPG.svg,MENU:rc_MENU.svg,EXIT:rc_EXIT.svg";
-  $row[8]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+    $row[5] = "TV:rc_TV.svg,AUDIO:rc_AUDIO.svg,RADIO:rc_RADIO.svg";
+    $row[6] = "TEXT:rc_TEXT.svg,HELP:rc_HELP.svg,AV:rc_AV.svg";
+    $row[7] = "INFO:rc_EPG.svg,MENU:rc_MENU.svg,EXIT:rc_EXIT.svg";
+    $row[8] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
 
-  $row[9]="VOLUMEUP:rc_VOLPLUS.svg,UP:rc_UP.svg,CHANNELUP:rc_PLUS.svg";
-  $row[10]="LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
-  $row[11]="VOLUMEDOWN:rc_VOLMINUS.svg,DOWN:rc_DOWN.svg,CHANNELDOWN:rc_MINUS.svg";
+    $row[9]  = "VOLUMEUP:rc_VOLPLUS.svg,UP:rc_UP.svg,CHANNELUP:rc_PLUS.svg";
+    $row[10] = "LEFT:rc_LEFT.svg,OK:rc_OK.svg,RIGHT:rc_RIGHT.svg";
+    $row[11] =
+      "VOLUMEDOWN:rc_VOLMINUS.svg,DOWN:rc_DOWN.svg,CHANNELDOWN:rc_MINUS.svg";
 
-  $row[12]=":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
+    $row[12] = ":rc_BLANK.svg,:rc_BLANK.svg,:rc_BLANK.svg";
 
-  $row[13]="RED:rc_RED.svg,GREEN:rc_GREEN.svg,YELLOW:rc_YELLOW.svg,BLUE:rc_BLUE.svg";
-  $row[14]="1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
-  $row[15]="4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
-  $row[16]="7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
-  $row[17]="LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
+    $row[13] =
+      "RED:rc_RED.svg,GREEN:rc_GREEN.svg,YELLOW:rc_YELLOW.svg,BLUE:rc_BLUE.svg";
+    $row[14] = "1:rc_1.svg,2:rc_2.svg,3:rc_3.svg";
+    $row[15] = "4:rc_4.svg,5:rc_5.svg,6:rc_6.svg";
+    $row[16] = "7:rc_7.svg,8:rc_8.svg,9:rc_9.svg";
+    $row[17] = "LEFTBRACE:rc_PREVIOUS.svg,0:rc_0.svg,RIGHTBRACE:rc_NEXT.svg";
 
-  $row[18]="attr rc_iconpath icons";
-  $row[19]="attr rc_iconprefix rc_";
-  return @row;
+    $row[18] = "attr rc_iconpath icons";
+    $row[19] = "attr rc_iconprefix rc_";
+    return @row;
 }
 
 # VU+ Duo2 with PNG
 sub ENIGMA2_RClayout_VUplusDuo2() {
-  my @row;
+    my @row;
 
-  $row[0]=":blank,:MUTE,POWER:POWEROFF";
-  $row[1]=":blank,:blank,:blank";
+    $row[0] = ":blank,:MUTE,POWER:POWEROFF";
+    $row[1] = ":blank,:blank,:blank";
 
-  $row[2]="REWIND,PLAY,FASTFORWARD:FF";
-  $row[3]="RECORD:REC,STOP,VIDEO";
-  $row[4]=":blank,:blank,:blank";
+    $row[2] = "REWIND,PLAY,FASTFORWARD:FF";
+    $row[3] = "RECORD:REC,STOP,VIDEO";
+    $row[4] = ":blank,:blank,:blank";
 
-  $row[5]="TV,AUDIO,RADIO:RADIO";
-  $row[6]="TEXT,HELP,AV";
-  $row[7]="INFO,MENU,EXIT";
-  $row[8]=":blank,:blank,:blank";
+    $row[5] = "TV,AUDIO,RADIO:RADIO";
+    $row[6] = "TEXT,HELP,AV";
+    $row[7] = "INFO,MENU,EXIT";
+    $row[8] = ":blank,:blank,:blank";
 
-  $row[9]="VOLUMEUP:VOLUP,UP,CHANNELUP:CHUP2";
-  $row[10]="LEFT,OK,RIGHT";
-  $row[11]="VOLUMEDOWN:VOLDOWN,DOWN,CHANNELDOWN:CHDOWN2";
+    $row[9]  = "VOLUMEUP:VOLUP,UP,CHANNELUP:CHUP2";
+    $row[10] = "LEFT,OK,RIGHT";
+    $row[11] = "VOLUMEDOWN:VOLDOWN,DOWN,CHANNELDOWN:CHDOWN2";
 
-  $row[12]=":blank,:blank,:blank";
+    $row[12] = ":blank,:blank,:blank";
 
-  $row[13]="RED,GREEN,YELLOW,BLUE";
-  $row[14]="1,2,3";
-  $row[15]="4,5,6";
-  $row[16]="7,8,9";
-  $row[17]="LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
+    $row[13] = "RED,GREEN,YELLOW,BLUE";
+    $row[14] = "1,2,3";
+    $row[15] = "4,5,6";
+    $row[16] = "7,8,9";
+    $row[17] = "LEFTBRACE:LEFT2,0:0,RIGHTBRACE:RIGHT2";
 
-  $row[18]="attr rc_iconpath icons/remotecontrol";
-  $row[19]="attr rc_iconprefix black_btn_";
-  return @row;
+    $row[18] = "attr rc_iconpath icons/remotecontrol";
+    $row[19] = "attr rc_iconprefix black_btn_";
+    return @row;
 }
 
 ###################################
 sub ENIGMA2_GetRemotecontrolCommand($) {
-  my ($command) = @_;
-  my $commands = {
-    'RESERVED' => 0,
-    'ESC' => 1,
-    '1' => 2,
-    '2' => 3,
-    '3' => 4,
-    '4' => 5,
-    '5' => 6,
-    '6' => 7,
-    '7' => 8,
-    '8' => 9,
-    '9' => 10,
-    '0' => 11,
-    'MINUS' => 12,
-    'EQUAL' => 13,
-    'BACKSPACE' => 14,
-    'TAB' => 15,
-    'Q' => 16,
-    'W' => 17,
-    'E' => 18,
-    'R' => 19,
-    'T' => 20,
-    'Y' => 21,
-    'U' => 22,
-    'I' => 23,
-    'O' => 24,
-    'P' => 25,
-    'LEFTBRACE' => 26,
-    'RIGHTBRACE' => 27,
-    'ENTER' => 28,
-    'LEFTCTRL' => 29,
-    'A' => 30,
-    'S' => 31,
-    'D' => 32,
-    'F' => 33,
-    'G' => 34,
-    'H' => 35,
-    'J' => 36,
-    'K' => 37,
-    'L' => 38,
-    'SEMICOLON' => 39,
-    'APOSTROPHE' => 40,
-    'GRAVE' => 41,
-    'LEFTSHIFT' => 42,
-    'BACKSLASH' => 43,
-    'Z' => 44,
-    'X' => 45,
-    'C' => 46,
-    'V' => 47,
-    'B' => 48,
-    'N' => 49,
-    'M' => 50,
-    'COMMA' => 51,
-    'DOT' => 52,
-    'SLASH' => 53,
-    'RIGHTSHIFT' => 54,
-    'KPASTERISK' => 55,
-    'LEFTALT' => 56,
-    'SPACE' => 57,
-    'CAPSLOCK' => 58,
-    'F1' => 59,
-    'F2' => 60,
-    'F3' => 61,
-    'F4' => 62,
-    'F5' => 63,
-    'F6' => 64,
-    'F7' => 65,
-    'F8' => 66,
-    'F9' => 67,
-    'F10' => 68,
-    'NUMLOCK' => 69,
-    'SCROLLLOCK' => 70,
-    'KP7' => 71,
-    'KP8' => 72,
-    'KP9' => 73,
-    'KPMINUS' => 74,
-    'KP4' => 75,
-    'KP5' => 76,
-    'KP6' => 77,
-    'KPPLUS' => 78,
-    'KP1' => 79,
-    'KP2' => 80,
-    'KP3' => 81,
-    'KP0' => 82,
-    'KPDOT' => 83,
-    '103RD' => 84,
-    'F13' => 85,
-    '102ND' => 86,
-    'F11' => 87,
-    'F12' => 88,
-    'F14' => 89,
-    'F15' => 90,
-    'F16' => 91,
-    'F17' => 92,
-    'F18' => 93,
-    'F19' => 94,
-    'F20' => 95,
-    'KPENTER' => 96,
-    'RIGHTCTRL' => 97,
-    'KPSLASH' => 98,
-    'SYSRQ' => 99,
-    'RIGHTALT' => 100,
-    'LINEFEED' => 101,
-    'HOME' => 102,
-    'UP' => 103,
-    'PAGEUP' => 104,
-    'LEFT' => 105,
-    'RIGHT' => 106,
-    'END' => 107,
-    'DOWN' => 108,
-    'PAGEDOWN' => 109,
-    'INSERT' => 110,
-    'DELETE' => 111,
-    'MACRO' => 112,
-    'MUTE' => 113,
-    'VOLUMEDOWN' => 114,
-    'VOLUMEUP' => 115,
-    'POWER' => 116,
-    'KPEQUAL' => 117,
-    'KPPLUSMINUS' => 118,
-    'PAUSE' => 119,
-    'F21' => 120,
-    'F22' => 121,
-    'F23' => 122,
-    'F24' => 123,
-    'KPCOMMA' => 124,
-    'LEFTMETA' => 125,
-    'RIGHTMETA' => 126,
-    'COMPOSE' => 127,
-    'STOP' => 128,
-    'AGAIN' => 129,
-    'PROPS' => 130,
-    'UNDO' => 131,
-    'FRONT' => 132,
-    'COPY' => 133,
-    'OPEN' => 134,
-    'PASTE' => 135,
-    'FIND' => 136,
-    'CUT' => 137,
-    'HELP' => 138,
-    'MENU' => 139,
-    'CALC' => 140,
-    'SETUP' => 141,
-    'SLEEP' => 142,
-    'WAKEUP' => 143,
-    'FILE' => 144,
-    'SENDFILE' => 145,
-    'DELETEFILE' => 146,
-    'XFER' => 147,
-    'PROG1' => 148,
-    'PROG2' => 149,
-    'WWW' => 150,
-    'MSDOS' => 151,
-    'COFFEE' => 152,
-    'DIRECTION' => 153,
-    'CYCLEWINDOWS' => 154,
-    'MAIL' => 155,
-    'BOOKMARKS' => 156,
-    'COMPUTER' => 157,
-    'BACK' => 158,
-    'FORWARD' => 159,
-    'CLOSECD' => 160,
-    'EJECTCD' => 161,
-    'EJECTCLOSECD' => 162,
-    'NEXTSONG' => 163,
-    'PLAYPAUSE' => 164,
-    'PREVIOUSSONG' => 165,
-    'STOPCD' => 166,
-    'RECORD' => 167,
-    'REWIND' => 168,
-    'PHONE' => 169,
-    'ISO' => 170,
-    'CONFIG' => 171,
-    'HOMEPAGE' => 172,
-    'REFRESH' => 173,
-    'EXIT' => 174,
-    'MOVE' => 175,
-    'EDIT' => 176,
-    'SCROLLUP' => 177,
-    'SCROLLDOWN' => 178,
-    'KPLEFTPAREN' => 179,
-    'KPRIGHTPAREN' => 180,
-    'INTL1' => 181,
-    'INTL2' => 182,
-    'INTL3' => 183,
-    'INTL4' => 184,
-    'INTL5' => 185,
-    'INTL6' => 186,
-    'INTL7' => 187,
-    'INTL8' => 188,
-    'INTL9' => 189,
-    'LANG1' => 190,
-    'LANG2' => 191,
-    'LANG3' => 192,
-    'LANG4' => 193,
-    'LANG5' => 194,
-    'LANG6' => 195,
-    'LANG7' => 196,
-    'LANG8' => 197,
-    'LANG9' => 198,
-    'PLAYCD' => 200,
-    'PAUSECD' => 201,
-    'PROG3' => 202,
-    'PROG4' => 203,
-    'SUSPEND' => 205,
-    'CLOSE' => 206,
-    'PLAY' => 207,
-    'FASTFORWARD' => 208,
-    'BASSBOOST' => 209,
-    'PRINT' => 210,
-    'HP' => 211,
-    'CAMERA' => 212,
-    'SOUND' => 213,
-    'QUESTION' => 214,
-    'EMAIL' => 215,
-    'CHAT' => 216,
-    'SEARCH' => 217,
-    'CONNECT' => 218,
-    'FINANCE' => 219,
-    'SPORT' => 220,
-    'SHOP' => 221,
-    'ALTERASE' => 222,
-    'CANCEL' => 223,
-    'BRIGHTNESSDOWN' => 224,
-    'BRIGHTNESSUP' => 225,
-    'MEDIA' => 226,
-    'UNKNOWN' => 240,
-    'OK' => 352,
-    'SELECT' => 353,
-    'GOTO' => 354,
-    'CLEAR' => 355,
-    'POWER2' => 356,
-    'OPTION' => 357,
-    'INFO' => 358,
-    'TIME' => 359,
-    'VENDOR' => 360,
-    'ARCHIVE' => 361,
-    'PROGRAM' => 362,
-    'CHANNEL' => 363,
-    'FAVORITES' => 364,
-    'EPG' => 365,
-    'PVR' => 366,
-    'MHP' => 367,
-    'LANGUAGE' => 368,
-    'TITLE' => 369,
-    'SUBTITLE' => 370,
-    'ANGLE' => 371,
-    'ZOOM' => 372,
-    'MODE' => 373,
-    'KEYBOARD' => 374,
-    'SCREEN' => 375,
-    'PC' => 376,
-    'TV' => 377,
-    'TV2' => 378,
-    'VCR' => 379,
-    'VCR2' => 380,
-    'SAT' => 381,
-    'SAT2' => 382,
-    'CD' => 383,
-    'TAPE' => 384,
-    'RADIO' => 385,
-    'TUNER' => 386,
-    'PLAYER' => 387,
-    'TEXT' => 388,
-    'DVD' => 389,
-    'AUX' => 390,
-    'MP3' => 391,
-    'AUDIO' => 392,
-    'VIDEO' => 393,
-    'DIRECTORY' => 394,
-    'LIST' => 395,
-    'MEMO' => 396,
-    'CALENDAR' => 397,
-    'RED' => 398,
-    'GREEN' => 399,
-    'YELLOW' => 400,
-    'BLUE' => 401,
-    'CHANNELUP' => 402,
-    'CHANNELDOWN' => 403,
-    'FIRST' => 404,
-    'LAST' => 405,
-    'AB' => 406,
-    'NEXT' => 407,
-    'RESTART' => 408,
-    'SLOW' => 409,
-    'SHUFFLE' => 410,
-    'BREAK' => 411,
-    'PREVIOUS' => 412,
-    'DIGITS' => 413,
-    'TEEN' => 414,
-    'TWEN' => 415,
-    'DEL_EOL' => 448,
-    'DEL_EOS' => 449,
-    'INS_LINE' => 450,
-    'DEL_LINE' => 451,
-    'ASCII' => 510,
-    'MAX' => 511,
-    'BTN_0' => 256,
-    'BTN_1' => 257
-  };
+    my ($command) = @_;
+    my $commands = {
+        'RESERVED'       => 0,
+        'ESC'            => 1,
+        '1'              => 2,
+        '2'              => 3,
+        '3'              => 4,
+        '4'              => 5,
+        '5'              => 6,
+        '6'              => 7,
+        '7'              => 8,
+        '8'              => 9,
+        '9'              => 10,
+        '0'              => 11,
+        'MINUS'          => 12,
+        'EQUAL'          => 13,
+        'BACKSPACE'      => 14,
+        'TAB'            => 15,
+        'Q'              => 16,
+        'W'              => 17,
+        'E'              => 18,
+        'R'              => 19,
+        'T'              => 20,
+        'Y'              => 21,
+        'U'              => 22,
+        'I'              => 23,
+        'O'              => 24,
+        'P'              => 25,
+        'LEFTBRACE'      => 26,
+        'RIGHTBRACE'     => 27,
+        'ENTER'          => 28,
+        'LEFTCTRL'       => 29,
+        'A'              => 30,
+        'S'              => 31,
+        'D'              => 32,
+        'F'              => 33,
+        'G'              => 34,
+        'H'              => 35,
+        'J'              => 36,
+        'K'              => 37,
+        'L'              => 38,
+        'SEMICOLON'      => 39,
+        'APOSTROPHE'     => 40,
+        'GRAVE'          => 41,
+        'LEFTSHIFT'      => 42,
+        'BACKSLASH'      => 43,
+        'Z'              => 44,
+        'X'              => 45,
+        'C'              => 46,
+        'V'              => 47,
+        'B'              => 48,
+        'N'              => 49,
+        'M'              => 50,
+        'COMMA'          => 51,
+        'DOT'            => 52,
+        'SLASH'          => 53,
+        'RIGHTSHIFT'     => 54,
+        'KPASTERISK'     => 55,
+        'LEFTALT'        => 56,
+        'SPACE'          => 57,
+        'CAPSLOCK'       => 58,
+        'F1'             => 59,
+        'F2'             => 60,
+        'F3'             => 61,
+        'F4'             => 62,
+        'F5'             => 63,
+        'F6'             => 64,
+        'F7'             => 65,
+        'F8'             => 66,
+        'F9'             => 67,
+        'F10'            => 68,
+        'NUMLOCK'        => 69,
+        'SCROLLLOCK'     => 70,
+        'KP7'            => 71,
+        'KP8'            => 72,
+        'KP9'            => 73,
+        'KPMINUS'        => 74,
+        'KP4'            => 75,
+        'KP5'            => 76,
+        'KP6'            => 77,
+        'KPPLUS'         => 78,
+        'KP1'            => 79,
+        'KP2'            => 80,
+        'KP3'            => 81,
+        'KP0'            => 82,
+        'KPDOT'          => 83,
+        '103RD'          => 84,
+        'F13'            => 85,
+        '102ND'          => 86,
+        'F11'            => 87,
+        'F12'            => 88,
+        'F14'            => 89,
+        'F15'            => 90,
+        'F16'            => 91,
+        'F17'            => 92,
+        'F18'            => 93,
+        'F19'            => 94,
+        'F20'            => 95,
+        'KPENTER'        => 96,
+        'RIGHTCTRL'      => 97,
+        'KPSLASH'        => 98,
+        'SYSRQ'          => 99,
+        'RIGHTALT'       => 100,
+        'LINEFEED'       => 101,
+        'HOME'           => 102,
+        'UP'             => 103,
+        'PAGEUP'         => 104,
+        'LEFT'           => 105,
+        'RIGHT'          => 106,
+        'END'            => 107,
+        'DOWN'           => 108,
+        'PAGEDOWN'       => 109,
+        'INSERT'         => 110,
+        'DELETE'         => 111,
+        'MACRO'          => 112,
+        'MUTE'           => 113,
+        'VOLUMEDOWN'     => 114,
+        'VOLUMEUP'       => 115,
+        'POWER'          => 116,
+        'KPEQUAL'        => 117,
+        'KPPLUSMINUS'    => 118,
+        'PAUSE'          => 119,
+        'F21'            => 120,
+        'F22'            => 121,
+        'F23'            => 122,
+        'F24'            => 123,
+        'KPCOMMA'        => 124,
+        'LEFTMETA'       => 125,
+        'RIGHTMETA'      => 126,
+        'COMPOSE'        => 127,
+        'STOP'           => 128,
+        'AGAIN'          => 129,
+        'PROPS'          => 130,
+        'UNDO'           => 131,
+        'FRONT'          => 132,
+        'COPY'           => 133,
+        'OPEN'           => 134,
+        'PASTE'          => 135,
+        'FIND'           => 136,
+        'CUT'            => 137,
+        'HELP'           => 138,
+        'MENU'           => 139,
+        'CALC'           => 140,
+        'SETUP'          => 141,
+        'SLEEP'          => 142,
+        'WAKEUP'         => 143,
+        'FILE'           => 144,
+        'SENDFILE'       => 145,
+        'DELETEFILE'     => 146,
+        'XFER'           => 147,
+        'PROG1'          => 148,
+        'PROG2'          => 149,
+        'WWW'            => 150,
+        'MSDOS'          => 151,
+        'COFFEE'         => 152,
+        'DIRECTION'      => 153,
+        'CYCLEWINDOWS'   => 154,
+        'MAIL'           => 155,
+        'BOOKMARKS'      => 156,
+        'COMPUTER'       => 157,
+        'BACK'           => 158,
+        'FORWARD'        => 159,
+        'CLOSECD'        => 160,
+        'EJECTCD'        => 161,
+        'EJECTCLOSECD'   => 162,
+        'NEXTSONG'       => 163,
+        'PLAYPAUSE'      => 164,
+        'PREVIOUSSONG'   => 165,
+        'STOPCD'         => 166,
+        'RECORD'         => 167,
+        'REWIND'         => 168,
+        'PHONE'          => 169,
+        'ISO'            => 170,
+        'CONFIG'         => 171,
+        'HOMEPAGE'       => 172,
+        'REFRESH'        => 173,
+        'EXIT'           => 174,
+        'MOVE'           => 175,
+        'EDIT'           => 176,
+        'SCROLLUP'       => 177,
+        'SCROLLDOWN'     => 178,
+        'KPLEFTPAREN'    => 179,
+        'KPRIGHTPAREN'   => 180,
+        'INTL1'          => 181,
+        'INTL2'          => 182,
+        'INTL3'          => 183,
+        'INTL4'          => 184,
+        'INTL5'          => 185,
+        'INTL6'          => 186,
+        'INTL7'          => 187,
+        'INTL8'          => 188,
+        'INTL9'          => 189,
+        'LANG1'          => 190,
+        'LANG2'          => 191,
+        'LANG3'          => 192,
+        'LANG4'          => 193,
+        'LANG5'          => 194,
+        'LANG6'          => 195,
+        'LANG7'          => 196,
+        'LANG8'          => 197,
+        'LANG9'          => 198,
+        'PLAYCD'         => 200,
+        'PAUSECD'        => 201,
+        'PROG3'          => 202,
+        'PROG4'          => 203,
+        'SUSPEND'        => 205,
+        'CLOSE'          => 206,
+        'PLAY'           => 207,
+        'FASTFORWARD'    => 208,
+        'BASSBOOST'      => 209,
+        'PRINT'          => 210,
+        'HP'             => 211,
+        'CAMERA'         => 212,
+        'SOUND'          => 213,
+        'QUESTION'       => 214,
+        'EMAIL'          => 215,
+        'CHAT'           => 216,
+        'SEARCH'         => 217,
+        'CONNECT'        => 218,
+        'FINANCE'        => 219,
+        'SPORT'          => 220,
+        'SHOP'           => 221,
+        'ALTERASE'       => 222,
+        'CANCEL'         => 223,
+        'BRIGHTNESSDOWN' => 224,
+        'BRIGHTNESSUP'   => 225,
+        'MEDIA'          => 226,
+        'UNKNOWN'        => 240,
+        'OK'             => 352,
+        'SELECT'         => 353,
+        'GOTO'           => 354,
+        'CLEAR'          => 355,
+        'POWER2'         => 356,
+        'OPTION'         => 357,
+        'INFO'           => 358,
+        'TIME'           => 359,
+        'VENDOR'         => 360,
+        'ARCHIVE'        => 361,
+        'PROGRAM'        => 362,
+        'CHANNEL'        => 363,
+        'FAVORITES'      => 364,
+        'EPG'            => 365,
+        'PVR'            => 366,
+        'MHP'            => 367,
+        'LANGUAGE'       => 368,
+        'TITLE'          => 369,
+        'SUBTITLE'       => 370,
+        'ANGLE'          => 371,
+        'ZOOM'           => 372,
+        'MODE'           => 373,
+        'KEYBOARD'       => 374,
+        'SCREEN'         => 375,
+        'PC'             => 376,
+        'TV'             => 377,
+        'TV2'            => 378,
+        'VCR'            => 379,
+        'VCR2'           => 380,
+        'SAT'            => 381,
+        'SAT2'           => 382,
+        'CD'             => 383,
+        'TAPE'           => 384,
+        'RADIO'          => 385,
+        'TUNER'          => 386,
+        'PLAYER'         => 387,
+        'TEXT'           => 388,
+        'DVD'            => 389,
+        'AUX'            => 390,
+        'MP3'            => 391,
+        'AUDIO'          => 392,
+        'VIDEO'          => 393,
+        'DIRECTORY'      => 394,
+        'LIST'           => 395,
+        'MEMO'           => 396,
+        'CALENDAR'       => 397,
+        'RED'            => 398,
+        'GREEN'          => 399,
+        'YELLOW'         => 400,
+        'BLUE'           => 401,
+        'CHANNELUP'      => 402,
+        'CHANNELDOWN'    => 403,
+        'FIRST'          => 404,
+        'LAST'           => 405,
+        'AB'             => 406,
+        'NEXT'           => 407,
+        'RESTART'        => 408,
+        'SLOW'           => 409,
+        'SHUFFLE'        => 410,
+        'BREAK'          => 411,
+        'PREVIOUS'       => 412,
+        'DIGITS'         => 413,
+        'TEEN'           => 414,
+        'TWEN'           => 415,
+        'DEL_EOL'        => 448,
+        'DEL_EOS'        => 449,
+        'INS_LINE'       => 450,
+        'DEL_LINE'       => 451,
+        'ASCII'          => 510,
+        'MAX'            => 511,
+        'BTN_0'          => 256,
+        'BTN_1'          => 257
+    };
 
-  if (defined($commands->{$command})) {
-    return $commands->{$command};
-  } elsif ($command eq "GetRemotecontrolCommands") {
-    return $commands;
-  } else {
-    return "";
-  }
+    if ( defined( $commands->{$command} ) ) {
+        return $commands->{$command};
+    }
+    elsif ( $command eq "GetRemotecontrolCommands" ) {
+        return $commands;
+    }
+    else {
+        return "";
+    }
 }
 
 1;
@@ -1579,7 +1905,7 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
     <ul>
     <li><b>on</b> &nbsp;&nbsp;-&nbsp;&nbsp; powers on the device and send a WoL magic package if needed</li>
     <li><b>off</b> &nbsp;&nbsp;-&nbsp;&nbsp; turns the device in standby mode</li>
-    <li><b>toogle</b> &nbsp;&nbsp;-&nbsp;&nbsp; switch between on and off</li>
+    <li><b>toggle</b> &nbsp;&nbsp;-&nbsp;&nbsp; switch between on and off</li>
     <li><b>shutdown</b> &nbsp;&nbsp;-&nbsp;&nbsp; turns the device in deepstandby mode</li>
     <li><b>reboot</b> &nbsp;&nbsp;-&nbsp;&nbsp;reboots the device</li>
     <li><b>restartGui</b> &nbsp;&nbsp;-&nbsp;&nbsp;restarts the GUI / ENIGMA2 process</li>
