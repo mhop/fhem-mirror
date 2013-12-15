@@ -570,7 +570,9 @@ CUL_DoInit($)
     CUL_SimpleWrite($hash, "T01" . $hash->{FHTID});
   }
 
-  $hash->{STATE} = "Initialized";
+  $hash->{STATE} =
+  $hash->{READINGS}{state}{VAL} = "Initialized";
+  $hash->{READINGS}{state}{TIME} = TimeNow();
 
   # Reset the counter
   delete($hash->{XMIT_TIME});
@@ -647,10 +649,9 @@ CUL_ReadAnswer($$$$)
 #####################################
 # Check if the 1% limit is reached and trigger notifies
 sub
-CUL_XmitLimitCheck($$)
+CUL_XmitLimitCheck($$$)
 {
-  my ($hash,$fn) = @_;
-  my $now = time();
+  my ($hash,$fn,$now) = @_;
 
   if(!$hash->{XMIT_TIME}) {
     $hash->{XMIT_TIME}[0] = $now;
@@ -675,17 +676,19 @@ CUL_XmitLimitCheck($$)
   $hash->{XMIT_TIME} = \@b;
   $hash->{NR_CMD_LAST_H} = int(@b);
 }
+
 sub
-CUL_XmitLimitCheckHM($$)
-{# add a delay to  last received. Thisis dynamic to obey System performance
- # was working with 700ms - added buffer to 900ms
-  my ($hash,$fn) = @_;
+CUL_XmitLimitCheckHM($$$)
+{
+  # add a delay to  last received. Thisis dynamic to obey System performance
+  # was working with 700ms - added buffer to 900ms
+  my ($hash,$fn,$now) = @_;
   my $id = (length($fn)>19)?substr($fn,16,6):"";#get HMID destination
   if($id &&
      $hash->{helper} && 
      $hash->{helper}{nextSend} &&
      $hash->{helper}{nextSend}{$id}) {
-    my $DevDelay = $hash->{helper}{nextSend}{$id} - gettimeofday();
+    my $DevDelay = $hash->{helper}{nextSend}{$id} - $now;
     if ($DevDelay > 0.01){# wait less then 10 ms will not work
       $DevDelay = ((int($DevDelay*100))%100)/100;# security: no more then 1 sec
 	  select(undef, undef, undef, $DevDelay);
@@ -760,6 +763,7 @@ CUL_SendFromQueue($$)
   my $hm = ($bstring =~ m/^A/);
   my $mz = ($bstring =~ m/^Z/);
   my $to = ($hm ? 0.15 : 0.3);
+  my $now = gettimeofday();
 
   if($bstring ne "") {
     my $sp = AttrVal($name, "sendpool", undef);
@@ -772,14 +776,17 @@ CUL_SendFromQueue($$)
            $defs{$f}{QUEUE}->[0] ne "")
           {
             unshift(@{$hash->{QUEUE}}, "");
-            InternalTimer(gettimeofday()+$to, "CUL_HandleWriteQueue", $hash, 1);
+            InternalTimer($now+$to, "CUL_HandleWriteQueue", $hash, 1);
             return;
           }
       }
     }
-	if($hm) {CUL_XmitLimitCheckHM($hash,$bstring)
-	}else{CUL_XmitLimitCheck($hash,$bstring)
-	}
+
+    if($hm) {
+      CUL_XmitLimitCheckHM($hash,$bstring, $now);
+    } else {
+      CUL_XmitLimitCheck($hash, $bstring, $now);
+    }
     CUL_SimpleWrite($hash, $bstring);
   }
 
@@ -787,7 +794,7 @@ CUL_SendFromQueue($$)
   # Write the next buffer not earlier than 0.23 seconds
   # = 3* (12*0.8+1.2+1.0*5*9+0.8+10) = 226.8ms
   # else it will be sent too early by the CUL, resulting in a collision
-  InternalTimer(gettimeofday()+$to, "CUL_HandleWriteQueue", $hash, 1);
+  InternalTimer($now+$to, "CUL_HandleWriteQueue", $hash, 1);
 }
 
 sub
@@ -896,7 +903,6 @@ CUL_Parse($$$$$)
     }
 
   } elsif($fn eq "H" && $len >= 13) {              # Reformat for 12_HMS.pm
-
     my $type = hex(substr($dmsg,6,1));
     my $stat = $type > 1 ? hex(substr($dmsg,7,2)) : hex(substr($dmsg,5,2));
     my $prf  = $type > 1 ? "02" : "05";
@@ -912,7 +918,6 @@ CUL_Parse($$$$$)
     $dmsg = lc($dmsg);
 
   } elsif($fn eq "K" && $len >= 5) {
-
     if($len == 15) {                               # Reformat for 13_KS300.pm
       my @a = split("", $dmsg);
       $dmsg = sprintf("81%02x04xx4027a001", $len/2+6);
@@ -936,8 +941,9 @@ CUL_Parse($$$$$)
     ;
   } elsif($fn eq "A" && $len >= 20) {              # AskSin/BidCos/HomeMatic
     my $srcId = substr($dmsg,9,6);
-	$hash->{helper}{nextSend}{$srcId} = gettimeofday() + 0.100;
-	$dmsg .="::$rssi:$name" if(defined($rssi));
+    $hash->{helper}{nextSend}{$srcId} = gettimeofday() + 0.100;
+    $dmsg .="::$rssi:$name" if(defined($rssi));
+
   } elsif($fn eq "Z" && $len >= 21) {              # Moritz/Max
     ;
   } elsif($fn eq "t" && $len >= 5)  {              # TX3
@@ -949,7 +955,8 @@ CUL_Parse($$$$$)
   }
 
   $hash->{"${name}_MSGCNT"}++;
-  $hash->{"${name}_TIME"} = TimeNow();
+  $hash->{"${name}_TIME"} =
+  $hash->{READINGS}{state}{TIME} = TimeNow();      # showtime attribute
   $hash->{RAWMSG} = $rmsg;
   my %addvals = (RAWMSG => $rmsg);
   if(defined($rssi)) {
