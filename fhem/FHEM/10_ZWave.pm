@@ -216,7 +216,10 @@ my %zwave_class = (
   IP_CONFIGURATION         => { id => '9a', },
   ASSOCIATION_COMMAND_CONFIGURATION
                            => { id => '9b', },
-  SENSOR_ALARM             => { id => '9c', },
+  SENSOR_ALARM             => { id => '9c',
+    get   => { alarm       => "01%02x", },
+    parse => { "..9c02(..)(..)(..)(....)" =>
+                '"alarm_type_$2:level $3 node $1 seconds ".hex($4)',}, },  
   SILENCE_ALARM            => { id => '9d', },
   SENSOR_CONFIGURATION     => { id => '9e', },
   MARK                     => { id => 'ef', },
@@ -814,6 +817,13 @@ s2Hex($)
     MULTI_CHANNEL device. The device is only created for channel 2 or greater.
     </li>
 
+  <br><br><b>Class SENSOR_ALARM</b>
+  <li>alarm alarmType<br>
+    return the nodes alarm status of the requested alarmType. 00 = GENERIC,
+    01 = SMOKE, 02 = CO, 03 = CO2, 04 = HEAT, 05 = WATER, ff = returns the
+    nodes first supported alarm type.    
+    </li>
+
   <br><br><b>Class SENSOR_BINARY</b>
   <li>sbStatus<br>
     return the status of the node, as state:open or state:closed.
@@ -918,6 +928,9 @@ s2Hex($)
   <br><br><b>Class MULTI_CHANNEL</b>
   <li>endpoints:total X $dynamic $identical</li>
   <li>mcCapability_X:class1 class2 ...</li>
+
+  <br><br><b>Class SENSOR_ALARM</b>
+  <li>alarm_type_X:level Y node $nodeID seconds $seconds</li>
 
   <br><br><b>Class SENSOR_BINARY</b>
   <li>state:open</li>
