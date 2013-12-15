@@ -571,17 +571,17 @@ FW_answerCall($)
 
   ########################
   # FW Extensions
+  my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
   if(defined($data{FWEXT})) {
     foreach my $k (sort keys %{$data{FWEXT}}) {
       my $h = $data{FWEXT}{$k};
       next if($h !~ m/HASH/ || !$h->{SCRIPT});
       my $script = $h->{SCRIPT};
       $script = ($script =~ m,^/,) ? "$FW_ME$script" : "$FW_ME/pgm2/$script";
-      FW_pO "<script type=\"text/javascript\" src=\"$script\"></script>";
+      FW_pO sprintf($jsTemplate, $script);
     }
   }
 
-  my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
   FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/svg.js") if($FW_plotmode eq "SVG");
   foreach my $js (@FW_fhemwebjs) {
     FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/$js");
