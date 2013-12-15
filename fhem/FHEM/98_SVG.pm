@@ -49,7 +49,7 @@ SVG_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn} = "SVG_Define";
-  $hash->{AttrList} = "fixedrange startDate plotsize label title plotfunction";
+  $hash->{AttrList} = "fixedoffset fixedrange startDate plotsize label title plotfunction";
   $hash->{SetFn}    = "SVG_Set";
   $hash->{FW_summaryFn} = "SVG_FwFn";
   $hash->{FW_detailFn}  = "SVG_FwFn";
@@ -550,6 +550,17 @@ SVG_substcfg($$$$$$)
   }
 }
 
+sub
+SVG_tspec($$@)
+{
+  my ($n,$e) = (shift,shift);
+  for(my $i=1; $i<$n; $i++) {
+    $_[$i] = 0;
+  }
+  return sprintf("%04d-%02d-%02d_%02d:%02d:%02d",
+                 $_[5]+1900,$_[4]+1,$_[3],$_[2],$_[1],$e);
+}
+
 ##################
 # Calculate either the number of scrollable SVGs (for $d = undef) or
 # for the device the valid from and to dates for the given zoom and offset
@@ -561,13 +572,12 @@ SVG_calcOffsets($$)
   my $pm = AttrVal($d,"plotmode",$FW_plotmode);
   return if($pm eq "gnuplot");
 
-  my $frx;
+  my ($fr, $fo);
   if($defs{$wl}) {
-    my $fr = AttrVal($wl, "fixedrange", undef);
+    $fr = AttrVal($wl, "fixedrange", undef);
     if($fr) {
-      #klaus fixed range day, week, month or year
-      if($fr eq "day" || $fr eq "week" || $fr eq "month" || $fr eq "year" ) {
-        $frx=$fr;
+      if($fr eq "day" || $fr eq "week" || $fr eq "month" || $fr eq "year" ||
+        $fr =~ m/^\d+days$/ ) {
 
       } else {
         my @range = split(" ", $fr);
@@ -577,11 +587,14 @@ SVG_calcOffsets($$)
         return;
       }
     }
+
+    $fo = AttrVal( $wl, "fixedoffset", undef);
   }
 
   my $off = $FW_pos{$d};
   $off = 0 if(!$off);
   $off += $FW_pos{off} if($FW_pos{off});
+  $off = $fo if(defined($fo) && $fo =~ m/^[+-]?\d+$/);
 
   my $now;
   my $st = AttrVal($wl, "startDate", undef);
@@ -593,75 +606,64 @@ SVG_calcOffsets($$)
 
   my $zoom = $FW_pos{zoom};
   $zoom = "day" if(!$zoom);
-  $zoom = $frx if ($frx); #for fixedrange {day|week|...} klaus
+  $zoom = $fr if(defined($fr)); 
 
 
+  my $endPlotNow = (AttrVal($FW_wname, "endPlotNow", undef) && !$st);
   if($zoom eq "hour") {
-    if(AttrVal($FW_wname, "endPlotNow", undef) && !$st) {
+    if($endPlotNow) {
       my $t = int(($now + $off*3600 - 3600)/300.0)*300 + 300;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} = sprintf("%04d-%02d-%02d_%02d:%02d:00",
-                                        $l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      $SVG_devs{$d}{from} = SVG_tspec(1,0,@l);
       @l = localtime($t+3600);
-      $SVG_devs{$d}{to} = sprintf("%04d-%02d-%02d_%02d:%02d:01",
-                                        $l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      $SVG_devs{$d}{to}   = SVG_tspec(1,1,@l);
+
     } else { 
       my $t = $now + $off*3600;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} = sprintf("%04d-%02d-%02d_%02d:00:00",
-                                        $l[5]+1900,$l[4]+1,$l[3],$l[2]);
+      $SVG_devs{$d}{from} = SVG_tspec(2,0,@l);
       @l = localtime($t+3600);
-      $SVG_devs{$d}{to} = sprintf("%04d-%02d-%02d_%02d:00:01",
-                                        $l[5]+1900,$l[4]+1,$l[3],$l[2]);
+      $SVG_devs{$d}{to}   = SVG_tspec(2,1,@l);
     }
   } elsif($zoom eq "qday") {
-    if(AttrVal($FW_wname, "endPlotNow", undef) && !$st) {
+    if($endPlotNow) {
       my $t = int(($now + $off*21600 - 21600)/300.0)*300 + 300;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} = sprintf("%04d-%02d-%02d_%02d:%02d:00",
-                                        $l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      $SVG_devs{$d}{from} = SVG_tspec(1,0,@l);
       @l = localtime($t+21600);
-      $SVG_devs{$d}{to} = sprintf("%04d-%02d-%02d_%02d:%02d:01",
-                                        $l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      $SVG_devs{$d}{to}   = SVG_tspec(1,1,@l);
     } else { 
       my $t = $now + $off*21600;
       my @l = localtime($t);
       $l[2] = int($l[2]/6)*6;
-      $SVG_devs{$d}{from} = sprintf("%04d-%02d-%02d_%02d:00:00",
-                                        $l[5]+1900,$l[4]+1,$l[3],$l[2]);
+      $SVG_devs{$d}{from} = SVG_tspec(2,0,@l);
       @l = localtime($t+21600);
       $l[2] = int($l[2]/6)*6;
-      $SVG_devs{$d}{to} = sprintf("%04d-%02d-%02d_%02d:00:01",
-                                        $l[5]+1900,$l[4]+1,$l[3],$l[2]);
+      $SVG_devs{$d}{to}   = SVG_tspec(2,1,@l);
     }
-  } elsif($zoom eq "day") {
-    if(AttrVal($FW_wname, "endPlotNow", undef) && !$st) {
-      my $t = int(($now + $off*86400 - 86400)/900.0)*900 + 900;
+  } elsif($zoom =~ m/^(\d+)?day/) {
+    my $nDays = $1 ? ($1-1) : 0;
+    if($endPlotNow) {
+      my $t = int(($now + ($off-$nDays-1)*86400)/900.0)*900 + 900;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} = sprintf("%04d-%02d-%02d_%02d:%02d:00",
-                                        $l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
-      @l = localtime($t+86400);
-      $SVG_devs{$d}{to} = sprintf("%04d-%02d-%02d_%02d:%02d:01",
-                                        $l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      $SVG_devs{$d}{from} = SVG_tspec(1,0,@l);
+      @l = localtime($t+(1+$nDays)*86400);
+      $SVG_devs{$d}{to}   = SVG_tspec(1,1,@l);
     } else { 
-      my $t = $now + $off*86400;
+      my $t = $now + ($off-$nDays)*86400;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} = sprintf("%04d-%02d-%02d_00:00:00",
-                                        $l[5]+1900,$l[4]+1,$l[3]);
-      @l = localtime($t+86400);
-      $SVG_devs{$d}{to} = sprintf("%04d-%02d-%02d_00:00:01",
-                                        $l[5]+1900,$l[4]+1,$l[3]);
+      $SVG_devs{$d}{from} = SVG_tspec(3,0,@l);
+      @l = localtime($t+(1+$nDays)*86400);
+      $SVG_devs{$d}{to}   = SVG_tspec(3,1,@l);
     }
   } elsif($zoom eq "week") {
     my @l = localtime($now);
     my $start = (AttrVal($FW_wname, "endPlotToday", undef) ? 6 : $l[6]);
     my $t = $now - ($start*86400) + ($off*86400)*7;
     @l = localtime($t);
-    $SVG_devs{$d}{from} = sprintf("%04d-%02d-%02d_00:00:00",
-                                        $l[5]+1900,$l[4]+1,$l[3]);
+    $SVG_devs{$d}{from} = SVG_tspec(3,0,@l);
     @l = localtime($t+7*86400);
-    $SVG_devs{$d}{to} = sprintf("%04d-%02d-%02d_00:00:01",
-                                        $l[5]+1900,$l[4]+1,$l[3]);
+    $SVG_devs{$d}{to}   = SVG_tspec(3,1,@l);
 
  } elsif($zoom eq "month") {
     my ($endDay, @l);
@@ -678,12 +680,11 @@ SVG_calcOffsets($$)
     }
     $l[4] += $off;
     $l[4] += 12, $l[5]-- if($l[4] < 0);
-    $SVG_devs{$d}{from} =
-        sprintf("%04d-%02d-%02d_00:00:00", $l[5]+1900, $l[4]+1,$endDay);
+    $l[3] = $endDay;
+    $SVG_devs{$d}{from} = SVG_tspec(3,0,@l);
     $l[4]++;
     $l[4] = 0, $l[5]++ if($l[4] == 12);
-    $SVG_devs{$d}{to} =
-        sprintf("%04d-%02d-%02d_00:00:01", $l[5]+1900, $l[4]+1,$endDay);
+    $SVG_devs{$d}{to}   = SVG_tspec(3,1,@l);
 
   } elsif($zoom eq "year") {
     my @l = localtime($now);
@@ -1610,12 +1611,19 @@ sub plotAsPng(@) {
     <li>fixedrange<br>
         Contains two time specs in the form YYYY-MM-DD separated by a space.
         In plotmode gnuplot-scroll or SVG the given time-range will be used,
-        and no scrolling for this weblinks will be possible. Needed e.g. for
+        and no scrolling for this SVG will be possible. Needed e.g. for
         looking at last-years data without scrolling.<br><br>
-        If the value is one of day, week, month, year then set the zoom level
-        for this weblink independently of the user specified zoom-level.
-        This is useful for pages with multiple plots: one of the plots is best
-        viewed in with the default (day) zoom, the other one with a week zoom.
+        If the value is one of day, &lt;N&gt;days, week, month, year than set
+        the zoom level for this SVG independently of the user specified
+        zoom-level. This is useful for pages with multiple plots: one of the
+        plots is best viewed in with the default (day) zoom, the other one with
+        a week zoom.
+
+        </li><br>
+
+    <a name="fixedoffset"></a>
+    <li>fixedoffset &lt;nDays&gt;<br>
+        Set an fixed offset (in days) for the plot.
         </li><br>
 
     <a name="startDate"></a>
