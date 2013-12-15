@@ -680,6 +680,8 @@ IOWrite($@)
     return;
   }
 
+  return if(IsDummy($iohash->{NAME}));
+
   no strict "refs";
   my $ret = &{$modules{$iohash->{TYPE}}{WriteFn}}($iohash, @a);
   use strict "refs";
@@ -2751,6 +2753,7 @@ Dispatch($$$)
   my $module = $modules{$hash->{TYPE}};
   my $name = $hash->{NAME};
 
+  return if(IsDummy($name));
   Log3 $hash, 5, "$name dispatch $dmsg";
 
   my ($isdup, $idx) = CheckDuplicate($name, $dmsg, $module->{FingerprintFn});
