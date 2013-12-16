@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: New module LINDY_HDMI_SWITCH.pm added
   - feature: ENIGMA2: improved logging, default attributes for webCmd and devStateIcon
   - bugfix:  ENIGMA2: support for option channels
   - feature: mailcheck: decode non ascii subjet to utf-8,
