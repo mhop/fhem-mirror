@@ -32,6 +32,7 @@ my @hw = qw(
   EMWZ
   ESA2000
   EnOcean
+  FB_CALLMONITOR
   FBAHA
   FBDECT
   FHT
@@ -80,6 +81,7 @@ my @hw = qw(
   OWTHERM
   OWX
   POKEYS
+  PRESENCE
   RFXCOM
   RFXMETER
   RFXX10REC
