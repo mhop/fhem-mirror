@@ -393,9 +393,11 @@ readingsGroup_2html($)
         }
 
         $txt = "<a href=\"/fhem?detail=$name\">$txt</a>" if( $show_links );
+        $v = "<div $value_style>$v</div>" if( $value_style && !$devStateIcon );
+
         $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>" if( $first || $multi == 1 );
         $ret .= "<td informId=\"$d-$name.$n\">$devStateIcon</td>" if( $devStateIcon );
-        $ret .= "<td><div $value_style informId=\"$d-$name.$n\">$v</div></td>" if( !$devStateIcon );
+        $ret .= "<td><div informId=\"$d-$name.$n\">$v</div></td>" if( !$devStateIcon );
         $ret .= "<td><div $timestamp_style informId=\"$d-$name.$n-ts\">$t</div></td>" if( $show_time && $t );
 
         $first = 0;
@@ -483,6 +485,8 @@ readingsGroup_Notify($$)
         $value = $s;
       }
 
+      my $value_style = AttrVal( $name, "valueStyle", "" );
+
       my $value_format = AttrVal( $name, "valueFormat", "" );
       if( $value_format =~ m/^{.*}$/ ) {
         my $vf = eval $value_format;
@@ -569,6 +573,9 @@ readingsGroup_Notify($$)
             CommandTrigger( "", "$name $n.$reading: $devStateIcon" ) if( $devStateIcon );
             next if( $devStateIcon );
           }
+
+          my $value_style = lookup2($value_style,$dev->{NAME},$reading,$value);
+          $value = "<div $value_style>$value</div>" if( $value_style );
 
           CommandTrigger( "", "$name $dev->{NAME}.$reading: $value" );
         }
@@ -747,7 +754,9 @@ readingsGroup_Get($@)
           <code>attr batteries valueStyle {($VALUE ne "ok")?'style="color:red"':'style="color:green"'}</code><br>
           <code>attr temperatures valueStyle {($DEVICE =~ m/aussen/)?'style="color:green"':'style="color:red"'}</code>
     </ul>
-      Note: The perl expressions are evaluated only once during html creation and will not reflect value updates with longpoll.
+      Note: Only valueStyle, valueFomat, valueIcon and <{...}#reading> are evaluated during longpoll updates
+      and valueStyle has to return a non empty style for every possible value. All other perl expressions are
+      evaluated only once during html creation and will not reflect value updates with longpoll.
       Refresh the page to update the dynamic style. For nameStyle the color attribut is not working at the moment,
       the font-... and background attributes do work.
 
