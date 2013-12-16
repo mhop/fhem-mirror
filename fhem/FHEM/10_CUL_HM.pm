@@ -5,8 +5,6 @@
 
 package main;
 
-# attribut conversion                                     "#todo Updt4 remove"
-#        the lines can be removed after some soak time - around version 2600
 use strict;
 use warnings;
 use HMConfig;
@@ -3286,9 +3284,13 @@ sub CUL_HM_Set($@) {
 
     # First the remote (one loop for on, one for off)
     if (!$target || $target =~ m/^(remote|both)$/){
-      my $burst = ($pSt eq "thermostat"?"0101":"0100");#set burst for target
-      my $pnb = 1 if ($culHmRegModel{$md}{peerNeedsBurst}|| #supported?
-                      $culHmRegType{$st}{peerNeedsBurst});
+      my $burst;
+      if ($culHmRegModel{$md}{peerNeedsBurst}|| #peerNeedsBurst supported
+          $culHmRegType{$st}{peerNeedsBurst}){
+        $burst = (CUL_HM_getRxType($peerHash) & 0x82) #burst |burstConditional
+                           ?"0101"  
+                           :"0100";
+      }
       for(my $i = 1; $i <= $nrCh2Pair; $i++) {
         my $b = ($i==1 ? $b1 : $b2);
         $b = $b2 if ($pSt eq "smokeDetector");
@@ -3304,7 +3306,7 @@ sub CUL_HM_Set($@) {
                  "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerBtn}00");
           CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,
                               hex($peerBtn),4,$burst)
-                   if($pnb && $cmdB eq "01"); # only if set
+                   if($burst && $cmdB eq "01"); # only if set
           CUL_HM_qAutoRead($name,3);
         }
       }
@@ -4107,6 +4109,7 @@ sub CUL_HM_ID2PeerList ($$$) {
         my $tn = ($_ =~ m/self/)?$name:$_;
         next if (!$defs{$tn});
         $defs{$tn}{sdTeam} = "sdLead" ;
+        $defs{$tn}{helper}{fkt}="sdLead";
       }
       if($peerNames !~ m/self/){
         delete $hash->{sdTeam};
