@@ -147,8 +147,9 @@ FHEM/82_LGTV.pm              painseeker           http://forum.fhem.de Sonstiges
 FHEM/82_M232Voltage.pm       borisneubert         http://forum.fhem.de Sonstiges
 FHEM/87_WS2000.pm            tdressler            http://forum.fhem.de Sonstiges
 FHEM/88_ALL4000T.pm          sachag               http://forum.fhem.de Sonstiges
+FHEM/88_LINDY_HDMI_SWITCH.pm sachag               http://forum.fhem.de Multimedia
 FHEM/88_IPWE.pm              tdressler            http://forum.fhem.de Sonstiges
-FHEM/88_Itach_Relay.pm       sachag               http://forum.fhem.de Sonstiges
+FHEM/88_Itach_Relay.pm       sachag               http://forum.fhem.de Automatisierung
 FHEM/88_VantagePro2.pm       sachag               http://forum.fhem.de Sonstiges
 FHEM/88_WEBCOUNT.pm          sachag               http://forum.fhem.de Sonstiges
 FHEM/90_at.pm                rudolfkoenig         http://forum.fhem.de Automatisierung
