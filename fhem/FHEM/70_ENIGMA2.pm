@@ -425,9 +425,8 @@ sub ENIGMA2_GetStatus($;$) {
 
                     my @servicetype = split( /:/,
                         $serviceinfo->{e2service}[0]{e2servicereference} );
-                    if ( ref(@servicetype) eq "ARRAY"
-                        && $servicetype[2] eq "2" )
-                    {
+
+                    if ( defined( $servicetype[2] ) && $servicetype[2] eq "2" ) {
                         readingsBulkUpdate( $hash, "input", "radio", 1 );
                     }
                     else {
@@ -457,9 +456,8 @@ sub ENIGMA2_GetStatus($;$) {
 
                     my @servicetype = split( /:/,
                         $serviceinfo->{e2service}{e2servicereference} );
-                    if ( ref(@servicetype) eq "ARRAY"
-                        && $servicetype[2] eq "2" )
-                    {
+
+                    if ( defined( $servicetype[2] ) && $servicetype[2] eq "2" ) {
                         readingsBulkUpdate( $hash, "input", "radio", 1 );
                     }
                     else {
@@ -662,14 +660,21 @@ sub ENIGMA2_Get($@) {
 ###################################
 sub ENIGMA2_Set($@) {
     my ( $hash, @a ) = @_;
-    my $name = $hash->{NAME};
+    my $name  = $hash->{NAME};
+    my $state = $hash->{STATE};
 
     return "No Argument given" if ( !defined( $a[1] ) );
 
     my $usage =
         "Unknown argument "
       . $a[1]
-      . ", choose one of statusRequest:noArg toggle:noArg on:noArg off:noArg reboot:noArg restartGui:noArg shutdown:noArg volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg mute:on,off msg remoteControl:UP,DOWN,LEFT,RIGHT,OK,MENU,EPG,ESC,EXIT,RECORD,RED,GREEN,YELLOW,BLUE,AUDIO channel:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30 channelUp:noArg channelDown:noArg input:tv,radio play:noArg pause:noArg stop:noArg showText ";
+      . ", choose one of statusRequest:noArg toggle:noArg on:noArg off:noArg reboot:noArg restartGui:noArg shutdown:noArg volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg mute:on,off msg remoteControl:UP,DOWN,LEFT,RIGHT,OK,MENU,EPG,ESC,EXIT,RECORD,RED,GREEN,YELLOW,BLUE,AUDIO channelUp:noArg channelDown:noArg play:noArg pause:noArg stop:noArg showText ";
+    $usage .=
+" channel:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30 input:tv,radio"
+      if ( $state eq "on" );
+    $usage .=
+" channel:-,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30 input:-,tv,radio"
+      if ( $state ne "on" );
     my $cmd = '';
     my $result;
 
@@ -686,12 +691,10 @@ sub ENIGMA2_Set($@) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{power}{VAL} eq "off" ) {
-            ENIGMA2_Set( $hash, "on" );
-            return undef;
+            return ENIGMA2_Set( $hash, $name, "on" );
         }
         else {
-            ENIGMA2_Set( $hash, "off" );
-            return undef;
+            return ENIGMA2_Set( $hash, $name, "off" );
         }
 
     }
@@ -865,6 +868,9 @@ sub ENIGMA2_Set($@) {
     elsif ( $a[1] eq "mute" ) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
+        return "No argument given, choose on of on off"
+          if ( !defined( $a[2] ) );
+
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             if ( $a[2] eq "off" ) {
                 if ( $hash->{READINGS}{mute}{VAL} ne "off" ) {
@@ -978,8 +984,7 @@ sub ENIGMA2_Set($@) {
             my $request = ENIGMA2_GetRemotecontrolCommand( uc( $a[2] ) );
 
             if ( $request eq "POWER" ) {
-                ENIGMA2_Set( $hash, "toggle" );
-                return undef;
+                return ENIGMA2_Set( $hash, $name, "toggle" );
             }
             elsif ( $request ne "" ) {
                 $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand( $a[2] );
@@ -1011,6 +1016,14 @@ sub ENIGMA2_Set($@) {
 
     # channel
     elsif ( $a[1] eq "channel" ) {
+        if (   defined( $a[2] )
+            && $hash->{READINGS}{presence}{VAL} eq "present"
+            && $hash->{READINGS}{state}{VAL} ne "on" )
+        {
+            Log3 $name, 4, "ENIGMA2 $name: indirect switching request to ON";
+            ENIGMA2_Set( $hash, $name, "on" );
+        }
+
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
         return
@@ -1020,7 +1033,8 @@ sub ENIGMA2_Set($@) {
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             my $_ = $a[2];
             if (m/^(\d+):(.*):$/) {
-                $result = ENIGMA2_SendCommand( $hash, "zap", "sRef=" . $_ );
+                $result =
+                  ENIGMA2_SendCommand( $hash, "zap", "sRef=" . urlEncode($_) );
             }
             elsif ( m/^\d+$/ && $_ > 0 && $_ < 10000 ) {
                 for ( split( //, $a[2] ) ) {
@@ -1037,7 +1051,8 @@ sub ENIGMA2_Set($@) {
             }
         }
         else {
-            return "Device needs to be ON to switch to a specific channel.";
+            return
+              "Device needs to be present to switch to a specific channel.";
         }
     }
 
@@ -1061,6 +1076,17 @@ sub ENIGMA2_Set($@) {
 
     # input
     elsif ( $a[1] eq "input" ) {
+        if (   defined( $a[2] )
+            && $hash->{READINGS}{presence}{VAL} eq "present"
+            && $hash->{READINGS}{state}{VAL} ne "on" )
+        {
+            Log3 $name, 4, "ENIGMA2 $name: indirect switching request to ON";
+            ENIGMA2_Set( $hash, $name, "on" );
+        }
+
+        return "No argument given, choose one of tv radio "
+          if ( !defined( $a[2] ) );
+
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
@@ -1076,12 +1102,12 @@ sub ENIGMA2_Set($@) {
                 return
                     "Argument "
                   . $a[2]
-                  . " is not a valid, please choose one from tv radio ";
+                  . " is not valid, please choose one from tv radio ";
             }
             $result = ENIGMA2_SendCommand( $hash, "remotecontrol", $cmd );
         }
         else {
-            return "Device needs to be ON to switch input.";
+            return "Device needs to be present to switch input.";
         }
     }
 
@@ -1231,10 +1257,10 @@ sub ENIGMA2_SendCommand($$;$) {
     my $return;
 
     if ( !defined($cmd) || $cmd eq "" ) {
-        Log3 $name, 4, "ENIGMA2 $name: REQUEST $service";
+        Log3 $name, 4, "ENIGMA2 $name: REQ $service";
     }
     else {
-        Log3 $name, 4, "ENIGMA2 $name: REQUEST $service -> $cmd";
+        Log3 $name, 4, "ENIGMA2 $name: REQ $service/" . urlDecode($cmd);
     }
 
     if ( defined($http_user) && defined($http_passwd) ) {
@@ -1261,7 +1287,7 @@ sub ENIGMA2_SendCommand($$;$) {
           "http://" . $address . ":" . $port . "/web/" . $service . "?" . $cmd;
     }
 
-    Log3 $name, 5, "ENIGMA2 $name: GET $URL";
+    Log3 $name, 5, "ENIGMA2 $name: GET " . urlDecode($URL);
 
     $response = CustomGetFileFromURL( 0, $URL, 4, $cmd, 0, 5 );
 
@@ -1285,14 +1311,22 @@ sub ENIGMA2_SendCommand($$;$) {
         }
 
         if ( !defined($cmd) || $cmd eq "" ) {
-            Log3 $name, 4, "ENIGMA2 $name: RECEIVED $service";
+            Log3 $name, 4, "ENIGMA2 $name: RCV $service";
         }
         else {
-            Log3 $name, 4, "ENIGMA2 $name: RECEIVED $cmd";
+            Log3 $name, 4, "ENIGMA2 $name: RCV $service/" . urlDecode($cmd);
         }
 
         if ( $response ne "" ) {
-            Log3 $name, 5, "ENIGMA2 $name: RESPONSE " . $response;
+            if ( !defined($cmd) || $cmd eq "" ) {
+                Log3 $name, 5, "ENIGMA2 $name: RES $service\n" . $response;
+            }
+            else {
+                Log3 $name, 5,
+                    "ENIGMA2 $name: RES $service/"
+                  . urlDecode($cmd) . "\n"
+                  . $response;
+            }
 
             my $parser = XML::Simple->new(
                 NormaliseSpace => 2,
@@ -1339,7 +1373,8 @@ sub ENIGMA2_wake ($) {
         if ( !defined $address ) { $address = '255.255.255.255' }
         if ( !defined $port || $port !~ /^\d+$/ ) { $port = 9 }
 
-        my $sock = new IO::Socket::INET( Proto => 'udp' ) or die "socket : $!";
+        my $sock = new IO::Socket::INET( Proto => 'udp' )
+          or die "socket : $!";
         die "Can't create WOL socket" if ( !$sock );
 
         my $ip_addr = inet_aton($address);
