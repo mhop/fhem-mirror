@@ -5,20 +5,47 @@ package main;
 
 use strict;
 use warnings;
-use Sys::Statistics::Linux::LoadAVG;
-use Sys::Statistics::Linux::DiskUsage;
+use Data::Dumper;
+
+my $SYSSTAT_hasSysStatistics = 1;
+my $SYSSTAT_hasSNMP = 1;
+
+my %SYSSTAT_diskTypes = (
+  ".1.3.6.1.2.1.25.2.1.1" => 'Other',
+  ".1.3.6.1.2.1.25.2.1.2" => 'Ram',
+  ".1.3.6.1.2.1.25.2.1.3" => 'VirtualMemory',
+  ".1.3.6.1.2.1.25.2.1.4" => 'FixedDisk',
+  ".1.3.6.1.2.1.25.2.1.5" => 'RemovableDisk',
+  ".1.3.6.1.2.1.25.2.1.6" => 'FloppyDisk',
+  ".1.3.6.1.2.1.25.2.1.7" => 'CompactDisk',
+  ".1.3.6.1.2.1.25.2.1.8" => 'RamDisk',
+  ".1.3.6.1.2.1.25.2.1.9" => 'FlashMemory',
+  ".1.3.6.1.2.1.25.2.1.10" => 'NetworkDisk',
+);
+
 
 sub
 SYSSTAT_Initialize($)
 {
   my ($hash) = @_;
 
+  eval "use Sys::Statistics::Linux::LoadAVG";
+  $SYSSTAT_hasSysStatistics = 0 if($@);
+  eval "use Sys::Statistics::Linux::DiskUsage";
+  $SYSSTAT_hasSysStatistics = 0 if($@);
+
+  eval "use Net::SNMP";
+  $SYSSTAT_hasSNMP = 0 if($@);
+
   $hash->{DefFn}    = "SYSSTAT_Define";
   $hash->{UndefFn}  = "SYSSTAT_Undefine";
   $hash->{GetFn}    = "SYSSTAT_Get";
   $hash->{AttrFn}   = "SYSSTAT_Attr";
-  $hash->{AttrList} = "filesystems raspberrycpufreq:1 raspberrytemperature:0,1,2 showpercent:1 uptime:1,2 useregex:1 ssh_user ".
-                       $readingFnAttributes;
+  $hash->{AttrList} = "disable:1 raspberrycpufreq:1 raspberrytemperature:0,1,2 synologytemperature:0,1,2 stat:1 uptime:1,2 ssh_user ";
+  $hash->{AttrList} .= " snmp:1";
+  $hash->{AttrList} .= " filesystems showpercent";
+  $hash->{AttrList} .= " useregex:1" if( $SYSSTAT_hasSysStatistics );
+  $hash->{AttrList} .= " $readingFnAttributes";
 }
 
 #####################################
@@ -46,6 +73,9 @@ SYSSTAT_Define($$)
   delete( $hash->{INTERVAL_FS} );
   delete( $hash->{HOST} );
 
+  $hash->{"HAS_Sys::Statistics"} = $SYSSTAT_hasSysStatistics;
+  $hash->{"HAS_Net::SNMP"} = $SYSSTAT_hasSNMP;
+
   $hash->{STATE} = "Initialized";
   $hash->{INTERVAL} = $interval;
   $hash->{INTERVAL_FS} = $interval_fs if( defined( $interval_fs ) );
@@ -53,7 +83,8 @@ SYSSTAT_Define($$)
   $hash->{HOST} = $host if( defined( $host ) );
 
   $hash->{interval_fs} = $interval_fs;
-  SYSSTAT_InitSys( $hash );
+  SYSSTAT_InitSys( $hash ) if( $SYSSTAT_hasSysStatistics );
+  SYSSTAT_InitSNMP( $hash ) if( $SYSSTAT_hasSNMP );
 
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SYSSTAT_GetUpdate", $hash, 0);
@@ -64,6 +95,8 @@ sub
 SYSSTAT_InitSys($)
 {
   my ($hash) = @_;
+
+  return if( !$SYSSTAT_hasSysStatistics );
 
   if( defined($hash->{HOST}) ) {
     my $cmd = qx(which ssh);
@@ -78,6 +111,35 @@ SYSSTAT_InitSys($)
   } else {
     $hash->{loadavg} = Sys::Statistics::Linux::LoadAVG->new;
     $hash->{diskusage} = Sys::Statistics::Linux::DiskUsage->new;
+  }
+}
+sub
+SYSSTAT_InitSNMP($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  delete( $hash->{session} );
+
+  return if( !$SYSSTAT_hasSNMP );
+
+  my $host = "localhost";
+  my $community = "public";
+
+  $host = $hash->{HOST} if( defined($hash->{HOST} ) );
+
+  my ( $session, $error ) = Net::SNMP->session(
+           -hostname  => $host,
+           -community => $community,
+           -port      => 161,
+           -version   => 1
+                        );
+  if( $error ) {
+    Log3 $name, 2, "$name: $error";
+  } elsif ( !defined($session) ) {
+    Log3 $name, 2, "$name: can't connect to host $host";
+  } else {
+    $hash->{session} = $session;
   }
 }
 
@@ -101,18 +163,35 @@ SYSSTAT_Get($@)
   my $cmd= $a[1];
 
   if($cmd eq "filesystems") {
-
-    my $filesystems = $hash->{diskusage}->get;
-
     my $ret;
-    $ret .= "<filesystem> <= <mountpoint>\n";
-    foreach my $filesystem (keys %$filesystems ) {
-      $ret .= $filesystem ." <= ". $filesystems->{$filesystem}->{mountpoint} ."\n";
+
+    if( $hash->{USE_SNMP} && defined($hash->{session}) ) {
+      my $types = SYSSTAT_readOIDs($hash,".1.3.6.1.2.1.25.2.3.1.2");
+      my $response = SYSSTAT_readOIDs($hash,".1.3.6.1.2.1.25.2.3.1.3");
+      foreach my $oid ( sort { ($a =~/\.(\d+)$/)[0] <=> ($b =~/\.(\d+)$/)[0]} keys %$response ) {
+        $ret .= "\n" if( $ret );
+        my $id = ($oid =~/\.(\d+)$/)[0];
+        $ret .= $id ." <= ". $response->{$oid} ."  (". $SYSSTAT_diskTypes{$types->{".1.3.6.1.2.1.25.2.3.1.2.$id"}} .")";
+      }
+      $ret = "<id> => <filesystem>\n$ret" if( $ret );
+    } elsif(defined($hash->{diskusage})) {
+      my $filesystems = $hash->{diskusage}->get;
+      $ret = "<filesystem> <= <mountpoint>";
+      foreach my $filesystem (keys %$filesystems ) {
+        $ret .= "\n" if( $ret );
+        $ret .= $filesystem ." <= ". $filesystems->{$filesystem}->{mountpoint};
+      }
     }
+
     return $ret;
+  } elsif( $cmd eq "update" ) {
+    $hash->{LOCAL} = 1;
+    SYSSTAT_GetUpdate( $hash );
+    delete $hash->{LOCAL};
+    return;
   }
 
-  return "Unknown argument $cmd, choose one of filesystems:noArg";
+  return "Unknown argument $cmd, choose one of update:noArg filesystems:noArg";
 }
 
 sub
@@ -122,9 +201,10 @@ SYSSTAT_Attr($$$)
 
   $attrVal= "" unless defined($attrVal);
   my $orig = $attrVal;
-  $attrVal= "1" if($attrName eq "useregex");
-  $attrVal= "1" if($attrName eq "showpercent");
-  $attrVal= "1" if($attrName eq "raspberrycpufreq");
+  $attrVal = "1" if($attrName eq "snmp");
+  $attrVal = "1" if($attrName eq "useregex");
+  $attrVal = "1" if($attrName eq "showpercent");
+  $attrVal = "1" if($attrName eq "raspberrycpufreq");
 
   if( $attrName eq "filesystems") {
     my $hash = $defs{$name};
@@ -133,7 +213,14 @@ SYSSTAT_Attr($$$)
   } elsif( $attrName eq "ssh_user") {
     $attr{$name}{$attrName} = $attrVal;
     my $hash = $defs{$name};
-    SYSSTAT_InitSys( $hash );
+    SYSSTAT_InitSys( $hash ) if( $SYSSTAT_hasSysStatistics );
+  } elsif ($attrName eq "snmp" && $SYSSTAT_hasSNMP ) {
+    my $hash = $defs{$name};
+    if( $cmd eq "set" && $attrVal ne "0" ) {
+      $hash->{USE_SNMP} = $attrVal;
+    } else {
+      delete $hash->{USE_SNMP};
+    }
   }
 
   if( $cmd eq "set" ) {
@@ -158,14 +245,17 @@ SYSSTAT_GetUpdate($)
   if(!$hash->{LOCAL}) {
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SYSSTAT_GetUpdate", $hash, 1);
+
+    return if( AttrVal($name,"disable", 0) > 0 );
   }
 
-  #my $load = $hash->{loadavg}->get;
   my $load = SYSSTAT_getLoadAVG( $hash );
 
   readingsBeginUpdate($hash);
 
-  my $state = $load->{avg_1} . " " . $load->{avg_5} . " " . $load->{avg_15} if( defined($load->{avg_1}) );
+  my $state = undef;
+  $state = $load->{state} if( defined($load->{state}) );
+  $state = $load->{avg_1} . " " . $load->{avg_5} . " " . $load->{avg_15} if( !$state && defined($load->{avg_1}) );
 
   readingsBulkUpdate($hash,"state",$state);
 
@@ -185,50 +275,101 @@ SYSSTAT_GetUpdate($)
   if( $do_diskusage
       && $#{$hash->{filesystems}} >= 0 ) {
 
-    my $usage = $hash->{diskusage}->get;
-
-    my $type = 'free';
-    if( AttrVal($name, "showpercent", "") ne "" ) {
-      $type = 'usageper';
-    }
-
-    if( AttrVal($name, "useregex", "") eq "" ) {
-      for my $filesystem (@{$hash->{filesystems}}) {
-        my $fs = $usage->{$filesystem};
-        readingsBulkUpdate($hash,$fs->{mountpoint},$fs->{$type});
+    if( $hash->{USE_SNMP} && defined($hash->{session}) ) {
+      my $showpercent = AttrVal($name, "showpercent", "") ne "";
+      my @snmpoids = ();
+      for my $id (@{$hash->{filesystems}}) {
+        push @snmpoids, sprintf( ".1.3.6.1.2.1.25.2.3.1.3.%i", $id );
+        push @snmpoids, sprintf( ".1.3.6.1.2.1.25.2.3.1.4.%i", $id ) if( !$showpercent );
+        push @snmpoids, sprintf( ".1.3.6.1.2.1.25.2.3.1.5.%i", $id );
+        push @snmpoids, sprintf( ".1.3.6.1.2.1.25.2.3.1.6.%i", $id );
       }
-    } else {
-      for my $filesystem (@{$hash->{filesystems}}) {
-        foreach my $key (keys %$usage) {
-          if( $key =~ /$filesystem/ ) {
-            my $fs = $usage->{$key};
-            readingsBulkUpdate($hash,$fs->{mountpoint},$fs->{$type});
+      my $response = SYSSTAT_readOIDs($hash,\@snmpoids);
+      for my $id (@{$hash->{filesystems}}) {
+        my $unit = $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.4.%i", $id )};
+        my $free = $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.5.%i", $id )} - $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.6.%i", $id )};
+
+       if( $showpercent ) {
+         $free =  100 * $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.6.%i", $id )} / $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.5.%i", $id )};
+         $free = sprintf( "%.1f", $free );
+       } else {
+         $free *= $unit;
+       }
+        my $name = $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.3.%i", $id )};
+        if( $name =~ m/^([[:alpha:]]:\\)/ ) {
+          $name = $1
+        } else {
+          $name =~ s/ //g;
+        }
+
+        readingsBulkUpdate($hash,$name,$free);
+      }
+
+    } elsif( defined($hash->{diskusage} ) ) {
+      my $usage = $hash->{diskusage}->get;
+
+      my $type = 'free';
+      if( AttrVal($name, "showpercent", "") ne "" ) {
+        $type = 'usageper';
+      }
+
+      if( AttrVal($name, "useregex", "") eq "" ) {
+        for my $filesystem (@{$hash->{filesystems}}) {
+          my $fs = $usage->{$filesystem};
+          readingsBulkUpdate($hash,$fs->{mountpoint},$fs->{$type});
+        }
+      } else {
+        for my $filesystem (@{$hash->{filesystems}}) {
+          foreach my $key (keys %$usage) {
+            if( $key =~ /$filesystem/ ) {
+              my $fs = $usage->{$key};
+              readingsBulkUpdate($hash,$fs->{mountpoint},$fs->{$type});
+            }
           }
         }
       }
     }
   }
 
-  if( AttrVal($name, "raspberrytemperature", "0") > 0 ) {
+  if( AttrVal($name, "raspberrytemperature", 0) > 0 ) {
     my $temp = SYSSTAT_getPiTemp($hash);
     if( $temp > 0 && $temp < 200  ) {
-      if( AttrVal($name, "raspberrytemperature", "0") eq 2 ) {
+      if( AttrVal($name, "raspberrytemperature", 0) eq 2 ) {
+          $temp = sprintf( "%.1f", (3 * ReadingsVal($name,"temperature",$temp) + $temp ) / 4 );
+        }
+      readingsBulkUpdate($hash,"temperature",$temp);
+    }
+  } elsif( AttrVal($name, "synologytemperature", 0) > 0 ) {
+    my $temp = SYSSTAT_getSynoTemp($hash);
+    if( $temp > 0 && $temp < 200  ) {
+      if( AttrVal($name, "raspberrytemperature", 0) eq 2 ) {
           $temp = sprintf( "%.1f", (3 * ReadingsVal($name,"temperature",$temp) + $temp ) / 4 );
         }
       readingsBulkUpdate($hash,"temperature",$temp);
     }
   }
 
-  if( AttrVal($name, "raspberrycpufreq", "0") > 0 ) {
+  if( AttrVal($name, "raspberrycpufreq", 0) > 0 ) {
     my $freq = SYSSTAT_getPiFreq($hash);
     readingsBulkUpdate($hash,"cpufreq",$freq);
   }
 
-  if( AttrVal($name, "uptime", "0") > 0 ) {
+  if( AttrVal($name, "stat", 0) > 0 ) {
+    my @percent = SYSSTAT_getStat($hash);
+
+    if( @percent ) {
+      #my($user,$nice,$system,$idle,$iowait,$irq,$softirq,$steal,$guest,$guest_nice) = @percent;
+      readingsBulkUpdate($hash,"user", $percent[0]);
+      readingsBulkUpdate($hash,"system", $percent[2]);
+      readingsBulkUpdate($hash,"idle", $percent[3]);
+      readingsBulkUpdate($hash,"iowait", $percent[4]);
+    }
+  }
+
+  if( AttrVal($name, "uptime", 0) > 0 ) {
     my $uptime = SYSSTAT_getUptime($hash);
     readingsBulkUpdate($hash,"uptime",$uptime);
   }
-
 
   readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
 }
@@ -237,6 +378,35 @@ sub
 SYSSTAT_getLoadAVG($ )
 {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  if( $hash->{USE_SNMP} && defined($hash->{session}) ) {
+    my @snmpoids = ( ".1.3.6.1.4.1.2021.10.1.3.1", ".1.3.6.1.4.1.2021.10.1.3.2", ".1.3.6.1.4.1.2021.10.1.3.3" );
+    my $response = SYSSTAT_readOIDs($hash,\@snmpoids);
+
+    if( !$response ) {
+      my $response = SYSSTAT_readOIDs($hash,".1.3.6.1.2.1.25.3.3.1.2");
+      my $avg = "";
+      my %lavg = ();
+      my $load = 0;
+      foreach my $key (keys %$response) {
+        $avg .= "," if( $avg ne "" );
+        $avg .= $response->{$key};
+        $load += $response->{$key} / 100;
+      }
+      $lavg{avg_1} = $load if( $avg ne "" );
+      $lavg{state} = $avg if( $avg ne "" );
+      return \%lavg;
+    }
+
+    my %lavg = ();
+    $lavg{avg_1} = $response->{".1.3.6.1.4.1.2021.10.1.3.1"};
+    $lavg{avg_5} = $response->{".1.3.6.1.4.1.2021.10.1.3.2"};
+    $lavg{avg_15} = $response->{".1.3.6.1.4.1.2021.10.1.3.3"};
+    return \%lavg;
+  }
+
+  return undef if( !defined($hash->{loadavg}) );
 
   if( defined($hash->{HOST}) ) {
     no strict;
@@ -269,6 +439,37 @@ SYSSTAT_getLoadAVG($ )
   }
 
   return $hash->{loadavg}->get;
+}
+
+sub
+SYSSTAT_readOIDs($$)
+{
+  my ($hash,$snmpoids) = @_;
+  my $name = $hash->{NAME};
+
+  return undef if( !defined($hash->{session}) );
+
+  my $response;
+
+  if( ref($snmpoids) eq "ARRAY" ) {
+    $response = $hash->{session}->get_request( @{$snmpoids} );
+    Log3 $name, 4, "$name: got empty result from snmp query" if( !$response );
+  } else {
+    $response = $hash->{session}->get_next_request($snmpoids);
+
+    my @snmpoids = ();
+    my @nextid   = keys %$response;
+    while ( $nextid[0] =~ m/^$snmpoids/ ) {
+      push( @snmpoids, $nextid[0] );
+
+      $response = $hash->{session}->get_next_request( $nextid[0] );
+      @nextid   = keys %$response;
+    }
+
+    $response = $hash->{session}->get_request( @snmpoids )
+  }
+
+  return $response;
 }
 
 sub
@@ -337,6 +538,22 @@ SYSSTAT_getPiTemp($)
 
   return $temp / 1000;
 }
+sub
+SYSSTAT_getSynoTemp($)
+{
+  my ($hash) = @_;
+
+  my $temp = -1;
+  if( $hash->{USE_SNMP} && defined($hash->{session}) ) {
+    my @snmpoids = ( ".1.3.6.1.4.1.6574.1.2.0" );
+
+    my $response = SYSSTAT_readOIDs($hash,\@snmpoids);
+
+    $temp = $response->{".1.3.6.1.4.1.6574.1.2.0"};
+  }
+
+  return $temp;
+}
 
 sub
 SYSSTAT_getPiFreq($)
@@ -354,24 +571,87 @@ SYSSTAT_getUptime($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
+  if( $hash->{USE_SNMP} && defined($hash->{session}) ) {
+      my @snmpoids = ( ".1.3.6.1.2.1.25.1.1.0" );
+
+      my $response = SYSSTAT_readOIDs($hash,\@snmpoids);
+
+      my $uptime = $response->{".1.3.6.1.2.1.25.1.1.0"};
+      if( AttrVal($name, "uptime", 0) == 2 ) {
+        if( $uptime && $uptime =~ m/(\d+)\s\D+,\s(\d+):(\d+):(\d+)/ ) {
+          my $days = $1?$1:0;
+          my $hours = $2;
+          my $minutes = $3;
+          my $seconds = $4;
+
+          $uptime = $days * 24;
+          $uptime += $hours;
+          $uptime *= 60;
+          $uptime += $minutes;
+          $uptime *= 60;
+          $uptime += $seconds;
+        }
+      }
+
+      return $uptime;
+    }
+
   my $uptime = SYSSTAT_readCmd($hash,"uptime",0);
 
-  $uptime = $1 if( $uptime =~ m/up\s+(((\d+)\D+,\s+)?(\d+):(\d+))/ ); 
-  $uptime = "0 days, $uptime" if( !$2);
+  $uptime = $1 if( $uptime && $uptime =~ m/[[:alpha:]]{2}\s+(((\d+)\D+,?\s+)?(\d+):(\d+))/ );
+  $uptime = "0 days, $uptime" if( $uptime && !$2);
 
-  if( AttrVal($name, "uptime", "0") == 2 ) {
+  if( AttrVal($name, "uptime", 0) == 2 ) {
     my $days = $3?$3:0;
-    my $hours = $4; 
-    my $minutes = $5; 
- 
-    $uptime = $days * 24; 
+    my $hours = $4;
+    my $minutes = $5;
+
+    $uptime = $days * 24;
     $uptime += $hours;
-    $uptime *= 60; 
+    $uptime *= 60;
     $uptime += $minutes;
-    $uptime *= 60; 
+    $uptime *= 60;
   }
 
   return $uptime;
+}
+
+sub
+SYSSTAT_getStat($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  if( $hash->{USE_SNMP} && defined($hash->{session}) ) {
+    my @snmpoids = ( ".1.3.6.1.4.1.2021.11.9.0", ".1.3.6.1.4.1.2021.11.10.0", ".1.3.6.1.4.1.2021.11.11.0"  );
+
+    my $response = SYSSTAT_readOIDs($hash,\@snmpoids);
+
+    my @percent = ( $response->{".1.3.6.1.4.1.2021.11.9.0"},        # user
+                    undef,
+                    $response->{".1.3.6.1.4.1.2021.11.10.0"},       # system
+                    $response->{".1.3.6.1.4.1.2021.11.11.0"} );     # idle
+
+    return @percent;
+  }
+
+  my $line = SYSSTAT_readFile($hash,"/proc/stat","");
+  #my($user,$nice,$system,$idle,$iowait,$irq,$softirq,$steal,$guest,$guest_nice) = split( " ", $Line );
+  my($dummy,@values) = split( " ", $line );
+
+  if( !defined($hash->{values}) ) {
+    $hash->{values} = \@values;
+    return undef;
+  } else {
+    my @diff = map { $values[$_] - $hash->{values}->[$_] } 0 .. $#values;
+    $hash->{values} = \@values;
+
+    my $sum = 0;
+    $sum += $_ for @diff;
+
+    my @percent = map { int($diff[$_]*1000 / $sum)/10 } 0 .. $#values;
+    return @percent;
+  }
 }
 
 
@@ -387,10 +667,11 @@ SYSSTAT_getUptime($)
 
   Notes:
   <ul>
-    <li>currently only Linux is supported.</li>
     <li>This module needs <code>Sys::Statistics::Linux</code> on Linux.<br>
         It can be installed with '<code>cpan install Sys::Statistics::Linux</code>'<br>
         or on debian with '<code>apt-get install libsys-statistics-linux-perl</code>'</li>
+
+    <li>To monitor a target by snmp <code>Net::SNMP</code> hast to be installed.<br></li>
 
     <li>To plot the load values the following code can be used:
   <PRE>
@@ -431,9 +712,11 @@ SYSSTAT_getUptime($)
   <b>Readings</b>
   <ul>
     <li>load<br>
-    the 1 minute load average</li>
+    the 1 minute load average (for windows targets monitored by snmp aproximated value</li>
     <li>state<br>
-    the 1, 5 and 15 minute load averages</li>
+    the 1, 5 and 15 minute load averages (or windows targets monitored by snmp the per cpu utilization)</li>
+    <li>user,system,idle,iowait<br>
+    respective percentage of systemutilization (linux targets only)</li>
     <li>&lt;mountpoint&gt;<br>
     free bytes for &lt;mountpoint&gt;</li>
   </ul><br>
@@ -448,21 +731,30 @@ SYSSTAT_getUptime($)
     Lists the filesystems that can be monitored.</li>
   </ul><br>
 
-
   <a name="SYSSTAT_Attr"></a>
   <b>Attributes</b>
   <ul>
+    <li>disable<br>
+      keep timers running but disable collection of statistics.</li>
     <li>filesystems<br>
       List of comma separated filesystems (not mountpoints) that should be monitored.<br>
     Examples:
     <ul>
       <code>attr sysstat filesystems /dev/md0,/dev/md2</code><br>
       <code>attr sysstat filesystems /dev/.*</code><br>
+      <code>attr sysstat filesystems 1,3,5</code><br>
     </ul></li></lu>
     <li>showpercent<br>
       If set the usage is shown in percent. If not set the remaining free space in bytes is shown.</li>
+    <li>snmp<br>
+      1 -> use snmp to monitor load, uptime and filesystems (including physical and virtual memory)</li>
+    <li>stat<br>
+      1 -> monitor user,system,idle and iowait percentage of system utilization (available only for linux targets)</li>
     <li>raspberrytemperature<br>
       If set and > 0 the raspberry pi on chip termal sensor is read.<br>
+      If set to 2 a geometric average over the last 4 values is created.</li>
+    <li>synologytemperature<br>
+      If set and > 0 the main temperaure of a synology diskstation is read. requires snmp.<br>
       If set to 2 a geometric average over the last 4 values is created.</li>
     <li>raspberrycpufreq<br>
       If set and > 0 the raspberry pi on chip termal sensor is read.<br>
