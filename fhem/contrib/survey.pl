@@ -57,6 +57,7 @@ my @hw = qw(
   KM271
   KS300
   LGTV
+  LINDY_HDMI_SWITCH
   LIRC
   LUXTRONIK2
   M232
