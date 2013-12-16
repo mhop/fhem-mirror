@@ -96,3 +96,53 @@ LINDY_HDMI_SWITCH_Define($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="LINDY_HDMI_SWITCH"></a>
+<h3>LINDY_HDMI_SWITCH</h3>
+<ul>
+  Note: this module needs the Net::Telnet module.
+  <br><br>
+  <a name="LINDY_HDMI_SWITCHdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; LINDY_HDMI_SWITCH &lt;ip-address&gt; &lt;port&gt;</code>
+    <br><br>
+    Defines an Lindy 4:2 HDMI Switch serial connected to a transparent ethernet to serial adapter via the ip address of the adapter. Lindy partnumber: 38054 <br><br>
+
+    Examples:
+    <ul>
+      <code>define livingroom.hdmi LINDY_HDMI_SWITCH 192.168.1.64 4999</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="LINDY_HDMI_SWITCHset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+	11 
+	12
+	13
+	14
+	21
+	22
+	23
+	24
+    </pre>
+    First digit is the input port, second digit is the output port.
+    Example:
+    <ul>
+      <code>set livingroom.hdmi 12</code><br>
+    </ul>
+    <br>
+  </ul>
+</ul>
+
+=end html
+=cut
