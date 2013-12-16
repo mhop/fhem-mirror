@@ -522,7 +522,6 @@ readingsGroup_Notify($$)
               my $new_line;
               my $DEVICE = $name;
               ($txt,$new_line) = eval $txt;
-              $new_line if( defined($new_line) );
               if( $@ ) {
                 $txt = "<ERROR>";
                 Log3 $name, 3, $name .": ". $regex .": ". $@;
