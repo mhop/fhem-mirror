@@ -172,7 +172,6 @@ CUL_Define($$)
   
   $hash->{DeviceName} = $dev;
   my $ret = DevIo_OpenDev($hash, 0, "CUL_DoInit");
-  $hash->{helper}{HMnextTR}=gettimeofday();
   return $ret;
 }
 
@@ -963,7 +962,6 @@ CUL_Parse($$$$$)
     $hash->{RSSI} = $rssi;
     $addvals{RSSI} = $rssi;
   }
-  $hash->{helper}{HMnextTR}=gettimeofday();
   Dispatch($hash, $dmsg, \%addvals);
 }
 
