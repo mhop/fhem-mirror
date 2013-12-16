@@ -405,6 +405,7 @@ mailcheck_Read($)
 
           $entity->head->decode();
           $subject = $entity->head->get('Subject');
+          chomp( $subject );
           Log3 $name, 4, "subject decoded: $subject";
 
         } elsif( my $accept_from = AttrVal($name, "accept_from", "" ) ) {
