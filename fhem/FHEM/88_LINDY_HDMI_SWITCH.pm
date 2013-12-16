@@ -135,7 +135,7 @@ LINDY_HDMI_SWITCH_Define($$)
 	23
 	24
     </pre>
-    First digit is the input port, second digit is the output port.
+    First digit is the output port, second digit is the input port.
     Example:
     <ul>
       <code>set livingroom.hdmi 12</code><br>
