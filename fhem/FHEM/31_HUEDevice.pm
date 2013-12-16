@@ -60,6 +60,7 @@ sub HUEDevice_Initialize($)
   $hash->{GetFn}    = "HUEDevice_Get";
   $hash->{AttrList} = "IODev ".
                       "delayedUpdate:1 ".
+                      "realtimePicker:1 ".
                       "color-icons:1,2 ".
                       "model:".join(",", sort keys %hueModels)." ".
                       "subType:colordimmer,dimmer,switch ".
@@ -312,6 +313,8 @@ HUEDevice_SetParam($$@)
     $defs{$name}->{fhem}->{update_timeout} = 1;
   } elsif( $cmd eq "immediateUpdate" ) {
     $defs{$name}->{fhem}->{update_timeout} = 0;
+  } elsif( $cmd eq "noUpdate" ) {
+    $defs{$name}->{fhem}->{update_timeout} = -1;
   } else {
     return 0;
   }
@@ -345,6 +348,18 @@ HUEDevice_Set($@)
     HUEDevice_SetParam($name, \%obj, $cmd, $value, $value2);
   }
 
+#  if( $defs{$name}->{fhem}->{update_timeout} == -1 ) {
+#    my $diff;
+#    my ($seconds, $microseconds) = gettimeofday();
+#    if( $defs{$name}->{fhem}->{timestamp} ) {
+#      my ($seconds2, $microseconds2) = @{$defs{$name}->{fhem}->{timestamp}};
+#
+#      $diff = (($seconds-$seconds2)*1000000 + $microseconds-$microseconds2)/1000;
+#    }
+#    $defs{$name}->{fhem}->{timestamp} = [$seconds, $microseconds];
+#
+#    return undef if( $diff < 100 );
+#  }
 
   if( scalar keys %obj ) {
     my $result;
@@ -358,7 +373,8 @@ HUEDevice_Set($@)
         return undef;
       }
 
-    if( $defs{$name}->{fhem}->{update_timeout}
+    if( $defs{$name}->{fhem}->{update_timeout} == -1 ) {
+    } elsif( $defs{$name}->{fhem}->{update_timeout}
         && !$hash->{fhem}->{group} ) {
       RemoveInternalTimer($hash);
       InternalTimer(gettimeofday()+1, "HUEDevice_GetUpdate", $hash, 1);

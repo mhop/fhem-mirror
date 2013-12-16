@@ -46,6 +46,13 @@ FHEM_colorpickerFn($$$)
                'border:1px solid #fff;border-radius:8px;background-color:#'. $args[1] .';"></div>'.
              '</a>'.
            '</td>';
+  } elsif(AttrVal($d,"realtimePicker",0)) {
+    my $c = "$FW_ME?XHR=1&cmd=set $d $cmd %$srf";
+    my $ci = $c;
+    $ci = "$FW_ME?XHR=1&cmd=set $d $cmd % : transitiontime 0 : noUpdate$srf" if($defs{$d}->{TYPE} eq "HUEDevice");
+    return '<td align="center">'.
+             "<input maxlength='6' size='6' id='colorpicker.$d-RGB' class=\"color {pickerMode:'$mode',pickerFaceColor:'transparent',pickerFace:3,pickerBorder:0,pickerInsetColor:'red',command:'$ci',onImmediateChange:'colorpicker_setColor(this)'}\" value='$cv' onChange='colorpicker_setColor(this,\"$mode\",\"$c\")'>".
+           '</td>';
   } else {
     my $c = "$FW_ME?XHR=1&cmd=set $d $cmd %$srf";
     return '<td align="center">'.
@@ -112,7 +119,7 @@ RgbToChannels($$) {
 sub
 ChannelsToRgb(@) {
   my @channels = @_;
-  return sprintf("%02X" x @_, @_);  
+  return sprintf("%02X" x @_, @_);
 }
 
 sub
@@ -124,14 +131,15 @@ ChannelsToBrightness(@) {
     $max = $value if ($max < $value);
   }
 
+  return {
+    bri => 0,
+    channels => \(255 x @channels),
+  } unless ($max > 0);
+
   my @bri = ();
-  if( $max == 0) {
-    @bri = (0) x @channels;
-  } else {
-    my $norm = 255/$max;
-    foreach my $value (@channels) {
-      push @bri,int($value*$norm);
-    }
+  my $norm = 255/$max;
+  foreach my $value (@channels) {
+    push @bri,int($value*$norm);
   }
 
   return {
