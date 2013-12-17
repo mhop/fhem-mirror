@@ -51,7 +51,7 @@ SWAP_0000002200000003_Initialize($)
   my ($hash) = @_;
 
   require "$attr{global}{modpath}/FHEM/34_SWAP.pm";
-  require "$attr{global}{modpath}/FHEM/31_HUEDevice.pm";
+  #require "$attr{global}{modpath}/FHEM/31_HUEDevice.pm";
 
   $hash->{SWAP_SetFn}     = "SWAP_0000002200000003_Set";
   $hash->{SWAP_SetList}   = { off => 0, on => 0, "on-for-timer" => 1, fadeTo => 2,
