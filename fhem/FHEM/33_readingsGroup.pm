@@ -541,6 +541,8 @@ readingsGroup_Notify($$)
 
           next if( defined($regex) && $reading !~ m/^$regex$/);
 
+          my $value_style = lookup2($value_style,$dev->{NAME},$reading,$value);
+
           my $value = $value;
           if( $value_format ) {
             my $value_format = lookup2($value_format,$dev->{NAME},$reading,$value);
@@ -574,7 +576,6 @@ readingsGroup_Notify($$)
             next if( $devStateIcon );
           }
 
-          my $value_style = lookup2($value_style,$dev->{NAME},$reading,$value);
           $value = "<div $value_style>$value</div>" if( $value_style );
 
           CommandTrigger( "", "$name $dev->{NAME}.$reading: $value" );
