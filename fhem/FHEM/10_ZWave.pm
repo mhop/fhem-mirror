@@ -226,7 +226,7 @@ my %zwave_class = (
   NON_INTEROPERABLE        => { id => 'f0', },
   );
 my %zwave_cmdArgs = (
-  dim => "slider,0,1,100",
+  dim => "slider,0,1,99",
   );
 
 
