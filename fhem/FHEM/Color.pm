@@ -131,15 +131,14 @@ ChannelsToBrightness(@) {
     $max = $value if ($max < $value);
   }
 
-  return {
-    bri => 0,
-    channels => \(255 x @channels),
-  } unless ($max > 0);
-
   my @bri = ();
-  my $norm = 255/$max;
-  foreach my $value (@channels) {
-    push @bri,int($value*$norm);
+  if( $max == 0) {
+    @bri = (0) x @channels;
+  } else {
+    my $norm = 255/$max;
+    foreach my $value (@channels) {
+      push @bri,int($value*$norm);
+    }
   }
 
   return {
