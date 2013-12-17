@@ -119,6 +119,8 @@ readingsGroup_updateDevices($)
 
   $hash->{CONTENT} = \%list;
   $hash->{DEVICES} = \@devices;
+
+  $hash->{fhem}->{last_update} = gettimeofday();
 }
 
 sub readingsGroup_Define($$)
@@ -212,6 +214,13 @@ readingsGroup_2html($)
   $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
 
   return undef if( !$hash );
+
+  if( $hash->{DEF} =~ m/=/ ) {
+    if( !$hash->{fhem}->{last_timeout}
+        || gettimeofday() - $hash->{fhem}->{last_timeout} > 600 ) {
+      readingsGroup_updateDevices($hash);
+    }
+  }
 
   my $d = $hash->{NAME};
 
