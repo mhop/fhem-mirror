@@ -521,6 +521,11 @@ sub CUL_HM_Attr(@) {#################################
     else{                    $hash->{protCondBurst} = "forced_off";}
     delete $hash->{helper}{rxType}; # needs new calculation
   }
+  elsif($attrName eq "IODev"){
+    if ($cmd eq "set"){
+      return "use $attrName only for device"             if (!$hash->{helper}{role}{dev});
+    }
+  }
   CUL_HM_queueUpdtCfg($name) if ($updtReq);
   return;
 }
@@ -1093,9 +1098,10 @@ sub CUL_HM_Parse($$) {##############################
       push @event,"state:".(($physLvl ne $val." %")?"chn:$vs phys:$physLvl":
                                                     $vs);
       my $eventName = "unknown"; # different names for events
-      $eventName = "switch"  if($st eq "switch");
-      $eventName = "motor"   if($st eq "blindActuator");
-      $eventName = "dim"     if($st eq "dimmer");
+      if   ($st eq "switch")       {$eventName = "switch";}  
+      elsif($st eq "blindActuator"){$eventName = "motor" ;}  
+      elsif($st eq "dimmer")       {$eventName = "dim"   ;}
+      
       my $action; #determine action
       push @event, "timedOn:".(($err&0x40)?"running":"off");
 
@@ -1710,7 +1716,9 @@ sub CUL_HM_parseCommon(@){#####################################################
       delete $shash->{EVENTS};
       delete $shash->{helper}{prt}{rspWait};
       delete $shash->{helper}{prt}{rspWaitSec};
-
+      
+      $attr{$shash->{NAME}}{IODev} = $iohash->{NAME}
+          if (!$modules{CUL_HM}{helper}{hmManualOper});
       my ($idstr, $s) = ($id, 0xA);
       $idstr =~ s/(..)/sprintf("%02X%s",$s++,$1)/ge;
       CUL_HM_pushConfig($shash, $id, $src,0,0,0,0, "0201$idstr");
@@ -3792,15 +3800,20 @@ sub CUL_HM_sndIfOpen($) {
 sub CUL_HM_SndCmd($$) {
   my ($hash, $cmd) = @_;
   $hash = CUL_HM_getDeviceHash($hash);
-  my $io = $hash->{IODev};
   return if(   AttrVal($hash->{NAME},"ignore","")
             || AttrVal($hash->{NAME},"dummy",""));
-  my $ioName = $io->{NAME};
-  if(!$io || !$ioName){
-    CUL_HM_eventP($hash,"IOerr");
-    CUL_HM_UpdtReadSingle($hash,"state","ERR_IOdev_undefined",1);
-    return;
+  if(!defined $hash->{IODev} ||!defined $hash->{IODev}{NAME}){
+    
+    AssignIoPort($hash);
+    if(!defined $hash->{IODev} ||!defined $hash->{IODev}{NAME}){
+      CUL_HM_eventP($hash,"IOerr");
+      CUL_HM_UpdtReadSingle($hash,"state","ERR_IOdev_undefined",1);
+      return;
+    }
   };
+  my $io = $hash->{IODev};
+  my $ioName = $io->{NAME};
+  
   if (  $io->{STATE} !~ m/^(opened|Initialized)$/          # we need to queue
       ||(hex substr($cmd,2,2) & 0x20) && (                 # check for commands with resp-req
            $modules{CUL_HM}{$ioName}{tmr}                  # queue already running
@@ -5106,6 +5119,7 @@ sub CUL_HM_unQEntity($$){# remove entity from q
   my $devN = CUL_HM_getDeviceName($name);
   return if (AttrVal($devN,"subType","") eq "virtual");
   my $dq = $defs{$devN}{helper}{q};
+  RemoveInternalTimer("sUpdt:$name") if ($q eq "qReqStat");#remove delayed
   return if ($dq->{$q} eq "");
 
   if ($devN eq $name){#all channels included
@@ -5120,7 +5134,6 @@ sub CUL_HM_unQEntity($$){# remove entity from q
   my $mQ = $q."Wu" if (CUL_HM_getRxType($defs{$name}) & 0x1C);
   $mQ = $modules{CUL_HM}{helper}{$q};
   @{$mQ} = grep !/^$devN$/,@{$mQ} if ($dq->{$q} eq "");
-  RemoveInternalTimer("sUpdt:$name") if ($q eq "qReqStat");#remove delayed
 }
 sub CUL_HM_qEntity($$){  # add to queue
   my ($name,$q) = @_;
@@ -5156,7 +5169,12 @@ sub CUL_HM_procQs($){#process non-wakeup queues
   foreach my $q ("qReqStat","qReqConf"){
     if   (@{$mq->{$q}}){
       my $devN = ${$mq->{$q}}[0];
-      my $ioName = $defs{$devN}{IODev}{NAME};
+      my $ioName = $defs{$devN}{IODev}{NAME};      
+      if(!defined $ioName){   
+        AssignIoPort($defs{$devN});
+        next  if(!defined $defs{$devN}{IODev}{NAME});
+        $ioName = $defs{$devN}{IODev}{NAME};
+      };
       if (   (   $ioName
               && ReadingsVal($ioName,"cond","") =~ m /^(ok|Overload-released|init)$/
               && $q eq "qReqStat")
