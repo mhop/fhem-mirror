@@ -1,2 +1,7 @@
 set-off        light_question.svg
 set-on         light_question.svg
+toggle         light_toggle.svg
+on-for-timer   light_on-for-timer.svg
+off-for-timer  light_off-for-timer.svg
+dimup          light_dim_up.svg
+dimdown        light_dim_down.svg
