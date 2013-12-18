@@ -8,7 +8,7 @@
 #
 # $Id$
 #
-# Version = 2.1
+# Version = 2.2
 #
 ##############################################################################
 #
@@ -16,7 +16,7 @@
 #
 # If <interval> is positive, new values are read every <interval> seconds.
 # If <interval> is 0, new values are read whenever a get request is called
-# on <name>. The default for <interval> is 300 (i.e. 5 minutes).
+# on <name>. The default for <interval> is 60 (i.e. 1 minutes).
 #
 # get <name> <key>
 #
@@ -34,7 +34,9 @@ my @gets = ('minPower',  # min value
       'DAYPOWER',       
       'MONTHPOWER',    
       'YEARPOWER',    
-      'TOTALPOWER'); 
+      'TOTALPOWER', 
+      'NT', 
+      'HT'); 
 
 sub
 SML_Initialize($)
@@ -93,7 +95,14 @@ energy_Define($$)
 
  $hash->{Host}     = $args[2];
  $hash->{Port}     = $args[3];
- $hash->{Interval} = int(@args) >= 5 ? int($args[4]) : 300;
+
+ if ( int(@args) >= 5 ){
+   if ( int($args[4]) >= 100 ){
+	$hash->{Interval} = 100;
+   }else{
+	$hash->{Interval} = int($args[4]);
+   }
+ }
  $hash->{Timeout}  = int(@args) >= 6 ? int($args[5]) : 4;
 
  #Log 4, "$hash->{NAME} will read from SML at $hash->{Host}:$hash->{Port} " ;
@@ -121,6 +130,74 @@ Log3 $hash, 3, "$hash->{NAME} will read from SML at $hash->{Host}:$hash->{Port} 
 }
 
 sub
+energy_Counter($)
+{
+ my ($hash) = @_;
+ my $ip = $hash->{Host};
+ my $port = $hash->{Port};
+ my $interval = $hash->{Interval};
+ my $timeout = $hash->{Timeout};
+ my $url =  "/?action=20";
+ my $socket ;
+ my $buf ;
+ my $message ;
+ my @array ;
+ my $counts = 0 ;
+ my $HT = 0;
+ my $NT = 0;
+ 
+ Log3 $hash, 4, "$hash->{NAME} $ip : $port : $url";
+ $socket = new IO::Socket::INET (
+              PeerAddr => $ip,
+              PeerPort => $port,
+              Proto    => 'tcp',
+              Reuse    => 0,
+              Timeout  => $timeout
+              );
+ Log3 $hash, 4, "$hash->{NAME} socket new";
+ if (defined ($socket) and $socket and $socket->connected())
+ {
+  	Log3 $hash, 4,  "$hash->{NAME} Connected ...";
+	print $socket "GET $url HTTP/1.0\r\n\r\n";
+	$socket->autoflush(1);
+	while ((read $socket, $buf, 1024) > 0)
+	{
+      		Log 5,"buf: $buf";
+      		$message .= $buf;
+		}
+ }else{
+  	Log3 $hash, 3, "$hash->{NAME} Cannot open socket ...";
+        $success = 1;
+      	return 0;
+ }
+	@array = split(/\n/,$message);
+	foreach (@array){
+           if ( $_ =~ /^<h3>(.*)HT:(.*)$/){
+		$HT = 1;
+	   }
+	   if ( $HT == 1 ){
+           	if ( $_ =~ /^<h3>(.*) kWh<\/h3>(.*)$/){
+		  $HT = $1;
+		  $counts = 0;
+		}
+	   }
+           if ( $_ =~ /^<h3>(.*)NT:(.*)$/){
+		$NT = 1;
+	   }
+	   if ( $NT == 1 ){
+           	if ( $_ =~ /^<h3>(.*) kWh<\/h3>(.*)$/){
+		  $NT = $1;
+		  $counts = 0;
+		}
+	   }
+	}
+        $hash->{READINGS}{HT}{VAL} = $HT;
+        $hash->{READINGS}{NT}{VAL} = $NT;
+   Log3 $hash, 3, "$hash->{NAME} HT = $HT  NT = $NT";
+	return "HT: $HT kWh  NT: $NT kWh";
+}
+
+sub
 energy_Update($)
 {
  my ($hash) = @_;
@@ -142,7 +219,8 @@ energy_Update($)
  my $timeout = $hash->{Timeout};
  my $counts = 0 ;
  my $summary = 0 ;
- my $url =  "/InstantView/request/getPowerProfile.html?ts=0\&n=$interval\&param=Wirkleistung\&format=1";
+ #my $url =  "/InstantView/request/getPowerProfile.html?ts=0\&n=$interval\&param=Wirkleistung\&format=1";
+ my $url =  "/InstantView/request/getPowerProfile.html?ts=0\&n=$interval";
  my $socket ;
  my $buf ;
  my $message ;
@@ -316,15 +394,18 @@ energy_Update($hash) unless $hash->{Interval};
 
  my $get = $args[1];
  my $val = $hash->{Invalid};
+ 
+if ( $get eq "counter"){
+  $val = energy_Counter($hash);	
+ }
 
  if (defined($hash->{READINGS}{$get})) {
-  $val = $hash->{READINGS}{$get}{VAL};
- } else {
- return "energy_Get: no such reading: $get";
- }
+   $val = $hash->{READINGS}{$get}{VAL};
+ } 
  if ( $get eq "?"){
- return "Unknown argument ?, choose one of minPower maxPower lastPower avgPower DAYPOWER MONTHPOWER YEARPOWER TOTALPOWER";
+   return "Unknown argument ?, choose one of counter minPower maxPower lastPower avgPower DAYPOWER MONTHPOWER YEARPOWER TOTALPOWER";
  }
+
  Log3 $hash, 3, "$args[0] $get => $val";
 
  return $val;
@@ -350,14 +431,14 @@ energy_Undef($$)
 <h3>SML</h3>
 <ul><p>
 This module supports "Intelligenter Strom Zhler"(ENBW) and "Sparzhler" (Yellow Strom).<br>
-The electricity meter will be polled in a defined interval for new values.
+The electricity meter will be polled in a defined interval (1-100) for new values.
 </p>
  <b>Define</b><br>
   <code>define &lt;name&gt; SML &lt;host&gt; &lt;port&gt; [&lt;interval&gt; &lt;timeout&gt;]</code><br>
   <p>
   Example:<br>
   define StromZ1 SML 192.168.178.20 <br>
-  define StromZ2 SML 192.168.10.25 300 60 <br>
+  define StromZ2 SML 192.168.10.25 60 60 <br>
   </p>
 
   <b>Set</b><br>
