@@ -409,6 +409,7 @@ IPCAM_getSnapshot($) {
       readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
       return undef;
     }
+    binmode(FH);
     print FH $snapshot;
     close(FH);
     Log 5, "IPCAM $name snapshot $storage/$lastSnapshot written.";
@@ -418,6 +419,7 @@ IPCAM_getSnapshot($) {
       readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
       return undef;
     }
+    binmode(FH);
     print FH $snapshot;
     close(FH);
     Log 5, "IPCAM $name snapshot $storage/$imageFile written.";
