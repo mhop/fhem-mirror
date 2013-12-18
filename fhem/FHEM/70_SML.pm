@@ -8,7 +8,7 @@
 #
 # $Id$
 #
-# Version = 2.2
+# Version = 2.3
 #
 ##############################################################################
 #
@@ -193,8 +193,10 @@ energy_Counter($)
 	}
         $hash->{READINGS}{HT}{VAL} = $HT;
         $hash->{READINGS}{NT}{VAL} = $NT;
-   Log3 $hash, 3, "$hash->{NAME} HT = $HT  NT = $NT";
-	return "HT: $HT kWh  NT: $NT kWh";
+	my $gesammt = $HT + $NT;
+        push @{$hash->{CHANGED}}, "HT: $HT kWh NT: $NT kWh Summe: $gesammt kWh";
+        DoTrigger($hash->{NAME}, undef) if ($init_done);
+	return "HT: $HT kWh NT: $NT kWh Summe: $gesammt kWh";
 }
 
 sub
@@ -406,7 +408,7 @@ if ( $get eq "counter"){
    return "Unknown argument ?, choose one of counter minPower maxPower lastPower avgPower DAYPOWER MONTHPOWER YEARPOWER TOTALPOWER";
  }
 
- Log3 $hash, 3, "$args[0] $get => $val";
+ Log3 $hash, 3, "$args[0] $val";
 
  return $val;
 }
