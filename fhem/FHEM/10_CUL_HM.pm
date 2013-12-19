@@ -626,7 +626,7 @@ sub CUL_HM_Parse($$) {##############################
   CUL_HM_DumpProtocol("RCV",$iohash,$len,$mNo,$mFlg,$mTp,$src,$dst,$p);
 
   #----------start valid messages parsing ---------
-  my $parse = CUL_HM_parseCommon($mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md);
+  my $parse = CUL_HM_parseCommon($iohash,$mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md);
   push @event, "powerOn"   if($parse eq "powerOn");
   push @event, ""          if($parse eq "parsed"); # msg is parsed but may
                                                    # be processed further
@@ -1564,7 +1564,6 @@ sub CUL_HM_Parse($$) {##############################
   #------------ process events ------------------
   push @event, "noReceiver:src:$src ".$mFlg.$mTp." $p" if(!@event && !@entities);
   CUL_HM_UpdtReadBulk($shash,1,@event); #events to the channel
-  $defs{$shash->{NAME}}{EVENTS}++;  # count events for channel
 
   @entities = CUL_HM_noDup(@entities,$shash->{NAME});
   $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/$name/,@entities);
@@ -1573,7 +1572,7 @@ sub CUL_HM_Parse($$) {##############################
 }
 sub CUL_HM_parseCommon(@){#####################################################
   # parsing commands that are device independent
-  my ($mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md) = @_;
+  my ($ioHash,$mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md) = @_;
   my $shash = $modules{CUL_HM}{defptr}{$src};
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
   return "" if(!$shash->{DEF});# this should be from ourself
@@ -1694,30 +1693,28 @@ sub CUL_HM_parseCommon(@){#####################################################
     $ret = $reply;
   }
   elsif($mTp eq "00"){######################################
-    my $iohash = $shash->{IODev};
-    my $id = CUL_HM_Id($iohash);
+    my $id = CUL_HM_Id($ioHash);
     CUL_HM_infoUpdtDevData($shash->{NAME}, $shash,$p)
                if (!$modules{CUL_HM}{helper}{hmManualOper}#no autoaction
-                   ||$iohash->{hmPair}
-                   ||$iohash->{hmPairSerial} );
+                   ||$ioHash->{hmPair}
+                   ||$ioHash->{hmPairSerial} );
     if(  $dst =~ m /(000000|$id)/ #--- see if we need to pair
-       &&($iohash->{hmPair}
-          ||(    $iohash->{hmPairSerial}
-              && $iohash->{hmPairSerial} eq $attr{$shash->{NAME}}{serialNr}))
+       &&($ioHash->{hmPair}
+          ||(    $ioHash->{hmPairSerial}
+              && $ioHash->{hmPairSerial} eq $attr{$shash->{NAME}}{serialNr}))
        &&( $mFlg.$mTp ne "0400") ) {
       #-- try to pair
       Log3 $shash,3, "CUL_HM pair: $shash->{NAME} "
                     ."$attr{$shash->{NAME}}{subType}, "
                     ."model $attr{$shash->{NAME}}{model} "
                     ."serialNr $attr{$shash->{NAME}}{serialNr}";
-      delete $iohash->{hmPairSerial};
+      delete $ioHash->{hmPairSerial};
       CUL_HM_respPendRm($shash); # remove all pending messages
       delete $shash->{cmdStack};
-      delete $shash->{EVENTS};
       delete $shash->{helper}{prt}{rspWait};
       delete $shash->{helper}{prt}{rspWaitSec};
       
-      $attr{$shash->{NAME}}{IODev} = $iohash->{NAME}
+      $attr{$shash->{NAME}}{IODev} = $ioHash->{NAME}
           if (!$modules{CUL_HM}{helper}{hmManualOper});
       my ($idstr, $s) = ($id, 0xA);
       $idstr =~ s/(..)/sprintf("%02X%s",$s++,$1)/ge;
@@ -1728,8 +1725,12 @@ sub CUL_HM_parseCommon(@){#####################################################
     }
     elsif(CUL_HM_getRxType($shash) & 0x04){#nothing to pair - maybe send config
       CUL_HM_appFromQ($shash->{NAME},"cf");   # stack cmds if waiting
-      if (hex($mFlg)&0x20){CUL_HM_SndCmd($shash,$mNo."8002".$id.$src."00");}
-      else{                CUL_HM_ProcessCmdStack($shash);} ;#config
+      if (hex($mFlg)&0x20){
+        #CUL_HM_SndCmd($shash,$mNo."8002".$id.$src."00");
+      }
+      else{
+        CUL_HM_ProcessCmdStack($shash);
+      };
     }
     $ret = "done";
   }
@@ -1796,18 +1797,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       }
     }
     elsif($subType eq "02" ||$subType eq "03"){ #ParamResp==================
-      my $msgValid = 0;
       if ($pendType eq "RegisterRead"){
-        if($shash->{helper}{prt}{rspWait}{mNoSeq}){#ignore msgNumber
-          $msgValid = 1;
-        }
-        elsif($shash->{helper}{prt}{rspWait}{mNo} == hex($mNo)){#next message
-          $shash->{helper}{prt}{rspWait}{mNo}++;
-          $shash->{helper}{prt}{rspWait}{mNo} &= 0xff;
-          $msgValid = 1;
-        }
-      }
-      if ($msgValid){
         my $chnSrc = $src.$shash->{helper}{prt}{rspWait}{forChn};
         my $chnHash = $modules{CUL_HM}{defptr}{$chnSrc};
         $chnHash = $shash if (!$chnHash);
@@ -1833,13 +1823,19 @@ sub CUL_HM_parseCommon(@){#####################################################
             $data = join(" ",@dataList);
           }
         }
-
+        my $lastAddr = hex($1) if ($data =~ m/.*(..):..$/);
         my $peer = $shash->{helper}{prt}{rspWait}{forPeer};
         my $regLNp = "RegL_$list:$peer";# pure, no expert
         my $regLN = ((CUL_HM_getAttrInt($chnName,"expert") == 2)?"":".").$regLNp;
-        readingsSingleUpdate($chnHash,$regLN,
+        if (   defined $lastAddr 
+            && (    $lastAddr > $shash->{helper}{prt}{rspWait}{nAddr}
+                 || $lastAddr == 0)){
+          readingsSingleUpdate($chnHash,$regLN,
                      ReadingsVal($chnName,$regLN,"")." ".$data,0);
-        if ($data =~m/00:00$/){ # this was the last message in the block
+          $shash->{helper}{prt}{rspWait}{nAddr} = $lastAddr;
+        }
+
+        if ($data =~ m/00:00$/){ # this was the last message in the block
           if($list eq "00"){
             my $name = CUL_HM_id2Name($src);
             readingsSingleUpdate($shash,"PairedTo",
@@ -1847,7 +1843,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           }
           CUL_HM_respPendRm($shash);
           delete $chnHash->{helper}{shadowReg}{$regLNp};   #rm shadow
-          # peer Channel name from/for user entry. <IDorName> <deviceID> <ioID>
+          # peerChannel name from/for user entry. <IDorName> <deviceID> <ioID>
           CUL_HM_updtRegDisp($chnHash,$list,
                 CUL_HM_peerChId($peer,
                         substr($chnHash->{DEF},0,6),"00000000"));
@@ -2257,7 +2253,6 @@ sub CUL_HM_Set($@) {
   my $roleD = $hash->{helper}{role}{dev}?1:0;
   my $roleV = $hash->{helper}{role}{vrt}?1:0;
   my $mdCh = $md.($isChannel?$chn:"00"); # chan specific commands?
-  my $id = CUL_HM_IOid($hash);
   my $fkt = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
   my $h = $culHmGlobalSets{$cmd}      if(                $st ne "virtual");
   $h = $culHmGlobalSetsVrtDev{$cmd}   if(!defined($h) &&($st eq "virtual"||!$st)  && $roleD);
@@ -2325,6 +2320,10 @@ sub CUL_HM_Set($@) {
   elsif($h !~ m/\.\.\./ && @h != @a-2) {
     return "$cmd requires parameter: $h";
   }
+
+  AssignIoPort($defs{$devName}) if (!$defs{$devName}{IOdev});
+  my $id = CUL_HM_IOid($defs{$devName});
+  return "no IO device identified" if(length($id) != 6 );
 
   #convert 'old' commands to current methodes like regSet and regBulk...
   # Unify the interface
@@ -2402,7 +2401,8 @@ sub CUL_HM_Set($@) {
 
   $cmd = $a[1];# get converted command
 
-     #if chn cmd is executed on device but refers to a channel?
+     #if chn cmd is executed on device but refers to a channel? 
+
   my $chnHash = (!$isChannel && $modules{CUL_HM}{defptr}{$dst."01"})?
                  $modules{CUL_HM}{defptr}{$dst."01"}:$hash;
   my $devHash = CUL_HM_getDeviceHash($hash);
@@ -2437,7 +2437,6 @@ sub CUL_HM_Set($@) {
 
       $hash->{helper}{prt}{bErr}=0;
       delete $hash->{cmdStack};
-      delete $hash->{EVENTS};
       delete $hash->{helper}{prt}{rspWait};
       delete $hash->{helper}{prt}{rspWaitSec};
       delete $hash->{helper}{prt}{mmcA};
@@ -3594,6 +3593,7 @@ sub CUL_HM_PushCmdStack($$) {
 sub CUL_HM_ProcessCmdStack($) {
   my ($chnhash) = @_;
   my $hash = CUL_HM_getDeviceHash($chnhash);
+
   if (!$hash->{helper}{prt}{rspWait}{cmd}){
     if($hash->{cmdStack} && @{$hash->{cmdStack}}){
       CUL_HM_SndCmd($hash, shift @{$hash->{cmdStack}});
@@ -3668,12 +3668,11 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
         my ($peer, $list) = ($1,$2) if ($p =~ m/..04(........)(..)/);
         $peer = ($peer ne "00000000")?CUL_HM_peerChName($peer,$dst,""):"";
         #--- set messaging items
-        my $mNoSeq =(AttrVal($hash->{NAME},"model","") eq "HM-PB-4DIS-WM")?"1":"0";
         CUL_HM_respWaitSu ($hash,"Pending:=RegisterRead"
                                 ,"cmd:=$cmd" ,"forChn:=$chn"
                                 ,"forList:=$list","forPeer:=$peer"
                                 ,"mNo:=".hex($mNo)
-                                ,"mNoSeq:=$mNoSeq"
+                                ,"nAddr:=0"
                                 ,"reSent:=$rss");
         #--- remove channel entries that will be replaced
         my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
@@ -3718,7 +3717,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
     if($hash->{cmdStack} && scalar @{$hash->{cmdStack}}){
       if (!$hash->{helper}{prt}{sleeping}){
         CUL_HM_protState($hash,"CMDs_processing...");
-        InternalTimer(gettimeofday()+.5, "CUL_HM_ProcessCmdStack", $hash, 0);
+        InternalTimer(gettimeofday()+.1, "CUL_HM_ProcessCmdStack", $hash, 0);
       }
       else{
         delete $hash->{helper}{prt}{sleeping};
