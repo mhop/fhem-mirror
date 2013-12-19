@@ -216,8 +216,8 @@ readingsGroup_2html($)
   return undef if( !$hash );
 
   if( $hash->{DEF} =~ m/=/ ) {
-    if( !$hash->{fhem}->{last_timeout}
-        || gettimeofday() - $hash->{fhem}->{last_timeout} > 600 ) {
+    if( !$hash->{fhem}->{last_update}
+        || gettimeofday() - $hash->{fhem}->{last_update} > 600 ) {
       readingsGroup_updateDevices($hash);
     }
   }
@@ -322,14 +322,26 @@ readingsGroup_2html($)
           next if( !defined($txt) );
         }
 
+        my $name_style = lookup2($name_style,$name,$1,undef);
+
         if( $first || $multi == 1 ) {
           $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
           $row++;
+
+          if( $h != $hash ) {
+            my $a = AttrVal($name, "alias", $name);
+            my $m = "$a$separator";
+            $m = $a if( $multi != 1 );
+            my $room = AttrVal($name, "room", "");
+            my $group = AttrVal($name, "group", "");
+            my $txt = lookup($mapping,$name,$a,"","",$room,$group,$m);
+
+            $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>";
+          }
         }
         $item++;
         my $inform_id = "";
         $inform_id = "informId=\"$d-$item.item\"" if( $readings );
-        my $name_style = lookup2($name_style,$name,$1,undef);
         $ret .= "<td><div $name_style $inform_id class=\"dname\">$txt</div></td>";
         $first = 0;
         next;
