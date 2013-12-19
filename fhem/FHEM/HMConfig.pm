@@ -898,13 +898,13 @@ my %culHmRegChan = (# if channelspecific then enter them here
                          ,CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1
                          ,WinJtOn         =>1,WinJtOff        =>1,WinJtRampOn     =>1,WinJtRampOff    =>1
                          ,OnTime          =>1,OffTime         =>1,OffLevelKm      =>1
-                         ,OnLevelKm       =>1,OnRampOnSp      =>1,OnRampOffSp     =>1
+                         ,OnLevelKm       =>1,RampOnSp        =>1,RampOffSp       =>1
                          },
   "WDF-solar01"       =>{ WinJtOn         =>1,WinJtOff        =>1,WinJtRampOn     =>1,WinJtRampOff    =>1
                          ,OffLevel        =>1,OnLevel         =>1
                          ,CtValLo         =>1,CtValHi         =>1
                          ,CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1
-                         ,OnRampOnSp      =>1,OnRampOffSp     =>1
+                         ,RampOnSp        =>1,RampOffSp       =>1
                          ,OnTime          =>1,OffTime         =>1
                          },
   "Schueco_263-xxx01" =>{ statusInfoMinDly=>1,statusInfoRandom=>1,

@@ -148,7 +148,9 @@ sub HMinfo_regCheck(@) { ######################################################
 
     foreach my $rNm (@lsNo){# check non-peer lists
       next if (!$rNm || $rNm eq "");
-      if    (!$ehash->{READINGS}{$rNm}){                 push @mReg, $rNm;}
+      
+      if (   !$ehash->{READINGS}{$rNm}
+          || !$ehash->{READINGS}{$rNm}{VAL})            {push @mReg, $rNm;}
       elsif ( $ehash->{READINGS}{$rNm}{VAL} !~ m/00:00/){push @iReg, $rNm;}
     }
     push @regMissing,$eName.":\t".join(",",@mReg) if (scalar @mReg);
@@ -1209,7 +1211,7 @@ sub HMinfo_cpRegs(@){##########################################################
 sub HMinfo_noDup(@) {#return list with no duplicates
   my %all;
   return "" if (scalar(@_) == 0);
-  $all{$_}=0 foreach (grep !/^$/,@_);
+  $all{$_}=0 foreach (grep {defined($_)} @_);
   delete $all{""}; #remove empties if present
   return (sort keys %all);
 }
