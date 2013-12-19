@@ -95,13 +95,14 @@ mailcheck_Notify($$)
 {
   my ($hash,$dev) = @_;
 
-  if( grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) ) {
-    delete $modules{mailcheck}->{NotifyFn};
+  return if($dev->{NAME} ne "global");
+  return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
-    foreach my $d (keys %defs) {
-      next if($defs{$d}{TYPE} ne "mailcheck");
-      mailcheck_Connect($defs{$d});
-    }
+  delete $modules{mailcheck}->{NotifyFn};
+
+  foreach my $d (keys %defs) {
+    next if($defs{$d}{TYPE} ne "mailcheck");
+    mailcheck_Connect($defs{$d});
   }
 }
 
