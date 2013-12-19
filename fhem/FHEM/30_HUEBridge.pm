@@ -26,6 +26,7 @@ sub HUEBridge_Initialize($)
 
   #Consumer
   $hash->{DefFn}    = "HUEBridge_Define";
+  $hash->{NotifyFn} = "HUEBridge_Notify";
   $hash->{SetFn}    = "HUEBridge_Set";
   $hash->{GetFn}    = "HUEBridge_Get";
   $hash->{UndefFn}  = "HUEBridge_Undefine";
@@ -43,7 +44,8 @@ HUEBridge_Read($@)
   return HUEBridge_Call($hash, 'lights/' . $id, $obj);
 }
 
-sub HUEBridge_Define($$)
+sub
+HUEBridge_Define($$)
 {
   my ($hash, $def) = @_;
 
@@ -83,8 +85,37 @@ sub HUEBridge_Define($$)
 
   $attr{$name}{"key"} = join "",map { unpack "H*", chr(rand(256)) } 1..16 unless defined( AttrVal($name, "key", undef) );
 
-  #HUEBridge_OpenDev($hash);
-  InternalTimer(gettimeofday()+10, "HUEBridge_OpenDev", $hash, 0);
+  if( !defined($hash->{helper}{count}) ) {
+    $modules{$hash->{TYPE}}{helper}{count} = 0 if( !defined($modules{$hash->{TYPE}}{helper}{count}) );
+    $hash->{helper}{count} =  $modules{$hash->{TYPE}}{helper}{count}++;
+  }
+
+  if( $init_done ) {
+    delete $modules{$hash->{TYPE}}{NotifyFn};
+    HUEBridge_OpenDev( $hash );
+  }
+
+  return undef;
+}
+sub
+HUEBridge_Notify($$)
+{
+  my ($hash,$dev) = @_;
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+
+  return if($dev->{NAME} ne "global");
+  return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
+
+  return if($attr{$name} && $attr{$name}{disable});
+
+  delete $modules{$type}{NotifyFn};
+  delete $hash->{NTFY_ORDER} if($hash->{NTFY_ORDER});
+
+  foreach my $d (keys %defs) {
+    next if($defs{$d}{TYPE} ne "$type");
+    HUEBridge_OpenDev($defs{$d});
+  }
 
   return undef;
 }
@@ -252,15 +283,17 @@ HUEBridge_Autocreate($)
   foreach my $key ( keys %$result ) {
     my $id= $key;
 
-    if( defined($modules{HUEDevice}{defptr}{$id}) ) {
-        Log3 $name, 5, "$name: id '$id' already defined as '$modules{HUEDevice}{defptr}{$id}->{NAME}'";
-        next;
+    my $code = $name ."-". $id;
+    if( defined($modules{HUEDevice}{defptr}{$code}) ) {
+      Log3 $name, 4, "$name: id '$id' already defined as '$modules{HUEDevice}{defptr}{$code}->{NAME}'";
+      next;
     }
 
-    my $devname= "HUEDevice" . $id;
-    my $define= "$devname HUEDevice $id";
+    my $devname = "HUEDevice" . $id;
+    $devname = $name ."_". $devname if( $hash->{helper}{count} );
+    my $define= "$devname HUEDevice $id IODev=$name";
 
-    Log3 $name, 5, "$name: create new device '$devname' for address '$id'";
+    Log3 $name, 4, "$name: create new device '$devname' for address '$id'";
 
     my $cmdret= CommandDefine(undef,$define);
     if($cmdret) {
@@ -268,6 +301,7 @@ HUEBridge_Autocreate($)
     } else {
       $cmdret= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
       $cmdret= CommandAttr(undef,"$devname room HUEDevice");
+      $cmdret= CommandAttr(undef,"$devname IODev $name");
     }
   }
 
@@ -276,15 +310,17 @@ HUEBridge_Autocreate($)
   foreach my $key ( keys %$result ) {
     my $id= $key;
 
-    if( defined($modules{HUEDevice}{defptr}{'G'.$id}) ) {
-        Log3 $name, 5, "$name: id '$id' already defined as '$modules{HUEDevice}{defptr}{'G'.$id}->{NAME}'";
-        next;
+    my $code = $name ."-G". $id;
+    if( defined($modules{HUEDevice}{defptr}{$code}) ) {
+      Log3 $name, 4, "$name: id '$id' already defined as '$modules{HUEDevice}{defptr}{$code}->{NAME}'";
+      next;
     }
 
     my $devname= "HUEGroup" . $id;
-    my $define= "$devname HUEDevice group $id";
+    $devname = $name ."_". $devname if( $hash->{helper}{count} );
+    my $define= "$devname HUEDevice group $id IODev=$name";
 
-    Log3 $name, 5, "$name: create new group '$devname' for address '$id'";
+    Log3 $name, 4, "$name: create new group '$devname' for address '$id'";
 
     my $cmdret= CommandDefine(undef,$define);
     if($cmdret) {
@@ -292,6 +328,7 @@ HUEBridge_Autocreate($)
     } else {
       $cmdret= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
       $cmdret= CommandAttr(undef,"$devname room HUEDevice");
+      $cmdret= CommandAttr(undef,"$devname IODev $name");
     }
   }
 
