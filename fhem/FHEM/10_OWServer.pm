@@ -251,6 +251,7 @@ OWServer_Read($@)
   if(AttrVal($hash->{NAME},"nonblocking",undef) && $init_done) {
     $hash->{".path"}= $path;
     pipe(READER,WRITER);
+    #READER->autoflush(1);
     WRITER->autoflush(1);
 
     my $pid= fork;
@@ -259,7 +260,7 @@ OWServer_Read($@)
       return undef;
     }
 
-    InternalTimer(gettimeofday()+20, "OWServer_TimeoutChild", $pid, 0);
+    InternalTimer(gettimeofday()+10, "OWServer_TimeoutChild", $pid, 0);
     if($pid == 0) {
       close READER;
       $ret= OWNet::read($hash->{DEF},$path);
@@ -277,8 +278,21 @@ OWServer_Read($@)
 
     Log3 $hash, 5, "OWServer child ID for reading '$path' is $pid";
     close WRITER;
-    chomp($ret= <READER>);
+    # http://forum.fhem.de/index.php/topic,16945.0/topicseen.html#msg110673
+    my ($rout,$rin, $eout,$ein) = ('','', '','');
+    vec($rin, fileno(READER),  1) = 1;
+    $ein = $rin;
+    my $nfound = select($rout=$rin, undef, $eout=$ein, 4);
+    if( $nfound ) {
+      chomp($ret= <READER>);
+      RemoveInternalTimer($pid);
+    } else {
+      Log3 undef, 1, "OWServer: read timeout for child $pid";
+      $hash->{READ_FAILED} = 0 if( !$hash->{READ_FAILED} );
+      $hash->{READ_FAILED}++;
+    }
     close READER;
+
   } else {
     $ret= $hash->{fhem}{owserver}->read($path);
     $ret =~ s/^\s+//g if(defined($ret));
