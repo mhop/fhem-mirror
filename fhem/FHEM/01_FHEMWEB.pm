@@ -1575,6 +1575,7 @@ FW_iconTable($$$$)
       next if(!$FW_icons{$style}{$imgName}); # Dont cut it twice: FS20.on.png
       next if($FW_icons{$style}{$imgName} !~ m/$imgName/); # Skip alias
       next if($imgName=~m+^(weather/|shutter.*big|fhemicon|favicon|ws_.*_kl)+);
+      next if($imgName=~m+^(dashboardicons)+);
       $icoList{$imgName} = 1;
     }
   }

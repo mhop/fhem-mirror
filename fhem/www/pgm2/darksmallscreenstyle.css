@@ -1,3 +1,5 @@
+@import url("dashboard_darkstyle.css");
+
 /* Author: Bernd auf Basis der Vorlage von Till*/
 body     { background-color: #444444; background-image:url(../images/default/fhemicon_darksmall.png); background-repeat:no-repeat; color: #CCCCCC; font-family:Arial, Helvetica, sans-serif; font-size:13px;}
 #logo    { position:absolute; top:10px; left:20px; width:78px; visibility:hidden; }
