@@ -162,6 +162,7 @@ FHEM/92_FileLog.pm           rudolfkoenig         http://forum.fhem.de Automatis
 FHEM/93_DbLog.pm             tobiasfaust          http://forum.fhem.de Automatisierung
 FHEM/93_FHEM2FHEM.pm         rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/95_FLOORPLAN.pm         ulimaass             http://forum.fhem.de Frontends
+FHEM/95_Dashboard.pm         svenson08            http://forum.fhem.de Frontends
 FHEM/95_PachLog.pm           rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
 FHEM/95_holiday.pm           rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/95_remotecontrol.pm     ulimaass             http://forum.fhem.de Frontends
