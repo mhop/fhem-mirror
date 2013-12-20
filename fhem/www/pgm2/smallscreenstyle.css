@@ -1,3 +1,5 @@
+@import url("dashboard_style.css");
+
 body     { background-color: #FFFFE7; 
            font-family:Arial, sans-serif; }
 textarea { font-family:Arial, sans-serif; font-size:16px;}
