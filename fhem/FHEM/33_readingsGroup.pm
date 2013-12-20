@@ -546,7 +546,7 @@ readingsGroup_Notify($$)
               next if( $reading !~ m/^$readings$/);
 
               my $new_line;
-              my $DEVICE = $name;
+              my $DEVICE = $dev->{NAME};
               ($txt,$new_line) = eval $txt;
               if( $@ ) {
                 $txt = "<ERROR>";
