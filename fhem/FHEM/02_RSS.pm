@@ -19,7 +19,7 @@ require "98_SVG.pm"; # enable use of plotAsPng()
 my @cmd_halign= qw(halign thalign ihalign);
 my @cmd_valign= qw(valign tvalign ivalign);
 my @valid_valign = qw(top center base bottom);
-my @valid_halign = qw(left center right);
+my @valid_halign = qw(left center right justified);
 
 # we can 
 # use vars qw(%FW_types);  # device types,
@@ -268,7 +268,7 @@ RSS_itemTextBox {
                       text => $text,
                       );
               $wrapbox->set_font($params{font}, $params{pt});
-              $wrapbox->set(align => 'justified', width => $boxwidth);
+              $wrapbox->set(align => $params{thalign}, width => $boxwidth);
               my ($left, $top, $right, $bottom) = $wrapbox->draw($x, $y);
               return $bottom;
         } else {
