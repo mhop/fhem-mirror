@@ -89,7 +89,7 @@ ECMD_Undef($$)
        $defs{$d}{IODev} == $hash)
       {
         my $lev = ($reread_active ? 4 : 2);
-        Log GetLogLevel($name,$lev), "deleting port for $d";
+        Log3 $hash, $lev, "deleting port for $d";
         delete $defs{$d}{IODev};
       }
   }
@@ -136,7 +136,7 @@ ECMD_OpenDev($$)
 
 
   $hash->{PARTIAL} = "";
-  Log 3, "ECMD opening $name (protocol $protocol, device $devicename)"
+  Log3 $hash, 3, "ECMD opening $name (protocol $protocol, device $devicename)"
         if(!$reopen);
 
   if($hash->{Protocol} eq "telnet") {
@@ -164,7 +164,7 @@ ECMD_OpenDev($$)
       delete($hash->{NEXT_OPEN})
 
     } else {
-      Log(3, "Can't connect to $devicename: $!") if(!$reopen);
+      Log3 $hash, 3, "Can't connect to $devicename: $!" if(!$reopen);
       $readyfnlist{"$name.$devicename"} = $hash;
       $hash->{STATE} = "disconnected";
       $hash->{NEXT_OPEN} = time()+60;
@@ -192,7 +192,7 @@ ECMD_OpenDev($$)
 
     if(!$po) {
       return undef if($reopen);
-      Log(3, "Can't open $devicename: $!");
+      Log3 $hash, 3, "Can't open $devicename: $!";
       $readyfnlist{"$name.$devicename"} = $hash;
       $hash->{STATE} = "disconnected";
       return "";
@@ -209,7 +209,7 @@ ECMD_OpenDev($$)
 
     if($baudrate) {
       $po->reset_error();
-      Log 3, "ECMD setting $name baudrate to $baudrate";
+      Log3 $hash, 3, "ECMD setting $name baudrate to $baudrate";
       $po->baudrate($baudrate);
       $po->databits(8);
       $po->parity('none');
@@ -240,18 +240,18 @@ ECMD_OpenDev($$)
   }
 
   if($reopen) {
-    Log 1, "ECMD $name ($devicename) reappeared";
+    Log3 $hash, 1, "ECMD $name ($devicename) reappeared";
   } else {
-    Log 3, "ECMD device opened";
+    Log3 $hash, 3, "ECMD device opened";
   }
 
   $hash->{STATE}= "";       # Allow InitDev to set the state
   my $ret  = ECMD_DoInit($hash);
 
   if($ret) {
-    Log 1,  "$ret";
+    Log3 $hash, 1,  "$ret";
     ECMD_CloseDev($hash);
-    Log 1, "Cannot init $name ($devicename), ignoring it";
+    Log3 $hash, 1, "Cannot init $name ($devicename), ignoring it";
   }
 
   DoTrigger($name, "CONNECTED") if($reopen);
@@ -352,10 +352,10 @@ ECMD_ReadAnswer($$)
 
       if($buf) {
         chomp $buf; # remove line break
-        Log 5, "ECMD (ReadAnswer): $buf";
+        Log3 $hash, 5, "ECMD (ReadAnswer): $buf";
         $data .= $buf;
-        }
-       return (undef, $data)
+      }
+      return (undef, $data)
   }
 }
 
@@ -392,7 +392,7 @@ ECMD_Disconnected($)
 
   return if(!defined($hash->{FD}));                 # Already deleted o
 
-  Log 1, "$dev disconnected, waiting to reappear";
+  Log3 $hash, 1, "$dev disconnected, waiting to reappear";
   ECMD_CloseDev($hash);
   $readyfnlist{"$name.$dev"} = $hash;               # Start polling
   $hash->{STATE} = "disconnected";
@@ -424,7 +424,7 @@ ECMD_Get($@)
         return "get raw needs an argument" if(@a< 3);
         my $nonl= AttrVal($name, "nonl", 0);
         my $ecmd= join " ", @args;
-        Log 5, $ecmd;
+        Log3 $hash, 5, $ecmd;
         ECMD_SimpleWrite($hash, $ecmd, $nonl);
         ($err, $msg) = ECMD_ReadAnswer($hash, "raw");
         return $err if($err);
@@ -448,21 +448,21 @@ ECMD_EvalClassDef($$$)
         # refuse overwriting existing definitions
         if(defined($hash->{fhem}{classDefs}{$classname})) {
                 my $err= "$name: class $classname is already defined.";
-                Log 1, $err;
+                Log3 $hash, 1, $err;
                 return $err;
         }
 
         # try and open the class definition file
         if(!open(CLASSDEF, $filename)) {
                 my $err= "$name: cannot open file $filename for class $classname.";
-                Log 1, $err;
+                Log3 $hash, 1, $err;
                 return $err;
         }
         my @classdef= <CLASSDEF>;
         close(CLASSDEF);
 
         # add the class definition
-        Log 5, "$name: adding new class $classname from file $filename";
+        Log3 $hash, 5, "$name: adding new class $classname from file $filename";
         $hash->{fhem}{classDefs}{$classname}{filename}= $filename;
 
         # format of the class definition:
@@ -494,57 +494,57 @@ ECMD_EvalClassDef($$$)
 		if($line=~ s/\\$//) { $cont= $line; undef $line; }
                 next unless($line);
 		$cont= "";
-                Log 5, "$name: evaluating >$line<";
+                Log3 $hash, 5, "$name: evaluating >$line<";
                 # split line into command and definition
                 my ($cmd, $def)= split("[ \t]+", $line, 2);
                 if($cmd eq "nonl") {
-                        Log 5, "$name: no newline";
+                        Log3 $hash, 5, "$name: no newline";
                         $hash->{fhem}{classDefs}{$classname}{nonl}= 1;
                 }
                 elsif($cmd eq "params") {
-                        Log 5, "$name: parameters are $def";
+                        Log3 $hash, 5, "$name: parameters are $def";
                         $hash->{fhem}{classDefs}{$classname}{params}= $def;
                 } elsif($cmd eq "set" || $cmd eq "get") {
                         my ($cmdname, $spec, $arg)= split("[ \t]+", $def, 3);
                         if($spec eq "params") {
                                 if($cmd eq "set") {
-                                        Log 5, "$name: set $cmdname has parameters $arg";
+                                        Log3 $hash, 5, "$name: set $cmdname has parameters $arg";
                                         $hash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{params}= $arg;
                                 } elsif($cmd eq "get") {
-                                        Log 5, "$name: get $cmdname has parameters $arg";
+                                        Log3 $hash, 5, "$name: get $cmdname has parameters $arg";
                                         $hash->{fhem}{classDefs}{$classname}{gets}{$cmdname}{params}= $arg;
                                 }
                         } elsif($spec eq "cmd") {
                                 if($arg !~ m/^{.*}$/s) {
-                                        Log 1, "$name: command for $cmd $cmdname is not a perl command.";
+                                        Log3 $hash, 1, "$name: command for $cmd $cmdname is not a perl command.";
                                         next;
                                 }
                                 $arg =~ s/^(\\\n|[ \t])*//;           # Strip space or \\n at the beginning
                                 $arg =~ s/[ \t]*$//;
                                 if($cmd eq "set") {
-                                        Log 5, "$name: set $cmdname command defined as $arg";
+                                        Log3 $hash, 5, "$name: set $cmdname command defined as $arg";
                                         $hash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{cmd}= $arg;
                                 } elsif($cmd eq "get") {
-                                        Log 5, "$name: get $cmdname command defined as $arg";
+                                        Log3 $hash, 5, "$name: get $cmdname command defined as $arg";
                                         $hash->{fhem}{classDefs}{$classname}{gets}{$cmdname}{cmd}= $arg;
                                 }
                         } elsif($spec eq "postproc") {
                                 if($arg !~ m/^{.*}$/s) {
-                                        Log 1, "$name: postproc command for $cmd $cmdname is not a perl command.";
+                                        Log3 $hash, 1, "$name: postproc command for $cmd $cmdname is not a perl command.";
                                         next;
                                 }
                                 $arg =~ s/^(\\\n|[ \t])*//;           # Strip space or \\n at the beginning
                                 $arg =~ s/[ \t]*$//;
                                 if($cmd eq "set") {
-                                        Log 5, "$name: set $cmdname postprocessor defined as $arg";
+                                        Log3 $hash, 5, "$name: set $cmdname postprocessor defined as $arg";
                                         $hash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{postproc}= $arg;
                                 } elsif($cmd eq "get") {
-                                        Log 5, "$name: get $cmdname postprocessor defined as $arg";
+                                        Log3 $hash, 5, "$name: get $cmdname postprocessor defined as $arg";
                                         $hash->{fhem}{classDefs}{$classname}{gets}{$cmdname}{postproc}= $arg;
                                 }
                         }
                 } else {
-                        Log 1, "$name: illegal tag $cmd for class $classname in file $filename.";
+                        Log3 $hash, 1, "$name: illegal tag $cmd for class $classname in file $filename.";
                 }
         }
 
@@ -626,13 +626,19 @@ ECMD_Write($$)
   my @ecmds= split "\n", $msg;
   my $nonl= AttrVal($hash->{NAME}, "nonl", 0);
   foreach my $ecmd (@ecmds) {
-        Log 5, "$hash->{NAME} sending $ecmd";
+        Log3 $hash, 5, "$hash->{NAME} sending $ecmd";
         ECMD_SimpleWrite($hash, $ecmd, $nonl);
         $answer= ECMD_ReadAnswer($hash, "$ecmd");
-        push @r, $answer;
-        Log 5, $answer;
+        if(defined($answer)) {
+          push @r, $answer;
+          Log3 $hash, 5, $answer;
+        } else {
+          Log3 $hash, 5, "no answer received";
+        }  
   }
-  return join("\n", @r);
+  
+  return join("\n", @r) unless($#r<0);
+  return undef;
 }
 
 #####################################
