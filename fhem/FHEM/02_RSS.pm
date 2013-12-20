@@ -96,6 +96,12 @@ RSS_Define($$) {
     Log3 $hash, 1, "Cannot use text alignment: $@";
   }
     
+  eval "use GD::Text::Wrap";
+  $hash->{fhem}{useTextWrap} = ($@ ? 0 : 1 );
+  if(!($hash->{fhem}{useTextWrap})) { 
+    Log3 $hash, 1, "Cannot use text wrapping: $@";
+  }
+    
   RSS_readLayout($hash);
   
   $hash->{STATE} = $name;
@@ -213,21 +219,13 @@ RSS_returnRSS($) {
 sub
 RSS_xy {
   my ($S,$x,$y,%params)= @_;
-  #Debug "RSS_xy on enter: (x,y)= ($x,$y)";
   
   $x = $params{x} if($x eq 'x');
   $y = $params{y} if($y eq 'y');
   
-  #$x = AnalyzePerlCommand(undef, $x);
-  #$y = AnalyzePerlCommand(undef, $y);
-  
   if((-1 < $x) && ($x < 1)) { $x*= $S->width; }
   if((-1 < $y) && ($y < 1)) { $y*= $S->height; }
   
-  $params{x} = $x;
-  $params{y} = $y;
-  
-  #Debug "RSS_xy on exit: (x,y)= ($x,$y)";
   return($x,$y);
 }
 
@@ -244,7 +242,6 @@ RSS_itemText {
   return unless(defined($text));
 
 	if($params{useTextAlign}) {
-		($x,$y)= RSS_xy($S,$x,$y,%params);
 		my $align = GD::Text::Align->new($S,
 			color  => RSS_color($S, $params{rgb}),
 			valign => $params{tvalign},
@@ -254,9 +251,30 @@ RSS_itemText {
 		$align->set_text($text);
 		$align->draw($x, $y, 0);
 	} else {
-		($x,$y)= RSS_xy($S,$x,$y,%params);
 		$S->stringFT(RSS_color($S,$params{rgb}),$params{font},$params{pt},0,$x,$y,$text);
 	}
+}
+
+sub
+RSS_itemTextBox {
+        my ($S,$x,$y,$boxwidth,$text,%params)= @_;
+        return unless(defined($text));
+        
+        if($params{useTextWrap}) {
+              if((0 < $boxwidth) && ($boxwidth < 1)) { $boxwidth*= $S->width; }
+              my $wrapbox = GD::Text::Wrap->new($S,
+                      color  => RSS_color($S, $params{rgb}),
+                      line_space => $params{linespace},
+                      text => $text,
+                      );
+              $wrapbox->set_font($params{font}, $params{pt});
+              $wrapbox->set(align => 'justified', width => $boxwidth);
+              my ($left, $top, $right, $bottom) = $wrapbox->draw($x, $y);
+              return $bottom;
+        } else {
+              RSS_itemText($S,$x,$y,$text,%params);
+              return $y;
+        }
 }
 
 sub
@@ -327,8 +345,6 @@ RSS_itemImg {
   } else {
     return;
   }
-  ($x,$y)= RSS_xy($S,$x,$y,%params);
-  
   eval {
     my ($width,$height)= $I->getBounds();
     if ($scale =~ s/([wh])([\d]*)/$2/) { # get the digit from width/hight to pixel entry
@@ -364,8 +380,6 @@ RSS_itemImg {
 sub
 RSS_itemLine {
   my ($S,$x1,$y1,$x2,$y2,$th,%params)= @_;
-  ($x1,$y1)= RSS_xy($S,$x1,$y1,%params);
-  ($x2,$y2)= RSS_xy($S,$x2,$y2,%params);
   $S->setThickness($th);
   $S->line($x1,$y1,$x2,$y2,RSS_color($S,$params{rgb}));  
 }
@@ -387,15 +401,17 @@ RSS_evalLayout($$@) {
   # we need two pairs of align parameters
   # due to different default values for text and img
   $params{useTextAlign}= $defs{$name}{fhem}{useTextAlign};
+  $params{useTextWrap}= $defs{$name}{fhem}{useTextWrap};
   $params{ihalign} = 'left';
   $params{ivalign} = 'top';
   $params{thalign} = 'left';
   $params{tvalign} = 'base';
+  $params{linespace} = 0;
   $params{x}= 0;
   $params{y}= 0;
   
 
-  my ($x,$y,$x1,$y1,$x2,$y2,$scale,$text,$imgtype,$srctype,$arg,$format);
+  my ($x,$y,$x1,$y1,$x2,$y2,$scale,$boxwidth,$text,$imgtype,$srctype,$arg,$format);
   
   my $cont= "";
   foreach my $line (@layout) {
@@ -420,6 +436,7 @@ RSS_evalLayout($$@) {
           }  
           next unless($params{condition});
           
+          #Debug "before command $line: x= " . $params{x} . ", y= " . $params{y};
           
           if($cmd eq "rgb") {
             $def= "\"$def\"" if(length($def) == 6 && $def =~ /[[:xdigit:]]{6}/);
@@ -430,12 +447,12 @@ RSS_evalLayout($$@) {
             $params{pt}= $def;
           } elsif($cmd eq "moveto") {
             my ($tox,$toy)= split('[ \t]+', $def, 2);
-            my ($x,$y)= RSS_xy($S, $tox,$toy);
+            my ($x,$y)= RSS_xy($S, $tox,$toy,%params);
             $params{x} = $x;
             $params{y} = $y;
           } elsif($cmd eq "moveby") {
             my ($byx,$byy)= split('[ \t]+', $def, 2);
-            my ($x,$y)= RSS_xy($S, $byx,$byy);
+            my ($x,$y)= RSS_xy($S, $byx,$byy,%params);
             $params{x} += $x;
             $params{y} += $y;
           } elsif($cmd ~~ @cmd_halign) {
@@ -454,32 +471,61 @@ RSS_evalLayout($$@) {
                 } else {
                   Log3 $name, 2, "$name: Illegal vertical alignment $d";
                 }
+          } elsif($cmd eq "linespace") {
+            $params{linespace}= $def;
           } elsif($cmd eq "text") {
             ($x,$y,$text)= split("[ \t]+", $def, 3);
+            ($x,$y)= RSS_xy($S, $x,$y,%params);
+            $params{x} = $x;
+            $params{y} = $y;
             my $txt= AnalyzePerlCommand(undef, $text);
             #Debug "$name: ($x,$y) $txt";
             RSS_itemText($S,$x,$y,$txt,%params);
+          } elsif($cmd eq "textbox") {
+            ($x,$y,$boxwidth,$text)= split("[ \t]+", $def, 4);
+            ($x,$y)= RSS_xy($S, $x,$y,%params);
+            my $txt= AnalyzePerlCommand(undef, $text);
+            #Debug "$name: ($x,$y) $txt";
+            $y= RSS_itemTextBox($S,$x,$y,$boxwidth,$txt,%params);
+            $params{x} = $x;
+            $params{y} = $y;
           } elsif($cmd eq "line") {
             ($x1,$y1,$x2,$y2,$format)= split("[ \t]+", $def, 5);
+            ($x1,$y1)= RSS_xy($S, $x1,$y1,%params);
+            ($x2,$y2)= RSS_xy($S, $x2,$y2,%params);
             $format //= 1; # set format to 1 as default thickness for the line
             RSS_itemLine($S,$x1,$y1,$x2,$y2, $format,%params);
           } elsif($cmd eq "time") {
             ($x,$y)= split("[ \t]+", $def, 2);
+            ($x,$y)= RSS_xy($S, $x,$y,%params);
+            $params{x} = $x;
+            $params{y} = $y;
             RSS_itemTime($S,$x,$y,%params);
           } elsif($cmd eq "seconds") {
             ($x,$y,$format) = split("[ \+]", $def,3);
+            ($x,$y)= RSS_xy($S, $x,$y,%params);
+            $params{x} = $x;
+            $params{y} = $y;
             RSS_itemSeconds($S,$x,$y,$format,%params);
           } elsif($cmd eq "date") {
             ($x,$y)= split("[ \t]+", $def, 2);
+            ($x,$y)= RSS_xy($S, $x,$y,%params);
+            $params{x} = $x;
+            $params{y} = $y;
             RSS_itemDate($S,$x,$y,%params);
           }  elsif($cmd eq "img") {
             ($x,$y,$scale,$imgtype,$srctype,$arg)= split("[ \t]+", $def,6);
+            ($x,$y)= RSS_xy($S, $x,$y,%params);
+            $params{x} = $x;
+            $params{y} = $y; 
             my $arg= AnalyzePerlCommand(undef, $arg);
             RSS_itemImg($S,$x,$y,$scale,$imgtype,$srctype,$arg,%params);
-          } elsif($cmd eq 'condition') {
           } else {
             Log3 $name, 1, "$name: Illegal command $cmd in layout definition.";
-          }  
+          } 
+          
+          #Debug "after  command $line: x= " . $params{x} . ", y= " . $params{y};
+
   }
 }
 
@@ -734,7 +780,7 @@ RSS_CGI(){
     <i>General notes</i><br> 
     <ol>
     <li>Use double quotes to quote literal text if perl specials are allowed.</li> 
-    <li>Text alignment requires the Perl module GD::Text::Align to be installed. Debian-based systems can install it with <code>apt-get install libgd-text-perl</code>.</li>
+    <li>Text alignment requires the Perl module GD::Text::Align to be installed. Text wrapping (in text boxes) require GD::Text::Wrap to be installed. Debian-based systems can install both with <code>apt-get install libgd-text-perl</code>.</li>
     </ol>
     <p>
     <i>Notes on coordinates</i><br>
@@ -774,6 +820,8 @@ RSS_CGI(){
     top-aligned for image. You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> instead of the literal alignment control word.</li><br>
     
+    <li>linespace &lt;space&gt;<br>Sets the line spacing in pixels for text boxes (see textbox item below).</li><br>
+    
     <li>condition &lt;condition&gt;<br>Subsequent layout control and item placement commands except for another condition command 
     are ignored if and only if &lt;condition&gt;
     evaluates to false.</li><br>
@@ -786,7 +834,7 @@ RSS_CGI(){
     You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;text&gt; to fully
     access device readings and do some programming on the fly. See below for examples.</li><br>
-
+    <li>textbox &lt;x&gt; &lt;y&gt; &lt;boxwidth&gt; &lt;text&gt;<br>Same as before but text is rendered in a box of horizontal width &lt;boxwidth&gt;.</li><br> 
     <li>time &lt;x&gt; &lt;y&gt;<br>Renders the current time in HH:MM format.</li><br>
     <li>seconds &lt;x&gt; &lt;y&gt; &lt;format&gt<br>Renders the curent seconds. Maybe usefull for a RSS Clock. With option colon a : </li><br>
     <li>date &lt;x&gt; &lt;y&gt;<br>Renders the current date in DD:MM:YYY format.</li><br>
