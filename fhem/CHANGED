@@ -6,14 +6,14 @@
   - feature: Add new module Dashboard
   - feature: Add new module ONKYO_AVR
   - feature: SYSSTAT: allow (remote) monitoring via snmp, support
-                      for monitoring windows systems and synology system temperature
+             for monitoring windows systems and synology system temperature
   - feature: New module LINDY_HDMI_SWITCH.pm added
-  - feature: ENIGMA2: improved logging, default attributes for webCmd and devStateIcon
+  - feature: ENIGMA2: improved logging, default attributes for webCmd and
+             devStateIcon
   - bugfix:  ENIGMA2: support for option channels
-  - feature: mailcheck: decode non ascii subjet to utf-8,
-                        verify gpg signatures
+  - feature: mailcheck: decode non ascii subjet to utf-8, verify gpg signatures
   - feature: PRESENCE: "statusRequest" command for lan-bluetooth mode
-                       (collectord >= 1.4, presenced >= 1.1 required)
+             (collectord >= 1.4, presenced >= 1.1 required)
   - feature: PRESENCE: new collectord package
   - feature: devspec: removed range, added :FILTER and more general search
   - feature: HUEBridge,HUEDevice: support for groups added
