@@ -457,7 +457,8 @@ readingsGroup_Notify($$)
 
   return if( AttrVal($name,"disable", 0) > 0 );
 
-  return if($dev->{NAME} eq $name);
+  return if($dev->{TYPE} eq $hash->{TYPE});
+  #return if($dev->{NAME} eq $name);
 
   my $devices = $hash->{DEVICES};
 
