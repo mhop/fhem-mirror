@@ -13,8 +13,7 @@
 #	Please read commandref for details on prerequisits!
 #	Depends on wiringPi library from http://wiringpi.com
 #
-#	Copyright: betateilchen ®
-#	e-mail: fhem.development@betateilchen.de
+#	maintainer: klaus.schauer (see MAINTAINER.txt)
 #
 #	This file is part of fhem.
 #
@@ -42,26 +41,36 @@ sub PIFACE_Define($$);
 sub PIFACE_Undefine($$);
 sub PIFACE_Set($@);
 sub PIFACE_Get($@);
+sub PIFACE_Attr(@);
 
-my $base = 199;
+my $base = 200;
 
 sub PIFACE_Initialize($){
-	my ($hash) = @_;
-	$hash->{DefFn}		=	"PIFACE_Define";
-	$hash->{UndefFn}	=	"PIFACE_Undefine";
-	$hash->{SetFn}		=	"PIFACE_Set";
-	$hash->{GetFn}		=	"PIFACE_Get";
-	$hash->{AttrList}	=	"pifaceAutoPoll:0,1 ".
-							$readingFnAttributes;
+  my ($hash) = @_;
+  $hash->{DefFn}	= "PIFACE_Define";
+  $hash->{UndefFn}	= "PIFACE_Undefine";
+  $hash->{SetFn}	= "PIFACE_Set";
+  $hash->{GetFn}	= "PIFACE_Get";
+  $hash->{NotifyFn}     = "PIFACE_Notify";
+  $hash->{AttrFn}	= "PIFACE_Attr";
+  $hash->{AttrList}	= $readingFnAttributes .
+                          " defaultState:0,1,last,off pollInterval:1,2,3,4,5,6,7,8,9,10,off" .
+                          " portMode0:tri,up" .
+                          " portMode1:tri,up" .
+                          " portMode2:tri,up" .
+                          " portMode3:tri,up" .
+                          " portMode4:tri,up" .
+                          " portMode5:tri,up" .
+                          " portMode6:tri,up" .
+                          " portMode7:tri,up";
 }
 
 sub PIFACE_Define($$){
-	my ($hash, $def) = @_;
-	my $name = $hash->{NAME};
-	Log3($name, 3, "PIFACE $name: created");
-	PI_read_allports($hash);
-	readingsSingleUpdate($hash, "state", "active",1);
-	return undef;
+  my ($hash, $def) = @_;
+  my $name = $hash->{NAME};
+  Log3($name, 3, "PIFACE $name active");
+  readingsSingleUpdate($hash, "state", "active",1);
+  return;
 }
 
 sub PIFACE_Undefine($$){
@@ -70,101 +79,195 @@ sub PIFACE_Undefine($$){
 	return;
 }
 
-sub PIFACE_Set($@){
+sub PIFACE_Set($@) {
 	my ($hash, @a)	= @_;
 	my $name = $hash->{NAME};
-
 	my $port = $a[1];
 	my $val  = $a[2];
-	my ($adr, $cmd, $i, $j, $k);
-	
-	my $usage = "Unknown argument $port, choose one of 0 1:0,1 2:0,1 3:0,1 4:0,1 5:0,1 6:0,1 7:0,1 8:0,1 ";
-	return $usage if $port eq "?";
-	
-	if ($port ne "0") {
+	my ($adr, $cmd, $i, $j, $k);	
+	my $usage = "Unknown argument $port, choose one of all 0:0,1 1:0,1 2:0,1 3:0,1 4:0,1 5:0,1 6:0,1 7:0,1 ";
+	return $usage if $port eq "?";	
+	if ($port ne "all") {
 		$adr = $base + $port;
-		Log3($name, 3, "PIFACE $name: set port $port $val");
+		Log3($name, 3, "PIFACE $name set port $port $val");
 		$cmd = "/usr/local/bin/gpio -p write $adr $val";
 		$cmd = `$cmd`;
 		readingsSingleUpdate($hash, 'out'.$port, $val, 1);
 	} else {
-		$adr = $base + 1;
-		Log3($name, 3, "PIFACE $name: set ports $val");
+		Log3($name, 3, "PIFACE $name set ports $val");
 		readingsBeginUpdate($hash);
-		for($i=0; $i<8; $i++){
+		for($i = 0; $i < 8; $i ++) {
 			$j = 2**$i;
 			$k = ($val & $j);
 			$k = ($k) ? 1 : 0;
-			$adr = 1 + $i;
-			Log3($name, 3, "PIFACE $name: set port $adr $k");
-			$adr += $base;
+			Log3($name, 3, "PIFACE $name set port $i $k");
+			$adr = $base + $i;
 			$cmd = "/usr/local/bin/gpio -p write $adr $k";
 			$cmd = `$cmd`;
-			$j = $i + 1;
-			readingsBulkUpdate($hash, 'out'.$j, $k);
+			readingsBulkUpdate($hash, 'out'.$i, $k);
 		}
 		readingsEndUpdate($hash, 1);
 	}
-	return "";
+	return;
 }
 
 sub PIFACE_Get($@){
 	my ($hash, @a)	= @_;
 	my $name = $hash->{NAME};
-
 	my $port = $a[1];
-	my ($adr, $cmd, $pin, $pull, $val);
-
-	my $usage = "Unknown argument $port, choose one of 0:noArg ".
-				"1:noArg  2:noArg  3:noArg  4:noArg ".
-				"5:noArg  6:noArg  7:noArg  8:noArg ".
-				"11:noArg  12:noArg  13:noArg  14:noArg ".
-				"15:noArg  16:noArg  17:noArg  18:noArg ".
-				"21:noArg  22:noArg  23:noArg  24:noArg ".
-				"25:noArg  26:noArg  27:noArg  28:noArg ";
+	my ($adr, $cmd, $pin, $portMode, $val);
+	my $usage = "Unknown argument $port, choose one of all:noArg in:noArg out:noArg ".
+				"0:noArg 1:noArg  2:noArg  3:noArg  4:noArg ".
+				"5:noArg  6:noArg  7:noArg";
 	return $usage if $port eq "?";
+	if ($port eq "all") {
+	  PIFACE_Read_Inports(1, $hash);
+          PIFACE_Read_Outports(1, $hash);                
+	} elsif ($port eq "in") {
+	  PIFACE_Read_Inports(0, $hash);	
+	} elsif ($port eq "out") {
+          PIFACE_Read_Outports(0, $hash);	
+	} else {
+	  $adr  = $base + $port;
+	  $cmd = '/usr/local/bin/gpio -p read '.$adr;
+	  $val = `$cmd`;
+	  $val =~ s/\n//g;
+	  $val =~ s/\r//g;
+	  readingsSingleUpdate($hash, 'in'.$port, $val, 1);
+	}
+	return;
+}
 
-	if ($port ~~ [11..18]) {
-		Log3($name, 3, "PIFACE $name: get inports with internal pullups is DEPRECATED and may be removed in further versions!");
-		# read single inport with pullup
-		$pin  = $port - 10;
-		$adr  = $base + $pin;
-		$cmd = '/usr/local/bin/gpio -p mode '.$adr.' up';
-		$val = `$cmd`;
-		$cmd = '/usr/local/bin/gpio -p read '.$adr;
+sub PIFACE_Attr(@) {
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+  my $hash = $defs{$name};
+  if ($attrName eq "pollInterval") {
+    if (!defined $attrVal) {
+      RemoveInternalTimer($hash);    
+    } elsif ($attrVal !~ m/^(off|[1..10])$/) {
+      RemoveInternalTimer($hash);    
+      Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
+      CommandDeleteAttr(undef, "$name pollInterval");
+    } else {
+      PIFACE_GetUpdate($hash);
+    }
+  } elsif ($attrName eq "defaultState") {
+    if (!defined $attrVal){
+    
+    } elsif ($attrVal !~ m/^(last|off|[01])$/) {
+      Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
+      CommandDeleteAttr(undef, "$name defaultState");
+    }
+  } elsif ($attrName =~ m/^portMode/) {
+    my $port = substr($attrName, 8, 1);
+    my $adr = $base + $port;
+    my $portMode = $attrVal;
+    my $val;
+    $portMode = "tri" if (!defined $attrVal);
+    if ($attrVal !~ m/^(tri|up)$/) {
+      $portMode = "tri" ;
+      Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
+      CommandDeleteAttr(undef, "$name $port");
+    }
+    $cmd = '/usr/local/bin/gpio -p mode ' . $adr . ' ' . $portMode;
+    $val = `$cmd`;
+    $cmd = '/usr/local/bin/gpio -p read ' . $adr;
+    $val = `$cmd`;
+    $val =~ s/\n//g;
+    $val =~ s/\r//g;
+    readingsSingleUpdate($hash, 'in' . $port, $val, 1);
+  }
+  return;
+}
+
+sub PIFACE_Notify(@) {
+  my ($hash, $dev) = @_;
+  my $name = $hash->{NAME}; 
+  if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED$/,@{$dev->{CHANGED}})){
+    Log3($name, 3, "PIFACE $name initialized");
+    PIFACE_Restore_Outports_State($hash);
+    PIFACE_Read_Inports(0, $hash);
+    PIFACE_Read_Outports(0, $hash);
+    PIFACE_GetUpdate($hash);    
+  }
+  return;
+}
+
+sub PIFACE_Read_Outports($$){
+	my ($updateMode, $hash) = @_;
+        my $name = $hash->{NAME};
+	my ($cmd, $i, $port, $val);
+	readingsBeginUpdate($hash);
+	for($i=0; $i<8; $i++){
+		$port = $base + $i + 8;
+		$cmd = '/usr/local/bin/gpio -p read '.$port;
 		$val = `$cmd`;
 		$val =~ s/\n//g;
 		$val =~ s/\r//g;
-		readingsSingleUpdate($hash, 'in'.$port, $val, 1);
-	} else {
-		# read all inports and outports
-		PI_read_allports($hash);
-	}
-	return "";
-}
-
-sub PI_read_allports($){
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-	my ($cmd, $val, $p, $pin, $v, $zeile, @ports);
-	
-	$cmd = '/usr/local/bin/gpio -p readall';
-	$val = `$cmd`;
-	@ports = split(/\n/, $val);
-
-	foreach (@ports){
-		$zeile = $_;
-		$p = substr($zeile,  3, 3);
-		$v = substr($zeile, 13, 1);
-		if (substr($p,0,1) eq '2' && $p ~~ [200..207]){
-			$pin = $p - 199;
-			readingsSingleUpdate($hash, 'in'.$pin, $v, 1) if(ReadingsVal($name, 'in'.$pin, '') ne $v);
-		} elsif (substr($p,0,1) eq '2' && $p ~~ [208..215]){
-			$pin = $p - 207;
-			readingsSingleUpdate($hash, 'out'.$pin, $v, 1) if(ReadingsVal($name, 'out'.$pin, '') ne $v);
+		if ($updateMode == 1){
+		  readingsBulkUpdate($hash, 'out'.$i, $val);
+		} else {
+		  readingsBulkUpdate($hash, 'out'.$i, $val) if(ReadingsVal($name, 'out'.$i, '') ne $val);		
 		}
 	}
+	readingsEndUpdate($hash, 1);
 	return;
+}
+
+sub PIFACE_Read_Inports($$){
+	my ($updateMode, $hash) = @_;
+        my $name = $hash->{NAME};
+	my ($cmd, $i, $j, $port, $portMode, $val);
+	readingsBeginUpdate($hash);
+	for($i=0; $i<8; $i++){
+	  $port = $base + $i;
+	  $cmd = '/usr/local/bin/gpio -p read '.$port;
+	  $val = `$cmd`;
+	  $val =~ s/\n//g;
+	  $val =~ s/\r//g;
+	  if ($updateMode == 1) {
+	    readingsBulkUpdate($hash, 'in'.$i, $val);
+	  } else {
+	    readingsBulkUpdate($hash, 'in'.$i, $val) if(ReadingsVal($name, 'in'.$i, '') ne $val);		
+	  }
+	}
+	readingsEndUpdate($hash, 1);
+	return;
+}
+
+sub PIFACE_Restore_Outports_State($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my @cmd = ($name, 0, 0);
+  my $defaultState = AttrVal($name, "defaultState", "off");
+  if ($defaultState ne "off") {
+    for(my $port = 0; $port < 8; $port ++){
+      $cmd[1] = $port;
+      if ($defaultState eq "last") {
+        $cmd[2] = ReadingsVal($name, "out" . $port, 0);
+      } elsif ($defaultState == 1) {
+        $cmd[2] = 1;    
+      } else {
+        $cmd[2] = 0;    
+      }
+      PIFACE_Set($hash, @cmd);
+    }
+  }
+  PIFACE_Read_Outports(1, $hash);
+  return;
+}
+
+sub
+PIFACE_GetUpdate($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $pollInterval = AttrVal($name, "pollInterval", "off");
+  if ($pollInterval ne "off") {
+    InternalTimer(gettimeofday() + $pollInterval, "PIFACE_GetUpdate", $hash, 1);
+    PIFACE_Read_Inports(0, $hash);
+    PIFACE_Read_Outports(0, $hash);
+  }  
+  return;
 }
 
 1;
@@ -217,12 +320,12 @@ sub PI_read_allports($){
 			<br/>
 			<li>set all ports in one command by bitmask<br/><br/>
 				Example:<br/>
-				set &lt;name&gt; 0 255 =&gt; set all ports on<br/>
-				set &lt;name&gt; 0 0 =&gt; set all ports off<br/>
-				set &lt;name&gt; 0 170 =&gt; bitmask(170) = 10101010 =&gt; set ports 2 4 6 8 on, ports 1 3 5 7 off<br/>
+				set &lt;name&gt; all 255 =&gt; set all ports on<br/>
+				set &lt;name&gt; all 0 =&gt; set all ports off<br/>
+				set &lt;name&gt; all 170 =&gt; bitmask(170) = 10101010 =&gt; set ports 1 3 5 7 on, ports 0 2 4 6 off<br/>
 				<br/>
 				<ul>
-					<code>port 87654321<br/>
+					<code>port 76543210<br/>
 					bit&nbsp; 10101010</code>
 				</ul></li>
 		</ul>
@@ -238,23 +341,25 @@ sub PI_read_allports($){
 		<code>get &lt;name&gt; &lt;port&gt;</code>
 		<br/><br/>
 		<ul>
-			<li>get state of single input port with internal pullups <b>off</b><br/><br/>
+			<li>get state of single port<br/><br/>
 				Example:<br/>
-				get &lt;name&gt; 3 =&gt; get state of input port 3<br/></li>
+				get &lt;name&gt; 3 =&gt; get state of port 3<br/>
+			</li>
 			<br/>
-			<li>get state of single input port with internal pullups <b>on</b><br/><br/>
-				Add 10 to port number!<br/><br/>
+			<li>get state of input ports and update changed readings<br/><br/>
 				Example:<br/>
-				get &lt;name&gt; 15 =&gt; get state of input port 5<br/></li>
-			<li>get state of single output port with internal pullups <b>on</b><br/><br/>
-				Add 20 to port number!<br/><br/>
+				get &lt;name&gt; in =&gt; get state of all input ports<br/>
+			</li>
+			<br/>
+			<li>get state of out ports and update changed readings<br/><br/>
 				Example:<br/>
-				get &lt;name&gt; 25 =&gt; get state of output port 5<br/>
-				<b>Important:</b> reading with internal pullups is DEPRECATED and will be removed in further versions!<br/><br/></li>
-			<li>get state of all input AND output ports and update readings.<br/>
-				<b>Important:</b> in-ports are only read without pullup!<br/>
+				get &lt;name&gt; out =&gt; get state of all output ports<br/>
+			</li>
+			<br/>
+			<li>get state of input and out ports and update all readings<br/><br/>
 				Example:<br/>
-				get &lt;name&gt; 0 =&gt; get state of all ports<br/></li>
+				get &lt;name&gt; all =&gt; get state of all ports<br/>
+			</li>
 		</ul>
 
 	</ul>
@@ -263,23 +368,35 @@ sub PI_read_allports($){
 	<a name="PIFACEattr"></a>
 	<b>Attributes</b><br/><br/>
 	<ul>
-		<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+          <li><a name="defaultState">defaultState</a> last|off|0|1,
+            [defaultState] = off is default.<br>
+            Restoration of the status of the output port after a Fhem reboot.
+          </li>
+          <li><a name="pollInterval">pollInterval</a> off|1,2,...,9,10,
+            [pollInterval] = off is default.<br>
+            Define the polling interval of the input ports in seconds.
+          </li>
+          <li><a name="portMode&lt;0..7&gt;">portMode&lt;0..7&gt;</a> tri|up,
+            [portMode&lt;0..7&gt;] = tri is default.<br>
+            This enables (up) or disables (tri) the internal pull-up resistor on the given input port.
+            You need to enable the pull-up if you want to read any of the on-board switches on the PiFace board.
+          </li>
+	  <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 	</ul>
 	<br/><br/>
 
 	<b>Generated Readings/Events:</b>
 	<br/><br/>
 	<ul>
-		<li><b>&lt;out1..out8&gt;</b> - state of output port 1..8</li>
-		<li><b>&lt;in1..in8&gt;</b> - state of input port 1..8 without pullup resistor active</li>
-		<li><b>&lt;in11..in18&gt;</b> - state of input port 1..8 with pullup resistor active</li>
+		<li><b>&lt;out0..out7&gt;</b> - state of output port 0..7</li>
+		<li><b>&lt;in0..in7&gt;</b> - state of input port 0..7</li>
 	</ul>
 	<br/><br/>
 
 	<b>Author's notes</b><br/><br/>
 	<ul>
-		<li>Relays 1 and 2 have corresponding port 1 and 2</li>
-		<li>Switches 1..4 have corresponding ports 1..4 and must be read with pullups on</li>
+		<li>Relays 0 and 1 have corresponding port 0 and 1</li>
+		<li>Switches 0..3 have corresponding ports 0..3 and must be read with attr portMode<0..7> = up</li>
 		<br/>
 		<li>Have fun!</li><br/>
 
