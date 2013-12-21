@@ -2321,7 +2321,7 @@ sub CUL_HM_Set($@) {
     return "$cmd requires parameter: $h";
   }
 
-  AssignIoPort($defs{$devName}) if (!$defs{$devName}{IOdev});
+  AssignIoPort($defs{$devName}) if (!$defs{$devName}{IODev});
   my $id = CUL_HM_IOid($defs{$devName});
   return "no IO device identified" if(length($id) != 6 );
 
