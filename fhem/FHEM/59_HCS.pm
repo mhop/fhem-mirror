@@ -442,21 +442,32 @@ HCS_getValues($$) {
   foreach my $d (sort keys %defs) {
     my $t = $defs{$d}{TYPE};
     # skipping unneeded devices
-    next if($t ne "FHT" && $t ne "CUL_HM");
+    next if($t ne "FHT" && $t ne "CUL_HM" && $t ne "MAX");
+    next if($t eq "MAX" && !$defs{$d}{type});
+    next if($t eq "MAX" && $defs{$d}{type} !~ m/HeatingThermostat/);
 
     next if($t eq "CUL_HM" &&(   !$attr{$d}{model}
 	                          ||!(  ($attr{$d}{model} eq "HM-CC-TC"    && !$defs{$d}{device})
 	                              ||($attr{$d}{model} eq "HM-CC-RT-DN" && !$defs{$d}{device}))));
 
-    $devs{$d}{actuator}     = ReadingsVal($d,"actuator","n/a");
-	
-    if ($devs{$d}{actuator} =~ m/^\d+\s*%$/) { $devs{$d}{actuator} =~ s/(\s+|%)//g;
-    } else {                                   $devs{$d}{actuator} = 0;
-    }
+    $devs{$d}{actuator}     = ReadingsVal($d,"valveposition","n/a") if($t =~ m/(MAX)/);
+    $devs{$d}{actuator}     = ReadingsVal($d,"actuator","n/a")      if($t =~ m/(FHT|CUL_HM)/);
+
+    if ($devs{$d}{actuator} =~ m/^\d+\s*%?$/) {
+      $devs{$d}{actuator} =~ s/(\s+|%)//g;
+    } else {
+      $devs{$d}{actuator} = 0;
+    }	
+
     $devs{$d}{excluded}     = ($exclude =~ m/$d/) ? 1 : 0;
     $devs{$d}{ignored}      = ($attr{$d}{ignore} && $attr{$d}{ignore} == 1) ? 1 : 0;
-    $devs{$d}{tempDesired}  = ReadingsVal($d,"desired-temp","n/a");
-    $devs{$d}{tempMeasured} = ReadingsVal($d,"measured-temp","n/a");
+
+    $devs{$d}{tempDesired}  = ReadingsVal($d,"desired-temp","n/a")       if($t =~ m/(FHT|CUL_HM)/);
+    $devs{$d}{tempDesired}  = ReadingsVal($d,"desiredTemperature","n/a") if($t =~ m/(MAX)/);
+    $devs{$d}{tempMeasured} = ReadingsVal($d,"measured-temp","n/a")      if($t =~ m/(FHT|CUL_HM)/);
+    $devs{$d}{tempMeasured} = ReadingsVal($d,"temperature","n/a")        if($t =~ m/(MAX)/);
+
+
     $devs{$d}{type}         = $t;
     $hash->{helper}{device}{$d}{excluded} = $devs{$d}{excluded};
     $hash->{helper}{device}{$d}{ignored}  = $devs{$d}{ignored};
@@ -513,6 +524,7 @@ HCS_getValues($$) {
   my $sumExcluded = 0;
   my $sumFHT      = 0;
   my $sumHMCCTC   = 0;
+  my $sumMAX      = 0;
   my $sumIdle     = 0;
   my $sumIgnored  = 0;
   my $sumTotal    = 0;
@@ -530,6 +542,7 @@ HCS_getValues($$) {
     $hash->{helper}{device}{$d}{tempDesired}  = $devs{$d}{tempDesired};
     $hash->{helper}{device}{$d}{tempMeasured} = $devs{$d}{tempMeasured};
     $hash->{helper}{device}{$d}{type}         = $devs{$d}{type};
+    $sumMAX++       if(lc($devs{$d}{type}) eq "max");
     $sumFHT++       if(lc($devs{$d}{type}) eq "fht");
     $sumHMCCTC++    if(lc($devs{$d}{type}) eq "cul_hm");
     $sumTotal++;
@@ -712,8 +725,8 @@ HCS_getValues($$) {
     }
 
   }
-  my $str = sprintf("Found %d Device(s): %d FHT, %d HM-CC-TC, demand: %d, idle: %d, ignored: %d, exlcuded: %d, unknown: %d",
-                    $sumTotal,$sumFHT,$sumHMCCTC,$sumDemand,$sumIdle,$sumIgnored,$sumExcluded,$sumUnknown);
+  my $str = sprintf("Found %d Device(s): %d FHT, %d HM-CC-TC, %d MAX, demand: %d, idle: %d, ignored: %d, excluded: %d, unknown: %d",
+                    $sumTotal,$sumFHT,$sumHMCCTC, $sumMAX, $sumDemand,$sumIdle,$sumIgnored,$sumExcluded,$sumUnknown);
   Log $ll, "$type $name $str, eco: $eco overdrive: $overdrive";
 
   return $heatDemand;
@@ -728,7 +741,7 @@ HCS_getValues($$) {
 <a name="HCS"></a>
 <h3>HCS</h3>
 <ul>
-  Defines a virtual device for monitoring thermostats (FHT, HM-CC-TC) to control a central
+  Defines a virtual device for monitoring thermostats (FHT, HM-CC-TC, MAX) to control a central
   heating unit.<br><br>
 
   <a name="HCSdefine"></a>
