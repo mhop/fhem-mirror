@@ -5,6 +5,9 @@
   - change:  integrated OWServer/OWDevice nonblocking and random start
              time patches (justme1968 & Boris)
   - feature: Add new module Dashboard
+  - change:  ONKYO_AVR: transfer command database into separate packet
+  			 ONKYOdb.pm
+  - feature: ENIGMA2: bouquet support e.g. for named channels
   - feature: Add new module ONKYO_AVR
   - feature: SYSSTAT: allow (remote) monitoring via snmp, support
              for monitoring windows systems and synology system temperature
