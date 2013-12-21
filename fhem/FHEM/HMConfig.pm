@@ -1119,7 +1119,7 @@ $culHmSubTypeSets{powerMeter}      = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
 
 my %culHmModelSets = (# channels of this subtype-------------
-  "HM-CC-VD"       =>{ valvePos       => "position"},
+#  "HM-CC-VD"       =>{ valvePos       => "position"},
   "HM-RC-19"       =>{ service        => "<count>"
                       ,alarm          => "<count>"
                       ,display        => "<text> [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
