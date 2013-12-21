@@ -1207,7 +1207,7 @@ FW_showRoom()
                         lc(AttrVal($b, "sortby", AttrVal($b,"alias",$b))) }
                    @atEnds) {
     no strict "refs";
-    FW_pO &{$modules{$defs{$d}{TYPE}}{FW_summaryFn}}($FW_chash, $d, 
+    FW_pO &{$modules{$defs{$d}{TYPE}}{FW_summaryFn}}($FW_wname, $d, 
                                                         $FW_room, \%extPage);
     use strict "refs";
   }
