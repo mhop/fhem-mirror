@@ -73,7 +73,8 @@ sub ENIGMA2_Initialize($) {
     $hash->{DefFn}   = "ENIGMA2_Define";
     $hash->{UndefFn} = "ENIGMA2_Undefine";
 
-    $hash->{AttrList} = "https:0,1 disable:0,1 bouquet " . $readingFnAttributes;
+    $hash->{AttrList} =
+      "https:0,1 disable:0,1 bouquet timeout " . $readingFnAttributes;
 
     $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG} =
       "ENIGMA2_RClayout_DM800_SVG";
@@ -145,7 +146,7 @@ sub ENIGMA2_GetStatus($;$) {
                 && defined( $services->{e2service}[0]{e2servicereference} )
                 && $services->{e2service}[0]{e2servicereference} ne "" )
             {
-                Log3 $name, 4, "ENIGMA2 $name: Adding attribute bouquet = "
+                Log3 $name, 3, "ENIGMA2 $name: Adding attribute bouquet = "
                   . $services->{e2service}[0]{e2servicereference};
 
                 $attr{$name}{bouquet} =
@@ -157,8 +158,8 @@ sub ENIGMA2_GetStatus($;$) {
                 && defined( $services->{e2service}{e2servicereference} )
                 && $services->{e2service}{e2servicereference} ne "" )
             {
-                Log3 $name, 4, "ENIGMA2 $name: Adding attribute bouquet = "
-                  . $services->{e2service}[0]{e2servicereference};
+                Log3 $name, 3, "ENIGMA2 $name: Adding attribute bouquet = "
+                  . $services->{e2service}{e2servicereference};
 
                 $attr{$name}{bouquet} =
                   $services->{e2service}{e2servicereference};
@@ -167,16 +168,16 @@ sub ENIGMA2_GetStatus($;$) {
             $services_list = ENIGMA2_SendCommand( $hash, "getservices",
                 "sRef=" . urlEncode( $attr{$name}{bouquet} ) );
 
-            my $i = 0;
             if ( ref($services_list) eq "HASH" ) {
-                for ( keys $services_list->{e2service} ) {
+                my $i = 0;
+                for ( keys @{ $services_list->{e2service} } ) {
                     my $channel =
                       $services_list->{e2service}[$_]{e2servicename};
                     $channel =~ s/\s/_/g;
 
                     # ignore markers
                     if ( $services_list->{e2service}[$_]{e2servicereference} =~
-                        "^1:64:" )
+                        /^1:64:/ )
                     {
                         Log3 $name, 4, "ENIGMA2 $name: Ignoring marker "
                           . $services_list->{e2service}[$_]{e2servicename};
@@ -1368,9 +1369,11 @@ sub ENIGMA2_Define($$) {
 ###################################
 sub ENIGMA2_SendCommand($$;$) {
     my ( $hash, $service, $cmd ) = @_;
-    my $name    = $hash->{NAME};
-    my $address = $hash->{helper}{ADDRESS};
-    my $port    = $hash->{helper}{PORT};
+    my $name     = $hash->{NAME};
+    my $address  = $hash->{helper}{ADDRESS};
+    my $port     = $hash->{helper}{PORT};
+    my $fritzbox = 0;
+    my $timeout;
 
     Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_SendCommand()";
 
@@ -1428,7 +1431,20 @@ sub ENIGMA2_SendCommand($$;$) {
 
     Log3 $name, 5, "ENIGMA2 $name: GET " . urlDecode($URL);
 
-    $response = CustomGetFileFromURL( 0, $URL, 4, $cmd, 0, 5 );
+    if ( defined( $attr{$name}{timeout} ) && $attr{$name}{timeout} =~ /^\d+$/ )
+    {
+        $timeout = $attr{$name}{timeout};
+    }
+    else {
+        $timeout = 6;
+    }
+
+    # detect a FritzBOX envirnoment
+    $fritzbox = 1
+      if ( exists $ENV{CONFIG_PRODUKT_NAME}
+        && defined $ENV{CONFIG_PRODUKT_NAME} );
+
+    $response = CustomGetFileFromURL( 0, $URL, $timeout, undef, $fritzbox, 5 );
 
     unless ( defined($response) ) {
         if (
