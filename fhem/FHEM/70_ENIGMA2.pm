@@ -1408,8 +1408,7 @@ sub ENIGMA2_SendCommand($$;$) {
           . $http_passwd . "@"
           . $address . ":"
           . $port . "/web/"
-          . $service . "?"
-          . $cmd;
+          . $service;
     }
     elsif ( defined($http_user) ) {
         $URL =
@@ -1417,16 +1416,14 @@ sub ENIGMA2_SendCommand($$;$) {
           . $http_user . "@"
           . $address . ":"
           . $port . "/web/"
-          . $service . "?"
-          . $cmd;
+          . $service;
     }
     else {
         $URL =
             $http_proto . "://"
           . $address . ":"
           . $port . "/web/"
-          . $service . "?"
-          . $cmd;
+          . $service;
     }
 
     Log3 $name, 5, "ENIGMA2 $name: GET " . urlDecode($URL);
@@ -1439,12 +1436,12 @@ sub ENIGMA2_SendCommand($$;$) {
         $timeout = 6;
     }
 
-    # detect a FritzBOX envirnoment
-    $fritzbox = 1
-      if ( exists $ENV{CONFIG_PRODUKT_NAME}
-        && defined $ENV{CONFIG_PRODUKT_NAME} );
+#    # detect a FritzBOX envirnoment
+#    $fritzbox = 1
+#      if ( exists $ENV{CONFIG_PRODUKT_NAME}
+#        && defined $ENV{CONFIG_PRODUKT_NAME} );
 
-    $response = CustomGetFileFromURL( 0, $URL, $timeout, undef, $fritzbox, 5 );
+    $response = CustomGetFileFromURL( 0, $URL, $timeout, $cmd, $fritzbox, 5 );
 
     unless ( defined($response) ) {
         if (
