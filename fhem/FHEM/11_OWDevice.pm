@@ -471,40 +471,47 @@ OWDevice_UpdateValues($) {
         my $state;
         if($#polls>=0) {
           my $address= $hash->{fhem}{address};
+          my $read_failed = 0;
           readingsBeginUpdate($hash);
           foreach my $reading (@polls) {
             my $value= OWDevice_ReadValue($hash,$reading);
             if(defined($value)) {
               readingsBulkUpdate($hash,$reading,$value);
+            } else {
+              $read_failed = 1;
             }
           }
-          if(@state) {
-            foreach my $reading (@state) {
-              my $value= ReadingsVal($hash->{NAME},$reading,undef);
-              if(defined($value)) {
-                $state .= "$reading: $value  ";
-              } else {
-                $state .= "$reading: n/a  ";
+          if( !$read_failed ) {
+            if(@state) {
+              foreach my $reading (@state) {
+                my $value= ReadingsVal($hash->{NAME},$reading,undef);
+                if(defined($value)) {
+                  $state .= "$reading: $value  ";
+                } else {
+                  $state .= "$reading: n/a  ";
+                }
               }
             }
+            if($alerting) {
+              my $dir= OWDevice_ReadFromServer($hash,"dir","/alarm/");
+              my $alarm= (defined($dir) && $dir =~ m/$address/) ? 1 :0;
+              readingsBulkUpdate($hash,"alarm",$alarm);
+              $state .= "alarm: $alarm";
+            }
+            if($interface eq "id") {
+              my $dir= OWDevice_ReadFromServer($hash,"dir","/");
+              my $present= (defined($dir) && $dir =~ m/$address/) ? 1 :0;
+              readingsBulkUpdate($hash,"present",$present);
+              $state .= "present: $present";
+              my $bus= OWDevice_ReadFromServer($hash,"find",$address);
+              my $location= (defined($bus)) ? $bus :"absent";
+              readingsBulkUpdate($hash,"location",$location);
+            }
+            $state =~ s/\s+$//;
+            readingsBulkUpdate($hash,"state",$state,0);
+          } else {
+            readingsBulkUpdate($hash,"state","read failed",0);
           }
-          if($alerting) {
-            my $dir= OWDevice_ReadFromServer($hash,"dir","/alarm/");
-            my $alarm= (defined($dir) && $dir =~ m/$address/) ? 1 :0;
-            readingsBulkUpdate($hash,"alarm",$alarm);
-            $state .= "alarm: $alarm";
-          }
-          if($interface eq "id") {
-            my $dir= OWDevice_ReadFromServer($hash,"dir","/");
-            my $present= (defined($dir) && $dir =~ m/$address/) ? 1 :0;
-            readingsBulkUpdate($hash,"present",$present);
-            $state .= "present: $present";
-            my $bus= OWDevice_ReadFromServer($hash,"find",$address);
-            my $location= (defined($bus)) ? $bus :"absent";
-            readingsBulkUpdate($hash,"location",$location);
-          }
-          $state =~ s/\s+$//;
-          readingsBulkUpdate($hash,"state",$state,0);
           readingsEndUpdate($hash,1);
         }
         RemoveInternalTimer($hash);
