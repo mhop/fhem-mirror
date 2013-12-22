@@ -99,7 +99,7 @@ my %culHmModel=(
   "0033" => {name=>"KS550LC"                 ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p,1'          ,chn=>"",},
   "0034" => {name=>"HM-PBI-4-FM"             ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:4",}, # HM Push Button Interface
   "0035" => {name=>"HM-PB-4-WM"              ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:4",},
-  "0036" => {name=>"HM-PB-2-WM"              ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:2",},
+  "0036" => {name=>"HM-PB-2-WM"              ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:2",}, # RC file - see also 0BF
 
   "0037" => {name=>"HM-RC-19"                ,st=>'remote'            ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,4:1p.2p.3p.4p.5p.6p.7p.8p.9p.10p.11p.12p.13p.14p.15p.16p'
                                                                                                                         ,chn=>"Btn:1:17,Disp:18:18",},
@@ -152,7 +152,7 @@ my %culHmModel=(
   "0068" => {name=>"HM-LC-Dim1TPBU-FM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "0069" => {name=>"HM-LC-Sw1PBU-FM"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
   "006A" => {name=>"HM-LC-Bl1PBU-FM"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
-  "006B" => {name=>"HM-PB-2-WM55"            ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"Btn:1:2",},
+  "006B" => {name=>"HM-PB-2-WM55"            ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2",},
   "006C" => {name=>"HM-LC-SW1-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'3'            ,chn=>"",},
   "006D" => {name=>"HM-OU-LED16"             ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''       ,lst=>'p'            ,chn=>"Led:1:16",},
   "006E" => {name=>"HM-LC-Dim1L-CV-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
@@ -169,7 +169,7 @@ my %culHmModel=(
   "007A" => {name=>"ROTO_ZEL-STG-RM-FSA"     ,st=>''                  ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, #
   "007B" => {name=>"ROTO_ZEL-STG-RM-FEP-230V",st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)
   "007C" => {name=>"ROTO_ZEL-STG-RM-FZS"     ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, # radio-controlled socket adapter switch actuator 1-channel
-  "007D" => {name=>"ROTO_ZEL-STG-RM-WT-2"    ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",}, # HM Push Button 2
+  "007D" => {name=>"ROTO_ZEL-STG-RM-WT-2"    ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",}, # HM Push Button 2
   "007E" => {name=>"ROTO_ZEL-STG-RM-DWT-10"  ,st=>'remote'            ,cyc=>'00:10' ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}, # HM Remote Display 4 buttons Roto
   "007F" => {name=>"ROTO_ZEL-STG-RM-FST-UP4" ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}, # HM Push Button Interface
   "0080" => {name=>"ROTO_ZEL-STG-RM-HS-4"    ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}, # HM Remote 4 buttons
@@ -184,7 +184,7 @@ my %culHmModel=(
   "008A" => {name=>"Schueco_263-133"         ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, # 1 channel dimmer TPBU (flush mount)
   "008B" => {name=>"Schueco_263-130"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, # radio-controlled switch actuator 1-channel (flush-mount)
   "008C" => {name=>"Schueco_263-131"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, # radio-controlled switch actuator 1-channel (flush-mount)
-  "008D" => {name=>"Schueco_263-135"         ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w'    ,lst=>'1,3'          ,chn=>"",}, # HM Push Button 2
+  "008D" => {name=>"Schueco_263-135"         ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,3'          ,chn=>"",}, # HM Push Button 2
   "008E" => {name=>"Schueco_263-155"         ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}, # HM Remote Display 4 buttons
   "008F" => {name=>"Schueco_263-145"         ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}, # HM Push Button Interface
   "0090" => {name=>"Schueco_263-162"         ,st=>'motionDetector'    ,cyc=>'00:30' ,rxt=>'c:w:l'  ,lst=>'1,3'          ,chn=>"",}, # HM radio-controlled motion detector
@@ -225,6 +225,12 @@ my %culHmModel=(
   "00BB" => {name=>"HM-LC-Dim2T-SM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",},#
   "00BD" => {name=>"HM-CC-RT-DN-BoM"         ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.5p.6p,3:3p.6p,1,7:3p.4'
                                                                                                                         ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,Clima:4:4,ClimaTeam:5:5,remote:6:6"}, #
+  "00BE" => {name=>"HM-MOD-RC-8"             ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'3'            ,chn=>"Sw:1:8",},
+  "00BF" => {name=>"HM-PB-2-FM"              ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:2",},
+  "004A" => {name=>"HM-SEC-MDIR"             ,st=>'motionDetector'    ,cyc=>'00:20' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",},
+  "00C0" => {name=>"HM-SEC-MDIR-2"           ,st=>'motionDetector'    ,cyc=>'00:20' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",},
+  "00C1" => {name=>"HM-Sen-MDIR-O-2"         ,st=>'motionDetector'    ,cyc=>'00:10' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",},
+  "00C2" => {name=>"HM-PB-2-WM55-2"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2",},
   "8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",},
   #263 167                        HM Smoke Detector Schueco
@@ -358,6 +364,7 @@ my %culHmRegDefine = (
 #remote mainly
   backlOnTime     =>{a=>  5.0,s=>0.6,l=>0,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight ontime[s]"     ,lit=>{0=>0,5=>1,10=>2,15=>3,20=>4,25=>5}},
   backlOnMode     =>{a=>  5.6,s=>0.2,l=>0,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight mode"          ,lit=>{off=>0,auto=>2}},
+  backlOnMode2    =>{a=>  5.6,s=>0.2,l=>0,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight mode"          ,lit=>{off=>0,on=>1}},
   ledMode         =>{a=>  5.6,s=>0.2,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED mode"                ,lit=>{off=>0,on=>1}},
   language        =>{a=>  7.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Language"                ,lit=>{English=>0,German=>1}},
   backAtKey       =>{a=> 13.7,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight at keystroke"  ,lit=>{off=>0,on=>1}},
@@ -380,6 +387,7 @@ my %culHmRegDefine = (
   cyclicInfoMsgDis=>{a=> 17.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message"},
   lowBatLimit     =>{a=> 18.0,s=>1.0,l=>0,min=>10 ,max=>12      ,c=>''         ,f=>10      ,u=>'V'   ,d=>1,t=>"low batterie limit, step .1V"},
   lowBatLimitBA   =>{a=> 18.0,s=>1.0,l=>0,min=>5  ,max=>15      ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
+  lowBatLimitBA2  =>{a=> 18.0,s=>1.0,l=>0,min=>0  ,max=>15      ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
   lowBatLimitFS   =>{a=> 18.0,s=>1.0,l=>0,min=>2  ,max=>3       ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
   lowBatLimitRT   =>{a=> 18.0,s=>1.0,l=>0,min=>2  ,max=>2.5     ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
   batDefectLimit  =>{a=> 19.0,s=>1.0,l=>0,min=>0.1,max=>2       ,c=>''         ,f=>100     ,u=>'Ohm' ,d=>1,t=>"batterie defect detection"},
@@ -604,7 +612,7 @@ my %culHmRegDefine = (
 
   boostPos        =>{a=> 10.0,s=>0.5,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>'0.2'   ,u=>'%'   ,d=>1,t=>"valve boost position"},
   boostPeriod     =>{a=> 10.5,s=>0.3,l=>7,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>'min' ,d=>1,t=>"boost period [min]"                          ,lit=>{0=>0,5=>1,10=>2,15=>3,20=>4,25=>5,30=>6}},
-  valveOffset     =>{a=> 11  ,s=>0.7,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"offset for valve"},
+  valveOffsetRt   =>{a=> 11  ,s=>0.7,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"offset for valve"},
   valveMaxPos     =>{a=> 12  ,s=>0.7,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"valve maximum position"},
   valveErrPos     =>{a=> 13  ,s=>0.7,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"valve error position"},
 
@@ -755,6 +763,7 @@ my %culHmRegModel = (
                         },
 
   "HM-CC-VD"          =>{ valveOffset     =>1,valveErrorPos   =>1},
+  "HM-MOD-RC-8"       =>{ localResDis     =>1,lowBatLimitBA2  =>1,backlOnMode2    =>1},
   "HM-CC-TC"          =>{ burstRx         =>1,backlOnTime     =>1,backlOnMode     =>1,btnLock         =>1},
   "HM-CC-RT-DN"       =>{ btnLock         =>1,localResDis     =>1,globalBtnLock   =>1,modusBtnLock    =>1
                          ,cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1
@@ -931,7 +940,7 @@ my %culHmRegChan = (# if channelspecific then enter them here
                          ,boostPos        =>1,boostPeriod     =>1
                          ,daylightSaveTime=>1,regAdaptive     =>1
                          ,showInfo        =>1,noMinMax4Manu   =>1,showWeekday     =>1
-                         ,valveOffset     =>1,valveMaxPos     =>1,valveErrPos     =>1
+                         ,valveOffsetRt   =>1,valveMaxPos     =>1,valveErrPos     =>1
                          ,modePrioManu    =>1,modePrioParty   =>1
                          ,reguIntI        =>1,reguIntP        =>1,reguIntPstart   =>1
                          ,reguExtI        =>1,reguExtP        =>1,reguExtPstart   =>1
