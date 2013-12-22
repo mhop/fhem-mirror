@@ -233,9 +233,9 @@ PCA301_Parse($$)
     my $consumption = ($bytes[8]*256 + $bytes[9]) / 100.0;
     my $state = $state; $state = $power if( $readonly );
     readingsBeginUpdate($rhash);
-    readingsBulkUpdate($rhash, "power", $power) if( $data != 0x00 || ReadingsVal($rname,"power",0) );
-    readingsBulkUpdate($rhash, "consumption", $consumption) if( $data != 0x00 );
-    readingsBulkUpdate($rhash, "state", $state) if( Value($rname) ne $state );
+    readingsBulkUpdate($rhash, "power", $power) if( $power != ReadingsVal($rname,"power",0) );
+    readingsBulkUpdate($rhash, "consumption", $consumption) if( $consumption != ReadingsVal($rname,"consumption",0) );
+    readingsBulkUpdate($rhash, "state", $state) if( $state ne ReadingsVal($rname,"state","") );
     readingsEndUpdate($rhash,1);
   } elsif( $cmd eq 0x05 ) {
     $state = $data==0x00?"off":"on";
