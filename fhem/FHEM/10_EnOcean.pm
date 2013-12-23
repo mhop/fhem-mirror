@@ -1776,7 +1776,7 @@ EnOcean_Parse($$)
       # $db[1] is the temperature where 0x00 = 0 °C ... 0xFF = 51 °C
       # $db[0]_bit_1 temperature sensor available 0 = no, 1 = yes
       my $coChannel1 = $db[2] << 2;
-      my $voltage = sprintf "0.1f", $db[3] * 0.02;
+      my $voltage = sprintf "%0.1f", $db[3] * 0.02;
       push @event, "3:CO:$coChannel1";
       if ($db[0] & 2) {
         my $temp = sprintf "%0.1f", $db[1] * 0.2;
@@ -2056,7 +2056,7 @@ EnOcean_Parse($$)
       # $db[0]_bit_6 ... $db[0]_bit_4 is the fan speed
       # $db[0]_bit_1 is Occupany enable where 0 = enabled, 1 = disabled
       # $db[0]_bit_0 is Occupany Button where 0 = pressed, 1 = released
-      my $voltage = sprintf "0.1f", $db[3] * 0.02;
+      my $voltage = sprintf "%0.1f", $db[3] * 0.02;
       if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
       my $setpoint = sprintf "%0.1f", 40 - $db[2] * 40 / 250;
       my $temp = sprintf "%0.1f", 40 - $db[1] * 40 / 250;
@@ -2091,7 +2091,7 @@ EnOcean_Parse($$)
       # $db[0]_bit_6 ... $db[0]_bit_4 is the fan speed
       # $db[0]_bit_1 is Occupany enable where 0 = enabled, 1 = disabled
       # $db[0]_bit_0 is Occupany Button where 0 = pressed, 1 = released
-      my $voltage = sprintf "0.1f", $db[3] * 0.02;
+      my $voltage = sprintf "%0.1f", $db[3] * 0.02;
       if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
       my $lux = $db[2] << 2;
       if ($db[2] == 251) {$lux = "over range";}
@@ -2270,7 +2270,7 @@ EnOcean_Parse($$)
           $lux = sprintf "%d", $db[2] * 116.48 + 300;
         }
       } else {
-        $voltage = sprintf "0.1f", $db[3] * 0.02;
+        $voltage = sprintf "%0.1f", $db[3] * 0.02;
         if($db[0] & 1) {
           $lux = sprintf "%d", $db[2] * 116.48 + 300;
         } else {
@@ -2288,7 +2288,7 @@ EnOcean_Parse($$)
       # $db[1] is the illuminance (ILL1) where min 0x00 = 0 lx, max 0xFF = 1020 lx
       # $db[0]_bit_0 is Range select where 0 = ILL1, 1 = ILL2
       my $lux;
-      my $voltage = sprintf "0.1f", $db[3] * 0.02;
+      my $voltage = sprintf "%0.1f", $db[3] * 0.02;
       if($db[0] & 1) {
         $lux = $db[2] << 1;
       } else {
@@ -2305,7 +2305,7 @@ EnOcean_Parse($$)
       # $db[2]_bit_7 ... $db[1]_bit_6 is the illuminance where min 0x000 = 0 lx, max 0x3E8 = 1000 lx
       my $lux = $db[2] << 2 | $db[1] >> 6;
       if ($lux == 1001) {$lux = "over range";}
-      my $voltage = sprintf "0.1f", $db[3] * 0.02;
+      my $voltage = sprintf "%0.1f", $db[3] * 0.02;
       if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
       push @event, "3:voltage:$voltage";
       push @event, "3:brightness:$lux";
@@ -2318,7 +2318,7 @@ EnOcean_Parse($$)
       # $db[1] is PIR Status (motion) where 0 ... 127 = off, 128 ... 255 = on
       my $motion = "off";
       if ($db[1] >= 128) {$motion = "on";}
-      if ($db[0] & 1) {push @event, "3:voltage:" . sprintf "0.1f", $db[3] * 0.02;}
+      if ($db[0] & 1) {push @event, "3:voltage:" . sprintf "%0.1f", $db[3] * 0.02;}
       if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
       push @event, "3:motion:$motion";
       push @event, "3:state:$motion";
@@ -2331,7 +2331,7 @@ EnOcean_Parse($$)
       my $motion = $db[0] >> 7 ? "on" : "off";
       if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
       push @event, "3:motion:$motion";
-      push @event, "3:voltage:" . sprintf "0.1f", $db[3] * 0.02;
+      push @event, "3:voltage:" . sprintf "%0.1f", $db[3] * 0.02;
       push @event, "3:state:$motion";
 
     } elsif ($st eq "occupSensor.03") {
@@ -2343,7 +2343,7 @@ EnOcean_Parse($$)
       my $motion = $db[0] >> 7 ? "on" : "off";
       my $lux = $db[2] << 2 | $db[1] >> 6;
       if ($lux == 1001) {$lux = "over range";}
-      my $voltage = sprintf "0.1f", $db[3] * 0.02;
+      my $voltage = sprintf "%0.1f", $db[3] * 0.02;
       if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
       push @event, "3:brightness:$lux";
       push @event, "3:motion:$motion";
@@ -2707,7 +2707,7 @@ EnOcean_Parse($$)
       # $db[0]_bit_0 is Contact where 0 = closed, 1 = open
       my $lux = $db[2] << 2;
       if ($db[2] == 251) {$lux = "over range";}
-      my $voltage = sprintf "0.1f", $db[3] * 0.02;
+      my $voltage = sprintf "%0.1f", $db[3] * 0.02;
       if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
       my $vibration = $db[0] & 2 ? "on" : "off";
       my $contact = $db[0] & 1 ? "open" : "closed";
