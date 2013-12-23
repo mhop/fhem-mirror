@@ -297,7 +297,7 @@ THRESHOLD_Set($@)
 		$state_format =~ s/\_s2s//g;
 		$state_format =~ s/\_sc//g;
       	readingsBulkUpdate   ($hash, "state", $state_format) if ($state_format);
-		readingsBulkUpdate   ($hash, "mode", "deactiveted");
+		readingsBulkUpdate   ($hash, "mode", "deactivated");
 		readingsEndUpdate    ($hash, 1);
 	  }
   } elsif ($arg eq "active" ) {
