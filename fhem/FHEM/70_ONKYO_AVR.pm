@@ -210,14 +210,16 @@ sub ONKYO_AVR_GetStatus($;$) {
         if ( defined( $attr{$name}{inputs} ) ) {
             my @inputs = split( ':', $attr{$name}{inputs} );
 
-            foreach (@inputs) {
-                if (m/[^,\s]+(,[^,\s]+)+/) {
-                    my @input_names = split( ',', $_ );
-                    $input_names[1] =~ s/\s/_/g;
-                    $hash->{helper}{receiver}{input_aliases}{ $input_names[0] }
-                      = $input_names[1];
-                    $hash->{helper}{receiver}{input_names}{ $input_names[1] } =
-                      $input_names[0];
+            if ( ref(@inputs) eq "ARRAY" ) {
+                foreach (@inputs) {
+                    if (m/[^,\s]+(,[^,\s]+)+/) {
+                        my @input_names = split( ',', $_ );
+                        $input_names[1] =~ s/\s/_/g;
+                        $hash->{helper}{receiver}{input_aliases}
+                          { $input_names[0] } = $input_names[1];
+                        $hash->{helper}{receiver}{input_names}
+                          { $input_names[1] } = $input_names[0];
+                    }
                 }
             }
         }
@@ -776,38 +778,37 @@ sub ONKYO_AVR_Set($@) {
 
     # mute
     elsif ( $a[1] eq "mute" ) {
-        if ( !defined( $a[2] ) ) {
-            $return = "No argument given, choose one of on off toggle";
+        if ( defined( $a[2] ) ) {
+            Log3 $name, 2, "ONKYO_AVR set $name " . $a[1] . " " . $a[2];
         }
         else {
-            Log3 $name, 2, "ONKYO_AVR set $name " . $a[1] . " " . $a[2];
+            Log3 $name, 2, "ONKYO_AVR set $name " . $a[1];
+        }
 
-            if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-                if ( $a[2] eq "off" ) {
-                    $result = ONKYO_AVR_SendCommand( $hash, "mute", "off" );
-                }
-                elsif ( $a[2] eq "on" ) {
-                    $result = ONKYO_AVR_SendCommand( $hash, "mute", "on" );
-                }
-                elsif ( $a[2] eq "toggle" ) {
-                    $result = ONKYO_AVR_SendCommand( $hash, "mute", "toggle" );
-                }
-                else {
-                    $return =
-                      "Argument does not seem to be one of on off toogle";
-                }
-
-                if ( defined($result) ) {
-                    if ( !defined( $hash->{READINGS}{mute}{VAL} )
-                        || $hash->{READINGS}{mute}{VAL} ne $result )
-                    {
-                        readingsSingleUpdate( $hash, "mute", $result, 1 );
-                    }
-                }
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            if ( !defined( $a[2] ) || $a[2] eq "toggle" ) {
+                $result = ONKYO_AVR_SendCommand( $hash, "mute", "toggle" );
+            }
+            elsif ( $a[2] eq "off" ) {
+                $result = ONKYO_AVR_SendCommand( $hash, "mute", "off" );
+            }
+            elsif ( $a[2] eq "on" ) {
+                $result = ONKYO_AVR_SendCommand( $hash, "mute", "on" );
             }
             else {
-                $return = "Device needs to be ON to mute/unmute audio.";
+                $return = "Argument does not seem to be one of on off toogle";
             }
+
+            if ( defined($result) ) {
+                if ( !defined( $hash->{READINGS}{mute}{VAL} )
+                    || $hash->{READINGS}{mute}{VAL} ne $result )
+                {
+                    readingsSingleUpdate( $hash, "mute", $result, 1 );
+                }
+            }
+        }
+        else {
+            $return = "Device needs to be ON to mute/unmute audio.";
         }
     }
 
@@ -831,6 +832,13 @@ sub ONKYO_AVR_Set($@) {
                             || $hash->{READINGS}{volume}{VAL} ne $result )
                         {
                             readingsSingleUpdate( $hash, "volume", $result, 1 );
+                        }
+
+                        if ( !defined( $hash->{READINGS}{mute}{VAL} )
+                            || $hash->{READINGS}{mute}{VAL} eq "on" )
+                        {
+                            readingsSingleUpdate( $hash, "mute", "off", 1 )
+
                         }
                     }
                 }
@@ -911,7 +919,8 @@ sub ONKYO_AVR_Set($@) {
         if ( !defined( $a[2] ) || $a[2] eq "help" ) {
 
             # Get all commands for zone
-            my $commands_details = ONKYOdb::ONKYO_GetRemotecontrolCommandDetails($zone);
+            my $commands_details =
+              ONKYOdb::ONKYO_GetRemotecontrolCommandDetails($zone);
 
             my $valid_commands =
 "Usage: <command> <value>\n\nValid commands in zone '$zone':\n\n\n"
@@ -950,7 +959,8 @@ sub ONKYO_AVR_Set($@) {
 
                 # Reading values for command from HASH table
                 my $values =
-                  ONKYOdb::ONKYO_GetRemotecontrolValue( $zone, $commands->{ $a[2] } );
+                  ONKYOdb::ONKYO_GetRemotecontrolValue( $zone,
+                    $commands->{ $a[2] } );
 
                 # Output help for values
                 if ( !defined( $a[3] ) || $a[3] eq "help" ) {
@@ -1163,7 +1173,8 @@ sub ONKYO_AVR_SendCommand($$$) {
 
     # Resolve command and value to ISCP raw command
     my $cmd_raw = ONKYOdb::ONKYO_GetRemotecontrolCommand( $zone, $cmd );
-    my $value_raw = ONKYOdb::ONKYO_GetRemotecontrolValue( $zone, $cmd_raw, $value );
+    my $value_raw =
+      ONKYOdb::ONKYO_GetRemotecontrolValue( $zone, $cmd_raw, $value );
     my $request_code = substr( $cmd_raw, 0, 3 );
 
     if ( !defined($cmd_raw) ) {
@@ -1212,7 +1223,9 @@ sub ONKYO_AVR_SendCommand($$$) {
             $line = ONKYO_AVR_read( $hash, \$buf );
             $response_code = substr( $line, 0, 3 ) if defined($line);
 
-            if ( defined($response_code) && $response_code eq $request_code ) {
+            if ( defined($response_code)
+                && $response_code eq $request_code )
+            {
                 $response->{$response_code} = $line;
                 $readon = 0;
             }
@@ -1254,7 +1267,8 @@ sub ONKYO_AVR_SendCommand($$$) {
             # Decode return value
             #
             my $values =
-              ONKYOdb::ONKYO_GetRemotecontrolCommandDetails( $zone, $request_code );
+              ONKYOdb::ONKYO_GetRemotecontrolCommandDetails( $zone,
+                $request_code );
 
             # Decode through device information
             if (   $cmd eq "input"
