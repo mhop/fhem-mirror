@@ -1693,6 +1693,7 @@ sub CUL_HM_parseCommon(@){#####################################################
     $ret = $reply;
   }
   elsif($mTp eq "00"){######################################
+    my $ioHash = $shash->{IODev};
     my $id = CUL_HM_Id($ioHash);
     CUL_HM_infoUpdtDevData($shash->{NAME}, $shash,$p)
                if (!$modules{CUL_HM}{helper}{hmManualOper}#no autoaction
