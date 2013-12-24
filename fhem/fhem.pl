@@ -2745,7 +2745,7 @@ HandleArchiving($)
 
 #####################################
 # Call a logical device (FS20) ParseMessage with data from a physical device
-# (FHZ)
+# (FHZ). Note: $hash may be dummy, used by FHEM2FHEM
 sub
 Dispatch($$$)
 {
@@ -2753,7 +2753,6 @@ Dispatch($$$)
   my $module = $modules{$hash->{TYPE}};
   my $name = $hash->{NAME};
 
-  return if(IsDummy($name));
   Log3 $hash, 5, "$name dispatch $dmsg";
 
   my ($isdup, $idx) = CheckDuplicate($name, $dmsg, $module->{FingerprintFn});
