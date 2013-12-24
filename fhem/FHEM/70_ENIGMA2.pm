@@ -190,40 +190,115 @@ sub ENIGMA2_GetStatus($;$) {
                     "sRef=" . urlEncode( $attr{$name}{ "bouquet-" . $input } ) )
                   if ( defined( $attr{$name}{ "bouquet-" . $input } ) );
 
-                if ( ref($services_list) eq "HASH" ) {
-                    my $i = 0;
-                    for ( keys @{ $services_list->{e2service} } ) {
-                        my $channel =
-                          $services_list->{e2service}[$_]{e2servicename};
-                        $channel =~ s/\s/_/g;
+                # Read channels
+                if ( ref($services_list) eq "HASH"
+                    && defined( $services_list->{e2service} ) )
+                {
+                    # multiple
+                    if (
+                        ref( $services_list->{e2service} ) eq "ARRAY"
+                        && defined(
+                            $services_list->{e2service}[0]{e2servicename}
+                        )
+                        && $services_list->{e2service}[0]{e2servicename} ne ""
+                        && defined(
+                            $services_list->{e2service}[0]{e2servicereference}
+                        )
+                        && $services_list->{e2service}[0]{e2servicereference}
+                        ne ""
+                      )
+                    {
+                        my $i = 0;
+                        for ( keys @{ $services_list->{e2service} } ) {
+                            my $channel =
+                              $services_list->{e2service}[$_]{e2servicename};
+                            $channel =~ s/\s/_/g;
 
+                            # ignore markers
+                            if ( $services_list->{e2service}[$_]
+                                {e2servicereference} =~ /^1:64:/ )
+                            {
+                                Log3 $name, 4,
+                                  "ENIGMA2 $name: Ignoring marker "
+                                  . $services_list->{e2service}[$_]
+                                  {e2servicename};
+                                next;
+                            }
+
+                            if ( $channel ne "" ) {
+                                $hash->{helper}{bouquet}{$input}{$channel} =
+                                  { 'sRef' => $services_list->{e2service}[$_]
+                                      {e2servicereference} };
+
+                                $hash->{helper}{channels}{$input}[$i] =
+                                  $channel;
+                            }
+
+                            $i++;
+                        }
+
+                        Log3 $name, 4,
+                            "ENIGMA2 $name: Cached favorite "
+                          . $input
+                          . " channels: "
+                          . join( ', ',
+                            @{ $hash->{helper}{channels}{$input} } );
+                    }
+
+                    # single
+                    elsif (
+                           defined( $services_list->{e2service}{e2servicename} )
+                        && $services_list->{e2service}{e2servicename} ne ""
+                        && defined(
+                            $services_list->{e2service}{e2servicereference}
+                        )
+                        && $services_list->{e2service}{e2servicereference} ne ""
+                      )
+                    {
                         # ignore markers
-                        if ( $services_list->{e2service}[$_]{e2servicereference}
-                            =~ /^1:64:/ )
+                        if ( $services_list->{e2service}{e2servicereference} =~
+                            /^1:64:/ )
                         {
                             Log3 $name, 4,
                               "ENIGMA2 $name: Ignoring marker "
-                              . $services_list->{e2service}[$_]{e2servicename};
-                            next;
+                              . $services_list->{e2service}{e2servicename};
+                        }
+                        else {
+                            my $channel =
+                              $services_list->{e2service}{e2servicename};
+                            $channel =~ s/\s/_/g;
+
+                            if ( $channel ne "" ) {
+                                $hash->{helper}{bouquet}{$input}{$channel} =
+                                  { 'sRef' => $services_list->{e2service}
+                                      {e2servicereference} };
+
+                                $hash->{helper}{channels}{$input}[0] =
+                                  $channel;
+
+                                Log3 $name, 4,
+                                    "ENIGMA2 $name: Cached favorite "
+                                  . $input
+                                  . " channels: "
+                                  . $hash->{helper}{channels}{$input}[0];
+                            }
                         }
 
-                        if ( $channel ne "" ) {
-                            $hash->{helper}{bouquet}{$input}{$channel} =
-                              { 'sRef' => $services_list->{e2service}[$_]
-                                  {e2servicereference} };
-
-                            $hash->{helper}{channels}{$input}[$i] =
-                              $channel;
-                        }
-
-                        $i++;
                     }
-
+                    else {
+                        Log3 $name, 4,
+                            "ENIGMA2 $name: ERROR: bouquet-"
+                          . $input
+                          . " seems to be empty.";
+                    }
+                }
+                elsif ( $input eq "radio" ) {
                     Log3 $name, 4,
-                        "ENIGMA2 $name: Cached favorite "
+                        "ENIGMA2 $name: ERROR: Unable to read "
                       . $input
-                      . " channels: "
-                      . join( ', ', @{ $hash->{helper}{channels}{$input} } );
+                      . " bouquet '"
+                      . $attr{$name}{ "bouquet-" . $input }
+                      . "' from device";
                 }
                 else {
                     Log3 $name, 3,
@@ -820,10 +895,20 @@ sub ENIGMA2_Set($@) {
     my ( $hash, @a ) = @_;
     my $name    = $hash->{NAME};
     my $state   = $hash->{STATE};
-    my $input   = $hash->{helper}{lastInput};
     my $channel = $hash->{READINGS}{channel}{VAL}
       if ( defined( $hash->{READINGS}{channel}{VAL} ) );
     my $channels = "";
+
+    if ( defined( $hash->{READINGS}{input}{VAL} )
+        && $hash->{READINGS}{input}{VAL} ne "-" )
+    {
+        $hash->{helper}{lastInput} = $hash->{READINGS}{input}{VAL};
+    }
+    elsif ( !defined( $hash->{helper}{lastInput} ) ) {
+        $hash->{helper}{lastInput} = "";
+    }
+
+    my $input = $hash->{helper}{lastInput};
 
     Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_Set()";
 
@@ -842,10 +927,12 @@ sub ENIGMA2_Set($@) {
         $channels .= $channel . ",";
     }
 
-    $channels .= join( ',', @{ $hash->{helper}{channels}{$input} } )
-      if ( $input ne ""
+    if (   $input ne ""
         && defined( $hash->{helper}{channels}{$input} )
-        && ref( $hash->{helper}{channels}{$input} ) eq "ARRAY" );
+        && ref( $hash->{helper}{channels}{$input} ) eq "ARRAY" )
+    {
+        $channels .= join( ',', @{ $hash->{helper}{channels}{$input} } );
+    }
 
     my $usage =
         "Unknown argument "
@@ -863,10 +950,13 @@ sub ENIGMA2_Set($@) {
     # statusRequest
     if ( $a[1] eq "statusRequest" ) {
         Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
-        Log3 $name, 4, "ENIGMA2 $name: Clearing cache for bouquet and channels";
 
-        $hash->{helper}{bouquet}  = undef;
-        $hash->{helper}{channels} = undef;
+        if ( $state ne "absent" ) {
+            Log3 $name, 4,
+              "ENIGMA2 $name: Clearing cache for bouquet and channels";
+            $hash->{helper}{bouquet}  = undef;
+            $hash->{helper}{channels} = undef;
+        }
 
         # actual statusRequest be executed anyway on the end of the function
 
@@ -1052,13 +1142,24 @@ sub ENIGMA2_Set($@) {
 
     # mute
     elsif ( $a[1] eq "mute" ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
-
-        return "No argument given, choose one of on off"
-          if ( !defined( $a[2] ) );
+        if ( defined( $a[2] ) ) {
+            Log3 $name, 2, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
+        }
+        else {
+            Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
+        }
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-            if ( $a[2] eq "off" ) {
+            if ( !defined( $a[2] || $a[2] eq "toggle" ) ) {
+                $cmd = "set=mute";
+                if ( $hash->{READINGS}{mute}{VAL} eq "off" ) {
+                    readingsSingleUpdate( $hash, "mute", "on", 1 );
+                }
+                else {
+                    readingsSingleUpdate( $hash, "mute", "off", 1 );
+                }
+            }
+            elsif ( $a[2] eq "off" ) {
                 if ( $hash->{READINGS}{mute}{VAL} ne "off" ) {
                     $cmd = "set=mute";
                     readingsSingleUpdate( $hash, "mute", $a[2], 1 );
@@ -1068,15 +1169,6 @@ sub ENIGMA2_Set($@) {
                 if ( $hash->{READINGS}{mute}{VAL} ne "on" ) {
                     $cmd = "set=mute";
                     readingsSingleUpdate( $hash, "mute", $a[2], 1 );
-                }
-            }
-            elsif ( $a[2] eq "toggle" || !defined( $a[2] ) ) {
-                $cmd = "set=mute";
-                if ( $hash->{READINGS}{mute}{VAL} eq "off" ) {
-                    readingsSingleUpdate( $hash, "mute", "on", 1 );
-                }
-                else {
-                    readingsSingleUpdate( $hash, "mute", "off", 1 );
                 }
             }
             else {
