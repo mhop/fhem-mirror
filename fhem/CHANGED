@@ -1,7 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
-  - feature:  HCS has now MAX Thermostat support
+  - feature: FLOORPLAN: Style4 (S300TH specific) now keeps its formatting
+             even with longpoll
+  - feature: HCS has now MAX Thermostat support
   - change:  integrated OWServer/OWDevice nonblocking and random start
              time patches (justme1968 & Boris)
   - feature: Add new module Dashboard
