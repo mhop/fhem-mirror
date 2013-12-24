@@ -38,6 +38,7 @@
 # 0027: Added FP_detailFn(), added delete-button in arrange-menu, fixed link for pdf-docu, minor code cleanup, added get config (July 08, 2013)
 # 0028: Implemented informid for longpoll, usage of @FW_fhemwebjs (July 19, 2013)
 # 0029: Fixed floorplan-specific icons and eliminated FHT-text "desired-temp" - both due to changes in fhemweb (Sep 29, 2013)
+# 0030: Style4 (S300TH) now works with longpoll without loosing its formatting (Dec 24, 2013)
 #
 ################################################################
 #
@@ -474,7 +475,7 @@ FP_show(){
 				$devName = ($text ? $text : AttrVal($d, "alias", $d));	 
 			}
 			if ($style == 4 && $txt =~ /T: ([\-0-9\.]+)[ ]+H: ([\-0-9\.]+).*/) { 		       # S300TH-specific
-				$txt = "<span class='fp_tempvalue'>".$1."&deg;C</span><BR><span class='fp_humvalue'>".$2."%</span>"; 
+				$txt = "<span class='fp_tempvalue' display=inline><span informId=$d-temperature>".$1."</span>&deg;C</span><BR><span class='fp_humvalue'><span informId=$d-humidity>".$2."</span>%</span>"; 
 			} 
 			FW_pO "<td colspan=\"$cols\">";
 			FW_pO "$devName" ;
@@ -507,7 +508,9 @@ FP_show(){
         }
 		if ($style == 3 || $style == 6) {
 		  FW_pO "<td><div informId=\"$d-$text\">$txt</div>";                                    # reading
-		} else {
+		} elsif ($style == 4) {
+		  FW_pO "<td>$txt";                                                                     # state style4
+        } else {
 	      FW_pO "<td informId=\"$d\" colspan=\"$cols\">$txt";                                   # state
 		}
 	    FW_pO "</td></tr>";
