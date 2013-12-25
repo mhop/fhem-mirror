@@ -39,6 +39,7 @@
 # 0028: Implemented informid for longpoll, usage of @FW_fhemwebjs (July 19, 2013)
 # 0029: Fixed floorplan-specific icons and eliminated FHT-text "desired-temp" - both due to changes in fhemweb (Sep 29, 2013)
 # 0030: Style4 (S300TH) now works with longpoll without loosing its formatting (Dec 24, 2013)
+# 0031: Text "desiredTemperature" will also be eliminated - for MAX devices (Dec 25, 2013)
 #
 ################################################################
 #
@@ -546,7 +547,8 @@ FP_show(){
                                                  $d, $FW_room, $cmd, $values);
               use strict "refs";
               if(defined($htmlTxt)) {
-			    $htmlTxt =~ s/>desired-temp/>/;  #mod20130929
+			    $htmlTxt =~ s/>desired-temp/>/;        #mod20130929
+				$htmlTxt =~ s/>desiredTemperature/>/;  #mod20131225
 				FW_pO $htmlTxt;
                 $firstIdx = 1;
                 last;
