@@ -2,7 +2,8 @@
 # Do not insert empty lines here, update check depends on it.
 - SVN
   - feature: FLOORPLAN: Style4 (S300TH specific) now keeps its formatting
-             even with longpoll
+             even with longpoll; Text "desiredTemperature" will now 
+             be eliminated - for MAX devices.
   - feature: HCS has now MAX Thermostat support
   - change:  integrated OWServer/OWDevice nonblocking and random start
              time patches (justme1968 & Boris)
