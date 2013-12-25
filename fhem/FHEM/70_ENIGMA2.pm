@@ -1560,6 +1560,7 @@ sub ENIGMA2_SendCommand($$;$) {
     }
     else {
         Log3 $name, 4, "ENIGMA2 $name: REQ $service/" . urlDecode($cmd);
+        $cmd = "?" . $cmd;
     }
 
     if ( defined($http_user) && defined($http_passwd) ) {
@@ -1569,7 +1570,8 @@ sub ENIGMA2_SendCommand($$;$) {
           . $http_passwd . "@"
           . $address . ":"
           . $port . "/web/"
-          . $service;
+          . $service
+          . $cmd;
     }
     elsif ( defined($http_user) ) {
         $URL =
@@ -1577,11 +1579,16 @@ sub ENIGMA2_SendCommand($$;$) {
           . $http_user . "@"
           . $address . ":"
           . $port . "/web/"
-          . $service;
+          . $service
+          . $cmd;
     }
     else {
         $URL =
-          $http_proto . "://" . $address . ":" . $port . "/web/" . $service;
+            $http_proto . "://"
+          . $address . ":"
+          . $port . "/web/"
+          . $service
+          . $cmd;
     }
 
     Log3 $name, 5, "ENIGMA2 $name: GET " . urlDecode($URL);
