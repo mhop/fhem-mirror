@@ -244,7 +244,7 @@ OWServer_Read($@)
 {
   my ($hash,$path)= @_;
 
-  return undef unless(defined($hash->{fhem}{owserver}));
+  return undef unless(defined($hash->{fhem}{owserver}) || $hash->{LAST_READ_FAILED});
 
   my $ret= undef;
 
@@ -260,7 +260,7 @@ OWServer_Read($@)
       return undef;
     }
 
-    InternalTimer(gettimeofday()+10, "OWServer_TimeoutChild", $pid, 0);
+    InternalTimer(gettimeofday()+6, "OWServer_TimeoutChild", $pid, 0);
     if($pid == 0) {
       close READER;
       $ret= OWNet::read($hash->{DEF},$path);
@@ -286,16 +286,21 @@ OWServer_Read($@)
     if( $nfound ) {
       chomp($ret= <READER>);
       RemoveInternalTimer($pid);
+      OWServer_OpenDev($hash) if( $hash->{LAST_READ_FAILED} );
+      $hash->{LAST_READ_FAILED} = 0;
     } else {
       Log3 undef, 1, "OWServer: read timeout for child $pid";
-      $hash->{READ_FAILED} = 0 if( !$hash->{READ_FAILED} );
-      $hash->{READ_FAILED}++;
+      $hash->{NR_READ_FAILED} = 0 if( !$hash->{NR_READ_FAILED} );
+      $hash->{NR_READ_FAILED}++;
+      OWServer_CloseDev($hash) if( !$hash->{LAST_READ_FAILED} );
+      $hash->{LAST_READ_FAILED} = 1;
     }
     close READER;
 
   } else {
     $ret= $hash->{fhem}{owserver}->read($path);
     $ret =~ s/^\s+//g if(defined($ret));
+    $hash->{LAST_READ_FAILED} = 0;
   }
 
   # if a device does not exist, the server returns undef
@@ -319,7 +324,10 @@ OWServer_Write($@)
 {
   my ($hash,$path,$value)= @_;
 
+  return undef if($hash->{LAST_READ_FAILED});
+
   return undef unless(defined($hash->{fhem}{owserver}));
+
   return $hash->{fhem}{owserver}->write($path,$value);
 }
 
@@ -329,7 +337,10 @@ OWServer_Dir($@)
 {
   my ($hash,$path)= @_;
 
+  return undef if($hash->{LAST_READ_FAILED});
+
   return undef unless(defined($hash->{fhem}{owserver}));
+
   $path= ($path) ? $path : "/";
   return $hash->{fhem}{owserver}->dir($path);
 }
@@ -339,6 +350,8 @@ sub
 OWServer_Find($@)
 {
   my ($hash,$slave)= @_;
+
+  return undef if($hash->{LAST_READ_FAILED});
 
   return undef unless(defined($hash->{fhem}{owserver}));
 
