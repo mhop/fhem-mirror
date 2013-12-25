@@ -26,16 +26,13 @@
 #
 # Version: 1.2.0
 #
-# Version History:
+# Major Version History:
 # - 1.2.0 - 2013-12-21
 # -- Add bouquet support e.g. for named channels
 #
 # - 1.1.0 - 2013-12-16
 # -- Improved logging & debugging
 # -- added default attributes for webCmd and devStateIcon
-#
-# - 1.0.1 - 2013-12-15
-# -- Bugfix release
 #
 # - 1.0.0 - 2013-09-23
 # -- First release
@@ -1627,7 +1624,7 @@ sub ENIGMA2_SendCommand($$;$) {
         }
 
         if ( $response ne "" ) {
-            if ( $response =~ /^<\?xml/ ) {
+            if ( $response =~ /^<\?xml/ && $response !~ /<\/html>/ ) {
                 if ( !defined($cmd) || $cmd eq "" ) {
                     Log3 $name, 5, "ENIGMA2 $name: RES $service\n" . $response;
                 }
