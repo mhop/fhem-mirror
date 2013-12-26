@@ -63,6 +63,8 @@ readingsProxy_updateDevices($)
   }
 
   $hash->{CONTENT} = \%list;
+
+  readingsProxy_update($hash, undef);
 }
 
 sub readingsProxy_Define($$)
@@ -76,11 +78,9 @@ sub readingsProxy_Define($$)
   my $name = shift(@args);
   my $type = shift(@args);
 
-  readingsProxy_updateDevices($hash);
-
   $hash->{STATE} = 'Initialized';
 
-  readingsProxy_update($hash, undef) if( $init_done );
+  readingsProxy_updateDevices($hash);
 
   return undef;
 }
