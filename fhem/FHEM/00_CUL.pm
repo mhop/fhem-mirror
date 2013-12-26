@@ -1041,20 +1041,20 @@ CUL_Attr(@)
 
     if($aVal eq "HomeMatic") {
       return if($hash->{initString} =~ m/Ar/);
-      if(($hash->{CMDS} =~ m/A/) || IsDummy($hash->{NAME})) {
+      if($hash->{CMDS} =~ m/A/ || IsDummy($hash->{NAME}) || !$hash->{FD}) {
         $hash->{Clients} = $clientsHomeMatic;
         $hash->{MatchList} = \%matchListHomeMatic;
         CUL_SimpleWrite($hash, "Zx") if ($hash->{CMDS} =~ m/Z/); # reset Moritz
         $hash->{initString} = "X21\nAr";  # X21 is needed for RSSI reporting
         CUL_SimpleWrite($hash, $hash->{initString});
       } else {
-	    Log3 $name, 2, $msg;
+        Log3 $name, 2, $msg;
         return $msg;
       }
 
     } elsif($aVal eq "MAX") {
       return if($hash->{initString} =~ m/Zr/);
-      if(($hash->{CMDS} =~ m/Z/) || IsDummy($hash->{NAME})) {
+      if($hash->{CMDS} =~ m/Z/ || IsDummy($hash->{NAME}) || !$hash->{FD}) {
         $hash->{Clients} = $clientsMAX;
         $hash->{MatchList} = \%matchListMAX;
         CUL_SimpleWrite($hash, "Ax") if ($hash->{CMDS} =~ m/A/); # reset AskSin
