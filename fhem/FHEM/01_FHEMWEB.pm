@@ -1464,7 +1464,7 @@ FW_style($$)
     FW_pO $end;
 
   } elsif($a[1] eq "select") {
-    my @fl = grep { $_ !~ m/floorplan/ } FW_fileList("$FW_cssdir/.*style.css");
+    my @fl = grep { $_ !~ m/(floorplan|dashboard)/ } FW_fileList("$FW_cssdir/.*style.css");
     FW_pO "$start<table class=\"block fileList\">";
     my $row = 0;
     foreach my $file (@fl) {
