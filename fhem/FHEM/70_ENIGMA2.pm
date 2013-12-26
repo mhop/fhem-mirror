@@ -71,7 +71,7 @@ sub ENIGMA2_Initialize($) {
     $hash->{UndefFn} = "ENIGMA2_Undefine";
 
     $hash->{AttrList} =
-      "https:0,1 disable:0,1 bouquet-tv bouquet-radio timeout "
+"https:0,1 http-method:GET,POST disable:0,1 bouquet-tv bouquet-radio timeout "
       . $readingFnAttributes;
 
     $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG} =
@@ -1498,6 +1498,23 @@ sub ENIGMA2_Define($$) {
     $hash->{helper}{PASSWORD} = $http_passwd if $http_passwd;
 
     # set default attributes
+    unless ( exists( $attr{$name}{"http-method"} ) ) {
+
+        # use http-method POST for FritzBox environment as GET does not seem to
+        # work properly. Might restrict use to newer
+        # ENIGMA2 Webif versions only.
+        if ( exists $ENV{CONFIG_PRODUKT_NAME}
+            && defined $ENV{CONFIG_PRODUKT_NAME} )
+        {
+            $attr{$name}{"http-method"} = 'POST';
+        }
+
+        # default method is GET and should be compatible to most
+        # ENIGMA2 Webif versions
+        else {
+            $attr{$name}{"http-method"} = 'GET';
+        }
+    }
     unless ( exists( $attr{$name}{webCmd} ) ) {
         $attr{$name}{webCmd} = 'channel:input';
     }
@@ -1529,9 +1546,10 @@ sub ENIGMA2_Define($$) {
 ###################################
 sub ENIGMA2_SendCommand($$;$) {
     my ( $hash, $service, $cmd ) = @_;
-    my $name    = $hash->{NAME};
-    my $address = $hash->{helper}{ADDRESS};
-    my $port    = $hash->{helper}{PORT};
+    my $name        = $hash->{NAME};
+    my $address     = $hash->{helper}{ADDRESS};
+    my $port        = $hash->{helper}{PORT};
+    my $http_method = $attr{$name}{"http-method"};
     my $timeout;
 
     Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_SendCommand()";
@@ -1560,7 +1578,8 @@ sub ENIGMA2_SendCommand($$;$) {
     }
     else {
         Log3 $name, 4, "ENIGMA2 $name: REQ $service/" . urlDecode($cmd);
-        $cmd = "?" . $cmd;
+        $cmd = "?" . $cmd . "&"
+          if ( $http_method eq "GET" || $http_method eq "" );
     }
 
     if ( defined($http_user) && defined($http_passwd) ) {
@@ -1570,8 +1589,8 @@ sub ENIGMA2_SendCommand($$;$) {
           . $http_passwd . "@"
           . $address . ":"
           . $port . "/web/"
-          . $service
-          . $cmd;
+          . $service;
+        $URL .= $cmd if ( $http_method eq "GET" || $http_method eq "" );
     }
     elsif ( defined($http_user) ) {
         $URL =
@@ -1579,19 +1598,14 @@ sub ENIGMA2_SendCommand($$;$) {
           . $http_user . "@"
           . $address . ":"
           . $port . "/web/"
-          . $service
-          . $cmd;
+          . $service;
+        $URL .= $cmd if ( $http_method eq "GET" || $http_method eq "" );
     }
     else {
         $URL =
-            $http_proto . "://"
-          . $address . ":"
-          . $port . "/web/"
-          . $service
-          . $cmd;
+          $http_proto . "://" . $address . ":" . $port . "/web/" . $service;
+        $URL .= $cmd if ( $http_method eq "GET" || $http_method eq "" );
     }
-
-    Log3 $name, 5, "ENIGMA2 $name: GET " . urlDecode($URL);
 
     if ( defined( $attr{$name}{timeout} )
         && $attr{$name}{timeout} =~ /^\d+$/ )
@@ -1602,7 +1616,29 @@ sub ENIGMA2_SendCommand($$;$) {
         $timeout = 6;
     }
 
-    $response = CustomGetFileFromURL( 0, $URL, $timeout, $cmd, 0, 5 );
+    # send request via HTTP-GET method
+    if ( $http_method eq "GET" || $http_method eq "" || $cmd eq "" ) {
+        Log3 $name, 5, "ENIGMA2 $name: GET " . urlDecode($URL);
+        $response = CustomGetFileFromURL( 0, $URL, $timeout, undef, 0, 5 );
+    }
+
+    # send request via HTTP-POST method
+    elsif ( $http_method eq "POST" ) {
+        Log3 $name, 5,
+            "ENIGMA2 $name: GET "
+          . $URL
+          . " (POST DATA: "
+          . urlDecode($cmd) . ")";
+        $response = CustomGetFileFromURL( 0, $URL, $timeout, $cmd, 0, 5 );
+    }
+
+    # other HTTP methods are not supported
+    else {
+        Log3 $name, 1,
+            "ENIGMA2 $name: ERROR: HTTP method "
+          . $http_method
+          . " is not supported.";
+    }
 
     unless ( defined($response) ) {
         if (
@@ -2444,6 +2480,7 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
     <li><b>bouquet-tv</b> - service reference address where the favorite television bouquet can be found (initially set automatically during define)</li>
     <li><b>bouquet-radio</b> - service reference address where the favorite radio bouquet can be found (initially set automatically during define)</li>
     <li><b>disable</b> - Disable polling (true/false)</li>
+    <li><b>http-method</b> - HTTP access method to be used; e.g. a FritzBox might need to use POST instead of GET (GET/POST)</li>
     <li><b>https</b> - Access box via secure HTTP (true/false)</li>
     <li><b>timeout</b> - Set different polling timeout in seconds (default=6)</li>
   </ul></ul>
