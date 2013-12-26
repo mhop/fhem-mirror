@@ -1097,6 +1097,7 @@ my %culHmSubTypeSets = (# channels of this subtype
   virtual          =>{ peerChan      =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"
                       ,press         =>"[long|short]..."
                       ,postEvent     =>"<condition>"
+                      ,postWeather   =>"<off| -80..80 degree>"
 #                      ,valvePos      =>"<position>"
                       },
   smokeDetector    =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] actor"},
