@@ -580,6 +580,9 @@ sub CUL_HM_Parse($$) {##############################
   my @entities; #additional entities with events to be notifies
 
   my $name = $shash->{NAME};
+  my $ioId = CUL_HM_Id($shash->{IODev});
+  $ioId = $id if(!$ioId);
+
   return $name if (CUL_HM_getAttrInt($name,"ignore"));
 
   if ($msgStat && $msgStat =~ m/AESKey/){
@@ -601,7 +604,8 @@ sub CUL_HM_Parse($$) {##############################
                    $myRSSI);
 
   my $msgX = "No:$mNo - t:$mTp s:$src d:$dst ".($p?$p:"");
-  if($shash->{lastMsg} && $shash->{lastMsg} eq $msgX) { #duplicate -lost 'ack'?
+  if($mTp ne "00" && 
+     $shash->{lastMsg} && $shash->{lastMsg} eq $msgX) { #duplicate -lost 'ack'?
     if(   $shash->{helper}{rpt}                           #was responded
        && $shash->{helper}{rpt}{IO}  eq $ioName           #from same IO
        && $shash->{helper}{rpt}{flg} eq substr($msg,5,1)  #not from repeater
@@ -774,9 +778,9 @@ sub CUL_HM_Parse($$) {##############################
           push @event,""; #
       }
     }
-    elsif($mTp eq "3F" && $id eq $dst) {       # Timestamp request
+    elsif($mTp eq "3F" && $ioId eq $dst) {     # Timestamp request
       my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
-      push @ack,$shash,"++803F$id${src}0204$s2000";
+      push @ack,$shash,"++803F$ioId${src}0204$s2000";
       push @event, "time-request";
     }
   }
@@ -877,9 +881,9 @@ sub CUL_HM_Parse($$) {##############################
                                             )
             if ($tHash);
       }
-    elsif($mTp eq "3F" && $id eq $dst) {       # Timestamp request
+    elsif($mTp eq "3F" && $ioId eq $dst) { # Timestamp request
       my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
-      push @ack,$shash,"++803F$id${src}0204$s2000";
+      push @ack,$shash,"++803F$ioId${src}0204$s2000";
       push @event, "time-request";
     }
   }
@@ -934,7 +938,7 @@ sub CUL_HM_Parse($$) {##############################
       my $chn = 1;
       $chn = 10 if ($md =~  m/^(WS550|WS888|HM-WDC7000)/);#todo use channel correct
       my $t =  hex(substr($p,0,4));
-      $t -= 32768 if($t > 1638.4);
+      $t -= 0x8000 if($t > 1638.4);
       $t = sprintf("%0.1f", $t/10);
       my $statemsg = "state:T: $t";
       push @event, "temperature:$t";#temp is always there
@@ -1257,7 +1261,7 @@ sub CUL_HM_Parse($$) {##############################
         #special: all LEDs map to device state
         my $devState = ReadingsVal($name,"color","00000000");
         if($parse eq "powerOn"){# reset LEDs after power on
-          CUL_HM_PushCmdStack($shash,'++A011'.$id.$src."8100".$devState);
+          CUL_HM_PushCmdStack($shash,'++A011'.$ioId.$src."8100".$devState);
           CUL_HM_ProcessCmdStack($shash);
           # no event necessary, all the same as before
         }
@@ -1338,8 +1342,8 @@ sub CUL_HM_Parse($$) {##############################
       push @event, 'devState_raw'.$d1.':'.$d2;
     }
 
-    if($id eq $dst && hex($mFlg)&0x20 && $state){
-      push @ack,$shash,$mNo."8002".$id.$src."0101${state}00";
+    if($ioId eq $dst && hex($mFlg)&0x20 && $state){
+      push @ack,$shash,$mNo."8002".$ioId.$src."0101${state}00";
     }
   }
   elsif($st eq "smokeDetector") { #############################################
@@ -1372,8 +1376,8 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "SDunknownMsg:$p" if(!@event);
     }
 
-    if($id eq $dst && (hex($mFlg)&0x20)){  # Send Ack/Nack
-      push @ack,$shash,$mNo."8002".$id.$src.($mFlg.$mTp eq "A001" ? "80":"00");
+    if($ioId eq $dst && (hex($mFlg)&0x20)){  # Send Ack/Nack
+      push @ack,$shash,$mNo."8002".$ioId.$src.($mFlg.$mTp eq "A001" ? "80":"00");
     }
   }
   elsif($st eq "threeStateSensor") { ##########################################
@@ -1531,7 +1535,7 @@ sub CUL_HM_Parse($$) {##############################
     }
     push @ack,$dhash,$mNo."8002".$dst.$src."00" if (hex($mFlg)&0x20 && (!@ack));
   }
-  elsif($id eq $dst){# if fhem is destination check if we need to react
+  elsif($ioId eq $dst){# if fhem is destination check if we need to react
     if($mTp =~ m/^4./ && $p =~ m/^(..)/ &&  #Push Button event
        (hex($mFlg)&0x20)){  #response required Flag
       my ($recChn) = (hex($1));# button number/event count
@@ -1543,13 +1547,12 @@ sub CUL_HM_Parse($$) {##############################
   #------------ send default ACK if not applicable------------------
   #    ack if we are destination, anyone did accept the message (@event)
   #        parser did not supress
-  push @ack,$shash, $mNo."8002".$id.$src."00"
-      if(   ($id eq $dst)     #are we adressee
+  push @ack,$shash, $mNo."8002".$ioId.$src."00"
+      if(   ($ioId eq $dst)     #are we adressee
          && (hex($mFlg)&0x20) #response required Flag
          && @event            #only ack if we identified it
          && (!@ack)           #sender requested ACK
          );
-
   if (@ack) {# send acks and store for repeat
     my $sRptHash = $modules{CUL_HM}{defptr}{$src}{helper}{rpt};
     $sRptHash->{IO}  = $ioName;
@@ -1693,45 +1696,45 @@ sub CUL_HM_parseCommon(@){#####################################################
     $ret = $reply;
   }
   elsif($mTp eq "00"){######################################
-    my $ioHash = $shash->{IODev};
-    my $id = CUL_HM_Id($ioHash);
-    CUL_HM_infoUpdtDevData($shash->{NAME}, $shash,$p)
-               if (!$modules{CUL_HM}{helper}{hmManualOper}#no autoaction
-                   ||$ioHash->{hmPair}
-                   ||$ioHash->{hmPairSerial} );
-    if(  $dst =~ m /(000000|$id)/ #--- see if we need to pair
-       &&($ioHash->{hmPair}
-          ||(    $ioHash->{hmPairSerial}
-              && $ioHash->{hmPairSerial} eq $attr{$shash->{NAME}}{serialNr}))
-       &&( $mFlg.$mTp ne "0400") ) {
-      #-- try to pair
-      Log3 $shash,3, "CUL_HM pair: $shash->{NAME} "
-                    ."$attr{$shash->{NAME}}{subType}, "
-                    ."model $attr{$shash->{NAME}}{model} "
-                    ."serialNr $attr{$shash->{NAME}}{serialNr}";
-      delete $ioHash->{hmPairSerial};
-      CUL_HM_respPendRm($shash); # remove all pending messages
-      delete $shash->{cmdStack};
-      delete $shash->{helper}{prt}{rspWait};
-      delete $shash->{helper}{prt}{rspWaitSec};
-      
-      $attr{$shash->{NAME}}{IODev} = $ioHash->{NAME}
-          if (!$modules{CUL_HM}{helper}{hmManualOper});
-      my ($idstr, $s) = ($id, 0xA);
-      $idstr =~ s/(..)/sprintf("%02X%s",$s++,$1)/ge;
-      CUL_HM_pushConfig($shash, $id, $src,0,0,0,0, "0201$idstr");
-      CUL_HM_ProcessCmdStack($shash); # start processing immediately
-      CUL_HM_qAutoRead($shash->{NAME},0);
-      CUL_HM_appFromQ($shash->{NAME},"cf");# stack cmds if waiting
-    }
-    elsif(CUL_HM_getRxType($shash) & 0x04){#nothing to pair - maybe send config
-      CUL_HM_appFromQ($shash->{NAME},"cf");   # stack cmds if waiting
-      if (hex($mFlg)&0x20){
-        #CUL_HM_SndCmd($shash,$mNo."8002".$id.$src."00");
+    my $paired = 0; #internal flag
+    if (   $ioHash->{hmPair} 
+        ||(    $ioHash->{hmPairSerial}
+            && $ioHash->{hmPairSerial} eq $attr{$shash->{NAME}}{serialNr})){
+      # pairing requested - shall we?      
+      CUL_HM_infoUpdtDevData($shash->{NAME}, $shash,$p)
+                  if (!$modules{CUL_HM}{helper}{hmManualOper});
+      my $oldIoId = CUL_HM_Id($shash->{IODev});
+      my $ioId = CUL_HM_Id($ioHash);
+      if( $mFlg.$mTp ne "0400") {
+        # pair now
+        Log3 $shash,3, "CUL_HM pair: $shash->{NAME} "
+                      ."$attr{$shash->{NAME}}{subType}, "
+                      ."model $attr{$shash->{NAME}}{model} "
+                      ."serialNr $attr{$shash->{NAME}}{serialNr}";
+        delete $ioHash->{hmPairSerial};
+        CUL_HM_respPendRm($shash); # remove all pending messages
+        delete $shash->{cmdStack};
+        delete $shash->{helper}{prt}{rspWait};
+        delete $shash->{helper}{prt}{rspWaitSec};
+
+        AssignIoPort($shash,$ioHash->{NAME})
+                    if (!$modules{CUL_HM}{helper}{hmManualOper});
+
+        my ($idstr, $s) = ($ioId, 0xA);
+        $idstr =~ s/(..)/sprintf("%02X%s",$s++,$1)/ge;
+        CUL_HM_pushConfig($shash, $ioId, $src,0,0,0,0, "0201$idstr");
+
+        CUL_HM_qAutoRead($shash->{NAME},0);
+        CUL_HM_appFromQ($shash->{NAME},"cf");# stack cmds if waiting
+        $respRemoved = 1;#force command stack processing
+        $paired = 1;
       }
-      else{
-        CUL_HM_ProcessCmdStack($shash);
-      };
+    }
+
+    if($paired == 0 && CUL_HM_getRxType($shash) & 0x04){#no pair -send config?
+      CUL_HM_appFromQ($shash->{NAME},"cf");   # stack cmds if waiting
+      my $ioId = CUL_HM_Id($shash->{IODev});
+      $respRemoved = 1;#force command stack processing
     }
     $ret = "done";
   }
@@ -2322,7 +2325,8 @@ sub CUL_HM_Set($@) {
     return "$cmd requires parameter: $h";
   }
 
-  AssignIoPort($defs{$devName}) if (!$defs{$devName}{IODev});
+  AssignIoPort($defs{$devName}) 
+        if (!$defs{$devName}{IODev}||!$defs{$devName}{IODev}{NAME});
   my $id = CUL_HM_IOid($defs{$devName});
   return "no IO device identified" if(length($id) != 6 );
 
@@ -3187,7 +3191,6 @@ sub CUL_HM_Set($@) {
     }
   }
   elsif($cmd eq "postEvent") { ################################################
-    #General add thermal event simulator
     my (undef,undef,$cond) = @a;
     my $cndNo;
     if ($cond =~ m/[+-]?\d+/){
@@ -3239,6 +3242,27 @@ sub CUL_HM_Set($@) {
                             ,"trig_$name:$cond"
                             ,"trigLast:$name:$cond");
     }
+  }
+  elsif($cmd eq "postWeather") { ##############################################
+    #add thermal event simulator
+    my (undef,undef,$temp) = @a;
+    if ($temp eq "off"){
+      RemoveInternalTimer("weather:$name");
+      delete $hash->{postWeather};
+      delete $hash->{helper}{weather};
+      return;
+    }
+    return "temp value:$temp outside +-80 degree" 
+          if (($temp !~ m/[+-]?\d+/) || (abs($temp) > 80) );
+    $hash->{postWeather} = $temp;#show User the Data
+    $temp *= 10;
+    $temp -= 0x8000 if ($temp < 0);
+    $temp = sprintf("%04X", $temp & 0x7fff);
+    if (!defined $hash->{helper}{weather}){# new entry - start timer
+      RemoveInternalTimer("weather:$name");# avoid duplicate
+      CUL_HM_weather("weather:$name");
+    }
+    $hash->{helper}{weather} = $temp;
   }
   elsif($cmd eq "peerChan") { ############################################# reg
     #peerChan <btnN> <device> ... [single|dual] [set|unset] [actor|remote|both]
@@ -3391,6 +3415,15 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   CUL_HM_ProcessCmdStack($hash);
   InternalTimer(gettimeofday()+$nextTimer,"CUL_HM_valvePosUpdt","valvePos:$vId",0);
 }
+sub CUL_HM_weather(@) {#periodically send weather data
+  my($in ) = @_;
+  my(undef,$name) = split(':',$in);
+  my $hash = $defs{$name};
+  my $dName = CUL_HM_getDeviceName($name) ;
+  my $ioId = CUL_HM_IOid($defs{$dName});
+  CUL_HM_SndCmd($hash,"++8670".$ioId."00000000".$hash->{helper}{weather});
+  InternalTimer(gettimeofday()+150,"CUL_HM_weather","weather:$name",0);
+}
 sub CUL_HM_infoUpdtDevData($$$) {#autoread config
   my($name,$hash,$p) = @_;
   my($fw,$mId,$serNo,$stc,$devInfo) = ($1,$2,$3,$4,$5)
@@ -3502,7 +3535,6 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
   my ($hash,$src,$dst,$chn,$peerAddr,$peerChn,$list,$content,$prep) = @_;
   my $flag = CUL_HM_getFlag($hash);
   my $tl = length($content);
-
   $chn     = sprintf("%02X",$chn);
   $peerChn = sprintf("%02X",$peerChn);
   $list    = sprintf("%02X",$list);
@@ -5851,6 +5883,11 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
          Alternally a literal ca be given as used by other sensors. enter <br>
          postEvent ?<br>
          to get options<br>
+       </li>
+       <li><B>postWeather &lt;[off|-80..80]&gt;<a name="CUL_HMpostWeather"></a></B>
+         simulates an weather event, i.e. a thermo-sensor. The temperature will 
+         be send regularely. Peered channels may use those.<br>
+         To stop sending issue an 'off'<br>
        </li>
        </ul>
     </li>
