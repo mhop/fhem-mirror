@@ -70,7 +70,7 @@ sub HMLAN_Initialize($) {
   $hash->{UndefFn} = "HMLAN_Undef";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "addvaltrigger " .
-                     "hmId hmKey hmKey2 hmKey3 " .
+                     "hmId hmKey hmKey2 hmKey3 hmKey4 hmKey5 " .
                      "respTime " .
                      "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger ".
                      "hmMsgLowLimit ".
@@ -205,6 +205,8 @@ sub HMLAN_Attr(@) {############################################################
          =( "01",AttrVal($name,"hmKey","")
            ,"02",AttrVal($name,"hmKey2","")
            ,"03",AttrVal($name,"hmKey3","")
+           ,"04",AttrVal($name,"hmKey4","")
+           ,"05",AttrVal($name,"hmKey5","")
                        );
 
     if ($k1 =~ m/:/){($k1no,$k1) = split(":",$k1);}
@@ -753,6 +755,8 @@ sub HMLAN_DoInit($) {##########################################################
          =( "01",AttrVal($name,"hmKey","")
            ,"02",AttrVal($name,"hmKey2","")
            ,"03",AttrVal($name,"hmKey3","")
+           ,"04",AttrVal($name,"hmKey4","")
+           ,"05",AttrVal($name,"hmKey5","")
                        );
 
   if ($k1 =~ m/:/){($k1no,$k1) = split(":",$k1);}
@@ -1005,6 +1009,8 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
         <li><a name="HMLANhmKey">hmKey</a></li><br>
         <li><a name="HMLANhmKey2">hmKey2</a></li><br>
         <li><a name="HMLANhmKey3">hmKey3</a><br>
+        <li><a name="HMLANhmKey4">hmKey4</a></li><br>
+        <li><a name="HMLANhmKey5">hmKey5</a><br>
         AES keys for the HMLAN adapter. <br>
         The key is converted to a hash. If a hash is given directly it is not converted but taken directly.
         Therefore the original key cannot be converted back<br>
