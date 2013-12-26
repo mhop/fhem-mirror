@@ -236,20 +236,20 @@ HUEDevice_SetParam($$@)
   if($cmd eq 'on') {
     $obj->{'on'}  = JSON::true;
     $obj->{'bri'} = 254 if( ReadingsVal($name,"bri","0") eq 0 );
-    $obj->{'transitiontime'} = $value / 10 if( defined($value) );
+    $obj->{'transitiontime'} = $value * 10 if( defined($value) );
   } elsif($cmd eq 'off') {
     $obj->{'on'}  = JSON::false;
-    $obj->{'transitiontime'} = $value / 10 if( defined($value) );
+    $obj->{'transitiontime'} = $value * 10 if( defined($value) );
   } elsif($cmd eq "pct") {
     $value = 3.5 if( $value < 3.5 && AttrVal($name, "model", "") eq "LWL001" );
     $obj->{'on'}  = JSON::true;
     $obj->{'bri'}  = int(2.54 * $value);
-    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
   } elsif($cmd eq "bri") {
     $value = 8 if( $value < 8 && AttrVal($name, "model", "") eq "LWL001" );
     $obj->{'on'}  = JSON::true;
     $obj->{'bri'}  = 0+$value;
-    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
   } elsif($cmd eq "dimUp") {
     my $bri = ReadingsVal($name,"bri","0");
     $bri += 25;
@@ -257,7 +257,7 @@ HUEDevice_SetParam($$@)
     $obj->{'on'}  = JSON::true;
     $obj->{'bri'}  = 0+$bri;
     $obj->{'transitiontime'} = 1;
-    #$obj->{'transitiontime'} = $value / 10 if( defined($value) );
+    #$obj->{'transitiontime'} = $value * 10 if( defined($value) );
     $defs{$name}->{helper}->{update_timeout} = 0;
   } elsif($cmd eq "dimDown") {
     my $bri = ReadingsVal($name,"bri","0");
@@ -266,25 +266,25 @@ HUEDevice_SetParam($$@)
     $obj->{'on'}  = JSON::true;
     $obj->{'bri'}  = 0+$bri;
     $obj->{'transitiontime'} = 1;
-    #$obj->{'transitiontime'} = $value / 10 if( defined($value) );
+    #$obj->{'transitiontime'} = $value * 10 if( defined($value) );
     $defs{$name}->{helper}->{update_timeout} = 0;
   } elsif($cmd eq "ct") {
     $obj->{'on'}  = JSON::true;
     $obj->{'ct'}  = 0+$value;
-    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
   } elsif($cmd eq "hue") {
     $obj->{'on'}  = JSON::true;
     $obj->{'hue'}  = 0+$value;
-    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
   } elsif($cmd eq "sat") {
     $obj->{'on'}  = JSON::true;
     $obj->{'sat'}  = 0+$value;
-    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
   } elsif($cmd eq "xy" && $value =~ m/^(.+),(.+)/) {
     my ($x,$y) = ($1, $2);
     $obj->{'on'}  = JSON::true;
     $obj->{'xy'}  = [0+$x, 0+$y];
-    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
   } elsif( $cmd eq "rgb" && $value =~ m/^(..)(..)(..)/) {
     # calculation from http://www.everyhue.com/vanilla/discussion/94/rgb-to-xy-or-hue-sat-values/p1
     my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
@@ -790,17 +790,17 @@ HUEDevice_GetUpdate($)
         Note: the FS20 compatible dimXX% commands are also accepted.</li>
       <li>color &lt;value&gt;<br>
         set colortemperature to &lt;value&gt; kelvin.</li>
-      <li>bri &lt;value&gt;<br>
+      <li>bri &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set brighness to &lt;value&gt;; range is 1-254.</li>
       <li>dimUp</li>
       <li>dimDown</li>
-      <li>ct &lt;value&gt;<br>
+      <li>ct &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set colortemperature to &lt;value&gt; mireds; range is 154-500.</li>
-      <li>hue &lt;value&gt;<br>
+      <li>hue &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set hue to &lt;value&gt;; range is 0-65535.</li>
-      <li>sat &lt;value&gt;<br>
+      <li>sat &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set saturation to &lt;value&gt;; range is 0-254.</li>
-      <li>xy &lt;x&gt;,&lt;y&gt;<br>
+      <li>xy &lt;x&gt;,&lt;y&gt; [&lt;ramp-time&gt;]<br>
         set the xy color coordinates to &lt;x&gt;,&lt;y&gt;</li>
       <li>alert [none|select|lselect]</li>
       <li>effect [none|colorloop]</li>
@@ -813,6 +813,7 @@ HUEDevice_GetUpdate($)
       <br>
       Note:
         <ul>
+        <li><ramp-time> is given in seconds<br>
         <li>multiple paramters can be set at once separated by <code>:</code><br>
           Examples:<br>
             <code>set LC on : transitiontime 100</code><br>
