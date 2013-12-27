@@ -1670,7 +1670,7 @@ Ext.define('FHEM.controller.ChartController', {
         // preapre the string for the file
         var finalstring = "FHEM.filelogcharts = " + Ext.encode(FHEM.filelogcharts) + ";;";
         
-        var cmd = "{ `echo '" + finalstring + "' > www/frontend/www/frontend/app/filelogcharts.js`}";
+        var cmd = "{ `echo '" + finalstring + "' > www/frontend/app/filelogcharts.js`}";
 //        var cmd = "{ `echo '" + finalstring + "' > www/frontenddev/app/filelogcharts.js`}";
         
         Ext.Ajax.request({
