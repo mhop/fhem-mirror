@@ -95,7 +95,7 @@ Ext.define('FHEM.controller.MainController', {
         
         if (Ext.isDefined(FHEM.version)) {
             var sp = this.getStatustextfield();
-            sp.setText(FHEM.version + "; Frontend Version: 1.0.3 - 2013-12-07");
+            sp.setText(FHEM.version + "; Frontend Version: 1.0.4 - 2013-12-27");
         }
         
         this.setupTree(false);
@@ -155,7 +155,11 @@ Ext.define('FHEM.controller.MainController', {
                                         //create roomfolder
                                         var roomfolder;
                                         if (room !== "hidden") {
-                                            roomfolder = {text: room, leaf: false, expanded: true, children: []};
+                                            if (room === "Unsorted") {
+                                                roomfolder = {text: room, leaf: false, expanded: false, children: []};
+                                            } else {
+                                                roomfolder = {text: room, leaf: false, expanded: true, children: []};
+                                            }
                                             roomfolder.children.push(subnode);
                                             root.appendChild(roomfolder);
                                         }
@@ -191,6 +195,11 @@ Ext.define('FHEM.controller.MainController', {
                 chartfolder = {text: "Charts", expanded: true, children: []};
             rootNode.appendChild(chartfolder);
             var chartfoldernode = rootNode.findChild("text", "Charts", true);
+            
+            //add the filelogcharts to the store
+            if (FHEM.filelogcharts) {
+                store.add(FHEM.filelogcharts);
+            }
             
             store.each(function(rec) {
                 var chartchild,
@@ -439,7 +448,7 @@ Ext.define('FHEM.controller.MainController', {
         if (rec.raw.data.template === true || rec.get('leaf') === true && 
             rec.raw.data &&
             rec.raw.data.TYPE && 
-            rec.raw.data.TYPE === "savedchart") {
+            (rec.raw.data.TYPE === "savedchart" || rec.raw.data.TYPE === "savedfilelogchart")) {
                 this.showLineChartPanel();
         } else {
             this.showDevicePanel(treeview, rec);
