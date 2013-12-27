@@ -257,7 +257,7 @@ UPD 2013-04-01_07:03:33 856 lib/ext-4.2.0.663/images/util/splitter/mini-top.gif
 UPD 2013-04-01_07:51:34 1482 lib/ext-4.2.0.663/license.txt
 UPD 2013-04-26_05:06:43 440 README.txt
 UPD 2013-04-01_07:05:33 613 app/userconfig.js
-UPD 2013-12-27_03:57:42 25 app/filelogcharts.js
+UPD 2013-12-27_04:36:42 25 app/filelogcharts.js
 UPD 2013-04-01_08:00:32 2104 app/resources/loading.png
 UPD 2013-04-03_07:27:17 781 app/resources/icons/accept.png
 UPD 2013-03-02_01:53:05 626 app/resources/icons/readme.txt
