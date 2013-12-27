@@ -233,7 +233,8 @@ ZWDongle_Set($@)
     $cmd =~ s/\@/$c/g;
   }
 
-  my $nargs = int(split("%", $cmd, -1))-1;
+  my @ca = split("%", $cmd, -1);
+  my $nargs = int(@ca)-1;
   return "set $name $type needs $nargs arguments" if($nargs != int(@a));
 
   ZWDongle_Write($hash,  "00", sprintf($cmd, @a));
@@ -254,7 +255,8 @@ ZWDongle_Get($@)
   return "Unknown argument $type, choose one of " . join(" ", sort keys %gets)
   	if(!defined($gets{$type}));
 
-  my $nargs = int(split("%", $gets{$type}, -1))-1;
+  my @ga = split("%", $gets{$type}, -1);
+  my $nargs = int(@ga)-1;
   return "get $name $type needs $nargs arguments" if($nargs != int(@a));
 
   return "No $type for dummies" if(IsDummy($name));
