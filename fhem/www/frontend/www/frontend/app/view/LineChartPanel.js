@@ -91,7 +91,7 @@ Ext.define('FHEM.view.LineChartPanel', {
         var chartSettingPanel = Ext.create('Ext.form.Panel', {
             title: 'Chart Settings - Click me to edit',
             name: 'chartformpanel',
-            maxHeight: 325,
+            maxHeight: 345,
             autoScroll: true,
             collapsible: true,
             titleCollapse: true,
@@ -99,7 +99,6 @@ Ext.define('FHEM.view.LineChartPanel', {
             items: [
                 {
                     xtype: 'fieldset',
-                    layout: 'column',
                     title: 'Select data',
                     name: 'axesfieldset',
                     defaults: {
@@ -109,72 +108,102 @@ Ext.define('FHEM.view.LineChartPanel', {
                 },
                 {
                     xtype: 'fieldset',
-                    layout: 'column',
+                    layout: 'vbox',
+                    autoScroll: true,
                     title: 'Select Timerange',
                     defaults: {
                         margin: '0 0 0 10'
                     },
                     items: [
                         {
-                            xtype: 'radiofield',
-                            fieldLabel: 'Timerange', 
-                            labelWidth: 60,
-                            name: 'rb', 
-                            checked: true,
-                            inputValue: 'timerange',
-                            listeners: {
-                                change: function(rb, newval, oldval) {
-                                    if (newval === false) {
-                                        rb.up().down('datefield[name=starttimepicker]').setDisabled(true);
-                                        rb.up().down('datefield[name=endtimepicker]').setDisabled(true);
-                                    } else {
-                                        rb.up().down('datefield[name=starttimepicker]').setDisabled(false);
-                                        rb.up().down('datefield[name=endtimepicker]').setDisabled(false);
-                                    }
-                                }
-                            }
-                        },
-                        {
-                          xtype: 'datefield',
-                          name: 'starttimepicker',
-                          format: 'Y-m-d H:i:s',
-                          fieldLabel: 'Starttime',
-                          allowBlank: false,
-                          labelWidth: 70
-                        },
-                        {
-                          xtype: 'datefield',
-                          name: 'endtimepicker',
-                          format: 'Y-m-d H:i:s',
-                          fieldLabel: 'Endtime',
-                          allowBlank: false,
-                          labelWidth: 70
-                        },
-                        {
-                            xtype: 'radiogroup',
-                            name: 'dynamictime',
-                            fieldLabel: 'or select a dynamic time',
-                            labelWidth: 140,
-                            allowBlank: true,
+                            xtype: 'fieldset',
+                            layout: 'hbox',
+                            autoScroll: true,
+                            border: false,
                             defaults: {
-                                labelWidth: 42,
-                                padding: "0 25px 0 0",
-                                checked: false
+                                margin: '0 0 0 10'
                             },
                             items: [
-                                { fieldLabel: 'yearly', name: 'rb', inputValue: 'year' },
-                                { fieldLabel: 'monthly', name: 'rb', inputValue: 'month' },
-                                { fieldLabel: 'weekly', name: 'rb', inputValue: 'week' },
-                                { fieldLabel: 'daily', name: 'rb', inputValue: 'day' },
-                                { fieldLabel: 'hourly', name: 'rb', inputValue: 'hour' }
+                                {
+                                    xtype: 'radiofield',
+                                    fieldLabel: 'Timerange', 
+                                    labelWidth: 60,
+                                    name: 'rb', 
+                                    checked: false,
+                                    allowBlank: true,
+                                    inputValue: 'timerange',
+                                    listeners: {
+                                        change: function(rb, newval, oldval) {
+                                            if (newval === false) {
+                                                rb.up().down('datefield[name=starttimepicker]').setDisabled(true);
+                                                rb.up().down('datefield[name=endtimepicker]').setDisabled(true);
+                                            } else {
+                                                rb.up().down('datefield[name=starttimepicker]').setDisabled(false);
+                                                rb.up().down('datefield[name=endtimepicker]').setDisabled(false);
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                  xtype: 'datefield',
+                                  name: 'starttimepicker',
+                                  format: 'Y-m-d H:i:s',
+                                  fieldLabel: 'Starttime',
+                                  allowBlank: false,
+                                  labelWidth: 70,
+                                  value: Ext.Date.add(new Date(), Ext.Date.DAY, -1)
+                                },
+                                {
+                                  xtype: 'datefield',
+                                  name: 'endtimepicker',
+                                  format: 'Y-m-d H:i:s',
+                                  fieldLabel: 'Endtime',
+                                  allowBlank: false,
+                                  labelWidth: 70,
+                                  value: new Date()
+                                }
+                            ]
+                        },
+                        {
+                            xtype: 'fieldset',
+                            layout: 'hbox',
+                            autoScroll: true,
+                            border: false,
+                            defaults: {
+                                margin: '0 0 0 10'
+                            },
+                            items: [
+                                {
+                                    xtype: 'radiogroup',
+                                    name: 'dynamictime',
+                                    fieldLabel: 'or select a dynamic time',
+                                    labelWidth: 140,
+                                    width: 900,
+                                    allowBlank: true,
+                                    defaults: {
+                                        padding: "0px 0px 0px 18px"
+                                    },
+                                    items: [
+                                        { fieldLabel: 'yearly', name: 'rb', inputValue: 'year', labelWidth: 38 },
+                                        { fieldLabel: 'monthly', name: 'rb', inputValue: 'month', labelWidth: 44 },
+                                        { fieldLabel: 'weekly', name: 'rb', inputValue: 'week', labelWidth: 40 },
+                                        { fieldLabel: 'daily', name: 'rb', inputValue: 'day', checked: true, labelWidth: 31 },
+                                        { fieldLabel: 'hourly', name: 'rb', inputValue: 'hour', labelWidth: 38 },
+                                        { fieldLabel: 'last hour', name: 'rb', inputValue: 'lasthour', labelWidth: 50 },
+                                        { fieldLabel: 'last 24h', name: 'rb', inputValue: 'last24h', labelWidth: 48 },
+                                        { fieldLabel: 'last 7 days', name: 'rb', inputValue: 'last7days', labelWidth: 65 },
+                                        { fieldLabel: 'last month', name: 'rb', inputValue: 'lastmonth', labelWidth: 65 }
+                                    ]
+                                }
                             ]
                         }
                     ]
-                }, 
+                },
                 {
 
                     xtype: 'fieldset',
-                    layout: 'column',
+                    layout: 'hbox',
+                    autoScroll: true,
                     title: 'Axis Configuration',
                     defaults: {
                         margin: '0 0 0 10'
@@ -186,6 +215,7 @@ Ext.define('FHEM.view.LineChartPanel', {
                             fieldLabel: 'Left Axis Scalerange',
                             labelWidth: 120,
                             allowBlank: true,
+                            width: 310,
                             defaults: {
                                 labelWidth: 55,
                                 padding: "0 25px 0 0",
@@ -230,6 +260,7 @@ Ext.define('FHEM.view.LineChartPanel', {
                             name: 'rightaxisconfiguration',
                             fieldLabel: 'Right Axis Scalerange',
                             labelWidth: 130,
+                            width: 310,
                             allowBlank: true,
                             defaults: {
                                 labelWidth: 55,
@@ -274,7 +305,8 @@ Ext.define('FHEM.view.LineChartPanel', {
                 }, 
                 {
                     xtype: 'fieldset',
-                    layout: 'column',
+                    layout: 'hbox',
+                    autoScroll: true,
                     title: 'Axis Title Configuration',
                     defaults: {
                         margin: '0 0 5 10'
@@ -300,7 +332,8 @@ Ext.define('FHEM.view.LineChartPanel', {
                 }, 
                 {
                     xtype: 'fieldset',
-                    layout: 'column',
+                    layout: 'hbox',
+                    autoScroll: true,
                     defaults: {
                         margin: '10 10 10 10'
                     },
@@ -421,7 +454,8 @@ Ext.define('FHEM.view.LineChartPanel', {
             {
                 xtype: 'fieldset',
                 name: 'singlerowfieldset',
-                layout: 'column',
+                layout: 'hbox',
+                autoScroll: true,
                 defaults: {
                     margin: '5 5 5 0'
                 },
@@ -616,7 +650,8 @@ Ext.define('FHEM.view.LineChartPanel', {
             {
                 xtype: 'fieldset',
                 name: 'baselineowfieldset',
-                layout: 'column',
+                layout: 'hbox',
+                autoScroll: true,
                 defaults: {
                     margin: '5 5 5 0'
                 },

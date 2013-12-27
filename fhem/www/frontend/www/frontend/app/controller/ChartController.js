@@ -132,16 +132,20 @@ Ext.define('FHEM.controller.ChartController', {
      * reconfigure combos to handle dblog / filelog
      */
     dataSourceChanged: function(radio, newval, oldval) {
-
+        
+        var selection;
+        if (radio.getChecked()[0]) {
+            selection = radio.getChecked()[0].inputValue;
+        } else {
+            selection = "dblog";
+        }
         var me = this,
             devicecombo = radio.up().down('combobox[name=devicecombo]'),
-            readingscombo = radio.up().down("combobox[name=yaxiscombo]"),
-            selection = radio.getChecked()[0].inputValue;
-        
+            readingscombo = radio.up().down("combobox[name=yaxiscombo]");
+    
         if (selection === "filelog") {
             
-            // disable save button and statistics for the moment
-            this.getSavechartdatabtn().setDisabled(true);
+            // disable statistics for the moment
             radio.up().down("combobox[name=yaxisstatisticscombo]").setDisabled(true);
             
             // Getting the FileLog Names to show them in Device-Combo
@@ -156,39 +160,26 @@ Ext.define('FHEM.controller.ChartController', {
             
             devicecombo.setValue("");
             devicecombo.getStore().removeAll();
-            var localstore = Ext.create('Ext.data.Store', {
-                model: 'FHEM.model.DeviceModel',
-                data: fileLogNames
-            });
+            devicecombo.getStore().add(fileLogNames);
             devicecombo.queryMode = 'local';
-            // bind the new one
-            devicecombo.bindStore(localstore);
             devicecombo.on("select", me.fileLogSelected);
             
             readingscombo.setValue();
             readingscombo.getStore().removeAll();
             
         } else {
-            // enable save button and statistics
-            this.getSavechartdatabtn().setDisabled(false);
+            // enable statistics
             radio.up().down("combobox[name=yaxisstatisticscombo]").setDisabled(false);
             
             devicecombo.setValue();
             devicecombo.getStore().removeAll();
-            var lcp = Ext.ComponentQuery.query("linechartpanel")[0];
-            // bind the new one
-            devicecombo.bindStore(lcp.devicestore);
-            // unregister listener
             devicecombo.un("select", me.fileLogSelected);
             devicecombo.queryMode = 'remote';
             devicecombo.getStore().load();
             
             readingscombo.setValue();
             readingscombo.getStore().removeAll();
-            // bind the new one
-            readingscombo.bindStore(readingscombo.ajaxStore);
             readingscombo.queryMode = 'remote';
-            
         }
     },
     
@@ -217,6 +208,13 @@ Ext.define('FHEM.controller.ChartController', {
                 endtime = Ext.Date.format(date, 'Y-m-d_H:i:s');
                 starttime = Ext.Date.add(date, Ext.Date.HOUR, -24);
                 starttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
+                
+            // logfiles can have absolute or relative pathes...
+            if (Ext.String.startsWith(currentlogfile, "/") === true) {
+                // we need to get out of the relative fhem directory,
+                // as the get command wont support absolute pathes by default...
+                currentlogfile = "../../../../../../../../" + currentlogfile;
+            }
             
             Ext.Ajax.request({
                 method: 'GET',
@@ -229,16 +227,14 @@ Ext.define('FHEM.controller.ChartController', {
                             keyArray = [];
                         
                         Ext.each(responseArr, function(row) {
-                            // the first column is always the timestamp, followed by device and key:value
-                            var keyindex = row.split(": ")[0].split(" ").length - 1,
-                                key = row.split(": ")[0].split(" ")[keyindex];
-                            
-                            if (key) {
-                                // filling keyarray for combo
-                                if (!Ext.Array.contains(keyArray, key)) {
-                                    keyArray.push(key);
+                            // the first column is always the timestamp, followed by device and multiple key:value
+                            var splitArr = row.split(" ");
+                            Ext.each(splitArr, function(key) {
+                                if (key.lastIndexOf(":") + 1 === key.length && 
+                                    !Ext.Array.contains(keyArray, key.replace(":", ""))) {
+                                        keyArray.push(key.replace(":", ""));
                                 }
-                            }
+                            });
                         });
                         
                         Ext.Array.sort(keyArray);
@@ -249,24 +245,32 @@ Ext.define('FHEM.controller.ChartController', {
                         
                         //reconfigure readings store
                         if (keyObjArray.length > 0) {
-                            
-                            var localstore = Ext.create('Ext.data.Store', {
-                                model: 'FHEM.model.ReadingsModel',
-                                data: keyObjArray,
-                                autoLoad: true
-                            });
-                            readingscombo.ajaxStore = readingscombo.getStore();
-                            // bind the new one
-                            readingscombo.bindStore(localstore);
+                            readingscombo.getStore().add(keyObjArray);
                             readingscombo.queryMode = 'local';
                             
                         } else {
-                            Ext.Msg.alert("Error", "No Readings found in the last 24 hours for this Logfile!");
+                            Ext.create('Ext.window.Window', { 
+                                width: 400,
+                                height: 400,
+                                autoScroll: true,
+                                title: 'Error',
+                                html: "No Readings found in the last 24 hours for this Logfile! The used Command was: <br>" +
+                                    "get Logfile " + currentlogfile + " - " + starttime + " " + endtime + "<br>" +
+                                    "The Response was: <br><div>" + response.responseText + "</div>"
+                            }).show();
                         }
                         readingscombo.setLoading(false);
                     } else {
                         readingscombo.setLoading(false);
-                        Ext.Msg.alert("Error", "No Readings found in the last 24 hours for this Logfile!");
+                        Ext.create('Ext.window.Window', { 
+                            width: 400,
+                            height: 400,
+                            autoScroll: true,
+                            title: 'Error',
+                            html: "Could get no data for the requested Logfile! The used Command was: <br>" +
+                                "get Logfile " + currentlogfile + " - " + starttime + " " + endtime + "<br>" +
+                                "The Response was: <br><div>" + response.responseText + "</div>"
+                        }).show();
                     }
                 }
             });
@@ -397,6 +401,26 @@ Ext.define('FHEM.controller.ChartController', {
                         starttime = date;
                         dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
                         endtime = Ext.Date.add(date, Ext.Date.HOUR, 1);
+                        dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
+                    } else if (box.inputValue === "lasthour") {
+                        endtime = date;
+                        starttime = Ext.Date.add(date, Ext.Date.HOUR, -1);
+                        dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
+                        dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
+                    } else if (box.inputValue === "last24h") {
+                        endtime = date;
+                        starttime = Ext.Date.add(date, Ext.Date.HOUR, -24);
+                        dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
+                        dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
+                    } else if (box.inputValue === "last7days") {
+                        endtime = date;
+                        starttime = Ext.Date.add(date, Ext.Date.DAY, -7);
+                        dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
+                        dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
+                    } else if (box.inputValue === "lastmonth") {
+                        endtime = date;
+                        starttime = Ext.Date.add(date, Ext.Date.DAY, -30);
+                        dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
                         dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
                     } else {
                         Ext.Msg.alert("Error", "Could not setup the dynamic time.");
@@ -553,14 +577,7 @@ Ext.define('FHEM.controller.ChartController', {
                             position : 'left',
                             fields : [],
                             title : '',
-                            grid : {
-                                odd : {
-                                    opacity : 1,
-                                    fill : '#ddd',
-                                    stroke : '#bbb',
-                                    'stroke-width' : 0.5
-                                }
-                            }
+                            grid : true
                         }, 
                         {
                             type : 'Numeric',
@@ -575,7 +592,8 @@ Ext.define('FHEM.controller.ChartController', {
                             position : 'bottom',
                             fields : [ 'TIMESTAMP' ],
                             dateFormat : "Y-m-d H:i:s",
-                            title : 'Time'
+                            title : 'Time',
+                            grid: true
                         }
                     ],
                     animate: false,
@@ -583,6 +601,35 @@ Ext.define('FHEM.controller.ChartController', {
                     store: store,
                     enableMask: true,
                     mask: true,//'vertical',//true, //'horizontal',
+                    gradients: [{
+                        id: 'gradientId',
+                        angle: 90,
+                        stops: {
+                            0: {
+                                color: '#FF0000'
+                            },
+                            50: {
+                                color: '#FFFF00'
+                            },
+                            100: {
+                                color: '#079400'
+                            }
+                        }
+                    }, {
+                        id: 'gradientId2',
+                        angle: 0,
+                        stops: {
+                            0: {
+                                color: '#590'
+                            },
+                            20: {
+                                color: '#599'
+                            },
+                            100: {
+                                color: '#ddd'
+                            }
+                        }
+                    }],
                     listeners: {
                         mousedown: function(evt) {
                             // fix for firefox, not dragging images
@@ -792,9 +839,17 @@ Ext.define('FHEM.controller.ChartController', {
                     return false;
                 }
             });
+            
+            // logfiles can have absolute or relative pathes...
+            if (Ext.String.startsWith(currentlogfile, "/") === true) {
+                // we need to get out of the relative fhem directory,
+                // as the get command wont support absolute pathes by default...
+                currentlogfile = "../../../../../../../../" + currentlogfile;
+            }
+            
             url += '../../../fhem?cmd=get%20Logfile%20' +
                 currentlogfile + '%20-%20' + dbstarttime +
-                '%20' + dbendtime + '%201:' + yaxis + '.*::$fld[3]&XHR=1';
+                '%20' + dbendtime + '%204:' + yaxis + '.*::&XHR=1';
         } else if (!Ext.isDefined(yaxisstatistics) || yaxisstatistics === "none" || Ext.isEmpty(yaxisstatistics)) {
             url += '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+' + dbstarttime + '+' + dbendtime + '+';
             url +=device + '+timerange+' + "TIMESTAMP" + '+' + yaxis;
@@ -1120,7 +1175,8 @@ Ext.define('FHEM.controller.ChartController', {
         
         chart.axes.get(2).fromDate = starttime;
         chart.axes.get(2).toDate = endtime;
-        
+        chart.axes.get(2).setTitle(Ext.Date.format(starttime, 'Y-m-d H:i:s') + '  -  ' + Ext.Date.format(endtime, 'Y-m-d H:i:s'));
+        chart.axes.get(2).displaySprite.attr.font = "14px Arial, Helvetica, sans-serif";
         
         var timediffhrs = Ext.Date.getElapsed(chart.axes.get(2).fromDate, chart.axes.get(2).toDate) / 1000 / 3600;
         
@@ -1211,19 +1267,26 @@ Ext.define('FHEM.controller.ChartController', {
                 title: title,
                 showInLegend: true,
                 smooth: 0,
-                highlight: true,
+                highlight: {
+                    size: 5,
+                    radius: 5
+                },
                 fill: fill,
                 style: {
                     fill: color,
+//                    fill: 'url(#gradientId)',
+                    opacity: 0.7,
                     stroke: '#808080',
                     'stroke-width': 2
                 },
                 markerConfig: {
                     type: 'circle',
-                    size: 3,
-                    radius: 3,
-                    stroke: color
+                    radius: 2,
+                    stroke: color,
+                    fill: color
                 },
+                showMarkers: true,
+                selectionTolerance: 5,
                 tips : {
                     trackMouse : true,
                     mouseOffset: [1,1],
@@ -1306,6 +1369,7 @@ Ext.define('FHEM.controller.ChartController', {
      */
     resetFormFields: function() {
         
+        this.getLinechartpanel().axiscounter = 0;
         var fieldset =  this.getChartformpanel().down('fieldset[name=axesfieldset]');
         fieldset.removeAll();
         this.getLinechartpanel().createNewYAxis();
@@ -1386,6 +1450,7 @@ Ext.define('FHEM.controller.ChartController', {
                 savename = savename.replace(/\+/g, "_");
                 
                 //getting the necessary values
+                var logtypes = Ext.ComponentQuery.query('radiogroup[name=datasourceradio]');
                 var devices = Ext.ComponentQuery.query('combobox[name=devicecombo]');
                 var yaxes = Ext.ComponentQuery.query('combobox[name=yaxiscombo]');
                 var yaxescolorcombos = Ext.ComponentQuery.query('combobox[name=yaxiscolorcombo]');
@@ -1425,7 +1490,8 @@ Ext.define('FHEM.controller.ChartController', {
                 var i = 0;
                 Ext.each(devices, function(dev) {
                     
-                    var device = dev.getValue(),
+                    var logtype = logtypes[i].getChecked()[0].inputValue,
+                        device = dev.getValue(),
                         yaxis = yaxes[i].getValue(),
                         yaxiscolorcombo = yaxescolorcombos[i].getDisplayValue(),
                         yaxisfillcheck = yaxesfillchecks[i].checked,
@@ -1443,6 +1509,7 @@ Ext.define('FHEM.controller.ChartController', {
                     
                     if (i === 0) {
                         jsonConfig += '"y":"' + yaxis + '","device":"' + device + '",';
+                        jsonConfig += '"logtype":"' + logtype + '",';
                         jsonConfig += '"yaxiscolorcombo":"' + yaxiscolorcombo + '","yaxisfillcheck":"' + yaxisfillcheck + '",';
                         jsonConfig += '"yaxisstepcheck":"' + yaxisstepcheck + '",';
                         jsonConfig += '"yaxisside":"' + axisside + '",';
@@ -1453,7 +1520,8 @@ Ext.define('FHEM.controller.ChartController', {
                             jsonConfig += '"yaxisstatistics":"' + yaxisstatistics + '",';
                         }
                     } else {
-                        var axisname = "y" + (i + 1) + "axis",
+                        var logtypename = "y" + (i + 1) + "logtype",
+                            axisname = "y" + (i + 1) + "axis",
                             devicename = "y" + (i + 1) + "device",
                             colorname = "y" + (i + 1) + "axiscolorcombo",
                             fillname = "y" + (i + 1) + "axisfillcheck",
@@ -1462,6 +1530,7 @@ Ext.define('FHEM.controller.ChartController', {
                             statsname = "y" + (i + 1) + "axisstatistics";
                         
                         jsonConfig += '"' + axisname + '":"' + yaxis + '","' + devicename + '":"' + device + '",';
+                        jsonConfig += '"' + logtypename + '":"' + logtype + '",';
                         jsonConfig += '"' + colorname + '":"' + yaxiscolorcombo + '","' + fillname + '":"' + yaxisfillcheck + '",';
                         jsonConfig += '"' + stepname + '":"' + yaxisstepcheck + '",';
                         jsonConfig += '"' + sidename + '":"' + axisside + '",';
@@ -1515,39 +1584,131 @@ Ext.define('FHEM.controller.ChartController', {
                 
                 jsonConfig += '"starttime":"' + dbstarttime + '","endtime":"' + dbendtime + '"}';
             
-                var url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+' + dbstarttime + '+' + dbendtime + '+';
-                    url +=devices[0].getValue() + '+savechart+""+""+' + savename + '+' + jsonConfig + '&XHR=1'; 
-                
                 chart.setLoading(true);
                 
-                Ext.Ajax.request({
-                    method: 'POST',
-                    disableCaching: false,
-                    url: url,
-                    success: function(response){
-                        chart.setLoading(false);
-                        var json = Ext.decode(response.responseText);
-                        if (json.success === "true" || json.data && json.data.length === 0) {
-                            me.getMaintreepanel().fireEvent("treeupdated");
-                            Ext.Msg.alert("Success", "Chart successfully saved!");
-                        } else if (json.msg) {
-                            Ext.Msg.alert("Error", "The Chart could not be saved, error Message is:<br><br>" + json.msg);
-                        } else {
-                            Ext.Msg.alert("Error", "The Chart could not be saved!");
-                        }
-                    },
-                    failure: function() {
-                        chart.setLoading(false);
-                        if (json && json.msg) {
-                            Ext.Msg.alert("Error", "The Chart could not be saved, error Message is:<br><br>" + json.msg);
-                        } else {
-                            Ext.Msg.alert("Error", "The Chart could not be saved!");
-                        }
+                //decide if we save to db or to file
+                var filelogbool = false,
+                    dblogbool = false;
+                
+                Ext.each(logtypes, function(typeradio) {
+                    if (typeradio.getChecked()[0].inputValue === "filelog") {
+                        filelogbool = true;
+                    } else {
+                        dblogbool = true;
                     }
                 });
+                
+                if (filelogbool === true && dblogbool === false) {
+                    
+                    // create the current chart object
+                    var chartobject = {},
+                        hash = 0, 
+                        k, 
+                        char;
+                    
+                    // generate hash from savename
+                    for (k = 0, l = savename.length; k < l; k++) {
+                        char  = savename.charCodeAt(k);
+                        hash  = ((hash<<5)-hash)+char;
+                        hash |= 0; // Convert to 32bit integer
+                    }
+                    
+                    chartobject.ID = hash;
+                    chartobject.NAME = savename;
+                    chartobject.TIMESTAMP = Ext.Date.format(new Date(), 'Y-m-d H:i:s');
+                    chartobject.TYPE = "savedfilelogchart";
+                    chartobject.VALUE = Ext.decode(jsonConfig);
+                    
+                    // append the chartobject to the global FHEM.filelogcharts
+                    FHEM.filelogcharts.push(chartobject);
+                    
+                    me.updateFileLogCharts(true);
+                    
+                } else {
+                    
+                    var url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+' + dbstarttime + '+' + dbendtime + '+';
+                    url +=devices[0].getValue() + '+savechart+""+""+' + savename + '+' + jsonConfig + '&XHR=1'; 
+                    Ext.Ajax.request({
+                        method: 'POST',
+                        disableCaching: false,
+                        url: url,
+                        success: function(response){
+                            chart.setLoading(false);
+                            var json = Ext.decode(response.responseText);
+                            if (json.success === "true" || json.data && json.data.length === 0) {
+                                me.getMaintreepanel().fireEvent("treeupdated");
+                                Ext.Msg.alert("Success", "Chart successfully saved!");
+                            } else if (json.msg) {
+                                Ext.Msg.alert("Error", "The Chart could not be saved, error Message is:<br><br>" + json.msg);
+                            } else {
+                                Ext.Msg.alert("Error", "The Chart could not be saved!");
+                            }
+                        },
+                        failure: function() {
+                            chart.setLoading(false);
+                            if (json && json.msg) {
+                                Ext.Msg.alert("Error", "The Chart could not be saved, error Message is:<br><br>" + json.msg);
+                            } else {
+                                Ext.Msg.alert("Error", "The Chart could not be saved!");
+                            }
+                        }
+                    });
+                }
+                
             }
         }, this);
         
+    },
+    
+    /**
+     * function used to update the filelogcharts by given cmd
+     */
+    updateFileLogCharts: function(treeupdate) {
+        var me = this,
+            chart = me.getChart();
+        
+        // preapre the string for the file
+        var finalstring = "FHEM.filelogcharts = " + Ext.encode(FHEM.filelogcharts) + ";;";
+        
+        var cmd = "{ `echo '" + finalstring + "' > www/frontend/www/frontend/app/filelogcharts.js`}";
+//        var cmd = "{ `echo '" + finalstring + "' > www/frontenddev/app/filelogcharts.js`}";
+        
+        Ext.Ajax.request({
+            method: 'POST',
+            disableCaching: false,
+            url: '../../../fhem?',
+            params: {
+                cmd: cmd,
+                XHR: 1
+            },
+            success: function(response){
+                if (chart) {
+                    chart.setLoading(false);
+                }
+                if (treeupdate) {
+                    me.getMaintreepanel().fireEvent("treeupdated");
+                }
+               
+                if (response.status === 200) {
+                    Ext.Msg.alert("Success", "Changes successfully saved!");
+                } else if (response.statusText) {
+                    Ext.Msg.alert("Error", "The Changes could not be saved, error Message is:<br><br>" + response.statusText);
+                } else {
+                    Ext.Msg.alert("Error", "The Changes could not be saved!");
+                }
+            },
+            failure: function(response) {
+                if (chart) {
+                    chart.setLoading(false);
+                }
+                me.getMaintreepanel().setLoading(false);
+                if (response.statusText) {
+                    Ext.Msg.alert("Error", "The Changes could not be saved, error Message is:<br><br>" + response.statusText);
+                } else {
+                    Ext.Msg.alert("Error", "The Changes could not be saved!");
+                }
+            }
+        });
     },
     
     /**
@@ -1558,7 +1719,8 @@ Ext.define('FHEM.controller.ChartController', {
             record.raw.data = record.raw;
         }
         var me = this;
-        if (record.raw.data && record.raw.data.TYPE && record.raw.data.TYPE === "savedchart") {
+        if (record.raw.data && record.raw.data.TYPE &&
+            (record.raw.data.TYPE === "savedchart" || record.raw.data.TYPE === "savedfilelogchart" )) {
             var name = record.raw.data.NAME,
                 chartdata = record.raw.data.VALUE;
             
@@ -1598,6 +1760,7 @@ Ext.define('FHEM.controller.ChartController', {
                     yaxeslength++;
                 }
                 
+                var logtypes = Ext.ComponentQuery.query('radiogroup[name=datasourceradio]');
                 var devices = Ext.ComponentQuery.query('combobox[name=devicecombo]');
                 var yaxes = Ext.ComponentQuery.query('combobox[name=yaxiscombo]');
                 var yaxescolorcombos = Ext.ComponentQuery.query('combobox[name=yaxiscolorcombo]');
@@ -1605,10 +1768,14 @@ Ext.define('FHEM.controller.ChartController', {
                 var yaxesstepchecks = Ext.ComponentQuery.query('checkbox[name=yaxisstepcheck]');
                 var axissideradio = Ext.ComponentQuery.query('radiogroup[name=axisside]');
                 var yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]');
+                var logtypename;
                 
                 var i = 0;
                 Ext.each(yaxes, function(yaxis) {
+                    
                     if (i === 0) {
+                        logtypename = logtypes[i].getChecked()[0].name;
+                        eval('logtypes[i].setValue({' + logtypename + ': "' + chartdata.logtype + '"})');
                         devices[i].setValue(chartdata.device);
                         yaxes[i].getStore().getProxy().url = url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+' + chartdata.device + '+getreadings&XHR=1';
                         yaxes[i].setDisabled(false);
@@ -1625,14 +1792,16 @@ Ext.define('FHEM.controller.ChartController', {
                         }
                         i++;
                     } else {
-                        var axisdevice = "y" + (i + 1) + "device",
+                            logtypename = logtypes[i].getChecked()[0].name,
+                            logtype = "y" + (i + 1) + "logtype",
+                            axisdevice = "y" + (i + 1) + "device",
                             axisname = "y" + (i + 1) + "axis",
                             axiscolorcombo = axisname + "colorcombo",
                             axisfillcheck = axisname + "fillcheck",
                             axisstepcheck = axisname + "stepcheck",
                             axisside = axisname + "side",
                             axisstatistics = axisname + "statistics";
-                            
+                        eval('logtypes[i].setValue({' + logtypename + ' : chartdata.' + logtype + '})');
                         eval('devices[i].setValue(chartdata.' + axisdevice + ')');
                         yaxes[i].getStore().getProxy().url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+' + eval('chartdata.' + axisdevice) + '+getreadings&XHR=1';
                         yaxes[i].setDisabled(false);
@@ -1689,12 +1858,13 @@ Ext.define('FHEM.controller.ChartController', {
                 //convert time
                 var dynamicradio = Ext.ComponentQuery.query('radiogroup[name=dynamictime]')[0],
                     st = chartdata.starttime;
-                if (st === "year" || st === "month" || st === "week" || st === "day" || st === "hour") {
-                    dynamicradio.eachBox(function(box, idx) {
-                        if (box.inputValue === st) {
-                            box.setValue(true);
-                        }
-                    });
+                if (st === "year" || st === "month" || st === "week" || st === "day" || st === "hour" ||
+                    st === "lasthour" || st === "last24h" || st === "last7days" || st === "lastmonth") {
+                        dynamicradio.eachBox(function(box, idx) {
+                            if (box.inputValue === st) {
+                                box.setValue(true);
+                            }
+                        });
                 } else {
                     var start = chartdata.starttime.replace("_", " "),
                         end = chartdata.endtime.replace("_", " ");
@@ -1771,30 +1941,41 @@ Ext.define('FHEM.controller.ChartController', {
                 
                 var url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+renamechart+""+""+' + savename + '+' + chartid + '&XHR=1'; 
                 
-                Ext.Ajax.request({
-                    method: 'GET',
-                    disableCaching: false,
-                    url: url,
-                    success: function(response){
-                        var json = Ext.decode(response.responseText);
-                        if (json && json.success === "true" || json.data && json.data.length === 0) {
-                            me.getMaintreepanel().fireEvent("treeupdated");
-                            Ext.Msg.alert("Success", "Chart successfully renamed!");
-                        } else if (json && json.msg) {
-                            Ext.Msg.alert("Error", "The Chart could not be renamed, error Message is:<br><br>" + json.msg);
-                        } else {
-                            Ext.Msg.alert("Error", "The Chart could not be renamed!");
-                        }
-                    },
-                    failure: function() {
-                        if (json && json.msg) {
-                            Ext.Msg.alert("Error", "The Chart could not be renamed, error Message is:<br><br>" + json.msg);
-                        } else {
-                            Ext.Msg.alert("Error", "The Chart could not be renamed!");
-                        }
+                if (menu.record.raw.data.TYPE === "savedfilelogchart") {
+                    if (Ext.Array.contains(FHEM.filelogcharts, menu.record.raw.data) === true) {
+                        Ext.Array.remove(FHEM.filelogcharts, menu.record.raw.data);
+                        
+                        var newRec = menu.record.raw.data;
+                        newRec.NAME = savename;
+                        FHEM.filelogcharts.push(newRec);
+                        
+                        me.updateFileLogCharts(true);
                     }
-                });
-                
+                } else {
+                    Ext.Ajax.request({
+                        method: 'GET',
+                        disableCaching: false,
+                        url: url,
+                        success: function(response){
+                            var json = Ext.decode(response.responseText);
+                            if (json && json.success === "true" || json.data && json.data.length === 0) {
+                                me.getMaintreepanel().fireEvent("treeupdated");
+                                Ext.Msg.alert("Success", "Chart successfully renamed!");
+                            } else if (json && json.msg) {
+                                Ext.Msg.alert("Error", "The Chart could not be renamed, error Message is:<br><br>" + json.msg);
+                            } else {
+                                Ext.Msg.alert("Error", "The Chart could not be renamed!");
+                            }
+                        },
+                        failure: function() {
+                            if (json && json.msg) {
+                                Ext.Msg.alert("Error", "The Chart could not be renamed, error Message is:<br><br>" + json.msg);
+                            } else {
+                                Ext.Msg.alert("Error", "The Chart could not be renamed!");
+                            }
+                        }
+                    });
+                }
             }
         });
     },
@@ -1825,40 +2006,50 @@ Ext.define('FHEM.controller.ChartController', {
                         
                         var url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+deletechart+""+""+' + chartid + '&XHR=1'; 
                     
-                        Ext.Ajax.request({
-                            method: 'GET',
-                            disableCaching: false,
-                            url: url,
-                            success: function(response){
-                                var json = Ext.decode(response.responseText);
-                                if (json && json.success === "true" || json.data && json.data.length === 0) {
-                                    var rootNode = me.getMaintreepanel().getRootNode();
-                                    var deletedNode = rootNode.findChildBy(function(rec) {
-                                        if (rec.raw.data && rec.raw.data.ID === chartid) {
-                                            return true;
-                                        }
-                                    }, this, true);
-                                    if (deletedNode) {
-                                        deletedNode.destroy();
-                                    }
-                                    Ext.Msg.alert("Success", "Chart successfully deleted!");
-                                    
-                                } else if (json && json.msg) {
-                                    Ext.Msg.alert("Error", "The Chart could not be deleted, error Message is:<br><br>" + json.msg);
-                                } else {
-                                    Ext.Msg.alert("Error", "The Chart could not be deleted!");
-                                }
-                                btn.up().up().destroy();
-                            },
-                            failure: function() {
-                                if (json && json.msg) {
-                                    Ext.Msg.alert("Error", "The Chart could not be deleted, error Message is:<br><br>" + json.msg);
-                                } else {
-                                    Ext.Msg.alert("Error", "The Chart could not be deleted!");
-                                }
+                        if (menu.record.raw.data.TYPE === "savedfilelogchart") {
+                            if (Ext.Array.contains(FHEM.filelogcharts, menu.record.raw.data) === true) {
+                                Ext.Array.remove(FHEM.filelogcharts, menu.record.raw.data);
+                                
+                                me.updateFileLogCharts(true);
                                 btn.up().up().destroy();
                             }
-                        });
+                        } else {
+                            Ext.Ajax.request({
+                                method: 'GET',
+                                disableCaching: false,
+                                url: url,
+                                success: function(response){
+                                    var json = Ext.decode(response.responseText);
+                                    if (json && json.success === "true" || json.data && json.data.length === 0) {
+                                        var rootNode = me.getMaintreepanel().getRootNode();
+                                        var deletedNode = rootNode.findChildBy(function(rec) {
+                                            if (rec.raw.data && rec.raw.data.ID === chartid) {
+                                                return true;
+                                            }
+                                        }, this, true);
+                                        if (deletedNode) {
+                                            deletedNode.destroy();
+                                        }
+                                        Ext.Msg.alert("Success", "Chart successfully deleted!");
+                                        
+                                    } else if (json && json.msg) {
+                                        Ext.Msg.alert("Error", "The Chart could not be deleted, error Message is:<br><br>" + json.msg);
+                                    } else {
+                                        Ext.Msg.alert("Error", "The Chart could not be deleted!");
+                                    }
+                                    btn.up().up().destroy();
+                                },
+                                failure: function() {
+                                    if (json && json.msg) {
+                                        Ext.Msg.alert("Error", "The Chart could not be deleted, error Message is:<br><br>" + json.msg);
+                                    } else {
+                                        Ext.Msg.alert("Error", "The Chart could not be deleted!");
+                                    }
+                                    btn.up().up().destroy();
+                                }
+                            });
+                        }
+                        
                     }
                 },
                 {
@@ -1999,14 +2190,19 @@ Ext.define('FHEM.controller.ChartController', {
      * handling the moving of nodes in tree, saving new position of saved charts in db
      */
     movenodeintree: function(treeview, action, collidatingrecord) {
-        var unsorted = Ext.ComponentQuery.query('treepanel button[name=unsortedtree]')[0].pressed;
+        var me = this,
+            unsorted = Ext.ComponentQuery.query('treepanel button[name=unsortedtree]')[0].pressed;
         
         //only save orders when in sorted mode
         if (!unsorted) {
+            Ext.ComponentQuery.query('treepanel')[0].setLoading(true);
             var rec = action.records[0],
             id = rec.raw.data.ID;
         
-            if (rec.raw.data && rec.raw.data.ID && rec.raw.data.TYPE === "savedchart" && !rec.raw.data.template) {
+            if (rec.raw.data && rec.raw.data.ID &&
+                (rec.raw.data.TYPE === "savedchart" || rec.raw.data.TYPE === "savedfilelogchart") &&
+                !rec.raw.data.template) {
+                
                 var rootNode = this.getMaintreepanel().getRootNode();
                 rootNode.cascadeBy(function(node) {
                     if (node.raw && node.raw.data && node.raw.data.ID && node.raw.data.ID === id) {
@@ -2024,35 +2220,51 @@ Ext.define('FHEM.controller.ChartController', {
                                 var encodedchartconfig = Ext.encode(chartconfig),
                                     url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+updatechart+""+""+' + chartid + '+' + encodedchartconfig + '&XHR=1'; 
                                 
-                                Ext.Ajax.request({
-                                    method: 'GET',
-                                    disableCaching: false,
-                                    url: url,
-                                    success: function(response){
-                                        var json = Ext.decode(response.responseText);
-                                        if (json && json.success === "true" || json.data && json.data.length === 0) {
-                                            //be quiet
-                                        } else if (json && json.msg) {
-                                            Ext.Msg.alert("Error", "The new position could not be saved, error Message is:<br><br>" + json.msg);
-                                        } else {
-                                            Ext.Msg.alert("Error", "The new position could not be saved!");
-                                        }
-                                    },
-                                    failure: function() {
-                                        if (json && json.msg) {
-                                            Ext.Msg.alert("Error", "The new position could not be saved, error Message is:<br><br>" + json.msg);
-                                        } else {
-                                            Ext.Msg.alert("Error", "The new position could not be saved!");
-                                        }
+                                // check for filelog or dblog
+                                if (node.raw.data.TYPE === "savedfilelogchart") {
+                                    
+                                    if (Ext.Array.contains(FHEM.filelogcharts, rec.raw.data) === true) {
+                                        Ext.Array.remove(FHEM.filelogcharts, rec.raw.data);
+                                        var newRec = rec.raw.data;
+                                        newRec.parentFolder = ownerfolder;
+                                        newRec.treeIndex = index;
+                                        FHEM.filelogcharts.push(newRec);
+//                                      
+                                        me.updateFileLogCharts();
                                     }
-                                });
+                                    
+                                } else {
+                                    Ext.Ajax.request({
+                                        method: 'GET',
+                                        disableCaching: false,
+                                        url: url,
+                                        success: function(response){
+                                            Ext.ComponentQuery.query('treepanel')[0].setLoading(false);
+                                            var json = Ext.decode(response.responseText);
+                                            if (json && json.success === "true" || json.data && json.data.length === 0) {
+                                                //be quiet
+                                            } else if (json && json.msg) {
+                                                Ext.Msg.alert("Error", "The new position could not be saved, error Message is:<br><br>" + json.msg);
+                                            } else {
+                                                Ext.Msg.alert("Error", "The new position could not be saved!");
+                                            }
+                                        },
+                                        failure: function() {
+                                            Ext.ComponentQuery.query('treepanel')[0].setLoading(false);
+                                            if (json && json.msg) {
+                                                Ext.Msg.alert("Error", "The new position could not be saved, error Message is:<br><br>" + json.msg);
+                                            } else {
+                                                Ext.Msg.alert("Error", "The new position could not be saved!");
+                                            }
+                                        }
+                                    });
+                                }
                             }
-                            
                         });
                     }
                 });
             }
-        
         }
+        Ext.ComponentQuery.query('treepanel')[0].setLoading(false);
     }
 });

@@ -151,7 +151,8 @@ Ext.define('FHEM.view.Viewport', {
                                 'itemcontextmenu': function(scope, rec, item, index, e, eOpts) {
                                     e.preventDefault();
                                     
-                                    if (rec.raw.data.TYPE && rec.raw.data.TYPE === "savedchart") {
+                                    if (rec.raw.data.TYPE &&
+                                        (rec.raw.data.TYPE === "savedchart" || rec.raw.data.TYPE === "savedfilelogchart")) {
                                         var menu = Ext.ComponentQuery.query('menu[id=treecontextmenu]')[0];
                                         if (menu) {
                                             menu.destroy();

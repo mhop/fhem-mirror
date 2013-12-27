@@ -48,7 +48,7 @@ Ext.define('FHEM.view.TableDataGridPanel', {
                 {
                     xtype: 'fieldset',
                     title: 'Configure Database Query',
-                    maxHeight: 150,
+                    maxHeight: 165,
                     items: [
                         {
                             xtype: 'fieldset',
