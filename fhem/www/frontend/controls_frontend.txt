@@ -257,7 +257,7 @@ UPD 2013-04-01_07:03:33 856 lib/ext-4.2.0.663/images/util/splitter/mini-top.gif
 UPD 2013-04-01_07:51:34 1482 lib/ext-4.2.0.663/license.txt
 UPD 2013-04-26_05:06:43 440 README.txt
 UPD 2013-04-01_07:05:33 613 app/userconfig.js
-UPD 2013-12-27_04:36:42 25 app/filelogcharts.js
+UPD 2013-12-27_05:03:42 25 app/filelogcharts.js
 UPD 2013-04-01_08:00:32 2104 app/resources/loading.png
 UPD 2013-04-03_07:27:17 781 app/resources/icons/accept.png
 UPD 2013-03-02_01:53:05 626 app/resources/icons/readme.txt
@@ -279,7 +279,7 @@ UPD 2013-12-26_08:39:37 10257 app/view/TableDataGridPanel.js
 UPD 2013-12-26_08:39:37 31894 app/view/LineChartPanel.js
 UPD 2013-12-27_01:39:11 9980 app/view/Viewport.js
 UPD 2013-12-27_03:20:41 19171 app/controller/MainController.js
-UPD 2013-12-27_03:21:01 106581 app/controller/ChartController.js
+UPD 2013-12-27_05:02:34 106568 app/controller/ChartController.js
 UPD 2013-06-30_11:46:54 5415 app/controller/TableDataController.js
 UPD 2013-04-01_07:04:35 202 app/model/ReadingsModel.js
 UPD 2013-04-01_07:04:36 338 app/model/SavedChartsModel.js
