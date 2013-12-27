@@ -931,8 +931,7 @@ FW_roomIdx(\@$)
   my ($index) = grep { $arr->[$_] =~ /^$v$/ } 0..$#$arr;
 
   return "9999-$v" if( !defined($index) );
-
-  return $index;
+  return sprintf( "%03i", $index );
 }
 
 
