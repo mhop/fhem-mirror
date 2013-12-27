@@ -344,7 +344,10 @@ ZWave_Cmd($$@)
   my $cmdId  = $cmdList{$cmd}{id};
 
   my $nArg = 0;
-  $nArg = int(split("%", $cmdFmt))-1 if($cmdFmt =~ m/%/);
+  if($cmdFmt =~ m/%/) {
+    my @ca = split("%", $cmdFmt);
+    $nArg = int(@ca)-1;
+  }
   my $parTxt = ($nArg == 0 ? "no parameter" : 
                ($nArg == 1 ? "one parameter" : 
                              "$nArg parameters"));
@@ -532,6 +535,7 @@ ZWave_Parse($$@)
   # Controller commands
   my $evt;
 
+  Log3 $ioName, 4, "$ioName CMD: $cmd";
   if($cmd eq 'ZW_ADD_NODE_TO_NETWORK' ||
      $cmd eq 'ZW_REMOVE_NODE_FROM_NETWORK') {
     my @vals = ("learnReady", "nodeFound", "slave",
@@ -546,7 +550,13 @@ ZWave_Parse($$@)
 
   } elsif($cmd eq "ZW_APPLICATION_UPDATE" && $arg =~ m/....(..)..(.*)$/) {
       my ($type6,$classes) = ($1, $2, $3);
-      return ZWave_SetClasses($homeId, $id, $type6, $classes);
+      my $ret = ZWave_SetClasses($homeId, $id, $type6, $classes);
+
+      my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
+      if($hash->{WakeUp} && @{$hash->{WakeUp}}) {
+        IOWrite($hash, "00", shift @{$hash->{WakeUp}});
+      }
+      return $ret;
 
   }
 
@@ -564,7 +574,10 @@ ZWave_Parse($$@)
 
   ######################################
   # device messages
-  return "" if($cmd ne "APPLICATION_COMMAND_HANDLER");
+  if($cmd ne "APPLICATION_COMMAND_HANDLER") {
+    Log3 $ioName, 4, "$ioName unhandled command $cmd";
+    return "" 
+  }
 
   if($arg =~ /^..600d(..)(..)(.*)/) { # MULTI_CHANNEL CMD_ENCAP
     $id = "$id$1";
