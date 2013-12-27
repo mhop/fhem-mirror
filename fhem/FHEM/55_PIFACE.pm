@@ -144,12 +144,12 @@ sub PIFACE_Attr(@) {
   if ($attrName eq "pollInterval") {
     if (!defined $attrVal) {
       RemoveInternalTimer($hash);    
-    } elsif ($attrVal !~ m/^(off|[1..10])$/) {
+    } elsif ($attrVal eq "off" || $attrVal ~~ [1..10]) {
+      PIFACE_GetUpdate($hash);
+    } else {
       RemoveInternalTimer($hash);    
       Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
       CommandDeleteAttr(undef, "$name pollInterval");
-    } else {
-      PIFACE_GetUpdate($hash);
     }
   } elsif ($attrName eq "defaultState") {
     if (!defined $attrVal){
