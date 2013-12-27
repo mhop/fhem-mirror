@@ -138,6 +138,7 @@ FHEMWEB_Initialize($)
     refresh
     reverseLogs:0,1
     roomIcons
+    sortRooms
     smallscreen:unused
     stylesheetPrefix
     touchpad:unused
@@ -923,6 +924,18 @@ FW_makeTableFromArray($$@) {
   }
 }
 
+sub
+FW_roomIdx(\@$)
+{
+  my ($arr,$v) = @_;
+  my ($index) = grep { $arr->[$_] =~ /^$v$/ } 0..$#$arr;
+
+  return "9999-$v" if( !defined($index) );
+
+  return $index;
+}
+
+
 ##############
 # Header, Zoom-Icons & list of rooms at the left.
 sub
@@ -982,9 +995,13 @@ FW_roomOverview($)
   }
   $FW_room = "" if(!$FW_room);
 
+  my @sortBy = split( " ", AttrVal( $FW_wname, "sortRooms", "" ) );
+  @sortBy = sort keys %FW_rooms if( scalar @sortBy == 0 );
+
   ##########################
   # Rooms and other links
-  foreach my $r (sort keys %FW_rooms) {
+  foreach my $r ( sort { FW_roomIdx(@sortBy,$a) cmp
+                         FW_roomIdx(@sortBy,$b) } keys %FW_rooms ) {
     next if($r eq "hidden" || $FW_hiddenroom{$r});
     $FW_room = $r if(!$FW_room && $FW_ss);
     $r =~ s/</&lt;/g;
@@ -2645,6 +2662,14 @@ FW_ActivateInform()
         Anlagen/EDV). The first part is treated as regexp, so space is
         represented by a dot.  Example:<br>
         attr WEB roomIcons Everything: Anlagen.EDV:icoEverything
+        </li>
+        <br>
+
+    <a name="sortRooms"></a>
+    <li>sortRooms<br>
+        Space separated list of rooms to override the default
+        sort order of the room links. Example:<br>
+        attr WEB sortRooms DG OG EG Keller
         </li>
         <br>
 
