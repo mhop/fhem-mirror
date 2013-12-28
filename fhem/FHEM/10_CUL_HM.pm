@@ -1750,13 +1750,6 @@ sub CUL_HM_parseCommon(@){#####################################################
     elsif($subType eq "01"){ #storePeerList=================================
       my $msgValid = 0;
       if ($pendType eq "PeerList"){
-        if($shash->{helper}{prt}{rspWait}{mNo} == hex($mNo)){#next message
-          $shash->{helper}{prt}{rspWait}{mNo}++;
-          $shash->{helper}{prt}{rspWait}{mNo} &= 0xff;
-          $msgValid = 1;
-        }
-      }
-      if ($msgValid){
         my $chn = $shash->{helper}{prt}{rspWait}{forChn};
         my $chnhash = $modules{CUL_HM}{defptr}{$src.$chn};
         $chnhash = $shash if (!$chnhash);
@@ -4022,7 +4015,8 @@ sub CUL_HM_respPendTout($) {
           delete $pHash->{mmcS};
         }
         else{#fillback simple command
-          unshift (@{$hash->{cmdStack}},"++".substr($pHash->{rspWait}{cmd},6));
+          unshift (@{$hash->{cmdStack}},"++".substr($pHash->{rspWait}{cmd},6))
+                if (substr($pHash->{rspWait}{cmd},8,2) ne '12');# not wakeup
         }
         my $wuReSent = $pHash->{rspWait}{reSent};# save 'invalid' count
         CUL_HM_respPendRm($hash);#clear
