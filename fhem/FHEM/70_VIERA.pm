@@ -8,9 +8,12 @@
 # written 2013 by Tobias Vaupel <fhem at 622 mbit dot de>
 #
 #
-# Version = 1.21
+# Version = 1.22
 #
 # Version  History:
+# - 1.22 - 2013-12-28
+# -- fixed set command remoteControl
+#
 # - 1.21 - 2013-08-19
 # -- Log() deprecated/replaced by Log3()
 # -- GetStatus() is called after set volume/mute to update readings immediately
@@ -27,7 +30,7 @@
 # -- New functions: sub VIERA_RClayout_TV(); sub VIERA_RCmakenotify($$);
 # -- Updated VIERA_Initialize for remotecontrol
 #
-# - 1.00 - yyy-mm-dd
+# - 1.00 - 2013-03-16
 # -- First release
 #
 ##############################################################################
@@ -216,7 +219,7 @@ sub VIERA_Set($@){
       break;
     }
     
-    when("remoteControl"){
+    when("remotecontrol"){
       if($state eq "?"){
         $usage = "choose one of the states:\n";
         foreach $key (sort keys %VIERA_remoteControl_args){
