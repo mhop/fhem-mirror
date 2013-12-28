@@ -1,15 +1,6 @@
 ##############################################
 # $Id$
 # See ZWDongle.pm for inspiration
-# TODO
-# - versioned commands
-# - use central readings functions
-# - Generate MISSING ACK
-# - implement (global?) on-for-timer
-# - better autocreate integration
-# - get support in FHEMWEB
-# - class meter: get 
-# - class SWITCH_ALL
 package main;
 
 use strict;
@@ -72,14 +63,11 @@ my %zwave_class = (
     get   => { sbStatus    => "02",       },
     parse => { "03300300"  => "state:closed",
                "033003ff"  => "state:open",  },},
+#053105030129
+
   SENSOR_MULTILEVEL        => { id => '31', 
     get   => { smStatus    => "04" },
-    parse => { "06310501(..)(....)" => 'sprintf("temperature:%0.1f %s",'.
-                      'hex($2)/(10**int(hex($1)/32)), hex($1)&8 ? "F":"C")',
-               "06310504(..)(....)" => 'sprintf("power:%0.1f %s",'.
-                      'hex($2)/(10**int(hex($1)/32)), hex($1)&8 ? "Btu/h":"W")',
-               "05310505(..)(..)" => 'sprintf("humidity:%0.1f %%", '.
-                      'hex($2)/(10**int(hex($1)/32)))', },},
+    parse => { "..3105(..)(..)(.*)" => 'ZWave_ParseMultilevel($1,$2,$3)'},},
   METER                    => { id => '32',
     parse => { "..3202(.*)"=> 'ZWave_ParseMeter($1)' }, },
   ZIP_ADV_SERVER           => { id => '33', },
@@ -361,24 +349,35 @@ ZWave_Cmd($$@)
   }
   $cmdFmt = sprintf($cmdFmt, @a) if($nArg);
 
+  my ($baseClasses, $baseHash) = ($classes, $hash);
   if($id =~ m/(..)(..)/) {  # Multi-Channel, encapsulate
-    my ($lid,$ch) = ($1, $2);
-    $id = $lid;
+    my ($baseId,$ch) = ($1, $2);
+    $id = $baseId;
     $cmdFmt = "0d01$ch$cmdId$cmdFmt";
     $cmdId = "60";  # MULTI_CHANNEL
+    $baseHash = $modules{ZWave}{defptr}{"$hash->{homeId} $baseId"};
+    $baseClasses = AttrVal($baseHash->{NAME}, "classes", "");
   }
-
 
   my $len = sprintf("%02x", length($cmdFmt)/2+1);
 
-  my $data = "13$id$len$cmdId${cmdFmt}05";
-  if($classes =~ m/WAKE_UP/) {
-    if(!$hash->{WakeUp}) {
+  my $data = "13$id$len$cmdId${cmdFmt}05"; # 13==SEND_DATA
+  if($baseClasses =~ m/WAKE_UP/) {
+    if(!$baseHash->{WakeUp}) {
       my @arr = ();
-      $hash->{WakeUp} = \@arr;
+      $baseHash->{WakeUp} = \@arr;
     }
-    push @{$hash->{WakeUp}}, $data;
-    return ($type eq "get" ? "Scheduled for sending after WAKEUP" : undef);
+    my $awake = ($baseHash->{lastMsgTimestamp} &&
+                  time() - $baseHash->{lastMsgTimestamp} < 2);
+
+    if($awake && @{$baseHash->{WakeUp}} == 0) {
+      push @{$baseHash->{WakeUp}}, ""; # Block the next
+
+    } else {
+      push @{$baseHash->{WakeUp}}, $data;
+      return ($type eq "get" && AttrVal($name,"verbose",3) > 2 ? 
+                  "Scheduled for sending after WAKEUP" : undef);
+    }
   }
   IOWrite($hash, "00", $data);
 
@@ -455,6 +454,41 @@ ZWave_ParseMeter($)
   return "$txt:$v3 $unit";
 }
 
+sub
+ZWave_ParseMultilevel($$$)
+{
+  my ($type,$fl,$arg) = @_; 
+  my %ml_tbl = (
+   '01' => { n => 'temperature',          st => ['C', 'F'] },
+   '02' => { n => 'generalPurpose',       st => ['%', ''] },
+   '03' => { n => 'luminance',            st => ['%', 'Lux'] },
+   '04' => { n => 'power',                st => ['W', 'Btu/h'] },
+   '05' => { n => 'humidity',             st => ['%'] },
+   '06' => { n => 'velocity',             st => ['m/s', 'mph'] },
+   '07' => { n => 'direction',            st => [] },
+   '08' => { n => 'atmosphericPressure',  st => ['kPa', 'inchHg'] },
+   '09' => { n => 'barometricPressure',   st => ['kPa', 'inchHg'] },
+   '0a' => { n => 'solarRadiation',       st => ['W/m2'] },
+   '0b' => { n => 'dewpoint',             st => ['C', 'F'] },
+   '0c' => { n => 'rain',                 st => ['mm/h', 'in/h'] },
+   '0d' => { n => 'tideLevel',            st => ['m', 'feet'] },
+   '0e' => { n => 'weight',               st => ['kg', 'pound'] },
+   '0f' => { n => 'voltage',              st => ['V', 'mV'] },
+   '10' => { n => 'current',              st => ['A', 'mA'] },
+   '11' => { n => 'CO2-level',            st => ['ppm']},
+   '12' => { n => 'airFlow',              st => ['m3/h', 'cfm'] },
+   '13' => { n => 'tankCapacity',         st => ['l', 'cbm', 'usgal'] },
+   '14' => { n => 'distance',             st => ['m', 'cm', 'feet'] },
+   '15' => { n => 'anglePosition',        st => ['%', 'relN', 'relS'] },
+  );
+
+  my $pr = (hex($fl)>>5)&0x07; # precision
+  my $sc = (hex($fl)>>3)&0x03; # scale
+  my $ml = $ml_tbl{$type};
+  return "UNKNOWN multilevel type: $type fl: $fl arg: $arg" if(!$ml);
+  return sprintf("%s:%.*f %s", $ml->{n}, $pr, hex($arg)/(10**$pr),
+       int(@{$ml->{st}}) > $sc ? $ml->{st}->[$sc] : "");
+}
 
 sub
 ZWave_SetClasses($$$$)
@@ -514,6 +548,7 @@ ZWave_mcCapability($$)
 
 ###################################
 # 0004000a03250300 (sensor binary off for id 11)
+# { ZWave_Parse($defs{zd}, "0004000c028407", 0) }
 sub
 ZWave_Parse($$@)
 {
@@ -524,10 +559,24 @@ ZWave_Parse($$@)
     Log3 $ioName, 1, "ERROR: $ioName homeId is not set!"
         if(!$iodev->{errReported});
     $iodev->{errReported} = 1;
-    return;
+    return "";
+  }
+  if($msg =~ m/^01(..)(..*)/) { # 01==ANSWER
+    my ($cmd, $arg) = ($1, $2);
+    $cmd = $zw_func_id{$cmd} if($zw_func_id{$cmd});
+    if($cmd eq "ZW_SEND_DATA") {
+      Log3 $ioName, 2, "ERROR: cannot SEND_DATA: $arg" if($arg != 1);
+      return "";
+    }
+    Log3 $ioName, 4, "$ioName: unhandled ANSWER: $cmd $arg";
+    return "";
   }
 
-  return "" if($msg !~ m/00(..)(..)(..)(..*)/); # Ignore unknown commands 
+  if($msg !~ m/^00(..)(..)(..)(.*)/) { # 00=REQUEST
+    Log3 $ioName, 4, "$ioName: UNKNOWN msg $msg";
+    return "";
+  }
+
   my ($cmd, $callbackid, $id, $arg) = ($1, $2, $3, $4);
   $cmd = $zw_func_id{$cmd} if($zw_func_id{$cmd});
 
@@ -535,7 +584,7 @@ ZWave_Parse($$@)
   # Controller commands
   my $evt;
 
-  Log3 $ioName, 4, "$ioName CMD: $cmd";
+  Log3 $ioName, 4, "$ioName CMD:$cmd ID:$id ARG:$arg";
   if($cmd eq 'ZW_ADD_NODE_TO_NETWORK' ||
      $cmd eq 'ZW_REMOVE_NODE_FROM_NETWORK') {
     my @vals = ("learnReady", "nodeFound", "slave",
@@ -549,15 +598,18 @@ ZWave_Parse($$@)
     }
 
   } elsif($cmd eq "ZW_APPLICATION_UPDATE" && $arg =~ m/....(..)..(.*)$/) {
-      my ($type6,$classes) = ($1, $2, $3);
-      my $ret = ZWave_SetClasses($homeId, $id, $type6, $classes);
+    my ($type6,$classes) = ($1, $2, $3);
+    my $ret = ZWave_SetClasses($homeId, $id, $type6, $classes);
 
-      my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
-      if($hash->{WakeUp} && @{$hash->{WakeUp}}) {
-        IOWrite($hash, "00", shift @{$hash->{WakeUp}});
-      }
-      return $ret;
+    my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
+    if($hash && $hash->{WakeUp} && @{$hash->{WakeUp}}) { # Always the base hash
+      IOWrite($hash, "00", shift @{$hash->{WakeUp}});
+    }
+    return $ret;
 
+  } elsif($cmd eq "ZW_SEND_DATA") {
+    Log3 $ioName, 2, "$ioName ERROR: SEND_DATA returned $id" if($id ne "00");
+    return "";
   }
 
   if($evt) {
@@ -565,10 +617,6 @@ ZWave_Parse($$@)
     DoTrigger($ioName, "$cmd $evt");
     Log3 $ioName, 4, "$ioName $cmd $evt";
     return "";
-
-  } else {
-    Log3 $ioName, 4, "$ioName $cmd $id ($arg)";
-
   }
 
 
@@ -579,16 +627,23 @@ ZWave_Parse($$@)
     return "" 
   }
 
+
+  my $baseHash;
   if($arg =~ /^..600d(..)(..)(.*)/) { # MULTI_CHANNEL CMD_ENCAP
+    $baseHash = $modules{ZWave}{defptr}{"$homeId $id"};
     $id = "$id$1";
     $arg = sprintf("%02x$3", length($3)/2);
   }
   my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
+  $baseHash = $hash if(!$baseHash);
+
+
   if(!$hash) {
     $id = hex($id);
     Log3 $ioName, 3, "Unknown ZWave device $homeId $id, please define it";
     return "";
   }
+
 
   my @event;
   my @args = ($arg); # MULTI_CMD handling
@@ -630,10 +685,12 @@ ZWave_Parse($$@)
   return "" if(!@event);
   return join(" ", @event) if($local);
 
-  if($hash->{WakeUp} && @{$hash->{WakeUp}}) {
-    IOWrite($hash, "00", shift @{$hash->{WakeUp}});
+  my $wu = $baseHash->{WakeUp};
+  if($wu && @{$wu}) {
+    shift @{$wu} if($wu->[0] eq "");
+    IOWrite($hash, "00", shift @{$wu});
   }
-
+  $baseHash->{lastMsgTimestamp} = time();
 
   readingsBeginUpdate($hash);
   for(my $i = 0; $i < int(@event); $i++) {
