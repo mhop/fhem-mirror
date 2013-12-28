@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - bugfix:  ENIGMA2: improved compatibility for Fritzbox and old
+  	                  Webif versions
   - feature: readingsGroup: process events only if visible in browser,
                             allow <br> for line breaks in multi-reading lines
   - feature: FLOORPLAN: Style4 (S300TH specific) now keeps its formatting
@@ -11,15 +13,15 @@
              time patches (justme1968 & Boris)
   - feature: Add new module Dashboard
   - change:  ONKYO_AVR: transfer command database into separate packet
-  			 ONKYOdb.pm
+  			            ONKYOdb.pm
   - feature: ENIGMA2: bouquet support e.g. for named channels
   - feature: Add new module ONKYO_AVR
   - feature: SYSSTAT: allow (remote) monitoring via snmp, support
              for monitoring windows systems and synology system temperature
   - feature: New module LINDY_HDMI_SWITCH.pm added
-  - feature: ENIGMA2: improved logging, default attributes for webCmd and
-             devStateIcon
-  - bugfix:  ENIGMA2: support for option channels
+  - change:  ENIGMA2: improved logging, default attributes for webCmd and
+                      devStateIcon
+  - feature: ENIGMA2: support for option channels
   - feature: mailcheck: decode non ascii subjet to utf-8, verify gpg signatures
   - feature: PRESENCE: "statusRequest" command for lan-bluetooth mode
              (collectord >= 1.4, presenced >= 1.1 required)
