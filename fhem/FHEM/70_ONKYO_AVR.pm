@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.0
+# Version: 1.0.1
 #
 # Major Version History:
 # - 1.0.0 - 2013-12-16
@@ -200,9 +200,10 @@ sub ONKYO_AVR_GetStatus($;$) {
             }
         }
         else {
-          Log3 $name, 4, "ONKYO_AVR $name: net-receiver-information command unsupported, this must be a pre2013 device! Implicit fallback to protocol version pre2013.";
-          $hash->{helper}{receiver} = 0;
-          readingsBulkUpdate( $hash, "deviceyear", "pre2013");
+            Log3 $name, 4,
+"ONKYO_AVR $name: net-receiver-information command unsupported, this must be a pre2013 device! Implicit fallback to protocol version pre2013.";
+            $hash->{helper}{receiver} = 0;
+            readingsBulkUpdate( $hash, "deviceyear", "pre2013" );
         }
 
         # Input alias handling

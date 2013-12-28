@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.0
+# Version: 1.2.1
 #
 # Major Version History:
 # - 1.2.0 - 2013-12-21
@@ -1502,7 +1502,7 @@ sub ENIGMA2_Define($$) {
 
         # use http-method POST for FritzBox environment as GET does not seem to
         # work properly. Might restrict use to newer
-        # ENIGMA2 Webif versions only.
+        # ENIGMA2 Webif versions or use of OWIF only.
         if ( exists $ENV{CONFIG_PRODUKT_NAME}
             && defined $ENV{CONFIG_PRODUKT_NAME} )
         {
@@ -1521,6 +1521,9 @@ sub ENIGMA2_Define($$) {
     unless ( exists( $attr{$name}{devStateIcon} ) ) {
         $attr{$name}{devStateIcon} =
           'on:rc_GREEN:off off:rc_YELLOW:on absent:rc_STOP:on';
+    }
+    unless ( exists( $attr{$name}{icon} ) ) {
+        $attr{$name}{icon} = 'dreambox';
     }
 
     unless ( exists( $hash->{helper}{AVAILABLE} )
@@ -1577,9 +1580,9 @@ sub ENIGMA2_SendCommand($$;$) {
         Log3 $name, 4, "ENIGMA2 $name: REQ $service";
     }
     else {
-        Log3 $name, 4, "ENIGMA2 $name: REQ $service/" . urlDecode($cmd);
         $cmd = "?" . $cmd . "&"
           if ( $http_method eq "GET" || $http_method eq "" );
+        Log3 $name, 4, "ENIGMA2 $name: REQ $service/" . urlDecode($cmd);
     }
 
     if ( defined($http_user) && defined($http_passwd) ) {
@@ -1689,14 +1692,14 @@ sub ENIGMA2_SendCommand($$;$) {
             else {
                 if ( !defined($cmd) || $cmd eq "" ) {
                     Log3 $name, 5,
-                      "ENIGMA2 $name: RES $service ERROR: not in XML format\n"
+                      "ENIGMA2 $name: RES ERROR $service - not in XML format\n"
                       . $response;
                 }
                 else {
                     Log3 $name, 5,
-                        "ENIGMA2 $name: RES $service/"
+                        "ENIGMA2 $name: RES ERROR $service/"
                       . urlDecode($cmd)
-                      . " ERROR: not in XML format\n"
+                      . " - not in XML format\n"
                       . $response;
                 }
 
