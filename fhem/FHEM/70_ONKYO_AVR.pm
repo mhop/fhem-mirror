@@ -38,9 +38,11 @@ use strict;
 use warnings;
 use ONKYOdb;
 use IO::Socket;
+use IO::Handle;
 use IO::Select;
 use XML::Simple;
 use Time::HiRes qw(usleep);
+use Symbol qw<qualify_to_ref>;
 use Data::Dumper;
 
 sub ONKYO_AVR_Set($@);
@@ -95,15 +97,70 @@ sub ONKYO_AVR_GetStatus($;$) {
     InternalTimer( gettimeofday() + $interval, "ONKYO_AVR_GetStatus", $hash, 0 )
       unless ( $local == 1 );
 
+    # Read powerstate
+    #
+    my $powerstate = ONKYO_AVR_SendCommand( $hash, "power", "query" );
+
+    $state = "off";
+    if ( defined($powerstate) ) {
+        if ( $powerstate eq "on" ) {
+            $state = "on";
+
+            # Read other state information
+            $states->{mute} = ONKYO_AVR_SendCommand( $hash, "mute", "query" );
+            $states->{volume} =
+              ONKYO_AVR_SendCommand( $hash, "volume", "query" );
+            $states->{sleep} = ONKYO_AVR_SendCommand( $hash, "sleep", "query" )
+              if ( $zone eq "main" );
+            $states->{input} = ONKYO_AVR_SendCommand( $hash, "input", "query" );
+            $states->{video} =
+              ONKYO_AVR_SendCommand( $hash, "video-information", "query" )
+              if ( $zone eq "main" );
+            $states->{audio} =
+              ONKYO_AVR_SendCommand( $hash, "audio-information", "query" )
+              if ( $zone eq "main" );
+        }
+    }
+    else {
+        $state = "absent";
+    }
+
     readingsBeginUpdate($hash);
+
+    # Set reading for power
+    #
+    my $readingPower = "off";
+    if ( $state eq "on" ) {
+        $readingPower = "on";
+    }
+
+    if ( !defined( $hash->{READINGS}{power}{VAL} )
+        || $hash->{READINGS}{power}{VAL} ne $readingPower )
+    {
+        readingsBulkUpdate( $hash, "power", $readingPower );
+    }
+
+    # Set reading for state
+    #
+    if ( !defined( $hash->{READINGS}{state}{VAL} )
+        || $hash->{READINGS}{state}{VAL} ne $state )
+    {
+        readingsBulkUpdate( $hash, "state", $state );
+    }
+
+    readingsEndUpdate( $hash, 1 );
 
     # cache XML device information
     #
     # get device information if not available from helper
-    if ( !defined( $hash->{helper}{receiver} ) && $protocol ne "pre2013" ) {
+    if (   !defined( $hash->{helper}{receiver} )
+        && $protocol ne "pre2013"
+        && $state ne "absent" )
+    {
         my $xml =
           ONKYO_AVR_SendCommand( $hash, "net-receiver-information", "query" );
-        if ( defined($xml) && $xml ne "" ) {
+
+        if ( defined($xml) && $xml =~ /^<\?xml/ ) {
             my $xml_parser = XML::Simple->new(
                 NormaliseSpace => 2,
                 KeepRoot       => 0,
@@ -133,6 +190,8 @@ sub ONKYO_AVR_GetStatus($;$) {
                 $inputs = substr( $inputs, 0, -1 );
                 $attr{$name}{inputs} = $inputs;
             }
+
+            readingsBeginUpdate($hash);
 
             # Brand
             $reading = "brand";
@@ -198,12 +257,15 @@ sub ONKYO_AVR_GetStatus($;$) {
                 readingsBulkUpdate( $hash, $reading,
                     $hash->{helper}{receiver}{device}{year} );
             }
+
+            readingsEndUpdate( $hash, 1 );
         }
-        else {
-            Log3 $name, 4,
+        elsif ( $hash->{READINGS}{presence}{VAL} ne "absent" ) {
+            Log3 $name, 3,
 "ONKYO_AVR $name: net-receiver-information command unsupported, this must be a pre2013 device! Implicit fallback to protocol version pre2013.";
-            $hash->{helper}{receiver} = 0;
+            readingsBeginUpdate($hash);
             readingsBulkUpdate( $hash, "deviceyear", "pre2013" );
+            readingsEndUpdate( $hash, 1 );
         }
 
         # Input alias handling
@@ -225,54 +287,11 @@ sub ONKYO_AVR_GetStatus($;$) {
             }
         }
     }
-
-    # Read powerstate
-    #
-    my $powerstate = ONKYO_AVR_SendCommand( $hash, "power", "query" );
-
-    $state = "off";
-    if ( defined($powerstate) ) {
-        if ( $powerstate eq "on" ) {
-            $state = "on";
-
-            # Read other state information
-            $states->{mute} = ONKYO_AVR_SendCommand( $hash, "mute", "query" );
-            $states->{volume} =
-              ONKYO_AVR_SendCommand( $hash, "volume", "query" );
-            $states->{sleep} = ONKYO_AVR_SendCommand( $hash, "sleep", "query" )
-              if ( $zone eq "main" );
-            $states->{input} = ONKYO_AVR_SendCommand( $hash, "input", "query" );
-            $states->{video} =
-              ONKYO_AVR_SendCommand( $hash, "video-information", "query" )
-              if ( $zone eq "main" );
-            $states->{audio} =
-              ONKYO_AVR_SendCommand( $hash, "audio-information", "query" )
-              if ( $zone eq "main" );
-        }
-    }
     else {
-        $state = "absent";
+        $hash->{helper}{receiver}{NRI} = 0;
     }
 
-    # Set reading for power
-    #
-    my $readingPower = "off";
-    if ( $state eq "on" ) {
-        $readingPower = "on";
-    }
-    if ( !defined( $hash->{READINGS}{power}{VAL} )
-        || $hash->{READINGS}{power}{VAL} ne $readingPower )
-    {
-        readingsBulkUpdate( $hash, "power", $readingPower, 1 );
-    }
-
-    # Set reading for state
-    #
-    if ( !defined( $hash->{READINGS}{state}{VAL} )
-        || $hash->{READINGS}{state}{VAL} ne $state )
-    {
-        readingsBulkUpdate( $hash, "state", $state, 1 );
-    }
+    readingsBeginUpdate($hash);
 
     # Set general readings for all zones
     #
@@ -281,14 +300,14 @@ sub ONKYO_AVR_GetStatus($;$) {
             if ( !defined( $hash->{READINGS}{$_}{VAL} )
                 || $hash->{READINGS}{$_}{VAL} ne $states->{$_} )
             {
-                readingsBulkUpdate( $hash, $_, $states->{$_}, 1 );
+                readingsBulkUpdate( $hash, $_, $states->{$_} );
             }
         }
         else {
             if ( !defined( $hash->{READINGS}{$_}{VAL} )
                 || $hash->{READINGS}{$_}{VAL} ne "-" )
             {
-                readingsBulkUpdate( $hash, $_, "-", 1 );
+                readingsBulkUpdate( $hash, $_, "-" );
             }
         }
     }
@@ -304,14 +323,14 @@ sub ONKYO_AVR_GetStatus($;$) {
                 if ( !defined( $hash->{READINGS}{$_}{VAL} )
                     || $hash->{READINGS}{$_}{VAL} ne $states->{$_} )
                 {
-                    readingsBulkUpdate( $hash, $_, $states->{$_}, 1 );
+                    readingsBulkUpdate( $hash, $_, $states->{$_} );
                 }
             }
             else {
                 if ( !defined( $hash->{READINGS}{$_}{VAL} )
                     || $hash->{READINGS}{$_}{VAL} ne "-" )
                 {
-                    readingsBulkUpdate( $hash, $_, "-", 1 );
+                    readingsBulkUpdate( $hash, $_, "-" );
                 }
             }
         }
@@ -334,14 +353,12 @@ sub ONKYO_AVR_GetStatus($;$) {
                 if ( !defined( $hash->{READINGS}{audin_src}{VAL} )
                     || $hash->{READINGS}{audin_src}{VAL} ne $audio_split[0] )
                 {
-                    readingsBulkUpdate( $hash, "audin_src", $audio_split[0],
-                        1 );
+                    readingsBulkUpdate( $hash, "audin_src", $audio_split[0] );
                 }
                 if ( !defined( $hash->{READINGS}{audin_enc}{VAL} )
                     || $hash->{READINGS}{audin_enc}{VAL} ne $audio_split[1] )
                 {
-                    readingsBulkUpdate( $hash, "audin_enc", $audio_split[1],
-                        1 );
+                    readingsBulkUpdate( $hash, "audin_enc", $audio_split[1] );
                 }
                 if (
                     !defined( $hash->{READINGS}{audin_srate}{VAL} )
@@ -349,7 +366,7 @@ sub ONKYO_AVR_GetStatus($;$) {
                         && $hash->{READINGS}{audin_srate}{VAL} ne $audin_srate )
                   )
                 {
-                    readingsBulkUpdate( $hash, "audin_srate", $audin_srate, 1 );
+                    readingsBulkUpdate( $hash, "audin_srate", $audin_srate );
                 }
                 if (
                     !defined( $hash->{READINGS}{audin_ch}{VAL} )
@@ -357,13 +374,12 @@ sub ONKYO_AVR_GetStatus($;$) {
                         && $hash->{READINGS}{audin_ch}{VAL} ne $audin_ch )
                   )
                 {
-                    readingsBulkUpdate( $hash, "audin_ch", $audin_ch, 1 );
+                    readingsBulkUpdate( $hash, "audin_ch", $audin_ch );
                 }
                 if ( !defined( $hash->{READINGS}{audout_mode}{VAL} )
                     || $hash->{READINGS}{audout_mode}{VAL} ne $audio_split[4] )
                 {
-                    readingsBulkUpdate( $hash, "audout_mode", $audio_split[4],
-                        1 );
+                    readingsBulkUpdate( $hash, "audout_mode", $audio_split[4] );
                 }
                 if (
                     !defined( $hash->{READINGS}{audout_ch}{VAL} )
@@ -371,7 +387,7 @@ sub ONKYO_AVR_GetStatus($;$) {
                         && $hash->{READINGS}{audout_ch}{VAL} ne $audout_ch )
                   )
                 {
-                    readingsBulkUpdate( $hash, "audout_ch", $audout_ch, 1 );
+                    readingsBulkUpdate( $hash, "audout_ch", $audout_ch );
                 }
             }
             else {
@@ -383,7 +399,7 @@ sub ONKYO_AVR_GetStatus($;$) {
                     if ( !defined( $hash->{READINGS}{$_}{VAL} )
                         || $hash->{READINGS}{$_}{VAL} ne "-" )
                     {
-                        readingsBulkUpdate( $hash, $_, "-", 1 );
+                        readingsBulkUpdate( $hash, $_, "-" );
                     }
                 }
             }
@@ -397,7 +413,7 @@ sub ONKYO_AVR_GetStatus($;$) {
                 if ( !defined( $hash->{READINGS}{$_}{VAL} )
                     || $hash->{READINGS}{$_}{VAL} ne "-" )
                 {
-                    readingsBulkUpdate( $hash, $_, "-", 1 );
+                    readingsBulkUpdate( $hash, $_, "-" );
                 }
             }
         }
@@ -451,57 +467,54 @@ sub ONKYO_AVR_GetStatus($;$) {
                 if ( !defined( $hash->{READINGS}{vidin_src}{VAL} )
                     || $hash->{READINGS}{vidin_src}{VAL} ne $video_split[0] )
                 {
-                    readingsBulkUpdate( $hash, "vidin_src", $video_split[0],
-                        1 );
+                    readingsBulkUpdate( $hash, "vidin_src", $video_split[0] );
                 }
                 if ( !defined( $hash->{READINGS}{vidin_res}{VAL} )
                     || $hash->{READINGS}{vidin_res}{VAL} ne $vidin_res )
                 {
-                    readingsBulkUpdate( $hash, "vidin_res", $vidin_res, 1 );
+                    readingsBulkUpdate( $hash, "vidin_res", $vidin_res );
                 }
                 if ( !defined( $hash->{READINGS}{vidin_cspace}{VAL} )
                     || $hash->{READINGS}{vidin_cspace}{VAL} ne
                     lc( $video_split[2] ) )
                 {
                     readingsBulkUpdate( $hash, "vidin_cspace",
-                        lc( $video_split[2] ), 1 );
+                        lc( $video_split[2] ) );
                 }
                 if ( !defined( $hash->{READINGS}{vidin_cdepth}{VAL} )
                     || $hash->{READINGS}{vidin_cdepth}{VAL} ne $vidin_cdepth )
                 {
-                    readingsBulkUpdate( $hash, "vidin_cdepth", $vidin_cdepth,
-                        1 );
+                    readingsBulkUpdate( $hash, "vidin_cdepth", $vidin_cdepth );
                 }
                 if ( !defined( $hash->{READINGS}{vidout_dst}{VAL} )
                     || $hash->{READINGS}{vidout_dst}{VAL} ne $video_split[4] )
                 {
-                    readingsBulkUpdate( $hash, "vidout_dst", $video_split[4],
-                        1 );
+                    readingsBulkUpdate( $hash, "vidout_dst", $video_split[4] );
                 }
                 if ( !defined( $hash->{READINGS}{vidout_res}{VAL} )
                     || $hash->{READINGS}{vidout_res}{VAL} ne $vidout_res )
                 {
-                    readingsBulkUpdate( $hash, "vidout_res", $vidout_res, 1 );
+                    readingsBulkUpdate( $hash, "vidout_res", $vidout_res );
                 }
                 if ( !defined( $hash->{READINGS}{vidout_cspace}{VAL} )
                     || $hash->{READINGS}{vidout_cspace}{VAL} ne
                     lc( $video_split[6] ) )
                 {
                     readingsBulkUpdate( $hash, "vidout_cspace",
-                        lc( $video_split[6] ), 1 );
+                        lc( $video_split[6] ) );
                 }
                 if ( !defined( $hash->{READINGS}{vidout_cdepth}{VAL} )
                     || $hash->{READINGS}{vidout_cdepth}{VAL} ne $vidout_cdepth )
                 {
-                    readingsBulkUpdate( $hash, "vidout_cdepth", $vidout_cdepth,
-                        1 );
+                    readingsBulkUpdate( $hash, "vidout_cdepth",
+                        $vidout_cdepth );
                 }
                 if ( !defined( $hash->{READINGS}{vidout_mode}{VAL} )
                     || $hash->{READINGS}{vidout_mode}{VAL} ne
                     lc( $video_split[8] ) )
                 {
                     readingsBulkUpdate( $hash, "vidout_mode",
-                        lc( $video_split[8] ), 1 );
+                        lc( $video_split[8] ) );
                 }
             }
             else {
@@ -514,7 +527,7 @@ sub ONKYO_AVR_GetStatus($;$) {
                     if ( !defined( $hash->{READINGS}{$_}{VAL} )
                         || $hash->{READINGS}{$_}{VAL} ne "-" )
                     {
-                        readingsBulkUpdate( $hash, $_, "-", 1 );
+                        readingsBulkUpdate( $hash, $_, "-" );
                     }
                 }
             }
@@ -529,7 +542,7 @@ sub ONKYO_AVR_GetStatus($;$) {
                 if ( !defined( $hash->{READINGS}{$_}{VAL} )
                     || $hash->{READINGS}{$_}{VAL} ne "-" )
                 {
-                    readingsBulkUpdate( $hash, $_, "-", 1 );
+                    readingsBulkUpdate( $hash, $_, "-" );
                 }
             }
         }
@@ -584,22 +597,24 @@ sub ONKYO_AVR_Set($@) {
     return "No argument given to ONKYO_AVR_Set" if ( !defined( $a[1] ) );
 
     # Input alias handling
-    if ( defined( $attr{$name}{inputs} ) ) {
+    if ( defined( $attr{$name}{inputs} ) && $attr{$name}{inputs} ne "" ) {
         my @inputs = split( ':', $attr{$name}{inputs} );
         $inputs_txt = "-," if ( $state ne "on" );
 
-        foreach (@inputs) {
-            if (m/[^,\s]+(,[^,\s]+)+/) {
-                my @input_names = split( ',', $_ );
-                $inputs_txt .= $input_names[1] . ",";
-                $input_names[1] =~ s/\s/_/g;
-                $hash->{helper}{receiver}{input_aliases}{ $input_names[0] } =
-                  $input_names[1];
-                $hash->{helper}{receiver}{input_names}{ $input_names[1] } =
-                  $input_names[0];
-            }
-            else {
-                $inputs_txt .= $_ . ",";
+        if (@inputs) {
+            foreach (@inputs) {
+                if (m/[^,\s]+(,[^,\s]+)+/) {
+                    my @input_names = split( ',', $_ );
+                    $inputs_txt .= $input_names[1] . ",";
+                    $input_names[1] =~ s/\s/_/g;
+                    $hash->{helper}{receiver}{input_aliases}{ $input_names[0] }
+                      = $input_names[1];
+                    $hash->{helper}{receiver}{input_names}{ $input_names[1] } =
+                      $input_names[0];
+                }
+                else {
+                    $inputs_txt .= $_ . ",";
+                }
             }
         }
 
@@ -664,6 +679,8 @@ sub ONKYO_AVR_Set($@) {
     RemoveInternalTimer($hash)
       if ( $a[1] ne "?" );
 
+    readingsBeginUpdate($hash);
+
     # statusRequest
     if ( $a[1] eq "statusRequest" ) {
         Log3 $name, 2, "ONKYO_AVR set $name " . $a[1];
@@ -694,7 +711,6 @@ sub ONKYO_AVR_Set($@) {
         else {
             $result = ONKYO_AVR_SendCommand( $hash, "power", "on" );
             if ( defined($result) ) {
-                readingsBeginUpdate($hash);
                 if ( !defined( $hash->{READINGS}{power}{VAL} )
                     || $hash->{READINGS}{power}{VAL} ne $result )
                 {
@@ -705,7 +721,6 @@ sub ONKYO_AVR_Set($@) {
                 {
                     readingsBulkUpdate( $hash, "state", $result );
                 }
-                readingsEndUpdate( $hash, 1 );
             }
             $interval = 2;
         }
@@ -722,7 +737,6 @@ sub ONKYO_AVR_Set($@) {
         else {
             $result = ONKYO_AVR_SendCommand( $hash, "power", "off" );
             if ( defined($result) ) {
-                readingsBeginUpdate($hash);
                 if ( !defined( $hash->{READINGS}{power}{VAL} )
                     || $hash->{READINGS}{power}{VAL} ne $result )
                 {
@@ -733,7 +747,6 @@ sub ONKYO_AVR_Set($@) {
                 {
                     readingsBulkUpdate( $hash, "state", $result );
                 }
-                readingsEndUpdate( $hash, 1 );
             }
             $interval = 2;
         }
@@ -770,7 +783,7 @@ sub ONKYO_AVR_Set($@) {
                     if ( !defined( $hash->{READINGS}{sleep}{VAL} )
                         || $hash->{READINGS}{sleep}{VAL} ne $result )
                     {
-                        readingsSingleUpdate( $hash, "sleep", $result, 1 );
+                        readingsBulkUpdate( $hash, "sleep", $result );
                     }
                 }
             }
@@ -804,7 +817,7 @@ sub ONKYO_AVR_Set($@) {
                 if ( !defined( $hash->{READINGS}{mute}{VAL} )
                     || $hash->{READINGS}{mute}{VAL} ne $result )
                 {
-                    readingsSingleUpdate( $hash, "mute", $result, 1 );
+                    readingsBulkUpdate( $hash, "mute", $result );
                 }
             }
         }
@@ -832,13 +845,13 @@ sub ONKYO_AVR_Set($@) {
                         if ( !defined( $hash->{READINGS}{volume}{VAL} )
                             || $hash->{READINGS}{volume}{VAL} ne $result )
                         {
-                            readingsSingleUpdate( $hash, "volume", $result, 1 );
+                            readingsBulkUpdate( $hash, "volume", $result );
                         }
 
                         if ( !defined( $hash->{READINGS}{mute}{VAL} )
                             || $hash->{READINGS}{mute}{VAL} eq "on" )
                         {
-                            readingsSingleUpdate( $hash, "mute", "off", 1 )
+                            readingsBulkUpdate( $hash, "mute", "off" )
 
                         }
                     }
@@ -871,7 +884,7 @@ sub ONKYO_AVR_Set($@) {
                 if ( !defined( $hash->{READINGS}{volume}{VAL} )
                     || $hash->{READINGS}{volume}{VAL} ne $result )
                 {
-                    readingsSingleUpdate( $hash, "volume", $result, 1 );
+                    readingsBulkUpdate( $hash, "volume", $result );
                 }
             }
         }
@@ -899,7 +912,7 @@ sub ONKYO_AVR_Set($@) {
                     if ( !defined( $hash->{READINGS}{input}{VAL} )
                         || $hash->{READINGS}{input}{VAL} ne $a[2] )
                     {
-                        readingsSingleUpdate( $hash, "input", $a[2], 1 );
+                        readingsBulkUpdate( $hash, "input", $a[2] );
                     }
                 }
             }
@@ -911,7 +924,7 @@ sub ONKYO_AVR_Set($@) {
     }
 
     # remoteControl
-    elsif ( $a[1] eq "remoteControl" ) {
+    elsif ( $a[1] eq "remoteControl" || $a[1] eq "remotecontrol" ) {
 
         # Reading commands for zone from HASH table
         my $commands = ONKYOdb::ONKYO_GetRemotecontrolCommand($zone);
@@ -1046,6 +1059,8 @@ sub ONKYO_AVR_Set($@) {
     else {
         $return = $usage;
     }
+
+    readingsEndUpdate( $hash, 1 );
 
     # Re-start internal timer
     InternalTimer( gettimeofday() + $interval, "ONKYO_AVR_GetStatus", $hash, 0 )
@@ -1202,26 +1217,21 @@ sub ONKYO_AVR_SendCommand($$$) {
 
     if ( defined($filehandle) && $cmd_raw ne "" && $value_raw ne "" ) {
         my $str = ONKYO_AVR_Pack( $cmd_raw . $value_raw, $protocol );
-        my $line;
 
         Log3 $name, 5,
           "ONKYO_AVR $name($zone): $address:$port snd "
           . ONKYO_AVR_hexdump($str);
+
         syswrite $filehandle, $str, length $str;
 
-        my $sel   = IO::Select->new($filehandle);
-        my $start = Time::HiRes::time;
-        my $last_read;
-        my $loop_time;
-        my $buf    = "";
-        my $readon = 1;
+        my $start_time = time();
+        my $readon     = 1;
         do {
-            $sel->can_read($timeout) or $readon = 0;
-            my $bytes = sysread( $filehandle, $buf, 65 * 1024, length($buf) );
-            die defined $bytes ? 'closed' : 'error: ' . $! unless ($bytes);
-            $last_read = Time::HiRes::time;
+            my $bytes = ONKYO_AVR_sysreadline( $filehandle, 1, $protocol );
 
-            $line = ONKYO_AVR_read( $hash, \$buf );
+            my $line = ONKYO_AVR_read( $hash, \$bytes )
+              if ( defined($bytes) && $bytes ne "" );
+
             $response_code = substr( $line, 0, 3 ) if defined($line);
 
             if ( defined($response_code)
@@ -1234,21 +1244,21 @@ sub ONKYO_AVR_SendCommand($$$) {
                 $response->{$response_code} = $line;
             }
 
-            $loop_time = $last_read - $start;
-            $readon = 0 if ( $loop_time ge $timeout );
+            $readon = 0 if time() > ( $start_time + $timeout );
         } while ($readon);
 
         # Close socket connections
-        $sel->remove($filehandle);
         $filehandle->close();
     }
+
+    readingsBeginUpdate($hash);
 
     unless ( defined($response) ) {
         if ( defined( $hash->{helper}{AVAILABLE} )
             and $hash->{helper}{AVAILABLE} eq 1 )
         {
             Log3 $name, 3, "ONKYO_AVR device $name is unavailable";
-            readingsSingleUpdate( $hash, "presence", "absent", 1 );
+            readingsBulkUpdate( $hash, "presence", "absent" );
         }
         $hash->{helper}{AVAILABLE} = 0;
     }
@@ -1257,7 +1267,7 @@ sub ONKYO_AVR_SendCommand($$$) {
             and $hash->{helper}{AVAILABLE} eq 0 )
         {
             Log3 $name, 3, "ONKYO_AVR device $name is available";
-            readingsSingleUpdate( $hash, "presence", "present", 1 );
+            readingsBulkUpdate( $hash, "presence", "present" );
         }
         $hash->{helper}{AVAILABLE} = 1;
 
@@ -1347,7 +1357,54 @@ sub ONKYO_AVR_SendCommand($$$) {
         return $return;
     }
 
+    readingsEndUpdate( $hash, 1 );
+
     return undef;
+}
+
+###################################
+sub ONKYO_AVR_sysreadline($;$$) {
+    my ( $handle, $timeout, $protocol ) = @_;
+    $handle = qualify_to_ref( $handle, caller() );
+    my $infinitely_patient = ( @_ == 1 || $timeout < 0 );
+    my $start_time         = time();
+    my $selector           = IO::Select->new();
+    $selector->add($handle);
+    my $line = "";
+  SLEEP:
+
+    until ( ONKYO_AVR_at_eol( $line, $protocol ) ) {
+        unless ($infinitely_patient) {
+            return $line if time() > ( $start_time + $timeout );
+        }
+
+        # sleep only 1 second before checking again
+        next SLEEP unless $selector->can_read(1.0);
+      INPUT_READY:
+        while ( $selector->can_read(0.0) ) {
+            my $was_blocking = $handle->blocking(0);
+          CHAR: while ( sysread( $handle, my $nextbyte, 1 ) ) {
+                $line .= $nextbyte;
+                last CHAR if $nextbyte eq "\n";
+            }
+            $handle->blocking($was_blocking);
+
+            # if incomplete line, keep trying
+            next SLEEP unless ONKYO_AVR_at_eol( $line, $protocol );
+            last INPUT_READY;
+        }
+    }
+    return $line;
+}
+
+###################################
+sub ONKYO_AVR_at_eol($;$) {
+    if ( defined( $_[1] ) && $_[1] eq "pre2013" ) {
+        $_[0] =~ /\r\z/;
+    }
+    else {
+        $_[0] =~ /\r\n\z/;
+    }
 }
 
 ###################################
