@@ -437,6 +437,11 @@ readingsGroup_detailFn()
 {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
 
+  my $hash = $defs{$d};
+
+  Log3 $hash->{NAME}, 5, "opened: $FW_cname";
+  $hash->{helper}->{myDisplay}->{$FW_cname} = 1;
+
   return readingsGroup_2html($d);
 }
 
@@ -456,6 +461,30 @@ readingsGroup_Notify($$)
   }
 
   return if( AttrVal($name,"disable", 0) > 0 );
+
+  if( !defined($hash->{helper}{myDisplay})
+      || !%{$hash->{helper}{myDisplay}} ) {
+    Log3 $name, 5, "$name: not on any display, ignoring notify";
+    return undef;
+  } else {
+    foreach my $display ( keys %{$hash->{helper}{myDisplay}} ) {
+      if( defined($defs{$display}) ) {
+        my $filter = $defs{$display}->{inform};
+        my $rn = AttrVal($name, "room", "");
+        if($filter eq "all" || $rn =~ m/\b$filter\b/) {
+          Log3 $name, 5, "$name: do update";
+        } else {
+          Log3 $name, 5, "$name: $display is not my room, ignoring notify";
+          delete( $hash->{helper}{myDisplay}{$display} );
+          return undef;
+        }
+      } else {
+        Log3 $name, 5, "$name: $display is closed, ignoring notify";
+        delete( $hash->{helper}{myDisplay}{$display} );
+        return undef;
+      }
+    }
+  }
 
   return if($dev->{TYPE} eq $hash->{TYPE});
   #return if($dev->{NAME} eq $name);
