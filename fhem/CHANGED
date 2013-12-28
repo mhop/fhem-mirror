@@ -1,7 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
-  - feature: readingsGroup: process events only if visible in browser
+  - feature: readingsGroup: process events only if visible in browser,
+                            allow <br> for line breaks in multi-reading lines
   - feature: FLOORPLAN: Style4 (S300TH specific) now keeps its formatting
              even with longpoll; Text "desiredTemperature" will now 
              be eliminated - for MAX devices.
