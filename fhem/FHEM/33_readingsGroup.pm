@@ -324,7 +324,12 @@ readingsGroup_2html($)
 
         my $name_style = lookup2($name_style,$name,$1,undef);
 
-        if( $first || $multi == 1 ) {
+        if( $txt eq 'br' ) {
+          $ret .= sprintf("<tr class=\"%s\">", ($row-1&1)?"odd":"even");
+          $ret .= "<td><div $name_style class=\"dname\"></div></td>";
+          $first = 0;
+          next;
+        } elsif( $first || $multi == 1 ) {
           $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
           $row++;
 
@@ -698,8 +703,8 @@ readingsGroup_Get($@)
       <li>If regex starts with a '+' it will be matched against the internal values of the device instead of the readings.</li>
       <li>If regex starts with a '?' it will be matched against the attributes of the device instead of the readings.</li>
       <li>regex can be of the form &lt;STRING&gt; or &lt;{perl}[#readings]&gt; where STRING or the string returned by perl is
-          inserted as the reading. skipped if STRING is undef. if readings is given the perl expression will be reevaluated
-          during longpoll updates.</li>
+          inserted as the reading. skipped if STRING is undef. if STRING is br a new line will be started. if readings is
+          given the perl expression will be reevaluated during longpoll updates.</li>
       <li>For internal values and attributes longpoll update is not possible. Refresh the page to update the values.</li>
       <li>the &lt;{perl}&gt; expression is limited to expressions without a space. it is best just to call a small sub
           in 99_myUtils.pm instead of having a compex expression in the define.</li>
