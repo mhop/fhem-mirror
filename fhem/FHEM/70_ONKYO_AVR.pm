@@ -26,7 +26,7 @@
 #
 # Version: 1.0.0
 #
-# Version History:
+# Major Version History:
 # - 1.0.0 - 2013-12-16
 # -- First release
 #
@@ -60,8 +60,6 @@ sub ONKYO_AVR_Initialize($) {
 
     Log3 $hash, 5, "ONKYO_AVR_Initialize: Entering";
 
-    require "$attr{global}{modpath}/FHEM/DevIo.pm";
-
     $hash->{GetFn}   = "ONKYO_AVR_Get";
     $hash->{SetFn}   = "ONKYO_AVR_Set";
     $hash->{DefFn}   = "ONKYO_AVR_Define";
@@ -82,7 +80,7 @@ sub ONKYO_AVR_GetStatus($;$) {
     my $name     = $hash->{NAME};
     my $interval = $hash->{INTERVAL};
     my $zone     = $hash->{ZONE};
-    my $protocol = $hash->{PROTOCOL};
+    my $protocol = $hash->{READINGS}{deviceyear}{VAL};
     my $state    = '';
     my $reading;
     my $states;
@@ -202,7 +200,9 @@ sub ONKYO_AVR_GetStatus($;$) {
             }
         }
         else {
-            $hash->{helper}{receiver} = 0;
+          Log3 $name, 4, "ONKYO_AVR $name: net-receiver-information command unsupported, this must be a pre2013 device! Implicit fallback to protocol version pre2013.";
+          $hash->{helper}{receiver} = 0;
+          readingsBulkUpdate( $hash, "deviceyear", "pre2013");
         }
 
         # Input alias handling
@@ -1076,10 +1076,6 @@ sub ONKYO_AVR_Define($$) {
     my $port = 60128;
     $hash->{helper}{PORT} = $port;
 
-    # protocol version
-    my $protocol = $a[3] || 2013;
-    $hash->{PROTOCOL} = $protocol;
-
     # used zone to control
     my $zone = $a[4] || "main";
     $hash->{ZONE} = $zone;
@@ -1096,10 +1092,14 @@ sub ONKYO_AVR_Define($$) {
     }
     $hash->{INTERVAL} = $interval;
 
-    # check values
+    # protocol version
+    my $protocol = $a[3] || 2013;
     if ( !( $protocol =~ /^(2013|pre2013)$/ ) ) {
         return "Invalid protocol, choose one of 2013 pre2013";
     }
+    readingsSingleUpdate( $hash, "deviceyear", $protocol, 1 );
+
+    # check values
     if ( !( $zone =~ /^(main|zone2|zone3|zone4|dock)$/ ) ) {
         return "Invalid zone, choose one of main zone2 zone3 zone4 dock";
     }
@@ -1140,7 +1140,7 @@ sub ONKYO_AVR_SendCommand($$$) {
     my $name     = $hash->{NAME};
     my $address  = $hash->{helper}{ADDRESS};
     my $port     = $hash->{helper}{PORT};
-    my $protocol = $hash->{PROTOCOL};
+    my $protocol = $hash->{READINGS}{deviceyear}{VAL};
     my $zone     = $hash->{ZONE};
     my $timeout  = 3;
     my $response;
