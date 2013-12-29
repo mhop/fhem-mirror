@@ -147,6 +147,12 @@ CustomGetFileFromURL($$@)
   my @header= split("\r\n", $1);
   my @header0= split(" ", shift @header);
   my $code= $header0[1];
+
+  if(!defined($code) || $code eq "") {
+    Log3 undef, $loglevel,
+           "CustomGetFileFromURL $displayurl: empty answer received";
+    return undef;
+  }
   Log3 undef, $loglevel,
        "CustomGetFileFromURL $displayurl: HTTP Response code $code";
 
