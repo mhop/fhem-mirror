@@ -83,15 +83,21 @@ FW_longpoll()
   FW_curLine = 0;
 
   FW_pollConn = new XMLHttpRequest();
-  var room="room=all";
-  var embArr = document.getElementsByTagName("embed");
-  if(embArr.length == 0) {      // SVG image content is not room dependent
+
+  var room="", embArr = document.getElementsByTagName("embed");
+  for(var i = 0; i < embArr.length; i++) {
+    var svg = embArr[i].getSVGDocument();
+    if(svg != null && svg.firstChild.nextSibling.getAttribute("flog"))
+      room="room=all";
+  }
+  if(room == "") {
     var sa = document.location.search.substring(1).split("&");
     for(var i = 0; i < sa.length; i++) {
       if(sa[i].substring(0,5) == "room=")
         room=sa[i];
     }
   }
+
   // Needed when using multiple FF windows
   var timestamp = "&timestamp="+new Date().getTime();
   var query = document.location.pathname+"?"+room+"&XHR=1&inform=1"+timestamp;

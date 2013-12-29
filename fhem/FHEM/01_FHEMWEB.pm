@@ -1960,6 +1960,7 @@ FW_roomStatesForInform($)
   my ($room) = @_;
   return "" if(!$room);
 
+  $room = ".*" if($room eq "all");
   my @rl = devspec2array("room=$room");
   my %extPage = ();
   my @data;
