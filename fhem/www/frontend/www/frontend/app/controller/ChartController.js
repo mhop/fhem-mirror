@@ -297,9 +297,7 @@ Ext.define('FHEM.controller.ChartController', {
             //getting the necessary values
             var devices = Ext.ComponentQuery.query('combobox[name=devicecombo]'),
                 yaxes = Ext.ComponentQuery.query('combobox[name=yaxiscombo]'),
-                yaxescolorcombos = Ext.ComponentQuery.query('combobox[name=yaxiscolorcombo]'),
-                yaxesfillchecks = Ext.ComponentQuery.query('checkbox[name=yaxisfillcheck]'),
-                yaxesstepcheck = Ext.ComponentQuery.query('checkbox[name=yaxisstepcheck]'),
+                rowFieldSets = Ext.ComponentQuery.query('fieldset[commonName=singlerowfieldset]'),
                 yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]'),
                 axissideradio = Ext.ComponentQuery.query('radiogroup[name=axisside]');
             
@@ -434,9 +432,7 @@ Ext.define('FHEM.controller.ChartController', {
             Ext.each(yaxes, function(y) {
                 var device = devices[i].getValue(),
                     yaxis = yaxes[i].getValue(),
-                    yaxiscolorcombo = yaxescolorcombos[i].getValue(),
-                    yaxisfillcheck = yaxesfillchecks[i].checked,
-                    yaxisstepcheck = yaxesstepcheck[i].checked,
+                    styleConfig = rowFieldSets[i].styleConfig,
                     yaxisstatistics = yaxesstatistics[i].getValue(),
                     axisside = axissideradio[i].getChecked()[0].getSubmitValue(),
                     logtype = axissideradio[i].up().down("radiogroup[name=datasourceradio]").getChecked()[0].inputValue;
@@ -444,8 +440,7 @@ Ext.define('FHEM.controller.ChartController', {
                     yaxis = yaxes[i].getRawValue();
                 }
                 
-                me.populateAxis(i, yaxes.length, device, yaxis, yaxiscolorcombo, yaxisfillcheck,
-                                yaxisstepcheck, axisside, yaxisstatistics, dbstarttime, dbendtime, logtype);
+                me.populateAxis(i, yaxes.length, device, yaxis, styleConfig, axisside, yaxisstatistics, dbstarttime, dbendtime, logtype);
                 i++;
             });
             
@@ -814,7 +809,7 @@ Ext.define('FHEM.controller.ChartController', {
     /**
      * fill the axes with data
      */
-    populateAxis: function(i, axeslength, device, yaxis, yaxiscolorcombo, yaxisfillcheck, yaxisstepcheck, axisside, yaxisstatistics, dbstarttime, dbendtime, logtype) {
+    populateAxis: function(i, axeslength, device, yaxis, styleConfig, axisside, yaxisstatistics, dbstarttime, dbendtime, logtype) {
         
         var me = this,
             chart = me.getChart(),
@@ -825,9 +820,9 @@ Ext.define('FHEM.controller.ChartController', {
             generalizationfactor = Ext.ComponentQuery.query('combobox[name=genfactor]')[0].getValue();
         
         if (i > 0) {
-            yseries = me.createSeries('VALUE' + (i + 1), device + " - " + yaxis, yaxisfillcheck, yaxiscolorcombo, axisside);
+            yseries = me.createSeries('VALUE' + (i + 1), device + " - " + yaxis, styleConfig, axisside);
         } else {
-            yseries = me.createSeries('VALUE', device + " - " + yaxis, yaxisfillcheck, yaxiscolorcombo, axisside);
+            yseries = me.createSeries('VALUE', device + " - " + yaxis, styleConfig, axisside);
         }
         
         var url;
@@ -896,8 +891,6 @@ Ext.define('FHEM.controller.ChartController', {
                       Ext.each(responseArr, function(row) {
                           // the first column is always the timestamp, followed by device and key:value
                           var timestamp = row.split(" ")[0].replace("_", " "),
-                              //keyindex = row.split(": ")[0].split(" ").length - 1,
-                              //key = row.split(": ")[0].split(" ")[keyindex],
                               val = row.split(" ")[1];
                           
                           if (timestamp && val) {
@@ -1021,7 +1014,7 @@ Ext.define('FHEM.controller.ChartController', {
                       //if yes, create a new record with the same value as the last one
                       //and a timestamp 1 millisecond less than the actual record to add.
                       //only do this, when last record is from same axis
-                      if(yaxisstepcheck) {
+                      if(styleConfig.yaxisstepcheck === "true" || styleConfig.yaxisstepcheck === true) {
                           if (store.last() && !Ext.isEmpty(store.last().get(valuetext)) && store.last().get(valuetext) !== "") {
                               var lastrec = store.last();
                               var datetomodify = Ext.Date.parse(json.data[j].TIMESTAMP, "Y-m-d H:i:s");
@@ -1219,7 +1212,7 @@ Ext.define('FHEM.controller.ChartController', {
     /**
      * create a single series for the chart
      */
-    createSeries: function(yfield, title, fill, color, axisside) {
+    createSeries: function(yfield, title, styleConfig, axisside) {
         
         //setting axistitle and fontsize
         var chart = this.getChart(),
@@ -1265,27 +1258,27 @@ Ext.define('FHEM.controller.ChartController', {
                 xField : 'TIMESTAMP',
                 yField : yfield,
                 title: title,
-                showInLegend: true,
-                smooth: 0,
+                showInLegend: (styleConfig.yaxislegendcheck === "false" || styleConfig.yaxislegendcheck === false) ? false : true,
+                smooth: (styleConfig.yaxisstepcheck === "true" || styleConfig.yaxisstepcheck === true)? 0 : styleConfig.yaxissmoothing,
                 highlight: {
                     size: 5,
                     radius: 5
                 },
-                fill: fill,
+                fill: (styleConfig.yaxisfillcheck === "false" || styleConfig.yaxisfillcheck === false) ? false : true,
                 style: {
-                    fill: color,
+                    fill: '#' + styleConfig.fillcolorhexcode,
 //                    fill: 'url(#gradientId)',
-                    opacity: 0.7,
-                    stroke: '#808080',
-                    'stroke-width': 2
+                    opacity: styleConfig.fillopacity,
+                    stroke: '#' + styleConfig.linecolorhexcode,
+                    'stroke-width': styleConfig.linestrokewidth
                 },
                 markerConfig: {
-                    type: 'circle',
-                    radius: 2,
-                    stroke: color,
-                    fill: color
+                    type: styleConfig.pointshape,
+                    radius: styleConfig.pointradius,
+                    stroke: '#' + styleConfig.pointcolorhexcode,
+                    fill: '#' + styleConfig.pointcolorhexcode
                 },
-                showMarkers: true,
+                showMarkers: (styleConfig.yaxisshowpoints === "false" || styleConfig.yaxisshowpoints === false) ? false : true,
                 selectionTolerance: 5,
                 tips : {
                     trackMouse : true,
@@ -1450,21 +1443,19 @@ Ext.define('FHEM.controller.ChartController', {
                 savename = savename.replace(/\+/g, "_");
                 
                 //getting the necessary values
-                var logtypes = Ext.ComponentQuery.query('radiogroup[name=datasourceradio]');
-                var devices = Ext.ComponentQuery.query('combobox[name=devicecombo]');
-                var yaxes = Ext.ComponentQuery.query('combobox[name=yaxiscombo]');
-                var yaxescolorcombos = Ext.ComponentQuery.query('combobox[name=yaxiscolorcombo]');
-                var yaxesfillchecks = Ext.ComponentQuery.query('checkbox[name=yaxisfillcheck]');
-                var yaxesstepchecks = Ext.ComponentQuery.query('checkbox[name=yaxisstepcheck]');
-                var axissideradio = Ext.ComponentQuery.query('radiogroup[name=axisside]');
-                var yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]');
+                var logtypes = Ext.ComponentQuery.query('radiogroup[name=datasourceradio]'),
+                    devices = Ext.ComponentQuery.query('combobox[name=devicecombo]'),
+                    yaxes = Ext.ComponentQuery.query('combobox[name=yaxiscombo]'),
+                    rowFieldSets = Ext.ComponentQuery.query('fieldset[commonName=singlerowfieldset]'),
+                    axissideradio = Ext.ComponentQuery.query('radiogroup[name=axisside]'),
+                    yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]'),
                 
-                var basesstart = Ext.ComponentQuery.query('numberfield[name=basestart]');
-                var basesend = Ext.ComponentQuery.query('numberfield[name=baseend]');
-                var basescolors = Ext.ComponentQuery.query('combobox[name=baselinecolorcombo]');
-                var basesfills = Ext.ComponentQuery.query('checkboxfield[name=baselinefillcheck]');
+                    basesstart = Ext.ComponentQuery.query('numberfield[name=basestart]'),
+                    basesend = Ext.ComponentQuery.query('numberfield[name=baseend]'),
+                    basescolors = Ext.ComponentQuery.query('combobox[name=baselinecolorcombo]'),
+                    basesfills = Ext.ComponentQuery.query('checkboxfield[name=baselinefillcheck]'),
                     
-                var starttime = me.getStarttimepicker().getValue(),
+                    starttime = me.getStarttimepicker().getValue(),
                     dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s'),
                     endtime = me.getEndtimepicker().getValue(),
                     dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s'),
@@ -1493,9 +1484,18 @@ Ext.define('FHEM.controller.ChartController', {
                     var logtype = logtypes[i].getChecked()[0].inputValue,
                         device = dev.getValue(),
                         yaxis = yaxes[i].getValue(),
-                        yaxiscolorcombo = yaxescolorcombos[i].getDisplayValue(),
-                        yaxisfillcheck = yaxesfillchecks[i].checked,
-                        yaxisstepcheck = yaxesstepchecks[i].checked,
+                        linestrokewidth = rowFieldSets[i].styleConfig.linestrokewidth,
+                        linecolorhexcode = rowFieldSets[i].styleConfig.linecolorhexcode.toString(),
+                        fillopacity = rowFieldSets[i].styleConfig.fillopacity,
+                        fillcolorhexcode = rowFieldSets[i].styleConfig.fillcolorhexcode,
+                        yaxisshowpoints = rowFieldSets[i].styleConfig.yaxisshowpoints,
+                        pointshape = rowFieldSets[i].styleConfig.pointshape,
+                        pointradius = rowFieldSets[i].styleConfig.pointradius,
+                        yaxissmoothing = rowFieldSets[i].styleConfig.yaxissmoothing,
+                        yaxislegendcheck = rowFieldSets[i].styleConfig.yaxislegendcheck,
+                        pointcolorhexcode = rowFieldSets[i].styleConfig.pointcolorhexcode,
+                        yaxisfillcheck = rowFieldSets[i].styleConfig.yaxisfillcheck,
+                        yaxisstepcheck = rowFieldSets[i].styleConfig.yaxisstepcheck,
                         yaxisstatistics = yaxesstatistics[i].getValue(),
                         axisside = axissideradio[i].getChecked()[0].getSubmitValue(),
                         rightaxistitle = me.getChartformpanel().down('textfield[name=rightaxistitle]').getValue(),
@@ -1506,11 +1506,20 @@ Ext.define('FHEM.controller.ChartController', {
                     //replacing + in title
                     rightaxistitle = rightaxistitle.replace(/\+/g, "_");
                     leftaxistitle = leftaxistitle.replace(/\+/g, "_");
-                    
                     if (i === 0) {
                         jsonConfig += '"y":"' + yaxis + '","device":"' + device + '",';
                         jsonConfig += '"logtype":"' + logtype + '",';
-                        jsonConfig += '"yaxiscolorcombo":"' + yaxiscolorcombo + '","yaxisfillcheck":"' + yaxisfillcheck + '",';
+                        jsonConfig += '"linestrokewidth":"' + linestrokewidth + '",';
+                        jsonConfig += '"linecolorhexcode":"' + linecolorhexcode + '",';
+                        jsonConfig += '"fillopacity":"' + fillopacity + '",';
+                        jsonConfig += '"fillcolorhexcode":"' + fillcolorhexcode + '",';
+                        jsonConfig += '"yaxisshowpoints":"' + yaxisshowpoints + '",';
+                        jsonConfig += '"pointshape":"' + pointshape + '",';
+                        jsonConfig += '"pointradius":"' + pointradius + '",';
+                        jsonConfig += '"yaxissmoothing":"' + yaxissmoothing + '",';
+                        jsonConfig += '"yaxislegendcheck":"' + yaxislegendcheck + '",';
+                        jsonConfig += '"pointcolorhexcode":"' + pointcolorhexcode + '",';
+                        jsonConfig += '"yaxisfillcheck":"' + yaxisfillcheck + '",';
                         jsonConfig += '"yaxisstepcheck":"' + yaxisstepcheck + '",';
                         jsonConfig += '"yaxisside":"' + axisside + '",';
                         jsonConfig += '"leftaxistitle":"' + leftaxistitle + '",';
@@ -1523,16 +1532,26 @@ Ext.define('FHEM.controller.ChartController', {
                         var logtypename = "y" + (i + 1) + "logtype",
                             axisname = "y" + (i + 1) + "axis",
                             devicename = "y" + (i + 1) + "device",
-                            colorname = "y" + (i + 1) + "axiscolorcombo",
-                            fillname = "y" + (i + 1) + "axisfillcheck",
-                            stepname = "y" + (i + 1) + "axisstepcheck",
                             sidename = "y" + (i + 1) + "axisside",
-                            statsname = "y" + (i + 1) + "axisstatistics";
+                            statsname = "y" + (i + 1) + "axisstatistics",
+                            prefix = "y" + (i + 1);
                         
                         jsonConfig += '"' + axisname + '":"' + yaxis + '","' + devicename + '":"' + device + '",';
                         jsonConfig += '"' + logtypename + '":"' + logtype + '",';
-                        jsonConfig += '"' + colorname + '":"' + yaxiscolorcombo + '","' + fillname + '":"' + yaxisfillcheck + '",';
-                        jsonConfig += '"' + stepname + '":"' + yaxisstepcheck + '",';
+                        
+                        jsonConfig += '"' + prefix + 'linestrokewidth' + '":"' + linestrokewidth + '",';
+                        jsonConfig += '"' + prefix + 'linecolorhexcode' + '":"' + linecolorhexcode + '",';
+                        jsonConfig += '"' + prefix + 'fillopacity' + '":"' + fillopacity + '",';
+                        jsonConfig += '"' + prefix + 'fillcolorhexcode' + '":"' + fillcolorhexcode + '",';
+                        jsonConfig += '"' + prefix + 'yaxisshowpoints' + '":"' + yaxisshowpoints + '",';
+                        jsonConfig += '"' + prefix + 'pointshape' + '":"' + pointshape + '",';
+                        jsonConfig += '"' + prefix + 'pointradius' + '":"' + pointradius + '",';
+                        jsonConfig += '"' + prefix + 'yaxissmoothing' + '":"' + yaxissmoothing + '",';
+                        jsonConfig += '"' + prefix + 'yaxislegendcheck' + '":"' + yaxislegendcheck + '",';
+                        jsonConfig += '"' + prefix + 'pointcolorhexcode' + '":"' + pointcolorhexcode + '",';
+                        jsonConfig += '"' + prefix + 'axisfillcheck' + '":"' + yaxisfillcheck + '",';
+                        jsonConfig += '"' + prefix + 'axisstepcheck' + '":"' + yaxisstepcheck + '",';
+                        
                         jsonConfig += '"' + sidename + '":"' + axisside + '",';
                         if (yaxisstatistics !== "none") {
                             jsonConfig += '"' + statsname + '":"' + yaxisstatistics + '",';
@@ -1760,19 +1779,30 @@ Ext.define('FHEM.controller.ChartController', {
                     yaxeslength++;
                 }
                 
-                var logtypes = Ext.ComponentQuery.query('radiogroup[name=datasourceradio]');
-                var devices = Ext.ComponentQuery.query('combobox[name=devicecombo]');
-                var yaxes = Ext.ComponentQuery.query('combobox[name=yaxiscombo]');
-                var yaxescolorcombos = Ext.ComponentQuery.query('combobox[name=yaxiscolorcombo]');
-                var yaxesfillchecks = Ext.ComponentQuery.query('checkbox[name=yaxisfillcheck]');
-                var yaxesstepchecks = Ext.ComponentQuery.query('checkbox[name=yaxisstepcheck]');
-                var axissideradio = Ext.ComponentQuery.query('radiogroup[name=axisside]');
-                var yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]');
-                var logtypename;
+                var logtypes = Ext.ComponentQuery.query('radiogroup[name=datasourceradio]'),
+                    devices = Ext.ComponentQuery.query('combobox[name=devicecombo]'),
+                    yaxes = Ext.ComponentQuery.query('combobox[name=yaxiscombo]'),
+                    rowFieldSets = Ext.ComponentQuery.query('fieldset[commonName=singlerowfieldset]'),
+                    axissideradio = Ext.ComponentQuery.query('radiogroup[name=axisside]'),
+                    yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]'),
+                    oldColorArray = ['Blue', 'Green', 'Orange', 'Yellow', 'Red'],
+                    logtypename;
                 
                 var i = 0;
                 Ext.each(yaxes, function(yaxis) {
                     
+                    // cleanup old colorvalues from old chartconfigs
+                    if (chartdata.yaxiscolorcombo === "Blue") {
+                        chartdata.yaxiscolorcombo = "3366FF";
+                    } else if (chartdata.yaxiscolorcombo === "Green") {
+                        chartdata.yaxiscolorcombo = "00FF00";
+                    } else if (chartdata.yaxiscolorcombo === "Orange") {
+                        chartdata.yaxiscolorcombo = "FF6600";
+                    } else if (chartdata.yaxiscolorcombo === "Yellow") {
+                        chartdata.yaxiscolorcombo = "FFFF00";
+                    } else if (chartdata.yaxiscolorcombo === "Red") {
+                        chartdata.yaxiscolorcombo = "FF0000";
+                    }
                     if (i === 0) {
                         logtypename = logtypes[i].getChecked()[0].name;
                         eval('logtypes[i].setValue({' + logtypename + ': "' + chartdata.logtype + '"})');
@@ -1780,9 +1810,19 @@ Ext.define('FHEM.controller.ChartController', {
                         yaxes[i].getStore().getProxy().url = url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+' + chartdata.device + '+getreadings&XHR=1';
                         yaxes[i].setDisabled(false);
                         yaxes[i].setValue(chartdata.y);
-                        yaxescolorcombos[i].setValue(chartdata.yaxiscolorcombo);
-                        yaxesfillchecks[i].setValue(chartdata.yaxisfillcheck);
-                        yaxesstepchecks[i].setValue(chartdata.yaxisstepcheck);
+                        rowFieldSets[i].styleConfig.linestrokewidth = chartdata.linestrokewidth || 2;
+                        rowFieldSets[i].styleConfig.linecolorhexcode = chartdata.linecolorhexcode || '000000';
+                        rowFieldSets[i].styleConfig.fillopacity = chartdata.fillopacity || 0.5;
+                        rowFieldSets[i].styleConfig.fillcolorhexcode = chartdata.fillcolorhexcode || chartdata.yaxiscolorcombo || 'FF0000';
+                        rowFieldSets[i].styleConfig.yaxisshowpoints = chartdata.yaxisshowpoints || true;
+                        rowFieldSets[i].styleConfig.pointshape = chartdata.pointshape || 'circle';
+                        rowFieldSets[i].styleConfig.pointradius = chartdata.pointradius || 2;
+                        rowFieldSets[i].styleConfig.yaxissmoothing = chartdata.yaxissmoothing || 3;
+                        rowFieldSets[i].styleConfig.yaxislegendcheck = chartdata.yaxislegendcheck || true;
+                        rowFieldSets[i].styleConfig.pointcolorhexcode = chartdata.pointcolorhexcode || chartdata.yaxiscolorcombo || 'FF0000';
+                        rowFieldSets[i].styleConfig.yaxisfillcheck = chartdata.yaxisfillcheck || false;
+                        rowFieldSets[i].styleConfig.yaxisstepcheck = chartdata.yaxisstepcheck || false;
+          
                         axissideradio[i].items.items[0].setValue(chartdata.yaxisside);
                         
                         if (chartdata.yaxisstatistics && chartdata.yaxisstatistics !== "") {
@@ -1792,23 +1832,44 @@ Ext.define('FHEM.controller.ChartController', {
                         }
                         i++;
                     } else {
-                            logtypename = logtypes[i].getChecked()[0].name,
-                            logtype = "y" + (i + 1) + "logtype",
-                            axisdevice = "y" + (i + 1) + "device",
-                            axisname = "y" + (i + 1) + "axis",
-                            axiscolorcombo = axisname + "colorcombo",
-                            axisfillcheck = axisname + "fillcheck",
-                            axisstepcheck = axisname + "stepcheck",
-                            axisside = axisname + "side",
-                            axisstatistics = axisname + "statistics";
+                        logtypename = logtypes[i].getChecked()[0].name,
+                        logtype = "y" + (i + 1) + "logtype",
+                        axisdevice = "y" + (i + 1) + "device",
+                        axisname = "y" + (i + 1) + "axis",
+                        axisside = axisname + "side",
+                        axisstatistics = axisname + "statistics",
+                        prefix = "y" + (i + 1),
+                        oldcolorcombo = eval('chartdata.' + prefix + 'axiscolorcombo');
+                            
+                         // cleanup old colorvalues from old chartconfigs
+                        if (oldcolorcombo === "Blue") {
+                            oldcolorcombo = "3366FF";
+                        } else if (oldcolorcombo === "Green") {
+                            oldcolorcombo = "00FF00";
+                        } else if (oldcolorcombo === "Orange") {
+                            oldcolorcombo = "FF6600";
+                        } else if (oldcolorcombo === "Yellow") {
+                            oldcolorcombo = "FFFF00";
+                        } else if (oldcolorcombo === "Red") {
+                            oldcolorcombo = "FF0000";
+                        }
                         eval('logtypes[i].setValue({' + logtypename + ' : chartdata.' + logtype + '})');
                         eval('devices[i].setValue(chartdata.' + axisdevice + ')');
                         yaxes[i].getStore().getProxy().url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+' + eval('chartdata.' + axisdevice) + '+getreadings&XHR=1';
                         yaxes[i].setDisabled(false);
                         eval('yaxes[i].setValue(chartdata.' + axisname + ')');
-                        eval('yaxescolorcombos[i].setValue(chartdata.' + axiscolorcombo + ')');
-                        eval('yaxesfillchecks[i].setValue(chartdata.' + axisfillcheck + ')');
-                        eval('yaxesstepchecks[i].setValue(chartdata.' + axisstepcheck + ')');
+                        rowFieldSets[i].styleConfig.linestrokewidth = eval('chartdata.' + prefix + 'linestrokewidth') || 2;
+                        rowFieldSets[i].styleConfig.linecolorhexcode = eval('chartdata.' + prefix + 'linecolorhexcode') || '000000';
+                        rowFieldSets[i].styleConfig.fillopacity = eval('chartdata.' + prefix + 'fillopacity') || 0.5;
+                        rowFieldSets[i].styleConfig.fillcolorhexcode = eval('chartdata.' + prefix + 'fillcolorhexcode') || oldcolorcombo || 'FF0000';
+                        rowFieldSets[i].styleConfig.yaxisshowpoints = eval('chartdata.' + prefix + 'yaxisshowpoints') || true;
+                        rowFieldSets[i].styleConfig.pointshape = eval('chartdata.' + prefix + 'pointshape') || 'circle';
+                        rowFieldSets[i].styleConfig.pointradius = eval('chartdata.' + prefix + 'pointradius') || 2;
+                        rowFieldSets[i].styleConfig.yaxissmoothing = eval('chartdata.' + prefix + 'yaxissmoothing') || 3;
+                        rowFieldSets[i].styleConfig.yaxislegendcheck = eval('chartdata.' + prefix + 'yaxislegendcheck') || true;
+                        rowFieldSets[i].styleConfig.pointcolorhexcode = eval('chartdata.' + prefix + 'pointcolorhexcode') || oldcolorcombo || 'FF0000';
+                        rowFieldSets[i].styleConfig.yaxisfillcheck = eval('chartdata.' + prefix + 'axisfillcheck') || false;
+                        rowFieldSets[i].styleConfig.yaxisstepcheck = eval('chartdata.' + prefix + 'axisstepcheck') || false;
                         eval('axissideradio[i].items.items[0].setValue(chartdata.' + axisside + ')');
                         
                         if (eval('chartdata.' + axisstatistics) && eval('chartdata.' + axisstatistics) !== "") {
@@ -2104,11 +2165,6 @@ Ext.define('FHEM.controller.ChartController', {
                     column = { 
                         header: key,
                         dataIndex: key, 
-//                        xtype: 'numbercolumn',
-//                        format:'0.000',
-//                        renderer: function(value){
-//                            return parseFloat(value, 10);
-//                        },
                         width: columnwidth
                     };
                 } else {
