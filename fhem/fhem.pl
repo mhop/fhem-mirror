@@ -462,10 +462,12 @@ while (1) {
 
   foreach my $p (keys %selectlist) {
     my $hash = $selectlist{$p};
-    vec($rin, $hash->{FD}, 1) = 1
-        if(defined($hash->{FD}));
-    vec($win, $hash->{FD}, 1) = 1
-        if(defined($hash->{FD}) && defined($hash->{$wbName}));
+    if(defined($hash->{FD})) {
+      vec($rin, $hash->{FD}, 1) = 1
+        if(!defined($hash->{directWriteFn}));
+      vec($win, $hash->{FD}, 1) = 1
+        if(defined($hash->{directWriteFn}) || defined($hash->{$wbName}));
+    }
     vec($ein, $hash->{EXCEPT_FD}, 1) = 1
         if(defined($hash->{"EXCEPT_FD"}));
   }
@@ -511,23 +513,36 @@ while (1) {
   # attached again.
   foreach my $p (keys %selectlist) {
     my $hash = $selectlist{$p};
-    next if(!$hash || !$hash->{NAME} || !$defs{$hash->{NAME}}); # due to delete
+    my $isDev = ($hash && $hash->{NAME} && $defs{$hash->{NAME}});
+    my $isDirect = ($hash && ($hash->{directReadFn} || $hash->{directWriteFn}));
+    next if(!$isDev && !$isDirect);
 
-    CallFn($hash->{NAME}, "ReadFn", $hash)
-      if(defined($hash->{FD}) && vec($rout, $hash->{FD}, 1));
-
-
-    my $wb = $hash->{$wbName};
-    if(defined($wb) && defined($hash->{FD}) && vec($wout, $hash->{FD}, 1)) {
-      my $ret = syswrite($hash->{CD}, $wb);
-      if(!$ret || $ret < 0) {
-        Log 4, "Write error to $p, deleting $hash->{NAME}";
-        CommandDelete(undef, $hash->{NAME});
+    if(defined($hash->{FD}) && vec($rout, $hash->{FD}, 1)) {
+      if($hash->{directReadFn}) {
+        $hash->{directReadFn}($hash);
       } else {
-        if($ret == length($wb)) {
-          delete($hash->{$wbName});
+        CallFn($hash->{NAME}, "ReadFn", $hash);
+      }
+    }
+
+    if((defined($hash->{$wbName}) || defined($hash->{directWriteFn})) &&
+        defined($hash->{FD}) && vec($wout, $hash->{FD}, 1)) {
+
+      if($hash->{directWriteFn}) {
+        $hash->{directWriteFn}($hash);
+
+      } else {
+        my $wb = $hash->{$wbName};
+        my $ret = syswrite($hash->{CD}, $wb);
+        if(!$ret || $ret < 0) {
+          Log 4, "Write error to $p, deleting $hash->{NAME}";
+          CommandDelete(undef, $hash->{NAME});
         } else {
-          $hash->{$wbName} = substr($wb, $ret);
+          if($ret == length($wb)) {
+            delete($hash->{$wbName});
+          } else {
+            $hash->{$wbName} = substr($wb, $ret);
+          }
         }
       }
     }
