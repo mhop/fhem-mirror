@@ -134,6 +134,7 @@ FHEMWEB_Initialize($)
     plotfork:1,0
     plotmode:gnuplot,gnuplot-scroll,SVG
     plotsize
+    nrAxis
     redirectCmds:0,1
     refresh
     reverseLogs:0,1
@@ -2440,6 +2441,14 @@ FW_ActivateInform()
         width,height. You can set individual sizes by setting the plotsize of
         the SVG. Default is 800,160 for desktop, and 480,160 for
         smallscreen.
+        </li><br>
+
+    <a name="nrAxis"></a>
+    <li>nrAxis<br>
+        the number of axis for which space should be reserved  on the left and right sides of a plot
+        and optionaly how many axes should realy be used on each side, separated by comma:
+        left,right[,useLeft,useRight].  You can set individual numbers by setting the nrAxis of
+        the SVG. Default is 1,1.
         </li><br>
 
     <a name="SVGcache"></a>

@@ -49,7 +49,7 @@ SVG_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn} = "SVG_Define";
-  $hash->{AttrList} = "fixedoffset fixedrange startDate plotsize label title plotfunction";
+  $hash->{AttrList} = "fixedoffset fixedrange startDate plotsize nrAxis label title plotfunction";
   $hash->{SetFn}    = "SVG_Set";
   $hash->{FW_summaryFn} = "SVG_FwFn";
   $hash->{FW_detailFn}  = "SVG_FwFn";
@@ -914,8 +914,15 @@ SVG_render($$$$$$$$$)
 
   my $SVG_ss = AttrVal($parent_name, "smallscreen", 0);
   return $SVG_RET if(!defined($dp));
+
+  my $nr_axis = AttrVal($parent_name,"nrAxis","1,1");
+  my ($nr_left_axis,$nr_right_axis,$use_left_axis,$use_right_axis) = split(",", AttrVal($name,"nrAxis",$nr_axis));
+  $use_left_axis = $nr_left_axis if( !defined($use_left_axis) );
+  $use_right_axis = $nr_right_axis if( !defined($use_right_axis) );
+
   my $th = 16;                          # "Font" height
-  my ($x, $y) = (($SVG_ss ? 2 : 3)*$th,  1.2*$th);      # Rect offset
+  my $axis_width = ($SVG_ss ? 2 : 3)*$th;
+  my ($x, $y) = ($axis_width*$nr_left_axis,  1.2*$th);      # Rect offset
 
   ######################
   # Convert the configuration to a "readable" form -> array to hash
@@ -924,7 +931,7 @@ SVG_render($$$$$$$$$)
   my $ps = "800,400";
   $ps = $1 if($conf{terminal} =~ m/.*size[ ]*([^ ]*)/);
   my ($ow,$oh) = split(",", $ps);       # Original width
-  my ($w, $h) = ($ow-2*$x, $oh-2*$y);   # Rect size
+  my ($w, $h) = ($ow-$nr_left_axis*$axis_width-$nr_right_axis*$axis_width, $oh-2*$y);   # Rect size
 
   # Keep only the Filter part of the #FileLog
   $flog = join(" ", map { my @a=split(":",$_);
@@ -964,7 +971,7 @@ SVG_render($$$$$$$$$)
   SVG_pO "<rect x=\"$x\" y=\"$y\" width =\"$w\" height =\"$h\" rx=\"8\" ry=\"8\" ".
         "fill=\"none\" class=\"border\"/>";
 
-  my ($off1,$off2) = ($ow/2, 3*$y/4);
+  my ($off1,$off2) = ($x+$w/2, 3*$y/4);
   my $title = ($conf{title} ? $conf{title} : " ");
   $title =~ s/</&lt;/g;
   $title =~ s/>/&gt;/g;
@@ -973,31 +980,39 @@ SVG_render($$$$$$$$$)
 
   ######################
   # Copy and Paste labels, hidden by default
-  SVG_pO "<text id=\"svg_paste\" x=\"" . ($ow-$x) . "\" y=\"$off2\" " .
+  SVG_pO "<text id=\"svg_paste\" x=\"" . ($ow-$axis_width-$nr_right_axis*$axis_width) . "\" y=\"$off2\" " .
         "onclick=\"parent.svg_paste(evt)\" " .
         "class=\"paste\" text-anchor=\"end\"> </text>";
-  SVG_pO "<text id=\"svg_copy\" x=\"" . ($ow-2*$x) . "\" y=\"$off2\" " .
+  SVG_pO "<text id=\"svg_copy\" x=\"" . ($ow-$nr_right_axis*$axis_width) . "\" y=\"$off2\" " .
         "onclick=\"parent.svg_copy(evt)\" " .
         "class=\"copy\" text-anchor=\"end\"> </text>";
 
   ######################
   # Left label = ylabel and right label = y2label
-  my $t = ($conf{ylabel} ? $conf{ylabel} : "");
-  $t =~ s/"//g;
   if(!$SVG_ss) {
-    ($off1,$off2) = (3*$th/4, $oh/2);
-    SVG_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
-        "class=\"ylabel\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
+    for my $idx (1..$use_left_axis)  {
+      my $name = "y".($idx)."label";
+      $name = "ylabel" if( $idx == 1 );
+      my $t = ($conf{$name} ? $conf{$name} : "");
+      $t =~ s/"//g;
+      ($off1,$off2) = ($x-($idx)*$axis_width+3*$th/4, $oh/2);
+      SVG_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
+          "class=\"ylabel\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
+    }
 
-    $t = ($conf{y2label} ? $conf{y2label} : "");
-    $t =~ s/"//g;
-    ($off1,$off2) = ($ow-$th/4, $oh/2);
-    SVG_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
-        "class=\"y2label\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
+    for my $idx ($use_left_axis+1..$use_left_axis+$use_right_axis)  {
+      my $name = "y".($idx)."label";
+      $name = "ylabel" if( $idx == 1 );
+      my $t = ($conf{$name} ? $conf{$name} : "");
+      $t =~ s/"//g;
+      ($off1,$off2) = ($x+$w+($idx-$use_left_axis)*$axis_width-$th/4, $oh/2);
+      SVG_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
+          "class=\"y2label\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
+    }
   }
 
   ######################
-  ($off1,$off2) = ($ow-$x-$th, $y+$th);
+  ($off1,$off2) = ($ow-$nr_right_axis*$axis_width-$th, $y+$th);
 
 
   ######################
@@ -1125,7 +1140,7 @@ SVG_render($$$$$$$$$)
   # then the text and the grid
   $off1 = $x;
   $off2 = $y+$h+$th;
-  $t = SVG_fmtTime($first_tag, $fromsec);
+  my $t = SVG_fmtTime($first_tag, $fromsec);
   SVG_pO "<text x=\"0\" y=\"$off2\" class=\"ylabel\">$t</text>";
   $initoffset = $step;
   $initoffset = int(($step/2)/86400)*86400 if($aligntext);
@@ -1214,30 +1229,30 @@ SVG_render($$$$$$$$$)
    
     # offsets
     my ($align,$display,$cll);
-    if( $a eq "x1y1" ){
-      # first axis = left
-      $off1 = $x-4-$th*0.3;
-      $off3 = $x-4;
-      $off4 = $off3+5;
-      $align = " text-anchor=\"end\"";
-      $display = "";
-      $cll = "";
-    } elsif ( $a eq "x1y2" ){
-      # second axis = right
-      $off1 = $x+4+$w+$th*0.3;
-      $off3 = $x+4+$w-5;
-      $off4 = $off3+5;
-      $align = "";
-      $display = "";
-      $cll = "";
-    } else {
-      # other axes in between
-      $off1 = $x-$th*0.3+30;
-      $off3 = $x+30;
-      $off4 = $off3+5;
-      $align = " text-anchor=\"end\"";
-      $display = " display=\"none\" id=\"hline_$idx\"";
-      $cll = " class=\"l$idx\"";
+    if( $a =~ m/x1y(\d)/ ) {
+      my $idx = $1;
+      if( $idx <= $use_left_axis ) {
+        $off1 = $x - ($idx-1)*$axis_width-4-$th*0.3;
+        $off3 = $x - ($idx-1)*$axis_width-4;
+        $off4 = $off3+5;
+        $align = " text-anchor=\"end\"";
+        $display = "";
+        $cll = "";
+      } elsif( $idx <= $use_left_axis+$use_right_axis ) {
+        $off1 = $x+4+$w+($idx-1-$use_left_axis)*$axis_width+$th*0.3;
+        $off3 = $x+4+$w+($idx-1-$use_left_axis)*$axis_width-5;
+        $off4 = $off3+5;
+        $align = "";
+        $display = "";
+        $cll = "";
+      } else {
+        $off1 = $x-$th*0.3+30;
+        $off3 = $x+30;
+        $off4 = $off3+5;
+        $align = " text-anchor=\"end\"";
+        $display = " display=\"none\" id=\"hline_$idx\"";
+        $cll = " class=\"l$idx\"";
+      }
     };
     
     #-- grouping
