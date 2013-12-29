@@ -509,7 +509,6 @@ sub HMLAN_Parse($$) {##########################################################
     my ($mNo,$flg,$type,$src,$dst,$p) = unpack('A2A2A2A6A6A*',$mFld[5]);
     my $CULinfo = "";
 
-    my @logIds = ("150B94","172A85");
     Log3 $hash,  HMLAN_getVerbLvl ($hash,$src,$dst,"5")
                     , "HMLAN_Parse: $name R:".$mFld[0]
                                    .(($mFld[0] =~ m/^E/)?'  ':'')
@@ -609,15 +608,22 @@ sub HMLAN_Parse($$) {##########################################################
                              ." max:" .$dlyP->{max}
                              ." last:".$dlyP->{lst}
                              ." cnt:" .$dlyP->{cnt};
+      ################# debugind help
+      #my $st = $sysC - $dly;#time send
+      #my $stms = sprintf("%03d",$st%1000);
+      #my @slt = localtime(int($st/1000));
+      #Log 1,"HMLAN dlyTime      st:$slt[2]:$slt[1]:$slt[0].".$stms."  dly:$dly";
+      #################
       $dly = 0 if ($dly<0);
     }
 
     # HMLAN sends ACK for flag 'A0' but not for 'A4'(config mode)-
     # we ack ourself an long as logic is uncertain - also possible is 'A6' for RHS
-    if (hex($flg)&0x22){#not sure: 4 oder 2 ? 0x.2 works for VD!
-      my $wait = 0.100 - $dly/1000;
-      $hash->{helper}{$src}{nextSend} = gettimeofday() + $wait if ($wait > 0);
-    }
+
+    my $wait = 0.100 - $dly/1000;
+    $modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend} = gettimeofday()+$wait
+              if ($modules{CUL_HM}{defptr}{$src} && $wait > 0);
+
     if (hex($flg)&0xA4 == 0xA4 && $hash->{owner} eq $dst){
       Log3 $hash, HMLAN_getVerbLvl ($hash,$src,$dst,"5")
                 , "HMLAN_Parse: $name ACK config";
@@ -694,11 +700,14 @@ sub HMLAN_SimpleWrite(@) {#####################################################
     my $hmId = AttrVal($name,"hmId","");
     my $hDst = $hash->{helper}{$dst};# shortcut
     my $tn = gettimeofday();
-    if ($hDst->{nextSend}){
-      my $DevDelay = $hDst->{nextSend} - $tn;
+    
+    if($modules{CUL_HM}{defptr}{$dst} && 
+       $modules{CUL_HM}{defptr}{$dst}{helper}{io} &&
+       $modules{CUL_HM}{defptr}{$dst}{helper}{io}{nextSend}
+       ){
+      my $DevDelay = $modules{CUL_HM}{defptr}{$dst}{helper}{io}{nextSend} - $tn;
       select(undef, undef, undef, (($DevDelay > 0.1)?0.1:$DevDelay))
             if ($DevDelay > 0.01);
-      delete $hDst->{nextSend};
     }
     if ($dst ne $hmId){  #delay send if answer is pending
       if ( $hDst->{flg} &&                #HMLAN's ack pending
