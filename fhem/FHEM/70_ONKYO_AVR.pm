@@ -97,70 +97,18 @@ sub ONKYO_AVR_GetStatus($;$) {
     InternalTimer( gettimeofday() + $interval, "ONKYO_AVR_GetStatus", $hash, 0 )
       unless ( $local == 1 );
 
-    # Read powerstate
-    #
-    my $powerstate = ONKYO_AVR_SendCommand( $hash, "power", "query" );
-
-    $state = "off";
-    if ( defined($powerstate) ) {
-        if ( $powerstate eq "on" ) {
-            $state = "on";
-
-            # Read other state information
-            $states->{mute} = ONKYO_AVR_SendCommand( $hash, "mute", "query" );
-            $states->{volume} =
-              ONKYO_AVR_SendCommand( $hash, "volume", "query" );
-            $states->{sleep} = ONKYO_AVR_SendCommand( $hash, "sleep", "query" )
-              if ( $zone eq "main" );
-            $states->{input} = ONKYO_AVR_SendCommand( $hash, "input", "query" );
-            $states->{video} =
-              ONKYO_AVR_SendCommand( $hash, "video-information", "query" )
-              if ( $zone eq "main" );
-            $states->{audio} =
-              ONKYO_AVR_SendCommand( $hash, "audio-information", "query" )
-              if ( $zone eq "main" );
-        }
-    }
-    else {
-        $state = "absent";
-    }
-
-    readingsBeginUpdate($hash);
-
-    # Set reading for power
-    #
-    my $readingPower = "off";
-    if ( $state eq "on" ) {
-        $readingPower = "on";
-    }
-
-    if ( !defined( $hash->{READINGS}{power}{VAL} )
-        || $hash->{READINGS}{power}{VAL} ne $readingPower )
-    {
-        readingsBulkUpdate( $hash, "power", $readingPower );
-    }
-
-    # Set reading for state
-    #
-    if ( !defined( $hash->{READINGS}{state}{VAL} )
-        || $hash->{READINGS}{state}{VAL} ne $state )
-    {
-        readingsBulkUpdate( $hash, "state", $state );
-    }
-
-    readingsEndUpdate( $hash, 1 );
-
     # cache XML device information
     #
     # get device information if not available from helper
     if (   !defined( $hash->{helper}{receiver} )
         && $protocol ne "pre2013"
-        && $state ne "absent" )
+        && $hash->{READINGS}{presence}{VAL} ne "absent" )
     {
         my $xml =
           ONKYO_AVR_SendCommand( $hash, "net-receiver-information", "query" );
 
         if ( defined($xml) && $xml =~ /^<\?xml/ ) {
+
             my $xml_parser = XML::Simple->new(
                 NormaliseSpace => 2,
                 KeepRoot       => 0,
@@ -273,7 +221,7 @@ sub ONKYO_AVR_GetStatus($;$) {
         if ( defined( $attr{$name}{inputs} ) ) {
             my @inputs = split( ':', $attr{$name}{inputs} );
 
-            if ( ref(@inputs) eq "ARRAY" ) {
+            if (@inputs) {
                 foreach (@inputs) {
                     if (m/[^,\s]+(,[^,\s]+)+/) {
                         my @input_names = split( ',', $_ );
@@ -287,11 +235,57 @@ sub ONKYO_AVR_GetStatus($;$) {
             }
         }
     }
+
+    # Read powerstate
+    #
+    my $powerstate = ONKYO_AVR_SendCommand( $hash, "power", "query" );
+
+    $state = "off";
+    if ( defined($powerstate) ) {
+        if ( $powerstate eq "on" ) {
+            $state = "on";
+
+            # Read other state information
+            $states->{mute} = ONKYO_AVR_SendCommand( $hash, "mute", "query" );
+            $states->{volume} =
+              ONKYO_AVR_SendCommand( $hash, "volume", "query" );
+            $states->{sleep} = ONKYO_AVR_SendCommand( $hash, "sleep", "query" )
+              if ( $zone eq "main" );
+            $states->{input} = ONKYO_AVR_SendCommand( $hash, "input", "query" );
+            $states->{video} =
+              ONKYO_AVR_SendCommand( $hash, "video-information", "query" )
+              if ( $zone eq "main" );
+            $states->{audio} =
+              ONKYO_AVR_SendCommand( $hash, "audio-information", "query" )
+              if ( $zone eq "main" );
+        }
+    }
     else {
-        $hash->{helper}{receiver}{NRI} = 0;
+        $state = "absent";
     }
 
     readingsBeginUpdate($hash);
+
+    # Set reading for power
+    #
+    my $readingPower = "off";
+    if ( $state eq "on" ) {
+        $readingPower = "on";
+    }
+
+    if ( !defined( $hash->{READINGS}{power}{VAL} )
+        || $hash->{READINGS}{power}{VAL} ne $readingPower )
+    {
+        readingsBulkUpdate( $hash, "power", $readingPower );
+    }
+
+    # Set reading for state
+    #
+    if ( !defined( $hash->{READINGS}{state}{VAL} )
+        || $hash->{READINGS}{state}{VAL} ne $state )
+    {
+        readingsBulkUpdate( $hash, "state", $state );
+    }
 
     # Set general readings for all zones
     #
@@ -590,7 +584,7 @@ sub ONKYO_AVR_Set($@) {
     my $state    = $hash->{STATE};
     my $return;
     my $reading;
-    my $inputs_txt;
+    my $inputs_txt = "";
 
     Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_Set()";
 
@@ -682,9 +676,9 @@ sub ONKYO_AVR_Set($@) {
     readingsBeginUpdate($hash);
 
     # statusRequest
-    if ( $a[1] eq "statusRequest" ) {
+    if ( $a[1] eq "statusRequest" || $a[1] eq "statusrequest" ) {
         Log3 $name, 2, "ONKYO_AVR set $name " . $a[1];
-        $hash->{helper}{receiver} = undef;
+        delete $hash->{helper}{receiver} if ( $state ne "absent" );
         ONKYO_AVR_GetStatus( $hash, 1 ) if ( !defined( $a[2] ) );
     }
 
