@@ -1021,7 +1021,7 @@ sub ENIGMA2_Set($@) {
     }
 
     # restartGui
-    elsif ( $a[1] eq "restartGui" ) {
+    elsif ( lc( $a[1] ) eq "restartgui" ) {
         Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
@@ -1147,7 +1147,7 @@ sub ENIGMA2_Set($@) {
         }
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-            if ( !defined( $a[2] || $a[2] eq "toggle" ) ) {
+            if ( !defined( $a[2] ) || $a[2] eq "toggle" ) {
                 $cmd = "set=mute";
                 if ( $hash->{READINGS}{mute}{VAL} eq "off" ) {
                     readingsSingleUpdate( $hash, "mute", "on", 1 );
@@ -1238,7 +1238,7 @@ sub ENIGMA2_Set($@) {
     }
 
     # remoteControl
-    elsif ( $a[1] eq "remoteControl" ) {
+    elsif ( lc( $a[1] ) eq "remotecontrol" ) {
         Log3 $name, 2, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
@@ -1258,8 +1258,11 @@ sub ENIGMA2_Set($@) {
 
             my $request = ENIGMA2_GetRemotecontrolCommand( uc( $a[2] ) );
 
-            if ( $request eq "POWER" ) {
+            if ( uc( $a[2] ) eq "POWER" ) {
                 return ENIGMA2_Set( $hash, $name, "toggle" );
+            }
+            elsif ( uc( $a[2] ) eq "MUTE" ) {
+                return ENIGMA2_Set( $hash, $name, "mute" );
             }
             elsif ( $request ne "" ) {
                 $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand( $a[2] );
@@ -1454,7 +1457,9 @@ sub ENIGMA2_Set($@) {
   # something (with local flag, so the internal timer is not getting interupted)
     if (   $a[1] ne "shutdown"
         && $a[1] ne "on"
-        && $a[1] ne "restartGui"
+        && $a[1] ne "mute"
+        && lc( $a[1] ) ne "restartgui"
+        && lc( $a[1] ) ne "remotecontrol"
         && $a[1] ne "reboot" )
     {
         ENIGMA2_GetStatus( $hash, 1 );
@@ -2021,7 +2026,7 @@ sub ENIGMA2_RClayout_VUplusDuo2_SVG() {
 sub ENIGMA2_RClayout_VUplusDuo2() {
     my @row;
 
-    $row[0] = ":blank,:MUTE,POWER:POWEROFF";
+    $row[0] = ":blank,MUTE,POWER:POWEROFF";
     $row[1] = ":blank,:blank,:blank";
 
     $row[2] = "REWIND,PLAY,FASTFORWARD:FF";
