@@ -1508,45 +1508,50 @@ SVG_pO($)
 ##################
 
 # this is a helper function which creates a PNG image from a given plot
-sub plotAsPng(@) {
-        my (@plotName) = @_;
-        my (@webs, $mimetype, $svgdata, $rsvg, $pngImg);
-        
-        @webs=devspec2array("TYPE=FHEMWEB");
-        foreach(@webs) {
-                if(!InternalVal($_,'TEMPORARY',undef)) {
-                        $FW_wname=InternalVal($_,'NAME','');
-                        last;
-                }
-        }
-        #Debug "FW_wname= $FW_wname, plotName= $plotName[0]";
+sub
+plotAsPng(@)
+{
+  my (@plotName) = @_;
+  my (@webs, $mimetype, $svgdata, $rsvg, $pngImg);
+  
+  @webs=devspec2array("TYPE=FHEMWEB");
+  foreach(@webs) {
+    if(!InternalVal($_,'TEMPORARY',undef)) {
+      $FW_wname=InternalVal($_,'NAME','');
+      last;
+    }
+  }
+  #Debug "FW_wname= $FW_wname, plotName= $plotName[0]";
 
-        $FW_RET                 = undef;
-        $FW_webArgs{dev}        = $plotName[0];
-        $FW_webArgs{logdev}     = InternalVal($plotName[0], "LOGDEVICE", "");
-        $FW_webArgs{gplotfile}  = InternalVal($plotName[0], "GPLOTFILE", "");
-        $FW_webArgs{logfile}    = InternalVal($plotName[0], "LOGFILE", "CURRENT"); 
-        $FW_pos{zoom}           = $plotName[1] if $plotName[1];
-        $FW_pos{off}            = $plotName[2] if $plotName[2];
+  $FW_RET                 = undef;
+  $FW_webArgs{dev}        = $plotName[0];
+  $FW_webArgs{logdev}     = InternalVal($plotName[0], "LOGDEVICE", "");
+  $FW_webArgs{gplotfile}  = InternalVal($plotName[0], "GPLOTFILE", "");
+  $FW_webArgs{logfile}    = InternalVal($plotName[0], "LOGFILE", "CURRENT"); 
+  $FW_pos{zoom}           = $plotName[1] if $plotName[1];
+  $FW_pos{off}            = $plotName[2] if $plotName[2];
 
-        ($mimetype, $svgdata)   = SVG_showLog("unused");
-        
-        #Debug "MIME type= $mimetype";
-        #Debug "SVG= $svgdata";
+  ($mimetype, $svgdata)   = SVG_showLog("unused");
+  
+  #Debug "MIME type= $mimetype";
+  #Debug "SVG= $svgdata";
 
-        eval {
-                require Image::LibRSVG;
-                $rsvg = new Image::LibRSVG();
-                $rsvg->loadImageFromString($svgdata);
-                $pngImg = $rsvg->getImageBitmap();
-        };
-        Log3 $FW_wname, 1, 
-          "plotAsPng(): Cannot create plot as png image for \"" . 
-          join(" ", @plotName) . "\": $@" 
-          if($@ or !defined($pngImg) or ($pngImg eq ""));
+  my ($w, $h) = split(",", AttrVal($plotName[0],"plotsize","800,160"));
+  $svgdata =~ s/<\/svg>/<polyline opacity="0" points="0,0 $w,$h"\/><\/svg>/;
 
-        return $pngImg if $pngImg;
-        return;
+  eval {
+    require Image::LibRSVG;
+    $rsvg = new Image::LibRSVG();
+    $rsvg->loadImageFromString($svgdata);
+    $pngImg = $rsvg->getImageBitmap();
+  };
+  Log3 $FW_wname, 1, 
+    "plotAsPng(): Cannot create plot as png image for \"" . 
+    join(" ", @plotName) . "\": $@" 
+    if($@ or !defined($pngImg) or ($pngImg eq ""));
+
+  return $pngImg if $pngImg;
+  return;
 }
 
 ##################
