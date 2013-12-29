@@ -1202,9 +1202,8 @@ sub CUL_HM_Parse($$) {##############################
       push @event,"level:$val %";
       push @event,"pct:$val"; # duplicate to level - necessary for "slider"
       push @event,"deviceMsg:$vs$target" if($chn ne "00");
-      my $eventName = "switch";
-      my $action; #determine action
-      push @event, "timedOn:".(($err&0x40)?"running":"off");
+      push @event,"state:$vs";
+      push @event,"timedOn:".(($err&0x40)?"running":"off");
     }
     elsif ($mTp eq "5E" ||$mTp eq "5F" ) {  #    POWER_EVENT_CYCLIC
       $shash = $modules{CUL_HM}{defptr}{$src."02"}
@@ -1697,12 +1696,12 @@ sub CUL_HM_parseCommon(@){#####################################################
   }
   elsif($mTp eq "00"){######################################
     my $paired = 0; #internal flag
+    CUL_HM_infoUpdtDevData($shash->{NAME}, $shash,$p)
+                  if (!$modules{CUL_HM}{helper}{hmManualOper});
     if (   $ioHash->{hmPair} 
         ||(    $ioHash->{hmPairSerial}
             && $ioHash->{hmPairSerial} eq $attr{$shash->{NAME}}{serialNr})){
       # pairing requested - shall we?      
-      CUL_HM_infoUpdtDevData($shash->{NAME}, $shash,$p)
-                  if (!$modules{CUL_HM}{helper}{hmManualOper});
       my $oldIoId = CUL_HM_Id($shash->{IODev});
       my $ioId = CUL_HM_Id($ioHash);
       if( $mFlg.$mTp ne "0400") {
@@ -3419,15 +3418,14 @@ sub CUL_HM_weather(@) {#periodically send weather data
 }
 sub CUL_HM_infoUpdtDevData($$$) {#autoread config
   my($name,$hash,$p) = @_;
-  my($fw,$mId,$serNo,$stc,$devInfo) = ($1,$2,$3,$4,$5)
-                       if($p =~ m/(..)(.{4})(.{20})(.{2})(.*)/);
+  my($fw1,$fw2,$mId,$serNo,$stc,$devInfo) = unpack('A1A1A4A20A2A*', $p);
+  
   my $md = $culHmModel{$mId}{name} ? $culHmModel{$mId}{name}:"unknown";
   $attr{$name}{model}    = $md;
   $attr{$name}{subType}  = $culHmModel{$mId}{st};
   $attr{$name}{serialNr} = pack('H*',$serNo);
   #expert level attributes
-  $attr{$name}{firmware} =
-        sprintf("%d.%d", hex(substr($p,0,1)),hex(substr($p,1,1)));
+  $attr{$name}{firmware} = sprintf("%d.%d", hex($fw1),hex($fw2));
   $attr{$name}{".devInfo"} = $devInfo;
   $attr{$name}{".stc"}     = $stc;
 

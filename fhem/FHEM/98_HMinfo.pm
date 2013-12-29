@@ -156,9 +156,10 @@ sub HMinfo_regCheck(@) { ######################################################
     push @regMissing,$eName.":\t".join(",",@mReg) if (scalar @mReg);
     push @regIncompl,$eName.":\t".join(",",@iReg) if (scalar @iReg);
   }
-  return  "\n\n missing register list\n    "   .(join "\n    ",sort @regMissing)
-         ."\n\n incomplete register list\n    ".(join "\n    ",sort @regIncompl)
-         ;
+  my $ret = "";
+  $ret .="\n\n missing register list\n    "   .(join "\n    ",sort @regMissing) if(@regMissing);
+  $ret .="\n\n incomplete register list\n    ".(join "\n    ",sort @regIncompl) if(@regIncompl);
+  return  $ret;
 }
 sub HMinfo_peerCheck(@) { #####################################################
   my @entities = @_;
@@ -198,10 +199,11 @@ sub HMinfo_peerCheck(@) { #####################################################
       }
     }
   }
-  return  "\n\n peer list not read"  ."\n    ".(join "\n    ",sort @peerIDsEmpty)
-         ."\n\n peer list incomplete"."\n    ".(join "\n    ",sort @peerIDsFail)
-         ."\n\n peer not verified "  ."\n    ".(join "\n    ",sort @peerIDsNoPeer)
-         ;
+  my $ret = "";
+  $ret .="\n\n peer list not read"  ."\n    ".(join "\n    ",sort @peerIDsEmpty) if(@peerIDsEmpty);
+  $ret .="\n\n peer list incomplete"."\n    ".(join "\n    ",sort @peerIDsFail)  if(@peerIDsEmpty);
+  $ret .="\n\n peer not verified "  ."\n    ".(join "\n    ",sort @peerIDsNoPeer)if(@peerIDsEmpty);
+  return  $ret;
 }
 sub HMinfo_burstCheck(@) { ####################################################
   my @entities = @_;
@@ -231,9 +233,33 @@ sub HMinfo_burstCheck(@) { ####################################################
       }
     }
   }
-  return  "\n\n peerNeedsBurst not set"  ."\n    ".(join "\n    ",sort @peerIDsNeed)
-         ."\n\n conditionalBurst not set"."\n    ".(join "\n    ",sort @peerIDsCond)
-  ;
+  my $ret = "";
+  $ret .="\n\n peerNeedsBurst not set"  ."\n    ".(join "\n    ",sort @peerIDsNeed) if(@peerIDsNeed);
+  $ret .="\n\n conditionalBurst not set"."\n    ".(join "\n    ",sort @peerIDsCond) if(@peerIDsCond);
+  return  $ret;
+}
+sub HMinfo_paramCheck(@) { ####################################################
+  my @entities = @_;
+  my @noIoDev;
+  my @noID;
+  my @idMismatch;
+  my %th = CUL_HM_putHash("culHmModel");
+  foreach my $eName (@entities){
+    next if (!$defs{$eName}{helper}{role}{dev});
+    my $ehash = $defs{$eName};
+    my $pairId =  CUL_HM_Get($ehash,$eName,"param","PairedTo");
+    my $IoDev =  $ehash->{IODev} if ($ehash->{IODev});
+    my $ioHmId = AttrVal($IoDev->{NAME},"hmId","-");
+    if (!$IoDev)                  { push @noIoDev,$eName;}
+    elsif ($pairId eq "undefined"){ push @noID,$eName;}
+    elsif ($pairId !~ m /$ioHmId/){ push @idMismatch,"$eName paired:$pairId IO attr: $ioHmId";}
+  }
+
+  my $ret = "";
+  $ret .="\n\n no IO device assigned"      ."\n    ".(join "\n    ",sort @noIoDev)    if (@noIoDev);
+  $ret .="\n\n PairedTo missing/unknown"   ."\n    ".(join "\n    ",sort @noID)       if (@noID);
+  $ret .="\n\n PairedTo missmatch to IODev"."\n    ".(join "\n    ",sort @idMismatch) if (@idMismatch);
+ return  $ret;
 }
 
 sub HMinfo_getEntities(@) { ###################################################
@@ -538,7 +564,8 @@ sub HMinfo_SetFn($@) {#########################################################
     my @entities = HMinfo_getEntities($opt."v",$filter);
     $ret = $cmd." done:" .HMinfo_regCheck(@entities)
                          .HMinfo_peerCheck(@entities)
-                         .HMinfo_burstCheck(@entities);
+                         .HMinfo_burstCheck(@entities)
+                         .HMinfo_paramCheck(@entities);
   }
   elsif($cmd eq "peerXref")   {##print cross-references------------------------
     my @peerPairs;
