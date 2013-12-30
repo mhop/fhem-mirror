@@ -147,15 +147,14 @@ readDeviceXML($$)
 
   my $device = XMLin($file_name, KeyAttr => {}, ForceArray => [ 'reg', 'param', 'endpoint', 'unit', ]);
 
+  delete $product->{registers};
   $product->{pwrdownmode} = $device->{pwrdownmode} eq "true"?1:0;
   foreach my $register (@{$device->{config}->{reg}}) {
     my $id = $register->{id};
-    $product->{registers}->{$id} = { name => $register->{name}, type => "config" };
 
-    my $i = 0;
+    my @endpoints = ();
     foreach my $param (@{$register->{param}}){
-      push @{$product->{registers}->{$id}->{endpoints}}, ();
-      my $_endpoint = $product->{registers}->{$id}->{endpoints}->[$i] = {};
+      my $_endpoint = {};
       $_endpoint->{name} = $param->{name};
       $_endpoint->{name} =~ s/ /_/g;
       $_endpoint->{position} = $param->{position} if( defined($param->{position}) );
@@ -164,21 +163,31 @@ readDeviceXML($$)
       $_endpoint->{type} = $map->{$param->{type}};
       $_endpoint->{default} = $param->{default};
       $_endpoint->{verif} = $param->{verif};
-      ++$i;
+
+      push( @endpoints, $_endpoint );
+    }
+
+    my $r = { name => $register->{name},
+              hwmask => $register->{hwmask},
+              swversion => $register->{swversion},
+              type => "config",
+              endpoints => \@endpoints, };
+    if( !defined($product->{registers}->{$id}) ) {
+      $product->{registers}->{$id} = $r;
+    } elsif( ref($product->{registers}->{$id}) ne 'ARRAY' ) {
+      $product->{registers}->{$id} = [$product->{registers}->{$id}];
+      push( @{$product->{registers}->{$id}}, $r );
+    } else {
+      push( @{$product->{registers}->{$id}}, $r );
     }
   }
 
   foreach my $register (@{$device->{regular}->{reg}}) {
     my $id = $register->{id};
-    $product->{registers}->{$id} = { name => $register->{name},
-                                     hwmask => $register->{hwmask},
-                                     swversion => $register->{swversion},
-                                     type => "regular" };
 
-    my $i = 0;
+    my @endpoints = ();
     foreach my $endpoint (@{$register->{endpoint}}){
-      push @{$product->{registers}->{$id}->{endpoints}}, ();
-      my $_endpoint = $product->{registers}->{$id}->{endpoints}->[$i] = {};
+      my $_endpoint = {};
       $_endpoint->{name} = $endpoint->{name};
       $_endpoint->{name} =~ s/ /_/g;
       $_endpoint->{position} = $endpoint->{position} if( defined($endpoint->{position}) );
@@ -193,7 +202,22 @@ readDeviceXML($$)
           push @{$_endpoint->{units}}, $unit;
         }
       }
-      ++$i;
+
+      push( @endpoints, $_endpoint);
+    }
+
+    my $r = { name => $register->{name},
+              hwmask => $register->{hwmask},
+              swversion => $register->{swversion},
+              type => "regular",
+              endpoints => \@endpoints, };
+    if( !defined($product->{registers}->{$id}) ) {
+      $product->{registers}->{$id} = $r;
+    } elsif( ref($product->{registers}->{$id}) ne 'ARRAY' ) {
+      $product->{registers}->{$id} = [$product->{registers}->{$id}];
+      push( @{$product->{registers}->{$id}}, $r );
+    } else {
+      push( @{$product->{registers}->{$id}}, $r );
     }
   }
 }
@@ -288,6 +312,45 @@ SWAP_Undef($$)
   return undef;
 }
 
+sub
+SWAP_getRegister($$)
+{
+  my ($hash, $reg) = @_;
+
+  my $register = $hash->{product}->{registers}->{$reg};
+  return undef if( !defined($register) );
+
+  my $hwversion = $hash->{"SWAP_01-HardwareVersion"};
+  my $swversion = $hash->{"SWAP_02-FirmwareVersion"};
+  $hwversion = hex($hwversion) if( defined($hwversion) );
+  $swversion = hex($swversion) if( defined($swversion) );
+  if( ref($register) eq 'ARRAY' ) {
+    foreach my $register (@{$register}) {
+      next if( !$register->{hwmask} && !$register->{swversion} );
+      next if( $hwversion && $register->{hwmask} && ($hwversion & hex($register->{hwmask})) != hex($register->{hwmask}) );
+      next if( $swversion && $register->{swversion} && $swversion < hex($register->{swversion}) );
+
+      return $register;
+    }
+
+    foreach my $register (@{$register}) {
+      next if( $hwversion && $register->{hwmask} && ($hwversion & hex($register->{hwmask})) != hex($register->{hwmask}) );
+      next if( $swversion && $register->{swversion} && $swversion < hex($register->{swversion}) );
+
+      return $register;
+    }
+
+    return undef;
+  }
+
+  return undef if( $hwversion && $register->{hwmask} && ($hwversion & hex($register->{hwmask})) != hex($register->{hwmask}) );
+  return undef if( $swversion && $register->{swversion} && $swversion < hex($register->{swversion}) );
+
+  return $register if( defined($register) );
+
+  return undef;
+}
+
 #####################################
 sub
 SWAP_Set($@)
@@ -337,13 +400,14 @@ SWAP_Set($@)
 
   if( $hash->{reg} ) {
     my $reg = hex($hash->{reg});
-    if( defined($hash->{product}->{registers}->{$reg})
-        && defined($hash->{product}->{registers}->{$reg}->{endpoints}->[0])
-        && $hash->{product}->{registers}->{$reg}->{endpoints}->[0]->{size} == 1 ) {
+    my $register = SWAP_getRegister($hash,$reg);
+    if( defined($register)
+        && defined($register->{endpoints}->[0])
+        && $register->{endpoints}->[0]->{size} == 1 ) {
 
       my $hasOn  = ($list =~ m/\bon\b/);
       my $hasOff = ($list =~ m/\boff\b/);
-      my $hasPct = ($list =~ m/\bpct\b/) || ($hash->{product}->{registers}->{$reg}->{endpoints}->[0]->{type} != NUM);
+      my $hasPct = ($list =~ m/\bpct\b/) || ($register->{endpoints}->[0]->{type} != NUM);
 
       $list .= " on" if( !$hasOn );
       $list .= " off" if( !$hasOff );
@@ -393,14 +457,15 @@ SWAP_Set($@)
       return "value has to be ". $len ." byte(s) in size" if( $len*2 != length( $arg2 ) );
     } else {
       return "register $arg is not known" if( $hash->{reg} && hex($hash->{reg}) != $reg );
-      my $register = $hash->{product}->{registers}->{$reg};
+      my $register = SWAP_getRegister($hash,$reg);
       return "register $arg is not known" if( !defined($register) );
-      return "register $arg is readonly" if( $register->{endpoints}->[0]->{direction} != OUT );
 
       my $hwversion = $hash->{"SWAP_01-HardwareVersion"};
-      return "register $arg is unused with HardwareVersion $hwversion" if( $hwversion && $register->{hwmask} && ($hwversion & $register->{hwmask}) != $register->{hwmask} );
+      return "register $arg is unused with HardwareVersion $hwversion" if( $hwversion && $register->{hwmask} && (hex($hwversion) & hex($register->{hwmask})) != hex($register->{hwmask}) );
       my $swversion = $hash->{"SWAP_02-FirmwareVersion"};
       return "register $arg is not available with FirmwareVersion $swversion" if( $swversion && $register->{swversion} && hex($swversion) < hex($register->{swversion}) );
+
+      return "register $arg is readonly" if( $register->{endpoints}->[0]->{direction} != OUT );
 
       if( defined($3) ) {
         my $ep = hex($3);
@@ -435,11 +500,11 @@ SWAP_Set($@)
 
     if( $reg <= 0x0A ) {
     } else {
-      my $register = $hash->{product}->{registers}->{$reg};
+      my $register = SWAP_getRegister($hash,$reg);
       return "register $arg is not known" if( !defined($register) );
 
       my $hwversion = $hash->{"SWAP_01-HardwareVersion"};
-      return "register $arg is unused with HardwareVersion $hwversion" if( $hwversion && $register->{hwmask} && ($hwversion & $register->{hwmask}) != $register->{hwmask} );
+      return "register $arg is unused with HardwareVersion $hwversion" if( $hwversion && $register->{hwmask} && (hex($hwversion) & hex($register->{hwmask})) != hex($register->{hwmask}) );
       my $swversion = $hash->{"SWAP_02-FirmwareVersion"};
       return "register $arg is not available with FirmwareVersion $swversion" if( $swversion && $register->{swversion} && hex($swversion) < hex($register->{swversion}) );
     }
@@ -456,38 +521,38 @@ SWAP_Set($@)
 
     $arg =~ m/^([\da-f]{2})(\.([\da-f]+))?$/i;
     my $reg = hex($1);
+    my $register = SWAP_getRegister($hash,$reg);
     if( defined($3) ) {
       my $ep = hex($3);
 
-      if( defined($hash->{product}->{registers}->{$reg}->{endpoints})
-          && defined($hash->{product}->{registers}->{$reg}->{endpoints}->[$ep]) ) {
-        my $endpoint = $hash->{product}->{registers}->{$reg}->{endpoints}->[0];
+      if( defined($register)
+          && defined($register->{endpoints})
+          && defined($register->{endpoints}->[$ep]) ) {
+        my $endpoint = $register->{endpoints}->[0];
         my $value = ReadingsVal( $name, $1."-".$endpoint->{name}, undef );
 
-        if( defined($hash->{product}->{registers}->{$reg}->{endpoints}->[$ep]) ) {
-          $endpoint = $hash->{product}->{registers}->{$reg}->{endpoints}->[$ep];
+        $endpoint = $register->{endpoints}->[$ep];
 
-          if( defined( $endpoint->{position} ) ) {
-            if( $endpoint->{position} =~ m/^(\d+)\.(\d+)$/ ) {
-              my $byte = hex( substr( $value, length($value) - 2 - $1*2, 2 ) );
-              my $mask = 0x01 << $2;
-              $byte &= ~$mask if( $arg2 eq "0" );
-              $byte |=  $mask if( $arg2 eq "1" );
-              $byte &= 0xFF;
-              substr( $value, length($value) - 2 - $1*2, 2 , sprintf("%02X",$byte) );
-            } else {
-              substr( $value, $endpoint->{position}*2, $endpoint->{size}*2, $arg2 );
-            }
-
-            $arg2 = $value;
+        if( defined( $endpoint->{position} ) ) {
+          if( $endpoint->{position} =~ m/^(\d+)\.(\d+)$/ ) {
+            my $byte = hex( substr( $value, length($value) - 2 - $1*2, 2 ) );
+            my $mask = 0x01 << $2;
+            $byte &= ~$mask if( $arg2 eq "0" );
+            $byte |=  $mask if( $arg2 eq "1" );
+            $byte &= 0xFF;
+            substr( $value, length($value) - 2 - $1*2, 2 , sprintf("%02X",$byte) );
+          } else {
+            substr( $value, $endpoint->{position}*2, $endpoint->{size}*2, $arg2 );
           }
+
+          $arg2 = $value;
         }
       }
     }
 
-    #if( defined($hash->{product}->{registers}->{$reg}->{endpoints})
-    #    && defined($hash->{product}->{registers}->{$reg}->{endpoints}->[0]) ) {
-    #  if( my $verif = $hash->{product}->{registers}->{$reg}->{endpoints}->[0]->{verif} ) {
+    #if( defined($register->{endpoints})
+    #    && defined($register->{endpoints}->[0]) ) {
+    #  if( my $verif = $register->{endpoints}->[0]->{verif} ) {
     #  }
     #}
 
@@ -527,13 +592,10 @@ SWAP_Set($@)
       SWAP_Send($hash, $addr, QUERY, sprintf( "%02X", $reg ) );
     }
 
-    my $hwversion = $hash->{"SWAP_01-HardwareVersion"};
-    my $swversion = $hash->{"SWAP_02-FirmwareVersion"};
     if( defined($hash->{product}->{registers} ) ) {
       foreach my $reg ( sort { $a <=> $b } keys ( %{$hash->{product}->{registers}} ) ) {
-        my $register = $hash->{product}->{registers}->{$reg};
-        next if( $hwversion && $register->{hwmask} && ($hwversion & $register->{hwmask}) != $register->{hwmask} );
-        next if( $swversion && $register->{swversion} && hex($swversion) < hex($register->{swversion}) );
+        my $register = SWAP_getRegister($hash,$reg);
+        next if( !defined($register) );
 
         next if( $hash->{reg} && hex($hash->{reg}) != $reg );
         SWAP_Send($hash, $addr, QUERY, sprintf( "%02X", $reg ) );
@@ -618,15 +680,11 @@ SWAP_Get($@)
       }
     }
 
-    my $hwversion = $hash->{"SWAP_01-HardwareVersion"};
-    my $swversion = $hash->{"SWAP_02-FirmwareVersion"};
     if( defined($hash->{product}->{registers} ) ) {
       foreach my $reg ( sort { $a <=> $b } keys ( %{$hash->{product}->{registers}} ) ) {
         next if( $hash->{reg} && hex($hash->{reg}) != $reg );
-        my $register = $hash->{product}->{registers}->{$reg};
-
-        next if( $hwversion && $register->{hwmask} && ($hwversion & $register->{hwmask}) != $register->{hwmask} );
-        next if( $swversion && $register->{swversion} && hex($swversion) < hex($register->{swversion}) );
+        my $register = SWAP_getRegister($hash,$reg);
+        next if( !defined($register) );
 
         my $i = 0;
         foreach my $endpoint ( @{$register->{endpoints}} ) {
@@ -720,16 +778,19 @@ SWAP_updateReadings($$$)
 {
   my($hash, $rid, $data) = @_;
 
+  return if( !$data );
+
   my $reg = hex($rid);
   my $name = $hash->{NAME};
 
+  my $register = SWAP_getRegister($hash,$reg);
   if( $hash->{reg} && hex($hash->{reg}) != $reg ) {
     # ignore
-  } elsif( defined($hash->{product}->{registers}->{$reg})
-           && defined($hash->{product}->{registers}->{$reg}->{endpoints} ) ) {
+  } elsif( defined($register)
+           && defined($register->{endpoints} ) ) {
     my $i = 0;
     readingsBeginUpdate($hash);
-    foreach my $endpoint (@{$hash->{product}->{registers}->{$reg}->{endpoints}}) {
+    foreach my $endpoint (@{$register->{endpoints}}) {
       my $position = 0;
       my $value = "";
       $position = $endpoint->{position} if( defined($endpoint->{position}) );
@@ -749,10 +810,11 @@ SWAP_updateReadings($$$)
         #$value = $v;
         readingsBulkUpdate($hash, lc($endpoint->{name}), $v);
       }
-      readingsBulkUpdate($hash, SWAP_regName($rid,$i,$endpoint), $value);
+      my $reading = SWAP_regName($rid,$i,$endpoint);
+      readingsBulkUpdate($hash, $reading, $value) if( ReadingsVal($name,$reading,"") ne $value );
       ++$i;
     }
-    readingsBulkUpdate($hash, "state", ($data eq "000000"?"off":$data)) if( defined($attr{$name}{ProductCode}) && $attr{$name}{ProductCode} eq '0000002200000003' && $reg == 0x0B );
+    readingsBulkUpdate($hash, "state", (substr($data,0,6) eq "000000"?"off":$data)) if( defined($attr{$name}{ProductCode}) && $attr{$name}{ProductCode} eq '0000002200000003' && $reg == 0x0B );
     readingsBulkUpdate($hash, "state", $data) if( $hash->{reg} && hex($hash->{reg}) == $reg );
     readingsEndUpdate($hash,1);
   } else {
@@ -1041,7 +1103,8 @@ SWAP_Attr(@)
 
       foreach my $reg ( sort { $a <=> $b } keys ( %{$hash->{product}->{registers}} ) ) {
         next if( $hash->{reg} && hex($hash->{reg}) != $reg );
-        my $register = $hash->{product}->{registers}->{$reg};
+        my $register = SWAP_getRegister($hash,$reg);
+        next if( !defined($register) );
 
         my $i = 0;
         foreach my $endpoint ( @{$register->{endpoints}} ) {
@@ -1098,7 +1161,7 @@ SWAP_Attr(@)
   <ul>
     <li> This module requires XML::Simple.</li>
     <li>Devices with the default address FF will be changed to the first free address in the range F0-FE.</li>
-    <li>For power-down devices the default transmit intervall of FFFF will be changed to 0384 (900 seconds).</li>
+    <li>For power-down devices the default transmit interval of FFFF will be changed to 0384 (900 seconds).</li>
   </ul>
 
   <br>
