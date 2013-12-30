@@ -143,7 +143,7 @@ SetExtensionsFn($)
   } elsif($cmd eq "off-for-timer") {
     DoSet($name, "on");
 
-  } elsif($cmd eq "blink") {
+  } elsif($cmd eq "blink" && $defs{$name}{SE_BLINKPARAM}) {
     DoSet($name, "blink", split(" ", $defs{$name}{SE_BLINKPARAM}, 2));
 
   }
