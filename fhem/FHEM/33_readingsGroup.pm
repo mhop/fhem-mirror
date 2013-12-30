@@ -110,6 +110,12 @@ readingsGroup_updateDevices($)
       } else {
         foreach my $d (sort keys %defs) {
           next if( IsIgnored($d) );
+          eval { $d =~ m/^$device[0]$/ };
+          if( $@ ) {
+            Log3 $hash->{NAME}, 3, $hash->{NAME} .": ". $device[0] .": ". $@;
+            push @devices, ["<<ERROR>>"];
+            last;
+          }
           next if( $d !~ m/^$device[0]$/);
           $list{$d} = 1;
           push @devices, [$d,$device[1]];
@@ -363,7 +369,14 @@ readingsGroup_2html($)
       foreach my $n (sort keys %{$h}) {
         next if( $n =~ m/^\./);
         next if( $n eq "state" && !$show_state && (!defined($regex) || $regex ne "state") );
-        next if( defined($regex) &&  $n !~ m/^$regex$/);
+        if( defined($regex) ) {
+          eval { $n =~ m/^$regex$/ };
+          if( $@ ) {
+            Log3 $name, 3, $name .": ". $regex .": ". $@;
+            last;
+          }
+        next if( $n !~ m/^$regex$/);
+        }
         my $val = $h->{$n};
 
         my ($v, $t);
@@ -481,6 +494,7 @@ readingsGroup_Notify($$)
     foreach my $display ( keys %{$hash->{helper}{myDisplay}} ) {
       if( defined($defs{$display}) ) {
         my $filter = $defs{$display}->{inform};
+        return undef if( !defined($filter) );
         my $rn = AttrVal($name, "room", "");
         if($filter eq "all" || $rn =~ m/\b$filter\b/) {
           Log3 $name, 5, "$name: do update";
