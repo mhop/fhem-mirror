@@ -985,6 +985,7 @@ FW_roomOverview($)
     foreach my $k (sort keys %{$data{FWEXT}}) {
       my $h = $data{FWEXT}{$k};
       next if($h !~ m/HASH/ || !$h->{LINK} || !$h->{NAME});
+      next if($FW_hiddenroom{$h->{NAME}});
       push(@list1, $h->{NAME});
       push(@list2, $FW_ME ."/".$h->{LINK});
       $cnt++;
