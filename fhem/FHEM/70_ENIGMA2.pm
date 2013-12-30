@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.1
+# Version: 1.2.2
 #
 # Major Version History:
 # - 1.2.0 - 2013-12-21
@@ -738,9 +738,18 @@ sub ENIGMA2_GetStatus($;$) {
                 if ( defined( $eventinfo->{e2event}{$e2reading} )
                     && $eventinfo->{e2event}{$e2reading} ne "0" )
                 {
-                    my $timestring =
-                      substr( FmtDateTime( $eventinfo->{e2event}{$e2reading} ),
-                        10 );
+                    my $timestring;
+                    if ( $_ eq "eventduration" ) {
+                        my @t = localtime( $eventinfo->{e2event}{$e2reading} );
+                        $timestring =
+                          sprintf( "%02d:%02d:%02d", $t[2] - 1, $t[1], $t[0] );
+                    }
+                    else {
+                        $timestring =
+                          substr(
+                            FmtDateTime( $eventinfo->{e2event}{$e2reading} ),
+                            11 );
+                    }
                     if ( !defined( $hash->{READINGS}{$reading}{VAL} )
                         || $hash->{READINGS}{$reading}{VAL} ne $timestring )
                     {
