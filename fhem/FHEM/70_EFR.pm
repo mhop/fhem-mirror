@@ -8,7 +8,7 @@
 #
 # $Id: 70_EFR.pm 3799 2013-08-26 18:15:33Z bentele $
 #
-# Version = 0.5
+# Version = 0.7
 #
 ##############################################################################
 #
@@ -42,6 +42,8 @@
 package main;
 use strict;
 use IO::Socket::INET;
+use Blocking;
+use MIME::Base64;
 
 my @gets = ('lastPower','PowerTotal','Power_L1','Power_L2','Power_L3');
 
@@ -55,6 +57,7 @@ my ($hash) = @_;
  $hash->{GetFn}    = "energy_Get";
  $hash->{StateFn}  = "energy_State";
  $hash->{SetFn}    = "energy_Set";
+
 }
 
 sub
@@ -95,6 +98,8 @@ energy_Define($$)
   return "energy_Define: too few arguments. Usage:\n" .
          "define <name> EFR <host> [<interval> [<timeout>]]";
  }
+ my $name = $args[0];
+ $hash->{NAME} = $name;
 
  $hash->{Host}     = $args[2];
  $hash->{Port}     = 80;
@@ -102,7 +107,6 @@ energy_Define($$)
  $hash->{Timeout}  = int(@args) >= 5 ? int($args[4]) : 4;
 
  Log3 $hash, 4, "$hash->{NAME} will read from EFR at $hash->{Host}:$hash->{Port} " ;
- $hash->{Invalid}    = -1;    # default value for invalid readings
  $hash->{Rereads}    =  2;    # number of retries when reading curPwr of 0
  $hash->{UseSVTime}  = '';    # use the SV time as timestamp (else: TimeNow())
 
@@ -112,10 +116,12 @@ energy_Define($$)
 
  for my $get (@gets)
  {
-  $hash->{READINGS}{$get}{VAL}  = $hash->{Invalid};
+  $hash->{READINGS}{$get}{VAL}  = -1 ;
   $hash->{READINGS}{$get}{TIME} = $timenow;
  }
- energy_Update($hash);
+
+ RemoveInternalTimer($hash);
+ InternalTimer(gettimeofday()+$hash->{Interval}, "energy_Update", $hash, 0);
 
  Log3 $hash, 3, "$hash->{NAME} will read from EFR at $hash->{Host}:$hash->{Port} " ; 
  return undef;
@@ -125,36 +131,33 @@ sub
 energy_Update($)
 {
  my ($hash) = @_;
+ my $name = $hash->{NAME};
 
- if ($hash->{Interval} > 0) {
-  InternalTimer(gettimeofday() + $hash->{Interval}, "energy_Update", $hash, 0);
- }
-
- Log3 $hash, 4, "$hash->{NAME} tries to contact EFR at $hash->{Host}:$hash->{Port}";
- 
- my $success  = 0;
- my %readings = ();
- my $timenow  = TimeNow();
- my $rereads  = $hash->{Rereads};
  my $ip = $hash->{Host};
  my $port = $hash->{Port};
  my $interval = $hash->{Interval};
- my $timeout = $hash->{Timeout};
+
+$hash->{helper}{RUNNING_PID} = BlockingCall("energy_DoUpdate", $name."|".$ip."|".$port."|".$interval, "energy_energyDone", 120, "energy_energyAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+
+}
+
+sub
+energy_DoUpdate($){
+ 
+ my ($string) = @_;
+ my ($name, $ip, $port,$interval) = split("\\|", $string); 
+ my $success  = 0;
+ my %readings = ();
+ my $timenow  = TimeNow();
+ my $timeout = 10;
  my $counts = 0 ;
  my $summary = 0 ;
  my $url="/json.txt?LogName=user\&LogPSWD=user";
- #my $url="/efr.txt";
+ #my $url="/efr/efr.txt";
  my $socket ;
  my $buf ;
  my $message ;
- my @array;
- my $last;
- my $avg;
- my $min = 20000;
- my $max = 0;
- my $log = "";
 
-Log3 $hash, 4, "$hash->{NAME} $ip : $port $url";
 $socket = new IO::Socket::INET (
               PeerAddr => $ip,
               PeerPort => $port,
@@ -163,29 +166,54 @@ $socket = new IO::Socket::INET (
               Timeout  => $timeout
               );
 
-Log3 $hash, 4, "$hash->{NAME} socket new";
 if (defined ($socket) and $socket and $socket->connected())
 {
-  	Log3 $hash, 4,  "$hash->{NAME} Connected ...";
 	print $socket "GET $url HTTP/1.0\r\n\r\n";
 	$socket->autoflush(1);
 	while ((read $socket, $buf, 1024) > 0)
 	{
-      		Log 5,"buf: $buf";
       		$message .= $buf;
 	}
 	$socket->close();
-	Log3 $hash, 4, "$hash->{NAME} Socket closed";
+	Log3 $name, 4, "Socket closed";
 	$success = 0;
 }else{
-  	Log3 $hash, 3, "$hash->{NAME} Cannot open socket ...";
+  	Log3 $name, 3, "$name Cannot open socket ...";
         $success = 1;
-      	return 0;
 }
 
-Log3 $hash, 5, "reading done.";
+	$message = encode_base64($message,"");
+ if ( $success == 0 ){
+	my $back = $name ."|". $message;
+	return "$name|$message" ;
+ }else{
+	return "$name|-1";
+ }
+}
 
-if ( $success == 0 )
+sub
+energy_energyDone($)
+{
+  my ($string) = @_;
+  return unless(defined($string));
+  my (@a) = split("\\|", $string);
+  my $hash = $defs{$a[0]};
+  my $message = decode_base64($a[1]);
+  my @array;
+  my $log = "";
+  my $timenow = TimeNow();
+  
+  delete($hash->{helper}{RUNNING_PID});
+  
+  if(!$hash->{LOCAL}) {
+    RemoveInternalTimer($hash);
+    InternalTimer(gettimeofday()+$hash->{Interval}, "energy_Update", $hash, 1);
+  }
+  if ($hash->{Interval} > 0) {
+   InternalTimer(gettimeofday() + $hash->{Interval}, "energy_Update", $hash, 0);
+  }
+
+if ( $message ne "-1" )
 {
 	@array=split(/\{/,$message);
 	my $powernow = $array[11];
@@ -236,7 +264,18 @@ if ( $success == 0 )
      	Log3 $hash, 3, "$hash->{NAME} can't update - device send a error";
 }
 
+ Log3 $hash, 5, "$hash->{NAME} loop done " ; 
 return undef;
+}
+
+sub
+energy_energyAborted($)
+{
+  my ($hash) = @_;
+  
+   Log3 $hash, 3, "$hash->{NAME} energy_energyAborted";
+
+  delete($hash->{helper}{RUNNING_PID});
 }
 
 sub
@@ -250,7 +289,7 @@ my ($hash, @args) = @_;
 energy_Update($hash) unless $hash->{Interval};
 
  my $get = $args[1];
- my $val = $hash->{Invalid};
+ my $val = -1;
 
  if (defined($hash->{READINGS}{$get})) {
   $val = $hash->{READINGS}{$get}{VAL};
@@ -271,6 +310,8 @@ energy_Undef($$)
  my ($hash, $args) = @_;
 
  RemoveInternalTimer($hash) if $hash->{Interval};
+
+ BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
 
  return undef;
 }

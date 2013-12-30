@@ -8,7 +8,7 @@
 #
 # $Id$
 #
-# Version = 2.5
+# Version = 2.6
 #
 ##############################################################################
 #
@@ -200,9 +200,6 @@ sml_energy_Update($)
 {
  my ($hash) = @_;
 
- if ($hash->{Interval} > 0) {
-  InternalTimer(gettimeofday() + $hash->{Interval}, "sml_energy_Update", $hash, 0);
- }
  my $name = $hash->{NAME};
  my $ip = $hash->{Host};
  my $port = $hash->{Port};
@@ -313,6 +310,10 @@ sml_energy_energyDone($)
 
  Log3 $hash, 4, "sml_energy_energyDone min: $min max: $max last: $last avg: $avg";
   delete($hash->{helper}{RUNNING_PID});
+ 
+ if ($hash->{Interval} > 0) {
+  InternalTimer(gettimeofday() + $hash->{Interval}, "sml_energy_Update", $hash, 0);
+ }
 
  if ( $success == 0){
 	$hash->{READINGS}{minPower}{VAL}  = $min;
