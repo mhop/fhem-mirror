@@ -34,7 +34,8 @@ sub readingsGroup_Initialize($)
   $hash->{UndefFn}  = "readingsGroup_Undefine";
   #$hash->{SetFn}    = "readingsGroup_Set";
   $hash->{GetFn}    = "readingsGroup_Get";
-  $hash->{AttrList} = "disable:1,2,3 nameIcon valueIcon mapping separator style nameStyle valueStyle valueFormat timestampStyle noheading:1 nolinks:1 notime:1 nostate:1";
+  $hash->{AttrFn}   = "readingsGroup_Attr";
+  $hash->{AttrList} = "disable:1,2,3 nameIcon valueIcon mapping separator style nameStyle valueStyle valueFormat timestampStyle noheading:1 nolinks:1 notime:1 nostate:1 alwaysTrigger:1";
 
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
@@ -444,8 +445,12 @@ readingsGroup_detailFn()
 
   my $hash = $defs{$d};
 
-  Log3 $hash->{NAME}, 5, "opened: $FW_cname";
-  $hash->{helper}->{myDisplay}->{$FW_cname} = 1;
+  if( $hash->{alwaysTrigger} ) {
+    delete( $hash->{helper}->{myDisplay} );
+  } else {
+    Log3 $hash->{NAME}, 5, "opened: $FW_cname";
+    $hash->{helper}->{myDisplay}->{$FW_cname} = 1;
+  }
 
   return readingsGroup_2html($d);
 }
@@ -467,7 +472,8 @@ readingsGroup_Notify($$)
 
   return if( AttrVal($name,"disable", 0) > 0 );
 
-  if( !defined($hash->{helper}{myDisplay})
+  if( $hash->{alwaysTrigger} ) {
+  } elsif( !defined($hash->{helper}{myDisplay})
       || !%{$hash->{helper}{myDisplay}} ) {
     Log3 $name, 5, "$name: not on any display, ignoring notify";
     return undef;
@@ -677,6 +683,34 @@ readingsGroup_Get($@)
   return "Unknown argument $cmd, choose one of html:noArg";
 }
 
+sub
+readingsGroup_Attr($$$)
+{
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+  my $orig = $attrVal;
+
+  if( $attrName eq "alwaysTrigger" ) {
+    my $hash = $defs{$name};
+    $attrVal = 1 if($attrVal);
+
+    if( $cmd eq "set" ) {
+      $hash->{alwaysTrigger} = $attrVal;
+      delete( $hash->{helper}->{myDisplay} ) if( $hash->{alwaysTrigger} );
+    } else {
+      delete $hash->{alwaysTrigger};
+    }
+  }
+
+  if( $cmd eq "set" ) {
+    if( $orig ne $attrVal ) {
+      $attr{$name}{$attrName} = $attrVal;
+      return $attrName ." set to ". $attrVal;
+    }
+  }
+
+  return;
+}
+
 1;
 
 =pod
@@ -754,6 +788,8 @@ readingsGroup_Get($@)
   <a name="readingsGroup_Attr"></a>
     <b>Attributes</b>
     <ul>
+      <li>alwaysTrigger<br>
+        1 -> alwaysTrigger update events. even if not visible.
       <li>disable<br>
         1 -> disable notify processing and longpoll updates. Notice: this also disables rename and delete handling.<br>
         2 -> also disable html table creation<br>
