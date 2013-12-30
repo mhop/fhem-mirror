@@ -537,7 +537,7 @@ MAX_Set($@)
       # check if Wallthermo is in same group
       foreach my $addr ( keys %{$modules{MAX}{defptr}} ) {
         $shash = $modules{MAX}{defptr}{$addr};
-        $wallthermo = 1 if((MAX_ReadingsVal($shash,"groupid") eq MAX_ReadingsVal($hash,"groupid")) and $shash->{type} eq "WallMountedThermostat");
+        $wallthermo = 1 if(defined $shash->{type} && $shash->{type} eq "WallMountedThermostat" && (MAX_ReadingsVal($shash,"groupid") eq MAX_ReadingsVal($hash,"groupid")));
       }
 
       if ($wallthermo eq 1) {
