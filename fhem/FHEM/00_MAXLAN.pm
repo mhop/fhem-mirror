@@ -667,6 +667,9 @@ MAXLAN_Parse($$)
         readingsBulkUpdate($dhash, "MAXLAN_valid", $valid);
         readingsBulkUpdate($dhash, "MAXLAN_isAnswer", $answer);
         readingsEndUpdate($dhash, 1);
+        if($error) {
+          MAXLAN_Write($hash,"r:01,".encode_base64(pack("H*",$addr),""), "S:");
+        }
       }
 
       $bindata=substr($bindata,$len+1); #+1 because the len field is not counted
