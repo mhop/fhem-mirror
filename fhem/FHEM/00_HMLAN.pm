@@ -693,9 +693,8 @@ sub HMLAN_SimpleWrite(@) {#####################################################
                   && !$hash->{helper}{recoverTest});# no send if overload or disconnect
       delete $hash->{helper}{recoverTest}; # test done
     }
-    $msg =~ m/(.{9}).(..).(.{8}).(..).(.{8}).(..)(..)(..)(.{6})(.{6})(.*)/;
-    my ($s,$stat,$t,$d,$r,$no,$flg,$typ,$src,$dst,$p) =
-       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11);
+    my ($s,undef,$stat,undef,$t,undef,$d,undef,$r,undef,$no,$flg,$typ,$src,$dst,$p) =
+       unpack('A9A1A2A1A8A1A2A1A8A1A2A2A2A6A6A*',$msg);
 
     my $hmId = AttrVal($name,"hmId","");
     my $hDst = $hash->{helper}{$dst};# shortcut

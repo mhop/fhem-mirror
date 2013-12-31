@@ -10,28 +10,29 @@ use warnings;
 use HMConfig;
 
 # ========================import constants=====================================
-my %culHmModel            =HMConfig::HMConfig_getHash("culHmModel");
-my %culHmRegDefShLg       =HMConfig::HMConfig_getHash("culHmRegDefShLg");
-my %culHmRegDefine        =HMConfig::HMConfig_getHash("culHmRegDefine");
-my %culHmRegGeneral       =HMConfig::HMConfig_getHash("culHmRegGeneral");
-my %culHmRegType          =HMConfig::HMConfig_getHash("culHmRegType");
-my %culHmRegModel         =HMConfig::HMConfig_getHash("culHmRegModel");
-my %culHmRegChan          =HMConfig::HMConfig_getHash("culHmRegChan");
-my %culHmGlobalGets       =HMConfig::HMConfig_getHash("culHmGlobalGets");
-my %culHmSubTypeGets      =HMConfig::HMConfig_getHash("culHmSubTypeGets");
-my %culHmModelGets        =HMConfig::HMConfig_getHash("culHmModelGets");
-my %culHmGlobalSetsDevice =HMConfig::HMConfig_getHash("culHmGlobalSetsDevice");
-my %culHmSubTypeDevSets   =HMConfig::HMConfig_getHash("culHmSubTypeDevSets");
-my %culHmGlobalSetsChn    =HMConfig::HMConfig_getHash("culHmGlobalSetsChn");
-my %culHmGlobalSets       =HMConfig::HMConfig_getHash("culHmGlobalSets");
-my %culHmGlobalSetsVrtDev =HMConfig::HMConfig_getHash("culHmGlobalSetsVrtDev");
-my %culHmSubTypeSets      =HMConfig::HMConfig_getHash("culHmSubTypeSets");
-my %culHmModelSets        =HMConfig::HMConfig_getHash("culHmModelSets");
-my %culHmChanSets         =HMConfig::HMConfig_getHash("culHmChanSets");
-my %culHmFunctSets        =HMConfig::HMConfig_getHash("culHmFunctSets");
-my %culHmBits             =HMConfig::HMConfig_getHash("culHmBits");
-my @culHmCmdFlags         =HMConfig::HMConfig_getHash("culHmCmdFlags");
-my $K_actDetID            =HMConfig::HMConfig_getHash("K_actDetID");
+
+my $culHmModel            =\%HMConfig::culHmModel;
+my $culHmRegDefShLg       =\%HMConfig::culHmRegDefShLg;
+my $culHmRegDefine        =\%HMConfig::culHmRegDefine;
+my $culHmRegGeneral       =\%HMConfig::culHmRegGeneral;
+my $culHmRegType          =\%HMConfig::culHmRegType;
+my $culHmRegModel         =\%HMConfig::culHmRegModel;
+my $culHmRegChan          =\%HMConfig::culHmRegChan;
+my $culHmGlobalGets       =\%HMConfig::culHmGlobalGets;
+my $culHmSubTypeGets      =\%HMConfig::culHmSubTypeGets;
+my $culHmModelGets        =\%HMConfig::culHmModelGets;
+my $culHmGlobalSetsDevice =\%HMConfig::culHmGlobalSetsDevice;
+my $culHmSubTypeDevSets   =\%HMConfig::culHmSubTypeDevSets;
+my $culHmGlobalSetsChn    =\%HMConfig::culHmGlobalSetsChn;
+my $culHmGlobalSets       =\%HMConfig::culHmGlobalSets;
+my $culHmGlobalSetsVrtDev =\%HMConfig::culHmGlobalSetsVrtDev;
+my $culHmSubTypeSets      =\%HMConfig::culHmSubTypeSets;
+my $culHmModelSets        =\%HMConfig::culHmModelSets;
+my $culHmChanSets         =\%HMConfig::culHmChanSets;
+my $culHmFunctSets        =\%HMConfig::culHmFunctSets;
+my $culHmBits             =\%HMConfig::culHmBits;
+my $culHmCmdFlags         =\@HMConfig::culHmCmdFlags;
+my $K_actDetID            =\$HMConfig::K_actDetID;
 
 ############################################################
 
@@ -148,12 +149,12 @@ sub CUL_HM_Initialize($) {
   #        ,4_backUpdt
 
   my @modellist;
-  foreach my $model (keys %culHmModel){
-    push @modellist,$culHmModel{$model}{name};
+  foreach my $model (keys %{$culHmModel}){
+    push @modellist,$culHmModel->{$model}{name};
   }
   $hash->{AttrList}  .= " model:"  .join(",", sort @modellist);
   $hash->{AttrList}  .= " subType:".join(",",
-               CUL_HM_noDup(map { $culHmModel{$_}{st} } keys %culHmModel));
+               CUL_HM_noDup(map { $culHmModel->{$_}{st} } keys %{$culHmModel}));
 
   $hash->{prot}{rspPend} = 0;#count Pending responses
   my @statQArr = ();
@@ -225,8 +226,8 @@ sub CUL_HM_updateConfig($){
       if ($hash->{helper}{role}{chn}){
         my $chn = (length($id) == 8)?substr($id,6,2):"01";
         my $devId = substr($id,0,6);
-        if ($culHmModel{$mId} && $culHmModel{$mId}{chn} =~ m/Sw._V/){#virtual?
-          my @chnPh = (grep{$_ =~ m/Sw:/ } split ',',$culHmModel{$mId}{chn});
+        if ($culHmModel->{$mId} && $culHmModel->{$mId}{chn} =~ m/Sw._V/){#virtual?
+          my @chnPh = (grep{$_ =~ m/Sw:/ } split ',',$culHmModel->{$mId}{chn});
           @chnPh = split ':',$chnPh[0] if (@chnPh);
           my $chnPhyMax = $chnPh[2]?$chnPh[2]:1;         # max Phys channels
           my $chnPhy    = int(($chn-$chnPhyMax+1)/2);    # assotiated phy chan
@@ -434,7 +435,7 @@ sub CUL_HM_Attr(@) {#################################
         foreach my $rdEntry (grep /^R-/   ,keys %{$hash->{READINGS}}){
            my $reg = $rdEntry;
             $reg =~ s/.*-//;
-          next if(!$culHmRegDefine{$reg} || $culHmRegDefine{$reg}{d} eq '1');
+          next if(!$culHmRegDefine->{$reg} || $culHmRegDefine->{$reg}{d} eq '1');
           $hash->{READINGS}{".".$rdEntry} = $hash->{READINGS}{$rdEntry};
           delete $hash->{READINGS}{$rdEntry};
         }
@@ -566,8 +567,8 @@ sub CUL_HM_Parse($$) {##############################
     # Generate an UNKNOWN event for pairing requests, ignore everything else
     if($mTp eq "00") {
       my $md = substr($p, 2, 4);
-      $md = $culHmModel{$md}{name}  ?
-                $culHmModel{$md}{name} :
+      $md = $culHmModel->{$md}{name}  ?
+                $culHmModel->{$md}{name} :
                 "ID_".$md;
       my $sname = "CUL_HM_".$md."_$src";
       $sname =~ s/-/_/g;
@@ -2065,16 +2066,16 @@ sub CUL_HM_Get($@) {
   my $roleD = $hash->{helper}{role}{dev}?1:0;
   my $roleV = $hash->{helper}{role}{vrt}?1:0;
 
-  my $h = $culHmGlobalGets{$cmd};
-  $h = $culHmSubTypeGets{$st}{$cmd} if(!defined($h) && $culHmSubTypeGets{$st});
-  $h = $culHmModelGets{$md}{$cmd}   if(!defined($h) && $culHmModelGets{$md});
+  my $h = $culHmGlobalGets->{$cmd};
+  $h = $culHmSubTypeGets->{$st}{$cmd} if(!defined($h) && $culHmSubTypeGets->{$st});
+  $h = $culHmModelGets->{$md}{$cmd}   if(!defined($h) && $culHmModelGets->{$md});
   my @h;
   @h = split(" ", $h) if($h);
 
   if(!defined($h)) {
-    my @arr = keys %culHmGlobalGets;
-    push @arr, keys %{$culHmSubTypeGets{$st}} if($culHmSubTypeGets{$st});
-    push @arr, keys %{$culHmModelGets{$md}} if($culHmModelGets{$md});
+    my @arr = keys %{$culHmGlobalGets};
+    push @arr, keys %{$culHmSubTypeGets->{$st}} if($culHmSubTypeGets->{$st});
+    push @arr, keys %{$culHmModelGets->{$md}} if($culHmModelGets->{$md});
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr);
 
     return $usg;
@@ -2099,10 +2100,10 @@ sub CUL_HM_Get($@) {
   elsif($cmd eq "reg") {  #####################################################
     my (undef,undef,$regReq,$list,$peerId) = @a;
     if ($regReq eq 'all'){
-      my @regArr = keys %culHmRegGeneral;
-      push @regArr, keys %{$culHmRegType{$st}} if($culHmRegType{$st});
-      push @regArr, keys %{$culHmRegModel{$md}} if($culHmRegModel{$md});
-      push @regArr, keys %{$culHmRegChan{$md.$chn}} if($culHmRegChan{$md.$chn});
+      my @regArr = keys %{$culHmRegGeneral};
+      push @regArr, keys %{$culHmRegType->{$st}} if($culHmRegType->{$st});
+      push @regArr, keys %{$culHmRegModel->{$md}} if($culHmRegModel->{$md});
+      push @regArr, keys %{$culHmRegChan->{$md.$chn}} if($culHmRegChan->{$md.$chn});
 
       my @peers; # get all peers we have a reglist
       my @listWp; # list that require peers
@@ -2117,7 +2118,7 @@ sub CUL_HM_Get($@) {
       my @regValList; #storage of results
       my $regHeader = "list:peer\tregister         :value\n";
       foreach my $regName (@regArr){
-        my $regL  = $culHmRegDefine{$regName}->{l};
+        my $regL  = $culHmRegDefine->{$regName}->{l};
         my @peerExe = (grep (/$regL/,@listWp))?@peers:("00000000");
         foreach my $peer(@peerExe){
           next if($peer eq "");
@@ -2146,24 +2147,24 @@ sub CUL_HM_Get($@) {
     }
   }
   elsif($cmd eq "regList") {  #################################################
-    my @regArr = keys %culHmRegGeneral ;
-    push @regArr, keys %{$culHmRegType{$st}} if($culHmRegType{$st});
-    push @regArr, keys %{$culHmRegModel{$md}} if($culHmRegModel{$md});
+    my @regArr = keys %{$culHmRegGeneral};
+    push @regArr, keys %{$culHmRegType->{$st}} if($culHmRegType->{$st});
+    push @regArr, keys %{$culHmRegModel->{$md}} if($culHmRegModel->{$md});
 
     if ($isChannel){
-      push @regArr, keys %{$culHmRegChan{$md.$chn}} if($culHmRegChan{$md.$chn});
+      push @regArr, keys %{$culHmRegChan->{$md.$chn}} if($culHmRegChan->{$md.$chn});
     }
     else{# add all ugly channel register to device view
       for my $chnId (CUL_HM_getAssChnIds($name)){
         my $chnN = substr($chnId,6,2);
-        push @regArr, keys %{$culHmRegChan{$md.$chnN}}
-              if($culHmRegChan{$md.$chnN});
+        push @regArr, keys %{$culHmRegChan->{$md.$chnN}}
+              if($culHmRegChan->{$md.$chnN});
       }
     }
 
     my @rI;
     foreach my $regName (@regArr){
-      my $reg  = $culHmRegDefine{$regName};
+      my $reg  = $culHmRegDefine->{$regName};
       my $help = $reg->{t};
       my ($min,$max) = ($reg->{min},"to ".$reg->{max});
       if (defined($reg->{lit})){
@@ -2250,37 +2251,37 @@ sub CUL_HM_Set($@) {
   my $roleV = $hash->{helper}{role}{vrt}?1:0;
   my $mdCh = $md.($isChannel?$chn:"00"); # chan specific commands?
   my $fkt = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
-  my $h = $culHmGlobalSets{$cmd}      if(                $st ne "virtual");
-  $h = $culHmGlobalSetsVrtDev{$cmd}   if(!defined($h) &&($st eq "virtual"||!$st)  && $roleD);
-  $h = $culHmGlobalSetsDevice{$cmd}   if(!defined($h) && $st ne "virtual"         && $roleD);
-  $h = $culHmSubTypeDevSets{$st}{$cmd}if(!defined($h) && $st ne "virtual"         && $roleD);
-  $h = $culHmGlobalSetsChn{$cmd}      if(!defined($h) && $st ne "virtual"         && $roleC);
-  $h = $culHmSubTypeSets{$st}{$cmd}   if(!defined($h) && $culHmSubTypeSets{$st}   && $roleC);
-  $h = $culHmModelSets{$md}{$cmd}     if(!defined($h) && $culHmModelSets{$md}  );
-  $h = $culHmChanSets{$md."00"}{$cmd} if(!defined($h) && $culHmChanSets{$md."00"} && $roleD);
-  $h = $culHmChanSets{$md.$chn}{$cmd} if(!defined($h) && $culHmChanSets{$md.$chn} && $roleC); 
-  $h = $culHmFunctSets{$fkt}{$cmd}    if(!defined($h) && $culHmFunctSets{$fkt});
+  my $h = $culHmGlobalSets->{$cmd}      if(                $st ne "virtual");
+  $h = $culHmGlobalSetsVrtDev->{$cmd}   if(!defined($h) &&($st eq "virtual"||!$st)  && $roleD);
+  $h = $culHmGlobalSetsDevice->{$cmd}   if(!defined($h) && $st ne "virtual"         && $roleD);
+  $h = $culHmSubTypeDevSets->{$st}{$cmd}if(!defined($h) && $st ne "virtual"         && $roleD);
+  $h = $culHmGlobalSetsChn->{$cmd}      if(!defined($h) && $st ne "virtual"         && $roleC);
+  $h = $culHmSubTypeSets->{$st}{$cmd}   if(!defined($h) && $culHmSubTypeSets->{$st}   && $roleC);
+  $h = $culHmModelSets->{$md}{$cmd}     if(!defined($h) && $culHmModelSets->{$md}  );
+  $h = $culHmChanSets->{$md."00"}{$cmd} if(!defined($h) && $culHmChanSets->{$md."00"} && $roleD);
+  $h = $culHmChanSets->{$md.$chn}{$cmd} if(!defined($h) && $culHmChanSets->{$md.$chn} && $roleC); 
+  $h = $culHmFunctSets->{$fkt}{$cmd}    if(!defined($h) && $culHmFunctSets->{$fkt});
 
   my @h;
   @h = split(" ", $h) if($h);
   my @postCmds=(); #Commands to be appended after regSet (ugly...)
 
-  if(!defined($h) && defined($culHmSubTypeSets{$st}{pct}) && $cmd =~ m/^\d+/) {
+  if(!defined($h) && defined($culHmSubTypeSets->{$st}{pct}) && $cmd =~ m/^\d+/) {
     splice @a, 1, 0,"pct";#insert the actual command
   }
   elsif(!defined($h)) {
     my @arr1 = ();
 
-    if( $st ne "virtual")                  {foreach(keys %culHmGlobalSets            ){push @arr1,"$_:$culHmGlobalSets{$_}"            }};
-    if(($st eq "virtual"||!$st)  && $roleD){foreach(keys %culHmGlobalSetsVrtDev      ){push @arr1,"$_:$culHmGlobalSetsVrtDev{$_}"      }};
-    if( $st ne "virtual"         && $roleD){foreach(keys %culHmGlobalSetsDevice      ){push @arr1,"$_:$culHmGlobalSetsDevice{$_}"      }};
-    if( $st ne "virtual"         && $roleD){foreach(keys %{$culHmSubTypeDevSets{$st}}){push @arr1,"$_:${$culHmSubTypeDevSets{$st}}{$_}"}};
-    if( $st ne "virtual"         && $roleC){foreach(keys %culHmGlobalSetsChn         ){push @arr1,"$_:$culHmGlobalSetsChn{$_}"         }};
-    if( $culHmSubTypeSets{$st}   && $roleC){foreach(keys %{$culHmSubTypeSets{$st}}   ){push @arr1,"$_:${$culHmSubTypeSets{$st}}{$_}"   }};
-    if( $culHmModelSets{$md})              {foreach(keys %{$culHmModelSets{$md}}     ){push @arr1,"$_:${$culHmModelSets{$md}}{$_}"     }};
-    if( $culHmChanSets{$md."00"} && $roleD){foreach(keys %{$culHmChanSets{$md."00"}} ){push @arr1,"$_:".${$culHmChanSets{$md."00"}}{$_}}};
-    if( $culHmChanSets{$md.$chn} && $roleC){foreach(keys %{$culHmChanSets{$md.$chn}} ){push @arr1,"$_:".${$culHmChanSets{$md.$chn}}{$_}}};
-    if( $culHmFunctSets{$fkt}    && $roleC){foreach(keys %{$culHmFunctSets{$fkt}}    ){push @arr1,"$_:".${$culHmFunctSets{$fkt}}{$_}   }};
+    if( $st ne "virtual")                    {foreach(keys %{$culHmGlobalSets}           ){push @arr1,"$_:".$culHmGlobalSets->{$_}            }};
+    if(($st eq "virtual"||!$st)    && $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_:".$culHmGlobalSetsVrtDev->{$_}      }};
+    if( $st ne "virtual"           && $roleD){foreach(keys %{$culHmGlobalSetsDevice}     ){push @arr1,"$_:".$culHmGlobalSetsDevice->{$_}      }};
+    if( $st ne "virtual"           && $roleD){foreach(keys %{$culHmSubTypeDevSets->{$st}}){push @arr1,"$_:".${$culHmSubTypeDevSets->{$st}}{$_}}};
+    if( $st ne "virtual"           && $roleC){foreach(keys %{$culHmGlobalSetsChn}        ){push @arr1,"$_:".$culHmGlobalSetsChn->{$_}         }};
+    if( $culHmSubTypeSets->{$st}   && $roleC){foreach(keys %{$culHmSubTypeSets->{$st}}   ){push @arr1,"$_:".${$culHmSubTypeSets->{$st}}{$_}   }};
+    if( $culHmModelSets->{$md})              {foreach(keys %{$culHmModelSets->{$md}}     ){push @arr1,"$_:".${$culHmModelSets->{$md}}{$_}     }};
+    if( $culHmChanSets->{$md."00"} && $roleD){foreach(keys %{$culHmChanSets->{$md."00"}} ){push @arr1,"$_:".${$culHmChanSets->{$md."00"}}{$_} }};
+    if( $culHmChanSets->{$md.$chn} && $roleC){foreach(keys %{$culHmChanSets->{$md.$chn}} ){push @arr1,"$_:".${$culHmChanSets->{$md.$chn}}{$_} }};
+    if( $culHmFunctSets->{$fkt}    && $roleC){foreach(keys %{$culHmFunctSets->{$fkt}}    ){push @arr1,"$_:".${$culHmFunctSets->{$fkt}}{$_}    }};
     @arr1 = CUL_HM_noDup(@arr1);
     foreach(@arr1){
       my ($cmd,$val) = split(":",$_,2);
@@ -2502,9 +2503,9 @@ sub CUL_HM_Set($@) {
       return "unknown peer".$peer if (length($pID) != 8);# peer only to channel
       my $pCh1 = substr($pID,6,2);
       my $pCh2 = $pCh1;
-      if(($culHmSubTypeSets{$st}   &&$culHmSubTypeSets{$st}{peerChan}  )||
-         ($culHmModelSets{$md}     &&$culHmModelSets{$md}{peerChan}    )||
-         ($culHmChanSets{$md.$chn} &&$culHmChanSets{$md.$chn}{peerChan})  ){
+      if(($culHmSubTypeSets->{$st}   &&$culHmSubTypeSets->{$st}{peerChan}  )||
+         ($culHmModelSets->{$md}     &&$culHmModelSets->{$md}{peerChan}    )||
+         ($culHmChanSets->{$md.$chn} &&$culHmChanSets->{$md.$chn}{peerChan})  ){
         $pCh2 = "00";                        # button behavior
       }
       CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chn.$set.
@@ -2578,18 +2579,18 @@ sub CUL_HM_Set($@) {
 
     my (undef,undef,$regName,$data,$peerChnIn) = @a;
     $state = "";
-    if (!$culHmRegType{$st}{$regName}      &&
-        !$culHmRegGeneral{$regName}        &&
-        !$culHmRegModel{$md}{$regName}     &&
-        !$culHmRegChan{$md.$chn}{$regName}  ){
-      my @regArr = keys %culHmRegGeneral ;
-      push @regArr, keys %{$culHmRegType{$st}} if($culHmRegType{$st});
-      push @regArr, keys %{$culHmRegModel{$md}} if($culHmRegModel{$md});
-      push @regArr, keys %{$culHmRegChan{$md.$chn}} if($culHmRegChan{$md.$chn});
+    if (!$culHmRegType->{$st}{$regName}      &&
+        !$culHmRegGeneral->{$regName}        &&
+        !$culHmRegModel->{$md}{$regName}     &&
+        !$culHmRegChan->{$md.$chn}{$regName}  ){
+      my @regArr = keys %{$culHmRegGeneral};
+      push @regArr, keys %{$culHmRegType->{$st}} if($culHmRegType->{$st});
+      push @regArr, keys %{$culHmRegModel->{$md}} if($culHmRegModel->{$md});
+      push @regArr, keys %{$culHmRegChan->{$md.$chn}} if($culHmRegChan->{$md.$chn});
       return "$regName failed: supported register are ".join(" ",sort @regArr);
     }
 
-    my $reg  = $culHmRegDefine{$regName};
+    my $reg  = $culHmRegDefine->{$regName};
     return $st." - ".$regName            # give some help
            .($reg->{lit}? " literal:".join(",",keys%{$reg->{lit}})." "
                         : " range:". $reg->{min}." to ".$reg->{max}.$reg->{u}
@@ -3309,8 +3310,8 @@ sub CUL_HM_Set($@) {
     # First the remote (one loop for on, one for off)
     if (!$target || $target =~ m/^(remote|both)$/){
       my $burst;
-      if ($culHmRegModel{$md}{peerNeedsBurst}|| #peerNeedsBurst supported
-          $culHmRegType{$st}{peerNeedsBurst}){
+      if ($culHmRegModel->{$md}{peerNeedsBurst}|| #peerNeedsBurst supported
+          $culHmRegType->{$st}{peerNeedsBurst}){
         $burst = (CUL_HM_getRxType($peerHash) & 0x82) #burst |burstConditional
                            ?"0101"  
                            :"0100";
@@ -3420,9 +3421,9 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
   my($name,$hash,$p) = @_;
   my($fw1,$fw2,$mId,$serNo,$stc,$devInfo) = unpack('A1A1A4A20A2A*', $p);
   
-  my $md = $culHmModel{$mId}{name} ? $culHmModel{$mId}{name}:"unknown";
+  my $md = $culHmModel->{$mId}{name} ? $culHmModel->{$mId}{name}:"unknown";
   $attr{$name}{model}    = $md;
-  $attr{$name}{subType}  = $culHmModel{$mId}{st};
+  $attr{$name}{subType}  = $culHmModel->{$mId}{st};
   $attr{$name}{serialNr} = pack('H*',$serNo);
   #expert level attributes
   $attr{$name}{firmware} = sprintf("%d.%d", hex($fw1),hex($fw2));
@@ -3434,7 +3435,7 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
   $mId = CUL_HM_getMId($hash);# set helper valiable and use result
 
   # autocreate undefined channels
-  my @chanTypesList = split(',',$culHmModel{$mId}{chn});
+  my @chanTypesList = split(',',$culHmModel->{$mId}{chn});
   my $startime = gettimeofday()+1;
   foreach my $chantype (@chanTypesList){
     my ($chnTpName,$chnStart,$chnEnd) = split(':',$chantype);
@@ -3451,9 +3452,9 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
       $chnNoTyp++;
     }
   }
-  if ($culHmModel{$mId}{cyc}){
+  if ($culHmModel->{$mId}{cyc}){
     CUL_HM_ActAdd($hash->{DEF},AttrVal($name,"actCycle",
-                                             $culHmModel{$mId}{cyc}));
+                                             $culHmModel->{$mId}{cyc}));
   }
 }
 sub CUL_HM_infoUpdtChanData(@) {# verify attributes after reboot
@@ -3477,7 +3478,7 @@ sub CUL_HM_getConfig($){
     my $chn = substr($channel,6,2);
     delete $cHash->{READINGS}{$_}
           foreach (grep /^[\.]?(RegL_)/,keys %{$cHash->{READINGS}});
-    my $lstAr = $culHmModel{CUL_HM_getMId($cHash)}{lst};
+    my $lstAr = $culHmModel->{CUL_HM_getMId($cHash)}{lst};
     if($lstAr){
       my @list = split(",",$lstAr); #get valid lists e.g."1, 5:2.3p ,6:2"
       my $pReq = 0; # Peer request not issued, do only once for channel
@@ -4183,9 +4184,9 @@ sub CUL_HM_getMId($) {#in: hash(chn or dev) out:model key (key for %culHmModel)
   my $mId = $hash->{helper}{mId};
   if (!$mId){
     my $model = AttrVal($hash->{NAME}, "model", "");
-    foreach my $mIdKey(keys%culHmModel){
-      next if (!$culHmModel{$mIdKey}{name} ||
-                $culHmModel{$mIdKey}{name} ne $model);
+    foreach my $mIdKey(keys%{$culHmModel}){
+      next if (!$culHmModel->{$mIdKey}{name} ||
+                $culHmModel->{$mIdKey}{name} ne $model);
       $hash->{helper}{mId} = $mIdKey ;
       return $mIdKey;
     }
@@ -4202,7 +4203,7 @@ sub CUL_HM_getRxType($) { #in:hash(chn or dev) out:binary coded Rx type
   use warnings;
   if (!$rxtEntity){ #at least one bit must be set
     my $MId = CUL_HM_getMId($hash);
-    my $rxtOfModel = $culHmModel{$MId}{rxt} if ($MId && $culHmModel{$MId}{rxt});
+    my $rxtOfModel = $culHmModel->{$MId}{rxt} if ($MId && $culHmModel->{$MId}{rxt});
     if ($rxtOfModel){
       $rxtEntity |= ($rxtOfModel =~ m/b/)?0x02:0;#burst
       $rxtEntity |= ($rxtOfModel =~ m/c/)?0x04:0;#config
@@ -4335,15 +4336,15 @@ sub CUL_HM_DumpProtocol($$@) {
   # decode message flags for printing
   my $msgFlLong="";
   my $msgFlagsHex = hex($msgFlags);
-  for(my $i = 0; $i < @culHmCmdFlags; $i++) {
-    $msgFlLong .= ",$culHmCmdFlags[$i]" if($msgFlagsHex & (1<<$i));
+  for(my $i = 0; $i < @{$culHmCmdFlags}; $i++) {
+    $msgFlLong .= ",".${$culHmCmdFlags}[$i] if($msgFlagsHex & (1<<$i));
   }
 
   my $ps;
-  $ps = $culHmBits{"$mTp;p11=$p11"} if(!$ps);
-  $ps = $culHmBits{"$mTp;p01=$p01"} if(!$ps);
-  $ps = $culHmBits{"$mTp;p02=$p02"} if(!$ps);
-  $ps = $culHmBits{"$mTp"}          if(!$ps);
+  $ps = $culHmBits->{"$mTp;p11=$p11"} if(!$ps);
+  $ps = $culHmBits->{"$mTp;p01=$p01"} if(!$ps);
+  $ps = $culHmBits->{"$mTp;p02=$p02"} if(!$ps);
+  $ps = $culHmBits->{"$mTp"}          if(!$ps);
   my $txt = "";
   if($ps) {
     $txt = $ps->{txt};
@@ -4372,7 +4373,7 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   my $hash = $defs{$name};
   my ($size,$pos,$conversion,$factor,$unit) = (8,0,"",1,""); # default
   my $addr = $regName;
-  my $reg = $culHmRegDefine{$regName};
+  my $reg = $culHmRegDefine->{$regName};
   if ($reg) { # get the register's information
     $addr = $reg->{a};
     $pos = ($addr*10)%10;
@@ -4444,10 +4445,10 @@ sub CUL_HM_updtRegDisp($$$) {
   my $md = $attr{$devName}{model}   ?$attr{$devName}{model}   :"";
   my $chn = $hash->{DEF};
   $chn = (length($chn) == 8)?substr($chn,6,2):"";
-  my @regArr = keys %culHmRegGeneral;
-  push @regArr, keys %{$culHmRegType{$st}} if($culHmRegType{$st});
-  push @regArr, keys %{$culHmRegModel{$md}} if($culHmRegModel{$md});
-  push @regArr, keys %{$culHmRegChan{$md.$chn}} if($culHmRegChan{$md.$chn});
+  my @regArr = keys %{$culHmRegGeneral};
+  push @regArr, keys %{$culHmRegType->{$st}} if($culHmRegType->{$st});
+  push @regArr, keys %{$culHmRegModel->{$md}} if($culHmRegModel->{$md});
+  push @regArr, keys %{$culHmRegChan->{$md.$chn}} if($culHmRegChan->{$md.$chn});
   my @changedRead;
   my $expL = CUL_HM_getAttrInt($name,"expert");
   my $expLvl = ($expL != 0)?1:0;
@@ -4457,10 +4458,10 @@ sub CUL_HM_updtRegDisp($$$) {
                                           substr(CUL_HM_name2Id($name),0,6),
                                           CUL_HM_IOid($hash)):"");
   foreach my $rgN (@regArr){
-    next if ($culHmRegDefine{$rgN}->{l} ne $listNo);
+    next if ($culHmRegDefine->{$rgN}->{l} ne $listNo);
     my $rgVal = CUL_HM_getRegFromStore($name,$rgN,$list,$peerId,$regLN);
     next if (!$rgVal || $rgVal eq "invalid");
-    my $rdN = ((!$expLvl && !$culHmRegDefine{$rgN}->{d})?".":"").$pReg.$rgN;
+    my $rdN = ((!$expLvl && !$culHmRegDefine->{$rgN}->{d})?".":"").$pReg.$rgN;
     push (@changedRead,$rdN.":".$rgVal)
           if (ReadingsVal($name,$rdN,"") ne $rgVal);
   }
@@ -4583,42 +4584,42 @@ sub CUL_HM_getChnLvl($){# in: name out: vit or phys level
 #--------------- Conversion routines for register settings---------------------
 sub CUL_HM_initRegHash() { #duplicate short and long press register
 
-  foreach my $reg (keys %culHmRegDefShLg){ #update register list
-    %{$culHmRegDefine{"sh".$reg}} = %{$culHmRegDefShLg{$reg}};
-    %{$culHmRegDefine{"lg".$reg}} = %{$culHmRegDefShLg{$reg}};
-    $culHmRegDefine{"lg".$reg}{a} +=0x80;
+  foreach my $reg (keys %{$culHmRegDefShLg}){ #update register list
+    %{$culHmRegDefine->{"sh".$reg}} = %{$culHmRegDefShLg->{$reg}};
+    %{$culHmRegDefine->{"lg".$reg}} = %{$culHmRegDefShLg->{$reg}};
+    $culHmRegDefine->{"lg".$reg}{a} +=0x80;
   }
-  foreach my $rN (keys %culHmRegDefine){#create literal inverse for fast search
-    if ($culHmRegDefine{$rN}{lit}){# literal assigned => create inverse
-      foreach my $lit (keys %{$culHmRegDefine{$rN}{lit}}){
-        $culHmRegDefine{$rN}{litInv}{$culHmRegDefine{$rN}{lit}{$lit}}=$lit;
+  foreach my $rN (keys %{$culHmRegDefine}){#create literal inverse for fast search
+    if ($culHmRegDefine->{$rN}{lit}){# literal assigned => create inverse
+      foreach my $lit (keys %{$culHmRegDefine->{$rN}{lit}}){
+        $culHmRegDefine->{$rN}{litInv}{$culHmRegDefine->{$rN}{lit}{$lit}}=$lit;
       }
     }
   }
-  foreach my $type(sort(keys %culHmRegType)){ #update references to register
-    foreach my $reg (sort(keys %{$culHmRegType{$type}})){
-      if ($culHmRegDefShLg{$reg}){
-        delete $culHmRegType{$type}{$reg};
-        $culHmRegType{$type}{"sh".$reg} = 1;
-        $culHmRegType{$type}{"lg".$reg} = 1;
+  foreach my $type(sort(keys %{$culHmRegType})){ #update references to register
+    foreach my $reg (sort(keys %{$culHmRegType->{$type}})){
+      if ($culHmRegDefShLg->{$reg}){
+        delete $culHmRegType->{$type}{$reg};
+        $culHmRegType->{$type}{"sh".$reg} = 1;
+        $culHmRegType->{$type}{"lg".$reg} = 1;
       }
     }
   }
-  foreach my $type(sort(keys %culHmRegModel)){ #update references to register
-    foreach my $reg (sort(keys %{$culHmRegModel{$type}})){
-      if ($culHmRegDefShLg{$reg}){
-        delete $culHmRegModel{$type}{$reg};
-        $culHmRegModel{$type}{"sh".$reg} = 1;
-        $culHmRegModel{$type}{"lg".$reg} = 1;
+  foreach my $type(sort(keys %{$culHmRegModel})){ #update references to register
+    foreach my $reg (sort(keys %{$culHmRegModel->{$type}})){
+      if ($culHmRegDefShLg->{$reg}){
+        delete $culHmRegModel->{$type}{$reg};
+        $culHmRegModel->{$type}{"sh".$reg} = 1;
+        $culHmRegModel->{$type}{"lg".$reg} = 1;
       }
     }
   }
-  foreach my $type(sort(keys %culHmRegChan)){ #update references to register
-    foreach my $reg (sort(keys %{$culHmRegChan{$type}})){
-      if ($culHmRegDefShLg{$reg}){
-        delete $culHmRegChan{$type}{$reg};
-        $culHmRegChan{$type}{"sh".$reg} = 1;
-        $culHmRegChan{$type}{"lg".$reg} = 1;
+  foreach my $type(sort(keys %{$culHmRegChan})){ #update references to register
+    foreach my $reg (sort(keys %{$culHmRegChan->{$type}})){
+      if ($culHmRegDefShLg->{$reg}){
+        delete $culHmRegChan->{$type}{$reg};
+        $culHmRegChan->{$type}{"sh".$reg} = 1;
+        $culHmRegChan->{$type}{"lg".$reg} = 1;
       }
     }
   }
@@ -4694,7 +4695,7 @@ sub CUL_HM_4DisText($) {      # convert text for 4dis
     $txtHex =~ s/ ..:/,/g;         #remove addr
     $txtHex =~ s/,00.*//;          #remove trailing string
     my @ch = split(",",$txtHex,12);
-    foreach (@ch){$txt{$sAddr}.=chr(hex($_))};
+    foreach (@ch){$txt{$sAddr}.=chr(hex($_)) if (length($_)==2)};
   }
   CUL_HM_UpdtReadBulk($hash,1,"text1:".$pref.$txt{54},
                               "text2:".$pref.$txt{70});
@@ -5314,7 +5315,7 @@ sub CUL_HM_getAttrInt($@){#return attrValue as integer
 #+++++++++++++++++ external use +++++++++++++++++++++++++++++++++++++++++++++++
 sub CUL_HM_putHash($) {# provide data for HMinfo
   my ($info) = @_;
-  return %culHmModel if ($info eq "culHmModel");
+  return %{$culHmModel} if ($info eq "culHmModel");
 }
 
 sub CUL_HM_peerUsed($) {# are peers expected?
@@ -5327,8 +5328,8 @@ sub CUL_HM_peerUsed($) {# are peers expected?
 
   my $mId = CUL_HM_getMId($hash);
   my $cNo = hex(substr($hash->{DEF}."01",6,2))."p"; #default to channel 01
-  return 0 if (!$mId || !$culHmModel{$mId});
-  foreach my $ls (split ",",$culHmModel{$mId}{lst}){
+  return 0 if (!$mId || !$culHmModel->{$mId});
+  foreach my $ls (split ",",$culHmModel->{$mId}{lst}){
     my ($l,$c) = split":",$ls;
     if (  ($l =~ m/^(p|3|4)$/ && !$c )  # 3,4,p without chanspec
         ||($c && $c =~ m/$cNo/       )){
@@ -5358,13 +5359,13 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
 
   my @lsNo;
   my $mId = CUL_HM_getMId($hash);
-  return undef if (!$mId || !$culHmModel{$mId});
+  return undef if (!$mId || !$culHmModel->{$mId});
   if ($hash->{helper}{role}{dev}){
     push @lsNo,"0:";
   }
   elsif ($hash->{helper}{role}{chn}){
 
-    foreach my $ls (split ",",$culHmModel{$mId}{lst}){
+    foreach my $ls (split ",",$culHmModel->{$mId}{lst}){
       my ($l,$c) = split":",$ls;
       if ($l ne "p"){# ignore peer-only entries
         if ($c){

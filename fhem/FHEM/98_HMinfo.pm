@@ -15,6 +15,7 @@ sub HMinfo_SetFn($@);
 sub HMinfo_SetFnDly($);
 
 use Blocking;
+use HMConfig;
 
 sub HMinfo_Initialize($$) {####################################################
   my ($hash) = @_;
@@ -137,8 +138,6 @@ sub HMinfo_regCheck(@) { ######################################################
   my @regMissing;
   my @peerRegsFail;
 
-  my %th = CUL_HM_putHash("culHmModel");
-
   foreach my $eName (@entities){
     my $ehash = $defs{$eName};
 
@@ -166,7 +165,6 @@ sub HMinfo_peerCheck(@) { #####################################################
   my @peerIDsFail;
   my @peerIDsEmpty;
   my @peerIDsNoPeer;
-  my %th = CUL_HM_putHash("culHmModel");
   foreach my $eName (@entities){
     next if (!$defs{$eName}{helper}{role}{chn});#device has no channels
     next if (!CUL_HM_peerUsed($eName));
@@ -209,7 +207,6 @@ sub HMinfo_burstCheck(@) { ####################################################
   my @entities = @_;
   my @peerIDsNeed;
   my @peerIDsCond;
-  my %th = CUL_HM_putHash("culHmModel");
   foreach my $eName (@entities){
     next if (!$defs{$eName}{helper}{role}{chn});#device has no channels
     next if (!CUL_HM_peerUsed($eName));
@@ -243,7 +240,6 @@ sub HMinfo_paramCheck(@) { ####################################################
   my @noIoDev;
   my @noID;
   my @idMismatch;
-  my %th = CUL_HM_putHash("culHmModel");
   foreach my $eName (@entities){
     next if (!$defs{$eName}{helper}{role}{dev});
     my $ehash = $defs{$eName};
@@ -583,10 +579,10 @@ sub HMinfo_SetFn($@) {#########################################################
                          ;
   }
   elsif($cmd eq "models")     {##print capability, models----------------------
-    my %th = CUL_HM_putHash("culHmModel");
+    my $th = \%HMConfig::culHmModel;
     my @model;
-    foreach (keys %th){
-      my $mode = $th{$_}{rxt};
+    foreach (keys %{$th}){
+      my $mode = $th->{$_}{rxt};
       $mode =~ s/c/config/;
       $mode =~ s/w/wakeup/;
       $mode =~ s/b/burst/;
@@ -594,20 +590,20 @@ sub HMinfo_SetFn($@) {#########################################################
       $mode =~ s/\bf\b/burstCond/;
       $mode =~ s/:/,/g;
       $mode = "normal" if (!$mode);
-      my $list = $th{$_}{lst};
+      my $list = $th->{$_}{lst};
       $list =~ s/.://g;
       $list =~ s/p//;
       my $chan = "";
-      foreach (split",",$th{$_}{chn}){
+      foreach (split",",$th->{$_}{chn}){
         my ($n,$s,$e) = split(":",$_);
         $chan .= $s.(($s eq $e)?"":("-".$e))." ".$n.", ";
       }
       push @model,sprintf("%-16s %-24s %4s %-24s %-5s %-5s %s"
-                          ,$th{$_}{st}
-                          ,$th{$_}{name}
+                          ,$th->{$_}{st}
+                          ,$th->{$_}{name}
                           ,$_
                           ,$mode
-                          ,$th{$_}{cyc}
+                          ,$th->{$_}{cyc}
                           ,$list
                           ,$chan
                           );
