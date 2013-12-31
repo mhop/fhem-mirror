@@ -9,6 +9,30 @@ package HMConfig;
 use strict;
 use warnings;
 
+############globals############
+use vars qw(%culHmModel);
+use vars qw(%culHmRegDefShLg);
+use vars qw(%culHmRegDefine);
+use vars qw(%culHmRegGeneral);
+use vars qw(%culHmRegType);
+use vars qw(%culHmRegModel);
+use vars qw(%culHmRegChan);
+use vars qw(%culHmGlobalGets);
+use vars qw(%culHmSubTypeGets);
+use vars qw(%culHmModelGets);
+use vars qw(%culHmGlobalSetsDevice);
+use vars qw(%culHmSubTypeDevSets);
+use vars qw(%culHmGlobalSetsChn);
+use vars qw(%culHmGlobalSets);
+use vars qw(%culHmGlobalSetsVrtDev);
+use vars qw(%culHmSubTypeSets);
+use vars qw(%culHmModelSets);
+use vars qw(%culHmChanSets);
+use vars qw(%culHmFunctSets);
+use vars qw(%culHmBits);
+use vars qw(@culHmCmdFlags);
+use vars qw($K_actDetID);
+
 # ----------------modul globals-----------------------
 my $K_actDetID = '000000'; # id of actionDetector
 
@@ -53,7 +77,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 #              => list 5 only for channel 3 but assotiated with peers
 #              => list 5 for channel 4 and 5 with peer=00000000
 #
-my %culHmModel=(
+%culHmModel=(
   "0001" => {name=>"HM-LC-SW1-PL-OM54"       ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"",},
   "0002" => {name=>"HM-LC-SW1-SM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"",},
   "0003" => {name=>"HM-LC-SW4-SM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"Sw:1:4",},
@@ -257,7 +281,7 @@ my %culHmModel=(
     # lit: if the command is a literal options will be entered here
     # d: if '1' the register will appear in Readings
     #
-my %culHmRegDefShLg = (# register that are available for short AND long button press. Will be merged to rgister list at init
+%culHmRegDefShLg = (# register that are available for short AND long button press. Will be merged to rgister list at init
 #blindActuator mainly
   ActionType      =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3}},
   OffTimeMode     =>{a=> 10.6,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"off time mode",lit=>{absolut=>0,minimal=>1}},
@@ -356,7 +380,7 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   TempRC          =>{a=> 45  ,s=>0.6,l=>3,min=>5  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>0,t=>"temperature repated to CtrlRc reg"},
 );
 
-my %culHmRegDefine = (
+%culHmRegDefine = (
 #--- list 0, device  and protocol level-----------------
   burstRx         =>{a=>  1.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>'device reacts on Burst'        ,lit=>{off=>0,on=>1}},
   intKeyVisib     =>{a=>  2.7,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>'visibility of internal channel',lit=>{invisib=>0,visib=>1}},
@@ -653,10 +677,10 @@ my %culHmRegDefine = (
 #'blindActuatorSol'
 #'powerMeter'
 
-my %culHmRegGeneral = (
+%culHmRegGeneral = (
   pairCentral=>1,
 );
-my %culHmRegType = (
+%culHmRegType = (
   swi                 =>{ peerNeedsBurst  =>1,expectAES       =>1},
   remote              =>{ peerNeedsBurst  =>1,expectAES       =>1,dblPress        =>1,longPress       =>1
                          ,sign            =>1
@@ -725,7 +749,7 @@ my %culHmRegType = (
 #clones - - - - - - - - - - - - - - -
 $culHmRegType{pushButton}     = $culHmRegType{remote};
 
-my %culHmRegModel = (
+%culHmRegModel = (
   "HM-RC-12"          =>{ backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1},
   "HM-RC-19"          =>{ backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1,backAtCharge    =>1,language =>1
                          ,lcdSymb         =>1, lcdLvlInterp   =>1
@@ -888,7 +912,7 @@ $culHmRegModel{"HM-LC-SW4-BA-PCB"}    = $culHmRegModel{"HM-LC-SW1-BA-PCB"};
 
 $culHmRegModel{"HM-CC-RT-DN-BoM"}     = $culHmRegModel{"HM-CC-RT-DN"};
 
-my %culHmRegChan = (# if channelspecific then enter them here
+%culHmRegChan = (# if channelspecific then enter them here
   "HM-CC-TC02"        =>{ displayMode     =>1,displayTemp     =>1,displayTempUnit =>1
                          ,controlMode     =>1,decalcDay       =>1
                          ,"day-temp"      =>1,"night-temp"    =>1,"party-temp"    =>1
@@ -1003,39 +1027,39 @@ $culHmRegChan{"HM-TC-IT-WM-W-EU06"}= $culHmRegType{"HM-CC-RT-DN06"};
 
 ##############################---get---########################################
 #define gets - try use same names as for set
-my %culHmGlobalGets = (
+%culHmGlobalGets = (
   param      => "<param>",
   reg        => "<addr> ... <list> <peer>",
   regList    => "",
   saveConfig => "<filename>",
 );
-my %culHmSubTypeGets = (
+%culHmSubTypeGets = (
   none4Type  =>{ "test"=>"" },
 );
-my %culHmModelGets = (
+%culHmModelGets = (
   none4Mod   =>{ "none"=>"" },
 );
 
 ##############################---set---########################################
-my %culHmGlobalSets = (# all but virtuals
+%culHmGlobalSets = (# all but virtuals
   regBulk       => "<list>:<peer> <addr1:data1> <addr2:data2> ...",
   getRegRaw     => "[List0|List1|List2|List3|List4|List5|List6] ... [<PeerChannel>]",
   getConfig     => "",
   regSet        => "[prep|exec] <regName> <value> ... [<peerChannel>]",
   clear         => "[readings|register|rssi|msgEvents]",
 );
-my %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
+%culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
   raw           => "data ...",
   virtual       =>"<noButtons>",
 );
-my %culHmGlobalSetsDevice = (# all devices but virtuals
+%culHmGlobalSetsDevice = (# all devices but virtuals
   raw           => "data ...",
   reset         => "",
   pair          => "",
   unpair        => "",
 );
 
-my %culHmSubTypeDevSets = (# device of this subtype
+%culHmSubTypeDevSets = (# device of this subtype
   switch           =>{ statusRequest => "",
                        getSerial     => ""},
   dimmer           =>{ statusRequest => "",
@@ -1054,11 +1078,11 @@ my %culHmSubTypeDevSets = (# device of this subtype
   outputUnit       =>{ statusRequest => ""},# also LED16? proof
 );
 
-my %culHmGlobalSetsChn = (# all channels but virtuals
+%culHmGlobalSetsChn = (# all channels but virtuals
   sign          => "[on|off]",
   peerBulk      => "<peer1,peer2,...>",
 );
-my %culHmSubTypeSets = (# channels of this subtype
+%culHmSubTypeSets = (# channels of this subtype
   switch           =>{ "on-for-timer"=>"<sec>"
                       ,"on-till"     =>"<time>"
                       ,on            =>""
@@ -1093,7 +1117,7 @@ my %culHmSubTypeSets = (# channels of this subtype
   threeStateSensor =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
 #                     ,statusRequest =>""
                       },
-  THSensor         =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
+  THSensor         =>{ peerChan      =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"},
   virtual          =>{ peerChan      =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"
                       ,press         =>"[long|short]..."
                       ,postEvent     =>"<condition>"
@@ -1128,7 +1152,7 @@ $culHmSubTypeSets{powerMeter}      = $culHmSubTypeSets{outputUnit};
 
 $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
 
-my %culHmModelSets = (# channels of this subtype-------------
+%culHmModelSets = (# channels of this subtype-------------
 #  "HM-CC-VD"       =>{ valvePos       => "position"},
   "HM-RC-19"       =>{ service        => "<count>"
                       ,alarm          => "<count>"
@@ -1158,7 +1182,7 @@ $culHmModelSets{"HM-RC-19-SW"} = $culHmModelSets{"HM-RC-19"};
 $culHmModelSets{"HM-OU-CM-PCB"} = $culHmModelSets{"HM-OU-CFM-PL"};
 #%{$culHmModelSets{"HM-RC-19-SW"}} = %{$culHmModelSets{"HM-RC-19"}}; copy
 
-my %culHmChanSets = (
+%culHmChanSets = (
   "HM-CC-TC00"        =>{ "desired-temp" =>"[on|off|6.0..30.0]"
                          ,statusRequest  =>""
                          ,sysTime        =>""
@@ -1184,15 +1208,12 @@ my %culHmChanSets = (
   "HM-OU-CFM-PL01"    =>{ led            =>"<color>[,<color>...] [<repeat>]"},
   "HM-OU-CFM-PL02"    =>{ playTone       =>"<MP3No>[,<MP3No>...] [<repeat>]"},
                       
-  "WDF-solar01"       =>{ peerChan       =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"},
-  "HM-Sen-RD-O01"     =>{ peerChan       =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"},
   "HM-Sen-RD-O02"     =>{ "on-for-timer" =>"<sec>"
                          ,"on-till"      =>"<time>"
                          ,on             =>""
                          ,off            =>""
                          ,toggle         =>""},
   "HM-CC-RT-DN00"     =>{ sysTime        =>""},
-  "HM-CC-RT-DN02"     =>{ sysTime        =>""},
   "HM-CC-RT-DN04"     =>{ controlMode    =>"[auto|boost|day|night]"
                          ,controlManu    =>"[on|off|5.0..30.0]"
                          ,controlParty   =>"<temp> <startDate> <startTime> <enddate> <endTime>"
@@ -1206,7 +1227,6 @@ my %culHmChanSets = (
                          ,"desired-temp" =>"[on|off|5.0..30.0]"
                          ,sysTime        =>""
                         },
-  "HM-CC-RT-DN05"     =>{ peerChan       =>" 0 <actChn> ... [single] [set|unset] [actor|remote|both]"},
   "HM-ES-PMSw1-Pl01"  =>{ "on-for-timer" =>"<sec>"
                          ,"on-till"      =>"<time>"
                          ,on             =>""
@@ -1215,20 +1235,27 @@ my %culHmChanSets = (
                          ,press          =>"[long|short] [on|off] ..."
                          ,inhibit        =>"[on|off]"
                          ,statusRequest  =>""},
-  "HM-ES-PMSw1-Pl03"  =>{ peerChan       =>" 0 <actChn> ... [single] [set|unset] [actor|remote|both]"},
 );
 # clones- - - - - - - - - - - - - - - - -
 #$culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};
-$culHmChanSets{"WDF-solar02"}      = $culHmChanSets{"blindActuator"};
+$culHmChanSets{"WDF-solar01"}      = $culHmSubTypeSets{"THSensor"};
+$culHmChanSets{"HM-Sen-RD-O01"}    = $culHmSubTypeSets{"THSensor"};
+$culHmChanSets{"HM-CC-RT-DN05"}    = $culHmSubTypeSets{"THSensor"};
+$culHmChanSets{"HM-ES-PMSw1-Pl03"} = $culHmSubTypeSets{"THSensor"};
+
+$culHmChanSets{"WDF-solar02"}      = $culHmSubTypeSets{"blindActuator"};
+
+$culHmChanSets{"HM-CC-RT-DN02"}    = $culHmChanSets{"HM-CC-RT-DN00"};
 $culHmChanSets{"HM-CC-RT-DN-BoM00"}= $culHmChanSets{"HM-CC-RT-DN00"};
 $culHmChanSets{"HM-CC-RT-DN-BoM02"}= $culHmChanSets{"HM-CC-RT-DN02"};
 $culHmChanSets{"HM-CC-RT-DN-BoM04"}= $culHmChanSets{"HM-CC-RT-DN04"};
 $culHmChanSets{"HM-CC-RT-DN-BoM05"}= $culHmChanSets{"HM-CC-RT-DN05"};
+
 $culHmChanSets{"HM-ES-PMSw1-Pl04"} = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
 $culHmChanSets{"HM-ES-PMSw1-Pl05"} = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
 $culHmChanSets{"HM-ES-PMSw1-Pl06"} = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
 
-my %culHmFunctSets = (# command depending on function
+%culHmFunctSets = (# command depending on function
   sdLead              =>{ alarmOn       =>""
                          ,alarmOff      =>""
                          ,teamCall      =>""
@@ -1239,7 +1266,7 @@ my %culHmFunctSets = (# command depending on function
                       
 
 # RC send BCAST to specific address. Is the meaning understood?
-my @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "CFG", "Bit3",
+@culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "CFG", "Bit3",
                      "BURST", "BIDI", "RPTED", "RPTEN");
                      #RPTEN    0x80: set in every message. Meaning?
                      #RPTED    0x40: repeated (repeater operation)
@@ -1251,7 +1278,7 @@ my @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "CFG", "Bit3",
                      #WAKEUP   0x01: send initially to keep the device awake
 
 ##############################---messages---###################################
-my %culHmBits = (
+%culHmBits = (
   "00"          => { txt => "DEVICE_INFO",  params => {
                      FIRMWARE       => '00,2',
                      TYPE           => "02,4",
@@ -1436,32 +1463,32 @@ my %culHmBits = (
                      HUM      => '04,2,$val=(hex($val))', } },
 );
 
-sub HMConfig_getHash($){
-  my $hn = shift;
-  return %culHmModel            if($hn eq "culHmModel"           );
-  return %culHmRegDefShLg       if($hn eq "culHmRegDefShLg"      );
-  return %culHmRegDefine        if($hn eq "culHmRegDefine"       );
-  return %culHmRegGeneral       if($hn eq "culHmRegGeneral"      );
-  return %culHmRegType          if($hn eq "culHmRegType"         );
-  return %culHmRegModel         if($hn eq "culHmRegModel"        );
-  return %culHmRegChan          if($hn eq "culHmRegChan"         );
-
-  return %culHmGlobalGets       if($hn eq "culHmGlobalGets"      );
-  return %culHmSubTypeGets      if($hn eq "culHmSubTypeGets"     );
-  return %culHmModelGets        if($hn eq "culHmModelGets"       );
-
-  return %culHmGlobalSetsDevice if($hn eq "culHmGlobalSetsDevice");
-  return %culHmSubTypeDevSets   if($hn eq "culHmSubTypeDevSets"  );
-  return %culHmGlobalSetsChn    if($hn eq "culHmGlobalSetsChn"   );
-  return %culHmGlobalSets       if($hn eq "culHmGlobalSets"      );
-  return %culHmGlobalSetsVrtDev if($hn eq "culHmGlobalSetsVrtDev");
-  return %culHmSubTypeSets      if($hn eq "culHmSubTypeSets"     );
-  return %culHmModelSets        if($hn eq "culHmModelSets"       );
-  return %culHmChanSets         if($hn eq "culHmChanSets"        );
-  return %culHmFunctSets        if($hn eq "culHmFunctSets"       );
-
-  return %culHmBits             if($hn eq "culHmBits"            );
-  return @culHmCmdFlags         if($hn eq "culHmCmdFlags"        );
-  return $K_actDetID            if($hn eq "K_actDetID"           );
-}
+#sub HMConfig_getHash($){
+#  my $hn = shift;
+#  return %culHmModel            if($hn eq "culHmModel"           );
+#  return %culHmRegDefShLg       if($hn eq "culHmRegDefShLg"      );
+#  return %culHmRegDefine        if($hn eq "culHmRegDefine"       );
+#  return %culHmRegGeneral       if($hn eq "culHmRegGeneral"      );
+#  return %culHmRegType          if($hn eq "culHmRegType"         );
+#  return %culHmRegModel         if($hn eq "culHmRegModel"        );
+#  return %culHmRegChan          if($hn eq "culHmRegChan"         );
+#
+#  return %culHmGlobalGets       if($hn eq "culHmGlobalGets"      );
+#  return %culHmSubTypeGets      if($hn eq "culHmSubTypeGets"     );
+#  return %culHmModelGets        if($hn eq "culHmModelGets"       );
+#
+#  return %culHmGlobalSetsDevice if($hn eq "culHmGlobalSetsDevice");
+#  return %culHmSubTypeDevSets   if($hn eq "culHmSubTypeDevSets"  );
+#  return %culHmGlobalSetsChn    if($hn eq "culHmGlobalSetsChn"   );
+#  return %culHmGlobalSets       if($hn eq "culHmGlobalSets"      );
+#  return %culHmGlobalSetsVrtDev if($hn eq "culHmGlobalSetsVrtDev");
+#  return %culHmSubTypeSets      if($hn eq "culHmSubTypeSets"     );
+#  return %culHmModelSets        if($hn eq "culHmModelSets"       );
+#  return %culHmChanSets         if($hn eq "culHmChanSets"        );
+#  return %culHmFunctSets        if($hn eq "culHmFunctSets"       );
+#
+#  return %culHmBits             if($hn eq "culHmBits"            );
+#  return @culHmCmdFlags         if($hn eq "culHmCmdFlags"        );
+#  return $K_actDetID            if($hn eq "K_actDetID"           );
+#}
 1;
