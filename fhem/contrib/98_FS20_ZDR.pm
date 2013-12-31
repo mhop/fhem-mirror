@@ -26,6 +26,21 @@ fs20_set {
   my $prog_5_6dev =  AttrVal($name, "5_6_dev", "");
   my $prog_7_8dev =  AttrVal($name, "7_8_dev", "");
 
+  my $isToggle = 0;
+  if ($v eq "toggle") {
+    $isToggle = 1;
+    my $state = Value($powerDev);
+      
+    my $name = $hash->{NAME};
+    fhem("setstate $name $state");
+
+    if ($state eq "off") {
+      $v = "on";
+    } else {
+      $v = "off";      
+    }
+  }
+   
   if ($v eq "on") {
     return "no power device set" if $powerDev eq "";
     fhem("set $powerDev on");
@@ -75,13 +90,18 @@ fs20_set {
     return "no 7_8 device set" if $prog_7_8dev eq "";
     fhem("set $prog_7_8dev on"); 
   } else {
-    return "unknown set value, choose one of on off volume_up volume_down left right sleep ms 1 2 3 4 5 6 7 8";
+    return "unknown set value, choose one of on off toggle volume_up volume_down left right sleep ms 1 2 3 4 5 6 7 8";
   }
 
   if ($v eq "on" || $v eq "off") {
     $hash->{READINGS}{state}{VAL} = $v;
     $hash->{READINGS}{state}{TIME} = TimeNow();
-    $hash->{STATE} = $v;
+    
+    my $name = $hash->{NAME};
+    
+    if ($isToggle == 0) {
+      $hash->{STATE} = $v;
+    }
   }   
   return undef;
 }
