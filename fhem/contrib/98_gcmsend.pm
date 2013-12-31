@@ -14,7 +14,7 @@ gcmsend_Initialize($)
  $hash->{DefFn}    = "gcmsend_Define";
  $hash->{NotifyFn} = "gcmsend_notify";
  $hash->{SetFn} = "gcmsend_set";
- $hash->{AttrList} = "loglevel:0,1,2,3,4,5 regIds apiKey stateFilter";
+ $hash->{AttrList} = "loglevel:0,1,2,3,4,5 regIds apiKey stateFilter vibrate";
 }
 
 sub 
@@ -24,8 +24,17 @@ gcmsend_set {
   if ($v eq "delete_saved_states") {
     $hash->{STATES} = {};
     return "deleted";
+  } elsif($v eq "send") {
+    my $msg = "";
+    for (my $i = 2; $i < int(@a); $i++) {
+      if (! ($msg eq "")) {
+       $msg .= " ";
+      }
+      $msg .= @a[$i];
+    }
+    return gcmsend_sendMessage($hash, $msg);
   } else {
-    return "unknown set value, choose one of delete_saved_states";
+    return "unknown set value, choose one of delete_saved_states send";
   }
 }
 
@@ -63,24 +72,34 @@ sub gcmsend_array_to_json(@) {
   return "[" . $ret . "]";
 }
 
-sub gcmsend_message($$$) {
-  my ($hash, $deviceName, $changes) = @_;
+sub gcmsend_sendPayload($$) {
+  my ($hash, $payload) = @_;
+
   my $name = $hash->{NAME};
+  
+  my $logLevel = GetLogLevel($name,5);
+  
   my $client = LWP::UserAgent->new();
   my $regIdsText =  AttrVal($name, "regIds", "");
+  
   my $apikey =  AttrVal($name, "apiKey", "");
   my @registrationIds = split(/\|/, $regIdsText);
+  
+  if (int(@registrationIds) == 0) {
+    Log $logLevel, "$name no registrationIds set.";
+    return undef;  
+  }
+  return undef if (int(@registrationIds) == 0);
+  
   my $unixTtimestamp = time*1000;
 
   my $data = 
     "{" . 
       "\"registration_ids\":" . gcmsend_array_to_json(@registrationIds) . "," .
-      "\"data\": {" .
-        "\"deviceName\": \"$deviceName\"," .
-        "\"changes\":\"$changes\"" .
-        "\"source\":\"gcmsend_fhem\"" .
-      "}".
+      "\"data\": $payload".
     "}";
+    
+  Log $logLevel, "data is $payload";
 
   my $req = HTTP::Request->new(POST => "https://android.googleapis.com/gcm/send");
   $req->header(Authorization  => 'key='.$apikey);
@@ -89,48 +108,138 @@ sub gcmsend_message($$$) {
 
   my $response = $client->request($req);
   if (! $response->is_success) {
-    Log 3, "error during request: " . $response->status_line;
+    Log $logLevel, "error during request: " . $response->status_line;
     $hash->{STATE} = $response->status_line;
   }
   $hash->{STATE} = "OK";
   return undef;
 }
 
+sub gcmsend_fillGeneralPayload($$) {
+  my ($hash, $payloadString) = @_;
+   
+  my $name = $hash->{NAME};
+   
+  my $vibrate = "false";
+  if (AttrVal($name, "vibrate", "false") eq "true") {
+    $vibrate = "true";
+  }
+  
+  return $payloadString .
+    "\"source\":\"gcmsend_fhem\"," .
+    "\"vibrate\":\"$vibrate\"";  
+}
+
+sub gcmsend_sendNotify($$$) {
+  my ($hash, $deviceName, $changes) = @_;
+  
+  my $payload =
+        "\"deviceName\": \"$deviceName\"," .
+        "\"changes\":\"$changes\"," .
+        "\"type\":\"notify\"";
+      
+  $payload = "{" . gcmsend_fillGeneralPayload($hash, $payload) . "}";
+      
+  gcmsend_sendPayload($hash, $payload);
+}
+
+sub gcmsend_sendMessage($$) {
+  my ($hash, $message) = @_;
+  
+  my @parts = split(/\|/, $message);
+  
+  my $tickerText;
+  my $contentTitle;
+  my $contentText;
+  my $notifyId = 1;
+  
+  my $length = int(@parts);
+  
+  if ($length == 3 || $length == 4) {
+    $tickerText = @parts[0];
+    $contentTitle = @parts[1];
+    $contentText = @parts[2];
+    
+    if ($length == 4) {
+      my $notifyIdText = @parts[3];
+      if (!(@parts[3] =~ m/[1-9][0-9]*/)) {
+        return "notifyId must be numeric and positive";
+      }
+      $notifyId = @parts[3];
+    }
+  } else {
+    return "Illegal message format. Required format is \r\n " .
+      "tickerText|contentTitle|contentText[|NotifyID]";
+  }
+  
+  my $payload =
+        "\"tickerText\":\"$tickerText\"," .
+        "\"contentTitle\":\"$contentTitle\"," .
+        "\"contentText\":\"$contentText\"," .
+        "\"notifyId\":\"$notifyId\"," .
+        "\"source\":\"gcmsend_fhem\"," .
+        "\"type\":\"message\""
+  ;
+
+  $payload = "{" . gcmsend_fillGeneralPayload($hash, $payload) . "}";
+      
+  gcmsend_sendPayload($hash, $payload);
+  
+  return undef;
+}
+
+
+sub gcmsend_getLastDeviceStatesFor($$)
+{
+  my ($gcm, $deviceName) = @_;
+  
+  if (! $gcm->{STATES}) {
+    $gcm->{STATES} = {};
+  }
+  
+  my $states = $gcm->{STATES};
+  if (!$states->{$deviceName}) {
+    $states->{$deviceName} = {};
+  }
+
+  return $states->{$deviceName};  
+}
+
 sub gcmsend_notify($$)
 {
-  my ($ntfy, $dev) = @_;
+  my ($gcm, $dev) = @_;
+  
+  my $logLevel = GetLogLevel($gcm,5);
 
   my $name = $dev->{NAME};
-
+  my $gcmName = $gcm->{NAME};
+  
+  return if $name eq $gcmName;
   return if(!$dev->{CHANGED}); # Some previous notify deleted the array.
   
+  my $stateFilter =  AttrVal($gcm->{NAME}, "stateFilter", "");
+
+  my $lastDeviceStates = gcmsend_getLastDeviceStatesFor($gcm, $name);
+
   my $val = "";
-  my $max = int(@{$dev->{CHANGED}});
-
-  my $key;
-  my $value;
-
-  if (! $dev->{STATES}) {
-    $dev->{STATES} = {};
-  }
-
-  my $stateFilter =  AttrVal($ntfy->{NAME}, "stateFilter", "");
-
-  my $states = $ntfy->{STATES};
-  if (!$states->{$name}) {
-    $states->{$name} = {};
-  }
-
-  my $deviceStates = $states->{$name};  
-
-  my $count = 0;
-  for (my $i = 0; $i < $max; $i++) {
+  my $nrOfFieldChanges = int(@{$dev->{CHANGED}});
+  my $sendFieldCount = 0;
+  
+  for (my $i = 0; $i < $nrOfFieldChanges; $i++) {
     my @keyValue = split(":", $dev->{CHANGED}[$i]);
     my $length = int($keyValue);
 
     my $change = $dev->{CHANGED}[$i]; 
-    my $position = index($change, ':');
 
+
+    # We need to find out a key and a value for each field update.
+    # For state updates, we have not field, which is why we simply
+    # put it to "state".
+    # For all other updates the notify value is delimited by ":",
+    # which we use to find out the value and the key.
+    my $key;
+    my $value;
+    my $position = index($change, ':');
     if ($position == -1) {
       $key = "state";
       $value = $keyValue[0];
@@ -139,21 +248,25 @@ sub gcmsend_notify($$)
       $value = substr($change, $position + 2, length($change));
     }
 
-    if (
-      ($stateFilter eq "" || $value =~ m/$stateFilter/) &&
-      (! $deviceStates->{$key} || !($deviceStates->{$key} eq $value)) && 
-      (!($value eq ""))
-    ) {
-      $deviceStates->{$key} = $value;
-      if ($count != 0) {
+    if (! ($stateFilter eq "") && ! ($value =~ m/$stateFilter/)) {
+      Log $logLevel, "$gcmName $name: ignoring $key, as value $value is blocked by stateFilter regexp."; 
+    } elsif ($value eq "") {
+      Log $logLevel, "$gcmName $name: ignoring $key, as value is empty."; 
+    } elsif ($lastDeviceStates->{$key} && $lastDeviceStates->{$key} eq $value) {
+      my $savedValue = $lastDeviceStates->{$key};
+      Log $logLevel, "$gcmName $name: ignoring $key, save value is $savedValue, value is $value";    
+    } else {
+      $lastDeviceStates->{$key} = $value;
+      # Multiple field updates are separated by <|>.
+      if ($sendFieldCount != 0) {
         $val .= "<|>";
       }
-      $count += 1;
+      $sendFieldCount += 1;
       $val .= "$key:$value";
-    }  
+    }
   } 
-  if ($count > 0) {
-    gcmsend_message($ntfy, $name, $val);
+  if ($sendFieldCount > 0) {
+    gcmsend_sendNotify($gcm, $name, $val);
   }
 } 
 
@@ -173,7 +286,9 @@ sub gcmsend_notify($$)
   an amount of changes. The changes are concatenated by "<|>", whereas each change itself is formatted
   like "key:value". <br />
   For instance, the changes could look like: "state:on<|>measured:2013-08-11".
-
+  <br />
+  Note: If not receiving messages, make sure to increase the log level of this device. Afterwards,
+  have a look at the log messages - the module is quite verbose.
   <br><br>
 
   <a name="GCMSenddefine"></a>
@@ -191,7 +306,7 @@ sub gcmsend_notify($$)
     Notes:
     <ul>
       <li>Module to send messages to GCM (Google Cloud Messaging).</li>
-      <li>Prerequisite is a GCM Account with Google (see <a href="https://code.google.com/apis/console/">Google API Console</a></li>
+      <li>Prerequisite is a GCM AcsendFieldCount with Google (see <a href="https://code.google.com/apis/console/">Google API Console</a></li>
     </ul>
   </ul>
 
@@ -203,11 +318,13 @@ sub gcmsend_notify($$)
     where <code>value</code> is one of:<br>
     <pre>
     delete_saved_states    # deletes all saved states
+    send                   # send a message (tickerText|contentTitle|contentText[|NotifyID])
     </pre>
 
     Examples:
     <ul>
       <code>set gcm delete_saved_states</code><br>
+      <code>set gcm send ticker text|my title|my text|5</code><br/>
     </ul>
   </ul>
 
@@ -220,7 +337,8 @@ sub gcmsend_notify($$)
                 <br />API-Key for GCM (can be found within the Google API Console)</li>
     <li><a name="gcmsend_stateFilter"><code>attr &lt;name&gt; stateFilter &lt;string&gt;</code></a>
                 <br />Send a GCM message only if the attribute matches the attribute filter regexp</li>
-
+    <li><a name="gcmsend_vibrate"><code>attr &lt;name&gt; vibrate (true|false)</a>
+                <br />Make the receiving device vibrate upon receiving the message. Must be true or false.</li>
   </ul>
 </ul>
 
