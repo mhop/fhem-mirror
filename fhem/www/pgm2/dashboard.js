@@ -5,12 +5,12 @@
 // Version  : 1.00
 // Revisions:
 // 0001: Released to testers 
-// 0002: Add DebugMsg. Fix independent Groupsize adjustment after set & siterefresh.
-//       First Release to FHEM SVN
-//
+// 0002: Add DebugMsg. Fix independent Groupsize adjustment after set & siterefresh. Fix
+//       wrong set of +Toogle Icon on Siderefresh
 //
 // Known Bugs/Todo's
 // See 95_Dashboard.pm
+//########################################################################################
 //########################################################################################
 
 function saveOrder() {
@@ -88,11 +88,12 @@ function restoreOrder() {
 				portlet.outerWidth(width);					
 				if (params[2] == 1) { portlet.addClass("dashboard_widgethelper"); } else { portlet.removeClass("dashboard_widgethelper"); }//Show Widget-Helper Frame
 				if (visible === 'false') {			
-// Icon plus is not set on restore order, why?
-				if (portlet.find(".dashboard_widgetheader").find(".dashboard_button_icon").hasClass("dashboard_button_iconminus")) { 
+
+					if (portlet.find(".dashboard_widgetheader").find(".dashboard_button_icon").hasClass("dashboard_button_iconminus")) { 
 						portlet.find(".dashboard_widgetheader").find(".dashboard_button_icon").removeClass( "dashboard_button_iconminus" ); 
 						portlet.find(".dashboard_widgetheader").find(".dashboard_button_icon").addClass( "dashboard_button_iconplus" ); 
 					}
+				
 					var currHeigth = Math.round(portlet.height());
 					portlet.find(".dashboard_content").data("userheight", currHeigth);
 					portlet.find(".dashboard_content").hide();	
@@ -105,7 +106,7 @@ function restoreOrder() {
   });	
 } 
 
-//Only use vor debugging
+//Only use for debugging
 function showdebugMessage(msg){
 	document.getElementById("dashboard_jsdebug").value = document.getElementById("dashboard_jsdebug").value+" "+msg;
 }
@@ -208,8 +209,6 @@ $(document).ready( function () {
 		dashboard_setlock();		
 	} 
 
-    restoreOrder(); 
-
 	if (params[6] == 1){ //ToogleButton show/hide	
 		$(".dashboard_widget")
 				.addClass( "dashboard_widget dashboard_content ui-corner-all" )
@@ -237,7 +236,7 @@ $(document).ready( function () {
 			event.stopImmediatePropagation();
 		});
 	}
-
+	
 	$("#dashboard_button_set").button({
 		create: function( event, ui ) {
 			$(this).addClass("dashboard_button_iconset");
@@ -262,6 +261,8 @@ $(document).ready( function () {
 			}
 		}
 	});
+	
+	restoreOrder(); 	
 });
 
 
