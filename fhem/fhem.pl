@@ -2258,7 +2258,7 @@ CommandSleep($$)
 
   Log 4, "sleeping for $sec";
 
-  if(!$cl && @cmdList && $sec && $init_done) {
+  if(@cmdList && $sec && $init_done) {
     my %h = (cmd          => join(";", @cmdList),
              evalSpecials => $evalSpecials,
              quiet        => $quiet);
