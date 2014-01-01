@@ -1,6 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - bugfix:  Dashboard: fixed bug identification an existing Weblink.
+			 fixed bug dashboard_sorting check. Buttonbar can now placed on 
+			 top or bottom of the Dashboard. Dashboard is always edited out 
+			 the Room Dashboard.
   - bugfix:  VIERA: fixed bug related to set command remoteControl
   - bugfix:  ENIGMA2: improved compatibility for Fritzbox and old
   	                  Webif versions
