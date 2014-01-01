@@ -32,7 +32,7 @@ my $culHmChanSets         =\%HMConfig::culHmChanSets;
 my $culHmFunctSets        =\%HMConfig::culHmFunctSets;
 my $culHmBits             =\%HMConfig::culHmBits;
 my $culHmCmdFlags         =\@HMConfig::culHmCmdFlags;
-my $K_actDetID            =\$HMConfig::K_actDetID;
+my $K_actDetID            ="000000";
 
 ############################################################
 
@@ -550,33 +550,47 @@ sub CUL_HM_Parse($$) {##############################
   my $ioName = $iohash->{NAME};
   my ($msg,$msgStat,$myRSSI,$msgIO) = split(":",$msgIn,4);
   # Msg format: Allnnffttssssssddddddpp...
-  $msg =~ m/A(..)(..)(..)(..)(......)(......)(.*)/;
-  my ($len,$mNo,$mFlg,$mTp,$src,$dst,$p) = ($1,$2,$3,$4,$5,$6,$7);
+  my (undef,$len,$mNo,$mFlg,$mTp,$src,$dst,$p) = unpack 'A1A2A2A2A2A6A6A*',$msg;
   $p = "" if(!defined($p));
   my @mI = unpack '(A2)*',$p; # split message info to bytes
-
-  return "" if(  ($msgStat && $msgStat eq 'NACK')# lowlevel error
-               ||($src eq $id));                 # mirrored messages
+  return "" if($msgStat && $msgStat eq 'NACK');# lowlevel error
   # $shash will be replaced for multichannel commands
-  my $shash = $modules{CUL_HM}{defptr}{$src};
-  my $dhash = $modules{CUL_HM}{defptr}{$dst};
+  my $shash = CUL_HM_id2Hash($src);
+  my $dhash = CUL_HM_id2Hash($dst);
   CUL_HM_statCnt($ioName,"r");
+  my $dname = ($dst eq "000000") ? "broadcast" :
+                                   ($dhash ? $dhash->{NAME} :
+                                             ($dst eq $id ? $ioName :
+                                                            $dst));
+
+  if(!$shash && $mTp eq "00") { # generate device
+    my $md = substr($p, 2, 4);
+    $md = $culHmModel->{$md}{name}  ?
+              $culHmModel->{$md}{name} :
+              "ID_".$md;
+    my $sname = "CUL_HM_".$md."_$src";
+    $sname =~ s/-/_/g;
+    Log3 undef, 3, "CUL_HM Unknown device $sname, please define it";
+    return "UNDEFINED $sname CUL_HM $src $msg";
+  }
+  ####################  attack alarm detection#####################
+  if (   $dhash 
+      && !CUL_HM_getAttrInt($dname,"ignore")
+      && ($mTp eq '01' || $mTp eq '11')){
+    my $ioId = AttrVal($dhash->{IODev}{NAME},"hmId","-");
+    CUL_HM_eventP($dhash,"ErrIoId_$src")if($ioId ne $src);
+    Log 1,"General ErrIoAttack ".$dhash->{NAME}.":$msg"
+          ."\n                         ".$dhash->{helper}{cSnd}    
+         if(defined $dhash->{helper}{cSnd} && $dhash->{helper}{cSnd} ne substr($msg,7));
+    CUL_HM_eventP($dhash,"ErrIoAttack")
+         if(defined $dhash->{helper}{cSnd} && $dhash->{helper}{cSnd} ne substr($msg,7));
+  }
+  ###########
+
+  #  return "" if($src eq $id);# mirrored messages - covered by !$shash
+  return "" if(!$shash);    # Unknown source
 
   $respRemoved = 0;  #set to 'no response in this message' at start
-  if(!$shash) {      #  Unknown source
-    # Generate an UNKNOWN event for pairing requests, ignore everything else
-    if($mTp eq "00") {
-      my $md = substr($p, 2, 4);
-      $md = $culHmModel->{$md}{name}  ?
-                $culHmModel->{$md}{name} :
-                "ID_".$md;
-      my $sname = "CUL_HM_".$md."_$src";
-      $sname =~ s/-/_/g;
-      Log3 undef, 3, "CUL_HM Unknown device $sname, please define it";
-      return "UNDEFINED $sname CUL_HM $src $msg";
-    }
-   return "";
-  }
   my @event;    #events to be posted for main entity
   my @entities; #additional entities with events to be notifies
 
@@ -592,10 +606,6 @@ sub CUL_HM_Parse($$) {##############################
   }
   CUL_HM_eventP($shash,"Evt_$msgStat")if ($msgStat);#log io-events
   CUL_HM_eventP($shash,"Rcv");
-  my $dname = ($dst eq "000000") ? "broadcast" :
-                                   ($dhash ? $dhash->{NAME} :
-                                             ($dst eq $id ? $ioName :
-                                                            $dst));
   my $target = " (to $dname)";
   my $st = AttrVal($name, "subType", "");
   my $md = AttrVal($name, "model"  , "");
@@ -3718,6 +3728,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       else{
         CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=$rss");
       }
+      $hash->{helper}{cSnd} = substr($cmd,8);
     }
     elsif($mTp eq '11' && $chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
 #      CUL_HM_qStateUpdatIfEnab($dst.$subType);# subtype actually is channel
@@ -3727,6 +3738,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
         $to = "timedOn:=1";
       }
       CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=$rss",$to);
+      $hash->{helper}{cSnd} = substr($cmd,8);
     }
     elsif($mTp eq '12' && $mFlg & 0x10){#wakeup with burst
       # response setup - do not repeat, set counter to 250
@@ -4305,7 +4317,8 @@ sub CUL_HM_id2Name($) { #in: name or HMid out: name
 sub CUL_HM_id2Hash($) {#in: id, out:hash
   my ($id) = @_;
   return $modules{CUL_HM}{defptr}{$id} if ($modules{CUL_HM}{defptr}{$id});
-  return $modules{CUL_HM}{defptr}{substr($id,0,6)}; # could be chn 01 of dev
+  $id = substr($id,0,6);
+  return $modules{CUL_HM}{defptr}{$id}?($modules{CUL_HM}{defptr}{$id}):undef;
 }
 sub CUL_HM_getDeviceHash($) {#in: hash out: devicehash
   my ($hash) = @_;
