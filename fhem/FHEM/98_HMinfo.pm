@@ -205,7 +205,8 @@ sub HMinfo_peerCheck(@) { #####################################################
 }
 sub HMinfo_burstCheck(@) { ####################################################
   my @entities = @_;
-  my @peerIDsNeed;
+  my @needBurstMiss;
+  my @needBurstFail;
   my @peerIDsCond;
   foreach my $eName (@entities){
     next if (!$defs{$eName}{helper}{role}{chn});#device has no channels
@@ -223,7 +224,10 @@ sub HMinfo_burstCheck(@) { ####################################################
       my $prxt = CUL_HM_getRxType($defs{$pn});
       
       next if (!($prxt & 0x82)); # not a burst peer
-      push @peerIDsNeed," $eName for peer $pn" if (ReadingsVal($eName,"R-$pn-peerNeedsBurst","") !~ m /on/);
+      my $pnb = ReadingsVal($eName,"R-$pn-peerNeedsBurst",undef);
+      if (!$pnb)           {push @needBurstMiss, $eName;}
+      elsif($pnb !~ m /on/){push @needBurstFail, $eName;}
+
       if ($prxt & 0x80){# conditional burst - is it on?
         my $pDevN = CUL_HM_getDeviceName($pn);
         push @peerIDsCond," $pDevN for remote $eName" if (ReadingsVal($pDevN,"R-burstRx","") !~ m /on/);
@@ -231,8 +235,9 @@ sub HMinfo_burstCheck(@) { ####################################################
     }
   }
   my $ret = "";
-  $ret .="\n\n peerNeedsBurst not set"  ."\n    ".(join "\n    ",sort @peerIDsNeed) if(@peerIDsNeed);
-  $ret .="\n\n conditionalBurst not set"."\n    ".(join "\n    ",sort @peerIDsCond) if(@peerIDsCond);
+  $ret .="\n\n peerNeedsBurst cannot be determined"  ."\n    ".(join "\n    ",sort @needBurstMiss) if(@needBurstMiss);
+  $ret .="\n\n peerNeedsBurst not set"               ."\n    ".(join "\n    ",sort @needBurstFail) if(@needBurstFail);
+  $ret .="\n\n conditionalBurst not set"             ."\n    ".(join "\n    ",sort @peerIDsCond)   if(@peerIDsCond);
   return  $ret;
 }
 sub HMinfo_paramCheck(@) { ####################################################
@@ -778,10 +783,13 @@ sub HMinfo_status($){##########################################################
   }
   #--- used for IO, protocol  and communication (e.g. rssi)
   my @IOdev;
-  my %protE  = (NACK =>0,IOerr =>0,ResndFail  =>0,CmdDel  =>0);
+
+  my %protC = (ErrIoId_ =>0,ErrIoAttack =>0);
+  my %protE = (NACK =>0,IOerr =>0,ResndFail =>0,CmdDel =>0);
   my %protW = (Resnd =>0,CmdPend =>0);
-  my @protNamesE;    # devices with current protocol events
-  my @protNamesW;    # devices with current protocol events
+  my @protNamesC;    # devices with current protocol Critical
+  my @protNamesE;    # devices with current protocol Errors
+  my @protNamesW;    # devices with current protocol Warnings
   my @Anames;        # devices with ActionDetector events
   my %rssiMin;
   my %rssiMinCnt = ("99>"=>0,"80>"=>0,"60>"=>0,"59<"=>0);
@@ -811,7 +819,17 @@ sub HMinfo_status($){##########################################################
       $nbrD++;
       push @IOdev,$ehash->{IODev}{NAME} if($ehash->{IODev} && $ehash->{IODev}{NAME});
       push @Anames,$eName if ($attr{$eName}{actStatus} && $attr{$eName}{actStatus} ne "alive");
-      foreach (grep {$ehash->{"prot".$_}} keys %protE){#protocol events reported
+
+      foreach (grep /ErrIoId_/, keys %{$ehash}){# detect addtional critical entries
+        my $k = $_;
+        $k =~ s/^prot//;
+        $protC{$k} = 0 if(!defined $protC{$_});
+      }
+      foreach (grep {$ehash->{"prot".$_}} keys %protC){#protocol critical alarms
+        $protC{$_}++;
+        push @protNamesC,$eName;
+      }
+      foreach (grep {$ehash->{"prot".$_}} keys %protE){#protocol errors
         $protE{$_}++;
         push @protNamesE,$eName;
       }
@@ -861,16 +879,20 @@ sub HMinfo_status($){##########################################################
   # ------- what about protocol events ------
   # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
   # additional variables are protCmdDel,protCmdPend,protState,protLastRcv
-  my @tp;
-  push @tp,"$_:$protE{$_}" foreach (grep {$protE{$_}} keys(%protE));
-  push @updates,"ERR__protocol:".join",",@tp        if(@tp);
+  my @tpc;
+  push @tpc,"$_:$protC{$_}" foreach (grep {$protC{$_}} keys(%protC));
+  if(@tpc){push @updates,"CRIT__protocol:".join",",@tpc;} else{delete $hash->{READINGS}{CRIT__protocol} };
+  my @tpe;
+  push @tpe,"$_:$protE{$_}" foreach (grep {$protE{$_}} keys(%protE));
+  if(@tpe){push @updates,"ERR__protocol:".join",",@tpe;} else{ delete $hash->{READINGS}{ERR__protocol} };
   my @tpw;
   push @tpw,"$_:$protW{$_}" foreach (grep {$protW{$_}} keys(%protW));
-  push @updates,"W__protocol:".join",",@tpw       if(@tpw);
+  if(@tpw){push @updates,"W__protocol:".join",",@tpw  ;} else{ delete $hash->{READINGS}{W__protocol} };
 
-  @protNamesE = grep !/^$/,HMinfo_noDup(@protNamesE);;
+  @protNamesC = grep !/^$/,HMinfo_noDup(@protNamesC);
+  $hash->{CRI__protoNames} = join",",@protNamesC if(@protNamesC);
+  @protNamesE = grep !/^$/,HMinfo_noDup(@protNamesE);
   $hash->{ERR__protoNames} = join",",@protNamesE if(@protNamesE);
-
   @protNamesW = grep !/^$/,HMinfo_noDup(@protNamesW);
   $hash->{W__protoNames} = join",",@protNamesW if(@protNamesW);
 
