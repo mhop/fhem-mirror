@@ -304,7 +304,7 @@ MAX_Set($@)
     return ($hash->{IODev}{Send})->($hash->{IODev},"SetTemperature",$hash->{addr},$payload, groupId => sprintf("%02x",$groupid), flags => ( $groupid ? "04" : "00" ));
 
   }elsif(grep (/^\Q$setting\E$/, ("boostDuration", "boostValveposition", "decalcification","maxValveSetting","valveOffset"))
-      and $hash->{type} =~ /HeatingThermostat.*/){
+      and $hash->{type} =~ /.*Thermostat.*/){
 
     my $val = join(" ",@args); #decalcification contains a space
 
