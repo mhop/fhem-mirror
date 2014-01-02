@@ -833,7 +833,8 @@ Ext.define('FHEM.controller.ChartController', {
             yseries = me.createSeries('VALUE', device + " - " + yaxis, styleConfig, axisside);
         }
         
-        var url;
+        var url = '../../../fhem?',
+            cmd;
         if (logtype && logtype === "filelog") {
             Ext.each(FHEM.filelogs, function(log) {
                 if (log.NAME === device) {
@@ -849,42 +850,41 @@ Ext.define('FHEM.controller.ChartController', {
                 // as the get command wont support absolute pathes by default...
                 currentlogfile = "../../../../../../../../" + currentlogfile;
             }
-            url = '../../../fhem?cmd=';
-            url += encodeURIComponent('get Logfile ' +
+            cmd = 'get Logfile ' +
                 currentlogfile + ' - ' + dbstarttime +
                 ' ' + dbendtime + ' ' + yaxisindex + ':' + yaxis +
-                '.*::$fld[' + (yaxisindex - 1) +
+                '\\x3a::$fld[' + (yaxisindex - 1) +
                 ']=~"ok|on|open|active|true"?1:($fld[' +
                 (yaxisindex - 1) +
                 ']=~"low|off|closed|inactive|false"?0:$fld[' +
-                (yaxisindex - 1) + ']*1)') + '&XHR=1';
+                (yaxisindex - 1) + ']*1)';
         } else if (!Ext.isDefined(yaxisstatistics) || yaxisstatistics === "none" || Ext.isEmpty(yaxisstatistics)) {
-            url += '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+' + dbstarttime + '+' + dbendtime + '+';
-            url +=device + '+timerange+' + "TIMESTAMP" + '+' + yaxis;
-            url += '&XHR=1'; 
+            cmd = 'get ' + FHEM.dblogname + ' - webchart ' + dbstarttime + ' ' + dbendtime + ' ';
+            cmd +=device + ' timerange ' + "TIMESTAMP" + ' ' + yaxis;
         } else { //setup url to get statistics
-            url += '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+' + dbstarttime + '+' + dbendtime + '+';
-            url +=device;
+            cmd = 'get ' + FHEM.dblogname + ' - webchart ' + dbstarttime + ' ' + dbendtime + ' ';
+            cmd += device;
             
             if (yaxisstatistics.indexOf("hour") === 0) {
-                url += '+hourstats+';
+                cmd += ' hourstats ';
             } else if (yaxisstatistics.indexOf("day") === 0) {
-                url += '+daystats+';
+                cmd += ' daystats ';
             } else if (yaxisstatistics.indexOf("week") === 0) {
-                url += '+weekstats+';
+                cmd += ' weekstats ';
             } else if (yaxisstatistics.indexOf("month") === 0) {
-                url += '+monthstats+';
+                cmd += ' monthstats ';
             } else if (yaxisstatistics.indexOf("year") === 0) {
-                url += '+yearstats+';
+                cmd += ' yearstats ';
             }
-            
-            url += 'TIMESTAMP' + '+' + yaxis;
-            url += '&XHR=1'; 
-            
+            cmd += 'TIMESTAMP' + ' ' + yaxis;
         }
         
         Ext.Ajax.request({
-          method: 'GET',
+          method: 'POST',
+          params: {
+            cmd: cmd,
+            XHR: 1
+          },
           async: false,
           disableCaching: false,
           url: url,

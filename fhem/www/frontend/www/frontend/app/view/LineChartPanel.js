@@ -189,7 +189,7 @@ Ext.define('FHEM.view.LineChartPanel', {
                                         { fieldLabel: 'weekly', name: 'rb', inputValue: 'week', labelWidth: 40 },
                                         { fieldLabel: 'daily', name: 'rb', inputValue: 'day', checked: true, labelWidth: 31 },
                                         { fieldLabel: 'hourly', name: 'rb', inputValue: 'hour', labelWidth: 38 },
-                                        { fieldLabel: 'last hour', name: 'rb', inputValue: 'lasthour', labelWidth: 50 },
+                                        { fieldLabel: 'last hour', name: 'rb', inputValue: 'lasthour', labelWidth: 60 },
                                         { fieldLabel: 'last 24h', name: 'rb', inputValue: 'last24h', labelWidth: 48 },
                                         { fieldLabel: 'last 7 days', name: 'rb', inputValue: 'last7days', labelWidth: 65 },
                                         { fieldLabel: 'last month', name: 'rb', inputValue: 'lastmonth', labelWidth: 65 }
@@ -897,7 +897,7 @@ Ext.define('FHEM.view.LineChartPanel', {
                                 checked: false
                             },
                             items: [
-                                { labelWidth: 50, fieldLabel: 'Left Axis', name: 'rbc' + me.getAxiscounter(), inputValue: 'left', checked: true },
+                                { labelWidth: 60, fieldLabel: 'Left Axis', name: 'rbc' + me.getAxiscounter(), inputValue: 'left', checked: true },
                                 { labelWidth: 60, fieldLabel: 'Right Axis', name: 'rbc' + me.getAxiscounter(), inputValue: 'right' }
                             ]
                         },
