@@ -932,14 +932,12 @@ SWAP_Parse($$)
 
     $rhash->{product} = $products->{$productcode} if( defined($productcode) && defined($products->{$productcode} ) );
 
-    #SWAP_Set( $rhash, $rname, "getConfig" ) if( !$first );
-    SWAP_Set( $rhash, $rname, "statusRequest" ) if( $first );
-  }
-
-  if( my $parse = $modules{$rhash->{TYPE}}{SWAP_ParseFn} ) {
-    no strict "refs";
-    &{$parse}($rhash,$reg,$func,$data);
-    use strict "refs";
+    if( $first ) {
+      SWAP_Set( $rhash, $rname, "statusRequest" );
+    } else {
+      SWAP_Send($rhash, $rhash->{addr}, QUERY, "01" );
+      SWAP_Send($rhash, $rhash->{addr}, QUERY, "02" );
+    }
   }
 
   my @list;
@@ -987,6 +985,12 @@ SWAP_Parse($$)
 
       SWAP_updateReadings( $modules{SWAP}{defptr}{$raddr.".".$rid}, $rid, $data );
     }
+  }
+
+  if( my $parse = $modules{$rhash->{TYPE}}{SWAP_ParseFn} ) {
+    no strict "refs";
+    &{$parse}($rhash,$reg,$func,$data);
+    use strict "refs";
   }
 
   if( !defined($rhash->{SWAP_nonce})
