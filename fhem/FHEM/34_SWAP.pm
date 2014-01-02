@@ -932,7 +932,7 @@ SWAP_Parse($$)
 
     $rhash->{product} = $products->{$productcode} if( defined($productcode) && defined($products->{$productcode} ) );
 
-    SWAP_Set( $rhash, $rname, "getConfig" ) if( !$first );
+    #SWAP_Set( $rhash, $rname, "getConfig" ) if( !$first );
     SWAP_Set( $rhash, $rname, "statusRequest" ) if( $first );
   }
 
