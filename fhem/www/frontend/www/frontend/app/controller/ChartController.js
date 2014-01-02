@@ -224,28 +224,34 @@ Ext.define('FHEM.controller.ChartController', {
                     if (response && response.responseText) {
                         var responseArr = response.responseText.split(/\n/),
                             keyObjArray = [],
-                            keyArray = [];
+                            keyArray = [],
+                            keyIndexArray = [];
                         
                         Ext.each(responseArr, function(row) {
                             // the first column is always the timestamp, followed by device and multiple key:value
-                            var splitArr = row.split(" ");
+                            var splitArr = row.split(" "),
+                                i = 2; // 2 is needed as offset, because get function starts at one and our array at 0
                             Ext.each(splitArr, function(key) {
                                 if (key.lastIndexOf(":") + 1 === key.length && 
                                     !Ext.Array.contains(keyArray, key.replace(":", ""))) {
                                         keyArray.push(key.replace(":", ""));
+                                        keyIndexArray.push(i);
                                 }
+                                i++;
                             });
                         });
                         
-                        Ext.Array.sort(keyArray);
+                        var j = 0;
                         Ext.each(keyArray, function(key) {
-                            var obj = {"READING": key};
+                            var obj = {"READING": key, "INDEX": keyIndexArray[j]};
                             keyObjArray.push(obj);
+                            j++;
                         });
                         
                         //reconfigure readings store
                         if (keyObjArray.length > 0) {
                             readingscombo.getStore().add(keyObjArray);
+                            readingscombo.getStore().sort('READING', 'asc');
                             readingscombo.queryMode = 'local';
                             
                         } else {
@@ -432,6 +438,7 @@ Ext.define('FHEM.controller.ChartController', {
             Ext.each(yaxes, function(y) {
                 var device = devices[i].getValue(),
                     yaxis = yaxes[i].getValue(),
+                    yaxisindex = yaxes[i].getStore().findRecord("READING", yaxes[i].getValue()).raw.INDEX,
                     styleConfig = rowFieldSets[i].styleConfig,
                     yaxisstatistics = yaxesstatistics[i].getValue(),
                     axisside = axissideradio[i].getChecked()[0].getSubmitValue(),
@@ -440,7 +447,7 @@ Ext.define('FHEM.controller.ChartController', {
                     yaxis = yaxes[i].getRawValue();
                 }
                 
-                me.populateAxis(i, yaxes.length, device, yaxis, styleConfig, axisside, yaxisstatistics, dbstarttime, dbendtime, logtype);
+                me.populateAxis(i, yaxes.length, device, yaxis, yaxisindex, styleConfig, axisside, yaxisstatistics, dbstarttime, dbendtime, logtype);
                 i++;
             });
             
@@ -809,7 +816,7 @@ Ext.define('FHEM.controller.ChartController', {
     /**
      * fill the axes with data
      */
-    populateAxis: function(i, axeslength, device, yaxis, styleConfig, axisside, yaxisstatistics, dbstarttime, dbendtime, logtype) {
+    populateAxis: function(i, axeslength, device, yaxis, yaxisindex, styleConfig, axisside, yaxisstatistics, dbstarttime, dbendtime, logtype) {
         
         var me = this,
             chart = me.getChart(),
@@ -841,10 +848,15 @@ Ext.define('FHEM.controller.ChartController', {
                 // as the get command wont support absolute pathes by default...
                 currentlogfile = "../../../../../../../../" + currentlogfile;
             }
-            
-            url += '../../../fhem?cmd=get%20Logfile%20' +
-                currentlogfile + '%20-%20' + dbstarttime +
-                '%20' + dbendtime + '%204:' + yaxis + '.*::&XHR=1';
+            url = '../../../fhem?cmd=';
+            url += encodeURIComponent('get Logfile ' +
+                currentlogfile + ' - ' + dbstarttime +
+                ' ' + dbendtime + ' ' + yaxisindex + ':' + yaxis +
+                '.*::$fld[' + (yaxisindex - 1) +
+                ']=~"ok|on|open|active|true"?1:($fld[' +
+                (yaxisindex - 1) +
+                ']=~"low|off|closed|inactive|false"?0:$fld[' +
+                (yaxisindex - 1) + ']*1)') + '&XHR=1';
         } else if (!Ext.isDefined(yaxisstatistics) || yaxisstatistics === "none" || Ext.isEmpty(yaxisstatistics)) {
             url += '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+' + dbstarttime + '+' + dbendtime + '+';
             url +=device + '+timerange+' + "TIMESTAMP" + '+' + yaxis;
