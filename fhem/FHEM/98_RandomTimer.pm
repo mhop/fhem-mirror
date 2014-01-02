@@ -475,13 +475,15 @@ sub RandomTimer_disable($) {
   <ul>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><a name="disableCond">disableCond</a><br>
-        In the disableCond-Attibute a condition can be specified, that must be true to have the
-        Randomtimer work. The Condition must be put into round brackets. The best way is to define
+        The default behavior of a RandomTimer is, that it works.
+        To set the Randomtimer out of work, you can specify in the disableCond attibute a condition in perlcode that must evaluate to true.
+        The Condition must be put into round brackets. The best way is to define
         a function in 99_utils.
         <br>
         <b>Examples</b>
         <pre>
         attr   ZufallsTimerZ         disableCond  (!isVerreist())
+        attr   ZufallsTimerZ         disableCond  (Value("presenceDummy" eq "notPresent"))
         </pre>
     </li>
     <li><a name="onOffCmd">onCmd, offCmd</a><br>
