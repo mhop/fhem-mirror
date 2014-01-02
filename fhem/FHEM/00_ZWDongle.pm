@@ -15,7 +15,7 @@ sub ZWDongle_Parse($$$);
 sub ZWDongle_Read($@);
 sub ZWDongle_ReadAnswer($$$);
 sub ZWDongle_Ready($);
-sub ZWDongle_Write($$$);
+sub ZWDongle_Write($$$@);
 
 
 # See also:
@@ -196,6 +196,8 @@ ZWDongle_Define($$)
 
   $hash->{DeviceName} = $dev;
   $hash->{CallbackNr} = 0;
+  my @empty;
+  $hash->{SendStack} = \@empty;
   my $ret = DevIo_OpenDev($hash, 0, "ZWDongle_DoInit");
   return $ret;
 }
@@ -253,7 +255,7 @@ ZWDongle_Get($@)
   my $type = shift @a;
 
   return "Unknown argument $type, choose one of " . join(" ", sort keys %gets)
-  	if(!defined($gets{$type}));
+        if(!defined($gets{$type}));
 
   my @ga = split("%", $gets{$type}, -1);
   my $nargs = int(@ga)-1;
@@ -385,10 +387,16 @@ ZWDongle_CheckSum($)
 
 #####################################
 sub
-ZWDongle_Write($$$)
+ZWDongle_Write($$$@)
 {
-  my ($hash,$fn,$msg) = @_;
+  my ($hash,$fn,$msg,$noStack) = @_;
 
+  if(!$noStack && $msg =~ m/^13/) { # SEND_DATA, wait for ACK
+    push @{$hash->{SendStack}}, $msg;
+    if(int(@{$hash->{SendStack}}) > 1) {
+      return;
+    }
+  }
   $msg = "$fn$msg";
   $msg = sprintf("%02x%s", length($msg)/2+1, $msg);
   $msg = "01$msg" . ZWDongle_CheckSum($msg);
@@ -432,6 +440,16 @@ ZWDongle_Read($@)
       $data = substr($data, 2);
       next;
     }
+    if($fb eq "18") {   # CAN
+      if(int(@{$hash->{SendStack}})) {
+        Log3 $name, 4, "$name: CANCEL received, retransmitting.";
+        ZWDongle_Write($hash, "00", $hash->{SendStack}->[0], 1);
+      } else {
+        Log3 $name, 4, "$name: CANCEL received, nothing to retransmit.";
+      }
+      $data = substr($data, 2);
+      next;
+    }
     if($fb ne "01") {   # SOF
       Log3 $name, 1, "$name: SOF missing (got $fb instead of 01)";
       last;
@@ -447,11 +465,18 @@ ZWDongle_Read($@)
 
     my $ccs = ZWDongle_CheckSum("$len$msg");    # Computed Checksum
     if($rcs ne $ccs) {
-      Log3 $name, 1, "$name: wrong checksum: received $rcs, computed $ccs";
-      next;
+      Log3 $name, 1, "$name: wrong checksum: received $rcs, computed $ccs for $len$msg";
     }
     DevIo_SimpleWrite($hash, "06", 1);          # Send ACK
     Log3 $name, 5, "ZWDongle_Read $name: $msg";
+    
+    if($msg =~ m/^00(04|13)/) { # FIXME: add timeout, check all msgtypes
+      shift @{$hash->{SendStack}};
+      if(int(@{$hash->{SendStack}})) {
+        ZWDongle_Write($hash, "00", $hash->{SendStack}->[0], 1);
+      }
+    }
+    
     last if(defined($local) && (!defined($regexp) || ($msg =~ m/$regexp/)));
     ZWDongle_Parse($hash, $name, $msg);
     $msg = undef;
