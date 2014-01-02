@@ -105,8 +105,8 @@ CUL_Initialize($)
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "showtime:1,0 model:CUL,CUN,CUR " . 
                      "sendpool addvaltrigger rfmode:SlowRF,HomeMatic,MAX ".
-					 "hmId ".
-		             "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger";
+                     "hmId ".
+                     "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger ";
 
   $hash->{ShutdownFn} = "CUL_Shutdown";
 
@@ -680,17 +680,17 @@ sub
 CUL_XmitDlyHM($$$)
 {
   my ($hash,$fn,$now) = @_;
+  
   my $id = (length($fn)>19)?substr($fn,16,6):"";#get HMID destination
   if($id &&
-     $hash->{helper} && 
-     $hash->{helper}{$id} &&
-     $hash->{helper}{$id}{nextSend}) {
-    my $dDly = $hash->{helper}{$id}{nextSend} - $now;
+     $modules{CUL_HM}{defptr}{$id} && 
+     $modules{CUL_HM}{defptr}{$id}{helper}{io} && 
+     $modules{CUL_HM}{defptr}{$id}{helper}{io}{nextSend}) {
+    my $dDly = $modules{CUL_HM}{defptr}{$id}{helper}{io}{nextSend} - $now;
     if ($dDly > 0.01){# wait less then 10 ms will not work
       $dDly = 0.1 if($dDly > 0.1);
       Log3 $hash->{NAME}, 5, "CUL $id dly:".int($dDly*1000)."ms";
-      InternalTimer($now+$dDly,"CUL_XmitDlyHMTo", "$hash->{NAME}:$id", 1);
-      return 1;
+      select(undef, undef, undef, $dDly);
     }
   }
   shift(@{$hash->{helper}{$id}{QUEUE}});
@@ -954,8 +954,11 @@ CUL_Parse($$$$$)
   } elsif($fn eq "I" && $len >= 12) {              # IR-CUL/CUN/CUNO
     ;
   } elsif($fn eq "A" && $len >= 20) {              # AskSin/BidCos/HomeMatic
-    my $srcId = substr($dmsg,9,6);
-    $hash->{helper}{$srcId}{nextSend} = gettimeofday() + 0.100;
+    my $src = substr($dmsg,9,6);
+    if($modules{CUL_HM}{defptr}{$src}){
+      $modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend} = 
+          gettimeofday() + 0.100;
+    }
     $dmsg .= "::$rssi:$name" if(defined($rssi));
 
   } elsif($fn eq "Z" && $len >= 21) {              # Moritz/Max
