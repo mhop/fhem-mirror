@@ -438,7 +438,8 @@ Ext.define('FHEM.controller.ChartController', {
             Ext.each(yaxes, function(y) {
                 var device = devices[i].getValue(),
                     yaxis = yaxes[i].getValue(),
-                    yaxisindex = yaxes[i].getStore().findRecord("READING", yaxes[i].getValue()).raw.INDEX,
+                    yaxisrec = yaxes[i].getStore().findRecord("READING", yaxes[i].getValue()),
+                    yaxisindex = yaxisrec ? yaxisrec.raw.INDEX : 0,
                     styleConfig = rowFieldSets[i].styleConfig,
                     yaxisstatistics = yaxesstatistics[i].getValue(),
                     axisside = axissideradio[i].getChecked()[0].getSubmitValue(),
@@ -446,7 +447,7 @@ Ext.define('FHEM.controller.ChartController', {
                 if(yaxis === "" || yaxis === null) {
                     yaxis = yaxes[i].getRawValue();
                 }
-                
+
                 me.populateAxis(i, yaxes.length, device, yaxis, yaxisindex, styleConfig, axisside, yaxisstatistics, dbstarttime, dbendtime, logtype);
                 i++;
             });
