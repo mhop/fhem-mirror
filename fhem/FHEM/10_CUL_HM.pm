@@ -579,9 +579,6 @@ sub CUL_HM_Parse($$) {##############################
       && ($mTp eq '01' || $mTp eq '11')){
     my $ioId = AttrVal($dhash->{IODev}{NAME},"hmId","-");
     CUL_HM_eventP($dhash,"ErrIoId_$src")if($ioId ne $src);
-    Log 1,"General ErrIoAttack ".$dhash->{NAME}.":$msg"
-          ."\n                         ".$dhash->{helper}{cSnd}    
-         if(defined $dhash->{helper}{cSnd} && $dhash->{helper}{cSnd} ne substr($msg,7));
     CUL_HM_eventP($dhash,"ErrIoAttack")
          if(defined $dhash->{helper}{cSnd} && $dhash->{helper}{cSnd} ne substr($msg,7));
   }
@@ -1944,7 +1941,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 
     my @peers = split(",",AttrVal($cName,"peerIDs",""));
     my @entities;
-    foreach my $peer (@peers){
+    foreach my $peer (grep !/00000000/,@peers){
       my $pName = CUL_HM_id2Name($peer);
       $pName = CUL_HM_id2Name(substr($peer,0,6)) if (!$defs{$pName});
       next if (!$defs{$pName});#||substr($peer,0,6) ne $dst
@@ -1952,8 +1949,9 @@ sub CUL_HM_parseCommon(@){#####################################################
                           ,"trig_$cName:$level"
                           ,"trigLast:$cName ".(($level ne "-")?":$level":""));
     }
-
-    return "entities:".join(",",@entities);
+    return (@entities
+                 ?"entities:".join(",",@entities)
+                 :"");
   }
   elsif($mTp eq "70"){ #Time to trigger TC##################
     #send wakeup and process command stack
