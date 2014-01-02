@@ -1,566 +1,729 @@
 ##############################################
 # $Id$
-# TODO:
-# - routing commands
-# - one command to create a fhem device for all nodeList entries
-# - inclusion mode active only for a given time (pairForSec)
-# - use central readings functions
+# See ZWDongle.pm for inspiration
 package main;
 
 use strict;
 use warnings;
-use Time::HiRes qw(gettimeofday);
+use SetExtensions;
 
-sub ZWDongle_Parse($$$);
-sub ZWDongle_Read($@);
-sub ZWDongle_ReadAnswer($$$);
-sub ZWDongle_Ready($);
-sub ZWDongle_Write($$$@);
+sub ZWave_Parse($$@);
+sub ZWave_Set($@);
+sub ZWave_Get($@);
+sub ZWave_Cmd($$@);
+sub ZWave_ParseMeter($);
+sub ZWave_SetClasses($$$$);
 
-
-# See also:
-# http://www.digiwave.dk/en/programming/an-introduction-to-the-z-wave-protocol/
-# http://open-zwave.googlecode.com/svn-history/r426/trunk/cpp/src/Driver.cpp
-# http://buzzdavidson.com/?p=68
-my %sets = (
-  "addNode"   => { cmd   => "4a%02x@",     # ZW_ADD_NODE_TO_NETWORK',
-                   param => {on=>0x81, off=>0x05 } },
-  "removeNode"=> { cmd   => "4b%02x@",     # ZW_REMOVE_NODE_FROM_NETWORK',
-                   param => {on=>0x81, off=>0x05 } },
-  "createNode"=> { cmd   => "60%02x"  },  # ZW_REQUEST_NODE_INFO',
-);
-
-my %gets = (
-  "caps"      => "07",     # SERIAL_API_GET_CAPABILITIES
-  "ctrlCaps"  => "05",     # ZW_GET_CONTROLLER_CAPS
-  "nodeInfo"  => "41%02x", # ZW_GET_NODE_PROTOCOL_INFO
-  "nodeList"  => "02",     # SERIAL_API_GET_INIT_DATA
-  "homeId"    => "20",     # MEMORY_GET_ID
-  "version"   => "15",     # ZW_GET_VERSION
-  "raw"       => "%s",
-);
-
-# Known controller function. 
-# Note: Known != implemented, see %sets & %gets for the implemented ones.
 use vars qw(%zw_func_id);
-use vars qw(%zw_type6);
-%zw_func_id= (
-  '02'  => 'SERIAL_API_GET_INIT_DATA',
-  '03'  => 'SERIAL_API_APPL_NODE_INFORMATION',
-  '04'  => 'APPLICATION_COMMAND_HANDLER',
-  '05'  => 'ZW_GET_CONTROLLER_CAPABILITIES',
-  '06'  => 'SERIAL_API_SET_TIMEOUTS',
-  '07'  => 'SERIAL_API_GET_CAPABILITIES',
-  '08'  => 'SERIAL_API_SOFT_RESET',
-  '10'  => 'ZW_SET_R_F_RECEIVE_MODE',
-  '11'  => 'ZW_SET_SLEEP_MODE',
-  '12'  => 'ZW_SEND_NODE_INFORMATION',
-  '13'  => 'ZW_SEND_DATA',
-  '14'  => 'ZW_SEND_DATA_MULTI',
-  '15'  => 'ZW_GET_VERSION',
-  '16'  => 'ZW_SEND_DATA_ABORT',
-  '17'  => 'ZW_R_F_POWER_LEVEL_SET',
-  '18'  => 'ZW_SEND_DATA_META',
-  '20'  => 'MEMORY_GET_ID',
-  '21'  => 'MEMORY_GET_BYTE',
-  '22'  => 'MEMORY_PUT_BYTE',
-  '23'  => 'MEMORY_GET_BUFFER',
-  '24'  => 'MEMORY_PUT_BUFFER',
-  '30'  => 'CLOCK_SET',
-  '31'  => 'CLOCK_GET',
-  '32'  => 'CLOCK_COMPARE',
-  '33'  => 'RTC_TIMER_CREATE',
-  '34'  => 'RTC_TIMER_READ',
-  '35'  => 'RTC_TIMER_DELETE',
-  '36'  => 'RTC_TIMER_CALL',
-  '41'  => 'ZW_GET_NODE_PROTOCOL_INFO',
-  '42'  => 'ZW_SET_DEFAULT',
-  '44'  => 'ZW_REPLICATION_COMMAND_COMPLETE',
-  '45'  => 'ZW_REPLICATION_SEND_DATA',
-  '46'  => 'ZW_ASSIGN_RETURN_ROUTE',
-  '47'  => 'ZW_DELETE_RETURN_ROUTE',
-  '48'  => 'ZW_REQUEST_NODE_NEIGHBOR_UPDATE',
-  '49'  => 'ZW_APPLICATION_UPDATE',
-  '4a'  => 'ZW_ADD_NODE_TO_NETWORK',
-  '4b'  => 'ZW_REMOVE_NODE_FROM_NETWORK',
-  '4c'  => 'ZW_CREATE_NEW_PRIMARY',
-  '4d'  => 'ZW_CONTROLLER_CHANGE',
-  '50'  => 'ZW_SET_LEARN_MODE',
-  '51'  => 'ZW_ASSIGN_SUC_RETURN_ROUTE',
-  '52'  => 'ZW_ENABLE_SUC',
-  '53'  => 'ZW_REQUEST_NETWORK_UPDATE',
-  '54'  => 'ZW_SET_SUC_NODE_ID',
-  '55'  => 'ZW_DELETE_SUC_RETURN_ROUTE',
-  '56'  => 'ZW_GET_SUC_NODE_ID',
-  '57'  => 'ZW_SEND_SUC_ID',
-  '59'  => 'ZW_REDISCOVERY_NEEDED',
-  '60'  => 'ZW_REQUEST_NODE_INFO',
-  '61'  => 'ZW_REMOVE_FAILED_NODE_ID',
-  '62'  => 'ZW_IS_FAILED_NODE',
-  '63'  => 'ZW_REPLACE_FAILED_NODE',
-  '70'  => 'TIMER_START',
-  '71'  => 'TIMER_RESTART',
-  '72'  => 'TIMER_CANCEL',
-  '73'  => 'TIMER_CALL',
-  '80'  => 'GET_ROUTING_TABLE_LINE',
-  '81'  => 'GET_T_X_COUNTER',
-  '82'  => 'RESET_T_X_COUNTER',
-  '83'  => 'STORE_NODE_INFO',
-  '84'  => 'STORE_HOME_ID',
-  '90'  => 'LOCK_ROUTE_RESPONSE',
-  '91'  => 'ZW_SEND_DATA_ROUTE_DEMO',
-  '95'  => 'SERIAL_API_TEST',
-  'a0'  => 'SERIAL_API_SLAVE_NODE_INFO',
-  'a1'  => 'APPLICATION_SLAVE_COMMAND_HANDLER',
-  'a2'  => 'ZW_SEND_SLAVE_NODE_INFO',
-  'a3'  => 'ZW_SEND_SLAVE_DATA',
-  'a4'  => 'ZW_SET_SLAVE_LEARN_MODE',
-  'a5'  => 'ZW_GET_VIRTUAL_NODES',
-  'a6'  => 'ZW_IS_VIRTUAL_NODE',
-  'bb'  => 'ZW_GET_NEIGHBOR_COUNT',
-  'bc'  => 'ZW_ARE_NODES_NEIGHBOURS',
-  'bd'  => 'ZW_TYPE_LIBRARY',
-  'd0'  => 'ZW_SET_PROMISCUOUS_MODE',
+
+my @zwave_models = qw(
+  Everspring_AN1582 Everspring_AN1583
 );
 
-%zw_type6 = (
-  '01' => 'GENERIC_CONTROLLER',    '12' => 'SWITCH_REMOTE',
-  '02' => 'STATIC_CONTROLLER',     '13' => 'SWITCH_TOGGLE',
-  '03' => 'AV_CONTROL_POINT',      '20' => 'SENSOR_BINARY',
-  '06' => 'DISPLAY',               '21' => 'SENSOR_MULTILEVEL',
-  '07' => 'GARAGE_DOOR',           '22' => 'WATER_CONTROL',
-  '08' => 'THERMOSTAT',            '30' => 'METER_PULSE',
-  '09' => 'WINDOW_COVERING',       '40' => 'ENTRY_CONTROL',
-  '0F' => 'REPEATER_SLAVE',        '50' => 'SEMI_INTEROPERABLE',
-  '10' => 'SWITCH_BINARY',         'ff' => 'NON_INTEROPERABLE',
-  '11' => 'SWITCH_MULTILEVEL',
-);
+my %zwave_id2class;
+my %zwave_class = (
+  NO_OPERATION             => { id => '00', },
+  BASIC                    => { id => '20',
+    set   => { basicValue  => "01%02x", },
+    get   => { basicStatus => "02",     }, 
+    parse => { "..200.(.*)"=> '"basicReport:$1"',}, },
+  CONTROLLER_REPLICATION   => { id => '21', },
+  APPLICATION_STATUS       => { id => '22', },
+  ZIP_SERVICES             => { id => '23', },
+  ZIP_SERVER               => { id => '24', },
+  SWITCH_BINARY            => { id => '25',
+    set   => { off         => "0100",
+               on          => "01FF",
+               reportOn    => "03FF",
+               reportOff   => "0300",     },
+    get   => { swbStatus   => "02",       },
+    parse => { "03250300"  => "state:off",
+               "032503ff"  => "state:on",  }, } ,
+  SWITCH_MULTILEVEL        => { id => '26', 
+    set   => { off         => "0100",
+               on          => "01FF",
+               dim         => "01%02x", 
+               reportOn    => "03FF",
+               reportOff   => "0300",     },
+    get   => { swmStatus   => "02",     }, 
+    #03260363 reported in http://forum.fhem.de/index.php?t=rview&th=10216
+    parse => { "032603(.*)"=> '($1 eq "00" ? "state:off" : 
+                               ($1 eq "ff" ? "state:on" : 
+                                             "state:dim ".hex($1)))',}, },
+  SWITCH_ALL               => { id => '27', },
+  SWITCH_TOGGLE_BINARY     => { id => '28', },
+  SWITCH_TOGGLE_MULTILEVEL => { id => '29', },
+  CHIMNEY_FAN              => { id => '2a', },
+  SCENE_ACTIVATION         => { id => '2b', },
+  SCENE_ACTUATOR_CONF      => { id => '2c', },
+  SCENE_CONTROLLER_CONF    => { id => '2d', },
+  ZIP_CLIENT               => { id => '2e', },
+  ZIP_ADV_SERVICES         => { id => '2f', },
+  SENSOR_BINARY            => { id => '30', 
+    get   => { sbStatus    => "02",       },
+    parse => { "03300300"  => "state:closed",
+               "033003ff"  => "state:open",  },},
+#053105030129
 
+  SENSOR_MULTILEVEL        => { id => '31', 
+    get   => { smStatus    => "04" },
+    parse => { "..3105(..)(..)(.*)" => 'ZWave_ParseMultilevel($1,$2,$3)'},},
+  METER                    => { id => '32',
+    parse => { "..3202(.*)"=> 'ZWave_ParseMeter($1)' }, },
+  ZIP_ADV_SERVER           => { id => '33', },
+  ZIP_ADV_CLIENT           => { id => '34', },
+  METER_PULSE              => { id => '35', },
+  HRV_STATUS               => { id => '37', 
+    get   => { hrvStatus    => "01%02x",
+               hrvStatusSupported => "03",},
+    parse => { "0637020042(....)" =>
+                   'sprintf("outdoorTemperature: %0.1f C", s2Hex($1)/100)',
+               "0637020142(....)" =>
+                   'sprintf("supplyAirTemperature: %0.1f C", s2Hex($1)/100)',
+               "0637020242(....)" =>
+                   'sprintf("exhaustAirTemperature: %0.1f C", s2Hex($1)/100)',
+               "0637020342(....)" =>
+                   'sprintf("dischargeAirTemperature: %0.1f C",s2Hex($1)/100)',
+               "0637020442(....)" =>
+                   'sprintf("indoorTemperature: %0.1f C", s2Hex($1)/100)',
+               "0537020501(..)" =>
+                   'sprintf("indoorHumidity: %s %%", hex($1))',
+               "0537020601(..)" =>
+                   'sprintf("remainingFilterLife: %s %%", hex($1))',
+               "033704(..)" =>
+                   'sprintf("supportedStatus: %s", ZWave_HrvStatus($1))',
+            },},
+  THERMOSTAT_HEATING       => { id => '38', },
+  HRV_CONTROL              => { id => '39', 
+    set   => { bypassOff => "0400",
+               bypassOn  => "04FF",
+               ventilationRate => "07%02x", },
+    get   => { bypass          => "05", 
+                ventilationRate => "08", },  
+    parse => { "033906(..)"=> '($1 eq "00" ? "bypass:off" : '.
+                              '($1 eq "ff" ? "bypass:on"  : '.
+                                            '"bypass:dim ".hex($1)))',
+               "033909(..)"=> 'sprintf("ventilationRate: %s",hex($1))', },},
+  METER_TBL_CONFIG         => { id => '3c', },
+  METER_TBL_MONITOR        => { id => '3d', },
+  METER_TBL_PUSH           => { id => '3e', },
+  THERMOSTAT_MODE          => { id => '40',
+    set   => { tmOff       => "0100",
+               tmHeating   => "0101",
+               tmCooling   => "010b",
+               tmManual    => "011f", },
+    get   => { thermostatMode => "02", },
+    parse => { "03400300"  => "state:off",
+               "0340030b"  => "state:cooling",
+               "03400301"  => "state:heating",
+               "0340031f"  => "state:manual",  }, } ,
+  THERMOSTAT_OPERATING_STATE=>{ id => '42', },
+  THERMOSTAT_SETPOINT      => { id => '43',
+    get   => { setpoint => "02" },
+    parse => { "064303(..)(..)(....)" => 'sprintf("temperature:%0.1f %s %s", '.
+                 'hex($3)/(10**int(hex($2)/32)), '.
+                 'hex($2)&8 ? "F":"C", $1==1 ? "heating":"cooling")' }, },
+  THERMOSTAT_FAN_MODE      => { id => '44', },
+  THERMOSTAT_FAN_STATE     => { id => '45', },
+  CLIMATE_CONTROL_SCHEDULE => { id => '46', },
+  THERMOSTAT_SETBACK       => { id => '47', },
+  DOOR_LOCK_LOGGING        => { id => '4c', },
+  SCHEDULE_ENTRY_LOCK      => { id => '4e', },
+  BASIC_WINDOW_COVERING    => { id => '50', },
+  MTP_WINDOW_COVERING      => { id => '51', },
+  MULTI_CHANNEL            => { id => '60',  # Version 2, aka MULTI_INSTANCE
+    get   => { mcEndpoints => "07",     # Endpoints
+               mcCapability=> "09%02x"},
+    parse => { "^046008(..)(..)" => '"mcEndpoints:total ".hex($2).'.
+                                 '(hex($1)&0x80 ? ", dynamic":"").'.
+                                 '(hex($1)&0x40 ? ", identical":", different")',
+               "^..600a(.*)"=> 'ZWave_mcCapability($hash, $1)' }, },
+  DOOR_LOCK                => { id => '62', },
+  USER_CODE                => { id => '63', },
+  CONFIGURATION            => { id => '70', 
+    set   => { configDefault=>"04%02x80",
+               configByte  => "04%02x01%02x",
+               configWord  => "04%02x02%04x",
+               configLong  => "04%02x04%08x", },
+    get   => { config      => "05%02x", },
+    parse => { "..7006(..)..(.*)" => '"config_$1:".hex($2)',}, },
+  ALARM                    => { id => '71', 
+    get   => { alarm       => "04%02x", },
+    parse => { "..7105(..)(..)" => '"alarm_type_$1:level $2"',}, },
+  MANUFACTURER_SPECIFIC    => { id => '72', },
+  POWERLEVEL               => { id => '73', },
+  PROTECTION               => { id => '75', },
+  LOCK                     => { id => '76', },
+  NODE_NAMING              => { id => '77', },
+  FIRMWARE_UPDATE_MD       => { id => '7a', },
+  GROUPING_NAME            => { id => '7b', },
+  REMOTE_ASSOCIATION_ACTIVATE=>{id => '7c', },
+  REMOTE_ASSOCIATION       => { id => '7d', },
+  BATTERY                  => { id => '80',
+    get   => { battery     => "02" },
+    parse => { "038003(..)"=> '"battery:".hex($1)." %"' }, },
+  CLOCK                    => { id => '81',
+    parse => { "028105"=> "clock:get" }, },
+  HAIL                     => { id => '82', },
+  WAKE_UP                  => { id => '84', 
+    set   => { wakeupInterval => "04%06x%02x",
+               wakeupNoMoreInformation => "08", },
+    get   => { wakeupInterval => "05" },
+    parse => { "028407"    => 'wakeup:notification',
+               "..8406(......)(..)" =>
+                '"wakeupReport:interval ".hex($1)." target ".hex($2)',}, },
+  ASSOCIATION              => { id => '85', 
+    set   => { associationAdd => "01%02x%02x*",
+               associationDel => "04%02x%02x*", },
+    get   => { association => "02%02x",      },
+    parse => { "..8503(..)(..)..(.*)" => '"assocGroup_$1:Max $2 Nodes $3"',}, },
+  VERSION                  => { id => '86',
+    get   => { version     => "11",       },
+    parse => { "078612(..)(..)(..)(..)(..)" =>
+    'sprintf("version:Lib %d Prot %d.%d App %d.%d",'.
+        'hex($1),hex($2),hex($3),hex($4),hex($5))', } },
+  INDICATOR                => { id => '87', },
+  PROPRIETARY              => { id => '88', },
+  LANGUAGE                 => { id => '89', },
+  TIME                     => { id => '8a', },
+  TIME_PARAMETERS          => { id => '8b', },
+  GEOGRAPHIC_LOCATION      => { id => '8c', },
+  COMPOSITE                => { id => '8d', },
+  MULTI_CHANNEL_ASSOCIATION=> { id => '8e', }, # aka MULTI_INSTANCE_ASSOCIATION
+  MULTI_CMD                => { id => '8f', }, # Handled in Parse
+  ENERGY_PRODUCTION        => { id => '90', },
+  MANUFACTURER_PROPRIETARY => { id => '91', },
+  SCREEN_MD                => { id => '92', },
+  SCREEN_ATTRIBUTES        => { id => '93', },
+  SIMPLE_AV_CONTROL        => { id => '94', },
+  AV_CONTENT_DIRECTORY_MD  => { id => '95', },
+  AV_RENDERER_STATUS       => { id => '96', },
+  AV_CONTENT_SEARCH_MD     => { id => '97', },
+  SECURITY                 => { id => '98', },
+  AV_TAGGING_MD            => { id => '99', },
+  IP_CONFIGURATION         => { id => '9a', },
+  ASSOCIATION_COMMAND_CONFIGURATION
+                           => { id => '9b', },
+  SENSOR_ALARM             => { id => '9c',
+    get   => { alarm       => "01%02x", },
+    parse => { "..9c02(..)(..)(..)(....)" =>
+                '"alarm_type_$2:level $3 node $1 seconds ".hex($4)',}, },  
+  SILENCE_ALARM            => { id => '9d', },
+  SENSOR_CONFIGURATION     => { id => '9e', },
+  MARK                     => { id => 'ef', },
+  NON_INTEROPERABLE        => { id => 'f0', },
+  );
+my %zwave_cmdArgs = (
+  dim => "slider,0,1,99",
+  );
 
 
 sub
-ZWDongle_Initialize($)
+ZWave_Initialize($)
 {
   my ($hash) = @_;
-
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
-
-# Provider
-  $hash->{ReadFn}  = "ZWDongle_Read";
-  $hash->{WriteFn} = "ZWDongle_Write";
-  $hash->{ReadyFn} = "ZWDongle_Ready";
-  $hash->{ReadAnswerFn} = "ZWDongle_ReadAnswer";
-
-# Normal devices
-  $hash->{DefFn}   = "ZWDongle_Define";
-  $hash->{SetFn}   = "ZWDongle_Set";
-  $hash->{GetFn}   = "ZWDongle_Get";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 model:ZWDongle";
+  $hash->{Match}     = ".*";
+  $hash->{SetFn}     = "ZWave_Set";
+  $hash->{GetFn}     = "ZWave_Get";
+  $hash->{DefFn}     = "ZWave_Define";
+  $hash->{UndefFn}   = "ZWave_Undef";
+  $hash->{ParseFn}   = "ZWave_Parse";
+  $hash->{AttrList}  = "IODev do_not_notify:1,0 ".
+    "ignore:1,0 dummy:1,0 showtime:1,0 classes ".
+    "$readingFnAttributes " .
+    "model:".join(",", sort @zwave_models);
+  map { $zwave_id2class{lc($zwave_class{$_}{id})} = $_ } keys %zwave_class;
 }
 
-#####################################
+
+#############################
 sub
-ZWDongle_Define($$)
+ZWave_Define($$)
 {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
+  my $name   = shift @a;
+  my $type = shift(@a); # always ZWave
 
-  if(@a != 3) {
-    my $msg = "wrong syntax: define <name> ZWDongle {none[:homeId] | ".
-                        "devicename[\@baudrate] | ".
-                        "devicename\@directio | ".
-                        "hostname:port}";
-    return $msg;
-  }
+  my $u = "wrong syntax for $name: define <name> ZWave homeId id [classes]";
+  return $u if(int(@a) < 2 || int(@a) > 3);
 
-  DevIo_CloseDev($hash);
+  my $homeId = lc(shift @a);
+  my $id     = shift @a;
 
-  my $name = $a[0];
-  my $dev = $a[2];
+  return "define $name: wrong homeId ($homeId): need an 8 digit hex value"
+                   if( ($homeId !~ m/^[a-f0-9]{8}$/i) );
+  return "define $name: wrong id ($id): need a number"
+                   if( ($id !~ m/^\d+$/i) );
 
-  $hash->{Clients} = ":ZWave:";
-  my %matchList = ( "1:ZWave" => ".*" );
-  $hash->{MatchList} = \%matchList;
+  $id = sprintf("%0*x", ($id > 255 ? 4 : 2), $id);
+  $hash->{homeId} = $homeId;
+  $hash->{id}     = $id;
 
-  if($dev =~ m/none:(.*)/) {
-    $hash->{homeId} = $1;
-    Log3 $name, 1, 
-        "$name device is none (homeId:$1), commands will be echoed only";
-    $attr{$name}{dummy} = 1;
-    return undef;
+  $modules{ZWave}{defptr}{"$homeId $id"} = $hash;
+  AssignIoPort($hash);  # FIXME: should take homeId into account
 
-  } elsif($dev !~ m/@/ && $dev !~ m/:/) {
-    $def .= "\@115200";  # default baudrate
+  if(@a) {
+    ZWave_SetClasses($homeId, $id, undef, $a[0]);
 
-  }
+    if($attr{$name}{classes} =~ m/ASSOCIATION/) {
+      my $iodev = $hash->{IODev};
+      my $homeReading = ReadingsVal($iodev->{NAME}, "homeId", "") if($iodev);
+      my $ctrlId = $1 if($homeReading && $homeReading =~ m/CtrlNodeId:(..)/);
 
-  $hash->{DeviceName} = $dev;
-  $hash->{CallbackNr} = 0;
-  my @empty;
-  $hash->{SendStack} = \@empty;
-  my $ret = DevIo_OpenDev($hash, 0, "ZWDongle_DoInit");
-  return $ret;
-}
+      if($ctrlId) {
+        Log3 $name, 1, "Adding the controller $ctrlId to association group 1";
+        IOWrite($hash, "00", "130a04850101${ctrlId}05");
 
-
-#####################################
-sub
-ZWDongle_Set($@)
-{
-  my ($hash, @a) = @_;
-  my $name = shift @a;
-
-  return "\"set ZWDongle\" needs at least one parameter" if(@a < 1);
-  my $type = shift @a;
-
-  if(!defined($sets{$type})) {
-    my @r;
-    map { my $p = $sets{$_}{param};
-          push @r,($p ? "$_:".join(",",sort keys %{$p}) : $_)} sort keys %sets;
-    return "Unknown argument $type, choose one of " . join(" ",@r);
-  }
-  my $cmd = $sets{$type}{cmd};
-  my $par = $sets{$type}{param};
-  if($par) {
-    return "Unknown argument for $type, choose one of ".join(" ",keys %{$par})
-      if(!defined($par->{$a[0]}));
-    $a[0] = $par->{$a[0]};
-  }
-
-  if($cmd =~ m/\@/) {
-    my $c = $hash->{CallbackNr}+1;
-    $c = 1 if($c > 255);
-    $hash->{CallbackNr} = $c;
-    $c = sprintf("%02x", $c);
-    $cmd =~ s/\@/$c/g;
-  }
-
-  my @ca = split("%", $cmd, -1);
-  my $nargs = int(@ca)-1;
-  return "set $name $type needs $nargs arguments" if($nargs != int(@a));
-
-  ZWDongle_Write($hash,  "00", sprintf($cmd, @a));
-  return undef;
-}
-
-
-#####################################
-sub
-ZWDongle_Get($@)
-{
-  my ($hash, @a) = @_;
-  my $name = shift @a;
-
-  return "\"get $name\" needs at least one parameter" if(@a < 1);
-  my $type = shift @a;
-
-  return "Unknown argument $type, choose one of " . join(" ", sort keys %gets)
-        if(!defined($gets{$type}));
-
-  my @ga = split("%", $gets{$type}, -1);
-  my $nargs = int(@ga)-1;
-  return "get $name $type needs $nargs arguments" if($nargs != int(@a));
-
-  return "No $type for dummies" if(IsDummy($name));
-
-  ZWDongle_Write($hash,  "00", sprintf($gets{$type}, @a));
-  my $re = "^01".substr($gets{$type},0,2);  # Start with <01><len><01><CMD>
-  my ($err, $ret) = ZWDongle_ReadAnswer($hash, "get $name $type", $re);
-  return $err if($err);
-
-  my $msg="";
-  $msg = $ret if($ret);
-  my @r = map { ord($_) } split("", pack('H*', $ret)) if(defined($ret));
-
-  if($type eq "nodeList") {                     ############################
-    return "$name: Bogus data received" if(int(@r) != 36);
-    my @list;
-    for my $byte (0..28) {
-      my $bits = $r[5+$byte];
-      for my $bit (0..7) {
-        push @list, $byte*8+$bit+1 if($bits & (1<<$bit));
-      }
-    }
-    $msg = join(",", @list);
-
-  } elsif($type eq "caps") {                    ############################
-    $msg  = sprintf("Vers:%d Rev:%d ",       $r[2], $r[3]);
-    $msg .= sprintf("ManufID:%02x%02x ",     $r[4], $r[5]);
-    $msg .= sprintf("ProductType:%02x%02x ", $r[6], $r[7]);
-    $msg .= sprintf("ProductID:%02x%02x",    $r[8], $r[9]);
-    my @list;
-    for my $byte (0..31) {
-      my $bits = $r[10+$byte];
-      for my $bit (0..7) {
-        my $fn = $zw_func_id{sprintf("%02x", $byte*8+$bit)};
-        push @list, $fn if(($bits & (1<<$bit)) && $fn);
-      }
-    }
-    $msg .= " ".join(",",@list);
-
-  } elsif($type eq "homeId") {                  ############################
-    $msg = sprintf("HomeId:%s CtrlNodeId:%s", 
-                substr($ret,4,8), substr($ret,12,2));
-    $hash->{homeId} = substr($ret,4,8);
-
-  } elsif($type eq "version") {                 ############################
-    $msg = join("",  map { chr($_) } @r[2..13]);
-    my @type = qw( STATIC_CONTROLLER CONTROLLER ENHANCED_SLAVE
-                   SLAVE INSTALLER NO_INTELLIGENT_LIFE BRIDGE_CONTROLLER);
-    my $idx = $r[14]-1;
-    $msg .= " $type[$idx]" if($idx >= 0 && $idx <= $#type);
-
-  } elsif($type eq "ctrlCaps") {                ############################
-    my @type = qw(SECONDARY OTHER MEMBER PRIMARY SUC);
-    my @list;
-    for my $bit (0..7) {
-      push @list, $type[$bit] if(($r[2] & (1<<$bit)) && $bit < @type);
-    }
-    $msg = join(" ", @list);
-
-  } elsif($type eq "nodeInfo") {                 ############################
-    my $id = sprintf("%02x", $r[6]);
-    if($id eq "00") {
-      $msg = "node $a[0] is not present";
-    } else {
-      my @list;
-      my @type5 = qw( CONTROLLER STATIC_CONTROLLER SLAVE ROUTING_SLAVE);
-      push @list, $type5[$r[5]-1] if($r[5]>0 && $r[5] <= @type5);
-      push @list, $zw_type6{$id} if($zw_type6{$id});
-      push @list, ($r[2] & 0x80) ? "listening" : "sleeping";
-      push @list, "routing"   if($r[2] & 0x40);
-      push @list, "40kBaud"   if(($r[2] & 0x38) == 0x10);
-      push @list, "Vers:" . (($r[2]&0x7)+1);
-      push @list, "Security:" . ($r[3]&0x1);
-      $msg = join(" ", @list);
-    }
-  }
-
-  $type .= "_".join("_", @a) if(@a);
-  $hash->{READINGS}{$type}{VAL} = $msg;
-  $hash->{READINGS}{$type}{TIME} = TimeNow();
-
-  return "$name $type => $msg";
-}
-
-#####################################
-sub
-ZWDongle_Clear($)
-{
-  my $hash = shift;
-
-  # Clear the pipe
-  $hash->{RA_Timeout} = 0.3;
-  for(;;) {
-    my ($err, undef) = ZWDongle_ReadAnswer($hash, "Clear", undef);
-    last if($err && $err =~ m/^Timeout/);
-  }
-  delete($hash->{RA_Timeout});
-}
-
-#####################################
-sub
-ZWDongle_DoInit($)
-{
-  my $hash = shift;
-  my $name = $hash->{NAME};
-
-  DevIo_SetHwHandshake($hash) if($hash->{USBDev});
-  ZWDongle_Clear($hash);
-  ZWDongle_Get($hash, $name, "devList"); # Make the following query faster (?)
-  ZWDongle_Get($hash, $name, "homeId");
-  $hash->{PARTIAL} = "";
-  $hash->{STATE} = "Initialized";
-  return undef;
-}
-
-#####################################
-sub
-ZWDongle_CheckSum($)
-{
-  my ($data) = @_;
-  my $cs = 0xff;
-  map { $cs ^= ord($_) } split("", pack('H*', $data));
-  return sprintf("%02x", $cs);
-}
-
-
-#####################################
-sub
-ZWDongle_Write($$$@)
-{
-  my ($hash,$fn,$msg,$noStack) = @_;
-
-  if(!$noStack && $msg =~ m/^13/) { # SEND_DATA, wait for ACK
-    push @{$hash->{SendStack}}, $msg;
-    if(int(@{$hash->{SendStack}}) > 1) {
-      return;
-    }
-  }
-  $msg = "$fn$msg";
-  $msg = sprintf("%02x%s", length($msg)/2+1, $msg);
-  $msg = "01$msg" . ZWDongle_CheckSum($msg);
-  DevIo_SimpleWrite($hash, $msg, 1);
-}
-
-#####################################
-# called from the global loop, when the select for hash->{FD} reports data
-sub
-ZWDongle_Read($@)
-{
-  my ($hash, $local, $regexp) = @_;
-
-  my $buf = (defined($local) ? $local : DevIo_SimpleRead($hash));
-  return "" if(!defined($buf));
-
-  my $name = $hash->{NAME};
-
-  $buf = unpack('H*', $buf);
-  # The dongle looses data over USB for some commands(?), and dropping the old
-  # buffer after a timeout is my only idea of solving this problem.
-  my $ts   = gettimeofday();
-  my $data = ($hash->{READ_TS} && $ts-$hash->{READ_TS} > 1) ?
-                        "" : $hash->{PARTIAL};
-  $hash->{READ_TS} = $ts;      # Flush old data.
-
-
-  Log3 $name, 5, "ZWDongle/RAW: $data/$buf";
-  $data .= $buf;
-  my $msg;
-
-  while(length($data) > 0) {
-    my $fb = substr($data, 0, 2);
-
-    if($fb eq "06") {   # ACK
-      $data = substr($data, 2);
-      next;
-    }
-    if($fb eq "15") {   # NACK
-      Log3 $name, 1, "$name: NACK received";
-      $data = substr($data, 2);
-      next;
-    }
-    if($fb eq "18") {   # CAN
-      if(int(@{$hash->{SendStack}})) {
-        Log3 $name, 4, "$name: CANCEL received, retransmitting.";
-        ZWDongle_Write($hash, "00", $hash->{SendStack}->[0], 1);
       } else {
-        Log3 $name, 4, "$name: CANCEL received, nothing to retransmit.";
-      }
-      $data = substr($data, 2);
-      next;
-    }
-    if($fb ne "01") {   # SOF
-      Log3 $name, 1, "$name: SOF missing (got $fb instead of 01)";
-      last;
-    }
-
-    my $len = substr($data, 2, 2);
-    my $l = hex($len)*2;
-    last if(!$l || length($data) < $l+4);       # Message not yet complete
-
-    $msg = substr($data, 4, $l-2);
-    my $rcs  = substr($data, $l+2, 2);          # Received Checksum
-    $data = substr($data, $l+4);
-
-    my $ccs = ZWDongle_CheckSum("$len$msg");    # Computed Checksum
-    if($rcs ne $ccs) {
-      Log3 $name, 1, "$name: wrong checksum: received $rcs, computed $ccs for $len$msg";
-    }
-    DevIo_SimpleWrite($hash, "06", 1);          # Send ACK
-    Log3 $name, 5, "ZWDongle_Read $name: $msg";
-    
-    if($msg =~ m/^00(04|13)/) { # FIXME: add timeout, check all msgtypes
-      shift @{$hash->{SendStack}};
-      if(int(@{$hash->{SendStack}})) {
-        ZWDongle_Write($hash, "00", $hash->{SendStack}->[0], 1);
+        Log3 $name, 1, "Cannot associate $name, missing controller id";
       }
     }
-    
-    last if(defined($local) && (!defined($regexp) || ($msg =~ m/$regexp/)));
-    ZWDongle_Parse($hash, $name, $msg);
-    $msg = undef;
   }
-  $hash->{PARTIAL} = $data;
-  return $msg if(defined($local));
   return undef;
 }
 
-#####################################
-# This is a direct read for commands like get
+###################################
 sub
-ZWDongle_ReadAnswer($$$)
+ZWave_Cmd($$@)
 {
-  my ($hash, $arg, $regexp) = @_;
-  return ("No FD (dummy device?)", undef)
-        if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
-  my $to = ($hash->{RA_Timeout} ? $hash->{RA_Timeout} : 3);
+  my ($type, $hash, @a) = @_;
+  my $ret = undef;
+  return "no $type argument specified" if(int(@a) < 2);
+  my $name = shift(@a);
+  my $cmd  = shift(@a);
 
-  for(;;) {
 
-    my $buf;
-    if($^O =~ m/Win/ && $hash->{USBDev}) {
-      $hash->{USBDev}->read_const_time($to*1000); # set timeout (ms)
-      # Read anstatt input sonst funzt read_const_time nicht.
-      $buf = $hash->{USBDev}->read(999);
-      return ("Timeout reading answer for get $arg", undef)
-        if(length($buf) == 0);
-
-    } else {
-      return ("Device lost when reading answer for get $arg", undef)
-        if(!$hash->{FD});
-      my $rin = '';
-      vec($rin, $hash->{FD}, 1) = 1;
-      my $nfound = select($rin, undef, undef, $to);
-      if($nfound < 0) {
-        next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
-        my $err = $!;
-        DevIo_Disconnected($hash);
-        return("ZWDongle_ReadAnswer $arg: $err", undef);
+  # Collect the commands from the distinct classes
+  my %cmdList;
+  my $classes = AttrVal($name, "classes", "");
+  foreach my $cl (split(" ", $classes)) {
+    my $ptr = $zwave_class{$cl}{$type} if($zwave_class{$cl}{$type});
+    next if(!$ptr);
+    foreach my $k (keys %{$ptr}) {
+      if(!$cmdList{$k}) {
+        $cmdList{$k}{fmt} = $ptr->{$k};
+        $cmdList{$k}{id}  = $zwave_class{$cl}{id};
       }
-      return ("Timeout reading answer for get $arg", undef)
-        if($nfound == 0);
-      $buf = DevIo_SimpleRead($hash);
-      return ("No data", undef) if(!defined($buf));
+    }
+  }
 
+  if(!$cmdList{$cmd}) {
+    my $list = join(" ",sort keys %cmdList);
+    foreach my $cmd (keys %zwave_cmdArgs) {      # add slider & co
+      $list =~ s/\b$cmd\b/$cmd:$zwave_cmdArgs{$cmd}/;
     }
 
-    my $ret = ZWDongle_Read($hash, $buf, $regexp);
-    return (undef, $ret) if(defined($ret));
+    if($type eq "set") {
+      unshift @a, $name, $cmd;
+      return SetExtensions($hash, $list, @a);
+    } else {
+      return "Unknown argument $cmd, choose one of $list";
+    }
+
   }
 
+  Log3 $name, 2, "ZWave $type $name $cmd";
+
+  ################################
+  # ZW_SEND_DATA,nodeId,CMD,ACK|AUTO_ROUTE
+  my $id = $hash->{id};
+  my $cmdFmt = $cmdList{$cmd}{fmt};
+  my $cmdId  = $cmdList{$cmd}{id};
+
+  my $nArg = 0;
+  if($cmdFmt =~ m/%/) {
+    my @ca = split("%", $cmdFmt);
+    $nArg = int(@ca)-1;
+  }
+  my $parTxt = ($nArg == 0 ? "no parameter" : 
+               ($nArg == 1 ? "one parameter" : 
+                             "$nArg parameters"));
+  if($cmdFmt =~ m/^(.*)\*$/) {
+    $cmdFmt = $1;
+    return "$type $cmd needs at least $parTxt" if($nArg > int(@a));
+    $cmdFmt .= ("%02x" x (int(@a)-$nArg));
+
+  } else {
+    return "$type $cmd needs $parTxt" if($nArg != int(@a));
+  }
+  $cmdFmt = sprintf($cmdFmt, @a) if($nArg);
+
+  my ($baseClasses, $baseHash) = ($classes, $hash);
+  if($id =~ m/(..)(..)/) {  # Multi-Channel, encapsulate
+    my ($baseId,$ch) = ($1, $2);
+    $id = $baseId;
+    $cmdFmt = "0d01$ch$cmdId$cmdFmt";
+    $cmdId = "60";  # MULTI_CHANNEL
+    $baseHash = $modules{ZWave}{defptr}{"$hash->{homeId} $baseId"};
+    $baseClasses = AttrVal($baseHash->{NAME}, "classes", "");
+  }
+
+  my $len = sprintf("%02x", length($cmdFmt)/2+1);
+
+  my $data = "13$id$len$cmdId${cmdFmt}05"; # 13==SEND_DATA
+  if($baseClasses =~ m/WAKE_UP/) {
+    if(!$baseHash->{WakeUp}) {
+      my @arr = ();
+      $baseHash->{WakeUp} = \@arr;
+    }
+    my $awake = ($baseHash->{lastMsgTimestamp} &&
+                  time() - $baseHash->{lastMsgTimestamp} < 2);
+
+    if($awake && @{$baseHash->{WakeUp}} == 0) {
+      push @{$baseHash->{WakeUp}}, ""; # Block the next
+
+    } else {
+      push @{$baseHash->{WakeUp}}, $data;
+      return ($type eq "get" && AttrVal($name,"verbose",3) > 2 ? 
+                  "Scheduled for sending after WAKEUP" : undef);
+    }
+  }
+  IOWrite($hash, "00", $data);
+
+  my $val;
+  if($type eq "get") {
+    no strict "refs";
+    my $iohash = $hash->{IODev};
+    my $fn = $modules{$iohash->{TYPE}}{ReadAnswerFn};
+    my ($err, $data) = &{$fn}($iohash, $cmd, "^000400$id");
+    use strict "refs";
+
+    return $err if($err);
+    $val =  ZWave_Parse($iohash, $data, 1);
+
+  } else {
+    $cmd .= " ".join(" ", @a) if(@a);
+
+  }
+
+  my $tn = TimeNow();
+  if($type eq "set") {
+    readingsSingleUpdate($hash, "state", $cmd, 1);
+
+  } else {
+    my $mval = $val;
+    ($cmd, $mval) = split(":", $val) if($val);
+    if($cmd && $mval) {
+      readingsSingleUpdate($hash, $cmd, $mval, 1);
+    }
+
+  }
+  return $val;
+}
+
+sub ZWave_Set($@) { return ZWave_Cmd("set", shift, @_); }
+sub ZWave_Get($@) { return ZWave_Cmd("get", shift, @_); }
+
+# returns supported Parameters by hrvStatus
+sub
+ZWave_HrvStatus($)
+{
+  my ($p) = @_;
+  $p = hex($p);
+
+  my @hrv_status = ( "outdoorTemperature", "supplyAirTemperature",
+                     "exhaustAirTemperature", "dischargeAirTemperature",
+                     "indoorTemperature", "indoorHumidity",
+                     "remainingFilterLife" );
+  my @l; 
+  for(my $i=0; $i < 7; $i++) {
+    push @l, "$i = $hrv_status[$i]" if($p & (1<<$i));
+  }
+  return join("\n", @l);
 }
 
 sub
-ZWDongle_Parse($$$)
+ZWave_ParseMeter($)
 {
-  my ($hash, $name, $rmsg) = @_;
+  my ($val) = @_;
+  return if($val !~ m/^(..)(..)(.*)$/);
+  my ($v1, $v2, $v3) = (hex($1) & 0x1f, hex($2), $3);
+  my @prectab = (1,10,100,1000,10000,100000,1000000, 10000000);
+  my $prec  = $prectab[($v2 >> 5) & 0x7];
+  my $scale = ($v2 >> 3) & 0x3;
+  my $size  = ($v2 >> 0) & 0x7;
+  my @txt = ("undef", "energy", "gas", "water");
+  my $txt = ($v1 > $#txt ? "undef" : $txt[$v1]);
+  my %unit = (energy => ["kWh", "kVAh", "W", "pulseCount"],
+              gas   => ["m3",  "feet3", "undef", "pulseCount"],
+              water => ["m3",  "feet3", "USgallons", "pulseCount"]);
+  my $unit = $txt eq "undef" ? "undef" : $unit{$txt}[$scale];
+  $txt = "power" if ($unit eq "W");
+  $v3 = hex(substr($v3, 0, 2*$size))/$prec;
+  return "$txt:$v3 $unit";
+}
 
-  $hash->{"${name}_MSGCNT"}++;
-  $hash->{"${name}_TIME"} = TimeNow();
-  $hash->{RAWMSG} = $rmsg;
+sub
+ZWave_ParseMultilevel($$$)
+{
+  my ($type,$fl,$arg) = @_; 
+  my %ml_tbl = (
+   '01' => { n => 'temperature',          st => ['C', 'F'] },
+   '02' => { n => 'generalPurpose',       st => ['%', ''] },
+   '03' => { n => 'luminance',            st => ['%', 'Lux'] },
+   '04' => { n => 'power',                st => ['W', 'Btu/h'] },
+   '05' => { n => 'humidity',             st => ['%'] },
+   '06' => { n => 'velocity',             st => ['m/s', 'mph'] },
+   '07' => { n => 'direction',            st => [] },
+   '08' => { n => 'atmosphericPressure',  st => ['kPa', 'inchHg'] },
+   '09' => { n => 'barometricPressure',   st => ['kPa', 'inchHg'] },
+   '0a' => { n => 'solarRadiation',       st => ['W/m2'] },
+   '0b' => { n => 'dewpoint',             st => ['C', 'F'] },
+   '0c' => { n => 'rain',                 st => ['mm/h', 'in/h'] },
+   '0d' => { n => 'tideLevel',            st => ['m', 'feet'] },
+   '0e' => { n => 'weight',               st => ['kg', 'pound'] },
+   '0f' => { n => 'voltage',              st => ['V', 'mV'] },
+   '10' => { n => 'current',              st => ['A', 'mA'] },
+   '11' => { n => 'CO2-level',            st => ['ppm']},
+   '12' => { n => 'airFlow',              st => ['m3/h', 'cfm'] },
+   '13' => { n => 'tankCapacity',         st => ['l', 'cbm', 'usgal'] },
+   '14' => { n => 'distance',             st => ['m', 'cm', 'feet'] },
+   '15' => { n => 'anglePosition',        st => ['%', 'relN', 'relS'] },
+  );
 
-  my %addvals = (RAWMSG => $rmsg);
-  Dispatch($hash, $rmsg, \%addvals);
+  my $pr = (hex($fl)>>5)&0x07; # precision
+  my $sc = (hex($fl)>>3)&0x03; # scale
+  my $ml = $ml_tbl{$type};
+  return "UNKNOWN multilevel type: $type fl: $fl arg: $arg" if(!$ml);
+  return sprintf("%s:%.*f %s", $ml->{n}, $pr, hex($arg)/(10**$pr),
+       int(@{$ml->{st}}) > $sc ? $ml->{st}->[$sc] : "");
+}
+
+sub
+ZWave_SetClasses($$$$)
+{
+  my ($homeId, $id, $type6, $classes) = @_;
+
+  my $def = $modules{ZWave}{defptr}{"$homeId $id"};
+  if(!$def) {
+    $type6 = $zw_type6{$type6} if($type6 && $zw_type6{$type6});
+    $id = hex($id);
+    return "UNDEFINED ZWave_${type6}_$id ZWave $homeId $id $classes"
+  }
+
+  my @classes;
+  for my $classId (grep /../, split(/(..)/, lc($classes))) {
+    push @classes, $zwave_id2class{lc($classId)} ? 
+        $zwave_id2class{lc($classId)} : "UNKNOWN_".lc($classId);
+  }
+  my $name = $def->{NAME};
+  $attr{$name}{classes} = join(" ", @classes) if(@classes);
+  $def->{DEF} = "$homeId ".hex($id);
+  return "";
+}
+
+sub
+ZWave_mcCapability($$)
+{
+  my ($hash, $caps) = @_;
+
+  my $name = $hash->{NAME};
+  my $iodev = $hash->{IODev};
+  return "Missing IODev for $name" if(!$iodev);
+
+  my $homeId = $iodev->{homeId};
+  my @l = grep /../, split(/(..)/, lc($caps));
+  my $chid = shift(@l);
+  my $id = $hash->{id};
+
+  my @classes;
+  for my $classId (@l) {
+    push @classes, $zwave_id2class{lc($classId)} ? 
+        $zwave_id2class{lc($classId)} : "UNKNOWN_".uc($classId);
+  }
+  return "mcCapability_$chid:no classes" if(!@classes);
+
+  if(!$modules{ZWave}{defptr}{"$homeId $id$chid"}) {
+    my $lid = hex("$id$chid");
+    my $lcaps = substr($caps, 2);
+    $id = hex($id);
+    DoTrigger("global",
+              "UNDEFINED ZWave_$classes[0]_$id.$chid ZWave $homeId $lid $caps",
+              1);
+  }
+
+  return "mcCapability_$chid:".join(" ", @classes);
+}
+
+###################################
+# 0004000a03250300 (sensor binary off for id 11)
+# { ZWave_Parse($defs{zd}, "0004000c028407", 0) }
+sub
+ZWave_Parse($$@)
+{
+  my ($iodev, $msg, $local) = @_;
+  my $homeId = $iodev->{homeId};
+  my $ioName = $iodev->{NAME};
+  if(!$homeId) {
+    Log3 $ioName, 1, "ERROR: $ioName homeId is not set!"
+        if(!$iodev->{errReported});
+    $iodev->{errReported} = 1;
+    return "";
+  }
+  if($msg =~ m/^01(..)(..*)/) { # 01==ANSWER
+    my ($cmd, $arg) = ($1, $2);
+    $cmd = $zw_func_id{$cmd} if($zw_func_id{$cmd});
+    if($cmd eq "ZW_SEND_DATA") {
+      Log3 $ioName, 2, "ERROR: cannot SEND_DATA: $arg" if($arg != 1);
+      return "";
+    }
+    Log3 $ioName, 4, "$ioName: unhandled ANSWER: $cmd $arg";
+    return "";
+  }
+
+  if($msg !~ m/^00(..)(..)(..)(.*)/) { # 00=REQUEST
+    Log3 $ioName, 4, "$ioName: UNKNOWN msg $msg";
+    return "";
+  }
+
+  my ($cmd, $callbackid, $id, $arg) = ($1, $2, $3, $4);
+  $cmd = $zw_func_id{$cmd} if($zw_func_id{$cmd});
+
+  #####################################
+  # Controller commands
+  my $evt;
+
+  Log3 $ioName, 4, "$ioName CMD:$cmd ID:$id ARG:$arg";
+  if($cmd eq 'ZW_ADD_NODE_TO_NETWORK' ||
+     $cmd eq 'ZW_REMOVE_NODE_FROM_NETWORK') {
+    my @vals = ("learnReady", "nodeFound", "slave",
+                "controller", "", "done", "failed");
+    $evt = ($id eq "00" || hex($id)>@vals+1) ? "unknownArg" : $vals[hex($id)-1];
+    if($evt eq "slave" &&
+       $arg =~ m/(..)....(..)..(.*)$/) {
+      my ($id,$type6,$classes) = ($1, $2, $3);
+      return ZWave_SetClasses($homeId, $id, $type6, $classes)
+        if($cmd eq 'ZW_ADD_NODE_TO_NETWORK');
+    }
+
+  } elsif($cmd eq "ZW_APPLICATION_UPDATE" && $arg =~ m/....(..)..(.*)$/) {
+    my ($type6,$classes) = ($1, $2, $3);
+    my $ret = ZWave_SetClasses($homeId, $id, $type6, $classes);
+
+    my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
+    if($hash && $hash->{WakeUp} && @{$hash->{WakeUp}}) { # Always the base hash
+      IOWrite($hash, "00", shift @{$hash->{WakeUp}});
+    }
+    return $ret;
+
+  } elsif($cmd eq "ZW_SEND_DATA") {
+    Log3 $ioName, 2, "$ioName ERROR: SEND_DATA returned $id" if($id ne "00");
+    return "";
+  }
+
+  if($evt) {
+    return "$cmd $evt" if($local);
+    DoTrigger($ioName, "$cmd $evt");
+    Log3 $ioName, 4, "$ioName $cmd $evt";
+    return "";
+  }
+
+
+  ######################################
+  # device messages
+  if($cmd ne "APPLICATION_COMMAND_HANDLER") {
+    Log3 $ioName, 4, "$ioName unhandled command $cmd";
+    return "" 
+  }
+
+
+  my $baseHash;
+  if($arg =~ /^..600d(..)(..)(.*)/) { # MULTI_CHANNEL CMD_ENCAP
+    $baseHash = $modules{ZWave}{defptr}{"$homeId $id"};
+    $id = "$id$1";
+    $arg = sprintf("%02x$3", length($3)/2);
+  }
+  my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
+  $baseHash = $hash if(!$baseHash);
+
+
+  if(!$hash) {
+    $id = hex($id);
+    Log3 $ioName, 3, "Unknown ZWave device $homeId $id, please define it";
+    return "";
+  }
+
+
+  my @event;
+  my @args = ($arg); # MULTI_CMD handling
+
+  while(@args) {
+    $arg = shift(@args);
+
+    return if($arg !~ m/^..(..)/);
+    my $class = $1;
+
+    my $className = $zwave_id2class{lc($class)} ?
+                  $zwave_id2class{lc($class)} : "UNKNOWN_".uc($class);
+    if($className eq "MULTI_CMD") {
+       my ($ncmd, $off) = (0, 4);
+       while(length($arg) > $off*2) {
+         my $l = hex(substr($arg, $off*2, 2))+1;
+         push @args, substr($arg, $off*2, $l*2);
+         $off += $l;
+       }
+       next;
+    }
+
+    my $ptr = $zwave_class{$className}{parse}
+                        if($zwave_class{$className}{parse});
+    if(!$ptr) {
+      Log3 $hash, 4, "$hash->{NAME}: Unknown message ($className $arg)";
+      next;
+    }
+
+    foreach my $k (keys %{$ptr}) {
+      if($arg =~ m/$k/) {
+        my $val = $ptr->{$k};
+        $val = eval $val if(index($val, '$') >= 0);
+        push @event, $val;
+      }
+    }
+  }
+
+  my $wu = $baseHash->{WakeUp};
+  if($wu && @{$wu}) {
+    shift @{$wu} if($wu->[0] eq "");
+    IOWrite($hash, "00", shift @{$wu}) if(@{$wu});
+  }
+  $baseHash->{lastMsgTimestamp} = time();
+
+  return "" if(!@event);
+  return join(" ", @event) if($local);
+
+  readingsBeginUpdate($hash);
+  for(my $i = 0; $i < int(@event); $i++) {
+    next if($event[$i] eq "");
+    my ($vn, $vv) = split(":", $event[$i], 2);
+    readingsBulkUpdate($hash, $vn, $vv);
+    readingsBulkUpdate($hash, "reportedState", $vv)
+        if($vn eq "state");     # different from set
+  }
+  readingsEndUpdate($hash, 1);
+  return $hash->{NAME};
+}
+
+#####################################
+sub
+ZWave_Undef($$)
+{
+  my ($hash, $arg) = @_;
+  my $homeId = $hash->{homeId};
+  my $id = $hash->{id};
+  delete $modules{ZWave}{defptr}{"$homeId $id"};
+  return undef;
 }
 
 
 #####################################
+# 2-byte signed hex
 sub
-ZWDongle_Ready($)
+s2Hex($)
 {
-  my ($hash) = @_;
-
-  return DevIo_OpenDev($hash, 1, "ZWDongle_DoInit")
-                if($hash->{STATE} eq "disconnected");
-
-  # This is relevant for windows/USB only
-  my $po = $hash->{USBDev};
-  if($po) {
-    my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
-    return ($InBytes>0);
-  }
-  return 0;
+  my ($p) = @_;
+  $p = hex($p);
+  return ($p > 32767 ? -(65536-$p) : $p);
 }
 
 1;
@@ -568,102 +731,313 @@ ZWDongle_Ready($)
 =pod
 =begin html
 
-<a name="ZWDongle"></a>
-<h3>ZWDongle</h3>
+<a name="ZWave"></a>
+<h3>ZWave</h3>
 <ul>
-  This module serves a ZWave dongle, which is attached via USB or TCP/IP, and
-  enables the use of ZWave devices (see also the <a href="#ZWave">ZWave</a>
-  module). It was tested wit a Goodway WD6001, but since the protocol is
-  standardized, it should work with other devices too. A notable exception is
-  the USB device from Merten.
+  This module is used to control ZWave devices via FHEM, see <a
+  href="http://www.z-wave.com">www.z-wave.com</a> on details for this device family.
+  This module is a client of the <a href="#ZWDongle">ZWDongle</a> module, which
+  is directly attached to the controller via USB or TCP/IP.
   <br><br>
-  <a name="ZWDongledefine"></a>
+  <a name="ZWavedefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; ZWDongle &lt;device&gt;</code>
+    <code>define &lt;name&gt; ZWave &lt;homeId&gt; &lt;id&gt; [classes]</code>
   <br>
   <br>
-  Upon initial connection the module will get the homeId of the attached
-  device. Since the DevIo module is used to open the device, you can also use
-  devices connected via  TCP/IP. See <a href="#CULdefine">this</a> paragraph on
-  device naming details.
+  &lt;homeId&gt; is the homeId of the controller node, and id is the id of the
+  slave node in the network of this controller.<br>
+  classes is a hex-list of ZWave device classes. This argument is usually
+  specified by autocreate when creating a device. If you wish to manually
+  create a device, use the classes attribute instead, see below for details.
+  Defining a ZWave device the first time is usually done by autocreate.
   <br>
   Example:
   <ul>
-    <code>define zwdongle_1 ZWDongle /dev/cu.PL2303-000014FA@115200</code><br>
+    <code>define lamp ZWave 00ce2074 9</code><br>
+    <code>attr lamp classes SWITCH_BINARY BASIC MANUFACTURER_SPECIFIC VERSION SWITCH_ALL ASSOCIATION METER CONFIGURATION ALARM</code><br>
   </ul>
   </ul>
   <br>
 
-  <a name="ZWDongleset"></a>
+  Note: the sets/gets/generated events of a gven node depend on the classes
+  supported by this node. If a node supports 3 classes, then the union of
+  these sets/gets/events will be available for this node.<br>
+  Commands for battery operated nodes will be queues internally, and sent when
+  the node sends a message. Answer to get commands appear then as events, the
+  corresponding readings will be updated.
+  <br><br>
+
+  <a name="ZWaveset"></a>
   <b>Set</b>
   <ul>
+  <br>
+  <b>Note</b>: devices with on/off functionality support the <a
+      href="#setExtensions"> set extensions</a>.
 
-  <li>addNode [on|off]<br>
-    Activate (or deactivate) inclusion mode. The controller (i.e. the dongle)
-    will accept inclusion (i.e. pairing/learning) requests only while in this
-    mode. After activating inclusion mode usually you have to press a switch
-    three times within 1.5 seconds on the node to be included into the network
-    of the controller. If autocreate is active, a fhem device will be created
-    after inclusion.</li>
+  <br><br><b>Class ASSOCIATION</b>
+  <li>associationAdd groupId nodeId ...<br>
+  Add the specified list of nodeIds to the assotion group groupId.<br> Note:
+  upon creating a fhem-device for the first time fhem will automatically add
+  the controller to the first association group of the node corresponding to
+  the fhem device, i.e it issues a "set name associationAdd 1
+  controllerNodeId"</li>
 
-  <li>removeNode [on|off]<br>
-    Activate (or deactivate) exclusion mode. Note: the corresponding fhem
-    device have to be deleted manually.</li>
+  <li>associationDel groupId nodeId ...<br>
+  Remove the specified list of nodeIds from the assotion group groupId.</li>
 
-  <li>createNode id<br>
-    Request the class information for the specified node, and create a fhem
-    device upon reception of the answer. Used for previously included nodes,
-    see the nodeList get command below.</li>
+  <br><br><b>Class BASIC</b>
+  <li>basicValue value<br>
+    Send value (0-255) to this device. The interpretation is device dependent,
+    e.g. for a SWITCH_BINARY device 0 is off and anything else is on.</li>
+
+  <br><br><b>Class CONFIGURATION</b>
+  <li>configByte cfgAddress 8bitValue<br>
+      configWord cfgAddress 16bitValue<br>
+      configLong cfgAddress 32bitValue<br>
+    Send a configuration value for the parameter cfgAddress. cfgAddress and
+    value is node specific.</li>
+  <li>configDefault cfgAddress<br>
+    Reset the configuration parameter for the cfgAddress parameter to its
+    default value.  See the device documentation to determine this value.</li>
+
+  <br><br><b>Class SWITCH_BINARY</b>
+  <li>on<br>
+    switch the device on</li>
+  <li>off<br>
+    switch the device off</li>
+  <li>reportOn,reportOff<br>
+    activate/deactivate the reporting of device state changes to the
+    association group.</li>
+
+  <br><br><b>Class SWITCH_MULTILEVEL</b>
+  <li>on, off, reportOn, reportOff<br>
+    the same as for SWITCH_BINARY.</li>
+  <li>dim value<br>
+    dim to the requested value (0..100)</li>
+
+  <br><br><b>Class THERMOSTAT_MODE</b>
+  <li>tmOff</li>
+  <li>tmCooling</li>
+  <li>tmHeating</li>
+  <li>tmManual<br>
+    set the thermostat mode to off, cooling, heating or manual.
+    </li>
+
+  <br><br><b>Class WAKE_UP</b>
+  <li>wakeupInterval value<br>
+    Set the wakeup interval of battery operated devices to the given value in
+    seconds. Upon wakeup the device sends a wakeup notification.</li>
+  <li>wakeupNoMoreInformation<br>
+    put a battery driven device into sleep mode. </li>
 
   </ul>
   <br>
 
-  <a name="ZWDongleget"></a>
+  <a name="ZWaveget"></a>
   <b>Get</b>
   <ul>
-  <li>nodeList<br>
-    return the list of included nodeIds. Can be used to recreate fhem-nodes
-    with the createNode command.</li>
 
-  <li>homeId<br>
-    return the six hex-digit homeId of the controller.</li>
+  <br><br><b>Class ALARM</b>
+  <li>alarm alarmId<br>
+    return the value for alarmId. The value is device specific.
+    </li>
 
-  <li>caps, ctrlCaps, version<br>
-    return different controller specific information. Needed by developers
-    only.  </li>
+  <br><br><b>Class ASSOCIATION</b>
+  <li>association groupId<br>
+    return the list of nodeIds in the association group groupId in the form:<br>
+    assocGroup_X:Max Y, Nodes id,id...
+    </li>
 
-  <li>nodeInfo<br>
-    return node specific information. Needed by developers only.</li>
+  <br><b>Class BASIC</b>
+  <li>basicStatus<br>
+    return the status of the node as basicReport:XY. The value (XY) depends on
+    the node, e.g a SWITCH_BINARY device report 00 for off and FF (255) for on.
+    </li>
 
+  <br><br><b>Class BATTERY</b>
+  <li>battery<br>
+    return the charge of the battery in %, as battery:value %
+    </li>
 
-  <li>raw<br>
-    Send raw data to the controller. Developer only.</li>
+  <br><br><b>Class CONFIGURATION</b>
+  <li>config cfgAddress<br>
+    return the value of the configuration parameter cfgAddress. The value is
+    device specific.
+    </li>
+
+  <br><br><b>HRV_STATUS</b>
+  <li>hrvStatus<br>
+    report the current status (temperature, etc)
+    </li>
+  <li>hrvStatusSupported<br>
+    report the supported status fields as a bitfield.
+    </li>
+
+  <br><br><b>Class MULTI_CHANNEL</b>
+  <li>mcEndpoints<br>
+    return the list of endpoints available, e.g.:<br>
+    mcEndpoints: total 2, identical
+    </li>
+  <li>mcCapability chid<br>
+    return the classes supported by the endpoint/channel chid. If the channel
+    does not exists, create a FHEM node for it. Example:<br>
+    mcCapability_02:SWITCH_BINARY<br>
+    <b>Note:</b> This is the best way to create the secondary nodes of a
+    MULTI_CHANNEL device. The device is only created for channel 2 or greater.
+    </li>
+
+  <br><br><b>Class SENSOR_ALARM</b>
+  <li>alarm alarmType<br>
+    return the nodes alarm status of the requested alarmType. 00 = GENERIC,
+    01 = SMOKE, 02 = CO, 03 = CO2, 04 = HEAT, 05 = WATER, ff = returns the
+    nodes first supported alarm type.    
+    </li>
+
+  <br><br><b>Class SENSOR_BINARY</b>
+  <li>sbStatus<br>
+    return the status of the node, as state:open or state:closed.
+    </li>
+
+  <br><br><b>Class SENSOR_MULTILEVEL</b>
+  <li>smStatus<br>
+    request data from the node (temperature/humidity/etc)
+    </li>
+
+  <br><br><b>Class SWITCH_BINARY</b>
+  <li>swbStatus<br>
+    return the status of the node, as state:on or state:off.
+    </li>
+
+  <br><br><b>Class SWITCH_MULTILEVEL</b>
+  <li>swmStatus<br>
+    return the status of the node, as state:on, state:off or state:dim value.
+    </li>
+
+  <br><br><b>Class THERMOSTAT_MODE</b>
+  <li>thermostatMode<br>
+    request the mode
+    </li>
+
+  <br><br><b>Class THERMOSTAT_SETPOINT</b>
+  <li>setpoint<br>
+    request the setpoint
+    </li>
+
+  <br><br><b>Class VERSION</b>
+  <li>version<br>
+    return the version information of this node in the form:<br>
+    Lib A Prot x.y App a.b
+    </li>
+
+  <br><br><b>Class WAKE_UP</b>
+  <li>wakeupInterval<br>
+    return the wakeup interval in seconds, in the form<br>
+    wakeupReport:interval seconds target id
+    </li>
+
   </ul>
   <br>
 
-  <a name="ZWDongleattr"></a>
+  <a name="ZWaveattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#dummy">dummy</a></li>
+    <li><a href="#IODev">IODev</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#dummy">dummy</a></li>
+    <li><a href="#showtime">showtime</a></li>
     <li><a href="#model">model</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li><a href="#classes">classes</a>
+      This attribute is needed by the ZWave module, as the list of the possible
+      set/get commands depends on it. It contains a space separated list of
+      class names (capital letters).
+      </li>
   </ul>
   <br>
 
-  <a name="ZWDongleevents"></a>
+  <a name="ZWaveevents"></a>
   <b>Generated events:</b>
   <ul>
-  <li>ZW_ADD_NODE_TO_NETWORK [learnReady|nodeFound|controller|done|failed]
-    </li>
-  <li>ZW_REMOVE_NODE_TO_NETWORK [learnReady|nodeFound|slave|controller|done|failed]
-    </li>
-  <li>UNDEFINED ZWave_${type6}_$id ZWave $homeId $id $classes"
-    </li>
+
+  <br><br><b>Class ALARM</b>
+  <li>alarm_type_X:level Y</li>
+
+  <br><br><b>Class ASSOCIATION</b>
+  <li>assocGroup_X:Max Y Nodes A,B,...</li>
+
+  <br><b>Class BASIC</b>
+  <li>basicReport:XY</li>
+
+  <br><br><b>Class BATTERY</b>
+  <li>battery:chargelevel %</li>
+
+  <br><br><b>Class CLOCK</b>
+  <li>clock:get</li>
+
+  <br><br><b>Class CONFIGURATION</b>
+  <li>config_X:Y</li>
+
+  <br><br><b>Class HRV_STATUS</b>
+  <li>outdoorTemperature: %0.1f C</li>
+  <li>supplyAirTemperature: %0.1f C</li>
+  <li>exhaustAirTemperature: %0.1f C</li>
+  <li>dischargeAirTemperature: %0.1f C</li>
+  <li>indoorTemperature: %0.1f C</li>
+  <li>indoorHumidity: %s %</li>
+  <li>remainingFilterLife: %s %</li>
+  <li>supportedStatus: <list of supported stati></li>
+
+  <br><br><b>Class METER</b>
+  <li>energy:val [kWh|kVAh|pulseCount]</li>
+  <li>gas:val [m3|feet3|pulseCount]</li>
+  <li>water:val [m3|feet3|USgallons|pulseCount]</li>
+  <li>power:val W</li>
+
+  <br><br><b>Class MULTI_CHANNEL</b>
+  <li>endpoints:total X $dynamic $identical</li>
+  <li>mcCapability_X:class1 class2 ...</li>
+
+  <br><br><b>Class SENSOR_ALARM</b>
+  <li>alarm_type_X:level Y node $nodeID seconds $seconds</li>
+
+  <br><br><b>Class SENSOR_BINARY</b>
+  <li>state:open</li>
+  <li>state:closed</li>
+
+  <br><br><b>Class SENSOR_MULTILEVEL</b>
+  <li>temperature:$temp [C|F]</li>
+  <li>humidity:$hum %</li>
+  <li>power:$pow [Btu/h|W]</li>
+
+  <br><br><b>Class SWITCH_BINARY</b>
+  <li>state:on</li>
+  <li>state:off</li>
+
+  <br><br><b>Class SWITCH_MULTILEVEL</b>
+  <li>state:on</li>
+  <li>state:off</li>
+  <li>state:dim value</li>
+
+  <br><br><b>Class THERMOSTAT_MODE</b>
+  <li>off</li>
+  <li>cooling</li>
+  <li>heating</li>
+  <li>manual</li>
+
+  <br><br><b>Class THERMOSTAT_SETPOINT</b>
+  <li>temperature:$temp [C|F] [heating|cooling]</li>
+
+  <br><br><b>Class VERSION</b>
+  <li>version:Lib A Prot x.y App a.b</li>
+
+  <br><br><b>Class WAKE_UP</b>
+  <li>wakeup:notification</li>
+  <li>wakeupReport:interval:X target:Y</li>
+
   </ul>
-
 </ul>
-
 
 =end html
 =cut
