@@ -103,7 +103,7 @@ sub Heating_Control_Define($$)
   # test if device is defined
   return "invalid Device, given Device <$device> not found" if(!$defs{$device});
 
-  #Altlasten bereinigen
+  #fuer den modify Altlasten bereinigen
   delete($hash->{TIME_AS_PERL})              if($hash->{TIME_AS_PERL});
   delete($hash->{helper}{CONDITION})         if($hash->{helper}{CONDITION});
   delete($hash->{helper}{COMMAND})           if($hash->{helper}{COMMAND});
@@ -641,6 +641,12 @@ sub SortNumber {
 
         <code>define HCW Heating_Control WZ_Heizung en Mo-Fr|{myFunction}|night-temp:18 Mo-Fr|{myFunction()}|dayTemp:16</code><br>
         The is switched at time myFunction(). It is sent the Command "night-temp 18" and "dayTemp 16".
+
+        If you want to have set all Heating_Controls their current value (after a temperature lowering phase holidays)
+        you can call the function <b> Heating_Control_SetAllTemps ()</b>.
+        This call can be automatically coupled to a dummy by notify:       
+        <code>define HeizStatus2 notify Heating:. * {Heating_Control_SetAllTemps ()}</code>
+
     </ul>
   </ul>
 
@@ -745,6 +751,12 @@ sub SortNumber {
 
         <code>define HCW Heating_Control WZ_Heizung en Mo-Fr|{myFunction}|night-temp:18 Mo-Fr|{myFunction()}|dayTemp:16</code><br>
         Das Gerät wird bei myFunction() geschaltet. Es wird das Kommando "night-temp 18" bzw. "dayTemp 16" gesendet.
+
+        Wenn du beispielsweise nach einer Temperaturabsenkungsphase erreichen willst, dass  alle Heating_Controls ihren aktuellen Wert
+        einstellen sollen, kannst du die Funktion <b>Heating_Control_SetAllTemps()</b> aufrufen.
+        Dieser Aufruf kann per notify automatisch an ein dummy gekoppelt werden:
+        <code>define HeizStatus2            notify Heizung:.*                          {Heating_Control_SetAllTemps()}</code>
+
         <p>
     </ul>
   </ul>

@@ -583,6 +583,17 @@ sub Twilight_CompassPoint($) {
   return $compassPoint;
 }
 
+sub twilight($$$$) {
+  my ($twilight, $reading, $min, $max) = @_;
+
+  my $t = hms2h(ReadingsVal($twilight,$reading,0));
+
+  $t = hms2h($min) if(defined($min) && (hms2h($min) > $t));
+  $t = hms2h($max) if(defined($max) && (hms2h($max) < $t));
+
+  return h2hms_fmt($t);
+}
+
 1;
 
 =pod
@@ -663,30 +674,30 @@ sub Twilight_CompassPoint($) {
 
     <code>get &lt;name&gt; &lt;reading&gt;</code><br><br>
     <table>
-    <tr><td>light</td><td>the current virtual daylight value</td></tr>
-    <tr><td>nextEvent</td><td>the name of the next event</td></tr>
-    <tr><td>nextEventTime</td><td>the time when the next event will probably happen (during light phase 5 and 6 this is updated when weather conditions change</td></tr>
-    <tr><td>sr_astro</td><td>time of astronomical sunrise</td></tr>
-    <tr><td>sr_naut</td><td>time of nautical sunrise</td></tr>
-    <tr><td>sr_civil</td><td>time of civil sunrise</td></tr>
-    <tr><td>sr</td><td>time of sunrise</td></tr>
-    <tr><td>sr_indoor</td><td>time of indoor sunrise</td></tr>
-    <tr><td>sr_weather</td><td>time of weather sunrise</td></tr>
-    <tr><td>ss_weather</td><td>time of weather sunset</td></tr>
-    <tr><td>ss_indoor</td><td>time of indoor sunset</td></tr>
-    <tr><td>ss</td><td>time of sunset</td></tr>
-    <tr><td>ss_civil</td><td>time of civil sunset</td></tr>
-    <tr><td>ss_nautic</td><td>time of nautic sunset</td></tr>
-    <tr><td>ss_astro</td><td>time of astro sunset</td></tr>
-    <tr><td>azimuth</td><td>the current azimuth of the sun 0&deg; ist north 180&deg; is south</td></tr>
-    <tr><td>compasspoint</td><td>a textual representation of the compass point</td></tr>
-    <tr><td>elevation</td><td>the elevaltion of the sun</td></tr>
-    <tr><td>twilight</td><td>a percetal value of a new (twi)light value: (elevation+12)/18 * 100) </td></tr>
-    <tr><td>twilight_weather</td><td>a percetal value of a new (twi)light value: (elevation-WEATHER_HORIZON+12)/18 * 100). So if there is weather, it
+    <tr><td><b>light</b></td><td>the current virtual daylight value</td></tr>
+    <tr><td><b>nextEvent</b></td><td>the name of the next event</td></tr>
+    <tr><td><b>nextEventTime</b></td><td>the time when the next event will probably happen (during light phase 5 and 6 this is updated when weather conditions change</td></tr>
+    <tr><td><b>sr_astro</b></td><td>time of astronomical sunrise</td></tr>
+    <tr><td><b>sr_naut</b></td><td>time of nautical sunrise</td></tr>
+    <tr><td><b>sr_civil</b></td><td>time of civil sunrise</td></tr>
+    <tr><td><b>sr</b></td><td>time of sunrise</td></tr>
+    <tr><td><b>sr_indoor</b></td><td>time of indoor sunrise</td></tr>
+    <tr><td><b>sr_weather</b></td><td>time of weather sunrise</td></tr>
+    <tr><td><b>ss_weather</b></td><td>time of weather sunset</td></tr>
+    <tr><td><b>ss_indoor</b></td><td>time of indoor sunset</td></tr>
+    <tr><td><b>ss</b></td><td>time of sunset</td></tr>
+    <tr><td><b>ss_civil</b></td><td>time of civil sunset</td></tr>
+    <tr><td><b>ss_nautic</b></td><td>time of nautic sunset</td></tr>
+    <tr><td><b>ss_astro</b></td><td>time of astro sunset</td></tr>
+    <tr><td><b>azimuth</b></td><td>the current azimuth of the sun 0&deg; ist north 180&deg; is south</td></tr>
+    <tr><td><b>compasspoint</b></td><td>a textual representation of the compass point</td></tr>
+    <tr><td><b>elevation</b></td><td>the elevaltion of the sun</td></tr>
+    <tr><td><b>twilight</b></td><td>a percetal value of a new (twi)light value: (elevation+12)/18 * 100) </td></tr>
+    <tr><td><b>twilight_weather</b></td><td>a percetal value of a new (twi)light value: (elevation-WEATHER_HORIZON+12)/18 * 100). So if there is weather, it
                                      is always a little bit darker than by fair weather</td></tr>
-    <tr><td>condition</td><td>the yahoo condition weather code</td></tr>
-    <tr><td>condition_txt</td><td>the yahoo condition weather code as textual representation</td></tr>
-    <tr><td>horizon</td><td>value auf the actual horizon 0&deg;, -6&deg;, -12&deg;, -18&deg;</td></tr>
+    <tr><td><b>condition</b></td><td>the yahoo condition weather code</td></tr>
+    <tr><td><b>condition_txt</b></td><td>the yahoo condition weather code as textual representation</td></tr>
+    <tr><td><b>horizon</b></td><td>value auf the actual horizon 0&deg;, -6&deg;, -12&deg;, -18&deg;</td></tr>
     </table>
 
   </ul>
@@ -698,6 +709,20 @@ sub Twilight_CompassPoint($) {
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
+
+  <a name="Twilightfunc"></a>
+  <b>Functions</b>
+  <ul>
+     <li><b>twilight</b>(<b>$twilight</b>, <b>$reading</b>, <b>$min</b>, <b>$max</b>)</li> - implements a routine to compute the twilighttimes like sunrise with min max values.<br><br>
+     <table>
+     <tr><td><b>$twilight</b></td><td>name of the twilight instance</td></tr>
+     <tr><td><b>$reading</b></td><td>name of the reading to use example: ss_astro, ss_weather ...</td></tr>
+     <tr><td><b>$min</b></td><td>parameter min time - optional</td></tr>
+     <tr><td><b>$max</b></td><td>parameter max time - optional</td></tr>
+     </table>
+  </ul>
+  <br>
+
 </ul>
 
 =end html

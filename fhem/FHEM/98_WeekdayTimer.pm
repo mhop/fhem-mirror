@@ -81,7 +81,7 @@ my ($hash) = @_;
   return Heating_Control_Update($hash);
 }
 #
-sub WeekdayTimer_SetAllTemps() {  # {WeekdayTimer_SetAllTemps()}
+sub WeekdayTimer_SetAllParms() {  # {WeekdayTimer_SetAllParms()}
 
   foreach my $hc ( sort keys %{$modules{WeekdayTimer}{defptr}} ) {
      my $hash = $modules{WeekdayTimer}{defptr}{$hc};
@@ -95,7 +95,7 @@ sub WeekdayTimer_SetAllTemps() {  # {WeekdayTimer_SetAllTemps()}
      WeekdayTimer_Update($hash);
      Log3 undef, 3, "WeekdayTimer_Update() for $hash->{NAME} done!";
   }
-  Log3 undef,  3, "WeekdayTimer_SetAllTemps() done!";
+  Log3 undef,  3, "WeekdayTimer_SetAllParms() done!";
 }
 
 1;
@@ -166,6 +166,12 @@ sub WeekdayTimer_SetAllTemps() {  # {WeekdayTimer_SetAllTemps()}
 
         <code>define dimmer WeekdayTimer livingRoom Sa-Su,We|07:00|dim30% Sa-Su,We|21:00|dim90% (ReadingsVal("WeAreThere", "state", "no") eq "yes")</code><br>
         The dimmer is only set to dimXX% if the dummy variable WeAreThere is "yes"(not a real live example).<p>
+
+        If you want to have set all WeekdayTimer their current value (after a phase of exception),
+        you can call the function <b> WeekdayTimer_SetAllParms ()</b>.
+        This call can be automatically coupled to a dummy by notify:       
+        <code>define WDStatus2 notify Dummy:. * {WeekdayTimer_SetAllParms ()}</code>
+
     </ul>
   </ul>
 
