@@ -133,7 +133,7 @@ HttpUtils_Connect($)
 
             return HttpUtils_Connect2($hash);
           };
-          $hash->{NAME} = ""; # Delete might check it
+          $hash->{NAME} = "" if(!defined($hash->{NAME})); #Delete might check it
           $selectlist{$hash} = $hash;
           InternalTimer(gettimeofday()+$hash->{timeout},
                         "HttpUtils_ConnErr", $hash, 0);
