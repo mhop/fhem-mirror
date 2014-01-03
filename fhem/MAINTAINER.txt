@@ -18,7 +18,7 @@ FHEM/00_CM11.pm              borisneubert         http://forum.fhem.de SlowRF
 FHEM/00_CUL.pm               rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/00_FBAHA.pm             rudolfkoenig         http://forum.fhem.de FRITZ!Box
 FHEM/00_FHZ.pm               rudolfkoenig         http://forum.fhem.de SlowRF
-FHEM/00_HMLAN.pm             martinp876           http://forum.fhem.de Sonstiges
+FHEM/00_HMLAN.pm             martinp876           http://forum.fhem.de HomeMatic
 FHEM/00_KM271.pm             physikus             http://forum.fhem.de Sonstiges
 FHEM/00_LIRC.pm              rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/00_MAXLAN.pm            mgehre               http://forum.fhem.de MAX
@@ -168,8 +168,9 @@ FHEM/95_Dashboard.pm         svenson08            http://forum.fhem.de Frontends
 FHEM/95_PachLog.pm           rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
 FHEM/95_holiday.pm           rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/95_remotecontrol.pm     ulimaass             http://forum.fhem.de Frontends
+FHEM/98_apptime.pm           martinp876           http://forum.fhem.de Sonstiges
 FHEM/98_CULflash.pm          rudolfkoenig         http://forum.fhem.de Sonstiges
-FHEM/98_HMinfo.pm            martinp876           http://forum.fhem.de Sonstiges
+FHEM/98_HMinfo.pm            martinp876           http://forum.fhem.de HomeMatic
 FHEM/98_Heating_Control.pm   dietmar63            http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_JsonList.pm          mfr69bs              http://forum.fhem.de Automatisierung
 FHEM/98_PID.pm               betateilchen         http://forum.fhem.de Automatisierung
