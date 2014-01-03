@@ -613,7 +613,8 @@ LightScene_Get($@)
       this attribute can be set on the devices to be included in a scene. it is set to a comma separated list of readings
       that will be saved. multiple readings separated by : are collated in to a single set command (this has to be supported
       by the device). each reading can have a perl expression appended with '@' that will be used to alter the $value used for
-      the set command. this can for example be used to strip a trailing % from a dimmer state.
+      the set command. this can for example be used to strip a trailing % from a dimmer state. this perl expression must not contain
+      spaces,colons or commas.<br>
       in addition to reading names the list can also contain expressions of the form <code>abc -> xyz</code>
       or <code>get cba -> set uvw</code> to map reading abc to set xyz or get cba to set uvw. the list can be given as a
       string or as a perl expression enclosed in {} that returns this string.<br>
