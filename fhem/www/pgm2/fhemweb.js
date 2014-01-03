@@ -97,6 +97,8 @@ FW_longpoll()
         room=sa[i];
     }
   }
+  if(room == "" && document.getElementById("floorplan")) // floorplan special
+    room="room=all";
 
   // Needed when using multiple FF windows
   var timestamp = "&timestamp="+new Date().getTime();
