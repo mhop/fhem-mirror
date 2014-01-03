@@ -54,6 +54,11 @@ Ext.define('FHEM.view.LineChartPanel', {
         lastXmin: null,
         
         /**
+         * used to suppress setting new lastmin and max values when zooming multiple times 
+         */
+        timesZoomed: 0,
+        
+        /**
          * 
          */
         axiscounter: 0
