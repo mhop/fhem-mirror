@@ -1227,7 +1227,7 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "power:"    . hex($P   )/100;         # 0.0  ..167772.15 W
       push @event, "current:"  . hex($I   )/1;           # 0.0  ..65535.0   mA
       push @event, "voltage:"  . hex($U   )/10;          # 0.0  ..6553.5    mV
-      push @event, "frequency:". hex($F   )/100+50;      # 48.72..51.27     Hz
+      push @event, "frequency:".(hex($F   )/100+50);      # 48.72..51.27     Hz
       push @event, "boot:"     .((hex($eCnt)&0x800000)?"on":"off");
     }
   }
