@@ -183,12 +183,6 @@ _sunrise_sunset($$$$$)
   # Compute time when Sun is at south - in hours UT
   my $tsouth  = 12.0 - _rev180( $sidtime - $sRA ) / $h;
 
-  # Compute the Sun's apparent radius, degrees
-  my $sradius = 0.2666 / $sr;
-
-  # Do correction to upper limb, if necessary
-  $altit -= $sradius;
-
   # Compute the diurnal arc that the Sun traverses to reach 
   # the specified altitude altit: 
   my $cost =
