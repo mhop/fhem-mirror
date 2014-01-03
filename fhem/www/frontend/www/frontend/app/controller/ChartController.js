@@ -132,7 +132,6 @@ Ext.define('FHEM.controller.ChartController', {
      * reconfigure combos to handle dblog / filelog
      */
     dataSourceChanged: function(radio, newval, oldval) {
-        
         var selection;
         if (radio.getChecked()[0]) {
             selection = radio.getChecked()[0].inputValue;
@@ -144,7 +143,6 @@ Ext.define('FHEM.controller.ChartController', {
             readingscombo = radio.up().down("combobox[name=yaxiscombo]");
     
         if (selection === "filelog") {
-            
             // disable statistics for the moment
             radio.up().down("combobox[name=yaxisstatisticscombo]").setDisabled(true);
             
@@ -164,7 +162,7 @@ Ext.define('FHEM.controller.ChartController', {
             devicecombo.queryMode = 'local';
             devicecombo.on("select", me.fileLogSelected);
             
-            readingscombo.setValue();
+            readingscombo.setValue("");
             readingscombo.getStore().removeAll();
             
         } else {
@@ -187,19 +185,22 @@ Ext.define('FHEM.controller.ChartController', {
      * gather filelog information to fill combos
      */
     fileLogSelected: function(combo, selectionArray) {
-        
         var readingscombo = combo.up().down("combobox[name=yaxiscombo]"),
-            currentlogfile;
-        if (selectionArray[0]) {
-            var logname = selectionArray[0].data.DEVICE;
-            Ext.each(FHEM.filelogs, function(log) {
-                if (log.NAME === logname) {
-                    // found the filelog entry, getting the logfile to load values
-                    currentlogfile = log.currentlogfile;
-                    return false;
-                }
-            });
+            currentlogfile,
+            logname;
+        if (selectionArray[0] && selectionArray[0].data) {
+            logname = selectionArray[0].data.DEVICE;
+        } else {
+            logname = selectionArray[0];
         }
+        Ext.each(FHEM.filelogs, function(log) {
+            if (log.NAME === logname) {
+                // found the filelog entry, getting the logfile to load values
+                currentlogfile = log.currentlogfile;
+                return false;
+            }
+        });
+        
         if (!Ext.isEmpty(currentlogfile)) {
             // retrieve the filelog, parse its containing fields
             readingscombo.setLoading(true);
@@ -316,11 +317,6 @@ Ext.define('FHEM.controller.ChartController', {
                 chart = me.getChart();
             
             //cleanup chartpanel 
-            var existingwins = Ext.ComponentQuery.query('window[name=statisticswin]');
-            Ext.each(existingwins, function(existingwin) {
-                existingwin.destroy();
-            });
-            
             var existingchartgrid = Ext.ComponentQuery.query('panel[name=chartgridpanel]')[0];
             if (!existingchartgrid) {
                 var chartdatagrid = Ext.create('FHEM.view.ChartGridPanel', {
@@ -532,36 +528,41 @@ Ext.define('FHEM.controller.ChartController', {
                             icon: 'app/resources/icons/delete.png',
                             scope: me,
                             handler: function(btn) {
-                                var chart = btn.up().up().down('chart');
-                                
-                                var existingwins = Ext.ComponentQuery.query('window[name=statisticswin]');
-                                Ext.each(existingwins, function(existingwin) {
-                                    existingwin.destroy();
-                                });
+                                var chart = btn.up().up().down('chart'),
+                                    cp = chart.up().up();
                                 
                                 chart.restoreZoom();
                                 
-                                chart.axes.get(0).minimum = chart.up().up().getLastYmin();
-                                chart.axes.get(0).maximum = chart.up().up().getLastYmax();
-                                chart.axes.get(1).minimum = chart.up().up().getLastY2min();
-                                chart.axes.get(1).maximum = chart.up().up().getLastY2max();
-                                chart.axes.get(2).minimum = chart.up().up().getLastXmin();
-                                chart.axes.get(2).maximum = chart.up().up().getLastXmax();
+                                chart.axes.get(0).minimum = cp.getLastYmin();
+                                chart.axes.get(0).maximum = cp.getLastYmax();
+                                chart.axes.get(1).minimum = cp.getLastY2min();
+                                chart.axes.get(1).maximum = cp.getLastY2max();
+                                chart.axes.get(2).minimum = cp.getLastXmin();
+                                chart.axes.get(2).maximum = cp.getLastXmax();
                                 
-                                chart.redraw();
                                 //helper to reshow the hidden items after zooming back out
-                                if (chart.up().up().artifactSeries && chart.up().up().artifactSeries.length > 0) {
-                                    Ext.each(chart.up().up().artifactSeries, function(serie) {
+                                if (cp.artifactSeries && cp.artifactSeries.length > 0) {
+                                    Ext.each(cp.artifactSeries, function(serie) {
                                         serie.showAll();
+                                        var showMarkers = false;
                                         Ext.each(serie.group.items, function(item) {
-                                            if (item.type === "circle") {
+                                            // make sure we hit the points
+                                            if (item.radius && item.radius > 0) {
                                                 item.show();
                                                 item.redraw();
+                                                showMarkers = true;
                                             }
                                         });
+                                        if (showMarkers) {
+                                            serie.showMarkers = true;
+                                        }
                                     });
-                                    chart.up().up().artifactSeries = [];
+                                    cp.artifactSeries = [];
                                 }
+                                
+                                chart.redraw();
+                                // restore the counter as we have zoomed out
+                                cp.timesZoomed = 0;
                             }
                         }
                     ]
@@ -641,14 +642,20 @@ Ext.define('FHEM.controller.ChartController', {
                         select: {
                             fn: function(chart, zoomConfig, evt) {
                                 
+                                var cp = chart.up().up();
+                                
                                 delete chart.axes.get(2).fromDate;
                                 delete chart.axes.get(2).toDate;
-                                chart.up().up().setLastYmax(chart.axes.get(0).maximum);
-                                chart.up().up().setLastYmin(chart.axes.get(0).minimum);
-                                chart.up().up().setLastY2max(chart.axes.get(1).maximum);
-                                chart.up().up().setLastY2min(chart.axes.get(1).minimum);
-                                chart.up().up().setLastXmax(chart.axes.get(2).maximum);
-                                chart.up().up().setLastXmin(chart.axes.get(2).minimum);
+                                
+                                //only save the state when we zoom the first time
+                                if (cp.timesZoomed === 0) {
+                                    chart.up().up().setLastYmax(chart.axes.get(0).maximum);
+                                    chart.up().up().setLastYmin(chart.axes.get(0).minimum);
+                                    chart.up().up().setLastY2max(chart.axes.get(1).maximum);
+                                    chart.up().up().setLastY2min(chart.axes.get(1).minimum);
+                                    chart.up().up().setLastXmax(chart.axes.get(2).maximum);
+                                    chart.up().up().setLastXmin(chart.axes.get(2).minimum);
+                                }
                                 
                                 chart.setZoom(zoomConfig);
                                 chart.mask.hide();
@@ -656,99 +663,15 @@ Ext.define('FHEM.controller.ChartController', {
                                 //helper hiding series and items which are out of scope
                                 Ext.each(chart.series.items, function(serie) {
                                     if (serie.items.length === 0) {
-                                        chart.up().up().artifactSeries.push(serie);
+                                        cp.artifactSeries.push(serie);
                                         Ext.each(serie.group.items, function(item) {
                                             item.hide();
                                             item.redraw();
                                         });
                                         serie.hideAll();
-                                        
-                                    } else {
-                                        //creating statistic windows after zooming
-                                        var html,
-                                            count = 0,
-                                            sum = 0,
-                                            average = 0,
-                                            min = 99999999,
-                                            max = 0,
-                                            lastrec,
-                                            diffkwh = 0,
-                                            winwidth = 125,
-                                            winheight = 105;
-                                        Ext.each(serie.items, function(item) {
-                                            if (Ext.isNumeric(item.value[1])) {
-                                                count++;
-                                                sum = sum + item.value[1];
-                                                if (min > item.value[1]) {
-                                                    min = item.value[1];
-                                                }
-                                                if (max < item.value[1]) {
-                                                    max = item.value[1];
-                                                }
-                                                if (serie.title.indexOf('actual_kwh') >= 0) {
-                                                    if (lastrec) {
-                                                        var diffhrs = Ext.Date.getElapsed(lastrec.value[0], item.value[0]) / 1000 / 3600;
-                                                        diffkwh = diffkwh + diffhrs * lastrec.value[1];
-                                                    }
-                                                    lastrec = item;
-                                                    winwidth = 165,
-                                                    winheight = 130;
-                                                }
-                                            }
-                                        });
-                                        average = sum / count;
-                                        
-                                        html = '<b>Selected Items: </b>' + count + '<br>';
-                                        html += '<b>Sum: </b>' + Ext.util.Format.round(sum, 5) + '<br>';
-                                        html += '<b>Average: </b>' + Ext.util.Format.round(average, 5) + '<br>';
-                                        html += '<b>Min: </b>' + min + '<br>';
-                                        html += '<b>Max: </b>' + max + '<br>';
-                                        if (serie.title.indexOf('actual_kwh') >= 0) {
-                                            html += '<b>Used kW/h: </b>' + Ext.util.Format.round(diffkwh, 3) + '<br>';
-                                            html += '<b>Costs (at 25c/kWh): </b>' + Ext.util.Format.round(diffkwh * 0.25, 2) + '€<br>';
-                                        }
-                                        
-                                        var existingwins = Ext.ComponentQuery.query('window[name=statisticswin]'),
-                                            matchfound = false,
-                                            lastwin,
-                                            win;
-                                        if (existingwins.length > 0) {
-                                            Ext.each(existingwins, function(existingwin) {
-                                                lastwin = existingwin;
-                                                if (existingwin.title === serie.title) {
-                                                    existingwin.update(html);
-                                                    existingwin.showAt(chart.getWidth() - 145, chart.getPosition()[1] + 8);
-                                                    matchfound = true;
-                                                } 
-                                            });
-                                            if (!matchfound) {
-                                                win = Ext.create('Ext.window.Window', {
-                                                    width: winwidth,
-                                                    height: winheight,
-                                                    html: html,
-                                                    title: serie.title,
-                                                    name: 'statisticswin',
-                                                    preventHeader: true,
-                                                    border: false,
-                                                    plain: true
-                                                });
-                                                win.showAt(chart.getWidth() - 145, lastwin.getPosition()[1] + lastwin.getHeight());
-                                            }
-                                        } else {
-                                            win = Ext.create('Ext.window.Window', {
-                                                width: winwidth,
-                                                height: winheight,
-                                                html: html,
-                                                title: serie.title,
-                                                name: 'statisticswin',
-                                                preventHeader: true,
-                                                border: false,
-                                                plain: true
-                                            });
-                                            win.showAt(chart.getWidth() - 145, chart.getPosition()[1] + 8);
-                                        }
                                     }
                                 });
+                                cp.timesZoomed++;
                             }
                         }
                     }
@@ -1820,7 +1743,11 @@ Ext.define('FHEM.controller.ChartController', {
                         logtypename = logtypes[i].getChecked()[0].name;
                         eval('logtypes[i].setValue({' + logtypename + ': "' + chartdata.logtype + '"})');
                         devices[i].setValue(chartdata.device);
-                        yaxes[i].getStore().getProxy().url = url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+' + chartdata.device + '+getreadings&XHR=1';
+                        if (chartdata.logtype === "filelog") {
+                            me.fileLogSelected(devices[i], [chartdata.device]);
+                        } else {
+                            yaxes[i].getStore().getProxy().url = url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+' + chartdata.device + '+getreadings&XHR=1';
+                        }
                         yaxes[i].setDisabled(false);
                         yaxes[i].setValue(chartdata.y);
                         rowFieldSets[i].styleConfig.linestrokewidth = chartdata.linestrokewidth || 2;
@@ -1868,7 +1795,11 @@ Ext.define('FHEM.controller.ChartController', {
                         }
                         eval('logtypes[i].setValue({' + logtypename + ' : chartdata.' + logtype + '})');
                         eval('devices[i].setValue(chartdata.' + axisdevice + ')');
-                        yaxes[i].getStore().getProxy().url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+' + eval('chartdata.' + axisdevice) + '+getreadings&XHR=1';
+                        if (eval('chartdata.' + logtype) === "filelog") {
+                            me.fileLogSelected(devices[i], [eval('chartdata.' + axisdevice)]);
+                        } else {
+                            yaxes[i].getStore().getProxy().url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+' + eval('chartdata.' + axisdevice) + '+getreadings&XHR=1';
+                        }
                         yaxes[i].setDisabled(false);
                         eval('yaxes[i].setValue(chartdata.' + axisname + ')');
                         rowFieldSets[i].styleConfig.linestrokewidth = eval('chartdata.' + prefix + 'linestrokewidth') || 2;

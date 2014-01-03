@@ -95,7 +95,7 @@ Ext.define('FHEM.controller.MainController', {
         
         if (Ext.isDefined(FHEM.version)) {
             var sp = this.getStatustextfield();
-            sp.setText(FHEM.version + "; Frontend Version: 1.0.6 - 2014-01-02");
+            sp.setText(FHEM.version + "; Frontend Version: 1.0.7 - 2014-01-03");
         }
         
         this.setupTree(false);

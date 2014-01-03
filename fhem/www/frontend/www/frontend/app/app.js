@@ -35,28 +35,32 @@ Ext.application({
             url: url,
             success: function(response){
                 Ext.getBody().unmask();
-                FHEM.info = Ext.decode(response.responseText);
-                FHEM.version = FHEM.info.Results[0].devices[0].ATTR.version;
-                Ext.each(FHEM.info.Results, function(result) {
-                    if (result.list === "DbLog" && result.devices[0].NAME) {
-                        FHEM.dblogname = result.devices[0].NAME;
-                    }
-                    if (result.list === "FileLog" && result.devices.length > 0) {
-                        FHEM.filelogs = result.devices;
-                    }
-                });
-                if ((!FHEM.dblogname || Ext.isEmpty(FHEM.dblogname)) && !FHEM.filelogs) {
-                    Ext.Msg.alert("Error", "Could not find a DbLog or FileLog Configuration. Do you have them already defined?");
-                } else {
-                    Ext.create("FHEM.view.Viewport", {
-                        hidden: true
+                try {
+                    FHEM.info = Ext.decode(response.responseText);
+                    FHEM.version = FHEM.info.Results[0].devices[0].ATTR.version;
+                    Ext.each(FHEM.info.Results, function(result) {
+                        if (result.list === "DbLog" && result.devices[0].NAME) {
+                            FHEM.dblogname = result.devices[0].NAME;
+                        }
+                        if (result.list === "FileLog" && result.devices.length > 0) {
+                            FHEM.filelogs = result.devices;
+                        }
                     });
-                    
-                    //removing the loadingimage
-                    var p = Ext.DomQuery.select('p[class=loader]')[0],
-                        img = Ext.DomQuery.select('#loading-overlay')[0];
-                    p.removeChild(img);
-                    // further configuration of viewport starts in maincontroller
+                    if ((!FHEM.dblogname || Ext.isEmpty(FHEM.dblogname)) && !FHEM.filelogs) {
+                        Ext.Msg.alert("Error", "Could not find a DbLog or FileLog Configuration. Do you have them already defined?");
+                    } else {
+                        Ext.create("FHEM.view.Viewport", {
+                            hidden: true
+                        });
+                        
+                        //removing the loadingimage
+                        var p = Ext.DomQuery.select('p[class=loader]')[0],
+                            img = Ext.DomQuery.select('#loading-overlay')[0];
+                        p.removeChild(img);
+                        // further configuration of viewport starts in maincontroller
+                    }
+                } catch (e) {
+                    Ext.Msg.alert("Oh no!", "JsonList did not respond correctly. This is a bug in FHEM. This Frontend cannot work without a valid JsonList response. See this link for details and complain there: http://forum.fhem.de/index.php/topic,17292.msg113132.html#msg113132");
                 }
             },
             failure: function() {
