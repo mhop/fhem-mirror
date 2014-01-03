@@ -314,7 +314,7 @@ readingsGroup_2html($)
       if( $regex && $regex =~ m/^<(.*)>$/ ) {
         my $txt = $1;
         my $readings;
-        if( $txt =~ m/^{(.*)}(#[\w|.*]+)?$/ ) {
+        if( $txt =~ m/^{(.*)}(@[\w|.*]+)?$/ ) {
           $txt = "{$1}";
           $readings = $2;
 
@@ -592,7 +592,7 @@ readingsGroup_Notify($$)
           if( $regex && $regex =~ m/^<(.*)>$/ ) {
             my $txt = $1;
             my $readings;
-            if( $txt =~ m/^{(.*)}(#([\w|.*]+))?$/ ) {
+            if( $txt =~ m/^{(.*)}(@([\w|.*]+))?$/ ) {
               $txt = "{$1}";
               $readings = $3;
 
@@ -750,7 +750,7 @@ readingsGroup_Attr($$$)
       <li>If regex is a comma separatet list the reading values will be shown on a single line.</li>
       <li>If regex starts with a '+' it will be matched against the internal values of the device instead of the readings.</li>
       <li>If regex starts with a '?' it will be matched against the attributes of the device instead of the readings.</li>
-      <li>regex can be of the form &lt;STRING&gt; or &lt;{perl}[#readings]&gt; where STRING or the string returned by perl is
+      <li>regex can be of the form &lt;STRING&gt; or &lt;{perl}[@readings]&gt; where STRING or the string returned by perl is
           inserted as the reading. skipped if STRING is undef. if STRING is br a new line will be started. if readings is
           given the perl expression will be reevaluated during longpoll updates.</li>
       <li>For internal values and attributes longpoll update is not possible. Refresh the page to update the values.</li>
@@ -861,7 +861,7 @@ readingsGroup_Attr($$$)
           <code>attr batteries valueStyle {($VALUE ne "ok")?'style="color:red"':'style="color:green"'}</code><br>
           <code>attr temperatures valueStyle {($DEVICE =~ m/aussen/)?'style="color:green"':'style="color:red"'}</code>
     </ul>
-      Note: Only valueStyle, valueFomat, valueIcon and <{...}#reading> are evaluated during longpoll updates
+      Note: Only valueStyle, valueFomat, valueIcon and <{...}@reading> are evaluated during longpoll updates
       and valueStyle has to return a non empty style for every possible value. All other perl expressions are
       evaluated only once during html creation and will not reflect value updates with longpoll.
       Refresh the page to update the dynamic style. For nameStyle the color attribut is not working at the moment,
