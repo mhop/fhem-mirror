@@ -348,7 +348,7 @@ sub CUL_HM_Define($$) {##############################
     $hash->{helper}{q}{qReqConf}=""; # queue autoConfig requests for this device
     $hash->{helper}{q}{qReqStat}=""; # queue autoConfig requests for this device
     CUL_HM_prtInit ($hash);
-    AssignIoPort($hash);
+    AssignIoPort($hash) if (!$init_done);
   }
   $modules{CUL_HM}{defptr}{$HMid} = $hash;
 
@@ -555,14 +555,14 @@ sub CUL_HM_Parse($$) {##############################
   my @mI = unpack '(A2)*',$p; # split message info to bytes
   return "" if($msgStat && $msgStat eq 'NACK');# lowlevel error
   # $shash will be replaced for multichannel commands
-  my $shash = CUL_HM_id2Hash($src);
-  my $dhash = CUL_HM_id2Hash($dst);
+  my $shash = CUL_HM_id2Hash($src); #sourcehash - will be modified to channel entity
+  my $devH = $shash;                # source device hash
+  my $dhash = CUL_HM_id2Hash($dst); # destination device hash
   CUL_HM_statCnt($ioName,"r");
   my $dname = ($dst eq "000000") ? "broadcast" :
                                    ($dhash ? $dhash->{NAME} :
                                              ($dst eq $id ? $ioName :
                                                             $dst));
-
   if(!$shash && $mTp eq "00") { # generate device
     my $md = substr($p, 2, 4);
     $md = $culHmModel->{$md}{name}  ?
@@ -570,9 +570,14 @@ sub CUL_HM_Parse($$) {##############################
               "ID_".$md;
     my $sname = "CUL_HM_".$md."_$src";
     $sname =~ s/-/_/g;
-    Log3 undef, 3, "CUL_HM Unknown device $sname, please define it";
-    return "UNDEFINED $sname CUL_HM $src $msg";
+    Log3 undef, 3, "CUL_HM Unknown device $sname is now defined";
+    CommandDefine(undef,"$sname CUL_HM $src");
+    $shash = CUL_HM_id2Hash($src); #sourcehash - will be modified to channel entity
+    $devH = $shash;
+    $devH->{IODev} = $iohash;
+    $shash->{helper}{io}{nextSend} = gettimeofday()+0.09;# io was not able to set timer
   }
+
   ####################  attack alarm detection#####################
   if (   $dhash 
       && !CUL_HM_getAttrInt($dname,"ignore")
@@ -589,7 +594,7 @@ sub CUL_HM_Parse($$) {##############################
 
   $respRemoved = 0;  #set to 'no response in this message' at start
   my @event;    #events to be posted for main entity
-  my @entities; #additional entities with events to be notifies
+  my @entities = ("global"); #additional entities with events to be notifies
 
   my $name = $shash->{NAME};
   my $ioId = CUL_HM_Id($shash->{IODev});
@@ -613,16 +618,17 @@ sub CUL_HM_Parse($$) {##############################
 
   my $msgX = "No:$mNo - t:$mTp s:$src d:$dst ".($p?$p:"");
   if($mTp ne "00" && 
-     $shash->{lastMsg} && $shash->{lastMsg} eq $msgX) { #duplicate -lost 'ack'?
-    if(   $shash->{helper}{rpt}                           #was responded
-       && $shash->{helper}{rpt}{IO}  eq $ioName           #from same IO
-       && $shash->{helper}{rpt}{flg} eq substr($msg,5,1)  #not from repeater
-       && $shash->{helper}{rpt}{ts}  < gettimeofday()-0.24 # again if older then 240ms (typ repeat time)
+     $devH->{lastMsg} && $devH->{lastMsg} eq $msgX) { #duplicate -lost 'ack'?
+           
+    if(   $devH->{helper}{rpt}                           #was responded
+       && $devH->{helper}{rpt}{IO}  eq $ioName           #from same IO
+       && $devH->{helper}{rpt}{flg} eq substr($msg,5,1)  #not from repeater
+       && $devH->{helper}{rpt}{ts}  < gettimeofday()-0.24 # again if older then 240ms (typ repeat time)
                                                           #todo: hack since HMLAN sends duplicate status messages
        ){
-      my $ack = $shash->{helper}{rpt}{ack};#shorthand
+      my $ack = $devH->{helper}{rpt}{ack};#shorthand
       my $i=0;
-      $shash->{helper}{rpt}{ts} = gettimeofday();
+      $devH->{helper}{rpt}{ts} = gettimeofday();
       CUL_HM_SndCmd(${$ack}[$i++],${$ack}[$i++]) while ($i<@{$ack});
       Log3 $name,4,"CUL_HM $name dup: repeat ack, dont process";
     }
@@ -1195,7 +1201,7 @@ sub CUL_HM_Parse($$) {##############################
       push @event,"state:$btnName $state$target";
     }
   }
-  elsif($st eq "powerMeter") {##########################
+  elsif($st eq "powerMeter") {#################################################
     if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
         ($mTp eq "10" && $p =~ m/^06/)) {  #    or Info_Status message here
 
@@ -1561,11 +1567,10 @@ sub CUL_HM_Parse($$) {##############################
          && (!@ack)           #sender requested ACK
          );
   if (@ack) {# send acks and store for repeat
-    my $sRptHash = $modules{CUL_HM}{defptr}{$src}{helper}{rpt};
-    $sRptHash->{IO}  = $ioName;
-    $sRptHash->{flg} = substr($msg,5,1);
-    $sRptHash->{ack} = \@ack;
-    $sRptHash->{ts}  = gettimeofday();
+    $devH->{helper}{rpt}{IO}  = $ioName;
+    $devH->{helper}{rpt}{flg} = substr($msg,5,1);
+    $devH->{helper}{rpt}{ack} = \@ack;
+    $devH->{helper}{rpt}{ts}  = gettimeofday();
     my $i=0;
     CUL_HM_SndCmd($ack[$i++],$ack[$i++])while ($i<@ack);
     Log3 $name,6,"CUL_HM $name sent ACK:".(int(@ack));
@@ -1731,8 +1736,11 @@ sub CUL_HM_parseCommon(@){#####################################################
         $idstr =~ s/(..)/sprintf("%02X%s",$s++,$1)/ge;
         CUL_HM_pushConfig($shash, $ioId, $src,0,0,0,0, "0201$idstr");
 
+        $attr{$shash->{NAME}}{autoReadReg}= 
+              AttrVal($shash->{NAME},"autoReadReg","4_reqStatus");
         CUL_HM_qAutoRead($shash->{NAME},0);
         CUL_HM_appFromQ($shash->{NAME},"cf");# stack cmds if waiting
+
         $respRemoved = 1;#force command stack processing
         $paired = 1;
       }
@@ -3149,7 +3157,7 @@ sub CUL_HM_Set($@) {
     for (my $btn=1;$btn <= $maxBtnNo;$btn++){
       my $chnName = $name."_Btn".$btn;
       my $chnId = $devId.sprintf("%02X",$btn);
-      DoTrigger("global",  "UNDEFINED $chnName CUL_HM $chnId")
+      CommandDefine(undef,"$chnName CUL_HM $chnId")
           if (!$modules{CUL_HM}{defptr}{$chnId});
     }
     foreach my $channel (keys %{$hash}){# remove higher numbers
@@ -3453,8 +3461,9 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
       if (!$modules{CUL_HM}{defptr}{$chnId}){
         my $chnName = $name."_".$chnTpName.(($chnStart == $chnEnd)?
                                 '':'_'.sprintf("%02d",$chnNoTyp));
-        InternalTimer($startime++,"CUL_HM_infoUpdtChanData",
-        "$chnName,$chnId,$md",0);
+                                
+        CommandDefine(undef,$chnName.' CUL_HM '.$chnId);
+        $attr{CUL_HM_id2Name($chnId)}{model} = $md;
       }
       $attr{CUL_HM_id2Name($chnId)}{model} = $md;
       $chnNoTyp++;
@@ -3464,12 +3473,6 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
     CUL_HM_ActAdd($hash->{DEF},AttrVal($name,"actCycle",
                                              $culHmModel->{$mId}{cyc}));
   }
-}
-sub CUL_HM_infoUpdtChanData(@) {# verify attributes after reboot
-  my($in ) = @_;
-  my($chnName,$chnId,$model ) = split(',',$in);
-  DoTrigger("global",  'UNDEFINED '.$chnName.' CUL_HM '.$chnId);
-  $attr{CUL_HM_id2Name($chnId)}{model} = $model;
 }
 sub CUL_HM_getConfig($){
   my $hash = shift;
@@ -4921,7 +4924,7 @@ sub CUL_HM_dimLog($) {# dimmer readings - support virtual chan - unused so far
 # ActionDetector will use the fixed HMid 000000
 sub CUL_HM_ActGetCreateHash() {# get ActionDetector - create if necessary
   if (!$modules{CUL_HM}{defptr}{"000000"}){
-    DoTrigger("global",  "UNDEFINED ActionDetector CUL_HM 000000");
+    CommandDefine(undef,"ActionDetector CUL_HM 000000");
     $attr{ActionDetector}{actCycle} = 600;
     $attr{ActionDetector}{"event-on-change-reading"} = ".*";
   }
@@ -5255,7 +5258,7 @@ sub CUL_HM_appFromQ($$){#stack commands if pend in WuQ
   if ($reason eq "cf"){# reason is config. add all since User has control
     foreach my $q ("qReqStat","qReqConf"){
       if ($dq->{$q} ne ""){# need update
-         my @eName;
+        my @eName;
         if ($dq->{$q} eq "00"){
           push @eName,$devN;
         }
