@@ -1999,6 +1999,8 @@ FW_Notify($$)
     $FW_sp = AttrVal($FW_wname, "stylesheetPrefix", 0);
     $FW_ss = ($FW_sp =~ m/smallscreen/);
     $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
+    @FW_iconDirs = grep { $_ } split(":", AttrVal($FW_wname, "iconPath",
+                                "$FW_sp:default:fhemSVG:openautomation"));
 
     my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
     ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir) = @old;
