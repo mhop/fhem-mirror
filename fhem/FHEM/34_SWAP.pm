@@ -375,7 +375,7 @@ SWAP_Set($@)
 
     if( $cmd ne '?' ) {
       if( my @a = grep( $_ =~ /^$cmd($|:)/, keys %{$sl} ) ) {
-        return "set $cmd requires $sl->{$a[0]} parameter(s)" if( $sl->{$a[0]} != -99 && $sl->{$a[0]} != $cnt-1 );
+        return "set $cmd requires $sl->{$a[0]} parameter(s)" if( defined($sl->{$cmd}) && $sl->{$cmd} != $cnt-1 );
 
         if( my $set = $modules{$hash->{TYPE}}{SWAP_SetFn} ) {
           no strict "refs";
@@ -393,7 +393,7 @@ SWAP_Set($@)
     foreach my $cmd ( sort keys ( %{$sl} ) ) {
       $list .= " ";
       $list .= $cmd;
-      $list .= ":noArg" if( !$sl->{$cmd} );
+      $list .= ":noArg" if( defined($sl->{$cmd}) && !$sl->{$cmd} );
     }
     #$list .= " " . join(" ", sort keys %{$sl});
   }
@@ -634,8 +634,8 @@ SWAP_Get($@)
 
   if( my $gl = $modules{$hash->{TYPE}}{SWAP_GetList} ) {
 
-    if(defined($gl->{$cmd}) ) {
-      return "get $cmd requires $gl->{$cmd} parameter(s)" if( $gl->{$cmd} != int(@args) );
+    if(exists($gl->{$cmd}) ) {
+      return "get $cmd requires $gl->{$cmd} parameter(s)" if( defined($gl->{$cmd}) && $gl->{$cmd} != int(@args) );
 
       if( my $get = $modules{$hash->{TYPE}}{SWAP_GetFn} ) {
         no strict "refs";
@@ -649,7 +649,7 @@ SWAP_Get($@)
     foreach my $cmd ( sort keys ( %{$gl} ) ) {
       $list .= " ";
       $list .= $cmd;
-      $list .= ":noArg" if( !$gl->{$cmd} );
+      $list .= ":noArg" if( defined($gl->{$cmd}) && !$gl->{$cmd} );
     }
     #$list .= " " . join(" ", sort keys %{$gl});
   }
