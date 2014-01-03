@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.2
+# Version: 1.2.3
 #
 # Major Version History:
 # - 1.2.0 - 2013-12-21
@@ -106,6 +106,7 @@ sub ENIGMA2_GetStatus($;$) {
     my $boxinfo;
     my $serviceinfo;
     my $eventinfo;
+    my $currsrvinfo;
     my $signalinfo;
     my $vol;
     my $changecount = 0;
@@ -113,7 +114,7 @@ sub ENIGMA2_GetStatus($;$) {
     Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_GetStatus()";
 
     $local = 0 unless ( defined($local) );
-    if ( defined( $attr{$name}{disable} ) && $attr{$name}{disable} eq "1" ) {
+    if ( defined( $attr{$name}{disable} ) && $attr{$name}{disable} == 1 ) {
         return $hash->{STATE};
     }
 
@@ -314,44 +315,20 @@ sub ENIGMA2_GetStatus($;$) {
         else {
             $state = "on";
 
-            # Read Boxinfo
-            $boxinfo     = ENIGMA2_SendCommand( $hash, "about",       "" );
-            $serviceinfo = ENIGMA2_SendCommand( $hash, "subservices", "" );
-            $signalinfo  = ENIGMA2_SendCommand( $hash, "signal",      "" );
-            $vol         = ENIGMA2_SendCommand( $hash, "vol",         "" );
-
-            # Read eventinfo
-            #  multiple
-            if (   ref($serviceinfo) eq "HASH"
-                && defined( $serviceinfo->{e2service} )
-                && ref( $serviceinfo->{e2service} ) eq "ARRAY"
-                && defined( $serviceinfo->{e2service}[0]{e2servicereference} )
-                && $serviceinfo->{e2service}[0]{e2servicereference} ne "" )
+            # Read Boxinfo every 10 minutes only
+            if (
+                !defined( $hash->{helper}{lastStatusUpdate} )
+                || ( defined( $hash->{helper}{lastStatusUpdate} )
+                    && $hash->{helper}{lastStatusUpdate} + 900 le time() )
+              )
             {
-                $eventinfo = ENIGMA2_SendCommand(
-                    $hash,
-                    "epgservicenow",
-                    "sRef="
-                      . urlEncode(
-                        $serviceinfo->{e2service}[0]{e2servicereference}
-                      )
-                );
+                $boxinfo = ENIGMA2_SendCommand( $hash, "about", "" );
             }
 
-            #  single
-            elsif (ref($serviceinfo) eq "HASH"
-                && defined( $serviceinfo->{e2service}{e2servicereference} )
-                && $serviceinfo->{e2service}{e2servicereference} ne "" )
-            {
-                $eventinfo = ENIGMA2_SendCommand(
-                    $hash,
-                    "epgservicenow",
-                    "sRef="
-                      . urlEncode(
-                        $serviceinfo->{e2service}{e2servicereference}
-                      )
-                );
-            }
+            # get current states
+            $currsrvinfo = ENIGMA2_SendCommand( $hash, "getcurrent", "" );
+            $vol         = ENIGMA2_SendCommand( $hash, "vol",        "" );
+            $signalinfo  = ENIGMA2_SendCommand( $hash, "signal",     "" );
         }
     }
     elsif ( $hash->{helper}{AVAILABLE} == 1 ) {
@@ -362,6 +339,10 @@ sub ENIGMA2_GetStatus($;$) {
     else {
         $state = "absent";
     }
+
+    ####
+    # update readings
+    #
 
     readingsBeginUpdate($hash);
 
@@ -374,7 +355,7 @@ sub ENIGMA2_GetStatus($;$) {
     if ( !defined( $hash->{READINGS}{power}{VAL} )
         || $hash->{READINGS}{power}{VAL} ne $readingPower )
     {
-        readingsBulkUpdate( $hash, "power", $readingPower, 1 );
+        readingsBulkUpdate( $hash, "power", $readingPower );
     }
 
     # Set reading for state
@@ -382,24 +363,20 @@ sub ENIGMA2_GetStatus($;$) {
     if ( !defined( $hash->{READINGS}{state}{VAL} )
         || $hash->{READINGS}{state}{VAL} ne $state )
     {
-        readingsBulkUpdate( $hash, "state", $state, 1 );
+        readingsBulkUpdate( $hash, "state", $state );
     }
 
-    # Set reading for Boxinfos
+    my $reading;
+    my $e2reading;
+
+    # Boxinfo
     #
     if ( ref($boxinfo) eq "HASH" ) {
-        my $reading;
-        my $e2reading;
 
-        # General
+        # General readings
         foreach (
-            "enigmaversion",    "imageversion",  "webifversion",
-            "fpversion",        "lanmac",        "model",
-            "servicenamespace", "serviceaspect", "serviceprovider",
-            "servicevideosize", "videowidth",    "videoheight",
-            "apid",             "vpid",          "pcrpid",
-            "servicevideosize", "pmtpid",        "txtpid",
-            "tsid",             "onid",          "sid"
+            "enigmaversion", "imageversion", "webifversion",
+            "fpversion",     "lanmac",       "model",
           )
         {
             $reading   = $_;
@@ -414,7 +391,7 @@ sub ENIGMA2_GetStatus($;$) {
                         lc( $boxinfo->{e2about}{$e2reading} ) )
                     {
                         readingsBulkUpdate( $hash, $reading,
-                            lc( $boxinfo->{e2about}{$e2reading} ), 1 );
+                            lc( $boxinfo->{e2about}{$e2reading} ) );
                     }
                 }
                 else {
@@ -423,7 +400,7 @@ sub ENIGMA2_GetStatus($;$) {
                         $boxinfo->{e2about}{$e2reading} )
                     {
                         readingsBulkUpdate( $hash, $reading,
-                            $boxinfo->{e2about}{$e2reading}, 1 );
+                            $boxinfo->{e2about}{$e2reading} );
                     }
                 }
             }
@@ -431,118 +408,94 @@ sub ENIGMA2_GetStatus($;$) {
                 if ( !defined( $hash->{READINGS}{$reading}{VAL} )
                     || $hash->{READINGS}{$reading}{VAL} ne "-" )
                 {
-                    readingsBulkUpdate( $hash, $reading, "-", 1 );
+                    readingsBulkUpdate( $hash, $reading, "-" );
                 }
-            }
-        }
-
-        # servicename + channel
-        $reading   = "servicename";
-        $e2reading = "e2" . $reading;
-        if ( defined( $boxinfo->{e2about}{$e2reading} ) ) {
-            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                || $hash->{READINGS}{$reading}{VAL} ne
-                $boxinfo->{e2about}{$e2reading} )
-            {
-                readingsBulkUpdate( $hash, $reading,
-                    $boxinfo->{e2about}{$e2reading}, 1 );
-
-                my $channel = $boxinfo->{e2about}{$e2reading};
-                $channel =~ s/\s/_/g;
-                readingsBulkUpdate( $hash, "channel", $channel, 1 );
-            }
-        }
-        else {
-            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                || $hash->{READINGS}{$reading}{VAL} ne "-" )
-            {
-                readingsBulkUpdate( $hash, $reading,  "-", 1 );
-                readingsBulkUpdate( $hash, "channel", "-", 1 );
             }
         }
 
         # HDD
-        #  multiple
-        if ( defined( $boxinfo->{e2about}{e2hddinfo} )
-            && ref( $boxinfo->{e2about}{e2hddinfo} ) eq "ARRAY" )
-        {
-            my $i        = 0;
-            my $arr_size = @{ $boxinfo->{e2about}{e2hddinfo} };
+        if ( defined( $boxinfo->{e2about}{e2hddinfo} ) ) {
 
-            while ( $i < $arr_size ) {
-                my $counter     = $i + 1;
-                my $readingname = "hdd" . $counter . "_model";
+            # multiple
+            if ( ref( $boxinfo->{e2about}{e2hddinfo} ) eq "ARRAY" ) {
+                my $i        = 0;
+                my $arr_size = @{ $boxinfo->{e2about}{e2hddinfo} };
+
+                while ( $i < $arr_size ) {
+                    my $counter     = $i + 1;
+                    my $readingname = "hdd" . $counter . "_model";
+                    if ( !defined( $hash->{READINGS}{$readingname}{VAL} )
+                        || $hash->{READINGS}{$readingname}{VAL} ne
+                        $boxinfo->{e2about}{e2hddinfo}[$i]{model} )
+                    {
+                        readingsBulkUpdate( $hash, $readingname,
+                            $boxinfo->{e2about}{e2hddinfo}[$i]{model} );
+                    }
+
+                    $readingname = "hdd" . $counter . "_capacity";
+                    my @value =
+                      split( / /,
+                        $boxinfo->{e2about}{e2hddinfo}[$i]{capacity} );
+                    if (
+                        !defined( $hash->{READINGS}{$readingname}{VAL} )
+                        || ( ref(@value) eq "ARRAY"
+                            && $hash->{READINGS}{$readingname}{VAL} ne
+                            $value[0] )
+                      )
+                    {
+                        readingsBulkUpdate( $hash, $readingname, $value[0] );
+                    }
+
+                    $readingname = "hdd" . $counter . "_free";
+                    @value =
+                      split( / /, $boxinfo->{e2about}{e2hddinfo}[$i]{free} );
+                    if (
+                        !defined( $hash->{READINGS}{$readingname}{VAL} )
+                        || ( ref(@value) eq "ARRAY"
+                            && $hash->{READINGS}{$readingname}{VAL} ne
+                            $value[0] )
+                      )
+                    {
+                        readingsBulkUpdate( $hash, $readingname, $value[0] );
+                    }
+
+                    $i++;
+                }
+            }
+
+            #  single
+            elsif ( ref( $boxinfo->{e2about}{e2hddinfo} ) eq "HASH" ) {
+                my $readingname = "hdd1_model";
                 if ( !defined( $hash->{READINGS}{$readingname}{VAL} )
                     || $hash->{READINGS}{$readingname}{VAL} ne
-                    $boxinfo->{e2about}{e2hddinfo}[$i]{model} )
+                    $boxinfo->{e2about}{e2hddinfo}{model} )
                 {
                     readingsBulkUpdate( $hash, $readingname,
-                        $boxinfo->{e2about}{e2hddinfo}[$i]{model}, 1 );
+                        $boxinfo->{e2about}{e2hddinfo}{model} );
                 }
 
-                $readingname = "hdd" . $counter . "_capacity";
+                $readingname = "hdd1_capacity";
                 my @value =
-                  split( / /, $boxinfo->{e2about}{e2hddinfo}[$i]{capacity} );
+                  split( / /, $boxinfo->{e2about}{e2hddinfo}{capacity} );
                 if (
                     !defined( $hash->{READINGS}{$readingname}{VAL} )
                     || ( ref(@value) eq "ARRAY"
                         && $hash->{READINGS}{$readingname}{VAL} ne $value[0] )
                   )
                 {
-                    readingsBulkUpdate( $hash, $readingname, $value[0], 1 );
+                    readingsBulkUpdate( $hash, $readingname, $value[0] );
                 }
 
-                $readingname = "hdd" . $counter . "_free";
-                @value =
-                  split( / /, $boxinfo->{e2about}{e2hddinfo}[$i]{free} );
+                $readingname = "hdd1_free";
+                @value = split( / /, $boxinfo->{e2about}{e2hddinfo}{free} );
                 if (
                     !defined( $hash->{READINGS}{$readingname}{VAL} )
                     || ( ref(@value) eq "ARRAY"
                         && $hash->{READINGS}{$readingname}{VAL} ne $value[0] )
                   )
                 {
-                    readingsBulkUpdate( $hash, $readingname, $value[0], 1 );
+                    readingsBulkUpdate( $hash, $readingname, $value[0] );
                 }
-
-                $i++;
-            }
-
-        }
-
-        #  single
-        elsif ( defined( $boxinfo->{e2about}{e2hddinfo} )
-            && ref( $boxinfo->{e2about}{e2hddinfo} ) eq "HASH" )
-        {
-            my $readingname = "hdd1_model";
-            if ( !defined( $hash->{READINGS}{$readingname}{VAL} )
-                || $hash->{READINGS}{$readingname}{VAL} ne
-                $boxinfo->{e2about}{e2hddinfo}{model} )
-            {
-                readingsBulkUpdate( $hash, $readingname,
-                    $boxinfo->{e2about}{e2hddinfo}{model}, 1 );
-            }
-
-            $readingname = "hdd1_capacity";
-            my @value =
-              split( / /, $boxinfo->{e2about}{e2hddinfo}{capacity} );
-            if (
-                !defined( $hash->{READINGS}{$readingname}{VAL} )
-                || ( ref(@value) eq "ARRAY"
-                    && $hash->{READINGS}{$readingname}{VAL} ne $value[0] )
-              )
-            {
-                readingsBulkUpdate( $hash, $readingname, $value[0], 1 );
-            }
-
-            $readingname = "hdd1_free";
-            @value = split( / /, $boxinfo->{e2about}{e2hddinfo}{free} );
-            if (
-                !defined( $hash->{READINGS}{$readingname}{VAL} )
-                || ( ref(@value) eq "ARRAY"
-                    && $hash->{READINGS}{$readingname}{VAL} ne $value[0] )
-              )
-            {
-                readingsBulkUpdate( $hash, $readingname, $value[0], 1 );
             }
         }
 
@@ -559,8 +512,7 @@ sub ENIGMA2_GetStatus($;$) {
                 if ( !defined( $hash->{READINGS}{$tuner_name}{VAL} )
                     || $hash->{READINGS}{$tuner_name}{VAL} ne $$tunerRef{type} )
                 {
-                    readingsBulkUpdate( $hash, $tuner_name,
-                        $$tunerRef{type}, 1 );
+                    readingsBulkUpdate( $hash, $tuner_name, $$tunerRef{type} );
                 }
 
             }
@@ -575,268 +527,371 @@ sub ENIGMA2_GetStatus($;$) {
                     if ( !defined( $hash->{READINGS}{$tuner_name}{VAL} )
                         || $hash->{READINGS}{$tuner_name}{VAL} ne $tuner_type )
                     {
-                        readingsBulkUpdate( $hash, $tuner_name,
-                            $tuner_type, 1 );
+                        readingsBulkUpdate( $hash, $tuner_name, $tuner_type );
                     }
                 }
             }
         }
+    }
 
-        # Volume
-        if ( ref($vol) eq "HASH" && defined( $vol->{e2current} ) ) {
-            if ( !defined( $hash->{READINGS}{volume}{VAL} )
-                || $hash->{READINGS}{volume}{VAL} ne $vol->{e2current} )
-            {
-                readingsBulkUpdate( $hash, "volume", $vol->{e2current}, 1 );
-            }
-        }
-        if ( ref($vol) eq "HASH" && defined( $vol->{e2ismuted} ) ) {
-            my $muteState = "on";
-            if ( lc( $vol->{e2ismuted} ) eq "false" ) {
-                $muteState = "off";
-            }
-            if ( !defined( $hash->{READINGS}{mute}{VAL} )
-                || $hash->{READINGS}{mute}{VAL} ne $muteState )
-            {
-                readingsBulkUpdate( $hash, "mute", $muteState, 1 );
-            }
-        }
+    # Service and Event information
+    #
+    if ( ref($currsrvinfo) eq "HASH" ) {
+        my $reading;
+        my $e2reading;
 
-        # servicereference + input + currentMedia
-        #  multiple
-        if (   ref($serviceinfo) eq "HASH"
-            && defined( $serviceinfo->{e2service} )
-            && ref( $serviceinfo->{e2service} ) eq "ARRAY" )
+        # Service readings
+        foreach (
+            "servicereference", "servicename", "providername",
+            "servicevideosize", "videowidth",  "videoheight",
+            "iswidescreen",     "apid",        "vpid",
+            "pcrpid",           "pmtpid",      "txtpid",
+            "tsid",             "onid",        "sid"
+          )
         {
-            if ( $serviceinfo->{e2service}[0]{e2servicereference} ne "" ) {
-                if ( !defined( $hash->{READINGS}{servicereference}{VAL} )
-                    || $hash->{READINGS}{servicereference}{VAL} ne
-                    $serviceinfo->{e2service}[0]{e2servicereference} )
+            $reading   = $_;
+            $e2reading = "e2" . $_;
+
+            if (   defined( $currsrvinfo->{e2service}{$e2reading} )
+                && lc( $currsrvinfo->{e2service}{$e2reading} ) ne "n/a"
+                && lc( $currsrvinfo->{e2service}{$e2reading} ) ne "n/axn/a" )
+            {
+                if (   $currsrvinfo->{e2service}{$e2reading} eq "False"
+                    || $currsrvinfo->{e2service}{$e2reading} eq "True" )
                 {
-                    readingsBulkUpdate( $hash, "servicereference",
-                        $serviceinfo->{e2service}[0]{e2servicereference}, 1 );
-                    readingsBulkUpdate( $hash, "currentMedia",
-                        $serviceinfo->{e2service}[0]{e2servicereference}, 1 );
-
-                    my @servicetype = split( /:/,
-                        $serviceinfo->{e2service}[0]{e2servicereference} );
-
-                    if ( defined( $servicetype[2] )
-                        && $servicetype[2] eq "2" )
+                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                        || $hash->{READINGS}{$reading}{VAL} ne
+                        lc( $currsrvinfo->{e2service}{$e2reading} ) )
                     {
-                        $hash->{helper}{lastInput} = "radio";
-                        readingsBulkUpdate( $hash, "input", "radio", 1 );
-                    }
-                    else {
-                        $hash->{helper}{lastInput} = "tv";
-                        readingsBulkUpdate( $hash, "input", "tv", 1 );
+                        readingsBulkUpdate( $hash, $reading,
+                            lc( $currsrvinfo->{e2service}{$e2reading} ) );
                     }
                 }
-            }
-            elsif ( $hash->{READINGS}{servicereference}{VAL} ne "-" ) {
-                readingsBulkUpdate( $hash, "servicereference", "-", 1 );
-                readingsBulkUpdate( $hash, "currentMedia",     "-", 1 );
-            }
-        }
+                else {
+                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                        || $hash->{READINGS}{$reading}{VAL} ne
+                        $currsrvinfo->{e2service}{$e2reading} )
+                    {
+                        readingsBulkUpdate( $hash, $reading,
+                            $currsrvinfo->{e2service}{$e2reading} );
 
-        #  single
-        elsif ( ref($serviceinfo) eq "HASH"
-            && defined( $serviceinfo->{e2service} ) )
-        {
-            if ( $serviceinfo->{e2service}{e2servicereference} ne "" ) {
-                if ( !defined( $hash->{READINGS}{servicereference}{VAL} )
-                    || $hash->{READINGS}{servicereference}{VAL} ne
-                    $serviceinfo->{e2service}{e2servicereference} )
-                {
-                    readingsBulkUpdate( $hash, "servicereference",
-                        $serviceinfo->{e2service}{e2servicereference}, 1 );
-                    readingsBulkUpdate( $hash, "currentMedia",
-                        $serviceinfo->{e2service}{e2servicereference}, 1 );
+                        # channel
+                        if ( $reading eq "servicename" ) {
+                            my $val = $currsrvinfo->{e2service}{$e2reading};
+                            $val =~ s/\s/_/g;
+                            readingsBulkUpdate( $hash, "channel", $val );
+                        }
 
+                        # currentMedia
+                        readingsBulkUpdate( $hash, "currentMedia",
+                            $currsrvinfo->{e2service}{$e2reading} )
+                          if $reading eq "servicereference";
+                    }
+                }
+
+                # input
+                if ( $reading eq "servicereference" ) {
                     my @servicetype =
-                      split( /:/,
-                        $serviceinfo->{e2service}{e2servicereference} );
+                      split( /:/, $currsrvinfo->{e2service}{$e2reading} );
 
                     if ( defined( $servicetype[2] )
                         && $servicetype[2] eq "2" )
                     {
                         $hash->{helper}{lastInput} = "radio";
-                        readingsBulkUpdate( $hash, "input", "radio", 1 );
+                        readingsBulkUpdate( $hash, "input", "radio" );
                     }
                     else {
                         $hash->{helper}{lastInput} = "tv";
-                        readingsBulkUpdate( $hash, "input", "tv", 1 );
+                        readingsBulkUpdate( $hash, "input", "tv" );
                     }
                 }
             }
-            elsif ( $hash->{READINGS}{servicereference}{VAL} ne "-" ) {
-                readingsBulkUpdate( $hash, "servicereference", "-", 1 );
-                readingsBulkUpdate( $hash, "currentMedia",     "-", 1 );
+            else {
+                if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                    || $hash->{READINGS}{$reading}{VAL} ne "-" )
+                {
+                    readingsBulkUpdate( $hash, $reading, "-" );
+
+                    # channel
+                    readingsBulkUpdate( $hash, "channel", "-" )
+                      if $reading eq "servicename";
+
+                    # currentMedia
+                    readingsBulkUpdate( $hash, "currentMedia", "-" )
+                      if $reading eq "servicereference";
+                }
             }
         }
 
-        # Event
-        if ( ref($eventinfo) eq "HASH" && defined( $eventinfo->{e2event} ) ) {
+        # Event readings
+        #
+        if ( defined( $currsrvinfo->{e2eventlist} ) ) {
+            my $eventNow;
+            my $eventNext;
+
+            if ( ref( $currsrvinfo->{e2eventlist}{e2event} ) eq "ARRAY" ) {
+                $eventNow  = $currsrvinfo->{e2eventlist}{e2event}[0];
+                $eventNext = $currsrvinfo->{e2eventlist}{e2event}[1]
+                  if ( defined( $currsrvinfo->{e2eventlist}{e2event}[1] ) );
+            }
+            else {
+                $eventNow = $currsrvinfo->{e2eventlist}{e2event};
+            }
+
             foreach (
-                "eventstart",       "eventduration",
-                "eventcurrenttime", "eventdescription",
+                "eventstart",       "eventduration",    "eventremaining",
+                "eventcurrenttime", "eventdescription", "eventtitle",
+                "eventname",
               )
             {
                 $reading   = $_;
                 $e2reading = "e2" . $_;
 
-                if ( defined( $eventinfo->{e2event}{$e2reading} ) ) {
+                # current event
+                if (   defined( $eventNow->{$e2reading} )
+                    && lc( $eventNow->{$e2reading} ) ne "n/a"
+                    && $eventNow->{$e2reading} ne "0"
+                    && $eventNow->{$e2reading} ne "" )
+                {
                     if ( !defined( $hash->{READINGS}{$reading}{VAL} )
                         || $hash->{READINGS}{$reading}{VAL} ne
-                        $eventinfo->{e2event}{$e2reading} )
+                        $eventNow->{$e2reading} )
                     {
                         readingsBulkUpdate( $hash, $reading,
-                            $eventinfo->{e2event}{$e2reading}, 1 );
+                            $eventNow->{$e2reading} );
+
+                        # currentTitle
+                        readingsBulkUpdate( $hash, "currentTitle",
+                            $eventNow->{$e2reading} )
+                          if $reading eq "eventtitle";
                     }
                 }
                 else {
                     if ( !defined( $hash->{READINGS}{$reading}{VAL} )
                         || $hash->{READINGS}{$reading}{VAL} ne "-" )
                     {
-                        readingsBulkUpdate( $hash, $reading, "-", 1 );
+                        readingsBulkUpdate( $hash, $reading, "-" );
+
+                        # currentTitle
+                        readingsBulkUpdate( $hash, "currentTitle", "-" )
+                          if $reading eq "eventtitle";
+                    }
+                }
+
+                # next event
+                $reading = $_ . "_next";
+                if (   defined( $eventNext->{$e2reading} )
+                    && lc( $eventNext->{$e2reading} ) ne "n/a"
+                    && $eventNext->{$e2reading} ne "0"
+                    && $eventNext->{$e2reading} ne "" )
+                {
+                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                        || $hash->{READINGS}{$reading}{VAL} ne
+                        $eventNext->{$e2reading} )
+                    {
+                        readingsBulkUpdate( $hash, $reading,
+                            $eventNext->{$e2reading} );
+
+                        # nextTitle
+                        readingsBulkUpdate( $hash, "nextTitle",
+                            $eventNext->{$e2reading} )
+                          if $reading eq "eventtitle_next";
+                    }
+                }
+                else {
+                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                        || $hash->{READINGS}{$reading}{VAL} ne "-" )
+                    {
+                        readingsBulkUpdate( $hash, $reading, "-" );
+
+                        # nextTitle
+                        readingsBulkUpdate( $hash, "nextTitle", "-" )
+                          if $reading eq "eventtitle_next";
                     }
                 }
             }
 
-            # eventtitle + currentTitle
-            $reading   = "eventtitle";
-            $e2reading = "e2" . $reading;
-            if ( defined( $eventinfo->{e2event}{$e2reading} )
-                && $eventinfo->{e2event}{$e2reading} ne "N/A" )
-            {
-                if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                    || $hash->{READINGS}{$reading}{VAL} ne
-                    $eventinfo->{e2event}{$e2reading} )
-                {
-                    readingsBulkUpdate( $hash, $reading,
-                        $eventinfo->{e2event}{$e2reading}, 1 );
-                    readingsBulkUpdate( $hash, "currentTitle",
-                        $eventinfo->{e2event}{$e2reading}, 1 );
-                }
-            }
-            else {
-                if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                    || $hash->{READINGS}{$reading}{VAL} ne
-                    $boxinfo->{e2about}{e2servicename} )
-                {
-                    readingsBulkUpdate( $hash, $reading,
-                        $boxinfo->{e2about}{e2servicename}, 1 );
-                    readingsBulkUpdate( $hash, "currentTitle",
-                        $boxinfo->{e2about}{e2servicename}, 1 );
-                }
-            }
-
             # convert date+time into human readable formats
-            foreach ( "eventstart", "eventcurrenttime", "eventduration" ) {
+            foreach (
+                "eventstart",    "eventcurrenttime",
+                "eventduration", "eventremaining"
+              )
+            {
                 $reading   = $_ . "_hr";
                 $e2reading = "e2" . $_;
-                if ( defined( $eventinfo->{e2event}{$e2reading} )
-                    && $eventinfo->{e2event}{$e2reading} ne "0" )
+
+                # current event
+                if (   defined( $eventNow->{$e2reading} )
+                    && $eventNow->{$e2reading} ne "0"
+                    && $eventNow->{$e2reading} ne "" )
                 {
                     my $timestring;
-                    if ( $_ eq "eventduration" ) {
-                        my @t = localtime( $eventinfo->{e2event}{$e2reading} );
+                    if (   $_ eq "eventduration"
+                        || $_ eq "eventremaining" )
+                    {
+                        my @t = localtime( $eventNow->{$e2reading} );
                         $timestring =
                           sprintf( "%02d:%02d:%02d", $t[2] - 1, $t[1], $t[0] );
                     }
                     else {
                         $timestring =
-                          substr(
-                            FmtDateTime( $eventinfo->{e2event}{$e2reading} ),
-                            11 );
+                          substr( FmtDateTime( $eventNow->{$e2reading} ), 11 );
                     }
                     if ( !defined( $hash->{READINGS}{$reading}{VAL} )
                         || $hash->{READINGS}{$reading}{VAL} ne $timestring )
                     {
-                        readingsBulkUpdate( $hash, $reading, $timestring, 1 );
+                        readingsBulkUpdate( $hash, $reading, $timestring );
                     }
                 }
                 else {
                     if ( !defined( $hash->{READINGS}{$reading}{VAL} )
                         || $hash->{READINGS}{$reading}{VAL} ne "-" )
                     {
-                        readingsBulkUpdate( $hash, $reading, "-", 1 );
+                        readingsBulkUpdate( $hash, $reading, "-" );
                     }
                 }
-            }
-        }
 
-        # Signal
-        if ( ref($signalinfo) eq "HASH"
-            && defined( $signalinfo->{e2snrdb} ) )
-        {
-            foreach ( "snrdb", "snr", "ber", "acg", ) {
-                $reading   = $_;
-                $e2reading = "e2" . $_;
-
-                if ( defined( $signalinfo->{$e2reading} ) ) {
-                    my @value = split( / /, $signalinfo->{$e2reading} );
-                    if ( defined( $value[1] ) || $reading eq "ber" ) {
-                        readingsBulkUpdate( $hash, $reading, $value[0], 1 );
+                # next event
+                $reading = $_ . "_next_hr";
+                if (   defined( $eventNext->{$e2reading} )
+                    && $eventNext->{$e2reading} ne "0"
+                    && $eventNext->{$e2reading} ne "" )
+                {
+                    my $timestring;
+                    if (   $_ eq "eventduration"
+                        || $_ eq "eventremaining" )
+                    {
+                        my @t = localtime( $eventNext->{$e2reading} );
+                        $timestring =
+                          sprintf( "%02d:%02d:%02d", $t[2] - 1, $t[1], $t[0] );
                     }
                     else {
-                        readingsBulkUpdate( $hash, $reading, "0", 1 );
+                        $timestring =
+                          substr( FmtDateTime( $eventNext->{$e2reading} ), 11 );
+                    }
+                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                        || $hash->{READINGS}{$reading}{VAL} ne $timestring )
+                    {
+                        readingsBulkUpdate( $hash, $reading, $timestring );
                     }
                 }
                 else {
-                    readingsBulkUpdate( $hash, $reading, "0", 1 );
+                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                        || $hash->{READINGS}{$reading}{VAL} ne "-" )
+                    {
+                        readingsBulkUpdate( $hash, $reading, "-" );
+                    }
                 }
             }
         }
-
     }
-    else {
 
-        # Set ENIGMA2 online-only readings to "-" in case box is in
-        # offline or in standby mode
+    # Volume
+    #
+    if ( ref($vol) eq "HASH" && defined( $vol->{e2current} ) ) {
+        if ( !defined( $hash->{READINGS}{volume}{VAL} )
+            || $hash->{READINGS}{volume}{VAL} ne $vol->{e2current} )
+        {
+            readingsBulkUpdate( $hash, "volume", $vol->{e2current} );
+        }
+    }
+    if ( ref($vol) eq "HASH" && defined( $vol->{e2ismuted} ) ) {
+        my $muteState = "on";
+        if ( lc( $vol->{e2ismuted} ) eq "false" ) {
+            $muteState = "off";
+        }
+        if ( !defined( $hash->{READINGS}{mute}{VAL} )
+            || $hash->{READINGS}{mute}{VAL} ne $muteState )
+        {
+            readingsBulkUpdate( $hash, "mute", $muteState );
+        }
+    }
+
+    # Signal
+    #
+    if ( ref($signalinfo) eq "HASH"
+        && defined( $signalinfo->{e2snrdb} ) )
+    {
+        foreach ( "snrdb", "snr", "ber", "acg", ) {
+            $reading   = $_;
+            $e2reading = "e2" . $_;
+
+            if ( defined( $signalinfo->{$e2reading} )
+                && lc( $signalinfo->{$e2reading} ) ne "n/a" )
+            {
+                my @value = split( / /, $signalinfo->{$e2reading} );
+                if ( defined( $value[1] ) || $reading eq "ber" ) {
+                    readingsBulkUpdate( $hash, $reading, $value[0] );
+                }
+                else {
+                    readingsBulkUpdate( $hash, $reading, "0" );
+                }
+            }
+            else {
+                readingsBulkUpdate( $hash, $reading, "0" );
+            }
+        }
+    }
+
+    # Set ENIGMA2 online-only readings to "-" in case box is in
+    # offline or in standby mode
+    if ( $state eq "off" || $state eq "absent" || $state eq "undefined" ) {
         foreach (
-            'servicename',         'servicenamespace', 'serviceaspect',
-            'serviceprovider',     'servicereference', 'videowidth',
-            'videoheight',         'servicevideosize', 'apid',
-            'vpid',                'pcrpid',           'pmtpid',
-            'txtpid',              'tsid',             'onid',
-            'sid',                 'mute',             'volume',
-            'channel',             'currentTitle',     'eventcurrenttime',
-            'eventcurrenttime_hr', 'eventdescription', 'eventduration',
-            'eventduration_hr',    'eventstart',       'eventstart_hr',
-            'eventtitle',          'currentMedia',
+            'servicename',            'providername',
+            'servicereference',       'videowidth',
+            'videoheight',            'servicevideosize',
+            'apid',                   'vpid',
+            'pcrpid',                 'pmtpid',
+            'txtpid',                 'tsid',
+            'onid',                   'sid',
+            'iswidescreen',           'mute',
+            'volume',                 'channel',
+            'currentTitle',           'nextTitle',
+            'currentMedia',           'eventcurrenttime',
+            'eventcurrenttime_hr',    'eventdescription',
+            'eventduration',          'eventduration_hr',
+            'eventremaining',         'eventremaining_hr',
+            'eventstart',             'eventstart_hr',
+            'eventtitle',             'eventname',
+            'eventcurrenttime_next',  'eventcurrenttime_next_hr',
+            'eventdescription_next',  'eventduration_next',
+            'eventduration_next_hr',  'eventremaining_next',
+            'eventremaining_next_hr', 'eventstart_next',
+            'eventstart_next_hr',     'eventtitle_next',
+            'eventname_next',
           )
         {
             if ( !defined( $hash->{READINGS}{$_}{VAL} )
                 || $hash->{READINGS}{$_}{VAL} ne "-" )
             {
-                readingsBulkUpdate( $hash, $_, "-", 1 );
+                readingsBulkUpdate( $hash, $_, "-" );
             }
         }
 
-        # Set ENIGMA2 online+standby readings to "-" in case box is in
-        # offline
-        if ( $state eq "absent" || $state eq "undefined" ) {
-            foreach ( 'input', ) {
-                if ( !defined( $hash->{READINGS}{$_}{VAL} )
-                    || $hash->{READINGS}{$_}{VAL} ne "-" )
-                {
-                    readingsBulkUpdate( $hash, $_, "-", 1 );
-                }
-            }
-        }
-
-        # Set ENIGMA2 online-only readings to "0" in case box is in
-        # offline or in standby mode
+        # special handling for signal values
         foreach ( 'acg', 'ber', 'snr', 'snrdb', ) {
             if ( !defined( $hash->{READINGS}{$_}{VAL} )
                 || $hash->{READINGS}{$_}{VAL} ne "0" )
             {
-                readingsBulkUpdate( $hash, $_, "0", 1 );
+                readingsBulkUpdate( $hash, $_, "0" );
             }
         }
-
     }
+
+    # Set ENIGMA2 online+standby readings to "-" in case box is in
+    # offline mode
+    if ( $state eq "absent" || $state eq "undefined" ) {
+        foreach ( 'input', ) {
+            if ( !defined( $hash->{READINGS}{$_}{VAL} )
+                || $hash->{READINGS}{$_}{VAL} ne "-" )
+            {
+                readingsBulkUpdate( $hash, $_, "-" );
+            }
+        }
+    }
+
+    # Update state
+    $hash->{helper}{lastStatusUpdate} = time();
 
     readingsEndUpdate( $hash, 1 );
 
@@ -946,9 +1001,11 @@ sub ENIGMA2_Set($@) {
       . ", choose one of statusRequest:noArg toggle:noArg on:noArg off:noArg reboot:noArg restartGui:noArg shutdown:noArg volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg mute:on,off msg remoteControl:UP,DOWN,LEFT,RIGHT,OK,MENU,EPG,ESC,EXIT,RECORD,RED,GREEN,YELLOW,BLUE,AUDIO channelUp:noArg channelDown:noArg play:noArg pause:noArg stop:noArg showText channel:"
       . $channels;
     $usage .= " input:-,tv,radio"
-      if ( $hash->{READINGS}{input}{VAL} eq "-" );
+      if ( defined( $hash->{READINGS}{input}{VAL} )
+        && $hash->{READINGS}{input}{VAL} eq "-" );
     $usage .= " input:tv,radio"
-      if ( $hash->{READINGS}{input}{VAL} ne "-" );
+      if ( defined( $hash->{READINGS}{input}{VAL} )
+        && $hash->{READINGS}{input}{VAL} ne "-" );
 
     my $cmd = '';
     my $result;
