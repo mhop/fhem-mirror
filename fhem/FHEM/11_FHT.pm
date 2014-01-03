@@ -372,7 +372,6 @@ FHT_Define($$)
   }
 
   $modules{FHT}{defptr}{$a[2]} = $hash;
-  $attr{$a[0]}{retrycount} = 3;
 
   #Log3 $a[0], 2, "Asking the FHT device $a[0]/$a[2] to send its data";
   #FHT_Set($hash, ($a[0], "report1", "255", "report2", "255"));
@@ -621,7 +620,7 @@ doSoftBuffer($)
     my $name = $h->{HASH}->{NAME};
     if($h->{NSENT}) {
       next if($now-$h->{SENDTIME} < $retryafter);
-      my $retry = $attr{$name}{retrycount};
+      my $retry = AttrVal($name, "retrycount", 1);
       if($h->{NSENT} > $retry) {
         Log3 $name, 2, "$name set $h->{CMD}: ".
                           "no confirmation after $h->{NSENT} tries, giving up";
@@ -960,7 +959,7 @@ getFhtBuffer($)
         resend commands <code>retrycount</code> times if after 240 seconds
         no confirmation message is received from the corresponding FHT
         device.<br>
-        Default is 3.</li><br>
+        Default is 1.</li><br>
 
     <a name="minfhtbuffer"></a>
     <li>minfhtbuffer<br>
