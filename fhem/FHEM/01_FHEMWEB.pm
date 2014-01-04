@@ -585,6 +585,10 @@ FW_answerCall($)
   }
 
   FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/svg.js") if($FW_plotmode eq "SVG");
+  if($FW_plotmode eq"jsSVG") {
+    FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/jsSVG.js");
+    FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/jquery.min.js");
+  }
   foreach my $js (@FW_fhemwebjs) {
     FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/$js");
   }
@@ -1515,6 +1519,8 @@ FW_style($$)
     my $data = join("", <FH>);
     close(FH);
 
+    $data =~ s/&/&amp;/g;
+	
     my $ncols = $FW_ss ? 40 : 80;
     FW_pO "<div id=\"content\">";
     FW_pO "<form method=\"$FW_formmethod\">";
