@@ -4254,15 +4254,17 @@ sub CUL_HM_getAssChnIds($) { #in: name out:ID list of assotiated channels
   # if device and no channel
   my ($name) = @_;
   my @chnIdList;
-  my $hash = $defs{$name};
-  foreach my $channel (grep /^channel_/, keys %{$hash}){
-    my $chnHash = $defs{$hash->{$channel}};
-    push @chnIdList,$chnHash->{DEF} if ($chnHash);
+  if ($defs{$name}){
+    my $hash = $defs{$name};
+    foreach my $channel (grep /^channel_/, keys %{$hash}){
+      my $chnHash = $defs{$hash->{$channel}};
+      push @chnIdList,$chnHash->{DEF} if ($chnHash);
+    }
+    my $dId = CUL_HM_name2Id($name);
+    
+    push @chnIdList,$dId."01" if (length($dId) == 6 && !$hash->{channel_01});
+    push @chnIdList,$dId if (length($dId) == 8);
   }
-  my $dId = CUL_HM_name2Id($name);
-
-  push @chnIdList,$dId."01" if (length($dId) == 6 && !$hash->{channel_01});
-  push @chnIdList,$dId if (length($dId) == 8);
   return sort(@chnIdList);
 }
 
@@ -5332,16 +5334,20 @@ sub CUL_HM_autoReadReady($){# capacity for autoread available?
 sub CUL_HM_getAttrInt($@){#return attrValue as integer
   my ($name,$attrName,$default) = @_;
   $default = 0 if (!defined $default);
-  my $val = ($attr{$name} && 
-             $attr{$name}{$attrName})
+  if($defs{$name}){
+    my $val = ($attr{$name}{$attrName})
                  ?$attr{$name}{$attrName}
                  :"";
-  no warnings 'numeric';
-  my $devN = $defs{$name}{device}?$defs{$name}{device}:$name;
-  $val = int($attr{$devN}{$attrName}?$attr{$devN}{$attrName}:$default)+0
-        if($val eq "");
-  use warnings 'numeric';
-  return substr($val,0,1);
+    no warnings 'numeric';
+    my $devN = $defs{$name}{device}?$defs{$name}{device}:$name;
+    $val = int($attr{$devN}{$attrName}?$attr{$devN}{$attrName}:$default)+0
+          if($val eq "");
+    use warnings 'numeric';
+    return substr($val,0,1);
+  }
+  else{
+    return $default;
+  }
 }
 
 #+++++++++++++++++ external use +++++++++++++++++++++++++++++++++++++++++++++++
