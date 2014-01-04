@@ -167,7 +167,7 @@ if($arguments[1] eq "search")
 else
 {
 
-   return "unknown argument, choose on of search"; 
+   return "unknown argument ".$arguments[1].", choose one of search"; 
 
 }
 
@@ -406,13 +406,17 @@ if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-
   else
   {
    
-   if($result =~ /<a class="namelink" href=".+?">(.+?)<\/a>/)
+   if($result =~ /<a href="http\:\/\/www\.klicktel\.de\/.*html" target="_self">1\. (.+?)<\/a>/)
    {
      $invert_match = $1;
      $invert_match = FB_CALLMONITOR_html2txt($invert_match);
      FB_CALLMONITOR_writeToCache($hash, $number, $invert_match) if(AttrVal($name, "reverse-search-cache", "0") eq "1");
      undef($result);
      return $invert_match;
+   }
+   else
+   {
+		Log3 $name, 3, "FB_CALLMONITOR: the reverse search result for $number could not be extracted from klicktel.de. Please contact the FHEM community.";
    }
   }
 }
@@ -436,13 +440,17 @@ if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-
   else
   {
    #Log 2, $result;
-   if($result =~ /getItemData\('.*?', '.*?', '.*?', '.*?', '.*?', '(.*?)', '.*?', '.*?', '.*?'\);/)
+   if($result =~ /<a href="http\:\/\/.+?\.dasoertliche\.de.+?".+?class="preview iname".+?><span class="">(.+?)<\/span>/)
    {
      $invert_match = $1;
      $invert_match = FB_CALLMONITOR_html2txt($invert_match);
      FB_CALLMONITOR_writeToCache($hash, $number, $invert_match) if(AttrVal($name, "reverse-search-cache", "0") eq "1");
      undef($result);
      return $invert_match;
+   }
+   else
+   {
+		Log3 $name, 3, "FB_CALLMONITOR: the reverse search result for $number could not be extracted from dasoertliche.de. Please contact the FHEM community.";
    }
   }
 }
@@ -473,6 +481,10 @@ if(AttrVal($name, "reverse-search", "none") eq "search.ch")
      FB_CALLMONITOR_writeToCache($hash, $number, $invert_match) if(AttrVal($name, "reverse-search-cache", "0") eq "1");
      undef($result);
      return $invert_match;
+   }
+   else
+   {
+		Log3 $name, 3, "FB_CALLMONITOR: the reverse search result for $number could not be extracted from search.ch. Please contact the FHEM community.";
    }
   }
 }
@@ -510,6 +522,10 @@ if(AttrVal($name, "reverse-search", "none") eq "dasschnelle.at")
      FB_CALLMONITOR_writeToCache($hash, $number, $invert_match) if(AttrVal($name, "reverse-search-cache", "0") eq "1");
      undef($result);
      return $invert_match;
+   }
+   else
+   {
+		Log3 $name, 3, "FB_CALLMONITOR: the reverse search result for $number could not be extracted from dasschnelle.at. Please contact the FHEM community.";
    }
   }
 }
