@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.3
+# Version: 1.2.4
 #
 # Major Version History:
 # - 1.2.0 - 2013-12-21
@@ -104,8 +104,6 @@ sub ENIGMA2_GetStatus($;$) {
     my $interval = $hash->{INTERVAL};
     my $state    = '';
     my $boxinfo;
-    my $serviceinfo;
-    my $eventinfo;
     my $currsrvinfo;
     my $signalinfo;
     my $vol;
@@ -317,12 +315,15 @@ sub ENIGMA2_GetStatus($;$) {
 
             # Read Boxinfo every 10 minutes only
             if (
-                !defined( $hash->{helper}{lastStatusUpdate} )
-                || ( defined( $hash->{helper}{lastStatusUpdate} )
-                    && $hash->{helper}{lastStatusUpdate} + 900 le time() )
+                !defined( $hash->{helper}{lastFullUpdate} )
+                || ( defined( $hash->{helper}{lastFullUpdate} )
+                    && $hash->{helper}{lastFullUpdate} + 900 le time() )
               )
             {
                 $boxinfo = ENIGMA2_SendCommand( $hash, "about", "" );
+
+                # Update state
+                $hash->{helper}{lastFullUpdate} = time();
             }
 
             # get current states
@@ -438,7 +439,7 @@ sub ENIGMA2_GetStatus($;$) {
                         $boxinfo->{e2about}{e2hddinfo}[$i]{capacity} );
                     if (
                         !defined( $hash->{READINGS}{$readingname}{VAL} )
-                        || ( ref(@value) eq "ARRAY"
+                        || (   @value
                             && $hash->{READINGS}{$readingname}{VAL} ne
                             $value[0] )
                       )
@@ -451,7 +452,7 @@ sub ENIGMA2_GetStatus($;$) {
                       split( / /, $boxinfo->{e2about}{e2hddinfo}[$i]{free} );
                     if (
                         !defined( $hash->{READINGS}{$readingname}{VAL} )
-                        || ( ref(@value) eq "ARRAY"
+                        || (   @value
                             && $hash->{READINGS}{$readingname}{VAL} ne
                             $value[0] )
                       )
@@ -479,7 +480,7 @@ sub ENIGMA2_GetStatus($;$) {
                   split( / /, $boxinfo->{e2about}{e2hddinfo}{capacity} );
                 if (
                     !defined( $hash->{READINGS}{$readingname}{VAL} )
-                    || ( ref(@value) eq "ARRAY"
+                    || (   @value
                         && $hash->{READINGS}{$readingname}{VAL} ne $value[0] )
                   )
                 {
@@ -490,7 +491,7 @@ sub ENIGMA2_GetStatus($;$) {
                 @value = split( / /, $boxinfo->{e2about}{e2hddinfo}{free} );
                 if (
                     !defined( $hash->{READINGS}{$readingname}{VAL} )
-                    || ( ref(@value) eq "ARRAY"
+                    || (   @value
                         && $hash->{READINGS}{$readingname}{VAL} ne $value[0] )
                   )
                 {
@@ -889,9 +890,6 @@ sub ENIGMA2_GetStatus($;$) {
             }
         }
     }
-
-    # Update state
-    $hash->{helper}{lastStatusUpdate} = time();
 
     readingsEndUpdate( $hash, 1 );
 
