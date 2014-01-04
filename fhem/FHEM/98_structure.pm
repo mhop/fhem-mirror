@@ -199,14 +199,19 @@ sub structure_Notify($$)
           if(defined($devstate) && $devstate =~ m/^$value[0]/){
             $devstate = $value[1];
             $i=99999; # RKO: ??
+          } else {
+            $devstate = undef;
           }
 
         } elsif(@value == 3) {           # value[0]:value[1] -> value[2]
           $devstate = ReadingsVal($d, $value[0], undef);
           if(defined($devstate) && $devstate =~ m/^$value[1]/){
             $devstate = $value[2];
+          } else {
+            $devstate = undef;
           }
         }
+
         if(defined($devstate)) {
           if(!$priority{$devstate} && $behavior eq "relativeKnown") {
             delete($hash->{INNTFY});
