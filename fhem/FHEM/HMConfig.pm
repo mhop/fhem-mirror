@@ -1122,7 +1122,6 @@ $culHmRegChan{"HM-TC-IT-WM-W-EU06"}= $culHmRegType{"HM-CC-RT-DN06"};
                       ,press         =>"[long|short]..."
                       ,postEvent     =>"<condition>"
                       ,postWeather   =>"<off| -80..80 degree>"
-#                      ,valvePos      =>"<position>"
                       },
   smokeDetector    =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] actor"},
   winMatic         =>{ matic         =>"<btn>"
@@ -1259,6 +1258,8 @@ $culHmChanSets{"HM-ES-PMSw1-Pl06"} = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
   sdLead              =>{ alarmOn       =>""
                          ,alarmOff      =>""
                          ,teamCall      =>""
+                        },
+  vdCtrl              =>{ valvePos      =>"<position>"
                         }
 );
 
@@ -1463,32 +1464,4 @@ $culHmChanSets{"HM-ES-PMSw1-Pl06"} = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
                      HUM      => '04,2,$val=(hex($val))', } },
 );
 
-#sub HMConfig_getHash($){
-#  my $hn = shift;
-#  return %culHmModel            if($hn eq "culHmModel"           );
-#  return %culHmRegDefShLg       if($hn eq "culHmRegDefShLg"      );
-#  return %culHmRegDefine        if($hn eq "culHmRegDefine"       );
-#  return %culHmRegGeneral       if($hn eq "culHmRegGeneral"      );
-#  return %culHmRegType          if($hn eq "culHmRegType"         );
-#  return %culHmRegModel         if($hn eq "culHmRegModel"        );
-#  return %culHmRegChan          if($hn eq "culHmRegChan"         );
-#
-#  return %culHmGlobalGets       if($hn eq "culHmGlobalGets"      );
-#  return %culHmSubTypeGets      if($hn eq "culHmSubTypeGets"     );
-#  return %culHmModelGets        if($hn eq "culHmModelGets"       );
-#
-#  return %culHmGlobalSetsDevice if($hn eq "culHmGlobalSetsDevice");
-#  return %culHmSubTypeDevSets   if($hn eq "culHmSubTypeDevSets"  );
-#  return %culHmGlobalSetsChn    if($hn eq "culHmGlobalSetsChn"   );
-#  return %culHmGlobalSets       if($hn eq "culHmGlobalSets"      );
-#  return %culHmGlobalSetsVrtDev if($hn eq "culHmGlobalSetsVrtDev");
-#  return %culHmSubTypeSets      if($hn eq "culHmSubTypeSets"     );
-#  return %culHmModelSets        if($hn eq "culHmModelSets"       );
-#  return %culHmChanSets         if($hn eq "culHmChanSets"        );
-#  return %culHmFunctSets        if($hn eq "culHmFunctSets"       );
-#
-#  return %culHmBits             if($hn eq "culHmBits"            );
-#  return @culHmCmdFlags         if($hn eq "culHmCmdFlags"        );
-#  return $K_actDetID            if($hn eq "K_actDetID"           );
-#}
 1;
