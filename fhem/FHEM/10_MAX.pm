@@ -525,8 +525,20 @@ MAX_Set($@)
         $assoclist .= "," if(length($assoclist));
         $assoclist .= "fakeWallThermostat,fakeShutterContact";
       }
-    } elsif($hash->{type} eq "ShutterContact" || $hash->{type} eq "WallMountedThermostat") {
-      $assoclist = join(",", map { defined($_->{type}) && $_->{type} =~ /HeatingThermostat.*/ ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
+
+    } elsif($hash->{type} =~ /WallMountedThermostat/) {
+      $assoclist = join(",", map { defined($_->{type}) &&
+        ($_->{type} eq "HeatingThermostat"
+          || $_->{type} eq "HeatingThermostatPlus"
+          || $_->{type} eq "ShutterContact")
+        && $_ != $hash ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
+      if($hash->{IODev}->{TYPE} eq "CUL_MAX") {
+        $assoclist .= "," if(length($assoclist));
+        $assoclist .= "fakeShutterContact";
+      }
+
+    } elsif($hash->{type} eq "ShutterContact") {
+      $assoclist = join(",", map { defined($_->{type}) && $_->{type} =~ /.*Thermostat.*/ ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
     }
 
     my $templistOffset = join(",",map { MAX_SerializeTemperature(($_-7)/2) }  (0..14));
