@@ -3096,7 +3096,18 @@ sub CUL_HM_Set($@) {
     }
     else {
       my $vp = $a[2];
+      foreach my $peer (split(',',AttrVal($name,"peerIDs",""))) {
+        next if (length($peer) != 8);
+        my $ph = CUL_HM_id2Hash($peer);
+        CUL_HM_UpdtReadBulk($ph,1,
+                       "state:set_$vp %",
+                       "ValveDesired:$vp %") 
+                if ($ph);
+      }
       readingsSingleUpdate($hash,"valvePosTC","$vp %",0);
+      $hash->{helper}{vd}{idh} = hex(substr($dst,2,2))*20077;
+      $hash->{helper}{vd}{idl} = hex(substr($dst,4,2))*256;
+      $hash->{helper}{vd}{msgCnt} = 1;
       CUL_HM_valvePosUpdt("valvePos:$dst$chn") if (!$hash->{helper}{virtTC});
       $hash->{helper}{virtTC} = "03";
       $state = "ValveAdjust:$vp %";
@@ -3402,24 +3413,24 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   my(undef,$vId) = split(':',$in);
   my $hash = CUL_HM_id2Hash($vId);
   my $vDevId = substr($vId,0,6);
-  my $nextTimer = 150;
-
-#  if ($updtValveCnt++ %2){
-#    $nextTimer = 20;
-#    CUL_HM_PushCmdStack($hash,"++8670".$vDevId."00000000D036");# some weather event -
-#  }
-#  else{
-    my $name = $hash->{NAME};
-    my $vp = ReadingsVal($name,"valvePosTC","15 %");
-    $vp =~ s/ %//;
-    $vp *=2.56;
-    foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
-      next if (length($peer) != 8);
-      $peer = substr($peer,0,6);
-      CUL_HM_PushCmdStack($hash,sprintf("++A258%s%s%s%02X",$vDevId
-                                        ,$peer,$hash->{helper}{virtTC},$vp));
-    }
-#  }
+  my $msgCnt = ($hash->{helper}{vd}{msgCnt} + 1)%255;
+  
+  my $idl = $hash->{helper}{vd}{idl}+$msgCnt;
+  my $lo = int(($idl*20077+12345)/65536)&0xff;
+  my $hi = ($hash->{helper}{vd}{idh}+$idl*198)&0xff;
+  my $nextTimer = (($lo+$hi)&0xff)/4 +120;
+ 
+  my $name = $hash->{NAME};
+  my $vp = ReadingsVal($name,"valvePosTC","15 %");
+  $vp =~ s/ %//;
+  $vp *=2.56;
+  foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
+    next if (length($peer) != 8);
+    $peer = substr($peer,0,6);
+    CUL_HM_PushCmdStack($hash,sprintf("%02XA258%s%s%s%02X",$msgCnt,$vDevId
+                                      ,$peer,$hash->{helper}{virtTC},$vp));
+  }
+  $hash->{helper}{vd}{msgCnt} = $msgCnt;
   $hash->{helper}{virtTC} = "00";
   CUL_HM_ProcessCmdStack($hash);
   InternalTimer(gettimeofday()+$nextTimer,"CUL_HM_valvePosUpdt","valvePos:$vId",0);
@@ -4148,12 +4159,16 @@ sub CUL_HM_ID2PeerList ($$$) {
     my $st = AttrVal($dHash->{NAME},"subType","");
     if ($st eq "virtual"){
       #if any of the peers is an SD we are team master
-      my $tMstr = 0;
+      my ($tMstr,$tcSim) = (0,0);
       foreach (split(",",$peerNames)){
         $tMstr = 1 if(AttrVal($_,"subType","") eq "smokeDetector");
+        $tcSim = 1 if(AttrVal($_,"model","")   eq "HM-CC-VD");
       }
-      if($tMstr){$hash->{sdTeam}="sdLead";$hash->{helper}{fkt}="sdLead";}
-      else      {delete $hash->{sdTeam};  delete $hash->{helper}{fkt};}
+      if   ($tMstr){$hash->{helper}{fkt}="sdLead";$hash->{sdTeam}="sdLead";}
+      elsif($tcSim){$hash->{helper}{fkt}="vdCtrl";}
+      else         {delete $hash->{helper}{fkt};}
+      
+      if(!$tMstr)  {delete $hash->{sdTeam};}      
     }
     elsif ($st eq "smokeDetector"){
       foreach (split(",",$peerNames)){
@@ -5316,10 +5331,13 @@ sub CUL_HM_autoReadReady($){# capacity for autoread available?
 
 sub CUL_HM_getAttrInt($@){#return attrValue as integer
   my ($name,$attrName,$default) = @_;
-  my $val = $attr{$name}{$attrName}?$attr{$name}{$attrName}:"";
+  $default = 0 if (!defined $default);
+  my $val = ($attr{$name} && 
+             $attr{$name}{$attrName})
+                 ?$attr{$name}{$attrName}
+                 :"";
   no warnings 'numeric';
   my $devN = $defs{$name}{device}?$defs{$name}{device}:$name;
-  $default = 0 if (!defined $default);
   $val = int($attr{$devN}{$attrName}?$attr{$devN}{$attrName}:$default)+0
         if($val eq "");
   use warnings 'numeric';
