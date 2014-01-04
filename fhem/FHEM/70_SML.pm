@@ -8,7 +8,7 @@
 #
 # $Id$
 #
-# Version = 2.6
+# Version = 2.7
 #
 ##############################################################################
 #
@@ -355,7 +355,7 @@ sml_energy_energyDone($)
      }else{   
     	my ($dateLast, $monthLast, $dayLast, $hourLast, $minLast, $secLast) = $hash->{READINGS}{MONTHPOWER}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)/;
     	my ($powLast) = $hash->{READINGS}{MONTHPOWER}{VAL} =~ /^(.*)$/;
-    	Log3 $hash, 4, "$hash->{NAME} myhour: $dateLast $monthLast $dayLast $hourLast $minLast $secLast $powLast";
+    	Log3 $hash, 4, "$hash->{NAME} month: $dateLast $monthLast $dayLast $hourLast $minLast $secLast $powLast";
     	$hash->{READINGS}{MONTHPOWER}{TIME} = $timenow;
     	if ( $monthLast eq $month ){ # es ist der gleiche Monat
     		$powLast += $newpower ;
@@ -374,9 +374,9 @@ sml_energy_energyDone($)
      }else{   
     	my ($dateLast, $monthLast, $dayLast, $hourLast, $minLast, $secLast) = $hash->{READINGS}{YEARPOWER}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)/;
     	my ($powLast) = $hash->{READINGS}{YEARPOWER}{VAL} =~ /^(.*)$/;
-    	Log3 $hash, 4, "$hash->{NAME} myhour: $dateLast $monthLast $dayLast $hourLast $minLast $secLast $powLast";
+    	Log3 $hash, 4, "$hash->{NAME} yearpower: $dateLast $monthLast $dayLast $hourLast $minLast $secLast $powLast";
     	$hash->{READINGS}{YEARPOWER}{TIME} = $timenow;
-    	if ( $yearhLast eq $year ){ # es ist das gleiche Jahr
+    	if ( $dateLast eq $date ){ # es ist das gleiche Jahr
     		$powLast += $newpower ;
     		$hash->{READINGS}{YEARPOWER}{VAL} = $powLast;
     		Log3 $hash, 4, "$hash->{NAME} Gleiches Jahr timenow: $timenow newpower $newpower powlast $powLast";
