@@ -59,8 +59,10 @@ sub WOL_Set($@) {
     ;
   }
 
+  WOL_UpdateReadings($hash);
+
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+5, "WOL_UpdateReadings", $hash, 0);
+  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "WOL_UpdateReadings", $hash, 0);
 
   if ($hash->{STATE} eq "on") {
       WOL_GetUpdate($hash);

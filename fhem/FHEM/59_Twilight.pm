@@ -5,6 +5,8 @@
 #     Copyright by Sebastian Stuecker
 #     erweitert von Dietmar Ortmann
 #
+#     used algorithm see:          http://lexikon.astronomie.info/zeitgleichung/
+#
 #     Sun position computing
 #     Copyright (C) 2013 Julian Pawlowski, julian.pawlowski AT gmail DOT com
 #     based on Twilight.tcl  http://www.homematic-wiki.info/mw/index.php/TCLScript:twilight
@@ -183,7 +185,10 @@ sub Twilight_TwilightTimes($$)
   my $midseconds = $now-$midnight;
 
   my $doy        = strftime("%j",localtime);
-
+  #
+  # WOZ - MOZ   = -0.171*sin(0.0337 * T + 0.465) - 0.1299*sin(0.01787 * T - 0.168)
+  # Deklination = 0.4095*sin(0.016906*(T-80.086))
+  #
   my $timezone   = Twilight_my_gmt_offset();
   my $timediff   = -0.171 *sin(0.0337  * $doy+0.465) - 0.1299*sin(0.01787 * $doy - 0.168);
   my $declination=  0.4095*sin(0.016906*($doy-80.086));
@@ -371,13 +376,17 @@ sub Twilight_calc($$$$$$$)
 {
   my ($latitude, $longitude, $horizon, $declination, $timezone, $midseconds, $timediff) = @_;
 
-  my $s1 = sin($horizon /57.29578);
-  my $s2 = sin($latitude/57.29578) * sin($declination);
-  my $s3 = cos($latitude/57.29578) * cos($declination);
+  my $bogRad = 360/2/pi;            # ~ 57.29578°
+  #                              $s1--|   $s2-------------------|   $s3---------------------|
+  #   Zeitdifferenz = 12*arccos((sin(h) - sin(B)*sin(Deklination)) / (cos(B)*cos(Deklination)))/Pi;
+  my $s1 = sin($horizon /$bogRad);
+  my $s2 = sin($latitude/$bogRad) * sin($declination);
+  my $s3 = cos($latitude/$bogRad) * cos($declination);
+
 
   my ($suntime, $sunrise, $sunset);
   my $acosArg = ($s1 - $s2) / $s3;
-  if (abs($acosArg) < 1.0) {   # ok
+  if (abs($acosArg) < 1.0) {        # ok
      $suntime = 12*acos($acosArg)/pi;
      $sunrise = $midseconds + (12-$timediff -$suntime -$longitude/15+$timezone) * 3600;
      $sunset  = $midseconds + (12-$timediff +$suntime -$longitude/15+$timezone) * 3600;
