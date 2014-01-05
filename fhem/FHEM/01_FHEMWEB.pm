@@ -467,14 +467,26 @@ FW_answerCall($)
 
 
   if($FW_inform) {      # Longpoll header
-    $me->{inform} = ($FW_room ? $FW_room : $FW_inform);
+    if($FW_inform =~ /type=/) {
+      foreach my $kv (split(";", $FW_inform)) {
+        my ($key,$value) = split("=", $kv, 2);
+        $me->{inform}{$key} = $value;
+      }
+
+    } else {                     # Compatibility mode
+      $me->{inform}{type}   = ($FW_room ? "status" : "raw");
+      $me->{inform}{filter} = ($FW_room ? $FW_room : ".*");
+    }
+    my %h = map { $_ => 1 } devspec2array($me->{inform}{filter});
+    $me->{inform}{devices} = \%h;
+
     # NTFY_ORDER is larger than the normal order (50-)
     $me->{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
     my $c = $me->{CD};
     print $c "HTTP/1.1 200 OK\r\n",
        $FW_headercors,
        "Content-Type: application/octet-stream; charset=$FW_encoding\r\n\r\n",
-       FW_roomStatesForInform($FW_room);
+       FW_roomStatesForInform($me);
     return -1;
   }
 
@@ -1965,14 +1977,13 @@ FW_makeEdit($$$)
 sub
 FW_roomStatesForInform($)
 {
-  my ($room) = @_;
-  return "" if(!$room);
+  my ($me) = @_;
+  return "" if($me->{inform}{type} !~ m/status/);
 
-  $room = ".*" if($room eq "all");
-  my @rl = devspec2array("room=$room");
   my %extPage = ();
   my @data;
-  foreach my $dn (@rl) {
+  foreach my $dn (keys %{$me->{inform}{devices}}) {
+    next if(!defined($defs{$dn}));
     my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
     if($defs{$dn} && $defs{$dn}{STATE} && $defs{$dn}{TYPE} ne "weblink") {
       push @data, "$dn<<$defs{$dn}{STATE}<<$txt";
@@ -1987,16 +1998,16 @@ FW_Notify($$)
 {
   my ($ntfy, $dev) = @_;
 
-  my $filter = $ntfy->{inform};
-  return undef if(!$filter);
+  my $h = $ntfy->{inform};
+  return undef if(!$h);
 
-  my $ln = $ntfy->{NAME};
   my $dn = $dev->{NAME};
+  return undef if(!$h->{devices}{$dn});
+
   my @data;
   my %extPage;
 
-  my $rn = AttrVal($dn, "room", "");
-  if($filter eq "all" || $rn =~ m/\b$filter\b/) {
+  if($h->{type} =~ m/status/) {
     # Why is saving this stuff needed? FLOORPLAN?
     my @old = ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir);
     $FW_wname = $ntfy->{SNAME};
@@ -2025,8 +2036,9 @@ FW_Notify($$)
         push @data, "$dn-$readingName-ts<<$tn<<$tn";
       }
     }
+  }
 
-  } elsif($filter eq "console") {
+  if($h->{type} =~ m/raw/) {
     if($dev->{CHANGED}) {    # It gets deleted sometimes (?)
       my $tn = TimeNow();
       if($attr{global}{mseclog}) {
@@ -2041,9 +2053,8 @@ FW_Notify($$)
     }
   }
 
-  if(@data) {
-     addToWritebuffer($ntfy, join("\n", map { s/\n/ /gm; $_ } @data)."\n");
-  }
+  addToWritebuffer($ntfy, join("\n", map { s/\n/ /gm; $_ } @data)."\n")
+    if(@data);
   return undef;
 }
 

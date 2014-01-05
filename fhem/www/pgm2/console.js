@@ -32,8 +32,9 @@ consFill()
 
   consConn = new XMLHttpRequest();
   // Needed when using multiple FF windows
-  var timestamp = "&timestamp="+new Date().getTime();
-  var query = document.location.pathname+"?XHR=1&inform=console"+timestamp;
+  var query = document.location.pathname+"?XHR=1"+
+       "&inform=type=raw;filter=.*"+
+       "&timestamp="+new Date().getTime();
   consConn.open("GET", query, true);
   consConn.onreadystatechange = consUpdate;
   consConn.send(null);
