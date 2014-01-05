@@ -2012,7 +2012,7 @@ sub CUL_HM_parseSDteam(@){#handle SD team events
       last;
     }
   }
-  return () if (!$sHash->{sdTeam} && $sHash->{sdTeam} ne "sdLead");
+  return () if (!$sHash->{sdTeam} || $sHash->{sdTeam} ne "sdLead");
 
   if ($mTp eq "40"){ #test
     my $trgCnt = hex(substr($p,2,2));
@@ -3242,16 +3242,19 @@ sub CUL_HM_Set($@) {
     push @peerDev,'000000' if (!@peerDev);#send to broadcast if no peer
     foreach my $peer (@peerDev){
       my $pHash = CUL_HM_id2Hash($peer);
-      my $peerFlag = $peer eq '00000000'?'A4':CUL_HM_getFlag($pHash);
-      $peerFlag =~ s/0/4/;# either 'A4' or 'B4'
-      CUL_HM_PushCmdStack($pHash, "++B112$id".substr($peer,0,6))
-             if (CUL_HM_getRxType($pHash) & 0x82);#burst or burstConditional
+      my $rxt = CUL_HM_getRxType($pHash);
+      my $peerFlag = ($rxt & 0x02)?"B4":"A4";#burst
       CUL_HM_PushCmdStack($pHash, sprintf("++%s41%s%s%02X%02X%02X"
                      ,$peerFlag,$dst,$peer
                      ,$chn
                      ,$pressCnt
                      ,$cndNo));
-      CUL_HM_ProcessCmdStack($pHash);
+      if ($rxt & 0x80){#burstConditional
+        CUL_HM_SndCmd($pHash, "++B112$id".substr($peer,0,6));
+      }
+      else{
+        CUL_HM_ProcessCmdStack($pHash);
+      }
     }
 
     foreach my $peer (@peerLChn){#inform each channel
@@ -3415,11 +3418,13 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   my $vDevId = substr($vId,0,6);
   my $msgCnt = ($hash->{helper}{vd}{msgCnt} + 1)%255;
   
+# 	int32_t result = (((_address << 8) | messageCounter) * 1103515245 + 12345) >> 16;
+#                          4e6d = 20077                        12996205 = C64E6D
+#	return (result & 0xFF) + 480;
   my $idl = $hash->{helper}{vd}{idl}+$msgCnt;
-  my $lo = int(($idl*20077+12345)/65536)&0xff;
+  my $lo = int(($idl*0x4e6d +12345)/0x10000)&0xff;
   my $hi = ($hash->{helper}{vd}{idh}+$idl*198)&0xff;
-  my $nextTimer = (($lo+$hi)&0xff)/4 +120;
- 
+  my $nextTimer = (($lo+$hi)&0xff)/4 + 120;#original - instable
   my $name = $hash->{NAME};
   my $vp = ReadingsVal($name,"valvePosTC","15 %");
   $vp =~ s/ %//;
