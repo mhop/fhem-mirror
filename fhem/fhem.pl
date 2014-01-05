@@ -921,8 +921,8 @@ devspec2array($)
         }
         next if(!defined($val));
         eval { # a bad regexp is deadly
-          if(($op eq  "=" && $val =~ m/^$re$/) ||
-             ($op eq "!=" && $val !~ m/^$re$/)) {
+          if(($op eq  "=" && $val =~ m/\b$re\b/) ||
+             ($op eq "!=" && $val !~ m/\b$re\b/)) {
             push @res, $d 
           }
         };
