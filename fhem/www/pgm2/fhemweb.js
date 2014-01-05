@@ -84,25 +84,27 @@ FW_longpoll()
 
   FW_pollConn = new XMLHttpRequest();
 
-  var room="", embArr = document.getElementsByTagName("embed");
+  var filter="", embArr = document.getElementsByTagName("embed");
   for(var i = 0; i < embArr.length; i++) {
     var svg = embArr[i].getSVGDocument();
     if(svg != null && svg.firstChild.nextSibling.getAttribute("flog"))
-      room="room=all";
+      filter=".*";
   }
-  if(room == "") {
+  if(filter == "") {
     var sa = document.location.search.substring(1).split("&");
     for(var i = 0; i < sa.length; i++) {
       if(sa[i].substring(0,5) == "room=")
-        room=sa[i];
+        filter=sa[i];
+      if(sa[i].substring(0,7) == "detail=")
+        filter=sa[i].substring(7);
     }
   }
-  if(room == "" && document.getElementById("floorplan")) // floorplan special
-    room="room=all";
+  if(filter == "" && document.getElementById("floorplan")) // floorplan special
+    filter=".*";
 
-  // Needed when using multiple FF windows
-  var timestamp = "&timestamp="+new Date().getTime();
-  var query = document.location.pathname+"?"+room+"&XHR=1&inform=1"+timestamp;
+  var query = document.location.pathname+"?XHR=1"+
+                "&inform=type=status;filter="+filter+
+                "&timestamp="+new Date().getTime();
   FW_pollConn.open("GET", query, true);
   FW_pollConn.onreadystatechange = FW_doUpdate;
   FW_pollConn.send(null);
