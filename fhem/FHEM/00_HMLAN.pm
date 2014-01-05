@@ -410,10 +410,10 @@ sub HMLAN_Write($$$) {#########################################################
   if (length($msg)>22){
     my ($mtype,$src,$dst) = (substr($msg, 8, 2),
                              substr($msg, 10, 6),
-                               substr($msg, 16, 6));
+                             substr($msg, 16, 6));
 
     if (   $mtype eq "02" && $src eq $hash->{owner} && length($msg) == 24
-        && $hash->{assignIDs} =~ m/$dst/){
+        && $hash->{assignedIDs} =~ m/$dst/){
       # Acks are generally send by HMLAN autonomously
       # Special
       Log3 $hash, 5, "HMLAN: Skip ACK" if (!$debug);
@@ -440,8 +440,8 @@ sub HMLAN_Write($$$) {#########################################################
       }
       $hash->{helper}{$dst}{name} = CUL_HM_id2Name($dst);
       $lhash{$dst} = 1;
-      $hash->{assignIDs}=join(',',keys %lhash);
-      $hash->{assignIDsCnt}=scalar(keys %lhash);
+      $hash->{assignedIDs}=join(',',keys %lhash);
+      $hash->{assignedIDsCnt}=scalar(keys %lhash);
     }
   }
   my $tm = int(gettimeofday()*1000) % 0xffffffff;
@@ -651,7 +651,7 @@ sub HMLAN_Parse($$) {##########################################################
     $hash->{firmware} = sprintf("%d.%d", (hex($mFld[1])>>12)&0xf, hex($mFld[1]) & 0xffff);
     $hash->{owner} = $mFld[4];
     $hash->{uptime} = HMLAN_uptime($mFld[5],$hash);
-       $hash->{assignIDsReport}=hex($mFld[6]);
+    $hash->{assignedIDsReport}=hex($mFld[6]);
     $hash->{helper}{q}{keepAliveRec} = 1;
     $hash->{helper}{q}{keepAliveRpt} = 0;
     Log3 $hash, ($hash->{helper}{log}{sys}?0:5)

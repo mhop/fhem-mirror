@@ -160,21 +160,21 @@ sub apptime_CommandDispTiming($$@) {
   <br>
   <br>
     apptime provides information about application procedure execution time. 
-    It is meant to support finding long runner jobs causing latency as well as 
+    It is designed to identify long runner jobs causing latency as well as 
     overall high cpu usage jobs<br>
-    no information about FHEM kernal times and delays will be provided.  <br>
-    Once started apptime monitors tasks. User may reset counts during operation. 
-    apptime itself may add about 1% CPU load in average to FHEM. 
-    in order to remove apptime shutdown restart is necessary ist necessary.
+    No information about FHEM kernel times and delays will be provided.  <br>
+    Once started apptime monitors tasks. User may reset counter during operation. 
+    apptime adds about 1% CPU load in average to FHEM. 
+    in order to remove apptime shutdown restart is necessary.
   <br>
   <br>
     <b>Features:</b><br>
     <ul>
       <li><code>apptime</code><br>
-          apptime is started with the its first call. It will monitor operation from that point in time<br>
-          To unload apptime shutdeon restart is necessary<br> </li>
+          apptime is started with the its first call nad continously monitor operation.<br>
+          To unload apptime shutdown restart is necessary<br> </li>
       <li><code>apptime clear</code><br>
-          will reset all counts and start fom zero<br>      </li>
+          reset all counter and start fom Zero<br>      </li>
       <li><code>apptime [count|funktion|average|clear|max|name|total] [all]</code><br>
           display a table sorted by the field selected<br>
           <b>all</b> will display the complete table while by default only the top lines are printed. <br></li>
