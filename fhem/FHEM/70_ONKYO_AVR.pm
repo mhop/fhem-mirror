@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.1
+# Version: 1.0.2
 #
 # Major Version History:
 # - 1.0.0 - 2013-12-16
@@ -1393,7 +1393,7 @@ sub ONKYO_AVR_sysreadline($;$$) {
 
 ###################################
 sub ONKYO_AVR_at_eol($;$) {
-    if ( $_[0] =~ /\r\z/ || $_[0] =~ /\r\n\z/ ) {
+    if ( $_[0] =~ /\r\n\z/ || $_[0] =~ /\r\z/  ) {
         return 1;
     }
     else {
