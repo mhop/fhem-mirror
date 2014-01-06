@@ -60,7 +60,7 @@ sub RPI_GPIO_Define($$) {
          "define <name> RPI_GPIO <GPIO>";
  }
 
- #Prüfen, ob GPIO bereits verwendet
+ #PrÃ¼fen, ob GPIO bereits verwendet
  foreach my $dev (devspec2array("TYPE=$hash->{TYPE}")) {
    if ($args[2] eq InternalVal($dev,"RPI_pin","")) {
      return "GPIO $args[2] already used by $dev";
@@ -70,7 +70,7 @@ sub RPI_GPIO_Define($$) {
  my $name = $args[0];
  $hash->{RPI_pin} = $args[2];
   
- #export Pin alte Version -> wird jetzt über direction gemacht (WiringPi Programm GPIO)
+ #export Pin alte Version -> wird jetzt Ã¼ber direction gemacht (WiringPi Programm GPIO)
  #my $exp = IO::File->new("> /sys/class/gpio/export");
  #print $exp "$hash->{RPI_pin}";
  #$exp->close;
@@ -118,12 +118,20 @@ sub RPI_GPIO_Set($@) {
 	        my $val = fileaccess($hash, "value");     #alten Wert des GPIO direkt auslesen
 	        $cmd = $val eq "0" ? "on" :"off";
 	      }
-        if ($cmd eq 'on') {
+if ($cmd eq 'on') {
           fileaccess($hash, "value", "1");
-          $hash->{STATE} = 'on';
+          #$hash->{STATE} = 'on';
+          readingsBeginUpdate($hash);
+		  #readingsBulkUpdate($hash, 'Pinlevel', $valalt);
+		  readingsBulkUpdate($hash, 'state', "on");
+		  readingsEndUpdate($hash, 1);
         } elsif ($cmd eq 'off') {
           fileaccess($hash, "value", "0");
-          $hash->{STATE} = 'off';
+          #$hash->{STATE} = 'off';
+          readingsBeginUpdate($hash);
+		  #readingsBulkUpdate($hash, 'Pinlevel', $valalt);
+		  readingsBulkUpdate($hash, 'state', "off");
+		  readingsEndUpdate($hash, 1);
         } else {
           my $slist = join(' ', keys %setsoutp);
           return SetExtensions($hash, $slist, @a);                          
@@ -192,7 +200,7 @@ sub RPI_GPIO_Attr(@) {
  }
  
  if ($attr eq 'direction') {
-   if (!$val) { #$val nicht definiert: Einstellungen löschen
+   if (!$val) { #$val nicht definiert: Einstellungen lÃ¶schen
        $msg = "$hash->{NAME}: no direction value. Use input output";
    } elsif ($val eq "input") {
        #fileaccess($hash, "direction", "in");
@@ -308,7 +316,7 @@ sub RPI_GPIO_Undef($$) {
 
 sub RPI_GPIO_Except($) {
   my ($hash) = @_;
-  #seek($hash->{filehandle},0,0);									          #an Anfang der Datei springen (ist nötig falls vorher schon etwas gelesen wurde)
+  #seek($hash->{filehandle},0,0);									          #an Anfang der Datei springen (ist nÃ¶tig falls vorher schon etwas gelesen wurde)
   #chomp ( my $firstval = $hash->{filehandle}->getline );		#aktuelle Zeile auslesen und Endezeichen entfernen
   my $eval = fileaccess($hash, "edge");								      #Eintstellung Flankensteuerung auslesen
   my ($valst, $valalt, $valto, $valcnt) = undef;
@@ -319,7 +327,7 @@ sub RPI_GPIO_Except($) {
     select(undef, undef, undef, $debounce_time);
   }
 
-  seek($hash->{filehandle},0,0);								#an Anfang der Datei springen (ist nötig falls vorher schon etwas gelesen wurde)
+  seek($hash->{filehandle},0,0);								#an Anfang der Datei springen (ist nÃ¶tig falls vorher schon etwas gelesen wurde)
   chomp ( my $val = $hash->{filehandle}->getline );			#aktuelle Zeile auslesen und Endezeichen entfernen  
   
   if ( ( $val == 1) && ( $eval ne ("falling") ) ) {
@@ -344,26 +352,26 @@ sub RPI_GPIO_Except($) {
        $valto = "off";
     }
     #Log 1, "Toggle  ist jetzt $valto";
-    if (( AttrVal($hash->{NAME}, "toggletostate", "no") ) eq ( "yes" )) {	#wenn Attr "toggletostate" gesetzt auch die Variable für den STATE wert setzen
+    if (( AttrVal($hash->{NAME}, "toggletostate", "no") ) eq ( "yes" )) {	#wenn Attr "toggletostate" gesetzt auch die Variable fÃ¼r den STATE wert setzen
        $valst = $valto;
     }
-#Zählfunktion
-    if (!defined($hash->{READINGS}{Counter}{VAL})) {			#Zähler existiert nicht -> anlegen
-        #Log 1, "Zähler war nicht def";
+#ZÃ¤hlfunktion
+    if (!defined($hash->{READINGS}{Counter}{VAL})) {			#ZÃ¤hler existiert nicht -> anlegen
+        #Log 1, "ZÃ¤hler war nicht def";
         $valcnt = "1";
     } else {
 		$valcnt = $hash->{READINGS}{Counter}{VAL} + 1;
-		#Log 1, "Zähler  ist jetzt $valcnt";
+		#Log 1, "ZÃ¤hler  ist jetzt $valcnt";
     }    
   } 
-  delete ($hash->{READINGS}{Toggle}) if ($eval ne ("rising" || "falling"));		#Reading Toggle löschen wenn kein Wert in Variable
+  delete ($hash->{READINGS}{Toggle}) if ($eval ne ("rising" || "falling"));		#Reading Toggle lÃ¶schen wenn kein Wert in Variable
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, 'Pinlevel', $valalt);
   readingsBulkUpdate($hash, 'state', $valst);
   readingsBulkUpdate($hash, 'Toggle', $valto) if ($valto);
   readingsBulkUpdate($hash, 'Counter', $valcnt) if ($valcnt);
   readingsEndUpdate($hash, 1);
-  #Log 1, "RPIGPIO: Except ausgelöst: $hash->{NAME}, Wert: $val, edge: $eval,vt: $valto, $debounce_time s: $firstval";  
+  #Log 1, "RPIGPIO: Except ausgelÃ¶st: $hash->{NAME}, Wert: $val, edge: $eval,vt: $valto, $debounce_time s: $firstval";  
 }
 
 sub updatevalue($) {
@@ -380,7 +388,7 @@ sub updatevalue($) {
     }
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, 'Pinlevel', $valalt);
-    readingsBulkUpdate($hash, 'state', $valst) if (( AttrVal($hash->{NAME}, "toggletostate", "yes") ) eq ( "no" ));
+    readingsBulkUpdate($hash, 'state', $valst) if (( AttrVal($hash->{NAME}, "toggletostate", "no") ) eq ( "no" ));
     readingsEndUpdate($hash, 1);
   } else {
   Log 1, "$hash->{NAME}: readout of Pinvalue fail";   
@@ -449,7 +457,7 @@ sub inthandling($$) {
  my ($hash, $arg) = @_;
  my $msg = '';
  if ( $arg eq "start") {
-    #FH für value-datei
+    #FH fÃ¼r value-datei
     my $pinroot = qq($gpiodir/gpio$hash->{RPI_pin});
     my $valfile = qq($pinroot/value);
     $hash->{filehandle} = IO::File->new("< $valfile"); 
@@ -641,12 +649,12 @@ sub inthandling($$) {
 <ul>
   <a name="RPI_GPIO"></a>
   <p>
-    Das Raspberry Pi ermöglicht direkten Zugriff zu einigen GPIO's über den Pfostenstecker P1 (und P5 bei V2). Die Steckerbelegung ist in den Tabellen unter Define zu finden.
-    Dieses Modul ermöglicht es, die herausgefühten GPIO's direkt als Ein- und Ausgang zu benutzen. Die Eingänge können zyklisch abgefragt werden oder auch sofort bei Pegelwechsel gesetzt werden.<br><br>
-    <b>Wichtig: Niemals Spannung an einen GPIO anlegen, der als Ausgang eingestellt ist! Die interne Logik der GPIO's arbeitet mit 3,3V. Ein überschreiten der 3,3V zerstört den GPIO und vielleicht auch den ganzen Prozessor!</b><br><br>
+    Das Raspberry Pi erm&ouml;glicht direkten Zugriff zu einigen GPIO's &uuml;ber den Pfostenstecker P1 (und P5 bei V2). Die Steckerbelegung ist in den Tabellen unter Define zu finden.
+    Dieses Modul erm&ouml;glicht es, die herausgef&uuml;hten GPIO's direkt als Ein- und Ausgang zu benutzen. Die Eing&auml;nge k&ouml;nnen zyklisch abgefragt werden oder auch sofort bei Pegelwechsel gesetzt werden.<br><br>
+    <b>Wichtig: Niemals Spannung an einen GPIO anlegen, der als Ausgang eingestellt ist! Die interne Logik der GPIO's arbeitet mit 3,3V. Ein &uuml;berschreiten der 3,3V zerst&ouml;rt den GPIO und vielleicht auch den ganzen Prozessor!</b><br><br>
     
     <b>Vorbereitung:</b><br>
-    Auf GPIO Pins wird im Modul über sysfs zugegriffen. Die Dateien befinden sich unter /system/class/gpio und können nur mit root erreicht werden.
+    Auf GPIO Pins wird im Modul &uuml;ber sysfs zugegriffen. Die Dateien befinden sich unter /system/class/gpio und k&ouml;nnen nur mit root erreicht werden.
     Dieses Modul nutzt das gpio Tool von der <a href="http://wiringpi.com/download-and-install/">WiringPi</a>. Bibliothek um GPIS zu exportieren und die korrekten Nutzerrechte zu setzen.
     Installation WiringPi:
     <pre>
@@ -663,7 +671,7 @@ sub inthandling($$) {
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; RPI_GPIO &lt;GPIO number&gt;</code><br><br>
-    Alle verfügbaren <code>GPIO number</code> sind in den folgenden Tabellen zu finden<br><br>
+    Alle verf&uuml;gbaren <code>GPIO number</code> sind in den folgenden Tabellen zu finden<br><br>
     
 	<table border="0" cellspacing="0" cellpadding="0">    
       <td> 
@@ -727,16 +735,16 @@ sub inthandling($$) {
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
     <code>value</code> ist dabei einer der folgenden Werte:<br>
-    <ul><li>Für GPIO der als output konfiguriert ist
+    <ul><li>F&uuml;r GPIO der als output konfiguriert ist
       <ul><code>
         off<br>
         on<br>
         toggle<br>		
         </code>
       </ul>
-      Die <a href="#setExtensions"> set extensions</a> werden auch unterstützt.<br>
+      Die <a href="#setExtensions"> set extensions</a> werden auch unterst&uuml;tzt.<br>
       </li>
-      <li>Für GPIO der als input konfiguriert ist
+      <li>F&uuml;r GPIO der als input konfiguriert ist
       <ul><code>
         readval		
       </code></ul>
@@ -755,7 +763,7 @@ sub inthandling($$) {
   <ul>
     <code>get &lt;name&gt;</code>
     <br><br>
-    Gibt "high" oder "low" entsprechend dem aktuellen Pinstatus zurück und schreibt den Wert auch in das reading <b>Pinlevel</b>
+    Gibt "high" oder "low" entsprechend dem aktuellen Pinstatus zur&uuml;ck und schreibt den Wert auch in das reading <b>Pinlevel</b>
   </ul><br>
 
   <a name="RPI_GPIOAttr"></a>
@@ -763,34 +771,34 @@ sub inthandling($$) {
   <ul>
     <li>direction<br>
       Setzt den GPIO auf Ein- oder Ausgang.<br>
-      Standard: input, gültige Werte: input, output<br><br>
+      Standard: input, g&uuml;ltige Werte: input, output<br><br>
     </li>
     <li>interrupt<br>
-      <b>kann nur gewählt werden, wenn der GPIO als Eingang konfiguriert ist</b><br>
-      Aktiviert Flankenerkennung für den GPIO<br>
-      bei jedem interrupt Erwignis werden die readings Pinlevel und state aktualisiert<br>
-      Standard: none, gültige Werte: none, falling, rising, both<br><br>
+      <b>kann nur gew&auml;hlt werden, wenn der GPIO als Eingang konfiguriert ist</b><br>
+      Aktiviert Flankenerkennung f&uuml;r den GPIO<br>
+      bei jedem interrupt Ereignis werden die readings Pinlevel und state aktualisiert<br>
+      Standard: none, g&uuml;ltige Werte: none, falling, rising, both<br><br>
     </li>
     <li>poll_interval<br>
-      Fragt den Zustand des GPIO regelmäßig ensprechend des eingestellten Wertes in Minuten ab<br>
-      Standard: -, gültige Werte: Dezimalzahl<br><br>
+      Fragt den Zustand des GPIO regelm&auml;&szlig;ig ensprechend des eingestellten Wertes in Minuten ab<br>
+      Standard: -, g&uuml;ltige Werte: Dezimalzahl<br><br>
     </li>
     <li>toggletostate<br>
       <b>Funktioniert nur bei auf falling oder rising gesetztem Attribut interrupt</b><br>
       Wenn auf "yes" gestellt wird bei jedem Triggerereignis das <b>state</b> reading invertiert<br>
-      Standard: no, gültige Werte: yes, no<br><br>
+      Standard: no, g&uuml;ltige Werte: yes, no<br><br>
     </li>
     <li>pud_resistor<br>
       Interner Pullup/down Widerstand<br>
-      Standard: -, gültige Werte: off, up, down<br><br>
+      Standard: -, g&uuml;ltige Werte: off, up, down<br><br>
     </li>
     <li>debounce_in_ms<br>
-      Wartezeit in ms bis nach ausgelöstem Interrupt der entsprechende Pin abgefragt wird. Kann zum entprellen von mechanischen Schaltern verwendet werden<br>
-      Standard: 0, gültige Werte: Dezimalzahl<br><br>
+      Wartezeit in ms bis nach ausgel&ouml;stem Interrupt der entsprechende Pin abgefragt wird. Kann zum entprellen von mechanischen Schaltern verwendet werden<br>
+      Standard: 0, g&uuml;ltige Werte: Dezimalzahl<br><br>
     </li>
     <li>restoreOnStartup<br>
-      Wiederherstellen der Portzustände nach Neustart<br>
-      Standard: on, gültige Werte: on, off<br><br>
+      Wiederherstellen der Portzust&Ã¤uml;nde nach Neustart<br>
+      Standard: on, g&uuml;ltige Werte: on, off<br><br>
     </li>
   </ul>
   <br>
