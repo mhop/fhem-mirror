@@ -813,7 +813,7 @@ HUEDevice_GetUpdate($)
       <br>
       Note:
         <ul>
-        <li><ramp-time> is given in seconds<br>
+        <li>&lt;ramp-time&gt; is given in seconds</li>
         <li>multiple paramters can be set at once separated by <code>:</code><br>
           Examples:<br>
             <code>set LC on : transitiontime 100</code><br>
