@@ -385,6 +385,7 @@ LightScene_Set($@)
               $set = $5 if( $5 );
             }
             ($get,$regex) = split('@', $get, 2);
+            $set = $get if( $regex && $set eq $param );
             $set = "state" if( $set eq "STATE" );
 
             $saved .= "$set " if( $set ne "state" );
