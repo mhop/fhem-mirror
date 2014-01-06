@@ -1393,11 +1393,11 @@ sub ONKYO_AVR_sysreadline($;$$) {
 
 ###################################
 sub ONKYO_AVR_at_eol($;$) {
-    if ( defined( $_[1] ) && $_[1] eq "pre2013" ) {
-        $_[0] =~ /\r\z/;
+    if ( $_[0] =~ /\r\z/ || $_[0] =~ /\r\n\z/ ) {
+        return 1;
     }
     else {
-        $_[0] =~ /\r\n\z/;
+        return 0;
     }
 }
 
@@ -1452,7 +1452,7 @@ sub ONKYO_AVR_read($$) {
 
     my $body = substr $$rbuf, 0, $data_size, '';
     my $sd = substr $body, 0, 2, '';
-    $body =~ s/([\032\r\n]|[\032\r]|[\032]|[\r\n]|[\r])+$//;
+    $body =~ s/([\032\r\n]|[\032\r]|[\r\n]|[\r])+$//;
 
     Log3 $name, 5,
       "ONKYO_AVR $name: Unexpected start/destination: expected '!1', got '$sd'"
