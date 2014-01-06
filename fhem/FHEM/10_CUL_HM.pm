@@ -3181,9 +3181,10 @@ sub CUL_HM_Set($@) {
   }
   elsif($cmd eq "press") { ####################################################
     my (undef,undef,$mode,$vChn) = @a;
+    $mode = 'short' if (!$mode);
+    return "$mode unknown - select long or short" if ($mode !~ m/^(short|long)$/);
     my $pressCnt = (!$hash->{helper}{count}?1:$hash->{helper}{count}+1)%256;
     $hash->{helper}{count}=$pressCnt;# remember for next round
-
     my @peerList;
     if ($st eq 'virtual'){#serve all peers of virtual button
       foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
@@ -3192,13 +3193,24 @@ sub CUL_HM_Set($@) {
       @peerList = grep !/^$/,CUL_HM_noDup(@peerList);
       @peerList = ('000000') if (scalar@peerList == 0);#send to broadcast if no peer
       foreach my $peer (sort @peerList){
-        my $peerFlag = $peer eq '000000'?'A4':
-                                           CUL_HM_getFlag(CUL_HM_id2Hash($peer));
-        $peerFlag =~ s/0/4/;# either 'A4' or 'B4'
-        CUL_HM_PushCmdStack($hash, sprintf("++%s40%s%s%02X%02X",
+        my ($pHash,$peerFlag,$rxt) = ($hash,'A4',1);
+        if ($peer ne '000000'){
+          $pHash = CUL_HM_id2Hash($peer);
+          $rxt = CUL_HM_getRxType($pHash);
+          $peerFlag = ($rxt & 0x02)?"B4":"A4" if(!$vChn || $vChn ne "noBurst");#burst
+        }
+        CUL_HM_PushCmdStack($pHash, sprintf("++%s40%s%s%02X%02X",
                        $peerFlag,$dst,$peer,
                        hex($chn)+(($mode && $mode eq "long")?64:0),
                        $pressCnt));
+
+        if ($rxt & 0x80){#burstConditional
+          CUL_HM_SndCmd($pHash, "++B112$id".substr($peer,0,6))
+                if(!$vChn || $vChn ne "noBurst");
+        }
+        else{
+          CUL_HM_ProcessCmdStack($pHash);
+        }
       }
     }
     else{#serve internal channels for actor
@@ -5776,11 +5788,16 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
           <ul><code>set &lt;name&gt; on-till 20:32:10<br></code></ul>
           Currently a max of 24h is supported with endtime.<br>
           </li>
-          <li><B>press &lt;[short|long]&gt;&lt;[on|off]&gt;</B><a name="CUL_HMpress"></a>
+          <li><B>press &lt;[short|long]&gt;&lt;[on|off]&gt;</B><a name="CUL_HMpress"></a><br>
+              <B>press &lt;[short|long]&gt;&lt;[noBurst]&gt;</B></a>
               simulate a press of the local button or direct connected switch of the actor.<br>
-              [short|long] choose whether to simulate a short or long press of the button.<br>
-              [on|off] is relevant only for devices with direct buttons per channel.
+              <B>[short|long]</B> choose whether to simulate a short or long press of the button.<br>
+              <B>[on|off]</B> is relevant for devices with direct buttons per channel.
               Those are available for dimmer and blind-actor, usually not for switches<br>
+              <B>[noBurst]</B> is relevant for peers which support conditional burst.
+              It will cause the command being added to the command queue of the peer. <B>No</B> burst is
+              issued subsequent thus the command is pending until the peer wakes up. It therefore 
+              <B>delays the button-press</B>, but will cause less traffic and performance cost. <br>
           </li>
           <li><B>toggle</B><a name="CUL_HMtoggle"></a> - toggle the Actor. It will switch from any current
                  level to off or from off to 100%</li>
