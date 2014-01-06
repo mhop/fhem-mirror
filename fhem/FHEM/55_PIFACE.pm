@@ -62,7 +62,8 @@ sub PIFACE_Initialize($){
                           " portMode4:tri,up" .
                           " portMode5:tri,up" .
                           " portMode6:tri,up" .
-                          " portMode7:tri,up";
+                          " portMode7:tri,up" .
+                          " watchdog:on,off,silent watchdogInterval";
 }
 
 sub PIFACE_Define($$){
@@ -74,9 +75,9 @@ sub PIFACE_Define($$){
 }
 
 sub PIFACE_Undefine($$){
-	my($hash, $name) = @_;
-	RemoveInternalTimer($hash);
-	return;
+  my($hash, $name) = @_;
+  RemoveInternalTimer($hash);
+  return;
 }
 
 sub PIFACE_Set($@) {
@@ -141,16 +142,18 @@ sub PIFACE_Get($@){
 sub PIFACE_Attr(@) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
   my $hash = $defs{$name};
+  
   if ($attrName eq "pollInterval") {
     if (!defined $attrVal) {
-      RemoveInternalTimer($hash);    
+      #RemoveInternalTimer($hash);    
     } elsif ($attrVal eq "off" || $attrVal ~~ [1..10]) {
       PIFACE_GetUpdate($hash);
     } else {
-      RemoveInternalTimer($hash);    
+      #RemoveInternalTimer($hash);    
       Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
       CommandDeleteAttr(undef, "$name pollInterval");
     }
+    
   } elsif ($attrName eq "defaultState") {
     if (!defined $attrVal){
     
@@ -158,6 +161,7 @@ sub PIFACE_Attr(@) {
       Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
       CommandDeleteAttr(undef, "$name defaultState");
     }
+    
   } elsif ($attrName =~ m/^portMode/) {
     my $port = substr($attrName, 8, 1);
     my $adr = $base + $port;
@@ -176,6 +180,26 @@ sub PIFACE_Attr(@) {
     $val =~ s/\n//g;
     $val =~ s/\r//g;
     readingsSingleUpdate($hash, 'in' . $port, $val, 1);
+    
+  } elsif ($attrName eq "watchdog") {
+    if (!defined $attrVal) {
+      $attrVal = "off" ;
+      CommandDeleteReading(undef, "$name watchdog");
+    }
+    if ($attrVal !~ m/^(on|off|silent)$/) {
+      Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
+      CommandDeleteAttr(undef, "$name watchdog");
+    }
+    if ($attrVal =~ m/^(on|silent)$/) {
+      readingsSingleUpdate($hash, 'watchdog', 'start', 1);
+      PIFACE_Watchdog($hash);
+    }
+    
+  } elsif ($attrName eq "watchdogInterval") {
+    if ($attrVal !~ m/^\d+$/ || $attrVal < 10) {
+      Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
+      CommandDeleteAttr(undef, "$name watchdogInterval");
+    }
   }
   return;
 }
@@ -189,6 +213,7 @@ sub PIFACE_Notify(@) {
     PIFACE_Read_Inports(0, $hash);
     PIFACE_Read_Outports(0, $hash);
     PIFACE_GetUpdate($hash);    
+    PIFACE_Watchdog($hash);
   }
   return;
 }
@@ -270,6 +295,92 @@ PIFACE_GetUpdate($) {
   return;
 }
 
+sub
+PIFACE_Watchdog($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my ($cmd, $port, $portMode, $valIn, $valOut0, $valOut1);
+  my $watchdog = AttrVal($name, "watchdog", undef);
+  my $watchdogInterval = AttrVal($name, "watchdogInterval", 60);
+  $watchdogInterval = 10 if ($watchdogInterval !~ m/^\d+$/ || $watchdogInterval < 10);
+  
+  if (!defined $watchdog) {
+    CommandDeleteReading(undef, "$name watchdog");
+    
+  } elsif ($watchdog =~ m/^(on|silent)$/) {
+    InternalTimer(gettimeofday() + $watchdogInterval, "PIFACE_Watchdog", $hash, 1);
+    for (my $i=0; $i<7; $i++) {
+     $port = $base + $i;
+     $portMode = AttrVal($name, "portMode" . $i, "tri");     
+     $cmd = '/usr/local/bin/gpio -p mode ' . $port . ' ' . $portMode;
+     $valIn = `$cmd`;
+    }    
+    $cmd = '/usr/local/bin/gpio -p mode 207 up';
+    $valIn = `$cmd`;
+    $cmd = '/usr/local/bin/gpio -p read 207';
+    $valIn = `$cmd`;
+    $valIn =~ s/\n//g;
+    $valIn =~ s/\r//g;
+    $cmd = '/usr/local/bin/gpio -p write 207 0';
+    $cmd = `$cmd`;    
+    $cmd = '/usr/local/bin/gpio -p read 215';
+    $valOut0 = `$cmd`;
+    $valOut0 =~ s/\n//g;
+    $valOut0 =~ s/\r//g;    
+    $cmd = '/usr/local/bin/gpio -p write 207 1';
+    $cmd = `$cmd`;    
+    $cmd = '/usr/local/bin/gpio -p read 215';
+    $valOut1 = `$cmd`;
+    $valOut1 =~ s/\n//g;
+    $valOut1 =~ s/\r//g;    
+    if ($valIn == 0 && $valOut0 == 0 && $valOut1 == 1) {
+      readingsSingleUpdate($hash, "state", "active", 1) if (ReadingsVal($name, "state", undef) ne "active");
+      readingsSingleUpdate($hash, ".watchdogRestart", 0, 1);
+      if ($watchdog eq "on") {
+        Log3($name, 3, "PIFACE $name Watchdog active");
+        readingsSingleUpdate($hash, "watchdog", "ok", 1);
+      } elsif ($watchdog eq "silent") {
+        readingsSingleUpdate($hash, "watchdog", "ok", 1) if (ReadingsVal($name, "watchdog", undef) ne "ok");
+      }
+    } else {
+      if ($watchdog eq "on") {    
+        Log3($name, 3, "PIFACE $name Watchdog error");
+        readingsSingleUpdate($hash, "watchdog", "error", 1);      
+      } elsif ($watchdog eq "silent") {
+        my $watchdogRestart = ReadingsVal($name, ".watchdogRestart", undef);      
+        if (!defined($watchdogRestart) || $watchdogRestart == 0) {
+          Log3($name, 3, "PIFACE $name Watchdog Fhem restart");
+          readingsSingleUpdate($hash, "watchdog", "restart", 1);      
+          readingsSingleUpdate($hash, ".watchdogRestart", 1, 1);      
+          CommandSave(undef, undef);
+          CommandShutdown(undef, "restart");
+        } elsif ($watchdogRestart == 1) {
+          Log3($name, 3, "PIFACE $name Watchdog OS restart");
+          readingsSingleUpdate($hash, "watchdog", "restart", 1);
+          readingsSingleUpdate($hash, ".watchdogRestart", 2, 1);      
+          CommandSave(undef, undef);
+          $cmd = 'shutdown -r now';
+          #$cmd = 'sudo /sbin/shutdown -r now';
+          #$cmd = 'sudo /sbin/shutdown -r now > /dev/null 2>&1';
+	  $cmd = `$cmd`;        
+        } elsif ($watchdogRestart == 2) {
+          $attr{$name}{watchdog} = "off";
+          Log3($name, 3, "PIFACE $name Watchdog error");
+          Log3($name, 3, "PIFACE $name Watchdog deactivated");
+          CommandDeleteReading(undef, "$name .watchdogRestart");          
+          readingsSingleUpdate($hash, "watchdog", "error", 1);
+          readingsSingleUpdate($hash, "state", "error",1);
+          CommandSave(undef, undef);
+        }
+      }
+    } 
+  } else {
+    Log3($name, 3, "PIFACE $name Watchdog off");  
+    readingsSingleUpdate($hash, "watchdog", "off", 1);
+  }
+  return;
+}
+
 1;
 
 =pod
@@ -278,35 +389,54 @@ PIFACE_GetUpdate($) {
 <a name="PIFACE"></a>
 <h3>PIFACE</h3>
 <ul>
-
-	<b>Prerequesits</b>
-	<ul>
+  The PIFACE module managed the <a href=http://www.raspberrypi.org/>Raspberry Pi</a> extension board <a href=http://www.piface.org.uk/products/piface_digital/>PiFace Digital</a>.<br>
+  PIFACE controls the input ports 0..7 and output ports 0..7.
+  <ul>
+  <li>The relays 0 and 1 have corresponding output port 0 and 1.</li>
+  <li>The switches 0..3 have corresponding input ports 0..3 and must be read with attr portMode<0..7> = up</li>
+  </ul>
+  The status of the ports can be displayed periodically. The update of the states via interrupt is not supported.<br>
+  The module can be periodically monitored by a watchdog function.<br>
+  The ports can be read and controlled individually by the function <a href="#readingsProxy">readingsProxy</a>.<br>
+  PIFACE is tested with the Raspbian OS.<br><br>
+  
+  <b>Preparatory Work</b><br>
+  The use of PIFACE module requires some preparatory work.
+  <ul>
+    <br>
+    <li>Module needs tools from <a href=http://wiringpi.com>Wiring Pi</a>. Install it with<br>
+      <code>git clone git://git.drogon.net/wiringPi<br>
+        cd wiringPi<br>
+        ./build</code><br>
+    </li>
+    <li>PiFace Digital need the SPI pins on the Raspberry Pi to be enabled in order to function.
+    Start <code>sudo raspi-config</code>, select <code>Option 8 Advanced Options</code>
+    and set the <code>A5 SPI</code> option to "Yes".
+    </li>
+    <li>The function of the PiFace Digital can be tested at OS command line. For example:<br>
+    <code>gpio -p readall</code><br>
+    <code>gpio -p read 200</code><br>
+    <code>gpio -p write 201 0</code> or <code>gpio -p write 201 1</code><br>
+    </li>
+    <li>The watchdog function monitors the input port 7 and the output port 7.<br>
+      If the watchdog is enabled, this ports can not be used for other tasks.
+      In order to monitor the input port 7, it must be connected to the ground!<br>
+      The OS command "shutdown" must be enable for fhem if an OS restart is to
+      be executed in case of malfunction. For example, with <code>chmod +s /sbin/shutdown</code>
+      or <code>sudo chmod +s /sbin/shutdown</code>.<br>
+    </li>
+    
+  </ul>
+  <br>
 	
-		<br/>
-		Module needs wiringPi tools from <a href=http://wiringpi.com>http://wiringpi.com</a><br/><br/>
-		<code>	git clone git://git.drogon.net/wiringPi<br/>
-				cd wiringPi<br/>
-				./build</code>
-		<br/>
-
-	</ul>
-	<br/><br/>
-	
-	<a name="PIFACEdefine"></a>
-	<b>Define</b>
-	<ul>
-
-		<br/>
-		<code>define &lt;name&gt; PIFACE</code>
-		<br/><br/>
-		This module provides set/get functionality to control ports on RaspberryPi extension board PiFace
-		<br/>
-
-	</ul>
-	<br/><br/>
+  <a name="PIFACEdefine"></a>
+  <b>Define</b>
+    <ul><br>
+       <code>define &lt;name&gt; PIFACE</code><br>
+    </ul><br>
 
 	<a name="PIFACEset"></a>
-	<b>Set-Commands</b><br/>
+	<b>Set</b><br/>
 	<ul>
 
 		<br/>
@@ -331,10 +461,10 @@ PIFACE_GetUpdate($) {
 		</ul>
 
 	</ul>
-	<br/><br/>
+	<br>
 
 	<a name="PIFACEget"></a>
-	<b>Get-Commands</b><br/>
+	<b>Get</b><br/>
 	<ul>
 
 		<br/>
@@ -363,7 +493,7 @@ PIFACE_GetUpdate($) {
 		</ul>
 
 	</ul>
-	<br/><br/>
+	<br>
 
 	<a name="PIFACEattr"></a>
 	<b>Attributes</b><br/><br/>
@@ -382,26 +512,36 @@ PIFACE_GetUpdate($) {
             You need to enable the pull-up if you want to read any of the on-board switches on the PiFace board.
           </li>
 	  <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+          <li><a name="watchdog">watchdog</a> off|on|silent,
+            [watchdog] = off is default.<br>
+            The function of the PiFace extension can be monitored periodically.
+            The watchdog module checks the function of ports in7 and out7.
+            If the watchdog function is to be used, ports in7 and out7 are reserved for this purpose.
+            The port 7 must be connected to ground.<br>
+            If [watchdog] = on, the result of which is periodically logged and written to the reading watchdog.<br>
+            If [watchdog] = silent, FHEM is restarted after the first error detected.
+            If the error could not be eliminated, then the Raspberry operating system is restarted.
+            If the error is not corrected as well, the monitoring function is disabled and the error is logged.
+          </li>
+          <li><a name="watchdogInterval">watchdogInterval</a> 10..65535,
+            [watchdogInterval] = 60 is default.<br>
+            Interval between two monitoring tests in seconds.
+          </li>
 	</ul>
-	<br/><br/>
+	<br>
 
 	<b>Generated Readings/Events:</b>
 	<br/><br/>
 	<ul>
-		<li><b>&lt;out0..out7&gt;</b> - state of output port 0..7</li>
-		<li><b>&lt;in0..in7&gt;</b> - state of input port 0..7</li>
+		<li>&lt;out0..out7&gt;: 0|1<br>
+		state of output port 0..7</li>
+		<li>&lt;in0..in7&gt;: 0|1<br>
+		state of input port 0..7</li>
+		<li>watchdog: off|ok|error|restart|start<br>
+		state of the watchdog function</li>
+		<li>state: active|error</li><br>
 	</ul>
-	<br/><br/>
-
-	<b>Author's notes</b><br/><br/>
-	<ul>
-		<li>Relays 0 and 1 have corresponding port 0 and 1</li>
-		<li>Switches 0..3 have corresponding ports 0..3 and must be read with attr portMode<0..7> = up</li>
-		<br/>
-		<li>Have fun!</li><br/>
-
-	</ul>
-
+	
 </ul>
 
 =end html
