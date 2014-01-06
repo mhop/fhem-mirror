@@ -35,7 +35,7 @@ sub readingsGroup_Initialize($)
   #$hash->{SetFn}    = "readingsGroup_Set";
   $hash->{GetFn}    = "readingsGroup_Get";
   $hash->{AttrFn}   = "readingsGroup_Attr";
-  $hash->{AttrList} = "disable:1,2,3 nameIcon valueIcon mapping separator style nameStyle valueStyle valueFormat timestampStyle noheading:1 nolinks:1 notime:1 nostate:1 alwaysTrigger:1";
+  $hash->{AttrList} = "disable:1,2,3 nameIcon valueIcon mapping separator style nameStyle valueColumns valueStyle valueFormat timestampStyle noheading:1 nolinks:1 notime:1 nostate:1 alwaysTrigger:1";
 
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
@@ -266,6 +266,12 @@ readingsGroup_2html($)
     $value_format = $vf if( $vf );
   }
 
+  my $value_columns = AttrVal( $d, "valueColumns", "" );
+  if( $value_columns =~ m/^{.*}$/ ) {
+    my $vc = eval $value_columns;
+    $value_columns = $vc if( $vc );
+  }
+
   my $mapping = AttrVal( $d, "mapping", "");
   $mapping = eval $mapping if( $mapping =~ m/^{.*}$/ );
   #$mapping = undef if( ref($mapping) ne 'HASH' );
@@ -401,6 +407,8 @@ readingsGroup_2html($)
           $v = $value_format;
         }
 
+        my $value_columns = lookup2($value_columns,$name,$n,$v);
+
         my $a = AttrVal($name, "alias", $name);
         my $m = "$a$separator$n";
         $m = $a if( $multi != 1 );
@@ -437,7 +445,7 @@ readingsGroup_2html($)
 
         $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>" if( $first || $multi == 1 );
         $ret .= "<td informId=\"$d-$name.$n\">$devStateIcon</td>" if( $devStateIcon );
-        $ret .= "<td><div informId=\"$d-$name.$n\">$v</div></td>" if( !$devStateIcon );
+        $ret .= "<td $value_columns><div informId=\"$d-$name.$n\">$v</div></td>" if( !$devStateIcon );
         $ret .= "<td><div $timestamp_style informId=\"$d-$name.$n-ts\">$t</div></td>" if( $show_time && $t );
 
         $first = 0;
@@ -836,6 +844,9 @@ readingsGroup_Attr($$$)
       <li>valueStyle<br>
         Specify an HTML style for the reading values, e.g.:<br>
           <code>attr temperatures valueStyle style="text-align:right"</code></li>
+      <li>valueColumns<br>
+        Specify an HTML colspan for the reading values, e.g.:<br>
+          <code>attr wzReceiverRG valueColumns { eventdescription => 'colspan="4"' }</code></li>
       <li>valueFormat<br>
         Specify an sprintf style format string used to display the reading values. If the format string is undef
         this reading will be skipped. Can be given as a string, a perl expression returning a hash or a perl
@@ -866,7 +877,6 @@ readingsGroup_Attr($$$)
       evaluated only once during html creation and will not reflect value updates with longpoll.
       Refresh the page to update the dynamic style. For nameStyle the color attribut is not working at the moment,
       the font-... and background attributes do work.
-
 </ul>
 
 =end html
