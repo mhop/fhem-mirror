@@ -40,6 +40,7 @@
 # 0029: Fixed floorplan-specific icons and eliminated FHT-text "desired-temp" - both due to changes in fhemweb (Sep 29, 2013)
 # 0030: Style4 (S300TH) now works with longpoll without loosing its formatting (Dec 24, 2013)
 # 0031: Text "desiredTemperature" will also be eliminated - for MAX devices (Dec 25, 2013)
+# 0032: Ensure URL always contains floorplan-name (redirect if !htmlarg[0]) as basis for fp-specific icon-folder (Jan 06, 2014)
 #
 ################################################################
 #
@@ -251,7 +252,7 @@ FP_CGI(){
   #####redirect URL - either back to fhemweb-detailscreen, or for redirectCmds to suppress repeated execution of commands upon browser refresh
   my $me = $defs{$FW_cname};                                                       # from FHEMWEB: Current connection name
   my $tgt = undef;
-  if( AttrVal($FW_wname, "redirectCmds", 1) && $me && $commands && !$FP_ret) {
+  if( !$htmlpart[0] || (AttrVal($FW_wname, "redirectCmds", 1) && $me && $commands && !$FP_ret)) {
     if($FP_name) {
       $tgt = "/floorplan/$FP_name" 
 	} else {
