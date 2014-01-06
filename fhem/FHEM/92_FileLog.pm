@@ -350,6 +350,7 @@ FileLog_fhemwebFn($$$$)
     $ret .= FW_hidden("dev.$d", "$d addRegexpPart");
     $ret .= FW_submit("cmd.$d", "set", "set");
     $ret .= "<div class=\"set downText\">&nbsp;$d addRegexpPart&nbsp;</div>";
+    $list =~ s/(['"])/./g;
     $ret .= FW_select("","arg.$d",\@al, undef, "set",
         "FW_selChange(this.options[selectedIndex].text,'$list','val.$d')");
     $ret .= FW_textfield("val.$d", 30, "set");
