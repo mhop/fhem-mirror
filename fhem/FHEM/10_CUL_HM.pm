@@ -571,7 +571,8 @@ sub CUL_HM_Parse($$) {##############################
     my $sname = "CUL_HM_".$md."_$src";
     $sname =~ s/-/_/g;
     Log3 undef, 3, "CUL_HM Unknown device $sname is now defined";
-    CommandDefine(undef,"$sname CUL_HM $src");
+    DoTrigger("global","UNDEFINED $sname CUL_HM $src");
+    # CommandDefine(undef,"$sname CUL_HM $src");
     $shash = CUL_HM_id2Hash($src); #sourcehash - will be modified to channel entity
     $devH = $shash;
     $devH->{IODev} = $iohash;
