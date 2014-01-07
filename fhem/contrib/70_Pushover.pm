@@ -90,11 +90,11 @@ sub Pushover_Set_Message
   my $shortExpressionMatched = 0;
   my $longExpressionMatched = 0;
   
-  if($attr =~ /(".*"|'.*')\s*(".*"|'.*')\s*(".*"|'.*')\s*(\d+)\s*(".*"|'.*')\s*(\d+)\s*(\d+)\s*$/s)
+  if($attr =~ /(".*"|'.*')\s*(".*"|'.*')\s*(".*"|'.*')\s*(-?\d+)\s*(".*"|'.*')\s*(\d+)\s*(\d+)\s*$/s)
   {
     $longExpressionMatched = 1;
   }
-  elsif($attr =~ /(".*"|'.*')\s*(".*"|'.*')\s*(".*"|'.*')\s*(\d+)\s*(".*"|'.*')\s*$/s)
+  elsif($attr =~ /(".*"|'.*')\s*(".*"|'.*')\s*(".*"|'.*')\s*(-?\d+)\s*(".*"|'.*')\s*$/s)
   {
     $shortExpressionMatched = 1;
   }
