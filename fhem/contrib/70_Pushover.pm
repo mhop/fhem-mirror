@@ -42,6 +42,7 @@ sub Pushover_Initialize($$)
   my ($hash) = @_;
   $hash->{DefFn}    = "Pushover_Define";
   $hash->{SetFn}    = "Pushover_Set";
+  $hash->{AttrList} = "timestamp:0,1";
 }
 
 sub Pushover_Define($$)
@@ -187,6 +188,13 @@ sub Pushover_Set_Message
     if ($expire ne "")
     {
       $body = $body . "&" . "expire=" . $expire;
+    }
+    
+    my $timestamp = AttrVal($hash->{NAME}, "timestamp", 0);
+    
+    if (1 == $timestamp)
+    {
+      $body = $body . "&" . "timestamp=" . time();
     }
     
     return Pushover_HTTP_Call($hash, $body);
