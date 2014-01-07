@@ -410,6 +410,10 @@ FW_answerCall($)
   $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
   @FW_iconDirs = grep { $_ } split(":", AttrVal($FW_wname, "iconPath",
                                 "$FW_sp:default:fhemSVG:openautomation"));
+  if($arg =~ m,$FW_ME/floorplan/([a-z0-9.:_]+),i) { # FLOORPLAN: special icondir
+    unshift @FW_iconDirs, $1;
+    FW_readIcons($1);
+  }
 
   # /icons/... => current state of ...
   # also used for static images: unintended, but too late to change
@@ -1814,7 +1818,7 @@ FW_readIconsFrom($$)
   my $ldir = ($subdir ? "$dir/$subdir" : $dir);
   my @entries;
   if(opendir(DH, "$FW_icondir/$ldir")) {
-    @entries= sort readdir(DH); # assures order: .gif  .ico  .jpg  .png
+    @entries= sort readdir(DH); # assures order: .gif  .ico  .jpg  .png .svg
     closedir(DH);
   }
 
@@ -2018,6 +2022,10 @@ FW_Notify($$)
     $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
     @FW_iconDirs = grep { $_ } split(":", AttrVal($FW_wname, "iconPath",
                                 "$FW_sp:default:fhemSVG:openautomation"));
+    if($h->{iconPath}) {
+      unshift @FW_iconDirs, $h->{iconPath};
+      FW_readIcons($h->{iconPath});
+    }
 
     my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
     ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir) = @old;
