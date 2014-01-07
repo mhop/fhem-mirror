@@ -99,8 +99,11 @@ FW_longpoll()
         filter=sa[i].substring(7);
     }
   }
-  if(filter == "" && document.getElementById("floorplan")) // floorplan special
-    filter=".*";
+  if(filter == "" && document.getElementById("floorplan")) { //floorplan special
+    var name = document.getElementsByTagName("body")[0].getAttribute("id");
+    name = name.substring(0,name.length-5);
+    filter=".*;iconPath="+name;
+  }
 
   var query = document.location.pathname+"?XHR=1"+
                 "&inform=type=status;filter="+filter+
