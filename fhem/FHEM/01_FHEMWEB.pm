@@ -1846,6 +1846,7 @@ FW_readIconsFrom($$)
       }
     }
   }
+  $FW_icons{$dir}{""} = 1; # Do not check empty directories again.
 }
 
 sub
