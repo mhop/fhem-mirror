@@ -98,10 +98,10 @@ mailcheck_Notify($$)
   return if($dev->{NAME} ne "global");
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
-  delete $modules{mailcheck}->{NotifyFn};
+  delete $modules{$hash->{TYPE}}->{NotifyFn};
 
   foreach my $d (keys %defs) {
-    next if($defs{$d}{TYPE} ne "mailcheck");
+    next if($defs{$d}{TYPE} ne $hash->{TYPE});
     mailcheck_Connect($defs{$d});
   }
 }
@@ -367,6 +367,7 @@ mailcheck_Read($)
           my $message = $client->message_string($resp);
           Log3 $name, 5, "message: $message";
           my $parser = new MIME::Parser;
+          $parser->tmp_to_core(1);
           my $entity = $parser->parse_data($message);
           #Log3 $name, 5, "mime: $entity";
 
