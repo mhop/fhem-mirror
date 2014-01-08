@@ -138,7 +138,7 @@ sub CUL_HM_Initialize($) {
                        "rawToReadable unit ".#"KFM-Sensor" only
                        "peerIDs repPeers ".
                        "actCycle actStatus ".
-                       "autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus,8_stateOnly ".
+                       "autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus,5_readMissing,8_stateOnly ".
                        "expert:0_off,1_on,2_full ".
                        "burstAccess:0_off,1_auto ".
                        "param msgRepeat ".
@@ -161,13 +161,16 @@ sub CUL_HM_Initialize($) {
   my @statQWuArr = ();
   my @confQArr = ();
   my @confQWuArr = ();
-  $hash->{helper}{qReqStat}   = \@statQArr;
-  $hash->{helper}{qReqStatWu} = \@statQWuArr;
-  $hash->{helper}{qReqConf}   = \@confQArr;
-  $hash->{helper}{qReqConfWu} = \@confQWuArr;
+  my @confCheckArr = ();
+  $hash->{helper}{qReqStat}     = \@statQArr;
+  $hash->{helper}{qReqStatWu}   = \@statQWuArr;
+  $hash->{helper}{qReqConf}     = \@confQArr;
+  $hash->{helper}{qReqConfWu}   = \@confQWuArr;
+  $hash->{helper}{confCheckArr} = \@confCheckArr;
   #statistics
   $hash->{stat}{s}{dummy}=0;
   $hash->{stat}{r}{dummy}=0;
+  RemoveInternalTimer("CUL_HM_statCntRfresh");
   InternalTimer(gettimeofday()+3600*20,"CUL_HM_statCntRfresh","StatCntRfresh", 0);
 
   CUL_HM_initRegHash();
@@ -527,6 +530,11 @@ sub CUL_HM_Attr(@) {#################################
       return "use $attrName only for device"             if (!$hash->{helper}{role}{dev});
     }
   }
+  elsif($attrName eq "autoReadReg"){
+    if ($cmd eq "set"){
+      CUL_HM_complConfigTest($name);
+    }
+  }
   CUL_HM_queueUpdtCfg($name) if ($updtReq);
   return;
 }
@@ -579,29 +587,38 @@ sub CUL_HM_Parse($$) {##############################
     $shash->{helper}{io}{nextSend} = gettimeofday()+0.09;# io was not able to set timer
   }
 
+  my @entities = ("global"); #additional entities with events to be notifies
   ####################  attack alarm detection#####################
   if (   $dhash 
       && !CUL_HM_getAttrInt($dname,"ignore")
       && ($mTp eq '01' || $mTp eq '11')){
     my $ioId = AttrVal($dhash->{IODev}{NAME},"hmId","-");
-    CUL_HM_eventP($dhash,"ErrIoId_$src")if($ioId ne $src);
-    CUL_HM_eventP($dhash,"ErrIoAttack")
-         if(defined $dhash->{helper}{cSnd} && $dhash->{helper}{cSnd} ne substr($msg,7));
+    if($ioId ne $src){
+	  CUL_HM_eventP($dhash,"ErrIoId_$src");
+          my ($evntCnt,undef) = split(' last_at:',$dhash->{"prot"."ErrIoId_$src"},2);
+	  push @entities,CUL_HM_UpdtReadSingle($dhash,"sabotageAttackId","ErrIoId_$src cnt:$evntCnt",1);
+	}
+
+	if( defined $dhash->{helper}{cSnd} && 
+	    $dhash->{helper}{cSnd} ne substr($msg,7)){
+          CUL_HM_eventP($dhash,"ErrIoAttack");
+          my ($evntCnt,undef) = split(' last_at:',$dhash->{"prot"."ErrIoAttack"},2);
+	  push @entities,CUL_HM_UpdtReadSingle($dhash,"sabotageAttack","ErrIoAttack cnt:$evntCnt",1);
+	}
   }
   ###########
 
   #  return "" if($src eq $id);# mirrored messages - covered by !$shash
-  return "" if(!$shash);    # Unknown source
+  return @entities if(!$shash);    # Unknown source
 
   $respRemoved = 0;  #set to 'no response in this message' at start
   my @event;    #events to be posted for main entity
-  my @entities = ("global"); #additional entities with events to be notifies
 
   my $name = $shash->{NAME};
   my $ioId = CUL_HM_Id($shash->{IODev});
   $ioId = $id if(!$ioId);
 
-  return $name if (CUL_HM_getAttrInt($name,"ignore"));
+  return (@entities,$name) if (CUL_HM_getAttrInt($name,"ignore"));
 
   if ($msgStat && $msgStat =~ m/AESKey/){
     push @entities,CUL_HM_UpdtReadSingle($shash,"aesKeyNbr",substr($msgStat,7),1);
@@ -636,7 +653,7 @@ sub CUL_HM_Parse($$) {##############################
     else{
       Log3 $name,4,"CUL_HM $name dup: dont process";
     }
-    return $name; #return something to please dispatcher
+    return (@entities,$name); #return something to please dispatcher
   }
   $shash->{lastMsg} = $msgX;
   delete $shash->{helper}{rpt};# new message, rm recent ack
@@ -2435,8 +2452,8 @@ sub CUL_HM_Set($@) {
     if   ($sect eq "readings"){
       my @cH = ($hash);
       push @cH,$defs{$hash->{$_}} foreach(grep /^channel/,keys %{$hash});
-
-      delete $_->{READINGS}foreach (@cH);
+      delete $_->{READINGS} foreach (@cH);
+      CUL_HM_complConfig($_->{NAME}) foreach (@cH);
     }
     elsif($sect eq "register"){
       my @cH = ($hash);
@@ -2445,6 +2462,7 @@ sub CUL_HM_Set($@) {
       foreach my $h(@cH){
         delete $h->{READINGS}{$_}
              foreach (grep /^(\.?)(R-|RegL)/,keys %{$h->{READINGS}});
+        CUL_HM_complConfig($h->{NAME});
       }
     }
     elsif($sect eq "msgEvents"){
@@ -3509,7 +3527,8 @@ sub CUL_HM_getConfig($){
   my $id = CUL_HM_IOid($hash);
   my $dst = substr($hash->{DEF},0,6);
   my $name = $hash->{NAME};
-
+  
+  CUL_HM_complConfigTest($name);
   CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'00040000000000')
            if ($hash->{helper}{role}{dev});
   my @chnIdList = CUL_HM_getAssChnIds($name);
@@ -3981,6 +4000,7 @@ sub CUL_HM_statCntRfresh($) {# update statistic once a day
     }
     CUL_HM_statCnt($_,"u") if ($_ ne "dummy");
   }
+  RemoveInternalTimer("CUL_HM_statCntRfresh");
   InternalTimer(gettimeofday()+3600*20,"CUL_HM_statCntRfresh","StatCntRfrh",0);
 }
 
@@ -5262,7 +5282,7 @@ sub CUL_HM_procQs($){#process non-wakeup queues
                        @{$mq->{$q}} = grep !/^$devN$/,@{$mq->{$q}};
         }
         my $dId = CUL_HM_name2Id($devN);
-        my $eN=($chns[0]ne "00")?CUL_HM_id2Name($dId.$chns[0]):$devN;
+        my $eN=($chns[0] && $chns[0]ne "00")?CUL_HM_id2Name($dId.$chns[0]):$devN;
         if ($q eq "qReqConf"){
           $mq->{autoRdActive} = $devN;
           CUL_HM_Set($defs{$eN},$eN,"getConfig");
@@ -5441,6 +5461,41 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
   $_ = $pre."RegL_0".$_ foreach (@lsNo);
   return @lsNo;
 }
+
+sub CUL_HM_complConfigTest($){# 
+  my $name = shift;
+  return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
+  push @{$modules{CUL_HM}{helper}{confCheckArr}},$name;
+  if (scalar @{$modules{CUL_HM}{helper}{confCheckArr}} == 1){
+    RemoveInternalTimer("CUL_HM_complConfigTO");
+    InternalTimer(gettimeofday()+ 1800,"CUL_HM_complConfigTO","CUL_HM_complConfigTO", 0);
+  }
+  (@{$modules{CUL_HM}{helper}{qReqStat}})
+}
+sub CUL_HM_complConfigTO($){
+  my @arr = @{$modules{CUL_HM}{helper}{confCheckArr}};
+  @{$modules{CUL_HM}{helper}{confCheckArr}} = ();
+  CUL_HM_complConfig($_) foreach (@arr);
+}
+sub CUL_HM_complConfig($) {# read config if enabled and not complete
+  my $name = shift;
+  return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
+  return if ((CUL_HM_getAttrInt($name,"autoReadReg") & 0x07) < 5);
+  if (CUL_HM_peerUsed($name) && !CUL_HM_peersValid($name) ){
+    CUL_HM_qAutoRead($name,0);
+    CUL_HM_complConfigTest($name);
+    return;
+  }
+  my @regList = CUL_HM_reglUsed($name);
+  foreach (@regList){
+    if (ReadingsVal($name,$_,"") !~ m /00:00/){
+      CUL_HM_qAutoRead($name,0);
+      CUL_HM_complConfigTest($name);
+      last;
+    }
+  }
+}
+
 1;
 
 =pod
@@ -6350,6 +6405,7 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
         '2' like '1' plus execute after power_on.<br>
         '3' includes '2' plus updates on writes to the device<br>
         '4' includes '3' plus tries to request status if it seems to be missing<br>
+        '5' checks reglist and peerlist. If reading seems incomplete getConfig will be scheduled<br>
         '8_stateOnly' will only update status information but not configuration
                        data like register and peer<br>
         Execution will be delayed in order to prevent congestion at startup. Therefore the update
@@ -6364,16 +6420,14 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
           until the device "wakes up".<br>
         </ul>
         </li>
-  </ul>
-  <br>
+  </ul>  <br>
   <a name="CUL_HMparams"><b>available parameter "param"</b></a>
   <ul>
-  <li><B>HM-Sen-RD-O</B><br>
-  offAtPon: heat channel only: force heating off after powerOn<br>
-  onAtRain: heat channel only: force heating on while status changes to 'rain' and off when it changes to 'dry'<br>
-  </li>
-
-  </ul>
+    <li><B>HM-Sen-RD-O</B><br>
+    offAtPon: heat channel only: force heating off after powerOn<br>
+    onAtRain: heat channel only: force heating on while status changes to 'rain' and off when it changes to 'dry'<br>
+    </li>
+  </ul><br>
   <a name="CUL_HMevents"></a>
   <b>Generated events:</b>
   <ul>
@@ -6381,10 +6435,14 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
       recentStateType:[ack|info] # cannot be used ti trigger notifies<br>
       <li>ack indicates that some statusinfo is derived from an acknowledge</li>  
       <li>info indicates an autonomous message from the device</li>  
-      </li>  
+      <li><a name="CUL_HMsabotageAttackId"><b>sabotageAttackId</b></a><br>
+        Alarming configuration access to the device from a unknown source<br></li>
+      <li><a name="CUL_HMsabotageAttack"><b>sabotageAttack</b></a><br>
+        Alarming configuration access to the device that was not issued by our system<br></li>
+     </li>  
   <li><B>HM-CC-TC</B><br>
       T: $t H: $h<br>
-        battery:[low|ok]<br>
+      battery:[low|ok]<br>
       measured-temp $t<br>
       humidity $h<br>
       actuator $vp %<br>
