@@ -933,7 +933,7 @@ THRESHOLD_setValue($$)
   <code>set TH_room desired 21</code><br>
   <br>
   <br>
-  <b><u>Beispiele für Belüftung:</u></b><br>
+  <b><u>Beispiele für Belüftungssteuerung:</u></b><br>
   <br>
   <b>Einfache Belüftung anhand der Luftfeuchtigkeit:</b><br>
   <br>
@@ -953,7 +953,7 @@ THRESHOLD_setValue($$)
   <b>Belüftung in Kombination mit einem Lichtschalter mit Nachlaufsteuerung:</b><br>
   <br>
   Der Lüfter soll angehen, wenn das Licht mindestens 2 Minuten lang brennt oder die Luftfeuchtigkeit 65 % überschreitet,<br>
-  der Lüfter soll ausgehen, wenn die die Luftfeuchtigkeit unter 60 % fällt und das Licht mindestens 3 Minuten lang aus ist.<br>
+  der Lüfter soll ausgehen, wenn die Luftfeuchtigkeit unter 60 % fällt und das Licht mindestens 3 Minuten lang aus ist.<br>
   <br>
   <code>define ventilator_state dummy</code><br>
   <code>define w_ventilator_state_off watchdog light_switch:off 00:03 light_switch:on set ventilator_state off;; trigger w_ventilator_state_off .</code><br>
@@ -977,7 +977,7 @@ THRESHOLD_setValue($$)
   <code>define TH_circ THRESHOLD return_w:temperature:4:water_storage:temperature:-5 circ_pump</code><br>
   <br>
   <br>
-  <b><u>Beispiele für Beschattung:</u></b><br>
+  <b><u>Beispiele für Beschattungssteuerung:</u></b><br>
   <br>
   <b>Beispiel für einfache Beschattung im Sommer:</b><br>
   <br>
@@ -991,7 +991,7 @@ THRESHOLD_setValue($$)
   <b>Beispiel für Beschattung im Sommer mit Verzögerung und automatischem Hochfahren des Rollladens:</b><br>
   <br>
   Zusätzlich zum obigen Beispiel wird der Rollladen erst heruntergefahren, wenn die Sonne mindestens 15 Minuten scheint<br>
-  und wieder hochgefahren, wenn die Sonne mindesten 30 Minuten nicht mehr scheint.<br>
+  und wieder hochgefahren, wenn die Sonne mindestens 30 Minuten nicht mehr scheint.<br>
   <br>
   <code>define sun_state dummy</code><br>
   <code>define w_sun_state_off watchdog sun:off 00:30 sun:on set sun_state off;; trigger w_sun_state_off .</code><br>
