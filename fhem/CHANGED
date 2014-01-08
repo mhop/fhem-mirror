@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: new module 70_XBMC.pm added (dbokermann)
   - feature: new module 51_RPI_GPIO.pm added (klausw)
   - bugfix:  Dashboard: fixed bug identification an existing Weblink.
              fixed bug dashboard_sorting check. Buttonbar can now placed on 
