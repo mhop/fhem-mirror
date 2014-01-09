@@ -110,7 +110,6 @@ sub CUL_HM_noDupInString($);#return string with no duplicates, comma separated
 sub CUL_HM_storeRssi(@);
 sub CUL_HM_qStateUpdatIfEnab($@);
 sub CUL_HM_getAttrInt($@);
-sub CUL_HM_putHash($);
 sub CUL_HM_appFromQ($$);
 
 # ----------------modul globals-----------------------
@@ -213,14 +212,14 @@ sub CUL_HM_updateConfig($){
 
     my $st  = CUL_HM_Get($hash,$name,"param","subType");
     my $md  = CUL_HM_Get($hash,$name,"param","model");
-    if ($md =~ /(HM-CC-TC)/){
+    if ($md =~ /(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/){
       $hash->{helper}{role}{chn} = 1 if (length($id) == 6); #tc special
       $attr{$name}{stateFormat} = "last:trigLast" if ($chn eq "03");
     }
     elsif ($md =~ m/HM-CC-RT-DN/){
       $attr{$name}{stateFormat} = "last:trigLast" if ($chn eq "03");
     }
-    elsif ($md eq "HM-CC-VD"){
+    elsif ($md =~ m/(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/){
       $hash->{helper}{oldDes} = "0";
     }
     elsif ("dimmer"  eq $st) {#setup virtual dimmer channels
@@ -273,13 +272,13 @@ sub CUL_HM_updateConfig($){
     if(!defined $webCmd){
       if    ($st eq "virtual"      ){$webCmd="press short:press long";
       }elsif((!$hash->{helper}{role}{chn} &&
-               $md ne "HM-CC-TC")
+               $md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/)
             ||$st eq "repeater"
-            ||$md eq "HM-CC-VD"    ){$webCmd="getConfig";
+            ||$md =~ m/(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/ ){$webCmd="getConfig";
       }elsif($st eq "blindActuator"){$webCmd="toggle:on:off:up:down:stop:statusRequest";
       }elsif($st eq "dimmer"       ){$webCmd="toggle:on:off:up:down:statusRequest";
       }elsif($st eq "switch"       ){$webCmd="toggle:on:off:statusRequest";
-      }elsif($st eq "smokeDetector"){$webCmd="test:alarmOn:alarmOff:statusRequest";
+      }elsif($st eq "smokeDetector"){$webCmd="teamCall:alarmOn:alarmOff:statusRequest";
       }elsif($st eq "keyMatic"     ){$webCmd="lock:inhibit on:inhibit off";
       }elsif($md eq "HM-OU-CFM-PL" ){$webCmd="press short:press long"
                                        .($chn eq "02"?":playTone replay":"");
@@ -718,7 +717,7 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "unknown:$p";
     }
   }
-  elsif($md eq "HM-CC-TC") { ##################################################
+  elsif($md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/) { ###########################
     my ($sType,$chn) = ($1,$2) if($p && $p =~ m/^(..)(..)/);
     if($mTp eq "70" && $p =~ m/^(....)(..)/) { # weather event
       $chn = '01'; # fix definition
@@ -816,7 +815,7 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "time-request";
     }
   }
-  elsif($md eq "HM-CC-VD") { ##################################################
+  elsif($md =~ m/(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/) { ###########################
     if($mTp eq "02" && $p =~ m/^(..)(..)(..)(..)/) {#subtype+chn+value+err
       my ($chn,$vp, $err) = (hex($2),hex($3), hex($4));
         $chn = sprintf("%02X",$chn&0x3f);
@@ -1385,7 +1384,11 @@ sub CUL_HM_Parse($$) {##############################
       my ($state,$err) = (hex($1),hex($2));
       push @event, "battery:".(($err&0x80)?"low"  :"ok"  );
       push @event, "level:"  .hex($state);
-      push @event, "state:"  .(($state < 2)?"off":"smoke-Alarm");
+      $state = (($state < 2)?"off":"smoke-Alarm");
+      push @event, "state:$state";
+      my $tName = ReadingsVal($name,"peerList","");#inform team
+      $tName =~ s/,.*//;
+      push @entities,CUL_HM_updtSDTeam($tName,$name,$state);
     }
     elsif ($mTp eq "40" || $mTp eq "41"){ #autonomous event
       push @entities,CUL_HM_parseSDteam($mTp,$src,$dst,$p);
@@ -2077,7 +2080,27 @@ sub CUL_HM_parseSDteam(@){#handle SD team events
   }
   return @entities;
 }
-
+sub CUL_HM_updtSDTeam(@){#in: TeamName, optional caller name and its new state
+  # update team status if virtual team lead
+  # check all member state
+  # prio: 1:alarm, 2: unknown, 3: off
+  # sState given in input may not yet be visible in readings
+  my ($name,$sName,$sState) = @_;
+  return undef if (!$defs{$name} || AttrVal($name,"model","") !~ m "virtual");
+  ($sName,$sState) = ("","") if (!$sName || !$sState);
+  return undef if (ReadingsVal($name,"state","off") =~ m/smoke-Alarm/);
+  my $dStat = "off";
+  foreach my $pId(split(',',AttrVal($name,"peerIDs",""))){#screen teamIDs for Alarm
+    my $pNam = CUL_HM_id2Name(substr($pId,0,6)) if ($pId && $pId ne "00000000");
+    next if (!$pNam ||!$defs{$pNam});
+    my $pStat = ($pNam eq $sName)
+                  ?$sState
+                  :ReadingsVal($pNam,"state",undef);
+    if    (!$pStat)         {$dStat = "unknown";}
+    elsif ($pStat ne "off") {$dStat = $pStat;last;}
+  }
+  return CUL_HM_UpdtReadSingle($defs{$name},"state",$dStat,1);
+}
 #+++++++++++++++++ get command+++++++++++++++++++++++++++++++++++++++++++++++++
 sub CUL_HM_Get($@) {
   my ($hash, @a) = @_;
@@ -2165,7 +2188,7 @@ sub CUL_HM_Get($@) {
         }
       }
       my $addInfo = "";
-      if    ($md eq "HM-CC-TC"     && $chn eq "02"){$addInfo = CUL_HM_TCtempReadings($hash)}
+      if    ($md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/ && $chn eq "02"){$addInfo = CUL_HM_TCtempReadings($hash)}
       elsif ($md =~ m/HM-CC-RT-DN/ && $chn eq "04"){$addInfo = CUL_HM_RTtempReadings($hash)}
       elsif ($md eq "HM-PB-4DIS-WM")               {$addInfo = CUL_HM_4DisText($hash)}
       elsif ($md eq "HM-Sys-sRP-Pl")               {$addInfo = CUL_HM_repReadings($hash)}
@@ -2395,7 +2418,7 @@ sub CUL_HM_Set($@) {
     @a = ($a[0],"regBulk","RegL_01:",split(" ",$l1.$l2));
   }
   elsif($cmd =~ m /(displayMode|displayTemp|displayTempUnit|controlMode)/) {
-    if ($md eq "HM-CC-TC"){#controlMode different for RT
+    if ($md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/){#controlMode different for RT
       splice @a,1,3, ("regSet",$a[1],$a[2]);
       push @postCmds,"++803F$id${dst}0204".sprintf("%02X",CUL_HM_secSince2000());
     }
@@ -3345,7 +3368,7 @@ sub CUL_HM_Set($@) {
     return "$single must be single or dual"                       if(defined($single) && ($single !~ m/^(single|dual)$/));
     return "$set must be set or unset"                            if(defined($set)    && ($set    !~ m/^(set|unset)$/));
     return "$target must be [actor|remote|both]"                  if(defined($target) && ($target !~ m/^(actor|remote|both)$/));
-    return "use climate chan to pair TC"                          if( $md eq "HM-CC-TC" && $myBtn ne "02");
+    return "use climate chan to pair TC"                          if( $md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/ && $myBtn ne "02");
     return "use - single [set|unset] actor - for smoke detector"  if( $st eq "smokeDetector"       && (!$single || $single ne "single" || $target ne "actor"));
     return "use - single - for ".$st                              if(($st =~ m/(threeStateSensor|thermostat|motionDetector)/)
                                                                           && (!$single || $single ne "single"));
@@ -4200,11 +4223,17 @@ sub CUL_HM_ID2PeerList ($$$) {
       my ($tMstr,$tcSim) = (0,0);
       foreach (split(",",$peerNames)){
         $tMstr = 1 if(AttrVal($_,"subType","") eq "smokeDetector");
-        $tcSim = 1 if(AttrVal($_,"model","")   eq "HM-CC-VD");
+        $tcSim = 1 if(AttrVal($_,"model","")   =~ m /(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/);
       }
-      if   ($tMstr){$hash->{helper}{fkt}="sdLead";$hash->{sdTeam}="sdLead";}
-      elsif($tcSim){$hash->{helper}{fkt}="vdCtrl";}
-      else         {delete $hash->{helper}{fkt};}
+      if   ($tMstr){
+        $hash->{helper}{fkt}="sdLead";
+        $hash->{sdTeam}="sdLead";
+        CUL_HM_updtSDTeam($name);
+      }
+      elsif($tcSim){
+        $hash->{helper}{fkt}="vdCtrl";}
+      else         {
+        delete $hash->{helper}{fkt};}
       
       if(!$tMstr)  {delete $hash->{sdTeam};}      
     }
@@ -4537,7 +4566,7 @@ sub CUL_HM_updtRegDisp($$$) {
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
 
   # ---  handle specifics -  Devices with abnormal or long register
-  if ($md eq "HM-CC-TC"){#handle temperature readings
+  if ($md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/){#handle temperature readings
     CUL_HM_TCtempReadings($hash)  if (($list == 5 ||$list == 6) &&
                       substr($hash->{DEF},6,2) eq "02");
   }
@@ -5389,10 +5418,6 @@ sub CUL_HM_getAttrInt($@){#return attrValue as integer
 }
 
 #+++++++++++++++++ external use +++++++++++++++++++++++++++++++++++++++++++++++
-sub CUL_HM_putHash($) {# provide data for HMinfo
-  my ($info) = @_;
-  return %{$culHmModel} if ($info eq "culHmModel");
-}
 
 sub CUL_HM_peerUsed($) {# are peers expected?
   my $name = shift;
@@ -6440,7 +6465,7 @@ sub CUL_HM_complConfig($) {# read config if enabled and not complete
       <li><a name="CUL_HMsabotageAttack"><b>sabotageAttack</b></a><br>
         Alarming configuration access to the device that was not issued by our system<br></li>
      </li>  
-  <li><B>HM-CC-TC</B><br>
+  <li><B>HM-CC-TC,ROTO_ZEL-STG-RM-FWT</B><br>
       T: $t H: $h<br>
       battery:[low|ok]<br>
       measured-temp $t<br>
@@ -6482,7 +6507,7 @@ sub CUL_HM_complConfig($) {# read config if enabled and not complete
       time-request<br>
       trig_&lt;src&gt; &lt;value&gt; #channel was triggered by &lt;src&gt; channel.
   </li>
-  <li><B>HM-CC-VD</B><br>
+  <li><B>HM-CC-VD,ROTO_ZEL-STG-RM-FSA</B><br>
       $vp %<br>
       battery:[critical|low|ok]<br>
       motorErr:[ok|blocked|loose|adjusting range too small|opening|closing|stop]<br>
