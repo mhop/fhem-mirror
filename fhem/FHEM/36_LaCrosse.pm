@@ -17,7 +17,7 @@ LaCrosse_Initialize($)
   my ($hash) = @_;
 
   $hash->{Match}     = "^\\S+\\s+9 ";
-  #$hash->{SetFn}     = "LaCrosse_Set";
+  $hash->{SetFn}     = "LaCrosse_Set";
   #$hash->{GetFn}     = "LaCrosse_Get";
   $hash->{DefFn}     = "LaCrosse_Define";
   $hash->{UndefFn}   = "LaCrosse_Undef";
@@ -129,6 +129,36 @@ LaCrosse_CalcDewpoint (@) {
   return $DP;
 }
 
+sub
+LaCrosse_RemoveReplaceBattery($)
+{
+  my $hash = shift;
+  delete($hash->{replaceBattery});
+}
+
+sub
+LaCrosse_Set($@)
+{
+  my ($hash, $name, $cmd, $arg, $arg2) = @_;
+
+  my $list = "replaceBatteryForSec";
+
+  if( $cmd eq "replaceBatteryForSec" ) {
+    foreach my $d (sort keys %defs) {
+      next if (!defined($defs{$d}) );
+      next if ($defs{$d} ne $hash->{TYPE} );
+      LaCrosse_RemoveReplaceBattery{$defs{$d}};
+    }
+    return "Usage: set $name replaceBatteryForSec <seconds_active> [ignore_battery]" if(!$arg || $arg !~ m/^\d+$/ || ($arg2 && $arg2 ne "ignore_battery"));
+    $hash->{replaceBattery} = $arg2?2:1;
+    InternalTimer(gettimeofday()+$arg, "LaCrosse_RemoveReplaceBattery", $hash, 1);
+
+  } else {
+    return "Unknown argument $cmd, choose one of ".$list;
+  }
+
+  return undef;
+}
 
 sub
 LaCrosse_Parse($$)
@@ -158,6 +188,28 @@ LaCrosse_Parse($$)
   my $rname = $rhash?$rhash->{NAME}:$raddr;
 
   if( !$modules{LaCrosse}{defptr}{$raddr} ) {
+    foreach my $d (sort keys %defs) {
+      next if (!defined($defs{$d}) );
+      next if ($defs{$d}->{TYPE} ne "LaCrosse" );
+      next if( !$defs{$d}->{replaceBattery} );
+      if( $battery_new ||  $defs{$d}->{replaceBattery} == 2 ) {
+        $rhash = $defs{$d};
+        $raddr = $rhash->{addr};
+
+        Log3 $name, 3, "LaCrosse Changing device $rname from $raddr to $addr";
+
+        delete $modules{LaCrosse}{defptr}{$raddr};
+        $rhash->{DEF} = $addr;
+        $rhash->{addr} = $addr;
+        $modules{LaCrosse}{defptr}{$addr} = $rhash;
+
+        LaCrosse_RemoveReplaceBattery($rhash);
+
+        CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
+
+        return "";
+      }
+    }
     Log3 $name, 3, "LaCrosse Unknown device $rname, please define it";
 
     return "" if( !$hash->{LaCrossePair} );
@@ -181,9 +233,13 @@ LaCrosse_Parse($$)
       $humidity = int($humidity / $resolution + 0.5) * $resolution;
     }
 
-    if( AttrVal( $rname, "doAverage", 0 ) ) {
-      $humidity = ($rhash->{"previousH$channel"}*3+$humidity)/4;
+    if( AttrVal( $rname, "doAverage", 0 )
+        && defined($rhash->{"previousT$channel"}) ) {
       $temperature = ($rhash->{"previousT$channel"}*3+$temperature)/4;
+    }
+    if( AttrVal( $rname, "doAverage", 0 )
+        && defined($rhash->{"previousH$channel"}) ) {
+      $humidity = ($rhash->{"previousH$channel"}*3+$humidity)/4;
     }
 
     if( defined($rhash->{"previousT$channel"})
@@ -197,7 +253,7 @@ LaCrosse_Parse($$)
         $dewpoint = LaCrosse_CalcDewpoint($temperature,$humidity);
         $dewpoint = int($dewpoint*10 + 0.5) / 10;
         readingsBulkUpdate($rhash, "dewpoint$channel", $dewpoint);
-      }    
+      }
 
       $temperature = int($temperature*10 + 0.5) / 10;
       $humidity = int($humidity*10 + 0.5) / 10;
@@ -263,6 +319,10 @@ LaCrosse_Attr(@)
   <a name="LaCrosse_Set"></a>
   <b>Set</b>
   <ul>
+    <li>replaceBatteryForSec &lt;sec&gt; [ignore_battery]<br>
+    sets the device for &lt;sec&gt; seconds into replace battery mode. the first unknown address that is
+    received will replace the current device address;
+    </li>
   </ul><br>
 
   <a name="LaCrosse_Get"></a>
