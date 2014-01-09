@@ -25,7 +25,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.0
+# Version: 1.0.1
 #
 # Major Version History:
 # - 1.0.0 - 2014-01-09
@@ -173,7 +173,7 @@ sub GEOFANCY_CGI() {
     my $trigger;
     my $msg;
 
-    # data via GET
+    # data received
     if ( $request =~ m,^(/[^/]+)\?((.*)?)?$, ) {
         $link = $1;
         $URI  = $2;
@@ -234,14 +234,14 @@ sub GEOFANCY_CGI() {
         $trigger = $webArgs->{trigger};
     }
 
-    # data via POST
+    # no data received
     else {
         Log3 undef, 3,
-"GEOFANCY: Data transfer via POST not implemented. (request URI: $request)";
+"GEOFANCY: No data received, see API information on http://wiki.geofancy.com";
 
         return (
             "text/plain; charset=utf-8",
-"NOK Data transfer via POST not implemented. (request URI: $request)"
+"NOK No data received, see API information on http://wiki.geofancy.com"
         );
     }
 
@@ -287,18 +287,60 @@ sub GEOFANCY_CGI() {
       . $trigger;
 
     readingsBeginUpdate($hash);
-    readingsBulkUpdate( $hash, $device,      $trigger . " " . $id );
-    readingsBulkUpdate( $hash, "lastDevice", $device );
-    readingsBulkUpdate( $hash, "lastEnter",  $device . " " . $id )
-      if $trigger eq "enter";
-    readingsBulkUpdate( $hash, "lastExit", $device . " " . $id )
-      if $trigger eq "exit";
-    readingsBulkUpdate( $hash, "lastId_" . $device,      $id );
-    readingsBulkUpdate( $hash, "lastLat_" . $device,     $lat );
-    readingsBulkUpdate( $hash, "lastLong_" . $device,    $long );
-    readingsBulkUpdate( $hash, "lastTrigger_" . $device, $trigger );
+
+    # General readings
     readingsBulkUpdate( $hash, "state",
         "dev:$device trig:$trigger id:$id lat:$lat long:$long" );
+    readingsBulkUpdate( $hash, "lastDevice", $device );
+    readingsBulkUpdate( $hash, "lastArr",    $device . " " . $id )
+      if $trigger eq "enter";
+    readingsBulkUpdate( $hash, "lastDep", $device . " " . $id )
+      if $trigger eq "exit";
+
+    my $time = TimeNow();
+
+    if ( $trigger eq "enter" || $trigger eq "test" ) {
+        Log3 $name, 3, "GEOFANCY $name: $device arrived at $id";
+        readingsBulkUpdate( $hash, $device,                  "arrived " . $id );
+        readingsBulkUpdate( $hash, "currLoc_" . $device,     $id );
+        readingsBulkUpdate( $hash, "currLocLat_" . $device,  $lat );
+        readingsBulkUpdate( $hash, "currLocLong_" . $device, $long );
+        readingsBulkUpdate( $hash, "currLocTime_" . $device, $time );
+    }
+    if ( $trigger eq "exit" ) {
+        my $currReading;
+        my $lastReading;
+
+        Log3 $name, 3, "GEOFANCY $name: $device left $id and is underway";
+
+        # backup last known location if not "underway"
+        $currReading = "currLoc_" . $device;
+        if ( defined( $hash->{READINGS}{$currReading}{VAL} )
+            && $hash->{READINGS}{$currReading}{VAL} ne "underway" )
+        {
+            foreach ( 'Loc', 'LocLat', 'LocLong' ) {
+                $currReading = "curr" . $_ . "_" . $device;
+                $lastReading = "last" . $_ . "_" . $device;
+                readingsBulkUpdate( $hash, $lastReading,
+                    $hash->{READINGS}{$currReading}{VAL} )
+                  if ( defined( $hash->{READINGS}{$currReading}{VAL} ) );
+            }
+            $currReading = "currLocTime_" . $device;
+            readingsBulkUpdate(
+                $hash,
+                "lastLocArr_" . $device,
+                $hash->{READINGS}{$currReading}{VAL}
+            ) if ( defined( $hash->{READINGS}{$currReading}{VAL} ) );
+            readingsBulkUpdate( $hash, "lastLocDep_" . $device, $time );
+        }
+
+        readingsBulkUpdate( $hash, $device,                  "left " . $id );
+        readingsBulkUpdate( $hash, "currLoc_" . $device,     "underway" );
+        readingsBulkUpdate( $hash, "currLocLat_" . $device,  "-" );
+        readingsBulkUpdate( $hash, "currLocLong_" . $device, "-" );
+        readingsBulkUpdate( $hash, "currLocTime_" . $device, $time );
+    }
+
     readingsEndUpdate( $hash, 1 );
 
     $msg = "$trigger OK";
