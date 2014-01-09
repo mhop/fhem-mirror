@@ -368,6 +368,7 @@ mailcheck_Read($)
           Log3 $name, 5, "message: $message";
           my $parser = new MIME::Parser;
           $parser->tmp_to_core(1);
+          $parser->output_to_core(1);
           my $entity = $parser->parse_data($message);
           #Log3 $name, 5, "mime: $entity";
 
