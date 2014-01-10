@@ -444,10 +444,12 @@ FileLog_logWrapper($)
     FileLog_loadSVG();
     FW_pO "<div id=\"content\">";
     FW_pO "<br>";
-    FW_pO SVG_zoomLink("$cmd;zoom=-1", "Zoom-in", "zoom in");
-    FW_pO SVG_zoomLink("$cmd;zoom=1",  "Zoom-out","zoom out");
-    FW_pO SVG_zoomLink("$cmd;off=-1",  "Prev",    "prev");
-    FW_pO SVG_zoomLink("$cmd;off=1",   "Next",    "next");
+    if(AttrVal($d,"plotmode",$FW_plotmode) ne "gnuplot") {
+      FW_pO SVG_zoomLink("$cmd;zoom=-1", "Zoom-in", "zoom in");
+      FW_pO SVG_zoomLink("$cmd;zoom=1",  "Zoom-out","zoom out");
+      FW_pO SVG_zoomLink("$cmd;off=-1",  "Prev",    "prev");
+      FW_pO SVG_zoomLink("$cmd;off=1",   "Next",    "next");
+    }
     FW_pO "<table><tr><td>";
     FW_pO "<td>";
     my $logtype = $defs{$d}{TYPE};
