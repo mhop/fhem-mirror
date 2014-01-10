@@ -1,7 +1,7 @@
 
 # $Id$
 
-# basic idea from https://github.com/justinribeiro/idleCO20
+# basic idea from http://code.google.com/p/airsensor-linux-usb
 
 package main;
 
