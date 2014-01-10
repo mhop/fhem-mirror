@@ -811,7 +811,7 @@ readingsGroup_Attr($$$)
     <b>Attributes</b>
     <ul>
       <li>alwaysTrigger<br>
-        1 -> alwaysTrigger update events. even if not visible.
+        1 -> alwaysTrigger update events. even if not visible.</li>
       <li>disable<br>
         1 -> disable notify processing and longpoll updates. Notice: this also disables rename and delete handling.<br>
         2 -> also disable html table creation<br>
