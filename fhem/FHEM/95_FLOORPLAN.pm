@@ -214,41 +214,50 @@ FP_CGI(){
   $FW_plotmode = AttrVal($FW_wname, "plotmode", "SVG");
   $FW_plotsize = AttrVal($FW_wname, "plotsize", $FW_ss ? "480,160" :
                                                 $FW_tp ? "640,160" : "800,160");  
-  $htmlarg =~ s/^\///;
+  $htmlarg =~ s/^\///;                                                             # eliminate leading /
   ## derive floorplan-name
-  my @params = split(/\//,$htmlarg);                                                # split URL by /
-  if ($params[2]) {                                                                 # URL with CGI-parameters has addtl / -> use $FP_name
+  my @params = split(/\//,$htmlarg);                                               # split URL by /
+  if ($params[2]) {                                                                # URL with CGI-parameters has addtl / -> use $FP_name
     $FP_name = $params[1];
     $params[1] = $params[2];
   }
   my @htmlpart = split("\\?", $params[1]) if ($params[1]);                         # split URL by ?   ->   htmlpart[0] = FP_name, htmlpart[1] = commandstring
   $FP_name = $htmlpart[0] if (!$FP_name);
   ### set global parameters, check floorplan-name  
-  if ($FP_name) {																   # a floorplan-name is part of URL
-	$FP_arrange =  AttrVal($FP_name, "fp_arrange", 0);                             # set arrange mode
-	$FP_viewport = AttrVal($FP_name, "fp_viewport", "width=768") if ($FP_name);    # viewport definition
-	if(!defined($defs{$FP_name})){
-		$FW_RET = "ERROR: Floorplan $FP_name not defined \n";					   # check for typo in URL
-		return ("text/plain; charset=$FW_encoding", $FW_RET);
+  if ($FP_name) {																   # floorplan-name is part of URL
+	if(!defined($defs{$FP_name}) && $FP_name ne "floorplanstartpage"){
+      $FW_RET = "ERROR: Floorplan $FP_name not defined \n";					       # check for typo in URL
+      return ("text/plain; charset=$FW_encoding", $FW_RET);
 	}
-	$FW_subdir = "/floorplan/$FP_name";
-  } else {																		   # no floorplan-name in URL
-    $FW_subdir = "/floorplan";
+    $FP_arrange =  AttrVal($FP_name, "fp_arrange", 0);                             # set arrange mode
+    $FP_viewport = AttrVal($FP_name, "fp_viewport", "width=768") if ($FP_name);    # viewport definition
+    $FW_subdir = "/floorplan/$FP_name";
+  } else {																		   # no floorplan-name in URL....
 	$FP_arrange_default = undef;
 	$FP_arrange_selected = undef;
 	my $dev = undef;
+	my $tmpname = undef;
+	my $cnt = 0;
 	foreach my $fp (keys %defs) {
-	   if (AttrVal($fp, "fp_default", undef)) {									   # use floorplan with attr fp_default
-			$FP_name = $fp;
-			$FW_subdir = "/floorplan/$fp";
-			$FP_arrange = AttrVal($fp, "fp_arrange", undef);
-	   }
-	}
+	  next if ($defs{$fp}{TYPE} ne "FLOORPLAN");
+      if (AttrVal($fp, "fp_default", undef)) {									   # use floorplan with attr fp_default
+        $FP_name = $fp;
+        last;
+      } else {
+        $tmpname=$fp;
+        $cnt++;
+      }
+    }
+    $FP_name = $tmpname if (!$FP_name && $cnt==1);                                 # otherwise, if only one floorplan, use that one
+    $FP_name = "floorplanstartpage" if (!$FP_name);                                # otherwise go to startpage
+    $FW_subdir = "/floorplan/$FP_name";
+    $FP_arrange = AttrVal($FP_name, "fp_arrange", 0);
   }
   ## process cgi
   my $commands = FP_digestCgi($htmlpart[1]) if $htmlpart[1];                       # analyze URL-commands
   my $FP_ret = AnalyzeCommand(undef, $commands) if $commands;                      # Execute commands
   Log 1, "FLOORPLAN: regex-error. commands: $commands; FP_ret: $FP_ret" if($FP_ret && ($FP_ret =~ m/regex/ ));  #test
+
   #####redirect URL - either back to fhemweb-detailscreen, or for redirectCmds to suppress repeated execution of commands upon browser refresh
   my $me = $defs{$FW_cname};                                                       # from FHEMWEB: Current connection name
   my $tgt = undef;
@@ -256,7 +265,8 @@ FP_CGI(){
     if($FP_name) {
       $tgt = "/floorplan/$FP_name" 
 	} else {
-	  $tgt = "/floorplan"
+      $FW_RET = 'ERROR: floorplan-name could not be derived from URL, fp_default or single floorplanname.';
+      return ("text/plain; charset=$FW_encoding", $FW_RET);
     }
   }
   $tgt = "?detail=$FP_fwdetail" if ($FP_fwdetail);                                  #return to fhemweb-detail-screen if coming from there
@@ -269,12 +279,11 @@ FP_CGI(){
             "\r\n";
 	return;
   }
-  ### output html-pages  
-  if($FP_name) {
-    FP_show();         # show floorplan
-  }
-  else {
-    FP_showStart();    # show startscreen
+  ### output html-pages
+  if($FP_name eq "floorplanstartpage") {
+    FP_showStart();         # show Startscreen if zero or more than one floorplan, and none with fp_default assigned
+  } else {
+    FP_show();              # show floorplan
   }
   # finish HTML & leave
   FW_pO "</html>\n";
@@ -408,9 +417,9 @@ FP_showStart() {
   }
   if ($count == 0) {
     FW_pO '<div id="startcontent">';
-	FW_pO "<br><br><br><br>No floorplans have been defined yet. For definition, use<br>";
+	FW_pO "<br><br><br><br>No floorplans have been defined yet. For definition, enter<br>";
 	FW_pO "<ul><code>define &lt;name&gt; FLOORPLAN</code></ul>";
-	FW_pO 'Also check the <a href="$FW_ME/docs/commandref.html#FLOORPLAN">commandref</a><br>';
+	FW_pO "Also check the <a href=\"$FW_ME/docs/commandref.html#FLOORPLAN\">commandref</a><br>";
 	FW_pO "</div>";
   }
   FW_pO "</body>";
