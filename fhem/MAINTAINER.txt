@@ -86,6 +86,7 @@ FHEM/31_HUEDevice.pm         justme1968           http://forum.fhem.de Sonstige 
 FHEM/31_LightScene.pm        justme1968           http://forum.fhem.de Automatisierung
 FHEM/32_SYSSTAT.pm           justme1968           http://forum.fhem.de Unterstuetzende Dienste
 FHEM/32_mailcheck.pm         justme1968           http://forum.fhem.de Automatisierung
+FHEM/32_withings.pm          justme1968           http://forum.fhem.de Sonstiges
 FHEM/33_readingsGroup.pm     justme1968           http://forum.fhem.de Frontends
 FHEM/33_readingsproxy.pm     justme1968           http://forum.fhem.de Automatisierung
 FHEM/32_speedtest.pm         justme1968           http://forum.fhem.de Sonstiges
