@@ -87,7 +87,10 @@ FW_longpoll()
   var filter="", embArr = document.getElementsByTagName("embed");
   for(var i = 0; i < embArr.length; i++) {
     var svg = embArr[i].getSVGDocument();
-    if(svg != null && svg.firstChild.nextSibling.getAttribute("flog"))
+    if(svg &&
+       svg.firstChild &&
+       svg.firstChild.nextSibling &&
+       svg.firstChild.nextSibling.getAttribute("flog"))
       filter=".*";
   }
   if(filter == "") {
