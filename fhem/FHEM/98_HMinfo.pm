@@ -405,6 +405,7 @@ sub HMinfo_SetFn($@) {#########################################################
     $type = "long" if(!$type);
     my @paramList;
     my @IOlist;
+    my @plSum; push @plSum,0 for (0..9);#prefill
     foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
       my $id = $defs{$dName}{DEF};
       my ($found,$para) = HMinfo_getParam($id,
@@ -419,13 +420,18 @@ sub HMinfo_SetFn($@) {#########################################################
         $_ =~ s/..-.. ..:..:..//g if ($type eq "short");
         $_ =~ s/CMDs // if ($type eq "short");
       }
+
+      for (1..9){
+        my ($x) =  $pl[$_] =~ /(\d+)/;
+        $plSum[$_] += $x;
+      }
       if ($type eq "short"){
         push @paramList, sprintf("%-20s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",
-                      $pl[0],$pl[1],$pl[2],$pl[3],$pl[5],$pl[6],$pl[7],$pl[8],$pl[9]);
+                      @pl[0..3],@pl[5..9]);
       }
       else{
         push @paramList, sprintf("%-20s%-17s|%-18s|%-18s|%-14s|%-18s#%-18s|%-18s|%-18s|%-18s",
-                      $pl[0],$pl[1],$pl[2],$pl[3],$pl[4],$pl[5],$pl[6],$pl[7],$pl[8],$pl[9]);
+                      @pl[0..9]);
       }
       push @IOlist,$defs{$pl[0]}{IODev}->{NAME};
     }
@@ -440,8 +446,16 @@ sub HMinfo_SetFn($@) {#########################################################
                              ,"State","CmdPend"
                              ,"Snd","Resnd"
                              ,"CmdDel","ResndFail","Nack","IOerr") if ($type eq "short");
-    $ret = $cmd." done:" ."\n    ".$hdr  ."\n    ".(join "\n    ",sort @paramList)
-           ;
+    $ret = $cmd." done:" ."\n    ".$hdr  ."\n    ".(join "\n    ",sort @paramList);
+    $ret .= "\n======================================================="
+           ."=========================================================";
+    if ($type eq "short"){
+      $ret .= "\n    ".sprintf("%-20s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s","sum",@plSum[1..3],@plSum[5..9]);
+    }
+    else{
+      $ret .= "\n    ".sprintf("%-20s%-17s|%-18s|%-18s|%-14s|%-18s#%-18s|%-18s|%-18s|%-18s","sum",@plSum[1..9]);
+    }
+
     $ret .= "\n\n    CUL_HM queue:$modules{CUL_HM}{prot}{rspPend}";
     $ret .= "\n";
     $ret .= "\n    autoReadReg pending:"          .join(",",@{$modules{CUL_HM}{helper}{qReqConf}})
