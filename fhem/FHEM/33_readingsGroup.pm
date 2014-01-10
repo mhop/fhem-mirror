@@ -466,7 +466,7 @@ readingsGroup_detailFn()
 
   my $hash = $defs{$d};
 
-  if( $hash->{alwaysTrigger} ) {
+  if( 1 || $hash->{alwaysTrigger} ) {
     delete( $hash->{helper}->{myDisplay} );
   } else {
     Log3 $hash->{NAME}, 5, "opened: $FW_cname";
@@ -493,7 +493,7 @@ readingsGroup_Notify($$)
 
   return if( AttrVal($name,"disable", 0) > 0 );
 
-  if( $hash->{alwaysTrigger} ) {
+  if( 1 || $hash->{alwaysTrigger} ) {
   } elsif( !defined($hash->{helper}{myDisplay})
       || !%{$hash->{helper}{myDisplay}} ) {
     Log3 $name, 5, "$name: not on any display, ignoring notify";
