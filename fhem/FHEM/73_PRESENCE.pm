@@ -40,200 +40,196 @@ use DevIo;
 sub
 PRESENCE_Initialize($)
 {
-	my ($hash) = @_;
+    my ($hash) = @_;
 
-	require "$attr{global}{modpath}/FHEM/DevIo.pm";
+    require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
-	# Provider
-	$hash->{ReadFn}  = "PRESENCE_Read";  
-	$hash->{ReadyFn} = "PRESENCE_Ready";
-	$hash->{SetFn}   = "PRESENCE_Set";
-	$hash->{DefFn}   = "PRESENCE_Define";
-	$hash->{UndefFn} = "PRESENCE_Undef";
-	$hash->{AttrFn}  = "PRESENCE_Attr";
-	$hash->{AttrList}= "do_not_notify:0,1 disable:0,1 fritzbox_repeater:0,1 ping_count:1,2,3,4,5,6,7,8,9,10 ".$readingFnAttributes;
-  
+    # Provider
+    $hash->{ReadFn}  = "PRESENCE_Read";  
+    $hash->{ReadyFn} = "PRESENCE_Ready";
+    $hash->{SetFn}   = "PRESENCE_Set";
+    $hash->{DefFn}   = "PRESENCE_Define";
+    $hash->{UndefFn} = "PRESENCE_Undef";
+    $hash->{AttrFn}  = "PRESENCE_Attr";
+    $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 fritzbox_repeater:0,1 ping_count:1,2,3,4,5,6,7,8,9,10 ".$readingFnAttributes;
+
 }
 
 #####################################
 sub
 PRESENCE_Define($$)
 {
-	my ($hash, $def) = @_;
-	my @a = split("[ \t]+", $def);
-	my $dev;
- 
-	if(defined($a[2]) and defined($a[3]))
-	{
-	    if($a[2] eq "local-bluetooth")
-	    {
-			unless($a[3] =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*$/)
-			{
-			    my $msg = "given address is not a bluetooth hardware address";
-			    Log 2, "PRESENCE: ".$msg;
-			    return $msg
-			}
-		
-			$hash->{MODE} = "local-bluetooth";
-			$hash->{ADDRESS} = $a[3];
-			$hash->{TIMEOUT_NORMAL} = (defined($a[4]) ? $a[4] : 30);
-			$hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : 30);
-	    
-	    }
-	    elsif($a[2] eq "fritzbox")
-	    {
-	    
-			unless(-X "/usr/bin/ctlmgr_ctl")
-			{
-			    my $msg = "this is not a fritzbox or you running FHEM with the AVM Beta Image. Please use the FHEM FritzBox Image from fhem.de";
-			    Log 2, "PRESENCE: ".$msg;
-			    return $msg;
-			}
+    my ($hash, $def) = @_;
+    my @a = split("[ \t]+", $def);
+    my $dev;
+    my $username = (getpwuid($<))[0];
 
-			unless($< == 0)
-			{
-			    my $msg = "FHEM is not running under root (currently ".(getpwuid($<))[0].") This check can only performed with root access to the FritzBox";
-			    Log 2, "PRESENCE: ".$msg;
-			    return $msg;
-			}
-			$hash->{MODE} = "fritzbox";
-			$hash->{ADDRESS} = $a[3];    
-			$hash->{TIMEOUT_NORMAL} = (defined($a[4]) ? $a[4] : 30);
-			$hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : 30);
-
-	    }
-	    elsif($a[2] eq "lan-ping")
-	    {
-			if(-X "/usr/bin/ctrlmgr_ctl" and not $< == 0)
-			{
-			    my $msg = "FHEM is not running under root (currently ".(getpwuid($<))[0].") This check can only performed with root access to the FritzBox";
-			    Log 2, "PRESENCE: ".$msg;
-			    return $msg;
-			}
-		
-			$hash->{MODE} = "lan-ping";
-			$hash->{ADDRESS} = $a[3];
-			$hash->{TIMEOUT_NORMAL} = (defined($a[4]) ? $a[4] : 30);
-			$hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : 30);
-	    
-	    }
-	    elsif($a[2] =~ /(shellscript|function)/)
-	    {
-			if($def =~ /(\S+) \w+ (\S+) ["']{0,1}(.+?)['"]{0,1}\s*(\d*)\s*(\d*)$/s)
-		    {
-		    	
-				$hash->{MODE} = $2;
-				$hash->{helper}{call} = $3;
-				$hash->{TIMEOUT_NORMAL} = ($4 ne "" ? $4 : 30);
-				$hash->{TIMEOUT_PRESENT} = ($5 ne "" ? $5 : 30);
-				
-				if($hash->{helper}{call} =~ /\|/)
-				{
-				    my $msg = "The command contains a pipe ( | ) symbol, which is not allowed.";
-				    Log 2, "PRESENCE: ".$msg;
-				    return $msg;
-				}
-				
-				if($hash->{MODE} eq "function" and not $hash->{helper}{call} =~ /^\{.+\}$/)
-				{
-				    my $msg = "The function call must be encapsulated by brackets ( {...} ).";
-				    Log 2, "PRESENCE: ".$msg;
-				    return $msg;
-				}
-			}
-	    
-	    }
-	    elsif($a[2] eq "lan-bluetooth")
-	    {
-	    
-			unless($a[3] =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*$/)
-			{
-				my $msg = "given address is not a bluetooth hardware address";
-				Log 2, "PRESENCE: ".$msg;
-				return $msg
-			}
-		
-			DevIo_CloseDev($hash);
-		  
-			$hash->{MODE} = "lan-bluetooth";
-			$hash->{ADDRESS} = $a[3];
-			$hash->{TIMEOUT_NORMAL} = (defined($a[5]) ? $a[5] : 30);
-			$hash->{TIMEOUT_PRESENT} = (defined($a[6]) ? $a[6] : 30);
-		
-			$dev = $a[4];
-			$dev .= ":5222" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
-
-			$hash->{DeviceName} = $dev;
-
-	    }
-	    else
-	    {
-			my $msg = "unknown mode: ".$a[2]." - Please use lan-ping, lan-bluetooth, local-bluetooth, fritzbox, shellscript or function";
-			Log 2, $msg;
-			return $msg
-	    }
-   
-	}
-	else
-	{
-		my $msg = "wrong syntax: define <name> PRESENCE <mode> <device-address> [ <check-interval> [ <present-check-interval> ] ]";
-		Log 2, $msg;
-		return $msg;
-	}
- 
-	my $timeout = $hash->{TIMEOUT_NORMAL};
-	my $presence_timeout = $hash->{TIMEOUT_PRESENCE};
-  
-    if(defined($timeout) and not $timeout =~ /^\d+$/)
+    if(defined($a[2]) and defined($a[3]))
     {
-		my $msg = "check-interval must be a number";
-		Log 2, "PRESENCE: ".$msg;
-		return $msg;
+        if($a[2] eq "local-bluetooth")
+        {
+            unless($a[3] =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*$/)
+            {
+                my $msg = "given address is not a bluetooth hardware address";
+                Log 2, "PRESENCE: ".$msg;
+                return $msg
+            }
+            
+            $hash->{MODE} = "local-bluetooth";
+            $hash->{ADDRESS} = $a[3];
+            $hash->{TIMEOUT_NORMAL} = (defined($a[4]) ? $a[4] : 30);
+            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : 30);
+            
+        }
+        elsif($a[2] eq "fritzbox")
+        {
+     
+            unless(-X "/usr/bin/ctlmgr_ctl")
+            {    
+                my $msg = "this is not a fritzbox or you running FHEM with the AVM Beta Image. Please use the FHEM FritzBox Image from fhem.de";
+                Log 2, "PRESENCE: ".$msg;
+                return $msg;
+            }
+
+            unless($username == "root")
+            {
+                my $msg = "FHEM is not running under root (currently $username) This check can only performed with root access to the FritzBox";
+                Log 2, "PRESENCE: ".$msg;
+                return $msg;
+            }
+            
+            $hash->{MODE} = "fritzbox";
+            $hash->{ADDRESS} = $a[3];    
+            $hash->{TIMEOUT_NORMAL} = (defined($a[4]) ? $a[4] : 30);
+            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : 30);
+
+        }
+        elsif($a[2] eq "lan-ping")
+        {
+            if(-X "/usr/bin/ctrlmgr_ctl" and not $username == "root")
+            {
+                my $msg = "FHEM is not running under root (currently $username) This check can only performed with root access to the FritzBox";
+                Log 2, "PRESENCE: ".$msg;
+                return $msg;
+            }
+
+            $hash->{MODE} = "lan-ping";
+            $hash->{ADDRESS} = $a[3];
+            $hash->{TIMEOUT_NORMAL} = (defined($a[4]) ? $a[4] : 30);
+            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : 30);
+     
+        }
+        elsif($a[2] =~ /(shellscript|function)/)
+        {
+            if($def =~ /(\S+) \w+ (\S+) ["']{0,1}(.+?)['"]{0,1}\s*(\d*)\s*(\d*)$/s)
+            {
+       
+                $hash->{MODE} = $2;
+                $hash->{helper}{call} = $3;
+                $hash->{TIMEOUT_NORMAL} = ($4 ne "" ? $4 : 30);
+                $hash->{TIMEOUT_PRESENT} = ($5 ne "" ? $5 : 30);
+
+                if($hash->{helper}{call} =~ /\|/)
+                {
+                    my $msg = "The command contains a pipe ( | ) symbol, which is not allowed.";
+                    Log 2, "PRESENCE: ".$msg;
+                    return $msg;
+                }
+
+                if($hash->{MODE} eq "function" and not $hash->{helper}{call} =~ /^\{.+\}$/)
+                {
+                    my $msg = "The function call must be encapsulated by brackets ( {...} ).";
+                    Log 2, "PRESENCE: ".$msg;
+                    return $msg;
+                }
+            }
+         
+        }
+        elsif($a[2] eq "lan-bluetooth")
+        {
+         
+            unless($a[3] =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*$/)
+            {
+                my $msg = "given address is not a bluetooth hardware address";
+                Log 2, "PRESENCE: ".$msg;
+                return $msg
+            }
+
+            DevIo_CloseDev($hash);
+
+            $hash->{MODE} = "lan-bluetooth";
+            $hash->{ADDRESS} = $a[3];
+            $hash->{TIMEOUT_NORMAL} = (defined($a[5]) ? $a[5] : 30);
+            $hash->{TIMEOUT_PRESENT} = (defined($a[6]) ? $a[6] : 30);
+
+            $dev = $a[4];
+            $dev .= ":5222" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
+
+            $hash->{DeviceName} = $dev;
+
+        }
+        else
+        {
+            my $msg = "unknown mode: ".$a[2]." - Please use lan-ping, lan-bluetooth, local-bluetooth, fritzbox, shellscript or function";
+            Log 2, $msg;
+            return $msg
+        }
+    }
+    else
+    {
+        my $msg = "wrong syntax: define <name> PRESENCE <mode> <device-address> [ <check-interval> [ <present-check-interval> ] ]";
+        Log 2, $msg;
+        return $msg;
     }
 
+    my $timeout = $hash->{TIMEOUT_NORMAL};
+    my $presence_timeout = $hash->{TIMEOUT_PRESENCE};
+
+    if(defined($timeout) and not $timeout =~ /^\d+$/)
+    {
+        my $msg = "check-interval must be a number";
+        Log 2, "PRESENCE: ".$msg;
+        return $msg;
+    }
 
     if(defined($timeout) and not $timeout > 0)
     {
-		my $msg = "check-interval must be greater than zero";
-		Log 2, "PRESENCE: ".$msg;
-		return $msg;
+        my $msg = "check-interval must be greater than zero";
+        Log 2, "PRESENCE: ".$msg;
+        return $msg;
     }
 
 
     if(defined($presence_timeout) and not $presence_timeout =~ /^\d+$/)
     {
-		my $msg = "presence-check-interval must be a number";
-		Log 2, "PRESENCE: ".$msg;
-		return $msg;
+        my $msg = "presence-check-interval must be a number";
+        Log 2, "PRESENCE: ".$msg;
+        return $msg;
     }
 
 
     if(defined($presence_timeout) and not $presence_timeout > 0)
     {
-		my $msg = "presence-check-interval must be greater than zero";
-		Log 2, "PRESENCE: ".$msg;
-		return $msg;
+        my $msg = "presence-check-interval must be greater than zero";
+        Log 2, "PRESENCE: ".$msg;
+        return $msg;
     }
-    
-    
-  
-	delete $hash->{helper}{cachednr} if(defined($hash->{helper}{cachednr}));
-    
-	if($hash->{MODE} =~ /(lan-ping|local-bluetooth|fritzbox|shellscript|function)/)
-	{
-	    
-	    RemoveInternalTimer($hash);
-	    InternalTimer(gettimeofday()+2, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
-	    
-	    return;
-	  
-	}
-	elsif($hash->{MODE} eq "lan-bluetooth")
-	{
-	    return DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
-	}
-  
-   
+
+    delete $hash->{helper}{cachednr} if(defined($hash->{helper}{cachednr}));
+
+    if($hash->{MODE} =~ /(lan-ping|local-bluetooth|fritzbox|shellscript|function)/)
+    {
+        RemoveInternalTimer($hash);
+        InternalTimer(gettimeofday()+2, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+     
+        return;
+    }
+    elsif($hash->{MODE} eq "lan-bluetooth")
+    {
+        return DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
+    }
+
+
 }
 
 
@@ -241,18 +237,18 @@ PRESENCE_Define($$)
 sub
 PRESENCE_Undef($$)
 {
-	my ($hash, $arg) = @_;
-	my $name = $hash->{NAME};
+    my ($hash, $arg) = @_;
+    my $name = $hash->{NAME};
 
-	RemoveInternalTimer($hash);
-  
-	if(defined($hash->{helper}{RUNNING_PID}))
-	{
-		BlockingKill($hash->{helper}{RUNNING_PID});
-	}
-  
-	DevIo_CloseDev($hash); 
-	return undef;
+    RemoveInternalTimer($hash);
+
+    if(defined($hash->{helper}{RUNNING_PID}))
+    {
+        BlockingKill($hash->{helper}{RUNNING_PID});
+    }
+
+    DevIo_CloseDev($hash); 
+    return undef;
 }
 
 sub
@@ -261,37 +257,32 @@ PRESENCE_Set($@)
     my ($hash, @a) = @_;
 
     return "No Argument given" if(!defined($a[1]));
-   
+
     my $usage = "Unknown argument ".$a[1].", choose one of statusRequest";
-   
+
     if($a[1] eq "statusRequest")
     {
-		if($hash->{MODE} ne "lan-bluetooth")
-		{
-		    PRESENCE_StartLocalScan($hash, 1);
-		    return undef;
-		}
-		else
-		{
-			if(exists($hash->{FD}))
-			{
-				DevIo_SimpleWrite($hash, "now\n", 0);
-			}
-			else
-			{
-				return "PRESENCE Definition \"".$hash->{NAME}."\" is not connected to ".$hash->{DeviceName};	
-			}
-		} 
+        if($hash->{MODE} ne "lan-bluetooth")
+        {
+            PRESENCE_StartLocalScan($hash, 1);
+            return undef;
+        }
+        else
+        {
+            if(exists($hash->{FD}))
+            {
+                DevIo_SimpleWrite($hash, "now\n", 0);
+            }
+            else
+            {
+                return "PRESENCE Definition \"".$hash->{NAME}."\" is not connected to ".$hash->{DeviceName}; 
+            }
+        } 
     }
     else
     {
         return $usage;
     }
-   
-
-
-
-
 }
 
 
@@ -299,77 +290,77 @@ PRESENCE_Set($@)
 sub
 PRESENCE_Attr(@)
 {
-	my @a = @_;
-	my $hash = $defs{$a[1]};
+    my @a = @_;
+    my $hash = $defs{$a[1]};
 
-	if($a[0] eq "set" && $a[2] eq "disable")
-	{
-		if($a[3] eq "0")
-		{
-		
-			readingsSingleUpdate($hash, "state", "defined",0) if(exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 1);
-		
-			if(defined($hash->{DeviceName}))
-			{
-				if(defined($hash->{FD}))
-				{
-					PRESENCE_DoInit($hash) if(exists($hash->{helper}{DISABLED}));
-					$hash->{helper}{DISABLED} = 0;
-				}
-				else
-				{
-					$hash->{helper}{DISABLED} = 0;
-					DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
-				}
-			}
-			else
-			{
-				$hash->{helper}{DISABLED} = 0;
-				PRESENCE_StartLocalScan($hash);
-			}
-			
-			$hash->{helper}{DISABLED} = 0;
-	    }
-	    elsif($a[3] eq "1")
-	    {
-			if(defined($hash->{FD}))
-			{
-			    DevIo_SimpleWrite($hash, "stop\n", 0);
-			}
-	
-			RemoveInternalTimer($hash);
-	
-			$hash->{helper}{DISABLED} = 1;
-			readingsSingleUpdate($hash, "state", "disabled",1);
-		}
-    
-	}
-	elsif($a[0] eq "del" && $a[2] eq "disable")
-	{
-    
-	    readingsSingleUpdate($hash, "state", "defined",0) if(exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 1);
-		
-	    if(defined($hash->{DeviceName}))
-	    {
-	        if(defined($hash->{FD}))
-		    {
-				PRESENCE_DoInit($hash) if(exists($hash->{helper}{DISABLED}));
-				$hash->{helper}{DISABLED} = 0;
-		    }
-		    else
-		    {
-				$hash->{helper}{DISABLED} = 0;
-				DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
-		    }
-	    }
-	    else
-	    {
-			$hash->{helper}{DISABLED} = 0;
-	        PRESENCE_StartLocalScan($hash);
-	    }
-	}
-	
-	return undef;
+    if($a[0] eq "set" && $a[2] eq "disable")
+    {
+        if($a[3] eq "0")
+        {
+
+            readingsSingleUpdate($hash, "state", "defined",0) if(exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 1);
+
+            if(defined($hash->{DeviceName}))
+            {
+                if(defined($hash->{FD}))
+                {
+                    PRESENCE_DoInit($hash) if(exists($hash->{helper}{DISABLED}));
+                    $hash->{helper}{DISABLED} = 0;
+                }
+                else
+                {
+                    $hash->{helper}{DISABLED} = 0;
+                    DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
+                }
+            }   
+            else
+            {
+                $hash->{helper}{DISABLED} = 0;
+                PRESENCE_StartLocalScan($hash);
+            }
+
+            $hash->{helper}{DISABLED} = 0;
+        }
+        elsif($a[3] eq "1")
+        {
+            if(defined($hash->{FD}))
+            {   
+                DevIo_SimpleWrite($hash, "stop\n", 0);
+            }
+
+            RemoveInternalTimer($hash);
+
+            $hash->{helper}{DISABLED} = 1;
+            readingsSingleUpdate($hash, "state", "disabled",1);
+        }
+
+    }
+    elsif($a[0] eq "del" && $a[2] eq "disable")
+    {
+
+        readingsSingleUpdate($hash, "state", "defined",0) if(exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 1);
+
+        if(defined($hash->{DeviceName}))
+        {
+            if(defined($hash->{FD}))
+            {
+                PRESENCE_DoInit($hash) if(exists($hash->{helper}{DISABLED}));
+                $hash->{helper}{DISABLED} = 0;
+            }
+            else
+            {
+                $hash->{helper}{DISABLED} = 0;
+                DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
+            }
+        }
+        else
+        {
+            $hash->{helper}{DISABLED} = 0;
+            PRESENCE_StartLocalScan($hash);
+        }
+    }
+
+    return undef;
 }
 
 
@@ -379,62 +370,62 @@ PRESENCE_Attr(@)
 sub
 PRESENCE_Read($)
 {
-	my ($hash) = @_;
+    my ($hash) = @_;
 
-	my $buf = DevIo_SimpleRead($hash);
-	return "" if(!defined($buf));
-	  
-	chomp $buf;
-  
-  
-	readingsBeginUpdate($hash);
-    
+    my $buf = DevIo_SimpleRead($hash);
+    return "" if(!defined($buf));
+
+    chomp $buf;
+
+
+    readingsBeginUpdate($hash);
+
     if($buf eq "absence")
     {
-		readingsBulkUpdate($hash, "state", "absent");
+        readingsBulkUpdate($hash, "state", "absent");
     }
     elsif($buf =~ /present;(.+?)$/)
     {
-		readingsBulkUpdate($hash, "state", "present");
-	
-		if($1 =~ /^(.*);(.+)$/)
-		{
-		    readingsBulkUpdate($hash, "room", $2);
-		    readingsBulkUpdate($hash, "device_name", $1);
-		}
-		else
-		{
-		    readingsBulkUpdate($hash, "device_name", $1);
-		}
-	
+        readingsBulkUpdate($hash, "state", "present");
+
+        if($1 =~ /^(.*);(.+)$/)
+        {
+            readingsBulkUpdate($hash, "room", $2);
+            readingsBulkUpdate($hash, "device_name", $1);
+        }
+        else
+        {
+            readingsBulkUpdate($hash, "device_name", $1);
+        }
+
     }
     elsif($buf eq "command accepted")
     {
-		readingsBulkUpdate($hash, "command_accepted", "yes");
+        readingsBulkUpdate($hash, "command_accepted", "yes");
     }
     elsif($buf eq "command rejected")
     {
-		readingsBulkUpdate($hash, "command_accepted", "no");
+        readingsBulkUpdate($hash, "command_accepted", "no");
     }
     elsif($buf =~ /socket_closed;(.+?)$/)
     {
-		Log3 $hash->{NAME}, 3, "PRESENCE: collectord lost connection to room $1 for device ".$hash->{NAME};
+        Log3 $hash->{NAME}, 3, "PRESENCE: collectord lost connection to room $1 for device ".$hash->{NAME};
     }
     elsif($buf =~ /socket_reconnected;(.+?)$/)
     {
-		Log3 $hash->{NAME}, 3, "PRESENCE: collectord reconnected to room $1 for device ".$hash->{NAME};
+        Log3 $hash->{NAME}, 3, "PRESENCE: collectord reconnected to room $1 for device ".$hash->{NAME};
     }
     elsif($buf =~ /error;(.+?)$/)
     {
-		Log3 $hash->{NAME}, 3, "PRESENCE: room $1 cannot execute hcitool to check device ".$hash->{NAME};
+        Log3 $hash->{NAME}, 3, "PRESENCE: room $1 cannot execute hcitool to check device ".$hash->{NAME};
     }
     elsif($buf =~ /error$/)
     {
-		Log3 $hash->{NAME}, 3, "PRESENCE: presenced cannot execute hcitool to check device ".$hash->{NAME};
+        Log3 $hash->{NAME}, 3, "PRESENCE: presenced cannot execute hcitool to check device ".$hash->{NAME};
     }
-	
+
     readingsEndUpdate($hash, 1);
-  
+
 }
 
 sub
@@ -445,25 +436,25 @@ PRESENCE_DoInit($)
 
     if( not exists($hash->{helper}{DISABLED}) or (exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 0))
     {
-		readingsSingleUpdate($hash, "state", "active",0);
-		DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT_NORMAL}."\n", 0);
+        readingsSingleUpdate($hash, "state", "active",0);
+        DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT_NORMAL}."\n", 0);
     }
-	else
-	{
-		readingsSingleUpdate($hash, "state", "disabled",0);
-	}
-	
-	return undef;
-	
+    else
+    {
+        readingsSingleUpdate($hash, "state", "disabled",0);
+    }
+
+    return undef;
+
 }
 
 
 sub
 PRESENCE_Ready($)
 {
-	my ($hash) = @_;
-       
-	return DevIo_OpenDev($hash, 1, "PRESENCE_DoInit") if($hash->{MODE} eq "lan-bluetooth");
+    my ($hash) = @_;
+   
+    return DevIo_OpenDev($hash, 1, "PRESENCE_DoInit") if($hash->{MODE} eq "lan-bluetooth");
 
 }
 
@@ -478,29 +469,29 @@ sub PRESENCE_StartLocalScan($;$)
     my ($hash, $local) = @_;
 
     $local = 0 unless(defined($local));
-    
+
     $hash->{STATE} = "active" if($hash->{STATE} eq "???");
-    
-    
+
+
     if($hash->{MODE} eq "local-bluetooth")
     {
-		$hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
     elsif($hash->{MODE} eq "lan-ping")
     {
-		$hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local."|".AttrVal($hash->{NAME}, "ping_count", "4"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local."|".AttrVal($hash->{NAME}, "ping_count", "4"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
     elsif($hash->{MODE} eq "fritzbox")
     {
-		$hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local."|".AttrVal($hash->{NAME}, "fritzbox_repeater", "0"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local."|".AttrVal($hash->{NAME}, "fritzbox_repeater", "0"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
     elsif($hash->{MODE} eq "shellscript")
     {
-		$hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalShellScriptScan", $hash->{NAME}."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalShellScriptScan", $hash->{NAME}."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
     elsif($hash->{MODE} eq "function")
     {
-		$hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFunctionScan", $hash->{NAME}."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFunctionScan", $hash->{NAME}."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
 }
 
@@ -512,41 +503,41 @@ PRESENCE_DoLocalPingScan($)
     my ($name, $device, $local, $count) = split("\\|", $string);
 
     Log3 $name, 5, "PRESENCE_DoLocalPingScan: $string";
-   
+
     my $retcode;
     my $return;
     my $temp;
 
     if($^O =~ m/(Win|cygwin)/)
     {
-		$temp = qx(ping -n $count -4 $device);
-		
-		chomp $temp;
-		if($temp ne "")
-		{
-			Log3 $name, 5, "PRESENCE ($name) - ping command returned with output:\n$temp";
-			$return = "$name|$local|".($temp =~ /TTL=\d+/ ? "present" : "absent");
-		}
-		else
-		{	
-			$return = "$name|$local|error|Could not execute ping command: \"ping -n $count $device\"";
-		}
+        $temp = qx(ping -n $count -4 $device);
+
+        chomp $temp;
+        if($temp ne "")
+        {
+            Log3 $name, 5, "PRESENCE ($name) - ping command returned with output:\n$temp";
+            $return = "$name|$local|".($temp =~ /TTL=\d+/ ? "present" : "absent");
+        }
+        else
+        { 
+            $return = "$name|$local|error|Could not execute ping command: \"ping -n $count $device\"";
+        }
 
     }
     else
     {
-		$temp = qx(ping -c $count $device);
-		
-		chomp $temp;
-		if($temp ne "")
-		{
-			Log3 $name, 5, "PRESENCE ($name) - ping command returned with output:\n$temp";
-			$return = "$name|$local|".($temp =~ /\d+ [Bb]ytes (from|von)/ ? "present" : "absent");
-		}
-		else
-		{	
-			$return = "$name|$local|error|Could not execute ping command: \"ping -c $count $device\"";
-		}
+        $temp = qx(ping -c $count $device);
+
+        chomp $temp;
+        if($temp ne "")
+        {
+            Log3 $name, 5, "PRESENCE ($name) - ping command returned with output:\n$temp";
+            $return = "$name|$local|".($temp =~ /\d+ [Bb]ytes (from|von)/ ? "present" : "absent");
+        }
+        else
+        { 
+            $return = "$name|$local|error|Could not execute ping command: \"ping -c $count $device\"";
+        }
     }
 
     return $return;
@@ -557,26 +548,26 @@ sub
 PRESENCE_ExecuteFritzBoxCMD($$)
 {
 
-	my ($name, $cmd) = @_;
-	my $status;
-	my $wait;
+    my ($name, $cmd) = @_;
+    my $status;
+    my $wait;
 
-	while(-e "/var/tmp/fhem-PRESENCE-cmd-lock.tmp" and (stat("/var/tmp/fhem-PRESENCE-cmd-lock.tmp"))[9] > (gettimeofday() - 2))
-	{	 
-		$wait = int(rand(4))+2;
-		Log3 $name, 5, "PRESENCE_ExecuteFritzBoxCMD: ($name) - ctlmgr_ctl is locked. waiting $wait seconds...";
-		sleep $wait;
-	}
+    while(-e "/var/tmp/fhem-PRESENCE-cmd-lock.tmp" and (stat("/var/tmp/fhem-PRESENCE-cmd-lock.tmp"))[9] > (gettimeofday() - 2))
+    {  
+        $wait = int(rand(4))+2;
+        Log3 $name, 5, "PRESENCE_ExecuteFritzBoxCMD: ($name) - ctlmgr_ctl is locked. waiting $wait seconds...";
+        sleep $wait;
+    }
 
-	unlink("/var/tmp/fhem-PRESENCE-cmd-lock.tmp") if(-e "/var/tmp/fhem-PRESENCE-cmd-lock.tmp");
-	
-	qx(touch /var/tmp/fhem-PRESENCE-cmd-lock.tmp);
+    unlink("/var/tmp/fhem-PRESENCE-cmd-lock.tmp") if(-e "/var/tmp/fhem-PRESENCE-cmd-lock.tmp");
 
-	$status = qx($cmd);
+    qx(touch /var/tmp/fhem-PRESENCE-cmd-lock.tmp);
 
-	unlink("/var/tmp/fhem-PRESENCE-cmd-lock.tmp") if(-e "/var/tmp/fhem-PRESENCE-cmd-lock.tmp");
+    $status = qx($cmd);
 
-	return $status;
+    unlink("/var/tmp/fhem-PRESENCE-cmd-lock.tmp") if(-e "/var/tmp/fhem-PRESENCE-cmd-lock.tmp");
+
+    return $status;
 }
 
 sub
@@ -584,10 +575,10 @@ PRESENCE_DoLocalFritzBoxScan($)
 {
     my ($string) = @_;
     my ($name, $device, $local, $repeater) = split("\\|", $string);
-    
+
     Log3 $name, 5, "PRESENCE_DoLocalFritzBoxScan: $string";
     my $number=0;
-    
+
     my $check_command = ($repeater ? "active" : "speed");
 
 
@@ -596,70 +587,70 @@ PRESENCE_DoLocalFritzBoxScan($)
     if (defined($defs{$name}{helper}{cachednr})) 
     {
         $number = $defs{$name}{helper}{cachednr};
-       
+   
         Log3 $name, 5, "PRESENCE_DoLocalFritzBoxScan: try checking $name as device $device with cached number $number";
-       
+   
         my $cached_name = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/name");    
         chomp $cached_name;
-       
+   
         # only use the cached $number if it has still the correct device name
         if($cached_name eq $device)
         {
             Log3 $name, 5, "PRESENCE ($name) - checking with cached number the $check_command state ($number)";
-    	    $status = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command");
-    	    
-    	    chomp $status;
-    	    
-    	    Log3 $name, 5, "PRESENCE ($name) - ctlmgr_ctl (cached: $number) returned: $status";
-    	    
-    	    if(not $status =~ /^\s*\d+\s*$/)
-    	    {
-				return "$name|$local|error|could not execute ctlmgr_ctl (cached)";
-    	    }
-			
-    	    return ($status == 0)? "$name|$local|absent|$number" : "$name|$local|present|$number"; ###MH
-		}
-		else
-		{
-			Log3 $name, 5, "PRESENCE ($name) - cached device name ($cached_name) does not match expected name ($device). perform a full scan";
-		}
+            $status = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command");
+     
+            chomp $status;
+     
+            Log3 $name, 5, "PRESENCE ($name) - ctlmgr_ctl (cached: $number) returned: $status";
+     
+            if(not $status =~ /^\s*\d+\s*$/)
+            {
+                return "$name|$local|error|could not execute ctlmgr_ctl (cached)";
+            }
+
+            return ($status == 0)? "$name|$local|absent|$number" : "$name|$local|present|$number"; ###MH
+        }
+        else
+        {
+            Log3 $name, 5, "PRESENCE ($name) - cached device name ($cached_name) does not match expected name ($device). perform a full scan";
+        }
     }
 
     my $max = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice/count");
-    
+
     chomp $max;
-    
+
     Log3 $name, 5, "PRESENCE ($name) - ctlmgr_ctl (getting device count) returned: $max";
-    
+
     if(not $max =~ /^\s*\d+\s*$/)
     {
-       return "$name|$local|error|could not execute ctlmgr_ctl";
+        return "$name|$local|error|could not execute ctlmgr_ctl";
     }
-    
+
     my $net_device;
 
     $number = 0;
-    
+
     while($number <= $max)
     {
-		$net_device = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/name");
-        
+        $net_device = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/name");
+    
         chomp $net_device;
-        
+    
         Log3 $name, 5, "PRESENCE ($name) - checking with device number $number the $check_command state ($net_device)";
-	
-		if($net_device eq $device)
-		{
-			$status = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command"); 
-  	    
-			chomp $status;
-  	    
-			Log3 $name, 5, "PRESENCE ($name) - $check_command for device number $net_device is $status";
-			last;
-		}
-	
-		$number++;
-		sleep 0.2;
+
+        if($net_device eq $device)
+        {
+            $status = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command"); 
+   
+            chomp $status;
+   
+            Log3 $name, 5, "PRESENCE ($name) - $check_command for device number $net_device is $status";
+            last;
+        }
+
+        $number++;
+        sleep 0.2;
     }
 
     return ($status == 0 ? "$name|$local|absent" : "$name|$local|present").($number <= $max ? "|$number" : "");
@@ -676,58 +667,58 @@ PRESENCE_DoLocalBluetoothScan($)
     my $return;
     my $wait = 1;
     my $ps;
-	
-	my $psargs = "ax";
-	
-	if(qx(ps --help 2>&1) =~ /BusyBox/g)
-	{
-		Log3 $name, 5, "PRESENCE ($name): found busybox variant of ps command, using \"w\" as parameter";
-		$psargs = "w";
-	}
-	else
-	{
-		Log3 $name, 5, "PRESENCE ($name): found standard variant of ps command, using \"ax\" as parameter";
-		$psargs = "ax";
-	}
-    
+
+    my $psargs = "ax";
+
+    if(qx(ps --help 2>&1) =~ /BusyBox/g)
+    {
+        Log3 $name, 5, "PRESENCE ($name): found busybox variant of ps command, using \"w\" as parameter";
+        $psargs = "w";
+    }
+    else
+    {
+        Log3 $name, 5, "PRESENCE ($name): found standard variant of ps command, using \"ax\" as parameter";
+        $psargs = "ax";
+    }
+
     Log3 $name, 4, "PRESENCE ($name): 'which hcitool' returns: $hcitool";
     chomp $hcitool;
-    
-    
+
+
     if(-x $hcitool)
     {
         while($wait)
         {   # check if another hcitool process is running
-			$ps = qx(ps $psargs | grep hcitool | grep -v grep);
-			if(not $ps =~ /^\s*$/)
-			{
-				# sleep between 1 and 5 seconds and try again
-				Log3 $name, 5, "PRESENCE ($name) - another hcitool command is running. waiting...";
-				sleep(rand(4)+1);
-			}
-			else
-			{
-				$wait = 0;
-			}
-		}
-    	   
-		$devname = qx(hcitool name $device);
+            $ps = qx(ps $psargs | grep hcitool | grep -v grep);
+            if(not $ps =~ /^\s*$/)
+            {
+                # sleep between 1 and 5 seconds and try again
+                Log3 $name, 5, "PRESENCE ($name) - another hcitool command is running. waiting...";
+                sleep(rand(4)+1);
+            }
+            else
+            {
+                $wait = 0;
+            }
+        }
+    
+        $devname = qx(hcitool name $device);
 
-		chomp($devname);
-		Log3 $name, 4, "PRESENCE ($name) - hcitool returned: $devname";
+        chomp($devname);
+        Log3 $name, 4, "PRESENCE ($name) - hcitool returned: $devname";
 
-		if(not $devname =~ /^\s*$/)
-		{
-			$return = "$name|$local|present|$devname";
-		}
-		else
-		{
-			$return = "$name|$local|absent";
-		}
+        if(not $devname =~ /^\s*$/)
+        {
+            $return = "$name|$local|present|$devname";
+        }
+        else
+        {
+            $return = "$name|$local|absent";
+        }
     }
     else
     {
-		$return = "$name|$local|error|no hcitool binary found. Please check that the bluez-package is properly installed";
+        $return = "$name|$local|error|no hcitool binary found. Please check that the bluez-package is properly installed";
     }
 
     return $return;
@@ -742,34 +733,34 @@ PRESENCE_DoLocalShellScriptScan($)
 
     my $ret;
     my $return;
-    
+
     Log3 $name, 5, "PRESENCE_DoLocalShellScriptScan: $string";
 
     $ret = qx($call);
-    
+
     chomp $ret;
-    
+
     if(not defined($ret))
     {
-		$return = "$name|$local|error|scriptcall doesn't return any output"; 
+        $return = "$name|$local|error|scriptcall doesn't return any output"; 
     }
     elsif($ret eq "1")
     {
-		$return = "$name|$local|present";
+        $return = "$name|$local|present";
     }
     elsif($ret eq "0")
     {
-		$return = "$name|$local|absent";
+        $return = "$name|$local|absent";
     }
     else
     {
-		$ret =~ s/\n/<<line-break>>/g;
-	
-		$return = "$name|$local|error|unexpected script output (expected 0 or 1): $ret"; 
+        $ret =~ s/\n/<<line-break>>/g;
+
+        $return = "$name|$local|error|unexpected script output (expected 0 or 1): $ret"; 
     }
-    
-    
-    
+
+
+
     return $return;
 
 }
@@ -784,34 +775,34 @@ PRESENCE_DoLocalFunctionScan($)
 
     my $ret;
     my $return;
-    
+
     Log3 $name, 5, "PRESENCE_DoLocalFunctionScan: $string";
 
     $ret = AnalyzeCommandChain(undef, $call);
-    
+
     chomp $ret;
-    
+
     if(not defined($ret))
     {
-		$return = "$name|$local|error|function call doesn't return any output"; 
+        $return = "$name|$local|error|function call doesn't return any output"; 
     }
     elsif($ret eq "1")
     {
-		$return = "$name|$local|present";
+        $return = "$name|$local|present";
     }
     elsif($ret eq "0")
     {
-		$return = "$name|$local|absent";
+        $return = "$name|$local|absent";
     }
     else
     {
-		$ret =~ s/\n/<<line-break>>/g;
-	
-		$return = "$name|$local|error|unexpected function output (expected 0 or 1): $ret"; 
+        $ret =~ s/\n/<<line-break>>/g;
+
+        $return = "$name|$local|error|unexpected function output (expected 0 or 1): $ret"; 
     }
-    
-    
-    
+
+
+
     return $return;
 
 }
@@ -819,97 +810,97 @@ PRESENCE_DoLocalFunctionScan($)
 sub
 PRESENCE_ProcessLocalScan($)
 {
-	my ($string) = @_;
- 
- 
-	return unless(defined($string));
-    
-	my @a = split("\\|",$string);
-	my $hash = $defs{$a[0]}; 
-	
-	return if($hash->{helper}{DISABLED});
- 
-	my $local = $a[1];
+    my ($string) = @_;
 
-	Log3 $hash->{NAME}, 5, "PRESENCE_ProcessLocalScan: $string";
-  
-	if(defined($hash->{helper}{RETRY_COUNT}))
-	{
-		Log3 $hash->{NAME}, 2, "PRESENCE: ".$hash->{NAME}." returned a valid result after ".$hash->{helper}{RETRY_COUNT}." unsuccesful ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry");
-		delete($hash->{helper}{RETRY_COUNT});
-	}
 
- 
-	if($hash->{MODE} eq "fritzbox" and defined($a[3]))
-	{
-		$hash->{helper}{cachednr} = $a[3] if(($a[2] eq "present") || ($a[2] eq "absent")); 
-	}
-	elsif($hash->{MODE} eq "fritzbox" and defined($hash->{helper}{cachednr}))
-	{
-		delete($hash->{helper}{cachednr});
-	}
- 
-	readingsBeginUpdate($hash);
- 
-	if($a[2] eq "present")
-	{
-		readingsBulkUpdate($hash, "state", "present");
-		readingsBulkUpdate($hash, "device_name", $a[3]) if(defined($a[3]) and $hash->{MODE} =~ /^(lan-bluetooth|local-bluetooth)$/ );
-	}
-	elsif($a[2] eq "absent")
-	{
-		readingsBulkUpdate($hash, "state", "absent");
-	}
-	elsif($a[2] eq "error")
-	{
-		$a[3] =~ s/<<line-break>>/\n/g;
-    
-		Log3 $hash->{NAME}, 2, "PRESENCE: error while processing device ".$hash->{NAME}." - ".$a[3];
-	}
+    return unless(defined($string));
 
-	readingsEndUpdate($hash, 1);
- 
-	delete($hash->{helper}{RUNNING_PID});
- 
-	#Schedule the next check withing $timeout if it is a regular run
-	unless($local)
-	{
-		RemoveInternalTimer($hash);
-		InternalTimer(gettimeofday()+($a[2] eq "present" ? $hash->{TIMEOUT_PRESENT} : $hash->{TIMEOUT_NORMAL}), "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
-	}
+    my @a = split("\\|",$string);
+    my $hash = $defs{$a[0]}; 
+
+    return if($hash->{helper}{DISABLED});
+
+    my $local = $a[1];
+
+    Log3 $hash->{NAME}, 5, "PRESENCE_ProcessLocalScan: $string";
+
+    if(defined($hash->{helper}{RETRY_COUNT}))
+    {
+        Log3 $hash->{NAME}, 2, "PRESENCE: ".$hash->{NAME}." returned a valid result after ".$hash->{helper}{RETRY_COUNT}." unsuccesful ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry");
+        delete($hash->{helper}{RETRY_COUNT});
+    }
+
+
+    if($hash->{MODE} eq "fritzbox" and defined($a[3]))
+    {
+        $hash->{helper}{cachednr} = $a[3] if(($a[2] eq "present") || ($a[2] eq "absent")); 
+    }
+    elsif($hash->{MODE} eq "fritzbox" and defined($hash->{helper}{cachednr}))
+    {
+        delete($hash->{helper}{cachednr});
+    }
+
+    readingsBeginUpdate($hash);
+
+    if($a[2] eq "present")
+    {
+        readingsBulkUpdate($hash, "state", "present");
+        readingsBulkUpdate($hash, "device_name", $a[3]) if(defined($a[3]) and $hash->{MODE} =~ /^(lan-bluetooth|local-bluetooth)$/ );
+    }
+    elsif($a[2] eq "absent")
+    {
+        readingsBulkUpdate($hash, "state", "absent");
+    }
+    elsif($a[2] eq "error")
+    {
+        $a[3] =~ s/<<line-break>>/\n/g;
+
+        Log3 $hash->{NAME}, 2, "PRESENCE: error while processing device ".$hash->{NAME}." - ".$a[3];
+    }
+
+    readingsEndUpdate($hash, 1);
+
+    delete($hash->{helper}{RUNNING_PID});
+
+    #Schedule the next check withing $timeout if it is a regular run
+    unless($local)
+    {
+        RemoveInternalTimer($hash);
+        InternalTimer(gettimeofday()+($a[2] eq "present" ? $hash->{TIMEOUT_PRESENT} : $hash->{TIMEOUT_NORMAL}), "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+    }
 }
 
 sub
 PRESENCE_ProcessAbortedScan($)
 {
 
-	my ($hash) = @_;
-	
-	delete($hash->{helper}{RUNNING_PID});
-	RemoveInternalTimer($hash);
-   
-	if(defined($hash->{helper}{RETRY_COUNT}))
-	{
-		if($hash->{helper}{RETRY_COUNT} >= 3)
-		{
-			Log3 $hash->{NAME}, 2, "PRESENCE: ".$hash->{NAME}." could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry"). " (resuming normal operation)" if($hash->{helper}{RETRY_COUNT} == 3);
-			InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
-			$hash->{helper}{RETRY_COUNT}++;
-		}
-		else
-		{
-			Log3 $hash->{NAME}, 2, "PRESENCE: ".$hash->{NAME}." could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry")." (retrying in 10 seconds)";
-			InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
-			$hash->{helper}{RETRY_COUNT}++;
-		}
-    
-	}
-	else
-	{
-		$hash->{helper}{RETRY_COUNT} = 1;
-		InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
-		Log 2, "PRESENCE: ".$hash->{NAME}." could not be checked (retrying in 10 seconds)"
-	}
+    my ($hash) = @_;
+
+    delete($hash->{helper}{RUNNING_PID});
+    RemoveInternalTimer($hash);
+
+    if(defined($hash->{helper}{RETRY_COUNT}))
+    {
+        if($hash->{helper}{RETRY_COUNT} >= 3)
+        {
+            Log3 $hash->{NAME}, 2, "PRESENCE: ".$hash->{NAME}." could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry"). " (resuming normal operation)" if($hash->{helper}{RETRY_COUNT} == 3);
+            InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+            $hash->{helper}{RETRY_COUNT}++;
+        }
+        else
+        {
+            Log3 $hash->{NAME}, 2, "PRESENCE: ".$hash->{NAME}." could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry")." (retrying in 10 seconds)";
+            InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+            $hash->{helper}{RETRY_COUNT}++;
+        }
+
+    }
+    else
+    {
+        $hash->{helper}{RETRY_COUNT} = 1;
+        InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+        Log 2, "PRESENCE: ".$hash->{NAME}." could not be checked (retrying in 10 seconds)"
+    }
 }
 
 1;
