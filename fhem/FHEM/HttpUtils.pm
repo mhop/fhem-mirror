@@ -224,6 +224,8 @@ HttpUtils_ParseAnswer($$)
   }
 
   $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
+  return ("", $ret) if(!defined($1));
+
   my @header= split("\r\n", $1);
   my @header0= split(" ", shift @header);
   my $code= $header0[1];
