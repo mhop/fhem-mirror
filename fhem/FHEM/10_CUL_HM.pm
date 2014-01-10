@@ -3343,15 +3343,18 @@ sub CUL_HM_Set($@) {
   }
   elsif($cmd eq "peerChan") { ############################################# reg
     #peerChan <btnN> <device> ... [single|dual] [set|unset] [actor|remote|both]
-    my ($bNo,$peerN,$single,$set,$target) = ($a[2],$a[3],$a[4],$a[5],$a[6]);
+    my ($bNo,$peerN,$single,$set,$target) = ($a[2],$a[3],($a[4]?$a[4]:"dual"),
+                                                         ($a[5]?$a[5]:"set"),
+                                                         ($a[6]?$a[6]:"both"));
     $state = "";
     return "$bNo is not a button number"                          if(($bNo < 1) && !$roleC);
     my $peerId = CUL_HM_name2Id($peerN);
     return "please enter peer"                                    if(!$peerId);
     $peerId .= "01" if( length($peerId)==6);
 
-    my ($peerChn,$peerBtn,$peerHash,$myBtn);
+    my ($peerChn,$peerBtn,$peerHash,$myBtn,$cmdB);
     my $peerDst = substr($peerId,0,6);
+    my $pmd     = AttrVal(CUL_HM_id2Name($peerDst), "model"  , "");
 
     if ($md =~ m/HM-CC-RT-DN/ && $chn eq "05" ){# rt team peers cross from 05 to 04
       $myBtn = $peerBtn = "04";
@@ -3364,18 +3367,20 @@ sub CUL_HM_Set($@) {
     $peerHash = $modules{CUL_HM}{defptr}{$peerDst.$peerChn}if ($modules{CUL_HM}{defptr}{$peerDst.$peerChn});
     $peerHash = $modules{CUL_HM}{defptr}{$peerDst}         if (!$peerHash);
 
-    return "$peerN not a CUL_HM device"                           if($target && ($target ne "remote") &&(!$peerHash ||$peerHash->{TYPE} ne "CUL_HM"));
-    return "$single must be single or dual"                       if(defined($single) && ($single !~ m/^(single|dual)$/));
-    return "$set must be set or unset"                            if(defined($set)    && ($set    !~ m/^(set|unset)$/));
-    return "$target must be [actor|remote|both]"                  if(defined($target) && ($target !~ m/^(actor|remote|both)$/));
-    return "use climate chan to pair TC"                          if( $md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/ && $myBtn ne "02");
-    return "use - single [set|unset] actor - for smoke detector"  if( $st eq "smokeDetector"       && (!$single || $single ne "single" || $target ne "actor"));
-    return "use - single - for ".$st                              if(($st =~ m/(threeStateSensor|thermostat|motionDetector)/)
-                                                                          && (!$single || $single ne "single"));
+    return "$peerN not a CUL_HM device"                           if(($target ne "remote") &&(!$peerHash ||$peerHash->{TYPE} ne "CUL_HM"));
+    return "$single must be single or dual"                       if($single !~ m/^(single|dual)$/);
+    return "$set must be set or unset"                            if($set    !~ m/^(set|unset)$/);
+    return "$target must be [actor|remote|both]"                  if($target !~ m/^(actor|remote|both)$/);
+    return "use - single [set|unset] actor - for smoke detector"  if( $st eq "smokeDetector"       && ($single ne "single" || $target ne "actor"));
+    return "use - single - for ".$st                              if(($st =~ m/(threeStateSensor|thermostat|motionDetector)/) && ($single ne "single"));
+    return "TC WindowRec only peers to channel 01 single"         if( $pmd =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/ && $peerChn eq "03" && $myBtn ne "01" && $set eq "set");
+
     my $pSt = CUL_HM_Get($peerHash,$peerHash->{NAME},"param","subType");
 
     $single = ($single eq "single")?1:"";#default to dual
-    $set = ($set && $set eq "unset")?0:1;
+    
+    if ($set eq "unset"){$set = 0;$cmdB ="02";}
+    else                {$set = 1;$cmdB ="01";}
 
     my ($b1,$b2,$nrCh2Pair);
     $b1 = ($roleC) ? hex($myBtn) : ($single?$bNo : ($bNo*2 - 1));
@@ -3389,7 +3394,6 @@ sub CUL_HM_Set($@) {
       $nrCh2Pair = 2;
     }
     $target = "both" if ($st eq "virtual" && $pSt eq "smokeDetector");
-    my $cmdB = ($set)?"01":"02";# do we set or remove?
 
     # First the remote (one loop for on, one for off)
     if (!$target || $target =~ m/^(remote|both)$/){
@@ -4084,11 +4088,10 @@ sub CUL_HM_respPendTout($) {
       Log3 $name,4,"CUL_HM_Resend: $name nr ".$pHash->{rspWait}{reSent};
       if ($hash->{protCondBurst}&&$hash->{protCondBurst} eq "on" ){
         #timeout while conditional burst was active. try re-wakeup
-        my (undef,$addr,$msg) = unpack 'A10A12A*',
-                                       $hash->{helper}{prt}{rspWait}{cmd};
+        my $addr = CUL_HM_IOid($hash);
         $pHash->{rspWaitSec}{$_} = $pHash->{rspWait}{$_}
                     foreach (keys%{$pHash->{rspWait}});
-        CUL_HM_SndCmd($hash,"++B112$addr");
+        CUL_HM_SndCmd($hash,"++B112$addr$HMid");
         $hash->{helper}{prt}{awake}=4;# start re-wakeup
       }
       elsif(CUL_HM_getRxType($hash) & 0x08){# wakeup devices
