@@ -134,15 +134,17 @@ SVG_FwFn($$$$)
   my $ret = "";
 
   # plots navigation buttons
-  if((!$pageHash || !$pageHash->{buttons}) &&
-     AttrVal($d, "fixedrange", "x") !~ m/^[ 0-9:-]*$/) {
+  if (AttrVal($d,"plotmode",$FW_plotmode) ne "gnuplot") {
+    if((!$pageHash || !$pageHash->{buttons}) &&
+       AttrVal($d, "fixedrange", "x") !~ m/^[ 0-9:-]*$/) {
 
-    $ret .= SVG_zoomLink("zoom=-1", "Zoom-in", "zoom in");
-    $ret .= SVG_zoomLink("zoom=1",  "Zoom-out","zoom out");
-    $ret .= SVG_zoomLink("off=-1",  "Prev",    "prev");
-    $ret .= SVG_zoomLink("off=1",   "Next",    "next");
-    $pageHash->{buttons} = 1 if($pageHash);
-    $ret .= "<br>";
+      $ret .= SVG_zoomLink("zoom=-1", "Zoom-in", "zoom in");
+      $ret .= SVG_zoomLink("zoom=1",  "Zoom-out","zoom out");
+      $ret .= SVG_zoomLink("off=-1",  "Prev",    "prev");
+      $ret .= SVG_zoomLink("off=1",   "Next",    "next");
+      $pageHash->{buttons} = 1 if($pageHash);
+      $ret .= "<br>";
+    }
   }
 
   my $arg="$FW_ME/SVG_showLog?dev=$d".
@@ -734,25 +736,35 @@ SVG_showLog($)
     my $errfile = "/tmp/gnuplot.err";
 
     if($pm eq "gnuplot" || !$SVG_devs{$d}{from}) {
-      # Looking for the logfile....
-      $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
-      my $path = "$1/$file";
-      $path = AttrVal($d,"archivedir","") . "/$file" if(!-f $path);
-      return ($FW_RETTYPE, "Cannot read $path") if(!-r $path);
+      # Fix range, as we are without scroll
+      my $f = 0;     # From the beginning of time...
+      my $t = 9;     # till the end
 
-      my ($err, $cfg, $plot, undef) = SVG_readgplotfile($wl, $gplot_pgm);
+      my ($err, $cfg, $plot, $flog) = SVG_readgplotfile($wl, $gplot_pgm);
       return ($FW_RETTYPE, $err) if($err);
-      my $gplot_script = SVG_substcfg(0, $wl, $cfg, $plot, $file,$tmpfile);
 
-      my $fr = AttrVal($wl, "fixedrange", undef);
-      if($fr) {
-        $fr =~ s/ /\":\"/;
-        $fr = "set xrange [\"$fr\"]\n";
-        $gplot_script =~ s/(set timefmt ".*")/$1\n$fr/;
+      # Read the data from the filelog
+      my $oll = $attr{global}{verbose};
+      $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
+      my @path = split(" ", FW_fC("get $d $file $tmpfile $f $t " .
+                                  join(" ", @{$flog})));
+      $attr{global}{verbose} = $oll;
+
+      # replace the path with the temporary filenames of the filelog output
+      my $i = 0;
+      $plot =~ s/\".*?using 1:[^ ]+ /"\"$path[$i++]\" using 1:2 "/gse;
+      my $xrange = "\n";        #We don't have a range, but need the new line
+      foreach my $p (@path) {   # If the file is empty, write a 0 line
+        next if(!-z $p);
+        open(FH, ">$p");
+        print FH "$f 0\n";
+        close(FH);
       }
 
+      my $gplot_script = SVG_substcfg(0, $wl, $cfg, $plot, $file, $tmpfile);
+
       open(FH, "|gnuplot >> $errfile 2>&1");# feed it to gnuplot
-      print FH $gplot_script;
+      print FH $gplot_script, $xrange, $plot;
       close(FH);
 
     } elsif($pm eq "gnuplot-scroll") {
@@ -911,7 +923,6 @@ SVG_render($$$$$$$$$)
   my $flog        = shift;  # #FileLog lines, as array pointer
 
   $SVG_RET="";
-
   my $SVG_ss = AttrVal($parent_name, "smallscreen", 0);
   return $SVG_RET if(!defined($dp));
 
