@@ -5,10 +5,9 @@ FW_svgUpdateDevs(devs)
   var embArr = document.getElementsByTagName("embed");
   for(var i = 0; i < embArr.length; i++) {
     var svg = embArr[i].getSVGDocument();
-    if(svg == null) // too many events sometimes.
+    if(!svg || !svg.firstChild || !svg.firstChild.nextSibling)
       continue;
-    svg = svg.firstChild.nextSibling;
-    var flog = svg.getAttribute("flog");
+    var flog = svg.firstChild.nextSibling.getAttribute("flog");
     for(var j=0; j < devs.length; j++) {
       if(flog !== null && flog.match(" "+devs[j]+" ")) {
         var e = embArr[i];

@@ -481,7 +481,11 @@ FW_answerCall($)
       $me->{inform}{type}   = ($FW_room ? "status" : "raw");
       $me->{inform}{filter} = ($FW_room ? $FW_room : ".*");
     }
-    my %h = map { $_ => 1 } devspec2array($me->{inform}{filter});
+    my $filter = $me->{inform}{filter};
+    $filter = "NAME=.*" if($filter eq "room=all");
+    $filter = "room!=.*" if($filter eq "room=Unsorted");
+
+    my %h = map { $_ => 1 } devspec2array($filter);
     $me->{inform}{devices} = \%h;
 
     # NTFY_ORDER is larger than the normal order (50-)
@@ -704,7 +708,6 @@ FW_digestCgi($)
   $cmd.=" $arg{$c}" if(defined($arg{$c}) &&
                        ($arg{$c} ne "state" || $cmd !~ m/^set/));
   $cmd.=" $val{$c}" if(defined($val{$c}));
-#Log3 $FW_wname, 1, "GOT:$arg -> CMD:$cmd";
   return ($cmd, $c);
 }
 
@@ -859,7 +862,6 @@ sub
 FW_doDetail($)
 {
   my ($d) = @_;
-
 
   my $h = $defs{$d};
   my $t = $h->{TYPE};
@@ -1989,6 +1991,8 @@ FW_roomStatesForInform($)
   my @data;
   foreach my $dn (keys %{$me->{inform}{devices}}) {
     next if(!defined($defs{$dn}));
+    my $t = $defs{$dn}{TYPE};
+    next if(!$t || $modules{$t}{FW_atPageEnd});
     my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
     if($defs{$dn} && $defs{$dn}{STATE} && $defs{$dn}{TYPE} ne "weblink") {
       push @data, "$dn<<$defs{$dn}{STATE}<<$txt";
