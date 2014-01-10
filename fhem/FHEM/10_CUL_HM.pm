@@ -310,6 +310,7 @@ sub CUL_HM_updateConfig($){
         }
       }
     }
+    CUL_HM_complConfig($name);
   }
   delete $modules{CUL_HM}{helper}{updtCfgLst};
 }
@@ -4075,9 +4076,12 @@ sub CUL_HM_respPendTout($) {
     }
     elsif ($pHash->{rspWait}{reSent} > AttrVal($name,"msgRepeat",3)#too many
            ||(!(CUL_HM_getRxType($hash) & 0x8B))){#config/lacyConfig cannot retry
-      my $pendCmd = ($pHash->{rspWait}{Pending}
-                                ?"RESPONSE TIMEOUT:".$pHash->{rspWait}{Pending}
-                                :"MISSING ACK");# save before remove
+
+      my $pendCmd = "MISSING ACK";
+      if ($pHash->{rspWait}{Pending}){
+        $pendCmd = "RESPONSE TIMEOUT:".$pHash->{rspWait}{Pending};
+        CUL_HM_complConfig($name);
+      }
       CUL_HM_eventP($hash,"ResndFail");
       readingsSingleUpdate($hash,"state",$pendCmd,1);
       CUL_HM_ProcessCmdStack($hash); # continue processing commands if any
@@ -5512,6 +5516,7 @@ sub CUL_HM_complConfig($) {# read config if enabled and not complete
   if (CUL_HM_peerUsed($name) && !CUL_HM_peersValid($name) ){
     CUL_HM_qAutoRead($name,0);
     CUL_HM_complConfigTest($name);
+    Log3 $name,5,"CUL_HM $name queue configRead";
     return;
   }
   my @regList = CUL_HM_reglUsed($name);
@@ -5519,6 +5524,7 @@ sub CUL_HM_complConfig($) {# read config if enabled and not complete
     if (ReadingsVal($name,$_,"") !~ m /00:00/){
       CUL_HM_qAutoRead($name,0);
       CUL_HM_complConfigTest($name);
+      Log3 $name,5,"CUL_HM $name queue configRead";
       last;
     }
   }
