@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.4
+# Version: 1.2.5
 #
 # Major Version History:
 # - 1.2.0 - 2013-12-21
@@ -41,6 +41,7 @@
 
 package main;
 
+use 5.012;
 use strict;
 use warnings;
 use XML::Simple;
@@ -205,6 +206,7 @@ sub ENIGMA2_GetStatus($;$) {
                       )
                     {
                         my $i = 0;
+                        # TODO this loop is >5.012 only
                         for ( keys @{ $services_list->{e2service} } ) {
                             my $channel =
                               $services_list->{e2service}[$_]{e2servicename};
@@ -555,7 +557,8 @@ sub ENIGMA2_GetStatus($;$) {
 
             if (   defined( $currsrvinfo->{e2service}{$e2reading} )
                 && lc( $currsrvinfo->{e2service}{$e2reading} ) ne "n/a"
-                && lc( $currsrvinfo->{e2service}{$e2reading} ) ne "n/axn/a" )
+                && lc( $currsrvinfo->{e2service}{$e2reading} ) ne "n/axn/a"
+                && lc( $currsrvinfo->{e2service}{$e2reading} ) ne "0x0" )
             {
                 if (   $currsrvinfo->{e2service}{$e2reading} eq "False"
                     || $currsrvinfo->{e2service}{$e2reading} eq "True" )
@@ -595,13 +598,14 @@ sub ENIGMA2_GetStatus($;$) {
                     my @servicetype =
                       split( /:/, $currsrvinfo->{e2service}{$e2reading} );
 
-                    if ( defined( $servicetype[2] )
-                        && $servicetype[2] eq "2" )
+                    if (   defined( $servicetype[2] )
+                        && $servicetype[2] eq "2"
+                        && $hash->{READING}{input}{VAL} ne "radio" )
                     {
                         $hash->{helper}{lastInput} = "radio";
                         readingsBulkUpdate( $hash, "input", "radio" );
                     }
-                    else {
+                    elsif ( $hash->{READING}{input}{VAL} ne "tv" ) {
                         $hash->{helper}{lastInput} = "tv";
                         readingsBulkUpdate( $hash, "input", "tv" );
                     }
@@ -945,7 +949,7 @@ sub ENIGMA2_Get($@) {
     }
     else {
         return
-"Unknown argument $what, choose one of power:noArg input:noArg volume:noArg mute:noArg channel:noArg currentMedia:noArg currentTitle:noArg serviceprovider:noArg servicevideosize:noArg streamUrl:,mobile ";
+"Unknown argument $what, choose one of power:noArg input:noArg volume:noArg mute:noArg channel:noArg currentMedia:noArg currentTitle:noArg nextTitle:noArg providername:noArg servicevideosize:noArg streamUrl:,mobile ";
     }
 }
 
