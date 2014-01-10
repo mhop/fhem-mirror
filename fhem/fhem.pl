@@ -919,7 +919,7 @@ devspec2array($)
         if(!defined($val)) {
           $val = $attr{$d}{$n} if($attr{$d});
         }
-        next if(!defined($val));
+        $val="" if(!defined($val));
         eval { # a bad regexp is deadly
           if(($op eq  "=" && $val =~ m/\b$re\b/) ||
              ($op eq "!=" && $val !~ m/\b$re\b/)) {
