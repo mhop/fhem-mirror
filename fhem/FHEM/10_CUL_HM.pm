@@ -1848,6 +1848,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           ($addr,$data) = (hex($1),$2) if ($data =~ m/(..)(.*)/);
           if ($addr == 0){
            $data = "00:00";
+           push @dataList,"00:00";
           }
           else{
             $data =~s/(..)/$1:/g;
