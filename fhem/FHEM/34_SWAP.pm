@@ -811,7 +811,7 @@ SWAP_updateReadings($$$)
         readingsBulkUpdate($hash, lc($endpoint->{name}), $v);
       }
       my $reading = SWAP_regName($rid,$i,$endpoint);
-      readingsBulkUpdate($hash, $reading, $value) if( ReadingsVal($name,$reading,"") ne $value );
+      readingsBulkUpdate($hash, $reading, $value) ;# if( ReadingsVal($name,$reading,"") ne $value );
       ++$i;
     }
     readingsBulkUpdate($hash, "state", (substr($data,0,6) eq "000000"?"off":$data)) if( defined($attr{$name}{ProductCode}) && $attr{$name}{ProductCode} eq '0000002200000003' && $reg == 0x0B );
