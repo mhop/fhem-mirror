@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.5
+# Version: 1.2.6
 #
 # Major Version History:
 # - 1.2.0 - 2013-12-21
@@ -72,7 +72,7 @@ sub ENIGMA2_Initialize($) {
     $hash->{UndefFn} = "ENIGMA2_Undefine";
 
     $hash->{AttrList} =
-"https:0,1 http-method:GET,POST disable:0,1 bouquet-tv bouquet-radio timeout "
+"https:0,1 http-method:GET,POST disable:0,1 bouquet-tv bouquet-radio timeout model "
       . $readingFnAttributes;
 
     $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG} =
@@ -206,6 +206,7 @@ sub ENIGMA2_GetStatus($;$) {
                       )
                     {
                         my $i = 0;
+
                         # TODO this loop is >5.012 only
                         for ( keys @{ $services_list->{e2service} } ) {
                             my $channel =
@@ -406,7 +407,19 @@ sub ENIGMA2_GetStatus($;$) {
                             $boxinfo->{e2about}{$e2reading} );
                     }
                 }
+
+                # model attribute
+                if ( $reading eq "model" ) {
+                    my $model = $boxinfo->{e2about}{$e2reading};
+                    $model =~ s/\s/_/g;
+                    if ( !exists( $attr{$name}{model} )
+                        || $attr{$name}{model} ne $model )
+                    {
+                        $attr{$name}{model} = $model;
+                    }
+                }
             }
+
             else {
                 if ( !defined( $hash->{READINGS}{$reading}{VAL} )
                     || $hash->{READINGS}{$reading}{VAL} ne "-" )
@@ -1550,6 +1563,8 @@ sub ENIGMA2_Define($$) {
         Log3 $name, 4, $msg;
         return $msg;
     }
+
+    $hash->{TYPE} = "ENIGMA2";
 
     my $address = $a[2];
     $hash->{helper}{ADDRESS} = $address;
