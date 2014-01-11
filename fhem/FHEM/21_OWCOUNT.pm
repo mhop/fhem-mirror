@@ -25,9 +25,11 @@
 # get <name> present             => 1 if device present, 0 if not
 # get <name> interval            => query interval
 # get <name> memory <page>       => 32 byte string from page 0..13
-# get <name> midnight  <channel> => todays starting value for counter
-# get <name> counter  <channel>  => value for counter
-# get <name> counters            => values for both counters
+# get <name> midnight  <channel> => todays starting value (formatted) for counter
+# get <name> month               => summary and average for month
+# get <name> year                => summary and average for year
+# get <name> raw <channel>       => raw value for counter
+# get <name> counters            => formatted values for both counters
 # get <name> version             => OWX version number
 #
 # set <name> interval            => set query interval for measurement
@@ -80,7 +82,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.31";
+my $owx_version="3.32";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -97,9 +99,10 @@ my %gets = (
   "interval"    => "",
   "memory"      => "",
   "midnight"    => "",
-  "counter"     => "",
+  "raw"         => "",
   "counters"    => "",
   "month"       => "",
+  "year"        => "",
   "version"     => ""
 );
 
@@ -372,7 +375,7 @@ sub OWCOUNT_FormatValues($) {
   my ($sec, $min, $hour, $day, $month, $year, $wday,$yday,$isdst) = localtime(time);
   my ($seco,$mino,$houro,$dayo,$montho,$yearo,$dayrest);
   my ($daily, $dt,$dval,$dval2,$deltim,$delt,$delf);
-  my ($total,$total0,$total1,@monthv);
+  my ($total,$total0,$total1,$total2,$total3,@monthv,@yearv);
   my $daybreak = 0;
   my $monthbreak = 0;
   
@@ -454,7 +457,7 @@ sub OWCOUNT_FormatValues($) {
         $dayo = substr($dayrest,0,2);
         ($houro,$mino,$seco) = split(/:/,substr($dayrest,3));
         
-        #-- time dfifference to previous measurement and to midnight
+        #-- time difference to previous measurement and to midnight
         $delt = ($hour-$houro)*3600 + ($min-$mino)*60 + ($sec-$seco);
         $delf =  $hour        *3600 +  $min       *60 +  $sec - 86400;
         
@@ -488,8 +491,8 @@ sub OWCOUNT_FormatValues($) {
           OWCOUNT_SetPage($hash,14+$i,sprintf("%f",$dval2));
           
           #-- string buildup for monthly and yearly logging
-          $dvalue .= sprintf( " %s: %5.1f %s %sm: %%5.1f %s", $owg_channel[$i],$dval,$unit,$owg_channel[$i],$unit); 
-          $mvalue .= sprintf( " %s: %%5.1f %s", $owg_channel[$i],$unit); 
+          $dvalue .= sprintf( " %s: %5.1f %s %sm: %%5.1f %s",  $owg_channel[$i],$dval,$unit,$owg_channel[$i],$unit); 
+          $mvalue .= sprintf( " %s: %%5.1f %s %sy: %%5.1f %s", $owg_channel[$i],$unit,$owg_channel[$i],$unit); 
         } #-- end daybreak
       
         #-- string buildup for return value and STATE
@@ -515,6 +518,7 @@ sub OWCOUNT_FormatValues($) {
   if( $daybreak == 1 ){
     #-- daily/monthly accumulated value
     @monthv = OWCOUNT_GetMonth($hash);
+    @yearv  = OWCOUNT_GetYear($hash);
     #-- error check
     if( int(@monthv) == 2 ){
       $total0 = $monthv[0]->[1];
@@ -524,13 +528,21 @@ sub OWCOUNT_FormatValues($) {
       $total0 = "";
       $total1 = "";
     };
-    #-- put in monthly sums
+    if( int(@yearv) == 2 ){
+      $total2 = $yearv[0]->[1];
+      $total3 = $yearv[1]->[1];
+    }else{
+      Log 3,"OWCOUNT: No yearly summary possible, ".$yearv[0];
+      $total2 = "";
+      $total3 = "";
+    };
+    #-- put in monthly and yearly sums
     $dvalue    = sprintf("D%02d ",$day).$dvalue;
     $dvalue    = sprintf($dvalue,$total0,$total1);
     readingsBulkUpdate($hash,"day",$dvalue);
     if ( $monthbreak == 1){
       $mvalue  = sprintf("M%02d ",$month+1).$mvalue;
-      $mvalue  = sprintf($mvalue,$total0,$total1); 
+      $mvalue  = sprintf($mvalue,$total2,$total3); 
       readingsBulkUpdate($hash,"month",$mvalue);
     }  
   }
@@ -622,9 +634,37 @@ sub OWCOUNT_Get($@) {
       }
       if( $daily==1){
         $value .= $owg_channel[$i]."m: ".$month2[$i]->[1]." ".$unit.
-        " (monthly sum, average ".$month2[$i]->[2]." ".$unit."/d)\n";
+        " (monthly sum until now, average ".$month2[$i]->[2]." ".$unit."/d)\n";
       }else{
         $value .= $owg_channel[$i]."m: ".$month2[$i]->[1]." ".$unit." (last midnight)\n";
+      }
+    }
+    return $value;
+  } 
+  
+  #-- get year
+  if($a[1] eq "year") {
+    $value="$name.year =>\n";
+    my @year2 = OWCOUNT_GetYear($hash);
+    #-- error case
+    if( int(@year2) != 2 ){
+      return $value." no yearly summary possible, ".$year2[0];
+    }
+    #-- 3 entries for each month
+    for(my $i=0;$i<int(@year2);$i++){
+      $unit   = $hash->{READINGS}{$owg_channel[$i]}{UNITABBR};
+      #-- mode = daily ?
+      $daily = 0;
+      if( defined($attr{$name}{$owg_fixed[$i]."Mode"} )){ 
+        if( $attr{$name}{$owg_fixed[$i]."Mode"} eq "daily"){
+          $daily = 1;
+        }
+      }
+      if( $daily==1){
+        $value .= $owg_channel[$i]."y: ".$year2[$i]->[1]." ".$unit.
+        " (yearly sum until now, average ".$year2[$i]->[2]." ".$unit."/d)\n";
+      }else{
+        $value .= $owg_channel[$i]."y: ".$year2[$i]->[1]." ".$unit." (last month)\n";
       }
     }
     return $value;
@@ -673,8 +713,8 @@ sub OWCOUNT_Get($@) {
   }
   
   #-- check syntax for getting counter
-  if( $reading eq "counter" ){
-    return "OWCOUNT: Get needs parameter when reading counter: <channel>"
+  if( $reading eq "raw" ){
+    return "OWCOUNT: Get needs parameter when reading raw counter: <channel>"
       if( int(@a)<2 );
     #-- find out which channel we have
     if( ($a[2] eq $owg_channel[0]) || ($a[2] eq "A") ){
@@ -695,6 +735,13 @@ sub OWCOUNT_Get($@) {
     }else{
       return "OWCOUNT: Get with wrong IODev type $interface";
     }
+    if( defined($ret)  ){
+      return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
+    }
+    $hash->{PRESENT} = 1; 
+    #-- only one counter will be returned
+    OWCOUNT_FormatValues($hash);
+    return "OWCOUNT: $name.raw $a[2] => ".$owg_val[$page-14];   
   #-- check syntax for getting counters
   }elsif( $reading eq "counters" ){
     return "OWCOUNT: Get needs no parameter when reading counters"
@@ -709,17 +756,18 @@ sub OWCOUNT_Get($@) {
     }else{
       return "OWCOUNT: GetValues with wrong IODev type $interface";
     }
+    #-- process results
+    $ret .= $ret1
+      if( defined($ret1) );
+    $ret .= $ret2
+      if( defined($ret2) );
+    if( defined($ret) ){
+      return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
+    }
+    $hash->{PRESENT} = 1; 
+    #-- both counters will be returned
+    return "OWCOUNT: $name.counters => ".OWCOUNT_FormatValues($hash);   
   }
-  #-- process results
-  $ret .= $ret1
-    if( defined($ret1) );
-  $ret .= $ret2
-    if( defined($ret2) );
-  if( $ret ne ""  ){
-    return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
-  }
-  $hash->{PRESENT} = 1; 
-  return "OWCOUNT: $name.$reading => ".OWCOUNT_FormatValues($hash);   
 }
 
 ########################################################################################
@@ -764,7 +812,7 @@ sub OWCOUNT_GetMonth($) {
   if( $ret) {
     while( <OWXFILE> ){
       #-- line looks as 
-      #   2013-02-09_23:59:31 <name> day: D09 <aname>: 180.0 <unit> <arate>: 180.0 <unit> <bname>: 180.0 <unit> <brate>: 180.0 <unit>
+      #   2013-06-25_23:57:57 DG.CT1 day: D25  W:  42.2 kWh Wm:  84.4 kWh  B: 2287295.7 cts Bm: 2270341.0 cts
       $line = $_;
       chomp($line);
       if ( $line =~ m/$regexp/i){  
@@ -792,7 +840,7 @@ sub OWCOUNT_GetMonth($) {
   #-- sum and average
   for (my $i=0;$i<int(@owg_fixed);$i++){
     $total = 0.0;
-    #-- summing only if mode daily
+    #-- summing only if mode daily (means daily reset !)
     $daily = 0;
     if( defined($attr{$name}{$owg_fixed[$i]."Mode"} )){ 
         if( $attr{$name}{$owg_fixed[$i]."Mode"} eq "daily"){
@@ -815,6 +863,105 @@ sub OWCOUNT_GetMonth($) {
     push(@month2,[($total,$total2,$av)]);
   } 
   return @month2; 
+}
+
+########################################################################################
+#
+# OWCOUNT_GetYear Read yearly data from a file
+#
+# Parameter hash
+#
+# Returns total value up to last month including this month and average including this day
+#
+########################################################################################
+
+sub OWCOUNT_GetYear($) {
+
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  my $regexp = ".*$name.*";
+  my $val;
+  my @year  = ();
+  my @year2 = ();
+  my @mchannel;
+  my @linarr;
+  my $month;
+  my $line;
+  my ($total,$total2,$daily,$deltim,$av);
+
+  #-- Check current logfile 
+  my $ln = $attr{$name}{"LogY"};
+  if( !(defined($ln))){
+    return "attribute LogY is missing";
+  }
+  
+  #-- get channel names 
+  OWCOUNT_ChannelNames($hash);
+  
+  my $lf = $defs{$ln}{currentlogfile};
+  if( !(defined($lf))){
+    return "logfile of LogY is missing";
+  }
+  
+  my $ret  = open(OWXFILE, "< $lf" );
+  if( $ret) {
+    while( <OWXFILE> ){
+      #-- line looks as 
+      #   2013-05-31_23:57:57 DG.CT1 month: M05  W:  42.2 kWh Wy:  84.4 kWh  B: 2287295.7 cts By: 2270341.0 cts
+      $line = $_;
+      chomp($line);
+      if ( $line =~ m/$regexp/i){  
+        @linarr = split(' ',$line);
+        if( int(@linarr)==4+6*int(@owg_fixed) ){
+          $month = $linarr[3];
+          $month =~ s/M_0+//;
+          @mchannel = ();
+          for (my $i=0;$i<int(@owg_fixed);$i++){
+            $val = $linarr[5+6*$i];
+            push(@mchannel,$val);
+          }
+          push(@year,[@mchannel]);
+        }
+      }
+    }
+    if( int(@year)==0 ){
+      return "invalid logfile format in LogY";
+    }
+  } else { 
+    return "cannot open logfile of LogY";
+  }
+  
+    
+  #-- sum and average
+  for (my $i=0;$i<int(@owg_fixed);$i++){
+    $total = 0.0;
+    #-- summing only if mode daily (means daily reset !)
+    $daily = 0;
+    if( defined($attr{$name}{$owg_fixed[$i]."Mode"} )){ 
+        if( $attr{$name}{$owg_fixed[$i]."Mode"} eq "daily"){
+          $daily = 1;
+        }
+    }
+    if( $daily==1){
+      for (my $j=0;$j<int(@year);$j++){
+        $total += $year[$j][$i];
+      }
+    }else{
+      $total = $year[int(@year)-1][$i];
+    };
+    
+    #-- add data from current day also for non-summed mode
+    $total = int($total*100)/100;
+    Log 1," GetYear total = $total";
+    $total2 = int(100*($total))/100;
+    #-- number of months so far, including the present day
+    my ($sec,$min,$hour,$day,$month,$year,$wday,$yday,$isdst) = localtime(time);
+    my $deltim = int(@year);
+    my $av = int(100*$total2/$deltim)/100;
+    #-- output format
+    push(@year2,[($total,$total2,$av)]);
+  } 
+  return @year2; 
 }
 
 #######################################################################################
@@ -1401,10 +1548,10 @@ sub OWXCOUNT_SetPage($$$) {
                     <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
                 interval in seconds. The default is 300 seconds. </li>
             <li><a name="owcount_memory">
-                    <code>set &lt;name&gt; memory &lt;page&gt;</code></a><br />Write 32 bytes to
+                    <code>set &lt;name&gt; memory &lt;page&gt; &lt;string&gt;</code></a><br />Write 32 bytes to
                 memory page 0..13 </li>
             <li><a name="owcount_midnight">
-                    <code>set &lt;name&gt; midnight &lt;channel-name&gt;</code></a><br />Write the
+                    <code>set &lt;name&gt; midnight &lt;channel-name&gt; &lt;int&gt;</code></a><br />Write the
                 day's starting value for counter &lt;channel&gt; (A, B or named channel, see
                 below)</li>
         </ul>
@@ -1429,6 +1576,10 @@ sub OWXCOUNT_SetPage($$$) {
                     <code>get &lt;name&gt; midnight &lt;channel-name&gt;</code></a><br />Obtain the
                 day's starting value for counter &lt;channel&gt; (A, B or named channel, see
                 below)</li>
+            <li><a name="owcount_month">
+                    <code>get &lt;name&gt; month</code></a><br />Returns cumulated and averaged monthly value if mode=daily, otherwise last day's and averaged value </li>
+            <li><a name="owcount_year">
+                    <code>get &lt;name&gt; year</code></a><br />Returns cumulated and averaged yearly value if mode=daily, otherwise last months's and averaged value </li>
             <li><a name="owcount_counter">
                     <code>get &lt;name&gt; counter &lt;channel-name&gt;</code></a><br />Obtain the
                 current value for counter &lt;channel&gt; (A, B or named channel, see below)</li>
@@ -1441,10 +1592,10 @@ sub OWXCOUNT_SetPage($$$) {
         <h4>Attributes</h4>
         <ul>
             <li><a name="owcount_logm"><code>attr &lt;name&gt; LogM
-                        &lt;string&gt;|</code></a>
+                        &lt;string&gt;</code></a>
                 <br />device name (not file name) of monthly log file.</li>
                  <li><a name="owcount_logy"><code>attr &lt;name&gt; LogY
-                        &lt;string&gt;|</code></a>
+                        &lt;string&gt;</code></a>
                 <br />device name (not file name) of yearly log file.</li>
         </ul>
         <p>For each of the following attributes, the channel identification A,B may be used.</p>
@@ -1466,7 +1617,10 @@ sub OWXCOUNT_SetPage($$$) {
                 <br />factor multiplied to (reading+offset) in this channel. </li>
             <li><a name="owcount_cmode"><code>attr &lt;name&gt; &lt;channel&gt;Mode daily |
                         normal</code></a>
-                <br />factor multiplied to (reading+offset) in this channel. </li>
+                <br />determines whether counter is nulled at start of day or running continuously </li>
+            <li><a name="owcount_cperiod"><code>attr &lt;name&gt; &lt;channel&gt;Period hour(default) | minute |
+                        second</code></a>
+                <br />period for rate calculation </li>
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
                     href="#event-on-update-reading">event-on-update-reading</a>, <a
                     href="#event-on-change-reading">event-on-change-reading</a>, <a
