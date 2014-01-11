@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.2
+# Version: 1.0.3
 #
 # Major Version History:
 # - 1.0.0 - 2013-12-16
@@ -68,7 +68,7 @@ sub ONKYO_AVR_Initialize($) {
     $hash->{UndefFn} = "ONKYO_AVR_Undefine";
 
     $hash->{AttrList} =
-"volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs disable:0,1 "
+"volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs disable:0,1 model "
       . $readingFnAttributes;
 
     #    $data{RC_layout}{ONKYO_AVR_SVG} = "ONKYO_AVR_RClayout_SVG";
@@ -165,6 +165,14 @@ sub ONKYO_AVR_GetStatus($;$) {
             {
                 readingsBulkUpdate( $hash, $reading,
                     $hash->{helper}{receiver}{device}{$reading} );
+
+                if ( !exists( $attr{$name}{model} )
+                    || $attr{$name}{model} ne
+                    $hash->{helper}{receiver}{device}{$reading} )
+                {
+                    $attr{$name}{model} =
+                      $hash->{helper}{receiver}{device}{$reading};
+                }
             }
 
             # Firmware version
@@ -214,6 +222,9 @@ sub ONKYO_AVR_GetStatus($;$) {
             readingsBeginUpdate($hash);
             readingsBulkUpdate( $hash, "deviceyear", "pre2013" );
             readingsEndUpdate( $hash, 1 );
+            unless ( exists( $attr{$name}{model} ) ) {
+                $attr{$name}{model} = "pre2013";
+            }
         }
 
         # Input alias handling
@@ -1079,6 +1090,8 @@ sub ONKYO_AVR_Define($$) {
         return $msg;
     }
 
+    $hash->{TYPE} = "ONKYO_AVR";
+
     my $address = $a[2];
     $hash->{helper}{ADDRESS} = $address;
 
@@ -1108,6 +1121,11 @@ sub ONKYO_AVR_Define($$) {
         return "Invalid protocol, choose one of 2013 pre2013";
     }
     readingsSingleUpdate( $hash, "deviceyear", $protocol, 1 );
+    if (   $protocol eq "pre2013" && !exists( $attr{$name}{model} )
+        || $attr{$name}{model} ne $protocol )
+    {
+        $attr{$name}{model} = $protocol;
+    }
 
     # check values
     if ( !( $zone =~ /^(main|zone2|zone3|zone4|dock)$/ ) ) {
@@ -1393,7 +1411,7 @@ sub ONKYO_AVR_sysreadline($;$$) {
 
 ###################################
 sub ONKYO_AVR_at_eol($;$) {
-    if ( $_[0] =~ /\r\n\z/ || $_[0] =~ /\r\z/  ) {
+    if ( $_[0] =~ /\r\n\z/ || $_[0] =~ /\r\z/ ) {
         return 1;
     }
     else {
