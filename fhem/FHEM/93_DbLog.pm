@@ -1047,7 +1047,7 @@ sub prepareSql(@) {
     } elsif($userquery eq "getdevices") {
         $sql = "SELECT distinct(device) FROM history";
     } elsif($userquery eq "timerange") {
-        $sql = "SELECT ".$xaxis.", VALUE FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime';";
+        $sql = "SELECT ".$xaxis.", VALUE FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' ORDER BY TIMESTAMP;";
     } elsif($userquery eq "hourstats") {
         $sql = $hourstats;
     } elsif($userquery eq "daystats") {
