@@ -53,7 +53,7 @@ YAMAHA_AVR_Initialize($)
   $hash->{DefFn}     = "YAMAHA_AVR_Define";
   $hash->{UndefFn}   = "YAMAHA_AVR_Undefine";
 
-  $hash->{AttrList}  = "do_not_notify:0,1 request-timeout:1,2,3,4,5 volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 volume-smooth-change:0,1 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
+  $hash->{AttrList}  = "do_not_notify:0,1 request-timeout:1,2,3,4,5 volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 model volume-smooth-change:0,1 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
                       $readingFnAttributes;
 }
 
@@ -154,6 +154,48 @@ YAMAHA_AVR_GetStatus($;$)
     if($return =~ /<Input_Sel>(.+)<\/Input_Sel>/)
     {
 		readingsBulkUpdate($hash, "input", YAMAHA_AVR_InputParam2Fhem(lc($1), 0));
+		
+		if($return =~ /<Src_Name>(.+?)<\/Src_Name>/)
+		{
+			Log3 $name, 4, "YAMAHA_AVR $name: check for extended informations";
+		
+			my $infos = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Info>GetParam</Play_Info></$1></YAMAHA_AV>");
+	    
+			if($infos =~ /<Meta_Info>.*?<Artist>(.+?)<\/Artist>.*?<\/Meta_Info>/)
+			{
+				readingsBulkUpdate($hash, "currentArtist", $1);
+			}
+			
+			if($infos =~ /<Meta_Info>.*?<Station>(.+?)<\/Station>.*?<\/Meta_Info>/)
+			{
+				readingsBulkUpdate($hash, "currentStation", $1);
+			}
+			elsif($infos =~ /<Meta_Info>.*?<Program_Service>(.+?)<\/Program_Service>.*?<\/Meta_Info>/)
+			{
+				readingsBulkUpdate($hash, "currentStation", $1);
+			}
+			
+			if($infos =~ /<Meta_Info>.*?<Channel>(.+?)<\/Channel>.*?<\/Meta_Info>/)
+			{
+				readingsBulkUpdate($hash, "currentChannel", $1);
+			}
+			
+			if($infos =~ /<Meta_Info>.*?<Album>(.+?)<\/Album>.*?<\/Meta_Info>/)
+			{
+				readingsBulkUpdate($hash, "currentAlbum", $1);
+			}
+			
+			if($infos =~ /<Meta_Info>.*?<Song>(.+?)<\/Song>.*?<\/Meta_Info>/)
+			{
+				readingsBulkUpdate($hash, "currentTitle", $1);
+			}
+			
+			if($infos =~ /<Playback_Info>(.+?)<\/Playback_Info>/)
+			{
+				readingsBulkUpdate($hash, "playStatus", lc($1));
+			}
+			
+		}
     }
     
     # input name as it is displayed on the receivers front display
@@ -177,12 +219,13 @@ YAMAHA_AVR_Get($@)
 {
     my ($hash, @a) = @_;
     my $what;
-
+    my $return;
+	
     return "argument is missing" if(int(@a) != 2);
     
     $what = $a[1];
     
-    if($what =~ /^(power|input|inputName|output|volume|volumeStraight|mute)$/)
+    if(exists($hash->{READINGS}{$what}))
     {
         YAMAHA_AVR_GetStatus($hash, 1);
 
@@ -197,8 +240,15 @@ YAMAHA_AVR_Get($@)
     }
     else
     {
-		return "Unknown argument $what, choose one of power:noArg input:noArg inputName:noArg volume:noArg mute:noArg".(exists($hash->{READINGS}{output})?" output:noArg":"");
-    }
+		$return = "unknown argument $what, choose one of";
+		
+		foreach my $reading (keys $hash->{READINGS})
+		{
+			$return .= " $reading:noArg";
+		}
+		
+		return $return;
+	}
 }
 
 
@@ -628,8 +678,6 @@ YAMAHA_AVR_SendCommand($$;$)
     my $name = $hash->{NAME};
     my $address = $hash->{helper}{ADDRESS};
     my $response;
-   
-    $loglevel = 3;
      
     Log3 $name, 5, "YAMAHA_AVR: execute on $name: $command";
     
@@ -799,23 +847,25 @@ sub YAMAHA_AVR_getModel($)
     
     Log3 $name, 3, "YAMAHA_AVR: could not get system configuration from device $name. Please turn on the device or check for correct hostaddress!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
     
-    if(defined($response) and $response =~ /<Model_Name>(.+?)<\/Model_Name>.*<System_ID>(.+?)<\/System_ID>.*<Version>(.+?)<\/Version>/)
-    {
-        $hash->{MODEL} = $1;
-        $hash->{SYSTEM_ID} = $2;
-        $hash->{FIRMWARE} = $3;
-    }
-    elsif(defined($response) and $response =~ /<Model_Name>(.+?)<\/Model_Name>.*<System_ID>(.+?)<\/System_ID>.*<Version>.*<Main>(.+?)<\/Main>.*<Sub>(.+?)<\/Sub>.*<\/Version>/)
+	if(defined($response) and $response =~ /<Model_Name>(.+?)<\/Model_Name>.*<System_ID>(.+?)<\/System_ID>.*<Version>.*<Main>(.+?)<\/Main>.*<Sub>(.+?)<\/Sub>.*<\/Version>/)
     {
         $hash->{MODEL} = $1;
         $hash->{SYSTEM_ID} = $2;
         $hash->{FIRMWARE} = $3."  ".$4;
+    }
+    elsif(defined($response) and $response =~ /<Model_Name>(.+?)<\/Model_Name>.*<System_ID>(.+?)<\/System_ID>.*<Version>(.+?)<\/Version>/)
+    {
+        $hash->{MODEL} = $1;
+        $hash->{SYSTEM_ID} = $2;
+        $hash->{FIRMWARE} = $3;
     }
     else
     {
 		return undef;
     }
     
+	$attr{$name}{"model"} = $hash->{MODEL};
+	
     # query the description url which contains all zones
     $response = GetFileFromURL("http://".$address.$desc_url, AttrVal($name, "request-timeout", 4), undef, 0, ($hash->{helper}{AVAILABLE} ?  undef : 5));
     
@@ -1020,6 +1070,7 @@ sub YAMAHA_AVR_getInputs($)
 <li><b>mute</b> on|off|toggle &nbsp;&nbsp;-&nbsp;&nbsp; activates volume mute</li>
 <li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current status of the device</li>
 <li><b>remoteControl</b> up,down,... &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands as listed below</li>
+
 </ul>
 </ul><br><br>
 <u>Remote control (not in all zones available, depending on your model)</u><br><br>
@@ -1085,17 +1136,10 @@ sub YAMAHA_AVR_getInputs($)
   <a name="YAMAHA_AVRget"></a>
   <b>Get</b>
   <ul>
-    <code>get &lt;name&gt; &lt;what&gt;</code>
+    <code>get &lt;name&gt; &lt;reading&gt;</code>
     <br><br>
-    Currently, the following commands are defined and return the current state of the receiver.<br><br>
-<ul><code>power<br>
-input<br>
-inputName<br>
-mute<br>
-volume<br>
-volumeStraight<br>
-presence<br>
-output        # only available in zones other than mainzone</code></ul><br><br>
+    Currently, the get command only returns the reading values. For a specific list of possible values, see section "Generated Readings/Events".
+	<br><br>
   </ul>
   <a name="YAMAHA_AVRattr"></a>
   <b>Attributes</b>
@@ -1116,8 +1160,8 @@ output        # only available in zones other than mainzone</code></ul><br><br>
     current and the desired volume. Default value is 5 steps<br><br>
 	<li><a name="volume-smooth-steps">volumeSteps</a></li>
 	Optional attribute to define the default increasing and decreasing level for the volumeUp and volumeDown set command. Default value is 5%<br>
-  </ul>
   <br>
+  </ul>
   <b>Generated Readings/Events:</b><br>
   <ul>
   <li><b>input</b> - The selected input source according to the FHEM input commands</li>
@@ -1128,6 +1172,13 @@ output        # only available in zones other than mainzone</code></ul><br><br>
   <li><b>volume</b> - Reports the current volume level of the receiver or zone in percentage values (between 0 and 100 %)</li>
   <li><b>volumeStraight</b> - Reports the current volume level of the receiver or zone in decibel values (between -80.5 and +15.5 dB)</li>
   <li><b>state</b> - Reports the current power state and an absence of the device (can be "on", "off" or "absent")</li>
+  <br><br><u>Input dependent Readings/Events:</u><br>
+  <li><b>currentChannel</b> - Number of the input channel (SIRIUS only)</li>
+  <li><b>currentStation</b> - Station name of the current radio station (available on NET RADIO, PANDORA</li>
+  <li><b>currentAlbum</b> - Album name of the current song</li>
+  <li><b>currentArtist</b> - Artist name of the current song</li>
+  <li><b>currentTitle</b> - Title of the current song</li>
+  <li><b>playStatus</b> - indicates if the input plays music or not</li>
   </ul>
 <br>
   <b>Implementator's note</b><br>
@@ -1279,20 +1330,11 @@ output        # only available in zones other than mainzone</code></ul><br><br>
   <a name="YAMAHA_AVRget"></a>
   <b>Get-Kommandos</b>
   <ul>
-    <code>get &lt;Name&gt; &lt;Parameter&gt;</code>
+    <code>get &lt;Name&gt; &lt;Readingname&gt;</code>
     <br><br>
-    Aktuell stehen folgende Parameter zur Verf&uuml;gung welche den aktuellen Status des Receivers zur&uuml;ck geben.<br><br>
-     <ul>
-     <li><code>power</code> - Betriebszustand des Receiveres/Zone (on oder off)</li>
-	 <li><code>presence</code> - Empfangsbereitschaft des Receivers (absent oder present)</li>
-     <li><code>input</code> - Gew&auml;hlter Eingang</li>
-     <li><code>inputName</code> - Bezeichnung des gew&auml;hlten Einganges wie im Display des Receivers</li>
-     <li><code>mute</code> - Lautlos an oder aus (on oder off)</li>
-     <li><code>volume</code> - Lautst&auml;rkepegel in %</li>
-	 <li><code>volumeStraight</code> - Lautst&auml;rkepegel in dB</li>
-     </ul>
+    Aktuell stehen via GET lediglich die Werte der Readings zur Verf&uuml;gung. Eine genaue Auflistung aller m&ouml;glichen Readings folgen unter "Generierte Readings/Events".
   </ul>
-  <br>
+  <br><br>
   <a name="YAMAHA_AVRattr"></a>
   <b>Attribute</b>
   <ul>
@@ -1324,6 +1366,13 @@ output        # only available in zones other than mainzone</code></ul><br><br>
   <li><b>volume</b> - Der aktuelle Lautst&auml;rkepegel in Prozent (zwischen 0 und 100 %)</li>
   <li><b>volumeStraight</b> - Der aktuelle Lautst&auml;rkepegel in Dezibel (zwischen -80.0 und +15 dB)</li>
   <li><b>state</b> - Der aktuelle Schaltzustand (power-Reading) oder die Abwesenheit des Ger&auml;tes (m&ouml;gliche Werte: "on", "off" oder "absent")</li>
+  <br><br><u>Eingangsabh&auml;ngige Readings/Events:</u><br>
+  <li><b>currentChannel</b> - Nummer des Eingangskanals (nur bei SIRIUS)</li>
+  <li><b>currentStation</b> - Name des Radiosenders (nur bei TUNER, NET RADIO und PANDORA)</li>
+  <li><b>currentAlbum</b> - Album es aktuell gespielten Titel</li>
+  <li><b>currentArtist</b> - Interpret des aktuell gespielten Titel</li>
+  <li><b>cutrentTitle</b> - Name des aktuell gespielten Titel</li>
+  <li><b>playStatus</b> - Wiedergabestatus des Eingangs</li>
   </ul>
 <br>
   <b>Hinweise des Autors</b>
