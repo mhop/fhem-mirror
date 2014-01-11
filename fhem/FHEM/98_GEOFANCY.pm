@@ -25,7 +25,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.1
+# Version: 1.0.2
 #
 # Major Version History:
 # - 1.0.0 - 2014-01-09
@@ -174,7 +174,7 @@ sub GEOFANCY_CGI() {
     my $msg;
 
     # data received
-    if ( $request =~ m,^(/[^/]+)\?((.*)?)?$, ) {
+    if ( $request =~ m,^(/[^/]+?)(?:\&|\?)(.*)?$, ) {
         $link = $1;
         $URI  = $2;
 
