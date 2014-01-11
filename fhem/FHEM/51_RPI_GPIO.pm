@@ -149,7 +149,7 @@ if ($cmd eq 'on') {
   } 
 }
 
-sub RPI_GPIO_State($$$$) {
+sub RPI_GPIO_State($$$$) {	#reload readings at FHEM start
   my ($hash, $tim, $sname, $sval) = @_;
   #Log 1, "$hash->{NAME}: $sname kann auf $sval wiederhergestellt werden $tim";
   if ( (AttrVal($hash->{NAME},"restoreOnStartup","on") eq "on") && ($sname ne "STATE") ) {
@@ -285,7 +285,7 @@ sub RPI_GPIO_Attr(@) {
  return ($msg) ? $msg : undef; 
  }
 
-sub RPI_GPIO_Poll($) {
+sub RPI_GPIO_Poll($) {		#for attr poll_intervall -> readout pin value
   my ($hash) = @_;
   my $name = $hash->{NAME};
   updatevalue($hash);
@@ -314,7 +314,7 @@ sub RPI_GPIO_Undef($$) {
   return undef;
 }
 
-sub RPI_GPIO_Except($) {
+sub RPI_GPIO_Except($) {	#called from main if an interrupt occured 
   my ($hash) = @_;
   #seek($hash->{filehandle},0,0);									          #an Anfang der Datei springen (ist nötig falls vorher schon etwas gelesen wurde)
   #chomp ( my $firstval = $hash->{filehandle}->getline );		#aktuelle Zeile auslesen und Endezeichen entfernen
@@ -363,8 +363,20 @@ sub RPI_GPIO_Except($) {
 		$valcnt = $hash->{READINGS}{Counter}{VAL} + 1;
 		#Log 1, "Zähler  ist jetzt $valcnt";
     }    
-  } 
+  } elsif ($eval eq "both") {
+	if 	( $val == 1 ) {
+		my $lngpressInterval = 1;
+		InternalTimer(gettimeofday() + $lngpressInterval, 'longpress', $hash, 0);
+	} else {
+		RemoveInternalTimer('longpress');
+		readingsBeginUpdate($hash);
+		readingsBulkUpdate($hash, 'Longpress', 'off');
+		readingsEndUpdate($hash, 1);
+	}
+  }
+  
   delete ($hash->{READINGS}{Toggle}) if ($eval ne ("rising" || "falling"));		#Reading Toggle löschen wenn kein Wert in Variable
+  delete ($hash->{READINGS}{Longpress}) if ($eval ne "both");						#Reading Longpress löschen wenn edge nicht on both
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, 'Pinlevel', $valalt);
   readingsBulkUpdate($hash, 'state', $valst);
@@ -374,7 +386,22 @@ sub RPI_GPIO_Except($) {
   #Log 1, "RPIGPIO: Except ausgelöst: $hash->{NAME}, Wert: $val, edge: $eval,vt: $valto, $debounce_time s: $firstval";  
 }
 
-sub updatevalue($) {
+sub longpress($) {			#for reading longpress
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $val = fileaccess($hash, "value");
+  if ($val == 1) {
+	readingsBeginUpdate($hash);
+	readingsBulkUpdate($hash, 'Longpress', 'on');
+	readingsEndUpdate($hash, 1);
+  }
+}
+
+sub dblclick($) {
+
+}
+
+sub updatevalue($) {		#update value for Input devices
   my ($hash) = @_;
   my $val = fileaccess($hash, "value");
   if ( defined ($val) ) {
@@ -395,7 +422,7 @@ sub updatevalue($) {
   }
 }
 
-sub fileaccess($$;$) {
+sub fileaccess($$;$) {		#Fileaccess for GPIO base directory
  #my ($hash, $fname, $value) = @_;
  my ($hash, @args) = @_;
  my $fname = $args[0];
@@ -424,7 +451,7 @@ sub fileaccess($$;$) {
  }
 }
 
-sub exuexpin($$) {
+sub exuexpin($$) {			#export and unexport Pin via GPIO utility
  my ($hash, $dir) = @_;
  my $sw;
  if ($dir eq "unexport") {
@@ -453,7 +480,7 @@ sub exuexpin($$) {
 
 }
 
-sub inthandling($$) {
+sub inthandling($$) {		#start/stop Interrupthandling
  my ($hash, $arg) = @_;
  my $msg = '';
  if ( $arg eq "start") {
@@ -612,7 +639,9 @@ sub inthandling($$) {
       <b>can only be used with GPIO configured as input</b><br>
       enables edge detection for GPIO pin<br>
       on each interrupt event readings Pinlevel and state will be updated<br>
-      Default: none, valid values: none, falling, rising, both<br><br>
+      Default: none, valid values: none, falling, rising, both<br>
+	  For "both" the reading Longpress will be added and set to on as long as kes hold down longer than 1s<br>
+	  For "falling" and "rising" the reading Toggle will be added an will be toggled at every interrupt and the reading Counter that increments at every interrupt<br><br>
     </li>
     <li>poll_interval<br>
       Set the polling interval in minutes to query the GPIO's level<br>
@@ -778,6 +807,9 @@ sub inthandling($$) {
       Aktiviert Flankenerkennung f&uuml;r den GPIO<br>
       bei jedem interrupt Ereignis werden die readings Pinlevel und state aktualisiert<br>
       Standard: none, g&uuml;ltige Werte: none, falling, rising, both<br><br>
+	  Bei "both" wird ein reading Longpress angelegt, welches auf on gesetzt wird solange der Pin länger als 1s gedr&uuml;ckt wird<br>
+	  Bei "falling" und "rising" wird ein reading Toggle angelegt, das bei jedem Interruptereignis toggelt und das Reading Counter, das bei jedem Ereignis um 1 hochzählt<br><br>
+
     </li>
     <li>poll_interval<br>
       Fragt den Zustand des GPIO regelm&auml;&szlig;ig ensprechend des eingestellten Wertes in Minuten ab<br>
