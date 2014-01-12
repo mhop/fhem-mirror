@@ -41,6 +41,9 @@ Ext.define('FHEM.controller.MainController', {
             'panel[name=fhemaccordion]': {
                 expand: this.showFHEMPanel
             },
+            'panel[name=fhemstatusaccordion]': {
+                expand: this.showFHEMStatusPanel
+            },
             'panel[name=tabledataaccordionpanel]': {
                 expand: this.showDatabaseTablePanel
             },
@@ -68,6 +71,9 @@ Ext.define('FHEM.controller.MainController', {
             },
             'button[name=sortedtree]': {
                 click: this.setupTree
+            },
+            'panel[name=statuspanel]': {
+                saveconfig: this.saveObjectToUserConfig
             }
         });
     },
@@ -84,6 +90,8 @@ Ext.define('FHEM.controller.MainController', {
         me.createLineChartPanel();
         me.createDatabaseTablePanel();
         
+        me.showFHEMStatusPanel();
+        
         me.getMainviewport().show();
         me.getMainviewport().getEl().setOpacity(0);
         me.getMainviewport().getEl().animate({
@@ -95,7 +103,7 @@ Ext.define('FHEM.controller.MainController', {
         
         if (Ext.isDefined(FHEM.version)) {
             var sp = this.getStatustextfield();
-            sp.setText(FHEM.version + "; Frontend Version: 1.0.7 - 2014-01-03");
+            sp.setText(FHEM.version + "; Frontend Version: 1.0.8 - 2014-01-12");
         }
         
         this.setupTree(false);
@@ -192,8 +200,10 @@ Ext.define('FHEM.controller.MainController', {
         //add the charts to the tree
         store.on("load", function() {
             var rootNode = me.getMaintreepanel().getRootNode(),
-                chartfolder = {text: "Charts", expanded: true, children: []};
+                chartfolder = {text: "Charts", expanded: true, children: []},
+                statusfolder = {text: "StatusRoom", expanded: true, children: []};
             rootNode.appendChild(chartfolder);
+            rootNode.appendChild(statusfolder);
             var chartfoldernode = rootNode.findChild("text", "Charts", true);
             
             //add the filelogcharts to the store
@@ -226,6 +236,7 @@ Ext.define('FHEM.controller.MainController', {
             chartchild = {text: 'Create new Chart', leaf: true, data: {template: true}, iconCls:'x-tree-icon-leaf-chart'};
             chartfoldernode.appendChild(chartchild);
             
+            me.getMaintreepanel().fireEvent('treeloaded');
         });
     },
     
@@ -458,6 +469,15 @@ Ext.define('FHEM.controller.MainController', {
     /**
      * 
      */
+    showFHEMStatusPanel: function() {
+        var panel = Ext.ComponentQuery.query('statuspanel')[0];
+        this.hideCenterPanels();
+        panel.show();
+    },
+    
+    /**
+     * 
+     */
     showFHEMPanel: function() {
         var panel = Ext.ComponentQuery.query('panel[name=fhempanel]')[0];
         this.hideCenterPanels();
@@ -572,6 +592,54 @@ Ext.define('FHEM.controller.MainController', {
         var panel = Ext.ComponentQuery.query('tabledatagridpanel')[0];
         this.hideCenterPanels();
         panel.show();
-    }
+    },
     
+    /**
+     * Method appending and saving a given object to the file userconfig.js, which is loaded on page load
+     * The location names the accesible part where the object should be saved in
+     */
+    saveObjectToUserConfig: function(objectToSave, location) {
+        
+        var me = this;
+        
+        if (FHEM.userconfig && objectToSave && !Ext.isEmpty(location)) {
+            
+            FHEM.userconfig[location] = objectToSave;
+            
+            // preapre the string for the file
+            var finalstring = "FHEM = {};;FHEM.userconfig = " + Ext.encode(FHEM.userconfig) + ";;";
+            
+            var cmd = "{ `echo '" + finalstring + "' > " + FHEM.appPath + "userconfig.js`}";
+            
+            Ext.Ajax.request({
+                method: 'POST',
+                disableCaching: false,
+                url: '../../../fhem?',
+                params: {
+                    cmd: cmd,
+                    XHR: 1
+                },
+                success: function(response){
+                    if (response.status === 200) {
+                        Ext.Msg.alert("Success", "Changes successfully saved!");
+                    } else if (response.statusText) {
+                        Ext.Msg.alert("Error", "The Changes could not be saved, error Message is:<br><br>" + response.statusText);
+                    } else {
+                        Ext.Msg.alert("Error", "The Changes could not be saved!");
+                    }
+                },
+                failure: function(response) {
+                    if (response.statusText) {
+                        Ext.Msg.alert("Error", "The Changes could not be saved, error Message is:<br><br>" + response.statusText);
+                    } else {
+                        Ext.Msg.alert("Error", "The Changes could not be saved!");
+                    }
+                }
+            });
+            
+        } else {
+            Ext.Msg.alert("Error", "A save attempt was made without enough parameters!");
+        }
+        
+    }
 });

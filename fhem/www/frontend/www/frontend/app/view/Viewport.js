@@ -9,6 +9,7 @@ Ext.define('FHEM.view.Viewport', {
     requires: [
         'FHEM.view.LineChartPanel',
         'FHEM.view.TableDataGridPanel',
+        'FHEM.view.StatusPanel',
         'FHEM.controller.ChartController',
         'FHEM.store.SavedChartsStore',
         'Ext.layout.container.Border',
@@ -108,6 +109,13 @@ Ext.define('FHEM.view.Viewport', {
                     },
                     items: [
                         {
+                            title: 'FHEM Status',
+                            name: 'fhemstatusaccordion',
+                            expanded: true,
+                            bodyPadding: '5 5 5 5',
+                            html: 'See your current FHEM Status / Overview Information here.'
+                        },
+                        {
                             title: 'FHEM',
                             name: 'fhemaccordion',
                             collapsed: true,
@@ -198,28 +206,31 @@ Ext.define('FHEM.view.Viewport', {
                     minHeight: 30
                 },
                 {
-                    region: 'center',
-                    title: 'Welcome',
-                    layout: 'hbox',
-                    bodyStyle: 'padding:5px 5px 0',
-                    items: [
-                        {
-                            xtype: 'image',
-                            src: '../../fhem/images/default/fhemicon.png',
-                            height: 132,
-                            width: 120
-                        },
-                        {
-                            xtype: 'text',
-                            name: 'statustextfield',
-                            padding: '50 0 0 20',
-                            width: 400,
-                            height: 130,
-                            html: '<br>Welcome to the new FHEM Frontend.<br>For Informations, Problems and discussion, visit the <a href="http://forum.fhem.de/index.php?t=msg&th=10439&start=0&rid=0">FHEM Forums</a>'
-                        }
-                    ],
-                    height: '100%'
+                    xtype: 'statuspanel'
                 }
+//                {
+//                    region: 'center',
+//                    title: 'Welcome',
+//                    layout: 'hbox',
+//                    bodyStyle: 'padding:5px 5px 0',
+//                    items: [
+//                        {
+//                            xtype: 'image',
+//                            src: '../../fhem/images/default/fhemicon.png',
+//                            height: 132,
+//                            width: 120
+//                        },
+//                        {
+//                            xtype: 'text',
+//                            name: 'statustextfield',
+//                            padding: '50 0 0 20',
+//                            width: 400,
+//                            height: 130,
+//                            html: '<br>Welcome to the new FHEM Frontend.<br>For Informations, Problems and discussion, visit the <a href="http://forum.fhem.de/index.php?t=msg&th=10439&start=0&rid=0">FHEM Forums</a>'
+//                        }
+//                    ],
+//                    height: '100%'
+//                }
             ]
         });
 

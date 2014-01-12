@@ -123,6 +123,12 @@ Ext.define('FHEM.controller.ChartController', {
             },
             'radiogroup[name=datasourceradio]': {
                 change: this.dataSourceChanged
+            },
+            'button[name=updatepreviewchart]': {
+                loadhiddenchart: this.loadsavedchart
+            },
+            'button[name=loadfullchart]': {
+                loadchart: this.loadsavedchart
             }
         });
         
@@ -291,8 +297,8 @@ Ext.define('FHEM.controller.ChartController', {
     /**
      * Triggers a request to FHEM Module to get the data from Database
      */
-    requestChartData: function(stepchangecalled) {
-        
+    requestChartData: function(stepchangecalled, hidden) {
+
         var me = this;
         
         //show loadmask
@@ -314,7 +320,7 @@ Ext.define('FHEM.controller.ChartController', {
                 dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s'),
                 dynamicradio = Ext.ComponentQuery.query('radiogroup[name=dynamictime]')[0],
                 chartpanel = me.getLinechartpanel(),
-                chart = me.getChart();
+                hiddenchartdiv = Ext.get("hiddenchart");
             
             //cleanup chartpanel 
             var existingchartgrid = Ext.ComponentQuery.query('panel[name=chartgridpanel]')[0];
@@ -334,9 +340,16 @@ Ext.define('FHEM.controller.ChartController', {
                 existingchart.destroy();
             }
             var store = Ext.create('FHEM.store.ChartStore'),
-                proxy = store.getProxy();
-            chart = me.createChart(store);
-            chartpanel.add(chart);
+                proxy = store.getProxy(),
+                chart;
+            
+            
+            if (hidden === true) {
+                chart = me.createChart(store, hiddenchartdiv);
+            } else {
+                chart = me.createChart(store);
+                chartpanel.add(chart);
+            }
             
             //reset zoomValues
             chartpanel.setLastYmax(null);
@@ -455,14 +468,12 @@ Ext.define('FHEM.controller.ChartController', {
      * resize the chart to fit the centerpanel
      */
     resizeChart: function() {
-        
         var lcp = Ext.ComponentQuery.query('linechartpanel')[0];
         var lcv = Ext.ComponentQuery.query('chart')[0];
         var cfp = Ext.ComponentQuery.query('form[name=chartformpanel]')[0];
         var cdg = Ext.ComponentQuery.query('panel[name=chartgridpanel]')[0];
         
         if (lcv) {
-            
             if (lcp && lcv && cfp && cdg) {
                 var lcph = lcp.getHeight(),
                     lcpw = lcp.getWidth(),
@@ -493,7 +504,7 @@ Ext.define('FHEM.controller.ChartController', {
     /**
      * create the base chart
      */
-    createChart: function(store) {
+    createChart: function(store, hidden) {
         var me = this;
         
         var chart = Ext.create('Ext.panel.Panel', {
@@ -502,6 +513,9 @@ Ext.define('FHEM.controller.ChartController', {
             collapsible: true,
             titleCollapse: true,
             animCollapse: false,
+            width: hidden ? 1 : false,
+            height: hidden ? 1 : false,
+            renderTo: hidden ? hidden : false,
             items: [
                 {
                     xtype: 'toolbar',
@@ -531,46 +545,51 @@ Ext.define('FHEM.controller.ChartController', {
                                 var chart = btn.up().up().down('chart'),
                                     cp = chart.up().up();
                                 
-                                chart.restoreZoom();
-                                
-                                chart.axes.get(0).minimum = cp.getLastYmin();
-                                chart.axes.get(0).maximum = cp.getLastYmax();
-                                chart.axes.get(1).minimum = cp.getLastY2min();
-                                chart.axes.get(1).maximum = cp.getLastY2max();
-                                chart.axes.get(2).minimum = cp.getLastXmin();
-                                chart.axes.get(2).maximum = cp.getLastXmax();
-                                
-                                //helper to reshow the hidden items after zooming back out
-                                if (cp.artifactSeries && cp.artifactSeries.length > 0) {
-                                    Ext.each(cp.artifactSeries, function(serie) {
-                                        serie.showAll();
-                                        var showMarkers = false;
-                                        Ext.each(serie.group.items, function(item) {
-                                            // make sure we hit the points
-                                            if (item.radius && item.radius > 0) {
-                                                item.show();
-                                                item.redraw();
-                                                showMarkers = true;
+                                //only reset zoom when chart was really zoomed, else will break layout 
+                                if (cp.timesZoomed !== 0) {
+                                    
+                                    chart.restoreZoom();
+                                    
+                                    chart.axes.get(0).minimum = cp.getLastYmin();
+                                    chart.axes.get(0).maximum = cp.getLastYmax();
+                                    chart.axes.get(1).minimum = cp.getLastY2min();
+                                    chart.axes.get(1).maximum = cp.getLastY2max();
+                                    chart.axes.get(2).minimum = cp.getLastXmin();
+                                    chart.axes.get(2).maximum = cp.getLastXmax();
+                                    
+                                    //helper to reshow the hidden items after zooming back out
+                                    if (cp.artifactSeries && cp.artifactSeries.length > 0) {
+                                        Ext.each(cp.artifactSeries, function(serie) {
+                                            serie.showAll();
+                                            var showMarkers = false;
+                                            Ext.each(serie.group.items, function(item) {
+                                                // make sure we hit the points
+                                                if (item.radius && item.radius > 0) {
+                                                    item.show();
+                                                    item.redraw();
+                                                    showMarkers = true;
+                                                }
+                                            });
+                                            if (showMarkers) {
+                                                serie.showMarkers = true;
                                             }
                                         });
-                                        if (showMarkers) {
-                                            serie.showMarkers = true;
-                                        }
-                                    });
-                                    cp.artifactSeries = [];
+                                        cp.artifactSeries = [];
+                                    }
+                                    chart.redraw();
+                                    // restore the counter as we have zoomed out
+                                    cp.timesZoomed = 0;
                                 }
-                                
-                                chart.redraw();
-                                // restore the counter as we have zoomed out
-                                cp.timesZoomed = 0;
                             }
                         }
                     ]
                 },
                 {
                     xtype: 'chart',
+                    isPreviewChart: hidden ? true : false,
                     legend: {
                         position: 'right',
+                        visible:  hidden ? false : true,
                         labelFont: '10px Helvetica, sans-serif',
                         padding: 4
                     },
@@ -605,35 +624,6 @@ Ext.define('FHEM.controller.ChartController', {
                     store: store,
                     enableMask: true,
                     mask: true,//'vertical',//true, //'horizontal',
-                    gradients: [{
-                        id: 'gradientId',
-                        angle: 90,
-                        stops: {
-                            0: {
-                                color: '#FF0000'
-                            },
-                            50: {
-                                color: '#FFFF00'
-                            },
-                            100: {
-                                color: '#079400'
-                            }
-                        }
-                    }, {
-                        id: 'gradientId2',
-                        angle: 0,
-                        stops: {
-                            0: {
-                                color: '#590'
-                            },
-                            20: {
-                                color: '#599'
-                            },
-                            100: {
-                                color: '#ddd'
-                            }
-                        }
-                    }],
                     listeners: {
                         mousedown: function(evt) {
                             // fix for firefox, not dragging images
@@ -687,7 +677,7 @@ Ext.define('FHEM.controller.ChartController', {
      */
     createBaseLine: function(index, basestart, baseend, basefill, basecolor) {
         var me = this,
-            chart = me.getChart(),
+            chart = Ext.ComponentQuery.query('chart')[0],
             store = chart.getStore(),
             yfield = "VALUEBASE" + index;
         
@@ -743,7 +733,7 @@ Ext.define('FHEM.controller.ChartController', {
     populateAxis: function(i, axeslength, device, yaxis, yaxisindex, styleConfig, axisside, yaxisstatistics, dbstarttime, dbendtime, logtype) {
         
         var me = this,
-            chart = me.getChart(),
+            chart = Ext.ComponentQuery.query('chart')[0],
             store = chart.getStore(),
             proxy = store.getProxy(),
             yseries,
@@ -773,14 +763,42 @@ Ext.define('FHEM.controller.ChartController', {
                 // as the get command wont support absolute pathes by default...
                 currentlogfile = "../../../../../../../../" + currentlogfile;
             }
+            
+            // get the conversions keys and values from userconfig
+            var queryString;
+            if (Ext.isDefined(FHEM) && Ext.isDefined(FHEM.userconfig)) {
+                var count = 0;
+                
+                Ext.iterate(FHEM.userconfig.chartkeys, function(k, v) {
+                    
+                    if (count === 0) {
+                        queryString = '$fld[' + (yaxisindex - 1) + ']=~"' + k + '"?' + v + ':';
+                    } else {
+                        queryString += '($fld[' + (yaxisindex - 1) + ']=~"' + k + '"?' + v + ':';
+                    }
+                    
+                    count++;
+                });
+                
+                // last fallback, similar to parseint
+                queryString += '$fld[3]*1';
+                
+                // add closing brackets
+                for (bracket = 1; bracket < count; bracket++) {
+                    queryString += ")";
+                }
+            }
+            
             cmd = 'get Logfile ' +
                 currentlogfile + ' - ' + dbstarttime +
                 ' ' + dbendtime + ' ' + yaxisindex + ':' + yaxis +
-                '\\x3a::$fld[' + (yaxisindex - 1) +
-                ']=~"ok|on|open|active|true"?1:($fld[' +
-                (yaxisindex - 1) +
-                ']=~"low|off|closed|inactive|false"?0:$fld[' +
-                (yaxisindex - 1) + ']*1)';
+                '\\x3a::' + queryString;
+            
+//                '\\x3a::$fld[' + (yaxisindex - 1) +
+//                ']=~"ok|on|open|active|true"?1:($fld[' +
+//                (yaxisindex - 1) +
+//                ']=~"low|off|closed|inactive|false"?0:$fld[' +
+//                (yaxisindex - 1) + ']*1)';
         } else if (!Ext.isDefined(yaxisstatistics) || yaxisstatistics === "none" || Ext.isEmpty(yaxisstatistics)) {
             cmd = 'get ' + FHEM.dblogname + ' - webchart ' + dbstarttime + ' ' + dbendtime + ' ';
             cmd +=device + ' timerange ' + "TIMESTAMP" + ' ' + yaxis;
@@ -993,7 +1011,6 @@ Ext.define('FHEM.controller.ChartController', {
                   }
                   
                   chart.series.add(yseries);
-                  
               } 
           },
           failure: function() {
@@ -1138,9 +1155,10 @@ Ext.define('FHEM.controller.ChartController', {
         
         chart.axes.get(2).processView();
         
-        me.resizeChart();
-        
-        chart.show();
+        // only call resize function when not a hidden chart
+        if (chart.isPreviewChart === false) {
+            me.resizeChart();
+        }
         
         me.getLinechartpanel().setLoading(false);
     },
@@ -1151,7 +1169,7 @@ Ext.define('FHEM.controller.ChartController', {
     createSeries: function(yfield, title, styleConfig, axisside) {
         
         //setting axistitle and fontsize
-        var chart = this.getChart(),
+        var chart = Ext.ComponentQuery.query('chart')[0],
             axis;
         
         if (axisside === "left") {
@@ -1188,46 +1206,59 @@ Ext.define('FHEM.controller.ChartController', {
         //adding linked yfield to axis fields
         axis.fields.push(yfield);
         
-        var series = {
-                type : 'line',
-                axis : axisside,
-                xField : 'TIMESTAMP',
-                yField : yfield,
-                title: title,
-                showInLegend: (styleConfig.yaxislegendcheck === "false" || styleConfig.yaxislegendcheck === false) ? false : true,
-                smooth: (styleConfig.yaxisstepcheck === "true" || styleConfig.yaxisstepcheck === true)? 0 : styleConfig.yaxissmoothing,
-                highlight: {
-                    size: 5,
-                    radius: 5
+        chart.surface.addGradient({
+            id: 'gradientId',
+            angle: 90,
+            stops: {
+                10: {
+                    color: '#FFFFFF'
                 },
-                fill: (styleConfig.yaxisfillcheck === "false" || styleConfig.yaxisfillcheck === false) ? false : true,
-                style: {
-                    fill: '#' + styleConfig.fillcolorhexcode,
-//                    fill: 'url(#gradientId)',
-                    opacity: styleConfig.fillopacity,
-                    stroke: '#' + styleConfig.linecolorhexcode,
-                    'stroke-width': styleConfig.linestrokewidth
-                },
-                markerConfig: {
-                    type: styleConfig.pointshape,
-                    radius: styleConfig.pointradius,
-                    stroke: '#' + styleConfig.pointcolorhexcode,
-                    fill: '#' + styleConfig.pointcolorhexcode
-                },
-                showMarkers: (styleConfig.yaxisshowpoints === "false" || styleConfig.yaxisshowpoints === false) ? false : true,
-                selectionTolerance: 5,
-                tips : {
-                    trackMouse : true,
-                    mouseOffset: [1,1],
-                    showDelay: 1000,
-                    width : 280,
-                    height : 50,
-                    renderer : function(storeItem, item) {
-                        this.setTitle(' Value: : ' + storeItem.get(yfield) + 
-                                '<br> Time: ' + storeItem.get('TIMESTAMP'));
-                    }
+                100: {
+                    color: '#' + styleConfig.fillcolorhexcode
                 }
-            };
+            }
+        });
+        
+        var series = {
+            type : 'line',
+            axis : axisside,
+            xField : 'TIMESTAMP',
+            yField : yfield,
+            title: title,
+            showInLegend: (styleConfig.yaxislegendcheck === "false" || styleConfig.yaxislegendcheck === false) ? false : true,
+            smooth: (styleConfig.yaxisstepcheck === "true" || styleConfig.yaxisstepcheck === true)? 0 : styleConfig.yaxissmoothing,
+            highlight: {
+                size: 5,
+                radius: 5
+            },
+            fill: (styleConfig.yaxisfillcheck === "false" || styleConfig.yaxisfillcheck === false) ? false : true,
+            style: {
+//                fill: '#' + styleConfig.fillcolorhexcode,
+                fill: 'url(#gradientId)',
+                opacity: styleConfig.fillopacity,
+                stroke: '#' + styleConfig.linecolorhexcode,
+                'stroke-width': styleConfig.linestrokewidth
+            },
+            markerConfig: {
+                type: styleConfig.pointshape,
+                radius: styleConfig.pointradius,
+                stroke: '#' + styleConfig.pointcolorhexcode,
+                fill: '#' + styleConfig.pointcolorhexcode
+            },
+            showMarkers: (styleConfig.yaxisshowpoints === "false" || styleConfig.yaxisshowpoints === false) ? false : true,
+            selectionTolerance: 5,
+            tips : {
+                trackMouse : true,
+                mouseOffset: [1,1],
+                showDelay: 1000,
+                width : 280,
+                height : 50,
+                renderer : function(storeItem, item) {
+                    this.setTitle(' Value: : ' + storeItem.get(yfield) + 
+                            '<br> Time: ' + storeItem.get('TIMESTAMP'));
+                }
+            }
+        };
         return series;
     },
     
@@ -1249,7 +1280,7 @@ Ext.define('FHEM.controller.ChartController', {
      */
     generalizeChartData: function(generalizationfactor, index) {
 
-        var store = this.getChart().getStore();
+        var store = Ext.ComponentQuery.query('chart')[0].getStore();
         
         this.factorpositive = 1 + (generalizationfactor / 100),
             this.factornegative = 1 - (generalizationfactor / 100),
@@ -1625,8 +1656,7 @@ Ext.define('FHEM.controller.ChartController', {
         // preapre the string for the file
         var finalstring = "FHEM.filelogcharts = " + Ext.encode(FHEM.filelogcharts) + ";;";
         
-        var cmd = "{ `echo '" + finalstring + "' > www/frontend/app/filelogcharts.js`}";
-//        var cmd = "{ `echo '" + finalstring + "' > www/frontenddev/app/filelogcharts.js`}";
+        var cmd = "{ `echo '" + finalstring + "' > " + FHEM.appPath + "filelogcharts.js`}";
         
         Ext.Ajax.request({
             method: 'POST',
@@ -1669,7 +1699,8 @@ Ext.define('FHEM.controller.ChartController', {
     /**
      * loading saved chart data and trigger the load of the chart
      */
-    loadsavedchart: function(treeview, record) {
+    loadsavedchart: function(treeview, record, hidden) {
+
         if (!record.raw.data) {
             record.raw.data = record.raw;
         }
@@ -1691,7 +1722,10 @@ Ext.define('FHEM.controller.ChartController', {
             //cleanup the form before loading
             this.resetFormFields();
             
-            this.getChartformpanel().collapse();
+            // no collapsing when hidden chart, will break the panel if done hidden
+            if (hidden !== true) {
+                this.getChartformpanel().collapse();
+            }
             
             if (chartdata && !Ext.isEmpty(chartdata)) {
                 
@@ -1912,7 +1946,7 @@ Ext.define('FHEM.controller.ChartController', {
                     me.getChartformpanel().down('textfield[name=leftaxistitle]').setValue(leftaxistitle);
                 }
                 
-                this.requestChartData();
+                this.requestChartData(false, hidden);
                 this.getLinechartpanel().setTitle(name);
             } else {
                 Ext.Msg.alert("Error", "The Chart could not be loaded! RawChartdata was: <br>" + chartdata);
