@@ -17,6 +17,7 @@ Ext.application({
     ],
 
     controllers: [
+        'FHEM.controller.StatusController',
         'FHEM.controller.MainController',
         'FHEM.controller.ChartController',
         'FHEM.controller.TableDataController'
@@ -38,6 +39,12 @@ Ext.application({
                 try {
                     FHEM.info = Ext.decode(response.responseText);
                     FHEM.version = FHEM.info.Results[0].devices[0].ATTR.version;
+                    
+                    if (window.location.href.indexOf("frontenddev") > 0) {
+                        FHEM.appPath = 'www/frontenddev/app/';
+                    } else {
+                        FHEM.appPath = 'www/frontend/app/';
+                    }
                     Ext.each(FHEM.info.Results, function(result) {
                         if (result.list === "DbLog" && result.devices[0].NAME) {
                             FHEM.dblogname = result.devices[0].NAME;
