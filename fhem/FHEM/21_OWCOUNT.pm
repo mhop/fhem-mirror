@@ -82,7 +82,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.32";
+my $owx_version="3.33";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -188,6 +188,7 @@ sub OWCOUNT_Define ($$) {
   #-- no model, 12 characters
   if( $a2 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = "DS2423";
+    CommandAttr (undef,"$name model DS2423"); 
     $fam           = "1D";
     $id            = $a[2];
     if(int(@a)>=4) { $interval = $a[3]; }
@@ -761,7 +762,7 @@ sub OWCOUNT_Get($@) {
       if( defined($ret1) );
     $ret .= $ret2
       if( defined($ret2) );
-    if( defined($ret) ){
+    if( defined($ret1) || defined($ret2) ){
       return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
     }
     $hash->{PRESENT} = 1; 
