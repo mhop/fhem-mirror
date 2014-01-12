@@ -232,6 +232,18 @@ Ext.define('FHEM.controller.MainController', {
                 }
             });
             
+            // sort root by treeindex as inserting with index whil some objects not added may be faulty
+            rootNode.sort(function(rec, rec2) {
+                if (rec && rec.raw && rec.raw.data && rec.raw.data.VALUE && 
+                    rec2 && rec2.raw && rec2.raw.data && rec2.raw.data.VALUE) {
+                        if (rec.raw.data.VALUE.treeIndex > rec2.raw.data.VALUE.treeIndex) {
+                            return 1;
+                        } else {
+                            return -1;
+                        }
+                    }
+            }, true);
+            
             // at last we add a chart template to the folder which wont be saved to db and cannot be deleted
             chartchild = {text: 'Create new Chart', leaf: true, data: {template: true}, iconCls:'x-tree-icon-leaf-chart'};
             chartfoldernode.appendChild(chartchild);
