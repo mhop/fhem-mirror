@@ -1207,7 +1207,7 @@ Ext.define('FHEM.controller.ChartController', {
         axis.fields.push(yfield);
         
         chart.surface.addGradient({
-            id: 'gradientId',
+            id: 'gradient' + yfield,
             angle: 90,
             stops: {
                 10: {
@@ -1234,7 +1234,7 @@ Ext.define('FHEM.controller.ChartController', {
             fill: (styleConfig.yaxisfillcheck === "false" || styleConfig.yaxisfillcheck === false) ? false : true,
             style: {
 //                fill: '#' + styleConfig.fillcolorhexcode,
-                fill: 'url(#gradientId)',
+                fill: 'url(#gradient' + yfield + ')',
                 opacity: styleConfig.fillopacity,
                 stroke: '#' + styleConfig.linecolorhexcode,
                 'stroke-width': styleConfig.linestrokewidth

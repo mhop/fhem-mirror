@@ -282,7 +282,7 @@ UPD 2014-01-12_12:09:17 5144 www/frontend/app/view/StatusPanel.js
 UPD 2014-01-12_12:55:22 10486 www/frontend/app/view/Viewport.js
 UPD 2014-01-12_02:42:27 21844 www/frontend/app/controller/MainController.js
 UPD 2014-01-12_02:49:58 16562 www/frontend/app/controller/StatusController.js
-UPD 2014-01-12_02:51:54 109250 www/frontend/app/controller/ChartController.js
+UPD 2014-01-12_03:28:35 109269 www/frontend/app/controller/ChartController.js
 UPD 2013-06-30_11:46:54 5415 www/frontend/app/controller/TableDataController.js
 UPD 2013-04-01_07:04:35 202 www/frontend/app/model/ReadingsModel.js
 UPD 2013-04-01_07:04:36 338 www/frontend/app/model/SavedChartsModel.js
