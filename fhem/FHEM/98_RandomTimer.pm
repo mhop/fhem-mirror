@@ -43,7 +43,7 @@ sub RandomTimer_Initialize($)
   $hash->{DefFn}     = "RandomTimer_Define";
   $hash->{UndefFn}   = "RandomTimer_Undef";
   $hash->{AttrFn}   =  "RandomTimer_Attr";
-  $hash->{AttrList}  = "onCmd offCmd switchmode disable:0,1 disableCond runonce:0,1 ".
+  $hash->{AttrList}  = "onCmd offCmd switchmode disable:0,1 disableCond runonce:0,1 keepDeviceAlive ".
                        $readingFnAttributes;
 }
 #
@@ -180,7 +180,8 @@ sub RandomTimer_Exec($)
 
   if (RandomTimer_disable($hash)) {
      if (defined $hash->{ABSCHALTZEIT}) {
-        $hash->{COMMAND} = "off";
+
+        $hash->{COMMAND} = AttrVal($hash->{NAME}, "keepDeviceAlive", 0) ? "on" : "off";
         $hash->{STATE}   = "off";
         fhem ("set $hash->{DEVICE} $hash->{COMMAND}");
         Log3 $hash, 3, "[".$hash->{NAME}. "]" . " $hash->{DEVICE} disabled - going down ...";
@@ -215,7 +216,7 @@ sub RandomTimer_Exec($)
 
   if ($now ge $hash->{ABSCHALTZEIT})  {
     Log3 $hash, 3, "[".$hash->{NAME}."]"." $hash->{DEVICE} going down ...";
-    $hash->{COMMAND} = "off";
+    $hash->{COMMAND} = AttrVal($hash->{NAME}, "keepDeviceAlive", 0) ? "on" : "off";
     $hash->{STATE}   = "off";
     fhem ("set $hash->{DEVICE} $hash->{COMMAND}");
     delete $hash->{ABSCHALTZEIT};
@@ -340,7 +341,7 @@ sub toggleDevice ($)
     my $zufall = int(rand(1000));
     Log3 $hash, 4,  "[".$hash->{NAME}."]"." Zustand:$hash->{COMMAND} sigma:$sigma random:$zufall";
 
-    if ($zufall <= $sigma ) {
+    if ($zufall < $sigma ) {
        $hash->{COMMAND}  = ($hash->{COMMAND} eq "on") ? "off" : "on";
 
        my $command = "set @ $hash->{COMMAND}";
@@ -389,6 +390,17 @@ sub RandomTimer_disable($) {
    my $disableCond = AttrVal($hash->{NAME}, "disableCond", "");
    $disable = $disable || eval ($disableCond);
    return $disable;
+}
+#
+sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
+
+  foreach my $hc ( sort keys %{$modules{RandomTimer}{defptr}} ) {
+     my $hash = $modules{RandomTimer}{defptr}{$hc};
+
+     RandomTimer_ExecRepeater($hash);
+     Log3 undef, 3, "RandomTimer_Wakeup() for $hash->{NAME} done!";
+  }
+  Log3 undef,  3, "RandomTimer_Wakeup() done!";
 }
 
 1;
@@ -482,9 +494,18 @@ sub RandomTimer_disable($) {
         <br>
         <b>Examples</b>
         <pre>
-        attr   ZufallsTimerZ         disableCond  (!isVerreist())
-        attr   ZufallsTimerZ         disableCond  (Value("presenceDummy" eq "notPresent"))
+        attr   ZufallsTimerZ         disableCond      (!isVerreist())
         </pre>
+
+    <li><a name="disableCond">disableCond</a><br>
+        The default behavior of a RandomTimer is, that it shuts down the device after stoptime is reached.
+        The <b>keepDeviceAlive</b> attribute  changes the behavior. If set, the device status is not changed when the stoptime is reached.
+        <br>
+        <b>Example</b>
+        <pre>
+        attr   ZufallsTimerZ         keepDeviceAlive
+        </pre>
+
     </li>
     <li><a name="onOffCmd">onCmd, offCmd</a><br>
         Setting the on-/offCmd changes the command sent to the device. Standard is: "set &lt;device&gt; on".
