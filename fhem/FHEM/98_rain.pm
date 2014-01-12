@@ -1,4 +1,4 @@
-#  $Id $
+#  $Id$
 ##############################################
 #
 # Rain computing 
@@ -40,7 +40,11 @@ rain_Initialize($)
   $hash->{DefFn}   = "rain_Define";
   $hash->{NotifyFn} = "rain_Notify";
   $hash->{NotifyOrderPrefix} = "10-";   # Want to be called before the rest
-  $hash->{AttrList} = "disable:0,1";
+  $hash->{AttrList} =   "disable:0,1 ".
+  						"DayChangeTime ".
+  						"CorrectionValue ".
+  						"DontUseIsRaining:1,0 ".
+  						$readingFnAttributes;
 }
 
 ##########################
@@ -76,13 +80,14 @@ rain_Define($$)
   return undef;
 }
 
+
 ##########################
 sub
 rain_Notify($$)
 {
   my ($hash, $dev) = @_;
   my $hashName = $hash->{NAME};
-
+  
   return "" if(AttrVal($hashName, "disable", undef));
   return "" if(!defined($hash->{DEV_REGEXP}));
 
@@ -115,8 +120,8 @@ rain_Notify($$)
   # alarm
   my $devname_ref = "";
   my $diff_rain = 0;
-
-  	if (!defined($hash->{RAIN_NAME}) || !defined($hash->{ISRAINING_NAME}) || !defined($hash->{NEW_NAME})) {
+    
+  if (!defined($hash->{RAIN_NAME}) || !defined($hash->{ISRAINING_NAME}) || !defined($hash->{NEW_NAME})) {
 		# should never happen!
 		Log3 $hash, 1, "Error rain: RAIN_NAME || ISRAINING_NAME || NEW_NAME undefined";
 		return "";
@@ -125,7 +130,67 @@ rain_Notify($$)
   	$israining_name = $hash->{ISRAINING_NAME};
   	$new_name = $hash->{NEW_NAME};
   	Log3 $hash, 5, "rain_notify: devname=$devName rainname=$hashName, dev=$devName, dev_regex=$re rain_name=$rain_name israining_name=$israining_name";
+ 	      
+  my $DayChangeTime = "0730";
+  my $DayChangeTimeHour = "07";    #use as checked value
+  my $DayChangeTimeMinutes = "30"; #use as checked value
+  my $HourChangeTimeMinutes = "30"; #use as checked value
+  my $CorrectionValue = 1;
+  my $DontUseIsRaining = 0;
+  Log3 $hash, 1, "rain_notify: rain_Notify Defaults: DayChangeTime='$DayChangeTime' DontUseIsRaining='$DontUseIsRaining' CorrectionValue='$CorrectionValue'" if ($rain_debug == 1);
+ 	
+ 	if(defined($attr{$hashName}) &&
+       defined($attr{$hashName}{"DayChangeTime"}) &&
+       !($attr{$hashName}{"DayChangeTime"} eq "")) {
+       		my $DayChangeTimeCheck = $attr{$hashName}{"DayChangeTime"}; #do not overwrite the default value until value is check
+       		#(\d{2})(\d{2}) <-RegExp for 2x2 digits
+       		#([012][\d])([012345][\d]) <-RegExp for 4 digit with timecode
+       		#\([012][\d]\)\([012345][\d]\) <-RegExp for 4 digit with timecode
+       			       					
+			if ($DayChangeTimeCheck =~ /([012][\d])([012345][\d])/) {
+       			#my $FistDigits = $DayChangeTimeCheck =~ s/([012][\d])([012345][\d])/$1/ ;
+       			#my $SecondDigits = $DayChangeTimeCheck =~ s/([012][\d])([012345][\d])/$2/ ;
+       			$DayChangeTimeHour = $1;
+       			$DayChangeTimeMinutes = $2;
+       			$HourChangeTimeMinutes = $DayChangeTimeMinutes;
+       			Log3 $hash, 4, "Attribut matchs TimeCode DayChangeTime='$DayChangeTimeHour:$DayChangeTimeMinutes' ";
+   				# tue etwas ...
+			}
+			else
+			{
+				Log3 $hash, 1, "Attribut DayChangeTime is not a correct timecode. will use '$DayChangeTimeHour:$DayChangeTimeMinutes' ";
+			}
+ 			Log3 $hash, 1, "rain_notify: rain_Notify Attribut use DayChangeTime='$DayChangeTime' " if ($rain_debug == 1);
+       }
+       
+       #my $cache = AttrVal($hashName, "DayChangeTime", undef);
+			#if(defined($cache)){
+				#AttrVal($hashName, "DayChangeTime", "");
+			#	Log3 $hash, 1, "rain_notify: rain_Notify D Attribut defined CacheDayChangeTime='$cache' " if ($rain_debug == 1);
+			#}
+              
+    #my $cache= (AttrVal($hash->{RAIN_NAME},"DayChangeTime","")) ? "default" : (AttrVal($hash->{RAIN_NAME},"DayChangeTime",""));
+    #Log3 $hash, 1, "rain_notify: rain_Notify D Attribut defined CacheDayChangeTime='$cache' " if ($rain_debug == 1);
+       
+    if(defined($attr{$hashName}) &&
+       defined($attr{$hashName}{"CorrectionValue"}) &&
+       !($attr{$hashName}{"CorrectionValue"} eq "")) {
+       		$CorrectionValue = $attr{$hashName}{"CorrectionValue"};
+ 			Log3 $hash, 1, "rain_notify: rain_Notify Attribut defined CorrectionValue='$CorrectionValue' " if ($rain_debug == 1);
+       }
+     
+     if(defined($attr{$hashName}) &&
+       defined($attr{$hashName}{"DontUseIsRaining"}) &&
+       !($attr{$hashName}{"DontUseIsRaining"} eq "")) {
+       		$DontUseIsRaining = $attr{$hashName}{"DontUseIsRaining"};
+ 			Log3 $hash, 1, "rain_notify: rain_Notify Attribut defined DontUseIsRaining='$DontUseIsRaining' " if ($rain_debug == 1);
+       }
  
+ 
+    Log3 $hash, 1, "rain_notify: rain_Notify DayChangeTime='$DayChangeTimeHour:$DayChangeTimeMinutes' DontUseIsRaining='$DontUseIsRaining' CorrectionValue='$CorrectionValue'" if ($rain_debug == 1);
+ 
+ 	$rain_name = $hash->{RAIN_NAME}; 
+ 		
   my $max = int(@{$dev->{CHANGED}});   
   my $n = -1;
   my $lastval;
@@ -171,6 +236,9 @@ rain_Notify($$)
  
   }
 
+  #if Attribut DontUSeIsRaining is set to 1 - set israining also to 1 / ignors device entry
+  $israining = 1 if ($DontUseIsRaining == 1);
+  
   Log3 $hash, 3, "rain_notify: n='$n'" if ($rain_debug == 1);
   Log3 $hash, 3, "rain_notify: rain_name='$rain_name'" if ($rain_debug == 1);
   
@@ -184,7 +252,7 @@ rain_Notify($$)
   # We found rain_value and israining. so we can calculate rain first
   
   # my $rain = sprintf("%.1f", rain($rain_value,$israining));
-  my $rain = sprintf("%.1f", $rain_value);
+  my $rain = sprintf("%.1f", $rain_value * $CorrectionValue);
   
   Log3 $hash, 1, "rain_notify: rain=$rain" if ($rain_debug == 1);
 
@@ -302,8 +370,9 @@ rain_Notify($$)
     
     # look forward to the next hour trigger event
     my @th=localtime($tsecs+1800);
-    # time for the hour-trigger (every houre at) 30 min
-    my $rain_h_trig=sprintf("%04d-%02d-%02d_%02d:%02d",$th[5]+1900,$th[4]+1,$th[3],$th[2],"30");
+    # time for the hour-trigger (every houre at) 30 min by default
+    #my $rain_h_trig=sprintf("%04d-%02d-%02d_%02d:%02d",$th[5]+1900,$th[4]+1,$th[3],$th[2],"30");
+    my $rain_h_trig=sprintf("%04d-%02d-%02d_%02d:%02d",$th[5]+1900,$th[4]+1,$th[3],$th[2],$HourChangeTimeMinutes);
     Log3 $hash, 1, "NEW rain_h_trigger would be = $rain_h_trig" if ($rain_debug == 1);
 
     Log3 $hash, 1, "rain_h_trigger_tsecs = $rain_h_trig_tsecs" if ($rain_debug == 1);
@@ -325,7 +394,8 @@ rain_Notify($$)
  		#Debug "gmData: ". join(' ', @gmData);
     	
     	#TODO should be 5:30 UTC?
-    	$rain_h_trig_tsecs = timelocal(0,30,7,$th[3],$th[4],$th[5]+1900);
+    	#$rain_h_trig_tsecs = timelocal(0,30,7,$th[3],$th[4],$th[5]+1900);
+    	$rain_h_trig_tsecs = timelocal(0,$DayChangeTimeMinutes,$DayChangeTimeHour,$th[3],$th[4],$th[5]+1900);
     		
     		# remember $rain_d_trig_tsecs     / trigger-time for next event to zero rain
 	    $r->{$sensor ."_h_trig_tsecs"}{TIME} = $tm;
@@ -337,7 +407,8 @@ rain_Notify($$)
 	    Log3 $hash, 1, "NEW rain_h_trigger IS = $rain_h_trig" if ($rain_debug == 1);
 	    
 	    #$time = timelocal($sec,$min,$hour,$mday,$mon,$year);
-	    $rain_h_trig_tsecs = timelocal(0,30,$th[2],$th[3],$th[4],$th[5]+1900);
+	    #$rain_h_trig_tsecs = timelocal(0,30,$th[2],$th[3],$th[4],$th[5]+1900);
+	    $rain_h_trig_tsecs = timelocal(0,$HourChangeTimeMinutes,$th[2],$th[3],$th[4],$th[5]+1900);
 	    Log3 $hash, 1, "rain_h_trigger_tsecs = $rain_h_trig_tsecs" if ($rain_debug == 1);
 	    
 		#$rain_h_last = sprintf("%0.1f", ($rain_raw_adj-$rain_raw_h_start) * $def->{RAINUNIT} / 1000);		
@@ -360,7 +431,8 @@ rain_Notify($$)
 	# look forward to the next day trigger event
 	@th=localtime($tsecs+86400);
     #  the time for the day-trigger:           7:30 Uhr
-    my $rain_d_trig=sprintf("%04d-%02d-%02d_%02d:%02d",$th[5]+1900,$th[4]+1,$th[3],"7","30");
+    #my $rain_d_trig=sprintf("%04d-%02d-%02d_%02d:%02d",$th[5]+1900,$th[4]+1,$th[3],"7","30");
+    my $rain_d_trig=sprintf("%04d-%02d-%02d_%02d:%02d",$th[5]+1900,$th[4]+1,$th[3],$DayChangeTimeHour,$DayChangeTimeMinutes);
     Log3 $hash, 1, "NEW rain_d_trigger would be= $rain_d_trig" if ($rain_debug == 1);
 
     Log3 $hash, 1, "rain_d_trigger_tsecs = $rain_d_trig_tsecs" if ($rain_debug == 1);	    
@@ -368,7 +440,8 @@ rain_Notify($$)
     
     if (($rain_d_trig_tsecs-$tsecs)>86400){ # something is wrong
     	Log3 $hash, 1, "something is wrong! the diff until next reset should not be greater than one day. Now set New Trigger" if ($rain_debug == 1);
-    	$rain_d_trig_tsecs = timelocal(0,30,7,$th[3],$th[4],$th[5]+1900);
+    	#$rain_d_trig_tsecs = timelocal(0,30,7,$th[3],$th[4],$th[5]+1900);
+    	$rain_d_trig_tsecs = timelocal(0,$DayChangeTimeMinutes,$DayChangeTimeHour,$th[3],$th[4],$th[5]+1900);
     		
     		# remember $rain_d_trig_tsecs     / trigger-time for next event to zero rain
 	    $r->{$sensor ."_d_trig_tsecs"}{TIME} = $tm;
@@ -381,7 +454,8 @@ rain_Notify($$)
 		Log3 $hash, 1, "NEW rain_d_trigger IS= $rain_d_trig" if ($rain_debug == 1);
 	    
 	    #         $time = timelocal($sec,$min,$hour,$mday,$mon,$year);
-	    $rain_d_trig_tsecs = timelocal(0,30,7,$th[3],$th[4],$th[5]+1900);
+	    #$rain_d_trig_tsecs = timelocal(0,30,7,$th[3],$th[4],$th[5]+1900);
+	    $rain_d_trig_tsecs = timelocal(0,$DayChangeTimeMinutes,$DayChangeTimeHour,$th[3],$th[4],$th[5]+1900);
 	    Log3 $hash, 1, "rain_d_trigger_tsecs = $rain_d_trig_tsecs" if ($rain_debug == 1);
 	    
 		$rain_d_last = sprintf("%0.1f", ($current-$rain_d_start));
@@ -448,36 +522,6 @@ rain_Notify($$)
   return undef;
 }
 
-# -----------------------------
-# Rain calculation.
-# see http://www.faqs.org/faqs/meteorology/rain-rain/ "5. EXAMPLE"
-sub
-rain($$$)
-{
-        my ($rain_value, $israining, $hash) = @_;
-
-        Log3 $hash, 5, "Info: rain() e==0: rain=$rain_value, israining=$israining";
-        
-        my $dp;
-
-        my $A = 17.2694;
-        my $B = ($rain_value > 0) ? 237.3 : 265.5;
-        my $es = 610.78 * exp( $A * $rain_value / ($rain_value + $B) );
-        my $e = $israining/ 100 * $es;
-        if ($e == 0) {
-                Log3 $hash, 1, "Error: rain() e==0: rain=$rain_value, israining=$israining";
-                return 0;
-        }
-        my $e1 = $e / 610.78;
-        my $f = log( $e1 ) / $A;
-        my $f1 = 1 - $f;
-        if ($f1 == 0) {
-                Log3 $hash, 1, "Error: rain() (1-f)==0: rain=$rain_value, israining=$israining";
-                return 0;
-        }
-        $dp = $B * $f / $f1  ;
-        return($dp);
-}
 
 1;
 
@@ -537,6 +581,21 @@ rain($$$)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
+    <li>DontUseIsRaining 0/1
+    		<br>
+    		Don't use the devicevalue IsRaining, if set to 1
+    		</li>
+    <li>DayChangeTime HHMM
+    		<br>
+    		Change the default (day)time of the 'set value to zero' time (use the timecode as four digits!)
+    		<br>
+    		The minutevalue is used to set the (hour)time of the 'set value to zero' time 
+    		</li>
+    
+    <li>CorrectionValue 1
+            <br>
+            Use this value if you wish to do a correction of the rain-device-values. It is used as an factor. The value 1 will not change anything.
+            </li>
     <br>
   </ul>
 </ul>
