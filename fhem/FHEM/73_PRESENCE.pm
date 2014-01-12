@@ -106,7 +106,7 @@ PRESENCE_Define($$)
         }
         elsif($a[2] eq "lan-ping")
         {
-            if(-X "/usr/bin/ctrlmgr_ctl" and not $username eq "root")
+            if(-X "/usr/bin/ctlmgr_ctl" and not $username eq "root")
             {
                 my $msg = "FHEM is not running under root (currently $username) This check can only performed with root access to the FritzBox";
                 Log 2, "PRESENCE: ".$msg;
