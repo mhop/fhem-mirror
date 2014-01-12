@@ -242,7 +242,7 @@ YAMAHA_AVR_Get($@)
     {
 		$return = "unknown argument $what, choose one of";
 		
-		foreach my $reading (keys $hash->{READINGS})
+		foreach my $reading (keys %{$hash->{READINGS}})
 		{
 			$return .= " $reading:noArg";
 		}
