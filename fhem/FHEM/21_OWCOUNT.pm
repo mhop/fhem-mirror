@@ -436,9 +436,9 @@ sub OWCOUNT_FormatValues($) {
     }else{     
       #-- only if attribute value mode=daily, take the midnight value from memory
       if( $daily == 1){
-        $vval = int( (($owg_val[$i] + $offset)*$factor - $owg_midnight[$i])*100)/100; 
+        $vval = int( (($owg_val[$i] + $offset)*$factor - $owg_midnight[$i])*10000+0.5)/10000; 
       } else {
-        $vval = int( ($owg_val[$i] + $offset)*$factor*100)/100;
+        $vval = int( ($owg_val[$i] + $offset)*$factor*10000+0.5)/10000;
       }
       
       #-- rate calculation: get the old values
@@ -450,7 +450,7 @@ sub OWCOUNT_FormatValues($) {
       if( length($oldtim) > 0 ){    
         #-- correct counter wraparound since last reading
         if( $vval < $oldval) {
-           $oldval -= 65536*(65536*$factor);
+           $oldval -= (65536*$factor);
         }
 
         #-- previous measurement time
@@ -465,6 +465,7 @@ sub OWCOUNT_FormatValues($) {
         #-- rate
         if( ($delt > 0.0) && $present ){
           $vrate  = ($vval-$oldval)/$delt;
+               Log 1, "Caluclating rate from oldval=$oldval, vval=$vval, delt=$delt as $vrate";
         } else {
           $vrate = 0.0;
         }
@@ -474,13 +475,13 @@ sub OWCOUNT_FormatValues($) {
         }elsif( $period eq "minute" ){
           $vrate*=60;
         }     
-        $vrate = int($vrate * 100)/100;       
+        $vrate = int($vrate * 10000+0.5)/10000;       
       
         #--midnight extrapolation only possible if previous measurement
         if( $daybreak==1 ){
           #--  linear extrapolation 
           $dt   = -$delf/$delt;
-          $dval = int(($vval+($vval-$oldval)*$dt)*100)/100;
+          $dval = int(($vval+($vval-$oldval)*$dt)*10000+0.5)/10000;
   
           if( $daily == 1 ){
             $dval2 = $dval+$owg_midnight[$i]; 
