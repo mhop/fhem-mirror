@@ -465,7 +465,6 @@ sub OWCOUNT_FormatValues($) {
         #-- rate
         if( ($delt > 0.0) && $present ){
           $vrate  = ($vval-$oldval)/$delt;
-               Log 1, "Caluclating rate from oldval=$oldval, vval=$vval, delt=$delt as $vrate";
         } else {
           $vrate = 0.0;
         }
