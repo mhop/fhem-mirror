@@ -608,7 +608,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   mdTempValve     =>{a=>  2.6,s=>0.2,l=>5,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{auto=>0,close=>1,open=>2}},
   "day-temp"      =>{a=>  3  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>1,t=>"comfort or day temperatur"},
   "night-temp"    =>{a=>  4  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>1,t=>"lower or night temperatur"},
-  tempWinOpen     =>{a=>  5  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Win open !chan 3 only!"},
+  tempWinOpen     =>{a=>  5  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Win open"},
   "party-temp"    =>{a=>  6  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Party"},
   decalMin        =>{a=>  8  ,s=>0.3,l=>5,min=>0  ,max=>50      ,c=>''         ,f=>0.1     ,u=>'min' ,d=>1,t=>"Decalc min"},
   decalHr         =>{a=>  8.3,s=>0.5,l=>5,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Decalc hour"},

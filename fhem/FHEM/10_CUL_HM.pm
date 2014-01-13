@@ -2692,7 +2692,7 @@ sub CUL_HM_Set($@) {
 
     my ($lChn,$peerId,$peerChn) = ($chn,"000000","00");
     if (($list == 3) ||($list == 4)   # peer is necessary for list 3/4
-        ||($list == 7 && $peerChnIn)){# and possible for List 7
+        ||($peerChnIn))              {# and if requested by user
       return "Peer not specified" if ($peerChnIn eq "");
       $peerId  = CUL_HM_peerChId($peerChnIn,$dst,$id);
       $peerChn = ((length($peerId) == 8)?substr($peerId,6,2):"01");
@@ -2770,7 +2770,7 @@ sub CUL_HM_Set($@) {
     my $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
     return "timer value to low" if ($tval eq "0000");
     CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."02$chn"."C80000$tval");
-     $hash = $chnHash; # report to channel if defined
+    $hash = $chnHash; # report to channel if defined
   }
   elsif($cmd eq "lock") { #####################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'800100FF'); # LEVEL_SET
@@ -3152,7 +3152,10 @@ sub CUL_HM_Set($@) {
       $hash->{helper}{vd}{idh} = hex(substr($dst,2,2))*20077;
       $hash->{helper}{vd}{idl} = hex(substr($dst,4,2))*256;
       $hash->{helper}{vd}{msgCnt} = 1;
-      CUL_HM_valvePosUpdt("valvePos:$dst$chn") if (!$hash->{helper}{virtTC});
+      if (!$hash->{helper}{virtTC}){
+        $hash->{helper}{virtTC} = "03";
+        CUL_HM_valvePosUpdt("valvePos:$dst$chn");
+      };
       $hash->{helper}{virtTC} = "03";
       $state = "ValveAdjust:$vp %";
     }
@@ -3244,7 +3247,7 @@ sub CUL_HM_Set($@) {
         }
         CUL_HM_PushCmdStack($pHash, sprintf("++%s40%s%s%02X%02X",
                        $peerFlag,$dst,$peer,
-                       hex($chn)+(($mode && $mode eq "long")?64:0),
+                       hex($chn)+(($mode eq "long")?64:0),
                        $pressCnt));
 
         if ($rxt & 0x80){#burstConditional
@@ -3489,16 +3492,21 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   my $vp = ReadingsVal($name,"valvePosTC","15 %");
   $vp =~ s/ %//;
   $vp *=2.56;
+  my $tn = gettimeofday();
+  my $delta = int((gettimeofday() - $hash->{helper}{vd}{next})*1000);
+#  Log 1,"VD-timing ##### diff:$delta";
+  Log 1,"VD-timing Critical ##### diff:$delta" if ($delta >100);
   foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
     next if (length($peer) != 8);
     $peer = substr($peer,0,6);
     CUL_HM_PushCmdStack($hash,sprintf("%02XA258%s%s%s%02X",$msgCnt,$vDevId
                                       ,$peer,$hash->{helper}{virtTC},$vp));
   }
+  $hash->{helper}{vd}{next} = $tn+$nextTimer;
   $hash->{helper}{vd}{msgCnt} = $msgCnt;
   $hash->{helper}{virtTC} = "00";
   CUL_HM_ProcessCmdStack($hash);
-  InternalTimer(gettimeofday()+$nextTimer,"CUL_HM_valvePosUpdt","valvePos:$vId",0);
+  InternalTimer($hash->{helper}{vd}{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
 }
 sub CUL_HM_weather(@) {#periodically send weather data
   my($in ) = @_;
