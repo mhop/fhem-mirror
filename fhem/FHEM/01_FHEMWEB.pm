@@ -950,11 +950,16 @@ FW_makeTableFromArray($$@) {
 sub
 FW_roomIdx(\@$)
 {
-  my ($arr,$v) = @_;
-  my ($index) = grep { $arr->[$_] =~ /^$v$/ } 0..$#$arr;
-
-  return "9999-$v" if( !defined($index) );
-  return sprintf( "%03i", $index );
+  my ($arr,$v) = @_; 
+  my ($index) = grep { $v =~ /^$arr->[$_]$/ } 0..$#$arr;
+ 
+  if( !defined($index) ) { 
+    $index = 9999;
+  } else {
+    $index = sprintf( "%03i", $index );
+  }
+ 
+  return "$index-$v";
 }
 
 
