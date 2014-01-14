@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id$
+# $Id: 42_SYSMON.pm 4644 2014-01-14 18:57:03Z hexenmeister $
 
 package main;
 
@@ -33,7 +33,7 @@ use warnings;
 my $VERSION = "1.2.1";
 
 use constant {
-	DATE            => "date",
+  DATE            => "date",
   UPTIME          => "uptime",
   UPTIME_TEXT     => "uptime_text",
   FHEMUPTIME      => "fhemuptime",
