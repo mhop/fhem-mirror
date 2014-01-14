@@ -1412,15 +1412,25 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
   "11;p02=8100" => { txt => "LEDall"      , params => {
                      Led1To16 => '04,8,$val= join(":",sprintf("%b",hex($val))=~ /(.{2})/g)',
                      } },
-  "11;p01=81"   => { txt => "LEVEL"       , params => {
+  "11;p01=81"   => { txt => "LEVEL"       , params => {#ALARM_COUNT/HANDLE_LOCK/LEVEL_SET/MANU_MODE_SET/SET_ALL_CHANNELS
                      CHANNEL  => "02,2",
                      TIME     => '04,2,$val=hex($val)',
                      SPEED    => '06,2,$val=hex($val)',
                      } },
-  "11;p01=82"   => { txt => "Sleepmode"   , params => {#only LED16?
+  "11;p01=82"   => { txt => "Sleepmode"   , params => {#SET_WINTER_MODE/SET_LED_SLEEP_MODE/SERVICE_COUNT/PARTY_MODE_SET  
                      CHANNEL  => "02,2",
                      MODE     => '04,2,$val=hex($val)',
                      } },
+  "11;p01=83"   => { txt => "EnterBootLoader"   },#BOOST_MODE_SET/SET_HANDLE_LED_MODE 
+#  "11;p01=84"   => { txt => ""   },#SET_SHEV_POS/COMFORT_MODE_SET
+#  "11;p01=85"   => { txt => ""   },#LOWERING_MODE_SET/SET_RELEASE_TURN 
+  "11;p01=86"   => { txt => "SetTemp"     , params => {
+                     B1     => "02,2",
+                     B2     => '04,2',
+                     } },
+  "11;p01=87"   => { txt => "AdaptionDriveSet"  },
+  "11;p01=CA"   => { txt => "EnterBootLoader"   },#download? at the end?
+
   "12"          => { txt => "HAVE_DATA"},
   "3E"          => { txt => "SWITCH"      , params => {
                      DST      => "00,6",
