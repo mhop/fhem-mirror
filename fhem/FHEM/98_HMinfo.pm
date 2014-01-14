@@ -262,6 +262,128 @@ sub HMinfo_paramCheck(@) { ####################################################
   $ret .="\n\n PairedTo missmatch to IODev"."\n    ".(join "\n    ",sort @idMismatch) if (@idMismatch);
  return  $ret;
 }
+sub HMinfo_tempList(@) { ######################################################
+  my ($action,$fName)=@_;
+  $fName = "tempList.cfg" if (!$fName);
+  $action = "save" if (!$action);
+  my $ret;
+  if ($action eq "save"){
+    open(aSave, ">$fName") || return("Can't open $fName: $!");
+    my @incmpl;
+    foreach my $eN(HMinfo_getEntities("d")){#search for devices and select correct channel
+      my $md = AttrVal($eN,"model","");
+      my $chN; #tempList channel name
+      if ($md =~ m/(HM-CC-RT-DN-BoM|HM-CC-RT-DN)/){
+        $chN = $defs{$eN}{channel_04};
+      }
+      elsif ($md =~ m/(ROTO_ZEL-STG-RM-FWT|HM-CC-TC)/){
+        $chN = $defs{$eN}{channel_02};
+      }
+      next if (!$chN || !$defs{$chN} );
+      print aSave "\nentities:$chN";
+      my @tl = sort grep /tempList[SMFWT]/,keys %{$defs{$chN}{READINGS}};
+      if (scalar@tl != 7){
+        print aSave "\nincomplete:$chN only data for ".join(",",@tl);
+        push @incmpl,$chN;
+        next;
+      }
+      foreach my $rd (@tl){
+        print aSave "\n$rd>$defs{$chN}{READINGS}{$rd}{VAL}";
+      }
+    }
+    print aSave "\n======= finished ===\n";
+    close(aSave);
+    $ret = "incomplete data for ".join("\n     ",@incmpl) if (scalar@incmpl);
+  }
+  elsif ($action eq "verify"){
+    open(aSave, "$fName") || return("Can't open $fName: $!");
+    my @el = ();
+    my @elAll = ();
+    my @entryFail = ();
+    my @entryNF = ();
+    while(<aSave>){
+      chomp;
+      if($_ =~ m/^entities:/){
+        my $line = $_;
+        $line =~s/.*://;
+        @el = ();
+        foreach (split(",",$line)){
+          if ($defs{$_}){
+            push @el,$_ if ($defs{$_});
+          }
+          else{
+            push @entryNF,$_;
+          }
+        }
+        push @elAll,@el;
+      }
+      elsif(@el && $_ =~ m/tempList[SMFWT].*\>/){
+        my ($tln,$val) = ($1,$2)if($_ =~ m/(.*)>(.*)/);
+        $tln =~ s/ //g;
+        $val =~ s/ //g;
+        foreach my $eN(@el){
+          my $valR = ReadingsVal($eN,$tln,"");
+          $valR =~ s/ //g;
+          push @entryFail,$eN." :".$tln if ($valR ne  $val);
+        }
+      }
+    }
+    $ret .= "\nentries tested:\n     "   .join("\n     ",@elAll)     if (scalar@elAll);
+    $ret .= "\nfailed verify:\n     "    .join("\n     ",@entryFail) if (scalar@entryFail);
+    $ret .= "\nentries not found:\n     ".join("\n     ",@entryNF)   if (scalar@entryNF);
+  }
+  elsif ($action eq "restore"){
+    open(aSave, "$fName") || return("Can't open $fName: $!");
+    my @el = ();
+    my @elAll = ();
+    my @entryFail = ();
+    my @entryNF = ();
+    my @exec = ();
+    while(<aSave>){
+      chomp;
+      if($_ =~ m/^entities:/){
+        my $line = $_;
+        $line =~s/.*://;
+        @el = ();
+        foreach (split(",",$line)){
+          if ($defs{$_}){
+            push @el,$_ if ($defs{$_});
+          }
+          else{
+            push @entryNF,$_;
+          }
+        }
+        foreach (@exec){
+          my @param = split(" ",$_);
+          CUL_HM_Set($defs{$param[0]},@param);
+        }
+        push @elAll,@el;
+      }
+      elsif(@el && $_ =~ m/tempList[SMFWT].*\>/){
+        my ($tln,$val) = ($1,$2)if($_ =~ m/(.*)>(.*)/);
+        $tln =~ s/ //g;
+        $val =~ tr/ +/ /;
+        $val =~ s/^ //;
+        $val =~ s/ $//;
+        @exec = ();
+        foreach my $eN(@el){
+          my $x = CUL_HM_Set($defs{$eN},$eN,$tln,"prep",split(" ",$val));
+          push @entryFail,$eN." :".$tln." respose:$x" if ($x != 1);
+          push @exec,$eN." ".$tln." exec ".$val;
+        }
+      }
+    }
+    foreach (@exec){
+      my @param = split(" ",$_);
+      CUL_HM_Set($defs{$param[0]},@param);
+    }
+
+    $ret = "failed Entries:\n     "   .join("\n     ",@entryFail) if (scalar@entryFail);
+    $ret = "Entries not found:\n     ".join("\n     ",@entryNF)   if (scalar@entryNF);
+  }
+
+  return $ret;
+}
 
 sub HMinfo_getEntities(@) { ###################################################
   my ($filter,$re) = @_;
@@ -273,9 +395,9 @@ sub HMinfo_getEntities(@) { ###################################################
   $re = '.' if (!$re);
   if ($filter){# options provided
     $doDev=$doChn=$doEmp= 0;#change default
-no warnings;
-    my @pl = split undef,$filter;
-use warnings;
+    no warnings;
+      my @pl = split undef,$filter;
+    use warnings;
     foreach (@pl){
       $doDev = 1 if($_ eq 'd');
       $doChn = 1 if($_ eq 'c');
@@ -663,6 +785,9 @@ sub HMinfo_SetFn($@) {#########################################################
   elsif($cmd eq "update")     {##update hm counts -----------------------------
     $ret = HMinfo_status($hash);
   }
+  elsif($cmd eq "tempList")     {##update hm counts -----------------------------
+    $ret = HMinfo_tempList(@a);
+  }
   elsif($cmd eq "help")       {
     $ret = " Unknown argument $cmd, choose one of "
            ."\n ---checks---"
@@ -672,6 +797,7 @@ sub HMinfo_SetFn($@) {#########################################################
            ."\n ---actions---"
            ."\n saveConfig [<typeFilter>] <file>               # stores peers and register with saveConfig"
            ."\n autoReadReg [<typeFilter>]                     # trigger update readings if attr autoReadReg is set"
+           ."\n tempList [save|restore|verify][filename]       # handle tempList of thermostat devices"
            ."\n ---infos---"
            ."\n update                                         # update HMindfo counts"
            ."\n register [<typeFilter>]                        # devicefilter parse devicename. Partial strings supported"
@@ -1392,6 +1518,46 @@ sub HMinfo_noDup(@) {#return list with no duplicates
       <li><a name="#HMinfosaveConfig">saveConfig</a> <a href="#HMinfoFilter">[filter]</a><br>
           performs a save for all HM register setting and peers. See <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>.
       </li>
+         <br>
+      <li><a name="#HMinfotempList">tempList</a> [save|restore|verify] [filename]</a><br>
+          this function supports handling of tempList for thermstates.
+          It allows templists to be saved in a separate file, verify settings against the file
+          and write the templist of the file to the devices. <br>
+          <li><B>save</B> saves tempList readings of the system to the file. <br>
+              Note that templist as available in FHEM is put to the file. It is up to the user to make
+              sure the data is actual<br>
+              Storage is not cumulative - former content of the file will be removed</li>
+          <li><B>restore</B> available templist as defined in the file is written directly 
+              to the device</li>
+          <li><B>verify</B> file data is compared to readings as present in FHEM. It does not
+              verify data in the device - user needs to ensure actuallity on the readings</li>
+          <br>
+          <li><B>filename</B> is the name of the file to be used. Default ist <B>tempList.cfg</B></li>
+          File example<br>
+          <ul><code>
+               entities:HK1_Climate,HK2_Clima<br>
+               tempListFri>07:00 14.0 13:00 16.0 16:00 18.0 21:00 19.0 24:00 14.0<br>
+               tempListMon>07:00 14.0 16:00 18.0 21:00 19.0 24:00 14.0<br>
+               tempListSat>08:00 14.0 15:00 18.0 21:30 19.0 24:00 14.0<br>
+               tempListSun>08:00 14.0 15:00 18.0 21:30 19.0 24:00 14.0<br>
+               tempListThu>07:00 14.0 16:00 18.0 21:00 19.0 24:00 14.0<br>
+               tempListTue>07:00 14.0 13:00 16.0 16:00 18.0 21:00 19.0 24:00 15.0<br>
+               tempListWed>07:00 14.0 16:00 18.0 21:00 19.0 24:00 14.0<br>
+               entities:hk3_Climate<br>
+               tempListFri>06:00 17.0 12:00 21.0 23:00 20.0 24:00 19.5<br>
+               tempListMon>06:00 17.0 12:00 21.0 23:00 20.0 24:00 17.0<br>
+               tempListSat>06:00 17.0 12:00 21.0 23:00 20.0 24:00 17.0<br>
+               tempListSun>06:00 17.0 12:00 21.0 23:00 20.0 24:00 17.0<br>
+               tempListThu>06:00 17.0 12:00 21.0 23:00 20.0 24:00 17.0<br>
+               tempListTue>06:00 17.0 12:00 21.0 23:00 20.0 24:00 17.0<br>
+               tempListWed>06:00 17.0 12:00 21.0 23:00 20.0 24:00 17.0<br>
+         </code></ul>
+         File keywords<br>
+         <li><B>entities</B> comma separated list of entities which refers to the teml lists following</li>
+         <li><B>tempList...</B> time and temp couples as used in the set tempList commands</li>
+         <br>
+
+     </li>
          <br>
       <li><a name="#HMinfocpRegs">cpRegs &lt;src:peer&gt; &lt;dst:peer&gt; </a><br>
           allows to copy register, setting and behavior of a channel to
