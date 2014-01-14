@@ -866,6 +866,7 @@ sub HMinfo_SetFn($@) {#########################################################
             ,"models"
             ,"regCheck","register","saveConfig","update"
             ,"cpRegs"
+            ,"tempList"
             ,"templateChk","templateDef","templateList","templateSet");
     $ret = join (" ",sort @cmdLst); 
   }
