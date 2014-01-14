@@ -1,0 +1,31 @@
+# SYSMON
+#
+# Network-Traffic ETH0
+# 
+# Beispiel aus dem Logfile:
+# 2013-11-17_21:35:57 sysmon eth0_diff: Received: 23.54 MB, Sent: 42.64 MB, Total: 66.18 MB
+#
+
+set terminal png transparent size <SIZE> crop
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set y2tics
+set title '<L1>'
+set grid xtics y2tics
+
+set y2label "Traffic in MB"
+
+#FileLog 5:eth0_diff\x3a:0:
+#FileLog 8:eth0_diff\x3a:0:
+#FileLog 11:eth0_diff\x3a:0:
+
+plot \
+  "< egrep 'RX:' <IN>"\
+     using 1:5 axes x1y2 title 'Empfangen' ls l1 lw 2 with lines \
+   "< egrep 'TX:' <IN>"\
+     using 1:8 axes x1y2 title 'Gesendet' ls l0 lw 2 with lines \
+   "< egrep 'Total:' <IN>"\
+     using 1:11 axes x1y2 title 'Gesamt' ls l2 lw 2 with lines

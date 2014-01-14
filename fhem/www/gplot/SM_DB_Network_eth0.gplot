@@ -1,0 +1,31 @@
+# SYSMON
+#
+# Network-Traffic ETH0 (DbLog)
+#
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+
+set title '<L1>'
+set ylabel "Traffic RX / TX"
+set y2label "Traffic Total"
+set grid
+set ytics
+set y2tics
+set format y "%.2f"
+set format y2 "%.2f"
+
+#DbLog <SPEC1>:eth0_diff:::$val=~s/^RX..([\d.]*).*/$1/eg
+#DbLog <SPEC1>:eth0_diff:::$val=~s/.*TX..([\d.]*).*/$1/eg
+#DbLog <SPEC1>:eth0_diff:::$val=~s/.*Total..([\d.]*).*/$1/eg
+
+plot \
+   "< awk '/eth0_diff:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l0 axes x1y1 title 'RX' lw 1 with lines \
+   "< awk '/eth0_diff:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l1 axes x1y1 title 'TX' lw 1 with lines \
+   "< awk '/eth0_diff:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l2 axes x1y2 title 'Total' lw 1 with lines \

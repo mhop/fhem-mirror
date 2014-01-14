@@ -1,0 +1,35 @@
+# SYSMON
+#
+# Anzeige: system load 
+#
+# define wl_sysmon_load SVG myDbLog:SMLoadDB:CURRENT
+# attr wl_sysmon_load label "Load Min: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"
+# attr wl_sysmon_load plotfunction sysmon
+# attr wl_sysmon_load room RaspberryPi
+#
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<L1>'
+set ytics
+set y2tics
+set grid ytics y2tics
+set ylabel "Last 1 Minute"
+set y2label "Last 5 / 15 Minuten"
+set yrange [0.00:1.0]
+set y2range [0.00:0.35]
+
+#DbLog <SPEC1>:loadavg:::$val=~s/([\d.]*).[\d.]*.[\d.]*/$1/eg
+#DbLog <SPEC1>:loadavg:::$val=~s/[\d.]*.([\d.]*).[\d.]*/$1/eg
+#DbLog <SPEC1>:loadavg:::$val=~s/[\d.]*.[\d.]*.([\d.]*)/$1/eg
+
+plot \
+     "< awk '/load avg:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l0fill axes x1y1 title '1 min' lw 1 with lines \
+   "< awk '/load avg5:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l1 axes x1y2 title '5 min' lw 2 with lines \
+  "< awk '/load avg15:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l2 axes x1y2 title '15 min' lw 2 with lines

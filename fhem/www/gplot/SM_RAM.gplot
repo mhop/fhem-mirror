@@ -1,0 +1,30 @@
+# SYSMON
+#
+# Visualisierung: RAM-Nutzung
+# 
+# Beispiel aus dem Logfile:
+# 2013-11-19_21:51:41 sysmon ram: Total: 485 MB, Used: 118 MB, 24.33 %, Free: 366 MB
+#
+
+set terminal png transparent size <SIZE> crop
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set y2tics
+set title '<L1>'
+set grid xtics y2tics
+
+set y2label "RAM-Nutzung MB"
+set y2range [0:495]
+
+#FileLog 5:ram\x3a:0:
+#FileLog 8:ram\x3a:0:
+
+plot \
+  "< egrep 'total:' <IN>"\
+     using 1:5 axes x1y2 title '' ls l0 lw 2 with lines
+plot \
+   "< egrep 'used:' <IN>"\
+     using 1:8 axes x1y2 title 'Verwendet' ls l2fill lw 0.5 with lines

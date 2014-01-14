@@ -1,0 +1,45 @@
+# SYSMON
+#
+# Visualisierung: Dateisysteminformationen (/)
+# 
+# Beispiel aus dem Logfile:
+# 2013-11-21_20:00:54 sysmon ~ /: Total: 7404 MB, Used: 3292 MB, 47 %, Available: 3787 MB
+# 2013-11-21_20:00:54 sysmon ~ /media/usb1: Total: 30942 MB, Used: 6330 MB, 21 %, Available: 24613 MB
+# 2013-11-21_20:00:54 sysmon fs_root: Total: 7404 MB, Used: 3292 MB, 47 %, Available: 3787 MB
+#
+
+set terminal png transparent size <SIZE> crop
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set y2tics
+set title '<L1>'
+set grid xtics y2tics
+
+set yrange [0:90]
+set y2range [0:7500]
+
+set ylabel "Nutzung %"
+set y2label "Nutzung MB"
+
+#FileLog 0:fs_root|~\s/\x3a:0:$fld[4]+$fld[5]
+#FileLog 0:fs_root|~\s/\x3a:0:$fld[7]+$fld[8]
+#FileLog 0:fs_root|~\s/\x3a:0:$fld[9]+$fld[10]
+#nur ~# FileLog 6:~\s/\x3a:0:
+#nur ~# FileLog 9:~\s/\x3a:0:
+#nur ~# FileLog 11:~\s/\x3a:0:
+#nur fs# FileLog 5:fs_root\x3a:0:
+#nur fs# FileLog 8:fs_root\x3a:0:
+#nur fs# FileLog 10:fs_root\x3a:0:
+
+plot \
+  "< egrep 'total:' <IN>"\
+     using 1:6 axes x1y2 title '' ls l0 lw 2 with lines
+plot \
+   "< egrep 'used:' <IN>"\
+     using 1:9 axes x1y2 title 'Verwendet MB' ls l2fill lw 0.5 with lines
+plot \
+   "< egrep 'percent:' <IN>"\
+     using 1:11 axes x1y1 title 'Verwendet %' ls l1 lw 1.5 with lines
