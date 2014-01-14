@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: YAMAHA_AVR: define separate on and off status intervals for
+             cyclic status updates
   - feature: Visualizations (Plots) for SYSMON added
   - feature: new module 42_SYSMON.pm added (hexenmeister)
   - feature: YAMAHA_AVR: new readings for radio stations, current title
