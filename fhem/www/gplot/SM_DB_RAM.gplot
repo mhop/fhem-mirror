@@ -1,0 +1,31 @@
+# SYSMON
+#
+# Visualisierung: RAM-Nutzung
+#
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+
+set title '<L1>'
+set ylabel "Ram Total / Free (MB)"
+set y2label "Ram Used (MB)"
+set grid
+set ytics
+set y2tics
+set format y "%.2f"
+set format y2 "%.2f"
+
+#DbLog <SPEC1>:ram:::$val=~s/^Total..([\d.]*).*/$1/eg
+#DbLog <SPEC1>:ram:::$val=~s/.*Used..([\d.]*).*/$1/eg
+#DbLog <SPEC1>:ram:::$val=~s/.*Free..([\d.]*).*/$1/eg
+
+plot \
+   "< awk '/ram:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l0 axes x1y1 title 'Total' lw 1 with lines \
+   "< awk '/ram:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l1 axes x1y2 title 'Used' lw 1 with lines \
+   "< awk '/ram:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l2 axes x1y1 title 'Free' lw 1 with lines \

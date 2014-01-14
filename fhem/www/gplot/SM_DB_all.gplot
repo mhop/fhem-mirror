@@ -1,0 +1,36 @@
+# SYSMON
+#
+# Anzeige verschiedener Statistiken aus SYSMON (DbLog)
+#
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<L1>'
+set ytics
+set grid ytics y2tics
+set ylabel "Temperatur"
+set y2label "Last"
+
+#DbLog <SPEC1>:cpu_temp:::
+#DbLog <SPEC1>:cpu_temp_avg:::
+#DbLog <SPEC1>:cpu_freq:::
+#DbLog <SPEC1>:loadavg:::$val=~s/([\d.]*).[\d.]*.[\d.]*/$1/eg
+#DbLog <SPEC1>:loadavg:::$val=~s/[\d.]*.([\d.]*).[\d.]*/$1/eg
+#DbLog <SPEC1>:loadavg:::$val=~s/[\d.]*.[\d.]*.([\d.]*)/$1/eg
+
+plot \
+     "< awk '/load avg:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l0 axes x1y1 title 'Temp' lw 1 with lines \
+   "< awk '/load avg5:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l1 axes x1y1 title 'Temp' lw 2 with lines \
+     "< awk '/load avg:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l2 axes x1y1 title 'MHz' lw 1 with lines \
+   "< awk '/load avg5:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l3 axes x1y2 title '1 Min' lw 2 with lines \
+     "< awk '/load avg:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l4 axes x1y2 title '5 Min' lw 1 with lines \
+   "< awk '/load avg5:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l5 axes x1y2 title '15 Min' lw 2 with lines \

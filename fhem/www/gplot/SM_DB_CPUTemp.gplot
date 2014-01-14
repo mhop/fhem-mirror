@@ -1,0 +1,24 @@
+# SYSMON
+#
+# Anzeige der gemessenen CPU Temperatur und des errechneten Durchschnitts
+#
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<L1>'
+set ytics
+set grid ytics y2tics
+set ylabel "Temperatur"
+set y2label "Temperatur"
+
+#DbLog <SPEC1>:cpu_temp:::
+#DbLog <SPEC1>:cpu_temp_avg:::
+
+plot \
+     "< awk '/load avg:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l0 axes x1y1 title 'Temp' lw 1 with lines \
+   "< awk '/load avg5:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l1 axes x1y1 title 'Temp' lw 2 with lines \
