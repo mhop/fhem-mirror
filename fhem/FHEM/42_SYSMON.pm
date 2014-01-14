@@ -1362,14 +1362,25 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <ul>
     predefined gplot files:<br>
      <ul>
+      FileLog versions:<br>
       <code>
-       mySMRAM.gplot<br>
-       mySMCPUTemp.gplot<br>
-       mySMFS_Root.gplot<br>
-       mySMFS_usb1.gplot<br>
-       mySMLoad.gplot<br>
-       mySMNetworkEth0.gplot<br>
-       mySMNetworkEth0t.gplot<br>
+       SM_RAM.gplot<br>
+       SM_CPUTemp.gplot<br>
+       SM_FS_root.gplot<br>
+       SM_FS_usb1.gplot<br>
+       SM_Load.gplot<br>
+       SM_Network_eth0.gplot<br>
+       SM_Network_eth0t.gplot<br>
+       SM_Network_wlan0.gplot<br>
+      </code>
+      <code>
+      DbLog versions:<br>
+       SM_DB_all.gplot<br>
+       SM_DB_CPUFreq.gplot<br>
+       SM_DB_CPUTemp.gplot<br>
+       SM_DB_Load.gplot<br>
+       SM_DB_Network_eth0.gplot<br>
+       SM_DB_RAM.gplot<br>
       </code>
      </ul>
     </ul><br>
@@ -1401,41 +1412,41 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       # Log<br>
       define FileLog_sysmon FileLog ./log/sysmon-%Y-%m.log sysmon<br>
       attr FileLog_sysmon group RPi<br>
-      attr FileLog_sysmon logtype mySMCPUTemp:Plot,text<br>
+      attr FileLog_sysmon logtype SM_CPUTemp:Plot,text<br>
       attr FileLog_sysmon room 9.03_Tech<br>
       <br>
       # Visualisierung: CPU-Temperatur<br>
-      define wl_sysmon_temp SVG FileLog_sysmon:mySMCPUTemp:CURRENT<br>
+      define wl_sysmon_temp SVG FileLog_sysmon:SM_CPUTemp:CURRENT<br>
       attr wl_sysmon_temp group RPi<br>
       attr wl_sysmon_temp label "CPU Temperatur: Min $data{min2}, Max $data{max2}, Last $data{currval2}"<br>
       attr wl_sysmon_temp room 9.03_Tech<br>
       <br>
       # Visualisierung: Netzwerk-Daten&uuml;bertragung f&uuml; eth0<br>
-      define wl_sysmon_eth0 SVG FileLog_sysmon:mySMNetworkEth0:CURRENT<br>
+      define wl_sysmon_eth0 SVG FileLog_sysmon:SM_Network_eth0:CURRENT<br>
       attr wl_sysmon_eth0 group RPi<br>
       attr wl_sysmon_eth0 label "Netzwerk-Traffic eth0: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
       attr wl_sysmon_eth0 room 9.03_Tech<br>
       <br>
       # Visualisierung: CPU-Auslastung (load average)<br>
-      define wl_sysmon_load SVG FileLog_sysmon:mySMLoad:CURRENT<br>
+      define wl_sysmon_load SVG FileLog_sysmon:SM_Load:CURRENT<br>
       attr wl_sysmon_load group RPi<br>
       attr wl_sysmon_load label "Load Min: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
       attr wl_sysmon_load room 9.03_Tech<br>
       <br>
       # Visualisierung: RAM-Nutzung<br>
-      define wl_sysmon_ram SVG FileLog_sysmon:mySMRAM:CURRENT<br>
+      define wl_sysmon_ram SVG FileLog_sysmon:SM_RAM:CURRENT<br>
       attr wl_sysmon_ram group RPi<br>
       attr wl_sysmon_ram label "RAM-Nutzung Total: $data{max1}, Min: $data{min2}, Max: $data{max2}, Aktuell: $data{currval2}"<br>
       attr wl_sysmon_ram room 9.03_Tech<br>
       <br>
       # Visualisierung: Dateisystem: Root-Partition<br>
-      define wl_sysmon_fs_root SVG FileLog_sysmon:mySMFS_Root:CURRENT<br>
+      define wl_sysmon_fs_root SVG FileLog_sysmon:SM_FS_root:CURRENT<br>
       attr wl_sysmon_fs_root group RPi<br>
       attr wl_sysmon_fs_root label "Root Partition Total: $data{max1}, Min: $data{min2}, Max: $data{max2}, Aktuell: $data{currval2}"<br>
       attr wl_sysmon_fs_root room 9.03_Tech<br>
       <br>
       # Visualisierung: Dateisystem: USB-Stick<br>
-      define wl_sysmon_fs_usb1 SVG FileLog_sysmon:mySMFS_usb1:CURRENT<br>
+      define wl_sysmon_fs_usb1 SVG FileLog_sysmon:SM_FS_usb1:CURRENT<br>
       attr wl_sysmon_fs_usb1 group RPi<br>
       attr wl_sysmon_fs_usb1 label "USB1 Total: $data{max1}, Min: $data{min2}, Max: $data{max2}, Aktuell: $data{currval2}"<br>
       attr wl_sysmon_fs_usb1 room 9.03_Tech<br>
@@ -1739,14 +1750,25 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <ul>
     F&uuml;r dieses Modul sind bereits einige gplot-Dateien vordefiniert:<br>
      <ul>
+      FileLog-Versionen:<br>
       <code>
-       mySMRAM.gplot<br>
-       mySMCPUTemp.gplot<br>
-       mySMFS_Root.gplot<br>
-       mySMFS_usb1.gplot<br>
-       mySMLoad.gplot<br>
-       mySMNetworkEth0.gplot<br>
-       mySMNetworkEth0t.gplot<br>
+       SM_RAM.gplot<br>
+       SM_CPUTemp.gplot<br>
+       SM_FS_root.gplot<br>
+       SM_FS_usb1.gplot<br>
+       SM_Load.gplot<br>
+       SM_Network_eth0.gplot<br>
+       SM_Network_eth0t.gplot<br>
+       SM_Network_wlan0.gplot<br>
+      </code>
+      <code>
+      DbLog-Versionen:<br>
+       SM_DB_all.gplot<br>
+       SM_DB_CPUFreq.gplot<br>
+       SM_DB_CPUTemp.gplot<br>
+       SM_DB_Load.gplot<br>
+       SM_DB_Network_eth0.gplot<br>
+       SM_DB_RAM.gplot<br>
       </code>
      </ul>
     </ul><br>
@@ -1781,41 +1803,41 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       # Log<br>
       define FileLog_sysmon FileLog ./log/sysmon-%Y-%m.log sysmon<br>
       attr FileLog_sysmon group RPi<br>
-      attr FileLog_sysmon logtype mySMCPUTemp:Plot,text<br>
+      attr FileLog_sysmon logtype SM_CPUTemp:Plot,text<br>
       attr FileLog_sysmon room 9.03_Tech<br>
       <br>
       # Visualisierung: CPU-Temperatur<br>
-      define wl_sysmon_temp SVG FileLog_sysmon:mySMCPUTemp:CURRENT<br>
+      define wl_sysmon_temp SVG FileLog_sysmon:SM_CPUTemp:CURRENT<br>
       attr wl_sysmon_temp group RPi<br>
       attr wl_sysmon_temp label "CPU Temperatur: Min $data{min2}, Max $data{max2}, Last $data{currval2}"<br>
       attr wl_sysmon_temp room 9.03_Tech<br>
       <br>
       # Visualisierung: Netzwerk-Daten&uuml;bertragung f&uuml; eth0<br>
-      define wl_sysmon_eth0 SVG FileLog_sysmon:mySMNetworkEth0:CURRENT<br>
+      define wl_sysmon_eth0 SVG FileLog_sysmon:SM_Network_eth0:CURRENT<br>
       attr wl_sysmon_eth0 group RPi<br>
       attr wl_sysmon_eth0 label "Netzwerk-Traffic eth0: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
       attr wl_sysmon_eth0 room 9.03_Tech<br>
       <br>
       # Visualisierung: CPU-Auslastung (load average)<br>
-      define wl_sysmon_load SVG FileLog_sysmon:mySMLoad:CURRENT<br>
+      define wl_sysmon_load SVG FileLog_sysmon:SM_Load:CURRENT<br>
       attr wl_sysmon_load group RPi<br>
       attr wl_sysmon_load label "Load Min: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
       attr wl_sysmon_load room 9.03_Tech<br>
       <br>
       # Visualisierung: RAM-Nutzung<br>
-      define wl_sysmon_ram SVG FileLog_sysmon:mySMRAM:CURRENT<br>
+      define wl_sysmon_ram SVG FileLog_sysmon:SM_RAM:CURRENT<br>
       attr wl_sysmon_ram group RPi<br>
       attr wl_sysmon_ram label "RAM-Nutzung Total: $data{max1}, Min: $data{min2}, Max: $data{max2}, Aktuell: $data{currval2}"<br>
       attr wl_sysmon_ram room 9.03_Tech<br>
       <br>
       # Visualisierung: Dateisystem: Root-Partition<br>
-      define wl_sysmon_fs_root SVG FileLog_sysmon:mySMFS_Root:CURRENT<br>
+      define wl_sysmon_fs_root SVG FileLog_sysmon:SM_FS_root:CURRENT<br>
       attr wl_sysmon_fs_root group RPi<br>
       attr wl_sysmon_fs_root label "Root Partition Total: $data{max1}, Min: $data{min2}, Max: $data{max2}, Aktuell: $data{currval2}"<br>
       attr wl_sysmon_fs_root room 9.03_Tech<br>
       <br>
       # Visualisierung: Dateisystem: USB-Stick<br>
-      define wl_sysmon_fs_usb1 SVG FileLog_sysmon:mySMFS_usb1:CURRENT<br>
+      define wl_sysmon_fs_usb1 SVG FileLog_sysmon:SM_FS_usb1:CURRENT<br>
       attr wl_sysmon_fs_usb1 group RPi<br>
       attr wl_sysmon_fs_usb1 label "USB1 Total: $data{max1}, Min: $data{min2}, Max: $data{max2}, Aktuell: $data{currval2}"<br>
       attr wl_sysmon_fs_usb1 room 9.03_Tech<br>
