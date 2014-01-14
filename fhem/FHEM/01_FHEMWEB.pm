@@ -490,6 +490,8 @@ FW_answerCall($)
 
     # NTFY_ORDER is larger than the normal order (50-)
     $me->{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
+    %ntfyHash = ();
+
     my $c = $me->{CD};
     print $c "HTTP/1.1 200 OK\r\n",
        $FW_headercors,

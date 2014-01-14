@@ -90,6 +90,7 @@ autocreate_Define($$)
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
   $hash->{STATE} = "active";
+  $hash->{NOTIFYDEV} = "global";
   $attr{global}{autoload_undefined_devices} = 1; # Make sure we work correctly
   return undef;
 }

@@ -4,7 +4,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2005-2013
+#  (c) 2005-2014
 #  Copyright: Rudolf Koenig (r dot koenig at koeniglich dot de)
 #  All rights reserved
 #
@@ -151,28 +151,29 @@ sub CommandTrigger($$);
 # IODev   - attached to io device
 # CHANGED - Currently changed attributes of this device. Used by NotifyFn
 # VOLATILE- Set if the definition should be saved to the "statefile"
+# NOTIFYDEV - if set, the notifyFn will only be called for this device
 
-use vars qw(%modules);		# List of loaded modules (device/log/etc)
-use vars qw(%defs);		# FHEM device/button definitions
-use vars qw(%attr);		# Attributes
-use vars qw(%interfaces);       # Global interface definitions, see createInterfaceDefinitions below
-use vars qw(%selectlist);	# devices which want a "select"
-use vars qw(%readyfnlist);	# devices which want a "readyfn"
-use vars qw($readytimeout);	# Polling interval. UNIX: device search only
+use vars qw(%modules);          # List of loaded modules (device/log/etc)
+use vars qw(%defs);             # FHEM device/button definitions
+use vars qw(%attr);             # Attributes
+use vars qw(%interfaces);       # see createInterfaceDefinitions below
+use vars qw(%selectlist);       # devices which want a "select"
+use vars qw(%readyfnlist);      # devices which want a "readyfn"
+use vars qw($readytimeout);     # Polling interval. UNIX: device search only
 $readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
 
-use vars qw(%value);		# Current values, see commandref.html
-use vars qw(%oldvalue);		# Old values, see commandref.html
+use vars qw(%value);            # Current values, see commandref.html
+use vars qw(%oldvalue);         # Old values, see commandref.html
 use vars qw($init_done);        #
-use vars qw($internal_data);    #
-use vars qw(%cmds);             # Global command name hash. To be expanded
-use vars qw(%data);		# Hash for user data
-use vars qw($devcount);	        # To sort the devices
-use vars qw(%defaultattr);    	# Default attributes, used by FHEM2FHEM
-use vars qw(%addNotifyCB);	# Used by event enhancers (e.g. avarage)
-use vars qw(%inform);	        # Used by telnet_ActivateInform
-use vars qw(%intAt);		# Internal at timer hash, global for benchmark
+use vars qw($internal_data);    # FileLog/DbLog -> SVG data transport
+use vars qw(%cmds);             # Global command name hash.
+use vars qw(%data);             # Hash for user data
+use vars qw($devcount);         # Maximum device number, used for storing
+use vars qw(%defaultattr);      # Default attributes, used by FHEM2FHEM
+use vars qw(%inform);           # Used by telnet_ActivateInform
+use vars qw(%intAt);            # Internal at timer hash, global for benchmark
 use vars qw($nextat);           # Time when next timer will be triggered.
+use vars qw(%ntfyHash);         # hash of devices needed to be notified.
 
 use vars qw($reread_active);
 use vars qw($winService);       # the Windows Service object
@@ -181,7 +182,6 @@ my $AttrList = "verbose:0,1,2,3,4,5 room group comment alias ".
                 "eventMap userReadings";
 
 my %comments;			# Comments from the include files
-my $ipv6;			# Using IPV6
 my $currlogfile;		# logfile, without wildcards
 my $currcfgfile="";		# current config/include file
 my $logopened = 0;              # logfile opened or using stdout
@@ -192,12 +192,7 @@ my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
 my $readingsUpdateDelayTrigger; # needed internally
 my $cvsid = '$Id$';
-my $namedef =
-  "where <name> is either:\n" .
-  "- a single device name\n" .
-  "- a list separated by komma (,)\n" .
-  "- a regexp, if it contains one of the following characters: *[]^\$\n" .
-  "- a range separated by dash (-)\n";
+my $namedef = "where <name> is a single device name, a list separated by komma (,) or a regexp. See the devspec section in the commandref.html for details.\n";
 my @cmdList;                    # Remaining commands in a chain. Used by sleep
 my $evalSpecials;       # Used by EvalSpecials->AnalyzeCommand parameter passing
 my $wbName = ".WRITEBUFFER";
@@ -1403,6 +1398,7 @@ CommandDefine($$)
   return "Invalid characters in name (not A-Za-z0-9.:_): $name"
                         if($name !~ m/^[a-z0-9.:_]*$/i);
 
+  %ntfyHash = ();
   my $m = $a[1];
   if(!$modules{$m}) {                           # Perhaps just wrong case?
     foreach my $i (keys %modules) {
@@ -1470,6 +1466,7 @@ CommandModify($$)
 
   # Return a list of modules
   return "Define $a[0] first" if(!defined($defs{$a[0]}));
+  %ntfyHash = ();
   my $hash = $defs{$a[0]};
 
   $hash->{OLDDEF} = $hash->{DEF};
@@ -1643,6 +1640,7 @@ CommandDeleteReading($$)
   my @a = split(" ", $def, 2);
   return "Usage: deletereading <name> <reading>\n$namedef" if(@a != 2);
 
+  %ntfyHash = ();
   my @rets;
   foreach my $sdev (devspec2array($a[0])) {
 
@@ -1661,7 +1659,6 @@ CommandDeleteReading($$)
     }
     
   }
-
   return join("\n", @rets);
 }
 
@@ -1865,6 +1862,7 @@ CommandRename($$)
                         if($new !~ m/^[a-z0-9.:_]*$/i);
   return "Cannot rename global" if($old eq "global");
 
+  %ntfyHash = ();
   $defs{$new} = $defs{$old};
   $defs{$new}{NAME} = $new;
   delete($defs{$old});          # The new pointer will preserve the hash
@@ -2324,7 +2322,7 @@ HandleTimeout()
       delete($intAt{$i});
     } else {
       $nextat = $tim if(!$nextat || $nextat > $tim);
-	}
+    }
   }
 
   return undef if(!$nextat);
@@ -2570,11 +2568,11 @@ DoTrigger($$@)
   # the inner loop.
   if($max && !defined($hash->{INTRIGGER})) {
     $hash->{INTRIGGER}=1;
-    my @ntfyList = sort { $defs{$a}{NTFY_ORDER} cmp $defs{$b}{NTFY_ORDER} }
-                   grep { $defs{$_}{NTFY_ORDER} } keys %defs;
     Log 5, "Notify loop for $dev $hash->{CHANGED}->[0]";
+    createNtfyHash() if(!%ntfyHash);
     $hash->{NTFY_TRIGGERTIME} = TimeNow(); # Optimize FileLog
-    foreach my $n (@ntfyList) {
+    my $ntfyLst = (defined($ntfyHash{$dev}) ? $ntfyHash{$dev} : $ntfyHash{"*"});
+    foreach my $n (@{$ntfyLst}) {
       next if(!defined($defs{$n}));     # Was deleted in a previous notify
       my $r = CallFn($n, "NotifyFn", $defs{$n}, $hash);
       $ret .= $r if($r);
@@ -3624,6 +3622,30 @@ addToWritebuffer($$)
     $hash->{$wbName} = $txt;
   } elsif(length($hash->{$wbName}) < 102400) {
     $hash->{$wbName} .= $txt;
+  }
+}
+
+sub
+createNtfyHash()
+{
+  my @ntfyList = sort { $defs{$a}{NTFY_ORDER} cmp $defs{$b}{NTFY_ORDER} }
+                 grep { $defs{$_}{NTFY_ORDER} } keys %defs;
+  foreach my $d (@ntfyList) {
+    my $nd = $defs{$d}{NOTIFYDEV};
+    #Log 1, "Created notify class for $nd / $d" if($nd);
+    $ntfyHash{$nd} = [] if($nd && !defined($ntfyHash{$nd}));
+  }
+  $ntfyHash{"*"} = [];
+  foreach my $d (@ntfyList) {
+    my $nd = $defs{$d}{NOTIFYDEV};
+    if($nd) {
+      push @{$ntfyHash{$nd}}, $d;
+
+    } else {
+      foreach $nd (keys %ntfyHash) {
+        push @{$ntfyHash{$nd}}, $d;
+      }
+    }
   }
 }
 
