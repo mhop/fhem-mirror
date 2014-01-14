@@ -37,6 +37,7 @@ use HttpUtils;
 sub YAMAHA_AVR_Get($@);
 sub YAMAHA_AVR_Define($$);
 sub YAMAHA_AVR_GetStatus($;$);
+sub YAMAHA_AVR_ResetTimer($;$);
 sub YAMAHA_AVR_Undefine($$);
 
 
@@ -67,7 +68,7 @@ YAMAHA_AVR_GetStatus($;$)
     
     $local = 0 unless(defined($local));
 
-    return "" if(!defined($hash->{helper}{ADDRESS}) or !defined($hash->{helper}{INTERVAL}));
+    return "" if(!defined($hash->{helper}{ADDRESS}) or !defined($hash->{helper}{OFF_INTERVAL}) or !defined($hash->{helper}{ON_INTERVAL}));
 
     my $device = $hash->{helper}{ADDRESS};
 
@@ -87,7 +88,7 @@ YAMAHA_AVR_GetStatus($;$)
     
     if(not defined($zone))
     {
-		InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0) unless($local == 1);
+		YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
 		return "No Zone available";
     }
     
@@ -98,7 +99,7 @@ YAMAHA_AVR_GetStatus($;$)
     if(not defined($return) or $return eq "")
     {
 		readingsSingleUpdate($hash, "state", "absent", 1);
-		InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0) unless($local == 1);
+		YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
 		return;
     }
     
@@ -206,7 +207,7 @@ YAMAHA_AVR_GetStatus($;$)
     
     readingsEndUpdate($hash, 1);
     
-    InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0) unless($local == 1);
+    YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
     
     Log3 $name, 4, "YAMAHA_AVR $name: ".$hash->{STATE};
     
@@ -618,11 +619,21 @@ YAMAHA_AVR_Define($$)
     # if an update interval was given which is greater than zero, use it.
     if(defined($a[4]) and $a[4] > 0)
     {
-		$hash->{helper}{INTERVAL}=$a[4];
+		$hash->{helper}{OFF_INTERVAL} = $a[4];
     }
     else
     {
-		$hash->{helper}{INTERVAL}=30;
+		$hash->{helper}{OFF_INTERVAL} = 30;
+    }
+    
+       
+    if(defined($a[5]) and $a[5] > 0)
+    {
+		$hash->{helper}{ON_INTERVAL} = $a[5];
+    }
+    else
+    {
+		$hash->{helper}{ON_INTERVAL} = $hash->{helper}{OFF_INTERVAL};
     }
     
     
@@ -656,8 +667,7 @@ YAMAHA_AVR_Define($$)
     }
 
     # start the status update timer
-	RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+2, "YAMAHA_AVR_GetStatus", $hash, 0);
+	YAMAHA_AVR_ResetTimer($hash,2);
   
   return undef;
 }
@@ -984,7 +994,28 @@ sub YAMAHA_AVR_getInputs($)
 
 }
 
+#############################
+sub
+YAMAHA_AVR_ResetTimer($;$)
+{
+    my ($hash, $interval) = @_;
+    
+    RemoveInternalTimer($hash);
+    
+    if(defined($interval))
+    {
+        InternalTimer(gettimeofday()+$interval, "YAMAHA_AVR_GetStatus", $hash, 0);
+    }
+    elsif($hash->{READINGS}{presence}{VAL} eq "present" and $hash->{READINGS}{power}{VAL} eq "on")
+    {
+        InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0);
+    }
+    else
+    {
+        InternalTimer(gettimeofday()+$hash->{helper}{OFF_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0);
+    }
 
+}
 
 1;
 
@@ -998,7 +1029,11 @@ sub YAMAHA_AVR_getInputs($)
   <a name="YAMAHA_AVRdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; YAMAHA_AVR &lt;ip-address&gt; [&lt;zone&gt;] [&lt;status_interval&gt;]</code>
+    <code>
+    define &lt;name&gt; YAMAHA_AVR &lt;ip-address&gt; [&lt;zone&gt;] [&lt;status_interval&gt;]
+    <br><br>
+    define &lt;name&gt; YAMAHA_AVR &lt;ip-address&gt; [&lt;zone&gt;] [&lt;off_status_interval&gt;] [&lt;on_status_interval&gt;]
+    </code>
     <br><br>
 
     This module controls AV receiver from Yamaha via network connection. You are able
@@ -1008,13 +1043,22 @@ sub YAMAHA_AVR_getInputs($)
     Defining a YAMAHA_AVR device will schedule an internal task (interval can be set
     with optional parameter &lt;status_interval&gt; in seconds, if not set, the value is 30
     seconds), which periodically reads the status of the AV receiver (power state, selected
-    input, volume and mute status) and triggers notify/filelog commands.<br><br>
-
+    input, volume and mute status) and triggers notify/filelog commands.
+    <br><br>
+    Different status update intervals depending on the power state can be given also. 
+    If two intervals are given in the define statement, the first interval statement stands for the status update 
+    interval in seconds in case the device is off, absent or any other non-normal state. The second 
+    interval statement is used when the device is on.
+   
     Example:<br><br>
     <ul><code>
        define AV_Receiver YAMAHA_AVR 192.168.0.10
        <br><br>
-       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60 &nbsp;&nbsp;&nbsp; # With custom interval of 60 seconds
+       # With custom status interval of 60 seconds<br>
+       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60 
+       <br><br>
+       # With custom "off"-interval of 60 seconds and "on"-interval of 10 seconds<br>
+       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60 10
     </code></ul>
    
   </ul>
@@ -1199,7 +1243,10 @@ sub YAMAHA_AVR_getInputs($)
   <a name="YAMAHA_AVRdefine"></a>
   <b>Definition</b>
   <ul>
-    <code>define &lt;name&gt; YAMAHA_AVR &lt;IP-Addresse&gt; [&lt;Zone&gt;] [&lt;Status_Interval&gt;]</code>
+    <code>define &lt;name&gt; YAMAHA_AVR &lt;IP-Addresse&gt; [&lt;Zone&gt;] [&lt;Status_Interval&gt;]
+    <br><br>
+    define &lt;name&gt; YAMAHA_AVR &lt;IP-Addresse&gt; [&lt;Zone&gt;] [&lt;Off_Interval&gt;] [&lt;On_Interval&gt;]
+    </code>
     <br><br>
 
     Dieses Modul steuert AV-Receiver des Herstellers Yamaha &uuml;ber die Netzwerkschnittstelle.
@@ -1208,13 +1255,21 @@ sub YAMAHA_AVR_getInputs($)
     <br><br>
     Bei der Definition eines YAMAHA_AVR-Moduls wird eine interne Routine in Gang gesetzt, welche regelm&auml;&szlig;ig 
     (einstellbar durch den optionalen Parameter <code>&lt;Status_Interval&gt;</code>; falls nicht gesetzt ist der Standardwert 30 Sekunden)
-    den Status des Receivers abfragt und entsprechende Notify-/FileLog-Ger&auml;te triggert..<br><br>
-
+    den Status des Receivers abfragt und entsprechende Notify-/FileLog-Ger&auml;te triggert.
+    <br><br>
+    Sofern 2 Interval-Argumente &uuml;bergeben werden, wird der erste Parameter <code>&lt;Off_Interval&gt;</code> genutzt
+    sofern der Receiver ausgeschaltet oder nicht erreichbar ist. Der zweiter Parameter <code>&lt;On_Interval&gt;</code> 
+    wird verwendet, sofern der Receiver eingeschaltet ist. 
+    <br><br>
     Beispiel:<br><br>
     <ul><code>
-       define AV_Receiver YAMAHA_AVR 192.168.0.10<br><br>
-       
-       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60 &nbsp;&nbsp;&nbsp; # Mit modifiziertem Status Interval (60 Sekunden)
+       define AV_Receiver YAMAHA_AVR 192.168.0.10
+       <br><br>
+       # Mit modifiziertem Status Interval (60 Sekunden)<br>
+       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60
+       <br><br>
+       # Mit gesetztem "Off"-Interval (60 Sekunden) und "On"-Interval (10 Sekunden)<br>
+       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60 10
     </code></ul><br><br>
   </ul>
   <b>Zonenauswahl</b><br>
