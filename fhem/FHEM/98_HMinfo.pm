@@ -164,6 +164,7 @@ sub HMinfo_peerCheck(@) { #####################################################
   my @entities = @_;
   my @peerIDsFail;
   my @peerIDsEmpty;
+  my @peerIDnotDef;
   my @peerIDsNoPeer;
   foreach my $eName (@entities){
     next if (!$defs{$eName}{helper}{role}{chn});#device has no channels
@@ -174,7 +175,7 @@ sub HMinfo_peerCheck(@) { #####################################################
     my $st = AttrVal(CUL_HM_id2Name($devId),"subType","");# from Master
     my $md = AttrVal(CUL_HM_id2Name($devId),"model","");
     my $peerIDs = AttrVal($eName,"peerIDs",undef);
-
+    
     if (!$peerIDs){                # no peers - is this correct?
       push @peerIDsEmpty,"empty: ".$eName;
     }
@@ -190,17 +191,25 @@ sub HMinfo_peerCheck(@) { #####################################################
           $_ =~ s/04$/05/;  # have to compare with clima_team, not clima
           $cId =~ s/05$/04/;# will find 04 in peerlist, not 05
         }
-        my $pName = CUL_HM_id2Name($_);
-        $pName =~s/_chn:01//;           #channel 01 could be covered by device
-        my $pPlist = AttrVal($pName,"peerIDs","");
-        push @peerIDsNoPeer,$eName." p:".$pName if ($pPlist !~ m/$cId/);
+        my $pDiD = substr($_,0,6) if (substr($_,6,2) eq "01");
+        if (!$modules{CUL_HM}{defptr}{$_} && 
+            ($pDiD && !$modules{CUL_HM}{defptr}{$pDiD})){
+          push @peerIDnotDef,$eName." id:".$_;
+        }
+        else{
+          my $pName = CUL_HM_id2Name($_);
+          $pName =~s/_chn:01//;           #channel 01 could be covered by device
+          my $pPlist = AttrVal($pName,"peerIDs","");
+          push @peerIDsNoPeer,$eName." p:".$pName if (!$pPlist || $pPlist !~ m/$cId/);
+        }
       }
     }
   }
   my $ret = "";
   $ret .="\n\n peer list not read"  ."\n    ".(join "\n    ",sort @peerIDsEmpty) if(@peerIDsEmpty);
   $ret .="\n\n peer list incomplete"."\n    ".(join "\n    ",sort @peerIDsFail)  if(@peerIDsEmpty);
-  $ret .="\n\n peer not verified "  ."\n    ".(join "\n    ",sort @peerIDsNoPeer)if(@peerIDsEmpty);
+  $ret .="\n\n peer not defined"    ."\n    ".(join "\n    ",sort @peerIDnotDef) if(@peerIDnotDef);
+  $ret .="\n\n peer not verified"   ."\n    ".(join "\n    ",sort @peerIDsNoPeer)if(@peerIDsEmpty);
   return  $ret;
 }
 sub HMinfo_burstCheck(@) { ####################################################
