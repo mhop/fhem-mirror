@@ -71,6 +71,14 @@ FileLog_Define($@)
   $hash->{currentlogfile} = $f;
   $hash->{STATE} = "active";
 
+  if(($a[3] =~ m/^([^:]*)$/ ||
+      $a[3] =~ m/^([^:]*):(.*)$/) &&
+     defined($defs{$1})) {
+    $hash->{NOTIFYDEV} = $1
+  } else {
+    delete($hash->{NOTIFYDEV}); # when called by modify
+  }
+
   return undef;
 }
 

@@ -40,6 +40,15 @@ notify_Define($$)
   $hash->{REGEXP} = $re;
   $hash->{STATE} = "active";
 
+  if(($re =~ m/^([^:]*)$/ ||
+      $re =~ m/^([^:]*):(.*)$/) &&
+     defined($defs{$1})) {
+    $hash->{NOTIFYDEV} = $1
+  } else {
+    delete($hash->{NOTIFYDEV}); # when called by modify
+  }
+
+
   return undef;
 }
 
