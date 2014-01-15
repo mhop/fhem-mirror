@@ -32,8 +32,7 @@
 
 package main;
 
-use HTTP::Request;
-use LWP::UserAgent;
+use HttpUtils;
 use utf8;
 
 my %sets = (
@@ -205,7 +204,14 @@ sub Pushover_Set_Message
       $body = $body . "&" . "timestamp=" . time();
     }
     
-    return Pushover_HTTP_Call($hash, $body);
+    my $result = Pushover_HTTP_Call($hash, $body);
+    
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, "last-message", $title . ": " . $message);
+    readingsBulkUpdate($hash, "last-result", $result);
+    readingsEndUpdate($hash, 1);
+    
+    return $result;
   }
   else
   {
@@ -217,28 +223,28 @@ sub Pushover_HTTP_Call($$)
 {
   my ($hash,$body) = @_;
   
-  my $client = LWP::UserAgent->new();
+  my $url = "https://api.pushover.net/1/messages.json";
   
-  my $req = HTTP::Request->new(POST => "https://api.pushover.net/1/messages.json");
-  $req->header('Content-Type' => 'application/x-www-form-urlencoded');
-  $req->content($body);
-
-  my $response = $client->request($req);
+  $response = GetFileFromURL($url, 10, $body, 0, 5);
   
-  if($response)
+  if ($response =~ m/"status":(.*),/)
   {
-    if ($response->is_error)
-    {
-        return "Error: " . $response->status_line;
-    }
-    else
-    {
-        return "OK";
-    }
+  	if ($1 eq "1")
+  	{
+      return "OK";
+  	}
+  	elsif ($response =~ m/"errors":\[(.*)\]/)
+  	{
+      return "Error: " . $1;
+  	}
+  	else
+  	{
+      return "Error";
+  	}
   }
   else
   {
-    return "Status: " . $response->status_line;
+  	return "Error: No known response"
   }
 }
 
@@ -255,15 +261,6 @@ sub Pushover_HTTP_Call($$)
   You need an account to use this module.<br>
   For further information about the service see <a href="https://pushover.net">pushover.net</a>.<br>
   <br>
-  You have to install these modules:<br>
-  <ul>
-    <li>IO::Socket::SSL</li>
-    <li>Mozilla::CA</li>
-    <li>LWP::Protocol::https</li>
-  </ul>
-  <br>
-  Use 'cpan -i *module-name*' to install them.<br>
-  For instructions on QNAP see <a href="http://forum.fhem.de/index.php/topic,17297.msg119096.html#msg119096">this thread</a>.<br>
   Discuss the module <a href="http://forum.fhem.de/index.php/topic,16215.0.html">here</a>.<br>
   <br>
   <br>
@@ -334,15 +331,6 @@ sub Pushover_HTTP_Call($$)
   Du brauchst einen Account um dieses Modul zu verwenden.<br>
   Für weitere Informationen über den Dienst besuche <a href="https://pushover.net">pushover.net</a>.<br>
   <br>
-  Du musst diese Module installieren:<br>
-  <ul>
-    <li>IO::Socket::SSL</li>
-    <li>Mozilla::CA</li>
-    <li>LWP::Protocol::https</li>
-  </ul>
-  <br>
-  Verwende 'cpan -i *module-name*' um sie zu installieren.<br>
-  Für Installationsschritte auf einem QNAP-Gerät besuche <a href="http://forum.fhem.de/index.php/topic,17297.msg119096.html#msg119096">diesen Thread</a>.<br>
   Diskutiere das Modul <a href="http://forum.fhem.de/index.php/topic,16215.0.html">hier</a>.<br>
   <br>
   <br>
