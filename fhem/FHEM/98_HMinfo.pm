@@ -272,7 +272,8 @@ sub HMinfo_paramCheck(@) { ####################################################
  return  $ret;
 }
 sub HMinfo_tempList(@) { ######################################################
-  my ($action,$fName)=@_;
+  my ($filter,$action,$fName)=@_;
+  $filter = "." if (!$filter);
   $fName = "tempList.cfg" if (!$fName);
   $action = "save" if (!$action);
   my $ret;
@@ -288,7 +289,7 @@ sub HMinfo_tempList(@) { ######################################################
       elsif ($md =~ m/(ROTO_ZEL-STG-RM-FWT|HM-CC-TC)/){
         $chN = $defs{$eN}{channel_02};
       }
-      next if (!$chN || !$defs{$chN} );
+      next if (!$chN || !$defs{$chN} || $chN !~ m/$filter/);
       print aSave "\nentities:$chN";
       my @tl = sort grep /tempList[SMFWT]/,keys %{$defs{$chN}{READINGS}};
       if (scalar@tl != 7){
@@ -318,7 +319,7 @@ sub HMinfo_tempList(@) { ######################################################
         @el = ();
         foreach (split(",",$line)){
           if ($defs{$_}){
-            push @el,$_ if ($defs{$_});
+            push @el,$_ if ($defs{$_} && $_ =~ m/$filter/);
           }
           else{
             push @entryNF,$_;
@@ -356,7 +357,7 @@ sub HMinfo_tempList(@) { ######################################################
         @el = ();
         foreach (split(",",$line)){
           if ($defs{$_}){
-            push @el,$_ if ($defs{$_});
+            push @el,$_ if ($defs{$_} && $_ =~ m/$filter/);
           }
           else{
             push @entryNF,$_;
@@ -390,7 +391,9 @@ sub HMinfo_tempList(@) { ######################################################
     $ret = "failed Entries:\n     "   .join("\n     ",@entryFail) if (scalar@entryFail);
     $ret = "Entries not found:\n     ".join("\n     ",@entryNF)   if (scalar@entryNF);
   }
-
+  else{
+    $ret = "$action unknown option - please use save, verify or restore";
+  }
   return $ret;
 }
 
@@ -794,8 +797,8 @@ sub HMinfo_SetFn($@) {#########################################################
   elsif($cmd eq "update")     {##update hm counts -----------------------------
     $ret = HMinfo_status($hash);
   }
-  elsif($cmd eq "tempList")     {##update hm counts -----------------------------
-    $ret = HMinfo_tempList(@a);
+  elsif($cmd eq "tempList")     {##handle thermostat templist from file -------
+    $ret = HMinfo_tempList($filter,@a);
   }
   elsif($cmd eq "help")       {
     $ret = " Unknown argument $cmd, choose one of "
@@ -806,7 +809,7 @@ sub HMinfo_SetFn($@) {#########################################################
            ."\n ---actions---"
            ."\n saveConfig [<typeFilter>] <file>               # stores peers and register with saveConfig"
            ."\n autoReadReg [<typeFilter>]                     # trigger update readings if attr autoReadReg is set"
-           ."\n tempList [save|restore|verify][filename]       # handle tempList of thermostat devices"
+           ."\n tempList [<typeFilter>][save|restore|verify][<filename>]# handle tempList of thermostat devices"
            ."\n ---infos---"
            ."\n update                                         # update HMindfo counts"
            ."\n register [<typeFilter>]                        # devicefilter parse devicename. Partial strings supported"
@@ -1529,7 +1532,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates
           performs a save for all HM register setting and peers. See <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>.
       </li>
          <br>
-      <li><a name="#HMinfotempList">tempList</a> [save|restore|verify] [filename]</a><br>
+      <li><a name="#HMinfotempList">tempList</a> <a href="#HMinfoFilter">[filter]</a>[save|restore|verify] [filename]</a><br>
           this function supports handling of tempList for thermstates.
           It allows templists to be saved in a separate file, verify settings against the file
           and write the templist of the file to the devices. <br>
@@ -1537,10 +1540,10 @@ sub HMinfo_noDup(@) {#return list with no duplicates
               Note that templist as available in FHEM is put to the file. It is up to the user to make
               sure the data is actual<br>
               Storage is not cumulative - former content of the file will be removed</li>
-          <li><B>restore</B> available templist as defined in the file is written directly 
+          <li><B>restore</B> available templist as defined in the file are written directly 
               to the device</li>
           <li><B>verify</B> file data is compared to readings as present in FHEM. It does not
-              verify data in the device - user needs to ensure actuallity on the readings</li>
+              verify data in the device - user needs to ensure actuallity of present readings</li>
           <br>
           <li><B>filename</B> is the name of the file to be used. Default ist <B>tempList.cfg</B></li>
           File example<br>
@@ -1563,7 +1566,8 @@ sub HMinfo_noDup(@) {#return list with no duplicates
                tempListWed>06:00 17.0 12:00 21.0 23:00 20.0 24:00 17.0<br>
          </code></ul>
          File keywords<br>
-         <li><B>entities</B> comma separated list of entities which refers to the teml lists following</li>
+         <li><B>entities</B> comma separated list of entities which refers to the temp lists following.
+         The actual entity holding the templist must be given - which is channel 04 for RTs or channel 02 for TCs</li>
          <li><B>tempList...</B> time and temp couples as used in the set tempList commands</li>
          <br>
 
