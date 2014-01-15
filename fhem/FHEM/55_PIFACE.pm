@@ -69,6 +69,7 @@ sub PIFACE_Initialize($){
 sub PIFACE_Define($$){
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
+  $hash->{NOTIFYDEV} = "global";
   Log3($name, 3, "PIFACE $name active");
   readingsSingleUpdate($hash, "state", "active",1);
   return;
