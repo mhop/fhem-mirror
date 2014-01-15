@@ -44,6 +44,7 @@ use constant {
 
 use constant {
   CPU_FREQ     => "cpu_freq",
+  CPU_BOGOMIPS => "cpu_bogomips",
   CPU_TEMP     => "cpu_temp",
   CPU_TEMP_AVG => "cpu_temp_avg",
   LOADAVG      => "loadavg"
@@ -148,6 +149,7 @@ SYSMON_updateCurrentReadingsMap($) {
 	
 	# Feste Werte
 	$rMap->{+DATE}               = "Date";
+	$rMap->{+CPU_BOGOMIPS}       = "BogoMIPS";
 	if(SYSMON_isCPUFreqRPiBBB($hash)) {
 	  #$rMap->{"cpu_freq"}       = "CPU Frequenz";
 	  $rMap->{"cpu_freq"}        = "CPU frequency";
@@ -488,7 +490,10 @@ SYSMON_obtainParameters($$)
 
   my $ref =  int(time()/$base);
 	my ($m1, $m2, $m3, $m4) = split(/\s+/, $im);
-
+	
+	# Einmaliges
+	$map = SYSMON_getCPUBogoMIPS($hash, $map);
+  
 	# immer aktualisieren: uptime, uptime_text, fhemuptime, fhemuptime_text, idletime, idletime_text
   $map = SYSMON_getUptime($hash, $map);
   $map = SYSMON_getFHEMUptime($hash, $map);
@@ -726,6 +731,27 @@ SYSMON_getCPUFreq($$)
 }
 
 #------------------------------------------------------------------------------
+# leifert CPU Speed in BogoMIPS
+#------------------------------------------------------------------------------
+sub
+SYSMON_getCPUBogoMIPS($$)
+{
+	my ($hash, $map) = @_;
+	my $old_val = ReadingsVal($hash->{NAME},CPU_BOGOMIPS,undef);
+	# nur einmalig ermitteln (wird sich ja nicht aendern
+	if(!defined $old_val) {
+    my $val = SYSMON_execute($hash, "cat /proc/cpuinfo | grep 'BogoMIPS' | sed 's/[^0-9\.]//g'");
+    #Log 3,"SYSMON -----------> DEBUG: read BogoMIPS = $val"; 
+    my $val_txt = trim($val);
+    $map->{+CPU_BOGOMIPS}="$val_txt";
+  } else {
+  	$map->{+CPU_BOGOMIPS}=$old_val;
+  }
+  
+	return $map;
+}
+
+#------------------------------------------------------------------------------
 # Liefert Werte fuer RAM und SWAP (Gesamt, Verwendet, Frei).
 #------------------------------------------------------------------------------
 sub SYSMON_getRamAndSwap($$)
@@ -794,7 +820,8 @@ sub SYSMON_getFileSystemInfo ($$$)
 		$fs = $fDef;
 	}
 
-  my $disk = "df ".$fs." -m 2>&1"; # in case of failure get string from stderr
+  #my $disk = "df ".$fs." -m 2>&1"; # in case of failure get string from stderr
+  my $disk = "df ".$fs." -m";
 
   #my @filesystems = qx($disk);
   my @filesystems = SYSMON_execute($hash, $disk);
@@ -909,6 +936,7 @@ log 3, "SYSMON $>name, @data<";
 	  @dataDescription = (DATE,
 	                      CPU_TEMP.":".$cur_readings_map->{+CPU_TEMP}.":"." &deg;C", 
 	                      CPU_FREQ.":".$cur_readings_map->{+CPU_FREQ}.":"." MHz", 
+	                      CPU_BOGOMIPS,
 	                      UPTIME_TEXT, FHEMUPTIME_TEXT, LOADAVG, RAM, SWAP);
 	                      
 	  # network-interfaces
@@ -960,7 +988,9 @@ log 3, "SYSMON $>name, @data<";
     	# Datum anzeigen
   	  $rVal = strftime("%d.%m.%Y %H:%M:%S", localtime());
   	}
-    $htmlcode .= "<tr><td valign='top'>".$rComment.":&nbsp;</td><td>".$rVal.$rPostfix."</td></tr>";
+  	if(defined $rVal) {
+      $htmlcode .= "<tr><td valign='top'>".$rComment.":&nbsp;</td><td>".$rVal.$rPostfix."</td></tr>";
+    }
   }
   
   # nur Default (also alles anzeigen)
@@ -1132,6 +1162,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
   <b>Readings:</b>
   <br><br>
   <ul>
+    <li>cpu_bogomips<br>
+        CPU Speed: BogoMIPS
+    </li>
     <li>cpu_freq<br>
         CPU frequency
     </li>
@@ -1505,6 +1538,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
   <b>Readings:</b>
   <br><br>
   <ul>
+    <li>cpu_bogomips<br>
+        CPU Speed: BogoMIPS
+    </li>
     <li>cpu_freq<br>
         CPU-Frequenz
     </li>
