@@ -164,16 +164,16 @@ YAMAHA_AVR_GetStatus($;$)
 	    
 			if($infos =~ /<Meta_Info>.*?<Artist>(.+?)<\/Artist>.*?<\/Meta_Info>/)
 			{
-				readingsBulkUpdate($hash, "currentArtist", $1);
+				readingsBulkUpdate($hash, "currentArtist", YAMAHA_AVR_html2txt($1));
 			}
 			
 			if($infos =~ /<Meta_Info>.*?<Station>(.+?)<\/Station>.*?<\/Meta_Info>/)
 			{
-				readingsBulkUpdate($hash, "currentStation", $1);
+				readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
 			}
 			elsif($infos =~ /<Meta_Info>.*?<Program_Service>(.+?)<\/Program_Service>.*?<\/Meta_Info>/)
 			{
-				readingsBulkUpdate($hash, "currentStation", $1);
+				readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
 			}
 			
 			if($infos =~ /<Meta_Info>.*?<Channel>(.+?)<\/Channel>.*?<\/Meta_Info>/)
@@ -183,12 +183,12 @@ YAMAHA_AVR_GetStatus($;$)
 			
 			if($infos =~ /<Meta_Info>.*?<Album>(.+?)<\/Album>.*?<\/Meta_Info>/)
 			{
-				readingsBulkUpdate($hash, "currentAlbum", $1);
+				readingsBulkUpdate($hash, "currentAlbum", YAMAHA_AVR_html2txt($1));
 			}
 			
 			if($infos =~ /<Meta_Info>.*?<Song>(.+?)<\/Song>.*?<\/Meta_Info>/)
 			{
-				readingsBulkUpdate($hash, "currentTitle", $1);
+				readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));
 			}
 			
 			if($infos =~ /<Playback_Info>(.+?)<\/Playback_Info>/)
@@ -995,8 +995,7 @@ sub YAMAHA_AVR_getInputs($)
 }
 
 #############################
-sub
-YAMAHA_AVR_ResetTimer($;$)
+sub YAMAHA_AVR_ResetTimer($;$)
 {
     my ($hash, $interval) = @_;
     
@@ -1017,6 +1016,26 @@ YAMAHA_AVR_ResetTimer($;$)
 
 }
 
+sub YAMAHA_AVR_html2txt($)
+{
+
+    my ($string) = @_;
+
+    $string =~ s/&nbsp;/ /g;
+    $string =~ s/&amp;/&/g;
+    $string =~ s/(\xe4|&auml;)/ä/g;
+    $string =~ s/(\xc4|&Auml;)/Ä/g;
+    $string =~ s/(\xf6|&ouml;)/ö/g;
+    $string =~ s/(\xd6|&Ouml;)/Ö/g;
+    $string =~ s/(\xfc|&uuml;)/ü/g;
+    $string =~ s/(\xdc|&Uuml;)/Ü/g;
+    $string =~ s/(\xdf|&szlig;)/ß/g;
+    $string =~ s/<.+?>//g;
+    $string =~ s/(^\s+|\s+$)//g;
+
+    return $string;
+
+}
 1;
 
 =pod
