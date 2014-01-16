@@ -590,13 +590,17 @@ sub HMinfo_SetFn($@) {#########################################################
       $ret .= "\n    ".sprintf("%-20s%-17s|%-18s|%-18s|%-14s|%-18s#%-18s|%-18s|%-18s|%-18s","sum",@plSum[1..9]);
     }
 
-    $ret .= "\n\n    CUL_HM queue:$modules{CUL_HM}{prot}{rspPend}";
+    $ret .= "\n\n    CUL_HM queue length:$modules{CUL_HM}{prot}{rspPend}";
+    
     $ret .= "\n";
-    $ret .= "\n    autoReadReg pending:"          .join(",",@{$modules{CUL_HM}{helper}{qReqConf}})
-               .($modules{CUL_HM}{helper}{autoRdActive}?" recent:".$modules{CUL_HM}{helper}{autoRdActive}:" recent:none");
-    $ret .= "\n    status request pending:"       .join(",",@{$modules{CUL_HM}{helper}{qReqStat}}) ;
-    $ret .= "\n    autoReadReg wakeup pending:"   .join(",",@{$modules{CUL_HM}{helper}{qReqConfWu}});
-    $ret .= "\n    status request wakeup pending:".join(",",@{$modules{CUL_HM}{helper}{qReqStatWu}});
+    $ret .= "\n    requests pending";
+    $ret .= "\n    ----------------";
+    $ret .= "\n    autoReadReg          :".join(", ",@{$modules{CUL_HM}{helper}{qReqConf}});
+    $ret .= "\n        recent           :".($modules{CUL_HM}{helper}{autoRdActive}?$modules{CUL_HM}{helper}{autoRdActive}:"none");
+    $ret .= "\n    status request       :".join(", ",@{$modules{CUL_HM}{helper}{qReqStat}}) ;
+    $ret .= "\n    autoReadReg wakeup   :".join(", ",@{$modules{CUL_HM}{helper}{qReqConfWu}});
+    $ret .= "\n    status request wakeup:".join(", ",@{$modules{CUL_HM}{helper}{qReqStatWu}});
+    $ret .= "\n    autoReadTest         :".join(", ",@{$modules{CUL_HM}{helper}{confCheckArr}});
     $ret .= "\n";
     @IOlist = HMinfo_noDup(@IOlist);
     foreach(@IOlist){
@@ -797,7 +801,7 @@ sub HMinfo_SetFn($@) {#########################################################
   elsif($cmd eq "update")     {##update hm counts -----------------------------
     $ret = HMinfo_status($hash);
   }
-  elsif($cmd eq "tempList")     {##handle thermostat templist from file -------
+  elsif($cmd eq "tempList")   {##handle thermostat templist from file ---------
     $ret = HMinfo_tempList($filter,@a);
   }
   elsif($cmd eq "help")       {
@@ -808,6 +812,7 @@ sub HMinfo_SetFn($@) {#########################################################
            ."\n peerCheck [<typeFilter>]                       # find incomplete or inconsistant peer lists"
            ."\n ---actions---"
            ."\n saveConfig [<typeFilter>] <file>               # stores peers and register with saveConfig"
+           ."\n loadConfig [<typeFilter>] <file>               # restores register and peer readings if missing"
            ."\n autoReadReg [<typeFilter>]                     # trigger update readings if attr autoReadReg is set"
            ."\n tempList [<typeFilter>][save|restore|verify][<filename>]# handle tempList of thermostat devices"
            ."\n ---infos---"
@@ -862,6 +867,9 @@ sub HMinfo_SetFn($@) {#########################################################
            ."\n "
            ;
   }
+  elsif($cmd eq "loadConfig") {##action: saveConfig----------------------------
+    $ret = HMinfo_loadConfig($filter,@a); 
+  }
   elsif($cmd eq "saveConfig") {##action: saveConfig----------------------------
     my $id = ++$hash->{nb}{cnt};
     my $bl = BlockingCall("HMinfo_saveConfig", join(",",("$name:$id",$a[0],$opt,$filter)), 
@@ -885,10 +893,71 @@ sub HMinfo_SetFn($@) {#########################################################
   return $ret;
 }
 
+sub HMinfo_loadConfig($@) {#####################################################
+  my ($filter,$fName)=@_;
+  $filter = "." if (!$filter);
+  $fName = "regSave.cfg" if (!$fName);
+  my $ret;
+
+  open(aSave, "$fName") || return("Can't open $fName: $!");
+  my @el = ();
+  my @elAll = ();
+  my @elincmpl = ();
+  my @entryNF = ();
+  while(<aSave>){
+    chomp;
+    my $line = $_;
+    next if ($line !~ m/set (.*) (peerBulk|regBulk) (.*)/);
+    my ($eN,$cmd,$param) = ($1,$2,$3);
+    $eN =~ s/ //g;
+    next if ($eN !~ m/$filter/);
+    if (!$eN || !$defs{$eN}){
+      push @entryNF,$eN;
+      next;
+    }
+    if ($cmd eq "peerBulk"){
+      next if(!$param);
+      $param =~ s/ //g;
+      if ($param !~ m/00000000/){
+        push @elincmpl,"$eN peerList";
+        next;
+      }
+      if (!AttrVal($eN,"peerIDs","")){
+        CUL_HM_ID2PeerList($eN,$_,1) foreach (grep /[0-9A-F]{8}/,split(",",$param));
+        push @el,"$eN peerIDs";
+      }
+    }
+    elsif($cmd eq "regBulk"){
+      my $exp = CUL_HM_getAttrInt($eN,"expert");
+      $param =~ s/\.RegL/RegL/;
+      $param =~ s/RegL/\.RegL/ if ($exp != 2);
+      my ($reg,$data) = split(" ",$param,2);
+      if ($data !~ m/00:00/){
+        push @elincmpl,"$eN reg list:$reg";
+        next;
+      }
+      if (!$defs{$eN}{READINGS}{$reg}){
+        my ($list,$pN) = ($1,$2) if ($reg =~ m/RegL_(..):(.*)/);
+        my $pId = CUL_HM_peerChId($pN,substr($defs{$eN}{DEF},0,6),"00000000");
+        $defs{$eN}{READINGS}{$reg}{VAL} = $data;
+        $defs{$eN}{READINGS}{$reg}{TIME} = "from file";
+#        $defs{$eN}{READINGS}{$reg}{TIME} = "0000-00-00 00:00:00";
+        CUL_HM_updtRegDisp($defs{$eN},$list,$pId);
+        push @el,"$eN reg list:$reg";
+      }
+    }
+  }
+  $ret .= "\nadded data:\n     "          .join("\n     ",@el)       if (scalar@el);
+  $ret .= "\nfile data incomplete:\n     ".join("\n     ",@elincmpl) if (scalar@elincmpl);
+  $ret .= "\nentries not defind:\n     "  .join("\n     ",@entryNF)  if (scalar@entryNF);
+
+  return $ret
+}
 sub HMinfo_saveConfig($) {#####################################################
   my ($param) = @_;
   my ($id,$file,$opt,$filter) = split ",",$param;
   my @entities;
+  $file = "regSave.cfg" if (!$file);
   foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
     CUL_HM_Get($defs{$dName},$dName,"saveConfig",$file);
     push @entities,$dName;
@@ -1528,11 +1597,20 @@ sub HMinfo_noDup(@) {#return list with no duplicates
           <li>register clears all register-entries in readings</li>
           </ul>
       </li>
-      <li><a name="#HMinfosaveConfig">saveConfig</a> <a href="#HMinfoFilter">[filter]</a><br>
+      <li><a name="#HMinfosaveConfig">saveConfig</a> <a href="#HMinfoFilter">[filter] [&lt;file&gt;]</a><br>
           performs a save for all HM register setting and peers. See <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>.
       </li>
+      <li><a name="#HMinfoloadConfig">loadConfig</a> <a href="#HMinfoFilter">[filter] [&lt;file&gt;]</a><br>
+          loads register and peers from a file saved by <a href="#HMinfosaveConfig">saveConfig</a>.<br>
+          It should be used carefully since it will add data to FHEM which cannot be verified. No readings will be replaced, only 
+          missing readings will be added. The command is mainly meant to be fill in readings and register that are 
+          hard to get. Those from devices which only react to config may not easily be read. <br>
+          Therefore it is strictly up to the user to fill valid data. User should consider using autoReadReg for devices 
+          that can be read.<br>
+          The command will update FHEM readings and attributes. It will <B>not</B> reprogramm any device.
+      </li>
          <br>
-      <li><a name="#HMinfotempList">tempList</a> <a href="#HMinfoFilter">[filter]</a>[save|restore|verify] [filename]</a><br>
+      <li><a name="#HMinfotempList">tempList</a> <a href="#HMinfoFilter">[filter]</a>[save|restore|verify] [&lt;file&gt;]</a><br>
           this function supports handling of tempList for thermstates.
           It allows templists to be saved in a separate file, verify settings against the file
           and write the templist of the file to the devices. <br>

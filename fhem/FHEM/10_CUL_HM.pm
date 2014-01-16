@@ -200,7 +200,7 @@ sub CUL_HM_updateConfig($){
         $attr{$name}{expert}     = AttrVal($name,"expert"     ,"2_full");
         $attr{$name}{autoReadReg}= AttrVal($name,"autoReadReg","4_reqStatus");
       }
-      CUL_HM_Attr("attr",$name,"expert",$attr{$name}{expert});#need update after readings are available
+      CUL_HM_Attr("attr",$name,"expert",$attr{$name}{expert}) if ($attr{$name}{expert});#need update after readings are available
     }
     else{# Action Detector only
       $attr{$name}{"event-on-change-reading"} = AttrVal($name, "event-on-change-reading", ".*");
