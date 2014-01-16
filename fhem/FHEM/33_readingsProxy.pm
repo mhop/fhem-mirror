@@ -196,6 +196,9 @@ readingsProxy_Set($@)
     if( "$set " =~ m/^${a[0]}[ :]/ ) {
       $found = 1;
       last;
+    } elsif( "$set " =~ m/^state[ :]/ ) {
+      $found = 1;
+      last;
     }
   }
   return SetExtensions($hash,$setList,$name,@a) if( !$found );
