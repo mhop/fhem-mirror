@@ -16,9 +16,9 @@ use strict;
 use warnings;
 use POSIX;
 use JSON;
-#use JSON::RPC::Client;
 use Data::Dumper;
 use DevIo;
+use IO::Socket::INET;
 use MIME::Base64;
 
 sub XBMC_Initialize($$)
@@ -29,7 +29,7 @@ sub XBMC_Initialize($$)
   $hash->{ReadFn}   = "XBMC_Read";  
   $hash->{ReadyFn}  = "XBMC_Ready";
   $hash->{UndefFn}  = "XBMC_Undefine";
-  $hash->{AttrList} = "fork:enable,disable offMode:quit,hibernate,shutdown,standby";
+  $hash->{AttrList} = "fork:enable,disable compatibilityMode:xbmc,plex offMode:quit,hibernate,shutdown,standby " . $readingFnAttributes;
   
   $data{RC_makenotify}{XBMC} = "XBMC_RCmakenotify";
   $data{RC_layout}{XBMC_RClayout}  = "XBMC_RClayout";
@@ -75,22 +75,24 @@ sub XBMC_Define($$)
 sub XBMC_Ready($)
 {
   my ($hash) = @_;
-  if(AttrVal($hash->{NAME},'fork','disable') eq 'enable') {
-    if($hash->{CHILDPID} && !(kill 0, $hash->{CHILDPID})) {
-      $hash->{CHILDPID} = undef;
+  if($hash->{Protocol} eq 'tcp') {
+    if(AttrVal($hash->{NAME},'fork','disable') eq 'enable') {
+      if($hash->{CHILDPID} && !(kill 0, $hash->{CHILDPID})) {
+        $hash->{CHILDPID} = undef;
+        return DevIo_OpenDev($hash, 1, "XBMC_Init");
+      }
+      elsif(!$hash->{CHILDPID}) {
+        return if($hash->{CHILDPID} = fork);
+	    my $ppid = getppid();
+	    while(kill 0, $ppid) {
+	      DevIo_OpenDev($hash, 1, "XBMC_ChildExit");
+	      sleep(5);
+	    }
+	    exit(0);
+      }
+    } else {
       return DevIo_OpenDev($hash, 1, "XBMC_Init");
     }
-    elsif(!$hash->{CHILDPID}) {
-      return if($hash->{CHILDPID} = fork);
-	  my $ppid = getppid();
-	  while(kill 0, $ppid) {
-	    DevIo_OpenDev($hash, 1, "XBMC_ChildExit");
-	    sleep(5);
-	  }
-	  exit(0);
-    }
-  } else {
-    return DevIo_OpenDev($hash, 1, "XBMC_Init");
   }
   return undef;
 }
@@ -151,11 +153,12 @@ sub XBMC_PlayerUpdate($$)
   my $obj  = {
     "method" => "Player.GetProperties",
     "params" => { 
-      "properties" => ["partymode", "totaltime", "repeat", "shuffled", "speed" ]
+      "properties" => ["time","totaltime", "repeat", "shuffled", "speed" ]
 	  #"canseek", "canchangespeed", "canmove", "canzoom", "canrotate", "canshuffle", "canrepeat"
     }
   };
-  if($playerid) {    
+  push(@{$obj->{params}->{properties}}, 'partymode') if(AttrVal($hash->{NAME},'compatibilityMode','xbmc') eq 'xbmc');
+  if($playerid >= 0) {    
 	$obj->{params}->{playerid} = $playerid;
     XBMC_Call($hash,$obj,1);
   }
@@ -228,23 +231,16 @@ sub XBMC_ProcessNotification($$)
   elsif($obj->{method} eq "Player.OnPlay") {
     my $id = XBMC_CreateId();
     my $type = $obj->{params}->{data}->{item}->{type};
-    if(!defined($obj->{params}->{data}->{item}->{id}) || $type eq "picture" || $type eq "unknown") {
+    if(AttrVal($hash->{NAME},'compatibilityMode','xbmc') eq 'plex' || !defined($obj->{params}->{data}->{item}->{id}) || $type eq "picture" || $type eq "unknown") {
 	  readingsBeginUpdate($hash);
 	  readingsBulkUpdate($hash,'playStatus','playing');
 	  readingsBulkUpdate($hash,'type',$type);
-	  if(defined($obj->{params}->{data}->{item}->{artist})) {
-	    my $artist = $obj->{params}->{data}->{item}->{artist};
-	    if(ref($artist) eq 'ARRAY') {
-	      if(int(@$artist)) {
-	        $artist = join(',',@$artist);
-	      }
+	  if(defined($obj->{params}->{data}->{item})) {
+	    foreach my $key (keys %{$obj->{params}->{data}->{item}}) {
+	      my $value = $obj->{params}->{data}->{item}->{$key};
+	      XBMC_CreateReading($hash,$key,$value);
 	    }
-		readingsBulkUpdate($hash,'currentArtist', $artist);
 	  }
-	  readingsBulkUpdate($hash,'currentAlbum',$obj->{params}->{data}->{item}->{album}) if(defined($obj->{params}->{data}->{item}->{album}));
-	  readingsBulkUpdate($hash,'currentTitle',$obj->{params}->{data}->{item}->{title}) if(defined($obj->{params}->{data}->{item}->{title}));
-	  readingsBulkUpdate($hash,'currentTrack',$obj->{params}->{data}->{item}->{track}) if(defined($obj->{params}->{data}->{item}->{track}));
-	  readingsBulkUpdate($hash,'currentMedia',$obj->{params}->{data}->{item}->{file}) if(defined($obj->{params}->{data}->{item}->{file}));
 	  readingsEndUpdate($hash, 1);
 	}	
     elsif($type eq "song") {
@@ -336,7 +332,6 @@ sub XBMC_ProcessResponse($$)
     my $name = $event->{name};
     my $type = $event->{type};
     my $value = '';          
-	#include song details into the event details
 	my $base = '';
     $base = $obj->{result}->{songdetails} if($type eq 'song');
 	$base = $obj->{result}->{episodedetails} if($type eq 'episode');
@@ -348,14 +343,7 @@ sub XBMC_ProcessResponse($$)
 	  readingsBulkUpdate($hash,'type',$type);
 	  foreach my $key (keys %$base) {
 	    my $item = $base->{$key};
-	    if(ref($item) eq 'ARRAY') {
-	      if(int(@$item)) {
-	        readingsBulkUpdate($hash,$key,join(',',@$item));
-	      }
-	    }
-	    else {
-		  readingsBulkUpdate($hash,$key,$item);
-	    }
+		XBMC_CreateReading($hash,$key,$item);
 	  }
 	  readingsEndUpdate($hash, 1);
 	} 
@@ -377,42 +365,59 @@ sub XBMC_ProcessResponse($$)
 	  readingsBeginUpdate($hash);
       foreach my $key (keys %$properties) {
 	    my $value = $properties->{$key};
-	    if($key eq 'version') {
-	      $value = $value->{major} . '.' . $value->{minor} . '-' . $value->{revision} . ' ' . $value->{tag};
-	    }
-	    elsif($key eq 'skin') {
-	      $value = $value->{name} . '(' . $value->{id} . ')';
-	    }
-		elsif($key eq 'totaltime') {
-	      $value = sprintf('%02d:%02d:%02d.%03d',$value->{hours},$value->{minutes},$value->{seconds},$value->{milliseconds});
-	    }
-		elsif($key eq 'shuffled') {
-		  $key = 'shuffle';
-		  $value = ($value ? 'on' : 'off');
-		}
-		elsif($key eq 'muted') {
-		  $key = 'mute';
-		  $value = ($value ? 'on' : 'off');
-		}
-		elsif($key eq 'speed') {
-		  readingsBulkUpdate($hash,'playStatus','playing') if $value != 0;
-		  readingsBulkUpdate($hash,'playStatus','paused') if $value == 0;
-		}
-		elsif($key =~ /(fullscreen|partymode)/) {
-		  $value = ($value ? 'on' : 'off');
-		}
-		elsif($key eq 'file') {
-		  $key = 'currentMedia';
-		}
-		elsif($key =~ /(album|artist|track|title)/) {
-		  $key = 'current' . ucfirst($key);
-		}
-	    readingsBulkUpdate($hash,$key,$value);
+	    XBMC_CreateReading($hash,$key,$value);
 	  }
 	  readingsEndUpdate($hash, 1);
 	}
   }
   return undef;
+}
+
+sub XBMC_CreateReading($$$) {
+  my $hash = shift;
+  my $key = shift;
+  my $value = shift;
+  if($key eq 'version') {
+	my $version = '';
+	$version = $value->{major};
+	$version .= '.' . $value->{minor} if(defined($value->{minor}));
+	$version .= '-' . $value->{revision} if(defined($value->{revision}));
+	$version .= ' ' . $value->{tag} if(defined($value->{tag}));
+	$value = $version;
+  }
+  elsif($key eq 'skin') {
+	$value = $value->{name} . '(' . $value->{id} . ')';
+  }
+  elsif($key eq 'totaltime' || $key eq 'time') {
+    $value = sprintf('%02d:%02d:%02d.%03d',$value->{hours},$value->{minutes},$value->{seconds},$value->{milliseconds});
+  }
+  elsif($key eq 'shuffled') {
+    $key = 'shuffle';
+    $value = ($value ? 'on' : 'off');
+  }
+  elsif($key eq 'muted') {
+    $key = 'mute';
+    $value = ($value ? 'on' : 'off');
+  }
+  elsif($key eq 'speed') {
+    readingsBulkUpdate($hash,'playStatus','playing') if $value != 0;
+    readingsBulkUpdate($hash,'playStatus','paused') if $value == 0;
+  }
+  elsif($key =~ /(fullscreen|partymode)/) {
+    $value = ($value ? 'on' : 'off');
+  }
+  elsif($key eq 'file') {
+    $key = 'currentMedia';
+  }
+  elsif($key =~ /(album|artist|track|title)/) {
+    $key = 'current' . ucfirst($key);
+  }
+  if(ref($value) eq 'ARRAY') {
+    if(int(@$value)) {
+      $value = join(',',@$value);
+    }
+  }
+  readingsBulkUpdate($hash,$key,$value);
 }
 
 #Parses a given string and returns ($msg,$tail). If the string contains a complete message 
@@ -630,7 +635,7 @@ sub XBMC_Set($@)
 	  "msg " . 
 	  "mute:toggle,on,off volume:slider,0,1,100 quit:noArg " . 
 	  "eject:noArg hibernate:noArg reboot:noArg shutdown:noArg suspend:noArg " . 
-	  "videolibrary:scan,clean audiolibrary:scan,clean";
+	  "videolibrary:scan,clean audiolibrary:scan,clean statusRequest";
   return $res ;
 
 }
@@ -909,7 +914,8 @@ sub XBMC_HTTP_Call($$$)
   my ($hash,$obj,$id) = @_;
   my $uri = "http://" . $hash->{Host} . ":" . $hash->{Port} . "/jsonrpc";
   my $ret = XBMC_HTTP_Request(0,$uri,undef,$obj,undef,$hash->{Username},$hash->{Password});
-  if($ret =~ /^error:(\d){3}$/) {
+  return undef if(!$ret);
+  if($ret =~ /^error:(\d{3})$/) {
     return "HTTP Error Code " . $1;
   }
   return XBMC_ProcessResponse($hash,decode_json($ret)) if($id);
@@ -1023,7 +1029,7 @@ sub XBMC_HTTP_Request($$@)
     <code>define &lt;name&gt; XBMC &lt;ip[:port]&gt; &lt;http|tcp&gt; [&lt;username&gt;] [&lt;password&gt;]</code>
     <br><br>
 
-    This module allows you to control XBMC and receive events from XBMC.<br><br>
+    This module allows you to control XBMC and receive events from XBMC. It can also be used to control Plex (see attribute <i>compatibilityMode</i>).<br><br>
 	
 	<b>Prerequisites</b>
 	<ul>
@@ -1031,7 +1037,8 @@ sub XBMC_HTTP_Request($$@)
 	  <li>To use this module you will have to enable JSON-RPC. See <a href="http://wiki.xbmc.org/index.php?title=JSON-RPC_API#Enabling_JSON-RPC">here</a>.</li>
 	  <li>The Perl module JSON is required. <br>
 	      On Debian/Raspbian: <code>apt-get install libjson-perl </code><br>
-		  Via CPAN: <code>cpan install JSON</code></li>
+		  Via CPAN: <code>cpan install JSON</code>
+		  To get it working on a Fritzbox the JSON module has to be installed manually.</li>
 	</ul>
 
     To receive events it is necessary to use TCP. The default TCP port is 9090. Username and password are optional for TCP. Be sure to enable JSON-RPC 
@@ -1162,7 +1169,7 @@ sub XBMC_HTTP_Request($$@)
 	<li><b>mute</b> - indicates if XBMC is muted (on/off)</li>
 	<li><b>name</b> - software name (e.g. XBMC)</li>
 	<li><b>originaltitle</b> - original title of the movie being played</li>
-	<li><b>partymode</b> - indicates if XBMC runs in party mode (on/off)</li>
+	<li><b>partymode</b> - indicates if XBMC runs in party mode (on/off) (not available for Plex)</li>
 	<li><b>playlist</b> - Possible values: add, clear, remove</li>
 	<li><b>playStatus</b> - Indicates the player status: playing, paused, stopped</li>
 	<li><b>repeat</b> - current repeat mode (one/all/off)</li>
@@ -1172,6 +1179,7 @@ sub XBMC_HTTP_Request($$@)
 	<li><b>skin</b> - current skin of XBMC</li>
 	<li><b>songid</b> - id of the song in the music library</li>
 	<li><b>system</b> - Possible values: lowbattery, quit, restart, sleep, wake</li>
+	<li><b>time</b> - current position in the playing media item (only updated on play/pause)</li>
 	<li><b>totaltime</b> - total run time of the current media item</li>
 	<li><b>type</b> - type of the media item. Possible values: episode, movie, song, musicvideo, picture, unknown</li>
 	<li><b>version</b> - version of XBMC</li>
@@ -1196,6 +1204,9 @@ sub XBMC_HTTP_Request($$@)
   <a name="XBMCattr"></a>
   <b>Attributes</b>
   <ul>
+    <li>compatibilityMode<br>
+      This module can also be used to control Plex, since the JSON Api is mostly the same, but there are some differences. 
+	  If you want to control Plex set the attribute <i>compatibilityMode</i> to <i>plex</i>.</li>
     <li>offMode<br>
       Declares what should be down if the off command is executed. Possible values are <i>quit</i> (closes XBMC), <i>hibernate</i> (puts system into hibernation), 
 	  <i>suspend</i> (puts system into stand by), and <i>shutdown</i> (shuts down the system). Default value is <i>quit</i></li>
