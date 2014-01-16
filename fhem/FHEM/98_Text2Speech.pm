@@ -1,3 +1,4 @@
+
 ##############################################
 # $Id$
 #
@@ -550,6 +551,7 @@ sub Text2Speech_AbortFn($)     {
 
 =pod
 =begin html
+
 <a name="Text2Speech"></a>
 <h3>Text2Speech</h3> 
 <ul>
@@ -686,6 +688,7 @@ sub Text2Speech_AbortFn($)     {
 =end html
 
 =begin html_DE 
+
 <a name="Text2Speech"></a>
 <h3>Text2Speech</h3> 
 <ul>
