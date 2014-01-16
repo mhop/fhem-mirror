@@ -1510,6 +1510,13 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "state:" .   (($val == 1) ? "unlocked" : "locked") . $state;
     }
   }
+  elsif (eval "defined(&CUL_HM_Parse$st)"){####################################
+    no strict "refs";
+    my @ret = &{"CUL_HM_Parse$st"}($mFlg,$mTp,$src,$dst,$p);
+    use strict "refs";
+    push @entities,@ret;
+    push @event,"" if (@ret);
+  }
   else{########################################################################
     ; # no one wants the message
   }
