@@ -3100,7 +3100,8 @@ sub CUL_HM_Set($@) {
       splice  @a,2,1;#remove prep
     }
     return "To few arguments"                if(@a < 4);
-    return "To many arguments, max 24 pairs" if(@a > (($md =~ m/HM-CC-RT-DN/)?28:50));
+    return "To many arguments, max 13 pairs" if(@a > 28 && $md =~ m/HM-CC-RT-DN/);
+    return "To many arguments, max 24 pairs" if(@a > 50 && $md !~ m/HM-CC-RT-DN/);
     return "Bad format, use HH:MM TEMP ..."  if(@a % 2);
     return "Last time spec must be 24:00"    if($a[@a-2] ne "24:00");
 
