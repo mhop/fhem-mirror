@@ -35,7 +35,7 @@ sub readingsGroup_Initialize($)
   #$hash->{SetFn}    = "readingsGroup_Set";
   $hash->{GetFn}    = "readingsGroup_Get";
   $hash->{AttrFn}   = "readingsGroup_Attr";
-  $hash->{AttrList} = "disable:1,2,3 nameIcon valueIcon mapping separator style nameStyle valueColumns valueStyle valueFormat timestampStyle noheading:1 nolinks:1 notime:1 nostate:1 alwaysTrigger:1";
+  $hash->{AttrList} = "disable:1,2,3 nameIcon valueIcon mapping separator style nameStyle valueColumns valueStyle valueFormat commands timestampStyle noheading:1 nolinks:1 notime:1 nostate:1 alwaysTrigger:1";
 
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
@@ -165,6 +165,7 @@ lookup($$$$$$$$)
       $default = $mapping->{$name} if( defined($mapping->{$name}) );
       $default = $mapping->{$reading} if( defined($mapping->{$reading}) );
       $default = $mapping->{$name.".".$reading} if( defined($mapping->{$name.".".$reading}) );
+      $default = $mapping->{$reading.".".$value} if( defined($mapping->{$reading.".".$value}) );
     #} elsif( $mapping =~ m/^{.*}$/) {
     #  my $DEVICE = $name;
     #  my $READING = $reading;
@@ -203,6 +204,7 @@ lookup2($$$$)
     my $vf = "";
     $vf = $lookup->{$reading} if( exists($lookup->{$reading}) );
     $vf = $lookup->{$name.".".$reading} if( exists($lookup->{$name.".".$reading}) );
+    $vf = $lookup->{$reading.".".$value} if( exists($lookup->{$reading.".".$value}) );
     $lookup = $vf;
   } elsif($lookup =~ m/^{.*}$/) {
     my $DEVICE = $name;
@@ -212,8 +214,44 @@ lookup2($$$$)
     $lookup = "" if( $@ );
   }
 
+  $lookup =~ s/\%DEVICE/$name/g;
+  $lookup =~ s/\%READING/$reading/g;
+  $lookup =~ s/\%VALUE/$value/g;
+
+  $lookup =~ s/\$DEVICE/$name/g;
+  $lookup =~ s/\$READING/$reading/g;
+  $lookup =~ s/\$VALUE/$value/g;
+
   return $lookup;
 }
+sub
+readingsGroup_makeLink($$$)
+{
+  my($v,$devStateIcon,$cmd) = @_;
+
+  if( $cmd ) {
+    my $txt = $v;
+    $txt = $devStateIcon if( $devStateIcon );
+    my $link = "cmd=$cmd";
+    if( AttrVal($FW_wname, "longpoll", 1)) {
+      $txt = "<a style=\"cursor:pointer\" onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
+    } else {
+      my $room = $FW_webArgs{room};
+      $room = "&detail=$FW_webArgs{detail}";
+      my $srf = $room ? "&room=$room" : "";
+      $srf = $room if( $room && $room =~ m/^&/ );
+      $txt = "<a href=\"$FW_ME$FW_subdir?$link$srf\">$txt</a>";
+    }
+    if( !$devStateIcon ) {
+      $v = $txt;
+    } else {
+      $devStateIcon = $txt;
+    }
+  }
+
+  return ($v, $devStateIcon);
+}
+
 sub
 readingsGroup_2html($)
 {
@@ -284,6 +322,8 @@ readingsGroup_2html($)
   $valueIcon = eval $valueIcon if( $valueIcon =~ m/^{.*}$/ );
   #$valueIcon = undef if( ref($valueIcon) ne 'HASH' );
 
+  my $commands = AttrVal( $d, "commands", "" );
+  $commands = eval $commands if( $commands =~ m/^{.*}$/ );
 
   my $devices = $hash->{DEVICES};
 
@@ -320,6 +360,7 @@ readingsGroup_2html($)
       if( $regex && $regex =~ m/^<(.*)>$/ ) {
         my $txt = $1;
         my $readings;
+        $item++;
         if( $txt =~ m/^{(.*)}(@[\w|.*]+)?$/ ) {
           $txt = "{$1}";
           $readings = $2;
@@ -342,6 +383,14 @@ readingsGroup_2html($)
           $ret .= "<td><div $name_style class=\"dname\"></div></td>";
           $first = 0;
           next;
+        } elsif( $txt && $txt =~ m/^%([^%]*)(%(.*))?/ ) {
+          my $icon = $1;
+          my $cmd = $3;
+          $txt = FW_makeImage( $icon, $icon, "icon" );
+
+          $cmd = lookup2($commands,$name,undef,$icon) if( !defined($cmd) );
+          ($txt,undef) = readingsGroup_makeLink($txt,undef,$cmd);
+
         } elsif( $first || $multi == 1 ) {
           $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
           $row++;
@@ -357,10 +406,9 @@ readingsGroup_2html($)
             $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>";
           }
         }
-        $item++;
         my $inform_id = "";
         $inform_id = "informId=\"$d-$item.item\"" if( $readings );
-        $ret .= "<td><div $name_style $inform_id class=\"dname\">$txt</div></td>";
+        $ret .= "<td><div $name_style $inform_id>$txt</div></td>";
         $first = 0;
         next;
       } elsif( $regex && $regex =~ m/^\+(.*)/ ) {
@@ -422,6 +470,7 @@ readingsGroup_2html($)
           }
         }
 
+        my $cmd;
         my $devStateIcon;
         if( $valueIcon ) {
           if( my $icon = lookup($valueIcon,$name,$a,$n,$v,$room,$group,"") ) {
@@ -431,9 +480,14 @@ readingsGroup_2html($)
               $devStateIcon = $txt;
             } else {
               $devStateIcon = FW_makeImage( $icon, $v, "icon" );
+              $cmd = lookup2($commands,$name,$n,$icon);
+              $cmd = lookup2($commands,$name,$n,$v) if( !$cmd );
             }
           }
         }
+
+        $cmd = lookup2($commands,$name,$n,$v) if( !$devStateIcon );
+        ($v,$devStateIcon) = readingsGroup_makeLink($v,$devStateIcon,$cmd);
 
         if( $first || $multi == 1 ) {
           $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
@@ -580,6 +634,10 @@ readingsGroup_Notify($$)
       my $valueIcon = AttrVal( $name, "valueIcon", "");
       $valueIcon = eval $valueIcon if( $valueIcon =~ m/^{.*}$/ );
 
+      my $commands = AttrVal( $name, "commands", "" );
+      $commands = eval $commands if( $commands =~ m/^{.*}$/ );
+
+
       foreach my $device (@{$devices}) {
         my $item = 0;
         my $h = $defs{@{$device}[0]};
@@ -600,6 +658,7 @@ readingsGroup_Notify($$)
           if( $regex && $regex =~ m/^<(.*)>$/ ) {
             my $txt = $1;
             my $readings;
+            $item++;
             if( $txt =~ m/^{(.*)}(@([\w|.*]+))?$/ ) {
               $txt = "{$1}";
               $readings = $3;
@@ -616,7 +675,14 @@ readingsGroup_Notify($$)
               }
               $txt = "" if( !defined($txt) );
 
-              $item++;
+              if( $txt && $txt =~ m/^%([^%]*)(%(.*))?/ ) {
+                my $icon = $1;
+                my $cmd = $3;
+
+                $txt = FW_makeImage( $icon, $icon, "icon" );
+                ($txt,undef) = readingsGroup_makeLink($txt,undef,$cmd);
+              }
+
               CommandTrigger( "", "$name $item.item: $txt" );
             }
 
@@ -640,6 +706,7 @@ readingsGroup_Notify($$)
             }
           }
 
+          my $cmd;
           my $devStateIcon;
           if( $valueIcon ) {
             my $n = $h->{NAME};
@@ -653,12 +720,21 @@ readingsGroup_Notify($$)
                 $devStateIcon = $txt;
               } else {
                 $devStateIcon = FW_makeImage( $icon, $value, "icon" );
+                $cmd = lookup2($commands,$n,$reading,$icon);
+                $cmd = lookup2($commands,$n,$reading,$value) if( !$cmd );
               }
             }
 
-            CommandTrigger( "", "$name $n.$reading: $devStateIcon" ) if( $devStateIcon );
-            next if( $devStateIcon );
+            if( $devStateIcon ) {
+              (undef,$devStateIcon) = readingsGroup_makeLink(undef,$devStateIcon,$cmd);
+
+              CommandTrigger( "", "$name $n.$reading: $devStateIcon" );
+              next;
+            }
           }
+
+          $cmd = lookup2($commands,$dev->{NAME},$reading,$value);
+          ($value,undef) = readingsGroup_makeLink($value,undef,$cmd);
 
           $value = "<div $value_style>$value</div>" if( $value_style );
 
@@ -759,8 +835,12 @@ readingsGroup_Attr($$$)
       <li>If regex starts with a '+' it will be matched against the internal values of the device instead of the readings.</li>
       <li>If regex starts with a '?' it will be matched against the attributes of the device instead of the readings.</li>
       <li>regex can be of the form &lt;STRING&gt; or &lt;{perl}[@readings]&gt; where STRING or the string returned by perl is
-          inserted as the reading. skipped if STRING is undef. if STRING is br a new line will be started. if readings is
-          given the perl expression will be reevaluated during longpoll updates.</li>
+          inserted as a reading or:
+          <ul><li>the item will be skipped if STRING is undef</li>
+              <li>if STRING is br a new line will be started</li>
+              <li>if STRING is of the form %ICON[%CMD] ICON will be used as the name of an icon instead of a text and CMD
+                  as the command to be executed if the icon is clicked. also see the commands attribute.</li></ul>
+          if readings is given the perl expression will be reevaluated during longpoll updates.</li>
       <li>For internal values and attributes longpoll update is not possible. Refresh the page to update the values.</li>
       <li>the &lt;{perl}&gt; expression is limited to expressions without a space. it is best just to call a small sub
           in 99_myUtils.pm instead of having a compex expression in the define.</li>
@@ -793,6 +873,19 @@ readingsGroup_Attr($$$)
         attr Verbrauch valueFormat {power => "%.1f W", consumption => "%.2f kWh"}<br>
         attr Verbrauch valueIcon { state => '%devStateIcon' }<br>
         attr Verbrauch valueStyle {($READING eq "power" && $VALUE > 150)?'style="color:red"':'style="color:green"'}<br>
+      <br>
+        define rg_battery readingsGroup TYPE=LaCrosse:[Bb]attery<br>
+        attr rg_battery alias Batteriestatus<br>
+        attr rg_battery commands { "battery.low" => "set %DEVICE replaceBatteryForSec 60" }<br>
+        attr rg_battery valueFormat {($VALUE eq 'ok')?"batterie":"batterie\@red"}<br>
+        attr rg_battery valueIcon %VALUE<br>
+      <br>
+        define rgMediaPlayer readingsGroup myMediaPlayer:currentTitle,<>,totaltime,<br>,currentAlbum,<>,currentArtist,<br>,volume,<{if(ReadingsVal($DEVICE,"playStatus","")eq"paused"){"%rc_PLAY%set+$DEVICE+play"}else{"%rc_PAUSE%set+$DEVICE+pause"}}@playStatus>,playStatus<br>
+        attr rgMediaPlayer commands { "playStatus.paused" => "set %DEVICE play", "playStatus.playing" => "set %DEVICE pause" }<br>
+        attr rgMediaPlayer mapping &nbsp;<br>
+        attr rgMediaPlayer notime 1<br>
+        attr rgMediaPlayer valueFormat { "volume" => "Volume: %i" }<br>
+        #attr rgMediaPlayer valueIcon { "playStatus.paused" => "rc_PLAY", "playStatus.playing" => "rc_PAUSE" }<br>
       </code><br>
     </ul>
   </ul><br>
@@ -863,7 +956,11 @@ readingsGroup_Attr($$$)
         in {} that returns a hash that maps reading value to the icon name. e.g.:<br>
           <code>attr devices valueIcon $VALUE</code></br>
           <code>attr devices valueIcon {state => '%VALUE'}</code></br>
-          <code>attr devices valueIcon {state => '%devStateIcon'}</code></li>
+          <code>attr devices valueIcon {state => '%devStateIcon'}</code>
+          <code>attr rgMediaPlayer valueIcon { "playStatus.paused" => "rc_PLAY", "playStatus.playing" => "rc_PAUSE" }</code></li>
+      <li>commands<br>
+        Makes a reading or icon clickable and specifies the command that should be executed. eg.:<br>
+        <code>attr rgMediaPlayer commands { "playStatus.paused" => "set %DEVICE play", "playStatus.playing" => "set %DEVICE pause" }</code></li>
     </ul><br>
 
       The nameStyle and valueStyle attributes can also contain a perl expression enclosed in {} that returns the style
