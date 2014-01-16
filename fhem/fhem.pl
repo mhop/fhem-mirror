@@ -3649,4 +3649,20 @@ createNtfyHash()
   }
 }
 
+sub
+notifyRegexpChanged($$)
+{
+  my ($hash, $re) = @_;
+
+  my $dev;
+  $dev = $1 if(($re =~ m/^([^:]*)$/ || $re =~ m/^([^:]*):(.*)$/));
+
+  if($dev && defined($defs{$dev}) && $re !~ m/\|/) {
+    $hash->{NOTIFYDEV} = $dev;
+  } else {
+    delete($hash->{NOTIFYDEV}); # when called by modify
+  }
+}
+
+
 1;
