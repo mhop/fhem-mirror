@@ -2,8 +2,8 @@
 #
 #  Copyright notice
 #
-#  (c) 2012 Torsten Poitzsch (torsten.poitzsch@gmx.de)
-#  (c) 2012-2013 Jan-Hinrich Fessel (oskar@fessel.org)
+#  (c) 2012,2014 Torsten Poitzsch (torsten.poitzsch@gmx.de)
+#  (c) 2012 Jan-Hinrich Fessel (oskar@fessel.org)
 #
 #  This script is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -29,6 +29,7 @@ package main;
 
 use strict;
 use warnings;
+use Blocking;
 use IO::Socket; 
 
 my $cc; # The Itmes Changed Counter
@@ -38,338 +39,482 @@ LUXTRONIK2_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{DefFn}     = "LUXTRONIK2_Define";
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 firmware statusHTML";
+  $hash->{DefFn}    = "LUXTRONIK2_Define";
+  $hash->{UndefFn}  = "LUXTRONIK2_Undefine";
+  $hash->{SetFn}    = "LUXTRONIK2_Set";
+  $hash->{AttrList} = "disable:0,1 ".
+					  "statusHTML ".
+					  $readingFnAttributes;
 }
 
 sub
 LUXTRONIK2_Define($$)
 {
   my ($hash, $def) = @_;
-  my $name=$hash->{NAME};
   my @a = split("[ \t][ \t]*", $def);
 
-  return "Wrong syntax: use define <name> LUXTRONIK2 <ip-address> [<poll-interval>]" if(int(@a) <3 || int(@a) >4);
-  $hash->{Host} = $a[2];
-  $hash->{INTERVAL}=$a[3] || 300;
-  
-  #Get first data after 5 seconds
-  InternalTimer(gettimeofday() + 5, "LUXTRONIK2_GetStatus", $hash, 0);
+  return "Usage: define <name> LUXTRONIK2 <ip-address> [poll-interval]" if(@a <3 || @a >4);
+
+  my $name = $a[0];
+  my $host = $a[2];
+
+  my $interval = 5*60;
+  $interval = $a[3] if(int(@a) == 4);
+  $interval = 1*60 if( $interval < 1*60 );
+
+  $hash->{NAME} = $name;
+
+  $hash->{STATE} = "Initializing";
+  $hash->{HOST} = $host;
+  $hash->{INTERVAL} = $interval;
+
+  RemoveInternalTimer($hash);
+  #Get first data after 10 seconds
+  InternalTimer(gettimeofday() + 10, "LUXTRONIK2_GetUpdate", $hash, 0);
  
   return undef;
 }
 
 sub
-LUXTRONIK2_TempValueMerken($$$)
+LUXTRONIK2_Undefine($$)
 {
-  my ($hash, $param, $paramName) = @_;
+  my ($hash, $arg) = @_;
 
-  $param /= 10;
-  if($hash->{READINGS}{$paramName}{VAL} != $param) {
-    $hash->{READINGS}{$paramName}{TIME} = TimeNow();
-    $hash->{READINGS}{$paramName}{VAL} = $param;
-    $hash->{READINGS}{$paramName}{UNIT} = "Degree Celsius";
-    $hash->{CHANGED}[$cc++] = $paramName .": ". $param;
-  }
+  RemoveInternalTimer($hash);
+
+  BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
+
+  return undef;
 }
 
-#####################################
+sub
+LUXTRONIK2_Set($$@)
+{
+  my ($hash, $name, $cmd) = @_;
+
+  if($cmd eq 'statusRequest') {
+    $hash->{LOCAL} = 1;
+    LUXTRONIK2_GetUpdate($hash);
+    $hash->{LOCAL} = 0;
+    return undef;
+  }
+
+  my $list = "statusRequest:noArg";
+  return "Unknown argument $cmd, choose one of $list";
+}
 
 sub
-LUXTRONIK2_GetStatus($)
+LUXTRONIK2_GetUpdate($)
 {
   my ($hash) = @_;
-  my $err_log='';
+  my $name = $hash->{NAME};
+
+  if(!$hash->{LOCAL}) {
+    RemoveInternalTimer($hash);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "LUXTRONIK2_GetUpdate", $hash, 1);
+  }
+
+  my $host = $hash->{HOST};
+
+  if( !$hash->{LOCAL} ) {
+    return undef if( AttrVal($name, "disable", 0 ) == 1 );
+  }
+
+  $hash->{helper}{RUNNING_PID} = BlockingCall("LUXTRONIK2_DoUpdate", $name."|".$host, "LUXTRONIK2_UpdateDone", 10, "LUXTRONIK2_UpdateAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+}
+
+sub
+LUXTRONIK2_DoUpdate($)
+{
+  my ($string) = @_;
+  my ($name, $host) = split("\\|", $string);
+
   my @heatpump_values;
   my @heatpump_parameters;
-  my $result='';
-  my $switch=0;
-  my $value='';
   my $count=0;
-#  my $i=0;
-  my $name = $hash->{NAME};
-  my $host = $hash->{Host};
-  my $sensor = '';
-  my $state = '';
-  my $firmware;
-  my $serialno;
-
-  $cc = 0; #initialize counter
- 
-  InternalTimer(gettimeofday() + $hash->{INTERVAL}, "LUXTRONIK2_GetStatus", $hash, 0);
-
+  my $result="";
+  my $readingStartTime = time();
+  
+  Log3 $name, 5, "$name: Opening connection to host ".$host;
   my $socket = new IO::Socket::INET (  PeerAddr => $host, 
 				       PeerPort => 8888,
 				       #   Type => SOCK_STREAM, # probably needed on some systems
 				       Proto => 'tcp'
       );
   if (!$socket) {
-      $hash->{STATE} = "error opening device"; 
-      Log 1,"$name: Error opening Connection to $host";
-      return "Can't Connect to $host -> $@ ( $!)\n";
+      Log3 $name, 1, "$name Error: Could not open connection to host ".$host;
+      return "$name|0|Can't connect to $host";
   }
   $socket->autoflush(1);
   
-  #Read operational values
-  
+############################ 
+#Fetch operational values (FOV)
+############################ 
+  Log3 $name, 5, "$name: Ask host for operational values";
   $socket->send(pack("N", 3004));
   $socket->send(pack("N", 0));
   
-  # read response, should be 3004, status, number of parameters, and the parameters...
+  Log3 $name, 5, "$name: Start to receive operational values";
+ #(FOV) read first 4 digits of response -> should be request_echo = 3004
   $socket->recv($result,4);
   $count = unpack("N", $result);
   if($count != 3004) {
-      Log 2, "LUXTRONIK2_GetStatus: $name $host 3004 Status problem 1: ".length($result)." -> ".$count;
-      return "3004 != 3004";
+      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: Fetching operational values - wrong echo of request 3004: ".length($result)." -> ".$count;
+  	  $socket->close();
+      return "$name|0|3004 != 3004";
   }
  
+ #(FOV) read next 4 digits of response -> should be status = 0
   $socket->recv($result,4);
   $count = unpack("N", $result);
-  if($count != 0) {
-      Log 2, "LUXTRONIK2_GetStatus: $name $host ".length($result)." -> ".$count;
-      return "0 != 0";
+  if($count > 0) {
+      Log3 $name, 4, "$name parameter on target changed, restart parameter reading after 5 seconds";
+	  $socket->close();
+      return "$name|2|Status = $count - parameter on target changed, restart device reading after 5 seconds";
   }
   
+ #(FOV) read next 4 digits of response -> should be number_of_parameters > 0
   $socket->recv($result,4);
   $count = unpack("N", $result);
   if($count == 0) {
-      Log 2, "LUXTRONIK2_GetStatus: $name $host 0 Paramters read".length($result)." -> ".$count;
-      return "0 Paramters read";
-  }
-
-  $socket->recv($result, $count*4+4);
-  if(length($result) != $count*4) {
-      Log 1, "LUXTRONIK2_GetStatus status report length check: $name $host ".length($result)." should have been ". $count * 4;
-      return "Value read mismatch Lux2 ( $!)\n";
-  }
-  @heatpump_values = unpack("N!$count", $result);
-  if(scalar(@heatpump_values) != $count) {
-      Log 2, "LUXTRONIK2_GetStatus10: $name $host ".scalar(@heatpump_values)." -> ".$heatpump_values[10];
-      return "Value unpacking problem";
+      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error:  Fetching operational values - 0 values announced: ".length($result)." -> ".$count;
+	  $socket->close();
+      return "$name|0|0 values read";
   }
   
-  # Parametereinstellung lesen
+ #(FOV) read remaining response -> should be previous number of parameters
+  my $i=1;
+  $result="";
+  my $buf="";
+  while($i<=$count) {
+	  $socket->recv($buf,4);
+      $result.=$buf;
+	  $i++;
+  }
+  if(length($result) != $count*4) {
+      Log3 $name, 1, "$name LUXTRONIK2_DoUpdate-Error: operational values length check: ".length($result)." should have been ". $count * 4;
+ 	  $socket->close();
+      return "$name|0|Number of values read mismatch ( $!)\n";
+  }
+  
+ #(FOV) unpack response in array
+  @heatpump_values = unpack("N$count", $result);
+  if(scalar(@heatpump_values) != $count) {
+      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: unpacking problem by operation values: ".scalar(@heatpump_values)." instead of ".$count;
+ 	  $socket->close();
+      return "$name|0|Unpacking problem of operational values";
+  }
+
+  Log3 $name, 5, "$name: $count operational values received";
+ 
+############################ 
+#Fetch set parameters (FSP)
+############################ 
+  Log3 $name, 5, "$name: Ask host for set parameters";
   $socket->send(pack("N", 3003));
   $socket->send(pack("N", 0));
 
+  Log3 $name, 5, "$name: Start to receive set parameters";
+ #(FSP) read first 4 digits of response -> should be request_echo=3003
   $socket->recv($result,4);
-  $count = unpack("N", $result);
   $count = unpack("N", $result);
   if($count != 3003) {
-      Log 2, "LUXTRONIK2_GetStatus: $name $host 3003 Status problem 1: ".length($result)." -> ".$count;
-      return "3003 != 3003";
+      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: wrong echo of request 3003: ".length($result)." -> ".$count;
+      $socket->close();
+      return "$name|0|3003 != 3003";
   }
   
+ #(FSP) read next 4 digits of response -> should be number_of_parameters > 0
   $socket->recv($result,4);
   $count = unpack("N", $result);
- 
-  $socket->recv($result, $count*4+4);
-  if(length($result) != $count*4) {
-      my $loop = 4; # safety net in case of communication problems
-      while((length($result) < ($count * 4)) && ($loop-- > 0) ) {
-	  my $result2;
-	  my $newcnt = ($count * 4) - length($result);
-	  $socket->recv($result2, $newcnt);
-	  $result .= $result2;
-#	  Log 3, "LUXTRONIK2_GetStatus read additional " . length($result2)
-#	      . " bytes of expected " . $newcnt . " bytes, total should be "
-#	      . $count * 4 . " buflen=" . length($result);
-      }
-      if($loop == 0) {
-        Log 3, "LUXTRONIK2_GetStatus parameter settings length check: $name $host "
-	  . length($result) . " should have been " . $count * 4;
-      }
+  if($count == 0) {
+      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: 0 parameter read: ".length($result)." -> ".$count;
+	  $socket->close();
+      return "$name|0|0 parameter read";
   }
+  
+ #(FSP) read remaining response -> should be previous number of parameters
+   my $i=1;
+  $result="";
+  my $buf="";
+  while($i<=$count) {
+	  $socket->recv($buf,4);
+      $result.=$buf;
+	  $i++;
+  }
+  if(length($result) != $count*4) {
+      Log3 $name, 1, "$name LUXTRONIK2_DoUpdate-Error: parameter length check: ".length($result)." should have been ". $count * 4;
+	  $socket->close();
+      return "$name|0|Number of parameters read mismatch ( $!)\n";
+  }
+
   @heatpump_parameters = unpack("N$count", $result);
   if(scalar(@heatpump_parameters) != $count) {
-      Log 1, "LUXTRONIK2_GetStatus: $name $host pump parameter problem: received parameter count ("
-	  . scalar(@heatpump_parameters) .
-	  ") is not equal to announced parameter count(" . $count . ")!";
-      return "Parameter read mismatch LUXTRONIK2 ( $!)\n";
+      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: unpacking problem by set parameter: ".scalar(@heatpump_parameters)." instead of ".$count;
+	  $socket->close();
+      return "$name|0|Unpacking problem of set parameters";
   }
- 
+
+  Log3 $name, 5, "$name: $count set values received";
+
+  Log3 $name, 5, "$name: Closing connection to host $host";
   $socket->close();
 
-  if($err_log ne "")
-  {
-      Log GetLogLevel($name,2), "LUXTRONIK2 ".$err_log;
-      return("LUXTRONIK2 general problem with heatpump connection");
-  }
-  
-  my %wpOpStat1 = ( 0 => "Waermepumpe laeuft",
-		    1 => "Waermepumpe steht",
-		    2 => "Waermepumpe kommt",
-		    3 => "Fehler",
-		    4 => "Abtauen" );
-  my %wpOpStat2 = ( 0 => "Heizbetrieb",
-		    1 => "Keine Anforderung",
-		    2 => "Netz Einschaltverz&ouml;gerung",
-		    3 => "Schaltspielzeit",
-		    4 => "EVU Sperrzeit",
-		    5 => "Brauchwasser",
-		    6 => "Stufe",
-		    7 => "Abtauen",
-		    8 => "Pumpenvorlauf",
-		    9 => "Thermische Desinfektion",
-		    10 => "K&uuml;hlbetrieb",
-		    12 => "Schwimmbad",
-		    13 => "Heizen_Ext_En",
-		    14 => "Brauchw_Ext_En",
-		    16 => "Durchflussueberwachung",
-		    17 => "Elektrische Zusatzheizung" );
-  my %wpMode = ( 0 => "Automatik",
-		 1 => "Zusatzheizung",
-		 2 => "Party",
-		 3 => "Ferien",
-		 4 => "Aus" );
+  my $readingEndTime = time();
 
-  # Erst die operativen Stati und Parameterenstellungen
-
-  $sensor = "firmware";
-  $value = '';
+#return certain readings for further processing
+  # 0 - name
+  my $return_str="$name";
+  # 1 - no error = 1
+  $return_str .= "|1";
+  # 2 - currentOperatingStatus1
+  $return_str .= "|".$heatpump_values[117];
+  # 3 - currentOperatingStatus2
+  $return_str .= "|".$heatpump_values[119];
+  # 4 - Stufe - Value 121
+  $return_str .= "|".$heatpump_values[121];
+  # 5 - Temperature Value 122
+  $return_str .= "|".$heatpump_values[122];
+  # 6 - Kreisumkehrventil 
+  $return_str .= "|".$heatpump_values[44];
+  # 7 - hotWaterOperatingMode
+  $return_str .= "|".$heatpump_parameters[4];
+  # 8 - hotWaterMonitoring
+  $return_str .= "|".$heatpump_values[124];
+  # 9 - hotWaterBoilerValve
+  $return_str .= "|".$heatpump_values[38];
+  # 10 - heatingOperatingMode
+  $return_str .= "|".$heatpump_parameters[3];
+  # 11 - heatingSommerMode
+  $return_str .= "|".$heatpump_parameters[699];
+  # 12 - ambientTemperature
+  $return_str .= "|".$heatpump_values[15];
+  # 13 - averageAmbientTemperature
+  $return_str .= "|".$heatpump_values[16];
+  # 14 - hotWaterTemperature
+  $return_str .= "|".$heatpump_values[17];
+  # 15 - flowTemperature
+  $return_str .= "|".$heatpump_values[10];
+  # 16 - returnTemperature
+  $return_str .= "|".$heatpump_values[11];
+  # 17 - returnTemperatureTarget
+  $return_str .= "|".$heatpump_values[12];
+  # 18 - returnTemperatureExtern
+  $return_str .= "|".$heatpump_values[13];
+  # 19 - flowRate
+  $return_str .= "|".$heatpump_values[155];
+  # 20 - firmware
+  my $fwvalue = "";
   for(my $fi=81; $fi<91; $fi++) {
-      $value .= chr($heatpump_values[$fi]) if $heatpump_values[$fi];
+      $fwvalue .= chr($heatpump_values[$fi]) if $heatpump_values[$fi];
   }
-  if($hash->{READINGS}{$sensor}{VAL} ne $value) {
-      $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-      $hash->{READINGS}{$sensor}{VAL} = $value;
-      $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
-  }
+  $return_str .= "|".$fwvalue;
+  # 21 - thresholdTemperatureSummerMode
+  $return_str .= "|".$heatpump_parameters[700];
+  # 22 - readingsDeviceTime
+  $return_str .= "|".$heatpump_values[134];
+  # 23 - heatSourceIN
+  $return_str .= "|".$heatpump_values[19];
+  # 24 - heatSourceOUT
+  $return_str .= "|".$heatpump_values[20];
+  # 25 - hotWaterTemperatureTarget
+  $return_str .= "|".$heatpump_values[18];
+  # 26 - hotGasTemperature
+  $return_str .= "|".$heatpump_values[14];
+  # 27 - heatingSystemCirculationPump
+  $return_str .= "|".$heatpump_values[39];
+  # 28 - hotWaterCirculatingPumpExtern
+  $return_str .= "|".$heatpump_values[46];
+  # 29 - readingStartTime
+  $return_str .= "|".$readingStartTime;
+  # 30 - readingEndTime
+  $return_str .= "|".$readingEndTime;
 
-  $sensor = "currentOperatingStatus1";
-  $switch = $heatpump_values[117];
-  $value = $wpOpStat1{$switch};
-  $value = "unbekannt (".$switch.")" unless $value;
+  return $return_str;
+}
 
-  if($hash->{READINGS}{$sensor}{VAL} ne $value) {
-      $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-      $hash->{READINGS}{$sensor}{VAL} = $value;
-      $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
-  }
-
-  $state = $value;
+sub
+LUXTRONIK2_UpdateDone($)
+{
+  my ($string) = @_;
+  my $value = "";
+  my $state = "";
   
-  $sensor = "currentOperatingStatus2";
-  $switch = $heatpump_values[119];
-  $value = $wpOpStat2{$switch};
+  return unless(defined($string));
 
-  # Sonderfaelle behandeln:
-  if ($switch==6) { $value = "Stufe ".$heatpump_values[121]." ".($heatpump_values[122] / 10)." &deg;C "; }
-  elsif ($switch==7) { 
-      if ($heatpump_values[44]==1) {$value = "Abtauen (Kreisumkehr)";}
-      else {$value = "Luftabtauen";}
-  }
-  $value = "unbekannt (".$switch.")" unless $value;
+  my @a = split("\\|",$string);
+  my $hash = $defs{$a[0]};
+  my $name = $a[0];
   
-  if($hash->{READINGS}{$sensor}{VAL} ne $value) {
-      $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-      $hash->{READINGS}{$sensor}{VAL} = $value;
-      $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
-  }
+  delete($hash->{helper}{RUNNING_PID});
 
-  $state = $state." - ".$value;
-  $hash->{READINGS}{state}{VAL} = $state;
-  $hash->{READINGS}{state}{TIME} = TimeNow();
+  return if($hash->{helper}{DISABLED});
+
+  Log3 $hash, 5, "$name: LUXTRONIK2_UpdateDone: $string";
+
+  #Define Status Messages
+  my %wpOpStat1 = ( 0 => "Waermepumpe laeuft",
+				1 => "Waermepumpe steht",
+				2 => "Waermepumpe kommt",
+				4 => "Fehler",
+				5 => "Abtauen" );
+  my %wpOpStat2 = ( 0 => "Heizbetrieb",
+				1 => "Keine Anforderung",
+				2 => "Netz Einschaltverz&ouml;gerung",
+				3 => "Schaltspielzeit",
+				4 => "EVU Sperrzeit",
+				5 => "Brauchwasser",
+				6 => "Stufe",
+				7 => "Abtauen",
+				8 => "Pumpenvorlauf",
+				9 => "Thermische Desinfektion",
+				10 => "Kuehlbetrieb",
+				12 => "Schwimmbad",
+				13 => "Heizen_Ext_En",
+				14 => "Brauchw_Ext_En",
+				16 => "Durchflussueberwachung",
+				17 => "Elektrische Zusatzheizung" );
+  my %wpMode = ( 0 => "Automatik",
+			 1 => "Zusatzheizung",
+			 2 => "Party",
+			 3 => "Ferien",
+			 4 => "Aus" );
+  #List of firmware that are known to be compatible with this modul
+  my $compatibleFirmware = "#1.54C#";
+			 
+  my $counterRetry = $hash->{fhem}{counterRetry};
+  $counterRetry++;	 
+
+  if ($a[1]==0 ) {
+     readingsSingleUpdate($hash,"state","Error: ".$a[2],1);
+	 $counterRetry = 0;
+  }
+  elsif ($a[1]==2 )  {
+     if ($counterRetry <=3) {
+	   InternalTimer(gettimeofday() + 5, "LUXTRONIK2_GetUpdate", $hash, 0);
+     }
+	 else {
+	    readingsSingleUpdate($hash,"state","Error: Reading skipped after $counterRetry tries",1);
+		Log3 $hash, 2, "$name Error: Device reading skipped after $counterRetry tries with parameter change on target";
+	 }
+  }
+  elsif ($a[1]==1 )  {
+    $counterRetry = 0;  
+	readingsBeginUpdate($hash);
+
+  #Operating status of heatpump
+	  my $currentOperatingStatus1 = $wpOpStat1{$a[2]};
+      $currentOperatingStatus1 = "unbekannt (".$a[2].")" unless $currentOperatingStatus1;
+	  readingsBulkUpdate($hash,"currentOperatingStatus1",$currentOperatingStatus1);
+	  my $currentOperatingStatus2 = $wpOpStat2{$a[3]};
+	  # refine text of second state
+	  if ($a[3]==6) { 
+	     $currentOperatingStatus2 = "Stufe ".$a[4]." ".LUXTRONIK2_CalcTemp($a[5])." &deg;C "; 
+	  }
+      elsif ($a[3]==7) { 
+         if ($a[6]==1) {$currentOperatingStatus2 = "Abtauen (Kreisumkehr)";}
+         else {$currentOperatingStatus2 = "Luftabtauen";}
+      }
+      $currentOperatingStatus2 = "unbekannt (".$a[3].")" unless $currentOperatingStatus2;
+	  readingsBulkUpdate($hash,"currentOperatingStatus2",$currentOperatingStatus2);
+	  
+	# Hot water operating mode 
+	  $value = $wpMode{$a[7]};
+	  $value = "unbekannt (".$a[7].")" unless $value;
+	  readingsBulkUpdate($hash,"hotWaterOperatingMode",$value);
+	# hotWaterStatus
+	  if ($a[8]==0) {$value="Aus";}
+      elsif ($a[8]==1 && $a[9]==1) {$value="Aufheizen";}
+      elsif ($a[8]==1 && $a[9]==0) {$value="Temp.OK";}
+      else {$value = "unbekannt (".$a[8]."/".$a[9].")";}
+	  readingsBulkUpdate($hash,"hotWaterStatus",$value);
+
+	# Heating operating mode including summer mode and average ambient temperature
+	  readingsBulkUpdate($hash,"heatingSummerMode",$a[11]?"on":"off");
+	  my $thresholdTemperatureSummerMode=LUXTRONIK2_CalcTemp($a[21]);
+	  readingsBulkUpdate($hash,"thresholdTemperatureSummerMode",$thresholdTemperatureSummerMode);
+	  my $averageAmbientTemperature=LUXTRONIK2_CalcTemp($a[13]);
+	  readingsBulkUpdate($hash,"averageAmbientTemperature",$averageAmbientTemperature);
+	  # Heating operating mode
+	  $value = $wpMode{$a[10]};
+	  # Consider also summer mode
+	  if ($a[10] == 0 
+	        && $a[11] == 1
+		    && $averageAmbientTemperature >= $thresholdTemperatureSummerMode)
+        {$value = "Automatik - Sommerbetrieb (Aus)";}
+	  $value = "unbekannt (".$a[10].")" unless $value;
+	  readingsBulkUpdate($hash,"heatingOperatingMode",$value);
+	  
+	# Remaining temperatures and flow rate
+	  readingsBulkUpdate($hash,"ambientTemperature",LUXTRONIK2_CalcTemp($a[12]));
+	  my $hotWaterTemperature = LUXTRONIK2_CalcTemp($a[14]);
+	  readingsBulkUpdate($hash,"hotWaterTemperature",$hotWaterTemperature);
+	  readingsBulkUpdate($hash,"hotWaterTemperatureTarget",LUXTRONIK2_CalcTemp($a[25]));
+	  readingsBulkUpdate($hash,"flowTemperature",LUXTRONIK2_CalcTemp($a[15]));
+	  readingsBulkUpdate($hash,"returnTemperature",LUXTRONIK2_CalcTemp($a[16]));
+	  readingsBulkUpdate($hash,"returnTemperatureTarget",LUXTRONIK2_CalcTemp($a[17]));
+	  readingsBulkUpdate($hash,"returnTemperatureExtern",LUXTRONIK2_CalcTemp($a[18]));
+	  readingsBulkUpdate($hash,"flowRate",$a[19]);
+	  readingsBulkUpdate($hash,"heatSourceIN",LUXTRONIK2_CalcTemp($a[23]));
+	  readingsBulkUpdate($hash,"heatSourceOUT",LUXTRONIK2_CalcTemp($a[24]));
+	  readingsBulkUpdate($hash,"hotGasTemperature",LUXTRONIK2_CalcTemp($a[26]));
+	  
+	# Input / Output status
+	  readingsBulkUpdate($hash,"heatingSystemCirculationPump",$a[27]?"on":"off");
+	  readingsBulkUpdate($hash,"hotWaterCirculationPumpExtern",$a[28]?"on":"off");
+	  readingsBulkUpdate($hash,"hotWaterSwitchingValve",$a[9]?"on":"off");
+	  
+	# Firmware
+	  readingsBulkUpdate($hash,"firmware",$a[20]);
+	  # if unknown firmware, ask at each startup to inform comunity
+	  if (!$hash->{fhem}{alertFirmware} && index("#".$a[20]."#",$compatibleFirmware) == -1) {
+		$hash->{fhem}{alertFirmware} = 1;
+		Log3 $hash, 2, "$name Alert: Host uses untested Firmware $a[20]. Please inform FHEM comunity about compatibility.";
+	  }
+	  
+	# Device times during readings 
+	  $value = strftime "%Y-%m-%d %H:%M:%S", localtime($a[22]);
+	  readingsBulkUpdate($hash, "deviceTimeStartReadings", $value);
+	  readingsBulkUpdate($hash, "delayDeviceTime", $a[29]-$a[22]);
+	  readingsBulkUpdate($hash, "durationFetchReadings", $a[30]-$a[29]);
   
-  $sensor = "hotWaterOperatingMode";
-  $switch = $heatpump_parameters[4];
-  
-  $value = $wpMode{$switch};
-  $value = "unbekannt (".$switch.")" unless $value;
- 
-  if($hash->{READINGS}{$sensor}{VAL} ne $value) {
-      $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-      $hash->{READINGS}{$sensor}{VAL} = $value;
-      $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
-  }
+	#HTML for floorplan
+	if(AttrVal($name, "statusHTML", "none") ne "none") {
+		  $value = "<div class=fp_" . $a[0] . "_title>" . $a[0] . "</div>";
+		  $value .= $currentOperatingStatus1 . "<br>";
+		  $value .= $currentOperatingStatus2 . "<br>";
+		  $value .= "Brauchwasser: " . $hotWaterTemperature . "&deg;C";
+		  readingsBulkUpdate($hash,"floorplanHTML",$value);
+	  }
 
-  $sensor = "heatingOperatingMode";
-  $switch = $heatpump_parameters[3];
-  
-  $value = $wpMode{$switch};
-  if ($switch == 0 
-		&& $heatpump_values[16] >= $heatpump_parameters[700] 
-		&& $heatpump_parameters[699] == 1)
-	{$value = "Automatik - Sommerbetrieb (Aus)";}
-  $value = "unbekannt (" . $switch . ")" unless $value;
- 
-  if($hash->{READINGS}{$sensor}{VAL} ne $value) {
-      $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-      $hash->{READINGS}{$sensor}{VAL} = $value;
-      $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
-  }
+ 	  readingsBulkUpdate($hash,"state",$currentOperatingStatus1." - ".$currentOperatingStatus2);
+	  
+      readingsEndUpdate($hash,1);
 
-#####################
-# Jetzt die aktuellen Betriebswerte auswerten.
-#####################
+	}
+	else {
+		Log3 $hash, 5, "$name LUXTRONIK2_DoUpdate-Error: Status = $a[1]";
+	}
+    $hash->{fhem}{counterRetry} = $counterRetry;
 
-  # is ambient temperature the correct wording for the outside temperature?
-  # Wikipedia:
-  # Ambient temperature simply means "the temperature of the surroundings" and will be the same as room temperature indoors.
-  LUXTRONIK2_TempValueMerken($hash,$heatpump_values[15],"ambientTemperature");
-  
-  LUXTRONIK2_TempValueMerken($hash,$heatpump_values[16],"averageAmbientTemperature");
-  
-  Log GetLogLevel($name,4), $sensor.": ".$value;
-#  Log 4, "LUXTRONIK2_GetStatus: $name $host ".$hash->{STATE}." -> ".$state;
-   
-  LUXTRONIK2_TempValueMerken($hash,$heatpump_values[17],"hotWaterTemperature");
-  
-  # Wert 10 gibt die Vorlauftemperatur an, die 
-  # korrekte Uebersetzung ist flow temperature.
-  LUXTRONIK2_TempValueMerken($hash,$heatpump_values[10],"flowTemperature");
-  # Ruecklauftempereatur
-  LUXTRONIK2_TempValueMerken($hash,$heatpump_values[11],"returnTemperature");
-  # Ruecklauftemperatur Sollwert
-  LUXTRONIK2_TempValueMerken($hash,$heatpump_values[12],"returnTemperatureTarget");
-  # Ruecklauftemperatur am externen Sensor.
-  LUXTRONIK2_TempValueMerken($hash,$heatpump_values[13],"returnTemperatureExtern");
+}
 
-# Wärmequellen
-  LUXTRONIK2_TempValueMerken($hash,$heatpump_values[19],"heatSourceIN");
-  LUXTRONIK2_TempValueMerken($hash,$heatpump_values[20],"heatSourceOUT");
+sub
+LUXTRONIK2_UpdateAborted($)
+{
+  my ($hash) = @_;
+  delete($hash->{helper}{RUNNING_PID});
+  my $name = $hash->{NAME};
+  Log3 $hash, 1, "$name LUXTRONIK2_UpdateAborted: Timeout when connecting to host";
+}
 
-
-  # Durchfluss Waermemengenzaehler
-  $sensor = "flowRate";
-  $value = $heatpump_values[155];
-  if($hash->{READINGS}{$sensor}{VAL} != $value) {
-      $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-      $hash->{READINGS}{$sensor}{VAL} = $value;
-      $hash->{READINGS}{$sensor}{UNIT} = "l/h";
-      $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
-  }
-  # Waermemengenzaehler
-  $sensor = "flowCountHeating";
-  $value = $heatpump_values[151];
-  if($hash->{READINGS}{$sensor}{VAL} != $value) {
-      $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-      $hash->{READINGS}{$sensor}{VAL} = $value;
-      $hash->{READINGS}{$sensor}{UNIT} = "Wh";
-      $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
-  }
-  # Waermemengenzaehler                                                                                                                                           
-  $sensor = "flowCountHotWater";
-  $value = $heatpump_values[152];
-  if($hash->{READINGS}{$sensor}{VAL} != $value) {
-      $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-      $hash->{READINGS}{$sensor}{VAL} = $value;
-      $hash->{READINGS}{$sensor}{UNIT} = "Wh";
-      $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
-  }
-
-  if(AttrVal($hash->{NAME}, "statusHTML", "none") ne "none") {
-      $sensor = "floorplanHTML";
-      $value = '<div class=fp_' . $name . '_title>' . $name . "</div>";
-      $value .= $hash->{READINGS}{'currentOperatingStatus1'}{VAL} . '<br>';
-      $value .= $hash->{READINGS}{'currentOperatingStatus2'}{VAL} . '<br>';
-      $value .= "Brauchwasser:" . $hash->{READINGS}{hotWaterTemperature}{VAL} . '&deg;C';
-      $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-      $hash->{READINGS}{$sensor}{VAL} = $value;
-      $hash->{READINGS}{$sensor}{UNIT} = "HTML";
-  }
-
-  DoTrigger($name, undef) if($init_done);
+sub
+LUXTRONIK2_CalcTemp($)
+{
+  my ($temp) = @_;
+  if ($temp > 100000) {$temp = $temp-4294967296;}
+  $temp /= 10;
+  return $temp;
 }
 
 1;
@@ -382,14 +527,15 @@ LUXTRONIK2_GetStatus($)
 <ul>
   Luxtronik 2.0 is a heating controller used in Alpha Innotec and Siemens Novelan Heatpumps.
   It has a builtin Ethernet Port, so it can be directly integrated into a local area network.
+  <i>The modul uses the communication features of the firmware v1.54C.</i>
   <br>
   
   <a name="LUXTRONIK2define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; LUXTRONIK2 &lt;IP-address&gt; [&lt;poll-interval&gt;]</code>
+    <code>define &lt;name&gt; LUXTRONIK2 &lt;IP-address&gt; [poll-interval]</code>
     <br>
-    If the pool interval is omitted, it is set to 300 (seconds).
+    If the pool interval is omitted, it is set to 300 (seconds). Smallest possible value is 60.
     <br>
     Example:
     <ul>
@@ -400,9 +546,7 @@ LUXTRONIK2_GetStatus($)
   
   <a name="LUXTRONIK2set"></a>
   <b>Set </b>
-  <ul>
-    Nothing to set here yet...
-  </ul>
+  <ul><b>statusRequest</b> Update device information</ul>
   <br>
   
   <a name="LUXTRONIK2get"></a>
@@ -427,3 +571,4 @@ LUXTRONIK2_GetStatus($)
 
 =end html
 =cut
+
