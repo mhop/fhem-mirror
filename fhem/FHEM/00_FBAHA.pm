@@ -95,12 +95,16 @@ FBAHA_Set($@)
     my ($err, $data) = FBAHA_ReadAnswer($hash, "REGISTER", "^01");
     if($err) {
       Log3 $name, 1, $err;
-      $hash->{STATE} = "???";
+      $hash->{STATE} =
+      $hash->{READINGS}{state}{VAL} = "???";
+      $hash->{READINGS}{state}{TIME} = TimeNow();
       return $err;
     }
 
     if($data =~ m/^01030010(........)/) {
-      $hash->{STATE} = "Initialized";
+      $hash->{STATE} =
+      $hash->{READINGS}{state}{VAL} = "Iniitalized";
+      $hash->{READINGS}{state}{TIME} = TimeNow();
       $hash->{HANDLE} = $1;
       Log3 $name, 1,
         "FBAHA $hash->{NAME} registered with handle: $hash->{HANDLE}";
@@ -108,7 +112,9 @@ FBAHA_Set($@)
     } else {
       my $msg = "Got bogus answer for REGISTER request: $data";
       Log3 $name, 1, $msg;
-      $hash->{STATE} = "???";
+      $hash->{STATE} =
+      $hash->{READINGS}{state}{VAL} = "???";
+      $hash->{READINGS}{state}{TIME} = TimeNow();
       return $msg;
 
     }
