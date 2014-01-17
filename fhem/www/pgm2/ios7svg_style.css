@@ -1,5 +1,5 @@
 /* Author: Volker Edit: fhainz */
-.background { fill:#e5e5e5; fill:none; fill-opacity:0.0; }
+.background { fill:none; fill-opacity:0.0; }
 
 text { font-family: Helvetica; font-weight:300; font-size:12px; fill:#343434;}
 text.title {font-family: Helvetica; font-weight:300; font-size:16px; fill:#343434;}
