@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - bugfix:  SYSMON: filesystems may be wrong on some systems
   - feature: new module 98_pilight.pm added (andreas-fey)
   - change: LUXTRONIK2: made compatible with current developer guidelines (Blocking.pm, reading update mechanism)
   - feature: readingsGroup: added icons and links/commands
