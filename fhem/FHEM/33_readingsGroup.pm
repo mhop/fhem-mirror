@@ -877,8 +877,7 @@ readingsGroup_Attr($$$)
         define rg_battery readingsGroup TYPE=LaCrosse:[Bb]attery<br>
         attr rg_battery alias Batteriestatus<br>
         attr rg_battery commands { "battery.low" => "set %DEVICE replaceBatteryForSec 60" }<br>
-        attr rg_battery valueFormat {($VALUE eq 'ok')?"batterie":"batterie\@red"}<br>
-        attr rg_battery valueIcon %VALUE<br>
+        attr rg_battery valueIcon {'battery.ok' => 'batterie', 'battery.low' => 'batterie\@red'}<br>
       <br>
         define rgMediaPlayer readingsGroup myMediaPlayer:currentTitle,<>,totaltime,<br>,currentAlbum,<>,currentArtist,<br>,volume,<{if(ReadingsVal($DEVICE,"playStatus","")eq"paused"){"%rc_PLAY%set+$DEVICE+play"}else{"%rc_PAUSE%set+$DEVICE+pause"}}@playStatus>,playStatus<br>
         attr rgMediaPlayer commands { "playStatus.paused" => "set %DEVICE play", "playStatus.playing" => "set %DEVICE pause" }<br>
