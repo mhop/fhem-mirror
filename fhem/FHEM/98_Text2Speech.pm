@@ -1,6 +1,6 @@
 
 ##############################################
-# $Id$
+# $Id: $
 #
 # 98_Text2Speech.pm
 #
@@ -61,6 +61,7 @@ sub Text2Speech_Initialize($)
                        " TTS_CacheFileDir".
                        " TTS_UseMP3Wrap:0,1".
                        " TTS_MplayerCall".
+                       " TTS_SentenceAppendix".
                        " ".$readingFnAttributes;
 }
 
@@ -142,6 +143,32 @@ sub Text2Speech_Attr(@) {
   my @a = @_;
   my $do = 0;
   my $hash = $defs{$a[1]};
+  my $value = $a[3];
+
+  if($a[2] eq "TTS_Delemiter" && $a[0] ne "del") {
+    return "wrong delemiter syntax: [+-]a[lfn]. \n".
+           "  Example 1: +an~\n".
+           "  Example 2: +al." if($value !~ m/^([+-]a[lfn]){0,1}(.){1}$/i);
+    return "This Attribute is only available in direct mode" if($hash->{MODE} ne "DIRECT");
+
+  } elsif ($a[2] eq "TTS_Ressource") {
+    return "This Attribute is only available in direct mode" if($hash->{MODE} ne "DIRECT");
+  
+  } elsif ($a[2] eq "TTS_CacheFileDir") {
+    return "This Attribute is only available in direct mode" if($hash->{MODE} ne "DIRECT");
+ 
+  } elsif ($a[2] eq "TTS_UseMP3Wrap") {
+    return "This Attribute is only available in direct mode" if($hash->{MODE} ne "DIRECT");
+    return "Attribute TTS_UseMP3Wrap is required by Attribute TTS_SentenceAppendix! Please delete it first." 
+      if(AttrVal($hash->{NAME}, "TTS_SentenceAppendix", undef));
+
+  } elsif ($a[2] eq "TTS_SentenceAppendix") { 
+    return "This Attribute is only available in direct mode" if($hash->{MODE} ne "DIRECT");
+    return "Attribute TTS_UseMP3Wrap is required!" unless(AttrVal($hash->{NAME}, "TTS_UseMP3Wrap", undef));
+    
+    my $file = AttrVal($hash->{NAME}, "TTS_CacheFileDir", "cache") ."/". $value;
+    return "File <".$file."> does not exists in CacheFileDir" if(! -e $file);
+  }
 
   if($a[0] eq "set" && $a[2] eq "disable") {
     $do = (!defined($a[3]) || $a[3]) ? 1 : 2;
@@ -151,19 +178,6 @@ sub Text2Speech_Attr(@) {
 
   $hash->{STATE} = ($do == 1 ? "disabled" : "Initialized");
 
-  if($a[2] eq "TTS_Delemiter") {
-    my $TTS_Delemiter = $a[3];
-    return "wrong delemiter syntax: [+-]a[lfn]. \n".
-           "  Example 1: +an~\n".
-           "  Example 2: +al." if($TTS_Delemiter =~ m/^([+-]a[lfn]){0,1}(.){1}$/i);
-    return "This Attribute is only available in direct mode" if($hash->{MODE} ne "DIRECT");
-  } elsif ($a[2] eq "TTS_Ressource") {
-    return "This Attribute is only available in direct mode" if($hash->{MODE} ne "DIRECT");
-  } elsif ($a[2] eq "TTS_CacheFileDir") {
-    return "This Attribute is only available in direct mode" if($hash->{MODE} ne "DIRECT");
-  } elsif ($a[2] eq "TTS_UseMP3Wrap") {
-    return "This Attribute is only available in direct mode" if($hash->{MODE} ne "DIRECT");
-  }
   return undef;
 }
 
@@ -446,15 +460,24 @@ sub Text2Speech_DoIt($) {
       # benutze das Tool MP3Wrap um bereits einzelne vorhandene Sprachdateien
       # zusammenzuführen. Ziel: sauberer Sprachfluss
       my @Mp3WrapArray;
+      my $Mp3WrapText = "";
+      my $TTS_SentenceAppendix = AttrVal($hash->{NAME}, "TTS_SentenceAppendix", undef); #muss eine mp3-Datei sein, ohne Pfadangabe
+      undef($TTS_SentenceAppendix) if($TTS_SentenceAppendix && (! -e $TTS_CacheFileDir ."/".$TTS_SentenceAppendix));
+
       foreach my $t (@{$hash->{helper}{Text2Speech}}) {
         $filename = md5_hex($t) . ".mp3";
         $file = $TTS_CacheFileDir."/".$filename;
         if(-e $file) {
           push(@Mp3WrapArray, $file);
+          $Mp3WrapText .= $t;
         } else {last;}
       }
 
+      push(@Mp3WrapArray, $TTS_CacheFileDir ."/".$TTS_SentenceAppendix) if($TTS_SentenceAppendix);
+
       if(scalar(@Mp3WrapArray) >= 2) {
+        Log3 $hash->{NAME}, 4, "Text2Speech: Bearbeite per MP3Wrap jetzt den Text: ". $Mp3WrapText;
+
         my $Mp3WrapPrefix = md5_hex(join("|", @Mp3WrapArray));
         my $Mp3WrapFile = $TTS_CacheFileDir ."/". $Mp3WrapPrefix . "_MP3WRAP.mp3"; 
 
@@ -480,7 +503,7 @@ sub Text2Speech_DoIt($) {
     $filename = md5_hex($hash->{helper}{Text2Speech}[0]) . ".mp3";
     $file = $TTS_CacheFileDir."/".$filename;
 
-    Log3 $hash->{NAME}, 4, "Text2Speech: Bearbeite jetzt String: ". $hash->{helper}{Text2Speech}[0];
+    Log3 $hash->{NAME}, 4, "Text2Speech: Bearbeite jetzt den Text: ". $hash->{helper}{Text2Speech}[0];
 
     if(! -e $file) { # Datei existiert noch nicht im Cache
       my $fh;
@@ -629,7 +652,7 @@ sub Text2Speech_AbortFn($)     {
 <b>Attributes</b>
 <ul>
   <li>TTS_Delemiter<br>
-    By using the google engine, its not possible to convert more than 100 characters in a single audio brick.
+    optional: By using the google engine, its not possible to convert more than 100 characters in a single audio brick.
     With a delemiter the audio brick will be split at this character. A delemiter must be a single character.!<br>
     By default, ech audio brick will be split at sentence end. Is a single sentence longer than 100 characters, 
     the sentence will be split additionally at comma, semicolon and the word <i>and</i>.<br>
@@ -637,7 +660,7 @@ sub Text2Speech_AbortFn($)     {
   </li> 
 
   <li>TTS_Ressource<br>
-    Selection of the Translator Engine<br>
+    optional: Selection of the Translator Engine<br>
     Notice: Only available in locally instances!
     <ul>
       <li>Google<br>
@@ -652,14 +675,14 @@ sub Text2Speech_AbortFn($)     {
   </li>
 
   <li>TTS_CacheFileDir<br>
-    The downloaded Goole audio bricks are saved in this folder for reusing. 
+    optional: The downloaded Goole audio bricks are saved in this folder for reusing. 
     No automatically implemented deleting are available.<br>
     Default: <i>cache/</i><br>
     Notice: Only available in locally instances!
   </li>
 
   <li>TTS_UseMP3Wrap<br>
-    To become a liquid audio response its recommend to use the tool mp3wrap.
+    optional: To become a liquid audio response its recommend to use the tool mp3wrap.
     Each downloaded audio bricks are concatinated to a single audio file to play with mplayer.<br>
     Installtion of the mp3wrap source is required.<br>
     <code>apt-get install mp3wrap</code><br>
@@ -667,8 +690,14 @@ sub Text2Speech_AbortFn($)     {
   </li>
 
   <li>TTS_MplayerCall<br>
-    Setting up the Mplayer system call.<br>
+    optional: Setting up the Mplayer system call. The following example is default.<br>
     Example: <code>sudo /usr/bin/mplayer</code>
+  </li>
+
+  <li>TTS_SentenceAppendix<br>
+    Optional: Definition of one mp3-file to append each time of audio response.<br>
+    Using of Mp3Wrap is required. The audio bricks has to be downloaded before into CacheFileDir.
+    Example: <code>silence.mp3</code>
   </li>
 
   <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
@@ -685,9 +714,9 @@ sub Text2Speech_AbortFn($)     {
   </li>
 
 </ul>
-=end html
 
-=begin html_DE 
+=end html
+=begin html_DE
 
 <a name="Text2Speech"></a>
 <h3>Text2Speech</h3> 
@@ -767,7 +796,7 @@ sub Text2Speech_AbortFn($)     {
 <b>Attribute</b>
 <ul>
   <li>TTS_Delemiter<br>
-    Wird ein Delemiter angegeben, so wird der Sprachbaustein an dieser Stelle geteilt. 
+    Optional: Wird ein Delemiter angegeben, so wird der Sprachbaustein an dieser Stelle geteilt. 
     Als Delemiter ist nur ein einzelnes Zeichen zul&auml;ssig.
     Hintergrund ist die Tatsache, das die Google Sprachengine nur 100Zeichen zul&auml;sst.<br>
     Im Standard wird nach jedem Satzende geteilt. Ist ein einzelner Satz l&auml;nger als 100 Zeichen,
@@ -776,7 +805,7 @@ sub Text2Speech_AbortFn($)     {
   </li> 
 
   <li>TTS_Ressource<br>
-    Auswahl der Sprachengine<br>
+    Optional: Auswahl der Sprachengine<br>
     Achtung: Nur bei einem lokal definierter Text2Speech Instanz m&ouml;glich!
     <ul>
       <li>Google<br>
@@ -792,14 +821,14 @@ sub Text2Speech_AbortFn($)     {
   </li>
 
   <li>TTS_CacheFileDir<br>
-    Die per Google geladenen Sprachbausteine werden in diesem Verzeichnis zur Wiedeverwendung abgelegt.
+    Optional: Die per Google geladenen Sprachbausteine werden in diesem Verzeichnis zur Wiedeverwendung abgelegt.
     Es findet zurZEit keine automatisierte L&ouml;schung statt.<br>
     Default: <i>cache/</i><br>
     Achtung: Nur bei einem lokal definierter Text2Speech Instanz m&ouml;glich!
   </li>
 
   <li>TTS_UseMP3Wrap<br>
-    F&uuml;r eine fl&uuml;ssige Sprachausgabe ist es zu empfehlen, die einzelnen vorher per Google 
+    Optional: F&uuml;r eine fl&uuml;ssige Sprachausgabe ist es zu empfehlen, die einzelnen vorher per Google 
     geladenen Sprachbausteine zu einem einzelnen Sprachbaustein zusammenfassen zu lassen bevor dieses per 
     Mplayer ausgegeben werden. Dazu muss Mp3Wrap installiert werden.<br>
     <code>apt-get install mp3wrap</code><br>
@@ -807,8 +836,15 @@ sub Text2Speech_AbortFn($)     {
   </li>
 
   <li>TTS_MplayerCall<br>
-    Angabe der Systemaufrufes zu Mplayer.<br>
+    Optional: Angabe der Systemaufrufes zu Mplayer. Das folgende Beispiel ist der Standardaufruf.<br>
     Beispiel: <code>sudo /usr/bin/mplayer</code>
+  </li>
+
+  <li>TTS_SentenceAppendix<br>
+    Optional: Angabe einer mp3-Datei die mit jeder Sprachausgabe am Ende ausgegeben wird.<br>
+    Voraussetzung ist die Nutzung von MP3Wrap. Die Sprachbausteine müssen bereits als mp3 im 
+    CacheFileDir vorliegen.
+    Beispiel: <code>silence.mp3</code>
   </li>
 
   <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
