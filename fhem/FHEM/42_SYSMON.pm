@@ -827,6 +827,7 @@ sub SYSMON_getFileSystemInfo ($$$)
   my @filesystems = SYSMON_execute($hash, $disk);
 
   shift @filesystems;
+  if (index($filesystems[0], $fs) < 0) { shift @filesystems; } # Wenn die Bezeichnung so lang ist, dass die Zeile umgebrochen wird...
   if (index($filesystems[0], $fs) >= 0) # check if filesystem available -> gives failure on console
   {
     my ($fs_desc, $total, $used, $available, $percentage_used, $mnt_point) = split(/\s+/, $filesystems[0]);
@@ -1128,7 +1129,10 @@ sub trim($)
 <a name="SYSMON"></a>
 <h3>SYSMON</h3>
 <ul>
-This module provides statistics about the system running FHEM server. Only Linux-based systems are supported. Some information are hardware specific and are not available on any platform. So far, this module has been tested on the following systems: Raspberry Pi (Debian Wheezy) BeagleBone Black, Fritz box 7390 (no CPU data).
+This module provides statistics about the system running FHEM server. Only Linux-based systems are supported. 
+Some information are hardware specific and are not available on any platform. 
+So far, this module has been tested on the following systems: 
+Raspberry Pi (Debian Wheezy) BeagleBone Black, Fritz box 7390 (no CPU data), WR703N under OpenWrt (no CPU Data).
   <br><br>
   <b>Define</b>
   <br><br>
@@ -1503,7 +1507,8 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
   Dieses Modul liefert diverse Informationen und Statistiken zu dem System, auf dem FHEM-Server ausgef&uuml;hrt wird.
   Es werden nur Linux-basierte Systeme unterst&uuml;tzt. Manche Informationen sind hardwarespezifisch und sind daher nicht auf jeder Plattform 
   verf&uuml;gbar.
-  Bis jetzt wurde dieses Modul auf folgenden Systemen getestet: Raspberry Pi (Debian Wheezy), BeagleBone Black, FritzBox 7390 (keine CPU-Daten).
+  Bis jetzt wurde dieses Modul auf folgenden Systemen getestet: Raspberry Pi (Debian Wheezy), BeagleBone Black, 
+  FritzBox 7390 (keine CPU-Daten), WR703N unter OpenWrt.
   <br><br>
   <b>Define</b>
   <br><br>
