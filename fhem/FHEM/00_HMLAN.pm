@@ -122,6 +122,8 @@ sub HMLAN_Define($$) {#########################################################
   my @al = ();
   @{$defs{$name}{helper}{log}{ids}} = \@al;
 
+  $defs{$name}{helper}{assId};
+
   HMLAN_condUpdate($hash,253);#set disconnected
   $hash->{STATE} = "disconnected";
 
@@ -403,8 +405,6 @@ sub HMLAN_ReadAnswer($$$) {# This is a direct read for commands like get
   }
 }
 
-my %lhash; # remember which ID is assigned to this HMLAN
-
 sub HMLAN_Write($$$) {#########################################################
   my ($hash,$fn,$msg) = @_;
   if (length($msg)>22){
@@ -427,9 +427,8 @@ sub HMLAN_Write($$$) {#########################################################
 #   my $IDnew = '+'.$dst.',00,01,';     # newChannel- trailing 01 to be sent if talk to neu channel
     my $IDadd = '+'.$dst.',00,00,';     # guess: add ID?
 
-    if (!$lhash{$dst} && $dst ne "000000"){
+    if (!$hash->{assIDs}{$dst} && $dst ne "000000"){
       HMLAN_SimpleWrite($hash, $IDadd);
-#     delete $hash->{helper}{$dst};
       my $dN = CUL_HM_id2Name($dst);
       if (!($dN eq $dst) &&  # name not found
           !(CUL_HM_Get(CUL_HM_id2Hash($dst),$dN,"param","rxType") & ~0x04)){#config only
@@ -439,9 +438,9 @@ sub HMLAN_Write($$$) {#########################################################
         $hash->{helper}{$dst}{newChn} = '+'.$dst.',00,01,';
       }
       $hash->{helper}{$dst}{name} = CUL_HM_id2Name($dst);
-      $lhash{$dst} = 1;
-      $hash->{assignedIDs}=join(',',keys %lhash);
-      $hash->{assignedIDsCnt}=scalar(keys %lhash);
+      $hash->{assIDs}{$dst} = 1;
+      $hash->{assignedIDs}=join(',',keys %{$hash->{assIDs}});
+      $hash->{assignedIDsCnt}=scalar(keys %{$hash->{assIDs}});
     }
   }
   my $tm = int(gettimeofday()*1000) % 0xffffffff;
@@ -785,7 +784,7 @@ sub HMLAN_DoInit($) {##########################################################
   HMLAN_condUpdate($hash,0xff);
   $hash->{helper}{q}{cap}{$_}=0 foreach (keys %{$hash->{helper}{q}{cap}});
 
-  foreach (keys %lhash){delete ($lhash{$_})};# clear IDs - HMLAN might have a reset
+  foreach (keys %{$hash->{helper}{assIDs}}){delete ($hash->{helper}{assIDs}{$_})};# clear IDs - HMLAN might have a reset
   $hash->{helper}{q}{keepAliveRec} = 1; # ok for first time
   $hash->{helper}{q}{keepAliveRpt} = 0; # ok for first time
 
