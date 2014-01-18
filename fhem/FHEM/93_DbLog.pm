@@ -53,6 +53,9 @@ DbLog_Define($@)
 
   $hash->{CONFIGURATION}= $a[2];
 
+  #remember PID for plotfork
+  $hash->{PID} = $$;
+
   return "Can't connect to database." if(!DbLog_Connect($hash));
 
   $hash->{STATE} = "active";
@@ -539,7 +542,7 @@ DbLog_Connect($)
     Log3 $hash->{NAME}, 2, "Can't connect to $dbconn: $DBI::errstr";
     return 0;
   }
-  Log3 $hash->{NAME}, 3, "Connection to db $dbconn established";
+  Log3 $hash->{NAME}, 3, "Connection to db $dbconn established for pid $$";
   $hash->{DBH}= $dbh;
   
   if ($hash->{DBMODEL} eq "SQLITE") {
@@ -551,6 +554,9 @@ DbLog_Connect($)
     $dbh->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(32), TYPE varchar(32), EVENT varchar(512), READING varchar(32), VALUE varchar(32), UNIT varchar(32))");
     $dbh->do("CREATE INDEX IF NOT EXISTS Search_Idx ON `history` (DEVICE, READING, TIMESTAMP)");
   }
+
+  # no webfrontend connection for plotfork
+  return 1 if( $hash->{PID} != $$ );
   
   # creating an own connection for the webfrontend, saved as DBHF in Hash
   # this makes sure that the connection doesnt get lost due to other modules
@@ -666,6 +672,12 @@ DbLog_Get($@)
     $readings[$i][2] = $fld[2]; # Default
     $readings[$i][3] = $fld[3]; # function
     $readings[$i][4] = $fld[4]; # regexp
+  }
+
+  #create new connection for plotfork
+  if( $hash->{PID} != $$ ) {
+    $hash->{DBH}->disconnect();
+    return "Can't connect to database." if(!DbLog_Connect($hash));
   }
 
   my $dbh= $hash->{DBH};
@@ -798,7 +810,7 @@ DbLog_Get($@)
         }
         if("$tstamp{hour}" ne "$lasttstamp{hour}") {
           # Aenderung der stunde, Berechne Delta
-          $out_value = sprintf("%0.1f", $maxval - $minval);
+          $out_value = sprintf("%g", $maxval - $minval);
           $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00");
           $minval =  999999;
           $maxval = -999999;
@@ -814,7 +826,7 @@ DbLog_Get($@)
         }
         if("$tstamp{day}" ne "$lasttstamp{day}") {
           # Aenderung des Tages, Berechne Delta
-          $out_value = sprintf("%0.1f", $maxval - $minval);
+          $out_value = sprintf("%g", $maxval - $minval);
           $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "00", "00", "00");
           $minval =  999999;
           $maxval = -999999;
@@ -858,7 +870,7 @@ DbLog_Get($@)
 
     ######## den letzten Abschlusssatz rausschreiben ##########
     if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
-      $out_value = sprintf("%0.1f", $maxval - $minval);
+      $out_value = sprintf("%g", $maxval - $minval);
       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "00", "00", "00") if($readings[$i]->[3] eq "delta-d");
       if(uc($outf) eq "ALL") {
@@ -892,6 +904,9 @@ DbLog_Get($@)
     $data{"currval$k"} = $lastv[$j];
     $data{"currdate$k"} = $lastd[$j];
   }
+
+  #cleanup plotfork connection
+  $dbh->disconnect() if( $hash->{PID} != $$ );
 
   if($internal) {
     $internal_data = \$retval;
