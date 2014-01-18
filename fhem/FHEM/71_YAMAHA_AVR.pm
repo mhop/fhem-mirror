@@ -1333,13 +1333,13 @@ sub YAMAHA_AVR_html2txt($)
 <ul>
 <li><b>on</b> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver ein</li>
 <li><b>off</b> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver aus</li>
-<li><b>input</b> hdm1,hdmX,... &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt den Eingangskanal (es werden nur die tats&auml;chlich verf&uuml;gbaren Eing&auml;nge angeboten)</li>
+<li><b>input</b> hdmi1,hdmiX,... &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt den Eingangskanal (es werden nur die tats&auml;chlich verf&uuml;gbaren Eing&auml;nge angeboten)</li>
 <li><b>scene</b> scene1,sceneX &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt eine vorgefertigte Szene aus</li>
 <li><b>volume</b> 0...100 &nbsp;&nbsp;-&nbsp;&nbsp; Setzt die Lautst&auml;rke in Prozent (0 bis 100%)</li>
 <li><b>volumeStraight</b> -87...15 &nbsp;&nbsp;-&nbsp;&nbsp; Setzt die Lautst&auml;rke in Dezibel (-80.5 bis 15.5 dB) so wie sie am Receiver auch verwendet wird.</li>
 <li><b>volumeUp</b> [0...100] &nbsp;&nbsp;-&nbsp;&nbsp; Erh&ouml;ht die Lautst&auml;rke um 5% oder entsprechend dem Attribut volumeSteps (optional kann der Wert auch als Argument angehangen werden, dieser hat dann Vorang) </li>
 <li><b>volumeDown</b> [0...100] &nbsp;&nbsp;-&nbsp;&nbsp; Veringert die Lautst&auml;rke um 5% oder entsprechend dem Attribut volumeSteps (optional kann der Wert auch als Argument angehangen werden, dieser hat dann Vorang) </li>
-<li><b>mute</b> on|off|toggle &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver stumm</li>
+<li><b>mute</b> on,off,toggle &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver stumm</li>
 <li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; Fragt den aktuell Status des Receivers ab</li>
 <li><b>remoteControl</b> up,down,... &nbsp;&nbsp;-&nbsp;&nbsp; Sendet Fernbedienungsbefehle wie im n&auml;chsten Abschnitt beschrieben</li>
 </ul>
@@ -1418,25 +1418,25 @@ sub YAMAHA_AVR_html2txt($)
 	<li><a name="request-timeout">request-timeout</a></li>
 	Optionales Attribut. Maximale Dauer einer Anfrage in Sekunden zum Receiver.
 	<br><br>
-	M&ouml;gliche Werte: 1-5 Sekunden. Standartwert ist 4 Sekunden<br><br>
+	M&ouml;gliche Werte: 1-5 Sekunden. Standardwert ist 4 Sekunden<br><br>
     <li><a name="volume-smooth-change">volume-smooth-change</a></li>
 	Optionales Attribut, welches einen weichen Lautst&auml;rke&uuml;bergang aktiviert..
 	<br><br>
 	M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br><br>
     <li><a name="volume-smooth-steps">volume-smooth-steps</a></li>
 	Optionales Attribut, welches angibt, wieviele Schritte zur weichen Lautst&auml;rkeanpassung
-	durchgef&uuml;hrt werden sollen. Standartwert ist 5 Anpassungschritte<br><br>
+	durchgef&uuml;hrt werden sollen. Standardwert ist 5 Anpassungschritte<br><br>
 	<li><a name="volumeSteps">volumeSteps</a></li>
-	Optionales Attribut, welches den Standartwert zur Lautst&auml;rkenerh&ouml;hung (volumeUp) und Lautst&auml;rkenveringerung (volumeDown) konfiguriert. Standartwert ist 5%<br>
+	Optionales Attribut, welches den Standardwert zur Lautst&auml;rkenerh&ouml;hung (volumeUp) und Lautst&auml;rkenveringerung (volumeDown) konfiguriert. Standardwert ist 5%<br>
   <br>
   </ul>
   <b>Generierte Readings/Events:</b><br>
   <ul>
   <li><b>input</b> - Der ausgew&auml;hlte Eingang entsprechend dem FHEM-Kommando</li>
   <li><b>inputName</b> - Die Eingangsbezeichnung, so wie sie am Receiver eingestellt wurde und auf dem Display erscheint</li>
-  <li><b>mute</b> - Der aktuelle Stumm-Status("on" =&gt; Stumm, "off" =&gt; Laut)</li>
-  <li><b>power</b> - Der aktuelle Betriebsstatuse ("on" =&gt; an, "off" =&gt; aus)</li>
-  <li><b>presence</b> - Die aktuelle Empfangsbereitschaft ("present" =&gt; empfangsbereit, "absent" =&gt; nicht empfangsbereits, z.B. Stromausfall)</li>
+  <li><b>mute</b> - Der aktuelle Stumm-Status ("on" =&gt; Stumm, "off" =&gt; Laut)</li>
+  <li><b>power</b> - Der aktuelle Betriebsstatus ("on" =&gt; an, "off" =&gt; aus)</li>
+  <li><b>presence</b> - Die aktuelle Empfangsbereitschaft ("present" =&gt; empfangsbereit, "absent" =&gt; nicht empfangsbereit, z.B. Stromausfall)</li>
   <li><b>volume</b> - Der aktuelle Lautst&auml;rkepegel in Prozent (zwischen 0 und 100 %)</li>
   <li><b>volumeStraight</b> - Der aktuelle Lautst&auml;rkepegel in Dezibel (zwischen -80.0 und +15 dB)</li>
   <li><b>state</b> - Der aktuelle Schaltzustand (power-Reading) oder die Abwesenheit des Ger&auml;tes (m&ouml;gliche Werte: "on", "off" oder "absent")</li>
@@ -1445,7 +1445,7 @@ sub YAMAHA_AVR_html2txt($)
   <li><b>currentStation</b> - Name des Radiosenders (nur bei TUNER, NET RADIO und PANDORA)</li>
   <li><b>currentAlbum</b> - Album es aktuell gespielten Titel</li>
   <li><b>currentArtist</b> - Interpret des aktuell gespielten Titel</li>
-  <li><b>cutrentTitle</b> - Name des aktuell gespielten Titel</li>
+  <li><b>currentTitle</b> - Name des aktuell gespielten Titel</li>
   <li><b>playStatus</b> - Wiedergabestatus des Eingangs</li>
   </ul>
 <br>
