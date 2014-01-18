@@ -594,17 +594,17 @@ sub CUL_HM_Parse($$) {##############################
       && ($mTp eq '01' || $mTp eq '11')){
     my $ioId = AttrVal($dhash->{IODev}{NAME},"hmId","-");
     if($ioId ne $src){
-	  CUL_HM_eventP($dhash,"ErrIoId_$src");
-          my ($evntCnt,undef) = split(' last_at:',$dhash->{"prot"."ErrIoId_$src"},2);
-	  push @entities,CUL_HM_UpdtReadSingle($dhash,"sabotageAttackId","ErrIoId_$src cnt:$evntCnt",1);
-	}
+      CUL_HM_eventP($dhash,"ErrIoId_$src");
+      my ($evntCnt,undef) = split(' last_at:',$dhash->{"prot"."ErrIoId_$src"},2);
+      push @entities,CUL_HM_UpdtReadSingle($dhash,"sabotageAttackId","ErrIoId_$src cnt:$evntCnt",1);
+    }
 
-	if( defined $dhash->{helper}{cSnd} && 
-	    $dhash->{helper}{cSnd} ne substr($msg,7)){
+    if( defined $dhash->{helper}{cSnd} && 
+          $dhash->{helper}{cSnd} ne substr($msg,7)){
           CUL_HM_eventP($dhash,"ErrIoAttack");
-          my ($evntCnt,undef) = split(' last_at:',$dhash->{"prot"."ErrIoAttack"},2);
-	  push @entities,CUL_HM_UpdtReadSingle($dhash,"sabotageAttack","ErrIoAttack cnt:$evntCnt",1);
-	}
+      my ($evntCnt,undef) = split(' last_at:',$dhash->{"prot"."ErrIoAttack"},2);
+      push @entities,CUL_HM_UpdtReadSingle($dhash,"sabotageAttack","ErrIoAttack cnt:$evntCnt",1);
+    }
   }
   ###########
 
@@ -3489,9 +3489,9 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   my $vDevId = substr($vId,0,6);
   my $msgCnt = ($hash->{helper}{vd}{msgCnt} + 1)%255;
   
-# 	int32_t result = (((_address << 8) | messageCounter) * 1103515245 + 12345) >> 16;
+# int32_t result = (((_address << 8) | messageCounter) * 1103515245 + 12345) >> 16;
 #                          4e6d = 20077                        12996205 = C64E6D
-#	return (result & 0xFF) + 480;
+# return (result & 0xFF) + 480;
   my $idl = $hash->{helper}{vd}{idl}+$msgCnt;
   my $lo = int(($idl*0x4e6d +12345)/0x10000)&0xff;
   my $hi = ($hash->{helper}{vd}{idh}+$idl*198)&0xff;
