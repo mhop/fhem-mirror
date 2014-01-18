@@ -1512,7 +1512,7 @@ sub CUL_HM_Parse($$) {##############################
   }
   elsif (eval "defined(&CUL_HM_Parse$st)"){####################################
     no strict "refs";
-    my @ret = &{"CUL_HM_Parse$st"}($mFlg,$mTp,$src,$dst,$p);
+    my @ret = &{"CUL_HM_Parse$st"}($mFlg,$mTp,$src,$dst,$p,$target);
     use strict "refs";
     push @entities,@ret;
     push @event,"" if (@ret);
@@ -2734,7 +2734,7 @@ sub CUL_HM_Set($@) {
 
     my $cHash = CUL_HM_id2Hash($dst.($lChn eq '00'?"":$lChn));
     $cHash = $hash if (!$cHash);
-    CUL_HM_pushConfig($cHash,$id,$dst,$lChn,$peerId,hex($peerChn),$list
+    CUL_HM_pushConfig($cHash,$id,$dst,hex($lChn),$peerId,hex($peerChn),$list
                      ,$addrData,$prep);
 
     CUL_HM_PushCmdStack($hash,$_) foreach(@postCmds);#ugly commands after regSet
