@@ -601,7 +601,8 @@ sub CUL_HM_Parse($$) {##############################
 
     if( defined $dhash->{helper}{cSnd} && 
           $dhash->{helper}{cSnd} ne substr($msg,7)){
-          CUL_HM_eventP($dhash,"ErrIoAttack");
+      Log3 $dname,6,"CUL_HM $dname attack:$dhash->{helper}{cSnd}:".substr($msg,7).".";
+      CUL_HM_eventP($dhash,"ErrIoAttack");
       my ($evntCnt,undef) = split(' last_at:',$dhash->{"prot"."ErrIoAttack"},2);
       push @entities,CUL_HM_UpdtReadSingle($dhash,"sabotageAttack","ErrIoAttack cnt:$evntCnt",1);
     }
@@ -3161,6 +3162,7 @@ sub CUL_HM_Set($@) {
       $hash->{helper}{vd}{idl} = hex(substr($dst,4,2))*256;
       $hash->{helper}{vd}{msgCnt} = 1;
       if (!$hash->{helper}{virtTC}){
+        $hash->{helper}{vd}{next} = 0 if (!defined $hash->{helper}{vd}{next});
         $hash->{helper}{virtTC} = "03";
         CUL_HM_valvePosUpdt("valvePos:$dst$chn");
       };
@@ -3501,7 +3503,7 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   $vp =~ s/ %//;
   $vp *=2.56;
   my $tn = gettimeofday();
-  my $delta = int((gettimeofday() - $hash->{helper}{vd}{next})*1000);
+  my $delta = int(($tn - $hash->{helper}{vd}{next})*1000);
 #  Log 1,"VD-timing ##### diff:$delta";
   Log 1,"VD-timing Critical ##### diff:$delta" if ($delta >100);
   foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
@@ -3510,6 +3512,12 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
     CUL_HM_PushCmdStack($hash,sprintf("%02XA258%s%s%s%02X",$msgCnt,$vDevId
                                       ,$peer,$hash->{helper}{virtTC},$vp));
   }
+#  if ($delta > 250) {
+    $hash->{helper}{vd}{next} += $nextTimer;
+#  }
+#  else {
+#    $hash->{helper}{vd}{next} = $tn+$nextTimer;
+#  }
   $hash->{helper}{vd}{next} = $tn+$nextTimer;
   $hash->{helper}{vd}{msgCnt} = $msgCnt;
   $hash->{helper}{virtTC} = "00";
@@ -3824,12 +3832,13 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       }
       $hash->{helper}{cSnd} = substr($cmd,8);
     }
-    elsif($mTp eq '11' && $chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
-#      CUL_HM_qStateUpdatIfEnab($dst.$subType);# subtype actually is channel
+    elsif($mTp eq '11'){
       my $to = "";
-      if ($p =~ m/02..(..)....(....)/){#lvl ne 0 and timer on
-        $hash->{helper}{tmdOn} = $2 if ($1 ne "00" && $2 !~ m/(0000|FFFF)/);
-        $to = "timedOn:=1";
+      if ($chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
+        if ($p =~ m/02..(..)....(....)/){#lvl ne 0 and timer on
+          $hash->{helper}{tmdOn} = $2 if ($1 ne "00" && $2 !~ m/(0000|FFFF)/);
+          $to = "timedOn:=1";
+        }
       }
       CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=$rss",$to);
       $hash->{helper}{cSnd} = substr($cmd,8);

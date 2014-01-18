@@ -122,7 +122,7 @@ sub HMLAN_Define($$) {#########################################################
   my @al = ();
   @{$defs{$name}{helper}{log}{ids}} = \@al;
 
-  $defs{$name}{helper}{assId};
+  $defs{$name}{helper}{assId} = 0;#define hash
 
   HMLAN_condUpdate($hash,253);#set disconnected
   $hash->{STATE} = "disconnected";
