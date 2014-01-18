@@ -1,12 +1,14 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: Setting of controller parameter now possible for LUXTRONIK2
   - feature: new module 71_YAMAHA_BD.pm to control Yamaha Blu-Ray
              players over network.
   - bugfix:  DbLog: fix for plotfork
   - bugfix:  SYSMON: filesystems may be wrong on some systems
   - feature: new module 98_pilight.pm added (andreas-fey)
-  - change: LUXTRONIK2: made compatible with current developer guidelines (Blocking.pm, reading update mechanism)
+  - change:  LUXTRONIK2 - made compatible with current developer guidelines
+             (Blocking.pm, reading update mechanism)
   - feature: readingsGroup: added icons and links/commands
   - feature: new module 98_Text2Speech.pm added (Tobias Faust)
              Google Translator Engine or ESpeak can be used
