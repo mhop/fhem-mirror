@@ -3,7 +3,7 @@
 #  Copyright notice
 #
 #  (c) 2012,2014 Torsten Poitzsch (torsten.poitzsch@gmx.de)
-#  (c) 2012 Jan-Hinrich Fessel (oskar@fessel.org)
+#  (c) 2012-2013 Jan-Hinrich Fessel (oskar@fessel.org)
 #
 #  This script is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -31,6 +31,8 @@ use strict;
 use warnings;
 use Blocking;
 use IO::Socket; 
+use Time::HiRes qw/ time /;
+use POSIX;
 
 my $cc; # The Itmes Changed Counter
 
@@ -43,6 +45,7 @@ LUXTRONIK2_Initialize($)
   $hash->{UndefFn}  = "LUXTRONIK2_Undefine";
   $hash->{SetFn}    = "LUXTRONIK2_Set";
   $hash->{AttrList} = "disable:0,1 ".
+					  "allowSetParameter ".
 					  "statusHTML ".
 					  $readingFnAttributes;
 }
@@ -71,6 +74,10 @@ LUXTRONIK2_Define($$)
   RemoveInternalTimer($hash);
   #Get first data after 10 seconds
   InternalTimer(gettimeofday() + 10, "LUXTRONIK2_GetUpdate", $hash, 0);
+
+  #Reset temporary values (min and max reading durations)
+  $hash->{fhem}{durationFetchReadingsMin} = 0;
+  $hash->{fhem}{durationFetchReadingsMax} = 0;
  
   return undef;
 }
@@ -90,18 +97,37 @@ LUXTRONIK2_Undefine($$)
 sub
 LUXTRONIK2_Set($$@)
 {
-  my ($hash, $name, $cmd) = @_;
-
+  my ($hash, $name, $cmd, $val) = @_;
+  my $resultStr;
+  
   if($cmd eq 'statusRequest') {
     $hash->{LOCAL} = 1;
     LUXTRONIK2_GetUpdate($hash);
     $hash->{LOCAL} = 0;
     return undef;
   }
-
-  my $list = "statusRequest:noArg";
+  elsif($cmd eq 'INTERVAL' && int(@_)==4 ) {
+		$val = 1*60 if( $val < 1*60 );
+		$hash->{INTERVAL}=$val;
+		return "Polling interval set to $val seconds.";
+  }
+  elsif(int(@_)==4 && ( 
+			$cmd eq 'hotWaterTemperatureTarget' ||
+			$cmd eq 'hotWaterOperatingMode'
+		)) {
+		$hash->{LOCAL} = 1;
+		$resultStr = LUXTRONIK2_SetParameter ($hash, $cmd, $val);
+		$hash->{LOCAL} = 0;
+		return $resultStr;
+  }
+  
+  my $list = "statusRequest:noArg".
+			 " hotWaterTemperatureTarget:slider,30.0,0.5,65.0".
+			 " hotWaterOperatingMode:Automatik,Party,Off".
+			 " INTERVAL:slider,60,30,1800";
   return "Unknown argument $cmd, choose one of $list";
 }
+
 
 sub
 LUXTRONIK2_GetUpdate($)
@@ -122,6 +148,7 @@ LUXTRONIK2_GetUpdate($)
 
   $hash->{helper}{RUNNING_PID} = BlockingCall("LUXTRONIK2_DoUpdate", $name."|".$host, "LUXTRONIK2_UpdateDone", 10, "LUXTRONIK2_UpdateAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
 }
+
 
 sub
 LUXTRONIK2_DoUpdate($)
@@ -333,6 +360,7 @@ LUXTRONIK2_DoUpdate($)
   return $return_str;
 }
 
+
 sub
 LUXTRONIK2_UpdateDone($)
 {
@@ -380,7 +408,7 @@ LUXTRONIK2_UpdateDone($)
 			 3 => "Ferien",
 			 4 => "Aus" );
   #List of firmware that are known to be compatible with this modul
-  my $compatibleFirmware = "#1.54C#";
+  my $compatibleFirmware = "#V1.54C#";
 			 
   my $counterRetry = $hash->{fhem}{counterRetry};
   $counterRetry++;	 
@@ -423,9 +451,10 @@ LUXTRONIK2_UpdateDone($)
 	  $value = "unbekannt (".$a[7].")" unless $value;
 	  readingsBulkUpdate($hash,"hotWaterOperatingMode",$value);
 	# hotWaterStatus
-	  if ($a[8]==0) {$value="Aus";}
+	  if ($a[8]==0) {$value="Sperrzeit";}
       elsif ($a[8]==1 && $a[9]==1) {$value="Aufheizen";}
       elsif ($a[8]==1 && $a[9]==0) {$value="Temp.OK";}
+	  elsif ($a[8]==3) {$value="Aus";}
       else {$value = "unbekannt (".$a[8]."/".$a[9].")";}
 	  readingsBulkUpdate($hash,"hotWaterStatus",$value);
 
@@ -475,9 +504,16 @@ LUXTRONIK2_UpdateDone($)
 	# Device times during readings 
 	  $value = strftime "%Y-%m-%d %H:%M:%S", localtime($a[22]);
 	  readingsBulkUpdate($hash, "deviceTimeStartReadings", $value);
-	  readingsBulkUpdate($hash, "delayDeviceTime", $a[29]-$a[22]);
-	  readingsBulkUpdate($hash, "durationFetchReadings", $a[30]-$a[29]);
-  
+	  readingsBulkUpdate($hash, "delayDeviceTime", floor($a[29]-$a[22]+0.5));
+	  my $durationFetchReadings = floor(($a[30]-$a[29]+0.005)*100)/100;
+	  readingsBulkUpdate($hash, "durationFetchReadings", $durationFetchReadings);
+	  #Remember min and max reading durations, will be reset when initializing the device
+	  if ($hash->{fhem}{durationFetchReadingsMin} == 0 || $hash->{fhem}{durationFetchReadingsMin} > $durationFetchReadings) {
+		$hash->{fhem}{durationFetchReadingsMin} = $durationFetchReadings;
+		} 
+	  if ($hash->{fhem}{durationFetchReadingsMax} < $durationFetchReadings) {
+		$hash->{fhem}{durationFetchReadingsMax} = $durationFetchReadings;
+		} 
 	#HTML for floorplan
 	if(AttrVal($name, "statusHTML", "none") ne "none") {
 		  $value = "<div class=fp_" . $a[0] . "_title>" . $a[0] . "</div>";
@@ -499,6 +535,7 @@ LUXTRONIK2_UpdateDone($)
 
 }
 
+
 sub
 LUXTRONIK2_UpdateAborted($)
 {
@@ -508,6 +545,7 @@ LUXTRONIK2_UpdateAborted($)
   Log3 $hash, 1, "$name LUXTRONIK2_UpdateAborted: Timeout when connecting to host";
 }
 
+
 sub
 LUXTRONIK2_CalcTemp($)
 {
@@ -515,6 +553,95 @@ LUXTRONIK2_CalcTemp($)
   if ($temp > 100000) {$temp = $temp-4294967296;}
   $temp /= 10;
   return $temp;
+}
+
+
+sub
+LUXTRONIK2_SetParameter($$$)
+{
+  my ($hash, $parameterName, $realValue) = @_;
+  my $setParameter = 0;
+  my $setValue = 0;
+  my $result;
+  my $buffer;
+  my $host = $hash->{HOST};
+  my $name = $hash->{NAME};
+  
+   my %opMode = ( "Automatik" => 0,
+			      "Party" => 2,
+			      "Off" => 4);
+   
+  if(AttrVal($name, "allowSetParameter", "no") ne "yes") {
+	return $name." Error: Setting of parameters not allowed. Please set attribut 'allowSetParameter' to 'yes'";
+  }
+  if ($parameterName eq "hotWaterTemperatureTarget") {
+     #parameter number
+	 $setParameter = 2;
+	 #limit temperature range
+	 $realValue = 30 if( $realValue < 30 );
+	 $realValue = 65 if( $realValue > 65 );
+	 #Allow only integer temperature or with decimal .5
+	 $setValue = int($realValue * 2) * 5;
+	 $realValue = $setValue / 10;
+  }
+  elsif ($parameterName eq "hotWaterOperatingMode") {
+	 if (! exists($opMode{$realValue})) {
+		return "$name Error: Wrong parameter given for hotWaterOperatingMode, use Automatik,Party,Off"
+	  }
+	 $setParameter = 4;
+ 	 $setValue = $opMode{$realValue};
+  }
+  else {
+    return "$name LUXTRONIK2_SetParameter-Error: unknown parameter $parameterName";
+  }
+
+############################ 
+# Send new parameter to host
+############################ 
+  if ($setParameter !=0) {
+	  Log3 $name, 5, "$name: Opening connection to host ".$host;
+	  my $socket = new IO::Socket::INET (  PeerAddr => $host, 
+						   PeerPort => 8888,
+						   Proto => 'tcp'
+	    );
+	  if (!$socket) {
+		  Log3 $name, 1, "$name LUXTRONIK2_SetParameter-Error: Could not open connection to host ".$host;
+		  return "$name Error: Could not open connection to host ".$host;
+	  }
+	  $socket->autoflush(1);
+	  
+	  Log3 $name, 5, "$name: Set parameter $parameterName ($setParameter) = $realValue ($setValue)";
+	  $socket->send(pack("N", 3002));
+	  $socket->send(pack("N", $setParameter));
+	  $socket->send(pack("N", $setValue));
+	  
+	  Log3 $name, 5, "$name: Receive confirmation";
+	 #read first 4 digits of response -> should be request_echo = 3002
+	  $socket->recv($buffer,4);
+	  $result = unpack("N", $buffer);
+	  if($result != 3002) {
+		  Log3 $name, 2, "$name LUXTRONIK2_SetParameter-Error: Set parameter $parameterName - wrong echo of request: $result instead of 3002";
+		  $socket->close();
+		  return "$name Error: Host did not confirm parameter setting";
+	  }
+	 
+	 #Read next 4 digits of response -> should be setParameter
+	  $socket->recv($buffer,4);
+	  $result = unpack("N", $buffer);
+	  if($result !=$setParameter) {
+		  Log3 $name, 2, "$name  LUXTRONIK2_SetParameter-Error: Set parameter $parameterName - missing confirmation: $result instead of $setParameter";
+		  $socket->close();
+		  return "$name Error: Host did not confirm parameter setting";
+	  }
+	  Log3 $name, 5, "$name: Parameter setting confirmed";
+	  
+	  $socket->close();
+	  
+	  readingsSingleUpdate($hash,$parameterName,$realValue,1);
+	  
+	  return "$name: Parameter $parameterName set to $realValue";
+   }
+  
 }
 
 1;
@@ -546,7 +673,10 @@ LUXTRONIK2_CalcTemp($)
   
   <a name="LUXTRONIK2set"></a>
   <b>Set </b>
-  <ul><b>statusRequest</b> Update device information</ul>
+  <ul><b>&lt;hotWaterOperatingMode%gt;</b> &lt;Mode:Auto|Party|Off%gt;- Operating Mode of domestic hot water boiler</ul>
+  <ul><b>&lt;hotWaterTemperatureTarget%gt;</b> &lt;temperature &deg;C%gt; - Target temperature of domestic hot water boiler</ul>
+  <ul><b>&lt;INTERVAL%gt;</b> &lt;seconds%gt; - Polling interval</ul>
+  <ul><b>&lt;statusRequest%gt;</b> - Update device information</ul>
   <br>
   
   <a name="LUXTRONIK2get"></a>
@@ -562,8 +692,9 @@ LUXTRONIK2_CalcTemp($)
     <li>statusHTML<br>
       if set, creates a HTML-formatted reading named "floorplanHTML" for use with the <a href="#FLOORPLAN">FLOORPLAN</a> module.<br>
       Currently, if the value of this attribute is not NULL, the corresponding reading consists of the current status of the heatpump and the temperature of the water.</li>
+    <li>allowSetParameter<br>
+      <a href="#LUXTRONIK2set">Parameters</a> of the heatpump controller can only be changed if this attribut is set to 'yes'.</li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
   </ul>
   <br>
   
