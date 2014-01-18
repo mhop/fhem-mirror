@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 4644 2014-01-14 18:57:03Z hexenmeister $
+# $Id$
 
 package main;
 
@@ -814,6 +814,8 @@ sub SYSMON_getFileSystemInfo ($$$)
 {
 	my ($hash, $map, $fs) = @_;
 	
+	logF($hash, "SYSMON_getFileSystemInfo", "get $fs");
+	
 	# Neue Syntax: benannte Filesystems: <name>:<definition>
 	my($fName, $fDef, $fComment) = split(/:/, $fs);
 	if(defined $fDef) {
@@ -822,14 +824,32 @@ sub SYSMON_getFileSystemInfo ($$$)
 
   #my $disk = "df ".$fs." -m 2>&1"; # in case of failure get string from stderr
   my $disk = "df ".$fs." -m";
+  
+  logF($hash, "SYSMON_getFileSystemInfo", "exec $disk");
 
   #my @filesystems = qx($disk);
   my @filesystems = SYSMON_execute($hash, $disk);
+  
+  logF($hash, "SYSMON_getFileSystemInfo", "recieved ".scalar(scalar(@filesystems))." lines");
+  
+  if(!defined @filesystems) { return $map; } # Ausgabe leer
+  if(scalar(@filesystems) == 0) { return $map; } # Array leer
+
+  logF($hash, "SYSMON_getFileSystemInfo", "recieved line0 $filesystems[0]");
 
   shift @filesystems;
-  if (index($filesystems[0], $fs) < 0) { shift @filesystems; } # Wenn die Bezeichnung so lang ist, dass die Zeile umgebrochen wird...
-  if (index($filesystems[0], $fs) >= 0) # check if filesystem available -> gives failure on console
+  
+  if(!defined $filesystems[0]) { return $map; } # Ausgabe leer
+  
+  logF($hash, "SYSMON_getFileSystemInfo", "analyse line $filesystems[0]");
+  
+  if (!$filesystems[0]=~ /$fs\s*$/){ shift @filesystems; }
+  #if (index($filesystems[0], $fs) < 0) { shift @filesystems; } # Wenn die Bezeichnung so lang ist, dass die Zeile umgebrochen wird...
+  #if (index($filesystems[0], $fs) >= 0) # check if filesystem available -> gives failure on console
+  if ($filesystems[0]=~ /$fs\s*$/)
   {
+  	logF($hash, "SYSMON_getFileSystemInfo", "use line $filesystems[0]");
+  	
     my ($fs_desc, $total, $used, $available, $percentage_used, $mnt_point) = split(/\s+/, $filesystems[0]);
     $percentage_used =~ /^(.+)%$/;
     $percentage_used = $1;
@@ -989,6 +1009,7 @@ log 3, "SYSMON $>name, @data<";
     	# Datum anzeigen
   	  $rVal = strftime("%d.%m.%Y %H:%M:%S", localtime());
   	}
+  	if(!defined $rPostfix) { $rPostfix = ""; }
   	if(defined $rVal) {
       $htmlcode .= "<tr><td valign='top'>".$rComment.":&nbsp;</td><td>".$rVal.$rPostfix."</td></tr>";
     }
