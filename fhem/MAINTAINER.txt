@@ -143,6 +143,7 @@ FHEM/70_XBMC.pm              dbokermann           http://forum.fhem.de Multimedi
 FHEM/70_Pushover.pm          Johannes_B           http://forum.fhem.de Unterstützende Dienste
 FHEM/71_LISTENLIVE.pm        betateilchen         http://forum.fhem.de Multimedia
 FHEM/71_YAMAHA_AVR.pm        markusbloch          http://forum.fhem.de Multimedia
+FHEM/71_YAMAHA_BD.pm         markusbloch          http://forum.fhem.de Multimedia
 FHEM/72_FB_CALLMONITOR.pm    markusbloch          http://forum.fhem.de Unterstuetzende Dienste
 FHEM/73_PRESENCE.pm          markusbloch          http://forum.fhem.de Unterstuetzende Dienste
 FHEM/75_MSG.pm               ruebedo              http://forum.fhem.de Automatisierung
