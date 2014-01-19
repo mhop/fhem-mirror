@@ -482,6 +482,9 @@ sub CUL_HM_Attr(@) {#################################
         else {return "param $_ unknown, use offAtPon or onAtRain";}
       }
     }
+    elsif ($md =~ m/^virtual_/ && $attrVal eq "noOnOff"){
+      ;
+    }
     else{
       return "attribut param not defined for this entity";
     }
@@ -1533,7 +1536,6 @@ sub CUL_HM_Parse($$) {##############################
         next if (!$modules{CUL_HM}{defptr}{$dChId});
         my $dChNo = substr($dChId,6,2);
         my $dChName = CUL_HM_id2Name($dChId);
-
         if(($attr{$dChName}{peerIDs}?$attr{$dChName}{peerIDs}:"") =~m/$recId/){
           my $dChHash = $defs{$dChName};
           $dChHash->{helper}{trgLgRpt} = 0
@@ -1541,18 +1543,22 @@ sub CUL_HM_Parse($$) {##############################
           $dChHash->{helper}{trgLgRpt} +=1;
           my $trgLgRpt = $dChHash->{helper}{trgLgRpt};
 
-          my $state  = ReadingsVal($dChName,"virtActState","OFF");
-          my $tNoOld = ReadingsVal($dChName,"virtActTrigNo","0");
-          $state = ($state eq "OFF")?"ON":"OFF" if ($trigNo ne $tNoOld);
+          my ($stT,$stAck) = ("ack","00");#state text and state Ack for Msg
+          if (AttrVal($dChName,"param","") !~ m/noOnOff/){
+            $stT  = ReadingsVal($dChName,"virtActState","OFF");
+            $stT = ($stT eq "OFF")?"ON":"OFF" 
+                if ($trigNo ne ReadingsVal($dChName,"virtActTrigNo","0"));
+            $stAck = '01'.$dChNo.(($stT eq "ON")?"C8":"00")."00"
+          }
+          
           if (hex($mFlg)&0x20){
             $longPress .= "_Release";
             $dChHash->{helper}{trgLgRpt}=0;
-            push @ack,$dhash,$mNo."8002".$dst.$src.'01'.$dChNo.
-                  (($state eq "ON")?"C8":"00")."00";
+            push @ack,$dhash,$mNo."8002".$dst.$src.$stAck;
           }
           push @entities,
-          CUL_HM_UpdtReadBulk($dChHash,1,"state:".$state,
-                                   "virtActState:".$state,
+          CUL_HM_UpdtReadBulk($dChHash,1,"state:".$stT,
+                                   "virtActState:".$stT,
                                    "virtActTrigger:".CUL_HM_id2Name($recId),
                                    "virtActTrigType:".$longPress,
                                    "virtActTrigRpt:".$trgLgRpt,
@@ -3162,7 +3168,8 @@ sub CUL_HM_Set($@) {
       $hash->{helper}{vd}{idl} = hex(substr($dst,4,2))*256;
       $hash->{helper}{vd}{msgCnt} = 1;
       if (!$hash->{helper}{virtTC}){
-        $hash->{helper}{vd}{next} = 0 if (!defined $hash->{helper}{vd}{next});
+        $hash->{helper}{vd}{next} = gettimeofday() 
+              if (!defined $hash->{helper}{vd}{next});
         $hash->{helper}{virtTC} = "03";
         CUL_HM_valvePosUpdt("valvePos:$dst$chn");
       };
@@ -3500,24 +3507,28 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   my $nextTimer = (($lo+$hi)&0xff)/4 + 120;#original - instable
   my $name = $hash->{NAME};
   my $vp = ReadingsVal($name,"valvePosTC","15 %");
+  my $ackTime;
   $vp =~ s/ %//;
   $vp *=2.56;
   my $tn = gettimeofday();
   my $delta = int(($tn - $hash->{helper}{vd}{next})*1000);
-#  Log 1,"VD-timing ##### diff:$delta";
-  Log 1,"VD-timing Critical ##### diff:$delta" if ($delta >100);
+  Log3 $name,3,"VD-timing Critical ##### diff:$delta" if ($delta >100);
   foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
     next if (length($peer) != 8);
     $peer = substr($peer,0,6);
+    my $pn = CUL_HM_id2Name($peer);
+    $ackTime = ReadingsTimestamp($pn, "ValvePosition", "nix");
     CUL_HM_PushCmdStack($hash,sprintf("%02XA258%s%s%s%02X",$msgCnt,$vDevId
                                       ,$peer,$hash->{helper}{virtTC},$vp));
   }
-#  if ($delta > 250) {
+
+  if ($ackTime && $ackTime ne $hash->{helper}{vd}{ackT} ) {
     $hash->{helper}{vd}{next} += $nextTimer;
-#  }
-#  else {
-#    $hash->{helper}{vd}{next} = $tn+$nextTimer;
-#  }
+  }
+  else {
+    $hash->{helper}{vd}{next} = $tn+$nextTimer;
+  }
+  $hash->{helper}{vd}{ackT} = $ackTime;
   $hash->{helper}{vd}{next} = $tn+$nextTimer;
   $hash->{helper}{vd}{msgCnt} = $msgCnt;
   $hash->{helper}{virtTC} = "00";
@@ -6486,6 +6497,10 @@ sub CUL_HM_complConfig($) {# read config if enabled and not complete
     <li><B>HM-Sen-RD-O</B><br>
     offAtPon: heat channel only: force heating off after powerOn<br>
     onAtRain: heat channel only: force heating on while status changes to 'rain' and off when it changes to 'dry'<br>
+    </li>
+    <li><B>virtuals</B><br>
+    noOnOff: virtual entity will not toggle state when trigger is received. If this parameter is
+    not given the entity will toggle its state between On and Off with each trigger<br>
     </li>
   </ul><br>
   <a name="CUL_HMevents"></a>

@@ -207,9 +207,9 @@ sub HMinfo_peerCheck(@) { #####################################################
   }
   my $ret = "";
   $ret .="\n\n peer list not read"  ."\n    ".(join "\n    ",sort @peerIDsEmpty) if(@peerIDsEmpty);
-  $ret .="\n\n peer list incomplete"."\n    ".(join "\n    ",sort @peerIDsFail)  if(@peerIDsEmpty);
+  $ret .="\n\n peer list incomplete"."\n    ".(join "\n    ",sort @peerIDsFail)  if(@peerIDsFail);
   $ret .="\n\n peer not defined"    ."\n    ".(join "\n    ",sort @peerIDnotDef) if(@peerIDnotDef);
-  $ret .="\n\n peer not verified"   ."\n    ".(join "\n    ",sort @peerIDsNoPeer)if(@peerIDsEmpty);
+  $ret .="\n\n peer not verified"   ."\n    ".(join "\n    ",sort @peerIDsNoPeer)if(@peerIDsNoPeer);
   return  $ret;
 }
 sub HMinfo_burstCheck(@) { ####################################################
@@ -884,7 +884,7 @@ sub HMinfo_SetFn($@) {#########################################################
             ,"configCheck","param","peerCheck","peerXref"
             ,"protoEvents","msgStat:view,clear","rssi"
             ,"models"
-            ,"regCheck","register","saveConfig","update"
+            ,"regCheck","register","saveConfig","loadConfig","update"
             ,"cpRegs"
             ,"tempList"
             ,"templateChk","templateDef","templateList","templateSet");
