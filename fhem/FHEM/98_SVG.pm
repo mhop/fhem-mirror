@@ -124,6 +124,17 @@ SVG_FwDetail($@)
   return $ret;
 }
 
+sub
+jsSVG_getAttrs($)
+{
+  my ($d) = @_;
+  return join("&#01;", map { #00 arrives as 65533 in JS
+     my $v=$attr{$d}{$_};
+     $v =~ s/'/&#39;/g;
+    "$_=$v";
+  } keys %{$attr{$d}});
+}
+
 ##################
 sub
 SVG_FwFn($$$$)
@@ -132,6 +143,26 @@ SVG_FwFn($$$$)
   my $hash = $defs{$d};
   my $ld = $defs{$hash->{LOGDEVICE}};
   my $ret = "";
+
+  if(AttrVal($FW_wname, "plotmode", "SVG") eq "jsSVG") {
+
+    my @d=split(":",$defs{$d}{DEF});
+    my $gplot;
+    if(open(FH, "$FW_gplotdir/$d[1].gplot")) {
+      $gplot = join("&#01;",<FH>);
+      $gplot =~ s/'/&#39;/g;
+      $gplot =~ s/\n//g;
+    }
+    close(FH);
+
+    $ret .= "<div id='jsSVG_$d' class='jsSVG' ".
+                "attr='".jsSVG_getAttrs($d)."' ".
+                "parentAttr='".jsSVG_getAttrs($FW_wname)."' ".
+                "gplotFile='$gplot' source='$d[0]'>".
+            "</div>";
+    return $ret;
+  }
+
 
   # plots navigation buttons
   if (AttrVal($d,"plotmode",$FW_plotmode) ne "gnuplot") {
@@ -575,12 +606,13 @@ SVG_calcOffsets($$)
   return if($pm eq "gnuplot");
 
   my ($fr, $fo);
+  my $frx; #fixedrange with offset
   if($defs{$wl}) {
     $fr = AttrVal($wl, "fixedrange", undef);
     if($fr) {
-      if($fr eq "day" || $fr eq "week" || $fr eq "month" || $fr eq "year" ||
-        $fr =~ m/^\d+days$/ ) {
-
+      if($fr =~ "^day" || $fr =~ "^week" || $fr =~ "^month" || $fr =~ "^year" ||
+        $fr =~ m/^\d+days$/ ) { #fixedrange with offset
+        $frx=$fr; #fixedrange with offset
       } else {
         my @range = split(" ", $fr);
         my @t = localtime;
@@ -609,7 +641,9 @@ SVG_calcOffsets($$)
   my $zoom = $FW_pos{zoom};
   $zoom = "day" if(!$zoom);
   $zoom = $fr if(defined($fr)); 
-
+  $zoom = $frx if ($frx); #fixedrange with offset  
+  my @zrange = split(" ", $zoom); #fixedrange with offset
+  if(defined($zrange[1])) { $off += $zrange[1]; $zoom=$zrange[0]; }  #fixedrange with offset
 
   my $endPlotNow = (AttrVal($FW_wname, "endPlotNow", undef) && !$st);
   if($zoom eq "hour") {
@@ -976,8 +1010,6 @@ SVG_render($$$$$$$$$)
   }
 
   ######################
-  # Draw the background
-  SVG_pO "<rect width =\"$ow\" height=\"$oh\" class=\"background\"/>";
   # Rectangle
   SVG_pO "<rect x=\"$x\" y=\"$y\" width =\"$w\" height =\"$h\" rx=\"8\" ry=\"8\" ".
         "fill=\"none\" class=\"border\"/>";
@@ -1639,7 +1671,7 @@ plotAsPng(@)
   <b>Attributes</b>
   <ul>
     <a name="fixedrange"></a>
-    <li>fixedrange<br>
+    <li>fixedrange [offset]<br>
         Contains two time specs in the form YYYY-MM-DD separated by a space.
         In plotmode gnuplot-scroll or SVG the given time-range will be used,
         and no scrolling for this SVG will be possible. Needed e.g. for
@@ -1649,6 +1681,8 @@ plotAsPng(@)
         zoom-level. This is useful for pages with multiple plots: one of the
         plots is best viewed in with the default (day) zoom, the other one with
         a week zoom.
+      If given, the optional integer parameter offset refers to a different period
+      (e.g. last year: fixedrange year -1, 2 days ago: fixedrange day -2).
 
         </li><br>
 
