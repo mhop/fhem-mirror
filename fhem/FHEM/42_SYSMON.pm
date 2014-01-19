@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.2.1";
+my $VERSION = "1.2.2";
 
 use constant {
   DATE            => "date",
@@ -823,7 +823,7 @@ sub SYSMON_getFileSystemInfo ($$$)
 	}
 
   #my $disk = "df ".$fs." -m 2>&1"; # in case of failure get string from stderr
-  my $disk = "df ".$fs." -m";
+  my $disk = "df ".$fs." -m 2>/dev/null";
   
   logF($hash, "SYSMON_getFileSystemInfo", "exec $disk");
 
@@ -832,7 +832,7 @@ sub SYSMON_getFileSystemInfo ($$$)
   
   logF($hash, "SYSMON_getFileSystemInfo", "recieved ".scalar(scalar(@filesystems))." lines");
   
-  if(!defined @filesystems) { return $map; } # Ausgabe leer
+  #if(!defined @filesystems) { return $map; } # Ausgabe leer
   if(scalar(@filesystems) == 0) { return $map; } # Array leer
 
   logF($hash, "SYSMON_getFileSystemInfo", "recieved line0 $filesystems[0]");
@@ -877,7 +877,7 @@ sub SYSMON_getFileSystemInfo ($$$)
 sub SYSMON_getNetworkInfo ($$$)
 {
 	my ($hash, $map, $device) = @_;
-	
+	logF($hash, "SYSMON_getNetworkInfo", "get $device");
 	my($nName, $nDef) = split(/:/, $device);
 	if(!defined $nDef) {
 	  $nDef = $nName;
@@ -950,9 +950,9 @@ sub SYSMON_ShowValuesHTML ($;@)
     my ($name, @data) = @_;
     my $hash = $main::defs{$name};
     SYSMON_updateCurrentReadingsMap($hash);
-log 3, "SYSMON $>name, @data<";
+#Log 3, "SYSMON $>name, @data<";
   my @dataDescription = @data;
-  if(!defined @data) {
+  if(scalar(@data)<=0) {
 	  # Array mit anzuzeigenden Parametern (Prefix, Name (in Map), Postfix)
 	  @dataDescription = (DATE,
 	                      CPU_TEMP.":".$cur_readings_map->{+CPU_TEMP}.":"." &deg;C", 
@@ -1016,7 +1016,7 @@ log 3, "SYSMON $>name, @data<";
   }
   
   # nur Default (also alles anzeigen)
-  if(!defined @data) {
+  if(scalar(@data)<=0) {
     ## network-interfaces
   	#my $networks = AttrVal($name, "network-interfaces", undef);
     #if(defined $networks) {
@@ -1133,13 +1133,13 @@ sub logF($$$)
   Log 5, "SYSMON $fname $msg";
 }
 
-sub trim($)
-{ 
-   my $string = shift;
-   $string =~ s/^\s+//;
-   $string =~ s/\s+$//;
-   return $string;
-}
+#sub trim($)
+#{ 
+#   my $string = shift;
+#   $string =~ s/^\s+//;
+#   $string =~ s/\s+$//;
+#   return $string;
+#}
 
 1;
 
