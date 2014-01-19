@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.2.2";
+my $VERSION = "1.2.4";
 
 use constant {
   DATE            => "date",
@@ -222,6 +222,54 @@ SYSMON_updateCurrentReadingsMap($) {
 	      }
 	    }
     }
+  } else {
+  	# Default Networkadapters
+  	# Wenn nichts definiert, werden Default-Werte verwendet
+  	if(SYSMON_isFB($hash)) {
+  		my $nName = "ath0";
+		  $rMap->{$nName}         = "Network adapter ".$nName;
+	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    
+	    $nName = "ath1";
+		  $rMap->{$nName}         = "Network adapter ".$nName;
+	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    
+	    $nName = "cpmac0";
+		  $rMap->{$nName}         = "Network adapter ".$nName;
+	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    
+	    $nName = "dsl";
+      $rMap->{$nName}         = "Network adapter ".$nName;
+	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    
+	    $nName = ETH0;
+		  $rMap->{$nName}         = "Network adapter ".$nName;
+	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    
+	    $nName = "guest";
+	  	$rMap->{$nName}         = "Network adapter ".$nName;
+	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    
+	    $nName = "hotspot";
+    	$rMap->{$nName}         = "Network adapter ".$nName;
+	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    
+	    $nName = "lan";
+		  $rMap->{$nName}         = "Network adapter ".$nName;
+	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    
+	    $nName = "vdsl";
+		  $rMap->{$nName}         = "Network adapter ".$nName;
+	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	  } else {
+	  	my $nName = ETH0;
+	  	$rMap->{$nName}         = "Network adapter ".$nName;
+	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      
+      $nName = WLAN0;
+      $rMap->{$nName}         = "Network adapter ".$nName;
+	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+    }
   }
 
 	# User defined
@@ -254,7 +302,8 @@ SYSMON_getObsoleteReadingsMap($) {
   foreach my $aName (@cKeys) {
     if(defined ($aName)) {
     	# alles hinzufuegen, was nicht in der Aktuellen Liste ist
-    	if(!$cur_readings_map->{$aName}) {
+    	if(!defined($cur_readings_map->{$aName})) {
+    		#Log 3, "SYSMON>>>>>>>>>>>>>>>>> SYSMON_getObsoleteReadingsMap >>> $aName";
     		$rMap->{$aName} = 1;
     	}
     }
@@ -535,7 +584,8 @@ SYSMON_obtainParameters($$)
         }
       } else {
       	# Wenn nichts definiert, werden Default-Werte verwendet
-      	if(SYSMON_isFB($hash)) { 
+      	#Log 3, "SYSMON>>>>>>>>>>>>>>>>>>>>>>>>> NETWORK";
+      	if(SYSMON_isFB($hash)) {
     		  $map = SYSMON_getNetworkInfo($hash, $map, "ath0");
     		  $map = SYSMON_getNetworkInfo($hash, $map, "ath1");
     		  $map = SYSMON_getNetworkInfo($hash, $map, "cpmac0");
@@ -546,8 +596,12 @@ SYSMON_obtainParameters($$)
     		  $map = SYSMON_getNetworkInfo($hash, $map, "lan");
     		  $map = SYSMON_getNetworkInfo($hash, $map, "vdsl");
     	  } else {
+    	  	#Log 3, "SYSMON>>>>>>>>>>>>>>>>>>>>>>>>> ".ETH0;
           $map = SYSMON_getNetworkInfo($hash, $map, ETH0);
+          #Log 3, "SYSMON>>>>>>>>>>>>>>>>>>>>>>>>> ".$map->{+ETH0};
+          #Log 3, "SYSMON>>>>>>>>>>>>>>>>>>>>>>>>> ".WLAN0;
           $map = SYSMON_getNetworkInfo($hash, $map, WLAN0);
+          #Log 3, "SYSMON>>>>>>>>>>>>>>>>>>>>>>>>> ".$map->{+WLAN0};
         }
       }
     }
@@ -890,10 +944,12 @@ sub SYSMON_getNetworkInfo ($$$)
 
   #my @dataThroughput = qx($cmd);
   my @dataThroughput = SYSMON_execute($hash, $cmd);
+  #Log 3, "SYSMON>>>>>>>>>>>>>>>>> ".$dataThroughput[0];
 
   # check if network available
   if (index($dataThroughput[0], 'Fehler') < 0 && index($dataThroughput[0], 'error') < 0)
-  {    
+  {  
+  	#Log 3, "SYSMON>>>>>>>>>>>>>>>>> OK >>>".$dataThroughput[0];
     my $dataThroughput = undef;
     foreach (@dataThroughput) {
       if(index($_, 'RX bytes') >= 0) {
@@ -933,6 +989,8 @@ sub SYSMON_getNetworkInfo ($$$)
     my $out_txt_diff = "RX: ".sprintf ("%.2f", $d_rx)." MB, TX: ".sprintf ("%.2f", $d_tx)." MB, Total: ".sprintf ("%.2f", $d_tt)." MB";
     $map->{$nName.DIFF_SUFFIX} = $out_txt_diff;
   } else {
+  	#Log 3, "SYSMON>>>>>>>>>>>>>>>>> NOK ";
+  	#Log 3, "SYSMON>>>>>>>>>>>>>>>>> >>> ".$nName;
   	$map->{$nName} = "not available";
   	$map->{$nName.DIFF_SUFFIX} = "not available";
   }
@@ -1486,6 +1544,12 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       attr wl_sysmon_eth0 label "Netzwerk-Traffic eth0: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
       attr wl_sysmon_eth0 room 9.03_Tech<br>
       <br>
+      # Visualisierung: Netzwerk-Daten&uuml;bertragung f&uuml; wlan0<br>
+      define wl_sysmon_wlan0 SVG FileLog_sysmon:SM_Network_wlan0:CURRENT<br>
+      attr wl_sysmon_wlan0 group RPi<br>
+      attr wl_sysmon_wlan0 label "Netzwerk-Traffic wlan0: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
+      attr wl_sysmon_wlan0 room 9.03_Tech<br>
+      <br>
       # Visualisierung: CPU-Auslastung (load average)<br>
       define wl_sysmon_load SVG FileLog_sysmon:SM_Load:CURRENT<br>
       attr wl_sysmon_load group RPi<br>
@@ -1880,6 +1944,12 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       attr wl_sysmon_eth0 group RPi<br>
       attr wl_sysmon_eth0 label "Netzwerk-Traffic eth0: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
       attr wl_sysmon_eth0 room 9.03_Tech<br>
+      <br>
+      # Visualisierung: Netzwerk-Daten&uuml;bertragung f&uuml; wlan0<br>
+      define wl_sysmon_wlan0 SVG FileLog_sysmon:SM_Network_wlan0:CURRENT<br>
+      attr wl_sysmon_wlan0 group RPi<br>
+      attr wl_sysmon_wlan0 label "Netzwerk-Traffic wlan0: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
+      attr wl_sysmon_wlan0 room 9.03_Tech<br>
       <br>
       # Visualisierung: CPU-Auslastung (load average)<br>
       define wl_sysmon_load SVG FileLog_sysmon:SM_Load:CURRENT<br>
