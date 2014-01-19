@@ -284,6 +284,7 @@ CommandAddStruct($)
   foreach my $d (devspec2array($a[0])) {
     $hash->{CONTENT}{$d} = 1;
   }
+  $hash->{DEF} = $hash->{ATTR} . " " . join(" ",sort keys %{$hash->{CONTENT}});
 
   @a = ( "set", $hash->{NAME}, $hash->{ATTR}, $hash->{NAME} );
   structure_Attr(@a);
@@ -310,6 +311,7 @@ CommandDelStruct($)
   foreach my $d (devspec2array($a[0])) {
     delete($hash->{CONTENT}{$d});
   }
+  $hash->{DEF} = $hash->{ATTR} . " " . join(" ",sort keys %{$hash->{CONTENT}});
 
   @a = ( "del", $hash->{NAME}, $hash->{ATTR} );
   structure_Attr(@a);
