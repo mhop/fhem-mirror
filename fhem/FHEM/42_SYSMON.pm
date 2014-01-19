@@ -740,9 +740,10 @@ SYSMON_getCPUBogoMIPS($$)
 	my $old_val = ReadingsVal($hash->{NAME},CPU_BOGOMIPS,undef);
 	# nur einmalig ermitteln (wird sich ja nicht aendern
 	if(!defined $old_val) {
-    my $val = SYSMON_execute($hash, "cat /proc/cpuinfo | grep 'BogoMIPS' | sed 's/[^0-9\.]//g'");
+    my $val = SYSMON_execute($hash, "cat /proc/cpuinfo | grep 'BogoMIPS'");
     #Log 3,"SYSMON -----------> DEBUG: read BogoMIPS = $val"; 
-    my $val_txt = trim($val);
+    my ($dummy, $val_txt) = split(/:\s+/, $val);
+    $val_txt = trim($val_txt);
     $map->{+CPU_BOGOMIPS}="$val_txt";
   } else {
   	$map->{+CPU_BOGOMIPS}=$old_val;
