@@ -1348,17 +1348,14 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                      LOWBAT         => '06,02,$val=(hex($val)&0x80)?1:0',
                      RSSI           => '08,02,$val=(-1)*(hex($val))', }},
   "02;p01=02"   => { txt => "ACK2"}, # smokeDetector pairing only?
-  "02;p01=04"   => { txt => "ACK-proc",  params => {# connected to AES??
+  "02;p01=04"   => { txt => "AES_req",  params => {# 
                      Para1          => "02,4",
                      Para2          => "06,4",
                      Para3          => "10,4",
-                     Para4          => "14,2",}}, # remote?
+                     keyNo          => "14,2",}},
   "02;p01=80"   => { txt => "NACK"},
   "02;p01=84"   => { txt => "NACK_TARGET_INVALID"},
   "02"          => { txt => "ACK/NACK_UNKNOWN   "},
-
-  "02"          => { txt => "Request AES", params => {  #todo check data
-                     DATA =>  "0," } },
 
   "03"          => { txt => "AES reply",   params => { # send 'old' AES key to actor
                      DATA =>  "0," } },
