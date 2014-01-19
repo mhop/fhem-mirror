@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - bugfix:  SYSMON: Log Warnings
   - feature: Setting of controller parameter now possible for LUXTRONIK2
   - feature: new module 71_YAMAHA_BD.pm to control Yamaha Blu-Ray
              players over network.
