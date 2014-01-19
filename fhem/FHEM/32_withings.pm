@@ -6,6 +6,7 @@ package main;
 use strict;
 use warnings;
 
+use Encode qw(encode_utf8);
 use JSON;
 use LWP::Simple;
 use HTTP::Request;
@@ -174,7 +175,7 @@ withings_getToken($)
   my $request = HTTP::Request->new('GET', $URL, $header);
   my $response = $agent->request($request);
 
-  my $json = decode_json($response->content);
+  my $json = JSON->new->utf8(0)->decode($response->content);
   my $once = $json->{body}{once};
 
   $hash->{Token} = $once;
@@ -213,7 +214,7 @@ withings_getSessionKey($)
     my $request = HTTP::Request->new('GET', $URL, $header);
     my $response = $agent->request($request);
 
-    my $json = decode_json($response->content);
+    my $json = JSON->new->utf8(0)->decode($response->content);
     foreach my $account (@{$json->{body}{account}}) {
         next if( !defined($account->{id}) );
         $hash->{AccountID} = $account->{id} if($account->{email} eq $hash->{Login});
@@ -360,7 +361,7 @@ withings_getUsers($)
   my $request = HTTP::Request->new('GET', $URL, $header);
   my $response = $agent->request($request);
 
-  my $json = decode_json($response->content);
+  my $json = JSON->new->utf8(0)->decode($response->content);
 
   my @users = ();
   foreach my $user (@{$json->{body}{users}}) {
@@ -384,7 +385,7 @@ withings_getDevices($)
   my $request = HTTP::Request->new('GET', $URL, $header);
   my $response = $agent->request($request);
 
-  my $json = decode_json($response->content);
+  my $json = JSON->new->utf8(0)->decode($response->content);
 
   my @devices = ();
   foreach my $association (@{$json->{body}{associations}}) {
@@ -410,7 +411,7 @@ withings_getDeviceDetail($$)
   my $request = HTTP::Request->new('GET', $URL, $header);
   my $response = $agent->request($request);
 
-  my $json = decode_json($response->content);
+  my $json = JSON->new->utf8(0)->decode($response->content);
 
   return $json->{body};
 }
@@ -435,7 +436,7 @@ withings_getDeviceReadings($$)
   my $request = HTTP::Request->new('GET', $URL, $header);
   my $response = $agent->request($request);
 
-  my $json = decode_json($response->content);
+  my $json = JSON->new->utf8(0)->decode($response->content);
 
   if(open(FH, "</tmp/getmeashf.txt")) {
     my $content;
@@ -446,7 +447,7 @@ withings_getDeviceReadings($$)
     }
     close(FH);
 
-    $json = decode_json($content);
+    $json = JSON->new->utf8(0)->decode($content);
   }
 
   return $json;
@@ -464,7 +465,7 @@ withings_getUserDetail($$)
   my $request = HTTP::Request->new('GET', $URL, $header);
   my $response = $agent->request($request);
 
-  my $json = decode_json($response->content);
+  my $json = JSON->new->utf8(0)->decode($response->content);
 
   return $json->{body}{users}[0];
 }
@@ -560,7 +561,7 @@ withings_pollUser($)
   $url .= "&userid=$hash->{User}&publickey=$hash->{Key}";
   $url .= "&lastupdate=$lastupdate" if( $lastupdate );
   my $ret = get($url);
-  my $json = decode_json($ret);
+  my $json = JSON->new->utf8(0)->decode($ret);
 
   $hash->{status} = $json->{status};
   if( $hash->{status} == 0 ) {
