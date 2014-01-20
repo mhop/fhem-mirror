@@ -3159,7 +3159,7 @@ sub CUL_HM_Set($@) {
   }
   elsif($cmd eq "valvePos") { #################################################
     return "only number <= 100  or 'off' allowed"
-       if (!($a[2] eq "off" ||$a[2]+0 ne $a[2] ||$a[2] <100 ));
+       if (!($a[2] eq "off" ||$a[2]+0 ne $a[2] ||$a[2] <=100 ));
     if ($a[2] eq "off"){
       $state = "ValveAdjust:stopped";
       RemoveInternalTimer("valvePos:$dst$chn");# remove responsePending timer
@@ -3522,6 +3522,7 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   my $ackTime;
   $vp =~ s/ %//;
   $vp *=2.56;
+  $vp = 255 if ($vp >255);
   my $tn = gettimeofday();
   my $delta = int(($tn - $hash->{helper}{vd}{next})*1000);
   Log3 $name,3,"VD-timing Critical ##### diff:$delta" if ($delta >100);
