@@ -665,6 +665,7 @@ sub inthandling($$) {		#start/stop Interrupthandling
       Restore Readings and sets after reboot<br>
       Default: on, valid values: on, off<br><br>
     </li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 </ul>
@@ -833,6 +834,7 @@ sub inthandling($$) {		#start/stop Interrupthandling
       Wiederherstellen der Portzust&äuml;nde nach Neustart<br>
       Standard: on, g&uuml;ltige Werte: on, off<br><br>
     </li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 </ul>
