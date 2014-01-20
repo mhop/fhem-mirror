@@ -33,7 +33,8 @@ sub RPI_GPIO_Initialize($) {
                       " direction:input,output pud_resistor:off,up,down" .
                       " interrupt:none,falling,rising,both" .
                       " toggletostate:no,yes active_low:no,yes" .
-                      " debounce_in_ms restoreOnStartup:no,yes";
+                      " debounce_in_ms restoreOnStartup:no,yes " .
+                      "$readingFnAttributes";
 }
 
 my $gpiodir = "/sys/class/gpio";			#GPIO base directory
