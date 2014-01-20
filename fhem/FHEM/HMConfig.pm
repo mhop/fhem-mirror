@@ -261,10 +261,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   #263 167                        HM Smoke Detector Schueco
   #"HM-RC-Key4-2"
   #"HM-RC-Sec4-2"
-
 );
-
-
 
 ##----------definitions for register settings-----------------
     # definition of Register for all devices
@@ -519,10 +516,10 @@ my $K_actDetID = '000000'; # id of actionDetector
                                                                 
   cndTxFalling    =>{a=>132.0,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if falling"                ,lit=>{off=>0,on=>1}},
   cndTxRising     =>{a=>132.1,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if rising"                 ,lit=>{off=>0,on=>1}},
-  cndTxCycBelow   =>{a=>132.2,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if cond is below threshold",lit=>{off=>0,on=>1}},
-  cndTxCycAbove   =>{a=>132.3,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if cond is above threshold",lit=>{off=>0,on=>1}},
-  cndTxDecAbove   =>{a=>133  ,s=>1  ,l=>1,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"trigger if decision is above"},
-  cndTxDecBelow   =>{a=>134  ,s=>1  ,l=>1,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"trigger if decision is below"},
+  cndTxCycBelow   =>{a=>132.2,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic trigger if level is below cndTxCycBelow",lit=>{off=>0,on=>1}},
+  cndTxCycAbove   =>{a=>132.3,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic trigger if level is above cndTxDecAbove",lit=>{off=>0,on=>1}},
+  cndTxDecAbove   =>{a=>133  ,s=>1  ,l=>1,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"level for cndTxCycAbove"},
+  cndTxDecBelow   =>{a=>134  ,s=>1  ,l=>1,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"level for cndTxCycBelow"},
 
   txThrLoPwr      =>{a=>135.0,s=>4  ,l=>1,min=>0    ,max=>3680  ,c=>''         ,f=>'100'   ,u=>'W'   ,d=>1,t=>"threshold low power"},
   txThrHiPwr      =>{a=>139.0,s=>4  ,l=>1,min=>0    ,max=>3680  ,c=>''         ,f=>'100'   ,u=>'W'   ,d=>1,t=>"threshold high power"},
@@ -563,7 +560,6 @@ my $K_actDetID = '000000'; # id of actionDetector
 # SEC-SC   08:00 ?
 # RC19     08:00 ? RC19 Button 08:08
 # Bl1PBU   08:00 09:00 10:00
-
 
 #  logicCombination=>{a=> 89.0,s=>0.5,l=>1,min=>0  ,max=>16      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"".
 #                                                                                                              "inactive=>unused\n".

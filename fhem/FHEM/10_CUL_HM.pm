@@ -176,6 +176,13 @@ sub CUL_HM_Initialize($) {
   $hash->{hmIoMaxDly}     = 60;# poll timeout - stop poll and discard
   $hash->{hmAutoReadScan} = 4; # delay autoConf readings
   $hash->{helper}{hmManualOper} = 0;# default automode
+  
+  my @dcpl = # deviceChannelParamList list of device params valid for channels
+          ("ignore","dummy",
+           "actCycle","actStatus",
+           "expert","burstAccess","msgRepeat","autoReadReg",
+           ".stc",".devInfo","firmware","serialNr","model","subType");
+  $hash->{helper}{dcpl} = \@dcpl;
 }
 
 sub CUL_HM_updateConfig($){
@@ -200,10 +207,12 @@ sub CUL_HM_updateConfig($){
         $attr{$name}{expert}     = AttrVal($name,"expert"     ,"2_full");
         $attr{$name}{autoReadReg}= AttrVal($name,"autoReadReg","4_reqStatus");
       }
-      CUL_HM_Attr("attr",$name,"expert",$attr{$name}{expert}) if ($attr{$name}{expert});#need update after readings are available
+      CUL_HM_Attr("attr",$name,"expert",$attr{$name}{expert}) 
+            if ($attr{$name}{expert});#need update after readings are available
     }
     else{# Action Detector only
-      $attr{$name}{"event-on-change-reading"} = AttrVal($name, "event-on-change-reading", ".*");
+      $attr{$name}{"event-on-change-reading"} = 
+                AttrVal($name, "event-on-change-reading", ".*");
       delete $hash->{helper}{role};
       $hash->{helper}{role}{vrt} = 1;
       next;
@@ -351,7 +360,7 @@ sub CUL_HM_Define($$) {##############################
     $hash->{helper}{q}{qReqConf}=""; # queue autoConfig requests for this device
     $hash->{helper}{q}{qReqStat}=""; # queue autoConfig requests for this device
     CUL_HM_prtInit ($hash);
-    AssignIoPort($hash) if (!$init_done);
+    AssignIoPort($hash) if (!$init_done && $HMid ne "000000");
   }
   $modules{CUL_HM}{defptr}{$HMid} = $hash;
 
@@ -619,7 +628,7 @@ sub CUL_HM_Parse($$) {##############################
   my @event;    #events to be posted for main entity
 
   my $name = $shash->{NAME};
-  my $ioId = CUL_HM_Id($shash->{IODev});
+  my $ioId = CUL_HM_Id($devH->{IODev});
   $ioId = $id if(!$ioId);
 
   return (@entities,$name) if (CUL_HM_getAttrInt($name,"ignore"));
@@ -2123,7 +2132,7 @@ sub CUL_HM_Get($@) {
   return "no get value specified" if(@a < 2);
 
   my $name = $hash->{NAME};
-  my $devName = $hash->{device}?$hash->{device}:$name;
+  my $devName = InternalVal($name,"device",$name);
   my $st = AttrVal($devName, "subType", "");
   my $md = AttrVal($devName, "model", "");
   my $mId = CUL_HM_getMId($hash);
@@ -2162,12 +2171,15 @@ sub CUL_HM_Get($@) {
   my $id = CUL_HM_IOid($hash);
 
   #----------- now start processing --------------
-  if($cmd eq "param") {  ######################################################
-    return $attr{$name}{$a[2]}              if ($attr{$name}{$a[2]});
-    return $hash->{READINGS}{$a[2]}{VAL}    if ($hash->{READINGS}{$a[2]});
-    return $attr{$devName}{$a[2]}           if ($attr{$devName}{$a[2]});
-    return $hash->{$a[2]}                   if ($hash->{$a[2]});
-    return $hash->{helper}{$a[2]}           if ($hash->{helper}{$a[2]} && ref($hash->{helper}{$a[2]}) ne "HASH");
+  if   ($cmd eq "param") {  ###################################################
+    my $p = $a[2];
+    return $attr{$name}{$p}              if ($attr{$name}{$p});
+    return $hash->{READINGS}{$p}{VAL}    if ($hash->{READINGS}{$p});
+    return $hash->{$p}                   if ($hash->{$p});
+    return $hash->{helper}{$p}           if ($hash->{helper}{$p} && ref($hash->{helper}{$p}) ne "HASH");
+    
+    return "undefined"                   if (!grep /^$p$/,@{$modules{CUL_HM}{helper}{dcpl}});
+    return $attr{$devName}{$p}           if ($attr{$devName}{$p});
     return "undefined";
   }
   elsif($cmd eq "reg") {  #####################################################
@@ -2310,7 +2322,7 @@ sub CUL_HM_Set($@) {
   my $name    = $hash->{NAME};
   return "device ignored due to attr 'ignore'"
         if (CUL_HM_getAttrInt($name,"ignore"));
-  my $devName = $hash->{device}?$hash->{device}:$name;
+  my $devName = InternalVal($name,"device",$name);
   my $st      = AttrVal($devName, "subType", "");
   my $md      = AttrVal($devName, "model"  , "");
   my $flag = CUL_HM_getFlag($hash); #set burst flag
@@ -2325,10 +2337,10 @@ sub CUL_HM_Set($@) {
   my $mdCh = $md.($isChannel?$chn:"00"); # chan specific commands?
   my $fkt = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
   my $h = $culHmGlobalSets->{$cmd}      if(                $st ne "virtual");
-  $h = $culHmGlobalSetsVrtDev->{$cmd}   if(!defined($h) &&($st eq "virtual"||!$st)  && $roleD);
-  $h = $culHmGlobalSetsDevice->{$cmd}   if(!defined($h) && $st ne "virtual"         && $roleD);
-  $h = $culHmSubTypeDevSets->{$st}{$cmd}if(!defined($h) && $st ne "virtual"         && $roleD);
-  $h = $culHmGlobalSetsChn->{$cmd}      if(!defined($h) && $st ne "virtual"         && $roleC);
+  $h = $culHmGlobalSetsVrtDev->{$cmd}   if(!defined($h) &&($st eq "virtual"||!$st)    && $roleD);
+  $h = $culHmGlobalSetsDevice->{$cmd}   if(!defined($h) && $st ne "virtual"           && $roleD);
+  $h = $culHmSubTypeDevSets->{$st}{$cmd}if(!defined($h) && $st ne "virtual"           && $roleD);
+  $h = $culHmGlobalSetsChn->{$cmd}      if(!defined($h) && $st ne "virtual"           && $roleC);
   $h = $culHmSubTypeSets->{$st}{$cmd}   if(!defined($h) && $culHmSubTypeSets->{$st}   && $roleC);
   $h = $culHmModelSets->{$md}{$cmd}     if(!defined($h) && $culHmModelSets->{$md}  );
   $h = $culHmChanSets->{$md."00"}{$cmd} if(!defined($h) && $culHmChanSets->{$md."00"} && $roleD);
@@ -3166,7 +3178,7 @@ sub CUL_HM_Set($@) {
       readingsSingleUpdate($hash,"valvePosTC","$vp %",0);
       $hash->{helper}{vd}{idh} = hex(substr($dst,2,2))*20077;
       $hash->{helper}{vd}{idl} = hex(substr($dst,4,2))*256;
-      $hash->{helper}{vd}{msgCnt} = 1;
+      $hash->{helper}{vd}{msgCnt} = 1 if (!defined $hash->{helper}{vd}{msgCnt});
       if (!$hash->{helper}{virtTC}){
         $hash->{helper}{vd}{next} = gettimeofday() 
               if (!defined $hash->{helper}{vd}{next});
@@ -3953,7 +3965,6 @@ sub CUL_HM_SndCmd($$) {
   return if(   AttrVal($hash->{NAME},"ignore","")
             || AttrVal($hash->{NAME},"dummy",""));
   if(!defined $hash->{IODev} ||!defined $hash->{IODev}{NAME}){
-    
     AssignIoPort($hash);
     if(!defined $hash->{IODev} ||!defined $hash->{IODev}{NAME}){
       CUL_HM_eventP($hash,"IOerr");
@@ -4390,6 +4401,10 @@ sub CUL_HM_getAssChnIds($) { #in: name out:ID list of assotiated channels
 
 sub CUL_HM_Id($) {#in: ioHash out: ioHMid
   my ($io) = @_;
+  if (ref($io) ne 'HASH'){
+    Log 1,"have problems with $io";
+    return "000000";
+  }
   my $fhtid = defined($io->{FHTID}) ? $io->{FHTID} : "0000";
   return $attr{$io->{NAME}}{hmId}?$attr{$io->{NAME}}{hmId}:"F1$fhtid";
 }
