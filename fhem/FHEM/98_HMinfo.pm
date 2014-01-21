@@ -623,7 +623,7 @@ sub HMinfo_SetFn($@) {#########################################################
   }
   elsif($cmd eq "rssi")       {##print RSSI protocol-events--------------------
     my @rssiList;
-    foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
+    foreach my $dName (HMinfo_getEntities($opt."d",$filter)){
       foreach my $dest (keys %{$defs{$dName}{helper}{rssi}}){
         my $dispName = $dName;
         my $dispDest = $dest;
