@@ -885,6 +885,12 @@ devspec2array($)
 
   my (@ret, $isAttr);
   foreach my $l (split(",", $name)) {   # List of elements
+
+    if(defined($defs{$l})) {
+      push @ret, $l;
+      next;
+    }
+
     my @names = sort keys %defs;
     my @res;
     foreach my $dName (split(":FILTER=", $l)) {
@@ -915,12 +921,15 @@ devspec2array($)
           $val = $attr{$d}{$n} if($attr{$d});
         }
         $val="" if(!defined($val));
+
+        my $lre = ($n eq "room" ? "\\b$re\\b" : "^$re\$");
         eval { # a bad regexp is deadly
-          if(($op eq  "=" && $val =~ m/\b$re\b/) ||
-             ($op eq "!=" && $val !~ m/\b$re\b/)) {
+          if(($op eq  "=" && $val =~ m/$lre/) ||
+             ($op eq "!=" && $val !~ m/$lre/)) {
             push @res, $d 
           }
         };
+
         if($@) {
           Log 1, "devspec2array $name: $@";
           return $name;
