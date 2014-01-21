@@ -198,12 +198,13 @@ sub HMLAN_Attr(@) {############################################################
                                (($val =~ m /^[0-9A-Fa-f]{32}$/ )?
                                  $val:
                                    unpack('H*', md5($val)));
-      $retVal = "$aName set to $attr{$name}{$aName}";
+      $retVal = "$aName set to $attr{$name}{$aName}"
+            if($aVal ne $attr{$name}{$aName});
     }
     else{
       delete $attr{$name}{$aName};
     }
-    my ($k1no,$k1,$k2no,$k2,$k3no,$k3)
+    my ($k1no,$k1,$k2no,$k2,$k3no,$k3,$k4no,$k4,$k5no,$k5)
          =( "01",AttrVal($name,"hmKey","")
            ,"02",AttrVal($name,"hmKey2","")
            ,"03",AttrVal($name,"hmKey3","")
@@ -214,10 +215,14 @@ sub HMLAN_Attr(@) {############################################################
     if ($k1 =~ m/:/){($k1no,$k1) = split(":",$k1);}
     if ($k2 =~ m/:/){($k2no,$k2) = split(":",$k2);}
     if ($k3 =~ m/:/){($k3no,$k3) = split(":",$k3);}
+    if ($k4 =~ m/:/){($k4no,$k4) = split(":",$k4);}
+    if ($k5 =~ m/:/){($k5no,$k5) = split(":",$k5);}
 
     HMLAN_SimpleWrite($defs{$name}, "Y01,".($k1?"$k1no,$k1":"00,"));
     HMLAN_SimpleWrite($defs{$name}, "Y02,".($k2?"$k2no,$k2":"00,"));
     HMLAN_SimpleWrite($defs{$name}, "Y03,".($k3?"$k3no,$k3":"00,"));
+    HMLAN_SimpleWrite($defs{$name}, "Y04,".($k4?"$k4no,$k4":"00,"));
+    HMLAN_SimpleWrite($defs{$name}, "Y05,".($k5?"$k5no,$k5":"00,"));
     return $retVal;
   }
   elsif($aName eq "hmMsgLowLimit"){

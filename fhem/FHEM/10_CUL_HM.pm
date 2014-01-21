@@ -566,11 +566,13 @@ sub CUL_HM_Attr(@) {#################################
                   );
 sub CUL_HM_Parse($$) {##############################
   my ($iohash, $msgIn) = @_;
-  my $id = CUL_HM_Id($iohash);
-  my $ioName = $iohash->{NAME};
+
   my ($msg,$msgStat,$myRSSI,$msgIO) = split(":",$msgIn,4);
   # Msg format: Allnnffttssssssddddddpp...
-  my (undef,$len,$mNo,$mFlg,$mTp,$src,$dst,$p) = unpack 'A1A2A2A2A2A6A6A*',$msg;
+  my ($t,$len,$mNo,$mFlg,$mTp,$src,$dst,$p) = unpack 'A1A2A2A2A2A6A6A*',$msg;
+
+  return if (ref($iohash) ne 'HASH'  || $t ne 'A'  || length($msg)<20);
+  
   $p = "" if(!defined($p));
   my @mI = unpack '(A2)*',$p; # split message info to bytes
   return "" if($msgStat && $msgStat eq 'NACK');# lowlevel error
@@ -578,6 +580,8 @@ sub CUL_HM_Parse($$) {##############################
   my $shash = CUL_HM_id2Hash($src); #sourcehash - will be modified to channel entity
   my $devH = $shash;                # source device hash
   my $dhash = CUL_HM_id2Hash($dst); # destination device hash
+  my $id = CUL_HM_Id($iohash);
+  my $ioName = $iohash->{NAME};
   CUL_HM_statCnt($ioName,"r");
   my $dname = ($dst eq "000000") ? "broadcast" :
                                    ($dhash ? $dhash->{NAME} :
@@ -3502,12 +3506,10 @@ sub CUL_HM_Set($@) {
 }
 
 #+++++++++++++++++ set/get support subroutines+++++++++++++++++++++++++++++++++
-my $updtValveCnt = 0;
 sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   my($in ) = @_;
   my(undef,$vId) = split(':',$in);
   my $hash = CUL_HM_id2Hash($vId);
-  my $vDevId = substr($vId,0,6);
   my $msgCnt = ($hash->{helper}{vd}{msgCnt} + 1)%255;
   
 # int32_t result = (((_address << 8) | messageCounter) * 1103515245 + 12345) >> 16;
@@ -3519,33 +3521,44 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   my $nextTimer = (($lo+$hi)&0xff)/4 + 120;#original - instable
   my $name = $hash->{NAME};
   my $vp = ReadingsVal($name,"valvePosTC","15 %");
-  my $ackTime;
   $vp =~ s/ %//;
   $vp *=2.56;
   $vp = 255 if ($vp >255);
-  my $tn = gettimeofday();
-  my $delta = int(($tn - $hash->{helper}{vd}{next})*1000);
-  Log3 $name,3,"VD-timing Critical ##### diff:$delta" if ($delta >100);
   foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
     next if (length($peer) != 8);
-    $peer = substr($peer,0,6);
-    my $pn = CUL_HM_id2Name($peer);
-    $ackTime = ReadingsTimestamp($pn, "ValvePosition", "nix");
-    CUL_HM_PushCmdStack($hash,sprintf("%02XA258%s%s%s%02X",$msgCnt,$vDevId
-                                      ,$peer,$hash->{helper}{virtTC},$vp));
+    CUL_HM_PushCmdStack($hash,sprintf("%02XA258%s%s%s%02X"
+                                      ,$msgCnt,substr($vId,0,6)
+                                      ,substr($peer,0,6)
+                                      ,$hash->{helper}{virtTC},$vp));
   }
 
-  if ($ackTime && $ackTime ne $hash->{helper}{vd}{ackT} ) {
-    $hash->{helper}{vd}{next} += $nextTimer;
-  }
-  else {
-    $hash->{helper}{vd}{next} = $tn+$nextTimer;
-  }
-  $hash->{helper}{vd}{ackT} = $ackTime;
-  $hash->{helper}{vd}{next} = $tn+$nextTimer;
+  my $tn = gettimeofday();
+  $hash->{helper}{vd}{nextF} = $hash->{helper}{vd}{next} + $nextTimer;
+  $hash->{helper}{vd}{nextM} = $tn+$nextTimer;
   $hash->{helper}{vd}{msgCnt} = $msgCnt;
   $hash->{helper}{virtTC} = "00";
   CUL_HM_ProcessCmdStack($hash);
+  InternalTimer($tn+10,"CUL_HM_valvePosTmr","valveTmr:$vId",0);
+}
+sub CUL_HM_valvePosTmr(@) {#calc next vd wakeup 
+  my($in ) = @_;
+  my(undef,$vId) = split(':',$in);
+  my $hash = CUL_HM_id2Hash($vId); 
+  my $ackTime;
+  foreach my $peer (sort(split(',',AttrVal($hash->{NAME},"peerIDs","")))) {
+    next if (length($peer) != 8);
+    my $pn = CUL_HM_id2Name(substr($peer,0,6));
+    $ackTime = ReadingsTimestamp($pn, "ValvePosition", "");
+  }
+
+   if (!$ackTime || $ackTime eq $hash->{helper}{vd}{ackT} ){
+     $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextF};
+     Log3 $hash->{NAME},5,"CUL_HM $hash->{NAME} virtualTC use fail-timer";
+   }
+   else{
+     $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextM};
+   }
+  $hash->{helper}{vd}{ackT} = $ackTime;
   InternalTimer($hash->{helper}{vd}{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
 }
 sub CUL_HM_weather(@) {#periodically send weather data
