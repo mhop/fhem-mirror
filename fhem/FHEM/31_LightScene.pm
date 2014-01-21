@@ -113,7 +113,7 @@ LightScene_2html($)
     foreach my $d (sort keys %{ $hash->{CONTENT} }) {
       my %extPage = ();
       my ($allSets, $cmdlist, $txt) = FW_devState($d, $room, \%extPage);
-      $ret .= "<td informId=\"$d\">$txt</td>";
+      $ret .= "<td informId=\"$name-$d.state\">$txt</td>";
     }
   }
 
@@ -175,6 +175,13 @@ LightScene_detailFn()
 {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
 
+  my $hash = $defs{$d};
+
+  if( AttrVal($FW_wname, "longpoll", 1) ) {
+    Log3 $hash->{NAME}, 5, "opened: $FW_cname";
+    $hash->{helper}->{myDisplay}->{$FW_cname} = 1;
+  }
+
   return LightScene_2html($d);
 }
 
@@ -185,12 +192,18 @@ LightScene_Notify($$)
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};
 
-  return if($dev->{NAME} ne "global");
+  if( !defined($hash->{helper}{myDisplay})
+      || !%{$hash->{helper}{myDisplay}} ) {
+    Log3 $name, 4, "$name: not on any display, ignoring notify";
+    return if($dev->{NAME} ne "global");
+  }
 
   if( grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) ) {
   } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
     LightScene_Save();
   }
+
+  return if($dev->{TYPE} eq $hash->{TYPE});
 
   my $max = int(@{$dev->{CHANGED}});
   for (my $i = 0; $i < $max; $i++) {
@@ -226,6 +239,55 @@ LightScene_Notify($$)
 
         delete( $hash->{CONTENT}{$name} );
       }
+    } else {
+
+      next if (!$hash->{CONTENT}->{$dev->{NAME}});
+
+      if( !defined($hash->{helper}{myDisplay})
+          || !%{$hash->{helper}{myDisplay}} ) {
+        Log3 $name, 4, "$name: not on any display, ignoring notify";
+        return undef;
+      } else {
+        my $do_update = 0;
+        foreach my $display ( keys %{$hash->{helper}{myDisplay}} ) {
+          if( defined($defs{$display}) ) {
+            my $filter = $defs{$display}->{inform};
+            $filter = $filter->{filter} if( ref($filter) eq 'HASH' );
+            return undef if( !defined($filter) );
+            if($filter eq "$name") {
+              $do_update = 1;
+            } else {
+              Log3 $name, 4, "$name: $display is not my room, ignoring notify";
+              delete( $hash->{helper}{myDisplay}{$display} );
+            }
+          } else {
+            Log3 $name, 4, "$name: $display is closed, ignoring notify";
+            delete( $hash->{helper}{myDisplay}{$display} );
+          }
+        }
+        if( !$do_update ) {
+          Log3 $name, 4, "$name: not on any display, ignoring notify";
+          return undef;
+        } else {
+          Log3 $name, 5, "$name: do update";
+        }
+      }
+
+
+      my @parts = split(/: /,$s);
+      my $reading = shift @parts;
+      my $value   = join(": ", @parts);
+
+      next if( $value ne "" );
+
+      $reading = "state";
+      $value = $s;
+
+      my $room = AttrVal($name, "room", "");
+      my %extPage = ();
+      (undef, undef, $value) = FW_devState($dev->{NAME}, $room, \%extPage);
+
+      CommandTrigger( "", "$name $dev->{NAME}.$reading: $value" );
     }
   }
 
