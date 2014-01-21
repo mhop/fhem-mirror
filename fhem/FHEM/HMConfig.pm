@@ -748,9 +748,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
 
 %culHmRegModel = (
   "HM-RC-12"          =>{ backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1},
-  "HM-RC-19"          =>{ backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1,backAtCharge    =>1,language =>1
-                         ,lcdSymb         =>1, lcdLvlInterp   =>1
-                        },
+  "HM-RC-19"          =>{ backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1,backAtCharge    =>1,language =>1},
   "HM-RC-4-2"         =>{ localResDis     =>1},
 
   "HM-LC-Bl1PBU-FM"   =>{ transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,localResDis     =>1},
@@ -924,6 +922,7 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
   "HM-RC-1912"        =>{ msgShowTime     =>1, beepAtAlarm    =>1, beepAtService  =>1,beepAtInfo  =>1
                          ,backlAtAlarm    =>1, backlAtService =>1, backlAtInfo    =>1
                          },
+  "HM-RC-1901"        =>{ lcdSymb         =>1, lcdLvlInterp   =>1},
   "HM-OU-CFM-PL01"    =>{ ActTypeLed      =>1},
   "HM-OU-CFM-PL02"    =>{ ActTypeMp3      =>1,Intense         =>1},
   "HM-SEC-WIN01"      =>{ setupDir        =>1,pullForce       =>1,pushForce       =>1,tiltMax         =>1
@@ -1013,6 +1012,12 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
 #clones - - - - - - - - - - - - - - -
 $culHmRegChan{"HM-RC-19-B12"}         = $culHmRegChan{"HM-RC-1912"};
 $culHmRegChan{"HM-RC-19-SW12"}        = $culHmRegChan{"HM-RC-1912"};
+foreach (2..16){
+  my $c = sprintf("%02X",$_);
+  $culHmRegChan{"HM-RC-19$c"}           = $culHmRegChan{"HM-RC-1901"};
+  $culHmRegChan{"HM-RC-19-B$c"}         = $culHmRegChan{"HM-RC-1901"};
+  $culHmRegChan{"HM-RC-19-SW$c"}        = $culHmRegChan{"HM-RC-1901"};
+}
                                       
 $culHmRegChan{"WDF-solar02"}          = $culHmRegType{"dimmer"};
                                       

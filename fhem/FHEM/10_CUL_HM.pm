@@ -2189,10 +2189,7 @@ sub CUL_HM_Get($@) {
   elsif($cmd eq "reg") {  #####################################################
     my (undef,undef,$regReq,$list,$peerId) = @a;
     if ($regReq eq 'all'){
-      my @regArr = keys %{$culHmRegGeneral};
-      push @regArr, keys %{$culHmRegType->{$st}} if($culHmRegType->{$st});
-      push @regArr, keys %{$culHmRegModel->{$md}} if($culHmRegModel->{$md});
-      push @regArr, keys %{$culHmRegChan->{$md.$chn}} if($culHmRegChan->{$md.$chn});
+      my @regArr = CUL_HM_getRegN($st,$md,$chn);
 
       my @peers; # get all peers we have a reglist
       my @listWp; # list that require peers
@@ -2236,20 +2233,7 @@ sub CUL_HM_Get($@) {
     }
   }
   elsif($cmd eq "regList") {  #################################################
-    my @regArr = keys %{$culHmRegGeneral};
-    push @regArr, keys %{$culHmRegType->{$st}} if($culHmRegType->{$st});
-    push @regArr, keys %{$culHmRegModel->{$md}} if($culHmRegModel->{$md});
-
-    if ($isChannel){
-      push @regArr, keys %{$culHmRegChan->{$md.$chn}} if($culHmRegChan->{$md.$chn});
-    }
-    else{# add all ugly channel register to device view
-      for my $chnId (CUL_HM_getAssChnIds($name)){
-        my $chnN = substr($chnId,6,2);
-        push @regArr, keys %{$culHmRegChan->{$md.$chnN}}
-              if($culHmRegChan->{$md.$chnN});
-      }
-    }
+    my @regArr = CUL_HM_getRegN($st,$md,$chn);
 
     my @rI;
     foreach my $regName (@regArr){
@@ -2669,16 +2653,9 @@ sub CUL_HM_Set($@) {
 
     my (undef,undef,$regName,$data,$peerChnIn) = @a;
     $state = "";
-    if (!$culHmRegType->{$st}{$regName}      &&
-        !$culHmRegGeneral->{$regName}        &&
-        !$culHmRegModel->{$md}{$regName}     &&
-        !$culHmRegChan->{$md.$chn}{$regName}  ){
-      my @regArr = keys %{$culHmRegGeneral};
-      push @regArr, keys %{$culHmRegType->{$st}} if($culHmRegType->{$st});
-      push @regArr, keys %{$culHmRegModel->{$md}} if($culHmRegModel->{$md});
-      push @regArr, keys %{$culHmRegChan->{$md.$chn}} if($culHmRegChan->{$md.$chn});
-      return "$regName failed: supported register are ".join(" ",sort @regArr);
-    }
+    my @regArr = CUL_HM_getRegN($st,$md,$chn);
+    return "$regName failed: supported register are ".join(" ",sort @regArr)
+          if (!grep /^$regName$/,@regArr );
 
     my $reg  = $culHmRegDefine->{$regName};
     return $st." - ".$regName            # give some help
@@ -4624,10 +4601,7 @@ sub CUL_HM_updtRegDisp($$$) {
   my $md = $attr{$devName}{model}   ?$attr{$devName}{model}   :"";
   my $chn = $hash->{DEF};
   $chn = (length($chn) == 8)?substr($chn,6,2):"";
-  my @regArr = keys %{$culHmRegGeneral};
-  push @regArr, keys %{$culHmRegType->{$st}} if($culHmRegType->{$st});
-  push @regArr, keys %{$culHmRegModel->{$md}} if($culHmRegModel->{$md});
-  push @regArr, keys %{$culHmRegChan->{$md.$chn}} if($culHmRegChan->{$md.$chn});
+  my @regArr = CUL_HM_getRegN($st,$md,$chn);
   my @changedRead;
   my $expL = CUL_HM_getAttrInt($name,"expert");
   my $expLvl = ($expL != 0)?1:0;
@@ -4653,6 +4627,9 @@ sub CUL_HM_updtRegDisp($$$) {
   }
   elsif ($md =~ m/HM-CC-RT-DN/){#handle temperature readings
     CUL_HM_RTtempReadings($hash)  if ($list == 7 && $chn eq "04");
+  }
+  elsif ($md =~ m/HM-TC-IT-WM-W-EU/){#handle temperature readings
+    CUL_HM_TCITtempReadings($hash)  if ($list >= 7 && $chn eq "02");
   }
   elsif ($md eq "HM-PB-4DIS-WM"){#add text
     CUL_HM_4DisText($hash)  if ($list == 1) ;
@@ -4852,6 +4829,14 @@ sub CUL_HM_time2min($) { # minutes -> time
   return $m;
 }
 
+sub CUL_HM_getRegN($$$){
+  my ($st,$md,$chn) = @_;
+  my @regArr = keys %{$culHmRegGeneral};
+  push @regArr, keys %{$culHmRegType->{$st}}      if($culHmRegType->{$st});
+  push @regArr, keys %{$culHmRegModel->{$md}}     if($culHmRegModel->{$md});
+  push @regArr, keys %{$culHmRegChan->{$md.$chn}} if($culHmRegChan->{$md.$chn});
+  return @regArr;
+}
 sub CUL_HM_4DisText($) {      # convert text for 4dis
   #text1: start at 54 (0x36) length 12 (0x0c)
   #text2: start at 70 (0x46) length 12 (0x0c)
@@ -5006,6 +4991,68 @@ sub CUL_HM_RTtempReadings($) {# parse RT temperature readings
         "winOpnBoost:"   .ReadingsVal($name,"R-winOpnBoost"   ,"unknown"),
         "winOpnMode:"    .ReadingsVal($name,"R-winOpnMode"    ,"unknown"),
         "winOpnDetFall:" .ReadingsVal($name,"R-winOpnDetFall" ,"unknown"),);
+  return $setting;
+}
+sub CUL_HM_TCITtempReadings($) {# parse RT temperature readings
+  my ($hash)=@_;
+  my $name = $hash->{NAME};
+  my $regPre = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".");
+  my @changedRead;
+  my $setting;
+  my %idxN = (7=>"P1",8=>"P2",9=>"P3");
+  foreach my $lst (7,8,9){
+    my $tempRegs = ReadingsVal($name,$regPre."RegL_0$lst:","");
+    my $stmpRegs = ($hash->{helper}{shadowReg}{"RegL_0$lst:"})? # need to compare actual data
+                   ($hash->{helper}{shadowReg}{"RegL_0$lst:"})
+                   :$tempRegs;
+#    return "reglist incomplete\n" if ($tempRegs !~ m/00:00/);
+
+    my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
+
+    $tempRegs =~ s/.* 14://;     #remove register up to addr 20 from list
+    $tempRegs =~ s/ 00:00/ /g;   #remove regline termination
+    $tempRegs =~ s/ ..://g;      #remove addr Info
+    $tempRegs =~ s/ //g;         #blank
+    
+    $stmpRegs =~ s/.* 14://;
+    $stmpRegs =~ s/ 00:00/ /g;
+    $stmpRegs =~ s/ ..://g;
+    $stmpRegs =~ s/ //g;
+
+    push (@changedRead,"tempList$idxN{$lst}_State:".
+                ($hash->{helper}{shadowReg}{"RegL_0$lst:"} ?"set":"verified"));
+    for (my $day = 0;$day<7;$day++){
+      my $dayRead = "";
+      my $pre ="";
+      my @time;
+      my @temp;
+      my $str;
+      if (substr($stmpRegs,$day *13*4,13*4) eq
+          substr($tempRegs,$day *13*4,13*4)   ){
+        $str = substr($tempRegs,$day *13*4,13*4);
+      }
+      else{
+        $str = substr($stmpRegs,$day *13*4,13*4);
+        $pre = "set_";
+      }
+      foreach (unpack '(A4)*',$str){
+        my $h = hex($_);
+        push @temp,($h >> 9)/2;
+        $h = ($h & 0x1ff) * 5;
+        $h = sprintf("%02d:%02d",int($h / 60),($h%60));
+        push @time,$h;
+      }
+    
+      for (my $idx = 0;$idx<13;$idx++){
+        my $entry = sprintf(" %s %3.01f",$time[$idx],$temp[$idx]);
+          $setting .= "Temp set: ".$days[$day].$entry." C\n";
+          $dayRead .= $entry;
+        last if ($time[$idx] eq "24:00");
+      }
+      push (@changedRead,"tempList$idxN{$lst}".$days[$day].":".$pre." ".$dayRead);
+    }
+  }
+  CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
   return $setting;
 }
 sub CUL_HM_repReadings($) {   # parse repeater
