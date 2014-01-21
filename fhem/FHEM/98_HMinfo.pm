@@ -275,7 +275,7 @@ sub HMinfo_tempList(@) { ######################################################
   my ($filter,$action,$fName)=@_;
   $filter = "." if (!$filter);
   $fName = "tempList.cfg" if (!$fName);
-  $action = "save" if (!$action);
+  $action = "" if (!$action);
   my $ret;
   if ($action eq "save"){
     open(aSave, ">$fName") || return("Can't open $fName: $!");
