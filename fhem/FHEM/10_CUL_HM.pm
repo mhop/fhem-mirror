@@ -169,7 +169,7 @@ sub CUL_HM_Initialize($) {
   #statistics
   $hash->{stat}{s}{dummy}=0;
   $hash->{stat}{r}{dummy}=0;
-  RemoveInternalTimer("CUL_HM_statCntRfresh");
+  RemoveInternalTimer("StatCntRfresh");
   InternalTimer(gettimeofday()+3600*20,"CUL_HM_statCntRfresh","StatCntRfresh", 0);
 
   CUL_HM_initRegHash();
@@ -3172,24 +3172,28 @@ sub CUL_HM_Set($@) {
     }
     else {
       my $vp = $a[2];
-      foreach my $peer (split(',',AttrVal($name,"peerIDs",""))) {
-        next if (length($peer) != 8);
-        my $ph = CUL_HM_id2Hash($peer);
-        CUL_HM_UpdtReadBulk($ph,1,
+      my @pId = grep !/^$/,split(',',AttrVal($name,"peerIDs",""));
+      return "virtual TC support one VD only. Correct number of peers"
+        if (scalar @pId != 1);
+      my $ph = CUL_HM_id2Hash($pId[0]);
+      return "peerID $pId[0] is not assigned to a device " if (!$ph);
+      $hash->{helper}{vd}{id} = substr($pId[0],0,6);
+      CUL_HM_UpdtReadBulk($ph,1,
                        "state:set_$vp %",
-                       "ValveDesired:$vp %") 
-                if ($ph);
-      }
+                       "ValveDesired:$vp %");
+
       readingsSingleUpdate($hash,"valvePosTC","$vp %",0);
       $hash->{helper}{vd}{idh} = hex(substr($dst,2,2))*20077;
       $hash->{helper}{vd}{idl} = hex(substr($dst,4,2))*256;
       $hash->{helper}{vd}{msgCnt} = 1 if (!defined $hash->{helper}{vd}{msgCnt});
       if (!$hash->{helper}{virtTC}){
         $hash->{helper}{vd}{ackT} = "" if (!defined$hash->{helper}{vd}{ackT});
+        $hash->{helper}{vd}{miss} = 0  if (!defined$hash->{helper}{vd}{miss});
         $hash->{helper}{vd}{next} = gettimeofday() 
               if (!defined $hash->{helper}{vd}{next});
         $hash->{helper}{virtTC} = "03";
         CUL_HM_valvePosUpdt("valvePos:$dst$chn");
+        CUL_HM_UpdtReadSingle($hash,"valveCtrl","init",1)
       };
       $hash->{helper}{virtTC} = "03";
       $state = "ValveAdjust:$vp %";
@@ -3526,13 +3530,11 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   $vp =~ s/ %//;
   $vp *=2.56;
   $vp = 255 if ($vp >255);
-  foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
-    next if (length($peer) != 8);
-    CUL_HM_PushCmdStack($hash,sprintf("%02XA258%s%s%s%02X"
+
+  CUL_HM_PushCmdStack($hash,sprintf("%02XA258%s%s%s%02X"
                                       ,$msgCnt,substr($vId,0,6)
-                                      ,substr($peer,0,6)
+                                      ,$hash->{helper}{vd}{id}
                                       ,$hash->{helper}{virtTC},$vp));
-  }
 
   my $tn = gettimeofday();
   $hash->{helper}{vd}{nextF} = $hash->{helper}{vd}{next} + $nextTimer;
@@ -3546,20 +3548,24 @@ sub CUL_HM_valvePosTmr(@) {#calc next vd wakeup
   my($in ) = @_;
   my(undef,$vId) = split(':',$in);
   my $hash = CUL_HM_id2Hash($vId); 
-  my $ackTime;
-  foreach my $peer (sort(split(',',AttrVal($hash->{NAME},"peerIDs","")))) {
-    next if (length($peer) != 8);
-    my $pn = CUL_HM_id2Name(substr($peer,0,6));
-    $ackTime = ReadingsTimestamp($pn, "ValvePosition", "");
-  }
+  
+  my $pn = CUL_HM_id2Name($hash->{helper}{vd}{id});
+  my $ackTime = ReadingsTimestamp($pn, "ValvePosition", "");
 
-   if (!$ackTime || $ackTime eq $hash->{helper}{vd}{ackT} ){
-     $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextF};
-     Log3 $hash->{NAME},5,"CUL_HM $hash->{NAME} virtualTC use fail-timer";
-   }
-   else{
-     $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextM};
-   }
+  if (!$ackTime || $ackTime eq $hash->{helper}{vd}{ackT} ){
+    $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextF};
+    $hash->{helper}{vd}{miss}++;
+    CUL_HM_UpdtReadSingle($hash,"valveCtrl","lost",1)
+          if(   $hash->{helper}{vd}{miss} > 6 
+             && ReadingsVal($hash->{NAME},"valveCtrl","") ne "lost");
+    Log3 $hash->{NAME},5,"CUL_HM $hash->{NAME} virtualTC use fail-timer";
+  }
+  else{
+    $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextM};
+    CUL_HM_UpdtReadSingle($hash,"valveCtrl","ok",1)
+          if(ReadingsVal($hash->{NAME},"valveCtrl","") ne "ok");
+    $hash->{helper}{vd}{miss} = 0;
+  }
   $hash->{helper}{vd}{ackT} = $ackTime;
   InternalTimer($hash->{helper}{vd}{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
 }
@@ -4092,8 +4098,8 @@ sub CUL_HM_statCntRfresh($) {# update statistic once a day
     }
     CUL_HM_statCnt($_,"u") if ($_ ne "dummy");
   }
-  RemoveInternalTimer("CUL_HM_statCntRfresh");
-  InternalTimer(gettimeofday()+3600*20,"CUL_HM_statCntRfresh","StatCntRfrh",0);
+  RemoveInternalTimer("StatCntRfresh");
+  InternalTimer(gettimeofday()+3600*20,"CUL_HM_statCntRfresh","StatCntRfresh",0);
 }
 
 sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
