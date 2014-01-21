@@ -1054,6 +1054,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegType{"HM-CC-TC03"};
 %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
   raw           => "data ...",
   virtual       =>"<noButtons>",
+  clear         => "[readings|register|rssi|msgEvents]",
 );
 %culHmGlobalSetsDevice = (# all devices but virtuals
   raw           => "data ...",
