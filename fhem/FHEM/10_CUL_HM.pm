@@ -3167,6 +3167,7 @@ sub CUL_HM_Set($@) {
     if ($a[2] eq "off"){
       $state = "ValveAdjust:stopped";
       RemoveInternalTimer("valvePos:$dst$chn");# remove responsePending timer
+      RemoveInternalTimer("valveTmr:$dst$chn");# remove responsePending timer
       delete($hash->{helper}{virtTC});
     }
     else {
@@ -3184,6 +3185,7 @@ sub CUL_HM_Set($@) {
       $hash->{helper}{vd}{idl} = hex(substr($dst,4,2))*256;
       $hash->{helper}{vd}{msgCnt} = 1 if (!defined $hash->{helper}{vd}{msgCnt});
       if (!$hash->{helper}{virtTC}){
+        $hash->{helper}{vd}{ackT} = "" if (!defined$hash->{helper}{vd}{ackT});
         $hash->{helper}{vd}{next} = gettimeofday() 
               if (!defined $hash->{helper}{vd}{next});
         $hash->{helper}{virtTC} = "03";
