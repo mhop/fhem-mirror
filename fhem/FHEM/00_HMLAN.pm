@@ -195,34 +195,16 @@ sub HMLAN_Attr(@) {############################################################
         return "illegal number:$no" if (hex($no) < 1 || hex($no) > 255 || length($no) != 2);
       }
       $attr{$name}{$aName} = "$no:".
-                               (($val =~ m /^[0-9A-Fa-f]{32}$/ )?
-                                 $val:
-                                   unpack('H*', md5($val)));
+                               (($val =~ m /^[0-9A-Fa-f]{32}$/ )
+                                 ? $val
+                                 : unpack('H*', md5($val)));
       $retVal = "$aName set to $attr{$name}{$aName}"
             if($aVal ne $attr{$name}{$aName});
     }
     else{
       delete $attr{$name}{$aName};
     }
-    my ($k1no,$k1,$k2no,$k2,$k3no,$k3,$k4no,$k4,$k5no,$k5)
-         =( "01",AttrVal($name,"hmKey","")
-           ,"02",AttrVal($name,"hmKey2","")
-           ,"03",AttrVal($name,"hmKey3","")
-           ,"04",AttrVal($name,"hmKey4","")
-           ,"05",AttrVal($name,"hmKey5","")
-                       );
-
-    if ($k1 =~ m/:/){($k1no,$k1) = split(":",$k1);}
-    if ($k2 =~ m/:/){($k2no,$k2) = split(":",$k2);}
-    if ($k3 =~ m/:/){($k3no,$k3) = split(":",$k3);}
-    if ($k4 =~ m/:/){($k4no,$k4) = split(":",$k4);}
-    if ($k5 =~ m/:/){($k5no,$k5) = split(":",$k5);}
-
-    HMLAN_SimpleWrite($defs{$name}, "Y01,".($k1?"$k1no,$k1":"00,"));
-    HMLAN_SimpleWrite($defs{$name}, "Y02,".($k2?"$k2no,$k2":"00,"));
-    HMLAN_SimpleWrite($defs{$name}, "Y03,".($k3?"$k3no,$k3":"00,"));
-    HMLAN_SimpleWrite($defs{$name}, "Y04,".($k4?"$k4no,$k4":"00,"));
-    HMLAN_SimpleWrite($defs{$name}, "Y05,".($k5?"$k5no,$k5":"00,"));
+    HMLAN_writeAesKey($name);
     return $retVal;
   }
   elsif($aName eq "hmMsgLowLimit"){
@@ -763,33 +745,19 @@ sub HMLAN_DoInit($) {##########################################################
   my $name = $hash->{NAME};
 
   my $id  = AttrVal($name, "hmId", "999999");
-  my ($k1no,$k1,$k2no,$k2,$k3no,$k3)
-         =( "01",AttrVal($name,"hmKey","")
-           ,"02",AttrVal($name,"hmKey2","")
-           ,"03",AttrVal($name,"hmKey3","")
-           ,"04",AttrVal($name,"hmKey4","")
-           ,"05",AttrVal($name,"hmKey5","")
-                       );
-
-  if ($k1 =~ m/:/){($k1no,$k1) = split(":",$k1);}
-  if ($k2 =~ m/:/){($k2no,$k2) = split(":",$k2);}
-  if ($k3 =~ m/:/){($k3no,$k3) = split(":",$k3);}
-
-  my $s2000 = sprintf("%02X", HMLAN_secSince2000());
   delete $hash->{READINGS}{state};
 
   HMLAN_SimpleWrite($hash, "A$id") if($id ne "999999");
   HMLAN_SimpleWrite($hash, "C");
-  HMLAN_SimpleWrite($defs{$name}, "Y01,".($k1?"$k1no,$k1":"00,"));
-  HMLAN_SimpleWrite($defs{$name}, "Y02,".($k2?"$k2no,$k2":"00,"));
-  HMLAN_SimpleWrite($defs{$name}, "Y03,".($k3?"$k3no,$k3":"00,"));
-  HMLAN_SimpleWrite($hash, "T$s2000,04,00,00000000");
+  HMLAN_writeAesKey($name);
+
   delete $hash->{helper}{ref};
 
   HMLAN_condUpdate($hash,0xff);
   $hash->{helper}{q}{cap}{$_}=0 foreach (keys %{$hash->{helper}{q}{cap}});
 
   foreach (keys %{$hash->{helper}{assIDs}}){delete ($hash->{helper}{assIDs}{$_})};# clear IDs - HMLAN might have a reset
+  delete ($hash->{helper}{assIDs}{$_}) foreach (keys %{$hash->{helper}{assIDs}});# clear IDs - HMLAN might have a reset
   $hash->{helper}{q}{keepAliveRec} = 1; # ok for first time
   $hash->{helper}{q}{keepAliveRpt} = 0; # ok for first time
 
@@ -805,6 +773,16 @@ sub HMLAN_DoInit($) {##########################################################
   HMLAN_Write($hash,"","As09998112".$id."000001");
 
   return undef;
+}
+sub HMLAN_writeAesKey($) {#####################################################
+  my ($name) = @_;
+
+  my ($k,$kNo);
+  foreach my $i (1..5){
+    ($kNo,$k) = ("0".$i,AttrVal($name,"hmKey".($i== 1?"":$i),""));
+    ($kNo,$k) = split(":",$k);
+    HMLAN_SimpleWrite($defs{$name}, "Y0$i,".($k?"$kNo,$k":"00,"));
+  }
 }
 sub HMLAN_KeepAlive($) {#######################################################
   my($in ) = shift;
