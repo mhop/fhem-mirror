@@ -136,7 +136,7 @@ sub HMinfo_regCheck(@) { ######################################################
   my @entities = @_;
   my @regIncompl;
   my @regMissing;
-  my @peerRegsFail;
+  my @regChPend;
 
   foreach my $eName (@entities){
     my $ehash = $defs{$eName};
@@ -151,13 +151,17 @@ sub HMinfo_regCheck(@) { ######################################################
       if (   !$ehash->{READINGS}{$rNm}
           || !$ehash->{READINGS}{$rNm}{VAL})            {push @mReg, $rNm;}
       elsif ( $ehash->{READINGS}{$rNm}{VAL} !~ m/00:00/){push @iReg, $rNm;}
+      if ($ehash->{helper}{shadowReg} && keys %{$ehash->{helper}{shadowReg}}){push @iReg, $rNm;}
     }
+    push @regChPend,$eName                        if ($ehash->{helper}{shadowReg} && 
+                                                      keys %{$ehash->{helper}{shadowReg}});
     push @regMissing,$eName.":\t".join(",",@mReg) if (scalar @mReg);
     push @regIncompl,$eName.":\t".join(",",@iReg) if (scalar @iReg);
   }
   my $ret = "";
   $ret .="\n\n missing register list\n    "   .(join "\n    ",sort @regMissing) if(@regMissing);
   $ret .="\n\n incomplete register list\n    ".(join "\n    ",sort @regIncompl) if(@regIncompl);
+  $ret .="\n\n Register changes pending\n    ".(join "\n    ",sort @regChPend)  if(@regChPend);
   return  $ret;
 }
 sub HMinfo_peerCheck(@) { #####################################################

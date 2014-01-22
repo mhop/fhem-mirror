@@ -778,7 +778,7 @@ sub HMLAN_writeAesKey($) {#####################################################
   my ($name) = @_;
 
   my ($k,$kNo);
-  foreach my $i (1..5){
+  foreach my $i (1..3){
     ($kNo,$k) = ("0".$i,AttrVal($name,"hmKey".($i== 1?"":$i),""));
     ($kNo,$k) = split(":",$k);
     HMLAN_SimpleWrite($defs{$name}, "Y0$i,".($k?"$kNo,$k":"00,"));
