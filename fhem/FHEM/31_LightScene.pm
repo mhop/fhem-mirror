@@ -549,7 +549,11 @@ LightScene_Set($@)
         $ret .= $r;
       } else {
         $ret .= " " if( $ret );
-        $ret .= CommandSet(undef,"$d $state");
+        if( $state =~m/^sleep\s*/ ) {
+          $ret .= AnalyzeCommandChain(undef,"$state");
+        } else {
+          $ret .= CommandSet(undef,"$d $state");
+        }
       }
     } else {
       $ret = "Unknown argument $cmd, choose one of save scene";
