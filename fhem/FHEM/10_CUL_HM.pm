@@ -227,6 +227,8 @@ sub CUL_HM_updateConfig($){
     }
     elsif ($md =~ m/HM-CC-RT-DN/){
       $attr{$name}{stateFormat} = "last:trigLast" if ($chn eq "03");
+      $hash->{helper}{shRegR}{"07"} = "00" if ($chn eq "04");# shadowReg List 7 read from CH 0
+      $hash->{helper}{shRegW}{"07"} = "04" if ($chn eq "00");# shadowReg List 7 write to CH 4
     }
     elsif ($md =~ m/(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/){
       $hash->{helper}{oldDes} = "0";
@@ -1932,7 +1934,8 @@ sub CUL_HM_parseCommon(@){#####################################################
       $data =~ s/(..)(..)/ $1:$2/g;
 
       my $lN = ReadingsVal($chnHash->{NAME},$regLN,"");
-      my $shdwReg = $chnHash->{helper}{shadowReg}{$regLNp};
+      my $sdH = CUL_HM_shH($chnHash,$list,$dst);
+      my $shdwReg = $sdH->{helper}{shadowReg}{$regLNp};
       foreach my $entry(split(' ',$data)){
         my ($a,$d) = split(":",$entry);
         last if ($a eq "00");
@@ -1940,7 +1943,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         }else{            $lN .= " ".$entry;}
         $shdwReg =~ s/ $a:..// if ($shdwReg);# confirmed: remove from shadow
       }
-      $chnHash->{helper}{shadowReg}{$regLNp} = $shdwReg;
+      $sdH->{helper}{shadowReg}{$regLNp} = $shdwReg; # todo possibley needs change
       $lN = join(' ',sort(split(' ',$lN)));# re-order
       if ($lN =~ s/00:00//){$lN .= " 00:00"};
       CUL_HM_UpdtReadSingle($chnHash,$regLN,$lN,0);
@@ -2730,7 +2733,7 @@ sub CUL_HM_Set($@) {
       }
     }
 
-    $lChn = "00" if($list == 7 && $peerChnIn eq "");#face to send
+#    $lChn = "00" if($list == 7 && (!$peerChnIn ||$peerChnIn eq ""));#face to send
 
     my $cHash = CUL_HM_id2Hash($dst.($lChn eq '00'?"":$lChn));
     $cHash = $hash if (!$cHash);
@@ -2824,7 +2827,7 @@ sub CUL_HM_Set($@) {
     }
     CUL_HM_PushCmdStack($hash,sprintf("++%s11%s%s02%s%02X%s%s",
                                      $flag,$id,$dst,$chn,$lvl*2,$rval,$tval));
-    readingsSingleUpdate($hash,"level","set_".$lvl,1);
+    CUL_HM_UpdtReadSingle($hash,"level","set_".$lvl,1);
     $state = "set_".$lvl;
   }
   elsif($cmd eq "stop") { #####################################################
@@ -3052,7 +3055,7 @@ sub CUL_HM_Set($@) {
                         $sh,$sd,$sy,$eh,$ed,$ey,($sm*16+$em));
     }
     my %mCmd = (auto=>0,manu=>1,party=>2,boost=>3,day=>4,night=>5);
-    readingsSingleUpdate($hash,"mode","set_".$mode,1);
+    CUL_HM_UpdtReadSingle($hash,"mode","set_".$mode,1);
     my $msg = '8'.($mCmd{$mode}).$chn;
     $msg .= sprintf("%02X",$temp) if ($temp);
     $msg .= $party if ($party);
@@ -3072,7 +3075,7 @@ sub CUL_HM_Set($@) {
       my $chnHash = CUL_HM_id2Hash($dst."02");
       my $mode = ReadingsVal($chnHash->{NAME},"R-controlMode","");
       $mode =~ s/set_//;#consider set as given
-      readingsSingleUpdate($chnHash,"desired-temp-cent",$a[2],1)
+      CUL_HM_UpdtReadSingle($chnHash,"desired-temp-cent",$a[2],1)
             if($mode =~ m/central/);
     }
   }
@@ -3159,7 +3162,7 @@ sub CUL_HM_Set($@) {
                        "state:set_$vp %",
                        "ValveDesired:$vp %");
 
-      readingsSingleUpdate($hash,"valvePosTC","$vp %",0);
+      CUL_HM_UpdtReadSingle($hash,"valvePosTC","$vp %",1);
       $hash->{helper}{vd}{idh} = hex(substr($dst,2,2))*20077;
       $hash->{helper}{vd}{idl} = hex(substr($dst,4,2))*256;
       $hash->{helper}{vd}{msgCnt} = 1 if (!defined $hash->{helper}{vd}{msgCnt});
@@ -3471,7 +3474,7 @@ sub CUL_HM_Set($@) {
     return "$cmd not impelmented - contact sysop";
   }
 
-  readingsSingleUpdate($hash,"state",$state,1) if($state);
+  CUL_HM_UpdtReadSingle($hash,"state",$state,1) if($state);
 
   my $rxType = CUL_HM_getRxType($devHash);
   Log3 $name,2,"CUL_HM set $name $act";
@@ -3647,8 +3650,9 @@ sub CUL_HM_getConfig($){
             }
           }
           else{
-            CUL_HM_PushCmdStack($cHash,sprintf("++%s01%s%s%s0400000000%02X"
-                                        ,$flag,$id,$dst,$chn,$listNo));
+            my $ln = sprintf("%02X",$listNo);
+            my $mch = CUL_HM_lstCh($cHash,$ln,$chn);
+            CUL_HM_PushCmdStack($cHash,"++$flag"."01$id$dst$mch"."0400000000$ln");
           }
         }
       }
@@ -3676,13 +3680,14 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
   #--- copy data from readings to shadow
   my $chnhash = $modules{CUL_HM}{defptr}{$dst.$chn};
   $chnhash = $hash if (!$chnhash);
+  my $sdH = CUL_HM_shH($chnhash,$list,$dst);
   my $rRd = ReadingsVal($chnhash->{NAME},$regLN,"");
-  if (!$chnhash->{helper}{shadowReg} ||
-      !$chnhash->{helper}{shadowReg}{$regLNp}){
-    $chnhash->{helper}{shadowReg}{$regLNp} = $rRd;
+  if (!$sdH->{helper}{shadowReg} ||
+      !$sdH->{helper}{shadowReg}{$regLNp}){
+    $sdH->{helper}{shadowReg}{$regLNp} = $rRd;
   }
   #--- update with ne value
-  my $regs = $chnhash->{helper}{shadowReg}{$regLNp};
+  my $regs = $sdH->{helper}{shadowReg}{$regLNp};
   for(my $l = 0; $l < $tl; $l+=4) { #substitute changed bytes in shadow
     my $addr = substr($content,$l,2);
     my $data = substr($content,$l+2,2);
@@ -3690,10 +3695,10 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
       $regs .= " ".$addr.":".$data;
     }
   }
-  $chnhash->{helper}{shadowReg}{$regLNp} = $regs; # update shadow
+  $sdH->{helper}{shadowReg}{$regLNp} = $regs; # update shadow
   my @changeList;
   if ($prep eq "exec"){#update complete registerset
-    @changeList = keys%{$chnhash->{helper}{shadowReg}};
+    @changeList = keys%{$sdH->{helper}{shadowReg}};
   }
   elsif ($prep eq "prep"){
     return; #prepare shadowReg only. More data expected.
@@ -3705,7 +3710,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
   foreach my $nrn(@changeList){
     my $change;
     my $nrRd = ReadingsVal($chnhash->{NAME},$regPre.$nrn,"");
-    foreach (sort split " ",$chnhash->{helper}{shadowReg}{$nrn}){
+    foreach (sort split " ",$sdH->{helper}{shadowReg}{$nrn}){
       $change .= $_." " if ($nrRd !~ m /$_/);# filter only changes
     }
     next if (!$change);#no changes
@@ -3827,15 +3832,16 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
         my ($peer, $list) = ($1,$2) if ($p =~ m/..04(........)(..)/);
         $peer = ($peer ne "00000000")?CUL_HM_peerChName($peer,$dst,""):"";
         #--- set messaging items
+        my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
+        $chnhash = $hash if(!$chnhash);
+        my $fch = CUL_HM_shC($chnhash,$list,$chn);
         CUL_HM_respWaitSu ($hash,"Pending:=RegisterRead"
-                                ,"cmd:=$cmd" ,"forChn:=$chn"
+                                ,"cmd:=$cmd" ,"forChn:=$fch"
                                 ,"forList:=$list","forPeer:=$peer"
                                 ,"mNo:=".hex($mNo)
                                 ,"nAddr:=0"
                                 ,"reSent:=$rss");
         #--- remove channel entries that will be replaced
-        my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
-        $chnhash = $hash if(!$chnhash);
 
         $peer ="" if($list !~ m/^0[347]$/);
         #empty val since reading will be cumulative
@@ -4130,7 +4136,7 @@ sub CUL_HM_respPendTout($) {
         CUL_HM_complConfig($name);
       }
       CUL_HM_eventP($hash,"ResndFail");
-      readingsSingleUpdate($hash,"state",$pendCmd,1);
+      CUL_HM_UpdtReadSingle($hash,"state",$pendCmd,1);
       CUL_HM_ProcessCmdStack($hash); # continue processing commands if any
     }
     else{# manage retries
@@ -4182,7 +4188,7 @@ sub CUL_HM_eventP($$) {#handle protocol events
   my $nAttr = $hash;
   if ($evntType eq "Rcv"){
     $nAttr->{"protLastRcv"} = TimeNow();
-    readingsSingleUpdate($hash,".protLastRcv",$nAttr->{"protLastRcv"},0);
+    CUL_HM_UpdtReadSingle($hash,".protLastRcv",$nAttr->{"protLastRcv"},0);
     return;
   }
 
@@ -4191,7 +4197,7 @@ sub CUL_HM_eventP($$) {#handle protocol events
   $nAttr->{"prot".$evntType} = ++$evntCnt." last_at:".TimeNow();
 
   if ($evntType =~ m/(Nack|ResndFail|IOerr)/){# unrecoverable Error
-    readingsSingleUpdate($hash,"state",$evntType,1);
+    CUL_HM_UpdtReadSingle($hash,"state",$evntType,1);
     $hash->{helper}{prt}{bErr}++;
     $nAttr->{protCmdDel} = 0 if(!$nAttr->{protCmdDel});
     $nAttr->{protCmdDel} += scalar @{$hash->{cmdStack}} + 1
@@ -4238,7 +4244,7 @@ sub CUL_HM_protState($$){
   }
   $hash->{protState} = $state;
   if (!$hash->{helper}{role}{chn}){
-    readingsSingleUpdate($hash,"state",$state,0);
+    CUL_HM_UpdtReadSingle($hash,"state",$state,0);
     DoTrigger($name, undef);
   }
   Log3 $name,6,"CUL_HM $name protEvent:$state".
@@ -4268,7 +4274,7 @@ sub CUL_HM_ID2PeerList ($$$) {
   $attr{$name}{peerIDs} = $peerIDs;                 # make it public
   if ($peerNames){
     $peerNames =~ s/_chn:01//g; # channel 01 is part of device
-    readingsSingleUpdate($hash,"peerList",$peerNames,0);
+    CUL_HM_UpdtReadSingle($hash,"peerList",$peerNames,0);
     $hash->{peerList} = $peerNames;
     my $dHash = CUL_HM_getDeviceHash($hash);
     my $st = AttrVal($dHash->{NAME},"subType","");
@@ -4475,6 +4481,31 @@ sub CUL_HM_getDeviceName($) {#in: name out: name of device
   my $devHash = $modules{CUL_HM}{defptr}{substr($defs{$name}{DEF},0,6)};
   return ($devHash)?$devHash->{NAME}:$name;
 }
+sub CUL_HM_shH($$$){
+  my ($h,$l,$d) = @_;
+  if (   $h->{helper}{shRegW} 
+      && $h->{helper}{shRegW}{$l}
+      && $modules{CUL_HM}{defptr}{$d.$h->{helper}{shRegW}{$l}}){
+    return $modules{CUL_HM}{defptr}{$d.$h->{helper}{shRegW}{$l}};
+  }
+  return $h;
+}
+sub CUL_HM_shC($$$){
+  my ($h,$l,$c) = @_;
+  if (   $h->{helper}{shRegW} 
+      && $h->{helper}{shRegW}{$l}){
+    return $h->{helper}{shRegW}{$l};
+  }
+  return $c;
+}
+sub CUL_HM_lstCh($$$){
+  my ($h,$l,$c) = @_;
+  if (   $h->{helper}{shRegR} 
+      && $h->{helper}{shRegR}{$l}){
+    return $h->{helper}{shRegR}{$l};
+  }
+  return $c;
+}
 
 #+++++++++++++++++ debug ++++++++++++++++++++++++++++++++++++++++++++++++++++++
 sub CUL_HM_DumpProtocol($$@) {
@@ -4541,27 +4572,33 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
     $factor = $reg->{f};
     $unit = " ".$reg->{u};
   }
+  my $dst = substr(CUL_HM_name2Id($name),0,6);
   if(!$regLN){
     $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")
               .sprintf("RegL_%02X:",$list)
               .($peerId?CUL_HM_peerChName($peerId,
-                                          substr(CUL_HM_name2Id($name),0,6),
+                                          $dst,
                                           CUL_HM_IOid($hash)):"");
   }
   $regLN =~ s/broadcast//;
   my $regLNp = $regLN;
   $regLNp =~s/^\.//; #remove leading '.' in case ..
-
+  my $sdH = CUL_HM_shH($hash,sprintf("%02X",$list),$dst);
+  my $sRL = (    $sdH->{helper}{shadowReg}          # shadowregList
+              && $sdH->{helper}{shadowReg}{$regLNp})
+              ?$sdH->{helper}{shadowReg}{$regLNp}
+              :"";
+  my $rRL = ($hash->{READINGS}{$regLN})              #realRegList
+              ?$hash->{READINGS}{$regLN}{VAL}
+              :"";
+  
   my $data=0;
   my $convFlg = "";# confirmation flag - indicates data not confirmed by device
   for (my $size2go = $size;$size2go>0;$size2go -=8){
     my $addrS = sprintf("%02X",$addr);
     my ($dReadS,$dReadR) = (undef,"");
-    $dReadS = $1 if(   $hash->{helper}{shadowReg}
-                    && $hash->{helper}{shadowReg}{$regLNp}
-                    && $hash->{helper}{shadowReg}{$regLNp} =~ m/$addrS:(..)/);
-    $dReadR = $1 if(  $hash->{READINGS}{$regLN}
-                    &&$hash->{READINGS}{$regLN}{VAL}      =~ m/$addrS:(..)/);
+    $dReadS = $1 if( $sRL =~ m/$addrS:(..)/);
+    $dReadR = $1 if( $rRL =~ m/$addrS:(..)/);
     my $dRead = $dReadR;
     if (defined $dReadS){
       $convFlg = "set_" if ($dReadR ne $dReadS);
@@ -5124,8 +5161,8 @@ sub CUL_HM_dimLog($) {# dimmer readings - support virtual chan - unused so far
                       invMinus=>{calc=>'$val=(100-$val+$in)<100?(100-$val-$in) : 100'   ,txt=>'100 - state + chan'},
                       invMul  =>{calc=>'$val=(100-$val*$in)>0?(100-$val*$in) : 0'       ,txt=>'100 - state * chan'},
                       );
-  readingsSingleUpdate($hash,"R-logicCombTxt" ,$logicComb{$lComb}{txt},0);
-  readingsSingleUpdate($hash,"R-logicCombCalc",$logicComb{$lComb}{calc},0);
+  CUL_HM_UpdtReadBulk($hash,0,"R-logicCombTxt:".$logicComb{$lComb}{txt} 
+                             ,"R-logicCombCalc:".$logicComb{$lComb}{calc});
   return "";
 }
 
@@ -5254,7 +5291,7 @@ sub CUL_HM_ActCheck($) {# perform supervision
       }
     }
     if ($oldState ne $state){
-      readingsSingleUpdate($defs{$devName},"Activity",$state,1);
+      CUL_HM_UpdtReadSingle($defs{$devName},"Activity",$state,1);
       $attr{$devName}{actStatus} = $state;
       Log3 $actHash,4,"Device ".$devName." is ".$state;
     }
