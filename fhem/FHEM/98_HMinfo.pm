@@ -1123,9 +1123,9 @@ sub HMinfo_status($){##########################################################
     $hash->{I_autoReadPend} = join ",",@{$modules{CUL_HM}{helper}{qReqConf}};
     push @updates,"I_autoReadPend:". scalar @{$modules{CUL_HM}{helper}{qReqConf}};
   }
-  else{
+#  else{
 #    delete $hash->{I_autoReadPend};
-  }
+#  }
 
   # ------- what about rssi low readings ------
   foreach (grep {$rssiMin{$_} != 0}keys %rssiMin){
@@ -1140,10 +1140,8 @@ sub HMinfo_status($){##########################################################
   $d .= "$_:$rssiMinCnt{$_} " foreach (sort keys %rssiMinCnt);
   push @updates,"I_rssiMinLevel:".$d;
   $hash->{ERR___rssiCrit} = join(",",@rssiNames) if (@rssiNames);
-#  push @updates,":".$hash->{ERR___rssiCrit} if(@rssiNames);
   # ------- what about others ------
   $hash->{W_unConfRegs} = join(",",@shdwNames) if (@shdwNames > 0);
-#  push @updates,":".$hash->{W_unConfRegs} if(@shdwNames > 0);
   # ------- update own status ------
   $hash->{STATE} = "updated:".TimeNow();
   my $updt = join",",@updates;
