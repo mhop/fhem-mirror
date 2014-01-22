@@ -204,7 +204,7 @@ lookup2($$$$)
     my $vf = "";
     $vf = $lookup->{$reading} if( exists($lookup->{$reading}) );
     $vf = $lookup->{$name.".".$reading} if( exists($lookup->{$name.".".$reading}) );
-    $vf = $lookup->{$reading.".".$value} if( exists($lookup->{$reading.".".$value}) );
+    $vf = $lookup->{$reading.".".$value} if( defined($value) && exists($lookup->{$reading.".".$value}) );
     $lookup = $vf;
   } elsif($lookup =~ m/^{.*}$/) {
     my $DEVICE = $name;
