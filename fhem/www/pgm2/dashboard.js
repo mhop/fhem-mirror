@@ -4,111 +4,137 @@
 // Released : 14.11.2013 @svenson08
 // Version  : 1.00
 // Revisions:
-// 0001: Released to testers 
-// 0002: Add DebugMsg. Fix independent Groupsize adjustment after set & siterefresh. Fix
-//       wrong set of +Toogle Icon on Siderefresh
-//
+// 1.01: Released to testers 
+// 1.02: Add DebugMsg. Fix independent Groupsize adjustment after set & siterefresh. Fix
+//			wrong set of +Toogle Icon on Siderefresh
+// 2.00: First Changes vor Dashboard Tabs. Change method store Positiondata. optimization restore Positiondata. Clear poor routines.
+//			  Change max/min Values for Groupresize.	Top- and Bottom-Row always 100%
 // Known Bugs/Todo's
 // See 95_Dashboard.pm
 //########################################################################################
 //########################################################################################
 
 function saveOrder() {
-    var SaveResult = "";
-	//------------- Build new Position string ---------------
+	var EndSaveResult = "";
+	var ActiveTab = $("#tabs .ui-tabs-panel:visible").attr("id").substring(14,13);	
+	//------------------- Build new Position string ----------------------
     $(".dashboard_column").each(function(index, value){        
 		var colid = value.id;
-        var order = $('#' + colid).sortable("toArray");
-        for ( var i = 0, n = order.length; i < n; i++ ) {
-            var v = $('#' + order[i]).find('.dashboard_content').is(':visible');
-			var w = $('#' + order[i]).outerWidth();
-			if ( $('#' + order[i]).find(".dashboard_content").data("userheight") == null ) { 
-				var h = $('#' + order[i]).outerHeight(); 
-			} else {
-				var h = $('#' + order[i]).find(".dashboard_content").data("userheight"); 
-				if (h.length == 0) { var h = $('#' + order[i]).outerHeight(); }
+		var SaveResult = "";
+		var neworder = $('#' + colid).sortable("toArray");		
+		for ( var i = 0, n = neworder.length; i < n; i++ ) {
+			var tab = $('#' + neworder[i]).parent().attr("id").substring(14,13); 
+			var column = $('#' + neworder[i]).parent().attr("id").substring(20);	
+			if (ActiveTab == tab) {
+				var groupdata = ($('#' + neworder[i]).data("groupwidget").split(",")); //get curren Group-Configuration			
+				if (groupdata[1] != ''){
+					groupdata[0] = "t"+tab+"c"+$('#' + neworder[i]).parent().attr("id").substring(20);
+					groupdata[2] = $('#' + neworder[i]).find('.dashboard_content').is(':visible');
+					groupdata[3] = $('#' + neworder[i]).outerWidth();				
+					
+					if (groupdata[4] == 0) {groupdata[4] = $('#' + neworder[i]).outerHeight();}
+					if (groupdata[2] == true) {	
+						groupdata[4] = $('#' + neworder[i]).outerHeight();
+						$('#' + neworder[i]).find(".dashboard_content").data("userheight", $('#' + neworder[i]).outerHeight()); 
+					}								
+					$(neworder[i]).data("groupwidget",groupdata); //store in current Widget
+					SaveResult = SaveResult+groupdata+":";
+				}				
 			}
-            order[i] = order[i]+","+v+","+h+","+w;	
-        }
-		SaveResult = SaveResult + index+','+order+':';
-		//Result: <ColumNumber>,<portlet-1>,<status>,<height>,<width>,<portlet-n>,<status>,<height>,<width>:<columNumber.....		
+		}		
+		if (SaveResult != ""){ EndSaveResult = EndSaveResult + SaveResult; } //NewResult: <tab><column>,<portlet-1>,<status>,<height>,<width>,<portlet-n>,<status>,<height>,<width>:<columNumber.....	
     });	
-	//-------------------------------------------------------	
-	//------------ Set the new href String ------------------
-	document.getElementById("dashboard_currentsorting").value = SaveResult;	
-	if (document.getElementById("dashboard_button_set")) {
-		document.getElementById("dashboard_button_set").classList.add('dashboard_button_changed'); //Mark that the Changes are not saved
-	}
-	//-------------------------------------------------------
+	//------------------------------------------------------------------------		
+	//--------------------- Store new Positions ------------------------
+	if (EndSaveResult != "") { $("#tabs .ui-tabs-panel:visible").data("tabwidgets",EndSaveResult); } //store widgetposition in active tab Widget
+	document.getElementById("dashboard_button_set").classList.add('dashboard_button_changed'); //Mark that the Changes are not saved
+	//------------------------------------------------------------------------
 }
 
 function restoreOrder() {
-  $(".dashboard_column").each(function(index, value) {
-	var params = (document.getElementById("dashboard_attr").value).split(","); //get current Configuration
-	var coldata = (document.getElementById("dashboard_currentsorting").value).split(":");	//get the position string from the hiddenfield
-	var rowwidth = params[7] * params[1];
-	//------------------------------------------------------------
+ var params = (document.getElementById("dashboard_attr").value).split(","); //get current Configuration
+ var ActiveTab = $("#tabs .ui-tabs-panel:visible");
+ var ActiveTabId = ActiveTab.attr("id").substring(14,13);
+ var colwidth = ((100/params[7])-(0.5/params[7]))+"%"; //current
+ //var aColWidth = GetColWidth(params[7],params[12]); //future
 
-	$(".dashboard_column").width(params[1]); //Set Columwidth
-	$(".ui-row").width(rowwidth); //Set Rowwidth
-	if (value.id == "sortablecolumn100") { //Set RowHeight
-		$('#' + value.id).height(params[8]); 
-		$('#' + value.id).width(rowwidth);
-		var widgetmaxwidth = rowwidth;
-	} else {
-		if (value.id == "sortablecolumn200") { 
-			$('#' + value.id).height(params[9]);
-			$('#' + value.id).width(rowwidth);
-			var widgetmaxwidth = rowwidth;
-		} else { 
-			$('#' + value.id).height(params[5]); 
-			var widgetmaxwidth = params[1];
-		}
-	}
+ //--------------------------------------------- Set Row and Column Settings --------------------------------------------------------------------------------------------
+ $("#dashboard").width(params[1]);
+ if (ActiveTab.has("#dashboard_rowtop_tab"+ActiveTabId).length){ $("#dashboard_rowtop_tab"+ActiveTabId).height(params[8]);  }
+ if (ActiveTab.has("#dashboard_rowcenter_tab"+ActiveTabId).length){ $("#dashboard_rowcenter_tab"+ActiveTabId).height(params[5]); } 
+ if (ActiveTab.has("#dashboard_rowbottom_tab"+ActiveTabId).length){ $("#dashboard_rowbottom_tab"+ActiveTabId).height(params[9]); } 
+
+ for (var i = 0, n = params[7]; i <= n; i++) {  
+	if (ActiveTab.has("#dashboard_tab"+ActiveTabId+"column"+i).length) { $("#dashboard_tab"+ActiveTabId+"column"+i).width(colwidth); } //current
+	//if (ActiveTab.has("#dashboard_tab"+ActiveTabId+"column"+i).length) { $("#dashboard_tab"+ActiveTabId+"column"+i).width(aColWidth[i]+"%"); } //future
+ }	
+ if (params[2] == 1) { $(".ui-row").addClass("dashboard_columnhelper"); } else { $(".ui-row").removeClass("dashboard_columnhelper"); }//set showhelper
+ //--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+     
+ $(".dashboard_widget").each(function(index, value) {
+	var groupdata = $(this).data("groupwidget").split(","); //get the position string from the data
+	var TabId = groupdata[0].substring(1,2);
+	var ColumnId = groupdata[0].substring(3,groupdata[0].length);
 	
-	if (params[2] == 1) { $(".dashboard_column").addClass("dashboard_columnhelper"); } else { $(".dashboard_column").removeClass("dashboard_columnhelper"); }//set helperclass
+	if (TabId == ActiveTabId){ //Restore only for the current active tab
+		var groupname = groupdata[1];
+		var visible = groupdata[2];
+		var width = groupdata[3];
+		var height = groupdata[4];		
 
-	for (var i = 0, n = coldata.length; i < n; i++ ) { //for each column (Value = 1,name1,state1,name2,state2)
-		var portletsdata = coldata[i].split(","); //protlet array / all portlets in this (=index) column
+		//---------- Max. Width of an Group. Reduce group-with if need | Min. Width if need ----------	
+		var widgetmaxwidth = $(this).parent().width();
+		if (width == 0) { width = $(this).find(".dashboard_content").children().outerWidth()+10;}   
+		if (width > widgetmaxwidth) {width = widgetmaxwidth}; //width is =< columnwith
+		$(this).outerWidth(width);
+		//---------------------------------------------------------------------------------------------------------------	
+		//-------------------------------- Height of an Group. | Min. Height if need ---------------------------	
+		if (height == 0) { height = $(this).outerHeight();}		
+		if ($(this).outerHeight() > height) {$(this).outerHeight(height); } //set heigh only if > group min. height
+		//---------------------------------------------------------------------------------------------------------------
 		
-		//alert("Load Event (1) \nColumn="+index+"\nSaveResult="+coldata+"\nColumndata=("+i+"/"+coldata.length+") "+portletsdata);
-		for (var j = 1, m = portletsdata.length; j < m; j += 4 ) { 
-			//alert("Load Event (2) \nColumn="+index+"\nSaveResult="+coldata+"\nColumndata=("+i+"/"+coldata.length+"|"+j+"/"+portletsdata.length+") "+portletsdata+
-			//"\n\nPortletdata (ID)="+portletsdata[j]+"\nPortletdata (Visible)="+portletsdata[j+1]+"\nPortletheight (Height)="+portletsdata[j+2]+"\nPortletwidth (Width)="+portletsdata[j+3]);	
-			if (portletsdata[0] == index && portletsdata[0] != '' && portletsdata[j] != '' && portletsdata[j+1] != '') {
-				var portletID = portletsdata[j];
-				var visible   = portletsdata[j+1];
-				var height    = portletsdata[j+2]-5; //( limited -5 by CSS)
-				var width     = portletsdata[j+3]-5; //( limited -5 by CSS)
-
-				if (width > widgetmaxwidth) {width = widgetmaxwidth}; //Fix with ist widget width > current column width.
-				var portlet = $(".dashboard_column").find('#' + portletID);
-				portlet.appendTo($('#' + value.id));				
-				portlet.outerHeight(height);					
-				portlet.outerWidth(width);					
-				if (params[2] == 1) { portlet.addClass("dashboard_widgethelper"); } else { portlet.removeClass("dashboard_widgethelper"); }//Show Widget-Helper Frame
-				if (visible === 'false') {			
-
-					if (portlet.find(".dashboard_widgetheader").find(".dashboard_button_icon").hasClass("dashboard_button_iconminus")) { 
-						portlet.find(".dashboard_widgetheader").find(".dashboard_button_icon").removeClass( "dashboard_button_iconminus" ); 
-						portlet.find(".dashboard_widgetheader").find(".dashboard_button_icon").addClass( "dashboard_button_iconplus" ); 
-					}
-				
-					var currHeigth = Math.round(portlet.height());
-					portlet.find(".dashboard_content").data("userheight", currHeigth);
-					portlet.find(".dashboard_content").hide();	
-					var newHeigth = portlet.find(".dashboard_widgetinner").height()+5;		
-					portlet.height(newHeigth);								
-				}
-			}
-		}	
-	} 
-  });	
+		$(this).find(".dashboard_content").data("userheight", height-5);		
+		if (params[2] == 1) { $(this).addClass("dashboard_widgethelper"); } else { $(this).removeClass("dashboard_widgethelper"); }//Show Widget-Helper Frame
+		
+		if (visible === 'false') {
+			if ($(this).find("span").hasClass("dashboard_button_iconminus")){
+				$(this).find("span")
+					.removeClass( "dashboard_button_iconminus" )
+					.addClass( "dashboard_button_iconplus" ); 
+			}						
+			$(this).find(".dashboard_content").hide();	
+			$(this).height($(this).find(".dashboard_widgetinner").height()+5);								
+		}						
+	}
+ });
 } 
+
+function GetColWidth(ColCount, ColWidth){
+ var aColWidth = ColWidth.replace(/%/g, "").split(":");
+ if (aColWidth.length > ColCount) { aColWidth.length = ColCount; }
+ if (aColWidth.length < ColCount) { for (var i = aColWidth.length; i < ColCount; i++) { aColWidth[i] = "20"; } }   //fill missin width parts with 20%
+ var ColWidthCount = aColWidth.length; 
+ var ColWidthSum = 0;
+ for (var i = 0; i < ColWidthCount; i++) { ColWidthSum = parseInt(aColWidth[i]) + ColWidthSum; } 
+
+ if (ColWidthSum > 100) { //reduce width down to 100%
+    while (ColWidthSum > 100){
+		ColWidthSum = 0;
+		for (var i = 0; i < ColWidthCount; i++) { 
+			if (parseInt(aColWidth[i]) > 10) { aColWidth[i] = parseInt(aColWidth[i])-1; }
+			ColWidthSum = parseInt(aColWidth[i]) + ColWidthSum; 
+		} 		
+	}
+ }
+ if (ColWidthSum < 100) { aColWidth[ColWidthCount-1] = parseInt(aColWidth[ColWidthCount-1]) + (100 - ColWidthSum); } //fill up to 100% width  
+
+ aColWidth[0] = parseInt(aColWidth[0])-(0.2 * ColCount);
+ return aColWidth;
+}
 
 //Only use for debugging
 function showdebugMessage(msg){
-	document.getElementById("dashboard_jsdebug").value = document.getElementById("dashboard_jsdebug").value+" "+msg;
+	document.getElementById("dashboard_jsdebug").value = msg;
 }
 
 function dashboard_tooglelock(){
@@ -144,66 +170,69 @@ function dashboard_unsetlock(){
 	$( ".dashboard_column" ).sortable( "option", "disabled", false );
 	if (params[2] == 1) { $( ".dashboard_widget" ).addClass("dashboard_widgethelper"); } else { $( ".dashboard_widget" ).removeClass("dashboard_widgethelper"); }//Show Widget-Helper Frame
 	if (params[2] == 1) { $( ".dashboard_column" ).addClass("dashboard_columnhelper"); } else { $( ".dashboard_column" ).removeClass("dashboard_columnhelper"); }//Show Widget-Helper Frame
+
 	dashboard_modifyWidget();
 	//############################################################
 }
 
-function dashboard_setposition(){
-	var params = (document.getElementById("dashboard_attr").value).split(","); //get current Configuration
-	var sorting = document.getElementById("dashboard_currentsorting").value;
-	FW_cmd(document.location.pathname+'?XHR=1&cmd.'+params[0]+'=attr '+params[0]+' dashboard_sorting '+sorting);
-	document.getElementById("dashboard_button_set").classList.remove('dashboard_button_changed'); 
+function dashboard_setposition(){ 
+ var params = (document.getElementById("dashboard_attr").value).split(","); //get current Configuration
+ //------------------- store group position ----------------------------
+ for (var i = 0, n = params[10]; i < n; i++ ) {
+	if ($("#dashboard_tab"+i).data("tabwidgets") != null) {	
+		var j = i+1;
+		FW_cmd(document.location.pathname+'?XHR=1&cmd.'+params[0]+'=attr '+params[0]+' dashboard_tab'+j+'sorting '+$("#dashboard_tab"+i).data("tabwidgets"));
+	}
+ }
+ document.getElementById("dashboard_button_set").classList.remove('dashboard_button_changed'); 
+ //--------------------------------------------------------------------- 
+ //--------------------- store active Tab ------------------------------
+ var activeTab = ($( "#tabs" ).tabs( "option", "active" ))+1;
+ if (params[11] != activeTab){
+	FW_cmd(document.location.pathname+'?XHR=1&cmd.'+params[0]+'=attr '+params[0]+' dashboard_activetab '+activeTab);
+ }
+ //--------------------------------------------------------------------- 
 }
 
 function dashboard_modifyWidget(){
 		$( ".dashboard_widget" ).resizable({ 
-			'grid': 1,
-			'minWidth':  150,
+			'grid': 5,
 			start: function(e, ui) {
 				var params = (document.getElementById("dashboard_attr").value).split(","); //get current Configuration
-				//-------- Widgetbegrenzung festlegen -------------------
-				var rowid = $(this).parent().attr("id");
-				if (rowid == "sortablecolumn100") { 
-					var widgetmaxwidth = (params[7] * params[1]) - 5; 
-					var widgetmaxheight = params[8] - 5;
-				}
-				else { if (rowid == "sortablecolumn200") { 
-						var widgetmaxwidth = (params[7] * params[1]) - 5; 
-						var widgetmaxheight = params[9] -5 ;
-					 }
-					   else { 
-						var widgetmaxwidth = params[1] - 5;
-						var widgetmaxheight = params[5] -5;						
-					   }	
-				}
-				//-------------------------------------------------------
+				var groupdata = $(this).data("groupwidget").split(","); //get the position string from the data
+				var TabId = $(this).parent().attr("id").substring(14,13);
+				var ColumnId = $(this).parent().attr("id").substring(20);	
+				var widgetmaxwidth = $(this).parent().width();
+				
+				if (ColumnId == "100") { var widgetmaxheight = params[8]; }
+				if ((ColumnId != "100") && (ColumnId != "200")) { var widgetmaxheight = params[5]; }
+				if (ColumnId == "200") { var widgetmaxheight = params[9]; }
 				
 				maxWidthOffset = widgetmaxwidth;
-				$(this).resizable("option","maxWidth",widgetmaxwidth);
+				$(this).resizable("option","maxWidth",widgetmaxwidth-5);
 				$(this).resizable("option","maxHeight",widgetmaxheight);
 			},
 			resize: function(e, ui) {
-				minHeightOffset = $(this).find(".dashboard_widgetinner").height()+5;
-				ui.size.width = Math.round(ui.size.width);
-				if (ui.size.width > (maxWidthOffset)) {	$(this).resizable("option","maxWidth",maxWidthOffset); }
-				if (ui.size.height < (minHeightOffset)) { $(this).resizable("option","minHeight",minHeightOffset); }	
+				if ($(this).find(".dashboard_widgetheader").outerWidth() < $(this).find(".dashboard_content").children().outerWidth()) {$(this).resizable("option","minWidth", $(this).find(".dashboard_content").children().outerWidth()+5 ); }
+				if ($(this).find(".dashboard_widget").outerHeight() < $(this).find(".dashboard_widgetinner").outerHeight()) { $(this).resizable("option","minHeight",  $(this).find(".dashboard_widgetinner").outerHeight()); }
 			},
 			stop: function() { 
-				minHeightOffset = $(this).find(".dashboard_widgetinner").height()+5;
-				$(this).resizable("option","minHeight",minHeightOffset);
 				saveOrder(); 
 			} 
 		});		
 }
 
 $(document).ready( function () {
+	//--------------------------------- Attribute des Dashboards ------------------------------------------------------------------
 	var params = (document.getElementById("dashboard_attr").value).split(","); //get current Configuration
-	
+	//-------------------------------------------------------------------------------------------------------------------------------------
+
     $(".dashboard_column").sortable({
         connectWith: ['.dashboard_column', '.ui-row'],
+		cursor: 'move',
         stop: function() { saveOrder(); }
     }); 
-
+	
 	if (params[4] == 0){ //set if buttonbar not show
 		dashboard_modifyWidget();
 		dashboard_setlock();		
@@ -211,7 +240,7 @@ $(document).ready( function () {
 
 	if (params[6] == 1){ //ToogleButton show/hide	
 		$(".dashboard_widget")
-				.addClass( "dashboard_widget dashboard_content ui-corner-all" )
+				.addClass( "dashboard_widget ui-corner-all" )
 				.find(".dashboard_widgetheader")
 				.addClass( "dashboard_widgetheader ui-corner-all" )
 				.prepend('<span class="dashboard_button_icon dashboard_button_iconminus"></span>')  
@@ -222,16 +251,21 @@ $(document).ready( function () {
 				$(this).removeClass( "dashboard_button_iconplus" );
 				$(this).addClass( "dashboard_button_iconminus" );
 				$(this).parents(".dashboard_widget:first").find(".dashboard_content").show();				
-				var newHeigth = $(this).parents(".dashboard_widget:first").find(".dashboard_content").data("userheight");	
+				var newHeigth = $(this).parents(".dashboard_widget:first").find(".dashboard_content").data("userheight");
+				//-------- set heigh only if > group min. height -------------
+				if ($(this).parents(".dashboard_widgetinner").outerHeight() > newHeigth) { 
+					$(this).parents(".dashboard_widget:first").outerHeight($(this).parents(".dashboard_widgetinner").outerHeight()+10); 
+				} else { $(this).parents(".dashboard_widget:first").outerHeight(newHeigth);}
+				//------------------------------------------------------------
 			} else {
 				$(this).removeClass( "dashboard_button_iconminus" );
 				$(this).addClass( "dashboard_button_iconplus" );			
 				var currHeigth = Math.round($(this).parents(".dashboard_widget:first").height());
 				$(this).parents(".dashboard_widget:first").find(".dashboard_content").data("userheight", currHeigth);
 				$(this).parents(".dashboard_widget:first").find(".dashboard_content").hide();	
-				var newHeigth = $(this).parents(".dashboard_widget:first").find(".dashboard_widgetinner").height()+5;			
+				var newHeigth = $(this).parents(".dashboard_widget:first").find(".dashboard_widgetinner").height()+5;
+				$(this).parents(".dashboard_widget:first").height(newHeigth);		
 			}				 
-			$(this).parents(".dashboard_widget:first").height(newHeigth);
 			saveOrder();
 			event.stopImmediatePropagation();
 		});
@@ -254,17 +288,26 @@ $(document).ready( function () {
 			dashboard_modifyWidget();
 			if (params[3] == "lock") { 
 				$(this).button( "option", "label", "Unlock" );
-				dashboard_setlock(); 
+				dashboard_setlock();  
 			} else {
 				$(this).button( "option", "label", "Lock" );
-				dashboard_unsetlock();				
+				dashboard_unsetlock();
 			}
 		}
 	});
 	
-	restoreOrder(); 	
+	//--------------------------------- Dashboard Tabs ------------------------------------------------------------------------------
+	$("#tabs").tabs({
+		active: 0,
+		create: function(event, ui) { 
+			$( "#tabs" ).tabs( "option", "active", params[11]-1 ); //set active Tab
+			restoreOrder(); 
+			},
+		activate: function (event, ui) {
+			restoreOrder(); 
+		}   
+	});	
+	//-------------------------------------------------------------------------------------------------------------------------------------		
 });
-
-
 
 

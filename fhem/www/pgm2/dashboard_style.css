@@ -1,25 +1,27 @@
 /* Author: svenson08*/
-.dashboard_buttonbar { background: none repeat scroll 0 0 #F0F0D8; border: 1px solid #808080;
-         padding: 4px; border-radius: 8px 8px 8px 8px; float: left;}
-.dashboard_button { border-radius: 8px; float: left; background-color: #FFFFE7; font-weight: bold; font-size: 0.8em; background-repeat:no-repeat;
-          background-position: 4px 2px; border: 1px solid #808080; padding: 0.2em 0.7em 0.2em 0.4em; }
+.dashboard_buttonbar { background: none repeat scroll 0 0 #d3d3ad; border: 1px solid #808080;padding: 6px; margin: 0 .5em 0 0.4em;float: left; }
+.dashboard_buttonbar_top { border-bottom-width: 0; border-top-left-radius: 8px; border-top-right-radius: 8px; }
+.dashboard_buttonbar_bottom { border-top-width: 0; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+
+.dashboard_button { border-radius: 8px; float: left; color: #1c94c4; font-weight: bold; font-size: 0.8em; background-repeat:no-repeat;
+					background-position: 4px 2px; border: 1px solid #808080; padding: 0.2em 0.7em 0.2em 0.4em; }
 .dashboard_button_changed { color: blue; font-weight:bold; }
 
 .dashboard_column { float: left; }
 .dashboard_columnhelper { border: 1px dotted #808080; }
 
-.dashboard_widget { border-radius: 8px; float: left; } 
+.dashboard_widget { border-radius: 8px; float: left; padding: 0.2em;} 
 .dashboard_widgethelper { background-color: #A0FFFF; }
 .dashboard_widgetheader { background: none repeat scroll 0 0 #F0F0D8; border: 1px solid #808080;
-          border-radius: 8px; margin: 0.2em; 
-          padding-bottom: 2px; padding-top: 3px; padding-left: 0.2em;  }
+					border-radius: 8px; margin: 0.2em; 
+					padding-bottom: 4px; padding-top: 3px; padding-left: 0.7em;	}
 .dashboard_content { padding: 0.2em; }
 
 .dashboard_button_icon { width: 13px; height: 14px; background-repeat: no-repeat; 
-            float: left; background-image: url(../images/default/dashboardicons.png); }  
+						float: left; background-image: url(../images/default/dashboardicons.png); }	
 .dashboard_button_iconplus { margin: 0.1em 0.4em; float: right; background-position: -154px 0px; }
 .dashboard_button_iconminus { margin: 0.1em 0.4em; float: right; background-position: -140px 0px; }
-.dashboard_button_iconset { background-position: -116px 0px; }  
+.dashboard_button_iconset { background-position: -116px 0px; }	
 .dashboard_button_iconlock { background-position: -103px 0px; }
 .dashboard_button_iconunlock { background-position: -91px 0px; }
 .dashboard_button_icondetail { background-position: -128px 0px; }
@@ -27,7 +29,23 @@
 .ui-resizable { position: relative; }
 .ui-resizable-handle { position: absolute; font-size: 0.1px; }
 .ui-resizable-se { cursor: se-resize; width: 12px; height: 12px; right: 1px;
-           bottom: 1px; background-image: url(../images/default/dashboardicons.png); 
-           background-position: -170px 0px; background-repeat: no-repeat; }
+				   bottom: 1px; background-image: url(../images/default/dashboardicons.png); 
+				   background-position: -170px 0px; background-repeat: no-repeat; }
 .ui-sortable-placeholder { border: 1px dotted #808080;  visibility: visible !important; 
-               height: 25px !important; width: 150px; }
+						   height: 25px !important; width: 150px; }
+
+
+/* Neue CSS Einträge für Dashboard-Tabs */						
+.dashboard { padding: 0; margin: 0; }
+.dashboard_tabnav {	list-style: none; margin: 0; padding: 0 .5em 0; }
+.dashboard_tabnav:before,
+.dashboard_tabnav:after { content: ""; display: table; border-collapse: collapse; clear: both; }
+.dashboard_tabpanel { border: 1px solid #cccccc; background-color: #F0F0D8; border: 1px solid #dddddd;
+					border-radius: 8px 8px 8px 8px; }
+.dashboard_tab { border: 1px solid #cccccc;	border-bottom-width: 0;	border-top-left-radius: 8px;
+				border-top-right-radius: 8px; margin: 0 .5em -1px 0; float: left; padding: .5em 1em; }
+.dashboard_tab.ui-tabs-active { background-color: #F0F0D8; font-weight: bold; }
+.dashboard_tabcontent { width: 100%; padding: 0; margin: 0; }
+
+.dashboard_row { width: 100%; height: inherit; }
+.dashboard_columncenter { height: inherit;}
