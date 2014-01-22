@@ -388,7 +388,7 @@ readingsGroup_2html($)
           my $cmd = $3;
           $txt = FW_makeImage( $icon, $icon, "icon" );
 
-          $cmd = lookup2($commands,$name,undef,$icon) if( !defined($cmd) );
+          $cmd = lookup2($commands,$name,$d,$icon) if( !defined($cmd) );
           ($txt,undef) = readingsGroup_makeLink($txt,undef,$cmd);
 
         } elsif( $first || $multi == 1 ) {
@@ -407,7 +407,7 @@ readingsGroup_2html($)
           }
         }
         my $inform_id = "";
-        $inform_id = "informId=\"$d-$item.item\"" if( $readings );
+        $inform_id = "informId=\"$d-i$item.item\"" if( $readings );
         $ret .= "<td><div $name_style $inform_id>$txt</div></td>";
         $first = 0;
         next;
@@ -679,11 +679,12 @@ readingsGroup_Notify($$)
                 my $icon = $1;
                 my $cmd = $3;
 
+                $cmd = lookup2($commands,$name,$h->{NAME},$icon) if( !defined($cmd) );
                 $txt = FW_makeImage( $icon, $icon, "icon" );
                 ($txt,undef) = readingsGroup_makeLink($txt,undef,$cmd);
               }
 
-              CommandTrigger( "", "$name $item.item: $txt" );
+              CommandTrigger( "", "$name i$item.item: $txt" );
             }
 
             next;
