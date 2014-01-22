@@ -894,9 +894,8 @@ sub CUL_HM_Parse($$) {##############################
                  ($setTemp >30 )?'on' :$setTemp;
 
       my $dHash = $shash;
-       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
+      $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
-
       my %errTbl=( 0=>"ok", 1=>"ValveTight", 2=>"adjustRangeTooLarge"
                   ,3=>"adjustRangeTooSmall" , 4=>"communicationERR"
                   ,5=>"unknown" , 6=>"lowBat" , 7=>"ValveErrorPosition" );
@@ -1709,7 +1708,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       $reply = "ACKStatus";
       
       my $chnHash = CUL_HM_id2Hash($src.substr($p,2,2));
-      readingsSingleUpdate($chnHash,"recentStateType","ack",0);
+      CUL_HM_UpdtReadSingle($chnHash,"recentStateType","ack",0);
      
       if ($shash->{helper}{tmdOn}){
         if (not hex(substr($p,6,2))&0x40){# not timedOn, we have to repeat
@@ -1749,7 +1748,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       my $chn = sprintf("%02X",hex(substr($p,2,2))&0x3f);
       my $chnhash = $modules{CUL_HM}{defptr}{$chn?$src.$chn:$src};
       $chnhash = $shash if(!$chnhash);
-      readingsSingleUpdate($chnhash,"CommandAccepted",$success,0);
+      CUL_HM_UpdtReadSingle($chnhash,"CommandAccepted",$success,0);
       CUL_HM_ProcessCmdStack($shash) if(CUL_HM_IOid($shash) eq $dst);
       delete $shash->{helper}{prt}{wuReSent}
               if (!$shash->{helper}{prt}{mmcS});
@@ -1892,7 +1891,8 @@ sub CUL_HM_parseCommon(@){#####################################################
         if (   defined $lastAddr 
             && (    $lastAddr > $shash->{helper}{prt}{rspWait}{nAddr}
                  || $lastAddr == 0)){
-          readingsSingleUpdate($chnHash,$regLN,
+                 
+          CUL_HM_UpdtReadSingle($chnHash,$regLN,
                      ReadingsVal($chnName,$regLN,"")." ".$data,0);
           $shash->{helper}{prt}{rspWait}{nAddr} = $lastAddr;
         }
@@ -1900,7 +1900,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         if ($data =~ m/00:00$/){ # this was the last message in the block
           if($list eq "00"){
             my $name = CUL_HM_id2Name($src);
-            readingsSingleUpdate($shash,"PairedTo",
+            CUL_HM_UpdtReadSingle($shash,"PairedTo",
                             CUL_HM_getRegFromStore($name,"pairCentral",0,""),0);
           }
           CUL_HM_respPendRm($shash);
@@ -1943,7 +1943,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       $chnHash->{helper}{shadowReg}{$regLNp} = $shdwReg;
       $lN = join(' ',sort(split(' ',$lN)));# re-order
       if ($lN =~ s/00:00//){$lN .= " 00:00"};
-      readingsSingleUpdate($chnHash,$regLN,$lN,0);
+      CUL_HM_UpdtReadSingle($chnHash,$regLN,$lN,0);
       CUL_HM_updtRegDisp($chnHash,$list,$peerID);
       $ret= "parsed";
     }
@@ -1956,7 +1956,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       @{$modules{CUL_HM}{helper}{qReqStat}} = grep { $_ ne $shash->{NAME} }
                                        @{$modules{CUL_HM}{helper}{qReqStat}};
       my $chnHash = CUL_HM_id2Hash($src.substr($p,2,2));
-      readingsSingleUpdate($chnHash,"recentStateType","info",0);
+      CUL_HM_UpdtReadSingle($chnHash,"recentStateType","info",0);
 
       if ($pendType eq "StatusReq"){#it is the answer to our request
         my $chnSrc = $src.$shash->{helper}{prt}{rspWait}{forChn};
@@ -3528,21 +3528,21 @@ sub CUL_HM_valvePosTmr(@) {#calc next vd wakeup
   
   my $pn = CUL_HM_id2Name($hash->{helper}{vd}{id});
   my $ackTime = ReadingsTimestamp($pn, "ValvePosition", "");
-
+  my $vc;
   if (!$ackTime || $ackTime eq $hash->{helper}{vd}{ackT} ){
     $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextF};
-    $hash->{helper}{vd}{miss}++;
-    CUL_HM_UpdtReadSingle($hash,"valveCtrl","lost",1)
-          if(   $hash->{helper}{vd}{miss} > 6 
-             && ReadingsVal($hash->{NAME},"valveCtrl","") ne "lost");
+    $vc = (++$hash->{helper}{vd}{miss} > 5)
+                                          ?"lost"
+                                          :"miss_".$hash->{helper}{vd}{miss};
     Log3 $hash->{NAME},5,"CUL_HM $hash->{NAME} virtualTC use fail-timer";
   }
   else{
     $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextM};
-    CUL_HM_UpdtReadSingle($hash,"valveCtrl","ok",1)
-          if(ReadingsVal($hash->{NAME},"valveCtrl","") ne "ok");
+    $vc = "ok";
     $hash->{helper}{vd}{miss} = 0;
   }
+  CUL_HM_UpdtReadSingle($hash,"valveCtrl",$vc,1)
+          if(ReadingsVal($hash->{NAME},"valveCtrl","") ne $vc);
   $hash->{helper}{vd}{ackT} = $ackTime;
   InternalTimer($hash->{helper}{vd}{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
 }
