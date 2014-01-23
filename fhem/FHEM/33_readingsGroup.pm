@@ -361,7 +361,7 @@ readingsGroup_2html($)
         my $txt = $1;
         my $readings;
         $item++;
-        if( $txt =~ m/^{(.*)}(@[\w-|.*]+)?$/ ) {
+        if( $txt =~ m/^{(.*)}(@[\w\-|.*]+)?$/ ) {
           $txt = "{$1}";
           $readings = $2;
 
@@ -659,7 +659,7 @@ readingsGroup_Notify($$)
             my $txt = $1;
             my $readings;
             $item++;
-            if( $txt =~ m/^{(.*)}(@([\w-|.*]+))?$/ ) {
+            if( $txt =~ m/^{(.*)}(@([\w\-|.*]+))?$/ ) {
               $txt = "{$1}";
               $readings = $3;
 
