@@ -750,6 +750,8 @@ sub HMLAN_DoInit($) {##########################################################
   HMLAN_SimpleWrite($hash, "A$id") if($id ne "999999");
   HMLAN_SimpleWrite($hash, "C");
   HMLAN_writeAesKey($name);
+  my $s2000 = sprintf("%02X", HMLAN_secSince2000());
+  HMLAN_SimpleWrite($hash, "T$s2000,04,00,00000000");
 
   delete $hash->{helper}{ref};
 
@@ -853,17 +855,32 @@ sub HMLAN_qResp($$$) {#response-waiting queue##################################
   if ($cmd){
     $hashQ->{answerPend} ++;
     push @{$hashQ->{apIDs}},$id;
-    $hash->{XmitOpen} = 0 if ($hashQ->{answerPend} >= $hashQ->{hmLanQlen});
+    if ($hashQ->{answerPend} >= $hashQ->{hmLanQlen}){
+      $hash->{XmitOpen} = 0;
+      InternalTimer(gettimeofday()+10, "HMLAN_clearQ", "hmClearQ:$hash->{NAME}", 0);
+    }
   }
   else{
     $hashQ->{answerPend}-- if ($hashQ->{answerPend}>0);
     @{$hashQ->{apIDs}}=grep !/$id/,@{$hashQ->{apIDs}};
+    RemoveInternalTimer("hmClearQ:$hash->{NAME}")if ($hash->{XmitOpen} ==0);
     $hash->{XmitOpen} = 1
             if (($hashQ->{answerPend} < $hashQ->{hmLanQlen}) &&
                 !($hashQ->{HMcndN} == 4 ||
                   $hashQ->{HMcndN} == 253)
                );
   }
+}
+sub HMLAN_clearQ($) {#clear pending acks due to timeout########################
+  my($in ) = shift;
+  my(undef,$name) = split(':',$in);
+  my $hash = $defs{$name};
+  @{$hash->{helper}{q}{apIDs}} = (); #clear Q-status
+  $hash->{helper}{q}{answerPend} = 0;
+  Log3 $hash, 4, "HMLAN_ack: timeout - clear queue";
+  my $HMcnd = $hash->{helper}{q}{HMcndN};
+  if ($HMcnd == 4 || $HMcnd == 253) {$hash->{XmitOpen} = 0;
+  }else{                             $hash->{XmitOpen} = 1;}
 }
 
 sub HMLAN_condUpdate($$) {#####################################################
