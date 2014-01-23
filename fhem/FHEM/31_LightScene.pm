@@ -386,7 +386,7 @@ LightScene_Set($@)
 
   if( !defined($cmd) ){ return "$name: set needs at least one parameter" };
 
-  if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove:".join(",", sort keys %{$hash->{SCENES}}) ." save set scene:".join(",", sort keys %{$hash->{SCENES}})};
+  if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove:".join(",", sort keys %{$hash->{SCENES}}) ." save set setcmd scene:".join(",", sort keys %{$hash->{SCENES}})};
 
   if( $cmd eq "save" && !defined( $scene ) ) { return "Usage: set $name save <scene_name>" };
   if( $cmd eq "scene" && !defined( $scene ) ) { return "Usage: set $name scene <scene_name>" };
@@ -395,14 +395,19 @@ LightScene_Set($@)
   if( $cmd eq "remove" ) {
     delete( $hash->{SCENES}{$scene} );
     return undef;
-  } elsif( $cmd eq "set" ) {
+  } elsif( $cmd eq "set" || $cmd eq "setcmd" ) {
     my ($d, @args) = @a;
 
-    if( !defined( $scene ) || !defined( $d ) || !@args ) { return "Usage: set $name set <scene_name> <device> <cmd>" };
+    if( !defined( $scene ) || !defined( $d ) ) { return "Usage: set $name set <scene_name> <device> [<cmd>]" };
     return "no stored scene >$scene<" if( !defined($hash->{SCENES}{$scene} ) );
-    return "device >$d< is not a member of scene >$scene<" if( !defined($hash->{CONTENT}{$d} ) );
+    #return "device >$d< is not a member of scene >$scene<" if( !defined($hash->{CONTENT}{$d} ) );
 
-    $hash->{SCENES}{$scene}{$d} = join(" ", @args);
+    if( !@args ) {
+      delete $hash->{SCENES}{$scene}{$d};
+    } else {
+      $hash->{SCENES}{$scene}{$d} = (($cmd eq "setcmd")?';':''). join(" ", @args);
+    }
+
     return undef;
   }
 
@@ -543,13 +548,17 @@ LightScene_Set($@)
         my $r = "";
         foreach my $entry (@{$state}) {
           $r .= "," if( $ret );
-          $r .= CommandSet(undef,"$d $entry");
+          if( $entry =~m/^;/ ) {
+            $r .= AnalyzeCommandChain(undef,"$entry");
+          } else {
+            $r .= CommandSet(undef,"$d $entry");
+          }
         }
         $ret .= " " if( $ret );
         $ret .= $r;
       } else {
         $ret .= " " if( $ret );
-        if( $state =~m/^sleep\s*/ ) {
+        if( $state =~m/^;/ ) {
           $ret .= AnalyzeCommandChain(undef,"$state");
         } else {
           $ret .= CommandSet(undef,"$d $state");
@@ -660,8 +669,10 @@ LightScene_Get($@)
       save current state for alle devices in this LightScene to &lt;scene_name&gt;</li>
       <li>scene &lt;scene_name&gt;<br>
       shows scene &lt;scene_name&gt; - all devices are switched to the previously saved state</li>
-      <li>set &lt;scene_name&gt; &lt;device&gt; &lt;cmd&gt;<br>
+      <li>set &lt;scene_name&gt; &lt;device&gt; [&lt;cmd&gt;]<br>
       set the saved state of &lt;device&gt; in &lt;scene_name&gt; to &lt;cmd&gt;</li>
+      <li>setcmd &lt;scene_name&gt; &lt;device&gt; [&lt;cmd&gt;]<br>
+      set command to be executed for &lt;device&gt; in &lt;scene_name&gt; to &lt;cmd&gt;</li>
       <li>remove &lt;scene_name&gt;<br>
       remove &lt;scene_name&gt; from list of saved scenes</li>
     </ul><br>
