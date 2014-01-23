@@ -672,7 +672,12 @@ LightScene_Get($@)
       <li>set &lt;scene_name&gt; &lt;device&gt; [&lt;cmd&gt;]<br>
       set the saved state of &lt;device&gt; in &lt;scene_name&gt; to &lt;cmd&gt;</li>
       <li>setcmd &lt;scene_name&gt; &lt;device&gt; [&lt;cmd&gt;]<br>
-      set command to be executed for &lt;device&gt; in &lt;scene_name&gt; to &lt;cmd&gt;</li>
+      set command to be executed for &lt;device&gt; in &lt;scene_name&gt; to &lt;cmd&gt;.
+      &lt;cmd&gt; can be any commandline that fhem understands including multiple commands separated by ;;
+      <ul>
+        <li>set kino_group setcmd allOff LampeDecke sleep 30 ;; set LampeDecke off</li>
+        <li>set light_group setcmd test Lampe1 sleep 10 ;; set Lampe1 on ;; sleep 5 ;; set Lampe1 off</li>
+      </ul></li>
       <li>remove &lt;scene_name&gt;<br>
       remove &lt;scene_name&gt; from list of saved scenes</li>
     </ul><br>
