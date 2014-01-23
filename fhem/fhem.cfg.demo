@@ -7,21 +7,24 @@ attr global room System
 attr global sendStatistics never
 attr global statefile ./demolog/fhem.save
 attr global updateInBackground 1
-attr global userattr Light Light_map devStateIcon devStateStyle icon sortby structexclude webCmd
+attr global userattr Light Light_map devStateIcon devStateStyle icon lightSceneParamsToSave sortby structexclude webCmd
 attr global verbose 3
 
 define telnetPort telnet 7072 global
 attr telnetPort room System
 
 define WEB FHEMWEB 8083 global
+attr WEB hiddenroom DashboardRoom
 attr WEB iconPath openautomation:fhemSVG
 attr WEB room System
 
 define WEBphone FHEMWEB 8084 global
+attr WEBphone hiddenroom DashboardRoom
 attr WEBphone room System
 attr WEBphone stylesheetPrefix smallscreen
 
 define WEBtablet FHEMWEB 8085 global
+attr WEBtablet hiddenroom DashboardRoom
 attr WEBtablet iconPath openautomation:fhemSVG
 attr WEBtablet room System
 attr WEBtablet stylesheetPrefix ios7
@@ -147,3 +150,20 @@ attr lcCinema group Control
 attr lcCinema icon scene_scene
 attr lcCinema room Cinema
 attr lcCinema webCmd scene
+
+define anyViews Dashboard
+attr anyViews dashboard_colcount 2
+attr anyViews dashboard_colwidth 400
+attr anyViews dashboard_lockstate lock
+attr anyViews dashboard_row top-center
+attr anyViews dashboard_rowtopheight 150
+attr anyViews dashboard_showhelper 0
+attr anyViews dashboard_tab1groups Light,AV,Single Lights
+attr anyViews dashboard_tab1name Dashboard Demo
+attr anyViews dashboard_tab1sorting t0c100,Light,true,723,132:t0c0,Single Lights,true,462,207:t0c1,AV,true,326,123:
+attr anyViews dashboard_tabcount 1
+attr anyViews dashboard_width 80%
+
+define anyViews_weblink weblink htmlCode {DashboardAsHtml("anyViews")}
+attr anyViews_weblink room DashboardRoom
+
