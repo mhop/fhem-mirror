@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.3.1";
+my $VERSION = "1.3.2";
 
 use constant {
   DATE            => "date",
@@ -1696,10 +1696,12 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       <br>
       # Anzeige CPU Auslasung<br>
       define wl_sysmon_cpustat SVG FileLog_sysmon:SM_CPUStat:CURRENT<br>
+      attr wl_sysmon_cpustat label "CPU(min/max): user:$data{min1}/$data{max1} nice:$data{min2}/$data{max2} sys:$data{min3}/$data{max3} idle:$data{min4}/$data{max4} io:$data{min5}/$data{max5} irq:$data{min6}/$data{max6} sirq:$data{min7}/$data{max7}"<br>
       attr wl_sysmon_cpustat group RPi<br>
       attr wl_sysmon_cpustat room 9.99_Test<br>
       attr wl_sysmon_cpustat plotsize 840,420<br>
       define wl_sysmon_cpustat_s SVG FileLog_sysmon:SM_CPUStatSum:CURRENT<br>
+      attr wl_sysmon_cpustat_s label "CPU(min/max): user:$data{min1}/$data{max1} nice:$data{min2}/$data{max2} sys:$data{min3}/$data{max3} idle:$data{min4}/$data{max4} io:$data{min5}/$data{max5} irq:$data{min6}/$data{max6} sirq:$data{min7}/$data{max7}"<br>
       attr wl_sysmon_cpustat_s group RPi<br>
       attr wl_sysmon_cpustat_s room 9.99_Test<br>
       attr wl_sysmon_cpustat_s plotsize 840,420<br>
@@ -2133,10 +2135,12 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       <br>
       # Anzeige CPU Auslasung<br>
       define wl_sysmon_cpustat SVG FileLog_sysmon:SM_CPUStat:CURRENT<br>
+      attr wl_sysmon_cpustat label "CPU(min/max): user:$data{min1}/$data{max1} nice:$data{min2}/$data{max2} sys:$data{min3}/$data{max3} idle:$data{min4}/$data{max4} io:$data{min5}/$data{max5} irq:$data{min6}/$data{max6} sirq:$data{min7}/$data{max7}"<br>
       attr wl_sysmon_cpustat group RPi<br>
       attr wl_sysmon_cpustat room 9.99_Test<br>
       attr wl_sysmon_cpustat plotsize 840,420<br>
       define wl_sysmon_cpustat_s SVG FileLog_sysmon:SM_CPUStatSum:CURRENT<br>
+      attr wl_sysmon_cpustat_s label "CPU(min/max): user:$data{min1}/$data{max1} nice:$data{min2}/$data{max2} sys:$data{min3}/$data{max3} idle:$data{min4}/$data{max4} io:$data{min5}/$data{max5} irq:$data{min6}/$data{max6} sirq:$data{min7}/$data{max7}"<br>
       attr wl_sysmon_cpustat_s group RPi<br>
       attr wl_sysmon_cpustat_s room 9.99_Test<br>
       attr wl_sysmon_cpustat_s plotsize 840,420<br>
