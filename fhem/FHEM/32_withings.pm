@@ -40,6 +40,7 @@ withings_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn}    = "withings_Define";
+  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn} = "withings_Notify";
   $hash->{UndefFn}  = "withings_Undefine";
   #$hash->{SetFn}    = "withings_Set";
@@ -117,7 +118,6 @@ withings_Define($$)
   $hash->{STATE} = "Initialized";
 
   if( $init_done ) {
-    delete $modules{withings}->{NotifyFn};
     withings_initUser($hash) if( $hash->{SUBTYPE} eq "USER" );
     withings_connect($hash) if( $hash->{SUBTYPE} eq "ACCOUNT" );
     withings_initDevice($hash) if( $hash->{SUBTYPE} eq "DEVICE" );
@@ -134,14 +134,9 @@ withings_Notify($$)
   return if($dev->{NAME} ne "global");
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
-  delete $modules{$hash->{TYPE}}->{NotifyFn};
-
-  foreach my $d (keys %defs) {
-    next if($defs{$d}{TYPE} ne $hash->{TYPE});
-    withings_initUser($defs{$d}) if( $defs{$d}->{SUBTYPE} eq "USER" );
-    withings_connect($defs{$d}) if( $defs{$d}->{SUBTYPE} eq "ACCOUNT" );
-    withings_initDevice($defs{$d}) if( $defs{$d}->{SUBTYPE} eq "DEVICE" );
-  }
+  withings_initUser($hash) if( $hash->{SUBTYPE} eq "USER" );
+  withings_connect($hash) if( $hash->{SUBTYPE} eq "ACCOUNT" );
+  withings_initDevice($hash) if( $hash->{SUBTYPE} eq "DEVICE" );
 }
 
 sub

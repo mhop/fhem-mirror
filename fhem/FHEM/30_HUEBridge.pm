@@ -26,6 +26,7 @@ sub HUEBridge_Initialize($)
 
   #Consumer
   $hash->{DefFn}    = "HUEBridge_Define";
+  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn} = "HUEBridge_Notify";
   $hash->{SetFn}    = "HUEBridge_Set";
   $hash->{GetFn}    = "HUEBridge_Get";
@@ -91,7 +92,6 @@ HUEBridge_Define($$)
   }
 
   if( $init_done ) {
-    delete $modules{$hash->{TYPE}}{NotifyFn};
     HUEBridge_OpenDev( $hash );
   }
 
@@ -109,13 +109,7 @@ HUEBridge_Notify($$)
 
   return if($attr{$name} && $attr{$name}{disable});
 
-  delete $modules{$type}{NotifyFn};
-  delete $hash->{NTFY_ORDER} if($hash->{NTFY_ORDER});
-
-  foreach my $d (keys %defs) {
-    next if($defs{$d}{TYPE} ne "$type");
-    HUEBridge_OpenDev($defs{$d});
-  }
+  HUEBridge_OpenDev($hash);
 
   return undef;
 }

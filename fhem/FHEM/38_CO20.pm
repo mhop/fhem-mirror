@@ -16,6 +16,7 @@ CO20_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn}    = "CO20_Define";
+  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn} = "CO20_Notify";
   $hash->{UndefFn}  = "CO20_Undefine";
   #$hash->{SetFn}    = "CO20_Set";
@@ -47,7 +48,6 @@ CO20_Define($$)
   $hash->{NAME} = $name;
 
   if( $init_done ) {
-    delete $modules{CO20}->{NotifyFn};
     CO20_Disconnect($hash);
     CO20_Connect($hash);
   } elsif( $hash->{STATE} ne "???" ) {
@@ -62,14 +62,10 @@ CO20_Notify($$)
 {
   my ($hash,$dev) = @_;
 
-  if( grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) ) {
-    delete $modules{CO20}->{NotifyFn};
+  return if($dev->{NAME} ne "global");
+  return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
-    foreach my $d (keys %defs) {
-      next if($defs{$d}{TYPE} ne "CO20");
-      CO20_Connect($defs{$d});
-    }
-  }
+  CO20_Connect($hash);
 }
 
 my $VENDOR = 0x03eb;
