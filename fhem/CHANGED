@@ -5,7 +5,7 @@
   - feature: DASHBOARD: Dashboard get Tabs. Redesign saving of Group 
 			 positioning.
   - bugfix:  SYSMON: Log Warnings, unnoetige Readings erkenen und entfernen
-  - feature: Setting of controller parameter now possible for LUXTRONIK2
+  - feature: LUXTRONIK2: Setting of controller parameter and internal clock now possible
   - feature: new module 71_YAMAHA_BD.pm to control Yamaha Blu-Ray
              players over network.
   - bugfix:  DbLog: fix for plotfork
