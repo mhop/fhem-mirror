@@ -5,6 +5,8 @@
 #  (c) 2012,2014 Torsten Poitzsch (torsten.poitzsch@gmx.de)
 #  (c) 2012-2013 Jan-Hinrich Fessel (oskar@fessel.org)
 #
+#  The modul reads and writes parameters of the heat pump controller Luxtronik 2.0
+#
 #  This script is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 2 of the License, or
@@ -33,6 +35,7 @@ use Blocking;
 use IO::Socket; 
 use Time::HiRes qw/ time /;
 use POSIX;
+use Net::Telnet;
 
 my $cc; # The Itmes Changed Counter
 
@@ -44,8 +47,11 @@ LUXTRONIK2_Initialize($)
   $hash->{DefFn}    = "LUXTRONIK2_Define";
   $hash->{UndefFn}  = "LUXTRONIK2_Undefine";
   $hash->{SetFn}    = "LUXTRONIK2_Set";
+  $hash->{AttrFn}	= "LUXTRONIK2_Attr";
   $hash->{AttrList} = "disable:0,1 ".
-					  "allowSetParameter ".
+					  "allowSetParameter:0,1 ".
+					  "autoSynchClock:slider,10,5,300 ".
+					  "ignoreFirmwareCheck:0,1 ".
 					  "statusHTML ".
 					  $readingFnAttributes;
 }
@@ -98,7 +104,7 @@ sub
 LUXTRONIK2_Set($$@)
 {
   my ($hash, $name, $cmd, $val) = @_;
-  my $resultStr;
+  my $resultStr="";
   
   if($cmd eq 'statusRequest') {
     $hash->{LOCAL} = 1;
@@ -107,27 +113,76 @@ LUXTRONIK2_Set($$@)
     return undef;
   }
   elsif($cmd eq 'INTERVAL' && int(@_)==4 ) {
-		$val = 1*60 if( $val < 1*60 );
-		$hash->{INTERVAL}=$val;
-		return "Polling interval set to $val seconds.";
+	$val = 1*60 if( $val < 1*60 );
+	$hash->{INTERVAL}=$val;
+	return "Polling interval set to $val seconds.";
   }
-  elsif(int(@_)==4 && ( 
+
+  #Check Firmware and Set-Paramter-lock 
+  if ($cmd eq 'synchronizeClockHeatPump' ||
 			$cmd eq 'hotWaterTemperatureTarget' ||
-			$cmd eq 'hotWaterOperatingMode'
-		)) {
+			$cmd eq 'hotWaterOperatingMode') 
+   {
+	 my $firmware = ReadingsVal($name,"firmware","");
+	 my $firmwareCheck = LUXTRONIK2_checkFirmware($firmware);
+     # stop in case of incompatible firmware
+	 if ($firmwareCheck eq "fwNotCompatible") {
+		Log3 $name, 3, $name." Error: Host firmware '$firmware' not compatible for parameter setting.";
+		 return "Firmware '$firmware' not compatible for parameter setting. ";
+     # stop in case of untested firmware and firmware check enabled
+	 } elsif (AttrVal($name, "ignoreFirmwareCheck", 0)!= 1 &&
+				$firmwareCheck eq "fwNotTested") {
+		Log3 $name, 3, $name." Error: Host firmware '$firmware' not tested for parameter setting. To test set 'ignoreFirmwareCheck' to 1";
+		 return "Firmware '$firmware' not compatible for parameter setting. To test set 'ignoreFirmwareCheck' to 1.";
+     # stop in case setting of parameters is not enabled
+	 } elsif ( AttrVal($name, "allowSetParameter", 0) != 1) {
+		Log3 $name, 3, $name." Error: Setting of parameters not allowed. Please set attribut 'allowSetParameter' to 1";
+		 return "Setting of parameters not allowed. To unlock, please set attribut 'allowSetParameter' to 1.";
+     }
+   }
+  
+   if ($cmd eq 'synchronizeClockHeatPump') {
+		$hash->{LOCAL} = 1;
+		$resultStr = LUXTRONIK2_synchronizeClock($hash);
+		$hash->{LOCAL} = 0;
+		Log3 $name, 3, "$name - $resultStr";
+		return $resultStr;
+	} elsif(int(@_)==4 &&
+			($cmd eq 'hotWaterTemperatureTarget' ||
+			$cmd eq 'hotWaterOperatingMode')) {
 		$hash->{LOCAL} = 1;
 		$resultStr = LUXTRONIK2_SetParameter ($hash, $cmd, $val);
 		$hash->{LOCAL} = 0;
 		return $resultStr;
-  }
-  
+	}
+
+
   my $list = "statusRequest:noArg".
 			 " hotWaterTemperatureTarget:slider,30.0,0.5,65.0".
-			 " hotWaterOperatingMode:Automatik,Party,Off".
+			 " hotWaterOperatingMode:Auto,Party,Off".
+			 " synchronizeClockHeatPump:noArg".
 			 " INTERVAL:slider,60,30,1800";
   return "Unknown argument $cmd, choose one of $list";
 }
 
+sub
+LUXTRONIK2_Attr(@)
+{
+	my ($cmd,$name,$aName,$aVal) = @_;
+  	# $cmd can be "del" or "set"
+	# $name is device name
+	# aName and aVal are Attribute name and value
+	if ($cmd eq "set") {
+		if ($aName eq "1allowSetParameter") {
+			eval { qr/$aVal/ };
+			if ($@) {
+				Log3 $name, 3, "LUXTRONIK2: Invalid allowSetParameter in attr $name $aName $aVal: $@";
+				return "Invalid allowSetParameter $aVal";
+			}
+		}
+	}
+	return undef;
+}
 
 sub
 LUXTRONIK2_GetUpdate($)
@@ -146,7 +201,7 @@ LUXTRONIK2_GetUpdate($)
     return undef if( AttrVal($name, "disable", 0 ) == 1 );
   }
 
-  $hash->{helper}{RUNNING_PID} = BlockingCall("LUXTRONIK2_DoUpdate", $name."|".$host, "LUXTRONIK2_UpdateDone", 10, "LUXTRONIK2_UpdateAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+  $hash->{helper}{RUNNING_PID} = BlockingCall("LUXTRONIK2_DoUpdate", $name."|".$host, "LUXTRONIK2_UpdateDone", 20, "LUXTRONIK2_UpdateAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
 }
 
 
@@ -158,6 +213,7 @@ LUXTRONIK2_DoUpdate($)
 
   my @heatpump_values;
   my @heatpump_parameters;
+  my @heatpump_visibility;
   my $count=0;
   my $result="";
   my $readingStartTime = time();
@@ -165,7 +221,7 @@ LUXTRONIK2_DoUpdate($)
   Log3 $name, 5, "$name: Opening connection to host ".$host;
   my $socket = new IO::Socket::INET (  PeerAddr => $host, 
 				       PeerPort => 8888,
-				       #   Type => SOCK_STREAM, # probably needed on some systems
+				       #   Type = SOCK_STREAM, # probably needed on some systems
 				       Proto => 'tcp'
       );
   if (!$socket) {
@@ -182,16 +238,16 @@ LUXTRONIK2_DoUpdate($)
   $socket->send(pack("N", 0));
   
   Log3 $name, 5, "$name: Start to receive operational values";
- #(FOV) read first 4 digits of response -> should be request_echo = 3004
+ #(FOV) read first 4 bytes of response -> should be request_echo = 3004
   $socket->recv($result,4);
   $count = unpack("N", $result);
   if($count != 3004) {
       Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: Fetching operational values - wrong echo of request 3004: ".length($result)." -> ".$count;
   	  $socket->close();
-      return "$name|0|3004 != 3004";
+      return "$name|0|3004 != $count";
   }
  
- #(FOV) read next 4 digits of response -> should be status = 0
+ #(FOV) read next 4 bytes of response -> should be status = 0
   $socket->recv($result,4);
   $count = unpack("N", $result);
   if($count > 0) {
@@ -200,7 +256,7 @@ LUXTRONIK2_DoUpdate($)
       return "$name|2|Status = $count - parameter on target changed, restart device reading after 5 seconds";
   }
   
- #(FOV) read next 4 digits of response -> should be number_of_parameters > 0
+ #(FOV) read next 4 bytes of response -> should be number_of_parameters > 0
   $socket->recv($result,4);
   $count = unpack("N", $result);
   if($count == 0) {
@@ -230,6 +286,7 @@ LUXTRONIK2_DoUpdate($)
       Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: unpacking problem by operation values: ".scalar(@heatpump_values)." instead of ".$count;
  	  $socket->close();
       return "$name|0|Unpacking problem of operational values";
+  
   }
 
   Log3 $name, 5, "$name: $count operational values received";
@@ -242,7 +299,7 @@ LUXTRONIK2_DoUpdate($)
   $socket->send(pack("N", 0));
 
   Log3 $name, 5, "$name: Start to receive set parameters";
- #(FSP) read first 4 digits of response -> should be request_echo=3003
+ #(FSP) read first 4 bytes of response -> should be request_echo=3003
   $socket->recv($result,4);
   $count = unpack("N", $result);
   if($count != 3003) {
@@ -251,7 +308,7 @@ LUXTRONIK2_DoUpdate($)
       return "$name|0|3003 != 3003";
   }
   
- #(FSP) read next 4 digits of response -> should be number_of_parameters > 0
+ #(FSP) read next 4 bytes of response -> should be number_of_parameters > 0
   $socket->recv($result,4);
   $count = unpack("N", $result);
   if($count == 0) {
@@ -261,9 +318,9 @@ LUXTRONIK2_DoUpdate($)
   }
   
  #(FSP) read remaining response -> should be previous number of parameters
-   my $i=1;
+  $i=1;
   $result="";
-  my $buf="";
+  $buf="";
   while($i<=$count) {
 	  $socket->recv($buf,4);
       $result.=$buf;
@@ -284,6 +341,62 @@ LUXTRONIK2_DoUpdate($)
 
   Log3 $name, 5, "$name: $count set values received";
 
+goto SKIP_VISIBILITY_READING;
+  
+############################ 
+#Fetch Visibility Attributes (FVA)
+############################ 
+  Log3 $name, 5, "$name: Ask host for visibility attributes";
+  $socket->send(pack("N", 3005));
+  $socket->send(pack("N", 0));
+
+  Log3 $name, 5, "$name: Start to receive visibility attributes";
+ #(FVA) read first 4 bytes of response -> should be request_echo=3005
+  $socket->recv($result,4);
+  $count = unpack("N", $result);
+  if($count != 3005) {
+      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: wrong echo of request 3005: ".length($result)." -> ".$count;
+      $socket->close();
+      return "$name|0|3005 != $count";
+  }
+  
+ #(FVA) read next 4 bytes of response -> should be number_of_Visibility_Attributes > 0
+  $socket->recv($result,4);
+  $count = unpack("N", $result);
+  if($count == 0) {
+      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: 0 visibility attributes announced: ".length($result)." -> ".$count;
+	  $socket->close();
+      return "$name|0|0 visibility attributes announced";
+  }
+  
+ #(FVA) read remaining response bytewise -> should be previous number of parameters
+  $i=1;
+  $result="";
+  $buf="";
+  while($i<=$count) {
+	  $socket->recv($buf,1);
+      $result.=$buf;
+	  $i++;
+  }
+  if(length($result) != $count) {
+      Log3 $name, 1, "$name LUXTRONIK2_DoUpdate-Error: Visibility attributes length check: ".length($result)." should have been ". $count;
+	  $socket->close();
+      return "$name|0|Number of Visibility attributes read mismatch ( $!)\n";
+  }
+
+  @heatpump_visibility = unpack("C$count", $result);
+  if(scalar(@heatpump_visibility) != $count) {
+      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: Unpacking problem by visibility attributes: ".scalar(@heatpump_visibility)." instead of ".$count;
+	  $socket->close();
+      return "$name|0|Unpacking problem of visibility attributes";
+  }
+
+  Log3 $name, 5, "$name: $count visibility attributs received";
+
+####################################  
+
+SKIP_VISIBILITY_READING:  
+  
   Log3 $name, 5, "$name: Closing connection to host $host";
   $socket->close();
 
@@ -356,6 +469,24 @@ LUXTRONIK2_DoUpdate($)
   $return_str .= "|".$readingStartTime;
   # 30 - readingEndTime
   $return_str .= "|".$readingEndTime;
+  # 31 - typeHeatpump
+  $return_str .= "|".$heatpump_values[78];
+  # 32 - operatingHoursSecondHeatSource1
+  $return_str .= "|".$heatpump_values[60];
+  # 33 - operatingHoursHeatpump
+  $return_str .= "|".$heatpump_values[63];
+  # 34 - operatingHoursHeating
+  $return_str .= "|".$heatpump_values[64];
+  # 35 - operatingHoursHotWater
+  $return_str .= "|".$heatpump_values[65];
+  # 36 - heatQuantityHeating
+  $return_str .= "|".$heatpump_values[151];
+  # 37 - heatQuantityHotWater
+  $return_str .= "|".$heatpump_values[152];
+  # 38 - operatingHoursSecondHeatSource2
+  $return_str .= "|".$heatpump_values[61];
+  # 39 - operatingHoursSecondHeatSource3
+  $return_str .= "|".$heatpump_values[62];
 
   return $return_str;
 }
@@ -407,9 +538,21 @@ LUXTRONIK2_UpdateDone($)
 			 2 => "Party",
 			 3 => "Ferien",
 			 4 => "Aus" );
-  #List of firmware that are known to be compatible with this modul
-  my $compatibleFirmware = "#V1.54C#";
-			 
+  my %wpType = ( 0 => "ERC", 1 => "SW1", 
+				  2 => "SW2", 3 => "WW1", 
+				  4 => "WW2", 5 => "L1I", 
+				  6 => "L2I", 7 => "L1A", 
+				  8 => "L2A", 9 => "KSW",
+				 10 => "KLW", 11 => "SWC", 
+				 12 => "LWC", 13 => "L2G",
+				 14 => "WZS", 15 => "L1I407",
+				 16 => "L2I407", 17 => "L1A407",
+				 18 => "L2A407", 19 => "L2G407",
+				 20 => "LWC407", 21 => "L1AREV",
+				 22 => "L2AREV", 23 => "WWC1",
+				 24 => "WWC2", 25 => "L2G404",
+				 26 => "ERC" );
+				 
   my $counterRetry = $hash->{fhem}{counterRetry};
   $counterRetry++;	 
 
@@ -494,17 +637,25 @@ LUXTRONIK2_UpdateDone($)
 	  readingsBulkUpdate($hash,"hotWaterSwitchingValve",$a[9]?"on":"off");
 	  
 	# Firmware
-	  readingsBulkUpdate($hash,"firmware",$a[20]);
+	  my $firmware = $a[20];
+	  readingsBulkUpdate($hash,"firmware",$firmware);
+	  my $firmwareCheck = LUXTRONIK2_checkFirmware($firmware);
 	  # if unknown firmware, ask at each startup to inform comunity
-	  if (!$hash->{fhem}{alertFirmware} && index("#".$a[20]."#",$compatibleFirmware) == -1) {
+	  if ($hash->{fhem}{alertFirmware} != 1 && $firmwareCheck eq "fwNotTested") {
 		$hash->{fhem}{alertFirmware} = 1;
-		Log3 $hash, 2, "$name Alert: Host uses untested Firmware $a[20]. Please inform FHEM comunity about compatibility.";
+		Log3 $hash, 2, "$name Alert: Host uses untested Firmware '$a[20]'. Please inform FHEM comunity about compatibility.";
 	  }
+	  
+	# Type of Heatpump  
+	  $value = $wpType{$a[31]};
+	  $value = "unbekannt (".$a[31].")" unless $value;
+	  readingsBulkUpdate($hash,"typeHeatpump",$value);
 	  
 	# Device times during readings 
 	  $value = strftime "%Y-%m-%d %H:%M:%S", localtime($a[22]);
 	  readingsBulkUpdate($hash, "deviceTimeStartReadings", $value);
-	  readingsBulkUpdate($hash, "delayDeviceTime", floor($a[29]-$a[22]+0.5));
+	  my $delayDeviceTimeCalc=floor($a[29]-$a[22]+0.5);
+	  readingsBulkUpdate($hash, "delayDeviceTimeCalc", $delayDeviceTimeCalc);
 	  my $durationFetchReadings = floor(($a[30]-$a[29]+0.005)*100)/100;
 	  readingsBulkUpdate($hash, "durationFetchReadings", $durationFetchReadings);
 	  #Remember min and max reading durations, will be reset when initializing the device
@@ -514,6 +665,17 @@ LUXTRONIK2_UpdateDone($)
 	  if ($hash->{fhem}{durationFetchReadingsMax} < $durationFetchReadings) {
 		$hash->{fhem}{durationFetchReadingsMax} = $durationFetchReadings;
 		} 
+		
+	  #Operating hours (secondy->hours) and heat quantities, write/create readings only if >0	
+	  if ($a[32]>0) {readingsBulkUpdate($hash,"operatingHoursSecondHeatSource1",floor($a[32]/360+0.5)/10);}
+	  if ($a[33]>0) {readingsBulkUpdate($hash,"operatingHoursHeatPump",floor($a[33]/360+0.5)/10);}
+	  if ($a[34]>0) {readingsBulkUpdate($hash,"operatingHoursHeating",floor($a[34]/360+0.5)/10);}
+	  if ($a[35]>0) {readingsBulkUpdate($hash,"operatingHoursHotWater",floor($a[35]/360+0.5)/10);}
+	  if ($a[36]>0) {readingsBulkUpdate($hash,"heatQuantityHeating",$a[36]);}
+	  if ($a[37]>0) {readingsBulkUpdate($hash,"heatQuantityHotWater",$a[37]);}
+	  if ($a[38]>0) {readingsBulkUpdate($hash,"operatingHoursSecondHeatSource2",floor($a[38]/360+0.5)/10);}
+	  if ($a[39]>0) {readingsBulkUpdate($hash,"operatingHoursSecondHeatSource3",floor($a[39]/360+0.5)/10);}
+		
 	#HTML for floorplan
 	if(AttrVal($name, "statusHTML", "none") ne "none") {
 		  $value = "<div class=fp_" . $a[0] . "_title>" . $a[0] . "</div>";
@@ -527,6 +689,31 @@ LUXTRONIK2_UpdateDone($)
 	  
       readingsEndUpdate($hash,1);
 
+	############################ 
+	#Auto Synchronize Device Clock
+	  my $autoSynchClock = AttrVal($name, "autoSynchClock", 0);
+	  $autoSynchClock = 10 unless ($autoSynchClock >= 10 || $autoSynchClock == 0);
+	  $autoSynchClock = 600 unless $autoSynchClock <= 600;
+	  if ($autoSynchClock != 0 and abs($delayDeviceTimeCalc) > $autoSynchClock ) {
+		Log3 $name, 3, $name." - autoSynchClock triggered (delayDeviceTimeCalc ".abs($delayDeviceTimeCalc)." > $autoSynchClock).";
+		# Firmware not tested and Firmware Check not ignored
+		 if ($firmwareCheck eq "fwNotTested" && AttrVal($name, "ignoreFirmwareCheck", 0)!= 1) {
+			Log3 $name, 1, $name." Error: Host firmware '$firmware' not tested for clock synchronization. To test set 'ignoreFirmwareCheck' to 1.";
+			 $attr{$name}{autoSynchClock} = 0;
+			Log3 $name, 3, $name." Attribute 'autoSynchClock' set to 0.";
+		#Firmware not compatible
+		 } elsif ($firmwareCheck eq "fwNotCompatible") {
+			Log3 $name, 1, $name." Error: Host firmware '$firmware' not compatible for host clock synchronization.";
+			 $attr{$name}{autoSynchClock} = 0;
+			Log3 $name, 3, $name." Attribute 'autoSynchClock' set to 0.";
+		#Firmware OK -> Synchronize Clock
+		 } else {
+			$value = LUXTRONIK2_synchronizeClock($hash, 600);
+			Log3 $hash, 3, "$name ".$value;
+		 }
+	  }
+	#End of Auto Synchronize Device Clock
+  	############################ 
 	}
 	else {
 		Log3 $hash, 5, "$name LUXTRONIK2_DoUpdate-Error: Status = $a[1]";
@@ -550,7 +737,8 @@ sub
 LUXTRONIK2_CalcTemp($)
 {
   my ($temp) = @_;
-  if ($temp > 100000) {$temp = $temp-4294967296;}
+  #change unsigned into signed
+  if ($temp > 2147483648) {$temp = $temp-4294967296;}
   $temp /= 10;
   return $temp;
 }
@@ -567,12 +755,12 @@ LUXTRONIK2_SetParameter($$$)
   my $host = $hash->{HOST};
   my $name = $hash->{NAME};
   
-   my %opMode = ( "Automatik" => 0,
+   my %opMode = ( "Auto" => 0,
 			      "Party" => 2,
 			      "Off" => 4);
    
-  if(AttrVal($name, "allowSetParameter", "no") ne "yes") {
-	return $name." Error: Setting of parameters not allowed. Please set attribut 'allowSetParameter' to 'yes'";
+  if(AttrVal($name, "allowSetParameter", 0) != 1) {
+	return $name." Error: Setting of parameters not allowed. Please set attribut 'allowSetParameter' to 1";
   }
   if ($parameterName eq "hotWaterTemperatureTarget") {
      #parameter number
@@ -616,7 +804,7 @@ LUXTRONIK2_SetParameter($$$)
 	  $socket->send(pack("N", $setValue));
 	  
 	  Log3 $name, 5, "$name: Receive confirmation";
-	 #read first 4 digits of response -> should be request_echo = 3002
+	 #read first 4 bytes of response -> should be request_echo = 3002
 	  $socket->recv($buffer,4);
 	  $result = unpack("N", $buffer);
 	  if($result != 3002) {
@@ -625,7 +813,7 @@ LUXTRONIK2_SetParameter($$$)
 		  return "$name Error: Host did not confirm parameter setting";
 	  }
 	 
-	 #Read next 4 digits of response -> should be setParameter
+	 #Read next 4 bytes of response -> should be setParameter
 	  $socket->recv($buffer,4);
 	  $result = unpack("N", $buffer);
 	  if($result !=$setParameter) {
@@ -644,6 +832,76 @@ LUXTRONIK2_SetParameter($$$)
   
 }
 
+
+sub
+LUXTRONIK2_synchronizeClock (@)
+{
+  my ($hash,$maxDelta) = @_;
+  my $host = $hash->{HOST};
+  my $name = $hash->{NAME};
+  my $delay = 0;
+  my $returnStr = "";
+
+  $maxDelta = 60 unless $maxDelta >= 0;
+  $maxDelta = 600 unless $maxDelta <= 600;
+	   	
+   Log3 $name, 5, "$name: Open telnet connection to $host";
+     my $telnet = new Net::Telnet ( Host=>$host, Port => 23, Timeout=>10, Errmode=>'return');
+      if (!$telnet) {
+	    Log3 $name, 1, "$name LUXTRONIK2_synchronizeClock-Error: ".$telnet->errmsg;
+		  return "$name synchronizeDeviceClock-Error: ".$telnet->errmsg;
+	   }
+  
+    Log3 $name, 5, "$name: Log into $host";
+	   if (!$telnet->login('root', '')) {
+		  Log3 $name, 1, "$name LUXTRONIK2_synchronizeClock-Error: ".$telnet->errmsg;
+		  return "$name synchronizeDeviceClock-Error: ".$telnet->errmsg;
+	   }
+	   
+   Log3 $name, 5, "$name: Read current time of host";
+      my @output = $telnet->cmd('date +%s');
+	  $delay = floor(time()) - $output[0];
+   Log3 $name, 5, "$name: Current time is ".localtime($output[0])." Delay is $delay seconds.";
+
+     if (abs($delay)>$maxDelta && $maxDelta!=0) {
+		$returnStr = "Do not dare to synchronize. Device clock of host $host differs by $delay seconds (max. is $maxDelta).";
+     } elsif ($delay == 0) {
+	 	$returnStr = "Internal clock of host $host has no delay. -> not synchronized";
+	 } else {
+		my $newTime = strftime "%m%d%H%M%Y.%S", localtime();
+	  Log3 $name, 5, "$name: Run command 'date ".$newTime."'";
+		@output=$telnet->cmd('date '.$newTime);
+		$returnStr = "Internal clock of host $host corrected by $delay seconds. -> ".$output[0];
+		readingsSingleUpdate($hash,"lastDeviceClockSynch",TimeNow,1);
+	  }
+   
+   Log3 $name, 5, "$name: Close telnet connection.";
+	$telnet->close;
+	
+	return $returnStr;
+}
+
+
+sub
+LUXTRONIK2_checkFirmware ($)
+{
+  my ($myFirmware) = @_;
+  #List of firmware versions that are known to be compatible with this modul
+    my $testedFirmware = "#V1.54C#";
+    my $compatibleFirmware = "#V1.54C#";
+
+  #Firmware not tested
+	if (index("#".$myFirmware."#",$testedFirmware) == -1) { 
+	   return "fwNotTested";
+  #Firmware tested but not compatible
+	} elsif (index("#".$myFirmware."#",$compatibleFirmware) == -1) { 
+	   return "fwNotCompatible";
+  #Firmware compatible
+ 	} else {
+ 	   return "fwCompatible";
+	}
+}
+
 1;
 
 =pod
@@ -652,9 +910,9 @@ LUXTRONIK2_SetParameter($$$)
 <a name="LUXTRONIK2"></a>
 <h3>LUXTRONIK2</h3>
 <ul>
-  Luxtronik 2.0 is a heating controller used in Alpha Innotec and Siemens Novelan Heatpumps.
-  It has a builtin Ethernet Port, so it can be directly integrated into a local area network.
-  <i>The modul uses the communication features of the firmware v1.54C.</i>
+  Luxtronik 2.0 is a heating controller, used in Alpha Innotec and Siemens Novelan heat pumps.
+  It has a built-in ethernet port, so it can be directly integrated into a local area network (LAN).
+  <i>The modul is tested with firmware v1.54C.</i>
   <br>
   
   <a name="LUXTRONIK2define"></a>
@@ -672,11 +930,13 @@ LUXTRONIK2_SetParameter($$$)
   <br>
   
   <a name="LUXTRONIK2set"></a>
-  <b>Set </b>
+  <b>Set</b><br>
+   A firmware check assures before each set operation that a heat pump with untested firmware is not damaged accidently.
   <ul><b>&lt;hotWaterOperatingMode%gt;</b> &lt;Mode:Auto|Party|Off%gt;- Operating Mode of domestic hot water boiler</ul>
   <ul><b>&lt;hotWaterTemperatureTarget%gt;</b> &lt;temperature &deg;C%gt; - Target temperature of domestic hot water boiler</ul>
   <ul><b>&lt;INTERVAL%gt;</b> &lt;seconds%gt; - Polling interval</ul>
   <ul><b>&lt;statusRequest%gt;</b> - Update device information</ul>
+  <ul><b>&lt;synchClockHeatPump%gt;</b> - Synchronizes controller clock with FHEM time. <b>This change is lost in case of controller power off!!</b></ul>
   <br>
   
   <a name="LUXTRONIK2get"></a>
@@ -690,10 +950,15 @@ LUXTRONIK2_SetParameter($$$)
   <b>Attributes</b>
   <ul>
     <li>statusHTML<br>
-      if set, creates a HTML-formatted reading named "floorplanHTML" for use with the <a href="#FLOORPLAN">FLOORPLAN</a> module.<br>
-      Currently, if the value of this attribute is not NULL, the corresponding reading consists of the current status of the heatpump and the temperature of the water.</li>
-    <li>allowSetParameter<br>
-      <a href="#LUXTRONIK2set">Parameters</a> of the heatpump controller can only be changed if this attribut is set to 'yes'.</li>
+      if set, a HTML-formatted reading named "floorplanHTML" is created that can be used with the <a href="#FLOORPLAN">FLOORPLAN</a> module.<br>
+      Currently, if the value of this attribute is not NULL, the corresponding reading consists of the current status of the heat pump and the temperature of the water.</li>
+    <li>allowSetParameter <0|1><br>
+      The <a href="#LUXTRONIK2set">parameters</a> of the heat pump controller can only be changed if this attribut is set to 1.</li>
+	<li>autoSynchClock <delay><br>
+		Corrects the clock of the heatpump automatically if certain <i>delay</i> (10 s - 600 s) against the FHEM time is reached. Does a firmware check before.<br>
+		<i>(A 'delayDeviceTimeCalc' <= 2 s is due to the internal calculation interval of the heat pump controller)</i></li>
+	<li>ignoreFirmwareCheck <0|1><br>
+		A firmware check assures before each set operation that a heatpump controller with untested firmware is not damaged accidently. If this attribute is set to 1, the firmware check is ignored and new firmware can be tested for compatibility.</li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
   </ul>
   <br>
@@ -701,5 +966,66 @@ LUXTRONIK2_SetParameter($$$)
 </ul>
 
 =end html
+
+=begin html_DE
+<a name="LUXTRONIK2"></a>
+<h3>LUXTRONIK2</h3>
+<ul>
+  Luxtronik 2.0 ist eine Heizungssteuerung, welchen in W&auml;rmepumpen von Alpha Innotec und Siemens Novelan verbaut ist.
+  Sie besitzt einen Ethernet Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.
+  <i>Das Modul wurde bisher mit der Steuerungs-Firmware v1.54C getestet.</i>
+  <br>
+  
+  <a name="LUXTRONIK2define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; LUXTRONIK2 &lt;IP-Adresse&gt; [Abfrage-Interval]</code>
+    <br>
+    Wenn das Abfrage-Interval nicht angegeben ist, wird es auf 300 (Sekunden) gesetzt. Der kleinste mögliche Wert ist 60.
+    <br>
+    Beispiel:
+    <ul>
+      <code>define Heizung LUXTRONIK2 192.168.0.12 600</code>
+    </ul>
+  </ul>
+  <br>
+  
+  <a name="LUXTRONIK2set"></a>
+  <b>Set</b><br>
+   Durch einen Firmware-Test wird vor jeder Set-Operation sichergestellt, dass W&auml;rmepumpe mit ungetester Firmware nicht unabsichtlich besch&auml;digt werden.
+  <ul><b>&lt;hotWaterOperatingMode%gt;</b> &lt;Mode:Auto|Party|Off%gt;- Betriebsmodus des Heizuwasserboilers</ul>
+  <ul><b>&lt;hotWaterTemperatureTarget%gt;</b> &lt;Temperatur &deg;C%gt; - Soll-Temperatur des Heizwasserboilers</ul>
+  <ul><b>&lt;INTERVAL%gt;</b> &lt;seconds%gt; - Abfrageinterval</ul>
+  <ul><b>&lt;statusRequest%gt;</b> - Aktuallisieren der Gerätewerte</ul>
+  <ul><b>&lt;synchClockHeatPump%gt;</b> - Abgleich der Uhr der Steuerung mit der FHEM Zeit. <b>Diese Änderung geht verlordn, sobald die Steuerung ausgeschaltet wird!!</b></ul>
+  <br>
+  
+  <a name="LUXTRONIK2get"></a>
+  <b>Get</b>
+  <ul>
+    Es wurde noch kein "get" implementiert ...
+  </ul>
+  <br>
+  
+  <a name="LUXTRONIK2attr"></a>
+  <b>Attribute</b>
+  <ul>
+    <li>statusHTML<br>
+      wenn gesetzt, dann wird ein HTML-formatierter Wert "floorplanHTML" erzeugt welcher vom Modul <a href="#FLOORPLAN">FLOORPLAN</a> genutzt werden kann.<br>
+      Momentan wird nur gepr&uuml;ft, ob der Wert dieses Attributes ungleich NULL ist, der entsprechende Ger&auml;tewerte besteht aus dem aktuellen W&auml;rmepumpenstatus und der Heizwassertemperatur.</li>
+    <li>allowSetParameter <0|1><br>
+      Die internen <a href="#LUXTRONIK2set">Parameter</a> der W&auml;rmepumpensteuerung k&ouml;nnen nur ge&auml;ndert werden, wenn dieses Attribut auf 1 gesetzt ist.</li>
+	<li>autoSynchClock <Zeitunterschied><br>
+		Die Uhr der W&auml;rmepumpe wird automatisch korrigiert, wenn ein gewisser <i>Zeitunterschied</i> (10 s - 600 s) gegen&uuml;ber der FHEM Zeit erreicht ist. Zuvor wird ein die Kompatibilit&auml;t der Firmware &uuml;berpr&uuml;ft.<br>
+		<i>(Ein Ger&auml;tewert 'delayDeviceTimeCalc' <= 2 s ist auf die internen Berechnungsintervale der W&auml;rmepumpensteuerung zur&uuml;ck zu f&uuml;hren.)</i></li>
+	<li>ignoreFirmwareCheck <0|1><br>
+		Durch einen Firmware-Test wird vor jeder Set-Operation sichergestellt, dass W&auml;rmepumpe mit ungetester Firmware nicht unabsichtlich besch&auml;digt werden. Wenn dieses Attribute auf 1 gesetzt ist, dann wird der Firmware-Test ignoriert und neue Firmware kann getestet werden. Dieses Attribut wird jedoch ignoriert, wenn die Steuerungs-Firmware bereits als nicht kompatibel berichtet wurde.</li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+  </ul>
+  <br>
+  
+</ul>
+
+=end html_DE
 =cut
 
