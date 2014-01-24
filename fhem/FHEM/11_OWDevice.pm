@@ -349,6 +349,7 @@ OWDevice_Initialize($)
   $hash->{GetFn}     = "OWDevice_Get";
   $hash->{SetFn}     = "OWDevice_Set";
   $hash->{DefFn}     = "OWDevice_Define";
+  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn}  = "OWDevice_Notify";
   $hash->{NotifyOrderPrefix}= "50b-";
   $hash->{UndefFn}   = "OWDevice_Undef";
@@ -516,10 +517,8 @@ OWDevice_UpdateValues($) {
           readingsEndUpdate($hash,1);
         }
         RemoveInternalTimer($hash);
-        # http://forum.fhem.de/index.php/topic,16945.0/topicseen.html#msg110673
-        InternalTimer(int(gettimeofday())+$hash->{fhem}{rand}+$hash->{fhem}{interval}, 
-          "OWDevice_UpdateValues", $hash, 0) if(defined($hash->{fhem}{interval}));
-        $hash->{fhem}{rand} = 0;
+        InternalTimer(int(gettimeofday()) + $hash->{fhem}{interval}, "OWDevice_UpdateValues", $hash, 0)
+          if(defined($hash->{fhem}{interval}));
 }
 
 ###################################
@@ -662,13 +661,8 @@ OWDevice_Define($$)
         Log3 $name, 5, "$name: alerting: $alerting";
 
         if( $init_done ) {
-          $hash->{fhem}{rand} = 0;
-          delete $modules{OWDevice}{NotifyFn};
           OWDevice_InitValues($hash);
           OWDevice_UpdateValues($hash) if(defined($hash->{fhem}{interval}));
-        } else {
-          $hash->{fhem}{rand} = int(rand(20));
-          Log3 $name, 5, "$name: initial delay: $hash->{fhem}{rand}";
         }
 
         return undef;
@@ -686,13 +680,12 @@ OWDevice_Notify($$)
 
   return if($attr{$name} && $attr{$name}{disable});
 
-  delete $modules{OWDevice}{NotifyFn};
-
-  foreach my $d (keys %defs) {
-    next if($defs{$d}{TYPE} ne "OWDevice");
-    OWDevice_InitValues($defs{$d});
-    OWDevice_UpdateValues($defs{$d}) if(defined($defs{$d}->{fhem}{interval}));
-  }
+  OWDevice_InitValues($hash);
+  RemoveInternalTimer($hash);
+  # http://forum.fhem.de/index.php/topic,16945.0/topicseen.html#msg110673
+  my $delay = int(rand(20));
+  Log3 $name, 5, "$name: initial delay: $delay";
+  InternalTimer(int(gettimeofday())+$delay, "OWDevice_UpdateValues", $hash, 0) if(defined($hash->{fhem}{interval}));
 
   return undef;
 }

@@ -106,6 +106,7 @@ OWServer_Initialize($)
 
 # Consumer
   $hash->{DefFn}   = "OWServer_Define";
+  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn}= "OWServer_Notify";
   $hash->{NotifyOrderPrefix}= "50a-";
   $hash->{UndefFn} = "OWServer_Undef";
@@ -134,7 +135,6 @@ OWServer_Define($$)
   $hash->{fhem}{protocol}= $protocol;
 
   if( $init_done ) {
-    delete $modules{OWServer}{NotifyFn};
     OWServer_OpenDev($hash);
   }
 
@@ -209,13 +209,7 @@ OWServer_Notify($$)
 
   return if($attr{$name} && $attr{$name}{disable});
 
-  delete $modules{OWServer}{NotifyFn};
-  delete $hash->{NTFY_ORDER} if($hash->{NTFY_ORDER});
-
-  foreach my $d (keys %defs) {
-    next if($defs{$d}{TYPE} ne "OWServer");
-    OWServer_OpenDev($defs{$d});
-  }
+  OWServer_OpenDev($hash);
 
   return undef;
 }
@@ -393,6 +387,7 @@ OWServer_Autocreate($)
     }
   }
 
+  my $created = 0;
   for my $device (@devices) {
     my $address= substr($device,1);
     my $family= substr($address,0,2);
@@ -419,11 +414,14 @@ OWServer_Autocreate($)
         if($cmdret) {
           Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for address '$address': $cmdret";
         } else {
+          $created++;
           $cmdret= CommandAttr(undef,"$devname room OWDevice");
         }
       }
     }
   }
+
+  CommandSave(undef,undef) if( $created && AttrVal( "autocreate", "autosave", 1 ) );
 
   return undef;
 }

@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: changed 10_OWServer.pm and 11_OWDevice.pm to use
+             NOTIFYDEV (justme1968)
   - feature: LightScene: added setcmd command
   - feature: DASHBOARD: Dashboard get Tabs. Redesign saving of Group 
 			 positioning.
