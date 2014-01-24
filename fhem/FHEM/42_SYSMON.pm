@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.2.4";
+my $VERSION = "1.3.1";
 
 use constant {
   DATE            => "date",
@@ -63,6 +63,7 @@ use constant {
 
 use constant FS_PREFIX => "~ ";
 #use constant FS_PREFIX_N => "fs_";
+my $DEFAULT_INTERVAL_BASE = 60;
 
 sub
 SYSMON_Initialize($)
@@ -121,7 +122,7 @@ SYSMON_setInterval($@)
 {
 	my ($hash, @a) = @_;
 
-	my $interval = 60;
+	my $interval = $DEFAULT_INTERVAL_BASE;
 	$hash->{INTERVAL_BASE} = $interval;
 
 	my $p1=1;
@@ -179,6 +180,19 @@ SYSMON_updateCurrentReadingsMap($) {
   $rMap->{"uptime"}          = "System up time";
   $rMap->{"uptime_text"}     = "System up time";
 
+  # Werte fuer GesamtCPU
+  $rMap->{"stat_cpu"}          = "CPU statistics";
+  $rMap->{"stat_cpu_diff"}     = "CPU statistics (diff)";
+  $rMap->{"stat_cpu_percent"}  = "CPU statistics (diff, percent)";
+  $rMap->{"stat_cpu_text"}     = "CPU statistics (text)";
+  # CPU 0-7 (sollte reichen)
+  for my $i (0..7) { 
+    $rMap->{"stat_cpu".$i}            = "CPU".$i." statistics";
+    $rMap->{"stat_cpu".$i."_diff"}    = "CPU".$i." statistics (diff)";
+    $rMap->{"stat_cpu".$i."_percent"} = "CPU".$i." statistics (diff, percent)";
+    $rMap->{"stat_cpu".$i."_text"} = "CPU".$i." statistics (text)";
+  }
+  
 	# Filesystems <readingName>[:<mountPoint>[:<Comment>]]
 	my $filesystems = AttrVal($name, "filesystems", undef);
   if(defined $filesystems) {
@@ -561,6 +575,7 @@ SYSMON_obtainParameters($$)
         $map = SYSMON_getCPUFreq($hash, $map);
       }
       $map = SYSMON_getLoadAvg($hash, $map);
+      $map = SYSMON_getCPUProcStat($hash, $map);
     }
   }
 
@@ -803,6 +818,78 @@ SYSMON_getCPUBogoMIPS($$)
   	$map->{+CPU_BOGOMIPS}=$old_val;
   }
   
+	return $map;
+}
+
+#------------------------------------------------------------------------------
+# leifert Werte aus /proc/stat
+# Werte:
+#   neuCPUuser, neuCPUnice, neuCPUsystem, neuCPUidle, neuCPUiowait, neuCPUirq, neuCPUsoftirq
+# Differenzberechnung:
+#   CPUuser = neuCPUuser - altCPUuser (für alle anderen analog)
+#   GesammtCPU = CPUuser + CPUnice + CPUsystem + CPUidle + CPUiowait + CPUirq + CPUsoftirq
+# Belastung in %:
+#   ProzCPUuser = (CPUuser / GesammtCPU) * 100
+#------------------------------------------------------------------------------
+sub
+SYSMON_getCPUProcStat($$)
+{
+	my ($hash, $map) = @_;
+	my @values = SYSMON_execute($hash, "cat /proc/stat");
+	
+	for my $entry (@values){
+	  if (index($entry, "cpu") < 0){
+      last;
+    }
+    $map = SYSMON_getCPUProcStat_intern($hash, $map, $entry);
+  }
+  
+  # Wenn nur eine CPU vorhanden ist, löschen Werte für CPU0 (nur Gesamt belassen)
+  if(!defined($map->{"stat_cpu1"})){
+  	delete $map->{"stat_cpu0"};
+  	delete $map->{"stat_cpu0_diff"};
+  	delete $map->{"stat_cpu0_percent"};
+  }
+	
+	return $map;
+}
+
+sub
+SYSMON_getCPUProcStat_intern($$$) 
+{
+	my ($hash, $map, $entry) = @_;
+	
+	my($pName, $neuCPUuser, $neuCPUnice, $neuCPUsystem, $neuCPUidle, $neuCPUiowait, $neuCPUirq, $neuCPUsoftirq) = split(/\s+/, trim($entry));
+	$pName = "stat_".$pName;
+	$map->{$pName}=$neuCPUuser." ".$neuCPUnice." ".$neuCPUsystem." ".$neuCPUidle." ".$neuCPUiowait." ".$neuCPUirq." ".$neuCPUsoftirq;
+	
+	my $lastVal = ReadingsVal($hash->{NAME},$pName,undef);
+	if(defined $lastVal) {
+		# Diff. ausrechnen, falls vorherigen Werte vorhanden sind.
+	  my($altCPUuser, $altCPUnice, $altCPUsystem, $altCPUidle, $altCPUiowait, $altCPUirq, $altCPUsoftirq) = split(/\s+/, $lastVal);
+    
+    my $CPUuser    = $neuCPUuser    - $altCPUuser;
+    my $CPUnice    = $neuCPUnice    - $altCPUnice;
+    my $CPUsystem  = $neuCPUsystem  - $altCPUsystem;
+    my $CPUidle    = $neuCPUidle    - $altCPUidle;
+    my $CPUiowait  = $neuCPUiowait  - $altCPUiowait;
+    my $CPUirq     = $neuCPUirq     - $altCPUirq;
+    my $CPUsoftirq = $neuCPUsoftirq - $altCPUsoftirq;
+    $map->{$pName."_diff"}=$CPUuser." ".$CPUnice." ".$CPUsystem." ".$CPUidle." ".$CPUiowait." ".$CPUirq." ".$CPUsoftirq;
+	  
+    my $GesammtCPU = $CPUuser + $CPUnice + $CPUsystem + $CPUidle + $CPUiowait + $CPUirq + $CPUsoftirq;
+    my $PercentCPUuser    = ($CPUuser    / $GesammtCPU) * 100;
+    my $PercentCPUnice    = ($CPUnice    / $GesammtCPU) * 100;
+    my $PercentCPUsystem  = ($CPUsystem  / $GesammtCPU) * 100;
+    my $PercentCPUidle    = ($CPUidle    / $GesammtCPU) * 100;
+    my $PercentCPUiowait  = ($CPUiowait  / $GesammtCPU) * 100;
+    my $PercentCPUirq     = ($CPUirq     / $GesammtCPU) * 100;
+    my $PercentCPUsoftirq = ($CPUsoftirq / $GesammtCPU) * 100;
+    
+    $map->{$pName."_percent"}=sprintf ("%.2f %.2f %.2f %.2f %.2f %.2f %.2f",$PercentCPUuser,$PercentCPUnice,$PercentCPUsystem,$PercentCPUidle,$PercentCPUiowait,$PercentCPUirq,$PercentCPUsoftirq);
+    $map->{$pName."_text"}=sprintf ("user: %.2f %%, nice: %.2f %%, sys: %.2f %%, idle: %.2f %%, io: %.2f %%, irq: %.2f %%, sirq: %.2f %%",$PercentCPUuser,$PercentCPUnice,$PercentCPUsystem,$PercentCPUidle,$PercentCPUiowait,$PercentCPUirq,$PercentCPUsoftirq);
+  }
+
 	return $map;
 }
 
@@ -1228,7 +1315,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     The parameters are responsible for updating the readings according to the following scheme:
     <ul>
      <li>M1: (Default: 1)<br>
-     cpu_freq, cpu_temp, cpu_temp_avg, loadavg<br><br>
+     cpu_freq, cpu_temp, cpu_temp_avg, loadavg, stat_cpu, stat_cpu_diff, stat_cpu_percent, stat_cpu_text<br><br>
      </li>
      <li>M2: (Default: M1)<br>
      ram, swap<br>
@@ -1315,6 +1402,14 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     		<code>fs_root: Total: 7340 MB, Used: 3573 MB, 52 %, Available: 3425 MB at /</code>
     </li>
     <br>
+    <li>CPU utilization<br>
+    		Information about the utilization of CPUs.<br>
+    		Example:<br>
+    		<code>stat_cpu: 10145283 0 2187286 90586051 542691 69393 400342</code><br>
+        <code>stat_cpu_diff: 2151 0 1239 2522 10 3 761</code><br>
+        <code>stat_cpu_percent: 4.82 0.00 1.81 93.11 0.05 0.00 0.20</code><br>
+        <code>stat_cpu_text: user: 32.17 %, nice: 0.00 %, sys: 18.53 %, idle: 37.72 %, io: 0.15 %, irq: 0.04 %, sirq: 11.38 %</code>
+    </li>
     <br>
     <li>user defined<br>
         These Readings provide output of commands, which are passed to the operating system. 
@@ -1399,8 +1494,24 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 56 MB, Used: 19 MB, 33 %, Available: 38 MB at /boot</div></td>
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr><td><div class="dname">fs_usb1</div></td>
-<td><div>Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB at /media/usb1&nbsp;&nbsp;</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">fs_usb1</div></td>
+<td style="border-bottom: 1px solid black;"><div>Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB at /media/usb1&nbsp;&nbsp;</div></td>
+<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu</div></td>
+<td style="border-bottom: 1px solid black;"><div>10145283 0 2187286 90586051 542691 69393 400342&nbsp;&nbsp;</div></td>
+<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu_diff</div></td>
+<td style="border-bottom: 1px solid black;"><div>2151 0 1239 2522 10 3 761&nbsp;&nbsp;</div></td>
+<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu_percent</div></td>
+<td style="border-bottom: 1px solid black;"><div>4.82 0.00 1.81 93.11 0.05 0.00 0.20&nbsp;&nbsp;</div></td>
+<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td><div class="dname">stat_cpu_text</div></td>
+<td><div>user: 32.17 %, nice: 0.00 %, sys: 18.53 %, idle: 37.72 %, io: 0.15 %, irq: 0.04 %, sirq: 11.38 %&nbsp;&nbsp;</div></td>
 <td><div>2013-11-27 00:05:36</div></td>
 </tr>
 </table>
@@ -1491,9 +1602,11 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
        SM_Network_eth0.gplot<br>
        SM_Network_eth0t.gplot<br>
        SM_Network_wlan0.gplot<br>
+       SM_CPUStat.gplot<br>
+       SM_CPUStatSum.gplot<br>
       </code>
-      <code>
       DbLog versions:<br>
+      <code>
        SM_DB_all.gplot<br>
        SM_DB_CPUFreq.gplot<br>
        SM_DB_CPUTemp.gplot<br>
@@ -1580,6 +1693,16 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       define SysValues weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}<br>
       attr SysValues group RPi<br>
       attr SysValues room 9.03_Tech<br>
+      <br>
+      # Anzeige CPU Auslasung<br>
+      define wl_sysmon_cpustat SVG FileLog_sysmon:SM_CPUStat:CURRENT<br>
+      attr wl_sysmon_cpustat group RPi<br>
+      attr wl_sysmon_cpustat room 9.99_Test<br>
+      attr wl_sysmon_cpustat plotsize 840,420<br>
+      define wl_sysmon_cpustat_s SVG FileLog_sysmon:SM_CPUStatSum:CURRENT<br>
+      attr wl_sysmon_cpustat_s group RPi<br>
+      attr wl_sysmon_cpustat_s room 9.99_Test<br>
+      attr wl_sysmon_cpustat_s plotsize 840,420<br>
     </code>
     </ul>
 
@@ -1611,7 +1734,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Die Parameter sind f&uuml;r die Aktualisierung der Readings nach folgender Schema zust&auml;ndig:
     <ul>
      <li>M1: (Default-Wert: 1)<br>
-     cpu_freq, cpu_temp, cpu_temp_avg, loadavg<br><br>
+     cpu_freq, cpu_temp, cpu_temp_avg, loadavg, stat_cpu, stat_cpu_diff, stat_cpu_percent, stat_cpu_text<br><br>
      </li>
      <li>M2: (Default-Wert: M1)<br>
      ram, swap<br>
@@ -1703,6 +1826,14 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     		<code>fs_root: Total: 7340 MB, Used: 3573 MB, 52 %, Available: 3425 MB at /</code>
     </li>
     <br>
+    <li>CPU Auslastung<br>
+    		Informationen zu der Auslastung der CPU(s).<br>
+    		Beispiel:<br>
+    		<code>stat_cpu: 10145283 0 2187286 90586051 542691 69393 400342</code><br>
+        <code>stat_cpu_diff: 2151 0 1239 2522 10 3 761</code><br>
+        <code>stat_cpu_percent: 4.82 0.00 1.81 93.11 0.05 0.00 0.20</code><br>
+        <code>stat_cpu_text: user: 32.17 %, nice: 0.00 %, sys: 18.53 %, idle: 37.72 %, io: 0.15 %, irq: 0.04 %, sirq: 11.38 %</code>
+    </li>
     <br>
     <li>Benutzerdefinierte Eintr&auml;ge<br>
         Diese Readings sind Ausgaben der Kommanden, die an das Betriebssystem &uuml;bergeben werden.
@@ -1788,8 +1919,24 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 56 MB, Used: 19 MB, 33 %, Available: 38 MB at /boot</div></td>
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr><td><div class="dname">fs_usb1</div></td>
-<td><div>Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB at /media/usb1&nbsp;&nbsp;</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">fs_usb1</div></td>
+<td style="border-bottom: 1px solid black;"><div>Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB at /media/usb1&nbsp;&nbsp;</div></td>
+<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu</div></td>
+<td style="border-bottom: 1px solid black;"><div>10145283 0 2187286 90586051 542691 69393 400342&nbsp;&nbsp;</div></td>
+<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu_diff</div></td>
+<td style="border-bottom: 1px solid black;"><div>2151 0 1239 2522 10 3 761&nbsp;&nbsp;</div></td>
+<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu_percent</div></td>
+<td style="border-bottom: 1px solid black;"><div>4.82 0.00 1.81 93.11 0.05 0.00 0.20&nbsp;&nbsp;</div></td>
+<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td><div class="dname">stat_cpu_text</div></td>
+<td><div>user: 32.17 %, nice: 0.00 %, sys: 18.53 %, idle: 37.72 %, io: 0.15 %, irq: 0.04 %, sirq: 11.38 %&nbsp;&nbsp;</div></td>
 <td><div>2013-11-27 00:05:36</div></td>
 </tr>
 </table>
@@ -1889,9 +2036,11 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
        SM_Network_eth0.gplot<br>
        SM_Network_eth0t.gplot<br>
        SM_Network_wlan0.gplot<br>
+       SM_CPUStat.gplot<br>
+       SM_CPUStatSum.gplot<br>
       </code>
-      <code>
       DbLog-Versionen:<br>
+      <code>
        SM_DB_all.gplot<br>
        SM_DB_CPUFreq.gplot<br>
        SM_DB_CPUTemp.gplot<br>
@@ -1981,6 +2130,16 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       define SysValues weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}<br>
       attr SysValues group RPi<br>
       attr SysValues room 9.03_Tech<br>
+      <br>
+      # Anzeige CPU Auslasung<br>
+      define wl_sysmon_cpustat SVG FileLog_sysmon:SM_CPUStat:CURRENT<br>
+      attr wl_sysmon_cpustat group RPi<br>
+      attr wl_sysmon_cpustat room 9.99_Test<br>
+      attr wl_sysmon_cpustat plotsize 840,420<br>
+      define wl_sysmon_cpustat_s SVG FileLog_sysmon:SM_CPUStatSum:CURRENT<br>
+      attr wl_sysmon_cpustat_s group RPi<br>
+      attr wl_sysmon_cpustat_s room 9.99_Test<br>
+      attr wl_sysmon_cpustat_s plotsize 840,420<br>
     </code>
     </ul>
 
