@@ -407,7 +407,7 @@ readingsGroup_2html($)
           }
         }
         my $inform_id = "";
-        $inform_id = "informId=\"$d-i$item.item\"" if( $readings );
+        $inform_id = "informId=\"$d-$name.i$item.item\"" if( $readings );
         $ret .= "<td><div $name_style $inform_id>$txt</div></td>";
         $first = 0;
         next;
@@ -643,6 +643,7 @@ readingsGroup_Notify($$)
         my $h = $defs{@{$device}[0]};
         next if( !$h );
         next if( $dev->{NAME} ne $h->{NAME} );
+        my $n = $h->{NAME};
         my $regex = @{$device}[1];
         my @list = (undef);
         @list = split(",",$regex) if( $regex );
@@ -667,7 +668,7 @@ readingsGroup_Notify($$)
               next if( $reading !~ m/^$readings$/);
 
               my $new_line;
-              my $DEVICE = $dev->{NAME};
+              my $DEVICE = $n;
               ($txt,$new_line) = eval $txt;
               if( $@ ) {
                 $txt = "<ERROR>";
@@ -679,12 +680,12 @@ readingsGroup_Notify($$)
                 my $icon = $1;
                 my $cmd = $3;
 
-                $cmd = lookup2($commands,$name,$h->{NAME},$icon) if( !defined($cmd) );
+                $cmd = lookup2($commands,$name,$n,$icon) if( !defined($cmd) );
                 $txt = FW_makeImage( $icon, $icon, "icon" );
                 ($txt,undef) = readingsGroup_makeLink($txt,undef,$cmd);
               }
 
-              CommandTrigger( "", "$name i$item.item: $txt" );
+              CommandTrigger( "", "$name $n.i$item.item: $txt" );
             }
 
             next;
@@ -692,11 +693,11 @@ readingsGroup_Notify($$)
 
           next if( defined($regex) && $reading !~ m/^$regex$/);
 
-          my $value_style = lookup2($value_style,$dev->{NAME},$reading,$value);
+          my $value_style = lookup2($value_style,$n,$reading,$value);
 
           my $value = $value;
           if( $value_format ) {
-            my $value_format = lookup2($value_format,$dev->{NAME},$reading,$value);
+            my $value_format = lookup2($value_format,$n,$reading,$value);
 
             if( !defined($value_format) ) {
               $value = "";
@@ -710,7 +711,6 @@ readingsGroup_Notify($$)
           my $cmd;
           my $devStateIcon;
           if( $valueIcon ) {
-            my $n = $h->{NAME};
             my $a = AttrVal($n, "alias", $n);
             my $room = AttrVal($n, "room", "");
             my $group = AttrVal($n, "group", "");
@@ -734,12 +734,12 @@ readingsGroup_Notify($$)
             }
           }
 
-          $cmd = lookup2($commands,$dev->{NAME},$reading,$value);
+          $cmd = lookup2($commands,$n,$reading,$value);
           ($value,undef) = readingsGroup_makeLink($value,undef,$cmd);
 
           $value = "<div $value_style>$value</div>" if( $value_style );
 
-          CommandTrigger( "", "$name $dev->{NAME}.$reading: $value" );
+          CommandTrigger( "", "$name $n.$reading: $value" );
         }
       }
     }
