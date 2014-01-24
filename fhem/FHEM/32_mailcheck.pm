@@ -32,6 +32,7 @@ mailcheck_Initialize($)
   $hash->{ReadFn}   = "mailcheck_Read";
 
   $hash->{DefFn}    = "mailcheck_Define";
+  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn} = "mailcheck_Notify";
   $hash->{UndefFn}  = "mailcheck_Undefine";
   #$hash->{SetFn}    = "mailcheck_Set";
@@ -80,7 +81,6 @@ mailcheck_Define($$)
   $hash->{HAS_MIME} = $mailcheck_hasMIME;
 
   if( $init_done ) {
-    delete $modules{mailcheck}->{NotifyFn};
     mailcheck_Disconnect($hash);
     mailcheck_Connect($hash);
   } elsif( $hash->{STATE} ne "???" ) {
@@ -98,12 +98,7 @@ mailcheck_Notify($$)
   return if($dev->{NAME} ne "global");
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
-  delete $modules{$hash->{TYPE}}->{NotifyFn};
-
-  foreach my $d (keys %defs) {
-    next if($defs{$d}{TYPE} ne $hash->{TYPE});
-    mailcheck_Connect($defs{$d});
-  }
+  mailcheck_Connect($hash);
 }
 
 sub
