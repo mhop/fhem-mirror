@@ -931,13 +931,13 @@ LUXTRONIK2_checkFirmware ($)
   
   <a name="LUXTRONIK2set"></a>
   <b>Set</b><br>
-   A firmware check assures before each set operation that a heat pump with untested firmware is not damaged accidently.
-  <ul><b>&lt;hotWaterOperatingMode%gt;</b> &lt;Mode:Auto|Party|Off%gt;- Operating Mode of domestic hot water boiler</ul>
-  <ul><b>&lt;hotWaterTemperatureTarget%gt;</b> &lt;temperature &deg;C%gt; - Target temperature of domestic hot water boiler</ul>
-  <ul><b>&lt;INTERVAL%gt;</b> &lt;seconds%gt; - Polling interval</ul>
-  <ul><b>&lt;statusRequest%gt;</b> - Update device information</ul>
-  <ul><b>&lt;synchClockHeatPump%gt;</b> - Synchronizes controller clock with FHEM time. <b>This change is lost in case of controller power off!!</b></ul>
-  <br>
+   <ul>A firmware check assures before each set operation that a heat pump with untested firmware is not damaged accidently.
+  <li><b>&lt;hotWaterOperatingMode&gt;</b> &lt;Mode:Auto|Party|Off&gt;- Operating Mode of domestic hot water boiler</li>
+  <li><b>&lt;hotWaterTemperatureTarget&gt;</b> &lt;temperature &deg;C&gt; - Target temperature of domestic hot water boiler</li>
+  <li><b>&lt;INTERVAL&gt;</b> &lt;seconds&gt; - Polling interval</li>
+  <li><b>&lt;statusRequest&gt;</b> - Update device information</li>
+  <li><b>&lt;synchClockHeatPump&gt;</b> - Synchronizes controller clock with FHEM time. <b>This change is lost in case of controller power off!!</b></li>
+  </ul>
   
   <a name="LUXTRONIK2get"></a>
   <b>Get</b>
@@ -952,12 +952,12 @@ LUXTRONIK2_checkFirmware ($)
     <li>statusHTML<br>
       if set, a HTML-formatted reading named "floorplanHTML" is created that can be used with the <a href="#FLOORPLAN">FLOORPLAN</a> module.<br>
       Currently, if the value of this attribute is not NULL, the corresponding reading consists of the current status of the heat pump and the temperature of the water.</li>
-    <li>allowSetParameter <0|1><br>
+    <li>allowSetParameter &lt;0|1&gt;<br>
       The <a href="#LUXTRONIK2set">parameters</a> of the heat pump controller can only be changed if this attribut is set to 1.</li>
-	<li>autoSynchClock <delay><br>
+	<li>autoSynchClock &lt;delay&gt;<br>
 		Corrects the clock of the heatpump automatically if certain <i>delay</i> (10 s - 600 s) against the FHEM time is reached. Does a firmware check before.<br>
-		<i>(A 'delayDeviceTimeCalc' <= 2 s is due to the internal calculation interval of the heat pump controller)</i></li>
-	<li>ignoreFirmwareCheck <0|1><br>
+		<i>(A 'delayDeviceTimeCalc' &lt;= 2 s is due to the internal calculation interval of the heat pump controller)</i></li>
+	<li>ignoreFirmwareCheck &lt;0|1&gt;<br>
 		A firmware check assures before each set operation that a heatpump controller with untested firmware is not damaged accidently. If this attribute is set to 1, the firmware check is ignored and new firmware can be tested for compatibility.</li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
   </ul>
@@ -983,21 +983,21 @@ LUXTRONIK2_checkFirmware ($)
     <br>
     Wenn das Abfrage-Interval nicht angegeben ist, wird es auf 300 (Sekunden) gesetzt. Der kleinste mögliche Wert ist 60.
     <br>
-    Beispiel:
-    <ul>
-      <code>define Heizung LUXTRONIK2 192.168.0.12 600</code>
-    </ul>
+    Beispiel: <code>define Heizung LUXTRONIK2 192.168.0.12 600</code>
+ 
   </ul>
   <br>
   
   <a name="LUXTRONIK2set"></a>
   <b>Set</b><br>
    Durch einen Firmware-Test wird vor jeder Set-Operation sichergestellt, dass W&auml;rmepumpe mit ungetester Firmware nicht unabsichtlich besch&auml;digt werden.
-  <ul><b>&lt;hotWaterOperatingMode%gt;</b> &lt;Mode:Auto|Party|Off%gt;- Betriebsmodus des Heizuwasserboilers</ul>
-  <ul><b>&lt;hotWaterTemperatureTarget%gt;</b> &lt;Temperatur &deg;C%gt; - Soll-Temperatur des Heizwasserboilers</ul>
-  <ul><b>&lt;INTERVAL%gt;</b> &lt;seconds%gt; - Abfrageinterval</ul>
-  <ul><b>&lt;statusRequest%gt;</b> - Aktuallisieren der Gerätewerte</ul>
-  <ul><b>&lt;synchClockHeatPump%gt;</b> - Abgleich der Uhr der Steuerung mit der FHEM Zeit. <b>Diese Änderung geht verlordn, sobald die Steuerung ausgeschaltet wird!!</b></ul>
+  <ul>
+   <li><b>&lt;hotWaterOperatingMode&gt;</b> &lt;Mode:Auto|Party|Off&gt;- Betriebsmodus des Heizuwasserboilers</l>
+  <li><b>&lt;hotWaterTemperatureTarget&gt;</b> &lt;Temperatur &deg;C&gt; - Soll-Temperatur des Heizwasserboilers</li>
+  <li><b>&lt;INTERVAL&gt;</b> &lt;Sekunden&gt; - Abfrageinterval &auml;ndern</li>
+  <li><b>&lt;statusRequest&gt;</b> - Aktuallisieren der Gerätewerte</li>
+  <li><b>&lt;synchClockHeatPump&gt;</b> - Abgleich der Uhr der Steuerung mit der FHEM Zeit. <b>Diese Änderung geht verlordn, sobald die Steuerung ausgeschaltet wird!!</b></li>
+  </ul>
   <br>
   
   <a name="LUXTRONIK2get"></a>
@@ -1013,12 +1013,12 @@ LUXTRONIK2_checkFirmware ($)
     <li>statusHTML<br>
       wenn gesetzt, dann wird ein HTML-formatierter Wert "floorplanHTML" erzeugt welcher vom Modul <a href="#FLOORPLAN">FLOORPLAN</a> genutzt werden kann.<br>
       Momentan wird nur gepr&uuml;ft, ob der Wert dieses Attributes ungleich NULL ist, der entsprechende Ger&auml;tewerte besteht aus dem aktuellen W&auml;rmepumpenstatus und der Heizwassertemperatur.</li>
-    <li>allowSetParameter <0|1><br>
+    <li>allowSetParameter &lt;0|1&gt;<br>
       Die internen <a href="#LUXTRONIK2set">Parameter</a> der W&auml;rmepumpensteuerung k&ouml;nnen nur ge&auml;ndert werden, wenn dieses Attribut auf 1 gesetzt ist.</li>
-	<li>autoSynchClock <Zeitunterschied><br>
+	<li>autoSynchClock &lt;Zeitunterschied&gt;<br>
 		Die Uhr der W&auml;rmepumpe wird automatisch korrigiert, wenn ein gewisser <i>Zeitunterschied</i> (10 s - 600 s) gegen&uuml;ber der FHEM Zeit erreicht ist. Zuvor wird ein die Kompatibilit&auml;t der Firmware &uuml;berpr&uuml;ft.<br>
-		<i>(Ein Ger&auml;tewert 'delayDeviceTimeCalc' <= 2 s ist auf die internen Berechnungsintervale der W&auml;rmepumpensteuerung zur&uuml;ck zu f&uuml;hren.)</i></li>
-	<li>ignoreFirmwareCheck <0|1><br>
+		<i>(Ein Ger&auml;tewert 'delayDeviceTimeCalc' &lt;= 2 s ist auf die internen Berechnungsintervale der W&auml;rmepumpensteuerung zur&uuml;ck zu f&uuml;hren.)</i></li>
+	<li>ignoreFirmwareCheck &lt;0|1&gt;<br>
 		Durch einen Firmware-Test wird vor jeder Set-Operation sichergestellt, dass W&auml;rmepumpe mit ungetester Firmware nicht unabsichtlich besch&auml;digt werden. Wenn dieses Attribute auf 1 gesetzt ist, dann wird der Firmware-Test ignoriert und neue Firmware kann getestet werden. Dieses Attribut wird jedoch ignoriert, wenn die Steuerungs-Firmware bereits als nicht kompatibel berichtet wurde.</li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
   </ul>
