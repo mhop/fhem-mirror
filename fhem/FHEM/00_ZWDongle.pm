@@ -16,6 +16,7 @@ sub ZWDongle_Read($@);
 sub ZWDongle_ReadAnswer($$$);
 sub ZWDongle_Ready($);
 sub ZWDongle_Write($$$@);
+sub ZWave_HandleSendStack($);
 
 
 # See also:
@@ -392,15 +393,25 @@ ZWDongle_Write($$$@)
   my ($hash,$fn,$msg,$noStack) = @_;
 
   if(!$noStack && $msg =~ m/^13/) { # SEND_DATA, wait for ACK
+    InternalTimer(gettimeofday()+0.1, "ZWave_HandleSendStack", $hash, 0)
+      if(!int(@{$hash->{SendStack}}));
     push @{$hash->{SendStack}}, $msg;
-    if(int(@{$hash->{SendStack}}) > 1) {
-      return;
-    }
+    return if(int(@{$hash->{SendStack}}) > 1);
   }
   $msg = "$fn$msg";
   $msg = sprintf("%02x%s", length($msg)/2+1, $msg);
   $msg = "01$msg" . ZWDongle_CheckSum($msg);
   DevIo_SimpleWrite($hash, $msg, 1);
+}
+
+sub
+ZWave_HandleSendStack($)
+{
+  my $hash = shift;
+  shift @{$hash->{SendStack}};
+  return if(!@{$hash->{SendStack}});
+  ZWDongle_Write($hash, "00", $hash->{SendStack}->[0], 1);
+  InternalTimer(gettimeofday()+0.1, "ZWave_HandleSendStack", $hash, 0);
 }
 
 #####################################
@@ -419,9 +430,9 @@ ZWDongle_Read($@)
   # The dongle looses data over USB for some commands(?), and dropping the old
   # buffer after a timeout is my only idea of solving this problem.
   my $ts   = gettimeofday();
-  my $data = ($hash->{READ_TS} && $ts-$hash->{READ_TS} > 1) ?
+  my $data = ($hash->{ReadTime} && $ts-$hash->{ReadTime} > 1) ?
                         "" : $hash->{PARTIAL};
-  $hash->{READ_TS} = $ts;      # Flush old data.
+  $hash->{ReadTime} = $ts;      # Flush old data.
 
 
   Log3 $name, 5, "ZWDongle/RAW: $data/$buf";
@@ -437,6 +448,7 @@ ZWDongle_Read($@)
     }
     if($fb eq "15") {   # NACK
       Log3 $name, 1, "$name: NACK received";
+      undef @{$hash->{SendStack}};
       $data = substr($data, 2);
       next;
     }
@@ -452,6 +464,7 @@ ZWDongle_Read($@)
     }
     if($fb ne "01") {   # SOF
       Log3 $name, 1, "$name: SOF missing (got $fb instead of 01)";
+      undef @{$hash->{SendStack}};
       last;
     }
 
@@ -465,22 +478,17 @@ ZWDongle_Read($@)
 
     my $ccs = ZWDongle_CheckSum("$len$msg");    # Computed Checksum
     if($rcs ne $ccs) {
-      Log3 $name, 1, "$name: wrong checksum: received $rcs, computed $ccs for $len$msg";
+      Log3 $name, 1,
+           "$name: wrong checksum: received $rcs, computed $ccs for $len$msg";
     }
     DevIo_SimpleWrite($hash, "06", 1);          # Send ACK
     Log3 $name, 5, "ZWDongle_Read $name: $msg";
-    
-    if($msg =~ m/^00(04|13)/) { # FIXME: add timeout, check all msgtypes
-      shift @{$hash->{SendStack}};
-      if(int(@{$hash->{SendStack}})) {
-        ZWDongle_Write($hash, "00", $hash->{SendStack}->[0], 1);
-      }
-    }
     
     last if(defined($local) && (!defined($regexp) || ($msg =~ m/$regexp/)));
     ZWDongle_Parse($hash, $name, $msg);
     $msg = undef;
   }
+
   $hash->{PARTIAL} = $data;
   return $msg if(defined($local));
   return undef;
