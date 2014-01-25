@@ -1584,6 +1584,7 @@ sub CUL_HM_Parse($$) {##############################
       my ($d1,$vp) =($1,hex($2)); # adjust_command[0..4] adj_data[0..250]
       $vp = int($vp/2.56+0.5);    # valve position in %
       my $chnHash = $modules{CUL_HM}{defptr}{$dst."01"};
+      $chnHash = $dhash if (!$chnHash);
       push @entities, CUL_HM_UpdtReadBulk($chnHash,1,"ValvePosition:$vp %",
                                                      "ValveAdjCmd:".$d1);
       push @ack,$chnHash,$mNo."8002".$dst.$src.'0101'.
