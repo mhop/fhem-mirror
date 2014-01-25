@@ -369,17 +369,17 @@
       ProxyPass        /fhem  http://localhost:8083/fhem
       ProxyPassReverse /fhem  http://localhost:8083/fhem</pre>
 
-      Dann starten Sie den Apache-Server erneut mit dem Kommando apachectl 
-      graceful.
-      <p>
-      Um die Passwortdatei zu erzeugen geben Sie bitte folgende Befehlszeile ein:</p>
-      <p>htpasswd -c /home/httpd/etc/passwd &lt;username&gt;
-        <br>
-        &nbsp;</p>
-      <p>
-      Bitte schauen Sie unter <a href="http://fhemwiki.de/wiki/Apache_Authentication_Proxy">fhemwiki.de</a> f&ouml;r eine dataillierte Beschreibung 
-      nach. 
-        <br><br>
+      Dann starten Sie den Apache-Server erneut mit dem Kommando apachectl
+      graceful.  Um die Passwortdatei zu erzeugen geben Sie bitte folgende
+      Befehlszeile ein:
+      <ul><code>
+        htpasswd -c /home/httpd/etc/passwd &lt;username&gt;
+      </code></ul>
+      Eine ausf&uuml;hrlichere Dokumentation findet man <a
+      href="http://fhemwiki.de/wiki/Apache_Authentication_Proxy">hier</a>, eine
+      noch bessere, mit client/server Zertifikaten <a
+      href="https://gist.github.com/gbirke/8608543">hier</a>.
+      <br><br>
 
       Um das Protokoll HTTPS zu verwenden editieren Sie die http.conf folgenderma&szlig;en:<p>
       <br>
