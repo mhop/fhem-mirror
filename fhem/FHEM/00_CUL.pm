@@ -681,8 +681,10 @@ CUL_XmitDlyHM($$$)
 {
   my ($hash,$fn,$now) = @_;
   
-  my $id = (length($fn)>19)?substr($fn,16,6):"";#get HMID destination
+  my (undef,$mTy,undef,$id) = unpack 'A8A2A6A6',$fn if(length($fn)>19);
+
   if($id &&
+     $mTy ne "02" &&
      $modules{CUL_HM}{defptr}{$id} && 
      $modules{CUL_HM}{defptr}{$id}{helper}{io} && 
      $modules{CUL_HM}{defptr}{$id}{helper}{io}{nextSend}) {
