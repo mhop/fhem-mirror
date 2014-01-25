@@ -73,7 +73,7 @@ LUXTRONIK2_Define($$)
 
   my $interval = 5*60;
   $interval = $a[3] if(int(@a) == 4);
-  $interval = 1*60 if( $interval < 1*60 );
+  $interval = 30 if( $interval < 30 );
 
   $hash->{NAME} = $name;
 
@@ -117,7 +117,7 @@ LUXTRONIK2_Set($$@)
     return undef;
   }
   elsif($cmd eq 'INTERVAL' && int(@_)==4 ) {
-	$val = 1*60 if( $val < 1*60 );
+	$val = 30 if( $val < 30 );
 	$hash->{INTERVAL}=$val;
 	return "Polling interval set to $val seconds.";
   }
@@ -159,7 +159,6 @@ LUXTRONIK2_Set($$@)
 		$hash->{LOCAL} = 0;
 		return $resultStr;
 	}
-
 
   my $list = "statusRequest:noArg".
 			 " hotWaterTemperatureTarget:slider,30.0,0.5,65.0".
@@ -411,15 +410,15 @@ SKIP_VISIBILITY_READING:
   my $return_str="$name";
   # 1 - no error = 1
   $return_str .= "|1";
-  # 2 - currentOperatingStatus1
+  # 2 - currentOperatingState1
   $return_str .= "|".$heatpump_values[117];
-  # 3 - currentOperatingStatus3
+  # 3 - currentOperatingState3
   $return_str .= "|".$heatpump_values[119];
   # 4 - Stufe - Value 121
   $return_str .= "|".$heatpump_values[121];
   # 5 - Temperature Value 122
   $return_str .= "|".$heatpump_values[122];
-  # 6 - Kreisumkehrventil 
+  # 6 - Verdichter1 
   $return_str .= "|".$heatpump_values[44];
   # 7 - hotWaterOperatingMode
   $return_str .= "|".$heatpump_parameters[4];
@@ -491,12 +490,14 @@ SKIP_VISIBILITY_READING:
   $return_str .= "|".$heatpump_values[61];
   # 39 - operatingHoursSecondHeatSource3
   $return_str .= "|".$heatpump_values[62];
-  # 40 - currentOperatingStatus2 
+  # 40 - currentOperatingState2 
   $return_str .= "|".$heatpump_values[118];
-  # 41 - durationOperatingStatus
+  # 41 - durationOperatingState
   $return_str .= "|".$heatpump_values[120];
   # 42 - timeError0
   $return_str .= "|".$heatpump_values[95];
+  # 43 - bivalentLevel
+  $return_str .= "|".$heatpump_values[79];
 
   return $return_str;
 }
@@ -529,7 +530,7 @@ LUXTRONIK2_UpdateDone($)
 				5 => "Abtauen" );
   my %wpOpStat2 = ( 0 => "Heizbetrieb",
 				1 => "Keine Anforderung",
-				2 => "Netz Einschaltverz&ouml;gerung",
+				2 => "Netz Einschaltverzoegerung",
 				3 => "Schaltspielzeit",
 				4 => "EVU Sperrzeit",
 				5 => "Brauchwasser",
@@ -584,30 +585,32 @@ LUXTRONIK2_UpdateDone($)
 	readingsBeginUpdate($hash);
 
   #Operating status of heat pump
-	  my $currentOperatingStatus1 = $wpOpStat1{$a[2]}; ##############
-      $currentOperatingStatus1 = "unbekannt (".$a[2].")" unless $currentOperatingStatus1;
-	  readingsBulkUpdate($hash,"currentOperatingStatus1",$currentOperatingStatus1);
-	  my $currentOperatingStatus2 = "unknown ($a[40])"; ##############
+	  my $currentOperatingState1 = $wpOpStat1{$a[2]}; ##############
+      $currentOperatingState1 = "unbekannt (".$a[2].")" unless $currentOperatingState1;
+	  readingsBulkUpdate($hash,"currentOperatingState1",$currentOperatingState1);
+	  
+	  my $currentOperatingState2 = "unknown ($a[40])"; ##############
 	  my $prefix = "";
 	  if ($a[40] == 0 || $a[40] == 2) { $prefix = "seit ";}
 	  elsif ($a[40] == 1) { $prefix = "in ";}
 	  if ($a[40] == 2) { #Sonderbehandlung bei WP-Fehlern
-	    $currentOperatingStatus2 = $prefix . strftime "%d.%m.%Y %H:%M:%S", localtime($a[42]);
+	    $currentOperatingState2 = $prefix . strftime "%d.%m.%Y %H:%M:%S", localtime($a[42]);
 	  } else {
-	    $currentOperatingStatus2 = $prefix . LUXTRONIK2_FormatDuration($a[41]);
+	    $currentOperatingState2 = $prefix . LUXTRONIK2_FormatDuration($a[41]);
 	  }
-	  readingsBulkUpdate($hash,"currentOperatingStatus2",$currentOperatingStatus2);
-	  my $currentOperatingStatus3 = $wpOpStat2{$a[3]}; ##############
+	  readingsBulkUpdate($hash,"currentOperatingState2",$currentOperatingState2);
+	  
+	  my $currentOperatingState3 = $wpOpStat2{$a[3]}; ##############
 	  # refine text of third state
 	  if ($a[3]==6) { 
-	     $currentOperatingStatus3 = "Stufe ".$a[4]." ".LUXTRONIK2_CalcTemp($a[5])." &deg;C "; 
+	     $currentOperatingState3 = "Stufe ".$a[4]." ".LUXTRONIK2_CalcTemp($a[5])." &deg;C "; 
 	  }
       elsif ($a[3]==7) { 
-         if ($a[6]==1) {$currentOperatingStatus3 = "Abtauen (Kreisumkehr)";}
-         else {$currentOperatingStatus3 = "Luftabtauen";}
+         if ($a[6]==1) {$currentOperatingState3 = "Abtauen (Kreisumkehr)";}
+         else {$currentOperatingState3 = "Luftabtauen";}
       }
-      $currentOperatingStatus3 = "unbekannt (".$a[3].")" unless $currentOperatingStatus3;
-	  readingsBulkUpdate($hash,"currentOperatingStatus3",$currentOperatingStatus3);
+      $currentOperatingState3 = "unbekannt (".$a[3].")" unless $currentOperatingState3;
+	  readingsBulkUpdate($hash,"currentOperatingState3",$currentOperatingState3);
 	
 	# Hot water operating mode 
 	  $value = $wpMode{$a[7]};
@@ -636,7 +639,7 @@ LUXTRONIK2_UpdateDone($)
         {$value = "Automatik - Sommerbetrieb (Aus)";}
 	  $value = "unbekannt (".$a[10].")" unless $value;
 	  readingsBulkUpdate($hash,"heatingOperatingMode",$value);
-	  
+
 	# Remaining temperatures and flow rate
 	  readingsBulkUpdate($hash,"ambientTemperature",LUXTRONIK2_CalcTemp($a[12]));
 	  my $hotWaterTemperature = LUXTRONIK2_CalcTemp($a[14]);
@@ -655,6 +658,9 @@ LUXTRONIK2_UpdateDone($)
 	  readingsBulkUpdate($hash,"heatingSystemCirculationPump",$a[27]?"on":"off");
 	  readingsBulkUpdate($hash,"hotWaterCirculationPumpExtern",$a[28]?"on":"off");
 	  readingsBulkUpdate($hash,"hotWaterSwitchingValve",$a[9]?"on":"off");
+
+	  # bivalentLevel
+	  readingsBulkUpdate($hash,"bivalentLevel",$a[43]);
 	  
 	# Firmware
 	  my $firmware = $a[20];
@@ -670,7 +676,7 @@ LUXTRONIK2_UpdateDone($)
 	  $value = $wpType{$a[31]};
 	  $value = "unbekannt (".$a[31].")" unless $value;
 	  readingsBulkUpdate($hash,"typeHeatpump",$value);
-	  
+
 	# Device times during readings 
 	  $value = strftime "%Y-%m-%d %H:%M:%S", localtime($a[22]);
 	  readingsBulkUpdate($hash, "deviceTimeStartReadings", $value);
@@ -693,19 +699,20 @@ LUXTRONIK2_UpdateDone($)
 	  if ($a[35]>0) {readingsBulkUpdate($hash,"operatingHoursHotWater",floor($a[35]/360+0.5)/10);}
 	  if ($a[36]>0) {readingsBulkUpdate($hash,"heatQuantityHeating",$a[36]/10);}
 	  if ($a[37]>0) {readingsBulkUpdate($hash,"heatQuantityHotWater",$a[37]/10);}
+	  if ($a[36]+$a[37]>0) {readingsBulkUpdate($hash,"heatQuantityTotal",($a[36]+$a[37])/10);}
 	  if ($a[38]>0) {readingsBulkUpdate($hash,"operatingHoursSecondHeatSource2",floor($a[38]/360+0.5)/10);}
 	  if ($a[39]>0) {readingsBulkUpdate($hash,"operatingHoursSecondHeatSource3",floor($a[39]/360+0.5)/10);}
 		
 	#HTML for floorplan
 	if(AttrVal($name, "statusHTML", "none") ne "none") {
 		  $value = "<div class=fp_" . $a[0] . "_title>" . $a[0] . "</div>";
-		  $value .= "$currentOperatingStatus1 $currentOperatingStatus2<br>";
-		  $value .= $currentOperatingStatus3 . "<br>";
+		  $value .= "$currentOperatingState1 $currentOperatingState2<br>";
+		  $value .= $currentOperatingState3 . "<br>";
 		  $value .= "Brauchwasser: " . $hotWaterTemperature . "&deg;C";
 		  readingsBulkUpdate($hash,"floorplanHTML",$value);
 	  }
 
- 	  readingsBulkUpdate($hash,"state","$currentOperatingStatus1 $currentOperatingStatus2 - $currentOperatingStatus3");
+ 	  readingsBulkUpdate($hash,"state","$currentOperatingState1 $currentOperatingState2 - $currentOperatingState3");
 	  
       readingsEndUpdate($hash,1);
 
@@ -950,7 +957,7 @@ LUXTRONIK2_checkFirmware ($)
   <ul>
     <code>define &lt;name&gt; LUXTRONIK2 &lt;IP-address&gt; [poll-interval]</code>
     <br>
-    If the pool interval is omitted, it is set to 300 (seconds). Smallest possible value is 60.
+    If the pool interval is omitted, it is set to 300 (seconds). Smallest possible value is 30.
     <br>
     Example: <code>define Heizung LUXTRONIK2 192.168.0.12 600</code>
   </ul>
@@ -979,7 +986,7 @@ LUXTRONIK2_checkFirmware ($)
     <li>statusHTML<br>
       If set, a HTML-formatted reading named "floorplanHTML" is created. It can be used with the <a href="#FLOORPLAN">FLOORPLAN</a> module.<br>
       Currently, if the value of this attribute is not NULL, the corresponding reading consists of the current status of the heat pump and the temperature of the water.</li>
-    <li>allowSetParameter &lt; 0 | 1 &gt;<br>
+    <li>allowSetParameter &lt; 0 | 1 &gt;<br>f
       The <a href="#LUXTRONIK2set">parameters</a> of the heat pump controller can only be changed if this attribut is set to 1.</li>
 	<li>autoSynchClock &lt;delay&gt;<br>
 		Corrects the clock of the heatpump automatically if certain <i>delay</i> (10 s - 600 s) against the FHEM time is reached. Does a firmware check before.<br>
@@ -1010,7 +1017,7 @@ LUXTRONIK2_checkFirmware ($)
   <ul>
     <code>define &lt;name&gt; LUXTRONIK2 &lt;IP-Adresse&gt; [Abfrage-Interval]</code>
     <br>
-    Wenn das Abfrage-Interval nicht angegeben ist, wird es auf 300 (Sekunden) gesetzt. Der kleinste m&ouml;gliche Wert ist 60.
+    Wenn das Abfrage-Interval nicht angegeben ist, wird es auf 300 (Sekunden) gesetzt. Der kleinste m&ouml;gliche Wert ist 30.
     <br>
     Beispiel: <code>define Heizung LUXTRONIK2 192.168.0.12 600</code>
  
