@@ -1,4 +1,4 @@
-################################################################
+###############################################################
 #
 #  Copyright notice
 #
@@ -37,9 +37,13 @@ use Time::HiRes qw/ time /;
 use POSIX;
 use Net::Telnet;
 
-my $cc; # The Itmes Changed Counter
+#List of firmware versions that are known to be compatible with this modul
+  my $testedFirmware = "#V1.54C#";
+  my $compatibleFirmware = "#V1.54C#";
 
-sub
+#my $cc; # The Itmes Changed Counter
+
+sub ########################################
 LUXTRONIK2_Initialize($)
 {
   my ($hash) = @_;
@@ -56,7 +60,7 @@ LUXTRONIK2_Initialize($)
 					  $readingFnAttributes;
 }
 
-sub
+sub ########################################
 LUXTRONIK2_Define($$)
 {
   my ($hash, $def) = @_;
@@ -88,7 +92,7 @@ LUXTRONIK2_Define($$)
   return undef;
 }
 
-sub
+sub ########################################
 LUXTRONIK2_Undefine($$)
 {
   my ($hash, $arg) = @_;
@@ -100,7 +104,7 @@ LUXTRONIK2_Undefine($$)
   return undef;
 }
 
-sub
+sub ########################################
 LUXTRONIK2_Set($$@)
 {
   my ($hash, $name, $cmd, $val) = @_;
@@ -165,7 +169,7 @@ LUXTRONIK2_Set($$@)
   return "Unknown argument $cmd, choose one of $list";
 }
 
-sub
+sub ########################################
 LUXTRONIK2_Attr(@)
 {
 	my ($cmd,$name,$aName,$aVal) = @_;
@@ -184,7 +188,7 @@ LUXTRONIK2_Attr(@)
 	return undef;
 }
 
-sub
+sub ########################################
 LUXTRONIK2_GetUpdate($)
 {
   my ($hash) = @_;
@@ -205,7 +209,7 @@ LUXTRONIK2_GetUpdate($)
 }
 
 
-sub
+sub ########################################
 LUXTRONIK2_DoUpdate($)
 {
   my ($string) = @_;
@@ -409,7 +413,7 @@ SKIP_VISIBILITY_READING:
   $return_str .= "|1";
   # 2 - currentOperatingStatus1
   $return_str .= "|".$heatpump_values[117];
-  # 3 - currentOperatingStatus2
+  # 3 - currentOperatingStatus3
   $return_str .= "|".$heatpump_values[119];
   # 4 - Stufe - Value 121
   $return_str .= "|".$heatpump_values[121];
@@ -487,12 +491,18 @@ SKIP_VISIBILITY_READING:
   $return_str .= "|".$heatpump_values[61];
   # 39 - operatingHoursSecondHeatSource3
   $return_str .= "|".$heatpump_values[62];
+  # 40 - currentOperatingStatus2 
+  $return_str .= "|".$heatpump_values[118];
+  # 41 - durationOperatingStatus
+  $return_str .= "|".$heatpump_values[120];
+  # 42 - timeError0
+  $return_str .= "|".$heatpump_values[95];
 
   return $return_str;
 }
 
 
-sub
+sub ########################################
 LUXTRONIK2_UpdateDone($)
 {
   my ($string) = @_;
@@ -573,22 +583,32 @@ LUXTRONIK2_UpdateDone($)
     $counterRetry = 0;  
 	readingsBeginUpdate($hash);
 
-  #Operating status of heatpump
-	  my $currentOperatingStatus1 = $wpOpStat1{$a[2]};
+  #Operating status of heat pump
+	  my $currentOperatingStatus1 = $wpOpStat1{$a[2]}; ##############
       $currentOperatingStatus1 = "unbekannt (".$a[2].")" unless $currentOperatingStatus1;
 	  readingsBulkUpdate($hash,"currentOperatingStatus1",$currentOperatingStatus1);
-	  my $currentOperatingStatus2 = $wpOpStat2{$a[3]};
-	  # refine text of second state
+	  my $currentOperatingStatus2 = "unknown ($a[40])"; ##############
+	  my $prefix = "";
+	  if ($a[40] == 0 || $a[40] == 2) { $prefix = "seit ";}
+	  elsif ($a[40] == 1) { $prefix = "in ";}
+	  if ($a[40] == 2) { #Sonderbehandlung bei WP-Fehlern
+	    $currentOperatingStatus2 = $prefix . strftime "%d.%m.%Y %H:%M:%S", localtime($a[42]);
+	  } else {
+	    $currentOperatingStatus2 = $prefix . LUXTRONIK2_FormatDuration($a[41]);
+	  }
+	  readingsBulkUpdate($hash,"currentOperatingStatus2",$currentOperatingStatus2);
+	  my $currentOperatingStatus3 = $wpOpStat2{$a[3]}; ##############
+	  # refine text of third state
 	  if ($a[3]==6) { 
-	     $currentOperatingStatus2 = "Stufe ".$a[4]." ".LUXTRONIK2_CalcTemp($a[5])." &deg;C "; 
+	     $currentOperatingStatus3 = "Stufe ".$a[4]." ".LUXTRONIK2_CalcTemp($a[5])." &deg;C "; 
 	  }
       elsif ($a[3]==7) { 
-         if ($a[6]==1) {$currentOperatingStatus2 = "Abtauen (Kreisumkehr)";}
-         else {$currentOperatingStatus2 = "Luftabtauen";}
+         if ($a[6]==1) {$currentOperatingStatus3 = "Abtauen (Kreisumkehr)";}
+         else {$currentOperatingStatus3 = "Luftabtauen";}
       }
-      $currentOperatingStatus2 = "unbekannt (".$a[3].")" unless $currentOperatingStatus2;
-	  readingsBulkUpdate($hash,"currentOperatingStatus2",$currentOperatingStatus2);
-	  
+      $currentOperatingStatus3 = "unbekannt (".$a[3].")" unless $currentOperatingStatus3;
+	  readingsBulkUpdate($hash,"currentOperatingStatus3",$currentOperatingStatus3);
+	
 	# Hot water operating mode 
 	  $value = $wpMode{$a[7]};
 	  $value = "unbekannt (".$a[7].")" unless $value;
@@ -671,21 +691,21 @@ LUXTRONIK2_UpdateDone($)
 	  if ($a[33]>0) {readingsBulkUpdate($hash,"operatingHoursHeatPump",floor($a[33]/360+0.5)/10);}
 	  if ($a[34]>0) {readingsBulkUpdate($hash,"operatingHoursHeating",floor($a[34]/360+0.5)/10);}
 	  if ($a[35]>0) {readingsBulkUpdate($hash,"operatingHoursHotWater",floor($a[35]/360+0.5)/10);}
-	  if ($a[36]>0) {readingsBulkUpdate($hash,"heatQuantityHeating",$a[36]);}
-	  if ($a[37]>0) {readingsBulkUpdate($hash,"heatQuantityHotWater",$a[37]);}
+	  if ($a[36]>0) {readingsBulkUpdate($hash,"heatQuantityHeating",$a[36]/10);}
+	  if ($a[37]>0) {readingsBulkUpdate($hash,"heatQuantityHotWater",$a[37]/10);}
 	  if ($a[38]>0) {readingsBulkUpdate($hash,"operatingHoursSecondHeatSource2",floor($a[38]/360+0.5)/10);}
 	  if ($a[39]>0) {readingsBulkUpdate($hash,"operatingHoursSecondHeatSource3",floor($a[39]/360+0.5)/10);}
 		
 	#HTML for floorplan
 	if(AttrVal($name, "statusHTML", "none") ne "none") {
 		  $value = "<div class=fp_" . $a[0] . "_title>" . $a[0] . "</div>";
-		  $value .= $currentOperatingStatus1 . "<br>";
-		  $value .= $currentOperatingStatus2 . "<br>";
+		  $value .= "$currentOperatingStatus1 $currentOperatingStatus2<br>";
+		  $value .= $currentOperatingStatus3 . "<br>";
 		  $value .= "Brauchwasser: " . $hotWaterTemperature . "&deg;C";
 		  readingsBulkUpdate($hash,"floorplanHTML",$value);
 	  }
 
- 	  readingsBulkUpdate($hash,"state",$currentOperatingStatus1." - ".$currentOperatingStatus2);
+ 	  readingsBulkUpdate($hash,"state","$currentOperatingStatus1 $currentOperatingStatus2 - $currentOperatingStatus3");
 	  
       readingsEndUpdate($hash,1);
 
@@ -723,7 +743,7 @@ LUXTRONIK2_UpdateDone($)
 }
 
 
-sub
+sub ########################################
 LUXTRONIK2_UpdateAborted($)
 {
   my ($hash) = @_;
@@ -733,7 +753,7 @@ LUXTRONIK2_UpdateAborted($)
 }
 
 
-sub
+sub ########################################
 LUXTRONIK2_CalcTemp($)
 {
   my ($temp) = @_;
@@ -743,8 +763,20 @@ LUXTRONIK2_CalcTemp($)
   return $temp;
 }
 
+sub ########################################
+LUXTRONIK2_FormatDuration($)
+{
+  my ($value) = @_;
+  my $returnstr = sprintf "%02d:", int($value/3600);
+  $value %= 3600;
+  $returnstr .= sprintf "%02d:", int($value/60);
+  $value %= 60;
+  $returnstr .= sprintf "%02d", $value;
+  
+  return $returnstr;
+}
 
-sub
+sub ########################################
 LUXTRONIK2_SetParameter($$$)
 {
   my ($hash, $parameterName, $realValue) = @_;
@@ -833,7 +865,7 @@ LUXTRONIK2_SetParameter($$$)
 }
 
 
-sub
+sub ########################################
 LUXTRONIK2_synchronizeClock (@)
 {
   my ($hash,$maxDelta) = @_;
@@ -881,14 +913,10 @@ LUXTRONIK2_synchronizeClock (@)
 	return $returnStr;
 }
 
-
-sub
-LUXTRONIK2_checkFirmware ($)
+sub ######################################## 
+LUXTRONIK2_checkFirmware ($) 
 {
   my ($myFirmware) = @_;
-  #List of firmware versions that are known to be compatible with this modul
-    my $testedFirmware = "#V1.54C#";
-    my $compatibleFirmware = "#V1.54C#";
 
   #Firmware not tested
 	if (index("#".$myFirmware."#",$testedFirmware) == -1) { 
@@ -910,9 +938,11 @@ LUXTRONIK2_checkFirmware ($)
 <a name="LUXTRONIK2"></a>
 <h3>LUXTRONIK2</h3>
 <ul>
-  Luxtronik 2.0 is a heating controller, used in Alpha Innotec and Siemens Novelan heat pumps.
+  Luxtronik 2.0 is a heating controller used in Alpha Innotec and Siemens Novelan heat pumps.
   It has a built-in ethernet port, so it can be directly integrated into a local area network (LAN).
+  <br>
   <i>The modul is tested with firmware v1.54C.</i>
+  <br>&nbsp;
   <br>
   
   <a name="LUXTRONIK2define"></a>
@@ -922,10 +952,7 @@ LUXTRONIK2_checkFirmware ($)
     <br>
     If the pool interval is omitted, it is set to 300 (seconds). Smallest possible value is 60.
     <br>
-    Example:
-    <ul>
-      <code>define Heizung LUXTRONIK2 192.168.0.12 600</code>
-    </ul>
+    Example: <code>define Heizung LUXTRONIK2 192.168.0.12 600</code>
   </ul>
   <br>
   
@@ -938,7 +965,7 @@ LUXTRONIK2_checkFirmware ($)
   <li><b>&lt;statusRequest&gt;</b> - Update device information</li>
   <li><b>&lt;synchClockHeatPump&gt;</b> - Synchronizes controller clock with FHEM time. <b>This change is lost in case of controller power off!!</b></li>
   </ul>
-  
+  <br>
   <a name="LUXTRONIK2get"></a>
   <b>Get</b>
   <ul>
@@ -950,17 +977,17 @@ LUXTRONIK2_checkFirmware ($)
   <b>Attributes</b>
   <ul>
     <li>statusHTML<br>
-      if set, a HTML-formatted reading named "floorplanHTML" is created that can be used with the <a href="#FLOORPLAN">FLOORPLAN</a> module.<br>
+      If set, a HTML-formatted reading named "floorplanHTML" is created. It can be used with the <a href="#FLOORPLAN">FLOORPLAN</a> module.<br>
       Currently, if the value of this attribute is not NULL, the corresponding reading consists of the current status of the heat pump and the temperature of the water.</li>
-    <li>allowSetParameter &lt;0|1&gt;<br>
+    <li>allowSetParameter &lt; 0 | 1 &gt;<br>
       The <a href="#LUXTRONIK2set">parameters</a> of the heat pump controller can only be changed if this attribut is set to 1.</li>
 	<li>autoSynchClock &lt;delay&gt;<br>
 		Corrects the clock of the heatpump automatically if certain <i>delay</i> (10 s - 600 s) against the FHEM time is reached. Does a firmware check before.<br>
 		<i>(A 'delayDeviceTimeCalc' &lt;= 2 s is due to the internal calculation interval of the heat pump controller)</i></li>
-	<li>ignoreFirmwareCheck &lt;0|1&gt;<br>
+	<li>ignoreFirmwareCheck &lt; 0 | 1 &gt;<br>
 		A firmware check assures before each set operation that a heatpump controller with untested firmware is not damaged accidently. If this attribute is set to 1, the firmware check is ignored and new firmware can be tested for compatibility.</li>
-    <li><a href="#do_not_notify">do_not_notify</a></li>
-  </ul>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+ </ul>
   <br>
   
 </ul>
@@ -968,12 +995,14 @@ LUXTRONIK2_checkFirmware ($)
 =end html
 
 =begin html_DE
+
 <a name="LUXTRONIK2"></a>
 <h3>LUXTRONIK2</h3>
 <ul>
-  Luxtronik 2.0 ist eine Heizungssteuerung, welchen in W&auml;rmepumpen von Alpha Innotec und Siemens Novelan verbaut ist.
-  Sie besitzt einen Ethernet Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.
+  Die Luxtronik 2.0 ist eine Heizungssteuerung, welche in W&auml;rmepumpen von Alpha Innotec und Siemens Novelan verbaut ist.
+  Sie besitzt einen Ethernet Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.<br>
   <i>Das Modul wurde bisher mit der Steuerungs-Firmware v1.54C getestet.</i>
+  <br>&nbsp;
   <br>
   
   <a name="LUXTRONIK2define"></a>
@@ -981,7 +1010,7 @@ LUXTRONIK2_checkFirmware ($)
   <ul>
     <code>define &lt;name&gt; LUXTRONIK2 &lt;IP-Adresse&gt; [Abfrage-Interval]</code>
     <br>
-    Wenn das Abfrage-Interval nicht angegeben ist, wird es auf 300 (Sekunden) gesetzt. Der kleinste mögliche Wert ist 60.
+    Wenn das Abfrage-Interval nicht angegeben ist, wird es auf 300 (Sekunden) gesetzt. Der kleinste m&ouml;gliche Wert ist 60.
     <br>
     Beispiel: <code>define Heizung LUXTRONIK2 192.168.0.12 600</code>
  
@@ -990,13 +1019,14 @@ LUXTRONIK2_checkFirmware ($)
   
   <a name="LUXTRONIK2set"></a>
   <b>Set</b><br>
-   Durch einen Firmware-Test wird vor jeder Set-Operation sichergestellt, dass W&auml;rmepumpe mit ungetester Firmware nicht unabsichtlich besch&auml;digt werden.
   <ul>
-   <li><b>&lt;hotWaterOperatingMode&gt;</b> &lt;Mode:Auto|Party|Off&gt;- Betriebsmodus des Heizuwasserboilers</l>
-  <li><b>&lt;hotWaterTemperatureTarget&gt;</b> &lt;Temperatur &deg;C&gt; - Soll-Temperatur des Heizwasserboilers</li>
-  <li><b>&lt;INTERVAL&gt;</b> &lt;Sekunden&gt; - Abfrageinterval &auml;ndern</li>
-  <li><b>&lt;statusRequest&gt;</b> - Aktuallisieren der Gerätewerte</li>
-  <li><b>&lt;synchClockHeatPump&gt;</b> - Abgleich der Uhr der Steuerung mit der FHEM Zeit. <b>Diese Änderung geht verlordn, sobald die Steuerung ausgeschaltet wird!!</b></li>
+	  Durch einen Firmware-Test wird vor jeder Set-Operation sichergestellt, dass W&auml;rmepumpen mit ungetester Firmware nicht unabsichtlich besch&auml;digt werden.
+      <li>hotWaterOperatingMode &lt;Betriebsmodus&gt; - Betriebsmodus des Heißwasserboilers ( Auto | Party | Off )</l>
+	  <li>hotWaterTemperatureTarget &lt;Temperatur&gt; - Soll-Temperatur des Heißwasserboilers in &deg;C</li>
+	  <li>INTERVAL &lt;Abfrageinterval&gt; - Abfrageinterval in Sekunden</li>
+	  <li>statusRequest - Aktualisieren der Gerätewerte</li>
+	  <li>synchClockHeatPump - Abgleich der Uhr der Steuerung mit der FHEM Zeit. <br>
+	      <b>!! Diese Änderung geht verloren, sobald die Steuerung ausgeschaltet wird!!</b></li>
   </ul>
   <br>
   
@@ -1011,16 +1041,16 @@ LUXTRONIK2_checkFirmware ($)
   <b>Attribute</b>
   <ul>
     <li>statusHTML<br>
-      wenn gesetzt, dann wird ein HTML-formatierter Wert "floorplanHTML" erzeugt welcher vom Modul <a href="#FLOORPLAN">FLOORPLAN</a> genutzt werden kann.<br>
+      wenn gesetzt, dann wird ein HTML-formatierter Wert "floorplanHTML" erzeugt, welcher vom Modul <a href="#FLOORPLAN">FLOORPLAN</a> genutzt werden kann.<br>
       Momentan wird nur gepr&uuml;ft, ob der Wert dieses Attributes ungleich NULL ist, der entsprechende Ger&auml;tewerte besteht aus dem aktuellen W&auml;rmepumpenstatus und der Heizwassertemperatur.</li>
-    <li>allowSetParameter &lt;0|1&gt;<br>
+    <li>allowSetParameter &lt; 0 | 1 &gt;<br>
       Die internen <a href="#LUXTRONIK2set">Parameter</a> der W&auml;rmepumpensteuerung k&ouml;nnen nur ge&auml;ndert werden, wenn dieses Attribut auf 1 gesetzt ist.</li>
 	<li>autoSynchClock &lt;Zeitunterschied&gt;<br>
-		Die Uhr der W&auml;rmepumpe wird automatisch korrigiert, wenn ein gewisser <i>Zeitunterschied</i> (10 s - 600 s) gegen&uuml;ber der FHEM Zeit erreicht ist. Zuvor wird ein die Kompatibilit&auml;t der Firmware &uuml;berpr&uuml;ft.<br>
-		<i>(Ein Ger&auml;tewert 'delayDeviceTimeCalc' &lt;= 2 s ist auf die internen Berechnungsintervale der W&auml;rmepumpensteuerung zur&uuml;ck zu f&uuml;hren.)</i></li>
-	<li>ignoreFirmwareCheck &lt;0|1&gt;<br>
-		Durch einen Firmware-Test wird vor jeder Set-Operation sichergestellt, dass W&auml;rmepumpe mit ungetester Firmware nicht unabsichtlich besch&auml;digt werden. Wenn dieses Attribute auf 1 gesetzt ist, dann wird der Firmware-Test ignoriert und neue Firmware kann getestet werden. Dieses Attribut wird jedoch ignoriert, wenn die Steuerungs-Firmware bereits als nicht kompatibel berichtet wurde.</li>
-    <li><a href="#do_not_notify">do_not_notify</a></li>
+		Die Uhr der W&auml;rmepumpe wird automatisch korrigiert, wenn ein gewisser <i>Zeitunterschied</i> (10 s - 600 s) gegen&uuml;ber der FHEM Zeit erreicht ist. Zuvor wird die Kompatibilit&auml;t der Firmware &uuml;berpr&uuml;ft.<br>
+		<i>(Ein Ger&auml;tewert 'delayDeviceTimeCalc' &lt;= 2 s ist auf die internen Berechnungsintervale der W&auml;rmepumpensteuerung zur&uuml;ckzuf&uuml;hren.)</i></li>
+	<li>ignoreFirmwareCheck &lt; 0 | 1 &gt;<br>
+		Durch einen Firmware-Test wird vor jeder Set-Operation sichergestellt, dass W&auml;rmepumpen mit ungetester Firmware nicht unabsichtlich besch&auml;digt werden. Wenn dieses Attribute auf 1 gesetzt ist, dann wird der Firmware-Test ignoriert und neue Firmware kann getestet werden. Dieses Attribut wird jedoch ignoriert, wenn die Steuerungs-Firmware bereits als nicht kompatibel berichtet wurde.</li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
   
