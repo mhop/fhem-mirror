@@ -42,7 +42,7 @@ sub HandleTimeout() {
       my $arg = $intAt{$i}{ARG};
       $arg = "" if (!$arg);
       
-      apptime_getTiming("global","tmr-".$fn.";".$arg,$fn,$arg);
+      apptime_getTiming("global","tmr-".$fn.";".$arg,$fn,$tim,$arg);
 
       delete($intAt{$i});
     } else {
@@ -71,25 +71,34 @@ sub CallFn(@) {
   my $fn = $modules{$defs{$d}{TYPE}}{$n};
   return "" if(!$fn);
   
-  my @ret = apptime_getTiming($d,$fn,$fn,@_);
+  my @ret = apptime_getTiming($d,$fn,$fn,0,@_);
 
   if(wantarray){return @ret;}
   else         {return $ret[0];}
 }
 
 sub apptime_getTiming($$$@) {
-  my ($e,$fnName,$fn,@arg) = @_;
+  my ($e,$fnName,$fn,$tim,@arg) = @_;
+  my $h;
   if (!$defs{$e}{helper} || 
       !$defs{$e}{helper}{bm} ||
       !$defs{$e}{helper}{bm}{$fnName} ){
-    $defs{$e}{helper}{bm}{$fnName}{max}=0;
-    $defs{$e}{helper}{bm}{$fnName}{mAr}="";
-    $defs{$e}{helper}{bm}{$fnName}{cnt}=0;
-    $defs{$e}{helper}{bm}{$fnName}{tot}=0;
+
+    $defs{$e}{helper}{bm}{$fnName} =(max =>0, mAr =>"",
+                                     cnt =>1, tot =>0,
+                                     dmx =>0);
+
+    $h = $defs{$e}{helper}{bm}{$fnName};
   }
-  my $h = $defs{$e}{helper}{bm}{$fnName};
-  $h->{cnt}++;
+  else{
+    $h = $defs{$e}{helper}{bm}{$fnName};
+    $h->{cnt}++;
+  }
   my $ts1 = gettimeofday();
+  if ($tim){
+    my $td = int(($ts1-$tim)*1000);
+    $h->{dmx} = $td if ($h->{dmx} < $td);
+  }
 
   no strict "refs";
   my @ret = &{$fn}(@arg);
@@ -111,7 +120,7 @@ sub apptime_CommandDispTiming($$@) {
   my ($sFld,$top,$filter) = split" ",$param;
   $sFld = "max" if (!$sFld);
   $top = "top" if (!$top);
-  my %fld = (name=>0,funktion=>1,max=>2,count=>3,total=>4,average=>5,clear=>99);
+  my %fld = (name=>0,funktion=>1,max=>2,count=>3,total=>4,average=>5,maxDly=>6,clear=>99);
   return "$sFld undefined field, use one of ".join(",",keys %fld) 
         if(!defined $fld{$sFld});
   my @bmArr;
@@ -133,6 +142,7 @@ sub apptime_CommandDispTiming($$@) {
                    ,$h->{cnt}
                    ,$h->{tot}
                    ,$h->{tot} /$h->{cnt}
+                   ,$h->{dmx}
                    ,$h->{mAr}
                   )];
     }
@@ -141,11 +151,11 @@ sub apptime_CommandDispTiming($$@) {
   if ($field>1){@bmArr = sort { $b->[$field] <=> $a->[$field] } @bmArr;}
   else         {@bmArr = sort { $b->[$field] cmp $a->[$field] } @bmArr;}
   my $ret = sprintf("\n %35s %20s %6s %6s %8s %8s %s",
-            "name","function","max","count","total","average","param Max call");
+            "name","function","max","count","total","average","maxDly","param Max call");
   my $end = ($top && $top eq "top")?20:@bmArr-1;
   $end = @bmArr-1 if ($end>@bmArr-1);
 
-  $ret .= sprintf("\n %35s %20s %6d %6d %8d %8.2f %s",@{$bmArr[$_]})for (0..$end);
+  $ret .= sprintf("\n %35s %20s %6d %6d %8d %8.2f %6d %s",@{$bmArr[$_]})for (0..$end);
   return $ret;
 }
 
@@ -199,6 +209,9 @@ sub apptime_CommandDispTiming($$@) {
           accumulated duration of this procedure over all calls monitored<br> </li>
       <li><b>average</b><br>
           average time a call of this procedure takes<br> </li>
+      <li><b>maxDly</b><br>
+          maximum delay of a timer call to its schedules time. This column is not relevant 
+          for non-timer calls.<br> </li>
       <li><b>param Max call</b><br>
           gives the parameter of the call with the max duration<br> </li>
     </ul>
