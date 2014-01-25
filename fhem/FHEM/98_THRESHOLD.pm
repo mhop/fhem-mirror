@@ -226,27 +226,29 @@ THRESHOLD_Define($$$)
   $hash->{cmd2_lt} = SemicolonEscape($cmd2_lt);
   $hash->{cmd_default} = $cmd_default;
   $hash->{STATE} = 'initialized';
-
-  readingsBeginUpdate  ($hash);
-  
-  if (defined ($init_desired_value))
-  {
-    my $mode="active";
-    readingsBulkUpdate   ($hash, "threshold_min", $init_desired_value-$hysteresis+$offset);
-    readingsBulkUpdate   ($hash, "threshold_max", $init_desired_value+$offset);
-    readingsBulkUpdate   ($hash, "cmd","wait for next cmd");
-    readingsBulkUpdate   ($hash, "desired_value", $init_desired_value);
-    readingsBulkUpdate   ($hash, "mode", $mode);
-  }
-  
-  if (defined ($target_sensor))
-  {
-    my $mode="external";
-    readingsBulkUpdate   ($hash, "cmd", "wait for next cmd");
-    readingsBulkUpdate   ($hash, "mode", "external");
-  }
-  readingsEndUpdate    ($hash, 1);
-    
+  if (defined ($init_desired_value) or defined ($target_sensor)) {
+    readingsBeginUpdate  ($hash);
+    if (defined ($init_desired_value))
+    {
+      my $mode="active";
+      readingsBulkUpdate   ($hash, "threshold_min", $init_desired_value-$hysteresis+$offset);
+      readingsBulkUpdate   ($hash, "threshold_max", $init_desired_value+$offset);
+      readingsBulkUpdate   ($hash, "cmd","wait for next cmd");
+      readingsBulkUpdate   ($hash, "desired_value", $init_desired_value);
+      readingsBulkUpdate   ($hash, "mode", $mode);
+    }
+    if (defined ($target_sensor))
+    {
+      my $mode="external";
+      readingsBulkUpdate   ($hash, "cmd", "wait for next cmd");
+      readingsBulkUpdate   ($hash, "mode", "external");
+    }
+    readingsEndUpdate    ($hash, 1);
+#    my $msg = THRESHOLD_Check($hash);
+#    if ($msg ne "") {
+#      return $msg;
+#    }
+  }  
   return undef;
 }
 
@@ -287,6 +289,7 @@ THRESHOLD_Set($@)
     readingsBulkUpdate   ($hash, "cmd","wait for next cmd");
     readingsBulkUpdate   ($hash, "desired_value", $value);
     readingsEndUpdate    ($hash, 1);
+    return THRESHOLD_Check($hash);
   } elsif ($arg eq "deactivated" ) {
       $ret=CommandAttr(undef, "$pn disable 1");   
   } elsif ($arg eq "active" ) {
@@ -307,6 +310,7 @@ THRESHOLD_Set($@)
         readingsBulkUpdate   ($hash, "state", $state_format) if (!($state_format =~/^[ ]*$/));
         readingsBulkUpdate   ($hash, "cmd","wait for next cmd");
         readingsEndUpdate    ($hash, 1);
+        return THRESHOLD_Check($hash);
       }
   } elsif ($arg eq "hysteresis" ) {
       return "$pn: set hysteresis value:$value, hysteresis needs a numeric parameter" if (@a != 3  || $value !~ m/^[\d\.]*$/ );
@@ -317,6 +321,7 @@ THRESHOLD_Set($@)
         readingsBulkUpdate   ($hash, "threshold_max", $desired_value+$offset);
         readingsBulkUpdate   ($hash, "cmd","wait for next cmd");
         readingsEndUpdate    ($hash, 1);
+        return THRESHOLD_Check($hash);
       }
   } elsif ($arg eq "offset" ) {
       return "$pn: set offset value:$value, offset needs a numeric parameter" if (@a != 3  || $value !~ m/^[-\d\.]*$/ );
@@ -328,6 +333,7 @@ THRESHOLD_Set($@)
         readingsBulkUpdate   ($hash, "threshold_max", $desired_value+$offset);
         readingsBulkUpdate   ($hash, "cmd","wait for next cmd");
         readingsEndUpdate    ($hash, 1);
+        return THRESHOLD_Check($hash);
       }
   } elsif ($arg eq "cmd1_gt" ) {
           readingsBeginUpdate  ($hash);
@@ -352,19 +358,11 @@ THRESHOLD_Notify($$)
   my ($hash, $dev) = @_;
   my $pn = $hash->{NAME};
   return "" if($attr{$pn} && $attr{$pn}{disable});
-  
+  my $name = $dev->{NAME};
   my $sensor = $hash->{sensor};
-  my $reading = $hash->{sensor_reading};
   my $target_sensor = $hash->{target_sensor};
-  my $target_reading = $hash->{target_reading};
   my $sensor2 = $hash->{sensor2};
-  my $reading2 = $hash->{sensor2_reading};
-  my $s_value;
-  my $t_value;
-  my $sensor_max;
-  my $sensor_min;
-  my $name = $dev->{NAME};  
-  
+ 
   SELECT:{
   if (($name eq $sensor) and (ReadingsVal($pn,"desired_value","") ne "")) {last SELECT;}
     if ($sensor2) {
@@ -377,6 +375,26 @@ THRESHOLD_Notify($$)
     }  
     return "";
   }
+ return THRESHOLD_Check($hash);
+ #return THRESHOLD_Check(@_);
+}
+
+##########################
+sub
+THRESHOLD_Check($)
+{
+  my ($hash) = @_;
+  my $pn = $hash->{NAME};
+  my $sensor = $hash->{sensor};
+  my $reading = $hash->{sensor_reading};
+  my $target_sensor = $hash->{target_sensor};
+  my $target_reading = $hash->{target_reading};
+  my $sensor2 = $hash->{sensor2};
+  my $reading2 = $hash->{sensor2_reading};
+  my $s_value;
+  my $t_value;
+  my $sensor_max;
+  my $sensor_min;
   
   if (!($defs{$sensor}{READINGS}{$reading})) {
     my $msg = "$pn: no reading yet for $sensor $reading";
@@ -499,6 +517,7 @@ THRESHOLD_Attr(@)
       readingsBulkUpdate  ($hash, "mode", "active");
       readingsBulkUpdate  ($hash, "cmd","wait for next cmd");
       readingsEndUpdate   ($hash, 1);
+      return THRESHOLD_Check($hash);
     } elsif($a[3] eq "1") {
       readingsBeginUpdate ($hash);
       readingsBulkUpdate  ($hash, "state", "disabled");
@@ -511,6 +530,7 @@ THRESHOLD_Attr(@)
       readingsBulkUpdate  ($hash, "mode", "active");
       readingsBulkUpdate   ($hash, "cmd","wait for next cmd");
       readingsEndUpdate   ($hash, 1);
+      return THRESHOLD_Check($hash);
   }
   return undef;
 } 
@@ -939,7 +959,7 @@ THRESHOLD_setValue($$)
   <br>
   Es soll gelüftet werden, wenn die Feuchtigkeit im Zimmer über 70 % ist; bei 60 % geht der Lüfter wieder aus.<br>
   <br>
-  <code>define TH_hum THRESHOLD sens:humidity:10:70 Luefter|set @ on|set @ off|1</code><br>
+  <code>define TH_hum THRESHOLD sens:humidity:10:70 ventilator|set @ on|set @ off|1</code><br>
   <br>
   <b>Belüftung anhand des Taupunktes, abhängig von der Luftfeuchtigkeit innen:</b><br>
   <br>
@@ -948,7 +968,7 @@ THRESHOLD_setValue($$)
   <code>define TH_hum THRESHOLD sens:humidity:10:70||||on:off|_sc</code><br>
   <code>define dewpoint dewpoint indoor</code><br>
   <code>define dewpoint dewpoint outdoor</code><br>
-  <code>define TH_room THRESHOLD indoor:dewpoint:0:outdoor:dewpoint AND TH_hum:state:on Luefer|set @ on|set @ off|2</code><br>
+  <code>define TH_room THRESHOLD indoor:dewpoint:0:outdoor:dewpoint AND TH_hum:state:on ventilator|set @ on|set @ off|2</code><br>
   <br>
   <b>Belüftung in Kombination mit einem Lichtschalter mit Nachlaufsteuerung:</b><br>
   <br>
