@@ -38,8 +38,8 @@ sub INPUTEVENT_Initialize($) {
 	$hash->{SetFn}   = "INPUTEVENT_Set";
 	$hash->{AttrList}= "model:EVENT loglevel:0,1,2,3,4,5";
 
-	$hash->{READINGS}{uTIME}	= 0;
-	$hash->{READINGS}{lastCode}	= 0;
+	$hash->{READINGS}{uTIME}{VAL}		= 0;
+	$hash->{READINGS}{lastCode}{VAL}	= 0;
 }
 
 #####################################
@@ -93,7 +93,7 @@ sub INPUTEVENT_Define($$) {
 			foreach my $fh ($select->handles) {
 				$fileno = $fh->fileno;
 			}
-                
+
 			$selectlist{"$name.$dev"} = $hash;
 			$hash->{fh} = $devObj->fh;
 			$hash->{FD} = $fileno;
@@ -175,7 +175,7 @@ sub INPUTEVENT_Read($$) {
 		$fh->read($message,16);
 
 		INPUTEVENT_Parse($hash, $message);
-    }
+	}
 
 	return 1;
 }
@@ -189,8 +189,8 @@ sub INPUTEVENT_Parse($$) {
 	my $name = $hash->{NAME};
 	my $message;
 	
-    my ($b0,$b1,$b2,$b3,$b4,$b5,$b6,$b7,$b8,$b9,$b10,$b11,$b12,$b13,$b14,$b15) =
-    	map {$_ & 0x7F} unpack("U*",$msg);
+	my ($b0,$b1,$b2,$b3,$b4,$b5,$b6,$b7,$b8,$b9,$b10,$b11,$b12,$b13,$b14,$b15) =
+	map {$_ & 0x7F} unpack("U*",$msg);
 	
 	my $sec = sprintf('%10s', $b0 + $b1*256 + $b2*256*256 + $b3*256*256*256);
 	my $ySec = sprintf('%06s', $b4 + $b5*256 + $b6*256*256);
@@ -203,22 +203,28 @@ sub INPUTEVENT_Parse($$) {
 
 		# Set $ignoreUSecs => µSec sice last command.
 		my $uTime = $sec * 1000000 + $ySec;
-		my $ignoreUSecs = $uTime - $hash->{READINGS}{uTIME};
-	    $hash->{READINGS}{uTIME} = $uTime;
+		my $ignoreUSecs = $uTime - $hash->{READINGS}{uTIME}{VAL};
+		
+		my $tm = TimeNow();
+		$hash->{READINGS}{uTIME}{VAL} = $uTime;
+		$hash->{READINGS}{uTIME}{TIME} = $tm;
 		
 		#Log 4, $hash->{READINGS}{lastCode} . " _ " . $value . " | " . $hash->{READINGS}{uTIME} . " --- " . $uTime . " +++ " . $ignoreUSecs;
 
 		# IR-codes was repeated with short delay. So we ignor commands the next µSeconds set in the define command. (Default 175000)
-		if (($ignoreUSecs > ($hash->{msIgnore} * 1000)) || ($hash->{READINGS}{lastCode} ne $value)) {
-		    $hash->{READINGS}{LAST}{VAL} = unpack('H*',$msg);
-		    $hash->{READINGS}{LAST}{TIME} = TimeNow();
-		    $hash->{READINGS}{RAW}{TIME} = time();
-		    $hash->{READINGS}{RAW}{VAL} = unpack('H*',$msg);
-		    $hash->{READINGS}{lastCode} = $value;
+		if (($ignoreUSecs > ($hash->{msIgnore} * 1000)) || ($hash->{READINGS}{lastCode}{VAL} ne $value)) {
+			$hash->{READINGS}{LAST}{VAL} = unpack('H*',$msg);
+			$hash->{READINGS}{LAST}{TIME} = $tm;
+
+			$hash->{READINGS}{RAW}{VAL} = unpack('H*',$msg);
+			$hash->{READINGS}{RAW}{TIME} = $tm;
+
+			$hash->{READINGS}{lastCode}{VAL} = $value;
+			$hash->{READINGS}{lastCode}{TIME} = $tm;
 	
 			Log 4, $message;
-		    
-		    DoTrigger($name, $message);
+
+			DoTrigger($name, $message);
 		}
 	}
 }
@@ -226,9 +232,9 @@ sub INPUTEVENT_Parse($$) {
 
 #####################################
 sub INPUTEVENT_List($$) {
-  my ($hash,$msg) = @_;
-  $msg = INPUTEVENT_Get($hash,$hash->{NAME},'list');
-  return $msg;
+	my ($hash,$msg) = @_;
+	$msg = INPUTEVENT_Get($hash,$hash->{NAME},'list');
+	return $msg;
 }
 
 1;
