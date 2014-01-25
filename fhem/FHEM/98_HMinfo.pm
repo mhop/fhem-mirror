@@ -151,7 +151,6 @@ sub HMinfo_regCheck(@) { ######################################################
       if (   !$ehash->{READINGS}{$rNm}
           || !$ehash->{READINGS}{$rNm}{VAL})            {push @mReg, $rNm;}
       elsif ( $ehash->{READINGS}{$rNm}{VAL} !~ m/00:00/){push @iReg, $rNm;}
-      if ($ehash->{helper}{shadowReg} && keys %{$ehash->{helper}{shadowReg}}){push @iReg, $rNm;}
     }
     push @regChPend,$eName                        if ($ehash->{helper}{shadowReg} && 
                                                       keys %{$ehash->{helper}{shadowReg}});
@@ -561,7 +560,7 @@ sub HMinfo_SetFn($@) {#########################################################
 
       for (1..9){
         my ($x) =  $pl[$_] =~ /(\d+)/;
-        $plSum[$_] += $x;
+        $plSumf[$_] += $x;
       }
       if ($type eq "short"){
         push @paramList, sprintf("%-20s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",
