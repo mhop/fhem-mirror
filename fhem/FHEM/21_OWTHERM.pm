@@ -4,7 +4,7 @@
 #
 # FHEM module to commmunicate with 1-Wire temperature sensors DS1820, DS18S20, DS18B20, DS1822
 #
-# Prof. Dr. Peter A. Henning 
+# Prof. Dr. Peter A. Henning und Norbert Truchsess
 #
 # $Id$
 #
@@ -31,7 +31,7 @@
 # get <name> alarm       => alarm temperature settings
 # get <name> version     => OWX version number
 #
-# set <name> interval    => set period for measurement
+# set <name> interval    => period for measurement
 # set <name> tempLow     => lower alarm temperature setting 
 # set <name> tempHigh    => higher alarm temperature setting
 #
@@ -40,12 +40,14 @@
 # attr <name> stateAL  "<string>"  = character string for denoting low alarm condition, default is down triangle
 # attr <name> stateAH  "<string>"  = character string for denoting high alarm condition, default is up triangle
 # attr <name> tempOffset <float>   = temperature offset in degree Celsius added to the raw temperature reading 
-# attr <name> tempUnit  <string>   = unit of measurement, e.g. Celsius/Kelvin/Fahrenheit or C/K/F, default is Celsius
+# attr <name> tempUnit  <string>   = unit of measurement, e.g. Celsius/Kelvin/Fahrenheit, default is Celsius
 # attr <name> tempConv onkick|onread    =  determines, whether a temperature measurement will happen when "kicked" 
 #               through the OWX backend module (all temperature sensors at the same time), or on 
 #               reading the sensor (1 second waiting time). 
-# attr <name> tempLow   <float>    = value for low alarm 
-# attr <name> tempHigh  <float>    = value for high alarm 
+# attr <name> resolution  9|10|11|12 = resolution in bit for measurement
+# attr <name> interval  <floar>    = period for measurement
+# attr <name> tempLow   <float>    = lower alarm temperature setting 
+# attr <name> tempHigh  <float>    = higher alarm temperature setting
 #
 ########################################################################################
 #
@@ -73,7 +75,7 @@ use warnings;
 sub Log($$);
 sub AttrVal($$$);
 
-my $owx_version="3.24";
+my $owx_version="5.02";
 
 my %gets = (
   "id"          => "",
@@ -97,10 +99,10 @@ my %updates = (
 );
 
 my %convtimes = (
-  9 => 0.1,
-  10 => 0.2,
-  11 => 0.4,
-  12 => 0.8,
+9  => 100,
+10 => 200,
+11 => 400,
+12 => 800,
 );
 
 ########################################################################################
@@ -127,12 +129,13 @@ sub OWTHERM_Initialize ($) {
   $hash->{AttrFn}  = "OWTHERM_Attr";
   $hash->{AttrList}= "IODev model:DS1820,DS18B20,DS1822 loglevel:0,1,2,3,4,5 ".
                      "stateAL stateAH ".
-                     "tempOffset tempUnit:C,Celsius,F,Fahrenheit,K,Kelvin ".
+                     "tempOffset tempUnit:Celsius,Fahrenheit,Kelvin ".
                      "tempConv:onkick,onread tempLow tempHigh ".
                      "resolution:9,10,11,12 interval ".
                      $readingFnAttributes;                
-
-  #make sure OWX is loaded so OWX_CRC is available if running with OWServer
+  #-- ASYNC this function is needed for asynchronous execution of the device reads 
+  $hash->{AfterExecuteFn} = "OWXTHERM_ProcValues";
+  #-- make sure OWX is loaded so OWX_CRC is available if running with OWServer
   main::LoadModule("OWX");	
 }
   
@@ -168,6 +171,7 @@ sub OWTHERM_Define ($$) {
   #-- no model, 12 characters
   if( $a2 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = "DS1820";
+    CommandAttr (undef,"$name model DS1820"); 
     $fam           = "10";
     $id            = $a[2];
     if(int(@a)>=4) { $interval = $a[3]; }
@@ -220,6 +224,7 @@ sub OWTHERM_Define ($$) {
   $hash->{ROM_ID}     = "$fam.$id.$crc";
   $hash->{INTERVAL}   = $interval;
   $hash->{ERRCOUNT}   = 0;
+  $hash->{ASYNC}      = 0; #-- false for now
 
   #-- temperature globals - always the raw values from/for the device
   $hash->{".owg_temp"}   = "";
@@ -259,10 +264,11 @@ sub OWTHERM_Attr(@) {
   
   if ( $do eq "set") {
   	ARGUMENT_HANDLER: {
+      #-- interval modified at runtime
   	  $key eq "interval" and do {
-        # check value
+        #-- check value
         return "OWTHERM: Set with short interval, must be > 1" if(int($value) < 1);
-        # update timer
+        #-- update timer
         $hash->{INTERVAL} = $value;
         if ($init_done) {
           RemoveInternalTimer($hash);
@@ -270,16 +276,16 @@ sub OWTHERM_Attr(@) {
         }
   	    last;
   	  };
+      #-- resolution modified at runtime
   	  $key eq "resolution" and do {
         $hash->{".owg_cf"} = $value;
         last;
   	  };
-      #-- only alarm settings may be modified at runtime for now
+      #-- alarm settings modified at runtime
       $key =~ m/(.*)(Low|High)/  and do {
         #-- safeguard against uninitialized devices
         return undef
-          if( $hash->{READINGS}{"state"}{VAL} eq "defined" );
-  
+          if( $hash->{READINGS}{"state"}{VAL} eq "defined" ); 
         $ret = OWTHERM_Set($hash,($name,$key,$value));
       };
   	};
@@ -577,11 +583,11 @@ sub OWTHERM_InitializeDevice($) {
   
   my $args = {};
   
+  #-- Set the attribute values if defined
   if ( defined($attr{$name}{resolution}) ) {
   	$args->{resolution} = $attr{$name}{resolution};
   }
   
-  #-- Set the attribute values if defined
   if( defined($attr{$name}{"tempLow"}) ){
   	$args->{tempLow} = floor($attr{$name}{"tempLow"}/$factor-$offset+0.5); 
   }
@@ -638,6 +644,10 @@ sub OWTHERM_Set($@) {
 
   #-- set new timer interval
   if($key eq "interval") {
+    # check value
+    return "OWTHERM: Set with short interval, must be >= 1"
+      if(int($value) < 1);
+    # update timer
   	return OWTHERM_Attr("set",@a);
   }
 
@@ -808,7 +818,7 @@ sub OWFSTHERM_SetValues($$) {
 #
 ########################################################################################
 #
-# OWXTHERM_GetValues - Get reading from one device
+# OWXTHERM_GetValues - Trigger reading from one device 
 #
 # Parameter hash = hash of device addressed
 #
@@ -837,20 +847,49 @@ sub OWXTHERM_GetValues($) {
 
   #-- if the conversion has not been called before 
   if( $con==1 ){
-    OWX_Reset($master);
-    #-- issue the match ROM command \x55 and the start conversion command
-    if( OWX_Complex($master,$owx_dev,"\x44",0) eq 0 ){
-      return "$owx_dev not accessible";
-    } 
-    #-- conversion needs some 950 ms - but we may also do it in shorter time !
-    select(undef,undef,undef,$convtimes{AttrVal($name,"resolution",12)});
+    #-- issue the match ROM command \x55 and the start conversion command \x44
+    #-- asynchronous mode
+    if( $hash->{ASYNC} ){
+      OWX_Execute($master,"convert",1,$owx_dev,"\x44",0,$convtimes{AttrVal($name,"resolution",12)});
+    #-- synchronous mode
+    }else{
+      OWX_Reset($master);     
+      if( OWX_Complex($master,$owx_dev,"\x44",0) eq 0 ){
+        return "$owx_dev not accessible";
+      } 
+      #-- conversion needs some 950 ms - but we may also do it in shorter time !
+      select(undef,undef,undef,$convtimes{AttrVal($name,"resolution",12)}*0.001);
+    }   
   }
-
-  #-- NOW ask the specific device 
-  OWX_Reset($master);
+  #-- NOW ask the specific device
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE
   #-- reading 9 + 1 + 8 data bytes and 1 CRC byte = 19 bytes
-  my $res=OWX_Complex($master,$owx_dev,"\xBE",9);
+  #-- asynchronous mode
+  if( $hash->{ASYNC} ){
+    OWX_Execute($master,"read",1,$owx_dev,"\xBE",9,undef);
+  #-- synchronous mode
+  } else {
+    OWX_Reset($master);
+    my $res=OWX_Complex($master,$owx_dev,"\xBE",9);
+    OWXTHERM_ProcValues($hash,"read",undef,undef,$owx_dev,undef,undef,substr($res,10,9));
+  }
+} 
+
+########################################################################################
+#
+# OWXTHERM_ProcValues - Process reading from one device - translate binary into raw
+#
+# Parameter hash = hash of device addressed
+#
+########################################################################################
+
+sub OWXTHERM_ProcValues($$$$$$$$) {
+  my ($hash, $context, $success, $reset, $owx_dev, $data, $numread, $res) = @_;
+  
+  return undef unless (defined $context and $context eq "read");
+  my ($i,$j,$k,@data,$ow_thn,$ow_tln);
+  my $change = 0;
+
   #Log 1,"OWXTHERM: data length from reading device is ".length($res)." bytes";
   #-- process results
   if( $res eq 0 ){
@@ -858,25 +897,25 @@ sub OWXTHERM_GetValues($) {
   }
   
   #-- process results
-  @data=split(//,substr($res,9));
-  return "invalid data length, ".int(@data)." instead of 10 bytes"
-    if (@data != 10); 
+  @data=split(//,$res);
+  return "invalid data length, ".int(@data)." instead of 9 bytes"
+    if (@data != 9); 
   return "invalid data"
-    if (ord($data[8])<=0); 
+    if (ord($data[7])<=0); 
   return "invalid CRC"
-    if (OWX_CRC8(substr($res,10,8),$data[9])==0);
+    if (OWX_CRC8(substr($res,0,8),$data[8])==0);
   
   #-- this must be different for the different device types
   #   family = 10 => DS1820, DS18S20
   if( $hash->{OW_FAMILY} eq "10" ) {    
   
-    my $count_remain = ord($data[7]);
-    my $count_perc   = ord($data[8]);
+    my $count_remain = ord($data[6]);
+    my $count_perc   = ord($data[7]);
     my $delta        = -0.25 + ($count_perc - $count_remain)/$count_perc;
    
-    my $lsb  = ord($data[1]);
+    my $lsb  = ord($data[0]);
     my $msb  = 0;
-    my $sign = ord($data[2]) & 255;
+    my $sign = ord($data[1]) & 255;
       
     #-- test with -25 degrees
     #$lsb   =  12*16+14;
@@ -889,14 +928,14 @@ sub OWXTHERM_GetValues($) {
       $hash->{".owg_temp"} = -128+$hash->{".owg_temp"};
     }
 
-    $ow_thn = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
-    $ow_tln = ord($data[4]) > 127 ? 128-ord($data[4]) : ord($data[4]);
+    $ow_thn = ord($data[2]) > 127 ? 128-ord($data[2]) : ord($data[2]);
+    $ow_tln = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
 
   } elsif ( ($hash->{OW_FAMILY} eq "22") || ($hash->{OW_FAMILY} eq "28") ) {
      
-    my $lsb  = ord($data[1]);
-    my $msb  = ord($data[2]) & 7;
-    my $sign = ord($data[2]) & 248;
+    my $lsb  = ord($data[0]);
+    my $msb  = ord($data[1]) & 7;
+    my $sign = ord($data[1]) & 248;
       
     #-- test with -55 degrees
     #$lsb   = 9*16;
@@ -908,8 +947,8 @@ sub OWXTHERM_GetValues($) {
     if( $sign !=0 ){
       $hash->{".owg_temp"} = -128+$hash->{".owg_temp"};
     }
-    $ow_thn = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
-    $ow_tln = ord($data[4]) > 127 ? 128-ord($data[4]) : ord($data[4]);
+    $ow_thn = ord($data[2]) > 127 ? 128-ord($data[2]) : ord($data[2]);
+    $ow_tln = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
     
   } else {
     return "OWXTHERM: Unknown device family $hash->{OW_FAMILY}\n";
@@ -918,7 +957,9 @@ sub OWXTHERM_GetValues($) {
   #-- process alarm settings
   $hash->{".owg_tl"} = $ow_tln;
   $hash->{".owg_th"} = $ow_thn;
-
+  
+  #-- and now from raw to formatted values
+  OWTHERM_FormatValues($hash);
   return undef;
 }
 
@@ -970,10 +1011,15 @@ sub OWXTHERM_SetValues($$) {
   #   3. \x48 sent by WriteBytePower after match ROM => command ok, no effect on EEPROM
   
   my $select=sprintf("\x4E%c%c%c",$thp,$tlp,$cfg); 
-  my $res=OWX_Complex($master,$owx_dev,$select,3);
-
-  if( $res eq 0 ){
-    return "OWXTHERM: Device $owx_dev not accessible"; 
+  #-- asynchronous mode
+  if( $hash->{ASYNC} ){
+    OWX_Execute($master,"setvalues",1,$owx_dev,$select,3,undef);
+  #-- synchronous mode
+  }else{
+    my $res=OWX_Complex($master,$owx_dev,$select,3);
+    if( $res eq 0 ){
+      return "OWXTHERM: Device $owx_dev not accessible"; 
+    }
   } 
   
   return undef;
@@ -1032,7 +1078,7 @@ sub OWXTHERM_SetValues($$) {
         <ul>
             <li><a name="owtherm_interval">
                     <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Temperature
-                readout intervall in seconds. The default is 300 seconds. <b>Attention:</b>This is the 
+                readout interval in seconds. The default is 300 seconds. <b>Attention:</b>This is the 
                 readout interval. Whether an actual temperature measurement is performed, is determined by the
                 tempConv attribute </li>
             <li><a name="owtherm_tempHigh">
@@ -1085,9 +1131,17 @@ sub OWXTHERM_SetValues($$) {
                 </a>
                 <br />temperature offset in &deg;C added to the raw temperature reading. </li>
             <li><a name="owtherm_tempUnit"><code>attr &lt;name&gt; tempUnit
-                        Celsius|Kelvin|Fahrenheit|C|K|F</code>
+                        Celsius|Kelvin|Fahrenheit</code>
                 </a>
                 <br />unit of measurement (temperature scale), default is Celsius = &deg;C </li>
+            <li><a name="owtherm_resolution">
+                    <code>attr &lt;name&gt; resolution 9|10|11|12</code></a><br /> Temperature
+                resolution in bit, only relevant for DS18B20 </li>
+            <li><a name="owtherm_interval2">
+                    <code>attr &lt;name&gt; interval &lt;int&gt;</code></a><br /> Temperature
+                readout interval in seconds. The default is 300 seconds. <b>Attention:</b>This is the 
+                readout interval. Whether an actual temperature measurement is performed, is determined by the
+                tempConv attribute </li>
             <li><a name="owtherm_tempHigh2">
                     <code>attr &lt;name&gt; tempHigh &lt;float&gt;</code>
                 </a>
@@ -1098,6 +1152,7 @@ sub OWXTHERM_SetValues($$) {
                 </a>
                 <br /> low alarm temperature (on the temperature scale chosen by the attribute
                 value). </li>
+                
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
                     href="#event-on-update-reading">event-on-update-reading</a>, <a
                     href="#event-on-change-reading">event-on-change-reading</a>, <a
