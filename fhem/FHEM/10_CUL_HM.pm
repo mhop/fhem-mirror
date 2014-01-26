@@ -5661,12 +5661,11 @@ sub CUL_HM_complConfigTest($){#
     RemoveInternalTimer("CUL_HM_complConfigTO");
     InternalTimer(gettimeofday()+ 1800,"CUL_HM_complConfigTO","CUL_HM_complConfigTO", 0);
   }
-  (@{$modules{CUL_HM}{helper}{qReqStat}})
 }
 sub CUL_HM_complConfigTO($){
   my @arr = @{$modules{CUL_HM}{helper}{confCheckArr}};
   @{$modules{CUL_HM}{helper}{confCheckArr}} = ();
-  CUL_HM_complConfig($_) foreach (@arr);
+  CUL_HM_complConfig($_) foreach (CUL_HM_noDup(@arr));
 }
 sub CUL_HM_complConfig($) {# read config if enabled and not complete
   my $name = shift;

@@ -84,9 +84,9 @@ sub apptime_getTiming($$$@) {
       !$defs{$e}{helper}{bm} ||
       !$defs{$e}{helper}{bm}{$fnName} ){
 
-    $defs{$e}{helper}{bm}{$fnName} =(max =>0, mAr =>"",
-                                     cnt =>1, tot =>0,
-                                     dmx =>0);
+    %{$defs{$e}{helper}{bm}{$fnName}} =(max =>0, mAr =>"",
+                                        cnt =>1, tot =>0,
+                                        dmx =>0);
 
     $h = $defs{$e}{helper}{bm}{$fnName};
   }
