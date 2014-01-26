@@ -197,6 +197,7 @@ ZWDongle_Define($$)
 
   $hash->{DeviceName} = $dev;
   $hash->{CallbackNr} = 0;
+  $hash->{nrNAck} = 0;
   my @empty;
   $hash->{SendStack} = \@empty;
   my $ret = DevIo_OpenDev($hash, 0, "ZWDongle_DoInit");
@@ -480,7 +481,11 @@ ZWDongle_Read($@)
     if($rcs ne $ccs) {
       Log3 $name, 1,
            "$name: wrong checksum: received $rcs, computed $ccs for $len$msg";
+      DevIo_SimpleWrite($hash, "15", 1)         # Send NACK
+        if(++$hash->{nrNAck} < 5);
+      next;
     }
+    $hash->{nrNAck} = 0;
     DevIo_SimpleWrite($hash, "06", 1);          # Send ACK
     Log3 $name, 5, "ZWDongle_Read $name: $msg";
     
@@ -504,6 +509,7 @@ ZWDongle_ReadAnswer($$$)
         if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
   my $to = ($hash->{RA_Timeout} ? $hash->{RA_Timeout} : 3);
 
+  shift @{$hash->{SendStack}};   # Hope this is right.
   for(;;) {
 
     my $buf;
