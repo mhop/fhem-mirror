@@ -3727,7 +3727,8 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
 #   my @chSplit = unpack('(A28)*',$change);
     my @chSplit = unpack('(A1120)*',$change);# makes max 40 lines, 280 byte
     foreach my $chSpl(@chSplit){
-      CUL_HM_PushCmdStack($hash, "++".$flag.'01'.$src.$dst.$chn.'05'.
+      my $mch = CUL_HM_lstCh($chnhash,$list,$chn);
+      CUL_HM_PushCmdStack($hash, "++".$flag.'01'.$src.$dst.$mch.'05'.
                                           $peerAddr.$peerChn.$list);
       $tl = length($chSpl);
       for(my $l = 0; $l < $tl; $l+=28) {
@@ -3735,7 +3736,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
         CUL_HM_PushCmdStack($hash, "++A001".$src.$dst.$chn."08".
                                        substr($chSpl,$l,$ml));
       }
-      CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$chn."06");
+      CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$mch."06");
     }
     #########
   }
