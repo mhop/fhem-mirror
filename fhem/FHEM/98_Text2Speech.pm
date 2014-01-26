@@ -62,6 +62,8 @@ sub Text2Speech_Initialize($)
                        " TTS_UseMP3Wrap:0,1".
                        " TTS_MplayerCall".
                        " TTS_SentenceAppendix".
+                       " TTS_FileMapping".
+                       " TTS_FileTemplateDir".
                        " ".$readingFnAttributes;
 }
 
@@ -145,6 +147,10 @@ sub Text2Speech_Attr(@) {
   my $hash = $defs{$a[1]};
   my $value = $a[3];
 
+  my $TTS_FileTemplateDir = AttrVal($hash->{NAME}, "TTS_FileTemplateDir", "templates");
+  my $TTS_CacheFileDir = AttrVal($hash->{NAME}, "TTS_CacheFileDir", "cache");
+  my $TTS_FileMapping  = AttrVal($hash->{NAME}, "TTS_FileMapping", ""); # zb, silence:silence.mp3 ring:myringtone.mp3;
+
   if($a[2] eq "TTS_Delemiter" && $a[0] ne "del") {
     return "wrong delemiter syntax: [+-]a[lfn]. \n".
            "  Example 1: +an~\n".
@@ -166,8 +172,23 @@ sub Text2Speech_Attr(@) {
     return "This Attribute is only available in direct mode" if($hash->{MODE} ne "DIRECT");
     return "Attribute TTS_UseMP3Wrap is required!" unless(AttrVal($hash->{NAME}, "TTS_UseMP3Wrap", undef));
     
-    my $file = AttrVal($hash->{NAME}, "TTS_CacheFileDir", "cache") ."/". $value;
+    my $file = $TTS_CacheFileDir ."/". $value;
     return "File <".$file."> does not exists in CacheFileDir" if(! -e $file);
+  
+  } elsif ($a[2] eq "TTS_FileTemplateDir") {
+    unless(-e ($TTS_CacheFileDir ."/". $value) or mkdir ($TTS_CacheFileDir ."/". $value)) {
+      #Verzeichnis anlegen gescheitert
+      return "Could not create directory: <$value>";
+    }
+  
+  } elsif ($a[2] eq "TTS_FileMapping") {
+    #ueberpruefen, ob mp3 Template existiert
+    my @FileTpl = split(" ", $TTS_FileMapping);
+    for(my $j=0; $j<(@FileTpl); $j++) {
+      my @FileTplPc = split(/:/, $FileTpl[$j]);
+      return "file does not exist: <".$TTS_CacheFileDir ."/". $TTS_FileTemplateDir ."/". $FileTplPc[1] .">"
+        unless (-e $TTS_CacheFileDir ."/". $TTS_FileTemplateDir ."/". $FileTplPc[1]);
+    }
   }
 
   if($a[0] eq "set" && $a[2] eq "disable") {
@@ -319,6 +340,8 @@ sub Text2Speech_PrepareSpeech($$) {
 
   my $TTS_Ressource = AttrVal($hash->{NAME}, "TTS_Ressource", "Google");
   my $TTS_Delemiter = AttrVal($hash->{NAME}, "TTS_Delemiter", undef); 
+  my $TTS_FileTpl   = AttrVal($hash->{NAME}, "TTS_FileMapping", ""); # zb, silence:silence.mp3 ring:myringtone.mp3; im Text: mein Klingelton :ring: ist laut.
+  my $TTS_FileTemplateDir = AttrVal($hash->{NAME}, "TTS_FileTemplateDir", "templates");
 
   my $TTS_ForceSplit = 0;
   my $TTS_AddDelemiter;
@@ -351,11 +374,29 @@ sub Text2Speech_PrepareSpeech($$) {
     @text = $hash->{helper}{Text2Speech} if($hash->{helper}{Text2Speech}[0]);
     push(@text, $t);
 
+    my @FileTpl = split(" ", $TTS_FileTpl);
+    my @FileTplPc;
+    for(my $i=0; $i<(@FileTpl); $i++) {
+      #splitte bei jedem Template auf
+      @FileTplPc = split(/:/, $FileTpl[$i]);
+      @text = Text2Speech_SplitString(\@text, 100, ":".$FileTplPc[0].":", 1, "as"); # splitte bei bspw: :ring:
+    }
+
     @text = Text2Speech_SplitString(\@text, 100, $TTS_Delemiter, $TTS_ForceSplit, $TTS_AddDelemiter);
     @text = Text2Speech_SplitString(\@text, 100, "(?<=[\\.!?])\\s*", 0, "");
     @text = Text2Speech_SplitString(\@text, 100, ",", 0, "al");
     @text = Text2Speech_SplitString(\@text, 100, ";", 0, "al");
     @text = Text2Speech_SplitString(\@text, 100, "und", 0, "af");
+
+    for(my $i=0; $i<(@text); $i++) {
+      for(my $j=0; $j<(@FileTpl); $j++) {
+        # entferne führende und abschließende Leerzeichen aus jedem Textbaustein
+        $text[$i] =~ s/^\s+|\s+$//g; 
+        # ersetze die FileTemplates
+        @FileTplPc = split(/:/, $FileTpl[$j]);
+        $text[$i] = $TTS_FileTemplateDir ."/". $FileTplPc[1] if($text[$i] eq ":".$FileTplPc[0].":")
+      }
+    }
 
     @{$hash->{helper}{Text2Speech}} = @text;
 
@@ -370,7 +411,7 @@ sub Text2Speech_PrepareSpeech($$) {
 # param3: string: Delemiter
 # param4: int   : 1 -> es wird am Delemiter gesplittet
 #                 0 -> es wird nur gesplittet, wenn Stringlänge länger als MaxChar
-# param5: string: Add Delemiter to String? [pre|past|<empty>]
+# param5: string: Add Delemiter to String? [al|af|as|<empty>] (AddLast/AddFirst/AddSingle)
 #
 # Splittet die Texte aus $hash->{helper}->{Text2Speech} anhand des
 # Delemiters, wenn die Stringlänge MaxChars übersteigt.
@@ -395,7 +436,7 @@ sub Text2Speech_SplitString(@$$$$){
     for(my $j=0; $j<(@b); $j++) {
       $b[$j] = $b[$j] . $Delemiter if($AddDelemiter eq "al"); # Am Satzende wieder hinzufügen.
       $b[$j+1] = $Delemiter . $b[$j+1] if(($AddDelemiter eq "af") && ($b[$j+1])); # Am Satzanfang des nächsten Satzes wieder hinzufügen.
-
+      push(@newText, $Delemiter) if($AddDelemiter eq "as" && $j>0); # AddSingle: füge Delemiter als EinzelSatz hinzu. Zb. bei FileTemplates
       push(@newText, $b[$j]);
     }
   }
@@ -435,6 +476,33 @@ sub Text2Speech_BuildMplayerCmdString($$) {
 }
 
 #####################################
+# param1: hash  : Hash
+# param2: string: Dateiname
+# param2: string: Text
+# 
+# Holt den Text aus dem Google Translator als MP3Datei
+#####################################
+sub Text2Speech_Download($$$) {
+  my ($hash, $file, $text) = @_;
+
+  my $HttpResponse;
+  my $fh;
+
+  Log3 $hash->{NAME}, 4, "Text2Speech: Hole URL: ". "http://" . $ttsHost . $ttsPath . uri_escape($text);
+  $HttpResponse = GetHttpFile($ttsHost, $ttsPath . uri_escape($text));
+
+  $fh = new IO::File ">$file";
+  if(!defined($fh)) {
+    Log3 $hash->{NAME}, 2, "Text2Speech: mp3 Datei <$file> konnte nicht angelegt werden.";
+    return undef;
+  }
+
+  $fh->print($HttpResponse);
+  Log3 $hash->{NAME}, 4, "Text2Speech: Schreibe mp3 in die Datei $file mit ".length($HttpResponse)." Bytes";  
+  close($fh);
+}
+
+#####################################
 sub Text2Speech_DoIt($) {
   my ($hash) = @_;
 
@@ -445,7 +513,6 @@ sub Text2Speech_DoIt($) {
 
   if($TTS_Ressource eq "Google") {
 
-    my $HttpResponse;
     my $filename;
     my $file;
 
@@ -459,30 +526,35 @@ sub Text2Speech_DoIt($) {
     if(AttrVal($hash->{NAME}, "TTS_UseMP3Wrap", 0)) {
       # benutze das Tool MP3Wrap um bereits einzelne vorhandene Sprachdateien
       # zusammenzuführen. Ziel: sauberer Sprachfluss
-      my @Mp3WrapArray;
-      my $Mp3WrapText = "";
+      my @Mp3WrapFiles;
+      my @Mp3WrapText;
       my $TTS_SentenceAppendix = AttrVal($hash->{NAME}, "TTS_SentenceAppendix", undef); #muss eine mp3-Datei sein, ohne Pfadangabe
-      undef($TTS_SentenceAppendix) if($TTS_SentenceAppendix && (! -e $TTS_CacheFileDir ."/".$TTS_SentenceAppendix));
+      my $TTS_FileTemplateDir = AttrVal($hash->{NAME}, "TTS_FileTemplateDir", "templates");
+      
+      $TTS_SentenceAppendix = $TTS_CacheFileDir ."/". $TTS_FileTemplateDir ."/". $TTS_SentenceAppendix if($TTS_SentenceAppendix);
+      undef($TTS_SentenceAppendix) if($TTS_SentenceAppendix && (! -e $TTS_SentenceAppendix));
 
+      #Abspielliste erstellen
       foreach my $t (@{$hash->{helper}{Text2Speech}}) {
-        $filename = md5_hex($t) . ".mp3";
+        if(-e $TTS_CacheFileDir."/".$t) { $filename = $t;} else {$filename = md5_hex($t) . ".mp3";} # falls eine bestimmte mp3-Datei gespielt werden soll
         $file = $TTS_CacheFileDir."/".$filename;
         if(-e $file) {
-          push(@Mp3WrapArray, $file);
-          $Mp3WrapText .= $t;
+          push(@Mp3WrapFiles, $file);
+          push(@Mp3WrapText, $t);
+          #Text2Speech_WriteStats($hash, 0, $file, $t);
         } else {last;}
       }
 
-      push(@Mp3WrapArray, $TTS_CacheFileDir ."/".$TTS_SentenceAppendix) if($TTS_SentenceAppendix);
+      push(@Mp3WrapFiles, $TTS_SentenceAppendix) if($TTS_SentenceAppendix);
 
-      if(scalar(@Mp3WrapArray) >= 2) {
-        Log3 $hash->{NAME}, 4, "Text2Speech: Bearbeite per MP3Wrap jetzt den Text: ". $Mp3WrapText;
+      if(scalar(@Mp3WrapFiles) >= 2) {
+        Log3 $hash->{NAME}, 4, "Text2Speech: Bearbeite per MP3Wrap jetzt den Text: ". join(" ", @Mp3WrapText);
 
-        my $Mp3WrapPrefix = md5_hex(join("|", @Mp3WrapArray));
+        my $Mp3WrapPrefix = md5_hex(join("|", @Mp3WrapFiles));
         my $Mp3WrapFile = $TTS_CacheFileDir ."/". $Mp3WrapPrefix . "_MP3WRAP.mp3"; 
 
         if(! -e $Mp3WrapFile) {
-          $cmd = "mp3wrap " .$TTS_CacheFileDir. "/" .$Mp3WrapPrefix. ".mp3 " .join(" ", @Mp3WrapArray);
+          $cmd = "mp3wrap " .$TTS_CacheFileDir. "/" .$Mp3WrapPrefix. ".mp3 " .join(" ", @Mp3WrapFiles);
           $cmd .= " >/dev/null" if($verbose < 5);;
 
           Log3 $hash->{NAME}, 4, "Text2Speech: " .$cmd;
@@ -492,36 +564,29 @@ sub Text2Speech_DoIt($) {
           $cmd = Text2Speech_BuildMplayerCmdString($hash, $Mp3WrapFile);
           Log3 $hash->{NAME}, 4, "Text2Speech:" .$cmd;
           system($cmd);
+          #Text2Speech_WriteStats($hash, 1, $Mp3WrapFile, join(" ", @Mp3WrapText));
         } else {
           Log3 $hash->{NAME}, 2, "Text2Speech: Mp3Wrap Datei konnte nicht angelegt werden.";
         }
         
-        return $hash->{NAME} . "|". scalar(@Mp3WrapArray);
+        return $hash->{NAME} ."|". 
+               ($TTS_SentenceAppendix ? scalar(@Mp3WrapFiles)-1: scalar(@Mp3WrapFiles)) ."|". 
+               $Mp3WrapFile;
       }
     }
 
-    $filename = md5_hex($hash->{helper}{Text2Speech}[0]) . ".mp3";
+    if(-e $TTS_CacheFileDir."/".$hash->{helper}{Text2Speech}[0]) { 
+      # falls eine bestimmte mp3-Datei gespielt werden soll
+      $filename = $hash->{helper}{Text2Speech}[0];
+    } else {
+      $filename = md5_hex($hash->{helper}{Text2Speech}[0]) . ".mp3";
+    } 
     $file = $TTS_CacheFileDir."/".$filename;
 
     Log3 $hash->{NAME}, 4, "Text2Speech: Bearbeite jetzt den Text: ". $hash->{helper}{Text2Speech}[0];
 
     if(! -e $file) { # Datei existiert noch nicht im Cache
-      my $fh;
-    
-      Log3 $hash->{NAME}, 4, "Text2Speech: Hole URL: ". "http://" . $ttsHost . $ttsPath . uri_escape($hash->{helper}{Text2Speech}[0]);
-      $HttpResponse = GetHttpFile($ttsHost, $ttsPath . uri_escape($hash->{helper}{Text2Speech}[0]));
-
-      $fh = new IO::File ">$file";
-      if(!defined($fh)) {
-        Log3 $hash->{NAME}, 2, "Text2Speech: mp3 Datei <$file> konnte nicht angelegt werden.";
-        return undef;
-      }
-
-      $fh->print($HttpResponse);
-      Log3 $hash->{NAME}, 4, "Text2Speech: Schreibe mp3 in die Datei $file mit ".length($HttpResponse)." Bytes";  
-      close($fh);
-    } else {
-      Log3 $hash->{NAME}, 4, "Text2Speech: Datei <$file> bereits vorhanden, erneuter Download nicht notwendig";
+      Text2Speech_Download($hash, $file, $hash->{helper}{Text2Speech}[0]);
     }
 
     if(-e $file) { # Datei existiert jetzt
@@ -530,19 +595,26 @@ sub Text2Speech_DoIt($) {
       system($cmd);
     }
 
+    return $hash->{NAME}. "|". 
+           "1" ."|".
+           $file;
+
   } elsif ($TTS_Ressource eq "ESpeak") {
     $cmd = "sudo espeak -vde+f3 -k5 -s150 \"" . $hash->{helper}{Text2Speech}[0] . "\""; 
     Log3 $hash, 4, "Text2Speech:" .$cmd;
     system($cmd);
   }
 
-  return $hash->{NAME}. "|". "1";
+  return $hash->{NAME}. "|". 
+         "1" ."|".
+         "";
 }
 
 ####################################################
 # Rückgabe der Blockingfunktion
 # param1: HashName
 # param2: Anzahl der abgearbeiteten Textbausteine
+# param3: Dateiname der abgespielt wurde
 ####################################################
 sub Text2Speech_Done($) {
   my ($string) = @_;
@@ -551,8 +623,16 @@ sub Text2Speech_Done($) {
   my @a = split("\\|",$string);
   my $hash = $defs{shift(@a)};
   my $tts_done = shift(@a);
-  #Log 1, "SleepDone: " . $string;
+  my $filename = shift(@a);
   
+  if($filename) {
+    my @text;
+    for(my $i=0; $i<$tts_done; $i++) { 
+      push(@text, $hash->{helper}{Text2Speech}[$i]);
+    }         
+    Text2Speech_WriteStats($hash, 1, $filename, join(" ", @text));
+  }
+
   delete($hash->{helper}{RUNNING_PID});
   splice(@{$hash->{helper}{Text2Speech}}, 0, $tts_done);
 
@@ -568,6 +648,39 @@ sub Text2Speech_AbortFn($)     {
 
   delete($hash->{helper}{RUNNING_PID});
   Log3 $hash->{NAME}, 2, "Text2Speech: BlockingCall for ".$hash->{NAME}." was aborted";
+}
+
+#####################################
+# Hiermit werden Statistken per DbLogModul gesammelt
+# Wichitg zur Entscheidung welche Dateien aus dem Cache lange 
+# nicht benutzt und somit gelöscht werden koennen.
+#
+# param1: hash
+# param2: int:    0=indirekt (über mp3wrap); 1=direkt abgespielt
+# param3: string: Datei
+# param4: string: Text der als mp3 abgespielt wird
+#####################################
+sub Text2Speech_WriteStats($$$$){
+  my($hash, $typ, $file, $text) = @_;
+  my $DbLogDev;
+
+  #suche ein DbLogDevice
+  return undef unless($modules{"DbLog"} && $modules{"DbLog"}{"LOADED"});
+  foreach my $key (keys(%defs)) {
+    if($defs{$key}{TYPE} eq "DbLog") {
+      $DbLogDev = $key;
+      last;
+    } 
+  }
+  return undef if($defs{$DbLogDev}{STATE} ne "active"); # muss active sein!
+
+  # den letzten Value von "Usage" ermitteln um dann die Staistik um 1 zu erhoehen.
+  my @LastValue = DbLog_Get($defs{$DbLogDev}, "", "current", "array", "-", "-", $hash->{NAME} ."|". $file.":Usage");
+  my $NewValue = 1;
+  $NewValue = $LastValue[0]{value} + 1 if($LastValue[0]);
+
+  #           DbLogHash,        DbLogTable, TIMESTAMP, DEVICE,                    TYPE,          EVENT, READING, VALUE,     UNIT
+  DbLog_Push($defs{$DbLogDev}, "Current", TimeNow(), $hash->{NAME} ."|". $file, $hash->{TYPE}, $text, "Usage", $NewValue, "");
 }
 
 1;
@@ -698,6 +811,20 @@ sub Text2Speech_AbortFn($)     {
     Optional: Definition of one mp3-file to append each time of audio response.<br>
     Using of Mp3Wrap is required. The audio bricks has to be downloaded before into CacheFileDir.
     Example: <code>silence.mp3</code>
+  </li>
+
+  <li>TTS_FileMapping<br>
+    Definition of mp3files with a custom templatedefinition. Separated by space.
+    All templatedefinitions can used in audiobricks by i>tts</i>. 
+    The definition must begin and end with e colon. 
+    The mp3files must saved in the given directory by <i>TTS_FIleTemplateDir</i>.<br>
+    <code>attr myTTS TTS_FileMapping ring:ringtone.mp3 beep:MyBeep.mp3</code><br>
+    <code>set MyTTS tts Attention: This is my ringtone :ring: Its loud?</code>
+  </li>
+
+  <li>TTS_FileTemplateDir<br>
+    Directory to save all mp3-files are defined in <i>TTS_FileMapping</i> und <i>TTS_SentenceAppendix</i><br>
+    Optional, Default: <code>cache/templates</code>
   </li>
 
   <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
@@ -845,6 +972,21 @@ sub Text2Speech_AbortFn($)     {
     Voraussetzung ist die Nutzung von MP3Wrap. Die Sprachbausteine müssen bereits als mp3 im 
     CacheFileDir vorliegen.
     Beispiel: <code>silence.mp3</code>
+  </li>
+
+  <li>TTS_FileMapping<br>
+    Angabe von m&ouml;glichen MP3-Dateien mit deren Templatedefinition. Getrennt duch Leerzeichen.
+    Die Templatedefinitionen können in den per <i>tts</i> &uuml;bergebenen Sprachbausteinen verwendet werden
+    und m&uuml;ssen mit einem beginnenden und endenden Doppelpunkt angegeben werden.
+    Die Dateien müssen im Verzeichnis <i>TTS_FIleTemplateDir</i> gespeichert sein.<br>
+    <code>attr myTTS TTS_FileMapping ring:ringtone.mp3 beep:MyBeep.mp3</code><br>
+    <code>set MyTTS tts Achtung: hier kommt mein Klingelton :ring: War der laut?</code>
+  </li>
+
+  <li>TTS_FileTemplateDir<br>
+    Verzeichnis, in dem die per <i>TTS_FileMapping</i> und <i>TTS_SentenceAppendix</i> definierten
+    MP3-Dateien gespeichert sind.<br>
+    Optional, Default: <code>cache/templates</code>
   </li>
 
   <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
