@@ -560,7 +560,7 @@ sub HMinfo_SetFn($@) {#########################################################
 
       for (1..9){
         my ($x) =  $pl[$_] =~ /(\d+)/;
-        $plSum[$_] += $x;
+        $plSum[$_] += $x if ($x);
       }
       if ($type eq "short"){
         push @paramList, sprintf("%-20s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",
