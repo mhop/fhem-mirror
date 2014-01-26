@@ -287,7 +287,8 @@ LightScene_Notify($$)
       my %extPage = ();
       (undef, undef, $value) = FW_devState($dev->{NAME}, $room, \%extPage);
 
-      CommandTrigger( "", "$name $dev->{NAME}.$reading: $value" );
+      DoTrigger( "$name", "$dev->{NAME}.$reading: $value" );
+      #CommandTrigger( "", "$name $dev->{NAME}.$reading: $value" );
     }
   }
 
