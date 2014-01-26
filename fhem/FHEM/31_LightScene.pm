@@ -97,24 +97,24 @@ LightScene_2html($)
   $ret .= "<tr><td><div class=\"devType\"><a href=\"$FW_ME?detail=$name\">".AttrVal($name, "alias", $name)."</a></div></td></tr>" if( $show_heading );
   $ret .= "<tr><td><table class=\"block wide\">";
 
+  if( defined($FW_webArgs{detail}) ) {
+    $room = "&detail=$FW_webArgs{detail}";
+
+    $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
+    #$row++;
+    $ret .= "<td><div></div></td>";
+    foreach my $d (sort keys %{ $hash->{CONTENT} }) {
+      my %extPage = ();
+      my ($allSets, $cmdlist, $txt) = FW_devState($d, $room, \%extPage);
+      $ret .= "<td style=\"cursor:pointer\" informId=\"$name-$d.state\">$txt</td>";
+    }
+  }
+
   $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
   $row++;
   $ret .= "<td><div></div></td>";
   foreach my $d (sort keys %{ $hash->{CONTENT} }) {
     $ret .= "<td><div class=\"col2\"><a href=\"$FW_ME?detail=$d\">". AttrVal($d, "alias", $d) ."</a></div></td>";
-  }
-
-  if( defined($FW_webArgs{detail}) ) {
-    $room = "&detail=$FW_webArgs{detail}";
-
-    $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
-    $row++;
-    $ret .= "<td><div></div></td>";
-    foreach my $d (sort keys %{ $hash->{CONTENT} }) {
-      my %extPage = ();
-      my ($allSets, $cmdlist, $txt) = FW_devState($d, $room, \%extPage);
-      $ret .= "<td informId=\"$name-$d.state\">$txt</td>";
-    }
   }
 
   foreach my $scene (sort keys %{ $hash->{SCENES} }) {
@@ -130,7 +130,7 @@ LightScene_2html($)
       $txt = ($isHtml ? $icon : FW_makeImage($icon, $scene)) if( $icon );
     }
     if( AttrVal($FW_wname, "longpoll", 1)) {
-      $txt = "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
+      $txt = "<a style=\"cursor:pointer\" onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
     } else {
       $txt = "<a href=\"$FW_ME$FW_subdir?$link$srf\">$txt</a>";
     }
