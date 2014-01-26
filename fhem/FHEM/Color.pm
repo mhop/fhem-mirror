@@ -6,6 +6,8 @@ package main;
 use strict;
 use warnings;
 
+use vars qw($FW_ME);
+
 sub
 Color_Initialize()
 {
