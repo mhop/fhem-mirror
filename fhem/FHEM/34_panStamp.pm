@@ -376,7 +376,7 @@ panStamp_SendFromQueue($$)
            $defs{$f}{QUEUE}->[0] ne "")
           {
             unshift(@{$hash->{QUEUE}}, "");
-            InternalTimer(gettimeofday()+$to, "panStamp_HandleWriteQueue", $hash, 1);
+            InternalTimer(gettimeofday()+$to, "panStamp_HandleWriteQueue", $hash, 0);
             return;
           }
       }
@@ -386,7 +386,7 @@ panStamp_SendFromQueue($$)
     panStamp_SimpleWrite($hash, $bstring);
   }
 
-  InternalTimer(gettimeofday()+$to, "panStamp_HandleWriteQueue", $hash, 1);
+  InternalTimer(gettimeofday()+$to, "panStamp_HandleWriteQueue", $hash, 0);
 }
 
 sub

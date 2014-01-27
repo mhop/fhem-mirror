@@ -148,7 +148,7 @@ JeeLink_Set($@)
   } elsif( $cmd eq "LaCrossePairForSec" ) {
     return "Usage: set $name LaCrossePairForSec <seconds_active> [ignore_battery]" if(!$arg || $arg !~ m/^\d+$/ || ($arg2 && $arg2 ne "ignore_battery") );
     $hash->{LaCrossePair} = $arg2?2:1;
-    InternalTimer(gettimeofday()+$arg, "JeeLink_RemoveLaCrossePair", $hash, 1);
+    InternalTimer(gettimeofday()+$arg, "JeeLink_RemoveLaCrossePair", $hash, 0);
 
   } else {
     return "Unknown argument $cmd, choose one of ".$list;
@@ -332,7 +332,7 @@ JeeLink_SendFromQueue($$)
            $defs{$f}{QUEUE}->[0] ne "")
           {
             unshift(@{$hash->{QUEUE}}, "");
-            InternalTimer(gettimeofday()+$to, "JeeLink_HandleWriteQueue", $hash, 1);
+            InternalTimer(gettimeofday()+$to, "JeeLink_HandleWriteQueue", $hash, 0);
             return;
           }
       }
@@ -342,7 +342,7 @@ JeeLink_SendFromQueue($$)
     JeeLink_SimpleWrite($hash, $bstring);
   }
 
-  InternalTimer(gettimeofday()+$to, "JeeLink_HandleWriteQueue", $hash, 1);
+  InternalTimer(gettimeofday()+$to, "JeeLink_HandleWriteQueue", $hash, 0);
 }
 
 sub

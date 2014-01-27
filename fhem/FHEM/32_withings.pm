@@ -479,7 +479,7 @@ withings_poll($)
     withings_pollUser($hash);
   }
 
-  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "withings_poll", $hash, 1);
+  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "withings_poll", $hash, 0);
 }
 
 sub
@@ -646,6 +646,7 @@ withings_Get($$@)
     }
   }
 
+Log 3, "$name: >$hash->{SUBTYPE}< >>$cmd<<";
   return "Unknown argument $cmd, choose one of $list";
 }
 

@@ -93,7 +93,7 @@ speedtest_GetUpdate($)
 
   if(!$hash->{LOCAL}) {
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "speedtest_GetUpdate", $hash, 1);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "speedtest_GetUpdate", $hash, 0);
   }
 
   my $server ="";

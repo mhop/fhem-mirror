@@ -182,7 +182,7 @@ SWAP_0000002200000003_Parse($$$$)
   }
 
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+hex($hash->{'SWAP_0A-PeriodicTxInterval'})+10, "SWAP_0000002200000003_Watchdog", $hash, 1) if( defined $hash->{'SWAP_0A-PeriodicTxInterval'} );
+  InternalTimer(gettimeofday()+hex($hash->{'SWAP_0A-PeriodicTxInterval'})+10, "SWAP_0000002200000003_Watchdog", $hash, 0) if( defined $hash->{'SWAP_0A-PeriodicTxInterval'} );
 }
 
 sub
@@ -190,7 +190,7 @@ SWAP_0000002200000003_Set($@)
 {
   my ($hash, $name, $cmd, $arg, $arg2, $arg3) = @_;
 
-  InternalTimer(gettimeofday()+10, "SWAP_0000002200000003_Watchdog", $hash, 1);
+  InternalTimer(gettimeofday()+10, "SWAP_0000002200000003_Watchdog", $hash, 0);
 
   our $data = "00" x $hash->{CMD_SIZE};
   sub ret($) {
