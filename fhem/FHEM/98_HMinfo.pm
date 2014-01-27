@@ -519,7 +519,7 @@ sub HMinfo_SetFn($@) {#########################################################
       $opt .= "d" if ($type !~ m/(readings|register)/);# readings apply to all, others device only
       my @entities;
       $type = "msgEvents" if ($type eq "Protocol");# translate parameter
-      foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
+      foreach my $dName (HMinfo_getEntities($opt,$filter)){
         push @entities,$dName;
         CUL_HM_Set($defs{$dName},$dName,"clear",$type);
       }
@@ -543,7 +543,7 @@ sub HMinfo_SetFn($@) {#########################################################
     my @paramList;
     my @IOlist;
     my @plSum; push @plSum,0 for (0..9);#prefill
-    foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
+    foreach my $dName (HMinfo_getEntities($opt."d",$filter)){
       my $id = $defs{$dName}{DEF};
       my ($found,$para) = HMinfo_getParam($id,
                              ,"protState","protCmdPend"

@@ -195,38 +195,26 @@ sub CUL_HM_updateConfig($){
     next if (!$hash->{DEF}); # likely renamed
     
     my $id = $hash->{DEF};
-    my $chn = substr($id."00",6,2);
-
-    if ($id ne $K_actDetID){# if not action detector
-      CUL_HM_ID2PeerList($name,"",1);       # update peerList out of peerIDs
-      my $actCycle = AttrVal($name,"actCycle",undef);
-      CUL_HM_ActAdd($id,$actCycle) if ($actCycle);# add to ActionDetect?
-      # --- set default attrubutes if missing ---
-      if (   $hash->{helper}{role}{dev}
-          && AttrVal($name,"subType","") ne "virtual"){
-        $attr{$name}{expert}     = AttrVal($name,"expert"     ,"2_full");
-        $attr{$name}{autoReadReg}= AttrVal($name,"autoReadReg","4_reqStatus");
-      }
-      CUL_HM_Attr("attr",$name,"expert",$attr{$name}{expert}) 
-            if ($attr{$name}{expert});#need update after readings are available
-    }
-    else{# Action Detector only
+    my $nAttr = $modules{CUL_HM}{helper}{hmManualOper};# no update for attr
+    
+    if ($id eq $K_actDetID){# if action detector
       $attr{$name}{"event-on-change-reading"} = 
-                AttrVal($name, "event-on-change-reading", ".*");
+                AttrVal($name, "event-on-change-reading", ".*")
+                if(!$nAttr);
       delete $hash->{helper}{role};
       $hash->{helper}{role}{vrt} = 1;
       next;
-      #delete $attr{$name}{peerIDs}; # remove historical data
     }
-
+    CUL_HM_ID2PeerList($name,"",1);       # update peerList out of peerIDs
+    
+    my $chn = substr($id."00",6,2);
     my $st  = CUL_HM_Get($hash,$name,"param","subType");
     my $md  = CUL_HM_Get($hash,$name,"param","model");
-    if ($md =~ /(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/){
+    
+    if    ($md =~ /(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/){
       $hash->{helper}{role}{chn} = 1 if (length($id) == 6); #tc special
-      $attr{$name}{stateFormat} = "last:trigLast" if ($chn eq "03");
     }
     elsif ($md =~ m/HM-CC-RT-DN/){
-      $attr{$name}{stateFormat} = "last:trigLast" if ($chn eq "03");
       $hash->{helper}{shRegR}{"07"} = "00" if ($chn eq "04");# shadowReg List 7 read from CH 0
       $hash->{helper}{shRegW}{"07"} = "04" if ($chn eq "00");# shadowReg List 7 write to CH 4
     }
@@ -271,6 +259,24 @@ sub CUL_HM_updateConfig($){
     }
     elsif ("virtual" eq $st) {#setup virtuals
       $hash->{helper}{role}{vrt} = 1;
+    }
+
+    next if ($nAttr);# stop if default setting if attributes is not desired
+
+    my $actCycle = AttrVal($name,"actCycle",undef);
+    CUL_HM_ActAdd($id,$actCycle) if ($actCycle );#add 2 ActionDetect?
+    # --- set default attrubutes if missing ---
+    if (   $hash->{helper}{role}{dev}
+        && AttrVal($name,"subType","") ne "virtual"){
+      $attr{$name}{expert}     = AttrVal($name,"expert"     ,"2_full");
+      $attr{$name}{autoReadReg}= AttrVal($name,"autoReadReg","4_reqStatus");
+    }
+    CUL_HM_Attr("attr",$name,"expert",$attr{$name}{expert}) 
+          if ($attr{$name}{expert});#need update after readings are available
+
+    if ($chn eq "03" && 
+        $md =~ /(HM-CC-TC|ROTO_ZEL-STG-RM-FWT|HM-CC-RT-DN)/){
+      $attr{$name}{stateFormat} = "last:trigLast";
     }
 
     if ( $hash->{helper}{role}{dev} && CUL_HM_getRxType($hash)&0x02){#burst dev
@@ -2034,16 +2040,17 @@ sub CUL_HM_queueUpdtCfg($){
   my $name = shift;
   if ($modules{CUL_HM}{helper}{hmManualOper}){ # no update when manual operation
     delete $modules{CUL_HM}{helper}{updtCfgLst};
-    return;
-  }
-  my @arr;
-  if ($modules{CUL_HM}{helper}{updtCfgLst}){
-    @arr = CUL_HM_noDup((@{$modules{CUL_HM}{helper}{updtCfgLst}}, $name));
   }
   else{
-    push @arr,$name;
+    my @arr;
+    if ($modules{CUL_HM}{helper}{updtCfgLst}){
+      @arr = CUL_HM_noDup((@{$modules{CUL_HM}{helper}{updtCfgLst}}, $name));
+    }
+    else{
+      push @arr,$name;
+    }
+    $modules{CUL_HM}{helper}{updtCfgLst} = \@arr;
   }
-  $modules{CUL_HM}{helper}{updtCfgLst} = \@arr;
   RemoveInternalTimer("updateConfig");
   InternalTimer(gettimeofday()+5,"CUL_HM_updateConfig", "updateConfig", 0);
 }
@@ -5613,7 +5620,6 @@ sub CUL_HM_peersValid($) {# is list valid?
   }
   return 1;
 }
-
 sub CUL_HM_reglUsed($) {# provide data for HMinfo
   my $name = shift;
   my $hash = $defs{$name};
@@ -5654,7 +5660,7 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
   return @lsNo;
 }
 
-sub CUL_HM_complConfigTest($){# 
+sub CUL_HM_complConfigTest($){# Q - check register consistancy some time later
   my $name = shift;
   return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
   push @{$modules{CUL_HM}{helper}{confCheckArr}},$name;
@@ -5663,12 +5669,12 @@ sub CUL_HM_complConfigTest($){#
     InternalTimer(gettimeofday()+ 1800,"CUL_HM_complConfigTO","CUL_HM_complConfigTO", 0);
   }
 }
-sub CUL_HM_complConfigTO($){
+sub CUL_HM_complConfigTO($)  {# now perform consistancy check of register
   my @arr = @{$modules{CUL_HM}{helper}{confCheckArr}};
   @{$modules{CUL_HM}{helper}{confCheckArr}} = ();
   CUL_HM_complConfig($_) foreach (CUL_HM_noDup(@arr));
 }
-sub CUL_HM_complConfig($) {# read config if enabled and not complete
+sub CUL_HM_complConfig($)    {# read config if enabled and not complete
   my $name = shift;
   return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
   return if ((CUL_HM_getAttrInt($name,"autoReadReg") & 0x07) < 5);
