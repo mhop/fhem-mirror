@@ -244,7 +244,7 @@ SYSSTAT_GetUpdate($)
 
   if(!$hash->{LOCAL}) {
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SYSSTAT_GetUpdate", $hash, 1);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SYSSTAT_GetUpdate", $hash, 0);
 
     return if( AttrVal($name,"disable", 0) > 0 );
   }

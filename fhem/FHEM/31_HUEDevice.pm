@@ -399,7 +399,7 @@ HUEDevice_Set($@)
     } elsif( $defs{$name}->{helper}->{update_timeout}
         && !$hash->{helper}->{group} ) {
       RemoveInternalTimer($hash);
-      InternalTimer(gettimeofday()+1, "HUEDevice_GetUpdate", $hash, 1);
+      InternalTimer(gettimeofday()+1, "HUEDevice_GetUpdate", $hash, 0);
     } else {
       RemoveInternalTimer($hash);
       HUEDevice_GetUpdate( $hash );
@@ -608,7 +608,7 @@ HUEDevice_GetUpdate($)
 
   if(!$hash->{LOCAL}) {
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "HUEDevice_GetUpdate", $hash, 1);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "HUEDevice_GetUpdate", $hash, 0);
   }
 
   my $result = HUEDevice_ReadFromServer($hash,$hash->{ID});

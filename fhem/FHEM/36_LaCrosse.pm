@@ -151,7 +151,7 @@ LaCrosse_Set($@)
     }
     return "Usage: set $name replaceBatteryForSec <seconds_active> [ignore_battery]" if(!$arg || $arg !~ m/^\d+$/ || ($arg2 && $arg2 ne "ignore_battery"));
     $hash->{replaceBattery} = $arg2?2:1;
-    InternalTimer(gettimeofday()+$arg, "LaCrosse_RemoveReplaceBattery", $hash, 1);
+    InternalTimer(gettimeofday()+$arg, "LaCrosse_RemoveReplaceBattery", $hash, 0);
 
   } else {
     return "Unknown argument $cmd, choose one of ".$list;

@@ -131,7 +131,7 @@ CO20_Connect($)
       $hash->{INTERVAL} = $interval;
 
       RemoveInternalTimer($hash);
-      InternalTimer(gettimeofday()+10, "CO20_poll", $hash, 1);
+      InternalTimer(gettimeofday()+10, "CO20_poll", $hash, 0);
 
       my $buf;
       $hash->{DEV}->interrupt_read(0x00000081, $buf, 0x0000010, 1000);
@@ -194,7 +194,7 @@ CO20_poll($)
 
   if(!$hash->{LOCAL}) {
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "CO20_poll", $hash, 1);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "CO20_poll", $hash, 0);
   }
 
   if( $hash->{manufacturer} && $hash->{product} ) {

@@ -154,7 +154,7 @@ mailcheck_Connect($)
       $hash->{INTERVAL} = $interval;
 
       RemoveInternalTimer($hash);
-      InternalTimer(gettimeofday()+$hash->{INTERVAL}, "mailcheck_poll", $hash, 1);
+      InternalTimer(gettimeofday()+$hash->{INTERVAL}, "mailcheck_poll", $hash, 0);
 
       #if( !$client->has_capability("IDLE") ) {
         #mailcheck_Disconnect($hash);
@@ -226,7 +226,7 @@ mailcheck_poll($)
   my ($hash) = @_;
 
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "mailcheck_poll", $hash, 1);
+  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "mailcheck_poll", $hash, 0);
 
   my $client = $hash->{CLIENT};
   if( $client && $client->IsConnected && $client->IsAuthenticated ) {
