@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# OWAD.pm
+# OWAD.pm WIESO EVENT DREIFACH
 #
 # FHEM module to commmunicate with 1-Wire A/D converters DS2450
 #
@@ -75,27 +75,16 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.24";
+my $owx_version="5.01";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D");
 my @owg_channel = ("A","B","C","D");
-#-- value globals
-my @owg_status;
-my $owg_state;
-#-- channel values - always the raw values from the device
-my @owg_val=("","","","");
-#-- channel mode - fixed for now
-my @owg_mode = ("input","input","input","input");
-#-- resolution in bit - fixed for now
-my @owg_resoln = (16,16,16,16);
-#-- raw range in mV - fixed for now
-my @owg_range = (5100,5100,5100,5100);
-#-- alarm status 0 = disabled, 1 = enabled, but not alarmed, 2 = alarmed
-my @owg_slow=(0,0,0,0);
-my @owg_shigh=(0,0,0,0);
-#-- alarm values - always the raw values committed to the device
-my @owg_vlow;
-my @owg_vhigh;
+#-- channel mode - fixed for now, see initialization
+my @owg_mode;
+#-- resolution in bit - fixed for now, see initialization
+my @owg_resoln;
+#-- raw range in mV - fixed for now, see initialization
+my @owg_range;
 
 my %gets = (
   "id"          => "",
@@ -153,6 +142,7 @@ sub OWAD_Initialize ($) {
   $hash->{GetFn}   = "OWAD_Get";
   $hash->{SetFn}   = "OWAD_Set";
   $hash->{AttrFn}  = "OWAD_Attr";
+ 
   my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2450 loglevel:0,1,2,3,4,5 ".
                 "stateAL0 stateAL1 stateAH0 stateAH1 ".
                 "interval ".
@@ -169,8 +159,22 @@ sub OWAD_Initialize ($) {
     $attlist .= " ".$owg_fixed[$i]."High";
   }
   $hash->{AttrList} = $attlist; 
-
-  #make sure OWX is loaded so OWX_CRC is available if running with OWServer
+  
+  #-- value globals
+  $hash->{owg_status} = [];
+  $hash->{owg_state} = undef;
+  #-- channel values - always the raw values from the device
+  $hash->{owg_val} = ["","","",""];
+  #-- alarm status 0 = disabled, 1 = enabled, but not alarmed, 2 = alarmed
+  $hash->{owg_slow}=[0,0,0,0];
+  $hash->{owg_shigh}=[0,0,0,0];
+  #-- alarm values - always the raw values committed to the device
+  $hash->{owg_vlow} = [];
+  $hash->{owg_vhigh} = [];
+  
+  #-- ASYNC this function is needed for asynchronous execution of the device reads 
+  $hash->{AfterExecuteFn} = "OWXAD_ProcValues";
+  #--make sure OWX is loaded so OWX_CRC is available if running with OWServer
   main::LoadModule("OWX");	
 }
 
@@ -244,6 +248,7 @@ sub OWAD_Define ($$) {
   $hash->{PRESENT}    = 0;
   $hash->{INTERVAL}   = $interval;
   $hash->{ERRCOUNT}   = 0;
+  $hash->{ASYNC}      = 0; #-- false for now
   
   #-- Couple to I/O device
   AssignIoPort($hash);
@@ -254,7 +259,7 @@ sub OWAD_Define ($$) {
   #if( $hash->{IODev}->{PRESENT} != 1 ){
   #  return "OWAD: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
   #}
-  $modules{OWAD}{defptr}{$id} = $hash;
+  $main::modules{OWAD}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
   Log 3, "OWAD:    Device $name defined."; 
@@ -285,10 +290,11 @@ sub OWAD_Attr(@) {
   
   if ( $do eq "set") {
   	ARGUMENT_HANDLER: {
+  	  #-- interval modified at runtime
   	  $key eq "interval" and do {
-        # check value
+        #-- check value
         return "OWAD: Set with short interval, must be > 1" if(int($value) < 1);
-        # update timer
+        #-- update timer
         $hash->{INTERVAL} = $value;
         if ($init_done) {
           RemoveInternalTimer($hash);
@@ -296,7 +302,7 @@ sub OWAD_Attr(@) {
         }
   	    last;
   	  };
-      #-- only alarm settings may be modified at runtime for now
+      #-- alarm settings modified at runtime
       $key =~ m/(.*)(Alarm|Low|High)/ and do {
         #-- safeguard against uninitialized devices
         return undef
@@ -308,6 +314,7 @@ sub OWAD_Attr(@) {
   	};
   } elsif ( $do eq "del" ) {
   	ARGUMENT_HANDLER: {
+  	  #-- should remove alarm setting, but does nothing so far
   	  $key =~ m/(.*)(Alarm)/ and do {
   	  	last;
   	  };
@@ -378,7 +385,8 @@ sub OWAD_FormatValues($) {
   
   #-- insert initial values 
   for( my $k=0;$k<int(@owg_fixed);$k++ ){
-    $vfuncall .= "\$owg_val[$k]=$owg_val[$k];";
+  #-- TODO $hash->{owg_val}->[..] might be undefined here?
+    $vfuncall .= "\$hash->{owg_val}->[$k]=$hash->{owg_val}->[$k];"; 
   }
   my $alarm;
   my $galarm     = 0;
@@ -394,7 +402,7 @@ sub OWAD_FormatValues($) {
   
   #-- no change in any value if invalid reading
   for (my $i=0;$i<int(@owg_fixed);$i++){
-    return if( ($owg_val[$i] eq "") || (!defined($owg_val[$i])) );
+    return "" if( (!defined($hash->{owg_val}->[$i])) || ($hash->{owg_val}->[$i] eq "") );
   }
   
   #-- obtain channel names
@@ -418,12 +426,12 @@ sub OWAD_FormatValues($) {
     }
     $hash->{tempf}{$owg_fixed[$i]}{function}   = $vfunc;  
         
-    #-- replace by proper values (VA -> $owg_val[0] etc.)
+    #-- replace by proper values (VA -> $hash->{owg_val}->[0] etc.)
     #   careful: how to prevent {VAL} from being replaced ?
     for( my $k=0;$k<int(@owg_fixed);$k++ ){
       my $sstr = "V$owg_fixed[$k]";
       $vfunc =~ s/VAL/WERT/g;
-      $vfunc =~ s/$sstr/\$owg_val[$k]/g;
+      $vfunc =~ s/$sstr/\$hash->{owg_val}->[$k]/g;
       $vfunc =~ s/WERT/VAL/g;
     }
       
@@ -433,16 +441,16 @@ sub OWAD_FormatValues($) {
     if( !$vfunc ){
       $vval = 0.0;
     } elsif( $vfunc ne "" ){
-      $vval = int( $vfunc*1000 )/1000;
+      $vval = $vfunc;
     } else {
       $vval = "???";
     }
         
     #-- low alarm value
-    $vlow =$owg_vlow[$i];
+    $vlow =$hash->{owg_vlow}->[$i];
     $main::attr{$name}{$owg_fixed[$i]."Low"}=$vlow;
     #-- high alarm value
-    $vhigh=$owg_vhigh[$i];
+    $vhigh=$hash->{owg_vhigh}->[$i];
     $main::attr{$name}{$owg_fixed[$i]."High"}=$vhigh;            
         
     #-- string buildup for return value, STATE and alarm
@@ -451,20 +459,22 @@ sub OWAD_FormatValues($) {
     #-- Test for alarm condition
     $alarm = "none";
     #-- alarm signature low
-    if( $owg_slow[$i] == 0 ) {
+    #-- TODO may be undefined here?
+    if( $hash->{owg_slow}->[$i] == 0 ) { 
     } else {
       $alarm="low";
       if( $vval > $vlow ){
-        $owg_slow[$i] = 1;
+        $hash->{owg_slow}->[$i] = 1;
         $svalue .=  $stateal0;
       } else {
         $galarm = 1;
-        $owg_slow[$i] = 2;
+        $hash->{owg_slow}->[$i] = 2;
         $svalue .=  $stateal1;
       }
     }
     #-- alarm signature high
-    if( $owg_shigh[$i] == 0 ) {
+    #-- TODO may be undefined here?
+    if( $hash->{owg_shigh}->[$i] == 0 ) { 
     } else {
       if( $alarm eq "low") {
         $alarm="both";
@@ -472,11 +482,11 @@ sub OWAD_FormatValues($) {
         $alarm="high";
       }
       if( $vval < $vhigh ){
-        $owg_shigh[$i] = 1;
+        $hash->{owg_shigh}->[$i] = 1;
         $svalue .=  $stateah0;
       } else {
         $galarm = 1;
-        $owg_shigh[$i] = 2;
+        $hash->{owg_shigh}->[$i] = 2;
         $svalue .=  $stateah1;
       }
     }
@@ -511,6 +521,10 @@ sub OWAD_Get($@) {
   my $reading = $a[1];
   my $name    = $hash->{NAME};
   my $model   = $hash->{OW_MODEL};
+  
+  #-- ID of the device, hash of the busmaster
+  my $owx_dev = $hash->{ROM_ID};
+  my $master  = $hash->{IODev}; 
   my $interface= $hash->{IODev}->{TYPE};
   my ($value,$value2,$value3)   = (undef,undef,undef);
   my $ret     = "";
@@ -527,7 +541,7 @@ sub OWAD_Get($@) {
 
   #-- get id
   if($a[1] eq "id") {
-    $value = $hash->{ROM_ID};
+    $value = $owx_dev;
      return "$name.id => $value";
   } 
   
@@ -535,7 +549,7 @@ sub OWAD_Get($@) {
   if($a[1] eq "present") {
     #-- hash of the busmaster
     my $master       = $hash->{IODev};
-    $value           = OWX_Verify($master,$hash->{ROM_ID});
+    $value           = OWX_Verify($master,$owx_dev);
     $hash->{PRESENT} = $value;
     return "$name.present => $value";
   } 
@@ -643,20 +657,26 @@ sub OWAD_Get($@) {
       $value  .= $owg_channel[$i].": ".$owg_mode[$i].", ";
       #$value .= "disabled ," 
       #  if ( !($sb2 && 128) );
-      $value .=  sprintf "raw range %3.1f V, ",$owg_range[$i]/1000;
+      $value .=  sprintf "raw range %3.2f V, ",$owg_range[$i]/1000;
       $value .=  sprintf "resolution %d bit, ",$owg_resoln[$i];
-      $value .=  sprintf "low alarm disabled, "
-        if( $owg_slow[$i]==0 );
-      $value .=  sprintf "low alarm enabled, "
-        if( $owg_slow[$i]==1 );
-      $value .=  sprintf "alarmed low, "
-        if( $owg_slow[$i]==2 ); 
-      $value .=  sprintf "high alarm disabled"
-        if( $owg_shigh[$i]==0 );
-      $value .=  sprintf "high alarm enabled"
-        if( $owg_shigh[$i]==1 );
-      $value .=  sprintf "alarmed high"
-        if( $owg_shigh[$i]==2 );
+      if (!defined $hash->{owg_slow}->[$i]) {
+        $value .= "low alarm undefined, ";
+      } elsif( $hash->{owg_slow}->[$i]==0 ) { 
+        $value .= "low alarm disabled, ";
+      } elsif( $hash->{owg_slow}->[$i]==1 ) {
+        $value .= "low alarm enabled, ";
+      } elsif( $hash->{owg_slow}->[$i]==2 ) {
+        $value .= "alarmed low, ";
+      }
+      if (!defined $hash->{owg_shigh}) {
+        $value .= "high aralm undefined";
+      } elsif( $hash->{owg_shigh}->[$i]==0 ) {
+        $value .= "high alarm disabled";
+      } elsif( $hash->{owg_shigh}->[$i]==1 ) {
+        $value .= "high alarm enabled";
+      } elsif( $hash->{owg_shigh}->[$i]==2 ) {
+        $value .= "alarmed high";
+      }
       #-- insert space
       if( $i<int(@owg_fixed)-1 ){
         $value .= "\n";
@@ -706,8 +726,6 @@ sub OWAD_GetValues($) {
       $ret1 = OWXAD_GetPage($hash,"reading");
       $ret2 = OWXAD_GetPage($hash,"alarm");
       $ret3 = OWXAD_GetPage($hash,"status");
-      last
-        if( (!defined($ret)) && (!defined($ret2)) && (!defined($ret3))  );
     } 
   }elsif( $interface eq "OWServer" ){
     $ret1 = OWFSAD_GetPage($hash,"reading");
@@ -753,7 +771,7 @@ sub OWAD_InitializeDevice($) {
   my ($ret1,$ret2);
   
   #-- Initial readings 
-  @owg_val   = ("","","","");
+  $hash->{owg_val} = ["","","",""];
    
   #-- Initial alarm values
   for( my $i=0;$i<int(@owg_fixed);$i++) { 
@@ -763,33 +781,41 @@ sub OWAD_InitializeDevice($) {
     if( AttrVal($name,$owg_fixed[$i]."Alarm",undef) ){
       my $alarm = AttrVal($name,$owg_fixed[$i]."Alarm",undef);
       if( $alarm eq "none" ){
-        $owg_slow[$i]=0;
-        $owg_shigh[$i]=0;
+        $hash->{owg_slow}->[$i]=0;
+        $hash->{owg_shigh}->[$i]=0;
       }elsif( $alarm eq "low" ){
-        $owg_slow[$i]=1;
-        $owg_shigh[$i]=0;
+        $hash->{owg_slow}->[$i]=1;
+        $hash->{owg_shigh}->[$i]=0;
       }elsif( $alarm eq "high" ){
-        $owg_slow[$i]=0;
-        $owg_shigh[$i]=1;
+        $hash->{owg_slow}->[$i]=0;
+        $hash->{owg_shigh}->[$i]=1;
       }elsif( $alarm eq "both" ){
-        $owg_slow[$i]=1;
-        $owg_shigh[$i]=1;
+        $hash->{owg_slow}->[$i]=1;
+        $hash->{owg_shigh}->[$i]=1;
       }
-    }        
+    } else {
+      $hash->{owg_slow}->[$i]=0;
+      $hash->{owg_shigh}->[$i]=0;    
+    }    
     #-- low alarm value - no checking for correct parameters
     if( AttrVal($name,$owg_fixed[$i]."Low",undef) ){
-      $owg_vlow[$i] = $main::attr{$name}{$owg_fixed[$i]."Low"};
+      $hash->{owg_vlow}->[$i] = $main::attr{$name}{$owg_fixed[$i]."Low"};
+    } else {
+      $hash->{owg_vlow}->[$i] = 0;
     }
     #-- high alarm value
     if( AttrVal($name,$owg_fixed[$i]."High",undef) ){
-      $owg_vhigh[$i] = $main::attr{$name}{$owg_fixed[$i]."High"};
-    }      
-      Log 1,"+++++++++> Alarm enabling for $name channel $i is $owg_slow[$i] $owg_shigh[$i] $owg_vlow[$i] $owg_vhigh[$i]";      
+      $hash->{owg_vhigh}->[$i] = $main::attr{$name}{$owg_fixed[$i]."High"};
+    }  else {
+      $hash->{owg_vhigh}->[$i] = 0;
+    }     
   }
   #-- resolution in bit - fixed for now
   @owg_resoln = (16,16,16,16);
   #-- raw range in mV - fixed for now
-  @owg_range = (5100,5100,5100,5100);
+  @owg_range = (5120,5120,5120,5120);
+  #-- mode - fixed for now
+  @owg_mode  = ("input","input","input","input");
   #-- OWX interface
   if( $interface eq "OWX" ){
     $ret1 = OWXAD_SetPage($hash,"status");
@@ -799,7 +825,6 @@ sub OWAD_InitializeDevice($) {
     $ret1 = OWFSAD_SetPage($hash,"status");
     $ret2 = OWFSAD_SetPage($hash,"alarm");
   }
-  Log 1,"Status return $ret1 $ret2";
   #-- process results
   $ret .= $ret1
     if( defined($ret1) );
@@ -893,14 +918,14 @@ sub OWAD_Set($@) {
     }
     #-- put into device
     if( $value eq "low" || $value eq "both" ){
-       $owg_slow[$channo]=1;
+       $hash->{owg_slow}->[$channo]=1;
     } else{
-       $owg_slow[$channo]=0;
+       $hash->{owg_slow}->[$channo]=0;
     }
     if( $value eq "high" || $value eq "both" ){
-       $owg_shigh[$channo]=1;
+       $hash->{owg_shigh}->[$channo]=1;
     } else{
-       $owg_shigh[$channo]=0;
+       $hash->{owg_shigh}->[$channo]=0;
     }    
    
     #-- OWX interface
@@ -928,7 +953,7 @@ sub OWAD_Set($@) {
       if($value < $mmin || $value > $mmax);
     
     #-- round to those numbers understood by the device
-    my $value2  = int($value*255000/$owg_range[$channo])*$owg_range[$channo]/255000;
+    my $value2  = int($value*256000/$owg_range[$channo]+0.5)*$owg_range[$channo]/256000;
  
     if( $key =~ m/(.*)Low/ ){
       #-- put into attribute value
@@ -937,7 +962,7 @@ sub OWAD_Set($@) {
         $main::attr{$name}{$owg_fixed[$channo]."Low"} = $value2 
       }
       #-- put into device
-      $owg_vlow[$channo]  = $value2;
+      $hash->{owg_vlow}->[$channo]  = $value2;
       
     } elsif( $key =~ m/(.*)High/ ){  
       #-- put into attribute value
@@ -946,7 +971,7 @@ sub OWAD_Set($@) {
         $main::attr{$name}{$owg_fixed[$channo]."High"} = $value2
       }
       #-- put into device
-      $owg_vhigh[$channo]  = $value2;
+      $hash->{owg_vhigh}->[$channo]  = $value2;
     }
   
     #-- OWX interface
@@ -983,7 +1008,7 @@ sub OWAD_Set($@) {
 
 sub OWAD_Undef ($) {
   my ($hash) = @_;
-  delete($modules{OWAD}{defptr}{$hash->{OW_ID}});
+  delete($main::modules{OWAD}{defptr}{$hash->{OW_ID}});
   RemoveInternalTimer($hash);
   return undef;
 }
@@ -1032,7 +1057,7 @@ sub OWFSAD_GetPage($$) {
     return "wrong data length from OWServer"
       if( int(@ral) != 4);
     for( $i=0;$i<int(@owg_fixed);$i++){
-      $owg_val[$i]= int($ral[$i]*1000)/1000;
+      $hash->{owg_val}->[$i]= int($ral[$i]*1000)/1000;
     }
   #=============== get the alarm reading ===============================
   } elsif ( $page eq "alarm" ) {
@@ -1053,8 +1078,8 @@ sub OWFSAD_GetPage($$) {
       if( (int(@ral) != 4) || (int(@ral2) != 4) );
       
     for( $i=0;$i<int(@owg_fixed);$i++){
-      $owg_vlow[$i] = int($ral[$i]*1000)/1000;
-      $owg_vhigh[$i] = int($ral2[$i]*1000)/1000;
+      $hash->{owg_vlow}->[$i] = int($ral[$i]*1000+0.5)/1000;
+      $hash->{owg_vhigh}->[$i] = int($ral2[$i]*1000+0.5)/1000;
     }
     
   #=============== get the status reading ===============================
@@ -1068,11 +1093,11 @@ sub OWFSAD_GetPage($$) {
     for( $i=0;$i<int(@owg_fixed);$i++){
       $owg_mode[$i]   =  "input";
       $owg_resoln[$i] =  16;
-      $owg_range[$i]  =  5100;
+      $owg_range[$i]  =  5120;
     }
     
     #-- get values - or should we rather use the uncached ones ?
-    $rel = OWServer_Read($master,"/$owx_add/alarm/low.ALL");
+    $rel  = OWServer_Read($master,"/$owx_add/alarm/low.ALL");
     $rel2 = OWServer_Read($master,"/$owx_add/set_alarm/low.ALL");
     
     return "no return from OWServer"
@@ -1098,7 +1123,7 @@ sub OWFSAD_GetPage($$) {
           $an = 2;
         }
       } 
-      $owg_slow[$i] = $an;
+      $hash->{owg_slow}->[$i] = $an;
     }
     #-- get values - or should we rather use the uncached ones ?
     $rel  = OWServer_Read($master,"/$owx_add/alarm/high.ALL");
@@ -1127,7 +1152,7 @@ sub OWFSAD_GetPage($$) {
           $an = 2;
         }
       } 
-      $owg_shigh[$i] = $an;
+      $hash->{owg_shigh}->[$i] = $an;
     }
   }
   return undef
@@ -1153,13 +1178,13 @@ sub OWFSAD_SetPage($$) {
   my $name   = $hash->{NAME};
   
   my $i;
-  my @ral=(0,0,0,0);
+  my @ral =(0,0,0,0);
   my @ral2=(0,0,0,0);
   
   #=============== set the alarm values ===============================
   if ( $page eq "alarm" ) {
-    OWServer_Write($master, "/$owx_add/set_alarm/voltlow.ALL",join(',',@owg_vlow));
-    OWServer_Write($master, "/$owx_add/set_alarm/volthigh.ALL",join(',',@owg_vhigh));
+    OWServer_Write($master, "/$owx_add/set_alarm/voltlow.ALL",join(',',@{$hash->{owg_vlow}}));
+    OWServer_Write($master, "/$owx_add/set_alarm/volthigh.ALL",join(',',@{$hash->{owg_vhigh}}));
   #=============== set the status ===============================
   } elsif ( $page eq "status" ) {
     for( $i=0;$i<int(@owg_fixed);$i++){
@@ -1167,13 +1192,13 @@ sub OWFSAD_SetPage($$) {
         #-- resolution (TODO: check !)
         #
         #-- alarm enabled        
-        if( defined($owg_slow[$i]) ){
+        if( defined($hash->{owg_slow}->[$i]) ){
          $ral[$i]=1
-           if($owg_slow[$i]>0);
+           if($hash->{owg_slow}->[$i]>0);
         }
-        if( defined($owg_shigh[$i]) ){
+        if( defined($hash->{owg_shigh}->[$i]) ){
           $ral2[$i]=1
-           if($owg_shigh[$i]>0);
+           if($hash->{owg_shigh}->[$i]>0);
         }
       }
     }
@@ -1217,15 +1242,23 @@ sub OWXAD_GetPage($$) {
 
   #=============== get the voltage reading ===============================
   if( $page eq "reading") {
-    OWX_Reset($master);
     #-- issue the match ROM command \x55 and the start conversion command
-    $res= OWX_Complex($master,$owx_dev,"\x3C\x0F\x00\xFF\xFF",0);
-    if( $res eq 0 ){
-      return "not accessible for conversion";
+    #-- asynchronous mode
+    if( $hash->{ASYNC} ){
+      if (!OWX_Execute( $master, "getpageconvert", 1, $owx_dev, "\x3C\x0F\x00\xFF\xFF", 0, 20 )) {
+        return "not accessible for conversion";
+      }
+    #-- synchronous mode
+    } else {
+      OWX_Reset($master);
+      $res= OWX_Complex($master,$owx_dev,"\x3C\x0F\x00\xFF\xFF",0);
+      if( $res eq 0 ){
+        return "not accessible for conversion";
+      } 
+      #-- conversion needs some 5 ms per channel
+      select(undef,undef,undef,0.02);
     } 
-    #-- conversion needs some 5 ms per channel
-    select(undef,undef,undef,0.02);
-    
+
     #-- issue the match ROM command \x55 and the read conversion page command
     #   \xAA\x00\x00 
     $select="\xAA\x00\x00";
@@ -1238,59 +1271,91 @@ sub OWXAD_GetPage($$) {
   } elsif ( $page eq "status" ) {
     #-- issue the match ROM command \x55 and the read status memory page command 
     #   \xAA\x08\x00 r
-  $select="\xAA\x08\x00";
+    $select="\xAA\x08\x00";
   #=============== wrong value requested ===============================
   } else {
-    return "wrong memory page requested";
+    return "wrong memory page requested from $owx_dev";
   } 
   
-  #-- reset the bus
-  OWX_Reset($master);
-  #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
-  $res=OWX_Complex($master,$owx_dev,$select,10);
-  if( $res eq 0 ){
-    return "not accessible in reading $page page"; 
+  #-- asynchronous mode
+  if( $hash->{ASYNC} ){
+     #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
+     if (OWX_Execute( $master, "getpage$page", 1, $owx_dev, $select, 10, undef)) {
+     } else {
+    return "$owx_dev not accessible in reading $page page"; 
+	}
+	return OWX_AwaitExecuteResponse( $master, "getpage$page", $owx_dev );
+  #-- asynchronous mode
+  } else {
+    #-- reset the bus
+    OWX_Reset($master);
+    #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
+    $res=OWX_Complex($master,$owx_dev,$select,10);
+    if( $res eq 0 ){
+      return "$owx_dev not accessible in reading $page page"; 
+    }
+    #-- for processing we also need the 3 command bytes
+    OWXAD_ProcValues($hash,$page,undef,undef,$owx_dev,undef,undef,substr($res,9,13));
   }
+
+  return undef;
+}
+
+########################################################################################
+#
+# OWXAD_ProcValues - Process reading from one device - translate binary into raw
+#
+# Parameter hash = hash of device addressed
+#
+########################################################################################
+
+sub OWXAD_ProcValues($$$$$$$$) {
+  my ($hash, $page, $success, $reset, $owx_dev, $data, $numread, $res) = @_;
   
-  #-- reset the bus
-  OWX_Reset($master);
+  #-- unused are success, reset, data numread
+  
+  return undef unless (defined $page and $page ne "convert");
+  
+  my ($i,$j,$k,@data,$ow_thn,$ow_tln);
+  my $change = 0;
   
   #-- process results
-  @data=split(//,substr($res,9));
-  return "invalid data length, ".int(@data)." instead of 13 bytes"
-    if (@data != 13); 
-  #return "invalid data"
-  #  if (ord($data[17])<=0); 
+  @data=split(//,substr($res,3,10));
+  return "invalid data length, ".int(@data)." instead of 10 bytes"
+    if (@data != 10); 
   return "invalid CRC"
-    if (OWX_CRC16(substr($res,9,11),$data[11],$data[12])==0);  
-    
+    if (OWX_CRC16(substr($res,9,11),$data[11],$data[12])==0);    
+      
   #=============== get the voltage reading ===============================
   if( $page eq "reading"){
     for( $i=0;$i<int(@owg_fixed);$i++){
-      $owg_val[$i]= int((ord($data[3+2*$i])+256*ord($data[4+2*$i]))/((1<<$owg_resoln[$i])-1) * $owg_range[$i])/1000;
+      $hash->{owg_val}->[$i]= (ord($data[2*$i])+256*ord($data[1+2*$i]) )/(1<<$owg_resoln[$i]) * $owg_range[$i]/1000;
     }
   #=============== get the alarm reading ===============================
   } elsif ( $page eq "alarm" ) {
     for( $i=0;$i<int(@owg_fixed);$i++){
-      $owg_vlow[$i]  = int(ord($data[3+2*$i])/255 * $owg_range[$i])/1000;
-      $owg_vhigh[$i] = int(ord($data[4+2*$i])/255 * $owg_range[$i])/1000;
+      $hash->{owg_vlow}->[$i]  = int(ord($data[2*$i])/256 * $owg_range[$i]+0.5)/1000;
+      $hash->{owg_vhigh}->[$i] = int(ord($data[1+2*$i])/256 * $owg_range[$i]+0.5)/1000;
     }
   #=============== get the status reading ===============================
-  } elsif ( $page eq "status" ) {
-   my ($sb1,$sb2);
-   for( $i=0;$i<int(@owg_fixed);$i++){
-      $sb1 = ord($data[3+2*$i]); 
-      $sb2 = ord($data[3+2*$i+1]);
+  } elsif ( $page eq "status" ) {  
+    my ($sb1,$sb2);
+    for( my $i=0;$i<int(@owg_fixed);$i++){
+      $sb1 = ord($data[2*$i]); 
+      $sb2 = ord($data[1+2*$i]);
+      
+      #Log 1,"VOR TEST sb1=$sb1 sb2=$sb2 UND mit 128 ist ".($sb1 && 128);
       
       #-- normal operation 
-      if( $sb1 && 128) {
+      if( ($sb1 && 128)==0) {
         #-- put into globals
         $owg_mode[$i]   =  "input";
         $owg_resoln[$i] =  ($sb1 & 15);
         $owg_resoln[$i] = 16 
           if ($owg_resoln[$i] == 0);
-        $owg_range[$i]  =  ($sb2 & 1) ? 5100 : 2550;
+        $owg_range[$i]  =  ($sb2 & 1) ? 5120 : 2560;
         
+        my $an;
         #-- low alarm disabled
         if( ($sb2 & 4)==0 ){  
           $an = 0;
@@ -1302,8 +1367,8 @@ sub OWXAD_GetPage($$) {
           }else{
             $an = 2;
           }
-        }  
-        $owg_slow[$i]= $an;
+        } 
+        $hash->{owg_slow}->[$i]= $an;
    
         #-- high alarm disabled
         if( ($sb2 & 8)==0 ){  
@@ -1317,16 +1382,20 @@ sub OWXAD_GetPage($$) {
             $an = 2;
           }
         }   
-        $owg_shigh[$i]= $an;
+        $hash->{owg_shigh}->[$i]= $an;
       #-- output operation     
       } else {
         $owg_mode[$i]   =  "output";
         #-- assemble status string
-        $owg_status[$i] = $owg_mode[$i].", ";
-        $owg_status[$i] .=  ($sb1 & 64 ) ? "ON" : "OFF";
+        $hash->{owg_status}->[$i] = $owg_mode[$i].", ";
+        $hash->{owg_status}->[$i] .=  ($sb1 & 64 ) ? "ON" : "OFF";
       }
     }
   } 
+  
+  #my $value=OWAD_FormatValues($hash);
+  #Log 5, $value;
+  
   return undef
 }
 
@@ -1357,9 +1426,12 @@ sub OWXAD_SetPage($$) {
     #   \x55\x10\x00 reading 8 data bytes and 2 CRC bytes
     $select="\x55\x10\x00";
     for( $i=0;$i<int(@owg_fixed);$i++){
-      $select .= sprintf "%c\xFF\xFF\xFF",int($owg_vlow[$i]*255000/$owg_range[$i]);
-      $select .= sprintf "%c\xFF\xFF\xFF",int($owg_vhigh[$i]*255000/$owg_range[$i]);
+      $select .= sprintf "%c\xFF\xFF\xFF",int($hash->{owg_vlow}->[$i]*256000/$owg_range[$i]); 
+      $select .= sprintf "%c\xFF\xFF\xFF",int($hash->{owg_vhigh}->[$i]*256000/$owg_range[$i]);
     }
+     
+#++Use of uninitialized value within @owg_vlow in multiplication  at 
+#++/usr/share/fhem/FHEM/21_OWAD.pm line 1362.
   #=============== set the status ===============================
   } elsif ( $page eq "status" ) {
     my ($sb1,$sb2)=(0,0);
@@ -1372,15 +1444,15 @@ sub OWXAD_SetPage($$) {
         #-- resolution (TODO: check !)
         $sb1 = $owg_resoln[$i] & 15;
         #-- alarm enabled        
-        if( defined($owg_slow[$i]) ){
-          $sb2   =  ( $owg_slow[$i] ne 0  ) ? 4 : 0;
+        if( defined($hash->{owg_slow}->[$i]) ){
+          $sb2   =  ( $hash->{owg_slow}->[$i] ne 0  ) ? 4 : 0;
         }
-        if( defined($owg_shigh[$i]) ){
-          $sb2  += ( $owg_shigh[$i] ne 0 ) ? 8 : 0;
+        if( defined($hash->{owg_shigh}->[$i]) ){
+          $sb2  += ( $hash->{owg_shigh}->[$i] ne 0 ) ? 8 : 0;
         }
         #-- range 
         $sb2 |= 1 
-          if( $owg_range[$i] > 2550 );
+          if( $owg_range[$i] > 2560 );
       } else {
         $sb1 = 128;
         $sb2 = 0;
@@ -1392,15 +1464,23 @@ sub OWXAD_SetPage($$) {
   } else {
     return "wrong memory page write attempt";
   } 
-  
-  OWX_Reset($master);
-  $res=OWX_Complex($master,$owx_dev,$select,0);
-  
-  #-- process results
-  if( $res eq 0 ){
+  #-- asynchronous mode
+  if( $hash->{ASYNC} ){
+    if (OWX_Execute( $master, "setpage", 1, $owx_dev, $select, 0, undef )) {
+		return undef;
+	} else {
     return "device $owx_dev not accessible for writing"; 
-  }
+    }
+  #-- synchronous mode
+  } else {
+    OWX_Reset($master);
+    $res=OWX_Complex($master,$owx_dev,$select,0);
   
+    #-- process results
+    if( $res eq 0 ){
+      return "device $owx_dev not accessible for writing"; 
+    }
+  }
   return undef;
 }
 
