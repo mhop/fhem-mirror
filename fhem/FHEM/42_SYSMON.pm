@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.3.2";
+my $VERSION = "1.3.3";
 
 use constant {
   DATE            => "date",
@@ -981,6 +981,13 @@ sub SYSMON_getFileSystemInfo ($$$)
 
   shift @filesystems;
   
+  # Falls kein Eintrag gefunden (z.B: kein Medium im Laufwerk), mit Nullen fuellen (damit die Plots richtig funktionieren).
+  if(defined $fDef) {
+  	$map->{$fName} = "Total: 0 MB, Used: 0 MB, 0 %, Available: 0 MB at ".$fs;
+  } else {
+    $map->{+FS_PREFIX.$fs} = "Total: 0 MB, Used: 0 MB, 0 %, Available: 0 MB at ".$fs;
+  }
+  
   if(!defined $filesystems[0]) { return $map; } # Ausgabe leer
   
   logF($hash, "SYSMON_getFileSystemInfo", "analyse line $filesystems[0]");
@@ -1001,13 +1008,14 @@ sub SYSMON_getFileSystemInfo ($$$)
     } else {
       $map->{+FS_PREFIX.$mnt_point} = $out_txt;
     }
-  } else {
-  	if(defined $fDef) {
-  		$map->{$fName} = "not available";
-  	} else {
-  	  $map->{+FS_PREFIX.$fs} = "not available";
-  	}
   }
+  # else {
+  #	if(defined $fDef) {
+  #		$map->{$fName} = "not available";
+  #	} else {
+  #	  $map->{+FS_PREFIX.$fs} = "not available";
+  #	}
+  #}
 
   return $map;
 }
