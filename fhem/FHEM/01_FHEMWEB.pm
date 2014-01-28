@@ -2389,7 +2389,7 @@ FW_ActivateInform()
     Enable the webfrontend on port &lt;tcp-portnr&gt;. If global is specified,
     then requests from all interfaces (not only localhost / 127.0.0.1) are
     serviced.<br>
-    To enable listening on IPV6 see the comments <a href="#port">here</a>.
+    To enable listening on IPV6 see the comments <a href="#telnet">here</a>.
     <br><br>
     Feature: http://host:port/fhem/icons/&lt;devicename&gt; will return
     the icon associated with the current status of &lt;devicename&gt;.
