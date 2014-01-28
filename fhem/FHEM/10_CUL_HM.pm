@@ -5355,7 +5355,7 @@ sub CUL_HM_setAttrIfCh($$$$) {
 sub CUL_HM_noDup(@) {#return list with no duplicates
   my %all;
   return "" if (scalar(@_) == 0);
-  $all{$_}=0 foreach (grep !/^$/,@_);
+  $all{$_}=0 foreach (grep {defined $_ && $_ !~ m/^$/} @_);
   delete $all{""}; #remove empties if present
   return (sort keys %all);
 }
