@@ -84,14 +84,19 @@ FW_longpoll()
 
   FW_pollConn = new XMLHttpRequest();
 
-  var filter="", embArr = document.getElementsByTagName("embed");
-  for(var i = 0; i < embArr.length; i++) {
-    var svg = embArr[i].getSVGDocument();
-    if(svg &&
-       svg.firstChild &&
-       svg.firstChild.nextSibling &&
-       svg.firstChild.nextSibling.getAttribute("flog"))
-      filter=".*";
+  var filter = document.body.getAttribute("longpollfilter");
+  if(filter == null)
+    filter = "";
+  if(filter == "") {
+    var embArr = document.getElementsByTagName("embed");
+    for(var i = 0; i < embArr.length; i++) {
+      var svg = embArr[i].getSVGDocument();
+      if(svg &&
+         svg.firstChild &&
+         svg.firstChild.nextSibling &&
+         svg.firstChild.nextSibling.getAttribute("flog"))
+        filter=".*";
+    }
   }
   if(filter == "") {
     var sa = document.location.search.substring(1).split("&");
@@ -107,6 +112,9 @@ FW_longpoll()
     name = name.substring(0,name.length-5);
     filter=".*;iconPath="+name;
   }
+  var iP = document.body.getAttribute("iconPath");
+  if(iP != null)
+    filter = filter +";iconPath="+iP;
 
   var query = document.location.pathname+"?XHR=1"+
                 "&inform=type=status;filter="+filter+
