@@ -686,7 +686,8 @@ sub HMLAN_SimpleWrite(@) {#####################################################
     my $hDst = $hash->{helper}{$dst};# shortcut
     my $tn = gettimeofday();
     
-    if($modules{CUL_HM}{defptr}{$dst} && 
+    if($typ ne "02" &&
+       $modules{CUL_HM}{defptr}{$dst} && 
        $modules{CUL_HM}{defptr}{$dst}{helper}{io} &&
        $modules{CUL_HM}{defptr}{$dst}{helper}{io}{nextSend}
        ){
