@@ -1097,7 +1097,7 @@ sub HMinfo_status($){##########################################################
   delete $tmp{""}; #remove empties if present
   @IOdev = sort keys %tmp;
   foreach (grep {$defs{$_}{READINGS}{cond}} @IOdev){
-    $_ .= " :".$defs{$_}{READINGS}{cond}{VAL};
+    $_ .= ",:".$defs{$_}{READINGS}{cond}{VAL};
   }
   $hash->{I_HM_IOdevices}= join",",@IOdev;
 
