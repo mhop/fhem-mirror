@@ -1,6 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: DASHBOARD: Use longpoll to update content.
+			 rowcentercolwidth can now be defined per column.
+			 Dashboard can hide FHEMWEB Roomliste and Header => Fullsizemode.
   - bugfix:  SYSMON: null reading for absent mount points
   - feature: DbLog: jokers "%" in device/reading definition are now possible
   - feature: SYSMON: new CPU Statistics and Plots
