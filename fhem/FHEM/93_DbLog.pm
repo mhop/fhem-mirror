@@ -1,4 +1,5 @@
 
+ 
 ##############################################
 # $Id$
 #
@@ -423,7 +424,7 @@ sub DbLog_Log($$) {
   my $DbLogType = AttrVal($hash->{NAME}, "DbLogType", "Current/History");
       
   #one Transaction
-  #eval {    
+  eval {    
     for (my $i = 0; $i < $max; $i++) {
       my $s = $dev->{CHANGED}[$i];
       $s = "" if(!defined($s));
@@ -473,7 +474,7 @@ sub DbLog_Log($$) {
 
       }
     } 
-  #};
+  };
   
   return "";
 }
@@ -663,12 +664,17 @@ DbLog_Get($@)
     $inf = "history";
   }
 
+  if($outf eq "int" && $inf eq "current") {
+    $inf = "history";
+    Log3 $hash->{NAME}, 3, "Defining DbLog SVG-Plots with :CURRENT is deprecated. Please define DbLog SVG-Plots with :HISTORY instead of :CURRENT. (define <mySVG> SVG <DbLogDev>:<gplotfile>:HISTORY)";
+  }
+
   if($outf eq "int") {
     $outf = "-";
     $internal = 1;
   } elsif($outf eq "array"){
 
-  } elsif(uc($outf) eq "webchart") {
+  } elsif(lc($outf) eq "webchart") {
     # redirect the get request to the chartQuery function
     return chartQuery($hash, @_);
   }
@@ -788,7 +794,7 @@ DbLog_Get($@)
       $sth->bind_columns(undef, \$sql_timestamp, \$sql_device, \$sql_reading, \$sql_value, \$type, \$event, \$unit);
     }
     else {
-      $sth->bind_columns(undef, \$sql_timestamp, \$sql_value);
+      $sth->bind_columns(undef, \$sql_timestamp, \$sql_device, \$sql_reading, \$sql_value);
     }
 
     if ($outf =~ m/(all)/) {
