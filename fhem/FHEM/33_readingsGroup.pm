@@ -23,6 +23,9 @@ package main;
 use strict;
 use warnings;
 
+use vars qw($FW_ME);
+use vars qw($FW_subdir);
+use vars qw($FW_wname);
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 sub readingsGroup_Initialize($)
@@ -279,10 +282,10 @@ readingsGroup_2html($)
     my $ret;
     $ret .= "<table>";
     my $txt = AttrVal($d, "alias", $d);
-    $txt = "<a href=\"/fhem?detail=$d\">$txt</a>" if( $show_links );
+    $txt = "<a href=\"$FW_ME$FW_subdir?detail=$d\">$txt</a>" if( $show_links );
     $ret .= "<tr><td><div class=\"devType\">$txt</a></div></td></tr>" if( $show_heading );
     $ret .= "<tr><td><table class=\"block wide\">";
-    #$ret .= "<div class=\"devType\"><a style=\"color:#ff8888\" href=\"/fhem?detail=$d\">readingsGroup $txt is disabled.</a></div>";
+    #$ret .= "<div class=\"devType\"><a style=\"color:#ff8888\" href=\"$FW_ME$FW_subdir?detail=$d\">readingsGroup $txt is disabled.</a></div>";
     $ret .= "<td><div style=\"color:#ff8888;text-align:center\">disabled</div></td>";
     $ret .= "</table></td></tr>";
     $ret .= "</table>";
@@ -331,7 +334,7 @@ readingsGroup_2html($)
   my $ret;
   $ret .= "<table>";
   my $txt = AttrVal($d, "alias", $d);
-  $txt = "<a href=\"/fhem?detail=$d\">$txt</a>" if( $show_links );
+  $txt = "<a href=\"$FW_ME$FW_subdir?detail=$d\">$txt</a>" if( $show_links );
   $ret .= "<tr><td><div class=\"devType\">$txt</a></div></td></tr>" if( $show_heading );
   $ret .= "<tr><td><table $style class=\"block wide\">";
   $ret .= "<tr><td colspan=\"99\"><div style=\"color:#ff8888;text-align:center\">updates disabled</div></tr>" if( $disable > 0 );
@@ -494,7 +497,7 @@ readingsGroup_2html($)
           $row++;
         }
 
-        $txt = "<a href=\"/fhem?detail=$name\">$txt</a>" if( $show_links );
+        $txt = "<a href=\"$FW_ME$FW_subdir?detail=$name\">$txt</a>" if( $show_links );
         $v = "<div $value_style>$v</div>" if( $value_style && !$devStateIcon );
 
         $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>" if( $first || $multi == 1 );

@@ -9,6 +9,9 @@ use POSIX;
 #use JSON;
 #use Data::Dumper;
 
+use vars qw($FW_ME); 
+use vars qw($FW_subdir); 
+use vars qw($FW_wname); 
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 my $LightScene_hasJSON = 1;
