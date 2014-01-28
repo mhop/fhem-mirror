@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - bugfix:  SYSMON: another format for ifconfig output
   - feature: DASHBOARD: Use longpoll to update content.
 			 rowcentercolwidth can now be defined per column.
 			 Dashboard can hide FHEMWEB Roomliste and Header => Fullsizemode.

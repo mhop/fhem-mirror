@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.3.3";
+my $VERSION = "1.3.4";
 
 use constant {
   DATE            => "date",
@@ -1040,18 +1040,45 @@ sub SYSMON_getNetworkInfo ($$$)
   #my @dataThroughput = qx($cmd);
   my @dataThroughput = SYSMON_execute($hash, $cmd);
   #Log 3, "SYSMON>>>>>>>>>>>>>>>>> ".$dataThroughput[0];
+  
+  #--- DEBUG ---
+  if($device eq "_test_") {
+  	@dataThroughput = (
+  	"enp4s0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1492",
+  	"        inet 192.168.2.7  netmask 255.255.255.0  broadcast 192.168.2.255",
+  	"        ether 00:21:85:5a:0d:e0  txqueuelen 1000  (Ethernet)",
+  	"        RX packets 1553313  bytes 651891540 (621.6 MiB)",
+  	"        RX errors 0  dropped 0  overruns 0  frame 0",
+  	"        TX packets 1915387  bytes 587386206 (560.1 MiB)",
+  	"        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0");
+  }
+  #--- DEBUG ---
 
   # check if network available
   if (index($dataThroughput[0], 'Fehler') < 0 && index($dataThroughput[0], 'error') < 0)
-  {  
+  {
   	#Log 3, "SYSMON>>>>>>>>>>>>>>>>> OK >>>".$dataThroughput[0];
     my $dataThroughput = undef;
+    
+    # Suche nach der Daten in Form:
+    # eth0      Link encap:Ethernet  Hardware Adresse b8:27:eb:a5:e0:85
+    #           inet Adresse:192.168.0.10  Bcast:192.168.0.255  Maske:255.255.255.0
+    #           UP BROADCAST RUNNING MULTICAST  MTU:1500  Metrik:1
+    #           RX packets:339826 errors:0 dropped:45 overruns:0 frame:0
+    #           TX packets:533293 errors:0 dropped:0 overruns:0 carrier:0
+    #           Kollisionen:0 Sendewarteschlangenlänge:1000
+    #           RX bytes:25517384 (24.3 MiB)  TX bytes:683970999 (652.2 MiB)
+
     foreach (@dataThroughput) {
       if(index($_, 'RX bytes') >= 0) {
         $dataThroughput = $_;
+        last;
       }
     }
 
+    my $rxRaw = -1;
+    my $txRaw = -1;
+    
     if(defined $dataThroughput) {
       # remove RX bytes or TX bytes from string
       $dataThroughput =~ s/RX bytes://;
@@ -1059,30 +1086,57 @@ sub SYSMON_getNetworkInfo ($$$)
       $dataThroughput = trim($dataThroughput);
 
       @dataThroughput = split(/ /, $dataThroughput); # return of split is array
+      $rxRaw = $dataThroughput[0] if(defined $dataThroughput[0]);
+      $txRaw = $dataThroughput[4] if(defined $dataThroughput[4]);
+    } else {
+    	#
+    	# an manchen Systemen kann die Ausgabe leider auch anders aussehen:
+    	# enp4s0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1492
+      #         inet 192.168.2.7  netmask 255.255.255.0  broadcast 192.168.2.255
+      #         ether 00:21:85:5a:0d:e0  txqueuelen 1000  (Ethernet)
+      #         RX packets 1553313  bytes 651891540 (621.6 MiB)
+      #         RX errors 0  dropped 0  overruns 0  frame 0
+      #         TX packets 1915387  bytes 587386206 (560.1 MiB)
+      #         TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+    	#
+    	my $d;
+    	foreach $d (@dataThroughput) {
+    		if($d =~ m/RX\s.*\sbytes\s(\d*)\s/) {
+	        $rxRaw = $1;
+        }
+        if($d =~ m/TX\s.*\sbytes\s(\d*)\s/) {
+	        $txRaw = $1;
+        }
+      }
     }
+    
+    if($rxRaw<0) {
+    	# Daten nicht gefunden / Format unbekannt
+    	$map->{$nName} = "unexpected format";
+  	  $map->{$nName.DIFF_SUFFIX} = "unexpected format";
+    } else {
+      $rxRaw = $rxRaw / 1048576; # Bytes in MB
+      $txRaw = $txRaw / 1048576;
+    	
+      my $rx = sprintf ("%.2f", $rxRaw);
+      my $tx = sprintf ("%.2f", $txRaw);
+      my $totalRxTx = $rx + $tx;
 
-    my $rxRaw = 0;
-    $rxRaw = $dataThroughput[0] / 1024 / 1024 if(defined $dataThroughput[0]);
-    my $txRaw = 0;
-    $txRaw = $dataThroughput[4] / 1024 / 1024 if(defined $dataThroughput[4]);
-    my $rx = sprintf ("%.2f", $rxRaw);
-    my $tx = sprintf ("%.2f", $txRaw);
-    my $totalRxTx = $rx + $tx;
+      my $out_txt = "RX: ".$rx." MB, TX: ".$tx." MB, Total: ".$totalRxTx." MB";
+      $map->{$nName} = $out_txt;
 
-    my $out_txt = "RX: ".$rx." MB, TX: ".$tx." MB, Total: ".$totalRxTx." MB";
-    $map->{$nName} = $out_txt;
+      my $lastVal = ReadingsVal($hash->{NAME},$device,"RX: 0 MB, TX: 0 MB, Total: 0 MB");
+      my ($d0, $o_rx, $d1, $d2, $o_tx, $d3, $d4, $o_tt, $d5) = split(/\s+/, trim($lastVal));
 
-    my $lastVal = ReadingsVal($hash->{NAME},$device,"RX: 0 MB, TX: 0 MB, Total: 0 MB");
-    my ($d0, $o_rx, $d1, $d2, $o_tx, $d3, $d4, $o_tt, $d5) = split(/\s+/, trim($lastVal));
-
-    my $d_rx = $rx-$o_rx;
-    if($d_rx<0) {$d_rx=0;}
-    my $d_tx = $tx-$o_tx;
-    if($d_tx<0) {$d_tx=0;}
-    my $d_tt = $totalRxTx-$o_tt;
-    if($d_tt<0) {$d_tt=0;}
-    my $out_txt_diff = "RX: ".sprintf ("%.2f", $d_rx)." MB, TX: ".sprintf ("%.2f", $d_tx)." MB, Total: ".sprintf ("%.2f", $d_tt)." MB";
-    $map->{$nName.DIFF_SUFFIX} = $out_txt_diff;
+      my $d_rx = $rx-$o_rx;
+      if($d_rx<0) {$d_rx=0;}
+      my $d_tx = $tx-$o_tx;
+      if($d_tx<0) {$d_tx=0;}
+      my $d_tt = $totalRxTx-$o_tt;
+      if($d_tt<0) {$d_tt=0;}
+      my $out_txt_diff = "RX: ".sprintf ("%.2f", $d_rx)." MB, TX: ".sprintf ("%.2f", $d_tx)." MB, Total: ".sprintf ("%.2f", $d_tt)." MB";
+      $map->{$nName.DIFF_SUFFIX} = $out_txt_diff;
+    }
   } else {
   	#Log 3, "SYSMON>>>>>>>>>>>>>>>>> NOK ";
   	#Log 3, "SYSMON>>>>>>>>>>>>>>>>> >>> ".$nName;
