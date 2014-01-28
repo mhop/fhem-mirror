@@ -2,13 +2,13 @@
 // dashboard.js
 //########################################################################################
 // Released : 14.11.2013 @svenson08
-// Version  : 1.00
-// Revisions:
+// Version : 
 // 1.01: Released to testers 
 // 1.02: Add DebugMsg. Fix independent Groupsize adjustment after set & siterefresh. Fix
 //			wrong set of +Toogle Icon on Siderefresh
 // 2.00: First Changes vor Dashboard Tabs. Change method store Positiondata. optimization restore Positiondata. Clear poor routines.
 //			  Change max/min Values for Groupresize.	Top- and Bottom-Row always 100%
+// 2.01: Add Longpoll function. Dashboard can hide FHEMWEB Roomliste and Header.
 // Known Bugs/Todo's
 // See 95_Dashboard.pm
 //########################################################################################
@@ -55,8 +55,8 @@ function restoreOrder() {
  var params = (document.getElementById("dashboard_attr").value).split(","); //get current Configuration
  var ActiveTab = $("#tabs .ui-tabs-panel:visible");
  var ActiveTabId = ActiveTab.attr("id").substring(14,13);
- var colwidth = ((100/params[7])-(0.5/params[7]))+"%"; //current
- //var aColWidth = GetColWidth(params[7],params[12]); //future
+ //var colwidth = ((100/params[7])-(0.5/params[7]))+"%"; //current
+ var aColWidth = GetColWidth(params[7],params[12]); //future
 
  //--------------------------------------------- Set Row and Column Settings --------------------------------------------------------------------------------------------
  $("#dashboard").width(params[1]);
@@ -65,8 +65,8 @@ function restoreOrder() {
  if (ActiveTab.has("#dashboard_rowbottom_tab"+ActiveTabId).length){ $("#dashboard_rowbottom_tab"+ActiveTabId).height(params[9]); } 
 
  for (var i = 0, n = params[7]; i <= n; i++) {  
-	if (ActiveTab.has("#dashboard_tab"+ActiveTabId+"column"+i).length) { $("#dashboard_tab"+ActiveTabId+"column"+i).width(colwidth); } //current
-	//if (ActiveTab.has("#dashboard_tab"+ActiveTabId+"column"+i).length) { $("#dashboard_tab"+ActiveTabId+"column"+i).width(aColWidth[i]+"%"); } //future
+	//if (ActiveTab.has("#dashboard_tab"+ActiveTabId+"column"+i).length) { $("#dashboard_tab"+ActiveTabId+"column"+i).width(colwidth); } //current
+	if (ActiveTab.has("#dashboard_tab"+ActiveTabId+"column"+i).length) { $("#dashboard_tab"+ActiveTabId+"column"+i).width(aColWidth[i]+"%"); } //future
  }	
  if (params[2] == 1) { $(".ui-row").addClass("dashboard_columnhelper"); } else { $(".ui-row").removeClass("dashboard_columnhelper"); }//set showhelper
  //--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -226,7 +226,14 @@ $(document).ready( function () {
 	//--------------------------------- Attribute des Dashboards ------------------------------------------------------------------
 	var params = (document.getElementById("dashboard_attr").value).split(","); //get current Configuration
 	//-------------------------------------------------------------------------------------------------------------------------------------
+	$("body").attr("longpollfilter", ".*") //need for longpoll
 
+	if (params[13] == 1){ //disable roomlist and header	
+		$("#menuScrollArea").remove();
+		$("#hdr").remove();
+		$("#content").css({position:   'inherit'});	
+	}
+	
     $(".dashboard_column").sortable({
         connectWith: ['.dashboard_column', '.ui-row'],
 		cursor: 'move',
