@@ -1129,9 +1129,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegType{"HM-CC-TC03"};
   THSensor         =>{ peerChan      =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"},
   virtual          =>{ peerChan      =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"
                       ,press         =>"[long|short]..."
-                      ,postEvent     =>"<condition>"
-                      ,postWeather   =>"<off| -80..80 degree>"
-                      },
+                      ,postEvent     =>"<condition>"},
   smokeDetector    =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] actor"},
   winMatic         =>{ matic         =>"<btn>"
                       ,keydef        =>"<btn> <txt1> <txt2>"
@@ -1274,8 +1272,8 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                          ,alarmOff      =>""
                          ,teamCall      =>""
                         },
-  vdCtrl              =>{ valvePos      =>"<position>"
-                        }
+  vdCtrl              =>{ valvePos      =>"<position>"},
+  virtThSens          =>{ virtTh        =>"<temp>"}
 );
 
                       
