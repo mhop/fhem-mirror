@@ -321,7 +321,8 @@ LaCrosse_Attr(@)
   <ul>
     <li>replaceBatteryForSec &lt;sec&gt; [ignore_battery]<br>
     sets the device for &lt;sec&gt; seconds into replace battery mode. the first unknown address that is
-    received will replace the current device address;
+    received will replace the current device address. this can be partly automated with a readings group configured
+    to show the battery state of all LaCrosse devices and a link/command to set replaceBatteryForSec on klick.
     </li>
   </ul><br>
 
