@@ -3149,42 +3149,58 @@ sub CUL_HM_Set($@) {
     my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
     CUL_HM_PushCmdStack($hash,"++A03F$id${dst}0204$s2000");
   }
-  elsif($cmd eq "valvePos") { #################################################
-    return "only number <= 100  or 'off' allowed"
-       if (!($a[2] eq "off" ||$a[2]+0 ne $a[2] ||$a[2] <=100 ));
-    if ($a[2] eq "off"){
+  elsif($cmd =~ m/^(valvePos|virtTemp)$/) { ###################################
+    my $val = $a[2];
+    if ($val eq "off"){
       $state = "ValveAdjust:stopped";
       RemoveInternalTimer("valvePos:$dst$chn");# remove responsePending timer
       RemoveInternalTimer("valveTmr:$dst$chn");# remove responsePending timer
       delete($hash->{helper}{virtTC});
     }
     else {
-      my $vp = $a[2];
-      my @pId = grep !/^$/,split(',',AttrVal($name,"peerIDs",""));
-      return "virtual TC support one VD only. Correct number of peers"
-        if (scalar @pId != 1);
-      my $ph = CUL_HM_id2Hash($pId[0]);
-      return "peerID $pId[0] is not assigned to a device " if (!$ph);
-      $hash->{helper}{vd}{id} = substr($pId[0],0,6);
-      CUL_HM_UpdtReadBulk($ph,1,
-                       "state:set_$vp %",
-                       "ValveDesired:$vp %");
-
-      CUL_HM_UpdtReadSingle($hash,"valvePosTC","$vp %",1);
+      my %lim = (valvePos =>{min=>0  ,max=>100},
+                 virtTemp =>{min=>-20,max=>50 });
+      return "level between $lim{$cmd}{min} and $lim{$cmd}{max} or 'off' allowed"
+           if (!($val+0 ne $val ||
+                 $val <=$lim{$cmd}{max}||$val >=$lim{$cmd}{min} ));                 
+      if ($cmd eq "valvePos"){
+        my @pId = grep !/^$/,split(',',AttrVal($name,"peerIDs",""));
+        return "virtual TC support one VD only. Correct number of peers"
+          if (scalar @pId != 1);
+        my $ph = CUL_HM_id2Hash($pId[0]);
+        return "peerID $pId[0] is not assigned to a device " if (!$ph);
+        $hash->{helper}{vd}{typ} = 1; #valvePos
+        $hash->{helper}{vd}{id}  = $pId[0];
+        $hash->{helper}{vd}{cmd} = "A258$dst".substr($pId[0],0,6);
+        CUL_HM_UpdtReadBulk($ph,1,
+                         "state:set_$val %",
+                         "ValveDesired:$val %");
+        CUL_HM_UpdtReadSingle($hash,"valvePosTC","$val %",1);
+        $hash->{helper}{vd}{val} = sprintf("%02X",($val * 2.56)%256);
+        $state = "ValveAdjust:$val %";
+      }
+      else{#virtTemp
+        CUL_HM_UpdtReadSingle($hash,"temperature",$val,1);
+        $hash->{helper}{vd}{typ} = 2; #virtTemp
+        $hash->{helper}{vd}{cmd} = "8670$dst"."000000";
+        $val *=10;
+        $val -= 0x8000 if ($val < 0);
+        $hash->{helper}{vd}{val} = sprintf("%04X", $val & 0x7fff);
+      }
+      
       $hash->{helper}{vd}{idh} = hex(substr($dst,2,2))*20077;
       $hash->{helper}{vd}{idl} = hex(substr($dst,4,2))*256;
       $hash->{helper}{vd}{msgCnt} = 1 if (!defined $hash->{helper}{vd}{msgCnt});
       if (!$hash->{helper}{virtTC}){
         $hash->{helper}{vd}{ackT} = "" if (!defined$hash->{helper}{vd}{ackT});
         $hash->{helper}{vd}{miss} = 0  if (!defined$hash->{helper}{vd}{miss});
+        $hash->{helper}{virtTC}   = ($cmd eq "valvePos")?"03":"00";
+        CUL_HM_UpdtReadSingle($hash,"valveCtrl","init",1)if ($cmd eq "valvePos");
         $hash->{helper}{vd}{next} = gettimeofday() 
               if (!defined $hash->{helper}{vd}{next});
-        $hash->{helper}{virtTC} = "03";
         CUL_HM_valvePosUpdt("valvePos:$dst$chn");
-        CUL_HM_UpdtReadSingle($hash,"valveCtrl","init",1)
       };
-      $hash->{helper}{virtTC} = "03";
-      $state = "ValveAdjust:$vp %";
+      $hash->{helper}{virtTC} = ($cmd eq "valvePos")?"03":"00";
     }
   }
   elsif($cmd eq "matic") { ####################################################
@@ -3352,27 +3368,6 @@ sub CUL_HM_Set($@) {
                             ,"trigLast:$name:$cond");
     }
   }
-  elsif($cmd eq "postWeather") { ##############################################
-    #add thermal event simulator
-    my (undef,undef,$temp) = @a;
-    if ($temp eq "off"){
-      RemoveInternalTimer("weather:$name");
-      delete $hash->{postWeather};
-      delete $hash->{helper}{weather};
-      return;
-    }
-    return "temp value:$temp outside +-80 degree" 
-          if (($temp !~ m/[+-]?\d+/) || (abs($temp) > 80) );
-    $hash->{postWeather} = $temp;#show User the Data
-    $temp *= 10;
-    $temp -= 0x8000 if ($temp < 0);
-    $temp = sprintf("%04X", $temp & 0x7fff);
-    if (!defined $hash->{helper}{weather}){# new entry - start timer
-      RemoveInternalTimer("weather:$name");# avoid duplicate
-      CUL_HM_weather("weather:$name");
-    }
-    $hash->{helper}{weather} = $temp;
-  }
   elsif($cmd eq "peerChan") { ############################################# reg
     #peerChan <btnN> <device> ... [single|dual] [set|unset] [actor|remote|both]
     my ($bNo,$peerN,$single,$set,$target) = ($a[2],$a[3],($a[4]?$a[4]:"dual"),
@@ -3514,15 +3509,12 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   my $hi = ($hash->{helper}{vd}{idh}+$idl*198)&0xff;
   my $nextTimer = (($lo+$hi)&0xff)/4 + 120;#original - instable
   my $name = $hash->{NAME};
-  my $vp = ReadingsVal($name,"valvePosTC","15 %");
-  $vp =~ s/ %//;
-  $vp *=2.56;
-  $vp = 255 if ($vp >255);
 
-  CUL_HM_PushCmdStack($hash,sprintf("%02XA258%s%s%s%02X"
-                                      ,$msgCnt,substr($vId,0,6)
-                                      ,$hash->{helper}{vd}{id}
-                                      ,$hash->{helper}{virtTC},$vp));
+  CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
+                                      ,$msgCnt
+                                      ,$hash->{helper}{vd}{cmd}
+                                      ,$hash->{helper}{virtTC}
+                                      ,$hash->{helper}{vd}{val}));
 
   my $tn = gettimeofday();
   $hash->{helper}{vd}{nextF} = $hash->{helper}{vd}{next} + $nextTimer;
@@ -3536,25 +3528,30 @@ sub CUL_HM_valvePosTmr(@) {#calc next vd wakeup
   my($in ) = @_;
   my(undef,$vId) = split(':',$in);
   my $hash = CUL_HM_id2Hash($vId); 
-  
-  my $pn = CUL_HM_id2Name($hash->{helper}{vd}{id});
-  my $ackTime = ReadingsTimestamp($pn, "ValvePosition", "");
-  my $vc;
-  if (!$ackTime || $ackTime eq $hash->{helper}{vd}{ackT} ){
-    $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextF};
-    $vc = (++$hash->{helper}{vd}{miss} > 5)
+
+  if ($hash->{helper}{vd}{typ} == 1){
+    my $pn = CUL_HM_id2Name($hash->{helper}{vd}{id});
+    my $ackTime = ReadingsTimestamp($pn, "ValvePosition", "");
+    my $vc;
+    if (!$ackTime || $ackTime eq $hash->{helper}{vd}{ackT} ){
+      $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextF};
+      $vc = (++$hash->{helper}{vd}{miss} > 5)
                                           ?"lost"
                                           :"miss_".$hash->{helper}{vd}{miss};
-    Log3 $hash->{NAME},5,"CUL_HM $hash->{NAME} virtualTC use fail-timer";
+      Log3 $hash->{NAME},5,"CUL_HM $hash->{NAME} virtualTC use fail-timer";
+    }
+    else{
+      $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextM};
+      $vc = "ok";
+      $hash->{helper}{vd}{miss} = 0;
+    }
+    CUL_HM_UpdtReadSingle($hash,"valveCtrl",$vc,1)
+          if(ReadingsVal($hash->{NAME},"valveCtrl","") ne $vc);
+    $hash->{helper}{vd}{ackT} = $ackTime;
   }
   else{
     $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextM};
-    $vc = "ok";
-    $hash->{helper}{vd}{miss} = 0;
   }
-  CUL_HM_UpdtReadSingle($hash,"valveCtrl",$vc,1)
-          if(ReadingsVal($hash->{NAME},"valveCtrl","") ne $vc);
-  $hash->{helper}{vd}{ackT} = $ackTime;
   InternalTimer($hash->{helper}{vd}{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
 }
 sub CUL_HM_weather(@) {#periodically send weather data
@@ -4289,10 +4286,12 @@ sub CUL_HM_ID2PeerList ($$$) {
     my $st = AttrVal($dHash->{NAME},"subType","");
     if ($st eq "virtual"){
       #if any of the peers is an SD we are team master
-      my ($tMstr,$tcSim) = (0,0);
+      my ($tMstr,$tcSim,$thSim) = (0,0,0);
       foreach (split(",",$peerNames)){
         $tMstr = 1 if(AttrVal($_,"subType","") eq "smokeDetector");
         $tcSim = 1 if(AttrVal($_,"model","")   =~ m /(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/);
+        my $pch = (substr(CUL_HM_name2Id($_),6,2));
+        $thSim = 1 if(AttrVal($_,"model","")   =~ m /HM-CC-RT-DN/ && $pch eq "01");
       }
       if   ($tMstr){
         $hash->{helper}{fkt}="sdLead";
@@ -4301,6 +4300,8 @@ sub CUL_HM_ID2PeerList ($$$) {
       }
       elsif($tcSim){
         $hash->{helper}{fkt}="vdCtrl";}
+      elsif($thSim){
+        $hash->{helper}{fkt}="virtThSens";}
       else         {
         delete $hash->{helper}{fkt};}
       
@@ -6186,16 +6187,12 @@ sub CUL_HM_complConfig($)    {# read config if enabled and not complete
          implementation will not specify the duration for long. Only one trigger
          will be sent of type "long".
        </li>
-       <li><B>postEvent &lt;[0..200]&gt;<a name="CUL_HMpostEvents"></a></B>
-         simulates an event. A value must be given between 0 and 200.<br>
-         Alternally a literal ca be given as used by other sensors. enter <br>
-         postEvent ?<br>
-         to get options<br>
+       <li><B>virtTemp &lt;[off -10..50]&gt;<a name="CUL_HMvirtTemp"></a></B>
+         simulates a thermostat. If peered to a device it periodically sends the
+         temperature until "off" is given<br>
        </li>
-       <li><B>postWeather &lt;[off|-80..80]&gt;<a name="CUL_HMpostWeather"></a></B>
-         simulates an weather event, i.e. a thermo-sensor. The temperature will 
-         be send regularely. Peered channels may use those.<br>
-         To stop sending issue an 'off'<br>
+       <li><B>valvePos &lt;[off 0..100]&gt;<a name="CUL_HMvalvePos"></a></B>
+         stimulates a VD<br>
        </li>
        </ul>
     </li>
