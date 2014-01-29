@@ -1116,6 +1116,9 @@ FileLog_sampleDataFn($$$$$)
         If this attribute is not set, but nrarchive and/or archivecmd are set,
         then nrarchive old logfiles are kept along the current one while older
         ones are moved to archivedir (or deleted if archivedir is not set).
+        <br>
+        Note: setting these attributes for the global instance will effect the
+        <a href="#logfile">FHEM logfile</a> only.
         </li><br>
 
     <li><a href="#disable">disable</a></li>
