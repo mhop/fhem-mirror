@@ -1273,7 +1273,7 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                          ,teamCall      =>""
                         },
   vdCtrl              =>{ valvePos      =>"<position>"},
-  virtThSens          =>{ virtTh        =>"<temp>"}
+  virtThSens          =>{ virtTemp      =>"<temp>"}
 );
 
                       
