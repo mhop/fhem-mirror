@@ -476,7 +476,7 @@ while (1) {
 
   if($nfound < 0) {
     my $err = int($!);
-    next if ($err == 0);
+    next if($err==0 || $err==4); # 4==EINTR
 
     Log 1, "ERROR: Select error $nfound ($err), error count= $errcount";
     $errcount++;
