@@ -3510,11 +3510,19 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   my $nextTimer = (($lo+$hi)&0xff)/4 + 120;#original - instable
   my $name = $hash->{NAME};
 
-  CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
+  if ($hash->{helper}{vd}{typ} == 1){
+    CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
                                       ,$msgCnt
                                       ,$hash->{helper}{vd}{cmd}
                                       ,$hash->{helper}{virtTC}
                                       ,$hash->{helper}{vd}{val}));
+  }
+  else{
+    CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s"
+                                      ,$msgCnt
+                                      ,$hash->{helper}{vd}{cmd}
+                                      ,$hash->{helper}{vd}{val}));
+  }
 
   my $tn = gettimeofday();
   $hash->{helper}{vd}{nextF} = $hash->{helper}{vd}{next} + $nextTimer;
