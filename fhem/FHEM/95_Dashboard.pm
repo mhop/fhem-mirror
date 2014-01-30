@@ -4,8 +4,7 @@
 #
 ########################################################################################
 # Released : 20.12.2013 @svenson08
-# Version  : 2.00
-# Revisions:
+# Version :
 # 1.00: Released to testers
 # 1.02: Don't show link on Groups with WebLinks. Hide GroupToogle Button (new Attribut dashboard_showtooglebuttons).
 #       Set the Columnheight (new Attribur dashboard_colheight).
@@ -31,15 +30,11 @@
 #		Provisionally the columns widths are dependent on the total width of the Dashboard.
 # 2.01: attibute dashboard_colwidth replace with dashboard_rowcentercolwidth. rowcentercolwidth can now be defined per 
 #			column. Delete Groups Attribut with Value 1. Dashboard can hide FHEMWEB Roomliste and Header => Fullscreenmode
+# 2.02: Tabs can set on top, bottom or hidden. Fix "variable $tabgroups masks earlier" Errorlog.
 #
 # Known Bugs/Todos:
-# x TODO: groups attribut with value 1 -> erase attribute?
-# x TODO: dashboard_colwidth -> <1.col, 2.col, 3.col ...> only <1.col>, first col = value, split rest on colcount.
-# TODO: Tab top, bottom, hidden
-# BUG: Longpoll dosen't work on Dashboard
 # BUG: wenn ich mehrere Tabs habe und zb. im Uten Tab eine Lampe schalte, springt er danach direkt in den ersten Tab. Finde ich etwas unglücklich.
 # TODO: Icon on Tabs
-# x NICETOHAVE: Ich würde mir jetzt noch wünschen, das ich den linken und oberen Bereich in einem Style ausblenden kann
 # Log 1, "[DASHBOARD simple debug] '".$g."' ";
 ########################################################################################
 #
@@ -84,7 +79,7 @@ my $fwjquery = "jquery.min.js";
 my $fwjqueryui = "jquery-ui.min.js";
 my $dashboardname = "Dashboard"; # Link Text
 my $dashboardhiddenroom = "DashboardRoom"; # Hiddenroom
-my $dashboardversion = "2.01";
+my $dashboardversion = "2.02";
 # -------------------------------------------------------------------------------------------
 
 sub Dashboard_Initialize ($) {
@@ -100,8 +95,7 @@ sub Dashboard_Initialize ($) {
 						 "dashboard_lockstate:unlock,lock ".
 						 "dashboard_rowtopheight ".
 						 "dashboard_rowbottomheight ".
-						 "dashboard_row:top,center,bottom,top-center,center-bottom,top-center-bottom ".
-						 "dashboard_showbuttonbar:top,bottom,hidden ".
+						 "dashboard_row:top,center,bottom,top-center,center-bottom,top-center-bottom ".						 
 						 "dashboard_showhelper:0,1 ".
 						 "dashboard_showtooglebuttons:0,1 ".						 
 						 
@@ -128,12 +122,15 @@ sub Dashboard_Initialize ($) {
 						 #new attribute vers. 2.01
 						 "dashboard_rowcentercolwidth ".
 						 "dashboard_showfullsize:0,1 ".
+						 #new attribute vers. 2.02
+						 "dashboard_showtabs:tabs-and-buttonbar-at-the-top,tabs-at-the-top-buttonbar-hidden,tabs-and-buttonbar-on-the-bottom,tabs-on-the-bottom-buttonbar-hidden,tabs-and-buttonbar-hidden ".
 						 
 						 #obsolete - erase in future releases
 						 "dashboard_groups ". # obsolet -> erase in future releases
 						 "dashboard_colheight ". # obsolet -> erase in future releases
 						 "dashboard_sorting ". # obsolet -> erase in future releases
 						 "dashboard_colwidth ". # obsolet -> erase in future releases
+						 "dashboard_showbuttonbar:dont-use-this-attribute ". # obsolet -> erase in future releases
 						 
 						 $readingFnAttributes;					  
 
@@ -141,29 +138,15 @@ sub Dashboard_Initialize ($) {
   $data{FWEXT}{Dashboardx}{LINK} = "?room=".$dashboardhiddenroom;
   $data{FWEXT}{Dashboardx}{NAME} = $dashboardname;	
 	
-  #$hash->{FW_detailFn}  = "Dashboard_detailFn";
-  #$hash->{FW_summaryFn}  = "Dashboard_detailFn";
-	
   return undef;
 }
-
-#sub Dashboard_detailFn()
-#{
-#  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
-#  return NewDashboardAsHtml($d);
-#}
-#sub NewDashboardAsHtml($)
-#{
-# my $ret = ""; 
-# $ret .= "<table class=\"roomoverview dashboard\" id=\"dashboard\">\n";
-# $ret .= "</table>\n";  
-#}
 
 sub DashboardAsHtml($)
 {
  my ($d) = @_;
  
  my $ret = "";
+ my $showbuttonbar = "hidden";
  my $debugfield = "hidden";
  
  my $h = $defs{$d};
@@ -173,16 +156,14 @@ sub DashboardAsHtml($)
  ######################### Read Dashboard Attributes and set Default-Values ####################################
  my $disable = AttrVal($defs{$d}{NAME}, "disable", 0);
  my $colcount = AttrVal($defs{$d}{NAME}, "dashboard_colcount", 1);
- #my $colwidth = AttrVal($defs{$d}{NAME}, "dashboard_colwidth", 320); #current
- my $colwidth = AttrVal($defs{$d}{NAME}, "dashboard_rowcentercolwidth", 100); #future
+ my $colwidth = AttrVal($defs{$d}{NAME}, "dashboard_rowcentercolwidth", 100);
  my $colheight = AttrVal($defs{$d}{NAME}, "dashboard_rowcenterheight", 400); 
  my $rowtopheight = AttrVal($defs{$d}{NAME}, "dashboard_rowtopheight", 250);
  my $rowbottomheight = AttrVal($defs{$d}{NAME}, "dashboard_rowbottomheight", 250); 
  my $showhelper = AttrVal($defs{$d}{NAME}, "dashboard_showhelper", 1);
- my $showbuttonbar = AttrVal($defs{$d}{NAME}, "dashboard_showbuttonbar", "top");
+ my $showtabs = AttrVal($defs{$d}{NAME}, "dashboard_showtabs", "tabs-and-buttonbar-at-the-top"); 
  my $showtooglebuttons = AttrVal($defs{$d}{NAME}, "dashboard_showtooglebuttons", 1); 
- my $showfullsize  = AttrVal($defs{$d}{NAME}, "dashboard_showfullsize", 0);
- 
+ my $showfullsize  = AttrVal($defs{$d}{NAME}, "dashboard_showfullsize", 0); 
  
  my $row = AttrVal($defs{$d}{NAME}, "dashboard_row", "center");
  my $debug = AttrVal($defs{$d}{NAME}, "dashboard_debug", "0");
@@ -229,12 +210,14 @@ sub DashboardAsHtml($)
  }
  
  if ($debug == 1) { $debugfield = "edit" }; 
+ if ($showtabs eq "tabs-and-buttonbar-at-the-top") { $showbuttonbar = "top"; }
+ if ($showtabs eq "tabs-and-buttonbar-on-the-bottom") { $showbuttonbar = "bottom"; }
  if ($showbuttonbar eq "hidden") { $lockstate = "lock" };
+ 
  if ($activetab > $tabcount) { $activetab = $tabcount; }
 
- $colwidth =~ tr/,/:/; #future release
- #if (not ($colwidth =~ /^\d+$/)) { $colwidth = 320 }; #current
- #if ( ($colwidth =~ /[a-zA-Z]/)) { $colwidth = 150 }; #current
+ $colwidth =~ tr/,/:/;
+ #if ($colwidth =~/[a-zA-Z]+$/) { Log 1, "[DASHBOARD simple debug] Nicht nur zahlen ".$colwidth; } #future release
 
  if (not ($colheight =~ /^\d+$/)) { $colheight = 400 };  
  if (not ($rowtopheight =~ /^\d+$/)) { $rowtopheight = 50 };
@@ -254,12 +237,16 @@ sub DashboardAsHtml($)
  $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_attr\" value=\"$name,$dbwidth,$showhelper,$lockstate,$showbuttonbar,$colheight,$showtooglebuttons,$colcount,$rowtopheight,$rowbottomheight,$tabcount,$activetab,$colwidth,$showfullsize\">\n";
  $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_jsdebug\" value=\"\">\n";
  $ret .= "</div></td></tr>\n"; 
- 
  $ret .= "<tr><td><div id=\"tabs\" class=\"dashboard_tabs\">\n";  
+ 
  ########################### Dashboard Tab-Liste ##############################################
- $ret .= "	<ul id=\"dashboard_tabnav\" class=\"dashboard_tabnav\">\n";		
- if ($showbuttonbar eq "top") { $ret .= BuildButtonBar($d,$showbuttonbar); }
- for (my $i=0;$i<$tabcount;$i++){ $ret .= "    <li class=\"dashboard_tab\"><a href=\"#dashboard_tab".$i."\">".trim($tabnames[$i])."</a></li>"; } 
+ my $tabshow = "hidden";	
+ if ($showtabs eq "tabs-and-buttonbar-at-the-top" || $showtabs eq "tabs-at-the-top-buttonbar-hidden") { $tabshow = "top";}
+ if ($showtabs eq "tabs-and-buttonbar-on-the-bottom" || $showtabs eq "tabs-on-the-bottom-buttonbar-hidden") { $tabshow = "bottom";}
+	
+ $ret .= "	<ul id=\"dashboard_tabnav\" class=\"dashboard_tabnav dashboard_tabnav_".$tabshow."\">\n";	 
+ if ($showtabs ne "tabs-at-the-top-buttonbar-hidden" &&  $showtabs ne "tabs-on-the-bottom-buttonbar-hidden" && $showtabs ne "tabs-and-buttonbar-hidden") { $ret .= BuildButtonBar($d,$showtabs); }
+ for (my $i=0;$i<$tabcount;$i++){ $ret .= "    <li class=\"dashboard_tab dashboard_tab_".$tabshow."\"><a href=\"#dashboard_tab".$i."\">".trim($tabnames[$i])."</a></li>"; } 
  $ret .= "	</ul>\n"; 
  ##############################################################################################
  
@@ -283,7 +270,6 @@ sub DashboardAsHtml($)
 	 $ret .= " 	</ul>\n";
 	 $ret .= "	</div>\n"; 
  }
- if ($showbuttonbar eq "bottom") { $ret .= BuildButtonBar($d,$showbuttonbar); }
  $ret .= "</div></td></tr>\n";
  $ret .= "</table>\n";
  
@@ -334,12 +320,19 @@ sub BuildDashboardBottomRow($$$$){
 
 sub BuildButtonBar($$){
  my ($d,$pos) = @_;
- my $ret;
- $ret .= "<div class=\"dashboard_buttonbar dashboard_buttonbar_".$pos."\">\n";
- $ret .= "	<div class=\"dashboard_button\"> <span class=\"dashboard_button_icon dashboard_button_iconset\"></span> <a id=\"dashboard_button_set\" href=\"javascript:dashboard_setposition()\" title=\"Set the Position\">Set</a> </div>\n";
- $ret .= "	<div class=\"dashboard_button\"> <a id=\"dashboard_button_lock\" href=\"javascript:dashboard_tooglelock()\" title=\"Lock Dashboard\">Lock</a> </div>\n";
- $ret .= "	<div class=\"dashboard_button\"> <span class=\"dashboard_button_icon dashboard_button_icondetail\"></span> <a id=\"dashboard_button_detail\" href=\"/fhem?detail=$d\" title=\"Dashboard Details\">Detail</a> </div>\n";		
- $ret .= "</div>\n";
+ my $ret = "";
+ my $cssclass = "hidden";
+ 
+ if ($pos eq "tabs-and-buttonbar-at-the-top") { $cssclass = "top"; }
+ if ($pos eq "tabs-and-buttonbar-on-the-bottom") { $cssclass = "bottom"; }
+ 
+ if ($pos ne "hidden") {
+	 $ret .= "<div class=\"dashboard_buttonbar dashboard_buttonbar_".$cssclass."\">\n";
+	 $ret .= "	<div class=\"dashboard_button\"> <span class=\"dashboard_button_icon dashboard_button_iconset\"></span> <a id=\"dashboard_button_set\" href=\"javascript:dashboard_setposition()\" title=\"Set the Position\">Set</a> </div>\n";
+	 $ret .= "	<div class=\"dashboard_button\"> <a id=\"dashboard_button_lock\" href=\"javascript:dashboard_tooglelock()\" title=\"Lock Dashboard\">Lock</a> </div>\n";
+	 $ret .= "	<div class=\"dashboard_button\"> <span class=\"dashboard_button_icon dashboard_button_icondetail\"></span> <a id=\"dashboard_button_detail\" href=\"/fhem?detail=$d\" title=\"Dashboard Details\">Detail</a> </div>\n";		
+	 $ret .= "</div>\n";
+ }
  return $ret;
 }
 
@@ -505,22 +498,16 @@ sub CheckDashboardAttributUssage($) { # replaces old disused attributes and thei
  # ---------------- Delete empty Groups entries ---------------------------------------------------------- 
  my $tabgroups = AttrVal($defs{$d}{NAME}, "dashboard_tab1groups", "999");
  if ($tabgroups eq "1"  ) { FW_fC("deleteattr ".$d." dashboard_tab1groups"); }
- my $tabgroups = AttrVal($defs{$d}{NAME}, "dashboard_tab2groups", "999");
+ $tabgroups = AttrVal($defs{$d}{NAME}, "dashboard_tab2groups", "999");
  if ($tabgroups eq "1"  ) { FW_fC("deleteattr ".$d." dashboard_tab2groups"); } 
- my $tabgroups = AttrVal($defs{$d}{NAME}, "dashboard_tab3groups", "999");
+ $tabgroups = AttrVal($defs{$d}{NAME}, "dashboard_tab3groups", "999");
  if ($tabgroups eq "1"  ) { FW_fC("deleteattr ".$d." dashboard_tab3groups"); }  
- my $tabgroups = AttrVal($defs{$d}{NAME}, "dashboard_tab4groups", "999");
+ $tabgroups = AttrVal($defs{$d}{NAME}, "dashboard_tab4groups", "999");
  if ($tabgroups eq "1"  ) { FW_fC("deleteattr ".$d." dashboard_tab4groups"); }   
- my $tabgroups = AttrVal($defs{$d}{NAME}, "dashboard_tab5groups", "999");
+ $tabgroups = AttrVal($defs{$d}{NAME}, "dashboard_tab5groups", "999");
  if ($tabgroups eq "1"  ) { FW_fC("deleteattr ".$d." dashboard_tab5groups"); }   
  # -------------------------------------------------------------------------------------------------
   
- # -------------- Replace older dashboard_showbuttonbar value (outdated 01.2014) ------------------------------
- my $showbuttonbarvalue = AttrVal($defs{$d}{NAME}, "dashboard_showbuttonbar", "top");
- if ($showbuttonbarvalue eq "0") { FW_fC("attr ".$d." dashboard_showbuttonbar hidden"); }
- if ($showbuttonbarvalue eq "1") { FW_fC("attr ".$d." dashboard_showbuttonbar top"); }
- # ------------------------------------------------------------------------------------------------------------------------
- 
  # ---- detached / transferred from the old attribute to the tab extension (outdated 02.2014) ------
  my $colwidth = AttrVal($defs{$d}{NAME}, "dashboard_colwidth", "");
  if ($colwidth ne "") {
@@ -540,7 +527,6 @@ sub CheckDashboardAttributUssage($) { # replaces old disused attributes and thei
 	{ FW_fC("deleteattr ".$d." dashboard_groups"); }
 	$detailnote = $detailnote." [dashboard_groups -> dashboard_tab1groups]";
  } 
- 
  my $sorting = AttrVal($defs{$d}{NAME}, "dashboard_sorting", "");
  if ($sorting ne "") { #convert old sorting in new 
 	my @sortings = split(":", $sorting);
@@ -574,9 +560,17 @@ sub CheckDashboardAttributUssage($) { # replaces old disused attributes and thei
 	$detailnote = $detailnote." [dashboard_sorting -> dashboard_tab1sorting]";
  }
  # ------------------------------------------------------------------------------------------------------------------------ 
+ 
+ # ---- detached / transferred from the old attribute to the tab extension (outdated 02.2014) ------ 
+ my $buttonbar = AttrVal($defs{$d}{NAME}, "dashboard_showbuttonbar", ""); 
+ if ($buttonbar ne "") { 
+	FW_fC("deleteattr ".$d." dashboard_showbuttonbar"); 
+	$detailnote = $detailnote." [dashboard_showbuttonbar]";
+ }
+ # ------------------------------------------------------------------------------------------------------------------------ 
 
  # Get out any change to the Logfile 
- if ($showbuttonbarvalue eq "0" || $showbuttonbarvalue eq "1" || $groups ne "" || $sorting ne "") {   
+ if ($buttonbar ne "" || $groups ne "" || $sorting ne "") {   
   Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."]"." Using an outdated no longer used Attribute or Value. This has been corrected. Don't forget to save config. ".$detailnote; 
  }
 }
@@ -847,10 +841,10 @@ sub Dashboard_attr($$$) {
 		Hide FHEMWEB Roomliste (complete left side) and Page Header if Value is 1.<br>
 		Default: 0
     </li><br>		
- <a name="dashboard_showbuttonbar"></a>	
-    <li>dashboard_showbuttonbar<br>
-        Displayed a buttonbar panel. Can set on Top or on Bottom of the Dashboard If the bar is hidden dashboard_lockstate the "lock" is used.<br>
-		Default: top
+ <a name="dashboard_showtabs"></a>	
+    <li>dashboard_showtabs<br>
+		Displays the Tabs on top or bottom, or hides them. This also applies to the Buttonbar. If the Buttonbar is hidden dashboard_lockstate the "lock" is used.<br>
+		Default: tabs-and-buttonbar-at-the-top
     </li><br>
  <a name="dashboard_showhelper"></a>		
     <li>dashboard_showhelper<br>
@@ -1048,7 +1042,7 @@ sub Dashboard_attr($$$) {
   <a name="dashboard_lockstate"></a>		
     <li>dashboard_lockstate<br>
 		Bei Dashboard Einstellung "unlock" kann dieses bearbeitet werden. Bei der Einstellung "lock" können keine Änderung vorgenommen werden. <br>
-		Wenn die Leiste ausgeblendet ist (dashboard_showbuttonbar) ist das Dashboard gespert. Die Bearbeitung ist daher nur mit sichtbarer Buttonbar möglich ist.<br>
+		Wenn die Leiste ausgeblendet ist (dashboard_showtabs) ist das Dashboard gespert. Die Bearbeitung ist daher nur mit sichtbarer Buttonbar möglich ist.<br>
 		Standard: unlock
     </li><br>	
   <a name="dashboard_colcount"></a>	
@@ -1063,11 +1057,11 @@ sub Dashboard_attr($$$) {
 		Blendet die FHEMWEB Raumliste (kompleter linker Bereich der Seite) und den oberen Bereich von FHEMWEB aus wenn der Wert auf 1 gesetzt ist.<br>
 		Default: 0
     </li><br>		
- <a name="dashboard_showbuttonbar"></a>	
-    <li>dashboard_showbuttonbar<br>
-		Eine Buttonbar kann über oder unter dem Dashboard angezeigt werden. Wenn die Leiste ausgeblendet wird ist das Dashboard gespert.<br>
-		Standard: top
-    </li><br>
+ <a name="dashboard_showtabs"></a>	
+    <li>dashboard_showtabs<br>
+		Zeigt die Tabs des Dashboards oben oder unten an, oder blendet diese aus. Dies gilt auch für die Schalterleiste. Wenn die Schalterleiste ausgeblendet wird ist das Dashboard gespert.<br>
+		Standard: tabs-and-buttonbar-at-the-top
+    </li><br>	
  <a name="dashboard_showhelper"></a>		
     <li>dashboard_showhelper<br>
 		Blendet Ränder ein, die eine Positionierung der Gruppen erleichtern. <br>
