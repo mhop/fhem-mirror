@@ -9,6 +9,8 @@
 // 2.00: First Changes vor Dashboard Tabs. Change method store Positiondata. optimization restore Positiondata. Clear poor routines.
 //			  Change max/min Values for Groupresize.	Top- and Bottom-Row always 100%
 // 2.01: Add Longpoll function. Dashboard can hide FHEMWEB Roomliste and Header.
+// 2.02: Tabs can set on top, bottom or hidden
+//
 // Known Bugs/Todo's
 // See 95_Dashboard.pm
 //########################################################################################
@@ -55,8 +57,7 @@ function restoreOrder() {
  var params = (document.getElementById("dashboard_attr").value).split(","); //get current Configuration
  var ActiveTab = $("#tabs .ui-tabs-panel:visible");
  var ActiveTabId = ActiveTab.attr("id").substring(14,13);
- //var colwidth = ((100/params[7])-(0.5/params[7]))+"%"; //current
- var aColWidth = GetColWidth(params[7],params[12]); //future
+ var aColWidth = GetColWidth(params[7],params[12]);
 
  //--------------------------------------------- Set Row and Column Settings --------------------------------------------------------------------------------------------
  $("#dashboard").width(params[1]);
@@ -65,8 +66,7 @@ function restoreOrder() {
  if (ActiveTab.has("#dashboard_rowbottom_tab"+ActiveTabId).length){ $("#dashboard_rowbottom_tab"+ActiveTabId).height(params[9]); } 
 
  for (var i = 0, n = params[7]; i <= n; i++) {  
-	//if (ActiveTab.has("#dashboard_tab"+ActiveTabId+"column"+i).length) { $("#dashboard_tab"+ActiveTabId+"column"+i).width(colwidth); } //current
-	if (ActiveTab.has("#dashboard_tab"+ActiveTabId+"column"+i).length) { $("#dashboard_tab"+ActiveTabId+"column"+i).width(aColWidth[i]+"%"); } //future
+	if (ActiveTab.has("#dashboard_tab"+ActiveTabId+"column"+i).length) { $("#dashboard_tab"+ActiveTabId+"column"+i).width(aColWidth[i]+"%"); }
  }	
  if (params[2] == 1) { $(".ui-row").addClass("dashboard_columnhelper"); } else { $(".ui-row").removeClass("dashboard_columnhelper"); }//set showhelper
  //--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -240,7 +240,7 @@ $(document).ready( function () {
         stop: function() { saveOrder(); }
     }); 
 	
-	if (params[4] == 0){ //set if buttonbar not show
+	if (params[4] == "hidden") {	
 		dashboard_modifyWidget();
 		dashboard_setlock();		
 	} 
@@ -314,6 +314,8 @@ $(document).ready( function () {
 			restoreOrder(); 
 		}   
 	});	
+	if ($("#dashboard_tabnav").hasClass("dashboard_tabnav_bottom")) { $(".dashboard_tabnav").appendTo(".dashboard_tabs"); } //set Tabs on the Bottom	
+	$(".dashboard_tab_hidden").css("display", "none"); //hide Tabs
 	//-------------------------------------------------------------------------------------------------------------------------------------		
 });
 
