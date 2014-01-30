@@ -41,6 +41,7 @@ sub PIFACE_Define($$);
 sub PIFACE_Undefine($$);
 sub PIFACE_Set($@);
 sub PIFACE_Get($@);
+sub PIFACE_Notify(@);
 sub PIFACE_Attr(@);
 
 my $base = 200;
@@ -513,7 +514,7 @@ PIFACE_Watchdog($) {
             You need to enable the pull-up if you want to read any of the on-board switches on the PiFace board.
           </li>
 	  <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-          <li><a name="watchdog">watchdog</a> off|on|silent,
+          <li>watchdog off|on|silent,
             [watchdog] = off is default.<br>
             The function of the PiFace extension can be monitored periodically.
             The watchdog module checks the function of ports in7 and out7.
