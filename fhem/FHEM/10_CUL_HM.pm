@@ -287,18 +287,32 @@ sub CUL_HM_updateConfig($){
     my $webCmd;
     $webCmd  = AttrVal($name,"webCmd",undef);
     if(!defined $webCmd){
-      if    ($st eq "virtual"      ){$webCmd="press short:press long";
+      if    ($st eq "virtual"      ){
+          if   ($hash->{helper}{fkt} eq "sdLead")    {$webCmd="teamCall:alarmOn:alarmOff";}
+          elsif($hash->{helper}{fkt} eq "vdCtrl")    {$webCmd="valvePos";}
+          elsif($hash->{helper}{fkt} eq "virtThSens"){$webCmd="virtTemp";}
+          elsif ($hash->{helper}{role}{chn})         {$webCmd="press short:press long";}
+          else                                       {$webCmd="virtual";}
+
       }elsif((!$hash->{helper}{role}{chn} &&
                $md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/)
             ||$st eq "repeater"
-            ||$md =~ m/(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/ ){$webCmd="getConfig";
-      }elsif($st eq "blindActuator"){$webCmd="toggle:on:off:up:down:stop:statusRequest";
-      }elsif($st eq "dimmer"       ){$webCmd="toggle:on:off:up:down:statusRequest";
-      }elsif($st eq "switch"       ){$webCmd="toggle:on:off:statusRequest";
-      }elsif($st eq "smokeDetector"){$webCmd="teamCall:alarmOn:alarmOff:statusRequest";
-      }elsif($st eq "keyMatic"     ){$webCmd="lock:inhibit on:inhibit off";
-      }elsif($md eq "HM-OU-CFM-PL" ){$webCmd="press short:press long"
-                                       .($chn eq "02"?":playTone replay":"");
+            ||$md =~ m/(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/ ){$webCmd="getConfig:clear msgEvents";
+      }elsif($st eq "blindActuator"){
+        if ($hash->{helper}{role}{chn}){$webCmd="statusRequest:toggle:on:off:up:down:stop";}
+        else{                           $webCmd="statusRequest:getConfig:clear msgEvents";}
+      }elsif($st eq "dimmer"       ){
+        if ($hash->{helper}{role}{chn}){$webCmd="statusRequest:toggle:on:off:up:down";}
+        else{                           $webCmd="statusRequest:getConfig:clear msgEvents";}
+      }elsif($st eq "switch"       ){
+        if ($hash->{helper}{role}{chn}){$webCmd="statusRequest:toggle:on:off";}
+        else{                           $webCmd="statusRequest:getConfig:clear msgEvents";}
+      }elsif($st eq "smokeDetector"){   $webCmd="statusRequest";
+          if ($hash->{helper}{fkt} eq "sdLead"){
+                                        $webCmd.="teamCall:alarmOn:alarmOff";}
+      }elsif($st eq "keyMatic"     ){   $webCmd="lock:inhibit on:inhibit off";
+      }elsif($md eq "HM-OU-CFM-PL" ){   $webCmd="press short:press long"
+                                          .($chn eq "02"?":playTone replay":"");
       }
       if    (!$hash->{helper}{role}{chn}
            && $md =~ m/HM-CC-RT-DN/) {$webCmd.=":burstXmit";}
@@ -2062,7 +2076,6 @@ sub CUL_HM_parseSDteam(@){#handle SD team events
   my $dName = CUL_HM_id2Name($dId);
   my $sHash = CUL_HM_id2Hash($sId);
   my $sName = CUL_HM_hash2Name($sHash);
-  my $st = AttrVal($sName,"subType","");
   if (AttrVal($sName,"subType","") eq "virtual"){
     foreach my $cId (CUL_HM_getAssChnIds($sName)){
       my $cHash = CUL_HM_id2Hash($cId);
@@ -2381,7 +2394,7 @@ sub CUL_HM_Set($@) {
         my @vArr = split('\|',$val);
         foreach (@vArr){
           if ($_ =~ m/(.*)\.\.(.*)/ ){
-            my @list = map { ($_.".0", $_+0.5) } ($1..$2);
+            my @list = map { ($_.".0", $_+0.5) } (($1+0)..($2+0));
             pop @list;
             $_ = join(",",@list);
           }
