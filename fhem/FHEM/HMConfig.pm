@@ -549,8 +549,8 @@ my $K_actDetID = '000000'; # id of actionDetector
 # others
   localResetDis   =>{a=>  7  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"LocalReset disable",lit=>{off=>0,on=>1}},
 
-  condTxThrhHi    =>{a=>135  ,s=>2  ,l=>1,min=>0  ,max=>3000    ,c=>''         ,f=>''      ,u=>'mV'  ,d=>0,t=>"threshold high condition"},
-  condTxThrhHi    =>{a=>139  ,s=>2  ,l=>1,min=>0  ,max=>3000    ,c=>''         ,f=>''      ,u=>'mV'  ,d=>0,t=>"threshold high condition"},
+  cndTxThrhHi     =>{a=>135  ,s=>2  ,l=>1,min=>0  ,max=>3000    ,c=>''         ,f=>''      ,u=>'mV'  ,d=>0,t=>"threshold high condition"},
+  cndTxThrhLo     =>{a=>139  ,s=>2  ,l=>1,min=>0  ,max=>3000    ,c=>''         ,f=>''      ,u=>'mV'  ,d=>0,t=>"threshold high condition"},
   highHoldTime    =>{a=>143  ,s=>1  ,l=>1,min=>60 ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"hold time on high state"},
   evntRelFltTime  =>{a=>145  ,s=>1  ,l=>1,min=>1  ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter release time "},
 
@@ -952,7 +952,7 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
   "Schueco_263-xxx02" =>{ transmitTryMax  =>1,eventDlyTime    =>1},
   "Schueco_263-xxx03" =>{ ttJtOn          =>1,ttJtOff         =>1},
   "HM-Sen-RD-O01"     =>{ eventFilterTimeB=>1,transmitTryMax  =>1,peerNeedsBurst  =>1,expectAES       =>1
-                         ,condTxThrhHi    =>1,condTxThrhHi    =>1,highHoldTime    =>1,evntRelFltTime  =>1
+                         ,cndTxThrhHi     =>1,cndTxThrhLo     =>1,highHoldTime    =>1,evntRelFltTime  =>1
                          },
   "HM-CC-RT-DN03"     =>{ shCtValLo       =>1
                          ,winOpnTemp      =>1},
@@ -1272,8 +1272,8 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                          ,alarmOff      =>""
                          ,teamCall      =>""
                         },
-  vdCtrl              =>{ valvePos      =>"<position>"},
-  virtThSens          =>{ virtTemp      =>"<temp>"}
+  vdCtrl              =>{ valvePos      =>"[off|0.0..100.0]"},
+  virtThSens          =>{ virtTemp      =>"[off|-20.0..50.0]"}
 );
 
                       

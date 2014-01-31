@@ -269,9 +269,9 @@ sub HMinfo_paramCheck(@) { ####################################################
   }
 
   my $ret = "";
-  $ret .="\n\n no IO device assigned"      ."\n    ".(join "\n    ",sort @noIoDev)    if (@noIoDev);
-  $ret .="\n\n PairedTo missing/unknown"   ."\n    ".(join "\n    ",sort @noID)       if (@noID);
-  $ret .="\n\n PairedTo missmatch to IODev"."\n    ".(join "\n    ",sort @idMismatch) if (@idMismatch);
+  $ret .="\n\n no IO device assigned"     ."\n    ".(join "\n    ",sort @noIoDev)    if (@noIoDev);
+  $ret .="\n\n PairedTo missing/unknown"  ."\n    ".(join "\n    ",sort @noID)       if (@noID);
+  $ret .="\n\n PairedTo mismatch to IODev"."\n    ".(join "\n    ",sort @idMismatch) if (@idMismatch);
  return  $ret;
 }
 sub HMinfo_tempList(@) { ######################################################
