@@ -395,7 +395,7 @@ sub TRX_WEATHER_common_anemometer {
   }
 
   my $dir = $bytes->[5]*256 + $bytes->[6];
-  my $dirname = $TRX_WEATHER_winddir_name[$dir/22.5];
+  my $dirname = $TRX_WEATHER_winddir_name[int((($dir + 11.25) % 360) / 22.5)];
 
   my $avspeed = ($bytes->[7]*256 + $bytes->[8]) / 10;
   my $speed = ($bytes->[9]*256 + $bytes->[10]) / 10;
