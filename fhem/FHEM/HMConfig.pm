@@ -258,9 +258,10 @@ my $K_actDetID = '000000'; # id of actionDetector
   "00C2" => {name=>"HM-PB-2-WM55-2"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2",},
   "8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",},
-  #263 167                        HM Smoke Detector Schueco
-  #"HM-RC-Key4-2"
-  #"HM-RC-Sec4-2"
+
+#  "xxxx" => {name=>"HM-LC-SW4-DR-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
+#  "xxxx" => {name=>"HM-LC-Sw1-Pl-3"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
+ #  "HM-LGW-O-TW-W-EU" #Funk LAN Gateway
 );
 
 ##----------definitions for register settings-----------------
@@ -513,7 +514,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   txThrCur        =>{a=>127.0,s=>2  ,l=>1,min=>1    ,max=>16000 ,c=>''         ,f=>''      ,u=>'mA'  ,d=>1,t=>"threshold current"},
   txThrVlt        =>{a=>129.0,s=>2  ,l=>1,min=>0.1  ,max=>230   ,c=>''         ,f=>10      ,u=>'V'   ,d=>1,t=>"threshold voltage"},
   txThrFrq        =>{a=>131.0,s=>1  ,l=>1,min=>0.01 ,max=>2.55  ,c=>''         ,f=>100     ,u=>'Hz'  ,d=>1,t=>"threshold frequency"},
-                                                                
+
   cndTxFalling    =>{a=>132.0,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if falling"                ,lit=>{off=>0,on=>1}},
   cndTxRising     =>{a=>132.1,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if rising"                 ,lit=>{off=>0,on=>1}},
   cndTxCycBelow   =>{a=>132.2,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic trigger if level is below cndTxCycBelow",lit=>{off=>0,on=>1}},
@@ -1018,13 +1019,13 @@ foreach (2..16){
   $culHmRegChan{"HM-RC-19-B$c"}         = $culHmRegChan{"HM-RC-1901"};
   $culHmRegChan{"HM-RC-19-SW$c"}        = $culHmRegChan{"HM-RC-1901"};
 }
-                                      
+
 $culHmRegChan{"WDF-solar02"}          = $culHmRegType{"dimmer"};
-                                      
+
 $culHmRegChan{"HM-CC-RT-DN-BoM03"}    = $culHmRegType{"HM-CC-RT-DN03"};
 $culHmRegChan{"HM-CC-RT-DN-BoM04"}    = $culHmRegType{"HM-CC-RT-DN04"};
 $culHmRegChan{"HM-CC-RT-DN-BoM06"}    = $culHmRegType{"HM-CC-RT-DN06"};
-                                      
+
 $culHmRegChan{"HM-TC-IT-WM-W-EU03"}   = $culHmRegType{"HM-CC-RT-DN03"};
 $culHmRegChan{"HM-TC-IT-WM-W-EU06"}   = $culHmRegType{"HM-CC-RT-DN06"};
 
@@ -1216,7 +1217,7 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
                           level          =>"<level> <relockDly> <speed>..."},
   "HM-OU-CFM-PL01"    =>{ led            =>"<color>[,<color>...] [<repeat>]"},
   "HM-OU-CFM-PL02"    =>{ playTone       =>"<MP3No>[,<MP3No>...] [<repeat>]"},
-                      
+
   "HM-Sen-RD-O02"     =>{ "on-for-timer" =>"<sec>"
                          ,"on-till"      =>"<time>"
                          ,on             =>""
@@ -1251,15 +1252,15 @@ $culHmChanSets{"WDF-solar01"}           = $culHmSubTypeSets{"THSensor"};
 $culHmChanSets{"HM-Sen-RD-O01"}         = $culHmSubTypeSets{"THSensor"};
 $culHmChanSets{"HM-CC-RT-DN05"}         = $culHmSubTypeSets{"THSensor"};
 $culHmChanSets{"HM-ES-PMSw1-Pl03"}      = $culHmSubTypeSets{"THSensor"};
-                                        
+
 $culHmChanSets{"WDF-solar02"}           = $culHmSubTypeSets{"blindActuator"};
-                                        
+
 $culHmChanSets{"HM-CC-RT-DN02"}         = $culHmChanSets{"HM-CC-RT-DN00"};
 $culHmChanSets{"HM-CC-RT-DN-BoM00"}     = $culHmChanSets{"HM-CC-RT-DN00"};
 $culHmChanSets{"HM-CC-RT-DN-BoM02"}     = $culHmChanSets{"HM-CC-RT-DN02"};
 $culHmChanSets{"HM-CC-RT-DN-BoM04"}     = $culHmChanSets{"HM-CC-RT-DN04"};
 $culHmChanSets{"HM-CC-RT-DN-BoM05"}     = $culHmChanSets{"HM-CC-RT-DN05"};
-                                        
+
 $culHmChanSets{"HM-ES-PMSw1-Pl04"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
 $culHmChanSets{"HM-ES-PMSw1-Pl05"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
 $culHmChanSets{"HM-ES-PMSw1-Pl06"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
@@ -1273,11 +1274,12 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                          ,teamCall      =>""
                         },
   vdCtrl              =>{ valvePos      =>"[off|0.0..100.0]"},
-  virtThSens          =>{ virtTemp      =>"[off|-20.0..50.0]"}
+  virtThSens          =>{ virtTemp      =>"[off|-20.0..50.0]",
+                          virtHum       =>"[off|0.0..99.0]"}
 );
 
-                      
-                      
+
+
 
 # RC send BCAST to specific address. Is the meaning understood?
 @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "CFG", "Bit3",
@@ -1301,7 +1303,7 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                      PEER_CHANNEL_A => "28,2",
                      PEER_CHANNEL_B => "30,2",
                      UNKNOWN        => "32,2", }},
-                    
+
   "01;p11=01"   => { txt => "CONFIG_PEER_ADD", params => {
                      CHANNEL        => "00,2",
                      PEER_ADDRESS   => "04,6",
@@ -1348,7 +1350,7 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                      LOWBAT         => '06,02,$val=(hex($val)&0x80)?1:0',
                      RSSI           => '08,02,$val=(-1)*(hex($val))', }},
   "02;p01=02"   => { txt => "ACK2"}, # smokeDetector pairing only?
-  "02;p01=04"   => { txt => "AES_req",  params => {# 
+  "02;p01=04"   => { txt => "AES_req",  params => {#
                      Para1          => "02,4",
                      Para2          => "06,4",
                      Para3          => "10,4",
@@ -1365,7 +1367,7 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                      TYPE    => "02,2" } },                         #00: old key? 01: new key?
   "04"          => { txt => "To-Actor:send AES key" ,   params => { # HMLAN sends AES key to actor ??
                      CODE    => "00" } },
-                    
+
   "10;p01=00"   => { txt => "INFO_SERIAL", params => {
                      SERIALNO => '02,20,$val=pack("H*",$val)'},},
   "10;p01=01"   => { txt => "INFO_PEER_LIST", params => {
@@ -1414,13 +1416,13 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                      TIME     => '04,2,$val=hex($val)',
                      SPEED    => '06,2,$val=hex($val)',
                      } },
-  "11;p01=82"   => { txt => "Sleepmode"   , params => {#SET_WINTER_MODE/SET_LED_SLEEP_MODE/SERVICE_COUNT/PARTY_MODE_SET  
+  "11;p01=82"   => { txt => "Sleepmode"   , params => {#SET_WINTER_MODE/SET_LED_SLEEP_MODE/SERVICE_COUNT/PARTY_MODE_SET
                      CHANNEL  => "02,2",
                      MODE     => '04,2,$val=hex($val)',
                      } },
-  "11;p01=83"   => { txt => "EnterBootLoader"   },#BOOST_MODE_SET/SET_HANDLE_LED_MODE 
+  "11;p01=83"   => { txt => "EnterBootLoader"   },#BOOST_MODE_SET/SET_HANDLE_LED_MODE
 #  "11;p01=84"   => { txt => ""   },#SET_SHEV_POS/COMFORT_MODE_SET
-#  "11;p01=85"   => { txt => ""   },#LOWERING_MODE_SET/SET_RELEASE_TURN 
+#  "11;p01=85"   => { txt => ""   },#LOWERING_MODE_SET/SET_RELEASE_TURN
   "11;p01=86"   => { txt => "SetTemp"     , params => {
                      B1     => "02,2",
                      B2     => '04,2',
