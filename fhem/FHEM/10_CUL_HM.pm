@@ -290,7 +290,7 @@ sub CUL_HM_updateConfig($){
       if    ($st eq "virtual"      ){
           if   ($hash->{helper}{fkt} eq "sdLead")    {$webCmd="teamCall:alarmOn:alarmOff";}
           elsif($hash->{helper}{fkt} eq "vdCtrl")    {$webCmd="valvePos";}
-          elsif($hash->{helper}{fkt} eq "virtThSens"){$webCmd="virtTemp";}
+          elsif($hash->{helper}{fkt} eq "virtThSens"){$webCmd="virtTemp:virtHum";}
           elsif ($hash->{helper}{role}{chn})         {$webCmd="press short:press long";}
           else                                       {$webCmd="virtual";}
 
@@ -3162,20 +3162,30 @@ sub CUL_HM_Set($@) {
     my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
     CUL_HM_PushCmdStack($hash,"++A03F$id${dst}0204$s2000");
   }
-  elsif($cmd =~ m/^(valvePos|virtTemp)$/) { ###################################
-    my $val = $a[2];
-    if ($val eq "off"){
-      $state = "ValveAdjust:stopped";
-      RemoveInternalTimer("valvePos:$dst$chn");# remove responsePending timer
-      RemoveInternalTimer("valveTmr:$dst$chn");# remove responsePending timer
-      delete($hash->{helper}{virtTC});
+  elsif($cmd =~ m/^(valvePos|virtTemp|virtHum)$/) { ###########################
+    my $valu = $a[2];
+    my %lim = (valvePos =>{min=>0  ,max=>100,rd =>"valvePosTC" ,u =>" %"},
+               virtTemp =>{min=>-20,max=>50 ,rd =>"temperature",u =>""  },
+               virtHum  =>{min=>0  ,max=>99 ,rd =>"humidity"   ,u =>""  },);
+    if ($valu eq "off"){
+      if ($cmd eq "virtHum") {$hash->{helper}{vd}{vinH} = "";}
+      else                   {$hash->{helper}{vd}{vin}  = "";}
+      if ((!$hash->{helper}{vd}{vinH} || $hash->{helper}{vd}{vinH} eq "") && 
+          (!$hash->{helper}{vd}{vin}  || $hash->{helper}{vd}{vin}  eq "") ){
+        $state = "$cmd:stopped";
+        RemoveInternalTimer("valvePos:$dst$chn");# remove responsePending timer
+        RemoveInternalTimer("valveTmr:$dst$chn");# remove responsePending timer
+        delete($hash->{helper}{virtTC});
+      }
     }
-    else {
-      my %lim = (valvePos =>{min=>0  ,max=>100},
-                 virtTemp =>{min=>-20,max=>50 });
-      return "level between $lim{$cmd}{min} and $lim{$cmd}{max} or 'off' allowed"
-           if (!($val+0 ne $val ||
-                 $val <=$lim{$cmd}{max}||$val >=$lim{$cmd}{min} ));                 
+    if ($hash->{helper}{virtTC} || $valu ne "off") {
+      if ($valu ne "off"){
+        return "level between $lim{$cmd}{min} and $lim{$cmd}{max} or 'off' allowed"
+             if ($valu !~ m/^[+-]?\d+\.?\d?$/||
+                 $valu > $lim{$cmd}{max}||$valu < $lim{$cmd}{min} );
+        if ($cmd eq "virtHum") {$hash->{helper}{vd}{vinH} = $valu;}
+        else                   {$hash->{helper}{vd}{vin}  = $valu;}
+      }
       if ($cmd eq "valvePos"){
         my @pId = grep !/^$/,split(',',AttrVal($name,"peerIDs",""));
         return "virtual TC support one VD only. Correct number of peers"
@@ -3186,19 +3196,20 @@ sub CUL_HM_Set($@) {
         $hash->{helper}{vd}{id}  = $pId[0];
         $hash->{helper}{vd}{cmd} = "A258$dst".substr($pId[0],0,6);
         CUL_HM_UpdtReadBulk($ph,1,
-                         "state:set_$val %",
-                         "ValveDesired:$val %");
-        CUL_HM_UpdtReadSingle($hash,"valvePosTC","$val %",1);
-        $hash->{helper}{vd}{val} = sprintf("%02X",($val * 2.56)%256);
-        $state = "ValveAdjust:$val %";
+                         "state:set_$valu %",
+                         "ValveDesired:$valu %");
+        $hash->{helper}{vd}{val} = sprintf("%02X",($valu * 2.56)%256);
+        $state = "ValveAdjust:$valu %";
       }
-      else{#virtTemp
-        CUL_HM_UpdtReadSingle($hash,"temperature",$val,1);
+      else{#virtTemp || virtHum
         $hash->{helper}{vd}{typ} = 2; #virtTemp
         $hash->{helper}{vd}{cmd} = "8670$dst"."000000";
-        $val *=10;
-        $val -= 0x8000 if ($val < 0);
-        $hash->{helper}{vd}{val} = sprintf("%04X", $val & 0x7fff);
+        my $t = $hash->{helper}{vd}{vin}?$hash->{helper}{vd}{vin}:0;
+        $t *=10;
+        $t -= 0x8000 if ($t < 0);
+        $hash->{helper}{vd}{val} = sprintf("%04X", $t & 0x7fff);
+        $hash->{helper}{vd}{val} .= sprintf("%02X", $hash->{helper}{vd}{vinH})
+             if ($hash->{helper}{vd}{vinH} && $hash->{helper}{vd}{vinH} ne "");
       }
       
       $hash->{helper}{vd}{idh} = hex(substr($dst,2,2))*20077;
@@ -3215,6 +3226,7 @@ sub CUL_HM_Set($@) {
       };
       $hash->{helper}{virtTC} = ($cmd eq "valvePos")?"03":"00";
     }
+    CUL_HM_UpdtReadSingle($hash,$lim{$cmd}{rd},$valu.$lim{$cmd}{u},1);
   }
   elsif($cmd eq "matic") { ####################################################
     # Trigger pre-programmed action in the winmatic. These actions must be
@@ -6210,7 +6222,11 @@ sub CUL_HM_complConfig($)    {# read config if enabled and not complete
        </li>
        <li><B>virtTemp &lt;[off -10..50]&gt;<a name="CUL_HMvirtTemp"></a></B>
          simulates a thermostat. If peered to a device it periodically sends the
-         temperature until "off" is given<br>
+         temperature until "off" is given. See also <a href="#CUL_HMvirtHum">virtHum</a><br>
+       </li>
+       <li><B>virtHum &lt;[off -10..50]&gt;<a name="CUL_HMvirtHum"></a></B>
+         simulates the humidity part of a thermostat. If peered to a device it periodically sends 
+         the temperature and humidity until both are "off". See also <a href="#CUL_HMvirtTemp">virtTemp</a><br>
        </li>
        <li><B>valvePos &lt;[off 0..100]&gt;<a name="CUL_HMvalvePos"></a></B>
          stimulates a VD<br>
