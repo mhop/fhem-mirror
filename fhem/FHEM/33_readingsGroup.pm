@@ -217,6 +217,8 @@ lookup2($$$$)
     $lookup = "" if( $@ );
   }
 
+  return $lookup if( !defined($lookup) );
+
   $lookup =~ s/\%DEVICE/$name/g;
   $lookup =~ s/\%READING/$reading/g;
   $lookup =~ s/\%VALUE/$value/g;
