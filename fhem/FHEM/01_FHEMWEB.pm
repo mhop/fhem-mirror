@@ -2095,15 +2095,17 @@ FW_devState($$@)
   $hasOnOff = ($allSets =~ m/(^| )on(:[^ ]*)?( |$)/ &&
                $allSets =~ m/(^| )off(:[^ ]*)?( |$)/);
   my $txt = $state;
+  my $dsi = AttrVal($d, "devStateIcon", undef);
+
   if(defined(AttrVal($d, "showtime", undef))) {
     my $v = $defs{$d}{READINGS}{state}{TIME};
     $txt = $v if(defined($v));
 
-  } elsif($allSets =~ m/\bdesired-temp:/) {
+  } elsif(!$dsi && $allSets =~ m/\bdesired-temp:/) {
     $txt = "$1 &deg;C" if($txt =~ m/^measured-temp: (.*)/);      # FHT fix
     $cmdList = "desired-temp" if(!$cmdList);
 
-  } elsif($allSets =~ m/\bdesiredTemperature:/) {
+  } elsif(!$dsi && $allSets =~ m/\bdesiredTemperature:/) {
     $txt = ReadingsVal($d, "temperature", "");  # ignores stateFormat!!!
     $txt =~ s/ .*//;
     $txt .= "&deg;C";
