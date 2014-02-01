@@ -414,7 +414,7 @@ if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-
      undef($result);
      return $invert_match;
    }
-   else
+   elsif(not $result =~ /Leider wurde zu Deiner Suche kein Eintrag gefunden/)
    {
 		Log3 $name, 3, "FB_CALLMONITOR: the reverse search result for $number could not be extracted from klicktel.de. Please contact the FHEM community.";
    }
@@ -448,7 +448,7 @@ if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-
      undef($result);
      return $invert_match;
    }
-   else
+   elsif(not $result =~ /wir konnten keine Treffer finden/)
    {
 		Log3 $name, 3, "FB_CALLMONITOR: the reverse search result for $number could not be extracted from dasoertliche.de. Please contact the FHEM community.";
    }
@@ -482,7 +482,7 @@ if(AttrVal($name, "reverse-search", "none") eq "search.ch")
      undef($result);
      return $invert_match;
    }
-   else
+   elsif(not $result =~ /Keine Eintr.ge gefunden/)
    {
 		Log3 $name, 3, "FB_CALLMONITOR: the reverse search result for $number could not be extracted from search.ch. Please contact the FHEM community.";
    }
@@ -523,7 +523,7 @@ if(AttrVal($name, "reverse-search", "none") eq "dasschnelle.at")
      undef($result);
      return $invert_match;
    }
-   else
+   elsif(not $result =~ /Es wurden keine passenden Eintr.ge gefunden/)
    {
 		Log3 $name, 3, "FB_CALLMONITOR: the reverse search result for $number could not be extracted from dasschnelle.at. Please contact the FHEM community.";
    }
