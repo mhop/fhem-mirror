@@ -660,7 +660,7 @@ MAX_Parse($$)
     $shash->{mode} = $mode;
     $shash->{rferror} = $rferror;
     $shash->{dstsetting} = $dstsetting;
-    if($mode eq "temporary"){
+    if($mode == 2){
       $shash->{until} = "$untilStr";
     }else{
       delete($shash->{until});
