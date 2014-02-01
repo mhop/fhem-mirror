@@ -3,6 +3,7 @@
 /*
 Edit: fhainz
 */
+
 body     { background: #e5e5e5;
            font-family:Helvetica; font-weight:300; font-size:16px; }
 
@@ -52,18 +53,18 @@ table.room td:hover { background: #d9d9d9; }
 table.roomBlock1 tr { border: 0; }
 
 table.room a { display: block; padding: 6px 0 6px 50px; }
-table.block a { display: block; width: 100%; height: 100%; }
+table.block a { width: 100%; height: 100%; }
 
 table.block { width:790px; background: #fff; }
 table.block a { color: #151515; }
-table.block tr { width: 100%; border-bottom: 1px solid #cbcbcb; }
+table.block tr { width: 100%; border-bottom: 1px solid #cbcbcb;  }
 table.block tr:last-child { border: 0; }
-table.block tr.odd { background: #fff; }
+table.block tr.odd { background: #fff;}
 table.block tr.sel { background: #d9d9d9; }
 table.block td { padding:3px; }
 
 /* Bugfix fuer readingsGroup */
-table.block table.block {
+table.block table.block, table table {
 width: 100%;
 }
 
