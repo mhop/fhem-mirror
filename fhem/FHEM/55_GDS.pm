@@ -1289,6 +1289,9 @@ sub initDropdownLists($){
 
 <a name="GDS"></a>
 <h3>GDS</h3>
-<ul>Sorry, keine deutsche Dokumentation vorhanden.</ul>
+<ul>
+Sorry, keine deutsche Dokumentation vorhanden.<br/><br/>
+Die englische Doku gibt es hier: <a href='http://fhem.de/commandref.html#GDS'>GDS</a><br/><br/>;
+</ul>
 =end html_DE
 =cut
