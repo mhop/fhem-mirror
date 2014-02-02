@@ -94,7 +94,7 @@ sub ONKYO_AVR_GetStatus($;$) {
         return $hash->{STATE};
     }
 
-    InternalTimer( gettimeofday() + $interval, "ONKYO_AVR_GetStatus", $hash, 0 )
+    InternalTimer( gettimeofday() + $interval, "ONKYO_AVR_GetStatus", $hash, 1 )
       unless ( $local == 1 );
 
     # cache XML device information
@@ -1068,7 +1068,7 @@ sub ONKYO_AVR_Set($@) {
     readingsEndUpdate( $hash, 1 );
 
     # Re-start internal timer
-    InternalTimer( gettimeofday() + $interval, "ONKYO_AVR_GetStatus", $hash, 0 )
+    InternalTimer( gettimeofday() + $interval, "ONKYO_AVR_GetStatus", $hash, 1 )
       if ( $a[1] ne "?" );
 
     # return result
@@ -1121,8 +1121,11 @@ sub ONKYO_AVR_Define($$) {
         return "Invalid protocol, choose one of 2013 pre2013";
     }
     readingsSingleUpdate( $hash, "deviceyear", $protocol, 1 );
-    if (   $protocol eq "pre2013" && !exists( $attr{$name}{model} )
-        || $attr{$name}{model} ne $protocol )
+    if (
+        $protocol eq "pre2013"
+        && ( !exists( $attr{$name}{model} )
+            || $attr{$name}{model} ne $protocol )
+      )
     {
         $attr{$name}{model} = $protocol;
     }
@@ -1714,4 +1717,11 @@ sub ONKYO_AVR_RClayout() {
 </ul>
 
 =end html
+
+=begin html_DE
+Deutsche Version der Doku nicht verfügbar. Englische Version unter 
+
+ <a href='http://fhem.de/commandref.html#ONKYO_AVR>'>ONKYO_AVR</a> &nbsp;
+
+=end html_DE
 =cut

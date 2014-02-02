@@ -1290,8 +1290,8 @@ sub ENIGMA2_Set($@) {
             return
                 "Argument "
               . $_
-              . " is not a valid integer between 0 and 49680"
-              if ( !m/^\d+$/ || $_ < 0 || $_ > 49680 );
+              . " is not a valid integer between 5 and 49680"
+              if ( !m/^\d+$/ || $_ < 5 || $_ > 49680 );
 
             my $i    = 4;
             my $text = $a[$i];
@@ -2660,4 +2660,12 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
 </ul>
 
 =end html
+
+=begin html_DE
+Deutsche Version der Doku nicht verfügbar. Englische Version unter 
+
+ <a href='http://fhem.de/commandref.html#ENIGMA2>'>ENIGMA2</a> &nbsp;
+
+=end html_DE
+
 =cut
