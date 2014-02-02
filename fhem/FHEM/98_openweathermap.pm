@@ -549,6 +549,7 @@ sub OWO_isday($$){
 1;
 
 =pod
+not to be translated
 =begin html
 
 <a name="openweathermap"></a>

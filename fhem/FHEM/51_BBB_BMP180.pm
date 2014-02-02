@@ -235,6 +235,7 @@ sub bbb_relDruck($$){
 1;
 
 =pod
+not to be translated
 =begin html
 
 <a name="BBB_BMP180"></a>

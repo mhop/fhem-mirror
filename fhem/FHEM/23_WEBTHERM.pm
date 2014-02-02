@@ -125,6 +125,7 @@ WEBTHERM_GetStatus($)
 1;
 
 =pod
+not to be translated
 =begin html
 
 <a name="WEBTHERM"></a>
