@@ -318,4 +318,10 @@ not to be translated
 </ul>
 
 =end html
+=begin html_DE
+
+<a name="BBB_BMP180"></a>
+<h3>BBB_BMP180</h3>
+<ul>Sorry, keine deutsche Dokumentation vorhanden.</ul>
+=end html_DE
 =cut

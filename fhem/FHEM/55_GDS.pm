@@ -1285,4 +1285,10 @@ sub initDropdownLists($){
 </ul>
 
 =end html
+=begin html_DE
+
+<a name="GDS"></a>
+<h3>GDS</h3>
+<ul>Sorry, keine deutsche Dokumentation vorhanden.</ul>
+=end html_DE
 =cut
