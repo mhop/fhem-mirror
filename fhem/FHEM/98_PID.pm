@@ -234,6 +234,7 @@ PID_setValue($)
 1;
 
 =pod
+not to be translated
 =begin html
 
 <a name="PID"></a>

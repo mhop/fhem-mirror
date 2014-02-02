@@ -386,6 +386,7 @@ PIFACE_Watchdog($) {
 1;
 
 =pod
+not to be translated
 =begin html
 
 <a name="PIFACE"></a>
