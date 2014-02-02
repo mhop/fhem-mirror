@@ -37,11 +37,12 @@ use Time::HiRes qw/ time /;
 use POSIX;
 use Net::Telnet;
 
-#List of firmware versions that are known to be compatible with this modul
-  my $testedFirmware = "#V1.54C#";
-  my $compatibleFirmware = "#V1.54C#";
+# Modul Version for remote debugging
+  my $modulVersion = "2014-02-02";
 
-#my $cc; # The Itmes Changed Counter
+#List of firmware versions that are known to be compatible with this modul
+  my $testedFirmware = "#V1.54C#V1.60#V1.69#";
+  my $compatibleFirmware = "#V1.54C#V1.60#V1.69#";
 
 sub ########################################
 LUXTRONIK2_Initialize($)
@@ -50,11 +51,13 @@ LUXTRONIK2_Initialize($)
 
   $hash->{DefFn}    = "LUXTRONIK2_Define";
   $hash->{UndefFn}  = "LUXTRONIK2_Undefine";
+  $hash->{NotifyFn} = "LUXTRONIK2_Notify";
   $hash->{SetFn}    = "LUXTRONIK2_Set";
   $hash->{AttrFn}	= "LUXTRONIK2_Attr";
   $hash->{AttrList} = "disable:0,1 ".
 					  "allowSetParameter:0,1 ".
 					  "autoSynchClock:slider,10,5,300 ".
+					  "doStatistics:0,1 ".
 					  "ignoreFirmwareCheck:0,1 ".
 					  "statusHTML ".
 					  $readingFnAttributes;
@@ -85,10 +88,15 @@ LUXTRONIK2_Define($$)
   #Get first data after 10 seconds
   InternalTimer(gettimeofday() + 10, "LUXTRONIK2_GetUpdate", $hash, 0);
 
-  #Reset temporary values (min and max reading durations)
+  #Reset temporary values
   $hash->{fhem}{durationFetchReadingsMin} = 0;
   $hash->{fhem}{durationFetchReadingsMax} = 0;
+  $hash->{fhem}{alertFirmware} = 0;
+  $hash->{fhem}{statModeHotWater} = 0;
  
+  $hash->{fhem}{modulVersion} = $modulVersion;
+  Log3 $hash,5,"$name: LUXTRONIK2.pm version is $modulVersion.";
+       
   return undef;
 }
 
@@ -105,16 +113,80 @@ LUXTRONIK2_Undefine($$)
 }
 
 sub ########################################
+LUXTRONIK2_Notify(@) {
+  my ($hash,$dev) = @_;
+  my $name = $hash->{NAME};
+  
+  if ($dev->{NAME} eq "global" ) { # splitted to reduce CPU load
+	if (grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}})){
+    # housekeeping
+		my %cleanUp = ( 
+				delayDeviceTime => "delayDeviceTimeCalc",
+				deviceTimeStartReadings => "deviceTimeCalc",
+				heatingSummerMode => "heatingLimit",
+				thresholdTemperatureSummerMode => "thresholdHeatingLimit",
+				lastDeviceClockSynch => "deviceTimeLastSync",
+				operatingHoursHeatPump => "counterHoursHeatPump",
+				operatingHoursSecondHeatSource1 => "counterHours2ndHeatSource1",
+				operatingHoursSecondHeatSource2 => "counterHours2ndHeatSource2",
+				operatingHoursSecondHeatSource3 => "counterHours2ndHeatSource3",
+				operatingHoursHeating => "counterHoursHeating",
+				operatingHoursHotWater => "counterHoursHotWater",
+				heatQuantityHeating => "counterHeatQHeating",
+				heatQuantityHotWater => "counterHeatQHotWater",
+				heatQuantityTotal => "counterHeatQTotal", 
+				currentOperatingStatus1 => "opStateHeatPump1",
+				currentOperatingState1 => "opStateHeatPump1",
+				currentOperatingStatus2 => "opStateHeatPump3",
+				currentOperatingState2 => "opStateHeatPump2",
+				currentOperatingState3 => "opStateHeatPump3",
+				heatingOperatingMode => "opModeHeating",
+				heatingOperatingState => "opStateHeating",
+				hotWaterOperatingMode => "opModeHotWater",
+				hotWaterStatus => "opStateHotWater",
+				hotWaterState => "opStateHotWater",
+				heatingSystemCirculationPump => "heatingSystemCircPump",
+				hotWaterCirculationPumpExtern => "hotWaterCircPumpExtern" );
+	  
+		my $oldReading;
+		my $newReading;
+		while (($oldReading, $newReading) = each(%cleanUp)) {
+			if ( exists( $hash->{READINGS}{$oldReading} ) ) {
+				delete($hash->{READINGS}{$oldReading});
+				Log3 $name,2,"$name: !!! Change/fix in LUXTRONIK2-Modul: '$oldReading' is now '$newReading'";
+			}
+		}
+	 }
+  }
+  return;
+}
+
+
+sub ########################################
 LUXTRONIK2_Set($$@)
 {
   my ($hash, $name, $cmd, $val) = @_;
-  my $resultStr="";
+  my $resultStr = "";
   
   if($cmd eq 'statusRequest') {
     $hash->{LOCAL} = 1;
     LUXTRONIK2_GetUpdate($hash);
     $hash->{LOCAL} = 0;
     return undef;
+  }
+  elsif ($cmd eq 'deleteStatistics') {
+	if ( ($val eq "all" || $val eq "statGradientBoilerTempLoss") 
+			&& exists($defs{$name}{READINGS}{statGradientBoilerTempLoss})) {
+		delete $defs{$name}{READINGS}{statGradientBoilerTempLoss};
+		$resultStr .= " statGradientBoilerTempLoss";
+	}
+	if ( $resultStr eq "" ) {
+		$resultStr = "$name: No statistics to delete";
+	} else {
+		$resultStr = "$name: Statistic value(s) deleted:" . $resultStr;
+	}
+	Log3 $hash, 3, $resultStr;
+	return $resultStr;
   }
   elsif($cmd eq 'INTERVAL' && int(@_)==4 ) {
 	$val = 30 if( $val < 30 );
@@ -125,7 +197,7 @@ LUXTRONIK2_Set($$@)
   #Check Firmware and Set-Paramter-lock 
   if ($cmd eq 'synchronizeClockHeatPump' ||
 			$cmd eq 'hotWaterTemperatureTarget' ||
-			$cmd eq 'hotWaterOperatingMode') 
+			$cmd eq 'opModeHotWater') 
    {
 	 my $firmware = ReadingsVal($name,"firmware","");
 	 my $firmwareCheck = LUXTRONIK2_checkFirmware($firmware);
@@ -136,8 +208,8 @@ LUXTRONIK2_Set($$@)
      # stop in case of untested firmware and firmware check enabled
 	 } elsif (AttrVal($name, "ignoreFirmwareCheck", 0)!= 1 &&
 				$firmwareCheck eq "fwNotTested") {
-		Log3 $name, 3, $name." Error: Host firmware '$firmware' not tested for parameter setting. To test set 'ignoreFirmwareCheck' to 1";
-		 return "Firmware '$firmware' not compatible for parameter setting. To test set 'ignoreFirmwareCheck' to 1.";
+		Log3 $name, 3, $name." Error: Host firmware '$firmware' not tested for parameter setting. To test set attribute 'ignoreFirmwareCheck' to 1";
+		 return "Firmware '$firmware' not compatible for parameter setting. To test set attribute 'ignoreFirmwareCheck' to 1.";
      # stop in case setting of parameters is not enabled
 	 } elsif ( AttrVal($name, "allowSetParameter", 0) != 1) {
 		Log3 $name, 3, $name." Error: Setting of parameters not allowed. Please set attribut 'allowSetParameter' to 1";
@@ -152,8 +224,8 @@ LUXTRONIK2_Set($$@)
 		Log3 $name, 3, "$name - $resultStr";
 		return $resultStr;
 	} elsif(int(@_)==4 &&
-			($cmd eq 'hotWaterTemperatureTarget' ||
-			$cmd eq 'hotWaterOperatingMode')) {
+			($cmd eq 'hotWaterTemperatureTarget'
+			   || $cmd eq 'opModeHotWater')) {
 		$hash->{LOCAL} = 1;
 		$resultStr = LUXTRONIK2_SetParameter ($hash, $cmd, $val);
 		$hash->{LOCAL} = 0;
@@ -161,10 +233,11 @@ LUXTRONIK2_Set($$@)
 	}
 
   my $list = "statusRequest:noArg".
+			 " deleteStatistics:all,statGradientBoilerTempLoss".
 			 " hotWaterTemperatureTarget:slider,30.0,0.5,65.0".
-			 " hotWaterOperatingMode:Auto,Party,Off".
+			 " opModeHotWater:Auto,Party,Off".
 			 " synchronizeClockHeatPump:noArg".
-			 " INTERVAL:slider,60,30,1800";
+			 " INTERVAL:slider,30,30,1800";
   return "Unknown argument $cmd, choose one of $list";
 }
 
@@ -184,6 +257,7 @@ LUXTRONIK2_Attr(@)
 			}
 		}
 	}
+	
 	return undef;
 }
 
@@ -204,7 +278,7 @@ LUXTRONIK2_GetUpdate($)
     return undef if( AttrVal($name, "disable", 0 ) == 1 );
   }
 
-  $hash->{helper}{RUNNING_PID} = BlockingCall("LUXTRONIK2_DoUpdate", $name."|".$host, "LUXTRONIK2_UpdateDone", 20, "LUXTRONIK2_UpdateAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+  $hash->{helper}{RUNNING_PID} = BlockingCall("LUXTRONIK2_DoUpdate", $name."|".$host, "LUXTRONIK2_UpdateDone", 25, "LUXTRONIK2_UpdateAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
 }
 
 
@@ -254,16 +328,16 @@ LUXTRONIK2_DoUpdate($)
   $socket->recv($result,4);
   $count = unpack("N", $result);
   if($count > 0) {
-      Log3 $name, 4, "$name parameter on target changed, restart parameter reading after 5 seconds";
+      Log3 $name, 4, "$name: Parameter on target changed, restart parameter reading after 5 seconds";
 	  $socket->close();
       return "$name|2|Status = $count - parameter on target changed, restart device reading after 5 seconds";
   }
   
- #(FOV) read next 4 bytes of response -> should be number_of_parameters > 0
+ #(FOV) read next 4 bytes of response -> should be count_calc_values > 0
   $socket->recv($result,4);
-  $count = unpack("N", $result);
-  if($count == 0) {
-      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error:  Fetching operational values - 0 values announced: ".length($result)." -> ".$count;
+  my $count_calc_values = unpack("N", $result);
+  if($count_calc_values == 0) {
+      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error:  Fetching operational values - 0 values announced: ".length($result)." -> ".$count_calc_values;
 	  $socket->close();
       return "$name|0|0 values read";
   }
@@ -272,27 +346,27 @@ LUXTRONIK2_DoUpdate($)
   my $i=1;
   $result="";
   my $buf="";
-  while($i<=$count) {
+  while($i<=$count_calc_values) {
 	  $socket->recv($buf,4);
       $result.=$buf;
 	  $i++;
   }
-  if(length($result) != $count*4) {
-      Log3 $name, 1, "$name LUXTRONIK2_DoUpdate-Error: operational values length check: ".length($result)." should have been ". $count * 4;
+  if(length($result) != $count_calc_values*4) {
+      Log3 $name, 1, "$name LUXTRONIK2_DoUpdate-Error: operational values length check: ".length($result)." should have been ". $count_calc_values * 4;
  	  $socket->close();
       return "$name|0|Number of values read mismatch ( $!)\n";
   }
   
  #(FOV) unpack response in array
-  @heatpump_values = unpack("N$count", $result);
-  if(scalar(@heatpump_values) != $count) {
-      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: unpacking problem by operation values: ".scalar(@heatpump_values)." instead of ".$count;
+  @heatpump_values = unpack("N$count_calc_values", $result);
+  if(scalar(@heatpump_values) != $count_calc_values) {
+      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: unpacking problem by operation values: ".scalar(@heatpump_values)." instead of ".$count_calc_values;
  	  $socket->close();
       return "$name|0|Unpacking problem of operational values";
   
   }
 
-  Log3 $name, 5, "$name: $count operational values received";
+  Log3 $name, 5, "$name: $count_calc_values operational values received";
  
 ############################ 
 #Fetch set parameters (FSP)
@@ -313,9 +387,9 @@ LUXTRONIK2_DoUpdate($)
   
  #(FSP) read next 4 bytes of response -> should be number_of_parameters > 0
   $socket->recv($result,4);
-  $count = unpack("N", $result);
-  if($count == 0) {
-      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: 0 parameter read: ".length($result)." -> ".$count;
+  my $count_set_parameter = unpack("N", $result);
+  if($count_set_parameter == 0) {
+      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: 0 parameter read: ".length($result)." -> ".$count_set_parameter;
 	  $socket->close();
       return "$name|0|0 parameter read";
   }
@@ -324,25 +398,25 @@ LUXTRONIK2_DoUpdate($)
   $i=1;
   $result="";
   $buf="";
-  while($i<=$count) {
+  while($i<=$count_set_parameter) {
 	  $socket->recv($buf,4);
       $result.=$buf;
 	  $i++;
   }
-  if(length($result) != $count*4) {
-      Log3 $name, 1, "$name LUXTRONIK2_DoUpdate-Error: parameter length check: ".length($result)." should have been ". $count * 4;
+  if(length($result) != $count_set_parameter*4) {
+      Log3 $name, 1, "$name LUXTRONIK2_DoUpdate-Error: parameter length check: ".length($result)." should have been ". $count_set_parameter * 4;
 	  $socket->close();
       return "$name|0|Number of parameters read mismatch ( $!)\n";
   }
 
-  @heatpump_parameters = unpack("N$count", $result);
-  if(scalar(@heatpump_parameters) != $count) {
-      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: unpacking problem by set parameter: ".scalar(@heatpump_parameters)." instead of ".$count;
+  @heatpump_parameters = unpack("N$count_set_parameter", $result);
+  if(scalar(@heatpump_parameters) != $count_set_parameter) {
+      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: unpacking problem by set parameter: ".scalar(@heatpump_parameters)." instead of ".$count_set_parameter;
 	  $socket->close();
       return "$name|0|Unpacking problem of set parameters";
   }
 
-  Log3 $name, 5, "$name: $count set values received";
+  Log3 $name, 5, "$name: $count_set_parameter set values received";
 
 goto SKIP_VISIBILITY_READING;
   
@@ -410,25 +484,25 @@ SKIP_VISIBILITY_READING:
   my $return_str="$name";
   # 1 - no error = 1
   $return_str .= "|1";
-  # 2 - currentOperatingState1
+  # 2 - opStateHeatPump1
   $return_str .= "|".$heatpump_values[117];
-  # 3 - currentOperatingState3
+  # 3 - opStateHeatPump3
   $return_str .= "|".$heatpump_values[119];
-  # 4 - Stufe - Value 121
+  # 4 - Stufe - ID_WEB_HauptMenuAHP_Stufe
   $return_str .= "|".$heatpump_values[121];
-  # 5 - Temperature Value 122
+  # 5 - Temperature Value - ID_WEB_HauptMenuAHP_Temp
   $return_str .= "|".$heatpump_values[122];
-  # 6 - Verdichter1 
+  # 6 - Compressor1 
   $return_str .= "|".$heatpump_values[44];
-  # 7 - hotWaterOperatingMode
+  # 7 - opModeHotWater
   $return_str .= "|".$heatpump_parameters[4];
   # 8 - hotWaterMonitoring
   $return_str .= "|".$heatpump_values[124];
   # 9 - hotWaterBoilerValve
   $return_str .= "|".$heatpump_values[38];
-  # 10 - heatingOperatingMode
+  # 10 - opModeHeating
   $return_str .= "|".$heatpump_parameters[3];
-  # 11 - heatingSommerMode
+  # 11 - heatingLimit
   $return_str .= "|".$heatpump_parameters[699];
   # 12 - ambientTemperature
   $return_str .= "|".$heatpump_values[15];
@@ -452,9 +526,9 @@ SKIP_VISIBILITY_READING:
       $fwvalue .= chr($heatpump_values[$fi]) if $heatpump_values[$fi];
   }
   $return_str .= "|".$fwvalue;
-  # 21 - thresholdTemperatureSummerMode
+  # 21 - thresholdHeatingLimit
   $return_str .= "|".$heatpump_parameters[700];
-  # 22 - readingsDeviceTime
+  # 22 - rawDeviceTimeCalc
   $return_str .= "|".$heatpump_values[134];
   # 23 - heatSourceIN
   $return_str .= "|".$heatpump_values[19];
@@ -464,41 +538,51 @@ SKIP_VISIBILITY_READING:
   $return_str .= "|".$heatpump_values[18];
   # 26 - hotGasTemperature
   $return_str .= "|".$heatpump_values[14];
-  # 27 - heatingSystemCirculationPump
+  # 27 - heatingSystemCircPump
   $return_str .= "|".$heatpump_values[39];
-  # 28 - hotWaterCirculatingPumpExtern
+  # 28 - hotWaterCircPumpExtern
   $return_str .= "|".$heatpump_values[46];
-  # 29 - readingStartTime
+  # 29 - readingFhemStartTime
   $return_str .= "|".$readingStartTime;
-  # 30 - readingEndTime
+  # 30 - readingFhemEndTime
   $return_str .= "|".$readingEndTime;
   # 31 - typeHeatpump
   $return_str .= "|".$heatpump_values[78];
-  # 32 - operatingHoursSecondHeatSource1
+  # 32 - counterHours2ndHeatSource1
   $return_str .= "|".$heatpump_values[60];
-  # 33 - operatingHoursHeatpump
+  # 33 - counterHoursHeatpump
   $return_str .= "|".$heatpump_values[63];
-  # 34 - operatingHoursHeating
+  # 34 - counterHoursHeating
   $return_str .= "|".$heatpump_values[64];
-  # 35 - operatingHoursHotWater
+  # 35 - counterHoursHotWater
   $return_str .= "|".$heatpump_values[65];
-  # 36 - heatQuantityHeating
+  # 36 - counterHeatQHeating
   $return_str .= "|".$heatpump_values[151];
-  # 37 - heatQuantityHotWater
+  # 37 - counterHeatQHeating
   $return_str .= "|".$heatpump_values[152];
-  # 38 - operatingHoursSecondHeatSource2
+  # 38 - counterHours2ndHeatSource2
   $return_str .= "|".$heatpump_values[61];
-  # 39 - operatingHoursSecondHeatSource3
+  # 39 - counterHours2ndHeatSource3
   $return_str .= "|".$heatpump_values[62];
-  # 40 - currentOperatingState2 
+  # 40 - opStateHeatPump2 
   $return_str .= "|".$heatpump_values[118];
-  # 41 - durationOperatingState
+  # 41 - opStateHeatPump2Duration
   $return_str .= "|".$heatpump_values[120];
   # 42 - timeError0
   $return_str .= "|".$heatpump_values[95];
   # 43 - bivalentLevel
   $return_str .= "|".$heatpump_values[79];
-
+  # 44 - Number of calculated values
+  $return_str .= "|".$count_calc_values;
+  # 45 - Number of set parameters
+  $return_str .= "|".$count_set_parameter;
+  # 46 - opStateHeating
+  $return_str .= "|".$heatpump_values[125];
+  # 47 - deltaHeatingReduction
+  $return_str .= "|".$heatpump_parameters[13];
+  # 48 - thresholdTemperatureSetBack
+  $return_str .= "|".$heatpump_parameters[111];
+				
   return $return_str;
 }
 
@@ -545,24 +629,37 @@ LUXTRONIK2_UpdateDone($)
 				16 => "Durchflussueberwachung",
 				17 => "Elektrische Zusatzheizung" );
   my %wpMode = ( 0 => "Automatik",
-			 1 => "Zusatzheizung",
-			 2 => "Party",
-			 3 => "Ferien",
-			 4 => "Aus" );
+				 1 => "Zusatzheizung",
+				 2 => "Party",
+				 3 => "Ferien",
+				 4 => "Aus" );
+   my %heatingState = ( 0 => "Abgesenkt",
+					 1 => "Normal",
+					 3 => "Aus");
   my %wpType = ( 0 => "ERC", 1 => "SW1", 
-				  2 => "SW2", 3 => "WW1", 
-				  4 => "WW2", 5 => "L1I", 
-				  6 => "L2I", 7 => "L1A", 
-				  8 => "L2A", 9 => "KSW",
-				 10 => "KLW", 11 => "SWC", 
-				 12 => "LWC", 13 => "L2G",
-				 14 => "WZS", 15 => "L1I407",
-				 16 => "L2I407", 17 => "L1A407",
-				 18 => "L2A407", 19 => "L2G407",
-				 20 => "LWC407", 21 => "L1AREV",
-				 22 => "L2AREV", 23 => "WWC1",
-				 24 => "WWC2", 25 => "L2G404",
-				 26 => "ERC" );
+				 2 => "SW2", 3 => "WW1", 
+				 4 => "WW2", 5 => "L1I", 
+				 6 => "L2I", 7 => "L1A", 
+				 8 => "L2A", 9 => "KSW",
+				10 => "KLW", 11 => "SWC", 
+				12 => "LWC", 13 => "L2G",
+				14 => "WZS", 15 => "L1I407",
+				16 => "L2I407", 17 => "L1A407",
+				18 => "L2A407", 19 => "L2G407",
+				20 => "LWC407", 21 => "L1AREV",
+				22 => "L2AREV", 23 => "WWC1",
+				24 => "WWC2", 25 => "L2G404",
+				26 => "WZW", 27 => "L1S",
+				28 => "L1H", 29 => "L2H",
+				30 => "WZWD", 31 => "ERC",
+				40 => "WWB_20", 41 => "LD5",
+				42 => "LD7", 43 => "SW 37_45",
+				44 => "SW 58_69", 45 => "SW 29_56",
+				46 => "LD5 (230V)", 47 => "LD7 (230 V)",
+				48 => "LD9", 49 => "LD5 REV",
+				50 => "LD7 REV", 51 => "LD5 REV 230V",
+				52 => "LD7 REV 230V", 53 => "LD9 REV 230V",
+				54 => "SW 291", 55 => "LW SEC" );
 				 
   my $counterRetry = $hash->{fhem}{counterRetry};
   $counterRetry++;	 
@@ -582,84 +679,130 @@ LUXTRONIK2_UpdateDone($)
   }
   elsif ($a[1]==1 )  {
     $counterRetry = 0;  
+
 	readingsBeginUpdate($hash);
 
+    # Temporary storage of values because needed several times
+	my $ambientTemperature = LUXTRONIK2_CalcTemp($a[12]);
+	my $averageAmbientTemperature = LUXTRONIK2_CalcTemp($a[13]);
+	my $hotWaterTemperature = LUXTRONIK2_CalcTemp($a[14]);
+    my $thresholdHeatingLimit = LUXTRONIK2_CalcTemp($a[21]);
+	my $thresholdTemperatureSetBack = LUXTRONIK2_CalcTemp($a[48]);
+	my $flowTemperature = LUXTRONIK2_CalcTemp($a[15]);
+	my $returnTemperature = LUXTRONIK2_CalcTemp($a[16]);
+
+	# if selected, do all the statistic calculations
+	if ( AttrVal($name,"doStatistics",0) == 1) {
+		$value = LUXTRONIK2_doStatisticBoiler ($hash, $a[22], $a[37]/10, $hotWaterTemperature);
+		if ($value ne "") {
+			readingsBulkUpdate($hash,"statGradientBoilerTempLoss",$value);
+			Log3 $name,3,"$name: statGradientBoilerTempLoss set to $value"
+		}
+	}
+
   #Operating status of heat pump
-	  my $currentOperatingState1 = $wpOpStat1{$a[2]}; ##############
-      $currentOperatingState1 = "unbekannt (".$a[2].")" unless $currentOperatingState1;
-	  readingsBulkUpdate($hash,"currentOperatingState1",$currentOperatingState1);
+	  my $opStateHeatPump1 = $wpOpStat1{$a[2]}; ##############
+      $opStateHeatPump1 = "unbekannt (".$a[2].")" unless $opStateHeatPump1;
+	  readingsBulkUpdate($hash,"opStateHeatPump1",$opStateHeatPump1);
 	  
-	  my $currentOperatingState2 = "unknown ($a[40])"; ##############
+	  my $opStateHeatPump2 = "unknown ($a[40])"; ##############
 	  my $prefix = "";
 	  if ($a[40] == 0 || $a[40] == 2) { $prefix = "seit ";}
 	  elsif ($a[40] == 1) { $prefix = "in ";}
 	  if ($a[40] == 2) { #Sonderbehandlung bei WP-Fehlern
-	    $currentOperatingState2 = $prefix . strftime "%d.%m.%Y %H:%M:%S", localtime($a[42]);
+	    $opStateHeatPump2 = $prefix . strftime "%d.%m.%Y %H:%M:%S", localtime($a[42]);
 	  } else {
-	    $currentOperatingState2 = $prefix . LUXTRONIK2_FormatDuration($a[41]);
+	    $opStateHeatPump2 = $prefix . LUXTRONIK2_FormatDuration($a[41]);
 	  }
-	  readingsBulkUpdate($hash,"currentOperatingState2",$currentOperatingState2);
+	  readingsBulkUpdate($hash,"opStateHeatPump2",$opStateHeatPump2);
 	  
-	  my $currentOperatingState3 = $wpOpStat2{$a[3]}; ##############
+	  my $opStateHeatPump3 = $wpOpStat2{$a[3]}; ##############
 	  # refine text of third state
 	  if ($a[3]==6) { 
-	     $currentOperatingState3 = "Stufe ".$a[4]." ".LUXTRONIK2_CalcTemp($a[5])." &deg;C "; 
+	     $opStateHeatPump3 = "Stufe ".$a[4]." ".LUXTRONIK2_CalcTemp($a[5])." C "; 
 	  }
       elsif ($a[3]==7) { 
-         if ($a[6]==1) {$currentOperatingState3 = "Abtauen (Kreisumkehr)";}
-         else {$currentOperatingState3 = "Luftabtauen";}
+         if ($a[6]==1) {$opStateHeatPump3 = "Abtauen (Kreisumkehr)";}
+         else {$opStateHeatPump3 = "Luftabtauen";}
       }
-      $currentOperatingState3 = "unbekannt (".$a[3].")" unless $currentOperatingState3;
-	  readingsBulkUpdate($hash,"currentOperatingState3",$currentOperatingState3);
+      $opStateHeatPump3 = "unbekannt (".$a[3].")" unless $opStateHeatPump3;
+	  readingsBulkUpdate($hash,"opStateHeatPump3",$opStateHeatPump3);
 	
 	# Hot water operating mode 
 	  $value = $wpMode{$a[7]};
 	  $value = "unbekannt (".$a[7].")" unless $value;
-	  readingsBulkUpdate($hash,"hotWaterOperatingMode",$value);
-	# hotWaterStatus
+	  readingsBulkUpdate($hash,"opModeHotWater",$value);
+	# opStateHotWater
 	  if ($a[8]==0) {$value="Sperrzeit";}
       elsif ($a[8]==1 && $a[9]==1) {$value="Aufheizen";}
-      elsif ($a[8]==1 && $a[9]==0) {$value="Temp.OK";}
+      elsif ($a[8]==1 && $a[9]==0) {$value="Temp. OK";}
 	  elsif ($a[8]==3) {$value="Aus";}
       else {$value = "unbekannt (".$a[8]."/".$a[9].")";}
-	  readingsBulkUpdate($hash,"hotWaterStatus",$value);
+	  readingsBulkUpdate($hash,"opStateHotWater",$value);
 
-	# Heating operating mode including summer mode and average ambient temperature
-	  readingsBulkUpdate($hash,"heatingSummerMode",$a[11]?"on":"off");
-	  my $thresholdTemperatureSummerMode=LUXTRONIK2_CalcTemp($a[21]);
-	  readingsBulkUpdate($hash,"thresholdTemperatureSummerMode",$thresholdTemperatureSummerMode);
-	  my $averageAmbientTemperature=LUXTRONIK2_CalcTemp($a[13]);
-	  readingsBulkUpdate($hash,"averageAmbientTemperature",$averageAmbientTemperature);
-	  # Heating operating mode
+    # Heating operating mode
 	  $value = $wpMode{$a[10]};
-	  # Consider also summer mode
+	  $value = "unbekannt (".$a[10].")" unless $value;
+	  readingsBulkUpdate($hash,"opModeHeating",$value);
+	# Heating operating state
+	  # Consider also heating limit
 	  if ($a[10] == 0 
 	        && $a[11] == 1
-		    && $averageAmbientTemperature >= $thresholdTemperatureSummerMode)
-        {$value = "Automatik - Sommerbetrieb (Aus)";}
-	  $value = "unbekannt (".$a[10].")" unless $value;
-	  readingsBulkUpdate($hash,"heatingOperatingMode",$value);
-
-	# Remaining temperatures and flow rate
-	  readingsBulkUpdate($hash,"ambientTemperature",LUXTRONIK2_CalcTemp($a[12]));
-	  my $hotWaterTemperature = LUXTRONIK2_CalcTemp($a[14]);
-	  readingsBulkUpdate($hash,"hotWaterTemperature",$hotWaterTemperature);
-	  readingsBulkUpdate($hash,"hotWaterTemperatureTarget",LUXTRONIK2_CalcTemp($a[25]));
-	  readingsBulkUpdate($hash,"flowTemperature",LUXTRONIK2_CalcTemp($a[15]));
-	  readingsBulkUpdate($hash,"returnTemperature",LUXTRONIK2_CalcTemp($a[16]));
-	  readingsBulkUpdate($hash,"returnTemperatureTarget",LUXTRONIK2_CalcTemp($a[17]));
-	  readingsBulkUpdate($hash,"returnTemperatureExtern",LUXTRONIK2_CalcTemp($a[18]));
-	  readingsBulkUpdate($hash,"flowRate",$a[19]);
-	  readingsBulkUpdate($hash,"heatSourceIN",LUXTRONIK2_CalcTemp($a[23]));
-	  readingsBulkUpdate($hash,"heatSourceOUT",LUXTRONIK2_CalcTemp($a[24]));
-	  readingsBulkUpdate($hash,"hotGasTemperature",LUXTRONIK2_CalcTemp($a[26]));
+		    && $averageAmbientTemperature >= $thresholdHeatingLimit) {
+		$value = "Heizungsgrenze (Aus)";
+	  } else {
+	    $value = $heatingState{$a[46]};
+		$value = "unbekannt (".$a[46].")" unless $value;
+	  # Consider heating reduction limit
+		if ($a[46] == 0) {
+		  if ($thresholdTemperatureSetBack <= $ambientTemperature) { 
+			 $value .= " ".LUXTRONIK2_CalcTemp($a[47])." C"; 
+		  } else {
+			 $value = "Normal da < $thresholdTemperatureSetBack C"; 
+		  }
+		}
+	  }
+	  readingsBulkUpdate($hash,"opStateHeating",$value);
+		
+   # Device and reading times, delays and durations
+	  $value = strftime "%Y-%m-%d %H:%M:%S", localtime($a[22]);
+	  readingsBulkUpdate($hash, "deviceTimeCalc", $value);
+	  my $delayDeviceTimeCalc=floor($a[29]-$a[22]+0.5);
+	  readingsBulkUpdate($hash, "delayDeviceTimeCalc", $delayDeviceTimeCalc);
+	  my $durationFetchReadings = floor(($a[30]-$a[29]+0.005)*100)/100;
+	  readingsBulkUpdate($hash, "durationFetchReadings", $durationFetchReadings);
+	  #Remember min and max reading durations, will be reset when initializing the device
+	  if ($hash->{fhem}{durationFetchReadingsMin} == 0 || $hash->{fhem}{durationFetchReadingsMin} > $durationFetchReadings) {
+		$hash->{fhem}{durationFetchReadingsMin} = $durationFetchReadings;
+		} 
+	  if ($hash->{fhem}{durationFetchReadingsMax} < $durationFetchReadings) {
+		$hash->{fhem}{durationFetchReadingsMax} = $durationFetchReadings;
+		}
+   
+   # Temperatures and flow rate
+	  readingsBulkUpdate( $hash, "ambientTemperature", $ambientTemperature);
+	  readingsBulkUpdate( $hash, "averageAmbientTemperature", $averageAmbientTemperature);
+	  readingsBulkUpdate( $hash, "heatingLimit",$a[11]?"on":"off");
+	  readingsBulkUpdate( $hash, "thresholdHeatingLimit", $thresholdHeatingLimit);
+	  readingsBulkUpdate( $hash, "thresholdTemperatureSetBack", $thresholdTemperatureSetBack); 
+	  readingsBulkUpdate( $hash, "hotWaterTemperature", $hotWaterTemperature);
+	  readingsBulkUpdate( $hash, "hotWaterTemperatureTarget",LUXTRONIK2_CalcTemp($a[25]));
+	  readingsBulkUpdate( $hash, "flowTemperature", $flowTemperature);
+	  readingsBulkUpdate( $hash, "returnTemperature", $returnTemperature);
+	  readingsBulkUpdate( $hash, "returnTemperatureTarget",LUXTRONIK2_CalcTemp($a[17]));
+	  readingsBulkUpdate( $hash, "returnTemperatureExtern",LUXTRONIK2_CalcTemp($a[18]));
+	  readingsBulkUpdate( $hash, "flowRate",$a[19]);
+	  readingsBulkUpdate( $hash, "heatSourceIN",LUXTRONIK2_CalcTemp($a[23]));
+	  readingsBulkUpdate( $hash, "heatSourceOUT",LUXTRONIK2_CalcTemp($a[24]));
+	  readingsBulkUpdate( $hash, "hotGasTemperature",LUXTRONIK2_CalcTemp($a[26]));
+	  
 	  
 	# Input / Output status
-	  readingsBulkUpdate($hash,"heatingSystemCirculationPump",$a[27]?"on":"off");
-	  readingsBulkUpdate($hash,"hotWaterCirculationPumpExtern",$a[28]?"on":"off");
+	  readingsBulkUpdate($hash,"heatingSystemCircPump",$a[27]?"on":"off");
+	  readingsBulkUpdate($hash,"hotWaterCircPumpExtern",$a[28]?"on":"off");
 	  readingsBulkUpdate($hash,"hotWaterSwitchingValve",$a[9]?"on":"off");
 
-	  # bivalentLevel
+	# bivalentLevel
 	  readingsBulkUpdate($hash,"bivalentLevel",$a[43]);
 	  
 	# Firmware
@@ -677,45 +820,38 @@ LUXTRONIK2_UpdateDone($)
 	  $value = "unbekannt (".$a[31].")" unless $value;
 	  readingsBulkUpdate($hash,"typeHeatpump",$value);
 
-	# Device times during readings 
-	  $value = strftime "%Y-%m-%d %H:%M:%S", localtime($a[22]);
-	  readingsBulkUpdate($hash, "deviceTimeStartReadings", $value);
-	  my $delayDeviceTimeCalc=floor($a[29]-$a[22]+0.5);
-	  readingsBulkUpdate($hash, "delayDeviceTimeCalc", $delayDeviceTimeCalc);
-	  my $durationFetchReadings = floor(($a[30]-$a[29]+0.005)*100)/100;
-	  readingsBulkUpdate($hash, "durationFetchReadings", $durationFetchReadings);
-	  #Remember min and max reading durations, will be reset when initializing the device
-	  if ($hash->{fhem}{durationFetchReadingsMin} == 0 || $hash->{fhem}{durationFetchReadingsMin} > $durationFetchReadings) {
-		$hash->{fhem}{durationFetchReadingsMin} = $durationFetchReadings;
-		} 
-	  if ($hash->{fhem}{durationFetchReadingsMax} < $durationFetchReadings) {
-		$hash->{fhem}{durationFetchReadingsMax} = $durationFetchReadings;
-		} 
-		
-	  #Operating hours (secondy->hours) and heat quantities, write/create readings only if >0	
-	  if ($a[32]>0) {readingsBulkUpdate($hash,"operatingHoursSecondHeatSource1",floor($a[32]/360+0.5)/10);}
-	  if ($a[33]>0) {readingsBulkUpdate($hash,"operatingHoursHeatPump",floor($a[33]/360+0.5)/10);}
-	  if ($a[34]>0) {readingsBulkUpdate($hash,"operatingHoursHeating",floor($a[34]/360+0.5)/10);}
-	  if ($a[35]>0) {readingsBulkUpdate($hash,"operatingHoursHotWater",floor($a[35]/360+0.5)/10);}
-	  if ($a[36]>0) {readingsBulkUpdate($hash,"heatQuantityHeating",$a[36]/10);}
-	  if ($a[37]>0) {readingsBulkUpdate($hash,"heatQuantityHotWater",$a[37]/10);}
-	  if ($a[36]+$a[37]>0) {readingsBulkUpdate($hash,"heatQuantityTotal",($a[36]+$a[37])/10);}
-	  if ($a[38]>0) {readingsBulkUpdate($hash,"operatingHoursSecondHeatSource2",floor($a[38]/360+0.5)/10);}
-	  if ($a[39]>0) {readingsBulkUpdate($hash,"operatingHoursSecondHeatSource3",floor($a[39]/360+0.5)/10);}
-		
-	#HTML for floorplan
-	if(AttrVal($name, "statusHTML", "none") ne "none") {
+	# Operating hours (seconds->hours) and heat quantities, write/create readings only if >0	
+	  if ($a[32]>0) {readingsBulkUpdate($hash,"counterHours2ndHeatSource1",floor($a[32]/360+0.5)/10);}
+	  if ($a[38]>0) {readingsBulkUpdate($hash,"counterHours2ndHeatSource2",floor($a[38]/360+0.5)/10);}
+	  if ($a[39]>0) {readingsBulkUpdate($hash,"counterHours2ndHeatSource3",floor($a[39]/360+0.5)/10);}
+	  if ($a[33]>0) {readingsBulkUpdate($hash,"counterHoursHeatPump",floor($a[33]/360+0.5)/10);}
+	  if ($a[34]>0) {readingsBulkUpdate($hash,"counterHoursHeating",floor($a[34]/360+0.5)/10);}
+	  if ($a[35]>0) {readingsBulkUpdate($hash,"counterHoursHotWater",floor($a[35]/360+0.5)/10);}
+	  if ($a[36]>0) {readingsBulkUpdate($hash,"counterHeatQHeating",$a[36]/10);}
+	  if ($a[37]>0) {readingsBulkUpdate($hash,"counterHeatQHotWater",$a[37]/10);}
+	  if ($a[36]+$a[37]>0) {readingsBulkUpdate($hash,"counterHeatQTotal",($a[36]+$a[37])/10);}
+	  #WM[kW] = Wäremekapazität * (TVL-TRL) * Durchfluss [ccm/s]
+	  $value = 4.18 * ($flowTemperature-$returnTemperature) * $a[19] / 36000;
+	  $value = floor( 10 * $value + 0.5) / 10;
+	  readingsBulkUpdate( $hash, "currentThermalOutput", $value);
+	  
+	# HTML for floorplan
+	  if(AttrVal($name, "statusHTML", "none") ne "none") {
 		  $value = "<div class=fp_" . $a[0] . "_title>" . $a[0] . "</div>";
-		  $value .= "$currentOperatingState1 $currentOperatingState2<br>";
-		  $value .= $currentOperatingState3 . "<br>";
-		  $value .= "Brauchwasser: " . $hotWaterTemperature . "&deg;C";
+		  $value .= "$opStateHeatPump1<br>";
+		  $value .= "$opStateHeatPump2<br>";
+		  $value .= "$opStateHeatPump3<br>";
+		  $value .= "Brauchwasser: $hotWaterTemperature &deg;C";
 		  readingsBulkUpdate($hash,"floorplanHTML",$value);
 	  }
-
- 	  readingsBulkUpdate($hash,"state","$currentOperatingState1 $currentOperatingState2 - $currentOperatingState3");
+    # State update
+ 	  readingsBulkUpdate($hash,"state","$opStateHeatPump1 $opStateHeatPump2 - $opStateHeatPump3");
 	  
       readingsEndUpdate($hash,1);
-
+	  
+	  $hash->{helper}{fetched_calc_values} = $a[44];
+	  $hash->{helper}{fetched_parameters} = $a[45];
+	  
 	############################ 
 	#Auto Synchronize Device Clock
 	  my $autoSynchClock = AttrVal($name, "autoSynchClock", 0);
@@ -756,7 +892,8 @@ LUXTRONIK2_UpdateAborted($)
   my ($hash) = @_;
   delete($hash->{helper}{RUNNING_PID});
   my $name = $hash->{NAME};
-  Log3 $hash, 1, "$name LUXTRONIK2_UpdateAborted: Timeout when connecting to host";
+  my $host = $hash->{HOST};
+  Log3 $hash, 1, "$name Error: Timeout when connecting to host $host";
 }
 
 
@@ -811,9 +948,9 @@ LUXTRONIK2_SetParameter($$$)
 	 $setValue = int($realValue * 2) * 5;
 	 $realValue = $setValue / 10;
   }
-  elsif ($parameterName eq "hotWaterOperatingMode") {
+  elsif ($parameterName eq "opModeHotWater") {
 	 if (! exists($opMode{$realValue})) {
-		return "$name Error: Wrong parameter given for hotWaterOperatingMode, use Automatik,Party,Off"
+		return "$name Error: Wrong parameter given for opModeHotWater, use Automatik,Party,Off"
 	  }
 	 $setParameter = 4;
  	 $setValue = $opMode{$realValue};
@@ -911,7 +1048,7 @@ LUXTRONIK2_synchronizeClock (@)
 	  Log3 $name, 5, "$name: Run command 'date ".$newTime."'";
 		@output=$telnet->cmd('date '.$newTime);
 		$returnStr = "Internal clock of host $host corrected by $delay seconds. -> ".$output[0];
-		readingsSingleUpdate($hash,"lastDeviceClockSynch",TimeNow,1);
+		readingsSingleUpdate($hash,"deviceTimeLastSync",TimeNow,1);
 	  }
    
    Log3 $name, 5, "$name: Close telnet connection.";
@@ -926,16 +1063,100 @@ LUXTRONIK2_checkFirmware ($)
   my ($myFirmware) = @_;
 
   #Firmware not tested
-	if (index("#".$myFirmware."#",$testedFirmware) == -1) { 
+	if (index($testedFirmware,"#".$myFirmware."#") == -1) { 
 	   return "fwNotTested";
   #Firmware tested but not compatible
-	} elsif (index("#".$myFirmware."#",$compatibleFirmware) == -1) { 
+	} elsif (index($compatibleFirmware,"#".$myFirmware."#") == -1) { 
 	   return "fwNotCompatible";
   #Firmware compatible
  	} else {
  	   return "fwCompatible";
 	}
 }
+
+# Calculate hourly gradients of boiler based on hotWaterTemperature and counterHeatQHeating
+sub ######################################## 
+LUXTRONIK2_doStatisticBoiler ($$$$) 
+{
+
+    my ($hash,$time,$currHQ,$currTemp) = @_;
+	my $name = $hash->{NAME};
+    my $statModeHW = $hash->{fhem}{statModeHotWater};
+ 	my $minTemp = $hash->{fhem}{statHotWaterTempMin};
+	my $maxTemp = $hash->{fhem}{statHotWaterTempMax};
+	my $lastHQ = $hash->{fhem}{statHQHotWater};
+    my $value1 = 0;
+    my $value2 = 0;
+    my $value3 = 0;
+	
+  # mode 0 = init hot water gradient calculation 
+   if ($statModeHW == 0) { # -> Mode 1
+	  Log3 $name, 4, "$name: Boiler statMode 0: Initialized";
+	  $hash->{fhem}{statModeHotWater} = 1; 
+	  $hash->{fhem}{statStartTimeHotWater} = $time; 
+	  $hash->{fhem}{statHQHotWater} = $currHQ;
+	  $hash->{fhem}{statHotWaterTempMax} = $currTemp;
+	  $hash->{fhem}{statHotWaterTempMin} = $currTemp;
+	  
+  # mode 1 = wait till maximum of temperature is reached 
+   } elsif ($statModeHW == 1) { 
+	  # wait until heat quantity does not change anymore 
+	  if ($lastHQ != $currHQ) { 
+		 Log3 $name, 4, "$name: Boiler statMode 1: Heat Quantity changed ($lastHQ -> $currHQ)";
+		 $hash->{fhem}{statHQHotWater} = $currHQ;
+		 $hash->{fhem}{statHotWaterTempMax} = $currTemp;
+	  # and temperature is not rising anymore
+	  } elsif ($maxTemp < $currTemp) { 
+		 Log3 $name, 4, "$name: Boiler statMode 1: Temperature increased ($maxTemp < $currTemp)";
+		 $hash->{fhem}{statHotWaterTempMax} = $currTemp;
+	  # and temperature is starting to decrease -> Mode 2
+	  } elsif ($maxTemp - 0.2 > $currTemp) { 
+		 $value1 =  $maxTemp - $minTemp; # delta against last hot water temperature
+		 $value2 = ( $time - $hash->{fhem}{statStartTimeHotWater} ) / 60; # devided by delta time (minutes)
+		 $value3 = floor(100 * $value1 / $value2 + 0.5) / 100;  # rounded to 1/100th
+		 $value2 = floor($value2 + 0.5); # rounded 
+
+		 Log3 $name, 4, "$name: Boiler statMode 1: Measurement finished, start new measurement (maximum = $maxTemp )";
+		 $hash->{fhem}{statModeHotWater} = 2;
+		 $hash->{fhem}{statStartTimeHotWater} = $time; 
+		 $hash->{fhem}{statHotWaterTempMin} = $currTemp;
+
+		 return "DT/min: $value3 DT: $value1 Dmin: $value2";
+	  
+	  } else {
+		 Log3 $name, 4, "$name: Boiler statMode 1: Wait till temperature decreases (".($maxTemp-0.2)." <= $currTemp <= ".$maxTemp.")";
+	  }
+	  
+  # mode 2 = wait till heat quantity changes or minimum of temperature reached
+   } elsif ($statModeHW == 2) {
+       # wait until heat quantity changes or temperature is raising again
+	  if ($hash->{fhem}{statHQHotWater} != $currHQ 
+			 || $minTemp + 0.2 < $currTemp) { # wait till change of heat quantity or rising temperature -> Mode 1
+		 Log3 $name, 4, "$name: Boiler statMode 2: Heat quantiy changed or temperature raised ($lastHQ != $currHQ or $minTemp +0.2 < $currTemp)";
+		 $value1 =  $minTemp - $maxTemp; # delta against last hot water temperature
+		 $value2 = ( $time - $hash->{fhem}{statStartTimeHotWater} ) / 3600; # devided by delta time (hours)
+		 $value3 = floor(100 * $value1 / $value2 + 0.5) / 100;  # rounded to 1/100th
+		 $value2 = floor(100 * $value2 + 0.5) / 100; # rounded to 1/100th
+		 Log3 $name, 4, "$name: Boiler statMode 2: Measurement finished, start new measurment (minimum = $minTemp)";
+
+		 $hash->{fhem}{statModeHotWater} = 1; 
+		 $hash->{fhem}{statStartTimeHotWater} = $time; 
+		 $hash->{fhem}{statHotWaterTempMax} = $currTemp;
+		 $hash->{fhem}{statHQHotWater} = $currHQ;
+
+		 return "DT/h: $value3 DT: $value1 Dh: $value2";
+
+	  } elsif ($minTemp > $currTemp) {
+		 Log3 $name, 4, "$name: Boiler statMode 2: Temperature decreased ($minTemp > $currTemp)";
+		 $hash->{fhem}{statHotWaterTempMin} = $currTemp;
+      } else {
+		 Log3 $name, 4, "$name: Boiler statMode 2: Monitoring temperature change ($minTemp <= $currTemp <= ".($minTemp+0.2).")";
+	  }
+   }
+ 
+  return "";
+}	
+
 
 1;
 
@@ -945,10 +1166,10 @@ LUXTRONIK2_checkFirmware ($)
 <a name="LUXTRONIK2"></a>
 <h3>LUXTRONIK2</h3>
 <ul>
-  Luxtronik 2.0 is a heating controller used in Alpha Innotec and Siemens Novelan heat pumps.
+  Luxtronik 2.0 is a heating controller used in Alpha Innotec and Siemens Novelan (WPR NET) heat pumps.
   It has a built-in ethernet port, so it can be directly integrated into a local area network (LAN).
   <br>
-  <i>The modul is tested with firmware v1.54C.</i>
+  <i>The modul is reported to work with firmware: V1.54C, V1.60, V1.69.</i>
   <br>&nbsp;
   <br>
   
@@ -966,11 +1187,12 @@ LUXTRONIK2_checkFirmware ($)
   <a name="LUXTRONIK2set"></a>
   <b>Set</b><br>
    <ul>A firmware check assures before each set operation that a heat pump with untested firmware is not damaged accidently.
-  <li><b>&lt;hotWaterOperatingMode&gt;</b> &lt;Mode:Auto|Party|Off&gt;- Operating Mode of domestic hot water boiler</li>
-  <li><b>&lt;hotWaterTemperatureTarget&gt;</b> &lt;temperature &deg;C&gt; - Target temperature of domestic hot water boiler</li>
-  <li><b>&lt;INTERVAL&gt;</b> &lt;seconds&gt; - Polling interval</li>
-  <li><b>&lt;statusRequest&gt;</b> - Update device information</li>
-  <li><b>&lt;synchClockHeatPump&gt;</b> - Synchronizes controller clock with FHEM time. <b>This change is lost in case of controller power off!!</b></li>
+  <li>opModeHotWater &lt;Mode&gt;- Operating Mode of domestic hot water boiler (Auto | Party | Off)</li>
+  <li>hotWaterTemperatureTarget &lt;temperature&gt; - Target temperature of domestic hot water boiler in &deg;C</li>
+  <li>INTERVAL &lt;polling interval&gt; - Polling interval in seconds</li>
+  <li>statusRequest - Update device information</li>
+  <li>synchClockHeatPump - Synchronizes controller clock with FHEM time.<br>
+  <b>!! This change is lost in case of controller power off!!</b></li>
   </ul>
   <br>
   <a name="LUXTRONIK2get"></a>
@@ -986,13 +1208,16 @@ LUXTRONIK2_checkFirmware ($)
     <li>statusHTML<br>
       If set, a HTML-formatted reading named "floorplanHTML" is created. It can be used with the <a href="#FLOORPLAN">FLOORPLAN</a> module.<br>
       Currently, if the value of this attribute is not NULL, the corresponding reading consists of the current status of the heat pump and the temperature of the water.</li>
-    <li>allowSetParameter &lt; 0 | 1 &gt;<br>f
+    <li>doStatistics &lt; 0 | 1 &gt;<br>
+		Still Beta - Calculates statistic values: <i>statGradientBoilerTempLoss</i>
+	<li>allowSetParameter &lt; 0 | 1 &gt;<br>
       The <a href="#LUXTRONIK2set">parameters</a> of the heat pump controller can only be changed if this attribut is set to 1.</li>
 	<li>autoSynchClock &lt;delay&gt;<br>
-		Corrects the clock of the heatpump automatically if certain <i>delay</i> (10 s - 600 s) against the FHEM time is reached. Does a firmware check before.<br>
-		<i>(A 'delayDeviceTimeCalc' &lt;= 2 s is due to the internal calculation interval of the heat pump controller)</i></li>
+		Corrects the clock of the heatpump automatically if a certain <i>delay</i> (10 s - 600 s) against the FHEM time is exeeded. Does a firmware check before.<br>
+		<i>(A 'delayDeviceTimeCalc' &lt;= 2 s can be caused by the internal calculation interval of the heat pump controller.)</i></li>
 	<li>ignoreFirmwareCheck &lt; 0 | 1 &gt;<br>
-		A firmware check assures before each set operation that a heatpump controller with untested firmware is not damaged accidently. If this attribute is set to 1, the firmware check is ignored and new firmware can be tested for compatibility.</li>
+		A firmware check assures before each set operation that a heatpump controller with untested firmware is not damaged accidently.<br>
+		If this attribute is set to 1, the firmware check is ignored and new firmware can be tested for compatibility.</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
  </ul>
   <br>
@@ -1006,9 +1231,9 @@ LUXTRONIK2_checkFirmware ($)
 <a name="LUXTRONIK2"></a>
 <h3>LUXTRONIK2</h3>
 <ul>
-  Die Luxtronik 2.0 ist eine Heizungssteuerung, welche in W&auml;rmepumpen von Alpha Innotec und Siemens Novelan verbaut ist.
+  Die Luxtronik 2.0 ist eine Heizungssteuerung, welche in W&auml;rmepumpen von Alpha Innotec und Siemens Novelan (WPR NET) verbaut ist.<br>
   Sie besitzt einen Ethernet Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.<br>
-  <i>Das Modul wurde bisher mit der Steuerungs-Firmware v1.54C getestet.</i>
+  <i>Das Modul wurde bisher mit folgender Steuerungs-Firmware getestet: V1.54C, V1.60, V1.69.</i>
   <br>&nbsp;
   <br>
   
@@ -1028,12 +1253,12 @@ LUXTRONIK2_checkFirmware ($)
   <b>Set</b><br>
   <ul>
 	  Durch einen Firmware-Test wird vor jeder Set-Operation sichergestellt, dass W&auml;rmepumpen mit ungetester Firmware nicht unabsichtlich besch&auml;digt werden.
-      <li>hotWaterOperatingMode &lt;Betriebsmodus&gt; - Betriebsmodus des Heißwasserboilers ( Auto | Party | Off )</l>
-	  <li>hotWaterTemperatureTarget &lt;Temperatur&gt; - Soll-Temperatur des Heißwasserboilers in &deg;C</li>
+      <li>opModeHotWater &lt;Betriebsmodus&gt; - Betriebsmodus des Hei&szlig;wasserboilers ( Auto | Party | Off )</l>
+	  <li>hotWaterTemperatureTarget &lt;Temperatur&gt; - Soll-Temperatur des Hei&szlig;wasserboilers in &deg;C</li>
 	  <li>INTERVAL &lt;Abfrageinterval&gt; - Abfrageinterval in Sekunden</li>
-	  <li>statusRequest - Aktualisieren der Gerätewerte</li>
+	  <li>statusRequest - Aktualisieren der Ger&auml;tewerte</li>
 	  <li>synchClockHeatPump - Abgleich der Uhr der Steuerung mit der FHEM Zeit. <br>
-	      <b>!! Diese Änderung geht verloren, sobald die Steuerung ausgeschaltet wird!!</b></li>
+	      <b>!! Diese &Auml;nderung geht verloren, sobald die Steuerung ausgeschaltet wird!!</b></li>
   </ul>
   <br>
   
@@ -1050,7 +1275,9 @@ LUXTRONIK2_checkFirmware ($)
     <li>statusHTML<br>
       wenn gesetzt, dann wird ein HTML-formatierter Wert "floorplanHTML" erzeugt, welcher vom Modul <a href="#FLOORPLAN">FLOORPLAN</a> genutzt werden kann.<br>
       Momentan wird nur gepr&uuml;ft, ob der Wert dieses Attributes ungleich NULL ist, der entsprechende Ger&auml;tewerte besteht aus dem aktuellen W&auml;rmepumpenstatus und der Heizwassertemperatur.</li>
-    <li>allowSetParameter &lt; 0 | 1 &gt;<br>
+    <li>doStatistics &lt; 0 | 1 &gt;<br>
+		Noch im Versuchsstadium - Berechnet statistische Werte: <i>statGradientBoilerTempLoss</i>
+	<li>allowSetParameter &lt; 0 | 1 &gt;<br>
       Die internen <a href="#LUXTRONIK2set">Parameter</a> der W&auml;rmepumpensteuerung k&ouml;nnen nur ge&auml;ndert werden, wenn dieses Attribut auf 1 gesetzt ist.</li>
 	<li>autoSynchClock &lt;Zeitunterschied&gt;<br>
 		Die Uhr der W&auml;rmepumpe wird automatisch korrigiert, wenn ein gewisser <i>Zeitunterschied</i> (10 s - 600 s) gegen&uuml;ber der FHEM Zeit erreicht ist. Zuvor wird die Kompatibilit&auml;t der Firmware &uuml;berpr&uuml;ft.<br>
