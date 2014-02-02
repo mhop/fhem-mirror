@@ -167,4 +167,10 @@ not to be translated
 	</ul>
 </ul>	
 =end html
+=begin html_DE
+
+<a name="WEBTHERM"></a>
+<h3>WEBTHERM</h3>
+<ul>Sorry, keine deutsche Dokumentation vorhanden.</ul>
+=end html_DE
 =cut

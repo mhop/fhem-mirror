@@ -735,5 +735,10 @@ not to be translated
 </ul>
 
 =end html
+=begin html_DE
 
+<a name="openweathermap"></a>
+<h3>openweathermap</h3>
+<ul>Sorry, keine deutsche Dokumentation vorhanden.</ul>
+=end html_DE
 =cut

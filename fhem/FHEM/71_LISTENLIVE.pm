@@ -893,5 +893,10 @@ statusRequest
 </ul>
 
 =end html
+=begin html_DE
 
+<a name="LISTENLIVE"></a>
+<h3>LISTENLIVE</h3>
+<ul>Sorry, keine deutsche Dokumentation vorhanden.</ul>
+=end html_DE
 =cut
