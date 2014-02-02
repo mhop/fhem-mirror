@@ -412,4 +412,11 @@ sub GEOFANCY_CGI() {
 </ul>
 
 =end html
+
+=begin html_DE
+Deutsche Version der Doku nicht verfügbar. Englische Version unter 
+
+ <a href='http://fhem.de/commandref.html#GEOFANCY>'>GEOFANCY</a> &nbsp;
+
+=end html_DE
 =cut
