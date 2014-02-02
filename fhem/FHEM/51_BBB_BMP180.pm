@@ -322,6 +322,9 @@ not to be translated
 
 <a name="BBB_BMP180"></a>
 <h3>BBB_BMP180</h3>
-<ul>Sorry, keine deutsche Dokumentation vorhanden.</ul>
+<ul>
+Sorry, keine deutsche Dokumentation vorhanden.<br/><br/>
+Die englische Doku gibt es hier: <a href='http://fhem.de/commandref.html#BBB_BMP180'>BBB_BMP180</a><br/><br/>;
+</ul>
 =end html_DE
 =cut
