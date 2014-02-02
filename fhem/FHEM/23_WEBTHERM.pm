@@ -173,7 +173,7 @@ not to be translated
 <h3>WEBTHERM</h3>
 <ul>
 Sorry, keine deutsche Dokumentation vorhanden.<br/><br/>
-Die englische Doku gibt es hier: <a href='http://fhem.de/commandref.html#WEBTHERM'>WEBTHERM</a><br/><br/>;
+Die englische Doku gibt es hier: <a href='http://fhem.de/commandref.html#WEBTHERM'>WEBTHERM</a><br/>
 </ul>
 =end html_DE
 =cut
