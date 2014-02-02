@@ -1,6 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: FLOORPLAN-menu-items can get icons attached by new 
+             attribute fp_roomIcons
+  - feature: FLOORPLAN-specific icons can now be assigned by just
+             creating a folder under fhem/images with the flooplan-name  
   - feature: DASHBOARD:  Tabs can set on top, bottom or hidden. 
   - bugfix:  SYSMON: another format for ifconfig output
   - feature: DASHBOARD: Use longpoll to update content.
