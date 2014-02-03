@@ -28,6 +28,7 @@ sub HMinfo_Initialize($$) {####################################################
                        ."autoUpdate "
                        ."hmAutoReadScan hmIoMaxDly "
                        ."hmManualOper:0_auto,1_manual "
+                       ."configDir configFilename "
                        .$readingFnAttributes;
 
 }
@@ -277,7 +278,6 @@ sub HMinfo_paramCheck(@) { ####################################################
 sub HMinfo_tempList(@) { ######################################################
   my ($filter,$action,$fName)=@_;
   $filter = "." if (!$filter);
-  $fName = "tempList.cfg" if (!$fName);
   $action = "" if (!$action);
   my $ret;
   if ($action eq "save"){
@@ -805,7 +805,9 @@ sub HMinfo_SetFn($@) {#########################################################
     $ret = HMinfo_status($hash);
   }
   elsif($cmd eq "tempList")   {##handle thermostat templist from file ---------
-    $ret = HMinfo_tempList($filter,@a);
+    my $fn = $a[0]?$a[0]:"tempList.cfg";
+    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    $ret = HMinfo_tempList($filter,$a[0],$fn);
   }
   elsif($cmd eq "help")       {
     $ret = " Unknown argument $cmd, choose one of "
@@ -871,11 +873,25 @@ sub HMinfo_SetFn($@) {#########################################################
            ;
   }
   elsif($cmd eq "loadConfig") {##action: saveConfig----------------------------
-    $ret = HMinfo_loadConfig($filter,@a); 
+    my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
+    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    $ret = HMinfo_loadConfig($filter,$fn); 
+  }
+  elsif($cmd eq "purgeConfig"){##action: saveConfig----------------------------
+    my $id = ++$hash->{nb}{cnt};
+    my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
+    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    my $bl = BlockingCall("HMinfo_purgeConfig", join(",",("$name:$id",$fn)), 
+                          "HMinfo_bpPost", 30, 
+                          "HMinfo_bpAbort", "$name:$id");
+    $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
+    $ret = ""; 
   }
   elsif($cmd eq "saveConfig") {##action: saveConfig----------------------------
     my $id = ++$hash->{nb}{cnt};
-    my $bl = BlockingCall("HMinfo_saveConfig", join(",",("$name:$id",$a[0],$opt,$filter)), 
+    my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
+    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    my $bl = BlockingCall("HMinfo_saveConfig", join(",",("$name:$id",$fn,$opt,$filter)), 
                           "HMinfo_bpPost", 30, 
                           "HMinfo_bpAbort", "$name:$id");
     $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
@@ -887,7 +903,7 @@ sub HMinfo_SetFn($@) {#########################################################
             ,"configCheck","param","peerCheck","peerXref"
             ,"protoEvents","msgStat:view,clear","rssi"
             ,"models"
-            ,"regCheck","register","saveConfig","loadConfig","update"
+            ,"regCheck","register","saveConfig","loadConfig","purgeConfig","update"
             ,"cpRegs"
             ,"tempList"
             ,"templateChk","templateDef","templateList","templateSet");
@@ -899,26 +915,28 @@ sub HMinfo_SetFn($@) {#########################################################
 sub HMinfo_loadConfig($@) {#####################################################
   my ($filter,$fName)=@_;
   $filter = "." if (!$filter);
-  $fName = "regSave.cfg" if (!$fName);
   my $ret;
 
   open(aSave, "$fName") || return("Can't open $fName: $!");
   my @el = ();
-  my @elAll = ();
   my @elincmpl = ();
   my @entryNF = ();
   while(<aSave>){
     chomp;
     my $line = $_;
-    next if ($line !~ m/set (.*) (peerBulk|regBulk) (.*)/);
-    my ($eN,$cmd,$param) = ($1,$2,$3);
-    $eN =~ s/ //g;
+    next if (   $line !~ m/set .* (peerBulk|regBulk) .*/
+             && $line !~ m/attr .*/);
+    my ($cmd1,$eN,$cmd,$param) = split(" ",$line,4);
     next if ($eN !~ m/$filter/);
     if (!$eN || !$defs{$eN}){
       push @entryNF,$eN;
       next;
     }
-    if ($cmd eq "peerBulk"){
+    if ($cmd1 eq "setreading"){
+      $defs{$eN}{READINGS}{$cmd}{VAL} = $param;
+      $defs{$eN}{READINGS}{$cmd}{TIME} = "from archive";
+    }
+    elsif ($cmd eq "peerBulk"){
       next if(!$param);
       $param =~ s/ //g;
       if ($param !~ m/00000000/){
@@ -935,6 +953,7 @@ sub HMinfo_loadConfig($@) {#####################################################
       $param =~ s/\.RegL/RegL/;
       $param =~ s/RegL/\.RegL/ if ($exp != 2);
       my ($reg,$data) = split(" ",$param,2);
+      
       if ($data !~ m/00:00/){
         push @elincmpl,"$eN reg list:$reg";
         next;
@@ -943,8 +962,7 @@ sub HMinfo_loadConfig($@) {#####################################################
         my ($list,$pN) = ($1,$2) if ($reg =~ m/RegL_(..):(.*)/);
         my $pId = CUL_HM_peerChId($pN,substr($defs{$eN}{DEF},0,6),"00000000");
         $defs{$eN}{READINGS}{$reg}{VAL} = $data;
-        $defs{$eN}{READINGS}{$reg}{TIME} = "from file";
-#        $defs{$eN}{READINGS}{$reg}{TIME} = "0000-00-00 00:00:00";
+        $defs{$eN}{READINGS}{$reg}{TIME} = "from archive";
         CUL_HM_updtRegDisp($defs{$eN},$list,$pId);
         push @el,"$eN reg list:$reg";
       }
@@ -954,21 +972,60 @@ sub HMinfo_loadConfig($@) {#####################################################
   $ret .= "\nfile data incomplete:\n     ".join("\n     ",@elincmpl) if (scalar@elincmpl);
   $ret .= "\nentries not defind:\n     "  .join("\n     ",@entryNF)  if (scalar@entryNF);
 
-  return $ret
+  return $ret;
+}
+sub HMinfo_purgeConfig($) {#####################################################
+  my ($param) = @_;
+  my ($id,$fName) = split ",",$param;
+  $fName = "regSave.cfg" if (!$fName);
+
+  open(aSave, "$fName") || return("Can't open $fName: $!");
+  my %purgeH;
+  while(<aSave>){
+    chomp;
+    my $line = $_;
+    next if (   $line !~ m/set (.*) (peerBulk|regBulk) (.*)/
+             && $line !~ m/setreading .*/);
+    my ($cmd,$eN,$typ,$p1,$p2) = split(" ",$line,5);
+    if ($cmd eq "set" && $typ eq "regBulk"){
+      $typ .= " $p1";
+      $p1 = $p2;
+    }
+    elsif ($cmd eq "set" && $typ eq "peerBulk"){
+      delete $purgeH{$eN}{$cmd}{regBulk};# regBulk needs to be rewritten
+    }
+    $purgeH{$eN}{$cmd}{$typ} = $p1;
+  }
+  close(aSave);
+  open(aSave, ">$fName") || return("Can't open $fName: $!");
+  print aSave "\n\n#============data purged: ".TimeNow();
+  foreach my $eN(sort keys %purgeH){
+    next if (!defined $defs{$eN});
+    print aSave "\n\n#-------------- entity:".$eN." ------------";
+    foreach my $cmd (sort keys %{$purgeH{$eN}}){
+      foreach my $typ (sort keys %{$purgeH{$eN}{$cmd}}){
+        print aSave "\n$cmd $eN $typ ".$purgeH{$eN}{$cmd}{$typ};
+      }
+    }
+  }
+  print aSave "\n======= finished ===\n";
+  close(aSave);
+
+  return $id;
 }
 sub HMinfo_saveConfig($) {#####################################################
   my ($param) = @_;
-  my ($id,$file,$opt,$filter) = split ",",$param;
+  my ($id,$fN,$opt,$filter) = split ",",$param;
   my @entities;
-  $file = "regSave.cfg" if (!$file);
   foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
-    CUL_HM_Get($defs{$dName},$dName,"saveConfig",$file);
+    CUL_HM_Get($defs{$dName},$dName,"saveConfig",$fN);
     push @entities,$dName;
     foreach my $chnId (CUL_HM_getAssChnIds($dName)){
       my $dName = CUL_HM_id2Name($chnId);
       push @entities, $dName if($dName !~ m/_chn:/);
     }
   }
+  HMinfo_purgeConfig($param) if ( 200000 < -s "$fN");# auto purge if file to big
   return $id;
 }
 sub HMinfo_bpPost($) {#bp finished#############################################
@@ -1600,7 +1657,8 @@ sub HMinfo_noDup(@) {#return list with no duplicates
           </ul>
       </li>
       <li><a name="#HMinfosaveConfig">saveConfig</a> <a href="#HMinfoFilter">[filter] [&lt;file&gt;]</a><br>
-          performs a save for all HM register setting and peers. See <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>.
+          performs a save for all HM register setting and peers. See <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>.<br>
+          <a ref="#HMinfopurgeConfig">purgeConfig</a> will be executed automatically if the stored filesize exceeds 1MByte.<br>
       </li>
       <li><a name="#HMinfoloadConfig">loadConfig</a> <a href="#HMinfoFilter">[filter] [&lt;file&gt;]</a><br>
           loads register and peers from a file saved by <a href="#HMinfosaveConfig">saveConfig</a>.<br>
@@ -1611,6 +1669,13 @@ sub HMinfo_noDup(@) {#return list with no duplicates
           that can be read.<br>
           The command will update FHEM readings and attributes. It will <B>not</B> reprogramm any device.
       </li>
+      <li><a name="#HMinfopurgeConfig">purgeConfig</a> <a href="#HMinfoFilter">[filter] [&lt;file&gt;]</a><br>
+          purge (reduce) the saved config file. Due to the cumulative storage of the register setting
+          purge will use the latest stored readings and remove older one. 
+          See <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>.
+      </li>
+
+      
          <br>
       <li><a name="#HMinfotempList">tempList</a> <a href="#HMinfoFilter">[filter]</a>[save|restore|verify] [&lt;file&gt;]</a><br>
           this function supports handling of tempList for thermstates.
@@ -1784,7 +1849,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates
         </code></ul>
         will trigger the update every 10 min<br>
     </li>
-    <li><a name="#HMhmAutoReadScan">hmAutoReadScan</a>
+    <li><a name="#HMinfohmAutoReadScan">hmAutoReadScan</a>
         defines the time in seconds CUL_HM tries to schedule the next autoRead
         from the queue. Despide this timer FHEM will take care that only one device from the queue will be
         handled at one point in time. With this timer user can stretch timing even further - to up to 300sec
@@ -1793,14 +1858,26 @@ sub HMinfo_noDup(@) {#return list with no duplicates
         Note that compressing will increase message load while stretch will extent waiting time.
         data. <br>
     </li>
-    <li><a name="#HMhmIoMaxDly">hmIoMaxDly</a>
+    <li><a name="#HMinfohmIoMaxDly">hmIoMaxDly</a>
         max time in seconds CUL_HM stacks messages if the IO device is not ready to send.
         If the IO device will not reappear in time all command will be deleted and IOErr will be reported.<br>
         Note: commands will be executed after the IO device reappears - which could lead to unexpected
         activity long after command issue.<br>
         default is 60sec. max value is 3600sec<br>
     </li>
-    <li><a name="#HMhmManualOper">hmManualOper</a>
+    <li><a name="#HMinfoconfigDir">configDir</a>
+        default directory where to store and load configuration files from.
+        This path is used as long as teh path is not given in a filename of 
+        a given command.<br>
+        It is used by commands like <a ref="#HMinfotempList">tempList</a> or <a ref="#HMinfosaveConfig">saveConfig</a><br>
+    </li>
+    <li><a name="#HMinfoconfigFilename">configFilename</a>
+        default filename used by 
+        <a ref="#HMinfosaveConfig">saveConfig</a>, 
+        <a ref="#HMinfopurgeConfig">purgeConfig</a>, 
+        <a ref="#HMinfoloadConfig">loadConfig</a><br>
+    </li>
+    <li><a name="#HMinfohmManualOper">hmManualOper</a>
         set to 1 will prevent any automatic operation, update or default settings
         in CUL_HM.<br>
     </li>

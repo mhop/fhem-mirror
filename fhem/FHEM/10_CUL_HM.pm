@@ -166,6 +166,7 @@ sub CUL_HM_Initialize($) {
   $hash->{helper}{qReqConf}     = \@confQArr;
   $hash->{helper}{qReqConfWu}   = \@confQWuArr;
   $hash->{helper}{confCheckArr} = \@confCheckArr;
+  $hash->{helper}{cfgCmpl}{init}= 1;# mark entities with complete config
   #statistics
   $hash->{stat}{s}{dummy}=0;
   $hash->{stat}{r}{dummy}=0;
@@ -190,6 +191,7 @@ sub CUL_HM_updateConfig($){
   # this gives FHEM sufficient time to fill in attributes
   # it will also be called after each manual definition
   # Purpose is to parse attributes and read config
+
   foreach my $name (@{$modules{CUL_HM}{helper}{updtCfgLst}}){
     my $hash = $defs{$name};
     next if (!$hash->{DEF}); # likely renamed
@@ -206,11 +208,19 @@ sub CUL_HM_updateConfig($){
       next;
     }
     CUL_HM_ID2PeerList($name,"",1);       # update peerList out of peerIDs
-    
+
     my $chn = substr($id."00",6,2);
     my $st  = CUL_HM_Get($hash,$name,"param","subType");
     my $md  = CUL_HM_Get($hash,$name,"param","model");
-    
+
+    foreach my $rName ("D-firmware","D-serialNr",".D-devInfo",".D-stc"){
+      # move certain attributes to readings for future handling
+      my $aName = $rName;
+      $aName =~ s/D-//;
+      my $aVal = AttrVal($name,$aName,undef);               
+      CUL_HM_UpdtReadSingle($hash,$rName,$aVal,0)
+           if (!defined ReadingsVal($name,$rName,undef));
+    }
     if    ($md =~ /(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/){
       $hash->{helper}{role}{chn} = 1 if (length($id) == 6); #tc special
     }
@@ -259,6 +269,19 @@ sub CUL_HM_updateConfig($){
     }
     elsif ("virtual" eq $st) {#setup virtuals
       $hash->{helper}{role}{vrt} = 1;
+      if (   $hash->{helper}{fkt} 
+          && $hash->{helper}{fkt} =~ m/^(vdCtrl|virtThSens)$/){
+        my $n = ReadingsVal($name,".next",0);
+        my $now = gettimeofday();
+        $n = $now if ($n<$now);
+        my $vId = substr($id."01",0,8);
+        $hash->{helper}{virtTC} = "00";
+        CUL_HM_Set($hash,$name,"valvePos",ReadingsVal($name,"valvePosTC",""));
+        CUL_HM_Set($hash,$name,"virtTemp",ReadingsVal($name,"temperature",""));
+        CUL_HM_Set($hash,$name,"virtHum" ,ReadingsVal($name,"humidity",""));
+        RemoveInternalTimer("valvePos:$vId");
+        InternalTimer($n,"CUL_HM_valvePosUpdt","valvePos:$vId",0);
+        }
     }
 
     next if ($nAttr);# stop if default setting if attributes is not desired
@@ -295,9 +318,10 @@ sub CUL_HM_updateConfig($){
           else                                       {$webCmd="virtual";}
 
       }elsif((!$hash->{helper}{role}{chn} &&
-               $md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/)
+               $md !~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/)
             ||$st eq "repeater"
             ||$md =~ m/(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/ ){$webCmd="getConfig:clear msgEvents";
+        if ($md =~ m/HM-CC-RT-DN/)                      {$webCmd.=":burstXmit";}
       }elsif($st eq "blindActuator"){
         if ($hash->{helper}{role}{chn}){$webCmd="statusRequest:toggle:on:off:up:down:stop";}
         else{                           $webCmd="statusRequest:getConfig:clear msgEvents";}
@@ -314,8 +338,6 @@ sub CUL_HM_updateConfig($){
       }elsif($md eq "HM-OU-CFM-PL" ){   $webCmd="press short:press long"
                                           .($chn eq "02"?":playTone replay":"");
       }
-      if    (!$hash->{helper}{role}{chn}
-           && $md =~ m/HM-CC-RT-DN/) {$webCmd.=":burstXmit";}
 
       if ($webCmd){
         my $eventMap  = AttrVal($name,"eventMap",undef);
@@ -349,6 +371,7 @@ sub CUL_HM_Define($$) {##############################
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $HMid = uc($a[2]);
+
   return "wrong syntax: define <name> CUL_HM 6-digit-hex-code [Raw-Message]"
         if(!(int(@a)==3 || int(@a)==4) || $HMid !~ m/^[A-F0-9]{6,8}$/i);
   return  "HMid DEF already used by " . CUL_HM_id2Name($HMid)
@@ -1793,7 +1816,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         Log3 $shash,3, "CUL_HM pair: $shash->{NAME} "
                       ."$attr{$shash->{NAME}}{subType}, "
                       ."model $attr{$shash->{NAME}}{model} "
-                      ."serialNr $attr{$shash->{NAME}}{serialNr}";
+                      ."serialNr ".ReadingsVal($shash->{NAME},"D-serialNr","");
         delete $ioHash->{hmPairSerial};
         CUL_HM_respPendRm($shash); # remove all pending messages
         delete $shash->{cmdStack};
@@ -1827,10 +1850,10 @@ sub CUL_HM_parseCommon(@){#####################################################
   elsif($mTp eq "10"){######################################
     my $subType = substr($p,0,2);
     if   ($subType eq "00"){ #SerialRead====================================
-      $attr{$shash->{NAME}}{serialNr} = pack("H*",substr($p,2,20));
-      if ($pendType eq "SerialRead"){
-        CUL_HM_respPendRm($shash);
-      }
+      my $sn = pack("H*",substr($p,2,20));
+      CUL_HM_UpdtReadSingle($shash,"D-serialNr",$sn,0);
+      $attr{$shash->{NAME}}{serialNr} = $sn;
+      CUL_HM_respPendRm($shash) if ($pendType eq "SerialRead");
       $ret = "done";
     }
     elsif($subType eq "01"){ #storePeerList=================================
@@ -2296,6 +2319,10 @@ sub CUL_HM_Get($@) {
 
     foreach my $eName (@eNames){
       print aSave "\n#---      entity:".$eName;
+      foreach my $rName ("D-firmware","D-serialNr",".D-devInfo",".D-stc"){
+        my $rVal = ReadingsVal($eName,$rName,undef);        
+        print aSave "\nsetreading $eName $rName $rVal" if (defined $rVal);
+      }
       my $pIds = AttrVal($eName, "peerIDs", "");
       my $timestamps = "\n#     timestamp of the readings for reference";
       if ($pIds){
@@ -2348,7 +2375,8 @@ sub CUL_HM_Set($@) {
   my $roleV = $hash->{helper}{role}{vrt}?1:0;
   my $mdCh = $md.($isChannel?$chn:"00"); # chan specific commands?
   my $fkt = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
-  my $h = $culHmGlobalSets->{$cmd}      if(                $st ne "virtual");
+  my $h = undef;
+  $h = $culHmGlobalSets->{$cmd}         if(                $st ne "virtual");
   $h = $culHmGlobalSetsVrtDev->{$cmd}   if(!defined($h) &&($st eq "virtual"||!$st)    && $roleD);
   $h = $culHmGlobalSetsDevice->{$cmd}   if(!defined($h) && $st ne "virtual"           && $roleD);
   $h = $culHmSubTypeDevSets->{$st}{$cmd}if(!defined($h) && $st ne "virtual"           && $roleD);
@@ -2368,7 +2396,6 @@ sub CUL_HM_Set($@) {
   }
   elsif(!defined($h)) {
     my @arr1 = ();
-
     if( $st ne "virtual")                    {foreach(keys %{$culHmGlobalSets}           ){push @arr1,"$_:".$culHmGlobalSets->{$_}            }};
     if(($st eq "virtual"||!$st)    && $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_:".$culHmGlobalSetsVrtDev->{$_}      }};
     if( $st ne "virtual"           && $roleD){foreach(keys %{$culHmGlobalSetsDevice}     ){push @arr1,"$_:".$culHmGlobalSetsDevice->{$_}      }};
@@ -2516,6 +2543,7 @@ sub CUL_HM_Set($@) {
       my @cH = ($hash);
       push @cH,$defs{$hash->{$_}} foreach(grep /^channel/,keys %{$hash});
       delete $_->{READINGS} foreach (@cH);
+      delete $modules{CUL_HM}{helper}{cfgCmpl}{$_->{NAME}};
       CUL_HM_complConfig($_->{NAME}) foreach (@cH);
     }
     elsif($sect eq "register"){
@@ -2525,6 +2553,7 @@ sub CUL_HM_Set($@) {
       foreach my $h(@cH){
         delete $h->{READINGS}{$_}
              foreach (grep /^(\.?)(R-|RegL)/,keys %{$h->{READINGS}});
+        delete $modules{CUL_HM}{helper}{cfgCmpl}{$_->{NAME}};
         CUL_HM_complConfig($h->{NAME});
       }
     }
@@ -2568,7 +2597,7 @@ sub CUL_HM_Set($@) {
   }
   elsif($cmd eq "pair") { #####################################################
     $state = "";
-    my $serialNr = AttrVal($name, "serialNr", undef);
+    my $serialNr = ReadingsVal($name, "D-serialNr", undef);
     return "serialNr is not set" if(!$serialNr);
     CUL_HM_PushCmdStack($hash,"++A401".$id."000000010A".uc( unpack("H*",$serialNr)));
     $hash->{hmPairSerial} = $serialNr;
@@ -3193,7 +3222,9 @@ sub CUL_HM_Set($@) {
         my $ph = CUL_HM_id2Hash($pId[0]);
         return "peerID $pId[0] is not assigned to a device " if (!$ph);
         $hash->{helper}{vd}{typ} = 1; #valvePos
-        $hash->{helper}{vd}{id}  = $pId[0];
+        $hash->{helper}{vd}{id}  = $modules{CUL_HM}{defptr}{$pId[0]}
+                                              ?$pId[0]
+                                              :substr($pId[0],0,6);
         $hash->{helper}{vd}{cmd} = "A258$dst".substr($pId[0],0,6);
         CUL_HM_UpdtReadBulk($ph,1,
                          "state:set_$valu %",
@@ -3220,8 +3251,8 @@ sub CUL_HM_Set($@) {
         $hash->{helper}{vd}{miss} = 0  if (!defined$hash->{helper}{vd}{miss});
         $hash->{helper}{virtTC}   = ($cmd eq "valvePos")?"03":"00";
         CUL_HM_UpdtReadSingle($hash,"valveCtrl","init",1)if ($cmd eq "valvePos");
-        $hash->{helper}{vd}{next} = gettimeofday() 
-              if (!defined $hash->{helper}{vd}{next});
+        CUL_HM_UpdtReadSingle($hash,".next",
+                              ReadingsVal($name,".next",gettimeofday()),0);
         CUL_HM_valvePosUpdt("valvePos:$dst$chn");
       };
       $hash->{helper}{virtTC} = ($cmd eq "valvePos")?"03":"00";
@@ -3534,24 +3565,30 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   my $hi = ($hash->{helper}{vd}{idh}+$idl*198)&0xff;
   my $nextTimer = (($lo+$hi)&0xff)/4 + 120;#original - instable
   my $name = $hash->{NAME};
-
-  if ($hash->{helper}{vd}{typ} == 1){
-    CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
-                                      ,$msgCnt
-                                      ,$hash->{helper}{vd}{cmd}
-                                      ,$hash->{helper}{virtTC}
-                                      ,$hash->{helper}{vd}{val}));
+  if ($hash->{helper}{vd}{cmd}){
+    if ($hash->{helper}{vd}{typ} == 1){
+      CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
+                                        ,$msgCnt
+                                        ,$hash->{helper}{vd}{cmd}
+                                        ,$hash->{helper}{virtTC}
+                                        ,$hash->{helper}{vd}{val}));
+    }
+    else{
+      CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s"
+                                        ,$msgCnt
+                                        ,$hash->{helper}{vd}{cmd}
+                                        ,$hash->{helper}{vd}{val}));
+    }
   }
   else{
-    CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s"
-                                      ,$msgCnt
-                                      ,$hash->{helper}{vd}{cmd}
-                                      ,$hash->{helper}{vd}{val}));
+    delete $hash->{helper}{virtTC};
+    CUL_HM_UpdtReadSingle($hash,"state","stopped",1);
+    return;# terminate processing
   }
 
   my $tn = gettimeofday();
-  $hash->{helper}{vd}{nextF} = $hash->{helper}{vd}{next} + $nextTimer;
-  $hash->{helper}{vd}{nextM} = $tn+$nextTimer;
+  $hash->{helper}{vd}{nextF} = ReadingsVal($name,".next",0) + $nextTimer;
+  CUL_HM_UpdtReadSingle($hash,".next",$tn+$nextTimer,1);
   $hash->{helper}{vd}{msgCnt} = $msgCnt;
   $hash->{helper}{virtTC} = "00";
   CUL_HM_ProcessCmdStack($hash);
@@ -3561,31 +3598,27 @@ sub CUL_HM_valvePosTmr(@) {#calc next vd wakeup
   my($in ) = @_;
   my(undef,$vId) = split(':',$in);
   my $hash = CUL_HM_id2Hash($vId); 
-
+  my $name = $hash->{NAME};
   if ($hash->{helper}{vd}{typ} == 1){
     my $pn = CUL_HM_id2Name($hash->{helper}{vd}{id});
     my $ackTime = ReadingsTimestamp($pn, "ValvePosition", "");
     my $vc;
     if (!$ackTime || $ackTime eq $hash->{helper}{vd}{ackT} ){
-      $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextF};
+      CUL_HM_UpdtReadSingle($hash,".next",$hash->{helper}{vd}{nextF},1);
       $vc = (++$hash->{helper}{vd}{miss} > 5)
                                           ?"lost"
                                           :"miss_".$hash->{helper}{vd}{miss};
-      Log3 $hash->{NAME},5,"CUL_HM $hash->{NAME} virtualTC use fail-timer";
+      Log3 $name,5,"CUL_HM $name virtualTC use fail-timer";
     }
     else{
-      $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextM};
       $vc = "ok";
       $hash->{helper}{vd}{miss} = 0;
     }
     CUL_HM_UpdtReadSingle($hash,"valveCtrl",$vc,1)
-          if(ReadingsVal($hash->{NAME},"valveCtrl","") ne $vc);
+          if(ReadingsVal($name,"valveCtrl","") ne $vc);
     $hash->{helper}{vd}{ackT} = $ackTime;
   }
-  else{
-    $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextM};
-  }
-  InternalTimer($hash->{helper}{vd}{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
+  InternalTimer(ReadingsVal($name,".next",0),"CUL_HM_valvePosUpdt","valvePos:$vId",0);
 }
 sub CUL_HM_weather(@) {#periodically send weather data
   my($in ) = @_;
@@ -3601,14 +3634,19 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
   my($fw1,$fw2,$mId,$serNo,$stc,$devInfo) = unpack('A1A1A4A20A2A*', $p);
   
   my $md = $culHmModel->{$mId}{name} ? $culHmModel->{$mId}{name}:"unknown";
-  $attr{$name}{model}    = $md;
-  $attr{$name}{subType}  = $culHmModel->{$mId}{st};
-  $attr{$name}{serialNr} = pack('H*',$serNo);
-  #expert level attributes
-  $attr{$name}{firmware} = sprintf("%d.%d", hex($fw1),hex($fw2));
-  $attr{$name}{".devInfo"} = $devInfo;
-  $attr{$name}{".stc"}     = $stc;
+  my $serial = pack('H*',$serNo);
+  my $fw = sprintf("%d.%d", hex($fw1),hex($fw2));
 
+  $attr{$name}{model}      = $md;
+  $attr{$name}{subType}    = $culHmModel->{$mId}{st};
+  $attr{$name}{serialNr}   = $serial;  # to be removed from attributes
+  $attr{$name}{firmware}   = $fw;      # to be removed from attributes
+#  $attr{$name}{".devInfo"} = $devInfo; # to be removed from attributes
+#  $attr{$name}{".stc"}     = $stc;     # to be removed from attributes
+  CUL_HM_UpdtReadBulk($hash,1,"D-firmware:$fw",
+                              "D-serialNr:$serial",
+                              ".D-devInfo:$devInfo",
+                              ".D-stc:$stc");
   delete $hash->{helper}{rxType};
   CUL_HM_getRxType($hash); #will update rxType
   $mId = CUL_HM_getMId($hash);# set helper valiable and use result
@@ -3644,6 +3682,7 @@ sub CUL_HM_getConfig($){
   my $dst = substr($hash->{DEF},0,6);
   my $name = $hash->{NAME};
   
+  delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
   CUL_HM_complConfigTest($name);
   CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'00040000000000')
            if ($hash->{helper}{role}{dev});
@@ -5715,6 +5754,7 @@ sub CUL_HM_complConfig($)    {# read config if enabled and not complete
   if (CUL_HM_peerUsed($name) && !CUL_HM_peersValid($name) ){
     CUL_HM_qAutoRead($name,0);
     CUL_HM_complConfigTest($name);
+    delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
     Log3 $name,5,"CUL_HM $name queue configRead";
     return;
   }
@@ -5723,10 +5763,12 @@ sub CUL_HM_complConfig($)    {# read config if enabled and not complete
     if (ReadingsVal($name,$_,"") !~ m /00:00/){
       CUL_HM_qAutoRead($name,0);
       CUL_HM_complConfigTest($name);
+      delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
       Log3 $name,5,"CUL_HM $name queue configRead";
       last;
     }
   }
+  $modules{CUL_HM}{helper}{cfgCmpl}{$name} = 1;#mark config as complete
 }
 
 1;
