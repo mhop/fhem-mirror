@@ -2662,7 +2662,8 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
 =end html
 
 =begin html_DE
-Deutsche Version der Doku nicht verfügbar. Englische Version unter 
+Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden.
+Die englische Version ist hier zu finden: 
 
  <a href='http://fhem.de/commandref.html#ENIGMA2>'>ENIGMA2</a> &nbsp;
 
