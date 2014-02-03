@@ -1,11 +1,10 @@
 /* Author: svenson08*/
 .dashboard_buttonbar { background: none repeat scroll 0 0 #a6a6a6; border: 1px solid #d9d9d9; padding: 6px; margin: 0 .5em 0 0.4em; float: left;}
 .dashboard_buttonbar_top, .dashboard_buttonbar_bottom { border-bottom-width: 0; }
-
-
 .dashboard_button { float: left; background-color: #fff; font-weight: bold; font-size: 0.8em; background-repeat:no-repeat;
 					background-position: 4px 2px; border: 1px solid #808080; padding: 0.2em 0.7em 0.2em 0.4em; }
 .dashboard_button_changed { color: black; font-weight:bold; }
+a { outline: none; }
 
 .dashboard_column { float: left; }
 .dashboard_columnhelper { border: 1px dotted #808080; }
@@ -34,7 +33,6 @@
 .ui-sortable-placeholder { border: 1px dotted #d9d9d9;  visibility: visible !important; 
 						   height: 25px !important; width: 150px; }
 
-						   
 /* Neue CSS Einträge für Dashboard-Tabs */						
 .dashboard { padding: 0; margin: 0; }
 .dashboard_tabnav {	list-style: none; margin: 0; padding: 0 .5em 0; }
@@ -42,10 +40,10 @@
 .dashboard_tabnav:after { content: ""; display: table; border-collapse: collapse; clear: both; }
 .dashboard_tabpanel { border: 1px solid #cccccc; background-color: #cbcbcb;  }
 .dashboard_tab_top { border: 1px solid #cccccc;	border-bottom-width: 0;	margin: 0 .5em -1px 0; float: left; padding: .5em 1em; }
-.dashboard_tab_top.ui-tabs-active { background-color: #cbcbcb; font-weight: bold; }
+.dashboard_tab_top.ui-tabs-active { background-color: #cbcbcb; }
 .dashboard_tab_bottom { border: 1px solid #cccccc;	border-top-width: 0;	margin: 0 .5em -1px 0; float: left; padding: .5em 1em; }
-.dashboard_tab_bottom.ui-tabs-active { background-color: #cbcbcb; font-weight: bold; }
+.dashboard_tab_bottom.ui-tabs-active { background-color: #cbcbcb; }
 .dashboard_tabcontent { width: 100%; padding: 0; margin: 0; }
 
 .dashboard_row { width: 100%; height: inherit; }
-.dashboard_columncenter { height: inherit;}						   
+.dashboard_columncenter { height: inherit;} 
