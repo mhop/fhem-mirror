@@ -2662,10 +2662,16 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
 =end html
 
 =begin html_DE
+
+<a name="ENIGMA2"></a>
+<h3>ENIGMA2</h3>
+<ul>
 Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden.
 Die englische Version ist hier zu finden: 
-
- <a href='http://fhem.de/commandref.html#ENIGMA2>'>ENIGMA2</a> &nbsp;
+</ul>
+<ul>
+<a href='http://fhem.de/commandref.html#ENIGMA2'>ENIGMA2</a>
+</ul>
 
 =end html_DE
 

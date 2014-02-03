@@ -1719,10 +1719,16 @@ sub ONKYO_AVR_RClayout() {
 =end html
 
 =begin html_DE
+
+<a name="ONKYO_AVR"></a>
+<h3>ONKYO_AVR</h3>
+<ul>
 Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden.
 Die englische Version ist hier zu finden: 
-
- <a href='http://fhem.de/commandref.html#ONKYO_AVR>'>ONKYO_AVR</a> &nbsp;
+</ul>
+<ul>
+<a href='http://fhem.de/commandref.html#ONKYO_AVR'>ONKYO_AVR</a>
+</ul>
 
 =end html_DE
 =cut
