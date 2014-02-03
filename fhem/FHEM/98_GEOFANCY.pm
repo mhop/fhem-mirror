@@ -414,7 +414,8 @@ sub GEOFANCY_CGI() {
 =end html
 
 =begin html_DE
-Deutsche Version der Doku nicht verfügbar. Englische Version unter 
+Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden.
+Die englische Version ist hier zu finden: 
 
  <a href='http://fhem.de/commandref.html#GEOFANCY>'>GEOFANCY</a> &nbsp;
 

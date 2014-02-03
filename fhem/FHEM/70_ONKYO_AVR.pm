@@ -1719,7 +1719,8 @@ sub ONKYO_AVR_RClayout() {
 =end html
 
 =begin html_DE
-Deutsche Version der Doku nicht verfügbar. Englische Version unter 
+Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden.
+Die englische Version ist hier zu finden: 
 
  <a href='http://fhem.de/commandref.html#ONKYO_AVR>'>ONKYO_AVR</a> &nbsp;
 
