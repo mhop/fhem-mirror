@@ -414,10 +414,16 @@ sub GEOFANCY_CGI() {
 =end html
 
 =begin html_DE
+
+<a name="GEOFANCY"></a>
+<h3>GEOFANCY</h3>
+<ul>
 Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden.
 Die englische Version ist hier zu finden: 
-
- <a href='http://fhem.de/commandref.html#GEOFANCY>'>GEOFANCY</a> &nbsp;
+</ul>
+<ul>
+<a href='http://fhem.de/commandref.html#GEOFANCY'>GEOFANCY</a>
+</ul>
 
 =end html_DE
 =cut
