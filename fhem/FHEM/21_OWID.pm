@@ -5,6 +5,7 @@
 # FHEM module to commmunicate with general 1-Wire ID-ROMS
 #
 # Prof. Dr. Peter A. Henning
+# Norbert Truchsess
 #
 # $Id$
 #
@@ -52,7 +53,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.24";
+my $owx_version="5.03";
 #-- declare variables
 my %gets = (
   "present"     => "",
@@ -93,7 +94,7 @@ sub OWID_Initialize ($) {
                       "interval ".
                       $readingFnAttributes;
 
-  #make sure OWX is loaded so OWX_CRC is available if running with OWServer
+  #--make sure OWX is loaded so OWX_CRC is available if running with OWServer
   main::LoadModule("OWX");	
 }
 
@@ -191,7 +192,12 @@ sub OWID_Define ($$) {
   InternalTimer(time()+5+$hash->{INTERVAL}, "OWID_GetValues", $hash, 0);
   
   #--
-  readingsSingleUpdate($hash,"state","Initialized",1); 
+  readingsSingleUpdate($hash,"state","Initialized",1);
+  
+  if (! (defined AttrVal($hash->{NAME},"stateFormat",undef))) {
+    $main::attr{$hash->{NAME}}{"stateFormat"} = "{ReadingsVal(\$name,\"present\",0) ? \"present\" : \"not present\"}";
+  }
+   
   return undef; 
 }
 
@@ -212,10 +218,11 @@ sub OWID_Attr(@) {
   
   if ( $do eq "set") {
   	ARGUMENT_HANDLER: {
+  	  #-- interval modified at runtime
   	  $key eq "interval" and do {
-        # check value
+        #-- check value
         return "OWID: Set with short interval, must be > 1" if(int($value) < 1);
-        # update timer
+        #-- update timer
         $hash->{INTERVAL} = $value;
         if ($init_done) {
           RemoveInternalTimer($hash);
@@ -272,12 +279,12 @@ sub OWID_Get($@) {
     #-- hash of the busmaster
     my $master       = $hash->{IODev};
     $value           = OWX_Verify($master,$hash->{ROM_ID});
-    $hash->{PRESENT} = $value;
     if( $value == 0 ){
-      readingsSingleUpdate($hash,"state","not present",1); 
+      readingsSingleUpdate($hash,"present",0,$hash->{PRESENT}); 
     } else {
-      readingsSingleUpdate($hash,"state","present",1); 
+      readingsSingleUpdate($hash,"present",1,!$hash->{PRESENT}); 
     }
+    $hash->{PRESENT} = $value;
     return "$name.present => $value";
   } 
   
@@ -285,9 +292,7 @@ sub OWID_Get($@) {
   if( $a[1] eq "version") {
     return "$name.version => $owx_version";
   }
-  
 }
-
 
 ########################################################################################
 #
@@ -313,12 +318,14 @@ sub OWID_GetValues($) {
   #-- hash of the busmaster
   my $master       = $hash->{IODev};
   $value           = OWX_Verify($master,$hash->{ROM_ID});
-  $hash->{PRESENT} = $value;
+  
+  #-- generate an event only if presence has changed
   if( $value == 0 ){
-    readingsSingleUpdate($hash,"state","not present",1); 
+    readingsSingleUpdate($hash,"present",0,$hash->{PRESENT}); 
   } else {
-    readingsSingleUpdate($hash,"state","present",1); 
+    readingsSingleUpdate($hash,"present",1,!$hash->{PRESENT}); 
   }
+  $hash->{PRESENT} = $value;
 }
 
 #######################################################################################

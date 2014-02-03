@@ -1,10 +1,11 @@
 ########################################################################################
 #
-# OWAD.pm WIESO EVENT DREIFACH
+# OWAD.pm  
 #
 # FHEM module to commmunicate with 1-Wire A/D converters DS2450
 #
-# Prof. Dr. Peter A. Henning, 2012
+# Prof. Dr. Peter A. Henning
+# Norbert Truchsess
 #
 # $Id$
 #
@@ -75,7 +76,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.01";
+my $owx_version="5.03";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D");
 my @owg_channel = ("A","B","C","D");
@@ -162,7 +163,7 @@ sub OWAD_Initialize ($) {
   
   #-- value globals
   $hash->{owg_status} = [];
-  $hash->{owg_state} = undef;
+  #$hash->{owg_state} = undef;
   #-- channel values - always the raw values from the device
   $hash->{owg_val} = ["","","",""];
   #-- alarm status 0 = disabled, 1 = enabled, but not alarmed, 2 = alarmed
@@ -172,9 +173,9 @@ sub OWAD_Initialize ($) {
   $hash->{owg_vlow} = [];
   $hash->{owg_vhigh} = [];
   
-  #-- ASYNC this function is needed for asynchronous execution of the device reads 
-  $hash->{AfterExecuteFn} = "OWXAD_ProcValues";
-  #--make sure OWX is loaded so OWX_CRC is available if running with OWServer
+  #-- this function is needed for asynchronous execution of the device reads 
+  $hash->{AfterExecuteFn} = "OWXAD_BinValues";
+  #-- make sure OWX is loaded so OWX_CRC is available if running with OWServer
   main::LoadModule("OWX");	
 }
 
@@ -1221,103 +1222,20 @@ sub OWFSAD_SetPage($$) {
 #
 ########################################################################################
 #
-# OWXAD_GetPage - Get one memory page from device
-#
-# Parameter hash = hash of device addressed
-#           page = "reading", "alarm" or "status"
-#
-########################################################################################
-
-sub OWXAD_GetPage($$) {
-
-  my ($hash,$page) = @_;
-  
-  my ($select, $res, $res2, $res3, @data, $an, $vn);
-  
-  #-- ID of the device, hash of the busmaster
-  my $owx_dev = $hash->{ROM_ID};
-  my $master  = $hash->{IODev};
-  
-  my ($i,$j,$k);
-
-  #=============== get the voltage reading ===============================
-  if( $page eq "reading") {
-    #-- issue the match ROM command \x55 and the start conversion command
-    #-- asynchronous mode
-    if( $hash->{ASYNC} ){
-      if (!OWX_Execute( $master, "getpageconvert", 1, $owx_dev, "\x3C\x0F\x00\xFF\xFF", 0, 20 )) {
-        return "not accessible for conversion";
-      }
-    #-- synchronous mode
-    } else {
-      OWX_Reset($master);
-      $res= OWX_Complex($master,$owx_dev,"\x3C\x0F\x00\xFF\xFF",0);
-      if( $res eq 0 ){
-        return "not accessible for conversion";
-      } 
-      #-- conversion needs some 5 ms per channel
-      select(undef,undef,undef,0.02);
-    } 
-
-    #-- issue the match ROM command \x55 and the read conversion page command
-    #   \xAA\x00\x00 
-    $select="\xAA\x00\x00";
-  #=============== get the alarm reading ===============================
-  } elsif ( $page eq "alarm" ) {
-    #-- issue the match ROM command \x55 and the read alarm page command 
-    #   \xAA\x10\x00 
-    $select="\xAA\x10\x00";
-  #=============== get the status reading ===============================
-  } elsif ( $page eq "status" ) {
-    #-- issue the match ROM command \x55 and the read status memory page command 
-    #   \xAA\x08\x00 r
-    $select="\xAA\x08\x00";
-  #=============== wrong value requested ===============================
-  } else {
-    return "wrong memory page requested from $owx_dev";
-  } 
-  
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-     #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
-     if (OWX_Execute( $master, "getpage$page", 1, $owx_dev, $select, 10, undef)) {
-     } else {
-    return "$owx_dev not accessible in reading $page page"; 
-	}
-	return OWX_AwaitExecuteResponse( $master, "getpage$page", $owx_dev );
-  #-- asynchronous mode
-  } else {
-    #-- reset the bus
-    OWX_Reset($master);
-    #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
-    $res=OWX_Complex($master,$owx_dev,$select,10);
-    if( $res eq 0 ){
-      return "$owx_dev not accessible in reading $page page"; 
-    }
-    #-- for processing we also need the 3 command bytes
-    OWXAD_ProcValues($hash,$page,undef,undef,$owx_dev,undef,undef,substr($res,9,13));
-  }
-
-  return undef;
-}
-
-########################################################################################
-#
-# OWXAD_ProcValues - Process reading from one device - translate binary into raw
+# OWXAD_BinValues - Binary readings into clear values
 #
 # Parameter hash = hash of device addressed
 #
 ########################################################################################
 
-sub OWXAD_ProcValues($$$$$$$$) {
-  my ($hash, $page, $success, $reset, $owx_dev, $data, $numread, $res) = @_;
+sub OWXAD_BinValues($$$$$$$$) {
+  my ($hash, $context, $success, $reset, $owx_dev, $command, $numread, $res) = @_;
   
-  #-- unused are success, reset, data numread
-  
-  return undef unless (defined $page and $page ne "convert");
+  #-- always check for success, unused are reset, numread
+  return unless ($success and $context);
+  #Log 1,"OWXAD_BinValues context = $context";
   
   my ($i,$j,$k,@data,$ow_thn,$ow_tln);
-  my $change = 0;
   
   #-- process results
   @data=split(//,substr($res,3,10));
@@ -1327,18 +1245,18 @@ sub OWXAD_ProcValues($$$$$$$$) {
     if (OWX_CRC16(substr($res,9,11),$data[11],$data[12])==0);    
       
   #=============== get the voltage reading ===============================
-  if( $page eq "reading"){
+  if( $context eq "ds2450.getreading"){
     for( $i=0;$i<int(@owg_fixed);$i++){
       $hash->{owg_val}->[$i]= (ord($data[2*$i])+256*ord($data[1+2*$i]) )/(1<<$owg_resoln[$i]) * $owg_range[$i]/1000;
     }
   #=============== get the alarm reading ===============================
-  } elsif ( $page eq "alarm" ) {
+  } elsif ( $context eq "ds2450.getalarm" ) {
     for( $i=0;$i<int(@owg_fixed);$i++){
       $hash->{owg_vlow}->[$i]  = int(ord($data[2*$i])/256 * $owg_range[$i]+0.5)/1000;
       $hash->{owg_vhigh}->[$i] = int(ord($data[1+2*$i])/256 * $owg_range[$i]+0.5)/1000;
     }
   #=============== get the status reading ===============================
-  } elsif ( $page eq "status" ) {  
+  } elsif ( $context eq "ds2450.getstatus" ) {  
     my ($sb1,$sb2);
     for( my $i=0;$i<int(@owg_fixed);$i++){
       $sb1 = ord($data[2*$i]); 
@@ -1392,11 +1310,91 @@ sub OWXAD_ProcValues($$$$$$$$) {
       }
     }
   } 
-  
-  #my $value=OWAD_FormatValues($hash);
-  #Log 5, $value;
-  
+  my $value = OWAD_FormatValues($hash);
+  Log 5, $value;
   return undef
+}
+
+########################################################################################
+#
+# OWXAD_GetPage - Get one memory page from device
+#
+# Parameter hash = hash of device addressed
+#           page = "reading", "alarm" or "status"
+#
+########################################################################################
+
+sub OWXAD_GetPage($$) {
+
+  my ($hash,$page) = @_;
+  
+  my ($select, $res, $res2, $res3, @data, $an, $vn);
+  
+  #-- ID of the device, hash of the busmaster
+  my $owx_dev = $hash->{ROM_ID};
+  my $master  = $hash->{IODev};
+  
+  my ($i,$j,$k);
+
+  #=============== get the voltage reading ===============================
+  if( $page eq "reading") {
+    #-- issue the match ROM command \x55 and the start conversion command
+    #-- asynchronous mode
+    # difficult here, shoul dbe put into Binvalues as in OWSWITCH
+    if( $hash->{ASYNC} ){
+      if (!OWX_Execute( $master, "getpageconvert", 1, $owx_dev, "\x3C\x0F\x00\xFF\xFF", 0, 20 )) {
+        return "not accessible for conversion";
+      }
+    #-- synchronous mode
+    } else {
+      OWX_Reset($master);
+      $res= OWX_Complex($master,$owx_dev,"\x3C\x0F\x00\xFF\xFF",0);
+      if( $res eq 0 ){
+        return "not accessible for conversion";
+      } 
+      #-- conversion needs some 5 ms per channel
+      select(undef,undef,undef,0.02);
+    } 
+
+    #-- issue the match ROM command \x55 and the read conversion page command
+    #   \xAA\x00\x00 
+    $select="\xAA\x00\x00";
+  #=============== get the alarm reading ===============================
+  } elsif ( $page eq "alarm" ) {
+    #-- issue the match ROM command \x55 and the read alarm page command 
+    #   \xAA\x10\x00 
+    $select="\xAA\x10\x00";
+  #=============== get the status reading ===============================
+  } elsif ( $page eq "status" ) {
+    #-- issue the match ROM command \x55 and the read status memory page command 
+    #   \xAA\x08\x00 r
+    $select="\xAA\x08\x00";
+  #=============== wrong value requested ===============================
+  } else {
+    return "wrong memory page requested from $owx_dev";
+  } 
+  #-- asynchronous mode
+  if( $hash->{ASYNC} ){
+    #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
+    if (OWX_Execute( $master, "ds2450.get".$page, 1, $owx_dev, $select, 10, undef)) {
+      return OWX_AwaitExecuteResponse( $master, "getpage$page", $owx_dev );
+    } else {
+      return "$owx_dev not accessible in reading $page page"; 
+	}
+  #-- synchronous mode
+  } else {
+    #-- reset the bus
+    OWX_Reset($master);
+    #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
+    $res=OWX_Complex($master,$owx_dev,$select,10);
+    if( $res eq 0 ){
+      return "$owx_dev not accessible in reading $page page"; 
+    }
+    #-- for processing we also need the 3 command bytes
+    OWXAD_BinValues($hash,"ds2450.get".$page,1,undef,$owx_dev,undef,undef,substr($res,9,13));
+  }
+
+  return undef;
 }
 
 ########################################################################################
@@ -1475,8 +1473,6 @@ sub OWXAD_SetPage($$) {
   } else {
     OWX_Reset($master);
     $res=OWX_Complex($master,$owx_dev,$select,0);
-  
-    #-- process results
     if( $res eq 0 ){
       return "device $owx_dev not accessible for writing"; 
     }

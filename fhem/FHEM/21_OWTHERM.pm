@@ -4,7 +4,8 @@
 #
 # FHEM module to commmunicate with 1-Wire temperature sensors DS1820, DS18S20, DS18B20, DS1822
 #
-# Prof. Dr. Peter A. Henning und Norbert Truchsess
+# Prof. Dr. Peter A. Henning
+# Norbert Truchsess
 #
 # $Id$
 #
@@ -16,9 +17,8 @@
 #
 # where <name> may be replaced by any name string 
 #     
-#       <model> is a 1-Wire device type. If omitted, we assume this to be an
-#              DS1820 temperature sensor 
-#              Currently allowed values are DS1820, DS18B20, DS1822
+#       <model> is a 1-Wire device type. If omitted AND no FAM_ID given we assume this to be an
+#              DS1820 temperature sensor. Currently allowed values are DS1820, DS18B20, DS1822
 #       <FAM_ID> is a 1-Wire family id, currently allowed values are 10, 22, 28
 #       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
 #                without Family ID, e.g. A2D90D000800 
@@ -75,7 +75,7 @@ use warnings;
 sub Log($$);
 sub AttrVal($$$);
 
-my $owx_version="5.02";
+my $owx_version="5.03";
 
 my %gets = (
   "id"          => "",
@@ -98,6 +98,7 @@ my %updates = (
   "alarm"       => ""
 );
 
+#-- conversion times in milliseconds depend on resolution
 my %convtimes = (
 9  => 100,
 10 => 200,
@@ -134,7 +135,7 @@ sub OWTHERM_Initialize ($) {
                      "resolution:9,10,11,12 interval ".
                      $readingFnAttributes;                
   #-- ASYNC this function is needed for asynchronous execution of the device reads 
-  $hash->{AfterExecuteFn} = "OWXTHERM_ProcValues";
+  $hash->{AfterExecuteFn} = "OWXTHERM_BinValues";
   #-- make sure OWX is loaded so OWX_CRC is available if running with OWServer
   main::LoadModule("OWX");	
 }
@@ -818,75 +819,20 @@ sub OWFSTHERM_SetValues($$) {
 #
 ########################################################################################
 #
-# OWXTHERM_GetValues - Trigger reading from one device 
+# OWXTHERM_BinValues - Binary readings into clear values
 #
 # Parameter hash = hash of device addressed
 #
 ########################################################################################
 
-sub OWXTHERM_GetValues($) {
-
-  my ($hash) = @_;
+sub OWXTHERM_BinValues($$$$$$$$) {
+  my ($hash, $context, $success, $reset, $owx_dev, $command, $numread, $res) = @_;
   
-  my ($i,$j,$k,@data,$ow_thn,$ow_tln);
-  my $change = 0;
+  #-- always check for success, unused are reset, numread
+  return unless ($success and ($context =~ /.*reading.*/));
+ 
+  #Log 1,"OWXTHERM_BinValues context = $context";
   
-  #-- For default, perform the conversion now
-  my $con=1;
-  
-  #-- ID of the device
-  my $owx_dev = $hash->{ROM_ID};
-  #-- hash of the busmaster
-  my $master = $hash->{IODev};
-  my $name   = $hash->{NAME};
-  
-  #-- check, if the conversion has been called before for all sensors
-  if( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
-    $con=0;
-  }  
-
-  #-- if the conversion has not been called before 
-  if( $con==1 ){
-    #-- issue the match ROM command \x55 and the start conversion command \x44
-    #-- asynchronous mode
-    if( $hash->{ASYNC} ){
-      OWX_Execute($master,"convert",1,$owx_dev,"\x44",0,$convtimes{AttrVal($name,"resolution",12)});
-    #-- synchronous mode
-    }else{
-      OWX_Reset($master);     
-      if( OWX_Complex($master,$owx_dev,"\x44",0) eq 0 ){
-        return "$owx_dev not accessible";
-      } 
-      #-- conversion needs some 950 ms - but we may also do it in shorter time !
-      select(undef,undef,undef,$convtimes{AttrVal($name,"resolution",12)}*0.001);
-    }   
-  }
-  #-- NOW ask the specific device
-  #-- issue the match ROM command \x55 and the read scratchpad command \xBE
-  #-- reading 9 + 1 + 8 data bytes and 1 CRC byte = 19 bytes
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    OWX_Execute($master,"read",1,$owx_dev,"\xBE",9,undef);
-  #-- synchronous mode
-  } else {
-    OWX_Reset($master);
-    my $res=OWX_Complex($master,$owx_dev,"\xBE",9);
-    OWXTHERM_ProcValues($hash,"read",undef,undef,$owx_dev,undef,undef,substr($res,10,9));
-  }
-} 
-
-########################################################################################
-#
-# OWXTHERM_ProcValues - Process reading from one device - translate binary into raw
-#
-# Parameter hash = hash of device addressed
-#
-########################################################################################
-
-sub OWXTHERM_ProcValues($$$$$$$$) {
-  my ($hash, $context, $success, $reset, $owx_dev, $data, $numread, $res) = @_;
-  
-  return undef unless (defined $context and $context eq "read");
   my ($i,$j,$k,@data,$ow_thn,$ow_tln);
   my $change = 0;
 
@@ -962,6 +908,65 @@ sub OWXTHERM_ProcValues($$$$$$$$) {
   OWTHERM_FormatValues($hash);
   return undef;
 }
+
+########################################################################################
+#
+# OWXTHERM_GetValues - Trigger reading from one device 
+#
+# Parameter hash = hash of device addressed
+#
+########################################################################################
+
+sub OWXTHERM_GetValues($) {
+
+  my ($hash) = @_;
+  
+  #-- For default, perform the conversion now
+  my $con=1;
+  
+  #-- ID of the device
+  my $owx_dev = $hash->{ROM_ID};
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+  my $name   = $hash->{NAME};
+  
+  #-- check, if the conversion has been called before for all sensors
+  if( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
+    $con=0;
+  }  
+
+  #-- if the conversion has not been called before 
+  if( $con==1 ){
+    #-- issue the match ROM command \x55 and the start conversion command \x44
+    #-- asynchronous mode
+    if( $hash->{ASYNC} ){
+      OWX_Execute($master,"ds182x.convert",1,$owx_dev,"\x44",0,$convtimes{AttrVal($name,"resolution",12)});
+    #-- synchronous mode
+    }else{
+      OWX_Reset($master);     
+      if( OWX_Complex($master,$owx_dev,"\x44",0) eq 0 ){
+        return "$owx_dev not accessible";
+      } 
+      #-- conversion needs some 950 ms - but we may also do it in shorter time !
+      select(undef,undef,undef,$convtimes{AttrVal($name,"resolution",12)}*0.001);
+    }   
+  }
+  #-- NOW ask the specific device
+  #-- issue the match ROM command \x55 and the read scratchpad command \xBE
+  #-- reading 9 + 1 + 8 data bytes and 1 CRC byte = 19 bytes
+  #-- asynchronous mode
+  if( $hash->{ASYNC} ){
+    OWX_Execute($master,"read",1,$owx_dev,"\xBE",9,undef);
+  #-- synchronous mode
+  } else {
+    OWX_Reset($master);
+    my $res=OWX_Complex($master,$owx_dev,"\xBE",9);
+    if( $res eq 0 ){
+      return "$owx_dev not accessible in reading"; 
+    }
+    OWXTHERM_BinValues($hash,"ds182x.reading",1,undef,$owx_dev,undef,undef,substr($res,10,9));
+  }
+} 
 
 #######################################################################################
 #
