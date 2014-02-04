@@ -31,10 +31,16 @@
 # 2.01: attibute dashboard_colwidth replace with dashboard_rowcentercolwidth. rowcentercolwidth can now be defined per 
 #			column. Delete Groups Attribut with Value 1. Dashboard can hide FHEMWEB Roomliste and Header => Fullscreenmode
 # 2.02: Tabs can set on top, bottom or hidden. Fix "variable $tabgroups masks earlier" Errorlog.
+# 2.03: dashboard_showfullsize only in DashboardRoom. Tabs can show Icons (new Attributes). Fix showhelper Bug on lock/unlock.
+#			 The error that after a trigger action the curren tab is changed to the "old" activetab tab has been fixed. dashboard_activetab 
+#			 is stored after tab change
 #
 # Known Bugs/Todos:
-# BUG: wenn ich mehrere Tabs habe und zb. im Uten Tab eine Lampe schalte, springt er danach direkt in den ersten Tab. Finde ich etwas unglücklich.
-# TODO: Icon on Tabs
+# x BUG: wenn ich mehrere Tabs habe und zb. im Uten Tab eine Lampe schalte, springt er danach direkt in den ersten Tab. Finde ich etwas unglücklich.
+# BUG: Nicht alle Inhalte aller Tabs laden, bei Plots dauert die bedienung des Dashboards zu lange. -> elemente hidden?
+# x BUG: Lock blendet schow helper nicht aus?
+# x BUG: dashboard_showfullsize nicht in room everything
+# x TODO: Icon on Tabs
 # Log 1, "[DASHBOARD simple debug] '".$g."' ";
 ########################################################################################
 #
@@ -98,7 +104,6 @@ sub Dashboard_Initialize ($) {
 						 "dashboard_row:top,center,bottom,top-center,center-bottom,top-center-bottom ".						 
 						 "dashboard_showhelper:0,1 ".
 						 "dashboard_showtooglebuttons:0,1 ".						 
-						 
 						 #new attribute vers. 2.00
 						 "dashboard_tabcount:1,2,3,4,5 ".
 						 "dashboard_activetab:1,2,3,4,5 ".						 
@@ -124,6 +129,12 @@ sub Dashboard_Initialize ($) {
 						 "dashboard_showfullsize:0,1 ".
 						 #new attribute vers. 2.02
 						 "dashboard_showtabs:tabs-and-buttonbar-at-the-top,tabs-at-the-top-buttonbar-hidden,tabs-and-buttonbar-on-the-bottom,tabs-on-the-bottom-buttonbar-hidden,tabs-and-buttonbar-hidden ".
+						 #new attribute vers. 2.03
+						 "dashboard_tab1icon ".
+						 "dashboard_tab2icon ".
+						 "dashboard_tab3icon ".
+						 "dashboard_tab4icon ".
+						 "dashboard_tab5icon ".
 						 
 						 #obsolete - erase in future releases
 						 "dashboard_groups ". # obsolet -> erase in future releases
@@ -186,17 +197,24 @@ sub DashboardAsHtml($)
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab2sorting", ""),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab3sorting", ""),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab4sorting", ""),
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab5sorting", ""));
+							   AttrVal($defs{$d}{NAME}, "dashboard_tab5sorting", ""));							   
+ my @tabicons = (AttrVal($defs{$d}{NAME}, "dashboard_tab1icon", ""),
+							AttrVal($defs{$d}{NAME}, "dashboard_tab2icon", ""),
+							AttrVal($defs{$d}{NAME}, "dashboard_tab3icon", ""),
+							AttrVal($defs{$d}{NAME}, "dashboard_tab4icon", ""),
+							AttrVal($defs{$d}{NAME}, "dashboard_tab5icon", ""));
 							   
  #############################################################################################
 
  #---------------- Dashboard is always edited out the Room Dashboard -------------------------
- #if ($FW_room ne $dashboardhiddenroom) { #Dashboard is always edited out the Room Dashboard 	
-#	if ($showbuttonbar eq "hidden") {$showbuttonbar = "top" };
-#	$showhelper = 1;
-#	$showtooglebuttons = 1;
-#	$lockstate = "unlock";
- #}
+ if ($FW_room ne $dashboardhiddenroom) { 	
+#	if ($showbuttonbar eq "hidden") {$showbuttonbar = "top" };   #Dashboard is always edited out the Room Dashboard 
+#	$showhelper = 1;																		#Dashboard is always edited out the Room Dashboard 
+#	$showtooglebuttons = 1																#Dashboard is always edited out the Room Dashboard 
+#	$lockstate = "unlock";																	#Dashboard is always edited out the Room Dashboard 
+
+	$showfullsize = 0;	# Fullsize only in Dashboardroom
+ }
  ################ temp. deaktiviert
  #---------------------------------------------------------------------------- 
   
@@ -241,12 +259,17 @@ sub DashboardAsHtml($)
  
  ########################### Dashboard Tab-Liste ##############################################
  my $tabshow = "hidden";	
+ my $tabicon = "";
  if ($showtabs eq "tabs-and-buttonbar-at-the-top" || $showtabs eq "tabs-at-the-top-buttonbar-hidden") { $tabshow = "top";}
  if ($showtabs eq "tabs-and-buttonbar-on-the-bottom" || $showtabs eq "tabs-on-the-bottom-buttonbar-hidden") { $tabshow = "bottom";}
 	
  $ret .= "	<ul id=\"dashboard_tabnav\" class=\"dashboard_tabnav dashboard_tabnav_".$tabshow."\">\n";	 
  if ($showtabs ne "tabs-at-the-top-buttonbar-hidden" &&  $showtabs ne "tabs-on-the-bottom-buttonbar-hidden" && $showtabs ne "tabs-and-buttonbar-hidden") { $ret .= BuildButtonBar($d,$showtabs); }
- for (my $i=0;$i<$tabcount;$i++){ $ret .= "    <li class=\"dashboard_tab dashboard_tab_".$tabshow."\"><a href=\"#dashboard_tab".$i."\">".trim($tabnames[$i])."</a></li>"; } 
+  for (my $i=0;$i<$tabcount;$i++){ 
+	$tabicon = ""; 
+	if ($tabicons[$i] ne "") { $tabicon = FW_makeImage($tabicons[$i],$tabicons[$i],"dashboard_tabicon") . "&nbsp;"; }
+    $ret .= "    <li class=\"dashboard_tab dashboard_tab_".$tabshow."\">".$tabicon."<a href=\"#dashboard_tab".$i."\">".trim($tabnames[$i])."</a></li>"; 
+ } 
  $ret .= "	</ul>\n"; 
  ##############################################################################################
  
@@ -395,7 +418,7 @@ sub BuildGroup($)
 		my $type = $defs{$d}{TYPE};
 		my $devName = AttrVal($d, "alias", $d);
 		my $icon = AttrVal($d, "icon", "");
-		$icon = FW_makeImage($icon,$icon,"icon") . "&nbsp;" if($icon);
+		$icon = FW_makeImage($icon,$icon,"icon dashboard_groupicon") . "&nbsp;" if($icon);
 	
 		if($FW_hiddenroom{detail}) { $ret .= "<td><div class=\"col1\">$icon$devName</div></td>"; } 
 		else { 
@@ -823,7 +846,27 @@ sub Dashboard_attr($$$) {
   <a name="dashboard_tab5groups"></a>	
     <li>dashboard_tab1groups<br>
         Comma-separated list of the names of the groups to be displayed in Tab 5.
-    </li><br>			
+    </li><br>	
+  <a name="dashboard_tab1icon"></a>	
+    <li>dashboard_tab1icon<br>
+		Set the icon for a Tab. There must exist an icon with the name ico.png in the modpath directory. If the image is referencing an SVG icon, then you can use the @colorname suffix to color the image. 
+    </li><br>
+  <a name="dashboard_tab2icon"></a>	
+    <li>dashboard_tab2icon<br>
+		Set the icon for a Tab. There must exist an icon with the name ico.png in the modpath directory. If the image is referencing an SVG icon, then you can use the @colorname suffix to color the image. 
+    </li><br>	
+  <a name="dashboard_tab3icon"></a>	
+    <li>dashboard_tab3icon<br>
+		Set the icon for a Tab. There must exist an icon with the name ico.png in the modpath directory. If the image is referencing an SVG icon, then you can use the @colorname suffix to color the image. 
+    </li><br>	
+  <a name="dashboard_tab4icon"></a>	
+    <li>dashboard_tab4icon<br>
+		Set the icon for a Tab. There must exist an icon with the name ico.png in the modpath directory. If the image is referencing an SVG icon, then you can use the @colorname suffix to color the image. 
+    </li><br>	
+  <a name="dashboard_tab5icon"></a>	
+    <li>dashboard_tab5icon<br>
+		Set the icon for a Tab. There must exist an icon with the name ico.png in the modpath directory. If the image is referencing an SVG icon, then you can use the @colorname suffix to color the image. 
+    </li><br>	
   <a name="dashboard_lockstate"></a>		
     <li>dashboard_lockstate<br>
         When set to "unlock" you can edit the Dashboard. When set to "lock" no change can be made. <br>
@@ -1038,7 +1081,27 @@ sub Dashboard_attr($$$) {
   <a name="dashboard_tab5groups"></a>	
     <li>dashboard_tab5groups<br>
 		Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 5 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.
-    </li><br>		
+    </li><br>	
+  <a name="dashboard_tab1icon"></a>	
+    <li>dashboard_tab1icon<br>
+		Zeigt am Tab ein Icon an. Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es sich um ein SVG Icon kann der Suffix @colorname für die Farbe des Icons angegeben werden.
+    </li><br>
+  <a name="dashboard_tab2icon"></a>	
+    <li>dashboard_tab2icon<br>
+		Zeigt am Tab ein Icon an. Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es sich um ein SVG Icon kann der Suffix @colorname für die Farbe des Icons angegeben werden.
+    </li><br>	
+  <a name="dashboard_tab3icon"></a>	
+    <li>dashboard_tab3icon<br>
+		Zeigt am Tab ein Icon an. Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es sich um ein SVG Icon kann der Suffix @colorname für die Farbe des Icons angegeben werden.
+    </li><br>	
+  <a name="dashboard_tab4icon"></a>	
+    <li>dashboard_tab4icon<br>
+		Zeigt am Tab ein Icon an. Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es sich um ein SVG Icon kann der Suffix @colorname für die Farbe des Icons angegeben werden.
+    </li><br>	
+  <a name="dashboard_tab5icon"></a>	
+    <li>dashboard_tab5icon<br>
+		Zeigt am Tab ein Icon an. Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es sich um ein SVG Icon kann der Suffix @colorname für die Farbe des Icons angegeben werden.
+    </li><br>	
   <a name="dashboard_lockstate"></a>		
     <li>dashboard_lockstate<br>
 		Bei Dashboard Einstellung "unlock" kann dieses bearbeitet werden. Bei der Einstellung "lock" können keine Änderung vorgenommen werden. <br>

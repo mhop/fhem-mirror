@@ -1,6 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: DASHBOARD: Tabs can show an icon.
+  - bugfix:  DASHBOARD: dashboard_showfullsize only in DashboardRoom.
+             Fix showhelper Bug on lock/unlock. The error that after a trigger 
+			 action the curren tab is changed to the "old" activetab tab has 
+			 been fixed.
   - bugfix:  SYSMON: Filesystems (absent medium)
   - feature: FLOORPLAN-menu-items can get icons attached by new 
              attribute fp_roomIcons
