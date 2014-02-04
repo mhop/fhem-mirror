@@ -1666,7 +1666,9 @@ sub CUL_HM_Parse($$) {##############################
     $devH->{helper}{rpt}{ack} = \@ack;
     $devH->{helper}{rpt}{ts}  = gettimeofday();
     my $i=0;
+    my $rr = $respRemoved;
     CUL_HM_SndCmd($ack[$i++],$ack[$i++])while ($i<@ack);
+    $respRemoved = $rr;
     Log3 $name,6,"CUL_HM $name sent ACK:".(int(@ack));
   }
   CUL_HM_ProcessCmdStack($shash) if ($respRemoved); # cont if complete
@@ -1692,9 +1694,10 @@ sub CUL_HM_parseCommon(@){#####################################################
   # TC wakes up with 8270, not with A258
   # VD wakes up with 8202
   #                  9610
-
-  if(CUL_HM_getRxType($shash) & 0x08){ #wakeup device
-    if((hex($mFlg) & 0xA2) == 0x82){ #wakeup signal
+  my $rxt = CUL_HM_getRxType($shash);
+  my $mFlgH = hex($mFlg);
+  if($rxt & 0x08){ #wakeup device
+    if(($mFlgH & 0xA2) == 0x82){ #wakeup signal
       CUL_HM_appFromQ($shash->{NAME},"wu");# stack cmds if waiting
       if ($shash->{cmdStack}){
         CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IOid($shash).$src);
@@ -1703,9 +1706,21 @@ sub CUL_HM_parseCommon(@){#####################################################
     }
     elsif($shash->{helper}{prt}{sProc} != 1){ # no wakeup signal, 
       # this is an autonom message send ACK but dont process further
-      $shash->{helper}{prt}{sleeping} = 1 if(hex($mFlg) & 0x20) ;
+      $shash->{helper}{prt}{sleeping} = 1 if($mFlgH & 0x20) ;
     }
   }
+  elsif($rxt & 0x10){ # lazy config
+    if($mFlgH & 0x02                  #wakeup device
+       && $defs{$shash->{IODev}{NAME}}{TYPE} eq "HMLAN"){
+      CUL_HM_appFromQ($shash->{NAME},"cf");# stack cmds if waiting
+      $shash->{helper}{prt}{sleeping} = 0;
+      CUL_HM_ProcessCmdStack($shash);
+    }
+    else{
+      $shash->{helper}{prt}{sleeping} = 1;
+    }
+  }  
+  
   my $repeat;
   if   ($mTp eq "02"){# Ack/Nack ###########################
 
@@ -3245,7 +3260,7 @@ sub CUL_HM_Set($@) {
       
       $hash->{helper}{vd}{idh} = hex(substr($dst,2,2))*20077;
       $hash->{helper}{vd}{idl} = hex(substr($dst,4,2))*256;
-      $hash->{helper}{vd}{msgCnt} = 1 if (!defined $hash->{helper}{vd}{msgCnt});
+      CUL_HM_UpdtReadSingle($hash,".msgCnt",ReadingsVal($name,".msgCnt",1),0);
       if (!$hash->{helper}{virtTC}){
         $hash->{helper}{vd}{ackT} = "" if (!defined$hash->{helper}{vd}{ackT});
         $hash->{helper}{vd}{miss} = 0  if (!defined$hash->{helper}{vd}{miss});
@@ -3555,7 +3570,8 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   my($in ) = @_;
   my(undef,$vId) = split(':',$in);
   my $hash = CUL_HM_id2Hash($vId);
-  my $msgCnt = ($hash->{helper}{vd}{msgCnt} + 1)%255;
+  my $name = $hash->{NAME};
+  my $msgCnt = (ReadingsVal($name,".msgCnt",0) + 1)%255;
   
 # int32_t result = (((_address << 8) | messageCounter) * 1103515245 + 12345) >> 16;
 #                          4e6d = 20077                        12996205 = C64E6D
@@ -3564,7 +3580,6 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   my $lo = int(($idl*0x4e6d +12345)/0x10000)&0xff;
   my $hi = ($hash->{helper}{vd}{idh}+$idl*198)&0xff;
   my $nextTimer = (($lo+$hi)&0xff)/4 + 120;#original - instable
-  my $name = $hash->{NAME};
   if ($hash->{helper}{vd}{cmd}){
     if ($hash->{helper}{vd}{typ} == 1){
       CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
@@ -3588,8 +3603,8 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
 
   my $tn = gettimeofday();
   $hash->{helper}{vd}{nextF} = ReadingsVal($name,".next",0) + $nextTimer;
-  CUL_HM_UpdtReadSingle($hash,".next",$tn+$nextTimer,1);
-  $hash->{helper}{vd}{msgCnt} = $msgCnt;
+  CUL_HM_UpdtReadBulk($hash,0,".next:".($tn+$nextTimer)
+                             ,".msgCnt:$msgCnt");
   $hash->{helper}{virtTC} = "00";
   CUL_HM_ProcessCmdStack($hash);
   InternalTimer($tn+10,"CUL_HM_valvePosTmr","valveTmr:$vId",0);
@@ -4206,7 +4221,7 @@ sub CUL_HM_respPendTout($) {
       CUL_HM_ProcessCmdStack($hash) if(CUL_HM_getRxType($hash) & 0x03);#burst/all
     }
     elsif ($pHash->{rspWait}{reSent} > AttrVal($name,"msgRepeat",3)#too many
-           ||(!(CUL_HM_getRxType($hash) & 0x8B))){#config/lacyConfig cannot retry
+           ||(!(CUL_HM_getRxType($hash) & 0x9B))){#config cannot retry
 
       my $pendCmd = "MISSING ACK";
       if ($pHash->{rspWait}{Pending}){
@@ -4229,7 +4244,7 @@ sub CUL_HM_respPendTout($) {
         CUL_HM_SndCmd($hash,"++B112$addr$HMid");
         $hash->{helper}{prt}{awake}=4;# start re-wakeup
       }
-      elsif(CUL_HM_getRxType($hash) & 0x08){# wakeup devices
+      elsif(CUL_HM_getRxType($hash) & 0x18){# wakeup/lazy devices
         #need to fill back command to queue and wait for next wakeup
         if ($pHash->{mmcA}){#fillback multi-message command
           unshift @{$hash->{cmdStack}},$_ foreach (reverse@{$pHash->{mmcA}});
