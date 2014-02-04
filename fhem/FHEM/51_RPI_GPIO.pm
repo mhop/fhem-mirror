@@ -6,7 +6,7 @@
 # Modul for Raspberry Pi GPIO access
 #
 # define <name> RPI_GPIO <Pin>
-# where <Pin> is one of RPi's GPIO #
+# where <Pin> is one of RPi's GPIO 
 #
 # contributed by Klaus Wittstock (2013) email: klauswittstock bei gmail punkt com
 #
@@ -29,11 +29,12 @@ sub RPI_GPIO_Initialize($) {
   $hash->{AttrFn}   = "RPI_GPIO_Attr";
   $hash->{UndefFn}  = "RPI_GPIO_Undef";
   $hash->{ExceptFn} = "RPI_GPIO_Except";
-  $hash->{AttrList} = "poll_interval loglevel:0,1,2,3,4,5" .
+  $hash->{AttrList} = "poll_interval" .
                       " direction:input,output pud_resistor:off,up,down" .
                       " interrupt:none,falling,rising,both" .
                       " toggletostate:no,yes active_low:no,yes" .
-                      " debounce_in_ms restoreOnStartup:no,yes " .
+                      " debounce_in_ms restoreOnStartup:no,yes" .
+					  " longpressinterval " .
                       "$readingFnAttributes";
 }
 
@@ -91,7 +92,7 @@ sub RPI_GPIO_Get($) {
   #my $dir = $attr{$hash->{NAME}}{direction} || "output";
   my $dir = "";
   my $zustand = undef;
-  my $val = fileaccess($hash, "value");
+  my $val = RPI_GPIO_fileaccess($hash, "value");
   if ( defined ($val) ) {
     if ( $val == 1) {
       if ($dir eq "output") {$zustand = "on";} else {$zustand = "high";}
@@ -99,7 +100,7 @@ sub RPI_GPIO_Get($) {
       if ($dir eq "output") {$zustand = "off";} else {$zustand = "low";}
     }    
   } else { 
-    Log 1, "$hash->{NAME} GetFn: readout of Pinvalue fail"; 
+    Log3 $hash, 1, "$hash->{NAME} GetFn: readout of Pinvalue fail"; 
   }
   $hash->{READINGS}{Pinlevel}{VAL} = $zustand;
   $hash->{READINGS}{Pinlevel}{TIME} = TimeNow();
@@ -116,18 +117,18 @@ sub RPI_GPIO_Set($@) {
       my $mt = $attr{$name}{"direction"};
       if($mt && $mt eq "output") {
 	      if ($cmd eq 'toggle') {
-	        my $val = fileaccess($hash, "value");     #alten Wert des GPIO direkt auslesen
+	        my $val = RPI_GPIO_fileaccess($hash, "value");     #alten Wert des GPIO direkt auslesen
 	        $cmd = $val eq "0" ? "on" :"off";
 	      }
 if ($cmd eq 'on') {
-          fileaccess($hash, "value", "1");
+          RPI_GPIO_fileaccess($hash, "value", "1");
           #$hash->{STATE} = 'on';
           readingsBeginUpdate($hash);
 		  #readingsBulkUpdate($hash, 'Pinlevel', $valalt);
 		  readingsBulkUpdate($hash, 'state', "on");
 		  readingsEndUpdate($hash, 1);
         } elsif ($cmd eq 'off') {
-          fileaccess($hash, "value", "0");
+          RPI_GPIO_fileaccess($hash, "value", "0");
           #$hash->{STATE} = 'off';
           readingsBeginUpdate($hash);
 		  #readingsBulkUpdate($hash, 'Pinlevel', $valalt);
@@ -146,36 +147,36 @@ if ($cmd eq 'on') {
       }      
   }
   if ($cmd eq 'readValue') { #noch bei input einpflegen
-     updatevalue($hash);  
+     RPI_GPIO_updatevalue($hash);  
   } 
 }
 
 sub RPI_GPIO_State($$$$) {	#reload readings at FHEM start
   my ($hash, $tim, $sname, $sval) = @_;
-  #Log 1, "$hash->{NAME}: $sname kann auf $sval wiederhergestellt werden $tim";
+  Log3 $hash, 4, "$hash->{NAME}: $sname kann auf $sval wiederhergestellt werden $tim";
   if ( (AttrVal($hash->{NAME},"restoreOnStartup","on") eq "on") && ($sname ne "STATE") ) {
      if (AttrVal($hash->{NAME},"direction","") eq "output") {
 		$hash->{READINGS}{$sname}{VAL} = $sval;
 		$hash->{READINGS}{$sname}{TIME} = $tim;
-		#Log 1, "OUTPUT $hash->{NAME}: $sname wiederhergestellt auf $sval";
+		Log3 $hash, 4, "OUTPUT $hash->{NAME}: $sname wiederhergestellt auf $sval";
 		if ($sname eq "state") {
 			#RPI_GPIO_Set($hash,$hash->{NAME},$sname,$sval);
 			RPI_GPIO_Set($hash,$hash->{NAME},$sval);
-			#Log 1, "OUTPUT $hash->{NAME}: STATE wiederhergestellt auf $sval";	
+			Log3 $hash, 4, "OUTPUT $hash->{NAME}: STATE wiederhergestellt auf $sval";	
 		} 
 	 } elsif ( (AttrVal($hash->{NAME},"direction","") eq "input") && (AttrVal($hash->{NAME},"toggletostate","") eq "yes")) {
 	    if ($sname eq "Toggle") {
-			   $hash->{READINGS}{$sname}{VAL} = $sval;
+			 $hash->{READINGS}{$sname}{VAL} = $sval;
 		     $hash->{READINGS}{$sname}{TIME} = $tim;
 		     #RPI_GPIO_Set($hash,$hash->{NAME},$sval);
 		     readingsBeginUpdate($hash);
-         readingsBulkUpdate($hash, 'state', $sval);
-         readingsEndUpdate($hash, 1);
-		     #Log 1, "INPUT $hash->{NAME}: $sname und STATE wiederhergestellt auf $sval";	
+             readingsBulkUpdate($hash, 'state', $sval);
+             readingsEndUpdate($hash, 1);
+		     Log3 $hash, 4, "INPUT $hash->{NAME}: $sname und STATE wiederhergestellt auf $sval";	
 		   } elsif ($sname eq "Counter") {
 		     $hash->{READINGS}{$sname}{VAL} = $sval;
 		     $hash->{READINGS}{$sname}{TIME} = $tim;
-		     #Log 1, "INPUT $hash->{NAME}: $sname wiederhergestellt auf $sval";	
+		     Log3 $hash, 4, "INPUT $hash->{NAME}: $sname wiederhergestellt auf $sval";	
 		   }
 	 }
   }
@@ -200,19 +201,27 @@ sub RPI_GPIO_Attr(@) {
    }
  }
  
+  if ($attr eq 'longpressinterval') {
+   if ( defined($val) ) {
+     unless ( looks_like_number($val) && $val >= 0.1 && $val <= 10 ) {
+		$msg = "$hash->{NAME}: Wrong longpress time defined. Value must be a number between 0.1 and 10";
+     }    
+   } 
+ }
+ 
  if ($attr eq 'direction') {
    if (!$val) { #$val nicht definiert: Einstellungen löschen
        $msg = "$hash->{NAME}: no direction value. Use input output";
    } elsif ($val eq "input") {
-       #fileaccess($hash, "direction", "in");
-       exuexpin($hash, "in");
-       #Log 1, "$hash->{NAME}: direction: input"; 
+       #RPI_GPIO_fileaccess($hash, "direction", "in");
+       RPI_GPIO_exuexpin($hash, "in");
+       Log3 $hash, 5, "$hash->{NAME}: direction: input"; 
    } elsif( ( AttrVal($hash->{NAME}, "interrupt", "none") ) ne ( "none" ) ) {
        $msg = "$hash->{NAME}: Delete attribute interrupt or set it to none for output direction"; 
    } elsif ($val eq "output") {
-       #fileaccess($hash, "direction", "out");
-       exuexpin($hash, "out");
-       #Log 1, "$hash->{NAME}: direction: output";
+       #RPI_GPIO_fileaccess($hash, "direction", "out");
+       RPI_GPIO_exuexpin($hash, "out");
+       Log3 $hash, 5, "$hash->{NAME}: direction: output";
    } else {
        $msg = "$hash->{NAME}: Wrong $attr value. Use input output";
    }
@@ -220,42 +229,40 @@ sub RPI_GPIO_Attr(@) {
 
  if ($attr eq 'interrupt') {
    if ( !$val || ($val eq "none") ) {
-     fileaccess($hash, "edge", "none");
-     inthandling($hash, "stop");
-     #Log 1, "$hash->{NAME}: interrupt: none"; 
+     RPI_GPIO_fileaccess($hash, "edge", "none");
+     RPI_GPIO_inthandling($hash, "stop");
+     Log3 $hash, 5, "$hash->{NAME}: interrupt: none"; 
    } elsif (( AttrVal($hash->{NAME}, "direction", "output") ) eq ( "output" )) {
      $msg = "$hash->{NAME}: Wrong direction value defined for interrupt. Use input";
    } elsif ($val eq "falling") {
-     fileaccess($hash, "edge", "falling");
-     inthandling($hash, "start");
-     #Log 1, "$hash->{NAME}: interrupt: falling"; 
+     RPI_GPIO_fileaccess($hash, "edge", "falling");
+     RPI_GPIO_inthandling($hash, "start");
+     Log3 $hash, 5, "$hash->{NAME}: interrupt: falling"; 
    } elsif ($val eq "rising") {
-     fileaccess($hash, "edge", "rising");
-     inthandling($hash, "start");
-     #Log 1, "$hash->{NAME}: interrupt: rising";  
+     RPI_GPIO_fileaccess($hash, "edge", "rising");
+     RPI_GPIO_inthandling($hash, "start");
+     Log3 $hash, 5, "$hash->{NAME}: interrupt: rising";  
    } elsif ($val eq "both") {
-     fileaccess($hash, "edge", "both");
-     inthandling($hash, "start");
-     #Log 1, "$hash->{NAME}: interrupt: both";  
+     RPI_GPIO_fileaccess($hash, "edge", "both");
+     RPI_GPIO_inthandling($hash, "start");
+     Log3 $hash, 5, "$hash->{NAME}: interrupt: both";  
    } else {
      $msg = "$hash->{NAME}: Wrong $attr value. Use none, falling, rising or both";
    }  
  }
  #Tastfunktion: bei jedem Tastendruck wird State invertiert
  if ($attr eq 'toggletostate') {
-   if ( !$val || ($val eq ("yes" || "no") ) ) {
-     #Log 1, "$hash->{NAME}: toggletostate: passt"; 
-   } else {
+   unless ( !$val || ($val eq ("yes" || "no") ) ) {
      $msg = "$hash->{NAME}: Wrong $attr value. Use yes or no";
    }
  }
 #invertierte Logik 
  if ($attr eq 'active_low') {
    if ( !$val || ($val eq "no" ) ) {
-     fileaccess($hash, "active_low", "0");
+     RPI_GPIO_fileaccess($hash, "active_low", "0");
      #Log 1, "$hash->{NAME}: interrupt: none"; 
    } elsif ($val eq "yes") {
-     fileaccess($hash, "active_low", "1");
+     RPI_GPIO_fileaccess($hash, "active_low", "1");
    } else {
      $msg = "$hash->{NAME}: Wrong $attr value. Use yes or no";
    }
@@ -289,7 +296,7 @@ sub RPI_GPIO_Attr(@) {
 sub RPI_GPIO_Poll($) {		#for attr poll_intervall -> readout pin value
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  updatevalue($hash);
+  RPI_GPIO_updatevalue($hash);
   my $pollInterval = AttrVal($hash->{NAME}, 'poll_interval', 0);
   if ($pollInterval > 0) {
     InternalTimer(gettimeofday() + ($pollInterval * 60), 'RPI_GPIO_Poll', $hash, 0);
@@ -311,25 +318,26 @@ sub RPI_GPIO_Undef($$) {
   #print $uexp "$hash->{RPI_pin}";
   #$uexp->close;
   #alternative unexport Pin:
-  exuexpin($hash, "unexport");
+  RPI_GPIO_exuexpin($hash, "unexport");
   return undef;
 }
 
 sub RPI_GPIO_Except($) {	#called from main if an interrupt occured 
   my ($hash) = @_;
-  #seek($hash->{filehandle},0,0);									          #an Anfang der Datei springen (ist nötig falls vorher schon etwas gelesen wurde)
+  #seek($hash->{filehandle},0,0);								#an Anfang der Datei springen (ist nötig falls vorher schon etwas gelesen wurde)
   #chomp ( my $firstval = $hash->{filehandle}->getline );		#aktuelle Zeile auslesen und Endezeichen entfernen
-  my $eval = fileaccess($hash, "edge");								      #Eintstellung Flankensteuerung auslesen
-  my ($valst, $valalt, $valto, $valcnt) = undef;
+  #my $acttime = gettimeofday();
+  my $eval = RPI_GPIO_fileaccess($hash, "edge");							#Eintstellung Flankensteuerung auslesen
+  my ($valst, $valalt, $valto, $valcnt, $vallp) = undef;
   my $debounce_time = AttrVal($hash->{NAME}, "debounce_in_ms", "0"); #Wartezeit zum entprellen
   if( $debounce_time ne "0" ) {
     $debounce_time /= 1000;
-    Log 1, "Wartezeit: $debounce_time ms"; 
+    Log3 $hash, 4, "Wartezeit: $debounce_time ms"; 
     select(undef, undef, undef, $debounce_time);
   }
 
   seek($hash->{filehandle},0,0);								#an Anfang der Datei springen (ist nötig falls vorher schon etwas gelesen wurde)
-  chomp ( my $val = $hash->{filehandle}->getline );			#aktuelle Zeile auslesen und Endezeichen entfernen  
+  chomp ( my $val = $hash->{filehandle}->getline );				#aktuelle Zeile auslesen und Endezeichen entfernen  
   
   if ( ( $val == 1) && ( $eval ne ("falling") ) ) {
     $valst = "on";
@@ -341,56 +349,61 @@ sub RPI_GPIO_Except($) {	#called from main if an interrupt occured
   if ( ( ($eval eq "rising") && ( $val == 1 ) ) || ( ($eval eq "falling") && ( $val == 0 ) ) ) {	#nur bei Trigger auf steigende / fallende Flanke
 #Togglefunktion
     if (!defined($hash->{READINGS}{Toggle}{VAL})) {			#Togglewert existiert nicht -> anlegen
-        #Log 1, "Toggle war nicht def";
+        Log3 $hash, 5, "Toggle war nicht def";
         $valto = "on";
     } elsif ( $hash->{READINGS}{Toggle}{VAL} eq "off" ) {		#Togglewert invertieren
-       #my $twert = $hash->{READINGS}{Toggle}{VAL};
-       #Log 1, "Toggle war auf $twert";
+       Log3 $hash, 5, "Toggle war auf $hash->{READINGS}{Toggle}{VAL}";
        $valto = "on";
     } else {
-       #my $twert = $hash->{READINGS}{Toggle}{VAL};
-       #Log 1, "Toggle war auf $twert";
+       Log3 $hash, 5, "Toggle war auf $hash->{READINGS}{Toggle}{VAL}";
        $valto = "off";
     }
-    #Log 1, "Toggle  ist jetzt $valto";
+    Log3 $hash, 5, "Toggle ist jetzt $valto";
     if (( AttrVal($hash->{NAME}, "toggletostate", "no") ) eq ( "yes" )) {	#wenn Attr "toggletostate" gesetzt auch die Variable für den STATE wert setzen
        $valst = $valto;
     }
 #Zählfunktion
     if (!defined($hash->{READINGS}{Counter}{VAL})) {			#Zähler existiert nicht -> anlegen
-        #Log 1, "Zähler war nicht def";
+        Log3 $hash, 5, "Zähler war nicht def";
         $valcnt = "1";
     } else {
 		$valcnt = $hash->{READINGS}{Counter}{VAL} + 1;
-		#Log 1, "Zähler  ist jetzt $valcnt";
-    }    
+		Log3 $hash, 5, "Zähler ist jetzt $valcnt";
+    }
+#langer Testendruck    
   } elsif ($eval eq "both") {
 	if 	( $val == 1 ) {
-		my $lngpressInterval = 1;
-		InternalTimer(gettimeofday() + $lngpressInterval, 'longpress', $hash, 0);
+		my $lngpressInterval = AttrVal($hash->{NAME}, "longpressinterval", "1");
+		InternalTimer(gettimeofday() + $lngpressInterval, 'RPI_GPIO_longpress', $hash, 0);
+		#$hash->{Anzeit} = gettimeofday();
 	} else {
-		RemoveInternalTimer('longpress');
-		readingsBeginUpdate($hash);
-		readingsBulkUpdate($hash, 'Longpress', 'off');
-		readingsEndUpdate($hash, 1);
+	    RemoveInternalTimer('RPI_GPIO_longpress');
+		$vallp = 'off';
+		#my $zeit = $acttime;
+		#$zeit -= $hash->{Anzeit};
+		#Log3 $hash, 5, "Anzeit: $zeit";
+		#readingsBeginUpdate($hash);
+		#readingsBulkUpdate($hash, 'Anzeit', $zeit);
+		#readingsEndUpdate($hash, 1);
 	}
   }
   
-  delete ($hash->{READINGS}{Toggle}) if ($eval ne ("rising" || "falling"));		#Reading Toggle löschen wenn kein Wert in Variable
-  delete ($hash->{READINGS}{Longpress}) if ($eval ne "both");						#Reading Longpress löschen wenn edge nicht on both
+  delete ($hash->{READINGS}{Toggle})    if ($eval ne ("rising" || "falling"));		#Reading Toggle löschen wenn Edge weder "rising" noch "falling"
+  delete ($hash->{READINGS}{Longpress}) if ($eval ne "both");					#Reading Longpress löschen wenn edge nicht "both"
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash, 'Pinlevel', $valalt);
-  readingsBulkUpdate($hash, 'state', $valst);
-  readingsBulkUpdate($hash, 'Toggle', $valto) if ($valto);
-  readingsBulkUpdate($hash, 'Counter', $valcnt) if ($valcnt);
+  readingsBulkUpdate($hash, 'Pinlevel',  $valalt);
+  readingsBulkUpdate($hash, 'state',     $valst);
+  readingsBulkUpdate($hash, 'Toggle',    $valto)  if ($valto);
+  readingsBulkUpdate($hash, 'Counter',   $valcnt) if ($valcnt);
+  readingsBulkUpdate($hash, 'Longpress', $vallp)  if ($vallp);
   readingsEndUpdate($hash, 1);
-  #Log 1, "RPIGPIO: Except ausgelöst: $hash->{NAME}, Wert: $val, edge: $eval,vt: $valto, $debounce_time s: $firstval";  
+  #Log3 $hash, 5, "RPIGPIO: Except ausgelöst: $hash->{NAME}, Wert: $val, edge: $eval,vt: $valto, $debounce_time s: $firstval";  
 }
 
-sub longpress($) {			#for reading longpress
+sub RPI_GPIO_longpress($) {			#for reading longpress
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  my $val = fileaccess($hash, "value");
+  my $val = RPI_GPIO_fileaccess($hash, "value");
   if ($val == 1) {
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, 'Longpress', 'on');
@@ -398,13 +411,13 @@ sub longpress($) {			#for reading longpress
   }
 }
 
-sub dblclick($) {
+sub RPI_GPIO_dblclick($) {
 
 }
 
-sub updatevalue($) {		#update value for Input devices
+sub RPI_GPIO_updatevalue($) {		#update value for Input devices
   my ($hash) = @_;
-  my $val = fileaccess($hash, "value");
+  my $val = RPI_GPIO_fileaccess($hash, "value");
   if ( defined ($val) ) {
     my ($valst, $valalt) = undef;
     if ( $val == 1) {
@@ -419,11 +432,11 @@ sub updatevalue($) {		#update value for Input devices
     readingsBulkUpdate($hash, 'state', $valst) if (( AttrVal($hash->{NAME}, "toggletostate", "no") ) eq ( "no" ));
     readingsEndUpdate($hash, 1);
   } else {
-  Log 1, "$hash->{NAME}: readout of Pinvalue fail";   
+  Log3 $hash, 1, "$hash->{NAME}: readout of Pinvalue fail";   
   }
 }
 
-sub fileaccess($$;$) {		#Fileaccess for GPIO base directory
+sub RPI_GPIO_fileaccess($$;$) {		#Fileaccess for GPIO base directory
  #my ($hash, $fname, $value) = @_;
  my ($hash, @args) = @_;
  my $fname = $args[0];
@@ -437,7 +450,7 @@ sub fileaccess($$;$) {		#Fileaccess for GPIO base directory
       return $pinvalue;
    } 
    else {
-      Log 1, "Can't open file: $hash->{NAME}, $fname";
+      Log3 $hash, 1, "Can't open file: $hash->{NAME}, $fname";
    }
  } else {
    my $value = $args[1];
@@ -447,12 +460,12 @@ sub fileaccess($$;$) {		#Fileaccess for GPIO base directory
       $fh->close;
    }
    else {
-      Log 1, "Can't open file: $hash->{NAME}, $fname";
+      Log3 $hash, 1, "Can't open file: $hash->{NAME}, $fname";
    }
  }
 }
 
-sub exuexpin($$) {			#export and unexport Pin via GPIO utility
+sub RPI_GPIO_exuexpin($$) {			#export and unexport Pin via GPIO utility
  my ($hash, $dir) = @_;
  my $sw;
  if ($dir eq "unexport") {
@@ -469,19 +482,19 @@ sub exuexpin($$) {			#export and unexport Pin via GPIO utility
        my $exp = $gpioprg.' '.$sw.' '.$hash->{RPI_pin}.$dir;
        $exp = `$exp`;
        } else {
-         Log 1, "file $gpioprg is not setuid"; 
+         Log3 $hash, 1, "file $gpioprg is not setuid"; 
        }
      } else {
-       Log 1, "file $gpioprg is not executable"; 
+       Log3 $hash, 1, "file $gpioprg is not executable"; 
      }
    } else {
-     Log 1, "file $gpioprg doesnt exist"; 
+     Log3 $hash, 1, "file $gpioprg doesnt exist"; 
    }
  #######################
 
 }
 
-sub inthandling($$) {		#start/stop Interrupthandling
+sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
  my ($hash, $arg) = @_;
  my $msg = '';
  if ( $arg eq "start") {
@@ -495,7 +508,7 @@ sub inthandling($$) {		#start/stop Interrupthandling
       $selectlist{$hash->{NAME}} = $hash;
       $hash->{EXCEPT_FD} = fileno($hash->{filehandle});
       my $pinvalue = $hash->{filehandle}->getline;
-      Log 5, "Datei: $valfile, FH: $hash->{filehandle}, EXCEPT_FD: $hash->{EXCEPT_FD}, akt. Wert: $pinvalue";
+      Log3 $hash, 5, "Datei: $valfile, FH: $hash->{filehandle}, EXCEPT_FD: $hash->{EXCEPT_FD}, akt. Wert: $pinvalue";
     }
   } else {
     delete $selectlist{$hash->{NAME}};
@@ -665,6 +678,11 @@ sub inthandling($$) {		#start/stop Interrupthandling
       Restore Readings and sets after reboot<br>
       Default: on, valid values: on, off<br><br>
     </li>
+	<li>longpressinterval<br>
+	  <b>works with interrupt set to both only</b><br>
+      time in seconds, a port need to be high to set reading longpress to on<br>
+      Default: 1, valid values: 0.1 - 10<br><br>
+    </li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
@@ -833,6 +851,11 @@ sub inthandling($$) {		#start/stop Interrupthandling
     <li>restoreOnStartup<br>
       Wiederherstellen der Portzust&äuml;nde nach Neustart<br>
       Standard: on, g&uuml;ltige Werte: on, off<br><br>
+    </li>
+	<li>longpressinterval<br>
+	  <b>Funktioniert nur bei auf both gesetztem Attribut interrupt</b><br>
+      Zeit in Sekunden, die ein GPIO auf high verweilen muss, bevor das Reading longpress auf on gesetzt wird <br>
+      Standard: 1, g&uuml;ltige Werte: 0.1 - 10<br><br>
     </li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
