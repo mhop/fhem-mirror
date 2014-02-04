@@ -417,12 +417,17 @@ sub HMLAN_Write($$$) {#########################################################
     if (!$hash->{assIDs}{$dst} && $dst ne "000000"){
       HMLAN_SimpleWrite($hash, $IDadd);
       my $dN = CUL_HM_id2Name($dst);
-      if (!($dN eq $dst) &&  # name not found
-          !(CUL_HM_Get(CUL_HM_id2Hash($dst),$dN,"param","rxType") & ~0x04)){#config only
-        $hash->{helper}{$dst}{newChn} = '+'.$dst.",01,01,FE1F";
-      }
-      else{
-        $hash->{helper}{$dst}{newChn} = '+'.$dst.',00,01,';
+      if (!($dN eq $dst) ){# name not found
+        my $rxt = CUL_HM_Get(CUL_HM_id2Hash($dst),$dN,"param","rxType");
+        if (!($rxt & ~0x04)){#config only
+          $hash->{helper}{$dst}{newChn} = '+'.$dst.",01,01,FE1F";
+        }
+        elsif($rxt & 0x10){#lazyConfig
+          $hash->{helper}{$dst}{newChn} = '+'.$dst.',03,01,1E';
+        }
+        else{
+          $hash->{helper}{$dst}{newChn} = '+'.$dst.',00,01,';
+        }
       }
       $hash->{helper}{$dst}{name} = CUL_HM_id2Name($dst);
       $hash->{assIDs}{$dst} = 1;
