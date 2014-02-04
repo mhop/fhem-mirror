@@ -103,6 +103,18 @@ foreach my $lang (@lang) {
         if($dosMode);
     print "*** $lang $mods{$mod}: No document text found\n"
         if(!$suffix && !$docCount && !$dosMode);
+    if($suffix && !$docCount && !$dosMode) {
+      if($lang eq "DE") {
+        print OUT << "EOF";
+<a name="$mod"></a>
+<h3>$mod</h3>
+<ul>
+  Sorry, keine deutsche Dokumentation vorhanden.
+  Die englische Doku gibt es hier: <a href='commandref.html#$mod'>$mod</a><br/>
+</ul>
+EOF
+      }
+    }
     print "$lang $mods{$mod}: No <a name=\"$mod\"> link\n"
         if(!$suffix && $docCount && !$hasLink);
 
