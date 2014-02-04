@@ -684,11 +684,11 @@ CUL_XmitDlyHM($$$)
   my (undef,$mTy,undef,$id) = unpack 'A8A2A6A6',$fn if(length($fn)>19);
 
   if($id &&
-     $mTy ne "02" &&
      $modules{CUL_HM}{defptr}{$id} && 
      $modules{CUL_HM}{defptr}{$id}{helper}{io} && 
      $modules{CUL_HM}{defptr}{$id}{helper}{io}{nextSend}) {
     my $dDly = $modules{CUL_HM}{defptr}{$id}{helper}{io}{nextSend} - $now;
+    $dDly -= 0.04 if ($mTy eq "02");
     if ($dDly > 0.01){# wait less then 10 ms will not work
       $dDly = 0.1 if($dDly > 0.1);
       Log3 $hash->{NAME}, 5, "CUL $id dly:".int($dDly*1000)."ms";
