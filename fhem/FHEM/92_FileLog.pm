@@ -950,7 +950,7 @@ FileLog_sampleDataFn($$$$$)
 
     Log events to <code>&lt;filename&gt;</code>. The log format is
     <ul><code><br>
-      YYYY:MM:DD_HH:MM:SS &lt;device&gt; &lt;event&gt;<br>
+      YYYY-MM-DD_HH:MM:SS &lt;device&gt; &lt;event&gt;<br>
     <br></code></ul>
     The regexp will be checked against the device name
     devicename:event or timestamp:devicename:event combination.
@@ -978,10 +978,10 @@ FileLog_sampleDataFn($$$$$)
     Examples:
     <ul>
       <code>define lamplog FileLog %L/lamp.log lamp</code><br>
-      <code>define wzlog FileLog /var/tmp/wz-%Y-%U.log
+      <code>define wzlog FileLog ./log/wz-%Y-%U.log
               wz:(measured-temp|actuator).*</code><br>
       With ISO 8601 week numbers, if supported:<br>
-      <code>define wzlog FileLog /var/tmp/wz-%G-%V.log
+      <code>define wzlog FileLog ./log/wz-%G-%V.log
               wz:(measured-temp|actuator).*</code><br>
     </ul>
     <br>
@@ -1171,4 +1171,272 @@ FileLog_sampleDataFn($$$$$)
 </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="FileLog"></a>
+<h3>FileLog</h3>
+<ul>
+  <br>
+
+  <a name="FileLogdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; FileLog &lt;filename&gt; &lt;regexp&gt;</code>
+    <br><br>
+
+    Speichert Ereignisse in einer Log-Datei mit Namen <code>&lt;filename&gt;</code>. Das Log-Format ist
+    <ul><code><br>
+      YYYY-MM-DD_HH:MM:SS &lt;device&gt; &lt;event&gt;<br>
+    <br></code></ul>
+    Der Ausdruck unter regexp wird anhand des Ger&auml;tenames &uuml;berpr&uuml;ft und zwar 
+    devicename:event oder der timestamp:devicename:event-Kombination.
+    Der regexp muss mit dem kompletten String &uuml;bereinstimmen und nicht nur teilweise.
+    <br>
+    <code>&lt;filename&gt;</code> k&ouml;nnen %-wildcards der POSIX
+    strftime-Funktion des darunterliegenden OS enthalten (siehe auch strftime
+    Beschreibung).
+    Allgemein gebr&auml;uchliche Wildcards sind:
+    <ul>
+    <li><code>%d</code> Tag des Monats (01..31)</li>
+    <li><code>%m</code> Monat (01..12)</li>
+    <li><code>%Y</code> Jahr (1970...)</li>
+    <li><code>%w</code> Wochentag (0..6);  beginnend mit Sonntag (0)</li>
+    <li><code>%j</code> Tag des Jahres (001..366)</li>
+    <li><code>%U</code> Wochennummer des Jahres, wobei Wochenbeginn = Sonntag (00..53)</li>
+    <li><code>%W</code> Wochennummer des Jahres, wobei Wochenbeginn = Montag (00..53)</li>
+    </ul>
+    FHEM ersetzt <code>%L</code> mit dem Wert des global logdir Attributes.<br>
+
+    Bevor <code>%V</code> f&uuml;r ISO 8601 Wochennummern verwendet werden,
+    muss &uuml;berpr&uuml;ft werden, ob diese Funktion durch das Brriebssystem
+    unterst&uuml;tzt wird (Es kann sein, dass %V nicht umgesetzt wird, durch
+    einen Leerstring ersetzt wird oder durch eine falsche ISO-Wochennummer
+    dargestellt wird - besonders am Jahresanfang)
+
+    Bei der Verwendung von <code>%V</code> muss gleichzeitig f&uuml;r das Jahr
+    ein <code>%G</code> anstelle von <code>%Y</code> benutzt werden.<br>
+
+    Beispiele:
+    <ul>
+      <code>define lamplog FileLog %L/lamp.log lamp</code><br>
+      <code>define wzlog FileLog ./log/wz-%Y-%U.log
+              wz:(measured-temp|actuator).*</code><br>
+      Mit ISO 8601 Wochennummern falls unterst&uuml;tzt:<br>
+      <code>define wzlog FileLog ./log/wz-%G-%V.log
+              wz:(measured-temp|actuator).*</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="FileLogset"></a>
+  <b>Set </b>
+  <ul>
+    <li>reopen
+      <ul>
+        Erneutes &Ouml;ffnen eines FileLogs nach h&auml;ndischen &Auml;nderungen in dieser Datei.
+      </ul>
+      </li>
+    <li>addRegexpPart &lt;device&gt; &lt;regexp&gt;
+      <ul>
+        Hinzuf&uuml;gen eines regexp Teiles, der gem&auml;&szlig; device:regexp
+        aufgebaut ist. Die Teile werden mit einem | voneinander getrennt.
+        Achtung: Wenn die regexp-Teile umsortiert werden, k&ouml;nnen die
+        manuell erzeugten regexps ung&uuml;ltig werden.
+      </ul>
+      </li>
+    <li>removeRegexpPart &lt;re&gt;
+      <ul>
+        Entfernt ein regexp-Teil. Achtung: Wenn die regexp-Teile umsortiert
+        werden, k&ouml;nnen die manuell erzeugten regexps ung&uuml;ltig
+        werden.<br>
+        Die Inkonsistenz von addRegexpPart/removeRegexPart-Argumenten hat
+        seinen Ursprung in der Wiederverwendung von Javascript-Funktionen.
+      </ul>
+      </li>
+    <li>absorb secondFileLog 
+      <ul>
+        F&uuml;hrt den gegenw&auml;rtigen Log und den secondFileLog zu einer
+        gemeinsamen Datei zusammen, f&uuml;gt danach die regexp des
+        secondFileLog dem gegenw&auml;rtigen Filelog hinzu und l&ouml;scht dann
+        anschlie&szlig;end das secondFileLog.<br>
+
+        Dieses Komanndo wird zur Erzeugung von kombinierten Plots (weblinks)
+        ben&ouml;tigt.<br>
+
+        <b>Hinweise:</b>
+        <ul>
+          <li>secondFileLog wird gel&ouml;scht (d.h. die FHEM-Definition und
+              die Datei selbst).</li>
+          <li>nur das aktuelle File wird zusammengef&uuml;hrt, keine
+              archivierten Versionen.</li>
+          <li>Weblinks, die das secondFilelog benutzen werden unbrauchbar, sie
+              m&uuml;ssen deshalb auf das neue Logfile angepasst oder gel&ouml;scht
+              werden.</li>
+        </ul>
+      </ul>
+      </li>
+      <br>
+    </ul>
+    <br>
+
+
+  <a name="FileLogget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
+          &lt;to&gt; &lt;column_spec&gt; </code>
+    <br><br>
+    Liest Daten aus einem Logfile und wird von einem Frontend ben&ouml;tigt, um
+    Daten ohne direkten Zugriff aus der Datei zu lesen.<br>
+
+    <ul>
+      <li>&lt;infile&gt;<br>
+        Name des Logfiles, auf das zugegriffen werden soll. "-" steht f&uuml;r
+        das aktuelle Logfile. Man kann auch auf ein &auml;lteres File zugreifen
+        (oder eines aus dem Archiv).</li>
+
+      <li>&lt;outfile&gt;<br>
+        Bei einem  "-", bekommt man die Daten auf der aktuellen Verbindung
+        zur&uuml;ck, anderenfall ist es das Name (eigentlich Prefix, s.u.) des
+        Output-Files. Wenn mehr als ein File angesprochen wird, werden die
+        einzelnen Dateinamen durch ein "-" getrennt, anderenfalls werden die
+        Daten in einzelne Dateien geschrieben, die - beginnend mit 0 -
+        durchnummeriert werden.
+
+        </li>
+      <li>&lt;from&gt; &lt;to&gt;<br>
+        Bezeichnet den gew&uuml;nschten Datenbereich. Die beiden Elemente
+        m&uuml;ssen ganz oder mit dem Anfang des Zeitformates
+        &uuml;bereinstimmen.</li>
+
+      <li>&lt;column_spec&gt;<br>
+        Jede column_spec sendet die gew&uuml;nschten Daten entweder in eine
+        gesonderte Datei oder &uuml;ber die gegenw&auml;rtige Verbindung durch
+        "-" getrennt.<br>
+
+        Syntax: &lt;col&gt;:&lt;regexp&gt;:&lt;default&gt;:&lt;fn&gt;<br>
+        <ul>
+          <li>&lt;col&gt;
+            gibt die Spaltennummer zur&uuml;ck, beginnend mit 1 beim Datum.
+            Wenn die Spaltenmummer in doppelten Anf&uuml;hrungszeichen steht,
+            handelt es sich um einen festen Text und nicht um eine
+            Spaltennummer.</li>
+
+          <li>&lt;regexp&gt;
+            gibt, falls vorhanden, Zeilen mit Inhalten von regexp zur&uuml;ck.
+            Gro&szlig;- und Kleinschreibung beachten.  </li>
+          <li>&lt;default&gt;<br>
+            Wenn keine Werte gefunden werden, und der Default-Wert
+            (Voreinstellung) wurde gesetzt, wird eine Zeile zur&uuml;ckgegeben,
+            die den von-Wert (from) und diesen Default-Wert enth&auml;lt.
+            Dieses Leistungsmerkmal ist notwendig, da gnuplot abbricht, wenn
+            ein Datensatz keine Daten enth&auml;lt.
+            </li>
+          <li>&lt;fn&gt;
+            Kann folgende Inhalte haben:
+            <ul>
+              <li>int<br>
+                L&ouml;st den Integer-Wert zu Beginn eines Strings heraus. Wird
+                z.B. bei 10% gebraucht.</li>
+              <li>delta-h oder delta-d<br>
+                Gibt nur den Unterschied der Werte-Spalte pro
+                Stunde oder pro Tag aus. Wird ben&ouml;tigt, wenn die Spalte
+                einen Z&auml;hler enth&auml;lt, wie im Falles des KS300 in der
+                Spalte f&uuml;r die Regenmenge.</li>
+              <li>alles andere<br>
+                Dieser String wird als Perl-Ausdruck ausgewertet. @fld enthaelt
+                die aktuelle Zeile getrennt durch Leerzeichen. Achtung:
+                Dieser String/Perl-Ausdruck darf keine Leerzeichen enthalten.
+                </li>
+            </ul></li>
+        </ul></li>
+      </ul>
+    <br><br>
+    Beispiel:
+      <ul><code><br>
+        get outlog out-2008.log - 2008-01-01 2008-01-08 4:IR:int: 9:IR::
+      </code></ul>
+    <br>
+  </ul>
+
+  <a name="FileLogattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <a name="archivedir"></a>
+    <a name="archivecmd"></a>
+    <a name="nrarchive"></a>
+    <li>archivecmd / archivedir / nrarchive<br>
+        Wenn eine neue FileLog-Datei ge&ouml;ffnet wird, wird der FileLog
+        archiver aufgerufen.  Das geschieht aber nur , wenn der Name der Datei
+        sich ge&auml;ndert hat(abh&auml;ngig von den zeitspezifischen
+        Wildcards, die weiter oben unter <a href="#FileLogdefine">FileLog
+        (define)</a> beschrieben werden) und gleichzeitig ein neuer Datensatz
+        in diese Datei geschrieben werden muss.  <br>
+
+        Wenn das Attribut archivecmd benutzt wird, startet es als
+        shell-Kommando ( eine Einbettung in " ist nicht notwendig), und jedes %
+        in diesem Befehl wird durch den Namen des alten Logfiles ersetzt.<br>
+
+        Wenn dieses Attribut nicht gesetzt wird, aber daf&uuml;r nrarchive
+        und/oder archivecmd, werden nrarchive viele Logfiles im aktuellen
+        Verzeichnis gelassen, und &auml;ltere Dateien in das Archivverzeichnis
+        (archivedir) verschoben (oder gel&ouml;scht, falls kein archivedir
+        gesetzt wurde).<br>
+		
+        Hinweis: Werden diese Attribute als global instance gesetzt, hat das
+        auschlie&szlig;lich auf das <a href="#logfile">FHEM logfile</a>
+        Auswirkungen.
+
+        </li><br>
+
+    <li><a href="#disable">disable</a></li>
+
+    <a name="logtype"></a>
+    <li>logtype<br>
+        Wird vom pgm2 webfrontend ben&ouml;tigt, um gnuplot/SVG-Kurven aus den
+        Logdateien zu zeichnen. Der String wird aus komma-separierten Tokens
+        (,) erzeugt, wobei jeder Token ein eigenes gnuplot-Programm bezeichnet.
+        Die Token k&ouml;nnen Doppelpunkte (:) enthalten. Der Teil vor dem
+        Doppelpunkt bezeichnet den Namen des Programms; der Teil nach dem
+        Doppelpunkt ist der String, der im Web.Frontend dargestellt werden
+        soll. Gegenw&auml;rtig sind folgende Typen von gnuplot-Programmen
+        implementiert:<br>
+
+        <ul>
+           <li>fs20<br>
+               Zeichnet  on als 1 and off als 0. Die geeignete
+               filelog-Definition f&uuml;r das Ger&auml;t fs20dev lautet:<br>
+               define fslog FileLog log/fs20dev-%Y-%U.log fs20dev
+          </li>
+           <li>fht<br>
+               Zeichnet die Ist-Temperatur/Soll-temperatur/Aktor Kurven. Die
+               passende FileLog-Definition (f&uuml;r das FHT-Ger&auml;t mit
+               Namen fht1)sieht wie folgt aus: <br>
+               <code>define fhtlog1 FileLog log/fht1-%Y-%U.log fht1:.*(temp|actuator).*</code>
+          </li>
+           <li>temp4rain10<br>
+               Zeichnet eine Kurve aus der Temperatur und dem Niederschlag (pro
+               Stunde und pro Tag) eines KS300. Die dazu passende
+               FileLog-Definition (f&uuml;r das KS300
+               Ger&auml;t mit Namen ks300) sieht wie folgt aus:<br>
+               define ks300log FileLog log/fht1-%Y-%U.log ks300:.*H:.*
+          </li>
+           <li>hum6wind8<br>
+               Zeichnet eine Kurve aus der Feuchtigkeit und der
+               Windgeschwindigkeit eines ks300. Die geeignete
+               FileLog-Definition ist identisch mit der vorhergehenden
+               Definition. Beide programme erzeugen das gleiche Log.
+          </li>
+           <li>text<br>
+               Zeigt das LogFile in seiner urspr&uuml;nglichen Form (Nur
+               Text).Eine gnuplot-Definition ist nicht notwendig.  </li> </ul>
+               Beispiel:<br> attr ks300log1 logtype
+               temp4rain10:Temp/Rain,hum6wind8:Hum/Wind,text:Raw-data </li><br>
+  </ul>
+  <br>
+</ul>
+
+=end html_DE
+
 =cut
