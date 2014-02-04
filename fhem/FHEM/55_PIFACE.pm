@@ -386,7 +386,6 @@ PIFACE_Watchdog($) {
 1;
 
 =pod
-not to be translated
 =begin html
 
 <a name="PIFACE"></a>
@@ -501,21 +500,21 @@ not to be translated
 	<a name="PIFACEattr"></a>
 	<b>Attributes</b><br/><br/>
 	<ul>
-          <li><a name="defaultState">defaultState</a> last|off|0|1,
+          <li><a name="PIFACE_defaultState">defaultState</a> last|off|0|1,
             [defaultState] = off is default.<br>
             Restoration of the status of the output port after a Fhem reboot.
           </li>
-          <li><a name="pollInterval">pollInterval</a> off|1,2,...,9,10,
+          <li><a name="PIFACE_pollInterval">pollInterval</a> off|1,2,...,9,10,
             [pollInterval] = off is default.<br>
             Define the polling interval of the input ports in seconds.
           </li>
-          <li><a name="portMode&lt;0..7&gt;">portMode&lt;0..7&gt;</a> tri|up,
+          <li><a name="PIFACE_portMode&lt;0..7&gt;">portMode&lt;0..7&gt;</a> tri|up,
             [portMode&lt;0..7&gt;] = tri is default.<br>
             This enables (up) or disables (tri) the internal pull-up resistor on the given input port.
             You need to enable the pull-up if you want to read any of the on-board switches on the PiFace board.
           </li>
 	  <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-          <li>watchdog off|on|silent,
+          <li><a name="PIFACE_watchdog">watchdog</a> off|on|silent,
             [watchdog] = off is default.<br>
             The function of the PiFace extension can be monitored periodically.
             The watchdog module checks the function of ports in7 and out7.
@@ -526,7 +525,7 @@ not to be translated
             If the error could not be eliminated, then the Raspberry operating system is restarted.
             If the error is not corrected as well, the monitoring function is disabled and the error is logged.
           </li>
-          <li><a name="watchdogInterval">watchdogInterval</a> 10..65535,
+          <li><a name="PIFACE_watchdogInterval">watchdogInterval</a> 10..65535,
             [watchdogInterval] = 60 is default.<br>
             Interval between two monitoring tests in seconds.
           </li>
