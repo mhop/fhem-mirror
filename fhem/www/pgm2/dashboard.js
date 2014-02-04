@@ -10,6 +10,8 @@
 //			  Change max/min Values for Groupresize.	Top- and Bottom-Row always 100%
 // 2.01: Add Longpoll function. Dashboard can hide FHEMWEB Roomliste and Header.
 // 2.02: Tabs can set on top, bottom or hidden
+// 2.03: Fix showhelper Bug on lock/unlock. The error that after a trigger action the curren tab is changed to the "old" activetab tab has 
+//			 been fixed.
 //
 // Known Bugs/Todo's
 // See 95_Dashboard.pm
@@ -187,10 +189,10 @@ function dashboard_setposition(){
  document.getElementById("dashboard_button_set").classList.remove('dashboard_button_changed'); 
  //--------------------------------------------------------------------- 
  //--------------------- store active Tab ------------------------------
- var activeTab = ($( "#tabs" ).tabs( "option", "active" ))+1;
- if (params[11] != activeTab){
-	FW_cmd(document.location.pathname+'?XHR=1&cmd.'+params[0]+'=attr '+params[0]+' dashboard_activetab '+activeTab);
- }
+ //var activeTab = ($( "#tabs" ).tabs( "option", "active" ))+1;
+ //if (params[11] != activeTab){
+//	FW_cmd(document.location.pathname+'?XHR=1&cmd.'+params[0]+'=attr '+params[0]+' dashboard_activetab '+activeTab);
+// }
  //--------------------------------------------------------------------- 
 }
 
@@ -277,6 +279,27 @@ $(document).ready( function () {
 			event.stopImmediatePropagation();
 		});
 	}
+		
+	//--------------------------------- Dashboard Tabs ------------------------------------------------------------------------------
+	$("#tabs").tabs({
+		active: 0,
+		create: function(event, ui) { 
+			$( "#tabs" ).tabs( "option", "active", params[11]-1 ); //set active Tab
+			restoreOrder(); 
+			},
+		activate: function (event, ui) {
+			restoreOrder(); 
+			
+			var activeTab = ($( "#tabs" ).tabs( "option", "active" ))+1;
+			if (params[11] != activeTab){
+				FW_cmd(document.location.pathname+'?XHR=1&cmd.'+params[0]+'=attr '+params[0]+' dashboard_activetab '+activeTab);
+			 }			
+		}   
+	});	
+	if ($("#dashboard_tabnav").hasClass("dashboard_tabnav_bottom")) { $(".dashboard_tabnav").appendTo(".dashboard_tabs"); } //set Tabs on the Bottom	
+	$(".dashboard_tab_hidden").css("display", "none"); //hide Tabs
+	//-------------------------------------------------------------------------------------------------------------------------------------		
+	
 	
 	$("#dashboard_button_set").button({
 		create: function( event, ui ) {
@@ -301,22 +324,8 @@ $(document).ready( function () {
 				dashboard_unsetlock();
 			}
 		}
-	});
-	
-	//--------------------------------- Dashboard Tabs ------------------------------------------------------------------------------
-	$("#tabs").tabs({
-		active: 0,
-		create: function(event, ui) { 
-			$( "#tabs" ).tabs( "option", "active", params[11]-1 ); //set active Tab
-			restoreOrder(); 
-			},
-		activate: function (event, ui) {
-			restoreOrder(); 
-		}   
 	});	
-	if ($("#dashboard_tabnav").hasClass("dashboard_tabnav_bottom")) { $(".dashboard_tabnav").appendTo(".dashboard_tabs"); } //set Tabs on the Bottom	
-	$(".dashboard_tab_hidden").css("display", "none"); //hide Tabs
-	//-------------------------------------------------------------------------------------------------------------------------------------		
+	
 });
 
 
