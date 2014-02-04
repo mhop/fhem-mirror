@@ -439,8 +439,8 @@ FBAHA_Ready($)
   wobei &lt;host&gt; die Adresse der FRITZ!Box ist (localhost AUF dem
   FRITZ.BOX) und &lt;port&gt; 2002 ist, oder
   UNIX:SEQPACKET:/var/tmp/me_avm_home_external.ctl, wobei das nur fuer
-  FHEM@FRITZ!BOX zur Verfügung steht. Mit FRITZ!OS 5.50 steht auch der
-  Netzwerkport zur Verfügung, auf manchen Laborvarianten nur das UNIX socket.
+  FHEM@FRITZ!BOX zur Verf&uuml;gung steht. Mit FRITZ!OS 5.50 steht auch der
+  Netzwerkport zur Verf&uuml;gung, auf manchen Laborvarianten nur das UNIX socket.
   <br>
   Beispiel:
   <ul>
