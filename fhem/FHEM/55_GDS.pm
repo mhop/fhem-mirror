@@ -38,13 +38,6 @@ use XML::Simple;
 use HttpUtils;
 require LWP::UserAgent;
 
-sub GDS_Define($$$);
-sub GDS_Undef($$);
-sub GDS_Set($@);
-sub GDS_Get($@);
-sub GDS_Attr(@);
-
-
 my ($bulaList, $cmapList, %rmapList, $fmapList, %bula2bulaShort, %bulaShort2dwd, %dwd2Dir, %dwd2Name,
 	$alertsXml, %capCityHash, %capCellHash, $sList, $aList);
 
@@ -66,6 +59,7 @@ sub GDS_Initialize($) {
 	$hash->{UndefFn}	=	"GDS_Undef";
 	$hash->{GetFn}		=	"GDS_Get";
 	$hash->{SetFn}		=	"GDS_Set";
+	$hash->{ShutdownFn}	=	"GDS_Shutdown";
 	$hash->{AttrFn}		=	"GDS_Attr";
 	$hash->{AttrList}	=	"gdsFwName gdsFwType:0,1,2,3,4,5,6,7 ".
 							"gdsAll:0,1 gdsDebug:0,1 gdsLong:0,1 gdsPolygon:0,1 ".
@@ -140,6 +134,13 @@ sub GDS_Undef($$) {
 	my $name = $hash->{NAME};
 	CommandDelete(undef, "gds_web_".$name);
 	RemoveInternalTimer($hash);
+	return undef;
+}
+
+sub GDS_Shutdown($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	Log3 ($name,4,"GDS $name: shutdown requested");
 	return undef;
 }
 
@@ -777,7 +778,7 @@ sub retrieveFile($$;$$$){
 	eval {
 		$ftp = Net::FTP->new(	"ftp-outgoing2.dwd.de",
 								Debug => 0,
-								Timeout => 360,
+								Timeout => 10,
 								FirewallType => $proxyType,
 								Firewall => $proxyName);
 		if(defined($ftp)){
@@ -1081,6 +1082,9 @@ sub initDropdownLists($){
 #				added	support for fhem installtions running on windows-based systems
 #
 #	2013-11-03	added	error handling for malformed XML files from GDS
+#
+#	2014-02-04	added	ShutdownFn
+#				changed	FTP Timeout
 #
 ####################################################################################################
 #
