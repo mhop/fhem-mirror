@@ -36,8 +36,8 @@
 #			 is stored after tab change
 #
 # Known Bugs/Todos:
-# x BUG: wenn ich mehrere Tabs habe und zb. im Uten Tab eine Lampe schalte, springt er danach direkt in den ersten Tab. Finde ich etwas unglücklich.
 # BUG: Nicht alle Inhalte aller Tabs laden, bei Plots dauert die bedienung des Dashboards zu lange. -> elemente hidden?
+# x BUG: wenn ich mehrere Tabs habe und zb. im Uten Tab eine Lampe schalte, springt er danach direkt in den ersten Tab. Finde ich etwas unglücklich.
 # x BUG: Lock blendet schow helper nicht aus?
 # x BUG: dashboard_showfullsize nicht in room everything
 # x TODO: Icon on Tabs
@@ -85,7 +85,7 @@ my $fwjquery = "jquery.min.js";
 my $fwjqueryui = "jquery-ui.min.js";
 my $dashboardname = "Dashboard"; # Link Text
 my $dashboardhiddenroom = "DashboardRoom"; # Hiddenroom
-my $dashboardversion = "2.02";
+my $dashboardversion = "2.03";
 # -------------------------------------------------------------------------------------------
 
 sub Dashboard_Initialize ($) {
