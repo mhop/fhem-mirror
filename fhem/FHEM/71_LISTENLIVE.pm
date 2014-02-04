@@ -70,6 +70,10 @@
 #				Updated:	commandref documentations
 #							internal help texts
 #
+#	2014-02-04
+#				Added:		ShutdownFn
+#				Changed:	Undef will delete presence, too
+#
 ##############################################################################
 
 package main;
@@ -84,12 +88,6 @@ use HttpUtils;
 use MIME::Base64;
 use Time::HiRes qw(gettimeofday sleep usleep);
 use feature qw(say switch);
-
-sub LISTENLIVE_Set($@);
-sub LISTENLIVE_Get($@);
-sub LISTENLIVE_Define($$);
-sub LISTENLIVE_GetStatus($;$);
-sub LISTENLIVE_Undefine($$);
 
 sub HMT350_RCLayout();
 sub HMT350_RCmakenotify($$);
@@ -158,6 +156,7 @@ sub LISTENLIVE_Initialize($) {
 	my ($hash) = @_;
 	$hash->{DefFn}		=	"LISTENLIVE_Define";
 	$hash->{UndefFn}	=	"LISTENLIVE_Undefine";
+	$hash->{ShutdownFn}	=	"LISTENLIVE_Shutdown";
 	$hash->{AttrFn}		=	"LISTENLIVE_Attr";
 	$hash->{SetFn}		=	"LISTENLIVE_Set";
 	$hash->{GetFn}		=	"LISTENLIVE_Get";
@@ -231,9 +230,18 @@ sub LISTENLIVE_Define($$) {
 
 sub LISTENLIVE_Undefine($$) {
 	my($hash, $name) = @_;
+	CommandDelete(undef, "pres_".$name);
 	RemoveInternalTimer($hash);
 	return undef;
 }
+
+sub LISTENLIVE_Shutdown($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	Log3 ($name,4,"LISTENLIVE $name: shutdown requested");
+	return undef;
+}
+
 
 sub LISTENLIVE_Attr($@) {
 	my @a = @_;

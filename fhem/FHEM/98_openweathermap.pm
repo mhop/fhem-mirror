@@ -73,14 +73,6 @@ my	$ua = LWP::UserAgent->new;	# test
 	$ua->timeout(10);				# test
 	$ua->env_proxy;					# test
 
-sub OWO_Set($@);
-sub OWO_Get($@);
-sub OWO_Attr(@);
-sub OWO_Notify($$);
-sub OWO_Define($$);
-sub OWO_GetStatus($;$);
-sub OWO_Undefine($$);
-
 sub OWO_abs2rel($$$);
 sub OWO_isday($$);
 
@@ -94,6 +86,7 @@ sub openweathermap_Initialize($) {
 	$hash->{UndefFn}	=	"OWO_Undefine";
 	$hash->{NotifyFn}	=	"OWO_Notify";
 	$hash->{AttrFn}		=	"OWO_Attr";
+	$hash->{ShutdownFn}	=	"OWO_Shutdown";
 
 	$hash->{AttrList}	=	"do_not_notify:0,1 ".
 							"owoGetUrl owoSendUrl owoInterval:600,900,1800,3600 ".
@@ -104,6 +97,13 @@ sub openweathermap_Initialize($) {
 							"owoSrc10 owoSrc11 owoSrc12 owoSrc13 owoSrc14 ".
 							"owoSrc15 owoSrc16 owoSrc17 owoSrc18 owoSrc19 ".
 							$readingFnAttributes;
+}
+
+sub OWO_Shutdown($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	Log3 ($name,4,"owo $name: shutdown requested");
+	return undef;
 }
 
 sub OWO_Set($@){
