@@ -697,7 +697,7 @@ sub SortNumber {
     </ul>
     <p>
     <ul><b>language</b><br>
-      Spezifiziert die Sprache für die Definition und die Anzeige der Profile in der Weboberfläche.
+      Spezifiziert die Sprache f&uumlr die Definition und die Anzeige der Profile in der Weboberfl&aumlche.
       Zurzeit sind de,en,fr definiert. Der Parameter ist optional.
     </ul>
     <p>
@@ -711,7 +711,7 @@ sub SortNumber {
       <u>Uhrzeit:</u>Angabe der Uhrzeit zu der geschaltet werden soll, Format: HH:MM:[SS](HH im 24 Stunden Format) oder eine Perlfunction wie {sunrise_abs()}<br>
       <u>Parameter:</u>Angabe der zu setzenden Temperatur als Zahl mit Format 99.9 oder als symbolische Konstante <b>eco</b>
       or <b>comfort</b> - was immer das Heizk&oumlrperthermostat versteht.
-      Symbolischen Werten kann ein zusätzlicher Parameter angehängt werden: dayTemp:16 night-temp:15. Unten folgen Beispiele<br><br>
+      Symbolischen Werten kann ein zus&aumltzlicher Parameter angeh&aumlngt werden: dayTemp:16 night-temp:15. Unten folgen Beispiele<br><br>
     </ul>
     <p>
     <ul><b>command</b><br>
@@ -747,10 +747,10 @@ sub SortNumber {
         Die zu setzende Temperatur wird nur gesetzt, falls die Dummy Variable WeAreThere = "yes" ist.<p>
 
         <code>define HCW Heating_Control WZ_Heizung en Su-Fr|{sunrise_abs()}|21 Mo-Fr|{sunset_abs()}|16</code><br>
-        Das Gerät wird bei Sonnenaufgang und Sonnenuntergang geschaltet. Sprache: Englisch.
+        Das Ger&aumlt wird bei Sonnenaufgang und Sonnenuntergang geschaltet. Sprache: Englisch.
 
         <code>define HCW Heating_Control WZ_Heizung en Mo-Fr|{myFunction}|night-temp:18 Mo-Fr|{myFunction()}|dayTemp:16</code><br>
-        Das Gerät wird bei myFunction() geschaltet. Es wird das Kommando "night-temp 18" bzw. "dayTemp 16" gesendet.
+        Das Ger&aumlt wird bei myFunction() geschaltet. Es wird das Kommando "night-temp 18" bzw. "dayTemp 16" gesendet.
 
         Wenn du beispielsweise nach einer Temperaturabsenkungsphase erreichen willst, dass  alle Heating_Controls ihren aktuellen Wert
         einstellen sollen, kannst du die Funktion <b>Heating_Control_SetAllTemps()</b> aufrufen.
@@ -774,7 +774,7 @@ sub SortNumber {
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
     <li><a href="#stateFormat">stateFormat</a></li>
-    <li>windowSensor<br>Definiert eine Liste mit Fensterkontakten. Wenn das Reading window state eines Fensterkontakts <b>open</b> ist, wird der aktuelle Schaltvorgang verzögert.</li>
+    <li>windowSensor<br>Definiert eine Liste mit Fensterkontakten. Wenn das Reading window state eines Fensterkontakts <b>open</b> ist, wird der aktuelle Schaltvorgang verz&oumlgert.</li>
   </ul><br>
 </ul>
 
