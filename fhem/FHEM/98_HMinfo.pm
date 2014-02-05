@@ -25,7 +25,7 @@ sub HMinfo_Initialize($$) {####################################################
   $hash->{AttrFn}    = "HMinfo_Attr";
   $hash->{AttrList}  =  "loglevel:0,1,2,3,4,5,6 "
                        ."sumStatus sumERROR "
-                       ."autoUpdate "
+                       ."autoUpdate autoArchieve "
                        ."hmAutoReadScan hmIoMaxDly "
                        ."hmManualOper:0_auto,1_manual "
                        ."configDir configFilename "
@@ -115,6 +115,9 @@ sub HMinfo_autoUpdate($){#in:name, send status-request
   my $name = shift;
   (undef,$name)=split":",$name,2;
   HMinfo_SetFn($defs{$name},$name,"update") if ($name);
+  HMinfo_archConfig($defs{$name},$name,"","") 
+        if (AttrVal($name,"autoArchieve",undef) && 
+            scalar(@{$modules{CUL_HM}{helper}{confUpdt}}));
   InternalTimer(gettimeofday()+$defs{$name}{helper}{autoUpdate},
                 "HMinfo_autoUpdate","sUpdt:".$name,0)
         if (defined $defs{$name}{helper}{autoUpdate});
@@ -816,7 +819,9 @@ sub HMinfo_SetFn($@) {#########################################################
            ."\n regCheck [<typeFilter>]                        # find incomplete or inconsistant register readings"
            ."\n peerCheck [<typeFilter>]                       # find incomplete or inconsistant peer lists"
            ."\n ---actions---"
-           ."\n saveConfig [<typeFilter>] <file>               # stores peers and register with saveConfig"
+           ."\n saveConfig [<typeFilter>] [<file>]             # stores peers and register with saveConfig"
+           ."\n archConfig [-a] [<file>]                       # as saveConfig but only if data of entity is complete"
+           ."\n purgeConfig [<file>]                           # purge content of saved configfile "
            ."\n loadConfig [<typeFilter>] <file>               # restores register and peer readings if missing"
            ."\n autoReadReg [<typeFilter>]                     # trigger update readings if attr autoReadReg is set"
            ."\n tempList [<typeFilter>][save|restore|verify][<filename>]# handle tempList of thermostat devices"
@@ -897,6 +902,12 @@ sub HMinfo_SetFn($@) {#########################################################
     $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
     $ret = $cmd." done:" ."\n saved";
   }
+  elsif($cmd eq "archConfig") {##action: archiveConfig-------------------------
+    # save config only if register are complete
+    my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
+    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    $ret = HMinfo_archConfig($hash,$name,$opt,$fn);
+  }
   else{
     my @cmdLst =     
            ( "autoReadReg","clear"  #"clear:msgStat,Protocol,readings,register,rssi"
@@ -912,7 +923,7 @@ sub HMinfo_SetFn($@) {#########################################################
   return $ret;
 }
 
-sub HMinfo_loadConfig($@) {#####################################################
+sub HMinfo_loadConfig($@) {####################################################
   my ($filter,$fName)=@_;
   $filter = "." if (!$filter);
   my $ret;
@@ -974,7 +985,7 @@ sub HMinfo_loadConfig($@) {#####################################################
 
   return $ret;
 }
-sub HMinfo_purgeConfig($) {#####################################################
+sub HMinfo_purgeConfig($) {####################################################
   my ($param) = @_;
   my ($id,$fName) = split ",",$param;
   $fName = "regSave.cfg" if (!$fName);
@@ -1015,19 +1026,53 @@ sub HMinfo_purgeConfig($) {#####################################################
 }
 sub HMinfo_saveConfig($) {#####################################################
   my ($param) = @_;
-  my ($id,$fN,$opt,$filter) = split ",",$param;
+  my ($id,$fN,$opt,$filter,$strict) = split ",",$param;
+  $strict = "" if (!defined $strict);
   my @entities;
   foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
-    CUL_HM_Get($defs{$dName},$dName,"saveConfig",$fN);
+    CUL_HM_Get($defs{$dName},$dName,"saveConfig",$fN,$strict);
     push @entities,$dName;
     foreach my $chnId (CUL_HM_getAssChnIds($dName)){
       my $dName = CUL_HM_id2Name($chnId);
       push @entities, $dName if($dName !~ m/_chn:/);
     }
   }
-  HMinfo_purgeConfig($param) if ( 200000 < -s "$fN");# auto purge if file to big
+  HMinfo_purgeConfig($param) if (-e $fN && 200000 < -s $fN);# auto purge if file to big
   return $id;
 }
+
+sub HMinfo_archConfig($$$$) {#####################################################
+    # save config only if register are complete
+    my ($hash,$name,$opt,$fn) = @_;
+    my @eN;
+    if ($opt eq "a"){@eN = HMinfo_getEntities("d","");}
+    else            {@eN = @{$modules{CUL_HM}{helper}{confUpdt}}}
+    my @names;
+    push @names,CUL_HM_getAssChnNames($_) foreach(@eN);
+    @{$modules{CUL_HM}{helper}{confUpdt}} = ();
+    my @archs;
+    foreach(HMinfo_noDup(@names)){
+      if (CUL_HM_peersValid($_) !=1 ||HMinfo_regCheck($_)){
+        push @{$modules{CUL_HM}{helper}{confUpdt}},$_;
+      }
+      else{
+        push @archs,$_;
+      }
+    }
+    my $id = ++$hash->{nb}{cnt};
+    my $bl = BlockingCall("HMinfo_saveConfig", join(",",("$name:$id"
+                                                         ,$fn
+                                                         ,"c"
+                                                         ,"\^(".join("|",@archs).")\$")
+                                                         ,"strict"), 
+                          "HMinfo_bpPost", 30, 
+                          "HMinfo_bpAbort", "$name:$id");
+    $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
+    return (@{$modules{CUL_HM}{helper}{confUpdt}}
+                 ?"data incomplete:".join(",",@{$modules{CUL_HM}{helper}{confUpdt}})
+                 :"");
+}
+
 sub HMinfo_bpPost($) {#bp finished#############################################
   my ($rep) = @_;
   my ($name,$id) = split(":",$rep);
@@ -1660,6 +1705,11 @@ sub HMinfo_noDup(@) {#return list with no duplicates
           performs a save for all HM register setting and peers. See <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>.<br>
           <a ref="#HMinfopurgeConfig">purgeConfig</a> will be executed automatically if the stored filesize exceeds 1MByte.<br>
       </li>
+      <li><a name="#HMinfoarchConfig">archConfig</a> <a href="#HMinfoFilter">[filter] [&lt;file&gt;]</a><br>
+          performs <a href="#HMinfosaveConfig">saveConfig</a> for entities that appeare to have achanged configuration.
+          It is more conservative that saveConfig since incomplete sets are not stored.<br>
+          option -a force an archieve for all devices that have a complete set of data<br>
+      </li>
       <li><a name="#HMinfoloadConfig">loadConfig</a> <a href="#HMinfoFilter">[filter] [&lt;file&gt;]</a><br>
           loads register and peers from a file saved by <a href="#HMinfosaveConfig">saveConfig</a>.<br>
           It should be used carefully since it will add data to FHEM which cannot be verified. No readings will be replaced, only 
@@ -1674,7 +1724,6 @@ sub HMinfo_noDup(@) {#return list with no duplicates
           purge will use the latest stored readings and remove older one. 
           See <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>.
       </li>
-
       
          <br>
       <li><a name="#HMinfotempList">tempList</a> <a href="#HMinfoFilter">[filter]</a>[save|restore|verify] [&lt;file&gt;]</a><br>

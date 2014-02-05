@@ -1040,7 +1040,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegType{"HM-CC-TC03"};
   param      => "<param>",
   reg        => "<addr> ... <list> <peer>",
   regList    => "",
-  saveConfig => "<filename>",
+  saveConfig => "<filename> ...",
 );
 %culHmSubTypeGets = (
   none4Type  =>{ "test"=>"" },
@@ -1273,7 +1273,7 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                          ,alarmOff      =>""
                          ,teamCall      =>""
                         },
-  vdCtrl              =>{ valvePos      =>"[off|0.0..100.0]"},
+  vdCtrl              =>{ valvePos      =>"[off|0.0..99.0]"},
   virtThSens          =>{ virtTemp      =>"[off|-20.0..50.0]",
                           virtHum       =>"[off|0.0..99.0]"}
 );

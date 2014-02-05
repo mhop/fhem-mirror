@@ -692,13 +692,18 @@ sub HMLAN_SimpleWrite(@) {#####################################################
     my $tn = gettimeofday();
     
     if($modules{CUL_HM}{defptr}{$dst} && 
-       $modules{CUL_HM}{defptr}{$dst}{helper}{io} &&
-       $modules{CUL_HM}{defptr}{$dst}{helper}{io}{nextSend}
+       $modules{CUL_HM}{defptr}{$dst}{helper}{io}
        ){
-      my $dDly = $modules{CUL_HM}{defptr}{$dst}{helper}{io}{nextSend} - $tn;
-      $dDly -= 0.05 if ($typ eq "02");# delay at least 50ms for ACK, but not 100
-      select(undef, undef, undef, (($dDly > 0.1)?0.1:$dDly))
-            if ($dDly > 0.01);
+      if ($modules{CUL_HM}{defptr}{$dst}{helper}{io}{nextSend}){
+        my $dDly = $modules{CUL_HM}{defptr}{$dst}{helper}{io}{nextSend} - $tn;
+        $dDly -= 0.05 if ($typ eq "02");# delay at least 50ms for ACK, but not 100
+        select(undef, undef, undef, (($dDly > 0.1)?0.1:$dDly))
+              if ($dDly > 0.01);
+      }
+      if ($modules{CUL_HM}{defptr}{$dst}{helper}{io}{newCh}){# force chan msg
+        delete $hDst->{chn};
+        delete $modules{CUL_HM}{defptr}{$dst}{helper}{io}{newCh};
+      }
     }
     if ($dst ne $hmId){  #delay send if answer is pending
       if ( $hDst->{flg} &&                #HMLAN's ack pending
@@ -717,7 +722,7 @@ sub HMLAN_SimpleWrite(@) {#####################################################
 
     if ($len > 52){#channel information included, send sone kind of clearance
       my $chn = substr($msg,52,2);
-      if ($hDst->{chn} && $hDst->{chn} ne $chn){
+      if (!$hDst->{chn} || $hDst->{chn} ne $chn){
         my $updt = $hDst->{newChn};
         Log3 $hash,  HMLAN_getVerbLvl($hash,$src,$dst,"5")
                   , 'HMLAN_Send:  '.$name.' S:'.$updt;
