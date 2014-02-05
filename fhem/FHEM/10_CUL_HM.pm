@@ -3582,11 +3582,17 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   my $msgCnt = $hash->{helper}{vd}{msgCnt};
   my ($idl,$lo,$hi,$nextTimer);
   my $tn = gettimeofday();
+  $hash->{helper}{vd}{next} = ReadingsVal($name,".next",$tn)
+        if (!defined $hash->{helper}{vd}{next});
   $hash->{helper}{vd}{nextF} = $hash->{helper}{vd}{next};
-
 # int32_t result = (((_address << 8) | messageCounter) * 1103515245 + 12345) >> 16;
 #                          4e6d = 20077                        12996205 = C64E6D
 # return (result & 0xFF) + 480;
+
+  if ($tn > ($hash->{helper}{vd}{nextF} + 3000)){# mised 20 periods;
+    Log3 $name,3,"CUL_HM $name virtualTC timer off by:".int($tn - $hash->{helper}{vd}{nextF});
+    $hash->{helper}{vd}{nextF} = $tn;
+  }
   do {
     $msgCnt = ($msgCnt + 1)%255;
     $idl = $hash->{helper}{vd}{idl}+$msgCnt;
@@ -3595,6 +3601,7 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
     $nextTimer = (($lo+$hi)&0xff)/4 + 120;
     $hash->{helper}{vd}{nextF} += $nextTimer;
   } until ($hash->{helper}{vd}{nextF} > $tn);
+
   $hash->{helper}{vd}{nextM} = $tn+$nextTimer;
   $hash->{helper}{vd}{msgCnt} = $msgCnt;
   if ($hash->{helper}{vd}{cmd}){
@@ -5720,7 +5727,7 @@ sub CUL_HM_peerUsed($) {# are peers expected?
 
   my $mId = CUL_HM_getMId($hash);
   my $cNo = hex(substr($hash->{DEF}."01",6,2))."p"; #default to channel 01
-     0 if (!$mId || !$culHmModel->{$mId});
+  return 0 if (!$mId || !$culHmModel->{$mId});
   foreach my $ls (split ",",$culHmModel->{$mId}{lst}){
     my ($l,$c) = split":",$ls;
     if (  ($l =~ m/^(p|3|4)$/ && !$c )  # 3,4,p without chanspec
