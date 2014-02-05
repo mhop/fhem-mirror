@@ -1900,12 +1900,11 @@ sub HMinfo_noDup(@) {#return list with no duplicates
     </li>
     <li><a name="#HMinfohmAutoReadScan">hmAutoReadScan</a>
         defines the time in seconds CUL_HM tries to schedule the next autoRead
-        from the queue. Despide this timer FHEM will take care that only one device from the queue will be
+        from the queue. Despite this timer FHEM will take care that only one device from the queue will be
         handled at one point in time. With this timer user can stretch timing even further - to up to 300sec
         min delay between execution. <br>
         Setting to 1 still obeys the "only one at a time" prinzip.<br>
-        Note that compressing will increase message load while stretch will extent waiting time.
-        data. <br>
+        Note that compressing will increase message load while stretch will extent waiting time.<br>
     </li>
     <li><a name="#HMinfohmIoMaxDly">hmIoMaxDly</a>
         max time in seconds CUL_HM stacks messages if the IO device is not ready to send.
@@ -1916,7 +1915,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates
     </li>
     <li><a name="#HMinfoconfigDir">configDir</a>
         default directory where to store and load configuration files from.
-        This path is used as long as teh path is not given in a filename of 
+        This path is used as long as the path is not given in a filename of 
         a given command.<br>
         It is used by commands like <a ref="#HMinfotempList">tempList</a> or <a ref="#HMinfosaveConfig">saveConfig</a><br>
     </li>
