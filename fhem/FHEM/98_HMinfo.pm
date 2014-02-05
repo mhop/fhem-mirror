@@ -115,9 +115,9 @@ sub HMinfo_autoUpdate($){#in:name, send status-request
   my $name = shift;
   (undef,$name)=split":",$name,2;
   HMinfo_SetFn($defs{$name},$name,"update") if ($name);
-  HMinfo_archConfig($defs{$name},$name,"","") 
-        if (AttrVal($name,"autoArchieve",undef) && 
-            scalar(@{$modules{CUL_HM}{helper}{confUpdt}}));
+#  HMinfo_archConfig($defs{$name},$name,"","") 
+#        if (AttrVal($name,"autoArchieve",undef) && 
+#            scalar(@{$modules{CUL_HM}{helper}{confUpdt}}));
   InternalTimer(gettimeofday()+$defs{$name}{helper}{autoUpdate},
                 "HMinfo_autoUpdate","sUpdt:".$name,0)
         if (defined $defs{$name}{helper}{autoUpdate});
@@ -914,7 +914,7 @@ sub HMinfo_SetFn($@) {#########################################################
             ,"configCheck","param","peerCheck","peerXref"
             ,"protoEvents","msgStat:view,clear","rssi"
             ,"models"
-            ,"regCheck","register","saveConfig","loadConfig","purgeConfig","update"
+            ,"regCheck","register","archConfig:-0,-a","saveConfig","loadConfig","purgeConfig","update"
             ,"cpRegs"
             ,"tempList"
             ,"templateChk","templateDef","templateList","templateSet");
@@ -1045,8 +1045,8 @@ sub HMinfo_archConfig($$$$) {###################################################
     # save config only if register are complete
     my ($hash,$name,$opt,$fn) = @_;
     my @eN;
-    if ($opt eq "a"){@eN = HMinfo_getEntities("d","");}
-    else            {@eN = @{$modules{CUL_HM}{helper}{confUpdt}}}
+    if ($opt eq "-a"){@eN = HMinfo_getEntities("d","");}
+    else             {@eN = @{$modules{CUL_HM}{helper}{confUpdt}}}
     my @names;
     push @names,CUL_HM_getAssChnNames($_) foreach(@eN);
     @{$modules{CUL_HM}{helper}{confUpdt}} = ();
