@@ -156,16 +156,18 @@ sub CUL_HM_Initialize($) {
                CUL_HM_noDup(map { $culHmModel->{$_}{st} } keys %{$culHmModel}));
 
   $hash->{prot}{rspPend} = 0;#count Pending responses
-  my @statQArr = ();
-  my @statQWuArr = ();
-  my @confQArr = ();
-  my @confQWuArr = ();
+  my @statQArr     = ();
+  my @statQWuArr   = ();
+  my @confQArr     = ();
+  my @confQWuArr   = ();
   my @confCheckArr = ();
+  my @confUpdt     = ();
   $hash->{helper}{qReqStat}     = \@statQArr;
   $hash->{helper}{qReqStatWu}   = \@statQWuArr;
   $hash->{helper}{qReqConf}     = \@confQArr;
   $hash->{helper}{qReqConfWu}   = \@confQWuArr;
   $hash->{helper}{confCheckArr} = \@confCheckArr;
+  $hash->{helper}{confUpdt}     = \@confUpdt;
   $hash->{helper}{cfgCmpl}{init}= 1;# mark entities with complete config
   #statistics
   $hash->{stat}{s}{dummy}=0;
@@ -1712,6 +1714,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   elsif($rxt & 0x10){ # lazy config
     if($mFlgH & 0x02                  #wakeup device
        && $defs{$shash->{IODev}{NAME}}{TYPE} eq "HMLAN"){
+      $shash->{helper}{io}{newCh} = 1;
       CUL_HM_appFromQ($shash->{NAME},"cf");# stack cmds if waiting
       $shash->{helper}{prt}{sleeping} = 0;
       CUL_HM_ProcessCmdStack($shash);
@@ -2321,17 +2324,20 @@ sub CUL_HM_Get($@) {
     return $info;
   }
   elsif($cmd eq "saveConfig"){  ###############################################
+    return "no filename given" if (!$a[2]);
     my $fName = $a[2];
     open(aSave, ">>$fName") || return("Can't open $fName: $!");
-
-    print aSave "\n\n#======== store device data:".$devName." === from: ".TimeNow();
+    my $sName;
     my @eNames;
-    push @eNames,$devName;
-    foreach my $e (CUL_HM_getAssChnIds($name)){
-      my $eName = CUL_HM_id2Name($e);
-      push @eNames, $eName if($eName !~ m/_chn:/);
+    if ($a[3] && $a[3] eq "strict"){
+      @eNames = ($name);
+      $sName =  $name;
     }
-
+    else{
+      $sName = $devName;
+      @eNames = CUL_HM_getAssChnNames($sName);
+    }
+    print aSave "\n\n#======== store device data:".$sName." === from: ".TimeNow();
     foreach my $eName (@eNames){
       print aSave "\n#---      entity:".$eName;
       foreach my $rName ("D-firmware","D-serialNr",".D-devInfo",".D-stc"){
@@ -3208,7 +3214,7 @@ sub CUL_HM_Set($@) {
   }
   elsif($cmd =~ m/^(valvePos|virtTemp|virtHum)$/) { ###########################
     my $valu = $a[2];
-    my %lim = (valvePos =>{min=>0  ,max=>100,rd =>"valvePosTC" ,u =>" %"},
+    my %lim = (valvePos =>{min=>0  ,max=>99 ,rd =>"valvePosTC" ,u =>" %"},
                virtTemp =>{min=>-20,max=>50 ,rd =>"temperature",u =>""  },
                virtHum  =>{min=>0  ,max=>99 ,rd =>"humidity"   ,u =>""  },);
     if ($valu eq "off"){
@@ -3262,7 +3268,8 @@ sub CUL_HM_Set($@) {
       $hash->{helper}{vd}{idl} = hex(substr($dst,4,2))*256;
       CUL_HM_UpdtReadSingle($hash,".msgCnt",ReadingsVal($name,".msgCnt",1),0);
       if (!$hash->{helper}{virtTC}){
-        $hash->{helper}{vd}{ackT} = "" if (!defined$hash->{helper}{vd}{ackT});
+        my $pn = CUL_HM_id2Name($hash->{helper}{vd}{id});
+        $hash->{helper}{vd}{ackT} = ReadingsTimestamp($pn, "ValvePosition", "");
         $hash->{helper}{vd}{miss} = 0  if (!defined$hash->{helper}{vd}{miss});
         $hash->{helper}{virtTC}   = ($cmd eq "valvePos")?"03":"00";
         CUL_HM_UpdtReadSingle($hash,"valveCtrl","init",1)if ($cmd eq "valvePos");
@@ -3571,15 +3578,22 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   my(undef,$vId) = split(':',$in);
   my $hash = CUL_HM_id2Hash($vId);
   my $name = $hash->{NAME};
-  my $msgCnt = (ReadingsVal($name,".msgCnt",0) + 1)%255;
-  
+  my $msgCnt = ReadingsVal($name,".msgCnt",0);
+  my ($idl,$lo,$hi,$nextTimer);
+  my $tn = gettimeofday();
+  $hash->{helper}{vd}{nextF} = ReadingsVal($name,".next",0);
+ 
 # int32_t result = (((_address << 8) | messageCounter) * 1103515245 + 12345) >> 16;
 #                          4e6d = 20077                        12996205 = C64E6D
 # return (result & 0xFF) + 480;
-  my $idl = $hash->{helper}{vd}{idl}+$msgCnt;
-  my $lo = int(($idl*0x4e6d +12345)/0x10000)&0xff;
-  my $hi = ($hash->{helper}{vd}{idh}+$idl*198)&0xff;
-  my $nextTimer = (($lo+$hi)&0xff)/4 + 120;#original - instable
+  do {
+    $msgCnt = ($msgCnt + 1)%255;
+    $idl = $hash->{helper}{vd}{idl}+$msgCnt;
+    $lo = int(($idl*0x4e6d +12345)/0x10000)&0xff;
+    $hi = ($hash->{helper}{vd}{idh}+$idl*198)&0xff;
+    $nextTimer = (($lo+$hi)&0xff)/4 + 120;
+    $hash->{helper}{vd}{nextF} += $nextTimer;
+  } until ($hash->{helper}{vd}{nextF} > $tn);
   if ($hash->{helper}{vd}{cmd}){
     if ($hash->{helper}{vd}{typ} == 1){
       CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
@@ -3601,7 +3615,6 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
     return;# terminate processing
   }
 
-  my $tn = gettimeofday();
   $hash->{helper}{vd}{nextF} = ReadingsVal($name,".next",0) + $nextTimer;
   CUL_HM_UpdtReadBulk($hash,0,".next:".($tn+$nextTimer)
                              ,".msgCnt:$msgCnt");
@@ -3619,7 +3632,7 @@ sub CUL_HM_valvePosTmr(@) {#calc next vd wakeup
     my $ackTime = ReadingsTimestamp($pn, "ValvePosition", "");
     my $vc;
     if (!$ackTime || $ackTime eq $hash->{helper}{vd}{ackT} ){
-      CUL_HM_UpdtReadSingle($hash,".next",$hash->{helper}{vd}{nextF},1);
+      CUL_HM_UpdtReadSingle($hash,".next",$hash->{helper}{vd}{nextF},0);
       $vc = (++$hash->{helper}{vd}{miss} > 5)
                                           ?"lost"
                                           :"miss_".$hash->{helper}{vd}{miss};
@@ -3658,6 +3671,11 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
   $attr{$name}{firmware}   = $fw;      # to be removed from attributes
 #  $attr{$name}{".devInfo"} = $devInfo; # to be removed from attributes
 #  $attr{$name}{".stc"}     = $stc;     # to be removed from attributes
+  CUL_HM_configUpdate($name) if(ReadingsVal($name,"D-firmware","") ne $fw
+                              ||ReadingsVal($name,"D-serialNr","") ne $serial
+                              ||ReadingsVal($name,".D-devInfo","") ne $devInfo
+                              ||ReadingsVal($name,".D-stc"    ,"") ne $stc
+                              ) ;
   CUL_HM_UpdtReadBulk($hash,1,"D-firmware:$fw",
                               "D-serialNr:$serial",
                               ".D-devInfo:$devInfo",
@@ -4491,7 +4509,15 @@ sub CUL_HM_getAssChnIds($) { #in: name out:ID list of assotiated channels
   }
   return sort(@chnIdList);
 }
-
+sub CUL_HM_getAssChnNames($) { #in: name out:list of assotiated chan and device 
+  my ($name) = @_;
+  my @chnN = ($name);
+  if ($defs{$name}){
+    my $hash = $defs{$name};
+    push @chnN,$defs{$name}{$_} foreach (grep /^channel_/, keys %{$defs{$name}});
+  }
+  return sort(@chnN);
+}
 #+++++++++++++++++ Conversions names, hashes, ids++++++++++++++++++++++++++++++
 #Performance opti: subroutines may consume up to 5 times the performance
 #
@@ -5494,6 +5520,7 @@ sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request
 }
 sub CUL_HM_qAutoRead($$){
   my ($name,$lvl) = @_;
+  CUL_HM_configUpdate($name);
   return if (!$defs{$name}
              ||$lvl >= (0x07 & CUL_HM_getAttrInt($name,"autoReadReg")));
   CUL_HM_qEntity($name,"qReqConf");
@@ -5691,7 +5718,7 @@ sub CUL_HM_peerUsed($) {# are peers expected?
 
   my $mId = CUL_HM_getMId($hash);
   my $cNo = hex(substr($hash->{DEF}."01",6,2))."p"; #default to channel 01
-  return 0 if (!$mId || !$culHmModel->{$mId});
+     0 if (!$mId || !$culHmModel->{$mId});
   foreach my $ls (split ",",$culHmModel->{$mId}{lst}){
     my ($l,$c) = split":",$ls;
     if (  ($l =~ m/^(p|3|4)$/ && !$c )  # 3,4,p without chanspec
@@ -5784,6 +5811,11 @@ sub CUL_HM_complConfig($)    {# read config if enabled and not complete
     }
   }
   $modules{CUL_HM}{helper}{cfgCmpl}{$name} = 1;#mark config as complete
+}
+sub CUL_HM_configUpdate($)   {# mark entities with changed data
+  my $name = shift;
+  @{$modules{CUL_HM}{helper}{confUpdt}} = 
+           CUL_HM_noDup(@{$modules{CUL_HM}{helper}{confUpdt}},$name);
 }
 
 1;
