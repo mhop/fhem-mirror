@@ -273,16 +273,14 @@ sub CUL_HM_updateConfig($){
       $hash->{helper}{role}{vrt} = 1;
       if (   $hash->{helper}{fkt} 
           && $hash->{helper}{fkt} =~ m/^(vdCtrl|virtThSens)$/){
-        my $n = ReadingsVal($name,".next",0);
-        my $now = gettimeofday();
-        $n = $now if ($n<$now);
         my $vId = substr($id."01",0,8);
         $hash->{helper}{virtTC} = "00";
         CUL_HM_Set($hash,$name,"valvePos",ReadingsVal($name,"valvePosTC",""));
         CUL_HM_Set($hash,$name,"virtTemp",ReadingsVal($name,"temperature",""));
         CUL_HM_Set($hash,$name,"virtHum" ,ReadingsVal($name,"humidity",""));
         RemoveInternalTimer("valvePos:$vId");
-        InternalTimer($n,"CUL_HM_valvePosUpdt","valvePos:$vId",0);
+        InternalTimer(ReadingsVal($name,".next",1)
+                     ,"CUL_HM_valvePosUpdt","valvePos:$vId",0);
         }
     }
 
@@ -1308,7 +1306,8 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "power:"    . hex($P   )/100;         # 0.0  ..167772.15 W
       push @event, "current:"  . hex($I   )/1;           # 0.0  ..65535.0   mA
       push @event, "voltage:"  . hex($U   )/10;          # 0.0  ..6553.5    mV
-      push @event, "frequency:".(hex($F   )/100+50);      # 48.72..51.27     Hz
+      $F = hex($F);$F -= 256 if ($F > 127);
+      push @event, "frequency:".($F/100+50);             # 48.72..51.27     Hz
       push @event, "boot:"     .((hex($eCnt)&0x800000)?"on":"off");
     }
   }
