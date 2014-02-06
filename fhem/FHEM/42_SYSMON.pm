@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.3.5";
+my $VERSION = "1.3.6";
 
 use constant {
   DATE            => "date",
@@ -762,7 +762,10 @@ SYSMON_getCPUTemp_RPi($$)
 	my ($hash, $map) = @_;
   my $val = SYSMON_execute($hash, "cat /sys/class/thermal/thermal_zone0/temp 2>&1");  
   $val = int($val);
-  my $val_txt = sprintf("%.2f", $val/1000);
+  if($val>1000) { # Manche Systeme scheinen die Daten verschieden zu skalieren (z.B. utilite)...
+    $val = $val/1000;
+  }
+  my $val_txt = sprintf("%.2f", $val);
   $map->{+CPU_TEMP}="$val_txt";
   my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
   $map->{+CPU_TEMP_AVG}="$t_avg";
@@ -809,7 +812,7 @@ SYSMON_getCPUBogoMIPS($$)
 	my $old_val = ReadingsVal($hash->{NAME},CPU_BOGOMIPS,undef);
 	# nur einmalig ermitteln (wird sich ja nicht aendern
 	if(!defined $old_val) {
-    my $val = SYSMON_execute($hash, "cat /proc/cpuinfo | grep 'BogoMIPS'");
+    my $val = SYSMON_execute($hash, "cat /proc/cpuinfo | grep -m 1 'BogoMIPS'");
     #Log 3,"SYSMON -----------> DEBUG: read BogoMIPS = $val"; 
     my ($dummy, $val_txt) = split(/:\s+/, $val);
     $val_txt = trim($val_txt);
