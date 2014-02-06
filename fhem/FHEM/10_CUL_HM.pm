@@ -3594,7 +3594,7 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
     $hash->{helper}{vd}{nextF} = $tn;
   }
   do {
-    $msgCnt = ($msgCnt + 1)%255;
+    $msgCnt = ($msgCnt + 1)%256;
     $idl = $hash->{helper}{vd}{idl}+$msgCnt;
     $lo = int(($idl*0x4e6d +12345)/0x10000)&0xff;
     $hi = ($hash->{helper}{vd}{idh}+$idl*198)&0xff;
