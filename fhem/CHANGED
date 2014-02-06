@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - bugfix:  PRESENCE: fix present-check-interval to be equal with normal 
+             check-interval if not set in define statement and not 30 sec.
   - feature: DASHBOARD: Tabs can show an icon.
   - bugfix:  DASHBOARD: dashboard_showfullsize only in DashboardRoom.
              Fix showhelper Bug on lock/unlock. The error that after a trigger 

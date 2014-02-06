@@ -78,7 +78,7 @@ PRESENCE_Define($$)
             $hash->{MODE} = "local-bluetooth";
             $hash->{ADDRESS} = $a[3];
             $hash->{TIMEOUT_NORMAL} = (defined($a[4]) ? $a[4] : 30);
-            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : 30);
+            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : $hash->{TIMEOUT_NORMAL});
             
         }
         elsif($a[2] eq "fritzbox")
@@ -101,7 +101,7 @@ PRESENCE_Define($$)
             $hash->{MODE} = "fritzbox";
             $hash->{ADDRESS} = $a[3];    
             $hash->{TIMEOUT_NORMAL} = (defined($a[4]) ? $a[4] : 30);
-            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : 30);
+            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : $hash->{TIMEOUT_NORMAL});
 
         }
         elsif($a[2] eq "lan-ping")
@@ -116,7 +116,7 @@ PRESENCE_Define($$)
             $hash->{MODE} = "lan-ping";
             $hash->{ADDRESS} = $a[3];
             $hash->{TIMEOUT_NORMAL} = (defined($a[4]) ? $a[4] : 30);
-            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : 30);
+            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : $hash->{TIMEOUT_NORMAL});
      
         }
         elsif($a[2] =~ /(shellscript|function)/)
@@ -127,7 +127,7 @@ PRESENCE_Define($$)
                 $hash->{MODE} = $2;
                 $hash->{helper}{call} = $3;
                 $hash->{TIMEOUT_NORMAL} = ($4 ne "" ? $4 : 30);
-                $hash->{TIMEOUT_PRESENT} = ($5 ne "" ? $5 : 30);
+                $hash->{TIMEOUT_PRESENT} = ($5 ne "" ? $5 : $hash->{TIMEOUT_NORMAL});
 
                 if($hash->{helper}{call} =~ /\|/)
                 {
@@ -160,7 +160,7 @@ PRESENCE_Define($$)
             $hash->{MODE} = "lan-bluetooth";
             $hash->{ADDRESS} = $a[3];
             $hash->{TIMEOUT_NORMAL} = (defined($a[5]) ? $a[5] : 30);
-            $hash->{TIMEOUT_PRESENT} = (defined($a[6]) ? $a[6] : 30);
+            $hash->{TIMEOUT_PRESENT} = (defined($a[6]) ? $a[6] : $hash->{TIMEOUT_NORMAL});
 
             $dev = $a[4];
             $dev .= ":5222" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
