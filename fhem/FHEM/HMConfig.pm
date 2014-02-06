@@ -434,6 +434,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 # Blind          9:00 10:00 20:00
 # BL1TPBU  02:01 21:FF
 # Dim1TPBU 02:01 21:FF 22:00
+# TC-IT 16:00
 #Keymatic 3.3 unknown, seen 1 here
 
 #--- list 1, Channel level------------------
