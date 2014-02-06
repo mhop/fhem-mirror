@@ -25,7 +25,7 @@ sub HMinfo_Initialize($$) {####################################################
   $hash->{AttrFn}    = "HMinfo_Attr";
   $hash->{AttrList}  =  "loglevel:0,1,2,3,4,5,6 "
                        ."sumStatus sumERROR "
-                       ."autoUpdate autoArchieve "
+                       ."autoUpdate autoArchive "
                        ."hmAutoReadScan hmIoMaxDly "
                        ."hmManualOper:0_auto,1_manual "
                        ."configDir configFilename "
@@ -116,7 +116,7 @@ sub HMinfo_autoUpdate($){#in:name, send status-request
   (undef,$name)=split":",$name,2;
   HMinfo_SetFn($defs{$name},$name,"update") if ($name);
 #  HMinfo_archConfig($defs{$name},$name,"","") 
-#        if (AttrVal($name,"autoArchieve",undef) && 
+#        if (AttrVal($name,"autoArchive",undef) && 
 #            scalar(@{$modules{CUL_HM}{helper}{confUpdt}}));
   InternalTimer(gettimeofday()+$defs{$name}{helper}{autoUpdate},
                 "HMinfo_autoUpdate","sUpdt:".$name,0)
@@ -144,6 +144,7 @@ sub HMinfo_regCheck(@) { ######################################################
 
   foreach my $eName (@entities){
     my $ehash = $defs{$eName};
+    next if (!$ehash);
 
     my @lsNo = CUL_HM_reglUsed($eName);
     my @mReg = ();
@@ -1041,36 +1042,49 @@ sub HMinfo_saveConfig($) {#####################################################
   return $id;
 }
 
-sub HMinfo_archConfig($$$$) {#####################################################
-    # save config only if register are complete
-    my ($hash,$name,$opt,$fn) = @_;
-    my @eN;
-    if ($opt eq "-a"){@eN = HMinfo_getEntities("d","");}
-    else             {@eN = @{$modules{CUL_HM}{helper}{confUpdt}}}
-    my @names;
-    push @names,CUL_HM_getAssChnNames($_) foreach(@eN);
-    @{$modules{CUL_HM}{helper}{confUpdt}} = ();
-    my @archs;
-    foreach(HMinfo_noDup(@names)){
-      if (CUL_HM_peersValid($_) !=1 ||HMinfo_regCheck($_)){
-        push @{$modules{CUL_HM}{helper}{confUpdt}},$_;
-      }
-      else{
-        push @archs,$_;
-      }
+sub HMinfo_archConfig($$$$) {################################################
+  # save config only if register are complete
+  my ($hash,$name,$opt,$fN) = @_;
+  my $id = ++$hash->{nb}{cnt};
+  my $bl = BlockingCall("HMinfo_archConfigExec", join(",",("$name:$id"
+                                                       ,$fN
+                                                       ,$opt)), 
+                        "HMinfo_archConfigPost", 30, 
+                        "HMinfo_bpAbort", "$name:$id");
+  $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
+  @{$modules{CUL_HM}{helper}{confUpdt}} = ();
+  return ;
+}
+sub HMinfo_archConfigExec($)  {################################################
+  # save config only if register are complete
+  my ($id,$fN,$opt) = split ",",shift;
+  my @eN;
+  if ($opt eq "-a"){@eN = HMinfo_getEntities("d","");}
+  else             {@eN = @{$modules{CUL_HM}{helper}{confUpdt}}}
+  my @names;
+  push @names,CUL_HM_getAssChnNames($_) foreach(@eN);
+  @{$modules{CUL_HM}{helper}{confUpdt}} = ();
+  my @archs;
+  @eN = ();
+  foreach(HMinfo_noDup(@names)){
+    if (CUL_HM_peersValid($_) !=1 ||HMinfo_regCheck($_)){
+      push @eN,$_;
     }
-    my $id = ++$hash->{nb}{cnt};
-    my $bl = BlockingCall("HMinfo_saveConfig", join(",",("$name:$id"
-                                                         ,$fn
-                                                         ,"c"
-                                                         ,"\^(".join("|",@archs).")\$")
-                                                         ,"strict"), 
-                          "HMinfo_bpPost", 30, 
-                          "HMinfo_bpAbort", "$name:$id");
-    $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
-    return (@{$modules{CUL_HM}{helper}{confUpdt}}
-                 ?"data incomplete:".join(",",@{$modules{CUL_HM}{helper}{confUpdt}})
-                 :"");
+    else{
+      push @archs,$_;
+    }
+  }
+  HMinfo_saveConfig(join(",",( $id
+                              ,$fN
+                              ,"c"
+                              ,"\^(".join("|",@archs).")\$")
+                              ,"strict"));
+  return (@eN ? join(",",@eN) : "");
+}
+sub HMinfo_archConfigPost($)  {################################################
+  my $post = shift;
+  push @{$modules{CUL_HM}{helper}{confUpdt}},split(",",$post) if ($post);
+  return ;
 }
 
 sub HMinfo_bpPost($) {#bp finished#############################################
@@ -1897,6 +1911,13 @@ sub HMinfo_noDup(@) {#return list with no duplicates
            attr hm autoUpdate 00:10<br>
         </code></ul>
         will trigger the update every 10 min<br>
+    </li>
+    <li><a name="#HMinfoautoArchive">autoArchive</a>
+        if set fhem will update the configFile each time the new data is available.
+        The update will happen with <a ref="#HMinfoautoUpdate">autoUpdate</a>. It will not 
+        work it autoUpdate is not used.<br>
+        see also <a ref="#HMinfoarchConfig">archConfig</a>
+        <br>
     </li>
     <li><a name="#HMinfohmAutoReadScan">hmAutoReadScan</a>
         defines the time in seconds CUL_HM tries to schedule the next autoRead
