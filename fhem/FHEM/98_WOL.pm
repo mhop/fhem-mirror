@@ -292,8 +292,8 @@ So, for example a Buffalo NAS can be kept awake.
   <ul>
     <li><code>attr &lt;name&gt; sysCmd &lt;string&gt;</code>
                 <br>Custom command executed to wakeup a remote machine, i.e. <code>/usr/bin/ether-wake or /usr/bin/wakeonlan</code></li>
-    <li><code>attr &lt;name&gt; shutdownCmd &lt;<command>&gt;</code>
-                <br>Custom command executed to shutdown a remote machine. You can use <command>, like you use it in at, notify or Watchdog</li>
+    <li><code>attr &lt;name&gt; shutdownCmd &lt;command&gt;</code>
+                <br>Custom command executed to shutdown a remote machine. You can use &lt;command&gt;, like you use it in at, notify or Watchdog</li>
     <br><br>
     Examples:
     <PRE>
