@@ -589,7 +589,8 @@ sub CUL_HM_Attr(@) {#################################
   }
   elsif($attrName eq "autoReadReg"){
     if ($cmd eq "set"){
-      CUL_HM_complConfigTest($name);
+      CUL_HM_complConfigTest($name)
+        if (!CUL_HM_getAttrInt($name,"ignore"));;
     }
   }
   CUL_HM_queueUpdtCfg($name) if ($updtReq);
@@ -2563,7 +2564,7 @@ sub CUL_HM_Set($@) {
       my @cH = ($hash);
       push @cH,$defs{$hash->{$_}} foreach(grep /^channel/,keys %{$hash});
       delete $_->{READINGS} foreach (@cH);
-      delete $modules{CUL_HM}{helper}{cfgCmpl}{$_->{NAME}};
+      delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
       CUL_HM_complConfig($_->{NAME}) foreach (@cH);
     }
     elsif($sect eq "register"){
@@ -2573,7 +2574,7 @@ sub CUL_HM_Set($@) {
       foreach my $h(@cH){
         delete $h->{READINGS}{$_}
              foreach (grep /^(\.?)(R-|RegL)/,keys %{$h->{READINGS}});
-        delete $modules{CUL_HM}{helper}{cfgCmpl}{$_->{NAME}};
+        delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
         CUL_HM_complConfig($h->{NAME});
       }
     }
@@ -3722,7 +3723,7 @@ sub CUL_HM_getConfig($){
   my $id = CUL_HM_IOid($hash);
   my $dst = substr($hash->{DEF},0,6);
   my $name = $hash->{NAME};
-  
+  CUL_HM_configUpdate($name);
   delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
   CUL_HM_complConfigTest($name);
   CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'00040000000000')
@@ -5746,8 +5747,7 @@ sub CUL_HM_peersValid($) {# is list valid?
 sub CUL_HM_reglUsed($) {# provide data for HMinfo
   my $name = shift;
   my $hash = $defs{$name};
-  my $devId = substr($hash->{DEF},0,6);
-  my $chn   = substr($hash->{DEF}."01",6,2);
+  my ($devId,$chn) =  unpack 'A6A2',$hash->{DEF}."01";
   return undef if (AttrVal(CUL_HM_id2Name($devId),"subType","") eq "virtual");
 
   my @pNames;
