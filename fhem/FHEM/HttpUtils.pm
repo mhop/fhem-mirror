@@ -192,7 +192,8 @@ HttpUtils_Connect2($)
     $hash->{directReadFn} = sub() {
       my $buf;
       my $len = sysread($hash->{conn},$buf,65536);
-      if(!defined($len) || $len <= 0) { # EOF
+      $hash->{buf} .= $buf if(defined($len) && $len > 0);
+      if(!defined($len) || $len <= 0 || HttpUtils_DataComplete($hash->{buf})) {
         delete($hash->{FD});
         delete($hash->{directReadFn});
         delete($selectlist{$hash});
@@ -200,7 +201,6 @@ HttpUtils_Connect2($)
         $hash->{callback}($hash, $err, $ret) if(!$redirect);
         return;
       }
-      $hash->{buf} .= $buf;
     };
     $selectlist{$hash} = $hash;
     InternalTimer(gettimeofday()+$hash->{timeout},
@@ -209,6 +209,18 @@ HttpUtils_Connect2($)
   }
 
   return undef;
+}
+
+sub
+HttpUtils_DataComplete($)
+{
+  my ($ret) = @_;
+  return 0 if($ret !~ m/^(.*?)\r\n\r\n(.*)$/s);
+  my $hdr = $1;
+  my $data = $2;
+  return 0 if($hdr !~ m/Content-Length:\s*(\d+)/s);
+  return 0 if(length($data) < $1);
+  return 1;
 }
 
 sub
@@ -310,6 +322,7 @@ HttpUtils_BlockingGet($)
     my $len = sysread($hash->{conn},$buf,65536);
     last if(!defined($len) || $len <= 0);
     $ret .= $buf;
+    last if(HttpUtils_DataComplete($ret));
   }
   return HttpUtils_ParseAnswer($hash, $ret);
 }
