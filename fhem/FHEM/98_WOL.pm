@@ -41,6 +41,7 @@ sub WOL_Set($@) {
   
   my $name = shift @a;
   my $v = join(" ", @a);
+  my $mod = "[".$hash->{NAME} ."] ";
 
   Log3 $hash, 3, "WOL set $name $v";
   
@@ -53,7 +54,11 @@ sub WOL_Set($@) {
      if ($cmd eq "") {
        Log3 $hash, 3, "No shutdown command given (see shutdownCmd attribute)!";
      } else {
-       qx ($cmd);
+#      qx ($cmd);
+       $cmd  = SemicolonEscape($cmd);
+       Log3 $hash, 3, $mod."shutdownCmd: $cmd executed";
+       my $ret  = AnalyzeCommandChain(undef, $cmd);
+       Log3 ($hash, 3, $ret) if($ret);
      }
   } elsif ($v eq "refresh") {
     ;
@@ -287,8 +292,15 @@ So, for example a Buffalo NAS can be kept awake.
   <ul>
     <li><code>attr &lt;name&gt; sysCmd &lt;string&gt;</code>
                 <br>Custom command executed to wakeup a remote machine, i.e. <code>/usr/bin/ether-wake or /usr/bin/wakeonlan</code></li>
-    <li><code>attr &lt;name&gt; shutdownCmd &lt;string&gt;</code>
-                <br>Custom command executed to shutdown a remote machine, i.e. <code>sh /path/to/some/shell/script.sh</code></li>
+    <li><code>attr &lt;name&gt; shutdownCmd &lt;<command>&gt;</code>
+                <br>Custom command executed to shutdown a remote machine. You can use <command>, like you use it in at, notify or Watchdog</li>
+    <br><br>
+    Examples:
+    <PRE>
+    shutdownCmd    set lamp on                            # fhem command
+    shutdownCmd    { Log 1, "Teatime" }                   # Perl command
+    shutdownCmd    "/bin/echo "Teatime" > /dev/console"   # shell command
+    </PRE>
     <li><code>attr &lt;name&gt; interval &lt;seconds&gt;</code></a>
                 <br>defines the time between two checks by a <i>ping</i> if state of &lt;name&gt is <i>on</i></li>
   </ul>
