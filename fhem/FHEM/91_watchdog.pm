@@ -236,4 +236,103 @@ watchdog_Undef($$)
 </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="watchdog"></a>
+<h3>watchdog</h3>
+<ul>
+  <br>
+
+  <a name="watchdogdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; watchdog &lt;regexp1&gt; &lt;timespec&gt;
+    &lt;regexp2&gt; &lt;command&gt;</code><br>
+    <br>
+
+    Startet einen beliebigen fhem.pl Befehl wenn nach dem Empfang des
+    Ereignisses &lt;regexp1&gt; nicht innerhalb von &lt;timespec&gt; ein
+    &lt;regexp2&gt; Ereignis empfangen wird.<br>
+
+    Der Syntax f&uuml;r &lt;regexp1&gt; und &lt;regexp2&gt; ist der gleiche wie
+    regexp f&uuml;r <a href="#notify">notify</a>.<br>
+
+    &lt;timespec&gt; ist HH:MM[:SS]<br>
+
+    &lt;command&gt; ist ein gew&ouml;hnlicher fhem Befehl wie z.B. in <a
+    href="#at">at</a> oderr <a href="#notify">notify</a>
+    <br><br>
+
+    Beispiele:
+    <code><ul>
+    # Frage Daten vom FHT80 _einmalig_ ab, wenn wir keine Nachricht f&uuml;r<br>
+    # 15 Minuten erhalten haben.<br>
+    define w watchdog FHT80 00:15:00 SAME set FHT80 date<br><br>
+
+    # Frage Daten vom FHT80 jedes Mal ab, wenn keine Nachricht f&uuml;r<br>
+    # 15 Minuten emfpangen wurde, d.h. reaktiviere den Watchdog nachdem er
+    getriggert wurde.<br>
+
+    # Kann gef&auml;hrlich sein, da er so in einer Schleife getriggert werden
+    kann.<br>
+    define w watchdog FHT80 00:15:00 SAME set FHT80 date;; trigger w .<br><br>
+
+    # Alarmiere einmalig wenn vom FHT80 f&uuml;r 15 Minuten keine Nachricht
+    # emfpangen wurde.<br>
+    define w watchdog HMS100-FIT 01:00:00 SAME "alarm-fit.sh"<br><br>
+
+    # Sende eine Mail wenn das Fenster offen gelassen wurde<br>
+    define w watchdog contact1:open 00:15 contact1:closed "mail_me close
+    window1"<br>
+    attr w regexp1WontReactivate<br><br>
+    </ul></code>
+
+    Hinweise:<br>
+    <ul>
+      <li>Wenn &lt;regexp1&gt; . (Punkt) ist, dann aktiviere den Watchdog zur
+      definierten Zeit.  Sonst wird er durch den Empfang des ersten passenden
+      Events aktiviert.</li>
+
+      <li>&lt;regexp1&gt; Resetet den Timer eines laufenden Watchdogs. Um das
+      zu verhindern wird das regexp1WontReactivate Attribut gesetzt.</li>
+
+      <li>Wenn &lt;regexp2&gt; SAME ist , dann ist es das gleiche wie das erste
+      regexp, und wird reaktiviert wenn es empfangen wird.  </li>
+
+      <li>trigger &lt;watchdogname&gt; . aktiviert den Trigger wenn dessen
+      Status defined ist und setzt ihn in den Status defined wenn sein status
+      triggered ist.<br>
+
+      Der Watchdog musst immer mit diesem Befehl reaktiviert werden wenn er
+      getriggert wurde.</li>
+
+      <li>Ein generischer Watchdog (ein Watchdog, verantwortlich f&uuml;r
+      mehrere Devices) ist derzeit nicht m&ouml;glich.</li>
+
+    </ul>
+
+    <br>
+  </ul>
+
+  <a name="watchdogset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="watchdogget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="watchdogattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#disable">disable</a></li>
+    <li><a name="regexp1WontReactivate">regexp1WontReactivate</a><br>
+        Wenn ein Watchdog aktiv ist, wird ein zweites Ereignis das auf regexp1
+        passt normalerweise den Timer zur&uuml;cksetzen. Dieses Attribut wird
+        das verhindern.
+    </li>
+  </ul>
+  <br>
+</ul>
+
+=end html
 =cut
