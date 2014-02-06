@@ -234,7 +234,7 @@ at_State($$$$)
 <h3>at</h3>
 <ul>
 
-  Start an arbitrary fhem.pl command at a later time.<br>
+  Start an arbitrary FHEM command at a later time.<br>
   <br>
 
   <a name="atdefine"></a>
@@ -355,4 +355,139 @@ at_State($$$$)
 </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="at"></a>
+<h3>at</h3>
+<ul>
+
+  Startet einen beliebigen FHEM Befehl zu einem sp&auml;teren Zeitpunkt.<br>
+  <br>
+
+  <a name="atdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; at &lt;timespec&gt; &lt;command&gt;</code><br>
+    <br>
+    <code>&lt;timespec&gt;</code> Format: [+][*{N}]&lt;timedet&gt;<br>
+    <ul>
+      Das optionale <code>+</code> zeigt, dass die Angabe <i>relativ</i> ist 
+      (also zur jetzigen Zeit dazugez&auml;hlt wird).<br>
+
+      Das optionale <code>*</code> zeigt, dass die Ausf&uuml;hrung
+      <i>wiederholt</i> erfolgen soll.<br>
+
+      Das optionale <code>{N}</code> nach dem * bedeutet, dass der Befehl genau
+      <i>N-mal</i> wiederholt werden soll.<br>
+
+      &lt;timedet&gt; ist entweder HH:MM, HH:MM:SS oder {perlfunc()}, wobei
+      perlfunc HH:MM or HH:MM:SS zur&uuml;ckgeben muss. Hinweis: {perlfunc()}
+      darf keine Leerzeichen enthalten.
+
+    </ul>
+    <br>
+
+    Beispiele:
+    <PRE>
+    # Absolute Beispiele:
+    define a1 at 17:00:00 set lamp on                            # fhem Befehl
+    define a2 at 17:00:00 { Log 1, "Teatime" }                   # Perl Befehl
+    define a3 at 17:00:00 "/bin/echo "Teatime" > /dev/console"   # shell Befehl
+    define a4 at *17:00:00 set lamp on                           # Jeden Tag
+
+    # Realtive Beispiele:
+    define a5 at +00:00:10 set lamp on                  # Einschalten in 10 Sekunden
+    define a6 at +00:00:02 set lamp on-for-timer 1      # Einmal blinken in 2 Sekunden
+    define a7 at +*{3}00:00:02 set lamp on-for-timer 1  # Blinke 3 mal
+
+    # Blinke 3 mal wenn  piri einen Befehl sendet
+    define n1 notify piri:on.* define a8 at +*{3}00:00:02 set lamp on-for-timer 1
+
+    # Lampe von Sonnenuntergang bis 23:00 Uhr einschalten
+    define a9 at +*{sunset_rel()} set lamp on
+    define a10 at *23:00:00 set lamp off
+
+    # Elegantere Version, ebenfalls von Sonnenuntergang bis 23:00 Uhr
+    define a11 at +*{sunset_rel()} set lamp on-till 23:00
+
+    # Nur am Wochenende ausf&uuml;hren
+    define a12 at +*{sunset_rel()} { fhem("set lamp on-till 23:00") if($we) }
+
+    # Schalte lamp1 und lamp2 ein von 7:00 bis 10 Minuten nach Sonnenaufgang
+    define a13 at *07:00 set lamp1,lamp2 on-till {sunrise(+600)}
+
+    # Schalte lamp jeden Tag 2 Minuten nach Sonnenaufgang aus
+    define a14 at +{sunrise(+120)} set lamp on
+
+    # Schalte lamp1 zum Sonnenuntergang ein, aber nicht vor 18:00 und nicht nach 21:00
+    define a15 at *{sunset(0,"18:00","21:00")} set lamp1 on
+
+    </PRE>
+
+    Hinweise:<br>
+    <ul>
+      <li>wenn kein <code>*</code> angegeben wird, wird der Befehl nur einmal
+      ausgef&uuml;hrt und der entsprechende <code>at</code> Eintrag danach
+      gel&ouml;scht. In diesem Fall wird der Befehl im Statefile gespeichert
+      (da er nicht statisch ist) und steht nicht im Config-File (siehe auch <a
+      href="#save">save</a>).</li>
+
+      <li>wenn die aktuelle Zeit gr&ouml;&szlig;er ist als die angegebene Zeit,
+      dann wird der Befehl am folgenden Tag ausgef&uuml;hrt.</li>
+
+      <li>F&uuml;r noch komplexere Datums- und Zeitabl&auml;ufe muss man den
+      Aufruf entweder per cron starten oder Datum/Zeit mit perl weiter
+      filtern. Siehe hierzu das letzte Beispiel und das <a href="#perl">Perl
+      special</a>.  </li>
+
+    </ul>
+    <br>
+  </ul>
+
+
+  <a name="atset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="atget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="atattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <a name="disable"></a>
+    <li>disable<br>
+        Kann f&uuml;r at/watchdog/notify/FileLog Devices gesetzt werden.<br>
+        Deaktiviert das entsprechende at/notify oder FileLog Device. Hinweis:
+        Wenn angewendet auf ein <a href="#at">at</a>, dann wird der Befehl
+        nicht ausgef&uuml;hrt, jedoch die n&auml;chste Ausf&uuml;hrungszeit
+        berechnet.</li><br>
+
+    <a name="skip_next"></a>
+    <li>skip_next<br>
+        Wird bei at Befehlen verwendet um die n&auml;chste Ausf&uuml;hrung zu
+        &uuml;berspringen</li><br>
+
+    <a name="alignTime"></a>
+    <li>alignTime<br>
+        Nur f&uuml;r relative Definitionen: Stellt den Zeitpunkt der
+        Ausf&uuml;hrung des Befehls so, dass er auch zur alignTime
+        ausgef&uuml;hrt wird.  Dieses Argument ist ein timespec. Siehe oben
+        f&uuml; die Definition<br>
+
+        Beispiel:<br>
+        <ul>
+        # Stelle sicher das es gongt wenn eine neue Stunde beginnt.<br>
+        define at2 at +*01:00 set Chime on-for-timer 1<br>
+        attr at2 alignTime 00:00<br>
+        </ul>
+        </li><br>
+
+  </ul>
+  <br>
+
+</ul>
+
+=end html
+
 =cut

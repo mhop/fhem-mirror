@@ -201,6 +201,90 @@ FHT8V_Get($@)
   <br>
 </ul>
 
+=end html
+
+=begin html_DE
+
+<a name="FHT8V"></a>
+<h3>FHT8V</h3>
+<ul>
+   
+  Fhem kann die Ventile vom Typ FHT8V durch einen <a href="#CUL">CUL</a> 
+  direkt, ohne zwischengeschalteten FHT, ansteuern. Dieser Abschnitt 
+  beschreibt einen der Bausteine, der andere ist das <a href="#PID">PID</a> Device.
+  <br>
+  <br>
+
+  <a name="FHT8Vdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; FHT8V &lt;Hauscode&gt; [IODev|FHTID]</code>
+    <br><br>
+
+    <code>&lt;Hauscode&gt;</code> ist eine vierstellige hexadezimale Zahl, die
+    folgende Beziehung zum zust&auml;ndigen CUL-Device aufweisen muss:
+
+    <ul>Bei gegebenem Hauscode des CUL als AABB muss dieser Hauscode die Form CCBB 
+    haben, wobei CC gr&ouml;&szlig;er oder gleich AA, aber kleiner AA+8 sein muss.
+    </ul>
+    
+    Diese Form wurde gew&auml;hlt, damit der CUL alle FHT8V-Ventilstellungen
+    innerhalb von zwei Minuten aktualisieren kann.  <br><br>
+
+    <code>&lt;IODev&gt;</code> mu&szlig; angegeben werden, wenn der als letzter
+    definierte CUL nicht der zust&auml;ndige ist. Normalerweise wird dies mit
+    dem <a href="#IODev">IODev</a>-Attribut gesetzt, da die
+    &Uuml;berpr&uuml;fung der Adresse aber w&auml;hrend der Definition erfolgt,
+    brauchen wir hier eine Ausnahme.  <br>
+
+    Als Alternative kann man die FHTID des zust&auml;ndigen IODev-Ger&auml;tes
+    (anstelle des IODev selbst) setzen. Diese Methode ist n&ouml;tig, wenn man
+    FHT8V &uuml;ber FHEM2FHEM betreibt.  <br>
+
+    Beispiel:
+    <ul>
+      <code>define wz FHT8V 3232</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="FHT8Vset"></a>
+  <b>Set </b>
+  <ul>
+      <li>set &lt;name&gt; valve &lt;Wert&gt;<br>
+        &Ouml;ffnet das Ventil auf den angegebenen Wert (in Prozent, von 0 bis 100).
+        </li>
+      <li>set &lt;name&gt; pair<br>
+        Verbindet das Ventil mit dem CUL.
+        </li>
+      <li>set &lt;name&gt; decalc<br>
+        Startet einen Entkalkungslauf des angegebenen Ventils.
+        </li>
+  </ul>
+  <br>
+
+  <a name="FHT8Vget"></a>
+  <b>Get </b>
+  <ul>
+      <li>get &lt;name&gt; valve<br>
+      Liest die Ventil&ouml;ffnung aus dem FHT-Puffer des CUL und wandelt sie
+      in Prozent (von 0 bis 100) um.
+      </li>
+  </ul>
+  <br>
+
+  <a name="FHT8Vattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#IODev">IODev</a></li>
+    <li><a href="#dummy">dummy</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#eventMap">eventMap</a></li><br>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+  <br>
+</ul>
 
 =end html
+
 =cut
