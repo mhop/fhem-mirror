@@ -1238,6 +1238,20 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
                          ,"desired-temp" =>"[on|off|5.0..30.0]"
                          ,sysTime        =>""
                         },
+  "HM-TC-IT-WM-W-EU02"=>{ controlMode    =>"[auto|boost|day|night]"
+                         ,controlManu    =>"[on|off|5.0..30.0]"
+                         ,controlParty   =>"<temp> <startDate> <startTime> <enddate> <endTime>"
+                         ,tempListSat    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                         ,tempListSun    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                         ,tempListMon    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                         ,tempListTue    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                         ,tempListThu    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                         ,tempListWed    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                         ,tempListFri    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                         ,"desired-temp" =>"[on|off|5.0..30.0]"
+                         ,inhibit        =>"[on|off]"
+                         ,sysTime        =>""
+                        },
   "HM-ES-PMSw1-Pl01"  =>{ "on-for-timer" =>"<sec>"
                          ,"on-till"      =>"<time>"
                          ,on             =>""
@@ -1262,8 +1276,6 @@ $culHmChanSets{"HM-CC-RT-DN-BoM02"}     = $culHmChanSets{"HM-CC-RT-DN02"};
 $culHmChanSets{"HM-CC-RT-DN-BoM04"}     = $culHmChanSets{"HM-CC-RT-DN04"};
 $culHmChanSets{"HM-CC-RT-DN-BoM05"}     = $culHmChanSets{"HM-CC-RT-DN05"};
 
-$culHmChanSets{"HM-TC-IT-WM-W-EU02"}    = $culHmChanSets{"HM-CC-RT-DN02"};
-
 $culHmChanSets{"HM-ES-PMSw1-Pl04"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
 $culHmChanSets{"HM-ES-PMSw1-Pl05"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
 $culHmChanSets{"HM-ES-PMSw1-Pl06"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
@@ -1280,8 +1292,6 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
   virtThSens          =>{ virtTemp      =>"[off|-20.0..50.0]",
                           virtHum       =>"[off|0.0..99.0]"}
 );
-
-
 
 
 # RC send BCAST to specific address. Is the meaning understood?
@@ -1470,6 +1480,10 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                      CMD      => "00,2",
                      desTemp  => '02,2,$val=((hex($val)>>2) /2)',
                      mode     => '02,2,$val=(hex($val) & 0x3)',} },
+  "5A"          => { txt => "ThermCtrl" , params => {
+                     setTemp  => '00,2,$val=(((hex($val)>>2)&0x3f) /2)',
+                     actTemp  => '00,4,$val=((hex($val)>>6) /10)',
+                     hum      => '04,2,$val=(hex($val) & 0x3)',} },
   "5E"          => { txt => "powerEvntCyc" , params => {
                      energy   => '00,3,$val=((hex($val)) /10)',
                      power    => '00,3,$val=((hex($val)) /100)',

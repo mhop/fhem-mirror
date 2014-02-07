@@ -981,6 +981,67 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "time-request";
     }
   }
+  elsif($md eq "HM-ES-PMSw1-Pl") { ############################################
+    my %ctlTbl=( 0=>"auto", 1=>"manu", 2=>"party",3=>"boost");
+    if   ($mTp eq "10" && $p =~ m/^0B(....)(..)(..)(..)/) {#info-level
+      my ($d1,$d2,$d3,$d4)=(hex($1),hex($2),hex($3),hex($4));
+      my ($chn,$setTemp,$actTemp, $cRep,$bat,$lbat,$wRep, $ctrlMode) =
+          ("02",$d1,$d1,            $d2,$d2,$d2,$d2,            $d3);
+      $setTemp    =(($setTemp    >>10) & 0x3f )/2;
+      $actTemp    =(($actTemp        ) & 0x2ff)/10;
+      $actTemp    = -1 * $actTemp if ($1 & 0x200 );# obey signed
+      $bat        =(($bat            ) & 0x1f)/10+1.5;
+      $lbat       = ($lbat           ) & 0x80;
+      $ctrlMode   = ($ctrlMode   >> 6) & 0x3  ;
+      $actTemp = sprintf("%2.1f",$actTemp);
+      $setTemp = ($setTemp < 5 )?'off':
+                 ($setTemp >30 )?'on' :$setTemp;
+
+      my $dHash = $shash;
+      $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
+                             if($modules{CUL_HM}{defptr}{"$src$chn"});
+      push @event, "measured-temp:$actTemp";
+      push @event, "desired-temp:$setTemp";
+      push @event, "mode:$ctlTbl{$ctrlMode}";
+      push @event, "state:T: $actTemp desired: $setTemp";
+      push @entities,CUL_HM_UpdtReadBulk($dHash,1
+                                            ,"battery:".($lbat?"low":"ok")
+                                            ,"batteryLevel:$bat V"
+                                            ,"measured-temp:$actTemp" # values to please HCS
+                                            ,"desired-temp:$setTemp"
+                                            );
+    }
+    elsif($mTp eq "70"){
+      my $chn = 1;
+      $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
+                             if($modules{CUL_HM}{defptr}{"$src$chn"});
+      my ($t,$h) =  (hex(substr($p,0,4)),hex(substr($p,4,2)));
+      $t -= 0x8000 if($t > 1638.4);
+      $t = sprintf("%0.1f", $t/10);
+      push @event, "temperature:$t";
+      push @event, "humidity:$h";
+      push @event, "state:T: $t H: $h";
+    }
+    elsif($mTp eq "5A"){# thermal control - might work with broadcast
+      my $chn = 2;
+      $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
+                             if($modules{CUL_HM}{defptr}{"$src$chn"});
+      my ($setTemp,$actTemp,) =  (hex(substr($p,0,4)),hex(substr($p,4,2)));
+      $setTemp    =(($setTemp    >>10) & 0x3f )/2;
+      $actTemp    =(($actTemp        ) & 0x2ff)/10;
+      $actTemp = sprintf("%2.1f",$actTemp);
+      $setTemp = ($setTemp < 5 )?'off':
+                 ($setTemp >30 )?'on' :$setTemp;
+      push @event, "measured-temp:$actTemp";
+      push @event, "desired-temp:$setTemp";
+      push @event, "state:T: $actTemp desired: $setTemp";
+    }
+    elsif($mTp eq "3F" && $ioId eq $dst) { # Timestamp request
+      my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
+      push @ack,$shash,"++803F$ioId${src}0204$s2000";
+      push @event, "time-request";
+    }
+  }
   elsif($md =~ m/^(HM-Sen-Wa-Od|HM-CC-SCD)$/){ ################################
     if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
         ($mTp eq "10" && $p =~ m/^06/) ||  #or Info_Status message here
@@ -3154,7 +3215,7 @@ sub CUL_HM_Set($@) {
     my $wd = $1;
     $state= "";
     my ($list,$addr,$prgChn);
-    if ($md =~ m/HM-CC-RT-DN/){
+    if ($md =~ m/(HM-CC-RT-DN|HM-TC-IT-WM-W-EU)/){
       my %day2off = ( "Sat"=>"20", "Sun"=>"46", "Mon"=>"72", "Tue"=>"98",
                       "Wed"=>"124","Thu"=>"150","Fri"=>"176");
       ($list,$addr,$prgChn) = (7,$day2off{$wd},0);
@@ -3173,9 +3234,13 @@ sub CUL_HM_Set($@) {
       $prep = $a[2];
       splice  @a,2,1;#remove prep
     }
+    if ($md =~ m/HM-TC-IT-WM-W-EU/ && $a[2] =~ m/^p([1..3])$/){
+      $list +=  $1 - 1;
+      splice  @a,2,1;#remove list
+    }
     return "To few arguments"                if(@a < 4);
-    return "To many arguments, max 13 pairs" if(@a > 28 && $md =~ m/HM-CC-RT-DN/);
-    return "To many arguments, max 24 pairs" if(@a > 50 && $md !~ m/HM-CC-RT-DN/);
+    return "To many arguments, max 13 pairs" if(@a > 28 && $md =~ m/(HM-CC-RT-DN|HM-TC-IT-WM-W-EU)/);
+    return "To many arguments, max 24 pairs" if(@a > 50 && $md !~ m/(HM-CC-RT-DN|HM-TC-IT-WM-W-EU)/);
     return "Bad format, use HH:MM TEMP ..."  if(@a % 2);
     return "Last time spec must be 24:00"    if($a[@a-2] ne "24:00");
 
@@ -3186,7 +3251,7 @@ sub CUL_HM_Set($@) {
       my ($h, $m) = ($1, $2);
       my ($hByte,$lByte);
       my $temp = $a[$idx+1];
-      if ($md =~ m/HM-CC-RT-DN/){
+      if ($md =~ m/(HM-CC-RT-DN|HM-TC-IT-WM-W-EU)/){
         $temp = (int($temp*2)<<9) + ($h*12+($m/5));
         $hByte = $temp>>8;
         $lByte = $temp & 0xff;
