@@ -3605,13 +3605,13 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   $hash->{helper}{vd}{nextM} = $tn+$nextTimer;
   $hash->{helper}{vd}{msgCnt} = $msgCnt;
   if ($hash->{helper}{vd}{cmd}){
-    if (   $hash->{helper}{vd}{typ} == 1
-        && ReadingsVal($name,"valveCtrl","init") ne "init"){
+    if ($hash->{helper}{vd}{typ} == 1){
       CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
                                         ,$msgCnt
                                         ,$hash->{helper}{vd}{cmd}
                                         ,$hash->{helper}{virtTC}
-                                        ,$hash->{helper}{vd}{val}));
+                                        ,$hash->{helper}{vd}{val}))
+            if(ReadingsVal($name,"valveCtrl","init") ne "init");
     }
     else{
       CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s"
@@ -3702,7 +3702,6 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
 
   # autocreate undefined channels
   my @chanTypesList = split(',',$culHmModel->{$mId}{chn});
-  my $startime = gettimeofday()+1;
   foreach my $chantype (@chanTypesList){
     my ($chnTpName,$chnStart,$chnEnd) = split(':',$chantype);
     my $chnNoTyp = 1;
