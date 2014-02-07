@@ -329,7 +329,7 @@ sub GEOFANCY_CGI() {
 
     # General readings
     readingsBulkUpdate( $hash, "state",
-"id:$id name:$locName entry:$entry date:$date lat:$lat long:$long dev:$device"
+"id:$id name:$locName trig:$entry date:$date lat:$lat long:$long dev:$device"
     );
 
     $id = $locName if ( defined($locName) && $locName ne "" );
