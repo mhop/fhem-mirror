@@ -42,6 +42,7 @@ use strict;
 use warnings;
 use vars qw(%data);
 use HttpUtils;
+use Time::Local;
 use Data::Dumper;
 
 sub GEOFANCY_Set($@);
