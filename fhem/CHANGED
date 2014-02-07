@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: LightScene: added attribute lightSceneRestoreOnlyIfChanged
   - bugfix:  SYSMON: Fix: CPUTemp & BogoMIPS for utilite-Box.
   - bugfix:  PRESENCE: fix present-check-interval to be equal with normal 
              check-interval if not set in define statement and not 30 sec.
