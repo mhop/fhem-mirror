@@ -9,9 +9,9 @@ use POSIX;
 #use JSON;
 #use Data::Dumper;
 
-use vars qw($FW_ME); 
-use vars qw($FW_subdir); 
-use vars qw($FW_wname); 
+use vars qw($FW_ME);
+use vars qw($FW_subdir);
+use vars qw($FW_wname);
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 my $LightScene_hasJSON = 1;
@@ -30,6 +30,7 @@ sub LightScene_Initialize($)
   $hash->{FW_detailFn}  = "LightScene_detailFn";
 
   addToAttrList("lightSceneParamsToSave");
+  addToAttrList("lightSceneRestoreOnlyIfChanged:1,0");
 
   eval "use JSON";
   $LightScene_hasJSON = 0 if($@);
@@ -381,6 +382,138 @@ LightScene_Load($)
   return undef;
 }
 
+sub
+LightScene_SaveDevice($$)
+{
+  my($hash,$d) = @_;
+
+  my $state = "";
+  my $icon = undef;
+  my $type = $defs{$d}->{TYPE};
+  $type = "" if( !defined($type) );
+
+  if( my $toSave = AttrVal($d,"lightSceneParamsToSave","") ) {
+    $icon = Value($d);
+    if( $toSave =~ m/^{.*}$/) {
+      my $DEVICE = $d;
+      $toSave = eval $toSave;
+      $toSave = "state" if( $@ );
+    }
+    my @sets = split(',', $toSave);
+    foreach my $set (@sets) {
+      my $saved = "";
+      my @params = split(':', $set);
+      foreach my $param (@params) {
+        $saved .= " : " if( $saved );
+
+        my $use_get = 0;
+        my $get = $param;
+        my $regex;
+        my $set = $param;
+
+        if( $param =~ /(get\s+)?(\S*)(\s*->\s*(set\s+)?)?(\S*)?/ ) {
+          $use_get = 1 if( $1 );
+          $get = $2 if( $2 );
+          $set = $5 if( $5 );
+        }
+        ($get,$regex) = split('@', $get, 2);
+        $set = $get if( $regex && $set eq $param );
+        $set = "state" if( $set eq "STATE" );
+
+        $saved .= "$set " if( $set ne "state" );
+
+        my $value;
+        if( $use_get ) {
+          $value = CommandGet( "", "$d $get" );
+        } elsif( $get eq "STATE" ) {
+          $value = Value($d);
+        } else {
+          $value = ReadingsVal($d,$get,undef);
+        }
+        $value = eval $regex if( $regex );
+        Log3 $hash, 2, "$hash->{NAME}: $@" if($@);
+        $saved .= $value;
+      }
+
+      if( !$state ) {
+        $state = $saved;
+      } else {
+        $state = [$state] if( ref($state) ne 'ARRAY' );
+        push( @{$state}, $saved );
+      }
+    }
+  } elsif( $type eq 'CUL_HM' ) {
+    #my $subtype = AttrVal($d,"subType","");
+    my $subtype = CUL_HM_Get($defs{$d},$d,"param","subType");
+    if( $subtype eq "switch" ) {
+      $state = Value($d);
+    } elsif( $subtype eq "dimmer" ) {
+      $state = Value($d);
+      if ( $state =~ m/^(\d+)/ ) {
+        $icon = $state;
+        $state = $1 if ( $state =~ m/^(\d+)/ );
+      }
+    } else {
+      $state = Value($d);
+    }
+  } elsif( $type eq 'FS20' ) {
+      $state = Value($d);
+  } elsif( $type eq 'SWAP_0000002200000003' ) {
+      $state = Value($d);
+      $state = "rgb ". $state if( $state ne "off" );
+  } elsif( $type eq 'HUEDevice' ) {
+    my $subtype = AttrVal($d,"subType","");
+    if( $subtype eq "switch" || Value($d) eq "off" ) {
+      $state = Value($d);
+    } elsif( $subtype eq "dimmer" ) {
+      $state = "bri ". ReadingsVal($d,'bri',"0");
+    } elsif( $subtype eq "colordimmer" ) {
+      if( ReadingsVal($d,"colormode","") eq "ct" ) {
+        ReadingsVal($d,"ct","") =~ m/(\d+) .*/;
+        $state = "bri ". ReadingsVal($d,'bri',"0") ." : ct ". $1;
+      } else {
+        $state = "bri ". ReadingsVal($d,'bri',"0") ." : xy ". ReadingsVal($d,'xy',"");
+      }
+    }
+  } elsif( $type eq 'IT' ) {
+    my $subtype = AttrVal($d,"model","");
+    if( $subtype eq "itswitch" ) {
+      $state = Value($d);
+    } elsif( $subtype eq "itdimmer" ) {
+      $state = Value($d);
+    } else {
+      $state = Value($d);
+    }
+  } elsif( $type eq 'TRX_LIGHT' ) {
+    $state = Value($d);
+  } else {
+    $state = Value($d);
+  }
+
+  return($state,$icon,$type);
+}
+
+sub
+LightScene_RestoreDevice($$$)
+{
+  my($hash,$d,$cmd) = @_;
+
+  if( AttrVal($d,"lightSceneRestoreOnlyIfChanged", AttrVal($hash->{NAME},"lightSceneRestoreOnlyIfChanged",0) ) > 0 )
+    {
+      my($state,undef,undef) = LightScene_SaveDevice($hash,$d);
+
+      return "" if( $state eq $cmd );
+    }
+
+  my $ret;
+  if( $cmd =~m/^;/ ) {
+    $ret = AnalyzeCommandChain(undef,"$cmd");
+  } else {
+    $ret = CommandSet(undef,"$d $cmd");
+  }
+
+  return $ret;
+}
 
 sub
 LightScene_Set($@)
@@ -426,108 +559,7 @@ LightScene_Set($@)
     }
 
     if( $cmd eq "save" ) {
-      my $state = "";
-      my $icon = undef;
-      my $type = $defs{$d}->{TYPE};
-      $type = "" if( !defined($type) );
-
-      if( my $toSave = AttrVal($d,"lightSceneParamsToSave","") ) {
-        $icon = Value($d);
-        if( $toSave =~ m/^{.*}$/) {
-          my $DEVICE = $d;
-          $toSave = eval $toSave;
-          $toSave = "state" if( $@ );
-        }
-        my @sets = split(',', $toSave);
-        foreach my $set (@sets) {
-          my $saved = "";
-          my @params = split(':', $set);
-          foreach my $param (@params) {
-            $saved .= " : " if( $saved );
-
-            my $use_get = 0;
-            my $get = $param;
-            my $regex;
-            my $set = $param;
-
-            if( $param =~ /(get\s+)?(\S*)(\s*->\s*(set\s+)?)?(\S*)?/ ) {
-              $use_get = 1 if( $1 );
-              $get = $2 if( $2 );
-              $set = $5 if( $5 );
-            }
-            ($get,$regex) = split('@', $get, 2);
-            $set = $get if( $regex && $set eq $param );
-            $set = "state" if( $set eq "STATE" );
-
-            $saved .= "$set " if( $set ne "state" );
-
-            my $value;
-            if( $use_get ) {
-              $value = CommandGet( "", "$d $get" );
-            } elsif( $get eq "STATE" ) {
-              $value = Value($d);
-            } else {
-              $value = ReadingsVal($d,$get,undef);
-            }
-            $value = eval $regex if( $regex );
-            Log3 $hash, 2, "$name: $@" if($@);
-            $saved .= $value;
-          }
-
-          if( !$state ) {
-            $state = $saved;
-          } else {
-            $state = [$state] if( ref($state) ne 'ARRAY' );
-            push( @{$state}, $saved );
-          }
-        }
-      } elsif( $type eq 'CUL_HM' ) {
-        #my $subtype = AttrVal($d,"subType","");
-        my $subtype = CUL_HM_Get($defs{$d},$d,"param","subType");
-        if( $subtype eq "switch" ) {
-          $state = Value($d);
-        } elsif( $subtype eq "dimmer" ) {
-          $state = Value($d);
-          if ( $state =~ m/^(\d+)/ ) {
-            $icon = $state;
-            $state = $1 if ( $state =~ m/^(\d+)/ );
-          }
-        } else {
-          $state = Value($d);
-        }
-      } elsif( $type eq 'FS20' ) {
-          $state = Value($d);
-      } elsif( $type eq 'SWAP_0000002200000003' ) {
-          $state = Value($d);
-          $state = "rgb ". $state if( $state ne "off" );
-      } elsif( $type eq 'HUEDevice' ) {
-        my $subtype = AttrVal($d,"subType","");
-        if( $subtype eq "switch" || Value($d) eq "off" ) {
-          $state = Value($d);
-        } elsif( $subtype eq "dimmer" ) {
-          $state = "bri ". ReadingsVal($d,'bri',"0");
-        } elsif( $subtype eq "colordimmer" ) {
-          if( ReadingsVal($d,"colormode","") eq "ct" ) {
-            ReadingsVal($d,"ct","") =~ m/(\d+) .*/;
-            $state = "bri ". ReadingsVal($d,'bri',"0") ." : ct ". $1;
-          } else {
-            $state = "bri ". ReadingsVal($d,'bri',"0") ." : xy ". ReadingsVal($d,'xy',"");
-          }
-        }
-      } elsif( $type eq 'IT' ) {
-        my $subtype = AttrVal($d,"model","");
-        if( $subtype eq "itswitch" ) {
-          $state = Value($d);
-        } elsif( $subtype eq "itdimmer" ) {
-          $state = Value($d);
-        } else {
-          $state = Value($d);
-        }
-      } elsif( $type eq 'TRX_LIGHT' ) {
-        $state = Value($d);
-      } else {
-        $state = Value($d);
-      }
+      my($state,$icon,$type) = LightScene_SaveDevice($hash,$d);
 
       if( $icon || ref($state) eq 'ARRAY' || $type eq "SWAP_0000002200000003" || $type eq "HUEDevice"  ) {
         my %desc;
@@ -552,21 +584,13 @@ LightScene_Set($@)
         my $r = "";
         foreach my $entry (@{$state}) {
           $r .= "," if( $ret );
-          if( $entry =~m/^;/ ) {
-            $r .= AnalyzeCommandChain(undef,"$entry");
-          } else {
-            $r .= CommandSet(undef,"$d $entry");
-          }
+          $r .= LightScene_RestoreDevice($hash,$d,$entry);
         }
         $ret .= " " if( $ret );
         $ret .= $r;
       } else {
         $ret .= " " if( $ret );
-        if( $state =~m/^;/ ) {
-          $ret .= AnalyzeCommandChain(undef,"$state");
-        } else {
-          $ret .= CommandSet(undef,"$d $state");
-        }
+        $ret .= LightScene_RestoreDevice($hash,$d,$state);
       }
     } else {
       $ret = "Unknown argument $cmd, choose one of save scene";
@@ -696,6 +720,11 @@ LightScene_Get($@)
   <a name="LightScene_Attr"></a>
     <b>Attributes</b>
     <ul>
+      <li>lightSceneRestoreOnlyIfChanged<br>
+      this attribute can be set on the lightscene and/or on the individual devices included in a scene.
+      the device settings have precedence over the scene setting.<br>
+      1 -> for each device do nothing if current device state is the same as the saved state
+      0 -> always set the state even if the current state is the same as the saved state. this is the default</li>
       <li>lightSceneParamsToSave<br>
       this attribute can be set on the devices to be included in a scene. it is set to a comma separated list of readings
       that will be saved. multiple readings separated by : are collated in to a single set command (this has to be supported
