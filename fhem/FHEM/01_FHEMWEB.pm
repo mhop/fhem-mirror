@@ -118,6 +118,7 @@ FHEMWEB_Initialize($)
     CORS:0,1
     HTTPS:1,0
     SVGcache:1,0
+    allowedCommands
     allowfrom
     basicAuth
     basicAuthMsg
@@ -1491,6 +1492,8 @@ FW_style($$)
   my ($cmd, $msg) = @_;
   my @a = split(" ", $cmd);
 
+  return if( AttrVal($FW_wname,"allowedCommands","") !~ m/\b$a[0]\b/);
+
   my $start = "<div id=\"content\"><table><tr><td>";
   my $end   = "</td></tr></table></div>";
   
@@ -1769,9 +1772,11 @@ FW_fC($@)
   my ($cmd, $unique) = @_;
   my $ret;
   if($unique) {
-    $ret = AnalyzeCommand($FW_chash, $cmd);
+    $ret = AnalyzeCommand($FW_chash, $cmd,
+                AttrVal($FW_wname,"allowedCommands",undef));
   } else {
-    $ret = AnalyzeCommandChain($FW_chash, $cmd);
+    $ret = AnalyzeCommandChain($FW_chash, $cmd,
+                AttrVal($FW_wname,"allowedCommands",undef));
   }
   return $ret;
 }
@@ -2565,6 +2570,24 @@ FW_ActivateInform()
       <br>
     </li>
 
+    <a name="allowedCommands"></a>
+    <li>allowedCommands<br>
+        A comma separated list of commands allowed from this FHEMWEB
+        instance.<br> If set to an empty list <code>, (i.e. comma only)</code>
+        then this FHEMWEB instance will be read-only.<br> If set to
+        <code>get,set</code>, then this FHEMWEB instance will only allow
+        regular usage of the frontend by clicking the icons/buttons/sliders but
+        not changing any configuration.<br>
+
+
+        This attribute intended to be used together with hiddenroom/hiddengroup
+        <br>
+
+        <b>Note:</b>allowedCommands should work as intended, but no guarantee
+        can be given that there is no way to circumvent it.  If a command is
+        allowed it can be issued by URL manipulation also for devices that are
+        hidden.</li><br>
+
     <li><a href="#allowfrom">allowfrom</a></li>
     </li><br>
 
@@ -2614,7 +2637,7 @@ FW_ActivateInform()
         Comma separated list of rooms to "hide", i.e. not to show. Special
         values are input, detail and save, in which case the input areas, link
         to the detailed views or save button is hidden (although each aspect
-        still can be addressed through url manipulation).<br>
+        still can be addressed through URL manipulation).<br>
         The list can also contain values from the additional "Howto/Wiki/FAQ"
         block.
         </li>
