@@ -1262,6 +1262,8 @@ $culHmChanSets{"HM-CC-RT-DN-BoM02"}     = $culHmChanSets{"HM-CC-RT-DN02"};
 $culHmChanSets{"HM-CC-RT-DN-BoM04"}     = $culHmChanSets{"HM-CC-RT-DN04"};
 $culHmChanSets{"HM-CC-RT-DN-BoM05"}     = $culHmChanSets{"HM-CC-RT-DN05"};
 
+$culHmChanSets{"HM-TC-IT-WM-W-EU02"}    = $culHmChanSets{"HM-CC-RT-DN02"};
+
 $culHmChanSets{"HM-ES-PMSw1-Pl04"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
 $culHmChanSets{"HM-ES-PMSw1-Pl05"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
 $culHmChanSets{"HM-ES-PMSw1-Pl06"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
