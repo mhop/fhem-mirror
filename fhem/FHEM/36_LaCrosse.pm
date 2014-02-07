@@ -146,7 +146,7 @@ LaCrosse_Set($@)
   if( $cmd eq "replaceBatteryForSec" ) {
     foreach my $d (sort keys %defs) {
       next if (!defined($defs{$d}) );
-      next if ($defs{$d} ne $hash->{TYPE} );
+      next if ($defs{$d}->{TYPE} ne "LaCrosse" );
       LaCrosse_RemoveReplaceBattery{$defs{$d}};
     }
     return "Usage: set $name replaceBatteryForSec <seconds_active> [ignore_battery]" if(!$arg || $arg !~ m/^\d+$/ || ($arg2 && $arg2 ne "ignore_battery"));
