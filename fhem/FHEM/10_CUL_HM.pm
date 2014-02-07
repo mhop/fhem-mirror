@@ -3231,7 +3231,7 @@ sub CUL_HM_Set($@) {
     if ($hash->{helper}{virtTC} || $valu ne "off") {
       if ($valu ne "off"){
         return "level between $lim{$cmd}{min} and $lim{$cmd}{max} or 'off' allowed"
-             if ($valu !~ m/^[+-]?\d+\.?\d?$/||
+             if ($valu !~ m/^[+-]?\d+\.?\d+$/||
                  $valu > $lim{$cmd}{max}||$valu < $lim{$cmd}{min} );
         if ($cmd eq "virtHum") {$hash->{helper}{vd}{vinH} = $valu;}
         else                   {$hash->{helper}{vd}{vin}  = $valu;}
