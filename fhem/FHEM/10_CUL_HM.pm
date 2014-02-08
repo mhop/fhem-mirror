@@ -982,7 +982,7 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "time-request";
     }
   }
-  elsif($md eq "HM-ES-PMSw1-Pl") { ############################################
+  elsif($md eq "HM-TC-IT-WM-W-EU") { ##########################################
     my %ctlTbl=( 0=>"auto", 1=>"manu", 2=>"party",3=>"boost");
     if   ($mTp eq "10" && $p =~ m/^0B(....)(..)(..)(..)/) {#info-level
       my ($d1,$d2,$d3,$d4)=(hex($1),hex($2),hex($3),hex($4));
