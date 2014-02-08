@@ -38,7 +38,7 @@ use POSIX;
 use Net::Telnet;
 
 # Modul Version for remote debugging
-  my $modulVersion = "2014-02-02";
+  my $modulVersion = "2014-02-08";
 
 #List of firmware versions that are known to be compatible with this modul
   my $testedFirmware = "#V1.54C#V1.60#V1.69#";
