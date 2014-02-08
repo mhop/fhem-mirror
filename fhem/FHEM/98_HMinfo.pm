@@ -115,9 +115,12 @@ sub HMinfo_autoUpdate($){#in:name, send status-request
   my $name = shift;
   (undef,$name)=split":",$name,2;
   HMinfo_SetFn($defs{$name},$name,"update") if ($name);
-#  HMinfo_archConfig($defs{$name},$name,"","") 
-#        if (AttrVal($name,"autoArchive",undef) && 
-#            scalar(@{$modules{CUL_HM}{helper}{confUpdt}}));
+  if (AttrVal($name,"autoArchive",undef) && 
+      scalar(@{$modules{CUL_HM}{helper}{confUpdt}})){
+    my $fN = AttrVal($name,"configFilename","regSave.cfg");
+    $fN = AttrVal($name,"configDir",".")."\/".$fN if ($fN !~ m/\//);
+    HMinfo_archConfig($defs{$name},$name,"",$fN);
+  }
   InternalTimer(gettimeofday()+$defs{$name}{helper}{autoUpdate},
                 "HMinfo_autoUpdate","sUpdt:".$name,0)
         if (defined $defs{$name}{helper}{autoUpdate});
@@ -905,9 +908,7 @@ sub HMinfo_SetFn($@) {#########################################################
   }
   elsif($cmd eq "archConfig") {##action: archiveConfig-------------------------
     # save config only if register are complete
-    my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
-    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
-    $ret = HMinfo_archConfig($hash,$name,$opt,$fn);
+    $ret = HMinfo_archConfig($hash,$name,$opt,($a[0]?$a[0]:""));
   }
   else{
     my @cmdLst =     
@@ -1045,6 +1046,8 @@ sub HMinfo_saveConfig($) {#####################################################
 sub HMinfo_archConfig($$$$) {################################################
   # save config only if register are complete
   my ($hash,$name,$opt,$fN) = @_;
+  $fN = $fN?$fN:AttrVal($name,"configFilename","regSave.cfg");
+  $fN = AttrVal($name,"configDir",".")."\/".$fN if ($fN !~ m/\//);
   my $id = ++$hash->{nb}{cnt};
   my $bl = BlockingCall("HMinfo_archConfigExec", join(",",("$name:$id"
                                                        ,$fN
