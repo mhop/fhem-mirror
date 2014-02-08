@@ -14,7 +14,7 @@ gcmsend_Initialize($)
  $hash->{DefFn}    = "gcmsend_Define";
  $hash->{NotifyFn} = "gcmsend_notify";
  $hash->{SetFn} = "gcmsend_set";
- $hash->{AttrList} = "loglevel:0,1,2,3,4,5 regIds apiKey stateFilter vibrate";
+ $hash->{AttrList} = "loglevel:0,1,2,3,4,5 regIds apiKey stateFilter vibrate deviceFilter";
 }
 
 sub 
@@ -125,7 +125,7 @@ sub gcmsend_fillGeneralPayload($$) {
     $vibrate = "true";
   }
   
-  return $payloadString .
+  return $payloadString . "," .
     "\"source\":\"gcmsend_fhem\"," .
     "\"vibrate\":\"$vibrate\"";  
 }
@@ -214,8 +214,11 @@ sub gcmsend_notify($$)
   my $name = $dev->{NAME};
   my $gcmName = $gcm->{NAME};
   
+  my $deviceFilter =  AttrVal($gcm->{NAME}, "deviceFilter", "");
+    
   return if $name eq $gcmName;
   return if(!$dev->{CHANGED}); # Some previous notify deleted the array.
+  return if (! ($deviceFilter eq "") && !($name =~ m/$deviceFilter/));
   
   my $stateFilter =  AttrVal($gcm->{NAME}, "stateFilter", "");
 
@@ -335,10 +338,12 @@ sub gcmsend_notify($$)
                 <br />Registration IDs Google sends the messages to (multiple values separated by "|"</li>
     <li><a name="gcmsend_apiKey"><code>attr &lt;name&gt; apiKey &lt;string&gt;</code></a>
                 <br />API-Key for GCM (can be found within the Google API Console)</li>
-    <li><a name="gcmsend_stateFilter"><code>attr &lt;name&gt; stateFilter &lt;string&gt;</code></a>
+    <li><a name="gcmsend_stateFilter"><code>attr &lt;name&gt; stateFilter &lt;regexp&gt;</code></a>
                 <br />Send a GCM message only if the attribute matches the attribute filter regexp</li>
     <li><a name="gcmsend_vibrate"><code>attr &lt;name&gt; vibrate (true|false)</a>
                 <br />Make the receiving device vibrate upon receiving the message. Must be true or false.</li>
+    <li><a name="gcmsend_deviceFilter"><code>attr &lt;name&gt; deviceFilter &lt;regexp&gt;</a>
+                <br />Send a GCM notify only is the device name matches the given filter regexp.</li>
   </ul>
 </ul>
 
