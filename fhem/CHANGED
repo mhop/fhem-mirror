@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: new modules 10_RESIDENTS, 20_ROOMMATE and 20_GUEST added (loredo)
   - feature: LUXTRONIK2: attribute 'doStatistics' calculates boiler gradients
   - feature: GEOFANCY: support both apps, Geofency.app and Geofancy.app
   - feature: LightScene: added attribute lightSceneRestoreOnlyIfChanged
