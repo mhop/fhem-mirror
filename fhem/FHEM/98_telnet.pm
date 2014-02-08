@@ -471,6 +471,162 @@ telnet_ActivateInform($)
 
 </ul>
 
-
 =end html
+
+=begin html_DE
+
+<a name="telnet"></a>
+<h3>telnet</h3>
+<ul>
+  <br>
+  <a name="telnetdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; telnet &lt;portNumber&gt; [global]</code><br>
+    oder<br>
+    <code>define &lt;name&gt; telnet &lt;servername&gt:&lt;portNummer&gt;</code>
+    <br><br>
+
+    Erste Form, <b>Server</b>-mode:<br>
+    &Uuml;berwacht den TCP/IP-Port <code>&lt;portNummer&gt;</code> auf
+    ankommende Verbindungen. Wenn der zweite Parameter gobal <b>nicht</b>
+    angegeben wird, wird der Server nur auf Verbindungen von localhost achten.
+
+    <br>
+    F&uuml;r den Gebrauch von IPV6 muss die Portnummer als IPV6:&lt;nummer&gt;
+    angegeben werden, in diesem Fall wird das Perl-Modul IO::Socket:INET6
+    angesprochen. Unter Linux kann es sein, dass dieses Modul mittels cpan -i
+    IO::Socket::INET6 oder apt-get libio-socket-inet6-perl nachinstalliert werden
+    muss; OSX und Fritzbox-7390 enthalten bereits dieses Modul.<br>
+
+    Beispiele:
+    <ul>
+        <code>define tPort telnet 7072 global</code><br>
+        <code>attr tPort globalpassword mySecret</code><br>
+        <code>attr tPort SSL</code><br>
+    </ul>
+    Hinweis: Das alte (pre 5.3) "global attribute port" wird automatisch in
+    eine telnet-Instanz mit dem Namen telnetPort umgewandelt. Im Rahmen dieser
+    Umwandlung geht das globale Attribut allowfrom verloren.
+
+    <br><br>
+    Zweite Form, <b>Client</b>-mode:<br>
+    Verbindet zu einem angegebenen Server-Port und f&uuml;hrt die von dort aus
+    empfangenen Anweisungen - genau wie im Server-mode - aus. Dies kann
+    verwendet werden, um sich mit einer fhem-Instanz, die sich hinter einer
+    Firewall befindet, zu verbinden, f&uuml;r den Fall, wenn das Installieren
+    von Ausnahmen in der Firewall nicht erw&uuml;nscht oder nicht m&ouml;glich
+    sind. Hinweis: Dieser Client-mode unterst&uuml;tzt zwar SSL, aber nicht
+    IPV6.<br>
+
+    Beispiel:
+    <ul>
+      Starten von tcptee auf einem &ouml;ffentlich erreichbaren Host ausserhalb
+      der Firewall:<ul>
+        <code>perl contrib/tcptee.pl --bidi 3000</code></ul>
+      Konfigurieren von fhem innerhalb der Firewall:<ul>
+        <code>define tClient telnet &lt;tcptee_host&gt;:3000</code></ul>
+      Verbinden mit fhem (hinter der Firewall) von ausserhalb der Firewall:<ul>
+        <code>telnet &lt;tcptee_host&gt; 3000</code></ul>
+    </ul>
+
+  </ul>
+  <br>
+
+
+  <a name="telnetset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="telnetget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="telnetattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <a name="password"></a>
+    <li>password<br>
+        Bezeichnet ein Passwort, welches als allererster String eingegeben
+        werden muss, nachdem die Verbindung aufgebaut wurde. Wenn das Argument
+        in {} eingebettet ist, dann wird es als Perl-Ausdruck ausgewertet, und
+        die Variable $password mit dem eingegebenen Passwort verglichen. Ist
+        der zur&uuml;ckgegebene Wert wahr (true), wurde das Passwort
+        akzeptiert.  Falls dieser Parameter gesetzt wird, sendet fhem
+        telnet IAC Requests, um ein Echo w&auml;hrend der Passworteingabe zu
+        unterdr&uuml;cken. Ebenso werden alle zur&uuml;ckgegebenen Zeilen mit
+        \r\n abgeschlossen.
+
+        Beispiel:<br>
+        <ul>
+        <code>
+        attr tPort password secret<br>
+        attr tPort password {"$password" eq "secret"}
+        </code>
+        </ul>
+        Hinweis: Falls dieses Attribut gesetzt wird, muss als erstes Argument
+        ein Passwort angegeben werden, wenn fhem.pl im Client-mode betrieben
+        wird:
+        <ul>
+        <code>
+          perl fhem.pl localhost:7072 secret "set lamp on"
+        </code>
+        </ul>
+        </li><br>
+
+    <a name="globalpassword"></a>
+    <li>globalpassword<br>
+        Entspricht dem Attribut password; ein Passwort wird aber
+        ausschlie&szlig;lich f&uuml;r nicht-lokale Verbindungen verlangt.
+        </li><br>
+
+    <a name="SSL"></a>
+    <li>SSL<br>
+        SSL-Verschl&uuml;sselung f&uuml;r eine Verbindung aktivieren. <a
+        href="#HTTPS">Hier</a> gibt es eine Beschreibung, wie das erforderliche
+        SSL-Zertifikat generiert werden kann. Um eine Verbindung mit solch
+        einem Port herzustellen, sind folgende Befehle m&ouml;glich:
+        <ul>
+        <code>
+          socat openssl:fhemhost:fhemport,verify=0 readline<br>
+          ncat --ssl fhemhost fhemport<br>
+          openssl s_client -connect fhemhost:fhemport<br>
+        </code>
+        </ul>		
+	</li><br>
+
+    <a name="allowfrom"></a>
+    <li>allowfrom<br>
+        Regexp der erlaubten IP-Adressen oder Hostnamen. Wenn dieses Attribut
+        gesetzt wurde, werden ausschlie&szlig;lich Verbindungen von diesen
+        Adressen akzeptiert.
+        </li><br>
+
+    <a name="connectTimeout"></a>
+    <li>connectTimeout<br>
+        Gibt die maximale Wartezeit in Sekunden an, in der die Verbindung
+        aufgebaut sein muss. Standardwert ist 2.
+    </li><br>
+
+    <a name="connectInterval"></a>
+    <li>connectInterval<br>
+        Gibt die Dauer an, die entweder nach Schlie&szlig;en einer Verbindung
+        oder f&uuml;r den Fall, dass die Verbindung nicht zustande kommt,
+        gewartet werden muss, bis ein erneuter Verbindungsversuch gestartet
+        werden soll. Standardwert ist 60.
+        </li><br>
+
+    <a name="encoding"></a>
+    <li>encoding<br>
+        Bezeichnet die Zeichentabelle f&uuml;r die zum Client gesendeten Daten.
+        M&ouml;gliche Werte sind utf8 und latin1. Standardwert ist utf8. 
+    </li><br>
+
+
+  </ul>
+
+</ul>
+
+=end html_DE
+
 =cut
+
+1;

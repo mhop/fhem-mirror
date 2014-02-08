@@ -508,7 +508,6 @@ autocreate_Attr(@)
     <code>define &lt;name&gt; autocreate</code><br>
     <br>
     <ul>
-      It makes no sense to create more than one instance of this module.
       By defining an instance, the global attribute <a href=
       "#autoload_undefined_devices">autoload_undefined_devices</a>
       is set, so that modules for unknnown devices are automatically loaded.
@@ -523,6 +522,9 @@ autocreate_Attr(@)
       <a href="#disable">disable</a> attribute, in this case only the rename
       hook is active, and you can use the  <a href="#createlog">createlog</a>
       command to add FileLog and SVG to an already defined device.
+      <b>Note 3:</b> It makes no sense to create more than one instance of this
+      module.
+
     </ul>
     <br>
 
@@ -589,10 +591,7 @@ autocreate_Attr(@)
   <b>createlog</b>
   <ul>
       Use this command to manually add a FileLog and an SVG to an existing
-      device. E.g. if a HomeMatic device is created automatically by something
-      else then a pairing message, the model is unknown, so no plots will be
-      generated.  You can set the model/subtype attribute manually, and then call
-      createlog to add the corresponding logs.<br><br>
+      device. 
       This command is part of the autocreate module.
   </ul>
   <br>
@@ -615,14 +614,171 @@ autocreate_Attr(@)
 
       On Linux it will also check with the lsusb command, if unflashed CULs are
       attached. If this is the case, it will call CULflash with the appropriate
-      parameters (or display the CULflash command if scan is specified). Only
-      one device to flash is displayed at a time.<br><br>
+      parameters (or display the CULflash command if scan is specified). The
+      usb command will only flash one device per call.<br><br>
 
       This command is part of the autocreate module.
+  </ul>
+</ul>
+<br>
+
+=end html
+
+=begin html_DE
+
+<a name="autocreate"></a>
+<h3>autocreate</h3>
+<ul>
+
+  Erzeugt f&uuml;r noch nicht definierte fhem-Ger&auml;te automatisch die
+  geignete Definition (define). Diese Definition wird aus einer Nachricht
+  gewonnen, die von diesen neuen Ger&auml;ten empfangen wurde. Hinweis:
+  Ger&auml;te, die mit Polling arbeiten (wie z.B. der Zugriff auf EMEM/EMWZ
+  &uuml;ber EM1010PC) werden NICHT automatisch erzeugt.
+  <br><br>
+
+  <a name="autocreatedefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; autocreate</code><br>
+    <br>
+    <ul>
+      Durch die Definition dieser Instanz wird das globale Attribut <a
+      href="#autoload_undefined_devices">autoload_undefined_devices</a>
+      gesetzt, sodass die Module f&uuml;r unbekannte Ger&auml;te automatisch
+      nachgeladen werden. Das autocreate-Modul interpretiert das
+      UNDEFINED-event, welches von jedem Modul gestartet wird, erzeugt ein
+      Ger&auml;t (device) und bei Bedarf ein FileLog sowie
+      SVG-Eintr&auml;ge.<br>
+
+      <b>Hinweis 1:</b> Ger&auml;te werden mit einem eindeutigen Namen erzeugt,
+      der den Typ und eine individuelle ID f&uuml;r diesen Typ enth&auml;lt.
+      Wird ein Ger&auml;t umbenannt (<a href="#rename">rename</a>), wird
+      gleichzeitig das automatisch erzeugte FileLog und die SVG Ger&auml;te
+      unbenannt.<br>
+
+      <b>Hinweis 2:</b> Durch das Setzen des <a
+      href="#disable">disable</a>-Attributes kann die automatische Erzeugung
+      ausgeschaltet werden. In diesem Fall ist ausschlie&szlig;lich die oben
+      erl&auml;uterte Umbenennung aktiv. Der <a
+      href="#createlog">createlog</a>-Befehl kann zum Hinzuf&uuml;gen von
+      FileLog und SVG eines bereits definierten Ger&auml;tes benutzt werden.
+      <br>
+
+      <b>Hinweis 3:</b>Es macht keinen Sinn, die Instanz dieses Moduls mehrmals
+      zu erzeugen.
+
+    </ul>
+    <br>
+
+    Beispiel:<PRE>
+    define autocreate autocreate
+    attr autocreate autosave
+    attr autocreate device_room %TYPE
+    attr autocreate filelog test2/log/%NAME-%Y.log
+    attr autocreate weblink
+    attr autocreate weblink_room Plots
+    </PRE>
+  </ul>
+
+
+  <a name="autocreateset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="autocreateget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="autocreateattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <a name="autosave"></a>
+    <li>autosave<br>
+        Nach der Erzeugung eines neuen Ger&auml;tes wird automatisch die
+        Konfigurationsdatei mit dem Befehl <a href="#save">save</a>
+        gespeichert. Der Standardwert ist 1 (d.h. aktiviert), eine 0 schaltet
+        die automatische Speicherung aus.</li><br>
+
+    <a name="device_room"></a>
+    <li>device_room<br>
+        "Schiebt" das neu erstellte Ger&auml;t in diesen Raum. Der Name kann
+        die Wildcards %NAME und %TYPE enthalten, siehe oben stehendes
+        Beispiel.</li><br>
+
+    <a name="filelogattr"></a>
+    <li>filelog<br>
+        Erstellt ein Filelog welches zu einem Ger&auml;t geh&ouml;rt. Der
+        Dateiname darf die Wildcards %NAME und %TYPE enthalten, siehe oben
+        stehendes Beispiel. Das Filelog wird in den gleichen Raum "geschoben"
+        wie das zugeh&ouml;rige Ger&auml;t.</li><br>
+
+    <a name="weblinkattr"></a>
+    <li>weblink<br>
+        Erzeugt ein SVG, welches mit dem Ger&auml;t/Filelog verkn&uuml;pft
+        ist.</li><br>
+
+    <a name="weblink_room"></a>
+    <li>weblink_room<br>
+        "Schiebt" das neu erstellte SVG in den bezeichneten Raum. Der Name kann
+        die Wildcards %NAME und %TYPE enthalten, siehe oben stehendes
+        Beispiel.</li><br>
+
+    <li><a href="#disable">disable</a></li>
+      <br>
+
+    <a name="ignoreTypes"></a>
+    <li>ignoreTypes<br>
+        Dies ist ein Regexp, um bestimmte Ger&auml;te zu ignorieren, z.b. der
+        Funk-Heizungsthermostat (FHT) des Nachbarn. In dem Ausdruck k&ouml;nnen
+        mehr als ein Ger&auml;t &uuml;ber die normale Regexp-Syntax angegeben
+        werden.<br>
+
+        Beispiel:<br>
+        <code>
+        attr autocreate ignoreTypes CUL_HOERMANN.*|FHT_1234|CUL_WS_7
+        </code>
+        </li>
+
+  </ul>
+  <br>
+
+  <a name="createlog"></a>
+  <b>createlog</b>
+  <ul>
+      Dieser Befehl wird f&uuml;r ein manuelles Hinzuf&uuml;gen eines Logfile
+      oder eines SVG zu einem vorhandenen Ger&auml;t verwendet.
+      <br><br>
+      Dieser Befehl ist Bestandteilteil des autocreate-Modules.
+  </ul>
+  <br>
+
+  <a name="usb"></a>
+  <b>usb</b>
+  <ul>
+      Verwendung:
+      <ul><code>
+        usb scan<br>
+        usb create<br>
+      </code></ul>
+      Dieser Befehl durchsucht das /dev-Verzeichnis nach angeschlossenen
+      USB-Ger&auml;ten und versucht gleichzeitig sie zu identifizieren. Mit dem
+      Argument scan wird eine Liste von ausf&uuml;hrbaren fhem-Befehlen
+      zur&uuml;ckgegeben. Das Argument create gibt keine Liste o.&auml;.
+      zur&uuml;ck, die Ger&auml;te werden stattdessen erzeugt.<br><br>
+
+      Es ist zu beachten, dass ein CUL immer noch manuell in den
+      HomeMatic-Modus umgeschaltet werden muss. <br><br>
+
+      Unter Linux wird gleichzeitig mit dem lsusb-befehl &uuml;berpr&uuml;ft,
+      ob nichtgeflashte CULs angeschlossen sind. Ist dies der Fall, ruft Linux
+      CULflash mit den geeigneten Parametern auf (oder zeigt den
+      CULflash-Befehl an, falls scan aufgef&uuml;hrt wurde).
+      Pro usb Befehl wird nur ein Ger&auml;t geflasht.<br><br>
+
+      Dieser Befehl ist Bestandteilteil des autocreate-Modules. 
   </ul>
 </ul> <!-- End of autocreate -->
 <br>
 
+=end html_DE
 
-=end html
 =cut
