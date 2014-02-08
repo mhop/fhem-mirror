@@ -229,7 +229,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   "00A5" => {name=>"HM-RC-Sec4-2"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"Btn:1:2,BTN_T:3:3,BTN_A:4:4",},#only 1 and 2 can be peered???
   "00A6" => {name=>"HM-RC-Key4-2"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"Btn:1:2,BTN_T:3:3,BTN_A:4:4",},#only 1 and 2 can be peered???
   "00A7" => {name=>"HM-Sen-RD-O"             ,st=>'sensRain'          ,cyc=>''      ,rxt=>''       ,lst=>'1:1,4:1p'     ,chn=>"Rain:1:1,Heating:2:2",},#stc:70 THSensor
-  "00A8" => {name=>"HM-WDS30-OT2-SM"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"T1:1:1,T2:2:2,T1_T2:3:3,T2_T1:4:4,Event:5:5",},
+  "00A8" => {name=>"HM-WDS30-OT2-SM"         ,st=>'THSensor'          ,cyc=>'12:00' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"T1:1:1,T2:2:2,T1_T2:3:3,T2_T1:4:4,Event:5:5",},
   "00A9" => {name=>"HM-PB-6-WM55"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:6",},
   "00AB" => {name=>"HM-LC-SW4-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "00AC" => {name=>"HM-ES-PMSw1-Pl"          ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
@@ -256,12 +256,25 @@ my $K_actDetID = '000000'; # id of actionDetector
   "00C0" => {name=>"HM-SEC-MDIR-2"           ,st=>'motionDetector'    ,cyc=>'00:20' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",},
   "00C1" => {name=>"HM-Sen-MDIR-O-2"         ,st=>'motionDetector'    ,cyc=>'00:10' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",},
   "00C2" => {name=>"HM-PB-2-WM55-2"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2",},
+  "00C8" => {name=>"HM-LC-Sw1-Pl-3"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
+  "00C9" => {name=>"HM-LC-Sw1-SM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
+  "00CA" => {name=>"HM-LC-Sw1-FM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
+  "00CB" => {name=>"HM-LC-Sw2-FM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",},
+  "00CC" => {name=>"HM-LC-Sw2-DR-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",},
+  "00CD" => {name=>"HM-LC-Sw4-SM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
+  "00CE" => {name=>"HM-LC-Sw4-PCB-2"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
+  "00CF" => {name=>"HM-LC-Sw4-WM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
+  "00D0" => {name=>"HM-LC-Sw4-DR-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
+  "00D1" => {name=>"HM-LC-Bl1-SM-2"          ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)
+  "00D2" => {name=>"HM-LC-Bl1-FM-2"          ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)
   "8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",},
 
-#  "xxxx" => {name=>"HM-LC-SW4-DR-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
-#  "xxxx" => {name=>"HM-LC-Sw1-Pl-3"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
- #  "HM-LGW-O-TW-W-EU" #Funk LAN Gateway
+  #  "HM-LGW-O-TW-W-EU" #Funk LAN Gateway
+#################open:---------------------------
+ 
+# rf_s           list 1 ist neu
+# rf_s_644       list 1 ist neu
 );
 
 ##----------definitions for register settings-----------------
@@ -687,6 +700,8 @@ my $K_actDetID = '000000'; # id of actionDetector
   blindActuator       =>{ intKeyVisib     =>1
                          ,driveUp         =>1,driveDown       =>1,driveTurn       =>1,refRunCounter   =>1
                          ,sign            =>1
+                         ,confBtnTime     =>1,localResDis     =>1
+                         ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1
                          ,MaxTimeF        =>1
                          ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
                          ,OffLevel        =>1,OnLevel         =>1
@@ -715,6 +730,8 @@ my $K_actDetID = '000000'; # id of actionDetector
                          ,lgMultiExec     =>1
                         },
   switch              =>{ intKeyVisib     =>1,sign            =>1
+                         ,confBtnTime     =>1,localResDis     =>1
+                         ,transmitTryMax  =>1,powerUpAction   =>1,statusInfoMinDly=>1,statusInfoRandom=>1
                          ,OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1
                          ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
                          ,CtValLo         =>1,CtValHi         =>1
@@ -1161,7 +1178,7 @@ $culHmSubTypeSets{powerMeter}      = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
 
 %culHmModelSets = (# channels of this subtype-------------
-#  "HM-CC-VD"       =>{ valvePos       => "position"},
+  "HM-CC-VD"       =>{ valvePos       =>"[off|0.0..99.0]"},
   "HM-RC-19"       =>{ service        => "<count>"
                       ,alarm          => "<count>"
                       ,display        => "<text> [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
