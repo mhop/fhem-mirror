@@ -1492,7 +1492,8 @@ FW_style($$)
   my ($cmd, $msg) = @_;
   my @a = split(" ", $cmd);
 
-  return if( AttrVal($FW_wname,"allowedCommands","") !~ m/\b$a[0]\b/);
+  my $ac = AttrVal($FW_wname,"allowedCommands","");
+  return if($ac && $ac !~ m/\b$a[0]\b/);
 
   my $start = "<div id=\"content\"><table><tr><td>";
   my $end   = "</td></tr></table></div>";
