@@ -423,8 +423,8 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
 <ul>
   Provides webhook receiver for geofencing via the following iOS apps:<br>
   <br>
-  <li>Geofency: https://itunes.apple.com/de/app/geofency-time-tracking-automatic/id615538630?l=en&mt=8</li>
-  <li>Geofancy: https://itunes.apple.com/de/app/geofancy/id725198453?l=en&mt=8</li>
+  <li><a href="https://itunes.apple.com/de/app/geofency-time-tracking-automatic/id615538630?l=en&mt=8">Geofency</a></li>
+  <li><a href="https://itunes.apple.com/de/app/geofancy/id725198453?l=en&mt=8">Geofancy</a></li>
 
   <p>Note: GEOFANCY is an extension to <a href="FHEMWEB">FHEMWEB</a>. You need to install FHEMWEB to use GEOFANCY.</p>
 
