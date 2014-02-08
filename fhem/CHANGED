@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: LUXTRONIK2: attribute 'doStatistics' calculates boiler gradients
   - feature: GEOFANCY: support both apps, Geofency.app and Geofancy.app
   - feature: LightScene: added attribute lightSceneRestoreOnlyIfChanged
   - bugfix:  SYSMON: Fix: CPUTemp & BogoMIPS for utilite-Box.
@@ -30,7 +31,7 @@
   - feature: DASHBOARD: Dashboard get Tabs. Redesign saving of Group 
 			 positioning.
   - bugfix:  SYSMON: Log Warnings, unnoetige Readings erkenen und entfernen
-  - feature: LUXTRONIK2: Setting of controller parameter and internal clock now possible
+  - feature: LUXTRONIK2: Setting of controller parameter and internal clock
   - feature: new module 71_YAMAHA_BD.pm to control Yamaha Blu-Ray
              players over network.
   - bugfix:  DbLog: fix for plotfork
@@ -59,7 +60,7 @@
              the Room Dashboard.
   - bugfix:  VIERA: fixed bug related to set command remoteControl
   - bugfix:  ENIGMA2: improved compatibility for Fritzbox and old
-  	     Webif versions
+  	         Webif versions
   - feature: readingsGroup: process events only if visible in browser,
              allow <br> for line breaks in multi-reading lines
   - feature: FLOORPLAN: Style4 (S300TH specific) now keeps its formatting

@@ -83,6 +83,7 @@ LUXTRONIK2_Define($$)
   $hash->{STATE} = "Initializing";
   $hash->{HOST} = $host;
   $hash->{INTERVAL} = $interval;
+  $hash->{NOTIFYDEV} = "global";
 
   RemoveInternalTimer($hash);
   #Get first data after 10 seconds
@@ -92,7 +93,8 @@ LUXTRONIK2_Define($$)
   $hash->{fhem}{durationFetchReadingsMin} = 0;
   $hash->{fhem}{durationFetchReadingsMax} = 0;
   $hash->{fhem}{alertFirmware} = 0;
-  $hash->{fhem}{statModeHotWater} = 0;
+  $hash->{fhem}{statBoilerHeatUpStep} = 0;
+  $hash->{fhem}{statBoilerCoolDownStep} = 0;
  
   $hash->{fhem}{modulVersion} = $modulVersion;
   Log3 $hash,5,"$name: LUXTRONIK2.pm version is $modulVersion.";
@@ -117,8 +119,7 @@ LUXTRONIK2_Notify(@) {
   my ($hash,$dev) = @_;
   my $name = $hash->{NAME};
   
-  if ($dev->{NAME} eq "global" ) { # splitted to reduce CPU load
-	if (grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}})){
+  if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}})){
     # housekeeping
 		my %cleanUp = ( 
 				delayDeviceTime => "delayDeviceTimeCalc",
@@ -146,15 +147,14 @@ LUXTRONIK2_Notify(@) {
 				hotWaterStatus => "opStateHotWater",
 				hotWaterState => "opStateHotWater",
 				heatingSystemCirculationPump => "heatingSystemCircPump",
-				hotWaterCirculationPumpExtern => "hotWaterCircPumpExtern" );
-	  
+				hotWaterCirculationPumpExtern => "hotWaterCircPumpExtern",
+				statGradientBoilerTempLoss => "statBoilerGradientHeatUp' and 'statBoilerGradientCoolDown" ); 
 		my $oldReading;
 		my $newReading;
 		while (($oldReading, $newReading) = each(%cleanUp)) {
 			if ( exists( $hash->{READINGS}{$oldReading} ) ) {
 				delete($hash->{READINGS}{$oldReading});
 				Log3 $name,2,"$name: !!! Change/fix in LUXTRONIK2-Modul: '$oldReading' is now '$newReading'";
-			}
 		}
 	 }
   }
@@ -174,14 +174,14 @@ LUXTRONIK2_Set($$@)
     $hash->{LOCAL} = 0;
     return undef;
   }
-  elsif ($cmd eq 'deleteStatistics') {
-	if ( ($val eq "all" || $val eq "statGradientBoilerTempLoss") 
-			&& exists($defs{$name}{READINGS}{statGradientBoilerTempLoss})) {
-		delete $defs{$name}{READINGS}{statGradientBoilerTempLoss};
-		$resultStr .= " statGradientBoilerTempLoss";
+  elsif ($cmd eq 'resetStatistics') {
+	if ( ($val eq "all" || $val eq "statBoilerGradientCoolDownMin") 
+			&& exists($defs{$name}{READINGS}{statBoilerGradientCoolDownMin})) {
+		delete $defs{$name}{READINGS}{statBoilerGradientCoolDownMin};
+		$resultStr .= " statBoilerGradientCoolDownMin";
 	}
 	if ( $resultStr eq "" ) {
-		$resultStr = "$name: No statistics to delete";
+		$resultStr = "$name: No statistics to reset";
 	} else {
 		$resultStr = "$name: Statistic value(s) deleted:" . $resultStr;
 	}
@@ -233,7 +233,7 @@ LUXTRONIK2_Set($$@)
 	}
 
   my $list = "statusRequest:noArg".
-			 " deleteStatistics:all,statGradientBoilerTempLoss".
+			 " resetStatistics:all,statBoilerGradientCoolDownMin".
 			 " hotWaterTemperatureTarget:slider,30.0,0.5,65.0".
 			 " opModeHotWater:Auto,Party,Off".
 			 " synchronizeClockHeatPump:noArg".
@@ -582,7 +582,9 @@ SKIP_VISIBILITY_READING:
   $return_str .= "|".$heatpump_parameters[13];
   # 48 - thresholdTemperatureSetBack
   $return_str .= "|".$heatpump_parameters[111];
-				
+  # 49 - hotWaterTemperatureHysterese
+  $return_str .= "|".$heatpump_parameters[74];
+  
   return $return_str;
 }
 
@@ -611,7 +613,9 @@ LUXTRONIK2_UpdateDone($)
 				1 => "Waermepumpe steht",
 				2 => "Waermepumpe kommt",
 				4 => "Fehler",
-				5 => "Abtauen" );
+				5 => "Abtauen",
+				6 => "Warte auf LIN-Verbindung",
+				7 => "Verdichter heizt auf");
   my %wpOpStat2 = ( 0 => "Heizbetrieb",
 				1 => "Keine Anforderung",
 				2 => "Netz Einschaltverzoegerung",
@@ -623,7 +627,7 @@ LUXTRONIK2_UpdateDone($)
 				8 => "Pumpenvorlauf",
 				9 => "Thermische Desinfektion",
 				10 => "Kuehlbetrieb",
-				12 => "Schwimmbad",
+				12 => "Schwimmbad/Photovoltaik",
 				13 => "Heizen_Ext_En",
 				14 => "Brauchw_Ext_En",
 				16 => "Durchflussueberwachung",
@@ -686,17 +690,37 @@ LUXTRONIK2_UpdateDone($)
 	my $ambientTemperature = LUXTRONIK2_CalcTemp($a[12]);
 	my $averageAmbientTemperature = LUXTRONIK2_CalcTemp($a[13]);
 	my $hotWaterTemperature = LUXTRONIK2_CalcTemp($a[14]);
+	my $hotWaterTemperatureTarget = LUXTRONIK2_CalcTemp($a[25]);
+	my $hotWaterTemperatureThreshold = LUXTRONIK2_CalcTemp($a[25] - $a[49]);
     my $thresholdHeatingLimit = LUXTRONIK2_CalcTemp($a[21]);
 	my $thresholdTemperatureSetBack = LUXTRONIK2_CalcTemp($a[48]);
 	my $flowTemperature = LUXTRONIK2_CalcTemp($a[15]);
 	my $returnTemperature = LUXTRONIK2_CalcTemp($a[16]);
-
+	
 	# if selected, do all the statistic calculations
-	if ( AttrVal($name,"doStatistics",0) == 1) {
-		$value = LUXTRONIK2_doStatisticBoiler ($hash, $a[22], $a[37]/10, $hotWaterTemperature);
+	if ( AttrVal($name,"doStatistics",0) == 1) { 
+		#LUXTRONIK2_doStatisticBoilerHeatUp $hash, $currOpHours, $currHQ, $currTemp, $opState, $target
+		$value = LUXTRONIK2_doStatisticBoilerHeatUp ($hash, $a[35], $a[37]/10, $hotWaterTemperature, $a[3],$hotWaterTemperatureTarget);
 		if ($value ne "") {
-			readingsBulkUpdate($hash,"statGradientBoilerTempLoss",$value);
-			Log3 $name,3,"$name: statGradientBoilerTempLoss set to $value"
+			readingsBulkUpdate($hash,"statBoilerGradientHeatUp",$value); 
+			Log3 $name,3,"$name: statBoilerGradientHeatUp set to $value";
+		}
+		#LUXTRONIK2_doStatisticBoilerCoolDown $hash, $time, $currTemp, $opState, $target, $threshold
+		$value = LUXTRONIK2_doStatisticBoilerCoolDown ($hash, $a[22], $hotWaterTemperature, $a[3], $hotWaterTemperatureTarget, $hotWaterTemperatureThreshold);
+		if ($value ne "") {
+			readingsBulkUpdate($hash,"statBoilerGradientCoolDown",$value); 
+			Log3 $name,3,"$name: statBoilerGradientCoolDown set to $value";
+			if ( exists( $hash->{READINGS}{statBoilerGradientCoolDownMin} ) ) {
+				my @new = split / /, $value;
+				my @old = split / /, $hash->{READINGS}{statBoilerGradientCoolDownMin};
+				if ($new[5]>6 && $new[0]<$old[0]) {
+					readingsBulkUpdate($hash,"statBoilerGradientCoolDownMin",$value); 
+					Log3 $name,3,"$name: statBoilerGradientCoolDownMin set to $value";
+				}
+			} else {
+				readingsBulkUpdate($hash,"statBoilerGradientCoolDownMin",$value); 
+				Log3 $name,3,"$name: statBoilerGradientCoolDownMin set to $value";
+			}
 		}
 	}
 
@@ -786,7 +810,7 @@ LUXTRONIK2_UpdateDone($)
 	  readingsBulkUpdate( $hash, "thresholdHeatingLimit", $thresholdHeatingLimit);
 	  readingsBulkUpdate( $hash, "thresholdTemperatureSetBack", $thresholdTemperatureSetBack); 
 	  readingsBulkUpdate( $hash, "hotWaterTemperature", $hotWaterTemperature);
-	  readingsBulkUpdate( $hash, "hotWaterTemperatureTarget",LUXTRONIK2_CalcTemp($a[25]));
+	  readingsBulkUpdate( $hash, "hotWaterTemperatureTarget",$hotWaterTemperatureTarget);
 	  readingsBulkUpdate( $hash, "flowTemperature", $flowTemperature);
 	  readingsBulkUpdate( $hash, "returnTemperature", $returnTemperature);
 	  readingsBulkUpdate( $hash, "returnTemperatureTarget",LUXTRONIK2_CalcTemp($a[17]));
@@ -830,10 +854,9 @@ LUXTRONIK2_UpdateDone($)
 	  if ($a[36]>0) {readingsBulkUpdate($hash,"counterHeatQHeating",$a[36]/10);}
 	  if ($a[37]>0) {readingsBulkUpdate($hash,"counterHeatQHotWater",$a[37]/10);}
 	  if ($a[36]+$a[37]>0) {readingsBulkUpdate($hash,"counterHeatQTotal",($a[36]+$a[37])/10);}
-	  #WM[kW] = Wäremekapazität * (TVL-TRL) * Durchfluss [ccm/s]
-	  $value = 4.18 * ($flowTemperature-$returnTemperature) * $a[19] / 36000;
-	  $value = floor( 10 * $value + 0.5) / 10;
-	  readingsBulkUpdate( $hash, "currentThermalOutput", $value);
+	  #WM[kW] = delta_Temp [K] * Durchfluss [l/h] / ( 3.600 [kJ/kWh] / ( 4,179 [kJ/(kg*K)] (H2O Wärmekapazität bei 30 & 40°C) * 0,994 [kg/l] (H2O Dichte bei 35°C) )  
+	  $value = ($flowTemperature-$returnTemperature) * $a[19] / 866.65;
+	  readingsBulkUpdate( $hash, "currentThermalOutput", sprintf("%.1f", $value));
 	  
 	# HTML for floorplan
 	  if(AttrVal($name, "statusHTML", "none") ne "none") {
@@ -1074,87 +1097,168 @@ LUXTRONIK2_checkFirmware ($)
 	}
 }
 
-# Calculate hourly gradients of boiler based on hotWaterTemperature and counterHeatQHeating
+# Calculate heat-up gradients of boiler based on hotWaterTemperature and counterHeatQHeating
 sub ######################################## 
-LUXTRONIK2_doStatisticBoiler ($$$$) 
+LUXTRONIK2_doStatisticBoilerHeatUp ($$$$$$) 
 {
 
-    my ($hash,$time,$currHQ,$currTemp) = @_;
+    my ($hash, $currOpHours, $currHQ, $currTemp, $opState, $target) = @_;
 	my $name = $hash->{NAME};
-    my $statModeHW = $hash->{fhem}{statModeHotWater};
- 	my $minTemp = $hash->{fhem}{statHotWaterTempMin};
-	my $maxTemp = $hash->{fhem}{statHotWaterTempMax};
-	my $lastHQ = $hash->{fhem}{statHQHotWater};
+    my $step = $hash->{fhem}{statBoilerHeatUpStep};
+	my $minTemp = $hash->{fhem}{statBoilerHeatUpMin};
+	my $maxTemp = $hash->{fhem}{statBoilerHeatUpMax};
+	my $lastHQ = $hash->{fhem}{statBoilerHeatUpHQ};
+	my $lastOpHours = $hash->{fhem}{statBoilerHeatUpOpHours}; 
+	my $value1 = 0;
+    my $value2 = 0;
+    my $value3 = 0;
+	my $returnStr = "";
+
+  # step 0 = Initialize - if hot water preparation is off
+   if ($step == 0) { 
+	  if ($opState != 5) { # wait till hot water preparation stopped
+		  Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 0->1: Initializing Measurment";
+		  $step = 1;
+		  $lastOpHours = $currOpHours;
+		  $lastHQ = $currHQ;
+		  $minTemp = $currTemp;
+	  }
+	  
+  # step 1 = wait till hot water preparation starts -> monitor Tmin, take previous HQ and previous operating hours
+   } elsif ($step == 1) { 
+	  if ($currTemp < $minTemp) { # monitor minimum temperature
+		 Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 1: Monitor minimum temperature ($minTemp -> $currTemp)";
+		 $minTemp = $currTemp;
+	  }
+	  if ($opState != 5) { # wait -> update operating hours and HQ to be used as start value in calculations
+		  $lastOpHours = $currOpHours; 
+		  $lastHQ = $currHQ;
+	  } else { # go to step 2 - if hot water preparation running
+ 		  Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 1->2: Hot water preparation started ".($currOpHours-$lastOpHours)." s ago";
+		  $step = 2; 
+		  $maxTemp = $currTemp;
+	  }
+
+  # step 2 = wait till hot water preparation done and target reached
+   } elsif ($step == 2) { 
+	  if ($currTemp < $minTemp) { # monitor minimal temperature
+		 Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 2: Boiler temperature still decreasing ($minTemp -> $currTemp)";
+		 $minTemp = $currTemp;
+	  }
+	  if ($currTemp > $maxTemp) { # monitor maximal temperature
+		 Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 2: Boiler temperature increasing ($maxTemp -> $currTemp)";
+		 $maxTemp = $currTemp;
+	  }
+	  
+	  if ($opState != 5) { # wait till hot water preparation stopped
+		  if ($currTemp >= $target) {
+			 Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 2->3: Hot water preparation stopped";
+		     $step = 3; 
+		  } else {
+			  Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 2->1: Measurement cancelled (hot water preparation stopped but target not reached, $currTemp < $target)";
+			  $step = 1; 
+			  $lastOpHours = $currOpHours; 
+			  $lastHQ = $currHQ;
+			  $minTemp = $currTemp;
+		  }
+	  }
+	  
+  # step 3 = wait with calculation till temperature maximum reached once
+   } elsif ($step == 3) { 
+     # cancel measurement - if hot water preparation has restarted
+	   if ($opState == 5) { 
+ 		  Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 3->0: Measurement cancelled (hot water preparation restarted before maximum reached)";
+		  $step = 0; 
+	 # monitor maximal temperature
+       } elsif ($currTemp > $maxTemp) { 
+		  Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 3: Temperature still increasing ($maxTemp -> $currTemp)";
+		  $maxTemp = $currTemp;
+	 # else calculate temperature gradient 
+	   } else {
+		  Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 3->1: Boiler heat-up measurement finished";
+		  $value1 =  ( int(10 * $maxTemp) - int(10 * $minTemp) ) / 10; # delta hot water temperature
+		  $value2 = ( $currOpHours - $lastOpHours ) / 60; # delta time (minutes)
+		  # $value3 = floor(100 * $value1 / $value2 + 0.5) / 100;  # Temperature gradient over time rounded to 1/100th
+		  # $value2 = floor(100 * $value2 + 0.5) / 100; # rounded to 1/100th
+		  $returnStr = "DT/min: ".sprintf("%.2f", $value1/$value2)." DT: ".sprintf("%.2f", $value1)." Dmin: ".sprintf("%.0f", $value2);
+
+		  $value2 = $currHQ - $lastHQ; # delta heat quantity
+		  # $value2 = floor(10*($currHQ - $lastHQ)+0.5)/10; # delta heat quantity
+		  # $value3 = floor(100 * $value2 / $value1 + 0.5) / 100;  # heat gradient over temperature rounded to 1/100th
+		  $returnStr .= " DQ/T: ".sprintf("%.2f",$value2/$value1)." DQ: ".sprintf("%.1f",$value2);
+
+		  #Volumen [l] = Wärmemenge [kWh] / (delta T) [K] * ( 3.600 [kJ/kWh] / ( 4,179 [kJ/(kg*K)] (H2O Wärmekapazität bei 40°C) * 0,992 [kg/l] (H2O Dichte bei 40°C) ) [K/(kWh*l)] )  
+		  $value3 = 868.4 * $value2 / $value1 ;  # heated water volume in liter
+		  $returnStr .= " DV: ".sprintf("%.0f",$value3);
+		  
+		  $step = 1; 
+		  $lastOpHours = $currOpHours; 
+		  $lastHQ = $currHQ;
+		  $minTemp = $currTemp;
+
+	   }
+	}
+    $hash->{fhem}{statBoilerHeatUpStep} = $step;
+ 	$hash->{fhem}{statBoilerHeatUpMin} = $minTemp;
+	$hash->{fhem}{statBoilerHeatUpMax} = $maxTemp;
+	$hash->{fhem}{statBoilerHeatUpHQ} = $lastHQ;
+	$hash->{fhem}{statBoilerHeatUpOpHours} = $lastOpHours; 
+	
+    return $returnStr;
+	  
+}
+	  
+# Calculate heat loss gradients of boiler based on hotWaterTemperature and counterHeatQHeating
+sub ######################################## 
+LUXTRONIK2_doStatisticBoilerCoolDown ($$$$$$) 
+{
+    my ($hash, $time, $currTemp, $opState, $target, $threshold) = @_;
+	my $name = $hash->{NAME};
+    my $step = $hash->{fhem}{statBoilerCoolDownStep};
+	my $maxTemp = $hash->{fhem}{statBoilerCoolDownMax};
+	my $startTime = $hash->{fhem}{statBoilerCoolDownStartTime}; 
     my $value1 = 0;
     my $value2 = 0;
     my $value3 = 0;
-	
-  # mode 0 = init hot water gradient calculation 
-   if ($statModeHW == 0) { # -> Mode 1
-	  Log3 $name, 4, "$name: Boiler statMode 0: Initialized";
-	  $hash->{fhem}{statModeHotWater} = 1; 
-	  $hash->{fhem}{statStartTimeHotWater} = $time; 
-	  $hash->{fhem}{statHQHotWater} = $currHQ;
-	  $hash->{fhem}{statHotWaterTempMax} = $currTemp;
-	  $hash->{fhem}{statHotWaterTempMin} = $currTemp;
-	  
-  # mode 1 = wait till maximum of temperature is reached 
-   } elsif ($statModeHW == 1) { 
-	  # wait until heat quantity does not change anymore 
-	  if ($lastHQ != $currHQ) { 
-		 Log3 $name, 4, "$name: Boiler statMode 1: Heat Quantity changed ($lastHQ -> $currHQ)";
-		 $hash->{fhem}{statHQHotWater} = $currHQ;
-		 $hash->{fhem}{statHotWaterTempMax} = $currTemp;
-	  # and temperature is not rising anymore
-	  } elsif ($maxTemp < $currTemp) { 
-		 Log3 $name, 4, "$name: Boiler statMode 1: Temperature increased ($maxTemp < $currTemp)";
-		 $hash->{fhem}{statHotWaterTempMax} = $currTemp;
-	  # and temperature is starting to decrease -> Mode 2
-	  } elsif ($maxTemp - 0.2 > $currTemp) { 
-		 $value1 =  $maxTemp - $minTemp; # delta against last hot water temperature
-		 $value2 = ( $time - $hash->{fhem}{statStartTimeHotWater} ) / 60; # devided by delta time (minutes)
-		 $value3 = floor(100 * $value1 / $value2 + 0.5) / 100;  # rounded to 1/100th
-		 $value2 = floor($value2 + 0.5); # rounded 
+	my $returnStr = "";
 
-		 Log3 $name, 4, "$name: Boiler statMode 1: Measurement finished, start new measurement (maximum = $maxTemp )";
-		 $hash->{fhem}{statModeHotWater} = 2;
-		 $hash->{fhem}{statStartTimeHotWater} = $time; 
-		 $hash->{fhem}{statHotWaterTempMin} = $currTemp;
-
-		 return "DT/min: $value3 DT: $value1 Dmin: $value2";
-	  
+  # step 0 = Initialize - if hot water preparation is off and target reached, 
+    if ($step == 0) { 
+	  if ($opState == 5 || $currTemp < $target) { # -> stay step 0
+		  # Log3 $name, 4, "$name: Statistic Boiler Cool-Down step 0: Wait till hot water preparation stops and target is reached ($currTemp < $target)";
 	  } else {
-		 Log3 $name, 4, "$name: Boiler statMode 1: Wait till temperature decreases (".($maxTemp-0.2)." <= $currTemp <= ".$maxTemp.")";
+		  Log3 $name, 4, "$name: Statistic Boiler Cool-Down step 0->1: Initializing, target reached ($currTemp >= $target)";
+		  $step = 1; 
+		  $startTime = $time; 
+		  $maxTemp = $currTemp;
 	  }
-	  
-  # mode 2 = wait till heat quantity changes or minimum of temperature reached
-   } elsif ($statModeHW == 2) {
-       # wait until heat quantity changes or temperature is raising again
-	  if ($hash->{fhem}{statHQHotWater} != $currHQ 
-			 || $minTemp + 0.2 < $currTemp) { # wait till change of heat quantity or rising temperature -> Mode 1
-		 Log3 $name, 4, "$name: Boiler statMode 2: Heat quantiy changed or temperature raised ($lastHQ != $currHQ or $minTemp +0.2 < $currTemp)";
-		 $value1 =  $minTemp - $maxTemp; # delta against last hot water temperature
-		 $value2 = ( $time - $hash->{fhem}{statStartTimeHotWater} ) / 3600; # devided by delta time (hours)
-		 $value3 = floor(100 * $value1 / $value2 + 0.5) / 100;  # rounded to 1/100th
-		 $value2 = floor(100 * $value2 + 0.5) / 100; # rounded to 1/100th
-		 Log3 $name, 4, "$name: Boiler statMode 2: Measurement finished, start new measurment (minimum = $minTemp)";
-
-		 $hash->{fhem}{statModeHotWater} = 1; 
-		 $hash->{fhem}{statStartTimeHotWater} = $time; 
-		 $hash->{fhem}{statHotWaterTempMax} = $currTemp;
-		 $hash->{fhem}{statHQHotWater} = $currHQ;
-
-		 return "DT/h: $value3 DT: $value1 Dh: $value2";
-
-	  } elsif ($minTemp > $currTemp) {
-		 Log3 $name, 4, "$name: Boiler statMode 2: Temperature decreased ($minTemp > $currTemp)";
-		 $hash->{fhem}{statHotWaterTempMin} = $currTemp;
-      } else {
-		 Log3 $name, 4, "$name: Boiler statMode 2: Monitoring temperature change ($minTemp <= $currTemp <= ".($minTemp+0.2).")";
+  # step 1 = wait till threshold is reached -> do calculation, monitor maximal temperature
+    } elsif ($step == 1) { 
+	  if ($currTemp > $maxTemp) { # monitor maximal temperature
+		  Log3 $name, 4, "$name: Statistic Boiler Cool-Down step 1: Temperature still increasing ($currTemp > $maxTemp)";
+ 		  $maxTemp = $currTemp;
+		  $startTime = $time; 
 	  }
-   }
- 
-  return "";
+	  if ($opState == 5) {
+		  Log3 $name, 4, "$name: Statistic Boiler Cool-Down step 1: Measurement cancelled (restart of hot water preparation)";
+		  $step = 0;
+	  } elsif ($currTemp <= $threshold) {
+	      Log3 $name, 4, "$name: Statistic Boiler Cool-Down step 2->1: Measurement finished, threshold reached ($currTemp <= $threshold)";
+		  $value1 =  ( int(10 * $currTemp) - int(10 * $maxTemp) ) / 10; # delta hot water temperature
+		  $value2 = ( $time - $startTime ) / 3600; # delta time (hours)
+		  $value3 = floor(100 * $value1 / $value2 + 0.5) / 100;  # Temperature gradient over time rounded to 1/100th
+		  $value2 = floor(100 * $value2 + 0.5) / 100; # rounded to 1/100th
+		  $returnStr = "DT/h: $value3 DT: $value1 Dh: $value2";
+
+		  $step = 0;
+	  }
+    }   
+
+    $hash->{fhem}{statBoilerCoolDownStep} = $step;
+	$hash->{fhem}{statBoilerCoolDownMax} = $maxTemp;
+	$hash->{fhem}{statBoilerCoolDownStartTime} = $startTime; 
+
+	return $returnStr;
 }	
 
 
@@ -1166,7 +1270,7 @@ LUXTRONIK2_doStatisticBoiler ($$$$)
 <a name="LUXTRONIK2"></a>
 <h3>LUXTRONIK2</h3>
 <ul>
-  Luxtronik 2.0 is a heating controller used in Alpha Innotec and Siemens Novelan (WPR NET) heat pumps.
+  Luxtronik 2.0 is a heating controller used in Alpha Innotec and Siemens Novelan (WPR NET) heat pumps.<br>
   It has a built-in ethernet port, so it can be directly integrated into a local area network (LAN).
   <br>
   <i>The modul is reported to work with firmware: V1.54C, V1.60, V1.69.</i>
@@ -1187,12 +1291,16 @@ LUXTRONIK2_doStatisticBoiler ($$$$)
   <a name="LUXTRONIK2set"></a>
   <b>Set</b><br>
    <ul>A firmware check assures before each set operation that a heat pump with untested firmware is not damaged accidently.
-  <li>opModeHotWater &lt;Mode&gt;- Operating Mode of domestic hot water boiler (Auto | Party | Off)</li>
-  <li>hotWaterTemperatureTarget &lt;temperature&gt; - Target temperature of domestic hot water boiler in &deg;C</li>
-  <li>INTERVAL &lt;polling interval&gt; - Polling interval in seconds</li>
-  <li>statusRequest - Update device information</li>
-  <li>synchClockHeatPump - Synchronizes controller clock with FHEM time.<br>
-  <b>!! This change is lost in case of controller power off!!</b></li>
+  <li><code>opModeHotWater &lt;Mode&gt;</code><br>
+  Operating Mode of domestic hot water boiler (Auto | Party | Off)</li>
+  <li><code>hotWaterTemperatureTarget &lt;temperature&gt;</code><br>
+  Target temperature of domestic hot water boiler in &deg;C</li>
+  <li><code>INTERVAL &lt;polling interval&gt;</code><br>
+ Polling interval in seconds</li>
+  <li><code>statusRequest</code><br>
+  Update device information</li>
+  <li><code>synchClockHeatPump</code><br>
+  Synchronizes controller clock with FHEM time. <b>!! This change is lost in case of controller power off!!</b></li>
   </ul>
   <br>
   <a name="LUXTRONIK2get"></a>
@@ -1205,17 +1313,17 @@ LUXTRONIK2_doStatisticBoiler ($$$$)
   <a name="LUXTRONIK2attr"></a>
   <b>Attributes</b>
   <ul>
-    <li>statusHTML<br>
+    <li><code>statusHTML</code><br>
       If set, a HTML-formatted reading named "floorplanHTML" is created. It can be used with the <a href="#FLOORPLAN">FLOORPLAN</a> module.<br>
       Currently, if the value of this attribute is not NULL, the corresponding reading consists of the current status of the heat pump and the temperature of the water.</li>
-    <li>doStatistics &lt; 0 | 1 &gt;<br>
-		Still Beta - Calculates statistic values: <i>statGradientBoilerTempLoss</i>
-	<li>allowSetParameter &lt; 0 | 1 &gt;<br>
+    <li><code>doStatistics &lt; 0 | 1 &gt;</code><br>
+		Calculates statistic values: <i>statBoilerGradientHeatUp, statBoilerGradientCoolDown, statBoilerGradientCoolDownMin (boiler heat loss)</i></li>
+	<li><code>allowSetParameter &lt; 0 | 1 &gt;</code><br>
       The <a href="#LUXTRONIK2set">parameters</a> of the heat pump controller can only be changed if this attribut is set to 1.</li>
-	<li>autoSynchClock &lt;delay&gt;<br>
+	<li><code>autoSynchClock &lt;delay&gt;</code><br>
 		Corrects the clock of the heatpump automatically if a certain <i>delay</i> (10 s - 600 s) against the FHEM time is exeeded. Does a firmware check before.<br>
 		<i>(A 'delayDeviceTimeCalc' &lt;= 2 s can be caused by the internal calculation interval of the heat pump controller.)</i></li>
-	<li>ignoreFirmwareCheck &lt; 0 | 1 &gt;<br>
+	<li><code>ignoreFirmwareCheck &lt; 0 | 1 &gt;</code><br>
 		A firmware check assures before each set operation that a heatpump controller with untested firmware is not damaged accidently.<br>
 		If this attribute is set to 1, the firmware check is ignored and new firmware can be tested for compatibility.</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
@@ -1276,7 +1384,7 @@ LUXTRONIK2_doStatisticBoiler ($$$$)
       wenn gesetzt, dann wird ein HTML-formatierter Wert "floorplanHTML" erzeugt, welcher vom Modul <a href="#FLOORPLAN">FLOORPLAN</a> genutzt werden kann.<br>
       Momentan wird nur gepr&uuml;ft, ob der Wert dieses Attributes ungleich NULL ist, der entsprechende Ger&auml;tewerte besteht aus dem aktuellen W&auml;rmepumpenstatus und der Heizwassertemperatur.</li>
     <li>doStatistics &lt; 0 | 1 &gt;<br>
-		Noch im Versuchsstadium - Berechnet statistische Werte: <i>statGradientBoilerTempLoss</i>
+		Berechnet statistische Werte: <i>statBoilerGradientHeatUp, statBoilerGradientCoolDown, statBoilerGradientCoolDownMin (Wärmeverlust des Boilers)</i></li>
 	<li>allowSetParameter &lt; 0 | 1 &gt;<br>
       Die internen <a href="#LUXTRONIK2set">Parameter</a> der W&auml;rmepumpensteuerung k&ouml;nnen nur ge&auml;ndert werden, wenn dieses Attribut auf 1 gesetzt ist.</li>
 	<li>autoSynchClock &lt;Zeitunterschied&gt;<br>
