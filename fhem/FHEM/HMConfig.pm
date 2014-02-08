@@ -1180,13 +1180,15 @@ $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
   "HM-CC-TC"       =>{ burstXmit      =>""},
   "HM-CC-RT-DN"    =>{ burstXmit      =>""
                       ,inhibit        =>"[on|off]"},
-  "HM-CC-RT-DN-BoM"=>{ statusRequest  =>""
-                      ,inhibit        =>"[on|off]"},
   "HM-SEC-SD"      =>{ statusRequest  =>""},
 );
 # clones- - - - - - - - - - - - - - - - -
+$culHmModelSets{"HM-CC-RT-DN-BoM"}    = $culHmModelSets{"HM-CC-RT-DN"};
+$culHmModelSets{"HM-TC-IT-WM-W-EU"}   = $culHmModelSets{"HM-CC-RT-DN"};
+
 $culHmModelSets{"HM-RC-19-B"}          = $culHmModelSets{"HM-RC-19"};
 $culHmModelSets{"HM-RC-19-SW"}         = $culHmModelSets{"HM-RC-19"};
+
 $culHmModelSets{"HM-OU-CM-PCB"}        = $culHmModelSets{"HM-OU-CFM-PL"};
 $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
 
@@ -1249,8 +1251,6 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
                          ,tempListWed    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
                          ,tempListFri    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
                          ,"desired-temp" =>"[on|off|5.0..30.0]"
-                         ,inhibit        =>"[on|off]"
-                         ,sysTime        =>""
                         },
   "HM-ES-PMSw1-Pl01"  =>{ "on-for-timer" =>"<sec>"
                          ,"on-till"      =>"<time>"
@@ -1272,6 +1272,7 @@ $culHmChanSets{"WDF-solar02"}           = $culHmSubTypeSets{"blindActuator"};
 
 $culHmChanSets{"HM-CC-RT-DN02"}         = $culHmChanSets{"HM-CC-RT-DN00"};
 $culHmChanSets{"HM-CC-RT-DN-BoM00"}     = $culHmChanSets{"HM-CC-RT-DN00"};
+$culHmChanSets{"HM-TC-IT-WM-W-EU00"}    = $culHmChanSets{"HM-CC-RT-DN00"};
 $culHmChanSets{"HM-CC-RT-DN-BoM02"}     = $culHmChanSets{"HM-CC-RT-DN02"};
 $culHmChanSets{"HM-CC-RT-DN-BoM04"}     = $culHmChanSets{"HM-CC-RT-DN04"};
 $culHmChanSets{"HM-CC-RT-DN-BoM05"}     = $culHmChanSets{"HM-CC-RT-DN05"};
