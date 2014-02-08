@@ -3283,70 +3283,79 @@ sub CUL_HM_Set($@) {
     my %lim = (valvePos =>{min=>0  ,max=>99 ,rd =>"valvePosTC" ,u =>" %"},
                virtTemp =>{min=>-20,max=>50 ,rd =>"temperature",u =>""  },
                virtHum  =>{min=>0  ,max=>99 ,rd =>"humidity"   ,u =>""  },);
-    if ($valu eq "off"){
-      if ($cmd eq "virtHum") {$hash->{helper}{vd}{vinH} = "";}
-      else                   {$hash->{helper}{vd}{vin}  = "";}
-      if ((!$hash->{helper}{vd}{vinH} || $hash->{helper}{vd}{vinH} eq "") && 
-          (!$hash->{helper}{vd}{vin}  || $hash->{helper}{vd}{vin}  eq "") ){
-        $state = "$cmd:stopped";
-        RemoveInternalTimer("valvePos:$dst$chn");# remove responsePending timer
-        RemoveInternalTimer("valveTmr:$dst$chn");# remove responsePending timer
-        delete($hash->{helper}{virtTC});
-      }
-    }
-    if ($hash->{helper}{virtTC} || $valu ne "off") {
-      if ($valu ne "off"){
-        return "level between $lim{$cmd}{min} and $lim{$cmd}{max} or 'off' allowed"
+    if ($md eq "HM-CC-VD"){
+      return "level between $lim{$cmd}{min} and $lim{$cmd}{max} allowed"
              if ($valu !~ m/^[+-]?\d+\.?\d+$/||
                  $valu > $lim{$cmd}{max}||$valu < $lim{$cmd}{min} );
-        if ($cmd eq "virtHum") {$hash->{helper}{vd}{vinH} = $valu;}
-        else                   {$hash->{helper}{vd}{vin}  = $valu;}
-      }
-      if ($cmd eq "valvePos"){
-        my @pId = grep !/^$/,split(',',AttrVal($name,"peerIDs",""));
-        return "virtual TC support one VD only. Correct number of peers"
-          if (scalar @pId != 1);
-        my $ph = CUL_HM_id2Hash($pId[0]);
-        return "peerID $pId[0] is not assigned to a device " if (!$ph);
-        $hash->{helper}{vd}{typ} = 1; #valvePos
-        $hash->{helper}{vd}{id}  = $modules{CUL_HM}{defptr}{$pId[0]}
-                                              ?$pId[0]
-                                              :substr($pId[0],0,6);
-        $hash->{helper}{vd}{cmd} = "A258$dst".substr($pId[0],0,6);
-        CUL_HM_UpdtReadBulk($ph,1,
-                         "state:set_$valu %",
-                         "ValveDesired:$valu %");
-        $hash->{helper}{vd}{val} = sprintf("%02X",($valu * 2.56)%256);
-        $state = "ValveAdjust:$valu %";
-      }
-      else{#virtTemp || virtHum
-        $hash->{helper}{vd}{typ} = 2; #virtTemp
-        $hash->{helper}{vd}{cmd} = "8670$dst"."000000";
-        my $t = $hash->{helper}{vd}{vin}?$hash->{helper}{vd}{vin}:0;
-        $t *=10;
-        $t -= 0x8000 if ($t < 0);
-        $hash->{helper}{vd}{val} = sprintf("%04X", $t & 0x7fff);
-        $hash->{helper}{vd}{val} .= sprintf("%02X", $hash->{helper}{vd}{vinH})
-             if ($hash->{helper}{vd}{vinH} && $hash->{helper}{vd}{vinH} ne "");
-      }
-      $hash->{helper}{vd}{idh} = hex(substr($dst,2,2))*20077;
-      $hash->{helper}{vd}{idl} = hex(substr($dst,4,2))*256;
-      $hash->{helper}{vd}{msgCnt} = ReadingsVal($name,".msgCnt",0) 
-            if (!defined $hash->{helper}{vd}{msgCnt});
-      if (!$hash->{helper}{virtTC}){
-        my $pn = CUL_HM_id2Name($hash->{helper}{vd}{id});
-        $hash->{helper}{vd}{ackT} = ReadingsTimestamp($pn, "ValvePosition", "")
-              if (!defined $hash->{helper}{vd}{ackT});
-        $hash->{helper}{vd}{miss} = 0  if (!defined$hash->{helper}{vd}{miss});
-        $hash->{helper}{virtTC}   = ($cmd eq "valvePos")?"03":"00";
-        CUL_HM_UpdtReadSingle($hash,"valveCtrl","init",1)if ($cmd eq "valvePos");
-        $hash->{helper}{vd}{next} = ReadingsVal($name,".next",gettimeofday()) 
-              if (!defined $hash->{helper}{vd}{next});
-        CUL_HM_valvePosUpdt("valvePos:$dst$chn");
-      }
-      $hash->{helper}{virtTC} = ($cmd eq "valvePos")?"03":"00";
+      CUL_HM_PushCmdStack($hash,'++A258'.$id.$dst
+                                ."00".sprintf("%02X",($valu * 2.56)%256));
     }
-    CUL_HM_UpdtReadSingle($hash,$lim{$cmd}{rd},$valu.$lim{$cmd}{u},1);
+    else{
+      if ($valu eq "off"){
+        if ($cmd eq "virtHum") {$hash->{helper}{vd}{vinH} = "";}
+        else                   {$hash->{helper}{vd}{vin}  = "";}
+        if ((!$hash->{helper}{vd}{vinH} || $hash->{helper}{vd}{vinH} eq "") && 
+            (!$hash->{helper}{vd}{vin}  || $hash->{helper}{vd}{vin}  eq "") ){
+          $state = "$cmd:stopped";
+          RemoveInternalTimer("valvePos:$dst$chn");# remove responsePending timer
+          RemoveInternalTimer("valveTmr:$dst$chn");# remove responsePending timer
+          delete($hash->{helper}{virtTC});
+        }
+      }
+      if ($hash->{helper}{virtTC} || $valu ne "off") {
+        if ($valu ne "off"){
+          return "level between $lim{$cmd}{min} and $lim{$cmd}{max} or 'off' allowed"
+               if ($valu !~ m/^[+-]?\d+\.?\d+$/||
+                   $valu > $lim{$cmd}{max}||$valu < $lim{$cmd}{min} );
+          if ($cmd eq "virtHum") {$hash->{helper}{vd}{vinH} = $valu;}
+          else                   {$hash->{helper}{vd}{vin}  = $valu;}
+        }
+        if ($cmd eq "valvePos"){
+          my @pId = grep !/^$/,split(',',AttrVal($name,"peerIDs",""));
+          return "virtual TC support one VD only. Correct number of peers"
+            if (scalar @pId != 1);
+          my $ph = CUL_HM_id2Hash($pId[0]);
+          return "peerID $pId[0] is not assigned to a device " if (!$ph);
+          $hash->{helper}{vd}{typ} = 1; #valvePos
+          $hash->{helper}{vd}{id}  = $modules{CUL_HM}{defptr}{$pId[0]}
+                                                ?$pId[0]
+                                                :substr($pId[0],0,6);
+          $hash->{helper}{vd}{cmd} = "A258$dst".substr($pId[0],0,6);
+          CUL_HM_UpdtReadBulk($ph,1,
+                           "state:set_$valu %",
+                           "ValveDesired:$valu %");
+          $hash->{helper}{vd}{val} = sprintf("%02X",($valu * 2.56)%256);
+          $state = "ValveAdjust:$valu %";
+        }
+        else{#virtTemp || virtHum
+          $hash->{helper}{vd}{typ} = 2; #virtTemp
+          $hash->{helper}{vd}{cmd} = "8670$dst"."000000";
+          my $t = $hash->{helper}{vd}{vin}?$hash->{helper}{vd}{vin}:0;
+          $t *=10;
+          $t -= 0x8000 if ($t < 0);
+          $hash->{helper}{vd}{val} = sprintf("%04X", $t & 0x7fff);
+          $hash->{helper}{vd}{val} .= sprintf("%02X", $hash->{helper}{vd}{vinH})
+               if ($hash->{helper}{vd}{vinH} && $hash->{helper}{vd}{vinH} ne "");
+        }
+        $hash->{helper}{vd}{idh} = hex(substr($dst,2,2))*20077;
+        $hash->{helper}{vd}{idl} = hex(substr($dst,4,2))*256;
+        $hash->{helper}{vd}{msgCnt} = ReadingsVal($name,".msgCnt",0) 
+              if (!defined $hash->{helper}{vd}{msgCnt});
+        if (!$hash->{helper}{virtTC}){
+          my $pn = CUL_HM_id2Name($hash->{helper}{vd}{id});
+          $hash->{helper}{vd}{ackT} = ReadingsTimestamp($pn, "ValvePosition", "")
+                if (!defined $hash->{helper}{vd}{ackT});
+          $hash->{helper}{vd}{miss} = 0  if (!defined$hash->{helper}{vd}{miss});
+          $hash->{helper}{virtTC}   = ($cmd eq "valvePos")?"03":"00";
+          CUL_HM_UpdtReadSingle($hash,"valveCtrl","init",1)if ($cmd eq "valvePos");
+          $hash->{helper}{vd}{next} = ReadingsVal($name,".next",gettimeofday()) 
+                if (!defined $hash->{helper}{vd}{next});
+          CUL_HM_valvePosUpdt("valvePos:$dst$chn");
+        }
+        $hash->{helper}{virtTC} = ($cmd eq "valvePos")?"03":"00";
+      }
+      CUL_HM_UpdtReadSingle($hash,$lim{$cmd}{rd},$valu.$lim{$cmd}{u},1);
+    }
   }
   elsif($cmd eq "matic") { ####################################################
     # Trigger pre-programmed action in the winmatic. These actions must be
