@@ -279,6 +279,7 @@ sub CUL_HM_updateConfig($){
         CUL_HM_Set($hash,$name,"virtTemp",ReadingsVal($name,"temperature",""));
         CUL_HM_Set($hash,$name,"virtHum" ,ReadingsVal($name,"humidity",""));
         RemoveInternalTimer("valvePos:$vId");
+        RemoveInternalTimer("valveTmr:$vId");
         InternalTimer(ReadingsVal($name,".next",1)
                      ,"CUL_HM_valvePosUpdt","valvePos:$vId",0);
       }
@@ -3670,19 +3671,22 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   $hash->{helper}{vd}{nextM} = $tn+$nextTimer;
   $hash->{helper}{vd}{msgCnt} = $msgCnt;
   if ($hash->{helper}{vd}{cmd}){
-    if ($hash->{helper}{vd}{typ} == 1){
+    if    ($hash->{helper}{vd}{typ} == 1){
       CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
                                         ,$msgCnt
                                         ,$hash->{helper}{vd}{cmd}
                                         ,$hash->{helper}{virtTC}
                                         ,$hash->{helper}{vd}{val}))
             if(ReadingsVal($name,"valveCtrl","init") ne "init");
+      InternalTimer($tn+10,"CUL_HM_valvePosTmr","valveTmr:$vId",0);
     }
-    else{
+    elsif ($hash->{helper}{vd}{typ} == 2){
       CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s"
                                         ,$msgCnt
                                         ,$hash->{helper}{vd}{cmd}
                                         ,$hash->{helper}{vd}{val}));
+      $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextM};
+      InternalTimer($hash->{helper}{vd}{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
     }
   }
   else{
@@ -3692,40 +3696,37 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   }
   $hash->{helper}{virtTC} = "00";
   CUL_HM_ProcessCmdStack($hash);
-  InternalTimer($tn+10,"CUL_HM_valvePosTmr","valveTmr:$vId",0);
 }
 sub CUL_HM_valvePosTmr(@) {#calc next vd wakeup 
   my($in ) = @_;
   my(undef,$vId) = split(':',$in);
   my $hash = CUL_HM_id2Hash($vId); 
   my $name = $hash->{NAME};
-  if ($hash->{helper}{vd}{typ} == 1){
-    if (ReadingsVal($name,"valveCtrl","init") eq "init") {
+  if (ReadingsVal($name,"valveCtrl","init") eq "init") {
+    $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextF};
+    CUL_HM_UpdtReadSingle($hash,"valveCtrl","ready",1);
+  }
+  else {
+    my $pn = CUL_HM_id2Name($hash->{helper}{vd}{id});
+    my $ackTime = ReadingsTimestamp($pn, "ValvePosition", "");
+    my $vc;
+    if (!$ackTime || $ackTime eq $hash->{helper}{vd}{ackT} ){
       $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextF};
-      CUL_HM_UpdtReadSingle($hash,"valveCtrl","ready",1);
+      $vc = (++$hash->{helper}{vd}{miss} > 5)
+                                          ?"lost"
+                                          :"miss_".$hash->{helper}{vd}{miss};
+      Log3 $name,5,"CUL_HM $name virtualTC use fail-timer";
     }
-    else {
-      my $pn = CUL_HM_id2Name($hash->{helper}{vd}{id});
-      my $ackTime = ReadingsTimestamp($pn, "ValvePosition", "");
-      my $vc;
-      if (!$ackTime || $ackTime eq $hash->{helper}{vd}{ackT} ){
-        $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextF};
-        $vc = (++$hash->{helper}{vd}{miss} > 5)
-                                            ?"lost"
-                                            :"miss_".$hash->{helper}{vd}{miss};
-        Log3 $name,5,"CUL_HM $name virtualTC use fail-timer";
-      }
-      else{
-        CUL_HM_UpdtReadBulk($hash,0,".next:".$hash->{helper}{vd}{next}
-                                   ,".msgCnt:".($hash->{helper}{vd}{msgCnt}-1));
-        $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextM};
-        $vc = "ok";
-        $hash->{helper}{vd}{miss} = 0;
-      }
-      CUL_HM_UpdtReadSingle($hash,"valveCtrl",$vc,1)
-            if(ReadingsVal($name,"valveCtrl","") ne $vc);
-      $hash->{helper}{vd}{ackT} = $ackTime;
+    else{
+      CUL_HM_UpdtReadBulk($hash,0,".next:".$hash->{helper}{vd}{next}
+                                 ,".msgCnt:".($hash->{helper}{vd}{msgCnt}-1));
+      $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextM};
+      $vc = "ok";
+      $hash->{helper}{vd}{miss} = 0;
     }
+    CUL_HM_UpdtReadSingle($hash,"valveCtrl",$vc,1)
+          if(ReadingsVal($name,"valveCtrl","") ne $vc);
+    $hash->{helper}{vd}{ackT} = $ackTime;
   }
   InternalTimer($hash->{helper}{vd}{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
 }
