@@ -43,6 +43,7 @@ FHEM/10_IT.pm                odroegehorn          http://forum.fhem.de InterTech
 FHEM/10_MAX.pm               mgehre               http://forum.fhem.de MAX
 FHEM/10_OWServer.pm          borisneubert/mfr69bs http://forum.fhem.de 1Wire
 FHEM/10_ZWave.pm             rudolfkoenig         http://forum.fhem.de ZWave
+FHEM/10_RESIDENTS.pm         loredo               http://forum.fhem.de Automatisierung
 FHEM/11_FHT.pm               rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/11_FHT8V.pm             rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/11_OWDevice.pm          borisneubert/mfr69bs http://forum.fhem.de 1Wire
@@ -66,6 +67,8 @@ FHEM/20_FRM_PWM.pm           ntruchsess           http://forum.fhem.de Sonstiges
 FHEM/20_FRM_SERVO.pm         ntruchsess           http://forum.fhem.de Sonstiges
 FHEM/20_OWFS.pm              mfr69bs              http://forum.fhem.de 1Wire (deprecated)
 FHEM/20_X10.pm               borisneubert         http://forum.fhem.de SlowRF
+FHEM/20_ROOMMATE.pm          loredo               http://forum.fhem.de Automatisierung
+FHEM/20_GUEST.pm             loredo               http://forum.fhem.de Automatisierung
 FHEM/21_OWAD.pm              pahenning            http://forum.fhem.de 1Wire
 FHEM/21_OWCOUNT.pm           pahenning            http://forum.fhem.de 1Wire
 FHEM/21_OWID.pm              pahenning            http://forum.fhem.de 1Wire
