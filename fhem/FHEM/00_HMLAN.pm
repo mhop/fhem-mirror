@@ -522,10 +522,9 @@ sub HMLAN_Parse($$) {##########################################################
     #    00 21= ??(seen with 'R') - see below
     #    00 2x= should: AES was accepted, here is the response
     #    00 30= should: AES response failed
-    #    00 40= ??(seen with 'E') after 0100
-    #    00 41= ??(seen with 'R')
+    #    00 4x= AES response accepted
     #    00 50= ??(seen with 'R')
-    #    00 81= ??
+    #    00 8x= first AES-response for this device?
     #    01 xx= ?? 0100 AES response send (gen autoMsgSent)
     #    02 xx= prestate to 04xx. Message is still sent. This is a warning
     #    04 xx= nothing sent anymore. Any restart unsuccessful except power
