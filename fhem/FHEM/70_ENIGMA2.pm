@@ -2489,11 +2489,14 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
     <ul><code>
        define SATReceiver ENIGMA2 192.168.0.10
        <br><br>
-       define SATReceiver ENIGMA2 192.168.0.10 8080 &nbsp;&nbsp;&nbsp; # With custom port
+       # With custom port<br>
+       define SATReceiver ENIGMA2 192.168.0.10 8080
        <br><br>
-       define SATReceiver ENIGMA2 192.168.0.10 80 60 &nbsp;&nbsp;&nbsp; # With custom interval of 60 seconds
+       # With custom interval of 60 seconds<br>
+       define SATReceiver ENIGMA2 192.168.0.10 80 60
        <br><br>
-       define SATReceiver ENIGMA2 192.168.0.10 80 60 root secret &nbsp;&nbsp;&nbsp; # With HTTP user credentials
+       # With HTTP user credentials<br>
+       define SATReceiver ENIGMA2 192.168.0.10 80 60 root secret
     </code></ul>
   </ul>
   <br>
@@ -2529,7 +2532,8 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
       <li><b>msg</b> yesno,info... &nbsp;&nbsp;-&nbsp;&nbsp; allows more complex messages as showText, see commands as listed below</li>
     </ul>
   </ul>
-
+  <br>
+  <br>
   <ul>
     <u>Messaging</u><br><br>
     <ul>
