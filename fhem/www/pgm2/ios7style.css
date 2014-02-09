@@ -126,3 +126,14 @@ g.on { fill:#53d769; }
 
 table.room svg      { height:20px; width:20px; fill:#147bff; }
 table.room svg.it_raspberry_logo { height: 26px; width: 26px; }
+
+
+/*--------------     Samsung Remote Control     -------------------*/
+table#TYPE_remotecontrol { width: 250px; }
+table#TYPE_remotecontrol tr { border: 0; }
+table#TYPE_remotecontrol td { padding: 5px 7px; }
+.rc_body { border-style: solid; border-color: black; border-width: 1px; padding: 5px;
+                background: #e5e5e5; font-size:6px;}
+.rc_button            { padding: 5px 7px;}
+.rc_button img        { border-style: solid; border-width: 1px; border-color: transparent; }
+.rc_button img:active { border-color: gray; }
