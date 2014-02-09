@@ -23,7 +23,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.0
+# Version: 1.0.1
 #
 # Major Version History:
 # - 1.0.0 - 2014-02-08
@@ -202,8 +202,8 @@ sub GUEST_Define($$) {
 
     readingsEndUpdate( $hash, 1 );
 
-    # run AutoGone timer
-    InternalTimer( gettimeofday() + 10, "ROOMMATE_AutoGone", $hash, 1 );
+    # run timers
+    InternalTimer( gettimeofday() + 15, "GUEST_StartInternalTimers", $hash, 0 );
 
     return undef;
 }
@@ -754,7 +754,7 @@ sub GUEST_DurationTimer($;$) {
             $diff =
               $timestampNow -
               GUEST_Datetime2Timestamp( $hash->{READINGS}{lastArrival}{VAL} );
-            $durPresence = ( $diff / 60 ) % 60;
+            $durPresence = int( $diff / 60 );
         }
     }
 
@@ -770,7 +770,7 @@ sub GUEST_DurationTimer($;$) {
             $diff =
               $timestampNow -
               GUEST_Datetime2Timestamp( $hash->{READINGS}{lastDeparture}{VAL} );
-            $durAbsence = ( $diff / 60 ) % 60;
+            $durAbsence = int( $diff / 60 );
         }
     }
 
@@ -784,7 +784,7 @@ sub GUEST_DurationTimer($;$) {
             $diff =
               $timestampNow -
               GUEST_Datetime2Timestamp( $hash->{READINGS}{lastSleep}{VAL} );
-            $durSleep = ( $diff / 60 ) % 60;
+            $durSleep = int( $diff / 60 );
         }
     }
 
@@ -883,6 +883,14 @@ sub GUEST_RemoveInternalTimer($$) {
     }
 }
 
+###################################
+sub GUEST_StartInternalTimers($$) {
+    my ($hash) = @_;
+
+    GUEST_AutoGone($hash);
+    GUEST_DurationTimer($hash);
+}
+
 1;
 
 =pod
@@ -904,38 +912,39 @@ sub GUEST_RemoveInternalTimer($$) {
 
     Example:<br>
     <ul><code>
-       # Standalone
+       # Standalone<br>
        define rg_Guest GUEST
        <br><br>
-       # Typical group member
+       # Typical group member<br>
        define rg_Guest GUEST rgr_Residents                  # to be member of resident group rgr_Residents
        <br><br>
-       # Member of multiple groups
+       # Member of multiple groups<br>
        define rg_Guest GUEST rgr_Residents,rgr_Guests       # to be member of resident group rgr_Residents and rgr_Guests
     </code></ul>
   </ul><br>
 
-  Please note the RESIDENTS group device needs to be existing before a GUEST device can become a member of it.<br>
+  <ul>Please note the RESIDENTS group device needs to be existing before a GUEST device can become a member of it.</ul><br>
   <br>
   <br>
 
   <a name="GUESTset"></a>
   <b>Set</b>
   <ul>
-    <code>set &lt;rg_FirstName&gt; &lt;command&gt; [&lt;parameter&gt;]</code>
+    <code>set &lt;rg_GuestName&gt; &lt;command&gt; [&lt;parameter&gt;]</code>
     <br><br>
     Currently, the following commands are defined.<br>
     <ul>
       <li><b>location</b> &nbsp;&nbsp;-&nbsp;&nbsp; sets reading 'location'; see attribute rg_locations to adjust list shown in FHEMWEB</li>
       <li><b>mood</b> &nbsp;&nbsp;-&nbsp;&nbsp; sets reading 'mood'; see attribute rg_moods to adjust list shown in FHEMWEB</li>
-      <li><b>state</b> &nbsp;&nbsp;home,gotosleep,asleep,awoken,absent,gone&nbsp;&nbsp; switch between states; see attribute rg_states to adjust list shown in FHEMWEB</li>
+      <li><b>state</b> &nbsp;&nbsp;home,gotosleep,asleep,awoken,absent,none&nbsp;&nbsp; switch between states; see attribute rg_states to adjust list shown in FHEMWEB</li>
     </ul>
   </ul>
 
+<br><br>
   <ul>
     <u>Possible states and their meaning</u><br><br>
     <ul>
-      This module differs 6 states:<br><br>
+      This module differs between 6 states:<br><br>
 
       <ul>
       <li><b>home</b> - individual is present at home and awake</li>
@@ -998,7 +1007,15 @@ sub GUEST_RemoveInternalTimer($$) {
       Whenever location is set to 'underway', the state is set to 'absent' if prior presence state was 'present'. If attribute rg_locationUnderway was defined, all of those locations will trigger state change to 'absent' as well. Those locations won't appear in reading 'lastLocation'.<br>
       <br>
       Whenever location is set to 'wayhome', the reading 'wayhome' is set to '1' if current presence state is 'absent'. If attribute rg_locationWayhome was defined, LEAVING one of those locations will set reading 'wayhome' to '1' as well. So you actually have implicit and explicit options to trigger wayhome.<br>
-      Arriving at home will reset the value of 'wayhome' to '0'.
+      Arriving at home will reset the value of 'wayhome' to '0'.<br>
+      <br>
+      If you are using the <a href="#GEOFANCY">GEOFANCY</a> module, you can easily have your location updated with GEOFANCY events by defining a simple NOTIFY-trigger like this:<br>
+      <br>
+      <code>
+      define n_rg_Guest.location notify geofancy:currLoc_Guest.* set rg_Guest location $EVTPART1
+      </code><br>
+      <br>
+      By defining geofencing zones called 'home', 'underway' and 'wayhome' in the iOS app, you automatically get all the features of automatic state changes described above.
     </ul>
   </ul>
   <br>
@@ -1008,7 +1025,7 @@ sub GUEST_RemoveInternalTimer($$) {
   <b>Attributes</b><br>
   <ul><ul>
     <li><b>rg_autoGoneAfter</b> - hours after which state should be auto-set to 'gone' when current state is 'absent'; defaults to 16 hours</li>
-    <li><b>rg_locationHome</b> - locations matching these will be treated as being at home; first entry reflects default value to be used with state correlation; separate entries by space; defaults to "home"</li>
+    <li><b>rg_locationHome</b> - locations matching these will be treated as being at home; first entry reflects default value to be used with state correlation; separate entries by space; defaults to 'home'</li>
     <li><b>rg_locationUnderway</b> - locations matching these will be treated as being underway; first entry reflects default value to be used with state correlation; separate entries by comma or space; defaults to "underway"</li>
     <li><b>rg_locationWayhome</b> - leaving a location matching these will set reading wayhome to 1; separate entries by space; defaults to "wayhome"</li>
     <li><b>rg_locations</b> - list of locations ot be shown in FHEMWEB; separate entries by comma only and do NOT use spaces</li>
@@ -1054,10 +1071,16 @@ sub GUEST_RemoveInternalTimer($$) {
 =end html
 
 =begin html_DE
+
+<a name="GUEST"></a>
+<h3>GUEST</h3>
+<ul>
 Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden.
 Die englische Version ist hier zu finden: 
-
- <a href='http://fhem.de/commandref.html#GUEST>'>GUEST</a> &nbsp;
+</ul>
+<ul>
+<a href='http://fhem.de/commandref.html#GUEST'>GUEST</a>
+</ul>
 
 =end html_DE
 

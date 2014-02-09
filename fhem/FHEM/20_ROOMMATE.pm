@@ -23,7 +23,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.0
+# Version: 1.0.1
 #
 # Major Version History:
 # - 1.0.0 - 2014-02-08
@@ -195,8 +195,12 @@ sub ROOMMATE_Define($$) {
 
     readingsEndUpdate( $hash, 1 );
 
-    # run AutoGone timer
-    InternalTimer( gettimeofday() + 10, "ROOMMATE_AutoGone", $hash, 1 );
+    # run timers
+    InternalTimer(
+        gettimeofday() + 15,
+        "ROOMMATE_StartInternalTimers",
+        $hash, 0
+    );
 
     return undef;
 }
@@ -742,7 +746,7 @@ sub ROOMMATE_DurationTimer($;$) {
               $timestampNow -
               ROOMMATE_Datetime2Timestamp(
                 $hash->{READINGS}{lastArrival}{VAL} );
-            $durPresence = ( $diff / 60 ) % 60;
+            $durPresence = int( $diff / 60 );
         }
     }
 
@@ -757,7 +761,7 @@ sub ROOMMATE_DurationTimer($;$) {
               $timestampNow -
               ROOMMATE_Datetime2Timestamp(
                 $hash->{READINGS}{lastDeparture}{VAL} );
-            $durAbsence = ( $diff / 60 ) % 60;
+            $durAbsence = int( $diff / 60 );
         }
     }
 
@@ -771,7 +775,7 @@ sub ROOMMATE_DurationTimer($;$) {
             $diff =
               $timestampNow -
               ROOMMATE_Datetime2Timestamp( $hash->{READINGS}{lastSleep}{VAL} );
-            $durSleep = ( $diff / 60 ) % 60;
+            $durSleep = int( $diff / 60 );
         }
     }
 
@@ -869,6 +873,14 @@ sub ROOMMATE_RemoveInternalTimer($$) {
     }
 }
 
+###################################
+sub ROOMMATE_StartInternalTimers($$) {
+    my ($hash) = @_;
+
+    ROOMMATE_AutoGone($hash);
+    ROOMMATE_DurationTimer($hash);
+}
+
 1;
 
 =pod
@@ -890,24 +902,24 @@ sub ROOMMATE_RemoveInternalTimer($$) {
 
     Example:<br>
     <ul><code>
-       # Standalone
+       # Standalone<br>
        define rr_Manfred ROOMMATE
        <br><br>
-       # Typical group member
+       # Typical group member<br>
        define rr_Manfred ROOMMATE rgr_Residents                # to be member of resident group rgr_Residents
        <br><br>
-       # Member of multiple groups
+       # Member of multiple groups<br>
        define rr_Manfred ROOMMATE rgr_Residents,rgr_Parents    # to be member of resident group rgr_Residents and rgr_Parents
        <br><br>
-       # Complex family structure
-       define rr_Manfred ROOMMATE rgr_Residents,rgr_Parents    # Parent
-       define rr_Lisa ROOMMATE rgr_Residents,rgr_Parents       # Parent
-       define rr_Rick ROOMMATE rgr_Residents,rgr_Children      # Child1
+       # Complex family structure<br>
+       define rr_Manfred ROOMMATE rgr_Residents,rgr_Parents    # Parent<br>
+       define rr_Lisa ROOMMATE rgr_Residents,rgr_Parents       # Parent<br>
+       define rr_Rick ROOMMATE rgr_Residents,rgr_Children      # Child1<br>
        define rr_Alex ROOMMATE rgr_Residents,rgr_Children      # Child2
     </code></ul>
   </ul><br>
 
-  Please note the RESIDENTS group device needs to be existing before a ROOMMATE device can become a member of it.<br>
+  <ul>Please note the RESIDENTS group device needs to be existing before a ROOMMATE device can become a member of it.</ul><br>
   <br>
   <br>
 
@@ -924,10 +936,11 @@ sub ROOMMATE_RemoveInternalTimer($$) {
     </ul>
   </ul>
 
+<br><br>
   <ul>
     <u>Possible states and their meaning</u><br><br>
     <ul>
-      This module differs 6 states:<br><br>
+      This module differs between 6 states:<br><br>
 
       <ul>
       <li><b>home</b> - individual is present at home and awake</li>
@@ -990,7 +1003,15 @@ sub ROOMMATE_RemoveInternalTimer($$) {
       Whenever location is set to 'underway', the state is set to 'absent' if prior presence state was 'present'. If attribute rr_locationUnderway was defined, all of those locations will trigger state change to 'absent' as well. Those locations won't appear in reading 'lastLocation'.<br>
       <br>
       Whenever location is set to 'wayhome', the reading 'wayhome' is set to '1' if current presence state is 'absent'. If attribute rr_locationWayhome was defined, LEAVING one of those locations will set reading 'wayhome' to '1' as well. So you actually have implicit and explicit options to trigger wayhome.<br>
-      Arriving at home will reset the value of 'wayhome' to '0'.
+      Arriving at home will reset the value of 'wayhome' to '0'.<br>
+      <br>
+      If you are using the <a href="#GEOFANCY">GEOFANCY</a> module, you can easily have your location updated with GEOFANCY events by defining a simple NOTIFY-trigger like this:<br>
+      <br>
+      <code>
+      define n_rr_Manfred.location notify geofancy:currLoc_Manfred.* set rr_Manfred location $EVTPART1
+      </code><br>
+      <br>
+      By defining geofencing zones called 'home', 'underway' and 'wayhome' in the iOS app, you automatically get all the features of automatic state changes described above.
     </ul>
   </ul>
   <br>
@@ -1000,7 +1021,7 @@ sub ROOMMATE_RemoveInternalTimer($$) {
   <b>Attributes</b><br>
   <ul><ul>
     <li><b>rr_autoGoneAfter</b> - hours after which state should be auto-set to 'gone' when current state is 'absent'; defaults to 36 hours</li>
-    <li><b>rr_locationHome</b> - locations matching these will be treated as being at home; first entry reflects default value to be used with state correlation; separate entries by space; defaults to "home"</li>
+    <li><b>rr_locationHome</b> - locations matching these will be treated as being at home; first entry reflects default value to be used with state correlation; separate entries by space; defaults to 'home'</li>
     <li><b>rr_locationUnderway</b> - locations matching these will be treated as being underway; first entry reflects default value to be used with state correlation; separate entries by comma or space; defaults to "underway"</li>
     <li><b>rr_locationWayhome</b> - leaving a location matching these will set reading wayhome to 1; separate entries by space; defaults to "wayhome"</li>
     <li><b>rr_locations</b> - list of locations ot be shown in FHEMWEB; separate entries by comma only and do NOT use spaces</li>
@@ -1043,10 +1064,16 @@ sub ROOMMATE_RemoveInternalTimer($$) {
 =end html
 
 =begin html_DE
+
+<a name="ROOMMATE"></a>
+<h3>ROOMMATE</h3>
+<ul>
 Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden.
 Die englische Version ist hier zu finden: 
-
- <a href='http://fhem.de/commandref.html#ROOMMATE>'>ROOMMATE</a> &nbsp;
+</ul>
+<ul>
+<a href='http://fhem.de/commandref.html#ROOMMATE'>ROOMMATE</a>
+</ul>
 
 =end html_DE
 
