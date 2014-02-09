@@ -434,12 +434,12 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
     <code>define &lt;name&gt; &lt;infix&gt;</code><br><br>
 
     Defines the webhook server. <code>&lt;infix&gt;</code> is the portion behind the FHEMWEB base URL (usually
-    <code>http://hostname:8083/fhem</code>)
-
+    <code>http://hostname:8083/fhem</code>)<br>
+    <br>
     Example:
     <ul>
       <code>define geofancy GEOFANCY geo</code><br>
-    </ul>
+    </ul><br>
     The webhook will be reachable at http://hostname:8083/fhem/geo in that case.<br>
     <br>
   </ul>
@@ -462,19 +462,25 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
   <b>Usage information</b>
   <br><br>
   <ul>
-    Likely your FHEM installation is not reachable directly from the internet (good idea!).
+    Likely your FHEM installation is not reachable directly from the internet (good idea!).<br>
     It is recommended to have a reverse proxy like nginx or Apache in front of FHEM where you can make sure access is only possible
-    to specific subdirectories like /fhem/geo.
-    You might also want to think about protecting the access by using HTTP Basic Authentication and encryption via SSL.
+    to specific subdirectories like /fhem/geo.<br>
+    You might also want to think about protecting the access by using HTTP Basic Authentication and encryption via SSL.<br>
     Also the definition of a dedicated FHEMWEB instance for that purpose might help to restrict FHEM's functionality
-    (note that the 'hidden' attributes of FHEMWEB currently do NOT protect from just guessing/knowing the correct URL!)
+    (note that the 'hidden' attributes of FHEMWEB currently do NOT protect from just guessing/knowing the correct URL!)<br>
     <br>
-    To make that reverse proxy available from the internet, just forward the appropriate port via your internet router.
+    To make that reverse proxy available from the internet, just forward the appropriate port via your internet router.<br>
     <br>
     The actual solution on how you can securely make your Geofancy webhook available to the internet is not part of this documentation
     and depends on your own skills.
   </ul>
   <br><br>
+
+  <b>Integration with Home Automation</b>
+  <br><br>
+  <ul>
+    You might want to have a look to the module family of <a href="#ROOMMATE">ROOMMATE</a>, <a href="#GUEST">GUEST</a> and <a href="#RESIDENTS">RESIDENTS</a> for an easy processing of GEOFANCY events.
+  </ul>
 </ul>
 
 =end html
