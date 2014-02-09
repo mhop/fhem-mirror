@@ -829,7 +829,7 @@ sub Calendar_GetUpdate($) {
   my $ics;
   
   if($type eq "url"){ 
-    $ics= GetFileFromURLQuiet($url) if($type eq "url");
+    $ics= GetFileFromURLQuiet($url,10,undef,0,1) if($type eq "url");
   } elsif($type eq "file") {
     if(open(ICSFILE, $url)) {
       while(<ICSFILE>) { 
@@ -962,7 +962,7 @@ sub Calendar_Get($@) {
     if(defined($a[3])) {
       my $keep= $a[3];
       return "Argument $keep is not a number." unless($keep =~ /\d+/);
-      splice @texts, $keep if($#texts>= 0);  
+      splice @texts, $keep if($#texts>= 0 && $#texts >= $keep);  
     }
     return join("\n", @texts);
     
