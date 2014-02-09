@@ -1015,7 +1015,7 @@ sub GUEST_StartInternalTimers($$) {
       define n_rg_Guest.location notify geofancy:currLoc_Guest.* set rg_Guest location $EVTPART1
       </code><br>
       <br>
-      By defining geofencing zones called 'home', 'underway' and 'wayhome' in the iOS app, you automatically get all the features of automatic state changes described above.
+      By defining geofencing zones called 'home' and 'wayhome' in the iOS app, you automatically get all the features of automatic state changes described above.
     </ul>
   </ul>
   <br>

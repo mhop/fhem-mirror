@@ -1011,7 +1011,7 @@ sub ROOMMATE_StartInternalTimers($$) {
       define n_rr_Manfred.location notify geofancy:currLoc_Manfred.* set rr_Manfred location $EVTPART1
       </code><br>
       <br>
-      By defining geofencing zones called 'home', 'underway' and 'wayhome' in the iOS app, you automatically get all the features of automatic state changes described above.
+      By defining geofencing zones called 'home' and 'wayhome' in the iOS app, you automatically get all the features of automatic state changes described above.
     </ul>
   </ul>
   <br>
