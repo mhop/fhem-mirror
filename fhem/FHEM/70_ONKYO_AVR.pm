@@ -1654,18 +1654,24 @@ sub ONKYO_AVR_RClayout() {
     <ul><code>
        define avr ONKYO_AVR 192.168.0.10
        <br><br>
-       define avr ONKYO_AVR 192.168.0.10 2013 &nbsp;&nbsp;&nbsp; # With explicit protocol version 2013 and later
+       # With explicit protocol version 2013 and later<br>
+       define avr ONKYO_AVR 192.168.0.10 2013
        <br><br>
-       define avr ONKYO_AVR 192.168.0.10 pre2013 &nbsp;&nbsp;&nbsp; # With protocol version prior 2013
+       # With protocol version prior 2013<br>
+       define avr ONKYO_AVR 192.168.0.10 pre2013
        <br><br>
-       define avr ONKYO_AVR 192.168.0.10 pre2013 zone2 &nbsp;&nbsp;&nbsp; # With zone2
+       # With zone2<br>
+       define avr ONKYO_AVR 192.168.0.10 pre2013 zone2
        <br><br>
-       define avr ONKYO_AVR 192.168.0.10 pre2013 main 60 &nbsp;&nbsp;&nbsp; # With custom interval of 60 seconds
+       # With custom interval of 60 seconds<br>
+       define avr ONKYO_AVR 192.168.0.10 pre2013 main 60
        <br><br>
-       define avr ONKYO_AVR 192.168.0.10 pre2013 zone2 60 &nbsp;&nbsp;&nbsp; # With zone2 and custom interval of 60 seconds
+       # With zone2 and custom interval of 60 seconds<br>
+       define avr ONKYO_AVR 192.168.0.10 pre2013 zone2 60
     </code></ul>
    
-  </ul>
+  </ul><br><br>
+
   
   <a name="ONKYO_AVRset"></a>
   <b>Set </b>
@@ -1688,6 +1694,7 @@ sub ONKYO_AVR_RClayout() {
     </ul>
   </ul><br><br>
 
+
   <a name="ONKYO_AVRget"></a>
   <b>Get</b>
   <ul>
@@ -1701,9 +1708,8 @@ sub ONKYO_AVR_RClayout() {
     mute<br>
     sleep<br>
   </code></ul>
-</ul>
+</ul><br><br>
 
-  <br>
   <b>Generated Readings/Events (may vary depending on zone):</b><br>
   <ul>
   <li><b>input</b> - Shows currently used input; part of FHEM-4-AV-Devices compatibility</li>
