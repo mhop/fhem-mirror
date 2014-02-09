@@ -734,7 +734,7 @@ sub GUEST_DurationTimer($;$) {
     my ( $mHash, @a ) = @_;
     my $hash         = ( $mHash->{HASH} ) ? $mHash->{HASH} : $mHash;
     my $name         = $hash->{NAME};
-    my $state        = ( $hash->{STATE} ) ? $hash->{STATE} : "initialized";
+    my $state        = ( $hash->{READINGS}{state}{VAL} ) ? $hash->{READINGS}{state}{VAL} : "initialized";
     my $silent       = ( defined( $a[0] ) && $a[0] eq "1" ) ? 1 : 0;
     my $timestampNow = gettimeofday();
     my $diff;
