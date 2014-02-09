@@ -600,7 +600,7 @@ JSONMETER_UpdateAborted($)
 		  <li>deviceType 'url': specifies the url path</li>
 		  <li>other: can be used to add login information to the url path of predefined devices
 			  <br>
-			  e.g. <code>?LogName=geheim&LogPSWD=auch_geheim</code></li>
+			  e.g. <code>?LogName=secret&LogPSWD=very_secret</code></li>
 		</ul>
 	<li><code>port &lt;number&gt;</code>
 		<br>
@@ -636,7 +636,7 @@ JSONMETER_UpdateAborted($)
 	   <li><b>ITF</b> - Eintarifz&auml;hler, genutzt von N-ENERGY Netz GmbH (Industrietechnik Fr&ouml;schle)</li>
 	   <li><b>EFR</b> - Stromz&auml;hler, genutzt von  N-ENERGY Netz GmbH</li>
 	   <li><b>url</b> - benutzt die URL, welche durch das Attribut 'pathString' und 'port' definiert wird.</li>
-	   <li><b>file</b> - benutzt die Datei, welche durh das Attribut 'pathString' definiert wird (im FHEM Dateisystem)</li>
+	   <li><b>file</b> - benutzt die Datei, welche durch das Attribut 'pathString' definiert wird (im FHEM Dateisystem)</li>
 	   Das Attribute 'pathString' kann auch benutzt werdne, um Login Information an den URL-Pfad der vordefinierten Ger&auml;te anzuh&auml;ngen.
 	  </ul>
 	</li>
@@ -662,7 +662,7 @@ JSONMETER_UpdateAborted($)
   <ul>
       <li><code>jsonFile</code>
 		<br>
-		extracts and shows the json file</li>
+		Liest die JSON-Datei ein und zeigt sie an</li>
   </ul>
   <br>
 
@@ -671,18 +671,18 @@ JSONMETER_UpdateAborted($)
    <ul>
     <li><code>doStatistics &lt; 0 | 1 &gt;</code>
 		<br>
-		Calculates statistic values - <i>not implemented yet</i></li>
-	<li><code>pathString &lt;string&gt;</code>
+		Berechnet statistische Werte - <i>noch nicht implementiert</i></li>
+	<li><code>pathString &lt;Zeichenkette&gt;</code>
 		<ul>
-		  <li>deviceType 'file': specifies the local file name and path</li>
-		  <li>deviceType 'url': specifies the url path</li>
-		  <li>other: can be used to add login information to the url path of predefined devices
+		  <li>Ger&auml;tetyp 'file': definiert den lokalen Dateinamen und -pfad</li>
+		  <li>Ger&auml;tetyp 'url': Definiert den URL-Pfad</li>
+		  <li>Andere: Kann benutzt werden um Login-Information zum URL Pfad von vordefinerten Ger&auml;ten hinzuzuf&uuml;gen
 			  <br>
-			  e.g. <code>?LogName=geheim&LogPSWD=auch_geheim</code></li>
+			  e.g. <code>?LogName=geheim&LogPSWD=sehr_geheim</code></li>
 		</ul>
-	<li><code>port &lt;number&gt;</code>
+	<li><code>port &lt;Nummer&gt;</code>
 		<br>
-		if the deviceType 'url' is selected the url port can be specified here (default is 80)</li>
+		Beim Ger&auml;tetyp 'url' kann hier der URL-Port festgelegt werden (standardmässig 80)</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
 </ul>
