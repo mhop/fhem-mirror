@@ -23,7 +23,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.0
+# Version: 1.0.1
 #
 # Major Version History:
 # - 1.0.0 - 2014-02-08
@@ -899,7 +899,7 @@ sub RESIDENTS_TimeDiff($$) {
 
     Example:<br>
     <ul><code>
-       # Standalone
+       # Standalone<br>
        define rgr_Residents RESIDENTS
     </code></ul>
   </ul>
@@ -909,27 +909,30 @@ sub RESIDENTS_TimeDiff($$) {
   <a name="RESIDENTSset"></a>
   <b>Set</b>
   <ul>
-    <code>set &lt;rg_FirstName&gt; &lt;command&gt; [&lt;parameter&gt;]</code>
+    <code>set &lt;rgr_ResidentsName&gt; &lt;command&gt; [&lt;parameter&gt;]</code>
     <br><br>
     Currently, the following commands are defined.<br>
     <ul>
-      <li><b>location</b> &nbsp;&nbsp;-&nbsp;&nbsp; sets reading 'location'; see attribute rg_locations to adjust list shown in FHEMWEB</li>
-      <li><b>mood</b> &nbsp;&nbsp;-&nbsp;&nbsp; sets reading 'mood'; see attribute rg_moods to adjust list shown in FHEMWEB</li>
-      <li><b>state</b> &nbsp;&nbsp;home,gotosleep,asleep,awoken,absent,gone&nbsp;&nbsp; switch between states; see attribute rg_states to adjust list shown in FHEMWEB</li>
+      <li><b>addGuest</b> &nbsp;&nbsp;-&nbsp;&nbsp; creates a new GUEST device and adds it to the current RESIDENTS group. Just enter the dummy name and there you go.</li>
+      <li><b>addRoommate</b> &nbsp;&nbsp;-&nbsp;&nbsp; creates a new ROOMMATE device and adds it to the current RESIDENTS group. Just enter the first name and there you go.</li>
+      <li><b>removeGuest</b> &nbsp;&nbsp;-&nbsp;&nbsp; shows all GUEST members and allows to delete their dummy devices easily.</li>
+      <li><b>removeRoommate</b> &nbsp;&nbsp;-&nbsp;&nbsp; shows all ROOMMATE members and allows to delete their dummy devices easily.</li>
+      <li><b>state</b> &nbsp;&nbsp;home,gotosleep,asleep,awoken,absent,gone&nbsp;&nbsp; switch between states for all group members at once; see attribute rgr_states to adjust list shown in FHEMWEB</li>
     </ul>
   </ul>
 
+<br><br>
   <ul>
     <u>Possible states and their meaning</u><br><br>
     <ul>
-      This module differs 7 states:<br><br>
+      This module differs between 7 states:<br><br>
 
       <ul>
-      <li><b>home</b> - residents are present at home and awake</li>
-      <li><b>gotosleep</b> - all present residents are on it's way to bed</li>
+      <li><b>home</b> - residents are present at home and at least one of them is not asleep</li>
+      <li><b>gotosleep</b> - present residents are on their way to bed (if they are not asleep already)</li>
       <li><b>asleep</b> - all present residents are currently sleeping</li>
-      <li><b>awoken</b> - all present residents just woke up from sleep</li>
-      <li><b>absent</b> - no resident is currently at home but will be back shortly</li>
+      <li><b>awoken</b> - at least one resident just woke up from sleep</li>
+      <li><b>absent</b> - no resident is currently at home but at least one will be back shortly</li>
       <li><b>gone</b> - all residents left home for longer period</li>
       <li><b>none</b> - no active member</li>
       </ul><br>
@@ -953,6 +956,8 @@ sub RESIDENTS_TimeDiff($$) {
   <br>
   <b>Generated Readings/Events:</b><br>
   <ul><ul>
+    <li><b>lastActivity</b> - the last state change of one of the group members</li>
+    <li><b>lastActivityBy</b> - the realname of the last group member with changed state</li>
     <li><b>lastArrival</b> - timestamp of last arrival at home</li>
     <li><b>lastAwake</b> - timestamp of last sleep cycle end</li>
     <li><b>lastDeparture</b> - timestamp of last departure from home</li>
@@ -967,7 +972,7 @@ sub RESIDENTS_TimeDiff($$) {
     <li><b>residentsAwoken</b> - number of residents with state 'awoken'</li>
     <li><b>residentsGone</b> - number of residents with state 'gone'</li>
     <li><b>residentsGotosleep</b> - number of residents with state 'gotosleep'</li>
-    <li><b>residentsGuests</b> - number of active guests who are currently threated as part of the residents scope</li>
+    <li><b>residentsGuests</b> - number of active guests who are currently treated as part of the residents scope</li>
     <li><b>residentsHome</b> - number of residents with state 'home'</li>
     <li><b>residentsTotal</b> - total number of all active residents despite their current state</li>
     <li><b>residentsTotalAbsent</b> - number of all residents who are currently underway</li>
@@ -981,10 +986,16 @@ sub RESIDENTS_TimeDiff($$) {
 =end html
 
 =begin html_DE
+
+<a name="RESIDENTS"></a>
+<h3>RESIDENTS</h3>
+<ul>
 Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden.
 Die englische Version ist hier zu finden: 
-
- <a href='http://fhem.de/commandref.html#RESIDENTS>'>RESIDENTS</a> &nbsp;
+</ul>
+<ul>
+<a href='http://fhem.de/commandref.html#RESIDENTS'>RESIDENTS</a>
+</ul>
 
 =end html_DE
 
