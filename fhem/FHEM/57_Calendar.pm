@@ -962,7 +962,8 @@ sub Calendar_Get($@) {
     if(defined($a[3])) {
       my $keep= $a[3];
       return "Argument $keep is not a number." unless($keep =~ /\d+/);
-      splice @texts, $keep if($#texts>= 0 && $#texts >= $keep);  
+      $keep= $#texts+1 if($keep> $#texts);
+      splice @texts, $keep if($keep>= 0);  
     }
     return join("\n", @texts);
     
