@@ -712,10 +712,10 @@ sub CUL_HM_Parse($$) {##############################
       my $i=0;
       $devH->{helper}{rpt}{ts} = gettimeofday();
       CUL_HM_SndCmd(${$ack}[$i++],${$ack}[$i++]) while ($i<@{$ack});
-      Log3 $name,4,"CUL_HM $name dup: repeat ack, dont process";
+      Log3 $name,4,"CUL_HM $name dupe: repeat ack, dont process";
     }
     else{
-      Log3 $name,4,"CUL_HM $name dup: dont process";
+      Log3 $name,4,"CUL_HM $name dupe: dont process";
     }
     return (@entities,$name); #return something to please dispatcher
   }
@@ -1016,7 +1016,7 @@ sub CUL_HM_Parse($$) {##############################
       my $chn = 1;
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
-      my ($t,$h) =  (hex(substr($p,0,4)),hex(substr($p,4,2)));
+      my ($t,$h) =  (hex(substr($p,0,4)),hex(substr($p,6,2)));
       $t -= 0x8000 if($t > 1638.4);
       $t = sprintf("%0.1f", $t/10);
       push @event, "temperature:$t";
@@ -2205,7 +2205,7 @@ sub CUL_HM_parseSDteam(@){#handle SD team events
     #C8: Smoke Alarm
     #C7: tone off
     #01: no alarm
-    my ($No,$state) = (substr($p,2,2),substr($p,4,2));
+    my (undef,$No,$state) = unpack 'A2A2A2',$p;
     if(($dHash) && # update source(ID reported in $dst)
        (!$dHash->{helper}{alarmNo} || $dHash->{helper}{alarmNo} ne $No)){
       $dHash->{helper}{alarmNo} = $No;
@@ -3310,6 +3310,7 @@ sub CUL_HM_Set($@) {
           if ($cmd eq "virtHum") {$hash->{helper}{vd}{vinH} = $valu;}
           else                   {$hash->{helper}{vd}{vin}  = $valu;}
         }
+        $attr{$devName}{msgRepeat} = 0;#force no repeat
         if ($cmd eq "valvePos"){
           my @pId = grep !/^$/,split(',',AttrVal($name,"peerIDs",""));
           return "virtual TC support one VD only. Correct number of peers"
