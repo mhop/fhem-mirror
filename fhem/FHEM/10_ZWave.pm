@@ -484,9 +484,12 @@ ZWave_ParseMultilevel($$$)
 
   my $pr = (hex($fl)>>5)&0x07; # precision
   my $sc = (hex($fl)>>3)&0x03; # scale
+  my $bc = (hex($fl)>>0)&0x07; # bytecount
+  my $msb = (hex($arg)>>8*$bc-1); # most significant bit  ( 0 = pos, 1 = neg )
+  my $val = $msb ? -( 2 ** (8 * $bc) - hex($arg) ) : hex($arg); # 2's complement   
   my $ml = $ml_tbl{$type};
   return "UNKNOWN multilevel type: $type fl: $fl arg: $arg" if(!$ml);
-  return sprintf("%s:%.*f %s", $ml->{n}, $pr, hex($arg)/(10**$pr),
+  return sprintf("%s:%.*f %s", $ml->{n}, $pr, $val/(10**$pr),
        int(@{$ml->{st}}) > $sc ? $ml->{st}->[$sc] : "");
 }
 
