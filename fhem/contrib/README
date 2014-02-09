@@ -6,6 +6,8 @@
   Support for the heatpump controller LUXTRONIK2 used by Alpha-Innotec
   and Siemens and probably some other vendors, too.  LUX2.gplot is one 
   example plotting template.
+- 97_SB_SERVER.pm & 98_SB_PLAYER
+  Squeezebox module from bugster_de
 - 70_SCIVT.pm
   Support for an SCD series solar controler device. Details see 
   http://english.ivt-hirschau.de/content.php?parent_id=CAT_64&doc_id=DOC_118
