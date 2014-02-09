@@ -1,5 +1,7 @@
 ###############################################################
 #
+#  23_LUXTRONIK2.pm
+#
 #  Copyright notice
 #
 #  (c) 2012,2014 Torsten Poitzsch (torsten.poitzsch@gmx.de)
@@ -53,7 +55,7 @@ LUXTRONIK2_Initialize($)
   $hash->{UndefFn}  = "LUXTRONIK2_Undefine";
   $hash->{NotifyFn} = "LUXTRONIK2_Notify";
   $hash->{SetFn}    = "LUXTRONIK2_Set";
-  $hash->{AttrFn}	= "LUXTRONIK2_Attr";
+  $hash->{AttrFn}   = "LUXTRONIK2_Attr";
   $hash->{AttrList} = "disable:0,1 ".
 					  "allowSetParameter:0,1 ".
 					  "autoSynchClock:slider,10,5,300 ".
@@ -155,10 +157,31 @@ LUXTRONIK2_Notify(@) {
 			if ( exists( $hash->{READINGS}{$oldReading} ) ) {
 				delete($hash->{READINGS}{$oldReading});
 				Log3 $name,2,"$name: !!! Change/fix in LUXTRONIK2-Modul: '$oldReading' is now '$newReading'";
+			}
 		}
-	 }
-  }
-  return;
+	}
+	return;
+}
+
+
+sub ########################################
+LUXTRONIK2_Attr(@)
+{
+	my ($cmd,$name,$aName,$aVal) = @_;
+  	# $cmd can be "del" or "set"
+	# $name is device name
+	# aName and aVal are Attribute name and value
+	if ($cmd eq "set") {
+		if ($aName eq "1allowSetParameter") {
+			eval { qr/$aVal/ };
+			if ($@) {
+				Log3 $name, 3, "LUXTRONIK2: Invalid allowSetParameter in attr $name $aName $aVal: $@";
+				return "Invalid allowSetParameter $aVal";
+			}
+		}
+	}
+	
+	return undef;
 }
 
 
@@ -241,25 +264,6 @@ LUXTRONIK2_Set($$@)
   return "Unknown argument $cmd, choose one of $list";
 }
 
-sub ########################################
-LUXTRONIK2_Attr(@)
-{
-	my ($cmd,$name,$aName,$aVal) = @_;
-  	# $cmd can be "del" or "set"
-	# $name is device name
-	# aName and aVal are Attribute name and value
-	if ($cmd eq "set") {
-		if ($aName eq "1allowSetParameter") {
-			eval { qr/$aVal/ };
-			if ($@) {
-				Log3 $name, 3, "LUXTRONIK2: Invalid allowSetParameter in attr $name $aName $aVal: $@";
-				return "Invalid allowSetParameter $aVal";
-			}
-		}
-	}
-	
-	return undef;
-}
 
 sub ########################################
 LUXTRONIK2_GetUpdate($)
@@ -296,7 +300,8 @@ LUXTRONIK2_DoUpdate($)
   my $readingStartTime = time();
   
   Log3 $name, 5, "$name: Opening connection to host ".$host;
-  my $socket = new IO::Socket::INET (  PeerAddr => $host, 
+  my $socket = new IO::Socket::INET (  
+					   PeerAddr => $host, 
 				       PeerPort => 8888,
 				       #   Type = SOCK_STREAM, # probably needed on some systems
 				       Proto => 'tcp'
@@ -1270,18 +1275,19 @@ LUXTRONIK2_doStatisticBoilerCoolDown ($$$$$$)
 <a name="LUXTRONIK2"></a>
 <h3>LUXTRONIK2</h3>
 <ul>
-  Luxtronik 2.0 is a heating controller used in Alpha Innotec and Siemens Novelan (WPR NET) heat pumps.<br>
+  Luxtronik 2.0 is a heating controller used in Alpha Innotec and Siemens Novelan (WPR NET) heat pumps.
+  <br>
   It has a built-in ethernet port, so it can be directly integrated into a local area network (LAN).
   <br>
   <i>The modul is reported to work with firmware: V1.54C, V1.60, V1.69.</i>
-  <br>&nbsp;
+  <br>
+  &nbsp;
   <br>
   
   <a name="LUXTRONIK2define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; LUXTRONIK2 &lt;IP-address&gt; [poll-interval]</code>
-    <br>
+    <code>define &lt;name&gt; LUXTRONIK2 &lt;IP-address&gt; [poll-interval]</code><br>
     If the pool interval is omitted, it is set to 300 (seconds). Smallest possible value is 30.
     <br>
     Example: <code>define Heizung LUXTRONIK2 192.168.0.12 600</code>
@@ -1313,18 +1319,26 @@ LUXTRONIK2_doStatisticBoilerCoolDown ($$$$$$)
   <a name="LUXTRONIK2attr"></a>
   <b>Attributes</b>
   <ul>
-    <li><code>statusHTML</code><br>
-      If set, a HTML-formatted reading named "floorplanHTML" is created. It can be used with the <a href="#FLOORPLAN">FLOORPLAN</a> module.<br>
-      Currently, if the value of this attribute is not NULL, the corresponding reading consists of the current status of the heat pump and the temperature of the water.</li>
-    <li><code>doStatistics &lt; 0 | 1 &gt;</code><br>
+    <li><code>statusHTML</code>
+		<br>
+		If set, a HTML-formatted reading named "floorplanHTML" is created. It can be used with the <a href="#FLOORPLAN">FLOORPLAN</a> module.
+		<br>
+		Currently, if the value of this attribute is not NULL, the corresponding reading consists of the current status of the heat pump and the temperature of the water.</li>
+    <li><code>doStatistics &lt; 0 | 1 &gt;</code>
+		<br>
 		Calculates statistic values: <i>statBoilerGradientHeatUp, statBoilerGradientCoolDown, statBoilerGradientCoolDownMin (boiler heat loss)</i></li>
-	<li><code>allowSetParameter &lt; 0 | 1 &gt;</code><br>
+	<li><code>allowSetParameter &lt; 0 | 1 &gt;</code>
+		<br>
       The <a href="#LUXTRONIK2set">parameters</a> of the heat pump controller can only be changed if this attribut is set to 1.</li>
-	<li><code>autoSynchClock &lt;delay&gt;</code><br>
-		Corrects the clock of the heatpump automatically if a certain <i>delay</i> (10 s - 600 s) against the FHEM time is exeeded. Does a firmware check before.<br>
+	<li><code>autoSynchClock &lt;delay&gt;</code>
+		<br>
+		Corrects the clock of the heatpump automatically if a certain <i>delay</i> (10 s - 600 s) against the FHEM time is exeeded. Does a firmware check before.
+		<br>
 		<i>(A 'delayDeviceTimeCalc' &lt;= 2 s can be caused by the internal calculation interval of the heat pump controller.)</i></li>
-	<li><code>ignoreFirmwareCheck &lt; 0 | 1 &gt;</code><br>
-		A firmware check assures before each set operation that a heatpump controller with untested firmware is not damaged accidently.<br>
+	<li><code>ignoreFirmwareCheck &lt; 0 | 1 &gt;</code>
+		<br>
+		A firmware check assures before each set operation that a heatpump controller with untested firmware is not damaged accidently.
+		<br>
 		If this attribute is set to 1, the firmware check is ignored and new firmware can be tested for compatibility.</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
  </ul>
@@ -1361,12 +1375,21 @@ LUXTRONIK2_doStatisticBoilerCoolDown ($$$$$$)
   <b>Set</b><br>
   <ul>
 	  Durch einen Firmware-Test wird vor jeder Set-Operation sichergestellt, dass W&auml;rmepumpen mit ungetester Firmware nicht unabsichtlich besch&auml;digt werden.
-      <li>opModeHotWater &lt;Betriebsmodus&gt; - Betriebsmodus des Hei&szlig;wasserboilers ( Auto | Party | Off )</l>
-	  <li>hotWaterTemperatureTarget &lt;Temperatur&gt; - Soll-Temperatur des Hei&szlig;wasserboilers in &deg;C</li>
-	  <li>INTERVAL &lt;Abfrageinterval&gt; - Abfrageinterval in Sekunden</li>
-	  <li>statusRequest - Aktualisieren der Ger&auml;tewerte</li>
-	  <li>synchClockHeatPump - Abgleich der Uhr der Steuerung mit der FHEM Zeit. <br>
-	      <b>!! Diese &Auml;nderung geht verloren, sobald die Steuerung ausgeschaltet wird!!</b></li>
+      <li><code>opModeHotWater &lt;Betriebsmodus&gt;</code>
+			<br>
+			Betriebsmodus des Hei&szlig;wasserboilers ( Auto | Party | Off )</l>
+	  <li><code>hotWaterTemperatureTarget &lt;Temperatur&gt;</code>
+			<br>
+			Soll-Temperatur des Hei&szlig;wasserboilers in &deg;C</li>
+	  <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
+			<br>
+			Abfrageinterval in Sekunden</li>
+	  <li><code>statusRequest</code>
+			<br>
+			Aktualisieren der Ger&auml;tewerte</li>
+	  <li><code>synchClockHeatPump</code>
+			<br>
+			Abgleich der Uhr der Steuerung mit der FHEM Zeit. <b>Diese &Auml;nderung geht verloren, sobald die Steuerung ausgeschaltet wird!!</b></li>
   </ul>
   <br>
   
@@ -1380,17 +1403,21 @@ LUXTRONIK2_doStatisticBoilerCoolDown ($$$$$$)
   <a name="LUXTRONIK2attr"></a>
   <b>Attribute</b>
   <ul>
-    <li>statusHTML<br>
+    <li><code>statusHTML</code><br>
       wenn gesetzt, dann wird ein HTML-formatierter Wert "floorplanHTML" erzeugt, welcher vom Modul <a href="#FLOORPLAN">FLOORPLAN</a> genutzt werden kann.<br>
       Momentan wird nur gepr&uuml;ft, ob der Wert dieses Attributes ungleich NULL ist, der entsprechende Ger&auml;tewerte besteht aus dem aktuellen W&auml;rmepumpenstatus und der Heizwassertemperatur.</li>
-    <li>doStatistics &lt; 0 | 1 &gt;<br>
-		Berechnet statistische Werte: <i>statBoilerGradientHeatUp, statBoilerGradientCoolDown, statBoilerGradientCoolDownMin (Wärmeverlust des Boilers)</i></li>
-	<li>allowSetParameter &lt; 0 | 1 &gt;<br>
-      Die internen <a href="#LUXTRONIK2set">Parameter</a> der W&auml;rmepumpensteuerung k&ouml;nnen nur ge&auml;ndert werden, wenn dieses Attribut auf 1 gesetzt ist.</li>
-	<li>autoSynchClock &lt;Zeitunterschied&gt;<br>
+    <li><code>doStatistics &lt; 0 | 1 &gt;</code>
+		<br>
+		Berechnet statistische Werte: <i>statBoilerGradientHeatUp, statBoilerGradientCoolDown, statBoilerGradientCoolDownMin (W&auml;rmeverlust des Boilers)</i></li>
+	<li><code>allowSetParameter &lt; 0 | 1 &gt;</code>
+		<br>
+		Die internen <a href="#LUXTRONIK2set">Parameter</a> der W&auml;rmepumpensteuerung k&ouml;nnen nur ge&auml;ndert werden, wenn dieses Attribut auf 1 gesetzt ist.</li>
+	<li><code>autoSynchClock &lt;Zeitunterschied&gt;</code>
+		<br>
 		Die Uhr der W&auml;rmepumpe wird automatisch korrigiert, wenn ein gewisser <i>Zeitunterschied</i> (10 s - 600 s) gegen&uuml;ber der FHEM Zeit erreicht ist. Zuvor wird die Kompatibilit&auml;t der Firmware &uuml;berpr&uuml;ft.<br>
 		<i>(Ein Ger&auml;tewert 'delayDeviceTimeCalc' &lt;= 2 s ist auf die internen Berechnungsintervale der W&auml;rmepumpensteuerung zur&uuml;ckzuf&uuml;hren.)</i></li>
-	<li>ignoreFirmwareCheck &lt; 0 | 1 &gt;<br>
+	<li><code>ignoreFirmwareCheck &lt; 0 | 1 &gt;</code>
+		<br>
 		Durch einen Firmware-Test wird vor jeder Set-Operation sichergestellt, dass W&auml;rmepumpen mit ungetester Firmware nicht unabsichtlich besch&auml;digt werden. Wenn dieses Attribute auf 1 gesetzt ist, dann wird der Firmware-Test ignoriert und neue Firmware kann getestet werden. Dieses Attribut wird jedoch ignoriert, wenn die Steuerungs-Firmware bereits als nicht kompatibel berichtet wurde.</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
