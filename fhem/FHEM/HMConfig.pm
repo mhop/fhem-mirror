@@ -1269,6 +1269,7 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
                          ,tempListFri    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
                          ,"desired-temp" =>"[on|off|5.0..30.0]"
                         },
+  "HM-TC-IT-WM-W-EU07"=>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
   "HM-ES-PMSw1-Pl01"  =>{ "on-for-timer" =>"<sec>"
                          ,"on-till"      =>"<time>"
                          ,on             =>""
