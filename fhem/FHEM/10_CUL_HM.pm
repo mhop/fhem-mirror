@@ -984,10 +984,10 @@ sub CUL_HM_Parse($$) {##############################
   }
   elsif($md eq "HM-TC-IT-WM-W-EU") { ##########################################
     my %ctlTbl=( 0=>"auto", 1=>"manu", 2=>"party",3=>"boost");
-    if   ($mTp eq "10" && $p =~ m/^0B(....)(..)(..)(..)/) {#info-level
-      my ($d1,$d2,$d3,$d4)=(hex($1),hex($2),hex($3),hex($4));
+    if   ($mTp eq "10" && $p =~ m/^0B/) {#info-level
+      my @d = map{hex($_)} unpack 'A2A4(A2)*',$p;
       my ($chn,$setTemp,$actTemp, $cRep,$bat,$lbat,$wRep, $ctrlMode) =
-          ("02",$d1,$d1,            $d2,$d2,$d2,$d2,            $d3);
+          ("02",$d[1],$d[1],      $d[2],$d[2],$d[2],$d[2],$d[3]);
       $setTemp    =(($setTemp    >>10) & 0x3f )/2;
       $actTemp    =(($actTemp        ) & 0x2ff)/10;
       $actTemp    = -1 * $actTemp if ($1 & 0x200 );# obey signed
@@ -1016,7 +1016,7 @@ sub CUL_HM_Parse($$) {##############################
       my $chn = 1;
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
-      my ($t,$h) =  (hex(substr($p,0,4)),hex(substr($p,6,2)));
+      my ($t,$h) =  map{hex($_)} unpack 'A4A2',$p;
       $t -= 0x8000 if($t > 1638.4);
       $t = sprintf("%0.1f", $t/10);
       push @event, "temperature:$t";
@@ -1027,7 +1027,7 @@ sub CUL_HM_Parse($$) {##############################
       my $chn = 2;
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
-      my ($setTemp,$actTemp,) =  (hex(substr($p,0,4)),hex(substr($p,4,2)));
+      my ($setTemp,$actTemp) =  map{hex($_)} unpack 'A4A2',$p;
       $setTemp    =(($setTemp    >>10) & 0x3f )/2;
       $actTemp    =(($actTemp        ) & 0x2ff)/10;
       $actTemp = sprintf("%2.1f",$actTemp);
