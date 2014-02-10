@@ -2384,9 +2384,8 @@ FW_ActivateInform()
 <a name="FHEMWEB"></a>
 <h3>FHEMWEB</h3>
 <ul>
-  FHEMWEB is the builtin web-frontend (webpgm2). It implements a simple web
-  server (optionally with Basic-Auth and HTTPS), so no additional program is
-  needed.
+  FHEMWEB is the builtin web-frontend, it also implements a simple web
+  server (optionally with Basic-Auth and HTTPS).
   <br> <br>
 
   <a name="FHEMWEBdefine"></a>
@@ -2398,10 +2397,7 @@ FW_ActivateInform()
     then requests from all interfaces (not only localhost / 127.0.0.1) are
     serviced.<br>
     To enable listening on IPV6 see the comments <a href="#telnet">here</a>.
-    <br><br>
-    Feature: http://host:port/fhem/icons/&lt;devicename&gt; will return
-    the icon associated with the current status of &lt;devicename&gt;.
-
+    <br>
   </ul>
   <br>
 
@@ -2409,11 +2405,11 @@ FW_ActivateInform()
   <b>Set</b>
   <ul>
     <li>rereadicons<br>
-      Rereads the icons in the icon path and updates the mapping from logical
-      icons to physical files.  Use after adding, deleting or changing icons.
+      reads the names of the icons from the icon path.  Use after adding or
+      deleting icons.
       </li>
     <li>clearSvgCache<br>
-      Delete all files found in the www/SVGcache directory, which is used to
+      delete all files found in the www/SVGcache directory, which is used to
       cache SVG data, if the SVGcache attribute is set.
       </li>
   </ul>
@@ -2457,30 +2453,18 @@ FW_ActivateInform()
     <li>plotmode<br>
         Specifies how to generate the plots:
         <ul>
-          <li>gnuplot<br>
-              Call the gnuplot script with each logfile. The filename
-              specification of the <a href="#FileLog">FileLog</a> device will
-              determine what is in the plot.  The data is converted into an
-              image on the backend with gnuplot.</li>
-          <li>gnuplot-scroll<br>
-              Fhemweb will offer zoom and scroll buttons in order to navigate
-              in the current logfile, i.e. you can select just a part of the
-              data to be displayed. The more data is contained in a single
-              logfile, the easier you can navigate. The recommendation is to
-              store the data for a whole year in one logfile.  The data is
-              converted into an image on the backend with gnuplot.</li>
           <li>SVG<br>
-              The same scrolling as with gnuplot scroll, but the data is sent
-              as an SVG script to the frontend, which will compute
-              the image: no need for gnuplot on the backend.
-              This is the default. Note: SVG is supported on the Android
-              platform by Opera/Firefox and the Internet Explorer before 9
-              needs a plugin.
-              </li>
+              The plots are created with the <a href="#SVG">SVG</a> module.
+              This is the default.</li>
+
+          <li>gnuplot<br>
+              The plots are created with the gnuplot program. Note: this mode
+              ist only available due to historic reasons.</li>
+
+          <li>gnuplot-scroll<br>
+              Like the gnuplot-mode, but scrolling to historical values is alos
+              possible, just like with SVG.</li>
         </ul>
-        See also the attribute fixedrange.
-        Note: for gnuplot & gnuplot-scroll mode the gnuplot output is
-        redirected to the file gnuplot.err in the /tmp directory
         </li><br>
 
     <a name="plotsize"></a>
@@ -2493,10 +2477,11 @@ FW_ActivateInform()
 
     <a name="nrAxis"></a>
     <li>nrAxis<br>
-        the number of axis for which space should be reserved  on the left and right sides of a plot
-        and optionaly how many axes should realy be used on each side, separated by comma:
-        left,right[,useLeft,useRight].  You can set individual numbers by setting the nrAxis of
-        the SVG. Default is 1,1.
+        the number of axis for which space should be reserved  on the left and
+        right sides of a plot and optionaly how many axes should realy be used
+        on each side, separated by comma: left,right[,useLeft,useRight].  You
+        can set individual numbers by setting the nrAxis of the SVG. Default is
+        1,1.
         </li><br>
 
     <a name="SVGcache"></a>
@@ -2724,7 +2709,7 @@ FW_ActivateInform()
         Set the icon for a device in the room overview. There is an
         icon-chooser in FHEMWEB to ease this task.  Setting icons for the room
         itself is indirect: there must exist an icon with the name
-        ico<ROOMNAME>.png in the modpath directory.
+        ico<ROOMNAME>.png in the iconPath.
         </li>
         <br>
 
@@ -2736,7 +2721,7 @@ FW_ActivateInform()
         Everything, or to set one for rooms with / in the name (e.g.
         Anlagen/EDV). The first part is treated as regexp, so space is
         represented by a dot.  Example:<br>
-        attr WEB roomIcons Everything: Anlagen.EDV:icoEverything
+        attr WEB roomIcons Anlagen.EDV:icoEverything
         </li>
         <br>
 
@@ -2859,7 +2844,484 @@ FW_ActivateInform()
     </ul>
   </ul>
 
-
-
 =end html
+
+=begin html_DE
+
+<a name="FHEMWEB"></a>
+<h3>FHEMWEB</h3>
+<ul>
+  FHEMWEB ist das default WEB-Frontend, es implementiert auch einen einfachen
+  Webserver (optional mit Basic-Auth und HTTPS).
+  <br> <br>
+
+  <a name="FHEMWEBdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; FHEMWEB &lt;tcp-portnr&gt; [global]</code>
+    <br><br>
+    Aktiviert das Webfrontend auf dem Port &lt;tcp-portnr&gt;. Mit dem
+    Parameter global werden Anfragen von allen Netzwerkschnittstellen
+    akzeptiert (nicht nur vom localhost / 127.0.0.1) .  <br>
+
+    Informationen f&uuml;r den Betrieb mit IPv6 finden Sie <a
+    href="#telnet">hier</a>.<br>
+  </ul>
+  <br>
+
+  <a name="FHEMWEBset"></a>
+  <b>Set</b>
+  <ul>
+    <li>rereadicons<br>
+      Damit wird die Liste der Icons neu eingelesen, f&uuml;r den Fall, dass
+      Sie Icons l&ouml;schen oder hinzuf&uuml;gen.
+      </li>
+    <li>clearSvgCache<br>
+      Im Verzeichnis www/SVGcache werden SVG Daten zwischengespeichert, wenn
+      das Attribut SVGcache gesetzt ist.  Mit diesem Befehl leeren Sie diesen
+      Zwischenspeicher.
+      </li>
+  </ul>
+  <br>
+
+  <a name="FHEMWEBget"></a>
+  <b>Get</b>
+  <ul>
+    <li>icon &lt;logical icon&gt;<br>
+        Liefert den absoluten Pfad des (logischen) Icons zur&uuml;ck. Beispiel:
+        <ul>
+          <code>get myFHEMWEB icon FS20.on<br>
+          /data/Homeautomation/fhem/FHEM/FS20.on.png
+          </code>
+        </ul></li>
+    <li>pathlist<br>
+        Zeigt diejenigen Verzeichnisse an, in welchen die verschiedenen Dateien
+        f&uuml;r FHEMWEB liegen.
+        </li>
+    <br><br>
+
+  </ul>
+
+  <a name="FHEMWEBattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <a name="webname"></a>
+    <li>webname<br>
+        Der Pfad nach http://hostname:port/ . Standard ist fhem,
+        so ist die Standard HTTP Adresse http://localhost:8083/fhem
+        </li><br>
+
+    <a name="refresh"></a>
+    <li>refresh<br>
+        Damit erzeugen Sie auf den ausgegebenen Webseiten einen automatischen
+        Refresh, z.B. nach 5 Sekunden.
+        </li><br>
+
+    <a name="plotmode"></a>
+    <li>plotmode<br>
+        Spezifiziert, wie Plots erzeugt werden sollen:
+        <ul>
+          <li>SVG<br>
+          Die Plots werden mit Hilfe des <a href="#SVG">SVG</a> Moduls als SVG
+          Grafik gerendert. Das ist die Standardeinstellung.</li>
+
+          <li>gnuplot<br>
+          Die Plots werden mit Hilfe des gnuplot Programmes erzeugt. Diese
+          Option ist aus historischen Gr&uuml;nden vorhanden.
+          </li>
+
+          <li>gnuplot-scroll<br>
+          Wie gnuplot, der einfache Zugriff auf historische Daten ist aber
+          genauso m&ouml;glich wie mit dem SVG Modul.</li>
+
+        </ul>
+        </li><br>
+
+    <a name="plotsize"></a>
+    <li>plotsize<br>
+        gibt die Standardbildgr&ouml;&szlig;e aller erzeugten Plots an als
+        Breite,H&ouml;he an. Um einem individuellen Plot die Gr&ouml;&szlig;e zu
+        &auml;ndern muss dieses Attribut bei der entsprechenden SVG Instanz
+        gesetzt werden.  Default sind 800,160 f&uuml;r Desktop und 480,160
+        f&uuml;r Smallscreen
+        </li><br>
+
+    <a name="nrAxis"></a>
+    <li>nrAxis<br>
+        (bei mehrfach-Y-Achsen im SVG-Plot) Die Darstellung der Y Achsen
+        ben&ouml;tigt Platz. Hierdurch geben Sie an wie viele Achsen Sie
+        links,rechts [useLeft,useRight] ben&ouml;tigen. Default ist 1,1 (also 1
+        Achse links, 1 Achse rechts).
+        </li><br>
+
+    <a name="SVGcache"></a>
+    <li>SVGcache<br>
+        Plots die sich nicht mehr &auml;ndern, werden im SVGCache Verzeichnis
+        (www/SVGcache) gespeichert, um die erneute, rechenintensive
+        Berechnung der Grafiken zu vermeiden. Default ist 0, d.h. aus.<br>
+        Siehe den clearSvgCache Befehl um diese Daten zu l&ouml;schen.
+        </li><br>
+
+    <a name="endPlotToday"></a>
+    <li>endPlotToday<br>
+        Wird dieses FHEMWEB Attribut gesetzt, so enden Wochen- bzw. Monatsplots
+        am aktuellen Tag, sonst wird die aktuelle Woche/Monat angezeigt.
+        </li><br>
+
+    <a name="endPlotNow"></a>
+    <li>endPlotNow<br>
+        Wenn Sie dieses FHEMWEB Attribut auf 1 setzen, werden Tages und
+        Stunden-Plots zur aktuellen Zeit beendet. (&Auml;hnlich wie
+        endPlotToday, nur eben min&uuml;tlich).
+        Ansonsten wird der gesamte Tag oder eine 6 Stunden Periode (0, 6, 12,
+        18 Stunde) gezeigt. Dieses Attribut wird nicht verwendet, wenn das SVG
+        Attribut startDate benutzt wird.<br>
+        </li><br>
+
+    <a name="plotfork"></a>
+    <li>plotfork<br>
+        Normalerweise wird die Ploterstellung im Hauptprozess ausgef&uuml;hrt,
+        FHEM wird w&auml;rend dieser Zeit nicht auf andere Ereignisse
+        reagieren. Auf Rechnern mit sehr wenig Speicher (z.Bsp. FRITZ!Box 7170)
+        kann das zum automatischen Abschuss des FHEM Prozesses durch das OS
+        f&uuml;hren.
+        </li><br>
+
+    <a name="basicAuth"></a>
+    <li>basicAuth, basicAuthMsg<br>
+        Fragt username/password zur Autentifizierung ab. Es gibt mehrere
+        Varianten:
+        <ul>
+        <li>falls das Argument <b>nicht</b> in {} eingeschlossen ist, dann wird
+          es als base64 kodiertes benutzername:passwort interpretiert.
+          Um sowas zu erzeugen kann man entweder einen der zahlreichen
+          Webdienste verwenden, oder das base64 Programm. Beispiel:
+          <ul><code>
+            $ echo -n fhemuser:secret | base64<br>
+            ZmhlbXVzZXI6c2VjcmV0<br>
+            fhem.cfg:<br>
+            attr WEB basicAuth ZmhlbXVzZXI6c2VjcmV0
+          </code></ul>
+          </li>
+        <li>Werden die Argumente in {} angegeben, wird es als perl-Ausdruck
+          ausgewertet, die Variablen $user and $password werden auf die
+          eingegebenen Werte gesetzt. Falls der R&uuml;ckgabewert wahr ist,
+          wird die Anmeldung akzeptiert.
+
+          Beispiel:<br>
+          <code>
+            attr WEB basicAuth { "$user:$password" eq "admin:secret" }<br>
+          </code>
+          </li>
+        </ul>
+    </li><br>
+
+    <a name="HTTPS"></a>
+    <li>HTTPS<br>
+        Erm&ouml;glicht HTTPS Verbindungen. Es werden die Perl Module
+        IO::Socket::SSL ben&ouml;tigt, installierbar mit cpan -i
+        IO::Socket::SSL oder apt-get install libio-socket-ssl-perl; (OSX und
+        die FritzBox-7390 haben dieses Modul schon installiert.)<br>
+
+        Ein lokales Zertifikat muss im Verzeichis certs erzeugt werden.
+        Dieses Verzeichnis <b>muss</b> im <a href="#modpath">modpath</a>
+        angegeben werden, also auf der gleichen Ebene wie das FHEM Verzeichnis.
+        Beispiel:
+        <ul>
+        mkdir certs<br>
+        cd certs<br>
+        openssl req -new -x509 -nodes -out server-cert.pem -days 3650 -keyout server-key.pem
+        </ul>
+
+      <br>
+    </li>
+
+    <a name="allowedCommands"></a>
+    <li>allowedCommands<br>
+        Eine Komma getrennte Liste der erlaubten Befehle. Bei einer leeren
+        Liste (, dh. nur ein Komma)  wird dieser FHEMWEB-Instanz "read-only".
+        <br> Falls es auf <code>get,set</code> gesetzt ist, dann sind in dieser
+        FHEMWEB Instanz keine Konfigurations&auml;nderungen m&ouml;glich, nur
+        "normale" Bedienung der Schalter/etc.<br>
+
+        Dieses Attribut sollte zusammen mit dem hiddenroom/hiddengroup
+        Attributen verwendet werden.  <br>
+
+        <b>Achtung:</b> allowedCommands sollte wie hier beschrieben
+        funktionieren, allerdings k&ouml;nnen wir keine Garantie geben,
+        da&szlig; man sie nicht &uuml;berlisten, und Schaden anrichten kann.
+        </li><br>
+
+    <li><a href="#allowfrom">allowfrom</a>
+        </li><br>
+
+    <a name="stylesheetPrefix"></a>
+    <li>stylesheetPrefix<br>
+      Pr&auml;fix f&uuml;r die Dateien style.css, svg_style.css und
+      svg_defs.svg. Wenn die Datei mit dem Pr&auml;fix fehlt, wird die Default
+      Datei (ohne Pr&auml;fix) verwendet.  Diese Dateien  m&uuml;ssen im FHEM
+      Ordner liegen und k&ouml;nnen direkt mit "Select style" im FHEMWEB
+      Men&uuml;eintrag ausgew&auml;hlt werden. Beispiel:
+      <ul>
+        attr WEB stylesheetPrefix dark<br>
+        <br>
+        Referenzdateien:<br>
+        <ul>
+        darksvg_defs.svg<br>
+        darksvg_style.css<br>
+        darkstyle.css<br>
+        </ul>
+        <br>
+      </ul>
+      <b>Anmerkung:</b>Wenn der Parametername smallscreen oder touchpad
+      enth&auml;lt, wird FHEMWEB das Layout/den Zugriff f&uuml;r entsprechende
+      Ger&auml;te (Smartphones oder Touchpads) optimieren<br>
+
+      Standardm&auml;&szlig;ig werden 3 FHEMWEB Instanzen aktiviert: Port 8083
+      f&uuml;r Desktop Browser, Port 8084 f&uuml;r Smallscreen, und 8085
+      f&uuml;r Touchpad.<br>
+
+      Wenn touchpad oder smallscreen benutzt werden, wird WebApp support
+      aktiviert: Nachdem Sie eine Seite am iPhone oder iPad mit Safari
+      angesehen haben, k&ouml;nnen Sie einen Link auf den Homescreen anlegen um
+      die Seite im Fullscreen Modus zu sehen. Links werden in diesem Modus
+      anders gerendert, um ein "Zur&uuml;ckfallen" in den "normalen" Browser zu
+      verhindern.
+      </li><br>
+
+    <a name="iconPath"></a>
+    <li>iconPath<br>
+      Durch Doppelpunkt getrennte Aufz&auml;hlung der Verzeichnisse, in
+      welchen nach Icons gesucht wird.  Die Verzeichnisse m&uuml;ssen unter
+      fhem/www/images angelegt sein. Standardeinstellung ist:
+      $styleSheetPrefix:default:fhemSVG:openautomation<br>
+      Setzen Sie den Wert auf fhemSVG:openautomation um nur SVG Bilder zu
+      benutzen.
+      </li><br>
+
+    <a name="hiddenroom"></a>
+    <li>hiddenroom<br>
+       Eine Komma getrennte Liste, um R&auml;ume zu verstecken, d.h. nicht 
+       anzuzeigen. Besondere Werte sind input, detail und save. In diesem
+       Fall werden diverse Eingabefelder ausgeblendent. Durch direktes Aufrufen
+       der URL sind diese R&auml;ume weiterhin erreichbar!<br>
+       Ebenso k&ouml;nnen Eintr&auml;ge in den Logfile/Commandref/etc Block
+       versteckt werden.  </li><br>
+
+    <a name="hiddengroup"></a>
+    <li>hiddengroup<br>
+        Wie hiddenroom (siehe oben), jedoch auf Ger&auml;tegruppen bezogen.
+        <br>
+        Beispiel:  attr WEBtablet hiddengroup FileLog,dummy,at,notify
+        </li><br>
+
+    <a name="menuEntries"></a>
+    <li>menuEntries<br>
+        Komma getrennte Liste; diese Links werden im linken Men&uuml; angezeigt.
+        Beispiel:<br>
+        attr WEB menuEntries fhem.de,http://fhem.de,culfw.de,http://culfw.de<br>
+        attr WEB menuEntries AlarmOn,http://fhemhost:8083/fhem?cmd=set%20alarm%20on<br>
+        </li><br>
+
+    <a name="longpoll"></a>
+    <li>longpoll<br>
+        Dies betrifft die Aktualisierung der Ger&auml;testati in der
+        Weboberfl&auml;che. Ist longpoll aktiviert, werden
+        Status&auml;nderungen sofort im Browser dargestellt. ohne die Seite
+        manuell neu laden zu m&uuml;ssen. Standard ist aktiviert.
+        </li><br>
+
+
+    <a name="longpollSVG"></a>
+    <li>longpollSVG<br>
+        L&auml;dt SVG Instanzen erneut, falls ein Ereignis dessen Inhalt
+        &auml;ndert. Funktioniert nur, falls der dazugeh&ouml;rige #FileLog
+        Definition in der .gplot Datei folgenden Form hat: deviceName.Event
+        bzw. deviceName.*. Wenn man den <a href="#weblinkEditor">Plot
+        Editor</a> benutzt, ist das &uuml;brigens immer der Fall. Die SVG Datei
+        wird bei <b>jedem</b> ausl&ouml;senden Event dieses Ger&auml;tes neu
+        geladen.  Standard ist aus.
+        </li><br>
+
+    <a name="redirectCmds"></a>
+    <li>redirectCmds<br>
+        Damit wird das URL Eingabefeld des Browser nach einem Befehl geleert.
+        Standard ist eingeschaltet (1), ausschalten kann man es durch
+        setzen des Attributs auf 0, z.Bsp. um den Syntax der Kommunikation mit
+        FHEMWEB zu untersuchen.
+        </li><br>
+
+    <a name="fwcompress"></a>
+    <li>fwcompress<br>
+        Aktiviert die HTML Datenkompression (Standard ist 1, also ja, 0 stellt
+        die Kompression aus).
+        </li><br>
+
+    <a name="reverseLogs"></a>
+    <li>reverseLogs<br>
+        Damit wird das Logfile umsortiert, die neuesten Eintr&auml;ge stehen
+        oben.  Der Vorteil ist, dass man nicht runterscrollen muss um den
+        neuesten Eintrag zu sehen, der Nachteil dass FHEM damit deutlich mehr
+        Hauptspeicher ben&ouml;tigt, etwa 6 mal so viel, wie das Logfile auf
+        dem Datentr&auml;ger gro&szlig; ist. Das kann auf Systemen mit wenig
+        Speicher (FRITZ!Box) zum Terminieren des FHEM Prozesses durch das
+        Betriebssystem f&uuml;hren.
+        </li><br>
+
+    <a name="CORS"></a>
+    <li>CORS<br>
+        Wenn auf 1 gestellt, wird FHEMWEB einen "Cross origin resource sharing"
+        Header bereitstellen, n&auml;heres siehe Wikipedia.
+        </li><br>
+
+    <a name="icon"></a>
+    <li>icon<br>
+        Damit definiert man ein Icon f&uuml;r die einzelnen Ger&auml;te in der
+        Raum&uuml;bersicht. Es gibt einen passenden Link in der Detailansicht
+        um das zu vereinfachen. Um ein Bild f&uuml;r die R&auml;ume selbst zu
+        definieren muss ein Icon mit dem Namen ico&lt;Raumname&gt;.png im
+        iconPath existieren (oder man verwendet roomIcons, s.u.)
+        </li><br>
+
+    <a name="roomIcons"></a>
+    <li>roomIcons<br>
+        Leerzeichen getrennte Liste von room:icon Zuordnungen
+        Der erste Teil wird als regexp interpretiert, daher muss ein
+        Leerzeichen als Punkt geschrieben werden. Beispiel:<br>
+          attr WEB roomIcons Anlagen.EDV:icoEverything
+        </li><br>
+
+    <a name="sortRooms"></a>
+    <li>sortRooms<br>
+        Durch Leerzeichen getrennte Liste von R&auml;umen, um deren Reihenfolge
+        zu definieren.  Beispiel:<br>
+          attr WEB sortRooms DG OG EG Keller
+        </li><br>
+
+    <a name="sortby"></a>
+    <li>sortby<br>
+        Der Wert dieses Attributs wird zum sortieren von Ger&auml;ten in
+        R&auml;umen verwendet, sonst w&auml;re es der Alias oder, wenn keiner
+        da ist, der Ger&auml;tename selbst.
+        </li><br>
+
+    <a name="devStateIcon"></a>
+    <li>devStateIcon<br>
+        Erste Variante:<br>
+        <ul>
+        Leerzeichen getrennte Auflistung von regexp:icon-name:cmd
+        Dreierp&auml;rchen, icon-name und cmd d&uuml;rfen leer sein.<br>
+
+        Wenn der Zustand des Ger&auml;tes mit der regexp &uuml;bereinstimmt,
+        wird als icon-name das entsprechende Status Icon angezeigt, und (falls
+        definiert), l&ouml;st ein Klick auf das Icon das entsprechende cmd aus.
+        Wenn fhem icon-name nicht finden kann, wird der Status als Text
+        angezeigt. 
+        Beispiel:<br>
+        <ul>
+        attr lamp devStateIcon on:closed off:open<br>
+        attr lamp devStateIcon on::A0 off::AI<br>
+        attr lamp devStateIcon .*:noIcon<br>
+        </ul>
+        Anmerkung: Wenn das Icon ein SVG Bild ist, kann das @colorname Suffix
+        verwendet werden um das Icon einzuf&auml;rben. Z.B.:<br>
+        <ul>
+          attr Fax devStateIcon on:control_building_empty@red off:control_building_filled:278727
+        </ul>
+
+        </ul>
+        Zweite Variante:<br>
+        <ul>
+        Perl regexp eingeschlossen in {}. Wenn der Code undef
+        zur&uuml;ckliefert, wird das Standard Icon verwendet; wird ein String
+        in <> zur&uuml;ck geliefert, wird dieser als HTML String interpretiert.
+        Andernfalls wird der String als devStateIcon gem&auml;&szlig; der
+        ersten Variante interpretiert, siehe oben.  Beispiel:<br>
+
+        {'&lt;div style="width:32px;height:32px;background-color:green"&gt;&lt;/div&gt;'}
+        </ul>
+        </li><br>
+
+    <a name="devStateStyle"></a>
+    <li>devStateStyle<br>
+        F&uuml;r ein best. Ger&auml;t einen best. HTML-Style benutzen.
+        Beispiel:<br>
+        <ul>
+        attr sensor devStateStyle style="text-align:left;;font-weight:bold;;"<br>
+        </ul>
+        </li><br>
+
+    <a name="webCmd"></a>
+    <li>webCmd<br>
+        Durch Doppelpunkte getrennte Auflistung von Befehlen, die f&uuml;r ein
+        bestimmtes Ger&auml;t gelten sollen.  Funktioniert nicht mit
+        smallscreen, ein Ersatz daf&uuml;r ist der devStateIcon Befehl.<br>
+        Beispiel:
+        <ul>
+          attr lamp webCmd on:off:on-for-timer 10<br>
+        </ul>
+        <br>
+
+        Der erste angegebene Befehl wird in der "set device ?" list
+        nachgeschlagen (Siehe das <a href="#setList">setList</a> Attrib
+        f&uuml;r Dummy Ger&auml;te).  Wenn <b>dort</b> bekannte Modifier sind,
+        wird ein anderes Widget angezeigt:
+        <ul>
+          <li>Ist der Modifier ":noArg", wird kein weiteres Eingabefeld
+              angezeigt.</li>
+
+          <li>Ist der Modifier ":time", wird ein in Javaskript geschreibenes
+              Zeitauswahlmen&uuml; angezeigt.</li>
+
+          <li>Ist der Modifier ":textField", wird ein Eingabefeld
+              angezeigt.</li>
+
+          <li>Ist der Modifier in der Form
+            ":slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;", so wird ein in
+            JavaScript programmierter Slider angezeigt</li>
+
+          <li>In allen anderen F&auml;llen erscheint ein Dropdown mit allen
+            Modifier Werten.</li>
+        </ul>
+
+        Wenn der Befehl state ist, wird der Wert als Kommando interpretiert.<br>
+        Beispiele f&uuml;r modifier:
+        <ul>
+          define d1 dummy<br>
+          attr d1 webCmd state<br>
+          attr d1 setList state:on,off<br>
+          define d2 dummy<br>
+          attr d2 webCmd state<br>
+          attr d2 setList state:slider,0,1,10<br>
+          define d3 dummy<br>
+          attr d3 webCmd state<br>
+          attr d3 setList state:time<br>
+        </ul>
+
+        Anmerkung: dies ist ein Attribut f&uuml;r das anzuzeigende Ger&auml;t,
+        nicht f&uuml;r die FHEMWEBInstanz.
+        </li><br>
+
+     <a name="column"></a>
+     <li>column<br>
+        Damit werden mehrere Spalten f&uuml;r einen Raum angezeigt, indem
+        sie verschiedene Gruppen Spalten zuordnen. Beispiel:<br>
+        <ul><code>
+          attr WEB column LivingRoom:FS20,notify|FHZ,notify DiningRoom:FS20|FHZ
+        </code></ul>
+       
+        In diesem Beispiel werden im Raum LivingRoom die FS20 sowie die notify
+        Gruppe in der ersten Spalte, die FHZ und das notify in der zweiten
+        Spalte angezeigt.<br>
+       
+        Anmerkung: einige Elemente, wie SVG Plots und readingsGroup k&ouml;nnen
+        nur Teil einer Spalte sein wenn sie in <a href="#group">group</a>
+        stehen.
+        </li><br>
+
+    </ul>
+  </ul>
+
+=end html_DE
+
 =cut
