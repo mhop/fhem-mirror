@@ -1013,7 +1013,7 @@ sub CUL_HM_Parse($$) {##############################
                                             );
     }
     elsif($mTp eq "70"){
-      my $chn = 1;
+      my $chn = "01";
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
       my ($t,$h) =  map{hex($_)} unpack 'A4A2',$p;
@@ -1024,7 +1024,7 @@ sub CUL_HM_Parse($$) {##############################
       push @event, "state:T: $t H: $h";
     }
     elsif($mTp eq "5A"){# thermal control - might work with broadcast
-      my $chn = 2;
+      my $chn = "02";
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
       my ($setTemp,$actTemp) =  map{hex($_)} unpack 'A4A2',$p;
