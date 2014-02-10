@@ -125,9 +125,25 @@ FW_longpoll()
 }
 
 function
+FW_replaceLinks()
+{
+  var elArr = document.querySelectorAll("a[href]");
+  for(var i1=0; i1< elArr.length; i1++) {
+    var a = elArr[i1];
+    var ma = a.getAttribute("href").match(/^(.*\?)(cmd[^=]*=.*)$/);
+    if(ma == null || ma.length == 0 || ma[2].match(/=style/))
+      continue;
+    a.removeAttribute("href");
+    a.setAttribute("onclick", "FW_cmd('"+ma[1]+"XHR=1&"+ma[2]+"')");
+    a.setAttribute("style", "cursor:pointer");
+  }
+}
+
+function
 FW_delayedStart()
 {
   setTimeout("FW_longpoll()", 100);
+  FW_replaceLinks();
 }
 /*************** LONGPOLL END **************/
 
