@@ -525,11 +525,11 @@ sub ############################
 JSONMETER_UpdateAborted($)
 {
   my ($hash) = @_;
-  
-  Log3 $hash->{NAME}, 3, "BlockingCall for ". $hash->{NAME} ." was aborted";
-   
-  RemoveInternalTimer($hash);
   delete($hash->{helper}{RUNNING_PID});
+  my $name = $hash->{NAME};
+  my $host = $hash->{HOST};
+  Log3 $hash, 1, "$name Error: Timeout when connecting to host $host";
+
 } # end JSONMETER_UpdateAborted
 
 
