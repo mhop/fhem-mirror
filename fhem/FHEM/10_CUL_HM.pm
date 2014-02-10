@@ -990,7 +990,7 @@ sub CUL_HM_Parse($$) {##############################
           ("02",$d[1],$d[1],      $d[2],$d[2],$d[2],$d[2],$d[3]);
       $setTemp    =(($setTemp    >>10) & 0x3f )/2;
       $actTemp    =(($actTemp        ) & 0x2ff)/10;
-      $actTemp    = -1 * $actTemp if ($1 & 0x200 );# obey signed
+      $actTemp    = -1 * $actTemp if ($d[1] & 0x200 );# obey signed
       $bat        =(($bat            ) & 0x1f)/10+1.5;
       $lbat       = ($lbat           ) & 0x80;
       $ctrlMode   = ($ctrlMode   >> 6) & 0x3  ;

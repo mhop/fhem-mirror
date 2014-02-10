@@ -259,7 +259,7 @@ sub HMLAN_Attr(@) {############################################################
       @{$defs{$name}{helper}{log}{ids}}=@ids;
     }
     return "logging set to $attr{$name}{$aName}"
-        if ($attr{$name}{$aName} ne $aVal);
+        if ($aVal && $attr{$name}{$aName} ne $aVal);
   }
   elsif($aName eq "dummy"){
     if ($cmd eq "set" && $aVal != 0){
