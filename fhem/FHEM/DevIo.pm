@@ -104,8 +104,8 @@ DevIo_OpenDev($$$)
   ($dev, $baudrate) = split("@", $dev);
 
   $hash->{PARTIAL} = "";
-  Log3 $name, 3, "Opening $name device $dev"
-        if(!$reopen);
+  Log3 $name, 3, ($hash->{DevioText} ? $hash->{DevioText} : "Opening").
+       " $name device $dev" if(!$reopen);
 
   if($dev =~ m/^UNIX:(SEQPACKET|STREAM):(.*)$/) { # FBAHA
     my ($type, $fname) = ($1, $2);
@@ -216,7 +216,8 @@ DevIo_OpenDev($$$)
 
     if($baudrate) {
       $po->reset_error();
-      Log3 $name, 3, "Setting $name baudrate to $baudrate";
+      Log3 $name, 3, "Setting $name baudrate to $baudrate"
+        if(!$hash->{DevioText});
       $po->baudrate($baudrate);
       $po->databits(8);
       $po->parity('none');
@@ -243,14 +244,12 @@ DevIo_OpenDev($$$)
     }
 
     $po->write_settings;
-
-
   }
 
   if($reopen) {
     Log3 $name, 1, "$dev reappeared ($name)";
   } else {
-    Log3 $name, 3, "$name device opened";
+    Log3 $name, 3, "$name device opened" if(!$hash->{DevioText});
   }
 
   $hash->{STATE}="opened";

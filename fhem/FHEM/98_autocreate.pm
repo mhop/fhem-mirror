@@ -408,18 +408,27 @@ CommandUsb($$)
           # Check if it already used
           foreach my $d (keys %defs) {
             if($defs{$d}{DeviceName} &&
-               $defs{$d}{DeviceName} =~ m/$dev/ &&
                $defs{$d}{FD}) {
-              $msg = "already used by the fhem device $d";
-              Log3 undef, 4, $msg; $ret .= $msg . "\n";
-              goto NEXTDEVICE;
+
+              my $dn = $defs{$d}{DeviceName};
+              my $match = ($dn =~ m/$dev/);
+              if(!$match) {
+                $dn =~ s/@.*//;
+                $match = (readlink($dn) =~ m/$dev/) if(-l $dn);
+              }
+
+              if($match) {
+                $msg = "already used by the fhem device $d";
+                Log3 undef, 4, $msg; $ret .= $msg . "\n";
+                goto NEXTDEVICE;
+              }
             }
           }
 
           # Open the device
           my $dname = $thash->{DeviceName};
           $dname =~ s,DEVICE,$dir/$dev,g;
-          my $hash = { NAME=>$name, DeviceName=>$dname };
+          my $hash = { NAME=>$name, DeviceName=>$dname, DevioText=>"Probing" };
           DevIo_OpenDev($hash, 0, 0);
           if(!defined($hash->{USBDev})) {
             DevIo_CloseDev($hash);      # remove the ReadyFn loop
