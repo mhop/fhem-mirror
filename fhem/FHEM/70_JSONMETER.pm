@@ -86,6 +86,20 @@ sub JSONMETER_UpdateAborted($);
     ,[1, "0101010800FF", "powerConsumption", 2] #{"obis":"0101010800FF","value":41.42,"unit":"kWh" },				
 	,[1, "0101010801FF", "powerConsumptionTariff1", 2] # {"obis":"0101010801FF","value":33.53,"unit":"kWh"},					
 	,[1, "0101010802FF", "powerConsumptionTariff2", 2] # {"obis":"0101010802FF","value":33.53,"unit":"kWh"},					
+	,[1, "0101010803FF", "powerConsumptionTariff3", 2] # {"obis":"0101010803FF","value":33.53,"unit":"kWh"},					
+	,[1, "0101010804FF", "powerConsumptionTariff4", 2] # {"obis":"0101010804FF","value":33.53,"unit":"kWh"},					
+	,[1, "0101010805FF", "powerConsumptionTariff5", 2] # {"obis":"0101010805FF","value":33.53,"unit":"kWh"},					
+	,[1, "010001080080", "powerConsumptionToday", 1] 
+	,[1, "010001080081", "powerConsumptionYesterday", 1] 
+	,[1, "010001080082", "powerConsumptionLastWeek", 1] 
+	,[1, "010001080083", "powerConsumptionLastMonth", 1] 
+	,[1, "010001080084", "powerConsumptionLastYear", 1] 
+	,[1, "010002080080", "powerProductionToday", 1] 
+	,[1, "010002080081", "powerProductionYesterday", 1] 
+	,[1, "010002080082", "powerProductionLastWeek", 1] 
+	,[1, "010002080083", "powerProductionLastMonth", 1] 
+	,[1, "010002080084", "powerProductionLastYear", 1] 
+    ,[1, "0101020800FF", "powerProduction", 2]
 	,[1, "010020070000", "voltagePhase1", 1] #{"obis":"010020070000","value":237.06,"unit":"V"},					
 	,[1, "010034070000", "voltagePhase2", 1] # {"obis":"010034070000","value":236.28,"unit":"V"},					
 	,[1, "010048070000", "voltagePhase3", 1] # {"obis":"010048070000","value":236.90,"unit":"V"},
@@ -556,16 +570,26 @@ JSONMETER_UpdateAborted($)
     If the pool interval is omitted, it is set to 300 (seconds). Smallest possible value is 10.
 	<br>
 	With 0 it will only update on "manual" request.
-	<li><code>deviceType</code>
-	  <ul>Used to define the path and port to extract the json file. 
-	   <li><b>ITF</b> - One tariff power meter used by N-ENERGY Netz GmbH (Industrietechnik Fr&ouml;schle)</li>
-	   <li><b>EFR</b> - Power meter used by N-ENERGY Netz GmbH</li>
-	   <li><b>url</b> - use URL defined via the attributes 'pathString' and 'port'</li>
-	   <li><b>file</b> - use file defined via the attribute 'pathString' (positioned in the FHEM file system)</li>
-	   The attribute 'pathString' can also be used to add login information to the URL-path of predefined devices.
+	<li><code>&lt;deviceType&gt;</code>
+	  <br>
+	  Used to define the path and port to extract the json file.
+	  <br>
+	  The attribute 'pathString' can be used to add login information to the URL-path of predefined devices.
+	  <ul> 
+	   <li><b>ITF</b> - One tariff electrical meter used by N-ENERGY (Industrietechnik Fr&ouml;schle)</li>
+	   <li><b>EFR</b> - <a href="http://www.efr.de>EFR</a> Smart Grid Hub for electrical meter used by EON, N-ENERGY and EnBW
+		   <br>
+		   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;use the 'pathstring' attribute to specifiy your login information
+		   <br>
+		   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code>attr <device> pathString ?LogName=<i>user</i>&LogPSWD=<i>password</i></code>
+		   </li>
+	   <li><b>url</b> - use the URL defined via the attributes 'pathString' and 'port'</li>
+	   <li><b>file</b> - use the file defined via the attribute 'pathString' (positioned in the FHEM file system)</li>
+	   
 	  </ul>
 	</li>
   </ul>
+  <br>
 
   <b>Set</b><br>
   <ul>
@@ -579,7 +603,7 @@ JSONMETER_UpdateAborted($)
 		  This analysis happens normally only once if readings have been found.</li>
   </ul>
 
- <b>Get</b><br>
+  <br>
    <b>Get</b>
   <ul>
       <li><code>jsonFile</code>
@@ -588,6 +612,7 @@ JSONMETER_UpdateAborted($)
   </ul>
   <br>
 
+  <br>
   <a name="JSONMETERattr"></a>
    <b>Attributes</b>
    <ul>
@@ -596,15 +621,13 @@ JSONMETER_UpdateAborted($)
 		Calculates statistic values - <i>not implemented yet</i></li>
 	<li><code>pathString &lt;string&gt;</code>
 		<ul>
-		  <li>deviceType 'file': specifies the local file name and path</li>
-		  <li>deviceType 'url': specifies the url path</li>
-		  <li>other: can be used to add login information to the url path of predefined devices
-			  <br>
-			  e.g. <code>?LogName=secret&LogPSWD=very_secret</code></li>
+		  <li>if deviceType = 'file': specifies the local file name and path</li>
+		  <li>if deviceType = 'url': specifies the url path</li>
+		  <li>other deviceType: can be used to add login information to the url path of predefined devices</li>
 		</ul>
 	<li><code>port &lt;number&gt;</code>
 		<br>
-		if the deviceType 'url' is selected the url port can be specified here (default is 80)</li>
+		Specifies the IP port for the deviceType 'url' (default is 80)</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
 </ul>
@@ -632,16 +655,25 @@ JSONMETER_UpdateAborted($)
 	<br>
 	Bei 0 kann die Ger&auml;teabfrage nur manuell gestartet werden.
 	<li><code>Ger&auml;tetyp</code>
-	  <ul>Definiert den Pfad und den Port, um die JSON-Datei zu einzulesen. 
-	   <li><b>ITF</b> - Eintarifz&auml;hler, genutzt von N-ENERGY Netz GmbH (Industrietechnik Fr&ouml;schle)</li>
-	   <li><b>EFR</b> - Stromz&auml;hler, genutzt von  N-ENERGY Netz GmbH</li>
+		<br>
+		Definiert den Pfad und den Port, um die JSON-Datei zu einzulesen.
+		<br>
+		Mit dem Attribute 'pathString' können Login Information an den URL-Pfad von vordefinierten Ger&auml;te angehangen werden.
+	  <ul> 
+	   <li><b>ITF</b> - Eintarifz&auml;hler von N-ENERGY Netz GmbH (Industrietechnik Fr&ouml;schle)</li>
+	   <li><b>EFR</b> - Stromz&auml;hler von EON, N-ENERGY, EnBW
+		   <br>
+		   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Die Login Information werden über das Attribute 'pathstring' angegeben.
+		   <br>
+		   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code>?LogName=<i>Benutzer</i>&LogPSWD=<i>Passwort</i></code></li>
 	   <li><b>url</b> - benutzt die URL, welche durch das Attribut 'pathString' und 'port' definiert wird.</li>
 	   <li><b>file</b> - benutzt die Datei, welche durch das Attribut 'pathString' definiert wird (im FHEM Dateisystem)</li>
-	   Das Attribute 'pathString' kann auch benutzt werdne, um Login Information an den URL-Pfad der vordefinierten Ger&auml;te anzuh&auml;ngen.
+	   
 	  </ul>
 	</li>
   </ul>
-
+  
+  <br>
   <b>Set</b><br>
   <ul>
 	  <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
@@ -657,15 +689,16 @@ JSONMETER_UpdateAborted($)
 		  Diese Analysie wird normaler Weise nur einmal durchgef&uuml;hrt, wenn Ger&auml;tewerte gefunden wurden.</li>
   </ul>
 
- <b>Get</b><br>
+  <br>
    <b>Get</b>
   <ul>
       <li><code>jsonFile</code>
 		<br>
-		Liest die JSON-Datei ein und zeigt sie an</li>
+		Liest die JSON-Datei ein und zeigt sie an.</li>
   </ul>
   <br>
 
+  <br>
   <a name="JSONMETERattr"></a>
    <b>Attributes</b>
    <ul>
@@ -678,11 +711,11 @@ JSONMETER_UpdateAborted($)
 		  <li>Ger&auml;tetyp 'url': Definiert den URL-Pfad</li>
 		  <li>Andere: Kann benutzt werden um Login-Information zum URL Pfad von vordefinerten Ger&auml;ten hinzuzuf&uuml;gen
 			  <br>
-			  e.g. <code>?LogName=geheim&LogPSWD=sehr_geheim</code></li>
+			  e.g. </li>
 		</ul>
 	<li><code>port &lt;Nummer&gt;</code>
 		<br>
-		Beim Ger&auml;tetyp 'url' kann hier der URL-Port festgelegt werden (standardmässig 80)</li>
+		Beim Ger&auml;tetyp 'url' kann hier der URL-Port festgelegt werden (standardm&auml;ssig 80)</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
 </ul>
