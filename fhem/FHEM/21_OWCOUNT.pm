@@ -84,7 +84,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.02";
+my $owx_version="5.03";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -904,7 +904,7 @@ sub OWCOUNT_GetMonth($) {
     $total2 = int(100*($total+$hash->{READINGS}{$owg_channel[$i]}{VAL}))/100;
     #-- number of days so far, including the present day
     my $deltim = int(@month)+($chour+$cmin/60.0 + $csec/3600.0)/24.0;
-    my $av = int(100*$total2/$deltim)/100;
+    my $av = $deltim>0 ? int(100*$total2/$deltim)/100 : -1;
     #-- output format
     push(@month2,[($total,$total2,$av)]);
   } 
@@ -983,6 +983,7 @@ sub OWCOUNT_GetYear($) {
   
     
   #-- sum and average
+  my @month2 = OWCOUNT_GetMonth($hash);
   for (my $i=0;$i<int(@owg_fixed);$i++){
     $total = 0.0;
     #-- summing only if mode daily (means daily reset !)
@@ -997,16 +998,16 @@ sub OWCOUNT_GetYear($) {
         $total += $year[$j][$i];
       }
     }else{
-      $total = $year[int(@year)-1][$i];
+      $total = $year[int(@year)-1][$i]
+        if (int(@year)>0);
     };
     
     #-- add data from current day also for non-summed mode
     $total = int($total*100)/100;
-    Log 1," GetYear total = $total";
-    $total2 = int(100*($total))/100;
-    #-- number of months so far, including the present day
-    my $deltim = int(@year);
-    my $av = int(100*$total2/$deltim)/100;
+    $total2 = int(100*($total+$month2[$i]->[1]))/100;
+    #-- number of days so far, including the present day
+    my $deltim = $cyday+($chour+$cmin/60.0 + $csec/3600.0)/24.0;
+    my $av = $deltim>0 ? int(100*$total2/$deltim)/100 : -1;
     #-- output format
     push(@year2,[($total,$total2,$av)]);
   } 
