@@ -43,6 +43,7 @@
 # * "TFA_RAIN"	is TFA
 # * "RG700"	is UPM RG700
 # * "WS2300_RAIN" is WS2300
+# * "TX5_RAIN" is La Crosse TX5
 #
 # wind sensors (WIND):
 # * "WTGR800_A" is WTGR800
@@ -663,6 +664,8 @@ sub TRX_WEATHER_common_rain {
 	0x03 => "TFA_RAIN",
 	0x04 => "RG700",
 	0x05 => "WS2300_RAIN", # WS2300
+	0x06 => "TX5_RAIN", # La Crosse TX5
+
   );
 
   if (exists $devname{$bytes->[1]}) {
@@ -707,13 +710,15 @@ sub TRX_WEATHER_common_rain {
   	};
   }
 
-  my $train = ($bytes->[7]*256*256 + $bytes->[8]*256 + $bytes->[9])/10; # total rain
-  push @res, {
-	device => $dev_str,
-	type => 'train',
-	current => $train,
-	units => 'mm',
-  };
+  if ($dev_type ne "TX5_RAIN") {
+  	my $train = ($bytes->[7]*256*256 + $bytes->[8]*256 + $bytes->[9])/10; # total rain
+  	push @res, {
+		device => $dev_str,
+		type => 'train',
+		current => $train,
+		units => 'mm',
+  	};
+  }
 
   TRX_WEATHER_battery($bytes, $dev_str, \@res, 10);
   return @res;
