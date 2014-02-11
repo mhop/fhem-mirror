@@ -1038,17 +1038,18 @@ foreach (2..16){
   $culHmRegChan{"HM-RC-19-SW$c"}        = $culHmRegChan{"HM-RC-1901"};
 }
 
-$culHmRegChan{"WDF-solar02"}          = $culHmRegType{"dimmer"};
+$culHmRegChan{"WDF-solar02"}          = $culHmRegType{"dimmer"};      # type hash
 
-$culHmRegChan{"HM-CC-RT-DN-BoM03"}    = $culHmRegType{"HM-CC-RT-DN03"};
-$culHmRegChan{"HM-CC-RT-DN-BoM04"}    = $culHmRegType{"HM-CC-RT-DN04"};
-$culHmRegChan{"HM-CC-RT-DN-BoM06"}    = $culHmRegType{"HM-CC-RT-DN06"};
+$culHmRegChan{"HM-CC-RT-DN-BoM03"}    = $culHmRegChan{"HM-CC-RT-DN03"};
+$culHmRegChan{"HM-CC-RT-DN-BoM04"}    = $culHmRegChan{"HM-CC-RT-DN04"};
+$culHmRegChan{"HM-CC-RT-DN-BoM06"}    = $culHmRegChan{"HM-CC-RT-DN06"};
 
-$culHmRegChan{"HM-TC-IT-WM-W-EU03"}   = $culHmRegType{"HM-CC-RT-DN03"};
-$culHmRegChan{"HM-TC-IT-WM-W-EU06"}   = $culHmRegType{"HM-CC-RT-DN06"};
+$culHmRegChan{"HM-TC-IT-WM-W-EU03"}   = $culHmRegChan{"HM-CC-RT-DN03"};
+$culHmRegChan{"HM-TC-IT-WM-W-EU06"}   = $culHmRegChan{"HM-CC-RT-DN06"};
+$culHmRegChan{"HM-TC-IT-WM-W-EU07"}   = $culHmRegType{remote};        # type hash
 
-$culHmRegChan{"ROTO_ZEL-STG-RM-FWT02"}= $culHmRegType{"HM-CC-TC02"};
-$culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegType{"HM-CC-TC03"};
+$culHmRegChan{"ROTO_ZEL-STG-RM-FWT02"}= $culHmRegChan{"HM-CC-TC02"};
+$culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
 
 ##--------------- Conversion routines for register settings
 
@@ -1270,6 +1271,7 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
                          ,"desired-temp" =>"[on|off|5.0..30.0]"
                          ,peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
                         },
+  "HM-TC-IT-WM-W-EU01"=>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
   "HM-TC-IT-WM-W-EU07"=>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
   "HM-ES-PMSw1-Pl01"  =>{ "on-for-timer" =>"<sec>"
                          ,"on-till"      =>"<time>"

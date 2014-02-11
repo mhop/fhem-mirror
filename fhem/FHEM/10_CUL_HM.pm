@@ -537,9 +537,21 @@ sub CUL_HM_Attr(@) {#################################
         else {return "param $_ unknown, use offAtPon or onAtRain";}
       }
     }
-    elsif ($md =~ m/^virtual_/ && $attrVal eq "noOnOff"){
-      ;
-    }
+    elsif ($md =~ m/^virtual_/){
+      if ($cmd eq "set"){
+        if ($attrVal eq "noOnOff"){# no action	    
+        }
+        elsif ($attrVal eq "msgReduce"){#set param
+          $hash->{helper}{vd}{msgRed}=1;
+        }
+        else{
+          return "attribut param not defined for this entity";
+        }
+      }
+      else{
+        delete $hash->{helper}{vd}{msgRed};
+      }
+    }	
     else{
       return "attribut param not defined for this entity";
     }
@@ -1027,14 +1039,15 @@ sub CUL_HM_Parse($$) {##############################
       my $chn = "02";
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
-      my ($setTemp,$actTemp) =  map{hex($_)} unpack 'A4A2',$p;
-      $setTemp    =(($setTemp    >>10) & 0x3f )/2;
-      $actTemp    =(($actTemp        ) & 0x2ff)/10;
+      my ($t,$h) =  map{hex($_)} unpack 'A4A2',$p;
+      my $setTemp    =(($t    >>10) & 0x3f )/2;
+      my $actTemp    =(($t        ) & 0x2ff)/10;
       $actTemp = sprintf("%2.1f",$actTemp);
       $setTemp = ($setTemp < 5 )?'off':
                  ($setTemp >30 )?'on' :$setTemp;
       push @event, "measured-temp:$actTemp";
       push @event, "desired-temp:$setTemp";
+      push @event, "humidity:$h";
       push @event, "state:T: $actTemp desired: $setTemp";
     }
     elsif($mTp eq "3F" && $ioId eq $dst) { # Timestamp request
@@ -1167,7 +1180,7 @@ sub CUL_HM_Parse($$) {##############################
         $shash->{helper}{lastRain} = $tn;
       }
       elsif ($val eq "dry" && $shash->{helper}{lastRain}){
-         CUL_HM_UpdtReadSingle($shash,'lastRain',$shash->{helper}{lastRain},0);
+        CUL_HM_UpdtReadSingle($shash,'lastRain',$shash->{helper}{lastRain},0);
         delete $shash->{helper}{lastRain};
       }
 
@@ -1719,7 +1732,7 @@ sub CUL_HM_Parse($$) {##############################
   #    ack if we are destination, anyone did accept the message (@event)
   #        parser did not supress
   push @ack,$shash, $mNo."8002".$ioId.$src."00"
-      if(   ($ioId eq $dst)     #are we adressee
+      if(   ($ioId eq $dst)   #are we adressee
          && (hex($mFlg)&0x20) #response required Flag
          && @event            #only ack if we identified it
          && (!@ack)           #sender requested ACK
@@ -3291,7 +3304,9 @@ sub CUL_HM_Set($@) {
                                 ."00".sprintf("%02X",($valu * 2.56)%256));
     }
     else{
+      my $u = $lim{$cmd}{u};
       if ($valu eq "off"){
+        $u = "";
         if ($cmd eq "virtHum") {$hash->{helper}{vd}{vinH} = "";}
         else                   {$hash->{helper}{vd}{vin}  = "";}
         if ((!$hash->{helper}{vd}{vinH} || $hash->{helper}{vd}{vinH} eq "") && 
@@ -3305,7 +3320,7 @@ sub CUL_HM_Set($@) {
       if ($hash->{helper}{virtTC} || $valu ne "off") {
         if ($valu ne "off"){
           return "level between $lim{$cmd}{min} and $lim{$cmd}{max} or 'off' allowed"
-               if ($valu !~ m/^[+-]?\d+\.?\d+$/||
+               if ($valu !~ m/^[+-]?\d+\.?\d*$/||
                    $valu > $lim{$cmd}{max}||$valu < $lim{$cmd}{min} );
           if ($cmd eq "virtHum") {$hash->{helper}{vd}{vinH} = $valu;}
           else                   {$hash->{helper}{vd}{vin}  = $valu;}
@@ -3355,7 +3370,7 @@ sub CUL_HM_Set($@) {
         }
         $hash->{helper}{virtTC} = ($cmd eq "valvePos")?"03":"00";
       }
-      CUL_HM_UpdtReadSingle($hash,$lim{$cmd}{rd},$valu.$lim{$cmd}{u},1);
+      CUL_HM_UpdtReadSingle($hash,$lim{$cmd}{rd},$valu.$u,1);
     }
   }
   elsif($cmd eq "matic") { ####################################################
@@ -3670,7 +3685,7 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
     $hash->{helper}{vd}{nextF} = $tn;
   }
   do {
-    $msgCnt = $msgCnt++ %256;
+    $msgCnt = ($msgCnt +1) %256;
     $idl = $hash->{helper}{vd}{idl}+$msgCnt;
     $lo = int(($idl*0x4e6d +12345)/0x10000)&0xff;
     $hi = ($hash->{helper}{vd}{idh}+$idl*198)&0xff;
@@ -3682,12 +3697,19 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   $hash->{helper}{vd}{msgCnt} = $msgCnt;
   if ($hash->{helper}{vd}{cmd}){
     if    ($hash->{helper}{vd}{typ} == 1){
-      CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
-                                        ,$msgCnt
-                                        ,$hash->{helper}{vd}{cmd}
-                                        ,$hash->{helper}{virtTC}
-                                        ,$hash->{helper}{vd}{val}))
-            if(ReadingsVal($name,"valveCtrl","init") ne "init");
+      my $vc = ReadingsVal($name,"valveCtrl","init");
+      if(!defined $hash->{helper}{vd}{msgRed}){
+        $hash->{helper}{vd}{msgRed} = 0;
+      }
+
+      if (!(($vc eq "init") || 
+            ($vc eq "ok") && $hash->{helper}{vd}{msgRed})) {#if ready,idle,miss,lost
+      	CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
+                                           ,$msgCnt
+                                           ,$hash->{helper}{vd}{cmd}
+                                           ,$hash->{helper}{virtTC}
+                                           ,$hash->{helper}{vd}{val}));
+      }
       InternalTimer($tn+10,"CUL_HM_valvePosTmr","valveTmr:$vId",0);
     }
     elsif ($hash->{helper}{vd}{typ} == 2){
@@ -3712,9 +3734,15 @@ sub CUL_HM_valvePosTmr(@) {#calc next vd wakeup
   my(undef,$vId) = split(':',$in);
   my $hash = CUL_HM_id2Hash($vId); 
   my $name = $hash->{NAME};
-  if (ReadingsVal($name,"valveCtrl","init") eq "init") {
-    $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextF};
-    CUL_HM_UpdtReadSingle($hash,"valveCtrl","ready",1);
+  my $vc = ReadingsVal($name,"valveCtrl","init");
+  if ($vc eq "init") {
+  	$hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextF};
+  	CUL_HM_UpdtReadSingle($hash,"valveCtrl","ready",1);
+  }
+  elsif (($vc eq "ok") && $hash->{helper}{vd}{msgRed}) {
+  	$hash->{helper}{vd}{miss} = 1;
+  	$hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextF};
+  	CUL_HM_UpdtReadSingle($hash,"valveCtrl","idle",1);
   }
   else {
     my $pn = CUL_HM_id2Name($hash->{helper}{vd}{id});
@@ -4661,6 +4689,7 @@ sub CUL_HM_name2Id(@) { #in: name or HMid ==>out: HMid, "" if no match
 }
 sub CUL_HM_id2Name($) { #in: name or HMid out: name
   my ($p) = @_;
+  $p = "" if (!defined $p);
   return $p                               if($defs{$p}||$p =~ m/_chn:/);
   my $devId= substr($p, 0, 6);
   return "broadcast"                      if($devId eq "000000");
@@ -6842,6 +6871,8 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
     <li><B>virtuals</B><br>
     noOnOff: virtual entity will not toggle state when trigger is received. If this parameter is
     not given the entity will toggle its state between On and Off with each trigger<br>
+    msgReduce: if set and channel is use for <a ref="CUL_HMvalvePos"></a> it skips every other message
+    in order to reduce message load<br>
     </li>
   </ul><br>
   <a name="CUL_HMevents"></a>
