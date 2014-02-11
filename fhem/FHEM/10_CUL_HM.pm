@@ -3563,10 +3563,10 @@ sub CUL_HM_Set($@) {
     }
     $peerHash = $modules{CUL_HM}{defptr}{$peerDst.$peerChn}if ($modules{CUL_HM}{defptr}{$peerDst.$peerChn});
     $peerHash = $modules{CUL_HM}{defptr}{$peerDst}         if (!$peerHash);
-
+    Log 1,"General $peerN  t:$peerHash->{TYPE} d:$devName i:$defs{$devName}{IODev}->{NAME}";
     return "$peerN not a CUL_HM device"                           if(   ($target ne "remote") 
-                                                                     && (!$peerHash ||($peerHash->{TYPE} ne "CUL_HM" && 
-                                                                                       $defs{FB}{IODev}->{NAME}) ne $peerN));
+                                                                     && (!$peerHash || $peerHash->{TYPE} ne "CUL_HM")
+                                                                     &&  $defs{$devName}{IODev}->{NAME} ne $peerN);
     return "$single must be single or dual"                       if($single !~ m/^(single|dual)$/);
     return "$set must be set or unset"                            if($set    !~ m/^(set|unset)$/);
     return "$target must be [actor|remote|both]"                  if($target !~ m/^(actor|remote|both)$/);
