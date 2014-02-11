@@ -690,5 +690,100 @@ WeatherAsHtmlD($)
   <br>
 </ul>
 
+
 =end html
+=begin html_DE
+
+<a name="Weather"></a>
+<h3>Weather</h3>
+<ul>
+  <br>
+
+  <a name="Weatherdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; Weather &lt;location&gt; [&lt;interval&gt; [&lt;language&gt;]]</code><br>
+    <br>
+    Bezechnet ein virtuelles Gerät für Wettervorhersagen.<br><br>
+
+    Eine solche virtuelle Wetterstation sammelt periodisch aktuelle und zukünftige Wetterdaten aus der Yahoo-Wetter-API.<br><br>
+
+    Der Parameter <code>location</code> entspricht der sechsstelligen WOEID (WHERE-ON-EARTH-ID). Die WOEID für den eigenen Standort kann auf <a href="http://weather.yahoo.com">http://weather.yahoo.com</a> gefunden werden.<br><br>
+
+    Der optionale Parameter  <code>interval</code> gibt die Dauer in Sekunden zwischen den einzelnen Aktualisierungen der Wetterdaten an. Der Standardwert ist 3600 (1 Stunde). Wird kein Wert angegeben, gilt der Standardwert.<br><br>
+
+    Der optionale Parameter für die möglichen Sprachen darf einen der folgende Werte annehmen: <code>de</code>, <code>en</code> oder <code>nl</code>. Er bezeichnet die natürliche Sprache, in der die Wetterinformationen dargestellt werden. Der Standardwert ist <code>en</code>. Wird für die Sprache kein Wert angegeben, gilt der Standardwert. Wird allerdings der Parameter für die Sprache gesetzt, muss ebenfalls ein Wert für das Abfrageintervall gesetzt werden.<br><br>
+        
+                
+    Beispiele:
+    <pre>
+      define MyWeather Weather 673513
+      define Forecast Weather 673513 1800
+     </pre>
+     
+    Das Modul unterstützt zusätzlich vier verschiedene Funktionen <code>WeatherAsHtml</code>, <code>WeatherAsHtmlV</code>, <code>WeatherAsHtmlH</code> und <code>WeatherAsHtmlD</code>. Die ersten beiden Funktionen sind identisch: sie erzeugen den HTML-Code für eine vertikale Darstellung des Wetterberichtes. Die dritte Funktion liefert den HTML-Code für eine horizontale Darstellung des Wetterberichtes. Die letztgenannte Funktion wählt automatisch eine Ausrichtung, die abhängig davon ist, ob ein Smallcreen Style ausgewählt ist (vertikale Darstellung) oder nicht (horizontale Darstellung).<br><br>
+    Beispiel:
+    <pre>
+      define MyWeatherWeblink weblink htmlCode { WeatherAsHtmlH("MyWeather") }
+    </pre>
+
+     
+  </ul>
+  <br>
+
+  <a name="Weatherset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; update</code><br><br>
+
+    Erzwingt eine Abfrage der Wetterdaten. Die darauffolgende Abfrage wird gemäß dem eingestellten Intervall <code>interval</code> Sekunden später durchgeführt.<br><br>
+  </ul>
+  <br>
+
+  <a name="Weatherget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;reading&gt;</code><br><br>
+
+    Gültige ausgelesene Daten (readings) und ihre Bedeutung (das ? kann einen der Werte 1, 2, 3 , 4 oder 5 annehmen und steht für heute, morgen, übermorgen etc.):<br><br>
+    <table>
+    <tr><td>city</td><td>Name der Stadt, der aufgrund der WOEID übermittelt wird</td></tr>
+    <tr><td>code</td><td>Code für die aktuellen Wetterverhältnisse</td></tr>
+    <tr><td>condition</td><td>aktuelle Wetterverhältnisse</td></tr>
+    <tr><td>current_date_time</td><td>Zeitstempel der letzten Aktualisierung der Wetterdaten vom Server</td></tr>
+    <tr><td>fc?_code</td><td>Code für die vorhergesagten Wetterverhältnisse</td></tr>
+    <tr><td>fc?_condition</td><td>vorhergesagte Wetterverhältnisse</td></tr>
+    <tr><td>fc?_day_of_week</td><td>Wochentag des Tages, der durch ? dargestellt wird</td></tr>
+    <tr><td>fc?_high_c</td><td>vorhergesagte maximale Tagestemperatur in Grad Celsius</td></tr>
+    <tr><td>fc?_icon</td><td>Icon für Vorhersage</td></tr>
+    <tr><td>fc?_low_c</td><td>vorhergesagte niedrigste Tagestemperatur in Grad Celsius</td></tr>
+    <tr><td>humidity</td><td>gegenwärtige Luftfeuchtgkeit in %</td></tr>
+    <tr><td>icon</td><td>relativer Pfad für das aktuelle Icon</td></tr>
+    <tr><td>pressure</td><td>Luftdruck in hPa</td></tr>
+    <tr><td>pressure_trend</td><td>Luftdrucktendenz (0= gleichbleibend, 1= steigend, 2= fallend)</td></tr>
+    <tr><td>pressure_trend_txt</td><td>textliche Darstellung der Luftdrucktendenz</td></tr>
+    <tr><td>pressure_trend_sym</td><td>symbolische Darstellung der Luftdrucktendenz</td></tr>
+    <tr><td>temperature</td><td>gegenwärtige Temperatur in Grad Celsius</td></tr>
+    <tr><td>temp_c</td><td>gegenwärtige Temperatur in Grad Celsius</td></tr>
+    <tr><td>temp_f</td><td>gegenwärtige Temperatur in Grad Celsius</td></tr>
+    <tr><td>visibility</td><td>Sichtweite in km</td></tr>
+    <tr><td>wind</td><td>Windgeschwindigkeit in km/h</td></tr>
+    <tr><td>wind_chill</td><td>gefühlte Temperatur in Grad Celsius</td></tr>
+    <tr><td>wind_condition</td><td>Windrichtung und -geschwindigkeit</td></tr>
+    <tr><td>wind_direction</td><td>Gradangabe der Windrichtung (0 = Nordwind)</td></tr>
+    <tr><td>wind_speed</td><td>Windgeschwindigkeit in km/h (mit wind identisch)</td></tr>
+    </table>
+
+  </ul>
+  <br>
+
+  <a name="Weatherattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+  <br>
+</ul>
+
+=end html_DE
 =cut
