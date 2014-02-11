@@ -64,16 +64,20 @@ sub JSONMETER_UpdateAborted($);
  ##############################################################
   my %meterTypes = ( ITF => "80 GetMeasuredValue.cgi" 
                ,EFR => "80 json.txt"
+               ,LS110 => "80 a?f=j"
                );
 
  ##############################################################
  # Syntax: valueType, code, FHEM reading name, statisticType
- #       valueType: 1=OBISvalue | 2=OBISvalueString | 3=jsonEntryTime | 4=jsonEntry 
+ #     valueType: 1=OBISvalue       | 2=OBISvalueString | 3=jsonEntryTime
+ #                4=jsonEntryQuotes | 5=OBISvalueQuotes | 6=jsonEntryNoQuotes
  #     statisticType: 0=noStatistic | 1=maxMinStatistic | 2=timeStatistic
  ##############################################################
   my @jsonFields = (
     [3, "meterType", "meterType", 0] # {"meterId": "0000000061015736", "meterType": "Simplex", "interval": 0, "entry": [
    ,[4, "timestamp", "deviceTime", 0] # {"timestamp": 1389296286, "periodEntries": [
+   ,[3, "cnt", "electricityConsumed", 2] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
+   ,[6, "pwr", "electricityPower", 1] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
    ,[5, "010000090B00", "deviceTime", 0] #   { "obis":"010000090B00","value":"dd.mm.yyyy,hh:mm"}
    ,[2, "0.0.0", "meterID", 0] # {"obis": "0.0.0", "scale": 0, "value": 1627477814, "unit": "", "valueString": "0000000061015736" }, 
    ,[5, "0100000000FF", "meterID", 0] #  #   { "obis":"0100000000FF","value":"xxxxx"},
@@ -124,6 +128,7 @@ JSONMETER_Initialize($)
                 ."doStatistics:0,1 "
                 ."pathString "
                 ."port "
+                ."alwaysAnalyse:0,1 "
                 ."electricityTariff "
                 ."electricityTariff1 "
                 ."electricityTariff2 "
@@ -427,14 +432,16 @@ if ( $a[1] == 1 ){
 
     my @fields=split(/\{/,$message); # JSON in einzelne Felder zerlegen
    
-   my $jsonInterpreter = "";
+    my $jsonInterpreter =  $hash->{fhem}{jsonInterpreter} || "";
+    my $alwaysAnalyse = $attr{$name}{alwaysAnalyse} || 0;
   
   ####################################
   # ANALYSE once: Find all known obis codes in the first run and store in the item no, 
   # value type and reading name in the jsonInterpreter
   ####################################
-    if ( $hash->{fhem}{jsonInterpreter} eq "" ) {
-      Log3 $name, 3, "$name: Analyse JSON pathString for known readings";
+    if ( $jsonInterpreter eq "" || $alwaysAnalyse == 1 ) {
+      Log3 $name, 3, "$name: Analyse JSON pathString for known readings" if $alwaysAnalyse != 1;
+      Log3 $name, 4, "$name: Analyse JSON pathString for known readings" if $alwaysAnalyse == 1;
       foreach my $f (@jsonFields) 
       {
          for(my $i=0; $i<=$#fields; $i++) 
@@ -459,11 +466,16 @@ if ( $a[1] == 1 ){
                   $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[1]";
                   Log3 $name,4,"$name: Property \"$$f[1]\" will be stored in $$f[2]";
                }
+            } elsif ($$f[0] == 6) { 
+               if ($fields[$i] =~ /"$$f[1]".*?:.*".*".*?[,}]/) {
+                  $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[1]";
+                  Log3 $name,4,"$name: Property \"$$f[1]\" will be stored in $$f[2]";
+               }
             }   
          }
       }
       if ($jsonInterpreter ne "") {
-         Log3 $name, 3, "$name: Store results of JSON analysis for next device readings";
+         Log3 $name, 3, "$name: Store results of JSON analysis for next device readings" if $alwaysAnalyse != 1;
          $jsonInterpreter = substr $jsonInterpreter, 1;
          $hash->{fhem}{jsonInterpreter} = $jsonInterpreter;
       } else {
@@ -521,6 +533,14 @@ if ( $a[1] == 1 ){
             $value =~ s/^\s+|\s+$//g;
             Log3 $name, 4, "$name: value $value for reading $b[2] extracted from '$fields[$b[0]]'";
             $value =  strftime "%Y-%m-%d %H:%M:%S", localtime($value);
+            readingsBulkUpdate($hash, $b[2], $value); 
+         } else {
+            Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
+         }
+      } elsif   ($b[1] == 6) {   
+         if ($fields[$b[0]] =~ /"$b[4]":(\d*),?/ ) {
+            $value = $1;
+            Log3 $name, 4, "$name: value $value for reading $b[2] extracted from '$fields[$b[0]]'";
             readingsBulkUpdate($hash, $b[2], $value); 
          } else {
             Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
@@ -590,6 +610,7 @@ JSONMETER_UpdateAborted($)
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code>attr <device> pathString ?LogName=<i>user</i>&LogPSWD=<i>password</i></code>
             </li>
+         <li>LS110</li>
          <li><b>url</b> - use the URL defined via the attributes 'pathString' and 'port'</li>
          <li><b>file</b> - use the file defined via the attribute 'pathString' (positioned in the FHEM file system)</li>
      </ul>
@@ -624,12 +645,14 @@ JSONMETER_UpdateAborted($)
   <a name="JSONMETERattr"></a>
    <b>Attributes</b>
    <ul>
+   <li><code>alwaysAnalyse &lt; 0 | 1 &gt;</code>
+      <br>
+      Repeats by each update the json analysis - use if structure of json data changes
+      <br>
+      Normally the once analysed structure is saved to reduce CPU load.</li>
     <li><code>doStatistics &lt; 0 | 1 &gt;</code>
       <br>
       Calculates statistic values - <i>not implemented yet</i></li>
-   <li><code>alwaysAnalyse &lt; 0 | 1 &gt;</code>
-      <br>
-      Repeats by each update the json analysis - use if structur of json data changes - <i>not implemented yet</i></li>
    <li><code>pathString &lt;string&gt;</code>
       <ul>
         <li>if deviceType = 'file': specifies the local file name and path</li>
@@ -671,12 +694,12 @@ JSONMETER_UpdateAborted($)
       <br>
       Definiert den Pfad und den Port, um die JSON-Datei zu einzulesen.
       <br>
-      Mit dem Attribute 'pathString' können Login Information an den URL-Pfad von vordefinierten Ger&auml;te angehangen werden.
+      Mit dem Attribute 'pathString' k&ouml;nnen Login Information an den URL-Pfad von vordefinierten Ger&auml;te angehangen werden.
       <ul> 
          <li><b>ITF</b> - Eintarifz&auml;hler von N-ENERGY Netz GmbH (Industrietechnik Fr&ouml;schle)</li>
          <li><b>EFR</b> - Stromz&auml;hler von EON, N-ENERGY, EnBW
             <br>
-            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Die Login Information werden über das Attribute 'pathstring' angegeben.
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Die Login-Information wird &uuml;ber das Attribute 'pathstring' angegeben.
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code>?LogName=<i>Benutzer</i>&LogPSWD=<i>Passwort</i></code></li>
          <li><b>url</b> - benutzt die URL, welche durch das Attribut 'pathString' und 'port' definiert wird.</li>
@@ -688,17 +711,22 @@ JSONMETER_UpdateAborted($)
   <br>
   <b>Set</b>
   <ul>
-     <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
+      <li><code>alwaysAnalyse &lt; 0 | 1 &gt;</code>
+         <br>
+         Führt bei jeder Abfrage der Ger&auml;tewerte eine Analyse der JSON-Datenstruktur durch.
+         Dies ist sinnvoll, wenn sich diese Struktur &auml;ndert. Normalerweise wird die analysierte Struktur
+         zwischengespeichert, um die CPU-Last gering zu halten.</li>
+      <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
          <br>
          Abfrageinterval in Sekunden</li>
-     <li><code>statusRequest</code>
-         <br>
-         Aktualisieren der Ger&auml;tewerte</li>
       <li><code>restartJsonAnalysis</code>
         <br>
         Neustart der Analyse der json-Datei zum Auffinden bekannter Ger&auml;tewerte (kompatibel zum OBIS Standard).
         <br>
         Diese Analysie wird normaler Weise nur einmal durchgef&uuml;hrt, wenn Ger&auml;tewerte gefunden wurden.</li>
+     <li><code>statusRequest</code>
+         <br>
+         Aktualisieren der Ger&auml;tewerte</li>
   </ul>
   <br>
 
