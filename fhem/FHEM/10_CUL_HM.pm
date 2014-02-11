@@ -3208,7 +3208,7 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$msg);
   }
   elsif($cmd eq "desired-temp") { #############################################
-    if ($md =~ m/HM-CC-RT-DN/){
+    if ($md =~ m/(HM-CC-RT-DN|HM-TC-IT-WM-W-EU)/){
       my $temp = ($a[2] eq "off")?9:($a[2] eq "on"?61:$a[2]*2);
       return "invalid temp:$a[2]" if($temp <9 ||$temp > 61);
       $temp = sprintf ("%02X",$temp);
