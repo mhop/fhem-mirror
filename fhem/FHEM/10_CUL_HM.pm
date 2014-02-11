@@ -4651,7 +4651,6 @@ sub CUL_HM_getAssChnNames($) { #in: name out:list of assotiated chan and device
 sub CUL_HM_Id($) {#in: ioHash out: ioHMid
   my ($io) = @_;
   if (ref($io) ne 'HASH'){
-    Log 1,"have problems with $io";
     return "000000";
   }
   my $fhtid = defined($io->{FHTID}) ? $io->{FHTID} : "0000";
