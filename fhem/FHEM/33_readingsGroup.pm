@@ -210,7 +210,9 @@ lookup2($$$$)
     $vf = $lookup->{$name.".".$reading} if( exists($lookup->{$name.".".$reading}) );
     $vf = $lookup->{$reading.".".$value} if( defined($value) && exists($lookup->{$reading.".".$value}) );
     $lookup = $vf;
-  } elsif($lookup =~ m/^{.*}$/) {
+  }
+
+  if( !ref($lookup) && $lookup =~ m/^{.*}$/) {
     my $DEVICE = $name;
     my $READING = $reading;
     my $VALUE = $value;
@@ -928,10 +930,10 @@ readingsGroup_Attr($$$)
       <li>notime<br>
         If set to 1 the reading timestamp is not displayed.</li>
       <li>mapping<br>
-        Can be a simple string or a perl expression enclosed in {} that returns a hash that maps reading names to the displayed name.
-        The keys can be either the name of the reading or &lt;device&gt;.&lt;reading&gt;.
-        %DEVICE, %ALIAS, %ROOM, %GROUP and %READING are replaced by the device name, device alias, room attribute, group attribute and reading name respectively. You can
-        also prefix these keywords with $ instead of %. Examples:<br>
+        Can be a simple string or a perl expression enclosed in {} that returns a hash that maps reading names
+        to the displayed name.  The keys can be either the name of the reading or &lt;device&gt;.&lt;reading&gt;.
+        %DEVICE, %ALIAS, %ROOM, %GROUP and %READING are replaced by the device name, device alias, room attribute,
+        group attribute and reading name respectively. You can also prefix these keywords with $ instead of %. Examples:<br>
           <code>attr temperatures mapping $DEVICE-$READING</code><br>
           <code>attr temperatures mapping {temperature => "%DEVICE Temperatur"}</code>
         </li>
