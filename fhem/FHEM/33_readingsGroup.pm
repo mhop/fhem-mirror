@@ -24,8 +24,9 @@ use strict;
 use warnings;
 
 use vars qw($FW_ME);
-use vars qw($FW_subdir);
 use vars qw($FW_wname);
+use vars qw($FW_subdir);
+use vars qw(%FW_hiddenroom);
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 sub readingsGroup_Initialize($)
@@ -276,6 +277,7 @@ readingsGroup_2html($)
 
   my $show_heading = !AttrVal( $d, "noheading", "0" );
   my $show_links = !AttrVal( $d, "nolinks", "0" );
+  $show_links = 0 if($FW_hiddenroom{detail});
 
   my $disable = AttrVal($d,"disable", 0);
   if( AttrVal($d,"disable", 0) > 2 ) {
