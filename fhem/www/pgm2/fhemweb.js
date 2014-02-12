@@ -131,7 +131,7 @@ FW_replaceLinks()
   for(var i1=0; i1< elArr.length; i1++) {
     var a = elArr[i1];
     var ma = a.getAttribute("href").match(/^(.*\?)(cmd[^=]*=.*)$/);
-    if(ma == null || ma.length == 0 || ma[2].match(/=style/))
+    if(ma == null || ma.length == 0 || ma[2].match(/=(style|save)/))
       continue;
     a.removeAttribute("href");
     a.setAttribute("onclick", "FW_cmd('"+ma[1]+"XHR=1&"+ma[2]+"')");
