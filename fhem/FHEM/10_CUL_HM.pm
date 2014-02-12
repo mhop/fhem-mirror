@@ -299,7 +299,7 @@ sub CUL_HM_updateConfig($){
           if ($attr{$name}{expert});#need update after readings are available
 
     if ($chn eq "03" && 
-        $md =~ /(HM-CC-TC|ROTO_ZEL-STG-RM-FWT|HM-CC-RT-DN)/){
+        $md =~ /(-TC|ROTO_ZEL-STG-RM-FWT|HM-CC-RT-DN)/){
       $attr{$name}{stateFormat} = "last:trigLast";
     }
 
@@ -724,7 +724,7 @@ sub CUL_HM_Parse($$) {##############################
       my $i=0;
       $devH->{helper}{rpt}{ts} = gettimeofday();
       CUL_HM_SndCmd(${$ack}[$i++],${$ack}[$i++]) while ($i<@{$ack});
-      Log3 $name,4,"CUL_HM $name dupe: repeat ack, dont process";
+      Log3 $name,4,"CUL_HM $name dupe: repeat ".scalar(@{$ack})." ack, dont process";
     }
     else{
       Log3 $name,4,"CUL_HM $name dupe: dont process";

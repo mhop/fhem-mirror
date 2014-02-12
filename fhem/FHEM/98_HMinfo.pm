@@ -406,6 +406,60 @@ sub HMinfo_tempList(@) { ######################################################
   }
   return $ret;
 }
+sub HMinfo_tempListTmpl(@) { ##################################################
+  my ($filter,$tmpl,$fName)=@_;
+  $filter = "." if (!$filter);
+  return "no template name given" if (!$tmpl);
+  my $ret;
+  my @el ;
+  foreach my $eN(HMinfo_getEntities("d")){#search for devices and select correct channel
+    my $md = AttrVal($eN,"model","");
+    my $chN; #tempList channel name
+    if ($md =~ m/(HM-CC-RT-DN-BoM|HM-CC-RT-DN)/)    {$chN = $defs{$eN}{channel_04};}
+    elsif ($md =~ m/(ROTO_ZEL-STG-RM-FWT|HM-CC-TC)/){$chN = $defs{$eN}{channel_02};}
+    next if (!$chN || !$defs{$chN} || $chN !~ m/$filter/);
+    push @el;
+  }
+  return "no entities selected" if (!scalar @el);
+
+  open(aSave, "$fName") || return("Can't open $fName: $!");
+  my $found = 0;
+  my @entryFail = ();
+  my @exec = ();
+  while(<aSave>){
+    chomp;
+    if($_ =~ m/^entities:/){
+      last if ($found != 0);
+      my $line = $_;
+      $line =~s/.*://;
+      foreach (split(",",$line)){
+        $found = 1 if ($defs{$_} && $_ eq $tmpl);
+      }
+    }
+    elsif($found != 1 && $_ =~ m/tempList[SMFWT].*\>/){
+      my ($tln,$val) = ($1,$2)if($_ =~ m/(.*)>(.*)/);
+      $tln =~ s/ //g;
+      $val =~ tr/ +/ /;
+      $val =~ s/^ //;
+      $val =~ s/ $//;
+      @exec = ();
+      foreach my $eN(@el){
+        my $x = CUL_HM_Set($defs{$eN},$eN,$tln,"prep",split(" ",$val));
+        push @entryFail,$eN." :".$tln." respose:$x" if ($x != 1);
+        push @exec,$eN." ".$tln." exec ".$val;
+      }
+    }
+
+    foreach (@exec){
+      my @param = split(" ",$_);
+      CUL_HM_Set($defs{$param[0]},@param);
+    }
+
+    $ret = "failed Entries:\n     "   .join("\n     ",@entryFail) if (scalar@entryFail);
+  }
+  close(aSave);
+  return $ret;
+}
 
 sub HMinfo_getEntities(@) { ###################################################
   my ($filter,$re) = @_;
@@ -812,9 +866,43 @@ sub HMinfo_SetFn($@) {#########################################################
     $ret = HMinfo_status($hash);
   }
   elsif($cmd eq "tempList")   {##handle thermostat templist from file ---------
-    my $fn = $a[0]?$a[0]:"tempList.cfg";
+    my $fn = $a[1]?$a[1]:"tempList.cfg";
     $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
     $ret = HMinfo_tempList($filter,$a[0],$fn);
+  }
+  elsif($cmd eq "tempListTmpl"){##handle thermostat templist from file ---------
+    my $fn = $a[1]?$a[1]:"tempList.cfg";
+    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    $ret = HMinfo_tempListTmpl($filter,$a[0],$fn);
+  }
+  elsif($cmd eq "loadConfig") {##action: saveConfig----------------------------
+    my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
+    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    $ret = HMinfo_loadConfig($filter,$fn); 
+  }
+  elsif($cmd eq "purgeConfig"){##action: saveConfig----------------------------
+    my $id = ++$hash->{nb}{cnt};
+    my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
+    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    my $bl = BlockingCall("HMinfo_purgeConfig", join(",",("$name:$id",$fn)), 
+                          "HMinfo_bpPost", 30, 
+                          "HMinfo_bpAbort", "$name:$id");
+    $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
+    $ret = ""; 
+  }
+  elsif($cmd eq "saveConfig") {##action: saveConfig----------------------------
+    my $id = ++$hash->{nb}{cnt};
+    my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
+    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    my $bl = BlockingCall("HMinfo_saveConfig", join(",",("$name:$id",$fn,$opt,$filter)), 
+                          "HMinfo_bpPost", 30, 
+                          "HMinfo_bpAbort", "$name:$id");
+    $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
+    $ret = $cmd." done:" ."\n saved";
+  }
+  elsif($cmd eq "archConfig") {##action: archiveConfig-------------------------
+    # save config only if register are complete
+    $ret = HMinfo_archConfig($hash,$name,$opt,($a[0]?$a[0]:""));
   }
   elsif($cmd eq "help")       {
     $ret = " Unknown argument $cmd, choose one of "
@@ -829,6 +917,7 @@ sub HMinfo_SetFn($@) {#########################################################
            ."\n loadConfig [<typeFilter>] <file>               # restores register and peer readings if missing"
            ."\n autoReadReg [<typeFilter>]                     # trigger update readings if attr autoReadReg is set"
            ."\n tempList [<typeFilter>][save|restore|verify][<filename>]# handle tempList of thermostat devices"
+           ."\n tempListTmpl[<typeFilter>][templateName][<filename>]# program a templist from a template in the file to one or multiple devices"
            ."\n ---infos---"
            ."\n update                                         # update HMindfo counts"
            ."\n register [<typeFilter>]                        # devicefilter parse devicename. Partial strings supported"
@@ -881,35 +970,6 @@ sub HMinfo_SetFn($@) {#########################################################
            ."\n "
            ;
   }
-  elsif($cmd eq "loadConfig") {##action: saveConfig----------------------------
-    my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
-    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
-    $ret = HMinfo_loadConfig($filter,$fn); 
-  }
-  elsif($cmd eq "purgeConfig"){##action: saveConfig----------------------------
-    my $id = ++$hash->{nb}{cnt};
-    my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
-    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
-    my $bl = BlockingCall("HMinfo_purgeConfig", join(",",("$name:$id",$fn)), 
-                          "HMinfo_bpPost", 30, 
-                          "HMinfo_bpAbort", "$name:$id");
-    $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
-    $ret = ""; 
-  }
-  elsif($cmd eq "saveConfig") {##action: saveConfig----------------------------
-    my $id = ++$hash->{nb}{cnt};
-    my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
-    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
-    my $bl = BlockingCall("HMinfo_saveConfig", join(",",("$name:$id",$fn,$opt,$filter)), 
-                          "HMinfo_bpPost", 30, 
-                          "HMinfo_bpAbort", "$name:$id");
-    $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
-    $ret = $cmd." done:" ."\n saved";
-  }
-  elsif($cmd eq "archConfig") {##action: archiveConfig-------------------------
-    # save config only if register are complete
-    $ret = HMinfo_archConfig($hash,$name,$opt,($a[0]?$a[0]:""));
-  }
   else{
     my @cmdLst =     
            ( "autoReadReg","clear"  #"clear:msgStat,Protocol,readings,register,rssi"
@@ -918,7 +978,7 @@ sub HMinfo_SetFn($@) {#########################################################
             ,"models"
             ,"regCheck","register","archConfig:-0,-a","saveConfig","loadConfig","purgeConfig","update"
             ,"cpRegs"
-            ,"tempList"
+            ,"tempList tempListTmpl"
             ,"templateChk","templateDef","templateList","templateSet");
     $ret = join (" ",sort @cmdLst); 
   }
@@ -1781,8 +1841,14 @@ sub HMinfo_noDup(@) {#return list with no duplicates
          The actual entity holding the templist must be given - which is channel 04 for RTs or channel 02 for TCs</li>
          <li><B>tempList...</B> time and temp couples as used in the set tempList commands</li>
          <br>
-
      </li>
+     <li><a name="#HMinfotempListTmpl">tempListTmpl</a> <a href="#HMinfoFilter">[filter]</a>[templateName] [&lt;file&gt;]</a><br>
+	    program one or more thermostat lists. The list of thermostats is selected by filter. <br>
+		<li></B>templateName</B> is the name of the template as being named in the file. The file format ist 
+		identical to <a ref="#HMinfotempList">tempList</a>. If the entity in the file matches templateName the subsequent
+		temp-settings from the file are bing programmed to all Thermostats that match the filter<br></li>
+        <li><B>filename</B> is the name of the file to be used. Default ist <B>tempList.cfg</B></li>
+      </li>
          <br>
       <li><a name="#HMinfocpRegs">cpRegs &lt;src:peer&gt; &lt;dst:peer&gt; </a><br>
           allows to copy register, setting and behavior of a channel to
