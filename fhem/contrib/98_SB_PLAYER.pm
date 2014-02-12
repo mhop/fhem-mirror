@@ -374,7 +374,9 @@ sub SB_PLAYER_Parse( $$ ) {
     if( $cmd eq "mixer" ) {
 	if( $args[ 0 ] eq "volume" ) {
 	    # update the volume 
-	    if( scalar( $args[ 1 ] ) > 0 ) {
+            if ($args[ 1 ] eq "?") {
+                 # it is a request
+            } elsif( scalar( $args[ 1 ] ) > 0 ) {
 		readingsSingleUpdate( $hash, "volume", 
 				      scalar( $args[ 1 ] ), 0 );
 	    } else {
@@ -386,25 +388,29 @@ sub SB_PLAYER_Parse( $$ ) {
 	}
 
     } elsif( $cmd eq "play" ) {
-	readingsSingleUpdate( $hash, "playStatus", "playing", 0 );
+	readingsSingleUpdate( $hash, "playStatus", "playing", 1 );
 
     } elsif( $cmd eq "stop" ) {
-	readingsSingleUpdate( $hash, "playStatus", "stopped", 0 );
+	readingsSingleUpdate( $hash, "playStatus", "stopped", 1 );
 
     } elsif( $cmd eq "pause" ) {
-	readingsBulkUpdate( $hash, "playStatus", "paused" );
+        if( $args[ 0 ] eq "0" ) {
+            readingsSingleUpdate( $hash, "playStatus", "playing", 1 );
+        } else {
+            readingsSingleUpdate( $hash, "playStatus", "paused", 1 );
+        } 
 
     } elsif( $cmd eq "mode" ) {
-	Log3( $hash, 1, "Playmode: $args[ 0 ]" );
+	#Log3( $hash, 1, "Playmode: $args[ 0 ]" );
 	# alittle more complex to fulfill FHEM Development guidelines
 	if( $args[ 0 ] eq "play" ) {
-	    readingsSingleUpdate( $hash, "playStatus", "playing", 0 );
+	    readingsSingleUpdate( $hash, "playStatus", "playing", 1 );
 	} elsif( $args[ 0 ] eq "stop" ) {
-	    readingsSingleUpdate( $hash, "playStatus", "stopped", 0 );
+	    readingsSingleUpdate( $hash, "playStatus", "stopped", 1 );
 	} elsif( $args[ 0 ] eq "pause" ) {
-	    readingsSingleUpdate( $hash, "playStatus", "paused", 0 );
+	    readingsSingleUpdate( $hash, "playStatus", "paused", 1 );
 	} else {
-	    readingsSingleUpdate( $hash, "playStatus", $args[ 0 ], 0 );
+	    readingsSingleUpdate( $hash, "playStatus", $args[ 0 ], 1 );
 	}
 
     } elsif( $cmd eq "newmetadata" ) {
@@ -501,13 +507,25 @@ sub SB_PLAYER_Parse( $$ ) {
 	}
 
     } elsif( $cmd eq "power" ) {
-	if( $args[ 0 ] eq "1" ) {
+	if (!(@args)) {
+	    # power toggle : should only happen when called with SB CLI
+            if (ReadingsVal($hash->{NAME}, "state", "off") eq "on") {
+                readingsSingleUpdate( $hash, "presence", "absent", 0 );
+                readingsSingleUpdate( $hash, "state", "off", 1 );
+                readingsSingleUpdate( $hash, "power", "off", 1 );
+            } else {
+                readingsSingleUpdate( $hash, "state", "on", 1 );
+                readingsSingleUpdate( $hash, "power", "on", 1 );
+            }
+	} elsif( $args[ 0 ] eq "1" ) {
 	    readingsSingleUpdate( $hash, "state", "on", 1 );
-	    readingsSingleUpdate( $hash, "power", "on", 0 );
-	} else {
-	    readingsSingleUpdate( $hash, "state", "off", 1 );
-	    readingsSingleUpdate( $hash, "power", "off", 0 );
+	    readingsSingleUpdate( $hash, "power", "on", 1 );
+	} elsif( $args[ 0 ] eq "0" ) {
 	    readingsSingleUpdate( $hash, "presence", "absent", 0 );
+	    readingsSingleUpdate( $hash, "state", "off", 1 );
+	    readingsSingleUpdate( $hash, "power", "off", 1 );
+	} else {
+	    # should be "?" normally
 	}
 
     } elsif( $cmd eq "displaytype" ) {
@@ -555,7 +573,8 @@ sub SB_PLAYER_Parse( $$ ) {
 	# TODO
 	Log3( $hash, 5, "SB_PLAYER_Parse($name): please implement the " . 
 	      "parser for the status answer" );
-
+    } elsif( $cmd eq "client" ) {
+        # filter "client disconnect" and "client reconnect" messages 
     } elsif( $cmd eq "prefset" ) {
 	if( $args[ 0 ] eq "server" ) {
 	    if( $args[ 1 ] eq "currentSong" ) {
@@ -1091,6 +1110,7 @@ sub SB_PLAYER_RecBroadcast( $$@ ) {
 	    # the server is off, so are we
 	    RemoveInternalTimer( $hash );
 	    readingsSingleUpdate( $hash, "state", "off", 1 );
+	    readingsSingleUpdate( $hash, "power", "off", 1 );
 	} elsif( $args[ 0 ] eq "ON" ) {
 	    # the server is back
 	    # do and update of the status
