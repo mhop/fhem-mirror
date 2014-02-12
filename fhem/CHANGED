@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: Dashboard: The display of the dashboard can be limited to a 
+             defined FHEMWEB. Change view of readingroups
   - feature: new module 70_JSONMETER to read obis compatible data in json
              format from so called smart meters for electricity, gas or heat 
   - feature: new modules 10_RESIDENTS, 20_ROOMMATE and 20_GUEST added (loredo)
