@@ -70,7 +70,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.03";
+my $owx_version="5.04";
 #-- flexible channel name
 my $owg_channel;
 
@@ -100,14 +100,17 @@ my %updates = (
 #
 # Prefix = OWMULTI
 #
-########################################################################################
-#
-# OWMULTI_Initialize
-#
-# Parameter hash = hash of device addressed
-#
-########################################################################################
-
+##
+# Parameters:
+#    hash - hash of device addressed
+# 
+# Called By: 
+#    FHEM - Main Loop
+#    Gargelmargel - dunno where
+#    
+#Calling:
+#    None
+##
 sub OWMULTI_Initialize ($) {
   my ($hash) = @_;
 
@@ -323,7 +326,7 @@ sub OWMULTI_ChannelNames($) {
     $tfactor = 1.8;
   } else {
     $tabbr="?";
-    Log 1, "OWMULTI_FormatValues: unknown unit $tunit";
+    Log 1, "OWMULTI_ChannelNames: unknown unit $tunit";
   }
   
   #-- these values are rather complex to obtain, therefore save them in the hash
@@ -463,6 +466,7 @@ sub OWMULTI_Get($@) {
   if( $interface eq "OWX" ){
     #-- not different from getting all values ..
     $ret = OWXMULTI_GetValues($hash);
+    #ASYNC: Need to wait for some return
   #-- OWFS interface not yet implemented
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSMULTI_GetValues($hash);
@@ -479,7 +483,7 @@ sub OWMULTI_Get($@) {
   
   #-- return the special reading
   if ($reading eq "reading") {
-    return "OWMULTI: $name.reading => ".OWMULTI_FormatValues($hash);
+    return "OWMULTI: $name.reading => ".$hash->{READINGS}{"state"}{VAL};
   }
 
   if ($reading eq "temperature") {
@@ -529,6 +533,7 @@ sub OWMULTI_GetValues($@) {
     #-- max 3 tries
     for(my $try=0; $try<3; $try++){
       $ret = OWXMULTI_GetValues($hash);
+      #ASYNC: Need to wait for some result
       return if( !defined($ret) );
     } 
   }elsif( $interface eq "OWServer" ){
@@ -542,9 +547,6 @@ sub OWMULTI_GetValues($@) {
     return "OWMULTI: Could not get values from device $name, reason $ret";
   }
   $hash->{PRESENT} = 1; 
-
-  $value=OWMULTI_FormatValues($hash);
-  Log 5, $value;
 
   return undef;
 }
@@ -642,7 +644,7 @@ sub OWMULTI_Set($@) {
   #-- process results - we have to reread the device
   $hash->{PRESENT} = 1; 
   OWMULTI_GetValues($hash);
-  OWMULTI_FormatValues($hash);
+
   Log 4, "OWMULTI: Set $hash->{NAME} $key $value";
   
   return undef;
@@ -690,7 +692,7 @@ sub OWFSMULTI_GetValues($) {
   my $name   = $hash->{NAME};
           
   #-- get values - or should we rather get the uncached ones ?
-  $hash->{owg_val}->[0] = OWServer_Read($master,"/$owx_add/temperature");
+  $hash->{owg_val}->[0]   = OWServer_Read($master,"/$owx_add/temperature");
   $hash->{owg_val}->[1]   = OWServer_Read($master,"/$owx_add/VDD");
   $hash->{owg_val}->[2]   = OWServer_Read($master,"/$owx_add/VAD");
   
@@ -699,6 +701,9 @@ sub OWFSMULTI_GetValues($) {
   return "empty return from OWServer"
     if( ($hash->{owg_val}->[0] eq "") || ($hash->{owg_val}->[1] eq "") || ($hash->{owg_val}->[2] eq "") );
     
+  #-- and now from raw to formatted values 
+  my $value = OWMULTI_FormatValues($hash);
+  Log 5, $value;
   return undef;
 }
 
@@ -790,6 +795,8 @@ sub OWXMULTI_BinValues($$$$$$$$) {
           
     #-- external voltage
     $hash->{owg_val}->[2] = ($msb*256+ $lsb)/100;
+     
+    #-- and now from raw to formatted values 
     my $value = OWMULTI_FormatValues($hash);
     Log 5, $value;
   };

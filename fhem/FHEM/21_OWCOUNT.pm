@@ -84,7 +84,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.03";
+my $owx_version="5.04";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -735,7 +735,6 @@ sub OWCOUNT_Get($@) {
     }
     $hash->{PRESENT} = 1; 
     #-- only one counter will be returned
-    OWCOUNT_FormatValues($hash);
     return "OWCOUNT: $name.raw $a[2] => ".$hash->{owg_val}->[$page-14];   
     
   #-- check syntax for getting counters
@@ -755,7 +754,7 @@ sub OWCOUNT_Get($@) {
     }
     $hash->{PRESENT} = 1; 
     #-- both counters will be returned
-    return "OWCOUNT: $name.counters => ".OWCOUNT_FormatValues($hash);   
+    return "OWCOUNT: $name.counters => ".$hash->{READINGS}{"state"}{VAL}; 
   }
 }
 
@@ -1063,9 +1062,6 @@ sub OWCOUNT_GetValues($) {
     return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
   }
   $hash->{PRESENT} = 1; 
-  
-  $value=OWCOUNT_FormatValues($hash);
-  Log 5, $value;
  
   return undef;
 }
@@ -1243,7 +1239,6 @@ sub OWCOUNT_Set($@) {
   #-- process results - we have to reread the device
   $hash->{PRESENT} = 1; 
   OWCOUNT_GetValues($hash);  
-  OWCOUNT_FormatValues($hash);  
   Log 4, "OWCOUNT: Set $hash->{NAME} $key $value";
 }
 
@@ -1435,7 +1430,10 @@ sub OWFSCOUNT_GetPage($$) {
       if( $strval eq "" );
     $hash->{owg_str}->[$page] = $strval;
   }
-  return undef
+  #-- and now from raw to formatted values 
+  my $value = OWCOUNT_FormatValues($hash);
+  Log 5, $value;
+  return undef;
 }
 
 ########################################################################################
@@ -1595,7 +1593,9 @@ sub OWXCOUNT_BinValues($$$$$$$$) {
       $hash->{owg_midnight}->[1] = $strval;
     }
   }
- 
+  #-- and now from raw to formatted values 
+  my $value = OWCOUNT_FormatValues($hash);
+  Log 5, $value;
   return undef;
 }
 
