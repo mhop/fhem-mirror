@@ -34,13 +34,14 @@
 # 2.03: dashboard_showfullsize only in DashboardRoom. Tabs can show Icons (new Attributes). Fix showhelper Bug on lock/unlock.
 #			 The error that after a trigger action the curren tab is changed to the "old" activetab tab has been fixed. dashboard_activetab 
 #			 is stored after tab change
+# 2.04: change view of readingroups. Attribute dashboard_groups removed. New Attribute dashboard_webfrontendfilter to define 
+#			separate Dashboards per FHEMWEB Instance.
 #
 # Known Bugs/Todos:
 # BUG: Nicht alle Inhalte aller Tabs laden, bei Plots dauert die bedienung des Dashboards zu lange. -> elemente hidden?
-# x BUG: wenn ich mehrere Tabs habe und zb. im Uten Tab eine Lampe schalte, springt er danach direkt in den ersten Tab. Finde ich etwas unglücklich.
-# x BUG: Lock blendet schow helper nicht aus?
-# x BUG: dashboard_showfullsize nicht in room everything
-# x TODO: Icon on Tabs
+# x TODO: Dashboard Config diverenzieren je auflösung
+# x TODO: Darstellung von z.B. readingGroups
+# TODO: personalisiertes CSS angeben und bestehende CSS zu überschreiben -> User-config
 # Log 1, "[DASHBOARD simple debug] '".$g."' ";
 ########################################################################################
 #
@@ -85,7 +86,7 @@ my $fwjquery = "jquery.min.js";
 my $fwjqueryui = "jquery-ui.min.js";
 my $dashboardname = "Dashboard"; # Link Text
 my $dashboardhiddenroom = "DashboardRoom"; # Hiddenroom
-my $dashboardversion = "2.03";
+my $dashboardversion = "2.04";
 # -------------------------------------------------------------------------------------------
 
 sub Dashboard_Initialize ($) {
@@ -135,9 +136,10 @@ sub Dashboard_Initialize ($) {
 						 "dashboard_tab3icon ".
 						 "dashboard_tab4icon ".
 						 "dashboard_tab5icon ".
+						 #new attribute vers. 2.04
+						 "dashboard_webfrontendfilter ".
 						 
 						 #obsolete - erase in future releases
-						 "dashboard_groups ". # obsolet -> erase in future releases
 						 "dashboard_colheight ". # obsolet -> erase in future releases
 						 "dashboard_sorting ". # obsolet -> erase in future releases
 						 "dashboard_colwidth ". # obsolet -> erase in future releases
@@ -175,6 +177,7 @@ sub DashboardAsHtml($)
  my $showtabs = AttrVal($defs{$d}{NAME}, "dashboard_showtabs", "tabs-and-buttonbar-at-the-top"); 
  my $showtooglebuttons = AttrVal($defs{$d}{NAME}, "dashboard_showtooglebuttons", 1); 
  my $showfullsize  = AttrVal($defs{$d}{NAME}, "dashboard_showfullsize", 0); 
+ my $webfrontendfilter = AttrVal($defs{$d}{NAME}, "dashboard_webfrontendfilter", "*");
  
  my $row = AttrVal($defs{$d}{NAME}, "dashboard_row", "center");
  my $debug = AttrVal($defs{$d}{NAME}, "dashboard_debug", "0");
@@ -226,6 +229,21 @@ sub DashboardAsHtml($)
 	$defs{$d}{STATE} = "No Groups set"; 
 	return $ret;
  }
+ 
+ ############# Filter Dashboard display depending on $FW_wname ###################################
+ if ($webfrontendfilter ne "*") {
+    my $filterhit = 0;
+	my @webfilter = split(",", $webfrontendfilter); 
+	for (my $i=0;$i<@webfilter;$i++){
+		if (trim($FW_wname) eq trim($webfilter[$i])) { $filterhit = 1; }
+	} 
+	if ($filterhit == 0) {
+	  $ret .= "No Dashboard configured for ".$FW_wname."<br>";  
+	  $ret .= "Set Attribute dashboard_webfrontendfilter, see <a href=\"/fhem?detail=$d\" title=\"".$name."\">Details</a>";
+	  return $ret; 
+	}  
+ }
+ ##################################################################################
  
  if ($debug == 1) { $debugfield = "edit" }; 
  if ($showtabs eq "tabs-and-buttonbar-at-the-top") { $showbuttonbar = "top"; }
@@ -418,18 +436,44 @@ sub BuildGroup($)
 		my $type = $defs{$d}{TYPE};
 		my $devName = AttrVal($d, "alias", $d);
 		my $icon = AttrVal($d, "icon", "");
+
 		$icon = FW_makeImage($icon,$icon,"icon dashboard_groupicon") . "&nbsp;" if($icon);
 	
-		if($FW_hiddenroom{detail}) { $ret .= "<td><div class=\"col1\">$icon$devName</div></td>"; } 
+		if($FW_hiddenroom{detail}) { 
+			$ret .= "<td><div class=\"col1\">$icon$devName</div></td>"; 	
+		} 
 		else { 
 			if ($type ne "weblink" && $type ne "SVG" && $type ne "readingsGroup") { # Don't show Link by weblink, svg and readingsGroup
-				$ret .=FW_pH "detail=$d", "$icon$devName", 1, "col1", 1; 
+				$ret .= FW_pH "detail=$d", "$icon$devName", 1, "col1", 1; 
 			}			
-		}
+		}		
+		
 		$row++;		
 			
 		my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
-		$ret .= "<td informId=\"$d\">$txt</td>";
+		
+	    ################   Edit Result for readingroup etc. #####################
+		my @txtarray = split(">", $txt);				
+		if ($type eq "readingsGroup" && $txtarray[0]  eq "<table") {		
+		    my $storeinfo = 0;
+			my $txtreturn = "";
+			my $linkreturn = "";
+
+			for (my $i=0;$i<@txtarray;$i++){		
+				if (index($txtarray[$i],"</table") > -1) {$storeinfo = 0; }
+				if ($storeinfo == 3) { $txtreturn .= $txtarray[$i].">"; }	
+				if ($storeinfo == 2 && index($txtarray[$i],"<td") > -1 ) { $storeinfo = $storeinfo+1;}				
+				if ($storeinfo == 1 && index($txtarray[$i],"<a href") > -1 ) { $linkreturn = $txtarray[$i].">"; }
+				if (index($txtarray[$i],"<table") > -1) {$storeinfo = $storeinfo+1; }
+			}
+			####if ($helper == 1) {$txtreturn .= "<tr class=\"dashboard_editreadinggroups\"><td><div class=\"devType\"><div class=\"dashboard_button\"><span class=\"dashboard_button_icon dashboard_button_icondetail\"></span>$linkreturn Detail</a></div></div></td></tr>";}
+			$ret .= "<td>$txtreturn</td>";
+		} else  { $ret .= "<td informId=\"$d\">$txt</td>"; }
+		
+		
+#$ret .= "<td informId=\"$d\">$txt</td>";
+
+		###########################################################
 
 		###### Commands, slider, dropdown
         if(!$FW_ss && $cmdlist) {
@@ -448,7 +492,7 @@ sub BuildGroup($)
 				if($htmlTxt) {
 					$ret .= $htmlTxt;
 				} else {
-				  $ret .=FW_pH "cmd.$d=set $d $cmd$rf", $cmd, 1, "col3", 1;
+					$ret .= FW_pH "cmd.$d=set $d $cmd$rf", $cmd, 1, "col3", 1;
 				}
 			}
 		}
@@ -544,12 +588,6 @@ sub CheckDashboardAttributUssage($) { # replaces old disused attributes and thei
 	{ FW_fC("deleteattr ".$d." dashboard_colheight"); }
 	$detailnote = $detailnote." [dashboard_colheight -> dashboard_rowcenterheight]";
  }
- my $groups = AttrVal($defs{$d}{NAME}, "dashboard_groups", "");
- if ($groups ne "") {
-	{ FW_fC("attr ".$d." dashboard_tab1groups ".$groups); }
-	{ FW_fC("deleteattr ".$d." dashboard_groups"); }
-	$detailnote = $detailnote." [dashboard_groups -> dashboard_tab1groups]";
- } 
  my $sorting = AttrVal($defs{$d}{NAME}, "dashboard_sorting", "");
  if ($sorting ne "") { #convert old sorting in new 
 	my @sortings = split(":", $sorting);
@@ -593,7 +631,7 @@ sub CheckDashboardAttributUssage($) { # replaces old disused attributes and thei
  # ------------------------------------------------------------------------------------------------------------------------ 
 
  # Get out any change to the Logfile 
- if ($buttonbar ne "" || $groups ne "" || $sorting ne "") {   
+ if ($buttonbar ne "" || $sorting ne "") {   
   Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."]"." Using an outdated no longer used Attribute or Value. This has been corrected. Don't forget to save config. ".$detailnote; 
  }
 }
@@ -641,7 +679,7 @@ sub Dashboard_define ($$) {
   
  CheckInstallation($hash);
  CheckDashboardEntry($hash);
-
+ 
  return;
 }
 
@@ -751,6 +789,16 @@ sub Dashboard_attr($$$) {
     <li>dashboard_tab5name<br>
 		Title of Tab 5.
 		Default: Dashboard-Tab 5
+    </li><br>	
+	<a name="dashboard_webfrontendfilter"></a>	
+    <li>dashboard_webfrontendfilter<br>
+		If this attribute not set, or value is * the dashboard is displayed on all configured FHEMWEB instances. <br>
+		Set the Name of an FHEMWEB instance (eg WEB) to the Dashboard appears only in this.<br>
+		There may be several valid instances are separated by comma eg WEB,WEBtablet.<br>
+		This makes it possible to define an additional dashboard that only Show on Tablet (which of course an own instance FHEMWEB use).<br>
+		Default: *
+		<br>
+		It should NEVER two ore more activ dashboards in a FHEMWEB instance!
     </li><br>		
   <a name="dashboard_sorting"></a>	
     <li>dashboard_sorting<br>
@@ -822,11 +870,6 @@ sub Dashboard_attr($$$) {
         Height of the bottom row in which the groups may be positioned.<br>
 		Default: 250
     </li><br>		
-  <a name="dashboard_groups"></a>	
-    <li>dashboard_groups<br>
-		This attribute is no longer used and will be removed at a later date. It was replaced with <br>
-		dashboard_tab1groups, dashboard_tab2groups, dashboard_tab3groups, dashboard_tab4groups, dashboard_tab5groups
-    </li><br>			
   <a name="dashboard_tab1groups"></a>	
     <li>dashboard_tab1groups<br>
         Comma-separated list of the names of the groups to be displayed in Tab 1.
@@ -955,38 +998,48 @@ sub Dashboard_attr($$$) {
   <a name="dashboard_tabcount"></a>	
     <li>dashboard_tabcount<br>
 		Gibt die Anzahl der angezeigten Tabs an.
-		Default: 1
+		Standard: 1
     </li><br>	  
   <a name="dashboard_activetab"></a>	
 	 <li>dashboard_activetab<br>
 		Gibt an welches Tab aktiviert ist. Kann manuell gesetzt werden, wird aber auch durch den Schalter "Set" auf das gerade aktive Tab gesetzt.
-		Default: 1
+		Standard: 1
     </li><br>	  
   <a name="dashboard_tab1name"></a>
     <li>dashboard_tab1name<br>
 		Titel des 1. Tab.
-		Default: Dashboard-Tab 1
+		Standard: Dashboard-Tab 1
     </li><br>	   
   <a name="dashboard_tab2name"></a>
     <li>dashboard_tab2name<br>
 		Titel des 2. Tab.
-		Default: Dashboard-Tab 2
+		Standard: Dashboard-Tab 2
     </li><br>	    
    <a name="dashboard_tab3name"></a>
     <li>dashboard_tab3name<br>
 		Titel des 3. Tab.
-		Default: Dashboard-Tab 3
+		Standard: Dashboard-Tab 3
     </li><br>	 
    <a name="dashboard_tab4name"></a>
     <li>dashboard_tab4name<br>
 		Titel des 4. Tab.
-		Default: Dashboard-Tab 4
+		Standard: Dashboard-Tab 4
     </li><br>	 
    <a name="dashboard_tab5name"></a>
     <li>dashboard_tab5name<br>
 		Titel des 5. Tab.
-		Default: Dashboard-Tab 5
-    </li><br>	
+		Standard: Dashboard-Tab 5
+    </li><br>		
+	<a name="dashboard_webfrontendfilter"></a>	
+    <li>dashboard_webfrontendfilter<br>
+		Ist dieses Attribut nicht gesetzt, oder hat den Wert * wird das Dashboard auf allen konfigurierten FHEMWEB Instanzen angezeigt. <br>
+		Wird dem Attribut der Name einer FHEMWEB Instanz (z.B. WEB) zugewiesen so wird das Dashboard nur in dieser Instanz angezeigt. <br>
+		Es können auch mehrere Instanzen durch Komma getrennt angegeben werden, z.B. WEB,WEBtablet. Dadurch ist es möglich ein <br>
+		zusätzliches Dashboard zu definieren und dieses nur z.B. auf Tablet anzeigen zulassen (die natürlich eine eigenen FHEMWEB Instanz verwenden).<br>
+		Standard: *<br>
+		<br>
+		Es dürfen NIE zwei Dashboards in einer FHEMWEB instanz aktiv sein!		
+    </li><br>			
   <a name="dashboard_sorting"></a>	
     <li>dashboard_sorting<br>
 		Dieses Attribut ist nicht mehr zu verwenden und wird zu einem späteren Zeitpunkt entfernt. Es wurde ersetzt durch <br>
@@ -1056,11 +1109,6 @@ sub Dashboard_attr($$$) {
     <li>"dashboard_rowbottomheight<br>
         Höhe der unteren Zeile, in der die Gruppen angeordnet werden.<br>
 		Standard: 250
-    </li><br>		
-  <a name="dashboard_groups"></a>	
-    <li>dashboard_groups<br>
-		Dieses Attribut ist nicht mehr zu verwenden und wird zu einem späteren Zeitpunkt entfernt. Es wurde ersetzt durch <br>
-		dashboard_tab1groups, dashboard_tab2groups, dashboard_tab3groups, dashboard_tab4groups, dashboard_tab5groups.
     </li><br>		
   <a name="dashboard_tab1groups"></a>	
     <li>dashboard_tab1groups<br>
