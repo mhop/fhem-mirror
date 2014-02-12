@@ -7,7 +7,7 @@ body     { background-color: #444444; background-image:url(../images/default/fhe
 #console { width:100%; height:100%; position:absolute; overflow-y:auto;}
 #hdr     { position:absolute; top:10px; left:180px; }
 #content { position:absolute; top:50px; left:180px; bottom:20px; right:10px; }
-#connect_err { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:40px; z-index: 10; }
+#errmsg { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:40px; z-index: 10; }
 
 a { color: #CCCCCC; text-decoration: none;}
 a:hover { color: #ffffff; }

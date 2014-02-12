@@ -13,7 +13,7 @@ body[id~=Media]     { background-color: #A5A5A5; font-family:Arial, Helvetica, s
 	box-shadow:5px 5px 5px #000; margin-bottom: 10px;}
 #content { position:absolute; top:50px; left:180px; bottom:10px; right:10px; text-align:center}
 #startcontent {position:absolute; top:20px; left:200px; text-align:left; font-size: 16px; color:gray; } 
-#connect_err { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:40px; z-index: 10; }
+#errmsg { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:40px; z-index: 10; }
 
 a { color:#CCCCCC; text-decoration:none;}
 td {padding-left: 3px; padding-right: 3px; padding-top: 3px; padding-bottom: 3px;}

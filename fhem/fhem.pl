@@ -1257,7 +1257,7 @@ CommandSave($$)
   foreach my $fh (values %fh) {
     close($fh) if($fh ne "1");
   }
-  return ($ret ? $ret : undef);
+  return ($ret ? $ret : "Wrote configuration to $param");
 }
 
 #####################################

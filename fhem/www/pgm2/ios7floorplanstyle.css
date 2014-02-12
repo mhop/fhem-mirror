@@ -19,7 +19,7 @@ body[id~=Media]     { background-color: #A5A5A5;
 table a:hover {font-weight:bold;}
 #hdr     { position:absolute; top:10px; left:180px; border:1px solid gray; }
 #content { position:absolute; top:50px; left:180px; bottom:10px; right:10px; text-align:center}
-#connect_err { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:40px; z-index: 10; }
+#errmsg { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:40px; z-index: 10; }
 a { color: #278727; }
 img {  border-style: none; }
 table { -moz-border-radius:8px; border-radius:8px; }

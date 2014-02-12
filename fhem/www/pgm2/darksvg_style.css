@@ -1,6 +1,4 @@
 /* Author: Volker */
-.background { fill:none; fill-opacity:0.0; }
-
 text { font-family:Arial, Helvetica, sans-serif; font-size:12px; fill:#CCCCCC;}
 text.title {font-family:Arial, Helvetica, sans-serif; font-size:16px; fill:#CCCCCC;}
 text.copy { text-decoration:underline; stroke:none; fill:blue;}
