@@ -573,7 +573,8 @@ CUL_MAX_BroadcastTime(@)
     #1. the MAX device dhash uses this MAX_CUL as IODev
     #2. the MAX device is a Wall/HeatingThermostat
     if(exists($dhash->{IODev}) && $dhash->{IODev} == $hash
-    && $dhash->{type} =~ /.*Thermostat.*/ ) {
+    && $dhash->{type} =~ /.*Thermostat.*/
+    && AttrVal($dhash->{NAME},"ignore","0") eq "0" ) {
 
       my $h = ReadingsVal($dhash->{NAME},"TimeInformationHour",""); 
       if( $h !~ /^[0-5]$/ ) {
