@@ -76,7 +76,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.03";
+my $owx_version="5.04";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -348,7 +348,7 @@ sub OWSWITCH_ChannelNames($) {
 #
 # OWSWITCH_FormatValues - put together various format strings 
 #
-# CalledBy:  OWSWITCH_FormatValues, OWSWITCH_Get, OWSWITCH_Set
+# CalledBy:  OWSWITCH_Get, OWSWITCH_Set
 # Calling:   -- 
 # Parameter; hash = hash of device addressed, fs = format string
 #
@@ -486,7 +486,7 @@ sub OWSWITCH_Get($@) {
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXSWITCH_GetState($hash);
-      #OWXSWITCH_AwaitGetState($hash);
+      #ASYNC OWXSWITCH_AwaitGetState($hash);
     #-- OWFS interface
     }elsif( $interface eq "OWFS" ){
       $ret = OWFSSWITCH_GetState($hash);
@@ -495,7 +495,6 @@ sub OWSWITCH_Get($@) {
       return "OWSWITCH: Get with wrong IODev type $interface";
     }
     #-- process results
-    OWSWITCH_FormatValues($hash);  
     $hash->{PRESENT} = 1; 
     return $name.".".$a[2]." => ".$hash->{READINGS}{$owg_channel[$fnd]}{VAL};
     
@@ -506,7 +505,7 @@ sub OWSWITCH_Get($@) {
 
     if( $interface eq "OWX" ){
       $ret = OWXSWITCH_GetState($hash);
-      #OWXSWITCH_AwaitGetState($hash);
+      #ASYNC OWXSWITCH_AwaitGetState($hash);
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSSWITCH_GetState($hash);
     }else{
@@ -517,7 +516,7 @@ sub OWSWITCH_Get($@) {
       return "OWSWITCH: Could not get values from device $name, reason $ret";
     }
     $hash->{PRESENT} = 1; 
-    return "OWSWITCH: $name.$reading => ".OWSWITCH_FormatValues($hash);  
+    return "OWSWITCH: $name.$reading => ".$hash->{READINGS}{"state"}{VAL};  
   }
 }
 
@@ -573,9 +572,6 @@ sub OWSWITCH_GetValues($) {
     return 1;
   }
   $hash->{PRESENT} = 1; 
-  
-  $value = OWSWITCH_FormatValues($hash);
-  Log 5, $value;
   
   return undef;
 }
@@ -771,9 +767,7 @@ sub OWSWITCH_Set($@) {
   #-- process results - we have to reread the device
   $hash->{PRESENT} = 1; 
   OWSWITCH_GetValues($hash);  
-  #OWSWITCH_FormatValues($hash);  
   Log 4, "OWSWITCH: Set $hash->{NAME} $key $value";
-  #$hash->{CHANGED}[0] = $value;
   return undef;
 }
 
@@ -860,7 +854,11 @@ sub OWFSSWITCH_GetState($) {
   } else {
     return "unknown device family $hash->{OW_FAMILY}\n";
   }
-  return undef
+  
+  #-- and now from raw to formatted values 
+  my $value = OWSWITCH_FormatValues($hash);
+  Log 5, $value;
+  return undef;
 }
 
 ########################################################################################
@@ -1058,7 +1056,7 @@ sub OWXSWITCH_BinValues($$$$$$$$) {
     return "unknown context in OWXSWITCH_BinValues";
   }
   
-  #-- put into real readings 
+  #-- and now from raw to formatted values 
   my $value = OWSWITCH_FormatValues($hash);
   Log 5, $value;
   return undef;

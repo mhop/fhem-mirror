@@ -75,7 +75,7 @@ use warnings;
 sub Log($$);
 sub AttrVal($$$);
 
-my $owx_version="5.03";
+my $owx_version="5.04";
 
 my %gets = (
   "id"          => "",
@@ -228,9 +228,9 @@ sub OWTHERM_Define ($$) {
   $hash->{ASYNC}      = 0; #-- false for now
 
   #-- temperature globals - always the raw values from/for the device
-  $hash->{".owg_temp"}   = "";
-  $hash->{".owg_th"}     = "";
-  $hash->{".owg_tl"}     = "";
+  $hash->{owg_temp}   = "";
+  $hash->{owg_th}     = "";
+  $hash->{owg_tl}     = "";
   
   #-- Couple to I/O device, exit if not possible
   AssignIoPort($hash);
@@ -279,7 +279,7 @@ sub OWTHERM_Attr(@) {
   	  };
       #-- resolution modified at runtime
   	  $key eq "resolution" and do {
-        $hash->{".owg_cf"} = $value;
+        $hash->{owg_cf} = $value;
         last;
   	  };
       #-- alarm settings modified at runtime
@@ -337,12 +337,12 @@ sub OWTHERM_FormatValues($) {
   $hash->{tempf}{factor}                     = $factor;
   
   #-- no change in any value if invalid reading
-  return if( $hash->{".owg_temp"} eq "");
+  return if( $hash->{owg_temp} eq "");
   
   #-- correct values for proper offset, factor 
-  $vval  = ($hash->{".owg_temp"} + $offset)*$factor;
-  $vlow   = floor(($hash->{".owg_tl"} + $offset)*$factor+0.5);
-  $vhigh  = floor(($hash->{".owg_th"} + $offset)*$factor+0.5);
+  $vval  = ($hash->{owg_temp} + $offset)*$factor;
+  $vlow   = floor(($hash->{owg_tl} + $offset)*$factor+0.5);
+  $vhigh  = floor(($hash->{owg_th} + $offset)*$factor+0.5);
   
   $main::attr{$name}{"tempLow"} = $vlow;
   $main::attr{$name}{"tempHigh"} = $vhigh;
@@ -439,6 +439,7 @@ sub OWTHERM_Get($@) {
   if( $interface eq "OWX" ){
     #-- not different from getting all values ..
     $ret = OWXTHERM_GetValues($hash);
+    #ASYNC: NEED TO WAIT UNTIL DATA IS THERE
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSTHERM_GetValues($hash);
@@ -452,7 +453,6 @@ sub OWTHERM_Get($@) {
     return "OWTHERM: Could not get values from device $name, return was $ret";
   }
   $hash->{PRESENT} = 1; 
-  OWTHERM_FormatValues($hash);
   
   #-- return the special reading
   if ($reading eq "temperature") {
@@ -479,6 +479,12 @@ sub OWTHERM_GetValues($@) {
   my $name    = $hash->{NAME};
   my $value   = "";
   my $ret     = "";
+  
+  #-- check if device needs to be initialized
+  if( $hash->{READINGS}{"state"}{VAL} eq "defined"){
+    OWTHERM_InitializeDevice($hash);
+    OWTHERM_FormatValues($hash);
+  }
   
   #-- restart timer for updates
   RemoveInternalTimer($hash);
@@ -513,13 +519,6 @@ sub OWTHERM_GetValues($@) {
   }
   $hash->{PRESENT} = 1; 
 
-  #-- check if device needs to be initialized
-  OWTHERM_InitializeDevice($hash)
-    if( $hash->{READINGS}{"state"}{VAL} eq "defined");
-
-  $value=OWTHERM_FormatValues($hash);
-  Log 5, $value;
-  
   return undef;
 }
 
@@ -555,7 +554,7 @@ sub OWTHERM_InitializeDevice($) {
     $factor = 1.8;
   } else {
     $abbr="?";
-    Log 3, "OWTHERM_FormatValues: unknown unit $unit";
+    Log 3, "OWTHERM_InitializeDevice: unknown unit $unit";
   }
   #-- these values are rather complex to obtain, therefore save them in the hash
   $hash->{READINGS}{"temperature"}{TYPE} = "temperature";
@@ -663,8 +662,8 @@ sub OWTHERM_Set($@) {
     $value = floor($value+0.5);
     
     #-- First we have to read the current data, because alarms may not be set independently
-    $hash->{".owg_tl"} = floor($main::attr{$name}{"tempLow"}/$factor-$offset+0.5);
-    $hash->{".owg_th"} = floor($main::attr{$name}{"tempHigh"}/$factor-$offset+0.5);
+    $hash->{owg_tl} = floor($main::attr{$name}{"tempLow"}/$factor-$offset+0.5);
+    $hash->{owg_th} = floor($main::attr{$name}{"tempHigh"}/$factor-$offset+0.5);
     
     #-- find upper and lower boundaries for given offset/factor
     my $mmin = floor((-55+$offset)*$factor+0.5);
@@ -753,23 +752,26 @@ sub OWFSTHERM_GetValues($) {
   my $name   = $hash->{NAME};
   
   #-- resolution (set by Attribute 'resolution' on OWFS)
-  my $resolution = defined $hash->{".owg_cf"} ? $hash->{".owg_cf"} : "";
+  my $resolution = defined $hash->{owg_cf} ? $hash->{owg_cf} : "";
   #-- get values - or should we rather get the uncached ones ?
-  $hash->{".owg_temp"} = OWServer_Read($master,"/$owx_add/temperature$resolution");
+  $hash->{owg_temp} = OWServer_Read($master,"/$owx_add/temperature$resolution");
  
   my $ow_thn   = OWServer_Read($master,"/$owx_add/temphigh");
   my $ow_tln   = OWServer_Read($master,"/$owx_add/templow");
   
   return "no return from OWServer"
-    if( (!defined($hash->{".owg_temp"})) || (!defined($ow_thn)) || (!defined($ow_tln)) );
+    if( (!defined($hash->{owg_temp})) || (!defined($ow_thn)) || (!defined($ow_tln)) );
   return "empty return from OWServer"
-    if( ($hash->{".owg_temp"} eq "") || ($ow_thn eq "") || ($ow_tln eq "") );
+    if( ($hash->{owg_temp} eq "") || ($ow_thn eq "") || ($ow_tln eq "") );
         
   #-- process alarm settings
-  $hash->{".owg_tl"} = $ow_tln;
-  $hash->{".owg_th"} = $ow_thn;
+  $hash->{owg_tl} = $ow_tln;
+  $hash->{owg_th} = $ow_thn;
   
-  return undef
+  #-- and now from raw to formatted values
+  my $value = OWTHERM_FormatValues($hash);
+  Log 5, $value;
+  return undef;
 }
 
 ########################################################################################
@@ -795,11 +797,11 @@ sub OWFSTHERM_SetValues($$) {
   	my $value = $args->{$key};
   	next unless (defined $value and $value ne "");
     if( lc($key) eq "templow") {
-  	  $hash->{".owg_tl"} = $value;
+  	  $hash->{owg_tl} = $value;
     } elsif( lc($key) eq "temphigh") {
-  	  $hash->{".owg_th"} = $value;
+  	  $hash->{owg_th} = $value;
     } elsif( lc($key) eq "resolution") {
-  	  $hash->{".owg_cf"} = $value;
+  	  $hash->{owg_cf} = $value;
   	  next;
     } else {
       next;
@@ -869,9 +871,9 @@ sub OWXTHERM_BinValues($$$$$$$$) {
     #$delta = 0;
       
     #-- 2's complement form = signed bytes
-    $hash->{".owg_temp"} = int($lsb/2) + $delta;
+    $hash->{owg_temp} = int($lsb/2) + $delta;
     if( $sign !=0 ){
-      $hash->{".owg_temp"} = -128+$hash->{".owg_temp"};
+      $hash->{owg_temp} = -128+$hash->{owg_temp};
     }
 
     $ow_thn = ord($data[2]) > 127 ? 128-ord($data[2]) : ord($data[2]);
@@ -889,9 +891,9 @@ sub OWXTHERM_BinValues($$$$$$$$) {
     #$msb   = 7;
       
     #-- 2's complement form = signed bytes
-    $hash->{".owg_temp"} = $msb*16+ $lsb/16;   
+    $hash->{owg_temp} = $msb*16+ $lsb/16;   
     if( $sign !=0 ){
-      $hash->{".owg_temp"} = -128+$hash->{".owg_temp"};
+      $hash->{owg_temp} = -128+$hash->{owg_temp};
     }
     $ow_thn = ord($data[2]) > 127 ? 128-ord($data[2]) : ord($data[2]);
     $ow_tln = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
@@ -901,11 +903,12 @@ sub OWXTHERM_BinValues($$$$$$$$) {
   }
   
   #-- process alarm settings
-  $hash->{".owg_tl"} = $ow_tln;
-  $hash->{".owg_th"} = $ow_thn;
+  $hash->{owg_tl} = $ow_tln;
+  $hash->{owg_th} = $ow_thn;
   
   #-- and now from raw to formatted values
-  OWTHERM_FormatValues($hash);
+  my $value = OWTHERM_FormatValues($hash);
+  Log 5, $value;
   return undef;
 }
 
@@ -993,16 +996,16 @@ sub OWXTHERM_SetValues($$) {
     
   #-- $owg_tl and $owg_th are preset and may be changed here
   foreach my $key (keys %$args) {
-  	$hash->{".owg_tl"} = $args->{$key} if( lc($key) eq "templow");
-  	$hash->{".owg_th"} = $args->{$key} if( lc($key) eq "temphigh");
-  	$hash->{".owg_cf"} = $args->{$key} if( lc($key) eq "resolution");
+  	$hash->{owg_tl} = $args->{$key} if( lc($key) eq "templow");
+  	$hash->{owg_th} = $args->{$key} if( lc($key) eq "temphigh");
+  	$hash->{owg_cf} = $args->{$key} if( lc($key) eq "resolution");
   }
 
   #-- put into 2's complement formed (signed byte)
-  my $tlp = $hash->{".owg_tl"} < 0 ? 128 - $hash->{".owg_tl"} : $hash->{".owg_tl"}; 
-  my $thp = $hash->{".owg_th"} < 0 ? 128 - $hash->{".owg_th"} : $hash->{".owg_th"};
+  my $tlp = $hash->{owg_tl} < 0 ? 128 - $hash->{owg_tl} : $hash->{owg_tl}; 
+  my $thp = $hash->{owg_th} < 0 ? 128 - $hash->{owg_th} : $hash->{owg_th};
   #-- resolution is defined in bits 5+6 of configuration register
-  my $cfg = defined $hash->{".owg_cf"} ? (($hash->{".owg_cf"}-9) << 5) | 0x1f : 0x7f;
+  my $cfg = defined $hash->{owg_cf} ? (($hash->{owg_cf}-9) << 5) | 0x1f : 0x7f;
 
   OWX_Reset($master);
   

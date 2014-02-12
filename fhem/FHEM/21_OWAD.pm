@@ -76,7 +76,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.03";
+my $owx_version="5.04";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D");
 my @owg_channel = ("A","B","C","D");
@@ -591,7 +591,7 @@ sub OWAD_Get($@) {
       return "OWAD: Could not get values from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
     }
     $hash->{PRESENT} = 1; 
-    return "OWAD: $name.reading => ".OWAD_FormatValues($hash);
+    return "OWAD: $name.reading => ".$hash->{READINGS}{"state"}{VAL};
   }
   
   #-- get alarm values according to interface type
@@ -616,7 +616,6 @@ sub OWAD_Get($@) {
       return "OWAD: Could not get values from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
     }
     $hash->{PRESENT} = 1; 
-    OWAD_FormatValues($hash);
     
     #-- assemble ouput string
     $value = "";
@@ -650,7 +649,6 @@ sub OWAD_Get($@) {
       return "OWAD: Could not get values from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
     }
     $hash->{PRESENT} = 1; 
-    OWAD_FormatValues($hash);
     
     #-- assemble output string
     $value = "\n";
@@ -747,9 +745,6 @@ sub OWAD_GetValues($) {
     return "OWAD: Could not get values from device $name, reason $ret";
   }
   $hash->{PRESENT} = 1; 
-
-  $value=OWAD_FormatValues($hash);
-  Log 5, $value;
   
   return undef;
 }
@@ -993,7 +988,6 @@ sub OWAD_Set($@) {
   #-- process results - we have to reread the device
   $hash->{PRESENT} = 1; 
   OWAD_GetValues($hash);  
-  OWAD_FormatValues($hash);  
   Log 4, "OWAD: Set $hash->{NAME} $key $value";
 
   return undef;
@@ -1156,6 +1150,9 @@ sub OWFSAD_GetPage($$) {
       $hash->{owg_shigh}->[$i] = $an;
     }
   }
+  #-- and now from raw to formatted values
+  my $value = OWAD_FormatValues($hash);
+  Log 5, $value;
   return undef
 }
 
@@ -1310,6 +1307,7 @@ sub OWXAD_BinValues($$$$$$$$) {
       }
     }
   } 
+  #-- and now from raw to formatted values
   my $value = OWAD_FormatValues($hash);
   Log 5, $value;
   return undef
