@@ -15,7 +15,7 @@ select   { font-family:Helvetica; font-weight:300; font-size:16px;}
 #console { width:100%; height:100%; position:absolute; overflow-y:auto;}
 #hdr     { position:absolute; top:40px; left:65px; }
 #content { position:absolute; top:85px; left: 0px; right: 0px;}
-#connect_err { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:0px; z-index: 10; }
+#errmsg { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:0px; z-index: 10; }
 
 .devType { padding-top:10px; font-size:16px;}
 a {  color: #151515; }

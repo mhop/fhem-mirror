@@ -12,7 +12,7 @@ select   { font-family:Arial, sans-serif; font-size:16px;}
 #console { width:100%; height:100%; position:absolute; overflow-y:auto;}
 #hdr     { position:absolute; top:40px; left:65px; }
 #content { position:absolute; top:85px; left: 0px; right: 0px;}
-#connect_err { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:0px; z-index: 10; }
+#errmsg { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:0px; z-index: 10; }
 
 .devType { padding-top:10px; font-size:12px;}
 a {  color: #278727; }
@@ -79,3 +79,4 @@ svg { height:32px; width:32px; fill:#278727; }
 g.on { fill:red; }
 
 .changed { color:red; }
+#cloudfree { display:none; }

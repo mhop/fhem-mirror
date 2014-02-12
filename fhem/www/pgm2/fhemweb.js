@@ -10,22 +10,44 @@ FW_cmd(arg)     /* see also FW_devState */
   var req = new XMLHttpRequest();
   req.open("GET", arg, true);
   req.send(null);
+  req.onreadystatechange = function(){
+    if(req.readyState == 4)
+      FW_errmsg(req.responseText, 5000);
+  }
+}
+
+function
+FW_errmsg(txt, timeout)
+{
+  var errmsg = document.getElementById("errmsg");
+  if(!errmsg) {
+    if(txt == "")
+      return;
+    errmsg = document.createElement('div');
+    errmsg.setAttribute("id","errmsg");
+    document.body.appendChild(errmsg);
+  }
+  if(txt == "") {
+    document.body.removeChild(errmsg);
+    return;
+  }
+  errmsg.innerHTML = txt;
+  if(timeout)
+    setTimeout("FW_errmsg('')", timeout);
 }
 
 function
 FW_doUpdate()
 {
   if(FW_pollConn.readyState == 4 && !FW_leaving) {
-    var errdiv = document.createElement('div');
-    errdiv.innerHTML = "Connection lost, reconnecting in 5 seconds...";
-    errdiv.setAttribute("id","connect_err");
-    document.body.appendChild(errdiv);
-    setTimeout("FW_longpoll()", 5000);
+    FW_errmsg("Connection lost, trying a reconnect every 5 seconds.", 4900);
+    setTimeout(FW_longpoll, 5000);
     return; // some problem connecting
   }
 
   if(FW_pollConn.readyState != 3)
     return;
+
   var lines = FW_pollConn.responseText.split("\n");
   //Pop the last (maybe empty) line after the last "\n"
   //We wait until it is complete, i.e. terminated by "\n"
@@ -76,12 +98,7 @@ FW_doUpdate()
 function
 FW_longpoll()
 {
-  var errdiv = document.getElementById("connect_err");
-  if(errdiv)
-    document.body.removeChild(errdiv);
-
   FW_curLine = 0;
-
   FW_pollConn = new XMLHttpRequest();
 
   var filter = document.body.getAttribute("longpollfilter");
@@ -131,7 +148,7 @@ FW_replaceLinks()
   for(var i1=0; i1< elArr.length; i1++) {
     var a = elArr[i1];
     var ma = a.getAttribute("href").match(/^(.*\?)(cmd[^=]*=.*)$/);
-    if(ma == null || ma.length == 0 || ma[2].match(/=(style|save)/))
+    if(ma == null || ma.length == 0 || !ma[2].match(/=(save|set)/))
       continue;
     a.removeAttribute("href");
     a.setAttribute("onclick", "FW_cmd('"+ma[1]+"XHR=1&"+ma[2]+"')");

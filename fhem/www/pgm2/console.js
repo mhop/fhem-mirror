@@ -6,13 +6,11 @@ function
 consUpdate()
 {
   if(consConn.readyState == 4) {
-    var errdiv = document.createElement('div');
-    errdiv.innerHTML = "Connection lost, reconnecting in 5 seconds...";
-    errdiv.setAttribute("id","connect_err");
-    document.body.appendChild(errdiv);
-    setTimeout("consFill()", 5000);
+    FW_errmsg("Connection lost, trying a reconnect every 5 seconds.");
+    setTimeout(consFill, 5000);
     return; // some problem connecting
   }
+
   if(consConn.readyState != 3)
     return;
 
@@ -26,12 +24,8 @@ consUpdate()
 function
 consFill()
 {
-  var errdiv = document.getElementById("connect_err");
-  if(errdiv)
-    document.body.removeChild(errdiv);
-
+  FW_errmsg("");
   consConn = new XMLHttpRequest();
-  // Needed when using multiple FF windows
   var query = document.location.pathname+"?XHR=1"+
        "&inform=type=raw;filter=.*"+
        "&timestamp="+new Date().getTime();
