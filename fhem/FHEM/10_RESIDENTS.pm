@@ -893,7 +893,7 @@ sub RESIDENTS_TimeDiff($$) {
     <code>define &lt;rgr_ResidentsName&gt; RESIDENTS</code>
     <br><br>
 
-  Provides a special dummy device to represent a group if individuals living at your home.<br>
+  Provides a special dummy device to represent a group of individuals living at your home.<br>
   It locically combines individual states of <a href="#ROOMMATE">ROOMMATE</a> and <a href="#GUEST">GUEST</a> devices and allows state changes for all members.<br>
   Based on the current state and other readings, you may trigger other actions within FHEM.<br><br>
 
