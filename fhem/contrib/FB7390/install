@@ -50,9 +50,5 @@ if test $r != 0; then
 fi
 rm -f /var/nvi.tmp
 
-echo "########################### Starting fhem ############################"
-sync
-$home/startfhem
-
 echo "########################### FHEM INSTALL END #########################"
 exit 1 # INSTALL_SUCCESS_REBOOT
