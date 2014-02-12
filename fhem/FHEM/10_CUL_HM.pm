@@ -233,7 +233,7 @@ sub CUL_HM_updateConfig($){
     elsif ($md =~ m/(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/){
       $hash->{helper}{oldDes} = "0";
     }
-    elsif ("dimmer"  eq $st) {#setup virtual dimmer channels
+    elsif ($st eq "dimmer"  ) {#setup virtual dimmer channels
       my $mId = CUL_HM_getMId($hash);
       #configure Dimmer virtual channel assotiation
       if ($hash->{helper}{role}{chn}){
@@ -269,7 +269,7 @@ sub CUL_HM_updateConfig($){
         }
       }
     }
-    elsif ("virtual" eq $st) {#setup virtuals
+    elsif ($st eq "virtual" ) {#setup virtuals
       $hash->{helper}{role}{vrt} = 1;
       if (   $hash->{helper}{fkt} 
           && $hash->{helper}{fkt} =~ m/^(vdCtrl|virtThSens)$/){
@@ -284,7 +284,10 @@ sub CUL_HM_updateConfig($){
                      ,"CUL_HM_valvePosUpdt","valvePos:$vId",0);
       }
     }
-
+    elsif ($st eq "sensRain") {
+      $hash->{helper}{lastRain} = ReadingsTimestamp($name,"state","")
+            if (ReadingsVal($name,"state","") eq "rain");
+    }
     next if ($nAttr);# stop if default setting if attributes is not desired
 
     my $actCycle = AttrVal($name,"actCycle",undef);
@@ -1184,7 +1187,7 @@ sub CUL_HM_Parse($$) {##############################
         delete $shash->{helper}{lastRain};
       }
 
-       CUL_HM_UpdtReadSingle($shash,'.level',#store level invisible
+      CUL_HM_UpdtReadSingle($shash,'.level',#store level invisible
                                      ($val eq "off"?"0 %":"100 %"),0);
 
       if ($mNo eq "00" && $chn eq "02" && $val eq "on"){
