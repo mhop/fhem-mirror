@@ -42,6 +42,7 @@ sub FW_submit($$@);
 sub FW_textfield($$$);
 sub FW_textfieldv($$$$);
 sub FW_updateHashes();
+sub FW_visibleDevices(;$);
 
 use vars qw($FW_dir);     # base directory for web server
 use vars qw($FW_icondir); # icon base directory
@@ -72,6 +73,7 @@ use vars qw($FW_detail);   # currently selected device for detail view
 use vars qw($FW_cmdret);   # Returned data by the fhem call
 use vars qw($FW_room);      # currently selected room
 use vars qw($FW_formmethod);
+use vars qw(%FW_visibleDeviceHash);
 
 $FW_formmethod = "post";
 
@@ -488,6 +490,7 @@ FW_answerCall($)
 
     my %h = map { $_ => 1 } devspec2array($filter);
     $me->{inform}{devices} = \%h;
+    %FW_visibleDeviceHash = FW_visibleDevices();
 
     # NTFY_ORDER is larger than the normal order (50-)
     $me->{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
@@ -2369,6 +2372,27 @@ FW_textFieldFn($$$$)
 
 # Widgets END
 ###########################
+
+sub
+FW_visibleDevices(;$)
+{
+  my($FW_wname) = @_; 
+ 
+  my %devices = (); 
+  foreach my $d (sort keys %defs) {
+    next if(!defined($defs{$d}));
+    my $h = $defs{$d};
+    next if(!$h->{TEMPORARY});
+    next if($h->{TYPE} ne "FHEMWEB");
+    next if(defined($FW_wname) && $h->{SNAME} ne $FW_wname);
+ 
+    next if(!defined($h->{inform}));
+ 
+    @devices{ keys %{$h->{inform}->{devices}} } = 
+                values %{$h->{inform}->{devices}};
+  }
+  return %devices;
+}
 
 sub 
 FW_ActivateInform()
