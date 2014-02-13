@@ -977,6 +977,18 @@ sub SYSMON_getFileSystemInfo ($$$)
   
   logF($hash, "SYSMON_getFileSystemInfo", "recieved ".scalar(scalar(@filesystems))." lines");
   
+  # - DEBUG -
+  #if($fs eq "/test") {
+  #  @filesystems=(
+  #    "Filesystem           1M-blocks      Used Available Use% Mounted on",
+  #    "/dev/mapper/n40l-root",
+  #    "                        226741     22032    193192  11% /"
+  #  );
+  #  $fs = "/";
+  #}
+  #- DEBUG -
+  
+  
   #if(!defined @filesystems) { return $map; } # Ausgabe leer
   #if(scalar(@filesystems) == 0) { return $map; } # Array leer
 
@@ -993,12 +1005,18 @@ sub SYSMON_getFileSystemInfo ($$$)
   
   if(!defined $filesystems[0]) { return $map; } # Ausgabe leer
   
-  logF($hash, "SYSMON_getFileSystemInfo", "analyse line $filesystems[0]");
+  logF($hash, "SYSMON_getFileSystemInfo", "analyse line $filesystems[0] for $fs");
   
-  if (!$filesystems[0]=~ /$fs\s*$/){ shift @filesystems; }
+  #if (!($filesystems[0]=~ /$fs\s*$/)){ shift @filesystems; }
+  if (!($filesystems[0]=~ /$fs$/)){ 
+    shift @filesystems; 
+    logF($hash, "SYSMON_getFileSystemInfo", "analyse line $filesystems[0] for $fs");
+  } else {
+  	logF($hash, "SYSMON_getFileSystemInfo", "pattern ($fs) found");
+  }
   #if (index($filesystems[0], $fs) < 0) { shift @filesystems; } # Wenn die Bezeichnung so lang ist, dass die Zeile umgebrochen wird...
   #if (index($filesystems[0], $fs) >= 0) # check if filesystem available -> gives failure on console
-  if ($filesystems[0]=~ /$fs\s*$/)
+  if ($filesystems[0]=~ /$fs$/)
   {
   	logF($hash, "SYSMON_getFileSystemInfo", "use line $filesystems[0]");
   	
