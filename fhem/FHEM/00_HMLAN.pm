@@ -27,7 +27,6 @@ sub HMLAN_secSince2000();
 sub HMLAN_relOvrLd($);
 sub HMLAN_condUpdate($$);
 
-my $debug = 1; # set 1 for better log readability
 my %sets = ( "hmPairForSec" => "HomeMatic"
             ,"hmPairSerial" => "HomeMatic"
 );
@@ -403,7 +402,7 @@ sub HMLAN_Write($$$) {#########################################################
         && $hash->{assignedIDs} =~ m/$dst/){
       # Acks are generally send by HMLAN autonomously
       # Special
-      Log3 $hash, 5, "HMLAN: Skip ACK" if (!$debug);
+      Log3 $hash, 5, "HMLAN: Skip ACK";
       return;
     }
 #   my $IDHM  = '+'.$dst.',01,00,F1EF'; #used by HMconfig - meanning??
@@ -447,7 +446,7 @@ sub HMLAN_Read($) {############################################################
   my $name = $hash->{NAME};
 
   my $hmdata = $hash->{PARTIAL};
-  Log3 $hash, 5, "HMLAN/RAW: $hmdata/$buf" if (!$debug);
+  Log3 $hash, 5, "HMLAN/RAW: $hmdata/$buf";
   $hmdata .= $buf;
 
   while($hmdata =~ m/\n/) {

@@ -22,6 +22,7 @@ sub HMinfo_Initialize($$) {####################################################
 
   $hash->{DefFn}     = "HMinfo_Define";
   $hash->{SetFn}     = "HMinfo_SetFn";
+  $hash->{GetFn}     = "HMinfo_GetFn";
   $hash->{AttrFn}    = "HMinfo_Attr";
   $hash->{AttrList}  =  "loglevel:0,1,2,3,4,5,6 "
                        ."sumStatus sumERROR "
@@ -57,7 +58,7 @@ sub HMinfo_Define($$){#########################################################
   $hash->{nb}{cnt} = 0;
   return;
 }
-sub HMinfo_Attr(@) {#################################
+sub HMinfo_Attr(@) {###########################################################
   my ($cmd,$name, $attrName,$attrVal) = @_;
   my @hashL;
   my $hash = $defs{$name};
@@ -287,21 +288,21 @@ sub HMinfo_tempList(@) { ######################################################
   $filter = "." if (!$filter);
   $action = "" if (!$action);
   my $ret;
-  if ($action eq "save"){
+  if    ($action eq "save"){
     open(aSave, ">$fName") || return("Can't open $fName: $!");
     my @incmpl;
-    foreach my $eN(HMinfo_getEntities("d")){#search for devices and select correct channel
+    foreach my $eN(HMinfo_getEntities("d")){#search and select channel
       my $md = AttrVal($eN,"model","");
       my $chN; #tempList channel name
       if ($md =~ m/(HM-CC-RT-DN-BoM|HM-CC-RT-DN)/){
         $chN = $defs{$eN}{channel_04};
       }
-      elsif ($md =~ m/(ROTO_ZEL-STG-RM-FWT|HM-CC-TC)/){
+      elsif ($md =~ m/(ROTO_ZEL-STG-RM-FWT|HM-CC-TC|HM-TC-IT-WM-W-EU)/){
         $chN = $defs{$eN}{channel_02};
       }
       next if (!$chN || !$defs{$chN} || $chN !~ m/$filter/);
       print aSave "\nentities:$chN";
-      my @tl = sort grep /tempList[SMFWT]/,keys %{$defs{$chN}{READINGS}};
+      my @tl = sort grep /tempList(P[123])?[SMFWT]/,keys %{$defs{$chN}{READINGS}};
       if (scalar@tl != 7){
         print aSave "\nincomplete:$chN only data for ".join(",",@tl);
         push @incmpl,$chN;
@@ -337,7 +338,7 @@ sub HMinfo_tempList(@) { ######################################################
         }
         push @elAll,@el;
       }
-      elsif(@el && $_ =~ m/tempList[SMFWT].*\>/){
+      elsif(@el && $_ =~ m/tempList(P[123])?[SMFWT].*\>/){
         my ($tln,$val) = ($1,$2)if($_ =~ m/(.*)>(.*)/);
         $tln =~ s/ //g;
         $val =~ s/ //g;
@@ -379,7 +380,7 @@ sub HMinfo_tempList(@) { ######################################################
         }
         push @elAll,@el;
       }
-      elsif(@el && $_ =~ m/tempList[SMFWT].*\>/){
+      elsif(@el && $_ =~ m/tempList(P[123])?[SMFWT].*\>/){
         my ($tln,$val) = ($1,$2)if($_ =~ m/(.*)>(.*)/);
         $tln =~ s/ //g;
         $val =~ tr/ +/ /;
@@ -436,7 +437,7 @@ sub HMinfo_tempListTmpl(@) { ##################################################
         $found = 1 if ($defs{$_} && $_ eq $tmpl);
       }
     }
-    elsif($found != 1 && $_ =~ m/tempList[SMFWT].*\>/){
+    elsif($found != 1 && $_ =~ m/tempList(P[123])?[SMFWT].*\>/){
       my ($tln,$val) = ($1,$2)if($_ =~ m/(.*)>(.*)/);
       $tln =~ s/ //g;
       $val =~ tr/ +/ /;
@@ -508,7 +509,6 @@ sub HMinfo_getEntities(@) { ###################################################
   }
   return sort(@names);
 }
-
 sub HMinfo_getMsgStat() { #####################################################
   my ($hr,$dr,$hs,$ds);
   $hr  =  sprintf("\n  %-14s:","receive hour");
@@ -546,6 +546,33 @@ sub HMinfo_getMsgStat() { #####################################################
            .$tsts
            .$dr.$ds
            ;
+}
+
+sub HMinfo_GetFn($@) {#########################################################
+  my ($hash,$name,$cmd,@a) = @_;
+  my ($opt,$optEmpty,$filter) = ("",1,"");
+  my $ret;
+
+  if (@a && ($a[0] =~ m/^-/) && ($a[0] !~ m/^-f$/)){# options provided
+    $opt = $a[0];
+    $optEmpty = ($opt =~ m/e/)?1:0;
+    shift @a; #remove
+  }
+  if (@a && $a[0] =~ m/^-f$/){# options provided
+    shift @a; #remove
+    $filter = shift @a;
+  }
+
+  $cmd = "?" if(!$cmd);# by default print options
+  if   ($cmd eq "unused" )     {##actionImmediate: clear parameter--------------
+  }
+  else{
+    my @cmdLst =     
+           ( "notsupproted");
+    $ret = join (" ",sort @cmdLst); 
+  }
+  return $ret;
+
 }
 sub HMinfo_SetFn($@) {#########################################################
   my ($hash,$name,$cmd,@a) = @_;
@@ -870,7 +897,7 @@ sub HMinfo_SetFn($@) {#########################################################
     $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
     $ret = HMinfo_tempList($filter,$a[0],$fn);
   }
-  elsif($cmd eq "tempListTmpl"){##handle thermostat templist from file ---------
+  elsif($cmd eq "tempListTmpl"){##handle thermostat templist from file --------
     my $fn = $a[1]?$a[1]:"tempList.cfg";
     $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
     $ret = HMinfo_tempListTmpl($filter,$a[0],$fn);
@@ -1103,7 +1130,7 @@ sub HMinfo_saveConfig($) {#####################################################
   return $id;
 }
 
-sub HMinfo_archConfig($$$$) {################################################
+sub HMinfo_archConfig($$$$) {##################################################
   # save config only if register are complete
   my ($hash,$name,$opt,$fN) = @_;
   $fN = $fN?$fN:AttrVal($name,"configFilename","regSave.cfg");
