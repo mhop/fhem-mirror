@@ -679,7 +679,7 @@ sub CUL_HM_Parse($$) {##############################
 
     if( defined $dhash->{helper}{cSnd} && 
           $dhash->{helper}{cSnd} ne substr($msg,7)){
-      Log3 $dname,6,"CUL_HM $dname attack:$dhash->{helper}{cSnd}:".substr($msg,7).".";
+      Log3 $dname,5,"CUL_HM $dname attack:$dhash->{helper}{cSnd}:".substr($msg,7).".";
       CUL_HM_eventP($dhash,"ErrIoAttack");
       my ($evntCnt,undef) = split(' last_at:',$dhash->{"prot"."ErrIoAttack"},2);
       push @entities,CUL_HM_UpdtReadSingle($dhash,"sabotageAttack","ErrIoAttack cnt:$evntCnt",1);
@@ -1728,6 +1728,7 @@ sub CUL_HM_Parse($$) {##############################
       my ($recChn) = (hex($1));# button number/event count
                 # fhem CUL shall ack a button press
       push @ack,$shash,$mNo."8002".$dst.$src."0101".(($recChn&1)?"C8":"00")."00";
+	  Log3 $name,5,"CUL_HM $name prep ACK for $recChn";
     }
   }
 
@@ -1749,7 +1750,7 @@ sub CUL_HM_Parse($$) {##############################
     my $rr = $respRemoved;
     CUL_HM_SndCmd($ack[$i++],$ack[$i++])while ($i<@ack);
     $respRemoved = $rr;
-    Log3 $name,6,"CUL_HM $name sent ACK:".(int(@ack));
+    Log3 $name,5,"CUL_HM $name sent ACK:".(int(@ack));
   }
   CUL_HM_ProcessCmdStack($shash) if ($respRemoved); # cont if complete
   #------------ process events ------------------
@@ -3566,7 +3567,6 @@ sub CUL_HM_Set($@) {
     }
     $peerHash = $modules{CUL_HM}{defptr}{$peerDst.$peerChn}if ($modules{CUL_HM}{defptr}{$peerDst.$peerChn});
     $peerHash = $modules{CUL_HM}{defptr}{$peerDst}         if (!$peerHash);
-    Log 1,"General $peerN  t:$peerHash->{TYPE} d:$devName i:$defs{$devName}{IODev}->{NAME}";
     return "$peerN not a CUL_HM device"                           if(   ($target ne "remote") 
                                                                      && (!$peerHash || $peerHash->{TYPE} ne "CUL_HM")
                                                                      &&  $defs{$devName}{IODev}->{NAME} ne $peerN);
@@ -4482,7 +4482,7 @@ sub CUL_HM_protState($$){
     CUL_HM_UpdtReadSingle($hash,"state",$state,0);
     DoTrigger($name, undef);
   }
-  Log3 $name,6,"CUL_HM $name protEvent:$state".
+  Log3 $name,5,"CUL_HM $name protEvent:$state".
             ($hash->{cmdStack}?" pending:".scalar @{$hash->{cmdStack}}:"");
 }
 
@@ -5289,7 +5289,7 @@ sub CUL_HM_TCITtempReadings($) {# parse RT temperature readings
     my $stmpRegs = ($hash->{helper}{shadowReg}{"RegL_0$lst:"})? # need to compare actual data
                    ($hash->{helper}{shadowReg}{"RegL_0$lst:"})
                    :$tempRegs;
-#    return "reglist incomplete\n" if ($tempRegs !~ m/00:00/);
+    next if ($tempRegs !~ m/00:00/);
 
     my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
 
