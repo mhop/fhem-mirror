@@ -54,11 +54,11 @@ sub WOL_Set($@) {
      if ($cmd eq "") {
        Log3 $hash, 3, "No shutdown command given (see shutdownCmd attribute)!";
      } else {
-#      qx ($cmd);
        $cmd  = SemicolonEscape($cmd);
        Log3 $hash, 3, $mod."shutdownCmd: $cmd executed";
        my $ret  = AnalyzeCommandChain(undef, $cmd);
        Log3 ($hash, 3, $ret) if($ret);
+       return undef;
      }
   } elsif ($v eq "refresh") {
     ;
@@ -297,9 +297,9 @@ So, for example a Buffalo NAS can be kept awake.
     <br><br>
     Examples:
     <PRE>
-    shutdownCmd    set lamp on                            # fhem command
-    shutdownCmd    { Log 1, "Teatime" }                   # Perl command
-    shutdownCmd    "/bin/echo "Teatime" > /dev/console"   # shell command
+    attr wol shutdownCmd    set lamp on                            # fhem command
+    attr wol shutdownCmd    { Log 1, "Teatime" }                   # Perl command
+    attr wol shutdownCmd    "/bin/echo "Teatime" > /dev/console"   # shell command
     </PRE>
     <li><code>attr &lt;name&gt; interval &lt;seconds&gt;</code></a>
                 <br>defines the time between two checks by a <i>ping</i> if state of &lt;name&gt is <i>on</i></li>
