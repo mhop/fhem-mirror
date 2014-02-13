@@ -624,7 +624,7 @@ JSONMETER_UpdateAborted($)
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code>attr <device> pathString ?LogName=<i>user</i>&LogPSWD=<i>password</i></code>
             </li>
-         <li>LS110</li>
+         <li><b>LS110</b> - <a href="http://www.youless.nl/productdetails/product/ls110.html">YouLess LS110</a> network sensor (counter) for electro mechanical electricity meter</li>
          <li><b>url</b> - use the URL defined via the attributes 'pathString' and 'port'</li>
          <li><b>file</b> - use the file defined via the attribute 'pathString' (positioned in the FHEM file system)</li>
      </ul>
@@ -725,6 +725,7 @@ JSONMETER_UpdateAborted($)
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Die Login-Information wird &uuml;ber das Attribute 'pathstring' angegeben.
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code>?LogName=<i>Benutzer</i>&LogPSWD=<i>Passwort</i></code></li>
+         <li><b>LS110</b> - <a href="http://www.youless.nl/productdetails/product/ls110.html">YouLess LS110</a> Netzwerkf&auml;higer Sensor für elektromechanische Stromz&auml;hler</li>
          <li><b>url</b> - benutzt die URL, welche durch das Attribut 'pathString' und 'port' definiert wird.</li>
          <li><b>file</b> - benutzt die Datei, welche durch das Attribut 'pathString' definiert wird (im FHEM Dateisystem)</li>
       </ul>
