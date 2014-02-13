@@ -4,7 +4,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2012,2014 Torsten Poitzsch (torsten.poitzsch@gmx.de)
+#  (c) 2012,2014 Torsten Poitzsch (torsten poitzsch at gmx . de)
 #  (c) 2012-2013 Jan-Hinrich Fessel (oskar@fessel.org)
 #
 #  The modul reads and writes parameters of the heat pump controller 
