@@ -198,7 +198,7 @@ LightScene_Notify($$)
 
   if( !defined($hash->{helper}{myDisplay})
       || !%{$hash->{helper}{myDisplay}} ) {
-    Log3 $name, 4, "$name: not on any display, ignoring notify";
+    Log3 $name, 5, "$name: not on any display, ignoring notify";
     return if($dev->{NAME} ne "global");
   }
 
