@@ -708,7 +708,7 @@ withings_Attr($$$)
     <br>
 
     Defines a withings device.<br><br>
-    If a withing device of the account type is created all fhem devices for users and devices are automaticaly created.
+    If a withings device of the account type is created all fhem devices for users and devices are automaticaly created.
     <br>
 
     Examples:
