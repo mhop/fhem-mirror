@@ -74,7 +74,7 @@ sub JSONMETER_UpdateAborted($);
  ##############################################################
   my @jsonFields = (
     [3, "meterType", "meterType", 0] # {"meterId": "0000000061015736", "meterType": "Simplex", "interval": 0, "entry": [
-   ,[3, "timestamp", "deviceTime", 0] # {"timestamp": 1389296286, "periodEntries": [
+   ,[4, "timestamp", "deviceTime", 0] # {"timestamp": 1389296286, "periodEntries": [
    ,[3, "cnt", "electricityConsumed", 2] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
    ,[3, "pwr", "electricityPower", 1] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
    ,[1, "010000090B00", "deviceTime", 0] #   { "obis":"010000090B00","value":"dd.mm.yyyy,hh:mm"}
