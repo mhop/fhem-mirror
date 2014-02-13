@@ -171,19 +171,31 @@ HttpUtils_Connect2($)
     return "$hash->{displayurl}: Can't connect to $hash->{addr}: $@"; 
   }
 
+  my $data;
+  if(defined($hash->{data})) {
+    if( ref($hash->{data}) eq 'HASH' ) {
+      foreach my $key (keys %{$hash->{data}}) {
+        $data .= "&" if( $data );
+        $data .= "$key=". urlEncode($hash->{data}{$key});
+      }
+    } else {
+      $data = $hash->{data};
+    }
+  }
+
   $hash->{host} =~ s/:.*//;
-  my $hdr = ($hash->{data} ? "POST" : "GET")." $hash->{path} HTTP/1.0\r\n";
+  my $hdr = ($data ? "POST" : "GET")." $hash->{path} HTTP/1.0\r\n";
   $hdr .= "Host: $hash->{host}\r\n";
   $hdr .= "Authorization: Basic $hash->{auth}\r\n" if(defined($hash->{auth}));
   $hdr .= $hash->{header}."\r\n" if(defined($hash->{header}));
-  if(defined($hash->{data})) {
-    $hdr .= "Content-Length: ".length($hash->{data})."\r\n";
+  if(defined($data)) {
+    $hdr .= "Content-Length: ".length($data)."\r\n";
     $hdr .= "Content-Type: application/x-www-form-urlencoded\r\n"
                 if ($hdr !~ "Content-Type:");
   }
   $hdr .= "\r\n";
   syswrite $hash->{conn}, $hdr;
-  syswrite $hash->{conn}, $hash->{data} if(defined($hash->{data}));
+  syswrite $hash->{conn}, $data if(defined($data));
   shutdown $hash->{conn}, 1 if(!$hash->{noshutdown});
 
   if($hash->{callback}) { # Nonblocking read
