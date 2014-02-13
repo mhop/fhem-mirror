@@ -720,7 +720,7 @@ LUXTRONIK2_UpdateDone($)
          if ( exists( $hash->{READINGS}{statBoilerGradientCoolDownMin} ) ) {
             my @new = split / /, $value;
             my @old = split / /, $hash->{READINGS}{statBoilerGradientCoolDownMin};
-            if ($new[5]>6 && $new[0]<$old[0]) {
+            if ($new[5]>6 && $new[0]>$old[0] && $new[0] < 0) {
                readingsBulkUpdate($hash,"statBoilerGradientCoolDownMin",$value); 
                Log3 $name,3,"$name: statBoilerGradientCoolDownMin set to $value";
             }
