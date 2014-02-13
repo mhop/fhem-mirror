@@ -814,12 +814,12 @@ AnalyzeCommand($$;$)
   return undef if(!$cmd);
 
   if($cmd =~ m/^{.*}$/s) {		# Perl code
-    return( "Forbidden command $cmd." ) if( $allowed && $allowed !~ m/\bperl\b/ );
+    return "Forbidden command $cmd." if($allowed && $allowed !~ m/\bperl\b/);
     return AnalyzePerlCommand($cl, $cmd);
   }
 
   if($cmd =~ m/^"(.*)"$/s) { # Shell code in bg, to be able to call us from it
-    return( "Forbidden command $cmd." ) if( $allowed && $allowed !~ m/\bshell\b/ );
+    return "Forbidden command $cmd." if($allowed && $allowed !~ m/\bshell\b/);
     if($evalSpecials) {
       map { $ENV{substr($_,1)} = $evalSpecials->{$_}; } keys %{$evalSpecials};
     }
@@ -851,7 +851,7 @@ AnalyzeCommand($$;$)
   $fn = $cmds{$fn}{ReplacedBy}
                 if(defined($cmds{$fn}) && defined($cmds{$fn}{ReplacedBy}));
 
-  return( "Forbidden command $fn." ) if( $allowed && $allowed !~ m/\b$fn\b/ );
+  return "Forbidden command $fn." if($allowed && $allowed !~ m/\b$fn\b/);
 
   #############
   # autoload commands.
@@ -926,7 +926,7 @@ devspec2array($)
         }
         $val="" if(!defined($val));
 
-        my $lre = ($n eq "room" ? "\\b$re\\b" : "^$re\$");
+        my $lre = ($n eq "room" ? "(^|,)$re(,|\$)" : "^$re\$");
         eval { # a bad regexp is deadly
           if(($op eq  "=" && $val =~ m/$lre/) ||
              ($op eq "!=" && $val !~ m/$lre/)) {
