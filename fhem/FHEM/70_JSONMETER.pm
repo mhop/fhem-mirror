@@ -53,7 +53,7 @@ sub JSONMETER_GetUpdate($);
 sub JSONMETER_GetJsonFile($);
 sub JSONMETER_ReadFromUrl($);
 sub JSONMETER_ReadFromFile($);
-sub JSONMETER_UpdateDone($);
+sub JSONMETER_ParseJsonFile($);
 sub JSONMETER_UpdateAborted($);
 
 # Modul Version for remote debugging
@@ -69,26 +69,23 @@ sub JSONMETER_UpdateAborted($);
 
  ##############################################################
  # Syntax: valueType, code, FHEM reading name, statisticType
- #     valueType: 1=OBISvalue       | 2=OBISvalueString | 3=jsonEntryTime
- #                4=jsonEntryQuotes | 5=OBISvalueQuotes | 6=jsonEntryNoQuotes
+ #     valueType: 1=OBISvalue | 2=OBISvalueString | 3=jsonProperty | 4=jsonPropertyTime
  #     statisticType: 0=noStatistic | 1=maxMinStatistic | 2=timeStatistic
  ##############################################################
   my @jsonFields = (
     [3, "meterType", "meterType", 0] # {"meterId": "0000000061015736", "meterType": "Simplex", "interval": 0, "entry": [
-   ,[4, "timestamp", "deviceTime", 0] # {"timestamp": 1389296286, "periodEntries": [
+   ,[3, "timestamp", "deviceTime", 0] # {"timestamp": 1389296286, "periodEntries": [
    ,[3, "cnt", "electricityConsumed", 2] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
-   ,[6, "pwr", "electricityPower", 1] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
-   ,[5, "010000090B00", "deviceTime", 0] #   { "obis":"010000090B00","value":"dd.mm.yyyy,hh:mm"}
+   ,[3, "pwr", "electricityPower", 1] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
+   ,[1, "010000090B00", "deviceTime", 0] #   { "obis":"010000090B00","value":"dd.mm.yyyy,hh:mm"}
    ,[2, "0.0.0", "meterID", 0] # {"obis": "0.0.0", "scale": 0, "value": 1627477814, "unit": "", "valueString": "0000000061015736" }, 
-   ,[5, "0100000000FF", "meterID", 0] #  #   { "obis":"0100000000FF","value":"xxxxx"},
+   ,[1, "0100000000FF", "meterID", 0] #  #   { "obis":"0100000000FF","value":"xxxxx"},
    ,[2, "0.2.0", "firmware", 0] # {"obis": "0.2.0", "scale": 0, "value": 0, "unit": "", "valueString": "V320090704" }, 
-   ,[1, "1.7.0", "electricityPower", 1]  # {"obis": "1.7.0", "scale": 0, "value": 392, "unit": "W", "valueString": "0000392" }, 
-   ,[1, "0100010700FF", "electricityPower", 1] # {"obis":"0100010700FF","value":313.07,"unit":"W"},
+   ,[1, "1.7.0|0100010700FF", "electricityPower", 1]  # {"obis": "1.7.0", "scale": 0, "value": 392, "unit": "W", "valueString": "0000392" }, 
    ,[1, "0100150700FF", "electricityPowerPhase1", 1] # {"obis":"0100150700FF","value":209.40,"unit":"W"},
    ,[1, "0100290700FF", "electricityPowerPhase2", 1] # {"obis":"0100290700FF","value":14.27,"unit":"W"},
    ,[1, "01003D0700FF", "electricityPowerPhase3", 1] # {"obis":"01003D0700FF","value":89.40,"unit":"W"},
-   ,[1, "1.8.0", "electricityConsumed", 2] # {"obis": "1.8.0", "scale": 0, "value": 8802276, "unit": "Wh", "valueString": "0008802.276" }, 
-   ,[1, "0101010800FF", "electricityConsumed", 2] #{"obis":"0101010800FF","value":41.42,"unit":"kWh" },            
+   ,[1, "1.8.0|0101010800FF", "electricityConsumed", 2] # {"obis": "1.8.0", "scale": 0, "value": 8802276, "unit": "Wh", "valueString": "0008802.276" }, 
    ,[1, "0101010801FF", "electricityConsumedTariff1", 2] # {"obis":"0101010801FF","value":33.53,"unit":"kWh"},               
    ,[1, "0101010802FF", "electricityConsumedTariff2", 2] # {"obis":"0101010802FF","value":33.53,"unit":"kWh"},               
    ,[1, "0101010803FF", "electricityConsumedTariff3", 2] # {"obis":"0101010803FF","value":33.53,"unit":"kWh"},               
@@ -265,15 +262,28 @@ JSONMETER_Get($@)
 {
   my ($hash, $name, $cmd) = @_;
   my $result;
+  my $message;
   
-  if ($cmd eq "jsonFile") {
-   $result = JSONMETER_GetJsonFile $name;
-   my @a = split /\|/, $result;
-   my $message = decode_base64($a[2]);
-   return $message;
+   if ($cmd eq "jsonFile") {
+      $result = JSONMETER_GetJsonFile $name;
+      my @a = split /\|/, $result;
+      if ($a[1] == 1) {
+         $message = decode_base64($a[2]);
+      } else {
+         $message = $a[1];
+      }
+      return $message;
+  } elsif ($cmd eq "jsonAnalysis") {
+      $hash->{fhem}{jsonInterpreter} = "";
+      $result = JSONMETER_GetJsonFile $name;
+      $result = JSONMETER_ParseJsonFile $result;
+      # my @a = split /\|/, $result;
+      $message = decode_base64($result); #$a[2]);
+      return $message;
   }
   
-  my $list = "jsonFile:noArg";
+  my $list = "jsonFile:noArg"
+            ." jsonAnalysis:noArg";
   return "Unknown argument $cmd, choose one of $list";
 
 } # end JSONMETER_Get
@@ -300,7 +310,10 @@ JSONMETER_GetUpdate($)
       return "$name|0|"."Error reading device: Please define the attribute 'pathString'.";
    }
    
-   $hash->{helper}{RUNNING_PID} = BlockingCall("JSONMETER_GetJsonFile", $name, "JSONMETER_UpdateDone", 10,"JSONMETER_UpdateAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+   $hash->{helper}{RUNNING_PID} = BlockingCall("JSONMETER_GetJsonFile", $name, 
+                                          "JSONMETER_ParseJsonFile", 10,
+                                          "JSONMETER_UpdateAborted", $hash) 
+                                unless(exists($hash->{helper}{RUNNING_PID}));
 }
 
 
@@ -411,7 +424,7 @@ JSONMETER_ReadFromUrl($)
 } # end JSONMETER_ReadFromUrl
 
 sub ###########################
-JSONMETER_UpdateDone($)
+JSONMETER_ParseJsonFile($)
 {
   my ($string) = @_;
   return unless(defined($string));
@@ -419,14 +432,13 @@ JSONMETER_UpdateDone($)
   my $hash = $defs{$a[0]};
   my $name = $hash->{NAME};
   my $value;
+  my $returnStr;
   
   delete($hash->{helper}{RUNNING_PID});
-  
+
 
 if ( $a[1] == 1 ){
    my $message = decode_base64($a[2]);
-   $message =~ s/\s/ /g;
-   $message =~ s/\n/ /g;
 
    readingsBeginUpdate($hash);
 
@@ -434,8 +446,9 @@ if ( $a[1] == 1 ){
    
     my $jsonInterpreter =  $hash->{fhem}{jsonInterpreter} || "";
     my $alwaysAnalyse = $attr{$name}{alwaysAnalyse} || 0;
-  
-  ####################################
+    $returnStr .= "================= Find JSON property ==================\n\n";
+
+    ####################################
   # ANALYSE once: Find all known obis codes in the first run and store in the item no, 
   # value type and reading name in the jsonInterpreter
   ####################################
@@ -446,30 +459,35 @@ if ( $a[1] == 1 ){
       {
          for(my $i=0; $i<=$#fields; $i++) 
          {
-            if ($$f[0] == 1 || $$f[0] == 5) { 
-               if ($fields[$i] =~ /"obis".*?:.*?"$$f[1]".*?[,}]/ && $fields[$i] =~ /"value"/) {
+            if ($$f[0] =~ /^[15]$/) { 
+               if ($fields[$i] =~ /"obis"\s*:\s*"($$f[1])"\s*[,}]/ && $fields[$i] =~ /"value"/) {
                   $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3]";
                   Log3 $name,4,"$name: OBIS code \"$$f[1]\" will be stored in $$f[2]";
+                  $returnStr .= "OBIS code \"$$f[1]\" will be extracted as reading '$$f[2]' from part $i:\n$fields[$i]\n\n";
                }
             } elsif ($$f[0] == 2) { 
-               if ($fields[$i] =~ /"obis".*?:.*?"$$f[1]".*?[,}]/ && $fields[$i] =~ /"valueString"/) {
+               if ($fields[$i] =~ /"obis"\s*:\s*"($$f[1])"\s*[,}]/ && $fields[$i] =~ /"valueString"/) {
                   $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3]";
                   Log3 $name,4,"$name: OBIS code \"$$f[1]\" will be stored in $$f[2]";
+                  $returnStr .= "OBIS code \"$$f[1]\" will be extracted as reading '$$f[2]' from part $i:\n$fields[$i]\n\n";
                }
             } elsif ($$f[0] == 3) { 
-               if ($fields[$i] =~ /"$$f[1]".*?:.*?[,}]/) {
+               if ($fields[$i] =~ /"($$f[1])"\s*:/) {
                   $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[1]";
                   Log3 $name,4,"$name: Property \"$$f[1]\" will be stored in $$f[2]";
-               }
+                  $returnStr .= "Property \"$$f[1]\" will be extracted as reading '$$f[2]' from part $i:\n$fields[$i]\n\n";
+              }
             } elsif ($$f[0] == 4) { 
-               if ($fields[$i] =~ /"$$f[1]".*?:.*?\d*.*?[,}]/) {
+               if ($fields[$i] =~ /"($$f[1])"\s*:/) {
                   $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[1]";
                   Log3 $name,4,"$name: Property \"$$f[1]\" will be stored in $$f[2]";
+                  $returnStr .= "Property \"$$f[1]\" will be extracted as reading '$$f[2]' from part $i:\n$fields[$i]\n\n";
                }
             } elsif ($$f[0] == 6) { 
-               if ($fields[$i] =~ /"$$f[1]".*?:.*".*".*?[,}]/) {
+               if ($fields[$i] =~ /"($$f[1])"\s*:/) {
                   $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[1]";
                   Log3 $name,4,"$name: Property \"$$f[1]\" will be stored in $$f[2]";
+                  $returnStr .= "Property \"$$f[1]\" will be extracted as reading '$$f[2]' from part $i:\n$fields[$i]\n\n";
                }
             }   
          }
@@ -479,7 +497,7 @@ if ( $a[1] == 1 ){
          $jsonInterpreter = substr $jsonInterpreter, 1;
          $hash->{fhem}{jsonInterpreter} = $jsonInterpreter;
       } else {
-         Log3 $name, 2, "$name: Could not interpret the JSON pathString => please contact FHEM community" if $jsonInterpreter eq "";
+         Log3 $name, 2, "$name: Could not interpret the JSON file => please contact FHEM community" if $jsonInterpreter eq "";
       }
    } else {
       $jsonInterpreter = $hash->{fhem}{jsonInterpreter} if exists $hash->{fhem}{jsonInterpreter};
@@ -489,61 +507,56 @@ if ( $a[1] == 1 ){
   # INTERPRETE AND STORE
   # use the previously filled jsonInterpreter to extract the correct values
   ####################################
-   my @a = split /\|/, $jsonInterpreter;
+  
+  $returnStr .= "\n================= Extract JSON values ==================\n\n";
+
+  my @a = split /\|/, $jsonInterpreter;
    Log3 $name, 4, "$name: Extract ".($#a+1)." readings from ".($#fields+1)." json parts";
    foreach (@a) {
       Log3 $name, 5, "$name: Handle $_";
       my @b = split / /, $_ ;
-      if ($b[1] == 1) {
-         if ($fields[$b[0]] =~ /"value".*?:(.*?)[,\}]/ ) {
+      if ($b[1] == 1) { #obis value
+         if ($fields[$b[0]] =~ /"value"\s*:\s*"(.*?)"\s*[,\}]/g || $fields[$b[0]] =~ /"value"\s*:\s*(.*?)\s*[,\}]/g) {
             $value = $1;
-            $value =~ s/^\s+|\s+$//g;
-            Log3 $name, 4, "$name: value $value for reading $b[2] extracted from '$fields[$b[0]]'";
+            # $value =~ s/^\s+|\s+$//g;
+            Log3 $name, 4, "$name: Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
+            $returnStr .= "Value \"$value\" for reading '$b[2]' extracted from part $b[0]:\n$fields[$b[0]]\n\n";
             readingsBulkUpdate($hash,$b[2],$value);             
          } else {
             Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
+            $returnStr .= "Could not extract value for reading '$b[2]' from part $b[0]:\n$fields[$b[0]]\n\n";
          }
-      } elsif   ($b[1] == 5) {   
-         if ($fields[$b[0]] =~ /"value".*?:.*?"(.*?)".*?[,}]/ ) {
+      } elsif   ($b[1] == 2) { #obis valueString
+         if ($fields[$b[0]] =~ /"valueString"\s*:\s*"(.*?)"\s*[,}]/g ) {
             $value = $1;
-            Log3 $name, 4, "$name: value $value for reading $b[2] extracted from '$fields[$b[0]]'";
+            Log3 $name, 4, "$name: Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
+            $returnStr .= "Value \"$value\" for reading '$b[2]' extracted from part $b[0]:\n$fields[$b[0]]\n\n";
             readingsBulkUpdate($hash,$b[2],$value); 
          } else {
             Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
+            $returnStr .= "Could not extract value for reading '$b[2]' from part $b[0]:\n$fields[$b[0]]\n\n";
          }
-      } elsif   ($b[1] == 2) {   
-         if ($fields[$b[0]] =~ /"valueString".*?:.*?"(.*?)".*?[,}]/ ) {
+      } elsif   ($b[1] == 3) { # JSON-Property  
+         if ($fields[$b[0]] =~ /"$b[4]"\s*:\s*"(.*?)"\s*[,}]/g || $fields[$b[0]] =~ /"$b[4]"\s*:\s*(.*?)\s*[,}]/g ) {
             $value = $1;
-            Log3 $name, 4, "$name: value $value for reading $b[2] extracted from '$fields[$b[0]]'";
-            readingsBulkUpdate($hash,$b[2],$value); 
-         } else {
-            Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
-         }
-      } elsif   ($b[1] == 3) {   
-         if ($fields[$b[0]] =~ /"$b[4]".*?:.*?"(.*?)".*?[,}]/ ) {
-            $value = $1;
-            Log3 $name, 4, "$name: value $value for reading $b[2] extracted from '$fields[$b[0]]'";
+            $value =~ /^ *\d+(,\d\d\d)+/ && $value =~ s/,| //g;
+            Log3 $name, 4, "$name: Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
+            $returnStr .= "Value \"$value\" for reading '$b[2]' extracted from part $b[0]:\n$fields[$b[0]]\n\n";
             readingsBulkUpdate($hash, $b[2], $value); 
          } else {
             Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
+            $returnStr .= "Could not extract value for reading '$b[2]' from part $b[0]:\n$fields[$b[0]]\n\n";
          }
-      } elsif   ($b[1] == 4) {   
-         if ($fields[$b[0]] =~ /"$b[4]".*?:(.*?)[,}]/ ) {
+      } elsif   ($b[1] == 4) {  # JSON-Property Time
+         if ($fields[$b[0]] =~ /"$b[4]"\s*:\s"?(\d*)"?\s*[,}]/g ) {
             $value = $1;
-            $value =~ s/^\s+|\s+$//g;
-            Log3 $name, 4, "$name: value $value for reading $b[2] extracted from '$fields[$b[0]]'";
+            Log3 $name, 4, "$name: Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
+            $returnStr .= "Value \"$value\" for reading '$b[2]' extracted from part $b[0]:\n$fields[$b[0]]\n\n";
             $value =  strftime "%Y-%m-%d %H:%M:%S", localtime($value);
             readingsBulkUpdate($hash, $b[2], $value); 
          } else {
             Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
-         }
-      } elsif   ($b[1] == 6) {   
-         if ($fields[$b[0]] =~ /"$b[4]":(\d*),?/ ) {
-            $value = $1;
-            Log3 $name, 4, "$name: value $value for reading $b[2] extracted from '$fields[$b[0]]'";
-            readingsBulkUpdate($hash, $b[2], $value); 
-         } else {
-            Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
+            $returnStr .= "Could not extract value for reading '$b[2]' from part $b[0]:\n$fields[$b[0]]\n\n";
          }
       }
    }
@@ -556,7 +569,7 @@ if ( $a[1] == 1 ){
    readingsSingleUpdate($hash,"state",$a[2],1);
   }
 
-  return undef;
+  return encode_base64($returnStr);
 }
 
 sub ############################
@@ -602,6 +615,7 @@ JSONMETER_UpdateAborted($)
      Used to define the path and port to extract the json file.
      <br>
      The attribute 'pathString' can be used to add login information to the URL-path of predefined devices.
+     <br>&nbsp;
      <ul> 
          <li><b>ITF</b> - One tariff electrical meter used by N-ENERGY (Industrietechnik Fr&ouml;schle)</li>
          <li><b>EFR</b> - <a href="http://www.efr.de">EFR</a> Smart Grid Hub for electrical meter used by EON, N-ENERGY and EnBW
@@ -621,9 +635,11 @@ JSONMETER_UpdateAborted($)
   <b>Set</b>
   <ul>
       <li><code>INTERVAL &lt;polling interval&gt;</code><br>
-        Polling interval in seconds</li>
+        Polling interval in seconds
+        <br></li>
       <li><code>statusRequest</code><br>
-          Update device information</li>
+          Update device information
+          <br></li>
       <li><code>restartJsonAnalysis</code><br>
           Restarts the analysis of the json file for known readings (compliant to the OBIS standard).
         <br>
@@ -635,7 +651,8 @@ JSONMETER_UpdateAborted($)
   <ul>
       <li><code>jsonFile</code>
       <br>
-      extracts and shows the json data</li>
+      extracts and shows the json data
+      <br></li>
       <li><code>jsonAnalysis</code>
       <br>
       extracts the json data and shows the result of the analysis</li>
@@ -649,20 +666,23 @@ JSONMETER_UpdateAborted($)
       <br>
       Repeats by each update the json analysis - use if structure of json data changes
       <br>
-      Normally the once analysed structure is saved to reduce CPU load.</li>
+      Normally the once analysed structure is saved to reduce CPU load.
+      <br></li>
     <li><code>doStatistics &lt; 0 | 1 &gt;</code>
       <br>
-      Calculates statistic values - <i>not implemented yet</i></li>
+      Calculates statistic values - <i>not implemented yet</i>
+      <br></li>
    <li><code>pathString &lt;string&gt;</code>
       <ul>
         <li>if deviceType = 'file': specifies the local file name and path</li>
         <li>if deviceType = 'url': specifies the url path</li>
         <li>other deviceType: can be used to add login information to the url path of predefined devices</li>
       </ul>
-    </li>
+      <br></li>
    <li><code>port &lt;number&gt;</code>
       <br>
-      Specifies the IP port for the deviceType 'url' (default is 80)</li>
+      Specifies the IP port for the deviceType 'url' (default is 80)
+      <br></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
 </ul>
@@ -690,7 +710,10 @@ JSONMETER_UpdateAborted($)
     Wenn das Abfrage-Interval nicht angegeben ist, wird es auf 300 (Sekunden) gesetzt. Der kleinste m&ouml;gliche Wert ist 30.
     <br>
     Bei 0 kann die Ger&auml;teabfrage nur manuell gestartet werden.
-   <li><code>Ger&auml;tetyp</code>
+    <br>
+    &nbsp;
+    <br>
+    <li><code>Ger&auml;tetyp</code>
       <br>
       Definiert den Pfad und den Port, um die JSON-Datei zu einzulesen.
       <br>
@@ -713,17 +736,21 @@ JSONMETER_UpdateAborted($)
   <ul>
       <li><code>alwaysAnalyse &lt; 0 | 1 &gt;</code>
          <br>
-         Führt bei jeder Abfrage der Ger&auml;tewerte eine Analyse der JSON-Datenstruktur durch.
-         Dies ist sinnvoll, wenn sich diese Struktur &auml;ndert. Normalerweise wird die analysierte Struktur
-         zwischengespeichert, um die CPU-Last gering zu halten.</li>
+         F&uuml;hrt bei jeder Abfrage der Ger&auml;tewerte eine Analyse der JSON-Datenstruktur durch.
+         <br>
+         Dies ist sinnvoll, wenn sich die JSON-Struktur &auml;ndert. Normalerweise wird die analysierte Struktur
+         zwischengespeichert, um die CPU-Last gering zu halten.
+      <br></li>
       <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
          <br>
-         Abfrageinterval in Sekunden</li>
+         Abfrageinterval in Sekunden
+      <br></li>
       <li><code>restartJsonAnalysis</code>
         <br>
         Neustart der Analyse der json-Datei zum Auffinden bekannter Ger&auml;tewerte (kompatibel zum OBIS Standard).
         <br>
-        Diese Analysie wird normaler Weise nur einmal durchgef&uuml;hrt, wenn Ger&auml;tewerte gefunden wurden.</li>
+        Diese Analysie wird normaler Weise nur einmal durchgef&uuml;hrt, wenn Ger&auml;tewerte gefunden wurden.
+        <br></li>
      <li><code>statusRequest</code>
          <br>
          Aktualisieren der Ger&auml;tewerte</li>
@@ -743,12 +770,16 @@ JSONMETER_UpdateAborted($)
    <ul>
       <li><code>doStatistics &lt; 0 | 1 &gt;</code>
          <br>
-         Berechnet statistische Werte - <i>noch nicht implementiert</i></li>
+         Berechnet statistische Werte - <i>noch nicht implementiert</i>
+        <br><</li>
       <li><code>pathString &lt;Zeichenkette&gt;</code>
          <ul>
-            <li>Ger&auml;tetyp 'file': definiert den lokalen Dateinamen und -pfad</li>
-            <li>Ger&auml;tetyp 'url': Definiert den URL-Pfad</li>
-            <li>Andere: Kann benutzt werden um Login-Information zum URL Pfad von vordefinerten Ger&auml;ten hinzuzuf&uuml;gen</li>
+            <li>Ger&auml;tetyp 'file': definiert den lokalen Dateinamen und -pfad
+               <br><</li>
+            <li>Ger&auml;tetyp 'url': Definiert den URL-Pfad
+               <br><</li>
+            <li>Andere: Kann benutzt werden um Login-Information zum URL Pfad von vordefinerten Ger&auml;ten hinzuzuf&uuml;gen
+               <br><</li>
          </ul>
       </li>
    <li><code>port &lt;Nummer&gt;</code>
