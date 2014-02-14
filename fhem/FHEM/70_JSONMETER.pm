@@ -618,7 +618,7 @@ JSONMETER_UpdateAborted($)
      The attribute 'pathString' can be used to add login information to the URL-path of predefined devices.
      <br>&nbsp;
      <ul> 
-         <li><b>ITF</b> - One tariff electrical meter used by N-ENERGY (<a href="www.itf-edv.de">ITF-EDV Fr&ouml;schl</a>)</li>
+         <li><b>ITF</b> - One tariff electrical meter used by N-ENERGY (<a href="www.itf-froeschl.de">ITF Fr&ouml;schl</a>)</li>
          <li><b>EFR</b> - <a href="http://www.efr.de">EFR</a> Smart Grid Hub for electrical meter used by EON, N-ENERGY and EnBW
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;use the 'pathstring' attribute to specifiy your login information
@@ -720,7 +720,7 @@ JSONMETER_UpdateAborted($)
       <br>
       Mit dem Attribute 'pathString' k&ouml;nnen Login Information an den URL-Pfad von vordefinierten Ger&auml;te angehangen werden.
       <ul> 
-         <li><b>ITF</b> - Eintarifz&auml;hler von N-ENERGY Netz GmbH (<a href="www.itf-edv.de">ITF-EDV Fr&ouml;schl</a>)</li>
+         <li><b>ITF</b> - Eintarifz&auml;hler von N-ENERGY Netz GmbH (<a href="www.itf-froeschl.de">ITF Fr&ouml;schl</a>)</li>
          <li><b>EFR</b> - Stromz&auml;hler von EON, N-ENERGY, EnBW
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Die Login-Information wird &uuml;ber das Attribute 'pathstring' angegeben.
