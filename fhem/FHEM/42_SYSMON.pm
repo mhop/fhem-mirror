@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.3.6";
+my $VERSION = "1.3.7";
 
 use constant {
   DATE            => "date",
@@ -992,7 +992,11 @@ sub SYSMON_getFileSystemInfo ($$$)
   #if(!defined @filesystems) { return $map; } # Ausgabe leer
   #if(scalar(@filesystems) == 0) { return $map; } # Array leer
 
-  logF($hash, "SYSMON_getFileSystemInfo", "recieved line0 $filesystems[0]");
+  if(defined($filesystems[0])) {
+  	logF($hash, "SYSMON_getFileSystemInfo", "recieved line0 $filesystems[0]");
+  } else {
+  	logF($hash, "SYSMON_getFileSystemInfo", "recieved empty line");
+  }
 
   shift @filesystems;
   
@@ -1718,7 +1722,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       # Modul-Definition<br>
       define sysmon SYSMON 1 1 1 10<br>
       #attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,^~ /.*usb.*,~ /$<br>
-      attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,fs_.*<br>
+      attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,fs_.*,stat_cpu_percent<br>
       attr sysmon filesystems fs_boot:/boot,fs_root:/:Root,fs_usb1:/media/usb1:USB-Stick<br>
       attr sysmon network-interfaces eth0:eth0:Ethernet,wlan0:wlan0:WiFi<br>
       attr sysmon group RPi<br>
@@ -2157,7 +2161,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       # Modul-Definition<br>
       define sysmon SYSMON 1 1 1 10<br>
       #attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,^~ /.*usb.*,~ /$<br>
-      attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,fs_.*<br>
+      attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,fs_.*,stat_cpu_percent<br>
       attr sysmon filesystems fs_boot:/boot,fs_root:/:Root,fs_usb1:/media/usb1:USB-Stick<br>
       attr sysmon network-interfaces eth0:eth0:Ethernet,wlan0:wlan0:WiFi<br>
       attr sysmon group RPi<br>
