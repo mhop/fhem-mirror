@@ -58,6 +58,9 @@
 #
 #	2013-12-08	fixed:	first try to remove duplicate processing
 #
+#	2014-02-04	added:	shutdownFn
+#
+#	2014-02-14	modi:	changed Loglevel from 3 to 4 where possible
 
 package main;
 
@@ -286,7 +289,7 @@ sub OWO_GetStatus($;$){
 				$o = 0 if(!defined($o));
 				$v = ReadingsVal($s, $v, "?") + $o;
 				$dataString = $dataString."&$p=$v";
-				Log3($name, 3, "owo $name: reading: $paraName $p $s $v");
+				Log3($name, 4, "owo $name: reading: $paraName $p $s $v");
 				readingsSingleUpdate($hash, "my_".$p, $v, 1);
 			}
 		}
@@ -295,7 +298,7 @@ sub OWO_GetStatus($;$){
 
 		my $sendString = $urlString."?".$dataString;
 		if(AttrVal($name, "owoDebug",1) == 0){
-			Log3($name, 3, "owo $name: sending: $dataString");
+			Log3($name, 4, "owo $name: sending: $dataString");
 			$htmlDummy = $ua->post($sendString);
 			Log3($name, 3, "owo $name: htmlResponse: ".$htmlDummy->status_line);
 		} else {
@@ -327,7 +330,7 @@ sub OWO_GetStatus($;$){
 	my $cId = ReadingsVal($name,"c_stationId", undef);
 	if(defined($cId)){
 		my $cName = ReadingsVal($name,"stationName", "");
-		Log3($name, 3, "owo $name: retrievingStationData: Id: $cId Name: $cName");
+		Log3($name, 4, "owo $name: retrievingStationData: Id: $cId Name: $cName");
 		fhem("set $name stationById $cId");
 	}
 
@@ -361,7 +364,7 @@ sub OWO_Define($$){
 #	readingsSingleUpdate($hash, "state","defined",1);
 #	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "OWO_GetStatus", $hash, 0);
 
-	Log3($name, 3, "owo $name: created");
+	Log3($name, 4, "owo $name: created");
 
 	return;
 }
@@ -393,10 +396,10 @@ sub UpdateReadings($$$){
 
 	if(defined($response)){
 		if(AttrVal($name, "owoDebug", 1) == 1){
-			Log3($name, 3, "owo $name: response:\n".$response->decoded_content);
+			Log3($name, 4, "owo $name: response:\n".$response->decoded_content);
 		}
 	} else {
-		Log3($name, 3, "owo $name: error: no response from server");
+		Log3($name, 4, "owo $name: error: no response from server");
 		return;
 	}
 
@@ -404,7 +407,7 @@ sub UpdateReadings($$$){
 	readingsSingleUpdate($hash, "_httpResponse_".substr($prefix,0,1), $response->status_line, 1);
 
 	if($xmlMode eq "1" && $response->is_success){
-		Log3($name, 3, "owo $name: decoding XML");
+		Log3($name, 4, "owo $name: decoding XML");
 		my $xml			= new XML::Simple;
 		$jsonWeather	= undef;
 		$jsonWeather	= $xml->XMLin($response->decoded_content, KeyAttr => 'current' );
@@ -438,12 +441,12 @@ sub UpdateReadings($$$){
 			readingsBulkUpdate($hash, "state", "active");
 			readingsEndUpdate($hash, 1);
 		} else { 
-			Log3($name, 3, "owo $name error: update not possible!"); 
+			Log3($name, 2, "owo $name error: update not possible!"); 
 		}
 	}
 	
 	if($xmlMode ne "1" && $response->is_success){
-		Log3($name, 3, "owo $name: decoding JSON");
+		Log3($name, 4, "owo $name: decoding JSON");
 		my $json = JSON->new->allow_nonref;
 		eval {$jsonWeather = $json->decode($response->decoded_content)}; warn $@ if $@;
 
@@ -482,7 +485,7 @@ sub UpdateReadings($$$){
 			readingsBulkUpdate($hash, "state", "active");
 			readingsEndUpdate($hash, 1);
 		} else { 
-			Log3($name, 3, "owo $name error: update not possible!"); 
+			Log3($name, 2, "owo $name error: update not possible!"); 
 		}
 	}
 	return;
