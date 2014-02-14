@@ -150,6 +150,7 @@ FHEM/71_YAMAHA_AVR.pm        markusbloch          http://forum.fhem.de Multimedi
 FHEM/71_YAMAHA_BD.pm         markusbloch          http://forum.fhem.de Multimedia
 FHEM/72_FB_CALLMONITOR.pm    markusbloch          http://forum.fhem.de Unterstuetzende Dienste
 FHEM/73_PRESENCE.pm          markusbloch          http://forum.fhem.de Unterstuetzende Dienste
+FHEM/73_MPD.pm               wzut                 http://forum.fhem.de Multimedia
 FHEM/75_MSG.pm               ruebedo              http://forum.fhem.de Automatisierung
 FHEM/76_MSGFile.pm           ruebedo              http://forum.fhem.de Automatisierung
 FHEM/76_MSGMail.pm           ruebedo              http://forum.fhem.de Automatisierung
