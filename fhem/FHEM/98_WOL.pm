@@ -211,7 +211,7 @@ sub wol_by_ew($$) {
 
   my $sysCmd = AttrVal($hash->{NAME}, "sysCmd", "/usr/bin/ether-wake");
   if (-e $sysCmd) {
-     my $response = `$sysCmd $mac`;
+     qx ("$sysCmd $mac");
   } else {
      Log3 $hash, 1, "[$hash->{NAME}] system command '$sysCmd' not found";
   }
