@@ -70,7 +70,7 @@ sub JSONMETER_UpdateAborted($);
  ##############################################################
  # Syntax: valueType, code, FHEM reading name, statisticType
  #     valueType: 1=OBISvalue | 2=OBISvalueString | 3=jsonProperty | 4=jsonPropertyTime
- #     statisticType: 0=noStatistic | 1=maxMinStatistic | 2=timeStatistic
+ #     statisticType: 0=noStatistic | 1=maxMinStatistic | 2=integralTimeStatistic
  ##############################################################
   my @jsonFields = (
     [3, "meterType", "meterType", 0] # {"meterId": "0000000061015736", "meterType": "Simplex", "interval": 0, "entry": [
@@ -101,7 +101,7 @@ sub JSONMETER_UpdateAborted($);
    ,[1, "010002080082", "electricityProducedLastWeek", 1] 
    ,[1, "010002080083", "electricityProducedLastMonth", 1] 
    ,[1, "010002080084", "electricityProducedLastYear", 1] 
-   ,[1, "0101020800FF", "electricityPowerOutput", 2]
+   ,[1, "0101020800FF", "electricityPowerOutput", 1]
    ,[1, "010020070000", "electricityVoltagePhase1", 1] #{"obis":"010020070000","value":237.06,"unit":"V"},               
    ,[1, "010034070000", "electricityVoltagePhase2", 1] # {"obis":"010034070000","value":236.28,"unit":"V"},               
    ,[1, "010048070000", "electricityVoltagePhase3", 1] # {"obis":"010048070000","value":236.90,"unit":"V"},
@@ -610,6 +610,7 @@ JSONMETER_UpdateAborted($)
     If the pool interval is omitted, it is set to 300 (seconds). Smallest possible value is 10.
    <br>
    With 0 it will only update on "manual" request.
+   <br>&nbsp;
    <li><code>&lt;deviceType&gt;</code>
      <br>
      Used to define the path and port to extract the json file.
@@ -617,7 +618,7 @@ JSONMETER_UpdateAborted($)
      The attribute 'pathString' can be used to add login information to the URL-path of predefined devices.
      <br>&nbsp;
      <ul> 
-         <li><b>ITF</b> - One tariff electrical meter used by N-ENERGY (Industrietechnik Fr&ouml;schle)</li>
+         <li><b>ITF</b> - One tariff electrical meter used by N-ENERGY (<a href="www.itf-edv.de">ITF-EDV Fr&ouml;schl</a>)</li>
          <li><b>EFR</b> - <a href="http://www.efr.de">EFR</a> Smart Grid Hub for electrical meter used by EON, N-ENERGY and EnBW
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;use the 'pathstring' attribute to specifiy your login information
@@ -636,10 +637,10 @@ JSONMETER_UpdateAborted($)
   <ul>
       <li><code>INTERVAL &lt;polling interval&gt;</code><br>
         Polling interval in seconds
-        <br></li>
+        </li><br>
       <li><code>statusRequest</code><br>
           Update device information
-          <br></li>
+          </li><br>
       <li><code>restartJsonAnalysis</code><br>
           Restarts the analysis of the json file for known readings (compliant to the OBIS standard).
         <br>
@@ -652,7 +653,7 @@ JSONMETER_UpdateAborted($)
       <li><code>jsonFile</code>
       <br>
       extracts and shows the json data
-      <br></li>
+      </li><br>
       <li><code>jsonAnalysis</code>
       <br>
       extracts the json data and shows the result of the analysis</li>
@@ -667,22 +668,22 @@ JSONMETER_UpdateAborted($)
       Repeats by each update the json analysis - use if structure of json data changes
       <br>
       Normally the once analysed structure is saved to reduce CPU load.
-      <br></li>
+      </li><br>
     <li><code>doStatistics &lt; 0 | 1 &gt;</code>
       <br>
       Calculates statistic values - <i>not implemented yet</i>
-      <br></li>
+      </li><br>
    <li><code>pathString &lt;string&gt;</code>
       <ul>
         <li>if deviceType = 'file': specifies the local file name and path</li>
         <li>if deviceType = 'url': specifies the url path</li>
         <li>other deviceType: can be used to add login information to the url path of predefined devices</li>
       </ul>
-      <br></li>
+      </li><br>
    <li><code>port &lt;number&gt;</code>
       <br>
       Specifies the IP port for the deviceType 'url' (default is 80)
-      <br></li>
+      </li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
 </ul>
@@ -719,13 +720,13 @@ JSONMETER_UpdateAborted($)
       <br>
       Mit dem Attribute 'pathString' k&ouml;nnen Login Information an den URL-Pfad von vordefinierten Ger&auml;te angehangen werden.
       <ul> 
-         <li><b>ITF</b> - Eintarifz&auml;hler von N-ENERGY Netz GmbH (Industrietechnik Fr&ouml;schle)</li>
+         <li><b>ITF</b> - Eintarifz&auml;hler von N-ENERGY Netz GmbH (<a href="www.itf-edv.de">ITF-EDV Fr&ouml;schl</a>)</li>
          <li><b>EFR</b> - Stromz&auml;hler von EON, N-ENERGY, EnBW
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Die Login-Information wird &uuml;ber das Attribute 'pathstring' angegeben.
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code>?LogName=<i>Benutzer</i>&LogPSWD=<i>Passwort</i></code></li>
-         <li><b>LS110</b> - <a href="http://www.youless.nl/productdetails/product/ls110.html">YouLess LS110</a> Netzwerkf&auml;higer Sensor für elektromechanische Stromz&auml;hler</li>
+         <li><b>LS110</b> - <a href="http://www.youless.nl/productdetails/product/ls110.html">YouLess LS110</a> Netzwerkf&auml;higer Sensor f&uuml;r elektromechanische Stromz&auml;hler</li>
          <li><b>url</b> - benutzt die URL, welche durch das Attribut 'pathString' und 'port' definiert wird.</li>
          <li><b>file</b> - benutzt die Datei, welche durch das Attribut 'pathString' definiert wird (im FHEM Dateisystem)</li>
       </ul>
@@ -741,17 +742,17 @@ JSONMETER_UpdateAborted($)
          <br>
          Dies ist sinnvoll, wenn sich die JSON-Struktur &auml;ndert. Normalerweise wird die analysierte Struktur
          zwischengespeichert, um die CPU-Last gering zu halten.
-      <br></li>
+      </li><br>
       <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
          <br>
          Abfrageinterval in Sekunden
-      <br></li>
+      </li><br>
       <li><code>restartJsonAnalysis</code>
         <br>
         Neustart der Analyse der json-Datei zum Auffinden bekannter Ger&auml;tewerte (kompatibel zum OBIS Standard).
         <br>
         Diese Analysie wird normaler Weise nur einmal durchgef&uuml;hrt, wenn Ger&auml;tewerte gefunden wurden.
-        <br></li>
+        </li><br>
      <li><code>statusRequest</code>
          <br>
          Aktualisieren der Ger&auml;tewerte</li>
@@ -762,7 +763,11 @@ JSONMETER_UpdateAborted($)
   <ul>
       <li><code>jsonFile</code>
       <br>
-      Liest die JSON-Datei ein und zeigt sie an.</li>
+      Liest die JSON-Datei ein und zeigt sie an.
+      </li><br>
+      <li><code>jsonAnalysis</code>
+      <br>
+      Extrahiert die JSON-Daten und zeigt das Resultat der JSON-Analyse.</li>
   </ul>
   <br>
 
@@ -772,20 +777,21 @@ JSONMETER_UpdateAborted($)
       <li><code>doStatistics &lt; 0 | 1 &gt;</code>
          <br>
          Berechnet statistische Werte - <i>noch nicht implementiert</i>
-        <br><</li>
+      </li><br>
       <li><code>pathString &lt;Zeichenkette&gt;</code>
          <ul>
             <li>Ger&auml;tetyp 'file': definiert den lokalen Dateinamen und -pfad
-               <br><</li>
+               </li>
             <li>Ger&auml;tetyp 'url': Definiert den URL-Pfad
-               <br><</li>
+               </li>
             <li>Andere: Kann benutzt werden um Login-Information zum URL Pfad von vordefinerten Ger&auml;ten hinzuzuf&uuml;gen
-               <br><</li>
+               </li>
          </ul>
-      </li>
-   <li><code>port &lt;Nummer&gt;</code>
+      </li><br>
+      <li><code>port &lt;Nummer&gt;</code>
       <br>
-      Beim Ger&auml;tetyp 'url' kann hier der URL-Port festgelegt werden (standardm&auml;ssig 80)</li>
+      Beim Ger&auml;tetyp 'url' kann hier der URL-Port festgelegt werden (standardm&auml;ssig 80)
+      </li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
 </ul>
