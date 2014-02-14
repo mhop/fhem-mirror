@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - bugfix:  SYSMON: Fix: root fs with /dev/mapper
   - feature: Dashboard: The display of the dashboard can be limited to a 
              defined FHEMWEB. Change view of readingroups
   - feature: new module 70_JSONMETER to read obis compatible data in json
