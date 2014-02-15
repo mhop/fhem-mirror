@@ -42,6 +42,7 @@
 # 0031: Text "desiredTemperature" will also be eliminated - for MAX devices (Dec 25, 2013)
 # 0032: Ensure URL always contains floorplan-name (redirect if !htmlarg[0]) as basis for fp-specific icon-folder (Jan 06, 2014)
 # 0033: Updated loglevel -> verbose, added fp_roomIcons (Feb 2, 2014)
+# 0034: iOS fullscreen app - navigating to other floorplan doesn't open safari anymore (Feb 15, 2014)
 #
 ################################################################
 #
@@ -622,14 +623,13 @@ FP_menu() {
 	FW_pO "</tr>";
 	foreach my $f (sort keys %defs) {
 		next if ($defs{$f}{TYPE} ne "FLOORPLAN");
-    	FW_pO "<tr><td>";
-#		FW_pH "$FW_ME/floorplan/$f", $f, 0;
+    	FW_pO "<tr>";
         my $icoName = "ico$f";
         map { my ($n,$v) = split(":",$_); $icoName=$v if($f =~ m/$n/); }
         split(" ", AttrVal($FP_name, "fp_roomIcons", ""));
         my $icon = FW_iconName($icoName) ?  FW_makeImage($icoName,$icoName,"icon")."&nbsp;" : "";
-        FW_pO "<a href=\"$FW_ME/floorplan/$f\">$icon$f</a></td>";
-    	FW_pO "</td></tr>";
+        FW_pH "$FW_ME/floorplan/$f", "$icon$f", 1;
+    	FW_pO "</tr>";
 	}
 	FW_pO "</table><br>";
 	FW_pO "</div>\n";
