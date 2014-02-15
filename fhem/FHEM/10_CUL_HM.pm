@@ -275,6 +275,10 @@ sub CUL_HM_updateConfig($){
           && $hash->{helper}{fkt} =~ m/^(vdCtrl|virtThSens)$/){
         my $vId = substr($id."01",0,8);
         $hash->{helper}{virtTC} = "00";
+        $hash->{helper}{vd}{msgRed}= 0 if(!defined $hash->{helper}{vd}{msgRed});
+        $hash->{helper}{vd}{next}  = ReadingsVal($name,".next",gettimeofday())
+                                       if (!defined $hash->{helper}{vd}{next});
+
         CUL_HM_Set($hash,$name,"valvePos",ReadingsVal($name,"valvePosTC",""));
         CUL_HM_Set($hash,$name,"virtTemp",ReadingsVal($name,"temperature",""));
         CUL_HM_Set($hash,$name,"virtHum" ,ReadingsVal($name,"humidity",""));
@@ -544,8 +548,10 @@ sub CUL_HM_Attr(@) {#################################
       if ($cmd eq "set"){
         if ($attrVal eq "noOnOff"){# no action	    
         }
-        elsif ($attrVal eq "msgReduce"){#set param
-          $hash->{helper}{vd}{msgRed}=1;
+        elsif ($attrVal =~ m/msgReduce/){#set param
+		  my (undef,$rCnt) = split(":",$attrVal,2);
+		  $rCnt=(defined $rCnt && $rCnt =~ m/^\d$/)?$rCnt:1;
+          $hash->{helper}{vd}{msgRed}=$rCnt;
         }
         else{
           return "attribut param not defined for this entity";
@@ -3364,10 +3370,13 @@ sub CUL_HM_Set($@) {
         if (!$hash->{helper}{virtTC}){
           my $pn = CUL_HM_id2Name($hash->{helper}{vd}{id});
           $hash->{helper}{vd}{ackT} = ReadingsTimestamp($pn, "ValvePosition", "")
-                if (!defined $hash->{helper}{vd}{ackT});
-          $hash->{helper}{vd}{miss} = 0  if (!defined$hash->{helper}{vd}{miss});
+                                          if(!defined $hash->{helper}{vd}{ackT});
+          $hash->{helper}{vd}{miss}   = 0 if(!defined $hash->{helper}{vd}{miss});
+          $hash->{helper}{vd}{msgRed} = 0 if(!defined $hash->{helper}{vd}{msgRed});
+
           $hash->{helper}{virtTC}   = ($cmd eq "valvePos")?"03":"00";
-          CUL_HM_UpdtReadSingle($hash,"valveCtrl","init",1)if ($cmd eq "valvePos");
+          CUL_HM_UpdtReadSingle($hash,"valveCtrl","init",1)
+		        if ($cmd eq "valvePos");
           $hash->{helper}{vd}{next} = ReadingsVal($name,".next",gettimeofday()) 
                 if (!defined $hash->{helper}{vd}{next});
           CUL_HM_valvePosUpdt("valvePos:$dst$chn");
@@ -3674,56 +3683,53 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   my($in ) = @_;
   my(undef,$vId) = split(':',$in);
   my $hash = CUL_HM_id2Hash($vId);
+  my $hashVd = $hash->{helper}{vd}; 
   my $name = $hash->{NAME};
-  my $msgCnt = $hash->{helper}{vd}{msgCnt};
+  my $msgCnt = $hashVd->{msgCnt};
   my ($idl,$lo,$hi,$nextTimer);
   my $tn = gettimeofday();
-  $hash->{helper}{vd}{next} = ReadingsVal($name,".next",$tn)
-        if (!defined $hash->{helper}{vd}{next});
-  $hash->{helper}{vd}{nextF} = $hash->{helper}{vd}{next};
+  my $nextF = $hashVd->{next};
 # int32_t result = (((_address << 8) | messageCounter) * 1103515245 + 12345) >> 16;
 #                          4e6d = 20077                        12996205 = C64E6D
 # return (result & 0xFF) + 480;
 
-  if ($tn > ($hash->{helper}{vd}{nextF} + 3000)){# mised 20 periods;
-    Log3 $name,3,"CUL_HM $name virtualTC timer off by:".int($tn - $hash->{helper}{vd}{nextF});
-    $hash->{helper}{vd}{nextF} = $tn;
+  if ($tn > ($nextF + 3000)){# missed 20 periods;
+    Log3 $name,3,"CUL_HM $name virtualTC timer off by:".int($tn - $nextF);
+    $nextF = $tn;
   }
   do {
     $msgCnt = ($msgCnt +1) %256;
-    $idl = $hash->{helper}{vd}{idl}+$msgCnt;
-    $lo = int(($idl*0x4e6d +12345)/0x10000)&0xff;
-    $hi = ($hash->{helper}{vd}{idh}+$idl*198)&0xff;
+    $idl = $hashVd->{idl}+$msgCnt;
+    $lo = int(($idl*0x4e6d +12345)/0x10000);#&0xff;
+    $hi = ($hashVd->{idh}+$idl*198);        #&0xff;
     $nextTimer = (($lo+$hi)&0xff)/4 + 120;
-    $hash->{helper}{vd}{nextF} += $nextTimer;
-  } until ($hash->{helper}{vd}{nextF} > $tn);
+    $nextF += $nextTimer;
+  } until ($nextF > $tn);
 
-  $hash->{helper}{vd}{nextM} = $tn+$nextTimer;
-  $hash->{helper}{vd}{msgCnt} = $msgCnt;
-  if ($hash->{helper}{vd}{cmd}){
-    if    ($hash->{helper}{vd}{typ} == 1){
+  $hashVd->{nextM} = $tn+$nextTimer;
+  $hashVd->{msgCnt} = $msgCnt;
+  if ($hashVd->{cmd}){
+    if    ($hashVd->{typ} == 1){
       my $vc = ReadingsVal($name,"valveCtrl","init");
-      if(!defined $hash->{helper}{vd}{msgRed}){
-        $hash->{helper}{vd}{msgRed} = 0;
-      }
-
-      if (!(($vc eq "init") || 
-            ($vc eq "ok") && $hash->{helper}{vd}{msgRed})) {#if ready,idle,miss,lost
-      	CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
+      if (!(   $vc eq "init"
+             ||$hashVd->{msgRed} > $hashVd->{miss})
+           || $hash->{helper}{virtTC} ne "00") {
+        $hashVd->{msgSent} = 1;
+        CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
                                            ,$msgCnt
-                                           ,$hash->{helper}{vd}{cmd}
+                                           ,$hashVd->{cmd}
                                            ,$hash->{helper}{virtTC}
-                                           ,$hash->{helper}{vd}{val}));
+                                           ,$hashVd->{val}));
       }
       InternalTimer($tn+10,"CUL_HM_valvePosTmr","valveTmr:$vId",0);
     }
-    elsif ($hash->{helper}{vd}{typ} == 2){
+    elsif ($hashVd->{typ} == 2){
       CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s"
                                         ,$msgCnt
-                                        ,$hash->{helper}{vd}{cmd}
-                                        ,$hash->{helper}{vd}{val}));
-      $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextM};
-      InternalTimer($hash->{helper}{vd}{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
+                                        ,$hashVd->{cmd}
+                                        ,$hashVd->{val}));
+      $hashVd->{next} = $hashVd->{nextM};
+      InternalTimer($hashVd->{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
     }
   }
   else{
@@ -3731,6 +3737,7 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
     CUL_HM_UpdtReadSingle($hash,"state","stopped",1);
     return;# terminate processing
   }
+  $hashVd->{nextF} = $nextF;
   $hash->{helper}{virtTC} = "00";
   CUL_HM_ProcessCmdStack($hash);
 }
@@ -3738,40 +3745,36 @@ sub CUL_HM_valvePosTmr(@) {#calc next vd wakeup
   my($in ) = @_;
   my(undef,$vId) = split(':',$in);
   my $hash = CUL_HM_id2Hash($vId); 
+  my $hashVd = $hash->{helper}{vd}; 
   my $name = $hash->{NAME};
   my $vc = ReadingsVal($name,"valveCtrl","init");
-  if ($vc eq "init") {
-  	$hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextF};
-  	CUL_HM_UpdtReadSingle($hash,"valveCtrl","ready",1);
-  }
-  elsif (($vc eq "ok") && $hash->{helper}{vd}{msgRed}) {
-  	$hash->{helper}{vd}{miss} = 1;
-  	$hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextF};
-  	CUL_HM_UpdtReadSingle($hash,"valveCtrl","idle",1);
+  my $vcn = $vc;
+  if (!$hashVd->{msgSent}) {
+    $hashVd->{miss}++;
+    $hashVd->{next} = $hashVd->{nextF};
+    $vcn = "ready" if ($vc eq "init");
   }
   else {
-    my $pn = CUL_HM_id2Name($hash->{helper}{vd}{id});
+    my $pn = CUL_HM_id2Name($hashVd->{id});
     my $ackTime = ReadingsTimestamp($pn, "ValvePosition", "");
-    my $vc;
-    if (!$ackTime || $ackTime eq $hash->{helper}{vd}{ackT} ){
-      $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextF};
-      $vc = (++$hash->{helper}{vd}{miss} > 5)
-                                          ?"lost"
-                                          :"miss_".$hash->{helper}{vd}{miss};
+    if (!$ackTime || $ackTime eq $hashVd->{ackT} ){
+      $hashVd->{next} = $hashVd->{nextF};
+      $vcn = (++$hashVd->{miss} > 5) ? "lost"
+                                     :"miss_".$hashVd->{miss};
       Log3 $name,5,"CUL_HM $name virtualTC use fail-timer";
     }
     else{
-      CUL_HM_UpdtReadBulk($hash,0,".next:".$hash->{helper}{vd}{next}
-                                 ,".msgCnt:".($hash->{helper}{vd}{msgCnt}-1));
-      $hash->{helper}{vd}{next} = $hash->{helper}{vd}{nextM};
-      $vc = "ok";
-      $hash->{helper}{vd}{miss} = 0;
+      CUL_HM_UpdtReadBulk($hash,0,".next:".$hashVd->{next}
+                                 ,".msgCnt:".($hashVd->{msgCnt}-1));
+      $hashVd->{next} = $hashVd->{nextM};
+      $vcn = "ok";
+      $hashVd->{miss} = 0;
+      $hashVd->{msgSent} = 0;
     }
-    CUL_HM_UpdtReadSingle($hash,"valveCtrl",$vc,1)
-          if(ReadingsVal($name,"valveCtrl","") ne $vc);
-    $hash->{helper}{vd}{ackT} = $ackTime;
+    $hashVd->{ackT} = $ackTime;
   }
-  InternalTimer($hash->{helper}{vd}{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
+  CUL_HM_UpdtReadSingle($hash,"valveCtrl",$vcn,1) if($vc ne $vcn);
+  InternalTimer($hashVd->{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
 }
 sub CUL_HM_weather(@) {#periodically send weather data
   my($in ) = @_;
