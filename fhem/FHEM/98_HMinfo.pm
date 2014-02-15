@@ -419,7 +419,7 @@ sub HMinfo_tempListTmpl(@) { ##################################################
     if ($md =~ m/(HM-CC-RT-DN-BoM|HM-CC-RT-DN)/)    {$chN = $defs{$eN}{channel_04};}
     elsif ($md =~ m/(ROTO_ZEL-STG-RM-FWT|HM-CC-TC)/){$chN = $defs{$eN}{channel_02};}
     next if (!$chN || !$defs{$chN} || $chN !~ m/$filter/);
-    push @el;
+    push @el,$chN;
   }
   return "no entities selected" if (!scalar @el);
 
@@ -529,7 +529,7 @@ sub HMinfo_getMsgStat() { #####################################################
     $hs .=  sprintf("|%3d",$modules{CUL_HM}{stat}{s}{$ioD}{h}{$_}) foreach (0..23);
     $dr .=  sprintf("|%4d",$modules{CUL_HM}{stat}{r}{$ioD}{d}{$_}) foreach (0..6);
     $ds .=  sprintf("|%4d",$modules{CUL_HM}{stat}{s}{$ioD}{d}{$_}) foreach (0..6);
-
+  
     my ($tdr,$tds);
     $tdr += $modules{CUL_HM}{stat}{r}{$ioD}{h}{$_} foreach (0..23);
     $tds += $modules{CUL_HM}{stat}{s}{$ioD}{h}{$_} foreach (0..23);
@@ -564,68 +564,7 @@ sub HMinfo_GetFn($@) {#########################################################
   }
 
   $cmd = "?" if(!$cmd);# by default print options
-  if   ($cmd eq "unused" )     {##actionImmediate: clear parameter--------------
-  }
-  else{
-    my @cmdLst =     
-           ( "notsupproted");
-    $ret = join (" ",sort @cmdLst); 
-  }
-  return $ret;
-
-}
-sub HMinfo_SetFn($@) {#########################################################
-  my ($hash,$name,$cmd,@a) = @_;
-  my ($opt,$optEmpty,$filter) = ("",1,"");
-  my $ret;
-
-  if (@a && ($a[0] =~ m/^-/) && ($a[0] !~ m/^-f$/)){# options provided
-    $opt = $a[0];
-    $optEmpty = ($opt =~ m/e/)?1:0;
-    shift @a; #remove
-  }
-  if (@a && $a[0] =~ m/^-f$/){# options provided
-    shift @a; #remove
-    $filter = shift @a;
-  }
-
-  $cmd = "?" if(!$cmd);# by default print options
-  if   ($cmd eq "clear" )     {##actionImmediate: clear parameter--------------
-    my ($type) = @a;
-    if ($type eq "msgStat"){
-      foreach (keys %{$modules{CUL_HM}{stat}{r}}){
-        next if ($_ ne "dummy");
-        delete $modules{CUL_HM}{stat}{$_};
-        delete $modules{CUL_HM}{stat}{r}{$_};
-        delete $modules{CUL_HM}{stat}{s}{$_};
-      }
-      return;
-    }
-    else{
-      return "unknown parameter - use Protocol, readings, msgStat, register or rssi"
-            if ($type !~ m/^(Protocol|readings|register|rssi)$/);
-      $opt .= "d" if ($type !~ m/(readings|register)/);# readings apply to all, others device only
-      my @entities;
-      $type = "msgEvents" if ($type eq "Protocol");# translate parameter
-      foreach my $dName (HMinfo_getEntities($opt,$filter)){
-        push @entities,$dName;
-        CUL_HM_Set($defs{$dName},$dName,"clear",$type);
-      }
-      return $cmd.$type." done:" ."\n cleared"  ."\n    ".(join "\n    ",sort @entities)
-                           ;
-    }
-  }
-  elsif($cmd eq "autoReadReg"){##actionImmediate: re-issue register Read-------
-    my @entities;
-    foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
-      next if (!substr(AttrVal($dName,"autoReadReg","0"),0,1));
-      CUL_HM_qAutoRead($dName,1);
-      push @entities,$dName;
-    }
-    return $cmd." done:" ."\n triggered:"  ."\n    ".(join "\n    ",sort @entities)
-                         ;
-  }
-  elsif($cmd eq "protoEvents"){##print protocol-events-------------------------
+  if   ($cmd eq "protoEvents"){##print protocol-events-------------------------
     my ($type) = @a;
     $type = "long" if(!$type);
     my @paramList;
@@ -868,8 +807,8 @@ sub HMinfo_SetFn($@) {#########################################################
                           )
             .join"\n  ",grep(/$filter/,sort @model);
   }
-  elsif($cmd eq "templateSet"){##template: set of register --------------------
-    return HMinfo_templateSet(@a);
+  elsif($cmd eq "templateList"){##template: list templates --------------------
+    return HMinfo_templateList($a[0]);
   }
   elsif($cmd eq "templateChk"){##template: see if it applies ------------------
     my $repl;
@@ -880,8 +819,141 @@ sub HMinfo_SetFn($@) {#########################################################
     }
     return $repl;
   }
-  elsif($cmd eq "templateList"){##template: list templates --------------------
-    return HMinfo_templateList($a[0]);
+  elsif($cmd eq "help")       {
+    $ret = " Unknown argument $cmd, choose one of "
+           ."\n ---checks---"
+           ."\n get configCheck [<typeFilter>]                     # perform regCheck and regCheck"
+           ."\n get regCheck [<typeFilter>]                        # find incomplete or inconsistant register readings"
+           ."\n get peerCheck [<typeFilter>]                       # find incomplete or inconsistant peer lists"
+           ."\n ---actions---"
+           ."\n set saveConfig [<typeFilter>] [<file>]             # stores peers and register with saveConfig"
+           ."\n set archConfig [-a] [<file>]                       # as saveConfig but only if data of entity is complete"
+           ."\n set purgeConfig [<file>]                           # purge content of saved configfile "
+           ."\n set loadConfig [<typeFilter>] <file>               # restores register and peer readings if missing"
+           ."\n set autoReadReg [<typeFilter>]                     # trigger update readings if attr autoReadReg is set"
+           ."\n set tempList [<typeFilter>][save|restore|verify][<filename>]# handle tempList of thermostat devices"
+           ."\n set tempListTmpl[<typeFilter>][templateName][<filename>]# program a templist from a template in the file to one or multiple devices"
+           ."\n  ---infos---"
+           ."\n set update                                         # update HMindfo counts"
+           ."\n get register [<typeFilter>]                        # devicefilter parse devicename. Partial strings supported"
+           ."\n get peerXref [<typeFilter>]                        # peer cross-reference"
+           ."\n get models [<typeFilter>]                          # list of models incl native parameter"
+           ."\n get protoEvents [<typeFilter>] [short|long]        # protocol status - names can be filtered"
+           ."\n get msgStat                                        # view message statistic"
+           ."\n get param [<typeFilter>] [<param1>] [<param2>] ... # displays params for all entities as table"
+           ."\n get rssi [<typeFilter>]                            # displays receive level of the HM devices"
+           ."\n          last: most recent"
+           ."\n          avg:  average overall"
+           ."\n          range: min to max value"
+           ."\n          count: number of events in calculation"
+           ."\n  ---clear status---"
+           ."\n set clear [<typeFilter>] [Protocol|readings|msgStat|register|rssi]"
+           ."\n          Protocol     # delete all protocol-events"
+           ."\n          readings     # delete all readings"
+           ."\n          register     # delete all register-readings"
+           ."\n          rssi         # delete all rssi data"
+           ."\n          msgStat      # delete message statistics"
+           ."\n ---help---"
+           ."\n get help                            #"
+           ."\n ***footnote***"
+           ."\n [<nameFilter>]   : only matiching names are processed - partial names are possible"
+           ."\n [<modelsFilter>] : any match in the output are searched. "
+           ."\n"
+           ."\n set cpRegs <src:peer> <dst:peer>"
+           ."\n            copy register for a channel or behavior of channel/peer"
+           ."\n set templateDef <entity> <templateName> <param1[:<param2>...] <description> <reg1>:<val1> [<reg2>:<val2>] ... "
+           ."\n                 define a template"
+           ."\n set templateSet <entity> <templateName> <peer:[long|short]> [<param1> ...] "
+           ."\n                 write register according to a given template"
+           ."\n get templateChk [<typeFilter>] <templateName> <peer:[long|short]> [<param1> ...] "
+           ."\n                 compare whether register match the template values"
+           ."\n get templateList [<templateName>]         # gives a list of templates or a description of the named template"
+           ."\n                  list all currently defined templates or the structure of a given template"
+           ."\n ======= typeFilter options: supress class of devices  ===="
+           ."\n set <name> <cmd> [-dcasev] [-f <filter>] [params]"
+           ."\n      entities according to list will be processed"
+           ."\n      d - device   :include devices"
+           ."\n      c - channels :include channels"
+           ."\n      i - ignore   :include devices marked as ignore"
+           ."\n      v - virtual  :supress fhem virtual"
+           ."\n      p - physical :supress physical"
+           ."\n      a - aktor    :supress actor"
+           ."\n      s - sensor   :supress sensor"
+           ."\n      e - empty    :include results even if requested fields are empty"
+           ."\n "
+           ."\n     -f - filter   :regexp to filter entity names "
+           ."\n "
+           ;
+  }
+
+  else{
+    my @cmdLst =     
+           ( "help"
+		    ,"configCheck","param","peerCheck","peerXref"
+            ,"protoEvents","msgStat","rssi"
+            ,"models"
+            ,"regCheck","register"
+            ,"templateList","templateChk"
+            );
+    $ret = "Unknown argument $cmd, choose one of ".join (" ",sort @cmdLst);
+  }
+  return $ret;
+}
+
+sub HMinfo_SetFn($@) {#########################################################
+  my ($hash,$name,$cmd,@a) = @_;
+  my @in = @a;
+  my ($opt,$optEmpty,$filter) = ("",1,"");
+  my $ret;
+  if (@a && ($a[0] =~ m/^-/) && ($a[0] !~ m/^-f$/)){# options provided
+    $opt = $a[0];
+    $optEmpty = ($opt =~ m/e/)?1:0;
+    shift @a; #remove
+  }
+  if (@a && $a[0] =~ m/^-f$/){# options provided
+    shift @a; #remove
+    $filter = shift @a;
+  }
+
+  $cmd = "?" if(!$cmd);# by default print options
+  if   ($cmd eq "clear" )     {##actionImmediate: clear parameter--------------
+    my ($type) = @a;
+    if ($type eq "msgStat"){
+      foreach (keys %{$modules{CUL_HM}{stat}{r}}){
+        next if ($_ ne "dummy");
+        delete $modules{CUL_HM}{stat}{$_};
+        delete $modules{CUL_HM}{stat}{r}{$_};
+        delete $modules{CUL_HM}{stat}{s}{$_};
+      }
+      return;
+    }
+    else{
+      return "unknown parameter - use Protocol, readings, msgStat, register or rssi"
+            if ($type !~ m/^(Protocol|readings|register|rssi)$/);
+      $opt .= "d" if ($type !~ m/(readings|register)/);# readings apply to all, others device only
+      my @entities;
+      $type = "msgEvents" if ($type eq "Protocol");# translate parameter
+      foreach my $dName (HMinfo_getEntities($opt,$filter)){
+        push @entities,$dName;
+        CUL_HM_Set($defs{$dName},$dName,"clear",$type);
+      }
+      return $cmd.$type." done:" ."\n cleared"  ."\n    ".(join "\n    ",sort @entities)
+                           ;
+    }
+  }
+  elsif($cmd eq "autoReadReg"){##actionImmediate: re-issue register Read-------
+    my @entities;
+    foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
+      next if (!substr(AttrVal($dName,"autoReadReg","0"),0,1));
+      CUL_HM_qAutoRead($dName,1);
+      push @entities,$dName;
+    }
+    return $cmd." done:" ."\n triggered:"  ."\n    ".(join "\n    ",sort @entities)
+                         ;
+  }
+
+  elsif($cmd eq "templateSet"){##template: set of register --------------------
+    return HMinfo_templateSet(@a);
   }
   elsif($cmd eq "templateDef"){##template: define one -------------------------
     return HMinfo_templateDef(@a);
@@ -902,12 +974,12 @@ sub HMinfo_SetFn($@) {#########################################################
     $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
     $ret = HMinfo_tempListTmpl($filter,$a[0],$fn);
   }
-  elsif($cmd eq "loadConfig") {##action: saveConfig----------------------------
+  elsif($cmd eq "loadConfig") {##action: loadConfig----------------------------
     my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
     $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
     $ret = HMinfo_loadConfig($filter,$fn); 
   }
-  elsif($cmd eq "purgeConfig"){##action: saveConfig----------------------------
+  elsif($cmd eq "purgeConfig"){##action: purgeConfig---------------------------
     my $id = ++$hash->{nb}{cnt};
     my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
     $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
@@ -931,56 +1003,73 @@ sub HMinfo_SetFn($@) {#########################################################
     # save config only if register are complete
     $ret = HMinfo_archConfig($hash,$name,$opt,($a[0]?$a[0]:""));
   }
-  elsif($cmd eq "help")       {
-    $ret = " Unknown argument $cmd, choose one of "
+
+  ### redirect set commands to get - thus the command also work in webCmd
+  elsif(HMinfo_GetFn($hash,$name,"?") =~ m/\b$cmd\b/){##----------------
+    $ret = HMinfo_GetFn($hash,$name,$cmd,@a);
+  }
+
+  else{
+    my @cmdLst =     
+           ( "autoReadReg","clear"  
+			,"archConfig:-0,-a","saveConfig","loadConfig","purgeConfig","update"
+            ,"cpRegs"
+            ,"tempList tempListTmpl"
+            ,"templateDef","templateSet");
+    $ret = "Unknown argument $cmd, choose one of ".join (" ",sort @cmdLst);
+  }
+  return $ret;
+}
+sub HMInfo_help(){
+  return    " Unknown argument choose one of "
            ."\n ---checks---"
-           ."\n configCheck [<typeFilter>]                     # perform regCheck and regCheck"
-           ."\n regCheck [<typeFilter>]                        # find incomplete or inconsistant register readings"
-           ."\n peerCheck [<typeFilter>]                       # find incomplete or inconsistant peer lists"
+           ."\n get configCheck [<typeFilter>]                     # perform regCheck and regCheck"
+           ."\n get regCheck [<typeFilter>]                        # find incomplete or inconsistant register readings"
+           ."\n get peerCheck [<typeFilter>]                       # find incomplete or inconsistant peer lists"
            ."\n ---actions---"
-           ."\n saveConfig [<typeFilter>] [<file>]             # stores peers and register with saveConfig"
-           ."\n archConfig [-a] [<file>]                       # as saveConfig but only if data of entity is complete"
-           ."\n purgeConfig [<file>]                           # purge content of saved configfile "
-           ."\n loadConfig [<typeFilter>] <file>               # restores register and peer readings if missing"
-           ."\n autoReadReg [<typeFilter>]                     # trigger update readings if attr autoReadReg is set"
-           ."\n tempList [<typeFilter>][save|restore|verify][<filename>]# handle tempList of thermostat devices"
-           ."\n tempListTmpl[<typeFilter>][templateName][<filename>]# program a templist from a template in the file to one or multiple devices"
-           ."\n ---infos---"
-           ."\n update                                         # update HMindfo counts"
-           ."\n register [<typeFilter>]                        # devicefilter parse devicename. Partial strings supported"
-           ."\n peerXref [<typeFilter>]                        # peer cross-reference"
-           ."\n models [<typeFilter>]                          # list of models incl native parameter"
-           ."\n protoEvents [<typeFilter>] [short|long]        # protocol status - names can be filtered"
-           ."\n msgStat                                        # view message statistic"
-           ."\n param [<typeFilter>] [<param1>] [<param2>] ... # displays params for all entities as table"
-           ."\n rssi [<typeFilter>]                            # displays receive level of the HM devices"
-           ."\n       last: most recent"
-           ."\n       avg:  average overall"
-           ."\n       range: min to max value"
-           ."\n       count: number of events in calculation"
-           ."\n ---clear status---"
-           ."\n clear [<typeFilter>] [Protocol|readings|msgStat|register|rssi]"
-           ."\n       Protocol     # delete all protocol-events"
-           ."\n       readings     # delete all readings"
-           ."\n       register     # delete all register-readings"
-           ."\n       rssi         # delete all rssi data"
-           ."\n       msgStat      # delete message statistics"
+           ."\n set saveConfig [<typeFilter>] [<file>]             # stores peers and register with saveConfig"
+           ."\n set archConfig [-a] [<file>]                       # as saveConfig but only if data of entity is complete"
+           ."\n set purgeConfig [<file>]                           # purge content of saved configfile "
+           ."\n set loadConfig [<typeFilter>] <file>               # restores register and peer readings if missing"
+           ."\n set autoReadReg [<typeFilter>]                     # trigger update readings if attr autoReadReg is set"
+           ."\n set tempList [<typeFilter>][save|restore|verify][<filename>]# handle tempList of thermostat devices"
+           ."\n set tempListTmpl[<typeFilter>][templateName][<filename>]# program a templist from a template in the file to one or multiple devices"
+           ."\n  ---infos---"
+           ."\n set update                                         # update HMindfo counts"
+           ."\n get register [<typeFilter>]                        # devicefilter parse devicename. Partial strings supported"
+           ."\n get peerXref [<typeFilter>]                        # peer cross-reference"
+           ."\n get models [<typeFilter>]                          # list of models incl native parameter"
+           ."\n get protoEvents [<typeFilter>] [short|long]        # protocol status - names can be filtered"
+           ."\n get msgStat                                        # view message statistic"
+           ."\n get param [<typeFilter>] [<param1>] [<param2>] ... # displays params for all entities as table"
+           ."\n get rssi [<typeFilter>]                            # displays receive level of the HM devices"
+           ."\n          last: most recent"
+           ."\n          avg:  average overall"
+           ."\n          range: min to max value"
+           ."\n          count: number of events in calculation"
+           ."\n  ---clear status---"
+           ."\n set clear [<typeFilter>] [Protocol|readings|msgStat|register|rssi]"
+           ."\n          Protocol     # delete all protocol-events"
+           ."\n          readings     # delete all readings"
+           ."\n          register     # delete all register-readings"
+           ."\n          rssi         # delete all rssi data"
+           ."\n          msgStat      # delete message statistics"
            ."\n ---help---"
-           ."\n help                            #"
+           ."\n get help                            #"
            ."\n ***footnote***"
            ."\n [<nameFilter>]   : only matiching names are processed - partial names are possible"
            ."\n [<modelsFilter>] : any match in the output are searched. "
            ."\n"
-           ."\n cpRegs <src:peer> <dst:peer>"
-           ."\n        copy register for a channel or behavior of channel/peer"
-           ."\n templateChk [<typeFilter>] <templateName> <peer:[long|short]> [<param1> ...] "
-           ."\n        compare whether register match the template values"
-           ."\n templateDef <entity> <templateName> <param1[:<param2>...] <description> <reg1>:<val1> [<reg2>:<val2>] ... "
-           ."\n        define a template"
-           ."\n templateList [<templateName>]         # gives a list of templates or a description of the named template"
-           ."\n        list all currently defined templates or the structure of a given template"
-           ."\n templateSet <entity> <templateName> <peer:[long|short]> [<param1> ...] "
-           ."\n        write register according to a given template"
+           ."\n set cpRegs <src:peer> <dst:peer>"
+           ."\n            copy register for a channel or behavior of channel/peer"
+           ."\n set templateDef <entity> <templateName> <param1[:<param2>...] <description> <reg1>:<val1> [<reg2>:<val2>] ... "
+           ."\n                 define a template"
+           ."\n set templateSet <entity> <templateName> <peer:[long|short]> [<param1> ...] "
+           ."\n                 write register according to a given template"
+           ."\n get templateChk [<typeFilter>] <templateName> <peer:[long|short]> [<param1> ...] "
+           ."\n                 compare whether register match the template values"
+           ."\n get templateList [<templateName>]         # gives a list of templates or a description of the named template"
+           ."\n                  list all currently defined templates or the structure of a given template"
            ."\n ======= typeFilter options: supress class of devices  ===="
            ."\n set <name> <cmd> [-dcasev] [-f <filter>] [params]"
            ."\n      entities according to list will be processed"
@@ -996,20 +1085,6 @@ sub HMinfo_SetFn($@) {#########################################################
            ."\n     -f - filter   :regexp to filter entity names "
            ."\n "
            ;
-  }
-  else{
-    my @cmdLst =     
-           ( "autoReadReg","clear"  #"clear:msgStat,Protocol,readings,register,rssi"
-            ,"configCheck","param","peerCheck","peerXref"
-            ,"protoEvents","msgStat:view,clear","rssi"
-            ,"models"
-            ,"regCheck","register","archConfig:-0,-a","saveConfig","loadConfig","purgeConfig","update"
-            ,"cpRegs"
-            ,"tempList tempListTmpl"
-            ,"templateChk","templateDef","templateList","templateSet");
-    $ret = join (" ",sort @cmdLst); 
-  }
-  return $ret;
 }
 
 sub HMinfo_loadConfig($@) {####################################################
@@ -1647,18 +1722,18 @@ sub HMinfo_cpRegs(@){##########################################################
 #                                     CUL_HM_Get($ehash,$eName,"param","model"));
 
   if ($srcP){# will be peer related copy
-    if   ($srcP =~ m/self(.*)/)      {$srcPid = $defs{$srcCh}{DEF}.sprintf("%02X",$1)}
+    if   ($srcP =~ m/self(.*)/)      {$srcPid = substr($defs{$srcCh}{DEF},0,6).sprintf("%02X",$1)}
     elsif($srcP =~ m/^[A-F0-9]{8}$/i){$srcPid = $srcP;}
     elsif($srcP =~ m/(.*)_chn:(..)/) {$srcPid = $defs{$1}->{DEF}.$2;}
     elsif($defs{$srcP})              {$srcPid = $defs{$srcP}{DEF}.$2;}
 
-    if   ($dstP =~ m/self(.*)/)      {$dstPid = $defs{$dstCh}{DEF}.sprintf("%02X",$1)}
+    if   ($dstP =~ m/self(.*)/)      {$dstPid = substr($defs{$dstCh}{DEF},0,6).sprintf("%02X",$1)}
     elsif($dstP =~ m/^[A-F0-9]{8}$/i){$dstPid = $dstP;}
     elsif($dstP =~ m/(.*)_chn:(..)/) {$dstPid = $defs{$1}->{DEF}.$2;}
     elsif($defs{$dstP})              {$dstPid = $defs{$dstP}{DEF}.$2;}
 
     return "invalid peers src:$srcP dst:$dstP" if(!$srcPid || !$dstPid);
-    return "sourcepeer not in peerlist"        if ($attr{$srcCh}{peerIDs} !~ m/$srcPid/);
+    return "source peer not in peerlist"       if ($attr{$srcCh}{peerIDs} !~ m/$srcPid/);
     return "destination peer not in peerlist"  if ($attr{$dstCh}{peerIDs} !~ m/$dstPid/);
 
     if   ($defs{$srcCh}{READINGS}{"RegL_03:".$srcP})  {$srcRegLn =  "RegL_03:".$srcP}
@@ -1758,7 +1833,69 @@ sub HMinfo_noDup(@) {#return list with no duplicates
     Just one entity needs to be defined without any parameter.<br>
   </ul>
   <br>
-
+############################################################
+  <a name="HMinfoget"><b>Get</b></a>
+  <ul>
+    <ul>
+      <li><a name="#HMinfomodels">models</a><br>
+          list all HM models that are supported in FHEM
+      </li>
+      <li><a name="#HMinfoparam">param</a> <a href="#HMinfoFilter">[filter]</a> &lt;name&gt; &lt;name&gt;...<br>
+          returns a table parameter values (attribute, readings,...)
+          for all entities as a table
+      </li>
+      <li><a name="#HMinforegister">register</a> <a href="#HMinfoFilter">[filter]</a><br>
+          provides a tableview of register of an entity
+      </li>
+      <li><a name="#HMinforegCheck">regCheck</a> <a href="#HMinfoFilter">[filter]</a><br>
+          performs a consistency check on register readings for completeness
+      </li>
+      <li><a name="#HMinfopeerCheck">peerCheck</a> <a href="#HMinfoFilter">[filter]</a><br>
+          performs a consistency check on peers. If a peer is set in one channel
+          this funktion will search wether the peer also exist on the opposit side.
+      </li>
+      <li><a name="#HMinfopeerXref">peerXref</a> <a href="#HMinfoFilter">[filter]</a><br>
+          provides a cross-reference on peerings, a kind of who-with-who summary over HM
+      </li>
+      <li><a name="#HMinfoconfigCheck">configCheck</a> <a href="#HMinfoFilter">[filter]</a><br>
+          performs a consistency check of HM settings. It includes regCheck and peerCheck
+      </li>
+      <li><a name="#HMinfotemplateList">templateList [&lt;name&gt;]</a><br>
+          list defined templates. If no name is given all templates will be listed<br>
+      </li>
+	  
+      <li><a name="#HMinfomsgStat">msgStat</a> <a href="#HMinfoFilter">[filter]</a><br>
+          statistic about message transferes over a week<br>
+      </li>
+      <li><a name="#HMinfoprotoEvents">protoEvents </a><a href="#HMinfoFilter">[filter]</a> <br>
+          this is likely a very <B>important view</B> for message incidents.
+		  Information about pending commands and - much more relevant - about failed executions 
+		  is given in a table over all devices.<br>
+		  Consider to clear this statistic use <a name="#HMinfoclear">clear Protocol</a>.<br>
+      </li>
+      <li><a name="#HMinforssi">rssi </a><a href="#HMinfoFilter">[filter]</a><br>
+          statistic over rssi data for HM entities.<br>
+      </li>
+	  
+      <li><a name="#HMinfotemplateChk">templateChk <a href="#HMinfoFilter">[filter] &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
+         verifies if the register-readings comply to the template <br>
+         Parameter are identical to <a href="#HMinfotemplateSet">templateSet</a><br>
+         The procedure will check if the register values match the ones provided by the template<br>
+         If no peer is necessary use <b>none</b> to skip this entry<br>
+        Example to verify settings<br>
+        <ul><code>
+         set hm templateChk -f RolloNord BlStopUpLg none         1 2 # RolloNord, no peer, parameter 1 and 2 given<br>
+         set hm templateChk -f RolloNord BlStopUpLg peerName:long    # RolloNord peerName, long only<br>
+         set hm templateChk -f RolloNord BlStopUpLg peerName         # RolloNord peerName, long and short<br>
+         set hm templateChk -f RolloNord BlStopUpLg peerName:all     # RolloNord peerName, long and short<br>
+         set hm templateChk -f RolloNord BlStopUpLg all:long         # RolloNord any peer, long only<br>
+         set hm templateChk -f RolloNord BlStopUpLg all              # RolloNord any peer,long and short<br>
+         set hm templateChk -f Rollo.*   BlStopUpLg all              # each Rollo* any peer,long and short<br>
+         set hm templateChk BlStopUpLg                               # each entities<br>
+        </code></ul>
+      </li>
+    </ul>
+  </ul>
   <a name="HMinfoset"><b>Set</b></a>
   <ul>
   even though the commands are more a get funktion they are implemented
@@ -1767,35 +1904,12 @@ sub HMinfo_noDup(@) {#return list with no duplicates
       <li><a name="#HMinfoupdate">update</a><br>
           updates HM status counter.
       </li>
-      <li><a name="#HMinfomodels">models</a><br>
-          list all HM models that are supported in FHEM
-      </li>
-      <li><a name="#HMinfoparam">param</a> <a href="#HMinfoFilter">[filter]</a> &lt;name&gt; &lt;name&gt;...<br>
-          returns a table parameter values (attribute, readings,...)
-          for all entities as a table
-      </li>
-      <li><a name="#HMinfopeerXref">peerXref</a> <a href="#HMinfoFilter">[filter]</a><br>
-          provides a cross-reference on peerings, a kind of who-with-who summary over HM
-      </li>
-      <li><a name="#HMinforegister">register</a> <a href="#HMinfoFilter">[filter]</a><br>
-          provides a tableview of register of an entity
-      </li>
 
-      <li><a name="#HMinfoconfigCheck">configCheck</a> <a href="#HMinfoFilter">[filter]</a><br>
-          performs a consistency check of HM settings. It includes regCheck and peerCheck
-      </li>
-      <li><a name="#HMinfopeerCheck">peerCheck</a> <a href="#HMinfoFilter">[filter]</a><br>
-          performs a consistency check on peers. If a peer is set in one channel
-          this funktion will search wether the peer also exist on the opposit side.
-      </li>
-      <li><a name="#HMinforegCheck">regCheck</a> <a href="#HMinfoFilter">[filter]</a><br>
-          performs a consistency check on register readings for completeness
-      </li>
 
       <li><a name="#HMinfoautoReadReg">autoReadReg</a> <a href="#HMinfoFilter">[filter]</a><br>
           schedules a read of the configuration for the CUL_HM devices with attribut autoReadReg set to 1 or higher.
       </li>
-      <li><a name="#HMinfoclear">clear [Protocol|readings|msgStat|register|rssi]</a> <a href="#HMinfoFilter">[filter]</a><br>
+      <li><a name="#HMinfoclear">clear</a> <a href="#HMinfoFilter">[filter]</a> [Protocol|readings|msgStat|register|rssi]<br>
           executes a set clear ...  on all HM entities<br>
           <ul>
           <li>Protocol relates to set clear msgEvents</li>
@@ -1913,26 +2027,6 @@ sub HMinfo_noDup(@) {#return list with no duplicates
         Example<br>
         <ul><code>
          set hm templateDef SwOnCond level:cond "my description" CtValLo:p0 CtDlyOn:p1 CtOn:geLo<br>
-        </code></ul>
-      </li>
-      <li><a name="#HMinfotemplateList">templateList [&lt;name&gt;]</a><br>
-          list defined templates. If no name is given all templates will be listed<br>
-      </li>
-      <li><a name="#HMinfotemplateChk">templateChk <a href="#HMinfoFilter">[filter] &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
-         verifies if the register-readings comply to the template <br>
-         Parameter are identical to <a href="#HMinfotemplateSet">templateSet</a><br>
-         The procedure will check if the register values match the ones provided by the template<br>
-         If no peer is necessary use <b>none</b> to skip this entry<br>
-        Example to verify settings<br>
-        <ul><code>
-         set hm templateChk -f RolloNord BlStopUpLg none         1 2 # RolloNord, no peer, parameter 1 and 2 given<br>
-         set hm templateChk -f RolloNord BlStopUpLg peerName:long    # RolloNord peerName, long only<br>
-         set hm templateChk -f RolloNord BlStopUpLg peerName         # RolloNord peerName, long and short<br>
-         set hm templateChk -f RolloNord BlStopUpLg peerName:all     # RolloNord peerName, long and short<br>
-         set hm templateChk -f RolloNord BlStopUpLg all:long         # RolloNord any peer, long only<br>
-         set hm templateChk -f RolloNord BlStopUpLg all              # RolloNord any peer,long and short<br>
-         set hm templateChk -f Rollo.*   BlStopUpLg all              # each Rollo* any peer,long and short<br>
-         set hm templateChk BlStopUpLg                               # each entities<br>
         </code></ul>
       </li>
       <li><a name="#HMinfotemplateSet">templateSet &lt;entity&gt; &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
