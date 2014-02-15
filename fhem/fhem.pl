@@ -2043,8 +2043,8 @@ CommandAttr($$)
          }
       }
       if(!$found) {
-        push @rets, "$sdev: unknown attribute $a[1], ".
-                        "choose one of $list or use attr global userattr $a[1]";
+        push @rets, "$sdev: unknown attribute $a[1]. ".
+                        "Type 'attr $a[0] ?' for a detailed list.";
         next;
       }
     }
