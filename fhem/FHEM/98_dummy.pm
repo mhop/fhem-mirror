@@ -96,4 +96,58 @@ dummy_Define($$)
 </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="dummy"></a>
+<h3>dummy</h3>
+<ul>
+
+  Definiert eine Pseudovariable, der mit <a href="#set">set</a> jeder beliebige
+  Wert zugewiesen werden kann.  Sinnvoll zum Programmieren.
+  <br><br>
+
+  <a name="dummydefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; dummy</code>
+    <br><br>
+
+    Beispiel:
+    <ul>
+      <code>define myvar dummy</code><br>
+      <code>set myvar 7</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="dummyset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt</code><br>
+    Weist einen Wert zu.
+  </ul>
+  <br>
+
+  <a name="dummyget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="dummyattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a name="setList">setList</a><br>
+        Liste mit Werten durch Leerzeichen getrennt. Diese Liste wird mit "set
+        name ?" ausgegeben.  Damit kann das FHEMWEB-Frontend Auswahl-Men&uuml;s
+        oder Schalter erzeugen.<br>
+        Beispiel: attr dummyName setList on off
+
+        </li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+  <br>
+
+</ul>
+
+=end html_DE
+
 =cut
