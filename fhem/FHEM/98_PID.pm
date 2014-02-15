@@ -45,7 +45,7 @@ PID_Define($$$)
   $pid->{sensor} = $sensor;
   if(!$regexp) {
     my $t = $defs{$sensor}{TYPE};
-    if($t eq "HMS" || $t eq "CUL_WS") {
+    if($t eq "HMS" || $t eq "CUL_WS" || $t eq "CUL_HM" ) {
       $reading = "temperature";
       $regexp = '([\\d\\.]*)';
     } else {
