@@ -1130,6 +1130,7 @@ sub CUL_HM_Parse($$) {##############################
         push @entities,CUL_HM_UpdtReadBulk($chnHash,1,$statemsg,
                                                     "temperature:$t")
                   if ($chnHash);
+        push @event, "battery:".(hex(substr($p,0,4))&0x80?"low":"ok");
       }
       elsif ($md !~ m/^(S550IA|HM-WDS30-T-O)$/){#skip temp-only sens
         my $h =  hex(substr($p,4,2));
@@ -1145,6 +1146,7 @@ sub CUL_HM_Parse($$) {##############################
     }
     elsif ($mTp eq "53"){
       my ($mChn,@dat) = unpack 'A2(A6)*',$p;
+      push @event, "battery:".(hex($mChn)&0x80?"low":"ok");
       foreach (@dat){
         my ($a,$d) = unpack 'A2A4',$_;
         $d = hex($d);
