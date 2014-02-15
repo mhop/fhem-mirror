@@ -77,9 +77,9 @@ sub I2C_BMP180_Initialize($) {
 	$hash->{UndefFn}  = 'I2C_BMP180_Undef';
 
 	$hash->{AttrList} = 'do_not_notify:0,1 showtime:0,1 model:BMP180,BMP085 ' .
-	                    'loglevel:0,1,2,3,4,5,6 poll_interval:1,2,5,10,20,30 ' .
-	                    'oversampling_settings:0,1,2,3 roundPressureDecimal:0,1,2 ' .
-	                    'roundTemperatureDecimal:0,1,2 ' . $readingFnAttributes;
+	                    'poll_interval:1,2,5,10,20,30 oversampling_settings:0,1,2,3 ' .
+						'roundPressureDecimal:0,1,2 roundTemperatureDecimal:0,1,2 ' .
+						$readingFnAttributes;
 }
 
 =head2 I2C_BMP180_Define
@@ -107,7 +107,7 @@ sub I2C_BMP180_Define($$) {
 	$msg = CommandAttr(undef, $name . ' oversampling_settings 3');
 
 	if ($msg) {
-		Log (1, $msg);
+		Log3 ($hash, 1, $msg);
 		return $msg;
 	}
 	
@@ -295,7 +295,7 @@ sub I2C_BMP180_ReadInt($$;$) {
 		}
 
 	} catch Error with {
-		Log (1, $name . ': ERROR: I2C_BMP180: i2c-bus_read failure');
+		Log3 ($hash, 1, ': ERROR: I2C_BMP180: i2c-bus_read failure');
 	};  
 	
 	return $retVal;
@@ -510,6 +510,114 @@ sub I2C_BMP180_calcTruePressure($$$) {
   <br>
 </ul>
 
-
 =end html
+=cut
+
+=pod
+=begin html_DE
+
+<a name="I2C_BMP180"></a>
+<h3>I2C_BMP180</h3>
+<ul>
+  <a name="I2C_BMP180"></a>
+  <p>
+    Dieses Modul erm&ouml;glicht das Auslesen der digitalen (Luft)drucksensoren
+    BMP085 und BMP180 &uuml;ber den I2C Bus des Raspberry Pi.<br><br>
+    
+    Vor Verwendung des Moduls m&uuml;ssen auf dem Raspberry Pi die I2C Kernel
+    Module geladen werden.<br>
+    Diese beiden Zeilen m&uuml;ssen in die Datei <b>/etc/modules</b> angef&uuml;gt werden,
+    um die Kernel Module automatisch beim Booten des Raspberry Pis zu laden.<br>
+    
+    <code><pre>
+    i2c-bcm2708 
+    i2c-dev</pre></code>
+    <b>Bemerkung:</b><br>
+    F&uuml;r die Kommunikation &uuml;ber den I2C Bus wird das Perl Modul <b>HiPi::Device::I2C</b>
+    ben&ouml;tigt.<br>
+    Die Installation erfolgt automatisch mit folgenden Befehlen auf der Konsole des 
+    Raspberry Pis:<br>
+    
+    <code><pre>
+    wget http://raspberry.znix.com/hipifiles/hipi-install
+    perl hipi-install</pre></code>
+    
+    Um die Rechte des I2C Devices anzupassen, muss die Datei
+    <b>/etc/udev/rules.d/98_i2c.rules</b> mit folgendem Inhalt erzeugt werden:<br>
+    <code><pre>
+    SUBSYSTEM=="i2c-dev", MODE="0666"</pre></code>
+    Danach muss der Raspberry Pi neu gestartet werden.<br><br>
+    
+    Wenn der Sensor am zweiten I2C Bus am Stecker P5 (nur in der Version 2 des
+    Raspberry Pi vorhanden) verwendet werden soll, muss die fett gedruckte Zeile
+    des folgenden Codes in das FHEM Start Skript aufgenommen werden:
+    <code><pre>
+    case "$1" in
+    'start')
+        <b>sudo hipi-i2c e 0 1</b>
+        ...
+    </pre></code>
+  <p>
+  
+  <b>Define</b>
+  <ul>
+    <code>define BMP180 &lt;BMP180_name&gt; &lt;I2C_device&gt;</code><br>
+    <br>
+    Beispiel:
+    <pre>
+      define BMP180 I2C_BMP180 /dev/i2c-0
+      attr BMP180 oversampling_settings 3
+      attr BMP180 poll_interval 5
+    </pre>
+  </ul>
+
+  <a name="I2C_BMP180set"></a>
+  <b>Set</b>
+  <ul>
+    <code>set BMP180 readValues</code>
+    <br><br>
+    Liest die aktuelle Temperatur und den Luftdruck des Sensors aus.<br>
+    Dies wird automatisch nach Ablauf des definierten Intervalls ausgef&uuml;hrt.
+    Wenn der aktuelle Wert gelesen werden soll, kann dieser Befehl auch manuell
+    ausgef&uuml;hrt werden.
+    <br><br>
+  </ul>
+
+  <a name="I2C_BMP180get"></a>
+  <b>Get</b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+  <a name="I2C_BMP180attr"></a>
+  <b>Attribute</b>
+  <ul>
+    <li>oversampling_settings<br>
+      Steuert das Oversampling der Druckmessung im Sensor.<br>
+      Default: 3, g&uuml;ltige Werte: 0, 1, 2, 3<br><br>
+    </li>
+    <li>poll_interval<br>
+      Definiert das Poll Intervall in Minuten f&uuml;r das Auslesen einer neuen Messung.<br>
+      Default: 5, g&uuml;ltige Werte: 1, 2, 5, 10, 20, 30<br><br>
+    </li>
+    <li>roundTemperatureDecimal<br>
+      Rundet den Temperaturwert mit den angegebenen Nachkommastellen.<br>
+      Default: 1, g&uuml;ltige Werte: 0, 1, 2<br><br>
+    </li>
+    <li>roundPressureDecimal<br>
+      Rundet die Drucksensorwerte mit den angegebenen Nachkommastellen.<br>
+      Default: 1, valid values: 0, 1, 2<br><br>
+    </li>
+    <li>altitude<br>
+      Wenn dieser Wert definiert ist, wird diese Angabe zus&auml; f&uuml;r die Berechnung des 
+      Luftdrucks bezogen auf Meeresh&ouml;he (Normalnull) NN herangezogen.<br>
+      Bemerkung: Dies ist ein globales Attribut.<br><br>
+      <code>attr global altitude 220</code>
+    </li>
+</ul>
+  <br>
+</ul>
+
+=end html_DE
 =cut
