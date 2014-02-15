@@ -153,7 +153,9 @@ CommandFheminfo($$)
   foreach my $d (sort keys %defs) {
     my $n = $defs{$d}{NAME};
     my $t = $defs{$d}{TYPE};
-    my $m = AttrVal($n,"model","unknown");
+    my $m = "unknown";
+    $m = $defs{$d}{model} if( defined($defs{$d}{model}) );
+    $m = AttrVal($n,"model",$m);
     if(exists $control_ref->{$t}) {
       Log 5, "fheminfo name:$n type:$t model:$m";
       $info{modules}{$t}{$n} = $m;
