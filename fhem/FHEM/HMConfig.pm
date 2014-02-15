@@ -1059,6 +1059,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
   param      => "<param>",
   reg        => "<addr> ... <list> <peer>",
   regList    => "",
+  cmdList    => "",
   saveConfig => "<filename> ...",
 );
 %culHmSubTypeGets = (

@@ -1388,16 +1388,22 @@ sub CUL_HM_Parse($$) {##############################
       push @event,"timedOn:".(($err&0x40)?"running":"off");
     }
     elsif ($mTp eq "5E" ||$mTp eq "5F" ) {  #    POWER_EVENT_CYCLIC
+      my $devHash = $shash;
       $shash = $modules{CUL_HM}{defptr}{$src."02"}
                              if($modules{CUL_HM}{defptr}{$src."02"});
-      my ($eCnt,$P,$I,$U,$F) = unpack 'A6A6A4A4A2',$p;
-      push @event, "energy:"   .(hex($eCnt)&0x7fffff)/10;# 0.0  ..838860.7  Wh
-      push @event, "power:"    . hex($P   )/100;         # 0.0  ..167772.15 W
-      push @event, "current:"  . hex($I   )/1;           # 0.0  ..65535.0   mA
-      push @event, "voltage:"  . hex($U   )/10;          # 0.0  ..6553.5    mV
+      my ($eCnt,$P,$I,$U,$F) = map{hex($_)} unpack 'A6A6A4A4A2',$p;
+      push @event, "energy:"   .($eCnt&0x7fffff)/10;# 0.0  ..838860.7  Wh
+      push @event, "power:"    . $P   /100;         # 0.0  ..167772.15 W
+      push @event, "current:"  . $I   /1;           # 0.0  ..65535.0   mA
+      push @event, "voltage:"  . $U   /10;          # 0.0  ..6553.5    mV
       $F = hex($F);$F -= 256 if ($F > 127);
       push @event, "frequency:".($F/100+50);             # 48.72..51.27     Hz
-      push @event, "boot:"     .((hex($eCnt)&0x800000)?"on":"off");
+      push @event, "boot:"     .(($eCnt&0x800000)?"on":"off");
+      if($eCnt == 0 && $mTp eq "5E" && hex($mNo) < 3 ){
+        push @entities,CUL_HM_UpdtReadSingle($devHash,'powerOn',"-",1);
+        push @event, "energyOffset:".ReadingsVal($shash->{NAME},"energy",0)+
+                                     ReadingsVal($shash->{NAME},"energyOffset",0);
+      }
     }
   }
   elsif($st eq "repeater"){ ###################################################
@@ -2307,6 +2313,7 @@ sub CUL_HM_Get($@) {
   my $roleC = $hash->{helper}{role}{chn}?1:0; #entity may act in multiple roles
   my $roleD = $hash->{helper}{role}{dev}?1:0;
   my $roleV = $hash->{helper}{role}{vrt}?1:0;
+  my $fkt = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
 
   my $h = $culHmGlobalGets->{$cmd};
   $h = $culHmSubTypeGets->{$st}{$cmd} if(!defined($h) && $culHmSubTypeGets->{$st});
@@ -2321,10 +2328,12 @@ sub CUL_HM_Get($@) {
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr);
 
     return $usg;
-  }elsif($h eq "" && @a != 2) {
+  }
+  elsif($h eq "" && @a != 2) {
     return "$cmd requires no parameters";
 
-  } elsif($h !~ m/\.\.\./ && @h != @a-2) {
+  }
+  elsif($h !~ m/\.\.\./ && @h != @a-2) {
     return "$cmd requires parameter: $h";
   }
   my $devHash = CUL_HM_getDeviceHash($hash);
@@ -2412,6 +2421,29 @@ sub CUL_HM_Get($@) {
     my $info = sprintf("list: %16s | %-18s | %-8s | %s\n",
                      "register","range","peer","description");
     foreach(sort(@rI)){$info .= $_;}
+    return $info;
+  }
+  elsif($cmd eq "cmdList") {  #################################################
+    my   @arr;
+    push @arr,"$_ $culHmGlobalGets->{$_}"       foreach (keys %{$culHmGlobalGets});
+    push @arr,"$_ $culHmSubTypeGets->{$st}{$_}" foreach (keys %{$culHmSubTypeGets->{$st}});
+    push @arr,"$_ $culHmModelGets->{$md}{$_}"   foreach (keys %{$culHmModelGets->{$md}});
+    my   @arr1;
+    if( $st ne "virtual")                    {foreach(keys %{$culHmGlobalSets}           ){push @arr1,"$_ ".$culHmGlobalSets->{$_}            }};
+    if(($st eq "virtual"||!$st)    && $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_ ".$culHmGlobalSetsVrtDev->{$_}      }};
+    if( $st ne "virtual"           && $roleD){foreach(keys %{$culHmGlobalSetsDevice}     ){push @arr1,"$_ ".$culHmGlobalSetsDevice->{$_}      }};
+    if( $st ne "virtual"           && $roleD){foreach(keys %{$culHmSubTypeDevSets->{$st}}){push @arr1,"$_ ".${$culHmSubTypeDevSets->{$st}}{$_}}};
+    if( $st ne "virtual"           && $roleC){foreach(keys %{$culHmGlobalSetsChn}        ){push @arr1,"$_ ".$culHmGlobalSetsChn->{$_}         }};
+    if( $culHmSubTypeSets->{$st}   && $roleC){foreach(keys %{$culHmSubTypeSets->{$st}}   ){push @arr1,"$_ ".${$culHmSubTypeSets->{$st}}{$_}   }};
+    if( $culHmModelSets->{$md})              {foreach(keys %{$culHmModelSets->{$md}}     ){push @arr1,"$_ ".${$culHmModelSets->{$md}}{$_}     }};
+    if( $culHmChanSets->{$md."00"} && $roleD){foreach(keys %{$culHmChanSets->{$md."00"}} ){push @arr1,"$_ ".${$culHmChanSets->{$md."00"}}{$_} }};
+    if( $culHmChanSets->{$md.$chn} && $roleC){foreach(keys %{$culHmChanSets->{$md.$chn}} ){push @arr1,"$_ ".${$culHmChanSets->{$md.$chn}}{$_} }};
+    if( $culHmFunctSets->{$fkt}    && $roleC){foreach(keys %{$culHmFunctSets->{$fkt}}    ){push @arr1,"$_ ".${$culHmFunctSets->{$fkt}}{$_}    }};
+
+    my $info .= " Gets ------\n";
+    $info .= join("\n",sort @arr);
+    $info .= "\n\n Sets ------\n";
+    $info .= join("\n",sort @arr1);
     return $info;
   }
   elsif($cmd eq "saveConfig"){  ###############################################
@@ -3264,7 +3296,7 @@ sub CUL_HM_Set($@) {
       $prep = $a[2];
       splice  @a,2,1;#remove prep
     }
-    if ($md =~ m/HM-TC-IT-WM-W-EU/ && $a[2] =~ m/^p([1..3])$/){
+    if ($md =~ m/HM-TC-IT-WM-W-EU/ && $a[2] =~ m/^p([123])$/){
       $list +=  $1 - 1;
       splice  @a,2,1;#remove list
     }
@@ -5302,47 +5334,38 @@ sub CUL_HM_TCITtempReadings($) {# parse RT temperature readings
 
     my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
 
-    $tempRegs =~ s/.* 14://;     #remove register up to addr 20 from list
-    $tempRegs =~ s/ 00:00/ /g;   #remove regline termination
-    $tempRegs =~ s/ ..://g;      #remove addr Info
-    $tempRegs =~ s/ //g;         #blank
-    
-    $stmpRegs =~ s/.* 14://;
-    $stmpRegs =~ s/ 00:00/ /g;
-    $stmpRegs =~ s/ ..://g;
-    $stmpRegs =~ s/ //g;
-
+    my @r1;
+    foreach(split " ",$tempRegs){
+      my ($a,$d) = split ":",$_;
+      $r1[hex($a)] = $d;
+    }
+    foreach(split " ",$stmpRegs){
+      my ($a,$d) = split ":",$_;
+      $r1[hex($a)] = $d;
+    }
+     
+    $tempRegs = join("",@r1[20..scalar@r1-1]);
     push (@changedRead,"tempList$idxN{$lst}_State:".
                 ($hash->{helper}{shadowReg}{"RegL_0$lst:"} ?"set":"verified"));
     for (my $day = 0;$day<7;$day++){
       my $dayRead = "";
-      my $pre ="";
       my @time;
       my @temp;
-      my $str;
-      if (substr($stmpRegs,$day *13*4,13*4) eq
-          substr($tempRegs,$day *13*4,13*4)   ){
-        $str = substr($tempRegs,$day *13*4,13*4);
-      }
-      else{
-        $str = substr($stmpRegs,$day *13*4,13*4);
-        $pre = "set_";
-      }
-      foreach (unpack '(A4)*',$str){
+       
+      foreach (unpack '(A4)*',substr($tempRegs,$day *13*4,13*4)){
         my $h = hex($_);
         push @temp,($h >> 9)/2;
         $h = ($h & 0x1ff) * 5;
         $h = sprintf("%02d:%02d",int($h / 60),($h%60));
         push @time,$h;
       }
-    
       for (my $idx = 0;$idx<13;$idx++){
         my $entry = sprintf(" %s %3.01f",$time[$idx],$temp[$idx]);
           $setting .= "Temp set: ".$days[$day].$entry." C\n";
           $dayRead .= $entry;
         last if ($time[$idx] eq "24:00");
       }
-      push (@changedRead,"tempList$idxN{$lst}".$days[$day].":".$pre." ".$dayRead);
+      push (@changedRead,"tempList$idxN{$lst}".$days[$day].": ".$dayRead);
     }
   }
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
