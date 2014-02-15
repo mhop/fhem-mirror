@@ -230,6 +230,10 @@ sub CUL_HM_updateConfig($){
       $hash->{helper}{shRegR}{"07"} = "00" if ($chn eq "04");# shadowReg List 7 read from CH 0
       $hash->{helper}{shRegW}{"07"} = "04" if ($chn eq "00");# shadowReg List 7 write to CH 4
     }
+    elsif ($md =~ m/HM-TC-IT-WM-W-EU/){
+      $hash->{helper}{shRegR}{"07"} = "00" if ($chn eq "02");# shadowReg List 7 read from CH 0
+      $hash->{helper}{shRegW}{"07"} = "02" if ($chn eq "00");# shadowReg List 7 write to CH 4
+    }
     elsif ($md =~ m/(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/){
       $hash->{helper}{oldDes} = "0";
     }
@@ -1842,7 +1846,9 @@ sub CUL_HM_parseCommon(@){#####################################################
     }
 
     if   ($subType =~ m/^8/){#NACK
+      #82 : peer not accepted - list full (VD)
       #84 : request undefined register
+      #85 : peer not accepted - why? unknown
       $success = "no";
       CUL_HM_eventP($shash,"Nack");
       $reply = "NACK";
