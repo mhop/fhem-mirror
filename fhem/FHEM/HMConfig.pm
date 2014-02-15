@@ -661,7 +661,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 
   hyst2point      =>{a=> 15.0,s=>0.5,l=>7,min=>0  ,max=>2       ,c=>''         ,f=>'10'    ,u=>'C'   ,d=>1,t=>"hysteresis range",},
   heatCool        =>{a=> 15.7,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"select heating or cooling"                   ,lit=>{heating=>0,cooling=>1}},
-  weekPrgSel      =>{a=> 16.0,s=>1.0,l=>7,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"select week program"                         ,lit=>{prog1=>0,prog2=>1,prog1=>2}},
+  weekPrgSel      =>{a=> 16.0,s=>1.0,l=>7,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"select week program"                         ,lit=>{prog1=>0,prog2=>1,prog3=>2}},
 
   modePrioParty   =>{a=> 18.0,s=>0.3,l=>7,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"allow tempChange for party only by..."       ,lit=>{RT_TC_SC_SELF=>0,all=>1,RT_TC_CCU_SELF=>2,CCU=>3,self=>4}},
   modePrioManu    =>{a=> 18.3,s=>0.3,l=>7,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"allow tempChange for manual only by..."      ,lit=>{RT_TC_SC_SELF=>0,all=>1,RT_TC_CCU_SELF=>2,CCU=>3,self=>4}},
