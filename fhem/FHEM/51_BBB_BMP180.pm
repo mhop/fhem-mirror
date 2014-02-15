@@ -40,7 +40,7 @@ sub BBB_BMP180_Initialize($){
 	$hash->{GetFn}		=	"BBB_BMP180_Get";
 	$hash->{AttrFn}		=	"BBB_BMP180_Attr";
 	$hash->{NotifyFn}	=	"BBB_BMP180_Notify";
-	$hash->{ShutdoenFn}	=	"BBB_BMP180_Shutdown";
+	$hash->{ShutdownFn}	=	"BBB_BMP180_Shutdown";
 	$hash->{AttrList}	=	"bbbRoundPressure:0,1 ".
 							"bbbRoundTemperature:0,1 ".
 							"bbbInterval ".
