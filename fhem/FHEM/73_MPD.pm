@@ -17,7 +17,7 @@
 #  GNU General Public License for more details.
 ################################################################
 
-# Version 0.8  - 01.02.14
+# Version 0.9  - 15.02.14
 
 package main;
 
@@ -132,8 +132,10 @@ sub MPD_updateConfig($)
   $hash->{".playlist"}  = "";
   $hash->{".music"}     = "";
   $hash->{".outputs"}   = "";
+  $hash->{".lasterror"} = "";
   $hash->{".lcd"}       = AttrVal($name, "lcdDevice", undef);
   $hash->{PRESENT}      =  0;
+  $hash->{VOLUME}       =  0;
    
   ## kommen wir via reset Kommando ?
   if ($hash->{".reset"})
@@ -153,12 +155,15 @@ sub MPD_updateConfig($)
 
   # Playlisten und Dateien laden ?
   
-  $error = mpd_cmd($hash, "i|lsinfo|music") if (AttrVal($name, "loadMusic", 0) && !$error);
-  Log 3 ,"$name could not load music -> $error" if ($error);
-
-  $error = mpd_cmd($hash, "i|lsinfo|playlists") if (AttrVal($name, "loadPlaylists", 0) && !$error);
-  Log 3 ,"$name could not load playlists -> $error" if ($error);
-
+  if (AttrVal($name, "loadMusic", 0) && !$error)
+  { $error = mpd_cmd($hash, "i|lsinfo|music");
+     Log 3 ,"$name could not load music -> $error" if ($error);
+  }
+  if (AttrVal($name, "loadPlaylists", 0) && !$error)
+  {
+   $error = mpd_cmd($hash, "i|lsinfo|playlists");
+   Log 3 ,"$name could not load playlists -> $error" if ($error);
+  } 
   
  if (!$error)
  {
@@ -216,7 +221,7 @@ sub MPD_Undef ($$) {
 sub MPD_GetUpdate($) {
  my ($hash) = @_;
  my $name = $hash->{NAME};
-
+ my $lasterror = $hash->{".lasterror"};
 
  my $error  = mpd_cmd($hash, "status");
 
@@ -227,10 +232,18 @@ sub MPD_GetUpdate($) {
   $error = mpd_cmd($hash, "currentsong");
  }
 
-  readingsSingleUpdate($hash,"state",$hash->{STATE},1);
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "state", $hash->{STATE});
+  readingsBulkUpdate($hash, "error", $error) if ($error);
+  readingsEndUpdate($hash, 1);
 
- Log 3 , "$name, $error" if ($error);
+ if ($error && ($error ne $lasterror))
+ {
+   Log 3 , "$name, $error";
+   $hash->{".lasterror"} = $error;
+ }
 
+ 
  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "MPD_GetUpdate", $hash, 0) if ($hash->{INTERVAL});
 
  my_lcd($hash) if (defined($hash->{".lcd"})); 
@@ -241,6 +254,7 @@ sub MPD_GetUpdate($) {
   $hash->{helper}{RUNNING_PID} = BlockingCall("MPD_IdleStart", $name."|".$hash->{HOST}."|".$hash->{PORT}, "MPD_IdleDone", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
   Log 4 , "$name IdleStart with PID : ".$hash->{helper}{RUNNING_PID}{pid};
  }
+
 
 return;
 
@@ -832,7 +846,7 @@ sub MPD_summaryFn($$$$) {
 <a name="MPD"></a>
 <h3>MPD</h3>
  FHEM module to control a MPD like the MPC (MPC =  Music Player Command, the command line interface to the <a href='http://en.wikipedia.org/wiki/Music_Player_Daemon'>Music Player Daemon</a> )<br>
-To install a MPD on a Raspberry Pi you will find a lot of documentaion in the Inetrnet e.g. http://www.forum-raspberrypi.de/Thread-tutorial-music-player-daemon-mpd-und-mpc-auf-dem-raspberry-pi  in german<br>
+To install a MPD on a Raspberry Pi you will find a lot of documentation at the web e.g. http://www.forum-raspberrypi.de/Thread-tutorial-music-player-daemon-mpd-und-mpc-auf-dem-raspberry-pi  in german<br>
 <ul>  
  <a name="MPDdefine"></a>
   <b>Define</b>
@@ -850,7 +864,7 @@ To install a MPD on a Raspberry Pi you will find a lot of documentaion in the In
   </ul>
   <br>
   <a name="MPDset"></a>
-  <b>SET</b><ul>
+  <b>Set</b><ul>
     <code>set &lt;name&gt; &lt;what&gt;</code>
     <br>&nbsp;<br>
     Currently, the following commands are defined.<br>
@@ -869,13 +883,13 @@ To install a MPD on a Raspberry Pi you will find a lot of documentaion in the In
     playlist (playlist name) => set playlist on MPD Server<br>
     playfile (file) => create playlist +  add file to playlist + start playing<br>  
     updateDb => like MPC update<br>
-    interval => set polling interval of MPD server, overwrites attr interval temp , set 0 to disbale polling<br>. 
+    interval => set polling interval of MPD server, overwrites attr interval temp , use 0 to disbale polling<br>. 
     reset => reset MPD Modul
-    mpdCMD => same as GET mpdCMD
+    mpdCMD => same as GET mpdCMD<br>
    </ul>
   <br>
   <a name="MPDget"></a>
-  <b>GET</b><ul>
+  <b>Get</b><ul>
     <code>get &lt;name&gt; &lt;what&gt;</code>
     <br>&nbsp;<br>
     Currently, the following commands are defined.<br>
@@ -890,7 +904,7 @@ To install a MPD on a Raspberry Pi you will find a lot of documentaion in the In
     statusRequest => get MPD status<br>
     mpdCMD (cmd) => send cmd to MPD Server ( Ref <a>http://www.musicpd.org/doc/protocol/</a> )<br>
     currentsong => get infos from current song in playlist<br>
-    outputs => get infos about the defined MPD output devices
+    outputs => get infos about the defined MPD output devices<br>
   </ul>
   <br>
   <a name="MPDattr"></a>
@@ -899,9 +913,9 @@ To install a MPD on a Raspberry Pi you will find a lot of documentaion in the In
       <li>interval | polling interval at MPD server, set 0 to disbale polling</li>
       <li>password | (not ready yet) if password on MPD server is set</li>
       <li>loadMusic |  load MPD music data at startup</li>
-      <li>loadPlaylists | load MPD playlistsa at startup</li><br>
-      <li>volumeStep | Step size for Volume +/-</li><br>
-      <li>useIdle | send Idle cmd to MPD and wait for MPD events needs MPD Version 0.16.0 or greater</li><br>
+      <li>loadPlaylists | load MPD playlistsa at startup</li>
+      <li>volumeStep | Step size for Volume +/-</li>
+      <li>useIdle | send Idle cmd to MPD and wait for MPD events needs MPD Version 0.16.0 or greater</li>
    </ul>
    <br>
    <b>Readings</b>
