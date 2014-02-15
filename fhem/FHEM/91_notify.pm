@@ -79,6 +79,7 @@ notify_Exec($$)
       );
       $exec= EvalSpecials($exec, %specials);
 
+      Log3 $ln, 4, "$ln exec $exec";
       my $r = AnalyzeCommandChain(undef, $exec);
       Log3 $ln, 3, "$ln return value: $r" if($r);
       $ret .= " $r" if($r);
