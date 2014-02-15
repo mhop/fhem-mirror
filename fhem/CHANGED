@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - added:   new module 51_BBB_WATCHDOG.pm (betateilchen)
   - bugfix:  SYSMON: Fix: uninitialized variable
   - feature: new modul 73_MPD added (Wzut) 
   - bugfix:  SYSMON: Fix: root fs with /dev/mapper
