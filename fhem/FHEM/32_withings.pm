@@ -309,8 +309,8 @@ withings_initDevice($)
   $hash->{fw} = $device->{fw};
   $hash->{DeviceType} = $device->{type};
   $hash->{DeviceType} = $device_types{$device->{type}} if( defined($device_types{$device->{type}}) );
-  $hash->{Model} = $device->{model};
-  $hash->{Model} = $device_models{$device->{type}}->{$device->{model}}
+  $hash->{model} = $device->{model};
+  $hash->{model} = $device_models{$device->{type}}->{$device->{model}}
                    if( defined($device_models{$device->{type}}) && defined($device_models{$device->{type}}->{$device->{model}}) );
 
   if( !defined( $attr{$name}{stateFormat} ) ) {
