@@ -75,13 +75,21 @@ YAMAHA_AVR_GetStatus($;$)
     # get the model informations and available zones if no informations are available
     if(not defined($hash->{ACTIVE_ZONE}) or not defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
     {
-		YAMAHA_AVR_getModel($hash);
+		unless(defined(YAMAHA_AVR_getModel($hash)))
+        {
+            YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
+            return;
+        }
     }
 
     # get all available inputs if nothing is available
     if(not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0)
     {
-		YAMAHA_AVR_getInputs($hash);
+		unless(defined(YAMAHA_AVR_getInputs($hash)))
+        {
+            YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
+            return;
+        }
     }
     
     my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
@@ -98,7 +106,6 @@ YAMAHA_AVR_GetStatus($;$)
     
     if(not defined($return) or $return eq "")
     {
-		readingsSingleUpdate($hash, "state", "absent", 1);
 		YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
 		return;
     }
@@ -595,7 +602,7 @@ YAMAHA_AVR_Define($$)
     
     if(! @a >= 4)
     {
-	my $msg = "wrong syntax: define <name> YAMAHA_AVR <ip-or-hostname> [<zone>] [<statusinterval>]";
+	my $msg = "wrong syntax: define <name> YAMAHA_AVR <ip-or-hostname> [<zone>] [<ON-statusinterval>] [<OFF-statusinterval>] ";
 	Log 2, $msg;
 	return $msg;
     }
@@ -704,7 +711,13 @@ YAMAHA_AVR_SendCommand($$;$)
 		{
 			Log3 $name, 3, "YAMAHA_AVR: could not execute command on device $name. Please turn on your device in case of deactivated network standby or check for correct hostaddress.";
 			readingsSingleUpdate($hash, "presence", "absent", 1);
+            readingsSingleUpdate($hash, "state", "absent", 1);
 		}
+        else
+        {
+            Log3 $name, 5, "YAMAHA_AVR: could not execute command on device $name. Please turn on your device in case of deactivated network standby or check for correct hostaddress. (Device is still absent)";
+        }
+        
     }
     else
     {
@@ -842,7 +855,10 @@ sub YAMAHA_AVR_getModel($)
     
     $response = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Unit_Desc>GetParam</Unit_Desc></System></YAMAHA_AV>");
 
-    Log3 $name, 3, "YAMAHA_AVR: could not get unit description url from device $name. Please turn on the device or check for correct hostaddress!"  if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1); 
+    if (not defined($response))
+    { 
+        return undef;
+    }
     
     if(defined($response) and $response =~ /<URL>(.+?)<\/URL>/)
     { 
@@ -855,7 +871,10 @@ sub YAMAHA_AVR_getModel($)
     
     $response = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>");
     
-    Log3 $name, 3, "YAMAHA_AVR: could not get system configuration from device $name. Please turn on the device or check for correct hostaddress!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
+    if(not defined($response))
+    {
+        return undef;
+    }
     
 	if(defined($response) and $response =~ /<Model_Name>(.+?)<\/Model_Name>.*<System_ID>(.+?)<\/System_ID>.*<Version>.*<Main>(.+?)<\/Main>.*<Sub>(.+?)<\/Sub>.*<\/Version>/)
     {
@@ -946,8 +965,11 @@ sub YAMAHA_AVR_getInputs($)
     
     my $response = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></$zone></YAMAHA_AV>");
     
-    
-    Log3 $name, 3, "YAMAHA_AVR: could not get the available inputs from device $name. Please turn on the device or check for correct hostaddress!!!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
+    if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1)
+    {
+        Log3 $name, 3, "YAMAHA_AVR: could not get the available inputs from device $name. Please turn on the device or check for correct hostaddress!!!";
+        return undef;
+    }
     
     return undef unless (defined($response));
 
@@ -1005,7 +1027,7 @@ sub YAMAHA_AVR_ResetTimer($;$)
     {
         InternalTimer(gettimeofday()+$interval, "YAMAHA_AVR_GetStatus", $hash, 0);
     }
-    elsif($hash->{READINGS}{presence}{VAL} eq "present" and $hash->{READINGS}{power}{VAL} eq "on")
+    elsif((exists($hash->{READINGS}{presence}{VAL}) and $hash->{READINGS}{presence}{VAL} eq "present") and (exists($hash->{READINGS}{power}{VAL}) and $hash->{READINGS}{power}{VAL} eq "on"))
     {
         InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0);
     }
