@@ -418,6 +418,8 @@ sub HMLAN_Write($$$) {#########################################################
       my $dN = CUL_HM_id2Name($dst);
       if (!($dN eq $dst) ){# name not found
         my $rxt = CUL_HM_Get(CUL_HM_id2Hash($dst),$dN,"param","rxType");
+        #'+'.$dst.",01,01,FE1F" # 01 first: AES request
+        #'+'.$dst.",00,01,FE1F" # 00 first: AES not requested
         if (!($rxt & ~0x04)){#config only
           $hash->{helper}{$dst}{newChn} = '+'.$dst.",01,01,FE1F";
         }
@@ -531,7 +533,7 @@ sub HMLAN_Parse($$) {##########################################################
     #  parameter 'cond'- condition of the IO device
     #  Cond text
     #     0 ok
-    #     1 comes with AES, also seen with wakeup long-sleep devices
+    #     1 AES request by HMLAN pending
     #     2 Warning-HighLoad
     #     4 Overload condition - no send anymore
     #
@@ -554,16 +556,19 @@ sub HMLAN_Parse($$) {##########################################################
           if (($stat & 0x48) == 8);# reject - but not from repeater
 
       $hash->{helper}{$dst}{flg} = 0;#got response => unblock sending
-      if ($stat & 0x0A){#08 and 02 dont need to go to CUL, internal ack only
+      if     ($stat & 0x0A){#08 and 02 dont need to go to CUL, internal ack only
         Log3 $hash, HMLAN_getVerbLvl ($hash,$src,$dst,"5")
                   , "HMLAN_Parse: $name no ACK from $dst"   if($stat & 0x08);
         return;
-      }elsif (($stat & 0x70) == 0x30){Log3 $hash, HMLAN_getVerbLvl ($hash,$src,$dst,"5")
+      }
+      elsif (($stat & 0x70) == 0x30){Log3 $hash, HMLAN_getVerbLvl ($hash,$src,$dst,"5") 
                                                 , "HMLAN_Parse: $name AES code rejected for $dst $stat";
                                       $CULinfo = "AESerrReject";
                                       HMLAN_qResp($hash,$src,0);
-      }elsif (($stat & 0x70) == 0x20){$CULinfo = "AESok";
-      }elsif (($stat & 0x70) == 0x40){;#$CULinfo = "???";
+      }
+      elsif (($stat & 0x70) == 0x20){$CULinfo = "AESok";
+      }
+      elsif ( $stat & 0x40)         {$CULinfo = "AESCom-".($stat & 0x10?"fail":"ok");
       }
     }
     else{
@@ -694,7 +699,7 @@ sub HMLAN_SimpleWrite(@) {#####################################################
        ){
       if ($modules{CUL_HM}{defptr}{$dst}{helper}{io}{nextSend}){
         my $dDly = $modules{CUL_HM}{defptr}{$dst}{helper}{io}{nextSend} - $tn;
-        $dDly -= 0.05 if ($typ eq "02");# delay at least 50ms for ACK, but not 100
+#        $dDly -= 0.05 if ($typ eq "02");# delay at least 50ms for ACK, but not 100
         select(undef, undef, undef, (($dDly > 0.1)?0.1:$dDly))
               if ($dDly > 0.01);
       }
