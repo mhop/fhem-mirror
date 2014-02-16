@@ -26,6 +26,8 @@ sub LightScene_Initialize($)
   $hash->{UndefFn}  = "LightScene_Undefine";
   $hash->{SetFn}    = "LightScene_Set";
   $hash->{GetFn}    = "LightScene_Get";
+  $hash->{AttrFn}   = "LightScene_Attr";
+  $hash->{AttrList} = "switchingOrder";
 
   $hash->{FW_detailFn}  = "LightScene_detailFn";
 
@@ -43,7 +45,7 @@ sub LightScene_Define($$)
 {
   my ($hash, $def) = @_;
 
-  return "install JSON or Data::Dumper to use LightScene" if( !$LightScene_hasJSON && !$LightScene_hasDataDumper );
+  return "install JSON (or Data::Dumper) to use LightScene" if( !$LightScene_hasJSON && !$LightScene_hasDataDumper );
 
   my @args = split("[ \t]+", $def);
 
@@ -67,6 +69,7 @@ sub LightScene_Define($$)
   $hash->{SCENES} = \%scenes;
 
   LightScene_Load($hash);
+  LightScene_updateHelper( $hash, AttrVal($name,"switchingOrder",undef) );
 
   $hash->{STATE} = 'Initialized';
 
@@ -545,13 +548,22 @@ LightScene_Set($@)
       $hash->{SCENES}{$scene}{$d} = (($cmd eq "setcmd")?';':''). join(" ", @args);
     }
 
+    LightScene_updateHelper( $hash, AttrVal($name,"switchingOrder",undef) );
+
     return undef;
   }
 
 
   $hash->{INSET} = 1;
 
-  foreach my $d (sort keys %{ $hash->{CONTENT} }) {
+  my @devices;
+  if( $cmd eq "scene" && defined($hash->{switchingOrder}) && defined($hash->{switchingOrder}{$scene}) ) {
+    @devices = @{$hash->{switchingOrder}{$scene}};
+  } else {
+    @devices = @{$hash->{devices}};
+  }
+
+  foreach my $d (@devices) {
     next if(!$defs{$d});
     if($defs{$d}{INSET}) {
       Log3 $name, 1, "ERROR: endless loop detected for $d in " . $hash->{NAME};
@@ -599,6 +611,8 @@ LightScene_Set($@)
 
   delete($hash->{INSET});
   Log3 $hash, 5, "SET: $ret" if($ret);
+
+  LightScene_updateHelper( $hash, AttrVal($name,"switchingOrder",undef) );
 
   return $ret;
 
@@ -652,6 +666,85 @@ LightScene_Get($@)
   }
 
   return "Unknown argument $cmd, choose one of html:noArg scenes:noArg scene:".join(",", sort keys %{$hash->{SCENES}});
+}
+sub
+LightScene_updateHelper($$)
+{
+  my ($hash, $attrVal) = @_;
+
+  my @devices = sort keys %{ $hash->{CONTENT} };
+  $hash->{devices} = \@devices;
+
+  if( !$attrVal ) {
+    delete $hash->{switchingOrder};
+    return;
+  }
+
+  my %switchingOrder = ();
+  my @parts = split( ' ', $attrVal );
+  foreach my $part (@parts) {
+    my ($s,$devices) = split( ':', $part,2 );
+
+    my $reverse = 0;
+    if( $devices =~ m/^!(.*)/ ) {
+      $reverse = 1;
+      $devices = $1;
+    }
+
+    foreach my $scene (keys %{ $hash->{SCENES} }) {
+      eval { $scene =~ m/$s/ };
+      if( $@ ) {
+        my $name = $hash->{NAME};
+        Log3 $name, 3, $name .": ". $s .": ". $@;
+        next;
+      }
+      next if( $scene !~ m/$s/ );
+      next if( $switchingOrder{$scene} );
+
+      my @devs = split( ',', $devices );
+      my @devices = ();
+      @devices = @{$hash->{devices}} if( $reverse );
+      foreach my $d (@devs) {
+        foreach my $device (@{$hash->{devices}}) {
+          next if( !$reverse && grep { $_ eq $device } @devices );
+          eval { $device =~ m/$d/ };
+          if( $@ ) {
+            my $name = $hash->{NAME};
+            Log3 $name, 3, $name .": ". $d .": ". $@;
+            next;
+          }
+          next if( $device !~ m/$d/ );
+
+          @devices = grep { $_ ne $device } @devices if($reverse);
+          push( @devices, $device );
+        }
+      }
+      foreach my $device (@{$hash->{devices}}) {
+        next if( grep { $_ eq $device } @devices );
+        push( @devices, $device );
+      }
+      $switchingOrder{$scene} = \@devices;
+    }
+  }
+
+  $hash->{switchingOrder} = \%switchingOrder;
+}
+sub
+LightScene_Attr($@)
+{
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+
+  if( $attrName eq "switchingOrder" ) {
+    my $hash = $defs{$name};
+
+    if( $cmd eq "set" ) {
+      LightScene_updateHelper( $hash, $attrVal );
+    } else {
+      delete $hash->{switchingOrder};
+    }
+  }
+
+  return;
 }
 
 1;
@@ -737,6 +830,17 @@ LightScene_Get($@)
         the device settings have precedence over the scene setting.<br>
         1 -> for each device do nothing if current device state is the same as the saved state
         0 -> always set the state even if the current state is the same as the saved state. this is the default</li>
+      <li>switchingOrder<br>
+        space separated list of &lt;scene&gt;:&lt;deviceList&gt; items that will give a per scene order
+        in which the devices should be switched.<br>
+        the devices from &lt;deviceList&gt; will come before all other devices of this LightScene;
+        if the first character of the &lt;deviceList&gt; ist a ! the devices from the list will come after
+        all other devices from this lightScene.<br>
+        &lt;scene&gt; and each element of &lt;deviceList&gt; are treated as a regex.<br>
+        Example: To switch a master power outlet before every other device at power on and after every device on power off:
+        <code>define media LightScene TV,DVD,Amplifier,masterPower<br>
+              attr media switchingOrder allOn:masterPower,.* allOff:!.*,masterPower</code>
+        </li>
     </ul><br>
 </ul>
 
