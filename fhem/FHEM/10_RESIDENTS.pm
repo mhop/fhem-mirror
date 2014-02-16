@@ -1029,7 +1029,7 @@ sub RESIDENTS_TimeDiff($$) {
   <ul>
     <u>M&ouml;gliche Stati und ihre Bedeutung</u><br><br>
     <ul>
-      Dieses Modul unterscheidene 7 verschiedene Stati:<br><br>
+      Dieses Modul unterscheidet 7 verschiedene Stati:<br><br>
 
       <ul>
       <li><b>home</b> - Bewohner sind zu Hause und mindestens einer schl&auml;ft nicht</li>
