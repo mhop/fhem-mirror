@@ -31,7 +31,7 @@ sub HUEBridge_Initialize($)
   $hash->{SetFn}    = "HUEBridge_Set";
   $hash->{GetFn}    = "HUEBridge_Get";
   $hash->{UndefFn}  = "HUEBridge_Undefine";
-  $hash->{AttrList}= "key";
+  $hash->{AttrList}= "key disable:1";
 }
 
 sub
@@ -92,7 +92,7 @@ HUEBridge_Define($$)
   }
 
   if( $init_done ) {
-    HUEBridge_OpenDev( $hash );
+    HUEBridge_OpenDev( $hash ) if( !AttrVal($name, "disable", 0) );
   }
 
   return undef;
@@ -107,7 +107,7 @@ HUEBridge_Notify($$)
   return if($dev->{NAME} ne "global");
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
-  return if($attr{$name} && $attr{$name}{disable});
+  return undef if( AttrVal($name, "disable", 0) );
 
   HUEBridge_OpenDev($hash);
 
@@ -389,6 +389,9 @@ sub HUEBridge_HTTP_Call($$$)
 {
   my ($hash,$path,$obj) = @_;
   my $name = $hash->{NAME};
+
+  return undef if($attr{$name} && $attr{$name}{disable});
+  #return { state => {reachable => 0 } } if($attr{$name} && $attr{$name}{disable});
 
   my $uri = "http://" . $hash->{Host} . "/api";
   my $method = 'GET';
