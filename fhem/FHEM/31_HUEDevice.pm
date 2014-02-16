@@ -613,9 +613,11 @@ HUEDevice_GetUpdate($)
 
   my $result = HUEDevice_ReadFromServer($hash,$hash->{ID});
   if( !defined($result) ) {
+    $hash->{helper}{reachable} = 0;
     $hash->{STATE} = "unknown";
     return;
   } elsif( $result->{'error'} ) {
+    $hash->{helper}{reachable} = 0;
     $hash->{STATE} = $result->{'error'}->{'description'};
     return;
   }
@@ -690,18 +692,13 @@ HUEDevice_GetUpdate($)
     {
       $s = 'off';
       $percent = 0;
-      if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",0);}
+      if( $on && $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",0);}
     }
 
   if( $percent != $hash->{helper}{percent} ) {readingsBulkUpdate($hash,"level", $percent . ' %');}
   if( $percent != $hash->{helper}{percent} ) {readingsBulkUpdate($hash,"pct", $percent);}
 
   $s = 'off' if( !$reachable );
-
-  if( $s ne $hash->{STATE} ) {readingsBulkUpdate($hash,"state",$s);}
-  readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
-
-  CommandTrigger( "", "$name RGB: ".CommandGet("","$name rgb") );
 
   $hash->{helper}{on} = $on;
   $hash->{helper}{reachable} = $reachable;
@@ -715,6 +712,12 @@ HUEDevice_GetUpdate($)
   $hash->{helper}{effect} = $effect;
 
   $hash->{helper}{percent} = $percent;
+
+  if( $s ne $hash->{STATE} ) {readingsBulkUpdate($hash,"state",$s);}
+  readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
+
+  CommandTrigger( "", "$name RGB: ".CommandGet("","$name rgb") );
+
 }
 
 1;
