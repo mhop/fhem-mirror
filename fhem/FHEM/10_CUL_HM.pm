@@ -709,9 +709,14 @@ sub CUL_HM_Parse($$) {##############################
 
   return (@entities,$name) if (CUL_HM_getAttrInt($name,"ignore"));
 
-  if ($msgStat && $msgStat =~ m/AESKey/){
-    push @entities,CUL_HM_UpdtReadSingle($shash,"aesKeyNbr",substr($msgStat,7),1);
-    $msgStat = ""; # already processed
+  if ($msgStat){
+    if   ($msgStat =~ m/AESKey/){
+      push @entities,CUL_HM_UpdtReadSingle($shash,"aesKeyNbr",substr($msgStat,7),1);
+      $msgStat = ""; # already processed
+    }
+    elsif($msgStat =~ m/AESCom/){# AES communication to central
+      push @entities,CUL_HM_UpdtReadSingle($shash,"aesCommToDev",substr($msgStat,7),1);
+    }
   }
   CUL_HM_eventP($shash,"Evt_$msgStat")if ($msgStat);#log io-events
   CUL_HM_eventP($shash,"Rcv");
@@ -1777,7 +1782,7 @@ sub CUL_HM_Parse($$) {##############################
 
   @entities = CUL_HM_noDup(@entities,$shash->{NAME});
   $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/$name/,@entities);
-  
+  Log 1,"General trigger:".join(",",@entities);
   return @entities;
 }
 sub CUL_HM_parseCommon(@){#####################################################

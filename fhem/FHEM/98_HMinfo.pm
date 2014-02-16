@@ -414,6 +414,7 @@ sub HMinfo_tempListTmpl(@) { ##################################################
   my $ret;
   my @el ;
   foreach my $eN(HMinfo_getEntities("d")){#search for devices and select correct channel
+    next if (!$eN);
     my $md = AttrVal($eN,"model","");
     my $chN; #tempList channel name
     if    ($md =~ m/(HM-CC-RT-DN-BoM|HM-CC-RT-DN)/){$chN = $defs{$eN}{channel_04};}
