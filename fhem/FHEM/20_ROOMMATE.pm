@@ -23,7 +23,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.1
+# Version: 1.0.2
 #
 # Major Version History:
 # - 1.0.0 - 2014-02-08
@@ -157,7 +157,7 @@ sub ROOMMATE_Define($$) {
     unless ( exists( $attr{$name}{$name_attr} ) ) {
         Log3 $name, 4, "ROOMMATE $name: created new attribute '$name_attr'";
 
-        $attr{$name}{$name_attr} = "status_available";
+        $attr{$name}{$name_attr} = "people_sensor";
     }
 
     # attr room
@@ -1024,14 +1024,14 @@ sub ROOMMATE_StartInternalTimers($$) {
     <li><b>rr_locationHome</b> - locations matching these will be treated as being at home; first entry reflects default value to be used with state correlation; separate entries by space; defaults to 'home'</li>
     <li><b>rr_locationUnderway</b> - locations matching these will be treated as being underway; first entry reflects default value to be used with state correlation; separate entries by comma or space; defaults to "underway"</li>
     <li><b>rr_locationWayhome</b> - leaving a location matching these will set reading wayhome to 1; separate entries by space; defaults to "wayhome"</li>
-    <li><b>rr_locations</b> - list of locations ot be shown in FHEMWEB; separate entries by comma only and do NOT use spaces</li>
+    <li><b>rr_locations</b> - list of locations to be shown in FHEMWEB; separate entries by comma only and do NOT use spaces</li>
     <li><b>rr_moodDefault</b> - the mood that should be set after arriving at home or changing state from awoken to home</li>
     <li><b>rr_moodSleepy</b> - the mood that should be set if state was changed to gotosleep or awoken</li>
     <li><b>rr_moods</b> - list of moods to be shown in FHEMWEB; separate entries by comma only and do NOT use spaces</li>
     <li><b>rr_passPresenceTo</b> - synchronize presence state with other ROOMMATE or GUEST devices; separte devices by space</li>
     <li><b>rr_realname</b> - whenever ROOMMATE wants to use the realname it uses the value of attribute alias or group; defaults to group</li>
     <li><b>rr_showAllStates</b> - states 'asleep' and 'awoken' are hidden by default to allow simple gotosleep process via devStateIcon; defaults to 0</li>
-    <li><b>rr_states</b> - list of states ot be shown in FHEMWEB; separate entries by comma only and do NOT use spaces; unsupported states will lead to errors though</li>
+    <li><b>rr_states</b> - list of states to be shown in FHEMWEB; separate entries by comma only and do NOT use spaces; unsupported states will lead to errors though</li>
   </ul></ul>
   <br>
   <br>
@@ -1068,11 +1068,177 @@ sub ROOMMATE_StartInternalTimers($$) {
 <a name="ROOMMATE"></a>
 <h3>ROOMMATE</h3>
 <ul>
-Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden.
-Die englische Version ist hier zu finden: 
-</ul>
-<ul>
-<a href='http://fhem.de/commandref.html#ROOMMATE'>ROOMMATE</a>
+
+  <a name="ROOMMATEdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;rr_FirstName&gt; ROOMMATE [&lt;Device Name der Bewohnergruppe&gt;]</code>
+    <br><br>
+
+  Stellt ein spezielles Dummy Device bereit, welches einen Mitbewohner repr&auml;sentiert.<br>
+  Basierend auf dem aktuelle Status und anderen Readings k&ouml;nnen andere Aktionen innerhalb von FHEM angesto&szlig;en werden.<br><br>
+  Wird vom &uuml;bergeordneten Modul <a href="#RESIDENTS">RESIDENTS</a> verwendet, kann aber auch einzeln benutzt werden.<br><br>
+
+    Beispiele:<br>
+    <ul><code>
+       # Einzeln<br>
+       define rr_Manfred ROOMMATE
+       <br><br>
+       # Typisches Gruppenmitglied<br>
+       define rr_Manfred ROOMMATE rgr_Residents                # um Mitglied der Gruppe rgr_Residents zu sein
+       <br><br>
+       # Mitglied in mehreren Gruppen<br>
+       define rr_Manfred ROOMMATE rgr_Residents,rgr_Parents    # um Mitglied den Gruppen rgr_Residents und rgr_Parents zu sein 
+       <br><br>
+       # Komplexe Familien Struktur<br>
+       define rr_Manfred ROOMMATE rgr_Residents,rgr_Parents    # Elternteil<br>
+       define rr_Lisa ROOMMATE rgr_Residents,rgr_Parents       # Elternteil<br>
+       define rr_Rick ROOMMATE rgr_Residents,rgr_Children      # Kind1<br>
+       define rr_Alex ROOMMATE rgr_Residents,rgr_Children      # Kind2
+    </code></ul>
+  </ul><br>
+
+  <ul>Bitte beachten, dass das RESIDENTS Gruppen Device zun&auml;chst angelegt werden muss, bevor ein ROOMMATE Objekt dort Mitglied werden kann.</ul><br>
+  <br>
+  <br>
+
+  <a name="ROOMMATEset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;rr_FirstName&gt; &lt;command&gt; [&lt;parameter&gt;]</code>
+    <br><br>
+    Momentan sind die folgenden Kommandos definiert.<br>
+    <ul>
+      <li><b>location</b> &nbsp;&nbsp;-&nbsp;&nbsp; setzt das Reading 'location'; siehe auch Attribut rr_locations, um die in FHEMWEB angezeigte Liste anzupassen</li>
+      <li><b>mood</b> &nbsp;&nbsp;-&nbsp;&nbsp; setzt das Reading 'mood'; siehe auch Attribut rr_moods, um die in FHEMWEB angezeigte Liste anzupassen</li>
+      <li><b>state</b> &nbsp;&nbsp;home,gotosleep,asleep,awoken,absent,gone&nbsp;&nbsp; wechselt den Status; siehe auch Attribut rr_states, um die in FHEMWEB angezeigte Liste anzupassen</li>
+    </ul>
+  </ul>
+
+<br><br>
+  <ul>
+    <u>M&ouml;gliche Stati und ihre Bedeutung</u><br><br>
+    <ul>
+      Dieses Modul unterscheidene 6 verschiedene Stati:<br><br>
+
+      <ul>
+      <li><b>home</b> - Mitbrwohner ist zuhause und wach</li>
+      <li><b>gotosleep</b> - Mitbewohner ist auf dem Weg ins Bett</li>
+      <li><b>asleep</b> - Mitbewohner schl&auml;ft</li>
+      <li><b>awoken</b> - Mitbewohner ist gerade aufgewacht</li>
+      <li><b>absent</b> - Mitbewohner ist momentan nicht zuhause, wird aber bald zur&uuml;ck sein</li>
+      <li><b>gone</b> - Mitbewohner ist f&uuml;r l&auml;ngere Zeit verreist</li>
+      </ul>
+
+    </ul>
+  </ul>
+  <br>
+  <br>
+
+  <ul>
+    <u>Zusammenhang zwischen Anwesenheit/Presence und Aufenthaltsort/Location</u><br><br>
+    <ul>
+      Unter bestimmten Umst&auml;nden f&uuml;hrt der Wechsel des Status auch zu einer Änderung des Readings 'location'.<br>
+      <br>
+      Wannimmer die Anwesenheit (bzw. das Reading 'presence') von 'absent' auf 'present' wechselt, wird 'location' auf 'home' gesetzt. Sofern das Attribut rr_locationHome gesetzt ist, wird die erste Lokation daraus anstelle von 'home' verwendet.<br>
+      <br>
+      Wannimmer die Anwesenheit (bzw. das Reading 'presence') von 'present' auf 'absent' wechselt, wird 'location' auf 'underway' gesetzt. Sofern das Attribut rr_locationUnderway gesetzt ist, wird die erste Lokation daraus anstelle von 'underway' verwendet.
+    </ul>
+  </ul>
+  <br>
+  <br>
+
+  <ul>
+    <u>Auto-Status 'gone'</u><br><br>
+    <ul>
+      Immer wenn ein Mitbewohner auf 'absent' gesetzt wird, wird ein Z&auml;hler gestartet, der nach einer bestimmten Zeit den Status automatisch auf 'gone' setzt.<br>
+      Der Standard ist nach 36 Stunden.<br>
+      <br>
+      Dieses Verhalten kann &uuml;ber das Attribut rr_autoGoneAfter angepasst werden.
+    </ul>
+  </ul>
+  <br>
+  <br>
+
+  <ul>
+    <u>Anwesenheit mit anderen ROOMMATE oder GUEST Devices synchronisieren</u><br><br>
+    <ul>
+      Wenn Sie immer zusammen mit anderen Mitbewohnern oder G&auml;sten das Haus verlassen oder erreichen, k&ouml;nnen Sie ihren Status ganz einfach auf andere Mitbewohner &uuml;bertragen.<br>
+      Durch das Setzen des Attributs rr_PassPresenceTo folgen die dort aufgef&uuml;hrten Mitbewohner ihren eigenen Status&auml;nderungen nach 'home', 'absent' oder 'gone'.<br>
+      <br>
+      Bitte beachten, dass Mitbewohner mit dem aktuellen Status 'gone' oder 'none' (im Falle von G&auml;sten) nicht beachtet werden.
+    </ul>
+  </ul>
+  <br>
+  <br>
+
+  <ul>
+    <u>Zusammenhang zwischen Aufenthaltsort/Location und Anwesenheit/Presence</u><br><br>
+    <ul>
+      Unter bestimmten Umst&auml;nden hat der Wechsel des Readings 'location' auch einen Einfluss auf den tats&auml;chlichen Status.<br>
+      <br>
+      Immer wenn eine Lokation mit dem Namen 'home' gesetzt wird, wird auch der Status auf 'home' gesetzt, sofern die Anwesenheit bis dahin noch auf 'absent' stand. Sofern das Attribut rr_locationHome gesetzt wurde, so l&ouml;sen alle dort angegebenen Lokationen einen Statuswechsel nach 'home' aus.<br>
+      <br>
+      Immer wenn eine Lokation mit dem Namen 'underway' gesetzt wird, wird auch der Status auf 'absent' gesetzt, sofern die Anwesenheit bis dahin noch auf 'present' stand. Sofern das Attribut rr_locationUnderway gesetzt wurde, so l&ouml;sen alle dort angegebenen Lokationen einen Statuswechsel nach 'underway' aus. Diese Lokationen werden auch nicht in das Reading 'lastLocation' &uuml;bertragen.<br>
+      <br>
+      Immer wenn eine Lokation mit dem Namen 'wayhome' gesetzt wird, wird das Reading 'wayhome' auf '1' gesetzt, sofern die Anwesenheit zu diesem Zeitpunkt 'absent' ist. Sofern das Attribut rr_locationWayhome gesetzt wurde, so f&uuml;hrt das VERLASSEN einer dort aufgef&uuml;hrten Lokation ebenfalls dazu, dass das Reading 'wayhome' auf '1' gesetzt wird. Es gibt also 2 M&ouml;glichkeiten den Nach-Hause-Weg-Indikator zu beeinflussen (implizit und explizit).<br>
+      Die Ankunft zuhause setzt den Wert von 'wayhome' zur&uuml;ck auf '0'.<br>
+      <br>
+      Wenn Sie auch das <a href="#GEOFANCY">GEOFANCY</a> Modul verwenden, k&ouml;nnen Sie das Reading 'location' ganz einfach &uuml;ber GEOFANCY Ereignisse aktualisieren lassen. Definieren Sie dazu einen NOTIFY-Trigger wie diesen:<br>
+      <br>
+      <code>
+      define n_rr_Manfred.location notify geofancy:currLoc_Manfred.* set rr_Manfred location $EVTPART1
+      </code><br>
+      <br>
+      Durch das Anlegen von Geofencing-Zonen mit den Namen 'home' und 'wayhome' in der iOS App werden zuk&uuml;nftig automatisch alle Status&auml;nderungen wie oben beschrieben durchgef&uuml;hrt.
+    </ul>
+  </ul>
+  <br>
+  <br>
+
+  <a name="ROOMMATEattr"></a>
+  <b>Attribute</b><br>
+  <ul><ul>
+    <li><b>rr_autoGoneAfter</b> - Anzahl der Stunden, nach denen sich der Status automatisch auf 'gone' &auml;ndert, wenn der aktuelle Status 'absent' ist; Standard ist 36 Stunden</li>
+    <li><b>rr_locationHome</b> - hiermit &uuml;bereinstimmende Lokationen werden als zuhause gewertet; der erste Eintrag wird f&uuml;r das Zusammenspiel bei Status&auml;nderungen benutzt; mehrere Eintr&auml;ge durch Leerzeichen trennen; Standard ist 'home'</li>
+    <li><b>rr_locationUnderway</b> - hiermit &uuml;bereinstimmende Lokationen werden als unterwegs gewertet; der erste Eintrag wird f&uuml;r das Zusammenspiel bei Status&auml;nderungen benutzt; mehrere Eintr&auml;ge durch Leerzeichen trennen; Standard ist 'underway'</li>
+    <li><b>rr_locationWayhome</b> - das Verlassen einer Lokation, die hier aufgef&uuml;hrt ist, l&auml;sst das Reading 'wayhome' auf '1' setzen; mehrere Eintr&auml;ge durch Leerzeichen trennen; Standard ist "wayhome"</li>
+    <li><b>rr_locations</b> - Liste der in FHEMWEB anzuzeigenden Lokationsauswahlliste in FHEMWEB; mehrere Eintr&auml;ge nur durch Komma trennen und KEINE Leerzeichen verwenden</li>
+    <li><b>rr_moodDefault</b> - die Stimmung, die nach Ankunft zuhause oder nach dem Statuswechsel von 'awoken' auf 'home' gesetzt werden soll</li>
+    <li><b>rr_moodSleepy</b> - die Stimmung, die nach Statuswechsel zu 'gotosleep' oder 'awoken' gesetzt werden soll</li>
+    <li><b>rr_moods</b> - Liste von Stimmungen, wie sie in FHEMWEB angezeigt werden sollen; mehrere Eintr&auml;ge nur durch Komma trennen und KEINE Leerzeichen verwenden</li>
+    <li><b>rr_passPresenceTo</b> - synchronisiere die Anwesenheit mit anderen ROOMMATE oder GUEST Devices; mehrere Devices durch Leerzeichen trennen</li>
+    <li><b>rr_realname</b> - wo immer ROOMMATE den richtigen Namen verwenden m&ouml;chte nutzt es den Wert des Attributs alias oder group; Standard ist group</li>
+    <li><b>rr_showAllStates</b> - die Stati 'asleep' und 'awoken' sind normalerweise nicht immer sichtbar, um einen einfachen Zubettgeh-Prozess &uuml;ber das devStateIcon Attribut zu erm&ouml;glichen; Standard ist 0</li>
+    <li><b>rr_states</b> - Liste aller in FHEMWEB angezeigter Stati; Eintrage nur mit Komma trennen und KEINE Leerzeichen benutzen; nicht unterst&uuml;tzte Stati f&uuml;hren zu Fehlern</li>
+  </ul></ul>
+  <br>
+  <br>
+
+  <br>
+  <b>Generierte Readings/Events:</b><br>
+  <ul><ul>
+    <li><b>durTimerAbsence</b> - Timer, der die Dauer der Abwesenheit in Minuten anzeigt</li>
+    <li><b>durTimerPresence</b> - Timer, der die Dauer der Anwesenheit in Minuten anzeigt</li>
+    <li><b>durTimerSleep</b> - Timer, der die Schlafdauer in Minuten anzeigt/li>
+    <li><b>lastArrival</b> - Zeitstempel der letzten Ankunft zu Hause</li>
+    <li><b>lastAwake</b> - Zeitstempel des Endes des letzten Schlafzyklus</li>
+    <li><b>lastDeparture</b> - Zeitstempel des letzten Verlassens des Zuhauses</li>
+    <li><b>lastDurAbsence</b> - Dauer der letzten Abwesenheit im folgenden Format: Stunden:Minuten:Sekunden</li>
+    <li><b>lastDurPresence</b> - Dauer der letzten Anwesenheit im folgenden Format: Stunden:Minuten:Sekunden</li>
+    <li><b>lastDurSleep</b> - Dauer des letzten Schlafzyklus im folgenden Format: Stunden:Minuten:Sekunden</li>
+    <li><b>lastLocation</b> - der vorherige Aufenthaltsort</li>
+    <li><b>lastMood</b> - die vorherige Stimmung</li>
+    <li><b>lastSleep</b> - Zeitstempel des Beginns des letzten Schlafzyklus</li>
+    <li><b>lastState</b> - der vorherige Status</li>
+    <li><b>location</b> - der aktuelle Aufenthaltsort</li>
+    <li><b>presence</b> - gibt den Zuhause Status in Abh&auml;ngigkeit des Readings 'state' wieder (kann 'present' oder 'absent' sein)</li>
+
+    <li><b>mood</b> - die aktuelle Stimmung</li>
+    <li><b>state</b> - gibt den aktuellen Status wieder</li>
+    <li><b>wayhome</b> - abh&auml;ngig vom aktullen Aufenthaltsort, kann der Wert '1' werden, wenn die Person auf dem weg zur&uuml;ck nach Hause ist</li>
+  </ul></ul>
+
 </ul>
 
 =end html_DE
