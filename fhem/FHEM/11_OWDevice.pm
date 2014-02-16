@@ -875,4 +875,158 @@ OWDevice_InitValues($)
 
 
 =end html
+=begin html_DE
+
+<a name="OWDevice"></a>
+<h3>OWDevice</h3>
+<ul>
+  <br>
+  <a name="OWDevicedefine"></a>
+  <b>Definition</b>
+  <ul>
+    <code>define &lt;name&gt; OWDevice &lt;address&gt; [&lt;interval&gt;]</code>
+    <br><br>
+
+    Definiert ein 1-Wire- Gerät. 1-Wire- Geräte werden anhand ihrer Adresse &lt;address&gt; definiert. Diese wird
+    durch den zuvor eingerichteten <a href="#OWServer">OWServer</a> bereitgestellt.
+    <br><br>
+
+    Wird zusätzlich  &lt;interval&gt; angegeben, ruft OWServer alle &lt;interval&gt; Sekunden
+    einen Datensatz des Gerätes ab.
+    <br><br>
+
+    Jedes OWDevice ist ein eigenständiges Gerät. Seine Eigenschaften werden erstmals zum Zeitpunkt der Definition
+    abgefragt. Die durch "get" oder "set" erzeugten, sowie durch den zyklischen Abruf gelieferten readings, 
+        können mit dem Kommando <code><a href="#list">list</a> &lt;name&gt;</code> angezeigt werden.
+    <br><br>
+    Folgende 1-Wire- und iButton- Komponenten werden aktuell unterstützt:
+    <ul>
+      <li>DS2401 - Im Chip integrierte Seriennummer</li>
+      <li>DS1990A - iButton mit fester Seriennummer</li>
+      <li>DS2405 - Adressierbarer Schalter</li>
+      <li>DS18S20 - Hochpräzisions-Digital-Thermosensor</li>
+      <li>DS1920 - iButton-Thermosensor</li>
+      <li>DS2406, DS2407 - Dualer adressierbarer Schalter mit 1 kbit Speicher</li>
+      <li>DS2436 - Batterie-ID/Monitor- Schaltkreis</li>
+      <li>DS2423 - Dual-Zählerbaustein mit Speicherfunktion</li>
+      <li>DS2450 - Vierfach-A/D Umsetzer</li>
+      <li>DS1822 - Econo-Thermosensor</li>
+      <li>DS2415 - Zeitgeber- Schaltkreis </li>
+      <li>DS1904 - iButton-Echtzeituhr</li>
+      <li>DS2438 - Smart-Batterie-Monitor</li>
+      <li>DS2417 - Zeitgeber-Schaltkreis mit Interrupt</li>
+      <li>DS18B20 - Thermosensor mit programmierbarer Auflösung</li>
+      <li>DS2408 -  8-kanaliger adressierbarer Schalter</li>
+      <li>DS2413 -  2-kanaliger adressierbarer Schalter</li>
+      <li>DS1825 -  Thermosensor mit programmierbarer Auflösung und ID</li>
+      <li>EDS0066 - Vielfachsensor für Temperatur und Luftdruck</li>
+      <li>LCD - LCD-Ansteuerung von Louis Swart</li>
+    </ul>
+    <br>
+    Das Hinzufügen weiterer Geräte ist im Modulcode (subroutine <code>OWDevice_GetDetails</code>) sehr einfach möglich.
+    <br><br>
+    <b>Achtung: Dieses Modul ist weder verwandt noch verwendbar mit den 1-Wire Modulen, deren Namen nur aus Großbuchstaben bestehen!</b>
+    <br><br>
+    <b>Bitte beachten:</b> Um einer Verwechselung entgegenzuwirken, stößt das reading "state" der Geräte keine Events an.<br><br>
+
+    Beispiele zur Einrichtung:
+    <ul>
+      <code>
+      define myOWServer localhost:4304<br><br>
+      get myOWServer devices<br>
+      10.487653020800 DS18S20<br><br>
+      define myT1 10.487653020800<br><br>
+      list myT1 10.487653020800<br>
+      Internals:<br>
+          ...<br>
+        Readings:<br>
+          2012-12-22 20:30:07   temperature     23.1875<br>
+        Fhem:<br>
+          ...<br>
+          getters:<br>
+            address<br>
+            family<br>
+            id<br>
+            power<br>
+            type<br>
+            temperature<br>
+            templow<br>
+            temphigh<br>
+          polls:<br>
+            temperature<br>
+          setters:<br>
+            alias<br>
+            templow<br>
+            temphigh<br>
+        ...<br>
+      </code>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="OWDeviceset"></a>
+  <b>Set-Befehle</b>
+  <ul>
+    <li><code>set &lt;name&gt; interval &lt;value&gt;</code>
+      <br>
+      <code>value</code> überschreibt das Abrufintervall der Datensätze. Der Wert ist in Sekunden anzugeben.
+    </li><br>
+    <li><code>set &lt;name&gt; &lt;reading&gt; &lt;value&gt;</code>
+      <br>
+      Setzt das &lt;reading&gt; auf &lt;value&gt; für das 1-Wire-Gerät &lt;name&gt;. Die verwendbaren Werte werden durch die
+      jeweiligen 1-wire-Geräte bestimmt.
+      <br><br>
+      Beispiel:
+      <ul>
+        <code>set myT1 templow 5</code><br>
+      </ul>
+      <br>
+    </li>
+  </ul>
+
+
+  <a name="OWDeviceget"></a>
+  <b>Get-Befehle</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;reading&gt; &lt;value&gt;</code>
+    <br>
+    Holt das &lt;reading&gt; des 1- Wire Geräte- &lt;name&gt;. Die verwendbaren Werte werden durch die
+    jeweiligen 1-wire-Geräte bestimmt.
+    <br><br>
+    Beispiel:
+    <ul>
+      <code>get myT1 temperature</code><br>
+    </ul>
+    <br>
+  </ul>
+
+
+  <a name="OWDeviceattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <a name="IODev"></a>         
+    <li>IODev:   
+    Bestimmt die OWServer-Instanz, welche für das Senden und Abrufen der Daten
+        eines OWDevice-Gerätes genutzt werden soll. Hinweis: Während des Starts 
+        ordnet FHEM die neuen OWDevice-Geräte der jeweils zuletzt definierten OWServer-Instanz zu.
+        Deshalb verfährt man idealerweise so, dass man zuerst eine OWServer-Instanz und
+        anschließend die zugehörigen OWDevice-Geräte definiert. Danach definiert man die
+        nächste OWServer-Instanz, gefolgt von den zugehörigen OWDevice-Geräten, usw.   
+    </li>
+    <li>trimvalues: Entfernt voran- und nachgestellte Leerzeichen aus den readings. Standartwert ist 1 (ein).</li>
+    <li>polls: Eine per Komma getrennte Liste der abzurufenden readings. Mit diesem Attribut unterdrückt man alle standartmäßig abgerufenen readings und ersetzt sie durch die eigene Zusammenstellung.</li>
+    <li>interfaces: Ersetzt die durch dieses Gerät erzeugten Interfaces.</li>
+    <li>model: Angabe des Gerätetyps, z.B.: DS18S20.</li>
+    <li>resolution: Angabe der Auflösung für die Temperaturmessung in bits, zur Verfügung stehen: 9, 10, 11 oder 12. 
+    Hinweis: Geringere Auflösungen bewirken schnellere Reaktionen des Busses. Dies kann z.B. bei umfangreichen 1-Wire- Installationen hilfreich sein,
+        um eventuelle Stillstände von FHEM zu vermindern.</li>
+    <li><a href="#eventMap">eventMap</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+  <br><br>
+
+
+</ul>
+
+=end html_DE
 =cut

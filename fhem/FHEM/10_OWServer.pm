@@ -641,4 +641,129 @@ OWServer_Set($@)
 </ul>
 
 =end html
+=begin html_DE
+
+<a name="OWServer"></a>
+<h3>OWServer</h3>
+<ul>
+  <br>
+  <a name="OWDevicedefine"></a>
+  <b>Definition</b>
+  <ul>
+    <code>define &lt;name&gt; OWServer &lt;protocol&gt;</code>
+    <br><br>
+
+    Definiert eine logische OWServer- Instanz. OWServer ist die Serverkomponente des
+    <a href="http://owfs.org">1-Wire Dateisystems</a>. Sie ermöglicht den Zugriff auf 
+    alle 1-Wire- Busteilnehmer eines Systems.<br><br>
+        &lt;protocol&gt; hat das Format &lt;hostname&gt;:&lt;port&gt;  Nähere Informationen dazu gibt es in der <a href="http://owfs.org/index.php?page=owserver_protocol">owserver Dokumentation</a>.
+        <br><br>
+    Voraussetzung innerhalb von FHEM ist das Modul <a href="http://owfs.cvs.sourceforge.net/viewvc/owfs/owfs/module/ownet/perl5/OWNet/lib/OWNet.pm">OWNet.pm von owfs.org</a>, welches bereits mit FHEM ausgeliefert wird. 
+        Das auf CPAN erhältliche OWNet- Modul beinhaltet seit dem 23.12.2012 einen Fehler, der es für Fernzugriffe unbrauchbar macht.<p>
+        Auf dem Computer, an dem der 1-Wire- Bus angeschlossen ist, muss die Software "owserver" installiert sein. Zusätzlich sollte auf diesem Rechner die Konfigurationsdatei "owfs.conf" eingesehen bzw. angepasst werden. <a href="http://www.fhemwiki.de/wiki/OWServer_%26_OWDevice#Tipps_und_Tricks"> Einen WIKI- Artikel dazu gibt es hier.</a>
+    <br><br>
+    Die vorhandenen 1-Wire- Busteilnehmer werden als <a href="#OWDevice">OWDevice</a> -Geräte definiert.
+    Wenn <a href="#autocreate">autocreate</a> aktiviert ist, werden beim Start von FHEM alle Geräte automatisch erkannt und eingerichtet.
+    <br><br>
+        <b>Achtung: Dieses Modul ist weder verwandt noch verwendbar mit den 1-Wire Modulen, deren Namen nur aus Großbuchstaben bestehen!</b>
+    <br><br>
+    Beispiele für die Einrichtung:
+    <ul>
+      <code>define myLocalOWServer OWServer localhost:4304</code><br>
+      <code>define myRemoteOWServer OWServer 192.168.1.100:4304</code><br>
+          <code>define myRemoteOWServer OWServer raspi:4304</code><br>
+    </ul>
+    <br>
+    Hinweis: Sollten keine Geräte erkannt werden, kann man versuchen in der owserver- Konfigurationsdatei (owfs.conf) zwei Servereinträge anzulegen:
+        Einen mit <code>localhost</code> und einen mit dem "FQDN", bzw. dem Hostnamen, oder der  IP-Adresse des Computers, auf dem die Software "owserver" läuft.
+    <br><br>
+
+  </ul>
+
+  <a name="OWServerset"></a>
+  <b>Set- Befehle</b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    wobei <code>value</code> für einen der folgenden Befehle steht:<br><br>
+    <li><code>reopen</code><br>
+      Erneuert die Verbindung zum owserver.
+    </li>
+    <li>owserver (OWFS) -spezifische Einstellungen:
+      <ul>
+        <li><code>timeout/directory</code></li>
+        <li><code>timeout/ftp</code></li>
+        <li><code>timeout/ha7</code></li>
+        <li><code>timeout/network</code></li>
+        <li><code>timeout/presence</code></li>
+        <li><code>timeout/serial</code></li>
+        <li><code>timeout/server</code></li>
+        <li><code>timeout/stable</code></li>
+        <li><code>timeout/uncached</code></li>
+        <li><code>timeout/usb</code></li>
+        <li><code>timeout/volatile</code></li>
+        <li><code>timeout/w1</code></li>
+        <li><code>units/pressure_scale</code></li>
+        <li><code>units/temperature_scale</code></li>
+      </ul>
+    </li>
+    Nähere Informationen zu diesen Einstellungen gibt es im <a href="http://owfs.org/uploads/owserver.1.html#sect41">owserver- Manual</a>.
+    <br>
+  </ul>
+  <br><br>
+
+
+  <a name="OWServerget"></a>
+  <b>Get- Befehle</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    wobei <code>value</code> für einen der folgenden Befehle steht:<br><br>
+    <li><code>devices</code><br>
+      Gibt eine Liste der Adressen und Typen aller von owserver erkannten Geräte aus. Außerdem
+          werden die entsprechenden <a href="#OWDevice">OWDevice-</a> Namen angezeigt, soweit sie bereits definiert sind.
+    </li>
+    <li><code>errors</code><br>
+      Liefert eine Fehlerstatistik zurück.</li>
+    <li>owserver (OWFS) -spezifische Einstellungen:
+      <ul>
+        <li><code>/settings/timeout/directory</code></li>
+        <li><code>/settings/timeout/ftp</code></li>
+        <li><code>/settings/timeout/ha7</code></li>
+        <li><code>/settings/timeout/network</code></li>
+        <li><code>/settings/timeout/presence</code></li>
+        <li><code>/settings/timeout/serial</code></li>
+        <li><code>/settings/timeout/server</code></li>
+        <li><code>/settings/timeout/stable</code></li>
+        <li><code>/settings/timeout/uncached</code></li>
+        <li><code>/settings/timeout/usb</code></li>
+        <li><code>/settings/timeout/volatile</code></li>
+        <li><code>/settings/timeout/w1</code></li>
+        <li><code>/settings/units/pressure_scale</code></li>
+        <li><code>/settings/units/temperature_scale</code></li>
+      </ul>
+    </li>
+    Nähere Informationen zu diesen Einstellungen gibt es im <a href="http://owfs.org/uploads/owserver.1.html#sect41">owserver- Manual</a>.
+    <br>
+  </ul>
+  <p>
+
+  <a name="OWDeviceattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <li>nonblocking<br>
+    Holt alle readings (OWServer / <a href="#OWDevice">OWDevice</a>) über einen Tochterprozess. Dieses Verfahren stellt sicher,
+    dass FHEM während der Kommunikation mit owserver nicht angehalten wird.<br>
+    Beispiel:<br>
+    <code> attr &lt;name&gt; nonblocking 1</code>
+    </li>
+    <li><a href="#eventMap">eventMap</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+  <br>
+  Hinweis: Falls in FHEM trotzdem ungewöhnliche Stillstände auftreten, sollte das Attribut <code>nonblocking</code> wieder deaktiviert werden.<br>  
+
+</ul>
+
+=end html_DE
 =cut
