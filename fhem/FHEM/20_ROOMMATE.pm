@@ -1119,7 +1119,7 @@ sub ROOMMATE_StartInternalTimers($$) {
   <ul>
     <u>M&ouml;gliche Stati und ihre Bedeutung</u><br><br>
     <ul>
-      Dieses Modul unterscheidene 6 verschiedene Stati:<br><br>
+      Dieses Modul unterscheidet 6 verschiedene Stati:<br><br>
 
       <ul>
       <li><b>home</b> - Mitbrwohner ist zuhause und wach</li>
