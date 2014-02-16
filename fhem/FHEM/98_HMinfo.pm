@@ -416,8 +416,8 @@ sub HMinfo_tempListTmpl(@) { ##################################################
   foreach my $eN(HMinfo_getEntities("d")){#search for devices and select correct channel
     my $md = AttrVal($eN,"model","");
     my $chN; #tempList channel name
-    if ($md =~ m/(HM-CC-RT-DN-BoM|HM-CC-RT-DN)/)    {$chN = $defs{$eN}{channel_04};}
-    elsif ($md =~ m/(ROTO_ZEL-STG-RM-FWT|HM-CC-TC)/){$chN = $defs{$eN}{channel_02};}
+    if    ($md =~ m/(HM-CC-RT-DN-BoM|HM-CC-RT-DN)/){$chN = $defs{$eN}{channel_04};}
+    elsif ($md =~ m/(ROTO_ZEL-STG-RM-FWT|-TC)/)    {$chN = $defs{$eN}{channel_02};}
     next if (!$chN || !$defs{$chN} || $chN !~ m/$filter/);
     push @el,$chN;
   }
@@ -1107,11 +1107,11 @@ sub HMinfo_loadConfig($@) {####################################################
       push @entryNF,$eN;
       next;
     }
-    if ($cmd1 eq "setreading"){
+    if   ($cmd1 eq "setreading"){
       $defs{$eN}{READINGS}{$cmd}{VAL} = $param;
       $defs{$eN}{READINGS}{$cmd}{TIME} = "from archive";
     }
-    elsif ($cmd eq "peerBulk"){
+    elsif($cmd eq "peerBulk"){
       next if(!$param);
       $param =~ s/ //g;
       if ($param !~ m/00000000/){

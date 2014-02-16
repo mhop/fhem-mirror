@@ -279,9 +279,9 @@ sub CUL_HM_updateConfig($){
           && $hash->{helper}{fkt} =~ m/^(vdCtrl|virtThSens)$/){
         my $vId = substr($id."01",0,8);
         $hash->{helper}{virtTC} = "00";
-        $hash->{helper}{vd}{msgRed}= 0 if(!defined $hash->{helper}{vd}{msgRed});
-        $hash->{helper}{vd}{next}  = ReadingsVal($name,".next",gettimeofday())
-                                       if (!defined $hash->{helper}{vd}{next});
+        $hash->{helper}{vd}{msgRed}= 0                                        if(!defined $hash->{helper}{vd}{msgRed});
+        $hash->{helper}{vd}{msgCnt}= ReadingsVal($name,".msgCnt",0)           if(!defined $hash->{helper}{vd}{msgCnt});
+        $hash->{helper}{vd}{next}  = ReadingsVal($name,".next",gettimeofday())if(!defined $hash->{helper}{vd}{next});
 
         CUL_HM_Set($hash,$name,"valvePos",ReadingsVal($name,"valvePosTC",""));
         CUL_HM_Set($hash,$name,"virtTemp",ReadingsVal($name,"temperature",""));
@@ -3339,7 +3339,7 @@ sub CUL_HM_Set($@) {
   elsif($cmd eq "sysTime") { ##################################################
     $state = "";
     my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
-    CUL_HM_PushCmdStack($hash,"++A03F$id${dst}0204$s2000");
+    CUL_HM_PushCmdStack($hash,"++803F$id${dst}0204$s2000");
   }
   elsif($cmd =~ m/^(valvePos|virtTemp|virtHum)$/) { ###########################
     my $valu = $a[2];
@@ -5749,6 +5749,7 @@ sub CUL_HM_procQs($){#process non-wakeup queues
               && ReadingsVal($ioName,"cond","") =~ m /^(ok|Overload-released|init)$/
               && $q eq "qReqStat")
            ||(   CUL_HM_autoReadReady($ioName)
+              && !$defs{$devN}{cmdStack}
               && $q eq "qReqConf")){
         my $dq = $defs{$devN}{helper}{q};
         my @chns = split(",",$dq->{$q});
