@@ -610,15 +610,17 @@ SVG_calcOffsets($$)
   if($defs{$wl}) {
     $fr = AttrVal($wl, "fixedrange", undef);
     if($fr) {
-      if($fr =~ "^day" || $fr =~ "^week" || $fr =~ "^month" || $fr =~ "^year" ||
-        $fr =~ m/^\d+days$/ ) { #fixedrange with offset
+      if($fr =~ "^hour" || $fr =~ "^day" || $fr =~ "^week" || $fr =~ "^month" ||
+         $fr =~ "^year" || $fr =~ m/^\d+days$/ ) { #fixedrange with offset
         $frx=$fr; #fixedrange with offset
+
       } else {
         my @range = split(" ", $fr);
         my @t = localtime;
         $SVG_devs{$d}{from} = ResolveDateWildcards($range[0], @t);
         $SVG_devs{$d}{to} = ResolveDateWildcards($range[1], @t); 
         return;
+
       }
     }
 
@@ -653,7 +655,6 @@ SVG_calcOffsets($$)
       $SVG_devs{$d}{from} = SVG_tspec(1,0,@l);
       @l = localtime($t+3600);
       $SVG_devs{$d}{to}   = SVG_tspec(1,1,@l);
-
     } else { 
       my $t = $now + $off*3600;
       my @l = localtime($t);
@@ -661,6 +662,7 @@ SVG_calcOffsets($$)
       @l = localtime($t+3600);
       $SVG_devs{$d}{to}   = SVG_tspec(2,1,@l);
     }
+
   } elsif($zoom eq "qday") {
     if($endPlotNow) {
       my $t = int(($now + $off*21600 - 21600)/300.0)*300 + 300;
@@ -677,6 +679,7 @@ SVG_calcOffsets($$)
       $l[2] = int($l[2]/6)*6;
       $SVG_devs{$d}{to}   = SVG_tspec(2,1,@l);
     }
+
   } elsif($zoom =~ m/^(\d+)?day/) {
     my $nDays = $1 ? ($1-1) : 0;
     if($endPlotNow) {
@@ -692,6 +695,7 @@ SVG_calcOffsets($$)
       @l = localtime($t+(1+$nDays)*86400);
       $SVG_devs{$d}{to}   = SVG_tspec(3,1,@l);
     }
+
   } elsif($zoom eq "week") {
     my @l = localtime($now);
     my $start = (AttrVal($FW_wname, "endPlotToday", undef) ? 6 : $l[6]);
@@ -1676,13 +1680,15 @@ plotAsPng(@)
         In plotmode gnuplot-scroll or SVG the given time-range will be used,
         and no scrolling for this SVG will be possible. Needed e.g. for
         looking at last-years data without scrolling.<br><br>
-        If the value is one of day, &lt;N&gt;days, week, month, year than set
-        the zoom level for this SVG independently of the user specified
+        If the value is one of hour, day, &lt;N&gt;days, week, month, year than
+        set the zoom level for this SVG independently of the user specified
         zoom-level. This is useful for pages with multiple plots: one of the
         plots is best viewed in with the default (day) zoom, the other one with
-        a week zoom.
-      If given, the optional integer parameter offset refers to a different period
-      (e.g. last year: fixedrange year -1, 2 days ago: fixedrange day -2).
+        a week zoom.<br>
+
+        If given, the optional integer parameter offset refers to a different
+        period (e.g. last year: fixedrange year -1, 2 days ago: fixedrange day
+        -2).
 
         </li><br>
 
