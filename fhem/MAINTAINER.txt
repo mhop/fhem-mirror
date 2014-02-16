@@ -24,6 +24,7 @@ FHEM/00_LIRC.pm              rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/00_MAXLAN.pm            mgehre               http://forum.fhem.de MAX
 FHEM/00_OWX.pm               pahenning            http://forum.fhem.de 1Wire
 FHEM/00_TCM.pm               klaus-schauer        http://forum.fhem.de EnOcean
+FHEM/00_THZ.pm               immiimmi             http://forum.fhem.de Sonstiges 		
 FHEM/00_TUL.pm               hotmaz               http://forum.fhem.de KNX/EIB
 FHEM/00_ZWDongle.pm          rudolfkoenig         http://forum.fhem.de ZWave
 FHEM/01_FHEMWEB.pm           rudolfkoenig         http://forum.fhem.de Frontends
