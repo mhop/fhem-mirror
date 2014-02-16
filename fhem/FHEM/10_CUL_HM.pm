@@ -1782,7 +1782,6 @@ sub CUL_HM_Parse($$) {##############################
 
   @entities = CUL_HM_noDup(@entities,$shash->{NAME});
   $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/$name/,@entities);
-  Log 1,"General trigger:".join(",",@entities);
   return @entities;
 }
 sub CUL_HM_parseCommon(@){#####################################################
