@@ -1392,7 +1392,7 @@ Raspberry Pi (Debian Wheezy) BeagleBone Black, Fritz box 7390 (no CPU data), WR7
   <br><br>
   <b>Define</b>
   <br><br>
-    <code>define <name> SYSMON [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
+    <code>define &lt;name&gt; SYSMON [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
     <br>
     
 This statement creates a new SYSMON instance. The parameters M1 to M4 define the refresh interval for various Readings (statistics). The parameters are to be understood as multipliers for the time defined by INTERVAL_BASE. Because this time is fixed at 60 seconds, the Mx-parameter can be considered as time intervals in minutes.<br>
@@ -1812,7 +1812,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
   <br><br>
   <b>Define</b>
   <br><br>
-    <code>define <name> SYSMON [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
+    <code>define &lt;name&gt; SYSMON [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
     <br>
     Diese Anweisung erstellt eine neue SYSMON-Instanz.
     Die Parameter M1 bis M4 legen die Aktualisierungsintervale f&uuml;r verschiedenen Readings (Statistiken) fest.
