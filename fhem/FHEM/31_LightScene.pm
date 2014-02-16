@@ -837,9 +837,9 @@ LightScene_Attr($@)
         if the first character of the &lt;deviceList&gt; ist a ! the devices from the list will come after
         all other devices from this lightScene.<br>
         &lt;scene&gt; and each element of &lt;deviceList&gt; are treated as a regex.<br>
-        Example: To switch a master power outlet before every other device at power on and after every device on power off:
+        Example: To switch a master power outlet before every other device at power on and after every device on power off:<br>
         <code>define media LightScene TV,DVD,Amplifier,masterPower<br>
-              attr media switchingOrder allOn:masterPower,.* allOff:!.*,masterPower</code>
+              attr media switchingOrder .*On:masterPower,.* allOff:!.*,masterPower</code>
         </li>
     </ul><br>
 </ul>
