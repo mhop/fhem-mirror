@@ -55,52 +55,55 @@
 1 Sens.Out T: .*  H: .*  W: .*  R: .*  IR: no
 31 TV off
 14 TV on
-50 global DEFINED Alarm_timer
-1 global DEFINED AllLights
-1 global DEFINED CUL_0
-1 global DEFINED Lamp1
-1 global DEFINED Lamp2
-1 global DEFINED Lamp3
-1 global DEFINED Lamp4
-1 global DEFINED Light3
-1 global DEFINED Log.Cellar
-1 global DEFINED Log.Dewpoint
-1 global DEFINED Log.Out
-1 global DEFINED OutSens
-4 global DEFINED Outdoor_timer
-1 global DEFINED SVG_Log.Cellar_1
-2 global DEFINED SVG_Log.Dewpoint_1
-1 global DEFINED SVG_Log.Garden_1
-1 global DEFINED Sens.Cellar
-1 global DEFINED alarmToggler
-1 global DEFINED dew_all
-741 global DEFINED minuteTimer
-1 global DEFINED outdoorNotify
-1 global DEFINED sunRise
-1 global DEFINED sunSet
-50 global DELETED Alarm_timer
-4 global DELETED Outdoor_timer
-1 global DELETED SVG_Log.Dewpoint_1
-1 global DELETED alarmToggler
-741 global DELETED minuteTimer
-31 global INITIALIZED
-1 global RENAMED Lamp1 Outdoor
-1 global RENAMED Lamp2 Office
-1 global RENAMED Lamp3 Livingroom
-1 global RENAMED Lamp4 Alarm
-1 global RENAMED Light3 Alarm
-1 global RENAMED Log.Out Log.Garden
-1 global RENAMED OutSens Sens.Out
-1 global RENAMED SVG_Log.Cellar_1 SVG_02_Cellar
-1 global RENAMED SVG_Log.Dewpoint_1 SVG_03_Dewpoint
-1 global RENAMED SVG_Log.Garden_1 SVG_01_Garden
-1 global RENAMED Sens.Cellar Cellar
-1 global RENAMED Sens.Out Garden
-1 global RENAMED outdoorNotify outdoorNotifier
-42 global SAVE
-31 global SHUTDOWN
 15 lcCinema scene AllOff
 19 lcCinema scene Break
 16 lcCinema scene Cinema
 13 lcCinema scene WatchTV
 740 minuteTimer 
+1 rgr_Children home
+1 rgr_Children lastActivity: home
+1 rgr_Children lastActivityBy: Baby
+1 rgr_Children lastAwake: .*.*.* .*:.*:.*
+1 rgr_Children lastDurSleep: .*:.*:.*
+1 rgr_Children lastState: asleep
+2 rgr_Children register rr_Baby
+2 rgr_Children register rr_Daughter
+2 rgr_Children register rr_Son
+1 rgr_Children residentsAsleep: .*
+1 rgr_Children residentsHome: .*
+2 rgr_Guests register rg_Guest1
+2 rgr_Guests register rg_Guest2
+1 rgr_Parents lastActivity: absent
+1 rgr_Parents lastActivityBy: Father
+2 rgr_Parents register rr_Father
+2 rgr_Parents register rr_Mother
+1 rgr_Parents residentsAbsent: .*
+1 rgr_Parents residentsGone: .*
+1 rgr_Residents lastActivity: absent
+1 rgr_Residents lastActivity: home
+1 rgr_Residents lastActivityBy: Baby
+1 rgr_Residents lastActivityBy: Father
+2 rgr_Residents register rg_Guest1
+2 rgr_Residents register rg_Guest2
+2 rgr_Residents register rr_Baby
+2 rgr_Residents register rr_Daughter
+2 rgr_Residents register rr_Father
+2 rgr_Residents register rr_Mother
+2 rgr_Residents register rr_Son
+1 rgr_Residents residentsAbsent: .*
+1 rgr_Residents residentsAsleep: .*
+1 rgr_Residents residentsGone: .*
+1 rgr_Residents residentsHome: .*
+1 rr_Baby durTimerPresence: .*
+2 rr_Baby durTimerSleep: .*
+1 rr_Baby home
+1 rr_Baby lastAwake: .*.*.* .*:.*:.*
+1 rr_Baby lastDurSleep: .*:.*:.*
+1 rr_Baby lastState: asleep
+1 rr_Baby mood: calm
+2 rr_Daughter durTimerAbsence: .*
+1 rr_Father absent
+2 rr_Father durTimerAbsence: .*
+1 rr_Father lastState: gone
+2 rr_Mother durTimerPresence: .*
+2 rr_Son durTimerAbsence: .*
