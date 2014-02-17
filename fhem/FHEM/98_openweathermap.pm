@@ -102,6 +102,7 @@ sub openweathermap_Initialize($) {
 							$readingFnAttributes;
 }
 
+
 sub OWO_Shutdown($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
