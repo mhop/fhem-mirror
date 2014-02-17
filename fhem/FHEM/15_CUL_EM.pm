@@ -285,9 +285,9 @@ CUL_EM_Parse($$)
     <br>
 
     <b>CostPerUnit</b> and <b>BasicFeePerMonth</b> are used to compute your
-    daily and mothly fees. Your COST will appear in the log, generated once
-    daiy (without the basic fee) or month (with the bassic fee included). Your
-    definition should look like E.g.:
+    daily and monthly fees. Your COST will appear in the log, generated once
+    daily (without the basic fee) or month (with the bassic fee included). Your
+    definition should look like e.g.:
     <ul><code>
     define emwz 1 75 900 0.15 12.50<br>
     </code></ul>
@@ -300,7 +300,7 @@ CUL_EM_Parse($$)
     Tip: You can configure your EMWZ device to show in the CUM column of the
     STATE reading the current reading of your meter. For this purpose: multiply
     the current reading (from the real device) with the corr1 value (RperKW),
-    and substract the RAW CUM value from it. Now set the basis reading of your
+    and subtract the RAW CUM value from it. Now set the basis reading of your
     EMWZ device (named emwz) to this value.<br>
 
   </ul>
