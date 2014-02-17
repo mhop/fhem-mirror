@@ -19,18 +19,19 @@
 
 .dashboard_button_icon { width: 13px; height: 14px; background-repeat: no-repeat; 
 						float: left; background-image: url(../images/default/dashboardicons.png); }	
-.dashboard_button_iconplus { margin: 0.1em 0.4em; float: right; background-position: -154px 0px; }
-.dashboard_button_iconminus { margin: 0.1em 0.4em; float: right; background-position: -140px 0px; }
-.dashboard_button_iconset { background-position: -116px 0px; }	
-.dashboard_button_iconlock { background-position: -103px 0px; }
-.dashboard_button_iconunlock { background-position: -91px 0px; }
-.dashboard_button_icondetail { background-position: -128px 0px; }
+.dashboard_button_iconplus { margin: 0.1em 0.4em; float: right; background-position: -65px -16px; }
+.dashboard_button_iconminus { margin: 0.1em 0.4em; float: right; background-position: -52px -16px; }
+.dashboard_button_iconset { background-position: -26px -16px; }	
+.dashboard_button_iconlock { background-position: -0px -16px; }
+.dashboard_button_iconunlock { background-position: -13px -16px; }
+.dashboard_button_icondetail { background-position: -39px -16px; }
+.dashboard_button_iconback { margin: 0.1em 0.4em; float: right; background-position: -91px -16px; }
 
 .ui-resizable { position: relative; }
 .ui-resizable-handle { position: absolute; font-size: 0.1px; }
 .ui-resizable-se { cursor: se-resize; width: 12px; height: 12px; right: 1px;
 				   bottom: 1px; background-image: url(../images/default/dashboardicons.png); 
-				   background-position: -170px 0px; background-repeat: no-repeat; }
+				   background-position: -78px -16px; background-repeat: no-repeat; }
 .ui-sortable-placeholder { border: 1px dotted #808080;  visibility: visible !important; 
 						   height: 25px !important; width: 150px; }
 
@@ -48,7 +49,7 @@
 .dashboard_tab_bottom { border: 1px solid #cccccc;	border-top-width: 0;	border-bottom-left-radius: 8px;
 				border-bottom-right-radius: 8px; margin: 0 .5em -1px 0; float: left; padding: .5em 1em; }				
 .dashboard_tab_bottom.ui-tabs-active { background-color: #F0F0D8; font-weight: bold; }
-.dashboard_tabicon {width: 16px; height: 16px; vertical-align: top; margin-left: -0.5em; }
+.dashboard_tabicon {width: 16px; height: 16px; vertical-align: top; margin-left: -0.5em; margin-top: 0.1em;}
 .dashboard_tabcontent { width: 100%; padding: 0; margin: 0; }
 
 .dashboard_row { width: 100%; height: inherit; }
