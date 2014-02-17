@@ -415,21 +415,6 @@ sub HMLAN_Write($$$) {#########################################################
 
     if (!$hash->{assIDs}{$dst} && $dst ne "000000"){
       HMLAN_SimpleWrite($hash, $IDadd);
-      my $dN = CUL_HM_id2Name($dst);
-      if (!($dN eq $dst) ){# name not found
-        my $rxt = CUL_HM_Get(CUL_HM_id2Hash($dst),$dN,"param","rxType");
-        #'+'.$dst.",01,01,FE1F" # 01 first: AES request
-        #'+'.$dst.",00,01,FE1F" # 00 first: AES not requested
-        if (!($rxt & ~0x04)){#config only
-          $hash->{helper}{$dst}{newChn} = '+'.$dst.",01,01,FE1F";
-        }
-        elsif($rxt & 0x10){#lazyConfig
-          $hash->{helper}{$dst}{newChn} = '+'.$dst.',03,01,1E';
-        }
-        else{
-          $hash->{helper}{$dst}{newChn} = '+'.$dst.',00,01,';
-        }
-      }
       $hash->{helper}{$dst}{name} = CUL_HM_id2Name($dst);
       $hash->{assIDs}{$dst} = 1;
       $hash->{assignedIDs}=join(',',keys %{$hash->{assIDs}});
@@ -699,7 +684,7 @@ sub HMLAN_SimpleWrite(@) {#####################################################
        ){
       if ($modules{CUL_HM}{defptr}{$dst}{helper}{io}{nextSend}){
         my $dDly = $modules{CUL_HM}{defptr}{$dst}{helper}{io}{nextSend} - $tn;
-#        $dDly -= 0.05 if ($typ eq "02");# delay at least 50ms for ACK, but not 100
+        #$dDly -= 0.05 if ($typ eq "02");# delay at least 50ms for ACK, but not 100
         select(undef, undef, undef, (($dDly > 0.1)?0.1:$dDly))
               if ($dDly > 0.01);
       }
@@ -726,7 +711,7 @@ sub HMLAN_SimpleWrite(@) {#####################################################
     if ($len > 52){#channel information included, send sone kind of clearance
       my $chn = substr($msg,52,2);
       if (!$hDst->{chn} || $hDst->{chn} ne $chn){
-        my $updt = $hDst->{newChn};
+        my $updt = $modules{CUL_HM}{defptr}{$dst}{helper}{io}{newChn};
         Log3 $hash,  HMLAN_getVerbLvl($hash,$src,$dst,"5")
                   , 'HMLAN_Send:  '.$name.' S:'.$updt;
         syswrite($hash->{TCPDev}, $updt."\r\n")     if($hash->{TCPDev});
