@@ -166,7 +166,7 @@ sub wake($){
 
   readingsBeginUpdate ($hash);
   
-  Log3 $hash, 3, "WOL keeping $name with MAC $mac IP $host busy";
+  Log3 $hash, 4, "WOL keeping $name with MAC $mac IP $host busy";
 
   if ($hash->{MODE} eq "BOTH" || $hash->{MODE} eq "EW" ) {
      wol_by_ew ($hash, $mac);
@@ -209,9 +209,20 @@ sub wol_by_udp {
 sub wol_by_ew($$) {
   my ($hash, $mac) = @_;
 
-  my $sysCmd = AttrVal($hash->{NAME}, "sysCmd", "/usr/bin/ether-wake");
+  #               Fritzbox               Raspberry
+  my @commands = "/usr/bin/ether-wake", "/usr/sbin/etherwake";
+
+  my $standardEtherwake = "no etherwake installed";
+  foreach my $sysCmd (@commands) {
+     if (-e $sysCmd) {
+        $standardEtherwake = $sysCmd;
+     }
+  }
+
+  my $sysCmd = AttrVal($hash->{NAME}, "sysCmd", $standardEtherwake);
   if (-e $sysCmd) {
-     qx ("$sysCmd $mac");
+     $sysCmd = "$sysCmd $mac";
+     qx ($sysCmd);
   } else {
      Log3 $hash, 1, "[$hash->{NAME}] system command '$sysCmd' not found";
   }
