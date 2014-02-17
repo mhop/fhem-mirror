@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature  FB_CALLMONITOR: new attribute "disable" to 
+             disable FB_CALLMONITOR
   - feature: YAMAHA_BD: new attribute "disable" to disable cyclic status
              updates of player
   - change:  09_CUL_FHTTK.pm: added event-on...readings and event-min-interval

@@ -94,7 +94,7 @@ FB_CALLMONITOR_Initialize($)
   
  
   
-  $hash->{AttrList}= "do_not_notify:0,1 unique-call-ids:0,1 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,internal,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at,none reverse-search-cache:0,1 reverse-search-phonebook-file ".
+  $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 unique-call-ids:0,1 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,internal,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at,none reverse-search-cache:0,1 reverse-search-phonebook-file ".
                         $readingFnAttributes;
 }
 
@@ -183,12 +183,12 @@ FB_CALLMONITOR_Set($@)
 
     if($a[1] eq "rereadPhonebook")
     {
-	FB_CALLMONITOR_loadInternalPhonebookFile($hash);
-	return undef;
+        FB_CALLMONITOR_loadInternalPhonebookFile($hash);
+        return undef;
     }
     else
     {
-	return $usage;
+        return $usage;
     }
 }
 
@@ -198,110 +198,97 @@ FB_CALLMONITOR_Set($@)
 sub
 FB_CALLMONITOR_Read($)
 {
-  my ($hash) = @_;
+    my ($hash) = @_;
 
-  my $buf = DevIo_SimpleRead($hash);
-  return "" if(!defined($buf));
-  my $name = $hash->{NAME};
-  my @array;
-  my $reverse_search = undef;
-  my $data = $buf;
-  my $area_code = AttrVal($name, "local-area-code", "");
-  my $external_number = undef;
+    my $buf = DevIo_SimpleRead($hash);
+    return "" if(!defined($buf));
+    my $name = $hash->{NAME};
+    my @array;
+    my $reverse_search = undef;
+    my $data = $buf;
+    my $area_code = AttrVal($name, "local-area-code", "");
+    my $external_number = undef;
   
+    @array = split(";", $data);
   
-   @array = split(";", $data);
+    $external_number = $array[3] if(not $array[3] eq "0" and $array[1] eq "RING" and $array[3] ne "");
+    $external_number = $array[5] if($array[1] eq "CALL" and $array[3] ne "");
   
-   $external_number = $array[3] if(not $array[3] eq "0" and $array[1] eq "RING" and $array[3] ne "");
-   $external_number = $array[5] if($array[1] eq "CALL" and $array[3] ne "");
+    $external_number =~ s/^0// if(AttrVal($name, "remove-leading-zero", "0") eq "1" and defined($external_number));
   
-   $external_number =~ s/^0// if(AttrVal($name, "remove-leading-zero", "0") eq "1" and defined($external_number));
-  
-   if(defined($external_number) and not $external_number =~ /^0/ and $area_code ne "")
-   {
-    if($area_code =~ /^0[1-9]\d+$/)
+    if(defined($external_number) and not $external_number =~ /^0/ and $area_code ne "")
     {
-      $external_number = $area_code.$external_number;
+        if($area_code =~ /^0[1-9]\d+$/)
+        {
+          $external_number = $area_code.$external_number;
+        }
+        else
+        {
+            Log3 $name, 2, "$name: given local area code '$area_code' is not an area code. therefore will be ignored";
+        }
     }
-    else
-    {
-     Log3 $name, 2, "$name: given local area code '$area_code' is not an area code. therefore will be ignored";
-    }
-   }
 
-   # Remove trailing hash sign and everything afterwards
-   $external_number =~ s/#.*$// if(defined($external_number));
+    # Remove trailing hash sign and everything afterwards
+    $external_number =~ s/#.*$// if(defined($external_number));
   
-   $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $external_number) if(defined($external_number) and AttrVal($name, "reverse-search", "none") ne "none");
+    $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $external_number) if(defined($external_number) and AttrVal($name, "reverse-search", "none") ne "none");
    
-   readingsBeginUpdate($hash);
-   readingsBulkUpdate($hash, "event", lc($array[1]));
-   readingsBulkUpdate($hash, "external_number", (defined($external_number) ? $external_number : "unknown")) if($array[1] eq "RING" or $array[1] eq "CALL");
-   readingsBulkUpdate($hash, "external_name",(defined($reverse_search) ? $reverse_search : "unknown")) if($array[1] eq "RING" or $array[1] eq "CALL");
-   readingsBulkUpdate($hash, "internal_number", $array[4]) if($array[1] eq "RING" or $array[1] eq "CALL");
-   readingsBulkUpdate($hash, "external_connection", $array[5]) if($array[1] eq "RING");
-   readingsBulkUpdate($hash, "external_connection", $array[6]) if($array[1] eq "CALL");
-   readingsBulkUpdate($hash, "internal_connection", $connection_type{$array[3]}) if($array[1] eq "CALL" or $array[1] eq "CONNECT" and defined($connection_type{$array[3]}));
-   readingsBulkUpdate($hash, "call_duration", $array[3]) if($array[1] eq "DISCONNECT");
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, "event", lc($array[1]));
+    readingsBulkUpdate($hash, "external_number", (defined($external_number) ? $external_number : "unknown")) if($array[1] eq "RING" or $array[1] eq "CALL");
+    readingsBulkUpdate($hash, "external_name",(defined($reverse_search) ? $reverse_search : "unknown")) if($array[1] eq "RING" or $array[1] eq "CALL");
+    readingsBulkUpdate($hash, "internal_number", $array[4]) if($array[1] eq "RING" or $array[1] eq "CALL");
+    readingsBulkUpdate($hash, "external_connection", $array[5]) if($array[1] eq "RING");
+    readingsBulkUpdate($hash, "external_connection", $array[6]) if($array[1] eq "CALL");
+    readingsBulkUpdate($hash, "internal_connection", $connection_type{$array[3]}) if($array[1] eq "CALL" or $array[1] eq "CONNECT" and defined($connection_type{$array[3]}));
+    readingsBulkUpdate($hash, "call_duration", $array[3]) if($array[1] eq "DISCONNECT");
    
 
-    if ($array[1] eq "RING")
+    if($array[1] eq "RING")
     {
-	$hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{EVENT} = $array[1];
-	 my $no = "unknown";
-	
-	if (defined($external_number))
-	{
+        $hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{EVENT} = $array[1];
+        my $no = "unknown";
+        if(defined($external_number))
+        {
     	    $no = $external_number;
-	    if (defined($reverse_search))
-	    {
-		$no .= " (".$reverse_search.")";
-	    }
-	}
+            if(defined($reverse_search))
+            {
+                $no .= " (".$reverse_search.")";
+            }
+        }
 
-	$hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{NUMBER} = $no;
+        $hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{NUMBER} = $no;
     }
     elsif ($array[1] eq "DISCONNECT")
     {
-	if (($array[3] eq "0") and (exists($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}) and $hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{EVENT} eq "RING")) 
-	{
+        if (($array[3] eq "0") and (exists($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}) and $hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{EVENT} eq "RING")) 
+        {
             readingsBulkUpdate($hash, "missed_call", $hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{NUMBER})
-	}
-	
-	delete($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}) if(exists($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}));
+        }
+        delete($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}) if(exists($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}));
     }
 
 
     if(AttrVal($name, "unique-call-ids", "0") eq "1")
     {
-	if($array[1] eq "RING" or $array[1] eq "CALL")
-	{
-	    $hash->{helper}{CALLID}{$array[2]} = Digest::MD5::md5_hex($data);
-	}
+        if($array[1] eq "RING" or $array[1] eq "CALL")
+        {
+    	    $hash->{helper}{CALLID}{$array[2]} = Digest::MD5::md5_hex($data);
+        }
+        readingsBulkUpdate($hash, "call_id", $hash->{helper}{CALLID}{$array[2]});
 	
-	readingsBulkUpdate($hash, "call_id", $hash->{helper}{CALLID}{$array[2]});
-	
-	if($array[1] eq "DISCONNECT")
-	{
-	    delete($hash->{helper}{CALLID}{$array[2]});
-	}
+        if($array[1] eq "DISCONNECT")
+        {
+            delete($hash->{helper}{CALLID}{$array[2]});
+    	}
     }
     else
     {
-	readingsBulkUpdate($hash, "call_id", $array[2]);
+        readingsBulkUpdate($hash, "call_id", $array[2]);
     }
     
     readingsEndUpdate($hash, 1);
   
-}
-
-sub
-FB_CALLMONITOR_DoInit($)
-{
-
-# No Initialization needed
-return undef;
-
 }
 
 
@@ -310,7 +297,7 @@ FB_CALLMONITOR_Ready($)
 {
    my ($hash) = @_;
    
-   return DevIo_OpenDev($hash, 1, "FB_CALLMONITOR_DoInit");
+   return DevIo_OpenDev($hash, 1, undef);
 
 }
 
@@ -324,32 +311,47 @@ FB_CALLMONITOR_Attr($@)
     
     if($a[0] eq "set")
     {
-
         if($a[2] eq "reverse-search" or $a[2] eq "reverse-search-phonebook-file")
         {
             $attr{$name}{"reverse-search-phonebook-file"} = $a[3] if($a[2] eq "reverse-search-phonebook-file");
+            FB_CALLMONITOR_loadInternalPhonebookFile($hash);
+        }
 
-	    FB_CALLMONITOR_loadInternalPhonebookFile($hash);
-	}
-	
-	if($a[2] eq "reverse-search-cache-file")
-	{
-	    $attr{$name}{"reverse-search-cache-file"} = $a[3];
-      
-	    FB_CALLMONITOR_loadCacheFile($hash);
-	}
+        if($a[2] eq "reverse-search-cache-file")
+        {
+            $attr{$name}{"reverse-search-cache-file"} = $a[3];
+            FB_CALLMONITOR_loadCacheFile($hash);
+        }
+        
+        if($a[2] eq "disable")
+        {
+            if($a[3] eq "0")
+            {
+                DevIo_OpenDev($hash, 0, "FB_CALLMONITOR_DoInit");
+            }
+            elsif($a[3] eq "1")
+            {
+               DevIo_CloseDev($hash); 
+               $hash->{STATE} = "disabled";
+            }
+        }
 
     }
     elsif($a[0] eq "del")
     {
     
-	if($a[2] eq "reverse-search" or $a[2] eq "reverse-search-phonebook-file")
+        if($a[2] eq "reverse-search" or $a[2] eq "reverse-search-phonebook-file")
         {
-	    delete($hash->{helper}{PHONEBOOK}) if(defined($hash->{helper}{PHONEBOOK}));
-	}
-    
+            delete($hash->{helper}{PHONEBOOK}) if(defined($hash->{helper}{PHONEBOOK}));
+        } 
+        
+        if( $a[2] eq "disable")
+        {
+           DevIo_OpenDev($hash, 0, "FB_CALLMONITOR_DoInit");
+        }
     }
-
+    
+   
     return undef;
 
 }
@@ -782,7 +784,12 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <b>Attributes</b><br><br>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
+    <li><a name="disable">disable</a></li>
+	Optional attribute to disable the Callmonitor. When disabled, no phone events can be detected.
+	<br><br>
+	Possible values: 0 => Callmonitor is activated, 1 => Callmonitor is deactivated.<br>
+    Default Value is 0 (activated)<br><br>
     <li><a name="reverse-search">reverse-search</a> (all|internal|klicktel.de|dasoertliche.de|search.ch|dasschnelle.at|none)</li>
     Activate the reverse searching of the external number (at dial and call receiving).
     It is possible to select a specific web service, which should be used for reverse searching.
@@ -880,7 +887,12 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <b>Attribute</b><br><br>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
+    <li><a name="disable">disable</a></li>
+	Optionales Attribut zur Deaktivierung des Callmonitors. Es k&ouml;nnen dann keine Anruf-Events mehr erkannt und erzeugt werden.
+	<br><br>
+	M&ouml;gliche Werte: 0 => Callmonitor ist aktiv, 1 => Callmonitor ist deaktiviert.<br>
+    Standardwert ist 0 (aktiv)<br><br>
     <li><a name="reverse-search">reverse-search</a> (all|internal|klicktel.de|dasoertliche.de|search.ch|dasschnelle.at|none)</li>
     Aktiviert die R&uuml;ckw&auml;rtssuche der externen Rufnummer der Gegenstelle (bei eingehenden/abgehenden Anrufen).
     Es ist m&ouml;glich einen bestimmten Suchanbieter zu verwenden, welcher f&uuml;r die R&uuml;ckw&auml;rtssuche verwendet werden soll.
