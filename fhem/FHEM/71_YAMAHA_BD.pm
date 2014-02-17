@@ -37,6 +37,7 @@ use HttpUtils;
 sub YAMAHA_BD_Get($@);
 sub YAMAHA_BD_Define($$);
 sub YAMAHA_BD_GetStatus($;$);
+sub YAMAHA_BD_Attr(@);
 sub YAMAHA_BD_ResetTimer($;$);
 sub YAMAHA_BD_Undefine($$);
 
@@ -52,9 +53,10 @@ YAMAHA_BD_Initialize($)
   $hash->{GetFn}     = "YAMAHA_BD_Get";
   $hash->{SetFn}     = "YAMAHA_BD_Set";
   $hash->{DefFn}     = "YAMAHA_BD_Define";
+  $hash->{AttrFn}    = "YAMAHA_BD_Attr";
   $hash->{UndefFn}   = "YAMAHA_BD_Undefine";
 
-  $hash->{AttrList}  = "do_not_notify:0,1 request-timeout:1,2,3,4,5 model ".
+  $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 request-timeout:1,2,3,4,5 model ".
                       $readingFnAttributes;
 }
 
@@ -524,10 +526,54 @@ YAMAHA_BD_Define($$)
     }
 
     # start the status update timer
+    $hash->{helper}{DISABLED} = 0 unless(exists($hash->{helper}{DISABLED}));
 	YAMAHA_BD_ResetTimer($hash, 2);
   
   return undef;
 }
+
+##########################
+sub
+YAMAHA_BD_Attr(@)
+{
+    my @a = @_;
+    my $hash = $defs{$a[1]};
+
+    if($a[0] eq "set" && $a[2] eq "disable")
+    {
+        if($a[3] eq "0")
+        {
+             $hash->{helper}{DISABLED} = 0;
+             YAMAHA_BD_GetStatus($hash, 1);
+        }
+        elsif($a[3] eq "1")
+        {
+            $hash->{helper}{DISABLED} = 1;
+        }
+    }
+    elsif($a[0] eq "del" && $a[2] eq "disable")
+    {
+        $hash->{helper}{DISABLED} = 0;
+        YAMAHA_BD_GetStatus($hash, 1);
+    }
+
+    # Start/Stop Timer according to new disabled-Value
+    YAMAHA_BD_ResetTimer($hash);
+    
+    return undef;
+}
+
+#############################
+sub
+YAMAHA_BD_Undefine($$)
+{
+    my($hash, $name) = @_;
+  
+    # Stop the internal GetStatus-Loop and exit
+    RemoveInternalTimer($hash);
+    return undef;
+}
+
 
 #############################################################################################################
 #
@@ -588,32 +634,24 @@ YAMAHA_BD_ResetTimer($;$)
     
     RemoveInternalTimer($hash);
     
-    if(defined($interval))
+    if($hash->{helper}{DISABLED} == 0)
     {
-        InternalTimer(gettimeofday()+$interval, "YAMAHA_BD_GetStatus", $hash, 0);
+        if(defined($interval))
+        {
+            InternalTimer(gettimeofday()+$interval, "YAMAHA_BD_GetStatus", $hash, 0);
+        }
+        elsif($hash->{READINGS}{presence}{VAL} eq "present" and $hash->{READINGS}{power}{VAL} eq "on")
+        {
+            InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, "YAMAHA_BD_GetStatus", $hash, 0);
+        }
+        else
+        {
+            InternalTimer(gettimeofday()+$hash->{helper}{OFF_INTERVAL}, "YAMAHA_BD_GetStatus", $hash, 0);
+        }
     }
-    elsif($hash->{READINGS}{presence}{VAL} eq "present" and $hash->{READINGS}{power}{VAL} eq "on")
-    {
-        InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, "YAMAHA_BD_GetStatus", $hash, 0);
-    }
-    else
-    {
-        InternalTimer(gettimeofday()+$hash->{helper}{OFF_INTERVAL}, "YAMAHA_BD_GetStatus", $hash, 0);
-    }
-
 }
 
 
-#############################
-sub
-YAMAHA_BD_Undefine($$)
-{
-    my($hash, $name) = @_;
-  
-    # Stop the internal GetStatus-Loop and exit
-    RemoveInternalTimer($hash);
-    return undef;
-}
 
 
 #############################
@@ -795,11 +833,14 @@ sub YAMAHA_BD_formatTimestamp($)
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
+    <li><a name="disable">disable</a></li>
+	Optional attribute to disable the internal cyclic status update of the player. Manual status updates via statusRequest command is still possible.
+	<br><br>
+	Possible values: 0 => perform cyclic status update, 1 => don't perform cyclic status updates.<br><br>
 	<li><a name="request-timeout">request-timeout</a></li>
 	Optional attribute change the response timeout in seconds for all queries to the player.
 	<br><br>
-	Possible values: 1-5 seconds. Default value is 4 seconds.<br>
-  <br>
+	Possible values: 1-5 seconds. Default value is 4 seconds.<br><br>
   </ul>
   <b>Generated Readings/Events:</b><br>
   <ul>
@@ -952,11 +993,14 @@ sub YAMAHA_BD_formatTimestamp($)
   
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
+    <li><a name="disable">disable</a></li>
+	Optionales Attribut zur Deaktivierung des zyklischen Status-Updates. Ein manuelles Update via statusRequest-Befehl ist dennoch m&ouml;glich.
+	<br><br>
+	M&ouml;gliche Werte: 0 => zyklische Status-Updates, 1 => keine zyklischen Status-Updates.<br><br>
 	<li><a name="request-timeout">request-timeout</a></li>
 	Optionales Attribut. Maximale Dauer einer Anfrage in Sekunden zum Player.
 	<br><br>
 	M&ouml;gliche Werte: 1-5 Sekunden. Standartwert ist 4 Sekunden<br><br>
-    <br>
   </ul>
   <b>Generierte Readings/Events:</b><br>
   <ul>
