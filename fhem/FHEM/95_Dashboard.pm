@@ -36,12 +36,18 @@
 #			 is stored after tab change
 # 2.04: change view of readingroups. Attribute dashboard_groups removed. New Attribute dashboard_webfrontendfilter to define 
 #			separate Dashboards per FHEMWEB Instance.
+# 2.05: bugfix, changes in dashboard.js, groups can show Icons (group:icon@color,group:icon@color ...). "Back"-Button in Fullsize-Mode.
+# 		 Dashboard near top in Fullsize-Mode. dashboard_activetab store the active Tab, not the last active tab.
 #
 # Known Bugs/Todos:
 # BUG: Nicht alle Inhalte aller Tabs laden, bei Plots dauert die bedienung des Dashboards zu lange. -> elemente hidden?
-# x TODO: Dashboard Config diverenzieren je auflösung
-# x TODO: Darstellung von z.B. readingGroups
+# xTODO: dashboard_activetab wieder zur ursprungsfunktion
+# BUG: Variabler abstand wird nicht gesichert
 # TODO: personalisiertes CSS angeben und bestehende CSS zu überschreiben -> User-config
+# BUG: dashboard_webfrontendfilter doesn't Work Antwort #469
+# TODO: More Tabs
+# TODO: sortby
+# TODO: sort by alias, eg sort by device name
 # Log 1, "[DASHBOARD simple debug] '".$g."' ";
 ########################################################################################
 #
@@ -79,6 +85,7 @@ use vars qw(%defs);		    # FHEM device/button definitions
 use vars qw($FW_wname);     # Web instance
 use vars qw(%FW_hiddenroom);# hash of hidden rooms, used by weblink
 use vars qw(%FW_types);     # device types
+use vars qw($FW_ss);      # is smallscreen, needed by 97_GROUP/95_VIEW
 
 # --------------------------- Global Variable -----------------------------------------------
 my %group;
@@ -86,7 +93,7 @@ my $fwjquery = "jquery.min.js";
 my $fwjqueryui = "jquery-ui.min.js";
 my $dashboardname = "Dashboard"; # Link Text
 my $dashboardhiddenroom = "DashboardRoom"; # Hiddenroom
-my $dashboardversion = "2.04";
+my $dashboardversion = "2.05";
 # -------------------------------------------------------------------------------------------
 
 sub Dashboard_Initialize ($) {
@@ -253,8 +260,6 @@ sub DashboardAsHtml($)
  if ($activetab > $tabcount) { $activetab = $tabcount; }
 
  $colwidth =~ tr/,/:/;
- #if ($colwidth =~/[a-zA-Z]+$/) { Log 1, "[DASHBOARD simple debug] Nicht nur zahlen ".$colwidth; } #future release
-
  if (not ($colheight =~ /^\d+$/)) { $colheight = 400 };  
  if (not ($rowtopheight =~ /^\d+$/)) { $rowtopheight = 50 };
  if (not ($rowbottomheight =~ /^\d+$/)) { $rowbottomheight = 50 };  
@@ -281,8 +286,9 @@ sub DashboardAsHtml($)
  if ($showtabs eq "tabs-and-buttonbar-at-the-top" || $showtabs eq "tabs-at-the-top-buttonbar-hidden") { $tabshow = "top";}
  if ($showtabs eq "tabs-and-buttonbar-on-the-bottom" || $showtabs eq "tabs-on-the-bottom-buttonbar-hidden") { $tabshow = "bottom";}
 	
- $ret .= "	<ul id=\"dashboard_tabnav\" class=\"dashboard_tabnav dashboard_tabnav_".$tabshow."\">\n";	 
- if ($showtabs ne "tabs-at-the-top-buttonbar-hidden" &&  $showtabs ne "tabs-on-the-bottom-buttonbar-hidden" && $showtabs ne "tabs-and-buttonbar-hidden") { $ret .= BuildButtonBar($d,$showtabs); }
+ $ret .= "	<ul id=\"dashboard_tabnav\" class=\"dashboard_tabnav dashboard_tabnav_".$tabshow."\">\n";	   
+ if ($showtabs ne "tabs-at-the-top-buttonbar-hidden" &&  $showtabs ne "tabs-on-the-bottom-buttonbar-hidden" && $showtabs ne "tabs-and-buttonbar-hidden") { $ret .= BuildButtonBar($d,$showtabs,$showfullsize); }
+    
   for (my $i=0;$i<$tabcount;$i++){ 
 	$tabicon = ""; 
 	if ($tabicons[$i] ne "") { $tabicon = FW_makeImage($tabicons[$i],$tabicons[$i],"dashboard_tabicon") . "&nbsp;"; }
@@ -294,12 +300,13 @@ sub DashboardAsHtml($)
  for (my $t=0;$t<$tabcount;$t++){ 
 	my @tabgroup = split(",", $tabgroups[$t]); #Set temp. position for groups without an stored position
 	for (my $i=0;$i<@tabgroup;$i++){
-		if (index($tabsortings[$t],trim($tabgroup[$i])) < 0) { $tabsortings[$t] = $tabsortings[$t]."t".$t."c".GetMaxColumnId($row,$colcount).",".trim($tabgroup[$i]).",true,0,0:"; }
+		my @stabgroup = split(":", trim($tabgroup[$i]));		
+		if (index($tabsortings[$t],trim($stabgroup[$i])) < 0) { $tabsortings[$t] = $tabsortings[$t]."t".$t."c".GetMaxColumnId($row,$colcount).",".trim($stabgroup[$i]).",true,0,0:"; }
 	}	
 	%group = BuildGroupList($tabgroups[$t]);	 
 	$ret .= "	<div id=\"dashboard_tab".$t."\" data-tabwidgets=\"".$tabsortings[$t]."\" class=\"dashboard_tabpanel\">\n";
 	$ret .= "   <ul class=\"dashboard_tabcontent\">\n";
-	$ret .= "	<table class=\"dashboard_tabcontent\">\n";	# dashboard\">";	 
+	$ret .= "	<table class=\"dashboard_tabcontent\">\n";	 
 		##################### Top Row (only one Column) #############################################
 		if ($row eq "top-center-bottom" || $row eq "top-center" || $row eq "top"){ $ret .= BuildDashboardTopRow($t,$id,$tabgroups[$t],$tabsortings[$t]); }		
 		##################### Center Row (max. 5 Column) ############################################
@@ -359,36 +366,57 @@ sub BuildDashboardBottomRow($$$$){
  return $ret;
 }
 
-sub BuildButtonBar($$){
- my ($d,$pos) = @_;
+sub BuildButtonBar($$$){
+ my ($d,$pos,$fullsize) = @_;
  my $ret = "";
  my $cssclass = "hidden";
  
  if ($pos eq "tabs-and-buttonbar-at-the-top") { $cssclass = "top"; }
  if ($pos eq "tabs-and-buttonbar-on-the-bottom") { $cssclass = "bottom"; }
  
+  if ($fullsize eq "1" && $pos ne "hidden" ) {
+	 $ret .= "<div class=\"dashboard_buttonbar dashboard_buttonbar_".$cssclass."\">\n"; 
+	 $ret .= "	<div class=\"dashboard_button\"> <a id=\"dashboard_button_back\" href=\"/\" title=\"Back\"><span class=\"dashboard_button_icon dashboard_button_iconback\"></span></a> </div>\n";
+	 $ret .= "</div>\n";	 
+ }
+ 
  if ($pos ne "hidden") {
 	 $ret .= "<div class=\"dashboard_buttonbar dashboard_buttonbar_".$cssclass."\">\n";
-	 $ret .= "	<div class=\"dashboard_button\"> <span class=\"dashboard_button_icon dashboard_button_iconset\"></span> <a id=\"dashboard_button_set\" href=\"javascript:dashboard_setposition()\" title=\"Set the Position\">Set</a> </div>\n";
+	 $ret .= "	<div class=\"dashboard_button\"> <a id=\"dashboard_button_set\" href=\"javascript:dashboard_setposition()\" title=\"Set the Position\"><span class=\"dashboard_button_icon dashboard_button_iconset\"></span>Set</a> </div>\n";
 	 $ret .= "	<div class=\"dashboard_button\"> <a id=\"dashboard_button_lock\" href=\"javascript:dashboard_tooglelock()\" title=\"Lock Dashboard\">Lock</a> </div>\n";
-	 $ret .= "	<div class=\"dashboard_button\"> <span class=\"dashboard_button_icon dashboard_button_icondetail\"></span> <a id=\"dashboard_button_detail\" href=\"/fhem?detail=$d\" title=\"Dashboard Details\">Detail</a> </div>\n";		
+	 $ret .= "	<div class=\"dashboard_button\"> <a id=\"dashboard_button_detail\" href=\"/fhem?detail=$d\" title=\"Dashboard Details\"><span class=\"dashboard_button_icon dashboard_button_icondetail\"></span>Detail</a> </div>\n";		
 	 $ret .= "</div>\n";
- }
+ } 
+ 
  return $ret;
 }
 
 sub BuildGroupWidgets($$$$$) {
  my ($tab,$column,$id,$dbgroups, $dbsorting) = @_;
  my $ret = "";
- 
+
  		my $counter = 0;
 		my @storedsorting = split(":", $dbsorting);
+		
+		my @dbgroup = split(",", $dbgroups);
+		my $widgetheader = ""; 
+		
 		foreach my $singlesorting (@storedsorting) {
 			my @groupdata = split(",", $singlesorting);		
-			if (index($dbsorting, "t".$tab."c".$column.",".$groupdata[1]) >= 0  && index($dbgroups, $groupdata[1]) >= 0 && $groupdata[1] ne "" ) { #gruppe auch für tab hinterlegt
+			
+			if (index($dbsorting, "t".$tab."c".$column.",".$groupdata[1]) >= 0  && index($dbgroups, $groupdata[1]) >= 0 && $groupdata[1] ne "" ) { #group is set to tab
+			
+				$widgetheader = $groupdata[1];
+				foreach my $strdbgroup (@dbgroup) {
+					my @groupicon = split(":", trim($strdbgroup));			
+					if ($groupicon[0] eq $groupdata[1]) {
+						if ($#groupicon > 0) { $widgetheader = FW_makeImage($groupicon[1],$groupicon[1],"dashboard_tabicon") . "&nbsp;".$groupdata[1]; }
+					}
+				}
+				
 				$ret .= "  <div class=\"dashboard_widget\" data-groupwidget=\"".$singlesorting."\" id=\"".$id."t".$tab."c".$column."w".$counter."\">\n";
 				$ret .= "   <div class=\"dashboard_widgetinner\">\n";	
-				$ret .= "    <div class=\"dashboard_widgetheader\">".$groupdata[1]."</div>\n";
+				$ret .= "    <div class=\"dashboard_widgetheader\">".$widgetheader."</div>\n";
 				$ret .= "    <div data-userheight=\"\" class=\"dashboard_content\">\n";
 				$ret .= BuildGroup($groupdata[1]);
 				$ret .= "    </div>\n";	
@@ -396,21 +424,21 @@ sub BuildGroupWidgets($$$$$) {
 				$ret .= "  </div>\n";	
 				$counter++;
 			}
-		}
- 
+		} 
  return $ret; 
 }
 
 sub BuildGroupList($) {
  my @dashboardgroups = split(",", $_[0]); #array for all groups to build an widget
  my %group = ();
+ my $test;
  
  foreach my $d (sort keys %defs) {
     foreach my $grp (split(",", AttrVal($d, "group", ""))) {
 		$grp = trim($grp);
 		foreach my $g (@dashboardgroups){ 
-			$g = trim($g);
-			$group{$grp}{$d} = 1 if($g eq $grp); 
+			my ($gtitle, $iconName) = split(":", trim($g));
+			$group{$grp}{$d} = 1 if($gtitle eq $grp); 
 		}
     }
  } 
@@ -469,10 +497,6 @@ sub BuildGroup($)
 			####if ($helper == 1) {$txtreturn .= "<tr class=\"dashboard_editreadinggroups\"><td><div class=\"devType\"><div class=\"dashboard_button\"><span class=\"dashboard_button_icon dashboard_button_icondetail\"></span>$linkreturn Detail</a></div></div></td></tr>";}
 			$ret .= "<td>$txtreturn</td>";
 		} else  { $ret .= "<td informId=\"$d\">$txt</td>"; }
-		
-		
-#$ret .= "<td informId=\"$d\">$txt</td>";
-
 		###########################################################
 
 		###### Commands, slider, dropdown
@@ -872,23 +896,33 @@ sub Dashboard_attr($$$) {
     </li><br>		
   <a name="dashboard_tab1groups"></a>	
     <li>dashboard_tab1groups<br>
-        Comma-separated list of the names of the groups to be displayed in Tab 1.
+        Comma-separated list of the names of the groups to be displayed in Tab 1.<br>
+		Each group can be given an icon for this purpose the group name, the following must be completed ":&lt;icon&gt;@&lt;color&gt;"<br>
+		Example: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow		
     </li><br>		
   <a name="dashboard_tab2groups"></a>	
     <li>dashboard_tab1groups<br>
-        Comma-separated list of the names of the groups to be displayed in Tab 2.
+        Comma-separated list of the names of the groups to be displayed in Tab 2.<br>
+		Each group can be given an icon for this purpose the group name, the following must be completed ":&lt;icon&gt;@&lt;color&gt;"<br>
+		Example: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
     </li><br>			
   <a name="dashboard_tab3groups"></a>	
     <li>dashboard_tab1groups<br>
-        Comma-separated list of the names of the groups to be displayed in Tab 3.
+        Comma-separated list of the names of the groups to be displayed in Tab 3.<br>
+		Each group can be given an icon for this purpose the group name, the following must be completed ":&lt;icon&gt;@&lt;color&gt;"<br>
+		Example: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
     </li><br>		
   <a name="dashboard_tab4groups"></a>	
     <li>dashboard_tab1groups<br>
-        Comma-separated list of the names of the groups to be displayed in Tab 4.
+        Comma-separated list of the names of the groups to be displayed in Tab 4.<br>
+		Each group can be given an icon for this purpose the group name, the following must be completed ":&lt;icon&gt;@&lt;color&gt;"<br>
+		Example: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
     </li><br>			
   <a name="dashboard_tab5groups"></a>	
     <li>dashboard_tab1groups<br>
-        Comma-separated list of the names of the groups to be displayed in Tab 5.
+        Comma-separated list of the names of the groups to be displayed in Tab 5.<br>
+		Each group can be given an icon for this purpose the group name, the following must be completed ":&lt;icon&gt;@&lt;color&gt;"<br>
+		Example: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
     </li><br>	
   <a name="dashboard_tab1icon"></a>	
     <li>dashboard_tab1icon<br>
@@ -1112,23 +1146,33 @@ sub Dashboard_attr($$$) {
     </li><br>		
   <a name="dashboard_tab1groups"></a>	
     <li>dashboard_tab1groups<br>
-		Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 1 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.
+		Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 1 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.<br>
+		Jede Gruppe kann zusätzlich ein Icon anzeigen, dazu muss der Gruppen name um ":&lt;icon&gt;@&lt;farbe&gt;"ergänzt werden<br>
+		Beispiel: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow		
     </li><br>		
   <a name="dashboard_tab2groups"></a>	
     <li>dashboard_tab2groups<br>
-		Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 2 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.
+		Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 2 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.<br>
+		Jede Gruppe kann zusätzlich ein Icon anzeigen, dazu muss der Gruppen name um ":&lt;icon&gt;@&lt;farbe&gt;"ergänzt werden<br>
+		Beispiel: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
     </li><br>		
   <a name="dashboard_tab3groups"></a>	
     <li>dashboard_tab3groups<br>
-		Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 3 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.
+		Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 3 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.<br>
+		Jede Gruppe kann zusätzlich ein Icon anzeigen, dazu muss der Gruppen name um ":&lt;icon&gt;@&lt;farbe&gt;"ergänzt werden<br>
+		Beispiel: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
     </li><br>	
   <a name="dashboard_tab4groups"></a>	
     <li>dashboard_tab4groups<br>
-		Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 4 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.
+		Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 4 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.<br>
+		Jede Gruppe kann zusätzlich ein Icon anzeigen, dazu muss der Gruppen name um ":&lt;icon&gt;@&lt;farbe&gt;"ergänzt werden<br>
+		Beispiel: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
     </li><br>	
   <a name="dashboard_tab5groups"></a>	
     <li>dashboard_tab5groups<br>
-		Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 5 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.
+		Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 5 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.<br>
+		Jede Gruppe kann zusätzlich ein Icon anzeigen, dazu muss der Gruppen name um ":&lt;icon&gt;@&lt;farbe&gt;"ergänzt werden<br>
+		Beispiel: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
     </li><br>	
   <a name="dashboard_tab1icon"></a>	
     <li>dashboard_tab1icon<br>

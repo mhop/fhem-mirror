@@ -12,6 +12,7 @@
 // 2.02: Tabs can set on top, bottom or hidden
 // 2.03: Fix showhelper Bug on lock/unlock. The error that after a trigger action the curren tab is changed to the "old" activetab tab has 
 //			 been fixed.
+// 2.04: Dashboard position near Top in showfullsize-mode. Restore ActiveTab funktion
 //
 // Known Bugs/Todo's
 // See 95_Dashboard.pm
@@ -93,7 +94,7 @@ function restoreOrder() {
 		//-------------------------------- Height of an Group. | Min. Height if need ---------------------------	
 		if (height == 0) { height = $(this).outerHeight();}		
 		if ($(this).outerHeight() > height) {$(this).outerHeight(height); } //set heigh only if > group min. height
-		//---------------------------------------------------------------------------------------------------------------
+		//---------------------------------------------------------------------------------------------------------------	
 		
 		$(this).find(".dashboard_content").data("userheight", height-5);		
 		if (params[2] == 1) { $(this).addClass("dashboard_widgethelper"); } else { $(this).removeClass("dashboard_widgethelper"); }//Show Widget-Helper Frame
@@ -105,8 +106,9 @@ function restoreOrder() {
 					.addClass( "dashboard_button_iconplus" ); 
 			}						
 			$(this).find(".dashboard_content").hide();	
-			$(this).height($(this).find(".dashboard_widgetinner").height()+5);								
-		}						
+			$(this).height($(this).find(".dashboard_widgetinner").height()+5);	
+			$(this).find(".dashboard_widgetheader").addClass("dashboard_widgetmin");			
+		}	else {$(this).find(".dashboard_widgetheader").addClass("dashboard_widgetmax"); }					
 	}
  });
 } 
@@ -189,10 +191,10 @@ function dashboard_setposition(){
  document.getElementById("dashboard_button_set").classList.remove('dashboard_button_changed'); 
  //--------------------------------------------------------------------- 
  //--------------------- store active Tab ------------------------------
- //var activeTab = ($( "#tabs" ).tabs( "option", "active" ))+1;
- //if (params[11] != activeTab){
-//	FW_cmd(document.location.pathname+'?XHR=1&cmd.'+params[0]+'=attr '+params[0]+' dashboard_activetab '+activeTab);
-// }
+ var activeTab = ($( "#tabs" ).tabs( "option", "active" ))+1;
+ if (params[11] != activeTab){
+	FW_cmd(document.location.pathname+'?XHR=1&cmd.'+params[0]+'=attr '+params[0]+' dashboard_activetab '+activeTab);
+ }
  //--------------------------------------------------------------------- 
 }
 
@@ -233,6 +235,8 @@ $(document).ready( function () {
 	if (params[13] == 1){ //disable roomlist and header	
 		$("#menuScrollArea").remove();
 		$("#hdr").remove();
+		$(".roomoverview:first").remove();
+		$("br:first").remove();
 		$("#content").css({position:   'inherit'});	
 	}
 	
@@ -255,12 +259,17 @@ $(document).ready( function () {
 				.prepend('<span class="dashboard_button_icon dashboard_button_iconminus"></span>')  
 				.end();
 	
-		$(".dashboard_widgetheader .dashboard_button_icon").click(function(event) {
+		$(".dashboard_widgetheader .dashboard_button_icon").click(function(event) {				
 			if ($(this).hasClass("dashboard_button_iconplus")) {
 				$(this).removeClass( "dashboard_button_iconplus" );
 				$(this).addClass( "dashboard_button_iconminus" );
 				$(this).parents(".dashboard_widget:first").find(".dashboard_content").show();				
-				var newHeigth = $(this).parents(".dashboard_widget:first").find(".dashboard_content").data("userheight");
+				var newHeigth = $(this).parents(".dashboard_widget:first").find(".dashboard_content").data("userheight");				
+				
+				$(this).parent().removeClass("dashboard_widgetmin");			
+				$(this).parent().addClass("dashboard_widgetmax");
+
+				
 				//-------- set heigh only if > group min. height -------------
 				if ($(this).parents(".dashboard_widgetinner").outerHeight() > newHeigth) { 
 					$(this).parents(".dashboard_widget:first").outerHeight($(this).parents(".dashboard_widgetinner").outerHeight()+10); 
@@ -274,6 +283,9 @@ $(document).ready( function () {
 				$(this).parents(".dashboard_widget:first").find(".dashboard_content").hide();	
 				var newHeigth = $(this).parents(".dashboard_widget:first").find(".dashboard_widgetinner").height()+5;
 				$(this).parents(".dashboard_widget:first").height(newHeigth);		
+				
+				$(this).parent().removeClass("dashboard_widgetmax");			
+				$(this).parent().addClass("dashboard_widgetmin");
 			}				 
 			saveOrder();
 			event.stopImmediatePropagation();
@@ -290,10 +302,10 @@ $(document).ready( function () {
 		activate: function (event, ui) {
 			restoreOrder(); 
 			
-			var activeTab = ($( "#tabs" ).tabs( "option", "active" ))+1;
-			if (params[11] != activeTab){
-				FW_cmd(document.location.pathname+'?XHR=1&cmd.'+params[0]+'=attr '+params[0]+' dashboard_activetab '+activeTab);
-			 }			
+			//var activeTab = ($( "#tabs" ).tabs( "option", "active" ))+1;
+			//if (params[11] != activeTab){
+			//	FW_cmd(document.location.pathname+'?XHR=1&cmd.'+params[0]+'=attr '+params[0]+' dashboard_activetab '+activeTab);
+			// }			
 		}   
 	});	
 	if ($("#dashboard_tabnav").hasClass("dashboard_tabnav_bottom")) { $(".dashboard_tabnav").appendTo(".dashboard_tabs"); } //set Tabs on the Bottom	
