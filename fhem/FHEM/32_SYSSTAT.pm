@@ -757,8 +757,7 @@ SYSSTAT_getStat($)
       If set and > 0 the main temperaure of a synology diskstation is read. requires snmp.<br>
       If set to 2 a geometric average over the last 4 values is created.</li>
     <li>raspberrycpufreq<br>
-      If set and > 0 the raspberry pi on chip termal sensor is read.<br>
-      If set to 2 a geometric average over the last 4 values is created.</li>
+      If set and > 0 the raspberry pi on chip termal sensor is read.</li>
     <li>uptime<br>
       If set and > 0 the system uptime is read.<br>
       If set to 2 the uptime is displayed in seconds.</li>
@@ -766,9 +765,135 @@ SYSSTAT_getStat($)
       If set the entries of the filesystems list are treated as regex.</li>
     <li>ssh_user<br>
       The username for ssh remote access.</li>
-    <li>readingFnAttributes</li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
 </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="SYSSTAT"></a>
+<h3>SYSSTAT</h3>
+<ul>
+  Das Modul stellt Systemstatistiken f&uuml;r den Rechner, auf dem FHEM l&auml;uft bzw. 
+  f&uuml;r ein entferntes Linux System, das per vorkonfiguriertem ssh Zugang ohne Passwort
+  erreichbar ist, zur Vef&uuml;gung.<br><br>
+
+  Notes:
+  <ul>
+    <li>Dieses Modul ben&ouml;tigt  <code>Sys::Statistics::Linux</code> f&uuml;r Linux.<br>
+        Es kann mit '<code>cpan install Sys::Statistics::Linux</code>'<br> 
+        bzw. auf Debian mit '<code>apt-get install libsys-statistics-linux-perl</code>'
+        installiert werden.</li>
+
+    <li>Um einen Zielrechner mit snmp  zu &uuml;berwachen, muss
+    <code>Net::SNMP</code> installiert sein.<br></li>
+
+    <li>Um die Lastwerte zu plotten, kann der folgende Code verwendet werden:
+  <pre>
+  define sysstatlog FileLog /usr/local/FHEM/var/log/sysstat-%Y-%m.log sysstat
+  attr sysstatlog nrarchive 1
+  define wl_sysstat weblink fileplot sysstatlog:sysstat:CURRENT
+  attr wl_sysstat label "Load Min: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"
+  attr wl_sysstat room System
+  </pre></li>
+    <li>Um das Wurzel-Dateisystem (Mountpunkt '/') bei Plots der Plattennutzung zu erhalten,
+    sollte dieser Code '<code>#FileLog 4:/\x3a:0:</code>' bzw. '<code>#FileLog 4:\s..\s:0:</code>'
+    und <b>nicht</b> dieser Code '<code>#FileLog 4:/:0:</code>' verwendet werden, da der letztere
+    alle Mountpunkte darstellt.</li>.
+  </ul>
+
+  <a name="SYSSTAT_Define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; SYSSTAT [&lt;interval&gt; [&lt;interval_fs&gt;] [&lt;host&gt;]]</code><br>
+    <br>
+
+    definiert ein SYSSTAT Device.<br><br>
+
+    Die (Prozessor)last wird alle &lt;interval&gt; Sekunden aktualisiert. Standard bzw. Minimum ist 60.<br><br>
+    Die Plattennutzung wird alle &lt;interval_fs&gt; Sekunden aktualisiert. Standardwert ist &lt;interval&gt;*60 
+    und Minimum ist 60.
+    &lt;interval_fs&gt; wird nur angen&auml;hert und funktioniert am Besten, wenn &lt;interval_fs&gt; 
+    ein ganzzahliges Vielfaches von &lt;interval&gt; ist.<br><br>
+
+    Wenn &lt;host&gt; angegeben wird, muss der Zugang per ssh ohne Passwort m&ouml;glich sein.<br><br>
+
+    Beispiele:
+    <ul>
+      <code>define sysstat SYSSTAT</code><br>
+      <code>define sysstat SYSSTAT 300</code><br>
+      <code>define sysstat SYSSTAT 60 600</code>
+    </ul>
+  </ul><br>
+
+  <a name="SYSSTAT_Readings"></a>
+  <b>Readings</b>
+  <ul>
+    <li>load<br>
+    die durchschnittliche (Prozessor)last der letzten 1 Minute (f&uuml;r Windows Rechner mit 
+    snmp angen&auml;hertem Wert)</li>
+    <li>state<br>
+    die durchschnittliche (Prozessor)last der letzten 1, 5 und 15 Minuten (f&uuml;r Windows 
+    Rechner die Nutzung pro CPU via snmp ermittelt)</li>
+    <li>user, system, idle, iowait<br>
+    den Prozentsatz der entsprechenden Systemlast (nur f&uuml;r Linux Systeme)</li>
+    <li>&lt;mountpoint&gt;<br>
+    Anzahl der freien Bytes f&uuml;r &lt;mountpoint&gt;</li>
+  </ul><br>
+
+  <a name="SYSSTAT_Get"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    Werte f&uuml;r <code>value</code> sind<br><br>
+    <li>filesystems<br>
+    zeigt die Dateisysteme an, die &uuml;berwacht werden k&ouml;nnen.</li>
+  </ul><br>
+
+  <a name="SYSSTAT_Attr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li>disable<br>
+      l&auml;sst die Timer weiterlaufen, aber stoppt die Speicherung der Daten.</li>
+    <li>filesystems<br>
+      Liste mit Komma getrennten Dateisystemen (nicht Mountpunkten) die &uuml;berwacht
+      werden sollen.<br>
+    Beispiele:
+    <ul>
+      <code>attr sysstat filesystems /dev/md0,/dev/md2</code><br>
+      <code>attr sysstat filesystems /dev/.*</code><br>
+      <code>attr sysstat filesystems 1,3,5</code><br>
+    </ul></li>
+    <li>showpercent<br>
+      Wenn gesetzt, wird die Nutzung in Prozent angegeben. Wenn nicht gesetzt, wird der verf&uuml;bare
+      Platz in Bytes angezeigt.</li>
+    <li>snmp<br>
+      1 -> snmp wird verwendet, um Last, Einschaltzeit und Dateisysteme (inkl. physikalischem und
+      virtuellem Speicher) zu &uuml;berwachen</li>
+    <li>stat<br>
+      1 -> &uuml;berwacht Prozentsatz der user, system, idle und iowait Last 
+      (nur auf Linux Systemen verf&uuml;gbar)</li>
+    <li>raspberrytemperature<br>
+      Wenn gesetzt und  > 0 wird der Temperatursensor auf dem Raspberry Pi ausgelesen.<br>
+      Wenn Wert 2 ist, wird ein geometrischer Durchschnitt der letzten 4 Werte dargestellt.</li>
+    <li>synologytemperature<br>
+      Wenn gesetzt und  > 0 wird die Temperatur einer Synology Diskstation ausgelesen (erfordert snmp).<br>
+      Wenn Wert 2 ist, wird ein geometrischer Durchschnitt der letzten 4 Werte dargestellt.</li>
+    <li>raspberrycpufreq<br>
+      Wenn gesetzt und > 0 wird die Raspberry Pi CPU Frequenz ausgelesen.</li>
+    <li>uptime<br>
+      Wenn gesetzt und > 0 wird die Betriebszeit (uptime) des Systems ausgelesen.<br>
+      Wenn Wert 2 ist, wird die Betriebszeit (uptime) in Sekunden angezeigt.</li>
+    <li>useregex<br>
+      Wenn Wert gesetzt, werden die Eintr&auml;ge der Dateisysteme als regex behandelt.</li>
+    <li>ssh_user<br>
+      Der Username f&uuml;r den ssh Zugang auf dem entfernten Rechner.</li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+</ul>
+
+=end html_DE
 =cut
