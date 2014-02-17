@@ -1,10 +1,11 @@
-#Thu Sep 26 12:28:55 2013
+#Mon Feb 17 20:54:16 2014
 setstate Alarm on
 setstate Alarm 2013-08-23 07:42:48 state on
 setstate AllLights on
 setstate AllLights 2013-08-25 14:23:20 LastDevice Office
 setstate AllLights 2013-08-25 14:23:20 LastDevice_Abs Office
 setstate AllLights 2013-08-25 14:23:20 state on
+setstate AllResidentsAway active
 setstate CeilingLight dim0%
 setstate CeilingLight 2013-08-26 18:01:06 state off
 setstate Cellar T: 21.1  H: 54.6
@@ -14,7 +15,7 @@ setstate Cellar 2013-08-13 08:00:48 dewpoint 11.6
 setstate Cellar 2013-08-13 08:00:48 humidity 54.6
 setstate Cellar 2013-08-13 08:00:48 state T: 21.1  H: 54.6
 setstate Cellar 2013-08-13 08:00:48 temperature 21.1
-setstate Garden T: 18.3  H: 72  W: 0.5  R: 81.9  IR: no
+setstate Garden defined
 setstate Garden 2013-08-13 08:03:17 avg_day T: 17.2  H: 73  W: 0.0  R: 0.0
 setstate Garden 2013-08-13 00:02:53 avg_month T: 21.0  H: 33  W: 30.1  R: 30.4
 setstate Garden 2013-08-13 08:03:17 cum_day 2013-08-13 00:02:53 T: 494797  H: 2112387  W: 502.6  R: 81.9
@@ -25,7 +26,7 @@ setstate Garden 2013-08-13 15:03:17 israining no
 setstate Garden 2013-08-13 15:03:17 rain 81.9
 setstate Garden 2013-08-13 15:03:17 rain_raw 321
 setstate Garden 2013-08-13 15:03:17 rain_raw_adj 321
-setstate Garden 2013-08-13 15:03:17 state T: 18.3  H: 72  W: 0.5  R: 81.9  IR: no
+setstate Garden 2014-02-17 20:54:12 state defined
 setstate Garden 2013-08-13 15:03:17 temperature 18.3
 setstate Garden 2013-08-13 15:03:17 tsecs 1376805797
 setstate Garden 2013-08-13 15:03:17 unknown1 a
@@ -46,6 +47,7 @@ setstate Projector off
 setstate Projector 2013-08-26 18:01:06 state off
 setstate ReadingLight dim12%
 setstate ReadingLight 2013-08-26 18:01:06 state dim12%
+setstate ResidentsComeHome active
 setstate SVG_01_Garden initialized
 setstate SVG_02_Cellar initialized
 setstate SVG_03_Dewpoint initialized
@@ -53,11 +55,230 @@ setstate Screen up
 setstate Screen 2013-08-26 18:01:06 state up
 setstate TV on
 setstate TV 2013-08-26 18:01:06 state on
+setstate anyViews_weblink initialized
 setstate autocreate active
 setstate dew_all active
 setstate et active
 setstate global <no definition>
 setstate outdoorNotifier active
-setstate sunRise Next: 06:44:33
-setstate sunSet Next: 19:49:35
+setstate rg_Guest1 none
+setstate rg_Guest1 2014-02-16 13:59:50 durTimerAbsence 0
+setstate rg_Guest1 2014-02-16 13:34:06 durTimerPresence 0
+setstate rg_Guest1 2014-02-15 16:15:34 durTimerSleep 0
+setstate rg_Guest1 2014-02-16 14:09:20 lastArrival -
+setstate rg_Guest1 2014-02-16 14:09:29 lastAwake 0
+setstate rg_Guest1 2014-02-16 14:09:20 lastDeparture 2014-02-16 14:09:20
+setstate rg_Guest1 2014-02-16 14:09:20 lastDurAbsence -
+setstate rg_Guest1 2014-02-16 14:09:20 lastDurPresence 00:00:03
+setstate rg_Guest1 2014-02-16 14:09:29 lastDurSleep 0
+setstate rg_Guest1 2014-02-16 14:09:20 lastLocation -
+setstate rg_Guest1 2014-02-16 14:09:20 lastMood -
+setstate rg_Guest1 2014-02-16 14:09:29 lastSleep 0
+setstate rg_Guest1 2014-02-16 14:09:20 lastState home
+setstate rg_Guest1 2014-02-16 14:09:20 location -
+setstate rg_Guest1 2014-02-16 14:09:20 mood -
+setstate rg_Guest1 2014-02-16 14:09:20 presence absent
+setstate rg_Guest1 2014-02-16 14:09:20 state none
+setstate rg_Guest1 2014-02-15 16:16:27 wayhome 0
+setstate rg_Guest2 none
+setstate rg_Guest2 2014-02-15 16:15:39 durTimerAbsence 0
+setstate rg_Guest2 2014-02-16 13:34:05 durTimerPresence 0
+setstate rg_Guest2 2014-02-15 16:15:39 durTimerSleep 0
+setstate rg_Guest2 2014-02-16 14:01:22 lastArrival -
+setstate rg_Guest2 2014-02-16 14:09:29 lastAwake 0
+setstate rg_Guest2 2014-02-16 14:00:46 lastDeparture 2014-02-16 14:00:45
+setstate rg_Guest2 2014-02-16 14:01:22 lastDurAbsence -
+setstate rg_Guest2 2014-02-16 14:00:46 lastDurPresence 00:00:03
+setstate rg_Guest2 2014-02-16 14:09:29 lastDurSleep 0
+setstate rg_Guest2 2014-02-16 14:01:22 lastLocation -
+setstate rg_Guest2 2014-02-16 14:01:22 lastMood -
+setstate rg_Guest2 2014-02-16 14:09:29 lastSleep 0
+setstate rg_Guest2 2014-02-16 14:01:22 lastState absent
+setstate rg_Guest2 2014-02-16 14:01:22 location -
+setstate rg_Guest2 2014-02-16 14:01:22 mood -
+setstate rg_Guest2 2014-02-16 14:00:46 presence absent
+setstate rg_Guest2 2014-02-16 14:01:22 state none
+setstate rg_Guest2 2014-02-15 16:16:29 wayhome 0
+setstate rgr_Children home
+setstate rgr_Children 2014-02-17 20:45:12 lastActivity home
+setstate rgr_Children 2014-02-17 20:45:12 lastActivityBy Baby
+setstate rgr_Children 2014-02-16 14:31:05 lastArrival 2014-02-16 14:31:05
+setstate rgr_Children 2014-02-17 20:45:12 lastAwake 2014-02-17 20:45:12
+setstate rgr_Children 2014-02-16 14:26:55 lastDeparture 2014-02-16 14:26:55
+setstate rgr_Children 2014-02-16 14:31:05 lastDurAbsence 00:04:10
+setstate rgr_Children 2014-02-16 14:26:55 lastDurPresence 00:10:37
+setstate rgr_Children 2014-02-17 20:45:12 lastDurSleep 29:47:11
+setstate rgr_Children 2014-02-16 14:58:01 lastSleep 2014-02-16 14:58:01
+setstate rgr_Children 2014-02-17 20:45:12 lastState asleep
+setstate rgr_Children 2014-02-16 14:31:05 presence present
+setstate rgr_Children 2014-02-16 14:58:01 residentsAbsent 2
+setstate rgr_Children 2014-02-17 20:45:12 residentsAsleep 0
+setstate rgr_Children 2014-02-16 14:06:48 residentsAwoken 0
+setstate rgr_Children 2014-02-16 14:58:00 residentsGone 0
+setstate rgr_Children 2014-02-16 14:31:13 residentsGotosleep 0
+setstate rgr_Children 2014-02-15 16:16:25 residentsGuests 0
+setstate rgr_Children 2014-02-17 20:45:12 residentsHome 1
+setstate rgr_Children 2014-02-16 14:31:05 residentsTotal 3
+setstate rgr_Children 2014-02-16 14:58:01 residentsTotalAbsent 2
+setstate rgr_Children 2014-02-16 14:58:01 residentsTotalPresent 1
+setstate rgr_Children 2014-02-15 16:16:25 residentsTotalWayhome 0
+setstate rgr_Children 2014-02-17 20:45:12 state home
+setstate rgr_Guests none
+setstate rgr_Guests 2014-02-16 14:09:20 lastActivity none
+setstate rgr_Guests 2014-02-16 14:09:20 lastActivityBy Guests
+setstate rgr_Guests 2014-02-16 14:09:17 lastArrival 2014-02-16 14:09:17
+setstate rgr_Guests 2014-02-16 14:09:20 lastDeparture 2014-02-16 14:09:20
+setstate rgr_Guests 2014-02-16 14:09:17 lastDurAbsence 00:00:04
+setstate rgr_Guests 2014-02-16 14:09:20 lastDurPresence 00:00:03
+setstate rgr_Guests 2014-02-16 14:09:20 lastState home
+setstate rgr_Guests 2014-02-16 14:09:20 presence absent
+setstate rgr_Guests 2014-02-16 14:09:17 residentsAbsent 0
+setstate rgr_Guests 2014-02-15 16:16:27 residentsAsleep 0
+setstate rgr_Guests 2014-02-15 16:16:27 residentsAwoken 0
+setstate rgr_Guests 2014-02-15 16:16:27 residentsGone 0
+setstate rgr_Guests 2014-02-15 16:16:27 residentsGotosleep 0
+setstate rgr_Guests 2014-02-16 14:09:20 residentsGuests 0
+setstate rgr_Guests 2014-02-16 14:09:20 residentsHome 0
+setstate rgr_Guests 2014-02-16 14:09:20 residentsTotal 0
+setstate rgr_Guests 2014-02-16 14:09:17 residentsTotalAbsent 0
+setstate rgr_Guests 2014-02-16 14:09:20 residentsTotalPresent 0
+setstate rgr_Guests 2014-02-15 16:16:27 residentsTotalWayhome 0
+setstate rgr_Guests 2014-02-16 14:09:20 state none
+setstate rgr_Parents home
+setstate rgr_Parents 2014-02-17 20:45:19 lastActivity absent
+setstate rgr_Parents 2014-02-17 20:45:19 lastActivityBy Father
+setstate rgr_Parents 2014-02-16 14:16:17 lastArrival 2014-02-16 14:16:17
+setstate rgr_Parents 2014-02-15 16:39:35 lastAwake 2014-02-15 16:39:35
+setstate rgr_Parents 2014-02-16 14:16:16 lastDeparture 2014-02-16 14:16:16
+setstate rgr_Parents 2014-02-16 14:16:17 lastDurAbsence 00:00:01
+setstate rgr_Parents 2014-02-16 14:16:16 lastDurPresence 00:00:03
+setstate rgr_Parents 2014-02-15 16:39:35 lastDurSleep 00:02:44
+setstate rgr_Parents 2014-02-15 16:36:51 lastSleep 2014-02-15 16:36:51
+setstate rgr_Parents 2014-02-16 14:16:17 lastState absent
+setstate rgr_Parents 2014-02-16 14:16:17 presence present
+setstate rgr_Parents 2014-02-17 20:45:19 residentsAbsent 1
+setstate rgr_Parents 2014-02-16 13:31:53 residentsAsleep 0
+setstate rgr_Parents 2014-02-16 13:31:53 residentsAwoken 0
+setstate rgr_Parents 2014-02-17 20:45:19 residentsGone 0
+setstate rgr_Parents 2014-02-15 16:36:51 residentsGotosleep 0
+setstate rgr_Parents 2014-02-15 16:13:39 residentsGuests 0
+setstate rgr_Parents 2014-02-16 14:26:52 residentsHome 1
+setstate rgr_Parents 2014-02-16 13:48:12 residentsTotal 2
+setstate rgr_Parents 2014-02-16 14:26:52 residentsTotalAbsent 1
+setstate rgr_Parents 2014-02-16 14:26:52 residentsTotalPresent 1
+setstate rgr_Parents 2014-02-15 16:13:39 residentsTotalWayhome 0
+setstate rgr_Parents 2014-02-16 14:16:17 state home
+setstate rgr_Residents home
+setstate rgr_Residents 2014-02-17 20:45:19 lastActivity absent
+setstate rgr_Residents 2014-02-17 20:45:19 lastActivityBy Father
+setstate rgr_Residents 2014-02-16 14:16:17 lastArrival 2014-02-16 14:16:17
+setstate rgr_Residents 2014-02-16 14:02:48 lastAwake 2014-02-16 14:02:48
+setstate rgr_Residents 2014-02-16 14:16:16 lastDeparture 2014-02-16 14:16:16
+setstate rgr_Residents 2014-02-16 14:16:17 lastDurAbsence 00:00:01
+setstate rgr_Residents 2014-02-16 14:16:16 lastDurPresence 00:00:02
+setstate rgr_Residents 2014-02-16 14:02:48 lastDurSleep 00:00:00
+setstate rgr_Residents 2014-02-16 14:02:48 lastSleep 2014-02-16 14:02:48
+setstate rgr_Residents 2014-02-16 14:16:17 lastState absent
+setstate rgr_Residents 2014-02-16 14:16:17 presence present
+setstate rgr_Residents 2014-02-17 20:45:19 residentsAbsent 3
+setstate rgr_Residents 2014-02-17 20:45:12 residentsAsleep 0
+setstate rgr_Residents 2014-02-16 14:06:49 residentsAwoken 0
+setstate rgr_Residents 2014-02-17 20:45:19 residentsGone 0
+setstate rgr_Residents 2014-02-16 14:31:13 residentsGotosleep 0
+setstate rgr_Residents 2014-02-16 14:09:20 residentsGuests 0
+setstate rgr_Residents 2014-02-17 20:45:12 residentsHome 2
+setstate rgr_Residents 2014-02-16 14:31:05 residentsTotal 5
+setstate rgr_Residents 2014-02-16 14:58:01 residentsTotalAbsent 3
+setstate rgr_Residents 2014-02-16 14:58:01 residentsTotalPresent 2
+setstate rgr_Residents 2014-02-15 16:13:39 residentsTotalWayhome 0
+setstate rgr_Residents 2014-02-16 14:16:17 state home
+setstate rr_Baby home
+setstate rr_Baby 2014-02-16 14:30:21 durTimerAbsence 0
+setstate rr_Baby 2014-02-17 20:44:42 durTimerPresence 1814
+setstate rr_Baby 2014-02-17 20:45:12 durTimerSleep 0
+setstate rr_Baby 2014-02-16 14:30:21 lastArrival 2014-02-16 14:30:21
+setstate rr_Baby 2014-02-17 20:45:12 lastAwake 2014-02-17 20:45:12
+setstate rr_Baby 2014-02-16 14:32:38 lastDeparture 0
+setstate rr_Baby 2014-02-17 20:45:12 lastDurSleep 30:13:59
+setstate rr_Baby 2014-02-16 14:30:21 lastLocation undefined
+setstate rr_Baby 2014-02-16 14:31:13 lastMood sleepy
+setstate rr_Baby 2014-02-16 14:31:13 lastSleep 2014-02-16 14:31:13
+setstate rr_Baby 2014-02-17 20:45:12 lastState asleep
+setstate rr_Baby 2014-02-16 14:30:21 location home
+setstate rr_Baby 2014-02-17 20:45:12 mood calm
+setstate rr_Baby 2014-02-16 14:30:21 presence present
+setstate rr_Baby 2014-02-17 20:45:12 state home
+setstate rr_Baby 2014-02-16 14:30:21 wayhome 0
+setstate rr_Daughter absent
+setstate rr_Daughter 2014-02-17 20:45:42 durTimerAbsence 1787
+setstate rr_Daughter 2014-02-16 14:26:54 durTimerPresence 0
+setstate rr_Daughter 2014-02-16 14:02:48 durTimerSleep 0
+setstate rr_Daughter 2014-02-16 14:57:58 lastArrival 2014-02-16 14:57:58
+setstate rr_Daughter 2014-02-16 14:02:48 lastAwake 2014-02-16 14:02:48
+setstate rr_Daughter 2014-02-16 14:57:59 lastDeparture 2014-02-16 14:57:59
+setstate rr_Daughter 2014-02-16 14:57:58 lastDurAbsence 00:23:49
+setstate rr_Daughter 2014-02-16 14:57:59 lastDurPresence 00:00:01
+setstate rr_Daughter 2014-02-16 14:02:48 lastDurSleep 00:08:12
+setstate rr_Daughter 2014-02-16 14:57:59 lastLocation home
+setstate rr_Daughter 2014-02-16 14:57:59 lastMood calm
+setstate rr_Daughter 2014-02-16 13:54:36 lastSleep 2014-02-16 13:54:36
+setstate rr_Daughter 2014-02-16 14:57:59 lastState home
+setstate rr_Daughter 2014-02-16 14:57:59 location underway
+setstate rr_Daughter 2014-02-16 14:57:59 mood -
+setstate rr_Daughter 2014-02-16 14:57:59 presence absent
+setstate rr_Daughter 2014-02-16 14:57:59 state absent
+setstate rr_Daughter 2014-02-16 13:46:26 wayhome 0
+setstate rr_Father absent
+setstate rr_Father 2014-02-17 20:45:19 durTimerAbsence 1818
+setstate rr_Father 2014-02-16 14:26:52 durTimerPresence 0
+setstate rr_Father 2014-02-16 13:46:02 durTimerSleep 0
+setstate rr_Father 2014-02-16 14:16:17 lastArrival 2014-02-16 14:16:17
+setstate rr_Father 2014-02-16 14:26:52 lastDeparture 2014-02-16 14:26:52
+setstate rr_Father 2014-02-16 14:16:17 lastDurAbsence 00:00:01
+setstate rr_Father 2014-02-16 14:26:52 lastDurPresence 00:10:35
+setstate rr_Father 2014-02-16 14:26:52 lastLocation home
+setstate rr_Father 2014-02-16 14:26:52 lastMood calm
+setstate rr_Father 2014-02-17 20:45:19 lastState gone
+setstate rr_Father 2014-02-16 14:26:52 location underway
+setstate rr_Father 2014-02-16 14:26:52 mood -
+setstate rr_Father 2014-02-16 14:26:52 presence absent
+setstate rr_Father 2014-02-17 20:45:19 state absent
+setstate rr_Father 2014-02-16 13:46:02 wayhome 0
+setstate rr_Mother home
+setstate rr_Mother 2014-02-16 14:04:26 durTimerAbsence 0
+setstate rr_Mother 2014-02-17 20:45:42 durTimerPresence 1829
+setstate rr_Mother 2014-02-16 13:46:09 durTimerSleep 0
+setstate rr_Mother 2014-02-16 14:16:17 lastArrival 2014-02-16 14:16:17
+setstate rr_Mother 2014-02-16 14:16:16 lastDeparture 2014-02-16 14:16:16
+setstate rr_Mother 2014-02-16 14:16:17 lastDurAbsence 00:00:01
+setstate rr_Mother 2014-02-16 14:16:16 lastDurPresence 00:00:02
+setstate rr_Mother 2014-02-16 14:16:16 lastLocation home
+setstate rr_Mother 2014-02-16 14:16:16 lastMood calm
+setstate rr_Mother 2014-02-16 14:16:17 lastState absent
+setstate rr_Mother 2014-02-16 14:16:17 location home
+setstate rr_Mother 2014-02-16 14:16:17 mood calm
+setstate rr_Mother 2014-02-16 14:16:17 presence present
+setstate rr_Mother 2014-02-16 14:16:17 state home
+setstate rr_Mother 2014-02-16 13:46:09 wayhome 0
+setstate rr_Son absent
+setstate rr_Son 2014-02-17 20:45:42 durTimerAbsence 1787
+setstate rr_Son 2014-02-16 14:26:55 durTimerPresence 0
+setstate rr_Son 2014-02-16 14:00:53 durTimerSleep 0
+setstate rr_Son 2014-02-16 14:58:00 lastArrival 2014-02-16 14:58:00
+setstate rr_Son 2014-02-16 14:06:44 lastAwake 2014-02-16 14:06:44
+setstate rr_Son 2014-02-16 14:58:01 lastDeparture 2014-02-16 14:58:01
+setstate rr_Son 2014-02-16 14:58:00 lastDurAbsence 00:23:50
+setstate rr_Son 2014-02-16 14:58:01 lastDurPresence 00:00:01
+setstate rr_Son 2014-02-16 14:06:44 lastDurSleep 00:00:11
+setstate rr_Son 2014-02-16 14:58:01 lastLocation home
+setstate rr_Son 2014-02-16 14:58:01 lastMood calm
+setstate rr_Son 2014-02-16 14:06:33 lastSleep 2014-02-16 14:06:33
+setstate rr_Son 2014-02-16 14:58:01 lastState home
+setstate rr_Son 2014-02-16 14:58:01 location underway
+setstate rr_Son 2014-02-16 14:58:01 mood -
+setstate rr_Son 2014-02-16 14:58:01 presence absent
+setstate rr_Son 2014-02-16 14:58:01 state absent
+setstate rr_Son 2014-02-16 13:46:38 wayhome 0
+setstate sunRise Next: 06:58:34
+setstate sunSet Next: 18:20:46
 setstate wlCinema initialized

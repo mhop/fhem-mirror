@@ -7,7 +7,7 @@ attr global room System
 attr global sendStatistics never
 attr global statefile ./demolog/fhem.save
 attr global updateInBackground 1
-attr global userattr Light Light_map devStateIcon devStateStyle icon lightSceneParamsToSave sortby structexclude webCmd
+attr global userattr Light Light_map devStateIcon devStateStyle icon lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0 sortby structexclude webCmd
 attr global verbose 3
 
 define telnetPort telnet 7072 global
@@ -17,16 +17,19 @@ define WEB FHEMWEB 8083 global
 attr WEB hiddenroom DashboardRoom
 attr WEB iconPath openautomation:fhemSVG
 attr WEB room System
+attr WEB sortRooms Light Cinema Residents Sensors System
 
 define WEBphone FHEMWEB 8084 global
 attr WEBphone hiddenroom DashboardRoom
 attr WEBphone room System
+attr WEBphone sortRooms Light Cinema Residents Sensors System
 attr WEBphone stylesheetPrefix smallscreen
 
 define WEBtablet FHEMWEB 8085 global
 attr WEBtablet hiddenroom DashboardRoom
 attr WEBtablet iconPath openautomation:fhemSVG
 attr WEBtablet room System
+attr WEBtablet sortRooms Light Cinema Residents Sensors System
 attr WEBtablet stylesheetPrefix ios7
 
 # Fake FileLog entry, to access the fhem log from FHEMWEB 
@@ -153,17 +156,116 @@ attr lcCinema webCmd scene
 
 define anyViews Dashboard
 attr anyViews dashboard_colcount 2
-attr anyViews dashboard_colwidth 400
 attr anyViews dashboard_lockstate lock
 attr anyViews dashboard_row top-center
-attr anyViews dashboard_rowtopheight 150
-attr anyViews dashboard_showhelper 0
-attr anyViews dashboard_tab1groups Light,AV,Single Lights
+attr anyViews dashboard_rowcentercolwidth 400
+attr anyViews dashboard_rowtopheight 205
+attr anyViews dashboard_showhelper 1
+attr anyViews dashboard_tab1groups Home State,Light,AV,Single Lights
 attr anyViews dashboard_tab1name Dashboard Demo
-attr anyViews dashboard_tab1sorting t0c100,Light,true,723,132:t0c0,Single Lights,true,462,207:t0c1,AV,true,326,123:
+attr anyViews dashboard_tab1sorting t0c100,Light,true,518,129:t0c100,Home State,true,496,204:t0c0,Single Lights,true,522,209:t0c0,AV,true,221,170:
 attr anyViews dashboard_tabcount 1
 attr anyViews dashboard_width 80%
 
 define anyViews_weblink weblink htmlCode {DashboardAsHtml("anyViews")}
 attr anyViews_weblink room DashboardRoom
 
+define rgr_Residents RESIDENTS
+attr rgr_Residents alias Residents
+attr rgr_Residents devStateIcon .*home:status_available:absent .*absent:status_away_1:home .*gone:status_standby:home .*none:control_building_empty .*gotosleep:status_night:asleep .*asleep:status_night:awoken .*awoken:status_available:home
+attr rgr_Residents group Home State
+attr rgr_Residents icon control_building_filled
+attr rgr_Residents room Residents
+attr rgr_Residents sortby 2
+attr rgr_Residents webCmd state
+define rgr_Parents RESIDENTS
+attr rgr_Parents alias Parents
+attr rgr_Parents devStateIcon .*home:status_available:absent .*absent:status_away_1:home .*gone:status_standby:home .*none:control_building_empty .*gotosleep:status_night:asleep .*asleep:status_night:awoken .*awoken:status_available:home
+attr rgr_Parents group Home State
+attr rgr_Parents icon control_building_filled
+attr rgr_Parents room Residents
+attr rgr_Parents sortby 2
+attr rgr_Parents webCmd state
+define rgr_Children RESIDENTS
+attr rgr_Children alias Children
+attr rgr_Children devStateIcon .*home:status_available:absent .*absent:status_away_1:home .*gone:status_standby:home .*none:control_building_empty .*gotosleep:status_night:asleep .*asleep:status_night:awoken .*awoken:status_available:home
+attr rgr_Children group Home State
+attr rgr_Children icon control_building_filled
+attr rgr_Children room Residents
+attr rgr_Children sortby 3
+attr rgr_Children webCmd state
+define rgr_Guests RESIDENTS
+attr rgr_Guests alias Guests
+attr rgr_Guests devStateIcon .*home:status_available:absent .*absent:status_away_1:home .*gone:status_standby:home .*none:control_building_empty .*gotosleep:status_night:asleep .*asleep:status_night:awoken .*awoken:status_available:home
+attr rgr_Guests group Home State
+attr rgr_Guests icon control_building_filled
+attr rgr_Guests room Residents
+attr rgr_Guests sortby 4
+attr rgr_Guests webCmd state
+define rg_Guest1 GUEST rgr_Residents,rgr_Guests
+attr rg_Guest1 alias Guest1
+attr rg_Guest1 devStateIcon .*home:user_available:absent .*absent:user_away:home .*none:control_building_empty:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
+attr rg_Guest1 group Guests
+attr rg_Guest1 icon scene_visit_guests
+attr rg_Guest1 rg_autoGoneAfter 0.01
+attr rg_Guest1 rg_realname alias
+attr rg_Guest1 room Residents
+attr rg_Guest1 sortby 1
+attr rg_Guest1 webCmd state
+define rg_Guest2 GUEST rgr_Residents,rgr_Guests
+attr rg_Guest2 alias Guest2
+attr rg_Guest2 devStateIcon .*home:user_available:absent .*absent:user_away:home .*none:control_building_empty:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
+attr rg_Guest2 group Guests
+attr rg_Guest2 icon scene_visit_guests
+attr rg_Guest2 rg_autoGoneAfter 0.01
+attr rg_Guest2 rg_realname alias
+attr rg_Guest2 room Residents
+attr rg_Guest2 sortby 1
+attr rg_Guest2 webCmd state
+define rr_Father ROOMMATE rgr_Residents,rgr_Parents
+attr rr_Father alias Status
+attr rr_Father devStateIcon .*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
+attr rr_Father group Father
+attr rr_Father icon status_available
+attr rr_Father room Residents
+attr rr_Father rr_autoGoneAfter 0.1
+attr rr_Father sortby 0
+attr rr_Father webCmd state
+define rr_Mother ROOMMATE rgr_Residents,rgr_Parents
+attr rr_Mother alias Status
+attr rr_Mother devStateIcon .*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
+attr rr_Mother group Mother
+attr rr_Mother icon status_available
+attr rr_Mother room Residents
+attr rr_Mother rr_autoGoneAfter 0.1
+attr rr_Mother rr_passPresenceTo rr_Baby
+attr rr_Mother sortby 0
+attr rr_Mother webCmd state
+define rr_Daughter ROOMMATE rgr_Residents,rgr_Children
+attr rr_Daughter alias Status
+attr rr_Daughter devStateIcon .*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
+attr rr_Daughter group Daughter
+attr rr_Daughter icon status_available
+attr rr_Daughter room Residents
+attr rr_Daughter sortby 0
+attr rr_Daughter webCmd state
+define rr_Son ROOMMATE rgr_Residents,rgr_Children
+attr rr_Son alias Status
+attr rr_Son devStateIcon .*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
+attr rr_Son group Son
+attr rr_Son icon status_available
+attr rr_Son room Residents
+attr rr_Son sortby 0
+attr rr_Son webCmd state
+define AllResidentsAway notify rgr_Residents:(absent|gone) set AllLights off;;set lcCinema scene AllOff
+attr AllResidentsAway room Residents
+define ResidentsComeHome notify rgr_Residents:home set Outdoor on
+attr ResidentsComeHome room Residents
+define rr_Baby ROOMMATE rgr_Residents,rgr_Children
+attr rr_Baby alias Status
+attr rr_Baby devStateIcon .*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown
+attr rr_Baby group Baby
+attr rr_Baby icon status_available
+attr rr_Baby room Residents
+attr rr_Baby sortby 0
+attr rr_Baby webCmd state
