@@ -131,18 +131,19 @@ sub CUL_HM_Initialize($) {
   $hash->{GetFn}     = "CUL_HM_Get";
   $hash->{RenameFn}  = "CUL_HM_Rename";
   $hash->{AttrFn}    = "CUL_HM_Attr";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:1,0 dummy:1,0 ".
-                       "showtime:1,0 ".
-                       "serialNr firmware ".
-                       "rawToReadable unit ".#"KFM-Sensor" only
-                       "peerIDs repPeers ".
-                       "actCycle actStatus ".
-                       "autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus,5_readMissing,8_stateOnly ".
-                       "expert:0_off,1_on,2_full ".
-                       "burstAccess:0_off,1_auto ".
-                       "param msgRepeat ".
-                       ".stc .devInfo ".
-                       $readingFnAttributes;
+  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:1,0 dummy:1,0 "
+                       ."showtime:1,0 "
+                       ."serialNr firmware "
+                       ."rawToReadable unit "#"KFM-Sensor" only
+                       ."peerIDs repPeers "
+                       ."actCycle actStatus "
+                       ."autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus,5_readMissing,8_stateOnly "
+                       ."expert:0_off,1_on,2_full "
+                       ."burstAccess:0_off,1_auto "
+                       ."param msgRepeat "
+                       .".stc .devInfo "
+                       ."aesCommReq:1,0 "
+                       .$readingFnAttributes;
   #autoReadReg:
   #        ,6_allForce
   #        ,4_backUpdt
@@ -193,6 +194,11 @@ sub CUL_HM_updateConfig($){
   # this gives FHEM sufficient time to fill in attributes
   # it will also be called after each manual definition
   # Purpose is to parse attributes and read config
+  if (!$init_done){
+    RemoveInternalTimer("updateConfig");
+    InternalTimer(gettimeofday()+5,"CUL_HM_updateConfig", "updateConfig", 0);
+	return;
+  }
 
   foreach my $name (@{$modules{CUL_HM}{helper}{updtCfgLst}}){
     my $hash = $defs{$name};
@@ -288,6 +294,7 @@ sub CUL_HM_updateConfig($){
         CUL_HM_Set($hash,$name,"virtHum" ,ReadingsVal($name,"humidity",""));
         RemoveInternalTimer("valvePos:$vId");
         RemoveInternalTimer("valveTmr:$vId");
+        CUL_HM_UpdtReadSingle($hash,"valveCtrl","restart",1) if (ReadingsVal($name,"valvePosTC",""));
         InternalTimer(ReadingsVal($name,".next",1)
                      ,"CUL_HM_valvePosUpdt","valvePos:$vId",0);
       }
@@ -417,6 +424,7 @@ sub CUL_HM_Define($$) {##############################
     $hash->{helper}{q}{qReqConf}=""; # queue autoConfig requests for this device
     $hash->{helper}{q}{qReqStat}=""; # queue autoConfig requests for this device
     CUL_HM_prtInit ($hash);
+	CUL_HM_hmInitMsg($hash);
     AssignIoPort($hash) if (!$init_done && $HMid ne "000000");
   }
   $modules{CUL_HM}{defptr}{$HMid} = $hash;
@@ -487,7 +495,7 @@ sub CUL_HM_Attr(@) {#################################
   my $updtReq = 0;
   my $hash = CUL_HM_name2Hash($name);
   if   ($attrName eq "expert"){#[0,1,2]
-    $attr{$name}{expert} = $attrVal;
+    $attr{$name}{$attrName} = $attrVal;
     my $eHash = $defs{$name};
     foreach my $chId (CUL_HM_getAssChnIds($name)){
       my $cHash = CUL_HM_id2Hash($chId);
@@ -596,6 +604,19 @@ sub CUL_HM_Attr(@) {#################################
   elsif($attrName eq "model" && $hash->{helper}{role}{dev}){
     delete $hash->{helper}{rxType}; # needs new calculation
     delete $hash->{helper}{mId};
+    $attr{$name}{$attrName} = $attrVal if ($cmd eq "set");
+    CUL_HM_hmInitMsg($hash);
+  }
+  elsif($attrName eq "aesCommReq" ){
+    return "use $attrName only for device" if (!$hash->{helper}{role}{dev});
+	if ($cmd eq "set"){
+      return "$attrName support 0 or 1 only" if ($attrVal !~ m/[01]/);
+      $attr{$name}{$attrName} = $attrVal;
+	}
+	else{
+	  delete $attr{$name}{$attrName};
+	}
+    CUL_HM_hmInitMsg($hash);
   }
   elsif($attrName eq "burstAccess"){
     if ($cmd eq "set"){
@@ -610,7 +631,7 @@ sub CUL_HM_Attr(@) {#################################
   }
   elsif($attrName eq "IODev"){
     if ($cmd eq "set"){
-      return "use $attrName only for device"             if (!$hash->{helper}{role}{dev});
+      return "use $attrName only for device" if (!$hash->{helper}{role}{dev});
     }
   }
   elsif($attrName eq "autoReadReg"){
@@ -621,6 +642,26 @@ sub CUL_HM_Attr(@) {#################################
   }
   CUL_HM_queueUpdtCfg($name) if ($updtReq);
   return;
+}
+sub CUL_HM_prtInit($){ #setup protocol variables after define
+  my ($hash)=@_;
+  $hash->{helper}{prt}{sProc} = 0; # stack not being processed by now
+  $hash->{helper}{prt}{bErr} = 0;
+}
+sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
+  #message to be send to HMLAN/USB to define device communication defails
+  #bit-usage is widely unknown. 
+  my ($hash)=@_;
+  my $rxt = CUL_HM_getRxType($hash);
+  my @p;
+  if (!($rxt & ~0x04)){@p = ("00","01","FE1F")}#config only
+  elsif($rxt & 0x10)  {@p = ("02","01","1E")}  #lazyConfig
+  else                {@p = ("00","01","")}
+  if (AttrVal($hash->{NAME},"aesCommReq",0)){
+    $p[0] = sprintf("%02X",($p[0] + 1));
+    $p[2] = ($p[2]eq "")?"1E":$p[2];
+  }
+  $hash->{helper}{io}{newChn} = '+'.CUL_HM_hash2Id($hash).",".join(",",@p);
 }
 
 #+++++++++++++++++ msg receive, parsing++++++++++++++++++++++++++++++++++++++++
@@ -669,10 +710,10 @@ sub CUL_HM_Parse($$) {##############################
     Log3 undef, 3, "CUL_HM Unknown device $sname is now defined";
     DoTrigger("global","UNDEFINED $sname CUL_HM $src");
     # CommandDefine(undef,"$sname CUL_HM $src");
-    $shash = CUL_HM_id2Hash($src); #sourcehash - will be modified to channel entity
+    $shash = CUL_HM_id2Hash($src); #sourcehash - changed to channel entity
     $devH = $shash;
     $devH->{IODev} = $iohash;
-    $shash->{helper}{io}{nextSend} = gettimeofday()+0.09;# io was not able to set timer
+    $shash->{helper}{io}{nextSend} = gettimeofday()+0.09;# io couldn't set
   }
 
   my @entities = ("global"); #additional entities with events to be notifies
@@ -2389,7 +2430,8 @@ sub CUL_HM_Get($@) {
       }
       my $addInfo = "";
       if    ($md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/ && $chn eq "02"){$addInfo = CUL_HM_TCtempReadings($hash)}
-      elsif ($md =~ m/HM-CC-RT-DN/ && $chn eq "04"){$addInfo = CUL_HM_RTtempReadings($hash)}
+      elsif ($md =~ m/HM-CC-RT-DN/ && $chn eq "04"){$addInfo = CUL_HM_TCITRTtempReadings($hash,7)}
+      elsif ($md =~ m/HM-TC-IT/    && $chn eq "02"){$addInfo = CUL_HM_TCITRTtempReadings($hash,7,8,9)}
       elsif ($md eq "HM-PB-4DIS-WM")               {$addInfo = CUL_HM_4DisText($hash)}
       elsif ($md eq "HM-Sys-sRP-Pl")               {$addInfo = CUL_HM_repReadings($hash)}
 
@@ -3736,7 +3778,6 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
 # int32_t result = (((_address << 8) | messageCounter) * 1103515245 + 12345) >> 16;
 #                          4e6d = 20077                        12996205 = C64E6D
 # return (result & 0xFF) + 480;
-
   if ($tn > ($nextF + 3000)){# missed 20 periods;
     Log3 $name,3,"CUL_HM $name virtualTC timer off by:".int($tn - $nextF);
     $nextF = $tn;
@@ -3755,9 +3796,10 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   if ($hashVd->{cmd}){
     if    ($hashVd->{typ} == 1){
       my $vc = ReadingsVal($name,"valveCtrl","init");
-      if (!(   $vc eq "init"
-             ||$hashVd->{msgRed} > $hashVd->{miss})
-           || $hash->{helper}{virtTC} ne "00") {
+      if (   $vc ne 'restart' 
+	      &&((    $vc ne "init"
+               && $hashVd->{msgRed} <= $hashVd->{miss})
+             || $hash->{helper}{virtTC} ne "00")) {
         $hashVd->{msgSent} = 1;
         CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
                                            ,$msgCnt
@@ -3796,7 +3838,6 @@ sub CUL_HM_valvePosTmr(@) {#calc next vd wakeup
   if (!$hashVd->{msgSent}) {
     $hashVd->{miss}++;
     $hashVd->{next} = $hashVd->{nextF};
-    $vcn = "ready" if ($vc eq "init");
   }
   else {
     my $pn = CUL_HM_id2Name($hashVd->{id});
@@ -4051,11 +4092,6 @@ sub CUL_HM_ProcessCmdStack($) {
   return;
 }
 
-sub CUL_HM_prtInit($){ #setup protocol variables after define
-  my ($hash)=@_;
-  $hash->{helper}{prt}{sProc} = 0; # stack not being processed by now
-  $hash->{helper}{prt}{bErr}=0;
-}
 sub CUL_HM_respWaitSu($@){ #setup response for multi-message response
   # single commands
   # cmd: single msg that needs to be ACKed
@@ -4957,10 +4993,10 @@ sub CUL_HM_updtRegDisp($$$) {
                       substr($hash->{DEF},6,2) eq "02");
   }
   elsif ($md =~ m/HM-CC-RT-DN/){#handle temperature readings
-    CUL_HM_RTtempReadings($hash)  if ($list == 7 && $chn eq "04");
+    CUL_HM_TCITRTtempReadings($hash,7)  if ($list == 7 && $chn eq "04");
   }
   elsif ($md =~ m/HM-TC-IT-WM-W-EU/){#handle temperature readings
-    CUL_HM_TCITtempReadings($hash)  if ($list >= 7 && $chn eq "02");
+    CUL_HM_TCITRTtempReadings($hash,7,8,9)  if ($list >= 7 && $chn eq "02");
   }
   elsif ($md eq "HM-PB-4DIS-WM"){#add text
     CUL_HM_4DisText($hash)  if ($list == 1) ;
@@ -5256,103 +5292,44 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
   }
   return $setting;
 }
-sub CUL_HM_RTtempReadings($) {# parse RT temperature readings
-  my ($hash)=@_;
-  my $name = $hash->{NAME};
-  my $regPre = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".");
-  my $tempRegs = ReadingsVal($name,$regPre."RegL_07:","");
-  my $stmpRegs = ($hash->{helper}{shadowReg}{"RegL_07:"})? # need to compare actual data
-                   ($hash->{helper}{shadowReg}{"RegL_07:"})
-                   :$tempRegs;
-  return "reglist incomplete\n" if ($tempRegs !~ m/00:00/);
-
-  my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
-
-  $tempRegs =~ s/.* 14://;     #remove register up to addr 20 from list
-  $tempRegs =~ s/ 00:00/ /g;   #remove regline termination
-  $tempRegs =~ s/ ..://g;      #remove addr Info
-  $tempRegs =~ s/ //g;         #blank
-
-  $stmpRegs =~ s/.* 14://;
-  $stmpRegs =~ s/ 00:00/ /g;
-  $stmpRegs =~ s/ ..://g;
-  $stmpRegs =~ s/ //g;
-
-  my $setting;
-  my @changedRead;
-  push (@changedRead,"tempList_State:".
-                ($hash->{helper}{shadowReg}{"RegL_07:"} ?"set":"verified"));
-  for (my $day = 0;$day<7;$day++){
-    my $dayRead = "";
-    my $pre ="";
-    my @time;
-    my @temp;
-    my $str;
-    if (substr($stmpRegs,$day *13*4,13*4) eq
-        substr($tempRegs,$day *13*4,13*4)   ){
-      $str = substr($tempRegs,$day *13*4,13*4);
-    }
-    else{
-      $str = substr($stmpRegs,$day *13*4,13*4);
-      $pre = "set_";
-    }
-    foreach (unpack '(A4)*',$str){
-      my $h = hex($_);
-      push @temp,($h >> 9)/2;
-      $h = ($h & 0x1ff) * 5;
-      $h = sprintf("%02d:%02d",int($h / 60),($h%60));
-      push @time,$h;
-    }
-
-    for (my $idx = 0;$idx<13;$idx++){
-      my $entry = sprintf(" %s %3.01f",$time[$idx],$temp[$idx]);
-        $setting .= "Temp set: ".$days[$day].$entry." C\n";
-        $dayRead .= $entry;
-      last if ($time[$idx] eq "24:00");
-    }
-    push (@changedRead,"tempList".$days[$day].":".$pre." ".$dayRead);
-  }
-  CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
-
-  # transport some readings to relevant channels (window receivce here)
-  my $wHash = $modules{CUL_HM}{defptr}{substr($hash->{DEF},0,6)."03"};
-  CUL_HM_UpdtReadBulk($wHash,1,
-        "winOpnTemp-int:".ReadingsVal($name,"R-winOpnTemp"    ,"unknown"),
-        "winOpnPeriod:"  .ReadingsVal($name,"R-winOpnPeriod"  ,"unknown"),
-        "winOpnBoost:"   .ReadingsVal($name,"R-winOpnBoost"   ,"unknown"),
-        "winOpnMode:"    .ReadingsVal($name,"R-winOpnMode"    ,"unknown"),
-        "winOpnDetFall:" .ReadingsVal($name,"R-winOpnDetFall" ,"unknown"),);
-  return $setting;
-}
-sub CUL_HM_TCITtempReadings($) {# parse RT temperature readings
-  my ($hash)=@_;
+sub CUL_HM_TCITRTtempReadings($@) {# parse RT - TC-IT temperature readings
+  my ($hash,@list)=@_;
   my $name = $hash->{NAME};
   my $regPre = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".");
   my @changedRead;
   my $setting;
   my %idxN = (7=>"P1",8=>"P2",9=>"P3");
-  foreach my $lst (7,8,9){
-    my $tempRegs = ReadingsVal($name,$regPre."RegL_0$lst:","");
-    my $stmpRegs = ($hash->{helper}{shadowReg}{"RegL_0$lst:"})? # need to compare actual data
-                   ($hash->{helper}{shadowReg}{"RegL_0$lst:"})
-                   :$tempRegs;
-    next if ($tempRegs !~ m/00:00/);
-
-    my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
-
+  $idxN{7} = "" if(scalar @list == 1);# not prefix for RT
+  my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
+  foreach my $lst (@list){
     my @r1;
+    my $tempRegs = ReadingsVal($name,$regPre."RegL_0$lst:","");
+    if ($tempRegs !~ m/00:00/){
+      for (my $day = 0;$day<7;$day++){
+        push (@changedRead,"tempList$idxN{$lst}".$days[$day].": incomplete");
+      }
+      push (@changedRead,"tempList$idxN{$lst}_State:incomplete");
+      CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
+      next;
+    }
+
     foreach(split " ",$tempRegs){
       my ($a,$d) = split ":",$_;
       $r1[hex($a)] = $d;
     }
-    foreach(split " ",$stmpRegs){
-      my ($a,$d) = split ":",$_;
-      $r1[hex($a)] = $d;
+
+    if ($hash->{helper}{shadowReg}{"RegL_0$lst:"}){
+      foreach(split " ",$hash->{helper}{shadowReg}{"RegL_0$lst:"}){
+        my ($a,$d) = split ":",$_;
+        $r1[hex($a)] = $d;
+      }	  
+      push (@changedRead,"tempList$idxN{$lst}_State:set");
+    }
+    else{
+      push (@changedRead,"tempList$idxN{$lst}_State:verified");
     }
      
     $tempRegs = join("",@r1[20..scalar@r1-1]);
-    push (@changedRead,"tempList$idxN{$lst}_State:".
-                ($hash->{helper}{shadowReg}{"RegL_0$lst:"} ?"set":"verified"));
     for (my $day = 0;$day<7;$day++){
       my $dayRead = "";
       my @time;
@@ -5377,6 +5354,8 @@ sub CUL_HM_TCITtempReadings($) {# parse RT temperature readings
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
   return $setting;
 }
+
+
 sub CUL_HM_repReadings($) {   # parse repeater
   my ($hash)=@_;
   my %pCnt;
@@ -6800,8 +6779,11 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
          stores peers and register to the file.<br>
          Stored will be the data as available in fhem. It is necessary to read the information from the device prior to the save.<br>
          The command supports device-level action. I.e. if executed on a device also all related channel entities will be stored implicitely.<br>
-         Storage to the file will be cumulative. If an entity is stored multiple times to the same file data will be appended. User can identify time of storage in the file if necessary.<br>
-         Content of the file can be used to restore device configuration. It will restore all peers and all register to the entity.<br>
+         Storage to the file will be cumulative. 
+		 If an entity is stored multiple times to the same file data will be appended. 
+		 User can identify time of storage in the file if necessary.<br>
+         Content of the file can be used to restore device configuration. 
+		 It will restore all peers and all register to the entity.<br>
          Constrains/Restrictions:<br>
          prior to rewrite data to an entity it is necessary to pair the device with FHEM.<br>
          restore will not delete any peered channels, it will just add peer channels.<br>
@@ -6817,12 +6799,19 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li><a href="#actCycle">actCycle</a>
+    <li><a name="CUL_HMaesCommReq">aesCommReq</a>
+	     if set HMLAN/USB is forced to request AES signature before sending ACK to the device.<br>
+		 This funktion strictly works with HMLAN/USB - it doesn't work for CUL type IOs.<br>
+	</li>
+    <li><a name="#CUL_HMactCycle">actCycle</a>
          actCycle &lt;[hhh:mm]|off&gt;<br>
-         Supports 'alive' or better 'not alive' detection for devices. [hhh:mm] is the maximum silent time for the device. Upon no message received in this period an event will be raised "&lt;device&gt; is dead". If the device sends again another notification is posted "&lt;device&gt; is alive". <br>
+         Supports 'alive' or better 'not alive' detection for devices. [hhh:mm] is the maximum silent time for the device. 
+		 Upon no message received in this period an event will be raised "&lt;device&gt; is dead". 
+		 If the device sends again another notification is posted "&lt;device&gt; is alive". <br>
          This actiondetect will be autocreated for each device with build in cyclic status report.<br>
          Controlling entity is a pseudo device "ActionDetector" with HMId "000000".<br>
-         Due to performance considerations the report latency is set to 600sec (10min). It can be controlled by the attribute "actCycle" of "ActionDetector".<br>
+         Due to performance considerations the report latency is set to 600sec (10min). 
+		 It can be controlled by the attribute "actCycle" of "ActionDetector".<br>
          Once entered to the supervision the HM device has 2 attributes:<br>
          <ul>
          actStatus: activity status of the device<br>
@@ -6908,14 +6897,15 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
   <a name="CUL_HMparams"><b>available parameter "param"</b></a>
   <ul>
     <li><B>HM-Sen-RD-O</B><br>
-    offAtPon: heat channel only: force heating off after powerOn<br>
-    onAtRain: heat channel only: force heating on while status changes to 'rain' and off when it changes to 'dry'<br>
+    <B>offAtPon</B> heat channel only: force heating off after powerOn<br>
+    <B>onAtRain</B> heat channel only: force heating on while status changes to 'rain' and off when it changes to 'dry'<br>
     </li>
     <li><B>virtuals</B><br>
-    noOnOff: virtual entity will not toggle state when trigger is received. If this parameter is
+    <B>noOnOff</B> virtual entity will not toggle state when trigger is received. If this parameter is
     not given the entity will toggle its state between On and Off with each trigger<br>
-    msgReduce: if set and channel is use for <a ref="CUL_HMvalvePos"></a> it skips every other message
-    in order to reduce message load<br>
+    <B>msgReduce:&lt;No&gt;</B> if channel is used for <a ref="CUL_HMvalvePos"></a> it skips every No message
+    in order to reduce transmit load. Numbers from 0 (no skip) up to 9 can be given. 
+	VD will lose connection with more then 5 skips<br>
     </li>
   </ul><br>
   <a name="CUL_HMevents"></a>
@@ -7133,6 +7123,12 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
       [unlocked|locked|uncertain]<br>
   </li>
   </ul>
+  <a name="CUL_HMinternals"><b>Internals</b></a>
+  <ul>
+    <li><B>aesCommToDev</B><br>
+    gives information about success or fail of AES communication between IO-device and HM-Device<br>
+    </li>
+  </ul><br>
   <br>
 </ul>
 =end html
