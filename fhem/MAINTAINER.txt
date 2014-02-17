@@ -31,7 +31,7 @@ FHEM/01_FHEMWEB.pm           rudolfkoenig         http://forum.fhem.de Frontends
 FHEM/02_HTTPSRV.pm           borisneubert         http://forum.fhem.de Frontends
 FHEM/02_RSS.pm               borisneubert         http://forum.fhem.de Frontends
 FHEM/09_BS.pm                borisneubert         http://forum.fhem.de SlowRF
-FHEM/09_CUL_FHTTK.pm         painseeker           http://forum.fhem.de SlowRF
+FHEM/09_CUL_FHTTK.pm         matscher             http://forum.fhem.de SlowRF
 FHEM/09_USF1000.pm           borisneubert         http://forum.fhem.de SlowRF
 FHEM/10_CUL_HM.pm            martinp876           http://forum.fhem.de HomeMatic
 FHEM/10_CUL_IR.pm            odroegehorn          http://forum.fhem.de SlowRF
