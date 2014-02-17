@@ -3,6 +3,8 @@
 #  (c) 2014 Copyright: Wzut
 #  All rights reserved
 #
+#  FHEM Forum : http://forum.fhem.de/index.php/topic,18517.0.html
+#
 #  This code is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 2 of the License, or
@@ -17,7 +19,12 @@
 #  GNU General Public License for more details.
 ################################################################
 
-# Version 0.9  - 15.02.14
+
+# Version 0.95  - 17.02.14
+# add command set IdleNow
+#
+# Version 0.9   - 15.02.14
+# Version 0.8   - 01.02.14 , first version on SVN
 
 package main;
 
@@ -62,7 +69,8 @@ my %sets = (
    "updateDb:noArg"        => "",
    "interval"              => "",
    "mpdCMD"                => "",
-   "reset:noArg"           => ""
+   "reset:noArg"           => "",
+   "IdleNow:noArg"         => ""
    
   );
 
@@ -252,7 +260,8 @@ sub MPD_GetUpdate($) {
  if (AttrVal($name, "useIdle", 0) && !$error)
  {
   $hash->{helper}{RUNNING_PID} = BlockingCall("MPD_IdleStart", $name."|".$hash->{HOST}."|".$hash->{PORT}, "MPD_IdleDone", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
-  Log 4 , "$name IdleStart with PID : ".$hash->{helper}{RUNNING_PID}{pid};
+  $hash->{IPID} = $hash->{helper}{RUNNING_PID};
+  Log 4 , "$name IdleStart with PID : ".$hash->{helper}{RUNNING_PID}{pid} if($hash->{helper}{RUNNING_PID});
  }
 
 
@@ -284,7 +293,7 @@ sub MPD_Set($@)
  my $vol_now = int($hash->{VOLUME});
  my $vol_new;
   
- if ($cmd eq "reset")   { $hash->{".reset"} = 1; $ret = MPD_updateConfig($hash); }
+ if ($cmd eq "reset")   { $hash->{".reset"} = 1; MPD_updateConfig($hash); return undef;}
  if ($cmd eq "pause")   { $ret = mpd_cmd($hash, "pause");   }
  if ($cmd eq "stop")    { $ret = mpd_cmd($hash, "stop");  }
  if ($cmd eq "update")  { $ret = mpd_cmd($hash, "update");  }
@@ -359,10 +368,23 @@ sub MPD_Set($@)
   {
     return "$name: Set with short interval, must be 0 or greater" if(int($a[2]) < 0);
     # update timer
+    RemoveInternalTimer($hash);
     $hash->{INTERVAL} = $a[2];
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "MPD_GetUpdate", $hash, 0) if ($hash->{INTERVAL});
     return undef;
   }
+
+ if ($cmd eq "IdleNow")   
+ {
+  return "$name: sorry, one Idle process is always running with pid ".$hash->{helper}{RUNNING_PID}{pid} if($hash->{helper}{RUNNING_PID});
+  $hash->{helper}{RUNNING_PID} = BlockingCall("MPD_IdleStart", $name."|".$hash->{HOST}."|".$hash->{PORT}, "MPD_IdleDone", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+  if($hash->{helper}{RUNNING_PID})
+        { 
+          $hash->{IPID} = $hash->{helper}{RUNNING_PID}{pid};
+          return "$name: idle process started with PID : ".$hash->{IPID}; }
+   else { return "$name: idle process start failed !"; }
+ }
+
 
 
   # die ersten beiden brauchen wir nicht mehr
@@ -404,7 +426,7 @@ sub MPD_Set($@)
 
   mpd_cmd($hash, "status");
  
-  readingsSingleUpdate($hash,"error",$ret,1) if($ret);
+  # readingsSingleUpdate($hash,"error",$ret,1) if($ret); ToDo : warum ist error manchmal  = "0" ??
 
 
   InternalTimer(gettimeofday()+$hash->{INTERVAL}, "MPD_GetUpdate", $hash, 0) if ($hash->{INTERVAL});
@@ -847,20 +869,20 @@ sub MPD_summaryFn($$$$) {
 <h3>MPD</h3>
  FHEM module to control a MPD like the MPC (MPC =  Music Player Command, the command line interface to the <a href='http://en.wikipedia.org/wiki/Music_Player_Daemon'>Music Player Daemon</a> )<br>
 To install a MPD on a Raspberry Pi you will find a lot of documentation at the web e.g. http://www.forum-raspberrypi.de/Thread-tutorial-music-player-daemon-mpd-und-mpc-auf-dem-raspberry-pi  in german<br>
-<ul>  
+FHEM Forum : <a href='http://forum.fhem.de/index.php/topic,18517.0.html'>Modul f&uuml;r MPD</a> ( in german )<br>
+<ul>
  <a name="MPDdefine"></a>
   <b>Define</b>
   <ul>
-    define &lt;name&gt; MPD &lt;IP MPD Server | default localhost&gt; &lt;Port  MPD Server | default 6600&gt;<br>
-    Example:<br>
-    <ul><pre>
-      define myMPD MPD 192.168.0.99 7000
-     </pre>
-     if FHEM and MPD a running on the same device : 
-     <pre>
-      define myMPD MPD
-     </pre>
-     </ul>
+  define &lt;name&gt; MPD &lt;IP MPD Server | default localhost&gt; &lt;Port  MPD Server | default 6600&gt;<br>
+  Example:<br>
+  <pre>
+  define myMPD MPD 192.168.0.99 7000
+  </pre>
+  if FHEM and MPD a running on the same device : 
+  <pre>
+  define myMPD MPD
+  </pre>
   </ul>
   <br>
   <a name="MPDset"></a>
@@ -869,22 +891,23 @@ To install a MPD on a Raspberry Pi you will find a lot of documentation at the w
     <br>&nbsp;<br>
     Currently, the following commands are defined.<br>
     &nbsp;<br>
-    play  =>- like MPC play , start playing song in playlist<br>
-    clear =>  like MPC clear , delete MPD playlist<br>
-    stop  =>  like MPC stop, stops playing <br>
-    pause => like MPC pause<br>
+    play     => like MPC play , start playing song in playlist<br>
+    clear    => like MPC clear , delete MPD playlist<br>
+    stop     => like MPC stop, stops playing <br>
+    pause    => like MPC pause<br>
     previous => like MPC previous, play previous song in playlist<br>
-    next => like MPC next, play next song in playlist<br>
-    random => like MPC random, toggel on/off<br>
-    repaet => like MPC repeat, toggel on/off<br>
+    next     => like MPC next, play next song in playlist<br>
+    random   => like MPC random, toggel on/off<br>
+    repaet   => like MPC repeat, toggel on/off<br>
+    updateDb => like MPC update<br>
     volume (%) => like MPC volume %, 0 - 100<br>
     volumeUp => inc volume ( + attr volumeStep size )<br>
     volumeDown => dec volume ( - attr volumeStep size )<br>
     playlist (playlist name) => set playlist on MPD Server<br>
-    playfile (file) => create playlist +  add file to playlist + start playing<br>  
-    updateDb => like MPC update<br>
-    interval => set polling interval of MPD server, overwrites attr interval temp , use 0 to disbale polling<br>. 
-    reset => reset MPD Modul
+    playfile (file) => create playlist + add file to playlist + start playing<br>
+    IdleNow => send Idle command to MPD and wait for events to return<br>
+    interval => set polling interval of MPD server, overwrites attr interval temp , use 0 to disable polling<br>
+    reset => reset MPD Modul<br>
     mpdCMD => same as GET mpdCMD<br>
    </ul>
   <br>
@@ -902,30 +925,47 @@ To install a MPD on a Raspberry Pi you will find a lot of documentation at the w
        attr &lt;name&gt; room MPD
     </pre>
     statusRequest => get MPD status<br>
-    mpdCMD (cmd) => send cmd to MPD Server ( Ref <a>http://www.musicpd.org/doc/protocol/</a> )<br>
+    mpdCMD (cmd) => send a command to MPD Server ( <a href='http://www.musicpd.org/doc/protocol/'>MPD Command Ref</a> )<br>
     currentsong => get infos from current song in playlist<br>
-    outputs => get infos about the defined MPD output devices<br>
+    outputs => get name,id,status about all MPD output devices in /etc/mpd.conf<br>
   </ul>
   <br>
   <a name="MPDattr"></a>
   <b>Attributes</b>
-  <ul> 
-      <li>interval | polling interval at MPD server, set 0 to disbale polling</li>
-      <li>password | (not ready yet) if password on MPD server is set</li>
-      <li>loadMusic |  load MPD music data at startup</li>
-      <li>loadPlaylists | load MPD playlistsa at startup</li>
-      <li>volumeStep | Step size for Volume +/-</li>
-      <li>useIdle | send Idle cmd to MPD and wait for MPD events needs MPD Version 0.16.0 or greater</li>
-   </ul>
-   <br>
-   <b>Readings</b>
-   <ul>
+  <ul>
+      <li>interval = polling interval at MPD server, use 0 to disable polling (default 30)</li>
+      <li>password (not ready yet) if password on MPD server is set</li>
+      <li>loadMusic 0|1 = load titles from MPD database at startup</li>
+      <li>loadPlaylists 0|1 = load playlist names from MPD database at startup</li>
+      <li>volumeStep 1|2|5|10 =  Step size for Volume +/- (default 5)</li>
+      <li>useIdle 0|1 = send Idle command to MPD and wait for MPD events needs MPD Version 0.16.0 or greater</li>
+      <li>titleSplit 1|0 = split title to artist and title if no artist is given in songinfo (e.g. radio-stream)</li>
+  </ul>
+  <br>
+  <b>Readings</b>
+  <ul>
     all MPD internal values
-   </ul>
-
+  </ul>
 </ul>
-
 =end html
+
+=begin html_DE
+
+<a name="MPD"></a>
+<h3>MPD</h3>
+<ul>
+  FHEM Modul zur Steuerung des MPD &auml;hnlich dem MPC (MPC =  Music Player Command, das Kommando Zeilen Interface f&uuml;r den 
+  <a href='http://en.wikipedia.org/wiki/Music_Player_Daemon'>Music Player Daemon</a> ) (englisch)<br>
+  Um den MPD auf einem Raspberry Pi zu installieren finden sich im Internet zahlreiche gute Dokumentaionen 
+  z.B. <a hrref='http://www.forum-raspberrypi.de/Thread-tutorial-music-player-daemon-mpd-und-mpc-auf-dem-raspberry-pi'>hier</a><br>
+ <br>&nbsp;<br>
+ <ul>
+ Eine deutsche Version der Modul Dokumentaion  ist zur Zeit leider noch nicht verf&uuml;gbar (aber in Arbeit) <br>
+ Englische Version : <a href='http://fhem.de/commandref.html#MPD'>MPD</a><br>
+ Thread im FHEM Forum : <a href='http://forum.fhem.de/index.php/topic,18517.0.html'>Modul f&uuml;r MPD</a>
+ </ul>
+</ul>
+=end html_DE
 =cut
 
 
