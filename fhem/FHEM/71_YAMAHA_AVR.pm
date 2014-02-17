@@ -37,6 +37,7 @@ use HttpUtils;
 sub YAMAHA_AVR_Get($@);
 sub YAMAHA_AVR_Define($$);
 sub YAMAHA_AVR_GetStatus($;$);
+sub YAMAHA_AVR_Attr(@);
 sub YAMAHA_AVR_ResetTimer($;$);
 sub YAMAHA_AVR_Undefine($$);
 
@@ -52,9 +53,10 @@ YAMAHA_AVR_Initialize($)
   $hash->{GetFn}     = "YAMAHA_AVR_Get";
   $hash->{SetFn}     = "YAMAHA_AVR_Set";
   $hash->{DefFn}     = "YAMAHA_AVR_Define";
+  $hash->{AttrFn}    = "YAMAHA_AVR_Attr";
   $hash->{UndefFn}   = "YAMAHA_AVR_Undefine";
 
-  $hash->{AttrList}  = "do_not_notify:0,1 request-timeout:1,2,3,4,5 volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 model volume-smooth-change:0,1 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
+  $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 request-timeout:1,2,3,4,5 volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 model volume-smooth-change:0,1 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
                       $readingFnAttributes;
 }
 
@@ -674,10 +676,55 @@ YAMAHA_AVR_Define($$)
     }
 
     # start the status update timer
+    $hash->{helper}{DISABLED} = 0 unless(exists($hash->{helper}{DISABLED}));
 	YAMAHA_AVR_ResetTimer($hash,2);
   
   return undef;
 }
+
+
+##########################
+sub
+YAMAHA_AVR_Attr(@)
+{
+    my @a = @_;
+    my $hash = $defs{$a[1]};
+
+    if($a[0] eq "set" && $a[2] eq "disable")
+    {
+        if($a[3] eq "0")
+        {
+             $hash->{helper}{DISABLED} = 0;
+             YAMAHA_AVR_GetStatus($hash, 1);
+        }
+        elsif($a[3] eq "1")
+        {
+            $hash->{helper}{DISABLED} = 1;
+        }
+    }
+    elsif($a[0] eq "del" && $a[2] eq "disable")
+    {
+        $hash->{helper}{DISABLED} = 0;
+        YAMAHA_AVR_GetStatus($hash, 1);
+    }
+
+    # Start/Stop Timer according to new disabled-Value
+    YAMAHA_AVR_ResetTimer($hash);
+    
+    return undef;
+}
+
+#############################
+sub
+YAMAHA_AVR_Undefine($$)
+{
+  my($hash, $name) = @_;
+  
+  # Stop the internal GetStatus-Loop and exit
+  RemoveInternalTimer($hash);
+  return undef;
+}
+
 
 #############################################################################################################
 #
@@ -734,16 +781,6 @@ YAMAHA_AVR_SendCommand($$;$)
 
 }
 
-#############################
-sub
-YAMAHA_AVR_Undefine($$)
-{
-  my($hash, $name) = @_;
-  
-  # Stop the internal GetStatus-Loop and exit
-  RemoveInternalTimer($hash);
-  return undef;
-}
 
 
 #############################
@@ -1023,19 +1060,21 @@ sub YAMAHA_AVR_ResetTimer($;$)
     
     RemoveInternalTimer($hash);
     
-    if(defined($interval))
+    if($hash->{helper}{DISABLED} == 0)
     {
-        InternalTimer(gettimeofday()+$interval, "YAMAHA_AVR_GetStatus", $hash, 0);
+        if(defined($interval))
+        {
+            InternalTimer(gettimeofday()+$interval, "YAMAHA_AVR_GetStatus", $hash, 0);
+        }
+        elsif((exists($hash->{READINGS}{presence}{VAL}) and $hash->{READINGS}{presence}{VAL} eq "present") and (exists($hash->{READINGS}{power}{VAL}) and $hash->{READINGS}{power}{VAL} eq "on"))
+        {
+            InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0);
+        }
+        else
+        {
+            InternalTimer(gettimeofday()+$hash->{helper}{OFF_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0);
+        }
     }
-    elsif((exists($hash->{READINGS}{presence}{VAL}) and $hash->{READINGS}{presence}{VAL} eq "present") and (exists($hash->{READINGS}{power}{VAL}) and $hash->{READINGS}{power}{VAL} eq "on"))
-    {
-        InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0);
-    }
-    else
-    {
-        InternalTimer(gettimeofday()+$hash->{helper}{OFF_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0);
-    }
-
 }
 
 sub YAMAHA_AVR_html2txt($)
@@ -1236,6 +1275,10 @@ sub YAMAHA_AVR_html2txt($)
 	Optional attribute change the response timeout in seconds for all queries to the receiver.
 	<br><br>
 	Possible values: 1-5 seconds. Default value is 4 seconds.<br><br>
+    <li><a name="request-timeout">disable</a></li>
+	Optional attribute to disable the internal cyclic status update of the receiver. Manual status updates via statusRequest command is still possible.
+	<br><br>
+	Possible values: 0 => perform cyclic status update, 1 => don't perform cyclic status updates.<br><br>
     <li><a name="volume-smooth-change">volume-smooth-change</a></li>
 	Optional attribute to activate a smooth volume change.
 	<br><br>
@@ -1441,6 +1484,10 @@ sub YAMAHA_AVR_html2txt($)
 	Optionales Attribut. Maximale Dauer einer Anfrage in Sekunden zum Receiver.
 	<br><br>
 	M&ouml;gliche Werte: 1-5 Sekunden. Standardwert ist 4 Sekunden<br><br>
+    <li><a name="request-timeout">disable</a></li>
+	Optionales Attribut zur Deaktivierung des zyklischen Status-Updates. Ein manuelles Update via statusRequest-Befehl ist dennoch m&ouml;glich.
+	<br><br>
+	M&ouml;gliche Werte: 0 => zyklische Status-Updates, 1 => keine zyklischen Status-Updates.<br><br>
     <li><a name="volume-smooth-change">volume-smooth-change</a></li>
 	Optionales Attribut, welches einen weichen Lautst&auml;rke&uuml;bergang aktiviert..
 	<br><br>
