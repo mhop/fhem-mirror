@@ -86,11 +86,11 @@ sub JSONMETER_UpdateAborted($);
    ,[1, "0100290700FF", "electricityPowerPhase2", 1] # {"obis":"0100290700FF","value":14.27,"unit":"W"},
    ,[1, "01003D0700FF", "electricityPowerPhase3", 1] # {"obis":"01003D0700FF","value":89.40,"unit":"W"},
    ,[1, "1.8.0|0101010800FF", "electricityConsumed", 2] # {"obis": "1.8.0", "scale": 0, "value": 8802276, "unit": "Wh", "valueString": "0008802.276" }, 
-   ,[1, "0101010801FF", "electricityConsumedTariff1", 2] # {"obis":"0101010801FF","value":33.53,"unit":"kWh"},               
-   ,[1, "0101010802FF", "electricityConsumedTariff2", 2] # {"obis":"0101010802FF","value":33.53,"unit":"kWh"},               
-   ,[1, "0101010803FF", "electricityConsumedTariff3", 2] # {"obis":"0101010803FF","value":33.53,"unit":"kWh"},               
-   ,[1, "0101010804FF", "electricityConsumedTariff4", 2] # {"obis":"0101010804FF","value":33.53,"unit":"kWh"},               
-   ,[1, "0101010805FF", "electricityConsumedTariff5", 2] # {"obis":"0101010805FF","value":33.53,"unit":"kWh"},               
+   ,[1, "1.8.1|0101010801FF", "electricityConsumedTariff1", 2] # {"obis":"0101010801FF","value":33.53,"unit":"kWh"},               
+   ,[1, "1.8.2|0101010802FF", "electricityConsumedTariff2", 2] # {"obis":"0101010802FF","value":33.53,"unit":"kWh"},               
+   ,[1, "1.8.3|0101010803FF", "electricityConsumedTariff3", 2] # {"obis":"0101010803FF","value":33.53,"unit":"kWh"},               
+   ,[1, "1.8.4|0101010804FF", "electricityConsumedTariff4", 2] # {"obis":"0101010804FF","value":33.53,"unit":"kWh"},               
+   ,[1, "1.8.5|0101010805FF", "electricityConsumedTariff5", 2] # {"obis":"0101010805FF","value":33.53,"unit":"kWh"},               
    ,[1, "010001080080", "electricityConsumedToday", 1] 
    ,[1, "010001080081", "electricityConsumedYesterday", 1] 
    ,[1, "010001080082", "electricityConsumedLastWeek", 1] 
@@ -606,19 +606,19 @@ JSONMETER_UpdateAborted($)
     <code>define &lt;name&gt; JSONMETER &lt;deviceType&gt; [&lt;ip address&gt;] [poll-interval]</code>
    <br>
     Example: <code>define powermeter JSONMETER ITF 192.168.178.20 300</code>
-   <br>
-    If the pool interval is omitted, it is set to 300 (seconds). Smallest possible value is 10.
-   <br>
-   With 0 it will only update on "manual" request.
    <br>&nbsp;
+   <li><code>[poll-interval]</code>
+   <br>
+   Default is 300 seconds. Smallest possible value is 10. With 0 it will only update on "manual" request.
+   </li><br>
    <li><code>&lt;deviceType&gt;</code>
      <br>
      Used to define the path and port to extract the json file.
      <br>
-     The attribute 'pathString' can be used to add login information to the URL-path of predefined devices.
+     The attribute 'pathString' can be used to add login information to the URL path of predefined devices.
      <br>&nbsp;
      <ul> 
-         <li><b>ITF</b> - One tariff electrical meter used by N-ENERGY (<a href="www.itf-froeschl.de">ITF Fr&ouml;schl</a>)</li>
+         <li><b>ITF</b> - One tariff electrical meter used by N-ENERGY (<a href="http://www.itf-froeschl.de">ITF Fr&ouml;schl</a>)</li>
          <li><b>EFR</b> - <a href="http://www.efr.de">EFR</a> Smart Grid Hub for electrical meter used by EON, N-ENERGY and EnBW
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;use the 'pathstring' attribute to specifiy your login information
@@ -708,19 +708,19 @@ JSONMETER_UpdateAborted($)
     <br>
     Beispiel: <code>define Stromzaehler JSONMETER ITF 192.168.178.20 300</code>
     <br>
-    Wenn das Abfrage-Interval nicht angegeben ist, wird es auf 300 (Sekunden) gesetzt. Der kleinste m&ouml;gliche Wert ist 30.
-    <br>
-    Bei 0 kann die Ger&auml;teabfrage nur manuell gestartet werden.
-    <br>
-    &nbsp;
-    <br>
-    <li><code>Ger&auml;tetyp</code>
+    <li><code>[Abfrageinterval]</code>
       <br>
-      Definiert den Pfad und den Port, um die JSON-Datei zu einzulesen.
+      Standardm&auml;ssig 300 Sekunden. Der kleinste m&ouml;gliche Wert ist 30.
+      <br> 
+      Bei 0 kann die Ger&auml;teabfrage nur manuell gestartet werden.
+    </li><br>
+    <li><code>&lt;Ger&auml;tetyp&gt;</code>
+      <br>
+      Definiert den Pfad und den Port, um die JSON-Datei einzulesen.
       <br>
       Mit dem Attribute 'pathString' k&ouml;nnen Login Information an den URL-Pfad von vordefinierten Ger&auml;te angehangen werden.
       <ul> 
-         <li><b>ITF</b> - Eintarifz&auml;hler von N-ENERGY Netz GmbH (<a href="www.itf-froeschl.de">ITF Fr&ouml;schl</a>)</li>
+         <li><b>ITF</b> - Eintarifz&auml;hler von N-ENERGY Netz GmbH (<a href="http://www.itf-froeschl.de">ITF Fr&ouml;schl</a>)</li>
          <li><b>EFR</b> - Stromz&auml;hler von EON, N-ENERGY, EnBW
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Die Login-Information wird &uuml;ber das Attribute 'pathstring' angegeben.
@@ -736,13 +736,6 @@ JSONMETER_UpdateAborted($)
   <br>
   <b>Set</b>
   <ul>
-      <li><code>alwaysAnalyse &lt; 0 | 1 &gt;</code>
-         <br>
-         F&uuml;hrt bei jeder Abfrage der Ger&auml;tewerte eine Analyse der JSON-Datenstruktur durch.
-         <br>
-         Dies ist sinnvoll, wenn sich die JSON-Struktur &auml;ndert. Normalerweise wird die analysierte Struktur
-         zwischengespeichert, um die CPU-Last gering zu halten.
-      </li><br>
       <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
          <br>
          Abfrageinterval in Sekunden
@@ -751,7 +744,7 @@ JSONMETER_UpdateAborted($)
         <br>
         Neustart der Analyse der json-Datei zum Auffinden bekannter Ger&auml;tewerte (kompatibel zum OBIS Standard).
         <br>
-        Diese Analysie wird normaler Weise nur einmal durchgef&uuml;hrt, wenn Ger&auml;tewerte gefunden wurden.
+        Diese Analysie wird normaler Weise nur einmalig durchgef&uuml;hrt, nachdem Ger&auml;tewerte gefunden wurden.
         </li><br>
      <li><code>statusRequest</code>
          <br>
@@ -774,6 +767,13 @@ JSONMETER_UpdateAborted($)
   <a name="JSONMETERattr"></a>
    <b>Attributes</b>
    <ul>
+      <li><code>alwaysAnalyse &lt; 0 | 1 &gt;</code>
+         <br>
+         F&uuml;hrt bei jeder Abfrage der Ger&auml;tewerte eine Analyse der JSON-Datenstruktur durch.
+         <br>
+         Dies ist sinnvoll, wenn sich die JSON-Struktur &auml;ndert. Normalerweise wird die analysierte Struktur
+         zwischengespeichert, um die CPU-Last gering zu halten.
+      </li><br>
       <li><code>doStatistics &lt; 0 | 1 &gt;</code>
          <br>
          Berechnet statistische Werte - <i>noch nicht implementiert</i>
