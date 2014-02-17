@@ -125,6 +125,7 @@ FHEMWEB_Initialize($)
     basicAuth
     basicAuthMsg
     column
+    defaultRoom
     endPlotNow:1,0
     endPlotToday:1,0
     fwcompress:0,1
@@ -656,11 +657,19 @@ FW_answerCall($)
   elsif($FW_detail)            { FW_doDetail($FW_detail); }
   elsif($FW_room)              { FW_showRoom();           }
   elsif(!$FW_cmdret &&
-        !$FW_contentFunc &&
-        AttrVal("global", "motd", "none") ne "none") {
-    my $motd = AttrVal("global","motd",undef);
-    $motd =~ s/\n/<br>/g;
-    FW_pO "<div id=\"content\">$motd</div>";
+        !$FW_contentFunc) {
+
+    $FW_room = AttrVal($FW_wname, "defaultRoom", '');
+    if($FW_room ne '') {
+      FW_showRoom(); 
+
+    } else {
+      my $motd = AttrVal("global","motd",undef);
+      if(defined($motd)) {
+        $motd =~ s/\n/<br>/g;
+        FW_pO "<div id=\"content\">$motd</div>";
+      }
+    }
   }
   FW_pO "</body></html>";
   return 0;
@@ -2756,6 +2765,14 @@ FW_ActivateInform()
         attr WEB sortRooms DG OG EG Keller
         </li>
         <br>
+        
+    <a name="defaultRoom"></a>
+    <li>defaultRoom<br>
+        show the specified room if no room selected, e.g. on execution of some
+        commands.  If set hides the <a href="#motd">motd</a>. Example:<br>
+        attr WEB defaultRoom Zentrale
+        </li>
+        <br> 
 
     <a name="sortby"></a>
     <li>sortby<br>
@@ -3221,6 +3238,14 @@ FW_ActivateInform()
         zu definieren.  Beispiel:<br>
           attr WEB sortRooms DG OG EG Keller
         </li><br>
+
+    <a name="defaultRoom"></a>
+    <li>defaultRoom<br>
+        Zeigt den angegebenen Raum an falls kein Raum explizit ausgew&auml;hlt
+        wurde.  Achtung: falls gesetzt, wird motd nicht mehr angezeigt.
+        Beispiel:<br>
+        attr WEB defaultRoom Zentrale
+        </li><br> 
 
     <a name="sortby"></a>
     <li>sortby<br>
