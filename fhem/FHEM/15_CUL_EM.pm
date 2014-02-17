@@ -326,6 +326,79 @@ CUL_EM_Parse($$)
   <br>
 </ul>
 
-
 =end html
+
+=begin html_DE
+
+<a name="CUL_EM"></a>
+<h3>CUL_EM</h3>
+<ul>
+  Das Modul CUL_EM wertet von einem CUL empfange Botschaften des Typs EM aus, 
+  dies sind aktuell Botschaften von EMEM, EMWZ bzw. EMGZ Ger&auml;ten.
+  <br><br>
+
+  <a name="CUL_EMdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; CUL_EM &lt;code&gt; [corr1 corr2
+                CostPerUnit BasicFeePerMonth]</code> <br>
+    <br>
+    &lt;code&gt; ist der Code, der am EM Ger&auml;t eingestellt wird. G&uuml;tige Werte sind
+    1 bis 12. 1-4 gilt f&uuml;r EMWZ, 5-8 f&uuml;r EMEM und 9-12 f&uuml;r EMGZ Ger&auml;te.<br><br>
+
+    <b>corr1</b> ist der Kalibrierfaktor f&uuml;r den Momentanverbrauch, <b>corr2</b>
+    f&uuml;r den Gesamtverbrauch.
+    <ul>
+      <li>f&uuml;r EMWZ Ger&auml;te wird die Umdrehungsgeschwindigkeit (U/kW)
+          des verwendeten Stromz&auml;hlers (z.B. 150) f&uuml;r corr1 und 12 mal 
+          diesen Wert f&uuml;r corr2 verwendet</li>
+      <li>f&uuml;r EMEM devices ist corr1 mit 0.01 und corr2 mit 0.001 anzugeben</li>
+    </ul>
+    <br>
+
+    <b>CostPerUnit</b> und <b>BasicFeePerMonth</b> werden dazu verwendet, die 
+    t&auml;gliche bzw. monatliche Kosten zu berechnen. Die Kosten werden in der 
+    Logdatei einmal t&auml;glich (ohne Fixkosten) bzw. monatlich (mit Fixkosten) 
+    generiert und angezeigt.
+    Die Definition sollte in etwa so aussehen:
+    <ul><code>
+    define emwz 1 75 900 0.15 12.50<br>
+    </code></ul>
+    und in der Logdatei sollten diese Zeilen erscheinen:
+    <ul><code>
+    CUM_DAY: 6.849 CUM: 60123.4 COST: 1.02<br>
+    CUM_MONTH: 212.319 CUM: 60123.4 COST: 44.34<br>
+    </code></ul>
+
+    Tipp: Das EMWZ Ger&auml;t kann so konfiguriert werden, dass es in der CUM Spalte
+    des STATE Wertes den aktuellen Wert des Stromz&auml;hlers anzeigt. 
+    Hierf&uuml;r muss der aktuell am Stromz&auml;hler abgelesene Wert mit corr1 (U/kW) 
+    multipliziert werden und der CUM Rohwert aus der aktuellen fhem Messung ('reading') 
+    davon abgezogen werden. Dann muss dieser Wert als Basiswert des EMWZ Ger&auml;tes 
+    (im Beispiel emwz) gesetzt werden.<br>
+
+  </ul>
+  <br>
+
+  <a name="CUL_EMset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="CUL_EMget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="CUL_EMattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#ignore">ignore</a></li><br>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#model">model</a> (EMEM,EMWZ,EMGZ)</li><br>
+    <li><a href="#IODev">IODev</a></li><br>
+    <li><a href="#eventMap">eventMap</a></li><br>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+  <br>
+</ul>
+
+=end html_DE
 =cut
