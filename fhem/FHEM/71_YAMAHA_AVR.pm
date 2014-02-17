@@ -1275,7 +1275,7 @@ sub YAMAHA_AVR_html2txt($)
 	Optional attribute change the response timeout in seconds for all queries to the receiver.
 	<br><br>
 	Possible values: 1-5 seconds. Default value is 4 seconds.<br><br>
-    <li><a name="request-timeout">disable</a></li>
+    <li><a name="disable">disable</a></li>
 	Optional attribute to disable the internal cyclic status update of the receiver. Manual status updates via statusRequest command is still possible.
 	<br><br>
 	Possible values: 0 => perform cyclic status update, 1 => don't perform cyclic status updates.<br><br>
@@ -1484,7 +1484,7 @@ sub YAMAHA_AVR_html2txt($)
 	Optionales Attribut. Maximale Dauer einer Anfrage in Sekunden zum Receiver.
 	<br><br>
 	M&ouml;gliche Werte: 1-5 Sekunden. Standardwert ist 4 Sekunden<br><br>
-    <li><a name="request-timeout">disable</a></li>
+    <li><a name="disable">disable</a></li>
 	Optionales Attribut zur Deaktivierung des zyklischen Status-Updates. Ein manuelles Update via statusRequest-Befehl ist dennoch m&ouml;glich.
 	<br><br>
 	M&ouml;gliche Werte: 0 => zyklische Status-Updates, 1 => keine zyklischen Status-Updates.<br><br>
