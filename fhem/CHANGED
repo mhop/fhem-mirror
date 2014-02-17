@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - deleted: 51_BBB_WATCHDOG.pm - not really needed
   - bugfix:  DbLog: adding ShutdownFunction
   - feature: YAMAHA_AVR: new attribute "disable" to disable cyclic status 
              updates of receiver
