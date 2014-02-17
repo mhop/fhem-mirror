@@ -342,12 +342,10 @@ FBAHA_Ready($)
 <a name="FBAHA"></a>
 <h3>FBAHA</h3>
 <ul>
-  <b>NOTE:</b> As of FRITZ!OS 5.50 this module is known to work on the FB7390,
-  and is known to <b>crash the FB7270</b>.<br><br>
-
   This module connects to the AHA server (AVM Home Automation) on a FRITZ!Box.
   It serves as the "physical" counterpart to the <a href="#FBDECT">FBDECT</a>
-  devices.
+  devices. Note: you have to enable the access to this feature in the FRITZ!Box
+  frontend first.
   <br><br>
   <a name="FBAHAdefine"></a>
   <b>Define</b>
@@ -419,12 +417,10 @@ FBAHA_Ready($)
 <a name="FBAHA"></a>
 <h3>FBAHA</h3>
 <ul>
-  <b>Achtung:</b> Es ist bekannt, da&szlig; dieses Modul mit FRITZ!OS 5.50 auf
-  einem FB7390 funktioniert, aber <b>den FB7270 zum Absurz bringt</b>.<br><br>
-
   Dieses Modul verbindet sich mit dem AHA (AVM Home Automation) Server auf
   einem FRITZ!Box. Es dient als "physikalisches" Gegenst&uuml;ck zum <a
-  href="#FBDECT">FBDECT</a> Modul.
+  href="#FBDECT">FBDECT</a> Modul. Achtung: als erstes muss der Zugang zu
+  diesen Daten in der FRITZ!Box Web-Oberfl&auml;che aktiviert werden.
   <br><br>
   <a name="FBAHAdefine"></a>
   <b>Define</b>
