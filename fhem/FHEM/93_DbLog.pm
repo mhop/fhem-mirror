@@ -18,6 +18,14 @@ use warnings;
 use DBI;
 use Data::Dumper;
 
+my %columns = ("DEVICE"  => 64,
+               "TYPE"    => 64,
+               "EVENT"   => 512,
+               "READING" => 64,
+               "VALUE"   => 128,
+               "UNIT"    => 32
+          );
+
 ################################################################
 sub DbLog_Initialize($)
 {
@@ -28,7 +36,10 @@ sub DbLog_Initialize($)
   $hash->{NotifyFn} = "DbLog_Log";
   $hash->{GetFn}    = "DbLog_Get";
   $hash->{AttrFn}   = "DbLog_Attr";
-  $hash->{AttrList} = "disable:0,1 DbLogType:Current,History,Current/History";
+  $hash->{ShutdownFn} = "DbLog_Shutdown";
+  $hash->{AttrList} = "disable:0,1 ".
+           "DbLogType:Current,History,Current/History ".
+           "shutdownWait";
 
   addToAttrList("DbLogExclude");
 }
@@ -68,6 +79,18 @@ sub DbLog_Undef($$)
   $dbh->disconnect() if(defined($dbh));
   return undef;
 }
+
+#####################################
+sub DbLog_Shutdown($)
+{  my ($hash) = @_;
+ my $name = $hash->{NAME};
+ my $shutdownWait = AttrVal($name,"shutdownWait",undef);
+ if(defined($shutdownWait)) {
+   Log3($name, 2, "DbLog $name waiting for shutdown");
+   sleep($shutdownWait);
+ }
+ return undef; }
+
 
 ################################################################
 #
@@ -115,6 +138,10 @@ sub DbLog_ParseEvent($$$)
     $reading= "state";
     $value= $event;
   }
+
+  #TODO: globales abfangen von 
+  # - temperature
+  # - humidity
 
   # the interpretation of the argument depends on the device type
   # EMEM, M232Counter, M232Voltage return plain numbers
@@ -212,7 +239,7 @@ sub DbLog_ParseEvent($$$)
           $value=~ s/%//; $value= $value*1.; $unit= "%";
         }
       }
-      elsif($value eq "synctime") {
+      elsif($value =~ m(^synctime)) {
         $reading= "actuator-synctime";
         undef $value;
       }
@@ -290,6 +317,8 @@ sub DbLog_ParseEvent($$$)
   elsif($type eq "TRX_WEATHER") {
     if($reading eq "energy_current") { $value=~ s/ W//; }
     elsif($reading eq "energy_total") { $value=~ s/ kWh//; }
+#    elsif($reading eq "temperature") {TODO}
+#    elsif($reading eq "temperature")  {TODO
     elsif($reading eq "battery") {
       if ($value=~ m/(\d+)\%/) { 
         $value= $1; 
@@ -356,8 +385,16 @@ sub DbLog_ParseEvent($$$)
 ################################################################
 sub DbLog_Push(@) {
   my ($hash, $DbLogType, $timestamp, $device, $type, $event, $reading, $value, $unit) = @_;
-  
   my $dbh= $hash->{DBH};
+  
+  # Daten auf maximale laenge beschneiden
+  $device   = substr($device,0, $columns{DEVICE});
+  $type     = substr($type,0, $columns{TYPE});
+  $event    = substr($event,0, $columns{EVENT});
+  $reading  = substr($reading,0, $columns{READING});
+  $value    = substr($value,0, $columns{VALUE});
+  $unit     = substr($unit,0, $columns{UNIT});
+
   $dbh->{RaiseError} = 1;
   
   $dbh->begin_work();
@@ -366,30 +403,33 @@ sub DbLog_Push(@) {
   my $sth_ic = $dbh->prepare_cached("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)") if (lc($DbLogType) =~ m(current) );
   my $sth_uc = $dbh->prepare_cached("UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)") if (lc($DbLogType) =~ m(current) );
 
-  # insert into history
-  if (lc($DbLogType) =~ m(history) ) {
-    my $rv_ih = $sth_ih->execute(($timestamp, $device, $type, $event, $reading, $value, $unit));
-  }
+  Log3 $hash->{NAME}, 5, "DbLog: logging of Device: $device , Type: $type , Event: $event , Reading: $reading , Value: $value , Unit: $unit";
 
-  # update or insert current
-  if (lc($DbLogType) =~ m(current) ) {
-    my $rv_uc = $sth_uc->execute(($timestamp, $type, $event, $value, $unit, $device, $reading));
-    if ($rv_uc == 0) {
-      my $rv_ic = $sth_ic->execute(($timestamp, $device, $type, $event, $reading, $value, $unit));
+  eval {
+    # insert into history
+    if (lc($DbLogType) =~ m(history) ) {
+      my $rv_ih = $sth_ih->execute(($timestamp, $device, $type, $event, $reading, $value, $unit));
     }
-  }
 
-  $dbh->commit();
+    # update or insert current
+    if (lc($DbLogType) =~ m(current) ) {
+      my $rv_uc = $sth_uc->execute(($timestamp, $type, $event, $value, $unit, $device, $reading));
+      if ($rv_uc == 0) {
+        my $rv_ic = $sth_ic->execute(($timestamp, $device, $type, $event, $reading, $value, $unit));
+      }
+    }
+  };
+
   
   if ($@) {
     Log3 $hash->{NAME}, 2, "DbLog: Failed to insert new readings into database: $@";
-    $dbh->{RaiseError} = 0;  
     $dbh->rollback();
     # reconnect
     $dbh->disconnect();  
     DbLog_Connect($hash);
   }
   else {
+    $dbh->commit();
     $dbh->{RaiseError} = 0;  
   }
 
@@ -567,8 +607,8 @@ sub DbLog_Connect($)
     $dbh->do("PRAGMA synchronous=NORMAL");
     $dbh->do("PRAGMA journal_mode=WAL");
     $dbh->do("PRAGMA cache_size=4000");
-    $dbh->do("CREATE TEMP TABLE IF NOT EXISTS current (TIMESTAMP TIMESTAMP, DEVICE varchar(32), TYPE varchar(32), EVENT varchar(512), READING varchar(32), VALUE varchar(32), UNIT varchar(32))");
-    $dbh->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(32), TYPE varchar(32), EVENT varchar(512), READING varchar(32), VALUE varchar(32), UNIT varchar(32))");
+    $dbh->do("CREATE TEMP TABLE IF NOT EXISTS current (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
+    $dbh->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
     $dbh->do("CREATE INDEX IF NOT EXISTS Search_Idx ON `history` (DEVICE, READING, TIMESTAMP)");
   }
 
@@ -707,7 +747,7 @@ DbLog_Get($@)
     $readings[$i][3] = $fld[3]; # function
     $readings[$i][4] = $fld[4]; # regexp
 
-    $readings[$i][1] = "%" if(length($readings[$i][1])==0); #falls Reading nicht gefüllt setze Joker
+    $readings[$i][1] = "%" if(!$readings[$i][1] || length($readings[$i][1])==0); #falls Reading nicht gefuellt setze Joker
   }
 
   #create new connection for plotfork
@@ -1513,6 +1553,11 @@ sub chartQuery($@) {
   </ul>
   <a name="DbLogattr"></a>
   <b>Attributes</b> 
+  <ul><b>shutdownWait</b>
+    <ul><code>attr &lt;device&gt; shutdownWait <n></code><br/>
+      causes fhem shutdown to wait n seconds for pending database commit<br/>
+    </ul>
+  </ul><br/>
   <ul><b>DbLogExclude</b>
     <br>
     <ul>
@@ -1795,6 +1840,11 @@ sub chartQuery($@) {
 
   <a name="DbLogattr"></a>
   <b>Attribute</b>
+  <ul><b>shutdownWait</b>
+     <ul><code>attr &lt;device&gt; shutdownWait <n></code><br/>
+      fhem wartet waehrend des shutdowns fuer n Sekunden, um die Datenbank korrekt zu beenden<br/>
+    </ul>
+  </ul><br/>
   <ul><b>DbLogExclude</b>
     <ul>
       <code>
