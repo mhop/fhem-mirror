@@ -76,7 +76,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.04";
+my $owx_version="5.05";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -248,9 +248,7 @@ sub OWSWITCH_Define ($$) {
   if( !defined($hash->{IODev}->{NAME}) || !defined($hash->{IODev}) ){
     return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
   }
-  #if( $hash->{IODev}->{PRESENT} != 1 ){
-  #  return "OWSWITCH: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
-  #}
+
   $main::modules{OWSWITCH}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
@@ -280,20 +278,18 @@ sub OWSWITCH_Attr(@) {
   my $ret;
   
   if ( $do eq "set") {
-  	ARGUMENT_HANDLER: {
-      #-- interval modified at runtime
-  	  $key eq "interval" and do {
-        #-- check value
-        return "OWSWITCH: Set with short interval, must be > 1" if(int($value) < 1);
-        #-- update timer
-        $hash->{INTERVAL} = $value;
-        if ($init_done) {
-          RemoveInternalTimer($hash);
-          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 1);
-        }
-  	    last;
-  	  };
-    }
+    #-- interval modified at runtime
+   $key eq "interval" and do {
+      #-- check value
+      return "OWSWITCH: Set with short interval, must be > 1" if(int($value) < 1);
+      #-- update timer
+      $hash->{INTERVAL} = $value;
+      if ($init_done) {
+        RemoveInternalTimer($hash);
+        InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 1);
+      }
+      last;
+    };
   }
   return $ret;
 }
@@ -459,10 +455,7 @@ sub OWSWITCH_Get($@) {
   if( $a[1] eq "version") {
     return "$name.version => $owx_version";
   }
-  
-  #-- reset presence
-  $hash->{PRESENT}  = 0;
-  
+   
   #-- get channel names
   OWSWITCH_ChannelNames($hash);
   
@@ -495,7 +488,6 @@ sub OWSWITCH_Get($@) {
       return "OWSWITCH: Get with wrong IODev type $interface";
     }
     #-- process results
-    $hash->{PRESENT} = 1; 
     return $name.".".$a[2]." => ".$hash->{READINGS}{$owg_channel[$fnd]}{VAL};
     
   #-- get all states
@@ -515,7 +507,6 @@ sub OWSWITCH_Get($@) {
     if( defined($ret)  ){
       return "OWSWITCH: Could not get values from device $name, reason $ret";
     }
-    $hash->{PRESENT} = 1; 
     return "OWSWITCH: $name.$reading => ".$hash->{READINGS}{"state"}{VAL};  
   }
 }
@@ -544,9 +535,6 @@ sub OWSWITCH_GetValues($) {
   RemoveInternalTimer($hash);
   InternalTimer(time()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 1);
   
-  #-- reset presence
-  $hash->{PRESENT}  = 0;
-  
   #-- Get readings according to interface type
   my $interface= $hash->{IODev}->{TYPE};
   if( $interface eq "OWX" ){
@@ -571,7 +559,6 @@ sub OWSWITCH_GetValues($) {
     Log 3, "OWSWITCH: Could not get values from device $name, reason $ret";
     return 1;
   }
-  $hash->{PRESENT} = 1; 
   
   return undef;
 }
@@ -765,7 +752,6 @@ sub OWSWITCH_Set($@) {
   }
   
   #-- process results - we have to reread the device
-  $hash->{PRESENT} = 1; 
   OWSWITCH_GetValues($hash);  
   Log 4, "OWSWITCH: Set $hash->{NAME} $key $value";
   return undef;
@@ -810,6 +796,9 @@ sub OWFSSWITCH_GetState($) {
   #-- hash of the busmaster
   my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
+  
+  #-- reset presence
+  $hash->{PRESENT}  = 0;
   
   #-- get values - or should we rather use the uncached ones ?
   my $rel = OWServer_Read($master,"/$owx_add/sensed.ALL");
@@ -856,6 +845,7 @@ sub OWFSSWITCH_GetState($) {
   }
   
   #-- and now from raw to formatted values 
+  $hash->{PRESENT}  = 1;
   my $value = OWSWITCH_FormatValues($hash);
   Log 5, $value;
   return undef;
@@ -1057,7 +1047,8 @@ sub OWXSWITCH_BinValues($$$$$$$$) {
   }
   
   #-- and now from raw to formatted values 
-  my $value = OWSWITCH_FormatValues($hash);
+  $hash->{PRESENT}  = 1;
+  $value = OWSWITCH_FormatValues($hash);
   Log 5, $value;
   return undef;
 }
@@ -1105,6 +1096,9 @@ sub OWXSWITCH_GetState($) {
   
   #-- hash of the busmaster
   my $master = $hash->{IODev};
+  
+  #-- reset presence
+  $hash->{PRESENT}  = 0;
   
   my ($i,$j,$k);
   

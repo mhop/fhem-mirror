@@ -70,7 +70,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.04";
+my $owx_version="5.05";
 #-- flexible channel name
 my $owg_channel;
 
@@ -156,20 +156,18 @@ sub OWMULTI_Attr(@) {
   my $ret;
   
   if ( $do eq "set") {
-  	ARGUMENT_HANDLER: {
-  	  #-- interval modified at runtime
-  	  $key eq "interval" and do {
-        #-- check value
-        return "OWMULTI: Set with short interval, must be > 1" if(int($value) < 1);
-        #-- update timer
-        $hash->{INTERVAL} = $value;
-        if ($init_done) {
-          RemoveInternalTimer($hash);
-          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 1);
-        }
-  	    last;
-  	  };
-    }
+   #-- interval modified at runtime
+   $key eq "interval" and do {
+      #-- check value
+      return "OWMULTI: Set with short interval, must be > 1" if(int($value) < 1);
+      #-- update timer
+      $hash->{INTERVAL} = $value;
+      if ($init_done) {
+        RemoveInternalTimer($hash);
+        InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 1);
+      }
+      last;
+    };
   }
   return $ret;
 }
@@ -254,9 +252,6 @@ sub OWMULTI_Define ($$) {
   if( !defined($hash->{IODev}->{NAME}) || !defined($hash->{IODev}) ){
     return "OWMULTI: Warning, no 1-Wire I/O device found for $name.";
   }
-  #if( $hash->{IODev}->{PRESENT} != 1 ){
-  #  return "OWMULTI: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
-  #}
   $main::modules{OWMULTI}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
@@ -458,9 +453,6 @@ sub OWMULTI_Get($@) {
     return "$name.version => $owx_version";
   }
   
-  #-- reset presence
-  $hash->{PRESENT}  = 0;
-
   #-- for the other readings we need a new reading
   #-- OWX interface
   if( $interface eq "OWX" ){
@@ -479,7 +471,6 @@ sub OWMULTI_Get($@) {
   if( defined($ret)  ){
     return "OWMULTI: Could not get values from device $name, reason $ret";
   }
-  $hash->{PRESENT} = 1; 
   
   #-- return the special reading
   if ($reading eq "reading") {
@@ -509,7 +500,7 @@ sub OWMULTI_Get($@) {
 #
 ########################################################################################
 
-sub OWMULTI_GetValues($@) {
+sub OWMULTI_GetValues($) {
   my $hash    = shift;
   
   my $name    = $hash->{NAME};
@@ -524,8 +515,6 @@ sub OWMULTI_GetValues($@) {
   RemoveInternalTimer($hash);
   InternalTimer(time()+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 1);
 
-  #-- reset presence
-  $hash->{PRESENT}  = 0;
 
   #-- Get values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
@@ -546,7 +535,6 @@ sub OWMULTI_GetValues($@) {
   if( defined($ret)  ){
     return "OWMULTI: Could not get values from device $name, reason $ret";
   }
-  $hash->{PRESENT} = 1; 
 
   return undef;
 }
@@ -642,7 +630,6 @@ sub OWMULTI_Set($@) {
   }
   
   #-- process results - we have to reread the device
-  $hash->{PRESENT} = 1; 
   OWMULTI_GetValues($hash);
 
   Log 4, "OWMULTI: Set $hash->{NAME} $key $value";
@@ -691,6 +678,9 @@ sub OWFSMULTI_GetValues($) {
   my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
           
+  #-- reset presence
+  $hash->{PRESENT}  = 0;
+            
   #-- get values - or should we rather get the uncached ones ?
   $hash->{owg_val}->[0]   = OWServer_Read($master,"/$owx_add/temperature");
   $hash->{owg_val}->[1]   = OWServer_Read($master,"/$owx_add/VDD");
@@ -702,6 +692,7 @@ sub OWFSMULTI_GetValues($) {
     if( ($hash->{owg_val}->[0] eq "") || ($hash->{owg_val}->[1] eq "") || ($hash->{owg_val}->[2] eq "") );
     
   #-- and now from raw to formatted values 
+  $hash->{PRESENT}  = 1;
   my $value = OWMULTI_FormatValues($hash);
   Log 5, $value;
   return undef;
@@ -797,6 +788,7 @@ sub OWXMULTI_BinValues($$$$$$$$) {
     $hash->{owg_val}->[2] = ($msb*256+ $lsb)/100;
      
     #-- and now from raw to formatted values 
+    $hash->{PRESENT}  = 1;
     my $value = OWMULTI_FormatValues($hash);
     Log 5, $value;
   };
@@ -808,12 +800,13 @@ sub OWXMULTI_BinValues($$$$$$$$) {
 # OWXMULTI_GetValues - Get reading from one device
 #
 # Parameter hash = hash of device addressed
+#           final= 1 if FormatValues is to be called
 #
 ########################################################################################
 
-sub OWXMULTI_GetValues($) {
+sub OWXMULTI_GetValues($$) {
 
-  my ($hash) = @_;
+  my ($hash,$final) = @_;
   
   my ($i,$j,$k,$res,$res2);
    
@@ -822,6 +815,8 @@ sub OWXMULTI_GetValues($) {
   #-- hash of the busmaster
   my $master = $hash->{IODev};
   
+  #-- reset presence
+  $hash->{PRESENT}  = 0;
   #------------------------------------------------------------------------------------
   #-- switch the device to current measurement off, VDD only
   #-- issue the match ROM command \x55 and the write scratchpad command
