@@ -1163,31 +1163,24 @@ sub CUL_HM_Parse($$) {##############################
   }
   elsif($st eq "THSensor") { ##################################################
     if    ($mTp eq "70"){
-      my $chn = 1;
-      $chn = 10 if ($md =~  m/^(WS550|WS888|HM-WDC7000)/);#todo use channel correct
-      my $t =  hex(substr($p,0,4));
-      $t -= 0x8000 if($t > 1638.4);
+      my $chn;
+      if    ($md =~  m/^(WS550|WS888|HM-WDC7000)/){$chn = "10"}
+      elsif ($md eq "HM-WDS30-OT2-SM")            {$chn = "05"}
+	  else                                        {$chn = "01"}
+	  my ($d1,$h,$ap) = map{hex($_)} unpack 'A4A2A4',$p;
+      my $t =  $d1 & 0x7fff;
+      $t -= 0x8000 if($t &0x4000);
       $t = sprintf("%0.1f", $t/10);
       my $statemsg = "state:T: $t";
       push @event, "temperature:$t";#temp is always there
-      if ($md eq "HM-WDS30-OT2-SM"){
-        $chn = 5;
-        my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
-        push @entities,CUL_HM_UpdtReadBulk($chnHash,1,$statemsg,
-                                                    "temperature:$t")
-                  if ($chnHash);
-        push @event, "battery:".(hex(substr($p,0,4))&0x80?"low":"ok");
-      }
-      elsif ($md !~ m/^(S550IA|HM-WDS30-T-O)$/){#skip temp-only sens
-        my $h =  hex(substr($p,4,2));
-        $statemsg .= " H: $h";
-        push @event, "humidity:$h";
-        if ($md eq "HM-WDC7000"){#airpressure sensor
-          my $ap = hex(substr($p,6,4));
-          $statemsg .= " AP: $ap";
-          push @event, "airpress:$ap";
-        }
-      }
+	  push @event, "battery:".($d1 & 0x8000?"low":"ok");
+	  if($modules{CUL_HM}{defptr}{$src.$chn}){
+	    push @entities,CUL_HM_UpdtReadBulk($modules{CUL_HM}{defptr}{$src.$chn}
+		                                       ,1,$statemsg
+                                                 ,"temperature:$t")
+	  }
+      if ($h) {$statemsg .= " H: $h"  ; push @event, "humidity:$h";	}
+      if ($ap){$statemsg .= " AP: $ap"; push @event, "airpress:$ap";}
       push @event, $statemsg;
     }
     elsif ($mTp eq "53"){
@@ -3782,25 +3775,26 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
     Log3 $name,3,"CUL_HM $name virtualTC timer off by:".int($tn - $nextF);
     $nextF = $tn;
   }
-  do {
+  while ($nextF < $tn) {# calculate next time from last successful
     $msgCnt = ($msgCnt +1) %256;
     $idl = $hashVd->{idl}+$msgCnt;
     $lo = int(($idl*0x4e6d +12345)/0x10000);#&0xff;
     $hi = ($hashVd->{idh}+$idl*198);        #&0xff;
     $nextTimer = (($lo+$hi)&0xff)/4 + 120;
     $nextF += $nextTimer;
-  } until ($nextF > $tn);
-
-  $hashVd->{nextM} = $tn+$nextTimer;
+  }
+  $hashVd->{next} = $nextF;
+  $hashVd->{nextM} = $tn+$nextTimer;# new adjust if we will match
   $hashVd->{msgCnt} = $msgCnt;
   if ($hashVd->{cmd}){
-    if    ($hashVd->{typ} == 1){
+    if    ($hashVd->{typ} == 1){ 
       my $vc = ReadingsVal($name,"valveCtrl","init");
       if (   $vc ne 'restart' 
 	      &&((    $vc ne "init"
                && $hashVd->{msgRed} <= $hashVd->{miss})
              || $hash->{helper}{virtTC} ne "00")) {
         $hashVd->{msgSent} = 1;
+        $hashVd->{nextL} = $tn;#last send
         CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
                                            ,$msgCnt
                                            ,$hashVd->{cmd}
@@ -3823,7 +3817,6 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
     CUL_HM_UpdtReadSingle($hash,"state","stopped",1);
     return;# terminate processing
   }
-  $hashVd->{nextF} = $nextF;
   $hash->{helper}{virtTC} = "00";
   CUL_HM_ProcessCmdStack($hash);
 }
@@ -3837,21 +3830,19 @@ sub CUL_HM_valvePosTmr(@) {#calc next vd wakeup
   my $vcn = $vc;
   if (!$hashVd->{msgSent}) {
     $hashVd->{miss}++;
-    $hashVd->{next} = $hashVd->{nextF};
   }
   else {
     my $pn = CUL_HM_id2Name($hashVd->{id});
     my $ackTime = ReadingsTimestamp($pn, "ValvePosition", "");
     if (!$ackTime || $ackTime eq $hashVd->{ackT} ){
-      $hashVd->{next} = $hashVd->{nextF};
       $vcn = (++$hashVd->{miss} > 5) ? "lost"
                                      :"miss_".$hashVd->{miss};
       Log3 $name,5,"CUL_HM $name virtualTC use fail-timer";
     }
-    else{
-      CUL_HM_UpdtReadBulk($hash,0,".next:".$hashVd->{next}
+    else{#successful - store sendtime and msgCnt that calculated it
+      CUL_HM_UpdtReadBulk($hash,0,".next:".$hashVd->{nextL}
                                  ,".msgCnt:".($hashVd->{msgCnt}-1));
-      $hashVd->{next} = $hashVd->{nextM};
+      $hashVd->{next} = $hashVd->{nextM};#use adjusted value if ack
       $vcn = "ok";
       $hashVd->{miss} = 0;
       $hashVd->{msgSent} = 0;
