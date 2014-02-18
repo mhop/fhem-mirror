@@ -697,7 +697,7 @@ JSONMETER_UpdateAborted($)
 <ul>
   Dieses Modul liest Daten von Messger&auml;ten (z.B. Stromz&auml;hler, Gasz&auml;hler oder W&auml;rmez&auml;hler, so genannte Smartmeter),
   <br>
-  welche OBIS kompatible Daten im JSON-Format auf einem Webserver oder auf dem FHEM-Dateisystem zur Verf&uuml;gung stellen.
+  welche <a href="http://de.wikipedia.org/wiki/OBIS-Kennzahlen">OBIS</a> kompatible Daten im JSON-Format auf einem Webserver oder auf dem FHEM-Dateisystem zur Verf&uuml;gung stellen.
   <br>
   &nbsp;
   <br>
@@ -707,10 +707,10 @@ JSONMETER_UpdateAborted($)
     <code>define &lt;name&gt; JSONMETER &lt;Ger&auml;tetyp&gt; [&lt;IP-Adresse&gt;] [Abfrageinterval]</code>
     <br>
     Beispiel: <code>define Stromzaehler JSONMETER ITF 192.168.178.20 300</code>
-    <br>
+    <br>&nbsp;
     <li><code>[Abfrageinterval]</code>
       <br>
-      Standardm&auml;ssig 300 Sekunden. Der kleinste m&ouml;gliche Wert ist 30.
+      Optional. Standardm&auml;ssig 300 Sekunden. Der kleinste m&ouml;gliche Wert ist 30.
       <br> 
       Bei 0 kann die Ger&auml;teabfrage nur manuell gestartet werden.
     </li><br>
@@ -721,7 +721,7 @@ JSONMETER_UpdateAborted($)
       Mit dem Attribute 'pathString' k&ouml;nnen Login Information an den URL-Pfad von vordefinierten Ger&auml;te angehangen werden.
       <ul> 
          <li><b>ITF</b> - Eintarifz&auml;hler von N-ENERGY Netz GmbH (<a href="http://www.itf-froeschl.de">ITF Fr&ouml;schl</a>)</li>
-         <li><b>EFR</b> - Stromz&auml;hler von EON, N-ENERGY, EnBW
+         <li><b>EFR</b> - <a href="http://www.efr.de">EFR</a> Smart Grid Hub f&uuml;r Stromz&auml;hler von EON, N-ENERGY, EnBW
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Die Login-Information wird &uuml;ber das Attribute 'pathstring' angegeben.
             <br>
