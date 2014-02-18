@@ -53,7 +53,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.04";
+my $owx_version="5.05";
 #-- declare variables
 my %gets = (
   "present"     => "",
@@ -217,20 +217,18 @@ sub OWID_Attr(@) {
   my $ret;
   
   if ( $do eq "set") {
-  	ARGUMENT_HANDLER: {
-  	  #-- interval modified at runtime
-  	  $key eq "interval" and do {
-        #-- check value
-        return "OWID: Set with short interval, must be > 1" if(int($value) < 1);
-        #-- update timer
-        $hash->{INTERVAL} = $value;
-        if ($init_done) {
-          RemoveInternalTimer($hash);
-          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWID_GetValues", $hash, 1);
-        }
-  	    last;
-  	  };
-    }
+    #-- interval modified at runtime
+    $key eq "interval" and do {
+      #-- check value
+      return "OWID: Set with short interval, must be > 1" if(int($value) < 1);
+      #-- update timer
+      $hash->{INTERVAL} = $value;
+      if ($init_done) {
+        RemoveInternalTimer($hash);
+        InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWID_GetValues", $hash, 1);
+      }
+      last;
+    };
   }
   return $ret;
 }

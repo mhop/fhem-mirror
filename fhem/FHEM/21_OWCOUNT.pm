@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# OWCOUNT.pm 
+# OWCOUNT.pm  
 #
 # FHEM module to commmunicate with 1-Wire Counter/RAM DS2423
 #
@@ -84,7 +84,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.04";
+my $owx_version="5.05";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -270,20 +270,18 @@ sub OWCOUNT_Attr(@) {
   my $ret;
   
   if ( $do eq "set") {
-  	ARGUMENT_HANDLER: {
-  	  #-- interval modified at runtime
-  	  $key eq "interval" and do {
-        #-- check value
-        return "OWCOUNT: Set with short interval, must be > 1" if(int($value) < 1);
-        #-- update timer
-        $hash->{INTERVAL} = $value;
-        if ($init_done) {
-          RemoveInternalTimer($hash);
-          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 1);
-        }
-  	    last;
-  	  };
-    }
+    #-- interval modified at runtime
+    $key eq "interval" and do {
+      #-- check value
+      return "OWCOUNT: Set with short interval, must be > 1" if(int($value) < 1);
+      #-- update timer
+      $hash->{INTERVAL} = $value;
+      if ($init_done) {
+        RemoveInternalTimer($hash);
+        InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 1);
+      }
+      last;
+    };
   }
   return $ret;
 }
@@ -388,8 +386,6 @@ sub OWCOUNT_FormatValues($) {
   my $daybreak = 0;
   my $monthbreak = 0;
   
-  my $present  = $hash->{PRESENT};
-  
   #-- no change in any value if invalid reading
   for (my $i=0;$i<int(@owg_fixed);$i++){
     return if( $hash->{owg_val}->[$i] eq "");
@@ -463,7 +459,7 @@ sub OWCOUNT_FormatValues($) {
 
         #-- previous measurement time
         ($yearo,$montho,$dayrest) = split(/-/,$oldtim);
-        $dayo = substr($dayrest,0,2);
+        $dayo = substr($dayrest,0,2);*60=
         ($houro,$mino,$seco) = split(/:/,substr($dayrest,3));
         
         #-- time difference to previous measurement and to midnight
@@ -471,7 +467,7 @@ sub OWCOUNT_FormatValues($) {
         $delf =  $hour        *3600 +  $min       *60 +  $sec - 86400;
         
         #-- rate
-        if( ($delt > 0.0) && $present ){
+        if( $delt > 0.0){
           $vrate  = ($vval-$oldval)/$delt;
         } else {
           $vrate = 0.0;
@@ -482,7 +478,7 @@ sub OWCOUNT_FormatValues($) {
         }elsif( $period eq "minute" ){
           $vrate*=60;
         }     
-        $vrate = int($vrate * 10000+0.5)/10000;       
+        $vrate = int($vrate * 10000+0.5)/10000;   
       
         #--midnight extrapolation only possible if previous measurement
         if( $daybreak==1 ){
@@ -497,7 +493,9 @@ sub OWCOUNT_FormatValues($) {
           }
            
           #-- in any mode store the interpolated value in the midnight store
-          OWCOUNT_SetPage($hash,14+$i,sprintf("%f",$dval2));
+          my $msg = sprintf("%4d-%02d-%02d midnight %7.2f",
+            $year+1900,$month+1,$day,$dval2);
+          OWCOUNT_SetPage($hash,14+$i,$msg);
           
           #-- string buildup for monthly and yearly logging
           $dvalue .= sprintf( " %s: %5.1f %s %sM: %%5.1f %s",  $owg_channel[$i],$dval,$unit,$owg_channel[$i],$unit); 
@@ -510,7 +508,7 @@ sub OWCOUNT_FormatValues($) {
           $svalue .= sprintf( "%s: %5.1f %s %s: %5.2f %s", $owg_channel[$i], $vval,$unit,$owg_rate[$i],$vrate,$runit);
         #-- 3 decimals
         } else {
-          $svalue .= sprintf( "%s: %5.3f %s %s: %5.2f %s", $owg_channel[$i], $vval,$unit,$owg_rate[$i],$vrate,$runit);
+          $svalue .= sprintf( "%s: %5.3f %s %s: %5.4f %s", $owg_channel[$i], $vval,$unit,$owg_rate[$i],$vrate,$runit);
         }  
       }
       readingsBulkUpdate($hash,$owg_channel[$i],$vval);
@@ -617,9 +615,6 @@ sub OWCOUNT_Get($@) {
     return "$name.version => $owx_version";
   }
   
-  #-- reset presence
-  $hash->{PRESENT}  = 0;
-  
   #-- get channel names
   OWCOUNT_ChannelNames($hash);
   
@@ -679,6 +674,8 @@ sub OWCOUNT_Get($@) {
     return $value;
   } 
   
+ 
+  
   #-- get memory page/counter according to interface type
   my $interface= $hash->{IODev}->{TYPE};
   
@@ -706,13 +703,12 @@ sub OWCOUNT_Get($@) {
         return "OWCOUNT: Invalid midnight counter address, must be A, B or defined channel name"
       }
     }
-    $ret = OWCOUNT_GetPage($hash,$page);
-    
+    $ret = OWCOUNT_GetPage($hash,$page,1);  
     #-- when we have a return code, we have an error
     if( $ret ){
       return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
     }else{
-      return "OWCOUNT: $name.$reading [$page] =>".$hash->{owg_str}->[$page];
+      return "OWCOUNT: $name.$reading [$page] =>".$hash->{owg_midnight}->[$page-14];
     }
   }
   
@@ -728,12 +724,11 @@ sub OWCOUNT_Get($@) {
     } else {
       return "OWCOUNT: Invalid counter address, must be A, B or defined channel name"
     }
-
-    $ret = OWCOUNT_GetPage($hash,$page);
-    if( defined($ret)  ){
+    $ret = OWCOUNT_GetPage($hash,$page,1);
+    #-- when we have a return code, we have an error
+    if( $ret  ){
       return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
     }
-    $hash->{PRESENT} = 1; 
     #-- only one counter will be returned
     return "OWCOUNT: $name.raw $a[2] => ".$hash->{owg_val}->[$page-14];   
     
@@ -741,8 +736,8 @@ sub OWCOUNT_Get($@) {
   }elsif( $reading eq "counters" ){
     return "OWCOUNT: Get needs no parameter when reading counters"
       if( int(@a)==1 );
-    $ret1 = OWCOUNT_GetPage($hash,14);
-    $ret2 = OWCOUNT_GetPage($hash,15);
+    $ret1 = OWCOUNT_GetPage($hash,14,0);
+    $ret2 = OWCOUNT_GetPage($hash,15,1);
   
     #-- process results
     $ret .= $ret1
@@ -752,7 +747,6 @@ sub OWCOUNT_Get($@) {
     if( defined($ret1) || defined($ret2) ){
       return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
     }
-    $hash->{PRESENT} = 1; 
     #-- both counters will be returned
     return "OWCOUNT: $name.counters => ".$hash->{READINGS}{"state"}{VAL}; 
   }
@@ -764,52 +758,63 @@ sub OWCOUNT_Get($@) {
 #
 #  Parameter hash = hash of device addressed
 #            page = page addressed
+#            final= 1 if FormatValues is to be called
 #
 ########################################################################################
 
-sub OWCOUNT_GetPage ($$) {
-  my ($hash, $page) = @_;
+sub OWCOUNT_GetPage ($$$) {
+  my ($hash, $page,$final) = @_;
   
   #-- get memory page/counter according to interface type
   my $interface= $hash->{IODev}->{TYPE};
   my $name    = $hash->{NAME};
   my $ret; 
+  my $oldfinal= $final;
   
   #-- check if memory usage has been disabled
   my $nomemory  = defined($attr{$name}{"nomemory"}) ? $attr{$name}{"nomemory"} : 0;
+  $final=0
+    if($nomemory==1);
   
   #-- even if memory usage has been disabled, we need to read the page because it contains the counter values
-  if( ($nomemory==0) || (($nomemory==1) && ( ($page==14)||($page==15) )) ){
+  if( ($nomemory==0) || ($nomemory==1 && (($page==14)||($page==15))) ){
+
     #-- OWX interface
     if( $interface eq "OWX" ){
-      $ret = OWXCOUNT_GetPage($hash,$page);
+      $ret = OWXCOUNT_GetPage($hash,$page,$final);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
-      $ret = OWFSCOUNT_GetPage($hash,$page);
+      $ret = OWFSCOUNT_GetPage($hash,$page,$final);
     #-- Unknown interface
     }else{
       return "OWCOUNT: GetPage with wrong IODev type $interface";
-    }
-    
+    }   
     #-- process results
     if( defined($ret)  ){
       return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
     } else {
       return undef
-        if( $nomemory==0 );
+         if ($nomemory==0);
     }
-    #-- when nomemory==1, we need to read the files
-    if( $page==14 ){
-      $hash->{owg_str}->[14] = OWCOUNT_recall($hash,"OWCOUNT_".$name."_14.dat");
-      return undef;
-    }elsif( $page==15 ){
-      $hash->{owg_str}->[15] = OWCOUNT_recall($hash,"OWCOUNT_".$name."_15.dat");
-      return undef;
-    } else {
-      return "OWCOUNT: file recall with wrong page number";
-    }
-    
+  }
+  #-- when we are here, we need to read the files
+  my $strval = OWCOUNT_recall($hash,"OWCOUNT_".$name."_".$page.".dat");
+
+  #-- midnight value
+  #-- new format
+  if ($strval =~ /^\d\d\d\d-\d\d-\d\d.*/){
+    my @data=split(' ',$strval);
+    $strval = $data[2];
   } 
+  #-- parse float from midnight
+  $strval =~ s/[^\d\.]+//g;
+  $strval = 0.0 if(!defined($strval) or $strval !~ /^\d+\.\d*$/);
+  $strval = int($strval*100)/100;
+  $hash->{owg_midnight}->[$page-14] = $strval;
+  OWCOUNT_FormatValues($hash)
+    if($oldfinal==1);
+    
+  return undef 
 }
 
 ########################################################################################
@@ -1038,17 +1043,14 @@ sub OWCOUNT_GetValues($) {
   RemoveInternalTimer($hash);
   InternalTimer(time()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 1);
   
-  #-- reset presence - 
-  $hash->{PRESENT}  = 0;
-  
   #-- Get readings according to interface type
   my $interface= $hash->{IODev}->{TYPE};
   if( $interface eq "OWX" ){
-    $ret1 = OWXCOUNT_GetPage($hash,14);
-    $ret2 = OWXCOUNT_GetPage($hash,15);
+    $ret1 = OWXCOUNT_GetPage($hash,14,0);
+    $ret2 = OWXCOUNT_GetPage($hash,15,1);
   }elsif( $interface eq "OWServer" ){
-    $ret1 = OWFSCOUNT_GetPage($hash,14);
-    $ret2 = OWFSCOUNT_GetPage($hash,15);
+    $ret1 = OWFSCOUNT_GetPage($hash,14,0);
+    $ret2 = OWFSCOUNT_GetPage($hash,15,1);
   }else{
     return "OWCOUNT: GetValues with wrong IODev type $interface";
   }
@@ -1061,7 +1063,6 @@ sub OWCOUNT_GetValues($) {
   if( $ret ne ""  ){
     return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
   }
-  $hash->{PRESENT} = 1; 
  
   return undef;
 }
@@ -1083,8 +1084,7 @@ sub OWCOUNT_InitializeDevice($) {
   
   my $olddata  = "";
   my $newdata  = "OWCOUNT ".$owx_version;
-  my $ret      = "";
-  $hash->{PRESENT}    = 0;
+  my $ret;
    
   #-- initial values
   for( my $i=0;$i<int(@owg_fixed);$i++) { 
@@ -1101,24 +1101,19 @@ sub OWCOUNT_InitializeDevice($) {
   #   Model attribute will be modified now after checking for memory
   #-- OWX interface
   if( $interface eq "OWX" ){
-    $ret .= OWXCOUNT_GetPage($hash,0);
+    $ret = OWXCOUNT_GetPage($hash,0,0);
     $olddata = $hash->{owg_str}->[0];
     $ret  = OWXCOUNT_SetPage($hash,0,$newdata);
-    $ret .= OWXCOUNT_GetPage($hash,0);
-    $ret .= OWXCOUNT_SetPage($hash,0,$olddata); 
-##Use of uninitialized value in concatenation (.) or string at 
-##ERRORR /usr/share/fhem/FHEM/21_OWCOUNT.pm line 1100.
-##Use of uninitialized value in concatenation (.) or string at 
-##/usr/share/fhem/FHEM/21_OWCOUNT.pm line 1103.
-##Use of uninitialized value in concatenation (.) or string at 
-##/usr/share/fhem/FHEM/21_OWCOUNT.pm line 1104. 
+    $ret  = OWXCOUNT_GetPage($hash,0,0);
+    $ret  = OWXCOUNT_SetPage($hash,0,$olddata); 
+
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
-    $ret .= OWXCOUNT_GetPage($hash,0);
+    $ret  = OWXCOUNT_GetPage($hash,0,0);
     $olddata = $hash->{owg_str}->[0];
     $ret  = OWFSCOUNT_SetPage($hash,0,$newdata);
-    $ret .= OWFSCOUNT_GetPage($hash,0);
-    $ret .= OWFSCOUNT_SetPage($hash,0,$olddata);  
+    $ret  = OWFSCOUNT_GetPage($hash,0,0);
+    $ret  = OWFSCOUNT_SetPage($hash,0,$olddata);  
   #-- Unknown interface
   }else{
     return "OWCOUNT: InitializeDevice with wrong IODev type $interface";
@@ -1193,29 +1188,15 @@ sub OWCOUNT_Set($@) {
   
   #-- check syntax for setting memory page 0..13 or midnight A/B
   my $nomemory  = defined($attr{$name}{"nomemory"}) ? $attr{$name}{"nomemory"} : 0;
-  if( ($key eq "memory") || ($key eq "midnight") ){
-    if( $key eq "memory" ){
-      return "OWCOUNT: Memory usage disabled"
-        if( $nomemory==1 );
-      return "OWCOUNT: Set needs parameter when writing memory: <page>"
-        if( int(@a)<2 );
-      $page=int($a[2]);
-      if( ($page<0) || ($page>13) ){
-        return "OWXCOUNT: Wrong memory page write attempted";
-      }
-    }else{
-      return "OWCOUNT: Set needs parameter when writing midnight: <channel>"
-        if( int(@a)<2 );
-      #-- find out which channel we have
-      if( ($a[2] eq $owg_channel[0]) || ($a[2] eq "A") ){
-        $page=14;
-      }elsif( ($a[2] eq $owg_channel[1]) || ($a[2] eq "B") ){    
-        $page=15;
-      } else {
-        return "OWCOUNT: Invalid midnight counter address, must be A, B or defined channel name"
-      }
+  if( $key eq "memory" ){
+    return "OWCOUNT: Memory usage disabled"
+      if( $nomemory==1 );
+    return "OWCOUNT: Set needs parameter when writing memory: <page>"
+      if( int(@a)<2 );
+    $page=int($a[2]);
+    if( ($page<0) || ($page>13) ){
+      return "OWXCOUNT: Wrong memory page write attempted";
     }
-   
     $data=$a[3];
     for( my $i=4;$i<int(@a);$i++){
       $data.=" ".$a[$i];
@@ -1229,17 +1210,30 @@ sub OWCOUNT_Set($@) {
       }
     }
     $ret = OWCOUNT_SetPage($hash,$page,$data);
- 
-    #-- process results
-    if( defined($ret)  ){
-      return "OWCOUNT: Could not set device $name, reason: ".$ret;
+  }    
+  if( $key eq "midnight" ){
+    return "OWCOUNT: Set needs parameter when writing midnight: <channel>"
+      if( int(@a)<2 );
+    #-- find out which channel we have
+    if( ($a[2] eq $owg_channel[0]) || ($a[2] eq "A") ){
+      $page=14;
+    }elsif( ($a[2] eq $owg_channel[1]) || ($a[2] eq "B") ){    
+      $page=15;
+    } else {
+      return "OWCOUNT: Invalid midnight counter address, must be A, B or defined channel name"
     }
+    my ($sec, $min, $hour, $day, $month, $year, $wday,$yday,$isdst) = localtime(time);
+    $data = sprintf("%4d-%02d-%02d midnight %7.2f",
+            $year+1900,$month+1,$day,$a[3]);
+    $ret = OWCOUNT_SetPage($hash,$page,$data);
   }
-    
   #-- process results - we have to reread the device
-  $hash->{PRESENT} = 1; 
+  if( defined($ret) && ($ret ne "")  ){
+      return "OWCOUNT: Could not set device $name, reason: ".$ret;
+  } 
+
   OWCOUNT_GetValues($hash);  
-  Log 4, "OWCOUNT: Set $hash->{NAME} $key $value";
+  Log 5, "OWCOUNT: Set $hash->{NAME} $key $value";
 }
 
 #######################################################################################
@@ -1276,7 +1270,7 @@ sub OWCOUNT_SetPage ($$$) {
     }
     
     #-- process results
-    if( defined($ret)  ){
+    if( defined($ret) && ($ret ne "")  ){
       return "OWCOUNT: Could not set device $name, reason: ".$ret;
     }
   }else{
@@ -1326,15 +1320,16 @@ sub OWCOUNT_recall($$) {
   my ($hash,$filename) = @_;
   
   my $name= $hash->{NAME};
+  
   my $mp  = AttrVal("global", "modpath", ".");
   my $ret = open(OWXFILE, "< $mp/FHEM/$filename" );
   if( $ret ){
     my $line = readline OWXFILE;
-    close(OWXFILE);      
+    close(OWXFILE);    
     return $line;
   }
   Log 1, "OWCOUNT_recall: Cannot open $filename for reading!";
-  return 0;                 
+  return undef;;                
 }
 
 ########################################################################################
@@ -1364,11 +1359,13 @@ sub OWCOUNT_Undef ($) {
 # OWFSCOUNT_GetPage - Get page from device
 #
 # Parameter hash = hash of device addressed
+#           page = page to be read
+#           final= 1 if FormatValues is to be called
 #
 ########################################################################################
 
-sub OWFSCOUNT_GetPage($$) {
-  my ($hash,$page) = @_;
+sub OWFSCOUNT_GetPage($$$) {
+  my ($hash,$page,$final) = @_;
  
   #-- ID of the device
   my $owx_add = substr($hash->{ROM_ID},0,15);
@@ -1376,6 +1373,9 @@ sub OWFSCOUNT_GetPage($$) {
   #-- hash of the busmaster
   my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
+  
+  #-- reset presence
+  $hash->{PRESENT}  = 0;
   
   my $vval;
   my $strval;
@@ -1406,15 +1406,14 @@ sub OWFSCOUNT_GetPage($$) {
   }elsif( $page == 15) {
     $vval    = OWServer_Read($master,"/$owx_add/counters.B");
     $strval  = OWServer_Read($master,"/$owx_add/pages/page.15");
-    
     return "no return from OWServer"
-    if( (!defined($vval)) || (!defined($strval)) );
-    
+      if( (!defined($vval)) || (!defined($strval)) );  
     return "empty return from OWServer"
-    if( ($vval eq "") || ($strval eq "") );
+      if( ($vval eq "") || ($strval eq "") );
     
     $hash->{owg_val}->[1]      = $vval;
-    $hash->{owg_str}->[15]      = $strval;
+    $hash->{owg_str}->[15]     = $strval;
+    
     #-- parse float from midnight
     $strval =~ s/[^\d\.]+//g;
     $strval = 0.0 if(!defined($strval) or $strval !~ /^\d+\.\d*$/);
@@ -1422,17 +1421,18 @@ sub OWFSCOUNT_GetPage($$) {
     $hash->{owg_midnight}->[1] = $strval;
   }else {
     $strval = OWServer_Read($master,"/$owx_add/pages/page.".$page);
-    
     return "no return from OWServer"
-    if( !defined($strval) );
-    
+      if( !defined($strval) );
     return "empty return from OWServer"
       if( $strval eq "" );
     $hash->{owg_str}->[$page] = $strval;
   }
   #-- and now from raw to formatted values 
-  my $value = OWCOUNT_FormatValues($hash);
-  Log 5, $value;
+  $hash->{PRESENT}  = 1;
+  if($final==1){
+    my $value = OWCOUNT_FormatValues($hash);
+    Log 5, $value;
+  }
   return undef;
 }
 
@@ -1471,21 +1471,93 @@ sub OWFSCOUNT_SetPage($$$) {
 #
 ########################################################################################
 #
+# OWXCOUNT_BinValues - Process reading from one device - translate binary into raw
+#
+# Parameter hash = hash of device addressed
+#
+########################################################################################
+
+sub OWXCOUNT_BinValues($$$$$$$$) {
+  my ($hash, $page, $success, $reset, $owx_dev, $data, $final, $res) = @_;
+  
+  #-- unused are success, reset, data
+  
+  return undef unless (defined $page and $page ne "convert");
+  
+  my $name   = $hash->{NAME};
+  my ($i,$j,$k,@data,$strval,$value);
+  my $change = 0;
+  
+  #-- process results
+  @data=split(//,$res);
+  return "invalid data length, ".int(@data)." instead of 45 bytes in three steps"
+    if( int(@data) < 45);
+  #return "invalid data"
+  #  if (ord($data[17])<=0); 
+  Log 1,"invalid CRC"
+    if (OWX_CRC16(substr($res,0,43),$data[43],$data[44]) == 0);
+    
+  #-- first 3 command, next 32 are memory
+  my $nomemory  = defined($attr{$name}{"nomemory"}) ? $attr{$name}{"nomemory"} : 0;
+  if( $nomemory==0 ){
+    #-- memory part, treated as string
+    $strval=substr($res,3,32);
+    $hash->{owg_str}->[$page]=$strval;
+  }
+  #-- counter part
+  if( ($page == 14) || ($page == 15) ){
+    @data=split(//,substr($res,35));
+    if ( ($data[4] | $data[5] | $data[6] | $data[7]) ne "\x00" ){
+      #Log 1, "device $owx_dev returns invalid data ".ord($data[4])." ".ord($data[5])." ".ord($data[6])." ".ord($data[7]);
+      return "device $owx_dev returns invalid data";
+    }
+    #-- counter value
+    $value = (ord($data[3])<<24) + (ord($data[2])<<16) +(ord($data[1])<<8) + ord($data[0]);       
+    $hash->{owg_val}->[$page-14] = $value;
+    #-- midnight value
+    if( $nomemory==0 ){ 
+      #-- new format
+      if ($strval =~ /^\d\d\d\d-\d\d-\d\d.*/){
+        @data=split(' ',$strval);
+        $strval = $data[2];
+      } 
+      #-- parse float from midnight
+      $strval =~ s/[^\d\.]+//g;
+      $strval = 0.0 if(!defined($strval) or $strval !~ /^\d+\.\d*$/);
+      $strval = int($strval*100)/100;
+      $hash->{owg_midnight}->[$page-14] = $strval;
+    }
+  }
+  #-- and now from raw to formatted values 
+  $hash->{PRESENT}  = 1;
+  if( $final==1) {
+    my $value = OWCOUNT_FormatValues($hash);
+    Log 5, $value;
+  }
+  return undef;
+}
+
+########################################################################################
+#
 # OWXCOUNT_GetPage - Get one memory page + counter from device
 #
 # Parameter hash = hash of device addressed
 #           page = 0..15
+#           final= 1 if FormatValues is to be called
 #
 ########################################################################################
 
-sub OWXCOUNT_GetPage($$) {
-  my ($hash,$page) = @_;
+sub OWXCOUNT_GetPage($$$) {
+  my ($hash,$page,$final) = @_;
   
   my ($select, $res, $res2, $res3, @data);
   
   #-- ID of the device, hash of the busmaster
   my $owx_dev = $hash->{ROM_ID};
   my $master  = $hash->{IODev};
+  
+  #-- reset presence
+  $hash->{PRESENT}  = 0;
   
   my ($i,$j,$k);
 
@@ -1529,73 +1601,11 @@ sub OWXCOUNT_GetPage($$) {
       }
     }  
     #-- reset the bus (needed to stop receiving data ?)
-    #OWX_Reset($master);
+    OWX_Reset($master);
     #-- for processing we need 45 bytes
-    OWXCOUNT_BinValues($hash,$page,undef,undef,$owx_dev,undef,undef,substr($res,9));
+    OWXCOUNT_BinValues($hash,$page,undef,undef,$owx_dev,undef,$final,substr($res,9))
+      if( length($res)==54 );
   }
-  return undef;
-}
-
-########################################################################################
-#
-# OWXCOUNT_BinValues - Process reading from one device - translate binary into raw
-#
-# Parameter hash = hash of device addressed
-#
-########################################################################################
-
-sub OWXCOUNT_BinValues($$$$$$$$) {
-  my ($hash, $page, $success, $reset, $owx_dev, $data, $numread, $res) = @_;
-  
-  #-- unused are success, reset, data numread
-  
-  return undef unless (defined $page and $page ne "convert");
-  
-  my ($i,$j,$k,@data,$strval);
-  my $change = 0;
-  
-  #-- process results
-  @data=split(//,$res);
-  return "invalid data length, ".int(@data)." instead of 45 bytes in three steps"
-    if( int(@data) < 45);
-  #return "invalid data"
-  #  if (ord($data[17])<=0); 
-  Log 1,"invalid CRC"
-    if (OWX_CRC16(substr($res,0,43),$data[43],$data[44]) == 0);
-  
-  #-- first 3 command, next 32 are memory
-  #-- memory part, treated as string
-  $strval=substr($res,3,32);
-  $hash->{owg_str}->[$page]=$strval;
-  #-- counter part
-  if( ($page == 14) || ($page == 15) ){
-    @data=split(//,substr($res,35));
-    if ( ($data[4] | $data[5] | $data[6] | $data[7]) ne "\x00" ){
-      #Log 1, "device $owx_dev returns invalid data ".ord($data[4])." ".ord($data[5])." ".ord($data[6])." ".ord($data[7]);
-      return "device $owx_dev returns invalid data";
-    }
-  
-    my $value = (ord($data[3])<<24) + (ord($data[2])<<16) +(ord($data[1])<<8) + ord($data[0]);       
-   
-    if( $page == 14) {
-      $hash->{owg_val}->[0] = $value;
-      #-- parse float from midnight
-      $strval =~ s/[^\d\.]+//g;
-      $strval = 0.0 if(!defined($strval) or $strval !~ /^\d+\.\d*$/);
-      $strval = int($strval*100)/100;
-      $hash->{owg_midnight}->[0] = $strval;
-    }elsif( $page == 15) {
-      $hash->{owg_val}->[1] = $value;
-      #-- parse float from midnight
-      $strval =~ s/[^\d\.]+//g;
-      $strval = 0.0 if(!defined($strval) or $strval !~ /^\d+\.\d*$/);
-      $strval = int($strval*100)/100;
-      $hash->{owg_midnight}->[1] = $strval;
-    }
-  }
-  #-- and now from raw to formatted values 
-  my $value = OWCOUNT_FormatValues($hash);
-  Log 5, $value;
   return undef;
 }
 
@@ -1643,7 +1653,7 @@ sub OWXCOUNT_SetPage($$$) {
     $res=OWX_Complex($master,$owx_dev,$select,0);
     if( $res eq 0 ){
       return "device $owx_dev not accessible in writing scratchpad"; 
-    }
+    } 
   }
   #-- issue the match ROM command \x55 and the read scratchpad command
   #   \xAA 
@@ -1663,7 +1673,7 @@ sub OWXCOUNT_SetPage($$$) {
     $res=OWX_Complex($master,$owx_dev,"\xAA",28);
     if( length($res) < 13 ){
       return "device $owx_dev not accessible in reading scratchpad"; 
-    }
+    } 
   }
   #-- issue the match ROM command \x55 and the copy scratchpad command
   #   \x5A followed by 3 byte authentication code
@@ -1684,7 +1694,7 @@ sub OWXCOUNT_SetPage($$$) {
     #-- process results
     if( $res eq 0 ){
       return "device $owx_dev not accessible for writing"; 
-    }
+    } 
   }
   return undef;
 }
