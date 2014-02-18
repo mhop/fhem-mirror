@@ -75,7 +75,7 @@ use warnings;
 sub Log($$);
 sub AttrVal($$$);
 
-my $owx_version="5.04";
+my $owx_version="5.05";
 
 my %gets = (
   "id"          => "",
@@ -264,32 +264,31 @@ sub OWTHERM_Attr(@) {
   my $ret;
   
   if ( $do eq "set") {
-  	ARGUMENT_HANDLER: {
-      #-- interval modified at runtime
-  	  $key eq "interval" and do {
-        #-- check value
-        return "OWTHERM: Set with short interval, must be > 1" if(int($value) < 1);
-        #-- update timer
-        $hash->{INTERVAL} = $value;
-        if ($init_done) {
-          RemoveInternalTimer($hash);
-          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
-        }
-  	    last;
-  	  };
-      #-- resolution modified at runtime
-  	  $key eq "resolution" and do {
-        $hash->{owg_cf} = $value;
-        last;
-  	  };
-      #-- alarm settings modified at runtime
-      $key =~ m/(.*)(Low|High)/  and do {
-        #-- safeguard against uninitialized devices
-        return undef
-          if( $hash->{READINGS}{"state"}{VAL} eq "defined" ); 
-        $ret = OWTHERM_Set($hash,($name,$key,$value));
-      };
-  	};
+    #-- interval modified at runtime
+    $key eq "interval" and do {
+      #-- check value
+      return "OWTHERM: Set with short interval, must be > 1" if(int($value) < 1);
+      #-- update timer
+      $hash->{INTERVAL} = $value;
+
+      if ($init_done) {
+        RemoveInternalTimer($hash);
+        InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
+      }
+  	  last;
+   };
+   #-- resolution modified at runtime
+   $key eq "resolution" and do {
+      $hash->{owg_cf} = $value;
+      last;
+   };
+   #-- alarm settings modified at runtime
+   $key =~ m/(.*)(Low|High)/  and do {
+     #-- safeguard against uninitialized devices
+     return undef
+       if( $hash->{READINGS}{"state"}{VAL} eq "defined" ); 
+     $ret = OWTHERM_Set($hash,($name,$key,$value));
+     };
   }
   return $ret;
 }
@@ -432,9 +431,6 @@ sub OWTHERM_Get($@) {
     return "$name.version => $owx_version";
   }
   
-  #-- reset presence
-  $hash->{PRESENT}  = 0;
-
   #-- OWX interface
   if( $interface eq "OWX" ){
     #-- not different from getting all values ..
@@ -452,7 +448,6 @@ sub OWTHERM_Get($@) {
   if( defined($ret)  ){
     return "OWTHERM: Could not get values from device $name, return was $ret";
   }
-  $hash->{PRESENT} = 1; 
   
   #-- return the special reading
   if ($reading eq "temperature") {
@@ -490,9 +485,6 @@ sub OWTHERM_GetValues($@) {
   RemoveInternalTimer($hash);
   InternalTimer(time()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
 
-  #-- reset presence
-  $hash->{PRESENT}  = 0;
-
   #-- Get values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
   if( $interface eq "OWX" ){
@@ -517,7 +509,6 @@ sub OWTHERM_GetValues($@) {
     }
     return "OWTHERM: Could not get values from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
   }
-  $hash->{PRESENT} = 1; 
 
   return undef;
 }
@@ -751,6 +742,9 @@ sub OWFSTHERM_GetValues($) {
   my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
   
+  #-- reset presence
+  $hash->{PRESENT}  = 0;
+  
   #-- resolution (set by Attribute 'resolution' on OWFS)
   my $resolution = defined $hash->{owg_cf} ? $hash->{owg_cf} : "";
   #-- get values - or should we rather get the uncached ones ?
@@ -769,6 +763,7 @@ sub OWFSTHERM_GetValues($) {
   $hash->{owg_th} = $ow_thn;
   
   #-- and now from raw to formatted values
+  $hash->{PRESENT}  = 1;
   my $value = OWTHERM_FormatValues($hash);
   Log 5, $value;
   return undef;
@@ -907,6 +902,7 @@ sub OWXTHERM_BinValues($$$$$$$$) {
   $hash->{owg_th} = $ow_thn;
   
   #-- and now from raw to formatted values
+  $hash->{PRESENT}  = 1;
   my $value = OWTHERM_FormatValues($hash);
   Log 5, $value;
   return undef;
@@ -929,9 +925,13 @@ sub OWXTHERM_GetValues($) {
   
   #-- ID of the device
   my $owx_dev = $hash->{ROM_ID};
+  
   #-- hash of the busmaster
   my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
+ 
+  #-- reset presence
+  $hash->{PRESENT}  = 0;
   
   #-- check, if the conversion has been called before for all sensors
   if( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
@@ -1056,7 +1056,7 @@ sub OWXTHERM_SetValues($$) {
         <h4>Define</h4>
         <p>
         <code>define &lt;name&gt; OWTHERM [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code> or <br/>
-        <code>define &lt;name&gt; OWTHERM &lt;fam&gt;.lt;id&gt; [&lt;interval&gt;]</code>
+        <code>define &lt;name&gt; OWTHERM &lt;fam&gt;.&lt;id&gt; [&lt;interval&gt;]</code>
         <br /><br /> Define a 1-Wire digital thermometer device.</p>
         <ul>
           <li>
