@@ -27,6 +27,7 @@ use vars qw($FW_ME);
 use vars qw($FW_wname);
 use vars qw($FW_subdir);
 use vars qw(%FW_hiddenroom);
+use vars qw(%FW_visibleDeviceHash);
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 sub readingsGroup_Initialize($)
@@ -398,6 +399,7 @@ readingsGroup_2html($)
           $txt = FW_makeImage( $icon, $icon, "icon" );
 
           $cmd = lookup2($commands,$name,$d,$icon) if( !defined($cmd) );
+
           ($txt,undef) = readingsGroup_makeLink($txt,undef,$cmd);
 
         } elsif( $first || $multi == 1 ) {
@@ -414,7 +416,36 @@ readingsGroup_2html($)
 
             $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>";
           }
+        } else {
+          my $cmd = lookup2($commands,$name,$d,$txt);
+
+          if( $cmd =~ m/^(\w.*):(\S.*)?$/ ) {
+            my $set = $1;
+            my $values = $2;
+
+            if( !$values ) {
+              my %extPage = ();
+              my ($allSets, undef, undef) = FW_devState($name, "", \%extPage);
+              if( $allSets && $allSets =~ m/$set:([^ ]*)/) {
+                 $values = $1;
+              }
+            }
+
+            my $room = $FW_webArgs{room};
+            $room = "&detail=$FW_webArgs{detail}" if( $FW_webArgs{"detail"} );
+
+            my $htmlTxt;
+            foreach my $fn (sort keys %{$data{webCmdFn}}) {
+              no strict "refs";
+              $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,$name,$room,$set,$values);
+              use strict "refs";
+              last if(defined($htmlTxt));
+            }
+
+            $txt = $htmlTxt if( $htmlTxt );
+          }
         }
+
         my $inform_id = "";
         $inform_id = "informId=\"$d-$name.i$item.item\"" if( $readings );
         $ret .= "<td><div $name_style $inform_id>$txt</div></td>";
@@ -495,8 +526,40 @@ readingsGroup_2html($)
           }
         }
 
-        $cmd = lookup2($commands,$name,$n,$v) if( !$devStateIcon );
-        ($v,$devStateIcon) = readingsGroup_makeLink($v,$devStateIcon,$cmd);
+        my $webCmdFn = 0;
+        if( !$devStateIcon ) {
+          $cmd = lookup2($commands,$name,$n,$v) if( !$devStateIcon );
+
+          if( $cmd =~ m/^(\w.*):(\S.*)?$/ ) {
+            my $set = $1;
+            my $values = $2;
+
+            if( !$values ) {
+              my %extPage = ();
+              my ($allSets, undef, undef) = FW_devState($name, $room, \%extPage);
+              if( $allSets && $allSets =~ m/$set:([^ ]*)/) {
+                $values = $1;
+              }
+            }
+
+            my $room = $FW_webArgs{room};
+            $room = "&detail=$FW_webArgs{detail}" if( $FW_webArgs{"detail"} );
+
+            my $htmlTxt;
+            foreach my $fn (sort keys %{$data{webCmdFn}}) {
+              no strict "refs";
+              $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,$name,$room,$set,$values);
+              use strict "refs";
+              last if(defined($htmlTxt));
+            }
+
+            if( $htmlTxt ) {
+              $v = $htmlTxt;
+              $webCmdFn = 1;
+            }
+          }
+        }
+        ($v,$devStateIcon) = readingsGroup_makeLink($v,$devStateIcon,$cmd) if( !$webCmdFn );
 
         if( $first || $multi == 1 ) {
           $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
@@ -529,12 +592,7 @@ readingsGroup_detailFn()
 
   my $hash = $defs{$d};
 
-  if( 1 || $hash->{alwaysTrigger} ) {
-    delete( $hash->{helper}->{myDisplay} );
-  } else {
-    Log3 $hash->{NAME}, 5, "opened: $FW_cname";
-    $hash->{helper}->{myDisplay}->{$FW_cname} = 1;
-  }
+  $hash->{mayBeVisible} = 1;
 
   return readingsGroup_2html($d);
 }
@@ -556,29 +614,16 @@ readingsGroup_Notify($$)
 
   return if( AttrVal($name,"disable", 0) > 0 );
 
-  if( 1 || $hash->{alwaysTrigger} ) {
-  } elsif( !defined($hash->{helper}{myDisplay})
-      || !%{$hash->{helper}{myDisplay}} ) {
+  if( $hash->{alwaysTrigger} ) {
+  } elsif( !defined($hash->{mayBeVisible}) ) {
     Log3 $name, 5, "$name: not on any display, ignoring notify";
     return undef;
   } else {
-    foreach my $display ( keys %{$hash->{helper}{myDisplay}} ) {
-      if( defined($defs{$display}) ) {
-        my $filter = $defs{$display}->{inform};
-        return undef if( !defined($filter) );
-        my $rn = AttrVal($name, "room", "");
-        if($filter eq "all" || $rn =~ m/\b$filter\b/) {
-          Log3 $name, 5, "$name: do update";
-        } else {
-          Log3 $name, 5, "$name: $display is not my room, ignoring notify";
-          delete( $hash->{helper}{myDisplay}{$display} );
-          return undef;
-        }
-      } else {
-        Log3 $name, 5, "$name: $display is closed, ignoring notify";
-        delete( $hash->{helper}{myDisplay}{$display} );
-        return undef;
-      }
+    if( $FW_visibleDeviceHash{$name} ) {
+    } else {
+      Log3 $name, 5, "$name: no longer visible, ignoring notify";
+      delete( $hash->{mayBeVisible} );
+      return undef;
     }
   }
 
@@ -746,6 +791,10 @@ readingsGroup_Notify($$)
           }
 
           $cmd = lookup2($commands,$n,$reading,$value);
+          if( $cmd =~ m/^(\w.*):(\S.*)?$/ ) {
+            next;
+          }
+
           ($value,undef) = readingsGroup_makeLink($value,undef,$cmd);
 
           $value = "<div $value_style>$value</div>" if( $value_style );
@@ -971,8 +1020,16 @@ readingsGroup_Attr($$$)
           <code>attr devices valueIcon {state => '%devStateIcon'}</code>
           <code>attr rgMediaPlayer valueIcon { "playStatus.paused" => "rc_PLAY", "playStatus.playing" => "rc_PAUSE" }</code></li>
       <li>commands<br>
-        Makes a reading or icon clickable and specifies the command that should be executed. eg.:<br>
-        <code>attr rgMediaPlayer commands { "playStatus.paused" => "set %DEVICE play", "playStatus.playing" => "set %DEVICE pause" }</code></li>
+        Can be used in to different ways:
+        <ul>
+        <li>To make a reading or icon clickable by directly specifying the command that should be executed. eg.:<br>
+        <code>attr rgMediaPlayer commands { "playStatus.paused" => "set %DEVICE play", "playStatus.playing" => "set %DEVICE pause" }</code></li><br>
+        <li>Or if the mapped command is of the form &lt;command&gt;:[&lt;modifier&gt;] then the normal <a href="#FHEMWEB">FHEMWEB</a>
+        webCmd widget for &lt;modifier&gt; will be used for this command. if &lt;modifier&gt; is omitted then the FHEMWEB lookup mechanism for &lt;command&gt; will be used. eg:<br>
+        <code>attr rgMediaPlayer commands { volume => "volume:slider,0,1,100" }</code><br>
+        <code>attr lights commands { pct => "pct:", dim => "dim:" }</code></li>
+    </ul>
+    </li>
     </ul><br>
 
       The nameStyle and valueStyle attributes can also contain a perl expression enclosed in {} that returns the style
