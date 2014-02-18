@@ -651,7 +651,7 @@ sub SB_PLAYER_Get( $@ ) {
     
     #my $name = $hash->{NAME};
 
-    Log3( $hash, 1, "SB_PLAYER_Get: called with @a" );
+    Log3( $hash, 4, "SB_PLAYER_Get: called with @a" );
 
     my $name = shift( @a );
     my $cmd  = shift( @a ); 
@@ -682,7 +682,7 @@ sub SB_PLAYER_Set( $@ ) {
 
     #my $name = $hash->{NAME};
 
-    Log3( $hash, 5, "SB_PLAYER_Set: called with $cmd" );
+    Log3( $hash, 4, "SB_PLAYER_Set: called with $cmd" );
 
     # check if we have received a command
     if( !defined( $cmd ) ) { 
@@ -948,6 +948,8 @@ sub SB_PLAYER_Alarm( $$@ ) {
     my ( $hash, $n, @arg ) = @_;
 
     my $name = $hash->{NAME};
+    
+    Log( $hash, 4, "SB_PLAYER_Alarm($name): called" );
 
     if( ( $n != 1 ) && ( $n != 2 ) ) {
 	Log3( $hash, 1, "SB_PLAYER_Alarm: $name: wrong ID given. Must be 1|2" );
@@ -1039,7 +1041,7 @@ sub SB_PLAYER_GetStatus( $ ) {
     my $name = $hash->{NAME};
     my $strbuf = "";
 
-    Log3( $hash, 5, "SB_PLAYER_GetStatus: called" );
+    Log3( $hash, 5, "SB_PLAYER_GetStatus($name): called" );
 
     # we fire the respective questions and parse the answers in parse
     IOWrite( $hash, "$hash->{PLAYERMAC} mode ?\n" );
@@ -1079,7 +1081,7 @@ sub SB_PLAYER_GetStatus( $ ) {
 	IOWrite( $hash, "$hash->{PLAYERMAC} connected ?\n" );
     }
 
-    # do and update of the status
+    # do an update of the status
     InternalTimer( gettimeofday() + 300, 
 		   "SB_PLAYER_GetStatus", 
 		   $hash, 
@@ -1151,6 +1153,8 @@ sub SB_PLAYER_ParseAlarams( $@ ) {
     my ( $hash, @data ) = @_;
 
     my $name = $hash->{NAME};
+    
+    Log( $hash, 4, "SB_PLAYER_ParseAlarms($name): called" );
 
     if( $data[ 0 ] =~ /^([0-9])*/ ) {
 	shift( @data );
