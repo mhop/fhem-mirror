@@ -425,8 +425,6 @@ LUXTRONIK2_DoUpdate($)
 
   Log3 $name, 5, "$name: $count_set_parameter set values received";
 
-goto SKIP_VISIBILITY_READING;
-  
 ############################ 
 #Fetch Visibility Attributes (FVA)
 ############################ 
@@ -479,8 +477,6 @@ goto SKIP_VISIBILITY_READING;
 
 ####################################  
 
-SKIP_VISIBILITY_READING:  
-  
   Log3 $name, 5, "$name: Closing connection to host $host";
   $socket->close();
 
@@ -524,7 +520,7 @@ SKIP_VISIBILITY_READING:
   # 17 - returnTemperatureTarget
   $return_str .= "|".$heatpump_values[12];
   # 18 - returnTemperatureExtern
-  $return_str .= "|".$heatpump_values[13];
+  $return_str .= "|".($heatpump_visibility[24]==1 ? $heatpump_values[13] : "no");
   # 19 - flowRate
   $return_str .= "|".$heatpump_values[155];
   # 20 - firmware
@@ -556,21 +552,21 @@ SKIP_VISIBILITY_READING:
   # 31 - typeHeatpump
   $return_str .= "|".$heatpump_values[78];
   # 32 - counterHours2ndHeatSource1
-  $return_str .= "|".$heatpump_values[60];
+  $return_str .= "|". ($heatpump_visibility[84]==1 ? $heatpump_values[60] : "no");
   # 33 - counterHoursHeatpump
-  $return_str .= "|".$heatpump_values[63];
+  $return_str .= "|". ($heatpump_visibility[87]==1 ? $heatpump_values[63] : "no");
   # 34 - counterHoursHeating
-  $return_str .= "|".$heatpump_values[64];
+  $return_str .= "|". ($heatpump_visibility[195]==1 ? $heatpump_values[64] : "no");
   # 35 - counterHoursHotWater
-  $return_str .= "|".$heatpump_values[65];
+  $return_str .= "|". ($heatpump_visibility[196]==1 ? $heatpump_values[65] : "no");
   # 36 - counterHeatQHeating
-  $return_str .= "|".$heatpump_values[151];
+  $return_str .= "|" . $heatpump_values[151];
   # 37 - counterHeatQHeating
-  $return_str .= "|".$heatpump_values[152];
+  $return_str .= "|". $heatpump_values[152];
   # 38 - counterHours2ndHeatSource2
-  $return_str .= "|".$heatpump_values[61];
+  $return_str .= "|". ($heatpump_visibility[85]==1 ? $heatpump_values[61] : "no");
   # 39 - counterHours2ndHeatSource3
-  $return_str .= "|".$heatpump_values[62];
+  $return_str .= "|". ($heatpump_visibility[86]==1 ? $heatpump_values[62] : "no");
   # 40 - opStateHeatPump2 
   $return_str .= "|".$heatpump_values[118];
   # 41 - opStateHeatPump2Duration
@@ -591,6 +587,12 @@ SKIP_VISIBILITY_READING:
   $return_str .= "|".$heatpump_parameters[111];
   # 49 - hotWaterTemperatureHysterese
   $return_str .= "|".$heatpump_parameters[74];
+  # 50 - solarCollectorTemperature
+  $return_str .= "|". ($heatpump_visibility[36]==1 ? $heatpump_values[26] : "no");
+  # 51 - solarBufferTemperature
+  $return_str .= "|". ($heatpump_visibility[37]==1 ? $heatpump_values[27] : "no");
+  # 52 - counterHoursSolar
+  $return_str .= "|". ($heatpump_visibility[248]==1 ? $heatpump_values[161] : "no");
   
   return $return_str;
 }
@@ -720,7 +722,7 @@ LUXTRONIK2_UpdateDone($)
          if ( exists( $hash->{READINGS}{statBoilerGradientCoolDownMin} ) ) {
             my @new = split / /, $value;
             my @old = split / /, $hash->{READINGS}{statBoilerGradientCoolDownMin};
-            if ($new[5]>6 && $new[0]>$old[0] && $new[0] < 0) {
+            if ($new[5]>6 && $new[1]>$old[1] && $new[1] < 0) {
                readingsBulkUpdate($hash,"statBoilerGradientCoolDownMin",$value); 
                Log3 $name,3,"$name: statBoilerGradientCoolDownMin set to $value";
             }
@@ -821,7 +823,7 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate( $hash, "flowTemperature", $flowTemperature);
      readingsBulkUpdate( $hash, "returnTemperature", $returnTemperature);
      readingsBulkUpdate( $hash, "returnTemperatureTarget",LUXTRONIK2_CalcTemp($a[17]));
-     readingsBulkUpdate( $hash, "returnTemperatureExtern",LUXTRONIK2_CalcTemp($a[18]));
+     if ($a[18] !~ /no/) {readingsBulkUpdate( $hash, "returnTemperatureExtern",LUXTRONIK2_CalcTemp($a[18]))};
      readingsBulkUpdate( $hash, "flowRate",$a[19]);
      readingsBulkUpdate( $hash, "heatSourceIN",LUXTRONIK2_CalcTemp($a[23]));
      readingsBulkUpdate( $hash, "heatSourceOUT",LUXTRONIK2_CalcTemp($a[24]));
@@ -852,18 +854,23 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate($hash,"typeHeatpump",$value);
 
    # Operating hours (seconds->hours) and heat quantities, write/create readings only if >0   
-     if ($a[32]>0) {readingsBulkUpdate($hash,"counterHours2ndHeatSource1",floor($a[32]/360+0.5)/10);}
-     if ($a[38]>0) {readingsBulkUpdate($hash,"counterHours2ndHeatSource2",floor($a[38]/360+0.5)/10);}
-     if ($a[39]>0) {readingsBulkUpdate($hash,"counterHours2ndHeatSource3",floor($a[39]/360+0.5)/10);}
-     if ($a[33]>0) {readingsBulkUpdate($hash,"counterHoursHeatPump",floor($a[33]/360+0.5)/10);}
-     if ($a[34]>0) {readingsBulkUpdate($hash,"counterHoursHeating",floor($a[34]/360+0.5)/10);}
-     if ($a[35]>0) {readingsBulkUpdate($hash,"counterHoursHotWater",floor($a[35]/360+0.5)/10);}
-     if ($a[36]>0) {readingsBulkUpdate($hash,"counterHeatQHeating",$a[36]/10);}
-     if ($a[37]>0) {readingsBulkUpdate($hash,"counterHeatQHotWater",$a[37]/10);}
-     if ($a[36]+$a[37]>0) {readingsBulkUpdate($hash,"counterHeatQTotal",($a[36]+$a[37])/10);}
+     if ($a[32] !~ /no/) {readingsBulkUpdate($hash,"counterHours2ndHeatSource1", sprintf("%.1f", $a[32]/3600));}
+     if ($a[38] !~ /no/) {readingsBulkUpdate($hash,"counterHours2ndHeatSource2", sprintf("%.1f", $a[38]/3600));}
+     if ($a[39] !~ /no/) {readingsBulkUpdate($hash,"counterHours2ndHeatSource3", sprintf("%.1f", $a[39]/3600));}
+     if ($a[33] !~ /no/) {readingsBulkUpdate($hash,"counterHoursHeatPump", sprintf("%.1f", $a[33]/3600));}
+     if ($a[34] !~ /no/) {readingsBulkUpdate($hash,"counterHoursHeating", sprintf("%.1f", $a[34]/3600));}
+     if ($a[35] !~ /no/) {readingsBulkUpdate($hash,"counterHoursHotWater", sprintf("%.1f", $a[35]/3600));}
+     if ($a[36] > 0) {readingsBulkUpdate($hash,"counterHeatQHeating", $a[36]/10);}
+     if ($a[37] > 0) {readingsBulkUpdate($hash,"counterHeatQHotWater" ,$a[37]/10);}
+     if ($a[36] > 0 && $a[37] > 0) {readingsBulkUpdate($hash,"counterHeatQTotal",($a[36]+$a[37])/10);}
      #WM[kW] = delta_Temp [K] * Durchfluss [l/h] / ( 3.600 [kJ/kWh] / ( 4,179 [kJ/(kg*K)] (H2O Wärmekapazität bei 30 & 40°C) * 0,994 [kg/l] (H2O Dichte bei 35°C) )  
      $value = ($flowTemperature-$returnTemperature) * $a[19] / 866.65;
      readingsBulkUpdate( $hash, "currentThermalOutput", sprintf("%.1f", $value));
+     
+   # Solar
+     if ($a[50] !~ /no/) {readingsBulkUpdate($hash, "solarCollectorTemperature", LUXTRONIK2_CalcTemp($a[50]));}
+     if ($a[51] !~ /no/) {readingsBulkUpdate($hash, "solarBufferTemperature", LUXTRONIK2_CalcTemp($a[51]));}
+     if ($a[52] !~ /no/) {readingsBulkUpdate($hash, "counterHoursSolar", sprintf("%.1f", $a[52]/3600));}
      
    # HTML for floorplan
      if(AttrVal($name, "statusHTML", "none") ne "none") {
@@ -1277,7 +1284,7 @@ LUXTRONIK2_doStatisticBoilerCoolDown ($$$$$$)
 <a name="LUXTRONIK2"></a>
 <h3>LUXTRONIK2</h3>
 <ul>
-  Luxtronik 2.0 is a heating controller used in Alpha Innotec and Siemens Novelan (WPR NET) heat pumps.
+  Luxtronik 2.0 is a heating controller used in <a href="http://www.alpha-innotec.de">Alpha Innotec</a> and Siemens Novelan (WPR NET) heat pumps.
   <br>
   It has a built-in ethernet port, so it can be directly integrated into a local area network (LAN).
   <br>
@@ -1354,7 +1361,7 @@ LUXTRONIK2_doStatisticBoilerCoolDown ($$$$$$)
 <a name="LUXTRONIK2"></a>
 <h3>LUXTRONIK2</h3>
 <ul>
-  Die Luxtronik 2.0 ist eine Heizungssteuerung, welche in W&auml;rmepumpen von Alpha Innotec und Siemens Novelan (WPR NET) verbaut ist.<br>
+  Die Luxtronik 2.0 ist eine Heizungssteuerung, welche in W&auml;rmepumpen von <a href="http://www.alpha-innotec.de">Alpha Innotec</a> und Siemens Novelan (WPR NET) verbaut ist.<br>
   Sie besitzt einen Ethernet Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.<br>
   <i>Das Modul wurde bisher mit folgender Steuerungs-Firmware getestet: V1.54C, V1.60, V1.69.</i>
   <br>&nbsp;
