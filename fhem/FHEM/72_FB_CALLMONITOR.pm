@@ -119,7 +119,7 @@ FB_CALLMONITOR_Define($$)
   
 
   $hash->{DeviceName} = $dev;
-  my $ret = DevIo_OpenDev($hash, 0, "FB_CALLMONITOR_DoInit");
+  my $ret = DevIo_OpenDev($hash, 0, undef);
 
   
 
@@ -327,7 +327,7 @@ FB_CALLMONITOR_Attr($@)
         {
             if($a[3] eq "0")
             {
-                DevIo_OpenDev($hash, 0, "FB_CALLMONITOR_DoInit");
+                DevIo_OpenDev($hash, 0, undef);
             }
             elsif($a[3] eq "1")
             {
@@ -347,7 +347,7 @@ FB_CALLMONITOR_Attr($@)
         
         if( $a[2] eq "disable")
         {
-           DevIo_OpenDev($hash, 0, "FB_CALLMONITOR_DoInit");
+           DevIo_OpenDev($hash, 0, undef);
         }
     }
     
