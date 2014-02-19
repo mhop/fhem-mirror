@@ -926,8 +926,13 @@ sub SYSMON_getRamAndSwap($$)
   $used    = $used / 1024;
   $free    = $free / 1024;
   $buffers = $buffers / 1024;
-  $cached  = $cached / 1024;
-  
+  if(defined($cached)) {
+    $cached  = $cached / 1024;
+  } else {
+  	# Bei FritzBox wird dieser Wert nicht ausgageben
+  	$cached  = 0;
+  }
+
   $ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, ($used - $buffers - $cached), (($used - $buffers - $cached) / $total * 100), ($free + $buffers + $cached));
 
   $map->{+RAM} = $ram;
