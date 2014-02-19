@@ -41,23 +41,22 @@ sub WOL_Set($@) {
   
   my $name = shift @a;
   my $v = join(" ", @a);
-  my $mod = "[".$hash->{NAME} ."] ";
 
-  Log3 $hash, 3, "WOL set $name $v";
+  Log3 $hash, 3, "[$name] set $name $v";
   
   if      ($v eq "on")  {
      $hash->{STATE}  = $v;
-     Log3 $hash, 3, "WOL waking  $name with MAC $hash->{MAC} IP $hash->{IP} ";
+     Log3 $hash, 3, "[$name] waking  $name with MAC $hash->{MAC} IP $hash->{IP} ";
   } elsif ($v eq "off") {
      $hash->{STATE}  = $v;
      my $cmd = AttrVal($name, "shutdownCmd", "");
      if ($cmd eq "") {
-       Log3 $hash, 3, "No shutdown command given (see shutdownCmd attribute)!";
+       Log3 $hash, 3, "[$name] no shutdown command given (see shutdownCmd attribute)!";
      } else {
        $cmd  = SemicolonEscape($cmd);
-       Log3 $hash, 3, $mod."shutdownCmd: $cmd executed";
+       Log3 $hash, 3, "[$name] shutdownCmd: $cmd executed";
        my $ret  = AnalyzeCommandChain(undef, $cmd);
-       Log3 ($hash, 3, $ret) if($ret);
+       Log3 ($hash, 3, "[$name]" . $ret) if($ret);
        return undef;
      }
   } elsif ($v eq "refresh") {
@@ -166,7 +165,7 @@ sub wake($){
 
   readingsBeginUpdate ($hash);
   
-  Log3 $hash, 4, "WOL keeping $name with MAC $mac IP $host busy";
+  Log3 $hash, 4, "[$name] keeping $name with MAC $mac IP $host busy";
 
   if ($hash->{MODE} eq "BOTH" || $hash->{MODE} eq "EW" ) {
      wol_by_ew ($hash, $mac);
@@ -182,6 +181,7 @@ sub wake($){
 # method to wakevia lan, taken from Net::Wake package
 sub wol_by_udp {
   my ($hash, $mac_addr, $host, $port) = @_;
+  my $name  = $hash->{NAME};
 
   # use the discard service if $port not passed in
   if (! defined $host) { $host = '255.255.255.255' }
@@ -189,7 +189,7 @@ sub wol_by_udp {
 
   my $sock = new IO::Socket::INET(Proto=>'udp') or die "socket : $!";
   if(!$sock) {
-     Log3 $hash, 1, "Can't create WOL socket";
+     Log3 $hash, 1, "[$name] Can't create WOL socket";
      return 1;
   }
 
@@ -208,20 +208,27 @@ sub wol_by_udp {
 # method to wake via system command
 sub wol_by_ew($$) {
   my ($hash, $mac) = @_;
+  my $name  = $hash->{NAME};
 
-  #               Fritzbox               Raspberry
-  my @commands = "/usr/bin/ether-wake", "/usr/sbin/etherwake";
+  #               Fritzbox               Raspberry             Raspberry aber root
+  my @commands = ("/usr/bin/ether-wake", "/usr/bin/wakeonlan", "/usr/sbin/etherwake" );
 
-  my $standardEtherwake = "no etherwake installed";
-  foreach my $sysCmd (@commands) {
-     if (-e $sysCmd) {
-        $standardEtherwake = $sysCmd;
+  my $standardEtherwake = "no WOL found - use '/usr/bin/ether-wake' or '/usr/bin/wakeonlan' or define Attribut sysCmd";
+  foreach my $tstCmd (@commands) {
+     if (-e $tstCmd) {
+        $standardEtherwake = $tstCmd;
+        last;
      }
   }
 
-  my $sysCmd = AttrVal($hash->{NAME}, "sysCmd", $standardEtherwake);
+  Log3 $hash, 5, "[$name] standard wol command: $standardEtherwake";
+
+  my $sysCmd = AttrVal($hash->{NAME}, "sysCmd", "");
+  Log3 $hash, 5, "[$name] user wol command(sysCmd): '$sysCmd'";
+  $sysCmd = $standardEtherwake     if ($sysCmd eq "");
   if (-e $sysCmd) {
      $sysCmd = "$sysCmd $mac";
+     Log3 $hash, 5, "[$name] executing $sysCmd";
      qx ($sysCmd);
   } else {
      Log3 $hash, 1, "[$hash->{NAME}] system command '$sysCmd' not found";
