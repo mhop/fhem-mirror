@@ -286,9 +286,8 @@ sub CUL_HM_updateConfig($){
         my $vId = substr($id."01",0,8);
         $hash->{helper}{virtTC} = "00";
         $hash->{helper}{vd}{msgRed}= 0                                        if(!defined $hash->{helper}{vd}{msgRed});
-        $hash->{helper}{vd}{msgCnt}= ReadingsVal($name,".msgCnt",0)           if(!defined $hash->{helper}{vd}{msgCnt});
-        $hash->{helper}{vd}{next}  = ReadingsVal($name,".next",gettimeofday())if(!defined $hash->{helper}{vd}{next});
-
+        ($hash->{helper}{vd}{msgCnt},$hash->{helper}{vd}{next}) = 
+                    split(";",ReadingsVal($name,".next","0;".gettimeofday())) if(!defined $hash->{helper}{vd}{next});
         CUL_HM_Set($hash,$name,"valvePos",ReadingsVal($name,"valvePosTC",""));
         CUL_HM_Set($hash,$name,"virtTemp",ReadingsVal($name,"temperature",""));
         CUL_HM_Set($hash,$name,"virtHum" ,ReadingsVal($name,"humidity",""));
@@ -677,7 +676,7 @@ sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
                           ,"threeStateSensor"=>{"00"=>"closed"  ,"64"=>"tilted"  ,"C8"=>"open"}
                          }
                   );
-sub CUL_HM_Parse($$) {##############################
+sub CUL_HM_Parse($$) {#########################################################
   my ($iohash, $msgIn) = @_;
 
   my ($msg,$msgStat,$myRSSI,$msgIO) = split(":",$msgIn,4);
@@ -1289,9 +1288,9 @@ sub CUL_HM_Parse($$) {##############################
       $shash = $modules{CUL_HM}{defptr}{$chId}
                              if($modules{CUL_HM}{defptr}{$chId});
       my $physLvl;                             #store phys level if available
-      if(   $p =~ m/^........(..)(..)$/        #message with physical level?
+      if(   defined $mI[5]                     #message with physical level?
          && $st eq "dimmer"){
-        my $pl = hex($2)/2;
+        my $pl = hex($mI[5])/2;
         my $vDim = $shash->{helper}{vDim};     #shortcut
         if ($vDim->{idPhy} &&
             CUL_HM_id2Hash($vDim->{idPhy})){   #has virt chan
@@ -1331,7 +1330,17 @@ sub CUL_HM_Parse($$) {##############################
       
       my $action; #determine action
       push @event, "timedOn:".(($err&0x40)?"running":"off");
-
+      if ($shash->{helper}{dlvl} && defined $err #desired level?
+          && !($err&0x70)){              #stopped and not timedOn
+        if ($mI[2] ne $shash->{helper}{dlvl}){#level not met, repeat
+          Log3 $name,3,"CUL_HM $name repeat, level $mI[2] instead of $shash->{helper}{dlvl}";
+          CUL_HM_PushCmdStack($shash,$shash->{helper}{dlvlCmd});
+          CUL_HM_ProcessCmdStack($shash);
+        }
+        else{
+          delete $shash->{helper}{dlvl};
+        }
+      }
       if ($st ne "switch"){
         my $dir =  $err&0x30;
         if   ($dir == 0x10){push @event, "$eventName:up:$vs"  ;}
@@ -1343,6 +1352,7 @@ sub CUL_HM_Parse($$) {##############################
           else            {CUL_HM_unQEntity($shash->{NAME},"qReqStat");}
         }
       }
+ 
       if ($st eq "dimmer"){
         push @event,"overload:".(($err&0x02)?"on":"off");
         push @event,"overheat:".(($err&0x04)?"on":"off");
@@ -2993,9 +3003,15 @@ sub CUL_HM_Set($@) {
                         sprintf("%02X%02s%02X",$lvl*2,$rLocDly,$speed*2));
   }
   elsif($cmd =~ m/^(on|off|toggle)$/) { #######################################
-    my $lvl = ($cmd eq 'on')  ? 'C8':
-             (($cmd eq 'off') ? '00':(CUL_HM_getChnLvl($name) != 0 ?"00":"C8"));
-    CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."02$chn$lvl".'0000');
+    $hash->{helper}{dlvl} = ($cmd eq 'on') 
+                                ? 'C8'
+                                :(($cmd eq 'off') 
+                                    ? '00'
+                                    :(CUL_HM_getChnLvl($name) != 0 ?"00"
+                                                                   :"C8"));
+    $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"
+                               ."02$chn$hash->{helper}{dlvl}".'0000';
+    CUL_HM_PushCmdStack($hash,$hash->{helper}{dlvlCmd});
     $hash = $chnHash; # report to channel if defined
   }
   elsif($cmd =~ m/^(on-for-timer|on-till)$/) { ################################
@@ -3014,6 +3030,7 @@ sub CUL_HM_Set($@) {
           if (!defined $duration || $duration !~ m/^[+-]?\d+(\.\d+)?$/);
     my $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
     return "timer value to low" if ($tval eq "0000");
+    delete $hash->{helper}{dlvl};#stop desiredLevel supervision
     CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."02$chn"."C80000$tval");
     $hash = $chnHash; # report to channel if defined
   }
@@ -3060,12 +3077,16 @@ sub CUL_HM_Set($@) {
       }
       $rval = CUL_HM_encodeTime16((@a > 4)?$a[4]:2.5);# rampTime 0.0..85825945.6, 0=immediate
     }
-    CUL_HM_PushCmdStack($hash,sprintf("++%s11%s%s02%s%02X%s%s",
-                                     $flag,$id,$dst,$chn,$lvl*2,$rval,$tval));
+    # store desiredLevel in and its Cmd in case we have to repeat
+    $hash->{helper}{dlvl} = sprintf("%02X",$lvl*2);
+    $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"
+                               ."02$chn$hash->{helper}{dlvl}$rval$tval";
+    CUL_HM_PushCmdStack($hash,$hash->{helper}{dlvlCmd});
     CUL_HM_UpdtReadSingle($hash,"level","set_".$lvl,1);
     $state = "set_".$lvl;
   }
   elsif($cmd eq "stop") { #####################################################
+    delete $hash->{helper}{dlvl};#stop desiredLevel supervision
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'03'.$chn);
   }
   elsif($cmd eq "setRepeat") { ################################################
@@ -3444,8 +3465,8 @@ sub CUL_HM_Set($@) {
         }
         $hash->{helper}{vd}{idh} = hex(substr($dst,2,2))*20077;
         $hash->{helper}{vd}{idl} = hex(substr($dst,4,2))*256;
-        $hash->{helper}{vd}{msgCnt} = ReadingsVal($name,".msgCnt",0) 
-              if (!defined $hash->{helper}{vd}{msgCnt});
+        ($hash->{helper}{vd}{msgCnt},$hash->{helper}{vd}{next}) = 
+                    split(";",ReadingsVal($name,".next","0;".gettimeofday())) if(!defined $hash->{helper}{vd}{next});
         if (!$hash->{helper}{virtTC}){
           my $pn = CUL_HM_id2Name($hash->{helper}{vd}{id});
           $hash->{helper}{vd}{ackT} = ReadingsTimestamp($pn, "ValvePosition", "")
@@ -3536,13 +3557,10 @@ sub CUL_HM_Set($@) {
     return "$mode unknown - select long or short" if ($mode !~ m/^(short|long)$/);
     my $pressCnt = (!$hash->{helper}{count}?1:$hash->{helper}{count}+1)%256;
     $hash->{helper}{count}=$pressCnt;# remember for next round
-    my @peerList;
     if ($st eq 'virtual'){#serve all peers of virtual button
-      foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
-        push (@peerList,substr($peer,0,6));
-      }
+      my @peerList = map{substr($_,0,6)} split(',',AttrVal($name,"peerIDs",""));
       @peerList = grep !/^$/,CUL_HM_noDup(@peerList);
-      @peerList = ('000000') if (scalar@peerList == 0);#send to broadcast if no peer
+      @peerList = ('000000') if (scalar@peerList == 0);#send broadcast if no peer
       foreach my $peer (sort @peerList){
         my ($pHash,$peerFlag,$rxt) = ($hash,'A4',1);
         if ($peer ne '000000'){
@@ -3568,6 +3586,7 @@ sub CUL_HM_Set($@) {
       my $pChn = $chn; # simple device, only one button per channel
       $pChn = (($vChn && $vChn eq "off")?-1:0) + $chn*2
               if($st eq 'blindActuator'||$st eq 'dimmer');
+      delete $hash->{helper}{dlvl};#stop desiredLevel supervision
       CUL_HM_PushCmdStack($hash, sprintf("++%s3E%s%s%s40%02X%02X",$flag,
                                      $id,$dst,$dst,
                                      $pChn+(($mode && $mode eq "long")?64:0),
@@ -3783,6 +3802,7 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
     $nextTimer = (($lo+$hi)&0xff)/4 + 120;
     $nextF += $nextTimer;
   }
+  Log3  $name,5,"CUL_HM $name m:$hashVd->{msgCnt} ->$msgCnt t:$hashVd->{next}->$nextF  M:$tn :$nextTimer";
   $hashVd->{next} = $nextF;
   $hashVd->{nextM} = $tn+$nextTimer;# new adjust if we will match
   $hashVd->{msgCnt} = $msgCnt;
@@ -3828,10 +3848,7 @@ sub CUL_HM_valvePosTmr(@) {#calc next vd wakeup
   my $name = $hash->{NAME};
   my $vc = ReadingsVal($name,"valveCtrl","init");
   my $vcn = $vc;
-  if (!$hashVd->{msgSent}) {
-    $hashVd->{miss}++;
-  }
-  else {
+  if ($hashVd->{msgSent}) {
     my $pn = CUL_HM_id2Name($hashVd->{id});
     my $ackTime = ReadingsTimestamp($pn, "ValvePosition", "");
     if (!$ackTime || $ackTime eq $hashVd->{ackT} ){
@@ -3840,14 +3857,16 @@ sub CUL_HM_valvePosTmr(@) {#calc next vd wakeup
       Log3 $name,5,"CUL_HM $name virtualTC use fail-timer";
     }
     else{#successful - store sendtime and msgCnt that calculated it
-      CUL_HM_UpdtReadBulk($hash,0,".next:".$hashVd->{nextL}
-                                 ,".msgCnt:".($hashVd->{msgCnt}-1));
+      CUL_HM_UpdtReadSingle($hash,".next","$hashVd->{msgCnt};$hashVd->{nextM}",0);
       $hashVd->{next} = $hashVd->{nextM};#use adjusted value if ack
       $vcn = "ok";
       $hashVd->{miss} = 0;
-      $hashVd->{msgSent} = 0;
     }
+    $hashVd->{msgSent} = 0;
     $hashVd->{ackT} = $ackTime;
+  }
+  else {
+    $hashVd->{miss}++;
   }
   CUL_HM_UpdtReadSingle($hash,"valveCtrl",$vcn,1) if($vc ne $vcn);
   InternalTimer($hashVd->{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
@@ -4707,7 +4726,7 @@ sub CUL_HM_getAssChnIds($) { #in: name out:ID list of assotiated channels
   }
   return sort(@chnIdList);
 }
-sub CUL_HM_getAssChnNames($) { #in: name out:list of assotiated chan and device 
+sub CUL_HM_getAssChnNames($) { #in: name out:list of assotiated chan and device
   my ($name) = @_;
   my @chnN = ($name);
   if ($defs{$name}){
@@ -5345,7 +5364,6 @@ sub CUL_HM_TCITRTtempReadings($@) {# parse RT - TC-IT temperature readings
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
   return $setting;
 }
-
 
 sub CUL_HM_repReadings($) {   # parse repeater
   my ($hash)=@_;
