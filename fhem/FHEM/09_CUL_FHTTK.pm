@@ -321,4 +321,62 @@ CUL_FHTTK_Parse($$)
 </ul>
 
 =end html
+=begin html_DE
+
+<a name="CUL_FHTTK"></a>
+<h3>CUL_FHTTK</h3>
+<ul>
+  Dieses Modul hantiert die empfangen Daten von FHT80 TF "Fenster-T&uuml;r-Kontakt" Sensoren, welche 
+  normalerweise nur mit den <a href="#FHT">FHT80B</a> Geräten kommunizieren. Mit diesen Modul k&ouml;nnen 
+  FHT80 TFs in eingeschr&auml;nkter Weise &auml;hnlich wie HMS TFK Sensoren benutzt werden (weitere 
+  Informationen sind unter <a href="http://fhz4linux.info/tiki-index.php?page=FHT+protocol">Wiki</a> zu lesen).
+  Der name des FHEM Moduls wurde so gewählt, weil a) nur der CUL die Daten empfangen kann und b) "TF" normalerweise
+  Temperatur- und Feuchtigkeitssensoren suggeriert. (Keine Ahnung, warum ELV diesen Sensor nicht TFK genannt hat, 
+  wie die Sensoren von FS20 und HMS).
+  <br><br>
+  <a href="#CUL">CUL</a> device muss vorhr definiert sein.<br><br>
+
+  <a name="CUL_FHTTKdefine"></a>
+  <b>D</b>
+  <ul>
+    <code>define &lt;name&gt; CUL_FHTTK &lt;devicecode&gt;</code>
+    <br><br>
+
+    <code>&lt;devicecode&gt;</code> Ist eine sechstellige Hexadezimalzahl, welche zum Zeitpunkt der Produktion 
+	des FHT80 TF gegeben wurde. Somit ist diese auch nicht mehr änderbar und bleibt auch nach einem Batteriewechsel 
+	erhalten.<br>
+
+    Examples:
+    <ul>
+      <code>define TK_TEST CUL_FHTTK 965AB0</code>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="CUL_FHTTKset"></a>
+  <b>Set </b>
+    <ul> N/A </ul>
+  <br>
+
+  <b>Get</b>
+	<ul> N/A </ul>
+  <br>
+
+  <a name="CUL_FHTTKattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#model">model</a> (FHT80TF)</li><br>
+    <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#IODev">IODev</a></li><br>
+    <li><a href="#ignore">ignore</a></li><br>
+    <li><a href="#eventMap">eventMap</a></li><br>
+	<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+  <br>
+
+</ul>
+
+=end html_DE
 =cut
