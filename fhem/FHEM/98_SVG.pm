@@ -1774,9 +1774,9 @@ plotAsPng(@)
     <li>if you want to omit the title for a Diagram label, enter notitle in the
       input field.</li>
     <li>if you want to specify a fixed value (not taken from a column) if a
-      string found (e.g. 1 of the FS20 switch is on 0 if it off), then you have
-      to specify the Tics first, and write the .gplot file, before you can
-      select this value from the dropdown.<br>
+      string found (e.g. 1 if the FS20 switch is on and 0 if it is off), then
+      you have to specify the Tics first, and write the .gplot file, before you
+      can select this value from the dropdown.<br>
       Example:
       <ul>
       Enter in the Tics field: ("On" 1, "Off" 0)<br>
@@ -1790,4 +1790,204 @@ plotAsPng(@)
 </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="SVG"></a>
+<h3>SVG</h3>
+<ul>
+  <a name="SVGlinkdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; SVG &lt;logDevice&gt;:&lt;gplotfile&gt;:&lt;logfile&gt;</code>
+    <br><br>
+    Dies ist das Zeichenmodul von FHEMWEB, mit dem Vektorgrafiken (SVG) erzeugt
+    werden. <br><br>
+    Beispiel:
+    <ul>
+      <code>define MyPlot SVG inlog:temp4hum4:CURRENT</code><br>
+    </ul>
+    <br>
+
+    Hinweise:
+    <ul>
+      <li>Normalerweise m&uuml;ssen SVG-Ger&auml;te nicht manuell erzeugt
+        werden, da FHEMWEB es f&uuml;r den Nutzer einfach macht: man muss in
+        der Detailansicht eines FileLogs wechseln und auf "Create SVG instance"
+        klicken.</li>
+
+      <li>CURRENT als &lt;logfile&gt; wird immer das aktuelle Logfile
+        benutzen, selbst dann, wenn der Name des Logfiles sich
+        regelm&auml;&szlig;ig &auml;ndert.  </li>
+
+      <li>Aus historischen Gr&uuml;nden ben&ouml;tigt jede SVG-Instanz eine
+        sog. .gplot Datei, die auch als Input f&uuml;r das gnuplot Programm
+        verwendet werden kann.  Einige besondere Zeilen (welche mit #FileLog
+        oder #DbLog beginnen) werden zus&auml;tzlich benutzt, diese werden von
+        gnuplot als Kommentar betrachtet. Auf der anderen Seite implementiert
+        dieses Modul nicht alle gnuplot-Attribute.</li>
+
+    </ul>
+  </ul>
+  <br>
+
+  <a name="SVGset"></a>
+  <b>Set</b>
+  <ul>
+    <li>copyGplotFile<br>
+      Kopiert die aktuell ausgew&auml;hlte .gplot Datei in eine neue Datei, die
+      den Namen der SVG Instanz tr&auml;gt; bereits bestehende Dateien mit
+      gleichem Namen werden &uuml;berschrieben. Diese Vorgehensweise ist
+      notwendig, wenn man den Ploteditor benutzt. Erzeugt man aus der
+      Detailansicht des FileLogs die SVG Instanz, wird eine eindeutige
+      .gplot-Datei erzeugt. In diesem Fall ist dieses Befehl nicht
+      erforderlich.</li>
+
+  </ul><br>
+
+  <a name="SVGget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="SVGattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <a name="fixedrange"></a>
+    <li>fixedrange [offset]<br>
+      Version 1<br>
+      Enth&auml;lt zwei Zeit-Spezifikationen in der Schreibweise YYYY-MM-DD,
+      getrennt durch ein Leerzeichen. Im Plotmodus gnuplot-Scroll oder SVG wird
+      das vorgegebene Intervall verwendet und ein Scrolling der Zeitachse ist
+      nicht m&ouml;glich. Dies wird z.B. verwendet, um sich die Daten des
+      vergangenen Jahres ohne Scrollen anzusehen.<br><br>   
+
+      Version 2<br>
+      Wenn der Wert entweder Tag, &lt;N&gt;Tage, Woche, Monat oder Jahr lautet,
+      kann der Zoom-Level f&uuml;r dieses SVG unabh&auml;ngig vom
+      User-spezifischen Zoom eingestellt werden. Diese Einstellung ist
+      n&uuml;tzlich f&uuml;r mehrere Plots auf einer Seite: Eine Grafik ist mit
+      dem Standard-Zoom am aussagekr&auml;ftigsten, die anderen mit einem Zoom
+      &uuml;ber eine Woche.
+      Der optionale ganzzahlige Parameter [offset] setzt ein anderes
+      Zeitintervall (z.B. letztes Jahr: <code> fixedrange year -1</code>,
+      vorgestern: <code> fixedrange day -2</code>).
+      </li><br>
+
+    <a name="fixedoffset"></a>
+    <li>fixedoffset &lt;nTage&gt;<br>
+      Verschiebt den Plot-Offset um einen festen Wert (in Tagen). 
+      </li><br>
+
+    <a name="startDate"></a>
+    <li>startDate<br>
+      Setzt das Startdatum f&uuml;r den Plot. Wird f&uuml;r Demo-Installationen
+      verwendet.
+      </li><br>
+
+    <li><a href="#plotsize">plotsize</a></li><br>
+
+    <li><a href="#plotmode">plotmode</a></li><br>
+
+    <a name="label"></a>
+    <li>label<br>
+      Eine Liste, bei der die einzelnen Werte mit einem zweifachen Doppelpunkt
+      voneinander getrennt werden. Diese Liste wird verwendet um die &lt;L#&gt;
+      Zeichenfolgen in der .gplot-Datei zu ersetzen. Dabei steht das # f&uuml;r
+      eine laufende Ziffer beginnend mit 1 (&lt;L1&gt;, &lt;L2&gt;, usw.).
+      Jeder Wert wird als Perl-Ausdruck bewertet, deshalb hat man Zugriff z.B.
+      auf die hinterlegten Funktionen. <br><br>
+
+      Egal, ob es sich bei der Plotart um gnuplot-scroll oder SVG handelt, es
+      k&ouml;nnen ebenfalls die Werte der individuellen Kurve f&uuml;r min,
+      max, avg, cnt, sum, currval (letzter Wert) und currdate (letztes Datum)
+      durch Zugriff der entsprechenden Werte &uuml;ber das DataHash verwendet
+      werden. Siehe untenstehendes Beispiel:<br>
+      <ul>
+        <li>Beschriftunng der rechten und linken y-Achse:<br>
+          <ul>
+            <li>Fhem config:<br>
+                <code>attr wl_1 label "Temperature"::"Humidity"</code></li>
+            <li>Eintrag in der .gplot-Datei:<br>
+                <code>set ylabel &lt;L1&gt;<br>
+                set y2label &lt;L2&gt;</code></li>
+          </ul>
+          </li>
+        <li>&Uuml;berschrift aus Maximum und dem letzten Wert der ersten
+          Kurve(FileLog)
+          <ul>
+            <li>Fhem config:<br>
+                <code>attr wl_1 label "Max $data{max1}, Current $data{currval1}"</code></li>
+            <li>Eintrag in der .gplot-Datei:<br>
+                <code>set title &lt;L1&gt;</code><br></li>
+          </ul>
+          </li>
+      </ul>
+      </li>
+
+    <a name="title"></a>
+    <li>title<br>
+      Eine besondere Form der &Uuml;berschrift (siehe oben), bei der die
+      Zeichenfolge &lt;TL&gt; in der .gplot-Datei ersetzt wird.
+      Standardm&auml;&szlig;ig wird als &lt;TL&gt; der Dateiname des Logfiles
+      eingesetzt.
+      </li><br>
+
+    <a name="plotfunction"></a>
+    <li>plotfunction<br>
+      Eine Liste, deren Werte durch Leerzeichen voneinander getrennt sind.
+      Diese Liste wird verwendet um die &lt;SPEC#&gt; Zeichenfolgen in der
+      .gplot-Datei zu ersetzen. Dabei steht das # f&uuml;r eine laufende Ziffer
+      beginnend mit 1 (&lt;SPEC1&gt;, &lt;SPEC2&gt;, usw.) in der #FileLog oder
+      #DBLog Anweisung. Mit diesem Attrbute ist es m&ouml;glich eine
+      .gplot-Datei f&uuml;r mehrere Ger&auml;te mit einem einzigen logdevice zu
+      verwenden. <br><br>
+
+      <ul><b>Beispiel:</b><br>
+        <li>#FileLog &lt;SPEC1&gt;<br>
+          mit:<br>
+            <code>attr &lt;SVGdevice&gt; plotfunction "4:IR\x3a:0:"</code><br>
+          anstelle von:<br>  
+            <code>#FileLog 4:IR\x3a:0:</code>
+          </li>
+        <li>#DbLog &lt;SPEC1&gt;<br>
+          mit:<br> 
+            <code>attr &lt;SVGdevice&gt; plotfunction "Garage_Raumtemp:temperature::"</code><br>
+          anstelle von:<br>
+            <code>#DbLog Garage_Raumtemp:temperature::</code>
+          </li>
+      </ul>
+      </li>
+  </ul>
+  <br>
+
+  <a name="plotEditor"></a>
+  <b>Plot-Editor</b>
+  <ul>
+    Dieser Editor ist in der Detailansicht der SVG-Instanz zu sehen. Die
+    meisten Features sind hier einleuchtend und bekannt, es gibt aber auch
+    einige Ausnahmen:
+    <li>wenn f&uuml;r ein Diagramm die &Uuml;berschrift unterdr&uuml;ckt werden
+      soll, muss im Eingabefeld <code>notitle</code> eingetragen werden.
+      </li>
+
+    <li>wenn ein fester Wert (nicht aus einer Wertespalte) definiert werden
+      soll, f&uuml;r den Fall, das eine Zeichenfoge gefunden wurde (z.B. 1
+      f&uuml;r eine FS20 Schalter, der AN ist und 0 f&uuml;r den AUS-Zustand),
+      muss zuerst das Tics-Feld gef&uuml;llt, und die .gplot-Datei
+      gespeichert werden, bevor der Wert &uuml;ber die Dropdownliste erreichbar
+      ist.
+      <ul><b>Beispiel:</b><br>
+        Eingabe im Tics-Feld: ("On" 1, "Off" 0)<br>
+        .gplot-Datei speichern<br>
+        "1" als Regexp switch.on und "0" f&uuml;r den Regexp switch.off vom
+        Spalten-Dropdown ausw&auml;hlen (auf die G&auml;nsef&uuml;&szlig;chen
+        achten!).<br>
+        .gplot-Datei erneut speichern<br>
+      </ul>
+      </li>
+  </ul>
+  <br>
+</ul>
+
+=end html_DE
+
 =cut
