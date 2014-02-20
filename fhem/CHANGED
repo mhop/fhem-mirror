@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: 10_EnOcean: UTE protocol implemented
+  - feature: 00_TCM: new command teach
   - bugfix:  SYSMOM: uninitialized value warning on FritzBox
   - added:   09_CUL_FHTTK.pm: german module documentation (matscher)
   - feature: readingsGroup: allow FHEMWEB slider and dropdown menus as commands
