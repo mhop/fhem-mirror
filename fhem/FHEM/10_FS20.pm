@@ -589,7 +589,7 @@ four2hex($$)
     <li>IODev<br>
         Set the IO or physical device which should be used for sending signals
         for this "logical" device. An example for the physical device is an FHZ
-        or a CUL. Note: Upon startup fhem assigns each logical device
+        or a CUL. Note: Upon startup FHEM assigns each logical device
         (FS20/HMS/KS300/etc) the last physical device which can receive data
         for this type of device. The attribute IODev needs to be used only if
         you attached more than one physical device capable of receiving signals
@@ -696,4 +696,257 @@ four2hex($$)
 </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="FS20"></a>
+<h3>FS20</h3>
+<ul>
+  Das FS20 Protokoll wird von einem gro&szlig;en Spektrum an Ger&auml;ten
+  verwendet.  Diese stammen entweder aus der Kategorie Sensor/Sender oder
+  Aktor/Empf&auml;nger.  Die Funknachrichten (868.35 MHz) k&ouml;nnen mit einem
+  <a href="#FHZ">FHZ</a> oder einem <a href="#CUL">CUL</a> empfangen werden.
+  Dieses muss daher zuerst definiert werden.
+  <br><br>
+
+  <a name="FS20define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; FS20 &lt;housecode&gt; &lt;button&gt;
+    [fg &lt;fgaddr&gt;] [lm &lt;lmaddr&gt;] [gm FF] </code>
+    <br><br>
+
+   Die Werte housecode, button, fg, lm, und gm k&ouml;nnen entweder hexadezimal
+   oder in der ELV-typischen quatern&auml;ren Notation (Zahlen von 1-4)
+   eingegeben werden.
+   Hier und auch in sp&auml;teren Beispielen wird als Referenz die ELV4
+   Notation verwendet. Die Notationen k&ouml;nnen auch gemischt werden da FHEM
+   die verwendete Notation durch z&auml;hlen der Zeichen erkennt.<br>
+
+   <ul>
+   <li><code>&lt;housecode&gt;</code> ist eine 4 stellige Hex oder 8 stellige
+     ELV4 Zahl, entsprechend der Hauscode Adresse.</li>
+
+   <li><code>&lt;button&gt;</code> ist eine 2 stellige Hex oder 4 stellige ELV4
+     Zahl, entsprechend dem Button des Transmitters.</li>
+
+   <li>Optional definiert <code>&lt;fgaddr&gt;</code> die Funktionsgruppe mit
+     einer 2 stelligen Hex oder 4 stelligen  ELV4 Adresse. Bei Hex muss die
+     erste Stelle F, bei ELV4 die ersten zwei Stellen 44 sein.</li>
+
+   <li>Optional definiert <code>&lt;lmaddr&gt;</code> definiert einen local
+     master mit einer 2 stelligen Hex oder 4 stelligen  ELV4 Adresse. Bei Hex
+     muss die letzte Stelle F, bei ELV4 die letzten zwei Stellen 44 sein.</li>
+
+   <li>Optional definiert  gm den global master. Die Adresse muss FF bei HEX
+     und 4444 bei ELV4 Notation sein.</li>
+
+   </ul>
+   <br>
+
+    Beispiele:
+    <ul>
+      <code>define lamp FS20 7777 00 fg F1 gm F</code><br>
+      <code>define roll1 FS20 7777 01</code><br>
+      <code>define otherlamp FS20 24242424 1111 fg 4412 gm 4444</code><br>
+      <code>define otherroll1 FS20 24242424 1114</code>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="FS20set"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt]</code>
+    <br><br>
+    Wobei <code>value</code> einer der folgenden Werte sein kann:<br>
+    <ul><code>
+      dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50%<br>
+      dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%<br>
+      dimdown<br>
+      dimup<br>
+      dimupdown<br>
+      off<br>
+      off-for-timer<br>
+      on                # dimmer: Setze auf diesen Wert vor dem Ausschalten<br>
+      on-for-timer      # Siehe Hinweise<br>
+      on-old-for-timer  # Setze zum vorherigen (vor dem Einschalten)<br>
+      ramp-on-time      # Zeit bis zum erreichen des gew&uuml;nschten Dim-Wertes<br>
+      ramp-off-time     # Zeit bis zum Ausschalten bei Dimmern<br>
+      reset<br>
+      sendstate<br>
+      timer<br>
+      toggle            # zwischen aus und dem letztern Dim-Wert<br>
+      on-till           # Siehe Hinweise<br>
+    </code></ul><br>
+    Die<a href="#setExtensions"> set extensions</a> sind ebenfalls
+    unterst&uuml;tzt.<br>
+    <br>
+    Beispiele:
+    <ul>
+      <code>set lamp on</code><br>
+      <code>set lamp1,lamp2,lamp3 on</code><br>
+      <code>set lamp1-lamp3 on</code><br>
+      <code>set lamp on-for-timer 12</code><br>
+    </ul>
+    <br>
+
+    Hinweise:
+    <ul>
+      <li>reset nur mit Vorsicht verwenden: Auch der Hauscode wird
+        gel&ouml;scht.  </li>
+
+      <li>Da das FS20 Protokoll 0.22Sek f&uuml;r eine Funksequenz ben&ouml;tigt
+        wird nach jeder Ausf&uuml;hrung eine Pause von 0.22Sek eingef&uuml;gt.
+        </li>
+
+      <li>Das FS20ST schaltet f&uuml;r dim*% und dimup ein. Es reagiert nicht
+        auf sendstate.</li>
+
+      <li>Wenn ein Timer gesetzt ist (und dieser nicht 0 ist) werden on, dim*,
+        und *-for-timer ber&uuml;cksichtigt (zumindest beim FS20ST).  </li>
+
+      <li>Das <code>time</code> Argument geht von 0.25Sek bis 4Std und 16Min.
+        Da <code>time</code> nur mit einem Byte dargestellt wird ergeben sich
+        hieraus nur 112 eindeutige Zeit-Werte die mit ansteigender
+        gr&ouml;&szlig;e immer gr&ouml;ber aufgel&ouml;st werden. Das Programm
+        zeigt die exakte Restzeit an wenn die gew&auml;hlte Aufl&ouml;sung
+        nicht eindeutig war.  Die Aufl&ouml;sung ist is 0.25Sek von 0 bis 4
+        Sekunden, 0.5Sek von 4 bis 8Sek, 1Sek von 8 bis 16 Sek und so weiter.
+        Wenn eine h&ouml;here Genauigkeit bei gro&szlig;en Werten gebraucht
+        wird, dann hilft <a href="#at">at</a> mit einer Aufl&ouml;sung von
+        1Sek.</li>
+
+      <li>on-till setzt eine absolute Zeit im "at" Format voraus (HH:MM:SS,
+        HH:MM oder { &lt;perl code&gt; }, wobei der perl-code eine Zeit
+        zur&uuml;ck geben muss).  Wenn die aktuelle Zeit gr&ouml;&szlig;er ist
+        als die angegebene, dann wird der Befehl ignoriert und ein at-"on"
+        Befehl erzeugt, sowie f&uuml;r die angegebe "till-time" ein at-"off"
+        Befehl.
+      </li>
+    </ul>
+  </ul>
+  <br>
+
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="FS20attr"></a>
+  <b>Attribute</b>
+  <ul>
+    <a name="IODev"></a>
+    <li>IODev<br>
+      Setzt das IO oder das physische Device welches zum Senden der Signale an
+      dieses logische Device verwendet werden soll (Beispielsweise FHZ oder
+      CUL).  Hinweis: Beim Start weist FHEM jedem logischen Device das letzte
+      physische Device zu, das Daten von diesem Typ empfangen kann.  Das
+      Attribut IODev muss nur gesetzt werden wenn mehr als ein physisches
+      Device f&auml;hig ist Signale von diesem logischen Device zu empfangen.
+      </li><br>
+
+    <a name="eventMap"></a>
+    <li>eventMap<br>
+      Ersetze Event Namen und setze Argumente. Der Wert dieses Attributes
+      besteht aus einer Liste von durch Leerzeichen getrennte Werten. Jeder
+      Wert ist ein durch Doppelpunkt getrenntes Paar. Der erste Teil stellt den
+      "alten" Wert, der zweite Teil den "neuen" Wert dar. Wenn der erste Wert
+      ein Slash (/) oder ein Komma (,) ist, dann wird nicht durch Leerzeichen
+      sondern durch das vorgestellte Zeichen getrennt.
+      Beispiele:
+      <ul><code>
+        attr store eventMap on:open off:closed<br>
+        attr store eventMap /on-for-timer 10:open/off:closed/<br>
+        set store open
+      </code></ul>
+      </li><br>
+
+    <a name="attrdummy"></a>
+    <li>dummy<br>
+      Setzt das Attribut dummy um Devices zu definieren, die keine Funksignale
+      absetzen.  Zugeh&ouml;rige notifys werden ausgef&uuml;hrt wenn das Signal
+      empfangen wird.  Wird beispielsweise genutzt um auf Code eines Sender zu
+      reagieren, dennoch wird es auch dann kein Signal senden wenn es im Web
+      Frontend getriggert wird.
+      </li><br>
+
+    <a name="follow-on-for-timer"></a>
+    <li>follow-on-for-timer<br>
+      Plant ein "setstate off;trigger off" f&uuml;r die angegebene Zeit als
+      Argument zum on-for-timer Command. Oder das gleiche mit "on" wenn der
+      Befehl "follow-off-for-timer" war.
+      </li><br>
+
+    <a name="follow-on-timer"></a>
+    <li>follow-on-timer<br>
+      Wie follow-on-for-timer plant es ein "setstate off;trigger off", aber
+      diesmal als Argument in Sekunden zum Attribut.  Wird verwendet um dem
+      vorprogrammierten Timer zu folgen welcher vorher durch den timer-Befehl,
+      oder manuell durch Dr&uuml;cken des Buttons gesetzt wurde. Im Handbuch
+      finden sich noch mehr Informationen.
+      </li><br>
+
+
+    <a name="model"></a>
+    <li>model<br>
+      Das "model" Attribut bezeichnet den Modelltyp des Ger&auml;tes.  Dieses
+      Attribut wird (derzeit) nicht direkt durch fhem.pl genutzt.  Es kann
+      beispielsweise von externen Programmen oder Webinterfaces genutzt werden
+      um Ger&auml;teklassen zu unterscheiden und dazu passende Befehle zu senden
+      (z.B. "on" oder "off" an ein fs20st, "dim..%" an ein fs20du etc.).  Die
+      Schreibweise des Modellnamens ist wie die in Anf&uuml;hrungszeichen in
+      der Anleitung gedruckte Bezeichnung die jedem Ger&auml;t beiliegt.
+      Dieser Name wird ohne Leerzeichen ausschlie&szlig;lich in Kleinbuchstaben
+      verwendet.  G&uuml;ltige Zeichen sind <code>a-z 0-9</code> und
+      <code>-</code>, andere Zeichen sind zu vermeiden. Hier ist eine Liste der
+      "offiziellen" Devices:<br><br>
+
+      <b>Sender/Sensor</b>: fs20fms fs20hgs fs20irl fs20kse fs20ls
+      fs20pira fs20piri fs20piru fs20s16 fs20s20 fs20s4  fs20s4a fs20s4m
+      fs20s4u fs20s4ub fs20s8 fs20s8m fs20sd  fs20sn  fs20sr fs20ss
+      fs20str fs20tc1 fs20tc6 fs20tfk fs20tk  fs20uts fs20ze fs20bf<br><br>
+
+      <b>Dimmer</b>: fs20di  fs20di10 fs20du<br><br>
+
+      <b>Empf&auml;nger/Aktor</b>: fs20as1 fs20as4 fs20ms2 fs20rgbsa fs20rst
+      fs20rsu fs20sa fs20sig fs20sm4 fs20sm8 fs20st fs20su fs20sv fs20ue1
+      fs20usr fs20ws1
+      </li><br>
+
+
+    <a name="ignore"></a>
+    <li>ignore<br>
+      Ignoriere dieses Ger&auml;t, beispielsweise wenn es dem Nachbar
+      geh&ouml;rt.  Das Ger&auml;t wird keine FileLogs/notifys triggern,
+      empfangene Befehle werden stillschweigend ignoriert (es wird kein
+      Funksignal gesendet, wie auch beim <a href="#attrdummy">dummy</a>
+      Attribut). Das Ger&auml;t wird weder in der Device-List angezeigt (es sei
+      denn, es wird explizit abgefragt), noch wird es in Befehlen mit
+      "Wildcard"-Namenspezifikation (siehe <a href="#devspec">devspec</a>)
+      erscheinen.  Es kann mit dem "ignored=1" devspec dennoch erreicht werden.
+      </li><br>
+
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+
+  </ul>
+  <br>
+
+  <a name="FS20events"></a>
+  <b>Erzeugte Events:</b>
+  <ul>
+     Von einem FS20 Ger&auml;t k&ouml;nnen folgende Events empfangen werden:
+     <li>on</li>
+     <li>off</li>
+     <li>toggle</li>
+     <li>dimdown</li>
+     <li>dimup</li>
+     <li>dimupdown</li>
+     <li>on-for-timer</li>
+     Welches Event gesendet wird ist Ger&auml;teabh&auml;ngig und kann manchmal
+     auf dem Device konfiguriert werden.
+  </ul>
+</ul>
+
+=end html_DE
+
 =cut
