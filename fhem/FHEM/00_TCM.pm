@@ -590,13 +590,13 @@ sub
 TCM_RemovePair($)
 {
   my $hash = shift;
-  delete($hash->{pair});
-  CommandDeleteReading(undef, "$hash->{NAME} pair");
+  delete($hash->{Teach});
 }
 
 # Set commands TCM 120
 my %sets120 = (    # Name, Data to send to the CUL, Regexp for the answer
   "pairForSec"   => { cmd => "AB18", arg => "\\d+" },
+  "teach"        => { cmd => "AB18", arg => "\\d+" },
   "idbase"       => { cmd => "AB18", arg => "FF[8-9A-F][0-9A-F]{5}" },
   "baseID"       => { cmd => "AB18", arg => "FF[8-9A-F][0-9A-F]{5}" },
   "sensitivity"  => { cmd => "AB08", arg => "0[01]" },
@@ -610,6 +610,7 @@ my %sets120 = (    # Name, Data to send to the CUL, Regexp for the answer
 # Set commands TCM 310
 my %sets310 = (
   "pairForSec"   => { cmd => "AB18", arg=> "\\d+" },
+  "teach"        => { cmd => "AB18", arg=> "\\d+" },
   "sleep"        => { cmd => "01", arg => "00[0-9A-F]{6}" },
   "reset"        => { cmd => "02" },
   "bist"         => { cmd => "06", BIST_Result => "1,1", },
@@ -646,9 +647,8 @@ TCM_Set($@)
     $cmdHex .= $arg;
   }
 
-  if($cmd eq "pairForSec") {
-    $hash->{pair} = 1;
-    readingsSingleUpdate($hash, "pair", 1, 1);
+  if($cmd eq "pairForSec" || $cmd eq "teach") {
+    $hash->{Teach} = 1;
     InternalTimer(gettimeofday()+$arg, "TCM_RemovePair", $hash, 1);
     return;
   }
@@ -849,11 +849,11 @@ TCM_Undef($$)
       Deactivates TCM modem functionality</li>
     <li>modem_on [0000 ... FFFF]<br>
       Activates TCM modem functionality and sets the modem ID</li>
-    <li>pairForSec &lt;t/s&gt;<br>
+    <li>teach &lt;t/s&gt; or pairForSec &lt;t/s&gt;<br>
       Set Fhem in teach-in mode.<br>
-      The command is only required to teach-in bidirectional actuators
-      e. g. EEP 4BS, RORG A5-20-01 (Battery Powered Actuator),
-      see <a href="#pairForSec"> Bidirectional Teach-In / Teach-Out</a>.</li>
+      The command is required for UTE and to teach-in bidirectional actuators
+      e. g. EEP 4BS (RORG A5-20-XX),
+      see <a href="#EnOcean_teach-in"> Bidirectional Teach-In / Teach-Out</a>.</li>
     <li>reset<br>
       Reset the device</li>
     <li>sensitivity [00|01]<br>
@@ -875,11 +875,11 @@ TCM_Undef($$)
     <li>maturity [00|01]<br>
       Waiting till end of maturity time before received radio telegrams will transmit:
       radio telegrams are send immediately = 00, after the maturity time is elapsed = 01</li>
-    <li>pairForSec &lt;t/s&gt;<br>
+    <li>teach &lt;t/s&gt; or pairForSec &lt;t/s&gt;<br>
       Set Fhem in teach-in mode.<br>
-      The command is only required to teach-in bidirectional actuators
-      e. g. EEP 4BS, RORG A5-20-01 (Battery Powered Actuator),
-      see <a href="#pairForSec"> Bidirectional Teach-In / Teach-Out</a>.</li>
+      The command is required for UTE and to teach-in bidirectional actuators
+      e. g. EEP 4BS (RORG A5-20-XX),
+      see <a href="#EnOcean_teach-in"> Bidirectional Teach-In / Teach-Out</a>.</li>
     <li>reset<br>
       Reset the device</li>
     <li>repeater [0000|0101|0102]<br>
