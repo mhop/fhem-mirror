@@ -43,6 +43,7 @@
 # 0032: Ensure URL always contains floorplan-name (redirect if !htmlarg[0]) as basis for fp-specific icon-folder (Jan 06, 2014)
 # 0033: Updated loglevel -> verbose, added fp_roomIcons (Feb 2, 2014)
 # 0034: iOS fullscreen app - navigating to other floorplan doesn't open safari anymore (Feb 15, 2014)
+# 0035: added allowedCommands-Attribute based on FHEMWEB (Feb 20, 2014)
 #
 ################################################################
 #
@@ -259,8 +260,8 @@ FP_CGI(){
   }
   ## process cgi
   my $commands = FP_digestCgi($htmlpart[1]) if $htmlpart[1];                       # analyze URL-commands
-  my $FP_ret = AnalyzeCommand(undef, $commands) if $commands;                      # Execute commands
-#  Log 1, "FLOORPLAN: regex-error. commands: $commands; FP_ret: $FP_ret" if($FP_ret && ($FP_ret =~ m/regex/ ));  #test
+  my $FP_ret = my $FP_ret = AnalyzeCommand(undef, $commands,
+                            AttrVal($FW_wname,"allowedCommands",undef)) if $commands;  #Execute commands
   Log3 "FLOORPLAN", 1, "FLOORPLAN: regex-error. commands: $commands; FP_ret: $FP_ret" if($FP_ret && ($FP_ret =~ m/regex/ ));  #test
   #####redirect URL - either back to fhemweb-detailscreen, or for redirectCmds to suppress repeated execution of commands upon browser refresh
   my $me = $defs{$FW_cname};                                                       # from FHEMWEB: Current connection name
@@ -1014,6 +1015,7 @@ FP_pOfill($@) {
 		<a href="#webname">webname</a><br>
 		<a href="#redirectCmds">redirectCmds</a><br>
 		<a href="#longpoll">longpoll</a><br>
+        <a href="#allowedCommands">allowedCommands</a><br>
      </ul>
     </li><br>
   </ul>
@@ -1182,7 +1184,8 @@ FP_pOfill($@) {
 		<a href="#plotsize">plotsize</a><br>
 		<a href="#webname">webname</a><br>
 		<a href="#redirectCmds">redirectCmds</a><br>
-		<a href="#longpoll">longpoll</a><br>
+        <a href="#longpoll">longpoll</a><br>
+		<a href="#allowedCommands">allowedCommands</a><br>
      </ul>
     </li><br>
   </ul>
