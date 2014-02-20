@@ -688,7 +688,10 @@ CUL_XmitDlyHM($$$)
      $modules{CUL_HM}{defptr}{$id}{helper}{io} && 
      $modules{CUL_HM}{defptr}{$id}{helper}{io}{nextSend}) {
     my $dDly = $modules{CUL_HM}{defptr}{$id}{helper}{io}{nextSend} - $now;
-    $dDly -= 0.04 if ($mTy eq "02");
+    #$dDly -= 0.04 if ($mTy eq "02");# while HM devices need a rest there are 
+                                     # still some devices that need faster 
+                                     # reactionfor ack. 
+                                     # Mode needs to be determined
     if ($dDly > 0.01){# wait less then 10 ms will not work
       $dDly = 0.1 if($dDly > 0.1);
       Log3 $hash->{NAME}, 5, "CUL $id dly:".int($dDly*1000)."ms";
