@@ -37,11 +37,10 @@ use warnings;
 use Blocking;
 use IO::Socket; 
 use Time::HiRes qw/ time /;
-use POSIX;
 use Net::Telnet;
 
 # Modul Version for remote debugging
-  my $modulVersion = "2014-02-08";
+  my $modulVersion = "2014-02-20";
 
 #List of firmware versions that are known to be compatible with this modul
   my $testedFirmware = "#V1.54C#V1.60#V1.69#";
@@ -800,9 +799,9 @@ LUXTRONIK2_UpdateDone($)
    # Device and reading times, delays and durations
      $value = strftime "%Y-%m-%d %H:%M:%S", localtime($a[22]);
      readingsBulkUpdate($hash, "deviceTimeCalc", $value);
-     my $delayDeviceTimeCalc=floor($a[29]-$a[22]+0.5);
+     my $delayDeviceTimeCalc=sprintf("%.0f",$a[29]-$a[22]);
      readingsBulkUpdate($hash, "delayDeviceTimeCalc", $delayDeviceTimeCalc);
-     my $durationFetchReadings = floor(($a[30]-$a[29]+0.005)*100)/100;
+     my $durationFetchReadings = sprintf("%.2f",$a[30]-$a[29]);
      readingsBulkUpdate($hash, "durationFetchReadings", $durationFetchReadings);
      #Remember min and max reading durations, will be reset when initializing the device
      if ($hash->{fhem}{durationFetchReadingsMin} == 0 || $hash->{fhem}{durationFetchReadingsMin} > $durationFetchReadings) {
