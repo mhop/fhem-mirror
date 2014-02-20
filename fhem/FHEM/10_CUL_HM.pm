@@ -288,12 +288,14 @@ sub CUL_HM_updateConfig($){
         $hash->{helper}{vd}{msgRed}= 0                                        if(!defined $hash->{helper}{vd}{msgRed});
         ($hash->{helper}{vd}{msgCnt},$hash->{helper}{vd}{next}) = 
                     split(";",ReadingsVal($name,".next","0;".gettimeofday())) if(!defined $hash->{helper}{vd}{next});
-        CUL_HM_Set($hash,$name,"valvePos",ReadingsVal($name,"valvePosTC",""));
+        my $d =ReadingsVal($name,"valvePosTC","");
+        $d =~ s/ %//;
+        CUL_HM_Set($hash,$name,"valvePos",$d);
         CUL_HM_Set($hash,$name,"virtTemp",ReadingsVal($name,"temperature",""));
         CUL_HM_Set($hash,$name,"virtHum" ,ReadingsVal($name,"humidity",""));
+        CUL_HM_UpdtReadSingle($hash,"valveCtrl","restart",1) if (ReadingsVal($name,"valvePosTC",""));
         RemoveInternalTimer("valvePos:$vId");
         RemoveInternalTimer("valveTmr:$vId");
-        CUL_HM_UpdtReadSingle($hash,"valveCtrl","restart",1) if (ReadingsVal($name,"valvePosTC",""));
         InternalTimer(ReadingsVal($name,".next",1)
                      ,"CUL_HM_valvePosUpdt","valvePos:$vId",0);
       }
@@ -1281,8 +1283,7 @@ sub CUL_HM_Parse($$) {#########################################################
         ($mTp eq "10" && $p =~ m/^06/)) { #    or Info_Status message here
 
       my $rSUpdt = 0;# require status update
-      my ($subType,$chn,$val,$err) = ($1,hex($2),hex($3)/2,hex($4))
-                          if($p =~ m/^(..)(..)(..)(..)/);
+      my ($subType,$chn,$val,$err) = ($mI[0],hex($mI[1]),hex($mI[2])/2,hex($mI[3]));
       $chn = sprintf("%02X",$chn&0x3f);
       my $chId = $src.$chn;
       $shash = $modules{CUL_HM}{defptr}{$chId}
@@ -1334,11 +1335,18 @@ sub CUL_HM_Parse($$) {#########################################################
           && !($err&0x70)){              #stopped and not timedOn
         if ($mI[2] ne $shash->{helper}{dlvl}){#level not met, repeat
           Log3 $name,3,"CUL_HM $name repeat, level $mI[2] instead of $shash->{helper}{dlvl}";
-          CUL_HM_PushCmdStack($shash,$shash->{helper}{dlvlCmd});
-          CUL_HM_ProcessCmdStack($shash);
+          if ($shash->{helper}{dlvlCmd}){# first try
+            CUL_HM_PushCmdStack($shash,$shash->{helper}{dlvlCmd});
+            CUL_HM_ProcessCmdStack($shash);
+            delete $shash->{helper}{dlvlCmd};# will prevent second try
+          }
+          else{# no second try - alarm and stop
+            push @event,"levelMissed:desired:".hex($shash->{helper}{dlvl})/2;
+            delete $shash->{helper}{dlvl};# we only make one attempt
+          }
         }
         else{
-          delete $shash->{helper}{dlvl};
+          delete $shash->{helper}{dlvl};# we only make one attempt
         }
       }
       if ($st ne "switch"){
@@ -1443,13 +1451,26 @@ sub CUL_HM_Parse($$) {#########################################################
       $shash = $modules{CUL_HM}{defptr}{$src."02"}
                              if($modules{CUL_HM}{defptr}{$src."02"});
       my ($eCnt,$P,$I,$U,$F) = map{hex($_)} unpack 'A6A6A4A4A2',$p;
-      push @event, "energy:"   .($eCnt&0x7fffff)/10;# 0.0  ..838860.7  Wh
-      push @event, "power:"    . $P   /100;         # 0.0  ..167772.15 W
-      push @event, "current:"  . $I   /1;           # 0.0  ..65535.0   mA
-      push @event, "voltage:"  . $U   /10;          # 0.0  ..6553.5    mV
+      $eCnt = ($eCnt&0x7fffff)/10;           #0.0  ..838860.7  Wh
+      $P = $P   /100;                       #0.0  ..167772.15 W
+      $I = $I   /1;                         #0.0  ..65535.0   mA
+      $U = $U   /10;                        #0.0  ..6553.5    mV
       $F = hex($F);$F -= 256 if ($F > 127);
-      push @event, "frequency:".($F/100+50);             # 48.72..51.27     Hz
+      $F = $F/100+50;                      # 48.72..51.27     Hz
+      
+      push @event, "energy:"   .$eCnt;
+      push @event, "power:"    .$P;    
+      push @event, "current:"  .$I;    
+      push @event, "voltage:"  .$U;    
+      push @event, "frequency:".$F;    
       push @event, "boot:"     .(($eCnt&0x800000)?"on":"off");
+      
+      push @entities,CUL_HM_UpdtReadSingle($defs{$devHash->{channel_02}},'state',$eCnt,1) if ($devHash->{channel_02});
+      push @entities,CUL_HM_UpdtReadSingle($defs{$devHash->{channel_03}},'state',$P   ,1) if ($devHash->{channel_03});
+      push @entities,CUL_HM_UpdtReadSingle($defs{$devHash->{channel_04}},'state',$I   ,1) if ($devHash->{channel_04});
+      push @entities,CUL_HM_UpdtReadSingle($defs{$devHash->{channel_05}},'state',$U   ,1) if ($devHash->{channel_05});
+      push @entities,CUL_HM_UpdtReadSingle($defs{$devHash->{channel_06}},'state',$F   ,1) if ($devHash->{channel_06});
+      
       if($eCnt == 0 && $mTp eq "5E" && hex($mNo) < 3 ){
         push @entities,CUL_HM_UpdtReadSingle($devHash,'powerOn',"-",1);
         push @event, "energyOffset:".ReadingsVal($shash->{NAME},"energy",0)+
@@ -2342,30 +2363,27 @@ sub CUL_HM_updtSDTeam(@){#in: TeamName, optional caller name and its new state
   }
   return CUL_HM_UpdtReadSingle($defs{$name},"state",$dStat,1);
 }
-#+++++++++++++++++ get command+++++++++++++++++++++++++++++++++++++++++++++++++
-sub CUL_HM_Get($@) {
+
+sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   my ($hash, @a) = @_;
-  return "no get value specified" if(@a < 2);
+  return "no value specified" if(@a < 2);
 
   my $name = $hash->{NAME};
   my $devName = InternalVal($name,"device",$name);
   my $st = AttrVal($devName, "subType", "");
   my $md = AttrVal($devName, "model", "");
-  my $mId = CUL_HM_getMId($hash);
 
   my $cmd = $a[1];
-  my $dst = $hash->{DEF};
-  return "" if (!$dst);
-
-  my $isChannel = (length($dst) == 8)?"true":"";
-  my $chn = ($isChannel)?substr($dst,6,2):"01";
-  $dst = substr($dst,0,6);
+  my ($dst,$chn) = unpack 'A6A2',$hash->{DEF}.'01';#default to chn 01 for dev
+  return "" if (!defined $chn);
+  
   my $roleC = $hash->{helper}{role}{chn}?1:0; #entity may act in multiple roles
   my $roleD = $hash->{helper}{role}{dev}?1:0;
   my $roleV = $hash->{helper}{role}{vrt}?1:0;
-  my $fkt = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
+  my $fkt   = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
 
-  my $h = $culHmGlobalGets->{$cmd};
+  my $h = undef;
+  $h = $culHmGlobalGets->{$cmd};
   $h = $culHmSubTypeGets->{$st}{$cmd} if(!defined($h) && $culHmSubTypeGets->{$st});
   $h = $culHmModelGets->{$md}{$cmd}   if(!defined($h) && $culHmModelGets->{$md});
   my @h;
@@ -2546,36 +2564,32 @@ sub CUL_HM_Get($@) {
   CUL_HM_ProcessCmdStack($devHash) if ($rxType & 0x03);#burst/all
   return "";
 }
-
-#+++++++++++++++++ set command+++++++++++++++++++++++++++++++++++++++++++++++++
-sub CUL_HM_Set($@) {
+sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my ($hash, @a) = @_;
+  return "no value specified" if(@a < 2);
   my $act = join(" ", @a[1..$#a]);
-  my $ret;
-  return "no set value specified" if(@a < 2);
   my $name    = $hash->{NAME};
   return "device ignored due to attr 'ignore'"
         if (CUL_HM_getAttrInt($name,"ignore"));
   my $devName = InternalVal($name,"device",$name);
   my $st      = AttrVal($devName, "subType", "");
   my $md      = AttrVal($devName, "model"  , "");
-  my $flag = CUL_HM_getFlag($hash); #set burst flag
-  my $cmd = $a[1];
-  my $dst = $hash->{DEF};
-  my $isChannel = (length($dst) == 8)?"true":"";
-  my $chn = ($isChannel)?substr($dst,6,2):"01";
-  $dst = substr($dst,0,6);
+  my $flag    = CUL_HM_getFlag($hash); #set burst flag
+  my $cmd     = $a[1];
+  my ($dst,$chn) = unpack 'A6A2',$hash->{DEF}.'01';#default to chn 01 for dev
+  return "" if (!defined $chn);
+
   my $roleC = $hash->{helper}{role}{chn}?1:0; #entity may act in multiple roles
   my $roleD = $hash->{helper}{role}{dev}?1:0;
   my $roleV = $hash->{helper}{role}{vrt}?1:0;
-  my $mdCh = $md.($isChannel?$chn:"00"); # chan specific commands?
-  my $fkt = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
+  my $fkt   = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
+  
   my $h = undef;
-  $h = $culHmGlobalSets->{$cmd}         if(                $st ne "virtual");
-  $h = $culHmGlobalSetsVrtDev->{$cmd}   if(!defined($h) &&($st eq "virtual"||!$st)    && $roleD);
-  $h = $culHmGlobalSetsDevice->{$cmd}   if(!defined($h) && $st ne "virtual"           && $roleD);
-  $h = $culHmSubTypeDevSets->{$st}{$cmd}if(!defined($h) && $st ne "virtual"           && $roleD);
-  $h = $culHmGlobalSetsChn->{$cmd}      if(!defined($h) && $st ne "virtual"           && $roleC);
+  $h = $culHmGlobalSets->{$cmd}         if(                !$roleV);
+  $h = $culHmGlobalSetsVrtDev->{$cmd}   if(!defined($h) &&( $roleV || !$st)           && $roleD);
+  $h = $culHmGlobalSetsDevice->{$cmd}   if(!defined($h) && !$roleV                    && $roleD);
+  $h = $culHmSubTypeDevSets->{$st}{$cmd}if(!defined($h) && !$roleV                    && $roleD);
+  $h = $culHmGlobalSetsChn->{$cmd}      if(!defined($h) && !$roleV                    && $roleC);
   $h = $culHmSubTypeSets->{$st}{$cmd}   if(!defined($h) && $culHmSubTypeSets->{$st}   && $roleC);
   $h = $culHmModelSets->{$md}{$cmd}     if(!defined($h) && $culHmModelSets->{$md}  );
   $h = $culHmChanSets->{$md."00"}{$cmd} if(!defined($h) && $culHmChanSets->{$md."00"} && $roleD);
@@ -2718,9 +2732,8 @@ sub CUL_HM_Set($@) {
 
   $cmd = $a[1];# get converted command
 
-     #if chn cmd is executed on device but refers to a channel? 
-
-  my $chnHash = (!$isChannel && $modules{CUL_HM}{defptr}{$dst."01"})?
+  #if chn cmd is executed on device but refers to a channel? 
+  my $chnHash = (!$roleC && $modules{CUL_HM}{defptr}{$dst."01"})?
                  $modules{CUL_HM}{defptr}{$dst."01"}:$hash;
   my $devHash = CUL_HM_getDeviceHash($hash);
   my $state = "set_".join(" ", @a[1..(int(@a)-1)]);
@@ -3143,7 +3156,7 @@ sub CUL_HM_Set($@) {
   elsif($cmd eq "display") { ##################################################
     my (undef,undef,undef,$t,$c,$u,$snd,$blk,$symb) = @_;
     return "cmd only possible for device or its display channel"
-           if ($isChannel && $chn ne "12");
+           if ($roleC && $chn ne "12");
     my %symbol=(off => 0x0000,
                 bulb =>0x0100,switch =>0x0200,window   =>0x0400,door=>0x0800,
                 blind=>0x1000,scene  =>0x2000,phone    =>0x4000,bell=>0x8000,
@@ -3403,6 +3416,7 @@ sub CUL_HM_Set($@) {
   }
   elsif($cmd =~ m/^(valvePos|virtTemp|virtHum)$/) { ###########################
     my $valu = $a[2];
+
     my %lim = (valvePos =>{min=>0  ,max=>99 ,rd =>"valvePosTC" ,u =>" %"},
                virtTemp =>{min=>-20,max=>50 ,rd =>"temperature",u =>""  },
                virtHum  =>{min=>0  ,max=>99 ,rd =>"humidity"   ,u =>""  },);
@@ -3809,17 +3823,17 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
   if ($hashVd->{cmd}){
     if    ($hashVd->{typ} == 1){ 
       my $vc = ReadingsVal($name,"valveCtrl","init");
-      if (   $vc ne 'restart' 
-	      &&((    $vc ne "init"
-               && $hashVd->{msgRed} <= $hashVd->{miss})
-             || $hash->{helper}{virtTC} ne "00")) {
-        $hashVd->{msgSent} = 1;
-        $hashVd->{nextL} = $tn;#last send
-        CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
-                                           ,$msgCnt
-                                           ,$hashVd->{cmd}
-                                           ,$hash->{helper}{virtTC}
-                                           ,$hashVd->{val}));
+      if ($vc eq 'restart'){
+        CUL_HM_UpdtReadSingle($hash,"valveCtrl","unknown",1)
+      }
+      elsif(  ($vc ne "init" && $hashVd->{msgRed} <= $hashVd->{miss})
+            || $hash->{helper}{virtTC} ne "00") {
+          $hashVd->{msgSent} = 1;
+          CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
+                                             ,$msgCnt
+                                             ,$hashVd->{cmd}
+                                             ,$hash->{helper}{virtTC}
+                                             ,$hashVd->{val}));
       }
       InternalTimer($tn+10,"CUL_HM_valvePosTmr","valveTmr:$vId",0);
     }
