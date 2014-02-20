@@ -1,21 +1,22 @@
 # ############################################################################
 #
-#  FHEM Modue for Squeezebox Players
+#  FHEM Module for Squeezebox Players
 #
 # ############################################################################
 #
 #  used to interact with Squeezebox Player
 #
 # ############################################################################
+# $Id$
+# ############################################################################
 #
 #  This is absolutley open source. Please feel free to use just as you
-#  like. Please note, that no warranty is given and no liability 
-#  granted
+#  like. Please note, that no warranty is given and no liability granted
 #
 # ############################################################################
 #
 #  we have the following readings
-#  state            not yet implemented
+#  state            on / off / ?
 #
 # ############################################################################
 #
