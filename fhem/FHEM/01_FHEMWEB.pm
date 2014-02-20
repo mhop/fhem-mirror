@@ -664,8 +664,8 @@ FW_answerCall($)
       FW_showRoom(); 
 
     } else {
-      my $motd = AttrVal("global","motd",undef);
-      if(defined($motd)) {
+      my $motd = AttrVal("global","motd","none");
+      if($motd ne "none") {
         $motd =~ s/\n/<br>/g;
         FW_pO "<div id=\"content\">$motd</div>";
       }
