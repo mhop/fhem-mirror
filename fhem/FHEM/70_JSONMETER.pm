@@ -57,7 +57,7 @@ sub JSONMETER_ParseJsonFile($);
 sub JSONMETER_UpdateAborted($);
 
 # Modul Version for remote debugging
-  my $modulVersion = "2014-02-08";
+  my $modulVersion = "2014-02-20";
 
  ##############################################################
  # Syntax: meterType => port URL-Path
@@ -267,15 +267,18 @@ JSONMETER_Get($@)
    if ($cmd eq "jsonFile") {
       $result = JSONMETER_GetJsonFile $name;
       my @a = split /\|/, $result;
-      if ($a[1] == 1) {
-         $message = decode_base64($a[2]);
+      if ($a[1]==0) { 
+         return $a[2]; 
       } else {
-         $message = $a[1];
+         return decode_base64($a[2]);
       }
-      return $message;
+      
   } elsif ($cmd eq "jsonAnalysis") {
       $hash->{fhem}{jsonInterpreter} = "";
       $result = JSONMETER_GetJsonFile $name;
+      my @a = split /\|/, $result;
+      if ($a[1]==0) { return $a[2]; }
+      
       $result = JSONMETER_ParseJsonFile $result;
       # my @a = split /\|/, $result;
       $message = decode_base64($result); #$a[2]);
@@ -307,7 +310,7 @@ JSONMETER_GetUpdate($)
    {
       Log3 $name,2,"$name - Error reading device: Please define the attribute 'pathString'";
       $hash->{STATE} = "pathString missing";
-      return "$name|0|"."Error reading device: Please define the attribute 'pathString'.";
+      return "$name|0|Error reading device: Please define the attribute 'pathString'.";
    }
    
    $hash->{helper}{RUNNING_PID} = BlockingCall("JSONMETER_GetJsonFile", $name, 
@@ -330,8 +333,8 @@ JSONMETER_GetJsonFile ($)
     my $urlPath = "";
     $urlPath = $hash->{urlPath} if defined $hash->{urlPath};
  
-    return "$name|0|".encode_base64("Error: deviceType '$type' Please define the attribute 'pathString' first.")
-      if ($type eq "url" || $type eq "file") && ! defined($attr{$name}{"pathString"});
+    if (($type eq "url" || $type eq "file") && ! defined($attr{$name}{"pathString"}))
+         {return "$name|0|Error: deviceType is '$type' - Please define the attribute 'pathString' first.";}
 
     my $pathString = "";
     $pathString = $attr{$name}{"pathString"} if defined($attr{$name}{"pathString"});
@@ -362,14 +365,13 @@ JSONMETER_ReadFromFile($)
     Log3 $name, 4, "$name: Open file '$pathString'";
     if (open(IN, "<" . $pathString)) {
       my $message = join " ", <IN>;
-      # my @file = <IN>;
       close(IN);
       Log3 $name, 4, "$name: Close file";
       $message = encode_base64($message,"");
       return "$name|1|$message" ;
     } else {
       Log3 $name, 2, "$name Error: Cannot open file $pathString: $!";
-      return "$name|0|Error: Cannot open file";;
+      return "$name|0|Error: Cannot open file $pathString: $!";;
     }
 } # end JSONMETER_ReadFromFile
 
@@ -410,18 +412,17 @@ JSONMETER_ReadFromUrl($)
       Log3 $name, 5, "$name: received:\n $message";
       $socket->close();
       Log3 $name, 4, "$name: Socket closed";
+      if ($message =~ /^HTTP\/1.\d 404 Not Found/) {
+           return "$name|0|Error: URL 'http://$ip:$port/$pathString' returned 'Error 404: Page Not Found'";
+      }
+      
       $message = encode_base64($message,"");
       
       return "$name|1|$message" ;
-
-   } else {
-      Log3 $name, 2, "$name: Cannot open socket to $ip:$port/$pathString";
-      
-      return "$name|0|Error: Cannot open socket to $ip:$port/$pathString";
-   
    }
 
 } # end JSONMETER_ReadFromUrl
+
 
 sub ###########################
 JSONMETER_ParseJsonFile($)
