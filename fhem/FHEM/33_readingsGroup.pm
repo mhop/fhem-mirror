@@ -614,19 +614,6 @@ readingsGroup_Notify($$)
 
   return if( AttrVal($name,"disable", 0) > 0 );
 
-  if( $hash->{alwaysTrigger} ) {
-  } elsif( !defined($hash->{mayBeVisible}) ) {
-    Log3 $name, 5, "$name: not on any display, ignoring notify";
-    return undef;
-  } else {
-    if( $FW_visibleDeviceHash{$name} ) {
-    } else {
-      Log3 $name, 5, "$name: no longer visible, ignoring notify";
-      delete( $hash->{mayBeVisible} );
-      return undef;
-    }
-  }
-
   return if($dev->{TYPE} eq $hash->{TYPE});
   #return if($dev->{NAME} eq $name);
 
@@ -660,6 +647,19 @@ readingsGroup_Notify($$)
       next if(AttrVal($name,"disable", undef));
 
       next if (!$hash->{CONTENT}->{$dev->{NAME}});
+
+      if( $hash->{alwaysTrigger} ) {
+      } elsif( !defined($hash->{mayBeVisible}) ) {
+        Log3 $name, 5, "$name: not on any display, ignoring notify";
+        return undef;
+      } else {
+        if( $FW_visibleDeviceHash{$name} ) {
+        } else {
+          Log3 $name, 5, "$name: no longer visible, ignoring notify";
+          delete( $hash->{mayBeVisible} );
+          return undef;
+        }
+      }
 
       my @parts = split(/: /,$s);
       my $reading = shift @parts;
