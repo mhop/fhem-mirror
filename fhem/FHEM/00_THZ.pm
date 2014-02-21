@@ -1,7 +1,7 @@
 ##############################################
 # 00_THZ
 # by immi 02/2014
-# v. 0.067
+# v. 0.068
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -43,6 +43,7 @@ sub THZ_overwritechecksum($);
 sub THZ_encodecommand($$);
 sub hex2int($);
 sub quaters2time($);
+sub time2quaters($);
 sub THZ_debugread($);
 sub THZ_GetRefresh($);
 sub THZ_Refresh_all_gets($);
@@ -58,23 +59,24 @@ sub THZ_Refresh_all_gets($);
 my %sets = (
 	"p01RoomTempDayHC1"		=> {cmd2=>"0B0005", argMin => "13", argMax => "28"  },   
 	"p02RoomTempNightHC1"		=> {cmd2=>"0B0008", argMin => "13", argMax => "28"  },
-	"p02RoomTempStendbyHC1"		=> {cmd2=>"0B013D", argMin => "13", argMax => "28"  },
+	"p03RoomTempStandbyHC1"		=> {cmd2=>"0B013D", argMin => "13", argMax => "28"  },
 	"p01RoomTempDayHC2"		=> {cmd2=>"0C0005", argMin => "13", argMax => "28"  },
 	"p02RoomTempNightHC2"		=> {cmd2=>"0C0008", argMin => "13", argMax => "28"  },
-	"p02RoomTempStendbyHC2"		=> {cmd2=>"0C013D", argMin => "13", argMax => "28"  },
+	"p03RoomTempStandbyHC2"		=> {cmd2=>"0C013D", argMin => "13", argMax => "28"  },
 	"p04DHWsetDay"			=> {cmd2=>"0A0013", argMin => "13", argMax => "46"  },
 	"p05DHWsetNight"		=> {cmd2=>"0A05BF", argMin => "13", argMax => "46"  },
 	"p07FanStageDay"		=> {cmd2=>"0A056C", argMin =>  "0", argMax =>  "3"  },
 	"p08FanStageNight"		=> {cmd2=>"0A056D", argMin =>  "0", argMax =>  "3"  },
 	"p09FanStageStandby"		=> {cmd2=>"0A056F", argMin =>  "0", argMax =>  "3"  },
+	"p99FanStageParty"		=> {cmd2=>"0A0570", argMin =>  "0", argMax =>  "3"  },
 	"holidayBegin_day"		=> {cmd2=>"0A011B", argMin =>  "1", argMax =>  "31"  }, 
 	"holidayBegin_month"		=> {cmd2=>"0A011C", argMin =>  "1", argMax =>  "12"  },
 	"holidayBegin_year"		=> {cmd2=>"0A011D", argMin =>  "12", argMax => "20"  },
-	# "holidayBegin-time"		=> {cmd2=>"0A05D3", argMin =>  "0", argMax =>  "3"   },
+	"holidayBegin-time"		=> {cmd2=>"0A05D3", argMin =>  "00:00", argMax =>  "23:59"},
 	"holidayEnd_day"		=> {cmd2=>"0A011E", argMin =>  "1", argMax =>  "31"  }, 
 	"holidayEnd_month"		=> {cmd2=>"0A011F", argMin =>  "1", argMax =>  "12"  },
 	"holidayEnd_year"		=> {cmd2=>"0A0120", argMin =>  "12", argMax => "20"  }, 
-	#"holidayEnd-time"		=> {cmd2=>"0A05D4"}, # the answer look like  0A05D4-0D0A05D40029 for year 41 which is 10:15
+	"holidayEnd-time"		=> {cmd2=>"0A05D4", argMin =>  "00:00", argMax =>  "24:60" }, # the answer look like  0A05D4-0D0A05D40029 for year 41 which is 10:15
 	#"party-time"			=> {cmd2=>"0A05D1"}, # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   );
 
@@ -83,7 +85,7 @@ my %sets = (
 
 ########################################################################################
 #
-# %gets - all supported protocols are listed
+# %gets - all supported protocols are listed without header and footer
 #
 ########################################################################################
 
@@ -97,15 +99,16 @@ my %gets = (
         "firmware" 			=> {cmd2=>"FD"},
 	"p01RoomTempDayHC1"		=> {cmd2=>"0B0005"},   
 	"p02RoomTempNightHC1"		=> {cmd2=>"0B0008"},
-	"p03RoomTempStendbyHC1"		=> {cmd2=>"0B013D"},
+	"p03RoomTempStandbyHC1"		=> {cmd2=>"0B013D"},
 	"p01RoomTempDayHC2"		=> {cmd2=>"0C0005"},
 	"p02RoomTempNightHC2"		=> {cmd2=>"0C0008"},
-	"p03RoomTempStendbyHC2"		=> {cmd2=>"0C013D"},
+	"p03RoomTempStandbyHC2"		=> {cmd2=>"0C013D"},
 	"p04DHWsetDay"			=> {cmd2=>"0A0013"},
 	"p05DHWsetNight"		=> {cmd2=>"0A05BF"},
 	"p07FanStageDay"		=> {cmd2=>"0A056C"},
 	"p08FanStageNight"		=> {cmd2=>"0A056D"},
 	"p09FanStageStandby"		=> {cmd2=>"0A056F"},
+	"p99FanStageParty"		=> {cmd2=>"0A0570"},
 	"holidayBegin_day"		=> {cmd2=>"0A011B"}, 
 	"holidayBegin_month"		=> {cmd2=>"0A011C"},
 	"holidayBegin_year"		=> {cmd2=>"0A011D"},
@@ -357,13 +360,14 @@ sub THZ_Set($@){
   return "\"set $name $cmd\" needs at least one further argument: <value-to-be-modified>" if(!defined($arg));
   my $argreMax = $cmdhash->{argMax};
   my $argreMin = $cmdhash->{argMin};
-  return "Argument does not match the allow inerval Max $argreMax .... Min $argreMin " if(($arg > $argreMax) or ($arg < $argreMin));
+  return "Argument does not match the allowed inerval Min $argreMin ...... Max $argreMax " if(($arg > $argreMax) or ($arg < $argreMin));
   my $cmdHex2 = $cmdhash->{cmd2};
     
-  if     (substr($cmdHex2,0,4) eq "0A01")  {$arg=$arg*256}		        # shift 2 times -- the answer look like  0A0120-3A0A01200E00  for year 14
-  #  elsif ((substr($message,4,2) eq "1D") or (substr($message,4,2) eq "17")) 	{$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30  
-  #  elsif  (substr($message,4,3) eq "05D")  					{$message = quaters2time(substr($message, 10,2)) }  #value 1Ch 28dec is 7 
-  elsif  (substr($cmdHex2,0,5) eq "0A056") { } 				# fann speed: do not multiply
+  if     (substr($cmdHex2,0,4) eq "0A01")  {$arg=$arg*256}		        	# shift 2 times -- the answer look like  0A0120-3A0A01200E00  for year 14
+  #  elsif ((substr($message,4,2) eq "1D") or (substr($message,4,2) eq "17")) 		{$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30  
+  #  elsif  (substr($message,4,3) eq "05D")  						{$message = quaters2time(substr($message, 10,2)) }  #value 1Ch 28dec is 7 
+  elsif  ((substr($cmdHex2,0,6) eq "0A05D3") or (substr($cmdHex2,0,6) eq "0A05D4")) 	{$arg= time2quaters($arg)} 
+  elsif  ((substr($cmdHex2,0,5) eq "0A056") or (substr($cmdHex2,0,5) eq "0A057"))	{ } 				# fann speed: do not multiply
   else 			             {$arg=$arg*10} 
     
   THZ_Write($hash,  "02"); 			# STX start of text
@@ -538,7 +542,7 @@ sub time2quaters($) {
  my ($h,$m) = split(":", shift);
   $m = 0 if(!$m);
   $h = 0 if(!$h);
-  my $num = $h*4 + $m %15;
+  my $num = $h*4 +  int($m/15);
   return (sprintf("%02X", $num));
 }
 
@@ -661,9 +665,9 @@ sub THZ_Parse($) {
       if     (substr($message,4,2) eq "01")					{$message = hex(substr($message, 8,2))} 						      # the answer look like  0A0120-3A0A01200E00  for year 14
       elsif ((substr($message,4,2) eq "1D") or (substr($message,4,2) eq "17")) 	{$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30  
       elsif (substr($message,4,4) eq "05D1") 				 	{$message = quaters2time(substr($message, 10,2)) ."--". quaters2time(substr($message, 8,2))}  #like above but before stop then start !!!!
-      elsif  ((substr($message,4,4) eq "05D3") or (substr($message,4,4) eq "05D4"))   					{$message = quaters2time(substr($message, 10,2)) }  #value 1Ch 28dec is 7 
-      elsif  (substr($message,4,3) eq "056") 										{$message = hex(substr($message, 8,4))}
-      else 														{$message = hex2int(substr($message, 8,4))/10 ." °C" }
+      elsif  ((substr($message,4,4) eq "05D3") or (substr($message,4,4) eq "05D4"))   		{$message = quaters2time(substr($message, 10,2)) }  #value 1Ch 28dec is 7 
+      elsif  ((substr($message,4,3) eq "056")  or (substr($message,4,3) eq "057"))		{$message = hex(substr($message, 8,4))}
+      else 										{$message = hex2int(substr($message, 8,4))/10 ." °C" }
   }  
   when ("0B")    {							   #set parameter HC1
       if (substr($message,4,2) eq "14")  {$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
