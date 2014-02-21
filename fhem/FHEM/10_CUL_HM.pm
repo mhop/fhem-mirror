@@ -296,7 +296,7 @@ sub CUL_HM_updateConfig($){
         CUL_HM_UpdtReadSingle($hash,"valveCtrl","restart",1) if (ReadingsVal($name,"valvePosTC",""));
         RemoveInternalTimer("valvePos:$vId");
         RemoveInternalTimer("valveTmr:$vId");
-        InternalTimer(ReadingsVal($name,".next",1)
+        InternalTimer($hash->{helper}{vd}{next}
                      ,"CUL_HM_valvePosUpdt","valvePos:$vId",0);
       }
     }
