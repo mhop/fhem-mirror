@@ -19,12 +19,12 @@
 #  GNU General Public License for more details.
 ################################################################
 
-
+# Version 1.0   - 21.02.14
+# add german doc , readings & state times only on change, devStateIcon
 # Version 0.95  - 17.02.14
 # add command set IdleNow
-#
 # Version 0.9   - 15.02.14
-# Version 0.8   - 01.02.14 , first version on SVN
+# Version 0.8   - 01.02.14 , first version 
 
 package main;
 
@@ -143,7 +143,7 @@ sub MPD_updateConfig($)
   $hash->{".lasterror"} = "";
   $hash->{".lcd"}       = AttrVal($name, "lcdDevice", undef);
   $hash->{PRESENT}      =  0;
-  $hash->{VOLUME}       =  0;
+  $hash->{VOLUME}       =  -1;
    
   ## kommen wir via reset Kommando ?
   if ($hash->{".reset"})
@@ -153,8 +153,9 @@ sub MPD_updateConfig($)
     if(defined($hash->{helper}{RUNNING_PID}))
     {
       BlockingKill($hash->{helper}{RUNNING_PID});
-      Log 3 , "$name IdleKill PID : ".$hash->{helper}{RUNNING_PID}{pid};
+      Log 3 , "$name Idle Kill PID : ".$hash->{helper}{RUNNING_PID}{pid};
       delete $hash->{helper}{RUNNING_PID};
+      $hash->{IPID} = "";
       Log 3 ,"$name Reset done";
     }
   } 
@@ -207,6 +208,9 @@ sub MPD_Define($$)
   Log 3, "MPD: Device $name defined.";
   readingsSingleUpdate($hash,"state","defined",1);
 
+  $attr{$name}{devStateIcon} = 'play:rc_PLAY:stop stop:rc_STOP:play pause:rc_PAUSE:pause' unless (exists($attr{$name}{devStateIcon}));
+  $attr{$name}{icon}         = 'it_radio' unless (exists($attr{$name}{icon})); 
+
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+5, "MPD_updateConfig", $hash, 0);
 
@@ -241,7 +245,7 @@ sub MPD_GetUpdate($) {
  }
 
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash, "state", $hash->{STATE});
+  #readingsBulkUpdate($hash, "state", $hash->{STATE});
   readingsBulkUpdate($hash, "error", $error) if ($error);
   readingsEndUpdate($hash, 1);
 
@@ -588,7 +592,7 @@ sub mpd_cmd($$)
 
       if ($b && defined($readings{$b})) # ist das ein Internals oder Reading ?
       { 
-        if ($b eq "state")  { $hash->{STATE}  = $c; }  # Sonderfall state
+        # if ($b eq "state")  { $hash->{STATE}  = $c; }  # Sonderfall state
         if ($b eq "volume") { $hash->{VOLUME} = $c; }  # Sonderfall volume
         if ($b eq "title")
         {
@@ -600,7 +604,9 @@ sub mpd_cmd($$)
           }  else { readingsSingleUpdate($hash,"title",$c,1); } # kein Titel Split
         
         }      
-         else { readingsSingleUpdate($hash,$b,$c,1); }  # irgendwas aber kein Titel 
+        elsif ($b eq "state")
+              { readingsSingleUpdate($hash,"state",$c,1) if ($c ne $hash->{STATE}); }        
+               else { readingsSingleUpdate($hash,$b,$c,1) if ($c ne defined($hash->{READINGS}{$b}{VAL}));}  # irgendwas aber kein Titel oder State 
       }     
        else { $hash->{uc($b)} = $c; } # Internal
       
@@ -689,6 +695,7 @@ sub MPD_IdleDone($)
 
   Log 4 , "$name IdleDone PID : ".$hash->{helper}{RUNNING_PID}{pid};
   delete($hash->{helper}{RUNNING_PID});
+  $hash->{IPID} = "";
 
   return if($hash->{helper}{DISABLED});
   
@@ -699,7 +706,7 @@ sub MPD_IdleDone($)
       if (!$error && (($hash->{STATE} eq "play")  || $hash->{READINGS}{"playlistlength"}{VAL})) { $error = mpd_cmd($hash, "currentsong");}
     
       readingsBeginUpdate($hash);
-      readingsBulkUpdate($hash, "state", $hash->{STATE});
+      #readingsBulkUpdate($hash, "state", $hash->{STATE});
       readingsBulkUpdate($hash, "error", $error) if ($error);
       readingsBulkUpdate($hash, "mpd_event", $ret);
       readingsEndUpdate($hash, 1);
@@ -846,14 +853,41 @@ return $html;
 
 sub MPD_summaryFn($$$$) {
 	my ($FW_wname, $hash, $room, $pageHash) = @_;
-        $hash=$defs{$hash};
+        $hash            = $defs{$hash};
+        my $state        = $hash->{STATE};
+        my $txt          = $state;
+        my $name         = $hash->{NAME};
+        my $playlist     = $hash->{".playlist"};
+        my $playlists    = $hash->{".playlists"};
 
-        my $title  = $hash->{READINGS}{"title"}{VAL} ? $hash->{READINGS}{"title"}{VAL} : "";
-        my $artist = $hash->{READINGS}{"artist"}{VAL} ? $hash->{READINGS}{"artist"}{VAL}."<br />" : "";
-  
-        if (!$title && !$artist && $hash->{READINGS}{"name"}{VAL}) { $title = $hash->{READINGS}{"name"}{VAL}; } # besser das als nix
-	my $html="<table><tr><td>".$hash->{STATE}."</td><td>";
-	$html .= $artist.$title if (($hash->{STATE} eq "play") || ($hash->{STATE} eq "pause"));
+        my ($icon,$isHtml,$link,$html,@list,$sel);
+ 
+        ($icon, $link, $isHtml) = FW_dev2image($name);
+        $txt = ($isHtml ? $icon : FW_makeImage($icon, $state)) if ($icon);
+        $link = "cmd.$name=set $name $link" if ($link);
+        $txt  = "<a onClick=\"FW_cmd('/fhem?XHR=1&$link&room=$room')\">".$txt."</a>" if ($link);
+
+        my $title  = defined($hash->{READINGS}{"title"}{VAL}) ? $hash->{READINGS}{"title"}{VAL} : "&nbsp;";
+        my $artist = defined($hash->{READINGS}{"artist"}{VAL})? $hash->{READINGS}{"artist"}{VAL}."<br />" : "&nbsp;";
+        my $rname  = defined($hash->{READINGS}{"name"}{VAL})  ? $hash->{READINGS}{"name"}{VAL} : "&nbsp;";
+
+        if (!$title && !$artist) { $title = $rname; } # besser das als nix
+	$html  ="<table><tr><td>$txt</td><td>";
+         if ($playlists) 
+         { 
+          $html .= "<select  id=\"".$name."_List\" name=\"".$name."_List\" class=\"dropdown\" onchange=\"FW_cmd('/fhem?XHR=1&cmd.$name=set $name playlist ' + this.options[this.selectedIndex].value)\">";
+          $html .= "<optgroup label=\"Playlists\">"; 
+          $html .= "<option>---</option>";
+          @list = split ("\n",$playlists);
+          foreach (@list) 
+          {
+           $sel = ($_ eq $playlist) ? " selected" : "";
+           $html .= "<option ".$sel." value=\"".uri_escape($_)."\">".$_."</option>";
+          }
+          $html .= "</optgroup></select></td><td>";
+         }
+
+	$html .= (($state eq "play") || ($state eq "pause")) ? $artist.$title : "&nbsp;";
 	$html .= "</td></tr></table>";
 	return $html;	
 }
@@ -957,15 +991,93 @@ FHEM Forum : <a href='http://forum.fhem.de/index.php/topic,18517.0.html'>Modul f
   FHEM Modul zur Steuerung des MPD &auml;hnlich dem MPC (MPC =  Music Player Command, das Kommando Zeilen Interface f&uuml;r den 
   <a href='http://en.wikipedia.org/wiki/Music_Player_Daemon'>Music Player Daemon</a> ) (englisch)<br>
   Um den MPD auf einem Raspberry Pi zu installieren finden sich im Internet zahlreiche gute Dokumentaionen 
-  z.B. <a hrref='http://www.forum-raspberrypi.de/Thread-tutorial-music-player-daemon-mpd-und-mpc-auf-dem-raspberry-pi'>hier</a><br>
- <br>&nbsp;<br>
- <ul>
- Eine deutsche Version der Modul Dokumentaion  ist zur Zeit leider noch nicht verf&uuml;gbar (aber in Arbeit) <br>
- Englische Version : <a href='http://fhem.de/commandref.html#MPD'>MPD</a><br>
- Thread im FHEM Forum : <a href='http://forum.fhem.de/index.php/topic,18517.0.html'>Modul f&uuml;r MPD</a>
- </ul>
+  z.B. <a href="http://www.forum-raspberrypi.de/Thread-tutorial-music-player-daemon-mpd-und-mpc-auf-dem-raspberry-pi">hier</a><br>
+  Thread im FHEM Forum : <a href='http://forum.fhem.de/index.php/topic,18517.0.html'>Modul f&uuml;r MPD</a><br>
+  <br>&nbsp;<br>
+  <a name="MPDdefine"></a>
+  <b>Define</b>
+  <ul>
+    define &lt;name&gt; MPD &lt;IP MPD Server | default localhost&gt; &lt;Port  MPD Server | default 6600&gt;<br>
+    Beispiel :<br>
+    <ul><pre>
+    define myMPD MPD 192.168.0.99 7000
+    </pre>
+    wenn FHEM und der MPD auf dem gleichen PC laufen : 
+    <pre>
+    define myMPD MPD
+    </pre>
+    </ul>
+  </ul>
+  <br>
+  <a name="MPDset"></a>
+  <b>Set</b><ul>
+    <code>set &lt;name&gt; &lt;was&gt;</code>
+    <br>&nbsp;<br>
+    z.Z. unterst&uuml;tzte Kommandos<br>
+    &nbsp;<br>
+    play  => spielt den aktuellen Titel der geladenen Playliste<br>
+    clear => l&ouml;scht die Playliste<br>
+    stop  => stoppt die Wiedergabe<br>
+    pause => Pause an/aus<br>
+    previous => spielt den vorherigen Titel in der Playliste<br>
+    next => spielt den n&aumlchsten Titel in der Playliste<br>
+    random => zuf&auml;llige Wiedergabe an/aus<br>
+    repaet => Wiederholung an/aus<br>
+    volume (%) => &auml;ndert die Lautst&auml;rke von 0 - 100%<br>
+    volumeUp => Lautst&auml;rke schrittweise erh&ouml;hen , Schrittweite = ( attr volumeStep size )<br>
+    volumeDown => Lautst&auml;rke schrittweise erniedrigen , Schrittweite = ( attr volumeStep size )<br>
+    playlist (playlist name) => lade Playliste <name> aus der MPD Datenbank und starte Wiedergabe mit dem ersten Titel<br>
+    playfile (file) => erzeugt eine temor&auml;re Playliste mit file und spielt dieses ab<br>  
+    updateDb => wie MPC update, Update der MPD Datenbank<br>
+    interval => in Sekunden bis neue aktuelle Informationen vom MPD geholt werden. Überschreibt die Einstellung von attr interval Ein Wert von 0 deaktiviert diese Funktion<br>
+    reset => reset des FHEM MPD Moduls<br>
+    mpdCMD => gleiche Funktion wie get mpdCMD<br>
+    IdleNow => sendet das Kommando idle zum MPD und wartet auf Ereignisse - siehe auch Attribut useIdle<br>
+   </ul>
+  <br>
+  <a name="MPDget"></a>
+  <b>Get</b><ul>
+    <code>get &lt;name&gt; &lt;was&gt;</code>
+    <br>&nbsp;<br>
+    z.Z. unterst&uuml;tzte Kommandos<br>
+    music => zeigt alle Dateien der MPD Datenbank<br>
+    playlists => zeigt alle Playlisten der MPD Datenbank<br>
+    playlistsinfo => zeigt Informationen der aktuellen Playliste<br>
+    webrc => HTML Ausgabe einer einfachen Web Fernbedienung Bsp :.<br>
+    <pre>
+      define &lt;name&gt; weblink htmlCode {fhem("get &lt;name&gt; webrc", 1)}
+      attr &lt;name&gt; room MPD
+    </pre>
+    statusRequest => hole aktuellen MPD Status<br>
+    mpdCMD (cmd) => sende cmd direkt zum MPD Server ( siehe auch <a href="http://www.musicpd.org/doc/protocol/">MPD Comm Ref</a> )<br>
+    currentsong => zeigt Informationen zum aktuellen Titel in der Playliste<br>
+    outputs => zeigt Informationen der definierten MPD Ausgabe Kan&auml;le ( aus /etc/mpd.conf )<br>
+  </ul>
+  <br>
+  <a name="MPDattr"></a>
+  <b>Attribute</b>
+  <ul> 
+    <li>interval 0..x => polling Interval des MPD Servers, 0 zum abschalten oder in Verbindung mit useIdle</li>
+    <li>password <pwd> => (z.Z. nicht umgesetzt)</li>
+    <li>loadMusic 0|1  => lade die MPD Titel beim FHEM Start</li>
+    <li>loadPlaylists 0|1 => lade die MPD Playlisten beim FHEM Start</li>
+    <li>volumeStep x => Schrittweite f&uuml;r Volume +/-</li>
+    <li>useIdle 0|1 => sendet das Kommando idle zum MPD und wartet auf Ereignisse - ben&ouml;tigt MPD Version 0.16.0 oder h&ouml;her<br>
+    Wenn useIdle benutzt wird kann das Polling auf einen hohen Wert (300-600) gesetzt werden oder gleich ganz abgeschaltet werden.<br>
+    FHEM startet einen Hintergrundprozess und wartet auf &Auml;nderungen des MPD , wie z.B Titelwechsel im Stream, start/stop, etc.<br>
+    So lassen sich relativ zeitnah andere Ger&auml;te an/aus schalten oder z.B. eine LCD Anzeige aktualisieren ohne erst den n&auml;chsten Polling Intervall abwarten zu m&uuml;ssen !</li>
+    <li>titleSplit 1|0 = zerlegt die aktuelle Titelangabe am ersten Vorkommen von - (BlankMinusBlank) in die zwei Felder Artist und Titel,<br>
+    wenn im abgespielten Titel die Artist Information nicht verf&uuml;gbar ist (sehr oft bei Radio-Streams)<br>
+    Liegen keine Titelangaben vor wird die Ausgabe durch den Namen der Radiostation erstetzt</li>
+   </ul>
+  <br>
+  <b>Readings</b>
+  <ul>
+    alle MPD internen Werte
+  </ul>
 </ul>
 =end html_DE
+
 =cut
 
 
