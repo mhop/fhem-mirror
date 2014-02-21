@@ -709,7 +709,7 @@ FW_digestCgi($)
     if($p eq "room")         { $FW_room = $v; }
     if($p eq "cmd")          { $cmd = $v; }
     if($p =~ m/^arg\.(.*)$/) { $arg{$1} = $v; }
-    if($p =~ m/^val\.(.*)$/) { $val{$1} = $v; }
+    if($p =~ m/^val\.(.*)$/) { $val{$1} = ($val{$1} ? $val{$1}.",$v" : $v) }
     if($p =~ m/^dev\.(.*)$/) { $dev{$1} = $v; }
     if($p =~ m/^cmd\.(.*)$/) { $cmd = $v; $c = $1; }
     if($p eq "pos")          { %FW_pos =  split(/[=;]/, $v); }
@@ -914,7 +914,7 @@ FW_doDetail($)
   FW_makeTable("Readings", $d, $h->{READINGS});
 
   my $attrList = getAllAttr($d);
-  my $roomList = join(",", sort grep !/ /, keys %FW_rooms);
+  my $roomList = "multiple,".join(",", sort grep !/ /, keys %FW_rooms);
   $attrList =~ s/room /room:$roomList /;
   FW_makeSelect($d, "attr", $attrList,"attr");
 
@@ -2848,8 +2848,10 @@ FW_ActivateInform()
             displayed.</li>
           <li>if the modifier is ":textField", an input field is displayed.</li>
           <li>if the modifier is of the form
-          ":slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;", then a javascript
-          driven slider is displayed</li>
+            ":slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;", then a javascript
+            driven slider is displayed</li>
+          <li>if the modifier is of the form ":multiple,val1,val2,...", then
+            multiple values can be selected, the result is comma separated.
           <li>else a dropdown with all the modifier values is displayed</li>
         </ul>
         If the command is state, then the value will be used as a command.<br>
@@ -3328,6 +3330,9 @@ FW_ActivateInform()
           <li>Ist der Modifier in der Form
             ":slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;", so wird ein in
             JavaScript programmierter Slider angezeigt</li>
+
+          <li>Ist der Modifier ":multiple,val1,val2,...", dann ein
+            Mehrfachauswahl ist m&ouml;glich, das Ergebnis ist Komma-separiert.
 
           <li>In allen anderen F&auml;llen erscheint ein Dropdown mit allen
             Modifier Werten.</li>
