@@ -2851,7 +2851,7 @@ FW_ActivateInform()
             ":slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;", then a javascript
             driven slider is displayed</li>
           <li>if the modifier is of the form ":multiple,val1,val2,...", then
-            multiple values can be selected, the result is comma separated.
+            multiple values can be selected, the result is comma separated.</li>
           <li>else a dropdown with all the modifier values is displayed</li>
         </ul>
         If the command is state, then the value will be used as a command.<br>
@@ -3332,7 +3332,7 @@ FW_ActivateInform()
             JavaScript programmierter Slider angezeigt</li>
 
           <li>Ist der Modifier ":multiple,val1,val2,...", dann ein
-            Mehrfachauswahl ist m&ouml;glich, das Ergebnis ist Komma-separiert.
+            Mehrfachauswahl ist m&ouml;glich, das Ergebnis ist Komma-separiert.</li>
 
           <li>In allen anderen F&auml;llen erscheint ein Dropdown mit allen
             Modifier Werten.</li>
