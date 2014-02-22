@@ -246,7 +246,7 @@ readingsGroup_makeLink($$$)
       $txt = "<a style=\"cursor:pointer\" onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
     } else {
       my $room = $FW_webArgs{room};
-      $room = "&detail=$FW_webArgs{detail}";
+      $room = "&detail=$FW_webArgs{detail}" if( $FW_webArgs{"detail"} );
       my $srf = $room ? "&room=$room" : "";
       $srf = $room if( $room && $room =~ m/^&/ );
       $txt = "<a href=\"$FW_ME$FW_subdir?$link$srf\">$txt</a>";
