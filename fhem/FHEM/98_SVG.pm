@@ -610,8 +610,8 @@ SVG_calcOffsets($$)
   if($defs{$wl}) {
     $fr = AttrVal($wl, "fixedrange", undef);
     if($fr) {
-      if($fr =~ "^hour" || $fr =~ "^day" || $fr =~ "^week" || $fr =~ "^month" ||
-         $fr =~ "^year" || $fr =~ m/^\d+days$/ ) { #fixedrange with offset
+      if($fr =~ "^(hour|qday|day|week|month|year)" ||
+         $fr =~ m/^\d+days$/ ) { #fixedrange with offset
         $frx=$fr; #fixedrange with offset
 
       } else {
