@@ -132,11 +132,11 @@ my $K_actDetID = '000000'; # id of actionDetector
   "0039" => {name=>"HM-CC-TC"                ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:2p,5:2.3p,6:2',chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3",},
   "003A" => {name=>"HM-CC-VD"                ,st=>'thermostat'        ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'p,5'          ,chn=>"",},
   "003B" => {name=>"HM-RC-4-B"               ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:4",},
-  "003C" => {name=>"HM-WDS20-TH-O"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",},
-  "003D" => {name=>"HM-WDS10-TH-O"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",},
-  "003E" => {name=>"HM-WDS30-T-O"            ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",},
-  "003F" => {name=>"HM-WDS40-TH-I"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",},
-  "0040" => {name=>"HM-WDS100-C6-O"          ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p,1'          ,chn=>"",},
+  "003C" => {name=>"HM-WDS20-TH-O"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:f'    ,lst=>'p'            ,chn=>"",}, #:w  todo should be wakeup, does not react
+  "003D" => {name=>"HM-WDS10-TH-O"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:f'    ,lst=>'p'            ,chn=>"",}, #:w  todo should be wakeup, does not react
+  "003E" => {name=>"HM-WDS30-T-O"            ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",}, #:w remark: this device behaves on wakeup
+  "003F" => {name=>"HM-WDS40-TH-I"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:f'    ,lst=>'p'            ,chn=>"",}, #:w  todo should be wakeup, does not react
+  "0040" => {name=>"HM-WDS100-C6-O"          ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c'      ,lst=>'p,1'          ,chn=>"",}, #:w  todo should be wakeup, does not react
   "0041" => {name=>"HM-WDC7000"              ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>''       ,lst=>'1,4'          ,chn=>"",},
   "0042" => {name=>"HM-SEC-SD"               ,st=>'smokeDetector'     ,cyc=>'99:00' ,rxt=>'b'      ,lst=>'p'            ,chn=>"",},
   "0043" => {name=>"HM-SEC-TIS"              ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",},
@@ -333,10 +333,10 @@ my $K_actDetID = '000000'; # id of actionDetector
   DimElsActionType=>{a=> 38.0,s=>0.4,l=>3,min=>0  ,max=>8       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3,upDim=>4,downDim=>5,toggelDim=>6,toggelDimToCnt=>7,toggelDimToCntInv=>8}},
 #output Unit
   ActTypeMp3      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Tone or MP3 to be played"},
-  ActTypeLed      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED color"          ,lit=>{no=>0x00,red_short=>0x11,red_long=>0x12,green_short=>0x21,green_long=>0x22,orange_short=>0x31,orange_long=>0x32}},
-  ActTypeOuCf     =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"type sound or LED"  ,lit=>{no=>0,short=>1,long=>2}},
+  ActTypeLed      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED color"         ,lit=>{no=>0x00,red_short=>0x11,red_long=>0x12,green_short=>0x21,green_long=>0x22,orange_short=>0x31,orange_long=>0x32}},
+  ActTypeOuCf     =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"type sound or LED" ,lit=>{no=>0,short=>1,long=>2}},
   ActNum          =>{a=> 37  ,s=>1  ,l=>3,min=>1  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Number of repetitions"},
-  Intense         =>{a=> 43  ,s=>1  ,l=>3,min=>10 ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Volume",lit=>{vol_100=>255,vol_90=>250,vol_80=>246,vol_70=>240,vol_60=>234,vol_50=>227,vol_40=>218,vol_30=>207,vol_20=>190,vol_10=>162,vol_00=>10}},
+  Intense         =>{a=> 43  ,s=>1  ,l=>3,min=>10 ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Volume"            ,lit=>{vol_100=>255,vol_90=>250,vol_80=>246,vol_70=>240,vol_60=>234,vol_50=>227,vol_40=>218,vol_30=>207,vol_20=>190,vol_10=>162,vol_00=>10}},
 # statemachines
   BlJtOn          =>{a=> 11.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from on"      ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
   BlJtOff         =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from off"     ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
@@ -408,7 +408,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   backAtCharge    =>{a=> 13.5,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight at Charge"     ,lit=>{off=>0,on=>1}},
   stbyTime        =>{a=> 14.0,s=>1.0,l=>0,min=>1  ,max=>99      ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Standby Time"},
   backOnTime      =>{a=> 14.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Backlight On Time"},
-  btnLock         =>{a=> 15.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Button Lock"             ,lit=>{unlock=>0,lock=>1}},
+  btnLock         =>{a=> 15.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Button Lock"             ,lit=>{off=>0,on=>200}},
 
 # keymatic/winmatic secific register
   keypressSignal  =>{a=>  3.0,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Keypress beep"           ,lit=>{off=>0,on=>1}},
@@ -432,8 +432,8 @@ my $K_actDetID = '000000'; # id of actionDetector
 #repeater
   compMode        =>{a=> 23.0,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"compatibility moden"     ,lit=>{off=>0,on=>1}},
   localResDis     =>{a=> 24.0,s=>1.0,l=>0,min=>1  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"local reset disable"     ,lit=>{off=>0,on=>1}},
-  globalBtnLock   =>{a=> 25.0,s=>1.0,l=>0,min=>1  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"global button lock"      ,lit=>{unlock=>0,lock=>200}},
-  modusBtnLock    =>{a=> 26.0,s=>1.0,l=>0,min=>1  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"mode button lock"        ,lit=>{unlock=>0,lock=>200}},
+  globalBtnLock   =>{a=> 25.0,s=>1.0,l=>0,min=>1  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"global button lock"      ,lit=>{off=>0,on=>200}},
+  modusBtnLock    =>{a=> 26.0,s=>1.0,l=>0,min=>1  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"mode button lock"        ,lit=>{off=>0,on=>200}},
   paramSel        =>{a=> 27.0,s=>1.0,l=>0,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"data transfered to peer" ,lit=>{off=>0,T1=>1,T2=>2,T1_T2=>3,T2_T1=>4}},
   RS485IdleTime   =>{a=> 29.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s'   ,d=>0,t=>"Idle Time"},
 #un-identified List0
@@ -481,7 +481,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   statusInfoMinDly=>{a=> 87.0,s=>0.5,l=>1,min=>0.5,max=>15.5    ,c=>''         ,f=>2       ,u=>"s"   ,d=>0,t=>"status message min delay"},
   statusInfoRandom=>{a=> 87.5,s=>0.3,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>"s"   ,d=>0,t=>"status message random delay"},
   characteristic  =>{a=> 88.0,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>""                                      ,lit=>{linear=>0,square=>1}},
-  logicCombination=>{a=> 89.0,s=>0.5,l=>1,min=>0  ,max=>16      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""             ,lit=>{inactive=>0,or=>1,and=>2,xor=>3,nor=>4,nand=>5,orinv=>6,andinv=>7,plus=>8,minus=>9,mul=>10,plusinv=>11,minusinv=>12,mulinv=>13,invPlus=>14,invMinus=>15,invMul=>16}},
+  logicCombination=>{a=> 89.0,s=>0.5,l=>1,min=>0  ,max=>16      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                      ,lit=>{inactive=>0,or=>1,and=>2,xor=>3,nor=>4,nand=>5,orinv=>6,andinv=>7,plus=>8,minus=>9,mul=>10,plusinv=>11,minusinv=>12,mulinv=>13,invPlus=>14,invMinus=>15,invMul=>16}},
 #SCD
   msgScdPosA      =>{a=> 32.6,s=>0.2,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position A",lit=>{noMsg=>0,lvlNormal=>1}},
   msgScdPosB      =>{a=> 32.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position B",lit=>{noMsg=>0,lvlNormal=>1,lvlAddStrong=>2,lvlAdd=>3}},
@@ -529,8 +529,8 @@ my $K_actDetID = '000000'; # id of actionDetector
   txThrVlt        =>{a=>129.0,s=>2  ,l=>1,min=>0.1  ,max=>230   ,c=>''         ,f=>10      ,u=>'V'   ,d=>1,t=>"threshold voltage"},
   txThrFrq        =>{a=>131.0,s=>1  ,l=>1,min=>0.01 ,max=>2.55  ,c=>''         ,f=>100     ,u=>'Hz'  ,d=>1,t=>"threshold frequency"},
 
-  cndTxFalling    =>{a=>132.0,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if falling"                ,lit=>{off=>0,on=>1}},
-  cndTxRising     =>{a=>132.1,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if rising"                 ,lit=>{off=>0,on=>1}},
+  cndTxFalling    =>{a=>132.0,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if falling"                            ,lit=>{off=>0,on=>1}},
+  cndTxRising     =>{a=>132.1,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if rising"                             ,lit=>{off=>0,on=>1}},
   cndTxCycBelow   =>{a=>132.2,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic trigger if level is below cndTxCycBelow",lit=>{off=>0,on=>1}},
   cndTxCycAbove   =>{a=>132.3,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic trigger if level is above cndTxDecAbove",lit=>{off=>0,on=>1}},
   cndTxDecAbove   =>{a=>133  ,s=>1  ,l=>1,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"level for cndTxCycAbove"},
@@ -1246,7 +1246,7 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
                          ,off            =>""
                          ,toggle         =>""},
   "HM-CC-RT-DN00"     =>{ sysTime        =>""},
-  "HM-CC-RT-DN04"     =>{ controlMode    =>"[auto|boost|day|night]"
+  "HM-CC-RT-DN04"     =>{ controlMode    =>"[auto|manu|boost|day|night]"
                          ,controlManu    =>"[on|off|5.0..30.0]"
                          ,controlParty   =>"<temp> <startDate> <startTime> <enddate> <endTime>"
                          ,tempListSat    =>"[prep|exec] HH:MM temp ..."
@@ -1259,7 +1259,7 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
                          ,"desired-temp" =>"[on|off|5.0..30.0]"
                          ,sysTime        =>""
                         },
-  "HM-TC-IT-WM-W-EU02"=>{ controlMode    =>"[auto|boost|day|night]"
+  "HM-TC-IT-WM-W-EU02"=>{ controlMode    =>"[auto|manu|boost|day|night]"
                          ,controlManu    =>"[on|off|5.0..30.0]"
                          ,controlParty   =>"<temp> <startDate> <startTime> <enddate> <endTime>"
                          ,tempListSat    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
