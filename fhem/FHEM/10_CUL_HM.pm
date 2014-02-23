@@ -1396,7 +1396,7 @@ sub CUL_HM_Parse($$) {#########################################################
         push @evtEt,[$h,1,"sabotageError:".(($err&0x04) ? "on":"off")];
         push @evtEt,[$h,1,"battery:".(($err&0x08)?"critical":($err&0x80?"low":"ok"))];
       }
-      elsif ($md eq "HM-LC-SW1-BA-PCB"){
+      elsif ($md =~ m /HM-LC-SW.-BA-PCB/){
         push @event,"battery:" . (($err&0x80) ? "low" : "ok" );
       }
     }
