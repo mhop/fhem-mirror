@@ -63,8 +63,8 @@ my %zwave_class = (
     get   => { sbStatus    => "02",       },
     parse => { "03300300"  => "state:closed",
                "033003ff"  => "state:open", 
-               "043003(..)0c" => "motion:$1",    #Philio PHI_PSP01, PSM02-1
-               "043003(..)08" => "tamper:$1",    #Philio PHI_PSP01, PSM02-1
+               "043003(..)0c" => '"motion:$1"',  #Philio PHI_PSP01, PSM02-1
+               "043003(..)08" => '"tamper:$1"',  #Philio PHI_PSP01, PSM02-1
                "043003000a"   => "state:closed", #Philio PSM02-1
                "043003ff0a"   => "state:open",   #Philio PSM02-1
                },},
