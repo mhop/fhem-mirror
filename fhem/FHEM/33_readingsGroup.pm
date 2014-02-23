@@ -402,6 +402,10 @@ readingsGroup_2html($)
 
           ($txt,undef) = readingsGroup_makeLink($txt,undef,$cmd);
 
+          if( $first || $multi == 1 ) {
+            $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
+            $row++;
+          }
         } elsif( $first || $multi == 1 ) {
           $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
           $row++;
