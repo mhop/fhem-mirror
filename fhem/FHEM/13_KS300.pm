@@ -229,7 +229,7 @@ KS300_Parse($$)
     $v[9] = KS300_windIndex($v[2]);
 
     # Negative temp
-    $v[4] = -$v[4] if($v[8] & 8);
+    $v[4] = -$v[4] if(hex($v[8]) & 8);
 
     Log3 $def, 4, "KS300 $dev: $msg";
 
