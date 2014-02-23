@@ -426,7 +426,7 @@ sub CUL_HM_Define($$) {##############################
     $hash->{helper}{q}{qReqConf}=""; # queue autoConfig requests for this device
     $hash->{helper}{q}{qReqStat}=""; # queue autoConfig requests for this device
     CUL_HM_prtInit ($hash);
-	CUL_HM_hmInitMsg($hash);
+    CUL_HM_hmInitMsg($hash);
     AssignIoPort($hash) if (!$init_done && $HMid ne "000000");
   }
   $modules{CUL_HM}{defptr}{$HMid} = $hash;
@@ -611,13 +611,13 @@ sub CUL_HM_Attr(@) {#################################
   }
   elsif($attrName eq "aesCommReq" ){
     return "use $attrName only for device" if (!$hash->{helper}{role}{dev});
-	if ($cmd eq "set"){
+    if ($cmd eq "set"){
       return "$attrName support 0 or 1 only" if ($attrVal !~ m/[01]/);
       $attr{$name}{$attrName} = $attrVal;
-	}
-	else{
-	  delete $attr{$name}{$attrName};
-	}
+    }
+    else{
+      delete $attr{$name}{$attrName};
+    }
     CUL_HM_hmInitMsg($hash);
   }
   elsif($attrName eq "burstAccess"){
@@ -656,14 +656,36 @@ sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
   my ($hash)=@_;
   my $rxt = CUL_HM_getRxType($hash);
   my @p;
-  if (!($rxt & ~0x04)){@p = ("00","01","FE1F")}#config only
-  elsif($rxt & 0x10)  {@p = ("02","01","1E")}  #lazyConfig
-  else                {@p = ("00","01","")}
+  if (!($rxt & ~0x04)){@p = ("00","01","FE1F");}#config only
+  elsif($rxt & 0x10)  {@p = ("00","01","1E");  }#lazyConfig
+  else                {@p = ("00","01","1E");  }
   if (AttrVal($hash->{NAME},"aesCommReq",0)){
     $p[0] = sprintf("%02X",($p[0] + 1));
     $p[2] = ($p[2]eq "")?"1E":$p[2];
   }
-  $hash->{helper}{io}{newChn} = '+'.CUL_HM_hash2Id($hash).",".join(",",@p);
+  my $id = CUL_HM_hash2Id($hash);
+  $hash->{helper}{io}{newChn} = "+$id,".join(",",@p);
+  CUL_HM_hmInitMsgUpdt($hash);
+}
+sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
+  my ($hash)=@_;
+  return if(!(CUL_HM_getRxType($hash) & 0x10));
+
+  my $oldChn = $hash->{helper}{io}{newChn};
+  my @p = unpack 'A8A2A*',$oldChn;
+  if($hash->{helper}{q}{qReqConf}  ||
+     $hash->{helper}{q}{qReqStat}  ||
+     $hash->{helper}{prt}{sProc}){
+    $p[1] |= 2;
+  }
+  else{
+    $p[1] &= 0xFD;
+  }
+  $hash->{helper}{io}{newChn} = sprintf("%s%02X%s",@p);
+  if ($hash->{helper}{io}{newChn} ne $oldChn){
+    my $id = CUL_HM_hash2Id($hash);
+    IOWrite($hash, "", "init:$id");
+  }
 }
 
 #+++++++++++++++++ msg receive, parsing++++++++++++++++++++++++++++++++++++++++
@@ -3815,7 +3837,7 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
     Log3 $name,3,"CUL_HM $name virtualTC timer off by:".int($tn - $nextF);
     $nextF = $tn;
   }
-  while ($nextF < $tn+0.05) {# calculate next time from last successful
+  while ($nextF < ($tn+0.05)) {# calculate next time from last successful
     $msgCnt = ($msgCnt +1) %256;
     $idl = $hashVd->{idl}+$msgCnt;
     $lo = int(($idl*0x4e6d +12345)/0x10000);#&0xff;
@@ -3831,7 +3853,9 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
     if    ($hashVd->{typ} == 1){ 
       my $vc = ReadingsVal($name,"valveCtrl","init");
       if ($vc eq 'restart'){
-        CUL_HM_UpdtReadSingle($hash,"valveCtrl","unknown",1)
+        CUL_HM_UpdtReadSingle($hash,"valveCtrl","unknown",1);
+        my $pn = CUL_HM_id2Name($hashVd->{id});
+        $hashVd->{ackT} = ReadingsTimestamp($pn, "ValvePosition", "");
       }
       elsif(  ($vc ne "init" && $hashVd->{msgRed} <= $hashVd->{miss})
             || $hash->{helper}{virtTC} ne "00") {
@@ -4571,6 +4595,7 @@ sub CUL_HM_eventP($$) {#handle protocol events
 sub CUL_HM_protState($$){
   my ($hash,$state) = @_;
   my $name = $hash->{NAME};
+  my $sProcIn = $hash->{helper}{prt}{sProc};
   if   ($state =~ m/processing/) {
     $hash->{helper}{prt}{sProc} = 1;
   }
@@ -4598,6 +4623,11 @@ sub CUL_HM_protState($$){
   }
   Log3 $name,5,"CUL_HM $name protEvent:$state".
             ($hash->{cmdStack}?" pending:".scalar @{$hash->{cmdStack}}:"");
+            
+            
+  CUL_HM_hmInitMsgUpdt($hash) if (  $hash->{helper}{prt}{sProc} != $sProcIn
+                                  &&$hash->{helper}{prt}{sProc} == 0
+                                  ||$hash->{helper}{prt}{sProc} == 2);
 }
 
 ###################-----------helper and shortcuts--------#####################
@@ -5725,6 +5755,7 @@ sub CUL_HM_qEntity($$){  # add to queue
   my $devN = CUL_HM_getDeviceName($name);
   return if (AttrVal($devN,"subType","") eq "virtual");
   return if ($defs{$devN}{helper}{q}{$q} eq "00"); #already requesting all
+
   if ($devN eq $name){#config for all device
     $defs{$devN}{helper}{q}{$q}="00";
   }
@@ -5741,6 +5772,7 @@ sub CUL_HM_qEntity($$){  # add to queue
   my $wT = (@{$modules{CUL_HM}{helper}{qReqStat}})?
                               "1":
                               $modules{CUL_HM}{hmAutoReadScan};
+  CUL_HM_hmInitMsgUpdt($defs{$devN});
   RemoveInternalTimer("CUL_HM_procQs");
   InternalTimer(gettimeofday()+ $wT,"CUL_HM_procQs","CUL_HM_procQs", 0);
 }

@@ -421,6 +421,13 @@ sub HMLAN_Write($$$) {#########################################################
       $hash->{assignedIDsCnt}=scalar(keys %{$hash->{assIDs}});
     }
   }
+  elsif($msg =~ m /init:(......)/){
+    if ($modules{CUL_HM}{defptr}{$1} &&
+        $modules{CUL_HM}{defptr}{$1}{helper}{io}{newChn} ){
+      HMLAN_SimpleWrite($hash,$modules{CUL_HM}{defptr}{$1}{helper}{io}{newChn});
+    }
+    return;
+  }
   my $tm = int(gettimeofday()*1000) % 0xffffffff;
   $msg = sprintf("S%08X,00,00000000,01,%08X,%s",$tm, $tm, substr($msg, 4));
   HMLAN_SimpleWrite($hash, $msg);
