@@ -620,11 +620,21 @@ CUL_MAX_BroadcastTime(@)
   <b>Set</b>
   <ul>
       <li>pairmode<br>
-      Sets the CUL_MAX into pairing mode for 60 seconds where it can be paired with other devices (Thermostats, Buttons, etc.). You also have to set the other device into pairing mode manually. (For Thermostats, this is pressing the "Boost" button for 3 seconds, for example).</li>
+      Sets the CUL_MAX into pairing mode for 60 seconds where it can be paired with 
+      other devices (Thermostats, Buttons, etc.). You also have to set the other device 
+      into pairing mode manually. (For Thermostats, this is pressing the "Boost" button 
+      for 3 seconds, for example).</li>
       <li>fakeSC &lt;device&gt; &lt;open&gt;<br>
-      Sends a fake ShutterContactState message; &lt;open&gt; must be 0 or 1 for "window closed" or "window opened". If the &lt;device&gt; has a non-zero groupId, the fake ShutterContactState message affects all devices with that groupId. Make sure you associate the target device(s) with fakeShutterContact beforehand.</li>
+      Sends a fake ShutterContactState message &lt;open&gt; must be 0 or 1 for 
+      "window closed" or "window opened". If the &lt;device&gt; has a non-zero groupId, 
+      the fake ShutterContactState message affects all devices with that groupId. 
+      Make sure you associate the target device(s) with fakeShutterContact beforehand.</li>
       <li>fakeWT &lt;device&gt; &lt;desiredTemperature&gt; &lt;measuredTemperature&gt;<br>
-      Sends a fake WallThermostatControl message (parameters both may have one digit after the decimal point, for desiredTemperature it may only by 0 or 5). If the &lt;device&gt; has a non-zero groupId, the fake WallThermostatControl message affects all devices with that groupId. Make sure you associate the target device with fakeWallThermostat beforehand.</li>
+      Sends a fake WallThermostatControl message (parameters both may have one digit 
+      after the decimal point, for desiredTemperature it may only by 0 or 5). 
+      If the &lt;device&gt; has a non-zero groupId, the fake WallThermostatControl 
+      message affects all devices with that groupId. Make sure you associate the target 
+      device with fakeWallThermostat beforehand.</li>
   </ul>
   <br>
 
@@ -651,4 +661,71 @@ CUL_MAX_BroadcastTime(@)
 
 
 =end html
+=begin html_DE
+<a name="CUL_MAX"></a>
+<h3>CUL_MAX</h3>
+<ul>
+  Das Modul CUL_MAX wertet von einem CUL empfangene MAX! Botschaften aus.
+  Es wird mit Hilfe von autocreate automatisch generiert, es muss nur sichergestellt 
+  werden, dass der richtige rfmode gesetzt wird, z.B. <code>attr CUL0 rfmode MAX</code>.<br>
+  <br>
+
+  <a name="CUL_MAXdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; CUL_MAX &lt;addr&gt;</code>
+      <br><br>
+
+      Definiert ein CUL_MAX Ger&auml;t des Typs &lt;type&gt; und der Adresse &lt;addr&gt.
+      Die Adresse darf nicht schon von einem anderen MAX! Ger&auml; verwendet werden.
+  </ul>
+  <br>
+
+  <a name="CUL_MAXset"></a>
+  <b>Set</b>
+  <ul>
+      <li>pairmode<br>
+      Versetzt den CUL_MAX f&uuml; 60 Sekunden in den Pairing Modus, w&auml;rend dieser Zeit
+      kann das Ger&auml; mit anderen Ger&auml;ten gepaart werden (Heizk&ouml;rperthermostate, 
+      Eco-Taster, etc.). Auch das zu paarende Ger&auml; muss manuell in den Pairing Modus 
+      versetzt werden (z.B. beim Heizk&ouml;rperthermostat durch Dr&uuml;cken der "Boost" 
+      Taste f&uuml; 3 Sekunden).</li>
+      <li>fakeSC &lt;device&gt; &lt;open&gt;<br>
+      Sendet eine fingierte <i>ShutterContactState</i> Meldung &lt;open&gt; dies muss 0 bzw. 1 f&uuml;r
+      "Fenster geschlossen" bzw. "Fenster offen" sein. Wenn das &lt;device&gt; eine Gruppen-ID
+      ungleich Null hat, beeinflusst diese fingierte <i>ShutterContactState</i> Meldung alle Ger&auml;te
+      mit dieser Gruppen-ID. Es muss sichergestellt werden, dass vorher alle Zielger&auml;te 
+      mit <i>fakeShutterContact</i> verbunden werden.</li>
+      <li>fakeWT &lt;device&gt; &lt;desiredTemperature&gt; &lt;measuredTemperature&gt;<br>
+      Sendet eine fingierte <i>WallThermostatControl</i> Meldung (beide Parameter k&ooml;nnen
+      eine Nachkommastelle haben, &uuml; <i>desiredTemperature</i> darf die Nachkommastelle nur 0 bzw. 5 sein).
+      Wenn das &lt;device&gt; eine Gruppen-ID ungleich Null hat, beeinflusst diese fingierte 
+      <i>WallThermostatControl</i> Meldung alle Ger&auml;te mit dieser Gruppen-ID.
+      Es muss sichergestellt werden, dass vorher alle Zielger&auml;te 
+      mit <i>fakeWallThermostat</i> verbunden werden.</li>
+  </ul>
+  <br>
+
+  <a name="CUL_MAXget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="CUL_MAXattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#ignore">ignore</a></li><br>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+  <br>
+
+  <a name="CUL_MAXevents"></a>
+  <b>Events</b>
+  <ul>N/A</ul>
+  <br>
+
+</ul>
+
+=end html_DE
 =cut
