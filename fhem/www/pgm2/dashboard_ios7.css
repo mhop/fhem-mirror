@@ -1,9 +1,9 @@
-Code: [Auswählen]
 /* Author: svenson08 edit by fhainz */
-.dashboard_buttonbar { padding: 6px 6px 6px 0; margin: 0 .5em 0 0; float: left;}
+.dashboard_buttonbar { padding: 6px 6px 6px 0; margin: 0 .5em 0 0; float: left; }
 .dashboard_buttonbar_top, .dashboard_buttonbar_bottom { }
 .dashboard_button { float: left; background-color: #fff; font-size: 0.8em; background-repeat:no-repeat;
-					background-position: 4px 2px; border: 1px solid #808080; padding: 0.2em 0.7em 0.2em 0.4em; }
+					background-position: 4px 2px; border: 1px solid #808080; padding: 0.2em 0.7em 0.2em 0.4em; margin-top:7px; }
+.dashboard_button:last-child { margin-right: 6px; }
 #dashboard_button_set { color: black; cursor: default; }
 #dashboard_button_set.dashboard_button_changed { color: #147bff; cursor: pointer; }
 
@@ -23,11 +23,11 @@ a,li { outline: none; }
 						float: left; background-image: url(../images/default/dashboardicons.png); }	
 .dashboard_button_iconplus { margin: 0.1em 0.4em; float: right; background-position: -65px -16px; }
 .dashboard_button_iconminus { margin: 0.1em 0.4em; float: right; background-position: -52px -16px; }
-.dashboard_button_iconset { background-position: -26px -16px; }	
-.dashboard_button_iconlock { background-position: -0px -16px; }
-.dashboard_button_iconunlock { background-position: -13px -16px; }
-.dashboard_button_icondetail { background-position: -39px -16px; }
-.dashboard_button_iconback { margin: 0.1em 0.4em; float: right; background-position: -91px -16px; }
+.dashboard_button_iconset { margin:0 2px; background-position: -26px -16px; }	
+.dashboard_button_iconlock { margin:0 2px; background-position: -0px -16px; }
+.dashboard_button_iconunlock { margin:0 2px; background-position: -13px -16px; }
+.dashboard_button_icondetail { margin:0 2px; background-position: -39px -16px; }
+.dashboard_button_iconback { margin:1px 1px 0 5px; float: right; background-position: -91px -16px; }
 
 .ui-resizable { position: relative; }
 .ui-resizable-handle { position: absolute; font-size: 0.1px; }

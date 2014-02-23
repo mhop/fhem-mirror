@@ -338,6 +338,7 @@ $(document).ready( function () {
 		}
 	});	
 	
+	if (params[14] != "none" ) {$('<style type="text/css">'+params[14]+'</style>').appendTo($('head')); }
 });
 
 
