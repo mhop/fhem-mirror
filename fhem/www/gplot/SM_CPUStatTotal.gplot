@@ -1,0 +1,31 @@
+# SYSMON
+#
+# Anzeige: system cpu Gesamtauslastung
+#
+# Daten: user nice system idle iowait irq softirq
+# Beispiel aus dem Logfile:
+# 2014-01-23_23:37:59 sysmon stat_cpu_percent: 32.17 0.00 18.53 37.72 0.15 0.04 11.38
+#
+# 
+#
+set terminal png transparent size <SIZE> crop
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics
+set yrange [0:100]
+set y2range [0:100]
+
+set title '<L1>'
+set grid xtics y2tics
+
+set y2label "Auslastung %"
+
+#FileLog 0:stat_cpu_percent:0:$fld[3]+$fld[4]+$fld[5]+$fld[7]+$fld[8]+$fld[9]
+
+plot \
+  "< awk '/load avg:/ {print $1, $4}' <IN>" \
+   using 1:2 ls l0fill axes x1y1 title 'Gesamtauslastung' lw 1.0 with lines
+
