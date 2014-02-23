@@ -682,7 +682,8 @@ sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
     $p[1] &= 0xFD;
   }
   $hash->{helper}{io}{newChn} = sprintf("%s%02X%s",@p);
-  if ($hash->{helper}{io}{newChn} ne $oldChn){
+  if ($hash->{helper}{io}{newChn} ne $oldChn
+      &&{$hash->{IODev}->{TYPE}} eq "HMLAN"){
     my $id = CUL_HM_hash2Id($hash);
     IOWrite($hash, "", "init:$id");
   }
