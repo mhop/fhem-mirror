@@ -264,6 +264,7 @@ PRESENCE_Set($@)
     {
         if($hash->{MODE} ne "lan-bluetooth")
         {
+            Log3  $hash->{NAME}, 5, "PRESENCE (".$hash->{NAME}.") - starting local scan";
             PRESENCE_StartLocalScan($hash, 1);
             return undef;
         }
@@ -467,31 +468,48 @@ PRESENCE_Ready($)
 sub PRESENCE_StartLocalScan($;$)
 {
     my ($hash, $local) = @_;
-
+    my $name = $hash->{NAME};
+    my $mode = $hash->{MODE};
+    
     $local = 0 unless(defined($local));
+     
+    if(not (exists($hash->{ADDRESS}) or exists($hash->{helper}{call})))
+    {
+         return;
+    }
 
     $hash->{STATE} = "active" if($hash->{STATE} eq "???");
 
+    if(not $local)
+    {
+        Log3 $name, 5, "PRESENCE ($name) - resetting Timer";
+        RemoveInternalTimer($hash);
+    }
 
-    if($hash->{MODE} eq "local-bluetooth")
+    if($mode eq "local-bluetooth")
     {
-        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        Log3 $name, 5, "PRESENCE ($name) - starting Blocking call for mode local-bluetooth";
+        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $name."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
-    elsif($hash->{MODE} eq "lan-ping")
+    elsif($mode eq "lan-ping")
     {
-        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local."|".AttrVal($hash->{NAME}, "ping_count", "4"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        Log3 $name, 5, "PRESENCE ($name) - starting Blocking call for mode lan-ping";
+        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "ping_count", "4"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
-    elsif($hash->{MODE} eq "fritzbox")
+    elsif($mode eq "fritzbox")
     {
-        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local."|".AttrVal($hash->{NAME}, "fritzbox_repeater", "0"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        Log3 $name, 5, "PRESENCE ($name) - starting Blocking call for mode fritzbox";
+        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "fritzbox_repeater", "0"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
-    elsif($hash->{MODE} eq "shellscript")
+    elsif($mode eq "shellscript")
     {
-        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalShellScriptScan", $hash->{NAME}."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        Log3 $name, 5, "PRESENCE ($name) - starting Blocking call for mode shellscript";
+        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalShellScriptScan", $name."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
-    elsif($hash->{MODE} eq "function")
+    elsif($mode eq "function")
     {
-        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFunctionScan", $hash->{NAME}."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        Log3 $name, 5, "PRESENCE ($name) - starting Blocking call for mode function";
+        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFunctionScan", $name."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
 }
 
