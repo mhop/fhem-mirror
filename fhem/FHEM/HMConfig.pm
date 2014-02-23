@@ -850,6 +850,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,                                        transmitTryMax  =>1},
   "HM-Dis-TD-T"       =>{ lowBatLimitFS   =>1,ledMode         =>1},
   "HM-LC-SW1-BA-PCB"  =>{ lowBatLimitBA   =>1,ledMode         =>1},
+  "HM-LC-SW4-BA-PCB"  =>{ lowBatLimitBA   =>1,ledMode         =>1,localResDis     =>1},
   "HM-Sys-sRP-Pl"     =>{ compMode        =>1},
   "KFM-Display"       =>{ CtDlyOn         =>1,CtDlyOff        =>1
                          ,CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1
@@ -921,8 +922,6 @@ $culHmRegModel{"HM-LC-Sw1PBU-FM"}     = $culHmRegModel{"HM-LC-Bl1PBU-FM"};
 
 $culHmRegModel{"HM-RC-Sec4-2"}        = $culHmRegModel{"HM-RC-4-2"};
 $culHmRegModel{"HM-RC-Key4-2"}        = $culHmRegModel{"HM-RC-4-2"};
-
-$culHmRegModel{"HM-LC-SW4-BA-PCB"}    = $culHmRegModel{"HM-LC-SW1-BA-PCB"};
 
 $culHmRegModel{"HM-CC-RT-DN-BoM"}     = $culHmRegModel{"HM-CC-RT-DN"};
 $culHmRegModel{"ROTO_ZEL-STG-RM-FWT"} = $culHmRegModel{"HM-CC-TC"};
