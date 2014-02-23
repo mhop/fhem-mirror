@@ -566,4 +566,139 @@ attr dew_all max_timediff 60
 
 
 =end html
+=begin html_DE
+<a name="dewpoint"></a>
+<h3>dewpoint</h3>
+<ul>
+  Berechnungen des Taupunkts. Es gibt drei Varianten, das Modul dewpoint zu verwenden: <br>
+  <ul>
+    <li><b>dewpoint</b>: Taupunkt<br>
+        Erzeugt ein zus&auml;tzliches Ereignis "dewpoint" aus Temperatur- und Luftfeuchtewerten eines F&uuml;hlers.</li>
+    <li><b>fan</b>: L&uuml;fter<br>
+        Erzeugt ein Ereignis, um einen L&uuml;fter einzuschalten, wenn die Au&szlig;enluft weniger Wasser als die Raumluft enth&auml;lt.</li>
+    <li><b>alarm</b>: Alarm<br>
+        Erzeugt einen Schimmel-Alarm, wenn eine Referenz-Temperatur unter den Taupunkt f&auml;llt.</li>
+  <br>
+  </ul>
+
+  <a name="dewpointdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; dewpoint dewpoint &lt;devicename-regex&gt; [&lt;temp_name&gt; &lt;hum_name&gt; &lt;new_name&gt;]</code><br>
+    <br>
+    <ul>
+    Berechnet den Taupunkt des Ger&auml;ts &lt;devicename-regex&gt; basierend auf Temperatur und Luftfeuchte und erzeugt daraus ein neues Reading namens dewpoint.
+    Wenn &lt;temp_name&gt;, &lt;hum_name&gt; und &lt;new_name&gt; angegeben sind, werden die Temperatur aus dem Reading &lt;temp_name&gt;, die Luftfeuchte aus dem Reading &lt;hum_name&gt; gelesen und als berechneter Taupunkt ins Reading &lt;new_name&gt; geschrieben.<br>
+    Wenn &lt;temp_name&gt; T lautet, wird die Temperatur aus state T: H: benutzt und &lt;new_name&gt; zu state hinzugef&uuml;gt.
+    </ul>
+    <br>
+
+    Beispiele:<PRE>
+    # Berechnet den Taupunkt aufgrund von Temperatur und Luftfeuchte
+    # in Ereignissen, die vom Ger&auml;t temp1 erzeugt wurden und erzeugt ein Reading dewpoint.
+    define dew_temp1 dewpoint dewpoint temp1
+    define dew_temp1 dewpoint dewpoint temp1 temperature humidity dewpoint
+
+    # Berechnet den Taupunkt aufgrund von Temperatur und Luftfeuchte
+    # in Ereignissen, die von allen Ger&auml;ten erzeugt wurden die diese Werte ausgeben
+    # und erzeugt ein Reading dewpoint.
+    define dew_all dewpoint dewpoint .*
+    define dew_all dewpoint dewpoint .* temperature humidity dewpoint
+
+    # Berechnet den Taupunkt aufgrund von Temperatur und Luftfeuchte
+    # in Ereignissen, die vom Ger&auml;t Aussen_1 erzeugt wurden und erg&auml;nzt 
+    # mit diesem Wert den Status STATE.
+    define dew_state dewpoint dewpoint Aussen_1 T H D
+
+    # Berechnet den Taupunkt aufgrund von Temperatur und Luftfeuchte
+    # in Ereignissen, die von allen Ger&auml;ten erzeugt wurden die diese Werte ausgeben
+    # und erg&auml;nzt mit diesem Wert den Status STATE.
+    # Beispiel STATE: "T: 10 H: 62.5" wird ver&auml;ndert nach
+    # "T: 10 H: 62.5 D: 3.2"
+    define dew_state dewpoint dewpoint .* T H D
+
+    </PRE>
+  </ul>
+
+  <ul>
+    <code>define &lt;name&gt; dewpoint fan &lt;devicename-regex&gt; &lt;devicename-outside&gt; &lt;min-temp&gt; [&lt;diff_temp&gt;]</code><br>
+    <br>
+    <ul>
+      Erzeugt ein Ereignis, um einen L&uuml;fter einzuschalten, wenn die Au&szlig;enluft weniger Wasser als die Raumluft enth&auml;lt.</li>
+    <ul>
+        <li>
+    Erzeugt das Ereignis "fan: on" wenn (Taupunkt von &lt;devicename-outside&gt;) + &lt;diff_temp&gt; ist niedriger als der Taupunkt von &lt;devicename&gt; und die Temperatur von &lt;devicename-outside&gt; &gt;= min-temp ist. Das Ereignis wird nur erzeugt wenn das Reading "fan" nicht schon "on" war. Das Ereignis wird f&uuml;r das Ger&auml;t &lt;devicename&gt; erzeugt. Der Parameter &lt;diff-temp&gt; ist optional.</li>
+    <li>Andernfalls wird das Ereignis "fan: off" erzeugt, wenn das Reading von "fan" nicht bereits  "off" war.</li>
+    </ul>
+    </ul>
+    <br>
+
+    Beispiel:<PRE>
+    # Erzeugt das Ereignis "fan: on", wenn der Taupunkt des Ger&auml;ts Aussen_1 zum ersten Mal
+    # niedriger ist als der Taupunkt des Ger&auml;ts basement_tempsensor und die 
+    # Au&szlig;entemperatur &gt;= 0 ist und wechselt nach "fan: off" wenn diese Bedingungen nicht 
+    # mehr zutreffen.
+    # Schaltet den Schalter fan_switch abh&auml;ngig vom Zustand ein oder aus.
+    define dew_fan1 dewpoint fan basement_tempsensor Aussen_1 0
+    define dew_fan1_on notify basement_tempsensor.*fan:.*on set fan_switch on
+    define dew_fan1_off notify basement_tempsensor.*fan:.*off set fan_switch off
+
+    </PRE>
+  </ul>
+
+  <ul>
+    <code>define &lt;name&gt; dewpoint alarm &lt;devicename-regex&gt; &lt;devicename-reference&gt; &lt;diff-temp&gt;</code><br>
+    <br>
+    <ul>
+    Erzeugt einen Schimmel-Alarm, wenn eine Referenz-Temperatur unter den Taupunkt f&auml;llt.</li>
+    <ul>
+        <li>
+    Erzeugt ein Reading/Ereignis "alarm: on" wenn die Temperatur von &lt;devicename-reference&gt; - &lt;diff-temp&gt; unter den Taupunkt von &lt;devicename&gt; f&auml;llt und das Reading "alarm" nicht bereits "on" ist. Das Ereignis wird f&uuml;r &lt;devicename&gt; erzeugt.</li>
+    <li>Erzeugt ein Reading/Ereignis "alarm: off" wenn die Temperatur von &lt;devicename-reference&gt; - &lt;diff-temp&gt; &uuml;ber den Taupunkt von &lt;devicename&gt; steigt und das Reading "alarm" nicht bereits "off" ist.</li>
+</li>
+    </ul>
+    </ul>
+    <br>
+
+    Beispiel:<PRE>
+    # Es wird ein Anlegef&uuml;hler (Wandsensor) und ein Thermo-/Hygrometer (Raumf&uuml;hler)
+    # verwendet, um einen Alarm zu erzeugen, wenn die Wandtemperatur
+    # unter den Taupunkt der Luft f&auml;llt. In diesem Fall w&uuml;rde sich Wasser an der Wand
+    # niederschlagen (kondensieren), weil die Wand zu kalt ist.
+    # Der Schalter einer Sirene (alarm_siren) wird &uuml;ber ein notify geschaltet.
+    define dew_alarm1 dewpoint alarm roomsensor wallsensor 0
+    define roomsensor_alarm_on notify roomsensor.*alarm:.*on set alarm_siren on
+    define roomsensor_alarm_off notify roomsensor.*alarm:.*off set alarm_siren off
+
+    # Ohne Wandsensor l&auml;sst sich auch der Taupunkt eines Raums mit der Temperatur desselben
+    # (oder eines anderen) F&uuml;hlers vergleichen.
+    # Die Alarmtemperatur ist 5 Grad niedriger gesetzt als die des Vergleichsthermostats.
+    define dev_alarm2 dewpoint alarm roomsensor roomsensor 5
+
+    </PRE>
+  </ul>
+
+  <a name="dewpointset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="dewpointget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="dewpointattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#disable">disable</a></li>
+    <li>max_timediff<br>
+        Maximale erlaubter Zeitunterschied in Sekunden zwischen den Temperatur- und Luftfeuchtewerten eines Ger&auml;ts. dewpoint verwendet Readings von Temperatur oder Luftfeuchte wenn sie nicht im Ereignis mitgeliefert werden. Das ist sowohl f&uuml;r den Betrieb mit event-on-change-reading n&ouml;tig als auch bei Sensoren die Temperatur und Luftfeuchte in getrennten Ereignissen kommunizieren (z.B. Technoline Sensoren TX3TH).<br>
+Der Standardwert ist 1 Sekunde.
+      <br><br>
+      Beispiel:<PRE>
+    # Maximal erlaubter Zeitunterschied soll 60 Sekunden sein
+    define dew_all dewpoint dewpoint .*
+    attr dew_all max_timediff 60
+    </li><br>
+  </ul>
+</ul>
+
+=end html_DE
 =cut
