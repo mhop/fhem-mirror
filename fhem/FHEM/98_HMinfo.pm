@@ -303,7 +303,7 @@ sub HMinfo_tempList(@) { ######################################################
       next if (!$chN || !$defs{$chN} || $chN !~ m/$filter/);
       print aSave "\nentities:$chN";
       my @tl = sort grep /tempList(P[123])?[SMFWT]/,keys %{$defs{$chN}{READINGS}};
-      if (scalar@tl != 7){
+      if (scalar@tl != 7 && scalar@tl != 21){
         print aSave "\nincomplete:$chN only data for ".join(",",@tl);
         push @incmpl,$chN;
         next;
