@@ -1696,6 +1696,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
        SM_Network_wlan0.gplot<br>
        SM_CPUStat.gplot<br>
        SM_CPUStatSum.gplot<br>
+       SM_CPUStatTotal.gplot<br>
       </code>
       DbLog versions:<br>
       <code>
@@ -1797,6 +1798,11 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       attr wl_sysmon_cpustat_s group RPi<br>
       attr wl_sysmon_cpustat_s room 9.99_Test<br>
       attr wl_sysmon_cpustat_s plotsize 840,420<br>
+      define wl_sysmon_cpustatT SVG FileLog_sysmon:SM_CPUStatTotal:CURRENT<br>
+      attr wl_sysmon_cpustatT label "CPU-Auslastung"<br>
+      attr wl_sysmon_cpustatT group RPi<br>
+      attr wl_sysmon_cpustatT plotsize 840,420<br>
+      attr wl_sysmon_cpustatT room 9.99_Test<br>
     </code>
     </ul>
 
@@ -2132,6 +2138,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
        SM_Network_wlan0.gplot<br>
        SM_CPUStat.gplot<br>
        SM_CPUStatSum.gplot<br>
+       SM_CPUStatTotal.gplot<br>
       </code>
       DbLog-Versionen:<br>
       <code>
@@ -2236,6 +2243,11 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       attr wl_sysmon_cpustat_s group RPi<br>
       attr wl_sysmon_cpustat_s room 9.99_Test<br>
       attr wl_sysmon_cpustat_s plotsize 840,420<br>
+      define wl_sysmon_cpustatT SVG FileLog_sysmon:SM_CPUStatTotal:CURRENT<br>
+      attr wl_sysmon_cpustatT label "CPU-Auslastung"<br>
+      attr wl_sysmon_cpustatT group RPi<br>
+      attr wl_sysmon_cpustatT plotsize 840,420<br>
+      attr wl_sysmon_cpustatT room 9.99_Test<br>
     </code>
     </ul>
 
