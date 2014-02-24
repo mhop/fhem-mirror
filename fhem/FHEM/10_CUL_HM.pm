@@ -1397,7 +1397,8 @@ sub CUL_HM_Parse($$) {#########################################################
         push @evtEt,[$h,1,"battery:".(($err&0x08)?"critical":($err&0x80?"low":"ok"))];
       }
       elsif ($md =~ m /HM-LC-SW.-BA-PCB/){
-        push @event,"battery:" . (($err&0x80) ? "low" : "ok" );
+        my $h = CUL_HM_getDeviceHash($shash);
+        push @evtEt,[$h,1,"battery:" . (($err&0x80) ? "low" : "ok" )];
       }
     }
   }
