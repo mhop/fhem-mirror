@@ -224,7 +224,7 @@ TCM_Read($)
   return "" if(!defined($buf));
 
   my $name = $hash->{NAME};
-  my $blockSenderID = ReadingsVal($name, "blockSenderID", "no");
+  my $blockSenderID = AttrVal($name, "blockSenderID", "own");
   my $baseID = hex $hash->{BaseID};
   my $lastID = hex $hash->{LastID};
 
@@ -931,7 +931,7 @@ TCM_Undef($$)
   <b>Attributes</b>
   <ul>
     <li><a name="blockSenderID">blockSenderID</a> &lt;own|no&gt;,
-      [blockSenderID] = no is default.<br>
+      [blockSenderID] = own is default.<br>
       Block receiving telegrams with a TCM SenderID sent by repeaters.      
       </li>
     <li><a href="#attrdummy">dummy</a></li>
