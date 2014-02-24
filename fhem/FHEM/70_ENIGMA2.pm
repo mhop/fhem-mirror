@@ -24,9 +24,14 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.7
+# Version: 1.3.0
 #
 # Major Version History:
+# - 1.3.0 - 2013-12-21
+# -- rewrite for NonBlocking
+# -- add recordings indicator
+# -- add new command record
+#
 # - 1.2.0 - 2013-12-21
 # -- Add bouquet support e.g. for named channels
 #
@@ -44,6 +49,7 @@ package main;
 use 5.012;
 use strict;
 use warnings;
+use Data::Dumper;
 use XML::Simple;
 use IO::Socket;
 use HttpUtils;
@@ -72,7 +78,7 @@ sub ENIGMA2_Initialize($) {
     $hash->{UndefFn} = "ENIGMA2_Undefine";
 
     $hash->{AttrList} =
-"https:0,1 http-method:GET,POST disable:0,1 bouquet-tv bouquet-radio timeout model "
+"https:0,1 http-method:GET,POST disable:0,1 bouquet-tv bouquet-radio timeout "
       . $readingFnAttributes;
 
     $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG} =
@@ -96,826 +102,32 @@ sub ENIGMA2_Initialize($) {
 #  $data{RC_layout}{ENIGMA2_VUplus_Ultimo_SVG}  = "ENIGMA2_RClayout_VUplusUltimo_SVG";
 #  $data{RC_layout}{ENIGMA2_VUplus_Ultimo}  = "ENIGMA2_RClayout_VUplusUltimo";
     $data{RC_makenotify}{ENIGMA2} = "ENIGMA2_RCmakenotify";
+
+    return;
 }
 
 #####################################
 sub ENIGMA2_GetStatus($;$) {
-    my ( $hash, $local ) = @_;
+    my ( $hash, $update ) = @_;
     my $name     = $hash->{NAME};
     my $interval = $hash->{INTERVAL};
-    my $state    = '';
-    my $boxinfo;
-    my $currsrvinfo;
-    my $signalinfo;
-    my $vol;
-    my $changecount = 0;
 
     Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_GetStatus()";
 
-    $local = 0 unless ( defined($local) );
-    if ( defined( $attr{$name}{disable} ) && $attr{$name}{disable} == 1 ) {
-        return $hash->{STATE};
-    }
+    RemoveInternalTimer($hash);
+    InternalTimer( gettimeofday() + $interval, "ENIGMA2_GetStatus", $hash, 0 );
 
-    InternalTimer( gettimeofday() + $interval, "ENIGMA2_GetStatus", $hash, 0 )
-      unless ( $local == 1 );
+    return
+      if ( defined( $attr{$name}{disable} ) && $attr{$name}{disable} == 1 );
 
-    # Read powerstate
-    #
-    my $powerstate = ENIGMA2_SendCommand( $hash, "powerstate", "" );
-
-    if ( defined($powerstate) && ref($powerstate) eq "HASH" ) {
-
-        # Cache bouquet information - get favorite bouquet
-        # if not available from helper
-        foreach my $input ( "tv", "radio" ) {
-            my $service_uri;
-            my $services;
-            my $services_list;
-
-            if (   !defined( $hash->{helper}{bouquet}{$input} )
-                || !defined( $hash->{helper}{channels}{$input} ) )
-            {
-                $service_uri =
-                    '1:7:2:0:0:0:0:0:0:0:(type == 2)FROM BOUQUET "bouquets.'
-                  . $input
-                  . '" ORDER BY bouquet';
-
-                $services =
-                  ENIGMA2_SendCommand( $hash, "getservices",
-                    "sRef=" . urlEncode($service_uri) )
-                  if ( !defined( $attr{$name}{ "bouquet-" . $input } ) );
-
-                # set FHEM device attribute if not available
-                #  multiple
-                if (   ref($services) eq "HASH"
-                    && defined( $services->{e2service} )
-                    && ref( $services->{e2service} ) eq "ARRAY"
-                    && defined( $services->{e2service}[0]{e2servicereference} )
-                    && $services->{e2service}[0]{e2servicereference} ne "" )
-                {
-                    Log3 $name, 3,
-                        "ENIGMA2 $name: Adding attribute bouquet-"
-                      . $input . " = "
-                      . $services->{e2service}[0]{e2servicereference};
-
-                    $attr{$name}{ "bouquet-" . $input } =
-                      $services->{e2service}[0]{e2servicereference};
-                }
-
-                #  single
-                elsif (ref($services) eq "HASH"
-                    && defined( $services->{e2service}{e2servicereference} )
-                    && $services->{e2service}{e2servicereference} ne "" )
-                {
-                    Log3 $name, 3,
-                        "ENIGMA2 $name: Adding attribute bouquet-"
-                      . $input . " = "
-                      . $services->{e2service}{e2servicereference};
-
-                    $attr{$name}{ "bouquet-" . $input } =
-                      $services->{e2service}{e2servicereference};
-                }
-                elsif ( !defined( $attr{$name}{ "bouquet-" . $input } ) ) {
-                    Log3 $name, 3,
-                        "ENIGMA2 $name: ERROR: Unable to read any "
-                      . $input
-                      . " bouquets from device";
-                }
-
-                $services_list = ENIGMA2_SendCommand( $hash, "getservices",
-                    "sRef=" . urlEncode( $attr{$name}{ "bouquet-" . $input } ) )
-                  if ( defined( $attr{$name}{ "bouquet-" . $input } ) );
-
-                # Read channels
-                if ( ref($services_list) eq "HASH"
-                    && defined( $services_list->{e2service} ) )
-                {
-                    # multiple
-                    if (
-                        ref( $services_list->{e2service} ) eq "ARRAY"
-                        && defined(
-                            $services_list->{e2service}[0]{e2servicename}
-                        )
-                        && $services_list->{e2service}[0]{e2servicename} ne ""
-                        && defined(
-                            $services_list->{e2service}[0]{e2servicereference}
-                        )
-                        && $services_list->{e2service}[0]{e2servicereference}
-                        ne ""
-                      )
-                    {
-                        my $i = 0;
-
-                        # TODO this loop is >5.012 only
-                        for ( keys @{ $services_list->{e2service} } ) {
-                            my $channel =
-                              $services_list->{e2service}[$_]{e2servicename};
-                            $channel =~ s/\s/_/g;
-
-                            # ignore markers
-                            if ( $services_list->{e2service}[$_]
-                                {e2servicereference} =~ /^1:64:/ )
-                            {
-                                Log3 $name, 4,
-                                  "ENIGMA2 $name: Ignoring marker "
-                                  . $services_list->{e2service}[$_]
-                                  {e2servicename};
-                                next;
-                            }
-
-                            if ( $channel ne "" ) {
-                                $hash->{helper}{bouquet}{$input}{$channel} =
-                                  { 'sRef' => $services_list->{e2service}[$_]
-                                      {e2servicereference} };
-
-                                $hash->{helper}{channels}{$input}[$i] =
-                                  $channel;
-                            }
-
-                            $i++;
-                        }
-
-                        Log3 $name, 4,
-                            "ENIGMA2 $name: Cached favorite "
-                          . $input
-                          . " channels: "
-                          . join( ', ',
-                            @{ $hash->{helper}{channels}{$input} } );
-                    }
-
-                    # single
-                    elsif (
-                           defined( $services_list->{e2service}{e2servicename} )
-                        && $services_list->{e2service}{e2servicename} ne ""
-                        && defined(
-                            $services_list->{e2service}{e2servicereference}
-                        )
-                        && $services_list->{e2service}{e2servicereference} ne ""
-                      )
-                    {
-                        # ignore markers
-                        if ( $services_list->{e2service}{e2servicereference} =~
-                            /^1:64:/ )
-                        {
-                            Log3 $name, 4,
-                              "ENIGMA2 $name: Ignoring marker "
-                              . $services_list->{e2service}{e2servicename};
-                        }
-                        else {
-                            my $channel =
-                              $services_list->{e2service}{e2servicename};
-                            $channel =~ s/\s/_/g;
-
-                            if ( $channel ne "" ) {
-                                $hash->{helper}{bouquet}{$input}{$channel} =
-                                  { 'sRef' => $services_list->{e2service}
-                                      {e2servicereference} };
-
-                                $hash->{helper}{channels}{$input}[0] =
-                                  $channel;
-
-                                Log3 $name, 4,
-                                    "ENIGMA2 $name: Cached favorite "
-                                  . $input
-                                  . " channels: "
-                                  . $hash->{helper}{channels}{$input}[0];
-                            }
-                        }
-
-                    }
-                    else {
-                        Log3 $name, 4,
-                            "ENIGMA2 $name: ERROR: bouquet-"
-                          . $input
-                          . " seems to be empty.";
-                    }
-                }
-                elsif ( $input eq "radio" ) {
-                    Log3 $name, 4,
-                        "ENIGMA2 $name: ERROR: Unable to read "
-                      . $input
-                      . " bouquet '"
-                      . $attr{$name}{ "bouquet-" . $input }
-                      . "' from device";
-                }
-                else {
-                    Log3 $name, 3,
-                        "ENIGMA2 $name: ERROR: Unable to read "
-                      . $input
-                      . " bouquet '"
-                      . $attr{$name}{ "bouquet-" . $input }
-                      . "' from device";
-                }
-            }
-        }
-
-        if ( $powerstate->{e2instandby} eq "true" ) {
-            $state = "off";
-        }
-        else {
-            $state = "on";
-
-            # Read Boxinfo every 10 minutes only
-            if (
-                !defined( $hash->{helper}{lastFullUpdate} )
-                || ( defined( $hash->{helper}{lastFullUpdate} )
-                    && $hash->{helper}{lastFullUpdate} + 900 le time() )
-              )
-            {
-                $boxinfo = ENIGMA2_SendCommand( $hash, "about", "" );
-
-                # Update state
-                $hash->{helper}{lastFullUpdate} = time();
-            }
-
-            # get current states
-            $currsrvinfo = ENIGMA2_SendCommand( $hash, "getcurrent", "" );
-            $vol         = ENIGMA2_SendCommand( $hash, "vol",        "" );
-            $signalinfo  = ENIGMA2_SendCommand( $hash, "signal",     "" );
-        }
-    }
-    elsif ( $hash->{helper}{AVAILABLE} == 1 ) {
-        Log3 $name, 2, "ENIGMA2 $name: ERROR: Undefined state of device";
-
-        $state = "undefined";
+    if ( !$update ) {
+        ENIGMA2_SendCommand( $hash, "powerstate" );
     }
     else {
-        $state = "absent";
+        ENIGMA2_SendCommand( $hash, "getcurrent" );
     }
 
-    ####
-    # update readings
-    #
-
-    readingsBeginUpdate($hash);
-
-    # Set reading for power
-    #
-    my $readingPower = "off";
-    if ( $state eq "on" ) {
-        $readingPower = "on";
-    }
-    if ( !defined( $hash->{READINGS}{power}{VAL} )
-        || $hash->{READINGS}{power}{VAL} ne $readingPower )
-    {
-        readingsBulkUpdate( $hash, "power", $readingPower );
-    }
-
-    # Set reading for state
-    #
-    if ( !defined( $hash->{READINGS}{state}{VAL} )
-        || $hash->{READINGS}{state}{VAL} ne $state )
-    {
-        readingsBulkUpdate( $hash, "state", $state );
-    }
-
-    my $reading;
-    my $e2reading;
-
-    # Boxinfo
-    #
-    if ( ref($boxinfo) eq "HASH" ) {
-
-        # General readings
-        foreach (
-            "enigmaversion", "imageversion", "webifversion",
-            "fpversion",     "lanmac",       "model",
-          )
-        {
-            $reading   = $_;
-            $e2reading = "e2" . $_;
-
-            if ( defined( $boxinfo->{e2about}{$e2reading} ) ) {
-                if (   $boxinfo->{e2about}{$e2reading} eq "False"
-                    || $boxinfo->{e2about}{$e2reading} eq "True" )
-                {
-                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                        || $hash->{READINGS}{$reading}{VAL} ne
-                        lc( $boxinfo->{e2about}{$e2reading} ) )
-                    {
-                        readingsBulkUpdate( $hash, $reading,
-                            lc( $boxinfo->{e2about}{$e2reading} ) );
-                    }
-                }
-                else {
-                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                        || $hash->{READINGS}{$reading}{VAL} ne
-                        $boxinfo->{e2about}{$e2reading} )
-                    {
-                        readingsBulkUpdate( $hash, $reading,
-                            $boxinfo->{e2about}{$e2reading} );
-                    }
-                }
-
-                # model attribute
-                if ( $reading eq "model" ) {
-                    my $model = $boxinfo->{e2about}{$e2reading};
-                    $model =~ s/\s/_/g;
-                    if ( !exists( $attr{$name}{model} )
-                        || $attr{$name}{model} ne $model )
-                    {
-                        $attr{$name}{model} = $model;
-                    }
-                }
-            }
-
-            else {
-                if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                    || $hash->{READINGS}{$reading}{VAL} ne "-" )
-                {
-                    readingsBulkUpdate( $hash, $reading, "-" );
-                }
-            }
-        }
-
-        # HDD
-        if ( defined( $boxinfo->{e2about}{e2hddinfo} ) ) {
-
-            # multiple
-            if ( ref( $boxinfo->{e2about}{e2hddinfo} ) eq "ARRAY" ) {
-                my $i        = 0;
-                my $arr_size = @{ $boxinfo->{e2about}{e2hddinfo} };
-
-                while ( $i < $arr_size ) {
-                    my $counter     = $i + 1;
-                    my $readingname = "hdd" . $counter . "_model";
-                    if ( !defined( $hash->{READINGS}{$readingname}{VAL} )
-                        || $hash->{READINGS}{$readingname}{VAL} ne
-                        $boxinfo->{e2about}{e2hddinfo}[$i]{model} )
-                    {
-                        readingsBulkUpdate( $hash, $readingname,
-                            $boxinfo->{e2about}{e2hddinfo}[$i]{model} );
-                    }
-
-                    $readingname = "hdd" . $counter . "_capacity";
-                    my @value =
-                      split( / /,
-                        $boxinfo->{e2about}{e2hddinfo}[$i]{capacity} );
-                    if (
-                        !defined( $hash->{READINGS}{$readingname}{VAL} )
-                        || (   @value
-                            && $hash->{READINGS}{$readingname}{VAL} ne
-                            $value[0] )
-                      )
-                    {
-                        readingsBulkUpdate( $hash, $readingname, $value[0] );
-                    }
-
-                    $readingname = "hdd" . $counter . "_free";
-                    @value =
-                      split( / /, $boxinfo->{e2about}{e2hddinfo}[$i]{free} );
-                    if (
-                        !defined( $hash->{READINGS}{$readingname}{VAL} )
-                        || (   @value
-                            && $hash->{READINGS}{$readingname}{VAL} ne
-                            $value[0] )
-                      )
-                    {
-                        readingsBulkUpdate( $hash, $readingname, $value[0] );
-                    }
-
-                    $i++;
-                }
-            }
-
-            #  single
-            elsif ( ref( $boxinfo->{e2about}{e2hddinfo} ) eq "HASH" ) {
-                my $readingname = "hdd1_model";
-                if ( !defined( $hash->{READINGS}{$readingname}{VAL} )
-                    || $hash->{READINGS}{$readingname}{VAL} ne
-                    $boxinfo->{e2about}{e2hddinfo}{model} )
-                {
-                    readingsBulkUpdate( $hash, $readingname,
-                        $boxinfo->{e2about}{e2hddinfo}{model} );
-                }
-
-                $readingname = "hdd1_capacity";
-                my @value =
-                  split( / /, $boxinfo->{e2about}{e2hddinfo}{capacity} );
-                if (
-                    !defined( $hash->{READINGS}{$readingname}{VAL} )
-                    || (   @value
-                        && $hash->{READINGS}{$readingname}{VAL} ne $value[0] )
-                  )
-                {
-                    readingsBulkUpdate( $hash, $readingname, $value[0] );
-                }
-
-                $readingname = "hdd1_free";
-                @value = split( / /, $boxinfo->{e2about}{e2hddinfo}{free} );
-                if (
-                    !defined( $hash->{READINGS}{$readingname}{VAL} )
-                    || (   @value
-                        && $hash->{READINGS}{$readingname}{VAL} ne $value[0] )
-                  )
-                {
-                    readingsBulkUpdate( $hash, $readingname, $value[0] );
-                }
-            }
-        }
-
-        # Tuner
-        if ( defined( $boxinfo->{e2about}{e2tunerinfo}{e2nim} ) ) {
-            my %tuner = %{ $boxinfo->{e2about}{e2tunerinfo}{e2nim} };
-
-            #  single
-            if ( defined( $tuner{type} ) ) {
-                my $tunerRef   = \%tuner;
-                my $tuner_name = lc( $$tunerRef{name} );
-                $tuner_name =~ s/\s/_/g;
-
-                if ( !defined( $hash->{READINGS}{$tuner_name}{VAL} )
-                    || $hash->{READINGS}{$tuner_name}{VAL} ne $$tunerRef{type} )
-                {
-                    readingsBulkUpdate( $hash, $tuner_name, $$tunerRef{type} );
-                }
-
-            }
-
-            #  multiple
-            else {
-                for ( keys %tuner ) {
-                    my $tuner_name = lc($_);
-                    $tuner_name =~ s/\s/_/g;
-                    my $tuner_type = $tuner{$_}{type};
-
-                    if ( !defined( $hash->{READINGS}{$tuner_name}{VAL} )
-                        || $hash->{READINGS}{$tuner_name}{VAL} ne $tuner_type )
-                    {
-                        readingsBulkUpdate( $hash, $tuner_name, $tuner_type );
-                    }
-                }
-            }
-        }
-    }
-
-    # Service and Event information
-    #
-    if ( ref($currsrvinfo) eq "HASH" ) {
-        my $reading;
-        my $e2reading;
-
-        # Service readings
-        foreach (
-            "servicereference", "servicename", "providername",
-            "servicevideosize", "videowidth",  "videoheight",
-            "iswidescreen",     "apid",        "vpid",
-            "pcrpid",           "pmtpid",      "txtpid",
-            "tsid",             "onid",        "sid"
-          )
-        {
-            $reading   = $_;
-            $e2reading = "e2" . $_;
-
-            if (   defined( $currsrvinfo->{e2service}{$e2reading} )
-                && lc( $currsrvinfo->{e2service}{$e2reading} ) ne "n/a"
-                && lc( $currsrvinfo->{e2service}{$e2reading} ) ne "n/axn/a"
-                && lc( $currsrvinfo->{e2service}{$e2reading} ) ne "0x0" )
-            {
-                if (   $currsrvinfo->{e2service}{$e2reading} eq "False"
-                    || $currsrvinfo->{e2service}{$e2reading} eq "True" )
-                {
-                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                        || $hash->{READINGS}{$reading}{VAL} ne
-                        lc( $currsrvinfo->{e2service}{$e2reading} ) )
-                    {
-                        readingsBulkUpdate( $hash, $reading,
-                            lc( $currsrvinfo->{e2service}{$e2reading} ) );
-                    }
-                }
-                else {
-                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                        || $hash->{READINGS}{$reading}{VAL} ne
-                        $currsrvinfo->{e2service}{$e2reading} )
-                    {
-                        readingsBulkUpdate( $hash, $reading,
-                            $currsrvinfo->{e2service}{$e2reading} );
-
-                        # channel
-                        if ( $reading eq "servicename" ) {
-                            my $val = $currsrvinfo->{e2service}{$e2reading};
-                            $val =~ s/\s/_/g;
-                            readingsBulkUpdate( $hash, "channel", $val );
-                        }
-
-                        # currentMedia
-                        readingsBulkUpdate( $hash, "currentMedia",
-                            $currsrvinfo->{e2service}{$e2reading} )
-                          if $reading eq "servicereference";
-                    }
-                }
-
-                # input
-                if ( $reading eq "servicereference" ) {
-                    my @servicetype =
-                      split( /:/, $currsrvinfo->{e2service}{$e2reading} );
-
-                    if (
-                           defined( $servicetype[2] )
-                        && $servicetype[2] eq "2"
-                        && ( !defined( $hash->{READINGS}{input}{VAL} )
-                            || $hash->{READINGS}{input}{VAL} ne "radio" )
-                      )
-                    {
-                        $hash->{helper}{lastInput} = "radio";
-                        readingsBulkUpdate( $hash, "input", "radio" );
-                    }
-                    elsif ( !defined( $hash->{READINGS}{input}{VAL} )
-                        || $hash->{READINGS}{input}{VAL} ne "tv" )
-                    {
-                        $hash->{helper}{lastInput} = "tv";
-                        readingsBulkUpdate( $hash, "input", "tv" );
-                    }
-                }
-            }
-            else {
-                if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                    || $hash->{READINGS}{$reading}{VAL} ne "-" )
-                {
-                    readingsBulkUpdate( $hash, $reading, "-" );
-
-                    # channel
-                    readingsBulkUpdate( $hash, "channel", "-" )
-                      if $reading eq "servicename";
-
-                    # currentMedia
-                    readingsBulkUpdate( $hash, "currentMedia", "-" )
-                      if $reading eq "servicereference";
-                }
-            }
-        }
-
-        # Event readings
-        #
-        if ( defined( $currsrvinfo->{e2eventlist} ) ) {
-            my $eventNow;
-            my $eventNext;
-
-            if ( ref( $currsrvinfo->{e2eventlist}{e2event} ) eq "ARRAY" ) {
-                $eventNow  = $currsrvinfo->{e2eventlist}{e2event}[0];
-                $eventNext = $currsrvinfo->{e2eventlist}{e2event}[1]
-                  if ( defined( $currsrvinfo->{e2eventlist}{e2event}[1] ) );
-            }
-            else {
-                $eventNow = $currsrvinfo->{e2eventlist}{e2event};
-            }
-
-            foreach (
-                "eventstart",       "eventduration",    "eventremaining",
-                "eventcurrenttime", "eventdescription", "eventtitle",
-                "eventname",
-              )
-            {
-                $reading   = $_;
-                $e2reading = "e2" . $_;
-
-                # current event
-                if (   defined( $eventNow->{$e2reading} )
-                    && lc( $eventNow->{$e2reading} ) ne "n/a"
-                    && $eventNow->{$e2reading} ne "0"
-                    && $eventNow->{$e2reading} ne "" )
-                {
-                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                        || $hash->{READINGS}{$reading}{VAL} ne
-                        $eventNow->{$e2reading} )
-                    {
-                        readingsBulkUpdate( $hash, $reading,
-                            $eventNow->{$e2reading} );
-
-                        # currentTitle
-                        readingsBulkUpdate( $hash, "currentTitle",
-                            $eventNow->{$e2reading} )
-                          if $reading eq "eventtitle";
-                    }
-                }
-                else {
-                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                        || $hash->{READINGS}{$reading}{VAL} ne "-" )
-                    {
-                        readingsBulkUpdate( $hash, $reading, "-" );
-
-                        # currentTitle
-                        readingsBulkUpdate( $hash, "currentTitle", "-" )
-                          if $reading eq "eventtitle";
-                    }
-                }
-
-                # next event
-                $reading = $_ . "_next";
-                if (   defined( $eventNext->{$e2reading} )
-                    && lc( $eventNext->{$e2reading} ) ne "n/a"
-                    && $eventNext->{$e2reading} ne "0"
-                    && $eventNext->{$e2reading} ne "" )
-                {
-                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                        || $hash->{READINGS}{$reading}{VAL} ne
-                        $eventNext->{$e2reading} )
-                    {
-                        readingsBulkUpdate( $hash, $reading,
-                            $eventNext->{$e2reading} );
-
-                        # nextTitle
-                        readingsBulkUpdate( $hash, "nextTitle",
-                            $eventNext->{$e2reading} )
-                          if $reading eq "eventtitle_next";
-                    }
-                }
-                else {
-                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                        || $hash->{READINGS}{$reading}{VAL} ne "-" )
-                    {
-                        readingsBulkUpdate( $hash, $reading, "-" );
-
-                        # nextTitle
-                        readingsBulkUpdate( $hash, "nextTitle", "-" )
-                          if $reading eq "eventtitle_next";
-                    }
-                }
-            }
-
-            # convert date+time into human readable formats
-            foreach (
-                "eventstart",    "eventcurrenttime",
-                "eventduration", "eventremaining"
-              )
-            {
-                $reading   = $_ . "_hr";
-                $e2reading = "e2" . $_;
-
-                # current event
-                if (   defined( $eventNow->{$e2reading} )
-                    && $eventNow->{$e2reading} ne "0"
-                    && $eventNow->{$e2reading} ne "" )
-                {
-                    my $timestring;
-                    if (   $_ eq "eventduration"
-                        || $_ eq "eventremaining" )
-                    {
-                        my @t = localtime( $eventNow->{$e2reading} );
-                        $timestring =
-                          sprintf( "%02d:%02d:%02d", $t[2] - 1, $t[1], $t[0] );
-                    }
-                    else {
-                        $timestring =
-                          substr( FmtDateTime( $eventNow->{$e2reading} ), 11 );
-                    }
-                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                        || $hash->{READINGS}{$reading}{VAL} ne $timestring )
-                    {
-                        readingsBulkUpdate( $hash, $reading, $timestring );
-                    }
-                }
-                else {
-                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                        || $hash->{READINGS}{$reading}{VAL} ne "-" )
-                    {
-                        readingsBulkUpdate( $hash, $reading, "-" );
-                    }
-                }
-
-                # next event
-                $reading = $_ . "_next_hr";
-                if (   defined( $eventNext->{$e2reading} )
-                    && $eventNext->{$e2reading} ne "0"
-                    && $eventNext->{$e2reading} ne "" )
-                {
-                    my $timestring;
-                    if (   $_ eq "eventduration"
-                        || $_ eq "eventremaining" )
-                    {
-                        my @t = localtime( $eventNext->{$e2reading} );
-                        $timestring =
-                          sprintf( "%02d:%02d:%02d", $t[2] - 1, $t[1], $t[0] );
-                    }
-                    else {
-                        $timestring =
-                          substr( FmtDateTime( $eventNext->{$e2reading} ), 11 );
-                    }
-                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                        || $hash->{READINGS}{$reading}{VAL} ne $timestring )
-                    {
-                        readingsBulkUpdate( $hash, $reading, $timestring );
-                    }
-                }
-                else {
-                    if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                        || $hash->{READINGS}{$reading}{VAL} ne "-" )
-                    {
-                        readingsBulkUpdate( $hash, $reading, "-" );
-                    }
-                }
-            }
-        }
-    }
-
-    # Volume
-    #
-    if ( ref($vol) eq "HASH" && defined( $vol->{e2current} ) ) {
-        if ( !defined( $hash->{READINGS}{volume}{VAL} )
-            || $hash->{READINGS}{volume}{VAL} ne $vol->{e2current} )
-        {
-            readingsBulkUpdate( $hash, "volume", $vol->{e2current} );
-        }
-    }
-    if ( ref($vol) eq "HASH" && defined( $vol->{e2ismuted} ) ) {
-        my $muteState = "on";
-        if ( lc( $vol->{e2ismuted} ) eq "false" ) {
-            $muteState = "off";
-        }
-        if ( !defined( $hash->{READINGS}{mute}{VAL} )
-            || $hash->{READINGS}{mute}{VAL} ne $muteState )
-        {
-            readingsBulkUpdate( $hash, "mute", $muteState );
-        }
-    }
-
-    # Signal
-    #
-    if ( ref($signalinfo) eq "HASH"
-        && defined( $signalinfo->{e2snrdb} ) )
-    {
-        foreach ( "snrdb", "snr", "ber", "acg", ) {
-            $reading   = $_;
-            $e2reading = "e2" . $_;
-
-            if ( defined( $signalinfo->{$e2reading} )
-                && lc( $signalinfo->{$e2reading} ) ne "n/a" )
-            {
-                my @value = split( / /, $signalinfo->{$e2reading} );
-                if ( defined( $value[1] ) || $reading eq "ber" ) {
-                    readingsBulkUpdate( $hash, $reading, $value[0] );
-                }
-                else {
-                    readingsBulkUpdate( $hash, $reading, "0" );
-                }
-            }
-            else {
-                readingsBulkUpdate( $hash, $reading, "0" );
-            }
-        }
-    }
-
-    # Set ENIGMA2 online-only readings to "-" in case box is in
-    # offline or in standby mode
-    if ( $state eq "off" || $state eq "absent" || $state eq "undefined" ) {
-        foreach (
-            'servicename',            'providername',
-            'servicereference',       'videowidth',
-            'videoheight',            'servicevideosize',
-            'apid',                   'vpid',
-            'pcrpid',                 'pmtpid',
-            'txtpid',                 'tsid',
-            'onid',                   'sid',
-            'iswidescreen',           'mute',
-            'volume',                 'channel',
-            'currentTitle',           'nextTitle',
-            'currentMedia',           'eventcurrenttime',
-            'eventcurrenttime_hr',    'eventdescription',
-            'eventduration',          'eventduration_hr',
-            'eventremaining',         'eventremaining_hr',
-            'eventstart',             'eventstart_hr',
-            'eventtitle',             'eventname',
-            'eventcurrenttime_next',  'eventcurrenttime_next_hr',
-            'eventdescription_next',  'eventduration_next',
-            'eventduration_next_hr',  'eventremaining_next',
-            'eventremaining_next_hr', 'eventstart_next',
-            'eventstart_next_hr',     'eventtitle_next',
-            'eventname_next',
-          )
-        {
-            if ( !defined( $hash->{READINGS}{$_}{VAL} )
-                || $hash->{READINGS}{$_}{VAL} ne "-" )
-            {
-                readingsBulkUpdate( $hash, $_, "-" );
-            }
-        }
-
-        # special handling for signal values
-        foreach ( 'acg', 'ber', 'snr', 'snrdb', ) {
-            if ( !defined( $hash->{READINGS}{$_}{VAL} )
-                || $hash->{READINGS}{$_}{VAL} ne "0" )
-            {
-                readingsBulkUpdate( $hash, $_, "0" );
-            }
-        }
-    }
-
-    # Set ENIGMA2 online+standby readings to "-" in case box is in
-    # offline mode
-    if ( $state eq "absent" || $state eq "undefined" ) {
-        foreach ( 'input', ) {
-            if ( !defined( $hash->{READINGS}{$_}{VAL} )
-                || $hash->{READINGS}{$_}{VAL} ne "-" )
-            {
-                readingsBulkUpdate( $hash, $_, "-" );
-            }
-        }
-    }
-
-    readingsEndUpdate( $hash, 1 );
-
-    return $hash->{STATE};
+    return;
 }
 
 ###################################
@@ -934,8 +146,6 @@ sub ENIGMA2_Get($@) {
 /^(power|input|volume|mute|channel|currentMedia|currentTitle|serviceprovider|servicevideosize)$/
       )
     {
-        ENIGMA2_GetStatus( $hash, 1 );
-
         if ( defined( $hash->{READINGS}{$what} ) ) {
             return $hash->{READINGS}{$what}{VAL};
         }
@@ -975,7 +185,7 @@ sub ENIGMA2_Get($@) {
 sub ENIGMA2_Set($@) {
     my ( $hash, @a ) = @_;
     my $name    = $hash->{NAME};
-    my $state   = $hash->{STATE};
+    my $state   = $hash->{READINGS}{state}{VAL};
     my $channel = $hash->{READINGS}{channel}{VAL}
       if ( defined( $hash->{READINGS}{channel}{VAL} ) );
     my $channels = "";
@@ -1018,7 +228,7 @@ sub ENIGMA2_Set($@) {
     my $usage =
         "Unknown argument "
       . $a[1]
-      . ", choose one of statusRequest:noArg toggle:noArg on:noArg off:noArg reboot:noArg restartGui:noArg shutdown:noArg volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg msg remoteControl channelUp:noArg channelDown:noArg play:noArg pause:noArg stop:noArg showText channel:"
+      . ", choose one of statusRequest:noArg toggle:noArg on:noArg off:noArg reboot:noArg restartGui:noArg shutdown:noArg volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg msg remoteControl channelUp:noArg channelDown:noArg play:noArg pause:noArg stop:noArg record:noArg showText channel:"
       . $channels;
     $usage .= " mute:-,on,off"
       if ( defined( $hash->{READINGS}{mute}{VAL} )
@@ -1047,15 +257,14 @@ sub ENIGMA2_Set($@) {
             $hash->{helper}{channels} = undef;
         }
 
-        # actual statusRequest be executed anyway on the end of the function
-
+        ENIGMA2_GetStatus($hash);
     }
 
     # toggle
     elsif ( $a[1] eq "toggle" ) {
         Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
 
-        if ( $hash->{READINGS}{power}{VAL} eq "off" ) {
+        if ( $hash->{READINGS}{state}{VAL} ne "on" ) {
             return ENIGMA2_Set( $hash, $name, "on" );
         }
         else {
@@ -1068,31 +277,13 @@ sub ENIGMA2_Set($@) {
     elsif ( $a[1] eq "shutdown" ) {
         Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
 
+        return "Recordings running"
+          if ( $hash->{READINGS}{recordings}{VAL} ne "0" );
+
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
             $cmd = "newstate=1";
-            $result = ENIGMA2_SendCommand( $hash, "powerstate", $cmd );
-            readingsBeginUpdate($hash);
-
-            if ( !defined( $hash->{READINGS}{state}{VAL} )
-                || $hash->{READINGS}{power}{VAL} ne "off" )
-            {
-                readingsBulkUpdate( $hash, "power", "off" );
-            }
-
-            if ( !defined( $hash->{READINGS}{presence}{VAL} )
-                || $hash->{READINGS}{presence}{VAL} ne "absent" )
-            {
-                $hash->{helper}{AVAILABLE} = 0;
-                readingsBulkUpdate( $hash, "presence", "absent" );
-            }
-
-            if ( !defined( $hash->{READINGS}{state}{VAL} )
-                || $hash->{READINGS}{state}{VAL} ne "absent" )
-            {
-                readingsBulkUpdate( $hash, "state", "absent" );
-            }
-
-            readingsEndUpdate( $hash, 1 );
+            $result =
+              ENIGMA2_SendCommand( $hash, "powerstate", $cmd, "shutdown" );
         }
         else {
             return "Device needs to be ON to be set to standby mode.";
@@ -1103,9 +294,13 @@ sub ENIGMA2_Set($@) {
     elsif ( $a[1] eq "reboot" ) {
         Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
 
+        return "Recordings running"
+          if ( $hash->{READINGS}{recordings}{VAL} ne "0" );
+
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
             $cmd = "newstate=2";
-            $result = ENIGMA2_SendCommand( $hash, "powerstate", $cmd );
+            $result =
+              ENIGMA2_SendCommand( $hash, "powerstate", $cmd, "reboot" );
         }
         else {
             return "Device needs to be reachable to be rebooted.";
@@ -1116,9 +311,13 @@ sub ENIGMA2_Set($@) {
     elsif ( lc( $a[1] ) eq "restartgui" ) {
         Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
 
+        return "Recordings running"
+          if ( $hash->{READINGS}{recordings}{VAL} ne "0" );
+
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             $cmd = "newstate=3";
-            $result = ENIGMA2_SendCommand( $hash, "powerstate", $cmd );
+            $result =
+              ENIGMA2_SendCommand( $hash, "powerstate", $cmd, "restartGui" );
         }
         else {
             return "Device needs to be ON to restart the GUI.";
@@ -1142,20 +341,7 @@ sub ENIGMA2_Set($@) {
         }
         else {
             $cmd = "newstate=4";
-            $result = ENIGMA2_SendCommand( $hash, "powerstate", $cmd );
-            readingsBeginUpdate($hash);
-            if ( !defined( $hash->{READINGS}{power}{VAL} )
-                || $hash->{READINGS}{power}{VAL} ne "on" )
-            {
-                readingsBulkUpdate( $hash, "power", "on" );
-            }
-            if ( !defined( $hash->{READINGS}{state}{VAL} )
-                || $hash->{READINGS}{state}{VAL} ne "on" )
-            {
-                readingsBulkUpdate( $hash, "state", "on" );
-            }
-            readingsEndUpdate( $hash, 1 );
-            ENIGMA2_GetStatus( $hash, 1 );
+            $result = ENIGMA2_SendCommand( $hash, "powerstate", $cmd, "on" );
         }
     }
 
@@ -1165,19 +351,7 @@ sub ENIGMA2_Set($@) {
 
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
             $cmd = "newstate=5";
-            $result = ENIGMA2_SendCommand( $hash, "powerstate", $cmd );
-            readingsBeginUpdate($hash);
-            if ( !defined( $hash->{READINGS}{power}{VAL} )
-                || $hash->{READINGS}{power}{VAL} ne "off" )
-            {
-                readingsBulkUpdate( $hash, "power", "off" );
-            }
-            if ( !defined( $hash->{READINGS}{state}{VAL} )
-                || $hash->{READINGS}{state}{VAL} ne "off" )
-            {
-                readingsBulkUpdate( $hash, "state", "off" );
-            }
-            readingsEndUpdate( $hash, 1 );
+            $result = ENIGMA2_SendCommand( $hash, "powerstate", $cmd, "off" );
         }
         else {
             return "Device needs to be reachable to be set to standby mode.";
@@ -1194,11 +368,6 @@ sub ENIGMA2_Set($@) {
             my $_ = $a[2];
             if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
                 $cmd = "set=set" . $a[2];
-                if ( !defined( $hash->{READINGS}{volume}{VAL} )
-                    || $hash->{READINGS}{volume}{VAL} ne $a[2] )
-                {
-                    readingsSingleUpdate( $hash, "volume", $a[2], 1 );
-                }
             }
             else {
                 return
@@ -1241,29 +410,22 @@ sub ENIGMA2_Set($@) {
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             if ( !defined( $a[2] ) || $a[2] eq "toggle" ) {
                 $cmd = "set=mute";
-                if ( $hash->{READINGS}{mute}{VAL} eq "off" ) {
-                    readingsSingleUpdate( $hash, "mute", "on", 1 );
-                }
-                else {
-                    readingsSingleUpdate( $hash, "mute", "off", 1 );
-                }
             }
             elsif ( $a[2] eq "off" ) {
                 if ( $hash->{READINGS}{mute}{VAL} ne "off" ) {
                     $cmd = "set=mute";
-                    readingsSingleUpdate( $hash, "mute", $a[2], 1 );
                 }
             }
             elsif ( $a[2] eq "on" ) {
                 if ( $hash->{READINGS}{mute}{VAL} ne "on" ) {
                     $cmd = "set=mute";
-                    readingsSingleUpdate( $hash, "mute", $a[2], 1 );
                 }
             }
             else {
                 return "Unknown argument " . $a[2];
             }
-            $result = ENIGMA2_SendCommand( $hash, "vol", $cmd );
+            $result = ENIGMA2_SendCommand( $hash, "vol", $cmd )
+              if ( $cmd ne "" );
         }
         else {
             return "Device needs to be ON to mute/unmute audio.";
@@ -1469,12 +631,10 @@ sub ENIGMA2_Set($@) {
             if ( $a[2] eq "tv" || $a[2] eq "TV" ) {
                 $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("TV");
                 $hash->{helper}{lastInput} = "tv";
-                readingsSingleUpdate( $hash, "input", "tv", 1 );
             }
             elsif ( $a[2] eq "radio" || $a[2] eq "RADIO" ) {
                 $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("RADIO");
                 $hash->{helper}{lastInput} = "radio";
-                readingsSingleUpdate( $hash, "input", "radio", 1 );
             }
             else {
                 return
@@ -1515,6 +675,18 @@ sub ENIGMA2_Set($@) {
         }
     }
 
+    # record
+    elsif ( $a[1] eq "record" ) {
+        Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
+
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            $result = ENIGMA2_SendCommand( $hash, "recordnow" );
+        }
+        else {
+            return "Device needs to be ON to start instant recording.";
+        }
+    }
+
     # showText
     elsif ( $a[1] eq "showText" ) {
         Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
@@ -1545,19 +717,7 @@ sub ENIGMA2_Set($@) {
         return $usage;
     }
 
-  # Call the GetStatus() Function to retrieve the new values after setting
-  # something (with local flag, so the internal timer is not getting interupted)
-    if (   $a[1] ne "shutdown"
-        && $a[1] ne "on"
-        && $a[1] ne "mute"
-        && lc( $a[1] ) ne "restartgui"
-        && lc( $a[1] ) ne "remotecontrol"
-        && $a[1] ne "reboot" )
-    {
-        ENIGMA2_GetStatus( $hash, 1 );
-    }
-
-    return undef;
+    return;
 }
 
 ###################################
@@ -1584,8 +744,8 @@ sub ENIGMA2_Define($$) {
     my $port = $a[3] || 80;
     $hash->{helper}{PORT} = $port;
 
-    # use interval of 75sec if not defined
-    my $interval = $a[4] || 75;
+    # use interval of 45sec if not defined
+    my $interval = $a[4] || 45;
     $hash->{INTERVAL} = $interval;
 
     # set http user if defined
@@ -1597,7 +757,7 @@ sub ENIGMA2_Define($$) {
     $hash->{helper}{PASSWORD} = $http_passwd if $http_passwd;
 
     # set default attributes
-    unless ( exists( $attr{$name}{"http-method"} ) ) {
+    unless ( defined( AttrVal( $name, "http-method", undef ) ) ) {
 
         # use http-method POST for FritzBox environment as GET does not seem to
         # work properly. Might restrict use to newer
@@ -1614,18 +774,18 @@ sub ENIGMA2_Define($$) {
             $attr{$name}{"http-method"} = 'GET';
         }
     }
-    unless ( exists( $attr{$name}{webCmd} ) ) {
+    unless ( defined( AttrVal( $name, "webCmd", undef ) ) ) {
         $attr{$name}{webCmd} = 'channel:input';
     }
-    unless ( exists( $attr{$name}{devStateIcon} ) ) {
+    unless ( defined( AttrVal( $name, "devStateIcon", undef ) ) ) {
         $attr{$name}{devStateIcon} =
           'on:rc_GREEN:off off:rc_YELLOW:on absent:rc_STOP:on';
     }
-    unless ( exists( $attr{$name}{icon} ) ) {
+    unless ( defined( AttrVal( $name, "icon", undef ) ) ) {
         $attr{$name}{icon} = 'dreambox';
     }
 
-    unless ( exists( $hash->{helper}{AVAILABLE} )
+    unless ( defined( $hash->{helper}{AVAILABLE} )
         and ( $hash->{helper}{AVAILABLE} == 0 ) )
     {
         $hash->{helper}{AVAILABLE} = 1;
@@ -1634,9 +794,9 @@ sub ENIGMA2_Define($$) {
 
     # start the status update timer
     RemoveInternalTimer($hash);
-    InternalTimer( gettimeofday() + 2, "ENIGMA2_GetStatus", $hash, 0 );
+    InternalTimer( gettimeofday() + 2, "ENIGMA2_GetStatus", $hash, 1 );
 
-    return undef;
+    return;
 }
 
 ############################################################################################################
@@ -1646,13 +806,14 @@ sub ENIGMA2_Define($$) {
 ############################################################################################################
 
 ###################################
-sub ENIGMA2_SendCommand($$;$) {
-    my ( $hash, $service, $cmd ) = @_;
+sub ENIGMA2_SendCommand($$;$$) {
+    my ( $hash, $service, $cmd, $type ) = @_;
     my $name        = $hash->{NAME};
     my $address     = $hash->{helper}{ADDRESS};
     my $port        = $hash->{helper}{PORT};
     my $http_method = $attr{$name}{"http-method"};
     my $timeout;
+    $cmd = ( defined($cmd) ) ? $cmd : "";
 
     Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_SendCommand()";
 
@@ -1721,7 +882,23 @@ sub ENIGMA2_SendCommand($$;$) {
     # send request via HTTP-GET method
     if ( $http_method eq "GET" || $http_method eq "" || $cmd eq "" ) {
         Log3 $name, 5, "ENIGMA2 $name: GET " . urlDecode($URL);
-        $response = CustomGetFileFromURL( 0, $URL, $timeout, undef, 0, 5 );
+
+        #        $response = GetFileFromURL( $URL, $timeout, undef, 0, 5 );
+
+        HttpUtils_NonblockingGet(
+            {
+                url        => $URL,
+                timeout    => $timeout,
+                noshutdown => 1,
+                data       => undef,
+                hash       => $hash,
+                service    => $service,
+                cmd        => $cmd,
+                type       => $type,
+                callback   => \&ENIGMA2_ReceiveCommand,
+            }
+        );
+
     }
 
     # send request via HTTP-POST method
@@ -1731,7 +908,22 @@ sub ENIGMA2_SendCommand($$;$) {
           . $URL
           . " (POST DATA: "
           . urlDecode($cmd) . ")";
-        $response = CustomGetFileFromURL( 0, $URL, $timeout, $cmd, 0, 5 );
+
+        #        $response = GetFileFromURL( $URL, $timeout, $cmd, 0, 5 );
+
+        HttpUtils_NonblockingGet(
+            {
+                url        => $URL,
+                timeout    => $timeout,
+                noshutdown => 1,
+                data       => $cmd,
+                hash       => $hash,
+                service    => $service,
+                cmd        => $cmd,
+                type       => $type,
+                callback   => \&ENIGMA2_ReceiveCommand,
+            }
+        );
     }
 
     # other HTTP methods are not supported
@@ -1742,23 +934,62 @@ sub ENIGMA2_SendCommand($$;$) {
           . " is not supported.";
     }
 
-    unless ( defined($response) ) {
-        if (
-            ( not exists( $hash->{helper}{AVAILABLE} ) )
-            or ( exists( $hash->{helper}{AVAILABLE} )
-                and $hash->{helper}{AVAILABLE} eq 1 )
-          )
-        {
-            Log3 $name, 3, "ENIGMA2 device $name is unavailable";
-            readingsSingleUpdate( $hash, "presence", "absent", 1 );
+    return;
+}
+
+###################################
+sub ENIGMA2_ReceiveCommand($$$) {
+    my ( $param, $err, $data ) = @_;
+    my $hash    = $param->{hash};
+    my $name    = $hash->{NAME};
+    my $service = $param->{service};
+    my $cmd     = $param->{cmd};
+    my $state =
+      ( $hash->{READINGS}{state}{VAL} ) ? $hash->{READINGS}{state}{VAL} : "";
+    my $type = ( $param->{type} ) ? $param->{type} : "";
+    my $return;
+
+    Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_ReceiveCommand()";
+
+    readingsBeginUpdate($hash);
+
+    # device not reachable
+    if ($err) {
+
+        # powerstate
+        if ( $service eq "powerstate" ) {
+            $state = "absent";
+
+            if (
+                ( not exists( $hash->{helper}{AVAILABLE} ) )
+                or ( exists( $hash->{helper}{AVAILABLE} )
+                    and $hash->{helper}{AVAILABLE} eq 1 )
+              )
+            {
+                Log3 $name, 3, "ENIGMA2 device $name is unavailable";
+                readingsBulkUpdate( $hash, "presence", "absent" );
+            }
+        }
+
+        # all others
+        else {
+            if ( !defined($cmd) || $cmd eq "" ) {
+                Log3 $name, 4, "ENIGMA2 $name: RCV ERROR $service";
+            }
+            else {
+                Log3 $name, 4,
+                  "ENIGMA2 $name: RCV ERROR $service/" . urlDecode($cmd);
+            }
         }
     }
-    else {
+
+    # data received
+    elsif ($data) {
         if ( defined( $hash->{helper}{AVAILABLE} )
             and $hash->{helper}{AVAILABLE} eq 0 )
         {
             Log3 $name, 3, "ENIGMA2 device $name is available";
-            readingsSingleUpdate( $hash, "presence", "present", 1 );
+            readingsBulkUpdate( $hash, "presence", "present" );
         }
 
         if ( !defined($cmd) || $cmd eq "" ) {
@@ -1768,16 +999,16 @@ sub ENIGMA2_SendCommand($$;$) {
             Log3 $name, 4, "ENIGMA2 $name: RCV $service/" . urlDecode($cmd);
         }
 
-        if ( $response ne "" ) {
-            if ( $response =~ /^<\?xml/ && $response !~ /<\/html>/ ) {
+        if ( $data ne "" ) {
+            if ( $data =~ /^<\?xml/ && $data !~ /<\/html>/ ) {
                 if ( !defined($cmd) || $cmd eq "" ) {
-                    Log3 $name, 5, "ENIGMA2 $name: RES $service\n" . $response;
+                    Log3 $name, 5, "ENIGMA2 $name: RES $service\n" . $data;
                 }
                 else {
                     Log3 $name, 5,
                         "ENIGMA2 $name: RES $service/"
                       . urlDecode($cmd) . "\n"
-                      . $response;
+                      . $data;
                 }
 
                 my $parser = XML::Simple->new(
@@ -1786,39 +1017,936 @@ sub ENIGMA2_SendCommand($$;$) {
                     ForceArray     => 0,
                     SuppressEmpty  => 1
                 );
-                $return = $parser->XMLin( Encode::encode_utf8($response) );
+                $return = $parser->XMLin( Encode::encode_utf8($data) );
             }
             else {
                 if ( !defined($cmd) || $cmd eq "" ) {
                     Log3 $name, 5,
                       "ENIGMA2 $name: RES ERROR $service - not in XML format\n"
-                      . $response;
+                      . $data;
                 }
                 else {
                     Log3 $name, 5,
                         "ENIGMA2 $name: RES ERROR $service/"
                       . urlDecode($cmd)
                       . " - not in XML format\n"
-                      . $response;
+                      . $data;
                 }
 
                 return undef;
             }
         }
 
-        $hash->{helper}{AVAILABLE} = ( defined($response) ? 1 : 0 );
+        $return = Encode::encode_utf8($data) if ( ref($return) ne "HASH" );
 
-        if ( ref($return) eq "HASH" ) {
-            return $return;
+        #######################
+        # process return data
+        #
+
+        # powerstate
+        if ( $service eq "powerstate" ) {
+            if ( defined($return)
+                && ref($return) eq "HASH" )
+            {
+
+                # Cache bouquet information - get favorite bouquet
+                # if not available from helper
+                if (
+                    !defined($type)
+                    || (   $type ne "shutdown"
+                        && $type ne "reboot"
+                        && $type ne "restartGui"
+                        && $type ne "off" )
+                  )
+                {
+                    foreach my $input ( "tv", "radio" ) {
+                        if (   !defined( $hash->{helper}{bouquet}{$input} )
+                            || !defined( $hash->{helper}{channels}{$input} ) )
+                        {
+                            my $service_uri =
+'1:7:2:0:0:0:0:0:0:0:(type == 2)FROM BOUQUET "bouquets.'
+                              . $input
+                              . '" ORDER BY bouquet';
+
+                            # trigger cache update
+                            if (
+                                defined( $attr{$name}{ "bouquet-" . $input } ) )
+                            {
+                                ENIGMA2_SendCommand(
+                                    $hash,
+                                    "getservices",
+                                    "sRef="
+                                      . urlEncode(
+                                        $attr{$name}{ "bouquet-" . $input }
+                                      ),
+                                    "services-" . $input
+                                );
+                            }
+
+                            # set attributes first
+                            else {
+                                ENIGMA2_SendCommand(
+                                    $hash, "getservices",
+                                    "sRef=" . urlEncode($service_uri),
+                                    "defBouquet-" . $input
+                                );
+                            }
+
+                        }
+                    }
+                }
+
+                if (   $type eq "shutdown"
+                    || $type eq "reboot"
+                    || $type eq "restartGui"
+                    || $type eq "off"
+                    || ( $return->{e2instandby} eq "true" && $type ne "on" ) )
+                {
+                    $state = "off";
+                }
+                else {
+                    $state = "on";
+
+                    # Read Boxinfo every 15 minutes only
+                    if (
+                        !defined( $hash->{helper}{lastFullUpdate} )
+                        || ( defined( $hash->{helper}{lastFullUpdate} )
+                            && $hash->{helper}{lastFullUpdate} + 900 le time() )
+                      )
+                    {
+                        ENIGMA2_SendCommand( $hash, "about" );
+
+                        # Update state
+                        $hash->{helper}{lastFullUpdate} = time();
+                    }
+
+                    # get current states
+                    ENIGMA2_SendCommand( $hash, "getcurrent" );
+                    ENIGMA2_SendCommand( $hash, "timerlist" );
+                    ENIGMA2_SendCommand( $hash, "vol" );
+                    ENIGMA2_SendCommand( $hash, "signal" );
+                }
+            }
+            elsif ( $hash->{helper}{AVAILABLE} == 1 ) {
+                Log3 $name, 2,
+                  "ENIGMA2 $name: ERROR: Undefined state of device";
+
+                $state = "undefined";
+            }
         }
+
+        # update attributes for bouquet names
+        elsif ( $service eq "getservices"
+            && ( $type eq "defBouquet-tv" || $type eq "defBouquet-radio" ) )
+        {
+            my $input = ( $type eq "defBouquet-tv" ) ? "tv" : "radio";
+
+            # set FHEM device attribute if not available
+            #  multiple
+            if (   ref($return) eq "HASH"
+                && defined( $return->{e2service} )
+                && ref( $return->{e2service} ) eq "ARRAY"
+                && defined( $return->{e2service}[0]{e2servicereference} )
+                && $return->{e2service}[0]{e2servicereference} ne "" )
+            {
+                Log3 $name, 3,
+                    "ENIGMA2 $name: Adding attribute bouquet-"
+                  . $input . " = "
+                  . $return->{e2service}[0]{e2servicereference};
+
+                $attr{$name}{ "bouquet-" . $input } =
+                  $return->{e2service}[0]{e2servicereference};
+            }
+
+            #  single
+            elsif (ref($return) eq "HASH"
+                && defined( $return->{e2service}{e2servicereference} )
+                && $return->{e2service}{e2servicereference} ne "" )
+            {
+                Log3 $name, 3,
+                    "ENIGMA2 $name: Adding attribute bouquet-"
+                  . $input . " = "
+                  . $return->{e2service}{e2servicereference};
+
+                $attr{$name}{ "bouquet-" . $input } =
+                  $return->{e2service}{e2servicereference};
+            }
+            elsif ( !defined( $attr{$name}{ "bouquet-" . $input } ) ) {
+                Log3 $name, 3,
+                    "ENIGMA2 $name: ERROR: Unable to read any "
+                  . $input
+                  . " bouquets from device";
+            }
+
+            # trigger cache update
+            if ( defined( $attr{$name}{ "bouquet-" . $input } ) ) {
+                ENIGMA2_SendCommand(
+                    $hash,
+                    "getservices",
+                    "sRef=" . urlEncode( $attr{$name}{ "bouquet-" . $input } ),
+                    "services-" . $input
+                );
+            }
+        }
+
+        # update cache of tv and radio channels
+        elsif ( $service eq "getservices"
+            && ( $type eq "services-tv" || $type eq "services-radio" ) )
+        {
+            my $input = ( $type eq "services-tv" ) ? "tv" : "radio";
+
+            # Read channels
+            if ( ref($return) eq "HASH"
+                && defined( $return->{e2service} ) )
+            {
+                # multiple
+                if (   ref( $return->{e2service} ) eq "ARRAY"
+                    && defined( $return->{e2service}[0]{e2servicename} )
+                    && $return->{e2service}[0]{e2servicename} ne ""
+                    && defined( $return->{e2service}[0]{e2servicereference} )
+                    && $return->{e2service}[0]{e2servicereference} ne "" )
+                {
+                    my $i = 0;
+
+                    # TODO this loop is >5.012 only
+                    for ( keys @{ $return->{e2service} } ) {
+                        my $channel =
+                          $return->{e2service}[$_]{e2servicename};
+                        $channel =~ s/\s/_/g;
+
+                        # ignore markers
+                        if ( $return->{e2service}[$_]{e2servicereference} =~
+                            /^1:64:/ )
+                        {
+                            Log3 $name, 4,
+                              "ENIGMA2 $name: Ignoring marker "
+                              . $return->{e2service}[$_]{e2servicename};
+                            next;
+                        }
+
+                        if ( $channel ne "" ) {
+                            $hash->{helper}{bouquet}{$input}{$channel} =
+                              { 'sRef' =>
+                                  $return->{e2service}[$_]{e2servicereference}
+                              };
+
+                            $hash->{helper}{channels}{$input}[$i] =
+                              $channel;
+                        }
+
+                        $i++;
+                    }
+
+                    Log3 $name, 4,
+                        "ENIGMA2 $name: Cached favorite "
+                      . $input
+                      . " channels: "
+                      . join( ', ', @{ $hash->{helper}{channels}{$input} } );
+                }
+
+                # single
+                elsif (defined( $return->{e2service}{e2servicename} )
+                    && $return->{e2service}{e2servicename} ne ""
+                    && defined( $return->{e2service}{e2servicereference} )
+                    && $return->{e2service}{e2servicereference} ne "" )
+                {
+                    # ignore markers
+                    if ( $return->{e2service}{e2servicereference} =~ /^1:64:/ )
+                    {
+                        Log3 $name, 4,
+                          "ENIGMA2 $name: Ignoring marker "
+                          . $return->{e2service}{e2servicename};
+                    }
+                    else {
+                        my $channel = $return->{e2service}{e2servicename};
+                        $channel =~ s/\s/_/g;
+
+                        if ( $channel ne "" ) {
+                            $hash->{helper}{bouquet}{$input}{$channel} =
+                              { 'sRef' =>
+                                  $return->{e2service}{e2servicereference} };
+
+                            $hash->{helper}{channels}{$input}[0] =
+                              $channel;
+
+                            Log3 $name, 4,
+                                "ENIGMA2 $name: Cached favorite "
+                              . $input
+                              . " channels: "
+                              . $hash->{helper}{channels}{$input}[0];
+                        }
+                    }
+
+                }
+                else {
+                    Log3 $name, 4,
+                        "ENIGMA2 $name: ERROR: bouquet-"
+                      . $input
+                      . " seems to be empty.";
+                }
+            }
+            elsif ( $input eq "radio" ) {
+                Log3 $name, 4,
+                    "ENIGMA2 $name: ERROR: Unable to read "
+                  . $input
+                  . " bouquet '"
+                  . $attr{$name}{ "bouquet-" . $input }
+                  . "' from device";
+            }
+            else {
+                Log3 $name, 3,
+                    "ENIGMA2 $name: ERROR: Unable to read "
+                  . $input
+                  . " bouquet '"
+                  . $attr{$name}{ "bouquet-" . $input }
+                  . "' from device";
+            }
+        }
+
+        # boxinfo
+        elsif ( $service eq "about" ) {
+            my $reading;
+            my $e2reading;
+            if ( ref($return) eq "HASH" ) {
+
+                # General readings
+                foreach (
+                    "enigmaversion", "imageversion", "webifversion",
+                    "fpversion",     "lanmac",       "model",
+                  )
+                {
+                    $reading   = $_;
+                    $e2reading = "e2" . $_;
+
+                    if ( defined( $return->{e2about}{$e2reading} ) ) {
+                        if (   $return->{e2about}{$e2reading} eq "False"
+                            || $return->{e2about}{$e2reading} eq "True" )
+                        {
+                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                                || $hash->{READINGS}{$reading}{VAL} ne
+                                lc( $return->{e2about}{$e2reading} ) )
+                            {
+                                readingsBulkUpdate( $hash, $reading,
+                                    lc( $return->{e2about}{$e2reading} ) );
+                            }
+                        }
+                        else {
+                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                                || $hash->{READINGS}{$reading}{VAL} ne
+                                $return->{e2about}{$e2reading} )
+                            {
+                                readingsBulkUpdate( $hash, $reading,
+                                    $return->{e2about}{$e2reading} );
+                            }
+                        }
+
+                        # model
+                        if ( $reading eq "model" && $reading ne "" ) {
+                            my $model = $hash->{READINGS}{model}{VAL};
+                            $model =~ s/\s/_/g;
+                            $hash->{model} = $model;
+                        }
+                    }
+
+                    else {
+                        if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                            || $hash->{READINGS}{$reading}{VAL} ne "-" )
+                        {
+                            readingsBulkUpdate( $hash, $reading, "-" );
+                        }
+                    }
+                }
+
+                # HDD
+                if ( defined( $return->{e2about}{e2hddinfo} ) ) {
+
+                    # multiple
+                    if ( ref( $return->{e2about}{e2hddinfo} ) eq "ARRAY" ) {
+                        my $i        = 0;
+                        my $arr_size = @{ $return->{e2about}{e2hddinfo} };
+
+                        while ( $i < $arr_size ) {
+                            my $counter     = $i + 1;
+                            my $readingname = "hdd" . $counter . "_model";
+                            if (
+                                !defined(
+                                    $hash->{READINGS}{$readingname}{VAL}
+                                )
+                                || $hash->{READINGS}{$readingname}{VAL} ne
+                                $return->{e2about}{e2hddinfo}[$i]{model}
+                              )
+                            {
+                                readingsBulkUpdate( $hash, $readingname,
+                                    $return->{e2about}{e2hddinfo}[$i]{model} );
+                            }
+
+                            $readingname = "hdd" . $counter . "_capacity";
+                            my @value =
+                              split( / /,
+                                $return->{e2about}{e2hddinfo}[$i]{capacity} );
+                            if (
+                                !defined(
+                                    $hash->{READINGS}{$readingname}{VAL}
+                                )
+                                || (   @value
+                                    && $hash->{READINGS}{$readingname}{VAL} ne
+                                    $value[0] )
+                              )
+                            {
+                                readingsBulkUpdate( $hash, $readingname,
+                                    $value[0] );
+                            }
+
+                            $readingname = "hdd" . $counter . "_free";
+                            @value =
+                              split( / /,
+                                $return->{e2about}{e2hddinfo}[$i]{free} );
+                            if (
+                                !defined(
+                                    $hash->{READINGS}{$readingname}{VAL}
+                                )
+                                || (   @value
+                                    && $hash->{READINGS}{$readingname}{VAL} ne
+                                    $value[0] )
+                              )
+                            {
+                                readingsBulkUpdate( $hash, $readingname,
+                                    $value[0] );
+                            }
+
+                            $i++;
+                        }
+                    }
+
+                    #  single
+                    elsif ( ref( $return->{e2about}{e2hddinfo} ) eq "HASH" ) {
+                        my $readingname = "hdd1_model";
+                        if ( !defined( $hash->{READINGS}{$readingname}{VAL} )
+                            || $hash->{READINGS}{$readingname}{VAL} ne
+                            $return->{e2about}{e2hddinfo}{model} )
+                        {
+                            readingsBulkUpdate( $hash, $readingname,
+                                $return->{e2about}{e2hddinfo}{model} );
+                        }
+
+                        $readingname = "hdd1_capacity";
+                        my @value =
+                          split( / /, $return->{e2about}{e2hddinfo}{capacity} );
+                        if (
+                            !defined( $hash->{READINGS}{$readingname}{VAL} )
+                            || (   @value
+                                && $hash->{READINGS}{$readingname}{VAL} ne
+                                $value[0] )
+                          )
+                        {
+                            readingsBulkUpdate( $hash, $readingname,
+                                $value[0] );
+                        }
+
+                        $readingname = "hdd1_free";
+                        @value =
+                          split( / /, $return->{e2about}{e2hddinfo}{free} );
+                        if (
+                            !defined( $hash->{READINGS}{$readingname}{VAL} )
+                            || (   @value
+                                && $hash->{READINGS}{$readingname}{VAL} ne
+                                $value[0] )
+                          )
+                        {
+                            readingsBulkUpdate( $hash, $readingname,
+                                $value[0] );
+                        }
+                    }
+                }
+
+                # Tuner
+                if ( defined( $return->{e2about}{e2tunerinfo}{e2nim} ) ) {
+                    my %tuner = %{ $return->{e2about}{e2tunerinfo}{e2nim} };
+
+                    #  single
+                    if ( defined( $tuner{type} ) ) {
+                        my $tunerRef   = \%tuner;
+                        my $tuner_name = lc( $$tunerRef{name} );
+                        $tuner_name =~ s/\s/_/g;
+
+                        if ( !defined( $hash->{READINGS}{$tuner_name}{VAL} )
+                            || $hash->{READINGS}{$tuner_name}{VAL} ne
+                            $$tunerRef{type} )
+                        {
+                            readingsBulkUpdate( $hash, $tuner_name,
+                                $$tunerRef{type} );
+                        }
+
+                    }
+
+                    #  multiple
+                    else {
+                        for ( keys %tuner ) {
+                            my $tuner_name = lc($_);
+                            $tuner_name =~ s/\s/_/g;
+                            my $tuner_type = $tuner{$_}{type};
+
+                            if ( !defined( $hash->{READINGS}{$tuner_name}{VAL} )
+                                || $hash->{READINGS}{$tuner_name}{VAL} ne
+                                $tuner_type )
+                            {
+                                readingsBulkUpdate( $hash, $tuner_name,
+                                    $tuner_type );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        # currsrvinfo
+        elsif ( $service eq "getcurrent" ) {
+            my $reading;
+            my $e2reading;
+            if ( ref($return) eq "HASH" ) {
+
+                # Service readings
+                foreach (
+                    "servicereference", "servicename",
+                    "providername",     "servicevideosize",
+                    "videowidth",       "videoheight",
+                    "iswidescreen",     "apid",
+                    "vpid",             "pcrpid",
+                    "pmtpid",           "txtpid",
+                    "tsid",             "onid",
+                    "sid"
+                  )
+                {
+                    $reading   = $_;
+                    $e2reading = "e2" . $_;
+
+                    if (   defined( $return->{e2service}{$e2reading} )
+                        && lc( $return->{e2service}{$e2reading} ) ne "n/a"
+                        && lc( $return->{e2service}{$e2reading} ) ne "n/axn/a"
+                        && lc( $return->{e2service}{$e2reading} ) ne "0x0" )
+                    {
+                        if (   $return->{e2service}{$e2reading} eq "False"
+                            || $return->{e2service}{$e2reading} eq "True" )
+                        {
+                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                                || $hash->{READINGS}{$reading}{VAL} ne
+                                lc( $return->{e2service}{$e2reading} ) )
+                            {
+                                readingsBulkUpdate( $hash, $reading,
+                                    lc( $return->{e2service}{$e2reading} ) );
+                            }
+                        }
+                        else {
+                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                                || $hash->{READINGS}{$reading}{VAL} ne
+                                $return->{e2service}{$e2reading} )
+                            {
+                                readingsBulkUpdate( $hash, $reading,
+                                    $return->{e2service}{$e2reading} );
+
+                                # channel
+                                if ( $reading eq "servicename" ) {
+                                    my $val = $return->{e2service}{$e2reading};
+                                    $val =~ s/\s/_/g;
+                                    readingsBulkUpdate( $hash, "channel",
+                                        $val );
+                                }
+
+                                # currentMedia
+                                readingsBulkUpdate( $hash, "currentMedia",
+                                    $return->{e2service}{$e2reading} )
+                                  if $reading eq "servicereference";
+                            }
+                        }
+
+                        # input
+                        if ( $reading eq "servicereference" ) {
+                            my @servicetype =
+                              split( /:/, $return->{e2service}{$e2reading} );
+
+                            if (
+                                   defined( $servicetype[2] )
+                                && $servicetype[2] eq "2"
+                                && ( !defined( $hash->{READINGS}{input}{VAL} )
+                                    || $hash->{READINGS}{input}{VAL} ne
+                                    "radio" )
+                              )
+                            {
+                                $hash->{helper}{lastInput} = "radio";
+                                readingsBulkUpdate( $hash, "input", "radio" );
+                            }
+                            elsif ( !defined( $hash->{READINGS}{input}{VAL} )
+                                || $hash->{READINGS}{input}{VAL} ne "tv" )
+                            {
+                                $hash->{helper}{lastInput} = "tv";
+                                readingsBulkUpdate( $hash, "input", "tv" );
+                            }
+                        }
+                    }
+                    else {
+                        if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                            || $hash->{READINGS}{$reading}{VAL} ne "-" )
+                        {
+                            readingsBulkUpdate( $hash, $reading, "-" );
+
+                            # channel
+                            readingsBulkUpdate( $hash, "channel", "-" )
+                              if $reading eq "servicename";
+
+                            # currentMedia
+                            readingsBulkUpdate( $hash, "currentMedia", "-" )
+                              if $reading eq "servicereference";
+                        }
+                    }
+                }
+
+                # Event readings
+                #
+                if ( defined( $return->{e2eventlist} ) ) {
+                    my $eventNow;
+                    my $eventNext;
+
+                    if ( ref( $return->{e2eventlist}{e2event} ) eq "ARRAY" ) {
+                        $eventNow  = $return->{e2eventlist}{e2event}[0];
+                        $eventNext = $return->{e2eventlist}{e2event}[1]
+                          if ( defined( $return->{e2eventlist}{e2event}[1] ) );
+                    }
+                    else {
+                        $eventNow = $return->{e2eventlist}{e2event};
+                    }
+
+                    foreach (
+                        "eventstart",       "eventduration",
+                        "eventremaining",   "eventcurrenttime",
+                        "eventdescription", "eventtitle",
+                        "eventname",
+                      )
+                    {
+                        $reading   = $_;
+                        $e2reading = "e2" . $_;
+
+                        # current event
+                        if (   defined( $eventNow->{$e2reading} )
+                            && lc( $eventNow->{$e2reading} ) ne "n/a"
+                            && $eventNow->{$e2reading} ne "0"
+                            && $eventNow->{$e2reading} ne "" )
+                        {
+                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                                || $hash->{READINGS}{$reading}{VAL} ne
+                                $eventNow->{$e2reading} )
+                            {
+                                readingsBulkUpdate( $hash, $reading,
+                                    $eventNow->{$e2reading} );
+
+                                # currentTitle
+                                readingsBulkUpdate( $hash, "currentTitle",
+                                    $eventNow->{$e2reading} )
+                                  if $reading eq "eventtitle";
+                            }
+                        }
+                        else {
+                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                                || $hash->{READINGS}{$reading}{VAL} ne "-" )
+                            {
+                                readingsBulkUpdate( $hash, $reading, "-" );
+
+                                # currentTitle
+                                readingsBulkUpdate( $hash, "currentTitle", "-" )
+                                  if $reading eq "eventtitle";
+                            }
+                        }
+
+                        # next event
+                        $reading = $_ . "_next";
+                        if (   defined( $eventNext->{$e2reading} )
+                            && lc( $eventNext->{$e2reading} ) ne "n/a"
+                            && $eventNext->{$e2reading} ne "0"
+                            && $eventNext->{$e2reading} ne "" )
+                        {
+                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                                || $hash->{READINGS}{$reading}{VAL} ne
+                                $eventNext->{$e2reading} )
+                            {
+                                readingsBulkUpdate( $hash, $reading,
+                                    $eventNext->{$e2reading} );
+
+                                # nextTitle
+                                readingsBulkUpdate( $hash, "nextTitle",
+                                    $eventNext->{$e2reading} )
+                                  if $reading eq "eventtitle_next";
+                            }
+                        }
+                        else {
+                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                                || $hash->{READINGS}{$reading}{VAL} ne "-" )
+                            {
+                                readingsBulkUpdate( $hash, $reading, "-" );
+
+                                # nextTitle
+                                readingsBulkUpdate( $hash, "nextTitle", "-" )
+                                  if $reading eq "eventtitle_next";
+                            }
+                        }
+                    }
+
+                    # convert date+time into human readable formats
+                    foreach (
+                        "eventstart",    "eventcurrenttime",
+                        "eventduration", "eventremaining"
+                      )
+                    {
+                        $reading   = $_ . "_hr";
+                        $e2reading = "e2" . $_;
+
+                        # current event
+                        if (   defined( $eventNow->{$e2reading} )
+                            && $eventNow->{$e2reading} ne "0"
+                            && $eventNow->{$e2reading} ne "" )
+                        {
+                            my $timestring;
+                            if (   $_ eq "eventduration"
+                                || $_ eq "eventremaining" )
+                            {
+                                my @t = localtime( $eventNow->{$e2reading} );
+                                $timestring = sprintf( "%02d:%02d:%02d",
+                                    $t[2] - 1,
+                                    $t[1], $t[0] );
+                            }
+                            else {
+                                $timestring =
+                                  substr(
+                                    FmtDateTime( $eventNow->{$e2reading} ),
+                                    11 );
+                            }
+                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                                || $hash->{READINGS}{$reading}{VAL} ne
+                                $timestring )
+                            {
+                                readingsBulkUpdate( $hash, $reading,
+                                    $timestring );
+                            }
+                        }
+                        else {
+                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                                || $hash->{READINGS}{$reading}{VAL} ne "-" )
+                            {
+                                readingsBulkUpdate( $hash, $reading, "-" );
+                            }
+                        }
+
+                        # next event
+                        $reading = $_ . "_next_hr";
+                        if (   defined( $eventNext->{$e2reading} )
+                            && $eventNext->{$e2reading} ne "0"
+                            && $eventNext->{$e2reading} ne "" )
+                        {
+                            my $timestring;
+                            if (   $_ eq "eventduration"
+                                || $_ eq "eventremaining" )
+                            {
+                                my @t = localtime( $eventNext->{$e2reading} );
+                                $timestring = sprintf( "%02d:%02d:%02d",
+                                    $t[2] - 1,
+                                    $t[1], $t[0] );
+                            }
+                            else {
+                                $timestring =
+                                  substr(
+                                    FmtDateTime( $eventNext->{$e2reading} ),
+                                    11 );
+                            }
+                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                                || $hash->{READINGS}{$reading}{VAL} ne
+                                $timestring )
+                            {
+                                readingsBulkUpdate( $hash, $reading,
+                                    $timestring );
+                            }
+                        }
+                        else {
+                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
+                                || $hash->{READINGS}{$reading}{VAL} ne "-" )
+                            {
+                                readingsBulkUpdate( $hash, $reading, "-" );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        # timerlist
+        elsif ( $service eq "timerlist" ) {
+            my $recordings = 0;
+
+            if ( ref($return) eq "HASH" ) {
+                if ( ref( $return->{e2timer} ) eq "HASH" ) {
+                    $recordings++
+                      if ( defined( $return->{e2timer}{e2state} )
+                        && $return->{e2timer}{e2state} eq "2" );
+                }
+                elsif ( ref( $return->{e2timer} ) eq "ARRAY" ) {
+                    my $i        = 0;
+                    my $arr_size = @{ $return->{e2timer} };
+
+                    while ( $i < $arr_size ) {
+                        $recordings++
+                          if ( defined( $return->{e2timer}[$i]{e2state} )
+                            && $return->{e2timer}[$i]{e2state} eq "2" );
+                        $i++;
+                    }
+                }
+            }
+
+            if ( !defined( $hash->{READINGS}{recordings}{VAL} )
+                || $hash->{READINGS}{recordings}{VAL} ne $recordings )
+            {
+                readingsBulkUpdate( $hash, "recordings", $recordings );
+            }
+        }
+
+        # volume
+        elsif ( $service eq "vol" ) {
+            if ( ref($return) eq "HASH" && defined( $return->{e2current} ) ) {
+                if ( !defined( $hash->{READINGS}{volume}{VAL} )
+                    || $hash->{READINGS}{volume}{VAL} ne $return->{e2current} )
+                {
+                    readingsBulkUpdate( $hash, "volume", $return->{e2current} );
+                }
+            }
+            if ( ref($return) eq "HASH" && defined( $return->{e2ismuted} ) ) {
+                my $muteState = "on";
+                if ( lc( $return->{e2ismuted} ) eq "false" ) {
+                    $muteState = "off";
+                }
+                if ( !defined( $hash->{READINGS}{mute}{VAL} )
+                    || $hash->{READINGS}{mute}{VAL} ne $muteState )
+                {
+                    readingsBulkUpdate( $hash, "mute", $muteState );
+                }
+            }
+        }
+
+        # signal
+        elsif ( $service eq "signal" ) {
+            my $reading;
+            my $e2reading;
+            if ( ref($return) eq "HASH"
+                && defined( $return->{e2snrdb} ) )
+            {
+                foreach ( "snrdb", "snr", "ber", "acg", ) {
+                    $reading   = $_;
+                    $e2reading = "e2" . $_;
+
+                    if ( defined( $return->{$e2reading} )
+                        && lc( $return->{$e2reading} ) ne "n/a" )
+                    {
+                        my @value = split( / /, $return->{$e2reading} );
+                        if ( defined( $value[1] ) || $reading eq "ber" ) {
+                            readingsBulkUpdate( $hash, $reading, $value[0] );
+                        }
+                        else {
+                            readingsBulkUpdate( $hash, $reading, "0" );
+                        }
+                    }
+                    else {
+                        readingsBulkUpdate( $hash, $reading, "0" );
+                    }
+                }
+            }
+        }
+
+        # all other command results
         else {
-            return Encode::encode_utf8($response);
+            ENIGMA2_GetStatus( $hash, 1 );
         }
     }
 
-    $hash->{helper}{AVAILABLE} = ( defined($response) ? 1 : 0 );
+    # Set reading for power
+    #
+    my $readingPower = "off";
+    if ( $state eq "on" ) {
+        $readingPower = "on";
+    }
+    if ( !defined( $hash->{READINGS}{power}{VAL} )
+        || $hash->{READINGS}{power}{VAL} ne $readingPower )
+    {
+        readingsBulkUpdate( $hash, "power", $readingPower );
+    }
 
-    return undef;
+    # Set reading for state
+    #
+    if ( !defined( $hash->{READINGS}{state}{VAL} )
+        || $hash->{READINGS}{state}{VAL} ne $state )
+    {
+        readingsBulkUpdate( $hash, "state", $state );
+    }
+
+    # Set ENIGMA2 online-only readings to "-" in case box is in
+    # offline or in standby mode
+    if (   $state eq "off"
+        || $state eq "absent"
+        || $state eq "undefined" )
+    {
+        foreach (
+            'servicename',            'providername',
+            'servicereference',       'videowidth',
+            'videoheight',            'servicevideosize',
+            'apid',                   'vpid',
+            'pcrpid',                 'pmtpid',
+            'txtpid',                 'tsid',
+            'onid',                   'sid',
+            'iswidescreen',           'mute',
+            'volume',                 'channel',
+            'currentTitle',           'nextTitle',
+            'currentMedia',           'eventcurrenttime',
+            'eventcurrenttime_hr',    'eventdescription',
+            'eventduration',          'eventduration_hr',
+            'eventremaining',         'eventremaining_hr',
+            'eventstart',             'eventstart_hr',
+            'eventtitle',             'eventname',
+            'eventcurrenttime_next',  'eventcurrenttime_next_hr',
+            'eventdescription_next',  'eventduration_next',
+            'eventduration_next_hr',  'eventremaining_next',
+            'eventremaining_next_hr', 'eventstart_next',
+            'eventstart_next_hr',     'eventtitle_next',
+            'eventname_next',
+          )
+        {
+            if ( !defined( $hash->{READINGS}{$_}{VAL} )
+                || $hash->{READINGS}{$_}{VAL} ne "-" )
+            {
+                readingsBulkUpdate( $hash, $_, "-" );
+            }
+        }
+
+        # special handling for signal values
+        foreach ( 'acg', 'ber', 'snr', 'snrdb', ) {
+            if ( !defined( $hash->{READINGS}{$_}{VAL} )
+                || $hash->{READINGS}{$_}{VAL} ne "0" )
+            {
+                readingsBulkUpdate( $hash, $_, "0" );
+            }
+        }
+    }
+
+    # Set ENIGMA2 online+standby readings to "-" in case box is in
+    # offline mode
+    if ( $state eq "absent" || $state eq "undefined" ) {
+        foreach ( 'input', ) {
+            if ( !defined( $hash->{READINGS}{$_}{VAL} )
+                || $hash->{READINGS}{$_}{VAL} ne "-" )
+            {
+                readingsBulkUpdate( $hash, $_, "-" );
+            }
+        }
+    }
+
+    readingsEndUpdate( $hash, 1 );
+
+    $hash->{helper}{AVAILABLE} = ( defined($data) ? 1 : 0 );
+
+    return;
 }
 
 ###################################
@@ -1830,7 +1958,8 @@ sub ENIGMA2_Undefine($$) {
 
     # Stop the internal GetStatus-Loop and exit
     RemoveInternalTimer($hash);
-    return undef;
+
+    return;
 }
 
 ###################################
@@ -2482,7 +2611,7 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
 
     This module controls ENIGMA2 based devices like Dreambox or VUplus via network connection.<br><br>
     Defining an ENIGMA2 device will schedule an internal task (interval can be set
-    with optional parameter &lt;poll-interval&gt; in seconds, if not set, the value is 75
+    with optional parameter &lt;poll-interval&gt; in seconds, if not set, the value is 45
     seconds), which periodically reads the status of the device and triggers notify/filelog commands.<br><br>
 
     Example:<br>
@@ -2492,11 +2621,11 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
        # With custom port<br>
        define SATReceiver ENIGMA2 192.168.0.10 8080
        <br><br>
-       # With custom interval of 60 seconds<br>
-       define SATReceiver ENIGMA2 192.168.0.10 80 60
+       # With custom interval of 20 seconds<br>
+       define SATReceiver ENIGMA2 192.168.0.10 80 20
        <br><br>
        # With HTTP user credentials<br>
-       define SATReceiver ENIGMA2 192.168.0.10 80 60 root secret
+       define SATReceiver ENIGMA2 192.168.0.10 80 20 root secret
     </code></ul>
   </ul>
   <br>
@@ -2589,7 +2718,6 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
     <li><b>disable</b> - Disable polling (true/false)</li>
     <li><b>http-method</b> - HTTP access method to be used; e.g. a FritzBox might need to use POST instead of GET (GET/POST)</li>
     <li><b>https</b> - Access box via secure HTTP (true/false)</li>
-    <li><b>model</b> - The uses device model; set automatically according to device information</li>
     <li><b>timeout</b> - Set different polling timeout in seconds (default=6)</li>
   </ul></ul>
   <br>
@@ -2644,6 +2772,7 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
     <li><b>power</b> - Reports the power status of the device (can be "on" or "off")</li>
     <li><b>presence</b> - Reports the presence status of the receiver (can be "absent" or "present"). In case of an absent device, control is basically limited to turn it on again. This will only work if the device supports Wake-On-LAN packages, otherwise command "on" will have no effect.</li>
     <li><b>providername</b> - Service provider of current channel</li>
+    <li><b>recordings</b> - Number of active recordings</li>
     <li><b>servicename</b> - Name for current channel</li>
     <li><b>servicereference</b> - The service reference ID of current channel</li>
     <li><b>servicevideosize</b> - Video resolution for current channel</li>
