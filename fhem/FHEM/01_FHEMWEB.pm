@@ -135,6 +135,7 @@ FHEMWEB_Initialize($)
     longpoll:0,1
     longpollSVG:1,0
     menuEntries
+    ploteditor:always,onClick,never
     plotfork:1,0
     plotmode:gnuplot,gnuplot-scroll,SVG
     plotsize
@@ -2540,6 +2541,13 @@ FW_ActivateInform()
         is not used if the SVG has the attribute startDate defined.<br>
         </li><br>
 
+    <a name="ploteditor"></a>
+    <li>ploteditor<br>
+        Configures if the <a href="#plotEditor">Plot editor</a> should be shown
+        in the SVG detail view.
+        Can be set to always, onClick or never. Default is always.
+        </li><br>
+
     <a name="plotfork"></a>
     <li>plotfork<br>
         If set, generate the logs in a parallel process. Note: do not use it
@@ -2696,7 +2704,7 @@ FW_ActivateInform()
         need some help from the #FileLog definition in the .gplot file: the
         filter used there (second parameter) must either contain only the
         deviceName or have the form deviceName.event or deviceName.*. This is
-        always the case when using the <a href="#weblinkEditor">Plot
+        always the case when using the <a href="#plotEditor">Plot
         editor</a>. The SVG will be reloaded for <b>any</b> event triggered by
         this deviceName.
         Default is off.
@@ -3021,6 +3029,13 @@ FW_ActivateInform()
         Attribut startDate benutzt wird.<br>
         </li><br>
 
+    <a name="ploteditor"></a>
+    <li>ploteditor<br>
+        Gibt an ob der <a href="#plotEditor">Plot Editor</a> in der SVG detail
+        ansicht angezeigt werden soll.  Kann auf always, onClick oder never
+        gesetzt werden. Der Default ist always.
+        </li><br>
+
     <a name="plotfork"></a>
     <li>plotfork<br>
         Normalerweise wird die Ploterstellung im Hauptprozess ausgef&uuml;hrt,
@@ -3180,7 +3195,7 @@ FW_ActivateInform()
         L&auml;dt SVG Instanzen erneut, falls ein Ereignis dessen Inhalt
         &auml;ndert. Funktioniert nur, falls der dazugeh&ouml;rige #FileLog
         Definition in der .gplot Datei folgenden Form hat: deviceName.Event
-        bzw. deviceName.*. Wenn man den <a href="#weblinkEditor">Plot
+        bzw. deviceName.*. Wenn man den <a href="#plotEditor">Plot
         Editor</a> benutzt, ist das &uuml;brigens immer der Fall. Die SVG Datei
         wird bei <b>jedem</b> ausl&ouml;senden Event dieses Ger&auml;tes neu
         geladen.  Standard ist aus.

@@ -242,6 +242,10 @@ SVG_PEdit($$$$)
 {
   my ($FW_wname,$d,$room,$pageHash) = @_;
 
+  my $pe = AttrVal($FW_wname, "ploteditor", "always");
+
+  return "" if( $pe eq 'never' );
+
   my $ld = $defs{$d}{LOGDEVICE};
   my $ldt = $defs{$ld}{TYPE};
 
@@ -251,9 +255,22 @@ SVG_PEdit($$$$)
   my %conf = SVG_digestConf($cfg, $plot);
 
   my $ret = "<br>";
-  $ret .= "<form method=\"$FW_formmethod\" autocomplete=\"off\" ".
+
+  my $pestyle = "";
+  if( $pe eq 'onClick' ) {
+    my $pgm = "Javascript:" .
+               "s=document.getElementById('pedit').style;".
+               "s.display = s.display=='none' ? 'block' : 'none';".
+               "s=document.getElementById('pdisp').style;".
+               "s.display = s.display=='none' ? 'block' : 'none';";
+    $ret .= "<a id=\"pdisp\" style=\"cursor:pointer\" onClick=\"$pgm\">Show Plot Editor</a>";
+    $pestyle = 'style="display:none"';
+  }
+
+  $ret .= "<form $pestyle id=\"pedit\" method=\"$FW_formmethod\" autocomplete=\"off\" ".
                 "action=\"$FW_ME/SVG_WriteGplot\">";
-  $ret .= FW_hidden("detail", $d);
+  $ret .= "Plot Editor";
+  $ret .= FW_hidden("gplotName", $gp);
   $ret .= FW_hidden("gplotName", $gp);
   $ret .= FW_hidden("logdevicetype", $ldt);
   $ret .= "<table class=\"block wide plotEditor\">";
@@ -1768,9 +1785,10 @@ plotAsPng(@)
 
   <a name="plotEditor"></a>
   <b>Plot-Editor</b>
-  <ul>
+  <br>
     This editor is visible on the detail screen of the SVG instance.
     Most features are obvious here, up to some exceptions:
+  <ul>
     <li>if you want to omit the title for a Diagram label, enter notitle in the
       input field.</li>
     <li>if you want to specify a fixed value (not taken from a column) if a
@@ -1786,6 +1804,8 @@ plotAsPng(@)
       Write .gplot file again<br>
       </ul></li>
   </ul>
+  The visibility of the ploteditor can be configured with the FHEMWEB attribute
+  <a href="#ploteditor">ploteditor</a>.
   <br>
 </ul>
 
@@ -1915,7 +1935,8 @@ plotAsPng(@)
           Kurve(FileLog)
           <ul>
             <li>Fhem config:<br>
-                <code>attr wl_1 label "Max $data{max1}, Current $data{currval1}"</code></li>
+                <code>attr wl_1 label "Max $data{max1}, Current
+                        $data{currval1}"</code></li>
             <li>Eintrag in der .gplot-Datei:<br>
                 <code>set title &lt;L1&gt;</code><br></li>
           </ul>
@@ -1950,7 +1971,8 @@ plotAsPng(@)
           </li>
         <li>#DbLog &lt;SPEC1&gt;<br>
           mit:<br> 
-            <code>attr &lt;SVGdevice&gt; plotfunction "Garage_Raumtemp:temperature::"</code><br>
+            <code>attr &lt;SVGdevice&gt; plotfunction
+                    "Garage_Raumtemp:temperature::"</code><br>
           anstelle von:<br>
             <code>#DbLog Garage_Raumtemp:temperature::</code>
           </li>
@@ -1961,10 +1983,11 @@ plotAsPng(@)
 
   <a name="plotEditor"></a>
   <b>Plot-Editor</b>
-  <ul>
+   <br>
     Dieser Editor ist in der Detailansicht der SVG-Instanz zu sehen. Die
     meisten Features sind hier einleuchtend und bekannt, es gibt aber auch
     einige Ausnahmen:
+  <ul>
     <li>wenn f&uuml;r ein Diagramm die &Uuml;berschrift unterdr&uuml;ckt werden
       soll, muss im Eingabefeld <code>notitle</code> eingetragen werden.
       </li>
@@ -1985,6 +2008,8 @@ plotAsPng(@)
       </ul>
       </li>
   </ul>
+  Die sichtbarkeit des  Plot-Editors kann mit dem FHEMWEB Attribut <a
+  href="#ploteditor">ploteditor</a> konfiguriert werden.
   <br>
 </ul>
 
