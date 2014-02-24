@@ -914,7 +914,7 @@ FW_doDetail($)
   FW_makeTable("Readings", $d, $h->{READINGS});
 
   my $attrList = getAllAttr($d);
-  my $roomList = "multiple,".join(",", sort grep !/ /, keys %FW_rooms);
+  my $roomList = "multiple,".join(",", sort map { $_ =~ s/ /#/g ;$_} keys %FW_rooms);
   $attrList =~ s/room /room:$roomList /;
   FW_makeSelect($d, "attr", $attrList,"attr");
 
