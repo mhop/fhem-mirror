@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.3.0
+# Version: 1.3.1
 #
 # Major Version History:
 # - 1.3.0 - 2013-12-21
@@ -785,13 +785,6 @@ sub ENIGMA2_Define($$) {
         $attr{$name}{icon} = 'dreambox';
     }
 
-    unless ( defined( $hash->{helper}{AVAILABLE} )
-        and ( $hash->{helper}{AVAILABLE} == 0 ) )
-    {
-        $hash->{helper}{AVAILABLE} = 1;
-        readingsSingleUpdate( $hash, "presence", "present", 1 );
-    }
-
     # start the status update timer
     RemoveInternalTimer($hash);
     InternalTimer( gettimeofday() + 2, "ENIGMA2_GetStatus", $hash, 1 );
@@ -960,35 +953,35 @@ sub ENIGMA2_ReceiveCommand($$$) {
         if ( $service eq "powerstate" ) {
             $state = "absent";
 
-            if (
-                ( not exists( $hash->{helper}{AVAILABLE} ) )
-                or ( exists( $hash->{helper}{AVAILABLE} )
-                    and $hash->{helper}{AVAILABLE} eq 1 )
-              )
-            {
-                Log3 $name, 3, "ENIGMA2 device $name is unavailable";
-                readingsBulkUpdate( $hash, "presence", "absent" );
-            }
-        }
-
-        # all others
-        else {
             if ( !defined($cmd) || $cmd eq "" ) {
-                Log3 $name, 4, "ENIGMA2 $name: RCV ERROR $service";
+                Log3 $name, 4, "ENIGMA2 $name: RCV TIMEOUT $service";
             }
             else {
                 Log3 $name, 4,
-                  "ENIGMA2 $name: RCV ERROR $service/" . urlDecode($cmd);
+                  "ENIGMA2 $name: RCV TIMEOUT $service/" . urlDecode($cmd);
+            }
+
+            if (
+                ( !defined( $hash->{helper}{AVAILABLE} ) )
+                or ( defined( $hash->{helper}{AVAILABLE} )
+                    and $hash->{helper}{AVAILABLE} eq 1 )
+              )
+            {
+                $hash->{helper}{AVAILABLE} = 0;
+                readingsBulkUpdate( $hash, "presence", "absent" );
             }
         }
     }
 
     # data received
     elsif ($data) {
-        if ( defined( $hash->{helper}{AVAILABLE} )
-            and $hash->{helper}{AVAILABLE} eq 0 )
+        if (
+            ( !defined( $hash->{helper}{AVAILABLE} ) )
+            or ( defined( $hash->{helper}{AVAILABLE} )
+                and $hash->{helper}{AVAILABLE} eq 0 )
+          )
         {
-            Log3 $name, 3, "ENIGMA2 device $name is available";
+            $hash->{helper}{AVAILABLE} = 1;
             readingsBulkUpdate( $hash, "presence", "present" );
         }
 
@@ -1127,7 +1120,9 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     ENIGMA2_SendCommand( $hash, "signal" );
                 }
             }
-            elsif ( $hash->{helper}{AVAILABLE} == 1 ) {
+            elsif ( defined( $hash->{helper}{AVAILABLE} )
+                && $hash->{helper}{AVAILABLE} == 1 )
+            {
                 Log3 $name, 2,
                   "ENIGMA2 $name: ERROR: Undefined state of device";
 
@@ -1943,8 +1938,6 @@ sub ENIGMA2_ReceiveCommand($$$) {
     }
 
     readingsEndUpdate( $hash, 1 );
-
-    $hash->{helper}{AVAILABLE} = ( defined($data) ? 1 : 0 );
 
     return;
 }
