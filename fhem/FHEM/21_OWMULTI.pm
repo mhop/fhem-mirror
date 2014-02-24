@@ -70,7 +70,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.05";
+my $owx_version="5.06";
 #-- flexible channel name
 my $owg_channel;
 
@@ -156,18 +156,20 @@ sub OWMULTI_Attr(@) {
   my $ret;
   
   if ( $do eq "set") {
-   #-- interval modified at runtime
-   $key eq "interval" and do {
-      #-- check value
-      return "OWMULTI: Set with short interval, must be > 1" if(int($value) < 1);
-      #-- update timer
-      $hash->{INTERVAL} = $value;
-      if ($init_done) {
-        RemoveInternalTimer($hash);
-        InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 1);
+    ARGUMENT_HANDLER: {
+      #-- interval modified at runtime
+      $key eq "interval" and do {
+        #-- check value
+        return "OWMULTI: Set with short interval, must be > 1" if(int($value) < 1);
+        #-- update timer
+        $hash->{INTERVAL} = $value;
+        if ($init_done) {
+          RemoveInternalTimer($hash);
+          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 1);
+        }
+        last;
       }
-      last;
-    };
+    }
   }
   return $ret;
 }

@@ -75,7 +75,7 @@ use warnings;
 sub Log($$);
 sub AttrVal($$$);
 
-my $owx_version="5.05";
+my $owx_version="5.06";
 
 my %gets = (
   "id"          => "",
@@ -264,31 +264,33 @@ sub OWTHERM_Attr(@) {
   my $ret;
   
   if ( $do eq "set") {
-    #-- interval modified at runtime
-    $key eq "interval" and do {
-      #-- check value
-      return "OWTHERM: Set with short interval, must be > 1" if(int($value) < 1);
-      #-- update timer
-      $hash->{INTERVAL} = $value;
+  	ARGUMENT_HANDLER: {
+      #-- interval modified at runtime
+      $key eq "interval" and do {
+        #-- check value
+        return "OWTHERM: Set with short interval, must be > 1" if(int($value) < 1);
+        #-- update timer
+        $hash->{INTERVAL} = $value;
 
-      if ($init_done) {
-        RemoveInternalTimer($hash);
-        InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
-      }
-  	  last;
-   };
-   #-- resolution modified at runtime
-   $key eq "resolution" and do {
-      $hash->{owg_cf} = $value;
-      last;
-   };
-   #-- alarm settings modified at runtime
-   $key =~ m/(.*)(Low|High)/  and do {
-     #-- safeguard against uninitialized devices
-     return undef
-       if( $hash->{READINGS}{"state"}{VAL} eq "defined" ); 
-     $ret = OWTHERM_Set($hash,($name,$key,$value));
+        if ($init_done) {
+          RemoveInternalTimer($hash);
+          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
+        }
+    	  last;
      };
+     #-- resolution modified at runtime
+     $key eq "resolution" and do {
+        $hash->{owg_cf} = $value;
+        last;
+     };
+     #-- alarm settings modified at runtime
+     $key =~ m/(.*)(Low|High)/  and do {
+       #-- safeguard against uninitialized devices
+       return undef
+         if( $hash->{READINGS}{"state"}{VAL} eq "defined" ); 
+       $ret = OWTHERM_Set($hash,($name,$key,$value));
+       };
+    }
   }
   return $ret;
 }
