@@ -1490,8 +1490,10 @@ sub CUL_HM_Parse($$) {#########################################################
       
       if($eCnt == 0 && $mTp eq "5E" && hex($mNo) < 3 ){
         push @evtEt,[$devHash,1,"powerOn:-"];
-        push @event, "energyOffset:".ReadingsVal($shash->{NAME},"energy",0)+
-                                     ReadingsVal($shash->{NAME},"energyOffset",0);
+		my $eo = ReadingsVal($shash->{NAME},"energy",0)+
+		         ReadingsVal($shash->{NAME},"energyOffset",0);
+        push @event, "energyOffset:".$eo;
+        push @evtEt,[$defs{$devHash->{channel_02}},1,"energyOffset:$eo"] if ($devHash->{channel_02});
       }
     }
   }
@@ -3114,14 +3116,14 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $rval = CUL_HM_encodeTime16((@a > 4)?$a[4]:2.5);# rampTime 0.0..85825945.6, 0=immediate
     }
     # store desiredLevel in and its Cmd in case we have to repeat
+    my $lvlx = sprintf("%02X",$lvl*2);
     if ($tval && $tval ne "FFFF"){
       delete $hash->{helper}{dlvl};#stop desiredLevel supervision
     }
     else{
-      $hash->{helper}{dlvl} = sprintf("%02X",$lvl*2);
+      $hash->{helper}{dlvl} = $lvlx;
     }
-    $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"
-                               ."02$chn$hash->{helper}{dlvl}$rval$tval";
+    $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."02$chn$lvlx$rval$tval";
     CUL_HM_PushCmdStack($hash,$hash->{helper}{dlvlCmd});
     CUL_HM_UpdtReadSingle($hash,"level","set_".$lvl,1);
     $state = "set_".$lvl;
@@ -3857,6 +3859,7 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
         CUL_HM_UpdtReadSingle($hash,"valveCtrl","unknown",1);
         my $pn = CUL_HM_id2Name($hashVd->{id});
         $hashVd->{ackT} = ReadingsTimestamp($pn, "ValvePosition", "");
+		$hashVd->{msgSent} = 0;
       }
       elsif(  ($vc ne "init" && $hashVd->{msgRed} <= $hashVd->{miss})
             || $hash->{helper}{virtTC} ne "00") {
