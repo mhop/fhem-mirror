@@ -1861,8 +1861,8 @@ sub CUL_HM_Parse($$) {#########################################################
   CUL_HM_ProcessCmdStack($shash) if ($respRemoved); # cont if complete
   #------------ process events ------------------
   push @event, "noReceiver:src:$src ".$mFlg.$mTp." $p" if(!@event && !@entities);
-  CUL_HM_UpdtReadBulk($shash,1,@event); #events to the channel
-
+  
+  push @evtEt,[$shash,1,$_] foreach (@event);
   push @entities,CUL_HM_pushEvnts();
 
   @entities = CUL_HM_noDup(@entities,$shash->{NAME});
@@ -3321,7 +3321,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     if($mode eq "manu"){
       my $t = $a[2] ne "manu"?$a[2]:ReadingsVal($name,"desired-temp",18);
-      Log 1,"General t:$t a:$a[2]";
       return "temperatur for manu  4.5 to 30.5 C"
                 if ($t < 4.5 || $t > 30.5);
       $temp = $t*2;
@@ -5685,6 +5684,10 @@ sub CUL_HM_noDupInString($) {#return string with no duplicates, comma separated
 sub CUL_HM_storeRssi(@){
   my ($name,$peerName,$val) = @_;
   return if (!$val);
+  if (AttrVal($peerName,"subType","") eq "virtual"){
+    my $h = InternalVal($peerName,"IODev","");
+    $peerName = $h->{NAME};
+  }
   $defs{$name}{helper}{rssi}{$peerName}{lst} = $val;
   my $rssiP = $defs{$name}{helper}{rssi}{$peerName};
   $rssiP->{min} = $val if (!$rssiP->{min} || $rssiP->{min} > $val);
