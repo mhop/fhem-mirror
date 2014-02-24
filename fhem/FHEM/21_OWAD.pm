@@ -76,7 +76,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.05";
+my $owx_version="5.06";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D");
 my @owg_channel = ("A","B","C","D");
@@ -286,31 +286,35 @@ sub OWAD_Attr(@) {
   my $ret;
   
   if ( $do eq "set") {
-    #-- interval modified at runtime
-    $key eq "interval" and do {
-      #-- check value
-      return "OWAD: Set with short interval, must be > 1" if(int($value) < 1);
-      #-- update timer
-      $hash->{INTERVAL} = $value;
-      if ($init_done) {
-        RemoveInternalTimer($hash);
-        InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 1);
+    ARGUMENT_HANDLER: {
+      #-- interval modified at runtime
+      $key eq "interval" and do {
+        #-- check value
+        return "OWAD: Set with short interval, must be > 1" if(int($value) < 1);
+       #-- update timer
+        $hash->{INTERVAL} = $value;
+        if ($init_done) {
+          RemoveInternalTimer($hash);
+          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 1);
+        }
+        last;
+      };
+      #-- alarm settings modified at runtime
+      $key =~ m/(.*)(Alarm|Low|High)/ and do {
+        #-- safeguard against uninitialized devices
+        return undef
+          if( $hash->{READINGS}{"state"}{VAL} eq "defined" );
+        $ret = OWAD_Set($hash,($name,$key,$value));
+        last;
       }
-  	  last;
-  	};
-    #-- alarm settings modified at runtime
-    $key =~ m/(.*)(Alarm|Low|High)/ and do {
-      #-- safeguard against uninitialized devices
-      return undef
-        if( $hash->{READINGS}{"state"}{VAL} eq "defined" );
-      $ret = OWAD_Set($hash,($name,$key,$value));
-      last;
-    };
+    }
   } elsif ( $do eq "del" ) {
-    #-- should remove alarm setting, but does nothing so far
-    $key =~ m/(.*)(Alarm)/ and do {
-      last;
-    };
+    ARGUMENT_HANDLER: {
+      #-- should remove alarm setting, but does nothing so far
+      $key =~ m/(.*)(Alarm)/ and do {
+        last;
+      }
+    }
   }
   return $ret;
 }

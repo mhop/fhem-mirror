@@ -84,7 +84,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.05";
+my $owx_version="5.06";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -270,18 +270,20 @@ sub OWCOUNT_Attr(@) {
   my $ret;
   
   if ( $do eq "set") {
-    #-- interval modified at runtime
-    $key eq "interval" and do {
-      #-- check value
-      return "OWCOUNT: Set with short interval, must be > 1" if(int($value) < 1);
-      #-- update timer
-      $hash->{INTERVAL} = $value;
-      if ($init_done) {
-        RemoveInternalTimer($hash);
-        InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 1);
+    ARGUMENT_HANDLER: {
+      #-- interval modified at runtime
+      $key eq "interval" and do {
+        #-- check value
+        return "OWCOUNT: Set with short interval, must be > 1" if(int($value) < 1);
+        #-- update timer
+        $hash->{INTERVAL} = $value;
+        if ($init_done) {
+          RemoveInternalTimer($hash);
+          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 1);
+        }
+        last;
       }
-      last;
-    };
+    }
   }
   return $ret;
 }
