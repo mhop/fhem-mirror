@@ -662,6 +662,10 @@ sub HMinfo_GetFn($@) {#########################################################
           $dispName = $1;
           $dispDest = (($dest =~ m/^to_rpt_/)?"rep_":"").$dName;
         }
+        if (AttrVal($dName,"subType","") eq "virtual"){
+          my $h = InternalVal($dName,"IODev","");
+          $dispDest .= "/$h->{NAME}";
+        }
         push @rssiList,sprintf("%-15s:%-15s %-15s %6.1f %6.1f %6.1f<%6.1f %5s"
                                ,$dName,$dispName,$dispDest
                                ,$defs{$dName}{helper}{rssi}{$dest}{lst}
@@ -890,9 +894,10 @@ sub HMinfo_GetFn($@) {#########################################################
   else{
     my @cmdLst =     
            ( "help"
-		    ,"configCheck","param","peerCheck","peerXref"
+            ,"configCheck","param","peerCheck","peerXref"
             ,"protoEvents","msgStat","rssi"
             ,"models"
+            ,"clear"
             ,"regCheck","register"
             ,"templateList","templateChk"
             );
@@ -1013,7 +1018,7 @@ sub HMinfo_SetFn($@) {#########################################################
   else{
     my @cmdLst =     
            ( "autoReadReg","clear"  
-			,"archConfig:-0,-a","saveConfig","loadConfig","purgeConfig","update"
+            ,"archConfig:-0,-a","saveConfig","loadConfig","purgeConfig","update"
             ,"cpRegs"
             ,"tempList tempListTmpl"
             ,"templateDef","templateSet");
