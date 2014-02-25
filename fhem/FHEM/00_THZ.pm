@@ -1,7 +1,7 @@
 ##############################################
 # 00_THZ
 # by immi 02/2014
-# v. 0.068
+# v. 0.069
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -216,11 +216,6 @@ sub THZ_Define($$)
   my $ret = DevIo_OpenDev($hash, 0, undef);
   
     
-  #my %par = (command => "allFB", hash => $hash );   
-  #InternalTimer(gettimeofday() +200, "THZ_GetRefresh", \%par, 0);
-  #my %par1 = ( command => "firmware", hash => $hash);   
-  #InternalTimer(gettimeofday() +200, "THZ_GetRefresh", \%par1, 0);
-  #foreach  my $cmdhash  (keys %gets) { THZ_Get($hash, $hash->{NAME}, $cmdhash); }  #refresh all registers 
   THZ_Refresh_all_gets($hash);
   return $ret;
 }
@@ -416,14 +411,17 @@ sub THZ_Get($@){
   my $cmd = $a[1];
   my ($err, $msg) =("", " ");
 
+   if ($cmd eq "debug_read_raw_register_slow") {
+    THZ_debugread($hash);
+    return ("all raw registers read and saved");
+    } 
+  
+  
   my $cmdhash = $gets{$cmd};
   return "Unknown argument $cmd, choose one of " .
         join(" ", sort keys %gets) if(!defined($cmdhash));
 
-  if ($cmd eq "debug_read_raw_register_slow") {
-    THZ_debugread($hash);
-    return ("all raw registers read and saved");
-    }           
+           
 	            		
   THZ_Write($hash,  "02"); 			# STX start of text
   ($err, $msg) = THZ_ReadAnswer($hash);		#Expectedanswer1    is  "10"  DLE data link escape
@@ -716,9 +714,9 @@ sub THZ_Parse($) {
         	  "hot_gas_temp: " 				. hex2int(substr($message,20,4))/10 . " " .  #Heißgas Temperatur		
         	  "dhw_temp: "					. hex2int(substr($message,24,4))/10 . " " .  #Speicher Temperatur current cilinder water temperature
         	  "flow_temp_HC2: "				. hex2int(substr($message,28,4))/10 . " " .  #Vorlauf TemperaturHK2
-		  "evaporator_temp: "				. hex2int(substr($message,36,4))/10 . " " .  #Speicher Temperatur
-        	  "condenser_temp: "				. hex2int(substr($message,40,4))/10 . " " .
-        	  "Mixer_open: "				. ((hex(substr($message,44,1)) &  0b0001) / 0b0001) . " " .
+		  "evaporator_temp: "				. hex2int(substr($message,36,4))/10 . " " .  #Speicher Temperatur    
+        	  "condenser_temp: "				. hex2int(substr($message,40,4))/10 . " " .  
+        	  "Mixer_open: "				. ((hex(substr($message,44,1)) &  0b0001) / 0b0001) . " " .	
 		  "Mixer_closed: "				. ((hex(substr($message,44,1)) &  0b0010) / 0b0010) . " " .
 		  "HeatPipeValve: "				. ((hex(substr($message,44,1)) &  0b0100) / 0b0100) . " " .
 		  "DiverterValve: "				. ((hex(substr($message,44,1)) &  0b1000) / 0b1000) . " " .
@@ -839,18 +837,18 @@ my %parsinghash = (
 sub THZ_debugread($){
   my ($hash) = @_;
   my ($err, $msg) =("", " ");
-  #my @numbers=('01', '09', '0B0005', '0B0008', '0C0005','0C0008','0A0013', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
+  my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
  # my @numbers=('0B14A2', '0B54A2', '0B2000', '0B2010', '0C2000','0A2008','0A3010', '0B54A2', '0B64A2', '0B7000', '0B8010', '0C8000','0A8008','0A9010');
  
   #my @numbers = (1..255);
-  my @numbers = (1..65535);
+  #my @numbers = (1..65535);
   my $indice= "FF";
   unlink("data.txt"); #delete  debuglog
   foreach $indice(@numbers) {	
     #my $cmd = sprintf("%02X", $indice);
-    my $cmd = "0A" . sprintf("%04X",  $indice);
-    #my $cmd = $indice;
-    # STX start of text
+    #my $cmd = "0A" . sprintf("%04X",  $indice);
+    my $cmd = $indice;
+    #STX start of text
     THZ_Write($hash,  "02");
     ($err, $msg) = THZ_ReadAnswer($hash);  
     # send request
@@ -903,14 +901,16 @@ sub THZ_Undef($$) {
 
 1;
 
+
 =pod
 =begin html
 
 <a name="THZ"></a>
 <h3>THZ</h3>
 <ul>
-  THZ module: comunicate through serial interface (eg /dev/ttyxx) or through ser2net (e.g 10.0.x.x:5555) with a Tecalor/Eltron heatpump. <br>
-   Tested on a THZ303 (with serial speed 57600) and a THZ403 (with serial speed 115200) with the same Firmware 4.39. <br>
+  THZ module: comunicate through serial interface RS232/USB (eg /dev/ttyxx) or through ser2net (e.g 10.0.x.x:5555) with a Tecalor/Stiebel Eltron heatpump. <br>
+   Tested on a THZ303/Sol (with serial speed 57600/115200@USB) and a THZ403 (with serial speed 115200) with the same Firmware 4.39. <br>
+   Tested on a LWZ404 (with serial speed 115200) with Firmware 5.39. <br>
    Tested on fritzbox, nas-qnap, raspi and macos.<br>
    This module is not working if you have an older firmware; Nevertheless, "parsing" could be easily updated, because now the registers are well described.
   https://answers.launchpad.net/heatpumpmonitor/+question/100347  <br>
@@ -956,6 +956,65 @@ sub THZ_Undef($$) {
 </ul>
  
 =end html
+
+=begin html_DE
+
+<a name="THZ"></a>
+<h3>THZ</h3>
+<ul>
+  THZ Modul: Kommuniziert mittels einem seriellen Interface RS232/USB (z.B. /dev/ttyxx), oder mittels ser2net (z.B. 10.0.x.x:5555) mit einer Tecalor / Stiebel  
+  Eltron W&auml;rmepumpe. <br>
+  Getestet mit einer Tecalor THZ303/Sol (Serielle Geschwindigkeit 57600/115200@USB) und einer THZ403 (Serielle Geschwindigkeit 115200) mit identischer 
+  Firmware 4.39. <br>
+  Getestet mit einer Stiebel LWZ404 (Serielle Geschwindigkeit 115200@USB) mit Firmware 4.39. <br>
+  Getestet auf FritzBox, nas-qnap, Raspberry Pi and MacOS.<br>
+  Dieses Modul funktioniert nicht mit &aumlterer Firmware; Gleichwohl, das "parsing" k&ouml;nnte leicht angepasst werden da die Register gut 
+  beschrieben wurden.
+  https://answers.launchpad.net/heatpumpmonitor/+question/100347  <br>
+  Implementiert: Lesen der Statusinformation sowie Lesen und Schreiben einzelner Einstellungen.
+  <br><br>
+
+  <a name="THZdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; THZ &lt;device&gt;</code> <br>
+    <br>
+    <code>device</code> kann einige Parameter beinhalten (z.B. @baudrate, @direction,
+    TCP/IP, none) wie das <a href="#CULdefine">CUL</a>, z.B. 57600 baud oder 115200.<br>
+    Beispiel:<br>
+    Direkte Verbindung
+    <ul><code>
+      define Mytecalor THZ /dev/ttyUSB0@115200<br>
+      </code></ul>
+      oder vir Netzwerk (via ser2net)<br>
+      <ul><code>
+      define Myremotetecalor THZ 192.168.0.244:2323 
+    </code></ul>
+    <br>
+      <ul><code>
+      define Mythz THZ /dev/ttyUSB0@115200 <br>
+      attr Mythz interval_allFB 300      # Internes Polling Intervall 5min  <br>
+      attr Mythz interval_history 28800  # Internes Polling Intervall 8h    <br>
+      define FileLog_Mythz FileLog ./log/Mythz-%Y.log Mythz <br>
+      </code></ul>
+     <br> 
+   Wenn die Attribute interval_allFB und interval_history nicht definiert sind (oder 0), ist das interne Polling deaktiviert.
+   Nat&uuml;rlich kann das Polling auch mit dem "at" Befehl ausserhalb des Moduls definiert werden.
+    <br>
+      <ul><code>
+      define Mythz THZ /dev/ttyUSB0@115200 <br>
+      define atMythzFB at +*00:05:00 {fhem "get Mythz allFB","1";;return()}    <br>
+      define atMythz09 at +*08:00:00 {fhem "get Mythz history","1";;return()}   <br>
+      define FileLog_Mythz FileLog ./log/Mythz-%Y.log Mythz <br>
+      </code></ul>
+      
+  </ul>
+  <br>
+</ul>
+ 
+=end html_DE
+
+
 =cut
 
 
