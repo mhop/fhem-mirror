@@ -109,12 +109,13 @@ FileLog_Switch($)
     $fh = new IO::File ">>$cn";
     if(!defined($fh)) {
       Log3 $log, 0, "Can't open $cn";
-      return;
+      return 0;
     }
     $log->{currentlogfile} = $cn;
     $log->{FH} = $fh;
+    return 1;
   }
-
+  return 0;
 }
 
 #####################################
@@ -198,12 +199,14 @@ FileLog_Set($@)
   return "$cmd needs $sets{$cmd} parameter(s)" if(@a-$sets{$cmd} != 2);
 
   if($cmd eq "reopen") {
-    my $fh = $hash->{FH};
-    my $cn = $hash->{currentlogfile};
-    $fh->close();
-    $fh = new IO::File(">>$cn");
-    return "Can't open $cn" if(!defined($fh));
-    $hash->{FH} = $fh;
+    if(!FileLog_Switch($hash)) { # No rename, reopen anyway
+      my $fh = $hash->{FH};
+      my $cn = $hash->{currentlogfile};
+      $fh->close();
+      $fh = new IO::File(">>$cn");
+      return "Can't open $cn" if(!defined($fh));
+      $hash->{FH} = $fh;
+    }
 
   } elsif($cmd eq "addRegexpPart") {
     my %h;
