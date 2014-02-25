@@ -781,12 +781,14 @@ sub retrieveFile($$;$$$){
 								Timeout => 10,
 								FirewallType => $proxyType,
 								Firewall => $proxyName);
+		Log3($name, 4, "GDS $name: ftp connection established.");
 		if(defined($ftp)){
 			$ftp->login($user, $pass);
 			$ftp->cwd("$dir");
 			@files = undef;
 			@files = $ftp->ls($dwd);
 			if(@files){
+				Log3($name, 4, "GDS $name: filelist found.");
 				@files = sort(@files);
 				$dataFile = $files[-1];
 				$urlString .= $dataFile;
@@ -800,10 +802,12 @@ sub retrieveFile($$;$$$){
 				}
 				$found = 1;
 			} else { 
+				Log3($name, 4, "GDS $name: filelist not found.");
 				$found = 0;
 			}
 			$ftp->quit;
 		}
+		Log3($name, 4, "GDS $name: updating readings.");
 		readingsBeginUpdate($hash);
 		readingsBulkUpdate($hash, "_dataSource",		"Quelle: Deutscher Wetterdienst");
 		readingsBulkUpdate($hash, "_dF_".$request, $dataFile) if(AttrVal($name, "gdsDebug", 0));
