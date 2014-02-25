@@ -189,8 +189,9 @@ LaCrosse_Parse($$)
 
   if( !$modules{LaCrosse}{defptr}{$raddr} ) {
     foreach my $d (sort keys %defs) {
-      next if (!defined($defs{$d}) );
-      next if ($defs{$d}->{TYPE} ne "LaCrosse" );
+      next if( !defined($defs{$d}) );
+      next if( !defined($defs{$d}->{TYPE}) );
+      next if( $defs{$d}->{TYPE} ne "LaCrosse" );
       next if( !$defs{$d}->{replaceBattery} );
       if( $battery_new ||  $defs{$d}->{replaceBattery} == 2 ) {
         $rhash = $defs{$d};
