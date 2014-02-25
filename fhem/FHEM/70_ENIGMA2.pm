@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.3.1
+# Version: 1.3.2
 #
 # Major Version History:
 # - 1.3.0 - 2013-12-21
@@ -326,9 +326,9 @@ sub ENIGMA2_Set($@) {
 
     # on
     elsif ( $a[1] eq "on" ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
-
         if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
+            Log3 $name, 2, "ENIGMA2 set $name " . $a[1] . " (wakeup)";
+
             if ( defined( $hash->{READINGS}{lanmac}{VAL} )
                 && $hash->{READINGS}{lanmac}{VAL} ne "-" )
             {
@@ -340,6 +340,8 @@ sub ENIGMA2_Set($@) {
             }
         }
         else {
+            Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
+
             $cmd = "newstate=4";
             $result = ENIGMA2_SendCommand( $hash, "powerstate", $cmd, "on" );
         }
@@ -452,8 +454,8 @@ sub ENIGMA2_Set($@) {
             return
                 "Argument "
               . $_
-              . " is not a valid integer between 5 and 49680"
-              if ( !m/^\d+$/ || $_ < 5 || $_ > 49680 );
+              . " is not a valid integer between 0 and 49680"
+              if ( !m/^\d+$/ || $_ < 0 || $_ > 49680 );
 
             my $i    = 4;
             my $text = $a[$i];
