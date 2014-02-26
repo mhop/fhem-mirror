@@ -29,7 +29,7 @@ FRM_OUT_Initialize($)
   $hash->{AttrFn}    = "FRM_OUT_Attr";
   $hash->{StateFn}   = "FRM_OUT_State";
   
-  $hash->{AttrList}  = "restoreOnReconnect:on,off restoreOnStartup:on,off IODev $main::readingFnAttributes";
+  $hash->{AttrList}  = "restoreOnReconnect:on,off restoreOnStartup:on,off activeLow:yes,no IODev $main::readingFnAttributes";
   main::LoadModule("FRM");
 }
 
@@ -56,10 +56,11 @@ FRM_OUT_Set($$$)
 {
   my ($hash, $name, $cmd, @a) = @_;
   my $value;
+  my $invert = AttrVal($hash->{NAME},"activeLow","no");
   if ($cmd eq "on") {
-  	$value=PIN_HIGH;
+  	$value = $invert eq "yes" ? PIN_LOW : PIN_HIGH;
   } elsif ($cmd eq "off") {
-  	  $value=PIN_LOW;
+  	$value = $invert eq "yes" ? PIN_HIGH : PIN_LOW;
   } else {
   	my $list = "on off";
     return SetExtensions($hash, $list, $name, $cmd, @a);
@@ -141,6 +142,7 @@ FRM_OUT_Attr($$$$) {
   <ul>
       <li>restoreOnStartup &lt;on|off&gt;</li>
       <li>restoreOnReconnect &lt;on|off&gt;</li>
+      <li>activeLow &lt;yes|no&gt;</li>
       <li><a href="#IODev">IODev</a><br>
       Specify which <a href="#FRM">FRM</a> to use. (Optional, only required if there is more
       than one FRM-device defined.)
