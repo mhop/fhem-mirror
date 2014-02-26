@@ -36,7 +36,7 @@ use Net::FTP;
 use List::MoreUtils 'first_index'; 
 use XML::Simple;
 use HttpUtils;
-require LWP::UserAgent;
+#require LWP::UserAgent;
 
 my ($bulaList, $cmapList, %rmapList, $fmapList, %bula2bulaShort, %bulaShort2dwd, %dwd2Dir, %dwd2Name,
 	$alertsXml, %capCityHash, %capCellHash, $sList, $aList);
@@ -699,9 +699,17 @@ sub retrieveFile($$;$$$){
 	my ($dwd, $dir, $ftp, @files, $dataFile, $targetFile, $found, $readingName);
 	
 	my $urlString =	"ftp://$user:$pass\@ftp-outgoing2.dwd.de/";
-	my $ua = LWP::UserAgent->new;	# test
-	$ua->timeout(10);				# test
-	$ua->env_proxy;					# test
+	my $ua;
+	eval { $ua = LWP::UserAgent->new; };
+
+	if(!defined($ua)) {
+		Log3($name, 1, "GDS $name: LWP not available!");
+		readingsSingleUpdate($hash, 'LWP error', 'LWP not available!',1);
+		return;
+	}
+
+	$ua->timeout(10);
+	$ua->env_proxy;
 
 	given($request){
 
