@@ -63,7 +63,7 @@ sub GDS_Initialize($) {
 	$hash->{AttrFn}		=	"GDS_Attr";
 	$hash->{AttrList}	=	"gdsFwName gdsFwType:0,1,2,3,4,5,6,7 ".
 							"gdsAll:0,1 gdsDebug:0,1 gdsLong:0,1 gdsPolygon:0,1 ".
-							"gdsSetCond ".
+							"gdsSetCond gdsPassiveFtp:0,1 ".
 							$readingFnAttributes;
 
 	$tempDir = "c:\\temp\\" if($^O eq "MSWin32");
@@ -693,6 +693,7 @@ sub retrieveFile($$;$$$){
 	my $pass		= $hash->{helper}{PASS};
 	my $proxyName	= AttrVal($name, "gdsProxyName", "");
 	my $proxyType	= AttrVal($name, "gdsProxyType", "");
+	my $passive		= AttrVal($name, "gdsPassiveFtp", 0);
 	my $debug		= AttrVal($name, "gdsDebug",0);
 
 	my ($dwd, $dir, $ftp, @files, $dataFile, $targetFile, $found, $readingName);
@@ -779,6 +780,7 @@ sub retrieveFile($$;$$$){
 		$ftp = Net::FTP->new(	"ftp-outgoing2.dwd.de",
 								Debug => 0,
 								Timeout => 10,
+								Passive => $passive,
 								FirewallType => $proxyType,
 								Firewall => $proxyName);
 		Log3($name, 4, "GDS $name: ftp connection established.");
@@ -1090,6 +1092,8 @@ sub initDropdownLists($){
 #	2014-02-04	added	ShutdownFn
 #				changed	FTP Timeout
 #
+#	2014-02-26	added	attribute gdsPassiveFtp
+#
 ####################################################################################################
 #
 # Further informations
@@ -1264,6 +1268,7 @@ sub initDropdownLists($){
 		<li><b>gdsLong</b> - show long text fields "description" and "instruction" from alert message in readings</li>
 		<li><b>gdsPolygon</b> - show polygon data from alert message in a reading</li>
 		<br/>
+		<li><b>gdsPassiveFtp</b> - set to 1 to use passive FTP transfer</li>
 		<li><b>gdsFwName</b> - define firewall hostname in format &lt;hostname&gt;:&lt;port&gt;</li>
 		<li><b>gdsFwType</b> - define firewall type in a value 0..7 please refer to <a href="http://search.cpan.org/~gbarr/libnet-1.22/Net/Config.pm#NetConfig_VALUES">cpan documentation</a> for further informations regarding firewall settings.</li>
 	</ul>
