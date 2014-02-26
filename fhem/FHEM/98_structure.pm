@@ -329,8 +329,16 @@ structure_Set($@)
 
   $hash->{INSET} = 1;
 
-  $hash->{STATE} = join(" ", @list[1..@list-1])
-    if($list[1] ne "?");
+  my $filter;
+  if($list[1] ne "?") {
+    $hash->{STATE} = join(" ", @list[1..@list-1]);
+
+    if( $hash->{STATE} =~ /^\[(FILTER=.*)]/ ) {
+      $filter = $1;
+      @list = split(" ",
+                    $list[0] ." ". substr($hash->{STATE}, length($filter)+2));
+    }
+  }
 
   foreach my $d (sort keys %{ $hash->{CONTENT} }) {
     next if(!$defs{$d});
@@ -345,7 +353,14 @@ structure_Set($@)
     }
 
     $list[0] = $d;
-    my $sret .= CommandSet(undef, join(" ", @list));
+    my $sret;
+    if($filter) {
+      my $ret = AnalyzeCommand(undef,
+        "set $list[0]:$filter ". join(" ", @list[1..@list-1]) );
+      $sret .= $ret if( $ret );
+    } else {
+      $sret .= CommandSet(undef, join(" ", @list));
+    }
     if($sret) {
       $ret .= "\n" if($ret);
       $ret .= $sret;
@@ -449,7 +464,10 @@ structure_Attr($@)
   <ul>
     Every set command is propagated to the attached devices. Exception: if an
     attached device has an attribute structexclude, and the attribute value
-    matches (as a regexp) the name of the current structure.
+    matches (as a regexp) the name of the current structure.<br>
+    If the set is of the form <code>set &lt;structure&gt; [FILTER=&lt;filter&gt;] &lt;type-specific&gt;</code>
+    then :FILTER=&lt;filter&gt; will be appended to the device name in the propagated set for
+    the attached devices like this: <code>set <devN>:FILTER=&lt;filter&gt; &lt;type-specific&gt;</code>
   </ul>
   <br>
 
@@ -599,7 +617,10 @@ structure_Attr($@)
   <ul>
     Jedes set Kommando wird an alle Devices dieser Struktur weitergegeben.<br>
     Aussnahme: das Attribut structexclude ist in einem Device definiert und
-    dessen Attributwert matched als Regexp zum Namen der aktuellen Struktur.
+    dessen Attributwert matched als Regexp zum Namen der aktuellen Struktur.<br>
+    Wenn das set Kommando diese Form hat <code>set &lt;structure&gt; [FILTER=&lt;filter&gt;] &lt;type-specific&gt;</code>
+    wird :FILTER=&lt;filter&gt; bei der Weitergebe der set an jeden Devicenamen wie folgt angehängt:
+    <code>set <devN>:FILTER=&lt;filter&gt; &lt;type-specific&gt;</code>
   </ul>
   <br>
   <a name="structureget"></a>
