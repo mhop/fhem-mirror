@@ -36,7 +36,7 @@ use Net::FTP;
 use List::MoreUtils 'first_index'; 
 use XML::Simple;
 use HttpUtils;
-#require LWP::UserAgent;
+require LWP::UserAgent;
 
 my ($bulaList, $cmapList, %rmapList, $fmapList, %bula2bulaShort, %bulaShort2dwd, %dwd2Dir, %dwd2Name,
 	$alertsXml, %capCityHash, %capCellHash, $sList, $aList);
