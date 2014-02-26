@@ -260,7 +260,7 @@ FP_CGI(){
   }
   ## process cgi
   my $commands = FP_digestCgi($htmlpart[1]) if $htmlpart[1];                       # analyze URL-commands
-  my $FP_ret = my $FP_ret = AnalyzeCommand(undef, $commands,
+  my $FP_ret = AnalyzeCommand(undef, $commands,
                             AttrVal($FW_wname,"allowedCommands",undef)) if $commands;  #Execute commands
   Log3 "FLOORPLAN", 1, "FLOORPLAN: regex-error. commands: $commands; FP_ret: $FP_ret" if($FP_ret && ($FP_ret =~ m/regex/ ));  #test
   #####redirect URL - either back to fhemweb-detailscreen, or for redirectCmds to suppress repeated execution of commands upon browser refresh
