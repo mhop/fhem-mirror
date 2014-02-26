@@ -1085,7 +1085,7 @@ sub CUL_HM_Parse($$) {#########################################################
       my ($chn,$setTemp,$actTemp, $cRep,$bat,$lbat,$wRep, $ctrlMode) =
           ("02",$d[1],$d[1],      $d[2],$d[2],$d[2],$d[2],$d[3]);
       $setTemp    =(($setTemp    >>10) & 0x3f )/2;
-      $actTemp    =(($actTemp        ) & 0x2ff)/10;
+      $actTemp    =(($actTemp        ) & 0x3ff)/10;
       $actTemp    = -1 * $actTemp if ($d[1] & 0x200 );# obey signed
       $bat        =(($bat            ) & 0x1f)/10+1.5;
       $lbat       = ($lbat           ) & 0x80;
@@ -1123,7 +1123,7 @@ sub CUL_HM_Parse($$) {#########################################################
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
       my ($t,$h) =  map{hex($_)} unpack 'A4A2',$p;
       my $setTemp    =(($t    >>10) & 0x3f )/2;
-      my $actTemp    =(($t        ) & 0x2ff)/10;
+      my $actTemp    =(($t        ) & 0x3ff)/10;
       $actTemp = sprintf("%2.1f",$actTemp);
       $setTemp = ($setTemp < 5 )?'off':
                  ($setTemp >30 )?'on' :$setTemp;
@@ -1473,7 +1473,7 @@ sub CUL_HM_Parse($$) {#########################################################
       $P = $P   /100;                       #0.0  ..167772.15 W
       $I = $I   /1;                         #0.0  ..65535.0   mA
       $U = $U   /10;                        #0.0  ..6553.5    mV
-      $F = hex($F);$F -= 256 if ($F > 127);
+      $F -= 256 if ($F > 127);
       $F = $F/100+50;                      # 48.72..51.27     Hz
       
       push @evtEt,[$shash,1,"energy:"   .$eCnt];
@@ -2469,7 +2469,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
           $peerN = "      " if ($peer  eq "00000000");
           push @regValList,sprintf("   %d:%s\t%-16s :%s\n",
                   $regL,$peerN,$regName,$regVal)
-                if ($regVal ne 'invalid');
+                if ($regVal !~ m /invalid/);
         }
       }
       my $addInfo = "";
@@ -2485,8 +2485,8 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     }
     else{
       my $regVal = CUL_HM_getRegFromStore($name,$regReq,$list,$peerId);
-      return ($regVal eq "invalid")? "Value not captured"
-                                 : $regVal;
+      return ($regVal !~ m /invalid/)? "Value not captured"
+                                     : $regVal;
     }
   }
   elsif($cmd eq "regList") {  #################################################
@@ -2948,7 +2948,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
             )
            .(($reg->{l} == 3)?" peer required":"")." : ".$reg->{t}."\n"
                   if ($data eq "?");
-    return "value:".$data." out of range $reg->{min} to $reg->{max} for Reg \""
+    return "value:$data out of range $reg->{min} to $reg->{max} for Reg \""
            .$regName."\""
             if (!($reg->{c} =~ m/^(lit|hex|min2time)$/)&&
                 ($data < $reg->{min} ||$data > $reg->{max})); # none number
@@ -3002,8 +3002,11 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       my $rName = CUL_HM_id2Name($dst.$lChn);
       $rName =~ s/_chn:.*//;
       my $curVal = CUL_HM_getRegFromStore($rName,$addr,$list,$peerId.$peerChn);
-      return "cannot calculate value. Please issue set $name getConfig first - $curVal"
-                 if ($curVal !~ m/^(set_|)(\d+)$/);
+      if ($curVal !~ m/^(set_|)(\d+)$/){
+	    return "peer required for $regName" if ($curVal =~ m/peer/);
+	    return "cannot calculate value. Please issue set $name getConfig first - $curVal";
+      }
+                 ;
       $curVal = $2; # we expect one byte in int, strap 'set_' possibly
       $data = ($curVal & (~($mask<<$bit)))|($data<<$bit);
       $addrData.=sprintf("%02X%02X",$addr,$data);
@@ -4962,13 +4965,18 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
     $factor = $reg->{f};
     $unit = " ".$reg->{u};
   }
+  else{
+    return "invalid:regname or address"
+	      if($addr<1 ||$addr>255);
+  }
   my $dst = substr(CUL_HM_name2Id($name),0,6);
   if(!$regLN){
     $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")
               .sprintf("RegL_%02X:",$list)
               .($peerId?CUL_HM_peerChName($peerId,
                                           $dst,
-                                          CUL_HM_IOid($hash)):"");
+                                          CUL_HM_IOid($hash))
+                       :"");
   }
   $regLN =~ s/broadcast//;
   my $regLNp = $regLN;
@@ -4976,11 +4984,11 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   my $sdH = CUL_HM_shH($hash,sprintf("%02X",$list),$dst);
   my $sRL = (    $sdH->{helper}{shadowReg}          # shadowregList
               && $sdH->{helper}{shadowReg}{$regLNp})
-              ?$sdH->{helper}{shadowReg}{$regLNp}
-              :"";
+                           ?$sdH->{helper}{shadowReg}{$regLNp}
+                           :"";
   my $rRL = ($hash->{READINGS}{$regLN})              #realRegList
-              ?$hash->{READINGS}{$regLN}{VAL}
-              :"";
+                           ?$hash->{READINGS}{$regLN}{VAL}
+                           :"";
   
   my $data=0;
   my $convFlg = "";# confirmation flag - indicates data not confirmed by device
@@ -4995,6 +5003,10 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
       $dRead = $dReadS;
     }
     else{
+	  if (grep /$regLN../,keys %{$hash->{READINGS}} &&
+	       !$peerId){
+        return "invalid:peer missing";
+      }
       return "invalid" if (!defined($dRead) || $dRead eq "");
     }
 
@@ -5040,7 +5052,7 @@ sub CUL_HM_updtRegDisp($$$) {
   foreach my $rgN (@regArr){
     next if ($culHmRegDefine->{$rgN}->{l} ne $listNo);
     my $rgVal = CUL_HM_getRegFromStore($name,$rgN,$list,$peerId,$regLN);
-    next if (!$rgVal || $rgVal eq "invalid");
+    next if (!$rgVal || $rgVal =~ m /invalid/);
     my $rdN = ((!$expLvl && !$culHmRegDefine->{$rgN}->{d})?".":"").$pReg.$rgN;
     push (@changedRead,$rdN.":".$rgVal)
           if (ReadingsVal($name,$rdN,"") ne $rgVal);
@@ -5379,11 +5391,14 @@ sub CUL_HM_TCITRTtempReadings($@) {# parse RT - TC-IT temperature readings
     }
 
     if ($hash->{helper}{shadowReg}{"RegL_0$lst:"}){
+      my $ch = 0;
       foreach(split " ",$hash->{helper}{shadowReg}{"RegL_0$lst:"}){
         my ($a,$d) = split ":",$_;
-        $r1[hex($a)] = $d;
+        $a = hex($a);
+        $ch = 1 if ((!$r1[$a] || $r1[$a] ne $d) && $a >= 20);
+        $r1[$a] = $d;
       }
-      push (@changedRead,"tempList$idxN{$lst}_State:set");
+      push (@changedRead,"tempList$idxN{$lst}_State:set") if ($ch);
     }
     else{
       push (@changedRead,"tempList$idxN{$lst}_State:verified");
@@ -5971,7 +5986,6 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
     push @lsNo,"0:";
   }
   elsif ($hash->{helper}{role}{chn}){
-
     foreach my $ls (split ",",$culHmModel->{$mId}{lst}){
       my ($l,$c) = split":",$ls;
       if ($l ne "p"){# ignore peer-only entries
