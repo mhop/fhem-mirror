@@ -287,9 +287,13 @@ sub CUL_HM_updateConfig($){
           && $hash->{helper}{fkt} =~ m/^(vdCtrl|virtThSens)$/){
         my $vId = substr($id."01",0,8);
         $hash->{helper}{virtTC} = "00";
-        $hash->{helper}{vd}{msgRed}= 0                                        if(!defined $hash->{helper}{vd}{msgRed});
-        ($hash->{helper}{vd}{msgCnt},$hash->{helper}{vd}{next}) = 
-                    split(";",ReadingsVal($name,".next","0;".gettimeofday())) if(!defined $hash->{helper}{vd}{next});
+        $hash->{helper}{vd}{msgRed}= 0 if(!defined $hash->{helper}{vd}{msgRed});
+        if(!defined $hash->{helper}{vd}{next}){
+          ($hash->{helper}{vd}{msgCnt},$hash->{helper}{vd}{next}) = 
+                    split(";",ReadingsVal($name,".next","0;".gettimeofday()));
+          $hash->{helper}{vd}{idl} = 0;
+          $hash->{helper}{vd}{idh} = 0;
+        }
         my $d =ReadingsVal($name,"valvePosTC","");
         $d =~ s/ %//;
         CUL_HM_Set($hash,$name,"valvePos",$d);
@@ -690,7 +694,8 @@ sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
   $hash->{helper}{io}{newChn} = sprintf("%s%02X%s",@p);
   if (($hash->{helper}{io}{newChn} ne $oldChn)
       &&$hash->{IODev}
-      &&({$hash->{IODev}->{TYPE}} eq "HMLAN")){
+      &&$hash->{IODev}->{TYPE}
+      &&($hash->{IODev}->{TYPE} eq "HMLAN")){
     my $id = CUL_HM_hash2Id($hash);
     IOWrite($hash, "", "init:$id");
   }
