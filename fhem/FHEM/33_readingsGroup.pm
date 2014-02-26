@@ -40,7 +40,7 @@ sub readingsGroup_Initialize($)
   #$hash->{SetFn}    = "readingsGroup_Set";
   $hash->{GetFn}    = "readingsGroup_Get";
   $hash->{AttrFn}   = "readingsGroup_Attr";
-  $hash->{AttrList} = "disable:1,2,3 nameIcon valueIcon mapping separator style nameStyle valueColumns valueStyle valueFormat commands timestampStyle noheading:1 nolinks:1 notime:1 nostate:1 alwaysTrigger:1";
+  $hash->{AttrList} = "disable:1,2,3 nameIcon valueIcon mapping separator style nameStyle valueColumns valueStyle valueFormat commands timestampStyle noheading:1 nolinks:1 notime:1 nostate:1 alwaysTrigger:1 sortDevices:1";
 
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
@@ -127,6 +127,12 @@ readingsGroup_updateDevices($)
         }
       }
     }
+  }
+
+  if( AttrVal( $hash->{NAME}, "sortDevices", 0 ) == 1 ) {
+    @devices = sort { my $aa = @{$a}[0]; my $bb =  @{$b}[0];
+                      lc(AttrVal($aa,"sortby",AttrVal($aa,"alias",$aa))) cmp
+                      lc(AttrVal($bb,"sortby",AttrVal($bb,"alias",$bb))) } @devices;
   }
 
   $hash->{CONTENT} = \%list;
@@ -974,6 +980,8 @@ readingsGroup_Attr($$$)
         1 -> disable notify processing and longpoll updates. Notice: this also disables rename and delete handling.<br>
         2 -> also disable html table creation<br>
         3 -> also disable html creation completely</li>
+      <li>sortDevices<br>
+        1 -> sort the device lines alphabetically. use the first of sortby or alias or name that is defined for each device.</li>
       <li>noheading<br>
         If set to 1 the readings table will have no heading.</li>
       <li>nolinks<br>
