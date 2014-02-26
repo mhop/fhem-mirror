@@ -19,12 +19,15 @@ use Device::Firmata::Constants  qw/ :all /;
 
 my %sets = (
   "text" => "",
-  "home" => "",
-  "clear" => "",
+  "home" => "noArg",
+  "clear" => "noArg",
   "display" => "on,off",
   "cursor" => "",
   "scroll" => "left,right",
-);
+  "backlight" => "on,off",
+  "reset" => "noArg",
+  "writeXY" => ""
+ );
 
 my %gets = (
 );
@@ -151,12 +154,20 @@ sub FRM_LCD_Set(@) {
   return "Need at least one parameters" if(@a < 2);
   my $command = $a[1];
   my $value = $a[2];
-  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %sets)
-  	if(!defined($sets{$command}));
+  if(!defined($sets{$command})) {
+  	my @commands = ();
+    foreach my $key (sort keys %sets) {
+      push @commands, $sets{$key} ? $key.":".join(",",$sets{$key}) : $key;
+    }
+    return "Unknown argument $a[1], choose one of " . join(" ", @commands);
+  }
   my $lcd = $hash->{lcd};
   return unless defined $lcd;
   COMMAND_HANDLER: {
     $command eq "text" and do {
+    	shift @a;
+    	shift @a;
+    	$value = join(" ", @a);
     	if (AttrVal($hash->{NAME},"autoClear","on") eq "on") {
     		$lcd->clear();
     	}
@@ -184,6 +195,11 @@ sub FRM_LCD_Set(@) {
     	$lcd->home();
     	last;
     };
+    $command eq "reset" and do {
+    	$lcd->init();
+#    	$hash->{lcd} = $lcd;
+    	last;
+    };
     $command eq "clear" and do {
     	$lcd->clear();
     	main::readingsSingleUpdate($hash,"text","",1);
@@ -209,6 +225,37 @@ sub FRM_LCD_Set(@) {
     		$lcd->scrollDisplayRight();
     	}
     	last;
+    };
+    $command eq "backlight" and do {
+    	if ($value eq "on") {
+    		$lcd->backlight();
+    	} else {
+    		$lcd->noBacklight();
+    	}
+    	last;
+    };
+	$command eq "writeXY" and do { 
+		my ($x,$y,$l,$al) = split(",",$value);
+		$lcd->setCursor($x,$y);
+		shift @a; shift @a; shift @a;
+		my $t = join(" ", @a);
+		my %umlaute = ("ä" => "ae", "Ä" => "Ae", "ü" => "ue", "Ü" => "Ue", "ö" => "oe", "Ö" => "Oe", "ß" => "ss" ," - " => " " ,"©"=>"@");
+		my $umlautkeys = join ("|", keys(%umlaute));
+		$t =~ s/($umlautkeys)/$umlaute{$1}/g;
+		my $sl = length $t;
+		if ($sl > $l) {
+			$t = substr($t,0,$l);
+		}
+		if ($sl < $l) {
+			my $dif = "";
+			for (my $i=$sl; $i<$l; $i++) {
+				$dif .= " ";
+			}
+			$t = ($al eq "l") ? $t.$dif : $dif.$t;
+		}
+		$lcd->print($t);
+		readingsSingleUpdate($hash,"state",$t,1);
+		last; #"X=$x|Y=$y|L=$l|Text=$t";
     };
   }
 }
@@ -259,8 +306,17 @@ STATEHANDLER: {
   <a name="FRM_LCDset"></a>
   <b>Set</b><br>
   <ul>
-  <code>set &lt;name&gt; text &lt;text to be displayed&gt;</code><br>
+      <li><code>set &lt;name&gt; text &lt;text to be displayed&gt;</code><br></li>
+      <li><code>set &lt;name&gt; home</code><br></li>
+      <li><code>set &lt;name&gt; clear</code><br></li>
+      <li><code>set &lt;name&gt; display on|off</code><br></li>
+      <li><code>set &lt;name&gt; cursor &lt;...&gt;</code><br></li>
+      <li><code>set &lt;name&gt; scroll left|right</code><br></li>
+      <li><code>set &lt;name&gt; backlight on|off</code><br></li>
+      <li><code>set &lt;name&gt; reset</code><br></li>
+      <li><code>set &lt;name&gt; writeXY x-pos,y-pos,len[,l] &lt;text to be displayed&gt;</code><br></li>
   </ul>
+  
   <a name="FRM_I2Cget"></a>
   <b>Get</b><br>
   <ul>
