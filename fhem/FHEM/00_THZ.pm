@@ -1,7 +1,7 @@
 ##############################################
 # 00_THZ
 # by immi 02/2014
-# v. 0.069
+# v. 0.070
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -707,8 +707,7 @@ sub THZ_Parse($) {
               	  "Date: " 		. (hex(substr($message,12,2))+2000)  .	"/"		. hex(substr($message,14,2)) . "/"		. hex(substr($message,16,2));
   }
   when ("FB")    {                     #allFB
-    $message =
-        	  "outside_temp: " 				. hex2int(substr($message, 8,4))/10 . " " .
+    $message =    "outside_temp: " 				. hex2int(substr($message, 8,4))/10 . " " .
         	  "flow_temp: "					. hex2int(substr($message,12,4))/10 . " " .  #Vorlauf Temperatur
         	  "return_temp: "				. hex2int(substr($message,16,4))/10 . " " .  #Rücklauf Temperatur
         	  "hot_gas_temp: " 				. hex2int(substr($message,20,4))/10 . " " .  #Heißgas Temperatur		
@@ -716,36 +715,36 @@ sub THZ_Parse($) {
         	  "flow_temp_HC2: "				. hex2int(substr($message,28,4))/10 . " " .  #Vorlauf TemperaturHK2
 		  "evaporator_temp: "				. hex2int(substr($message,36,4))/10 . " " .  #Speicher Temperatur    
         	  "condenser_temp: "				. hex2int(substr($message,40,4))/10 . " " .  
-        	  "Mixer_open: "				. ((hex(substr($message,44,1)) &  0b0001) / 0b0001) . " " .	
-		  "Mixer_closed: "				. ((hex(substr($message,44,1)) &  0b0010) / 0b0010) . " " .
-		  "HeatPipeValve: "				. ((hex(substr($message,44,1)) &  0b0100) / 0b0100) . " " .
-		  "DiverterValve: "				. ((hex(substr($message,44,1)) &  0b1000) / 0b1000) . " " .
-		  "DHW_Pump: "					. ((hex(substr($message,45,1)) &  0b0001) / 0b0001) . " " .
-		  "HeatingCircuit_Pump: "			. ((hex(substr($message,45,1)) &  0b0010) / 0b0010) . " " .
-		  "Solar_Pump: "				. ((hex(substr($message,45,1)) &  0b1000) / 0b1000) . " " .
-		  "Compressor: "				. ((hex(substr($message,46,1)) &  0b1000) / 0b1000) . " " .
-		  "BoosterStage3: "				. ((hex(substr($message,47,1)) &  0b0001) / 0b0001) . " " .
-		  "BoosterStage2: "				. ((hex(substr($message,47,1)) &  0b0010) / 0b0010) . " " .
-		  "BoosterStage1: "				. ((hex(substr($message,47,1)) &  0b0100) / 0b0100). " " .
-		  "HighPressureSensor: "			. ((hex(substr($message,48,1)) &  0b0001) / 0b0001). " " .  #P1 	inverterd?
-		  "LowPressureSensor: "				. ((hex(substr($message,48,1)) &  0b0010) / 0b0010). " " .  #P3  inverterd?
-		  "EvaporatorIceMonitor: "			. ((hex(substr($message,48,1)) &  0b0100) / 0b0100). " " .  #N3
-		  "SignalAnode: "				. ((hex(substr($message,48,1)) &  0b1000) / 0b1000). " " .  #S1
-		  "EVU_release: "				. ((hex(substr($message,49,1)) &  0b0001) / 0b0001). " " .  
-		  "OvenFireplace: "				. ((hex(substr($message,49,1)) &  0b0010) / 0b0010). " " .  
-		  "STB: "					. ((hex(substr($message,49,1)) &  0b0100) / 0b0100). " " .  	
-		  "OutputVentilatorPower: "			. hex(substr($message,50,4))/10  . " " .
-        	  "InputVentilatorPower: " 			. hex(substr($message,54,4))/10  . " " .
-        	  "MainVentilatorPower: "			. hex(substr($message,58,4))/10  . " " .
-        	  "OutputVentilatorSpeed: "			. hex(substr($message,62,4))/1  	. " " .  # m3/h
-        	  "InputVentilatorSpeed: " 			. hex(substr($message,66,4))/1  	. " " .  # m3/h
-        	  "MainVentilatorSpeed: "			. hex(substr($message,70,4))/1  	. " " .  # m3/h
+        	  "Mixer_open: "				. ((hex(substr($message,45,1)) &  0b0001) / 0b0001) . " " .	#status bit
+		  "Mixer_closed: "				. ((hex(substr($message,45,1)) &  0b0010) / 0b0010) . " " .	#status bit
+		  "HeatPipeValve: "				. ((hex(substr($message,45,1)) &  0b0100) / 0b0100) . " " .	#status bit
+		  "DiverterValve: "				. ((hex(substr($message,45,1)) &  0b1000) / 0b1000) . " " .	#status bit
+		  "DHW_Pump: "					. ((hex(substr($message,44,1)) &  0b0001) / 0b0001) . " " .	#status bit
+		  "HeatingCircuit_Pump: "			. ((hex(substr($message,44,1)) &  0b0010) / 0b0010) . " " .	#status bit
+		  "Solar_Pump: "				. ((hex(substr($message,44,1)) &  0b1000) / 0b1000) . " " .	#status bit
+		  "Compressor: "				. ((hex(substr($message,47,1)) &  0b1000) / 0b1000) . " " .	#status bit
+		  "BoosterStage3: "				. ((hex(substr($message,46,1)) &  0b0001) / 0b0001) . " " .	#status bit
+		  "BoosterStage2: "				. ((hex(substr($message,46,1)) &  0b0010) / 0b0010) . " " .	#status bit
+		  "BoosterStage1: "				. ((hex(substr($message,46,1)) &  0b0100) / 0b0100). " " .	#status bit
+		  "HighPressureSensor: "			. (1-((hex(substr($message,49,1)) &  0b0001) / 0b0001)). " " .	#status bit  #P1 	inverterd?
+		  "LowPressureSensor: "				. (1-((hex(substr($message,49,1)) &  0b0010) / 0b0010)). " " .	#status bit  #P3  inverterd?
+		  "EvaporatorIceMonitor: "			. ((hex(substr($message,49,1)) &  0b0100) / 0b0100). " " .	#status bit  #N3
+		  "SignalAnode: "				. ((hex(substr($message,49,1)) &  0b1000) / 0b1000). " " .	#status bit  #S1
+		  "EVU_release: "				. ((hex(substr($message,48,1)) &  0b0001) / 0b0001). " " . 	#status bit 
+		  "OvenFireplace: "				. ((hex(substr($message,48,1)) &  0b0010) / 0b0010). " " .  	#status bit
+		  "STB: "					. ((hex(substr($message,48,1)) &  0b0100) / 0b0100). " " .	#status bit  	
+		  "OutputVentilatorPower: "			. hex(substr($message,50,4))/10  	. " " .
+        	  "InputVentilatorPower: " 			. hex(substr($message,54,4))/10  	. " " .
+        	  "MainVentilatorPower: "			. hex(substr($message,58,4))/10  	. " " .
+        	  "OutputVentilatorSpeed: "			. hex(substr($message,62,4))/1   	. " " .  # m3/h
+        	  "InputVentilatorSpeed: " 			. hex(substr($message,66,4))/1   	. " " .  # m3/h
+        	  "MainVentilatorSpeed: "			. hex(substr($message,70,4))/1   	. " " .  # m3/h
                   "Outside_tempFiltered: "			. hex2int(substr($message,74,4))/10     . " " .
-                  "Rel_humidity: "				. hex2int(substr($message,78,4))/10  	 . " " .
-		  "DEW_point: "					. hex2int(substr($message,86,4))/1     . " " .
-		  "P_Nd: "					. hex2int(substr($message,86,4))/100     . " " .	#bar
-		  "P_Hd: "					. hex2int(substr($message,90,4))/100     . " " .  #bar
-		  "Actual_power_Qc: "				. hex2int(substr($message,94,8))/1     . " " .	#kw
+                  "Rel_humidity: "				. hex2int(substr($message,78,4))/10	. " " .
+		  "DEW_point: "					. hex2int(substr($message,86,4))/1	. " " .
+		  "P_Nd: "					. hex2int(substr($message,86,4))/100	. " " .	#bar
+		  "P_Hd: "					. hex2int(substr($message,90,4))/100	. " " .  #bar
+		  "Actual_power_Qc: "				. hex2int(substr($message,94,8))/1      . " " .	#kw
 		  "Actual_power_Pel: "				. hex2int(substr($message,102,4))/1     . " " .	#kw
 		  "collector_temp: " 				. hex2int(substr($message, 4,4))/10 ;
   }
