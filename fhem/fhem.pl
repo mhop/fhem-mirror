@@ -926,7 +926,7 @@ devspec2array($)
         }
         $val="" if(!defined($val));
 
-        my $lre = ($n eq "room" ? "(^|,)$re(,|\$)" : "^$re\$");
+        my $lre = ($n eq "room" ? "(^|,)($re)(,|\$)" : "^($re)\$");
         eval { # a bad regexp is deadly
           if(($op eq  "=" && $val =~ m/$lre/) ||
              ($op eq "!=" && $val !~ m/$lre/)) {
