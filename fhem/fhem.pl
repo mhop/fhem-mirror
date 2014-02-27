@@ -1456,12 +1456,11 @@ CommandDefine($$)
     foreach my $da (sort keys (%defaultattr)) {     # Default attributes
       CommandAttr($cl, "$name $da $defaultattr{$da}");
     }
-    DoTrigger("global", "DEFINED $name", 1) if($init_done);
-
     if($modules{$m}{NotifyFn} && !$hash{NTFY_ORDER}) {
       $hash{NTFY_ORDER} = ($modules{$m}{NotifyOrderPrefix} ?
                 $modules{$m}{NotifyOrderPrefix} : "50-") . $name;
     }
+    DoTrigger("global", "DEFINED $name", 1) if($init_done);
 
   }
   return $ret;
