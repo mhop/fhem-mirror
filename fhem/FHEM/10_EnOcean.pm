@@ -43,6 +43,7 @@ my %EnO_gwCmd = (
 
 # Some Manufacturers (e.g. Jaeger Direkt) also sell EnOcean products without an entry in the table below.
 my %EnO_manuf = (
+  "000" => "Reserved",
   "001" => "Peha",
   "002" => "Thermokon",
   "003" => "Servodan",
@@ -68,10 +69,40 @@ my %EnO_manuf = (
   "017" => "S+S Regeltechnik GmbH",
   "018" => "Masco Corporation",
   "019" => "Intesis Software SL",
-  "01A" => "Res.",
+  "01A" => "Viessmann",
   "01B" => "Lutuo Technology",
-  "01C" => "CAN2GO",
+  "01C" => "Schneider Electric",
+  "01D" => "Sauter",
+  "01E" => "Boot-Up",
+  "01F" => "Osram Sylvania",
+  "020" => "Unotech",
+  "021" => "Delta Controls Inc",
+  "022" => "Unitronic AG",
+  "023" => "NanoSense",
+  "024" => "The S4 Group",
+  "025" => "MSR Solutions",
+  "026" => "GE",
+  "027" => "Maico",
+  "028" => "Ruskin Company",
+  "029" => "Magnum Engery Solutions",
+  "02A" => "KM Controls",
+  "02B" => "Ecologix Controls",
+  "02C" => "Trio 2 Sys",
+  "02D" => "Afriso-Euro-Index",
+  "030" => "NEC AccessTechnica Ltd",
+  "031" => "ITEC Corporation",  
+  "032" => "Simix Co Ltd",  
+  "034" => "Eurotronic Technology GmbH",  
+  "035" => "Art Japan Co Ltd",  
+  "036" => "Tiansu Automation Control System Co Ltd",  
+  "038" => "Gruppo Giordano Idea Spa",  
   "039" => "alphaEOS AG",
+  "03A" => "Tag Technologies",  
+  "03C" => "Cloud Buildings Ltd",  
+  "03E" => "GIGA Concept",  
+  "03F" => "Sensortec",  
+  "040" => "Jaeger Direkt",  
+  "041" => "Air System Components Inc",  
   "7FF" => "Multi user Manufacturer ID",
 );
 
@@ -1473,17 +1504,17 @@ EnOcean_Set($@)
         $channel = shift(@a);
         if (!defined $channel || $channel eq "all") {
           CommandDeleteReading(undef, "$name channel.*");          
-          CommandDeleteReading(undef, "$name dimValue.*");          
+          CommandDeleteReading(undef, "$name dim.*");          
           readingsSingleUpdate($hash, "channelAll", "on", 1);
-          readingsSingleUpdate($hash, "dimValueAll", $outputVal, 1);
+          readingsSingleUpdate($hash, "dim", $outputVal, 1);
           $channel = 30;
         } elsif ($channel eq "input") {
           readingsSingleUpdate($hash, "channelInput", "on", 1);
-          readingsSingleUpdate($hash, "dimValueInput", $outputVal, 1);
+          readingsSingleUpdate($hash, "dimInput", $outputVal, 1);
           $channel = 31;
         } elsif ($channel >= 0 && $channel <= 29) {
           readingsSingleUpdate($hash, "channel" . $channel, "on", 1);
-          readingsSingleUpdate($hash, "dimValue" . $channel, $outputVal, 1);
+          readingsSingleUpdate($hash, "dim" . $channel, $outputVal, 1);
         } else {
           return "$cmd $channel wrong, choose 0...39|all|input.";
         }     
@@ -1497,17 +1528,17 @@ EnOcean_Set($@)
         $channel = shift(@a);
         if (!defined $channel || $channel eq "all") {
           CommandDeleteReading(undef, "$name channel.*");          
-          CommandDeleteReading(undef, "$name dimValue.*");          
+          CommandDeleteReading(undef, "$name dim.*");          
           readingsSingleUpdate($hash, "channelAll", "off", 1);
-          readingsSingleUpdate($hash, "dimValueAll", $outputVal, 1);
+          readingsSingleUpdate($hash, "dim", $outputVal, 1);
           $channel = 30;
         } elsif ($channel eq "input") {
           readingsSingleUpdate($hash, "channelInput", "off", 1);
-          readingsSingleUpdate($hash, "dimValueInput", $outputVal, 1);
+          readingsSingleUpdate($hash, "dimInput", $outputVal, 1);
           $channel = 31;
         } elsif ($channel >= 0 && $channel <= 29) {
           readingsSingleUpdate($hash, "channel" . $channel, "off", 1);
-          readingsSingleUpdate($hash, "dimValue" . $channel, $outputVal, 1);
+          readingsSingleUpdate($hash, "dim" . $channel, $outputVal, 1);
         } else {
           return "$cmd $channel wrong, choose 0...39|all|input.";
         }     
@@ -1524,24 +1555,24 @@ EnOcean_Set($@)
         $channel = shift(@a);
         if (!defined $channel) {
           CommandDeleteReading(undef, "$name channel.*");          
-          CommandDeleteReading(undef, "$name dimValue.*");          
+          CommandDeleteReading(undef, "$name dim.*");          
           if ($outputVal == 0) {
             readingsSingleUpdate($hash, "channelAll", "off", 1);
           } else {
             readingsSingleUpdate($hash, "channelAll", "on", 1);          
           }
-          readingsSingleUpdate($hash, "dimValueAll", $outputVal, 1);
+          readingsSingleUpdate($hash, "dim", $outputVal, 1);
           $channel = 30;
         } else {
           if ($channel eq "all") {
             CommandDeleteReading(undef, "$name channel.*");          
-            CommandDeleteReading(undef, "$name dimValue.*");          
+            CommandDeleteReading(undef, "$name dim.*");          
             if ($outputVal == 0) {
               readingsSingleUpdate($hash, "channelAll", "off", 1);
             } else {
               readingsSingleUpdate($hash, "channelAll", "on", 1);          
             }
-            readingsSingleUpdate($hash, "dimValueAll", $outputVal, 1);
+            readingsSingleUpdate($hash, "dim", $outputVal, 1);
             $channel = 30;
           } elsif ($channel eq "input") {
             if ($outputVal == 0) {
@@ -1549,7 +1580,7 @@ EnOcean_Set($@)
             } else {
               readingsSingleUpdate($hash, "channelInput", "on", 1);          
             }
-            readingsSingleUpdate($hash, "dimValueInput", $outputVal, 1);
+            readingsSingleUpdate($hash, "dimInput", $outputVal, 1);
             $channel = 31;
           } elsif ($channel >= 0 && $channel <= 29) {
             if ($outputVal == 0) {
@@ -1557,7 +1588,7 @@ EnOcean_Set($@)
             } else {
               readingsSingleUpdate($hash, "channel" . $channel, "on", 1);          
             }
-            readingsSingleUpdate($hash, "dimValue" . $channel, $outputVal, 1);
+            readingsSingleUpdate($hash, "dim" . $channel, $outputVal, 1);
           } else {
             return "Usage: $cmd $channel wrong, choose 0...39|all|input.";
           }
@@ -2281,7 +2312,7 @@ EnOcean_Parse($$)
             # bidirectional Teach-In for EEP A5-20-01 (MD15)
             $attr{$name}{comMode} = "biDir";          
             $attr{$name}{destinationID} = "unicast";
-            # SenderID = BaseID
+            # SenderID = ChipID
             $attr{$name}{subDef} = "00000000";
             # next commands will be sent with a delay, max 10 s
             select(undef, undef, undef, 0.1);
@@ -3051,7 +3082,7 @@ EnOcean_Parse($$)
       # $db[0]_bit_0 is the Power Relay state where 0 = off, 1 = on
       push @event, "3:brightness:" . ($db[3] << 1);
       push @event, "3:illum:$db[2]";
-      push @event, "3:dimValue:$db[1]";
+      push @event, "3:dim:$db[1]";
       push @event, "3:powerRelayTimer:" . ($db[0] & 0x80 ? "enabled" : "disabled");
       push @event, "3:repeater:" . ($db[0] & 0x40 ? "enabled" : "disabled");
       push @event, "3:daylightHarvesting:" . ($db[0] & 0x20 ? "enabled" : "disabled");
@@ -3188,7 +3219,7 @@ EnOcean_Parse($$)
       my $mode = ($db[0] & 6) >> 1;
       if ($mode == 0) {
         # dimmer value and lamp operating hours
-        push @event, "3:dimValue:$db[3]";
+        push @event, "3:dim:$db[3]";
         if ($db[0] & 40) {
           push @event, "3:lampOpHours:" . ($db[2] << 8 | $db[1]);
         } else {
@@ -3650,7 +3681,7 @@ EnOcean_Parse($$)
           push @event, "3:channel" . $channel . ":on";
           push @event, "3:state:on";
         }
-        push @event, "3:dimValue" . $channel . ":" . $dimValue;        
+        push @event, "3:dim" . $channel . ":" . $dimValue;        
       
       } elsif ($cmd == 7) {
         # actuator measurement response
@@ -4105,16 +4136,16 @@ EnOcean_Undef($$)
     IO device, see <a href="#TCM">TCM</a> BaseID, LastID. For this first query the
     <a href="#TCM">TCM</a> with the <code>get &lt;tcm&gt; baseID</code> command
     for the BaseID. You can use up to 127 IDs starting with the BaseID + 1 shown there.
-    The BaseID is used for A5 devices with a bidectional teach-in only. If you
+    The BaseID is used for 4BS devices with a bidectional teach-in only. If you
     are using an Fhem SenderID outside of the allowed range, you will see an
-    ERR_ID_RANGE message in the Fhem log.<br>
-    In order to control bidirectional RPS devices (switches, actors) with
-    additional SenderIDs you can use the attributes <a href="#subDef">subDef</a>,
-    <a href="#subDef0">subDef0</a> and <a href="#subDefI">subDefI</a>.<br>
-    Fhem communicates unicast with the BaseID, if the 4BS devices are teached-in with the
+    ERR_ID_RANGE message in the Fhem log.<br>    
+    Fhem communicates unicast with the ChipID or BaseID, if the 4BS devices are teached-in with the
     <a href="#EnOcean_teach-in"> Bidirectional Teach-In / Teach-Out</a> procedure. In this case
-    Fhem send telegrams with its SenderID (BaseID) and the DestinationID of the
-    device.<br><br>
+    Fhem send telegrams with its SenderID (ChipID or BaseID) and the DestinationID of the
+    device.<br>
+    Newer devices send acknowledge telegrams. In order to control this devices (switches, actors) with
+    additional SenderIDs you can use the attributes <a href="#subDef">subDef</a>,
+    <a href="#subDef0">subDef0</a> and <a href="#subDefI">subDefI</a>.<br><br>
   </ul>
 
   <a name="EnOceanset"></a>
@@ -4669,10 +4700,9 @@ EnOcean_Undef($$)
     <li><a name="devChannel">devChannel</a> 00 ... FF, [devChannel] = FF is default<br>
       Number of the individual device channel, FF = all channels supported by the device 
     </li>
-    <li><a name="destinationID">destinationID</a> multicast|unicast|00000000 ... FFFFFFFF,
+    <li><a name="destinationID">destinationID</a> multicast|unicast|00000001 ... FFFFFFFF,
       [destinationID] = multicast is default<br>
-      Destination ID, special values: multicast = FFFFFFFF, unicast = [DEF],
-      <a href="#BaseID">BaseID</a> = 00000000
+      Destination ID, special values: multicast = FFFFFFFF, unicast = [DEF]
     </li>
     <li><a href="#devStateIcon">devStateIcon</a></li>
     <li><a name="dimValueOn">dimValueOn</a> dim/%|last|stored,
@@ -4743,7 +4773,7 @@ EnOcean_Undef($$)
     <li><a name="subDef">subDef</a> &lt;EnOcean SenderID&gt;,
       [subDef] = [def] is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset) to control a bidirectional switch or actor.<br>
-      In order to control bidirectional devices, you cannot reuse the ID of this
+      In order to control devices that send acknowledge telegrams, you cannot reuse the ID of this
       devices, instead you have to create your own, which must be in the
       allowed ID-Range of the underlying IO device. For this first query the
       <a href="#TCM">TCM</a> with the "<code>get &lt;tcm&gt; idbase</code>" command. You can use
@@ -5307,7 +5337,7 @@ EnOcean_Undef($$)
        <li>brightness: E/lx (Sensor Range: E = 0 lx ... 510 lx)</li>
        <li>contact: open|closed</li>
        <li>daylightHarvesting: enabled|disabled</li>
-       <li>dimValue: 0 ... 255</li>
+       <li>dim: 0 ... 255</li>
        <li>presence: absent|present</li>
        <li>illum: 0 ... 255</li>
        <li>mode: switching|dimming</li>
@@ -5367,7 +5397,7 @@ EnOcean_Undef($$)
      <ul>
        <li>on|off</li>
        <li>alarm: off|lamp failure|internal failure|external periphery failure</li>
-       <li>dimValue: 0 ... 255</li>
+       <li>dim: 0 ... 255</li>
        <li>measuredValue: &lt;formula symbol&gt;/&lt;unit&gt; (Sensor range: &lt;formula symbol&gt; = 0 ... 65535 &lt;unit&gt;</li>
        <li>measureUnit: mW|W|kW|MW|Wh|kWh|MWh|GWh|mA|1/10 A|mV|1/10 V</li>
        <li>lampOpHours: t/h |unknown (Sensor range: t = 0 h ... 65535 h)</li>
@@ -5561,7 +5591,7 @@ EnOcean_Undef($$)
      </ul><br>
         The attr subType must be gateway, gwCmd must be dimming and attr manufID must be 00D
         for Eltako Devices. This is done if the device was created by autocreate.<br>
-        For Eltako devices attributes must be set manually. Eltako devices only send on/off and dimValue.
+        For Eltako devices attributes must be set manually. Eltako devices only send on/off and dim.
      </li>
      <br><br>
 
@@ -5674,7 +5704,7 @@ EnOcean_Undef($$)
         <li>channel&lt;0...29|All|Input&gt;: on|off</li>
         <li>dayNight: day|night</li>        
         <li>defaultState: on|off|last</li>        
-        <li>dimValue&lt;0...29|All|Input&gt;: dim/% (Sensor Range: dim = 0 % ... 100 %)</li>
+        <li>dim&lt;0...29|Input&gt;: dim/% (Sensor Range: dim = 0 % ... 100 %)</li>
         <li>energy&lt;channel&gt;: 1/[Ws|Wh|KWh]</li>
         <li>energyUnit&lt;channel&gt;: Ws|Wh|KWh</li>
         <li>error&lt;channel&gt;: ok|warning|failure</li>
