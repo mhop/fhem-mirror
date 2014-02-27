@@ -187,6 +187,8 @@ lookup($$$$$$$$)
       $default = $mapping;
     }
 
+    return $default if( !defined($default) );
+
     $default =~ s/\%ALIAS/$alias/g;
     $default =~ s/\%DEVICE/$name/g;
     $default =~ s/\%READING/$reading/g;
@@ -453,10 +455,18 @@ readingsGroup_2html($)
             }
 
            if( $htmlTxt =~ m/<td colspan='2'>(.*)<\/td>/s ) {
-              $txt = $1;         
+              $txt = $1;
+
+              my $a = AttrVal($name, "alias", $name);
+              my $room = AttrVal($name, "room", "");
+              my $group = AttrVal($name, "group", "");
+              my $mapped = lookup($mapping,$name,$a,$set,"",$room,$group,undef);
+              if( defined($mapped) ) {
+                $txt =~ s/$set&nbsp;/$mapped&nbsp;/;
+              }
             } elsif( $htmlTxt ) {
-              $txt = $htmlTxt;   
-            }                    
+              $txt = $htmlTxt;
+            }
           }
         }
 
@@ -568,12 +578,16 @@ readingsGroup_2html($)
             }
 
            if( $htmlTxt =~ m/<td colspan='2'>(.*)<\/td>/s ) {
-              $v = $1;         
+              $v = $1;
+              my $mapped = lookup($mapping,$name,$a,$set,"",$room,$group,undef);
+              if( defined($mapped) ) {
+                $v =~ s/$set&nbsp;/$mapped&nbsp;/;
+              }
               $webCmdFn = 1;
             } elsif( $htmlTxt ) {
-              $v = $htmlTxt;   
+              $v = $htmlTxt;
               $webCmdFn = 1;
-            }                    
+            }
           }
         }
         ($v,$devStateIcon) = readingsGroup_makeLink($v,$devStateIcon,$cmd) if( !$webCmdFn );
