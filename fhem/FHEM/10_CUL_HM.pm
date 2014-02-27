@@ -144,7 +144,7 @@ sub CUL_HM_Initialize($) {
                        ."param msgRepeat "
                        .".stc .devInfo "
                        ."aesCommReq:1,0 "
-                       ."rssiLog "         # enable writing RSSI to Readings (device only)
+                       ."rssiLog:1,0 "         # enable writing RSSI to Readings (device only)
                        .$readingFnAttributes;
   #autoReadReg:
   #        ,6_allForce
@@ -6916,59 +6916,7 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
          The overall function can be viewed checking out the "ActionDetector" entity. The status of all entities is present in the READING section.<br>
          Note: This function can be enabled for devices with non-cyclic messages as well. It is up to the user to enter a reasonable cycletime.
     </li>
-    <li><a name="expert">expert</a><br>
-        This attribut controls the visibility of the readings. This attibute controlls
-        the presentation of device parameter in the readings.<br>
-        3 level can be choosen:<br>
-        <ul>
-        0_off: standart level. Display commonly used parameter<br>
-        1_on: enhanced level. Display all decoded device parameter<br>
-        2_full: display all parameter plus raw register information as well. <br>
-        </ul>
-        If expert is applied a device it is used for assotiated channels.
-        It can be overruled if expert attibute is also applied to the channel device.<br>
-        Make sure to check out attribut showInternalValues in the global values as well.
-        extert takes benefit of the implementation.
-        Nevertheless  - by definition - showInternalValues overrules expert.
-        </li>
-    <li><a name="model">model</a>,
-        <a name="subType">subType</a><br>
-        These attributes are set automatically after a successful pairing.
-        They are not supposed to be set by hand, and are necessary in order to
-        correctly interpret device messages or to be able to send them.</li>
-    <li><a name="param">param</a><br>
-        param defines model specific behavior or functions. See models for details</li>
-    <li><a name="msgRepeat">msgRepeat</a><br>
-        defines number of repetitions if a device doesn't answer in time. <br>
-        Devices which donly support config mode no repeat ist allowed. <br>
-        For devices with wakeup mode the device will wait for next wakeup. Lonng delay might be 
-        considered in this case. <br>
-        Repeat for burst devices will impact HMLAN transmission capacity.</li>
-    <li><a name="burstAccess">burstAccess</a><br>
-        can be set for the device entity if the model allowes conditionalBurst.
-        The attribut will switch off burst operations (0_off) which causes less message load
-        on HMLAN and therefore reduces the chance of HMLAN overload.<br>
-        Setting it on (1_auto) allowes shorter reaction time of the device. User does not
-        need to wait for the device to wake up. <br>
-        Note that also the register burstRx needs to be set in the device.</li>
-    <li><a name="rawToReadable">rawToReadable</a><br>
-        Used to convert raw KFM100 values to readable data, based on measured
-        values. E.g.  fill slowly your container, while monitoring the
-        values reported with <a href="#inform">inform</a>. You'll see:
-        <ul>
-          10 (at 0%)<br>
-          50 (at 20%)<br>
-          79 (at 40%)<br>
-         270 (at 100%)<br>
-        </ul>
-        Apply these values with: "attr KFM100 rawToReadable 10:0 50:20 79:40 270:100".
-        fhem will do a linear interpolation for values between the bounderies.
-        </li>
-    <li><a name="unit">unit</a><br>
-        set the reported unit by the KFM100 if rawToReadable is active. E.g.<br>
-        attr KFM100 unit Liter
-        </li>
-    <li><a name="autoReadReg">autoReadReg</a><br>
+    <li><a name="#CUL_HMautoReadReg">autoReadReg</a><br>
         '0' autoReadReg will be ignored.<br>
         '1' will execute a getConfig for the device automatically after each reboot of FHEM. <br>
         '2' like '1' plus execute after power_on.<br>
@@ -6988,6 +6936,63 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
           usage on devices which support wakeup-mode is usefull. But consider that execution is delayed
           until the device "wakes up".<br>
         </ul>
+        </li>
+    <li><a name="#CUL_HMburstAccess">burstAccess</a><br>
+        can be set for the device entity if the model allowes conditionalBurst.
+        The attribut will switch off burst operations (0_off) which causes less message load
+        on HMLAN and therefore reduces the chance of HMLAN overload.<br>
+        Setting it on (1_auto) allowes shorter reaction time of the device. User does not
+        need to wait for the device to wake up. <br>
+        Note that also the register burstRx needs to be set in the device.</li>
+    <li><a name="#CUL_HMexpert">expert</a><br>
+        This attribut controls the visibility of the readings. This attibute controlls
+        the presentation of device parameter in the readings.<br>
+        3 level can be choosen:<br>
+        <ul>
+        0_off: standart level. Display commonly used parameter<br>
+        1_on: enhanced level. Display all decoded device parameter<br>
+        2_full: display all parameter plus raw register information as well. <br>
+        </ul>
+        If expert is applied a device it is used for assotiated channels.
+        It can be overruled if expert attibute is also applied to the channel device.<br>
+        Make sure to check out attribut showInternalValues in the global values as well.
+        extert takes benefit of the implementation.
+        Nevertheless  - by definition - showInternalValues overrules expert.
+        </li>
+    <li><a name="#CUL_HMmodel">model</a>,
+        <a name="subType">subType</a><br>
+        These attributes are set automatically after a successful pairing.
+        They are not supposed to be set by hand, and are necessary in order to
+        correctly interpret device messages or to be able to send them.</li>
+    <li><a name="#CUL_HMmsgRepeat">msgRepeat</a><br>
+        defines number of repetitions if a device doesn't answer in time. <br>
+        Devices which donly support config mode no repeat ist allowed. <br>
+        For devices with wakeup mode the device will wait for next wakeup. Lonng delay might be 
+        considered in this case. <br>
+        Repeat for burst devices will impact HMLAN transmission capacity.</li>
+    <li><a name="#CUL_HMparam">param</a><br>
+        param defines model specific behavior or functions. See models for details</li>
+    <li><a name="#CUL_HMrawToReadable">rawToReadable</a><br>
+        Used to convert raw KFM100 values to readable data, based on measured
+        values. E.g.  fill slowly your container, while monitoring the
+        values reported with <a href="#inform">inform</a>. You'll see:
+        <ul>
+          10 (at 0%)<br>
+          50 (at 20%)<br>
+          79 (at 40%)<br>
+         270 (at 100%)<br>
+        </ul>
+        Apply these values with: "attr KFM100 rawToReadable 10:0 50:20 79:40 270:100".
+        fhem will do a linear interpolation for values between the bounderies.
+        </li>
+    <li><a name="#CUL_HMrssiLog">rssiLog</a><br>
+        can be given to devices, denied for channels. If switched '1' each RSSI entry will be
+        written to a reading. User may use this to log and generate a graph of RSSI level.<br>
+        Due to amount of readings and events it is NOT RECOMMENDED to switch it on by default.
+        </li>
+    <li><a name="unit">unit</a><br>
+        set the reported unit by the KFM100 if rawToReadable is active. E.g.<br>
+        attr KFM100 unit Liter
         </li>
   </ul>  <br>
   <a name="CUL_HMparams"><b>available parameter "param"</b></a>
