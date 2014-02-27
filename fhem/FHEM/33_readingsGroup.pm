@@ -452,7 +452,11 @@ readingsGroup_2html($)
               last if(defined($htmlTxt));
             }
 
-            $txt = $htmlTxt if( $htmlTxt );
+           if( $htmlTxt =~ m/<td colspan='2'>(.*)<\/td>/s ) {
+              $txt = $1;         
+            } elsif( $htmlTxt ) {
+              $txt = $htmlTxt;   
+            }                    
           }
         }
 
@@ -563,10 +567,13 @@ readingsGroup_2html($)
               last if(defined($htmlTxt));
             }
 
-            if( $htmlTxt ) {
-              $v = $htmlTxt;
+           if( $htmlTxt =~ m/<td colspan='2'>(.*)<\/td>/s ) {
+              $v = $1;         
               $webCmdFn = 1;
-            }
+            } elsif( $htmlTxt ) {
+              $v = $htmlTxt;   
+              $webCmdFn = 1;
+            }                    
           }
         }
         ($v,$devStateIcon) = readingsGroup_makeLink($v,$devStateIcon,$cmd) if( !$webCmdFn );
