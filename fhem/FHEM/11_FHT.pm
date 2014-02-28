@@ -5,7 +5,7 @@
 #     Copyright by 
 #     e-mail: 
 #
-#     This file is part of fhem.
+#     This file is part of FHEM.
 #
 #     Fhem is free software: you can redistribute it and/or modify
 #     it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 #     GNU General Public License for more details.
 #
 #     You should have received a copy of the GNU General Public License
-#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#     along with FHEM.  If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
 package main;
@@ -982,7 +982,7 @@ getFhtBuffer($)
     <a name="tmpcorr"></a>
     <li>tmpcorr<br>
         Correct the temperature reported by the FHT by the value specified.
-        Note: only the measured-temp value reported by fhem (used for logging)
+        Note: only the measured-temp value reported by FHEM (used for logging)
         will be modified.
         </li><br>
 
@@ -1027,4 +1027,328 @@ getFhtBuffer($)
 </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="FHT"></a>
+<h3>FHT</h3>
+<ul>
+  Fhem kann FHT Funktelegramme (868.35 MHz) entweder mit einem <a
+  href="#FHZ">FHZ</a> oder einem <a href="#CUL">CUL</a> empfangen, daher muss
+  dieses zuerst definiert sein.
+  <br><br>
+
+  <a name="FHTdefine"></a>
+  <b>Define</b>
+  <ul>
+    define &lt;name&gt; FHT &lt;fhtaddress&gt;
+    <br><br>
+
+    &lt;fhtaddress&gt; ist eine vierstellige HEX Zahl entsprechend der
+    Adresse des FHT80b Ger&auml;tes.
+    <br>
+
+    Beispiel:
+    <ul>
+      define wz FHT 3232<br>
+    </ul>
+    <br>
+    Mehr dazu im FHT Abschnitt <a href="#set">set</a>.
+  </ul>
+  <br>
+
+  <a name="FHTset"></a>
+  <b>Set </b>
+  <ul>
+    set &lt;name&gt; &lt;valuetype&gt; &lt;value&gt;
+    <br><br>
+    Wobei value eines von folgenden ist:<br>
+    <ul>
+      desired-temp<br>
+      day-temp night-temp<br>
+      report1 report2<br>
+      refreshvalues<br>
+      mode<br>
+      holiday1 holiday2      # siehe mode holiday_short oder holiday<br>
+      manu-temp              # Keine Ahnung was das bewirkt<br>
+      year month day hour minute<br>
+      time date<br>
+      lowtemp-offset         # Alarm-Temp.-Differenz<br>
+      windowopen-temp<br>
+      mon-from1 mon-to1 mon-from2 mon-to2<br>
+      tue-from1 tue-to1 tue-from2 tue-to2<br>
+      wed-from1 wed-to1 wed-from2 wed-to2<br>
+      thu-from1 thu-to1 thu-from2 thu-to2<br>
+      fri-from1 fri-to1 fri-from2 fri-to2<br>
+      sat-from1 sat-to1 sat-from2 sat-to2<br>
+      sun-from1 sun-to1 sun-from2 sun-to2<br>
+    </ul>
+
+    Beispiele:
+    <ul>
+      set wz desired-temp 22.5<br>
+      set fl desired-temp 20.5 day-temp 19.0 night-temp 16.0<br>
+    </ul>
+    <br>
+
+    Hinweise:
+    <ul>
+      <li>Folgende Events werden (mehr oder weniger regelm&auml;&szlig;ig) von
+          jedem FHT Device gemeldet:
+          <ul>
+          measured-temp actuator actuator1...actuator8 warnings<br>
+          </ul>
+          Diese Strings k&ouml;nnen f&uuml;r <a href="#notify">notify</a> oder
+          <a href="#FileLog">FileLog</a> Definitionen verwendet werden.
+          <ul>
+            <li>Warnings k&ouml;nnen folgende Strings enthalten:
+                none, Battery low,Temperature too low, Window open,
+                Fault on window sensor
+                </li>
+            <li>actuator (ohne Suffix) steht f&uuml;r alle Aktoren.</li>
+            <li>actuator or actuator1..8 kann folgende Werte verarbeiten:
+              <ul>
+                <li>&lt;value&gt;%<br>
+                   Das ist der Normalfall. Der Aktor wird angewiesen auf diesen
+                   Wert zu &ouml;ffnen.
+                   </li>
+                <li>offset &lt;value&gt;%<br>
+                   Der Aktor l&auml;uft mit diesem Offset.
+                   </li>
+                <li>lime-protection<br>
+                   Der Aktor wird angewiesen die lime-protection (Kalkschutz)
+                   Prozedur auszuf&uuml;hren.
+                   </li>
+                <li>synctime<br>
+                   Wenn Sond/Sync beim FHT80B gew&auml;hlt wird, wird ein
+                   Countdown gesetzt.
+                   </li>
+                <li>test<br>
+                   Der Aktor wird vom FHT80b angewiesen zu piepsen (beep).
+                   </li>
+                <li>pair<br>
+                   Das FHT80b sendet ein "you-belong-to-me"
+                   (Du-geh&ouml;rst-zu-mir) an diesen Aktor.
+                   </li>
+              </ul></li>
+          </ul></li>
+          <br>
+
+      <li>Das FHT ist sehr sparsam (oder faul). Es akzeptiert eine Nachricht
+          vom FHZ1x00 alle 115+x Sekunden, wobei x von der fhtaddress
+          abh&auml;ngt. Nicht &uuml;berrascht sein wenn ein Befehl erst 10
+          Minuten sp&auml;ter vom Ger&auml;t angenommen wird. Die FHT Befehle
+          werden im FHZ1x00/CUL gepuffert bis sie zum FHT geschickt werden.
+          Siehe den zugeh&ouml;rigen fhtbuf Eintrag im der <a
+          href="#get">get</a> Abschnitt.  Es k&ouml;nnen bis zu 8 Befehle in
+          einer Nachricht an ein FHT geschickt werden wenn diese alle als
+          Argumente im gleichen set Befehl zusammengefasst werden. Siehe
+          nachfolgendes Beispiel. </li><br>
+
+      <li>time setzt Stunde und Minute auf lokale Zeit</li><br>
+
+      <li>date setzt Jahr, Monat und Tag auf lokale Zeit</li><br>
+
+      <li>refreshvalues ist ein Alias f&uumlr report1 255 report2 255</li><br>
+
+      <li>Alle *-temp Werte brauchen eine Temperatur als Argument welche auf
+          0.5&deg;C gerundet wird.<br> Temperatur Werte m&uuml;ssen zwischen
+          5.5&deg;C und 30.5&deg;C sein. Der Wert 5.5 setzt den Aktor auf OFF,
+          der Wert 30.5 setzt den Aktor auf ON</li><br>
+
+      <li>mode kann auto, manual, holiday or
+          holiday_short sein.<br>
+          Wenn der mode holiday ist, schaltet dieser zur&uuml;ck auf entweder
+          auto oder manual um 00:00 des Tages der wie folgt spezifiziert wird:
+            <ul>
+              <li>holiday1 setzt Endtag des Urlaubs</li>
+              <li>holiday2 setzt den Endmonat des Urlaubs</li>
+            </ul>
+          F&uuml;r holiday_short (Party Modus)
+          <ul>
+              <li> holiday1 setzt die absolute Stunde zu der von diesem Modus
+                zur&uuml;ck geschalten wird (in 10-Minuten Schritten, max.
+                144)</li>
+
+              <li> holiday2 setzt den Tag des Monats an dem von diesem Modus
+                zur&uuml;ck geschalten wird (kann nur heute oder morgen sein, da
+                holiday1 nur 24h akzeptiert.)</li>
+
+              Beispiel:
+              <ul>
+                  <li>Aktuelles Datum ist der 29. Januar, Uhrzeit ist 18:05</li>
+                  <li>Es soll bis morgen 1:00Uhr in den Party Modus geschalten
+                    sein</li>
+                  <li>set holiday1 to 6 (6 x 10min = Std) and holiday2 to
+                      30</li>
+
+              </ul>
+          </ul>
+          Die Temperatur f&uuml;r den Urlaubszeitraum wird durch den
+          desired-temperature Parameter setzt.  <br> Bitte beachten, dass der
+          Holiday Mode nicht fr&uuml;her als auf &Uuml;bermorgen eingestellt
+          werden kann. Alternativ muss hier holiday_short genutzt werden.<br>
+          Weiterhin bitte beachten das diese Kommandos nur in einem
+          "Sammelkommando" erfolgen k&ouml;nnen.  Beispiel:
+          <br>
+          set FHT1 mode holiday holiday1 24 holiday2 12 desired-temp 14
+          </li><br>
+
+      <li>Die *-from1/*-from2/*-to1/*-to2 Wertetypen brauchen eine
+          Zeitspezifikation als Argument im Format HH:MM. Diese definieren den
+          Zeitraum in dem die day-temp g&uuml;ltig ist.  Minuten (MM) werden
+          auf 10er gerundet, 24:00 bedeutet OFF.  </li><br>
+
+      <li>Um die FHZ Zeit zu synchronisieren und um "stumme" Ger&auml;te
+          zu wecken, wird folgendes Kommando empfohlen:<br> define fht_sync at
+          +*3:30 set TYPE=FHT time </li><br>
+
+      <li>report1 mit dem Parameter 255 fordert das Senden aller Einstellungen
+          von Montag bis Sonntag an. Das Argument ist ein Bitfeld um einzelne
+          Werte wie folgt anzufordern:
+          <ul>
+            <li> 1: monday</li>
+            <li> 2: tuesday</li>
+            <li> 4: thursday</li>
+            <li> 8: wednesday</li>
+            <li>16: friday</li>
+            <li>32: saturday</li>
+            <li>64: sunday</li>
+          </ul>
+          measured-temp und actuator werden mitgesendet wenn vom FHT als
+          notwendig erachtet.
+          <br><br>
+          <b>Hinweis:</b> Dieser Befehl erzeugt sehr viel Funkverkehr was zu
+          weiteren Problemen f&uuml;hren kann, besonders wenn Empfang nicht gut
+          ist.  </li><br>
+
+      <li>report2 mit dem Parameter 255 fordert die Ausgabe der nachfolgenden
+          Einstellungen an:<br> day-temp night-temp windowopen-temp
+          lowtemp-offset desired-temp measured-temp mode warnings.<br> Das
+          Argument ist ein Bitfeld, um einzelne Werte abzufragen folgendes
+          anh&auml;ngen:
+          <ul>
+          <li> 1: warnings</li>
+          <li> 2: mode</li>
+          <li> 4: day-temp, night-temp, windowopen-temp</li>
+          <li>64: lowtemp-offset</li>
+          </ul>
+          measured-temp und actuator werden mitgesendet wenn vom FHT als
+          notwendig erachtet.  <br></li>
+
+      <li>lowtemp-offset braucht eine Temperatur als Argument. G&uuml;ltige
+          Werte m&uuml;ssen zwischen 1.0 und 5.0&deg;C liegen.<br> Wird eine
+          Warnung erzeugen wenn die desired-temp - measured-temp &gt;
+          lowtemp-offset, jedoch fr&uuml;hestens 1,5Stunden nach der letzten
+          &Auml;nderung der desired-temp.  </li><br>
+
+      <li>FHEM hat optional einen internen Softwarepuffer f&uuml;r FHT
+          Devices.  Dieser Puffer soll vor &Uuml;bertragungsfehlern
+          sch&uuml;tzen. Wenn nach einem bestimmten Zeitraum keine
+          Best&auml;tigung erhalten wurde wird FHEM den Befehl erneut senden.
+          Die Befehle in der Warteschlagen k&ouml;nnen mit <a
+          href="#list">list</a> &lt;fht-device&gt; angezeigt werden.  Siehe die
+          Attribute <a href="#fhtsoftbuffer">fhtsoftbuffer</a>, <a
+          href="#retrycount">retrycount</a> und <a
+          href="#minfhtbuffer">minfhtbuffer</a> f&uuml;r weitere Details.
+          </li><br>
+
+      <li>Befehle im Softwarepuffer werden in folgender Reihenfolge
+          gesendet:<br>
+          desired-temp,mode,report1,report2,holiday1,holiday2,day-temp,night-temp,
+          [all other commands] </li><br>
+
+    </ul>
+  </ul>
+  <br>
+
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="FHTattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <li><a href="#attrdummy">dummy</a><br>
+      <b>Hinweis:</b> Es macht Sinn ein FHT Device auch f&uuml;r ein FHT8b zu
+      definieren da sonst der Fehler "unknown FHT device, please define one"
+      f&uuml;r jedes FHT8b generiert wird, denn das CUL meldet die 8b
+      Nachrichten.  Das dummy Attribut sollte bei diesen Devices gesetzt werden
+      da sonst der interne FHT Buffer des CUL mit 8b-Daten gef&uuml;llt wird
+      die niemals gebraucht werden.  Wenn der Puffer dann voll ist werden "EOB"
+      Nachrichten vom CUL erzeugt, und Senden zu den 8b ist nicht mehr
+      m&ouml;glich.</li><br>
+
+    <a name="retrycount"></a>
+    <li>retrycount<br>
+      Wenn das <a href="#fhtsoftbuffer">fhtsoftbuffer</a> Attribut gesetzt ist,
+      dann werden die Befehle entsprechend dem retrycount n-mal erneut
+      versendet wenn nach 240 Sekunden keine Best&auml;tigungsmeldung vom
+      entsprechenden FHZ Device empfangen wurde.<br> Der Default-Wert ist
+      1.</li><br>
+
+    <a name="minfhtbuffer"></a>
+    <li>minfhtbuffer<br>
+      FHEM sendet keine Befehle mehr zum FHZ wenn der fhtbuffer-Wert diesen
+      Wert unterschritten hat.  Default-Wert ist 0. Wenn dieser Wert zu niedrig
+      ist hat die Reihenfolge von fht-Befehlen weniger Einfluss da nur Befehle
+      im Softbuffer priorisiert werden k&ouml;nnen.  (Siehe Hinweise in der FHT
+      Sektion <a href="#set">set</a>) Der Maximalwert sollte 7 unter dem
+      Hardware Maximum sein, siehe fhtbuf.  </li><br>
+
+    <a name="lazy"></a>
+    <li>lazy<br>
+      Wenn das Attribut lazy (faul) gesetzt wurde sendet FHEM keine Befehle
+      wenn die aktuell gelesenen Werte und der zu setzende Wert identisch sind.
+      Das spart Funkzeit und hilft Konflikte mit der Regelung die besagt, dass
+      maximal 1% der Zeit als Funkzeit verwendet werden darf, zu vermeiden.
+      Nicht standardm&auml;&szlig;ig aktiviert.  </li><br>
+
+    <a name="tmpcorr"></a>
+    <li>tmpcorr<br>
+      Korrigiert die Werte die vom FHZ gemeldet werden um den angegebenen Wert.
+      Hinweis: nur die measured-temp Werte die von FHEM gemeldet (f&uuml;r
+      Logging genutzt) werden angepasst.  </li><br>
+
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#model">model</a> (fht80b)</li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#IODev">IODev</a></li>
+    <li><a href="#eventMap">eventMap</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+
+  </ul>
+  <br>
+
+  <a name="FHTevents"></a>
+  <b>Erzeugte Events:</b>
+  <ul>
+     <li>actuator</li>
+     <li>actuator1 actuator2 actuator3 actuator4<br>
+         actuator5 actuator6 actuator7 actuator8<br>
+         (wird gesendet wenn ein Offset zum entsprechenden Ventil konfiguriert wurde)</li>
+     <li>mon-from1 mon-to1 mon-from2 mon-to2</li>
+     <li>tue-from1 tue-to1 tue-from2 tue-to2</li>
+     <li>wed-from1 wed-to1 wed-from2 wed-to2</li>
+     <li>thu-from1 thu-to1 thu-from2 thu-to2</li>
+     <li>fri-from1 fri-to1 fri-from2 fri-to2</li>
+     <li>sat-from1 sat-to1 sat-from2 sat-to2</li>
+     <li>sun-from1 sun-to1 sun-from2 sun-to2</li>
+     <li>mode</li>
+     <li>holiday1 holiday2</li>
+     <li>desired-temp</li>
+     <li>measured-temp measured-low measured-high</li>
+     <li>warnings</li>
+     <li>manu-temp</li>
+     <li>year month day hour minute</li>
+     <li>day-temp night-temp lowtemp-offset windowopen-temp</li>
+     <li>ack can-xmit can-rcv ack2 start-xmit end-xmit (Nur wenn das CUL
+       f&uuml;r die &Uuml;bertragung von FHT Protokoll Daten konfiguriert
+       ist)</li>
+  </ul>
+  <br>
+
+</ul>
+
+=end html_DE
+
 =cut
