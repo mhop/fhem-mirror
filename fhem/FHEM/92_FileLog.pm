@@ -33,7 +33,7 @@ FileLog_Initialize($)
   $hash->{SetFn}    = "FileLog_Set";
   $hash->{GetFn}    = "FileLog_Get";
   $hash->{UndefFn}  = "FileLog_Undef";
-  $hash->{DeleteFn} = "FileLog_Delete";
+  #$hash->{DeleteFn} = "FileLog_Delete";
   $hash->{NotifyFn} = "FileLog_Log";
   $hash->{AttrFn}   = "FileLog_Attr";
   # logtype is used by the frontend
@@ -84,6 +84,7 @@ FileLog_Undef($$)
   return undef;
 }
 
+# Unused
 sub
 FileLog_Delete($$)
 {
@@ -1021,8 +1022,7 @@ FileLog_sampleDataFn($$$$$)
         This command is needed to create combined plots (weblinks).<br>
         <b>Notes:</b>
         <ul>
-          <li>secondFileLog will be deleted (i.e. the FHEM definition and
-              the file itself).</li>
+          <li>secondFileLog will be deleted (i.e. the FHEM definition).</li>
           <li>only the current files will be merged.</li>
           <li>weblinks using secondFilelog will become broken, they have to be
               adopted to the new logfile or deleted.</li>
