@@ -2591,215 +2591,387 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
 1;
 
 =pod
+
 =begin html
 
-<a name="ENIGMA2"></a>
-<h3>ENIGMA2</h3>
-<ul>
-
-  <a name="ENIGMA2define"></a>
-  <b>Define</b>
-  <ul>
-    <code>define &lt;name&gt; ENIGMA2 &lt;ip-address-or-hostname&gt; [&lt;port&gt;] [&lt;poll-interval&gt;]
-   [&lt;http-user&gt;] [&lt;http-password&gt;]</code>
-    <br><br>
-
-    This module controls ENIGMA2 based devices like Dreambox or VUplus via network connection.<br><br>
-    Defining an ENIGMA2 device will schedule an internal task (interval can be set
-    with optional parameter &lt;poll-interval&gt; in seconds, if not set, the value is 45
-    seconds), which periodically reads the status of the device and triggers notify/filelog commands.<br><br>
-
-    Example:<br>
-    <ul><code>
-       define SATReceiver ENIGMA2 192.168.0.10
-       <br><br>
-       # With custom port<br>
-       define SATReceiver ENIGMA2 192.168.0.10 8080
-       <br><br>
-       # With custom interval of 20 seconds<br>
-       define SATReceiver ENIGMA2 192.168.0.10 80 20
-       <br><br>
-       # With HTTP user credentials<br>
-       define SATReceiver ENIGMA2 192.168.0.10 80 20 root secret
-    </code></ul>
-  </ul>
-  <br>
-  <br>
-  
-  <a name="ENIGMA2set"></a>
-  <b>Set </b>
-  <ul>
-    <code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code>
-    <br><br>
-    Currently, the following commands are defined.<br>
-    <ul>
-      <li><b>on</b> &nbsp;&nbsp;-&nbsp;&nbsp; powers on the device and send a WoL magic package if needed</li>
-      <li><b>off</b> &nbsp;&nbsp;-&nbsp;&nbsp; turns the device in standby mode</li>
-      <li><b>toggle</b> &nbsp;&nbsp;-&nbsp;&nbsp; switch between on and off</li>
-      <li><b>shutdown</b> &nbsp;&nbsp;-&nbsp;&nbsp; turns the device in deepstandby mode</li>
-      <li><b>reboot</b> &nbsp;&nbsp;-&nbsp;&nbsp;reboots the device</li>
-      <li><b>restartGui</b> &nbsp;&nbsp;-&nbsp;&nbsp;restarts the GUI / ENIGMA2 process</li>
-      <li><b>channel</b> channel,0...999,sRef &nbsp;&nbsp;-&nbsp;&nbsp; zap to specific channel or service reference</li>
-      <li><b>channelUp</b> &nbsp;&nbsp;-&nbsp;&nbsp; zap to next channel</li>
-      <li><b>channelDown</b> &nbsp;&nbsp;-&nbsp;&nbsp; zap to previous channel</li>
-      <li><b>volume</b> 0...100 &nbsp;&nbsp;-&nbsp;&nbsp; set the volume level in percentage</li>
-      <li><b>volumeUp</b> &nbsp;&nbsp;-&nbsp;&nbsp; increases the volume level</li>
-      <li><b>volumeDown</b> &nbsp;&nbsp;-&nbsp;&nbsp; decreases the volume level</li>
-      <li><b>mute</b> on,off,toggle &nbsp;&nbsp;-&nbsp;&nbsp; controls volume mute</li>
-      <li><b>play</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; starts/resumes playback</li>
-      <li><b>pause</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; pauses current playback or enables timeshift</li>
-      <li><b>stop</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; stops current playback</li>
-      <li><b>input</b> tv,radio &nbsp;&nbsp;-&nbsp;&nbsp; switches between tv and radio mode</li>
-      <li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current status of the device</li>
-      <li><b>remoteControl</b> UP,DOWN,... &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands; see remoteControl help</li>
-      <li><b>showText</b> text &nbsp;&nbsp;-&nbsp;&nbsp; sends info message to screen to be displayed for 8 seconds</li>
-      <li><b>msg</b> yesno,info... &nbsp;&nbsp;-&nbsp;&nbsp; allows more complex messages as showText, see commands as listed below</li>
-    </ul>
-  </ul>
-  <br>
-  <br>
-  <ul>
-    <u>Messaging</u><br><br>
-    <ul>
-      showText has predefined settings. If you would like to send more individual messages
-      to your TV screen, the function msg can be used.
-      For this application the following commands are available:<br><br>
-
-      <u>Type Selection:</u><br>
-      <ul><code>
-      msg yesno<br>
-      msg info<br>
-      msg message<br>
-      msg attention<br>
-      </code></ul><br><br>
-
-      The following parameter are essentially needed after type specification:
-      <ul><code>
-      msg &lt;TYPE&gt; &lt;TIMEOUT&gt; &lt;YOUR MESSAGETEXT&gt;<br>
-      </code></ul>
-    </ul>
-  </ul>
-  <br>
-  <br>
-
-  <a name="ENIGMA2get"></a>
-  <b>Get</b>
-  <ul>
-    <code>get &lt;name&gt; &lt;what&gt;</code>
-    <br><br>
-    Currently, the following commands are defined:<br><br>
-
-    <ul><code>channel<br>
-    currentMedia<br>
-    currentTitle<br>
-    mute<br>
-    nextTitle<br>
-    power<br>
-    providername<br>
-    servicevideosize<br>
-    input<br>
-    streamUrl<br>
-    volume<br>
-  </code></ul>
-  </ul>
-  <br>
-  <br>
-
-  <a name="ENIGMA2attr"></a>
-  <b>Attributes</b><br>
-  <ul><ul>
-    <li><b>bouquet-tv</b> - service reference address where the favorite television bouquet can be found (initially set automatically during define)</li>
-    <li><b>bouquet-radio</b> - service reference address where the favorite radio bouquet can be found (initially set automatically during define)</li>
-    <li><b>disable</b> - Disable polling (true/false)</li>
-    <li><b>http-method</b> - HTTP access method to be used; e.g. a FritzBox might need to use POST instead of GET (GET/POST)</li>
-    <li><b>https</b> - Access box via secure HTTP (true/false)</li>
-    <li><b>timeout</b> - Set different polling timeout in seconds (default=6)</li>
-  </ul></ul>
-  <br>
-  <br>
-
-  <br>
-  <b>Generated Readings/Events:</b><br>
-  <ul><ul>
-    <li><b>acg</b> - Shows Automatic Gain Control value in percent; reflects overall signal quality strength</li>
-    <li><b>apid</b> - Shows the audio process ID for current channel</li>
-    <li><b>ber</b> - Shows Bit Error Rate for current channel</li>
-    <li><b>channel</b> - Shows the service name of current channel or media file name; part of FHEM-4-AV-Devices compatibility</li>
-    <li><b>currentMedia</b> - The service reference ID of current channel; part of FHEM-4-AV-Devices compatibility</li>
-    <li><b>currentTitle</b> - Shows the title of the running event; part of FHEM-4-AV-Devices compatibility</li>
-    <li><b>enigmaversion</b> - Shows the installed version of ENIGMA2</li>
-    <li><b>eventcurrenttime</b> - Shows the current time of running event as UNIX timestamp</li>
-    <li><b>eventcurrenttime_hr</b> - Shows the current time of running event in human-readable format</li>
-    <li><b>eventcurrenttime_next</b> - Shows the current time of next event as UNIX timestamp</li>
-    <li><b>eventcurrenttime_next_hr</b> - Shows the current time of next event in human-readable format</li>
-    <li><b>eventdescription</b> - Shows the description of running event</li>
-    <li><b>eventdescription_next</b> - Shows the description of next event</li>
-    <li><b>evenduration</b> - Shows the total duration time of running event in seconds</li>
-    <li><b>evenduration_hr</b> - Shows the total duration time of running event in human-readable format</li>
-    <li><b>evenduration_next</b> - Shows the total duration time of next event in seconds</li>
-    <li><b>evenduration_next_hr</b> - Shows the total duration time of next event in human-readable format</li>
-    <li><b>eventname</b> - Shows the name of running event</li>
-    <li><b>eventname_next</b> - Shows the name of next event</li>
-    <li><b>eventremaining</b> - Shows the remaining duration time of running event in seconds</li>
-    <li><b>eventremaining_hr</b> - Shows the remaining duration time of running event in human-readable format</li>
-    <li><b>eventremaining_next</b> - Shows the remaining duration time of next event in seconds</li>
-    <li><b>eventremaining_next_hr</b> - Shows the remaining duration time of next event in human-readable format</li>
-    <li><b>eventstart</b> - Shows the starting time of running event as UNIX timestamp</li>
-    <li><b>eventstart_hr</b> - Shows the starting time of running event in human readable format</li>
-    <li><b>eventstart_next</b> - Shows the starting time of next event as UNIX timestamp</li>
-    <li><b>eventstart_next_hr</b> - Shows the starting time of next event in human readable format</li>
-    <li><b>eventtitle</b> - Shows the title of the running event</li>
-    <li><b>eventtitle_next</b> - Shows the title of the next event</li>
-    <li><b>fpversion</b> - Shows the firmware version for the front processor</li>
-    <li><b>hddX_capacity</b> - Shows the total capacity of the installed hard drive in GB</li>
-    <li><b>hddX_free</b> - Shows the free capacity of the installed hard drive in GB</li>
-    <li><b>hddX_model</b> - Shows hardware details for the installed hard drive</li>
-    <li><b>imageversion</b> - Shows the version for the installed software image</li>
-    <li><b>input</b> - Shows currently used input; part of FHEM-4-AV-Devices compatibility</li>
-    <li><b>iswidescreen</b> - Indicates widescreen format - 0=off 1=on</li>
-    <li><b>lanmac</b> - Shows the device MAC address</li>
-    <li><b>model</b> - Shows details about the device hardware</li>
-    <li><b>mute</b> - Reports the mute status of the device (can be "on" or "off")</li>
-    <li><b>nextTitle</b> - Shows the title of the next event; part of FHEM-4-AV-Devices compatibility</li>
-    <li><b>onid</b> - The ON ID</li>
-    <li><b>pcrpid</b> - The PCR process ID</li>
-    <li><b>pmtpid</b> - The PMT process ID</li>
-    <li><b>power</b> - Reports the power status of the device (can be "on" or "off")</li>
-    <li><b>presence</b> - Reports the presence status of the receiver (can be "absent" or "present"). In case of an absent device, control is basically limited to turn it on again. This will only work if the device supports Wake-On-LAN packages, otherwise command "on" will have no effect.</li>
-    <li><b>providername</b> - Service provider of current channel</li>
-    <li><b>recordings</b> - Number of active recordings</li>
-    <li><b>servicename</b> - Name for current channel</li>
-    <li><b>servicereference</b> - The service reference ID of current channel</li>
-    <li><b>servicevideosize</b> - Video resolution for current channel</li>
-    <li><b>sid</b> - The S-ID</li>
-    <li><b>snr</b> - Shows Signal to Noise for current channel in percent</li>
-    <li><b>snrdb</b> - Shows Signal to Noise in dB</li>
-    <li><b>state</b> - Reports current power state and an absence of the device (can be "on", "off" or "absent")</li>
-    <li><b>tsid</b> - The TS ID</li>
-    <li><b>tuner_X</b> - Details about the used tuner hardware</li>
-    <li><b>txtpid</b> - The TXT process ID</li>
-    <li><b>videoheight</b> - Height of the video resolution for current channel</li>
-    <li><b>videowidth</b> - Width of the video resolution for current channel</li>
-    <li><b>volume</b> - Reports current volume level of the receiver in percentage values (between 0 and 100 %)</li>
-    <li><b>vpid</b> - The Video process ID</li>
-    <li><b>webifversion</b> - Type and version of the used web interface</li>
-  </ul></ul>
-
-</ul>
+    <p>
+      <a name="ENIGMA2" id="ENIGMA2"></a>
+    </p>
+    <h3>
+      ENIGMA2
+    </h3>
+    <div style="margin-left: 2em">
+      <a name="ENIGMA2define" id="ENIGMA2define"></a> <b>Define</b>
+      <div style="margin-left: 2em">
+        <code>define &lt;name&gt; ENIGMA2 &lt;ip-address-or-hostname&gt; [&lt;port&gt;] [&lt;poll-interval&gt;] [&lt;http-user&gt;] [&lt;http-password&gt;]</code><br>
+        <br>
+        This module controls ENIGMA2 based devices like Dreambox or VUplus via network connection.<br>
+        <br>
+        Defining an ENIGMA2 device will schedule an internal task (interval can be set with optional parameter &lt;poll-interval&gt; in seconds, if not set, the value is 45 seconds), which periodically reads the status of the device and triggers notify/filelog commands.<br>
+        <br>
+        Example:<br>
+        <div style="margin-left: 2em">
+          <code>define SATReceiver ENIGMA2 192.168.0.10<br>
+          <br>
+          # With custom port<br>
+          define SATReceiver ENIGMA2 192.168.0.10 8080<br>
+          <br>
+          # With custom interval of 20 seconds<br>
+          define SATReceiver ENIGMA2 192.168.0.10 80 20<br>
+          <br>
+          # With HTTP user credentials<br>
+          define SATReceiver ENIGMA2 192.168.0.10 80 20 root secret</code>
+        </div>
+      </div><br>
+      <br>
+      <a name="ENIGMA2set" id="ENIGMA2set"></a> <b>Set</b>
+      <div style="margin-left: 2em">
+        <code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code><br>
+        <br>
+        Currently, the following commands are defined.<br>
+        <ul>
+          <li>
+            <b>on</b> &nbsp;&nbsp;-&nbsp;&nbsp; powers on the device and send a WoL magic package if needed
+          </li>
+          <li>
+            <b>off</b> &nbsp;&nbsp;-&nbsp;&nbsp; turns the device in standby mode
+          </li>
+          <li>
+            <b>toggle</b> &nbsp;&nbsp;-&nbsp;&nbsp; switch between on and off
+          </li>
+          <li>
+            <b>shutdown</b> &nbsp;&nbsp;-&nbsp;&nbsp; turns the device in deepstandby mode
+          </li>
+          <li>
+            <b>reboot</b> &nbsp;&nbsp;-&nbsp;&nbsp;reboots the device
+          </li>
+          <li>
+            <b>restartGui</b> &nbsp;&nbsp;-&nbsp;&nbsp;restarts the GUI / ENIGMA2 process
+          </li>
+          <li>
+            <b>channel</b> channel,0...999,sRef &nbsp;&nbsp;-&nbsp;&nbsp; zap to specific channel or service reference
+          </li>
+          <li>
+            <b>channelUp</b> &nbsp;&nbsp;-&nbsp;&nbsp; zap to next channel
+          </li>
+          <li>
+            <b>channelDown</b> &nbsp;&nbsp;-&nbsp;&nbsp; zap to previous channel
+          </li>
+          <li>
+            <b>volume</b> 0...100 &nbsp;&nbsp;-&nbsp;&nbsp; set the volume level in percentage
+          </li>
+          <li>
+            <b>volumeUp</b> &nbsp;&nbsp;-&nbsp;&nbsp; increases the volume level
+          </li>
+          <li>
+            <b>volumeDown</b> &nbsp;&nbsp;-&nbsp;&nbsp; decreases the volume level
+          </li>
+          <li>
+            <b>mute</b> on,off,toggle &nbsp;&nbsp;-&nbsp;&nbsp; controls volume mute
+          </li>
+          <li>
+            <b>play</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; starts/resumes playback
+          </li>
+          <li>
+            <b>pause</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; pauses current playback or enables timeshift
+          </li>
+          <li>
+            <b>stop</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; stops current playback
+          </li>
+          <li>
+            <b>input</b> tv,radio &nbsp;&nbsp;-&nbsp;&nbsp; switches between tv and radio mode
+          </li>
+          <li>
+            <b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current status of the device
+          </li>
+          <li>
+            <b>remoteControl</b> UP,DOWN,... &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands; see remoteControl help
+          </li>
+          <li>
+            <b>showText</b> text &nbsp;&nbsp;-&nbsp;&nbsp; sends info message to screen to be displayed for 8 seconds
+          </li>
+          <li>
+            <b>msg</b> yesno,info... &nbsp;&nbsp;-&nbsp;&nbsp; allows more complex messages as showText, see commands as listed below
+          </li>
+        </ul>
+      </div><br>
+      <br>
+      <div style="margin-left: 2em">
+        <u>Messaging</u><br>
+        <br>
+        <div style="margin-left: 2em">
+          showText has predefined settings. If you would like to send more individual messages to your TV screen, the function msg can be used. For this application the following commands are available:<br>
+          <br>
+          <u>Type Selection:</u><br>
+          <div style="margin-left: 2em">
+            <code>msg yesno<br>
+            msg info<br>
+            msg message<br>
+            msg attention<br></code>
+          </div><br>
+          <br>
+          The following parameter are essentially needed after type specification:
+          <div style="margin-left: 2em">
+            <code>msg &lt;TYPE&gt; &lt;TIMEOUT&gt; &lt;YOUR MESSAGETEXT&gt;<br></code>
+          </div>
+        </div>
+      </div><br>
+      <br>
+      <a name="ENIGMA2get" id="ENIGMA2get"></a> <b>Get</b>
+      <div style="margin-left: 2em">
+        <code>get &lt;name&gt; &lt;what&gt;</code><br>
+        <br>
+        Currently, the following commands are defined:<br>
+        <br>
+        <div style="margin-left: 2em">
+          <code>channel<br>
+          currentMedia<br>
+          currentTitle<br>
+          mute<br>
+          nextTitle<br>
+          power<br>
+          providername<br>
+          servicevideosize<br>
+          input<br>
+          streamUrl<br>
+          volume<br></code>
+        </div>
+      </div><br>
+      <br>
+      <a name="ENIGMA2attr" id="ENIGMA2attr"></a> <b>Attributes</b><br>
+      <div style="margin-left: 2em">
+        <ul>
+          <li>
+            <b>bouquet-tv</b> - service reference address where the favorite television bouquet can be found (initially set automatically during define)
+          </li>
+          <li>
+            <b>bouquet-radio</b> - service reference address where the favorite radio bouquet can be found (initially set automatically during define)
+          </li>
+          <li>
+            <b>disable</b> - Disable polling (true/false)
+          </li>
+          <li>
+            <b>http-method</b> - HTTP access method to be used; e.g. a FritzBox might need to use POST instead of GET (GET/POST)
+          </li>
+          <li>
+            <b>https</b> - Access box via secure HTTP (true/false)
+          </li>
+          <li>
+            <b>timeout</b> - Set different polling timeout in seconds (default=6)
+          </li>
+        </ul>
+      </div><br>
+      <br>
+      <br>
+      <b>Generated Readings/Events:</b><br>
+      <div style="margin-left: 2em">
+        <ul>
+          <li>
+            <b>acg</b> - Shows Automatic Gain Control value in percent; reflects overall signal quality strength
+          </li>
+          <li>
+            <b>apid</b> - Shows the audio process ID for current channel
+          </li>
+          <li>
+            <b>ber</b> - Shows Bit Error Rate for current channel
+          </li>
+          <li>
+            <b>channel</b> - Shows the service name of current channel or media file name; part of FHEM-4-AV-Devices compatibility
+          </li>
+          <li>
+            <b>currentMedia</b> - The service reference ID of current channel; part of FHEM-4-AV-Devices compatibility
+          </li>
+          <li>
+            <b>currentTitle</b> - Shows the title of the running event; part of FHEM-4-AV-Devices compatibility
+          </li>
+          <li>
+            <b>enigmaversion</b> - Shows the installed version of ENIGMA2
+          </li>
+          <li>
+            <b>eventcurrenttime</b> - Shows the current time of running event as UNIX timestamp
+          </li>
+          <li>
+            <b>eventcurrenttime_hr</b> - Shows the current time of running event in human-readable format
+          </li>
+          <li>
+            <b>eventcurrenttime_next</b> - Shows the current time of next event as UNIX timestamp
+          </li>
+          <li>
+            <b>eventcurrenttime_next_hr</b> - Shows the current time of next event in human-readable format
+          </li>
+          <li>
+            <b>eventdescription</b> - Shows the description of running event
+          </li>
+          <li>
+            <b>eventdescription_next</b> - Shows the description of next event
+          </li>
+          <li>
+            <b>evenduration</b> - Shows the total duration time of running event in seconds
+          </li>
+          <li>
+            <b>evenduration_hr</b> - Shows the total duration time of running event in human-readable format
+          </li>
+          <li>
+            <b>evenduration_next</b> - Shows the total duration time of next event in seconds
+          </li>
+          <li>
+            <b>evenduration_next_hr</b> - Shows the total duration time of next event in human-readable format
+          </li>
+          <li>
+            <b>eventname</b> - Shows the name of running event
+          </li>
+          <li>
+            <b>eventname_next</b> - Shows the name of next event
+          </li>
+          <li>
+            <b>eventremaining</b> - Shows the remaining duration time of running event in seconds
+          </li>
+          <li>
+            <b>eventremaining_hr</b> - Shows the remaining duration time of running event in human-readable format
+          </li>
+          <li>
+            <b>eventremaining_next</b> - Shows the remaining duration time of next event in seconds
+          </li>
+          <li>
+            <b>eventremaining_next_hr</b> - Shows the remaining duration time of next event in human-readable format
+          </li>
+          <li>
+            <b>eventstart</b> - Shows the starting time of running event as UNIX timestamp
+          </li>
+          <li>
+            <b>eventstart_hr</b> - Shows the starting time of running event in human readable format
+          </li>
+          <li>
+            <b>eventstart_next</b> - Shows the starting time of next event as UNIX timestamp
+          </li>
+          <li>
+            <b>eventstart_next_hr</b> - Shows the starting time of next event in human readable format
+          </li>
+          <li>
+            <b>eventtitle</b> - Shows the title of the running event
+          </li>
+          <li>
+            <b>eventtitle_next</b> - Shows the title of the next event
+          </li>
+          <li>
+            <b>fpversion</b> - Shows the firmware version for the front processor
+          </li>
+          <li>
+            <b>hddX_capacity</b> - Shows the total capacity of the installed hard drive in GB
+          </li>
+          <li>
+            <b>hddX_free</b> - Shows the free capacity of the installed hard drive in GB
+          </li>
+          <li>
+            <b>hddX_model</b> - Shows hardware details for the installed hard drive
+          </li>
+          <li>
+            <b>imageversion</b> - Shows the version for the installed software image
+          </li>
+          <li>
+            <b>input</b> - Shows currently used input; part of FHEM-4-AV-Devices compatibility
+          </li>
+          <li>
+            <b>iswidescreen</b> - Indicates widescreen format - 0=off 1=on
+          </li>
+          <li>
+            <b>lanmac</b> - Shows the device MAC address
+          </li>
+          <li>
+            <b>model</b> - Shows details about the device hardware
+          </li>
+          <li>
+            <b>mute</b> - Reports the mute status of the device (can be "on" or "off")
+          </li>
+          <li>
+            <b>nextTitle</b> - Shows the title of the next event; part of FHEM-4-AV-Devices compatibility
+          </li>
+          <li>
+            <b>onid</b> - The ON ID
+          </li>
+          <li>
+            <b>pcrpid</b> - The PCR process ID
+          </li>
+          <li>
+            <b>pmtpid</b> - The PMT process ID
+          </li>
+          <li>
+            <b>power</b> - Reports the power status of the device (can be "on" or "off")
+          </li>
+          <li>
+            <b>presence</b> - Reports the presence status of the receiver (can be "absent" or "present"). In case of an absent device, control is basically limited to turn it on again. This will only work if the device supports Wake-On-LAN packages, otherwise command "on" will have no effect.
+          </li>
+          <li>
+            <b>providername</b> - Service provider of current channel
+          </li>
+          <li>
+            <b>recordings</b> - Number of active recordings
+          </li>
+          <li>
+            <b>servicename</b> - Name for current channel
+          </li>
+          <li>
+            <b>servicereference</b> - The service reference ID of current channel
+          </li>
+          <li>
+            <b>servicevideosize</b> - Video resolution for current channel
+          </li>
+          <li>
+            <b>sid</b> - The S-ID
+          </li>
+          <li>
+            <b>snr</b> - Shows Signal to Noise for current channel in percent
+          </li>
+          <li>
+            <b>snrdb</b> - Shows Signal to Noise in dB
+          </li>
+          <li>
+            <b>state</b> - Reports current power state and an absence of the device (can be "on", "off" or "absent")
+          </li>
+          <li>
+            <b>tsid</b> - The TS ID
+          </li>
+          <li>
+            <b>tuner_X</b> - Details about the used tuner hardware
+          </li>
+          <li>
+            <b>txtpid</b> - The TXT process ID
+          </li>
+          <li>
+            <b>videoheight</b> - Height of the video resolution for current channel
+          </li>
+          <li>
+            <b>videowidth</b> - Width of the video resolution for current channel
+          </li>
+          <li>
+            <b>volume</b> - Reports current volume level of the receiver in percentage values (between 0 and 100 %)
+          </li>
+          <li>
+            <b>vpid</b> - The Video process ID
+          </li>
+          <li>
+            <b>webifversion</b> - Type and version of the used web interface
+          </li>
+        </ul>
+      </div>
+    </div>
 
 =end html
 
 =begin html_DE
 
-<a name="ENIGMA2"></a>
-<h3>ENIGMA2</h3>
-<ul>
-Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden.
-Die englische Version ist hier zu finden: 
-</ul>
-<ul>
-<a href='http://fhem.de/commandref.html#ENIGMA2'>ENIGMA2</a>
-</ul>
+    <p>
+      <a name="ENIGMA2" id="ENIGMA2"></a>
+    </p>
+    <h3>
+      ENIGMA2
+    </h3>
+    <div style="margin-left: 2em">
+      Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden. Die englische Version ist hier zu finden:
+    </div>
+    <div style="margin-left: 2em">
+      <a href='http://fhem.de/commandref.html#ENIGMA2'>ENIGMA2</a>
+    </div>
 
 =end html_DE
 

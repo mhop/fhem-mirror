@@ -1633,108 +1633,145 @@ sub ONKYO_AVR_RClayout() {
 1;
 
 =pod
+
 =begin html
 
-<a name="ONKYO_AVR"></a>
-<h3>ONKYO_AVR</h3>
-<ul>
-
-  <a name="ONKYO_AVRdefine"></a>
-  <b>Define</b>
-  <ul>
-    <code>define &lt;name&gt; ONKYO_AVR &lt;ip-address-or-hostname&gt; [&lt;protocol-version&gt;] [&lt;zone&gt;] [&lt;poll-interval&gt;]</code>
-    <br><br>
-
-    This module controls ONKYO A/V receivers via network connection.<br><br>
-    Defining an ONKYO device will schedule an internal task (interval can be set
-    with optional parameter &lt;poll-interval&gt; in seconds, if not set, the value is 75
-    seconds), which periodically reads the status of the device and triggers notify/filelog commands.<br><br>
-
-    Example:<br>
-    <ul><code>
-       define avr ONKYO_AVR 192.168.0.10
-       <br><br>
-       # With explicit protocol version 2013 and later<br>
-       define avr ONKYO_AVR 192.168.0.10 2013
-       <br><br>
-       # With protocol version prior 2013<br>
-       define avr ONKYO_AVR 192.168.0.10 pre2013
-       <br><br>
-       # With zone2<br>
-       define avr ONKYO_AVR 192.168.0.10 pre2013 zone2
-       <br><br>
-       # With custom interval of 60 seconds<br>
-       define avr ONKYO_AVR 192.168.0.10 pre2013 main 60
-       <br><br>
-       # With zone2 and custom interval of 60 seconds<br>
-       define avr ONKYO_AVR 192.168.0.10 pre2013 zone2 60
-    </code></ul>
-   
-  </ul><br><br>
-
-  
-  <a name="ONKYO_AVRset"></a>
-  <b>Set </b>
-  <ul>
-    <code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code>
-    <br><br>
-    Currently, the following commands are defined (may vary depending on zone).<br>
-    <ul>
-    <li><b>on</b> &nbsp;&nbsp;-&nbsp;&nbsp; powers on the device</li>
-    <li><b>off</b> &nbsp;&nbsp;-&nbsp;&nbsp; turns the device in standby mode</li>
-    <li><b>sleep</b> 1..90,off &nbsp;&nbsp;-&nbsp;&nbsp; sets auto-turnoff after X minutes</li>
-    <li><b>toggle</b> &nbsp;&nbsp;-&nbsp;&nbsp; switch between on and off</li>
-    <li><b>volume</b> 0...100 &nbsp;&nbsp;-&nbsp;&nbsp; set the volume level in percentage</li>
-    <li><b>volumeUp</b> &nbsp;&nbsp;-&nbsp;&nbsp; increases the volume level</li>
-    <li><b>volumeDown</b> &nbsp;&nbsp;-&nbsp;&nbsp; decreases the volume level</li>
-    <li><b>mute</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; controls volume mute</li>
-    <li><b>input</b> &nbsp;&nbsp;-&nbsp;&nbsp; switches between inputs</li>
-    <li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current status of the device</li>
-    <li><b>remoteControl</b> &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands; see remoteControl help</li>
-    </ul>
-  </ul><br><br>
-
-
-  <a name="ONKYO_AVRget"></a>
-  <b>Get</b>
-  <ul>
-    <code>get &lt;name&gt; &lt;what&gt;</code>
-    <br><br>
-    Currently, the following commands are defined (may vary depending on zone):<br><br>
-
-    <ul><code>power<br>
-    input<br>
-    volume<br>
-    mute<br>
-    sleep<br>
-  </code></ul>
-</ul><br><br>
-
-  <b>Generated Readings/Events (may vary depending on zone):</b><br>
-  <ul>
-  <li><b>input</b> - Shows currently used input; part of FHEM-4-AV-Devices compatibility</li>
-  <li><b>mute</b> - Reports the mute status of the device (can be "on" or "off")</li>
-  <li><b>power</b> - Reports the power status of the device (can be "on" or "off")</li>
-  <li><b>presence</b> - Reports the presence status of the receiver (can be "absent" or "present"). In case of an absent device, control is not possible.</li>
-  <li><b>sleep</b> - Reports current sleep state (can be "off" or shows timer in minutes)</li>
-  <li><b>state</b> - Reports current power state and an absence of the device (can be "on", "off" or "absent")</li>
-  <li><b>volume</b> - Reports current volume level of the receiver in percentage values (between 0 and 100 %)</li>
-  </ul>
-</ul>
+    <p>
+      <a name="ONKYO_AVR" id="ONKYO_AVR"></a>
+    </p>
+    <h3>
+      ONKYO_AVR
+    </h3>
+    <div style="margin-left: 2em">
+      <a name="ONKYO_AVRdefine" id="ONKYO_AVRdefine"></a> <b>Define</b>
+      <div style="margin-left: 2em">
+        <code>define &lt;name&gt; ONKYO_AVR &lt;ip-address-or-hostname&gt; [&lt;protocol-version&gt;] [&lt;zone&gt;] [&lt;poll-interval&gt;]</code><br>
+        <br>
+        This module controls ONKYO A/V receivers via network connection.<br>
+        <br>
+        Defining an ONKYO device will schedule an internal task (interval can be set with optional parameter &lt;poll-interval&gt; in seconds, if not set, the value is 75 seconds), which periodically reads the status of the device and triggers notify/filelog commands.<br>
+        <br>
+        Example:<br>
+        <div style="margin-left: 2em">
+          <code>define avr ONKYO_AVR 192.168.0.10<br>
+          <br>
+          # With explicit protocol version 2013 and later<br>
+          define avr ONKYO_AVR 192.168.0.10 2013<br>
+          <br>
+          # With protocol version prior 2013<br>
+          define avr ONKYO_AVR 192.168.0.10 pre2013<br>
+          <br>
+          # With zone2<br>
+          define avr ONKYO_AVR 192.168.0.10 pre2013 zone2<br>
+          <br>
+          # With custom interval of 60 seconds<br>
+          define avr ONKYO_AVR 192.168.0.10 pre2013 main 60<br>
+          <br>
+          # With zone2 and custom interval of 60 seconds<br>
+          define avr ONKYO_AVR 192.168.0.10 pre2013 zone2 60</code>
+        </div>
+      </div><br>
+      <br>
+      <a name="ONKYO_AVRset" id="ONKYO_AVRset"></a> <b>Set</b>
+      <div style="margin-left: 2em">
+        <code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code><br>
+        <br>
+        Currently, the following commands are defined (may vary depending on zone).<br>
+        <ul>
+          <li>
+            <b>on</b> &nbsp;&nbsp;-&nbsp;&nbsp; powers on the device
+          </li>
+          <li>
+            <b>off</b> &nbsp;&nbsp;-&nbsp;&nbsp; turns the device in standby mode
+          </li>
+          <li>
+            <b>sleep</b> 1..90,off &nbsp;&nbsp;-&nbsp;&nbsp; sets auto-turnoff after X minutes
+          </li>
+          <li>
+            <b>toggle</b> &nbsp;&nbsp;-&nbsp;&nbsp; switch between on and off
+          </li>
+          <li>
+            <b>volume</b> 0...100 &nbsp;&nbsp;-&nbsp;&nbsp; set the volume level in percentage
+          </li>
+          <li>
+            <b>volumeUp</b> &nbsp;&nbsp;-&nbsp;&nbsp; increases the volume level
+          </li>
+          <li>
+            <b>volumeDown</b> &nbsp;&nbsp;-&nbsp;&nbsp; decreases the volume level
+          </li>
+          <li>
+            <b>mute</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; controls volume mute
+          </li>
+          <li>
+            <b>input</b> &nbsp;&nbsp;-&nbsp;&nbsp; switches between inputs
+          </li>
+          <li>
+            <b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current status of the device
+          </li>
+          <li>
+            <b>remoteControl</b> &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands; see remoteControl help
+          </li>
+        </ul>
+      </div><br>
+      <br>
+      <a name="ONKYO_AVRget" id="ONKYO_AVRget"></a> <b>Get</b>
+      <div style="margin-left: 2em">
+        <code>get &lt;name&gt; &lt;what&gt;</code><br>
+        <br>
+        Currently, the following commands are defined (may vary depending on zone):<br>
+        <br>
+        <div style="margin-left: 2em">
+          <code>power<br>
+          input<br>
+          volume<br>
+          mute<br>
+          sleep<br></code>
+        </div>
+      </div><br>
+      <br>
+      <b>Generated Readings/Events (may vary depending on zone):</b><br>
+      <ul>
+        <li>
+          <b>input</b> - Shows currently used input; part of FHEM-4-AV-Devices compatibility
+        </li>
+        <li>
+          <b>mute</b> - Reports the mute status of the device (can be "on" or "off")
+        </li>
+        <li>
+          <b>power</b> - Reports the power status of the device (can be "on" or "off")
+        </li>
+        <li>
+          <b>presence</b> - Reports the presence status of the receiver (can be "absent" or "present"). In case of an absent device, control is not possible.
+        </li>
+        <li>
+          <b>sleep</b> - Reports current sleep state (can be "off" or shows timer in minutes)
+        </li>
+        <li>
+          <b>state</b> - Reports current power state and an absence of the device (can be "on", "off" or "absent")
+        </li>
+        <li>
+          <b>volume</b> - Reports current volume level of the receiver in percentage values (between 0 and 100 %)
+        </li>
+      </ul>
+    </div>
 
 =end html
 
 =begin html_DE
 
-<a name="ONKYO_AVR"></a>
-<h3>ONKYO_AVR</h3>
-<ul>
-Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden.
-Die englische Version ist hier zu finden: 
-</ul>
-<ul>
-<a href='http://fhem.de/commandref.html#ONKYO_AVR'>ONKYO_AVR</a>
-</ul>
+    <p>
+      <a name="ONKYO_AVR" id="ONKYO_AVR"></a>
+    </p>
+    <h3>
+      ONKYO_AVR
+    </h3>
+    <div style="margin-left: 2em">
+      Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden. Die englische Version ist hier zu finden:
+    </div>
+    <div style="margin-left: 2em">
+      <a href='http://fhem.de/commandref.html#ONKYO_AVR'>ONKYO_AVR</a>
+    </div>
 
 =end html_DE
+
 =cut

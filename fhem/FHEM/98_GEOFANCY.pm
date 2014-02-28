@@ -416,86 +416,92 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
 1;
 
 =pod
+
 =begin html
 
-<a name="GEOFANCY"></a>
-<h3>GEOFANCY</h3>
-<ul>
-  Provides webhook receiver for geofencing via the following iOS apps:<br>
-  <br>
-  <li><a href="https://itunes.apple.com/de/app/geofency-time-tracking-automatic/id615538630?l=en&mt=8">Geofency</a></li>
-  <li><a href="https://itunes.apple.com/de/app/geofancy/id725198453?l=en&mt=8">Geofancy</a></li>
-
-  <p>Note: GEOFANCY is an extension to <a href="FHEMWEB">FHEMWEB</a>. You need to install FHEMWEB to use GEOFANCY.</p>
-
-  <a name="GEOFANCYdefine"></a>
-  <b>Define</b>
-  <ul>
-    <code>define &lt;name&gt; &lt;infix&gt;</code><br><br>
-
-    Defines the webhook server. <code>&lt;infix&gt;</code> is the portion behind the FHEMWEB base URL (usually
-    <code>http://hostname:8083/fhem</code>)<br>
-    <br>
-    Example:
+    <p>
+      <a name="GEOFANCY" id="GEOFANCY"></a>
+    </p>
+    <h3>
+      GEOFANCY
+    </h3>
     <ul>
-      <code>define geofancy GEOFANCY geo</code><br>
-    </ul><br>
-    The webhook will be reachable at http://hostname:8083/fhem/geo in that case.<br>
-    <br>
-  </ul>
-
-  <a name="GEOFANCYset"></a>
-  <b>Set</b>
-  <ul>
-      <li><b>clear</b> &nbsp;&nbsp;readings&nbsp;&nbsp; can be used to cleanup auto-created readings from deprecated devices.</li>
-  </ul>
-  <br><br>
-
-  <a name="GEOFANCYattr"></a>
-  <b>Attributes</b>
-  <br><br>
-  <ul>
-    <li>devAlias: can be used to rename device names in the format DEVICEUUID:Aliasname. Separate using blank to rename multiple devices.</li>
-  </ul>
-  <br><br>
-
-  <b>Usage information</b>
-  <br><br>
-  <ul>
-    Likely your FHEM installation is not reachable directly from the internet (good idea!).<br>
-    It is recommended to have a reverse proxy like nginx or Apache in front of FHEM where you can make sure access is only possible
-    to specific subdirectories like /fhem/geo.<br>
-    You might also want to think about protecting the access by using HTTP Basic Authentication and encryption via SSL.<br>
-    Also the definition of a dedicated FHEMWEB instance for that purpose might help to restrict FHEM's functionality
-    (note that the 'hidden' attributes of FHEMWEB currently do NOT protect from just guessing/knowing the correct URL!)<br>
-    <br>
-    To make that reverse proxy available from the internet, just forward the appropriate port via your internet router.<br>
-    <br>
-    The actual solution on how you can securely make your Geofancy webhook available to the internet is not part of this documentation
-    and depends on your own skills.
-  </ul>
-  <br><br>
-
-  <b>Integration with Home Automation</b>
-  <br><br>
-  <ul>
-    You might want to have a look to the module family of <a href="#ROOMMATE">ROOMMATE</a>, <a href="#GUEST">GUEST</a> and <a href="#RESIDENTS">RESIDENTS</a> for an easy processing of GEOFANCY events.
-  </ul>
-</ul>
+      <li style="list-style: none">Provides webhook receiver for geofencing via the following iOS apps:<br>
+        <br>
+      </li>
+      <li>
+        <a href="https://itunes.apple.com/de/app/geofency-time-tracking-automatic/id615538630?l=en&amp;mt=8">Geofency</a>
+      </li>
+      <li>
+        <a href="https://itunes.apple.com/de/app/geofancy/id725198453?l=en&amp;mt=8">Geofancy</a>
+      </li>
+      <li style="list-style: none">
+        <p>
+          Note: GEOFANCY is an extension to <a href="FHEMWEB">FHEMWEB</a>. You need to install FHEMWEB to use GEOFANCY.
+        </p><a name="GEOFANCYdefine" id="GEOFANCYdefine"></a> <b>Define</b>
+        <div style="margin-left: 2em">
+          <code>define &lt;name&gt; &lt;infix&gt;</code><br>
+          <br>
+          Defines the webhook server. <code>&lt;infix&gt;</code> is the portion behind the FHEMWEB base URL (usually <code>http://hostname:8083/fhem</code>)<br>
+          <br>
+          Example:
+          <div style="margin-left: 2em">
+            <code>define geofancy GEOFANCY geo</code><br>
+          </div><br>
+          The webhook will be reachable at http://hostname:8083/fhem/geo in that case.<br>
+          <br>
+        </div><a name="GEOFANCYset" id="GEOFANCYset"></a> <b>Set</b>
+        <ul>
+          <li>
+            <b>clear</b> &nbsp;&nbsp;readings&nbsp;&nbsp; can be used to cleanup auto-created readings from deprecated devices.
+          </li>
+        </ul><br>
+        <br>
+        <a name="GEOFANCYattr" id="GEOFANCYattr"></a> <b>Attributes</b><br>
+        <br>
+        <ul>
+          <li>devAlias: can be used to rename device names in the format DEVICEUUID:Aliasname. Separate using blank to rename multiple devices.
+          </li>
+        </ul><br>
+        <br>
+        <b>Usage information</b><br>
+        <br>
+        <div style="margin-left: 2em">
+          Likely your FHEM installation is not reachable directly from the internet (good idea!).<br>
+          It is recommended to have a reverse proxy like nginx or Apache in front of FHEM where you can make sure access is only possible to specific subdirectories like /fhem/geo.<br>
+          You might also want to think about protecting the access by using HTTP Basic Authentication and encryption via SSL.<br>
+          Also the definition of a dedicated FHEMWEB instance for that purpose might help to restrict FHEM's functionality (note that the 'hidden' attributes of FHEMWEB currently do NOT protect from just guessing/knowing the correct URL!)<br>
+          <br>
+          To make that reverse proxy available from the internet, just forward the appropriate port via your internet router.<br>
+          <br>
+          The actual solution on how you can securely make your Geofancy webhook available to the internet is not part of this documentation and depends on your own skills.
+        </div><br>
+        <br>
+        <b>Integration with Home Automation</b><br>
+        <br>
+        <div style="margin-left: 2em">
+          You might want to have a look to the module family of <a href="#ROOMMATE">ROOMMATE</a>, <a href="#GUEST">GUEST</a> and <a href="#RESIDENTS">RESIDENTS</a> for an easy processing of GEOFANCY events.
+        </div>
+      </li>
+    </ul>
 
 =end html
 
 =begin html_DE
 
-<a name="GEOFANCY"></a>
-<h3>GEOFANCY</h3>
-<ul>
-Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden.
-Die englische Version ist hier zu finden: 
-</ul>
-<ul>
-<a href='http://fhem.de/commandref.html#GEOFANCY'>GEOFANCY</a>
-</ul>
+    <p>
+      <a name="GEOFANCY" id="GEOFANCY"></a>
+    </p>
+    <h3>
+      GEOFANCY
+    </h3>
+    <div style="margin-left: 2em">
+      Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden. Die englische Version ist hier zu finden:
+    </div>
+    <div style="margin-left: 2em">
+      <a href='http://fhem.de/commandref.html#GEOFANCY'>GEOFANCY</a>
+    </div>
 
 =end html_DE
+
 =cut
