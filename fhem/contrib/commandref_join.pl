@@ -88,7 +88,7 @@ foreach my $lang (@lang) {
       } elsif(!$skip) {
         print OUT $l;
         $docCount++;
-        $hasLink = ($l =~ m/<a name="$mod">/) if(!$hasLink);
+        $hasLink = ($l =~ m/<a name="$mod"/) if(!$hasLink);
         foreach $tag (TAGS) {
           my $ot = ($tagcount{$tag} ? $tagcount{$tag} : 0);
           $tagcount{$tag} +=()= ($l =~ /<$tag>/gi);
