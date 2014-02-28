@@ -74,6 +74,9 @@
 #				Added:		ShutdownFn
 #				Changed:	Undef will delete presence, too
 #
+#	2014-02-28
+#				Changed:	Make presence entities TEMPORARY
+#
 ##############################################################################
 
 package main;
@@ -196,15 +199,18 @@ sub LISTENLIVE_Define($$) {
 
 	if($address[0] ne "none"){
 		# PRESENCE aus device pres_+NAME lesen
+		my $pres_name;
 		$presence = ReadingsVal("pres_".$name,"state","noPresence");
 	
 		if($presence eq "noPresence"){
-			$cmd = "pres_$name PRESENCE lan-ping $address[0]";
+			$pres_name = "pres_".$name;
+			$cmd = "$pres_name PRESENCE lan-ping $address[0]";
 			$ret = CommandDefine(undef, $cmd);
 			if($ret){
 				Log3($name, 2, "LISTENLIVE ERROR $ret");
 			} else {
-				Log3($name, 3, "LISTENLIVE $name PRESENCE pres_$name created.");
+				Log3($name, 3, "LISTENLIVE $name PRESENCE $pres_name created.");
+				$defs{$pres_name}{TEMPORARY} = 1;
 			}
 		} else {
 			Log3($name, 3, "LISTENLIVE $name PRESENCE pres_$name found.");
