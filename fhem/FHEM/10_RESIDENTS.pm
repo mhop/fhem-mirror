@@ -881,211 +881,349 @@ sub RESIDENTS_TimeDiff($$) {
 1;
 
 =pod
+
 =begin html
 
-<a name="RESIDENTS"></a>
-<h3>RESIDENTS</h3>
-<ul>
-
-  <a name="RESIDENTSdefine"></a>
-  <b>Define</b>
-  <ul>
-    <code>define &lt;rgr_ResidentsName&gt; RESIDENTS</code>
-    <br><br>
-
-  Provides a special dummy device to represent a group of individuals living at your home.<br>
-  It locically combines individual states of <a href="#ROOMMATE">ROOMMATE</a> and <a href="#GUEST">GUEST</a> devices and allows state changes for all members.<br>
-  Based on the current state and other readings, you may trigger other actions within FHEM.<br><br>
-
-    Example:<br>
-    <ul><code>
-       # Standalone<br>
-       define rgr_Residents RESIDENTS
-    </code></ul>
-  </ul>
-  <br>
-  <br>
-
-  <a name="RESIDENTSset"></a>
-  <b>Set</b>
-  <ul>
-    <code>set &lt;rgr_ResidentsName&gt; &lt;command&gt; [&lt;parameter&gt;]</code>
-    <br><br>
-    Currently, the following commands are defined.<br>
-    <ul>
-      <li><b>addGuest</b> &nbsp;&nbsp;-&nbsp;&nbsp; creates a new GUEST device and adds it to the current RESIDENTS group. Just enter the dummy name and there you go.</li>
-      <li><b>addRoommate</b> &nbsp;&nbsp;-&nbsp;&nbsp; creates a new ROOMMATE device and adds it to the current RESIDENTS group. Just enter the first name and there you go.</li>
-      <li><b>removeGuest</b> &nbsp;&nbsp;-&nbsp;&nbsp; shows all GUEST members and allows to delete their dummy devices easily.</li>
-      <li><b>removeRoommate</b> &nbsp;&nbsp;-&nbsp;&nbsp; shows all ROOMMATE members and allows to delete their dummy devices easily.</li>
-      <li><b>state</b> &nbsp;&nbsp;home,gotosleep,asleep,awoken,absent,gone&nbsp;&nbsp; switch between states for all group members at once; see attribute rgr_states to adjust list shown in FHEMWEB</li>
-    </ul>
-  </ul>
-
-<br><br>
-  <ul>
-    <u>Possible states and their meaning</u><br><br>
-    <ul>
-      This module differs between 7 states:<br><br>
-
-      <ul>
-      <li><b>home</b> - residents are present at home and at least one of them is not asleep</li>
-      <li><b>gotosleep</b> - present residents are on their way to bed (if they are not asleep already)</li>
-      <li><b>asleep</b> - all present residents are currently sleeping</li>
-      <li><b>awoken</b> - at least one resident just woke up from sleep</li>
-      <li><b>absent</b> - no resident is currently at home but at least one will be back shortly</li>
-      <li><b>gone</b> - all residents left home for longer period</li>
-      <li><b>none</b> - no active member</li>
-      </ul><br>
+    <p>
+      <a name="RESIDENTS" id="RESIDENTS"></a>
+    </p>
+    <h3>
+      RESIDENTS
+    </h3>
+    <div style="margin-left: 2em">
+      <a name="RESIDENTSdefine" id="RESIDENTSdefine"></a> <b>Define</b>
+      <div style="margin-left: 2em">
+        <code>define &lt;rgr_ResidentsName&gt; RESIDENTS</code><br>
+        <br>
+        Provides a special dummy device to represent a group of individuals living at your home.<br>
+        It locically combines individual states of <a href="#ROOMMATE">ROOMMATE</a> and <a href="#GUEST">GUEST</a> devices and allows state changes for all members.<br>
+        Based on the current state and other readings, you may trigger other actions within FHEM.<br>
+        <br>
+        Example:<br>
+        <div style="margin-left: 2em">
+          <code># Standalone<br>
+          define rgr_Residents RESIDENTS</code>
+        </div>
+      </div><br>
       <br>
-      Note: State 'none' cannot explicitly be set. Setting state to 'gone' will be handled as 'none' for GUEST member devices.
-
-    </ul>
-  </ul>
-  <br>
-  <br>
-
-  <a name="RESIDENTSattr"></a>
-  <b>Attributes</b><br>
-  <ul><ul>
-    <li><b>rgr_showAllStates</b> - states 'asleep' and 'awoken' are hidden by default to allow simple gotosleep process via devStateIcon; defaults to 0</li>
-    <li><b>rgr_states</b> - list of states to be shown in FHEMWEB; separate entries by comma only and do NOT use spaces; unsupported states will lead to errors though</li>
-  </ul></ul>
-  <br>
-  <br>
-
-  <br>
-  <b>Generated Readings/Events:</b><br>
-  <ul><ul>
-    <li><b>lastActivity</b> - the last state change of one of the group members</li>
-    <li><b>lastActivityBy</b> - the realname of the last group member with changed state</li>
-    <li><b>lastArrival</b> - timestamp of last arrival at home</li>
-    <li><b>lastAwake</b> - timestamp of last sleep cycle end</li>
-    <li><b>lastDeparture</b> - timestamp of last departure from home</li>
-    <li><b>lastDurAbsence</b> - duration of last absence from home in following format: hours:minutes:seconds</li>
-    <li><b>lastDurPresence</b> - duration of last presence at home in following format: hours:minutes:seconds</li>
-    <li><b>lastDurSleep</b> - duration of last sleep in following format: hours:minutes:seconds</li>
-    <li><b>lastSleep</b> - timestamp of last sleep cycle begin</li>
-    <li><b>lastState</b> - the prior state</li>
-    <li><b>presence</b> - reflects the home presence state, depending on value of reading 'state' (can be 'present' or 'absent')</li>
-    <li><b>residentsAbsent</b> - number of residents with state 'absent'</li>
-    <li><b>residentsAsleep</b> - number of residents with state 'asleep'</li>
-    <li><b>residentsAwoken</b> - number of residents with state 'awoken'</li>
-    <li><b>residentsGone</b> - number of residents with state 'gone'</li>
-    <li><b>residentsGotosleep</b> - number of residents with state 'gotosleep'</li>
-    <li><b>residentsGuests</b> - number of active guests who are currently treated as part of the residents scope</li>
-    <li><b>residentsHome</b> - number of residents with state 'home'</li>
-    <li><b>residentsTotal</b> - total number of all active residents despite their current state</li>
-    <li><b>residentsTotalAbsent</b> - number of all residents who are currently underway</li>
-    <li><b>residentsTotalPresent</b> - number of all residents who are currently at home</li>
-    <li><b>residentsTotalWayhome</b> - number of all active residents who are currently on their way back home</li>
-    <li><b>state</b> - reflects the current state</li>
-  </ul></ul>
-
-</ul>
+      <a name="RESIDENTSset" id="RESIDENTSset"></a> <b>Set</b>
+      <div style="margin-left: 2em">
+        <code>set &lt;rgr_ResidentsName&gt; &lt;command&gt; [&lt;parameter&gt;]</code><br>
+        <br>
+        Currently, the following commands are defined.<br>
+        <ul>
+          <li>
+            <b>addGuest</b> &nbsp;&nbsp;-&nbsp;&nbsp; creates a new GUEST device and adds it to the current RESIDENTS group. Just enter the dummy name and there you go.
+          </li>
+          <li>
+            <b>addRoommate</b> &nbsp;&nbsp;-&nbsp;&nbsp; creates a new ROOMMATE device and adds it to the current RESIDENTS group. Just enter the first name and there you go.
+          </li>
+          <li>
+            <b>removeGuest</b> &nbsp;&nbsp;-&nbsp;&nbsp; shows all GUEST members and allows to delete their dummy devices easily.
+          </li>
+          <li>
+            <b>removeRoommate</b> &nbsp;&nbsp;-&nbsp;&nbsp; shows all ROOMMATE members and allows to delete their dummy devices easily.
+          </li>
+          <li>
+            <b>state</b> &nbsp;&nbsp;home,gotosleep,asleep,awoken,absent,gone&nbsp;&nbsp; switch between states for all group members at once; see attribute rgr_states to adjust list shown in FHEMWEB
+          </li>
+        </ul>
+      </div><br>
+      <br>
+      <div style="margin-left: 2em">
+        <u>Possible states and their meaning</u><br>
+        <br>
+        <div style="margin-left: 2em">
+          This module differs between 7 states:<br>
+          <br>
+          <ul>
+            <li>
+              <b>home</b> - residents are present at home and at least one of them is not asleep
+            </li>
+            <li>
+              <b>gotosleep</b> - present residents are on their way to bed (if they are not asleep already)
+            </li>
+            <li>
+              <b>asleep</b> - all present residents are currently sleeping
+            </li>
+            <li>
+              <b>awoken</b> - at least one resident just woke up from sleep
+            </li>
+            <li>
+              <b>absent</b> - no resident is currently at home but at least one will be back shortly
+            </li>
+            <li>
+              <b>gone</b> - all residents left home for longer period
+            </li>
+            <li>
+              <b>none</b> - no active member
+            </li>
+          </ul><br>
+          <br>
+          Note: State 'none' cannot explicitly be set. Setting state to 'gone' will be handled as 'none' for GUEST member devices.
+        </div>
+      </div><br>
+      <br>
+      <a name="RESIDENTSattr" id="RESIDENTSattr"></a> <b>Attributes</b><br>
+      <div style="margin-left: 2em">
+        <ul>
+          <li>
+            <b>rgr_showAllStates</b> - states 'asleep' and 'awoken' are hidden by default to allow simple gotosleep process via devStateIcon; defaults to 0
+          </li>
+          <li>
+            <b>rgr_states</b> - list of states to be shown in FHEMWEB; separate entries by comma only and do NOT use spaces; unsupported states will lead to errors though
+          </li>
+        </ul>
+      </div><br>
+      <br>
+      <br>
+      <b>Generated Readings/Events:</b><br>
+      <div style="margin-left: 2em">
+        <ul>
+          <li>
+            <b>lastActivity</b> - the last state change of one of the group members
+          </li>
+          <li>
+            <b>lastActivityBy</b> - the realname of the last group member with changed state
+          </li>
+          <li>
+            <b>lastArrival</b> - timestamp of last arrival at home
+          </li>
+          <li>
+            <b>lastAwake</b> - timestamp of last sleep cycle end
+          </li>
+          <li>
+            <b>lastDeparture</b> - timestamp of last departure from home
+          </li>
+          <li>
+            <b>lastDurAbsence</b> - duration of last absence from home in following format: hours:minutes:seconds
+          </li>
+          <li>
+            <b>lastDurPresence</b> - duration of last presence at home in following format: hours:minutes:seconds
+          </li>
+          <li>
+            <b>lastDurSleep</b> - duration of last sleep in following format: hours:minutes:seconds
+          </li>
+          <li>
+            <b>lastSleep</b> - timestamp of last sleep cycle begin
+          </li>
+          <li>
+            <b>lastState</b> - the prior state
+          </li>
+          <li>
+            <b>presence</b> - reflects the home presence state, depending on value of reading 'state' (can be 'present' or 'absent')
+          </li>
+          <li>
+            <b>residentsAbsent</b> - number of residents with state 'absent'
+          </li>
+          <li>
+            <b>residentsAsleep</b> - number of residents with state 'asleep'
+          </li>
+          <li>
+            <b>residentsAwoken</b> - number of residents with state 'awoken'
+          </li>
+          <li>
+            <b>residentsGone</b> - number of residents with state 'gone'
+          </li>
+          <li>
+            <b>residentsGotosleep</b> - number of residents with state 'gotosleep'
+          </li>
+          <li>
+            <b>residentsGuests</b> - number of active guests who are currently treated as part of the residents scope
+          </li>
+          <li>
+            <b>residentsHome</b> - number of residents with state 'home'
+          </li>
+          <li>
+            <b>residentsTotal</b> - total number of all active residents despite their current state
+          </li>
+          <li>
+            <b>residentsTotalAbsent</b> - number of all residents who are currently underway
+          </li>
+          <li>
+            <b>residentsTotalPresent</b> - number of all residents who are currently at home
+          </li>
+          <li>
+            <b>residentsTotalWayhome</b> - number of all active residents who are currently on their way back home
+          </li>
+          <li>
+            <b>state</b> - reflects the current state
+          </li>
+        </ul>
+      </div>
+    </div>
 
 =end html
 
 =begin html_DE
 
-<a name="RESIDENTS"></a>
-<h3>RESIDENTS</h3>
-<ul>
-
-  <a name="RESIDENTSdefine"></a>
-  <b>Define</b>
-  <ul>
-    <code>define &lt;rgr_ResidentsName&gt; RESIDENTS</code>
-    <br><br>
-
-  Stellt ein spezielles Dummy-Device bereit, um eine Gruppe von Personen zu repr&auml;sentieren, die zusammen wohnen.<br>
-  Es kombiniert dabei logisch die individuellen Stati von <a href="#ROOMMATE">ROOMMATE</a> und <a href="#GUEST">GUEST</a> Devices und erlaubt den Status f&uuml;r alle Mitglieder zeitgleich zu &auml;ndern.
-  Basierend auf dem aktuelle Status und anderen Readings k&ouml;nnen andere Aktionen innerhalb von FHEM angesto&szlig;en werden.<br><br>
-
-    Beispiele:<br>
-    <ul><code>
-       # Einzeln<br>
-       define rgr_Residents RESIDENTS
-    </code></ul>
-  </ul>
-  <br>
-  <br>
-
-  <a name="RESIDENTSset"></a>
-  <b>Set</b>
-  <ul>
-    <code>set &lt;rgr_ResidentsName&gt; &lt;command&gt; [&lt;parameter&gt;]</code>
-    <br><br>
-    Momentan sind die folgenden Kommandos definiert.<br>
-    <ul>
-      <li><b>addGuest</b> &nbsp;&nbsp;-&nbsp;&nbsp; erstellt ein neues GUEST Device und f&uuml;gt es der aktuellen RESIDENTS Gruppe hinzu. Einfach den Platzhalternamen eingeben und das wars.</li>
-      <li><b>addRoommate</b> &nbsp;&nbsp;-&nbsp;&nbsp; erstellt ein neues GUEST Device und f&uuml;gt es der aktuellen RESIDENTS Gruppe hinzu. Einfach den Vornamen eingeben und das wars.</li>
-      <li><b>removeGuest</b> &nbsp;&nbsp;-&nbsp;&nbsp; zeigt alle Mitglieder vom Typ GUEST an und erm&ouml;glicht ein einfaches l&ouml;schen des dazugeh&ouml;rigen Dummy Devices.</li>
-      <li><b>removeRoommate</b> &nbsp;&nbsp;-&nbsp;&nbsp; zeigt alle Mitglieder vom Typ ROOMMATE an und erm&ouml;glicht ein einfaches l&ouml;schen des dazugeh&ouml;rigen Dummy Devices.</li>
-      <li><b>state</b> &nbsp;&nbsp;home,gotosleep,asleep,awoken,absent,gone&nbsp;&nbsp; wechselt den Status f&uuml;r alle Gruppenmitglieder gleichzeitig; siehe Attribut rgr_states, um die angezeigte Liste in FHEMWEB abzu&auml;ndern</li>
-    </ul>
-  </ul>
-
-<br><br>
-  <ul>
-    <u>M&ouml;gliche Stati und ihre Bedeutung</u><br><br>
-    <ul>
-      Dieses Modul unterscheidet 7 verschiedene Stati:<br><br>
-
-      <ul>
-      <li><b>home</b> - Bewohner sind zu Hause und mindestens einer schl&auml;ft nicht</li>
-      <li><b>gotosleep</b> - alle anwesenden Bewohner sind auf dem Weg ins Bett (wenn sie nicht schon schlafen)</li>
-      <li><b>asleep</b> - alle anwesenden Bewohner schlafen</li>
-      <li><b>awoken</b> - mindestens einer der anwesenden Bewohner ist gerade aufgewacht</li>
-      <li><b>absent</b> - keiner der Bewohner ist momentan zu Hause; mindestens einer ist aber in K&uuml;rze zur&uuml;ck</li>
-      <li><b>gone</b> - alle Bewohner sind f&uuml;r l&auml;ngere Zeit verreist</li>
-      <li><b>none</b> - kein Mitglied aktiv</li>
-      </ul><br>
+    <p>
+      <a name="RESIDENTS" id="RESIDENTS"></a>
+    </p>
+    <h3>
+      RESIDENTS
+    </h3>
+    <div style="margin-left: 2em">
+      <a name="RESIDENTSdefine" id="RESIDENTSdefine"></a> <b>Define</b>
+      <div style="margin-left: 2em">
+        <code>define &lt;rgr_ResidentsName&gt; RESIDENTS</code><br>
+        <br>
+        Stellt ein spezielles Dummy-Device bereit, um eine Gruppe von Personen zu repräsentieren, die zusammen wohnen.<br>
+        Es kombiniert dabei logisch die individuellen Stati von <a href="#ROOMMATE">ROOMMATE</a> und <a href="#GUEST">GUEST</a> Devices und erlaubt den Status für alle Mitglieder zeitgleich zu ändern. Basierend auf dem aktuelle Status und anderen Readings können andere Aktionen innerhalb von FHEM angestoßen werden.<br>
+        <br>
+        Beispiele:<br>
+        <div style="margin-left: 2em">
+          <code># Einzeln<br>
+          define rgr_Residents RESIDENTS</code>
+        </div>
+      </div><br>
       <br>
-      Hinweis: Der Status 'none' kann nicht explizit gesetzt werden. Das setzen von 'gone' wird bei Mitgliedern vom Typ GUEST als 'none' behandelt.
-
-    </ul>
-  </ul>
-  <br>
-  <br>
-
-  <a name="RESIDENTSattr"></a>
-  <b>Attribute</b><br>
-  <ul><ul>
-    <li><b>rgr_showAllStates</b> - die Stati 'asleep' und 'awoken' sind normalerweise nicht immer sichtbar, um einen einfachen Zubettgeh-Prozess &uuml;ber das devStateIcon Attribut zu erm&ouml;glichen; Standard ist 0</li>
-    <li><b>rgr_states</b> - Liste aller in FHEMWEB angezeigter Stati; Eintrage nur mit Komma trennen und KEINE Leerzeichen benutzen; nicht unterst&uuml;tzte Stati f&uuml;hren zu Fehlern</li>
-  </ul></ul>
-  <br>
-  <br>
-
-  <br>
-  <b>Generierte Readings/Events:</b><br>
-  <ul><ul>
-    <li><b>lastActivity</b> - der letzte Status Wechsel eines Gruppenmitglieds</li>
-    <li><b>lastActivityBy</b> - der Name des Gruppenmitglieds, dessen Status zuletzt ge&auml;ndert wurde</li>
-    <li><b>lastArrival</b> - Zeitstempel der letzten Ankunft zu Hause</li>
-    <li><b>lastAwake</b> - Zeitstempel des Endes des letzten Schlafzyklus</li>
-    <li><b>lastDeparture</b> - Zeitstempel des letzten Verlassens des Zuhauses</li>
-    <li><b>lastDurAbsence</b> - Dauer der letzten Abwesenheit im folgenden Format: Stunden:Minuten:Sekunden</li>
-    <li><b>lastDurPresence</b> - Dauer der letzten Anwesenheit im folgenden Format: Stunden:Minuten:Sekunden</li>
-    <li><b>lastDurSleep</b> - Dauer des letzten Schlafzyklus im folgenden Format: Stunden:Minuten:Sekunden</li>
-    <li><b>lastSleep</b> - Zeitstempel des Beginns des letzten Schlafzyklus</li>
-    <li><b>lastState</b> - der vorherige Status</li>
-    <li><b>presence</b> - gibt den Zuhause Status in Abh&auml;ngigkeit des Readings 'state' wieder (kann 'present' oder 'absent' sein)</li>
-    <li><b>residentsAbsent</b> - Anzahl der Bewohner mit Status 'absent'</li>
-    <li><b>residentsAsleep</b> - Anzahl der Bewohner mit Status 'asleep'</li>
-    <li><b>residentsAwoken</b> - Anzahl der Bewohner mit Status 'awoken'</li>
-    <li><b>residentsGone</b> - Anzahl der Bewohner mit Status 'gone'</li>
-    <li><b>residentsGotosleep</b> - Anzahl der Bewohner mit Status 'gotosleep'</li>
-    <li><b>residentsGuests</b> - Anzahl der aktiven G&auml;ste, welche momentan du den Bewohnern dazugez&auml;hlt werden</li>
-    <li><b>residentsHome</b> - Anzahl der Bewohner mit Status 'home'</li>
-    <li><b>residentsTotal</b> - Summe aller aktiven Bewohner unabh&auml;ngig von ihrem aktuellen Status</li>
-    <li><b>residentsTotalAbsent</b> - Summe aller aktiven Bewohner, die unterwegs sind</li>
-    <li><b>residentsTotalPresent</b> - Summe aller aktiven Bewohner, die momentan Zuhause sind</li>
-    <li><b>residentsTotalWayhome</b> - Summe aller aktiven Bewohner, die momentan auf dem Weg zur&uuml;ck nach Hause sind</li>
-    <li><b>state</b> - gibt den aktuellen Status wieder</li>
-  </ul></ul>
-
-</ul>
+      <a name="RESIDENTSset" id="RESIDENTSset"></a> <b>Set</b>
+      <div style="margin-left: 2em">
+        <code>set &lt;rgr_ResidentsName&gt; &lt;command&gt; [&lt;parameter&gt;]</code><br>
+        <br>
+        Momentan sind die folgenden Kommandos definiert.<br>
+        <ul>
+          <li>
+            <b>addGuest</b> &nbsp;&nbsp;-&nbsp;&nbsp; erstellt ein neues GUEST Device und fügt es der aktuellen RESIDENTS Gruppe hinzu. Einfach den Platzhalternamen eingeben und das wars.
+          </li>
+          <li>
+            <b>addRoommate</b> &nbsp;&nbsp;-&nbsp;&nbsp; erstellt ein neues GUEST Device und fügt es der aktuellen RESIDENTS Gruppe hinzu. Einfach den Vornamen eingeben und das wars.
+          </li>
+          <li>
+            <b>removeGuest</b> &nbsp;&nbsp;-&nbsp;&nbsp; zeigt alle Mitglieder vom Typ GUEST an und ermöglicht ein einfaches löschen des dazugehörigen Dummy Devices.
+          </li>
+          <li>
+            <b>removeRoommate</b> &nbsp;&nbsp;-&nbsp;&nbsp; zeigt alle Mitglieder vom Typ ROOMMATE an und ermöglicht ein einfaches löschen des dazugehörigen Dummy Devices.
+          </li>
+          <li>
+            <b>state</b> &nbsp;&nbsp;home,gotosleep,asleep,awoken,absent,gone&nbsp;&nbsp; wechselt den Status für alle Gruppenmitglieder gleichzeitig; siehe Attribut rgr_states, um die angezeigte Liste in FHEMWEB abzuändern
+          </li>
+        </ul>
+      </div><br>
+      <br>
+      <div style="margin-left: 2em">
+        <u>Mögliche Stati und ihre Bedeutung</u><br>
+        <br>
+        <div style="margin-left: 2em">
+          Dieses Modul unterscheidet 7 verschiedene Stati:<br>
+          <br>
+          <ul>
+            <li>
+              <b>home</b> - Bewohner sind zu Hause und mindestens einer schläft nicht
+            </li>
+            <li>
+              <b>gotosleep</b> - alle anwesenden Bewohner sind auf dem Weg ins Bett (wenn sie nicht schon schlafen)
+            </li>
+            <li>
+              <b>asleep</b> - alle anwesenden Bewohner schlafen
+            </li>
+            <li>
+              <b>awoken</b> - mindestens einer der anwesenden Bewohner ist gerade aufgewacht
+            </li>
+            <li>
+              <b>absent</b> - keiner der Bewohner ist momentan zu Hause; mindestens einer ist aber in Kürze zurück
+            </li>
+            <li>
+              <b>gone</b> - alle Bewohner sind für längere Zeit verreist
+            </li>
+            <li>
+              <b>none</b> - kein Mitglied aktiv
+            </li>
+          </ul><br>
+          <br>
+          Hinweis: Der Status 'none' kann nicht explizit gesetzt werden. Das setzen von 'gone' wird bei Mitgliedern vom Typ GUEST als 'none' behandelt.
+        </div>
+      </div><br>
+      <br>
+      <a name="RESIDENTSattr" id="RESIDENTSattr"></a> <b>Attribute</b><br>
+      <div style="margin-left: 2em">
+        <ul>
+          <li>
+            <b>rgr_showAllStates</b> - die Stati 'asleep' und 'awoken' sind normalerweise nicht immer sichtbar, um einen einfachen Zubettgeh-Prozess über das devStateIcon Attribut zu ermöglichen; Standard ist 0
+          </li>
+          <li>
+            <b>rgr_states</b> - Liste aller in FHEMWEB angezeigter Stati; Eintrage nur mit Komma trennen und KEINE Leerzeichen benutzen; nicht unterstützte Stati führen zu Fehlern
+          </li>
+        </ul>
+      </div><br>
+      <br>
+      <br>
+      <b>Generierte Readings/Events:</b><br>
+      <div style="margin-left: 2em">
+        <ul>
+          <li>
+            <b>lastActivity</b> - der letzte Status Wechsel eines Gruppenmitglieds
+          </li>
+          <li>
+            <b>lastActivityBy</b> - der Name des Gruppenmitglieds, dessen Status zuletzt geändert wurde
+          </li>
+          <li>
+            <b>lastArrival</b> - Zeitstempel der letzten Ankunft zu Hause
+          </li>
+          <li>
+            <b>lastAwake</b> - Zeitstempel des Endes des letzten Schlafzyklus
+          </li>
+          <li>
+            <b>lastDeparture</b> - Zeitstempel des letzten Verlassens des Zuhauses
+          </li>
+          <li>
+            <b>lastDurAbsence</b> - Dauer der letzten Abwesenheit im folgenden Format: Stunden:Minuten:Sekunden
+          </li>
+          <li>
+            <b>lastDurPresence</b> - Dauer der letzten Anwesenheit im folgenden Format: Stunden:Minuten:Sekunden
+          </li>
+          <li>
+            <b>lastDurSleep</b> - Dauer des letzten Schlafzyklus im folgenden Format: Stunden:Minuten:Sekunden
+          </li>
+          <li>
+            <b>lastSleep</b> - Zeitstempel des Beginns des letzten Schlafzyklus
+          </li>
+          <li>
+            <b>lastState</b> - der vorherige Status
+          </li>
+          <li>
+            <b>presence</b> - gibt den Zuhause Status in Abhängigkeit des Readings 'state' wieder (kann 'present' oder 'absent' sein)
+          </li>
+          <li>
+            <b>residentsAbsent</b> - Anzahl der Bewohner mit Status 'absent'
+          </li>
+          <li>
+            <b>residentsAsleep</b> - Anzahl der Bewohner mit Status 'asleep'
+          </li>
+          <li>
+            <b>residentsAwoken</b> - Anzahl der Bewohner mit Status 'awoken'
+          </li>
+          <li>
+            <b>residentsGone</b> - Anzahl der Bewohner mit Status 'gone'
+          </li>
+          <li>
+            <b>residentsGotosleep</b> - Anzahl der Bewohner mit Status 'gotosleep'
+          </li>
+          <li>
+            <b>residentsGuests</b> - Anzahl der aktiven Gäste, welche momentan du den Bewohnern dazugezählt werden
+          </li>
+          <li>
+            <b>residentsHome</b> - Anzahl der Bewohner mit Status 'home'
+          </li>
+          <li>
+            <b>residentsTotal</b> - Summe aller aktiven Bewohner unabhängig von ihrem aktuellen Status
+          </li>
+          <li>
+            <b>residentsTotalAbsent</b> - Summe aller aktiven Bewohner, die unterwegs sind
+          </li>
+          <li>
+            <b>residentsTotalPresent</b> - Summe aller aktiven Bewohner, die momentan Zuhause sind
+          </li>
+          <li>
+            <b>residentsTotalWayhome</b> - Summe aller aktiven Bewohner, die momentan auf dem Weg zurück nach Hause sind
+          </li>
+          <li>
+            <b>state</b> - gibt den aktuellen Status wieder
+          </li>
+        </ul>
+      </div>
+    </div>
 
 =end html_DE
 
