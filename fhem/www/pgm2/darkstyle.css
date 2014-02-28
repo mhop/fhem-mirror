@@ -19,7 +19,6 @@ table.block tr.odd { background: #111111; }
 table.block tr.sel { background: red; }
 table { border-radius:8px; border-spacing: 0px;
        padding-bottom: 6px; padding-top: 6px; }
-table.column { border-spacing: 5px; }
 
 table.room { background: #111111; width: 140px; border:1px solid #CCCCCC; box-shadow:5px 5px 5px #000;}
 table.room a { color: #CCCCCC; text-decoration: none; }
@@ -53,7 +52,10 @@ h2,h3,h4 { color:#EEE; line-height:1.3; margin-top:1.5em; font-family:Verdana; }
 
 a img { border-style:none; }
 .col2 { text-align:center; }
-tr.column td { padding:0; vertical-align:top;}
+tr.column td {
+  padding-top:5px; padding-right:5px; padding-left:8px;
+  vertical-align:top;
+}
 
 /* detail-selector & slider */
 .makeTable { display:inline; float:left; clear:left;
