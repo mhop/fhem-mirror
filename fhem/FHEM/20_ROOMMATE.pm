@@ -1330,7 +1330,7 @@ sub ROOMMATE_StartInternalTimers($$) {
             <b>durTimerPresence</b> - Timer, der die Dauer der Anwesenheit in Minuten anzeigt
           </li>
           <li>
-            <b>durTimerSleep</b> - Timer, der die Schlafdauer in Minuten anzeigt/li&gt;
+            <b>durTimerSleep</b> - Timer, der die Schlafdauer in Minuten anzeigt
           </li>
           <li>
             <b>lastArrival</b> - Zeitstempel der letzten Ankunft zu Hause
