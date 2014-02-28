@@ -31,6 +31,7 @@ use Device::Firmata::Base
   ports                       => [],
   pins                        => {},
   pin_modes                   => {},
+  encoders                    => [],
 
   # To notify on events
   digital_observer            => [],
@@ -38,6 +39,8 @@ use Device::Firmata::Base
   sysex_observer              => undef,
   i2c_observer                => undef,
   onewire_observer            => [],
+  stepper_observer            => [],
+  encoder_observer            => [],
   scheduler_observer          => undef,
   string_observer             => undef,
 
@@ -242,6 +245,9 @@ sub sysex_handle {
       my @shiftpins;
       my @i2cpins;
       my @onewirepins;
+      my @stepperpins;
+      my @encoderpins;
+      
       foreach my $pin (keys %$capabilities) {
         if (defined $capabilities->{$pin}) {
           if ($capabilities->{$pin}->{PIN_INPUT+0}) {
@@ -271,6 +277,12 @@ sub sysex_handle {
           if ($capabilities->{$pin}->{PIN_ONEWIRE+0}) {
             push @onewirepins, $pin;
           }
+          if ($capabilities->{$pin}->{PIN_STEPPER+0}) {
+          	push @stepperpins, $pin;
+          }
+          if ($capabilities->{$pin}->{PIN_ENCODER+0}) {
+          	push @encoderpins, $pin;
+          }
         }
       }
       $self->{metadata}{input_pins}   = \@inputpins;
@@ -281,6 +293,8 @@ sub sysex_handle {
       $self->{metadata}{shift_pins}   = \@shiftpins;
       $self->{metadata}{i2c_pins}     = \@i2cpins;
       $self->{metadata}{onewire_pins} = \@onewirepins;
+      $self->{metadata}{stepper_pins} = \@stepperpins;
+      $self->{metadata}{encoder_pins} = \@encoderpins;
       last;
     };
 
@@ -332,7 +346,23 @@ sub sysex_handle {
         $observer->{method}( $data->{string}, $observer->{context} );
       }
       last;
-    }
+    };
+    
+    $sysex_message->{command_str} eq 'STEPPER_DATA' and do {
+      #TODO implement handling of STEPPER_DATA and call observer.
+      last;
+    };
+    
+    $sysex_message->{command_str} eq 'ENCODER_DATA' and do {
+      foreach my $encoder_data ( @$data ) {
+        my $encoderNum = $encoder_data->{encoderNum};
+        my $observer = $self->{encoder_observer}[$encoderNum];
+        if (defined $observer) {
+          $observer->{method}( $encoder_data, $observer->{context} );
+        }
+      };
+      last;
+    };
   }
 }
 
@@ -739,6 +769,38 @@ sub onewire_command_series {
   return $self->{io}->data_write($self->{protocol}->packet_onewire_request( $pin, $args ));
 }
 
+sub encoder_attach {
+  my ( $self, $encoderNum, $pinA, $pinB ) = @_;
+  die "unsupported mode 'ENCODER' for pin '".$pinA."'" unless $self->is_supported_mode($pinA,PIN_ENCODER);
+  die "unsupported mode 'ENCODER' for pin '".$pinB."'" unless $self->is_supported_mode($pinB,PIN_ENCODER);
+  return $self->{io}->data_write($self->{protocol}->packet_encoder_attach( $encoderNum, $pinA, $pinB ));
+}
+
+sub encoder_report_position {
+  my ( $self, $encoderNum ) = @_;
+  return $self->{io}->data_write($self->{protocol}->packet_encoder_report_position( $encoderNum ));
+}
+
+sub encoder_report_positions {
+  my ( $self ) = @_;
+  return $self->{io}->data_write($self->{protocol}->packet_encoder_report_positions());
+}
+
+sub encoder_reset_position {
+  my ( $self, $encoderNum ) = @_;
+  return $self->{io}->data_write($self->{protocol}->packet_encoder_reset_position( $encoderNum ));
+}
+
+sub encoder_report_auto {
+  my ( $self, $enable ) = @_;
+  return $self->{io}->data_write($self->{protocol}->packet_encoder_report_auto( $enable ));
+}
+
+sub encoder_detach {
+  my ( $self, $encoderNum ) = @_;
+  return $self->{io}->data_write($self->{protocol}->packet_encoder_detach( $encoderNum ));
+}
+
 =head2 poll
 
 Call this function every once in a while to
@@ -803,6 +865,21 @@ sub observe_onewire {
   my ( $self, $pin, $observer, $context ) = @_;
   die "unsupported mode 'ONEWIRE' for pin '".$pin."'" unless ($self->is_supported_mode($pin,PIN_ONEWIRE));
   $self->{onewire_observer}[$pin] =  {
+      method  => $observer,
+      context => $context,
+    };
+  return 1;
+}
+
+sub observe_stepper {
+  #TODO implement observe_stepper
+  return 1;
+}
+
+sub observe_encoder {
+  my ( $self, $encoderNum, $observer, $context ) = @_;
+#TODO validation?  die "unsupported mode 'ENCODER' for pin '".$pin."'" unless ($self->is_supported_mode($pin,PIN_ENCODER));
+  $self->{encoder_observer}[$encoderNum] = {
       method  => $observer,
       context => $context,
     };
