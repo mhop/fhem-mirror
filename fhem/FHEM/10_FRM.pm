@@ -323,6 +323,8 @@ sub FRM_DoInit($) {
 					$main::defs{$name}{i2c_pins} = join(",", sort{$a<=>$b}(@$i2cpins)) if (defined $i2cpins and scalar @$i2cpins);
 					my $onewirepins = $device->{metadata}{onewire_pins};
 					$main::defs{$name}{onewire_pins} = join(",", sort{$a<=>$b}(@$onewirepins)) if (defined $onewirepins and scalar @$onewirepins);
+					my $encoderpins = $device->{metadata}{encoder_pins};
+					$main::defs{$name}{encoder_pins} = join(",", sort{$a<=>$b}(@$encoderpins)) if (defined $encoderpins and scalar @$encoderpins);
 					if (defined $device->{metadata}{analog_resolutions}) {
 						my @analog_resolutions;
 						foreach my $pin (sort{$a<=>$b}(keys %{$device->{metadata}{analog_resolutions}})) {
@@ -343,6 +345,13 @@ sub FRM_DoInit($) {
 							push @servo_resolutions,$pin.":".$device->{metadata}{servo_resolutions}{$pin};
 						}
 						$main::defs{$name}{servo_resolutions} = join(",",@servo_resolutions) if (scalar @servo_resolutions);
+					}
+					if (defined $device->{metadata}{encoder_resolutions}) {
+						my @encoder_resolutions;
+						foreach my $pin (sort{$a<=>$b}(keys %{$device->{metadata}{encoder_resolutions}})) {
+							push @encoder_resolutions,$pin.":".$device->{metadata}{encoder_resolutions}{$pin};
+						}
+						$main::defs{$name}{encoder_resolutions} = join(",",@encoder_resolutions) if (scalar @encoder_resolutions);
 					}
 					$found = 1;
 				} else {
