@@ -109,8 +109,8 @@ foreach my $lang (@lang) {
 <a name="$mod"></a>
 <h3>$mod</h3>
 <ul>
-  Sorry, keine deutsche Dokumentation vorhanden.
-  Die englische Doku gibt es hier: <a href='commandref.html#$mod'>$mod</a><br/>
+  Leider keine deutsche Dokumentation vorhanden. Die englische Version gibt es
+  hier: <a href='commandref.html#$mod'>$mod</a><br/>
 </ul>
 EOF
       }
