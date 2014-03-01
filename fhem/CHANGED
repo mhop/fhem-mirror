@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: configDB.pm use sql database instead of fhem.cfg (betateilchen)
   - feature: 98_pilight: Added support for Elso protocol
   - feature: readingsGroup: added sortDevices attribute
   - feature: ENIGMA2: new reading 'recordings', new command record
