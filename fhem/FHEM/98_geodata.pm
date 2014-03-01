@@ -65,16 +65,12 @@ sub geodata_Attr($){
 		when("geo_googleApiKey"){
 			$attr{$name}{$attrName} = $attrValue;
 			geodata_collectData($hash);
-#			RemoveInternalTimer($hash);
-#			InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "OWO_GetStatus", $hash, 0);
 			break;
 		}
 
 		when("geo_wuApiKey"){
 			$attr{$name}{$attrName} = $attrValue;
 			geodata_collectData($hash);
-#			RemoveInternalTimer($hash);
-#			InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "OWO_GetStatus", $hash, 0);
 			break;
 		}
 
@@ -96,10 +92,7 @@ sub geodata_Shutdown($) {
 sub geodata_collectData($){
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-#
-# I really hate the fucking nonworking HttpUtils
-# from fhem, so we will not use them here!
-#
+
 	my	$ua = LWP::UserAgent->new;
 	$ua->timeout(10);				# test
 	$ua->env_proxy;
@@ -122,7 +115,6 @@ sub _wu_geolookup($$$) {
 	my ($hash, $ua, $wuapikey) = @_;
 	my $name		= $hash->{NAME};
 
-#	$wuapikey = '1c0d9efb71cf016e';
 
 	my $lat = ReadingsVal($name, 'latitude', '');
 	my $lon = ReadingsVal($name, 'longitude', '');
