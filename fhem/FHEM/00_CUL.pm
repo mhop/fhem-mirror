@@ -980,7 +980,7 @@ CUL_Parse($$$$$)
   $hash->{"${name}_TIME"} =
   $hash->{READINGS}{state}{TIME} = TimeNow();      # showtime attribute
   $hash->{RAWMSG} = $rmsg;
-  my %addvals = (RAWMSG => $rmsg);
+  my %addvals = (RAWMSG => $dmsg);
   if(defined($rssi)) {
     $hash->{RSSI} = $rssi;
     $addvals{RSSI} = $rssi;
