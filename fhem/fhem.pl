@@ -123,6 +123,13 @@ sub CommandShutdown($$);
 sub CommandSleep($$);
 sub CommandTrigger($$);
 
+# configDB special
+sub cfgDB_Init;
+sub cfgDB_ReadAll($);
+sub cfgDB_SaveState;
+sub cfgDB_SaveCfg;
+sub cfgDB_GlobalAttr;
+
 ##################################################
 # Variables:
 # global, to be able to access them from modules
@@ -365,6 +372,13 @@ $winService ||= {};
 # Server initialization
 doGlobalDef($ARGV[0]);
 
+if($attr{global}{configfile} eq 'configDB') {
+  eval "use configDB";
+  Log 1, $@ if($@);
+  cfgDB_Init();
+}
+
+
 # As newer Linux versions reset serial parameters after fork, we parse the
 # config file after the fork. But we need some global attr parameters before, so we
 # read them here.
@@ -389,12 +403,17 @@ while(time() < 2*3600) {
   sleep(5);
 }
 
-my $ret = CommandInclude(undef, $attr{global}{configfile});
-Log 1, "configfile: $ret" if($ret);
+if($attr{global}{configfile} eq 'configDB') {
+  cfgDB_ReadAll(undef);
 
-if($attr{global}{statefile} && -r $attr{global}{statefile}) {
-  $ret = CommandInclude(undef, $attr{global}{statefile});
-  Log 1, "statefile: $ret" if($ret);
+} else {
+  my $ret = CommandInclude(undef, $attr{global}{configfile});
+  Log 1, "configfile: $ret" if($ret);
+
+  if($attr{global}{statefile} && -r $attr{global}{statefile}) {
+    $ret = CommandInclude(undef, $attr{global}{statefile});
+    Log 1, "statefile: $ret" if($ret);
+  }
 }
 
 SignalHandling();
@@ -1068,7 +1087,8 @@ CommandRereadCfg($$)
   my ($cl, $param) = @_;
   my $name = ($cl ? $cl->{NAME} : "__anonymous__");
   my $cfgfile = ($param ? $param : $attr{global}{configfile});
-  return "Cannot open $cfgfile: $!" if(! -f $cfgfile);
+  return "Cannot open $cfgfile: $!"
+        if(! -f $cfgfile && $attr{global}{configfile} ne 'configDB');
 
   $attr{global}{configfile} = $cfgfile;
   WriteStatefile();
@@ -1091,13 +1111,21 @@ CommandRereadCfg($$)
   %inform = ();
 
   doGlobalDef($cfgfile);
-  setGlobalAttrBeforeFork($cfgfile);
+  my $ret;
+  
+  if($attr{global}{configfile} eq 'configDB') {
+    cfgDB_ReadAll($cl);
 
-  my $ret = CommandInclude($cl, $cfgfile);
-  if($attr{global}{statefile} && -r $attr{global}{statefile}) {
-    my $ret2 = CommandInclude($cl, $attr{global}{statefile});
-    $ret = (defined($ret) ? "$ret\n$ret2" : $ret2) if(defined($ret2));
+  } else {
+    setGlobalAttrBeforeFork($cfgfile);
+
+    $ret = CommandInclude($cl, $cfgfile);
+    if($attr{global}{statefile} && -r $attr{global}{statefile}) {
+      my $ret2 = CommandInclude($cl, $attr{global}{statefile});
+      $ret = (defined($ret) ? "$ret\n$ret2" : $ret2) if(defined($ret2));
+    }
   }
+
   DoTrigger("global", "REREADCFG", 1);
   $defs{$name} = $selectlist{$name} = $cl if($name && $name ne "__anonymous__");
 
@@ -1125,6 +1153,11 @@ CommandQuit($$)
 sub
 WriteStatefile()
 {
+  if($attr{global}{configfile} eq 'configDB') {
+    cfgDB_SaveState();
+    return "";
+  }
+
   return "No statefile specified" if(!$attr{global}{statefile});
   if(!open(SFH, ">$attr{global}{statefile}")) {
     my $msg = "WriteStateFile: Cannot open $attr{global}{statefile}: $!";
@@ -1188,6 +1221,11 @@ CommandSave($$)
   DoTrigger("global", "SAVE", 1);
 
   WriteStatefile();
+
+  if($attr{global}{configfile} eq 'configDB') {
+    $ret = cfgDB_SaveCfg();
+    return ($ret ? $ret : "Saved configuration to the DB");
+  }
 
   $param = $attr{global}{configfile} if(!$param);
   return "No configfile attribute set and no argument specified" if(!$param);
@@ -1590,7 +1628,7 @@ CommandDeleteAttr($$)
       delete($defs{$sdev}{'.userReadings'});
     }
 
-    $ret = CallFn($sdev, "AttrFn", "del", @a);
+    my $ret = CallFn($sdev, "AttrFn", "del", @a);
     if($ret) {
       push @rets, $ret;
       next;
@@ -3036,6 +3074,12 @@ sub
 setGlobalAttrBeforeFork($)
 {
   my ($f) = @_;
+
+  if($f eq 'configDB') {
+    cfgDB_GlobalAttr();
+    return;
+  }
+
   open(FH, $f) || die("Cant open $f: $!\n");
   while(my $l = <FH>) {
     $l =~ s/[\r\n]//g;
