@@ -270,7 +270,7 @@ SVG_PEdit($$$$)
   $ret .= "<form $pestyle id=\"pedit\" method=\"$FW_formmethod\" autocomplete=\"off\" ".
                 "action=\"$FW_ME/SVG_WriteGplot\">";
   $ret .= "Plot Editor";
-  $ret .= FW_hidden("gplotName", $gp);
+  $ret .= FW_hidden("detail", $d); # go to detail after save
   $ret .= FW_hidden("gplotName", $gp);
   $ret .= FW_hidden("logdevicetype", $ldt);
   $ret .= "<table class=\"block wide plotEditor\">";
