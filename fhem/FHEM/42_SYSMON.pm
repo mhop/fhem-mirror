@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.3.7";
+my $VERSION = "1.3.8";
 
 use constant {
   DATE            => "date",
@@ -1185,19 +1185,53 @@ sub SYSMON_getNetworkInfo ($$$)
 #------------------------------------------------------------------------------
 sub SYSMON_ShowValuesHTML ($;@)
 {
-    my ($name, @data) = @_;
+	my ($name, @data) = @_;
+	return SYSMON_ShowValuesFmt($name, 1, @data);
+}
+
+#------------------------------------------------------------------------------
+# Systemparameter im Textformat ausgeben
+# Parameter: Name des SYSMON-Geraetes (muss existieren), dessen Daten zur Anzeige gebracht werden sollen.
+# (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix]],...)
+# Beispiel: define sysv weblink htmlCode {SYSMON_ShowValuesText('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: °C', 'cpu_freq:CPU Frequenz: MHz'))}
+#------------------------------------------------------------------------------
+sub SYSMON_ShowValuesText ($;@)
+{
+	my ($name, @data) = @_;
+	return SYSMON_ShowValuesFmt($name, 0, @data);
+}
+
+#------------------------------------------------------------------------------
+# Systemparameter formatiert ausgeben
+# Parameter: 
+#   Format: 0 = Text, 1 = HTML
+#   Name des SYSMON-Geraetes (muss existieren), dessen Daten zur Anzeige gebracht werden sollen.
+#   (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix]],...)
+#------------------------------------------------------------------------------
+sub SYSMON_ShowValuesFmt ($$;@)
+{
+    my ($name, $format, @data) = @_;
+    
+    if($format != 0 && $format != 1) {
+    	return "unknown output format\r\n";
+    }
+    
     my $hash = $main::defs{$name};
     SYSMON_updateCurrentReadingsMap($hash);
 #Log 3, "SYSMON $>name, @data<";
   my @dataDescription = @data;
   if(scalar(@data)<=0) {
 	  # Array mit anzuzeigenden Parametern (Prefix, Name (in Map), Postfix)
+	  my $deg = "°";
+	  if($format == 1) {
+	  	$deg = "&deg;";
+	  }
 	  @dataDescription = (DATE,
-	                      CPU_TEMP.":".$cur_readings_map->{+CPU_TEMP}.":"." &deg;C", 
-	                      CPU_FREQ.":".$cur_readings_map->{+CPU_FREQ}.":"." MHz", 
+	                      CPU_TEMP.":".$cur_readings_map->{+CPU_TEMP}.": ".$deg."C", 
+	                      CPU_FREQ.":".$cur_readings_map->{+CPU_FREQ}.": "."MHz", 
 	                      CPU_BOGOMIPS,
 	                      UPTIME_TEXT, FHEMUPTIME_TEXT, LOADAVG, RAM, SWAP);
-	                      
+
 	  # network-interfaces
   	my $networks = AttrVal($name, "network-interfaces", undef);
     if(defined $networks) {
@@ -1234,8 +1268,15 @@ sub SYSMON_ShowValuesHTML ($;@)
 
   my $div_class="";
 
-  my $htmlcode = "<div  class='".$div_class."'><table>";
-
+  my $htmlcode;
+  if($format == 1) {
+  	$htmlcode = "<div  class='".$div_class."'><table>";
+  } else {
+  	if($format == 0) {
+  	  $htmlcode = "";
+  	}
+  }
+  
   # oben definierte Werte anzeigen
   foreach (@dataDescription) {
   	my($rName, $rComment, $rPostfix) = split(/:/, $_);
@@ -1250,47 +1291,41 @@ sub SYSMON_ShowValuesHTML ($;@)
   	  }
   	  if(!defined $rPostfix) { $rPostfix = ""; }
   	  if(defined $rVal) {
-        $htmlcode .= "<tr><td valign='top'>".$rComment.":&nbsp;</td><td>".$rVal.$rPostfix."</td></tr>";
+  	  	if($format == 1) {
+  	  	  $htmlcode .= "<tr><td valign='top'>".$rComment.":&nbsp;</td><td>".$rVal.$rPostfix."</td></tr>";
+  	  	} else {
+  	  		if($format == 0) {
+            $htmlcode .= sprintf("%-24s: %s%s\r\n", $rComment, $rVal,$rPostfix);
+          }
+        }
       }
     }
   }
   
   # nur Default (also alles anzeigen)
   if(scalar(@data)<=0) {
-    ## network-interfaces
-  	#my $networks = AttrVal($name, "network-interfaces", undef);
-    #if(defined $networks) {
-    #  my @networks_list = split(/,\s*/, trim($networks));
-    #  foreach (@networks_list) {
-    #    my($nName, $nDef, $nComment) = split(/:/, $_);
-  	#    my $nComment = $cur_readings_map->{$nName};
-  	#    my $nVal = $map->{$nName};
-    #  	$htmlcode .= "<tr><td valign='top'>".$nComment.":&nbsp;</td><td>".$nVal."</td></tr>";
-  	#  }
-  	#}
-  
     # File systems
     foreach my $aName (sort keys %{$map}) {
     	if(defined ($aName) && index($aName, FS_PREFIX) == 0) {
         $aName =~ /^~ (.+)/;
-        $htmlcode .= "<tr><td valign='top'>File System: ".$1."&nbsp;</td><td>".$map->{$aName}."</td></tr>";
+        if($format == 1) {
+          $htmlcode .= "<tr><td valign='top'>File System: ".$1."&nbsp;</td><td>".$map->{$aName}."</td></tr>";
+        } else {
+        	if($format == 0) {
+            $htmlcode .= sprintf("%-24s: %s\r\n", "File System: ".$1,$map->{$aName});
+          }
+        }
       }
     }
-  
-    ## named filesystems
-  	#my $filesystems = AttrVal($name, "filesystems", undef);
-    #if(defined $filesystems) {
-    #  my @filesystem_list = split(/,\s*/, trim($filesystems));
-    #  foreach (@filesystem_list) {
-    #    my($fName, $fDef, $fComment) = split(/:/, $_);
-  	#    my $fComment = $cur_readings_map->{$fName};
-  	#    my $fVal = $map->{$fName};
-  	#    $htmlcode .= "<tr><td valign='top'>".$fComment.":&nbsp;</td><td>".$fVal."</td></tr>";
-  	#  }
-  	#}
   }
 
-  $htmlcode .= "</table></div><br>";
+  if($format == 1) {
+    $htmlcode .= "</table></div><br>";
+  } else {
+  	if($format == 0) {
+  	  $htmlcode .= "";
+  	}
+  }
 
   return $htmlcode;
 }
@@ -1720,6 +1755,11 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     If no list specified, a predefined selection is used (all values are displayed).<br><br>
     <code>define sysv1 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}</code><br>
     <code>define sysv2 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: &deg;C', 'cpu_freq:CPU Frequenz: MHz'))}</code>
+    </ul><br>
+    
+  <b>Text output method (see Weblink): SYSMON_ShowValuesText(&lt;SYSMON-Instance&gt;[,&lt;Liste&gt;])</b><br><br>
+    <ul>
+    According to SYSMON_ShowValuesHTML, but formatted as plain text.<br>
     </ul><br>
 
   <b>Examples:</b><br><br>
@@ -2165,6 +2205,11 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Wird keine Liste angegeben, wird eine vordefinierte Auswahl verwendet (alle Werte).<br><br>
     <code>define sysv1 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}</code><br>
     <code>define sysv2 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: &deg;C', 'cpu_freq:CPU Frequenz: MHz'))}</code>
+    </ul><br>
+    
+    <b>Text output method (see Weblink): SYSMON_ShowValuesText(&lt;SYSMON-Instance&gt;[,&lt;Liste&gt;])</b><br><br>
+    <ul>
+    Analog SYSMON_ShowValuesHTML, jedoch formatiert als reines Text.<br>
     </ul><br>
 
   <b>Beispiele:</b><br><br>
