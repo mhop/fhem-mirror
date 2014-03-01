@@ -75,7 +75,7 @@ YAMAHA_AVR_GetStatus($;$)
     my $device = $hash->{helper}{ADDRESS};
 
     # get the model informations and available zones if no informations are available
-    if(not defined($hash->{ACTIVE_ZONE}) or not defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
+    if(not defined($hash->{ACTIVE_ZONE}) or not defined($hash->{helper}{ZONES}) or not defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
     {
 		unless(defined(YAMAHA_AVR_getModel($hash)))
         {
@@ -272,6 +272,19 @@ YAMAHA_AVR_Set($@)
     my $result = "";
     my $command;
 	my $target_volume;
+    
+    # get the model informations and available zones if no informations are available
+    if(not defined($hash->{ACTIVE_ZONE}) or not defined($hash->{helper}{ZONES}) or not defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
+    {
+		YAMAHA_AVR_getModel($hash);
+    }
+
+    # get all available inputs if nothing is available
+    if(not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0)
+    {
+		YAMAHA_AVR_getInputs($hash);
+    }
+    
     my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
     
     my $inputs_piped = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{INPUTS}), 0) : "" ;
