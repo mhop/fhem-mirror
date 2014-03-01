@@ -13,6 +13,7 @@ File                          Maintainer         Contact
 fhem.pl                      rudolfkoenig         http://forum.fhem.de Sonstiges
 fhem.cfg                     rudolfkoenig         http://forum.fhem.de Sonstiges
 Makefile                     rudolfkoenig         http://forum.fhem.de Sonstiges
+configDB.pm                  betateilchen         http://forum.fhem.de Sonstiges
                                                  
 FHEM/00_CM11.pm              borisneubert         http://forum.fhem.de SlowRF
 FHEM/00_CUL.pm               rudolfkoenig         http://forum.fhem.de SlowRF
