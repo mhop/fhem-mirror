@@ -1517,7 +1517,8 @@ FW_style($$)
 
     $attr{global}{configfile} =~ m,([^/]*)$,;
     my $cfgFileName = $1;
-    FW_displayFileList("config file", $cfgFileName);
+    FW_displayFileList("config file", $cfgFileName)
+                                if($attr{global}{configfile} ne 'configDB');
     FW_displayFileList("Own modules and helper files",
         FW_fileList("$MW_dir/^(.*sh|[0-9][0-9].*Util.*pm|.*cfg|.*holiday".
                                   "|.*layout)\$"));
