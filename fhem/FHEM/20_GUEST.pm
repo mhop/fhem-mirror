@@ -1132,7 +1132,7 @@ sub GUEST_StartInternalTimers($$) {
           <li>
             <b>wayhome</b> - depending on current location, it can become '1' if individual is on his/her way back home
           </li>
-          <li style="list-style: none">
+          <li>
             <br>
             <br>
             The following readings will be set to '-' if state was changed to 'none':<br>
@@ -1381,7 +1381,7 @@ sub GUEST_StartInternalTimers($$) {
           <li>
             <b>wayhome</b> - abhängig vom aktullen Aufenthaltsort, kann der Wert '1' werden, wenn die Person auf dem weg zurück nach Hause ist
           </li>
-          <li style="list-style: none">
+          <li>
             <br>
             Die folgenden Readings werden auf '-' gesetzt, sobald der Status auf 'none' steht:<br>
             lastArrival, lastDurAbsence, lastLocation, lastMood, location, mood

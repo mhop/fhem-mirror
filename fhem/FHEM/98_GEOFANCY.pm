@@ -426,7 +426,7 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
       GEOFANCY
     </h3>
     <ul>
-      <li style="list-style: none">Provides webhook receiver for geofencing via the following iOS apps:<br>
+      <li>Provides webhook receiver for geofencing via the following iOS apps:<br>
         <br>
       </li>
       <li>
@@ -435,7 +435,7 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
       <li>
         <a href="https://itunes.apple.com/de/app/geofancy/id725198453?l=en&amp;mt=8">Geofancy</a>
       </li>
-      <li style="list-style: none">
+      <li>
         <p>
           Note: GEOFANCY is an extension to <a href="FHEMWEB">FHEMWEB</a>. You need to install FHEMWEB to use GEOFANCY.
         </p><a name="GEOFANCYdefine" id="GEOFANCYdefine"></a> <b>Define</b>
