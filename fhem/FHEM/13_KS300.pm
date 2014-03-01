@@ -75,6 +75,7 @@ KS300_Undef($$)
 }
 
 #####################################
+# { Dispatch($defs{CUL},"810d04xx4027a00171240080009359", undef) }
 sub
 KS300_Parse($$)
 {
@@ -121,27 +122,16 @@ KS300_Parse($$)
 
     # preset current $rain_raw
     $v[0] = hex("$a[28]$a[27]$a[26]");
-    my $rain_raw= $v[0];
+    my $rain_raw = $v[0];
 
     # get previous rain_raw
-    my $rain_raw_prev= $rain_raw;
-    if(defined(ReadingsVal($name, 'rain_raw', undef))) {
-      # cut off "(counter)"
-      ($rain_raw_prev, undef) = split(" ", ReadingsVal($hash, 'rain_raw',''));
-    }
+    my $rain_raw_prev = ReadingsVal($name, 'rain_raw', $rain_raw);
+    ($rain_raw_prev, undef) = split(" ", $rain_raw_prev); # cut off "(counter)"
 
-    # unadjusted value as default
-    my $rain_raw_adj= $rain_raw;
-    # get previous rain_raw_adj
-    my $rain_raw_adj_prev= $rain_raw;
+    my $rain_raw_adj = $rain_raw;       # unadjusted value as default
+    my $rain_raw_adj_prev = ReadingsVal($name, 'rain_raw_adj', $rain_raw);
 
-    if(defined(ReadingsVal($name, 'rain_raw_adj', undef))) {
-      $rain_raw_adj_prev = ReadingsVal($name, 'rain_raw_adj','');
-    }
-
-    if(  defined($attr{$name}) &&
-      defined($attr{$name}{"rainadjustment"}) &&
-      ($attr{$name}{"rainadjustment"}>0)) {
+    if(AttrVal($name,"rainadjustment",0)) {
 
       # The rain values delivered by my KS300 randomly switch between two
       # different values. The offset between the two values follows no
@@ -151,25 +141,10 @@ KS300_Parse($$)
       # http://www.ipsymcon.de/forum/showthread.php?t=3303&highlight=ks300+regen&page=3
       # The following code detects and automatically corrects these offsets.
 
-      my $rain_raw_ofs;
-      my $rain_raw_ofs_prev;
-      my $tsecs_prev;
 
-      if(defined(ReadingsVal($name, 'rain_raw_ofs', undef))) {
-        $rain_raw_ofs_prev = ReadingsVal($name, 'rain_raw_ofs','');
-      } else {
-        $rain_raw_ofs_prev= 0;
-      }
-
-      # the current offset is the same, but this may change later
-      $rain_raw_ofs= $rain_raw_ofs_prev;
-
-      # get previous tsecs
-      if(defined(ReadingsVal($name, 'tsecs', undef))) {
-        $tsecs_prev= ReadingsVal($name, 'tsecs', 0);
-      } else{
-        $tsecs_prev= 0; # 1970-01-01
-      }
+      my $rain_raw_ofs_prev = ReadingsVal($name, 'rain_raw_ofs', 0);
+      my $rain_raw_ofs = $rain_raw_ofs_prev;
+      my $tsecs_prev = ReadingsVal($name, 'tsecs', 0);
 
       # detect error condition
       # delta is negative or delta is too large
@@ -181,30 +156,28 @@ KS300_Parse($$)
       # of magnitude larger.
       # The code also handles counter resets after battery replacement
 
-      my $rain_raw_delta= $rain_raw- $rain_raw_prev;
-      if($tsecs!= $tsecs_prev) { # avoids a rare but relevant condition
-        my $thours_delta= ($tsecs- $tsecs_prev)/3600.0; # in hours
-        my $rain_raw_per_hour= $rain_raw_delta/$thours_delta;
+      my $rain_raw_delta = $rain_raw - $rain_raw_prev;
+      if($tsecs != $tsecs_prev) { # avoids a rare but relevant condition
+        my $thours_delta = ($tsecs - $tsecs_prev)/3600.0; # in hours
+        my $rain_raw_per_hour = $rain_raw_delta/$thours_delta;
         if(($rain_raw_delta<0) || ($rain_raw_per_hour> 200.0)) {
-                  $rain_raw_ofs= $rain_raw_ofs_prev-$rain_raw_delta;
+          $rain_raw_ofs = $rain_raw_ofs_prev-$rain_raw_delta;
 
           # If the switch in the tick count occurs simultaneously with an
           # increase due to rain, the tick is lost. We therefore assume that
           # offsets between -5 and 0 are indeed rain.
 
-          if(($rain_raw_ofs>=-5) && ($rain_raw_ofs<0)) { $rain_raw_ofs= 0; }
-
+          if(($rain_raw_ofs>=-5) && ($rain_raw_ofs<0)) {
+            $rain_raw_ofs= 0;
+          }
           readingsBulkUpdate($def, 'rain_raw_ofs', $rain_raw_ofs, 0);
         }
       }
-      $rain_raw_adj= $rain_raw+ $rain_raw_ofs;
+      $rain_raw_adj = $rain_raw + $rain_raw_ofs;
 
     }
 
-    # remember tsecs
     readingsBulkUpdate($def, 'tsecs', $tsecs, 0);
-
-    # remember rain_raw_adj
     readingsBulkUpdate($def, 'rain_raw_adj', $rain_raw_adj, 0);
 
     # KS300 has a sensor which detects any drop of rain and immediately
@@ -241,8 +214,8 @@ KS300_Parse($$)
     readingsBulkUpdate($def,'state', $val);
 
     for(my $i = 0; $i < $max; $i++) {
-      readingsBulkUpdate($def, $txt[$i], $v[$i])
-                if(defined($repchanged{$txt[$i]}));
+      readingsBulkUpdate($def, $txt[$i], $v[$i],
+                            defined($repchanged{$txt[$i]}));
     }
 
 
