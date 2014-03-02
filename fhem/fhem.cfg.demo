@@ -21,6 +21,7 @@ attr WEB sortRooms Light Cinema Residents Sensors System
 
 define WEBphone FHEMWEB 8084 global
 attr WEBphone hiddenroom DashboardRoom
+attr WEBphone iconPath openautomation:fhemSVG
 attr WEBphone room System
 attr WEBphone sortRooms Light Cinema Residents Sensors System
 attr WEBphone stylesheetPrefix smallscreen
