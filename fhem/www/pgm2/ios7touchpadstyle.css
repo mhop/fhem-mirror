@@ -3,3 +3,11 @@
 
 body { width: 1024px; }
 table.block, table.FileList { width:760px; }
+
+/* 
+/* hdr alternate */
+/* to reactive old hdr delete the last 2 chars --> */
+.maininput{
+  width: 70%;
+}
+/*hdr alternate end */
