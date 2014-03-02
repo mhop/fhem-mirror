@@ -1,7 +1,7 @@
 ##############################################
 # 00_THZ
-# by immi 02/2014
-# v. 0.070
+# by immi 03/2014
+# v. 0.071
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -213,10 +213,7 @@ sub THZ_Define($$)
   }
   
   $hash->{DeviceName} = $dev;
-  my $ret = DevIo_OpenDev($hash, 0, undef);
-  
-    
-  THZ_Refresh_all_gets($hash);
+  my $ret = DevIo_OpenDev($hash, 0, "THZ_Refresh_all_gets");
   return $ret;
 }
 
@@ -234,7 +231,7 @@ sub THZ_Refresh_all_gets($) {
   foreach  my $cmdhash  (keys %gets) {
     my %par = ( command => $cmdhash, hash => $hash );
     RemoveInternalTimer(\%par);
-    InternalTimer(gettimeofday() + $timedelay++ , "THZ_GetRefresh", \%par, 0); 
+    InternalTimer(gettimeofday() + ($timedelay++)/2 , "THZ_GetRefresh", \%par, 0); 
   }  #refresh all registers; the register with interval_command ne 0 will keep on refreshing
 }
 
@@ -316,7 +313,7 @@ sub THZ_Ready($)
 {
   my ($hash) = @_;
 
-  return DevIo_OpenDev($hash, 1, undef)
+  return DevIo_OpenDev($hash, 1, "THZ_Refresh_all_gets")
                 if($hash->{STATE} eq "disconnected");
   
     # This is relevant for windows/USB only
@@ -726,8 +723,8 @@ sub THZ_Parse($) {
 		  "BoosterStage3: "				. ((hex(substr($message,46,1)) &  0b0001) / 0b0001) . " " .	#status bit
 		  "BoosterStage2: "				. ((hex(substr($message,46,1)) &  0b0010) / 0b0010) . " " .	#status bit
 		  "BoosterStage1: "				. ((hex(substr($message,46,1)) &  0b0100) / 0b0100). " " .	#status bit
-		  "HighPressureSensor: "			. (1-((hex(substr($message,49,1)) &  0b0001) / 0b0001)). " " .	#status bit  #P1 	inverterd?
-		  "LowPressureSensor: "				. (1-((hex(substr($message,49,1)) &  0b0010) / 0b0010)). " " .	#status bit  #P3  inverterd?
+		  "HighPressureSensor: "			. (1-((hex(substr($message,49,1)) &  0b0001) / 0b0001)) . " " .	#status bit  #P1 	inverterd?
+		  "LowPressureSensor: "				. (1-((hex(substr($message,49,1)) &  0b0010) / 0b0010)) . " " .	#status bit  #P3  inverterd?
 		  "EvaporatorIceMonitor: "			. ((hex(substr($message,49,1)) &  0b0100) / 0b0100). " " .	#status bit  #N3
 		  "SignalAnode: "				. ((hex(substr($message,49,1)) &  0b1000) / 0b1000). " " .	#status bit  #S1
 		  "EVU_release: "				. ((hex(substr($message,48,1)) &  0b0001) / 0b0001). " " . 	#status bit 
@@ -880,10 +877,18 @@ sub THZ_debugread($){
 }
 
 
+
+
+
+
+#####################################
+
+
+
 sub THZ_Undef($$) {
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
-
+  RemoveInternalTimer($hash);
   foreach my $d (sort keys %defs) {
     if(defined($defs{$d}) &&
        defined($defs{$d}{IODev}) &&
@@ -897,6 +902,19 @@ sub THZ_Undef($$) {
   DevIo_CloseDev($hash); 
   return undef;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 1;
 
@@ -965,7 +983,7 @@ sub THZ_Undef($$) {
   Eltron W&auml;rmepumpe. <br>
   Getestet mit einer Tecalor THZ303/Sol (Serielle Geschwindigkeit 57600/115200@USB) und einer THZ403 (Serielle Geschwindigkeit 115200) mit identischer 
   Firmware 4.39. <br>
-  Getestet mit einer Stiebel LWZ404 (Serielle Geschwindigkeit 115200@USB) mit Firmware 4.39. <br>
+  Getestet mit einer Stiebel LWZ404 (Serielle Geschwindigkeit 115200@USB) mit Firmware 5.39. <br>
   Getestet auf FritzBox, nas-qnap, Raspberry Pi and MacOS.<br>
   Dieses Modul funktioniert nicht mit &aumlterer Firmware; Gleichwohl, das "parsing" k&ouml;nnte leicht angepasst werden da die Register gut 
   beschrieben wurden.
