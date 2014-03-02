@@ -261,10 +261,6 @@ HMS_Parse($$)
     </ul>
     Notes:<br>
     <ul>
-      <li>There is _NO_ guarantee that the code will work as expected in all
-      circumstances, the authors are not liable for any damage occuring as a
-      result of incomplete or buggy code</li>
-
       <li>Currently supported devices are the HMS100-T HMS100-TF HMS100-WD
           HMS100-MG HMS100-TFK HMS100-CO HMS100-FIT RM100-2 RM100-3</li>
 
@@ -317,4 +313,81 @@ HMS_Parse($$)
 </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="HMS"></a>
+<h3>HMS</h3>
+<ul>
+  <a name="HMSdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; HMS &lt;housecode&gt;</code>
+    <br><br>
+
+    Der <code>&lt;housecode&gt;</code> ist eine vierstellige HEX-Zahl,
+    entsprechend dem HMS Ger&auml;t.<br>
+
+    Beispiel:
+    <ul>
+      <code>define temp HMS 1234</code><br>
+    </ul>
+    Hinweise:<br>
+    <ul>
+      <li>Derzeit werden folgende Komponenten Unterst&uuml;tzt: HMS100-T
+          HMS100-TF HMS100-WD HMS100-MG HMS100-TFK HMS100-CO HMS100-FIT RM100-2
+          RM100-3</li>
+
+      <li>Der Hauscode kann sich &auml;ndern wenn die Batterie gewechselt wird.
+        Um sich das Leben einfacher zu machen kann man ein "Wildcard"
+        (Platzhalter) Device f&uuml;r jeden Typ von HMS  Ger&auml;t anlegen.
+        Zuerst wird die echte Device-ID gepr&uuml;ft, danach die Wildcard-ID.
+        Wildcards sind:
+      <ul>
+        <li>1000 f&uuml;r das HMS100-TF</li>
+        <li>1001 f&uuml;r das HMS100-T</li>
+        <li>1002 f&uuml;r das HMS100-WD</li>
+        <li>1003 f&uuml;r das RM100-2</li>
+        <li>1004 f&uuml;r das HMS100-TFK</li>
+        <li>1006 f&uuml;r das HMS100-MG</li>
+        <li>1008 f&uuml;r das HMS100-CO</li>
+        <li>100e f&uuml;r das HMS100-FIT</li>
+      </ul>
+      </li>
+
+      <li>Einige "Batteriestand niedrig" Benachrichtigungen sind noch nicht
+        implemeniert (RM100, HMS100WD).</li>
+
+      <li>Die Installation ist zu testen bevor man sich auf die
+        Funktionalit&auml;t verl&auml;sst.</li>
+
+    </ul>
+    <br>
+  </ul>
+  <br>
+
+  <a name="HMSset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="HMSget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="HMSattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#IODev">IODev</a></li>
+    <li><a href="#eventMap">eventMap</a></li>
+    <li><a href="#model">model</a> (hms100-t hms100-tf hms100-wd hms100-mg
+        hms100-co hms100-tfk hms100-fit rm100-2)</li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+  <br>
+
+</ul>
+
+=end html_DE
+
 =cut
