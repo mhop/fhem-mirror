@@ -211,6 +211,7 @@ sub LISTENLIVE_Define($$) {
 			} else {
 				Log3($name, 3, "LISTENLIVE $name PRESENCE $pres_name created.");
 				$defs{$pres_name}{TEMPORARY} = 1;
+				$attr{$pres_name}{verbose} = 2;
 			}
 		} else {
 			Log3($name, 3, "LISTENLIVE $name PRESENCE pres_$name found.");
