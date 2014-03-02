@@ -564,9 +564,9 @@ attr dew_all max_timediff 60
   </ul>
 </ul>
 
-
 =end html
 =begin html_DE
+
 <a name="dewpoint"></a>
 <h3>dewpoint</h3>
 <ul>
@@ -624,11 +624,10 @@ attr dew_all max_timediff 60
     <code>define &lt;name&gt; dewpoint fan &lt;devicename-regex&gt; &lt;devicename-outside&gt; &lt;min-temp&gt; [&lt;diff_temp&gt;]</code><br>
     <br>
     <ul>
-      Erzeugt ein Ereignis, um einen L&uuml;fter einzuschalten, wenn die Au&szlig;enluft weniger Wasser als die Raumluft enth&auml;lt.</li>
+      <li>Erzeugt ein Ereignis, um einen L&uuml;fter einzuschalten, wenn die Au&szlig;enluft weniger Wasser als die Raumluft enth&auml;lt.</li>
     <ul>
-        <li>
-    Erzeugt das Ereignis "fan: on" wenn (Taupunkt von &lt;devicename-outside&gt;) + &lt;diff_temp&gt; ist niedriger als der Taupunkt von &lt;devicename&gt; und die Temperatur von &lt;devicename-outside&gt; &gt;= min-temp ist. Das Ereignis wird nur erzeugt wenn das Reading "fan" nicht schon "on" war. Das Ereignis wird f&uuml;r das Ger&auml;t &lt;devicename&gt; erzeugt. Der Parameter &lt;diff-temp&gt; ist optional.</li>
-    <li>Andernfalls wird das Ereignis "fan: off" erzeugt, wenn das Reading von "fan" nicht bereits  "off" war.</li>
+      <li>Erzeugt das Ereignis "fan: on" wenn (Taupunkt von &lt;devicename-outside&gt;) + &lt;diff_temp&gt; ist niedriger als der Taupunkt von &lt;devicename&gt; und die Temperatur von &lt;devicename-outside&gt; &gt;= min-temp ist. Das Ereignis wird nur erzeugt wenn das Reading "fan" nicht schon "on" war. Das Ereignis wird f&uuml;r das Ger&auml;t &lt;devicename&gt; erzeugt. Der Parameter &lt;diff-temp&gt; ist optional.</li>
+      <li>Andernfalls wird das Ereignis "fan: off" erzeugt, wenn das Reading von "fan" nicht bereits  "off" war.</li>
     </ul>
     </ul>
     <br>
@@ -652,10 +651,8 @@ attr dew_all max_timediff 60
     <ul>
     Erzeugt einen Schimmel-Alarm, wenn eine Referenz-Temperatur unter den Taupunkt f&auml;llt.</li>
     <ul>
-        <li>
-    Erzeugt ein Reading/Ereignis "alarm: on" wenn die Temperatur von &lt;devicename-reference&gt; - &lt;diff-temp&gt; unter den Taupunkt von &lt;devicename&gt; f&auml;llt und das Reading "alarm" nicht bereits "on" ist. Das Ereignis wird f&uuml;r &lt;devicename&gt; erzeugt.</li>
-    <li>Erzeugt ein Reading/Ereignis "alarm: off" wenn die Temperatur von &lt;devicename-reference&gt; - &lt;diff-temp&gt; &uuml;ber den Taupunkt von &lt;devicename&gt; steigt und das Reading "alarm" nicht bereits "off" ist.</li>
-</li>
+      <li>Erzeugt ein Reading/Ereignis "alarm: on" wenn die Temperatur von &lt;devicename-reference&gt; - &lt;diff-temp&gt; unter den Taupunkt von &lt;devicename&gt; f&auml;llt und das Reading "alarm" nicht bereits "on" ist. Das Ereignis wird f&uuml;r &lt;devicename&gt; erzeugt.</li>
+      <li>Erzeugt ein Reading/Ereignis "alarm: off" wenn die Temperatur von &lt;devicename-reference&gt; - &lt;diff-temp&gt; &uuml;ber den Taupunkt von &lt;devicename&gt; steigt und das Reading "alarm" nicht bereits "off" ist.</li>
     </ul>
     </ul>
     <br>
@@ -701,4 +698,5 @@ Der Standardwert ist 1 Sekunde.
 </ul>
 
 =end html_DE
+
 =cut
