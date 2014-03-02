@@ -662,6 +662,7 @@ CUL_MAX_BroadcastTime(@)
 
 =end html
 =begin html_DE
+
 <a name="CUL_MAX"></a>
 <h3>CUL_MAX</h3>
 <ul>
