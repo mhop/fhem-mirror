@@ -1,4 +1,45 @@
 # $Id$
+##############################################################################
+#
+# configDB.pm
+#
+# A fhem library to enable configuration from sql database
+# instead of plain text file, e.g. fhem.cfg
+#
+# READ COMMANDREF DOCUMENTATION FOR CORRECT USE!
+#
+# Copyright: betateilchen ®
+# e-mail: fhem.development@betateilchen.de
+#
+# This file is part of fhem.
+#
+# Fhem is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#
+# Fhem is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with fhem. If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
+#
+# ChangeLog
+#
+# 2014-03-01 - SVN 5080 - initial release of interface inside fhem.pl
+#            - initial release of configDB.pm
+#
+# 2014-03-02 - added     template files for sqlite in contrib/configDB
+#            - updated   commandref (EN) documentation
+#            - added     commandref (DE) documentation
+#
+##############################################################################
+#
+
 use DBI;
 
 ##################################################
@@ -391,7 +432,6 @@ sub cfgDB_Migrate {
 1;
 
 =pod
-not to be translated
 =begin html
 
 <a name="configDB"></a>
@@ -422,10 +462,10 @@ not to be translated
 		<li>The database tables will be created automatically.</li><br/>
 		<li>Create a configuration file containing the connection string to access database.<br/>
 			<br/>
-			<b>IMPORTANT:
+			<b>IMPORTANT:</b>
 			<ul><br/>
-				</b><li>This file <b>must</b> be named "configDB.conf"</li>
-				</b><li>This file <b>must</b> be located in your fhem main directory, e.g. /opt/fhem</li>
+				<li>This file <b>must</b> be named "configDB.conf"</li>
+				<li>This file <b>must</b> be located in your fhem main directory, e.g. /opt/fhem</li>
 			</ul>
 			<br/>
 			<pre>
@@ -544,6 +584,9 @@ Ver 0 always indicates the currently running configuration.<br/>
 		<b>Author's notes</b><br/>
 		<br/>
 		<ul>
+			<li>You can find two template files for datebase and configfile (sqlite only!) for easy installation.<br/>
+				Just copy them to your fhem installation directory (/opt/fhem) and have fun.</li>
+			<br/>
 			<li>The frontend option "Edit files"-&gt;"config file" will be removed when running configDB.</li>
 			<br/>
 			<li>Please be patient when issuing a "save" command 
@@ -560,3 +603,178 @@ Ver 0 always indicates the currently running configuration.<br/>
 	</ul>
 
 =end html
+
+=begin html_DE
+
+<a name="configDB"></a>
+<h3>configDB</h3>
+	<ul>
+		Seit version 5079 unterst&uuml;tzt fhem die Verwendung einer SQL Datenbank zum Abspeichern der kompletten Konfiguration<br/>
+		Dadurch kann man auf alle cfg Dateien, includes usw. verzichten und die daraus immer wieder resultierenden Probleme vermeiden.<br/>
+		Desweiteren gibt es damit eine Versionierung von Konfigurationen und die M&ouml;glichkeit, 
+		jederzeit eine &auml;ltere Version wiederherstellen zu k&ouml;nnen.<br/>
+		Der Zugriff auf die Datenbank erfolgt &uuml;ber die perl-eigene Datenbankschnittstelle DBI.<br/>
+		<br/>
+		<b>Voraussetzungen / Installation</b><br/>
+		<ul><br/>
+		<li>Es muss eine SQL Datenbank verf&uuml;gbar sein, untsrst&uuml;tzt werden SQLITE, MYSQL und POSTGRESQLL.</li><br/>
+		<li>Das zum Datenbanktype geh&ouml;rende DBD Modul muss in perl installiert sein,<br/>
+				f&uuml;r sqlite3 auf einem Debian System z.B. das Paket libdbd-sqlite3-perl</li><br/>
+		<li>Eine leere Datenbank muss angelegt werden, z.B. in sqlite3:<br/>
+			<pre>
+	mba:fhem udo$ sqlite3 configDB.db
+
+	SQLite version 3.7.13 2012-07-17 17:46:21
+	Enter ".help" for instructions
+	Enter SQL statements terminated with a ";"
+	sqlite> pragma auto_vacuum=2;
+	sqlite> .quit
+
+	mba:fhem udo$ 
+			</pre></li>
+		<li>Die ben&ouml;tigten Datenbanktabellen werden automatisch angelegt.</li><br/>
+		<li>Eine Konfigurationsdatei f&uuml;r die Verbindung zur Datenbank muss angelegt werden.<br/>
+			<br/>
+			<b>WICHTIG:</b>
+			<ul><br/>
+				<li>Diese Datei <b>muss</b> den Namen "configDB.conf" haben</li>
+				<li>Diese Datei <b>muss</b> im fhem Verzeichnis liegen, z.B. /opt/fhem</li>
+			</ul>
+			<br/>
+			<pre>
+## f&uuml;r MySQL
+################################################################
+#%dbconfig= (
+#	connection => "mysql:database=configDB;host=db;port=3306",
+#	user => "fhemuser",
+#	password => "fhempassword",
+#);
+################################################################
+#
+## f&uuml;r PostgreSQL
+################################################################
+#%dbconfig= (
+#        connection => "Pg:database=configDB;host=localhost",
+#        user => "fhemuser",
+#        password => "fhempassword"
+#);
+################################################################
+#
+## f&uuml;r SQLite (username and password bleiben bei SQLite leer)
+################################################################
+#%dbconfig= (
+#        connection => "SQLite:dbname=/opt/fhem/configDB.db",
+#        user => "",
+#        password => ""
+#);
+################################################################
+			</pre></li><br/>
+		</ul>
+
+		<b>Aufruf mit einer vollst&auml;ndig neuen fhem Installation</b><br/>
+		<ul><br/>
+			Sehr einfach... fhem muss lediglich folgendermassen gestartet werden:<br/><br/>
+			<ul><code>perl fhem.pl configDB</code></ul><br/>
+			<b>configDB</b> ist das Schl&uuml;sselwort, an dem fhem erkennt, <br/>
+				dass eine Datenbank f&uuml;r die Konfiguration verwendet werden soll.<br/>
+			<br/>
+			<b>Das war es schon.</b> Alle Befehle (save, rereadcfg etc) arbeiten wie gewohnt.
+		</ul>
+
+		<br/>
+		<b>oder:</b><br/>
+		<br/>
+
+		<b>&uuml;bertragen einer bestehenden fhem Konfiguration in die Datenbank</b><br/>
+		<ul><br/>
+			Auch sehr einfach... <br/>
+			<br/>
+			<li>fhem wird zum letzten Mal mit der fhem.cfg gestartet<br/><br/>
+				<ul><code>perl fhem.pl fhem.cfg</code></ul></li><br/>
+			<br/>
+			<li>Bestehende Konfiguration in die Datenbank &uuml;bertragen<br/><br/>
+				<ul><code>{cfgDB_Migrate}</code> in die Befehlszeile der fhem-Oberfl&auml;che eingeben</ul><br/></br>
+					Nicht die Geduld verlieren! Die Migration eine Weile dauern, speziell bei Mini-Systemen wie<br/>
+					RaspberryPi or Beaglebone.<br/>
+					Das Ende der Migration wird durch die Meldung "Migration finished." best&auml;tigt.<br/>
+					Die urspr&uuml;ngliche Konfigurationsdatei wird bei diesem Vorgang nicht angetastet.</li><br/>
+			<li>fhem beenden.</li><br/>
+			<li>fhem mit dem Schl&uuml;sselwort configDB starten<br/><br/>
+			<ul><code>perl fhem.pl configDB</code></ul></li><br/>
+			<b>configDB</b> ist das Schl&uuml;sselwort, an dem fhem erkennt, <br/>
+				dass eine Datenbank f&uuml;r die Konfiguration verwendet werden soll.<br/>
+			<br/>
+			<b>Das war es schon.</b> Alle Befehle (save, rereadcfg etc) arbeiten wie gewohnt.
+		</ul>
+		<br/><br/>
+
+		<b>Zus&auml;tzliche Funktionen</b><br/>
+		<ul><br/>
+			Alle Funktionen werden in der Befehelszeile aufgerufen!<br/>
+			<br/>
+			<li><code>{cfgDB_Info}</code></li><br/>
+			Liefert eine Datenbankstatistik<br/>
+<pre>
+--------------------------------------------------------------------------------
+ configDB Database Information
+--------------------------------------------------------------------------------
+ dbconn: SQLite:dbname=/opt/fhem/configDB.db
+ dbuser: 
+ dbpass: 
+ dbtype: SQLITE
+--------------------------------------------------------------------------------
+ fhemconfig: 7707 entries
+
+ Ver 0 saved: Sat Mar  1 11:37:00 2014 def: 293 attr: 1248
+ Ver 1 saved: Fri Feb 28 23:55:13 2014 def: 293 attr: 1248
+ Ver 2 saved: Fri Feb 28 23:49:01 2014 def: 293 attr: 1248
+ Ver 3 saved: Fri Feb 28 22:24:40 2014 def: 293 attr: 1247
+ Ver 4 saved: Fri Feb 28 22:14:03 2014 def: 293 attr: 1246
+--------------------------------------------------------------------------------
+ fhemstate: 1890 entries saved: Sat Mar  1 12:05:00 2014
+--------------------------------------------------------------------------------
+</pre>
+Ver 0 bezeichnet immer die aktuell geladene Konfiguration.<br/>
+<br/>
+
+			<li><code>{cfgDB_Reorg [keep]}</code></li><br/>
+				L&ouml;scht alle gespeicherten Versionen mit Versionsnummer &gt; [keep].<br/>
+				Standardwert f&uuml;r den optionalen Parameter keep = 3.<br/>
+				Im obigen Beispiel w&uuml;rde <code>{cfgDB_Reorg 2}</code> die Versionen #3 und #4 l&ouml;schen.<br/>
+				Diese Funktion kann z.B. verwendet werden, um eine regelm&auml;&szlig;ige n&auml;chtliche<br/> 
+				Datenbankreorganisation mit Hilfe einer at-Definition einzuplanen.<br/>
+			<br/>
+
+			<li><code>{cfgDB_Recover &lt;version&gt;}</code></li><br/>
+				Stellt eine &auml;ltere Version aus dem Datenbankarchiv wieder her.<br/>
+				<code>{cfgDB_Recover 3}</code>  <b>kopiert</b> die Version #3 aus der Datenbank 
+				zur Version #0.<br/>
+				Die urspr&uuml;ngliche Version #0 wird dabei gel&ouml;scht.<br/><br/>
+				<b>Wichtig!</b><br/>
+				Die zur&uuml;ckgeholte Version wird <b>NICHT</b> automatisch aktiviert!<br/>
+				Ein <code>rereadcfg</code> oder - besser - <code>shutdown restart</code> muss manuell erfolgen.<br/>
+		</ul>
+		<br/>
+		<br/>
+		<b>Hinweise</b><br/>
+		<br/>
+		<ul>
+			<li>Im Verzeichnis contrib/configDB befinden sich zwei Vorlagen f&uuml;r Datenbank und Konfiguration,<br/>
+				die durch einfaches Kopieren in das fhem Verzeichnis sofort verwendet werden k&ouml;nnen (Nur f&uuml;r sqlite!).</li>
+			<br/>
+			<li>Der Men&uuml;punkt "Edit files"-&gt;"config file" wird bei Verwendung von configDB nicht mehr angezeigt.</li>
+			<br/>
+			<li>Beim Speichern einer Konfiguration nicht ungeduldig werden (egal ob manuell oder durch Klicken auf "save config")<br/>
+				Durch das Schreiben der Versionsinformationen dauert das ein paar Sekunden.<br/>
+				Der Abschluss des Speichern wird durch eine entsprechende Meldung angezeigt.</li>
+			<br/>
+			<li>Diese Erweiterung wird laufend weiterentwickelt. Speziell an der Verbesserung der Performance wird gearbeitet.</li>
+			<br/>
+			<li>Viel Spass!</li>
+		</ul>
+
+	</ul>
+
+=end html_DE
+
+=cut
