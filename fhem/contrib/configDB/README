@@ -1,0 +1,5 @@
+For usage instruction see commandref.html, section configDB
+
+Template files can be used for configDB and SQLITE.
+Copy configDB.db and configDB.conf file
+into your fhem directory, e.g. /opt/fhem
