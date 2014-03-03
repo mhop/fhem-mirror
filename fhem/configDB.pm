@@ -49,8 +49,6 @@ sub AnalyzeCommandChain($$;$);
 sub Debug($);
 sub Log3($$$);
 
-#$cfgDB_svnId = '$Id$';
-
 ##################################################
 # Read configuration file
 #
@@ -117,6 +115,9 @@ sub cfgDB_Init {
 
 	eval { $fhem_dbh->do("CREATE EXTENSION \"uuid-ossp\"") if($cfgDB_dbtype eq 'POSTGRESQL'); };
 
+#	create TABLE fhemversions ifnonexistent
+	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemversions(VERSION INT, VERSIONUUID CHAR(50))");
+
 #	create TABLE fhemconfig if nonexistent
 	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemconfig(COMMAND CHAR(32), DEVICE CHAR(32), P1 CHAR(50), P2 TEXT, VERSION INT, VERSIONUUID CHAR(50))");
 #	check TABLE fhemconfig already populated
@@ -125,7 +126,7 @@ sub cfgDB_Init {
 #		insert default entries to get fhem running
 		my $uuid = cfgDB_Uuid;
 		$fhem_dbh->do("INSERT INTO fhemversions values (0, '$uuid')");
-		cfgDB_InsertLine($fhem_dbh, $uuid, '# added by cfgDB_Init');
+		cfgDB_InsertLine($fhem_dbh, $uuid, '#created by cfgDB_Init');
 		cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global logfile ./log/fhem-%Y-%m-%d.log');
 		cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global modpath .');
 		cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global userattr devStateIcon devStateStyle icon sortby webCmd');
@@ -133,16 +134,10 @@ sub cfgDB_Init {
 		cfgDB_InsertLine($fhem_dbh, $uuid, 'define telnetPort telnet 7072 global');
 		cfgDB_InsertLine($fhem_dbh, $uuid, 'define WEB FHEMWEB 8083 global');
 		cfgDB_InsertLine($fhem_dbh, $uuid, 'define Logfile FileLog ./log/fhem-%Y-%m-%d.log fakelog');
-#	} else {
-#		if entries found and any database changes necessary, they will be done now.
-#			eval { $fhem_dbh->do("ALTER TABLE fhemconfig ADD VERSIONUUID VARCHAR(50)"); };
 	}
 
 #	create TABLE fhemstate if nonexistent
 	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemstate(stateString TEXT)");
-
-#	create TABLE fhemversions ifnonexistent
-	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemversions(VERSION INT, VERSIONUUID CHAR(50))");
 
 #	close database connection
 	$fhem_dbh->commit();
@@ -176,7 +171,7 @@ sub cfgDB_Info {
 	$r .= " fhemconfig: $count entries\n\n";
 #	read versions creation time
 #	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE COMMAND ='#created' ORDER by VERSION" );  
-	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig as c join fhemversions as v on v.versionuuid=c.versionuuid WHERE COMMAND ='#created' ORDER by v.VERSION" );  
+	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig as c join fhemversions as v on v.versionuuid=c.versionuuid WHERE COMMAND like '#created%' ORDER by v.VERSION" );  
 	$sth->execute();
 	while (@line = $sth->fetchrow_array()) {
 		$row	 = " Ver $line[6] saved: $line[1] $line[2] $line[3] def: ".
@@ -467,7 +462,8 @@ sub cfgDB_Migrate {
 	Log3('configDB',4,'Processing: cfgDB_SaveState.');
 	cfgDB_SaveState;
 	Log3('configDB',4,'Migration finished.');
-	return 'Migration finished.';
+	return " Result after migration:\n".cfgDB_Info;
+
 }
 
 sub cfgDB_List($) {
@@ -582,7 +578,7 @@ sub cfgDB_List($) {
 			<li>transfer your existing configuration into the database<br/><br/>
 				<ul>enter <code>{cfgDB_Migrate}</code> into frontend's command line</ul><br/></br>
 				Be patient! Migration can take some time, especially on mini-systems like RaspberryPi or Beaglebone.<br/>
-				Completed migration will be indicated by a message "Migration finished."<br/>
+				Completed migration will be indicated by showing database statistics.<br/>
 				Your original configfile will not be touched or modified by this step.</li><br/>
 			<li>shutdown fhem</li><br/>
 			<li>restart fhem with keyword configDB<br/><br/>
@@ -756,7 +752,7 @@ Ver 0 always indicates the currently running configuration.<br/>
 				<ul><code>{cfgDB_Migrate}</code> in die Befehlszeile der fhem-Oberfl&auml;che eingeben</ul><br/></br>
 					Nicht die Geduld verlieren! Die Migration eine Weile dauern, speziell bei Mini-Systemen wie<br/>
 					RaspberryPi or Beaglebone.<br/>
-					Das Ende der Migration wird durch die Meldung "Migration finished." best&auml;tigt.<br/>
+					Am Ende der Migration wird eine aktuelle Datenbankstatistik angezeigt.<br/>
 					Die urspr&uuml;ngliche Konfigurationsdatei wird bei diesem Vorgang nicht angetastet.</li><br/>
 			<li>fhem beenden.</li><br/>
 			<li>fhem mit dem Schl&uuml;sselwort configDB starten<br/><br/>
