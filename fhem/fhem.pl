@@ -129,6 +129,7 @@ sub cfgDB_ReadAll($);
 sub cfgDB_SaveState;
 sub cfgDB_SaveCfg;
 sub cfgDB_GlobalAttr;
+sub cfgDB_svnId;
 
 ##################################################
 # Variables:
@@ -2327,6 +2328,7 @@ CommandVersion($$)
   my ($cl, $param) = @_;
 
   my @ret = ("# $cvsid");
+  push @ret, cfgDB_svnId if $attr{global}{configfile} eq 'configDB';
   foreach my $m (sort keys %modules) {
     next if(!$modules{$m}{LOADED} || $modules{$m}{ORDER} < 0);
     my $fn = "$attr{global}{modpath}/FHEM/".$modules{$m}{ORDER}."_$m.pm";
