@@ -16,6 +16,7 @@ use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 my $LightScene_hasJSON = 1;
 my $LightScene_hasDataDumper = 1;
+my $scn = '';             # scene used for edit-table
 
 sub LightScene_Initialize($)
 {
@@ -30,6 +31,7 @@ sub LightScene_Initialize($)
   $hash->{AttrList} = "switchingOrder";
 
   $hash->{FW_detailFn}  = "LightScene_detailFn";
+  $data{FWEXT}{"/LightScene"}{FUNC} = "LightScene_CGI"; #mod
 
   addToAttrList("lightSceneParamsToSave");
   addToAttrList("lightSceneRestoreOnlyIfChanged:1,0");
@@ -188,8 +190,9 @@ LightScene_detailFn()
     Log3 $hash->{NAME}, 5, "opened: $FW_cname";
     $hash->{helper}->{myDisplay}->{$FW_cname} = 1;
   }
-
-  return LightScene_2html($d);
+  my $html = LightScene_2html($d); #mod
+  $html .= LightScene_editTable($hash); #mod
+  return $html;
 }
 
 sub
@@ -746,7 +749,83 @@ LightScene_Attr($@)
 
   return;
 }
+sub
+LightScene_CGI {
+  my ($cgi) = @_;
+  my ($cmd,$c)=FW_digestCgi($cgi);
+  $scn =  $FW_webArgs{scn};
+  $cmd =~ s/ set / setcmd / if( defined($FW_webArgs{cmd1}) && $FW_webArgs{cmd1} eq 'setcmd' );
+# Debug "LS758: cmd: $cmd";
+  AnalyzeCommand(undef,$cmd);
+  #redirect to return to detail screen
+  my $tgt = "?detail=$FW_webArgs{detail}";
+  $tgt = $FW_ME.$tgt;
+  $c = $defs{$FW_cname}->{CD};
+  print $c "HTTP/1.1 302 Found\r\n",
+            "Content-Length: 0\r\n",
+            "Location: $tgt\r\n",
+            "\r\n";
+  return;
+}
+sub
+LightScene_editTable($) {
+  my ($hash) = @_;
+  my $html="\n\n<!--Beginning Edit-Table-->\n";
+  my $cmd='scn';
+  #make dropdown
+  my @tv = (sort keys %{ $hash->{SCENES} });
+  unshift (@tv,'Choose scene');
+  my $dd.="<form method=\"get\" action=\"" . $FW_ME . "/LightScene\">\n";
+  $dd.=FW_select("$hash->{NAME}-$cmd","scn", \@tv, $scn,"dropdown","submit()")."\n";
+  $dd.=FW_hidden("detail",$hash->{NAME}) . "\n";
+  $dd.="</form>\n";
+  # make table
+  if ($scn eq "Choose scene" || $scn eq '') {
+    $html.="<table><tr><td>Edit scene</td><td>$dd</td></tr>";
+  } else {
+	$html.="<table><tr><td>Edit scene</td><td>$dd</td></tr></table>";
+    $html .= '<table class="block wide">';
+    $html .= '<tr><th>Device</th><th>Command</th></tr>'."\n";
+    my $row=0;
+	my @devices;
+    if( $scn && defined($hash->{switchingOrder}) && defined($hash->{switchingOrder}{$scn}) ) {
+      @devices = @{$hash->{switchingOrder}{$scn}};
+    } else {
+      @devices = @{$hash->{devices}};
+    }
+    #table rows
+	my @cmds    = qw(set setcmd);
+    my $set     = "set $hash->{NAME} set $scn";
+    my $setcmd  = '';
+    foreach my $dev (@devices) {
+      $row+=1;
+      $html .= "<tr class=\"".(($row&1)?"odd":"even")."\">";
+	  $html .= "<td>$dev</td>";
+	  my $default = $hash->{SCENES}{$scn}{$dev};
 
+      if ($hash->{SCENES}{$scn}{$dev} =~ m/^;/) {
+	    $default =~ s/^;//;
+		$setcmd='setcmd';
+      } else {
+		$setcmd='set';
+	  }
+	  $default = $default->{state} if( ref($default) eq 'HASH' );
+	  $html.="<td><form method=\"get\" action=\"" . $FW_ME . "/LightScene\">\n";
+      $html.=FW_select('',"cmd1", \@cmds, $setcmd, 'select')."\n";
+	  $html.=FW_textfieldv("val.$dev", 50, 'class',$default)."\n";
+	  $html.=FW_hidden("dev.$dev", $dev) . "\n";
+	  $html.=FW_hidden("cmd.$dev", $set) . "\n";
+      $html.=FW_submit("lse", 'saveline');
+  	  $html.=FW_hidden("scn", $scn) . "\n";
+	  $html.=FW_hidden("detail",$hash->{NAME}) . "\n";
+	  $html .= "</form></td>\n";
+	}
+  }
+  #table end
+  $html .= "</table><br>\n";
+  $html .= "<!--End Edit-Table-->\n";
+  return $html;
+}
 1;
 
 =pod
