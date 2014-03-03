@@ -40,16 +40,13 @@
 # 		 Dashboard near top in Fullsize-Mode. dashboard_activetab store the active Tab, not the last active tab.
 # 2.06: Attribute dashboard_colheight removed. Change Groupcontent sorting in compliance by alias and sortby.
 #          Custom CSS over new Attribute dashboard_customcss. Fix Bug that affect new groups.
+# 2.07: Fix GroupWidget-Error with readingGroups in hiddenroom
 #
 # Known Bugs/Todos:
 # BUG: Nicht alle Inhalte aller Tabs laden, bei Plots dauert die bedienung des Dashboards zu lange. -> elemente hidden?
 # BUG: Variabler abstand wird nicht gesichert
 # BUG: dashboard_webfrontendfilter doesn't Work Antwort #469
 # BUG: Überlappen Gruppen andere?
-# xTODO: More Tabs
-# xTODO: personalisiertes CSS angeben und bestehende CSS zu überschreiben -> User-config
-# xTODO: sortby
-# xTODO: sort by alias, eg sort by device name
 #
 # Log 1, "[DASHBOARD simple debug] '".$g."' ";
 ########################################################################################
@@ -96,7 +93,7 @@ my $fwjquery = "jquery.min.js";
 my $fwjqueryui = "jquery-ui.min.js";
 my $dashboardname = "Dashboard"; # Link Text
 my $dashboardhiddenroom = "DashboardRoom"; # Hiddenroom
-my $dashboardversion = "2.06";
+my $dashboardversion = "2.07";
 # -------------------------------------------------------------------------------------------
 
 sub Dashboard_Initialize ($) {
@@ -162,7 +159,6 @@ sub Dashboard_Initialize ($) {
 						 #obsolete - erase in future releases
 						 "dashboard_sorting ". # obsolet -> erase in future releases
 						 "dashboard_colwidth ". # obsolet -> erase in future releases
-						 "dashboard_showbuttonbar:dont-use-this-attribute ". # obsolet -> erase in future releases
 						 
 						 $readingFnAttributes;					  
 
@@ -491,14 +487,14 @@ sub BuildGroup($)
 
 		$icon = FW_makeImage($icon,$icon,"icon dashboard_groupicon") . "&nbsp;" if($icon);
 	
-		if($FW_hiddenroom{detail}) { 
-			$ret .= "<td><div class=\"col1\">$icon$devName</div></td>"; 	
-		} 
-		else { 
-			if ($type ne "weblink" && $type ne "SVG" && $type ne "readingsGroup") { # Don't show Link by weblink, svg and readingsGroup
-				$ret .= FW_pH "detail=$d", "$icon$devName", 1, "col1", 1; 
-			}			
-		}		
+		#if($FW_hiddenroom{detail}) { 
+		#	$ret .= "<td><div class=\"col1\">$icon$devName</div></td>"; 	
+		#} 
+		#else { 
+		if ($type ne "weblink" && $type ne "SVG" && $type ne "readingsGroup") { # Don't show Link by weblink, svg and readingsGroup
+			$ret .= FW_pH "detail=$d", "$icon$devName", 1, "col1", 1; 
+		}			
+		#}		
 		
 		$row++;		
 			
@@ -518,7 +514,6 @@ sub BuildGroup($)
 				if ($storeinfo == 1 && index($txtarray[$i],"<a href") > -1 ) { $linkreturn = $txtarray[$i].">"; }
 				if (index($txtarray[$i],"<table") > -1) {$storeinfo = $storeinfo+1; }
 			}
-			####if ($helper == 1) {$txtreturn .= "<tr class=\"dashboard_editreadinggroups\"><td><div class=\"devType\"><div class=\"dashboard_button\"><span class=\"dashboard_button_icon dashboard_button_icondetail\"></span>$linkreturn Detail</a></div></div></td></tr>";}
 			$ret .= "<td>$txtreturn</td>";
 		} else  { $ret .= "<td informId=\"$d\">$txt</td>"; }
 		###########################################################
@@ -663,17 +658,9 @@ sub CheckDashboardAttributUssage($) { # replaces old disused attributes and thei
 	$detailnote = $detailnote." [dashboard_sorting -> dashboard_tab1sorting]";
  }
  # ------------------------------------------------------------------------------------------------------------------------ 
- 
- # ---- detached / transferred from the old attribute to the tab extension (outdated 02.2014) ------ 
- my $buttonbar = AttrVal($defs{$d}{NAME}, "dashboard_showbuttonbar", ""); 
- if ($buttonbar ne "") { 
-	FW_fC("deleteattr ".$d." dashboard_showbuttonbar"); 
-	$detailnote = $detailnote." [dashboard_showbuttonbar]";
- }
- # ------------------------------------------------------------------------------------------------------------------------ 
 
  # Get out any change to the Logfile 
- if ($buttonbar ne "" || $sorting ne "") {   
+ if ($sorting ne "") {   
   Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."]"." Using an outdated no longer used Attribute or Value. This has been corrected. Don't forget to save config. ".$detailnote; 
  }
 }
@@ -736,17 +723,11 @@ sub Dashboard_undef ($$) {
 sub Dashboard_detailFn() {
   my ($name, $d, $room, $pageHash) = @_;
   my $hash = $defs{$name};
-  #return DashboardAsHtml($d); #creates confusion and leads to incorrect storage of items
   return; 
 }
 
 sub Dashboard_attr($$$) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
-  
-#if ($cmd eq "set") {
-#	$dashboarddata{$attrName} = $attrVal;
-#	Log 1, "[DASHBOARD simple debug] ".$attrName." - ".$attrVal;
-# }
   return;  
 }
 
