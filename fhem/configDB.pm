@@ -49,6 +49,7 @@ sub AnalyzeCommandChain($$;$);
 sub Debug($);
 sub Log3($$$);
 
+my $cfgDB_svnId = '$Id$';
 ##################################################
 # Read configuration file
 #
