@@ -87,7 +87,9 @@ FHEM/23_WEBIO_12DIGITAL.pm   sachag               http://forum.fhem.de Sonstiges
 FHEM/23_WEBTHERM.pm          betateilchen/sachag  http://forum.fhem.de Sonstiges
 FHEM/24_NetIO230B.pm         rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
 FHEM/30_HUEBridge.pm         justme1968           http://forum.fhem.de Sonstige Systeme
+FHEM/30_ENECSYSGW.pm         akw                  http://forum.fhem.de Sonstige Systeme
 FHEM/31_HUEDevice.pm         justme1968           http://forum.fhem.de Sonstige Systeme
+FHEM/31_ENECSYSINV.pm        akw                  http://forum.fhem.de Sonstige Systeme
 FHEM/31_LightScene.pm        justme1968           http://forum.fhem.de Automatisierung
 FHEM/32_SYSSTAT.pm           justme1968           http://forum.fhem.de Unterstuetzende Dienste
 FHEM/32_mailcheck.pm         justme1968           http://forum.fhem.de Automatisierung
