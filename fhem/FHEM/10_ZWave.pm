@@ -611,6 +611,7 @@ ZWave_Parse($$@)
     if($hash && $hash->{WakeUp} && @{$hash->{WakeUp}}) { # Always the base hash
       IOWrite($hash, "00", shift @{$hash->{WakeUp}});
     }
+    readingsSingleUpdate($hash, "CMD", $cmd, 1); # forum:20884
     return $ret;
 
   } elsif($cmd eq "ZW_SEND_DATA") {
