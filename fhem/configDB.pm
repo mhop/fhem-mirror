@@ -37,6 +37,12 @@
 #            - updated   commandref (EN) documentation
 #            - added     commandref (DE) documentation
 #
+# 2014-03-03 - changed   performance optimized by using version uuid table
+#            - updated   commandref docu for migration
+#            - added     cfgDB_svnId for fhem.pl CommandVersion
+#            - added     cfgDB_List to show device info from database
+#            - updated   commandref docu for cfgDB_List
+#
 ##############################################################################
 #
 
@@ -81,11 +87,10 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 	$cfgDB_dbtype = "unknown";
 }
 
-sub cfgDB_svnId { return "# ".'$Id$' }
+sub cfgDB_svnId { 
+	return "# ".'$Id$' 
+}
 
-##################################################
-# Connect to database and return handle
-#
 sub cfgDB_Connect {
 	my $fhem_dbh = DBI->connect(
 	"dbi:$cfgDB_dbconn", 
@@ -159,19 +164,21 @@ sub cfgDB_Info {
 	$r .= " dbpass: $cfgDB_dbpass\n";
 	$r .= " dbtype: $cfgDB_dbtype\n";
 	$r .= " Unknown dbmodel type in configuration file.\n" if $dbtype eq 'unknown';
-	$r .= " Only Mysql, Postgresql, Oracle, SQLite are fully supported.\n" if $dbtype eq 'unknown';
+	$r .= " Only Mysql, Postgresql, SQLite are fully supported.\n" if $dbtype eq 'unknown';
 	$r .= $l;
 
 	my $fhem_dbh = cfgDB_Connect;
-	my ($sth, @line, $row);
+	my ($sql, $sth, @line, $row);
 
 #	read versions table statistics
 	my $count;
 	$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemconfig');
 	$r .= " fhemconfig: $count entries\n\n";
+
 #	read versions creation time
-#	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE COMMAND ='#created' ORDER by VERSION" );  
-	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig as c join fhemversions as v on v.versionuuid=c.versionuuid WHERE COMMAND like '#created%' ORDER by v.VERSION" );  
+	$sql = "SELECT * FROM fhemconfig as c join fhemversions as v on v.versionuuid=c.versionuuid ".
+			"WHERE COMMAND like '#created%' ORDER by v.VERSION";
+	$sth = $fhem_dbh->prepare( $sql );
 	$sth->execute();
 	while (@line = $sth->fetchrow_array()) {
 		$row	 = " Ver $line[6] saved: $line[1] $line[2] $line[3] def: ".
@@ -385,14 +392,10 @@ sub cfgDB_ReadCfg(@) {
 	my $fhem_dbh = cfgDB_Connect;
 	my ($sth, @line, $row);
 
-	my $uuid = $fhem_dbh->selectrow_array('SELECT VERSIONUUID FROM fhemversions WHERE VERSION = 0');
-	if($uuid){
-Debug("V0 from uuid: $uuid");
-		$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE VERSIONUUID = '$uuid'" );  
-	} else {
-Debug("V0 from V0");
-		$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE VERSION = 0" );  
-	}
+# using a join would be much nicer, but does not work due to sort of join's result
+	my $uuid = $fhem_dbh->selectrow_array('SELECT versionuuid FROM fhemversions WHERE version = 0');
+	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE versionuuid = '$uuid'" );  
+
 	$sth->execute();
 	while (@line = $sth->fetchrow_array()) {
 		$row = "$line[0] $line[1] $line[2] $line[3]";
@@ -466,19 +469,22 @@ sub cfgDB_Migrate {
 
 }
 
-sub cfgDB_List($) {
-	my ($search) = @_;
+sub cfgDB_List(;$$) {
+	my ($search,$searchversion) = @_;
+	$search = $search ? $search : "%";
+	$searchversion = $searchversion ? $searchversion : 0;
 	my $fhem_dbh = cfgDB_Connect;
-	my ($sth, @line, $row, @result, $ret);
-
-	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE VERSION = 0 AND DEVICE like '$search'" );  
+	my ($sql, $sth, @line, $row, @result, $ret);
+	$sql = "SELECT command, device, p1, p2 FROM fhemconfig as c join fhemversions as v ON v.versionuuid=c.versionuuid ".
+	       "WHERE v.version = '$searchversion' AND command not like '#create%' AND device like '$search%' ORDER BY lower(device),command DESC";
+	$sth = $fhem_dbh->prepare( $sql);
 	$sth->execute();
+	push @result, "search result for device: $search in version: $searchversion";
+	push @result, "--------------------------------------------------------------------------------";
 	while (@line = $sth->fetchrow_array()) {
 		$row = "$line[0] $line[1] $line[2] $line[3]";
 		push @result, "$row";
 	}
-	$row = $fhem_dbh->do("select lower(hex(randomblob(16)))");
-	push @result, "$row";
 	$fhem_dbh->disconnect();
 	$ret = join("\n", @result);
 	return $ret;
@@ -576,7 +582,9 @@ sub cfgDB_List($) {
 				<ul><code>perl fhem.pl fhem.cfg</code></ul></li><br/>
 			<br/>
 			<li>transfer your existing configuration into the database<br/><br/>
-				<ul>enter <code>{use configDB;; cfgDB_Migrate}</code> into frontend's command line</ul><br/></br>
+				<ul>enter <code>{use configDB;; cfgDB_Migrate}</code><br/>
+				<br/>
+				into frontend's command line</ul><br/></br>
 				Be patient! Migration can take some time, especially on mini-systems like RaspberryPi or Beaglebone.<br/>
 				Completed migration will be indicated by showing database statistics.<br/>
 				Your original configfile will not be touched or modified by this step.</li><br/>
@@ -617,6 +625,19 @@ sub cfgDB_List($) {
 </pre>
 Ver 0 always indicates the currently running configuration.<br/>
 <br/>
+
+			<li><code>{cfgDB_List [device],[version]}</code></li><br/>
+				Search for device named [device] in configuration version [version]<br/>
+				in database archive.<br/>
+				Default value for [device] = % to show all devices.<br/>
+				Default value for [version] = 0 to show devices from current version.<br/>
+				Examples for valid requests:<br/>
+				<br/>
+				<code>{cfgDB_List}</code><br/>
+				<code>{cfgDB_List 'global'}</code><br/>
+				<code>{cfgDB_List '',1}</code><br/>
+				<code>{cfgDB_List 'global',1}</code><br/>
+			<br/>
 
 			<li><code>{cfgDB_Reorg [keep]}</code></li><br/>
 				Deletes all stored versions with version number higher than [keep].<br/>
@@ -749,7 +770,9 @@ Ver 0 always indicates the currently running configuration.<br/>
 				<ul><code>perl fhem.pl fhem.cfg</code></ul></li><br/>
 			<br/>
 			<li>Bestehende Konfiguration in die Datenbank &uuml;bertragen<br/><br/>
-				<ul><code>{use configDB;; cfgDB_Migrate}</code> in die Befehlszeile der fhem-Oberfl&auml;che eingeben</ul><br/></br>
+				<ul><code>{use configDB;; cfgDB_Migrate}</code><br/>
+					<br/>
+					in die Befehlszeile der fhem-Oberfl&auml;che eingeben</ul><br/></br>
 					Nicht die Geduld verlieren! Die Migration eine Weile dauern, speziell bei Mini-Systemen wie<br/>
 					RaspberryPi or Beaglebone.<br/>
 					Am Ende der Migration wird eine aktuelle Datenbankstatistik angezeigt.<br/>
@@ -792,6 +815,19 @@ Ver 0 always indicates the currently running configuration.<br/>
 </pre>
 Ver 0 bezeichnet immer die aktuell geladene Konfiguration.<br/>
 <br/>
+
+			<li><code>{cfgDB_List [device],[version]}</code></li><br/>
+				Sucht das Ger&auml;t [device] in der Konfiguration der Version [version]<br/>
+				in der Datenbank.<br/>
+				Standardwert f&uuml;r [device] = % um alle Ger&auml;te anzuzeigen<br/>
+				Standardwert f&uuml;r [version] = 0 Ger&auml;te in der aktuellen Version anzuzeigen.<br/>
+				Beispiele f&uuml;r g&uuml;ltige Aufrufe:<br/>
+				<br/>
+				<code>{cfgDB_List}</code><br/>
+				<code>{cfgDB_List 'global'}</code><br/>
+				<code>{cfgDB_List '',1}</code><br/>
+				<code>{cfgDB_List 'global',1}</code><br/>
+			<br/>
 
 			<li><code>{cfgDB_Reorg [keep]}</code></li><br/>
 				L&ouml;scht alle gespeicherten Versionen mit Versionsnummer &gt; [keep].<br/>
