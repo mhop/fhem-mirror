@@ -227,6 +227,8 @@ function dashboard_modifyWidget(){
 }
 
 $(document).ready( function () {
+  var dbattr = document.getElementById("dashboard_attr");
+  if (dbattr) {
 	//--------------------------------- Attribute des Dashboards ------------------------------------------------------------------
 	var params = (document.getElementById("dashboard_attr").value).split(","); //get current Configuration
 	//-------------------------------------------------------------------------------------------------------------------------------------
@@ -339,6 +341,7 @@ $(document).ready( function () {
 	});	
 	
 	if (params[14] != "none" ) {$('<style type="text/css">'+params[14]+'</style>').appendTo($('head')); }
+  }	
 });
 
 
