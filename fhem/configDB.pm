@@ -576,7 +576,7 @@ sub cfgDB_List($) {
 				<ul><code>perl fhem.pl fhem.cfg</code></ul></li><br/>
 			<br/>
 			<li>transfer your existing configuration into the database<br/><br/>
-				<ul>enter <code>{cfgDB_Migrate}</code> into frontend's command line</ul><br/></br>
+				<ul>enter <code>{use configDB;; cfgDB_Migrate}</code> into frontend's command line</ul><br/></br>
 				Be patient! Migration can take some time, especially on mini-systems like RaspberryPi or Beaglebone.<br/>
 				Completed migration will be indicated by showing database statistics.<br/>
 				Your original configfile will not be touched or modified by this step.</li><br/>
@@ -749,7 +749,7 @@ Ver 0 always indicates the currently running configuration.<br/>
 				<ul><code>perl fhem.pl fhem.cfg</code></ul></li><br/>
 			<br/>
 			<li>Bestehende Konfiguration in die Datenbank &uuml;bertragen<br/><br/>
-				<ul><code>{cfgDB_Migrate}</code> in die Befehlszeile der fhem-Oberfl&auml;che eingeben</ul><br/></br>
+				<ul><code>{use configDB;; cfgDB_Migrate}</code> in die Befehlszeile der fhem-Oberfl&auml;che eingeben</ul><br/></br>
 					Nicht die Geduld verlieren! Die Migration eine Weile dauern, speziell bei Mini-Systemen wie<br/>
 					RaspberryPi or Beaglebone.<br/>
 					Am Ende der Migration wird eine aktuelle Datenbankstatistik angezeigt.<br/>
