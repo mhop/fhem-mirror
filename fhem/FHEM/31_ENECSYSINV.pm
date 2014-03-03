@@ -132,20 +132,20 @@ sub ENECSYSINV_Parse($$)
 <a name="ENECSYSINV"></a>
 <h3>ENECSYSINV</h3>
 <ul>
-  <br>
+  <br />
   <a name="ENECSYSINV_Define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; ENECSYSINV &lt;id&gt; [&lt;interval&gt;]</code><br>
-    <br>
+    <code>define &lt;name&gt; ENECSYSINV &lt;id&gt; [&lt;interval&gt;]</code><br />
+    <br />
 
-    Defines an micro-inverter device connected to an <a href="#ENECSYSGW">ENECSYSGW</a>.<br><br>
+    Defines an micro-inverter device connected to an <a href="#ENECSYSGW">ENECSYSGW</a>.<br /><br />
 
     Examples:
     <ul>
-      <code>define SolarPanel1 ENECSYSINV 100123456</code><br>
+      <code>define SolarPanel1 ENECSYSINV 100123456</code><br />
     </ul>
-  </ul><br>
+  </ul><br />
 
   <a name="ENECSYSINV_Readings"></a>
   <b>Readings</b>
@@ -173,7 +173,7 @@ sub ENECSYSINV_Parse($$)
   </ul><br />
 
 
-</ul><br>
+</ul><br />
 
 =end html
 =cut

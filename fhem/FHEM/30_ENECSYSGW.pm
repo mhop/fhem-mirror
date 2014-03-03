@@ -178,31 +178,31 @@ sub ENECSYSGW_Call($)
 <a name="ENECSYSGW"></a>
 <h3>ENECSYSGW</h3>
 <ul>
-  Module to access the ENECSYS gateway (http://www.ENECSYS.com/products/gateway/).<br><br>
+  Module to access the ENECSYS gateway (http://www.ENECSYS.com/products/gateway/).<br /><br />
 
   The actual micro-inverter devices are defined as <a href="#ENECSYSINV">ENECSYSINV</a> devices.
 
-  <br><br>
+  <br /><br />
   All newly found inverter devices are autocreated and added to the room ENECSYSINV.
 
 
-  <br><br>
+  <br /><br />
   <a name="ENECSYSGW_Define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; ENECSYSGW [&lt;host&gt;] [&lt;interval&gt;]</code><br>
-    <br>
+    <code>define &lt;name&gt; ENECSYSGW [&lt;host&gt;] [&lt;interval&gt;]</code><br />
+    <br />
 
-    Defines an ENECSYSGW device with address &lt;host&gt;.<br><br>
+    Defines an ENECSYSGW device with address &lt;host&gt;.<br /><br />
 
-    The gateway will be polled every &lt;interval&gt; seconds. The default is 10 and minimum is 5.<br><br>
+    The gateway will be polled every &lt;interval&gt; seconds. The default is 10 and minimum is 5.<br /><br />
 
     Examples:
     <ul>
-      <code>define gateway ENECSYSGW 10.0.1.1</code><br>
+      <code>define gateway ENECSYSGW 10.0.1.1</code><br />
     </ul>
-  </ul><br>
- </ul><br>
+  </ul><br />
+ </ul><br />
 
 =end html
 =cut
