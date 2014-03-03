@@ -131,7 +131,7 @@ sub HUEBridge_OpenDev($)
     return undef;
   }
 
-  if( !defined($result->{'mac'}) )
+  if( !defined($result->{'linkbutton'}) )
     {
       HUEBridge_Pair($hash);
       return;
