@@ -74,7 +74,7 @@ YAMAHA_BD_GetStatus($;$)
 
     my $device = $hash->{helper}{ADDRESS};
 
-    # get the model informations and available zones if no informations are available
+    # get the model informations if no informations are available
     if(defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
     {
 		YAMAHA_BD_getModel($hash);
@@ -230,10 +230,14 @@ YAMAHA_BD_Set($@)
     my $name = $hash->{NAME};
     my $address = $hash->{helper}{ADDRESS};
     my $result = "";
-
     
-       
-    return "No Argument given" if(!defined($a[1]));     
+    return "No Argument given" if(!defined($a[1]));  
+    
+    # get the model informations if no informations are available
+    if(defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
+    {
+		YAMAHA_BD_getModel($hash);
+    }
     
     my $what = $a[1];
     my $usage = "Unknown argument $what, choose one of on:noArg off:noArg statusRequest:noArg tray:open,close remoteControl:up,down,left,right,return,enter,OSDonScreen,OSDstatus,topMenu,popupMenu,red,green,blue,yellow,0,1,2,3,4,5,6,7,8,9,setup,home,clear fast:forward,reverse slow:forward,reverse skip:forward,reverse play:noArg pause:noArg stop:noArg";
@@ -640,7 +644,7 @@ YAMAHA_BD_ResetTimer($;$)
         {
             InternalTimer(gettimeofday()+$interval, "YAMAHA_BD_GetStatus", $hash, 0);
         }
-        elsif($hash->{READINGS}{presence}{VAL} eq "present" and $hash->{READINGS}{power}{VAL} eq "on")
+        elsif(exists($hash->{READINGS}{presence}{VAL}) and $hash->{READINGS}{presence}{VAL} eq "present" and exists($hash->{READINGS}{power}{VAL}) and $hash->{READINGS}{power}{VAL} eq "on")
         {
             InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, "YAMAHA_BD_GetStatus", $hash, 0);
         }
