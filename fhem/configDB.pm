@@ -270,12 +270,14 @@ sub cfgDB_InsertLine($$$) {
 
 sub cfgDB_Execute($@) {
 	my ($cl, @dbconfig) = @_;
+	my $ret;
 	foreach (@dbconfig){
 		my $l = $_;
 		$l =~ s/[\r\n]//g;
-		AnalyzeCommandChain($cl, $l);
+		$ret .= AnalyzeCommandChain($cl, $l);
 	}
-	return;
+	return $ret if($ret);
+	return undef;
 }
 
 sub cfgDB_SaveCfg {
@@ -447,13 +449,15 @@ sub cfgDB_Rotate($) {
 
 sub cfgDB_ReadAll($){
 	my ($cl) = @_;
+	my $ret;
 	# add Config Rows to commandfile
 	my @dbconfig = cfgDB_ReadCfg(@dbconfig);
 	# add State Rows to commandfile
 	@dbconfig = cfgDB_ReadState(@dbconfig);
 	# AnalyzeCommandChain for all entries
-	cfgDB_Execute($cl, @dbconfig);
-	return;
+	$ret .= cfgDB_Execute($cl, @dbconfig);
+	return $ret if($ret);
+	return undef;
 }
 
 sub cfgDB_Migrate {
