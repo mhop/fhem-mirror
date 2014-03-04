@@ -55,9 +55,12 @@ sub JSONMETER_ReadFromUrl($);
 sub JSONMETER_ReadFromFile($);
 sub JSONMETER_ParseJsonFile($);
 sub JSONMETER_UpdateAborted($);
+sub JSONMETER_doStatisticMinMax ($$$); 
+sub JSONMETER_doStatisticMinMaxSingle ($$$$);
+sub JSONMETER_doStatisticDelta ($$$);
 
 # Modul Version for remote debugging
-  my $modulVersion = "2014-02-20";
+  my $modulVersion = "2014-03-03";
 
  ##############################################################
  # Syntax: meterType => port URL-Path
@@ -91,16 +94,16 @@ sub JSONMETER_UpdateAborted($);
    ,[1, "1.8.3|0101010803FF", "electricityConsumedTariff3", 2] # {"obis":"0101010803FF","value":33.53,"unit":"kWh"},               
    ,[1, "1.8.4|0101010804FF", "electricityConsumedTariff4", 2] # {"obis":"0101010804FF","value":33.53,"unit":"kWh"},               
    ,[1, "1.8.5|0101010805FF", "electricityConsumedTariff5", 2] # {"obis":"0101010805FF","value":33.53,"unit":"kWh"},               
-   ,[1, "010001080080", "electricityConsumedToday", 1] 
-   ,[1, "010001080081", "electricityConsumedYesterday", 1] 
-   ,[1, "010001080082", "electricityConsumedLastWeek", 1] 
-   ,[1, "010001080083", "electricityConsumedLastMonth", 1] 
-   ,[1, "010001080084", "electricityConsumedLastYear", 1] 
-   ,[1, "010002080080", "electricityProducedToday", 1] 
-   ,[1, "010002080081", "electricityProducedYesterday", 1] 
-   ,[1, "010002080082", "electricityProducedLastWeek", 1] 
-   ,[1, "010002080083", "electricityProducedLastMonth", 1] 
-   ,[1, "010002080084", "electricityProducedLastYear", 1] 
+   ,[1, "010001080080", "electricityConsumedToday", 0] 
+   ,[1, "010001080081", "electricityConsumedYesterday", 0] 
+   ,[1, "010001080082", "electricityConsumedLastWeek", 0] 
+   ,[1, "010001080083", "electricityConsumedLastMonth", 0] 
+   ,[1, "010001080084", "electricityConsumedLastYear", 0] 
+   ,[1, "010002080080", "electricityProducedToday", 0] 
+   ,[1, "010002080081", "electricityProducedYesterday", 0] 
+   ,[1, "010002080082", "electricityProducedLastWeek", 0] 
+   ,[1, "010002080083", "electricityProducedLastMonth", 0] 
+   ,[1, "010002080084", "electricityProducedLastYear", 0] 
    ,[1, "0101020800FF", "electricityPowerOutput", 1]
    ,[1, "010020070000", "electricityVoltagePhase1", 1] #{"obis":"010020070000","value":237.06,"unit":"V"},               
    ,[1, "010034070000", "electricityVoltagePhase2", 1] # {"obis":"010034070000","value":236.28,"unit":"V"},               
@@ -230,29 +233,40 @@ JSONMETER_Set($$@)
 {
   my ($hash, $name, $cmd, $val) = @_;
   my $resultStr = "";
-  
+   
   if($cmd eq 'statusRequest') {
     $hash->{LOCAL} = 1;
     JSONMETER_GetUpdate($hash);
     $hash->{LOCAL} = 0;
     return undef;
   }
-  elsif($cmd eq 'restartJsonAnalysis') {
-    $hash->{fhem}{jsonInterpreter} = "";
-   $hash->{LOCAL} = 1;
-    JSONMETER_GetUpdate($hash);
-    $hash->{LOCAL} = 0;
-    return undef;
-  }
-  elsif($cmd eq 'INTERVAL' && int(@_)==4 ) {
-   $val = 10 if( $val < 10 );
-   $hash->{INTERVAL}=$val;
-   return "$name: Polling interval set to $val seconds.";
-  }
-  my $list = "statusRequest:noArg"
+   elsif($cmd eq 'restartJsonAnalysis') {
+      $hash->{fhem}{jsonInterpreter} = "";
+      $hash->{LOCAL} = 1;
+      JSONMETER_GetUpdate($hash);
+      $hash->{LOCAL} = 0;
+      return undef;
+   }
+   elsif ($cmd eq 'resetStatistics') {
+      foreach (sort keys %{ $hash->{READINGS} }) {
+         if ($_ =~ /^\.?stat/ && $_ ne "state") {
+            delete $hash->{READINGS}{$_};
+            $resultStr .= "$name: Reading '$_' deleted\n";
+         }
+      }
+      WriteStatefile();
+      return $resultStr;
+   }
+   elsif($cmd eq 'INTERVAL' && int(@_)==4 ) {
+      $val = 10 if( $val < 10 );
+      $hash->{INTERVAL}=$val;
+      return "$name: Polling interval set to $val seconds.";
+   }
+   my $list = "statusRequest:noArg"
+         ." resetStatistics:noArg"
          ." restartJsonAnalysis:noArg"
          ." INTERVAL:slider,0,10,600";
-  return "Unknown argument $cmd, choose one of $list";
+   return "Unknown argument $cmd, choose one of $list";
 
 } # end JSONMETER_Set
 
@@ -434,6 +448,7 @@ JSONMETER_ParseJsonFile($)
   my $name = $hash->{NAME};
   my $value;
   my $returnStr;
+  my $statisticType;
   
   delete($hash->{helper}{RUNNING_PID});
 
@@ -514,6 +529,7 @@ if ( $a[1] == 1 ){
   my @a = split /\|/, $jsonInterpreter;
    Log3 $name, 4, "$name: Extract ".($#a+1)." readings from ".($#fields+1)." json parts";
    foreach (@a) {
+      $statisticType = 0;
       Log3 $name, 5, "$name: Handle $_";
       my @b = split / /, $_ ;
       if ($b[1] == 1) { #obis value
@@ -522,7 +538,8 @@ if ( $a[1] == 1 ){
             # $value =~ s/^\s+|\s+$//g;
             Log3 $name, 4, "$name: Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
             $returnStr .= "Value \"$value\" for reading '$b[2]' extracted from part $b[0]:\n$fields[$b[0]]\n\n";
-            readingsBulkUpdate($hash,$b[2],$value);             
+            readingsBulkUpdate($hash,$b[2],$value);
+            $statisticType = $b[3];
          } else {
             Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
             $returnStr .= "Could not extract value for reading '$b[2]' from part $b[0]:\n$fields[$b[0]]\n\n";
@@ -533,6 +550,7 @@ if ( $a[1] == 1 ){
             Log3 $name, 4, "$name: Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
             $returnStr .= "Value \"$value\" for reading '$b[2]' extracted from part $b[0]:\n$fields[$b[0]]\n\n";
             readingsBulkUpdate($hash,$b[2],$value); 
+            $statisticType = $b[3];
          } else {
             Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
             $returnStr .= "Could not extract value for reading '$b[2]' from part $b[0]:\n$fields[$b[0]]\n\n";
@@ -544,6 +562,7 @@ if ( $a[1] == 1 ){
             Log3 $name, 4, "$name: Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
             $returnStr .= "Value \"$value\" for reading '$b[2]' extracted from part $b[0]:\n$fields[$b[0]]\n\n";
             readingsBulkUpdate($hash, $b[2], $value); 
+            $statisticType = $b[3];
          } else {
             Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
             $returnStr .= "Could not extract value for reading '$b[2]' from part $b[0]:\n$fields[$b[0]]\n\n";
@@ -555,14 +574,22 @@ if ( $a[1] == 1 ){
             $returnStr .= "Value \"$value\" for reading '$b[2]' extracted from part $b[0]:\n$fields[$b[0]]\n\n";
             $value =  strftime "%Y-%m-%d %H:%M:%S", localtime($value);
             readingsBulkUpdate($hash, $b[2], $value); 
+            $statisticType = $b[3];
          } else {
             Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
             $returnStr .= "Could not extract value for reading '$b[2]' from part $b[0]:\n$fields[$b[0]]\n\n";
          }
       }
-   }
+     
+      if ( AttrVal($name,"doStatistics",0) == 1) { 
+         # JSONMETER_doStatisticMinMax $hash, $readingName, $value
+         if ($statisticType == 1 ) { JSONMETER_doStatisticMinMax $hash, "stat".ucfirst($b[2]), $value ; }
+         # JSONMETER_doStatisticDelta: $hash, $readingName, $value
+         if ($statisticType == 2 ) { JSONMETER_doStatisticDelta $hash, "stat".ucfirst($b[2]), $value ; }
+      }
+    }
 
-   readingsBulkUpdate($hash,"state","Connected");
+    readingsBulkUpdate($hash,"state","Connected");
     readingsEndUpdate($hash,1);
     DoTrigger($hash->{NAME}, undef) if ($init_done);
  
@@ -584,6 +611,204 @@ JSONMETER_UpdateAborted($)
 
 } # end JSONMETER_UpdateAborted
 
+# Calculates single MaxMin Values and informs about end of day and month
+sub ######################################## 
+JSONMETER_doStatisticMinMax ($$$) 
+{
+   my ($hash, $readingName, $value) = @_;
+   my $dummy;
+
+   my $lastReading;
+   my $lastSums;
+   my @newReading;
+   
+   my $yearLast;
+   my $monthLast;
+   my $dayLast;
+   my $dayNow;
+   my $monthNow;
+   my $yearNow;
+   
+  # Determine date of last and current reading
+   if (exists($hash->{READINGS}{$readingName."Day"}{TIME})) {
+      ($yearLast, $monthLast, $dayLast) = $hash->{READINGS}{$readingName."Day"}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d)/;
+   } else {
+      ($dummy, $dummy, $dummy, $dayLast, $monthLast, $yearLast) = localtime;
+      $yearLast += 1900;
+      $monthLast ++;
+   }
+   ($dummy, $dummy, $dummy, $dayNow, $monthNow, $yearNow) = localtime;
+   $yearNow += 1900;
+   $monthNow ++;
+
+  # Daily Statistic
+   #JSONMETER_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast
+   JSONMETER_doStatisticMinMaxSingle $hash, $readingName."Day", $value, ($dayNow != $dayLast);
+   
+  # Monthly Statistic 
+   #JSONMETER_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast
+   JSONMETER_doStatisticMinMaxSingle $hash, $readingName."Month", $value, ($monthNow != $monthLast);
+    
+  # Yearly Statistic 
+   #JSONMETER_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast
+   JSONMETER_doStatisticMinMaxSingle $hash, $readingName."Year", $value, ($yearNow != $yearLast);
+
+   return ;
+
+}
+
+# Calculates single MaxMin Values and informs about end of day and month
+sub ######################################## 
+JSONMETER_doStatisticMinMaxSingle ($$$$) 
+{
+   my ($hash, $readingName, $value, $saveLast) = @_;
+   my $result;
+   
+   my $lastReading = $hash->{READINGS}{$readingName}{VAL} || "";
+   
+ # Initializing
+   if ( $lastReading eq "" ) { 
+      my $since = strftime "%Y-%m-%d_%H:%M:%S", localtime(); 
+      $result = "Count: 1 Sum: $value ShowDate: 1";
+      readingsBulkUpdate($hash, ".".$readingName, $result);
+      $result = "Min: $value Avg: $value Max: $value (since: $since )";
+      readingsBulkUpdate($hash, $readingName, $result);
+
+ # Calculations
+   } else { 
+      my @a = split / /, $hash->{READINGS}{"." . $readingName}{VAL}; # Internal values
+      my @b = split / /, $lastReading;
+    # Do calculations
+      if ($saveLast) {
+         readingsBulkUpdate($hash, $readingName . "Last", $lastReading);
+         $a[1] = 1;   $a[3] = $value;   $a[5] = 0;
+         $b[1] = $value;   $b[3] = $value;   $b[5] = $value;
+      } else {
+         $a[1]++; # Count
+         $a[3] += $value; # Sum
+         if ($value < $b[1]) { $b[1]=$value; } # Min
+         $b[3] = sprintf "%.0f" , $a[3] / $a[1]; # Avg
+         if ($value > $b[5]) { $b[5]=$value; } # Max
+      }
+    # Store internal calculation values
+      $result = "Count: $a[1] Sum: $a[3] ShowDate: $a[5]";  
+      readingsBulkUpdate($hash, ".".$readingName, $result);
+    # Store visible Reading
+      $result = "Min: $b[1] Avg: $b[3] Max: $b[5]";  
+      if ($a[5] == 1) { $result .= " (since: $b[7] )"; }
+      readingsBulkUpdate($hash, $readingName, $result);
+   }
+   return;
+}
+
+
+# Calculates deltas for day, month and year
+sub ######################################## 
+JSONMETER_doStatisticDelta ($$$) 
+{
+   my ($hash, $readingName, $value) = @_;
+   my $dummy;
+
+   my @curr = split / /, $hash->{READINGS}{$readingName}{VAL} || "";
+   my @start = split / /,  $hash->{READINGS}{"." . $readingName . "Start"}{VAL} || "";  
+
+   my $saveLast=0;
+   my @last;
+   if (exists ($hash->{READINGS}{$readingName."Last"})) { 
+     @last = split / /,  $hash->{READINGS}{$readingName."Last"}{VAL};
+   } else {
+      @last = split / /,  "Day: - Month: - Year: -";
+   }
+   
+   my $result;
+   my $yearLast;
+   my $monthLast;
+   my $dayLast;
+   my $dayNow;
+   my $monthNow;
+   my $yearNow;
+   
+  # Determine date of last and current reading
+   if (exists($hash->{READINGS}{$readingName}{TIME})) {
+      ($yearLast, $monthLast, $dayLast) = ($hash->{READINGS}{$readingName}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d)/);
+   } else {
+      ($dummy, $dummy, $dummy, $dayLast, $monthLast, $yearLast) = localtime;
+      $yearLast += 1900;
+      $monthLast ++;
+      $start[1] = $value;
+      $start[3] = $value;
+      $start[5] = $value;
+      $start[7] = 6; 
+      $curr[7] = strftime "%Y-%m-%d_%H:%M:%S", localtime(); # Start
+   }
+   ($dummy, $dummy, $dummy, $dayNow, $monthNow, $yearNow) = localtime;
+   $yearNow += 1900;
+   $monthNow ++;
+   
+  # Yearly Statistic
+   if ($yearNow != $yearLast){
+      $last[5] = $curr[5];
+      $start[5] = $value;
+     # Do not show the "since:" value for year changes anymore
+      if ($start[7] == 1) { $start[7] = 0; }
+     # Shows the "since:" value for the first year change
+      if ($start[7] >= 2) { 
+         $last[7] = $curr[7];
+         $start[7] = 1;
+      }
+   }
+   $curr[5] = $value - $start[5];
+
+  # Monthly Statistic 
+   if ($monthNow != $monthLast){
+      $last[3] = $curr[3];
+      $start[3] = $value;
+     # Do not show the "since:" value for month changes anymore
+      if ($start[7] == 3) { $start[7] = 2; }
+     # Shows the "since:" value for the first month change
+      if ($start[7] >= 4) { 
+         $last[7] = $curr[7];
+         $start[7] = 3;
+      }
+   }
+   $curr[3] = $value - $start[3];
+
+   # Daily Statistic
+   if ($dayNow != $dayLast){
+      $last[1] = $curr[1];
+      $start[1] = $value;
+     # Do not show the "since:" value for day changes anymore
+      if ($start[7] == 5) { $start[7] = 4; }
+     # Shows the "since:" value for the first day change
+      if ($start[7] >= 6) { 
+         $last[7] = $curr[7];
+         $start[7] = 5;
+        # Next monthly and yearly values start at 00:00
+         $curr[7] = strftime "%Y-%m-%d", localtime(); # Start
+         $start[3] = $value;
+         $start[5] = $value;
+      }
+      $saveLast = 1;
+   }
+   $curr[1] = $value - $start[1];
+   
+  # Store internal calculation values
+   $result = "Day: $start[1] Month: $start[3] Year: $start[5] ShowDate: $start[7]";  
+   readingsBulkUpdate($hash, ".".$readingName."Start", $result);
+
+  # Store visible Reading
+   $result = "Day: $curr[1] Month: $curr[3] Year: $curr[5]";
+   if ($start[7] != 0 ) { $result .= " (since: $curr[7] )"; }
+   readingsBulkUpdate($hash,$readingName,$result);
+
+   if ($saveLast == 1) {
+      $result = "Day: $last[1] Month: $last[3] Year: $last[5]";
+      if ( $start[7] =~ /1|3|5/ ) { $result .= " (since: $last[7] )";}
+      readingsBulkUpdate($hash,$readingName."Last",$result); 
+   }
+ 
+   return ;
+}
 
 1;
 
@@ -672,7 +897,9 @@ JSONMETER_UpdateAborted($)
       </li><br>
     <li><code>doStatistics &lt; 0 | 1 &gt;</code>
       <br>
-      Calculates statistic values - <i>not implemented yet</i>
+      Calculate statistic values according to reading type (e.g. Average/Min/Max)
+      <br>
+      Builds daily, monthly and yearly statistics of certain readings. For diagrams, log readings of type 'stat<i>ReadingName</i><b>Last</b>'.
       </li><br>
    <li><code>pathString &lt;string&gt;</code>
       <ul>
@@ -777,8 +1004,10 @@ JSONMETER_UpdateAborted($)
       </li><br>
       <li><code>doStatistics &lt; 0 | 1 &gt;</code>
          <br>
-         Berechnet statistische Werte - <i>noch nicht implementiert</i>
-      </li><br>
+         Bildet t&auml;gliche, monatliche und j&auml;hrliche Statistiken bestimmter Ger&auml;tewerte.
+         <br>
+         F&uuml;r grafische Auswertungen k&ouml;nnen die Werte der Form 'stat<i>ReadingName</i><b>Last</b>' genutzt werden.
+         </li><br>
       <li><code>pathString &lt;Zeichenkette&gt;</code>
          <ul>
             <li>Ger&auml;tetyp 'file': definiert den lokalen Dateinamen und -pfad
