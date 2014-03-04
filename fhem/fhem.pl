@@ -405,7 +405,8 @@ while(time() < 2*3600) {
 }
 
 if($attr{global}{configfile} eq 'configDB') {
-  cfgDB_ReadAll(undef);
+  my $ret = cfgDB_ReadAll(undef);
+  Log 1, "configDB: $ret" if($ret);
 
 } else {
   my $ret = CommandInclude(undef, $attr{global}{configfile});
@@ -1115,7 +1116,7 @@ CommandRereadCfg($$)
   my $ret;
   
   if($attr{global}{configfile} eq 'configDB') {
-    cfgDB_ReadAll($cl);
+    $ret = cfgDB_ReadAll($cl);
 
   } else {
     setGlobalAttrBeforeFork($cfgfile);
