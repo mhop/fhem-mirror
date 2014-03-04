@@ -76,7 +76,7 @@ button.dist { margin:5px; background:transparent; border:0px; cursor:pointer; }
           border:3px solid; color:#278727; text-align:center; } 
 
 svg { height:32px; width:32px; fill:#278727; }
-g.on { fill:red; }
+svg.on,svg.FS20_on { fill:orange; }
 
 .changed { color:red; }
 #cloudfree { display:none; }
