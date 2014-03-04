@@ -5,11 +5,12 @@
 # FHEM module to read the data from a Sunways NT5000 solar inverter
 #
 # Prof. Dr. Peter A. Henning, 2008
+# 
+# Version 2.2 - January 2014
 #
-# $Id: 70_NT5000.pm 2.0 2013-02 - pahenning $
+# TODO: do not ask for serialport.pm when emulator is called
 #
-########################################################################################
-#
+# Setup as:
 # define  <name> NT5000 <device>
 #    
 # where <name> may be replaced by any name string and <device> 
@@ -214,24 +215,22 @@ sub NT5000_Get ($@) {
     readingsSingleUpdate($hash,"reading",$v,1);
   #-- monthly reading   
   } elsif($a[1] eq "month") {
-    $v = NT5000_GetLine($hash,"month");
+    $v = NT5000_GetMonth($hash);
     if(!defined($v)) {
       Log GetLogLevel($name,2), "NT5000_Get $a[1] error";
       return "$a[0] $a[1] => Error";
     }
-    $v =~ s/[\r\n]//g;                          # Delete the NewLine
-    readingsSingleUpdate($hash,"month",$v,1);
+    readingsSingleUpdate($hash,"month","Wm: ".$hash->{month}->[0]." kWh (".$hash->{month}->[2]."%)",1);
   #-- yearly reading  
   } elsif($a[1] eq "year") {
-    $v = NT5000_GetLine($hash,"year");
+    $v = NT5000_GetYear($hash);
     if(!defined($v)) {
       Log GetLogLevel($name,2), "NT5000_Get $a[1] error";
       return "$a[0] $a[1] => Error";
     }
-    $v =~ s/[\r\n]//g;                          # Delete the NewLine
-    readingsSingleUpdate($hash,"year",$v,1);
+    readingsSingleUpdate($hash,"year","Wy: ".$hash->{year}->[0]." kWh (".$hash->{year}->[4]."%)",1);
   } else {
-    return "NT5000_Get with unknown argument $a[1], choose one of " . join(",", sort keys %gets);
+    return "NT5000_Get with unknown argument $a[1], choose one of " . join(" ", sort keys %gets);
   }
 
   Log GetLogLevel($name,3), "NT5000_Get $a[1] $v";
@@ -400,6 +399,8 @@ sub NT5000_GetMonth ($) {
   my $wex  = $attr{$name}{$mex};
   my $wac  = 0;
   my $wre;
+  my $wav;
+  my $value;
 
   my @names = ("W_D01","W_D02","W_D03","W_D04","W_D05","W_D06","W_D07","W_D08","W_D09","W_D10",
    "W_D11","W_D12","W_D13","W_D14","W_D15","W_D16","W_D17","W_D18","W_D19","W_D20",
@@ -421,7 +422,7 @@ sub NT5000_GetMonth ($) {
         if( $i == ($day-1) ){
           $daten = sprintf("%4d-%02d-%02d_%02d:%02d:%02d",$yearn,$monn,$dayn,$hour,$min,$sec);
         }else{
-          $daten = sprintf("%4d-%02d-%02d_23:59:59",$yearn,$monn,$dayn);
+          $daten = sprintf("%4d-%02d-%02d_23:59:00",$yearn,$monn,$dayn);
         }
         $wac  += $data[$day-$i];
         if( $wex ){  
@@ -430,10 +431,23 @@ sub NT5000_GetMonth ($) {
         # Put one item per line into the log file
         printf NT5000FILE "%s %s %5s %6.3f %5.1f %5.1f\n",$daten,$name,$names[$i],$data[$day-$i],$wac,$wre;  
       };
-      Log 1,"NT5000_GetMonth: File overwritten"; 
-      close(NT5000FILE);         
+      Log 1,"NT5000_GetMonth: File $lf overwritten"; 
+      close(NT5000FILE);      
+      #-- daily average
+      $wav = ($day > 1) ? int( 10*($wac-$data[1]) / ($day-1) )/10.0 : 0.0;
+      #-- store value 
+      $hash->{month}->[0]=$wac;
+      $hash->{month}->[1]=$wex;
+      $hash->{month}->[2]=$wre;
+      $hash->{month}->[2]=$wav;
+      #-- return value 
+      $value  = "\nWm ".$wac." kWh (monthly sum until now)\n";
+      $value .= "Wa ".$wav." kWh/d (average until yesterday)\n";
+      $value .= $wre."% of expected ".$wex." kWh";
+      return $value;  
     } else {
       Log 1,"NT5000_GetMonth: Cannot open $lf for writing!"; 
+      return undef;
     }
   }
 }
@@ -450,7 +464,7 @@ sub NT5000_GetYear ($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  my ($ln,$lf,$ret,$monn,$daten,$mex,$mmex);
+  my ($ln,$lf,$ret,$monn,$daten,$mex,$mmex,$value);
 
   my ($sec,$min,$hour,$dayn,$month,$year,$wday,$yday,$isdst) = localtime(time);
   my $yearn = $year+1900;
@@ -467,6 +481,8 @@ sub NT5000_GetYear ($) {
   my $wex  = $attr{$name}{Wx_Y};
   my $wac  = 0;
   my $wre;
+  my $wme = 0;
+  my $wrm;
 
   my @names = ("W_M01","W_M02","W_M03","W_M04","W_M05","W_M06","W_M07","W_M08","W_M09","W_M10",
   "W_M11","W_M12");
@@ -487,21 +503,39 @@ sub NT5000_GetYear ($) {
         if( $i == $month ){
           $daten = sprintf("%4d-%02d-28_%02d:%02d:%02d",$yearn,$monn,$hour,$min,$sec);
         }else{
-          $daten = sprintf("%4d-%02d-28_23:59:59",$yearn,$monn);
+          $daten = sprintf("%4d-%02d-28_23:59:00",$yearn,$monn);
         }
         $mex  = "Wx_M".($monn);
         $mmex  = $attr{$name}{$mex};
+        $wme += $mmex;
         $wac  += $data[$month+1-$i];
+        #-- relative total
         if( $wex ){ 
           $wre  = int(1000.0*$wac/$wex)/10 if ($wex > 0);
         };
+        #-- relative expected
+        if( $wme ){ 
+          $wrm  = int(1000.0*$wac/$wme)/10 if ($wme > 0);
+        };
         # Put one item per line into the log file
-        printf NT5000FILE "%s %s %5s %5.1f %3d %6.1f %5.1f\n",$daten,$name,$names[$i],$data[$month+1-$i],$mmex,$wac,$wre;
+        printf NT5000FILE "%s %s %5s %5.1f %3d %6.1f %5.1f %6.1f %5.1f\n",$daten,$name,$names[$i],$data[$month+1-$i],$mmex,$wac,$wre,$wme,$wrm;
       }
-      Log 1,"NT5000_GetYear: File overwritten"; 
-      close(NT5000FILE);         
+      Log 1,"NT5000_GetYear: File $lf overwritten"; 
+      close(NT5000FILE);    
+       #-- store value 
+      $hash->{year}->[0]=$wac;
+      $hash->{year}->[1]=$wex;
+      $hash->{year}->[2]=$wre;
+      $hash->{year}->[3]=$wme;
+      $hash->{year}->[4]=$wrm;
+      #-- return value 
+      $value  = "\nWy ".$wac." kWh (yearly sum until now)\n";
+      $value .= $wrm."% of expected ".$wme." kWh\n";
+      $value .= $wre."% of total ".$wex." kWh";
+      return $value;       
     } else {
       Log 1,"NT5000_GetYear: Cannot open $lf for writing!"; 
+      return undef;
     }
   }
 }
@@ -1128,7 +1162,7 @@ elsif( $count == 5)
         <h4>Set</h4>
         <ul>
             <li><a name="nt5000_time">
-                   Not yet implemented</li>
+                   Not yet implemented</a></li>
         </ul>
         <br />
         <a name="NT5000get"></a>
@@ -1159,13 +1193,13 @@ elsif( $count == 5)
         <ul>
             <li><a name="nt5000_Area"><code>attr &lt;name&gt; Area &lt;float&gt;</code>
                 </a>
-                <br />Effective area [m<sup>2</sup>of the installation</li>
+                <br />Effective area [m<sup>2</sup>] of the installation</li>
             <li><a name="nt5000_PSP"><code>attr &lt;name&gt; PSP &lt;float&gt;</code>
                 </a>
                 <br />Peak Solar Power [kW] of the installation</li>
-            <li><a name="nt5000_Wx_M"><code>attr &lt;name&gt; Wx_M<n> &lt;float&gt;</code>
+            <li><a name="nt5000_Wx_M"><code>attr &lt;name&gt; Wx_M&lt;n&gt; &lt;float&gt;</code>
                 </a>
-                <br />Expected yield [kWh] for month <n>=1...12</li>
+                <br />Expected yield [kWh] for month &lt;n&gt;=1...12</li>
             <li><a name="nt5000_Wx_Y"><code>attr &lt;name&gt; Wx_Y &lt;float&gt;</code>
                 </a>
                 <br />Expected yield [kWh] for a full year</li>
@@ -1174,7 +1208,8 @@ elsif( $count == 5)
                 <br />List of months with erroneous logging, see lines 83ff</li>
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
                     href="#event-on-update-reading">event-on-update-reading</a>, <a
-                    href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
+                    href="#event-on-change-reading">event-on-change-reading</a>, <a
+                    href="#stateFormat">stateFormat</a>, <a href="#room"
                     >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
                     <a href="#webCmd">webCmd</a></li>
         </ul>
