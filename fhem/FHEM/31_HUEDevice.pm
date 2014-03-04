@@ -692,7 +692,7 @@ HUEDevice_GetUpdate($)
     {
       $s = 'off';
       $percent = 0;
-      if( $on && $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",0);}
+      if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",0);}
     }
 
   if( $percent != $hash->{helper}{percent} ) {readingsBulkUpdate($hash,"level", $percent . ' %');}
