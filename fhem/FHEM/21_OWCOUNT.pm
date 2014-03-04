@@ -84,7 +84,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.08";
+my $owx_version="5.09";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -501,7 +501,7 @@ sub OWCOUNT_FormatValues($) {
           
           #-- string buildup for monthly and yearly logging
           $dvalue .= sprintf( " %s: %5.1f %s %sM: %%5.1f %s",  $owg_channel[$i],$dval,$unit,$owg_channel[$i],$unit); 
-          $mvalue .= sprintf( " %s: %%5.1fM %s %sY: %%5.1f %s", $owg_channel[$i],$unit,$owg_channel[$i],$unit); 
+          $mvalue .= sprintf( " %sM: %%5.1f %s %sY: %%5.1f %s", $owg_channel[$i],$unit,$owg_channel[$i],$unit); 
         } #-- end daybreak
       
         #-- string buildup for return value and STATE
