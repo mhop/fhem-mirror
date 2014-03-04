@@ -119,10 +119,10 @@ sub HMLAN_Define($$) {#########################################################
   $defs{$name}{helper}{log}{all} = 0;# selective log support
   $defs{$name}{helper}{log}{sys} = 0;
   my @al = ();
-  @{$defs{$name}{helper}{log}{ids}} = \@al;
+  @{$hash->{helper}{log}{ids}} = \@al;
 
-  $defs{$name}{helper}{assId} = 0;#define hash
-
+  $hash->{assignedIDsCnt} = 0;#define hash
+  $hash->{assignedIDs} = "";
   HMLAN_condUpdate($hash,253);#set disconnected
   $hash->{STATE} = "disconnected";
 
@@ -1021,7 +1021,7 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
         <li><a href="#hmId">hmId</a></li><br>
         <li><a name="HMLANhmKey">hmKey</a></li><br>
         <li><a name="HMLANhmKey2">hmKey2</a></li><br>
-        <li><a name="HMLANhmKey3">hmKey3</a><br>
+        <li><a name="HMLANhmKey3">hmKey3</a></li><br>
         <li><a name="HMLANhmKey4">hmKey4</a></li><br>
         <li><a name="HMLANhmKey5">hmKey5</a><br>
         AES keys for the HMLAN adapter. <br>

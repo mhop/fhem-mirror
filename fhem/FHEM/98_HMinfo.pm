@@ -394,6 +394,7 @@ sub HMinfo_tempList(@) { ######################################################
         }
       }
     }
+    close(aSave);
     foreach (@exec){
       my @param = split(" ",$_);
       CUL_HM_Set($defs{$param[0]},@param);
@@ -1149,6 +1150,7 @@ sub HMinfo_loadConfig($@) {####################################################
       }
     }
   }
+  close(aSave);
   $ret .= "\nadded data:\n     "          .join("\n     ",@el)       if (scalar@el);
   $ret .= "\nfile data incomplete:\n     ".join("\n     ",@elincmpl) if (scalar@elincmpl);
   $ret .= "\nentries not defind:\n     "  .join("\n     ",@entryNF)  if (scalar@entryNF);
