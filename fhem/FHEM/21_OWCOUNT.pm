@@ -84,7 +84,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.06";
+my $owx_version="5.08";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -1045,17 +1045,9 @@ sub OWCOUNT_GetValues($) {
   RemoveInternalTimer($hash);
   InternalTimer(time()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 1);
   
-  #-- Get readings according to interface type
-  my $interface= $hash->{IODev}->{TYPE};
-  if( $interface eq "OWX" ){
-    $ret1 = OWXCOUNT_GetPage($hash,14,0);
-    $ret2 = OWXCOUNT_GetPage($hash,15,1);
-  }elsif( $interface eq "OWServer" ){
-    $ret1 = OWFSCOUNT_GetPage($hash,14,0);
-    $ret2 = OWFSCOUNT_GetPage($hash,15,1);
-  }else{
-    return "OWCOUNT: GetValues with wrong IODev type $interface";
-  }
+  #-- Get readings 
+  $ret1 = OWCOUNT_GetPage($hash,14,0);
+  $ret2 = OWCOUNT_GetPage($hash,15,1);
   
   #-- process results
   $ret .= $ret1
@@ -1095,7 +1087,6 @@ sub OWCOUNT_InitializeDevice($) {
     $hash->{owg_midnight}->[$i] = "";
     $hash->{owg_str}->[$i]      = "";
   }
-
   
   #-- testing if it is the emulator
   #-- The model may be DS2423 or DS2423emu. Some weird people are violating 1-Wire integrity by using the 
