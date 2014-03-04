@@ -4,9 +4,9 @@
 #
 # FHEM module to read the data from a PeakTech PT8005 sound level meter
 #
-# Prof. Dr. Peter A. Henning, 2013
+# Prof. Dr. Peter A. Henning, 2014
 # 
-# Version 1.2 - December 2013
+# Version 1.3 - January 2014
 #
 # setup, set/get functions and attributes see HTML text at bottom
 #
@@ -52,7 +52,6 @@ my @noisehour;
 my $noisenight="";
 my $noiseday="";
 
-
 #-- arrays for hourly values
 my @hourarr;
 
@@ -94,7 +93,7 @@ sub PT8005_Initialize ($) {
   $hash->{GetFn}   = "PT8005_Get";
   $hash->{SetFn}   = "PT8005_Set";
   # LogM, LogY = name of the monthly and yearly log file
-  $hash->{AttrList}= "LogM LogY ".
+  $hash->{AttrList}= "LogM LogY LimNight LimDay ".
            "loglevel ".
            $readingFnAttributes;
 }
@@ -303,7 +302,7 @@ sub PT8005_Get ($@) {
     }
     $v =~ s/[\r\n]//g;                          # Delete the NewLine
   } else {
-    return "PT8005_Get with unknown argument $a[1], choose one of " . join(",", sort keys %gets);
+    return "PT8005_Get with unknown argument $a[1], choose one of " . join(" ", sort keys %gets);
   }
 
   Log GetLogLevel($name,3), "PT8005_Get $a[1] $v";
@@ -566,7 +565,7 @@ sub PT8005_GetStatus ($) {
               } else {
                 $noisenight = "";
               }
-            } elsif( $oldhour==22 ){
+            } elsif( $hour==22 ){
               $avday = 0.0;
               $avcnt   = 0;
               for( my $i=7;$i<=22;$i++ ){
