@@ -214,6 +214,7 @@ use constant (
       EXTENDED_ANALOG          => 0x6F, # analog write (PWM, Servo, etc) to any pin
       SERVO_CONFIG             => 0x70, # set max angle, minPulse, maxPulse, freq
       STRING_DATA              => 0x71, # a string message with 14-bits per char
+      STEPPER_DATA             => 0x72, # control a stepper motor
       ONEWIRE_DATA             => 0x73, # OneWire read/write/reset/select/skip/search request + read/search reply
       SHIFT_DATA               => 0x75, # shiftOut config/data message (34 bits)
       I2C_REQUEST              => 0x76, # send an I2C read/write request
@@ -233,7 +234,8 @@ use constant (
       SERVO                    => 0x04, # digital pin in Servo output mode
       SHIFT                    => 0x05, # shiftIn/shiftOut mode
       I2C                      => 0x06, # pin included in I2C setup
-      ONEWIRE                  => 0x07,
+      ONEWIRE                  => 0x07, # pin configured for 1-Wire commuication
+      STEPPER                  => 0x08, # pin configured for stepper motor
 
       # Deprecated entries
       deprecated => [
@@ -267,6 +269,7 @@ use constant (
       EXTENDED_ANALOG          => 0x6F, # analog write (PWM, Servo, etc) to any pin
       SERVO_CONFIG             => 0x70, # set max angle, minPulse, maxPulse, freq
       STRING_DATA              => 0x71, # a string message with 14-bits per char
+      STEPPER_DATA             => 0x72, # control a stepper motor
       ONEWIRE_DATA             => 0x73, # OneWire read/write/reset/select/skip/search request + read/search reply
       SHIFT_DATA               => 0x75, # shiftOut config/data message (34 bits)
       I2C_REQUEST              => 0x76, # send an I2C read/write request
@@ -286,8 +289,8 @@ use constant (
       SERVO                    => 0x04, # digital pin in Servo output mode
       SHIFT                    => 0x05, # shiftIn/shiftOut mode
       I2C                      => 0x06, # pin included in I2C setup
-      ONEWIRE                  => 0x07,
-
+      ONEWIRE                  => 0x07, # pin configured for 1-Wire commuication
+      STEPPER                  => 0x08, # pin configured for stepper motor
       # Deprecated entries
       deprecated => [
         qw( FIRMATA_STRING SYSEX_I2C_REQUEST SYSEX_I2C_REPLY SYSEX_SAMPLING_INTERVAL )

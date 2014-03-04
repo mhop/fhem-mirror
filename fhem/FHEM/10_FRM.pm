@@ -325,6 +325,8 @@ sub FRM_DoInit($) {
 					$main::defs{$name}{onewire_pins} = join(",", sort{$a<=>$b}(@$onewirepins)) if (defined $onewirepins and scalar @$onewirepins);
 					my $encoderpins = $device->{metadata}{encoder_pins};
 					$main::defs{$name}{encoder_pins} = join(",", sort{$a<=>$b}(@$encoderpins)) if (defined $encoderpins and scalar @$encoderpins);
+					my $stepperpins = $device->{metadata}{stepper_pins};
+					$main::defs{$name}{stepper_pins} = join(",", sort{$a<=>$b}(@$stepperpins)) if (defined $stepperpins and scalar @$stepperpins);
 					if (defined $device->{metadata}{analog_resolutions}) {
 						my @analog_resolutions;
 						foreach my $pin (sort{$a<=>$b}(keys %{$device->{metadata}{analog_resolutions}})) {
@@ -352,6 +354,13 @@ sub FRM_DoInit($) {
 							push @encoder_resolutions,$pin.":".$device->{metadata}{encoder_resolutions}{$pin};
 						}
 						$main::defs{$name}{encoder_resolutions} = join(",",@encoder_resolutions) if (scalar @encoder_resolutions);
+					}
+					if (defined $device->{metadata}{stepper_resolutions}) {
+						my @stepper_resolutions;
+						foreach my $pin (sort{$a<=>$b}(keys %{$device->{metadata}{stepper_resolutions}})) {
+							push @stepper_resolutions,$pin.":".$device->{metadata}{stepper_resolutions}{$pin};
+						}
+						$main::defs{$name}{stepper_resolutions} = join(",",@stepper_resolutions) if (scalar @stepper_resolutions);
 					}
 					$found = 1;
 				} else {

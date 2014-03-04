@@ -28,6 +28,8 @@ use Device::Firmata::Base
   analog_resolutions          => {},
   pwm_resolutions             => {},
   servo_resolutions           => {},
+  stepper_resolutions         => {},
+  encoder_resolutions         => {},
   ports                       => [],
   pins                        => {},
   pin_modes                   => {},
@@ -87,6 +89,8 @@ sub detach {
   $self->{sysex_observer}     = undef;
   $self->{i2c_observer}       = undef;
   $self->{onewire_observer}   = [];
+  $self->{stepper_observer}   = [];
+  $self->{encoder_observer}   = [];
   $self->{scheduler_observer} = undef;
   $self->{tasks}              = [];
   $self->{metadata}           = {};
@@ -111,6 +115,8 @@ sub system_reset {
   $self->{sysex_observer}     = undef;
   $self->{i2c_observer}       = undef;
   $self->{onewire_observer}   = [];
+  $self->{stepper_observer}   = [];
+  $self->{encoder_observer}   = [];
   $self->{scheduler_observer} = undef;
   $self->{tasks}              = [];
   $self->{metadata}           = {};
@@ -279,9 +285,11 @@ sub sysex_handle {
           }
           if ($capabilities->{$pin}->{PIN_STEPPER+0}) {
           	push @stepperpins, $pin;
+            $self->{metadata}{stepper_resolutions}{$pin} = $capabilities->{$pin}->{PIN_STEPPER+0}->{resolution};
           }
           if ($capabilities->{$pin}->{PIN_ENCODER+0}) {
           	push @encoderpins, $pin;
+            $self->{metadata}{encoder_resolutions}{$pin} = $capabilities->{$pin}->{PIN_ENCODER+0}->{resolution};
           }
         }
       }
@@ -347,18 +355,22 @@ sub sysex_handle {
       }
       last;
     };
-    
+
     $sysex_message->{command_str} eq 'STEPPER_DATA' and do {
-      #TODO implement handling of STEPPER_DATA and call observer.
+      my $stepperNum = $data->{stepperNum};
+      my $observer = $self->{stepper_observer}[$stepperNum];
+      if (defined $observer) {
+        $observer->{method}( $stepperNum, $observer->{context} );
+      };
       last;
     };
-    
+
     $sysex_message->{command_str} eq 'ENCODER_DATA' and do {
       foreach my $encoder_data ( @$data ) {
         my $encoderNum = $encoder_data->{encoderNum};
         my $observer = $self->{encoder_observer}[$encoderNum];
         if (defined $observer) {
-          $observer->{method}( $encoder_data, $observer->{context} );
+          $observer->{method}( $encoderNum, $encoder_data->{value}, $observer->{context} );
         }
       };
       last;
@@ -769,6 +781,20 @@ sub onewire_command_series {
   return $self->{io}->data_write($self->{protocol}->packet_onewire_request( $pin, $args ));
 }
 
+sub stepper_config {
+  my ( $self, $stepperNum, $interface, $stepsPerRev, $directionPin, $stepPin, $motorPin3, $motorPin4 ) = @_;
+  die "unsupported mode 'STEPPER' for pin '".$directionPin."'" unless $self->is_supported_mode($directionPin,PIN_STEPPER);
+  die "unsupported mode 'STEPPER' for pin '".$stepPin."'" unless $self->is_supported_mode($stepPin,PIN_STEPPER);
+  die "unsupported mode 'STEPPER' for pin '".$motorPin3."'" unless (!(defined $motorPin3) or $self->is_supported_mode($motorPin3,PIN_STEPPER));
+  die "unsupported mode 'STEPPER' for pin '".$motorPin4."'" unless (!(defined $motorPin4) or $self->is_supported_mode($motorPin4,PIN_STEPPER));
+  return $self->{io}->data_write($self->{protocol}->packet_stepper_config( $stepperNum, $interface, $stepsPerRev, $directionPin, $stepPin, $motorPin3, $motorPin4 ));
+}
+
+sub stepper_step {
+  my ( $self, $stepperNum, $direction, $numSteps, $stepSpeed, $accel, $decel ) = @_;
+  return $self->{io}->data_write($self->{protocol}->packet_stepper_step( $stepperNum, $direction, $numSteps, $stepSpeed, $accel, $decel ));
+}
+
 sub encoder_attach {
   my ( $self, $encoderNum, $pinA, $pinB ) = @_;
   die "unsupported mode 'ENCODER' for pin '".$pinA."'" unless $self->is_supported_mode($pinA,PIN_ENCODER);
@@ -872,7 +898,12 @@ sub observe_onewire {
 }
 
 sub observe_stepper {
-  #TODO implement observe_stepper
+  my ( $self, $stepperNum, $observer, $context ) = @_;
+#TODO validation?  die "unsupported mode 'STEPPER' for pin '".$pin."'" unless ($self->is_supported_mode($pin,PIN_STEPPER));
+  $self->{stepper_observer}[$stepperNum] = {
+      method  => $observer,
+      context => $context,
+    };
   return 1;
 }
 

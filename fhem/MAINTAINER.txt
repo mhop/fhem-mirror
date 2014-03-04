@@ -61,12 +61,15 @@ FHEM/17_SIS_PMS.pm           painseeker           http://forum.fhem.de Sonstiges
 FHEM/18_CUL_HOERMANN.pm      rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/19_Revolt.pm            martinppp/mehf       http://forum.fhem.de SlowRF
 FHEM/20_FRM_AD.pm            ntruchsess           http://forum.fhem.de Sonstiges
+FHEM/20_FRM_ROTENC.pm        ntruchsess           http://forum.fhem.de Sonstiges
 FHEM/20_FRM_I2C.pm           ntruchsess           http://forum.fhem.de Sonstiges
 FHEM/20_FRM_IN.pm            ntruchsess           http://forum.fhem.de Sonstiges
 FHEM/20_FRM_LCD.pm           ntruchsess           http://forum.fhem.de Sonstiges
 FHEM/20_FRM_OUT.pm           ntruchsess           http://forum.fhem.de Sonstiges
 FHEM/20_FRM_PWM.pm           ntruchsess           http://forum.fhem.de Sonstiges
+FHEM/20_FRM_RBG.pm           ntruchsess           http://forum.fhem.de Sonstiges
 FHEM/20_FRM_SERVO.pm         ntruchsess           http://forum.fhem.de Sonstiges
+FHEM/20_FRM_STEPPER.pm       ntruchsess           http://forum.fhem.de Sonstiges
 FHEM/20_OWFS.pm              mfr69bs              http://forum.fhem.de 1Wire (deprecated)
 FHEM/20_X10.pm               borisneubert         http://forum.fhem.de SlowRF
 FHEM/20_ROOMMATE.pm          loredo               http://forum.fhem.de Automatisierung
@@ -149,7 +152,7 @@ FHEM/70_USBWX.pm             wherzig              http://forum.fhem.de Sonstiges
 FHEM/70_VIERA.pm             teevau               http://forum.fhem.de Sonstiges
 FHEM/70_WS3600.pm            Josch                http://forum.fhem.de Sonstiges
 FHEM/70_XBMC.pm              dennisb              http://forum.fhem.de Multimedia
-FHEM/70_Pushover.pm          Johannes_B           http://forum.fhem.de Unterstützende Dienste
+FHEM/70_Pushover.pm          Johannes_B           http://forum.fhem.de Unterstï¿½tzende Dienste
 FHEM/71_LISTENLIVE.pm        betateilchen         http://forum.fhem.de Multimedia
 FHEM/71_YAMAHA_AVR.pm        markusbloch          http://forum.fhem.de Multimedia
 FHEM/71_YAMAHA_BD.pm         markusbloch          http://forum.fhem.de Multimedia
@@ -197,7 +200,7 @@ FHEM/98_RandomTimer.pm       dietmar63            http://forum.fhem.de Unterstue
 FHEM/98_SVG.pm               rudolfkoenig         http://forum.fhem.de Frontends
 FHEM/98_THRESHOLD.pm         damian-s             http://forum.fhem.de Automatisierung
 FHEM/98_WeekdayTimer.pm      dietmar63            http://forum.fhem.de Unterstuetzende Dienste
-FHEM/98_WOL.pm               dietmar63            http://forum.fhem.de Unterstützende Dienste
+FHEM/98_WOL.pm               dietmar63            http://forum.fhem.de Unterstï¿½tzende Dienste
 FHEM/98_XmlList.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_autocreate.pm        rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_average.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
