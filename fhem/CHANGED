@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: JSONMETER: added statistic functions
   - feature: LightScene: added scene editor from UliM
   - feature: SYSMON: New method: SYSMON_ShowValuesText
   - feature: configDB.pm use sql database instead of fhem.cfg (betateilchen)
