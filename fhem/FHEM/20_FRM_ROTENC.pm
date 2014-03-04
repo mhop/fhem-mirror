@@ -79,11 +79,11 @@ FRM_ROTENC_Init($$)
 sub
 FRM_ROTENC_observer
 {
-	my ( $data, $hash ) = @_;
+	my ( $encoder, $value, $hash ) = @_;
 	my $name = $hash->{NAME};
-	Log3 $name,5,"onEncoderMessage for pins ".$hash->{PINA}.",".$hash->{PINB}." encoder: ".$data->{encoderNum}." position: ".$data->{value}."\n";
+	Log3 $name,5,"onEncoderMessage for pins ".$hash->{PINA}.",".$hash->{PINB}." encoder: ".$encoder." position: ".$value."\n";
 	main::readingsBeginUpdate($hash);
-	main::readingsBulkUpdate($hash,"position",$data->{value}, 1);
+	main::readingsBulkUpdate($hash,"position",$value, 1);
 	main::readingsEndUpdate($hash,1);
 }
 
