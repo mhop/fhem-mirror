@@ -110,7 +110,7 @@ KS300_Parse($$)
     readingsBeginUpdate($def);
     my @v;
     my @txt = ( "rain_raw", "rain", "wind", "humidity", "temperature",
-                "israining", "unknown1", "type_raw", "unknown3", "windIndex");
+                "israining", "checksum", "type_raw", "unknown3", "windIndex");
     my @sfx = ( "(counter)", "(l/m2)", "(km/h)", "(%)", "(Celsius)",
         "(yes/no)", "","","","");
     my %repchanged = ("rain"=>1, "wind"=>1, "humidity"=>1, "temperature"=>1,
