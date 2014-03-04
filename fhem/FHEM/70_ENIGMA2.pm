@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.3.2
+# Version: 1.3.3
 #
 # Major Version History:
 # - 1.3.0 - 2013-12-21
@@ -78,7 +78,7 @@ sub ENIGMA2_Initialize($) {
     $hash->{UndefFn} = "ENIGMA2_Undefine";
 
     $hash->{AttrList} =
-"https:0,1 http-method:GET,POST disable:0,1 bouquet-tv bouquet-radio timeout "
+"https:0,1 http-method:GET,POST http-noshutdown:1,0 disable:0,1 bouquet-tv bouquet-radio timeout "
       . $readingFnAttributes;
 
     $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG} =
@@ -769,11 +769,14 @@ sub ENIGMA2_Define($$) {
         {
             $attr{$name}{"http-method"} = 'POST';
         }
+    }
+    unless ( defined( AttrVal( $name, "http-noshutdown", undef ) ) ) {
 
-        # default method is GET and should be compatible to most
-        # ENIGMA2 Webif versions
-        else {
-            $attr{$name}{"http-method"} = 'GET';
+        # do shutdown in case this is a FritzBox
+        if ( exists $ENV{CONFIG_PRODUKT_NAME}
+            && defined $ENV{CONFIG_PRODUKT_NAME} )
+        {
+            $attr{$name}{"http-noshutdown"} = '0';
         }
     }
     unless ( defined( AttrVal( $name, "webCmd", undef ) ) ) {
@@ -803,10 +806,11 @@ sub ENIGMA2_Define($$) {
 ###################################
 sub ENIGMA2_SendCommand($$;$$) {
     my ( $hash, $service, $cmd, $type ) = @_;
-    my $name        = $hash->{NAME};
-    my $address     = $hash->{helper}{ADDRESS};
-    my $port        = $hash->{helper}{PORT};
-    my $http_method = $attr{$name}{"http-method"};
+    my $name    = $hash->{NAME};
+    my $address = $hash->{helper}{ADDRESS};
+    my $port    = $hash->{helper}{PORT};
+    my $http_method =
+      ( $attr{$name}{"http-method"} ) ? $attr{$name}{"http-method"} : "GET";
     my $timeout;
     $cmd = ( defined($cmd) ) ? $cmd : "";
 
@@ -871,20 +875,23 @@ sub ENIGMA2_SendCommand($$;$$) {
         $timeout = $attr{$name}{timeout};
     }
     else {
-        $timeout = 6;
+        $timeout = 3;
     }
+
+    my $noshutdown =
+      ( $attr{$name}{"http-noshutdown"} )
+      ? $attr{$name}{"http-noshutdown"}
+      : 1;
 
     # send request via HTTP-GET method
     if ( $http_method eq "GET" || $http_method eq "" || $cmd eq "" ) {
         Log3 $name, 5, "ENIGMA2 $name: GET " . urlDecode($URL);
 
-        #        $response = GetFileFromURL( $URL, $timeout, undef, 0, 5 );
-
         HttpUtils_NonblockingGet(
             {
                 url        => $URL,
                 timeout    => $timeout,
-                noshutdown => 1,
+                noshutdown => $noshutdown,
                 data       => undef,
                 hash       => $hash,
                 service    => $service,
@@ -904,13 +911,11 @@ sub ENIGMA2_SendCommand($$;$$) {
           . " (POST DATA: "
           . urlDecode($cmd) . ")";
 
-        #        $response = GetFileFromURL( $URL, $timeout, $cmd, 0, 5 );
-
         HttpUtils_NonblockingGet(
             {
                 url        => $URL,
                 timeout    => $timeout,
-                noshutdown => 1,
+                noshutdown => $noshutdown,
                 data       => $cmd,
                 hash       => $hash,
                 service    => $service,
@@ -2752,6 +2757,9 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
           </li>
           <li>
             <b>http-method</b> - HTTP access method to be used; e.g. a FritzBox might need to use POST instead of GET (GET/POST)
+          </li>
+          <li>
+            <b>http-noshutdown</b> - Explicitly shutdown HTTP connections or not; e.g. a FritzBox might this to be 0 (default=1)
           </li>
           <li>
             <b>https</b> - Access box via secure HTTP (true/false)
