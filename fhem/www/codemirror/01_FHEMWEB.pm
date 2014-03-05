@@ -2459,14 +2459,14 @@ sub FW_codemirrorLink($)
   $lang = "perl" if( !$lang );
 
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/jquery.min.js\"></script>";
-  FW_pO "<link rel=\"stylesheet\" href=\"$FW_ME/codemirror/lib/codemirror.css\">";
-  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/codemirror/lib/codemirror.js\"></script>";
-  FW_pO "<link rel=\"stylesheet\" href=\"$FW_ME/codemirror/theme/$theme.css\">";
-  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/codemirror/addon/edit/closebrackets.js\"></script>";
-  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/codemirror/addon/edit/matchbrackets.js\"></script>";
-  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/codemirror/addon/hint/show-hint.js\"></script>";
-  FW_pO "<link rel=\"stylesheet\" href=\"$FW_ME/codemirror/addon/hint/show-hint.css\">";
-  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/codemirror/mode/$lang/$lang.js\"></script>" if( $lang );
+  FW_pO "<link rel=\"stylesheet\" href=\"$FW_ME/codemirror/codemirror.css\">";
+  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/codemirror/codemirror.js\"></script>";
+  FW_pO "<link rel=\"stylesheet\" href=\"$FW_ME/codemirror/$theme.css\">";
+  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/codemirror/closebrackets.js\"></script>";
+  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/codemirror/matchbrackets.js\"></script>";
+  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/codemirror/show-hint.js\"></script>";
+  FW_pO "<link rel=\"stylesheet\" href=\"$FW_ME/codemirror/show-hint.css\">";
+  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/codemirror/$lang.js\"></script>" if( $lang );
   return;
 }
 
