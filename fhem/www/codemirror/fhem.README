@@ -1,6 +1,0 @@
-# $Id $
-
-- Directory maintained for fhem by betateilchen@FHEM-FORUM
-- Autocomplete ./mode/fhem/fhem.js maintained by papa@FHEM-FORUM
-
-See commandref -> 01_FHEMWEB.pm for correct use.
