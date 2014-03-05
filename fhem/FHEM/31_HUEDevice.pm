@@ -185,6 +185,7 @@ sub HUEDevice_Define($$)
 
     $hash->{helper}{percent} = -1;
 
+    $hash->{helper}{RGB} = '';
 
     $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
   } else {
@@ -716,8 +717,9 @@ HUEDevice_GetUpdate($)
   if( $s ne $hash->{STATE} ) {readingsBulkUpdate($hash,"state",$s);}
   readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
 
-  CommandTrigger( "", "$name RGB: ".CommandGet("","$name rgb") );
-
+  my $RGB = CommandGet("","$name rgb");
+  CommandTrigger( "", "$name RGB: $RGB" ) if( $RGB != $hash->{helper}{RGB} );
+  $hash->{helper}{RGB} = $RGB;
 }
 
 1;
