@@ -17,6 +17,7 @@ use strict;
 use warnings;
 use DBI;
 use Data::Dumper;
+use feature qw/say switch/;
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -34,6 +35,7 @@ sub DbLog_Initialize($)
   $hash->{DefFn}    = "DbLog_Define";
   $hash->{UndefFn}  = "DbLog_Undef";
   $hash->{NotifyFn} = "DbLog_Log";
+  $hash->{SetFn}    = "DbLog_Set";
   $hash->{GetFn}    = "DbLog_Get";
   $hash->{AttrFn}   = "DbLog_Attr";
   $hash->{ShutdownFn} = "DbLog_Shutdown";
@@ -66,7 +68,8 @@ sub DbLog_Define($@)
 
   return "Can't connect to database." if(!DbLog_Connect($hash));
 
-  $hash->{STATE} = "active";
+#  $hash->{STATE} = "active";
+  readingsSingleUpdate($hash, 'state', 'active', 1);
 
   return undef;
 }
@@ -1019,6 +1022,72 @@ DbLog_Get($@)
   }
 }
 
+sub DbLog_Set($@) {
+	my ($hash, @a) = @_;
+	my $name = $hash->{NAME};
+	my $usage = "Unknown argument, choose one of reopen:noArg count:noArg deleteOldDays userCommand";
+	return $usage if(int(@a) < 2);
+	my $dbh = $hash->{DBH};
+	my $ret;
+
+	given ($a[1]) {
+
+		when ('reopen') {
+			Log3($name, 4, "DbLog $name: Reopen requested.");
+			$dbh->commit();
+			$dbh->disconnect();
+			DbLog_Connect($hash);
+			$ret = "Reopen executed.";
+		}
+
+		when ('count') {
+			Log3($name, 4, "DbLog $name: Records count requested.");
+			my $c = $dbh->selectrow_array('SELECT count(*) FROM history');
+			readingsSingleUpdate($hash, 'countHistory', $c ,1);
+			$c = $dbh->selectrow_array('SELECT count(*) FROM current');
+			readingsSingleUpdate($hash, 'countCurrent', $c ,1);
+		}
+
+		when ('deleteOldDays') {
+			Log3($name, 4, "DbLog $name: Deletion of old records requested.");
+			my ($c, $cmd);
+			my $dbModel = InternalVal($name, 'DBMODEL', 'unknown');
+			$cmd = "delete from history where TIMESTAMP < ";
+			given ($dbModel) {
+				when ('SQLITE')			{ $cmd .= "datetime('now', '-$a[2] days')"; }
+				when ('MYSQL')			{ $cmd .= "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
+				when ('POSTGRESQL')	{ $cmd .= "NOW() - INTERVAL '$a[2] DAY"; }
+				default {
+					$cmd = undef;
+					$ret = 'Unkwon database type. Maybe you can try userCommand anyway.';
+				}
+			}
+
+			if(defined($cmd)) {
+				$c = $dbh->do($cmd);
+				readingsSingleUpdate($hash, 'lastRowsDeleted', $c ,1);
+			}
+		}
+
+		when ('userCommand') {
+			Log3($name, 4, "DbLog $name: userCommand execution requested.");
+			my ($c, @cmd, $sql);
+			@cmd = @a;
+			shift(@cmd); shift(@cmd);
+			$sql = join(" ",@cmd);
+			readingsSingleUpdate($hash, 'userCommand', $sql, 1);
+			$c = $dbh->selectrow_array($sql);
+			readingsSingleUpdate($hash, 'userCommandResult', $c ,1);
+		}
+
+		default { $ret = $usage; }
+
+	}
+
+	return $ret;
+
+}
+
 ################################################################
 #
 # Charting Specific functions start here
@@ -1371,10 +1440,26 @@ sub chartQuery($@) {
         <code>define myDbLog DbLog /etc/fhem/db.conf .*:.*</code>
     </ul>
   </ul>
-
+  <br/><br/>
 
   <a name="DbLogset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set</b> 
+  <ul>
+    <code>set &lt;name&gt; reopen </code><br/><br/>
+      <ul>Perform a database disconnect and immediate reconnect to clear cache and flush journal file.</ul><br/>
+
+    <code>set &lt;name&gt; count </code><br/><br/>
+      <ul>Count records in tables current and history and write results into readings countCurrent and countHistory.</ul><br/>
+
+    <code>set &lt;name&gt; deleteOldDays &lt;n&gt;</code><br/><br/>
+      <ul>Delete records from history older than days. Number of deleted record will be written into reading lastRowsDeleted.</ul><br/>
+
+    <code>set &lt;name&gt; userCommand &lt;validSqlStatement&gt;</code><br/><br/>
+      <ul><b>DO NOT USE THIS COMMAND UNLESS YOU REALLY (REALLY!) KNOW WHAT YOU ARE DOING!!!</b><br/><br/>
+          Perform any (!!!) sql statement on connected database. Ueercommand and result will be written into corresponding readings.<br/>
+      </ul><br/>
+
+  </ul><br>
 
   <a name="DbLogget"></a>
   <b>Get</b>
