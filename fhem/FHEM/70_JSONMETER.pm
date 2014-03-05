@@ -57,7 +57,7 @@ sub JSONMETER_ParseJsonFile($);
 sub JSONMETER_UpdateAborted($);
 sub JSONMETER_doStatisticMinMax ($$$); 
 sub JSONMETER_doStatisticMinMaxSingle ($$$$);
-sub JSONMETER_doStatisticDelta ($$$);
+sub JSONMETER_doStatisticDelta ($$$$);
 
 # Modul Version for remote debugging
   my $modulVersion = "2014-03-03";
@@ -66,14 +66,14 @@ sub JSONMETER_doStatisticDelta ($$$);
  # Syntax: meterType => port URL-Path
  ##############################################################
   my %meterTypes = ( ITF => "80 GetMeasuredValue.cgi" 
-               ,EFR => "80 json.txt"
-               ,LS110 => "80 a?f=j"
-               );
+                    ,EFR => "80 json.txt"
+                  ,LS110 => "80 a?f=j"
+                  );
 
  ##############################################################
  # Syntax: valueType, code, FHEM reading name, statisticType
  #     valueType: 1=OBISvalue | 2=OBISvalueString | 3=jsonProperty | 4=jsonPropertyTime
- #     statisticType: 0=noStatistic | 1=maxMinStatistic | 2=integralTimeStatistic
+ #     statisticType: 0=noStatistic | 1=maxMinStatistic | 2=integralTimeStatistic | 3=State+IntegralTimeStatistic
  ##############################################################
   my @jsonFields = (
     [3, "meterType", "meterType", 0] # {"meterId": "0000000061015736", "meterType": "Simplex", "interval": 0, "entry": [
@@ -88,7 +88,7 @@ sub JSONMETER_doStatisticDelta ($$$);
    ,[1, "0100150700FF", "electricityPowerPhase1", 1] # {"obis":"0100150700FF","value":209.40,"unit":"W"},
    ,[1, "0100290700FF", "electricityPowerPhase2", 1] # {"obis":"0100290700FF","value":14.27,"unit":"W"},
    ,[1, "01003D0700FF", "electricityPowerPhase3", 1] # {"obis":"01003D0700FF","value":89.40,"unit":"W"},
-   ,[1, "1.8.0|0101010800FF", "electricityConsumed", 2] # {"obis": "1.8.0", "scale": 0, "value": 8802276, "unit": "Wh", "valueString": "0008802.276" }, 
+   ,[1, "1.8.0|0101010800FF", "electricityConsumed", 3] # {"obis": "1.8.0", "scale": 0, "value": 8802276, "unit": "Wh", "valueString": "0008802.276" }, 
    ,[1, "1.8.1|0101010801FF", "electricityConsumedTariff1", 2] # {"obis":"0101010801FF","value":33.53,"unit":"kWh"},               
    ,[1, "1.8.2|0101010802FF", "electricityConsumedTariff2", 2] # {"obis":"0101010802FF","value":33.53,"unit":"kWh"},               
    ,[1, "1.8.3|0101010803FF", "electricityConsumedTariff3", 2] # {"obis":"0101010803FF","value":33.53,"unit":"kWh"},               
@@ -479,31 +479,31 @@ if ( $a[1] == 1 ){
                if ($fields[$i] =~ /"obis"\s*:\s*"($$f[1])"\s*[,}]/ && $fields[$i] =~ /"value"/) {
                   $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3]";
                   Log3 $name,4,"$name: OBIS code \"$$f[1]\" will be stored in $$f[2]";
-                  $returnStr .= "OBIS code \"$$f[1]\" will be extracted as reading '$$f[2]' from part $i:\n$fields[$i]\n\n";
+                  $returnStr .= "OBIS code \"$$f[1]\" will be extracted as reading '$$f[2]' (statistic type: $$f[3]) from part $i:\n$fields[$i]\n\n";
                }
             } elsif ($$f[0] == 2) { 
                if ($fields[$i] =~ /"obis"\s*:\s*"($$f[1])"\s*[,}]/ && $fields[$i] =~ /"valueString"/) {
                   $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3]";
                   Log3 $name,4,"$name: OBIS code \"$$f[1]\" will be stored in $$f[2]";
-                  $returnStr .= "OBIS code \"$$f[1]\" will be extracted as reading '$$f[2]' from part $i:\n$fields[$i]\n\n";
+                  $returnStr .= "OBIS code \"$$f[1]\" will be extracted as reading '$$f[2]' (statistic type: $$f[3]) from part $i:\n$fields[$i]\n\n";
                }
             } elsif ($$f[0] == 3) { 
                if ($fields[$i] =~ /"($$f[1])"\s*:/) {
                   $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[1]";
                   Log3 $name,4,"$name: Property \"$$f[1]\" will be stored in $$f[2]";
-                  $returnStr .= "Property \"$$f[1]\" will be extracted as reading '$$f[2]' from part $i:\n$fields[$i]\n\n";
+                  $returnStr .= "Property \"$$f[1]\" will be extracted as reading '$$f[2]' (statistic type: $$f[3]) from part $i:\n$fields[$i]\n\n";
               }
             } elsif ($$f[0] == 4) { 
                if ($fields[$i] =~ /"($$f[1])"\s*:/) {
                   $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[1]";
                   Log3 $name,4,"$name: Property \"$$f[1]\" will be stored in $$f[2]";
-                  $returnStr .= "Property \"$$f[1]\" will be extracted as reading '$$f[2]' from part $i:\n$fields[$i]\n\n";
+                  $returnStr .= "Property \"$$f[1]\" will be extracted as reading '$$f[2]' (statistic type: $$f[3]) from part $i:\n$fields[$i]\n\n";
                }
             } elsif ($$f[0] == 6) { 
                if ($fields[$i] =~ /"($$f[1])"\s*:/) {
                   $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[1]";
                   Log3 $name,4,"$name: Property \"$$f[1]\" will be stored in $$f[2]";
-                  $returnStr .= "Property \"$$f[1]\" will be extracted as reading '$$f[2]' from part $i:\n$fields[$i]\n\n";
+                  $returnStr .= "Property \"$$f[1]\" will be extracted as reading '$$f[2]' (statistic type: $$f[3]) from part $i:\n$fields[$i]\n\n";
                }
             }   
          }
@@ -584,8 +584,10 @@ if ( $a[1] == 1 ){
       if ( AttrVal($name,"doStatistics",0) == 1) { 
          # JSONMETER_doStatisticMinMax $hash, $readingName, $value
          if ($statisticType == 1 ) { JSONMETER_doStatisticMinMax $hash, "stat".ucfirst($b[2]), $value ; }
-         # JSONMETER_doStatisticDelta: $hash, $readingName, $value
-         if ($statisticType == 2 ) { JSONMETER_doStatisticDelta $hash, "stat".ucfirst($b[2]), $value ; }
+         # JSONMETER_doStatisticDelta: $hash, $readingName, $value, $special
+         if ($statisticType == 2 ) { JSONMETER_doStatisticDelta $hash, "stat".ucfirst($b[2]), $value, 0 ; }
+         # JSONMETER_doStatisticDelta: $hash, $readingName, $value, $special
+         if ($statisticType == 3 ) { JSONMETER_doStatisticDelta $hash, "stat".ucfirst($b[2]), $value, 1 ; }
       }
     }
 
@@ -704,9 +706,9 @@ JSONMETER_doStatisticMinMaxSingle ($$$$)
 
 # Calculates deltas for day, month and year
 sub ######################################## 
-JSONMETER_doStatisticDelta ($$$) 
+JSONMETER_doStatisticDelta ($$$$) 
 {
-   my ($hash, $readingName, $value) = @_;
+   my ($hash, $readingName, $value, $special) = @_;
    my $dummy;
 
    my @curr = split / /, $hash->{READINGS}{$readingName}{VAL} || "";
@@ -800,6 +802,8 @@ JSONMETER_doStatisticDelta ($$$)
    $result = "Day: $curr[1] Month: $curr[3] Year: $curr[5]";
    if ($start[7] != 0 ) { $result .= " (since: $curr[7] )"; }
    readingsBulkUpdate($hash,$readingName,$result);
+   
+   if ($special == 1) { readingsBulkUpdate($hash,$readingName."Today",$curr[1]) };
 
    if ($saveLast == 1) {
       $result = "Day: $last[1] Month: $last[3] Year: $last[5]";
@@ -897,9 +901,9 @@ JSONMETER_doStatisticDelta ($$$)
       </li><br>
     <li><code>doStatistics &lt; 0 | 1 &gt;</code>
       <br>
-      Calculate statistic values according to reading type (e.g. Average/Min/Max)
+      Builds daily, monthly and yearly statistics for certain readings (average/min/max or cumulated values).
       <br>
-      Builds daily, monthly and yearly statistics of certain readings. For diagrams, log readings of type 'stat<i>ReadingName</i><b>Last</b>'.
+      Logging and visualisation of the statistics should be done with readings of type 'stat<i>ReadingName</i><b>Last</b>'.
       </li><br>
    <li><code>pathString &lt;string&gt;</code>
       <ul>
