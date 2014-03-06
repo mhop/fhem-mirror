@@ -494,6 +494,34 @@ sub cfgDB_List(;$$) {
 	return $ret;
 }
 
+sub cfgDB_Diff($$){
+	my ($search,$searchversion) = @_;
+	eval {use Text::Diff};
+	return "error: Please install Text::Diff!" if($@);
+	my ($sql, $sth, @line, $row, @result, $ret, $v0, $v1);
+	my $fhem_dbh = cfgDB_Connect;
+
+	$sql = "SELECT command, device, p1, p2 FROM fhemconfig as c join fhemversions as v ON v.versionuuid=c.versionuuid ".
+	       "WHERE v.version = 0 AND device = '$search' ORDER BY command DESC";
+	$sth = $fhem_dbh->prepare( $sql);
+	$sth->execute();
+	while (@line = $sth->fetchrow_array()) {
+		$v0 .= "$line[0] $line[1] $line[2] $line[3]\n";
+	}
+	$sql = "SELECT command, device, p1, p2 FROM fhemconfig as c join fhemversions as v ON v.versionuuid=c.versionuuid ".
+	       "WHERE v.version = '$searchversion' AND device = '$search' ORDER BY command DESC";
+	$sth = $fhem_dbh->prepare( $sql);
+	$sth->execute();
+	while (@line = $sth->fetchrow_array()) {
+		$v1 .= "$line[0] $line[1] $line[2] $line[3]\n";
+	}
+	$fhem_dbh->disconnect();
+
+	$ret = "compare device: $search in current version (left) to version: $searchversion (right)\n";
+	$ret .= diff \$v0, \$v1, { STYLE => "Table" }; #,   \%options;
+	
+	return $ret;
+}
 
 1;
 
