@@ -1162,7 +1162,7 @@ FW_showRoom()
 
   FW_pO "<form method=\"$FW_formmethod\" ".
                 "action=\"$FW_ME\" autocomplete=\"off\">";
-  FW_pO "<div id=\"content\">";
+  FW_pO "<div id=\"content\" room=\"$FW_room\">";
   FW_pO "<table class=\"roomoverview\">";  # Need for equal width of subtables
 
   my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room

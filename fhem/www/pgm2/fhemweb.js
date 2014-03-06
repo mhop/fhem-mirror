@@ -5,6 +5,13 @@ var FW_widgets = new Object(); // to be filled by fhemweb_*.js
 var FW_leaving;
 
 function
+log(txt)
+{
+  if(typeof window.console != "undefined") // IE
+    console.log(txt);
+}
+
+function
 FW_cmd(arg)     /* see also FW_devState */
 {
   var req = new XMLHttpRequest();
@@ -54,8 +61,10 @@ FW_doUpdate()
   lines.pop();
   var devs = new Array();
   for(var i=FW_curLine; i < lines.length; i++) {
-    var d = lines[i].split("<<", 3);    // Complete arg
-    console.log("Got "+lines[i]);
+    var l = lines[i];
+    log("Longpoll: "+(l.length>132 ? l.substring(0,132)+"...("+l.length+")":l));
+    var d = l.split("<<", 3);    // Complete arg
+
     if(d.length != 3)
       continue;
     var elArr = document.querySelectorAll("[informId='"+d[0]+"']");
@@ -129,6 +138,12 @@ FW_longpoll()
     name = name.substring(0,name.length-5);
     filter=".*;iconPath="+name;
   }
+  if(filter == "") {
+    var room = document.getElementById("content").getAttribute("room");
+    if(room)
+      filter="room="+room;
+  }
+
   var iP = document.body.getAttribute("iconPath");
   if(iP != null)
     filter = filter +";iconPath="+iP;
