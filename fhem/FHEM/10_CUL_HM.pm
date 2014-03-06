@@ -2019,7 +2019,6 @@ sub CUL_HM_parseCommon(@){#####################################################
         ||(    $ioHash->{hmPairSerial}
             && $ioHash->{hmPairSerial} eq $attr{$shash->{NAME}}{serialNr})){
       # pairing requested - shall we?      
-      my $oldIoId = CUL_HM_Id($shash->{IODev});
       my $ioId = CUL_HM_Id($ioHash);
       if( $mFlg.$mTp ne "0400") {
         # pair now
@@ -2447,7 +2446,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     return $attr{$devName}{$p}           if ($attr{$devName}{$p});
     return "undefined";
   }
-  elsif($cmd eq "reg") {  #####################################################
+  elsif($cmd =~ m /^(reg|regVal)$/) {  #####################################################
     my (undef,undef,$regReq,$list,$peerId) = @a;
     if ($regReq eq 'all'){
       my @regArr = CUL_HM_getRegN($st,$md,$chn);
@@ -2490,7 +2489,8 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     }
     else{
       my $regVal = CUL_HM_getRegFromStore($name,$regReq,$list,$peerId);
-      return ($regVal !~ m /invalid/)? "Value not captured"
+	  $regVal =~ s/ .*// if ($cmd eq "regVal");
+      return ($regVal =~ m /^invalid/)? "Value not captured"
                                      : $regVal;
     }
   }
@@ -2595,6 +2595,8 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
 sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my ($hash, @a) = @_;
   return "no value specified" if(@a < 2);
+  return "FW update in progress - please wait" 
+        if ($modules{CUL_HM}{helper}{updating});
   my $act = join(" ", @a[1..$#a]);
   my $name    = $hash->{NAME};
   return "device ignored due to attr 'ignore'"
@@ -3642,6 +3644,39 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                                      $pressCnt));
     }
   }
+  elsif($cmd eq "fwUpdate") { #################################################
+    return "no filename given" if (!$a[2]);
+    return "only thru CUL " if (!$hash->{IODev}->{TYPE}
+                                 ||($hash->{IODev}->{TYPE} ne "CUL"));
+    # todo General add version cehck of CUL
+    my $fName = $a[2];
+    my $pos = 0;
+    my @imA; # image array: image[block][msg]
+    open(aUpdtF, $fName) || return("Can't open $fName: $!");
+    while(<aUpdtF>){
+      my $line = $_;
+      my $fs = length($line);
+      while ($fs>$pos){
+        my $bs = hex(substr($line,$pos,4))*2+4;	  
+        return "file corrupt. length:$fs expected:".($pos+$bs) 
+              if ($fs<$pos+$bs);
+        my @msg = grep !/^$/,unpack 'A74(A70)*',substr($line,$pos,$bs);
+        push @imA,\@msg; # image[block][msg]
+        $pos += $bs;
+      }
+    }
+    close(aUpdtF);
+    # --- we are prepared start update---
+    InternalTimer(gettimeofday()+100,"CUL_HM_FWupdateEnd","updateTmr:$name",0);
+    $modules{CUL_HM}{helper}{updating} = 1;
+    $modules{CUL_HM}{helper}{updatingName} = $name;
+    $modules{CUL_HM}{helper}{updateData} = \@imA;
+    $modules{CUL_HM}{helper}{updateStep} = 0;
+    $modules{CUL_HM}{helper}{updateDst} = $dst;
+    $modules{CUL_HM}{helper}{updateId} = $id;
+    my $msg;
+    $msg = "++3011$id${dst}CA";  Log 1,"General enter Boot:  $msg"; # CUL_HM_PushCmdStack($hash, $msg);
+  }
   elsif($cmd eq "postEvent") { ################################################
     my (undef,undef,$cond) = @a;
     my $cndNo;
@@ -4183,20 +4218,20 @@ sub CUL_HM_respWaitSu($@){ #setup response for multi-message response
 sub CUL_HM_responseSetup($$) {#store all we need to handle the response
  #setup repeatTimer and cmdStackControll
   my ($hash,$cmd) =  @_;
-  my ($mNo,$mFlg,$mTp,$dst,$p) = ($2,hex($3),$4,$6,$7)
-      if ($cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/);
-  my ($chn,$subType) = ($1,$2) if($p =~ m/^(..)(..)/);
+  my (undef,$mNo,$mFlg,$mTp,$src,$dst,$chn,$sTp,$dat) = 
+        unpack 'A4A2A2A2A6A6A2A2A*',$cmd;
+  $mFlg = hex($mFlg);
 
   if (($mFlg & 0x20) && ($dst ne '000000')){#msg wants ack
     my $rss = $hash->{helper}{prt}{wuReSent}
                        ? $hash->{helper}{prt}{wuReSent}
                        :1;#resend count - may need preloaded for WU device
 
-    if   ($mTp eq "01" && $subType){
-      if   ($subType eq "03"){ #PeerList-----------
+    if   ($mTp eq "01" && $sTp){
+      if   ($sTp eq "03"){ #PeerList-----------
         #--- remember request params in device level
         CUL_HM_respWaitSu ($hash,"Pending:=PeerList"
-                                ,"cmd:=$cmd" ,"forChn:=".substr($p,0,2)
+                                ,"cmd:=$cmd" ,"forChn:=$chn"
                                 ,"mNo:=".hex($mNo)
                                 ,"reSent:=$rss");
 
@@ -4208,8 +4243,8 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
         delete $chnhash->{helper}{peerIDsRaw};
         $attr{$chnhash->{NAME}}{peerIDs} = '';
       }
-      elsif($subType eq "04"){ #RegisterRead-------
-        my ($peer, $list) = ($1,$2) if ($p =~ m/..04(........)(..)/);
+      elsif($sTp eq "04"){ #RegisterRead-------
+        my ($peer, $list) = unpack 'A8A2',$dat;
         $peer = ($peer ne "00000000")?CUL_HM_peerChName($peer,$dst,""):"";
         #--- set messaging items
         my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
@@ -4231,7 +4266,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
         my $chnHash = $modules{CUL_HM}{defptr}{$dst.$chn};
         delete ($chnhash->{READINGS}{$rlName}{TIME});
       }
-      elsif($subType eq "09"){ #SerialRead-------
+      elsif($sTp eq "09"){ #SerialRead-------
         CUL_HM_respWaitSu ($hash,"Pending:=SerialRead"
                                 ,"cmd:=$cmd" ,"reSent:=$rss");
       }
@@ -4242,8 +4277,8 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
     }
     elsif($mTp eq '11'){
       my $to = "";
-      if ($chn =~ m/^(02|81)$/){#!!! chn is subtype!!!
-        if ($p =~ m/02..(..)....(....)/){#lvl ne 0 and timer on
+      if ($chn eq "02"){#!!! chn is subtype!!!
+        if ($dat =~ m/(..)....(....)/){#lvl ne 0 and timer on
           $hash->{helper}{tmdOn} = $2 if ($1 ne "00" && $2 !~ m/(0000|FFFF)/);
           $to = "timedOn:=1";
         }
@@ -4278,7 +4313,6 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
 
   my $mmcS = $hash->{helper}{prt}{mmcS}?$hash->{helper}{prt}{mmcS}:0;
   if ($mTp eq '01'){
-    my ($chn,$sTp) = unpack 'A2A2',$p;
     my $oCmd = "++".substr($cmd,6);
     if    ($sTp eq "05"){
       my @arr = ($oCmd);
@@ -4560,6 +4594,48 @@ sub CUL_HM_respPendToutProlong($) {#used when device sends part responses
   RemoveInternalTimer("respPend:$hash->{DEF}");
   InternalTimer(gettimeofday()+2, "CUL_HM_respPendTout", "respPend:$hash->{DEF}", 0);
 }
+sub CUL_HM_FWupdateSteps($){#steps for FW update
+  my $step = $modules{CUL_HM}{helper}{updateStep};
+  my $hash = $defs{$modules{CUL_HM}{helper}{updatingName}};
+  my $dst = $modules{CUL_HM}{helper}{updateDst};
+  my $id = $modules{CUL_HM}{helper}{updateId};
+  my $msg;
+  if ($step == 0){#check bootloader entered - now chnage speed
+    $msg = "++00CB$id${dst}105B11F81547";  Log 1,"General ch baud:  $msg"; # CUL_HM_PushCmdStack($hash, $msg);
+    Log 1,"General switch speed";   #  IOWrite($hash, "","AR\n");  
+    $msg = "++++20CB$id${dst}105B11F81547";Log 1,"General chk baud: $msg"; # CUL_HM_PushCmdStack($hash, $msg);
+	$modules{CUL_HM}{helper}{updateStep}++;
+  }
+  else{# check response - start programming
+    my $blocks = scalar(@{$modules{CUL_HM}{helper}{updateData}});
+	if ($blocks == $step){
+	  Log 1,"General we are done#########";
+ #    IOWrite($hash, "","Ar\n");     # switch CUL baud to 10
+	  CUL_HM_FWupdateEnd("updateTmr:".$modules{CUL_HM}{helper}{updatingName});
+	  return ;
+	}
+	else{
+      my $bl = ${$modules{CUL_HM}{helper}{updateData}}[$step-1];
+      my $no = scalar(@{$bl});
+      Log 1,"General next block - length:$no :$msg";
+      foreach my $msgP (@{$bl}){
+        $msg = "++".((--$no)?"00":"20")."CA$id$dst".$msgP;
+        Log 1,"General updatemessage$no: $msg";# CUL_HM_PushCmdStack($hash, $msg);
+      }
+	  $modules{CUL_HM}{helper}{updateStep}++;
+	}
+  }
+}
+sub CUL_HM_FWupdateEnd($){#end FW update
+  my $tmr = shift;
+  RemoveInternalTimer($tmr); # could be called by finish
+  delete $modules{CUL_HM}{helper}{updating};
+  delete $modules{CUL_HM}{helper}{updatingName};
+  delete $modules{CUL_HM}{helper}{updateData};
+  delete $modules{CUL_HM}{helper}{updateStep};
+  delete $modules{CUL_HM}{helper}{updateDst};
+  delete $modules{CUL_HM}{helper}{updateId};
+}
 
 sub CUL_HM_eventP($$) {#handle protocol events
   # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
@@ -4808,7 +4884,7 @@ sub CUL_HM_Id($) {#in: ioHash out: ioHMid
     return "000000";
   }
   my $fhtid = defined($io->{FHTID}) ? $io->{FHTID} : "0000";
-  return $attr{$io->{NAME}}{hmId}?$attr{$io->{NAME}}{hmId}:"F1$fhtid";
+  return AttrVal($io->{NAME},"hmId","F1$fhtid");
 }
 sub CUL_HM_IOid($) {#in: hash out: id of IO device
   my ($hash) = @_;
@@ -4817,7 +4893,6 @@ sub CUL_HM_IOid($) {#in: hash out: id of IO device
   my $fhtid = defined($ioHash->{FHTID}) ? $ioHash->{FHTID} : "0000";
   return "" if (!$ioHash->{NAME});
   return AttrVal($ioHash->{NAME},"hmId","F1$fhtid");
-  return $attr{$ioHash->{NAME}}{hmId}?$attr{$ioHash->{NAME}}{hmId}:"F1$fhtid";
 }
 sub CUL_HM_hash2Id($) {#in: id, out:hash
   my ($hash) = @_;
@@ -6859,12 +6934,19 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
          Note: if this command is executed on a channel and 'model' is
          requested the content hosting device's 'model' will be returned.
          </li>
-     <li><B>reg &lt;addr&gt; &lt;list&gt; &lt;peerID&gt;</B><br>
-         returns the value of a register. The data is taken from the storage in FHEM and not read directly outof the device. If register content is not present please use getConfig, getReg in advance.<br>
+     <li><B>reg &lt;addr&gt; &lt;list&gt; &lt;peerID&gt;</B><a name="CUL_HMget_reg"></a><br>
+         returns the value of a register. The data is taken from the storage in FHEM and not 
+		 read directly outof the device. 
+		 If register content is not present please use getConfig, getReg in advance.<br>
 
-         &lt;addr&gt; address in hex of the register. Registername can be used alternaly if decoded by FHEM. "all" will return all decoded register for this entity in one list.<br>
-         &lt;list&gt; list from which the register is taken. If rgistername is used list is ignored and can be set to 0.<br>
+         &lt;addr&gt; address in hex of the register. Registername can be used alternaly 
+		 if decoded by FHEM. "all" will return all decoded register for this entity in one list.<br>
+         &lt;list&gt; list from which the register is taken. If rgistername is used list 
+		 is ignored and can be set to 0.<br>
          &lt;peerID&gt; identifies the registerbank in case of list3 and list4. It an be set to dummy if not used.<br>
+         </li>
+     <li><B>regVal &lt;addr&gt; &lt;list&gt; &lt;peerID&gt;</B><br>
+         returns the value of a register. It does the same as <a href="#CUL_HMget_reg">reg</a> but strips off units<br>
          </li>
      <li><B>regList</B><br>
          returns a list of register that are decoded by FHEM for this device.<br>

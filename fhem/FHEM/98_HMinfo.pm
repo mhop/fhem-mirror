@@ -1458,6 +1458,10 @@ my %tpl = (
    autoOff           => {p=>"time"             ,t=>"staircase - auto off after <time>, extend time with each trigger"
                     ,reg=>{ OnTime          =>"p0"
                            ,OffTime         =>111600
+                           ,SwJtOn          =>"on"
+                           ,SwJtOff         =>"dlyOn"
+                           ,SwJtDlyOn       =>"no"
+                           ,SwJtDlyOff      =>"dlyOn"
                      }}
   ,motionOnDim       => {p=>"ontime brightness",t=>"Dimmer:on for time if MDIR-brightness below level"
                     ,reg=>{ CtDlyOn         =>"ltLo"
