@@ -139,9 +139,12 @@ FW_longpoll()
     filter=".*;iconPath="+name;
   }
   if(filter == "") {
-    var room = document.getElementById("content").getAttribute("room");
-    if(room)
-      filter="room="+room;
+    var content = document.getElementById("content");
+    if(content) {
+      var room = content.getAttribute("room");
+      if(room)
+        filter="room="+room;
+    }
   }
 
   var iP = document.body.getAttribute("iconPath");
