@@ -15,6 +15,7 @@ sub ZWave_ParseMeter($);
 sub ZWave_SetClasses($$$$);
 
 use vars qw(%zw_func_id);
+use vars qw(%zw_type6);
 
 my @zwave_models = qw(
   Everspring_AN1582 Everspring_AN1583
