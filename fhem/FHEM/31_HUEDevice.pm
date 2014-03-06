@@ -718,7 +718,7 @@ HUEDevice_GetUpdate($)
   readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
 
   my $RGB = CommandGet("","$name rgb");
-  CommandTrigger( "", "$name RGB: $RGB" ) if( $RGB != $hash->{helper}{RGB} );
+  CommandTrigger( "", "$name RGB: $RGB" ) if( $RGB ne $hash->{helper}{RGB} );
   $hash->{helper}{RGB} = $RGB;
 }
 
