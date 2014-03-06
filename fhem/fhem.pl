@@ -1493,7 +1493,7 @@ CommandDefine($$)
 
   my $ret = CallFn($name, "DefFn", \%hash, $def);
   if($ret) {
-    Log 1, "define: $ret";
+    Log 1, "define $name $def: $ret";
     delete $defs{$name};                            # Veto
     delete $attr{$name};
 
@@ -1572,6 +1572,7 @@ AssignIoPort($;$)
       $hash->{IODev} = 0;
     }
   }
+  return undef;
 }
 
 
