@@ -443,6 +443,11 @@ $attr{global}{motd} = "$sc_text\n\n"
         if(!$attr{global}{motd} || $attr{global}{motd} =~ m/^$sc_text/);
 
 $init_done = 1;
+foreach my $d (keys %defs) {
+  if(defined($defs{$d}{IODev}) && $defs{$d}{IODev} == 0) {
+    Log 3, "No I/O device found for $defs{$d}{NAME}";
+  }
+}
 DoTrigger("global", "INITIALIZED", 1);
 
 $attr{global}{motd} .= "Running with root privileges."
@@ -1558,7 +1563,15 @@ AssignIoPort($;$)
       }
     }
   }
-  Log 3, "No I/O device found for $hash->{NAME}" if(!$hash->{IODev});
+  if($hash->{IODev}) {
+    $attr{$hash->{NAME}}{IODev} = $hash->{IODev}{NAME};
+  } else {
+    if($init_done) {
+      Log 3, "No I/O device found for $hash->{NAME}"
+    } else {
+      $hash->{IODev} = 0;
+    }
+  }
 }
 
 
