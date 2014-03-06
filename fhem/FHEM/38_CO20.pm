@@ -285,7 +285,9 @@ CO20_Attr($$$)
 
   Notes:
   <ul>
-    <li>Device::USB hast to be installed on the FHEM host.</li>
+    <li>Device::USB hast to be installed on the FHEM host.<br>
+        It can be installed with '<code>cpan install Device::USB</code>'<br>
+        or on debian with '<code>sudo apt-get install libdevice-usb-perl'</code>'</li>
   </ul><br>
 
   <a name="CO20_Define"></a>
