@@ -264,6 +264,7 @@ FW_queryValue(cmd, qFn, qArg)
     if(qConn.readyState != 3)
       return;
     var qResp = qConn.responseText.replace(/[\r\n]/g, "")
+                                  .replace(/\\/g, "\\\\")
                                   .replace(/"/g, "\\\"");
     eval(qFn.replace("%", qResp));
     delete qConn;
