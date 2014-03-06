@@ -517,7 +517,7 @@ sub cfgDB_Diff($$){
 	}
 	$fhem_dbh->disconnect();
 
-	$ret = "compare device: $search in current version (left) to version: $searchversion (right)\n";
+	$ret = "compare device: $search in current version 0 (left) to version: $searchversion (right)\n";
 	$ret .= diff \$v0, \$v1, { STYLE => "Table" }; #,   \%options;
 	
 	return $ret;
@@ -671,6 +671,20 @@ Ver 0 always indicates the currently running configuration.<br/>
 				<code>{cfgDB_List 'global',1}</code><br/>
 			<br/>
 
+			<li><code>{cfgDB_Diff &lt;device&gt;,&lt;version&gt;}</code></li><br/>
+				Compare configuration dataset for device &lt;device&gt; from current version 0 with version &lt;version&gt;<br/>
+				Example for valid request:<br/>
+				<br/>
+				<code>{cfgDB_Diff 'telnetPort',1}</code><br/>
+				<br/>
+				will show a result like this:
+				<pre>
+compare device: telnetPort in current version 0 (left) to version: 1 (right)
++--+--------------------------------------+--+--------------------------------------+
+| 1|define telnetPort telnet 7072 global  | 1|define telnetPort telnet 7072 global  |
+* 2|attr telnetPort room telnet           *  |                                      |
++--+--------------------------------------+--+--------------------------------------+</pre>
+
 			<li><code>{cfgDB_Reorg [keep]}</code></li><br/>
 				Deletes all stored versions with version number higher than [keep].<br/>
 				Default value for optional parameter keep = 3.<br/>
@@ -702,6 +716,8 @@ Ver 0 always indicates the currently running configuration.<br/>
 			(either manually or by clicking on "save config").<br/>
 			This will take some moments, due to writing version informations.<br/>
 			Finishing the save-process will be indicated by a corresponding message in frontend.</li>
+			<br/>
+			<li>You may need to install perl package Text::Diff to use cfgDB_Diff()</li>
 			<br/>
 			<li>There still will be some more (planned) development to this extension, 
 			especially regarding some perfomance issues.</li>
@@ -861,6 +877,20 @@ Ver 0 bezeichnet immer die aktuell geladene Konfiguration.<br/>
 				<code>{cfgDB_List 'global',1}</code><br/>
 			<br/>
 
+			<li><code>{cfgDB_Diff &lt;device&gt;,&lt;version&gt;}</code></li><br/>
+				Vergleicht die Konfigurationsdaten des Ger&auml;tes &lt;device&gt; aus der aktuellen Version 0 mit den Daten aus Version &lt;version&gt;<br/>
+				Beispielaufruf:<br/>
+				<br/>
+				<code>{cfgDB_Diff 'telnetPort',1}</code><br/>
+				<br/>
+				liefert ein Ergebnis &auml;hnlich dieser Ausgabe:
+				<pre>
+compare device: telnetPort in current version 0 (left) to version: 1 (right)
++--+--------------------------------------+--+--------------------------------------+
+| 1|define telnetPort telnet 7072 global  | 1|define telnetPort telnet 7072 global  |
+* 2|attr telnetPort room telnet           *  |                                      |
++--+--------------------------------------+--+--------------------------------------+</pre>
+
 			<li><code>{cfgDB_Reorg [keep]}</code></li><br/>
 				L&ouml;scht alle gespeicherten Versionen mit Versionsnummer &gt; [keep].<br/>
 				Standardwert f&uuml;r den optionalen Parameter keep = 3.<br/>
@@ -891,6 +921,8 @@ Ver 0 bezeichnet immer die aktuell geladene Konfiguration.<br/>
 			<li>Beim Speichern einer Konfiguration nicht ungeduldig werden (egal ob manuell oder durch Klicken auf "save config")<br/>
 				Durch das Schreiben der Versionsinformationen dauert das ein paar Sekunden.<br/>
 				Der Abschluss des Speichern wird durch eine entsprechende Meldung angezeigt.</li>
+			<br/>
+			<li>F&uumlr die Nutzung von cfgDB_Diff() wird das perl Paket Text::Diff ben&ouml;tigt.</li>
 			<br/>
 			<li>Diese Erweiterung wird laufend weiterentwickelt. Speziell an der Verbesserung der Performance wird gearbeitet.</li>
 			<br/>
