@@ -43,6 +43,12 @@
 #            - added     cfgDB_List to show device info from database
 #            - updated   commandref docu for cfgDB_List
 #
+# 2014-03-06 - added     cfgDB_Diff to compare device in two versions
+#
+# 2014-03-07 - changed   optimized cfgDB_Diff
+#                        restructured libraray internally
+#                        improved source code documentation
+#
 ##############################################################################
 #
 
@@ -56,8 +62,21 @@ sub Debug($);
 sub Log3($$$);
 
 ##################################################
-# Read configuration file
+# Forward declarations inside this library
 #
+
+sub _cfgDB_Connect;
+sub _cfgDB_InsertLine($$$);
+sub _cfgDB_Execute($@);
+sub _cfgDB_ReadCfg(@);
+sub _cfgDB_ReadState(@);
+sub _cfgDB_Rotate($);
+sub _cfgDB_Uuid;
+
+##################################################
+# Read configuration file for DB connection
+#
+
 if(!open(CONFIG, 'configDB.conf')) {
 	Log3('configDB', 1, 'Cannot open database configuration file configDB.conf');
 	return 0;
@@ -79,44 +98,27 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 	$cfgDB_dbtype ="POSTGRESQL";
 	} elsif ($cfgDB_dbconn =~ m/mysql:/i) {
 	$cfgDB_dbtype = "MYSQL";
-#	} elsif ($cfgDB_dbconn =~ m/oracle:/i) {
-#	$cfgDB_dbtype = "ORACLE";
 	} elsif ($cfgDB_dbconn =~ m/sqlite:/i) {
 	$cfgDB_dbtype = "SQLITE";
 	} else {
 	$cfgDB_dbtype = "unknown";
 }
 
-sub cfgDB_svnId { 
-	return "# ".'$Id$' 
-}
+##################################################
+# Basic functions needed for DB configuration
+# directly called from fhem.pl
+#
+# cfgDB_Init, cfgDB_GlobalAttr, cfgDB_ReadAll
+# cfgDB_SaveCfg, cfgDB_SaveState, cfgDB_svnId
+#
 
-sub cfgDB_Connect {
-	my $fhem_dbh = DBI->connect(
-	"dbi:$cfgDB_dbconn", 
-	$cfgDB_dbuser,
-	$cfgDB_dbpass,
-	{ AutoCommit => 0, RaiseError => 1 },
-	) or die $DBI::errstr;
-	return $fhem_dbh;
-}
-
-sub cfgDB_Uuid{
-	my $fhem_dbh = cfgDB_Connect;
-	my $uuid;
-	$uuid = $fhem_dbh->selectrow_array('select lower(hex(randomblob(16)))') if($cfgDB_dbtype eq 'SQLITE');
-	$uuid = $fhem_dbh->selectrow_array('select uuid()') if($cfgDB_dbtype eq 'MYSQL');
-	$uuid = $fhem_dbh->selectrow_array('select uuid_generate_v4()') if($cfgDB_dbtype eq 'POSTGRESQL');
-	$fhem_dbh->disconnect();
-	return $uuid;
-}
-
+# initialize database, create tables if necessary
 sub cfgDB_Init {
 ##################################################
 #	Create non-existing database tables 
 #	Create default config entries if necessary
 #
-	my $fhem_dbh = cfgDB_Connect;
+	my $fhem_dbh = _cfgDB_Connect;
 
 	eval { $fhem_dbh->do("CREATE EXTENSION \"uuid-ossp\"") if($cfgDB_dbtype eq 'POSTGRESQL'); };
 
@@ -129,16 +131,16 @@ sub cfgDB_Init {
 	my $count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemconfig');
 	if($count < 1) {
 #		insert default entries to get fhem running
-		my $uuid = cfgDB_Uuid;
+		my $uuid = _cfgDB_Uuid;
 		$fhem_dbh->do("INSERT INTO fhemversions values (0, '$uuid')");
-		cfgDB_InsertLine($fhem_dbh, $uuid, '#created by cfgDB_Init');
-		cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global logfile ./log/fhem-%Y-%m-%d.log');
-		cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global modpath .');
-		cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global userattr devStateIcon devStateStyle icon sortby webCmd');
-		cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global verbose 3');
-		cfgDB_InsertLine($fhem_dbh, $uuid, 'define telnetPort telnet 7072 global');
-		cfgDB_InsertLine($fhem_dbh, $uuid, 'define WEB FHEMWEB 8083 global');
-		cfgDB_InsertLine($fhem_dbh, $uuid, 'define Logfile FileLog ./log/fhem-%Y-%m-%d.log fakelog');
+		_cfgDB_InsertLine($fhem_dbh, $uuid, '#created by cfgDB_Init');
+		_cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global logfile ./log/fhem-%Y-%m-%d.log');
+		_cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global modpath .');
+		_cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global userattr devStateIcon devStateStyle icon sortby webCmd');
+		_cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global verbose 3');
+		_cfgDB_InsertLine($fhem_dbh, $uuid, 'define telnetPort telnet 7072 global');
+		_cfgDB_InsertLine($fhem_dbh, $uuid, 'define WEB FHEMWEB 8083 global');
+		_cfgDB_InsertLine($fhem_dbh, $uuid, 'define Logfile FileLog ./log/fhem-%Y-%m-%d.log fakelog');
 	}
 
 #	create TABLE fhemstate if nonexistent
@@ -151,135 +153,41 @@ sub cfgDB_Init {
 	return;
 }
 
-sub cfgDB_Info {
-	my $l = '--------------------';
-	$l .= $l;
-	$l .= $l;
-	$l .= "\n";
-	my $r = $l;
-	$r .= " configDB Database Information\n";
-	$r .= $l;
-	$r .= " dbconn: $cfgDB_dbconn\n";
-	$r .= " dbuser: $cfgDB_dbuser\n";
-	$r .= " dbpass: $cfgDB_dbpass\n";
-	$r .= " dbtype: $cfgDB_dbtype\n";
-	$r .= " Unknown dbmodel type in configuration file.\n" if $dbtype eq 'unknown';
-	$r .= " Only Mysql, Postgresql, SQLite are fully supported.\n" if $dbtype eq 'unknown';
-	$r .= $l;
+# read and set attributes for 'global'
+sub cfgDB_GlobalAttr {
+	my ($sth, @line, $row, @dbconfig);
 
-	my $fhem_dbh = cfgDB_Connect;
-	my ($sql, $sth, @line, $row);
-
-#	read versions table statistics
-	my $count;
-	$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemconfig');
-	$r .= " fhemconfig: $count entries\n\n";
-
-#	read versions creation time
-	$sql = "SELECT * FROM fhemconfig as c join fhemversions as v on v.versionuuid=c.versionuuid ".
-			"WHERE COMMAND like '#created%' ORDER by v.VERSION";
-	$sth = $fhem_dbh->prepare( $sql );
+	my $fhem_dbh = _cfgDB_Connect;
+	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = 'global'" );  
 	$sth->execute();
+
 	while (@line = $sth->fetchrow_array()) {
-		$row	 = " Ver $line[6] saved: $line[1] $line[2] $line[3] def: ".
-				$fhem_dbh->selectrow_array("SELECT COUNT(*) from fhemconfig where COMMAND = 'define' and VERSIONUUID = '$line[5]'");
-		$row	.= " attr: ".
-				$fhem_dbh->selectrow_array("SELECT COUNT(*) from fhemconfig where COMMAND = 'attr' and VERSIONUUID = '$line[5]'");
-		$r		.= "$row\n";
+		$row = "$line[0] $line[1] $line[2] $line[3]";
+		$line[3] =~ s/#.*//;
+		$line[3] =~ s/ .*$//;
+		$attr{global}{$line[2]} = $line[3];
 	}
-	$r .= $l;
-
-#	read state table statistics
-	$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemstate');
-	$r .= " fhemstate: $count entries saved: ";
-#	read state table creation time
-	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemstate WHERE STATESTRING like '#%'" );  
-	$sth->execute();
-	while ($row = $sth->fetchrow_array()) {
-		(undef,$row) = split(/#/,$row);
-		$r .= "$row\n";
-	}
-	$r .= $l;
-
 	$fhem_dbh->disconnect();
-
-	return $r;
-}
-
-sub cfgDB_Recover($) {
-	my ($version) = @_;
-	my ($cmd, $count, $ret);
-
-	if($version > 0) {
-		my $fhem_dbh = cfgDB_Connect;
-		$cmd = "SELECT count(*) FROM fhemconfig WHERE VERSIONUUID in (select versionuuid from fhemversions where version = $version)";
-		$count = $fhem_dbh->selectrow_array($cmd);
-
-		if($count > 0) {
-			my $fromuuid = $fhem_dbh->selectrow_array("select versionuuid from fhemversions where version = $version");
-			my $touuid   = cfgDB_Uuid;
-#			Delete current version 0
-			$fhem_dbh->do("DELETE FROM fhemconfig WHERE VERSIONUUID in (select versionuuid from fhemversions where version = 0)");
-			$fhem_dbh->do("update fhemversions set versionuuid = '$touuid' where version = 0");
-
-#			Copy selected version to version 0
-			my ($sth, $sth2, @line);
-			$cmd = "SELECT * FROM fhemconfig WHERE VERSIONUUID = '$fromuuid'";
-			$sth = $fhem_dbh->prepare($cmd);  
-			$sth->execute();
-			$sth2 = $fhem_dbh->prepare('INSERT INTO fhemconfig values (?, ?, ?, ?, ?, ?)');
-			while (@line = $sth->fetchrow_array()) {
-				$sth2->execute($line[0], $line[1], $line[2], $line[3], -1, $touuid);
-			}
-			$fhem_dbh->commit();
-			$fhem_dbh->disconnect();
-
-#			Inform user about restart or rereadcfg needed
-			$ret  = "Version 0 deleted.\n";
-			$ret .= "Version $version copied to version 0\n\n";
-			$ret .= "Please use rereadcfg or restart to activate configuration.";
-		} else {
-			$fhem_dbh->disconnect();
-			$ret = "No entries found in version $version.\nNo changes committed to database.";
-		}
-	} else {
-		$ret = 'Please select version 1..n for recovery.';
-	}
-	return $ret;
-}
-
-sub cfgDB_Reorg(;$) {
-	my ($lastversion) = @_;
-	$lastversion = ($lastversion > 0) ? $lastversion : 3;
-	Log3('configDB', 4, "DB Reorg started, keeping last $lastversion versions.");
-	my $fhem_dbh = cfgDB_Connect;
-	$fhem_dbh->do("delete FROM fhemconfig   where versionuuid in (select versionuuid from fhemversions where version > $lastversion)");
-	$fhem_dbh->do("delete from fhemversions where version > $lastversion");
-	$fhem_dbh->commit();
-	$fhem_dbh->disconnect();
-	return " Result after database reorg:\n".cfgDB_Info;
-}
-
-sub cfgDB_InsertLine($$$) {
-	my ($fhem_dbh, $uuid, $line) = @_;
-	my ($c,$d,$p1,$p2) = split(/ /, $line, 4);
-	my $sth = $fhem_dbh->prepare('INSERT INTO fhemconfig values (?, ?, ?, ?, ?, ?)');
-	$sth->execute($c, $d, $p1, $p2, -1, $uuid);
 	return;
 }
 
-sub cfgDB_Execute($@) {
-	my ($cl, @dbconfig) = @_;
+# read and execute all commands from
+# fhemconfig and fhemstate
+sub cfgDB_ReadAll($){
+	my ($cl) = @_;
 	my $ret;
-	foreach (@dbconfig){
-		my $l = $_;
-		$l =~ s/[\r\n]//g;
-		$ret .= AnalyzeCommandChain($cl, $l);
-	}
+	# add Config Rows to commandfile
+	my @dbconfig = _cfgDB_ReadCfg(@dbconfig);
+	# add State Rows to commandfile
+	@dbconfig = _cfgDB_ReadState(@dbconfig);
+	# AnalyzeCommandChain for all entries
+	$ret .= _cfgDB_Execute($cl, @dbconfig);
 	return $ret if($ret);
 	return undef;
 }
 
+# rotate all older versions to versionnumber+1
+# save running configuration to version 0
 sub cfgDB_SaveCfg {
 	my (%devByNr, @rowList);
 
@@ -325,17 +233,18 @@ sub cfgDB_SaveCfg {
 	}
 	
 # Insert @rowList into database table
-	my $fhem_dbh = cfgDB_Connect;
-	my $uuid = cfgDB_Rotate($fhem_dbh);
+	my $fhem_dbh = _cfgDB_Connect;
+	my $uuid = _cfgDB_Rotate($fhem_dbh);
 	$t = localtime;
 	$out = "#created $t";
 	push @rowList, $out;
-	foreach (@rowList) { cfgDB_InsertLine($fhem_dbh, $uuid, $_); }
+	foreach (@rowList) { _cfgDB_InsertLine($fhem_dbh, $uuid, $_); }
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
 	return 'configDB saved.';
 }
 
+# save statefile
 sub cfgDB_SaveState {
 	my ($out,$val,$r,$rd,$t,@rowList);
 
@@ -380,7 +289,7 @@ sub cfgDB_SaveState {
 		}
 	}
 
-	my $fhem_dbh = cfgDB_Connect;
+	my $fhem_dbh = _cfgDB_Connect;
 	$fhem_dbh->do("DELETE FROM fhemstate");
 	my $sth = $fhem_dbh->prepare('INSERT INTO fhemstate values ( ? )');
 	foreach (@rowList) { $sth->execute( $_ ); }
@@ -389,9 +298,54 @@ sub cfgDB_SaveState {
 	return;
 }
 
-sub cfgDB_ReadCfg(@) {
+# return SVN Id, called by fhem's CommandVersion
+sub cfgDB_svnId { 
+	return "# ".'$Id$' 
+}
+
+##################################################
+# Basic functions needed for DB configuration
+# but not called from fhem.pl directly
+#
+
+# connect do database
+sub _cfgDB_Connect {
+	my $fhem_dbh = DBI->connect(
+	"dbi:$cfgDB_dbconn", 
+	$cfgDB_dbuser,
+	$cfgDB_dbpass,
+	{ AutoCommit => 0, RaiseError => 1 },
+	) or die $DBI::errstr;
+	return $fhem_dbh;
+}
+
+# add configuration entry into fhemconfig
+sub _cfgDB_InsertLine($$$) {
+	my ($fhem_dbh, $uuid, $line) = @_;
+	my ($c,$d,$p1,$p2) = split(/ /, $line, 4);
+	my $sth = $fhem_dbh->prepare('INSERT INTO fhemconfig values (?, ?, ?, ?, ?, ?)');
+	$sth->execute($c, $d, $p1, $p2, -1, $uuid);
+	return;
+}
+
+# pass command table to AnalyzeCommandChain
+sub _cfgDB_Execute($@) {
+	my ($cl, @dbconfig) = @_;
+	my $ret;
+	foreach (@dbconfig){
+		my $l = $_;
+		$l =~ s/[\r\n]//g;
+		$ret .= AnalyzeCommandChain($cl, $l);
+	}
+	return $ret if($ret);
+	return undef;
+}
+
+# read all entries from fhemconfig
+# and add them to command table for execution
+sub _cfgDB_ReadCfg(@) {
 	my (@dbconfig) = @_;
-	my $fhem_dbh = cfgDB_Connect;
+	my $fhem_dbh = _cfgDB_Connect;
 	my ($sth, @line, $row);
 
 # using a join would be much nicer, but does not work due to sort of join's result
@@ -407,9 +361,11 @@ sub cfgDB_ReadCfg(@) {
 	return @dbconfig;
 }
 
-sub cfgDB_ReadState(@) {
+# read all entries from fhemstate
+# and add them to command table for execution
+sub _cfgDB_ReadState(@) {
 	my (@dbconfig) = @_;
-	my $fhem_dbh = cfgDB_Connect;
+	my $fhem_dbh = _cfgDB_Connect;
 	my ($sth, $row);
 
 	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemstate" );  
@@ -421,45 +377,32 @@ sub cfgDB_ReadState(@) {
 	return @dbconfig;
 }
 
-sub cfgDB_GlobalAttr {
-	my ($sth, @line, $row, @dbconfig);
-
-	my $fhem_dbh = cfgDB_Connect;
-	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = 'global'" );  
-	$sth->execute();
-
-	while (@line = $sth->fetchrow_array()) {
-		$row = "$line[0] $line[1] $line[2] $line[3]";
-		$line[3] =~ s/#.*//;
-		$line[3] =~ s/ .*$//;
-		$attr{global}{$line[2]} = $line[3];
-	}
-	$fhem_dbh->disconnect();
-	return;
-}
-
-sub cfgDB_Rotate($) {
+# rotate all versions to versionnum + 1
+# return uuid for new version 0
+sub _cfgDB_Rotate($) {
 	my ($fhem_dbh) = @_;
-	my $uuid = cfgDB_Uuid;
-#	$fhem_dbh->do("UPDATE fhemconfig SET VERSION = VERSION+1");
+	my $uuid = _cfgDB_Uuid;
 	$fhem_dbh->do("UPDATE fhemversions SET VERSION = VERSION+1");
 	$fhem_dbh->do("INSERT INTO fhemversions values (0, '$uuid')");
 	return $uuid;
 }
 
-sub cfgDB_ReadAll($){
-	my ($cl) = @_;
-	my $ret;
-	# add Config Rows to commandfile
-	my @dbconfig = cfgDB_ReadCfg(@dbconfig);
-	# add State Rows to commandfile
-	@dbconfig = cfgDB_ReadState(@dbconfig);
-	# AnalyzeCommandChain for all entries
-	$ret .= cfgDB_Execute($cl, @dbconfig);
-	return $ret if($ret);
-	return undef;
+##################################################
+# Tools / additional functions
+#
+
+# return a UUID based on DB-model
+sub _cfgDB_Uuid{
+	my $fhem_dbh = _cfgDB_Connect;
+	my $uuid;
+	$uuid = $fhem_dbh->selectrow_array('select lower(hex(randomblob(16)))') if($cfgDB_dbtype eq 'SQLITE');
+	$uuid = $fhem_dbh->selectrow_array('select uuid()') if($cfgDB_dbtype eq 'MYSQL');
+	$uuid = $fhem_dbh->selectrow_array('select uuid_generate_v4()') if($cfgDB_dbtype eq 'POSTGRESQL');
+	$fhem_dbh->disconnect();
+	return $uuid;
 }
 
+# migrate existing fhem config into database
 sub cfgDB_Migrate {
 	Log3('configDB',4,'Starting migration.');
 	Log3('configDB',4,'Processing: cfgDB_Init.');
@@ -473,11 +416,124 @@ sub cfgDB_Migrate {
 
 }
 
+# show database statistics
+sub cfgDB_Info {
+	my $l = '--------------------';
+	$l .= $l;
+	$l .= $l;
+	$l .= "\n";
+	my $r = $l;
+	$r .= " configDB Database Information\n";
+	$r .= $l;
+	$r .= " dbconn: $cfgDB_dbconn\n";
+	$r .= " dbuser: $cfgDB_dbuser\n";
+	$r .= " dbpass: $cfgDB_dbpass\n";
+	$r .= " dbtype: $cfgDB_dbtype\n";
+	$r .= " Unknown dbmodel type in configuration file.\n" if $dbtype eq 'unknown';
+	$r .= " Only Mysql, Postgresql, SQLite are fully supported.\n" if $dbtype eq 'unknown';
+	$r .= $l;
+
+	my $fhem_dbh = _cfgDB_Connect;
+	my ($sql, $sth, @line, $row);
+
+#	read versions table statistics
+	my $count;
+	$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemconfig');
+	$r .= " fhemconfig: $count entries\n\n";
+
+#	read versions creation time
+	$sql = "SELECT * FROM fhemconfig as c join fhemversions as v on v.versionuuid=c.versionuuid ".
+			"WHERE COMMAND like '#created%' ORDER by v.VERSION";
+	$sth = $fhem_dbh->prepare( $sql );
+	$sth->execute();
+	while (@line = $sth->fetchrow_array()) {
+		$row	 = " Ver $line[6] saved: $line[1] $line[2] $line[3] def: ".
+				$fhem_dbh->selectrow_array("SELECT COUNT(*) from fhemconfig where COMMAND = 'define' and VERSIONUUID = '$line[5]'");
+		$row	.= " attr: ".
+				$fhem_dbh->selectrow_array("SELECT COUNT(*) from fhemconfig where COMMAND = 'attr' and VERSIONUUID = '$line[5]'");
+		$r		.= "$row\n";
+	}
+	$r .= $l;
+
+#	read state table statistics
+	$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemstate');
+	$r .= " fhemstate: $count entries saved: ";
+#	read state table creation time
+	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemstate WHERE STATESTRING like '#%'" );  
+	$sth->execute();
+	while ($row = $sth->fetchrow_array()) {
+		(undef,$row) = split(/#/,$row);
+		$r .= "$row\n";
+	}
+	$r .= $l;
+
+	$fhem_dbh->disconnect();
+
+	return $r;
+}
+
+# recover former config from database archive
+sub cfgDB_Recover($) {
+	my ($version) = @_;
+	my ($cmd, $count, $ret);
+
+	if($version > 0) {
+		my $fhem_dbh = _cfgDB_Connect;
+		$cmd = "SELECT count(*) FROM fhemconfig WHERE VERSIONUUID in (select versionuuid from fhemversions where version = $version)";
+		$count = $fhem_dbh->selectrow_array($cmd);
+
+		if($count > 0) {
+			my $fromuuid = $fhem_dbh->selectrow_array("select versionuuid from fhemversions where version = $version");
+			my $touuid   = _cfgDB_Uuid;
+#			Delete current version 0
+			$fhem_dbh->do("DELETE FROM fhemconfig WHERE VERSIONUUID in (select versionuuid from fhemversions where version = 0)");
+			$fhem_dbh->do("update fhemversions set versionuuid = '$touuid' where version = 0");
+
+#			Copy selected version to version 0
+			my ($sth, $sth2, @line);
+			$cmd = "SELECT * FROM fhemconfig WHERE VERSIONUUID = '$fromuuid'";
+			$sth = $fhem_dbh->prepare($cmd);  
+			$sth->execute();
+			$sth2 = $fhem_dbh->prepare('INSERT INTO fhemconfig values (?, ?, ?, ?, ?, ?)');
+			while (@line = $sth->fetchrow_array()) {
+				$sth2->execute($line[0], $line[1], $line[2], $line[3], -1, $touuid);
+			}
+			$fhem_dbh->commit();
+			$fhem_dbh->disconnect();
+
+#			Inform user about restart or rereadcfg needed
+			$ret  = "Version 0 deleted.\n";
+			$ret .= "Version $version copied to version 0\n\n";
+			$ret .= "Please use rereadcfg or restart to activate configuration.";
+		} else {
+			$fhem_dbh->disconnect();
+			$ret = "No entries found in version $version.\nNo changes committed to database.";
+		}
+	} else {
+		$ret = 'Please select version 1..n for recovery.';
+	}
+	return $ret;
+}
+
+# delete old configurations
+sub cfgDB_Reorg(;$) {
+	my ($lastversion) = @_;
+	$lastversion = ($lastversion > 0) ? $lastversion : 3;
+	Log3('configDB', 4, "DB Reorg started, keeping last $lastversion versions.");
+	my $fhem_dbh = _cfgDB_Connect;
+	$fhem_dbh->do("delete FROM fhemconfig   where versionuuid in (select versionuuid from fhemversions where version > $lastversion)");
+	$fhem_dbh->do("delete from fhemversions where version > $lastversion");
+	$fhem_dbh->commit();
+	$fhem_dbh->disconnect();
+	return " Result after database reorg:\n".cfgDB_Info;
+}
+
+# list device(s) from given version
 sub cfgDB_List(;$$) {
 	my ($search,$searchversion) = @_;
 	$search = $search ? $search : "%";
 	$searchversion = $searchversion ? $searchversion : 0;
-	my $fhem_dbh = cfgDB_Connect;
+	my $fhem_dbh = _cfgDB_Connect;
 	my ($sql, $sth, @line, $row, @result, $ret);
 	$sql = "SELECT command, device, p1, p2 FROM fhemconfig as c join fhemversions as v ON v.versionuuid=c.versionuuid ".
 	       "WHERE v.version = '$searchversion' AND command not like '#create%' AND device like '$search%' ORDER BY lower(device),command DESC";
@@ -494,32 +550,33 @@ sub cfgDB_List(;$$) {
 	return $ret;
 }
 
-sub cfgDB_Diff($$){
+# used from cfgDB_Diff
+sub _cfgDB_Diff($$$) {
+	my ($fhem_dbh,$search,$searchversion) = @_;
+	my ($sql, $sth, @line, $ret);
+	$sql =	"SELECT command, device, p1, p2 FROM fhemconfig as c join fhemversions as v ON v.versionuuid=c.versionuuid ".
+					"WHERE v.version = '$searchversion' AND device = '$search' ORDER BY command DESC";
+	$sth = $fhem_dbh->prepare( $sql);
+	$sth->execute();
+	while (@line = $sth->fetchrow_array()) {
+		$ret .= "$line[0] $line[1] $line[2] $line[3]\n";
+	}
+	return $ret;
+}
+
+# compare device configurations from 2 versions
+sub cfgDB_Diff($$) {
 	my ($search,$searchversion) = @_;
 	eval {use Text::Diff};
 	return "error: Please install Text::Diff!" if($@);
-	my ($sql, $sth, @line, $row, @result, $ret, $v0, $v1);
-	my $fhem_dbh = cfgDB_Connect;
-
-	$sql = "SELECT command, device, p1, p2 FROM fhemconfig as c join fhemversions as v ON v.versionuuid=c.versionuuid ".
-	       "WHERE v.version = 0 AND device = '$search' ORDER BY command DESC";
-	$sth = $fhem_dbh->prepare( $sql);
-	$sth->execute();
-	while (@line = $sth->fetchrow_array()) {
-		$v0 .= "$line[0] $line[1] $line[2] $line[3]\n";
-	}
-	$sql = "SELECT command, device, p1, p2 FROM fhemconfig as c join fhemversions as v ON v.versionuuid=c.versionuuid ".
-	       "WHERE v.version = '$searchversion' AND device = '$search' ORDER BY command DESC";
-	$sth = $fhem_dbh->prepare( $sql);
-	$sth->execute();
-	while (@line = $sth->fetchrow_array()) {
-		$v1 .= "$line[0] $line[1] $line[2] $line[3]\n";
-	}
+	my ($ret, $v0, $v1);
+	my $fhem_dbh = _cfgDB_Connect;
+		$v0 = _cfgDB_Diff($fhem_dbh,$search,0);
+		$v1 = _cfgDB_Diff($fhem_dbh,$search,$searchversion);
 	$fhem_dbh->disconnect();
-
-	$ret = "compare device: $search in current version 0 (left) to version: $searchversion (right)\n";
-	$ret .= diff \$v0, \$v1, { STYLE => "Table" }; #,   \%options;
-	
+	$ret = diff \$v0, \$v1, { STYLE => "Table" };
+	$ret = "\nNo differences found!" if !$ret;
+	$ret = "compare device: $search in current version 0 (left) to version: $searchversion (right)\n$ret\n";
 	return $ret;
 }
 
