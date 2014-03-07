@@ -24,9 +24,14 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.0
+# Version: 1.1.0
 #
 # Major Version History:
+# - 1.1.0 - 2014-03-07
+# -- bugfixes
+# -- additional commands: ambiMode,rgb,pause,play,record,volumeStraight
+# -- additional readings for Ambilight state
+#
 # - 1.0.0 - 2014-03-06
 # -- First release
 #
@@ -144,6 +149,14 @@ sub PHTV_GetStatus($;$) {
 
         # read ambilight mode
         PHTV_SendCommand( $hash, "ambilight/mode" ) if ( !$update );
+
+        # read ambilight RGB value
+        PHTV_SendCommand( $hash, "ambilight/cached" )
+          if (
+            defined( $hash->{READINGS}{ambiMode}{VAL} )
+            && (   $hash->{READINGS}{ambiMode}{VAL} eq "manual"
+                || $hash->{READINGS}{ambiMode}{VAL} eq "expert" )
+          );
     }
 
     # Input alias handling
@@ -180,7 +193,7 @@ sub PHTV_Get($@) {
 
     $what = $a[1];
 
-    if ( $what =~ /^(power|input|volume|mute)$/ ) {
+    if ( $what =~ /^(power|input|volume|mute|rgb)$/ ) {
         if ( defined( $hash->{READINGS}{$what} ) ) {
             return $hash->{READINGS}{$what}{VAL};
         }
@@ -191,7 +204,7 @@ sub PHTV_Get($@) {
 
     else {
         return
-"Unknown argument $what, choose one of power:noArg input:noArg volume:noArg mute:noArg ";
+"Unknown argument $what, choose one of power:noArg input:noArg volume:noArg mute:noArg rgb:noArg ";
     }
 }
 
@@ -269,7 +282,13 @@ sub PHTV_Set($@) {
     my $usage =
         "Unknown argument "
       . $a[1]
-      . ", choose one of statusRequest:noArg toggle:noArg on:noArg off:noArg volume:slider,1,1,60 volumeUp:noArg volumeDown:noArg channelUp:noArg channelDown:noArg remoteControl ambiHue:off,on";
+      . ", choose one of statusRequest:noArg toggle:noArg on:noArg off:noArg play:noArg pause:noArg stop:noArg record:noArg volume:slider,1,1,100 volumeUp:noArg volumeDown:noArg channelUp:noArg channelDown:noArg remoteControl ambiHue:off,on ambiMode:internal,manual,expert rgb:colorpicker,RGB";
+    $usage .=
+        " volumeStraight:slider,"
+      . $hash->{helper}{audio}{min} . ",1,"
+      . $hash->{helper}{audio}{max}
+      if ( defined( $hash->{helper}{audio}{min} )
+        && defined( $hash->{helper}{audio}{max} ) );
     $usage .= " mute:-,on,off"
       if ( defined( $hash->{READINGS}{mute}{VAL} )
         && $hash->{READINGS}{mute}{VAL} eq "-" );
@@ -305,24 +324,9 @@ sub PHTV_Set($@) {
 
     }
 
-    # on
-    elsif ( $a[1] eq "on" ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1];
-
-        return
-"Sorry, Philips Television devices currently do not seem to reliably support WoWLAN or WOL packages which is essential to be woken up from standby mode.";
-
-        if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
-            $cmd = PHTV_GetRemotecontrolCommand("STANDBY");
-            PHTV_SendCommand( $hash, "input/key", '"key": "' . $cmd . '"' );
-        }
-        else {
-            return "Device needs to be reachable to be set to standby mode.";
-        }
-    }
-
     # off
-    elsif ( $a[1] eq "off" ) {
+    # on
+    elsif ( $a[1] eq "off" || $a[1] eq "on" ) {
         Log3 $name, 2, "PHTV set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
@@ -330,7 +334,7 @@ sub PHTV_Set($@) {
             PHTV_SendCommand( $hash, "input/key", '"key": "' . $cmd . '"' );
         }
         else {
-            return "Device needs to be reachable to be set to standby mode.";
+            return "Device needs to be reachable to toggle standby mode.";
         }
     }
 
@@ -364,25 +368,144 @@ sub PHTV_Set($@) {
         }
     }
 
+    # ambiMode
+    elsif ( lc( $a[1] ) eq "ambimode" ) {
+        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            if ( $a[2] eq "internal" || $a[2] eq "manual" || $a[2] eq "expert" )
+            {
+                PHTV_SendCommand( $hash, "ambilight/mode",
+                    '"current": "' . $a[2] . '"', $a[2] );
+
+                readingsSingleUpdate( $hash, "rgb", "000000", 1 )
+                  if ( $a[2] eq "internal" );
+            }
+            else {
+                return
+"Unknown argument given, choose one of internal manual expert";
+            }
+        }
+        else {
+            return "Device needs to be ON to control Ambilight mode.";
+        }
+    }
+
+    # rgb
+    elsif ( $a[1] eq "rgb" ) {
+        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            if ( uc( $a[2] ) =~ /^(..)(..)(..)$/ ) {
+                my $json;
+                my ( $r, $g, $b ) = ( hex($1), hex($2), hex($3) );
+                my $rgbsum = $r + $g + $b;
+
+                $json .= '"r": ' . $r . ',';
+                $json .= '"g": ' . $g . ',';
+                $json .= '"b": ' . $b;
+                PHTV_SendCommand( $hash, "ambilight/cached", $json,
+                    uc( $a[2] ) );
+
+                # enable manual Ambilight color if RGB!=000000
+                PHTV_SendCommand( $hash, "ambilight/mode",
+                    '"current": "manual"', "manual" )
+                  if ( $hash->{READINGS}{ambiMode}{VAL} ne "manual"
+                    && $rgbsum > 0 );
+
+                # disable manual Ambilight color if RGB=000000
+                PHTV_SendCommand( $hash, "ambilight/mode",
+                    '"current": "internal"', "internal" )
+                  if ( $hash->{READINGS}{ambiMode}{VAL} ne "internal"
+                    && $rgbsum == 0 );
+
+                readingsSingleUpdate( $hash, "rgb", uc( $a[2] ), 1 )
+                  if ( $hash->{READINGS}{rgb}{VAL} ne uc( $a[2] ) );
+            }
+            else {
+                return "Invalid RGB code";
+            }
+        }
+        else {
+            return "Device needs to be ON to set Ambilight color.";
+        }
+    }
+
     # volume
     elsif ( $a[1] eq "volume" ) {
         Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
 
         return "No argument given" if ( !defined( $a[2] ) );
 
+        my $vol;
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             my $_ = $a[2];
-            if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
-                $cmd = '"current": ' . $a[2];
+            if ( m/^\d+$/ && $_ >= 1 && $_ <= 100 ) {
+                if (   defined( $hash->{helper}{audio}{min} )
+                    && defined( $hash->{helper}{audio}{max} ) )
+                {
+                    $vol = int(
+                        ( $a[2] / 100 * $hash->{helper}{audio}{max} ) + 0.5 );
+                }
+                else {
+                    $vol = $a[2];
+                }
+                $cmd = '"current": ' . $vol;
             }
             else {
                 return
 "Argument does not seem to be a valid integer between 0 and 100";
             }
-            $result = PHTV_SendCommand( $hash, "audio/volume", $cmd );
+            PHTV_SendCommand( $hash, "audio/volume", $cmd );
 
-            readingsSingleUpdate( $hash, "volume", $a[2], 1 )
+            readingsBeginUpdate($hash);
+            readingsBulkUpdate( $hash, "volume", $a[2], 1 )
               if ( $hash->{READINGS}{volume}{VAL} ne $a[2] );
+            readingsBulkUpdate( $hash, "volumeStraight", $vol, 1 )
+              if ( defined($vol)
+                && $hash->{READINGS}{volumeStraight}{VAL} ne $vol );
+            readingsEndUpdate( $hash, 1 );
+        }
+        else {
+            return "Device needs to be ON to adjust volume.";
+        }
+    }
+
+    # volumeStraight
+    elsif ( lc( $a[1] ) eq "volumestraight" ) {
+        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        my $vol;
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            my $_ = $a[2];
+            if (   m/^\d+$/
+                && $_ >= $hash->{helper}{audio}{min}
+                && $_ <= $hash->{helper}{audio}{max} )
+            {
+                $vol =
+                  int( ( $a[2] / $hash->{helper}{audio}{max} * 100 ) + 0.5 );
+                $cmd = '"current": ' . $a[2];
+            }
+            else {
+                return
+                    "Argument does not seem to be a valid integer between "
+                  . $hash->{helper}{audio}{min} . " and "
+                  . $hash->{helper}{audio}{max};
+            }
+            PHTV_SendCommand( $hash, "audio/volume", $cmd );
+
+            readingsBeginUpdate($hash);
+            readingsBulkUpdate( $hash, "volume", $vol, 1 )
+              if ( $hash->{READINGS}{volume}{VAL} ne $vol );
+            readingsBulkUpdate( $hash, "volumeStraight", $a[2], 1 )
+              if ( $hash->{READINGS}{volumeStraight}{VAL} ne $a[2] );
+            readingsEndUpdate( $hash, 1 );
         }
         else {
             return "Device needs to be ON to adjust volume.";
@@ -527,6 +650,10 @@ sub PHTV_Set($@) {
             my $_ = $a[2];
             if ( defined( $hash->{helper}{device}{channelID}{$_}{id} ) ) {
                 $cmd = $hash->{helper}{device}{channelID}{$_}{id};
+
+                if ( $hash->{READINGS}{channel}{VAL} ne $_ ) {
+                    readingsSingleUpdate( $hash, "channel", $_, 1 );
+                }
             }
             elsif ( /^(\d+):(.*):$/
                 && defined( $hash->{helper}{device}{channelPreset}{$_}{id} ) )
@@ -597,12 +724,54 @@ sub PHTV_Set($@) {
         }
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-            $result =
-              PHTV_SendCommand( $hash, "sources/current",
-                '"id": ' . $input_id, $input_id );
+            PHTV_SendCommand( $hash, "sources/current", '"id": ' . $input_id,
+                $input_id );
+
+            if ( $hash->{READINGS}{input}{VAL} ne $a[2] ) {
+                readingsSingleUpdate( $hash, "input", $a[2], 1 );
+            }
         }
         else {
             return "Device needs to be present to switch input.";
+        }
+    }
+
+    # play / pause
+    elsif ( $a[1] =~ /^(play|pause)$/ ) {
+        Log3 $name, 2, "PHTV set $name " . $a[1];
+
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            $cmd = PHTV_GetRemotecontrolCommand("PLAYPAUSE");
+            PHTV_SendCommand( $hash, "input/key", '"key": "' . $cmd . '"' );
+        }
+        else {
+            return "Device needs to be ON to play or pause video.";
+        }
+    }
+
+    # stop
+    elsif ( $a[1] eq "stop" ) {
+        Log3 $name, 2, "PHTV set $name " . $a[1];
+
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            $cmd = PHTV_GetRemotecontrolCommand("STOP");
+            PHTV_SendCommand( $hash, "input/key", '"key": "' . $cmd . '"' );
+        }
+        else {
+            return "Device needs to be ON to stop video.";
+        }
+    }
+
+    # record
+    elsif ( $a[1] eq "record" ) {
+        Log3 $name, 2, "PHTV set $name " . $a[1];
+
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            $cmd = PHTV_GetRemotecontrolCommand("RECORD");
+            PHTV_SendCommand( $hash, "input/key", '"key": "' . $cmd . '"' );
+        }
+        else {
+            return "Device needs to be ON to start instant recording.";
         }
     }
 
@@ -646,7 +815,7 @@ sub PHTV_Define($$) {
       if ( defined( $hash->{READINGS}{".model"}{VAL} ) );
 
     unless ( defined( AttrVal( $name, "webCmd", undef ) ) ) {
-        $attr{$name}{webCmd} = 'volume:input';
+        $attr{$name}{webCmd} = 'volume:input:rgb';
     }
     unless ( defined( AttrVal( $name, "devStateIcon", undef ) ) ) {
         $attr{$name}{devStateIcon} =
@@ -841,19 +1010,34 @@ sub PHTV_ReceiveCommand($$$) {
         # audio/volume
         if ( $service eq "audio/volume" ) {
             if ( ref($return) eq "HASH" ) {
-                $hash->{helper}{audio}{min} = $return->{min}
-                  if ( defined( $return->{min} ) );
-                $hash->{helper}{audio}{max} = $return->{max}
-                  if ( defined( $return->{max} ) );
 
+                # calculate volume
+                my $vol = ( $return->{current} ) ? $return->{current} : 0;
+                if ( defined( $return->{min} ) && defined( $return->{max} ) ) {
+                    $hash->{helper}{audio}{min} = $return->{min};
+                    $hash->{helper}{audio}{max} = $return->{max};
+
+                    $vol = int(
+                        ( $return->{current} / $return->{max} * 100 ) + 0.5 );
+                }
+
+                # volume
+                if ( !defined( $hash->{READINGS}{volume}{VAL} )
+                    || $hash->{READINGS}{volume}{VAL} ne $vol )
+                {
+                    readingsBulkUpdate( $hash, "volume", $vol );
+                }
+
+                # volumeStraight
                 if (
                     defined( $return->{current} )
-                    && ( !defined( $hash->{READINGS}{volume}{VAL} )
-                        || $hash->{READINGS}{volume}{VAL} ne
+                    && ( !defined( $hash->{READINGS}{volumeStraight}{VAL} )
+                        || $hash->{READINGS}{volumeStraight}{VAL} ne
                         $return->{current} )
                   )
                 {
-                    readingsBulkUpdate( $hash, "volume", $return->{current} );
+                    readingsBulkUpdate( $hash, "volumeStraight",
+                        $return->{current} );
                 }
 
                 if ( defined( $return->{muted} ) ) {
@@ -1356,6 +1540,121 @@ sub PHTV_ReceiveCommand($$$) {
                 }
 
             }
+            elsif ( $return eq "ok" ) {
+                if ( !defined( $hash->{READINGS}{ambiMode}{VAL} )
+                    || $hash->{READINGS}{ambiMode}{VAL} ne $type )
+                {
+                    readingsBulkUpdate( $hash, "ambiMode", $type );
+                }
+            }
+        }
+
+        # ambilight/cached (rgb)
+        elsif ( $service eq "ambilight/cached" ) {
+            if ( ref($return) eq "HASH" ) {
+                foreach my $layer ( keys $return ) {
+                    foreach my $side ( keys $return->{$layer} ) {
+                        foreach my $led ( keys $return->{$layer}{$side} ) {
+                            my $rgb = "";
+                            my $l   = $layer;
+                            my $s   = $side;
+                            $l =~ s/layer/L/;
+                            $s =~ s/left/L/   if ( $side eq "left" );
+                            $s =~ s/top/T/    if ( $side eq "top" );
+                            $s =~ s/right/R/  if ( $side eq "right" );
+                            $s =~ s/bottom/B/ if ( $side eq "bottom" );
+
+                            my $readingname = "rgb_" . $l . $s . $led;
+                            $rgb .= uc(
+                                sprintf( "%02x",
+                                    $return->{$layer}{$side}{$led}{r} )
+                            );
+                            $rgb .= uc(
+                                sprintf( "%02x",
+                                    $return->{$layer}{$side}{$led}{g} )
+                            );
+                            $rgb .= uc(
+                                sprintf( "%02x",
+                                    $return->{$layer}{$side}{$led}{b} )
+                            );
+
+                            if (
+                                !defined(
+                                    $hash->{READINGS}{$readingname}{VAL}
+                                )
+                                || $hash->{READINGS}{$readingname}{VAL} ne $rgb
+                              )
+                            {
+                                readingsBulkUpdate( $hash, $readingname, $rgb );
+                            }
+                        }
+                    }
+                }
+            }
+            elsif ( $return eq "ok" ) {
+                if ( $type =~ /^(..)(..)(..)$/
+                    && defined( $hash->{READINGS}{ambiLEDLayers}{VAL} ) )
+                {
+                    if ( !defined( $hash->{READINGS}{rgb}{VAL} )
+                        || $hash->{READINGS}{rgb}{VAL} ne $type )
+                    {
+                        readingsBulkUpdate( $hash, "rgb", $type );
+                    }
+
+                    if ( defined( $hash->{READINGS}{ambiLEDLayers}{VAL} ) ) {
+                        my $layer = 1;
+                        while (
+                            $layer <= $hash->{READINGS}{ambiLEDLayers}{VAL} )
+                        {
+
+                            foreach
+                              my $side ( 'Left', 'Top', 'Right', 'Bottom' )
+                            {
+                                my $ambiLED = "ambiLED$side";
+                                my $side    = lc($side);
+
+                                my $l = "L" . $layer;
+                                my $s = $side;
+                                $s =~ s/left/L/   if ( $side eq "left" );
+                                $s =~ s/top/T/    if ( $side eq "top" );
+                                $s =~ s/right/R/  if ( $side eq "right" );
+                                $s =~ s/bottom/B/ if ( $side eq "bottom" );
+
+                                if ( defined( $hash->{READINGS}{$ambiLED}{VAL} )
+                                    && $hash->{READINGS}{$ambiLED}{VAL} > 0 )
+                                {
+                                    my $led = 0;
+
+                                    while ( $led <=
+                                        $hash->{READINGS}{$ambiLED}{VAL} - 1 )
+                                    {
+                                        my $readingname =
+                                          "rgb_" . $l . $s . $led;
+
+                                        if (
+                                            !defined(
+                                                $hash->{READINGS}{$readingname}
+                                                  {VAL}
+                                            )
+                                            || $hash->{READINGS}{$readingname}
+                                            {VAL} ne $type
+                                          )
+                                        {
+                                            readingsBulkUpdate( $hash,
+                                                $readingname, $type );
+                                        }
+
+                                        $led++;
+                                    }
+                                }
+                            }
+
+                            $layer++;
+                        }
+                    }
+
+                }
+            }
         }
 
         # ambilight/processed (ambiHue)
@@ -1363,11 +1662,6 @@ sub PHTV_ReceiveCommand($$$) {
             if ( ref($return) eq "HASH" ) {
                 readingsBulkUpdate( $hash, "ambiHue", "on" )
                   if ( $type eq "init" );
-
-                if (   !defined( $attr{$name}{ambiHueLeft} )
-                    && !defined( $attr{$name}{ambiHueRight} )
-                    && !defined( $attr{$name}{ambiHueTop} )
-                    && !defined( $attr{$name}{ambiHueBottom} ) );
 
                 # run ambiHue
                 if (
@@ -1571,9 +1865,11 @@ sub PHTV_ReceiveCommand($$$) {
         || $newstate eq "undefined" )
     {
         foreach (
-            'mute',         'volume',      'input',       'channel',
-            'currentMedia', 'servicename', 'frequency',   'onid',
-            'tsid',         'sid',         'receiveMode', 'ambiMode'
+            'mute',        'volume',    'volumeStraight',
+            'input',       'channel',   'currentMedia',
+            'servicename', 'frequency', 'onid',
+            'tsid',        'sid',       'receiveMode',
+            'ambiMode'
           )
         {
             if ( !defined( $hash->{READINGS}{$_}{VAL} )
@@ -1799,6 +2095,7 @@ sub PHTV_GetRemotecontrolCommand($) {
       <li><b>channelUp</b> &nbsp;&nbsp;-&nbsp;&nbsp; zap to next channel</li>
       <li><b>channelDown</b> &nbsp;&nbsp;-&nbsp;&nbsp; zap to previous channel</li>
       <li><b>volume</b> 0...100 &nbsp;&nbsp;-&nbsp;&nbsp; set the volume level in percentage</li>
+      <li><b>volumeStraight</b> 1...60 &nbsp;&nbsp;-&nbsp;&nbsp; set the volume level in device specific range</li>
       <li><b>volumeUp</b> &nbsp;&nbsp;-&nbsp;&nbsp; increases the volume level</li>
       <li><b>volumeDown</b> &nbsp;&nbsp;-&nbsp;&nbsp; decreases the volume level</li>
       <li><b>mute</b> on,off,toggle &nbsp;&nbsp;-&nbsp;&nbsp; controls volume mute</li>
@@ -1806,6 +2103,12 @@ sub PHTV_GetRemotecontrolCommand($) {
       <li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current status of the device</li>
       <li><b>remoteControl</b> UP,DOWN,... &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands; see remoteControl help</li>
       <li><b>ambiHue</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; activates/disables Ambilight+Hue function</li>
+      <li><b>ambiMode</b> internal,manual,expert &nbsp;&nbsp;-&nbsp;&nbsp; set source register for Ambilight</li>
+      <li><b>rgb</b> internal,manual,expert &nbsp;&nbsp;-&nbsp;&nbsp; set an RGB value for Ambilight</li>
+      <li><b>play</b> &nbsp;&nbsp;-&nbsp;&nbsp;  starts/resumes playback</li>
+      <li><b>pause</b> &nbsp;&nbsp;-&nbsp;&nbsp;  starts/resumes playback</li>
+      <li><b>stop</b> &nbsp;&nbsp;-&nbsp;&nbsp;  stops current playback</li>
+      <li><b>record</b> &nbsp;&nbsp;-&nbsp;&nbsp;  starts recording of current channel</li>
     </ul>
   </ul>
   <br>
@@ -1823,6 +2126,7 @@ sub PHTV_GetRemotecontrolCommand($) {
     power<br>
     input<br>
     volume<br>
+    rgb<br>
   </code></ul>
   </ul>
   <br>
@@ -1863,6 +2167,7 @@ sub PHTV_GetRemotecontrolCommand($) {
     <li><b>state</b> - Reports current power state and an absence of the device (can be "on", "off" or "absent")</li>
     <li><b>tsid</b> - The TS ID</li>
     <li><b>volume</b> - Reports current volume level of the receiver in percentage values (between 0 and 100 %)</li>
+    <li><b>volumeStraight</b> - Reports current volume level of the receiver in device specific range</li>
   </ul></ul>
 
 </ul>
