@@ -297,7 +297,7 @@ EnOcean_Define($$)
   my @a = split("[ \t][ \t]*", $def);
   my $name = $hash->{NAME};
   return "wrong syntax: define <name> EnOcean 8-digit-hex-code"
-    if(int(@a) < 3 || int(@a) > 4 || $a[2] !~ m/^[A-F0-9]{8}$/i);
+    if(int(@a) < 3 || int(@a) > 4 || $a[2] !~ m/^[A-Fa-f0-9]{8}$/i);
   $modules{EnOcean}{defptr}{uc($a[2])} = $hash;
   AssignIoPort($hash);
   # Help FHEMWEB split up devices
@@ -327,14 +327,15 @@ EnOcean_Get ($@)
   } elsif ($destinationID !~ m/^[\dA-F]{8}$/) {
     return "DestinationID $destinationID wrong, choose <8-digit-hex-code>.";
   }
-  my $manufID = AttrVal($name, "manufID", "");
+  $destinationID = uc($destinationID);
+  my $manufID = uc(AttrVal($name, "manufID", ""));
   my $model = AttrVal($name, "model", "");
   my $rorg;
   my $status = "00";
   my $st = AttrVal($name, "subType", "");
   my $stSet = AttrVal($name, "subTypeSet", undef);
   if (defined $stSet) {$st = $stSet;}
-  my $subDef = AttrVal($name, "subDef", $hash->{DEF});
+  my $subDef = uc(AttrVal($name, "subDef", $hash->{DEF}));
   if ($subDef !~ m/^[\dA-F]{8}$/) {return "SenderID $subDef wrong, choose <8-digit-hex-code>.";}
   my $tn = TimeNow();
   shift @a;
@@ -404,10 +405,11 @@ EnOcean_Set($@)
     $destinationID = "FFFFFFFF";
   } elsif ($destinationID eq "unicast") {
     $destinationID = $hash->{DEF};
-  } elsif ($destinationID !~ m/^[\dA-F]{8}$/) {
+  } elsif ($destinationID !~ m/^[\dA-Fa-f]{8}$/) {
     return "DestinationID $destinationID wrong, choose <8-digit-hex-code>.";
   }
-  my $manufID = AttrVal($name, "manufID", "");
+  $destinationID = uc($destinationID);
+  my $manufID = uc(AttrVal($name, "manufID", ""));
   my $model = AttrVal($name, "model", "");
   my $rorg;
   my $sendCmd = "yes";
@@ -415,7 +417,7 @@ EnOcean_Set($@)
   my $st = AttrVal($name, "subType", "");
   my $stSet = AttrVal($name, "subTypeSet", undef);
   if (defined $stSet) {$st = $stSet;}
-  my $subDef = AttrVal($name, "subDef", $hash->{DEF});
+  my $subDef = uc(AttrVal($name, "subDef", $hash->{DEF}));
   if ($subDef !~ m/^[\dA-F]{8}$/) {return "SenderID $subDef wrong, choose <8-digit-hex-code>.";}
   my $switchMode = AttrVal($name, "switchMode", "switch");
   my $tn = TimeNow();
@@ -1922,40 +1924,40 @@ EnOcean_Set($@)
       # sent raw data
       if ($cmd eq "4BS"){
         # 4BS Telegram
-        if ($a[1] && $a[1] =~ m/^[\dA-F]{8}$/) {
-          $data = $a[1];
+        if ($a[1] && $a[1] =~ m/^[\dA-Fa-f]{8}$/) {
+          $data = uc($a[1]);
           $rorg = "A5";
         } else {
           return "Wrong parameter, choose 4BS <data 4 Byte hex> [status 1 Byte hex]";
         }
       } elsif ($cmd eq "1BS") {
         # 1BS Telegram
-        if ($a[1] && $a[1] =~ m/^[\dA-F]{2}$/) {
-          $data = $a[1];
+        if ($a[1] && $a[1] =~ m/^[\dA-Fa-f]{2}$/) {
+          $data = uc($a[1]);
           $rorg = "D5";
         } else {
           return "Wrong parameter, choose 1BS <data 1 Byte hex> [status 1 Byte hex]";
         }
       } elsif ($cmd eq "RPS") {
         # RPS Telegram
-        if ($a[1] && $a[1] =~ m/^[\dA-F]{2}$/) {
-          $data = $a[1];
+        if ($a[1] && $a[1] =~ m/^[\dA-Fa-f]{2}$/) {
+          $data = uc($a[1]);
           $rorg = "F6";
         } else {
           return "Wrong parameter, choose RPS <data 1 Byte hex> [status 1 Byte hex]";
         }
       } elsif ($cmd eq "MSC") {
         # MSC Telegram
-        if ($a[1] && $a[1] =~ m/^[\dA-F]{2,28}$/ && !(length($a[1]) % 2)) {
-          $data = $a[1];
+        if ($a[1] && $a[1] =~ m/^[\dA-Fa-f]{2,28}$/ && !(length($a[1]) % 2)) {
+          $data = uc($a[1]);
           $rorg = "D1";
         } else {
           return "Wrong parameter, choose MSC <data 1 ... 14 Byte hex> [status 1 Byte hex]";
         }
       } elsif ($cmd eq "UTE") {
         # UTE Telegram
-        if ($a[1] && $a[1] =~ m/^[\dA-F]{14}$/) {
-          $data = $a[1];
+        if ($a[1] && $a[1] =~ m/^[\dA-Fa-f]{14}$/) {
+          $data = uc($a[1]);
           $rorg = "D4";
         } else {
           return "Wrong parameter, choose UTE <data 7 Byte hex> [status 1 Byte hex]";
@@ -1963,8 +1965,8 @@ EnOcean_Set($@)
 
       } elsif ($cmd eq "VLD") {
         # VLD Telegram
-        if ($a[1] && $a[1] =~ m/^[\dA-F]{2,28}$/ && !(length($a[1]) % 2)) {
-          $data = $a[1];
+        if ($a[1] && $a[1] =~ m/^[\dA-Fa-f]{2,28}$/ && !(length($a[1]) % 2)) {
+          $data = uc($a[1]);
           $rorg = "D2";
         } else {
           return "Wrong parameter, choose VLD <data 1 ... 14 Byte hex> [status 1 Byte hex]";
@@ -1974,11 +1976,11 @@ EnOcean_Set($@)
         return "Unknown argument $cmd, choose one of 1BS 4BS MSC RPS UTE VLD test";
       }
       if ($a[2]) {
-        if ($a[2] !~ m/^[\dA-F]{2}$/) {
+        if ($a[2] !~ m/^[\dA-Fa-f]{2}$/) {
           return "Wrong status parameter, choose $cmd $a[1] [status 1 Byte hex]";
         }
-       $status = $a[2];
-       shift(@a);     
+       $status = uc($a[2]);
+       splice(@a,2,1);
       }
       $updateState = 0;
       readingsSingleUpdate($hash, "RORG", $cmd, 1);
@@ -2131,7 +2133,7 @@ EnOcean_Parse($$)
   }  
   my @event;
   my $model = AttrVal($name, "model", "");
-  my $manufID = AttrVal($name, "manufID", "");
+  my $manufID = uc(AttrVal($name, "manufID", ""));
   my $st = AttrVal($name, "subType", "");
   Log3 $name, 5, "EnOcean $name PacketType:$packetType RORG:$rorg DATA:$data ID:$id STATUS:$status";
 
@@ -4938,7 +4940,7 @@ EnOcean_Undef($$)
 
      <li>Single Input Contact, Door/Window Contact<br>
          1BS Telegram (EEP D5-00-01)<br>
-         [Eltako FTK, Peha D 450 FU, STM-250, BSC ?]
+         [EnOcean STM 320, STM 329, STM 250, Eltako FTK, Peha D 450 FU, STM-250, BSC ?]
      <ul>
          <li>closed</li>
          <li>open</li>
@@ -4949,7 +4951,7 @@ EnOcean_Undef($$)
      <br><br>
 
      <li>Temperature Sensors with with different ranges (EEP A5-02-01 ... A5-02-30)<br>
-         [Eltako FTF55, Thermokon SR65 ...]<br>
+         [EnOcean STM 330, Eltako FTF55, Thermokon SR65 ...]<br>
      <ul>
        <li>t/&#176C</li>
        <li>temperature: t/&#176C (Sensor Range: t = &lt;t min&gt; &#176C ... &lt;t max&gt; &#176C)</li>
@@ -5020,7 +5022,7 @@ EnOcean_Undef($$)
      <br><br>
 
       <li>Occupancy Sensor (EEP A5-07-01, A5-07-02)<br>
-         [untested]<br>
+         [EnOcean EOSW, untested]<br>
      <ul>
        <li>on|off</li>
        <li>errorCode: 251 ... 255</li>
