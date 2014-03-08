@@ -6,15 +6,15 @@ use strict;
 use warnings;
 use feature qw/say switch/;
 
-sub configDB_Initialize($) {
+sub configDBwrap_Initialize($) {
   my ($hash) = @_;
-  $hash->{DefFn}     = "configDB_Define";
-  $hash->{SetFn}     = "configDB_Set";
-  $hash->{GetFn}     = "configDB_Get";
+  $hash->{DefFn}     = "configDBwrap_Define";
+  $hash->{SetFn}     = "configDBwrap_Set";
+  $hash->{GetFn}     = "configDBwrap_Get";
   $hash->{AttrList}  = "private:1,0 ";
 }
 
-sub configDB_Define($$) {
+sub configDBwrap_Define($$) {
   return "configDB not enabled!" unless $attr{global}{configfile} eq 'configDB';
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
@@ -24,7 +24,7 @@ sub configDB_Define($$) {
   return undef;
 }
 
-sub configDB_Set($@) {
+sub configDBwrap_Set($@) {
 	my ($hash, @a) = @_;
 	my $name = $hash->{NAME};
 	my $usage = "Unknown argument, choose one of reorg recover";
@@ -51,7 +51,7 @@ sub configDB_Set($@) {
 
 }
 
-sub configDB_Get($@) {
+sub configDBwrap_Get($@) {
 
 	my ($hash, @a) = @_;
 	my $name = $hash->{NAME};
