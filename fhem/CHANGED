@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: DbLog: Added new function : ReadingsVal/ReadingsTimestamp
+  - feature: Text2Speech: added new attribute TTS_VolumeAdjust
   - feature: added wrapper module 98_configDB (betateilchen)
   - feature: new module 70_PHTV.pm (loredo)
   - feature: JSONMETER: added statistic functions
