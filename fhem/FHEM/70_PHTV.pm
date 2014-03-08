@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.1.0
+# Version: 1.1.1
 #
 # Major Version History:
 # - 1.1.0 - 2014-03-07
@@ -44,6 +44,8 @@ use warnings;
 use Data::Dumper;
 use JSON;
 use HttpUtils;
+use Color;
+use SetExtensions;
 use Encode;
 
 sub PHTV_Set($@);
@@ -76,6 +78,8 @@ sub PHTV_Initialize($) {
     $data{RC_layout}{PHTV}     = "PHTV_RClayout";
 
     $data{RC_makenotify}{PHTV} = "PHTV_RCmakenotify";
+
+    FHEM_colorpickerInit();
 
     return;
 }
@@ -282,7 +286,7 @@ sub PHTV_Set($@) {
     my $usage =
         "Unknown argument "
       . $a[1]
-      . ", choose one of statusRequest:noArg toggle:noArg on:noArg off:noArg play:noArg pause:noArg stop:noArg record:noArg volume:slider,1,1,100 volumeUp:noArg volumeDown:noArg channelUp:noArg channelDown:noArg remoteControl ambiHue:off,on ambiMode:internal,manual,expert rgb:colorpicker,RGB";
+      . ", choose one of statusRequest:noArg toggle:noArg on:noArg off:noArg play:noArg pause:noArg stop:noArg record:noArg volume:slider,1,1,100 volumeUp:noArg volumeDown:noArg channelUp:noArg channelDown:noArg remoteControl ambiHue:off,on ambiMode:internal,manual,expert rgb:colorpicker,RGB pct:slider,0,1,100";
     $usage .=
         " volumeStraight:slider,"
       . $hash->{helper}{audio}{min} . ",1,"
@@ -402,12 +406,16 @@ sub PHTV_Set($@) {
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             if ( uc( $a[2] ) =~ /^(..)(..)(..)$/ ) {
                 my $json;
+                my $bri;
+                my $pct;
                 my ( $r, $g, $b ) = ( hex($1), hex($2), hex($3) );
                 my $rgbsum = $r + $g + $b;
 
                 $json .= '"r": ' . $r . ',';
                 $json .= '"g": ' . $g . ',';
                 $json .= '"b": ' . $b;
+                $bri = PHTV_rgb2hsv( $r, $g, $b, "v" );
+                $pct = PHTV_bri2pct($bri);
                 PHTV_SendCommand( $hash, "ambilight/cached", $json,
                     uc( $a[2] ) );
 
@@ -423,8 +431,16 @@ sub PHTV_Set($@) {
                   if ( $hash->{READINGS}{ambiMode}{VAL} ne "internal"
                     && $rgbsum == 0 );
 
-                readingsSingleUpdate( $hash, "rgb", uc( $a[2] ), 1 )
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate( $hash, "pct", $pct )
+                  if ( $hash->{READINGS}{pct}{VAL} ne $pct );
+                readingsBulkUpdate( $hash, "level", $pct . " %" )
+                  if ( $hash->{READINGS}{level}{VAL} ne $pct . " %" );
+                readingsBulkUpdate( $hash, "bri", $bri )
+                  if ( $hash->{READINGS}{bri}{VAL} ne $bri );
+                readingsBulkUpdate( $hash, "rgb", uc( $a[2] ) )
                   if ( $hash->{READINGS}{rgb}{VAL} ne uc( $a[2] ) );
+                readingsEndUpdate( $hash, 1 );
             }
             else {
                 return "Invalid RGB code";
@@ -1595,10 +1611,26 @@ sub PHTV_ReceiveCommand($$$) {
                 if ( $type =~ /^(..)(..)(..)$/
                     && defined( $hash->{READINGS}{ambiLEDLayers}{VAL} ) )
                 {
+                    my $bri = PHTV_hex2hsv( $type, "v" );
+                    my $pct = PHTV_bri2pct($bri);
+
                     if ( !defined( $hash->{READINGS}{rgb}{VAL} )
                         || $hash->{READINGS}{rgb}{VAL} ne $type )
                     {
                         readingsBulkUpdate( $hash, "rgb", $type );
+                    }
+
+                    if ( !defined( $hash->{READINGS}{bri}{VAL} )
+                        || $hash->{READINGS}{bri}{VAL} ne $bri )
+                    {
+                        readingsBulkUpdate( $hash, "bri", $bri );
+                    }
+
+                    if ( !defined( $hash->{READINGS}{pct}{VAL} )
+                        || $hash->{READINGS}{pct}{VAL} ne $pct )
+                    {
+                        readingsBulkUpdate( $hash, "pct",   $pct );
+                        readingsBulkUpdate( $hash, "level", $pct . " %" );
                     }
 
                     if ( defined( $hash->{READINGS}{ambiLEDLayers}{VAL} ) ) {
@@ -1869,7 +1901,6 @@ sub PHTV_ReceiveCommand($$$) {
             'input',       'channel',   'currentMedia',
             'servicename', 'frequency', 'onid',
             'tsid',        'sid',       'receiveMode',
-            'ambiMode'
           )
         {
             if ( !defined( $hash->{READINGS}{$_}{VAL} )
@@ -2048,6 +2079,108 @@ sub PHTV_GetRemotecontrolCommand($) {
     else {
         return "";
     }
+}
+
+###################################
+sub PHTV_hex2rgb($) {
+    my ($hex) = @_;
+    if ( uc($hex) =~ /^(..)(..)(..)$/ ) {
+        my ( $r, $g, $b ) = ( hex($1), hex($2), hex($3) );
+        return { "r" => $r, "g" => $g, "b" => $b };
+    }
+}
+
+###################################
+sub PHTV_hex2hsv($;$) {
+    my ( $hex, $type ) = @_;
+    $type = lc($type) if ( defined( ($type) && $type ne "" ) );
+    my $rgb = PHTV_hex2rgb($hex);
+    my $return = PHTV_rgb2hsv( $rgb->{r}, $rgb->{g}, $rgb->{b} );
+
+    if ( defined($type) ) {
+        return $return->{h} if ( $type eq "h" );
+        return $return->{s} if ( $type eq "s" );
+        return $return->{v} if ( $type eq "v" );
+    }
+    else {
+        return $return;
+    }
+}
+
+###################################
+sub PHTV_bri2pct($) {
+    my ($bri) = @_;
+    return 0 if ( $bri <= 0 );
+    return int( ( $bri / 255 * 100 ) + 0.5 );
+}
+
+###################################
+sub PHTV_pct2bri($) {
+    my ($pct) = @_;
+    return 0 if ( $pct <= 0 );
+    return int( ( $pct / 100 * 255 ) + 0.5 );
+}
+
+###################################
+sub PHTV_rgb2hsv($$$;$) {
+    my ( $r, $g, $b, $type ) = @_;
+    $type = lc($type) if ( defined( ($type) && $type ne "" ) );
+    my ( $M, $m, $C, $H, $S, $V );
+
+    $M = PHTV_max( $r, $g, $b );
+    $m = PHTV_min( $r, $g, $b );
+    $C = ( $M - $m ) if ( $M > 0 || $m > 0 );
+    $C = 0 if ( $M == 0 && $m == 0 );
+
+    if ( $C == 0 ) {
+        $H = 0;
+        $S = 0;
+    }
+    else {
+        if ( $r == $M ) {
+            $H = ( $g - $b ) / $C;
+            $H += 6.0
+              if ( $H < 0.0 );
+        }
+        elsif ( $g == $M ) {
+            $H = ( ( $b - $r ) / $C ) + 2.0;
+        }
+        elsif ( $b == $M ) {
+            $H = ( ( $r - $g ) / $C ) + 4.0;
+        }
+
+        $H *= 60.0;
+        $S = $C / $M;
+    }
+
+    $V = $M;
+
+    if ( defined($type) ) {
+        return $H if ( $type eq "h" );
+        return $S if ( $type eq "s" );
+        return $V if ( $type eq "v" );
+    }
+    else {
+        return { "h" => $H, "s" => $S, "v" => $V };
+    }
+}
+
+###################################
+sub PHTV_max {
+    my ( $max, @vars ) = @_;
+    for (@vars) {
+        $max = $_ if $_ > $max;
+    }
+    return $max;
+}
+
+###################################
+sub PHTV_min {
+    my ( $min, @vars ) = @_;
+    for (@vars) {
+        $min = $_ if $_ < $min;
+    }
+    return $min;
 }
 
 1;
