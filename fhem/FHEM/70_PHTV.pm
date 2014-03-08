@@ -1184,7 +1184,7 @@ sub PHTV_SendCommand($$;$$) {
         $timeout = $attr{$name}{timeout};
     }
     else {
-        $timeout = 3;
+        $timeout = 7;
     }
 
     # send request via HTTP-POST method
