@@ -1,5 +1,3 @@
-
- 
 ##############################################
 # $Id$
 #
@@ -26,6 +24,8 @@ my %columns = ("DEVICE"  => 64,
                "VALUE"   => 128,
                "UNIT"    => 32
           );
+
+sub dbReadings($@);
 
 ################################################################
 sub DbLog_Initialize($)
@@ -689,6 +689,8 @@ sub
 DbLog_Get($@)
 {
   my ($hash, @a) = @_;
+
+  return dbReadings($hash,@a) if $a[1] =~ m/^Readings/;
 
   return "Usage: get $a[0] <in> <out> <from> <to> <column_spec>...\n".
      "  where column_spec is <device>:<reading>:<default>:<fn>\n" .
@@ -1376,6 +1378,25 @@ sub chartQuery($@) {
     return $jsonstring;
 }
 
+#
+# provide new functions:
+# get <dbLog> ReadingsVal       <device> <reading> <default>
+# get <dbLog> ReadingsTimestamp <device> <reading> <default>
+#
+sub dbReadings($@) {
+	my($hash,@a) = @_;
+	my $dbhf= $hash->{DBHF};
+	return 'Wrong Syntax for ReadingsVal!' unless defined($a[4]);
+	my $query = "select VALUE,TIMESTAMP from current where DEVICE= '$a[2]' and READING= '$a[3]'";
+#	my $query = "select VALUE,TIMESTAMP from history where DEVICE= '$a[2]' and READING= '$a[3]' order by TIMESTAMP desc limit 1";
+	my ($reading,$timestamp) = $dbhf->selectrow_array($query);
+	$reading = (defined($reading)) ? $reading : $a[4];
+	$timestamp = (defined($timestamp)) ? $timestamp : $a[4];
+	return $reading   if $a[1] eq 'ReadingsVal';
+	return $timestamp if $a[1] eq 'ReadingsTimestamp';
+	return "Syntax error: $a[1]";
+}
+
 1;
 
 =pod
@@ -1463,6 +1484,14 @@ sub chartQuery($@) {
 
   <a name="DbLogget"></a>
   <b>Get</b>
+  <ul>
+  <code>get &lt;name&gt; ReadingsVal&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;device&gt; &lt;reading&gt; &lt;default&gt;</code><br/>
+  <code>get &lt;name&gt; ReadingsTimestamp &lt;device&gt; &lt;reading&gt; &lt;default&gt;</code><br/>
+  <br/>
+  Retrieve one single value, use and syntax are similar to ReadingsVal() and ReadingsTimestamp() functions.<br/>
+  </ul>
+  <br/>
+  <br/>
   <ul>
     <code>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
           &lt;to&gt; &lt;column_spec&gt; </code>
@@ -1754,6 +1783,14 @@ sub chartQuery($@) {
 
   <a name="DbLogget"></a>
   <b>Get</b>
+  <ul>
+  <code>get &lt;name&gt; ReadingsVal&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;device&gt; &lt;reading&gt; &lt;default&gt;</code><br/>
+  <code>get &lt;name&gt; ReadingsTimestamp &lt;device&gt; &lt;reading&gt; &lt;default&gt;</code><br/>
+  <br/>
+  Liest einen einzelnen Wert aus der Datenbank, Benutzung und Syntax sind weitgehend identisch zu ReadingsVal() und ReadingsTimestamp().<br/>
+  </ul>
+  <br/>
+  <br/>
   <ul>
     <code>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
           &lt;to&gt; &lt;column_spec&gt; </code>
