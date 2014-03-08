@@ -64,6 +64,7 @@ sub Text2Speech_Initialize($)
                        " TTS_SentenceAppendix".
                        " TTS_FileMapping".
                        " TTS_FileTemplateDir".
+		       " TTS_VolumeAdjust".
                        " ".$readingFnAttributes;
 }
 
@@ -317,9 +318,9 @@ sub Text2Speech_Set($@)
   } elsif($cmd eq "volume") {
       my $vol = join(" ", @a);
       return "volume adjusting only available in direct mode" if($hash->{MODE} ne "DIRECT");
-      return "volume level expects 0..100 percent" if($vol !~ m/^([0-9]{1,2})$/);
-      $hash->{VOLUME} = $vol  if($vol ne 100);
-      delete($hash->{VOLUME}) if($vol eq 100);
+      return "volume level expects 0..100 percent" if($vol !~ m/^([0-9]{1,3})$/ or $vol > 100);
+      $hash->{VOLUME} = $vol  if($vol <= 100);
+      delete($hash->{VOLUME}) if($vol > 100);
   }
 
   return undef;
@@ -369,7 +370,7 @@ sub Text2Speech_PrepareSpeech($$) {
     $t =~ s/Ä/Ae/g;
     $t =~ s/Ö/Oe/g;
     $t =~ s/Ü/Ue/g;
-    $t =~ s/ß/sz/g;
+    $t =~ s/ß/ss/g;
 
     @text = $hash->{helper}{Text2Speech} if($hash->{helper}{Text2Speech}[0]);
     push(@text, $t);
@@ -455,10 +456,11 @@ sub Text2Speech_BuildMplayerCmdString($$) {
   my $cmd;
 
   my $TTS_MplayerCall = AttrVal($hash->{NAME}, "TTS_MplayerCall", $mplayer);
+  my $TTS_VolumeAdjust = AttrVal($hash->{NAME}, "TTS_VolumeAdjust", 110);
   my $verbose = AttrVal($hash->{NAME}, "verbose", 3);
 
   if($hash->{VOLUME}) { # per: set <name> volume <..>
-    $mplayerOpts .= " -softvol -softvol-max 110 -volume " . $hash->{VOLUME}; 
+    $mplayerOpts .= " -softvol -softvol-max ". $TTS_VolumeAdjust ." -volume " . $hash->{VOLUME}; 
   }
 
   my $AlsaDevice = $hash->{ALSADEVICE};
