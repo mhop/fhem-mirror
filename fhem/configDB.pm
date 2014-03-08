@@ -58,6 +58,7 @@ use DBI;
 # Forward declarations for functions in fhem.pl
 #
 sub AnalyzeCommandChain($$;$);
+sub AttrVal($$$);
 sub Debug($);
 sub Log3($$$);
 
@@ -387,10 +388,6 @@ sub _cfgDB_Rotate($) {
 	return $uuid;
 }
 
-##################################################
-# Tools / additional functions
-#
-
 # return a UUID based on DB-model
 sub _cfgDB_Uuid{
 	my $fhem_dbh = _cfgDB_Connect;
@@ -401,6 +398,11 @@ sub _cfgDB_Uuid{
 	$fhem_dbh->disconnect();
 	return $uuid;
 }
+
+##################################################
+# Tools / Additional functions
+# not called from fhem.pl directly
+#
 
 # migrate existing fhem config into database
 sub cfgDB_Migrate {
@@ -418,30 +420,31 @@ sub cfgDB_Migrate {
 
 # show database statistics
 sub cfgDB_Info {
-	my $l = '--------------------';
-	$l .= $l;
-	$l .= $l;
-	$l .= "\n";
-	my $r = $l;
-	$r .= " configDB Database Information\n";
-	$r .= $l;
-	$r .= " dbconn: $cfgDB_dbconn\n";
-	$r .= " dbuser: $cfgDB_dbuser\n";
-	$r .= " dbpass: $cfgDB_dbpass\n";
-	$r .= " dbtype: $cfgDB_dbtype\n";
-	$r .= " Unknown dbmodel type in configuration file.\n" if $dbtype eq 'unknown';
-	$r .= " Only Mysql, Postgresql, SQLite are fully supported.\n" if $dbtype eq 'unknown';
-	$r .= $l;
+	my ($l, @r);
+	for my $i (1..65){ $l .= '-';}
+#	$l .= "\n";
+	push @r, $l;
+	push @r, " configDB Database Information";
+	push @r, $l;
+	push @r, " ".cfgDB_svnId;
+	push @r, $l;
+	push @r, " dbconn: $cfgDB_dbconn";
+	push @r, " dbuser: $cfgDB_dbuser" if !$attr{configDB}{private};
+	push @r, " dbpass: $cfgDB_dbpass" if !$attr{configDB}{private};
+	push @r, " dbtype: $cfgDB_dbtype";
+	push @r, " Unknown dbmodel type in configuration file." if $dbtype eq 'unknown';
+	push @r, " Only Mysql, Postgresql, SQLite are fully supported." if $dbtype eq 'unknown';
+	push @r, $l;
 
 	my $fhem_dbh = _cfgDB_Connect;
 	my ($sql, $sth, @line, $row);
 
-#	read versions table statistics
+# read versions table statistics
 	my $count;
 	$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemconfig');
-	$r .= " fhemconfig: $count entries\n\n";
+	push @r, " fhemconfig: $count entries\n";
 
-#	read versions creation time
+# read versions creation time
 	$sql = "SELECT * FROM fhemconfig as c join fhemversions as v on v.versionuuid=c.versionuuid ".
 			"WHERE COMMAND like '#created%' ORDER by v.VERSION";
 	$sth = $fhem_dbh->prepare( $sql );
@@ -451,25 +454,25 @@ sub cfgDB_Info {
 				$fhem_dbh->selectrow_array("SELECT COUNT(*) from fhemconfig where COMMAND = 'define' and VERSIONUUID = '$line[5]'");
 		$row	.= " attr: ".
 				$fhem_dbh->selectrow_array("SELECT COUNT(*) from fhemconfig where COMMAND = 'attr' and VERSIONUUID = '$line[5]'");
-		$r		.= "$row\n";
+		push @r, $row;
 	}
-	$r .= $l;
+	push @r, $l;
 
-#	read state table statistics
+# read state table statistics
 	$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemstate');
-	$r .= " fhemstate: $count entries saved: ";
-#	read state table creation time
+# read state table creation time
 	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemstate WHERE STATESTRING like '#%'" );  
 	$sth->execute();
 	while ($row = $sth->fetchrow_array()) {
 		(undef,$row) = split(/#/,$row);
-		$r .= "$row\n";
+		$row = " fhemstate: $count entries saved: $row";
+		push @r, $row;
 	}
-	$r .= $l;
+	push @r, $l;
 
 	$fhem_dbh->disconnect();
 
-	return $r;
+	return join("\n", @r);
 }
 
 # recover former config from database archive
@@ -550,7 +553,7 @@ sub cfgDB_List(;$$) {
 	return $ret;
 }
 
-# used from cfgDB_Diff
+# called from cfgDB_Diff
 sub _cfgDB_Diff($$$) {
 	my ($fhem_dbh,$search,$searchversion) = @_;
 	my ($sql, $sth, @line, $ret);
