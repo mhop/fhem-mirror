@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.1.1
+# Version: 1.1.2
 #
 # Major Version History:
 # - 1.1.0 - 2014-03-07
@@ -286,7 +286,7 @@ sub PHTV_Set($@) {
     my $usage =
         "Unknown argument "
       . $a[1]
-      . ", choose one of statusRequest:noArg toggle:noArg on:noArg off:noArg play:noArg pause:noArg stop:noArg record:noArg volume:slider,1,1,100 volumeUp:noArg volumeDown:noArg channelUp:noArg channelDown:noArg remoteControl ambiHue:off,on ambiMode:internal,manual,expert rgb:colorpicker,RGB pct:slider,0,1,100";
+      . ", choose one of statusRequest:noArg toggle:noArg on:noArg off:noArg play:noArg pause:noArg stop:noArg record:noArg volume:slider,1,1,100 volumeUp:noArg volumeDown:noArg channelUp:noArg channelDown:noArg remoteControl ambiHue:off,on ambiMode:internal,manual,expert ambiPreset:rainbow,rainbow-pastel rgb:colorpicker,rgb";
     $usage .=
         " volumeStraight:slider,"
       . $hash->{helper}{audio}{min} . ",1,"
@@ -311,6 +311,8 @@ sub PHTV_Set($@) {
 
         delete $hash->{helper}{device}
           if ( defined( $hash->{helper}{device} ) );
+        delete $hash->{helper}{supportedAPIcmds}
+          if ( defined( $hash->{helper}{supportedAPIcmds} ) );
 
         PHTV_GetStatus($hash);
     }
@@ -397,15 +399,177 @@ sub PHTV_Set($@) {
         }
     }
 
-    # rgb
-    elsif ( $a[1] eq "rgb" ) {
+    # ambiPreset
+    elsif ( lc( $a[1] ) eq "ambipreset" ) {
         Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
 
         return "No argument given" if ( !defined( $a[2] ) );
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+
+            if ( defined( $hash->{READINGS}{ambiLEDLayers}{VAL} ) ) {
+                my $json;
+
+                # rainbow
+                if ( $a[2] eq "rainbow" ) {
+                    my $layer = ( $a[3] ) ? $a[3] : 1;
+
+                    return "Layer $layer is not numeric"
+                      if ( !PHTV_isinteger($layer) );
+
+                    return "Layer $layer is not existing"
+                      if ( $layer > $hash->{READINGS}{ambiLEDLayers}{VAL} );
+
+                    while ( $layer <= $hash->{READINGS}{ambiLEDLayers}{VAL} ) {
+                        my $rgb;
+
+                        foreach my $side ( 'Left', 'Top', 'Right', 'Bottom' ) {
+                            my $ambiLED = "ambiLED$side";
+                            my $side    = lc($side);
+
+                            my $l = "layer" . $layer;
+
+                            if ( defined( $hash->{READINGS}{$ambiLED}{VAL} )
+                                && $hash->{READINGS}{$ambiLED}{VAL} > 0 )
+                            {
+                                $rgb = { "r" => 255, "g" => 0, "b" => 0 }
+                                  if ( $side eq "left" || $side eq "right" );
+
+                                # run clockwise for left and top
+                                if ( $side eq "left" || $side eq "top" ) {
+                                    my $led = 0;
+                                    while ( $led <=
+                                        $hash->{READINGS}{$ambiLED}{VAL} - 1 )
+                                    {
+                                        $json->{$l}{$side}{$led}{r} = $rgb->{r};
+                                        $json->{$l}{$side}{$led}{g} = $rgb->{g};
+                                        $json->{$l}{$side}{$led}{b} = $rgb->{b};
+
+                                        if ( $rgb->{r} == 255 ) {
+                                            $rgb = {
+                                                "r" => 0,
+                                                "g" => 255,
+                                                "b" => 0
+                                            };
+                                        }
+                                        elsif ( $rgb->{g} == 255 ) {
+                                            $rgb = {
+                                                "r" => 0,
+                                                "g" => 0,
+                                                "b" => 255
+                                            };
+                                        }
+                                        elsif ( $rgb->{b} == 255 ) {
+                                            $rgb = {
+                                                "r" => 255,
+                                                "g" => 0,
+                                                "b" => 0
+                                            };
+                                        }
+
+                                        $led++;
+                                    }
+                                }
+
+                                # run anti-clockwise for right and bottom
+                                elsif ( $side eq "right" || $side eq "bottom" )
+                                {
+                                    my $led =
+                                      $hash->{READINGS}{$ambiLED}{VAL} - 1;
+                                    while ( $led >= 0 ) {
+                                        $json->{$l}{$side}{$led}{r} = $rgb->{r};
+                                        $json->{$l}{$side}{$led}{g} = $rgb->{g};
+                                        $json->{$l}{$side}{$led}{b} = $rgb->{b};
+
+                                        if ( $rgb->{r} == 255 ) {
+                                            $rgb = {
+                                                "r" => 0,
+                                                "g" => 255,
+                                                "b" => 0
+                                            };
+                                        }
+                                        elsif ( $rgb->{g} == 255 ) {
+                                            $rgb = {
+                                                "r" => 0,
+                                                "g" => 0,
+                                                "b" => 255
+                                            };
+                                        }
+                                        elsif ( $rgb->{b} == 255 ) {
+                                            $rgb = {
+                                                "r" => 255,
+                                                "g" => 0,
+                                                "b" => 0
+                                            };
+                                        }
+
+                                        $led--;
+                                    }
+                                }
+
+                            }
+                        }
+
+                        last if ( defined( $a[3] ) );
+                        $layer++;
+                    }
+
+                    # enable manual Ambilight color
+                    PHTV_SendCommand( $hash, "ambilight/mode",
+                        '"current": "manual"', "manual" )
+                      if ( $hash->{READINGS}{ambiMode}{VAL} ne "manual" );
+                }
+
+                # rainbow-pastel
+                elsif ( $a[2] eq "rainbow-pastel" ) {
+                    my $layer = ( $a[3] ) ? $a[3] : 1;
+
+                    return "Layer $layer is not numeric"
+                      if ( !PHTV_isinteger($layer) );
+
+                    return "Layer $layer is not existing"
+                      if ( $layer > $hash->{READINGS}{ambiLEDLayers}{VAL} );
+
+                    PHTV_Set( $hash, $name, "ambiPreset", "rainbow" );
+                    fhem("sleep 0.5");
+
+                    # enable manual Ambilight color
+                    PHTV_SendCommand( $hash, "ambilight/mode",
+                        '"current": "expert"', "expert" )
+                      if ( $hash->{READINGS}{ambiMode}{VAL} ne "expert" );
+                }
+
+                # unknown preset
+                else {
+                    return "Unknown preset, choose one of rainbow";
+                }
+
+                PHTV_SendCommand( $hash, "ambilight/cached", $json );
+            }
+            else {
+                return "Devices does not seem to support Ambilight.";
+            }
+
+        }
+        else {
+            return "Device needs to be ON to control Ambilight mode.";
+        }
+    }
+
+    # rgb
+    elsif ( $a[1] eq "rgb" ) {
+        Log3 $name, 4, "PHTV set $name " . $a[1] . " " . $a[2];
+
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+
+            # set all LEDs at once
             if ( uc( $a[2] ) =~ /^(..)(..)(..)$/ ) {
                 my $json;
+                my $hsv;
+                my $hue;
+                my $sat;
                 my $bri;
                 my $pct;
                 my ( $r, $g, $b ) = ( hex($1), hex($2), hex($3) );
@@ -414,7 +578,10 @@ sub PHTV_Set($@) {
                 $json .= '"r": ' . $r . ',';
                 $json .= '"g": ' . $g . ',';
                 $json .= '"b": ' . $b;
-                $bri = PHTV_rgb2hsv( $r, $g, $b, "v" );
+                $hsv = PHTV_rgb2hsv( $r, $g, $b );
+                $hue = $hsv->{h};
+                $sat = int( $hsv->{s} * 100 + 0.5 );
+                $bri = $hsv->{v};
                 $pct = PHTV_bri2pct($bri);
                 PHTV_SendCommand( $hash, "ambilight/cached", $json,
                     uc( $a[2] ) );
@@ -422,7 +589,7 @@ sub PHTV_Set($@) {
                 # enable manual Ambilight color if RGB!=000000
                 PHTV_SendCommand( $hash, "ambilight/mode",
                     '"current": "manual"', "manual" )
-                  if ( $hash->{READINGS}{ambiMode}{VAL} ne "manual"
+                  if ( $hash->{READINGS}{ambiMode}{VAL} eq "internal"
                     && $rgbsum > 0 );
 
                 # disable manual Ambilight color if RGB=000000
@@ -436,14 +603,132 @@ sub PHTV_Set($@) {
                   if ( $hash->{READINGS}{pct}{VAL} ne $pct );
                 readingsBulkUpdate( $hash, "level", $pct . " %" )
                   if ( $hash->{READINGS}{level}{VAL} ne $pct . " %" );
+                readingsBulkUpdate( $hash, "hue", $hue )
+                  if ( $hash->{READINGS}{hue}{VAL} ne $hue );
+                readingsBulkUpdate( $hash, "sat", $sat )
+                  if ( $hash->{READINGS}{sat}{VAL} ne $sat );
                 readingsBulkUpdate( $hash, "bri", $bri )
                   if ( $hash->{READINGS}{bri}{VAL} ne $bri );
                 readingsBulkUpdate( $hash, "rgb", uc( $a[2] ) )
                   if ( $hash->{READINGS}{rgb}{VAL} ne uc( $a[2] ) );
                 readingsEndUpdate( $hash, 1 );
             }
+
+            # direct control per LED
+            elsif ( uc( $a[2] ) =~ /^L[1-9].*/ ) {
+                my $json;
+                my $rgbsum = 0;
+                my $i      = 2;
+
+                while ( exists( $a[$i] ) ) {
+                    my ( $layer, $side, $led, $rgb );
+                    my ( $addr, $hex ) = split( ':', $a[$i] );
+
+                    # calculate LED address
+                    $layer = "layer" . substr( $addr, 1, 1 )
+                      if ( length($addr) > 1
+                        && PHTV_isinteger( substr( $addr, 1, 1 ) ) );
+                    if ( length($addr) > 2 ) {
+                        $side = "left"   if ( substr( $addr, 2, 1 ) eq "L" );
+                        $side = "top"    if ( substr( $addr, 2, 1 ) eq "T" );
+                        $side = "right"  if ( substr( $addr, 2, 1 ) eq "R" );
+                        $side = "bottom" if ( substr( $addr, 2, 1 ) eq "B" );
+                    }
+                    $led = substr( $addr, 3 )
+                      if ( length($addr) > 3
+                        && PHTV_isinteger( substr( $addr, 3 ) ) );
+
+                    # get desired color
+                    if ( defined($hex) ) {
+                        if ( $hex =~ /^(..)(..)(..)$/ ) {
+                            $rgb = PHTV_hex2rgb($hex);
+                        }
+                        else {
+                            return
+                                "Color "
+                              . $hex
+                              . " for address "
+                              . $addr
+                              . " is not in HEX format";
+                        }
+                    }
+                    else {
+                        return
+                          "Please add color in HEX format for address $addr";
+                    }
+
+                    # update json hash
+                    if (   defined( $rgb->{r} )
+                        && defined( $rgb->{g} )
+                        && defined( $rgb->{b} ) )
+                    {
+                        $rgbsum += $rgb->{r} + $rgb->{g} + $rgb->{b};
+
+                        if (   defined($led)
+                            && defined($side)
+                            && defined($layer) )
+                        {
+                            $json->{$layer}{$side}{$led}{r} = $rgb->{r};
+                            $json->{$layer}{$side}{$led}{g} = $rgb->{g};
+                            $json->{$layer}{$side}{$led}{b} = $rgb->{b};
+                        }
+                        elsif ( defined($side) && defined($layer) ) {
+                            $json->{$layer}{$side}{r} = $rgb->{r};
+                            $json->{$layer}{$side}{g} = $rgb->{g};
+                            $json->{$layer}{$side}{b} = $rgb->{b};
+                        }
+                        elsif ( defined($layer) ) {
+                            $json->{$layer}{r} = $rgb->{r};
+                            $json->{$layer}{g} = $rgb->{g};
+                            $json->{$layer}{b} = $rgb->{b};
+                        }
+                        else {
+                            return "Invalid LED address format " . $addr;
+                        }
+                    }
+
+                    $i++;
+                }
+
+                PHTV_SendCommand( $hash, "ambilight/cached", $json );
+
+                # enable manual Ambilight color if RGB!=000000
+                PHTV_SendCommand( $hash, "ambilight/mode",
+                    '"current": "manual"', "manual" )
+                  if ( $hash->{READINGS}{ambiMode}{VAL} eq "internal"
+                    && $rgbsum > 0 );
+            }
             else {
                 return "Invalid RGB code";
+            }
+        }
+        else {
+            return "Device needs to be ON to set Ambilight color.";
+        }
+    }
+
+    # pct
+    elsif ( $a[1] eq "pct" ) {
+        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            if ( defined( $hash->{READINGS}{rgb}{VAL} )
+                && $hash->{READINGS}{rgb}{VAL} ne "" )
+            {
+                my $_ = $a[2];
+                my $rgb;
+                my $rgbnew;
+                if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
+                    $rgb = PHTV_hex2hsv( $hash->{READINGS}{rgb}{VAL} );
+                    $rgbnew = PHTV_hsv2hex( $rgb->{h}, $rgb->{s}, $_ );
+                    return PHTV_Set( $hash, $name, "rgb", $rgbnew );
+                }
+                else {
+                    return
+"Argument does not seem to be a valid integer between 0 and 100";
+                }
             }
         }
         else {
@@ -474,7 +759,7 @@ sub PHTV_Set($@) {
             }
             else {
                 return
-"Argument does not seem to be a valid integer between 0 and 100";
+"Argument does not seem to be a valid integer between 1 and 100";
             }
             PHTV_SendCommand( $hash, "audio/volume", $cmd );
 
@@ -740,8 +1025,8 @@ sub PHTV_Set($@) {
         }
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-            PHTV_SendCommand( $hash, "sources/current", '"id": ' . $input_id,
-                $input_id );
+            PHTV_SendCommand( $hash, "sources/current",
+                '"id": ' . $input_id, $input_id );
 
             if ( $hash->{READINGS}{input}{VAL} ne $a[2] ) {
                 readingsSingleUpdate( $hash, "input", $a[2], 1 );
@@ -827,8 +1112,8 @@ sub PHTV_Define($$) {
 
     readingsSingleUpdate( $hash, "ambiHue", "off", 0 );
 
-    $hash->{model} = $hash->{READINGS}{".model"}{VAL}
-      if ( defined( $hash->{READINGS}{".model"}{VAL} ) );
+    $hash->{model} = $hash->{READINGS}{model}{VAL}
+      if ( defined( $hash->{READINGS}{model}{VAL} ) );
 
     unless ( defined( AttrVal( $name, "webCmd", undef ) ) ) {
         $attr{$name}{webCmd} = 'volume:input:rgb';
@@ -860,8 +1145,15 @@ sub PHTV_SendCommand($$;$$) {
     my $name    = $hash->{NAME};
     my $address = $hash->{helper}{ADDRESS};
     my $port    = $hash->{helper}{PORT};
+    my $data;
     my $timeout;
-    $cmd = ( defined($cmd) ) ? "{ " . $cmd . " }" : "";
+
+    if ( defined($cmd) && ref($cmd) eq "HASH" ) {
+        $data = encode_json($cmd);
+    }
+    elsif ( defined($cmd) && $cmd !~ /^{/ ) {
+        $data = "{ " . $cmd . " }";
+    }
 
     Log3 $name, 5, "PHTV $name: called function PHTV_SendCommand()";
 
@@ -869,11 +1161,19 @@ sub PHTV_SendCommand($$;$$) {
     my $response;
     my $return;
 
-    if ( !defined($cmd) || $cmd eq "" ) {
+    if ( defined( $hash->{helper}{supportedAPIcmds}{$service} )
+        && $hash->{helper}{supportedAPIcmds}{$service} == 0 )
+    {
+        Log3 $name, 5,
+          "PHTV $name: API command '" . $service . "' not supported by device.";
+        return;
+    }
+
+    if ( !defined($data) || ref($cmd) eq "HASH" && $data eq "" ) {
         Log3 $name, 4, "PHTV $name: REQ $service";
     }
     else {
-        Log3 $name, 4, "PHTV $name: REQ $service/" . urlDecode($cmd);
+        Log3 $name, 4, "PHTV $name: REQ $service/" . urlDecode($data);
     }
 
     $URL = "http://" . $address . ":" . $port . "/1/" . $service;
@@ -888,14 +1188,19 @@ sub PHTV_SendCommand($$;$$) {
     }
 
     # send request via HTTP-POST method
-    Log3 $name, 5, "PHTV $name: GET " . $URL . " (" . urlDecode($cmd) . ")";
+    Log3 $name, 5, "PHTV $name: GET " . $URL . " (" . urlDecode($data) . ")"
+      if ( defined($data) && ref($cmd) ne "HASH" );
+    Log3 $name, 5, "PHTV $name: GET " . $URL . " (#HASH)"
+      if ( defined($data) && ref($cmd) eq "HASH" );
+    Log3 $name, 5, "PHTV $name: GET " . $URL
+      if ( !defined($data) );
 
     HttpUtils_NonblockingGet(
         {
             url        => $URL,
             timeout    => $timeout,
             noshutdown => 1,
-            data       => $cmd,
+            data       => $data,
             hash       => $hash,
             service    => $service,
             cmd        => $cmd,
@@ -931,7 +1236,7 @@ sub PHTV_ReceiveCommand($$$) {
 
         $newstate = "absent";
 
-        if ( !defined($cmd) || $cmd eq "" ) {
+        if ( !defined($cmd) || ref($cmd) eq "HASH" || $cmd eq "" ) {
             Log3 $name, 4, "PHTV $name: RCV TIMEOUT $service";
         }
         else {
@@ -962,7 +1267,7 @@ sub PHTV_ReceiveCommand($$$) {
             readingsBulkUpdate( $hash, "presence", "present" );
         }
 
-        if ( !defined($cmd) || $cmd eq "" ) {
+        if ( !defined($cmd) || ref($cmd) eq "HASH" | $cmd eq "" ) {
             Log3 $name, 4, "PHTV $name: RCV $service";
         }
         else {
@@ -971,7 +1276,7 @@ sub PHTV_ReceiveCommand($$$) {
 
         if ( $data ne "" ) {
             if ( $data =~ /^{/ || $data =~ /^\[/ ) {
-                if ( !defined($cmd) || $cmd eq "" ) {
+                if ( !defined($cmd) || ref($cmd) eq "HASH" || $cmd eq "" ) {
                     Log3 $name, 5, "PHTV $name: RES $service\n" . $data;
                 }
                 else {
@@ -981,13 +1286,18 @@ sub PHTV_ReceiveCommand($$$) {
                       . $data;
                 }
 
+                $hash->{helper}{supportedAPIcmds}{$service} = 1
+                  if ( !defined( $hash->{helper}{supportedAPIcmds}{$service} )
+                    && $service !~ /^channels\/.*/
+                    && $service !~ /^channellists\/.*/ );
+
                 $return = decode_json( Encode::encode_utf8($data) );
             }
 
             elsif ( $data eq
                 "<html><head><title>Ok</title></head><body>Ok</body></html>" )
             {
-                if ( !defined($cmd) || $cmd eq "" ) {
+                if ( !defined($cmd) || ref($cmd) eq "HASH" || $cmd eq "" ) {
                     Log3 $name, 4, "PHTV $name: RES $service - ok";
                 }
                 else {
@@ -995,11 +1305,16 @@ sub PHTV_ReceiveCommand($$$) {
                       "PHTV $name: RES $service/" . urlDecode($cmd) . " - ok";
                 }
 
+                $hash->{helper}{supportedAPIcmds}{$service} = 1
+                  if ( !defined( $hash->{helper}{supportedAPIcmds}{$service} )
+                    && $service !~ /^channels\/.*/
+                    && $service !~ /^channellists\/.*/ );
+
                 $return = "ok";
             }
 
             else {
-                if ( !defined($cmd) || $cmd eq "" ) {
+                if ( !defined($cmd) || ref($cmd) eq "HASH" || $cmd eq "" ) {
                     Log3 $name, 5, "PHTV $name: RES ERROR $service\n" . $data;
                 }
                 else {
@@ -1007,6 +1322,14 @@ sub PHTV_ReceiveCommand($$$) {
                         "PHTV $name: RES ERROR $service/"
                       . urlDecode($cmd) . "\n"
                       . $data;
+                }
+
+                if ( !defined( $hash->{helper}{supportedAPIcmds}{$service} ) ) {
+                    $hash->{helper}{supportedAPIcmds}{$service} = 0;
+                    Log3 $name, 3,
+                        "PHTV $name: API command '"
+                      . $service
+                      . "' not supported by device.";
                 }
 
                 return undef;
@@ -1029,7 +1352,9 @@ sub PHTV_ReceiveCommand($$$) {
 
                 # calculate volume
                 my $vol = ( $return->{current} ) ? $return->{current} : 0;
-                if ( defined( $return->{min} ) && defined( $return->{max} ) ) {
+                if (   defined( $return->{min} )
+                    && defined( $return->{max} ) )
+                {
                     $hash->{helper}{audio}{min} = $return->{min};
                     $hash->{helper}{audio}{max} = $return->{max};
 
@@ -1147,12 +1472,11 @@ sub PHTV_ReceiveCommand($$$) {
                 # model
                 if (
                     defined( $return->{model} )
-                    && ( !defined( $hash->{READINGS}{".model"}{VAL} )
-                        || $hash->{READINGS}{".model"}{VAL} ne
-                        $return->{model} )
+                    && ( !defined( $hash->{READINGS}{model}{VAL} )
+                        || $hash->{READINGS}{model}{VAL} ne $return->{model} )
                   )
                 {
-                    readingsBulkUpdate( $hash, ".model", $return->{model} );
+                    readingsBulkUpdate( $hash, "model", $return->{model} );
                     $hash->{model} = $return->{model};
                 }
             }
@@ -1262,10 +1586,10 @@ sub PHTV_ReceiveCommand($$$) {
                     $return->{id} =~ s/^\s+//;
                     $return->{id} =~ s/\s+$//;
                     $cmd =
-                      ( $hash->{helper}{device}{channelName}{ $return->{id} }
-                          {name} )
-                      ? $hash->{helper}{device}{channelName}{ $return->{id} }
-                      {name}
+                      ( $hash->{helper}{device}{channelName}
+                          { $return->{id} }{name} )
+                      ? $hash->{helper}{device}{channelName}
+                      { $return->{id} }{name}
                       : "-";
                 }
                 else {
@@ -1568,10 +1892,11 @@ sub PHTV_ReceiveCommand($$$) {
         # ambilight/cached (rgb)
         elsif ( $service eq "ambilight/cached" ) {
             if ( ref($return) eq "HASH" ) {
+                my $rgb = "";
                 foreach my $layer ( keys $return ) {
                     foreach my $side ( keys $return->{$layer} ) {
                         foreach my $led ( keys $return->{$layer}{$side} ) {
-                            my $rgb = "";
+                            my $hex = "";
                             my $l   = $layer;
                             my $s   = $side;
                             $l =~ s/layer/L/;
@@ -1581,29 +1906,64 @@ sub PHTV_ReceiveCommand($$$) {
                             $s =~ s/bottom/B/ if ( $side eq "bottom" );
 
                             my $readingname = "rgb_" . $l . $s . $led;
-                            $rgb .= uc(
-                                sprintf( "%02x",
-                                    $return->{$layer}{$side}{$led}{r} )
+                            $hex = PHTV_rgb2hex(
+                                $return->{$layer}{$side}{$led}{r},
+                                $return->{$layer}{$side}{$led}{g},
+                                $return->{$layer}{$side}{$led}{b}
                             );
-                            $rgb .= uc(
-                                sprintf( "%02x",
-                                    $return->{$layer}{$side}{$led}{g} )
-                            );
-                            $rgb .= uc(
-                                sprintf( "%02x",
-                                    $return->{$layer}{$side}{$led}{b} )
-                            );
+
+                            $rgb = $hex   if ( $rgb eq "" );
+                            $rgb = "diff" if ( $rgb ne $hex );
 
                             if (
                                 !defined(
                                     $hash->{READINGS}{$readingname}{VAL}
                                 )
-                                || $hash->{READINGS}{$readingname}{VAL} ne $rgb
+                                || $hash->{READINGS}{$readingname}{VAL} ne $hex
                               )
                             {
-                                readingsBulkUpdate( $hash, $readingname, $rgb );
+                                readingsBulkUpdate( $hash, $readingname, $hex );
                             }
                         }
+                    }
+                }
+
+                if ( $rgb ne "diff" ) {
+                    my $hsv = PHTV_hex2hsv($rgb);
+                    my $hue = $hsv->{h};
+                    my $sat = int( $hsv->{s} * 100 + 0.5 );
+                    my $bri = $hsv->{v};
+                    my $pct = PHTV_bri2pct($bri);
+
+                    if ( !defined( $hash->{READINGS}{rgb}{VAL} )
+                        || $hash->{READINGS}{rgb}{VAL} ne $rgb )
+                    {
+                        readingsBulkUpdate( $hash, "rgb", $rgb );
+                    }
+
+                    if ( !defined( $hash->{READINGS}{hue}{VAL} )
+                        || $hash->{READINGS}{hue}{VAL} ne $hue )
+                    {
+                        readingsBulkUpdate( $hash, "hue", $hue );
+                    }
+
+                    if ( !defined( $hash->{READINGS}{sat}{VAL} )
+                        || $hash->{READINGS}{sat}{VAL} ne $sat )
+                    {
+                        readingsBulkUpdate( $hash, "sat", $sat );
+                    }
+
+                    if ( !defined( $hash->{READINGS}{bri}{VAL} )
+                        || $hash->{READINGS}{bri}{VAL} ne $bri )
+                    {
+                        readingsBulkUpdate( $hash, "bri", $bri );
+                    }
+
+                    if ( !defined( $hash->{READINGS}{pct}{VAL} )
+                        || $hash->{READINGS}{pct}{VAL} ne $pct )
+                    {
+                        readingsBulkUpdate( $hash, "pct",   $pct );
+                        readingsBulkUpdate( $hash, "level", $pct . " %" );
                     }
                 }
             }
@@ -1611,13 +1971,28 @@ sub PHTV_ReceiveCommand($$$) {
                 if ( $type =~ /^(..)(..)(..)$/
                     && defined( $hash->{READINGS}{ambiLEDLayers}{VAL} ) )
                 {
-                    my $bri = PHTV_hex2hsv( $type, "v" );
+                    my $hsv = PHTV_hex2hsv($type);
+                    my $hue = $hsv->{h};
+                    my $sat = int( $hsv->{s} * 100 + 0.5 );
+                    my $bri = $hsv->{v};
                     my $pct = PHTV_bri2pct($bri);
 
                     if ( !defined( $hash->{READINGS}{rgb}{VAL} )
                         || $hash->{READINGS}{rgb}{VAL} ne $type )
                     {
                         readingsBulkUpdate( $hash, "rgb", $type );
+                    }
+
+                    if ( !defined( $hash->{READINGS}{hue}{VAL} )
+                        || $hash->{READINGS}{hue}{VAL} ne $hue )
+                    {
+                        readingsBulkUpdate( $hash, "hue", $hue );
+                    }
+
+                    if ( !defined( $hash->{READINGS}{sat}{VAL} )
+                        || $hash->{READINGS}{sat}{VAL} ne $sat )
+                    {
+                        readingsBulkUpdate( $hash, "sat", $sat );
                     }
 
                     if ( !defined( $hash->{READINGS}{bri}{VAL} )
@@ -1665,11 +2040,11 @@ sub PHTV_ReceiveCommand($$$) {
 
                                         if (
                                             !defined(
-                                                $hash->{READINGS}{$readingname}
-                                                  {VAL}
+                                                $hash->{READINGS}
+                                                  {$readingname}{VAL}
                                             )
-                                            || $hash->{READINGS}{$readingname}
-                                            {VAL} ne $type
+                                            || $hash->{READINGS}
+                                            {$readingname}{VAL} ne $type
                                           )
                                         {
                                             readingsBulkUpdate( $hash,
@@ -1813,7 +2188,8 @@ sub PHTV_ReceiveCommand($$$) {
                     if ( defined( $attr{$name}{ambiHueLeft} )
                         && $attr{$name}{ambiHueLeft} ne "" )
                     {
-                        my @devices = split( " ", $attr{$name}{ambiHueLeft} );
+                        my @devices =
+                          split( " ", $attr{$name}{ambiHueLeft} );
 
                         foreach (@devices) {
                             my ( $dev, $led ) = split( /:/, $_ );
@@ -1825,7 +2201,8 @@ sub PHTV_ReceiveCommand($$$) {
                     if ( defined( $attr{$name}{ambiHueTop} )
                         && $attr{$name}{ambiHueTop} ne "" )
                     {
-                        my @devices = split( " ", $attr{$name}{ambiHueTop} );
+                        my @devices =
+                          split( " ", $attr{$name}{ambiHueTop} );
 
                         foreach (@devices) {
                             my ( $dev, $led ) = split( /:/, $_ );
@@ -1909,6 +2286,88 @@ sub PHTV_ReceiveCommand($$$) {
                 readingsBulkUpdate( $hash, $_, "-" );
             }
         }
+
+        if ( !defined( $hash->{READINGS}{ambiMode}{VAL} )
+            || $hash->{READINGS}{ambiMode}{VAL} ne "internal" )
+        {
+            readingsBulkUpdate( $hash, "ambiMode", "internal" );
+        }
+
+        if ( !defined( $hash->{READINGS}{rgb}{VAL} )
+            || $hash->{READINGS}{rgb}{VAL} ne "000000" )
+        {
+            readingsBulkUpdate( $hash, "rgb", "000000" );
+        }
+
+        if ( !defined( $hash->{READINGS}{hue}{VAL} )
+            || $hash->{READINGS}{hue}{VAL} ne "0" )
+        {
+            readingsBulkUpdate( $hash, "hue", "0" );
+        }
+
+        if ( !defined( $hash->{READINGS}{sat}{VAL} )
+            || $hash->{READINGS}{sat}{VAL} ne "0" )
+        {
+            readingsBulkUpdate( $hash, "sat", "0" );
+        }
+
+        if ( !defined( $hash->{READINGS}{bri}{VAL} )
+            || $hash->{READINGS}{bri}{VAL} ne "0" )
+        {
+            readingsBulkUpdate( $hash, "bri", "0" );
+        }
+
+        if ( !defined( $hash->{READINGS}{pct}{VAL} )
+            || $hash->{READINGS}{pct}{VAL} ne "0" )
+        {
+            readingsBulkUpdate( $hash, "pct",   "0" );
+            readingsBulkUpdate( $hash, "level", "0 %" );
+        }
+
+        if ( defined( $hash->{READINGS}{ambiLEDLayers}{VAL} ) ) {
+            my $layer = 1;
+            while ( $layer <= $hash->{READINGS}{ambiLEDLayers}{VAL} ) {
+
+                foreach my $side ( 'Left', 'Top', 'Right', 'Bottom' ) {
+                    my $ambiLED = "ambiLED$side";
+                    my $side    = lc($side);
+
+                    my $l = "L" . $layer;
+                    my $s = $side;
+                    $s =~ s/left/L/   if ( $side eq "left" );
+                    $s =~ s/top/T/    if ( $side eq "top" );
+                    $s =~ s/right/R/  if ( $side eq "right" );
+                    $s =~ s/bottom/B/ if ( $side eq "bottom" );
+
+                    if ( defined( $hash->{READINGS}{$ambiLED}{VAL} )
+                        && $hash->{READINGS}{$ambiLED}{VAL} > 0 )
+                    {
+                        my $led = 0;
+
+                        while ( $led <= $hash->{READINGS}{$ambiLED}{VAL} - 1 ) {
+                            my $readingname = "rgb_" . $l . $s . $led;
+
+                            if (
+                                !defined(
+                                    $hash->{READINGS}{$readingname}{VAL}
+                                )
+                                || $hash->{READINGS}{$readingname}{VAL} ne
+                                "000000"
+                              )
+                            {
+                                readingsBulkUpdate( $hash,
+                                    $readingname, "000000" );
+                            }
+
+                            $led++;
+                        }
+                    }
+                }
+
+                $layer++;
+            }
+        }
+
     }
 
     readingsEndUpdate( $hash, 1 );
@@ -2082,12 +2541,31 @@ sub PHTV_GetRemotecontrolCommand($) {
 }
 
 ###################################
+sub PHTV_isinteger {
+    defined $_[0] && $_[0] =~ /^[+-]?\d+$/;
+}
+
+###################################
 sub PHTV_hex2rgb($) {
     my ($hex) = @_;
     if ( uc($hex) =~ /^(..)(..)(..)$/ ) {
         my ( $r, $g, $b ) = ( hex($1), hex($2), hex($3) );
-        return { "r" => $r, "g" => $g, "b" => $b };
+        my $return = { "r" => $r, "g" => $g, "b" => $b };
+        Log3 undef, 5,
+            "PHTV hex2rgb: $hex > "
+          . $return->{r} . " "
+          . $return->{g} . " "
+          . $return->{b};
+        return $return;
     }
+}
+
+###################################
+sub PHTV_rgb2hex($$$) {
+    my ( $r, $g, $b ) = @_;
+    my $return = sprintf( "%2.2X%2.2X%2.2X", $r, $g, $b );
+    Log3 undef, 5, "PHTV rgb2hex: $r $g $b > $return";
+    return uc($return);
 }
 
 ###################################
@@ -2119,6 +2597,13 @@ sub PHTV_pct2bri($) {
     my ($pct) = @_;
     return 0 if ( $pct <= 0 );
     return int( ( $pct / 100 * 255 ) + 0.5 );
+}
+
+###################################
+sub PHTV_hsv2hex($$$) {
+    my ( $h, $s, $v ) = @_;
+    my $rgb = PHTV_hsv2rgb( $h, $s, $v );
+    return PHTV_rgb2hex( $rgb->{r}, $rgb->{g}, $rgb->{b} );
 }
 
 ###################################
@@ -2155,6 +2640,8 @@ sub PHTV_rgb2hsv($$$;$) {
 
     $V = $M;
 
+    Log3 undef, 5, "PHTV rgb2hsv: $r $g $b > $H $S $V";
+
     if ( defined($type) ) {
         return $H if ( $type eq "h" );
         return $S if ( $type eq "s" );
@@ -2163,6 +2650,51 @@ sub PHTV_rgb2hsv($$$;$) {
     else {
         return { "h" => $H, "s" => $S, "v" => $V };
     }
+}
+
+###################################
+sub PHTV_hsv2rgb($$$) {
+    my ( $H, $S, $V ) = @_;
+    my ( $r, $g, $b, $C, $Hdash, $X, $m );
+
+    $C     = $S * $V;
+    $Hdash = $H / 60.0;
+    $X     = $C * ( 1.0 - int( ( $Hdash % 2.0 ) - 1.0 ) );
+
+    if ( $Hdash < 1.0 ) {
+        $r = $C;
+        $g = $X;
+    }
+    elsif ( $Hdash < 2.0 ) {
+        $r = $X;
+        $g = $C;
+    }
+    elsif ( $Hdash < 3.0 ) {
+        $g = $C;
+        $b = $X;
+    }
+    elsif ( $Hdash < 4.0 ) {
+        $g = $X;
+        $b = $C;
+    }
+    elsif ( $Hdash < 5.0 ) {
+        $r = $X;
+        $b = $C;
+    }
+    elsif ( $Hdash <= 6.0 ) {
+        $r = $C;
+        $b = $X;
+    }
+
+    $m = $V - $C;
+
+    $r += $m;
+    $g += $m;
+    $b += $m;
+
+    Log3 undef, 5, "PHTV hsv2rgb: $H $S $V > $r $g $b";
+
+    return { "r" => $r, "g" => $g, "b" => $b };
 }
 
 ###################################
@@ -2237,7 +2769,8 @@ sub PHTV_min {
       <li><b>remoteControl</b> UP,DOWN,... &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands; see remoteControl help</li>
       <li><b>ambiHue</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; activates/disables Ambilight+Hue function</li>
       <li><b>ambiMode</b> internal,manual,expert &nbsp;&nbsp;-&nbsp;&nbsp; set source register for Ambilight</li>
-      <li><b>rgb</b> internal,manual,expert &nbsp;&nbsp;-&nbsp;&nbsp; set an RGB value for Ambilight</li>
+      <li><b>ambiPreset</b> &nbsp;&nbsp;-&nbsp;&nbsp; set Ambilight to predefined state</li>
+      <li><b>rgb</b> HEX,LED address &nbsp;&nbsp;-&nbsp;&nbsp; set an RGB value for Ambilight</li>
       <li><b>play</b> &nbsp;&nbsp;-&nbsp;&nbsp;  starts/resumes playback</li>
       <li><b>pause</b> &nbsp;&nbsp;-&nbsp;&nbsp;  starts/resumes playback</li>
       <li><b>stop</b> &nbsp;&nbsp;-&nbsp;&nbsp;  stops current playback</li>
@@ -2246,6 +2779,31 @@ sub PHTV_min {
   </ul>
   <br>
   <br>
+
+      <div style="margin-left: 2em">
+        <u>Advanced Ambilight Control</u><br>
+        <br>
+        <div style="margin-left: 2em">
+          If you would like to specificly control color for individual sides or even individual LEDs, you may use special addressing to be used with set command 'rgb':<br>
+          <br><br>
+          LED addressing format:<br>
+          <code>&lt;Layer$gt;&lt;Side$gt;&lt;LED number$gt;</code>
+          <br><br>
+          <u>Examples:</u><br>
+          <div style="margin-left: 2em">
+            <code># set LED 0 on left side within layer 1 to color RED
+            set PhilipsTV rgb L1L0:FF0000<br><br>
+            # set LED 0, 2 and 4 on left side within layer 1 to color RED
+            set PhilipsTV rgb L1L0:FF0000 L1L2:FF0000 L1L4:FF0000<br><br>
+            # set complete right side within layer 1 to color GREEN
+            set PhilipsTV rgb L1R:00FF00<br><br>
+            # set complete layer 1 to color BLUE
+            set PhilipsTV rgb L1:0000FF</code>
+          </div><br>
+        </div>
+      </div>
+      <br>
+      <br>
 
   <a name="PHTVget"></a>
   <b>Get</b>
