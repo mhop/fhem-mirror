@@ -691,76 +691,8 @@ sub cfgDB_Diff($$) {
 
 		<b>Additional functions provided</b><br/>
 		<ul><br/>
-			All functions are called from fhem commandline!<br/>
-			<br/>
-			<li><code>{cfgDB_Info}</code></li><br/>
-			Returns some database statistics<br/>
-<pre>
---------------------------------------------------------------------------------
- configDB Database Information
---------------------------------------------------------------------------------
- dbconn: SQLite:dbname=/opt/fhem/configDB.db
- dbuser: 
- dbpass: 
- dbtype: SQLITE
---------------------------------------------------------------------------------
- fhemconfig: 7707 entries
-
- Ver 0 saved: Sat Mar  1 11:37:00 2014 def: 293 attr: 1248
- Ver 1 saved: Fri Feb 28 23:55:13 2014 def: 293 attr: 1248
- Ver 2 saved: Fri Feb 28 23:49:01 2014 def: 293 attr: 1248
- Ver 3 saved: Fri Feb 28 22:24:40 2014 def: 293 attr: 1247
- Ver 4 saved: Fri Feb 28 22:14:03 2014 def: 293 attr: 1246
---------------------------------------------------------------------------------
- fhemstate: 1890 entries saved: Sat Mar  1 12:05:00 2014
---------------------------------------------------------------------------------
-</pre>
-Ver 0 always indicates the currently running configuration.<br/>
-<br/>
-
-			<li><code>{cfgDB_List [device],[version]}</code></li><br/>
-				Search for device named [device] in configuration version [version]<br/>
-				in database archive.<br/>
-				Default value for [device] = % to show all devices.<br/>
-				Default value for [version] = 0 to show devices from current version.<br/>
-				Examples for valid requests:<br/>
-				<br/>
-				<code>{cfgDB_List}</code><br/>
-				<code>{cfgDB_List 'global'}</code><br/>
-				<code>{cfgDB_List '',1}</code><br/>
-				<code>{cfgDB_List 'global',1}</code><br/>
-			<br/>
-
-			<li><code>{cfgDB_Diff &lt;device&gt;,&lt;version&gt;}</code></li><br/>
-				Compare configuration dataset for device &lt;device&gt; from current version 0 with version &lt;version&gt;<br/>
-				Example for valid request:<br/>
-				<br/>
-				<code>{cfgDB_Diff 'telnetPort',1}</code><br/>
-				<br/>
-				will show a result like this:
-				<pre>
-compare device: telnetPort in current version 0 (left) to version: 1 (right)
-+--+--------------------------------------+--+--------------------------------------+
-| 1|define telnetPort telnet 7072 global  | 1|define telnetPort telnet 7072 global  |
-* 2|attr telnetPort room telnet           *  |                                      |
-+--+--------------------------------------+--+--------------------------------------+</pre>
-
-			<li><code>{cfgDB_Reorg [keep]}</code></li><br/>
-				Deletes all stored versions with version number higher than [keep].<br/>
-				Default value for optional parameter keep = 3.<br/>
-				In above example. <code>{cfgDB_Reorg 2}</code> will delete versions #3 and #4.<br/>
-				This function can be used to create a nightly running job for<br/>
-				database reorganisation when called from an at-Definition.<br/>
-			<br/>
-
-			<li><code>{cfgDB_Recover &lt;version&gt;}</code></li><br/>
-				Restores an older version from database archive.<br/>
-				<code>{cfgDB_Recover 3}</code> will <b>copy</b> version #3 from database 
-				to version #0.<br/>
-				Original version #0 will be lost.<br/><br/>
-				<b>Important!</b><br/>
-				The restored version will <b>NOT</b> be activated automatically!<br/>
-				You must do a <code>rereadcfg</code> or - even better - <code>shutdown restart</code> yourself.<br/>
+			You can define an extension with module <a href="#configDBwrap">98_configDBwrap</a><br/>
+			to gain access to some additional functionality.
 		</ul>
 <br/>
 <br/>
@@ -897,76 +829,8 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 
 		<b>Zus&auml;tzliche Funktionen</b><br/>
 		<ul><br/>
-			Alle Funktionen werden in der Befehelszeile aufgerufen!<br/>
-			<br/>
-			<li><code>{cfgDB_Info}</code></li><br/>
-			Liefert eine Datenbankstatistik<br/>
-<pre>
---------------------------------------------------------------------------------
- configDB Database Information
---------------------------------------------------------------------------------
- dbconn: SQLite:dbname=/opt/fhem/configDB.db
- dbuser: 
- dbpass: 
- dbtype: SQLITE
---------------------------------------------------------------------------------
- fhemconfig: 7707 entries
-
- Ver 0 saved: Sat Mar  1 11:37:00 2014 def: 293 attr: 1248
- Ver 1 saved: Fri Feb 28 23:55:13 2014 def: 293 attr: 1248
- Ver 2 saved: Fri Feb 28 23:49:01 2014 def: 293 attr: 1248
- Ver 3 saved: Fri Feb 28 22:24:40 2014 def: 293 attr: 1247
- Ver 4 saved: Fri Feb 28 22:14:03 2014 def: 293 attr: 1246
---------------------------------------------------------------------------------
- fhemstate: 1890 entries saved: Sat Mar  1 12:05:00 2014
---------------------------------------------------------------------------------
-</pre>
-Ver 0 bezeichnet immer die aktuell geladene Konfiguration.<br/>
-<br/>
-
-			<li><code>{cfgDB_List [device],[version]}</code></li><br/>
-				Sucht das Ger&auml;t [device] in der Konfiguration der Version [version]<br/>
-				in der Datenbank.<br/>
-				Standardwert f&uuml;r [device] = % um alle Ger&auml;te anzuzeigen<br/>
-				Standardwert f&uuml;r [version] = 0 Ger&auml;te in der aktuellen Version anzuzeigen.<br/>
-				Beispiele f&uuml;r g&uuml;ltige Aufrufe:<br/>
-				<br/>
-				<code>{cfgDB_List}</code><br/>
-				<code>{cfgDB_List 'global'}</code><br/>
-				<code>{cfgDB_List '',1}</code><br/>
-				<code>{cfgDB_List 'global',1}</code><br/>
-			<br/>
-
-			<li><code>{cfgDB_Diff &lt;device&gt;,&lt;version&gt;}</code></li><br/>
-				Vergleicht die Konfigurationsdaten des Ger&auml;tes &lt;device&gt; aus der aktuellen Version 0 mit den Daten aus Version &lt;version&gt;<br/>
-				Beispielaufruf:<br/>
-				<br/>
-				<code>{cfgDB_Diff 'telnetPort',1}</code><br/>
-				<br/>
-				liefert ein Ergebnis &auml;hnlich dieser Ausgabe:
-				<pre>
-compare device: telnetPort in current version 0 (left) to version: 1 (right)
-+--+--------------------------------------+--+--------------------------------------+
-| 1|define telnetPort telnet 7072 global  | 1|define telnetPort telnet 7072 global  |
-* 2|attr telnetPort room telnet           *  |                                      |
-+--+--------------------------------------+--+--------------------------------------+</pre>
-
-			<li><code>{cfgDB_Reorg [keep]}</code></li><br/>
-				L&ouml;scht alle gespeicherten Versionen mit Versionsnummer &gt; [keep].<br/>
-				Standardwert f&uuml;r den optionalen Parameter keep = 3.<br/>
-				Im obigen Beispiel w&uuml;rde <code>{cfgDB_Reorg 2}</code> die Versionen #3 und #4 l&ouml;schen.<br/>
-				Diese Funktion kann z.B. verwendet werden, um eine regelm&auml;&szlig;ige n&auml;chtliche<br/> 
-				Datenbankreorganisation mit Hilfe einer at-Definition einzuplanen.<br/>
-			<br/>
-
-			<li><code>{cfgDB_Recover &lt;version&gt;}</code></li><br/>
-				Stellt eine &auml;ltere Version aus dem Datenbankarchiv wieder her.<br/>
-				<code>{cfgDB_Recover 3}</code>  <b>kopiert</b> die Version #3 aus der Datenbank 
-				zur Version #0.<br/>
-				Die urspr&uuml;ngliche Version #0 wird dabei gel&ouml;scht.<br/><br/>
-				<b>Wichtig!</b><br/>
-				Die zur&uuml;ckgeholte Version wird <b>NICHT</b> automatisch aktiviert!<br/>
-				Ein <code>rereadcfg</code> oder - besser - <code>shutdown restart</code> muss manuell erfolgen.<br/>
+			Es kann mit Hilfe des Moduls <a href="#configDBwrap">98_configDBwrap</a> eine Erweiterung <br/>
+			definiert werden, die zus&auml;tzliche Funktionen bereitstellt.
 		</ul>
 		<br/>
 		<br/>
@@ -981,8 +845,6 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 			<li>Beim Speichern einer Konfiguration nicht ungeduldig werden (egal ob manuell oder durch Klicken auf "save config")<br/>
 				Durch das Schreiben der Versionsinformationen dauert das ein paar Sekunden.<br/>
 				Der Abschluss des Speichern wird durch eine entsprechende Meldung angezeigt.</li>
-			<br/>
-			<li>F&uumlr die Nutzung von cfgDB_Diff() wird das perl Paket Text::Diff ben&ouml;tigt.</li>
 			<br/>
 			<li>Diese Erweiterung wird laufend weiterentwickelt. Speziell an der Verbesserung der Performance wird gearbeitet.</li>
 			<br/>
