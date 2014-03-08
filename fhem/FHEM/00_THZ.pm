@@ -1,7 +1,7 @@
 ##############################################
 # 00_THZ
 # by immi 03/2014
-# v. 0.072
+# v. 0.074
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -69,6 +69,13 @@ my %sets = (
 	"p08FanStageNight"		=> {cmd2=>"0A056D", argMin =>  "0", argMax =>  "3"  },
 	"p09FanStageStandby"		=> {cmd2=>"0A056F", argMin =>  "0", argMax =>  "3"  },
 	"p99FanStageParty"		=> {cmd2=>"0A0570", argMin =>  "0", argMax =>  "3"  },
+	"passiveCooling"		=> {cmd2=>"0A0575", argMin =>  "0", argMax =>  "2"  },
+	"fanstage1-Airflow-inlet"	=> {cmd2=>"0A0576", argMin =>  "50", argMax =>  "300"},		#zuluft 
+	"fanstage2-Airflow-inlet"	=> {cmd2=>"0A0577", argMin =>  "50", argMax =>  "300" },	#zuluft 
+	"fanstage3-Airflow-inlet"	=> {cmd2=>"0A0578", argMin =>  "50", argMax =>  "300" },	#zuluft 
+	"fanstage1-Airflow-outlet"	=> {cmd2=>"0A0579", argMin =>  "50", argMax =>  "300" },	#abluft extrated
+	"fanstage2-Airflow-outlet"	=> {cmd2=>"0A057A", argMin =>  "50", argMax =>  "300" },	#abluft extrated
+	"fanstage3-Airflow-outlet"	=> {cmd2=>"0A057B", argMin =>  "50", argMax =>  "300" },	#abluft extrated
 	"holidayBegin_day"		=> {cmd2=>"0A011B", argMin =>  "1", argMax =>  "31"  }, 
 	"holidayBegin_month"		=> {cmd2=>"0A011C", argMin =>  "1", argMax =>  "12"  },
 	"holidayBegin_year"		=> {cmd2=>"0A011D", argMin =>  "12", argMax => "20"  },
@@ -229,6 +236,13 @@ my %gets = (
 	"p08FanStageNight"		=> {cmd2=>"0A056D"},
 	"p09FanStageStandby"		=> {cmd2=>"0A056F"},
 	"p99FanStageParty"		=> {cmd2=>"0A0570"},
+	"passiveCooling"		=> {cmd2=>"0A0575"},
+	"fanstage1-Airflow-inlet"	=> {cmd2=>"0A0576"},			#zuluft 
+	"fanstage2-Airflow-inlet"	=> {cmd2=>"0A0577"},			#zuluft 
+	"fanstage3-Airflow-inlet"	=> {cmd2=>"0A0578"},			#zuluft 
+	"fanstage1-Airflow-outlet"	=> {cmd2=>"0A0579"},			#abluft extrated
+	"fanstage2-Airflow-outlet"	=> {cmd2=>"0A057A"},			#abluft extrated
+	"fanstage3-Airflow-outlet"	=> {cmd2=>"0A057B"},			#abluft extrated
 	"holidayBegin_day"		=> {cmd2=>"0A011B"}, 
 	"holidayBegin_month"		=> {cmd2=>"0A011C"},
 	"holidayBegin_year"		=> {cmd2=>"0A011D"},
@@ -573,33 +587,39 @@ sub THZ_Set($@){
   if     (substr($cmdHex2,0,4) eq "0A01")  {$arg=$arg*256}		        	# shift 2 times -- the answer look like  0A0120-3A0A01200E00  for year 14
   elsif  ( (substr($cmdHex2,2,2) eq "1D") or (substr($cmdHex2,2,2)  eq "17") or (substr($cmdHex2,2,2) eq "15") or (substr($cmdHex2,2,2)  eq "14")) 	{$arg= time2quaters($arg) *256   + time2quaters($arg1)} # BeginTime-endtime, in the register is represented  begintime endtime
   #programFan_ (1D)  funziona;
-  elsif  (substr($cmdHex2,0,6) eq "0A05D1") 		  			{$arg= time2quaters($arg)   + time2quaters($arg1) *256} # PartyBeginTime-endtime, in the register is represented endtime begintime
+  elsif  (substr($cmdHex2,0,6) eq "0A05D1") 		  			{$arg= time2quaters($arg1) *256 + time2quaters($arg)} # PartyBeginTime-endtime, in the register is represented endtime begintime
   #partytime (0A05D1) non funziona; 
   elsif  ((substr($cmdHex2,0,6) eq "0A05D3") or (substr($cmdHex2,0,6) eq "0A05D4")) 	{$arg= time2quaters($arg)} # holidayBeginTime-endtime
   elsif  ((substr($cmdHex2,0,5) eq "0A056") or (substr($cmdHex2,0,5) eq "0A057"))	{ } 				# fann speed: do not multiply
   else 			             {$arg=$arg*10} 
-    
+  #return ($arg);  
   THZ_Write($hash,  "02"); 			# STX start of text
   ($err, $msg) = THZ_ReadAnswer($hash);		#Expectedanswer1    is  "10"  DLE data link escape
-  
+  my $msgtmp= $msg;
   if ($msg eq "10") {
     $cmdHex2=THZ_encodecommand(($cmdHex2 . sprintf("%04X", $arg)),"set");
     THZ_Write($hash,  $cmdHex2); 		# send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
     ($err, $msg) = THZ_ReadAnswer($hash);	#Expectedanswer     is "10",		DLE data link escape 
      }
-    
+   $msgtmp=  $msgtmp  ."\n" ."set--" . $cmdHex2  ."\n" . $msg; 
    if ($msg eq "10") {
       ($err, $msg) = THZ_ReadAnswer($hash);	#Expectedanswer  is "02"  -- STX start of text
      THZ_Write($hash,  "10"); 		    	# DLE data link escape  // ack datatranfer      
      ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer3 // read from the heatpump
       THZ_Write($hash,  "10");
      }
-   
+   elsif ($msg eq "1002") {
+     THZ_Write($hash,  "10"); 		    	# DLE data link escape  // ack datatranfer      
+     ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer3 // read from the heatpump
+      THZ_Write($hash,  "10");
+     }
+   $msgtmp= $msgtmp ."\n" . $msg; 
    if (defined($err))  {return ($cmdHex2 . "-". $msg ."--" . $err);}
    else {
 	sleep 1;
-	THZ_Get($hash, $name, $cmd);
-	#return ($cmd . " " . $cmdHex2 . "-x- ". $msg);
+	$msg=THZ_Get($hash, $name, $cmd);
+	$msgtmp= $msgtmp ."\n" . $msg;
+	return ($msg);
 	} 
 }
 
@@ -879,7 +899,8 @@ sub THZ_Parse($) {
       elsif ((substr($message,4,2) eq "1D") or (substr($message,4,2) eq "17")) 	{$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30  
       elsif (substr($message,4,4) eq "05D1") 				 	{$message = quaters2time(substr($message, 10,2)) ."--". quaters2time(substr($message, 8,2))}  #like above but before stop then start !!!!
       elsif  ((substr($message,4,4) eq "05D3") or (substr($message,4,4) eq "05D4"))   		{$message = quaters2time(substr($message, 10,2)) }  #value 1Ch 28dec is 7 
-      elsif  ((substr($message,4,3) eq "056")  or (substr($message,4,3) eq "057"))		{$message = hex(substr($message, 8,4))}
+      elsif  ((substr($message,4,3) eq "056")  or (substr($message,4,4) eq "0570")  or (substr($message,4,4) eq "0575"))		{$message = hex(substr($message, 8,4))}
+      elsif  (substr($message,4,3) eq "057")						{$message = hex(substr($message, 8,4)) ." m3/h" }
       else 										{$message = hex2int(substr($message, 8,4))/10 ." °C" }
   }  
   when ("0B")    {							   #set parameter HC1
