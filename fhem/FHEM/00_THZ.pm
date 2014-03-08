@@ -69,13 +69,13 @@ my %sets = (
 	"p08FanStageNight"		=> {cmd2=>"0A056D", argMin =>  "0", argMax =>  "3"  },
 	"p09FanStageStandby"		=> {cmd2=>"0A056F", argMin =>  "0", argMax =>  "3"  },
 	"p99FanStageParty"		=> {cmd2=>"0A0570", argMin =>  "0", argMax =>  "3"  },
-	"passiveCooling"		=> {cmd2=>"0A0575", argMin =>  "0", argMax =>  "2"  },
-	"fanstage1-Airflow-inlet"	=> {cmd2=>"0A0576", argMin =>  "50", argMax =>  "300"},		#zuluft 
-	"fanstage2-Airflow-inlet"	=> {cmd2=>"0A0577", argMin =>  "50", argMax =>  "300" },	#zuluft 
-	"fanstage3-Airflow-inlet"	=> {cmd2=>"0A0578", argMin =>  "50", argMax =>  "300" },	#zuluft 
-	"fanstage1-Airflow-outlet"	=> {cmd2=>"0A0579", argMin =>  "50", argMax =>  "300" },	#abluft extrated
-	"fanstage2-Airflow-outlet"	=> {cmd2=>"0A057A", argMin =>  "50", argMax =>  "300" },	#abluft extrated
-	"fanstage3-Airflow-outlet"	=> {cmd2=>"0A057B", argMin =>  "50", argMax =>  "300" },	#abluft extrated
+	"P75passiveCooling"		=> {cmd2=>"0A0575", argMin =>  "0", argMax =>  "2"  },
+	"P37fanstage1-Airflow-inlet"	=> {cmd2=>"0A0576", argMin =>  "50", argMax =>  "300"},		#zuluft 
+	"P38fanstage2-Airflow-inlet"	=> {cmd2=>"0A0577", argMin =>  "50", argMax =>  "300" },	#zuluft 
+	"P39fanstage3-Airflow-inlet"	=> {cmd2=>"0A0578", argMin =>  "50", argMax =>  "300" },	#zuluft 
+	"P40fanstage1-Airflow-outlet"	=> {cmd2=>"0A0579", argMin =>  "50", argMax =>  "300" },	#abluft extrated
+	"P41fanstage2-Airflow-outlet"	=> {cmd2=>"0A057A", argMin =>  "50", argMax =>  "300" },	#abluft extrated
+	"P42fanstage3-Airflow-outlet"	=> {cmd2=>"0A057B", argMin =>  "50", argMax =>  "300" },	#abluft extrated
 	"holidayBegin_day"		=> {cmd2=>"0A011B", argMin =>  "1", argMax =>  "31"  }, 
 	"holidayBegin_month"		=> {cmd2=>"0A011C", argMin =>  "1", argMax =>  "12"  },
 	"holidayBegin_year"		=> {cmd2=>"0A011D", argMin =>  "12", argMax => "20"  },
@@ -236,13 +236,13 @@ my %gets = (
 	"p08FanStageNight"		=> {cmd2=>"0A056D"},
 	"p09FanStageStandby"		=> {cmd2=>"0A056F"},
 	"p99FanStageParty"		=> {cmd2=>"0A0570"},
-	"passiveCooling"		=> {cmd2=>"0A0575"},
-	"fanstage1-Airflow-inlet"	=> {cmd2=>"0A0576"},			#zuluft 
-	"fanstage2-Airflow-inlet"	=> {cmd2=>"0A0577"},			#zuluft 
-	"fanstage3-Airflow-inlet"	=> {cmd2=>"0A0578"},			#zuluft 
-	"fanstage1-Airflow-outlet"	=> {cmd2=>"0A0579"},			#abluft extrated
-	"fanstage2-Airflow-outlet"	=> {cmd2=>"0A057A"},			#abluft extrated
-	"fanstage3-Airflow-outlet"	=> {cmd2=>"0A057B"},			#abluft extrated
+	"P75passiveCooling"		=> {cmd2=>"0A0575"},
+	"P37fanstage1-Airflow-inlet"	=> {cmd2=>"0A0576"},			#zuluft 
+	"P38fanstage2-Airflow-inlet"	=> {cmd2=>"0A0577"},			#zuluft 
+	"P39fanstage3-Airflow-inlet"	=> {cmd2=>"0A0578"},			#zuluft 
+	"P40fanstage1-Airflow-outlet"	=> {cmd2=>"0A0579"},			#abluft extrated
+	"P41fanstage2-Airflow-outlet"	=> {cmd2=>"0A057A"},			#abluft extrated
+	"P42fanstage3-Airflow-outlet"	=> {cmd2=>"0A057B"},			#abluft extrated
 	"holidayBegin_day"		=> {cmd2=>"0A011B"}, 
 	"holidayBegin_month"		=> {cmd2=>"0A011C"},
 	"holidayBegin_year"		=> {cmd2=>"0A011D"},
