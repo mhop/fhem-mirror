@@ -1115,6 +1115,9 @@ sub PHTV_Define($$) {
     $hash->{model} = $hash->{READINGS}{model}{VAL}
       if ( defined( $hash->{READINGS}{model}{VAL} ) );
 
+    $hash->{swversion} = $hash->{READINGS}{softwareversion}{VAL}
+      if ( defined( $hash->{READINGS}{softwareversion}{VAL} ) );
+
     unless ( defined( AttrVal( $name, "webCmd", undef ) ) ) {
         $attr{$name}{webCmd} = 'volume:input:rgb';
     }
@@ -1475,25 +1478,24 @@ sub PHTV_ReceiveCommand($$$) {
                 }
 
                 # softwareversion
-                if (
-                    defined( $return->{softwareversion} )
-                    && ( !defined( $hash->{READINGS}{softwareversion}{VAL} )
+                if ( defined( $return->{softwareversion} ) ) {
+                    if ( !defined( $hash->{READINGS}{softwareversion}{VAL} )
                         || $hash->{READINGS}{softwareversion}{VAL} ne
                         $return->{softwareversion} )
-                  )
-                {
-                    readingsBulkUpdate( $hash, "softwareversion",
-                        $return->{softwareversion} );
+                    {
+                        readingsBulkUpdate( $hash, "softwareversion",
+                            $return->{softwareversion} );
+                    }
+                    $hash->{swversion} = $return->{softwareversion};
                 }
 
                 # model
-                if (
-                    defined( $return->{model} )
-                    && ( !defined( $hash->{READINGS}{model}{VAL} )
+                if ( defined( $return->{model} ) ) {
+                    if ( !defined( $hash->{READINGS}{model}{VAL} )
                         || $hash->{READINGS}{model}{VAL} ne $return->{model} )
-                  )
-                {
-                    readingsBulkUpdate( $hash, "model", $return->{model} );
+                    {
+                        readingsBulkUpdate( $hash, "model", $return->{model} );
+                    }
                     $hash->{model} = $return->{model};
                 }
             }
@@ -2848,6 +2850,8 @@ sub PHTV_min {
     <li><b>ambiHueRight</b> - HUE devices that should get the color from right Ambilight. Add ":0"-":x" if you would like to use a specific LED as color reference</li>
     <li><b>ambiHueBottom</b> - HUE devices that should get the color from bottom Ambilight. Add ":0"-":x" if you would like to use a specific LED as color reference</li>
     <li><b>disable</b> - Disable polling (true/false)</li>
+    <li><b>http-timeout</b> - Set different polling timeout in seconds (default=7)</li>
+    <li><b>inputs</b> - Presents the inputs read from device. Inputs can be renamed by adding <code>,NewName</code> right after the original name.</li>
   </ul></ul>
   <br>
   <br>
@@ -2862,17 +2866,25 @@ sub PHTV_min {
     <li><b>ambiLEDRight</b> - Number of LEDs of right Ambilight</li>
     <li><b>ambiLEDTop</b> - Number of LEDs of top Ambilight</li>
     <li><b>ambiMode</b> - current Ambilight color source</li>
-    <li><b>channel</b> - Shows the service name of current channel or media file name; part of FHEM-4-AV-Devices compatibility</li>
-    <li><b>currentMedia</b> - The preset number of this channel; part of FHEM-4-AV-Devices compatibility</li>
+    <li><b>channel</b> - Shows the service name of current channel; part of FHEM-4-AV-Devices compatibility</li>
     <li><b>country</b> - Set country</li>
+    <li><b>currentMedia</b> - The preset number of this channel; part of FHEM-4-AV-Devices compatibility</li>
+    <li><b>frequency</b> - Shows current channels frequency</li>
     <li><b>input</b> - Shows currently used input; part of FHEM-4-AV-Devices compatibility</li>
     <li><b>language</b> - Set menu language</li>
+    <li><b>model</b> - Device model</li>
     <li><b>mute</b> - Reports the mute status of the device (can be "on" or "off")</li>
     <li><b>onid</b> - The ON ID</li>
     <li><b>power</b> - Reports the power status of the device (can be "on" or "off")</li>
     <li><b>presence</b> - Reports the presence status of the receiver (can be "absent" or "present"). In case of an absent device, control is basically limited to turn it on again. This will only work if the device supports Wake-On-LAN packages, otherwise command "on" will have no effect.</li>
+    <li><b>receiveMode</b> - Receiving mode (analog or DVB)</li>
+    <li><b>rgb</b> - Current Ambilight color if ambiMode is not set to internal and all LEDs have the same color</li>
+    <li><b>rgb_X</b> - Current Ambilight color of a specific LED if ambiMode is not set to internal</li>
+    <li><b>serialnumber</b> - Device serial number</li>
+    <li><b>servicename</b> - Name for current channel</li>
     <li><b>sid</b> - The S-ID</li>
     <li><b>state</b> - Reports current power state and an absence of the device (can be "on", "off" or "absent")</li>
+    <li><b>systemname</b> - Device system name</li>
     <li><b>tsid</b> - The TS ID</li>
     <li><b>volume</b> - Reports current volume level of the receiver in percentage values (between 0 and 100 %)</li>
     <li><b>volumeStraight</b> - Reports current volume level of the receiver in device specific range</li>
