@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.1.2
+# Version: 1.1.3
 #
 # Major Version History:
 # - 1.1.0 - 2014-03-07
@@ -1234,8 +1234,6 @@ sub PHTV_ReceiveCommand($$$) {
     # device not reachable
     if ($err) {
 
-        $newstate = "absent";
-
         if ( !defined($cmd) || ref($cmd) eq "HASH" || $cmd eq "" ) {
             Log3 $name, 4, "PHTV $name: RCV TIMEOUT $service";
         }
@@ -1244,14 +1242,33 @@ sub PHTV_ReceiveCommand($$$) {
               "PHTV $name: RCV TIMEOUT $service/" . urlDecode($cmd);
         }
 
-        if (
-            ( !defined( $hash->{helper}{AVAILABLE} ) )
-            or ( defined( $hash->{helper}{AVAILABLE} )
-                and $hash->{helper}{AVAILABLE} eq 1 )
-          )
-        {
-            $hash->{helper}{AVAILABLE} = 0;
-            readingsBulkUpdate( $hash, "presence", "absent" );
+        # device is not reachable or
+        # does not even support master command for audio
+        if ( $service eq "audio/volume" ) {
+            $newstate = "absent";
+
+            if (
+                ( !defined( $hash->{helper}{AVAILABLE} ) )
+                or ( defined( $hash->{helper}{AVAILABLE} )
+                    and $hash->{helper}{AVAILABLE} eq 1 )
+              )
+            {
+                $hash->{helper}{AVAILABLE} = 0;
+                readingsBulkUpdate( $hash, "presence", "absent" );
+            }
+        }
+
+        # device does not support command and behaves naughty
+        else {
+            $newstate = "on";
+
+            if ( !defined( $hash->{helper}{supportedAPIcmds}{$service} ) ) {
+                $hash->{helper}{supportedAPIcmds}{$service} = 0;
+                Log3 $name, 3,
+                    "PHTV $name: API command '"
+                  . $service
+                  . "' not supported by device.";
+            }
         }
     }
 
