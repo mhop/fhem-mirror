@@ -1452,11 +1452,11 @@ sub chartQuery($@) {
       <ul>Count records in tables current and history and write results into readings countCurrent and countHistory.</ul><br/>
 
     <code>set &lt;name&gt; deleteOldDays &lt;n&gt;</code><br/><br/>
-      <ul>Delete records from history older than days. Number of deleted record will be written into reading lastRowsDeleted.</ul><br/>
+      <ul>Delete records from history older than &lt;n&gt; days. Number of deleted record will be written into reading lastRowsDeleted.</ul><br/>
 
     <code>set &lt;name&gt; userCommand &lt;validSqlStatement&gt;</code><br/><br/>
       <ul><b>DO NOT USE THIS COMMAND UNLESS YOU REALLY (REALLY!) KNOW WHAT YOU ARE DOING!!!</b><br/><br/>
-          Perform any (!!!) sql statement on connected database. Ueercommand and result will be written into corresponding readings.<br/>
+          Perform any (!!!) sql statement on connected database. Useercommand and result will be written into corresponding readings.<br/>
       </ul><br/>
 
   </ul><br>
@@ -1732,7 +1732,25 @@ sub chartQuery($@) {
 
 
   <a name="DbLogset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set</b> 
+  <ul>
+    <code>set &lt;name&gt; reopen </code><br/><br/>
+      <ul>Schlie&szlig;t die Datenbank und &ouml;ffnet sie danach sofort wieder. Dabei wird die Journaldatei geleert und neu angelegt.<br/>
+	  Verbessert den Datendurchsatz und vermeidet Speicherplatzprobleme.</ul><br/>
+
+    <code>set &lt;name&gt; count </code><br/><br/>
+      <ul>Z&auml;hlt die Datens&auml;tze in den Tabellen current und history und schreibt die Ergebnisse in die Readings countCurrent und countHistory.</ul><br/>
+
+    <code>set &lt;name&gt; deleteOldDays &lt;n&gt;</code><br/><br/>
+      <ul>L&ouml;scht Datens&auml;tze, die &auml;lter sind als &lt;n&gt; Tage. Die Anzahl der gel&ouml;schten Datens&auml;tze wird in das Reading lastRowsDeleted geschrieben.</ul><br/>
+
+    <code>set &lt;name&gt; userCommand &lt;validSqlStatement&gt;</code><br/><br/>
+      <ul><b>BENUTZE DIESE FUNKTION NUR, WENN DU WIRKLICH (WIRKLICH!) WEISST, WAS DU TUST!!!</b><br/><br/>
+          F&uuml;hrt einen beliebigen (!!!) sql Befehl in der Datenbank aus. Der Befehl und ein zur&uuml;ckgeliefertes Ergebnis werden in entsprechende Readings geschrieben.<br/>
+      </ul><br/>
+
+  </ul><br>
+
 
   <a name="DbLogget"></a>
   <b>Get</b>
