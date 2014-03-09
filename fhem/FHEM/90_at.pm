@@ -16,7 +16,8 @@ at_Initialize($)
   $hash->{UndefFn}  = "at_Undef";
   $hash->{AttrFn}   = "at_Attr";
   $hash->{StateFn}  = "at_State";
-  $hash->{AttrList} = "disable:0,1 skip_next:0,1 alignTime";
+  $hash->{AttrList} = "disable:0,1 disabledForIntervals ".
+                        "skip_next:0,1 alignTime";
 }
 
 
@@ -119,7 +120,7 @@ at_Exec($)
   Log3 $name, 5, "exec at command $name";
 
   my $skip    = AttrVal($name, "skip_next", undef);
-  my $disable = AttrVal($name, "disable", undef);
+  my $disable = IsDisabled($name);
 
   delete $attr{$name}{skip_next} if($skip);
   my (undef, $command) = split("[ \t]+", $hash->{DEF}, 2);
@@ -330,6 +331,17 @@ at_State($$$$)
         If applied to an <a href="#at">at</a>, the command will not be executed,
         but the next time will be computed.</li><br>
 
+    <a name="disabledForIntervals"></a>
+    <li>disabledForIntervals HH:MM-HH:MM HH:MM-HH-MM...<br>
+        Space separated list of HH:MM tupels. If the current time is between
+        the two time specifications, the current device is disabled. Instead of
+        HH:MM you can also specify HH or HH:MM:SS. To specify an interval
+        spawning midnight, you have to specify two intervals, e.g.:
+        <ul>
+          23:00-24:00 00:00-01:00
+        </ul>
+        </li><br>
+
     <a name="skip_next"></a>
     <li>skip_next<br>
         Used for at commands: skip the execution of the command the next
@@ -457,11 +469,23 @@ at_State($$$$)
   <ul>
     <a name="disable"></a>
     <li>disable<br>
-        Kann f&uuml;r at/watchdog/notify/FileLog Devices gesetzt werden.<br>
-        Deaktiviert das entsprechende at/notify oder FileLog Device. Hinweis:
-        Wenn angewendet auf ein <a href="#at">at</a>, dann wird der Befehl
-        nicht ausgef&uuml;hrt, jedoch die n&auml;chste Ausf&uuml;hrungszeit
-        berechnet.</li><br>
+        Deaktiviert das entsprechende Ger&aauml;t.<br>
+        Hinweis: Wenn angewendet auf ein <a href="#at">at</a>, dann wird der
+        Befehl nicht ausgef&uuml;hrt, jedoch die n&auml;chste
+        Ausf&uuml;hrungszeit berechnet.</li><br>
+
+    <a name="disabledForIntervals"></a>
+    <li>disabledForIntervals HH:MM-HH:MM HH:MM-HH-MM...<br>
+        Das Argument ist eine Leerzeichengetrennte Liste von Minuszeichen-
+        getrennten HH:MM Paaren. Falls die aktuelle Uhrzeit zwischen diesen
+        Werten f&auml;llt, dann wird die Ausf&uuml;hrung, wie beim disable,
+        ausgesetzt.  Statt HH:MM kann man auch HH oder HH:MM:SS angeben.
+        Um einen Intervall um Mitternacht zu spezifizieren, muss man zwei
+        einzelne angeben, z.Bsp.:
+        <ul>
+          23:00-24:00 00:00-01:00
+        </ul>
+        </li><br>
 
     <a name="skip_next"></a>
     <li>skip_next<br>

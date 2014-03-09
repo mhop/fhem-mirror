@@ -617,12 +617,20 @@ sub
 IsDisabled($)
 {
   my $devname = shift;
-  if($devname &&
-     defined($attr{$devname}) &&
-     defined($attr{$devname}{disable})) {
-    Log 4, "Disabled $devname";
-    return 1;
+  return 0 if(!$devname || !defined($attr{$devname}));
+
+  return 1 if(defined($attr{$devname}{disable}));
+
+  my $dfi = $attr{$devname}{disabledForIntervals};
+  if(defined($dfi)) {
+    my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+    my $hms = sprintf("%02d:%02d:%02d", $hour, $min, $sec);
+    foreach my $ft (split(" ", $dfi)) {
+      my ($from, $to) = split("-", $ft);
+      return 1 if($from && $to && $from le $hms && $hms le $to);
+    }
   }
+
   return 0;
 }
 

@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: disabledForIntervals attribute added for at/notify/watchdog
   - feature: jsonlist2 added, jsonlist is deprecated.
   - change:  renamed 98_configDB to 98_configDBwrap
   - feature: DbLog: Added new function : ReadingsVal/ReadingsTimestamp
