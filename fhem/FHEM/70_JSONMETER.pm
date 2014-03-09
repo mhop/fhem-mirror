@@ -848,8 +848,8 @@ JSONMETER_doStatisticDelta ($$$$)
      The attribute 'pathString' can be used to add login information to the URL path of predefined devices.
      <br>&nbsp;
      <ul> 
-         <li><b>ITF</b> - One tariff electrical meter used by N-ENERGY (<a href="http://www.itf-froeschl.de">ITF Fr&ouml;schl</a>)</li>
-         <li><b>EFR</b> - <a href="http://www.efr.de">EFR</a> Smart Grid Hub for electrical meter used by EON, N-ENERGY and EnBW
+         <li><b>ITF</b> - FROETEC Simplex ME one tariff electrical meter (N-ENERGY) (<a href="http://www.itf-froeschl.de">ITF Fr&ouml;schl</a>)</li>
+         <li><b>EFR</b> - <a href="http://www.efr.de">EFR</a> Smart Grid Hub for electrical meter (EON, N-ENERGY and EnBW)
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;use the 'pathstring' attribute to specifiy your login information
             <br>
@@ -952,8 +952,8 @@ JSONMETER_doStatisticDelta ($$$$)
       <br>
       Mit dem Attribute 'pathString' k&ouml;nnen Login Information an den URL-Pfad von vordefinierten Ger&auml;te angehangen werden.
       <ul> 
-         <li><b>ITF</b> - Eintarifz&auml;hler von N-ENERGY Netz GmbH (<a href="http://www.itf-froeschl.de">ITF Fr&ouml;schl</a>)</li>
-         <li><b>EFR</b> - <a href="http://www.efr.de">EFR</a> Smart Grid Hub f&uuml;r Stromz&auml;hler von EON, N-ENERGY, EnBW
+         <li><b>ITF</b> - FROETEC Simplex ME Eintarifz&auml;hler (N-ENERGY) (<a href="http://www.itf-froeschl.de">ITF Fr&ouml;schl</a>)</li>
+         <li><b>EFR</b> - <a href="http://www.efr.de">EFR</a> Smart Grid Hub f&uuml;r Stromz&auml;hler (EON, N-ENERGY, EnBW)
             <br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Die Login-Information wird &uuml;ber das Attribute 'pathstring' angegeben.
             <br>
@@ -1008,7 +1008,7 @@ JSONMETER_doStatisticDelta ($$$$)
       </li><br>
       <li><code>doStatistics &lt; 0 | 1 &gt;</code>
          <br>
-         Bildet t&auml;gliche, monatliche und j&auml;hrliche Statistiken bestimmter Ger&auml;tewerte.
+         Bildet t&auml;gliche, monatliche und j&auml;hrliche Statistiken bestimmter Ger&auml;tewerte (Mittel/Min/Max oder kumulierte Werte).
          <br>
          F&uuml;r grafische Auswertungen k&ouml;nnen die Werte der Form 'stat<i>ReadingName</i><b>Last</b>' genutzt werden.
          </li><br>
