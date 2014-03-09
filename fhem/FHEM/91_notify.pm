@@ -14,7 +14,7 @@ notify_Initialize($)
   $hash->{DefFn} = "notify_Define";
   $hash->{NotifyFn} = "notify_Exec";
   $hash->{AttrFn}   = "notify_Attr";
-  $hash->{AttrList} = "disable:0,1 forwardReturnValue:0,1";
+  $hash->{AttrList} = "disable:0,1 disabledForIntervals forwardReturnValue:0,1";
 }
 
 
@@ -51,7 +51,7 @@ notify_Exec($$)
   my ($ntfy, $dev) = @_;
 
   my $ln = $ntfy->{NAME};
-  return "" if($attr{$ln} && $attr{$ln}{disable});
+  return "" if(IsDisabled($ln));
 
   my $n = $dev->{NAME};
   my $re = $ntfy->{REGEXP};
@@ -221,6 +221,8 @@ notify_Attr(@)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
+
     <a name="forwardReturnValue"></a>
     <li>forwardReturnValue<br>
         Forward the return value of the executed command to the caller,

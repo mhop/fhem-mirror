@@ -15,7 +15,8 @@ watchdog_Initialize($)
   $hash->{DefFn} = "watchdog_Define";
   $hash->{UndefFn} = "watchdog_Undef";
   $hash->{NotifyFn} = "watchdog_Notify";
-  $hash->{AttrList} = "disable:0,1 regexp1WontReactivate:0,1";
+  $hash->{AttrList} = "disable:0,1 disabledForIntervals ".
+                        "regexp1WontReactivate:0,1";
 }
 
 
@@ -65,7 +66,7 @@ watchdog_Notify($$)
   my ($watchdog, $dev) = @_;
 
   my $ln = $watchdog->{NAME};
-  return "" if(AttrVal($ln, "disable", 0));
+  return "" if(IsDisabled($ln));
   my $dontReAct = AttrVal($ln, "regexp1WontReactivate", 0);
 
   my $n   = $dev->{NAME};
@@ -227,6 +228,7 @@ watchdog_Undef($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a name="regexp1WontReactivate">regexp1WontReactivate</a><br>
         When a watchdog is active, a second event matching regexp1 will
         normally reset the timeout. Set this attribute to prevents this.
@@ -325,6 +327,7 @@ watchdog_Undef($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a name="regexp1WontReactivate">regexp1WontReactivate</a><br>
         Wenn ein Watchdog aktiv ist, wird ein zweites Ereignis das auf regexp1
         passt normalerweise den Timer zur&uuml;cksetzen. Dieses Attribut wird
