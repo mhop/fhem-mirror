@@ -406,6 +406,9 @@ CommandJsonList($$)
 <a name="JsonList"></a>
 <h3>JsonList</h3>
 <ul>
+  <b>Note</b>: this command is deprecated, use <a
+  href="#JsonList2">jsonlist2</a> instead.<br><br>
+
   <code>jsonlist [&lt;devspec&gt;|&lt;typespec&gt;|ROOMS]</code>
   <br><br>
   Returns an JSON tree of all definitions, all notify settings and all at
