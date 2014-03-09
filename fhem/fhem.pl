@@ -444,8 +444,9 @@ $attr{global}{motd} = "$sc_text\n\n"
 
 $init_done = 1;
 foreach my $d (keys %defs) {
-  if(defined($defs{$d}{IODev}) && $defs{$d}{IODev} == 0) {
+  if($defs{$d}{IODevMissing}) {
     Log 3, "No I/O device found for $defs{$d}{NAME}";
+    delete $defs{$d}{IODevMissing};
   }
 }
 DoTrigger("global", "INITIALIZED", 1);
@@ -1564,12 +1565,14 @@ AssignIoPort($;$)
     }
   }
   if($hash->{IODev}) {
-    $attr{$hash->{NAME}}{IODev} = $hash->{IODev}{NAME};
+    $attr{$hash->{NAME}}{IODev} = $hash->{IODev}{NAME}
+      if($hash->{TYPE} ne "CUL_WS"); # See CUL_WS_Attr() for details
+
   } else {
     if($init_done) {
       Log 3, "No I/O device found for $hash->{NAME}"
     } else {
-      $hash->{IODev} = 0;
+      $hash->{IODevMissing} = 1;
     }
   }
   return undef;
