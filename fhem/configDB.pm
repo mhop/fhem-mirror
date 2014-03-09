@@ -119,6 +119,7 @@ sub cfgDB_Init {
 #	Create non-existing database tables 
 #	Create default config entries if necessary
 #
+
 	my $fhem_dbh = _cfgDB_Connect;
 
 	eval { $fhem_dbh->do("CREATE EXTENSION \"uuid-ossp\"") if($cfgDB_dbtype eq 'POSTGRESQL'); };
@@ -397,6 +398,11 @@ sub _cfgDB_Uuid{
 	$uuid = $fhem_dbh->selectrow_array('select uuid_generate_v4()') if($cfgDB_dbtype eq 'POSTGRESQL');
 	$fhem_dbh->disconnect();
 	return $uuid;
+}
+
+sub _cfgDB_backupdata {
+	my (undef, $cfgDB_dblocation) = split(/=/,$cfgDB_dbconn);
+	return ($cfgDB_dbtype,$cfgDB_dblocation);
 }
 
 ##################################################
