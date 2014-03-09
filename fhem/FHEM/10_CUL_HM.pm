@@ -2441,7 +2441,6 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     return "$cmd requires parameter: $h";
   }
   my $devHash = CUL_HM_getDeviceHash($hash);
-  my $id = CUL_HM_IOid($hash);
 
   #----------- now start processing --------------
   if   ($cmd eq "param") {  ###################################################
@@ -4955,8 +4954,8 @@ sub CUL_HM_IOid($) {#in: hash out: id of IO device
   my ($hash) = @_;
   my $dHash = CUL_HM_getDeviceHash($hash);
   my $ioHash = $dHash->{IODev};
-  my $fhtid = defined($ioHash->{FHTID}) ? $ioHash->{FHTID} : "0000";
   return "" if (!$ioHash->{NAME});
+  my $fhtid = defined($ioHash->{FHTID}) ? $ioHash->{FHTID} : "0000";
   return AttrVal($ioHash->{NAME},"hmId","F1$fhtid");
 }
 sub CUL_HM_hash2Id($) {#in: id, out:hash
