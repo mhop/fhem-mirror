@@ -23,7 +23,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.2
+# Version: 1.0.3
 #
 # Major Version History:
 # - 1.0.0 - 2014-02-08
@@ -37,6 +37,7 @@ use strict;
 use warnings;
 use Time::Local;
 use Data::Dumper;
+use SetExtensions;
 
 sub GUEST_Set($@);
 sub GUEST_Define($$);
@@ -343,7 +344,7 @@ sub GUEST_Set($@) {
         }
         elsif ( defined( $a[2] ) ) {
             return
-"Invalid 2nd argument, choose one of home gotosleep asleep awoken absent gone ";
+"Invalid 2nd argument, choose one of home gotosleep asleep awoken absent none ";
         }
         else {
             $newstate = $a[1];
@@ -401,6 +402,24 @@ sub GUEST_Set($@) {
                   "GUEST $name: implicit mood change caused by state "
                   . $newstate;
                 GUEST_Set( $hash, $name, "silentSet", "mood", $mood_default );
+            }
+
+            # if state is asleep, start sleep timer
+            readingsBulkUpdate( $hash, "lastSleep", $datetime )
+              if ( $newstate eq "asleep" );
+
+            # if prior state was asleep, update sleep statistics
+            if ( $state eq "asleep"
+                && defined( $hash->{READINGS}{lastSleep}{VAL} ) )
+            {
+                readingsBulkUpdate( $hash, "lastAwake", $datetime );
+                readingsBulkUpdate(
+                    $hash,
+                    "lastDurSleep",
+                    GUEST_TimeDiff(
+                        $datetime, $hash->{READINGS}{lastSleep}{VAL}
+                    )
+                );
             }
 
             # calculate presence state
@@ -732,10 +751,13 @@ sub GUEST_AutoGone($;$) {
 ###################################
 sub GUEST_DurationTimer($;$) {
     my ( $mHash, @a ) = @_;
-    my $hash         = ( $mHash->{HASH} ) ? $mHash->{HASH} : $mHash;
-    my $name         = $hash->{NAME};
-    my $state        = ( $hash->{READINGS}{state}{VAL} ) ? $hash->{READINGS}{state}{VAL} : "initialized";
-    my $silent       = ( defined( $a[0] ) && $a[0] eq "1" ) ? 1 : 0;
+    my $hash = ( $mHash->{HASH} ) ? $mHash->{HASH} : $mHash;
+    my $name = $hash->{NAME};
+    my $state =
+      ( $hash->{READINGS}{state}{VAL} )
+      ? $hash->{READINGS}{state}{VAL}
+      : "initialized";
+    my $silent = ( defined( $a[0] ) && $a[0] eq "1" ) ? 1 : 0;
     my $timestampNow = gettimeofday();
     my $diff;
     my $durPresence = "0";
