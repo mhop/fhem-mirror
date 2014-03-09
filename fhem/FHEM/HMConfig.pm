@@ -1152,11 +1152,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       ,press         =>"[long|short]..."
                       ,postEvent     =>"<condition>"},
   smokeDetector    =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] actor"},
-  winMatic         =>{ matic         =>"<btn>"
-                      ,keydef        =>"<btn> <txt1> <txt2>"
-                      ,create        =>"<txt>"
-                      ,inhibit       =>"[on|off]"
-                      ,statusRequest =>""},
+  winMatic         =>{ statusRequest =>""},
   keyMatic         =>{ lock          =>""
                       ,unlock        =>"[<sec>] ..."
                       ,open          =>"[<sec>] ..."
@@ -1239,7 +1235,12 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
                           level          =>"<level> <relockDly> <speed>..."},
   "HM-OU-CFM-PL01"    =>{ led            =>"<color>[,<color>...] [<repeat>]"},
   "HM-OU-CFM-PL02"    =>{ playTone       =>"<MP3No>[,<MP3No>...] [<repeat>]"},
-
+  "HM-SEC-WIN01"      =>{ matic         =>"<btn>"
+                         ,keydef        =>"<btn> <txt1> <txt2>"
+                         ,create        =>"<txt>"
+                         ,inhibit       =>"[on|off]"
+                         ,press         =>"[long|short] [on|off] ..."
+                        },
   "HM-Sen-RD-O02"     =>{ "on-for-timer" =>"<sec>"
                          ,"on-till"      =>"<time>"
                          ,on             =>""
