@@ -47,11 +47,14 @@ sub
 CommandBackup($$)
 {
   my ($cl, $param) = @_;
+
   my $modpath = $attr{global}{modpath};
   my $configfile = (!defined($attr{global}{configfile}) ? undef : $attr{global}{configfile});
   my $statefile  = (!defined($attr{global}{statefile}) ? undef : $attr{global}{statefile});
   my $msg;
   my $ret;
+
+  return "Backup is not supported for configDB" if($configfile eq 'configDB');
 
   # set backupdir
   my $backupdir;
