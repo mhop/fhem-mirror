@@ -498,7 +498,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 #SC - different literals
   msgScPosA       =>{a=> 32.6,s=>0.2,l=>1,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position A",lit=>{noMsg=>0,closed=>1,open=>2}},
   msgScPosB       =>{a=> 32.4,s=>0.2,l=>1,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position B",lit=>{noMsg=>0,closed=>1,open=>2}},
-# keymatic/winmatic secific register
+# keymatic/winmatic specific register
   holdTime        =>{a=> 20  ,s=>1,  l=>1,min=>0  ,max=>8.16    ,c=>''         ,f=>31.25   ,u=>'s'   ,d=>0,t=>"Holdtime for door opening"},
   holdPWM         =>{a=> 21  ,s=>1,  l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Holdtime pulse wide modulation"},
   setupDir        =>{a=> 22  ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Rotation direction for locking",lit=>{right=>0,left=>1}},
@@ -739,7 +739,7 @@ my $K_actDetID = '000000'; # id of actionDetector
                          ,ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1
                          ,lgMultiExec     =>1
                         },
-  winMatic            =>{ signal          =>1,signalTone      =>1,keypressSignal  =>1},
+  winMatic            =>{ intKeyVisib     =>1,signal          =>1,signalTone      =>1,keypressSignal  =>1},
   keyMatic            =>{ signal          =>1,signalTone      =>1,keypressSignal  =>1
                          ,holdTime        =>1,holdPWM         =>1,setupDir        =>1,setupPosition   =>1
                          ,angelOpen       =>1,angelMax        =>1,angelLocked     =>1
@@ -1057,6 +1057,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
 %culHmGlobalGets = (
   param      => "<param>",
   reg        => "<addr> ... <list> <peer>",
+  regVal     => "<addr> ... <list> <peer>",
   regList    => "",
   cmdList    => "",
   saveConfig => "<filename> ...",
@@ -1179,30 +1180,30 @@ $culHmSubTypeSets{powerMeter}      = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
 
 %culHmModelSets = (# channels of this subtype-------------
-  "HM-CC-VD"       =>{ valvePos       =>"[off|0.0..99.0]"},
-  "HM-RC-19"       =>{ service        => "<count>"
-                      ,alarm          => "<count>"
-                      ,display        => "<text> [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
-  "HM-PB-4DIS-WM"  =>{ text           => "<txt1> <txt2>..."
-                        #text         => "<btn> [on|off] <txt1> <txt2>...", old style will not be offered anymore
-                     },
-  "HM-OU-LED16"    =>{ led            => "[off|red|green|orange]"
-                      ,ilum           => "[0-15] [0-127]"},
-  "HM-OU-CFM-PL"   =>{ "on-for-timer" =>"<sec>"
-                      ,"on-till"      =>"<time>"
-                      ,on             =>""
-                      ,off            =>""
-                      ,toggle         =>""
-                      ,press          =>"[long|short] [on|off] ..."
-                      ,inhibit        =>"[on|off]"},
-  "HM-CC-TC"       =>{ burstXmit      =>""},
-  "HM-CC-RT-DN"    =>{ burstXmit      =>""
-                      ,inhibit        =>"[on|off]"},
-  "HM-SEC-SD"      =>{ statusRequest  =>""},
+  "HM-CC-VD"         =>{ valvePos       =>"[off|0.0..99.0]"},
+  "HM-RC-19"         =>{ service        => "<count>"
+                        ,alarm          => "<count>"
+                        ,display        => "<text> [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
+  "HM-PB-4DIS-WM"    =>{ text           => "<txt1> <txt2>..."
+                          #text         => "<btn> [on|off] <txt1> <txt2>...", old style will not be offered anymore
+                       },
+  "HM-OU-LED16"      =>{ led            => "[off|red|green|orange]"
+                        ,ilum           => "[0-15] [0-127]"},
+  "HM-OU-CFM-PL"     =>{ "on-for-timer" =>"<sec>"
+                        ,"on-till"      =>"<time>"
+                        ,on             =>""
+                        ,off            =>""
+                        ,toggle         =>""
+                        ,press          =>"[long|short] [on|off] ..."
+                        ,inhibit        =>"[on|off]"},
+  "HM-CC-TC"         =>{ burstXmit      =>""},
+  "HM-CC-RT-DN"      =>{ burstXmit      =>""
+                        ,inhibit        =>"[on|off]"},
+  "HM-TC-IT-WM-W-EU" =>{ inhibit        =>"[on|off]"},
+  "HM-SEC-SD"        =>{ statusRequest  =>""},
 );
 # clones- - - - - - - - - - - - - - - - -
 $culHmModelSets{"HM-CC-RT-DN-BoM"}    = $culHmModelSets{"HM-CC-RT-DN"};
-$culHmModelSets{"HM-TC-IT-WM-W-EU"}   = $culHmModelSets{"HM-CC-RT-DN"};
 
 $culHmModelSets{"HM-RC-19-B"}          = $culHmModelSets{"HM-RC-19"};
 $culHmModelSets{"HM-RC-19-SW"}         = $culHmModelSets{"HM-RC-19"};
@@ -1244,7 +1245,9 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
                          ,on             =>""
                          ,off            =>""
                          ,toggle         =>""},
-  "HM-CC-RT-DN00"     =>{ sysTime        =>""},
+  "HM-CC-RT-DN00"     =>{ sysTime        =>""
+                         ,fwUpdate       =>"<filename>"
+                        },
   "HM-CC-RT-DN04"     =>{ controlMode    =>"[auto|manu|boost|day|night]"
                          ,controlManu    =>"[on|off|5.0..30.0]"
                          ,controlParty   =>"<temp> <startDate> <startTime> <enddate> <endTime>"
