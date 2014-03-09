@@ -725,6 +725,10 @@ sub CUL_HM_Parse($$) {#########################################################
              ref($iohash) ne 'HASH'  ||
              $t ne 'A'  || 
              length($msg)<20);
+  if ($modules{CUL_HM}{helper}{updating}){
+    CUL_HM_FWupdateSteps($msg);
+    return "";
+  }
   $p = "" if(!defined($p));
   my @mI = unpack '(A2)*',$p; # split message info to bytes
   return "" if($msgStat && $msgStat eq 'NACK');# lowlevel error
@@ -1064,6 +1068,9 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$dHash,1,"measured-temp:$actTemp"];
       push @evtEt,[$dHash,1,"desired-temp:$setTemp"];
       push @evtEt,[$dHash,1,"actuator:$vp %"];
+      
+      my $wHash = $modules{CUL_HM}{defptr}{$src."01"};
+      push @evtEt,[$wHash,1,"measured-temp:$actTemp"] if ($wHash);
     }
     elsif($mTp eq "59" && $p =~ m/^(..)/) {#inform team about new value
       my $setTemp = int(hex($1)/4)/2;
@@ -1703,7 +1710,7 @@ sub CUL_HM_Parse($$) {#########################################################
     elsif(!@evtEt){push @evtEt,[$shash,1,"3SSunknownMsg:$p"];}
   }
   elsif($st eq "winMatic") {  #################################################
-    my($sType,$chn,$lvl,$stat) = ($1,$2,$3,$4) if ($p =~ m/^(..)(..)(..)(..)/);
+    my($sType,$chn,$lvl,$stat) = @mI;
     if(($mTp eq "10" && $sType eq "06") ||
        ($mTp eq "02" && $sType eq "01")){
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
@@ -1713,25 +1720,25 @@ sub CUL_HM_Parse($$) {#########################################################
       if ($chn eq "01"){
         my %err = (0=>"no",1=>"TurnError",2=>"TiltError");
         my %dir = (0=>"no",1=>"up",2=>"down",3=>"undefined");
-        push @evtEt,[$shash,1,"motorError:".$err{(hex($stat)>>1)&0x02}];
-        push @evtEt,[$shash,1,"direction:".$dir{(hex($stat)>>4)&0x02}];
+        push @evtEt,[$shash,1,"motorError:".$err{(hex($stat)>>1)&0x03}];
+        push @evtEt,[$shash,1,"direction:" .$dir{(hex($stat)>>4)&0x03}];
       }
       else{ #should be akku
         my %statF = (0=>"trickleCharge",1=>"charge",2=>"dischange",3=>"unknown");
-        push @evtEt,[$shash,1,"charge:".$statF{(hex($stat)>>4)&0x02}];
+        push @evtEt,[$shash,1,"charge:".$statF{(hex($stat)>>4)&0x03}];
       }
     }
-    if ($p =~ m/^0287(..)89(..)8B(..)/) {
-      my ($air, undef, $course) = ($1, $2, $3);
-      push @evtEt,[$shash,1,"airing:".($air eq "FF" ? "inactiv" : CUL_HM_decodeTime8($air))];
-      push @evtEt,[$shash,1,"course:".($course eq "FF" ? "tilt" : "close")];
-    }
-    elsif($p =~ m/^0201(..)03(..)04(..)05(..)07(..)09(..)0B(..)0D(..)/) {
-      my ($flg1, $flg2, $flg3, $flg4, $flg5, $flg6, $flg7, $flg8) =
-         ($1, $2, $3, $4, $5, $6, $7, $8);
-      push @evtEt,[$shash,1,"airing:".($flg5 eq "FF" ? "inactiv" : CUL_HM_decodeTime8($flg5))];
-      push @evtEt,[$shash,1,"contact:tesed"];
-    }
+#    if ($p =~ m/^0287(..)89(..)8B(..)/) {
+#      my ($air, $course) = ($1, $3);
+#      push @evtEt,[$shash,1,"airing:".($air eq "FF" ? "inactiv" : CUL_HM_decodeTime8($air))];
+#      push @evtEt,[$shash,1,"course:".($course eq "FF" ? "tilt" : "close")];
+#    }
+#    elsif($p =~ m/^0201(..)03(..)04(..)05(..)07(..)09(..)0B(..)0D(..)/) {
+#      my ($flg1, $flg2, $flg3, $flg4, $flg5, $flg6, $flg7, $flg8) =
+#         ($1, $2, $3, $4, $5, $6, $7, $8);
+#      push @evtEt,[$shash,1,"airing:".($flg5 eq "FF" ? "inactiv" : CUL_HM_decodeTime8($flg5))];
+#      push @evtEt,[$shash,1,"contact:tesed"];
+#    }
   }
   elsif($st eq "keyMatic") {  #################################################
     #Info Level: mTp=0x10 p(..)(..)(..)(..) subty=06, chn, state,err (3bit)
@@ -2031,6 +2038,8 @@ sub CUL_HM_parseCommon(@){#####################################################
         delete $shash->{cmdStack};
         delete $shash->{helper}{prt}{rspWait};
         delete $shash->{helper}{prt}{rspWaitSec};
+        delete $shash->{READINGS}{"RegL_00:"};
+        delete $shash->{READINGS}{".RegL_00:"};
 
         AssignIoPort($shash,$ioHash->{NAME})
                     if (!$modules{CUL_HM}{helper}{hmManualOper});
@@ -3645,10 +3654,11 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
   }
   elsif($cmd eq "fwUpdate") { #################################################
+    return "implementation pending";
     return "no filename given" if (!$a[2]);
     return "only thru CUL " if (!$hash->{IODev}->{TYPE}
                                  ||($hash->{IODev}->{TYPE} ne "CUL"));
-    # todo General add version cehck of CUL
+    # todo General add version check of CUL
     my $fName = $a[2];
     my $pos = 0;
     my @imA; # image array: image[block][msg]
@@ -3667,15 +3677,19 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     close(aUpdtF);
     # --- we are prepared start update---
-    InternalTimer(gettimeofday()+100,"CUL_HM_FWupdateEnd","updateTmr:$name",0);
+    InternalTimer(gettimeofday()+5,"CUL_HM_FWupdateEnd","fail:notInBootLoader",0);
     $modules{CUL_HM}{helper}{updating} = 1;
     $modules{CUL_HM}{helper}{updatingName} = $name;
     $modules{CUL_HM}{helper}{updateData} = \@imA;
     $modules{CUL_HM}{helper}{updateStep} = 0;
     $modules{CUL_HM}{helper}{updateDst} = $dst;
     $modules{CUL_HM}{helper}{updateId} = $id;
+    $modules{CUL_HM}{helper}{updateNbr} = 10;
     my $msg;
-    $msg = "++3011$id${dst}CA";  Log 1,"General enter Boot:  $msg"; # CUL_HM_PushCmdStack($hash, $msg);
+    Log3 $name,3,"CUL_HM fwUpdate started for $name";
+    CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
+                        ."3011$id${dst}CA");
+    InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim",$dst.$id."00",0);#General simulation
   }
   elsif($cmd eq "postEvent") { ################################################
     my (undef,undef,$cond) = @a;
@@ -4290,7 +4304,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       # response setup - do not repeat, set counter to 250
       CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=$rss","wakeup:=1");
     }
-    else{
+    elsif($mTp !~ m /C./){
       CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=$rss");
     }
 
@@ -4594,48 +4608,89 @@ sub CUL_HM_respPendToutProlong($) {#used when device sends part responses
   RemoveInternalTimer("respPend:$hash->{DEF}");
   InternalTimer(gettimeofday()+2, "CUL_HM_respPendTout", "respPend:$hash->{DEF}", 0);
 }
+
 sub CUL_HM_FWupdateSteps($){#steps for FW update
+  my $mIn = shift;
   my $step = $modules{CUL_HM}{helper}{updateStep};
-  my $hash = $defs{$modules{CUL_HM}{helper}{updatingName}};
+  my $name = $modules{CUL_HM}{helper}{updatingName};
+  my $hash = $defs{$name};
   my $dst = $modules{CUL_HM}{helper}{updateDst};
   my $id = $modules{CUL_HM}{helper}{updateId};
-  my $msg;
+  my $mNo = $modules{CUL_HM}{helper}{updateNbr};
+  my $mNoA = sprintf("%02X",$mNo);
+  return if ($mIn !~ m/$mNoA..02$dst${id}00/);
+  Log 1,"General loop fwUpdate $mNoA------------";
   if ($step == 0){#check bootloader entered - now chnage speed
-    $msg = "++00CB$id${dst}105B11F81547";  Log 1,"General ch baud:  $msg"; # CUL_HM_PushCmdStack($hash, $msg);
-    Log 1,"General switch speed";   #  IOWrite($hash, "","AR\n");  
-    $msg = "++++20CB$id${dst}105B11F81547";Log 1,"General chk baud: $msg"; # CUL_HM_PushCmdStack($hash, $msg);
-	$modules{CUL_HM}{helper}{updateStep}++;
+    Log3 $name,4,"CUL_HM fwUpdate switch speed";
+    $mNo = (++$mNo)%256; $mNoA = sprintf("%02X",$mNo);
+    CUL_HM_SndCmd($hash,"${mNoA}00CB$id${dst}105B11F81547");
+    CUL_HM_FWupdateSpeed($name,100);
+    select(undef, undef, undef, (0.1));
+    $mNo = (++$mNo)%256; $mNoA = sprintf("%02X",$mNo);
+    CUL_HM_SndCmd($hash,"${mNoA}20CB$id${dst}105B11F81547");
+    $modules{CUL_HM}{helper}{updateStep}++;
+    $modules{CUL_HM}{helper}{updateNbr} = $mNo;
+    InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim","${dst}${id}00",0);#General simulation
+    RemoveInternalTimer("fail:notInBootLoader");
+    InternalTimer(gettimeofday()+5,"CUL_HM_FWupdateEnd","fail:SpeedChangeFailed",0);
   }
   else{# check response - start programming
     my $blocks = scalar(@{$modules{CUL_HM}{helper}{updateData}});
-	if ($blocks == $step){
-	  Log 1,"General we are done#########";
- #    IOWrite($hash, "","Ar\n");     # switch CUL baud to 10
-	  CUL_HM_FWupdateEnd("updateTmr:".$modules{CUL_HM}{helper}{updatingName});
-	  return ;
-	}
-	else{
+    RemoveInternalTimer("fail:SpeedChangeFailed");
+    RemoveInternalTimer("fail:Block".($step-1));
+    if ($blocks < $step){#last block
+      CUL_HM_FWupdateSpeed($name,10);
+      CUL_HM_FWupdateEnd("done");
+      Log3 $name,4,"CUL_HM fwUpdate completed";
+    }
+    else{# programming continue
       my $bl = ${$modules{CUL_HM}{helper}{updateData}}[$step-1];
       my $no = scalar(@{$bl});
-      Log 1,"General next block - length:$no :$msg";
+      Log3 $name,4,"CUL_HM fwUpdate write block $step of $blocks: $no messages";
       foreach my $msgP (@{$bl}){
-        $msg = "++".((--$no)?"00":"20")."CA$id$dst".$msgP;
-        Log 1,"General updatemessage$no: $msg";# CUL_HM_PushCmdStack($hash, $msg);
+        $mNo = (++$mNo)%256; $mNoA = sprintf("%02X",$mNo);
+        CUL_HM_SndCmd($hash, $mNoA.((--$no)?"00":"20")."CA$id$dst".$msgP);
+        select(undef, undef, undef, (0.1));
       }
-	  $modules{CUL_HM}{helper}{updateStep}++;
-	}
+      $modules{CUL_HM}{helper}{updateStep}++;
+      $modules{CUL_HM}{helper}{updateNbr} = $mNo;
+      InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim","${dst}${id}00",0);#General simulation
+      InternalTimer(gettimeofday()+5,"CUL_HM_FWupdateEnd","fail:Block$step",0);
+    }
   }
 }
 sub CUL_HM_FWupdateEnd($){#end FW update
-  my $tmr = shift;
-  RemoveInternalTimer($tmr); # could be called by finish
+  my $in = shift;
+  CUL_HM_UpdtReadSingle($defs{$modules{CUL_HM}{helper}{updatingName}},
+                        "fwUpdate",$in,1);
+  CUL_HM_FWupdateSpeed($modules{CUL_HM}{helper}{updatingName},10);
+  delete $defs{$modules{CUL_HM}{helper}{updatingName}}->{cmdStack};
   delete $modules{CUL_HM}{helper}{updating};
   delete $modules{CUL_HM}{helper}{updatingName};
   delete $modules{CUL_HM}{helper}{updateData};
   delete $modules{CUL_HM}{helper}{updateStep};
   delete $modules{CUL_HM}{helper}{updateDst};
   delete $modules{CUL_HM}{helper}{updateId};
+  delete $modules{CUL_HM}{helper}{updateNbr};
+  
 }
+sub CUL_HM_FWupdateSpeed($$){#set IO speed
+  my ($name,$speed) = @_;
+  my $hash = $defs{$name};
+  if ($hash->{IODev}->{TYPE} ne "CUL"){
+    my $msg = sprintf("G%02X",$speed);
+    IOWrite($hash, "",$msg);
+  }
+  else{
+    IOWrite($hash, "",($speed == 100)?"AR\n":"Ar\n");
+  }
+}
+sub CUL_HM_FWupdateSim($){#end FW Simulation
+  my $msg = shift;
+  my $ioName = $defs{$modules{CUL_HM}{helper}{updatingName}}->{IODev}->{NAME};
+#  CUL_HM_Parse($defs{$ioName},"A00118002$msg");
+}
+
 
 sub CUL_HM_eventP($$) {#handle protocol events
   # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
@@ -4734,12 +4789,14 @@ sub CUL_HM_ID2PeerList ($$$) {
     $peerNames .= CUL_HM_peerChName($pId,$dId,"").",";
   }
   $attr{$name}{peerIDs} = $peerIDs;                 # make it public
+  my $dHash = CUL_HM_getDeviceHash($hash);
+  my $st = AttrVal($dHash->{NAME},"subType","");
+  my $md = AttrVal($dHash->{NAME},"model","");
+  my $chn = InternalVal($name,"chanNo","");
   if ($peerNames){
     $peerNames =~ s/_chn:01//g; # channel 01 is part of device
     CUL_HM_UpdtReadSingle($hash,"peerList",$peerNames,0);
     $hash->{peerList} = $peerNames;
-    my $dHash = CUL_HM_getDeviceHash($hash);
-    my $st = AttrVal($dHash->{NAME},"subType","");
     if ($st eq "virtual"){
       #if any of the peers is an SD we are team master
       my ($tMstr,$tcSim,$thSim) = (0,0,0);
@@ -4775,11 +4832,19 @@ sub CUL_HM_ID2PeerList ($$$) {
         delete $hash->{helper}{fkt};
       }
     }
+    elsif( ($md =~ m/HM-CC-RT-DN/      && $chn=~ m/(02|05)/)
+      ||($md eq "HM-TC-IT-WM-W-EU"  && $chn=~ m/(07)/)){
+      CUL_HM_UpdtReadSingle($hash,"state","peered");
+    }
   }
   else{
     delete $hash->{READINGS}{peerList};
     delete $hash->{peerList};
-  }
+    if (($md =~ m/HM-CC-RT-DN/     && $chn=~ m/(02|03|05|06)/)
+      ||($md eq "HM-TC-IT-WM-W-EU" && $chn=~ m/(03|06|07)/)){
+      CUL_HM_UpdtReadSingle($hash,"state","unpeered");
+    }
+ }
 }
 sub CUL_HM_peerChId($$$) {# in:<IDorName> <deviceID> <ioID>, out:channelID
   my($pId,$dId,$iId)=@_;
@@ -5875,7 +5940,7 @@ sub CUL_HM_qEntity($$){  # add to queue
                                       .",".substr(CUL_HM_name2Id($name),6,2));
   }
 
-  $q .= "Wu" if (CUL_HM_getRxType($defs{$name}) & 0x1C);#normal or wakeup q?
+  $q .= "Wu" if (!(CUL_HM_getRxType($defs{$name}) & 0x03));#normal or wakeup q?
   $q = $modules{CUL_HM}{helper}{$q};
   @{$q} = CUL_HM_noDup(@{$q},$devN);
 
