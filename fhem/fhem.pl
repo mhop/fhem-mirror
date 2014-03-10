@@ -90,6 +90,7 @@ sub fhz($);
 sub getAllGets($);
 sub getAllSets($);
 sub latin1ToUtf8($);
+sub escapeLogLine($);
 sub readingsBeginUpdate($);
 sub readingsBulkUpdate($$$@);
 sub readingsEndUpdate($$);
@@ -3149,6 +3150,13 @@ ReadingsVal($$$)
 }
 
 sub
+ReadingsNum($$$)
+{ 
+  my ($d,$n,$default) = @_;
+  return ReadingsVal($d,$n,$default)+0;
+}
+
+sub
 ReadingsTimestamp($$$)
 {
   my ($d,$n,$default) = @_;
@@ -3688,6 +3696,23 @@ utf8ToLatin1($)
 {
   my ($s)= @_;
   $s =~ s/([\xC2\xC3])([\x80-\xBF])/chr(ord($1)<<6&0xC0|ord($2)&0x3F)/eg;
+  return $s;
+}
+
+# replaces some common control chars by escape sequences
+# in order to make logs more readable
+sub escapeLogLine($) {
+  my ($s)= @_;
+  
+  my %escSequences = (
+      '\t' => "\\t",
+      '\n' => "\\n",
+      '\r' => "\\r",
+      );
+  
+  foreach my $regex (keys %escSequences) {
+    $s =~ s/$regex/$escSequences{$regex}/g;
+  }
   return $s;
 }
 
