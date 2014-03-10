@@ -67,7 +67,7 @@ sub WBS_Define($)
 {
   # define <NAME> WBS TYPE CODE
   my ($self, $defs) = @_;
-  Log 0, "WBS|DEFINE: " . Dumper(@_);
+#  Log 0, "WBS|DEFINE: " . Dumper(@_);
   my @a = split(/ /, $defs);
   return "WBS|Define|ERROR: Unknown argument count " . int(@a) . " , usage define <NAME> WBS TYPE CODE"  if(int(@a) != 4);
   my $mod = $a[1];
@@ -131,7 +131,7 @@ sub WBS_Parse($$)
   my $fc = uc(substr($reading,0,1));
   $wbs->{STATE} = "$fc: $value | " . TimeNow();
   # Changed
-  $wbs->{CHANGED}[0] = "$reading:$value";
+  $wbs->{CHANGED}[0] = "$reading: $value";
   return $wbs_name;
 }
 ################################################################################
