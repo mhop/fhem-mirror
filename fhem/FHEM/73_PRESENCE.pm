@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 use Blocking;
-use Time::HiRes qw(gettimeofday sleep);
+use Time::HiRes qw(gettimeofday usleep sleep);
 use DevIo;
 
 
@@ -62,7 +62,7 @@ PRESENCE_Define($$)
     my ($hash, $def) = @_;
     my @a = split("[ \t]+", $def);
     my $dev;
-    my $username = (getpwuid($<))[0];
+    my $username =  getlogin || getpwuid($<) || "[unknown]";
 
     if(defined($a[2]) and defined($a[3]))
     {
@@ -582,7 +582,7 @@ PRESENCE_ExecuteFritzBoxCMD($$)
     qx(touch /var/tmp/fhem-PRESENCE-cmd-lock.tmp);
 
     $status = qx($cmd);
-
+    usleep 200000;
     unlink("/var/tmp/fhem-PRESENCE-cmd-lock.tmp") if(-e "/var/tmp/fhem-PRESENCE-cmd-lock.tmp");
 
     return $status;
@@ -668,7 +668,7 @@ PRESENCE_DoLocalFritzBoxScan($)
         }
 
         $number++;
-        sleep 0.2;
+       
     }
 
     return ($status == 0 ? "$name|$local|absent" : "$name|$local|present").($number <= $max ? "|$number" : "");
