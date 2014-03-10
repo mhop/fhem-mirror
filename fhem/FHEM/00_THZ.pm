@@ -1,7 +1,7 @@
 ##############################################
 # 00_THZ
 # by immi 03/2014
-# v. 0.074
+# v. 0.075
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -398,7 +398,11 @@ sub THZ_Initialize($)
   $hash->{UndefFn} = "THZ_Undef";
   $hash->{GetFn}   = "THZ_Get";
   $hash->{SetFn}   = "THZ_Set";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 loglevel:0,1,2,3,4,5,6  interval_allFB:0,60,120,180,300,600,3600,7200,43200,86400 interval_history:0,3600,7200,28800,43200,86400";
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 loglevel:0,1,2,3,4,5,6 "
+		    ."interval_allFB:0,60,120,180,300,600,3600,7200,43200,86400 "
+		    ."interval_history:0,3600,7200,28800,43200,86400 "
+		    ."interval_last10errors:0,3600,7200,28800,43200,86400 "
+		    . $readingFnAttributes;
 }
 
 
@@ -993,28 +997,23 @@ sub THZ_Parse($) {
                   "booster_heating: "		. hex(substr($message, 20,4))   ;			
   }
   when ("D1")    {                     #last10errors non testato e dte non convertita
-    $message =    "number_of_faults: "		. hex(substr($message, 4,4))    . " " .
-                  "fault0CODE: "		. hex(substr($message, 8,4))    . " " .
-                  "fault0TIME: "		. hex(substr($message, 12,2)) 	. ":" . hex(substr($message, 14,2))  . " " .
-                  "fault0DATE: "		. hex(substr($message, 16,4))   . " " .
-		  "fault1CODE: "		. hex(substr($message, 20,4))   . " " .
-                  "fault1TIME: "		. hex(substr($message, 24,2)) 	. ":" . hex(substr($message, 26,2))  . " " .
-                  "fault1DATE: "		. hex(substr($message, 28,4))   . " " .
-		  "fault2CODE: "		. hex(substr($message, 32,4))   . " " .
-                  "fault2TIME: "		. hex(substr($message, 36,2)) 	. ":" . hex(substr($message, 38,2))  . " " .
-                  "fault2DATE: "		. hex(substr($message, 40,4))   . " " .
-		  "fault3CODE: "		. hex(substr($message, 44,4))   . " " .
-                  "fault3TIME: "		. hex(substr($message, 48,2)) 	. ":" . hex(substr($message, 50,2))  . " " .
-                  "fault3DATE: "		. hex(substr($message, 52,4))   . " " .
-		  "fault4CODE: "		. hex(substr($message, 56,4))   . " " .
-                  "fault4TIME: "		. hex(substr($message, 60,2)) 	. ":" . hex(substr($message, 62,2))  . " " .
-                  "fault4DATE: "		. hex(substr($message, 64,4))   . " " .
-		  "fault5CODE: "		. hex(substr($message, 68,4))   . " " .
-                  "fault5TIME: "		. hex(substr($message, 72,2)) 	. ":" . hex(substr($message, 72,2))  . " " .
-                  "fault5DATE: "		. hex(substr($message, 76,4))   . " " .
-		  "fault6CODE: "		. hex(substr($message, 80,4))   . " " .
-                  "fault6TIME: "		. hex(substr($message, 84,2)) 	. ":" . hex(substr($message, 86,2))  . " " .
-                  "fault6DATE: "		. hex(substr($message, 88,4))   ;			
+    $message =    "number_of_faults: "		. hex(substr($message, 4,2))    . " " .
+                  #empty
+		  "fault0CODE: "		. hex(substr($message, 8,2))    . " " .
+                  "fault0TIME: "		. sprintf(join(':', split("\\.", hex(substr($message, 14,2) . substr($message, 12,2))/100)))   . " " .
+                  "fault0DATE: "		. (hex(substr($message, 18,2) . substr($message, 16,2))/100) . " " .
+		  
+		  "fault1CODE: "		. hex(substr($message, 20,2))    . " " .
+                  "fault1TIME: "		. sprintf(join(':', split("\\.", hex(substr($message, 26,2) . substr($message, 24,2))/100)))   . " " .
+                  "fault1DATE: "		. (hex(substr($message, 30,2) . substr($message, 28,2))/100) . " " .
+		 
+		  "fault2CODE: "		. hex(substr($message, 32,2))    . " " .
+                  "fault2TIME: "		. sprintf(join(':', split("\\.", hex(substr($message, 38,2) . substr($message, 36,2))/100)))   . " " .
+                  "fault2DATE: "		. (hex(substr($message, 42,2) . substr($message, 40,2))/100) . " " .
+		
+		  "fault2CODE: "		. hex(substr($message, 44,2))    . " " .
+                  "fault2TIME: "		. sprintf(join(':', split("\\.", hex(substr($message, 50,2) . substr($message, 48,2))/100)))   . " " .
+                  "fault2DATE: "		. (hex(substr($message, 54,2) . substr($message, 52,2))/100)  ;			
   }    
   }
   return (undef, $message);
@@ -1190,6 +1189,7 @@ sub THZ_Undef($$) {
       define Mythz THZ /dev/ttyUSB0@115200 <br>
       attr Mythz interval_allFB 300      # internal polling interval 5min  <br>
       attr Mythz interval_history 28800  # internal polling interval 8h    <br>
+      attr Mythz interval_last10errors 86400 # internal polling interval 24h    <br>
       define FileLog_Mythz FileLog ./log/Mythz-%Y.log Mythz <br>
       </code></ul>
      <br> 
@@ -1247,6 +1247,7 @@ sub THZ_Undef($$) {
       define Mythz THZ /dev/ttyUSB0@115200 <br>
       attr Mythz interval_allFB 300      # Internes Polling Intervall 5min  <br>
       attr Mythz interval_history 28800  # Internes Polling Intervall 8h    <br>
+      attr Mythz interval_last10errors 86400 # Internes Polling Intervall 24h    <br>
       define FileLog_Mythz FileLog ./log/Mythz-%Y.log Mythz <br>
       </code></ul>
      <br> 
