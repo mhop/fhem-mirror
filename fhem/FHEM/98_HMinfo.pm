@@ -1142,7 +1142,7 @@ sub HMinfo_loadConfig($@) {####################################################
       }
       if (!$defs{$eN}{READINGS}{$reg}){
         my ($list,$pN) = ($1,$2) if ($reg =~ m/RegL_(..):(.*)/);
-        my $pId = CUL_HM_peerChId($pN,substr($defs{$eN}{DEF},0,6),"00000000");
+        my $pId = CUL_HM_peerChId($pN,substr($defs{$eN}{DEF},0,6));
         $defs{$eN}{READINGS}{$reg}{VAL} = $data;
         $defs{$eN}{READINGS}{$reg}{TIME} = "from archive";
         CUL_HM_updtRegDisp($defs{$eN},$list,$pId);
@@ -1561,6 +1561,26 @@ my %tpl = (
                            ,BlJtRampOn       =>"on"
                            ,BlJtRefOff       =>"off"
                            ,BlJtRefOn        =>"rampOn"
+                    }}                   
+  ,wmOpen            => {p=>"speed"            ,t=>"winmatic open window"     
+                    ,reg=>{ WinJtOn          =>"rampOn"
+                           ,WinJtOff         =>"rampOn"
+                           ,WinJtRampOn      =>"on"
+                           ,WinJtRampOff     =>"rampOnFast"
+                           ,RampOnSp         =>"p0"
+                    }}
+  ,wmClose           => {p=>"speed"            ,t=>"winmatic close window"    
+                    ,reg=>{ WinJtOn          =>"rampOff"
+                           ,WinJtOff         =>"rampOff"
+                           ,WinJtRampOn      =>"on"
+                           ,WinJtRampOff     =>"rampOnFast"
+                           ,RampOffSp        =>"p0"
+                    }}
+  ,wmClosed          => {p=>""                 ,t=>"winmatic lock window"     
+                    ,reg=>{ OffLevelKm       =>"0"
+                    }}
+  ,wmLock          => {p=>""                 ,t=>"winmatic lock window"     
+                    ,reg=>{ OffLevelKm       =>"127.5"
                     }}
 );
 
@@ -1650,8 +1670,8 @@ sub HMinfo_templateChk(@){#####################################################
   if ($pName eq "all"){
     my $dId = substr(CUL_HM_name2Id($aName),0,6);
     foreach (grep !/00000000/,split(",",AttrVal($aName,"peerIDs",""))){
-      push @pNames,CUL_HM_peerChName($_,$dId,"").":long"  if (!$pTyp || $pTyp ne "short");
-      push @pNames,CUL_HM_peerChName($_,$dId,"").":short" if (!$pTyp || $pTyp ne "long");
+      push @pNames,CUL_HM_peerChName($_,$dId).":long"  if (!$pTyp || $pTyp ne "short");
+      push @pNames,CUL_HM_peerChName($_,$dId).":short" if (!$pTyp || $pTyp ne "long");
     }
   }
   elsif(($pName && !$pTyp) || $pTyp eq "all"){
@@ -1997,10 +2017,12 @@ sub HMinfo_noDup(@) {#return list with no duplicates
      </li>
      <li><a name="#HMinfotempListTmpl">tempListTmpl</a> <a href="#HMinfoFilter">[filter]</a>[templateName] [&lt;file&gt;]</a><br>
 	    program one or more thermostat lists. The list of thermostats is selected by filter. <br>
+        <ul>
 		<li></B>templateName</B> is the name of the template as being named in the file. The file format ist 
 		identical to <a ref="#HMinfotempList">tempList</a>. If the entity in the file matches templateName the subsequent
 		temp-settings from the file are bing programmed to all Thermostats that match the filter<br></li>
-        <li><B>filename</B> is the name of the file to be used. Default ist <B>tempList.cfg</B></li>
+        <li><B>file</B> name of the file to be used. Default: <B>tempList.cfg</B></li>
+        </ul>
       </li>
          <br>
       <li><a name="#HMinfocpRegs">cpRegs &lt;src:peer&gt; &lt;dst:peer&gt; </a><br>
@@ -2027,7 +2049,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates
       <li><a name="#HMinfotemplateDef">templateDef &lt;name&gt; &lt;param&gt; &lt;desc&gt; &lt;reg1:val1&gt; [&lt;reg2:val2&gt;] ...</a><br>
           define a template.<br>
           <b>param</b> gives the names of parameter necesary to execute the template. It is template dependant
-                       and coule be an onTime or brightnesslevel. a list of parameter needs to be separated with colon<br>
+                       and may be onTime or brightnesslevel. A list of parameter needs to be separated with colon<br>
                        param1:param2:param3<br>
                        if del is given as parameter the template is removed<br>
           <b>desc</b> shall give a description of the template<br>

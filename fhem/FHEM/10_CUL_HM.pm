@@ -64,8 +64,8 @@ sub CUL_HM_PushCmdStack($$);
 sub CUL_HM_ProcessCmdStack($);
 sub CUL_HM_pushConfig($$$$$$$$@);
 sub CUL_HM_ID2PeerList ($$$);
-sub CUL_HM_peerChId($$$);
-sub CUL_HM_peerChName($$$);
+sub CUL_HM_peerChId($$);
+sub CUL_HM_peerChName($$);
 sub CUL_HM_getMId($);
 sub CUL_HM_getRxType($);
 sub CUL_HM_getFlag($);
@@ -914,7 +914,7 @@ sub CUL_HM_Parse($$) {#########################################################
       $vp = int($vp/2.56+0.5);   # valve position in %
       my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
       if($chnHash){
-        push @evtEt,[$chnHash,1,"state:$vp %"];
+        push @evtEt,[$chnHash,1,"state:$vp"];
         if ($chnHash->{helper}{needUpdate}){
           if ($chnHash->{helper}{needUpdate} == 1){
             $chnHash->{helper}{needUpdate}++;
@@ -925,12 +925,12 @@ sub CUL_HM_Parse($$) {#########################################################
           }
         }
       }
-      push @evtEt,[$shash,1,"actuator:$vp %"];
+      push @evtEt,[$shash,1,"actuator:$vp"];
 
       # Set the valve state too, without an extra trigger
       if($dhash){
-        push @evtEt,[$dhash,1,"state:set_$vp %"   ];
-        push @evtEt,[$dhash,1,"ValveDesired:$vp %"];
+        push @evtEt,[$dhash,1,"state:set_$vp"   ];
+        push @evtEt,[$dhash,1,"ValveDesired:$vp"];
       }
     }
     elsif(($mTp eq '02' &&$sType eq '01')||    # ackStatus
@@ -974,10 +974,10 @@ sub CUL_HM_Parse($$) {#########################################################
     elsif($mTp eq "01"){                       # status reports
       if($p =~ m/^010809(..)0A(..)/) { # TC set valve  for VD => post events to VD
         my (   $of,     $vep) = (hex($1), hex($2));
-        push @evtEt,[$shash,1,"ValveErrorPosition_for_$dname: $vep %"];
-        push @evtEt,[$shash,1,"ValveOffset_for_$dname: $of %"];
-        push @evtEt,[$dhash,1,"ValveErrorPosition:set_$vep %"];
-        push @evtEt,[$dhash,1,"ValveOffset:set_$of %"];
+        push @evtEt,[$shash,1,"ValveErrorPosition_for_$dname: $vep"];
+        push @evtEt,[$shash,1,"ValveOffset_for_$dname: $of"];
+        push @evtEt,[$dhash,1,"ValveErrorPosition:set_$vep"];
+        push @evtEt,[$dhash,1,"ValveOffset:set_$of"];
       }
       elsif($p =~ m/^010[56]/){ # 'prepare to set' or 'end set'
         push @evtEt,[$shash,1,""]; #
@@ -994,8 +994,8 @@ sub CUL_HM_Parse($$) {#########################################################
       my ($chn,$vp, $err) = (hex($2),hex($3), hex($4));
         $chn = sprintf("%02X",$chn&0x3f);
       $vp = int($vp)/2;   # valve position in %
-      push @evtEt,[$shash,1,"ValvePosition:$vp %"];
-      push @evtEt,[$shash,1,"state:$vp %"];
+      push @evtEt,[$shash,1,"ValvePosition:$vp"];
+      push @evtEt,[$shash,1,"state:$vp"];
        $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
 
@@ -1058,16 +1058,16 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"motorErr:$errTbl{$err}" ];
       push @evtEt,[$shash,1,"measured-temp:$actTemp" ];
       push @evtEt,[$shash,1,"desired-temp:$setTemp"  ];
-      push @evtEt,[$shash,1,"ValvePosition:$vp %"    ];
+      push @evtEt,[$shash,1,"ValvePosition:$vp"    ];
       push @evtEt,[$shash,1,"mode:$ctlTbl{$ctrlMode}"];
       #push @evtEt,[$shash,1,"unknown0:$uk0"];
       #push @evtEt,[$shash,1,"unknown1:".$2 if ($p =~ m/^0A(.10)(.*)/)];
-      push @evtEt,[$shash,1,"state:T: $actTemp desired: $setTemp valve: $vp %"];
+      push @evtEt,[$shash,1,"state:T: $actTemp desired: $setTemp valve: $vp"];
       push @evtEt,[$dHash,1,"battery:".($err&0x80?"low":"ok")];
-      push @evtEt,[$dHash,1,"batteryLevel:$bat V"];
+      push @evtEt,[$dHash,1,"batteryLevel:$bat"];
       push @evtEt,[$dHash,1,"measured-temp:$actTemp"];
       push @evtEt,[$dHash,1,"desired-temp:$setTemp"];
-      push @evtEt,[$dHash,1,"actuator:$vp %"];
+      push @evtEt,[$dHash,1,"actuator:$vp"];
       
       my $wHash = $modules{CUL_HM}{defptr}{$src."01"};
       push @evtEt,[$wHash,1,"measured-temp:$actTemp"] if ($wHash);
@@ -1114,7 +1114,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"mode:$ctlTbl{$ctrlMode}"];
       push @evtEt,[$shash,1,"state:T: $actTemp desired: $setTemp"];
       push @evtEt,[$dHash,1,"battery:".($lbat?"low":"ok")];
-      push @evtEt,[$dHash,1,"batteryLevel:$bat V"];
+      push @evtEt,[$dHash,1,"batteryLevel:$bat"];
       push @evtEt,[$dHash,1,"measured-temp:$actTemp"];
       push @evtEt,[$dHash,1,"desired-temp:$setTemp"];
     }
@@ -1160,8 +1160,8 @@ sub CUL_HM_Parse($$) {#########################################################
       elsif ($lvlStr{st}{$st}){$lvl = $lvlStr{st}{$st}{$lvl} }
       else                    {$lvl = hex($lvl)/2}
 
-      push @evtEt,[$shash,1,"level:$lvl %"] if($md eq "HM-Sen-Wa-Od");
-      push @evtEt,[$shash,1,"state:$lvl %"];
+      push @evtEt,[$shash,1,"level:$lvl"] if($md eq "HM-Sen-Wa-Od");
+      push @evtEt,[$shash,1,"state:$lvl"];
       push @evtEt,[$shash,1,"battery:".($err&0x80?"low":"ok")] if (defined $err);
     }
   }
@@ -1190,7 +1190,8 @@ sub CUL_HM_Parse($$) {#########################################################
               last;
             }
           }
-        } else {
+        } 
+        else {
           push @evtEt,[$shash,1,"state:$v"];
         }
       }
@@ -1272,7 +1273,7 @@ sub CUL_HM_Parse($$) {#########################################################
         delete $shash->{helper}{lastRain};
       }
 
-      push @evtEt,[$shash,0,'.level:'.($val eq "off"?"0 %":"100 %")];
+      push @evtEt,[$shash,0,'.level:'.($val eq "off"?"0":"100")];
 
       if ($mNo eq "00" && $chn eq "02" && $val eq "on"){
         $hHash->{helper}{pOn} = 1;
@@ -1334,12 +1335,12 @@ sub CUL_HM_Parse($$) {#########################################################
               next if (!$vh || $vDim->{$tmpKey} eq $chId);
               my $vl = ReadingsVal($vh->{NAME},"level","???");
               my $vs = ($vl eq "100 %"?"on":($vl eq "0 %"?"off":"$vl"));
-              $vs = (($pl." %") ne $vl)?"chn:$vs  phys:$pl %":$vs;
+              $vs = (($pl." %") ne $vl)?"chn:$vs  phys:$pl":$vs;
               push @evtEt,[$vh,1,"state:$vs"];
-              push @evtEt,[$vh,1,"phyLevel:$pl %"];
+              push @evtEt,[$vh,1,"phyLevel:$pl"];
             }
-            push @evtEt,[$shash,1,"phyLevel:$pl %"];      #phys level
-            $physLvl = $pl." %";
+            push @evtEt,[$shash,1,"phyLevel:$pl"];      #phys level
+            $physLvl = $pl;
           }
           else{                                #invalid PhysLevel
             $rSUpdt = 1;
@@ -1347,14 +1348,14 @@ sub CUL_HM_Parse($$) {#########################################################
           }
         }
       }
-      $physLvl = ReadingsVal($name,"phyLevel",$val." %")
+      $physLvl = ReadingsVal($name,"phyLevel",$val)
             if(!$physLvl);                     #not updated? use old or ignore
-      my $vs = ($val==100 ? "on":($val==0 ? "off":"$val %")); # user string...
+      my $vs = ($val==100 ? "on":($val==0 ? "off":"$val")); # user string...
 
-      push @evtEt,[$shash,1,"level:$val %"];
+      push @evtEt,[$shash,1,"level:$val"];
       push @evtEt,[$shash,1,"pct:$val"]; # duplicate to level - necessary for "slider"
       push @evtEt,[$shash,1,"deviceMsg:$vs$target"] if($chn ne "00");
-      push @evtEt,[$shash,1,"state:".(($physLvl ne $val." %")?"chn:$vs phys:$physLvl":$vs)];
+      push @evtEt,[$shash,1,"state:".(($physLvl ne $val)?"chn:$vs phys:$physLvl":$vs)];
       my $eventName = "unknown"; # different names for events
       if   ($st eq "switch")       {$eventName = "switch";}  
       elsif($st eq "blindActuator"){$eventName = "motor" ;}  
@@ -1470,7 +1471,7 @@ sub CUL_HM_Parse($$) {#########################################################
                              if($modules{CUL_HM}{defptr}{$chId});
       my $vs = ($val==100 ? "on":($val==0 ? "off":"$val %")); # user string...
 
-      push @evtEt,[$shash,1,"level:$val %"];
+      push @evtEt,[$shash,1,"level:$val"];
       push @evtEt,[$shash,1,"pct:$val"]; # duplicate to level - necessary for "slider"
       push @evtEt,[$shash,1,"deviceMsg:$vs$target"] if($chn ne "00");
       push @evtEt,[$shash,1,"state:$vs"];
@@ -1716,7 +1717,7 @@ sub CUL_HM_Parse($$) {#########################################################
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
       # stateflag meaning unknown
-      push @evtEt,[$shash,1,"state:".(($lvl eq "FF")?"locked":((hex($lvl)/2)." %"))];
+      push @evtEt,[$shash,1,"state:".(($lvl eq "FF")?"locked":((hex($lvl)/2)))];
       if ($chn eq "01"){
         my %err = (0=>"no",1=>"TurnError",2=>"TiltError");
         my %dir = (0=>"no",1=>"up",2=>"down",3=>"undefined");
@@ -2169,7 +2170,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           # peerChannel name from/for user entry. <IDorName> <deviceID> <ioID>
           CUL_HM_updtRegDisp($chnHash,$list,
                 CUL_HM_peerChId($peer,
-                        substr($chnHash->{DEF},0,6),"00000000"));
+                        substr($chnHash->{DEF},0,6)));
           $ret = "done";
         }
         else{
@@ -2872,7 +2873,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
              if ($a[3] && $a[3] !~ m/^(set|unset)/);
     my $set = ($a[3] eq "unset")?"02":"01";
     foreach my $peer (grep(!/^self/,split(',',$pL))){
-      my $pID = CUL_HM_peerChId($peer,$dst,$id);
+      my $pID = CUL_HM_peerChId($peer,$dst);
       return "unknown peer".$peer if (length($pID) != 8);# peer only to channel
       my $pCh1 = substr($pID,6,2);
       my $pCh2 = $pCh1;
@@ -2902,7 +2903,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     # as of now only hex value allowed check range and convert
 
-    $peerID  = CUL_HM_peerChId(($peerID?$peerID:"00000000"),$dst,$id);
+    $peerID  = CUL_HM_peerChId(($peerID?$peerID:"00000000"),$dst);
     my $peerChn = ((length($peerID) == 8)?substr($peerID,6,2):"01");# have to split chan and id
     $peerID = substr($peerID,0,6);
 
@@ -3000,7 +3001,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     if (($list == 3) ||($list == 4)   # peer is necessary for list 3/4
         ||($peerChnIn))              {# and if requested by user
       return "Peer not specified" if ($peerChnIn eq "");
-      $peerId  = CUL_HM_peerChId($peerChnIn,$dst,$id);
+      $peerId  = CUL_HM_peerChId($peerChnIn,$dst);
       $peerChn = ((length($peerId) == 8)?substr($peerId,6,2):"01");
       $peerId  = substr($peerId,0,6);
       return "Peer not valid" if (!$peerId);
@@ -3545,18 +3546,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       CUL_HM_UpdtReadSingle($hash,$lim{$cmd}{rd},$valu.$u,1);
     }
   }
-  elsif($cmd eq "matic") { ####################################################
-    # Trigger pre-programmed action in the winmatic. These actions must be
-    # programmed via the original software.
-    CUL_HM_PushCmdStack($hash,
-        sprintf("++%s3E%s%s%s40%02X%s", $flag,$id, $dst, $id, $a[2], $chn));
-  }
-  elsif($cmd eq "create") { ###################################################
-    CUL_HM_PushCmdStack($hash,
-        sprintf("++%s01%s%s0101%s%02X%s",$flag,$id, $dst, $id, $a[2], $chn));
-    CUL_HM_PushCmdStack($hash,
-        sprintf("++A001%s%s0104%s%02X%s", $id, $dst, $id, $a[2], $chn));
-  }
   elsif($cmd eq "keydef") { ############################################### reg
     if (     $a[3] eq "tilt")      {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0B220D838B228D83");#JT_ON/OFF/RAMPON/RAMPOFF short and long
     } elsif ($a[3] eq "close")     {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0B550D838B558D83");#JT_ON/OFF/RAMPON/RAMPOFF short and long
@@ -3564,9 +3553,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     } elsif ($a[3] eq "bolt")      {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0FFF8FFF");        #offLevel (also thru register)
     } elsif ($a[3] eq "speedclose"){CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,sprintf("23%02XA3%02X",$a[4]*2,$a[4]*2));#RAMPOFFspeed (also in reg)
     } elsif ($a[3] eq "speedtilt") {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,sprintf("22%02XA2%02X",$a[4]*2,$a[4]*2));#RAMPOFFspeed (also in reg)
-    } elsif ($a[3] eq "delete")    {CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s0102%s%02X%s",$flag,$id, $dst, $id, $a[2], $chn));#unlearn key
-    } else {
-      return 'unknown argument '.$a[3];
+    } else                         {return 'unknown argument '.$a[3];
     }
   }
   elsif($cmd eq "teamCall") { #################################################
@@ -3611,9 +3598,15 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
   }
   elsif($cmd eq "press") { ####################################################
-    my (undef,undef,$mode,$vChn) = @a;
-    $mode = 'short' if (!$mode);
-    return "$mode unknown - select long or short" if ($mode !~ m/^(short|long)$/);
+    my $mode = 0;
+    if ($a[2]){
+      if ($a[2] =~ m/^(long|short)$/){
+        $mode = $a[2] eq "long"?64:0; #value for longPress
+        splice @a,2,1;
+      }
+    }
+    my $vChn = $a[2]?$a[2]:"";
+    
     my $pressCnt = (!$hash->{helper}{count}?1:$hash->{helper}{count}+1)%256;
     $hash->{helper}{count}=$pressCnt;# remember for next round
     if ($st eq 'virtual'){#serve all peers of virtual button
@@ -3625,16 +3618,16 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         if ($peer ne '000000'){
           $pHash = CUL_HM_id2Hash($peer);
           $rxt = CUL_HM_getRxType($pHash);
-          $peerFlag = ($rxt & 0x02)?"B4":"A4" if(!$vChn || $vChn ne "noBurst");#burst
+          $peerFlag = ($rxt & 0x02)?"B4":"A4" if($vChn ne "noBurst");#burst
         }
         CUL_HM_PushCmdStack($pHash, sprintf("++%s40%s%s%02X%02X",
                        $peerFlag,$dst,$peer,
-                       hex($chn)+(($mode eq "long")?64:0),
+                       hex($chn)+$mode,
                        $pressCnt));
 
         if ($rxt & 0x80){#burstConditional
           CUL_HM_SndCmd($pHash, "++B112$id".substr($peer,0,6))
-                if(!$vChn || $vChn ne "noBurst");
+                if($vChn ne "noBurst");
         }
         else{
           CUL_HM_ProcessCmdStack($pHash);
@@ -3642,13 +3635,26 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       }
     }
     else{#serve internal channels for actor
-      my $pChn = $chn; # simple device, only one button per channel
-      $pChn = (($vChn && $vChn eq "off")?-1:0) + $chn*2
-              if($st eq 'blindActuator'||$st eq 'dimmer');
+      #which button shall be simulated? We offer
+      # on/off: self button - on is even/off odd number. Obey channel
+      # name of peer
+      my $pId;
+      if ($vChn =~ m /^(on|off)$/ && $st =~ m/(blindActuator|dimmer)/){
+        $pId = $dst.sprintf("%02X",(($vChn eq "off")?-1:0) + $chn*2);
+      }
+      elsif($vChn){
+        $pId = CUL_HM_name2Id($vChn).($a[3]?sprintf("%02X",$a[3]):"01");
+      }
+      else{
+        $pId = $dst.sprintf("%02X",$chn);
+      }
+      my ($pDev,$pCh) = unpack 'A6A2',$pId;
+      return "button cannot be identified" if (!$pCh);
+      Log 1,"General ########### $pId:$pDev,$pCh,$mode";
       delete $hash->{helper}{dlvl};#stop desiredLevel supervision
       CUL_HM_PushCmdStack($hash, sprintf("++%s3E%s%s%s40%02X%02X",$flag,
-                                     $id,$dst,$dst,
-                                     $pChn+(($mode && $mode eq "long")?64:0),
+                                     $id,$dst,$pDev,
+                                     hex($pCh)+$mode,
                                      $pressCnt));
     }
   }
@@ -3745,6 +3751,26 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                             ,"trig_$name:$cond"
                             ,"trigLast:$name:$cond");
     }
+  }
+  elsif($cmd eq "peerIODev") { ################################################
+    # peerIODev [IO] <chn> [set|unset]...
+    $state = "";
+    return "command requires parameter" if (!$a[2]);
+    my ($ioId,$ioCh,$set) = ($id,$a[2],'set'); #set defaults
+    Log 1,"General got $a[2]";
+    if ($defs{$a[2]}){ #IO device given
+      $ioId =  AttrVal($a[2],"hmId","");
+      return "$a[2] not valid, attribut hmid not set" 
+            if($ioId !~ m/^[0-9A-F]{6}$/);
+      splice @a,2,1;
+      $ioCh = $a[2];
+    }
+    $set = $a[3] if ($a[3]);
+    $ioCh = sprintf("%02X",$ioCh);
+    return "No:$ioCh invalid. Number must be <=50"  if (!$ioCh || $ioCh !~ m/^(\d*)$/ || $ioCh > 50);
+    return "option $set unknown - use set or unset" if ($set != m/^(set|unset)$/);
+    $set = ($set eq "set")?"01":"02"; 
+    CUL_HM_PushCmdStack($hash,"++${flag}01$id${dst}$chn$set$ioId$ioCh$chn");
   }
   elsif($cmd eq "peerChan") { ############################################# reg
     #peerChan <btnN> <device> ... [single|dual] [set|unset] [actor|remote|both]
@@ -4103,7 +4129,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
   $prep    = "" if (!defined $prep);
   # --store pending changes in shadow to handle bit manipulations cululativ--
   $peerAddr = "000000" if(!$peerAddr);
-  my $peerN = ($peerAddr ne "000000")?CUL_HM_peerChName($peerAddr.$peerChn,$dst,""):"";
+  my $peerN = ($peerAddr ne "000000")?CUL_HM_peerChName($peerAddr.$peerChn,$dst):"";
   $peerN =~ s/broadcast//;
   $peerN =~ s/ /_/g;#remote blanks
   my $regLNp = "RegL_".$list.":".$peerN;
@@ -4258,7 +4284,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       }
       elsif($sTp eq "04"){ #RegisterRead-------
         my ($peer, $list) = unpack 'A8A2',$dat;
-        $peer = ($peer ne "00000000")?CUL_HM_peerChName($peer,$dst,""):"";
+        $peer = ($peer ne "00000000")?CUL_HM_peerChName($peer,$dst):"";
         #--- set messaging items
         my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
         $chnhash = $hash if(!$chnhash);
@@ -4785,7 +4811,7 @@ sub CUL_HM_ID2PeerList ($$$) {
     next if ($pId !~ m/^[0-9A-F]{8}$/);             #ignore non-channel IDs
     $peerIDs .= $pId.",";                           #append ID
     next if ($pId eq "00000000");                   # and end detection
-    $peerNames .= CUL_HM_peerChName($pId,$dId,"").",";
+    $peerNames .= CUL_HM_peerChName($pId,$dId).",";
   }
   $attr{$name}{peerIDs} = $peerIDs;                 # make it public
   my $dHash = CUL_HM_getDeviceHash($hash);
@@ -4845,8 +4871,9 @@ sub CUL_HM_ID2PeerList ($$$) {
     }
  }
 }
-sub CUL_HM_peerChId($$$) {# in:<IDorName> <deviceID> <ioID>, out:channelID
-  my($pId,$dId,$iId)=@_;
+sub CUL_HM_peerChId($$) {# in:<IDorName> <deviceID> <ioID>, out:channelID
+  my($pId,$dId)=@_;
+  my $iId = CUL_HM_IOid(CUL_HM_id2Hash($dId));
   my $pSc = substr($pId,0,4); #helper for shortcut spread
   return $dId.sprintf("%02X",'0'.substr($pId,4)) if ($pSc eq 'self');
   return $iId.sprintf("%02X",'0'.substr($pId,4)) if ($pSc eq 'fhem');
@@ -4855,8 +4882,9 @@ sub CUL_HM_peerChId($$$) {# in:<IDorName> <deviceID> <ioID>, out:channelID
   $repID .= '01' if (length( $repID) == 6);# add default 01 if this is a device
   return $repID;
 }
-sub CUL_HM_peerChName($$$) {#in:<IDorName> <deviceID> <ioID>, out:name
-  my($pId,$dId,$iId)=@_;
+sub CUL_HM_peerChName($$) {#in:<IDorName> <deviceID> <ioID>, out:name
+  my($pId,$dId)=@_;
+  my $iId = CUL_HM_IOid(CUL_HM_id2Hash($dId));
   my($pDev,$pChn) = unpack'A6A2',$pId;
   return 'self'.$pChn if ($pDev eq $dId);
   return 'fhem'.$pChn if ($pDev eq $iId);
@@ -5118,8 +5146,7 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
     $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")
               .sprintf("RegL_%02X:",$list)
               .($peerId?CUL_HM_peerChName($peerId,
-                                          $dst,
-                                          CUL_HM_IOid($hash))
+                                          $dst)
                        :"");
   }
   $regLN =~ s/broadcast//;
@@ -5175,10 +5202,13 @@ sub CUL_HM_updtRegDisp($$$) {
   my($hash,$list,$peerId)=@_;
   my $listNo = $list+0;
   my $name = $hash->{NAME};
+  my $devId = substr(CUL_HM_name2Id($name),0,6);
+  my $ioId = CUL_HM_IOid(CUL_HM_id2Hash($devId));
   my $pReg = ($peerId && $peerId ne '00000000' )?
-     CUL_HM_peerChName($peerId,substr($hash->{DEF},0,6),"")."-":"";
+     CUL_HM_peerChName($peerId,$devId)."-":"";
   $pReg=~s/:/-/;
   $pReg="R-".$pReg;
+  Log 1,"General $peerId,$devId,$ioId:".CUL_HM_peerChName($peerId,$devId);
   my $devName =CUL_HM_getDeviceHash($hash)->{NAME};# devName as protocol entity
   my $st = $attr{$devName}{subType} ?$attr{$devName}{subType} :"";
   my $md = $attr{$devName}{model}   ?$attr{$devName}{model}   :"";
@@ -5188,11 +5218,10 @@ sub CUL_HM_updtRegDisp($$$) {
   my @changedRead;
   my $expL = CUL_HM_getAttrInt($name,"expert");
   my $expLvl = ($expL != 0)?1:0;
+  
   my $regLN = (($expL == 2)?"":".")
               .sprintf("RegL_%02X:",$listNo)
-              .($peerId?CUL_HM_peerChName($peerId,
-                                          substr(CUL_HM_name2Id($name),0,6),
-                                          CUL_HM_IOid($hash)):"");
+              .($peerId?CUL_HM_peerChName($peerId,$devId):"");
   foreach my $rgN (@regArr){
     next if ($culHmRegDefine->{$rgN}->{l} ne $listNo);
     my $rgVal = CUL_HM_getRegFromStore($name,$rgN,$list,$peerId,$regLN);
@@ -5513,7 +5542,7 @@ sub CUL_HM_TCITRTtempReadings($@) {# parse RT - TC-IT temperature readings
   my $name = $hash->{NAME};
   my $regPre = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".");
   my @changedRead;
-  my $setting;
+  my $setting="";
   my %idxN = (7=>"P1",8=>"P2",9=>"P3");
   $idxN{7} = "" if(scalar @list == 1);# not prefix for RT
   my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
@@ -6120,7 +6149,7 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
   return undef if (AttrVal(CUL_HM_id2Name($devId),"subType","") eq "virtual");
 
   my @pNames;
-  push @pNames,CUL_HM_peerChName($_,$devId,"")
+  push @pNames,CUL_HM_peerChName($_,$devId)
              foreach (grep !/00000000/,split(",",AttrVal($name,"peerIDs","")));
 
   my @lsNo;
@@ -6541,16 +6570,30 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
           <ul><code>set &lt;name&gt; on-till 20:32:10<br></code></ul>
           Currently a max of 24h is supported with endtime.<br>
           </li>
-          <li><B>press &lt;[short|long]&gt;&lt;[on|off]&gt;</B><a name="CUL_HMpress"></a><br>
-              <B>press &lt;[short|long]&gt;&lt;[noBurst]&gt;</B></a>
+          <li><B>press &lt;[short|long]&gt; &lt;[on|off|&lt;peer&gt;]&gt; &lt;btnNo&gt;</B><a name="CUL_HMpress"></a><br>
               simulate a press of the local button or direct connected switch of the actor.<br>
-              <B>[short|long]</B> choose whether to simulate a short or long press of the button.<br>
-              <B>[on|off]</B> is relevant for devices with direct buttons per channel.
+              <B>[short|long]</B> select simulation of short or long press of the button.
+                                  Parameter is optional, short is default<br>
+              <B>[on|off|&lt;peer&gt;]</B> is relevant for devices with direct buttons per channel (blind or dimmer).
               Those are available for dimmer and blind-actor, usually not for switches<br>
-              <B>[noBurst]</B> is relevant for peers which support conditional burst.
+              <B>&lt;peer&gt;</B> allows to stimulate button-press of any peer of the actor. 
+                                  i.e. if the actor is peered to any remote, virtual or io (HMLAN/CUL) 
+                                  press can trigger the action defined. <br>              
+              <B>[noBurst]</B> relevant for virtual only <br>
               It will cause the command being added to the command queue of the peer. <B>No</B> burst is
               issued subsequent thus the command is pending until the peer wakes up. It therefore 
               <B>delays the button-press</B>, but will cause less traffic and performance cost. <br>
+              <B>Example:</B>
+              <code> 
+                 set actor press # trigger short of internal peer self assotiated to the channel<br>
+                 set actor press long # trigger long of internal peer self assotiated to the channel<br>
+                 set actor press on # trigger short of internal peer self related to 'on'<br>
+                 set actor press long off # trigger long of internal peer self related to 'of'<br>
+                 set actor press long FB_Btn01 # trigger long peer FB button 01<br>
+                 set actor press long FB_chn:8 # trigger long peer FB button 08<br>
+                 set actor press self01 # trigger short of internal peer 01<br>
+                 set actor press HMLAN1 2 # trigger short of FHEM IO 'HMLAN1' channel 2<br>
+              </code>
           </li>
           <li><B>toggle</B><a name="CUL_HMtoggle"></a> - toggle the Actor. It will switch from any current
                  level to off or from off to 100%</li>
@@ -6598,6 +6641,15 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
          learn mode is detected. Manual interaction of the user is necessary to
          activate learn mode. Whether commands are pending is reported on
          device level with parameter 'protCmdPend'.
+       <ul>
+    </li>
+    <li><B>peerIODev [IO] &lt;btn_no&gt; [<u>set</u>|unset]</B><a name="CUL_HMpeerIODev"></a><br>
+         The command is similar to <a href="#CUL_HMpeerChan">peerChan</a></B>. While peerChan
+         is executed on a remote and peers any remote to any actor channel peerIODev is 
+         executed on an actor channel and peer this to an channel of an FHEM IO device.<br>
+         An IO device according to eQ3 supports up to 50 virtual buttons. Those
+         will be peered/unpeerd to the actor. <a href="CUL_HMpress">press</a> can be
+         used to stimulate the related actions as defined in the actor register.
        <ul>
     <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>]
         [<u>set</u>|unset] [<u>both</u>|actor|remote]</B><a name="CUL_HMpeerChan"></a><br>

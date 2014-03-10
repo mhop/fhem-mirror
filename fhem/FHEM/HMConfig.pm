@@ -947,8 +947,8 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
                          ,CtValLo         =>1,CtValHi         =>1
                          ,CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1
                          ,WinJtOn         =>1,WinJtOff        =>1,WinJtRampOn     =>1,WinJtRampOff    =>1
-                         ,OnTime          =>1,OffTime         =>1,OffLevelKm      =>1
-                         ,OnLevelKm       =>1,RampOnSp        =>1,RampOffSp       =>1
+                         ,OnTime          =>1,OffTime         =>1,OffLevelKm      =>1,OnLevelKm       =>1
+                         ,RampOnSp        =>1,RampOffSp       =>1
                          },
   "WDF-solar01"       =>{ WinJtOn         =>1,WinJtOff        =>1,WinJtRampOn     =>1,WinJtRampOff    =>1
                          ,OffLevel        =>1,OnLevel         =>1
@@ -1113,43 +1113,49 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
   peerBulk      => "<peer1,peer2,...>",
 );
 %culHmSubTypeSets = (# channels of this subtype
-  switch           =>{ "on-for-timer"=>"<sec>"
-                      ,"on-till"     =>"<time>"
-                      ,on            =>""
-                      ,off           =>""
-                      ,toggle        =>""
-                      ,press         =>"[long|short] [on|off] ..."
-                      ,inhibit       =>"[on|off]"
-                      ,statusRequest =>""},
-  dimmer           =>{ "on-for-timer"=>"<sec>"
-                      ,"on-till"     =>"<time>"
-                      ,on            =>""
-                      ,off           =>""
-                      ,toggle        =>""
-                      ,pct           =>"<value> ... [<ontime>] [<ramptime>]"
-                      ,stop          =>""
-                      ,press         =>"[long|short] [on|off] ..."
-                      ,up            =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
-                      ,down          =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
-                      ,inhibit       =>"[on|off]"
-                      ,statusRequest =>""},
-  blindActuator    =>{ on            =>""
-                      ,off           =>""
-                      ,toggle        =>""
-                      ,pct           =>"[<value>] ... [<ontime>]"
-                      ,stop          =>""
-                      ,press         =>"[long|short] [on|off] ..."
-                      ,up            =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
-                      ,down          =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
-                      ,inhibit       =>"[on|off]"
-                      ,statusRequest =>""},
-  remote           =>{ peerChan      =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"},
+  switch           =>{ "on-for-timer" =>"<sec>"
+                      ,"on-till"      =>"<time>"
+                      ,on             =>""
+                      ,off            =>""
+                      ,toggle         =>""
+                      ,press          =>"[long|short] [on|off] ..."
+                      ,inhibit        =>"[on|off]"
+                      ,statusRequest  =>""
+                      ,peerIODev      =>"[IO] <btn> [set|unset]..."
+                     },
+  dimmer           =>{ "on-for-timer" =>"<sec>"
+                      ,"on-till"      =>"<time>"
+                      ,on             =>""
+                      ,off            =>""
+                      ,toggle         =>""
+                      ,pct            =>"<value> ... [<ontime>] [<ramptime>]"
+                      ,stop           =>""
+                      ,press          =>"[long|short] [on|off] ..."
+                      ,up             =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+                      ,down           =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+                      ,inhibit        =>"[on|off]"
+                      ,statusRequest  =>""
+                      ,peerIODev      =>"[IO] <btn> [set|unset]..."
+                     },
+  blindActuator    =>{ on             =>""
+                      ,off            =>""
+                      ,toggle         =>""
+                      ,pct            =>"[<value>] ... [<ontime>]"
+                      ,stop           =>""
+                      ,press          =>"[long|short] [on|off] ..."
+                      ,up             =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+                      ,down           =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+                      ,inhibit        =>"[on|off]"
+                      ,statusRequest  =>""
+                      ,peerIODev      =>"[IO] <btn> [set|unset]..."
+                      },
+  remote           =>{ peerChan       =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"},
   threeStateSensor =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
 #                     ,statusRequest =>""
                       },
   THSensor         =>{ peerChan      =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"},
   virtual          =>{ peerChan      =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"
-                      ,press         =>"[long|short]..."
+                      ,press         =>"[long|short] [noBurst] ..."
                       ,postEvent     =>"<condition>"},
   smokeDetector    =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] actor"},
   winMatic         =>{ statusRequest =>""},
@@ -1190,7 +1196,7 @@ $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
                         ,on             =>""
                         ,off            =>""
                         ,toggle         =>""
-                        ,press          =>"[long|short] [on|off] ..."
+                        ,press          =>"[long|short] [on|off|<peer> ] [<peerChn>]..."
                         ,inhibit        =>"[on|off]"},
   "HM-CC-TC"         =>{ burstXmit      =>""},
   "HM-CC-RT-DN"      =>{ burstXmit      =>""
@@ -1231,15 +1237,14 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
                          ,controlMode    =>"[auto|manual|central|party]"
                          ,statusRequest  =>""
                          ,sysTime        =>""},
-  "HM-SEC-WIN01"      =>{ stop           =>"",
-                          level          =>"<level> <relockDly> <speed>..."},
   "HM-OU-CFM-PL01"    =>{ led            =>"<color>[,<color>...] [<repeat>]"},
   "HM-OU-CFM-PL02"    =>{ playTone       =>"<MP3No>[,<MP3No>...] [<repeat>]"},
-  "HM-SEC-WIN01"      =>{ matic         =>"<btn>"
-                         ,keydef        =>"<btn> <txt1> <txt2>"
-                         ,create        =>"<txt>"
-                         ,inhibit       =>"[on|off]"
-                         ,press         =>"[long|short] [on|off] ..."
+  "HM-SEC-WIN01"      =>{ stop           =>"",
+                         ,level          =>"<level> <relockDly> <speed>..."
+                         ,keydef         =>"<btn> <txt1> <txt2>"
+                         ,inhibit        =>"[on|off]"
+                         ,press          =>"[long|short] [<peer>] [<peerChn>] ..."
+                         ,peerIODev      =>"[IO] <btn> [set|unset]..."
                         },
   "HM-Sen-RD-O02"     =>{ "on-for-timer" =>"<sec>"
                          ,"on-till"      =>"<time>"
@@ -1282,7 +1287,7 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
                          ,on             =>""
                          ,off            =>""
                          ,toggle         =>""
-                         ,press          =>"[long|short] [on|off] ..."
+                         ,press          =>"[long|short] [<peer>] [<peerChn>] ..."
                          ,inhibit        =>"[on|off]"
                          ,statusRequest  =>""},
 );
