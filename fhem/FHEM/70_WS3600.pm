@@ -269,7 +269,10 @@ WS3600_Read($)
     $inputline =~ s/\s+$//;
     my ($rawreading, $val, $val2) = split(/ /, $inputline);
     if(defined($rawreading)) {
-    Log3 $name, 4, "WS3600(Dbg): $name read $inputline|$rawreading|$val|$val2";
+      my $logmsg = "WS3600(Dbg): $name read $inputline|$rawreading|$val";
+         $logmsg .= "|$val2" if(defined($val2));
+      Log3 $name, 4, $logmsg;
+#      Log3 $name, 4, "WS3600(Dbg): $name read $inputline|$rawreading|$val|$val2";
 	    if(defined($TranslatedCodes{$rawreading})) {
 	      $reading = $TranslatedCodes{$rawreading};
               readingsBulkUpdate($hash,$reading, $val);
