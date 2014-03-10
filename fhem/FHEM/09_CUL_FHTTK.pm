@@ -95,6 +95,13 @@ my %fhttfk_translatedcodes = (
     "91" => "11",
     "92" => "12");
 
+# set
+my %fhttfk_c2b;	# command->button hash
+my %canset = (
+	"01" => "Open",
+	"02" => "Closed",
+	"0c" => "Syncing");
+
 # -wusel, 2009-11-06
 #
 # Parse messages from FHT80TK, normally interpreted only by FHT80
@@ -110,19 +117,71 @@ sub
 CUL_FHTTK_Initialize($)
 {
   my ($hash) = @_;
+  
+  foreach my $k (keys %canset) {
+	my $v = $canset{$k};
+	$fhttfk_c2b{$v} = $k;
+  }
 
-  $hash->{Match}     = "^T[A-F0-9]{8}",
+  $hash->{Match}     = "^T[A-F0-9]{8}";
+  $hash->{SetFn}     = "CUL_FHTTK_Set";
   $hash->{DefFn}     = "CUL_FHTTK_Define";
   $hash->{UndefFn}   = "CUL_FHTTK_Undef";
   $hash->{ParseFn}   = "CUL_FHTTK_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:0,1 " .
-                        "model:FHT80TF ".
+                        "model:FHT80TF,FHT80TF-2,dummy ".
 						$readingFnAttributes;
   $hash->{AutoCreate}=
      { "CUL_FHTTK.*" => { GPLOT => "fht80tf:Window,", FILTER => "%NAME" } };
 
 }
 
+#############################
+
+sub
+CUL_FHTTK_Set($@)
+{
+  my ($hash, @a) = @_;
+  my $ret = "";
+  
+  return "\"set $a[0]\" needs at least two parameters" if(@a < 2);
+  
+  my $name = shift(@a);
+  
+  # return here to supress set at cul_fhttk devices
+  if(defined($attr{$name}) && defined($attr{$name}{"model"})) {
+	if($attr{$name}{"model"} ne "dummy") {
+		return $ret
+	}
+  }
+    
+  my $opt = shift @a;
+  my $value = join("", @a);
+  
+  Log3 $name, 5, "$name $opt a ist $a[0] und $a[1] und value: $value";
+  
+  if(!defined($fhttfk_c2b{$opt})) {
+		my @cList = keys %fhttfk_c2b;
+		return "Unknown argument $opt ($value), choose one of " . join(" ", @cList);
+	}
+  
+  # add T as prefix, because of protocol like TCCCCCXX
+  my $arg = "T" . $hash->{CODE};
+    
+  # fhttfk_c2b
+  $arg .= $fhttfk_c2b{$opt};
+  Log3 $name, 5, "$name $opt message with option code: $arg";
+  
+  # write msg to CUL/CUNO
+  CUL_SimpleWrite($hash, $arg);
+  Log3 $name, 2, "CUL_FHTTK set $name $opt";
+  
+  # update new state 
+  readingsSingleUpdate($hash, "state", $opt, 1);
+  readingsSingleUpdate($hash, "Window", $opt, 1);
+   
+  return $ret;
+}
 
 #############################
 sub
@@ -308,8 +367,8 @@ CUL_FHTTK_Parse($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
-    <li><a href="#loglevel">loglevel</a></li><br>
-    <li><a href="#model">model</a> (FHT80TF)</li><br>
+    <li><a href="#verbose">verbose</a></li><br>
+    <li><a href="#model">model</a> (FHT80TF, FHT80TF-2)</li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#ignore">ignore</a></li><br>
@@ -366,8 +425,8 @@ CUL_FHTTK_Parse($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
-    <li><a href="#loglevel">loglevel</a></li><br>
-    <li><a href="#model">model</a> (FHT80TF)</li><br>
+    <li><a href="#verbose">verbose</a></li><br>
+    <li><a href="#model">model</a> (FHT80TF, FHT80TF-2)</li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#ignore">ignore</a></li><br>
