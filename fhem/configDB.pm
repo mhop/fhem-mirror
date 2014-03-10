@@ -576,8 +576,8 @@ sub _cfgDB_Diff($$$) {
 # compare device configurations from 2 versions
 sub cfgDB_Diff($$) {
 	my ($search,$searchversion) = @_;
-	eval {use Text::Diff};
-	return "error: Please install Text::Diff!" if($@);
+	eval {
+	use Text::Diff;
 	my ($ret, $v0, $v1);
 	my $fhem_dbh = _cfgDB_Connect;
 		$v0 = _cfgDB_Diff($fhem_dbh,$search,0);
@@ -586,6 +586,8 @@ sub cfgDB_Diff($$) {
 	$ret = diff \$v0, \$v1, { STYLE => "Table" };
 	$ret = "\nNo differences found!" if !$ret;
 	$ret = "compare device: $search in current version 0 (left) to version: $searchversion (right)\n$ret\n";
+	};
+	return "error: Please install Text::Diff!" if($@);
 	return $ret;
 }
 
