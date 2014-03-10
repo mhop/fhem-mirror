@@ -574,7 +574,8 @@ PRESENCE_ExecuteFritzBoxCMD($$)
     {  
         $wait = int(rand(4))+2;
         Log3 $name, 5, "PRESENCE_ExecuteFritzBoxCMD: ($name) - ctlmgr_ctl is locked. waiting $wait seconds...";
-        sleep $wait;
+        $wait = 1000000*$wait;
+        usleep $wait;
     }
 
     unlink("/var/tmp/fhem-PRESENCE-cmd-lock.tmp") if(-e "/var/tmp/fhem-PRESENCE-cmd-lock.tmp");
