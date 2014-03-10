@@ -620,7 +620,7 @@ IsDisabled($)
   my $devname = shift;
   return 0 if(!$devname || !defined($attr{$devname}));
 
-  return 1 if(defined($attr{$devname}{disable}));
+  return 1 if($attr{$devname}{disable});
 
   my $dfi = $attr{$devname}{disabledForIntervals};
   if(defined($dfi)) {
