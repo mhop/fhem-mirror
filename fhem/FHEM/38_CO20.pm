@@ -288,6 +288,9 @@ CO20_Attr($$$)
     <li>Device::USB hast to be installed on the FHEM host.<br>
         It can be installed with '<code>cpan install Device::USB</code>'<br>
         or on debian with '<code>sudo apt-get install libdevice-usb-perl'</code>'</li>
+    <li>FHEM has to have permissions to open the device. To configure this with udev
+        rules see here: <a href="https://code.google.com/p/usb-sensors-linux/wiki/Install_AirSensor_Linux">Install_AirSensor_Linux
+usb-sensors-linux</a></li>
   </ul><br>
 
   <a name="CO20_Define"></a>
