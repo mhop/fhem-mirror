@@ -1426,9 +1426,9 @@ sub logF($$$)
 <h3>SYSMON</h3>
 <ul>
 This module provides statistics about the system running FHEM server. Only Linux-based systems are supported. 
-Some information are hardware specific and are not available on any platform. 
+Some informations are hardware specific and are not available on every platform. 
 So far, this module has been tested on the following systems: 
-Raspberry Pi (Debian Wheezy) BeagleBone Black, Fritz box 7390 (no CPU data), WR703N under OpenWrt (no CPU Data).
+Raspberry Pi (Debian Wheezy) BeagleBone Black, FritzBox 7390 (no CPU data), WR703N under OpenWrt (no CPU data).
   <br><br>
   <b>Define</b>
   <br><br>
@@ -1539,7 +1539,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>user defined<br>
-        These Readings provide output of commands, which are passed to the operating system. 
+        These readings provide output of commands, which are passed to the operating system. 
     </li>
     <br>
   <br>
@@ -1655,7 +1655,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>update<br>
-    Refresh all readings.
+    Refreshs all readings.
     </li>
     <br>
     <li>version<br>
@@ -1786,13 +1786,13 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       attr wl_sysmon_temp label "CPU Temperatur: Min $data{min2}, Max $data{max2}, Last $data{currval2}"<br>
       attr wl_sysmon_temp room 9.03_Tech<br>
       <br>
-      # Visualisierung: Netzwerk-Daten&uuml;bertragung f&uuml; eth0<br>
+      # Visualisierung: Netzwerk-Daten&uuml;bertragung f&uuml;r eth0<br>
       define wl_sysmon_eth0 SVG FileLog_sysmon:SM_Network_eth0:CURRENT<br>
       attr wl_sysmon_eth0 group RPi<br>
       attr wl_sysmon_eth0 label "Netzwerk-Traffic eth0: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
       attr wl_sysmon_eth0 room 9.03_Tech<br>
       <br>
-      # Visualisierung: Netzwerk-Daten&uuml;bertragung f&uuml; wlan0<br>
+      # Visualisierung: Netzwerk-Daten&uuml;bertragung f&uuml;r wlan0<br>
       define wl_sysmon_wlan0 SVG FileLog_sysmon:SM_Network_wlan0:CURRENT<br>
       attr wl_sysmon_wlan0 group RPi<br>
       attr wl_sysmon_wlan0 label "Netzwerk-Traffic wlan0: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
@@ -1866,10 +1866,10 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <code>define &lt;name&gt; SYSMON [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
     <br>
     Diese Anweisung erstellt eine neue SYSMON-Instanz.
-    Die Parameter M1 bis M4 legen die Aktualisierungsintervale f&uuml;r verschiedenen Readings (Statistiken) fest.
+    Die Parameter M1 bis M4 legen die Aktualisierungsintervalle f&uuml;r verschiedenen Readings (Statistiken) fest.
     Die Parameter sind als Multiplikatoren f&uuml;r die Zeit, die durch INTERVAL_BASE definiert ist, zu verstehen.
     Da diese Zeit fest auf 60 Sekunden gesetzt ist, k&ouml;nnen die Mx-Parameters als Zeitintervalle in Minuten angesehen werden.<br>
-    Wird einer (oder mehrere) Multiplikator auf Null gesetzt werden, wird das entsprechende Readings deaktiviert.<br>
+    Wird einer (oder mehrere) Multiplikatoren auf Null gesetzt werden, wird das entsprechende Readings deaktiviert.<br>
     <br>
     Die Parameter sind f&uuml;r die Aktualisierung der Readings nach folgender Schema zust&auml;ndig:
     <ul>
@@ -2141,7 +2141,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <li>user-defined &lt;readingsName&gt;:&lt;Interval_Minutes&gt;:&lt;Comment&gt;:&lt;Cmd&gt;,...<br>
     Diese kommaseparierte Liste definiert Eintr&auml;ge mit jeweils folgenden Daten: 
-    Reading-Name, Aktualisierungsinterval in Minuten, Kommentar und Betriebssystem-Commando.
+    Reading-Name, Aktualisierungsintervall in Minuten, Kommentar und Betriebssystem-Commando.
     <br>Die BS-Befehle werden entsprechend des angegebenen Intervalls ausgef&uuml;hrt und als Readings mit den angegebenen Namen vermerkt.
     Kommentare werden f&uuml;r die HTML-Ausgaben (s. SYSMON_ShowValuesHTML) ben&ouml;tigt.
     <br>Alle Parameter sind nicht optional!
@@ -2236,13 +2236,13 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       attr wl_sysmon_temp label "CPU Temperatur: Min $data{min2}, Max $data{max2}, Last $data{currval2}"<br>
       attr wl_sysmon_temp room 9.03_Tech<br>
       <br>
-      # Visualisierung: Netzwerk-Daten&uuml;bertragung f&uuml; eth0<br>
+      # Visualisierung: Netzwerk-Daten&uuml;bertragung f&uuml;r eth0<br>
       define wl_sysmon_eth0 SVG FileLog_sysmon:SM_Network_eth0:CURRENT<br>
       attr wl_sysmon_eth0 group RPi<br>
       attr wl_sysmon_eth0 label "Netzwerk-Traffic eth0: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
       attr wl_sysmon_eth0 room 9.03_Tech<br>
       <br>
-      # Visualisierung: Netzwerk-Daten&uuml;bertragung f&uuml; wlan0<br>
+      # Visualisierung: Netzwerk-Daten&uuml;bertragung f&uuml;r wlan0<br>
       define wl_sysmon_wlan0 SVG FileLog_sysmon:SM_Network_wlan0:CURRENT<br>
       attr wl_sysmon_wlan0 group RPi<br>
       attr wl_sysmon_wlan0 label "Netzwerk-Traffic wlan0: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
