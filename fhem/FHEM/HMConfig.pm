@@ -423,6 +423,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   cyclicInfoMsgDis=>{a=> 17.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message"},
   lowBatLimit     =>{a=> 18.0,s=>1.0,l=>0,min=>10 ,max=>12      ,c=>''         ,f=>10      ,u=>'V'   ,d=>1,t=>"low batterie limit, step .1V"},
   lowBatLimitBA   =>{a=> 18.0,s=>1.0,l=>0,min=>5  ,max=>15      ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
+  lowBatLimitBA_4 =>{a=> 28.0,s=>1.0,l=>0,min=>5  ,max=>15      ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},# bug in SW4? strange - at least one user...
   lowBatLimitBA2  =>{a=> 18.0,s=>1.0,l=>0,min=>0  ,max=>15      ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
   lowBatLimitFS   =>{a=> 18.0,s=>1.0,l=>0,min=>2  ,max=>3       ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
   lowBatLimitRT   =>{a=> 18.0,s=>1.0,l=>0,min=>2  ,max=>2.5     ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
@@ -850,7 +851,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,                                        transmitTryMax  =>1},
   "HM-Dis-TD-T"       =>{ lowBatLimitFS   =>1,ledMode         =>1},
   "HM-LC-SW1-BA-PCB"  =>{ lowBatLimitBA   =>1,ledMode         =>1},
-  "HM-LC-SW4-BA-PCB"  =>{ lowBatLimitBA   =>1,ledMode         =>1,localResDis     =>1},
+  "HM-LC-SW4-BA-PCB"  =>{ lowBatLimitBA_4 =>1,ledMode         =>1,localResDis     =>1},
   "HM-Sys-sRP-Pl"     =>{ compMode        =>1},
   "KFM-Display"       =>{ CtDlyOn         =>1,CtDlyOff        =>1
                          ,CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1
