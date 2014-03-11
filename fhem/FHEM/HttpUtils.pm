@@ -184,7 +184,10 @@ HttpUtils_Connect2($)
   }
 
   $hash->{host} =~ s/:.*//;
-  my $hdr = ($data ? "POST" : "GET")." $hash->{path} HTTP/1.0\r\n";
+  my $method = $hash->{method};
+  $method = ($data ? "POST" : "GET") if( !$method );
+
+  my $hdr = "$method $hash->{path} HTTP/1.0\r\n";
   $hdr .= "Host: $hash->{host}\r\n";
   $hdr .= "Authorization: Basic $hash->{auth}\r\n" if(defined($hash->{auth}));
   $hdr .= $hash->{header}."\r\n" if(defined($hash->{header}));
@@ -295,7 +298,8 @@ HttpUtils_ParseAnswer($$)
 #  mandatory:
 #    url, callback
 #  optional(default):
-#    hideurl(0),timeout(4),data(""),noshutdown(0),loglevel(4),header("")
+#    hideurl(0),timeout(4),data(""),noshutdown(0),loglevel(4),header(""),
+#    method($data ? "POST" : "GET")
 # Example:
 #   HttpUtils_NonblockingGet({
 #     url=>"http://192.168.178.112:8888/fhem",
