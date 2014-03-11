@@ -1113,24 +1113,24 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
   peerBulk      => "<peer1,peer2,...>",
 );
 %culHmSubTypeSets = (# channels of this subtype
-  switch           =>{ "on-for-timer" =>"<sec>"
+  switch           =>{ "on-for-timer" =>"<ontime>"
                       ,"on-till"      =>"<time>"
                       ,on             =>""
                       ,off            =>""
                       ,toggle         =>""
-                      ,press          =>"[long|short] [on|off] ..."
+                      ,press          =>"[long|short] [<peer>] [<peerChn>]..."
                       ,inhibit        =>"[on|off]"
                       ,statusRequest  =>""
                       ,peerIODev      =>"[IO] <btn> [set|unset]..."
                      },
-  dimmer           =>{ "on-for-timer" =>"<sec>"
-                      ,"on-till"      =>"<time>"
+  dimmer           =>{ "on-for-timer" =>"<ontime> [<ramptime>]..."
+                      ,"on-till"      =>"<time> [<ramptime>]..."
                       ,on             =>""
                       ,off            =>""
                       ,toggle         =>""
                       ,pct            =>"<value> ... [<ontime>] [<ramptime>]"
                       ,stop           =>""
-                      ,press          =>"[long|short] [on|off] ..."
+                      ,press          =>"[long|short] [on|off|<peer>] [<peerChn>] ..."
                       ,up             =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,down           =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,inhibit        =>"[on|off]"
@@ -1142,7 +1142,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       ,toggle         =>""
                       ,pct            =>"[<value>] ... [<ontime>]"
                       ,stop           =>""
-                      ,press          =>"[long|short] [on|off] ..."
+                      ,press          =>"[long|short] [on|off|<peer>] [<peerChn>] ..."
                       ,up             =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,down           =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,inhibit        =>"[on|off]"
@@ -1150,24 +1150,24 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       ,peerIODev      =>"[IO] <btn> [set|unset]..."
                       },
   remote           =>{ peerChan       =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"},
-  threeStateSensor =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
-#                     ,statusRequest =>""
+  threeStateSensor =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
+#                     ,statusRequest  =>""
                       },
-  THSensor         =>{ peerChan      =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"},
-  virtual          =>{ peerChan      =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"
-                      ,press         =>"[long|short] [noBurst] ..."
-                      ,postEvent     =>"<condition>"},
-  smokeDetector    =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] actor"},
-  winMatic         =>{ statusRequest =>""},
-  keyMatic         =>{ lock          =>""
-                      ,unlock        =>"[<sec>] ..."
-                      ,open          =>"[<sec>] ..."
-                      ,inhibit       =>"[on|off]"
-                      ,statusRequest =>""},
-  repeater         =>{ setRepeat     => "[no1..36] <sendName> <recName> [bdcast-yes|no]"
-                      ,inhibit       => "[on|off]"
-                      ,statusRequest =>""},
-  outputUnit       =>{ statusRequest =>""},
+  THSensor         =>{ peerChan       =>"0 <actChn> ... single [set|unset] [actor|remote|both]"},
+  virtual          =>{ peerChan       =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"
+                      ,press          =>"[long|short] [noBurst] ..."
+                      ,postEvent      =>"<condition>"},
+  smokeDetector    =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] actor"},
+  winMatic         =>{ statusRequest  =>""},
+  keyMatic         =>{ lock           =>""
+                      ,unlock         =>"[<sec>] ..."
+                      ,open           =>"[<sec>] ..."
+                      ,inhibit        =>"[on|off]"
+                      ,statusRequest  =>""},
+  repeater         =>{ setRepeat      => "[no1..36] <sendName> <recName> [bdcast-yes|no]"
+                      ,inhibit        => "[on|off]"
+                      ,statusRequest  =>""},
+  outputUnit       =>{ statusRequest  =>""},
 );
 # clones- - - - - - - - - - - - - - - - -
 $culHmSubTypeSets{pushButton}      = $culHmSubTypeSets{remote};
@@ -1196,7 +1196,7 @@ $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
                         ,on             =>""
                         ,off            =>""
                         ,toggle         =>""
-                        ,press          =>"[long|short] [on|off|<peer> ] [<peerChn>]..."
+                        ,press          =>"[long|short] [<peer>] [<peerChn>]..."
                         ,inhibit        =>"[on|off]"},
   "HM-CC-TC"         =>{ burstXmit      =>""},
   "HM-CC-RT-DN"      =>{ burstXmit      =>""
