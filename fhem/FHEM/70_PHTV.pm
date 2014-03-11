@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.1.3
+# Version: 1.1.4
 #
 # Major Version History:
 # - 1.1.0 - 2014-03-07
@@ -71,7 +71,7 @@ sub PHTV_Initialize($) {
     $hash->{UndefFn} = "PHTV_Undefine";
 
     $hash->{AttrList} =
-"disable:0,1 timeout inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom "
+"disable:0,1 timeout inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:100,125,150,175,200,225,250,275,300,325,350,375,400,425,450,475,500"
       . $readingFnAttributes;
 
     $data{RC_layout}{PHTV_SVG} = "PHTV_RClayout_SVG";
@@ -152,15 +152,12 @@ sub PHTV_GetStatus($;$) {
         }
 
         # read ambilight mode
-        PHTV_SendCommand( $hash, "ambilight/mode" ) if ( !$update );
+        PHTV_SendCommand( $hash, "ambilight/mode" );
 
         # read ambilight RGB value
         PHTV_SendCommand( $hash, "ambilight/cached" )
-          if (
-            defined( $hash->{READINGS}{ambiMode}{VAL} )
-            && (   $hash->{READINGS}{ambiMode}{VAL} eq "manual"
-                || $hash->{READINGS}{ambiMode}{VAL} eq "expert" )
-          );
+          if ( defined( $hash->{READINGS}{ambiMode}{VAL} )
+            && $hash->{READINGS}{ambiMode}{VAL} ne "internal" );
     }
 
     # Input alias handling
@@ -380,7 +377,7 @@ sub PHTV_Set($@) {
 
         return "No argument given" if ( !defined( $a[2] ) );
 
-        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+        if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
             if ( $a[2] eq "internal" || $a[2] eq "manual" || $a[2] eq "expert" )
             {
                 PHTV_SendCommand( $hash, "ambilight/mode",
@@ -395,7 +392,7 @@ sub PHTV_Set($@) {
             }
         }
         else {
-            return "Device needs to be ON to control Ambilight mode.";
+            return "Device needs to be reachable to control Ambilight mode.";
         }
     }
 
@@ -405,7 +402,7 @@ sub PHTV_Set($@) {
 
         return "No argument given" if ( !defined( $a[2] ) );
 
-        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+        if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
 
             if ( defined( $hash->{READINGS}{ambiLEDLayers}{VAL} ) ) {
                 my $json;
@@ -552,7 +549,7 @@ sub PHTV_Set($@) {
 
         }
         else {
-            return "Device needs to be ON to control Ambilight mode.";
+            return "Device needs to be reachable to control Ambilight mode.";
         }
     }
 
@@ -562,7 +559,7 @@ sub PHTV_Set($@) {
 
         return "No argument given" if ( !defined( $a[2] ) );
 
-        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+        if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
 
             # set all LEDs at once
             if ( uc( $a[2] ) =~ /^(..)(..)(..)$/ ) {
@@ -703,7 +700,7 @@ sub PHTV_Set($@) {
             }
         }
         else {
-            return "Device needs to be ON to set Ambilight color.";
+            return "Device needs to be reachable to set Ambilight color.";
         }
     }
 
@@ -971,7 +968,7 @@ sub PHTV_Set($@) {
         }
         else {
             return
-              "Device needs to be present to switch to a specific channel.";
+              "Device needs to be reachable to switch to a specific channel.";
         }
     }
 
@@ -1033,7 +1030,7 @@ sub PHTV_Set($@) {
             }
         }
         else {
-            return "Device needs to be present to switch input.";
+            return "Device needs to be reachable to switch input.";
         }
     }
 
@@ -1111,6 +1108,8 @@ sub PHTV_Define($$) {
     $hash->{helper}{PORT} = 1925;
 
     readingsSingleUpdate( $hash, "ambiHue", "off", 0 );
+    if ( defined( $hash->{READINGS}{ambiHue}{VAL} )
+        && $hash->{READINGS}{ambiHue}{VAL} ne "off" );
 
     $hash->{model} = $hash->{READINGS}{model}{VAL}
       if ( defined( $hash->{READINGS}{model}{VAL} ) );
@@ -1820,7 +1819,6 @@ sub PHTV_ReceiveCommand($$$) {
                 elsif ( defined($type) && $type eq "channel" ) {
                     PHTV_SendCommand( $hash, "channels/current" );
                 }
-
             }
         }
 
@@ -2186,7 +2184,11 @@ sub PHTV_ReceiveCommand($$$) {
                         }
                     }
 
-                    fhem("sleep 0.2");
+                    my $latency =
+                      ( $attr{$name}{ambiHueLatency} )
+                      ? $attr{$name}{ambiHueLatency} / 100
+                      : 0.2;
+                    fhem("sleep $latency");
                     PHTV_SendCommand( $hash, "ambilight/processed" );
                 }
 
@@ -2849,9 +2851,10 @@ sub PHTV_min {
     <li><b>ambiHueTop</b> - HUE devices that should get the color from top Ambilight. Add ":0"-":x" if you would like to use a specific LED as color reference</li>
     <li><b>ambiHueRight</b> - HUE devices that should get the color from right Ambilight. Add ":0"-":x" if you would like to use a specific LED as color reference</li>
     <li><b>ambiHueBottom</b> - HUE devices that should get the color from bottom Ambilight. Add ":0"-":x" if you would like to use a specific LED as color reference</li>
+    <li><b>ambiHueLatency</b> - Controls the update interval for HUE devices in milliseconds; defaults to 200 ms. Note: This has huge impact on the performance of your FHEM installation!</li>
     <li><b>disable</b> - Disable polling (true/false)</li>
-    <li><b>http-timeout</b> - Set different polling timeout in seconds (default=7)</li>
     <li><b>inputs</b> - Presents the inputs read from device. Inputs can be renamed by adding <code>,NewName</code> right after the original name.</li>
+    <li><b>timeout</b> - Set different polling timeout in seconds (default=7)</li>
   </ul></ul>
   <br>
   <br>
