@@ -24,9 +24,12 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.1.4
+# Version: 1.2.0
 #
 # Major Version History:
+# - 1.2.0 - 2014-03-12
+# -- extended AmbiHue support
+#
 # - 1.1.0 - 2014-03-07
 # -- bugfixes
 # -- additional commands: ambiMode,rgb,pause,play,record,volumeStraight
@@ -42,6 +45,7 @@ package main;
 use strict;
 use warnings;
 use Data::Dumper;
+use Time::HiRes qw(gettimeofday);
 use JSON;
 use HttpUtils;
 use Color;
@@ -71,7 +75,7 @@ sub PHTV_Initialize($) {
     $hash->{UndefFn} = "PHTV_Undefine";
 
     $hash->{AttrList} =
-"disable:0,1 timeout inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:100,125,150,175,200,225,250,275,300,325,350,375,400,425,450,475,500"
+"disable:0,1 timeout inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom "
       . $readingFnAttributes;
 
     $data{RC_layout}{PHTV_SVG} = "PHTV_RClayout_SVG";
@@ -91,6 +95,10 @@ sub PHTV_GetStatus($;$) {
     my $interval = $hash->{INTERVAL};
 
     Log3 $name, 5, "PHTV $name: called function PHTV_GetStatus()";
+
+    $interval = $interval * 1.6
+      if ( defined( $hash->{READINGS}{ambiHue}{VAL} )
+        && $hash->{READINGS}{ambiHue}{VAL} eq "on" );
 
     RemoveInternalTimer($hash);
     InternalTimer( gettimeofday() + $interval, "PHTV_GetStatus", $hash, 0 );
@@ -266,8 +274,10 @@ sub PHTV_Set($@) {
     if ( defined( $hash->{helper}{device}{channelPreset} )
         && ref( $hash->{helper}{device}{channelPreset} ) eq "HASH" )
     {
-        my $i = 1;
-        while ( $i < 81 ) {
+        my $i     = 1;
+        my $count = scalar( keys $hash->{helper}{device}{channelPreset} );
+        $count = 80 if ( $count > 80 );
+        while ( $i <= $count ) {
             $channels .=
               $hash->{helper}{device}{channelPreset}{$i}{name} . ",";
             $i++;
@@ -283,7 +293,7 @@ sub PHTV_Set($@) {
     my $usage =
         "Unknown argument "
       . $a[1]
-      . ", choose one of statusRequest:noArg toggle:noArg on:noArg off:noArg play:noArg pause:noArg stop:noArg record:noArg volume:slider,1,1,100 volumeUp:noArg volumeDown:noArg channelUp:noArg channelDown:noArg remoteControl ambiHue:off,on ambiMode:internal,manual,expert ambiPreset:rainbow,rainbow-pastel rgb:colorpicker,rgb";
+      . ", choose one of statusRequest:noArg toggle:noArg on:noArg off:noArg play:noArg pause:noArg stop:noArg record:noArg volume:slider,1,1,100 volumeUp:noArg volumeDown:noArg channelUp:noArg channelDown:noArg remoteControl ambiHue:off,on ambiMode:internal,manual,expert ambiPreset:rainbow,rainbow-pastel rgb:colorpicker,rgb hue:slider,0,1,65534 sat:slider,0,1,255 pct:slider,0,1,100 bri:slider,0,1,255";
     $usage .=
         " volumeStraight:slider,"
       . $hash->{helper}{audio}{min} . ",1,"
@@ -564,7 +574,7 @@ sub PHTV_Set($@) {
             # set all LEDs at once
             if ( uc( $a[2] ) =~ /^(..)(..)(..)$/ ) {
                 my $json;
-                my $hsv;
+                my $hsb;
                 my $hue;
                 my $sat;
                 my $bri;
@@ -575,10 +585,10 @@ sub PHTV_Set($@) {
                 $json .= '"r": ' . $r . ',';
                 $json .= '"g": ' . $g . ',';
                 $json .= '"b": ' . $b;
-                $hsv = PHTV_rgb2hsv( $r, $g, $b );
-                $hue = $hsv->{h};
-                $sat = int( $hsv->{s} * 100 + 0.5 );
-                $bri = $hsv->{v};
+                $hsb = PHTV_rgb2hsb( $r, $g, $b );
+                $hue = $hsb->{h};
+                $sat = $hsb->{s};
+                $bri = $hsb->{b};
                 $pct = PHTV_bri2pct($bri);
                 PHTV_SendCommand( $hash, "ambilight/cached", $json,
                     uc( $a[2] ) );
@@ -696,11 +706,124 @@ sub PHTV_Set($@) {
                     && $rgbsum > 0 );
             }
             else {
-                return "Invalid RGB code";
+                return "Invalid RGB code " . $a[2];
             }
         }
         else {
             return "Device needs to be reachable to set Ambilight color.";
+        }
+    }
+
+    # hue
+    elsif ( $a[1] eq "hue" ) {
+        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            if ( defined( $hash->{READINGS}{rgb}{VAL} )
+                && $hash->{READINGS}{rgb}{VAL} ne "" )
+            {
+                my $_ = $a[2];
+                my $hsb;
+                my $hex;
+                if ( m/^\d+$/ && $_ >= 0 && $_ <= 65534 ) {
+                    $hsb = PHTV_hex2hsb( $hash->{READINGS}{rgb}{VAL} );
+                    $hex = PHTV_hsb2hex( $_, $hsb->{s}, $hsb->{b} );
+
+                    Log3 $name, 4,
+                        "PHTV $name hue - old: "
+                      . $hash->{READINGS}{rgb}{VAL}
+                      . " new: $hex(h=$_ s="
+                      . $hsb->{s} . " b="
+                      . $hsb->{b};
+
+                    return PHTV_Set( $hash, $name, "rgb", $hex );
+                }
+                else {
+                    return
+"Argument does not seem to be a valid integer between 0 and 100";
+                }
+            }
+        }
+        else {
+            return "Device needs to be ON to set Ambilight color.";
+        }
+    }
+
+    # sat
+    elsif ( $a[1] eq "sat" ) {
+        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            if ( defined( $hash->{READINGS}{rgb}{VAL} )
+                && $hash->{READINGS}{rgb}{VAL} ne "" )
+            {
+                my $_ = $a[2];
+                my $hsb;
+                my $hex;
+                if ( m/^\d+$/ && $_ >= 0 && $_ <= 255 ) {
+                    $hsb = PHTV_hex2hsb( $hash->{READINGS}{rgb}{VAL} );
+                    $hex = PHTV_hsb2hex( $hsb->{h}, $_, $hsb->{b} );
+
+                    Log3 $name, 4,
+                        "PHTV $name sat - old: "
+                      . $hash->{READINGS}{rgb}{VAL}
+                      . " new: $hex(h="
+                      . $hsb->{h}
+                      . " s=$_ b="
+                      . $hsb->{b};
+
+                    return PHTV_Set( $hash, $name, "rgb", $hex );
+                }
+                else {
+                    return
+"Argument does not seem to be a valid integer between 0 and 100";
+                }
+            }
+        }
+        else {
+            return "Device needs to be ON to set Ambilight color.";
+        }
+    }
+
+    # bri
+    elsif ( $a[1] eq "bri" ) {
+        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+
+        return "No argument given" if ( !defined( $a[2] ) );
+
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+            if ( defined( $hash->{READINGS}{rgb}{VAL} )
+                && $hash->{READINGS}{rgb}{VAL} ne "" )
+            {
+                my $_ = $a[2];
+                my $hsb;
+                my $hex;
+                if ( m/^\d+$/ && $_ >= 0 && $_ <= 255 ) {
+                    $hsb = PHTV_hex2hsb( $hash->{READINGS}{rgb}{VAL} );
+                    $hex = PHTV_hsb2hex( $hsb->{h}, $hsb->{s}, $_ );
+
+                    Log3 $name, 4,
+                        "PHTV $name bri - old: "
+                      . $hash->{READINGS}{rgb}{VAL}
+                      . " new: $hex(h="
+                      . $hsb->{h} . " s="
+                      . $hsb->{s}
+                      . " b=$_)";
+
+                    return PHTV_Set( $hash, $name, "rgb", $hex );
+                }
+                else {
+                    return
+"Argument does not seem to be a valid integer between 0 and 100";
+                }
+            }
+        }
+        else {
+            return "Device needs to be ON to set Ambilight color.";
         }
     }
 
@@ -715,12 +838,23 @@ sub PHTV_Set($@) {
                 && $hash->{READINGS}{rgb}{VAL} ne "" )
             {
                 my $_ = $a[2];
-                my $rgb;
-                my $rgbnew;
+                my $hsb;
+                my $bri;
+                my $hex;
                 if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
-                    $rgb = PHTV_hex2hsv( $hash->{READINGS}{rgb}{VAL} );
-                    $rgbnew = PHTV_hsv2hex( $rgb->{h}, $rgb->{s}, $_ );
-                    return PHTV_Set( $hash, $name, "rgb", $rgbnew );
+                    $hsb = PHTV_hex2hsb( $hash->{READINGS}{rgb}{VAL} );
+                    $bri = PHTV_pct2bri($_);
+                    $hex = PHTV_hsb2hex( $hsb->{h}, $hsb->{s}, $bri );
+
+                    Log3 $name, 4,
+                        "PHTV $name pct - old: "
+                      . $hash->{READINGS}{rgb}{VAL}
+                      . " new: $hex(h="
+                      . $hsb->{h} . " s="
+                      . $hsb->{s}
+                      . " b=$bri)";
+
+                    return PHTV_Set( $hash, $name, "rgb", $hex );
                 }
                 else {
                     return
@@ -1107,8 +1241,8 @@ sub PHTV_Define($$) {
 
     $hash->{helper}{PORT} = 1925;
 
-    readingsSingleUpdate( $hash, "ambiHue", "off", 0 );
-    if ( defined( $hash->{READINGS}{ambiHue}{VAL} )
+    readingsSingleUpdate( $hash, "ambiHue", "off", 0 )
+      if ( defined( $hash->{READINGS}{ambiHue}{VAL} )
         && $hash->{READINGS}{ambiHue}{VAL} ne "off" );
 
     $hash->{model} = $hash->{READINGS}{model}{VAL}
@@ -1144,9 +1278,10 @@ sub PHTV_Define($$) {
 ###################################
 sub PHTV_SendCommand($$;$$) {
     my ( $hash, $service, $cmd, $type ) = @_;
-    my $name    = $hash->{NAME};
-    my $address = $hash->{helper}{ADDRESS};
-    my $port    = $hash->{helper}{PORT};
+    my $name      = $hash->{NAME};
+    my $address   = $hash->{helper}{ADDRESS};
+    my $port      = $hash->{helper}{PORT};
+    my $timestamp = gettimeofday();
     my $data;
     my $timeout;
 
@@ -1207,6 +1342,7 @@ sub PHTV_SendCommand($$;$$) {
             service    => $service,
             cmd        => $cmd,
             type       => $type,
+            timestamp  => $timestamp,
             callback   => \&PHTV_ReceiveCommand,
         }
     );
@@ -1221,6 +1357,7 @@ sub PHTV_ReceiveCommand($$$) {
     my $name    = $hash->{NAME};
     my $service = $param->{service};
     my $cmd     = $param->{cmd};
+
     my $state =
       ( $hash->{READINGS}{state}{VAL} )
       ? $hash->{READINGS}{state}{VAL}
@@ -1909,7 +2046,7 @@ sub PHTV_ReceiveCommand($$$) {
         # ambilight/cached (rgb)
         elsif ( $service eq "ambilight/cached" ) {
             if ( ref($return) eq "HASH" ) {
-                my $rgb = "";
+                my $hexsum = "";
                 foreach my $layer ( keys $return ) {
                     foreach my $side ( keys $return->{$layer} ) {
                         foreach my $led ( keys $return->{$layer}{$side} ) {
@@ -1929,8 +2066,8 @@ sub PHTV_ReceiveCommand($$$) {
                                 $return->{$layer}{$side}{$led}{b}
                             );
 
-                            $rgb = $hex   if ( $rgb eq "" );
-                            $rgb = "diff" if ( $rgb ne $hex );
+                            $hexsum = $hex   if ( $hexsum eq "" );
+                            $hexsum = "diff" if ( $hexsum ne $hex );
 
                             if (
                                 !defined(
@@ -1945,17 +2082,17 @@ sub PHTV_ReceiveCommand($$$) {
                     }
                 }
 
-                if ( $rgb ne "diff" ) {
-                    my $hsv = PHTV_hex2hsv($rgb);
-                    my $hue = $hsv->{h};
-                    my $sat = int( $hsv->{s} * 100 + 0.5 );
-                    my $bri = $hsv->{v};
+                if ( $hexsum ne "diff" ) {
+                    my $hsb = PHTV_hex2hsb($hexsum);
+                    my $hue = $hsb->{h};
+                    my $sat = $hsb->{s};
+                    my $bri = $hsb->{b};
                     my $pct = PHTV_bri2pct($bri);
 
                     if ( !defined( $hash->{READINGS}{rgb}{VAL} )
-                        || $hash->{READINGS}{rgb}{VAL} ne $rgb )
+                        || $hash->{READINGS}{rgb}{VAL} ne $hexsum )
                     {
-                        readingsBulkUpdate( $hash, "rgb", $rgb );
+                        readingsBulkUpdate( $hash, "rgb", $hexsum );
                     }
 
                     if ( !defined( $hash->{READINGS}{hue}{VAL} )
@@ -1988,10 +2125,10 @@ sub PHTV_ReceiveCommand($$$) {
                 if ( $type =~ /^(..)(..)(..)$/
                     && defined( $hash->{READINGS}{ambiLEDLayers}{VAL} ) )
                 {
-                    my $hsv = PHTV_hex2hsv($type);
-                    my $hue = $hsv->{h};
-                    my $sat = int( $hsv->{s} * 100 + 0.5 );
-                    my $bri = $hsv->{v};
+                    my $hsb = PHTV_hex2hsb($type);
+                    my $hue = $hsb->{h};
+                    my $sat = $hsb->{s};
+                    my $bri = $hsb->{b};
                     my $pct = PHTV_bri2pct($bri);
 
                     if ( !defined( $hash->{READINGS}{rgb}{VAL} )
@@ -2103,92 +2240,148 @@ sub PHTV_ReceiveCommand($$$) {
                     foreach my $side ( 'Left', 'Top', 'Right', 'Bottom' ) {
                         my $ambiHue = "ambiHue$side";
                         my $ambiLED = "ambiLED$side";
-                        my $sidelc  = lc($side);
+                        my $s       = lc($side);
 
                         # $ambiHue
                         if (   defined( $attr{$name}{$ambiHue} )
                             && $attr{$name}{$ambiHue} ne ""
-                            && defined( $return->{layer1}->{$sidelc} )
-                            && ref( $return->{layer1}->{$sidelc} ) eq "HASH" )
+                            && defined( $return->{layer1}->{$s} )
+                            && ref( $return->{layer1}->{$s} ) eq "HASH"
+                            && defined( $hash->{READINGS}{$ambiLED}{VAL} )
+                            && $hash->{READINGS}{$ambiLED}{VAL} > 0 )
                         {
                             my @devices =
                               split( " ", $attr{$name}{$ambiHue} );
 
                             foreach my $devled (@devices) {
-                                my ( $dev, $led ) = split( /:/, $devled );
+                                my ( $dev, $led, $sat, $bri ) =
+                                  split( /:/, $devled );
+                                my @leds;
 
-                                # determine reference LED
+                                # next for if HUE device is not ready
+                                if (   !defined( $defs{$dev} )
+                                    || !defined( $defs{$dev}{TYPE} )
+                                    || $defs{$dev}{TYPE} ne "HUEDevice"
+                                    || $defs{$dev}{READINGS}{reachable}{VAL} ne
+                                    "true" )
+                                {
+                                    next;
+                                }
+
+                                # determine reference LEDs
                                 if ( !defined($led) || $led eq "" ) {
-                                    if (
-                                        defined(
-                                            $hash->{READINGS}{$ambiLED}{VAL}
+                                    my $led_middle = int(
+                                        $hash->{READINGS}{$ambiLED}{VAL} / 2 +
+                                          0.5 ) - 1;
+
+                                    # take the middle LED and
+                                    # one left and right each
+                                    push(
+                                        @leds,
+                                        (
+                                            $led_middle,
+                                            $led_middle - 1,
+                                            $led_middle + 1
                                         )
-                                        && $hash->{READINGS}{$ambiLED}{VAL} > 0
-                                      )
-                                    {
-                                        $led = int(
-                                            $hash->{READINGS}{$ambiLED}{VAL} /
-                                              2 + 0.5 ) - 1;
+                                    );
+                                }
+
+                                # user named reference LED(s)
+                                else {
+                                    my ( $ledB, $ledE ) = split( /-/, $led );
+                                    $ledB -= 1;
+                                    $ledE -= 1
+                                      if ( defined($ledE) && $ledE ne "" );
+
+                                    if ( !defined($ledE) || $ledE eq "" ) {
+                                        push( @leds, ($ledB) );
                                     }
                                     else {
-                                        $led = "";
+                                        my $i = $ledB;
+                                        while ( $i <= $ledE ) {
+                                            push( @leds, ($i) );
+                                            $i++;
+                                        }
                                     }
                                 }
 
-                                # copy color from reference LED
-                                if (
-                                       defined( $defs{$dev} && $led ne "" )
-                                    && $defs{$dev}{TYPE} eq "HUEDevice"
-                                    && defined(
-                                        $return->{layer1}->{$sidelc}->{$led}
-                                          ->{r}
-                                    )
-                                    && defined(
-                                        $return->{layer1}->{$sidelc}->{$led}
-                                          ->{g}
-                                    )
-                                    && defined(
-                                        $return->{layer1}->{$sidelc}->{$led}
-                                          ->{b}
-                                    )
-                                  )
-                                {
-                                    my $r = sprintf( "%02x",
-                                        $return->{layer1}->{$sidelc}->{$led}
-                                          ->{r} );
-                                    my $g = sprintf( "%02x",
-                                        $return->{layer1}->{$sidelc}->{$led}
-                                          ->{g} );
-                                    my $b = sprintf( "%02x",
-                                        $return->{layer1}->{$sidelc}->{$led}
-                                          ->{b} );
-
-                                    # temp. disable event triggers for HUEDevice
+                                # get current RGB values
+                                my ( $Hsum, $Ssum, $Bsum );
+                                foreach my $l (@leds) {
                                     if (
-                                        !defined(
-                                            $attr{$dev}
-                                              {"event-on-change-reading"}
+                                        defined(
+                                            $return->{layer1}->{$s}->{$l}
                                         )
-                                        || $attr{$dev}
-                                        {"event-on-change-reading"} ne "none"
                                       )
                                     {
-                                        $attr{$dev}{"event-on-change-reading"}
-                                          = "none";
-                                    }
 
-                                    # send command
-                                    fhem("set $dev rgb $r$g$b");
+                                        my $hsb = PHTV_rgb2hsb(
+                                            $return->{layer1}->{$s}->{$l}->{r},
+                                            $return->{layer1}->{$s}->{$l}->{g},
+                                            $return->{layer1}->{$s}->{$l}->{b}
+                                        );
+
+                                        $Hsum += $hsb->{h};
+                                        $Ssum += $hsb->{s};
+                                        $Bsum += $hsb->{b};
+                                    }
                                 }
+
+                                # consider user defined values
+                                my $satF =
+                                  ( $sat && $sat > 0 && $sat < 100 )
+                                  ? $sat / 100
+                                  : 1;
+                                my $briF =
+                                  ( $bri && $bri > 0 && $bri < 100 )
+                                  ? $bri / 100
+                                  : 1;
+
+                                my $countLEDs = scalar @leds;
+                                my $h         = sprintf( "%02x",
+                                    int( $Hsum / $countLEDs / 256 + 0.5 ) );
+                                my $s = sprintf( "%02x",
+                                    int( $Ssum / $countLEDs * $satF + 0.5 ) );
+                                my $b = sprintf( "%02x",
+                                    int( $Bsum / $countLEDs * $briF + 0.5 ) );
+
+                                # temp. disable event triggers for HUEDevice
+                                if (
+                                    !defined(
+                                        $attr{$dev}{"event-on-change-reading"}
+                                    )
+                                    || $attr{$dev}{"event-on-change-reading"}
+                                    ne "none"
+                                  )
+                                {
+                                    $attr{$dev}{"event-on-change-reading"} =
+                                      "none";
+                                }
+
+                                $hash->{helper}{ambiHueColor} = "$h$s$b";
+
+                                # switch HUE to color
+                                if ( $b ne "00" ) {
+                                    fhem(
+"set $dev transitiontime 1 : noUpdate : hsv $h$s$b"
+                                    );
+                                }
+
+                                # switch HUE off if brightness is 0
+                                else {
+                                    fhem(
+"set $dev transitiontime 0 : noUpdate : off"
+                                    );
+                                }
+
                             }
                         }
                     }
 
-                    my $latency =
-                      ( $attr{$name}{ambiHueLatency} )
-                      ? $attr{$name}{ambiHueLatency} / 100
-                      : 0.2;
-                    fhem("sleep $latency");
+                    $hash->{helper}{ambiHueDelay} =
+                      int(
+                        ( gettimeofday() - $param->{timestamp} ) * 1000 + 0.5 );
+
                     PHTV_SendCommand( $hash, "ambilight/processed" );
                 }
 
@@ -2201,6 +2394,8 @@ sub PHTV_ReceiveCommand($$$) {
                         && !defined( $attr{$name}{ambiHueBottom} ) )
                   )
                 {
+                    delete $hash->{helper}{ambiHueDelay};
+                    delete $hash->{helper}{ambiHueColor};
 
                     readingsBulkUpdate( $hash, "ambiHue", "off" )
                       if ( $hash->{READINGS}{ambiHue}{VAL} ne "off" );
@@ -2567,6 +2762,20 @@ sub PHTV_isinteger {
 }
 
 ###################################
+sub PHTV_bri2pct($) {
+    my ($bri) = @_;
+    return 0 if ( $bri <= 0 );
+    return int( $bri / 255 * 100 + 0.5 );
+}
+
+###################################
+sub PHTV_pct2bri($) {
+    my ($pct) = @_;
+    return 0 if ( $pct <= 0 );
+    return int( $pct / 100 * 255 + 0.5 );
+}
+
+###################################
 sub PHTV_hex2rgb($) {
     my ($hex) = @_;
     if ( uc($hex) =~ /^(..)(..)(..)$/ ) {
@@ -2590,16 +2799,16 @@ sub PHTV_rgb2hex($$$) {
 }
 
 ###################################
-sub PHTV_hex2hsv($;$) {
+sub PHTV_hex2hsb($;$) {
     my ( $hex, $type ) = @_;
     $type = lc($type) if ( defined( ($type) && $type ne "" ) );
     my $rgb = PHTV_hex2rgb($hex);
-    my $return = PHTV_rgb2hsv( $rgb->{r}, $rgb->{g}, $rgb->{b} );
+    my $return = PHTV_rgb2hsb( $rgb->{r}, $rgb->{g}, $rgb->{b} );
 
     if ( defined($type) ) {
         return $return->{h} if ( $type eq "h" );
         return $return->{s} if ( $type eq "s" );
-        return $return->{v} if ( $type eq "v" );
+        return $return->{b} if ( $type eq "b" );
     }
     else {
         return $return;
@@ -2607,113 +2816,136 @@ sub PHTV_hex2hsv($;$) {
 }
 
 ###################################
-sub PHTV_bri2pct($) {
-    my ($bri) = @_;
-    return 0 if ( $bri <= 0 );
-    return int( ( $bri / 255 * 100 ) + 0.5 );
-}
-
-###################################
-sub PHTV_pct2bri($) {
-    my ($pct) = @_;
-    return 0 if ( $pct <= 0 );
-    return int( ( $pct / 100 * 255 ) + 0.5 );
-}
-
-###################################
-sub PHTV_hsv2hex($$$) {
-    my ( $h, $s, $v ) = @_;
-    my $rgb = PHTV_hsv2rgb( $h, $s, $v );
+sub PHTV_hsb2hex($$$) {
+    my ( $h, $s, $b ) = @_;
+    my $rgb = PHTV_hsb2rgb( $h, $s, $b );
     return PHTV_rgb2hex( $rgb->{r}, $rgb->{g}, $rgb->{b} );
 }
 
 ###################################
-sub PHTV_rgb2hsv($$$;$) {
-    my ( $r, $g, $b, $type ) = @_;
-    $type = lc($type) if ( defined( ($type) && $type ne "" ) );
-    my ( $M, $m, $C, $H, $S, $V );
+sub PHTV_rgb2hsb ($$$) {
+    my ( $r, $g, $b ) = @_;
+
+    my $r2 = $r / 255.0;
+    my $g2 = $g / 255.0;
+    my $b2 = $b / 255.0;
+
+    my $hsv = PHTV_rgb2hsv( $r2, $g2, $b2 );
+    my $h   = int( $hsv->{h} * 65535 );
+    my $s   = int( $hsv->{s} * 255 );
+    my $bri = int( $hsv->{v} * 255 );
+
+    Log3 undef, 5, "PHTV rgb2hsb: $r $g $b > $h $s $bri";
+
+    return { "h" => $h, "s" => $s, "b" => $bri };
+}
+
+###################################
+sub PHTV_hsb2rgb ($$$) {
+    my ( $h, $s, $bri ) = @_;
+
+    my $h2   = $h / 65535.0;
+    my $s2   = $s / 255.0;
+    my $bri2 = $bri / 255.0;
+
+    my $rgb = PHTV_hsv2rgb( $h2, $s2, $bri2 );
+    my $r   = int( $rgb->{r} * 255 );
+    my $g   = int( $rgb->{g} * 255 );
+    my $b   = int( $rgb->{b} * 255 );
+
+    Log3 undef, 5, "PHTV hsb2rgb: $h $s $bri > $r $g $b";
+
+    return { "r" => $r, "g" => $g, "b" => $b };
+}
+
+###################################
+sub PHTV_rgb2hsv($$$) {
+    my ( $r, $g, $b ) = @_;
+    my ( $M, $m, $c, $h, $s, $v );
 
     $M = PHTV_max( $r, $g, $b );
     $m = PHTV_min( $r, $g, $b );
-    $C = ( $M - $m ) if ( $M > 0 || $m > 0 );
-    $C = 0 if ( $M == 0 && $m == 0 );
+    $c = $M - $m;
 
-    if ( $C == 0 ) {
-        $H = 0;
-        $S = 0;
+    if ( $c == 0 ) {
+        $h = 0;
+    }
+    elsif ( $M == $r ) {
+        $h = ( 60 * ( ( $g - $b ) / $c ) % 360 ) / 360;
+    }
+    elsif ( $M == $g ) {
+        $h = ( 60 * ( ( $b - $r ) / $c ) + 120 ) / 360;
+    }
+    elsif ( $M == $b ) {
+        $h = ( 60 * ( ( $r - $g ) / $c ) + 240 ) / 360;
+    }
+
+    if ( $M == 0 ) {
+        $s = 0;
     }
     else {
-        if ( $r == $M ) {
-            $H = ( $g - $b ) / $C;
-            $H += 6.0
-              if ( $H < 0.0 );
-        }
-        elsif ( $g == $M ) {
-            $H = ( ( $b - $r ) / $C ) + 2.0;
-        }
-        elsif ( $b == $M ) {
-            $H = ( ( $r - $g ) / $C ) + 4.0;
-        }
-
-        $H *= 60.0;
-        $S = $C / $M;
+        $s = $c / $M;
     }
+    $v = $M;
 
-    $V = $M;
+    Log3 undef, 5, "PHTV rgb2hsv: $r $g $b > $h $s $v";
 
-    Log3 undef, 5, "PHTV rgb2hsv: $r $g $b > $H $S $V";
-
-    if ( defined($type) ) {
-        return $H if ( $type eq "h" );
-        return $S if ( $type eq "s" );
-        return $V if ( $type eq "v" );
-    }
-    else {
-        return { "h" => $H, "s" => $S, "v" => $V };
-    }
+    return { "h" => $h, "s" => $s, "v" => $v };
 }
 
 ###################################
 sub PHTV_hsv2rgb($$$) {
-    my ( $H, $S, $V ) = @_;
-    my ( $r, $g, $b, $C, $Hdash, $X, $m );
+    my ( $h, $s, $v ) = @_;
+    my $r = 0.0;
+    my $g = 0.0;
+    my $b = 0.0;
 
-    $C     = $S * $V;
-    $Hdash = $H / 60.0;
-    $X     = $C * ( 1.0 - int( ( $Hdash % 2.0 ) - 1.0 ) );
+    if ( $s == 0 ) {
+        $r = $v;
+        $g = $v;
+        $b = $v;
+    }
+    else {
+        my $i = int( $h * 6.0 );
+        my $f = ( $h * 6.0 ) - $i;
+        my $p = $v * ( 1.0 - $s );
+        my $q = $v * ( 1.0 - $s * $f );
+        my $t = $v * ( 1.0 - $s * ( 1.0 - $f ) );
+        $i = $i % 6;
 
-    if ( $Hdash < 1.0 ) {
-        $r = $C;
-        $g = $X;
-    }
-    elsif ( $Hdash < 2.0 ) {
-        $r = $X;
-        $g = $C;
-    }
-    elsif ( $Hdash < 3.0 ) {
-        $g = $C;
-        $b = $X;
-    }
-    elsif ( $Hdash < 4.0 ) {
-        $g = $X;
-        $b = $C;
-    }
-    elsif ( $Hdash < 5.0 ) {
-        $r = $X;
-        $b = $C;
-    }
-    elsif ( $Hdash <= 6.0 ) {
-        $r = $C;
-        $b = $X;
+        if ( $i == 0 ) {
+            $r = $v;
+            $g = $t;
+            $b = $p;
+        }
+        elsif ( $i == 1 ) {
+            $r = $q;
+            $g = $v;
+            $b = $p;
+        }
+        elsif ( $i == 2 ) {
+            $r = $p;
+            $g = $v;
+            $b = $t;
+        }
+        elsif ( $i == 3 ) {
+            $r = $p;
+            $g = $q;
+            $b = $v;
+        }
+        elsif ( $i == 4 ) {
+            $r = $t;
+            $g = $p;
+            $b = $v;
+        }
+        elsif ( $i == 5 ) {
+            $r = $v;
+            $g = $p;
+            $b = $q;
+        }
     }
 
-    $m = $V - $C;
-
-    $r += $m;
-    $g += $m;
-    $b += $m;
-
-    Log3 undef, 5, "PHTV hsv2rgb: $H $S $V > $r $g $b";
+    Log3 undef, 5, "PHTV hsv2rgb: $h $s $v > $r $g $b";
 
     return { "r" => $r, "g" => $g, "b" => $b };
 }
@@ -2722,7 +2954,8 @@ sub PHTV_hsv2rgb($$$) {
 sub PHTV_max {
     my ( $max, @vars ) = @_;
     for (@vars) {
-        $max = $_ if $_ > $max;
+        $max = $_
+          if $_ > $max;
     }
     return $max;
 }
@@ -2792,6 +3025,9 @@ sub PHTV_min {
       <li><b>ambiMode</b> internal,manual,expert &nbsp;&nbsp;-&nbsp;&nbsp; set source register for Ambilight</li>
       <li><b>ambiPreset</b> &nbsp;&nbsp;-&nbsp;&nbsp; set Ambilight to predefined state</li>
       <li><b>rgb</b> HEX,LED address &nbsp;&nbsp;-&nbsp;&nbsp; set an RGB value for Ambilight</li>
+      <li><b>hue</b> 0-65534 &nbsp;&nbsp;-&nbsp;&nbsp; set the color hue value Ambilight</li>
+      <li><b>sat</b> 0-255 &nbsp;&nbsp;-&nbsp;&nbsp; set the saturation value for Ambilight</li>
+      <li><b>bri</b> 0-255 &nbsp;&nbsp;-&nbsp;&nbsp; set the brightness value for Ambilight</li>
       <li><b>play</b> &nbsp;&nbsp;-&nbsp;&nbsp;  starts/resumes playback</li>
       <li><b>pause</b> &nbsp;&nbsp;-&nbsp;&nbsp;  starts/resumes playback</li>
       <li><b>stop</b> &nbsp;&nbsp;-&nbsp;&nbsp;  stops current playback</li>
@@ -2826,6 +3062,44 @@ sub PHTV_min {
       <br>
       <br>
 
+  <br>
+  <br>
+
+      <div style="margin-left: 2em">
+        <u>Advanced Ambilight+HUE Control</u><br>
+        <br>
+        <div style="margin-left: 2em">
+          Linking to your HUE devices within attributes ambiHueLeft, ambiHueTop, ambiHueRight and ambiHueBottom uses some defaults to calculate the actual color.<br>
+          The following settings can be fine tuned:<br>
+          <br>
+          <li>LED(s) to be used as color source<br>
+          either 1 single LED or a few in a raw like 2-4. Defaults to use the middle LED and it's left and right partners. Counter starts at 1. See readings ambiLED* for how many LED's your TV has.</li>
+          <li>saturation in percent of the original value (1-99, default=100)</li>
+          <li>brightness in percent of the original value (1-99, default=100)</li>
+          <br><br>
+          Use the following addressing format for fine tuning:<br>
+          <code>devicename:&lt;LEDs$gt;&lt;saturation$gt;&lt;brightness$gt;</code>
+          <br><br>
+          <u>Examples:</u><br>
+          <div style="margin-left: 2em">
+            <code># to use only LED 4 from the top as source
+            attr PhilipsTV ambiHueTop HUEDevice0:4<br><br>
+            # to use a combination of LED's 1+2 as source
+            attr PhilipsTV ambiHueTop HUEDevice0:1-2<br><br>
+            # to use LED's 1+2 and only 90% of their saturation
+            attr PhilipsTV ambiHueTop HUEDevice0:1-2:90<br><br>
+            # to use LED's 1+2 and only 50% of their brightness
+            attr PhilipsTV ambiHueTop HUEDevice0:1-2::50<br><br>
+            # to use LED's 1+2, 90% saturation and 50% brightness
+            attr PhilipsTV ambiHueTop HUEDevice0:1-2:90:50
+            # to use default LED settings but only adjust their brightness to 50%
+            attr PhilipsTV ambiHueTop HUEDevice0:::50</code>
+          </div><br>
+        </div>
+      </div>
+      <br>
+      <br>
+
   <a name="PHTVget"></a>
   <b>Get</b>
   <ul>
@@ -2847,11 +3121,10 @@ sub PHTV_min {
   <a name="PHTVattr"></a>
   <b>Attributes</b><br>
   <ul><ul>
-    <li><b>ambiHueLeft</b> - HUE devices that should get the color from left Ambilight. Add ":0"-":x" if you would like to use a specific LED as color reference</li>
-    <li><b>ambiHueTop</b> - HUE devices that should get the color from top Ambilight. Add ":0"-":x" if you would like to use a specific LED as color reference</li>
-    <li><b>ambiHueRight</b> - HUE devices that should get the color from right Ambilight. Add ":0"-":x" if you would like to use a specific LED as color reference</li>
-    <li><b>ambiHueBottom</b> - HUE devices that should get the color from bottom Ambilight. Add ":0"-":x" if you would like to use a specific LED as color reference</li>
-    <li><b>ambiHueLatency</b> - Controls the update interval for HUE devices in milliseconds; defaults to 200 ms. Note: This has huge impact on the performance of your FHEM installation!</li>
+    <li><b>ambiHueLeft</b> - HUE devices that should get the color from left Ambilight.</li>
+    <li><b>ambiHueTop</b> - HUE devices that should get the color from top Ambilight.</li>
+    <li><b>ambiHueRight</b> - HUE devices that should get the color from right Ambilight.</li>
+    <li><b>ambiHueBottom</b> - HUE devices that should get the color from bottom Ambilight.</li>
     <li><b>disable</b> - Disable polling (true/false)</li>
     <li><b>inputs</b> - Presents the inputs read from device. Inputs can be renamed by adding <code>,NewName</code> right after the original name.</li>
     <li><b>timeout</b> - Set different polling timeout in seconds (default=7)</li>
