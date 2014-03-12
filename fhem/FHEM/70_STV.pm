@@ -98,7 +98,7 @@ sub STV_Define($$)
                     "TOOLS POWEROFF CHUP CHDOWN CONTENTS W_LINK ".
                     "RSS MTS SRS CAPTION TOPMENU SLEEP ESAVING ".
                     "PLAY PAUSE REWIND FF REC STOP ".
-                    "TV HDMI PIP_ONOFF ASPECT"; 
+                    "TV HDMI PIP_ONOFF ASPECT EXT20"; 
 	my $system = $^O;
 	if($system =~ m/Win/) {
 		$result = `ipconfig /all`;
