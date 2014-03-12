@@ -885,6 +885,7 @@ $culHmRegModel{"KS550"}               = $culHmRegModel{"HM-WDS100-C6-O"};
 $culHmRegModel{"KS550TECH"}           = $culHmRegModel{"HM-WDS100-C6-O"};
 $culHmRegModel{"KS550LC"}             = $culHmRegModel{"HM-WDS100-C6-O"};
 $culHmRegModel{"KS888"}               = $culHmRegModel{"HM-WDS100-C6-O"};
+$culHmRegModel{"HM-SEC-SC-2"}         = $culHmRegModel{"HM-SEC-SC"};
 
 $culHmRegModel{"HM-LC-Dim1L-Pl-2"}    = $culHmRegModel{"HM-LC-Dim1L-Pl"};#rf_d
 $culHmRegModel{"HM-LC-Dim1L-CV"}      = $culHmRegModel{"HM-LC-Dim1L-Pl"};
