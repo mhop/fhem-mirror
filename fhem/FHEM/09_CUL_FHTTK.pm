@@ -148,17 +148,20 @@ CUL_FHTTK_Set($@)
   
   my $name = shift(@a);
   
-  # return here to supress set at cul_fhttk devices
+  # suppress SET option
   if(defined($attr{$name}) && defined($attr{$name}{"model"})) {
 	if($attr{$name}{"model"} ne "dummy") {
 		return $ret
 	}
   }
-    
+  else {
+	return $ret;
+  }  
+  
   my $opt = shift @a;
   my $value = join("", @a);
   
-  Log3 $name, 5, "$name $opt a ist $a[0] und $a[1] und value: $value";
+  Log3 $name, 5, "$name option: $opt and value: $value";
   
   if(!defined($fhttfk_c2b{$opt})) {
 		my @cList = keys %fhttfk_c2b;
