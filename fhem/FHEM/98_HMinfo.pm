@@ -203,16 +203,18 @@ sub HMinfo_peerCheck(@) { #####################################################
           $_ =~ s/04$/05/;  # have to compare with clima_team, not clima
           $cId =~ s/05$/04/;# will find 04 in peerlist, not 05
         }
-        my $pDiD = substr($_,0,6) if (substr($_,6,2) eq "01");
+        my $pDid = substr($_,0,6);
         if (!$modules{CUL_HM}{defptr}{$_} && 
-            ($pDiD && !$modules{CUL_HM}{defptr}{$pDiD})){
+            (!$pDid || !$modules{CUL_HM}{defptr}{$pDid})){
+          next if($pDid && CUL_HM_id2IoId($id) eq $pDid);
           push @peerIDnotDef,$eName." id:".$_;
         }
         else{
           my $pName = CUL_HM_id2Name($_);
-          $pName =~s/_chn:01//;           #channel 01 could be covered by device
+          $pName =~s/_chn:01//;           #chan 01 could be covered by device
           my $pPlist = AttrVal($pName,"peerIDs","");
-          push @peerIDsNoPeer,$eName." p:".$pName if (!$pPlist || $pPlist !~ m/$cId/);
+          push @peerIDsNoPeer,$eName." p:".$pName 
+                if (!$pPlist || $pPlist !~ m/$cId/);
         }
       }
     }
@@ -760,14 +762,23 @@ sub HMinfo_GetFn($@) {#########################################################
     my @peerPairs;
     foreach my $dName (HMinfo_getEntities($opt,$filter)){
       my $peerIDs = AttrVal($dName,"peerIDs",undef);
+      my $dId = unpack 'A6',CUL_HM_name2Id($dName);
+      my @pl = ();
+      my @fheml = ();
       foreach (split",",$peerIDs){
         next if ($_ eq "00000000");
-        my $pName = CUL_HM_id2Name($_);
-        my $pPlist = AttrVal($pName,"peerIDs","");
-        $pName =~ s/$dName\_chn:/self/;
-        push @peerPairs,$dName." =>".$pName;
+        my $pn = CUL_HM_peerChName($_,$dId);
+        push @pl,$pn;
+        push @fheml,$pn.";".$dName if ($pn =~ m/^fhem/);
       }
-    }
+      push @peerPairs,$dName." => ".join(", ",(sort @pl)) if (@pl);
+      my %fChn;
+      foreach (sort @fheml){
+        my ($fhemCh,undef,$p)= unpack 'A6A1A*',$_;
+        $fChn{$fhemCh} => ($fChn{$fhemCh}?$fChn{$fhemCh}.", ":"").$p;
+      }
+      push @peerPairs,map {"$_ => $fChn{$_}"}sort keys %fChn;
+   }
     $ret = $cmd." done:" ."\n x-ref list"  ."\n    ".(join "\n    ",sort @peerPairs)
                          ;
   }
@@ -906,7 +917,6 @@ sub HMinfo_GetFn($@) {#########################################################
   }
   return $ret;
 }
-
 sub HMinfo_SetFn($@) {#########################################################
   my ($hash,$name,$cmd,@a) = @_;
   my @in = @a;
@@ -1027,6 +1037,7 @@ sub HMinfo_SetFn($@) {#########################################################
   }
   return $ret;
 }
+
 sub HMInfo_help(){
   return    " Unknown argument choose one of "
            ."\n ---checks---"

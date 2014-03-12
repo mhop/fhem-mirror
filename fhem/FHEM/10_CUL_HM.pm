@@ -4875,7 +4875,7 @@ sub CUL_HM_ID2PeerList ($$$) {
     }
  }
 }
-sub CUL_HM_peerChId($$) {# in:<IDorName> <deviceID> <ioID>, out:channelID
+sub CUL_HM_peerChId($$) {# in:<IDorName> <deviceID>, out:channelID
   my($pId,$dId)=@_;
   my $iId = CUL_HM_id2IoId($dId);
   my ($pSc,$pScNo) = unpack 'A4A*',$pId; #helper for shortcut spread
@@ -4886,7 +4886,7 @@ sub CUL_HM_peerChId($$) {# in:<IDorName> <deviceID> <ioID>, out:channelID
   return "" if (length($p)<8);
   return substr(CUL_HM_name2Id($pId).'01',0,8);# default chan is 01
 }
-sub CUL_HM_peerChName($$) {#in:<IDorName> <deviceID> <ioID>, out:name
+sub CUL_HM_peerChName($$) {#in:<IDorName> <deviceID>, out:name
   my($pId,$dId)=@_;
   my $iId = CUL_HM_id2IoId($dId);
   my($pDev,$pChn) = unpack'A6A2',$pId;
