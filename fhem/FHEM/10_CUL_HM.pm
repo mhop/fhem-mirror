@@ -1493,7 +1493,8 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"power:"    .$P];    
       push @evtEt,[$shash,1,"current:"  .$I];    
       push @evtEt,[$shash,1,"voltage:"  .$U];    
-      push @evtEt,[$shash,1,"frequency:".$F];    
+      push @evtEt,[$shash,1,"frequency:".$F];
+      push @evtEt,[$shash,1,"eState:E: $eCnt P: $P I: $I U: $U f: $F"];    
       push @evtEt,[$shash,1,"boot:"     .(($eCnt&0x800000)?"on":"off")];
       
       push @evtEt,[$defs{$devHash->{channel_02}},1,"state:$eCnt"] if ($devHash->{channel_02});
@@ -1873,7 +1874,7 @@ sub CUL_HM_Parse($$) {#########################################################
   #------------ process events ------------------
   push @evtEt,[$shash,1,"noReceiver:src:$src ".$mFlg.$mTp." $p"] 
         if(!@entities && !@evtEt);
-  
+
   push @entities,CUL_HM_pushEvnts();
 
   @entities = CUL_HM_noDup(@entities,$shash->{NAME});
@@ -4881,6 +4882,8 @@ sub CUL_HM_peerChId($$) {# in:<IDorName> <deviceID> <ioID>, out:channelID
   return $dId.sprintf("%02X",'0'.$pScNo) if ($pSc eq 'self');
   return $iId.sprintf("%02X",'0'.$pScNo) if ($pSc eq 'fhem');
   return "all"                           if ($pId eq 'all');#used by getRegList
+  my $p = CUL_HM_name2Id($pId).'01';
+  return "" if (length($p)<8);
   return substr(CUL_HM_name2Id($pId).'01',0,8);# default chan is 01
 }
 sub CUL_HM_peerChName($$) {#in:<IDorName> <deviceID> <ioID>, out:name
@@ -5176,7 +5179,7 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   my $convFlg = "";# confirmation flag - indicates data not confirmed by device
   for (my $size2go = $size;$size2go>0;$size2go -=8){
     my $addrS = sprintf("%02X",$addr);
-    my ($dReadS,$dReadR) = (undef,"");
+    my ($dReadS,$dReadR) = (undef,"");  
     $dReadS = $1 if( $sRL =~ m/$addrS:(..)/);
     $dReadR = $1 if( $rRL =~ m/$addrS:(..)/);
     my $dRead = $dReadR;

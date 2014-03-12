@@ -996,9 +996,9 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
 
     <a name="HMLANattr"><b>Attributes</b></a>
     <ul>
-        <li><a href="#do_not_notify">do_not_notify</a></li><br>
-        <li><a href="#attrdummy">dummy</a></li><br>
-        <li><a href="#addvaltrigger">addvaltrigger</a></li><br>
+        <li><a href="#addvaltrigger">addvaltrigger</a></li>
+        <li><a href="#do_not_notify">do_not_notify</a></li>
+        <li><a href="#attrdummy">dummy</a></li>
         <li><a href="#HMLANlogIDs">logIDs</a><br>
            enables selective logging of HMLAN messages. A list of HMIds or names can be
            entered, comma separated, which shall be logged.<br>
@@ -1017,33 +1017,33 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
             hmMsgLowLimit allowes to reduce this level further.<br>
             Note that HMLAN transmitt-level calculation is based on some estimations and
             has some tolerance. <br>
-            </li><br>
-        <li><a href="#hmId">hmId</a></li><br>
-        <li><a name="HMLANhmKey">hmKey</a></li><br>
-        <li><a name="HMLANhmKey2">hmKey2</a></li><br>
-        <li><a name="HMLANhmKey3">hmKey3</a></li><br>
-        <li><a name="HMLANhmKey4">hmKey4</a></li><br>
+            </li>
+        <li><a href="#hmId">hmId</a></li>
+        <li><a name="HMLANhmKey">hmKey</a></li>
+        <li><a name="HMLANhmKey2">hmKey2</a></li>
+        <li><a name="HMLANhmKey3">hmKey3</a></li>
+        <li><a name="HMLANhmKey4">hmKey4</a></li>
         <li><a name="HMLANhmKey5">hmKey5</a><br>
-        AES keys for the HMLAN adapter. <br>
-        The key is converted to a hash. If a hash is given directly it is not converted but taken directly.
-        Therefore the original key cannot be converted back<br>
+            AES keys for the HMLAN adapter. <br>
+            The key is converted to a hash. If a hash is given directly it is not converted but taken directly.
+            Therefore the original key cannot be converted back<br>
         </li>
         <li><a href="#hmProtocolEvents">hmProtocolEvents</a></li><br>
         <li><a name="HMLANrespTime">respTime</a><br>
-        Define max response time of the HMLAN adapter in seconds. Default is 1 sec.<br/>
-        Longer times may be used as workaround in slow/instable systems or LAN configurations.</li>
+            Define max response time of the HMLAN adapter in seconds. Default is 1 sec.<br/>
+            Longer times may be used as workaround in slow/instable systems or LAN configurations.</li>
         <li><a name="HMLAN#wdTimer">wdTimer</a><br>
-        Time in sec to trigger HMLAN. Values between 5 and 25 are allowed, 25 is default.<br>
-        It is <B>not recommended</B> to change this timer. If problems are detected with <br>
-        HLMLAN disconnection it is advisable to resolve the root-cause of the problem and not symptoms.</li>
+            Time in sec to trigger HMLAN. Values between 5 and 25 are allowed, 25 is default.<br>
+            It is <B>not recommended</B> to change this timer. If problems are detected with <br>
+            HLMLAN disconnection it is advisable to resolve the root-cause of the problem and not symptoms.</li>
         <li><a name="HMLANhmLanQlen">hmLanQlen</a><br>
-        defines queuelength of HMLAN interface. This is therefore the number of
-        simultanously send messages. increasing values may cause higher transmission speed.
-        It may also cause retransmissions up to data loss.<br>
-        Effects can be observed by watching protocol events<br>
-        1 - is a conservatibe value, and is default<br>
-        5 - is critical length, likely cause message loss</li>
-    </ul>
+            defines queuelength of HMLAN interface. This is therefore the number of
+            simultanously send messages. increasing values may cause higher transmission speed.
+            It may also cause retransmissions up to data loss.<br>
+            Effects can be observed by watching protocol events<br>
+            1 - is a conservatibe value, and is default<br>
+            5 - is critical length, likely cause message loss</li>
+    </ul><br>
     <a name="HMLANparameter"><b>parameter</b></a>
     <ul>
       <li><B>assignedIDs</B><br>
@@ -1070,7 +1070,7 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
           calculates the delay of messages in ms from send in HMLAN until processing in FHEM.
           It therefore gives an indication about FHEM system performance.
           </li>
-    </ul>
+    </ul><br>
     <a name="HMLANreadings"><b>parameter and readings</b></a>
     <ul>
       <li><B>prot_disconnect</B>       <br>recent HMLAN disconnect</li>
