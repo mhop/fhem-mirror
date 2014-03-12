@@ -1579,7 +1579,7 @@ my %tpl = (
   ,wmClosed          => {p=>""                 ,t=>"winmatic lock window"     
                     ,reg=>{ OffLevelKm       =>"0"
                     }}
-  ,wmLock          => {p=>""                 ,t=>"winmatic lock window"     
+  ,wmLock            => {p=>""                 ,t=>"winmatic lock window"     
                     ,reg=>{ OffLevelKm       =>"127.5"
                     }}
 );
@@ -1847,7 +1847,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates
             <li>s - sensor   :supress sensor</li>
             <li>e - empty    :include results even if requested fields are empty</li>
         </ul>
-        and/or a filter for <b>names</b>:<br>
+        and/or filter for <b>names</b>:<br>
         <ul>
             <li>-f &lt;filter&gt;  :regexp to filter entity names </li>
         </ul>
@@ -1865,10 +1865,8 @@ sub HMinfo_noDup(@) {#return list with no duplicates
     Just one entity needs to be defined without any parameter.<br>
   </ul>
   <br>
-############################################################
   <a name="HMinfoget"><b>Get</b></a>
   <ul>
-    <ul>
       <li><a name="#HMinfomodels">models</a><br>
           list all HM models that are supported in FHEM
       </li>
@@ -1926,7 +1924,6 @@ sub HMinfo_noDup(@) {#return list with no duplicates
          set hm templateChk BlStopUpLg                               # each entities<br>
         </code></ul>
       </li>
-    </ul>
   </ul>
   <a name="HMinfoset"><b>Set</b></a>
   <ul>
