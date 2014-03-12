@@ -1,7 +1,7 @@
 ##############################################
 # 00_THZ
 # by immi 03/2014
-# v. 0.075
+# v. 0.076
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -69,13 +69,13 @@ my %sets = (
 	"p08FanStageNight"		=> {cmd2=>"0A056D", argMin =>  "0", argMax =>  "3"  },
 	"p09FanStageStandby"		=> {cmd2=>"0A056F", argMin =>  "0", argMax =>  "3"  },
 	"p99FanStageParty"		=> {cmd2=>"0A0570", argMin =>  "0", argMax =>  "3"  },
-	"P75passiveCooling"		=> {cmd2=>"0A0575", argMin =>  "0", argMax =>  "2"  },
-	"P37fanstage1-Airflow-inlet"	=> {cmd2=>"0A0576", argMin =>  "50", argMax =>  "300"},		#zuluft 
-	"P38fanstage2-Airflow-inlet"	=> {cmd2=>"0A0577", argMin =>  "50", argMax =>  "300" },	#zuluft 
-	"P39fanstage3-Airflow-inlet"	=> {cmd2=>"0A0578", argMin =>  "50", argMax =>  "300" },	#zuluft 
-	"P40fanstage1-Airflow-outlet"	=> {cmd2=>"0A0579", argMin =>  "50", argMax =>  "300" },	#abluft extrated
-	"P41fanstage2-Airflow-outlet"	=> {cmd2=>"0A057A", argMin =>  "50", argMax =>  "300" },	#abluft extrated
-	"P42fanstage3-Airflow-outlet"	=> {cmd2=>"0A057B", argMin =>  "50", argMax =>  "300" },	#abluft extrated
+	"p75passiveCooling"		=> {cmd2=>"0A0575", argMin =>  "0", argMax =>  "2"  },
+	"p37fanstage1-Airflow-inlet"	=> {cmd2=>"0A0576", argMin =>  "50", argMax =>  "300"},		#zuluft 
+	"p38fanstage2-Airflow-inlet"	=> {cmd2=>"0A0577", argMin =>  "50", argMax =>  "300" },	#zuluft 
+	"p39fanstage3-Airflow-inlet"	=> {cmd2=>"0A0578", argMin =>  "50", argMax =>  "300" },	#zuluft 
+	"p40fanstage1-Airflow-outlet"	=> {cmd2=>"0A0579", argMin =>  "50", argMax =>  "300" },	#abluft extrated
+	"p41fanstage2-Airflow-outlet"	=> {cmd2=>"0A057A", argMin =>  "50", argMax =>  "300" },	#abluft extrated
+	"p42fanstage3-Airflow-outlet"	=> {cmd2=>"0A057B", argMin =>  "50", argMax =>  "300" },	#abluft extrated
 	"holidayBegin_day"		=> {cmd2=>"0A011B", argMin =>  "1", argMax =>  "31"  }, 
 	"holidayBegin_month"		=> {cmd2=>"0A011C", argMin =>  "1", argMax =>  "12"  },
 	"holidayBegin_year"		=> {cmd2=>"0A011D", argMin =>  "12", argMax => "20"  },
@@ -219,6 +219,8 @@ my %sets = (
 my %gets = (
 #	"hallo"       			=> { },
 #	"debug_read_raw_register_slow"	=> { },
+	"Status_HC1_F4"			=> {cmd2=>"F4"},
+	"Status_HC2_F5"			=> {cmd2=>"F5"},
 	"history"			=> {cmd2=>"09"},
 	"last10errors"			=> {cmd2=>"D1"},
         "allFB"     			=> {cmd2=>"FB"},
@@ -236,13 +238,13 @@ my %gets = (
 	"p08FanStageNight"		=> {cmd2=>"0A056D"},
 	"p09FanStageStandby"		=> {cmd2=>"0A056F"},
 	"p99FanStageParty"		=> {cmd2=>"0A0570"},
-	"P75passiveCooling"		=> {cmd2=>"0A0575"},
-	"P37fanstage1-Airflow-inlet"	=> {cmd2=>"0A0576"},			#zuluft 
-	"P38fanstage2-Airflow-inlet"	=> {cmd2=>"0A0577"},			#zuluft 
-	"P39fanstage3-Airflow-inlet"	=> {cmd2=>"0A0578"},			#zuluft 
-	"P40fanstage1-Airflow-outlet"	=> {cmd2=>"0A0579"},			#abluft extrated
-	"P41fanstage2-Airflow-outlet"	=> {cmd2=>"0A057A"},			#abluft extrated
-	"P42fanstage3-Airflow-outlet"	=> {cmd2=>"0A057B"},			#abluft extrated
+	"p75passiveCooling"		=> {cmd2=>"0A0575"},
+	"p37fanstage1-Airflow-inlet"	=> {cmd2=>"0A0576"},			#zuluft 
+	"p38fanstage2-Airflow-inlet"	=> {cmd2=>"0A0577"},			#zuluft 
+	"p39fanstage3-Airflow-inlet"	=> {cmd2=>"0A0578"},			#zuluft 
+	"p40fanstage1-Airflow-outlet"	=> {cmd2=>"0A0579"},			#abluft extrated
+	"p41fanstage2-Airflow-outlet"	=> {cmd2=>"0A057A"},			#abluft extrated
+	"p42fanstage3-Airflow-outlet"	=> {cmd2=>"0A057B"},			#abluft extrated
 	"holidayBegin_day"		=> {cmd2=>"0A011B"}, 
 	"holidayBegin_month"		=> {cmd2=>"0A011C"},
 	"holidayBegin_year"		=> {cmd2=>"0A011D"},
@@ -916,27 +918,44 @@ sub THZ_Parse($) {
       else 				 {$message = hex2int(substr($message, 8,4))/10 ." °C"  }
   }
   when ("F4")    {                     #allF4
-    $message = 	 
+    $message =
+		"outside_temp: " 		. hex2int(substr($message, 4,4))/10 . " " .
         	"x08: " 			. hex2int(substr($message, 8,4))/10 . " " .
-        	"x12: "				. hex2int(substr($message,12,4))/10 . " " .
-        	"x16: "				. hex2int(substr($message,16,4))/10 . " " .
-        	"x20: " 			. hex2int(substr($message,20,4))/10 . " " .
-        	"x24: "				. hex2int(substr($message,24,4))/10 . " " .
-		"x28: "				. hex2int(substr($message,28,4))/10 . " " .
+        	"return_temp: "			. hex2int(substr($message,12,4))/10 . " " .
+        	"integral_heat: "		. hex2int(substr($message,16,4))    . " " .
+        	"flow_temp: " 			. hex2int(substr($message,20,4))/10 . " " .
+        	"heat-set_temp: "		. hex2int(substr($message,24,4))/10 . " " . #soll HC1
+		"heat-actual_temp: "		. hex2int(substr($message,28,4))/10 . " " . #ist
         	"x32: "				. hex2int(substr($message,32,4))/10 . " " .
         	"x36: "				. hex2int(substr($message,36,4))/10 . " " .
         	"x40: "				. hex2int(substr($message,40,4))/10 . " " .
-		"x44: "				. hex2int(substr($message,44,4))/10 . " " .
+		"integral_switch: "		. hex2int(substr($message,44,4))    . " " .
 		"x48: " 			. hex2int(substr($message,48,4))/10 . " " .
         	"x52: "				. hex2int(substr($message,52,4))/10 . " " .
-        	"x56: "				. hex2int(substr($message,56,4))/10 . " " .
+        	"room-set-temp: "		. hex2int(substr($message,56,4))/10 . " " .
         	"x60: " 			. hex2int(substr($message,60,4))/10 . " " .
         	"x64: "				. hex2int(substr($message,64,4))/10 . " " .
 		"x68: "				. hex2int(substr($message,68,4))/10 . " " .
         	"x72: "				. hex2int(substr($message,72,4))/10 . " " .
         	"x76: "				. hex2int(substr($message,76,4))/10 . " " .
         	"x80: "				. hex2int(substr($message,80,4))/10 ;
-        	 }
+  }
+  when ("F5")    {                     #allF5
+    $message =
+		"outside_temp: " 		. hex2int(substr($message, 4,4))/10 . " " .
+        	"x08: " 			. hex2int(substr($message, 8,4))/10 . " " .
+        	"return_temp: "			. hex2int(substr($message,12,4))/10 . " " .
+        	"integral_heat: "		. hex2int(substr($message,16,4))    . " " .
+        	"flow_temp: " 			. hex2int(substr($message,20,4))/10 . " " .
+        	"heat-set_temp: "		. hex2int(substr($message,24,4))/10 . " " . #soll HC2
+		"heat-actual_temp: "		. hex2int(substr($message,28,4))/10 . " " . #ist
+        	"x32: "				. hex2int(substr($message,32,4))/10 . " " .
+        	"x36: "				. hex2int(substr($message,36,4))/10 . " " .
+        	"x40: "				. hex2int(substr($message,40,4))/10 . " " .
+		"integral_switch: "		. hex2int(substr($message,44,4))    . " " .
+		"x48: " 			. hex2int(substr($message,48,4))/10 . " " .
+        	"x52: "				. hex2int(substr($message,52,4))/10;
+  }
   when ("FD")    {                     #firmware_ver
     $message = "version: " . hex(substr($message,4,4))/100 ;
   }
@@ -1011,9 +1030,9 @@ sub THZ_Parse($) {
                   "fault2TIME: "		. sprintf(join(':', split("\\.", hex(substr($message, 38,2) . substr($message, 36,2))/100)))   . " " .
                   "fault2DATE: "		. (hex(substr($message, 42,2) . substr($message, 40,2))/100) . " " .
 		
-		  "fault2CODE: "		. hex(substr($message, 44,2))    . " " .
-                  "fault2TIME: "		. sprintf(join(':', split("\\.", hex(substr($message, 50,2) . substr($message, 48,2))/100)))   . " " .
-                  "fault2DATE: "		. (hex(substr($message, 54,2) . substr($message, 52,2))/100)  ;			
+		  "fault3CODE: "		. hex(substr($message, 44,2))    . " " .
+                  "fault3TIME: "		. sprintf(join(':', split("\\.", hex(substr($message, 50,2) . substr($message, 48,2))/100)))   . " " .
+                  "fault3DATE: "		. (hex(substr($message, 54,2) . substr($message, 52,2))/100)  ;			
   }    
   }
   return (undef, $message);
