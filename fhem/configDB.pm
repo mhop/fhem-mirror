@@ -169,6 +169,17 @@ sub cfgDB_GlobalAttr {
 		$line[3] =~ s/ .*$//;
 		$attr{global}{$line[2]} = $line[3];
 	}
+
+	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = 'configdb'" );  
+	$sth->execute();
+
+	while (@line = $sth->fetchrow_array()) {
+		$row = "$line[0] $line[1] $line[2] $line[3]";
+		$line[3] =~ s/#.*//;
+		$line[3] =~ s/ .*$//;
+		$attr{configdb}{$line[2]} = $line[3];
+	}
+
 	$fhem_dbh->disconnect();
 	return;
 }
@@ -233,7 +244,14 @@ sub cfgDB_SaveCfg {
 			push @rowList, "attr $d $a $val";
 		}
 	}
-	
+
+		foreach my $a (sort keys %{$attr{configdb}}) {
+			my $val = $attr{configdb}{$a};
+			$val =~ s/;/;;/g;
+			$val =~ s/\n/\\\n/g;
+			push @rowList, "attr configdb $a $val";
+		}
+
 # Insert @rowList into database table
 	my $fhem_dbh = _cfgDB_Connect;
 	my $uuid = _cfgDB_Rotate($fhem_dbh);
@@ -400,32 +418,34 @@ sub _cfgDB_Uuid{
 	return $uuid;
 }
 
-sub _cfgDB_backupdata {
-	my (undef, $cfgDB_dblocation) = split(/=/,$cfgDB_dbconn);
-	return ($cfgDB_dbtype,$cfgDB_dblocation);
-}
-
 ##################################################
-# Tools / Additional functions
+# Additional backend functions
 # not called from fhem.pl directly
 #
 
 # migrate existing fhem config into database
-sub cfgDB_Migrate {
+sub _cfgDB_Migrate {
+	my $ret;
+	$ret = "Starting migration...\n";
 	Log3('configDB',4,'Starting migration.');
+	$ret .= "Processing: database initialization.\n";
 	Log3('configDB',4,'Processing: cfgDB_Init.');
 	cfgDB_Init;
+	$ret .= "Processing: save config.\n";
 	Log3('configDB',4,'Processing: cfgDB_SaveCfg.');
 	cfgDB_SaveCfg;
+	$ret .= "Processing: save state.\n";
 	Log3('configDB',4,'Processing: cfgDB_SaveState.');
 	cfgDB_SaveState;
+	$ret .= "Migration completed.\n\n";
 	Log3('configDB',4,'Migration finished.');
-	return " Result after migration:\n".cfgDB_Info;
+	$ret .= _cfgDB_Info;
+	return $ret;
 
 }
 
 # show database statistics
-sub cfgDB_Info {
+sub _cfgDB_Info {
 	my ($l, @r);
 	for my $i (1..65){ $l .= '-';}
 #	$l .= "\n";
@@ -435,8 +455,8 @@ sub cfgDB_Info {
 	push @r, " ".cfgDB_svnId;
 	push @r, $l;
 	push @r, " dbconn: $cfgDB_dbconn";
-	push @r, " dbuser: $cfgDB_dbuser" if !$attr{configDB}{private};
-	push @r, " dbpass: $cfgDB_dbpass" if !$attr{configDB}{private};
+	push @r, " dbuser: $cfgDB_dbuser" if !$attr{configdb}{private};
+	push @r, " dbpass: $cfgDB_dbpass" if !$attr{configdb}{private};
 	push @r, " dbtype: $cfgDB_dbtype";
 	push @r, " Unknown dbmodel type in configuration file." if $dbtype eq 'unknown';
 	push @r, " Only Mysql, Postgresql, SQLite are fully supported." if $dbtype eq 'unknown';
@@ -482,7 +502,7 @@ sub cfgDB_Info {
 }
 
 # recover former config from database archive
-sub cfgDB_Recover($) {
+sub _cfgDB_Recover($) {
 	my ($version) = @_;
 	my ($cmd, $count, $ret);
 
@@ -525,7 +545,7 @@ sub cfgDB_Recover($) {
 }
 
 # delete old configurations
-sub cfgDB_Reorg(;$) {
+sub _cfgDB_Reorg(;$) {
 	my ($lastversion) = @_;
 	$lastversion = ($lastversion > 0) ? $lastversion : 3;
 	Log3('configDB', 4, "DB Reorg started, keeping last $lastversion versions.");
@@ -534,11 +554,11 @@ sub cfgDB_Reorg(;$) {
 	$fhem_dbh->do("delete from fhemversions where version > $lastversion");
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
-	return " Result after database reorg:\n".cfgDB_Info;
+	return " Result after database reorg:\n"._cfgDB_Info;
 }
 
 # list device(s) from given version
-sub cfgDB_List(;$$) {
+sub _cfgDB_List(;$$) {
 	my ($search,$searchversion) = @_;
 	$search = $search ? $search : "%";
 	$searchversion = $searchversion ? $searchversion : 0;
@@ -560,7 +580,7 @@ sub cfgDB_List(;$$) {
 }
 
 # called from cfgDB_Diff
-sub _cfgDB_Diff($$$) {
+sub __cfgDB_Diff($$$) {
 	my ($fhem_dbh,$search,$searchversion) = @_;
 	my ($sql, $sth, @line, $ret);
 	$sql =	"SELECT command, device, p1, p2 FROM fhemconfig as c join fhemversions as v ON v.versionuuid=c.versionuuid ".
@@ -574,13 +594,13 @@ sub _cfgDB_Diff($$$) {
 }
 
 # compare device configurations from 2 versions
-sub cfgDB_Diff($$) {
+sub _cfgDB_Diff($$) {
 	my ($search,$searchversion) = @_;
 	use Text::Diff;
 	my ($ret, $v0, $v1);
 	my $fhem_dbh = _cfgDB_Connect;
-		$v0 = _cfgDB_Diff($fhem_dbh,$search,0);
-		$v1 = _cfgDB_Diff($fhem_dbh,$search,$searchversion);
+		$v0 = __cfgDB_Diff($fhem_dbh,$search,0);
+		$v1 = __cfgDB_Diff($fhem_dbh,$search,$searchversion);
 	$fhem_dbh->disconnect();
 	$ret = diff \$v0, \$v1, { STYLE => "Table" };
 	$ret = "\nNo differences found!" if !$ret;
@@ -597,7 +617,7 @@ sub cfgDB_Diff($$) {
 <a name="configDB"></a>
 <h3>configDB</h3>
 	<ul>
-	This is the core library for configuration from SQL database.<br/>
+	This is the core backend library for configuration from SQL database.<br/>
 	See <a href="#configdb">configdb command documentation</a> for detailed info.<br/>
 	</ul>
 
