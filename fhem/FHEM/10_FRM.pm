@@ -121,8 +121,24 @@ sub FRM_Set($@) {
 
   COMMAND_HANDLER: {
     $command eq "reset" and do {
-  		DevIo_CloseDev($hash);	
-		  return DevIo_OpenDev($hash, 0, "FRM_DoInit");
+      return $hash->{NAME}." is not connected" unless (defined $hash->{FirmataDevice} and (defined $hash->{FD} or ($^O=~/Win/ and defined $hash->{USBDev})));
+      $hash->{FirmataDevice}->system_reset();
+      if (defined $hash->{SERVERSOCKET}) {
+        # dispose preexisting connections
+        foreach my $e ( sort keys %main::defs ) {
+          if ( defined( my $dev = $main::defs{$e} )) {
+            if ( defined( $dev->{SNAME} ) && ( $dev->{SNAME} eq $hash->{NAME} )) {
+              FRM_Tcp_Connection_Close($dev);
+            }
+          }
+        }
+        FRM_FirmataDevice_Close($hash);
+        last;
+      } else {
+        DevIo_CloseDev($hash);
+        FRM_FirmataDevice_Close($hash);
+        return DevIo_OpenDev($hash, 0, "FRM_DoInit");
+      }
     };
     $command eq "reinit" and do {
 			FRM_forall_clients($hash,\&FRM_Init_Client,undef);
