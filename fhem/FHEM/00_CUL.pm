@@ -1106,30 +1106,30 @@ CUL_Attr(@)
 
   <table>
   <tr><td>
-  The CUL/CUR/CUN is a family of RF devices sold by <a
+  The CUL/CUR/CUN(O) is a family of RF devices sold by <a
   href="http://www.busware.de">busware.de</a>.
 
-  With the opensource firmware (see this <a
-  href="http://culfw.de/culfw.html">link</a>) they are capable
-  to receive and send different 868MHz protocols (FS20/FHT/S300/EM/HMS).
+  With the opensource firmware 
+  <a href="http://culfw.de/culfw.html">culfw</a> they are capable
+  to receive and send different 433/868 MHz protocols (FS20/FHT/S300/EM/HMS/MAX!).
   It is even possible to use these devices as range extenders/routers, see the
   <a href="#CUL_RFR">CUL_RFR</a> module for details.
   <br> <br>
 
   Some protocols (FS20, FHT and KS300) are converted by this module so that
   the same logical device can be used, irrespective if the radio telegram is
-  received by a CUL or an FHZ device.<br> Other protocols (S300/EM) need their
+  received by a CUL or an FHZ device.<br>
+  Other protocols (S300/EM) need their
   own modules. E.g. S300 devices are processed by the CUL_WS module if the
   signals are received by the CUL, similarly EMWZ/EMGZ/EMEM is handled by the
   CUL_EM module.<br><br>
 
   It is possible to attach more than one device in order to get better
-  reception, fhem will filter out duplicate messages.<br><br>
+  reception, FHEM will filter out duplicate messages.<br><br>
 
-  Note: this module may require the Device::SerialPort or Win32::SerialPort
-  module if you attach the device via USB and the OS sets strange default
-  parameters for serial devices.
-
+  Note: This module may require the <code>Device::SerialPort</code> or 
+  <code>Win32::SerialPort</code> module if you attach the device via USB 
+  and the OS sets strange default parameters for serial devices.<br><br>
 
   </td><td>
   <img src="ccc.jpg"/>
@@ -1142,35 +1142,37 @@ CUL_Attr(@)
     <code>define &lt;name&gt; CUL &lt;device&gt; &lt;FHTID&gt;</code> <br>
     <br>
     USB-connected devices (CUL/CUR/CUN):<br><ul>
-      &lt;device&gt; specifies the serial port to communicate with the CUL or
-      CUR.  The name of the serial-device depends on your distribution, under
+      &lt;device&gt; specifies the serial port to communicate with the CUL.
+      The name of the serial-device depends on your distribution, under
       linux the cdc_acm kernel module is responsible, and usually a
       /dev/ttyACM0 device will be created. If your distribution does not have a
       cdc_acm module, you can force usbserial to handle the CUL by the
-      following command:<ul>modprobe usbserial vendor=0x03eb
-      product=0x204b</ul>In this case the device is most probably
-      /dev/ttyUSB0.<br><br>
+      following command:
+      <ul><code>
+        modprobe usbserial vendor=0x03eb product=0x204b
+      </code></ul>
+      In this case the device is most probably /dev/ttyUSB0.<br><br>
 
       You can also specify a baudrate if the device name contains the @
       character, e.g.: /dev/ttyACM0@38400<br><br>
 
       If the baudrate is "directio" (e.g.: /dev/ttyACM0@directio), then the
-      perl module Device::SerialPort is not needed, and fhem opens the device
-      with simple file io. This might work if the operating system uses sane
-      defaults for the serial parameters, e.g. some Linux distributions and
-      OSX.  <br><br>
+      perl module <code>Device::SerialPort</code> is not needed, and FHEM 
+      opens the device with simple file io. This might work if the operating 
+      system uses sane defaults for the serial parameters, e.g. some Linux 
+      distributions and OSX.<br><br>
 
     </ul>
-    Network-connected devices (CUN):<br><ul>
-    &lt;device&gt; specifies the host:port of the device. E.g.
+    Network-connected devices (CUN(O)):<br><ul>
+    &lt;device&gt; specifies the host:port of the device, e.g.
     192.168.0.244:2323
     </ul>
     <br>
     If the device is called none, then no device will be opened, so you
     can experiment without hardware attached.<br>
 
-    The FHTID is a 4 digit hex number, and it is used when the CUL/CUR talks to
-    FHT devices or when CUR requests data. Set it to 0000 to avoid answering
+    The FHTID is a 4 digit hex number, and it is used when the CUL talks to
+    FHT devices or when CUL requests data. Set it to 0000 to avoid answering
     any FHT80b request by the CUL.
   </ul>
   <br>
@@ -1189,30 +1191,30 @@ CUL_Attr(@)
         Set the CUL frequency / bandwidth / receiver-amplitude / sensitivity<br>
 
         Use it with care, it may destroy your hardware and it even may be
-        illegal to do so. Note: the parameters used for RFR transmission are
+        illegal to do so. Note: The parameters used for RFR transmission are
         not affected.<br>
         <ul>
         <li>freq sets both the reception and transmission frequency. Note:
-            although the CC1101 can be set to frequencies between 315 and 915
+            Although the CC1101 can be set to frequencies between 315 and 915
             MHz, the antenna interface and the antenna of the CUL is tuned for
-            exactly one frequency. Default is 868.3MHz (or 433MHz)</li>
-        <li>bWidth can be set to values between 58kHz and 812kHz. Large values
+            exactly one frequency. Default is 868.3 MHz (or 433 MHz)</li>
+        <li>bWidth can be set to values between 58 kHz and 812 kHz. Large values
             are susceptible to interference, but make possible to receive
-            inaccurate or multiple transmitters. It affects tranmission too.
-            Default is 325kHz.</li>
+            inaccurately calibrated transmitters. It affects tranmission too.
+            Default is 325 kHz.</li>
         <li>rAmpl is receiver amplification, with values between 24 and 42 dB.
             Bigger values allow reception of weak signals. Default is 42.
             </li>
-        <li>sens is the decision boundery between the on and off values, and it
+        <li>sens is the decision boundary between the on and off values, and it
             is 4, 8, 12 or 16 dB.  Smaller values allow reception of less clear
-            signals. Default is 4dB.</li>
+            signals. Default is 4 dB.</li>
         </ul>
         </li><br>
     <a name="hmPairForSec"></a>
     <li>hmPairForSec<br>
        <a href="#rfmode">HomeMatic</a> mode only.<br>
        Set the CUL in Pairing-Mode for the given seconds. Any HM device set into
-       pairing mode in this time will be paired with fhem.
+       pairing mode in this time will be paired with FHEM.
        </li><br>
     <a name="hmPairSerial"></a>
     <li>hmPairSerial<br>
@@ -1232,22 +1234,22 @@ CUL_Attr(@)
   <b>Get</b>
   <ul>
     <li>version<br>
-        return the CUL firmware version
+        returns the CUL firmware version
         </li><br>
     <li>uptime<br>
-        return the CUL uptime (time since CUL reset).
+        returns the CUL uptime (time since CUL reset)
         </li><br>
     <li>raw<br>
-        Issue a CUL firmware command, and wait for one line of data returned by
+        Issues a CUL firmware command, and waits for one line of data returned by
         the CUL. See the CUL firmware README document for details on CUL
         commands.
         </li><br>
     <li>fhtbuf<br>
         CUL has a message buffer for the FHT. If the buffer is full, then newly
         issued commands will be dropped, and an "EOB" message is issued to the
-        fhem log.
+        FHEM log.
         <code>fhtbuf</code> returns the free memory in this buffer (in hex),
-        an empty buffer in the CUL-V2 is 74 bytes, in CUL-V3/CUN 200 Bytes.
+        an empty buffer in the CUL V2 is 74 bytes, in CUL V3/CUN(O) 200 Bytes.
         A message occupies 3 + 2x(number of FHT commands) bytes,
         this is the second reason why sending multiple FHT commands with one
         <a href="#set">set</a> is a good idea. The first reason is, that
@@ -1255,19 +1257,18 @@ CUL_Attr(@)
         </li> <br>
 
     <li>ccconf<br>
-        Read some CUL radio-chip (cc1101) registers (frequency, bandwidth, etc),
+        Read some CUL radio-chip (cc1101) registers (frequency, bandwidth, etc.),
         and display them in human readable form.
         </li><br>
 
     <li>cmds<br>
         Depending on the firmware installed, CULs have a different set of
         possible commands. Please refer to the README of the firmware of your
-        CUL to interpret the response of this command. See also the raw-
-        command.
+        CUL to interpret the response of this command. See also the raw command.
         </li><br>
     <li>credit10ms<br>
-        One may send for a duration of credit10ms*10 ms before the send limit is reached and a LOVF is
-        generated.
+        One may send for a duration of credit10ms*10 ms before the send limit
+        is reached and a LOVF is generated.
         </li><br>
   </ul>
 
@@ -1279,15 +1280,15 @@ CUL_Attr(@)
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#model">model</a> (CUL,CUN,CUR)</li>
     <li><a name="sendpool">sendpool</a><br>
-        If using more than one CUL/CUN for covering a large area, sending
+        If using more than one CUL for covering a large area, sending
         different events by the different CUL's might disturb each other. This
         phenomenon is also known as the Palm-Beach-Resort effect.
         Putting them in a common sendpool will serialize sending the events.
         E.g. if you have three CUN's, you have to specify following
         attributes:<br>
-        attr CUN1 sendpool CUN1,CUN2,CUN3<br>
+        <code>attr CUN1 sendpool CUN1,CUN2,CUN3<br>
         attr CUN2 sendpool CUN1,CUN2,CUN3<br>
-        attr CUN3 sendpool CUN1,CUN2,CUN3<br>
+        attr CUN3 sendpool CUN1,CUN2,CUN3</code><br>
         </li><br>
     <li><a name="addvaltrigger">addvaltrigger</a><br>
         Create triggers for additional device values. Right now these are RSSI
@@ -1298,29 +1299,29 @@ CUL_Attr(@)
         arguments are:
         <ul>
         <li>SlowRF<br>
-            To communicate with FS20/FHT/HMS/EM1010/S300/Hoermann devices @1kHz
+            To communicate with FS20/FHT/HMS/EM1010/S300/Hoermann devices @1 kHz
             datarate. This is the default.</li>
 
         <li>HomeMatic<br>
-            To communicate with HomeMatic type of devices @20kHz datarate</li>
+            To communicate with HomeMatic type of devices @10 kHz datarate.</li>
 
         <li>MAX<br>
-            To communicate with MAX! type of devices @20kHz datarate</li>
+            To communicate with MAX! type of devices @10 kHz datarate.</li>
 
         </ul>
         </li><br>
     <li><a name="hmId">hmId</a><br>
         Set the HomeMatic ID of this device. If this attribute is absent, the
-        ID will be F1&lt;FHTID&gt;. Note 1: after setting or changing this
-        attribute you have to relearn all your HomeMatic devices. Note 2: the
-        value _must_ be a 6 digit hex number, and 000000 is not valid. fhem
-        wont complain if it is not correct, but the communication won't work.
+        ID will be F1&lt;FHTID&gt;. Note 1: After setting or changing this
+        attribute you have to relearn all your HomeMatic devices. Note 2: The
+        value <b>must</b> be a 6 digit hex number, and 000000 is not valid. FHEM
+        won't complain if it is not correct, but the communication won't work.
         </li><br>
 
     <li><a name="hmProtocolEvents">hmProtocolEvents</a><br>
         Generate events for HomeMatic protocol messages. These are normally
         used for debugging, by activating "inform timer" in a telnet session,
-        or looking at the "Event Monitor" window in the FHEMWEB frontend.
+        or looking at the Event Monitor window in the FHEMWEB frontend.<br>
         Example:
         <ul>
         <code>
@@ -1330,7 +1331,279 @@ CUL_Attr(@)
         </li><br>
   </ul>
   <br>
-</ul>
+  </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="CUL"></a>
+<h3>CUL</h3>
+<ul>
+
+  <table>
+  <tr><td>
+  Der CUL/CUR/CUN(O) ist eine Familie von Funkempf&auml;ngern, die von der Firma
+  <a href="http://www.busware.de">Busware</a> verkauft wird.
+
+  Mit der OpenSource Firmware 
+  <a href="http://culfw.de/culfw.html">culfw</a> k&ouml;nnen sie verschiedene
+  868 MHz Funkprotokolle empfangen bzw. senden (FS20/FHT/S300/EM/HMS/MAX!).
+  Man kann diese Ger&auml;te auch zur Reichweitenverl&auml;ngerung, siehe 
+  <a href="#CUL_RFR">CUL_RFR</a> einsetzen.
+  <br> <br>
+
+  Einige Protokolle (FS20, FHT und KS300) werden von diesem Modul in das FHZ
+  Format konvertiert, daher kann dasselbe logische Ger&auml;t verwendet werden,
+  egal ob das Funktelegramm von einem CUL oder einem FHZ Ger&auml;t empfangen
+  wird.<br>
+
+  Andere Protokolle (S300/EM) ben&ouml;tigen ihre eigenen Module.  S300
+  Ger&auml;te werden vom Modul CUL_WS verarbeitet, wenn das Signal von einem
+  CUL empfangen wurde, &auml;hnliches gilt f&uuml;r EMWZ/EMGZ/EMEM: diese
+  werden vom CUL_EM Modul verarbeitet.<br><br>
+
+  Es ist m&ouml;glich mehr als ein Ger&auml;t zu verwenden, um einen besseren
+  Empfang zu erhalten, FHEM filtert doppelte Funktelegramme aus.<br><br>
+
+  Bemerkung: Dieses Modul ben&ouml;tigt unter Umst&auml;nden das
+  <code>Device::SerialPort</code> bzw. <code>Win32::SerialPort</code> Modul,
+  wenn Sie das Ger&auml;t &uuml;ber USB anschlie&szlig;en und das
+  Betriebssystem un&uuml;bliche Parameter f&uuml;r serielle Schnittstellen
+  setzt.<br><br>
+
+  </td><td>
+  <img src="ccc.jpg"/>
+  </td></tr>
+  </table>
+
+  <a name="CULdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; CUL &lt;device&gt; &lt;FHTID&gt;</code> <br>
+    <br>
+    Ger&auml;te, die an USB angeschlossen sind (CUL/CUR/CUN):<br>
+    <ul>
+      &lt;device&gt; gibt die serielle Schnittstelle an, mit der der CUL
+      kommuniziert.  Der Name der seriellen Schnittstelle h&auml;ngt von der
+      gew&auml;hlten Distribution und USB-Treiber ab, unter Linux ist dies das
+      Kernel Modul cdc_acm und &uuml;blicherweise wird die Schnittstelle
+      /dev/ttyACM0 genannt. Wenn die Linux Distribution &uuml;ber kein Kernel
+      Modul cdc_acm verf&uuml;gt, dann kann die Schnittstelle &uuml;ber
+      usbserial mit dem folgenden Befehl erzeugt werden: 
+        <ul><code>
+          modprobe usbserial vendor=0x03eb product=0x204b
+        </code></ul>
+      In diesem Fall ist diese Schnittstelle dann wahrscheinlich
+      /dev/ttyUSB0.<br><br>
+
+      Wenn der Name der Schnittstelle ein @ enth&auml;lt, kann nachfolgend die
+      verwendete Baudrate angegeben werden, z.B.: /dev/ttyACM0@38400.<br><br>
+
+      Wenn die Baudrate mit "directio" angegeben wird (z.B.:
+      /dev/ttyACM0@directio), wird das Perl Modul
+      <code>Device::SerialPort</code> nicht ben&ouml;tigt und FHEM &ouml;ffnet
+      die Schnittstelle mit einfachem Dateizugriff. Dies sollte dann
+      funktionieren, wenn das Betriebssystem vern&uuml;nftige Standardwerte
+      f&uuml;r die serielle Schnittstelle verwendet, wie z.B. einige Linux
+      Distributionen oder OSX.<br><br>
+    </ul>
+
+    Ger&auml;te, die mit dem Netzwerk verbunden sind (CUN(O)):<br>
+    <ul>
+      &lt;device&gt; gibt die Hostadresse:Port des Ger&auml;tes an, z.B.
+      192.168.0.244:2323
+    </ul>
+    <br>
+
+    Wenn das Ger&auml;t mit none bezeichnet wird, wird keine Schnittstelle
+    ge&ouml;ffnet und man kann ohne angeschlossene Hardware
+    experimentieren.<br>
+
+    Die FHTID ist eine 4-stellige hexadezimale Zahl und wird verwendet, wenn
+    der CUL FHT Telegramme sendet bzw. Daten anfragt. Diese sollte als 0000
+    gew&auml;hlt werden, wenn man FHT80b Anfragen durch den CUL vermeiden will.
+  </ul>
+  <br>
+
+  <a name="CULset"></a>
+  <b>Set </b>
+  <ul>
+    <li>raw<br>
+        Sendet einen CUL Firmware Befehl. Siehe auch 
+        <a href="http://culfw.de/commandref.html">hier</a> f&uuml;r
+        n&auml;here Erl&auml;uterungen der CUL Befehle.
+        </li><br>
+
+    <li>freq / bWidth / rAmpl / sens<br>
+        Nur in der Betriebsart <a href="#rfmode">SlowRF</a>.<br> Bestimmt die
+        CUL Frequenz / Bandbreite / Empf&auml;nger Amplitude /
+        Empfindlichkeit<br>
+
+        Bitte mit Vorsicht verwenden, da es die verwendete Hardware
+        zerst&ouml;ren kann bzw.  es zu illegalen Funkzust&auml;nden kommen
+        kann. <br> Bemerkung: Die Parameter f&uuml;r die RFR &Uuml;bermittlung
+        werden hierdurch nicht beeinflu&szlig;t.<br>
+        <ul>
+        <li>freq bestimmt sowohl die Empfangs- als auch die Sendefrequenz.<br>
+            Bemerkung: Auch wenn der CC1101 zwischen den Frequenzen 315 und 915
+            MHz eingestellt werden kann, ist die Antennenanbindung bzw. die Antenne
+            des CUL exakt auf eine Frequenz eingestellt.
+            Standard ist 868.3 MHz (bzw. 433 MHz).</li>
+
+        <li>bWidth kann zwischen 58 kHz und 812 kHz variiert werden.
+            Gro&szlig;e Werte sind empfindlicher gegen Interferencen, aber
+            machen es m&ouml;glich, nicht genau kalbrierte Signale zu
+            empfangen. Die Einstellung beeinflusst ebenso die &Uuml;bertragung.
+            Standardwert ist 325 kHz.</li>
+
+        <li>rAmpl ist die Verst&auml;rkung des Empf&auml;ngers mit Werten
+            zwischen 24 and 42 dB.  Gr&ouml;&szlig;ere Werte erlauben den
+            Empfang von schwachen Signalen.  Standardwert ist 42.</li>
+
+        <li>sens ist die Entscheidungsgrenze zwischen "on" und "off"
+            Zust&auml;nden und kann 4, 8, 12 oder 16 dB sein. Kleinere Werte
+            erlauben den Empfang von undeutlicheren Signalen. Standard ist 4
+            dB.</li>
+        </ul>
+        </li><br>
+    <a name="hmPairForSec"></a>
+    <li>hmPairForSec<br>
+       Nur in der Betriebsart <a href="#rfmode">HomeMatic</a>.<br> Versetzt den
+       CUL f&uuml;r die angegebene Zeit in Sekunden in den Anlern-Modus.  Jedes
+       HM Ger&auml;t, das sich im Anlern-Modus befindet, wird an FHEM
+       angelernt.  </li><br>
+
+    <a name="hmPairSerial"></a>
+    <li>hmPairSerial<br>
+       Nur in der Betriebsart <a href="#rfmode">HomeMatic</a>.<br>
+       Versucht, das angegebene Ger&auml;t anzulernen (zu "pairen"). Der
+       Parameter ist eine 10-stellige Zeichenfolge, die normalerweise mit
+       Buchstaben beginnt und mit Ziffern endet; diese sind auf der
+       R&uuml;ckseite der Ger&auml;te aufgedruckt.  Wenn das Ger&auml;t ein
+       Empf&auml;nger ist, ist es nicht notwendig, das angegebene Ger&auml;t in
+       den Anlern-Modus zu versetzen.  </li><br>
+
+    <a name="hmPairForSec"></a>
+    <li>led<br>
+        Schaltet die LED des CUL: aus (00), an (01) oder blinkend (02).
+        </li><br>
+  </ul>
+
+  <a name="CULget"></a>
+  <b>Get</b>
+  <ul>
+    <li>version<br>
+        gibt die Version der CUL Firmware zur&uuml;ck
+        </li><br>
+    <li>uptime<br>
+        gibt die Betriebszeit des CULs zur&uuml;ck (Zeit seit dem letzten Reset
+        des CULs) </li><br>
+
+    <li>raw<br>
+        Sendet einen CUL Firmware Befehl und wartet auf eine R&uuml;ckgabe des
+        CULs.  Siehe auch README der Firmware f&uuml;r n&auml;here
+        Erl&auml;uterungen zu den CUL Befehlen.  </li><br>
+
+    <li>fhtbuf<br>
+        Der CUL hat einen Puffer f&uuml;r Nachrichten f&uuml;r FHT. Wenn der
+        Puffer voll ist, werden neu empfangene Telegramme ignoriert und eine
+        "EOB" Meldung wird in die FHEM Logdatei geschrieben.
+
+        <code>fhtbuf</code> gibt den freien Speicher dieses Puffers (in hex)
+        zur&uuml;ck, ein leerer Puffer im CUL V2 hat 74 Byte, im CUL V3/CUN(O)
+        hat 200 Byte.  Eine Telegramm ben&ouml;tigt 3 + 2x(Anzahl der FHT
+        Befehle) Byte, dies ist ein Grund, warum man mehrere FHT Befehle mit
+        einem <a href="#set">set</a> senden sollte. Ein weiterer Grund ist,
+        dass diese FHT Befehle in einem "Paket" zum FHT Ger&auml;t gesendet werden.
+        </li> <br>
+
+    <li>ccconf<br>
+        Liest einige CUL Register des CC1101 (Sende- und Empf&auml;ngerchips)
+        aus (Frequenz, Bandbreite, etc.) und stellt diese in lesbarer Form dar.
+        </li><br>
+
+    <li>cmds<br>
+        In abh&auml;gigkeit der installierten Firmware hat der CUL/CUR/CUN(O)
+        unterschiedliche Befehlss&auml;tze. N&auml;here Informationen &uuml;ber
+        die Befehle bzw. deren Interpretation siehe README Datei der
+        verwendeten CUL Firmware. Siehe auch Anmerkungen beim raw Befehl.
+        </li><br>
+
+    <li>credit10ms<br>
+        Der Funkraum darf f&uuml;r eine Dauer von credit10ms*10 ms belegt
+        werden, bevor die gesetzliche 1% Grenze erreicht ist und eine
+        LOVF Meldung ausgegeben wird.  </li><br> </ul>
+
+  <a name="CULattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#attrdummy">dummy</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#model">model</a> (CUL,CUN,CUR)</li>
+    <li><a name="sendpool">sendpool</a><br>
+        Wenn mehr als ein CUL verwendet wird, um einen gr&ouml;&szlig;eren
+        Bereich abzudecken, k&ouml;nnen diese sich gegenseitig
+        beeinflussen. Dieses Ph&auml;nomen wird auch Palm-Beach-Resort Effekt
+        genannt.  Wenn man diese zu einen gemeinsamen Sende"pool"
+        zusammenschlie&szlig;t, wird das Senden der einzelnen Telegramme
+        seriell (d.h. hintereinander) durchgef&uuml;hrt.
+        Wenn z.B. drei CUN's zur
+        Verf&uuml;gung stehen, werden folgende Attribute gesetzt:<br>
+        <code>attr CUN1 sendpool CUN1,CUN2,CUN3<br>
+        attr CUN2 sendpool CUN1,CUN2,CUN3<br>
+        attr CUN3 sendpool CUN1,CUN2,CUN3</code><br>
+        </li><br>
+
+    <li><a name="addvaltrigger">addvaltrigger</a><br>
+        Generiert Trigger f&uuml;r zus&auml;tzliche Werte. Momentan sind dies
+        RSSI und RAWMSG f&uuml;r die CUL Familie und RAWMSG f&uuml;r FHZ.
+        </li><br>
+
+    <li><a name="rfmode">rfmode</a><br>
+        Konfiguriert den RF Transceiver des CULs (CC1101). Verf&uuml;gbare
+        Argumente sind:
+        <ul>
+        <li>SlowRF<br>
+            F&uuml;r die Kommunikation mit FS20/FHT/HMS/EM1010/S300/Hoermann
+            Ger&auml;ten @1 kHz Datenrate (Standardeinstellung).</li>
+
+        <li>HomeMatic<br>
+            F&uuml;r die Kommunikation mit HomeMatic Ger&auml;ten @10 kHz
+            Datenrate.</li>
+
+        <li>MAX<br>
+            F&uuml;r die Kommunikation mit MAX! Ger&auml;ten @10 kHz
+            Datenrate.</li>
+
+        </ul>
+        </li><br>
+
+    <li><a name="hmId">hmId</a><br>
+        Setzt die HomeMatic ID des Ger&auml;tes. Wenn dieses Attribut fehlt,
+        wird die ID zu F1&lt;FHTID&gt; gesetzt. Bemerkung 1: Nach dem Setzen
+        bzw. Ver&auml;ndern dieses Attributes m&uuml;ssen alle HomeMatic
+        Ger&auml;te neu angelernt werden.  Bemerkung 2: Der Wert <b>muss</b>
+        eine 6-stellige Hexadezimalzahl sein, 000000 ist ung&uuml;ltig. FHEM
+        &uuml;berpr&uuml;ft nicht, ob die ID korrekt ist, im Zweifelsfall
+        funktioniert die Kommunikation nicht.  </li><br>
+
+    <li><a name="hmProtocolEvents">hmProtocolEvents</a><br>
+        Generiert Ereignisse f&uuml;r HomeMatic Telegramme. Diese werden
+        normalerweise f&uuml;r die Fehlersuche verwendet, z.B. durch Aktivieren
+        von <code>inform timer</code> in einer telnet Sitzung bzw. im
+        <code>Event Monitor</code> Fenster im FHEMWEB Frontend.<br>
+        Beispiel:
+        <ul>
+        <code>
+        2012-05-17 09:44:22.515 CUL CULHM RCV L:0B N:81 CMD:A258 SRC:...... DST:...... 0000 (TYPE=88,WAKEMEUP,BIDI,RPTEN)
+        </code>
+        </ul>
+        </li><br>
+  </ul>
+  <br>
+  </ul>
+
+=end html_DE
 =cut
