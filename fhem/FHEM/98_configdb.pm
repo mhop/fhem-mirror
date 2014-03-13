@@ -1,7 +1,11 @@
+# $Id $
+#
+
 package main;
 use strict;
 use warnings;
 use feature qw/say switch/;
+use configDB;
 
 sub CommandConfigdb($$);
 
@@ -126,57 +130,104 @@ sub _configdb_backup {
 sub CommandConfigdb($$) {
 	my ($cl, $param) = @_;
 
-	my $configfile = $attr{global}{configfile};
-	return "\n error: configDB not used!" unless($configfile eq 'configDB');
-
 	my @a = split(/ /,$param);
-	my ($ret,$usage);
+	my ($cmd, $param1, $param2) = @a;
+	$cmd    = $cmd    ? $cmd    : "";
+	$param1 = $param1 ? $param1 : "";
+	$param2 = $param2 ? $param2 : "";
 
-	given ($a[0]) {
+	my $configfile = $attr{global}{configfile};
+	return "\n error: configDB not used!" unless($configfile eq 'configDB' || $cmd eq 'migrate');
 
-		when ('info') {
-			$ret = cfgDB_Info;
-		}
+	my $ret;
 
-		when ('list') {
-			$a[1] = $a[1] ? $a[1] : '%';
-			$a[2] = $a[2] ? $a[2] : 0;
-			$ret = cfgDB_List($a[1],$a[2]);
-		}
+	given ($cmd) {
 
-		when ('diff') {
-			$ret = cfgDB_Diff($a[1],$a[2]);
-		}
-
-		when ('uuid') {
-			$ret = _cfgDB_Uuid;
-		}
-
-		when ('reorg') {
-			$a[1] = $a[1] ? $a[1] : 3;
-			$ret = cfgDB_Reorg($a[1]);
-		}
-
-		when ('recover') {
-			$a[1] = $a[1] ? $a[1] : 1;
-			$ret = cfgDB_Recover($a[1]);
+		when ('attr') {
+			Log3('configdb', 4, 'configdb: attr $param1 $param2 requested.');
+			if ($param1 eq "" && $param2 eq "") {
+			# list attributes
+				foreach my $c (sort keys %{$attr{configdb}}) {
+					my $val = $attr{configdb}{$c};
+					$val =~ s/;/;;/g;
+					$val =~ s/\n/\\\n/g;
+					$ret .= "attr configdb $c $val";
+				}
+			} elsif($param2 eq "") {
+			# delete attribute
+				undef($attr{configdb}{$param1});
+				$ret = " attribute $param1 deleted";
+			} else {
+			# set attribute
+				$attr{configdb}{$param1} = $param2;
+				$ret = " attribute $param1 set to value $param2";
+			}
 		}
 
 		when ('backup') {
 			if($^O =~ m/Win/) {
+				Log3('configdb', 4, "configdb: error: backup requested on MS platform.");
 				$ret = "\n error: backup not supported for Windows";
 			} else {
+				Log3('configdb', 4, "configdb: backup requested.");
 				$ret = _configdb_backup;
 			}
 		}
+
+		when ('diff') {
+			return "Syntax: configdb diff <device> <version>" if @a != 3;
+			Log3('configdb', 4, "configdb: diff requested for device: $param1 in version $param2.");
+			$ret = _cfgDB_Diff($param1, $param2);
+		}
+
+		when ('info') {
+			Log3('configdb', 4, "info requested.");
+			$ret = _cfgDB_Info;
+		}
+
+		when ('list') {
+			$param1 = $param1 ? $param1 : '%';
+			$param2 = $param2 ? $param2 : 0;
+			Log3('configdb', 4, "configdb: list requested for device: $param1 in version $param2.");
+			$ret = _cfgDB_List($param1,$param2);
+		}
+
+		when ('migrate') {
+			return "Migration not possible. Already running with configDB!" if $configfile eq 'configDB';
+			Log3('configdb', 4, "configdb: migration requested.");
+			$ret = _cfgDB_Migrate;
+		}
+
+		when ('recover') {
+			return "Syntax: configdb recover <version>" if @a != 2;
+			Log3('configdb', 4, "configdb: recover for version $param1 requested.");
+			$ret = _cfgDB_Recover($param1);
+		}
+
+		when ('reorg') {
+			$param1 = $param1 ? $param1 : 3;
+			Log3('configdb', 4, "configdb: reorg requested with keep: $param1.");
+			$ret = _cfgDB_Reorg($a[1]);
+		}
+
+		when ('uuid') {
+			$param1 = _cfgDB_Uuid;
+			Log3('configdb', 4, "configdb: uuid requested: $param1");
+			$ret = $param1;
+		}
+
 		default { 	
-			$ret =	"\n Syntax: configdb info\n".
-					"         configdb list [device] [version]\n".
-					"         configdb diff <device> <version>\n".
-					"         configdb uuid\n".
+			$ret =	"\n Syntax:".
+					"         configdb attr [attribute] [value]\n".
 					"         configdb backup\n".
+					"         configdb diff <device> <version>\n".
+					"         configdb info\n".
+					"         configdb list [device] [version]\n".
+					"         configdb migrate\n".
 					"         configdb recover <version>\n".
-					"         configdb reorg [keepVersions]\n";
+					"         configdb reorg [keepVersions]\n".
+					"         configdb uuid\n".
+					"";
 		}
 
 	}
@@ -200,6 +251,7 @@ sub CommandConfigdb($$) {
 		<br/>
 		<b>Prerequisits / Installation</b><br/>
 		<ul><br/>
+		<li>Please install perl package Text::Diff if not already installed on your system.</li><br/>
 		<li>You must have access to a SQL database. Supported database types are SQLITE, MYSQL and POSTGRESQL.</li><br/>
 		<li>The corresponding DBD module must be available in your perl environment,<br/>
 				e.g. sqlite3 running on a Debian systems requires package libdbd-sqlite3-perl</li><br/>
@@ -276,7 +328,7 @@ sub CommandConfigdb($$) {
 				<ul><code>perl fhem.pl fhem.cfg</code></ul></li><br/>
 			<br/>
 			<li>transfer your existing configuration into the database<br/><br/>
-				<ul>enter <code>{use configDB;; cfgDB_Migrate}</code><br/>
+				<ul>enter<br/><br/><code>configdb migrate</code><br/>
 				<br/>
 				into frontend's command line</ul><br/></br>
 				Be patient! Migration can take some time, especially on mini-systems like RaspberryPi or Beaglebone.<br/>
@@ -296,6 +348,43 @@ sub CommandConfigdb($$) {
 			A new command <code>configdb</code> is propagated to fhem.<br/>
 			This command can be used with different parameters.<br/>
 			<br/>
+
+		<li><code>configdb attr [attribute] [value]</code></li><br/>
+			Provides the possibility to pass attributes to backend and frontend.<br/>
+			<br/>
+			<code> configdb attr private 1</code> - set the attribute named 'private' to value 1.<br/>
+			<br/>
+			<code> configdb attr private</code> - delete the attribute named 'private'<br/>
+			<br/>
+			<code> configdb attr</code> - show all defined attributes.<br/>
+			<br/>
+			Currently, only one attribute is supported. If 'private' is set to 1 the user and password info<br/>
+			will not be shown in 'configdb info' output.<br/>
+<br/>
+
+		<li><code>configdb backup</code></li><br/>
+			Replaces fhem's default backup process, since backup is no longer supported <br/>
+			with activated configDB.<br/>
+			<br/>
+			<b>Important:</b><br/>
+			Please be aware you are responsible for data backup of your database yourself!<br/>
+			The backup command can and will not do this job for you!<br/>
+<br/>
+
+		<li><code>configdb diff &lt;device&gt; &lt;version&gt;</code></li><br/>
+			Compare configuration dataset for device &lt;device&gt; 
+			from current version 0 with version &lt;version&gt;<br/>
+			Example for valid request:<br/>
+			<br/>
+			<code>get configDB telnetPort 1</code><br/>
+			<br/>
+			will show a result like this:
+			<pre>
+compare device: telnetPort in current version 0 (left) to version: 1 (right)
++--+--------------------------------------+--+--------------------------------------+
+| 1|define telnetPort telnet 7072 global  | 1|define telnetPort telnet 7072 global  |
+* 2|attr telnetPort room telnet           *  |                                      |
++--+--------------------------------------+--+--------------------------------------+</pre>
 
 		<li><code>configdb info</code></li><br/>
 			Returns some database statistics<br/>
@@ -335,39 +424,6 @@ Ver 0 always indicates the currently running configuration.<br/>
 			<code>get configDB list global 1</code><br/>
 		<br/>
 
-		<li><code>configdb diff &lt;device&gt; &lt;version&gt;</code></li><br/>
-			Compare configuration dataset for device &lt;device&gt; 
-			from current version 0 with version &lt;version&gt;<br/>
-			Example for valid request:<br/>
-			<br/>
-			<code>get configDB telnetPort 1</code><br/>
-			<br/>
-			will show a result like this:
-			<pre>
-compare device: telnetPort in current version 0 (left) to version: 1 (right)
-+--+--------------------------------------+--+--------------------------------------+
-| 1|define telnetPort telnet 7072 global  | 1|define telnetPort telnet 7072 global  |
-* 2|attr telnetPort room telnet           *  |                                      |
-+--+--------------------------------------+--+--------------------------------------+</pre>
-
-		<li><code>configdb uuid</code></li><br/>
-			Returns a uuid that can be used for own purposes.<br/>
-<br/>
-		<li><code>configdb backup</code></li><br/>
-			Replaces fhem's default backup process, since backup is no longer supported <br/>
-			with activated configDB.<br/>
-			<br/>
-			<b>Important:</b><br/>
-			Please be aware you are responsible for data backup of your database yourself!<br/>
-			The backup command can and will not do this job for you!<br/>
-<br/>
-		<li><code>configdb reorg [keep]</code></li><br/>
-			Deletes all stored versions with version number higher than [keep].<br/>
-			Default value for optional parameter keep = 3.<br/>
-			This function can be used to create a nightly running job for<br/>
-			database reorganisation when called from an at-Definition.<br/>
-		<br/>
-
 		<li><code>configdb recover &lt;version&gt;</code></li><br/>
 			Restores an older version from database archive.<br/>
 			<code>set configDB recover 3</code> will <b>copy</b> version #3 from database 
@@ -376,6 +432,18 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 			<b>Important!</b><br/>
 			The restored version will <b>NOT</b> be activated automatically!<br/>
 			You must do a <code>rereadcfg</code> or - even better - <code>shutdown restart</code> yourself.<br/>
+<br/>
+
+		<li><code>configdb reorg [keep]</code></li><br/>
+			Deletes all stored versions with version number higher than [keep].<br/>
+			Default value for optional parameter keep = 3.<br/>
+			This function can be used to create a nightly running job for<br/>
+			database reorganisation when called from an at-Definition.<br/>
+		<br/>
+
+		<li><code>configdb uuid</code></li><br/>
+			Returns a uuid that can be used for own purposes.<br/>
+<br/>
 
 		</ul>
 <br/>
@@ -392,8 +460,6 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 			(either manually or by clicking on "save config").<br/>
 			This will take some moments, due to writing version informations.<br/>
 			Finishing the save-process will be indicated by a corresponding message in frontend.</li>
-			<br/>
-			<li>You may need to install perl package Text::Diff to use cfgDB_Diff()</li>
 			<br/>
 			<li>There still will be some more (planned) development to this extension, 
 			especially regarding some perfomance issues.</li>
@@ -418,6 +484,7 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 		<br/>
 		<b>Voraussetzungen / Installation</b><br/>
 		<ul><br/>
+		<li>Bitte das perl Paket Text::Diff installieren, falls noch nicht auf dem System vorhanden.</li><br/>
 		<li>Es muss eine SQL Datenbank verf&uuml;gbar sein, untsrst&uuml;tzt werden SQLITE, MYSQL und POSTGRESQLL.</li><br/>
 		<li>Das zum Datenbanktype geh&ouml;rende DBD Modul muss in perl installiert sein,<br/>
 				f&uuml;r sqlite3 auf einem Debian System z.B. das Paket libdbd-sqlite3-perl</li><br/>
@@ -494,7 +561,7 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 				<ul><code>perl fhem.pl fhem.cfg</code></ul></li><br/>
 			<br/>
 			<li>Bestehende Konfiguration in die Datenbank &uuml;bertragen<br/><br/>
-				<ul><code>{use configDB;; cfgDB_Migrate}</code><br/>
+				<ul><code>configdb migrate</code><br/>
 					<br/>
 					in die Befehlszeile der fhem-Oberfl&auml;che eingeben</ul><br/></br>
 					Nicht die Geduld verlieren! Die Migration eine Weile dauern, speziell bei Mini-Systemen wie<br/>
@@ -516,6 +583,46 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 			Es wird ein neuer Befehl <code>configdb</code> bereitgestellt,<br/>
 			der mit verschiedenen Parametern aufgerufen werden kann.<br/>
 			<br/>
+
+		<li><code>configdb attr [attribute] [value]</code></li><br/>
+			Hiermit lassen sich attribute setzen, die das Verhalten von Front- und Backend beeinflussen.<br/>
+			<br/>
+			<code> configdb attr private 1</code> - setzt das Attribut 'private' auf den Wert 1.<br/>
+			<br/>
+			<code> configdb attr private</code> - l&ouml;scht das Attribut 'private'<br/>
+			<br/>
+			<code> configdb attr</code> - zeigt alle gespeicherten Attribute<br/>
+			<br/>
+			Im Moment ist nur ein Attribut definiert. Wenn 'private' auf 1 gesetzt wird, werden bei 'configdb info' <br/>
+			keine Benutzer- und Passwortdaten angezeigt.<br/>
+			<br/>
+<br/>
+
+		<li><code>configdb backup</code></li><br/>
+			Ersetzt den Standard-Backup-Befehl von fhem, da dieser bei Verwendung von configDB nicht mehr<br/>
+			zur Verf&uuml;gung steht.<br/>
+			<br/>
+			<b>Wichtig:</b><br/>
+			F&uuml;r die Sicherung der Datenbank ist der Anwender selbst verantwortlich!<br/>
+			Der backup Befehl kann diese Aufgabe nicht &uuml;bernehmen.<br/>
+			Ausnahme: Nutzer einer im fhem Verzeichnis liegenden sqlite Datenbank profitieren von der Einfachheit<br/>
+			dieser Datenbank, denn das fhem Verzeichnis wird ohnehin komplett gesichert.<br/>
+		<br/>
+
+		<li><code>configdb diff &lt;device&gt; &lt;version&gt;</code></li><br/>
+			Vergleicht die Konfigurationsdaten des Ger&auml;tes &lt;device&gt; aus der aktuellen Version 0 mit den Daten aus Version &lt;version&gt;<br/>
+			Beispielaufruf:<br/>
+			<br/>
+			<code>configdb diff telnetPort 1</code><br/>
+			<br/>
+			liefert ein Ergebnis &auml;hnlich dieser Ausgabe:
+			<pre>
+compare device: telnetPort in current version 0 (left) to version: 1 (right)
++--+--------------------------------------+--+--------------------------------------+
+| 1|define telnetPort telnet 7072 global  | 1|define telnetPort telnet 7072 global  |
+* 2|attr telnetPort room telnet           *  |                                      |
++--+--------------------------------------+--+--------------------------------------+</pre>
+
 		<li><code>configdb info</code></li><br/>
 			Liefert eine Datenbankstatistik<br/>
 <pre>
@@ -548,45 +655,10 @@ Ver 0 bezeichnet immer die aktuell verwendete Konfiguration.<br/>
 			Standardwert f&uuml;r [version] = 0 um Ger&auml;te in der aktuellen Version anzuzeigen.<br/>
 			Beispiele f&uuml;r g&uuml;ltige Aufrufe:<br/>
 			<br/>
-			<code>get configDB list</code><br/>
-			<code>get configDB list global</code><br/>
-			<code>get configDB list '' 1</code><br/>
-			<code>get configDB list global 1</code><br/>
-		<br/>
-
-		<li><code>configdb diff &lt;device&gt; &lt;version&gt;</code></li><br/>
-			Vergleicht die Konfigurationsdaten des Ger&auml;tes &lt;device&gt; aus der aktuellen Version 0 mit den Daten aus Version &lt;version&gt;<br/>
-			Beispielaufruf:<br/>
-			<br/>
-			<code>get configDB diff telnetPort 1</code><br/>
-			<br/>
-			liefert ein Ergebnis &auml;hnlich dieser Ausgabe:
-			<pre>
-compare device: telnetPort in current version 0 (left) to version: 1 (right)
-+--+--------------------------------------+--+--------------------------------------+
-| 1|define telnetPort telnet 7072 global  | 1|define telnetPort telnet 7072 global  |
-* 2|attr telnetPort room telnet           *  |                                      |
-+--+--------------------------------------+--+--------------------------------------+</pre>
-
-		<li><code>configdb uuid</code></li><br/>
-			Liefert eine uuid, die man f&uuml;r eigene Zwecke verwenden kann.<br/>
-		<br/>
-
-		<li><code>configdb backup</code></li><br/>
-			Ersetzt den Standard-Backup-Befehl von fhem, da dieser bei Verwendung von configDB nicht mehr<br/>
-			zur Verf&uuml;gung steht.<br/>
-			<br/>
-			<b>Wichtig:</b><br/>
-			F&uuml;r die Sicherung der Datenbank ist der Anwender selbst verantwortlich!<br/>
-			Der backup Befehl kann diese Aufgabe nicht &uuml;bernehmen.<br/>
-			Ausnahme: Nutzer einer im fhem Verzeichnis liegenden sqlite Datenbank profitieren von der Einfachheit<br/>
-			dieser Datenbank, denn das fhem Verzeichnis wird ohnehin komplett gesichert.<br/>
-		<br/>
-
-		<li><code>configdb reorg [keep]</code></li><br/>
-			L&ouml;scht alle gespeicherten Konfigurationen mit Versionsnummern gr&ouml;&szlig;er als [keep].<br/>
-			Standardwert f&uuml;r den optionalen Parameter keep = 3.<br/>
-			Mit dieser Funktion l&auml;&szlig;t sich eine n&auml;chtliche Reorganisation per at umsetzen.<br/>
+			<code>configdb list</code><br/>
+			<code>configdb list global</code><br/>
+			<code>configdb list '' 1</code><br/>
+			<code>configdb list global 1</code><br/>
 		<br/>
 
 		<li><code>configdb recover &lt;version&gt;</code></li><br/>
@@ -599,6 +671,16 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 			Ein <code>rereadcfg</code> oder - besser - <code>shutdown restart</code> muss manuell erfolgen.<br/>
 		</ul>
 		<br/>
+		<br/>
+
+		<li><code>configdb reorg [keep]</code></li><br/>
+			L&ouml;scht alle gespeicherten Konfigurationen mit Versionsnummern gr&ouml;&szlig;er als [keep].<br/>
+			Standardwert f&uuml;r den optionalen Parameter keep = 3.<br/>
+			Mit dieser Funktion l&auml;&szlig;t sich eine n&auml;chtliche Reorganisation per at umsetzen.<br/>
+		<br/>
+
+		<li><code>configdb uuid</code></li><br/>
+			Liefert eine uuid, die man f&uuml;r eigene Zwecke verwenden kann.<br/>
 		<br/>
 
 		<b>Hinweise</b><br/>
