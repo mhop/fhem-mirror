@@ -112,7 +112,188 @@ sub HMinfo_Attr(@) {###########################################################
   }
   return;
 }
-sub HMinfo_autoUpdate($){#in:name, send status-request
+
+sub HMinfo_status($){##########################################################
+  # - count defined HM entities, selected readings, errors on filtered readings
+  # - display Assigned IO devices
+  # - show ActionDetector status
+  # - prot events if error
+  # - rssi - eval minimum values
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  my ($nbrE,$nbrD,$nbrC,$nbrV) = (0,0,0,0);# count entities and types
+  #--- used for status
+  my @info = split ",",$attr{$name}{sumStatus};#prepare event
+  my %sum;
+  #--- used for error counts
+  my @erro = split ",",$attr{$name}{sumERROR};
+  my %errFlt;
+  my %err;
+  my @errNames;
+  foreach (@erro){    #prepare reading filter for error counts
+    my ($p,@a) = split ":",$_;
+    $errFlt{$p}{x}=1; # add at least one reading
+    $errFlt{$p}{$_}=1 foreach (@a);
+  }
+  #--- used for IO, protocol  and communication (e.g. rssi)
+  my @IOdev;
+
+  my %protC = (ErrIoId_ =>0,ErrIoAttack =>0);
+  my %protE = (NACK =>0,IOerr =>0,ResndFail =>0,CmdDel =>0);
+  my %protW = (Resnd =>0,CmdPend =>0);
+  my @protNamesC;    # devices with current protocol Critical
+  my @protNamesE;    # devices with current protocol Errors
+  my @protNamesW;    # devices with current protocol Warnings
+  my @Anames;        # devices with ActionDetector events
+  my %rssiMin;
+  my %rssiMinCnt = ("99>"=>0,"80>"=>0,"60>"=>0,"59<"=>0);
+  my @rssiNames; #entities with ciritcal RSSI
+  my @shdwNames; #entites with shadowRegs, i.e. unconfirmed register ->W_unconfRegs
+
+  foreach my $id (keys%{$modules{CUL_HM}{defptr}}){#search/count for parameter
+    my $ehash = $modules{CUL_HM}{defptr}{$id};
+    my $eName = $ehash->{NAME};
+    $nbrE++;
+    $nbrC++ if ($ehash->{helper}{role}{chn});
+    $nbrV++ if ($ehash->{helper}{role}{vrt});
+    push @shdwNames,$eName if (keys %{$ehash->{helper}{shadowReg}});
+    foreach my $read (grep {$ehash->{READINGS}{$_}} @info){       #---- count critical readings
+      my $val = $ehash->{READINGS}{$read}{VAL};
+      $sum{$read}{$val} =0 if (!$sum{$read}{$val});
+      $sum{$read}{$val}++;
+    }
+    foreach my $read (grep {$ehash->{READINGS}{$_}} keys %errFlt){#---- count error readings
+      my $val = $ehash->{READINGS}{$read}{VAL};
+      next if (grep (/$val/,(keys%{$errFlt{$read}})));# filter non-Error
+      $err{$read}{$val} =0 if (!$err{$read}{$val});
+      $err{$read}{$val}++;
+      push @errNames,$eName;
+    }
+    if ($ehash->{helper}{role}{dev}){#---restrict to devices
+      $nbrD++;
+      push @IOdev,$ehash->{IODev}{NAME} if($ehash->{IODev} && $ehash->{IODev}{NAME});
+      push @Anames,$eName if ($attr{$eName}{actStatus} && $attr{$eName}{actStatus} ne "alive");
+
+      foreach (grep /ErrIoId_/, keys %{$ehash}){# detect addtional critical entries
+        my $k = $_;
+        $k =~ s/^prot//;
+        $protC{$k} = 0 if(!defined $protC{$_});
+      }
+      foreach (grep {$ehash->{"prot".$_}} keys %protC){#protocol critical alarms
+        $protC{$_}++;
+        push @protNamesC,$eName;
+      }
+      foreach (grep {$ehash->{"prot".$_}} keys %protE){#protocol errors
+        $protE{$_}++;
+        push @protNamesE,$eName;
+      }
+      foreach (grep {$ehash->{"prot".$_}} keys %protW){#protocol events reported
+        $protW{$_}++;
+        push @protNamesW,$eName;
+      }
+      $rssiMin{$eName} = 0;
+      foreach (keys %{$ehash->{helper}{rssi}}){
+        next if($_ !~ m /at_.*$ehash->{IODev}->{NAME}/ );#ignore unused IODev
+        $rssiMin{$eName} = $ehash->{helper}{rssi}{$_}{min}
+          if ($rssiMin{$eName} > $ehash->{helper}{rssi}{$_}{min});
+      }
+    }
+  }
+  #====== collection finished - start data preparation======
+  delete $hash->{$_} foreach (grep(/^(ERR|W_|I_|C_)/,keys%{$hash}));# remove old
+  my @updates;
+  foreach my $read(grep {defined $sum{$_}} @info){       #--- disp crt count
+    my $d;
+    $d .= "$_:$sum{$read}{$_};"foreach(keys %{$sum{$read}});
+    push @updates,"I_sum_$read:".$d;
+  }
+  foreach my $read(grep {defined $err{$_}} keys %errFlt){#--- disp err count
+    my $d;
+    $d .= "$_:$err{$read}{$_};"foreach(keys %{$err{$read}});
+    push @updates,"ERR_$read:".$d;
+  }
+
+  @errNames = grep !/^$/,HMinfo_noDup(@errNames);
+  $hash->{ERR_names} = join",",@errNames if(@errNames);# and name entities
+
+  push @updates,"C_sumDefined:"."entities:$nbrE device:$nbrD channel:$nbrC virtual:$nbrV";
+  # ------- display status of action detector ------
+  push @updates,"I_actTotal:".$modules{CUL_HM}{defptr}{"000000"}{STATE};
+  $hash->{ERRactNames} = join",",@Anames if (@Anames);
+
+  # ------- what about IO devices??? ------
+  my %tmp; # remove duplicates
+  $tmp{$_}=0 for @IOdev;
+  delete $tmp{""}; #remove empties if present
+  @IOdev = sort keys %tmp;
+  foreach (grep {$defs{$_}{READINGS}{cond}} @IOdev){
+    $_ .= ",:".$defs{$_}{READINGS}{cond}{VAL};
+  }
+  $hash->{I_HM_IOdevices}= join",",@IOdev;
+
+  # ------- what about protocol events ------
+  # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
+  # additional variables are protCmdDel,protCmdPend,protState,protLastRcv
+  my @tpc;
+  push @tpc,"$_:$protC{$_}" foreach (grep {$protC{$_}} keys(%protC));
+  if(@tpc){push @updates,"CRIT__protocol:".join",",@tpc;} else{delete $hash->{READINGS}{CRIT__protocol} };
+  my @tpe;
+  push @tpe,"$_:$protE{$_}" foreach (grep {$protE{$_}} keys(%protE));
+  if(@tpe){push @updates,"ERR__protocol:".join",",@tpe;} else{ delete $hash->{READINGS}{ERR__protocol} };
+  my @tpw;
+  push @tpw,"$_:$protW{$_}" foreach (grep {$protW{$_}} keys(%protW));
+  if(@tpw){push @updates,"W__protocol:".join",",@tpw  ;} else{ delete $hash->{READINGS}{W__protocol} };
+
+  @protNamesC = grep !/^$/,HMinfo_noDup(@protNamesC);
+  $hash->{CRI__protoNames} = join",",@protNamesC if(@protNamesC);
+  @protNamesE = grep !/^$/,HMinfo_noDup(@protNamesE);
+  $hash->{ERR__protoNames} = join",",@protNamesE if(@protNamesE);
+  @protNamesW = grep !/^$/,HMinfo_noDup(@protNamesW);
+  $hash->{W__protoNames} = join",",@protNamesW if(@protNamesW);
+
+  if (defined $modules{CUL_HM}{helper}{qReqConf} &&
+      @{$modules{CUL_HM}{helper}{qReqConf}}>0){
+    $hash->{I_autoReadPend} = join ",",@{$modules{CUL_HM}{helper}{qReqConf}};
+    push @updates,"I_autoReadPend:". scalar @{$modules{CUL_HM}{helper}{qReqConf}};
+  }
+#  else{
+#    delete $hash->{I_autoReadPend};
+#  }
+
+  # ------- what about rssi low readings ------
+  foreach (grep {$rssiMin{$_} != 0}keys %rssiMin){
+    if    ($rssiMin{$_}> -60) {$rssiMinCnt{"59<"}++;}
+    elsif ($rssiMin{$_}> -80) {$rssiMinCnt{"60>"}++;}
+    elsif ($rssiMin{$_}< -99) {$rssiMinCnt{"99>"}++;
+                               push @rssiNames,$_  ;}
+    else                      {$rssiMinCnt{"80>"}++;}
+  }
+
+  my $d ="";
+  $d .= "$_:$rssiMinCnt{$_} " foreach (sort keys %rssiMinCnt);
+  push @updates,"I_rssiMinLevel:".$d;
+  $hash->{ERR___rssiCrit} = join(",",@rssiNames) if (@rssiNames);
+  # ------- what about others ------
+  $hash->{W_unConfRegs} = join(",",@shdwNames) if (@shdwNames > 0);
+  # ------- update own status ------
+  $hash->{STATE} = "updated:".TimeNow();
+  my $updt = join",",@updates;
+  foreach (grep /^(W_|I_|ERR)/,keys%{$hash->{READINGS}}){
+    delete $hash->{READINGS}{$_} if ($updt !~ m /$_/);
+  }
+  readingsBeginUpdate($hash);
+  foreach my $rd (@updates){
+    next if (!$rd);
+    my ($rdName, $rdVal) = split(":",$rd, 2);
+    next if (defined $hash->{READINGS}{$rdName} &&
+             $hash->{READINGS}{$rdName}{VAL} eq $rdVal);
+    readingsBulkUpdate($hash,$rdName,
+                             ((defined($rdVal) && $rdVal ne "")?$rdVal:"-"));
+  }
+  readingsEndUpdate($hash,1);
+  return;
+}
+sub HMinfo_autoUpdate($){#in:name, send status-request#########################
   my $name = shift;
   (undef,$name)=split":",$name,2;
   HMinfo_SetFn($defs{$name},$name,"update") if ($name);
@@ -232,12 +413,13 @@ sub HMinfo_burstCheck(@) { ####################################################
   my @needBurstFail;
   my @peerIDsCond;
   foreach my $eName (@entities){
-    next if (!$defs{$eName}{helper}{role}{chn});#device has no channels
-    next if (!CUL_HM_peerUsed($eName));
-    next if (CUL_HM_Get($defs{$eName},$eName,"regList") !~ m/peerNeedsBurst/);
+    next if (!$defs{$eName}{helper}{role}{chn}         #entity has no channels
+          || !CUL_HM_peerUsed($eName)                  #entity not peered
+          || CUL_HM_Get($defs{$eName},$eName,"regList")#option not supported
+             !~ m/peerNeedsBurst/);
 
     my $peerIDs = AttrVal($eName,"peerIDs",undef);    
-    next if(!$peerIDs);                # no peers - noting to check 
+    next if(!$peerIDs);                                # no peers assigned
 
     my $devId = substr($defs{$eName}{DEF},0,6);
     foreach (split",",$peerIDs){
@@ -285,6 +467,7 @@ sub HMinfo_paramCheck(@) { ####################################################
   $ret .="\n\n PairedTo mismatch to IODev"."\n    ".(join "\n    ",sort @idMismatch) if (@idMismatch);
  return  $ret;
 }
+
 sub HMinfo_tempList(@) { ######################################################
   my ($filter,$action,$fName)=@_;
   $filter = "." if (!$filter);
@@ -568,6 +751,7 @@ sub HMinfo_GetFn($@) {#########################################################
   }
 
   $cmd = "?" if(!$cmd);# by default print options
+  #------------ statistics ---------------
   if   ($cmd eq "protoEvents"){##print protocol-events-------------------------
     my ($type) = @a;
     $type = "long" if(!$type);
@@ -683,6 +867,63 @@ sub HMinfo_GetFn($@) {#########################################################
                         ."\n    ".(join "\n    ",sort @rssiList)
                          ;
   }
+  #------------ checks ---------------
+  elsif($cmd eq "regCheck")   {##check register--------------------------------
+    my @entities = HMinfo_getEntities($opt."v",$filter);
+    $ret = $cmd." done:" .HMinfo_regCheck(@entities);
+  }
+  elsif($cmd eq "peerCheck")  {##check peers-----------------------------------
+    my @entities = HMinfo_getEntities($opt."v",$filter);
+    $ret = $cmd." done:" .HMinfo_peerCheck(@entities);
+  }
+  elsif($cmd eq "configCheck"){##check peers and register----------------------
+    my @entities = HMinfo_getEntities($opt."v",$filter);
+    $ret = $cmd." done:" .HMinfo_regCheck(@entities)
+                         .HMinfo_peerCheck(@entities)
+                         .HMinfo_burstCheck(@entities)
+                         .HMinfo_paramCheck(@entities);
+  }
+  elsif($cmd eq "templateChk"){##template: see if it applies ------------------
+    my $repl;
+    foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
+      unshift @a, $dName;
+      $repl .= HMinfo_templateChk(@a);
+      shift @a;
+    }
+    return $repl;
+  }
+  #------------ print tables ---------------
+  elsif($cmd eq "peerXref")   {##print cross-references------------------------
+    my @peerPairs;
+    my @peerFhem;
+    my @fheml = ();
+    foreach my $dName (HMinfo_getEntities($opt,$filter)){
+      my $peerIDs = AttrVal($dName,"peerIDs",undef);
+      my $dId = unpack 'A6',CUL_HM_name2Id($dName);
+      my @pl = ();
+      foreach (split",",$peerIDs){
+        next if ($_ eq "00000000");
+        my $pn = CUL_HM_peerChName($_,$dId);
+        push @pl,$pn;
+        push @fheml,"$_$dName" if ($pn =~ m/^fhem..$/);
+      }
+      push @peerPairs,$dName." => ".join(", ",(sort @pl)) if (@pl);
+    }
+    #--- calculate peerings to Central ---
+    my %fChn;
+    foreach (@fheml){
+      my ($fhId,$fhCh,$p)= unpack 'A6A2A*',$_;
+      my $fhemCh = "fhem_io_${fhId}_$fhCh";
+      $fChn{$fhemCh} = ($fChn{$fhemCh}?$fChn{$fhemCh}.", ":"").$p;
+    }
+    push @peerFhem,map {"$_ => $fChn{$_}"} keys %fChn;
+    $ret = $cmd." done:" ."\n x-ref list"."\n    ".(join "\n    ",sort @peerPairs)
+                                         ."\n    ".(join "\n    ",sort @peerFhem)
+                         ;
+  }
+  elsif($cmd eq "templateList"){##template: list templates --------------------
+    return HMinfo_templateList($a[0]);
+  }
   elsif($cmd eq "register")   {##print register--------------------------------
     # devicenameFilter
     my $RegReply = "";
@@ -743,45 +984,7 @@ sub HMinfo_GetFn($@) {#########################################################
                .(join "\n    ",sort @paramList)
            ;
   }
-  elsif($cmd eq "regCheck")   {##check register--------------------------------
-    my @entities = HMinfo_getEntities($opt."v",$filter);
-    $ret = $cmd." done:" .HMinfo_regCheck(@entities);
-  }
-  elsif($cmd eq "peerCheck")  {##check peers-----------------------------------
-    my @entities = HMinfo_getEntities($opt."v",$filter);
-    $ret = $cmd." done:" .HMinfo_peerCheck(@entities);
-  }
-  elsif($cmd eq "configCheck"){##check peers and register----------------------
-    my @entities = HMinfo_getEntities($opt."v",$filter);
-    $ret = $cmd." done:" .HMinfo_regCheck(@entities)
-                         .HMinfo_peerCheck(@entities)
-                         .HMinfo_burstCheck(@entities)
-                         .HMinfo_paramCheck(@entities);
-  }
-  elsif($cmd eq "peerXref")   {##print cross-references------------------------
-    my @peerPairs;
-    foreach my $dName (HMinfo_getEntities($opt,$filter)){
-      my $peerIDs = AttrVal($dName,"peerIDs",undef);
-      my $dId = unpack 'A6',CUL_HM_name2Id($dName);
-      my @pl = ();
-      my @fheml = ();
-      foreach (split",",$peerIDs){
-        next if ($_ eq "00000000");
-        my $pn = CUL_HM_peerChName($_,$dId);
-        push @pl,$pn;
-        push @fheml,$pn.";".$dName if ($pn =~ m/^fhem/);
-      }
-      push @peerPairs,$dName." => ".join(", ",(sort @pl)) if (@pl);
-      my %fChn;
-      foreach (sort @fheml){
-        my ($fhemCh,undef,$p)= unpack 'A6A1A*',$_;
-        $fChn{$fhemCh} => ($fChn{$fhemCh}?$fChn{$fhemCh}.", ":"").$p;
-      }
-      push @peerPairs,map {"$_ => $fChn{$_}"}sort keys %fChn;
-   }
-    $ret = $cmd." done:" ."\n x-ref list"  ."\n    ".(join "\n    ",sort @peerPairs)
-                         ;
-  }
+
   elsif($cmd eq "models")     {##print capability, models----------------------
     my $th = \%HMConfig::culHmModel;
     my @model;
@@ -823,18 +1026,6 @@ sub HMinfo_GetFn($@) {#########################################################
                           ,"channels"
                           )
             .join"\n  ",grep(/$filter/,sort @model);
-  }
-  elsif($cmd eq "templateList"){##template: list templates --------------------
-    return HMinfo_templateList($a[0]);
-  }
-  elsif($cmd eq "templateChk"){##template: see if it applies ------------------
-    my $repl;
-    foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
-      unshift @a, $dName;
-      $repl .= HMinfo_templateChk(@a);
-      shift @a;
-    }
-    return $repl;
   }
   elsif($cmd eq "help")       {
     $ret = " Unknown argument $cmd, choose one of "
@@ -1038,7 +1229,7 @@ sub HMinfo_SetFn($@) {#########################################################
   return $ret;
 }
 
-sub HMInfo_help(){
+sub HMInfo_help(){ ############################################################
   return    " Unknown argument choose one of "
            ."\n ---checks---"
            ."\n get configCheck [<typeFilter>]                     # perform regCheck and regCheck"
@@ -1271,7 +1462,7 @@ sub HMinfo_archConfigPost($)  {################################################
   return ;
 }
 
-sub HMinfo_bpPost($) {#bp finished#############################################
+sub HMinfo_bpPost($) {#bp finished ############################################
   my ($rep) = @_;
   my ($name,$id) = split(":",$rep);
   delete $defs{$name}{nb}{$id};
@@ -1284,322 +1475,12 @@ sub HMinfo_bpAbort($) {#bp timeout ############################################
   return;
 }
 
-sub HMinfo_status($){##########################################################
-  # - count defined HM entities, selected readings, errors on filtered readings
-  # - display Assigned IO devices
-  # - show ActionDetector status
-  # - prot events if error
-  # - rssi - eval minimum values
-  my $hash = shift;
-  my $name = $hash->{NAME};
-  my ($nbrE,$nbrD,$nbrC,$nbrV) = (0,0,0,0);# count entities and types
-  #--- used for status
-  my @info = split ",",$attr{$name}{sumStatus};#prepare event
-  my %sum;
-  #--- used for error counts
-  my @erro = split ",",$attr{$name}{sumERROR};
-  my %errFlt;
-  my %err;
-  my @errNames;
-  foreach (@erro){    #prepare reading filter for error counts
-    my ($p,@a) = split ":",$_;
-    $errFlt{$p}{x}=1; # add at least one reading
-    $errFlt{$p}{$_}=1 foreach (@a);
-  }
-  #--- used for IO, protocol  and communication (e.g. rssi)
-  my @IOdev;
-
-  my %protC = (ErrIoId_ =>0,ErrIoAttack =>0);
-  my %protE = (NACK =>0,IOerr =>0,ResndFail =>0,CmdDel =>0);
-  my %protW = (Resnd =>0,CmdPend =>0);
-  my @protNamesC;    # devices with current protocol Critical
-  my @protNamesE;    # devices with current protocol Errors
-  my @protNamesW;    # devices with current protocol Warnings
-  my @Anames;        # devices with ActionDetector events
-  my %rssiMin;
-  my %rssiMinCnt = ("99>"=>0,"80>"=>0,"60>"=>0,"59<"=>0);
-  my @rssiNames; #entities with ciritcal RSSI
-  my @shdwNames; #entites with shadowRegs, i.e. unconfirmed register ->W_unconfRegs
-
-  foreach my $id (keys%{$modules{CUL_HM}{defptr}}){#search/count for parameter
-    my $ehash = $modules{CUL_HM}{defptr}{$id};
-    my $eName = $ehash->{NAME};
-    $nbrE++;
-    $nbrC++ if ($ehash->{helper}{role}{chn});
-    $nbrV++ if ($ehash->{helper}{role}{vrt});
-    push @shdwNames,$eName if (keys %{$ehash->{helper}{shadowReg}});
-    foreach my $read (grep {$ehash->{READINGS}{$_}} @info){       #---- count critical readings
-      my $val = $ehash->{READINGS}{$read}{VAL};
-      $sum{$read}{$val} =0 if (!$sum{$read}{$val});
-      $sum{$read}{$val}++;
-    }
-    foreach my $read (grep {$ehash->{READINGS}{$_}} keys %errFlt){#---- count error readings
-      my $val = $ehash->{READINGS}{$read}{VAL};
-      next if (grep (/$val/,(keys%{$errFlt{$read}})));# filter non-Error
-      $err{$read}{$val} =0 if (!$err{$read}{$val});
-      $err{$read}{$val}++;
-      push @errNames,$eName;
-    }
-    if ($ehash->{helper}{role}{dev}){#---restrict to devices
-      $nbrD++;
-      push @IOdev,$ehash->{IODev}{NAME} if($ehash->{IODev} && $ehash->{IODev}{NAME});
-      push @Anames,$eName if ($attr{$eName}{actStatus} && $attr{$eName}{actStatus} ne "alive");
-
-      foreach (grep /ErrIoId_/, keys %{$ehash}){# detect addtional critical entries
-        my $k = $_;
-        $k =~ s/^prot//;
-        $protC{$k} = 0 if(!defined $protC{$_});
-      }
-      foreach (grep {$ehash->{"prot".$_}} keys %protC){#protocol critical alarms
-        $protC{$_}++;
-        push @protNamesC,$eName;
-      }
-      foreach (grep {$ehash->{"prot".$_}} keys %protE){#protocol errors
-        $protE{$_}++;
-        push @protNamesE,$eName;
-      }
-      foreach (grep {$ehash->{"prot".$_}} keys %protW){#protocol events reported
-        $protW{$_}++;
-        push @protNamesW,$eName;
-      }
-      $rssiMin{$eName} = 0;
-      foreach (keys %{$ehash->{helper}{rssi}}){
-        next if($_ !~ m /at_.*$ehash->{IODev}->{NAME}/ );#ignore unused IODev
-        $rssiMin{$eName} = $ehash->{helper}{rssi}{$_}{min}
-          if ($rssiMin{$eName} > $ehash->{helper}{rssi}{$_}{min});
-      }
-    }
-  }
-  #====== collection finished - start data preparation======
-  delete $hash->{$_} foreach (grep(/^(ERR|W_|I_|C_)/,keys%{$hash}));# remove old
-  my @updates;
-  foreach my $read(grep {defined $sum{$_}} @info){       #--- disp crt count
-    my $d;
-    $d .= "$_:$sum{$read}{$_};"foreach(keys %{$sum{$read}});
-    push @updates,"I_sum_$read:".$d;
-  }
-  foreach my $read(grep {defined $err{$_}} keys %errFlt){#--- disp err count
-    my $d;
-    $d .= "$_:$err{$read}{$_};"foreach(keys %{$err{$read}});
-    push @updates,"ERR_$read:".$d;
-  }
-
-  @errNames = grep !/^$/,HMinfo_noDup(@errNames);
-  $hash->{ERR_names} = join",",@errNames if(@errNames);# and name entities
-
-  push @updates,"C_sumDefined:"."entities:$nbrE device:$nbrD channel:$nbrC virtual:$nbrV";
-  # ------- display status of action detector ------
-  push @updates,"I_actTotal:".$modules{CUL_HM}{defptr}{"000000"}{STATE};
-  $hash->{ERRactNames} = join",",@Anames if (@Anames);
-
-  # ------- what about IO devices??? ------
-  my %tmp; # remove duplicates
-  $tmp{$_}=0 for @IOdev;
-  delete $tmp{""}; #remove empties if present
-  @IOdev = sort keys %tmp;
-  foreach (grep {$defs{$_}{READINGS}{cond}} @IOdev){
-    $_ .= ",:".$defs{$_}{READINGS}{cond}{VAL};
-  }
-  $hash->{I_HM_IOdevices}= join",",@IOdev;
-
-  # ------- what about protocol events ------
-  # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
-  # additional variables are protCmdDel,protCmdPend,protState,protLastRcv
-  my @tpc;
-  push @tpc,"$_:$protC{$_}" foreach (grep {$protC{$_}} keys(%protC));
-  if(@tpc){push @updates,"CRIT__protocol:".join",",@tpc;} else{delete $hash->{READINGS}{CRIT__protocol} };
-  my @tpe;
-  push @tpe,"$_:$protE{$_}" foreach (grep {$protE{$_}} keys(%protE));
-  if(@tpe){push @updates,"ERR__protocol:".join",",@tpe;} else{ delete $hash->{READINGS}{ERR__protocol} };
-  my @tpw;
-  push @tpw,"$_:$protW{$_}" foreach (grep {$protW{$_}} keys(%protW));
-  if(@tpw){push @updates,"W__protocol:".join",",@tpw  ;} else{ delete $hash->{READINGS}{W__protocol} };
-
-  @protNamesC = grep !/^$/,HMinfo_noDup(@protNamesC);
-  $hash->{CRI__protoNames} = join",",@protNamesC if(@protNamesC);
-  @protNamesE = grep !/^$/,HMinfo_noDup(@protNamesE);
-  $hash->{ERR__protoNames} = join",",@protNamesE if(@protNamesE);
-  @protNamesW = grep !/^$/,HMinfo_noDup(@protNamesW);
-  $hash->{W__protoNames} = join",",@protNamesW if(@protNamesW);
-
-  if (defined $modules{CUL_HM}{helper}{qReqConf} &&
-      @{$modules{CUL_HM}{helper}{qReqConf}}>0){
-    $hash->{I_autoReadPend} = join ",",@{$modules{CUL_HM}{helper}{qReqConf}};
-    push @updates,"I_autoReadPend:". scalar @{$modules{CUL_HM}{helper}{qReqConf}};
-  }
-#  else{
-#    delete $hash->{I_autoReadPend};
-#  }
-
-  # ------- what about rssi low readings ------
-  foreach (grep {$rssiMin{$_} != 0}keys %rssiMin){
-    if    ($rssiMin{$_}> -60) {$rssiMinCnt{"59<"}++;}
-    elsif ($rssiMin{$_}> -80) {$rssiMinCnt{"60>"}++;}
-    elsif ($rssiMin{$_}< -99) {$rssiMinCnt{"99>"}++;
-                               push @rssiNames,$_  ;}
-    else                      {$rssiMinCnt{"80>"}++;}
-  }
-
-  my $d ="";
-  $d .= "$_:$rssiMinCnt{$_} " foreach (sort keys %rssiMinCnt);
-  push @updates,"I_rssiMinLevel:".$d;
-  $hash->{ERR___rssiCrit} = join(",",@rssiNames) if (@rssiNames);
-  # ------- what about others ------
-  $hash->{W_unConfRegs} = join(",",@shdwNames) if (@shdwNames > 0);
-  # ------- update own status ------
-  $hash->{STATE} = "updated:".TimeNow();
-  my $updt = join",",@updates;
-  foreach (grep /^(W_|I_|ERR)/,keys%{$hash->{READINGS}}){
-    delete $hash->{READINGS}{$_} if ($updt !~ m /$_/);
-  }
-  readingsBeginUpdate($hash);
-  foreach my $rd (@updates){
-    next if (!$rd);
-    my ($rdName, $rdVal) = split(":",$rd, 2);
-    next if (defined $hash->{READINGS}{$rdName} &&
-             $hash->{READINGS}{$rdName}{VAL} eq $rdVal);
-    readingsBulkUpdate($hash,$rdName,
-                             ((defined($rdVal) && $rdVal ne "")?$rdVal:"-"));
-  }
-  readingsEndUpdate($hash,1);
-  return;
-}
-
-my %tpl = (
-   autoOff           => {p=>"time"             ,t=>"staircase - auto off after <time>, extend time with each trigger"
-                    ,reg=>{ OnTime          =>"p0"
-                           ,OffTime         =>111600
-                           ,SwJtOn          =>"on"
-                           ,SwJtOff         =>"dlyOn"
-                           ,SwJtDlyOn       =>"no"
-                           ,SwJtDlyOff      =>"dlyOn"
-                     }}
-  ,motionOnDim       => {p=>"ontime brightness",t=>"Dimmer:on for time if MDIR-brightness below level"
-                    ,reg=>{ CtDlyOn         =>"ltLo"
-                           ,CtDlyOff        =>"ltLo"
-                           ,CtOn            =>"ltLo"
-                           ,CtOff           =>"ltLo"
-                           ,CtValLo         =>"p1"
-                           ,CtRampOn        =>"ltLo"
-                           ,CtRampOff       =>"ltLo"
-                           ,OffTime         =>111600
-                           ,OnTime          =>"p0"
-
-                           ,ActionTypeDim   =>"jmpToTarget"
-                           ,DimJtOn         =>"on"
-                           ,DimJtOff        =>"dlyOn"
-                           ,DimJtDlyOn      =>"rampOn"
-                           ,DimJtDlyOff     =>"dlyOn"
-                           ,DimJtRampOn     =>"on"
-                           ,DimJtRampOff    =>"dlyOn"
-                     }}
-  ,motionOnSw        => {p=>"ontime brightness",t=>"Switch:on for time if MDIR-brightness below level"
-                    ,reg=>{ CtDlyOn         =>"ltLo"
-                           ,CtDlyOff        =>"ltLo"
-                           ,CtOn            =>"ltLo"
-                           ,CtOff           =>"ltLo"
-                           ,CtValLo         =>"p1"
-                           ,OffTime         =>111600
-                           ,OnTime          =>"p0"
-
-                           ,ActionType      =>"jmpToTarget"
-                           ,SwJtOn          =>"on"
-                           ,SwJtOff         =>"dlyOn"
-                           ,SwJtDlyOn       =>"on"
-                           ,SwJtDlyOff      =>"dlyOn"
-                    }}
-  ,SwCondAbove       => {p=>"condition"        ,t=>"Switch:execute only if condition level is above limit"
-                    ,reg=>{ CtDlyOn         =>"geLo"
-                           ,CtDlyOff        =>"geLo"
-                           ,CtOn            =>"geLo"
-                           ,CtOff           =>"geLo"
-                           ,CtValLo         =>"p0"
-                     }}
-  ,SwCondBelow       => {p=>"condition"        ,t=>"Switch:execute only if condition level is below limit"
-                    ,reg=>{ CtDlyOn         =>"ltLo"
-                           ,CtDlyOff        =>"ltLo"
-                           ,CtOn            =>"ltLo"
-                           ,CtOff           =>"ltLo"
-                           ,CtValLo         =>"p0"
-                     }}
-  ,SwOnCond          => {p=>"level cond"       ,t=>"switch:execute only if condition [geLo|ltLo] level is below limit"
-                    ,reg=>{ CtDlyOn         =>"p1"
-                           ,CtDlyOff        =>"p1"
-                           ,CtOn            =>"p1"
-                           ,CtOff           =>"p1"
-                           ,CtValLo         =>"p0"
-                     }}
-  ,BlStopDnLg        => {p=>""                 ,t=>"Blind: stop drive on any key - for long drive down"
-                    ,reg=>{ ActionType      =>"jmpToTarget"
-                           ,BlJtDlyOff      =>"refOff"
-                           ,BlJtDlyOn       =>"dlyOff"
-                           ,BlJtOff         =>"dlyOff"
-                           ,BlJtOn          =>"dlyOff"
-                           ,BlJtRampOff     =>"rampOff"
-                           ,BlJtRampOn      =>"on"
-                           ,BlJtRefOff      =>"rampOff"
-                           ,BlJtRefOn       =>"on"
-                    }}
-  ,BlStopDnSh        => {p=>""                 ,t=>"Blind: stop drive on any key - for short drive down"
-                    ,reg=>{ ActionType      =>"jmpToTarget"
-                           ,BlJtDlyOff      =>"refOff"
-                           ,BlJtDlyOn       =>"dlyOff"
-                           ,BlJtOff         =>"dlyOff"
-                           ,BlJtOn          =>"dlyOff"
-                           ,BlJtRampOff     =>"off"
-                           ,BlJtRampOn      =>"on"
-                           ,BlJtRefOff      =>"rampOff"
-                           ,BlJtRefOn       =>"on"
-                    }}
-  ,BlStopUpLg        => {p=>""                 ,t=>"Blind: stop drive on any key - for long drive up"
-                    ,reg=>{ ActionType       =>"jmpToTarget"
-                           ,BlJtDlyOff       =>"dlyOn"
-                           ,BlJtDlyOn        =>"refOn"
-                           ,BlJtOff          =>"dlyOn"
-                           ,BlJtOn           =>"dlyOn"
-                           ,BlJtRampOff      =>"off"
-                           ,BlJtRampOn       =>"rampOn"
-                           ,BlJtRefOff       =>"off"
-                           ,BlJtRefOn        =>"rampOn"
-                    }}
-  ,BlStopUpSh        => {p=>""                 ,t=>"Blind: stop drive on"
-                    ,reg=>{ ActionType       =>"jmpToTarget"
-                           ,BlJtDlyOff       =>"dlyOn"
-                           ,BlJtDlyOn        =>"refOn"
-                           ,BlJtOff          =>"dlyOn"
-                           ,BlJtOn           =>"dlyOn"
-                           ,BlJtRampOff      =>"off"
-                           ,BlJtRampOn       =>"on"
-                           ,BlJtRefOff       =>"off"
-                           ,BlJtRefOn        =>"rampOn"
-                    }}                   
-  ,wmOpen            => {p=>"speed"            ,t=>"winmatic open window"     
-                    ,reg=>{ WinJtOn          =>"rampOn"
-                           ,WinJtOff         =>"rampOn"
-                           ,WinJtRampOn      =>"on"
-                           ,WinJtRampOff     =>"rampOnFast"
-                           ,RampOnSp         =>"p0"
-                    }}
-  ,wmClose           => {p=>"speed"            ,t=>"winmatic close window"    
-                    ,reg=>{ WinJtOn          =>"rampOff"
-                           ,WinJtOff         =>"rampOff"
-                           ,WinJtRampOn      =>"on"
-                           ,WinJtRampOff     =>"rampOnFast"
-                           ,RampOffSp        =>"p0"
-                    }}
-  ,wmClosed          => {p=>""                 ,t=>"winmatic lock window"     
-                    ,reg=>{ OffLevelKm       =>"0"
-                    }}
-  ,wmLock            => {p=>""                 ,t=>"winmatic lock window"     
-                    ,reg=>{ OffLevelKm       =>"127.5"
-                    }}
-);
 
 sub HMinfo_templateDef(@){#####################################################
   my ($name,$param,$desc,@regs) = @_;
   return "insufficient parameter" if(!defined $param);
   if ($param eq "del"){
-    delete $tpl{$name};
+    delete $HMConfig::tpl{$name};
     return;
   }
   # get description if marked wir ""
@@ -1614,30 +1495,30 @@ sub HMinfo_templateDef(@){#####################################################
     splice @regs,0,$cnt;
   }
 
-  return "$name already defined, delete it first" if($tpl{$name});
+  return "$name already defined, delete it first" if($HMConfig::tpl{$name});
   return "insufficient parameter" if(@regs < 1);
-  $tpl{$name}{p} = "";
-  $tpl{$name}{p} = join(" ",split(":",$param)) if($param ne "0");
-  $tpl{$name}{t} = $desc;
+  $HMConfig::tpl{$name}{p} = "";
+  $HMConfig::tpl{$name}{p} = join(" ",split(":",$param)) if($param ne "0");
+  $HMConfig::tpl{$name}{t} = $desc;
   my $paramNo = split(":",$param);
   foreach (@regs){
     my ($r,$v)=split":",$_;
     if (!defined $v){
-      delete $tpl{$name};
+      delete $HMConfig::tpl{$name};
       return " empty reg value for $r";
     }
     elsif($v =~ m/^p(.)/){
       return ($1+1)." params are necessary, only $paramNo aregiven"
             if (($1+1)>$paramNo);
     }
-    $tpl{$name}{reg}{$r} = $v;
+    $HMConfig::tpl{$name}{reg}{$r} = $v;
   }
 }
 sub HMinfo_templateSet(@){#####################################################
   my ($aName,$tmpl,$pSet,@p) = @_;
   $pSet = ":" if (!$pSet || $pSet eq "none");
   my ($pName,$pTyp) = split(":",$pSet);
-  return "template undefined $tmpl"                       if(!$tpl{$tmpl});
+  return "template undefined $tmpl"                       if(!$HMConfig::tpl{$tmpl});
   return "aktor $aName unknown"                           if(!$defs{$aName});
   return "exec set $aName getConfig first"                if(!(grep /RegL_/,keys%{$defs{$aName}{READINGS}}));
   return "give <peer>:[short|long] with peer, not $pSet"  if($pName && $pTyp !~ m/(short|long)/);
@@ -1645,11 +1526,11 @@ sub HMinfo_templateSet(@){#####################################################
   my $aHash = $defs{$aName};
 
   my @regCh;
-  foreach (keys%{$tpl{$tmpl}{reg}}){
+  foreach (keys%{$HMConfig::tpl{$tmpl}{reg}}){
     my $regN = $pSet.$_;
-    my $regV = $tpl{$tmpl}{reg}{$_};
+    my $regV = $HMConfig::tpl{$tmpl}{reg}{$_};
     if ($regV =~m /^p(.)$/) {#replace with User parameter
-      return "insufficient values - at least ".$tpl{p}." are $1 necessary" if (@p < ($1+1));
+      return "insufficient values - at least ".$HMConfig::tpl{p}." are $1 necessary" if (@p < ($1+1));
       $regV = $p[$1];
     }
     my ($ret,undef) = CUL_HM_Set($aHash,$aName,"regSet",$regN,"?",$pName);
@@ -1673,7 +1554,7 @@ sub HMinfo_templateChk(@){#####################################################
   my ($aName,$tmpl,$pSet,@p) = @_;
   $pSet = "" if (!$pSet || $pSet eq "none");
   my ($pName,$pTyp) = split(":",$pSet);
-  return "template undefined $tmpl\n"                     if(!$tpl{$tmpl});
+  return "template undefined $tmpl\n"                     if(!$HMConfig::tpl{$tmpl});
   return "aktor $aName unknown\n"                         if(!$defs{$aName});
   return "give <peer>:[short|long|all] wrong:$pTyp\n"     if($pTyp && $pTyp !~ m/(short|long|all)/);
 
@@ -1702,16 +1583,16 @@ sub HMinfo_templateChk(@){#####################################################
     }
     else{
       my $pRnm = $pName?($pName."-".($pTyp eq "long"?"lg":"sh")):"";
-      foreach my $rn (keys%{$tpl{$tmpl}{reg}}){
+      foreach my $rn (keys%{$HMConfig::tpl{$tmpl}{reg}}){
         my $regV = ReadingsVal($aName,"R-$pRnm$rn" ,undef);
         $regV    = ReadingsVal($aName,".R-$pRnm$rn",undef) if (!defined $regV);
         $regV    = ReadingsVal($aName,"R-".$rn     ,undef) if (!defined $regV);
         $regV    = ReadingsVal($aName,".R-".$rn    ,undef) if (!defined $regV);
         if (defined $regV){
           $regV =~s/ .*//;#strip unit
-          my $tplV = $tpl{$tmpl}{reg}{$rn};
+          my $tplV = $HMConfig::tpl{$tmpl}{reg}{$rn};
           if ($tplV =~m /^p(.)$/) {#replace with User parameter
-            return "insufficient data - at least ".$tpl{p}." are $1 necessary"
+            return "insufficient data - at least ".$HMConfig::tpl{p}." are $1 necessary"
                                                            if (@p < ($1+1));
             $tplV = $p[$1];
           }
@@ -1729,22 +1610,21 @@ sub HMinfo_templateChk(@){#####################################################
 sub HMinfo_templateList($){####################################################
   my $templ = shift;
   my $reply = "";
-#  if(!$templ || !(grep /$templ/,keys%tpl)){# list all templates
-  if(!($templ && (grep /$templ/,keys%tpl))){# list all templates
-    foreach (sort keys%tpl){
+  if(!($templ && (grep /$templ/,keys%HMConfig::tpl))){# list all templates
+    foreach (sort keys%HMConfig::tpl){
       $reply .= sprintf("%-16s params:%-24s Info:%s\n"
                              ,$_
-                               ,$tpl{$_}{p}
-                               ,$tpl{$_}{t}
+                             ,$HMConfig::tpl{$_}{p}
+                             ,$HMConfig::tpl{$_}{t}
                        );
     }
   }
   else{#details about one template
-    $reply = sprintf("%-16s params:%-24s Info:%s\n",$templ,$tpl{$templ}{p},$tpl{$templ}{t});
-    foreach (sort keys %{$tpl{$templ}{reg}}){
-      my $val = $tpl{$templ}{reg}{$_};
+    $reply = sprintf("%-16s params:%-24s Info:%s\n",$templ,$HMConfig::tpl{$templ}{p},$HMConfig::tpl{$templ}{t});
+    foreach (sort keys %{$HMConfig::tpl{$templ}{reg}}){
+      my $val = $HMConfig::tpl{$templ}{reg}{$_};
       if ($val =~m /^p(.)$/){
-        my @a = split(" ",$tpl{$templ}{p});
+        my @a = split(" ",$HMConfig::tpl{$templ}{p});
         $val = $a[$1];
       }
       $reply .= sprintf("  %-16s :%s\n",$_,$val);
@@ -1801,7 +1681,7 @@ sub HMinfo_cpRegs(@){##########################################################
   my ($ret,undef) = CUL_HM_Set($defs{$dstCh},$dstCh,"regBulk",$srcRegLn,split(" ",$srcData));
   return $ret;
 }
-sub HMinfo_noDup(@) {#return list with no duplicates
+sub HMinfo_noDup(@) {#return list with no duplicates###########################
   my %all;
   return "" if (scalar(@_) == 0);
   $all{$_}=0 foreach (grep {defined($_)} @_);

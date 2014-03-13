@@ -1053,7 +1053,7 @@ sub CUL_HM_Parse($$) {#########################################################
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
       my %errTbl=( 0=>"ok", 1=>"ValveTight", 2=>"adjustRangeTooLarge"
                   ,3=>"adjustRangeTooSmall" , 4=>"communicationERR"
-                  ,5=>"unknown" , 6=>"lowBat" , 7=>"ValveErrorPosition" );
+                  ,5=>"unknown", 6=>"lowBat", 7=>"ValveErrorPosition" );
 
       push @evtEt,[$shash,1,"motorErr:$errTbl{$err}" ];
       push @evtEt,[$shash,1,"measured-temp:$actTemp" ];
@@ -1069,8 +1069,11 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$dHash,1,"desired-temp:$setTemp"];
       push @evtEt,[$dHash,1,"actuator:$vp"];
       
-      my $wHash = $modules{CUL_HM}{defptr}{$src."01"};
-      push @evtEt,[$wHash,1,"measured-temp:$actTemp"] if ($wHash);
+      my $wHash = $modules{CUL_HM}{defptr}{$src."01"}; 
+      if ($wHash){
+        push @evtEt,[$wHash,1,"measured-temp:$actTemp"];
+        push @evtEt,[$wHash,1,"state:$actTemp"];
+      }
     }
     elsif($mTp eq "59" && $p =~ m/^(..)/) {#inform team about new value
       my $setTemp = sprintf("%.1f",int(hex($1)/4)/2);
@@ -1334,8 +1337,8 @@ sub CUL_HM_Parse($$) {#########################################################
               my $vh = CUL_HM_id2Hash($vDim->{$tmpKey}) if ($vDim->{$tmpKey});
               next if (!$vh || $vDim->{$tmpKey} eq $chId);
               my $vl = ReadingsVal($vh->{NAME},"level","???");
-              my $vs = ($vl eq "100 %"?"on":($vl eq "0 %"?"off":"$vl"));
-              $vs = (($pl." %") ne $vl)?"chn:$vs  phys:$pl":$vs;
+              my $vs = ($vl eq "100"?"on":($vl eq "0"?"off":"$vl"));
+              $vs = ($pl ne $vl)?"chn:$vs  phys:$pl":$vs;
               push @evtEt,[$vh,1,"state:$vs"];
               push @evtEt,[$vh,1,"phyLevel:$pl"];
             }
@@ -2748,10 +2751,14 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $days = $a[3];
     ($eH,$eM)  = split(':',$a[2]);
 
+    my ($s,$m,$h) = localtime();
+    return "$eH:$eM passed at $h:$m. Please enter time in the feature" 
+                                                            if ($days == 0 && ($h+($m/60))>=($eH+($eM/60)) );
     return "$eM illegal - use 00 or 30 minutes only"        if ($eM !~ m/^(00|30)$/);
     return "$eH illegal - hour must be between 0 and 23"    if ($eH < 0 || $eH > 23);
     return "$days illegal - days must be between 0 and 200" if ($days < 0 || $days > 200);
     $eH += 128 if ($eM eq "30");
+
     my $cHash = CUL_HM_id2Hash($dst."02");
     $cHash->{helper}{partyReg} = sprintf("61%02X62%02X0000",$eH,$days);
     $cHash->{helper}{partyReg} =~ s/(..)(..)/ $1:$2/g;
@@ -4976,9 +4983,8 @@ sub CUL_HM_getAssChnNames($) { #in: name out:list of assotiated chan and device
 
 sub CUL_HM_Id($) {#in: ioHash out: ioHMid
   my ($io) = @_;
-  if (ref($io) ne 'HASH'){
-    return "000000";
-  }
+  return "000000" if (ref($io) ne 'HASH');
+
   my $fhtid = defined($io->{FHTID}) ? $io->{FHTID} : "0000";
   return AttrVal($io->{NAME},"hmId","F1$fhtid");
 }
@@ -4990,11 +4996,11 @@ sub CUL_HM_IOid($) {#in: hash out: id of IO device
   my $fhtid = defined($ioHash->{FHTID}) ? $ioHash->{FHTID} : "0000";
   return AttrVal($ioHash->{NAME},"hmId","F1$fhtid");
 }
-sub CUL_HM_hash2Id($) {#in: id, out:hash
+sub CUL_HM_hash2Id($) {  #in: id,   out:hash
   my ($hash) = @_;
   return $hash->{DEF};
 }
-sub CUL_HM_hash2Name($) {#in: id, out:name
+sub CUL_HM_hash2Name($) {#in: hash, out:name
   my ($hash) = @_;
   return $hash->{NAME};
 }
