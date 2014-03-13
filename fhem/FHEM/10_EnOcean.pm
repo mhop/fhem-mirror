@@ -241,7 +241,7 @@ my %EnO_subType = (
 my @EnO_models = qw (
   other
   FAE14 FHK14 FHK61
-  FSB14 FSB61 FSB70
+  FSA12 FSB14 FSB61 FSB70
   FSM12 FSM61
   FT55
   FTS12
@@ -803,7 +803,11 @@ EnOcean_Set($@)
           $updateState = 0;
           $data = sprintf "%02X%04X%02X", $gwCmdID, $time, $setCmd;
         } elsif ($cmd eq "off") {
-          $setCmd = 8;
+          if ($model eq "FSA12") {
+            $setCmd = 0x0E;
+          } else {
+            $setCmd = 8;
+          }
           readingsSingleUpdate($hash, "block", "unlock", 1);
           if ($a[1]) {
             return "Usage: $cmd [lock|unlock]" if (($a[1] ne "lock") && ($a[1] ne "unlock"));
@@ -4346,7 +4350,7 @@ EnOcean_Undef($$)
 
      <li>Gateway (EEP A5-38-08)<br>
          Switching<br>
-         [Eltako FLC61, FSR14]<br>
+         [Eltako FLC61, FSA12, FSR14]<br>
      <ul>
       <code>set &lt;name&gt; &lt;value&gt;</code>
       <br><br>
@@ -4361,7 +4365,8 @@ EnOcean_Undef($$)
      </ul><br>
         The attr subType must be gateway and gwCmd must be switching. This is done if the device was
         created by autocreate.<br>
-        For Eltako devices attributes must be set manually.
+        For Eltako devices attributes must be set manually. For Eltako FSA12 attribute model must be set 
+        to FSA12.
      </li>
      <br><br>
 
@@ -5560,7 +5565,7 @@ EnOcean_Undef($$)
 
      <li>Gateway (EEP A5-38-08)<br>
          Switching<br>
-         [Eltako FLC61, FSR14]<br>
+         [Eltako FLC61, FSA12, FSR14]<br>
      <ul>
        <li>on</li>
        <li>off</li>
