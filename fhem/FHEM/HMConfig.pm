@@ -423,7 +423,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   cyclicInfoMsgDis=>{a=> 17.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message"},
   lowBatLimit     =>{a=> 18.0,s=>1.0,l=>0,min=>10 ,max=>12      ,c=>''         ,f=>10      ,u=>'V'   ,d=>1,t=>"low batterie limit, step .1V"},
   lowBatLimitBA   =>{a=> 18.0,s=>1.0,l=>0,min=>5  ,max=>15      ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
-  lowBatLimitBA_4 =>{a=> 28.0,s=>1.0,l=>0,min=>5  ,max=>15      ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},# bug in SW4? strange - at least one user...
+  lowBatLimitBA_4 =>{a=> 24.0,s=>1.0,l=>0,min=>5  ,max=>15      ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},# bug in SW4? strange - at least one user...
   lowBatLimitBA2  =>{a=> 18.0,s=>1.0,l=>0,min=>0  ,max=>15      ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
   lowBatLimitFS   =>{a=> 18.0,s=>1.0,l=>0,min=>2  ,max=>3       ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
   lowBatLimitRT   =>{a=> 18.0,s=>1.0,l=>0,min=>2  ,max=>2.5     ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
@@ -1052,7 +1052,137 @@ $culHmRegChan{"HM-TC-IT-WM-W-EU07"}   = $culHmRegType{remote};        # type has
 $culHmRegChan{"ROTO_ZEL-STG-RM-FWT02"}= $culHmRegChan{"HM-CC-TC02"};
 $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
 
-##--------------- Conversion routines for register settings
+##############################---templates---##################################
+#en-block programming of funktions
+my %tpl = (
+   autoOff           => {p=>"time"             ,t=>"staircase - auto off after <time>, extend time with each trigger"
+                    ,reg=>{ OnTime          =>"p0"
+                           ,OffTime         =>111600
+                           ,SwJtOn          =>"on"
+                           ,SwJtOff         =>"dlyOn"
+                           ,SwJtDlyOn       =>"no"
+                           ,SwJtDlyOff      =>"dlyOn"
+                     }}
+  ,motionOnDim       => {p=>"ontime brightness",t=>"Dimmer: on for time if MDIR-brightness below level"
+                    ,reg=>{ CtDlyOn         =>"ltLo"
+                           ,CtDlyOff        =>"ltLo"
+                           ,CtOn            =>"ltLo"
+                           ,CtOff           =>"ltLo"
+                           ,CtValLo         =>"p1"
+                           ,CtRampOn        =>"ltLo"
+                           ,CtRampOff       =>"ltLo"
+                           ,OffTime         =>111600
+                           ,OnTime          =>"p0"
+
+                           ,ActionTypeDim   =>"jmpToTarget"
+                           ,DimJtOn         =>"on"
+                           ,DimJtOff        =>"dlyOn"
+                           ,DimJtDlyOn      =>"rampOn"
+                           ,DimJtDlyOff     =>"dlyOn"
+                           ,DimJtRampOn     =>"on"
+                           ,DimJtRampOff    =>"dlyOn"
+                     }}
+  ,motionOnSw        => {p=>"ontime brightness",t=>"Switch: on for time if MDIR-brightness below level"
+                    ,reg=>{ CtDlyOn         =>"ltLo"
+                           ,CtDlyOff        =>"ltLo"
+                           ,CtOn            =>"ltLo"
+                           ,CtOff           =>"ltLo"
+                           ,CtValLo         =>"p1"
+                           ,OffTime         =>111600
+                           ,OnTime          =>"p0"
+
+                           ,ActionType      =>"jmpToTarget"
+                           ,SwJtOn          =>"on"
+                           ,SwJtOff         =>"dlyOn"
+                           ,SwJtDlyOn       =>"on"
+                           ,SwJtDlyOff      =>"dlyOn"
+                    }}
+  ,SwCondAbove       => {p=>"condition"        ,t=>"Switch: execute only if condition level is above limit"
+                    ,reg=>{ CtDlyOn         =>"geLo"
+                           ,CtDlyOff        =>"geLo"
+                           ,CtOn            =>"geLo"
+                           ,CtOff           =>"geLo"
+                           ,CtValLo         =>"p0"
+                     }}
+  ,SwCondBelow       => {p=>"condition"        ,t=>"Switch: execute only if condition level is below limit"
+                    ,reg=>{ CtDlyOn         =>"ltLo"
+                           ,CtDlyOff        =>"ltLo"
+                           ,CtOn            =>"ltLo"
+                           ,CtOff           =>"ltLo"
+                           ,CtValLo         =>"p0"
+                     }}
+  ,SwOnCond          => {p=>"level cond"       ,t=>"switch: execute only if condition [geLo|ltLo] level is below limit"
+                    ,reg=>{ CtDlyOn         =>"p1"
+                           ,CtDlyOff        =>"p1"
+                           ,CtOn            =>"p1"
+                           ,CtOff           =>"p1"
+                           ,CtValLo         =>"p0"
+                     }}
+  ,BlStopDnLg        => {p=>""                 ,t=>"Blind: stop drive on any key - for long drive down"
+                    ,reg=>{ ActionType      =>"jmpToTarget"
+                           ,BlJtDlyOff      =>"refOff"
+                           ,BlJtDlyOn       =>"dlyOff"
+                           ,BlJtOff         =>"dlyOff"
+                           ,BlJtOn          =>"dlyOff"
+                           ,BlJtRampOff     =>"rampOff"
+                           ,BlJtRampOn      =>"on"
+                           ,BlJtRefOff      =>"rampOff"
+                           ,BlJtRefOn       =>"on"
+                    }}
+  ,BlStopDnSh        => {p=>""                 ,t=>"Blind: stop drive on any key - for short drive down"
+                    ,reg=>{ ActionType      =>"jmpToTarget"
+                           ,BlJtDlyOff      =>"refOff"
+                           ,BlJtDlyOn       =>"dlyOff"
+                           ,BlJtOff         =>"dlyOff"
+                           ,BlJtOn          =>"dlyOff"
+                           ,BlJtRampOff     =>"off"
+                           ,BlJtRampOn      =>"on"
+                           ,BlJtRefOff      =>"rampOff"
+                           ,BlJtRefOn       =>"on"
+                    }}
+  ,BlStopUpLg        => {p=>""                 ,t=>"Blind: stop drive on any key - for long drive up"
+                    ,reg=>{ ActionType       =>"jmpToTarget"
+                           ,BlJtDlyOff       =>"dlyOn"
+                           ,BlJtDlyOn        =>"refOn"
+                           ,BlJtOff          =>"dlyOn"
+                           ,BlJtOn           =>"dlyOn"
+                           ,BlJtRampOff      =>"off"
+                           ,BlJtRampOn       =>"rampOn"
+                           ,BlJtRefOff       =>"off"
+                           ,BlJtRefOn        =>"rampOn"
+                    }}
+  ,BlStopUpSh        => {p=>""                 ,t=>"Blind: stop drive on"
+                    ,reg=>{ ActionType       =>"jmpToTarget"
+                           ,BlJtDlyOff       =>"dlyOn"
+                           ,BlJtDlyOn        =>"refOn"
+                           ,BlJtOff          =>"dlyOn"
+                           ,BlJtOn           =>"dlyOn"
+                           ,BlJtRampOff      =>"off"
+                           ,BlJtRampOn       =>"on"
+                           ,BlJtRefOff       =>"off"
+                           ,BlJtRefOn        =>"rampOn"
+                    }}                   
+  ,wmOpen            => {p=>"speed"            ,t=>"winmatic: open window"     
+                    ,reg=>{ WinJtOn          =>"rampOn"
+                           ,WinJtOff         =>"rampOn"
+                           ,WinJtRampOn      =>"on"
+                           ,WinJtRampOff     =>"rampOnFast"
+                           ,RampOnSp         =>"p0"
+                    }}
+  ,wmClose           => {p=>"speed"            ,t=>"winmatic: close window"    
+                    ,reg=>{ WinJtOn          =>"rampOff"
+                           ,WinJtOff         =>"rampOff"
+                           ,WinJtRampOn      =>"on"
+                           ,WinJtRampOff     =>"rampOnFast"
+                           ,RampOffSp        =>"p0"
+                    }}
+  ,wmClosed          => {p=>""                 ,t=>"winmatic: lock window"     
+                    ,reg=>{ OffLevelKm       =>"0"
+                    }}
+  ,wmLock            => {p=>""                 ,t=>"winmatic: lock window"     
+                    ,reg=>{ OffLevelKm       =>"127.5"
+                    }}
+);
 
 ##############################---get---########################################
 #define gets - try use same names as for set
@@ -1496,6 +1626,10 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                      LOWBAT   => '00,2,$val=(hex($val)&0x80)?1:0',
                      NBR      => '02,2,$val=(hex($val))',
                      VALUE    => '04,2,$val=(hex($val))',} },
+  "42"          => { txt => "SwitchLevel", params => {
+                     BUTTON   => '00,2,$val=(hex($val)&0x3F)',
+                     NBR      => '02,2,$val=(hex($val))',
+                     LEVEL    => '04,2,$val=(hex($val))',} },
   "53"          => { txt => "SensorData"  , params => {
                      CMD => "00,2",
                      Fld1=> "02,2",
@@ -1513,18 +1647,18 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                      CMD      => "00,2",
                      desTemp  => '02,2,$val=((hex($val)>>2) /2)',
                      mode     => '02,2,$val=(hex($val) & 0x3)',} },
-  "5A"          => { txt => "ThermCtrl" , params => {
+  "5A"          => { txt => "ThermCtrl"   , params => {
                      setTemp  => '00,2,$val=(((hex($val)>>2)&0x3f) /2)',
                      actTemp  => '00,4,$val=((hex($val)>>6) /10)',
                      hum      => '04,2,$val=(hex($val) & 0x3)',} },
-  "5E"          => { txt => "powerEvntCyc" , params => {
+  "5E"          => { txt => "powerEvntCyc", params => {
                      energy   => '00,6,$val=((hex($val)) /10)',
                      power    => '06,6,$val=((hex($val)) /100)',
                      current  => '12,4,$val=((hex($val)) /1)',
                      voltage  => '16,4,$val=((hex($val)) /10)',
                      frequency=> '20,2,$val=((hex($val)) /100+50)',
                      } },
-  "5F"          => { txt => "powerEvnt" , params => {
+  "5F"          => { txt => "powerEvnt"   , params => {
                      energy   => '00,6,$val=((hex($val)) /10)',
                      power    => '06,6,$val=((hex($val)) /100)',
                      current  => '12,4,$val=((hex($val)) /1)',
