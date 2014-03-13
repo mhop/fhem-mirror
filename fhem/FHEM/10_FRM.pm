@@ -85,8 +85,6 @@ sub FRM_Define($$) {
 	$hash->{DeviceName} = $dev;
 	
 	my $ret = DevIo_OpenDev($hash, 0, "FRM_DoInit");
-	return $ret if (defined $ret and $ret eq "");
-	$hash->{STATE}="Initialized";
 	return $ret;	
 }
 
@@ -383,6 +381,7 @@ sub FRM_DoInit($) {
 		FRM_apply_attribute($shash,"sampling-interval");
 		FRM_apply_attribute($shash,"i2c-config");
 		FRM_forall_clients($shash,\&FRM_Init_Client,undef);
+		$shash->{STATE}="Initialized";
 		return undef;
 	}
 	Log3 $name,3,"no response from Firmata, closing DevIO";
