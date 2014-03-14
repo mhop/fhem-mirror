@@ -119,6 +119,7 @@ FHEMWEB_Initialize($)
   my @attrList = qw(
     CORS:0,1
     HTTPS:1,0
+    JavaScripts
     SVGcache:1,0
     allowedCommands
     allowfrom
@@ -259,7 +260,6 @@ FW_Read($)
       }
     }
   }
-
 
 
   # Data from HTTP Client
@@ -574,7 +574,7 @@ FW_answerCall($)
   FW_pO '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" '.
                 '"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
   FW_pO '<html xmlns="http://www.w3.org/1999/xhtml">';
-  FW_pO "<head>\n<title>$t</title>";
+  FW_pO "<head root=\"$FW_ME\">\n<title>$t</title>";
   FW_pO '<link rel="shortcut icon" href="'.FW_IconURL("favicon").'" />';
 
   # Enable WebApps
@@ -612,14 +612,16 @@ FW_answerCall($)
     }
   }
 
+  #######################
+  # Other JavaScripts
   FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/svg.js") if($FW_plotmode eq "SVG");
-  if($FW_plotmode eq"jsSVG") {
-    FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/jsSVG.js");
-    FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/jquery.min.js");
-  }
-  foreach my $js (@FW_fhemwebjs) {
-    FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/$js");
-  }
+  map { FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/$_") } @FW_fhemwebjs;
+
+  $jsTemplate = '<script attr=\'%s\' type="text/javascript" src="%s"></script>';
+  map {
+    my $n = $_; $n =~ s+.*/++; $n =~ s/.js$//; $n =~ s/fhem_//; $n .= "Param";
+    FW_pO sprintf($jsTemplate, AttrVal($FW_wname, $n, ""), "$FW_ME/$_");
+  } split(" ", AttrVal($FW_wname, "JavaScripts", ""));
 
   my $onload = AttrVal($FW_wname, "longpoll", 1) ?
                       "onload=\"FW_delayedStart()\"" : "";
@@ -1833,6 +1835,16 @@ FW_Attr(@)
     }
   }
 
+  if($a[2] eq "JavaScripts" && $a[0] eq "set") { # create some attributes
+    my (%a, @add);
+    map { $a{$_} = 1 } split(" ", $modules{FHEMWEB}{AttrList});
+    map {
+      $_ =~ s+.*/++; $_ =~ s/.js$//; $_ =~ s/fhem_//; $_ .= "Param";
+      push @add, $_ if(!$a{$_});
+    } split(" ", $a[3]);
+    $modules{FHEMWEB}{AttrList} .= " ".join(" ",@add) if(@add);
+  }
+
   return $retMsg;
 }
 
@@ -2135,7 +2147,7 @@ FW_devState($$@)
     my ($icon, $isHtml);
     ($icon, $link, $isHtml) = FW_dev2image($d);
     $txt = ($isHtml ? $icon : FW_makeImage($icon, $state)) if($icon);
-    $link = "cmd.$d=set $d $link" if($link);
+    $link = "cmd.$d=set $d $link" if(defined($link));
 
   }
 
@@ -2144,12 +2156,12 @@ FW_devState($$@)
     # Have to cover: "on:An off:Aus", "A0:Aus AI:An Aus:off An:on"
     my $on  = ReplaceEventMap($d, "on", 1);
     my $off = ReplaceEventMap($d, "off", 1);
-    $link = "cmd.$d=set $d " . ($state eq $on ? $off : $on) if(!$link);
+    $link = "cmd.$d=set $d " . ($state eq $on ? $off : $on) if(!defined($link));
     $cmdList = "$on:$off" if(!$cmdList);
 
   }
 
-  if($link) { # Have command to execute
+  if(defined($link)) { # Have command to execute
     my $room = AttrVal($d, "room", undef);
     if($room) {
       if($FW_room && $room =~ m/\b$FW_room\b/) {
