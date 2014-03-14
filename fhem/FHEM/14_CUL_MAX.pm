@@ -658,9 +658,8 @@ CUL_MAX_BroadcastTime(@)
   <br>
 
 </ul>
-
-
 =end html
+
 =begin html_DE
 
 <a name="CUL_MAX"></a>
@@ -678,7 +677,7 @@ CUL_MAX_BroadcastTime(@)
       <br><br>
 
       Definiert ein CUL_MAX Ger&auml;t des Typs &lt;type&gt; und der Adresse &lt;addr&gt.
-      Die Adresse darf nicht schon von einem anderen MAX! Ger&auml; verwendet werden.
+      Die Adresse darf nicht schon von einem anderen MAX! Ger&auml;t verwendet werden.
   </ul>
   <br>
 
@@ -686,20 +685,20 @@ CUL_MAX_BroadcastTime(@)
   <b>Set</b>
   <ul>
       <li>pairmode<br>
-      Versetzt den CUL_MAX f&uuml; 60 Sekunden in den Pairing Modus, w&auml;rend dieser Zeit
-      kann das Ger&auml; mit anderen Ger&auml;ten gepaart werden (Heizk&ouml;rperthermostate, 
-      Eco-Taster, etc.). Auch das zu paarende Ger&auml; muss manuell in den Pairing Modus 
+      Versetzt den CUL_MAX f&uuml;r 60 Sekunden in den Pairing Modus, w&auml;hrend dieser Zeit
+      kann das Ger&auml;t mit anderen Ger&auml;ten gepaart werden (Heizk&ouml;rperthermostate, 
+      Eco-Taster, etc.). Auch das zu paarende Ger&auml;t muss manuell in den Pairing Modus 
       versetzt werden (z.B. beim Heizk&ouml;rperthermostat durch Dr&uuml;cken der "Boost" 
-      Taste f&uuml; 3 Sekunden).</li>
+      Taste f&uuml;r 3 Sekunden).</li>
       <li>fakeSC &lt;device&gt; &lt;open&gt;<br>
-      Sendet eine fingierte <i>ShutterContactState</i> Meldung &lt;open&gt; dies muss 0 bzw. 1 f&uuml;r
+      Sendet eine fingierte <i>ShutterContactState</i> Meldung &lt;open&gt;, dies muss 0 bzw. 1 f&uuml;r
       "Fenster geschlossen" bzw. "Fenster offen" sein. Wenn das &lt;device&gt; eine Gruppen-ID
       ungleich Null hat, beeinflusst diese fingierte <i>ShutterContactState</i> Meldung alle Ger&auml;te
       mit dieser Gruppen-ID. Es muss sichergestellt werden, dass vorher alle Zielger&auml;te 
       mit <i>fakeShutterContact</i> verbunden werden.</li>
       <li>fakeWT &lt;device&gt; &lt;desiredTemperature&gt; &lt;measuredTemperature&gt;<br>
-      Sendet eine fingierte <i>WallThermostatControl</i> Meldung (beide Parameter k&ooml;nnen
-      eine Nachkommastelle haben, &uuml; <i>desiredTemperature</i> darf die Nachkommastelle nur 0 bzw. 5 sein).
+      Sendet eine fingierte <i>WallThermostatControl</i> Meldung (beide Parameter k&ouml;nnen
+      eine Nachkommastelle haben, f&uuml;r <i>desiredTemperature</i> darf die Nachkommastelle nur 0 bzw. 5 sein).
       Wenn das &lt;device&gt; eine Gruppen-ID ungleich Null hat, beeinflusst diese fingierte 
       <i>WallThermostatControl</i> Meldung alle Ger&auml;te mit dieser Gruppen-ID.
       Es muss sichergestellt werden, dass vorher alle Zielger&auml;te 
