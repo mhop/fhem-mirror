@@ -5027,7 +5027,7 @@ EnOcean_Undef($$)
      <br><br>
 
       <li>Occupancy Sensor (EEP A5-07-01, A5-07-02)<br>
-         [EnOcean EOSW, untested]<br>
+         [EnOcean EOSW]<br>
      <ul>
        <li>on|off</li>
        <li>errorCode: 251 ... 255</li>
