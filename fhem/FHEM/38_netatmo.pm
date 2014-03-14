@@ -229,6 +229,7 @@ netatmo_initDevice($)
 
   $hash->{stationName} = $device->{station_name} if( $device->{station_name} );
 
+  $hash->{model} = $device->{type};
   $hash->{firmware} = $device->{firmware};
   if( $device->{place} ) {
     $hash->{country} = $device->{place}{country};
