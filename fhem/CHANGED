@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: new module 38_netatmo.pm added (justme1968)
   - change:  09_CUL_FHTTK.pm: clean up code to avoid "Use of uninitialized 
              value in concatenation.."
   - change:  09_CUL_FHTTK.pm: extend module list to FHT80TF and FHT80TF-2
