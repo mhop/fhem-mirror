@@ -239,12 +239,21 @@ Ext.define('FHEM.controller.ChartController', {
                             var splitArr = row.split(" "),
                                 i = 2; // 2 is needed as offset, because get function starts at one and our array at 0
                             Ext.each(splitArr, function(key) {
-                                if (key.lastIndexOf(":") + 1 === key.length && 
+                                // first we need to check if key is empty string, which can be caused by logfiles
+                                // that contain multiple spaces between key / values in one row...
+                                // in that case, we will skip the entry
+                                if (key !== "" && 
+                                    key.lastIndexOf(":") + 1 === key.length && 
                                     !Ext.Array.contains(keyArray, key.replace(":", ""))) {
                                         keyArray.push(key.replace(":", ""));
                                         keyIndexArray.push(i);
                                 }
-                                i++;
+                                
+                                // only raise counter when key is not empty string (multiple whitespaces),
+                                // as the get function will exactly work like this
+                                if (key !== "") {
+                                    i++;
+                                }
                             });
                         });
                         
@@ -781,10 +790,10 @@ Ext.define('FHEM.controller.ChartController', {
                 });
                 
                 // last fallback, similar to parseint
-                queryString += '$fld[3]*1';
+                queryString += '$fld[' + (yaxisindex - 1) + ']*1';
                 
                 // add closing brackets
-                for (bracket = 1; bracket < count; bracket++) {
+                for (var bracket = 1; bracket < count; bracket++) {
                     queryString += ")";
                 }
             }
@@ -1328,8 +1337,10 @@ Ext.define('FHEM.controller.ChartController', {
      * reset the form fields e.g. when loading a new chart
      */
     resetFormFields: function() {
-        
         this.getLinechartpanel().axiscounter = 0;
+        //remove a possibly set record of the last loaded chart
+        this.getLinechartpanel().record = null;
+        
         var fieldset =  this.getChartformpanel().down('fieldset[name=axesfieldset]');
         fieldset.removeAll();
         this.getLinechartpanel().createNewYAxis();
@@ -1396,196 +1407,233 @@ Ext.define('FHEM.controller.ChartController', {
     
     
     /**
-     * save the current chart to database
+     * save the current chart
      */
-    saveChartData: function() {
+    saveChartData: function(btn, evt, savename, scope) {
         
-        var me = this;
+        var me = scope ? scope : this,
+            update = false,
+            lcp = me.getLinechartpanel();
         
-        Ext.Msg.prompt("Select a name", "Enter a name to save the Chart", function(action, savename) {
-            if (action === "ok" && !Ext.isEmpty(savename)) {
-                //replacing spaces in name
-                savename = savename.replace(/ /g, "_");
-                //replacing + in name
-                savename = savename.replace(/\+/g, "_");
+        // detect if we have a loaded chart or a new one
+        if (lcp && lcp.record && lcp.record !== null) {
+            // we have a already saved chart, need to update
+            savename = lcp.record.NAME;
+            update = true;
+        } else {
+            // we got a new chart which needs to be saved
+            if (!savename || Ext.isEmpty(savename)) {
+                Ext.Msg.prompt("Select a name", "Enter a name to save the Chart", function(action, savename) {
+                    if (action === "ok" && !Ext.isEmpty(savename)) {
+                        me.saveChartData(null, null, savename, me);
+                    }
+                }, me);
+                // we need to return as the script continues without waiting for user input
+                return;
+            }
+        }
+        
+        if (savename && !Ext.isEmpty(savename)) {
+            //replacing spaces in name
+            savename = savename.replace(/ /g, "_");
+            //replacing + in name
+            savename = savename.replace(/\+/g, "_");
+            
+            //getting the necessary values
+            var logtypes = Ext.ComponentQuery.query('radiogroup[name=datasourceradio]'),
+                devices = Ext.ComponentQuery.query('combobox[name=devicecombo]'),
+                yaxes = Ext.ComponentQuery.query('combobox[name=yaxiscombo]'),
+                rowFieldSets = Ext.ComponentQuery.query('fieldset[commonName=singlerowfieldset]'),
+                axissideradio = Ext.ComponentQuery.query('radiogroup[name=axisside]'),
+                yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]'),
+            
+                basesstart = Ext.ComponentQuery.query('numberfield[name=basestart]'),
+                basesend = Ext.ComponentQuery.query('numberfield[name=baseend]'),
+                basescolors = Ext.ComponentQuery.query('combobox[name=baselinecolorcombo]'),
+                basesfills = Ext.ComponentQuery.query('checkboxfield[name=baselinefillcheck]'),
                 
-                //getting the necessary values
-                var logtypes = Ext.ComponentQuery.query('radiogroup[name=datasourceradio]'),
-                    devices = Ext.ComponentQuery.query('combobox[name=devicecombo]'),
-                    yaxes = Ext.ComponentQuery.query('combobox[name=yaxiscombo]'),
-                    rowFieldSets = Ext.ComponentQuery.query('fieldset[commonName=singlerowfieldset]'),
-                    axissideradio = Ext.ComponentQuery.query('radiogroup[name=axisside]'),
-                    yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]'),
+                starttime = me.getStarttimepicker().getValue(),
+                dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s'),
+                endtime = me.getEndtimepicker().getValue(),
+                dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s'),
+                dynamicradio = Ext.ComponentQuery.query('radiogroup[name=dynamictime]')[0],
+                generalization = Ext.ComponentQuery.query('radio[boxLabel=active]')[0],
+                generalizationfactor = Ext.ComponentQuery.query('combobox[name=genfactor]')[0].getValue(),
+                leftaxisconfiguration = Ext.ComponentQuery.query('radiogroup[name=leftaxisconfiguration]')[0].getChecked()[0].inputValue,
+                rightaxisconfiguration = Ext.ComponentQuery.query('radiogroup[name=rightaxisconfiguration]')[0].getChecked()[0].inputValue,
+                chart = me.getChart();
+            
+            //setting the start / endtime parameter in the chartconfig to the string of the radiofield, gets parsed on load
+            if (this.getStarttimepicker().isDisabled()) {
+                dynamicradio.eachBox(function(box, idx) {
+                    if (box.checked) {
+                        dbstarttime = box.inputValue;
+                        dbendtime = box.inputValue;
+                    }
+                });
+            }
+            
+            var jsonConfig = '{';
+            var i = 0;
+            Ext.each(devices, function(dev) {
                 
-                    basesstart = Ext.ComponentQuery.query('numberfield[name=basestart]'),
-                    basesend = Ext.ComponentQuery.query('numberfield[name=baseend]'),
-                    basescolors = Ext.ComponentQuery.query('combobox[name=baselinecolorcombo]'),
-                    basesfills = Ext.ComponentQuery.query('checkboxfield[name=baselinefillcheck]'),
+                var logtype = logtypes[i].getChecked()[0].inputValue,
+                    device = dev.getValue(),
+                    yaxis = yaxes[i].getValue() ? yaxes[i].getValue() : yaxes[i].rawValue,
+                    linestrokewidth = rowFieldSets[i].styleConfig.linestrokewidth,
+                    linecolorhexcode = rowFieldSets[i].styleConfig.linecolorhexcode.toString(),
+                    fillopacity = rowFieldSets[i].styleConfig.fillopacity,
+                    fillcolorhexcode = rowFieldSets[i].styleConfig.fillcolorhexcode,
+                    yaxisshowpoints = rowFieldSets[i].styleConfig.yaxisshowpoints,
+                    pointshape = rowFieldSets[i].styleConfig.pointshape,
+                    pointradius = rowFieldSets[i].styleConfig.pointradius,
+                    yaxissmoothing = rowFieldSets[i].styleConfig.yaxissmoothing,
+                    yaxislegendcheck = rowFieldSets[i].styleConfig.yaxislegendcheck,
+                    pointcolorhexcode = rowFieldSets[i].styleConfig.pointcolorhexcode,
+                    yaxisfillcheck = rowFieldSets[i].styleConfig.yaxisfillcheck,
+                    yaxisstepcheck = rowFieldSets[i].styleConfig.yaxisstepcheck,
+                    yaxisstatistics = yaxesstatistics[i].getValue(),
+                    axisside = axissideradio[i].getChecked()[0].getSubmitValue(),
+                    rightaxistitle = me.getChartformpanel().down('textfield[name=rightaxistitle]').getValue(),
+                    leftaxistitle = me.getChartformpanel().down('textfield[name=leftaxistitle]').getValue();
+                //replacing spaces in title
+                rightaxistitle = rightaxistitle.replace(/ /g, "_");
+                leftaxistitle = leftaxistitle.replace(/ /g, "_");
+                //replacing + in title
+                rightaxistitle = rightaxistitle.replace(/\+/g, "_");
+                leftaxistitle = leftaxistitle.replace(/\+/g, "_");
+                if (i === 0) {
+                    jsonConfig += '"y":"' + yaxis + '","device":"' + device + '",';
+                    jsonConfig += '"logtype":"' + logtype + '",';
+                    jsonConfig += '"linestrokewidth":"' + linestrokewidth + '",';
+                    jsonConfig += '"linecolorhexcode":"' + linecolorhexcode + '",';
+                    jsonConfig += '"fillopacity":"' + fillopacity + '",';
+                    jsonConfig += '"fillcolorhexcode":"' + fillcolorhexcode + '",';
+                    jsonConfig += '"yaxisshowpoints":"' + yaxisshowpoints + '",';
+                    jsonConfig += '"pointshape":"' + pointshape + '",';
+                    jsonConfig += '"pointradius":"' + pointradius + '",';
+                    jsonConfig += '"yaxissmoothing":"' + yaxissmoothing + '",';
+                    jsonConfig += '"yaxislegendcheck":"' + yaxislegendcheck + '",';
+                    jsonConfig += '"pointcolorhexcode":"' + pointcolorhexcode + '",';
+                    jsonConfig += '"yaxisfillcheck":"' + yaxisfillcheck + '",';
+                    jsonConfig += '"yaxisstepcheck":"' + yaxisstepcheck + '",';
+                    jsonConfig += '"yaxisside":"' + axisside + '",';
+                    jsonConfig += '"leftaxistitle":"' + leftaxistitle + '",';
+                    jsonConfig += '"rightaxistitle":"' + rightaxistitle + '",';
                     
-                    starttime = me.getStarttimepicker().getValue(),
-                    dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s'),
-                    endtime = me.getEndtimepicker().getValue(),
-                    dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s'),
-                    dynamicradio = Ext.ComponentQuery.query('radiogroup[name=dynamictime]')[0],
-                    generalization = Ext.ComponentQuery.query('radio[boxLabel=active]')[0],
-                    generalizationfactor = Ext.ComponentQuery.query('combobox[name=genfactor]')[0].getValue(),
-                    leftaxisconfiguration = Ext.ComponentQuery.query('radiogroup[name=leftaxisconfiguration]')[0].getChecked()[0].inputValue,
-                    rightaxisconfiguration = Ext.ComponentQuery.query('radiogroup[name=rightaxisconfiguration]')[0].getChecked()[0].inputValue,
-                    chart = me.getChart(),
-                    store = chart.getStore();
+                    if (yaxisstatistics !== "none") {
+                        jsonConfig += '"yaxisstatistics":"' + yaxisstatistics + '",';
+                    }
+                } else {
+                    var logtypename = "y" + (i + 1) + "logtype",
+                        axisname = "y" + (i + 1) + "axis",
+                        devicename = "y" + (i + 1) + "device",
+                        sidename = "y" + (i + 1) + "axisside",
+                        statsname = "y" + (i + 1) + "axisstatistics",
+                        prefix = "y" + (i + 1);
+                    
+                    jsonConfig += '"' + axisname + '":"' + yaxis + '","' + devicename + '":"' + device + '",';
+                    jsonConfig += '"' + logtypename + '":"' + logtype + '",';
+                    
+                    jsonConfig += '"' + prefix + 'linestrokewidth' + '":"' + linestrokewidth + '",';
+                    jsonConfig += '"' + prefix + 'linecolorhexcode' + '":"' + linecolorhexcode + '",';
+                    jsonConfig += '"' + prefix + 'fillopacity' + '":"' + fillopacity + '",';
+                    jsonConfig += '"' + prefix + 'fillcolorhexcode' + '":"' + fillcolorhexcode + '",';
+                    jsonConfig += '"' + prefix + 'yaxisshowpoints' + '":"' + yaxisshowpoints + '",';
+                    jsonConfig += '"' + prefix + 'pointshape' + '":"' + pointshape + '",';
+                    jsonConfig += '"' + prefix + 'pointradius' + '":"' + pointradius + '",';
+                    jsonConfig += '"' + prefix + 'yaxissmoothing' + '":"' + yaxissmoothing + '",';
+                    jsonConfig += '"' + prefix + 'yaxislegendcheck' + '":"' + yaxislegendcheck + '",';
+                    jsonConfig += '"' + prefix + 'pointcolorhexcode' + '":"' + pointcolorhexcode + '",';
+                    jsonConfig += '"' + prefix + 'axisfillcheck' + '":"' + yaxisfillcheck + '",';
+                    jsonConfig += '"' + prefix + 'axisstepcheck' + '":"' + yaxisstepcheck + '",';
+                    
+                    jsonConfig += '"' + sidename + '":"' + axisside + '",';
+                    if (yaxisstatistics !== "none") {
+                        jsonConfig += '"' + statsname + '":"' + yaxisstatistics + '",';
+                    }
+                }
+                i++;
+            });
+            
+            if(generalization.checked) {
+                jsonConfig += '"generalization":"true",';
+                jsonConfig += '"generalizationfactor":"' + generalizationfactor + '",';
+            }
+            
+            if (leftaxisconfiguration === 'manual') {
+                var leftaxismin = Ext.ComponentQuery.query('numberfield[name=leftaxisminimum]')[0].getValue(),
+                    leftaxismax = Ext.ComponentQuery.query('numberfield[name=leftaxismaximum]')[0].getValue();
+            
+                if (Ext.isNumeric(leftaxismin) && Ext.isNumeric(leftaxismax)) {
+                    jsonConfig += '"leftaxismin":"' + leftaxismin + '",';
+                    jsonConfig += '"leftaxismax":"' + leftaxismax + '",';
+                } else {
+                    Ext.Msg.alert("Error", "Left axis configuration is invalid, values will not be saved!");
+                }
+            }
+            
+            if (rightaxisconfiguration === "manual") {
+                var rightaxismin = Ext.ComponentQuery.query('numberfield[name=rightaxisminimum]')[0].getValue(),
+                    rightaxismax = Ext.ComponentQuery.query('numberfield[name=rightaxismaximum]')[0].getValue();
                 
-                //setting the start / endtime parameter in the chartconfig to the string of the radiofield, gets parsed on load
-                if (this.getStarttimepicker().isDisabled()) {
-                    dynamicradio.eachBox(function(box, idx) {
-                        if (box.checked) {
-                            dbstarttime = box.inputValue;
-                            dbendtime = box.inputValue;
+                if (Ext.isNumeric(rightaxismin) && Ext.isNumeric(rightaxismax)) {
+                    jsonConfig += '"rightaxismin":"' + rightaxismin + '",';
+                    jsonConfig += '"rightaxismax":"' + rightaxismax + '",';
+                } else {
+                    Ext.Msg.alert("Error", "Right axis configuration is invalid, values will not be saved!");
+                }
+            }
+            
+            var j = 0;
+            Ext.each(basesstart, function(base) {
+                var basestart = basesstart[j].getValue(),
+                    baseend = basesend[j].getValue(),
+                    basecolor = basescolors[j].getDisplayValue(),
+                    basefill = basesfills[j].checked;
+                
+                j++;
+                jsonConfig += '"base' + j + 'start":"' + basestart + '","base' + j + 'end":"' + baseend + '",';
+                jsonConfig += '"base' + j + 'color":"' + basecolor + '","base' + j + 'fill":"' + basefill + '",';
+            });
+            
+            jsonConfig += '"starttime":"' + dbstarttime + '","endtime":"' + dbendtime + '"}';
+        
+            if (chart) {
+                chart.setLoading(true);
+            }
+            
+            //decide if we save to db or to file
+            var filelogbool = false,
+                dblogbool = false;
+            
+            Ext.each(logtypes, function(typeradio) {
+                if (typeradio.getChecked()[0].inputValue === "filelog") {
+                    filelogbool = true;
+                } else {
+                    dblogbool = true;
+                }
+            });
+            
+            if (filelogbool === true && dblogbool === false) {
+                
+                var filelogrecfound = false;
+                // check for create or update
+                if (update === true) {
+                    // find the current chart and relplace it
+                    Ext.each(FHEM.filelogcharts, function(chart) {
+                        if (chart.ID === lcp.record.ID) {
+                            filelogrecfound = chart;
                         }
                     });
-                }
-                
-                var jsonConfig = '{';
-                var i = 0;
-                Ext.each(devices, function(dev) {
-                    
-                    var logtype = logtypes[i].getChecked()[0].inputValue,
-                        device = dev.getValue(),
-                        yaxis = yaxes[i].getValue(),
-                        linestrokewidth = rowFieldSets[i].styleConfig.linestrokewidth,
-                        linecolorhexcode = rowFieldSets[i].styleConfig.linecolorhexcode.toString(),
-                        fillopacity = rowFieldSets[i].styleConfig.fillopacity,
-                        fillcolorhexcode = rowFieldSets[i].styleConfig.fillcolorhexcode,
-                        yaxisshowpoints = rowFieldSets[i].styleConfig.yaxisshowpoints,
-                        pointshape = rowFieldSets[i].styleConfig.pointshape,
-                        pointradius = rowFieldSets[i].styleConfig.pointradius,
-                        yaxissmoothing = rowFieldSets[i].styleConfig.yaxissmoothing,
-                        yaxislegendcheck = rowFieldSets[i].styleConfig.yaxislegendcheck,
-                        pointcolorhexcode = rowFieldSets[i].styleConfig.pointcolorhexcode,
-                        yaxisfillcheck = rowFieldSets[i].styleConfig.yaxisfillcheck,
-                        yaxisstepcheck = rowFieldSets[i].styleConfig.yaxisstepcheck,
-                        yaxisstatistics = yaxesstatistics[i].getValue(),
-                        axisside = axissideradio[i].getChecked()[0].getSubmitValue(),
-                        rightaxistitle = me.getChartformpanel().down('textfield[name=rightaxistitle]').getValue(),
-                        leftaxistitle = me.getChartformpanel().down('textfield[name=leftaxistitle]').getValue();
-                    //replacing spaces in title
-                    rightaxistitle = rightaxistitle.replace(/ /g, "_");
-                    leftaxistitle = leftaxistitle.replace(/ /g, "_");
-                    //replacing + in title
-                    rightaxistitle = rightaxistitle.replace(/\+/g, "_");
-                    leftaxistitle = leftaxistitle.replace(/\+/g, "_");
-                    if (i === 0) {
-                        jsonConfig += '"y":"' + yaxis + '","device":"' + device + '",';
-                        jsonConfig += '"logtype":"' + logtype + '",';
-                        jsonConfig += '"linestrokewidth":"' + linestrokewidth + '",';
-                        jsonConfig += '"linecolorhexcode":"' + linecolorhexcode + '",';
-                        jsonConfig += '"fillopacity":"' + fillopacity + '",';
-                        jsonConfig += '"fillcolorhexcode":"' + fillcolorhexcode + '",';
-                        jsonConfig += '"yaxisshowpoints":"' + yaxisshowpoints + '",';
-                        jsonConfig += '"pointshape":"' + pointshape + '",';
-                        jsonConfig += '"pointradius":"' + pointradius + '",';
-                        jsonConfig += '"yaxissmoothing":"' + yaxissmoothing + '",';
-                        jsonConfig += '"yaxislegendcheck":"' + yaxislegendcheck + '",';
-                        jsonConfig += '"pointcolorhexcode":"' + pointcolorhexcode + '",';
-                        jsonConfig += '"yaxisfillcheck":"' + yaxisfillcheck + '",';
-                        jsonConfig += '"yaxisstepcheck":"' + yaxisstepcheck + '",';
-                        jsonConfig += '"yaxisside":"' + axisside + '",';
-                        jsonConfig += '"leftaxistitle":"' + leftaxistitle + '",';
-                        jsonConfig += '"rightaxistitle":"' + rightaxistitle + '",';
-                        
-                        if (yaxisstatistics !== "none") {
-                            jsonConfig += '"yaxisstatistics":"' + yaxisstatistics + '",';
-                        }
+                    if (!filelogrecfound) {
+                        Ext.Msg.alert("Error", "Could not find the original Chart to update..");
                     } else {
-                        var logtypename = "y" + (i + 1) + "logtype",
-                            axisname = "y" + (i + 1) + "axis",
-                            devicename = "y" + (i + 1) + "device",
-                            sidename = "y" + (i + 1) + "axisside",
-                            statsname = "y" + (i + 1) + "axisstatistics",
-                            prefix = "y" + (i + 1);
-                        
-                        jsonConfig += '"' + axisname + '":"' + yaxis + '","' + devicename + '":"' + device + '",';
-                        jsonConfig += '"' + logtypename + '":"' + logtype + '",';
-                        
-                        jsonConfig += '"' + prefix + 'linestrokewidth' + '":"' + linestrokewidth + '",';
-                        jsonConfig += '"' + prefix + 'linecolorhexcode' + '":"' + linecolorhexcode + '",';
-                        jsonConfig += '"' + prefix + 'fillopacity' + '":"' + fillopacity + '",';
-                        jsonConfig += '"' + prefix + 'fillcolorhexcode' + '":"' + fillcolorhexcode + '",';
-                        jsonConfig += '"' + prefix + 'yaxisshowpoints' + '":"' + yaxisshowpoints + '",';
-                        jsonConfig += '"' + prefix + 'pointshape' + '":"' + pointshape + '",';
-                        jsonConfig += '"' + prefix + 'pointradius' + '":"' + pointradius + '",';
-                        jsonConfig += '"' + prefix + 'yaxissmoothing' + '":"' + yaxissmoothing + '",';
-                        jsonConfig += '"' + prefix + 'yaxislegendcheck' + '":"' + yaxislegendcheck + '",';
-                        jsonConfig += '"' + prefix + 'pointcolorhexcode' + '":"' + pointcolorhexcode + '",';
-                        jsonConfig += '"' + prefix + 'axisfillcheck' + '":"' + yaxisfillcheck + '",';
-                        jsonConfig += '"' + prefix + 'axisstepcheck' + '":"' + yaxisstepcheck + '",';
-                        
-                        jsonConfig += '"' + sidename + '":"' + axisside + '",';
-                        if (yaxisstatistics !== "none") {
-                            jsonConfig += '"' + statsname + '":"' + yaxisstatistics + '",';
-                        }
+                        filelogrecfound.TIMESTAMP = Ext.Date.format(new Date(), 'Y-m-d H:i:s');
+                        filelogrecfound.VALUE = Ext.decode(jsonConfig);
+                        me.updateFileLogCharts(false);
                     }
-                    i++;
-                });
-                
-                if(generalization.checked) {
-                    jsonConfig += '"generalization":"true",';
-                    jsonConfig += '"generalizationfactor":"' + generalizationfactor + '",';
-                }
-                
-                if (leftaxisconfiguration === 'manual') {
-                    var leftaxismin = Ext.ComponentQuery.query('numberfield[name=leftaxisminimum]')[0].getValue(),
-                        leftaxismax = Ext.ComponentQuery.query('numberfield[name=leftaxismaximum]')[0].getValue();
-                
-                    if (Ext.isNumeric(leftaxismin) && Ext.isNumeric(leftaxismax)) {
-                        jsonConfig += '"leftaxismin":"' + leftaxismin + '",';
-                        jsonConfig += '"leftaxismax":"' + leftaxismax + '",';
-                    } else {
-                        Ext.Msg.alert("Error", "Left axis configuration is invalid, values will not be saved!");
-                    }
-                }
-                
-                if (rightaxisconfiguration === "manual") {
-                    var rightaxismin = Ext.ComponentQuery.query('numberfield[name=rightaxisminimum]')[0].getValue(),
-                        rightaxismax = Ext.ComponentQuery.query('numberfield[name=rightaxismaximum]')[0].getValue();
-                    
-                    if (Ext.isNumeric(rightaxismin) && Ext.isNumeric(rightaxismax)) {
-                        jsonConfig += '"rightaxismin":"' + rightaxismin + '",';
-                        jsonConfig += '"rightaxismax":"' + rightaxismax + '",';
-                    } else {
-                        Ext.Msg.alert("Error", "Right axis configuration is invalid, values will not be saved!");
-                    }
-                }
-                
-                var j = 0;
-                Ext.each(basesstart, function(base) {
-                    var basestart = basesstart[j].getValue(),
-                        baseend = basesend[j].getValue(),
-                        basecolor = basescolors[j].getDisplayValue(),
-                        basefill = basesfills[j].checked;
-                    
-                    j++;
-                    jsonConfig += '"base' + j + 'start":"' + basestart + '","base' + j + 'end":"' + baseend + '",';
-                    jsonConfig += '"base' + j + 'color":"' + basecolor + '","base' + j + 'fill":"' + basefill + '",';
-                });
-                
-                jsonConfig += '"starttime":"' + dbstarttime + '","endtime":"' + dbendtime + '"}';
-            
-                chart.setLoading(true);
-                
-                //decide if we save to db or to file
-                var filelogbool = false,
-                    dblogbool = false;
-                
-                Ext.each(logtypes, function(typeradio) {
-                    if (typeradio.getChecked()[0].inputValue === "filelog") {
-                        filelogbool = true;
-                    } else {
-                        dblogbool = true;
-                    }
-                });
-                
-                if (filelogbool === true && dblogbool === false) {
-                    
+                } else {
                     // create the current chart object
                     var chartobject = {},
                         hash = 0, 
@@ -1607,42 +1655,56 @@ Ext.define('FHEM.controller.ChartController', {
                     
                     // append the chartobject to the global FHEM.filelogcharts
                     FHEM.filelogcharts.push(chartobject);
-                    
                     me.updateFileLogCharts(true);
-                    
-                } else {
-                    
-                    var url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+' + dbstarttime + '+' + dbendtime + '+';
-                    url +=devices[0].getValue() + '+savechart+""+""+' + savename + '+' + jsonConfig + '&XHR=1'; 
-                    Ext.Ajax.request({
-                        method: 'POST',
-                        disableCaching: false,
-                        url: url,
-                        success: function(response){
-                            chart.setLoading(false);
-                            var json = Ext.decode(response.responseText);
-                            if (json.success === "true" || json.data && json.data.length === 0) {
-                                me.getMaintreepanel().fireEvent("treeupdated");
-                                Ext.Msg.alert("Success", "Chart successfully saved!");
-                            } else if (json.msg) {
-                                Ext.Msg.alert("Error", "The Chart could not be saved, error Message is:<br><br>" + json.msg);
-                            } else {
-                                Ext.Msg.alert("Error", "The Chart could not be saved!");
-                            }
-                        },
-                        failure: function() {
-                            chart.setLoading(false);
-                            if (json && json.msg) {
-                                Ext.Msg.alert("Error", "The Chart could not be saved, error Message is:<br><br>" + json.msg);
-                            } else {
-                                Ext.Msg.alert("Error", "The Chart could not be saved!");
-                            }
-                        }
-                    });
                 }
                 
+            } else {
+                
+                var url;
+                
+                // check for create or update
+                if (update === true) {
+                    url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+' + dbstarttime + '+' + dbendtime + '+';
+                    url +=devices[0].getValue() + '+updatechart+""+""+' + lcp.record.ID + '+' + jsonConfig + '&XHR=1'; 
+                } else {
+                    url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+' + dbstarttime + '+' + dbendtime + '+';
+                    url +=devices[0].getValue() + '+savechart+""+""+' + savename + '+' + jsonConfig + '&XHR=1'; 
+                }
+                
+                Ext.Ajax.request({
+                    method: 'POST',
+                    disableCaching: false,
+                    url: url,
+                    success: function(response){
+                        if (chart) {
+                            chart.setLoading(false);
+                        }
+                        var json = Ext.decode(response.responseText);
+                        if (json.success === "true" || json.data && json.data.length === 0) {
+                            me.getMaintreepanel().fireEvent("treeupdated");
+                            Ext.Msg.alert("Success", "Chart successfully saved!");
+                        } else if (json.msg) {
+                            Ext.Msg.alert("Error", "The Chart could not be saved, error Message is:<br><br>" + json.msg);
+                        } else {
+                            Ext.Msg.alert("Error", "The Chart could not be saved!");
+                        }
+                    },
+                    failure: function() {
+                        if (chart) {
+                            chart.setLoading(false);
+                        }
+                        if (json && json.msg) {
+                            Ext.Msg.alert("Error", "The Chart could not be saved, error Message is:<br><br>" + json.msg);
+                        } else {
+                            Ext.Msg.alert("Error", "The Chart could not be saved!");
+                        }
+                    }
+                });
             }
-        }, this);
+            
+        } else {
+            Ext.Msg.alert("Error", "No name for the chart has been found!");
+        }
         
     },
     
@@ -1729,6 +1791,9 @@ Ext.define('FHEM.controller.ChartController', {
             
             if (chartdata && !Ext.isEmpty(chartdata)) {
                 
+                // set the rec of the loading record to panel to detect if chart needs update or create on save
+                this.getLinechartpanel().record = record.raw.data;
+                
                 //reset y-axis max
                 me.maxYValue = 0;
                 me.minYValue = 9999999;
@@ -1782,6 +1847,9 @@ Ext.define('FHEM.controller.ChartController', {
                         } else {
                             yaxes[i].getStore().getProxy().url = url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+' + chartdata.device + '+getreadings&XHR=1';
                         }
+                        // disable the datasource selection, as changing this on a saved chart would be
+                        // a lot of work...
+                        logtypes[i].setDisabled(true);
                         yaxes[i].setDisabled(false);
                         yaxes[i].setValue(chartdata.y);
                         rowFieldSets[i].styleConfig.linestrokewidth = chartdata.linestrokewidth || 2;
