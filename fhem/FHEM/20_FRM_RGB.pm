@@ -73,17 +73,24 @@ FRM_RGB_Init($$)
   my $ret = FRM_Init_Pin_Client($hash,$args,PIN_PWM);
   return $ret if (defined $ret);
   my @pins = ();
-  my $firmata = FRM_Client_FirmataDevice($hash);
-  $hash->{PIN} = "";
-  foreach my $pin (@{$args}) {
-    $firmata->pin_mode($pin,PIN_PWM);
-    push @pins,{
-      pin     => $pin,
-      "shift" => defined $firmata->{metadata}{pwm_resolutions} ? $firmata->{metadata}{pwm_resolutions}{$pin}-8 : 0,
-    };
-    $hash->{PIN} .= $hash->{PIN} eq "" ? $pin : " $pin";
+  eval {
+    my $firmata = FRM_Client_FirmataDevice($hash);
+    $hash->{PIN} = "";
+    foreach my $pin (@{$args}) {
+      $firmata->pin_mode($pin,PIN_PWM);
+      push @pins,{
+        pin     => $pin,
+        "shift" => defined $firmata->{metadata}{pwm_resolutions} ? $firmata->{metadata}{pwm_resolutions}{$pin}-8 : 0,
+      };
+      $hash->{PIN} .= $hash->{PIN} eq "" ? $pin : " $pin";
+    }
+    $hash->{PINS} = \@pins;
+  };
+  if ($@) {
+    $@ =~ /^(.*)( at.*FHEM.*)$/;
+    $hash->{STATE} = "error initializing: ".$1;
+    return "error initializing '".$hash->{NAME}."': ".$1;
   }
-  $hash->{PINS} = \@pins;
   if (! (defined AttrVal($name,"stateFormat",undef))) {
     $attr{$name}{"stateFormat"} = "rgb";
   }
@@ -254,18 +261,24 @@ sub
 FRM_RGB_Attr($$$$)
 {
   my ($command,$name,$attribute,$value) = @_;
-  if ($command eq "set") {
-    ARGUMENT_HANDLER: {
-      $attribute eq "IODev" and do {
-      	my $hash = $main::defs{$name};
-      	if (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $value) {
-        	$hash->{IODev} = $defs{$value};
-      		FRM_Init_Client($hash) if (defined ($hash->{IODev}));
-      	}
-        last;
-      };
-      $main::attr{$name}{$attribute}=$value;
+  my $hash = $main::defs{$name};
+  eval {
+    if ($command eq "set") {
+      ARGUMENT_HANDLER: {
+        $attribute eq "IODev" and do {
+          if ($main::init_done and (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $value)) {
+            FRM_Client_AssignIOPort($hash,$value);
+            FRM_Init_Client($hash) if (defined ($hash->{IODev}));
+          }
+          last;
+        };
+      }
     }
+  };
+  if ($@) {
+    $@ =~ /^(.*)( at.*FHEM.*)$/;
+    $hash->{STATE} = "error setting $attribute to $value: ".$1;
+    return "cannot $command attribute $attribute to $value for $name: ".$1;
   }
 }
 

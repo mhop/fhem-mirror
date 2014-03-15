@@ -42,9 +42,16 @@ FRM_I2C_Init($)
 	$hash->{"i2c-register"} = @$args[1];
 	$hash->{"i2c-bytestoread"} = @$args[2];
 
-  eval {
-    FRM_Client_FirmataDevice($hash)->i2c_read(@$args[0],@$args[1],@$args[2]);
-  };
+	eval {
+		FRM_Client_AssignIOPort($hash);
+		FRM_Client_FirmataDevice($hash)->i2c_read(@$args[0],@$args[1],@$args[2]);
+	};
+	if ($@) {
+		$@ =~ /^(.*)( at.*FHEM.*)$/;
+		$hash->{STATE} = "error initializing: ".$1;
+		return "error initializing '".$hash->{NAME}."': ".$1;
+	}
+
 	return "error calling i2c_read: ".$@ if ($@);
 	if (! (defined AttrVal($hash->{NAME},"event-min-interval",undef))) {
 		$main::attr{$hash->{NAME}}{"event-min-interval"} = 5;
@@ -55,18 +62,24 @@ FRM_I2C_Init($)
 sub
 FRM_I2C_Attr($$$$) {
   my ($command,$name,$attribute,$value) = @_;
-  if ($command eq "set") {
-    ARGUMENT_HANDLER: {
-      $attribute eq "IODev" and do {
-      	my $hash = $main::defs{$name};
-      	if (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $value) {
-        	$hash->{IODev} = $defs{$value};
-      		FRM_Init_Client($hash) if (defined ($hash->{IODev}));
-      	}
-        last;
-      };
-   	  $main::attr{$name}{$attribute}=$value;
+  my $hash = $main::defs{$name};
+  eval {
+    if ($command eq "set") {
+      ARGUMENT_HANDLER: {
+        $attribute eq "IODev" and do {
+          if ($main::init_done and (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $value)) {
+            FRM_Client_AssignIOPort($hash,$value);
+            FRM_Init_Client($hash) if (defined ($hash->{IODev}));
+          }
+          last;
+        };
+      }
     }
+  };
+  if ($@) {
+    $@ =~ /^(.*)( at.*FHEM.*)$/;
+    $hash->{STATE} = "error setting $attribute to $value: ".$1;
+    return "cannot $command attribute $attribute to $value for $name: ".$1;
   }
 }
 

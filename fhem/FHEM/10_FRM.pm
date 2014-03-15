@@ -48,7 +48,8 @@ sub FRM_Initialize($) {
 	$hash->{GetFn}    = "FRM_Get";
 	$hash->{SetFn}    = "FRM_Set";
 	$hash->{AttrFn}   = "FRM_Attr";
-  
+	$hash->{NotifyFn} = "FRM_Notify";
+
 	$hash->{AttrList} = "model:nano dummy:1,0 sampling-interval i2c-config $main::readingFnAttributes";
 }
 
@@ -57,35 +58,19 @@ sub FRM_Define($$) {
 	my ( $hash, $def ) = @_;
 
 	my ($name, $type, $dev, $global) = split("[ \t]+", $def);
+	$hash->{DeviceName} = $dev;
 
-	my $isServer = 1 if($dev && $dev =~ m/^(IPV6:)?\d+$/);
-#	my $isClient = 1 if($dev && $dev =~ m/^(IPV6:)?.*:\d+$/);
-
-#	return "Usage: define <name> FRM {<device>[@<baudrate>] | [IPV6:]<tcp-portnr> [global]}"
-#		if(!($isServer || $isClient) ||
-#			($isClient && $global) ||
-#			($global && $global ne "global"));
-
-	# Make sure that fhem only runs once
-	if($isServer) {
-		my $ret = TcpServer_Open($hash, $dev, $global);
-		if (!$ret) {
-			$hash->{STATE}="listening";
-		}
-		return $ret;
-	}
-
-	DevIo_CloseDev($hash);	
+	$hash->{NOTIFYDEV} = "global";
 
 	if ( $dev eq "none" ) {
 		Log3 $name,3,"device is none, commands will be echoed only";
 		$main::attr{$name}{dummy} = 1;
-		return undef;
 	}
-	$hash->{DeviceName} = $dev;
+	if ($main::init_done) {
+		return FRM_Start($hash);
+	}
 	
-	my $ret = DevIo_OpenDev($hash, 0, "FRM_DoInit");
-	return $ret;	
+	return undef;
 }
 
 #####################################
@@ -108,6 +93,46 @@ sub FRM_Undef($) {
 	FRM_FirmataDevice_Close($hash);
 
 	return undef;
+}
+
+sub FRM_Start {
+	my ($hash) = @_;
+
+	my ($dev, $global) = split("[ \t]+", $hash->{DEF});
+	$hash->{DeviceName} = $dev;
+	
+	my $isServer = 1 if($dev && $dev =~ m/^(IPV6:)?\d+$/);
+#	my $isClient = 1 if($dev && $dev =~ m/^(IPV6:)?.*:\d+$/);
+
+#	return "Usage: define <name> FRM {<device>[@<baudrate>] | [IPV6:]<tcp-portnr> [global]}"
+#		if(!($isServer || $isClient) ||
+#			($isClient && $global) ||
+#			($global && $global ne "global"));
+
+	# Make sure that fhem only runs once
+	if($isServer) {
+		my $ret = TcpServer_Open($hash, $dev, $global);
+		if (!$ret) {
+			$hash->{STATE}="listening";
+		}
+		return $ret;
+	}
+
+	DevIo_CloseDev($hash);	
+
+	my $ret = DevIo_OpenDev($hash, 0, "FRM_DoInit");
+	return $ret;	
+}
+
+sub FRM_Notify {
+  my ($hash,$dev) = @_;
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+
+  if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
+  	FRM_Start($hash);
+  } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
+  }
 }
 
 #####################################
@@ -297,22 +322,28 @@ sub FRM_DoInit($) {
 	
 	my ($hash) = @_;
 	
-	my $name = $hash->{SNAME}; #is this a serversocket-connection?
-	my $shash = defined $name ? $main::defs{$name} : $hash;
-	$name = $hash->{NAME};# if (!defined $name);
+	my $sname = $hash->{SNAME}; #is this a serversocket-connection?
+	my $shash = defined $sname ? $main::defs{$sname} : $hash;
+	
+	my $name = $shash->{NAME};
 	
   	my $firmata_io = Firmata_IO->new($hash);
 	my $device = Device::Firmata::Platform->attach($firmata_io) or return 1;
 
-	$hash->{FirmataDevice} = $device;
-	$device->observe_string(\&FRM_string_observer,$hash);
+	$shash->{FirmataDevice} = $device;
+	if (defined $sname) {
+		$shash->{SocketDevice} = $hash;
+		#as FRM_Read gets the connected socket hash, but calls firmatadevice->poll():
+		$hash->{FirmataDevice} = $device;
+	}
+	$device->observe_string(\&FRM_string_observer,$shash);
 	
 	my $found; # we cannot call $device->probe() here, as it doesn't select bevore read, so it would likely cause IODev to close the connection on the first attempt to read from empty stream
 	my $endTicks = time+5;
 	my $queryTicks = time+2;
 	$device->system_reset();
 	do {
-		FRM_poll($hash);
+		FRM_poll($shash);
 		if ($device->{metadata}{firmware} && $device->{metadata}{firmware_version}) {
 			$device->{protocol}->{protocol_version} = $device->{metadata}{firmware_version};
 			$main::defs{$name}{firmware} = $device->{metadata}{firmware};
@@ -321,7 +352,7 @@ sub FRM_DoInit($) {
 			$device->analog_mapping_query();
 			$device->capability_query();
 			do {
-				FRM_poll($hash);
+				FRM_poll($shash);
 				if ($device->{metadata}{analog_mappings} and $device->{metadata}{capabilities}) {
 					my $inputpins = $device->{metadata}{input_pins};
 					$main::defs{$name}{input_pins} = join(",", sort{$a<=>$b}(@$inputpins)) if (defined $inputpins and scalar @$inputpins);
@@ -392,8 +423,6 @@ sub FRM_DoInit($) {
 		}
 	} while (time < $endTicks and !$found);
 	if ($found) {
-		$shash->{FirmataDevice} = $device;
-		$shash->{SocketDevice} = $hash;
 		FRM_apply_attribute($shash,"sampling-interval");
 		FRM_apply_attribute($shash,"i2c-config");
 		FRM_forall_clients($shash,\&FRM_Init_Client,undef);
@@ -401,8 +430,9 @@ sub FRM_DoInit($) {
 		return undef;
 	}
 	Log3 $name,3,"no response from Firmata, closing DevIO";
-	DevIo_Disconnected($hash);
-	delete $hash->{FirmataDevice};
+	DevIo_Disconnected($shash);
+	delete $shash->{FirmataDevice};
+	delete $shash->{SocketDevice};
 	return "FirmataDevice not responding";
 }
 
@@ -430,7 +460,7 @@ FRM_Init_Client($@) {
 	my $name = $hash->{NAME};
 	my $ret = CallFn($name,"InitFn",$hash,$args);
 	if ($ret) {
-		Log3 $name,2,"error initializing ".$hash->{NAME}.": ".$ret;
+		Log3 $name,2,"error initializing '".$hash->{NAME}."': ".$ret;
 	}
 }
 
@@ -449,7 +479,7 @@ FRM_Init_Pin_Client($$$) {
 	if ($@) {
 		$@ =~ /^(.*)( at.*FHEM.*)$/;
 		$hash->{STATE} = "error initializing: ".$1;
-		return "error initializing '".$hash->{NAME}."': ".$1;
+		return $1;
 	}
 	return undef;
 }
@@ -462,10 +492,16 @@ FRM_Client_Define($$)
 
   $hash->{STATE}="defined";
   
-  eval {
-    FRM_Init_Client($hash,[@a[2..scalar(@a)-1]]);
-  };
-  return $@;
+  if ($main::init_done) {
+    eval {
+      FRM_Init_Client($hash,[@a[2..scalar(@a)-1]]);
+    };
+    if ($@) {
+      $@ =~ /^(.*)( at.*FHEM.*)$/;
+      return $1;
+    }
+  }
+  return undef;
 }
 
 sub
@@ -496,17 +532,17 @@ FRM_Client_Unassign($)
 }
 
 sub
-FRM_Client_AssignIOPort($)
+FRM_Client_AssignIOPort($@)
 {
-	my $hash = shift;
+	my ($hash,$iodev) = @_;
 	my $name = $hash->{NAME};
-	if (my $iodev = AttrVal($name,"IODev",undef)) {
-	  $hash->{IODev} = $defs{$iodev};
-	}
-	AssignIoPort($hash) unless defined($hash->{IODev});
+	AssignIoPort($hash,defined $iodev ? $iodev : AttrVal($hash->{NAME},"IODev",undef));
 	die "unable to assign IODev to '$name'" unless defined ($hash->{IODev});
 	
-	$hash->{IODev} = $main::defs{$hash->{IODev}->{SNAME}} if (defined($hash->{IODev}->{SNAME}));
+	if (defined($hash->{IODev}->{SNAME})) {
+		$hash->{IODev} = $main::defs{$hash->{IODev}->{SNAME}};
+		$attr{$name}{IODev} = $hash->{IODev}{NAME};
+	}
 
 	foreach my $d ( sort keys %main::defs ) {
 		if ( defined( my $dev = $main::defs{$d} )) {
@@ -516,7 +552,8 @@ FRM_Client_AssignIOPort($)
 				&& $dev->{IODev} == $hash->{IODev}
 				&& grep {$_ == $hash->{PIN}} split(" ",$dev->{PIN}) ) {
 				  delete $hash->{IODev};
-					die "Device $main::defs{$d}{NAME} allready defined for pin $hash->{PIN}";
+				  delete $attr{$name}{IODev};
+					die "Device '$main::defs{$d}{NAME}' allready defined for pin $hash->{PIN}";
 				}
 		}
 	}
@@ -542,7 +579,7 @@ sub new {
 sub data_write {
    	my ( $self, $buf ) = @_;
    	my $hash = $self->{hash};
-    main::Log3 $hash->{NAME},5,">".join(",",map{sprintf"%02x",ord$_}split//,$buf);
+    main::Log3 $hash->{NAME},5,$hash->{FD}.">".join(",",map{sprintf"%02x",ord$_}split//,$buf);
    	main::DevIo_SimpleWrite($hash,$buf,undef);
 }
 
@@ -551,7 +588,7 @@ sub data_read {
    	my $hash = $self->{hash};
     my $string = main::DevIo_SimpleRead($hash);
     if (defined $string ) {
-   	    main::Log3 $hash->{NAME},5,"<".join(",",map{sprintf"%02x",ord$_}split//,$string);
+   	    main::Log3 $hash->{NAME},5,$hash->{FD}."<".join(",",map{sprintf"%02x",ord$_}split//,$string);
    	}
     return $string;
 }
