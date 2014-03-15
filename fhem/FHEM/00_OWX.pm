@@ -225,7 +225,7 @@ sub OWX_Define ($$) {
   if (!OWX_Detect($hash)){
     $hash->{PRESENT} = 0;
     readingsSingleUpdate($hash,"state","failed",1);
-    $init_done = 1; 
+    # $init_done = 1; 
     return undef;
   }
   #-- Fourth step: discovering devices on the bus

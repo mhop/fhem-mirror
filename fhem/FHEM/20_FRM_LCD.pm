@@ -62,20 +62,26 @@ FRM_LCD_Init($)
 	$hash->{sizey} = shift @$args;
 	$hash->{address} = shift @$args if (@$args); 
 
-	return "no IODev set" unless defined $hash->{IODev};
-	return "no FirmataDevice assigned to ".$hash->{IODev}->{NAME} unless defined $hash->{IODev}->{FirmataDevice};  	
-
 	my $name = $hash->{NAME};
 	if (($hash->{type} eq "i2c") and defined $hash->{address}) {
-		require LiquidCrystal_I2C;
-		my $lcd = LiquidCrystal_I2C->new($hash->{address},$hash->{sizex},$hash->{sizey});
-		$lcd->attach($hash->{IODev}->{FirmataDevice});
-		$lcd->init();
-		$hash->{lcd} = $lcd;
-		FRM_LCD_Apply_Attribute($name,"backLight");
-#		FRM_LCD_Apply_Attribute($name,"autoscroll");
-#		FRM_LCD_Apply_Attribute($name,"direction");
-		FRM_LCD_Apply_Attribute($name,"blink");
+		eval {
+			FRM_Client_AssignIOPort($hash);
+			my $firmata = FRM_Client_FirmataDevice($hash);
+			require LiquidCrystal_I2C;
+			my $lcd = LiquidCrystal_I2C->new($hash->{address},$hash->{sizex},$hash->{sizey});
+			$lcd->attach($firmata);
+			$lcd->init();
+			$hash->{lcd} = $lcd;
+			FRM_LCD_Apply_Attribute($name,"backLight");
+#			FRM_LCD_Apply_Attribute($name,"autoscroll");
+#			FRM_LCD_Apply_Attribute($name,"direction");
+			FRM_LCD_Apply_Attribute($name,"blink");
+		};
+		if ($@) {
+			$@ =~ /^(.*)( at.*FHEM.*)$/;
+			$hash->{STATE} = "error initializing: ".$1;
+			return "error initializing '".$hash->{NAME}."': ".$1;
+		}
 	}
 	if (! (defined AttrVal($name,"stateFormat",undef))) {
 		$main::attr{$name}{"stateFormat"} = "text";
@@ -92,19 +98,26 @@ FRM_LCD_Init($)
 sub
 FRM_LCD_Attr($$$$) {
   my ($command,$name,$attribute,$value) = @_;
-  if ($command eq "set") {
-    ARGUMENT_HANDLER: {
-      $attribute eq "IODev" and do {
-      	my $hash = $main::defs{$name};
-      	if (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $value) {
-        	$hash->{IODev} = $defs{$value};
-      		FRM_Init_Client($hash) if (defined ($hash->{IODev}));
-      	}
-        last;
-      };
+  my $hash = $main::defs{$name};
+  eval {
+    if ($command eq "set") {
+      ARGUMENT_HANDLER: {
+        $attribute eq "IODev" and do {
+          if ($main::init_done and (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $value)) {
+            FRM_Client_AssignIOPort($hash,$value);
+            FRM_Init_Client($hash) if (defined ($hash->{IODev}));
+          }
+          last;
+        };
       $main::attr{$name}{$attribute}=$value;
       FRM_LCD_Apply_Attribute($name,$attribute);
+      }
     }
+  };
+  if ($@) {
+    $@ =~ /^(.*)( at.*FHEM.*)$/;
+    $hash->{STATE} = "error setting $attribute to $value: ".$1;
+    return "cannot $command attribute $attribute to $value for $name: ".$1;
   }
 }
 

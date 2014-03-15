@@ -153,83 +153,82 @@ FRM_IN_Attr($$$$) {
   my ($command,$name,$attribute,$value) = @_;
   my $hash = $main::defs{$name};
   my $pin = $hash->{PIN};
-  if ($command eq "set") {
-    ARGUMENT_HANDLER: {
-      $attribute eq "IODev" and do {
-      	if (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $value) {
-        	$hash->{IODev} = $defs{$value};
-      		FRM_Init_Client($hash) if (defined ($hash->{IODev}));
-      	}
-        last;
-      };
-      $attribute eq "count-mode" and do {
-        if ($value ne "none" and !defined main::ReadingsVal($name,"count",undef)) {
-          main::readingsSingleUpdate($main::defs{$name},"count",$sets{count},1);
-        }
-        last;
-      }; 
-      $attribute eq "reset-on-threshold-reached" and do {
-        if ($value eq "yes"
-        and defined (my $threshold = main::AttrVal($name,"count-threshold",undef))) {
-          if (main::ReadingsVal($name,"count",0) > $threshold) {
+  eval {
+    if ($command eq "set") {
+      ARGUMENT_HANDLER: {
+        $attribute eq "IODev" and do {
+          if ($main::init_done and (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $value)) {
+            FRM_Client_AssignIOPort($hash,$value);
+            FRM_Init_Client($hash) if (defined ($hash->{IODev}));
+          }
+          last;
+        };
+        $attribute eq "count-mode" and do {
+          if ($value ne "none" and !defined main::ReadingsVal($name,"count",undef)) {
             main::readingsSingleUpdate($main::defs{$name},"count",$sets{count},1);
           }
-        }
-        last;
-      };
-      $attribute eq "count-threshold" and do {
-        if (main::ReadingsVal($name,"count",0) > $value) {
-          main::readingsBeginUpdate($hash);
-          if (main::ReadingsVal($name,"alarm","off") ne "on") {
-            main::readingsBulkUpdate($hash,"alarm","on",1);
+          last;
+        }; 
+        $attribute eq "reset-on-threshold-reached" and do {
+          if ($value eq "yes"
+          and defined (my $threshold = main::AttrVal($name,"count-threshold",undef))) {
+            if (main::ReadingsVal($name,"count",0) > $threshold) {
+              main::readingsSingleUpdate($main::defs{$name},"count",$sets{count},1);
+            }
           }
-          if (main::AttrVal($name,"reset-on-threshold-reached","no") eq "yes") {
-            main::readingsBulkUpdate($main::defs{$name},"count",0,1);
+          last;
+        };
+        $attribute eq "count-threshold" and do {
+          if (main::ReadingsVal($name,"count",0) > $value) {
+            main::readingsBeginUpdate($hash);
+            if (main::ReadingsVal($name,"alarm","off") ne "on") {
+              main::readingsBulkUpdate($hash,"alarm","on",1);
+            }
+            if (main::AttrVal($name,"reset-on-threshold-reached","no") eq "yes") {
+              main::readingsBulkUpdate($main::defs{$name},"count",0,1);
+            }
+            main::readingsEndUpdate($hash,1);
           }
-          main::readingsEndUpdate($hash,1);
-        }
-        last;
-      };
-      $attribute eq "internal-pullup" and do {
-        eval {
+          last;
+        };
+        $attribute eq "internal-pullup" and do {
           my $firmata = FRM_Client_FirmataDevice($hash);
           $firmata->digital_write($pin,$value eq "on" ? 1 : 0);
-      	};
-      	#ignore any errors here, the attribute-value will be applied next time FRM_IN_init() is called.
-      	last;
-      };
-      $attribute eq "activeLow" and do {
-        my $oldval = AttrVal($hash->{NAME},"activeLow","no");
-        if ($oldval ne $value) {
-          $main::attr{$hash->{NAME}}{activeLow} = $value;
-          eval {
+          #ignore any errors here, the attribute-value will be applied next time FRM_IN_init() is called.
+          last;
+        };
+        $attribute eq "activeLow" and do {
+          my $oldval = AttrVal($hash->{NAME},"activeLow","no");
+          if ($oldval ne $value) {
+            $main::attr{$hash->{NAME}}{activeLow} = $value;
             my $firmata = FRM_Client_FirmataDevice($hash);
             FRM_IN_observer($pin,undef,$firmata->digital_read($pin),$hash);
           };
+          last;
         };
-        last;
-      };
-    }
-  } elsif ($command eq "del") {
-    ARGUMENT_HANDLER: {
-      $attribute eq "internal-pullup" and do {
-      	eval {
+      }
+    } elsif ($command eq "del") {
+      ARGUMENT_HANDLER: {
+        $attribute eq "internal-pullup" and do {
           my $firmata = FRM_Client_FirmataDevice($hash);
           $firmata->digital_write($pin,0);
-      	};
-        last;
-      };
-      $attribute eq "activeLow" and do {
-        if (AttrVal($hash->{NAME},"activeLow","no") eq "yes") {
-          delete $main::attr{$hash->{NAME}}{activeLow};
-          eval {
+          last;
+        };
+        $attribute eq "activeLow" and do {
+          if (AttrVal($hash->{NAME},"activeLow","no") eq "yes") {
+            delete $main::attr{$hash->{NAME}}{activeLow};
             my $firmata = FRM_Client_FirmataDevice($hash);
             FRM_IN_observer($pin,undef,$firmata->digital_read($pin),$hash);
           };
+          last;
         };
-        last;
-      };
+      }
     }
+  };
+  if ($@) {
+    $@ =~ /^(.*)( at.*FHEM.*)$/;
+    $hash->{STATE} = "error setting $attribute to $value: ".$1;
+    return "cannot $command attribute $attribute to $value for $name: ".$1;
   }
 }
 

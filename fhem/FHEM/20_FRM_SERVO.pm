@@ -52,21 +52,28 @@ FRM_SERVO_Init($$)
 sub
 FRM_SERVO_Attr($$$$) {
   my ($command,$name,$attribute,$value) = @_;
-  if ($command eq "set") {
-    ARGUMENT_HANDLER: {
-      $attribute eq "IODev" and do {
-      	my $hash = $main::defs{$name};
-      	if (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $value) {
-        	$hash->{IODev} = $defs{$value};
-      		FRM_Init_Client($hash) if (defined ($hash->{IODev}));
-      	}
-        last;
-      };
-   	  $main::attr{$name}{$attribute}=$value;
-   	  if ( $attribute eq "min-pulse" || $attribute eq "max-pulse" ) {
-   	    FRM_SERVO_apply_attribute($main::defs{$name},$attribute);
-   	  }
+  my $hash = $main::defs{$name};
+  eval {
+    if ($command eq "set") {
+      ARGUMENT_HANDLER: {
+        $attribute eq "IODev" and do {
+          if ($main::init_done and (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $value)) {
+            FRM_Client_AssignIOPort($hash,$value);
+            FRM_Init_Client($hash) if (defined ($hash->{IODev}));
+          }
+          last;
+        };
+        $main::attr{$name}{$attribute}=$value;
+        if ( $attribute eq "min-pulse" || $attribute eq "max-pulse" ) {
+          FRM_SERVO_apply_attribute($main::defs{$name},$attribute);
+        }
+      }
     }
+  };
+  if ($@) {
+    $@ =~ /^(.*)( at.*FHEM.*)$/;
+    $hash->{STATE} = "error setting $attribute to $value: ".$1;
+    return "cannot $command attribute $attribute to $value for $name: ".$1;
   }
 }
 

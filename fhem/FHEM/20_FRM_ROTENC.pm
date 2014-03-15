@@ -139,17 +139,23 @@ sub
 FRM_ROTENC_Attr($$$$) {
   my ($command,$name,$attribute,$value) = @_;
   my $hash = $main::defs{$name};
-  my $pin = $hash->{PIN};
-  if ($command eq "set") {
-    ARGUMENT_HANDLER: {
-      $attribute eq "IODev" and do {
-      	if (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $value) {
-        	$hash->{IODev} = $defs{$value};
-      		FRM_Init_Client($hash) if (defined ($hash->{IODev}));
-      	}
-        last;
-      };
+  eval {
+    if ($command eq "set") {
+      ARGUMENT_HANDLER: {
+        $attribute eq "IODev" and do {
+          if ($main::init_done and (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $value)) {
+            FRM_Client_AssignIOPort($hash,$value);
+            FRM_Init_Client($hash) if (defined ($hash->{IODev}));
+          }
+          last;
+        };
+      }
     }
+  };
+  if ($@) {
+    $@ =~ /^(.*)( at.*FHEM.*)$/;
+    $hash->{STATE} = "error setting $attribute to $value: ".$1;
+    return "cannot $command attribute $attribute to $value for $name: ".$1;
   }
 }
 
