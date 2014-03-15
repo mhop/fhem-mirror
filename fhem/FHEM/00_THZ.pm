@@ -1,7 +1,7 @@
 ##############################################
 # 00_THZ
 # by immi 03/2014
-# v. 0.076
+# v. 0.078
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -219,6 +219,8 @@ my %sets = (
 my %gets = (
 #	"hallo"       			=> { },
 #	"debug_read_raw_register_slow"	=> { },
+	"Status_Sol_16"			=> {cmd2=>"16"},
+	"Status_DHW_F3"			=> {cmd2=>"F3"},
 	"Status_HC1_F4"			=> {cmd2=>"F4"},
 	"Status_HC2_F5"			=> {cmd2=>"F5"},
 	"history"			=> {cmd2=>"09"},
@@ -917,6 +919,37 @@ sub THZ_Parse($) {
       if (substr($message,4,2) eq "15")  {$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
       else 				 {$message = hex2int(substr($message, 8,4))/10 ." °C"  }
   }
+  
+    when ("16")    {                     #all16 Solar
+    $message =
+		"collector_temp: " 		. hex2int(substr($message, 4,4))/10 . " " .
+        	"dhw_temp: " 			. hex2int(substr($message, 8,4))/10 . " " .
+        	"flow_temp: "			. hex2int(substr($message,12,4))/10 . " " .
+        	"ed_sol_pump_temp: "		. hex2int(substr($message,16,4))/10 . " " .
+        	"x20: "	 	 		. hex2int(substr($message,20,4))    . " " .
+        	"x24: "				. hex2int(substr($message,24,4))    . " " . 
+		"x28: "				. hex2int(substr($message,28,4))    . " " . 
+        	"x32: "				. hex2int(substr($message,32,4)) ;
+  }
+  
+  
+    when ("F3")    {                     #allF3 DHW
+    $message =
+		"dhw_temp: " 			. hex2int(substr($message, 4,4))/10 . " " .
+        	"outside_temp: " 		. hex2int(substr($message, 8,4))/10 . " " .
+        	"dhw_set_temp: "		. hex2int(substr($message,12,4))/10 . " " .
+        	"comp_block_time: "		. hex2int(substr($message,16,4))    . " " .
+        	"x20: " 			. hex2int(substr($message,20,4))    . " " .
+        	"heat_block_time: "		. hex2int(substr($message,24,4))    . " " . 
+		"x28: "				. hex2int(substr($message,28,4))    . " " . 
+        	"x32: "				. hex2int(substr($message,32,4))    . " " .
+        	"x36: "				. hex2int(substr($message,36,4))    . " " .
+        	"x40: "				. hex2int(substr($message,40,4));
+  }
+  
+  
+  
+  
   when ("F4")    {                     #allF4
     $message =
 		"outside_temp: " 		. hex2int(substr($message, 4,4))/10 . " " .
@@ -925,7 +958,7 @@ sub THZ_Parse($) {
         	"integral_heat: "		. hex2int(substr($message,16,4))    . " " .
         	"flow_temp: " 			. hex2int(substr($message,20,4))/10 . " " .
         	"heat-set_temp: "		. hex2int(substr($message,24,4))/10 . " " . #soll HC1
-		"heat-actual_temp: "		. hex2int(substr($message,28,4))/10 . " " . #ist
+		"heat_temp: "			. hex2int(substr($message,28,4))/10 . " " . #ist
         	"x32: "				. hex2int(substr($message,32,4))/10 . " " .
         	"x36: "				. hex2int(substr($message,36,4))/10 . " " .
         	"x40: "				. hex2int(substr($message,40,4))/10 . " " .
@@ -943,19 +976,21 @@ sub THZ_Parse($) {
   when ("F5")    {                     #allF5
     $message =
 		"outside_temp: " 		. hex2int(substr($message, 4,4))/10 . " " .
-        	"x08: " 			. hex2int(substr($message, 8,4))/10 . " " .
-        	"return_temp: "			. hex2int(substr($message,12,4))/10 . " " .
-        	"integral_heat: "		. hex2int(substr($message,16,4))    . " " .
-        	"flow_temp: " 			. hex2int(substr($message,20,4))/10 . " " .
-        	"heat-set_temp: "		. hex2int(substr($message,24,4))/10 . " " . #soll HC2
-		"heat-actual_temp: "		. hex2int(substr($message,28,4))/10 . " " . #ist
+        	"return_temp: " 		. hex2int(substr($message, 8,4))/10 . " " .
+        	"vorlauftemp: "			. hex2int(substr($message,12,4))/10 . " " .
+        	"heat_temp: "			. hex2int(substr($message,16,4))/10 . " " .
+        	"heat-set_temp: " 		. hex2int(substr($message,20,4))/10 . " " .
+        	"stellgroesse: "		. hex2int(substr($message,24,4))/10 . " " . 
+		"x28: "				. hex2int(substr($message,28,4))/10 . " " . 
         	"x32: "				. hex2int(substr($message,32,4))/10 . " " .
         	"x36: "				. hex2int(substr($message,36,4))/10 . " " .
         	"x40: "				. hex2int(substr($message,40,4))/10 . " " .
-		"integral_switch: "		. hex2int(substr($message,44,4))    . " " .
+		"x44: "				. hex2int(substr($message,44,4))/10 . " " .
 		"x48: " 			. hex2int(substr($message,48,4))/10 . " " .
         	"x52: "				. hex2int(substr($message,52,4))/10;
   }
+
+  
   when ("FD")    {                     #firmware_ver
     $message = "version: " . hex(substr($message,4,4))/100 ;
   }
