@@ -227,7 +227,7 @@ sub CUL_HM_updateConfig($){
       # move certain attributes to readings for future handling
       my $aName = $rName;
       $aName =~ s/D-//;
-      my $aVal = AttrVal($name,$aName,undef);               
+      my $aVal = AttrVal($name,$aName,undef);      
       CUL_HM_UpdtReadSingle($hash,$rName,$aVal,0)
            if (!defined ReadingsVal($name,$rName,undef));
     }
@@ -2027,6 +2027,7 @@ sub CUL_HM_parseCommon(@){#####################################################
     my $paired = 0; #internal flag
     CUL_HM_infoUpdtDevData($shash->{NAME}, $shash,$p)
                   if (!$modules{CUL_HM}{helper}{hmManualOper});
+
     if (   $ioHash->{hmPair} 
         ||(    $ioHash->{hmPairSerial}
             && $ioHash->{hmPairSerial} eq $attr{$shash->{NAME}}{serialNr})){
@@ -3687,7 +3688,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         my $bs = hex(substr($line,$pos,4))*2+4;	  
         return "file corrupt. length:$fs expected:".($pos+$bs) 
               if ($fs<$pos+$bs);
-        my @msg = grep !/^$/,unpack 'A74(A70)*',substr($line,$pos,$bs);
+        my @msg = grep !/^$/,unpack '(A60)*',substr($line,$pos,$bs);
         push @imA,\@msg; # image[block][msg]
         $pos += $bs;
       }
@@ -3703,10 +3704,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $modules{CUL_HM}{helper}{updateId} = $id;
     $modules{CUL_HM}{helper}{updateNbr} = 10;
     my $msg;
-    Log3 $name,3,"CUL_HM fwUpdate started for $name";
+    Log3 $name,1,"CUL_HM fwUpdate started for $name";
     CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
                         ."3011$id${dst}CA");
-    InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim",$dst.$id."00",0);#General simulation
+    # InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim",$dst.$id."00",0);
   }
   elsif($cmd eq "postEvent") { ################################################
     my (undef,undef,$cond) = @a;
@@ -4654,35 +4655,47 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
   my $id = $modules{CUL_HM}{helper}{updateId};
   my $mNo = $modules{CUL_HM}{helper}{updateNbr};
   my $mNoA = sprintf("%02X",$mNo);
-  return if ($mIn !~ m/$mNoA..02$dst${id}00/);
-  Log 1,"General loop fwUpdate $mNoA------------";
+  return if ($mIn !~ m/$mNoA..02$dst${id}00/&&$mIn !~ m/0010${dst}00000000/);
   if ($step == 0){#check bootloader entered - now chnage speed
-    Log3 $name,4,"CUL_HM fwUpdate switch speed";
+    return if ($mIn =~ m/$mNoA..02$dst${id}00/);
+    Log3 $name,1,"CUL_HM fwUpdate $name entered mode - switch speed";
     $mNo = (++$mNo)%256; $mNoA = sprintf("%02X",$mNo);
-    CUL_HM_SndCmd($hash,"${mNoA}00CB$id${dst}105B11F81547");
+    CUL_HM_SndCmd($hash,"${mNoA}20CB$id${dst}105B11F815470B081A1C191D1BC71C001DB221B623EA");
+    select(undef, undef, undef, (0.04));
     CUL_HM_FWupdateSpeed($name,100);
-    select(undef, undef, undef, (0.1));
+    select(undef, undef, undef, (0.04));
     $mNo = (++$mNo)%256; $mNoA = sprintf("%02X",$mNo);
-    CUL_HM_SndCmd($hash,"${mNoA}20CB$id${dst}105B11F81547");
     $modules{CUL_HM}{helper}{updateStep}++;
     $modules{CUL_HM}{helper}{updateNbr} = $mNo;
-    InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim","${dst}${id}00",0);#General simulation
     RemoveInternalTimer("fail:notInBootLoader");
     InternalTimer(gettimeofday()+5,"CUL_HM_FWupdateEnd","fail:SpeedChangeFailed",0);
   }
   else{# check response - start programming
+  ##16.130  CUL_Parse:  A 0A 30 0002 235EDB 255E91 00
+  ##16.338  CUL_Parse:  A 0A 39 0002 235EDB 255E91 00
+  ##16.716  CUL_Parse:  A 0A 42 0002 235EDB 255E91 00
+  ##17.093  CUL_Parse:  A 0A 4B 0002 235EDB 255E91 00
+  ##17.471  CUL_Parse:  A 0A 54 0002 235EDB 255E91 00
+  ##17.848  CUL_Parse:  A 0A 5D 0002 235EDB 255E91 00
+  ##...
+  ##43.621 4: CUL_Parse: iocu1 A 0A 58 0002 235EDB 255E91 00
+  ##44.034 4: CUL_Parse: iocu1 A 0A 61 0002 235EDB 255E91 00
+  ##44.161 4: CUL_Parse: iocu1 A 1D 6A 20CA 255E91 235EDB 00121642446D1C3F45F240ED84DC5E7C1AB7554D
+  ##44.180 4: CUL_Parse: iocu1 A 0A 6A 0002 235EDB 255E91 00
+  ## one block = 10 messages in 200-1000ms
     my $blocks = scalar(@{$modules{CUL_HM}{helper}{updateData}});
+    RemoveInternalTimer("respPend:$hash->{DEF}");
     RemoveInternalTimer("fail:SpeedChangeFailed");
     RemoveInternalTimer("fail:Block".($step-1));
     if ($blocks < $step){#last block
       CUL_HM_FWupdateSpeed($name,10);
       CUL_HM_FWupdateEnd("done");
-      Log3 $name,4,"CUL_HM fwUpdate completed";
+      Log3 $name,1,"CUL_HM fwUpdate completed";
     }
     else{# programming continue
       my $bl = ${$modules{CUL_HM}{helper}{updateData}}[$step-1];
       my $no = scalar(@{$bl});
-      Log3 $name,4,"CUL_HM fwUpdate write block $step of $blocks: $no messages";
+      Log3 $name,1,"CUL_HM fwUpdate write block $step of $blocks: $no messages";
       foreach my $msgP (@{$bl}){
         $mNo = (++$mNo)%256; $mNoA = sprintf("%02X",$mNo);
         CUL_HM_SndCmd($hash, $mNoA.((--$no)?"00":"20")."CA$id$dst".$msgP);
@@ -4690,7 +4703,7 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
       }
       $modules{CUL_HM}{helper}{updateStep}++;
       $modules{CUL_HM}{helper}{updateNbr} = $mNo;
-      InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim","${dst}${id}00",0);#General simulation
+      #InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim","${dst}${id}00",0);
       InternalTimer(gettimeofday()+5,"CUL_HM_FWupdateEnd","fail:Block$step",0);
     }
   }
@@ -4724,7 +4737,8 @@ sub CUL_HM_FWupdateSpeed($$){#set IO speed
 sub CUL_HM_FWupdateSim($){#end FW Simulation
   my $msg = shift;
   my $ioName = $defs{$modules{CUL_HM}{helper}{updatingName}}->{IODev}->{NAME};
-#  CUL_HM_Parse($defs{$ioName},"A00118002$msg");
+  my $mNo = sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr});
+  CUL_HM_Parse($defs{$ioName},"A00${mNo}8002$msg");
 }
 
 
