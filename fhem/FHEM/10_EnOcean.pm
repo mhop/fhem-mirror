@@ -2992,11 +2992,20 @@ EnOcean_Parse($$)
       # Occupancy Sensor (EEP A5-07-01)
       # $db[3] is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
       # $db[3] > 0xFA is error code
+      # $db[2] is solar panel current where =0 uA ... 0xFF = 127 uA      
       # $db[1] is PIR Status (motion) where 0 ... 127 = off, 128 ... 255 = on
       my $motion = "off";
       if ($db[1] >= 128) {$motion = "on";}
       if ($db[0] & 1) {push @event, "3:voltage:" . sprintf "%0.1f", $db[3] * 0.02;}
       if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
+      if ($manufID eq "00B") {
+        push @event, "3:current:" . sprintf "%0.1f", $db[2] / 2;
+        if ($db[0] & 2) {          
+          push @event, "3:sensorType:ceiling";
+        } else {
+          push @event, "3:sensorType:wall";        
+        }
+      }
       push @event, "3:motion:$motion";
       push @event, "3:state:$motion";
 
@@ -4319,7 +4328,7 @@ EnOcean_Undef($$)
       <li>unattended<br>
           Do not regulate the actuator.</li>
     </ul><br>
-    The attr subType must be MD15. This is done if the device was
+    The attr subType must be hvac.01. This is done if the device was
     created by autocreate. To control the device, it must be bidirectional paired,
     see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.<br>
     The command is not sent until the device wakes up and sends a mesage, usually
@@ -5030,13 +5039,16 @@ EnOcean_Undef($$)
          [EnOcean EOSW]<br>
      <ul>
        <li>on|off</li>
+       <li>current: I/&#181;A (Sensor Range: I = 0 V ... 127.0 &#181;A)</li>
        <li>errorCode: 251 ... 255</li>
        <li>motion: on|off</li>
+       <li>sensorType: ceiling|wall</li>
        <li>voltage: U/V (Sensor Range: U = 0 V ... 5.0 V)</li>
        <li>state: on|off</li>
      </ul><br>
         The attr subType must be occupSensor.<01|02>. This is done if the device was
-        created by autocreate.
+        created by autocreate. Current is the solar panel current. Some values are
+        displayed only for certain types of devices.
      </li>
      <br><br>
 
@@ -5545,7 +5557,7 @@ EnOcean_Undef($$)
        <li>window: open|closed</li>
        <li>state: Actuator/%</li>
      </ul><br>
-        The attr subType must be MD15. This is done if the device was created by
+        The attr subType must be hvac.01. This is done if the device was created by
         autocreate.
      </li>
      <br><br>
