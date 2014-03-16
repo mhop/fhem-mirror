@@ -3739,15 +3739,21 @@ utf8ToLatin1($)
 sub escapeLogLine($) {
   my ($s)= @_;
   
+  # http://perldoc.perl.org/perlrebackslash.html
   my %escSequences = (
-      '\t' => "\\t",
+      '\a' => "\\a",
+      '\e' => "\\e",
+      '\f' => "\\f",
       '\n' => "\\n",
       '\r' => "\\r",
+      '\t' => "\\t",
       );
   
+  $s =~ s/\\/\\\\/g;
   foreach my $regex (keys %escSequences) {
     $s =~ s/$regex/$escSequences{$regex}/g;
   }
+  $s =~ s/([\000-\037])/sprintf("\\%03o", ord($1))/eg;
   return $s;
 }
 
