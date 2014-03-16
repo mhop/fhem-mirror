@@ -2050,7 +2050,7 @@ FW_Notify($$)
   return undef if(!$h);
 
   my $dn = $dev->{NAME};
-  return undef if(!$h->{devices}{$dn});
+  return undef if(!$h->{devices}{$dn} && $h->{type} !~ m/raw/);
 
   my @data;
   my %extPage;
