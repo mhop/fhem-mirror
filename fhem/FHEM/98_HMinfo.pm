@@ -739,7 +739,6 @@ sub HMinfo_GetFn($@) {#########################################################
   my ($hash,$name,$cmd,@a) = @_;
   my ($opt,$optEmpty,$filter) = ("",1,"");
   my $ret;
-
   if (@a && ($a[0] =~ m/^-/) && ($a[0] !~ m/^-f$/)){# options provided
     $opt = $a[0];
     $optEmpty = ($opt =~ m/e/)?1:0;
@@ -1214,6 +1213,8 @@ sub HMinfo_SetFn($@) {#########################################################
 
   ### redirect set commands to get - thus the command also work in webCmd
   elsif(HMinfo_GetFn($hash,$name,"?") =~ m/\b$cmd\b/){##----------------
+    unshift @a,$filter if ($filter);
+    unshift @a,$opt if ($opt);
     $ret = HMinfo_GetFn($hash,$name,$cmd,@a);
   }
 
