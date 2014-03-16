@@ -1580,10 +1580,15 @@ sub
 AssignIoPort($;$)
 {
   my ($hash, $proposed) = @_;
+  my $ht = $hash->{TYPE};
+  my $hn = $hash->{NAME};
+  my $hasIODevAttr = ($ht &&
+                      $modules{$ht}{AttrList} &&
+                      $modules{$ht}{AttrList} =~ m/IODev/);
 
   if($proposed && $defs{$proposed}) {
     $hash->{IODev} = $defs{$proposed};
-    $attr{$hash->{NAME}}{IODev} = $proposed;
+    $attr{$hn}{IODev} = $proposed if($hasIODevAttr);
     delete($defs{$proposed}{".clientArray"});
     return;
   }
@@ -1593,7 +1598,7 @@ AssignIoPort($;$)
     my $cl = $defs{$p}{Clients};
     $cl = $modules{$defs{$p}{TYPE}}{Clients} if(!$cl);
 
-    if($cl && $defs{$p}{NAME} ne $hash->{NAME}) {      # e.g. RFR
+    if($cl && $defs{$p}{NAME} ne $hn) {      # e.g. RFR
       my @fnd = grep { $hash->{TYPE} =~ m/^$_$/; } split(":", $cl);
       if(@fnd) {
         $hash->{IODev} = $defs{$p};
@@ -1603,12 +1608,13 @@ AssignIoPort($;$)
     }
   }
   if($hash->{IODev}) {
-    $attr{$hash->{NAME}}{IODev} = $hash->{IODev}{NAME}
-      if($hash->{TYPE} ne "CUL_WS"); # See CUL_WS_Attr() for details
+    # See CUL_WS_Attr() for details
+    $attr{$hn}{IODev} = $hash->{IODev}{NAME}
+      if($hasIODevAttr && $hash->{TYPE} ne "CUL_WS");
 
   } else {
     if($init_done) {
-      Log 3, "No I/O device found for $hash->{NAME}"
+      Log 3, "No I/O device found for $hn";
     } else {
       $hash->{IODevMissing} = 1;
     }
