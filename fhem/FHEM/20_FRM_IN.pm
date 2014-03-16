@@ -59,6 +59,7 @@ FRM_IN_Init($$)
       }
       $firmata->observe_digital($pin,\&FRM_IN_observer,$hash);
 	};
+	return FRM_Catch($@) if $@;
 	if (! (defined AttrVal($hash->{NAME},"stateFormat",undef))) {
 		$main::attr{$hash->{NAME}}{"stateFormat"} = "reading";
 	}
@@ -192,17 +193,21 @@ FRM_IN_Attr($$$$) {
           last;
         };
         $attribute eq "internal-pullup" and do {
-          my $firmata = FRM_Client_FirmataDevice($hash);
-          $firmata->digital_write($pin,$value eq "on" ? 1 : 0);
-          #ignore any errors here, the attribute-value will be applied next time FRM_IN_init() is called.
+          if ($main::init_done) {
+            my $firmata = FRM_Client_FirmataDevice($hash);
+            $firmata->digital_write($pin,$value eq "on" ? 1 : 0);
+            #ignore any errors here, the attribute-value will be applied next time FRM_IN_init() is called.
+          }
           last;
         };
         $attribute eq "activeLow" and do {
           my $oldval = AttrVal($hash->{NAME},"activeLow","no");
           if ($oldval ne $value) {
             $main::attr{$hash->{NAME}}{activeLow} = $value;
-            my $firmata = FRM_Client_FirmataDevice($hash);
-            FRM_IN_observer($pin,undef,$firmata->digital_read($pin),$hash);
+            if ($main::init_done) {
+              my $firmata = FRM_Client_FirmataDevice($hash);
+              FRM_IN_observer($pin,undef,$firmata->digital_read($pin),$hash);
+            }
           };
           last;
         };
@@ -225,10 +230,9 @@ FRM_IN_Attr($$$$) {
       }
     }
   };
-  if ($@) {
-    $@ =~ /^(.*)( at.*FHEM.*)$/;
-    $hash->{STATE} = "error setting $attribute to $value: ".$1;
-    return "cannot $command attribute $attribute to $value for $name: ".$1;
+  if (my $error = FRM_Catch($@)) {
+    $hash->{STATE} = "error setting $attribute to $value: ".$error;
+    return "cannot $command attribute $attribute to $value for $name: ".$error;
   }
 }
 
