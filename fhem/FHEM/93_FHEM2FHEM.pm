@@ -146,7 +146,7 @@ FHEM2FHEM_Read($)
       next if($re && !($name =~ m/^$re$/ || "$name:$msg" =~ m/^$re$/));
 
       if(!$defs{$name}) {
-        LoadModule($type);
+        #LoadModule($type); Why do we need this line?
         $defs{$name}{NAME}  = $name;
         $defs{$name}{TYPE}  = $type;
         $defs{$name}{STATE} = $msg;
