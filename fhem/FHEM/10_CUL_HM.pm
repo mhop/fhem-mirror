@@ -3012,9 +3012,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         ||($peerChnIn))              {# and if requested by user
       return "Peer not specified" if ($peerChnIn eq "");
       $peerId  = CUL_HM_peerChId($peerChnIn,$dst);
-      $peerChn = ((length($peerId) == 8)?substr($peerId,6,2):"01");
-      $peerId  = substr($peerId,0,6);
-      return "Peer not valid" if (!$peerId);
+      ($peerId,$peerChn) = unpack 'A6A2',$peerId.'01';
+      return "Peer not valid" if (length ($peerId) < 6);
     }
     elsif($list == 0){
       $lChn = "00";
@@ -3223,7 +3222,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
               F=>8,x9=>9,x10=>10,x11=>11,x12=>12,x13=>13,x14=>14,x15=>15);
 
     my @symbList = split(',',$symb);
-    my $symbAdd = "";
+    my $symbAdd = 0;
     foreach my $symb (@symbList){
       if (!defined($symbol{$symb})){# wrong parameter
         return "'$symb ' unknown. Select one of ".join(" ",sort keys(%symbol));
@@ -5031,6 +5030,8 @@ sub CUL_HM_name2Id(@) { #in: name or HMid ==>out: HMid, "" if no match
   return "000000"            if($name eq "broadcast");        #broadcast
   return substr($idHash->{DEF},0,6).sprintf("%02X",$1)
                              if($idHash && ($name =~ m/self(.*)/));
+  return CUL_HM_IOid($idHash).sprintf("%02X",$1)
+                             if($idHash && ($name =~ m/fhem(.*)/));
   return AttrVal($name,"hmId",""); # could be IO device
 }
 sub CUL_HM_id2Name($) { #in: name or HMid out: name
