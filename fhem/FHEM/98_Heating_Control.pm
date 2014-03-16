@@ -33,6 +33,11 @@ sub Heating_Control_Initialize($)
 {
   my ($hash) = @_;
 
+  if(!$modules{Twilight}{LOADED} && -f "$attr{global}{modpath}/FHEM/59_Twilight.pm") {
+    my $ret = CommandReload(undef, "59_Twilight");
+    Log3 undef, 1, $ret if($ret);
+  }
+
 # Consumer
   $hash->{DefFn}   = "Heating_Control_Define";
   $hash->{UndefFn} = "Heating_Control_Undef";
@@ -101,7 +106,7 @@ sub Heating_Control_Define($$)
   $language = $hash->{LANGUAGE};
 
   # test if device is defined
-  return "invalid Device, given Device <$device> not found" if(!$defs{$device});
+  # return "invalid Device, given Device <$device> not found" if(!$defs{$device});
 
   #fuer den modify Altlasten bereinigen
   delete($hash->{TIME_AS_PERL})              if($hash->{TIME_AS_PERL});
@@ -154,11 +159,14 @@ sub Heating_Control_Define($$)
   }
 
   my $now = time();
-  if (!defined($hash->{PERLTIMEUPDATEMODE})) {
-     Heating_Control_UpdatePerlTime($hash);
+  if ($hash->{TIME_AS_PERL} ) {
+     Heating_Control_UpdatePerlTime_TimerSet($hash);
   }
-  RemoveInternalTimer($hash);
-  InternalTimer ($now+1, "$hash->{TYPE}_Update", $hash, 0);
+
+  $hash->{PERLTIMEUPDATEMODE} = 0    if (!defined($hash->{PERLTIMEUPDATEMODE}));
+
+  myRemoveInternalTimer("Update", $hash);
+  myInternalTimer      ("Update", $now+1, "$hash->{TYPE}_Update", $hash, 0);
 
   readingsBeginUpdate  ($hash);
   readingsBulkUpdate   ($hash, "nextUpdate",   strftime("Heute, %H:%M:%S",localtime($now+30)));
@@ -271,33 +279,41 @@ sub Heating_Control_ParseSwitchingProfile($$$) {
 sub Heating_Control_Undef($$) {
   my ($hash, $arg) = @_;
 
-  RemoveInternalTimer($hash);
+  myRemoveInternalTimer("Update",         $hash);
+  myRemoveInternalTimer("UpdatePerlTime", $hash);
+
   delete $modules{$hash->{TYPE}}{defptr}{$hash->{NAME}};
   return undef;
 }
 ################################################################################
-sub Heating_Control_UpdatePerlTime($)
-{
-    my ($hash) = @_;
+sub Heating_Control_UpdatePerlTime_TimerSet($) {
+   my ($hash) = @_;
+	
+   my $now = time();
+   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
+   my $secToMidnight = 24*3600 -(3600*$hour + 60*$min + $sec) + 10*60;
+  #my $secToMidnight =                                        + 01*60;
+
+   myRemoveInternalTimer("UpdatePerlTime", $hash);
+   myInternalTimer      ("UpdatePerlTime", $now+$secToMidnight, "$hash->{TYPE}_UpdatePerlTime", $hash, 0);
+
+}
+################################################################################
+sub Heating_Control_UpdatePerlTime($) {
+    my ($myHash) = @_;
+    my $hash     = $myHash->{HASH};
+
     if (defined($hash->{TIME_AS_PERL})) {
-
-       my $now = time();
-       my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
-
-       my $secToMidnight = 24*3600 -(3600*$hour + 60*$min + $sec) + 10*60;
-       if (abs($secToMidnight-24*3600)<10) {
-          $hash->{PERLTIMEUPDATEMODE} = 1;
-          Heating_Control_Define($hash, $hash->{NAME} . " " . $hash->{TYPE} . " " . $hash->{DEF} );
-          delete $hash->{PERLTIMEUPDATEMODE};
-       }
-       InternalTimer ($now+$secToMidnight, "Heating_Control_UpdatePerlTime", $hash, 0);
+       $hash->{PERLTIMEUPDATEMODE} = 1;
+       Heating_Control_Define($hash, $hash->{NAME} . " " . $hash->{TYPE} . " " . $hash->{DEF} );
     }
 }
 ################################################################################
-sub Heating_Control_Update($)
-{
-  my ($hash) = @_;
-  my $mod    = "[".$hash->{NAME} ."] ";
+sub Heating_Control_Update($) {
+  my ($myHash) = @_;
+  my $hash     = $myHash->{HASH};
+
+  my $mod    = "[".$hash->{NAME} ."] ";                                         ###
   my $name   = $hash->{NAME};
   my $now    = time() + 5;       # garantiert > als die eingestellte Schlatzeit
 
@@ -312,11 +328,13 @@ sub Heating_Control_Update($)
 
   # ggf. Device schalten
   Heating_Control_Device_Schalten($hash, $now, $nowSwitch, $newParam);
+  $hash->{PERLTIMEUPDATEMODE} = 0;
 
   Log3 $hash, 4, $mod .strftime('Next switch %d.%m.%Y %H:%M:%S',localtime($nextSwitch));
 
   # Timer und Readings setzen.
-  InternalTimer  ($nextSwitch, "$hash->{TYPE}_Update", $hash, 0);
+  myRemoveInternalTimer("Update", $hash);
+  myInternalTimer      ("Update", $nextSwitch, "$hash->{TYPE}_Update", $hash, 0);
 
   my $active = 1;
   if (defined $hash->{helper}{CONDITION}) {
@@ -334,7 +352,7 @@ sub Heating_Control_Update($)
 ################################################################################
 sub Heating_Control_FensterOffen ($) {
   my ($hash) = @_;
-  my $mod = "[".$hash->{NAME} ."]";
+  my $mod = "[".$hash->{NAME} ."]";                                             ###
 
   my %contacts =  ( "CUL_FHTTK" => { "READING" => "Window", "STATUS" => "(Open)"                       },
                     "CUL_HM"    => { "READING" => "state",  "STATUS" => "(open|tilted)",  "model" => 1 },
@@ -384,7 +402,7 @@ sub Heating_Control_FensterOffen ($) {
 sub Heating_Control_akt_next_param($$) {
   my ($now, $hash) = @_;
 
-  my $mod = "[".$hash->{NAME} ."] ";
+  my $mod = "[".$hash->{NAME} ."] ";                                            ###
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
 
   my ($nextParam, $next, $nextSwitch, $nowSwitch, $newParam) = (0,0,0,0,0);
@@ -432,7 +450,7 @@ sub Heating_Control_Device_Schalten($$$$) {
   my ($hash, $now, $nowSwitch, $newParam)  = @_;
 
   my $command = "";
-  my $mod     = "[".$hash->{NAME} ."] ";
+  my $mod     = "[".$hash->{NAME} ."] ";                                        ###
 
   #modifier des Zieldevices auswaehlen
   my $setModifier = isHeizung($hash);
@@ -457,15 +475,28 @@ sub Heating_Control_Device_Schalten($$$$) {
 
   #Kommando ausführen
   my $secondsSinceSwitch = $nowSwitch - $now;
+
+  if ($hash->{PERLTIMEUPDATEMODE} == 1) {
+     Log3 $hash, 5, $mod."no switch of device in PERLTIMEUPDATEMODE at 00:10 o'clock";
+     return;
+  }
+
   if (defined $hash->{helper}{COMMAND} || ($nowSwitch gt "" && $aktParam ne $newParam )) {
      if (!$setModifier && $secondsSinceSwitch < -60) {
-        Log3 $hash, 5, $mod."no switch in the yesterdays because of the devices type.";
+        Log3 $hash, 5, $mod."no switch in the yesterdays because of the devices type($defs{$hash->{DEVICE}}->{NAME} is not a heating).";
      } else {
         if ($command && !$disabled) {
           $newParam =~ s/:/ /g;
-          $command  =~ s/@/$hash->{DEVICE}/g;
-          $command  =~ s/%/$newParam/g;
+         #$command  =~ s/@/$hash->{DEVICE}/g;    # übernimmt EvalSpecials()
+         #$command  =~ s/%/$newParam/g;          #
+
           $command  = SemicolonEscape($command);
+          my %specials= (
+                 "%NAME"  => $hash->{DEVICE},
+                 "%EVENT" => $newParam,
+          );
+          $command= EvalSpecials($command, %specials);
+
           Log3 $hash, 4, $mod."command: $command executed";
           my $ret  = AnalyzeCommandChain(undef, $command);
           Log3 ($hash, 3, $ret) if($ret);
@@ -486,9 +517,10 @@ sub isHeizung($) {
                       "WallMountedThermostat" => 1 },
       "CUL_HM" =>  {  "mode" => "model","setModifier" => "desired-temp",
                       "HM-CC-TC"              => 1,
+                      "HM-TC-IT-WM-W-EU"      => 1,
                       "HM-CC-RT-DN"           => 1 } );
 
-  my $dHash = $defs{$hash->{DEVICE}};
+  my $dHash = $defs{$hash->{DEVICE}};                                           ###
   my $dType = $dHash->{TYPE};
   my $setModifier = $setmodifiers{$dType};
      $setModifier = ""  if (!defined($setModifier));
@@ -618,7 +650,7 @@ sub SortNumber {
     </ul>
     <p>
     <ul><b>condition</b><br>
-      if a condition is defined you must declared this with () and a valid perl-code.<br>
+      if a condition is defined you must declare this with () and a valid perl-code.<br>
       The returnvalue must be boolean.<br>
       The parameter @ and % will be interpreted.
     </ul>

@@ -149,8 +149,8 @@ sub Twilight_Define($$)
   $hash->{SUNPOS_OFFSET}  = 30;
  
   Twilight_sunposTimerSet($hash);
-  RemoveInternalTimer($hash);
-  InternalTimer(time()+1, "Twilight_Midnight", $hash, 0);
+  myRemoveInternalTimer("Midnight", $hash);
+  myInternalTimer      ("Midnight", time()+1, "Twilight_Midnight", $hash, 0);
   return undef;
 }
 ################################################################################
@@ -160,7 +160,7 @@ sub Twilight_Undef($$) {
   foreach my $key (keys %{$hash->{TW}}) {
      myRemoveInternalTimer($key, $hash);
   }
-  myRemoveInternalTimer    ("",         $hash);
+  myRemoveInternalTimer    ("Midnight", $hash);
   myRemoveInternalTimer    ("perlTime", $hash);
   myRemoveInternalTimer    ("sunpos",   $hash);
 
@@ -263,37 +263,33 @@ sub myInternalTimer($$$$$) {
    my ($modifier, $tim, $callback, $hash, $waitIfInitNotDone) = @_;
 
    my $mHash;
-   if ($modifier eq "") {
-      $mHash = $hash;
+   my $timerName = "";
+   $timerName = "$hash->{NAME}_$modifier";
+   if (exists  ($hash->{TIMER}{$timerName})) {                               ###
+       $mHash = $hash->{TIMER}{$timerName};
    } else {
-      my $timerName = "$hash->{NAME}_$modifier";
-      if (exists  ($hash->{TIMER}{$timerName})) {
-          $mHash = $hash->{TIMER}{$timerName};
-      } else {
-          $mHash = { HASH=>$hash, NAME=>"$hash->{NAME}_$modifier", MODIFIER=>$modifier};
-          $hash->{TIMER}{$timerName} = $mHash;
-      }
+       $mHash = { HASH=>$hash, NAME=>"$hash->{NAME}_$modifier", MODIFIER=>$modifier};                           ###
+       $hash->{TIMER}{$timerName} = $mHash;
    }
+   Log3 $hash, 5, "[$hash->{NAME}] setting  Timer: $timerName " . strftime("%d.%m.%Y  %H:%M:%S",localtime($tim));  ###
    InternalTimer($tim, $callback, $mHash, $waitIfInitNotDone);
 }
 ################################################################################
 sub myRemoveInternalTimer($$) {
    my ($modifier, $hash) = @_;
 
-   my $timerName = "$hash->{NAME}_$modifier";
-   if ($modifier eq "") {
-      RemoveInternalTimer($hash);
-   } else {
-      my $myHash = $hash->{TIMER}{$timerName};
-      if (defined($myHash)) {
-         delete $hash->{TIMER}{$timerName};
-         RemoveInternalTimer($myHash);
-      }
+   my $timerName = "$hash->{NAME}_$modifier";                                   ###
+   my $myHash = $hash->{TIMER}{$timerName};
+   if (defined($myHash)) {
+      delete $hash->{TIMER}{$timerName};
+      Log3 $hash, 5, "[$hash->{NAME}] removing Timer: $timerName";
+      RemoveInternalTimer($myHash);
    }
 }
 ################################################################################
 sub Twilight_Midnight($) {
-  my ($hash) = @_;
+   my ($myHash) = @_;
+   my $hash     = $myHash->{HASH};
 
   Twilight_TwilightTimes      ($hash, "Mid");
   Twilight_StandardTimerSet   ($hash);
@@ -311,8 +307,8 @@ sub Twilight_StandardTimerSet($) {
   my ($hash) = @_;
   my $midnight = time() - Twilight_midnight_seconds() + 24*3600 + 30;
 
-  myRemoveInternalTimer       ("", $hash);
-  myInternalTimer             ("", $midnight,    "Twilight_Midnight", $hash, 0);
+  myRemoveInternalTimer       ("Midnight", $hash);
+  myInternalTimer             ("Midnight", $midnight, "Twilight_Midnight", $hash, 0);
   Twilight_WeatherTimerSet    ($hash);
 }
 ################################################################################
