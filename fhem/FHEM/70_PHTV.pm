@@ -727,7 +727,7 @@ sub PHTV_Set($@) {
                 my $_ = $a[2];
                 my $hsb;
                 my $hex;
-                if ( m/^\d+$/ && $_ >= 0 && $_ <= 65534 ) {
+                if ( m/^\d+$/ && $_ >= 0 && $_ <= 65535 ) {
                     $hsb = PHTV_hex2hsb( $hash->{READINGS}{rgb}{VAL} );
                     $hex = PHTV_hsb2hex( $_, $hsb->{s}, $hsb->{b} );
 
@@ -3048,12 +3048,15 @@ sub PHTV_min {
           <br><br>
           <u>Examples:</u><br>
           <div style="margin-left: 2em">
-            <code># set LED 0 on left side within layer 1 to color RED
-            set PhilipsTV rgb L1L0:FF0000<br><br>
-            # set LED 0, 2 and 4 on left side within layer 1 to color RED
-            set PhilipsTV rgb L1L0:FF0000 L1L2:FF0000 L1L4:FF0000<br><br>
-            # set complete right side within layer 1 to color GREEN
-            set PhilipsTV rgb L1R:00FF00<br><br>
+            <code># set LED 0 on left side within layer 1 to color RED<br>
+            set PhilipsTV rgb L1L0:FF0000
+            <br><br>
+            # set LED 0, 2 and 4 on left side within layer 1 to color RED<br>
+            set PhilipsTV rgb L1L0:FF0000 L1L2:FF0000 L1L4:FF0000
+            <br><br>
+            # set complete right side within layer 1 to color GREEN<br>
+            set PhilipsTV rgb L1R:00FF00
+            <br><br>
             # set complete layer 1 to color BLUE
             set PhilipsTV rgb L1:0000FF</code>
           </div><br>
@@ -3082,17 +3085,22 @@ sub PHTV_min {
           <br><br>
           <u>Examples:</u><br>
           <div style="margin-left: 2em">
-            <code># to use only LED 4 from the top as source
-            attr PhilipsTV ambiHueTop HUEDevice0:4<br><br>
-            # to use a combination of LED's 1+2 as source
-            attr PhilipsTV ambiHueTop HUEDevice0:1-2<br><br>
-            # to use LED's 1+2 and only 90% of their saturation
-            attr PhilipsTV ambiHueTop HUEDevice0:1-2:90<br><br>
-            # to use LED's 1+2 and only 50% of their brightness
-            attr PhilipsTV ambiHueTop HUEDevice0:1-2::50<br><br>
-            # to use LED's 1+2, 90% saturation and 50% brightness
+            <code># to use only LED 4 from the top as source<br>
+            attr PhilipsTV ambiHueTop HUEDevice0:4
+            <br><br>
+            # to use a combination of LED's 1+2 as source<br>
+            attr PhilipsTV ambiHueTop HUEDevice0:1-2
+            <br><br>
+            # to use LED's 1+2 and only 90% of their saturation<br>
+            attr PhilipsTV ambiHueTop HUEDevice0:1-2:90
+            <br><br>
+            # to use LED's 1+2 and only 50% of their brightness<br>
+            attr PhilipsTV ambiHueTop HUEDevice0:1-2::50
+            <br><br>
+            # to use LED's 1+2, 90% saturation and 50% brightness<br>
             attr PhilipsTV ambiHueTop HUEDevice0:1-2:90:50
-            # to use default LED settings but only adjust their brightness to 50%
+            <br><br>
+            # to use default LED settings but only adjust their brightness to 50%<br>
             attr PhilipsTV ambiHueTop HUEDevice0:::50</code>
           </div><br>
         </div>
