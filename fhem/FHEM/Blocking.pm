@@ -83,7 +83,10 @@ BlockingCall($$@)
   foreach my $d (sort keys %defs) {   # Close all kind of FD
     my $h = $defs{$d};
     TcpServer_Close($h) if($h->{SERVERSOCKET});
-    DevIo_CloseDev($h,1)  if($h->{DeviceName});
+    if($h->{DeviceName}) {
+      require "$attr{global}{modpath}/FHEM/DevIo.pm";
+      DevIo_CloseDev($h,1);
+    }
   }
   
   no strict "refs";
