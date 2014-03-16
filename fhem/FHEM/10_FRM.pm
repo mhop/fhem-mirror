@@ -567,6 +567,15 @@ sub FRM_Client_FirmataDevice($) {
   return $iodev->{FirmataDevice};
 }
 
+sub FRM_Catch($) {
+  my $exception = shift;
+  if ($exception) {
+    $exception =~ /^(.*)( at.*FHEM.*)$/;
+    return $1;
+  }
+  return undef;
+}
+
 package Firmata_IO;
 
 sub new {
