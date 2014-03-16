@@ -2,13 +2,15 @@
 # $Id$
 package main;
 
-sub DevIo_SimpleRead($);
-sub DevIo_TimeoutRead($$);
-sub DevIo_SimpleWrite($$$);
-sub DevIo_OpenDev($$$);
 sub DevIo_CloseDev($@);
 sub DevIo_Disconnected($);
+sub DevIo_Expect($$$);
+sub DevIo_OpenDev($$$);
 sub DevIo_SetHwHandshake($);
+sub DevIo_SimpleRead($);
+sub DevIo_SimpleReadWithTimeout($$);
+sub DevIo_SimpleWrite($$$);
+sub DevIo_TimeoutRead($$);
 
 ########################
 sub
@@ -53,7 +55,25 @@ DevIo_SimpleRead($)
 }
 
 ########################
-# Read until you get the timeout. Use it with care
+# wait at most timeout seconds until the file handle gets ready
+# for reading; returns undef on timeout
+# NOTE1: FHEM can be blocked for $timeout seconds!
+# NOTE2: This works on Windows only for TCP connections
+sub
+DevIo_SimpleReadWithTimeout($$)
+{
+  my ($hash, $timeout) = @_;
+
+  my $rin = "";
+  vec($rin, $hash->{FD}, 1) = 1;
+  my $nfound = select($rin, undef, undef, $timeout);
+  return DevIo_DoSimpleRead($hash) if($nfound> 0);
+  return undef;
+}
+
+########################
+# Read until you get the timeout. Use it with care since it waits _at least_
+# timeout seconds, and it works on Windows only for TCP/IP connections
 sub
 DevIo_TimeoutRead($$)
 {
@@ -71,7 +91,6 @@ DevIo_TimeoutRead($$)
   }
   return $answer;
 }
-
 
 ########################
 # Input is HEX, with header and CRC
@@ -91,6 +110,51 @@ DevIo_SimpleWrite($$$)
   select(undef, undef, undef, 0.001);
 }
 
+########################
+# Write something, then read something
+# reopen device if timeout occurs and write again, then read again
+sub
+DevIo_Expect($$$)
+{
+  my ($hash, $msg, $timeout) = @_;
+  my $name= $hash->{NAME};
+  
+  my $state= $hash->{STATE};
+  if($state ne "opened") {
+    Log3 $name, 2, "Attempt to write to $state device.";
+    return undef;
+  }
+  # write something
+  return undef unless defined(DevIo_SimpleWrite($hash, $msg, 0));
+  # read answer
+  my $answer= DevIo_SimpleReadWithTimeout($hash, $timeout);
+  return $answer unless($answer eq "");
+    # the device has failed to deliver a result
+  $hash->{STATE}= "failed";
+  DoTrigger($name, "FAILED");
+  # reopen device
+  # unclear how to know whether the following succeeded
+  Log3 $name, 2, "$name: first attempt to read timed out, trying to close and open the device.";
+  # The next two lines are required to avoid a deadlock when the remote end closes the connection
+  # upon DevIo_OpenDev, as e.g.    netcat -l <port>      does.
+  DevIo_CloseDev($hash);
+  sleep(5) if($hash->{USBDEV});
+  DevIo_OpenDev($hash, 0, undef); # where to get the initfn from? 
+  # write something again
+  return undef unless defined(DevIo_SimpleWrite($hash, $msg, 0));
+  # read answer again
+  $answer= DevIo_SimpleReadWithTimeout($hash, $timeout);
+  # success
+  if($answer ne "") {
+    $hash->{STATE}= "opened";  
+    DoTrigger($name, "CONNECTED");
+    return $answer;
+  }
+  # ultimate failure
+  Log3 $name, 2, "$name: second attempt to read timed out, this is an unrecoverable error.";
+  DoTrigger($name, "DISCONNECTED");
+  return undef; # undef means ultimate failure
+}
 
 ########################
 sub
