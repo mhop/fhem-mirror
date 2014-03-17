@@ -862,11 +862,8 @@ sub CUL_HM_Parse($$) {#########################################################
     ;
   }
   elsif($md =~ m/^(KS550|KS888|HM-WDS100-C6-O)/) { ############################
-
-    if($mTp eq "70" && $p =~ m/^(....)(..)(....)(....)(..)(..)(..)/) {
-
-      my (    $t,      $h,      $r,      $w,     $wd,      $s,      $b ) =
-         (hex($1), hex($2), hex($3), hex($4), hex($5), hex($6), hex($7));
+    if($mTp eq "70") {
+      my ($t,$h,$r,$w,$wd,$s,$b) = map{hex($_)} unpack 'A4A2A4A4(A2)*',$p;
       my $tsgn = ($t & 0x4000);
       $t = ($t & 0x3fff)/10;
       $t = sprintf("%0.1f", $t-1638.4) if($tsgn);
@@ -875,17 +872,17 @@ sub CUL_HM_Parse($$) {#########################################################
       my $wdr = ($w>>14)*22.5;
       $w = ($w & 0x3fff)/10;
       $wd = $wd * 5;
-
-      push @evtEt,[$shash,1,"state:T: $t H: $h W: $w R: $r IR: $ir WD: $wd WDR: $wdr S: $s B: $b"];
-      push @evtEt,[$shash,1,"temperature:$t"    ];
-      push @evtEt,[$shash,1,"humidity:$h"       ];
-      push @evtEt,[$shash,1,"windSpeed:$w"      ];
-      push @evtEt,[$shash,1,"windDirection:$wd" ];
-      push @evtEt,[$shash,1,"windDirRange:$wdr" ];
-      push @evtEt,[$shash,1,"rain:$r"           ];
-      push @evtEt,[$shash,1,"isRaining:$ir"     ];
-      push @evtEt,[$shash,1,"sunshine:$s"       ];
-      push @evtEt,[$shash,1,"brightness:$b"     ];
+      my $sM = "state:";
+      if($t)  {$sM .= "T: $t "   ;push @evtEt,[$shash,1,"temperature:$t"    ];}
+      if($h)  {$sM .= "H: $h "   ;push @evtEt,[$shash,1,"humidity:$h"       ];}
+      if($w)  {$sM .= "W: $w "   ;push @evtEt,[$shash,1,"windSpeed:$w"      ];}
+      if($wd) {$sM .= "R: $wd "  ;push @evtEt,[$shash,1,"windDirection:$wd" ];}
+      if($wdr){$sM .= "IR: $wdr ";push @evtEt,[$shash,1,"windDirRange:$wdr" ];}
+      if($r)  {$sM .= "WD: $r "  ;push @evtEt,[$shash,1,"rain:$r"           ];}
+      if($ir) {$sM .= "WDR: $ir ";push @evtEt,[$shash,1,"isRaining:$ir"     ];}
+      if($s)  {$sM .= "S: $s "   ;push @evtEt,[$shash,1,"sunshine:$s"       ];}
+      if($b)  {$sM .= "B: $b "   ;push @evtEt,[$shash,1,"brightness:$b"     ];}
+      push @evtEt,[$shash,1,$sM];
     }
     else {
       push @evtEt,[$shash,1,"unknown:$p"       ];

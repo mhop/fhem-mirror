@@ -899,6 +899,10 @@ sub HMLAN_condUpdate($$) {#####################################################
   if ($HMcnd == 4){#HMLAN needs a rest. Supress all sends exept keep alive
     $hash->{STATE} = "overload";
   }
+  else{
+    $hash->{STATE} = "opened"
+          if (InternalVal($name,"STATE","") eq "overload");
+  }
 
   my $HMcndTxt = $HMcond{$HMcnd}?$HMcond{$HMcnd}:"Unknown:$HMcnd";
   Log3 $hash, 1, "HMLAN_Parse: $name new condition $HMcndTxt";
