@@ -1,6 +1,5 @@
 ##############################################
 # $Id$
-
 package main;
 
 use strict;
@@ -3297,11 +3296,7 @@ EnOcean_Parse($$)
         # $db[0]_bit_7 ... $db[0]_bit_4 is the Tariff info
         # $db[0]_bit_2 is the Data type where 0 = cumulative value kWh,
         # 1 = current value W
-        if ($dataType == 1) {
-          # momentary power
-          push @event, "3:power:$meterReading";
-          push @event, "3:state:$meterReading";
-        } elsif ($db[0] == 0x8F && $manufID eq "00D") {
+        if ($db[0] == 0x8F && $manufID eq "00D") {
           # Eltako, read meter serial number
           my $serialNumber;
           if ($db[0] == 0) {
@@ -3313,7 +3308,11 @@ EnOcean_Parse($$)
             $serialNumber = printf "%4c%01x%01x%01x%01x", $serialNumber,
                             $db[2] >> 4, $db[2] & 0x0F, $db[3] >> 4, $db[3] & 0x0F;
           }
-          push @event, "3:serialNumber:$serialNumber";
+          push @event, "3:serialNumber:$serialNumber";        
+        } elsif ($dataType == 1) {
+          # momentary power
+          push @event, "3:power:$meterReading";
+          push @event, "3:state:$meterReading";
         } else {
           # power consumption
           push @event, "3:energy$channel:$meterReading";
