@@ -41,6 +41,7 @@
 # 2.06: Attribute dashboard_colheight removed. Change Groupcontent sorting in compliance by alias and sortby.
 #          Custom CSS over new Attribute dashboard_customcss. Fix Bug that affect new groups.
 # 2.07: Fix GroupWidget-Error with readingGroups in hiddenroom
+# 2.08: Fix dashboard_webfrontendfilter Error-Message. Internal changes. Attribute dashboard_colwidth and dashboard_sorting removed.
 #
 # Known Bugs/Todos:
 # BUG: Nicht alle Inhalte aller Tabs laden, bei Plots dauert die bedienung des Dashboards zu lange. -> elemente hidden?
@@ -93,7 +94,7 @@ my $fwjquery = "jquery.min.js";
 my $fwjqueryui = "jquery-ui.min.js";
 my $dashboardname = "Dashboard"; # Link Text
 my $dashboardhiddenroom = "DashboardRoom"; # Hiddenroom
-my $dashboardversion = "2.07";
+my $dashboardversion = "2.08";
 # -------------------------------------------------------------------------------------------
 
 sub Dashboard_Initialize ($) {
@@ -154,17 +155,15 @@ sub Dashboard_Initialize ($) {
 						 "dashboard_tab6sorting ".	
 						 "dashboard_tab7sorting ".	
 						 "dashboard_tab6icon ".
-						 "dashboard_tab7icon ".
-						 
-						 #obsolete - erase in future releases
-						 "dashboard_sorting ". # obsolet -> erase in future releases
-						 "dashboard_colwidth ". # obsolet -> erase in future releases
-						 
+						 "dashboard_tab7icon ".						 
 						 $readingFnAttributes;					  
 
+	$data{FWEXT}{jquery}{SCRIPT} = "/pgm2/".$fwjquery if (!$data{FWEXT}{jquery}{SCRIPT});
+	$data{FWEXT}{jqueryui}{SCRIPT} = "/pgm2/".$fwjqueryui if (!$data{FWEXT}{jqueryui}{SCRIPT});
+	$data{FWEXT}{testjs}{SCRIPT} = "/pgm2/dashboard.js";						 
   			 
-  $data{FWEXT}{Dashboardx}{LINK} = "?room=".$dashboardhiddenroom;
-  $data{FWEXT}{Dashboardx}{NAME} = $dashboardname;	
+	$data{FWEXT}{Dashboardx}{LINK} = "?room=".$dashboardhiddenroom;
+	$data{FWEXT}{Dashboardx}{NAME} = $dashboardname;	
 	
   return undef;
 }
@@ -232,18 +231,6 @@ sub DashboardAsHtml($)
 							AttrVal($defs{$d}{NAME}, "dashboard_tab7icon", ""));
 							   
  #############################################################################################
-
- #---------------- Dashboard is always edited out the Room Dashboard -------------------------
- if ($FW_room ne $dashboardhiddenroom) { 	
-#	if ($showbuttonbar eq "hidden") {$showbuttonbar = "top" };   #Dashboard is always edited out the Room Dashboard 
-#	$showhelper = 1;																		#Dashboard is always edited out the Room Dashboard 
-#	$showtooglebuttons = 1																#Dashboard is always edited out the Room Dashboard 
-#	$lockstate = "unlock";																	#Dashboard is always edited out the Room Dashboard 
-
-	$showfullsize = 0;	# Fullsize only in Dashboardroom
- }
- ################ temp. deaktiviert
- #---------------------------------------------------------------------------- 
   
  if ($disable == 1) { 
 	$defs{$d}{STATE} = "disabled"; 
@@ -259,13 +246,14 @@ sub DashboardAsHtml($)
     my $filterhit = 0;
 	my @webfilter = split(",", $webfrontendfilter); 
 	for (my $i=0;$i<@webfilter;$i++){
-		if (trim($FW_wname) eq trim($webfilter[$i])) { $filterhit = 1; }
+
+		if (trim($FW_wname) eq trim($webfilter[$i]) ) { $filterhit = 1; }
 	} 
 	if ($filterhit == 0) {
-	  $ret .= "No Dashboard configured for ".$FW_wname."<br>";  
-	  $ret .= "Set Attribute dashboard_webfrontendfilter, see <a href=\"/fhem?detail=$d\" title=\"".$name."\">Details</a>";
+	#  $ret .= "No Dashboard configured for ".$FW_wname."<br>";  
+	#  $ret .= "Set Attribute dashboard_webfrontendfilter, see <a href=\"/fhem?detail=$d\" title=\"".$name."\">Details</a>";
 	  return $ret; 
-	}  
+	}
  }
  ##################################################################################
  
@@ -617,52 +605,6 @@ sub CheckDashboardAttributUssage($) { # replaces old disused attributes and thei
  $tabgroups = AttrVal($defs{$d}{NAME}, "dashboard_tab5groups", "999");
  if ($tabgroups eq "1"  ) { FW_fC("deleteattr ".$d." dashboard_tab5groups"); }   
  # -------------------------------------------------------------------------------------------------
-  
- # ---- detached / transferred from the old attribute to the tab extension (outdated 02.2014) ------
- my $colwidth = AttrVal($defs{$d}{NAME}, "dashboard_colwidth", "");
- if ($colwidth ne "") {
-	{ FW_fC("attr ".$d." dashboard_rowcentercolwidth ".$colwidth); }
-	{ FW_fC("deleteattr ".$d." dashboard_colwidth"); }
-	$detailnote = $detailnote." [dashboard_colwidth -> dashboard_rowcentercolwidth]"; 
- } 
- my $sorting = AttrVal($defs{$d}{NAME}, "dashboard_sorting", "");
- if ($sorting ne "") { #convert old sorting in new 
-	my @sortings = split(":", $sorting);
-	my $newsorting = "";
-	my $groupcounter = 0;
-	for (my $s=0;$s<@sortings;$s++){	#0,590w3,true,246,826, 590w0,true,183,258:
-		my @groups = split(",", $sortings[$s]);
-		for (my $g=1;$g<@groups;$g+=4){			
-			my $row = AttrVal($defs{$d}{NAME}, "dashboard_row", "center");
-			my $colcount = AttrVal($defs{$d}{NAME}, "dashboard_colcount", "1");
-			my @dbgroups = split(",", AttrVal($defs{$d}{NAME}, "dashboard_tab1groups", ",")); #1. gruppeneintrag = 1. gespeicherte gruppe
-			my @dbgroup = split("w",$groups[$g]);
-			my $column = "";
-			#Map old Column Count to new Count			
-			if ($row eq "top" && $groups[0] == 0) { $column = "t0c100"; }
-			if ($row eq "center") { $column = "t0c".$groups[0]; }			
-			if ($row eq "bottom" && $groups[0] == 0) { $column = "200"; }
-			if ($row eq "top-center" && $groups[0] == 0) { $column = "t0c100"; }
-			if ($row eq "top-center" && $groups[0] != 0) { $column = "t0c".($groups[0]-1); }
-			if ($row eq "center-bottom" && $groups[0] <= $colcount-1) { $column = "t0c".$groups[0]; }
-			if ($row eq "center-bottom" && $groups[0] > $colcount-1) { $column = "t0c200"; }
-			if ($row eq "top-center-bottom" && $groups[0] == "0") { $column = "t0c100"; }
-			if ($row eq "top-center-bottom" && $groups[0] != 0 && $groups[0] <= $colcount) { $column = "t0c".($groups[0]-1); }
-			if ($row eq "top-center-bottom" && $groups[0] > $colcount) { $column = "t0c200"; }			
-			$newsorting = $newsorting.$column.",".$dbgroups[$dbgroup[1]].",".$groups[$g+1].",".$groups[$g+3].",".$groups[$g+2].":";
-			$groupcounter = $groupcounter +1;
-		}		
-	}
-	{ FW_fC("attr ".$d." dashboard_tab1sorting ".$newsorting); }
-	{ FW_fC("deleteattr ".$d." dashboard_sorting"); }
-	$detailnote = $detailnote." [dashboard_sorting -> dashboard_tab1sorting]";
- }
- # ------------------------------------------------------------------------------------------------------------------------ 
-
- # Get out any change to the Logfile 
- if ($sorting ne "") {   
-  Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."]"." Using an outdated no longer used Attribute or Value. This has been corrected. Don't forget to save config. ".$detailnote; 
- }
 }
 
 sub CreateDashboardEntry($) {
@@ -699,11 +641,8 @@ sub CreateDashboardEntry($) {
 
 sub Dashboard_define ($$) {
  my ($hash, $def) = @_;
- my $name = $hash->{NAME};
- 
- $data{FWEXT}{jquery}{SCRIPT} = "/pgm2/".$fwjquery;
- $data{FWEXT}{jqueryui}{SCRIPT} = "/pgm2/".$fwjqueryui;
- $data{FWEXT}{testjs}{SCRIPT} = "/pgm2/dashboard.js";
+ my $name = $hash->{NAME}; 
+
  $hash->{STATE} = 'Initialized';  
   
  CheckInstallation($hash);
@@ -833,11 +772,6 @@ sub Dashboard_attr($$$) {
 		<br>
 		It should NEVER two ore more activ dashboards in a FHEMWEB instance!
     </li><br>		
-  <a name="dashboard_sorting"></a>	
-    <li>dashboard_sorting<br>
-		This attribute is no longer used and will be removed at a later date. It was replaced with <br>
-		dashboard_tab1sorting, dashboard_tab2sorting, dashboard_tab3sorting, dashboard_tab4sorting, dashboard_tab5sorting
-    </li><br>	
   <a name="dashboard_tab1sorting"></a>	
     <li>dashboard_tab1sorting<br>
         Contains the position of each group in Tab 1. Value is written by the "Set" button. It is not recommended to take manual changes.
@@ -876,12 +810,6 @@ sub Dashboard_attr($$$) {
         To determine the Dashboardwidth. The value can be specified, or an absolute width value (eg 1200) in pixels in% (eg 80%).<br>
 		Default: 100%
     </li><br>			
-  <a name="dashboard_colwidth"></a>	
-    <li>dashboard_colwidth<br>
-        This attribute is no longer used and will be removed at a later date. It was replaced with <br>
-		dashboard_rowcentercolwidth<br>
-		Default: 320
-    </li><br>		
   <a name="dashboard_rowcenterheight"></a>	
     <li>dashboard_rowcenterheight<br>
         Height of the center row in which the groups may be positioned. <br> 		
@@ -1116,11 +1044,6 @@ sub Dashboard_attr($$$) {
 		<br>
 		Es dürfen NIE zwei Dashboards in einer FHEMWEB instanz aktiv sein!		
     </li><br>			
-  <a name="dashboard_sorting"></a>	
-    <li>dashboard_sorting<br>
-		Dieses Attribut ist nicht mehr zu verwenden und wird zu einem späteren Zeitpunkt entfernt. Es wurde ersetzt durch <br>
-		dashboard_tab1sorting, dashboard_tab2sorting, dashboard_tab3sorting, dashboard_tab4sorting, dashboard_tab5sorting
-    </li><br>	
   <a name="dashboard_tab1sorting"></a>	
     <li>dashboard_tab1sorting<br>
 		Enthält die Poistionierung jeder Gruppe im Tab 1. Der Wert wird mit der Schaltfläche "Set" geschrieben. Es wird nicht empfohlen dieses Attribut manuelle zu ändern
@@ -1158,12 +1081,6 @@ sub Dashboard_attr($$$) {
     <li>dashboard_width<br>
         Zum bestimmen der Dashboardbreite. Der Wert kann in % (z.B. 80%) angegeben werden oder als absolute Breite (z.B. 1200) in Pixel.<br>
 		Standard: 100%
-    </li><br>		
-  <a name="dashboard_colwidth"></a>	
-    <li>dashboard_colwidth<br>
-        Dieses Attribut ist nicht mehr zu verwenden und wird zu einem späteren Zeitpunkt entfernt. Es wurde ersetzt durch.<br>
-		dashboard_rowcentercolwidth <br>
-		Standard: 320
     </li><br>		
   <a name="dashboard_rowcenterheight"></a>	
     <li>dashboard_rowcenterheight<br>
