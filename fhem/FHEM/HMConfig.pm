@@ -1062,6 +1062,34 @@ my %tpl = (
                            ,SwJtOff         =>"dlyOn"
                            ,SwJtDlyOn       =>"no"
                            ,SwJtDlyOff      =>"dlyOn"
+                           ,ActionType      =>"jmpToTarget"
+                     }}
+  ,SwToggle          => {p=>""                 ,t=>"Switch: toggle on trigger"
+                    ,reg=>{ OnTime          =>111600
+                           ,OffTime         =>111600
+                           ,SwJtOn          =>"dlyOff"
+                           ,SwJtOff         =>"dlyOn"
+                           ,SwJtDlyOn       =>"on"
+                           ,SwJtDlyOff      =>"off"
+                           ,ActionType      =>"jmpToTarget"
+                     }}
+  ,SwOn              => {p=>""                 ,t=>"Switch: on if trigger"
+                    ,reg=>{ OnTime          =>111600
+                           ,OffTime         =>111600
+                           ,SwJtOn          =>"no"
+                           ,SwJtOff         =>"dlyOn"
+                           ,SwJtDlyOn       =>"on"
+                           ,SwJtDlyOff      =>"dlyOn"
+                           ,ActionType      =>"jmpToTarget"
+                     }}
+  ,SwOff             => {p=>""                 ,t=>"Switch: off if trigger"
+                    ,reg=>{ OnTime          =>111600
+                           ,OffTime         =>111600
+                           ,SwJtOn          =>"dlyOff"
+                           ,SwJtOff         =>"no"
+                           ,SwJtDlyOn       =>"dlyOff"
+                           ,SwJtDlyOff      =>"off"
+                           ,ActionType      =>"jmpToTarget"
                      }}
   ,motionOnDim       => {p=>"ontime brightness",t=>"Dimmer: on for time if MDIR-brightness below level"
                     ,reg=>{ CtDlyOn         =>"ltLo"

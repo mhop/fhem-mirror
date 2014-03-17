@@ -3894,15 +3894,21 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 
   my $rxType = CUL_HM_getRxType($devHash);
   Log3 $name,2,"CUL_HM set $name $act";
-  if($rxType & 0x03){#all/burst
+  if($rxType & 0x01){#allways
     CUL_HM_ProcessCmdStack($devHash);
   }
-  elsif(CUL_HM_getAttrInt($name,"burstAccess")&& #burstConditional - have a try
-        $devHash->{cmdStack}                  &&
-        $devHash->{helper}{prt}{sProc} != 1    # not pocessing
+  elsif($devHash->{cmdStack}                  &&
+        $devHash->{helper}{prt}{sProc} != 1    # not processing
         ){
-    $hash->{helper}{prt}{wakeup}=1;# start auto-wakeup
-    CUL_HM_SndCmd($devHash,"++B112$id$dst");
+    if($rxType & 0x02){# handle burst Access devices - add burst Bit
+      my ($pre,$tp,$tail) = unpack 'A2A2A*',$devHash->{cmdStack}[0];
+      $devHash->{cmdStack}[0] = sprintf("%s%02X%s",$pre,(hex($tp)|0x10),$tail);
+      CUL_HM_ProcessCmdStack($devHash);
+    }
+    elsif (CUL_HM_getAttrInt($name,"burstAccess")){ #burstConditional - have a try
+      $hash->{helper}{prt}{wakeup}=1;# start auto-wakeup
+      CUL_HM_SndCmd($devHash,"++B112$id$dst");
+    }
   }
   return ("",1);# no not generate trigger outof command
 }
@@ -4567,6 +4573,7 @@ sub CUL_HM_respPendTout($) {
     my $name = $hash->{NAME};
     $pHash->{awake} = 0 if (defined $pHash->{awake});# set to asleep
     return if(!$pHash->{rspWait}{reSent});      # Double timer?
+    my $rxt = CUL_HM_getRxType($hash);
     if ($pHash->{rspWait}{wakeup}){#wakeup try failed (conditionalBurst)
       CUL_HM_respPendRm($hash);# don't count problems, was just a try
       $hash->{protCondBurst} = "off" if (!$hash->{protCondBurst}||
@@ -4586,11 +4593,10 @@ sub CUL_HM_respPendTout($) {
     }
     elsif ($hash->{IODev}->{STATE} !~ m/^(opened|Initialized)$/){#IO errors
       CUL_HM_eventP($hash,"IOdly");
-      CUL_HM_ProcessCmdStack($hash) if(CUL_HM_getRxType($hash) & 0x03);#burst/all
+      CUL_HM_ProcessCmdStack($hash) if($rxt & 0x03);#burst/all
     }
     elsif ($pHash->{rspWait}{reSent} > AttrVal($name,"msgRepeat",3)#too many
-           ||(!(CUL_HM_getRxType($hash) & 0x9B))){#config cannot retry
-
+           ||(!($rxt & 0x9B))){#config cannot retry
       my $pendCmd = "MISSING ACK";
       if ($pHash->{rspWait}{Pending}){
         $pendCmd = "RESPONSE TIMEOUT:".$pHash->{rspWait}{Pending};
@@ -4598,7 +4604,6 @@ sub CUL_HM_respPendTout($) {
       }
       CUL_HM_eventP($hash,"ResndFail");
       CUL_HM_UpdtReadSingle($hash,"state",$pendCmd,1);
-      CUL_HM_ProcessCmdStack($hash); # continue processing commands if any
     }
     else{# manage retries
       $pHash->{rspWait}{reSent}++;
@@ -4612,7 +4617,7 @@ sub CUL_HM_respPendTout($) {
         CUL_HM_SndCmd($hash,"++B112$addr$HMid");
         $hash->{helper}{prt}{awake}=4;# start re-wakeup
       }
-      elsif(CUL_HM_getRxType($hash) & 0x18){# wakeup/lazy devices
+      elsif($rxt & 0x18){# wakeup/lazy devices
         #need to fill back command to queue and wait for next wakeup
         if ($pHash->{mmcA}){#fillback multi-message command
           unshift @{$hash->{cmdStack}},$_ foreach (reverse@{$pHash->{mmcA}});
@@ -4629,6 +4634,10 @@ sub CUL_HM_respPendTout($) {
         $pHash->{wuReSent} = $wuReSent;# save 'invalid' count
       }
       else{# normal device resend
+        if ($rxt & 0x02){# type = burst - need to set burst-Bit for retry
+          my ($pre,$tp,$tail) = unpack 'A6A2A*',$pHash->{rspWait}{cmd};
+          $pHash->{rspWait}{cmd} = sprintf("%s%02X%s",$pre,(hex($tp)|0x10),$tail);
+        }
         IOWrite($hash, "", $pHash->{rspWait}{cmd});
         CUL_HM_statCnt($hash->{IODev}{NAME},"s");
         InternalTimer(gettimeofday()+rand(20)/10+4,"CUL_HM_respPendTout","respPend:$hash->{DEF}", 0);
@@ -4802,13 +4811,11 @@ sub CUL_HM_protState($$){
   }
   $hash->{protState} = $state;
   if (!$hash->{helper}{role}{chn}){
-    CUL_HM_UpdtReadSingle($hash,"state",$state,0);
-    DoTrigger($name, undef);
+    CUL_HM_UpdtReadSingle($hash,"state",$state,
+                          ($hash->{helper}{prt}{sProc} == 1)?0:1);
   }
   Log3 $name,5,"CUL_HM $name protEvent:$state".
             ($hash->{cmdStack}?" pending:".scalar @{$hash->{cmdStack}}:"");
-            
-            
   CUL_HM_hmInitMsgUpdt($hash) if (  $hash->{helper}{prt}{sProc} != $sProcIn
                                   &&$hash->{helper}{prt}{sProc} == 0
                                   ||$hash->{helper}{prt}{sProc} == 2);
@@ -4951,7 +4958,8 @@ sub CUL_HM_getRxType($) { #in:hash(chn or dev) out:binary coded Rx type
   return $rxtEntity;
 }
 sub CUL_HM_getFlag($) {#mFlg 'A0' or 'B0' for burst/normal devices
- # currently not supported is the wakeupflag since it is hardly used
+  # currently not supported is the wakeupflag since it is hardly used
+  return 'A0'; #burst mode implementation changed
   my ($hash) = @_;
   return (CUL_HM_getRxType($hash) & 0x02)?"B0":"A0"; #set burst flag
 }
@@ -5272,7 +5280,7 @@ sub CUL_HM_updtRegDisp($$$) {
     CUL_HM_TCITRTtempReadings($hash,7)  if ($list == 7 && $chn eq "04");
   }
   elsif ($md =~ m/HM-TC-IT-WM-W-EU/){#handle temperature readings
-    CUL_HM_TCITRTtempReadings($hash,7,8,9)  if ($list >= 7 && $chn eq "02");
+    CUL_HM_TCITRTtempReadings($hash,$list)  if ($list >= 7 && $chn eq "02");
   }
   elsif ($md eq "HM-PB-4DIS-WM"){#add text
     CUL_HM_4DisText($hash)  if ($list == 1) ;
@@ -5579,6 +5587,7 @@ sub CUL_HM_TCITRTtempReadings($@) {# parse RT - TC-IT temperature readings
   my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
   foreach my $lst (@list){
     my @r1;
+    $lst +=0;
     my $tempRegs = ReadingsVal($name,$regPre."RegL_0$lst:","");
     if ($tempRegs !~ m/00:00/){
       for (my $day = 0;$day<7;$day++){
@@ -5623,7 +5632,7 @@ sub CUL_HM_TCITRTtempReadings($@) {# parse RT - TC-IT temperature readings
       }
       for (my $idx = 0;$idx<13;$idx++){
         my $entry = sprintf(" %s %3.01f",$time[$idx],$temp[$idx]);
-          $setting .= "Temp set: ".$days[$day].$entry." C\n";
+          $setting .= "Temp set $idxN{$lst}: ".$days[$day].$entry." C\n";
           $dayRead .= $entry;
         last if ($time[$idx] eq "24:00");
       }
