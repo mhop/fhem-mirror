@@ -82,9 +82,12 @@ FRM_LCD_Init($)
 	if (! (defined AttrVal($name,"stateFormat",undef))) {
 		$main::attr{$name}{"stateFormat"} = "text";
 	}
-	my $value = ReadingsVal($name,"text",undef);
-	if (defined $value and AttrVal($hash->{NAME},"restoreOnReconnect","on") eq "on") {
-		FRM_LCD_Set($hash,$name,"text",$value);
+	if (AttrVal($hash->{NAME},"restoreOnReconnect","on") eq "on") {
+		foreach my $reading (("display","scroll","backlight","text","writeXY")) {
+			if (defined (my $value = ReadingsVal($name,$reading,undef))) {
+				FRM_LCD_Set($hash,$name,$reading,$value);
+			}
+		}
 	}
 	return undef;
 }
@@ -219,6 +222,7 @@ sub FRM_LCD_Set(@) {
         } else {
           $lcd->noDisplay();
         }
+        main::readingsSingleUpdate($hash,"display",$value,1);
         last;
       };
       $command eq "cursor" and do {
@@ -232,6 +236,7 @@ sub FRM_LCD_Set(@) {
         } else {
           $lcd->scrollDisplayRight();
         }
+        main::readingsSingleUpdate($hash,"scroll",$value,1);
         last;
       };
       $command eq "backlight" and do {
@@ -240,6 +245,7 @@ sub FRM_LCD_Set(@) {
         } else {
           $lcd->noBacklight();
         }
+        main::readingsSingleUpdate($hash,"backlight",$value,1);
         last;
       };
       $command eq "writeXY" and do { 
@@ -262,6 +268,7 @@ sub FRM_LCD_Set(@) {
           $t = ($al eq "l") ? $t.$dif : $dif.$t;
         }
         $lcd->print($t);
+        main::readingsSingleUpdate($hash,"writeXY",$value,1);
         readingsSingleUpdate($hash,"state",$t,1);
         last; #"X=$x|Y=$y|L=$l|Text=$t";
       };
