@@ -77,11 +77,7 @@ FRM_LCD_Init($)
 #			FRM_LCD_Apply_Attribute($name,"direction");
 			FRM_LCD_Apply_Attribute($name,"blink");
 		};
-		if ($@) {
-			$@ =~ /^(.*)( at.*FHEM.*)$/;
-			$hash->{STATE} = "error initializing: ".$1;
-			return "error initializing '".$hash->{NAME}."': ".$1;
-		}
+		return FRM_Catch($@) if $@;
 	}
 	if (! (defined AttrVal($name,"stateFormat",undef))) {
 		$main::attr{$name}{"stateFormat"} = "text";
@@ -90,8 +86,6 @@ FRM_LCD_Init($)
 	if (defined $value and AttrVal($hash->{NAME},"restoreOnReconnect","on") eq "on") {
 		FRM_LCD_Set($hash,$name,"text",$value);
 	}
-	
-	
 	return undef;
 }
 
@@ -114,17 +108,17 @@ FRM_LCD_Attr($$$$) {
       }
     }
   };
-  if ($@) {
-    $@ =~ /^(.*)( at.*FHEM.*)$/;
-    $hash->{STATE} = "error setting $attribute to $value: ".$1;
-    return "cannot $command attribute $attribute to $value for $name: ".$1;
+  my $ret = FRM_Catch($@) if $@;
+  if ($ret) {
+    $hash->{STATE} = "error setting $attribute to $value: ".$ret;
+    return "cannot $command attribute $attribute to $value for $name: ".$ret;
   }
 }
 
 sub FRM_LCD_Apply_Attribute {
 	my ($name,$attribute) = @_;
 	my $lcd = $main::defs{$name}{lcd};
-	if (defined $lcd) {
+	if ($main::init_done and defined $lcd) {
 		ATTRIBUTE_HANDLER: {
 			$attribute eq "backLight" and do {
 				if (AttrVal($name,"backLight","on") eq "on") {
@@ -176,101 +170,105 @@ sub FRM_LCD_Set(@) {
   }
   my $lcd = $hash->{lcd};
   return unless defined $lcd;
-  COMMAND_HANDLER: {
-    $command eq "text" and do {
-    	shift @a;
-    	shift @a;
-    	$value = join(" ", @a);
-    	if (AttrVal($hash->{NAME},"autoClear","on") eq "on") {
-    		$lcd->clear();
-    	}
-    	if (AttrVal($hash->{NAME},"autoBreak","on") eq "on") {
-    		my $sizex = $hash->{sizex};
-    		my $sizey = $hash->{sizey};
-    		my $start = 0;
-    		my $len = length $value;
-    		for (my $line = 0;$line<$sizey;$line++) {
-    			$lcd->setCursor(0,$line);
-    			if ($start<$len) {
-    				$lcd->print(substr $value, $start, $sizex);
-    			} else {
-    				last;
-    			}
-    			$start+=$sizex;
-    		}
-    	} else {
-    		$lcd->print($value);
-    	}
-    	main::readingsSingleUpdate($hash,"text",$value,1);
-    	last;
-    };
-    $command eq "home" and do {
-    	$lcd->home();
-    	last;
-    };
-    $command eq "reset" and do {
-    	$lcd->init();
-#    	$hash->{lcd} = $lcd;
-    	last;
-    };
-    $command eq "clear" and do {
-    	$lcd->clear();
-    	main::readingsSingleUpdate($hash,"text","",1);
-    	last;
-    };
-    $command eq "display" and do {
-    	if ($value ne "off") {
-			$lcd->display();    		
-    	} else {
-    		$lcd->noDisplay();
-    	}
-    	last;
-    };
-    $command eq "cursor" and do {
-    	my ($x,$y) = split ",",$value;
-    	$lcd->setCursor($x,$y);
-    	last;
-    };
-    $command eq "scroll" and do {
-    	if ($value eq "left") {
-			$lcd->scrollDisplayLeft();    		
-    	} else {
-    		$lcd->scrollDisplayRight();
-    	}
-    	last;
-    };
-    $command eq "backlight" and do {
-    	if ($value eq "on") {
-    		$lcd->backlight();
-    	} else {
-    		$lcd->noBacklight();
-    	}
-    	last;
-    };
-	$command eq "writeXY" and do { 
-		my ($x,$y,$l,$al) = split(",",$value);
-		$lcd->setCursor($x,$y);
-		shift @a; shift @a; shift @a;
-		my $t = join(" ", @a);
-		my %umlaute = ("ä" => "ae", "Ä" => "Ae", "ü" => "ue", "Ü" => "Ue", "ö" => "oe", "Ö" => "Oe", "ß" => "ss" ," - " => " " ,"©"=>"@");
-		my $umlautkeys = join ("|", keys(%umlaute));
-		$t =~ s/($umlautkeys)/$umlaute{$1}/g;
-		my $sl = length $t;
-		if ($sl > $l) {
-			$t = substr($t,0,$l);
-		}
-		if ($sl < $l) {
-			my $dif = "";
-			for (my $i=$sl; $i<$l; $i++) {
-				$dif .= " ";
-			}
-			$t = ($al eq "l") ? $t.$dif : $dif.$t;
-		}
-		$lcd->print($t);
-		readingsSingleUpdate($hash,"state",$t,1);
-		last; #"X=$x|Y=$y|L=$l|Text=$t";
-    };
-  }
+  eval {
+    COMMAND_HANDLER: {
+      $command eq "text" and do {
+        shift @a;
+        shift @a;
+        $value = join(" ", @a);
+        if (AttrVal($hash->{NAME},"autoClear","on") eq "on") {
+          $lcd->clear();
+        }
+        if (AttrVal($hash->{NAME},"autoBreak","on") eq "on") {
+          my $sizex = $hash->{sizex};
+          my $sizey = $hash->{sizey};
+          my $start = 0;
+          my $len = length $value;
+          for (my $line = 0;$line<$sizey;$line++) {
+            $lcd->setCursor(0,$line);
+            if ($start<$len) {
+              $lcd->print(substr $value, $start, $sizex);
+            } else {
+              last;
+            }
+            $start+=$sizex;
+          }
+        } else {
+          $lcd->print($value);
+        }
+        main::readingsSingleUpdate($hash,"text",$value,1);
+        last;
+      };
+      $command eq "home" and do {
+        $lcd->home();
+        last;
+      };
+      $command eq "reset" and do {
+        $lcd->init();
+#        $hash->{lcd} = $lcd;
+        last;
+      };
+      $command eq "clear" and do {
+        $lcd->clear();
+        main::readingsSingleUpdate($hash,"text","",1);
+        last;
+      };
+      $command eq "display" and do {
+        if ($value ne "off") {
+          $lcd->display();    		
+        } else {
+          $lcd->noDisplay();
+        }
+        last;
+      };
+      $command eq "cursor" and do {
+        my ($x,$y) = split ",",$value;
+        $lcd->setCursor($x,$y);
+        last;
+      };
+      $command eq "scroll" and do {
+        if ($value eq "left") {
+          $lcd->scrollDisplayLeft();    		
+        } else {
+          $lcd->scrollDisplayRight();
+        }
+        last;
+      };
+      $command eq "backlight" and do {
+        if ($value eq "on") {
+          $lcd->backlight();
+        } else {
+          $lcd->noBacklight();
+        }
+        last;
+      };
+      $command eq "writeXY" and do { 
+        my ($x,$y,$l,$al) = split(",",$value);
+        $lcd->setCursor($x,$y);
+        shift @a; shift @a; shift @a;
+        my $t = join(" ", @a);
+        my %umlaute = ("ä" => "ae", "Ä" => "Ae", "ü" => "ue", "Ü" => "Ue", "ö" => "oe", "Ö" => "Oe", "ß" => "ss" ," - " => " " ,"©"=>"@");
+        my $umlautkeys = join ("|", keys(%umlaute));
+        $t =~ s/($umlautkeys)/$umlaute{$1}/g;
+        my $sl = length $t;
+        if ($sl > $l) {
+          $t = substr($t,0,$l);
+        }
+        if ($sl < $l) {
+          my $dif = "";
+          for (my $i=$sl; $i<$l; $i++) {
+            $dif .= " ";
+          }
+          $t = ($al eq "l") ? $t.$dif : $dif.$t;
+        }
+        $lcd->print($t);
+        readingsSingleUpdate($hash,"state",$t,1);
+        last; #"X=$x|Y=$y|L=$l|Text=$t";
+      };
+    }
+  };
+  return FRM_Catch($@) if $@;
+  return undef;
 }
 
 sub FRM_LCD_State($$$$)
