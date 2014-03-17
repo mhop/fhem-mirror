@@ -267,6 +267,7 @@ EnOcean_Initialize($)
                        "actualTemp angleMax:slider,-180,20,180 angleMin:slider,-180,20,180 " .
                        "angleTime:0,1,2,3,4,5,6 comMode:biDir,uniDir destinationID " .
                        "devChannel devUpdate:off,auto,demand,polling,interrupt dimValueOn " .
+                       "disable:0,1 disabledForIntervals " .
                        "gwCmd:" . join(",", sort @EnO_gwCmd) . " humidityRefDev " .
                        "manufID:" . join(",", sort keys %EnO_manuf) . " " . 
                        "model:" . join(",", @EnO_models) . " " .
@@ -398,6 +399,10 @@ EnOcean_Set($@)
   my ($hash, @a) = @_;
   return "no set value specified" if (@a < 2);
   my $name = $hash->{NAME};
+  if (IsDisabled($name)) {
+    Log3 $name, 4, "EnOcean set $name commands disabled.";  
+    return;
+  }
   my $data;
   my $destinationID = AttrVal($name, "destinationID", undef);
   if (!defined $destinationID || $destinationID eq "multicast") {
@@ -4731,6 +4736,18 @@ EnOcean_Undef($$)
       stored.<br>
       dimValueOn is supported for dimmer.
       </li>
+    <li><a href="#EnOcean_disable">disable</a> 0|1<br>
+      If applied set commands will not be executed.
+    </li>
+    <li><a href="#EnOcean_disabledForIntervals">disabledForIntervals</a> HH:MM-HH:MM HH:MM-HH-MM...<br>
+      Space separated list of HH:MM tupels. If the current time is between
+      the two time specifications, set commands will not be executed. Instead of
+      HH:MM you can also specify HH or HH:MM:SS. To specify an interval
+      spawning midnight, you have to specify two intervals, e.g.:
+      <ul>
+        23:00-24:00 00:00-01:00
+      </ul>
+    </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#eventMap">eventMap</a></li>
     <li><a name="gwCmd">gwCmd</a> switching|dimming|setpointShift|setpointBasic|controlVar|fanStage|blindCmd<br>
