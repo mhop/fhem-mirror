@@ -39,14 +39,17 @@ FRM_SERVO_Initialize($)
 sub
 FRM_SERVO_Init($$)
 {
-	my ($hash,$args) = @_;
-	my $ret = FRM_Init_Pin_Client($hash,$args,PIN_SERVO);
-	return $ret if (defined $ret);
-	my $firmata = $hash->{IODev}->{FirmataDevice};
-	$main::defs{$hash->{NAME}}{resolution}=$firmata->{metadata}{servo_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{servo_resolutions});
-	FRM_SERVO_apply_attribute($hash,"max-pulse"); #sets min-pulse as well
-	main::readingsSingleUpdate($hash,"state","Initialized",1);
-	return undef;
+  my ($hash,$args) = @_;
+  my $ret = FRM_Init_Pin_Client($hash,$args,PIN_SERVO);
+  return $ret if (defined $ret);
+  eval {
+    my $firmata = FRM_Client_FirmataDevice($hash);
+    $hash->{resolution}=$firmata->{metadata}{servo_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{servo_resolutions});
+    FRM_SERVO_apply_attribute($hash,"max-pulse"); #sets min-pulse as well
+  };
+  return FRM_Catch($@) if $@;
+  main::readingsSingleUpdate($hash,"state","Initialized",1);
+  return undef;
 }
 
 sub
@@ -63,29 +66,31 @@ FRM_SERVO_Attr($$$$) {
           }
           last;
         };
-        $main::attr{$name}{$attribute}=$value;
-        if ( $attribute eq "min-pulse" || $attribute eq "max-pulse" ) {
-          FRM_SERVO_apply_attribute($main::defs{$name},$attribute);
-        }
+        ($attribute eq "min-pulse" || $attribute eq "max-pulse") and do {
+          if ($main::init_done) {
+          	$main::attr{$name}{$attribute}=$value;
+            FRM_SERVO_apply_attribute($hash,$attribute);
+          }
+          last;
+        };
       }
     }
   };
-  if ($@) {
-    $@ =~ /^(.*)( at.*FHEM.*)$/;
-    $hash->{STATE} = "error setting $attribute to $value: ".$1;
-    return "cannot $command attribute $attribute to $value for $name: ".$1;
+  my $ret = FRM_Catch($@) if $@;
+  if ($ret) {
+    $hash->{STATE} = "error setting $attribute to $value: ".$ret;
+    return "cannot $command attribute $attribute to $value for $name: ".$ret;
   }
+  return undef;
 }
 
 sub FRM_SERVO_apply_attribute {
-	my ($hash,$attribute) = @_;
-	return unless (defined $hash->{IODev} and defined $hash->{IODev}->{FirmataDevice});
-	my $firmata = $hash->{IODev}->{FirmataDevice};
-	my $name = $hash->{NAME};
-	if ( $attribute eq "min-pulse" || $attribute eq "max-pulse" ) {
-		# defaults are taken from: http://arduino.cc/en/Reference/ServoAttach
-		$firmata->servo_config($hash->{PIN},{min_pulse => main::AttrVal($name,"min-pulse",544), max_pulse => main::AttrVal($name,"max-pulse",2400)});
-	}
+  my ($hash,$attribute) = @_;
+  if ( $attribute eq "min-pulse" || $attribute eq "max-pulse" ) {
+    my $name = $hash->{NAME};
+    # defaults are taken from: http://arduino.cc/en/Reference/ServoAttach
+    FRM_Client_FirmataDevice($hash)->servo_config($hash->{PIN},{min_pulse => main::AttrVal($name,"min-pulse",544), max_pulse => main::AttrVal($name,"max-pulse",2400)});
+  }
 }
 
 sub
