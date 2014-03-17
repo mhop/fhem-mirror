@@ -85,7 +85,7 @@ FRM_LCD_Init($)
 	if (AttrVal($hash->{NAME},"restoreOnReconnect","on") eq "on") {
 		foreach my $reading (("display","scroll","backlight","text","writeXY")) {
 			if (defined (my $value = ReadingsVal($name,$reading,undef))) {
-				FRM_LCD_Set($hash,$name,$reading,$value);
+				FRM_LCD_Set($hash,$name,$reading,split " ", $value);
 			}
 		}
 	}
@@ -268,7 +268,7 @@ sub FRM_LCD_Set(@) {
           $t = ($al eq "l") ? $t.$dif : $dif.$t;
         }
         $lcd->print($t);
-        main::readingsSingleUpdate($hash,"writeXY",$value,1);
+        main::readingsSingleUpdate($hash,"writeXY",$value." ".$t,1);
         readingsSingleUpdate($hash,"state",$t,1);
         last; #"X=$x|Y=$y|L=$l|Text=$t";
       };
