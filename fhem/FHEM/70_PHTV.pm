@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.0
+# Version: 1.2.1
 #
 # Major Version History:
 # - 1.2.0 - 2014-03-12
@@ -42,6 +42,7 @@
 
 package main;
 
+use 5.012;
 use strict;
 use warnings;
 use Data::Dumper;
@@ -75,7 +76,7 @@ sub PHTV_Initialize($) {
     $hash->{UndefFn} = "PHTV_Undefine";
 
     $hash->{AttrList} =
-"disable:0,1 timeout inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom "
+"disable:0,1 timeout inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:150,200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000 "
       . $readingFnAttributes;
 
     $data{RC_layout}{PHTV_SVG} = "PHTV_RClayout_SVG";
@@ -365,6 +366,11 @@ sub PHTV_Set($@) {
                     && !defined( $attr{$name}{ambiHueRight} )
                     && !defined( $attr{$name}{ambiHueTop} )
                     && !defined( $attr{$name}{ambiHueBottom} ) );
+
+                # enable internal Ambilight color
+                PHTV_SendCommand( $hash, "ambilight/mode",
+                    '"current": "internal"', "internal" )
+                  if ( $hash->{READINGS}{ambiMode}{VAL} ne "internal" );
 
                 PHTV_SendCommand( $hash, "ambilight/processed", undef, "init" );
             }
@@ -2237,6 +2243,13 @@ sub PHTV_ReceiveCommand($$$) {
                   )
                 {
 
+                    my $transitiontime =
+                      ( $attr{$name}{ambiHueLatency} )
+                      ? int( $attr{$name}{ambiHueLatency} / 100 + 0.5 )
+                      : 3;
+
+                    $transitiontime = 3 if ( $transitiontime < 3 );
+
                     foreach my $side ( 'Left', 'Top', 'Right', 'Bottom' ) {
                         my $ambiHue = "ambiHue$side";
                         my $ambiLED = "ambiLED$side";
@@ -2306,7 +2319,10 @@ sub PHTV_ReceiveCommand($$$) {
                                 }
 
                                 # get current RGB values
-                                my ( $Hsum, $Ssum, $Bsum );
+                                my $Hsum      = 0;
+                                my $Ssum      = 0;
+                                my $Bsum      = 0;
+                                my $countLEDs = 0;
                                 foreach my $l (@leds) {
                                     if (
                                         defined(
@@ -2321,9 +2337,29 @@ sub PHTV_ReceiveCommand($$$) {
                                             $return->{layer1}->{$s}->{$l}->{b}
                                         );
 
-                                        $Hsum += $hsb->{h};
-                                        $Ssum += $hsb->{s};
-                                        $Bsum += $hsb->{b};
+                                        # only consider color if:
+                                        # - hue color delta <4000
+                                        # - sat&bri >5
+                                        # to avoid huge color skips between LEDs
+                                        if (
+                                            (
+                                                   $countLEDs > 0
+                                                && $Hsum / $countLEDs -
+                                                $hsb->{h} < 4000
+                                            )
+                                            || $countLEDs == 0
+                                          )
+                                        {
+                                            if (   $hsb->{s} > 5
+                                                && $hsb->{b} > 5 )
+                                            {
+                                                $Hsum += $hsb->{h};
+                                                $Ssum += $hsb->{s};
+                                                $Bsum += $hsb->{b};
+
+                                                $countLEDs++;
+                                            }
+                                        }
                                     }
                                 }
 
@@ -2337,13 +2373,22 @@ sub PHTV_ReceiveCommand($$$) {
                                   ? $bri / 100
                                   : 1;
 
-                                my $countLEDs = scalar @leds;
-                                my $h         = sprintf( "%02x",
-                                    int( $Hsum / $countLEDs / 256 + 0.5 ) );
-                                my $s = sprintf( "%02x",
-                                    int( $Ssum / $countLEDs * $satF + 0.5 ) );
-                                my $b = sprintf( "%02x",
-                                    int( $Bsum / $countLEDs * $briF + 0.5 ) );
+                                my ( $h, $s, $b );
+                                if ( $countLEDs > 0 ) {
+                                    $h = sprintf( "%02x",
+                                        int( $Hsum / $countLEDs / 256 + 0.5 ) );
+                                    $s = sprintf( "%02x",
+                                        int( $Ssum / $countLEDs * $satF + 0.5 )
+                                    );
+                                    $b = sprintf( "%02x",
+                                        int( $Bsum / $countLEDs * $briF + 0.5 )
+                                    );
+                                }
+                                else {
+                                    $h = "00";
+                                    $s = "00";
+                                    $b = "00";
+                                }
 
                                 # temp. disable event triggers for HUEDevice
                                 if (
@@ -2360,17 +2405,17 @@ sub PHTV_ReceiveCommand($$$) {
 
                                 $hash->{helper}{ambiHueColor} = "$h$s$b";
 
-                                # switch HUE to color
+                                # switch HUE bulb to color
                                 if ( $b ne "00" ) {
                                     fhem(
-"set $dev transitiontime 1 : noUpdate : hsv $h$s$b"
+"set $dev transitiontime $transitiontime : noUpdate : hsv $h$s$b"
                                     );
                                 }
 
-                                # switch HUE off if brightness is 0
+                                # switch HUE bulb off if brightness is 0
                                 else {
                                     fhem(
-"set $dev transitiontime 0 : noUpdate : off"
+"set $dev transitiontime 5 : noUpdate : off"
                                     );
                                 }
 
@@ -2378,9 +2423,23 @@ sub PHTV_ReceiveCommand($$$) {
                         }
                     }
 
-                    $hash->{helper}{ambiHueDelay} =
-                      int(
-                        ( gettimeofday() - $param->{timestamp} ) * 1000 + 0.5 );
+                    my $duration = gettimeofday() - $param->{timestamp};
+                    my $minLatency =
+                      ( $attr{$name}{ambiHueLatency} )
+                      ? $attr{$name}{ambiHueLatency} / 1000
+                      : 0.20;
+                    my $waittime = $minLatency - $duration;
+
+                    # latency compensation
+                    if ( $waittime > 0 ) {
+                        fhem("sleep $waittime");
+                        $hash->{helper}{ambiHueDelay} =
+                          int( ( $duration + $waittime ) * 1000 + 0.5 );
+                    }
+                    else {
+                        $hash->{helper}{ambiHueDelay} =
+                          int( $duration * 1000 + 0.5 );
+                    }
 
                     PHTV_SendCommand( $hash, "ambilight/processed" );
                 }
@@ -2410,6 +2469,10 @@ sub PHTV_ReceiveCommand($$$) {
                         foreach (@devices) {
                             my ( $dev, $led ) = split( /:/, $_ );
                             $attr{$dev}{"event-on-change-reading"} = ".*";
+
+                            fhem(
+"set $dev transitiontime 10 : noUpdate : hsv 000020"
+                            );
                         }
                     }
 
@@ -2423,6 +2486,10 @@ sub PHTV_ReceiveCommand($$$) {
                         foreach (@devices) {
                             my ( $dev, $led ) = split( /:/, $_ );
                             $attr{$dev}{"event-on-change-reading"} = ".*";
+
+                            fhem(
+"set $dev transitiontime 10 : noUpdate : hsv 000020"
+                            );
                         }
                     }
 
@@ -2436,6 +2503,10 @@ sub PHTV_ReceiveCommand($$$) {
                         foreach (@devices) {
                             my ( $dev, $led ) = split( /:/, $_ );
                             $attr{$dev}{"event-on-change-reading"} = ".*";
+
+                            fhem(
+"set $dev transitiontime 10 : noUpdate : hsv 000020"
+                            );
                         }
                     }
 
@@ -2449,6 +2520,10 @@ sub PHTV_ReceiveCommand($$$) {
                         foreach (@devices) {
                             my ( $dev, $led ) = split( /:/, $_ );
                             $attr{$dev}{"event-on-change-reading"} = ".*";
+
+                            fhem(
+"set $dev transitiontime 10 : noUpdate : hsv 000020"
+                            );
                         }
                     }
 
@@ -2459,7 +2534,7 @@ sub PHTV_ReceiveCommand($$$) {
         # all other command results
         else {
             Log3 $name, 2,
-"PHTV $name: ERROR: method to handle respond of $service not implemented";
+"PHTV $name: ERROR: method to handle response of $service not implemented";
         }
     }
 
@@ -2501,6 +2576,12 @@ sub PHTV_ReceiveCommand($$$) {
             {
                 readingsBulkUpdate( $hash, $_, "-" );
             }
+        }
+
+        if ( !defined( $hash->{READINGS}{ambiHue}{VAL} )
+            || $hash->{READINGS}{ambiHue}{VAL} ne "off" )
+        {
+            readingsBulkUpdate( $hash, "ambiHue", "off" );
         }
 
         if ( !defined( $hash->{READINGS}{ambiMode}{VAL} )
@@ -3133,6 +3214,7 @@ sub PHTV_min {
     <li><b>ambiHueTop</b> - HUE devices that should get the color from top Ambilight.</li>
     <li><b>ambiHueRight</b> - HUE devices that should get the color from right Ambilight.</li>
     <li><b>ambiHueBottom</b> - HUE devices that should get the color from bottom Ambilight.</li>
+    <li><b>ambiHueLatency</b> - Controls the update interval for HUE devices in milliseconds; defaults to 200 ms.</li>
     <li><b>disable</b> - Disable polling (true/false)</li>
     <li><b>inputs</b> - Presents the inputs read from device. Inputs can be renamed by adding <code>,NewName</code> right after the original name.</li>
     <li><b>timeout</b> - Set different polling timeout in seconds (default=7)</li>
