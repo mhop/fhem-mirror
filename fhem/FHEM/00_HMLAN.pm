@@ -244,7 +244,7 @@ sub HMLAN_Attr(@) {############################################################
           push @idName,CUL_HM_id2Name($_) foreach(@ids);
         }
         $attr{$name}{$aName} = join(",",@idName);
-        @{$defs{$name}{helper}{log}{ids}}=@ids;
+        @{$defs{$name}{helper}{log}{ids}}=grep !/^(sys|all)$/,@ids;
       }
       else{
         $defs{$name}{helper}{attrPend} = 1;
@@ -255,7 +255,7 @@ sub HMLAN_Attr(@) {############################################################
       my @ids = ();
       $defs{$name}{helper}{log}{sys}=0;
       $defs{$name}{helper}{log}{all}=0;
-      @{$defs{$name}{helper}{log}{ids}}=@ids;
+      @{$defs{$name}{helper}{log}{ids}}=grep !/^(sys|all)$/,@ids;
     }
     return "logging set to $attr{$name}{$aName}"
         if ($aVal && $attr{$name}{$aName} ne $aVal);
@@ -764,8 +764,8 @@ sub HMLAN_DoInit($) {##########################################################
   HMLAN_condUpdate($hash,0xff);
   $hash->{helper}{q}{cap}{$_}=0 foreach (keys %{$hash->{helper}{q}{cap}});
 
-  foreach (keys %{$hash->{helper}{assIDs}}){delete ($hash->{helper}{assIDs}{$_})};# clear IDs - HMLAN might have a reset
-  delete ($hash->{helper}{assIDs}{$_}) foreach (keys %{$hash->{helper}{assIDs}});# clear IDs - HMLAN might have a reset
+  foreach (keys %{$hash->{assIDs}}){delete ($hash->{assIDs}{$_})};# clear IDs - HMLAN might have a reset
+  delete ($hash->{assIDs}{$_}) foreach (keys %{$hash->{assIDs}});# clear IDs - HMLAN might have a reset
   $hash->{helper}{q}{keepAliveRec} = 1; # ok for first time
   $hash->{helper}{q}{keepAliveRpt} = 0; # ok for first time
 
