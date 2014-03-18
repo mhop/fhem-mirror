@@ -2489,8 +2489,8 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       }
       my $addInfo = "";
       if    ($md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/ && $chn eq "02"){$addInfo = CUL_HM_TCtempReadings($hash)}
-      elsif ($md =~ m/HM-CC-RT-DN/ && $chn eq "04"){$addInfo = CUL_HM_TCITRTtempReadings($hash,7)}
-      elsif ($md =~ m/HM-TC-IT/    && $chn eq "02"){$addInfo = CUL_HM_TCITRTtempReadings($hash,7,8,9)}
+      elsif ($md =~ m/HM-CC-RT-DN/ && $chn eq "04"){$addInfo = CUL_HM_TCITRTtempReadings($hash,$md,7)}
+      elsif ($md =~ m/HM-TC-IT/    && $chn eq "02"){$addInfo = CUL_HM_TCITRTtempReadings($hash,$md,7,8,9)}
       elsif ($md eq "HM-PB-4DIS-WM")               {$addInfo = CUL_HM_4DisText($hash)}
       elsif ($md eq "HM-Sys-sRP-Pl")               {$addInfo = CUL_HM_repReadings($hash)}
 
@@ -5277,10 +5277,10 @@ sub CUL_HM_updtRegDisp($$$) {
                       substr($hash->{DEF},6,2) eq "02");
   }
   elsif ($md =~ m/HM-CC-RT-DN/){#handle temperature readings
-    CUL_HM_TCITRTtempReadings($hash,7)  if ($list == 7 && $chn eq "04");
+    CUL_HM_TCITRTtempReadings($hash,$md,7)  if ($list == 7 && $chn eq "04");
   }
   elsif ($md =~ m/HM-TC-IT-WM-W-EU/){#handle temperature readings
-    CUL_HM_TCITRTtempReadings($hash,$list)  if ($list >= 7 && $chn eq "02");
+    CUL_HM_TCITRTtempReadings($hash,$md,$list)  if ($list >= 7 && $chn eq "02");
   }
   elsif ($md eq "HM-PB-4DIS-WM"){#add text
     CUL_HM_4DisText($hash)  if ($list == 1) ;
@@ -5576,14 +5576,14 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
   }
   return $setting;
 }
-sub CUL_HM_TCITRTtempReadings($@) {# parse RT - TC-IT temperature readings
-  my ($hash,@list)=@_;
+sub CUL_HM_TCITRTtempReadings($$@) {# parse RT - TC-IT temperature readings
+  my ($hash,$md,@list)=@_;
   my $name = $hash->{NAME};
   my $regPre = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".");
   my @changedRead;
   my $setting="";
   my %idxN = (7=>"P1",8=>"P2",9=>"P3");
-  $idxN{7} = "" if(scalar @list == 1);# not prefix for RT
+  $idxN{7} = "" if($md =~ m/CC-RT/);# not prefix for RT
   my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
   foreach my $lst (@list){
     my @r1;
@@ -5998,7 +5998,6 @@ sub CUL_HM_qEntity($$){  # add to queue
   my $devN = CUL_HM_getDeviceName($name);
   return if (AttrVal($devN,"subType","") eq "virtual");
   return if ($defs{$devN}{helper}{q}{$q} eq "00"); #already requesting all
-
   if ($devN eq $name){#config for all device
     $defs{$devN}{helper}{q}{$q}="00";
   }
@@ -6066,7 +6065,6 @@ sub CUL_HM_procQs($){#process non-wakeup queues
   my $next;# how long to wait for next timer
   if    (@{$mq->{qReqStat}}){$next = 1}
   elsif (@{$mq->{qReqConf}}){$next = $modules{CUL_HM}{hmAutoReadScan}}
-
   InternalTimer(gettimeofday()+$next,"CUL_HM_procQs","CUL_HM_procQs",0)
       if ($next);
 }

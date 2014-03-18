@@ -573,6 +573,10 @@ sub HMinfo_tempList(@) { ######################################################
         $val =~ s/ $//;
         @exec = ();
         foreach my $eN(@el){
+          if ($tln =~ m/tempList(P.)/){
+            $val = lc($1)." ".$val;
+            $tln =~ s/P.//;
+          }
           my $x = CUL_HM_Set($defs{$eN},$eN,$tln,"prep",split(" ",$val));
           push @entryFail,$eN." :".$tln." respose:$x" if ($x != 1);
           push @exec,$eN." ".$tln." exec ".$val;
@@ -1209,6 +1213,16 @@ sub HMinfo_SetFn($@) {#########################################################
   elsif($cmd eq "archConfig") {##action: archiveConfig-------------------------
     # save config only if register are complete
     $ret = HMinfo_archConfig($hash,$name,$opt,($a[0]?$a[0]:""));
+  }
+
+  elsif($cmd eq "?")          {##action: get commandlist-----------------------
+    my @cmdLst =     
+           ( "autoReadReg","clear"  
+            ,"archConfig:-0,-a","saveConfig","loadConfig","purgeConfig","update"
+            ,"cpRegs"
+            ,"tempList tempListTmpl"
+            ,"templateDef","templateSet");
+    $ret = "Unknown argument $cmd, choose one of ".join (" ",sort @cmdLst);
   }
 
   ### redirect set commands to get - thus the command also work in webCmd
