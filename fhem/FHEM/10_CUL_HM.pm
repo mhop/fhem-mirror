@@ -1482,7 +1482,7 @@ sub CUL_HM_Parse($$) {#########################################################
       $shash = $modules{CUL_HM}{defptr}{$src."02"}
                              if($modules{CUL_HM}{defptr}{$src."02"});
       my ($eCnt,$P,$I,$U,$F) = map{hex($_)} unpack 'A6A6A4A4A2',$p;
-      $eCnt = ($eCnt&0x7fffff)/10;           #0.0  ..838860.7  Wh
+      $eCnt = ($eCnt&0x7fffff)/10;          #0.0  ..838860.7  Wh
       $P = $P   /100;                       #0.0  ..167772.15 W
       $I = $I   /1;                         #0.0  ..65535.0   mA
       $U = $U   /10;                        #0.0  ..6553.5    mV
@@ -3778,7 +3778,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "No:$ioCh invalid. Number must be <=50"  if (!$ioCh || $ioCh !~ m/^(\d*)$/ || $ioCh > 50);
     return "option $set unknown - use set or unset" if ($set != m/^(set|unset)$/);
     $set = ($set eq "set")?"01":"02"; 
-    CUL_HM_PushCmdStack($hash,"++${flag}01$id${dst}$chn$set$ioId$ioCh$chn");
+    CUL_HM_PushCmdStack($hash,"++${flag}01$id${dst}$chn$set$ioId${ioCh}00");
   }
   elsif($cmd eq "peerChan") { ############################################# reg
     #peerChan <btnN> <device> ... [single|dual] [set|unset] [actor|remote|both]
@@ -4733,10 +4733,10 @@ sub CUL_HM_FWupdateSpeed($$){#set IO speed
   my $hash = $defs{$name};
   if ($hash->{IODev}->{TYPE} ne "CUL"){
     my $msg = sprintf("G%02X",$speed);
-    IOWrite($hash, "",$msg);
+    IOWrite($hash, "cmd",$msg);
   }
   else{
-    IOWrite($hash, "",($speed == 100)?"AR\n":"Ar\n");
+    IOWrite($hash, "cmd","speed".$speed);
   }
 }
 sub CUL_HM_FWupdateSim($){#end FW Simulation

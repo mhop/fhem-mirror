@@ -31,6 +31,7 @@ use vars qw(%culHmChanSets);
 use vars qw(%culHmFunctSets);
 use vars qw(%culHmBits);
 use vars qw(@culHmCmdFlags);
+use vars qw(%culHmTpl);
 use vars qw($K_actDetID);
 
 # ----------------modul globals-----------------------
@@ -1054,7 +1055,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
 
 ##############################---templates---##################################
 #en-block programming of funktions
-my %tpl = (
+%culHmTpl = (
    autoOff           => {p=>"time"             ,t=>"staircase - auto off after <time>, extend time with each trigger"
                     ,reg=>{ OnTime          =>"p0"
                            ,OffTime         =>111600
