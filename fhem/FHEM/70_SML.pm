@@ -57,7 +57,7 @@ energy_State($$$$)
   my ($hash, $tim, $vt, $val) = @_;
 	$hash->{READINGS}{$vt}{VAL} = $val;
 	$hash->{READINGS}{$vt}{TIME} = TimeNow();
-	Log3 $hash, 4, "time: $tim name: $vt value: $val";
+	Log3 $hash, 4, "$tim Readings: $vt Value: $val";
   return undef;
 }
 sub
@@ -66,7 +66,7 @@ energy_Set($$$$)
   my ($hash, $tim, $vt, $val) = @_;
 	$hash->{READINGS}{$vt}{VAL} = $val;
 	$hash->{READINGS}{$vt}{TIME} = TimeNow();
-	Log3 $hash, 4, "time: $tim name: $vt value: $val";
+	Log3 $hash, 4, "$tim Readings: $vt Value: $val";
  if ( $vt eq "?"){
  	return "Unknown argument ?, choose one of Interval DAYPOWER MONTHPOWER YEARPOWER TOTALPOWER";
  }
@@ -290,7 +290,7 @@ sml_energy_DoUpdate($)
   	$avg =sprintf("%.2f",$avg);
 
 	return "$name|$min|$max|$last|$avg|0" ;
- }elese{
+ }else{
 	return "$name|1|1|1|1|1";
  }
 
@@ -311,9 +311,10 @@ sml_energy_energyDone($)
  Log3 $hash, 4, "sml_energy_energyDone min: $min max: $max last: $last avg: $avg";
   delete($hash->{helper}{RUNNING_PID});
  
- if ($hash->{Interval} > 0) {
+# if ($hash->{Interval} > 0) {
   InternalTimer(gettimeofday() + $hash->{Interval}, "sml_energy_Update", $hash, 0);
- }
+ Log3 $hash, 4, "internalTimer funktion";
+# }
 
  if ( $success == 0){
 	$hash->{READINGS}{minPower}{VAL}  = $min;
