@@ -1495,7 +1495,7 @@ sub HMinfo_templateDef(@){#####################################################
   my ($name,$param,$desc,@regs) = @_;
   return "insufficient parameter" if(!defined $param);
   if ($param eq "del"){
-    delete $HMConfig::tpl{$name};
+    delete $HMConfig::culHmTpl{$name};
     return;
   }
   # get description if marked wir ""
@@ -1510,30 +1510,30 @@ sub HMinfo_templateDef(@){#####################################################
     splice @regs,0,$cnt;
   }
 
-  return "$name already defined, delete it first" if($HMConfig::tpl{$name});
+  return "$name already defined, delete it first" if($HMConfig::culHmTpl{$name});
   return "insufficient parameter" if(@regs < 1);
-  $HMConfig::tpl{$name}{p} = "";
-  $HMConfig::tpl{$name}{p} = join(" ",split(":",$param)) if($param ne "0");
-  $HMConfig::tpl{$name}{t} = $desc;
+  $HMConfig::culHmTpl{$name}{p} = "";
+  $HMConfig::culHmTpl{$name}{p} = join(" ",split(":",$param)) if($param ne "0");
+  $HMConfig::culHmTpl{$name}{t} = $desc;
   my $paramNo = split(":",$param);
   foreach (@regs){
     my ($r,$v)=split":",$_;
     if (!defined $v){
-      delete $HMConfig::tpl{$name};
+      delete $HMConfig::culHmTpl{$name};
       return " empty reg value for $r";
     }
     elsif($v =~ m/^p(.)/){
       return ($1+1)." params are necessary, only $paramNo aregiven"
             if (($1+1)>$paramNo);
     }
-    $HMConfig::tpl{$name}{reg}{$r} = $v;
+    $HMConfig::culHmTpl{$name}{reg}{$r} = $v;
   }
 }
 sub HMinfo_templateSet(@){#####################################################
   my ($aName,$tmpl,$pSet,@p) = @_;
   $pSet = ":" if (!$pSet || $pSet eq "none");
   my ($pName,$pTyp) = split(":",$pSet);
-  return "template undefined $tmpl"                       if(!$HMConfig::tpl{$tmpl});
+  return "template undefined $tmpl"                       if(!$HMConfig::culHmTpl{$tmpl});
   return "aktor $aName unknown"                           if(!$defs{$aName});
   return "exec set $aName getConfig first"                if(!(grep /RegL_/,keys%{$defs{$aName}{READINGS}}));
   return "give <peer>:[short|long] with peer, not $pSet"  if($pName && $pTyp !~ m/(short|long)/);
@@ -1541,11 +1541,11 @@ sub HMinfo_templateSet(@){#####################################################
   my $aHash = $defs{$aName};
 
   my @regCh;
-  foreach (keys%{$HMConfig::tpl{$tmpl}{reg}}){
+  foreach (keys%{$HMConfig::culHmTpl{$tmpl}{reg}}){
     my $regN = $pSet.$_;
-    my $regV = $HMConfig::tpl{$tmpl}{reg}{$_};
+    my $regV = $HMConfig::culHmTpl{$tmpl}{reg}{$_};
     if ($regV =~m /^p(.)$/) {#replace with User parameter
-      return "insufficient values - at least ".$HMConfig::tpl{p}." are $1 necessary" if (@p < ($1+1));
+      return "insufficient values - at least ".$HMConfig::culHmTpl{p}." are $1 necessary" if (@p < ($1+1));
       $regV = $p[$1];
     }
     my ($ret,undef) = CUL_HM_Set($aHash,$aName,"regSet",$regN,"?",$pName);
@@ -1569,7 +1569,7 @@ sub HMinfo_templateChk(@){#####################################################
   my ($aName,$tmpl,$pSet,@p) = @_;
   $pSet = "" if (!$pSet || $pSet eq "none");
   my ($pName,$pTyp) = split(":",$pSet);
-  return "template undefined $tmpl\n"                     if(!$HMConfig::tpl{$tmpl});
+  return "template undefined $tmpl\n"                     if(!$HMConfig::culHmTpl{$tmpl});
   return "aktor $aName unknown\n"                         if(!$defs{$aName});
   return "give <peer>:[short|long|all] wrong:$pTyp\n"     if($pTyp && $pTyp !~ m/(short|long|all)/);
 
@@ -1598,16 +1598,16 @@ sub HMinfo_templateChk(@){#####################################################
     }
     else{
       my $pRnm = $pName?($pName."-".($pTyp eq "long"?"lg":"sh")):"";
-      foreach my $rn (keys%{$HMConfig::tpl{$tmpl}{reg}}){
+      foreach my $rn (keys%{$HMConfig::culHmTpl{$tmpl}{reg}}){
         my $regV = ReadingsVal($aName,"R-$pRnm$rn" ,undef);
         $regV    = ReadingsVal($aName,".R-$pRnm$rn",undef) if (!defined $regV);
         $regV    = ReadingsVal($aName,"R-".$rn     ,undef) if (!defined $regV);
         $regV    = ReadingsVal($aName,".R-".$rn    ,undef) if (!defined $regV);
         if (defined $regV){
           $regV =~s/ .*//;#strip unit
-          my $tplV = $HMConfig::tpl{$tmpl}{reg}{$rn};
+          my $tplV = $HMConfig::culHmTpl{$tmpl}{reg}{$rn};
           if ($tplV =~m /^p(.)$/) {#replace with User parameter
-            return "insufficient data - at least ".$HMConfig::tpl{p}." are $1 necessary"
+            return "insufficient data - at least ".$HMConfig::culHmTpl{p}." are $1 necessary"
                                                            if (@p < ($1+1));
             $tplV = $p[$1];
           }
@@ -1625,21 +1625,21 @@ sub HMinfo_templateChk(@){#####################################################
 sub HMinfo_templateList($){####################################################
   my $templ = shift;
   my $reply = "";
-  if(!($templ && (grep /$templ/,keys%HMConfig::tpl))){# list all templates
-    foreach (sort keys%HMConfig::tpl){
+  if(!($templ && (grep /$templ/,keys%HMConfig::culHmTpl))){# list all templates
+    foreach (sort keys%HMConfig::culHmTpl){
       $reply .= sprintf("%-16s params:%-24s Info:%s\n"
                              ,$_
-                             ,$HMConfig::tpl{$_}{p}
-                             ,$HMConfig::tpl{$_}{t}
+                             ,$HMConfig::culHmTpl{$_}{p}
+                             ,$HMConfig::culHmTpl{$_}{t}
                        );
     }
   }
   else{#details about one template
-    $reply = sprintf("%-16s params:%-24s Info:%s\n",$templ,$HMConfig::tpl{$templ}{p},$HMConfig::tpl{$templ}{t});
-    foreach (sort keys %{$HMConfig::tpl{$templ}{reg}}){
-      my $val = $HMConfig::tpl{$templ}{reg}{$_};
+    $reply = sprintf("%-16s params:%-24s Info:%s\n",$templ,$HMConfig::culHmTpl{$templ}{p},$HMConfig::culHmTpl{$templ}{t});
+    foreach (sort keys %{$HMConfig::culHmTpl{$templ}{reg}}){
+      my $val = $HMConfig::culHmTpl{$templ}{reg}{$_};
       if ($val =~m /^p(.)$/){
-        my @a = split(" ",$HMConfig::tpl{$templ}{p});
+        my @a = split(" ",$HMConfig::culHmTpl{$templ}{p});
         $val = $a[$1];
       }
       $reply .= sprintf("  %-16s :%s\n",$_,$val);
