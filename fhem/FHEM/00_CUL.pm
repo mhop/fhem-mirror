@@ -103,7 +103,7 @@ CUL_Initialize($)
   $hash->{SetFn}   = "CUL_Set";
   $hash->{AttrFn}  = "CUL_Attr";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
-                     "showtime:1,0 model:CUL,CUN,CUR " . 
+                     "showtime:1,0 model:CUL,CUN " . 
                      "sendpool addvaltrigger rfmode:SlowRF,HomeMatic,MAX ".
                      "hmId ".
                      "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger ";
@@ -203,15 +203,8 @@ sub
 CUL_Shutdown($)
 {
   my ($hash) = @_;
-  CUL_SimpleWrite($hash, "X00") if(!CUL_isCUR($hash));
+  CUL_SimpleWrite($hash, "X00");
   return undef;
-}
-
-sub
-CUL_isCUR($)
-{
-  my ($hash) = @_;
-  return ($hash->{VERSION} && $hash->{VERSION} =~ m/CUR/);
 }
 
 sub
@@ -317,47 +310,6 @@ GOTBW:
     CUL_SimpleWrite($hash, "W1F$v");
     CUL_SimpleWrite($hash, $hash->{initString});
 
-  } elsif($type eq "file") { ########################################
-
-    return "Only supported for CUR devices (see VERSION)" if(!CUL_isCUR($hash));
-
-    return "$name: Need 2 further arguments: source destination"
-                                if(@a != 2);
-    my ($buf, $msg, $err);
-    return "$a[0]: $!" if(!open(FH, $a[0]));
-    $buf = join("", <FH>);
-    close(FH);
-
-    my $len = length($buf);
-    CUL_Clear($hash);
-    CUL_SimpleWrite($hash, "X00");
-
-    CUL_SimpleWrite($hash, sprintf("w%08X$a[1]", $len));
-    ($err, $msg) = CUL_ReadAnswer($hash, $type, 1, undef);
-    goto WRITEEND if($err);
-    if($msg ne sprintf("%08X\r\n", $len)) {
-      $err = "Bogus length received: $msg";
-      goto WRITEEND;
-    }
-
-    my $off = 0;
-    while($off < $len) {
-      my $mlen = ($len-$off) > 32 ? 32 : ($len-$off);
-      CUL_SimpleWrite($hash, substr($buf,$off,$mlen), 1);
-      $off += $mlen;
-    }
-
-WRITEEND:
-    CUL_SimpleWrite($hash, $hash->{initString});
-    return "$name: $err" if($err);
-
-  } elsif($type eq "time") { ########################################
-
-    return "Only supported for CUR devices (see VERSION)" if(!CUL_isCUR($hash));
-    my @a = localtime;
-    my $msg = sprintf("c%02d%02d%02d", $a[2],$a[1],$a[0]);
-    CUL_SimpleWrite($hash, $msg);
-
   } else { ###############################################  raw,led,patable
 
     return "Expecting a 0-padded hex number"
@@ -407,68 +359,6 @@ CUL_Get($@)
         4+4*($r{"1D"}&3)                                                #Sens
         );
     
-  } elsif($a[1] eq "file") {
-
-    return "Only supported for CUR devices (see VERSION)" if(!CUL_isCUR($hash));
-
-    CUL_Clear($hash);
-    CUL_SimpleWrite($hash, "X00");
-
-    if(int(@a) == 2) {  # No argument: List directory
-
-      CUL_SimpleWrite($hash, "r.");
-      ($err, $msg) = CUL_ReadAnswer($hash, $a[1], 0, undef);
-      goto READEND if($err);
-
-      $msg =~ s/[\r\n]//g;
-      my @a;
-      foreach my $f (split(" ", $msg)) {
-        my ($name, $size) = split("/", $f);
-        push @a, sprintf("%-14s %5d", $name, hex($size));
-      }
-      $msg = join("\n", @a);
-
-    } else {            # Read specific file
-
-      if(@a != 4) {
-        $err = "Need 2 further arguments: source [destination|-]";
-        goto READEND;
-      }
-
-      CUL_SimpleWrite($hash, "r$a[2]");
-      ($err, $msg) = CUL_ReadAnswer($hash, $a[1], 0, undef);
-      goto READEND if($err);
-
-      if($msg eq "X") {
-        $err = "$a[2]: file not found on CUL";
-        goto READEND if($err);
-      }
-      $msg =~ s/[\r\n]//g;
-      my ($len,  $buf) = (hex($msg), "");
-      $msg = "";
-      while(length($msg) != $len) {
-        ($err, $buf) = CUL_ReadAnswer($hash, $a[1], 1, undef);
-        goto READEND if($err);
-        $msg .= $buf;
-      }
-
-      if($a[3] ne "-") {
-        if(!open(FH, ">$a[3]")) {
-          $err = "$a[3]: $!";
-          goto READEND;
-        }
-        print FH $msg;
-        close(FH);
-        $msg = "";
-      }
-
-    }
-
-READEND:
-    CUL_SimpleWrite($hash, $hash->{initString});
-    return "$name: $err" if($err);
-    return $msg;
-
   } else {
 
     CUL_SimpleWrite($hash, $gets{$a[1]}[0] . $arg);
@@ -539,13 +429,6 @@ CUL_DoInit($)
   }
   $ver =~ s/[\r\n]//g;
   $hash->{VERSION} = $ver;
-
-  if($ver =~ m/CUR/) {
-    my @a = localtime;
-    my $msg = sprintf("c%02d%02d%02d%02d%02d%02d",
-                ($a[5]+1900)%100,$a[4]+1,$a[3],$a[2],$a[1],$a[0]);
-    CUL_SimpleWrite($hash, $msg);
-  }
 
   # Cmd-String feststellen
 
@@ -1106,7 +989,7 @@ CUL_Attr(@)
 
   <table>
   <tr><td>
-  The CUL/CUR/CUN(O) is a family of RF devices sold by <a
+  The CUL/CUN(O) is a family of RF devices sold by <a
   href="http://www.busware.de">busware.de</a>.
 
   With the opensource firmware 
@@ -1141,7 +1024,7 @@ CUL_Attr(@)
   <ul>
     <code>define &lt;name&gt; CUL &lt;device&gt; &lt;FHTID&gt;</code> <br>
     <br>
-    USB-connected devices (CUL/CUR/CUN):<br><ul>
+    USB-connected devices (CUL/CUN):<br><ul>
       &lt;device&gt; specifies the serial port to communicate with the CUL.
       The name of the serial-device depends on your distribution, under
       linux the cdc_acm kernel module is responsible, and usually a
@@ -1278,7 +1161,7 @@ CUL_Attr(@)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#attrdummy">dummy</a></li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a href="#model">model</a> (CUL,CUN,CUR)</li>
+    <li><a href="#model">model</a> (CUL,CUN)</li>
     <li><a name="sendpool">sendpool</a><br>
         If using more than one CUL for covering a large area, sending
         different events by the different CUL's might disturb each other. This
@@ -1343,7 +1226,7 @@ CUL_Attr(@)
 
   <table>
   <tr><td>
-  Der CUL/CUR/CUN(O) ist eine Familie von Funkempf&auml;ngern, die von der Firma
+  Der CUL/CUN(O) ist eine Familie von Funkempf&auml;ngern, die von der Firma
   <a href="http://www.busware.de">Busware</a> verkauft wird.
 
   Mit der OpenSource Firmware 
@@ -1382,7 +1265,7 @@ CUL_Attr(@)
   <ul>
     <code>define &lt;name&gt; CUL &lt;device&gt; &lt;FHTID&gt;</code> <br>
     <br>
-    Ger&auml;te, die an USB angeschlossen sind (CUL/CUR/CUN):<br>
+    Ger&auml;te, die an USB angeschlossen sind (CUL/CUN):<br>
     <ul>
       &lt;device&gt; gibt die serielle Schnittstelle an, mit der der CUL
       kommuniziert.  Der Name der seriellen Schnittstelle h&auml;ngt von der
@@ -1524,7 +1407,7 @@ CUL_Attr(@)
         </li><br>
 
     <li>cmds<br>
-        In abh&auml;gigkeit der installierten Firmware hat der CUL/CUR/CUN(O)
+        In abh&auml;gigkeit der installierten Firmware hat der CUL/CUN(O)
         unterschiedliche Befehlss&auml;tze. N&auml;here Informationen &uuml;ber
         die Befehle bzw. deren Interpretation siehe README Datei der
         verwendeten CUL Firmware. Siehe auch Anmerkungen beim raw Befehl.
@@ -1541,7 +1424,7 @@ CUL_Attr(@)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#attrdummy">dummy</a></li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a href="#model">model</a> (CUL,CUN,CUR)</li>
+    <li><a href="#model">model</a> (CUL,CUN)</li>
     <li><a name="sendpool">sendpool</a><br>
         Wenn mehr als ein CUL verwendet wird, um einen gr&ouml;&szlig;eren
         Bereich abzudecken, k&ouml;nnen diese sich gegenseitig
