@@ -1382,15 +1382,15 @@ sub CUL_HM_Parse($$) {#########################################################
         }
       }
       if ($st ne "switch"){
-        my $dir =  $err&0x30;
+        my $dir = $err&0x30;
         if   ($dir == 0x10){push @evtEt,[$shash,1,"$eventName:up:$vs"  ];}
         elsif($dir == 0x20){push @evtEt,[$shash,1,"$eventName:down:$vs"];}
         elsif($dir == 0x00){push @evtEt,[$shash,1,"$eventName:stop:$vs"];}
         elsif($dir == 0x30){push @evtEt,[$shash,1,"$eventName:err:$vs" ];}
-        if (!$rSUpdt){#dont touch if necessary for dimmer
-          if($dir != 0x00){CUL_HM_stateUpdatDly($shash->{NAME},120);}
-          else            {CUL_HM_unQEntity($shash->{NAME},"qReqStat");}
-        }
+      }
+      if (!$rSUpdt){#dont touch if necessary for dimmer
+        if(($err&0x70) != 0x00){CUL_HM_stateUpdatDly($shash->{NAME},120);}
+        else                   {CUL_HM_unQEntity($shash->{NAME},"qReqStat");}
       }
  
       if ($st eq "dimmer"){
@@ -5545,11 +5545,14 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
   my @time  = @Tregs[grep !($_ % 2), 0..$#Tregs]; # even-index =time
   my @temp  = @Tregs[grep $_ % 2, 0..$#Tregs];    # odd-index  =data
   return "reglist incomplete\n" if (scalar( @time )<168);
+  delete $hash->{READINGS}{$_} 
+          foreach (grep !/_/,grep /tempList/,keys %{$hash->{READINGS}});
+
   foreach  (@time){$_=hex($_)*10};
   foreach  (@temp){$_=hex($_)/2};
   my $setting;
   my @changedRead;
-  push (@changedRead,"tempList_State:".
+  push (@changedRead,"R_tempList_State:".
                 (($hash->{helper}{shadowReg}{"RegL_05:"} ||
                   $hash->{helper}{shadowReg}{"RegL_06:"} )?"set":"verified"));
   for (my $day = 0;$day<7;$day++){
@@ -5560,11 +5563,11 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
       last if ($tSpan > 1430);
       $tSpan = $time[$reg];
       my $entry = sprintf("%02d:%02d %3.01f",($tSpan/60),($tSpan%60),$temp[$reg]);
-        $setting .= "Temp set: ".$days[$day]." ".$entry." C\n";
+        $setting .= "Temp set: ${day}_".$days[$day]." ".$entry." C\n";
         $dayRead .= " ".$entry;
       $tSpan = $time[$reg];
     }
-    push (@changedRead,"tempList".$days[$day].":".$dayRead);
+    push (@changedRead,"R_${day}_tempList$days[$day]:$dayRead");
   }
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
   { #update readings in device - oldfashioned style, copy from Readings
@@ -5582,18 +5585,22 @@ sub CUL_HM_TCITRTtempReadings($$@) {# parse RT - TC-IT temperature readings
   my $regPre = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".");
   my @changedRead;
   my $setting="";
-  my %idxN = (7=>"P1",8=>"P2",9=>"P3");
+  my %idxN = (7=>"P1_",8=>"P2_",9=>"P3_");
   $idxN{7} = "" if($md =~ m/CC-RT/);# not prefix for RT
   my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
   foreach my $lst (@list){
     my @r1;
     $lst +=0;
+    # cleanup old value formats
+    my $ln = length($idxN{$lst})?substr($idxN{$lst},0,2):"";
+    delete $hash->{READINGS}{$_} 
+          foreach (grep !/_/,grep /tempList$ln/,keys %{$hash->{READINGS}});
     my $tempRegs = ReadingsVal($name,$regPre."RegL_0$lst:","");
     if ($tempRegs !~ m/00:00/){
       for (my $day = 0;$day<7;$day++){
-        push (@changedRead,"tempList$idxN{$lst}".$days[$day].": incomplete");
+        push (@changedRead,"R_$idxN{$lst}${day}_tempList".$days[$day].":incomplete");
       }
-      push (@changedRead,"tempList$idxN{$lst}_State:incomplete");
+      push (@changedRead,"R_$idxN{$lst}tempList_State:incomplete");
       CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
       next;
     }
@@ -5611,10 +5618,10 @@ sub CUL_HM_TCITRTtempReadings($$@) {# parse RT - TC-IT temperature readings
         $ch = 1 if ((!$r1[$a] || $r1[$a] ne $d) && $a >= 20);
         $r1[$a] = $d;
       }
-      push (@changedRead,"tempList$idxN{$lst}_State:set") if ($ch);
+      push (@changedRead,"R_$idxN{$lst}tempList_State:set") if ($ch);
     }
     else{
-      push (@changedRead,"tempList$idxN{$lst}_State:verified");
+      push (@changedRead,"R_$idxN{$lst}tempList_State:verified");
     }
      
     $tempRegs = join("",@r1[20..scalar@r1-1]);
@@ -5632,11 +5639,11 @@ sub CUL_HM_TCITRTtempReadings($$@) {# parse RT - TC-IT temperature readings
       }
       for (my $idx = 0;$idx<13;$idx++){
         my $entry = sprintf(" %s %3.01f",$time[$idx],$temp[$idx]);
-          $setting .= "Temp set $idxN{$lst}: ".$days[$day].$entry." C\n";
+          $setting .= "Temp set $idxN{$lst}: ${day}_".$days[$day].$entry." C\n";
           $dayRead .= $entry;
         last if ($time[$idx] eq "24:00");
       }
-      push (@changedRead,"tempList$idxN{$lst}".$days[$day].": ".$dayRead);
+      push (@changedRead,"R_$idxN{$lst}${day}_tempList$days[$day]:$dayRead");
     }
   }
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
@@ -5675,7 +5682,7 @@ sub CUL_HM_repReadings($) {   # parse repeater
       $sName = $defs{$pD[$fNo]}->{IODev}{NAME}
             if($attr{$defs{$pD[$fNo]}->{IODev}{NAME}}{hmId} eq $pdID);
     }
-    my $eS = sprintf("%02d %-15s %-15s %-3s %-4s",
+    my $eS = sprintf("%02d:%-15s %-15s %-3s %-4s",
                $no
               ,$sName
               ,((!$pS[$fNo] || $pS[$fNo] ne $sName)?"unknown":" dst>$pD[$fNo]")
@@ -5683,8 +5690,8 @@ sub CUL_HM_repReadings($) {   # parse repeater
               ,($pB[$fNo] && (  ($bdcst eq "01" && $pB[$fNo] eq "y")
                               ||($bdcst eq "00" && $pB[$fNo] eq "n")) ?"ok":"fail")
               );
-    push @retL, $eS;
-    $readList[$fNo]=sprintf("repPeer_%02d:%s",$no,$eS);
+    push @retL,$eS;
+    $readList[$fNo]="repPeer_".$eS;
   }
   CUL_HM_UpdtReadBulk($hash,0,@readList);
   return "No Source          Dest            Bcast\n". join"\n", sort @retL;
@@ -5971,7 +5978,6 @@ sub CUL_HM_qAutoRead($$){
 }
 sub CUL_HM_unQEntity($$){# remove entity from q
   my ($name,$q) = @_;
-
   my $devN = CUL_HM_getDeviceName($name);
   return if (AttrVal($devN,"subType","") eq "virtual");
   my $dq = $defs{$devN}{helper}{q};
