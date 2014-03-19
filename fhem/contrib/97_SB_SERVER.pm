@@ -10,7 +10,7 @@
 #
 #  This is absolutley open source. Please feel free to use just as you
 #  like. Please note, that no warranty is given and no liability 
-#  granted
+#  granted.
 #
 # ############################################################################
 #
