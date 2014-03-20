@@ -104,7 +104,7 @@ sub WeekdayTimer_SetAllParms() {  # {WeekdayTimer_SetAllParms()}
   <a name="weekdayTimer_define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; weekdayTimer &lt;device&gt; &lt;profile&gt; &lt;command&gt;|&lt;condition&gt;</code>
+    <code>define &lt;name&gt; WeekdayTimer &lt;device&gt; &lt;profile&gt; &lt;command&gt;|&lt;condition&gt;</code>
     <br><br>
 
     to set a weekly profile for &lt;device&gt;<br><br>
@@ -162,7 +162,7 @@ sub WeekdayTimer_SetAllParms() {  # {WeekdayTimer_SetAllParms()}
 
         If you want to have set all WeekdayTimer their current value (after a phase of exception),
         you can call the function <b> WeekdayTimer_SetAllParms ()</b>.
-        This call can be automatically coupled to a dummy by notify:       
+        This call can be automatically coupled to a dummy by notify:
         <code>define WDStatus2 notify Dummy:. * {WeekdayTimer_SetAllParms ()}</code>
 
     </ul>
