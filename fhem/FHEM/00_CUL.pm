@@ -20,7 +20,6 @@ sub CUL_SimpleWrite(@);
 
 my %gets = (    # Name, Data to send to the CUL, Regexp for the answer
   "ccconf"   => 1,
-  "file"     => 1,
   "version"  => ["V", '^V .*'],
   "raw"      => ["", '.*'],
   "uptime"   => ["t", '^[0-9A-F]{8}[\r\n]*$' ],
@@ -39,19 +38,15 @@ my %sets = (
   "sens"      => "SlowRF",
   "led"       => "",
   "patable"   => "",
-  "file"      => "",
-  "time"      => ""
 );
 
 my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42); # rAmpl(dB) 
 
-my $clientsSlowRF = ":FS20:FHT.*:KS300:USF1000:BS:HMS: " .
-                    ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_RFR:CUL_HOERMANN: " .
-                    ":ESA2000:CUL_IR:CUL_TX:Revolt:IT:";
-
-my $clientsHomeMatic = ":CUL_HM:HMS:CUL_IR:";  # OneWire emulated as HMS on a CUNO
-
-my $clientsMAX = ":CUL_MAX:HMS:CUL_IR";  # CUL_MAX is not available, yet
+my $clientsSlowRF    = ":FS20:FHT.*:KS300:USF1000:BS:HMS: " .
+                       ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_RFR:CUL_HOERMANN: " .
+                       ":ESA2000:CUL_IR:CUL_TX:Revolt:IT:STACKABLE_CC:";
+my $clientsHomeMatic = ":CUL_HM:HMS:CUL_IR:STACKABLE_CC:"; 
+my $clientsMAX       = ":CUL_MAX:HMS:CUL_IR:STACKABLE_CC:";
 
 my %matchListSlowRF = (
     "1:USF1000"   => "^81..(04|0c)..0101a001a5ceaa00....",
@@ -70,17 +65,20 @@ my %matchListSlowRF = (
     "E:CUL_TX"    => "^TX[A-F0-9]{10}",
     "F:Revolt"    => "^r......................\$",
     "G:IT"        => "^i......\$",
+    "H:STACKABLE_CC"=>"^\\*",
 );
 my %matchListHomeMatic = (
     "1:CUL_HM" => "^A....................",
     "8:HMS"       => "^810e04....(1|5|9).a001", # CUNO OneWire HMS Emulation
     "D:CUL_IR"    => "^I............",
+    "H:STACKABLE_CC"=>"^\\*",
 );
 
 my %matchListMAX = (
     "1:CUL_MAX" => "^Z........................",
     "8:HMS"       => "^810e04....(1|5|9).a001", # CUNO OneWire HMS Emulation
     "D:CUL_IR"    => "^I............",
+    "H:STACKABLE_CC"=>"^\\*",
 );
 
 sub
@@ -398,7 +396,7 @@ CUL_Clear($)
   $hash->{RA_Timeout} = 0.1;
   for(;;) {
     my ($err, undef) = CUL_ReadAnswer($hash, "Clear", 0, undef);
-    last if($err && $err =~ m/^Timeout/);
+    last if($err);
   }
   delete($hash->{RA_Timeout});
 }
@@ -441,15 +439,17 @@ CUL_DoInit($)
   CUL_SimpleWrite($hash, $hash->{initString});
 
   # FHTID
-  my $fhtid;
-  CUL_SimpleWrite($hash, "T01");
-  ($err, $fhtid) = CUL_ReadAnswer($hash, "FHTID", 0, undef);
-  return "$name: $err" if($err);
-  $fhtid =~ s/[\r\n]//g;
-  Log3 $name, 5, "GOT CUL fhtid: $fhtid";
-  if(!defined($fhtid) || $fhtid ne $hash->{FHTID}) {
-    Log3 $name, 2, "Setting CUL fhtid from $fhtid to " . $hash->{FHTID};
-    CUL_SimpleWrite($hash, "T01" . $hash->{FHTID});
+  if(defined($hash->{FHTID})) {
+    my $fhtid;
+    CUL_SimpleWrite($hash, "T01");
+    ($err, $fhtid) = CUL_ReadAnswer($hash, "FHTID", 0, undef);
+    return "$name: $err" if($err);
+    $fhtid =~ s/[\r\n]//g;
+    Log3 $name, 5, "GOT CUL fhtid: $fhtid";
+    if(!defined($fhtid) || $fhtid ne $hash->{FHTID}) {
+      Log3 $name, 2, "Setting CUL fhtid from $fhtid to " . $hash->{FHTID};
+      CUL_SimpleWrite($hash, "T01" . $hash->{FHTID});
+    }
   }
 
   $hash->{STATE} =
@@ -469,19 +469,18 @@ sub
 CUL_ReadAnswer($$$$)
 {
   my ($hash, $arg, $anydata, $regexp) = @_;
-  my $type = $hash->{TYPE};
+  my $ohash = $hash;
 
-  while($hash->{TYPE} eq "CUL_RFR") {   # Look for the first "real" CUL
+  while($hash->{TYPE} ne "CUL") {   # Look for the first "real" CUL
     $hash = $hash->{IODev};
   }
-
   return ("No FD", undef)
         if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
 
   my ($mculdata, $rin) = ("", '');
   my $buf;
   my $to = 3;                                         # 3 seconds timeout
-  $to = $hash->{RA_Timeout} if($hash->{RA_Timeout});  # ...or less
+  $to = $ohash->{RA_Timeout} if($ohash->{RA_Timeout});  # ...or less
   for(;;) {
 
     if($^O =~ m/Win/ && $hash->{USBDev}) {
@@ -511,21 +510,21 @@ CUL_ReadAnswer($$$$)
     }
 
     if($buf) {
-      Log3 $hash->{NAME}, 5, "CUL/RAW (ReadAnswer): $buf";
+      Log3 $ohash->{NAME}, 5, "CUL/RAW (ReadAnswer): $buf";
       $mculdata .= $buf;
     }
-    $mculdata = CUL_RFR_DelPrefix($mculdata) if($type eq "CUL_RFR");
 
     # \n\n is socat special
     if($mculdata =~ m/\r\n/ || $anydata || $mculdata =~ m/\n\n/ ) {
+      (undef, $mculdata) = CUL_prefix(0, $ohash, $mculdata); # Delete prefix
       if($regexp && $mculdata !~ m/$regexp/) {
-        CUL_Parse($hash, $hash, $hash->{NAME}, $mculdata, $hash->{initString});
+        CUL_Parse($ohash, $hash,
+                        $ohash->{NAME}, $mculdata, $ohash->{initString});
       } else {
         return (undef, $mculdata)
       }
     }
   }
-
 }
 
 #####################################
@@ -759,12 +758,17 @@ sub
 CUL_Parse($$$$$)
 {
   my ($hash, $iohash, $name, $rmsg, $initstr) = @_;
+
+  if($rmsg =~ m/^\*/) {                           # STACKABLE_CC
+    Dispatch($hash, $rmsg, undef);
+    return;
+  }
+
   my $rssi;
   my $dmsg = $rmsg;
   my $dmsgLog = (AttrVal($name,"rfmode","") eq "HomeMatic")
                    ? join(" ",(unpack'A1A2A2A4A6A6A*',$rmsg))
                    :$dmsg;
-  
   if($dmsg =~ m/^[AFTKEHRStZri]([A-F0-9][A-F0-9])+$/) { # RSSI
     my $l = length($dmsg);
     $rssi = hex(substr($dmsg, $l-2, 2));
@@ -896,10 +900,7 @@ CUL_SimpleWrite(@)
 {
   my ($hash, $msg, $nonl) = @_;
   return if(!$hash);
-  if($hash->{TYPE} eq "CUL_RFR") {
-    # Prefix $msg with RRBBU and return the corresponding CUL hash.
-    ($hash, $msg) = CUL_RFR_AddPrefix($hash, $msg); 
-  }
+  ($hash, $msg) = CUL_prefix(1, $hash, $msg); 
 
   my $name = $hash->{NAME};
   if (AttrVal($name,"rfmode","") eq "HomeMatic"){
@@ -976,6 +977,20 @@ CUL_Attr(@)
   }
  
   return undef;
+}
+
+sub
+CUL_prefix($$$)
+{
+  my ($isadd, $hash, $msg) = @_;
+  my $t = $hash->{TYPE};
+  while($t ne "CUL") {
+    $msg = CallFn($hash->{NAME}, $isadd ? "AddPrefix":"DelPrefix", $hash, $msg);
+    $hash = $hash->{IODev};
+    last if(!$hash);
+    $t = $hash->{TYPE};
+  }
+  return ($hash, $msg);
 }
 
 1;
