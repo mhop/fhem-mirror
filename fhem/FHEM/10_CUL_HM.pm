@@ -873,15 +873,15 @@ sub CUL_HM_Parse($$) {#########################################################
       $w = ($w & 0x3fff)/10;
       $wd = $wd * 5;
       my $sM = "state:";
-      if($t)  {$sM .= "T: $t "   ;push @evtEt,[$shash,1,"temperature:$t"    ];}
-      if($h)  {$sM .= "H: $h "   ;push @evtEt,[$shash,1,"humidity:$h"       ];}
-      if($w)  {$sM .= "W: $w "   ;push @evtEt,[$shash,1,"windSpeed:$w"      ];}
-      if($wd) {$sM .= "R: $wd "  ;push @evtEt,[$shash,1,"windDirection:$wd" ];}
-      if($wdr){$sM .= "IR: $wdr ";push @evtEt,[$shash,1,"windDirRange:$wdr" ];}
-      if($r)  {$sM .= "WD: $r "  ;push @evtEt,[$shash,1,"rain:$r"           ];}
-      if($ir) {$sM .= "WDR: $ir ";push @evtEt,[$shash,1,"isRaining:$ir"     ];}
-      if($s)  {$sM .= "S: $s "   ;push @evtEt,[$shash,1,"sunshine:$s"       ];}
-      if($b)  {$sM .= "B: $b "   ;push @evtEt,[$shash,1,"brightness:$b"     ];}
+      if(defined $t)  {$sM .= "T: $t "    ;push @evtEt,[$shash,1,"temperature:$t"    ];}
+      if(defined $h)  {$sM .= "H: $h "    ;push @evtEt,[$shash,1,"humidity:$h"       ];}
+      if(defined $w)  {$sM .= "W: $w "    ;push @evtEt,[$shash,1,"windSpeed:$w"      ];}
+      if(defined $wd) {$sM .= "R: $wd "   ;push @evtEt,[$shash,1,"windDirection:$wd" ];}
+      if(defined $ir) {$sM .= "IR: $ir "  ;push @evtEt,[$shash,1,"windDirRange:$ir"  ];}
+      if(defined $r)  {$sM .= "WD: $r "   ;push @evtEt,[$shash,1,"rain:$r"           ];}
+      if(defined $wdr){$sM .= "WDR: $wdr ";push @evtEt,[$shash,1,"isRaining:$wdr"    ];}
+      if(defined $s)  {$sM .= "S: $s "    ;push @evtEt,[$shash,1,"sunshine:$s"       ];}
+      if(defined $b)  {$sM .= "B: $b "    ;push @evtEt,[$shash,1,"brightness:$b"     ];}
       push @evtEt,[$shash,1,$sM];
     }
     else {
@@ -1351,7 +1351,6 @@ sub CUL_HM_Parse($$) {#########################################################
       $physLvl = ReadingsVal($name,"phyLevel",$val)
             if(!$physLvl);                     #not updated? use old or ignore
       my $vs = ($val==100 ? "on":($val==0 ? "off":"$val")); # user string...
-
       push @evtEt,[$shash,1,"level:$val"];
       push @evtEt,[$shash,1,"pct:$val"]; # duplicate to level - necessary for "slider"
       push @evtEt,[$shash,1,"deviceMsg:$vs$target"] if($chn ne "00");
@@ -1774,8 +1773,7 @@ sub CUL_HM_Parse($$) {#########################################################
     no strict "refs";
     my @ret = &{"CUL_HM_Parse$st"}($mFlg,$mTp,$src,$dst,$p,$target);
     use strict "refs";
-    push @entities,@ret;
-    push @evtEt,[$shash,1,""] if (@ret);
+    push @evtEt,@ret;
   }
   else{########################################################################
     ; # no one wants the message
@@ -3115,6 +3113,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif($cmd =~ m/^(up|down|pct)$/) { #########################################
     my ($lvl,$tval,$rval) = ($a[2],"","");
+    $lvl =~ s/(\d*\.?\d*).*/$1/;
     if ($cmd ne "pct"){#dim [<changeValue>] ... [ontime] [ramptime]
       $lvl = 10 if (!defined $a[2]); #set default step
       $lvl = -1*$lvl if ($cmd eq "down");
