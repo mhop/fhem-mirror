@@ -129,6 +129,7 @@ sub OWX_Initialize ($) {
   $hash->{UndefFn} = "OWX_Undef";
   $hash->{GetFn}   = "OWX_Get";
   $hash->{SetFn}   = "OWX_Set";
+  $hash->{NotifyFn} = "OWX_Notify";
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 buspower:real,parasitic IODev";
 
   #-- Adapt to FRM
@@ -159,6 +160,8 @@ sub OWX_Define ($$) {
      if(int(@a) > 3);
   #-- If this line contains 3 parameters, it is the bus master definition
   my $dev = $a[2];
+  
+  $hash->{NOTIFYDEV} = "global";
   
   #-- Dummy 1-Wire ROM identifier, empty device lists
   $hash->{ROM_ID}      = "FF";
@@ -221,11 +224,19 @@ sub OWX_Define ($$) {
       return $msg." not defined";
     } 
   }
+
+  if ($main::init_done) {
+    return OWX_Start($hash);
+  }
+}
+  
+sub OWX_Start ($) {
+  my ($hash) = @_;
+  
   #-- Third step: see, if a bus interface is detected
   if (!OWX_Detect($hash)){
     $hash->{PRESENT} = 0;
     readingsSingleUpdate($hash,"state","failed",1);
-    # $init_done = 1; 
     return undef;
   }
   #-- Fourth step: discovering devices on the bus
@@ -237,16 +248,23 @@ sub OWX_Define ($$) {
   $hash->{followAlarms} = "off";
   $hash->{ALARMED}      = "no";
   
-  #-- InternalTimer blocks if init_done is not true
-  my $oid = $init_done;
   $hash->{PRESENT} = 1;
   readingsSingleUpdate($hash,"state","defined",1);
-  $init_done = 1;
   #-- Intiate first alarm detection and eventually conversion in a minute or so
   InternalTimer(gettimeofday() + $hash->{interval}, "OWX_Kick", $hash,1);
-  $init_done     = $oid;
   $hash->{STATE} = "Active";
   return undef;
+}
+
+sub OWX_Notify {
+  my ($hash,$dev) = @_;
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+
+  if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
+  	OWX_Start($hash);
+  } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
+  }
 }
 
 ########################################################################################
@@ -581,13 +599,19 @@ sub OWX_Detect ($) {
     }
     #-- nothing to do for Arduino (already done in FRM)
   } elsif($owx_interface eq "firmata") {
-  	my $iodev = $hash->{IODev};
-	if (defined $iodev and defined $iodev->{FirmataDevice} and defined $iodev->{FD}) {  	
-  	  $ret=1;
-  	  $ress .= "Firmata detected in $iodev->{NAME}";
-	} else {
-	  $ret=0;
-	  $ress .= defined $iodev ? "$iodev->{NAME} is not connected to Firmata" : "not associated to any FRM device";
+    eval {
+      FRM_Client_AssignIOPort($hash);
+      if (defined $hash->{IODev}) {
+        $ret=1;
+  	    $ress .= "Firmata detected in $hash->{IODev}->{NAME}";
+      } else {
+      	$ret = 0;
+      	$ress .= "not associated to any FRM device";
+      }
+    };
+    if ($@) {
+      $ress .= FRM_Catch($@);
+      $ret = 0;
 	}
     #-- here we treat the COC/CUNO
   } else {
@@ -623,7 +647,7 @@ sub OWX_Detect ($) {
   }
   #-- store with OWX device
   $hash->{INTERFACE} = $owx_interface;
-  Log 1, $ress;
+  Log3 $hash->{NAME}, 1, $ress;
   return $ret; 
 }
 
