@@ -10,13 +10,14 @@ sub CUL_Attr(@);
 sub CUL_Clear($);
 sub CUL_HandleCurRequest($$);
 sub CUL_HandleWriteQueue($);
-sub CUL_Parse($$$$$);
+sub CUL_Parse($$$$;$);
 sub CUL_Read($);
 sub CUL_ReadAnswer($$$$);
 sub CUL_Ready($);
 sub CUL_Write($$$);
 
 sub CUL_SimpleWrite(@);
+sub CUL_WriteInit($);
 
 my %gets = (    # Name, Data to send to the CUL, Regexp for the answer
   "ccconf"   => 1,
@@ -257,7 +258,7 @@ CUL_Set($@)
     CUL_SimpleWrite($hash, "W0F$f2");
     CUL_SimpleWrite($hash, "W10$f1");
     CUL_SimpleWrite($hash, "W11$f0");
-    CUL_SimpleWrite($hash, $hash->{initString});   # Will reprogram the CC1101
+    CUL_WriteInit($hash);   # Will reprogram the CC1101
 
   } elsif($type eq "bWidth") { ###################################### KHz
 
@@ -282,7 +283,7 @@ GOTBW:
     $ob = sprintf("%02x", $ob+$bits);
     Log3 $name, 3, "Setting MDMCFG4 (10) to $ob = $bw KHz";
     CUL_SimpleWrite($hash, "W12$ob");
-    CUL_SimpleWrite($hash, $hash->{initString});
+    CUL_WriteInit($hash);
 
   } elsif($type eq "rAmpl") { ####################################### dB
 
@@ -296,7 +297,7 @@ GOTBW:
     $w = $ampllist[$v];
     Log3 $name, 3, "Setting AGCCTRL2 (1B) to $v / $w dB";
     CUL_SimpleWrite($hash, "W1D$v");
-    CUL_SimpleWrite($hash, $hash->{initString});
+    CUL_WriteInit($hash);
 
   } elsif($type eq "sens") { ######################################## dB
 
@@ -306,7 +307,7 @@ GOTBW:
     my $v = sprintf("9%d",$arg/4-1);
     Log3 $name, 3, "Setting AGCCTRL0 (1D) to $v / $w dB";
     CUL_SimpleWrite($hash, "W1F$v");
-    CUL_SimpleWrite($hash, $hash->{initString});
+    CUL_WriteInit($hash);
 
   } else { ###############################################  raw,led,patable
 
@@ -436,7 +437,7 @@ CUL_DoInit($)
   $hash->{CMDS} = $cmds;
   Log3 $name, 3, "$name: Possible commands: " . $hash->{CMDS};
 
-  CUL_SimpleWrite($hash, $hash->{initString});
+  CUL_WriteInit($hash);
 
   # FHTID
   if(defined($hash->{FHTID})) {
@@ -518,8 +519,7 @@ CUL_ReadAnswer($$$$)
     if($mculdata =~ m/\r\n/ || $anydata || $mculdata =~ m/\n\n/ ) {
       (undef, $mculdata) = CUL_prefix(0, $ohash, $mculdata); # Delete prefix
       if($regexp && $mculdata !~ m/$regexp/) {
-        CUL_Parse($ohash, $hash,
-                        $ohash->{NAME}, $mculdata, $ohash->{initString});
+        CUL_Parse($ohash, $hash, $ohash->{NAME}, $mculdata);
       } else {
         return (undef, $mculdata)
       }
@@ -749,13 +749,13 @@ CUL_Read($)
     my $rmsg;
     ($rmsg,$culdata) = split("\n", $culdata, 2);
     $rmsg =~ s/\r//;
-    CUL_Parse($hash, $hash, $name, $rmsg, $hash->{initString}) if($rmsg);
+    CUL_Parse($hash, $hash, $name, $rmsg) if($rmsg);
   }
   $hash->{PARTIAL} = $culdata;
 }
 
 sub
-CUL_Parse($$$$$)
+CUL_Parse($$$$;$)
 {
   my ($hash, $iohash, $name, $rmsg, $initstr) = @_;
 
@@ -895,6 +895,16 @@ CUL_Ready($)
 }
 
 ########################
+# Needed for STACKABLE_CC
+sub
+CUL_WriteInit($)
+{
+  my ($hash) = @_;
+  foreach my $is (split("\n", $hash->{initString})) {
+    CUL_SimpleWrite($hash, $is);
+  }
+}
+
 sub
 CUL_SimpleWrite(@)
 {
@@ -938,7 +948,8 @@ CUL_Attr(@)
         $hash->{MatchList} = \%matchListHomeMatic;
         CUL_SimpleWrite($hash, "Zx") if ($hash->{CMDS} =~ m/Z/); # reset Moritz
         $hash->{initString} = "X21\nAr";  # X21 is needed for RSSI reporting
-        CUL_SimpleWrite($hash, $hash->{initString});
+        CUL_WriteInit($hash);
+
       } else {
         Log3 $name, 2, $msg;
         return $msg;
@@ -951,7 +962,8 @@ CUL_Attr(@)
         $hash->{MatchList} = \%matchListMAX;
         CUL_SimpleWrite($hash, "Ax") if ($hash->{CMDS} =~ m/A/); # reset AskSin
         $hash->{initString} = "X21\nZr";  # X21 is needed for RSSI reporting
-        CUL_SimpleWrite($hash, $hash->{initString});
+        CUL_WriteInit($hash);
+
       } else {
         Log3 $name, 2, $msg;
         return $msg;
@@ -964,7 +976,8 @@ CUL_Attr(@)
       $hash->{initString} = "X21";
       CUL_SimpleWrite($hash, "Ax") if ($hash->{CMDS} =~ m/A/); # reset AskSin
       CUL_SimpleWrite($hash, "Zx") if ($hash->{CMDS} =~ m/Z/); # reset Moritz
-      CUL_SimpleWrite($hash, $hash->{initString});
+      CUL_WriteInit($hash);
+
     }
 
     Log3 $name, 2, "Switched $name rfmode to $aVal";
