@@ -125,6 +125,7 @@ FHEMWEB_Initialize($)
     allowfrom
     basicAuth
     basicAuthMsg
+    closeConn:1,0
     column
     defaultRoom
     endPlotNow:1,0
@@ -383,6 +384,13 @@ FW_Read($)
            $expires, $compressed, $FW_headercors,
            "Content-Type: $FW_RETTYPE\r\n\r\n",
            $FW_RET;
+
+  # Needed for slow server+iPad/iPhone. Forum #20294
+  if(AttrVal($FW_wname, "closeConn", undef)) {
+    TcpServer_Close($hash);
+    delete($defs{$hash->{NAME}});
+  }
+
   exit if(defined($pid));
 }
 
@@ -2905,6 +2913,14 @@ FW_ActivateInform()
        Note: some elements like SVG plots and readingsGroup can only be part of
        a column if they are part of a <a href="#group">group</a>.
        </li>
+
+     <a name="closeConn"></a>
+     <li>closeConn<br>
+        If set, a TCP Connection will only serve one HTTP request. Seems to
+        solve problems for certain hardware combinations like slow
+        FHEM-Server, and iPad/iPhone as Web-client.
+        </li><br>
+
     </ul>
   </ul>
 
@@ -3399,6 +3415,14 @@ FW_ActivateInform()
         Anmerkung: einige Elemente, wie SVG Plots und readingsGroup k&ouml;nnen
         nur Teil einer Spalte sein wenn sie in <a href="#group">group</a>
         stehen.
+        </li><br>
+
+     <a name="closeConn"></a>
+     <li>closeConn<br>
+        Falls gesetzt, wird pro TCP Verbindung nur ein HTTP Request
+        durchgefuehrt. Fuer bestimmte Hardware-Kombinationen (langsamer FHEM
+        Server, iPad/iPhone als Client) scheint dieses Attribu Ladeprobleme zu
+        beheben.
         </li><br>
 
     </ul>
