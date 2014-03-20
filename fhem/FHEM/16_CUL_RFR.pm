@@ -26,6 +26,9 @@ CUL_RFR_Initialize($)
   $hash->{GetFn}     = "CUL_Get";
   $hash->{SetFn}     = "CUL_Set";
   $hash->{noRawInform} = 1;     # Our message was already sent as raw.
+  $hash->{AddPrefix} = "CUL_RFR_AddPrefix"; 
+  $hash->{DelPrefix} = "CUL_RFR_DelPrefix"; 
+  $hash->{noAutocreatedFilelog} = 1;
 }
 
 
@@ -127,13 +130,11 @@ CUL_RFR_Parse($$)
 }
 
 sub
-CUL_RFR_DelPrefix($)
+CUL_RFR_DelPrefix($$)
 {
-  my ($msg) = @_;
-  while($msg =~ m/^\d{4}U/) {
-    (undef, $msg) = split("U", $msg, 2);
-  }
-  $msg =~ s/;([\r\n]*)$/$1/;
+  my ($hash, $msg) = @_;
+  $msg = $1 if($msg =~ m/^\d{4}U(.*)$/);
+  $msg =~ s/;([\r\n]*)$/$1/; # ???
   return $msg;
 }
 
@@ -141,12 +142,7 @@ sub
 CUL_RFR_AddPrefix($$)
 {
   my ($hash, $msg) = @_;
-  while($hash->{TYPE} eq "CUL_RFR") {
-    # Prefix $msg with RRBBU and return the corresponding CUL hash
-    $msg = "u" . $hash->{ID} . $hash->{ROUTERID} . $msg;
-    $hash = $hash->{IODev};
-  }
-  return ($hash, $msg);
+  return "u" . $hash->{ID} . $hash->{ROUTERID} . $msg;
 }
 
 1;

@@ -58,11 +58,6 @@ my %flogpar = (
       => { GPLOT => "temp4hum6:Temp/Hum,", FILTER => "%NAME:T:.*" },
 );
 
-# Do not create FileLog for the following devices.
-my @flog_blacklist = (
-  "CUL_RFR.*"
-);
-
 
 #####################################
 sub
@@ -149,12 +144,7 @@ autocreate_Notify($$)
       $room = $attr{$name}{room} if($attr{$name} && $attr{$name}{room}); 
       $attr{$name}{room} = $room if($room);
 
-      # BlackList processing
-      my $blfound;
-      foreach my $bl (@flog_blacklist) {
-        $blfound = 1 if($name  =~ m/^$bl$/);
-      }
-      last if($blfound);
+      next if($modules{$hash->{TYPE}}{noAutocreatedFilelog});
 
       ####################
       my $fl = replace_wildcards($hash, AttrVal($me, "filelog", ""));
