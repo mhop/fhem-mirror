@@ -116,10 +116,10 @@ CUL_RFR_Parse($$)
          ($1, $2, $3, $4, $5, $6, $7, $8);
       my $firstmsg = "T$fhtid$cmd$source$val$rssi";
       $m = "T$fhtid$cmd2$source$val2$rest$rssi";
-      CUL_Parse($hash, $iohash, $hash->{NAME}, $firstmsg, "X21");
+      CUL_Parse($hash, $iohash, $hash->{NAME}, $firstmsg);
     }
 
-    CUL_Parse($hash, $iohash, $hash->{NAME}, $m, "X21");
+    CUL_Parse($hash, $iohash, $hash->{NAME}, $m);
        if($m =~ m/^T/) { $hash->{NR_TMSG}++ }
     elsif($m =~ m/^F/) { $hash->{NR_FMSG}++ }
     elsif($m =~ m/^E/) { $hash->{NR_EMSG}++ }
