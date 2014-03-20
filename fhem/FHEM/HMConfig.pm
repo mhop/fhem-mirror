@@ -1655,7 +1655,7 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                      LOWBAT   => '00,2,$val=(hex($val)&0x80)?1:0',
                      NBR      => '02,2,$val=(hex($val))',
                      VALUE    => '04,2,$val=(hex($val))',} },
-  "42"          => { txt => "SwitchLevel", params => {
+  "42"          => { txt => "SwitchLevel" , params => {
                      BUTTON   => '00,2,$val=(hex($val)&0x3F)',
                      NBR      => '02,2,$val=(hex($val))',
                      LEVEL    => '04,2,$val=(hex($val))',} },
