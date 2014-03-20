@@ -1,4 +1,4 @@
-# $Id $
+# $Id$
 #
 
 package main;
@@ -14,6 +14,7 @@ my @pathname;
 sub configdb_Initialize($$) {
   my %hash = (  Fn => "CommandConfigdb",
                Hlp => "info|list|diff|uuid|
+          export|import|
           reorg|recover|backup     ,access additional functions from configDB" );
   $cmds{configdb} = \%hash;
 }
@@ -189,6 +190,13 @@ sub CommandConfigdb($$) {
 			$ret = _cfgDB_Export($param1, $param2);
 		}
 
+		when ('import') {
+			open ( FILE, "<./$param1" );
+			my @dbconfig = <FILE>;
+			close ( FILE );
+			$ret = _cfgDB_Execute(undef,@dbconfig);
+		}
+
 		when ('info') {
 			Log3('configdb', 4, "info requested.");
 			$ret = _cfgDB_Info;
@@ -226,7 +234,7 @@ sub CommandConfigdb($$) {
 		}
 
 		default { 	
-			$ret =	"\n Syntax:".
+			$ret =	"\n Syntax:\n".
 					"         configdb attr [attribute] [value]\n".
 					"         configdb backup\n".
 					"         configdb diff <device> <version>\n".

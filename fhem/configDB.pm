@@ -49,6 +49,8 @@
 #                        restructured libraray internally
 #                        improved source code documentation
 #
+# 2014-03-20 - added     export/import
+#
 ##############################################################################
 #
 
@@ -624,7 +626,7 @@ sub _cfgDB_Export($$) {
 	open( FILE, ">./$filename" );
 	while ( my $row = $sth->fetchrow_arrayref ) {
 		$counter++;
-		print FILE join( "|", @$row ), "\n";
+		print FILE join( " ", @$row ), "\n";
 	}
 	close ( FILE );
 
