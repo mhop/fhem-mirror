@@ -191,6 +191,7 @@ sub CommandConfigdb($$) {
 		}
 
 		when ('import') {
+			return "\n Syntax: configdb import <sourceFilename>" if @a != 2;
 			open ( FILE, "<./$param1" );
 			my @dbconfig = <FILE>;
 			close ( FILE );
@@ -238,6 +239,8 @@ sub CommandConfigdb($$) {
 					"         configdb attr [attribute] [value]\n".
 					"         configdb backup\n".
 					"         configdb diff <device> <version>\n".
+					"         configdb export <targetFilename> [version]".
+					"         configdb import <importFilename>".
 					"         configdb info\n".
 					"         configdb list [device] [version]\n".
 					"         configdb migrate\n".
