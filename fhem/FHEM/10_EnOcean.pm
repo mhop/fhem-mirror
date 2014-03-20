@@ -1,5 +1,6 @@
 ##############################################
 # $Id$
+
 package main;
 
 use strict;
@@ -400,7 +401,7 @@ EnOcean_Set($@)
   return "no set value specified" if (@a < 2);
   my $name = $hash->{NAME};
   if (IsDisabled($name)) {
-    Log3 $name, 4, "EnOcean set $name commands disabled.";  
+    Log3 $name, 4, "EnOcean $name set commands disabled.";  
     return;
   }
   my $data;
@@ -3304,13 +3305,14 @@ EnOcean_Parse($$)
         if ($db[0] == 0x8F && $manufID eq "00D") {
           # Eltako, read meter serial number
           my $serialNumber;
-          if ($db[0] == 0) {
+          if ($db[1] == 0) {
             # first 2 digits of the serial number
-            $serialNumber = printf "S-%01x%01x", $db[3] >> 4, $db[3] & 0x0F;
+            $serialNumber = substr(ReadingsVal($name, "serialNumber", "S-------"), 4, 4);
+            $serialNumber = sprintf "S-%01x%01x%4s", $db[3] >> 4, $db[3] & 0x0F, $serialNumber;
           } else {
             # last 4 digits of the serial number
             $serialNumber = substr(ReadingsVal($name, "serialNumber", "S---"), 0, 4);
-            $serialNumber = printf "%4c%01x%01x%01x%01x", $serialNumber,
+            $serialNumber = sprintf "%4s%01x%01x%01x%01x", $serialNumber,
                             $db[2] >> 4, $db[2] & 0x0F, $db[3] >> 4, $db[3] & 0x0F;
           }
           push @event, "3:serialNumber:$serialNumber";        
@@ -4165,6 +4167,26 @@ EnOcean_Undef($$)
     Newer devices send acknowledge telegrams. In order to control this devices (switches, actors) with
     additional SenderIDs you can use the attributes <a href="#subDef">subDef</a>,
     <a href="#subDef0">subDef0</a> and <a href="#subDefI">subDefI</a>.<br><br>
+  </ul>
+  
+  <a name="EnOceaninternals"></a>
+  <b>Internals</b>
+  <ul>
+    <li>&lt;IODev&gt;_DestinationID: 0000000 ... FFFFFFFF<br>
+      Received destination address, Broadcast radio: FFFFFFFF<br>
+    </li>
+    <li>&lt;IODev&gt;_RSSI: LP/dBm<br>
+      Received signal strength indication (best value of all received subtelegrams)<br>
+    </li>
+    <li>&lt;IODev&gt;_ReceivingQuality: excellent|good|bad<br>
+      excellent: RSSI >= -76 dBm (internal standard antenna sufficiently)<br>
+      good: RSSI < -76 dBm and RSSI >= -87 dBm (good antenna necessary)<br>
+      bad: RSSI < -87 dBm (repeater required)<br>
+    </li>
+    <li>&lt;IODev&gt;_RepeatingCounter: 0...2<br>
+      Number of forwardings by repeaters<br>
+    </li>
+    <br><br>
   </ul>
 
   <a name="EnOceanset"></a>
