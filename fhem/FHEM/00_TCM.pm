@@ -314,16 +314,24 @@ TCM_Read($)
         # packet type RADIO
         $mdata =~ m/^(..)(.*)(........)(..)$/;
         my ($org, $d1, $id, $status) = ($1,$2,$3,$4);
-
+        my $repeatingCounter = hex substr($status, 1, 1);
         $odata =~ m/^(..)(........)(..)(..)$/;
+        my ($RSSI, $receivingQuality) = (hex($3), "excellent");
+        if ($RSSI > 87) {
+          $receivingQuality = "bad";
+        } elsif ($RSSI > 75) {
+          $receivingQuality = "good";       
+        }
         my %addvals = (
-          PacketType    => $packetType,
-          SubTelNum     => hex($1),
-          DestinationID => $2,
-          RSSI          => -hex($3),
-          SecurityLevel => hex($4),
+          PacketType       => $packetType,
+          SubTelNum        => hex($1),
+          DestinationID    => $2,
+          RSSI             => -$RSSI,
+          ReceivingQuality => $receivingQuality,
+          RepeatingCounter => $repeatingCounter,
+          SecurityLevel    => hex($4),
         );
-        $hash->{RSSI} = -hex($3);
+        $hash->{RSSI} = -$RSSI;
         
         if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
           Log3 $name, 5, "TCM $name Telegram from $id blocked.";        
