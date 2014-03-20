@@ -550,6 +550,7 @@ FRM_Client_AssignIOPort($@)
 				&& defined( $dev->{IODev} )
 				&& defined( $dev->{PIN} )
 				&& $dev->{IODev} == $hash->{IODev}
+				&& defined( $hash->{PIN})
 				&& grep {$_ == $hash->{PIN}} split(" ",$dev->{PIN}) ) {
 				  delete $hash->{IODev};
 				  delete $attr{$name}{IODev};
@@ -675,15 +676,18 @@ FRM_OWX_Init($$)
 	my ($hash,$args) = @_;
 	my $ret = FRM_Init_Pin_Client($hash,$args,PIN_ONEWIRE);
 	return $ret if (defined $ret);
-	my $firmata = $hash->{IODev}->{FirmataDevice};
-	my $pin = $hash->{PIN};
-	$hash->{FRM_OWX_CORRELATIONID} = 0;
-	$firmata->observe_onewire($pin,\&FRM_OWX_observer,$hash);
-	$hash->{FRM_OWX_REPLIES} = {};
-	$hash->{DEVS} = [];
-	if ( AttrVal($hash->{NAME},"buspower","") eq "parasitic" ) {
-		$firmata->onewire_config($pin,1);
-	}
+	eval {
+		my $firmata = FRM_Client_FirmataDevice($hash);
+		my $pin = $hash->{PIN};
+		$hash->{FRM_OWX_CORRELATIONID} = 0;
+		$firmata->observe_onewire($pin,\&FRM_OWX_observer,$hash);
+		$hash->{FRM_OWX_REPLIES} = {};
+		$hash->{DEVS} = [];
+		if ( AttrVal($hash->{NAME},"buspower","") eq "parasitic" ) {
+			$firmata->onewire_config($pin,1);
+		}
+	};
+	return FRM_Catch($@) if ($@);
 	$hash->{STATE}="Initialized";
 	InternalTimer(gettimeofday()+10, "OWX_Discover", $hash,0);
 	return undef;
