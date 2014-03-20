@@ -175,9 +175,18 @@ sub CommandConfigdb($$) {
 		}
 
 		when ('diff') {
-			return "Syntax: configdb diff <device> <version>" if @a != 3;
+			return "\n Syntax: configdb diff <device> <version>" if @a != 3;
 			Log3('configdb', 4, "configdb: diff requested for device: $param1 in version $param2.");
 			$ret = _cfgDB_Diff($param1, $param2);
+		}
+
+		when ('export') {
+			return "\n Syntax: configdb export <targetFilename> [version]" if @a <2;
+			$param2 = $param2 ? $param2 : 0;
+			my $logtext = "configDB: database backup started into file $param1";
+			$logtext .= " for version $param2";
+			Log3 ('configDB', 4, $logtext);
+			$ret = _cfgDB_Export($param1, $param2);
 		}
 
 		when ('info') {
@@ -193,13 +202,13 @@ sub CommandConfigdb($$) {
 		}
 
 		when ('migrate') {
-			return "Migration not possible. Already running with configDB!" if $configfile eq 'configDB';
+			return "\n Migration not possible. Already running with configDB!" if $configfile eq 'configDB';
 			Log3('configdb', 4, "configdb: migration requested.");
 			$ret = _cfgDB_Migrate;
 		}
 
 		when ('recover') {
-			return "Syntax: configdb recover <version>" if @a != 2;
+			return "\n Syntax: configdb recover <version>" if @a != 2;
 			Log3('configdb', 4, "configdb: recover for version $param1 requested.");
 			$ret = _cfgDB_Recover($param1);
 		}
@@ -385,6 +394,12 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 | 1|define telnetPort telnet 7072 global  | 1|define telnetPort telnet 7072 global  |
 * 2|attr telnetPort room telnet           *  |                                      |
 +--+--------------------------------------+--+--------------------------------------+</pre>
+
+		<li><code>configdb export &lt;targetFilename&gt; [version];</code></li><br/>
+			Exports specified version from config database into file &lt;targetFilename&gt;<br/>
+			Default version if not specified = 0<br/>
+			The target file can be imported again, if needed.<br/>
+<br/>
 
 		<li><code>configdb info</code></li><br/>
 			Returns some database statistics<br/>
@@ -622,6 +637,12 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 | 1|define telnetPort telnet 7072 global  | 1|define telnetPort telnet 7072 global  |
 * 2|attr telnetPort room telnet           *  |                                      |
 +--+--------------------------------------+--+--------------------------------------+</pre>
+
+		<li><code>configdb export &lt;zielDateiname&gt; [version];</code></li><br/>
+			Exportiert die angegebene Version aus der Konfigurationsdatenbank in die Datei &lt;zielDateiname&gt;<br/>
+			Standardversion, falls nicht angegeben = 0<br/>
+			Die Zieldatei kann sp&auml;ter f&uuml;r die Wiederherstellung verwendet werden.<br/>
+<br/>
 
 		<li><code>configdb info</code></li><br/>
 			Liefert eine Datenbankstatistik<br/>

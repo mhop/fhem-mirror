@@ -608,6 +608,34 @@ sub _cfgDB_Diff($$) {
 	return $ret;
 }
 
+# backup database
+sub _cfgDB_Export($$) {
+	my ($filename,$version) = @_;
+	my ($counter, $ret);
+
+	my $sql =	"select command,device,p1,p2 from fhemconfig".
+						" as c join fhemversions as v ON v.versionuuid=c.versionuuid ".
+						"WHERE v.version = '$version' ORDER BY command DESC";
+
+	my $fhem_dbh = _cfgDB_Connect;
+	my $sth=$fhem_dbh->prepare( $sql );
+	$sth->execute();
+
+	open( FILE, ">./$filename" );
+	while ( my $row = $sth->fetchrow_arrayref ) {
+		$counter++;
+		print FILE join( "|", @$row ), "\n";
+	}
+	close ( FILE );
+
+	$sth->finish();
+	$fhem_dbh->disconnect();
+
+	$ret  = "\n $counter records exported ";
+	$ret .= "from version $version ";
+	$ret .= "to $filename";
+}
+
 1;
 
 =pod
