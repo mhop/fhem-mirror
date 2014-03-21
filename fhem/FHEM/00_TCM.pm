@@ -269,8 +269,28 @@ TCM_Read($)
 
       } else {
         # Receive Message Telegram (RMT)
-        TCM_Parse120($hash, $net, 0);
-
+        my $msg=TCM_Parse120($hash, $net, 1);
+        if (($msg eq 'OK') && ($net =~ m/^8B(..)(........)(........)(..)/)){
+          my ($org, $d1,$id,$status) = ($1, $2, $3, $4);
+          my $packetType = 1;
+          # Re-translate the ORG to RadioORG / TCM310 equivalent
+          my %orgmap = ("05"=>"F6", "06"=>"D5", "07"=>"A5", );
+          if($orgmap{$org}) {
+            $org = $orgmap{$org};
+          } else {
+            #Log 1, "TCM120: unknown ORG mapping for $org";
+            Log3 undef, 1, "TCM unknown ORG mapping for $org";
+          }
+          if ($org ne "A5") {
+            # extract db_0
+            $d1 = substr($d1, 0, 2);
+          }
+          if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
+            Log3 $name, 5, "TCM $name Telegram from $id blocked.";        
+          } else {
+            Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status", undef);
+          }
+         }
       }
       $data = $rest;
     }
@@ -395,6 +415,9 @@ TCM_Read($)
 
 # Parse Table TCM 120
 my %parsetbl120 = (
+  "8B05" => { msg=>"OK" },
+  "8B06" => { msg=>"OK" },
+  "8B07" => { msg=>"OK" },
   "8B08" => { msg=>"ERR_SYNTAX_H_SEQ" },
   "8B09" => { msg=>"ERR_SYNTAX_LENGTH" },
   "8B0A" => { msg=>"ERR_SYNTAX_CHKSUM" },
@@ -825,7 +848,20 @@ TCM_Undef($$)
   of commands depends on the hardware and the firmware version. A firmware update
   is usually not provided.
   <br><br>
-
+  The TCM module enables also a read-only wired connection to Eltako actuators over the 
+  Eltako RS485 bus in the switchboard or distribution box via Eltako FGW14 RS232-RS485
+  gateway modules. These actuators are linked to an associated wireless antenna module
+  (FAM14) on the bus. The FAM14 device frequently polls the actuator status of all 
+  associated devices if the FAM14 operating mode rotary switch is on position 4. 
+  Therefore, actuator states can be retrieved more reliable, even after any fhem downtime,
+  when switch events or actuator confirmations could not have been tracked during the
+  downtime. As all actuators are polled approx. every 1-2 seconds, it should be avoided to
+  use event-on-update-reading. Use instead either event-on-change-reading or 
+  event-min-interval.
+  The Eltako bus uses the EnOcean Serial Protocol version 2 (ESP2) protocol, which is 
+  the same serial protocol used by TCM120 modules. For this reason, a FGW14 can be 
+  configured as a TCM120.<br><br>
+  
   <a name="TCMdefine"></a>
   <b>Define</b>
   <ul>
@@ -836,10 +872,13 @@ TCM_Undef($$)
     <code>device</code> can take the same parameters (@baudrate, @directio,
     TCP/IP, none) like the <a href="#CULdefine">CUL</a>, but you probably have
     to specify the baudrate: the TCM120 should be opened with 9600 Baud, the
-    TCM310 with 57600 baud.<br>
+    TCM310 with 57600 baud. For Eltako FGW14 devices, type has to be set to 120 and 
+    the baudrate has to be set to 57600 baud if the FGW14 operating mode 
+    rotary switch is on position 6.<br>
     Example:
     <ul><code>
       define BscBor TCM 120 /dev/ttyACM0@9600<br>
+      define FGW14 TCM 120 /dev/ttyS3@57600
       define TCM310 TCM 310 /dev/ttyACM0@57600<br>
       define TCM310 TCM 310 COM1@57600 (Windows)<br>
     </code></ul>
