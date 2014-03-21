@@ -107,7 +107,7 @@ sub init($) {
 
 sub attach($$) {
 	my ($self,$dev) = @_;
-	$self->{FirmataDevice} = $dev;
+	$self->{I2CDevice} = $dev;
 }
 
 sub init_priv($) {
@@ -360,7 +360,7 @@ sub write4bits($$) {
 sub expanderWrite($$) {
 	my ( $self, $data ) = @_;
 
-	$self->{FirmataDevice}->i2c_write($self->{Addr},($data) | $self->{backlightval});
+	$self->{I2CDevice}->i2c_write($self->{Addr},($data) | $self->{backlightval});
 }
 
 sub pulseEnable($$) {
