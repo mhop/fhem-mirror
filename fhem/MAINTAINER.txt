@@ -208,6 +208,7 @@ FHEM/98_XmlList.pm           rudolfkoenig         http://forum.fhem.de Automatis
 FHEM/98_autocreate.pm        rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_average.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_backup.pm            mfr69bs              http://forum.fhem.de Sonstiges
+FHEM/98_cloneDummy.pm        Joachim              http://forum.fhem.de Automatisierung
 FHEM/98_cmdalias.pm          rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_configDBwrap.pm      betateilchen         http://forum.fhem.de Sonstiges
 FHEM/98_dewpoint.pm          wherzig              http://forum.fhem.de Automatisierung
