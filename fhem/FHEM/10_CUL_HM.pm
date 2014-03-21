@@ -876,9 +876,9 @@ sub CUL_HM_Parse($$) {#########################################################
       if(defined $t)  {$sM .= "T: $t "    ;push @evtEt,[$shash,1,"temperature:$t"    ];}
       if(defined $h)  {$sM .= "H: $h "    ;push @evtEt,[$shash,1,"humidity:$h"       ];}
       if(defined $w)  {$sM .= "W: $w "    ;push @evtEt,[$shash,1,"windSpeed:$w"      ];}
-      if(defined $wd) {$sM .= "R: $wd "   ;push @evtEt,[$shash,1,"windDirection:$wd" ];}
+      if(defined $r)  {$sM .= "R: $r "    ;push @evtEt,[$shash,1,"windDirection:$r"  ];}
       if(defined $ir) {$sM .= "IR: $ir "  ;push @evtEt,[$shash,1,"windDirRange:$ir"  ];}
-      if(defined $r)  {$sM .= "WD: $r "   ;push @evtEt,[$shash,1,"rain:$r"           ];}
+      if(defined $wd) {$sM .= "WD: $wd "  ;push @evtEt,[$shash,1,"rain:$wd"          ];}
       if(defined $wdr){$sM .= "WDR: $wdr ";push @evtEt,[$shash,1,"isRaining:$wdr"    ];}
       if(defined $s)  {$sM .= "S: $s "    ;push @evtEt,[$shash,1,"sunshine:$s"       ];}
       if(defined $b)  {$sM .= "B: $b "    ;push @evtEt,[$shash,1,"brightness:$b"     ];}
