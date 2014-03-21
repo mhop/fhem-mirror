@@ -31,6 +31,24 @@ my %gets = (
   "version"   => ""
 );
 
+my @clients = qw(
+  FRM_IN
+  FRM_OUT
+  FRM_AD
+  FRM_PWM
+  FRM_I2C
+  FRM_SERVO
+  FRM_RGB
+  FRM_ROTENC
+  FRM_STEPPER
+  OWX
+  I2C_LCD
+  I2C_PC.*
+  I2C_MCP23017
+  I2C_BMP180
+  FRM_LCD
+);
+
 #####################################
 sub FRM_Initialize($) {
 	my $hash = shift @_;
@@ -38,9 +56,11 @@ sub FRM_Initialize($) {
 	require "$main::attr{global}{modpath}/FHEM/DevIo.pm";
 
 	# Provider
-	$hash->{Clients} = ":FRM_IN:FRM_OUT:FRM_AD:FRM_PWM:FRM_I2C:FRM_SERVO:OWX:FRM_LCD:FRM_RGB:FRM_ROTENC:FRM_STEPPER:";
+	$hash->{Clients} = join (':',@clients);
 	$hash->{ReadyFn} = "FRM_Ready";  
 	$hash->{ReadFn}  = "FRM_Read";
+
+	$hash->{I2CWrtFn} = "FRM_I2C_Write";
 
 	# Consumer
 	$hash->{DefFn}    = "FRM_Define";
@@ -605,6 +625,54 @@ sub data_read {
 
 package main;
 
+# im master muss eine I2CWrtFn definiert werden, diese wird vom client mit
+# CallFn(<mastername>, "I2CWrtFn", <masterhash>, \%sendpackage);
+# aufgerufen.
+# Der Master muss mit AssignIoPort() dem Client zugeordnet werden;
+# %sendpackage muss folgende keys enthalten:
+#
+#    i2caddress => <xx>
+#    direction => <i2cwrite|i2cread>
+#    data => <xx [xx ...] (kann für read leer bleiben)>
+#
+# der Master fügt zu %sendpackage noch folgende keys hinzu:
+#
+#    received (durch leerzeichen getrennte 1byte hexwerte)
+#    mastername_* (alle mit mastername_  beginnenden keys können als internal im client angelegt weden)
+#    unter anderem: mastername_SENDSTAT (enthält "Ok" wenn Übertragung erfolgreich)
+#
+# danach ruft er über:
+# CallFn(<clientname>, "I2CRecFn", <clienthash>, $sendpackage);
+# die I2CRecFn im client auf. Dort werden die Daten verarbeitet und
+# im Master wird der Hash sendpackage gelöscht.
+#
+#		$package->{i2caddress}; # single byte value
+#		$package->{direction}; # i2cread|i2cwrite
+#		$package->{data}; # space separated list of values
+#		$package->{reg}; # register
+#		$package->{nbyte}; # number of bytes to read
+#		
+#		$firmata->i2c_read($address,$register,$bytestoread);
+#		$firmata->i2c_write($address,@data);
+
+sub FRM_I2C_Write
+{
+	my ($hash,$package)  = @_;
+	
+	if (defined (my $firmata = $hash->{FirmataDevice})) {
+		COMMANDHANDLER: {
+			$package->{direction} eq "i2cwrite" and do {
+				$firmata->i2c_write($package->{i2caddress},split(" ",$package->{data}));
+				last;
+			};
+			$package->{direction} eq "i2cread" and do {
+				$firmata->i2c_read($package->{i2caddress},$package->{reg},$package->{nbyte});
+				last;
+			};
+		}
+	}
+}
+
 sub
 FRM_i2c_observer
 {
@@ -616,7 +684,16 @@ FRM_i2c_observer
 sub FRM_i2c_update_device
 {
 	my ($hash,$data) = @_;
-	if (defined $hash->{"i2c-address"} && $hash->{"i2c-address"}==$data->{address}) {
+	
+	if (defined $hash->{I2C_Address} and $hash->{I2C_Address} eq $data->{address}) {
+		CallFn($hash->{NAME}, "I2CRecFn", $hash, {
+			i2caddress => $data->{address},
+			direction  => "i2cread",
+			reg        => $data->{register},
+			nbyte      => scalar(@{$data->{data}}),
+			data       => join (' ',@{$data->{data}})
+		});
+	} elsif (defined $hash->{"i2c-address"} && $hash->{"i2c-address"}==$data->{address}) {
 		my $replydata = $data->{data};
 		my @values = split(" ",ReadingsVal($hash->{NAME},"values",""));
 		splice(@values,$data->{register},@$replydata, @$replydata);
