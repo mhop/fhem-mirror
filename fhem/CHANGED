@@ -1,7 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
-  - feature: configdb export added for data security (betateilchen)
+  - feature: configdb export/import added for data security (betateilchen)
   - feature: new module 38_netatmo.pm added (justme1968)
   - change:  09_CUL_FHTTK.pm: clean up code to avoid "Use of uninitialized 
              value in concatenation.."
@@ -9,10 +9,8 @@
              and update of documentation (matscher)
   - feature: disabledForIntervals attribute added for at/notify/watchdog
   - feature: jsonlist2 added, jsonlist is deprecated.
-  - change:  renamed 98_configDB to 98_configDBwrap
   - feature: DbLog: Added new function : ReadingsVal/ReadingsTimestamp
   - feature: Text2Speech: added new attribute TTS_VolumeAdjust
-  - feature: added wrapper module 98_configDB (betateilchen)
   - feature: new module 70_PHTV.pm (loredo)
   - feature: JSONMETER: added statistic functions
   - feature: LightScene: added scene editor from UliM
