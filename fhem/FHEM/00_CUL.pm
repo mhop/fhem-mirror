@@ -25,7 +25,7 @@ my %gets = (    # Name, Data to send to the CUL, Regexp for the answer
   "raw"      => ["", '.*'],
   "uptime"   => ["t", '^[0-9A-F]{8}[\r\n]*$' ],
   "fhtbuf"   => ["T03", '^[0-9A-F]+[\r\n]*$' ],
-  "cmds"     => ["?", '.*Use one of[ 0-9A-Za-z]+[\r\n]*$' ],
+  "cmds"     => ["?", '.*Use one of[ \*0-9A-Za-z]+[\r\n]*$' ],
   "credit10ms" => [ "X", '^.. *\d*[\r\n]*$' ],
 );
 
@@ -601,8 +601,6 @@ CUL_WriteTranslate($$$)
 {
   my ($hash,$fn,$msg) = @_;
 
-  my $name = $hash->{NAME};
-
   ###################
   # Rewrite message from FHZ -> CUL
   if(length($fn) <= 1) {                                   # CUL Native
@@ -618,8 +616,18 @@ CUL_WriteTranslate($$$)
     $fn = "T";
     $msg = substr($msg,6,4) . substr($msg,10);
 
+  } elsif($fn eq "cmd") {                                  # internal command
+    $fn = "";
+    if($msg eq "speed100") { 
+      $msg = "AR";
+    } elsif($msg eq "speed10") {
+      $msg = "Ar";
+    } else {                                        # by default rewrite init
+      $msg = $hash->{initString};
+    }
+
   } else {
-    Log3 $name, 2, "CUL cannot translate $fn $msg";
+    Log3 $hash, 2, "CUL cannot translate $fn $msg";
     return (undef, undef);
   }
   return ($fn, $msg);
