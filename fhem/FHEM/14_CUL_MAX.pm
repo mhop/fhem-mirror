@@ -19,6 +19,8 @@ my $pairmodeDuration = 60; #seconds
 
 my $ackTimeout = 3; #seconds
 
+my $maxRetryCnt = 3;
+
 sub
 CUL_MAX_Initialize($)
 {
@@ -497,6 +499,9 @@ CUL_MAX_SendQueueHandler($$)
 
         $packet->{sent} = 1;
         $packet->{sentTime} = gettimeofday();
+        if(!defined($packet->{retryCnt})){
+           $packet->{retryCnt} = $maxRetryCnt;
+        }
         $timeout += 0.5; #recheck for Ack
       }
     } # $credit10ms ne "No answer"
@@ -504,9 +509,16 @@ CUL_MAX_SendQueueHandler($$)
   } elsif( $packet->{sent} == 1 ) { #Already sent it, got no Ack
     if( $packet->{sentTime} + $ackTimeout < gettimeofday() ) {
       # ackTimeout exceeded
-      Log 2, "CUL_MAX_SendQueueHandler: Missing ack from $packet->{dst} for $packet->{packet}";
-      splice @{$hash->{sendQueue}}, $pktIdx, 1; #Remove from array
-      readingsSingleUpdate($hash, "packetsLost", ReadingsVal($hash->{NAME}, "packetsLost", 0) + 1, 1);
+      if( $packet->{retryCnt} > 0 ) {
+          Log GetLogLevel($hash->{NAME}, 5), "CUL_MAX_SendQueueHandler: Retry $packet->{dst} for $packet->{packet} count: $packet->{retryCnt}";
+          $packet->{sent} = 0;
+          $packet->{retryCnt}--;
+          $timeout += 3;
+      } else {
+          Log 2, "CUL_MAX_SendQueueHandler: Missing ack from $packet->{dst} for $packet->{packet}";
+          splice @{$hash->{sendQueue}}, $pktIdx, 1; #Remove from array
+          readingsSingleUpdate($hash, "packetsLost", ReadingsVal($hash->{NAME}, "packetsLost", 0) + 1, 1);
+     }
     } else {
       # Recheck for Ack
       $timeout += 0.5;
