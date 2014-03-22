@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - change: MAX: interpret SetTemperature command from WT to HT
+  - feature: MAX: retry packets 3 times if missing an ack
   - feature: new module 98_cloneDummy.pm added (Joachim)
   - feature: STACKABLE_CC (busware.de device for the RPi) added
   - feature: configdb export/import added for data security (betateilchen)
