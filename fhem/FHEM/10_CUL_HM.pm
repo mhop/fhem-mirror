@@ -751,7 +751,7 @@ sub CUL_HM_Parse($$) {#########################################################
               "ID_".$md;
     my $sname = "CUL_HM_".$md."_$src";
     $sname =~ s/-/_/g;
-    Log3 undef, 3, "CUL_HM Unknown device $sname is now defined";
+    Log3 undef, 2, "CUL_HM Unknown device $sname is now defined";
     DoTrigger("global","UNDEFINED $sname CUL_HM $src");
     # CommandDefine(undef,"$sname CUL_HM $src");
     $shash = CUL_HM_id2Hash($src); #sourcehash - changed to channel entity
@@ -774,7 +774,7 @@ sub CUL_HM_Parse($$) {#########################################################
 
     if( defined $dhash->{helper}{cSnd} && 
           $dhash->{helper}{cSnd} ne substr($msg,7)){
-      Log3 $dname,5,"CUL_HM $dname attack:$dhash->{helper}{cSnd}:".substr($msg,7).".";
+      Log3 $dname,2,"CUL_HM $dname attack:$dhash->{helper}{cSnd}:".substr($msg,7).".";
       CUL_HM_eventP($dhash,"ErrIoAttack");
       my ($evntCnt,undef) = split(' last_at:',$dhash->{"prot"."ErrIoAttack"},2);
       push @evtEt,[$dhash,1,"sabotageAttack:ErrIoAttack cnt:$evntCnt"];
@@ -2603,7 +2603,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     close(aSave);
   }
 
-  Log3 $name,4,"CUL_HM get $name " . join(" ", @a[1..$#a]);
+  Log3 $name,3,"CUL_HM get $name " . join(" ", @a[1..$#a]);
 
   my $rxType = CUL_HM_getRxType($hash);
   CUL_HM_ProcessCmdStack($devHash) if ($rxType & 0x03);#burst/all
@@ -3675,7 +3675,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
   }
   elsif($cmd eq "fwUpdate") { #################################################
-    return "implementation pending";
+#    return "implementation pending";
     return "no filename given" if (!$a[2]);
     return "only thru CUL " if (!$hash->{IODev}->{TYPE}
                                  ||($hash->{IODev}->{TYPE} ne "CUL"));
@@ -3707,7 +3707,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $modules{CUL_HM}{helper}{updateId} = $id;
     $modules{CUL_HM}{helper}{updateNbr} = 10;
     my $msg;
-    Log3 $name,1,"CUL_HM fwUpdate started for $name";
+    Log3 $name,2,"CUL_HM fwUpdate started for $name";
     CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
                         ."3011$id${dst}CA");
     # InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim",$dst.$id."00",0);
@@ -3900,7 +3900,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   CUL_HM_UpdtReadSingle($hash,"state",$state,1) if($state);
 
   my $rxType = CUL_HM_getRxType($devHash);
-  Log3 $name,2,"CUL_HM set $name $act";
+  Log3 $name,3,"CUL_HM set $name $act";
   if($rxType & 0x01){#allways
     CUL_HM_ProcessCmdStack($devHash);
   }
@@ -4670,7 +4670,7 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
   return if ($mIn !~ m/$mNoA..02$dst${id}00/&&$mIn !~ m/0010${dst}00000000/);
   if ($step == 0){#check bootloader entered - now chnage speed
     return if ($mIn =~ m/$mNoA..02$dst${id}00/);
-    Log3 $name,1,"CUL_HM fwUpdate $name entered mode - switch speed";
+    Log3 $name,2,"CUL_HM fwUpdate $name entered mode - switch speed";
     $mNo = (++$mNo)%256; $mNoA = sprintf("%02X",$mNo);
     CUL_HM_SndCmd($hash,"${mNoA}20CB$id${dst}105B11F815470B081A1C191D1BC71C001DB221B623EA");
     select(undef, undef, undef, (0.04));
@@ -4702,12 +4702,12 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
     if ($blocks < $step){#last block
       CUL_HM_FWupdateSpeed($name,10);
       CUL_HM_FWupdateEnd("done");
-      Log3 $name,1,"CUL_HM fwUpdate completed";
+      Log3 $name,2,"CUL_HM fwUpdate completed";
     }
     else{# programming continue
       my $bl = ${$modules{CUL_HM}{helper}{updateData}}[$step-1];
       my $no = scalar(@{$bl});
-      Log3 $name,1,"CUL_HM fwUpdate write block $step of $blocks: $no messages";
+      Log3 $name,5,"CUL_HM fwUpdate write block $step of $blocks: $no messages";
       foreach my $msgP (@{$bl}){
         $mNo = (++$mNo)%256; $mNoA = sprintf("%02X",$mNo);
         CUL_HM_SndCmd($hash, $mNoA.((--$no)?"00":"20")."CA$id$dst".$msgP);
