@@ -177,7 +177,7 @@ sub OWID_Define ($$) {
   
   #-- Couple to I/O device
   AssignIoPort($hash);
-  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | !defined($hash->{IODev}->{PRESENT}) ){
+  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) ){
     return "OWID: Warning, no 1-Wire I/O device found for $name.";
   }
   $modules{OWID}{defptr}{$id} = $hash;
