@@ -309,11 +309,11 @@ sub HMLAN_UpdtMsgLoad($$) {####################################################
   my @tl;
   $hCap->{sum} = 0;
   for (($t-$HMmlSlice+1)..$t){# we have 6 slices
-    push @tl,int($hCap->{$_%$HMmlSlice}/16.8);
+    push @tl,int($hCap->{$_%$HMmlSlice}/450);
     $hCap->{sum} += $hCap->{$_%$HMmlSlice}; # need to recalc incase a slice was removed
   }
 
-  $hash->{msgLoadEst} = "1hour:".int($hCap->{sum}/16.8)."% "
+  $hash->{msgLoadEst} = "1hour:".int($hCap->{sum}/450)."% "
                         .(60/$HMmlSlice)."min steps: ".join("/",reverse @tl);
 #testing only           ." :".$hCap->{sum}
   return;
@@ -491,6 +491,7 @@ sub HMLAN_Parse($$) {##########################################################
     # max speed for devices is 100ms after receive - example:TC
 
     my ($mNo,$flg,$type,$src,$dst,$p) = unpack('A2A2A2A6A6A*',$mFld[5]);
+    my $mLen = length($mFld[5])/2;
     my $CULinfo = "";
 
     Log3 $hash,  HMLAN_getVerbLvl ($hash,$src,$dst,"5")
@@ -543,8 +544,8 @@ sub HMLAN_Parse($$) {##########################################################
       if    ($stat & 0x03 && $dst eq $attr{$name}{hmId}){HMLAN_qResp($hash,$src,0);}
       elsif ($stat & 0x08 && $src eq $attr{$name}{hmId}){HMLAN_qResp($hash,$dst,0);}
 
-      HMLAN_UpdtMsgLoad($name,((hex($flg)&0x10)?34   #burst=17units *2
-                                               :2))  #ACK=1 unit *2
+      HMLAN_UpdtMsgLoad($name,((hex($flg)&0x10)?($mLen*2+880)  #burst=17units *2
+                                               :($mLen*2+22))) #ACK=1 unit *2
           if (($stat & 0x48) == 8);# reject - but not from repeater
 
       $hash->{helper}{$dst}{flg} = 0;#got response => unblock sending
@@ -564,7 +565,7 @@ sub HMLAN_Parse($$) {##########################################################
       }
     }
     else{
-      HMLAN_UpdtMsgLoad($name,1)
+      HMLAN_UpdtMsgLoad($name,(21))
             if (   $letter eq "E"
                 && (hex($flg)&0x60) == 0x20 # ack but not from repeater
                 && $dst eq $attr{$name}{hmId});
@@ -628,7 +629,7 @@ sub HMLAN_Parse($$) {##########################################################
     # prepare dispatch-----------
     # HM format A<len><msg>:<info>:<RSSI>:<IOname>  Info is not used anymore
     my $dmsg = sprintf("A%02X%s:$CULinfo:$rssi:$name",
-                         length($mFld[5])/2, uc($mFld[5]));
+                         $mLen, uc($mFld[5]));
     my %addvals = (RAWMSG => $rmsg, RSSI => hex($mFld[4])-65536);
     Dispatch($hash, $dmsg, \%addvals);
   }
@@ -737,7 +738,7 @@ sub HMLAN_SimpleWrite(@) {#####################################################
                              .' '        .$dst
                              .' '        .$p;
 
-    HMLAN_UpdtMsgLoad($name,(hex($flg)&0x10)?17:1);#burst counts
+    HMLAN_UpdtMsgLoad($name,length($p)/2+20 +(hex($flg)&0x10)?440:0);#burst counts
   }
   else{
     Log3 $hash, ($hash->{helper}{log}{sys}?0:5), 'HMLAN_Send:  '.$name.' I:'.$msg;
