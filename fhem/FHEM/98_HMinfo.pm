@@ -523,14 +523,14 @@ sub HMinfo_tempList(@) { ######################################################
         }
         push @elAll,@el;
       }
-      elsif(@el && $_ =~ m/tempList(P[123])?[SMFWT].*\>/){
+      elsif(@el && $_ =~ m/R_(P[123])?_?._tempList[SMFWT].*\>/){
         my ($tln,$val) = ($1,$2)if($_ =~ m/(.*)>(.*)/);
         $tln =~ s/ //g;
         $val =~ s/ //g;
         foreach my $eN(@el){
           my $valR = ReadingsVal($eN,$tln,"");
           $valR =~ s/ //g;
-          push @entryFail,$eN." :".$tln if ($valR ne  $val);
+          push (@entryFail,$eN." :".$tln) if ($valR ne  $val);
         }
       }
     }
@@ -547,8 +547,8 @@ sub HMinfo_tempList(@) { ######################################################
     my @exec = ();
     while(<aSave>){
       chomp;
-      if($_ =~ m/^entities:/){
-        my $line = $_;
+      my $line = $_;
+      if($line =~ m/^entities:/){
         $line =~s/.*://;
         @el = ();
         foreach (split(",",$line)){
@@ -559,26 +559,26 @@ sub HMinfo_tempList(@) { ######################################################
             push @entryNF,$_;
           }
         }
-        foreach (@exec){
-          my @param = split(" ",$_);
-          CUL_HM_Set($defs{$param[0]},@param);
-        }
         push @elAll,@el;
       }
-      elsif(@el && $_ =~ m/tempList(P[123])?[SMFWT].*\>/){
-        my ($tln,$val) = ($1,$2)if($_ =~ m/(.*)>(.*)/);
+      elsif(@el && $line =~ m/R_(P[123])?_?._tempList[SMFWT].*\>/){
+        my ($tln,$val) = ($1,$2)if($line =~ m/(.*)>(.*)/);
         $tln =~ s/ //g;
         $val =~ tr/ +/ /;
         $val =~ s/^ //;
         $val =~ s/ $//;
         @exec = ();
         foreach my $eN(@el){
-          if ($tln =~ m/tempList(P.)/){
+          if ($tln =~ m/(P.)_._tempList/){
             $val = lc($1)." ".$val;
-            $tln =~ s/P.//;
           }
+          $tln =~ s/R_(P._)?._//;
           my $x = CUL_HM_Set($defs{$eN},$eN,$tln,"prep",split(" ",$val));
-          push @entryFail,$eN." :".$tln." respose:$x" if ($x != 1);
+          if ($x ne "1"){
+            my $list =$line;
+            $list =~ s/\>.*//;
+            push @entryFail,$eN." :".$list." respose:$x";
+          }
           push @exec,$eN." ".$tln." exec ".$val;
         }
       }
@@ -628,7 +628,7 @@ sub HMinfo_tempListTmpl(@) { ##################################################
         $found = 1 if ($defs{$_} && $_ eq $tmpl);
       }
     }
-    elsif($found != 1 && $_ =~ m/tempList(P[123])?[SMFWT].*\>/){
+    elsif($found != 1 && $_ =~ m/R_(P[123])?_?._tempList[SMFWT].*\>/){
       my ($tln,$val) = ($1,$2)if($_ =~ m/(.*)>(.*)/);
       $tln =~ s/ //g;
       $val =~ tr/ +/ /;
@@ -636,18 +636,20 @@ sub HMinfo_tempListTmpl(@) { ##################################################
       $val =~ s/ $//;
       @exec = ();
       foreach my $eN(@el){
+        if ($tln =~ m/(P.)_._tempList/){
+          $val = lc($1)." ".$val;
+        }
+        $tln =~ s/R_(P._)?._//;
         my $x = CUL_HM_Set($defs{$eN},$eN,$tln,"prep",split(" ",$val));
-        push @entryFail,$eN." :".$tln." respose:$x" if ($x != 1);
+        push @entryFail,$eN." :".$tln." respose:$x" if ($x ne "1");
         push @exec,$eN." ".$tln." exec ".$val;
       }
     }
-
-    foreach (@exec){
-      my @param = split(" ",$_);
-      CUL_HM_Set($defs{$param[0]},@param);
-    }
-
     $ret = "failed Entries:\n     "   .join("\n     ",@entryFail) if (scalar@entryFail);
+  }
+  foreach (@exec){
+    my @param = split(" ",$_);
+    CUL_HM_Set($defs{$param[0]},@param);
   }
   close(aSave);
   return $ret;

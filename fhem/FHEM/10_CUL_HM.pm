@@ -3710,7 +3710,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     Log3 $name,2,"CUL_HM fwUpdate started for $name";
     CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
                         ."3011$id${dst}CA");
-    # InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim",$dst.$id."00",0);
+    #InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim",$dst."00000000",0);
   }
   elsif($cmd eq "postEvent") { ################################################
     my (undef,undef,$cond) = @a;
@@ -4680,6 +4680,7 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
     $modules{CUL_HM}{helper}{updateStep}++;
     $modules{CUL_HM}{helper}{updateNbr} = $mNo;
     RemoveInternalTimer("fail:notInBootLoader");
+    #InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim","${dst}${id}00",0);
     InternalTimer(gettimeofday()+5,"CUL_HM_FWupdateEnd","fail:SpeedChangeFailed",0);
   }
   else{# check response - start programming
@@ -4750,7 +4751,13 @@ sub CUL_HM_FWupdateSim($){#end FW Simulation
   my $msg = shift;
   my $ioName = $defs{$modules{CUL_HM}{helper}{updatingName}}->{IODev}->{NAME};
   my $mNo = sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr});
-  CUL_HM_Parse($defs{$ioName},"A00${mNo}8002$msg");
+  if (0 == $modules{CUL_HM}{helper}{updateStep}){
+    CUL_HM_Parse($defs{$ioName},"A00${mNo}0010$msg");
+  }
+  else{
+    Log3 "",5,"FWupdate simulate No:$mNo";
+    CUL_HM_Parse($defs{$ioName},"A00${mNo}8002$msg");
+  }
 }
 
 
