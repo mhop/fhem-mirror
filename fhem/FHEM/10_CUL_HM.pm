@@ -1197,6 +1197,14 @@ sub CUL_HM_Parse($$) {#########################################################
       }
     }
   }
+  elsif($md eq "HM-SEN-EP") { #################################################
+    if ($mTp eq "40"){
+      my (undef,$counter) = unpack 'A2A2',$p;
+      $counter = hex($counter);
+      push @evtEt,[$shash,1,"state:".$counter];
+      push @evtEt,[$shash,1,"counter:".$counter];
+    }
+  }
   elsif($st eq "THSensor") { ##################################################
     if    ($mTp eq "70"){
       my $chn;
