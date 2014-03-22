@@ -61,6 +61,9 @@
 #	2014-02-04	added:	shutdownFn
 #
 #	2014-02-14	modi:	changed Loglevel from 3 to 4 where possible
+#
+#	2014-03-22	added:	added set command 'clear'
+#
 
 package main;
 
@@ -113,7 +116,7 @@ sub OWO_Shutdown($) {
 sub OWO_Set($@){
 	my ($hash, @a)	= @_;
 	my $name		= $hash->{NAME};
-	my $usage		= "Unknown argument, choose one of stationById stationByGeo stationByName send:noArg";
+	my $usage		= "Unknown argument, choose one of clear:noArg stationById stationByGeo stationByName send:noArg";
 	my $response;
 	
 	return "No Argument given" if(!defined($a[1]));
@@ -126,6 +129,13 @@ sub OWO_Set($@){
 	given($cmd){
 		when("?")		{ return $usage; }
 		
+		when("clear"){
+			CommandDeleteReading(undef, "$name _.*");
+			CommandDeleteReading(undef, "$name c_.*");
+			CommandDeleteReading(undef, "$name g_.*");
+			return;
+		}
+
 		when("send"){
 			OWO_GetStatus($hash,1);
 			return;
