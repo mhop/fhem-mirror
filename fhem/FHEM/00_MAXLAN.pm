@@ -51,7 +51,8 @@ MAXLAN_Initialize($)
   $hash->{DefFn}   = "MAXLAN_Define";
   $hash->{UndefFn} = "MAXLAN_Undef";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 set-clock-on-init:1,0 " .
-                     "loglevel:0,1,2,3,4,5,6 addvaltrigger "; 
+                     "loglevel:0,1,2,3,4,5,6 addvaltrigger " .
+                     "timezone:CET-CEST,GMT-BST,EET-EEST,FET-FEST,MSK-MSD,GMT,CET,EET";
 }
 
 #####################################
@@ -212,12 +213,40 @@ MAXLAN_Set($@)
     MAXLAN_Write($hash,$args[0]);
 
   }elsif($setting eq "clock") {
-    #This encodes the winter/summer timezones, its meaning is not entirely clear
-    my $timezones = "Q0VUAAAKAAMAAA4QQ0VTVAADAAIAABwg";
+    #Set timezone from attribute
+    #All strings are taken from MAX! software network analysis
+    #Base64 hex decode of the CET strings gives eg.
+    #CET[00][00][0a][00][03][00][00][0e][10]CEST[00][03][00][02][00][00][1c][20] for DST
+    #CET[00][00][0a][00][03][00][00][0e][10]CEST[00][03][00][02][00][00][0e][10] for no DST
+    #bytes 10-11 and 22-23 of each string appear to represent time offset from UTC in seconds
+    #a guess is that bytes 5 & 17 represent month no.
+    #All strings below appear to follow the same pattern & identical except for name & offset.
+    #The currently set string appears at the end of the decoded C: device message for the Cube
+    my $timezoneAttr = AttrVal($hash->{NAME},"timezone","CET-CEST");
+    my %tz_list = (     #timezone & strings
+      "GMT-BST"    =>   "R01UAAAKAAMAAAAAQlNUAAADAAIAAA4Q", #DST strings
+      "CET-CEST"   =>   "Q0VUAAAKAAMAAA4QQ0VTVAADAAIAABwg",
+      "EET-EEST"   =>   "RUVUAAAKAAMAABwgRUVTVAADAAIAACow",
+      "FET-FEST"   =>   "RkVUAAAKAAMAACowRkVTVAADAAIAACow", #No DST for this region or next
+      "MSK-MSD"    =>   "TVNLAAAKAAMAADhATVNEAAADAAIAADhA",
+      "GMT"        =>   "R01UAAAKAAMAAAAAQlNUAAADAAIAAAAA", #No DST strings
+      "CET"        =>   "Q0VUAAAKAAMAAA4QQ0VTVAADAAIAAA4Q",
+      "EET"        =>   "RUVUAAAKAAMAABwgRUVTVAADAAIAABwg"
+    );
 
-    #The offset was obtained by experiment and is up to 1 minute, I don't know exactly what
-    #time format the cube uses. Something based on ntp I guess. Maybe this only works in GMT+1?
-    my $time = time()-946684774;
+    my $timezones;
+    if(exists($tz_list{$timezoneAttr})) {
+      $timezones = $tz_list{$timezoneAttr};
+      Log 3, "MAX Cube is set to timezone $timezoneAttr";
+    } else {
+      Log 2, "ERROR: Timezone $timezoneAttr of MAX Cube is invalid. Using CET-CEST";
+      $timezones = $tz_list{"CET-CEST"};
+    }
+
+    #From various sources Cube base time is year 2000, offset should perhaps be number
+    #of secs diff between 1/Jan/1970 and 1/Jan/2000 ie. 946684800, ie. 26 secs diff
+    #Occasional 1 min diffs seen in logs when close to minute rollover
+    my $time = time()-946684800;
     my $rmsg = "v:".$timezones.",".sprintf("%08x",$time);
     my $ret = MAXLAN_Write($hash,$rmsg, "A:");
     $hash->{clockset} = 1;
@@ -870,7 +899,7 @@ Setting pairmode to "cancel" puts the cube out of pairing mode.</li>
     <li>raw &lt;data&gt;<br>
     Sends the raw &lt;data&gt; to the cube.</li>
     <li>clock<br>
-    Sets the internal clock in the cube to the current system time of fhem's machine. You can add<br>
+    Sets the internal clock in the cube to the current system time of fhem's machine (uses timezone attribute if set). You can add<br>
     <code>attr ml set-clock-on-init</code><br>
     to your fhem.cfg to do this automatically on startup.</li>
     <li>factorReset<br>
@@ -898,6 +927,23 @@ Setting pairmode to "cancel" puts the cube out of pairing mode.</li>
     <li><a href="#attrdummy">dummy</a></li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#addvaltrigger">addvaltrigger</a></li>
+    <li>timezone<br>
+      (Default: CET-CEST). Set MAX Cube timezone (requires "set clock" to take effect).<br>
+      <b>NB.</b>Cube time and cubeTimeDifference will not change until Cube next connects.<br>
+      <ul>
+      <li>GMT-BST - (UTC +0, UTC+1)</li>
+      <li>CET-CEST - (UTC +1, UTC+2)</li>
+      <li>EET-EEST - (UTC +2, UTC+3)</li>
+      <li>FET-FEST - (UTC +3)</li>
+      <li>MSK-MSD - (UTC +4)</li>
+      </ul>
+      The following are settings with no DST (daylight saving time)
+      <ul>
+      <li>GMT - (UTC +0)</li>
+      <li>CET - (UTC +1)</li>
+      <li>EET - (UTC +2)</li>
+      </ul>
+    </li>
   </ul>
 </ul>
 
