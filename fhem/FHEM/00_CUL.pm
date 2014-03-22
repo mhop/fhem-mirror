@@ -10,7 +10,7 @@ sub CUL_Attr(@);
 sub CUL_Clear($);
 sub CUL_HandleCurRequest($$);
 sub CUL_HandleWriteQueue($);
-sub CUL_Parse($$$$;$);
+sub CUL_Parse($$$$@);
 sub CUL_Read($);
 sub CUL_ReadAnswer($$$$);
 sub CUL_Ready($);
@@ -617,13 +617,12 @@ CUL_WriteTranslate($$$)
     $msg = substr($msg,6,4) . substr($msg,10);
 
   } elsif($fn eq "cmd") {                                  # internal command
-    $fn = "";
     if($msg eq "speed100") { 
-      $msg = "AR";
+      $fn = "AR";
     } elsif($msg eq "speed10") {
-      $msg = "Ar";
+      $fn = "Ar";
     } else {                                        # by default rewrite init
-      $msg = $hash->{initString};
+      $fn = $hash->{initString};
     }
 
   } else {
@@ -763,7 +762,7 @@ CUL_Read($)
 }
 
 sub
-CUL_Parse($$$$;$)
+CUL_Parse($$$$@)
 {
   my ($hash, $iohash, $name, $rmsg, $initstr) = @_;
 
