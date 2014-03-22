@@ -603,7 +603,7 @@ MAX_Parse($$)
     my $devicetype = undef;
     $devicetype = $args[0] if($msgtype eq "define" and $args[0] ne "Cube");
     $devicetype = "ShutterContact" if($msgtype eq "ShutterContactState");
-    $devicetype = "WallMountedThermostat" if(grep /^$msgtype$/, ("WallThermostatConfig","WallThermostatState","WallThermostatControl"));
+    $devicetype = "WallMountedThermostat" if(grep /^$msgtype$/, ("WallThermostatConfig","WallThermostatState","WallThermostatControl","SetTemperature"));
     $devicetype = "HeatingThermostat" if(grep /^$msgtype$/, ("HeatingThermostatConfig", "ThermostatState"));
     if($devicetype) {
       return "UNDEFINED MAX_$addr MAX $devicetype $addr";
@@ -832,7 +832,14 @@ MAX_Parse($$)
     } else {
       Log 2, "MAX_Parse: Don't know how to interpret Ack payload for $shash->{type}";
     }
-
+  } elsif(grep /^$msgtype$/,  ("SetTemperature")) { # SetTemperature is send by WallThermostat e.g. when pressing the boost button
+    my $bits = unpack("C",pack("H*",$args[0]));
+    my $mode = $bits >> 6;
+    my $desiredTemperature = ($bits & 0x3F) /2.0; #convert to degree celcius
+    readingsBulkUpdate($shash, "mode", $ctrl_modes[$mode] );
+    #This formatting must match with in MAX_Set:$templist
+    readingsBulkUpdate($shash, "desiredTemperature", MAX_SerializeTemperature($desiredTemperature));
+    Log GetLogLevel($shash->{NAME}, 5), "SetTemperature mode  $ctrl_modes[$mode], desiredTemperature $desiredTemperature";
   } else {
     Log 1, "MAX_Parse: Unknown message $msgtype";
   }

@@ -346,7 +346,7 @@ CUL_MAX_Parse($$)
           Dispatch($shash, "MAX,$isToMe,WallThermostatConfig,$src,17,21,30.5,4.5,$defaultWeekProfile,80,5,0,12", {});
         }
       }
-    } elsif(grep /^$msgType$/, ("ShutterContactState", "WallThermostatState", "WallThermostatControl", "ThermostatState", "PushButtonState"))  {
+    } elsif(grep /^$msgType$/, ("ShutterContactState", "WallThermostatState", "WallThermostatControl", "ThermostatState", "PushButtonState", "SetTemperature"))  {
       Dispatch($shash, "MAX,$isToMe,$msgType,$src,$payload", {});
     } else {
       Log $ll5, "Unhandled message $msgType";
