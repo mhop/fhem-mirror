@@ -661,6 +661,10 @@ not to be translated
 	<b>Set-Commands</b><br/>
 	<ul>
 		<br/>
+		<code>set &lt;name&gt; clear</code><br/>
+		<br/>
+		<ul>Delete all readings for cleanup</ul>
+		<br/><br/>
 		<code>set &lt;name&gt; send</code><br/>
 		<br/>
 		<ul>start an update cycle manually:
