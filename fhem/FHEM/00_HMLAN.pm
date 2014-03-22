@@ -312,7 +312,6 @@ sub HMLAN_UpdtMsgLoad($$) {####################################################
     push @tl,int($hCap->{$_%$HMmlSlice}/450);
     $hCap->{sum} += $hCap->{$_%$HMmlSlice}; # need to recalc incase a slice was removed
   }
-
   $hash->{msgLoadEst} = "1hour:".int($hCap->{sum}/450)."% "
                         .(60/$HMmlSlice)."min steps: ".join("/",reverse @tl);
 #testing only           ." :".$hCap->{sum}
@@ -738,7 +737,7 @@ sub HMLAN_SimpleWrite(@) {#####################################################
                              .' '        .$dst
                              .' '        .$p;
 
-    HMLAN_UpdtMsgLoad($name,length($p)/2+20 +(hex($flg)&0x10)?440:0);#burst counts
+    HMLAN_UpdtMsgLoad($name,length($p)/2+20 +((hex($flg)&0x10)?440:0));#burst counts
   }
   else{
     Log3 $hash, ($hash->{helper}{log}{sys}?0:5), 'HMLAN_Send:  '.$name.' I:'.$msg;
