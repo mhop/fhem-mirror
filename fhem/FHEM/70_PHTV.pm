@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.1
+# Version: 1.2.2
 #
 # Major Version History:
 # - 1.2.0 - 2014-03-12
@@ -1387,33 +1387,15 @@ sub PHTV_ReceiveCommand($$$) {
               "PHTV $name: RCV TIMEOUT $service/" . urlDecode($cmd);
         }
 
-        # device is not reachable or
-        # does not even support master command for audio
-        if ( $service eq "audio/volume" ) {
-            $newstate = "absent";
-
-            if (
-                ( !defined( $hash->{helper}{AVAILABLE} ) )
-                or ( defined( $hash->{helper}{AVAILABLE} )
-                    and $hash->{helper}{AVAILABLE} eq 1 )
-              )
-            {
-                $hash->{helper}{AVAILABLE} = 0;
-                readingsBulkUpdate( $hash, "presence", "absent" );
-            }
-        }
-
-        # device does not support command and behaves naughty
-        else {
-            $newstate = "on";
-
-            if ( !defined( $hash->{helper}{supportedAPIcmds}{$service} ) ) {
-                $hash->{helper}{supportedAPIcmds}{$service} = 0;
-                Log3 $name, 3,
-                    "PHTV $name: API command '"
-                  . $service
-                  . "' not supported by device.";
-            }
+        $newstate = "absent";
+        if (
+            ( !defined( $hash->{helper}{AVAILABLE} ) )
+            or ( defined( $hash->{helper}{AVAILABLE} )
+                and $hash->{helper}{AVAILABLE} eq 1 )
+          )
+        {
+            $hash->{helper}{AVAILABLE} = 0;
+            readingsBulkUpdate( $hash, "presence", "absent" );
         }
     }
 
@@ -2350,8 +2332,13 @@ sub PHTV_ReceiveCommand($$$) {
                                             || $countLEDs == 0
                                           )
                                         {
-                                            if (   $hsb->{s} > 5
-                                                && $hsb->{b} > 5 )
+                                            if (
+                                                (
+                                                       $hsb->{s} > 5
+                                                    && $hsb->{b} > 5
+                                                )
+                                                || $countLEDs == 0
+                                              )
                                             {
                                                 $Hsum += $hsb->{h};
                                                 $Ssum += $hsb->{s};
@@ -2373,21 +2360,30 @@ sub PHTV_ReceiveCommand($$$) {
                                   ? $bri / 100
                                   : 1;
 
-                                my ( $h, $s, $b );
+                                my ( $hDec, $sDec, $bDec, $h, $s, $b );
                                 if ( $countLEDs > 0 ) {
-                                    $h = sprintf( "%02x",
-                                        int( $Hsum / $countLEDs / 256 + 0.5 ) );
-                                    $s = sprintf( "%02x",
-                                        int( $Ssum / $countLEDs * $satF + 0.5 )
-                                    );
-                                    $b = sprintf( "%02x",
-                                        int( $Bsum / $countLEDs * $briF + 0.5 )
-                                    );
+                                    $hDec =
+                                      int( $Hsum / $countLEDs / 256 + 0.5 );
+                                    $sDec =
+                                      int( $Ssum / $countLEDs * $satF + 0.5 );
+                                    $bDec =
+                                      int( $Bsum / $countLEDs * $briF + 0.5 );
+
+                                    # keep bri=1 if user calc value
+                                    # would be below
+                                    $bDec = 1 if ( $briF < 1 && $bDec < 1 );
+
+                                    $h = sprintf( "%02x", $hDec );
+                                    $s = sprintf( "%02x", $sDec );
+                                    $b = sprintf( "%02x", $bDec );
                                 }
                                 else {
-                                    $h = "00";
-                                    $s = "00";
-                                    $b = "00";
+                                    $hDec = 0;
+                                    $sDec = 0;
+                                    $bDec = 0;
+                                    $h    = "00";
+                                    $s    = "00";
+                                    $b    = "00";
                                 }
 
                                 # temp. disable event triggers for HUEDevice
@@ -2403,22 +2399,83 @@ sub PHTV_ReceiveCommand($$$) {
                                       "none";
                                 }
 
-                                $hash->{helper}{ambiHueColor} = "$h$s$b";
+                                # Update color only if there is a
+                                #significant difference
+                                my (
+                                    $hMin,  $hMax, $hDiff, $sMin, $sMax,
+                                    $sDiff, $bMin, $bMax,  $bDiff
+                                );
+                                if (
+                                    defined(
+                                        $hash->{helper}{ambiHueColor}{$side}
+                                    )
+                                  )
+                                {
+                                    $hMin = PHTV_min(
+                                        $hash->{helper}{ambiHueColor}{$side}{h},
+                                        $hDec
+                                    );
+                                    $hMax = PHTV_max(
+                                        $hash->{helper}{ambiHueColor}{$side}{h},
+                                        $hDec
+                                    );
+                                    $hDiff = $hMax - $hMin;
+                                    $sMin  = PHTV_min(
+                                        $hash->{helper}{ambiHueColor}{$side}{s},
+                                        $sDec
+                                    );
+                                    $sMax = PHTV_max(
+                                        $hash->{helper}{ambiHueColor}{$side}{s},
+                                        $sDec
+                                    );
+                                    $sDiff = $sMax - $sMin;
+                                    $bMin  = PHTV_min(
+                                        $hash->{helper}{ambiHueColor}{$side}{b},
+                                        $bDec
+                                    );
+                                    $bMax = PHTV_max(
+                                        $hash->{helper}{ambiHueColor}{$side}{b},
+                                        $bDec
+                                    );
+                                    $bDiff = $bMax - $bMin;
+                                }
 
-                                # switch HUE bulb to color
-                                if ( $b ne "00" ) {
-                                    fhem(
+                                if (
+                                    ( $hDec == 0 && $sDec == 0 && $bDec == 0 )
+                                    || (   !defined($hDiff)
+                                        && !defined($sDiff)
+                                        && !defined($bDiff) )
+                                    || $hDiff >= 200
+                                    || $sDiff > 3
+                                    || $bDiff > 2
+                                  )
+                                {
+
+                                    Log3 $name, 4,
+"PHTV $name: color changed hDiff=$hDiff sDiff=$sDiff bDiff=$bDiff"
+                                      if ( $hDiff && $sDiff && $bDiff );
+
+                                    $hash->{helper}{ambiHueColor}{$side}{h} =
+                                      $hDec;
+                                    $hash->{helper}{ambiHueColor}{$side}{s} =
+                                      $sDec;
+                                    $hash->{helper}{ambiHueColor}{$side}{b} =
+                                      $bDec;
+
+                                    # switch HUE bulb to color
+                                    if ( $b ne "00" ) {
+                                        fhem(
 "set $dev transitiontime $transitiontime : noUpdate : hsv $h$s$b"
-                                    );
-                                }
+                                        );
+                                    }
 
-                                # switch HUE bulb off if brightness is 0
-                                else {
-                                    fhem(
+                                    # switch HUE bulb off if brightness is 0
+                                    else {
+                                        fhem(
 "set $dev transitiontime 5 : noUpdate : off"
-                                    );
+                                        );
+                                    }
                                 }
-
                             }
                         }
                     }
@@ -2918,7 +2975,11 @@ sub PHTV_rgb2hsb ($$$) {
 
     Log3 undef, 5, "PHTV rgb2hsb: $r $g $b > $h $s $bri";
 
-    return { "h" => $h, "s" => $s, "b" => $bri };
+    return {
+        "h" => $h,
+        "s" => $s,
+        "b" => $bri
+    };
 }
 
 ###################################
@@ -2936,7 +2997,11 @@ sub PHTV_hsb2rgb ($$$) {
 
     Log3 undef, 5, "PHTV hsb2rgb: $h $s $bri > $r $g $b";
 
-    return { "r" => $r, "g" => $g, "b" => $b };
+    return {
+        "r" => $r,
+        "g" => $g,
+        "b" => $b
+    };
 }
 
 ###################################
@@ -2971,7 +3036,11 @@ sub PHTV_rgb2hsv($$$) {
 
     Log3 undef, 5, "PHTV rgb2hsv: $r $g $b > $h $s $v";
 
-    return { "h" => $h, "s" => $s, "v" => $v };
+    return {
+        "h" => $h,
+        "s" => $s,
+        "v" => $v
+    };
 }
 
 ###################################
@@ -3028,7 +3097,11 @@ sub PHTV_hsv2rgb($$$) {
 
     Log3 undef, 5, "PHTV hsv2rgb: $h $s $v > $r $g $b";
 
-    return { "r" => $r, "g" => $g, "b" => $b };
+    return {
+        "r" => $r,
+        "g" => $g,
+        "b" => $b
+    };
 }
 
 ###################################
