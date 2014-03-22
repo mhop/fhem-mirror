@@ -829,7 +829,7 @@ sub Calendar_GetUpdate($) {
   my $ics;
   
   if($type eq "url"){ 
-    $ics= GetFileFromURLQuiet($url,10,undef,0,1) if($type eq "url");
+    $ics= GetFileFromURLQuiet($url,10,undef,0,5) if($type eq "url");
   } elsif($type eq "file") {
     if(open(ICSFILE, $url)) {
       while(<ICSFILE>) { 
