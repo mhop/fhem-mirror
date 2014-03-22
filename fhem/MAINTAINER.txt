@@ -139,7 +139,6 @@ FHEM/63_EMGZ.pm              rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/64_ESA2000.pm           stromer-12           http://forum.fhem.de SlowRF
 FHEM/66_ECMD.pm              borisneubert         http://forum.fhem.de Sonstiges
 FHEM/67_ECMDDevice.pm        borisneubert         http://forum.fhem.de Sonstiges
-FHEM/70_EFR.pm               bentele              http://forum.fhem.de Sonstiges
 FHEM/70_EGPM.pm              alexus               http://forum.fhem.de Sonstiges
 FHEM/70_ENIGMA2.pm           loredo               http://forum.fhem.de Multimedia
 FHEM/70_JSONMETER.pm         tupol                http://forum.fhem.de Sonstiges / if no reaction please via PM

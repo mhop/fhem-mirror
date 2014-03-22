@@ -429,6 +429,9 @@ sml_energy_energyAborted($)
    Log3 $hash, 3, "$hash->{NAME} sml_energy_energyAborted";
 
   delete($hash->{helper}{RUNNING_PID});
+#new
+ RemoveInternalTimer($hash);
+ InternalTimer(gettimeofday()+$hash->{Interval}, "sml_energy_Update", $hash, 0);
 }
 
 sub
