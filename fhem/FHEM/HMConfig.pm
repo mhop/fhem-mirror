@@ -514,6 +514,13 @@ my $K_actDetID = '000000'; # id of actionDetector
   ledFlashUnlocked=>{a=> 31.3,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED blinks when not locked",lit=>{off=>0,on=>1}},
   ledFlashLocked  =>{a=> 31.6,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED blinks when locked"    ,lit=>{off=>0,on=>1}},
 
+  seqPulse1       =>{a=> 36  ,s=>1  ,l=>1,min=>0  ,max=>4.08    ,c=>''         ,f=>62.5    ,u=>'s'   ,d=>1,t=>"Sequence Pulse. 0= unused, otherwise min= 0.032sec"},
+  seqPulse2       =>{a=> 37  ,s=>1  ,l=>1,min=>0  ,max=>4.08    ,c=>''         ,f=>62.5    ,u=>'s'   ,d=>1,t=>"Sequence Pulse. 0= unused, otherwise min= 0.032sec"},
+  seqPulse3       =>{a=> 38  ,s=>1  ,l=>1,min=>0  ,max=>4.08    ,c=>''         ,f=>62.5    ,u=>'s'   ,d=>1,t=>"Sequence Pulse. 0= unused, otherwise min= 0.032sec"},
+  seqPulse4       =>{a=> 39  ,s=>1  ,l=>1,min=>0  ,max=>4.08    ,c=>''         ,f=>62.5    ,u=>'s'   ,d=>1,t=>"Sequence Pulse. 0= unused, otherwise min= 0.032sec"},
+  seqPulse5       =>{a=> 40  ,s=>1  ,l=>1,min=>0  ,max=>4.08    ,c=>''         ,f=>62.5    ,u=>'s'   ,d=>1,t=>"Sequence Pulse. 0= unused, otherwise min= 0.032sec"},
+  seqTolerance    =>{a=> 44  ,s=>1  ,l=>1,min=>0.016,max=>4.08  ,c=>''         ,f=>62.5    ,u=>'s'   ,d=>1,t=>"Sequence tolernace"},
+
   waterUppThr     =>{a=>  6.0,s=>1  ,l=>1,min=>0  ,max=>256     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"water upper threshold"},
   waterlowThr     =>{a=>  7.0,s=>1  ,l=>1,min=>0  ,max=>256     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"water lower threshold"},
   caseDesign      =>{a=> 90.0,s=>1  ,l=>1,min=>1  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"case desing"               ,lit=>{verticalBarrel=>1,horizBarrel=>2,rectangle=>3}},
@@ -1028,6 +1035,10 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
                          ,cndTxFalling    =>1,cndTxRising     =>1,
                          ,cndTxCycBelow   =>1,cndTxCycAbove   =>1,cndTxDecAbove   =>1,cndTxDecBelow   =>1,
                           },
+  "HM-SEN-EP"         =>{ seqPulse1       =>1,seqPulse2       =>1,seqPulse3       =>1,seqPulse4       =>1
+                         ,seqPulse5       =>1,seqTolerance    =>1
+                         ,peerNeedsBurst  =>1
+                        }
   );
 
 #clones - - - - - - - - - - - - - - -
