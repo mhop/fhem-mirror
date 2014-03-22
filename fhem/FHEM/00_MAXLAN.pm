@@ -19,7 +19,7 @@ sub MAXLAN_Send(@);
 sub MAXLAN_RequestConfiguration($$);
 sub MAXLAN_RemoveDevice($$);
 
-my $reconnect_interval = 540; #seconds
+my $reconnect_interval = 60; #seconds
 
 #the time it takes after sending one command till we see its effect in the L: response
 my $roundtriptime = 3; #seconds
