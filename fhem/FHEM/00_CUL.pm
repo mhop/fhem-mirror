@@ -617,6 +617,7 @@ CUL_WriteTranslate($$$)
     $msg = substr($msg,6,4) . substr($msg,10);
 
   } elsif($fn eq "cmd") {                                  # internal command
+    $msg = "";
     if($msg eq "speed100") { 
       $fn = "AR";
     } elsif($msg eq "speed10") {
