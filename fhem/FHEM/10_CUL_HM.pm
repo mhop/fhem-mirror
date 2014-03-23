@@ -3104,7 +3104,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                                 ? '00'
                                 : 'C8';
     my(undef,$lvlMax)=split",",AttrVal($name, "levelRange", "0,100");
-    $hash->{helper}{dlvl} = sprintf("%02X",$lvlMax) 
+    $hash->{helper}{dlvl} = sprintf("%02X",$lvlMax*2) 
           if ($hash->{helper}{dlvl} eq 'C8');
     $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"
                                ."02$chn$hash->{helper}{dlvl}".'0000';
@@ -3130,7 +3130,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $ramp = ($ramp && $st eq "dimmer")?CUL_HM_encodeTime16($ramp):"0000";
     delete $hash->{helper}{dlvl};#stop desiredLevel supervision
     $hash->{helper}{stateUpdatDly} = ($duration>120)?$duration:120;
-    CUL_HM_PushCmdStack($hash,"++${flag}11$id${dst}02${chn}C8$ramp$tval");
+    my(undef,$lvlMax)=split",",AttrVal($name, "levelRange", "0,100");
+    $lvlMax = sprintf("%02X",$lvlMax*2);
+    CUL_HM_PushCmdStack($hash,"++${flag}11$id${dst}02${chn}$lvlMax$ramp$tval");
     $hash = $chnHash; # report to channel if defined
   }
   elsif($cmd eq "lock") { #####################################################
