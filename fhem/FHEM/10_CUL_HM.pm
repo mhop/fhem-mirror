@@ -143,6 +143,7 @@ sub CUL_HM_Initialize($) {
                        ."burstAccess:0_off,1_auto "
                        ."param msgRepeat "
                        .".stc .devInfo "
+                       ."levelRange "
                        ."aesCommReq:1,0 "
                        ."rssiLog:1,0 "         # enable writing RSSI to Readings (device only)
                        .$readingFnAttributes;
@@ -652,6 +653,17 @@ sub CUL_HM_Attr(@) {#################################
       return "use $attrName only for device" if (!$hash->{helper}{role}{dev});
     }
   }
+  elsif($attrName eq "levelRange" ){#General fix me
+    if ($cmd eq "set"){
+      return "use $attrName only for dimmer" if (CUL_HM_Get($defs{$name},$name,"param","subType") ne "dimmer");
+      my ($min,$max) = split (",",$attrVal);
+      return "use format min,max" if (!defined $max);
+      return "min:$min must be between 0 and 100" if ($min<0 || $min >100);
+      return "max:$max must be between 0 and 100" if ($max<0 || $max >100);
+      return "min:$min mit be lower then max:$max" if ($min >= $max);
+    }
+  }
+  
   CUL_HM_queueUpdtCfg($name) if ($updtReq);
   return;
 }
@@ -1329,6 +1341,8 @@ sub CUL_HM_Parse($$) {#########################################################
       my $chId = $src.$chn;
       $shash = $modules{CUL_HM}{defptr}{$chId}
                              if($modules{CUL_HM}{defptr}{$chId});
+      $name = $shash->{NAME};
+      my($lvlMin,$lvlMax)=split",",AttrVal($name, "levelRange", "0,100");
       my $physLvl;                             #store phys level if available
       if(   defined $mI[5]                     #message with physical level?
          && $st eq "dimmer"){
@@ -1343,21 +1357,27 @@ sub CUL_HM_Parse($$) {#########################################################
               next if (!$vh || $vDim->{$tmpKey} eq $chId);
               my $vl = ReadingsVal($vh->{NAME},"level","???");
               my $vs = ($vl eq "100"?"on":($vl eq "0"?"off":"$vl"));
-              $vs = ($pl ne $vl)?"chn:$vs  phys:$pl":$vs;
+              my($clvlMin,$clvlMax)=split",",AttrVal($vh->{NAME}, "levelRange", "0,100");
+              my $plc = int(($pl-$clvlMin)/($clvlMax - $clvlMin)*50)/2;
+              $vs = ($plc ne $vl)?"chn:$vs  phys:$plc":$vs;
               push @evtEt,[$vh,1,"state:$vs"];
-              push @evtEt,[$vh,1,"phyLevel:$pl"];
+              push @evtEt,[$vh,1,"phyLevel:$plc"];
             }
+            
+            $pl = int(($pl-$lvlMin)/($lvlMax - $lvlMin)*50)/2;
             push @evtEt,[$shash,1,"phyLevel:$pl"];      #phys level
             $physLvl = $pl;
           }
           else{                                #invalid PhysLevel
             $rSUpdt = 1;
-            CUL_HM_stateUpdatDly($shash->{NAME},5);     # update to get level
+            CUL_HM_stateUpdatDly($name,5);     # update to get level
           }
         }
       }
+      Log 1,"General val:$val min:$lvlMin max:$lvlMax new:".($val-$lvlMin)/($lvlMax - $lvlMin)*100;
+      $val = int(($val-$lvlMin)/($lvlMax - $lvlMin)*50)/2;
       $physLvl = ReadingsVal($name,"phyLevel",$val)
-            if(!$physLvl);                     #not updated? use old or ignore
+            if(!defined $physLvl);             #not updated? use old or ignore
       my $vs = ($val==100 ? "on":($val==0 ? "off":"$val")); # user string...
       push @evtEt,[$shash,1,"level:$val"];
       push @evtEt,[$shash,1,"pct:$val"]; # duplicate to level - necessary for "slider"
@@ -1396,8 +1416,8 @@ sub CUL_HM_Parse($$) {#########################################################
         elsif($dir == 0x30){push @evtEt,[$shash,1,"$eventName:err:$vs" ];}
       }
       if (!$rSUpdt){#dont touch if necessary for dimmer
-        if(($err&0x70) != 0x00){CUL_HM_stateUpdatDly($shash->{NAME},120);}
-        else                   {CUL_HM_unQEntity($shash->{NAME},"qReqStat");}
+        if(($err&0x70) != 0x00){CUL_HM_stateUpdatDly($name,120);}
+        else                   {CUL_HM_unQEntity($name,"qReqStat");}
       }
  
       if ($st eq "dimmer"){
@@ -3075,6 +3095,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                              ($cmd eq 'toggle' &&CUL_HM_getChnLvl($name) != 0)) 
                                 ? '00'
                                 : 'C8';
+    my(undef,$lvlMax)=split",",AttrVal($name, "levelRange", "0,100");
+    $hash->{helper}{dlvl} = sprintf("%02X",$lvlMax) 
+          if ($hash->{helper}{dlvl} eq 'C8');
     $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"
                                ."02$chn$hash->{helper}{dlvl}".'0000';
     CUL_HM_PushCmdStack($hash,$hash->{helper}{dlvlCmd});
@@ -3122,12 +3145,20 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd =~ m/^(up|down|pct)$/) { #########################################
     my ($lvl,$tval,$rval) = ($a[2],"","");
     $lvl =~ s/(\d*\.?\d*).*/$1/;
-    if ($cmd ne "pct"){#dim [<changeValue>] ... [ontime] [ramptime]
+    my($lvlMin,$lvlMax)=split",",AttrVal($name, "levelRange", "0,100");
+
+    if ($cmd eq "pct"){
+      $lvl = $lvlMin + $lvl*($lvlMax-$lvlMin)/100;
+    }
+    else{#dim [<changeValue>] ... [ontime] [ramptime]
       $lvl = 10 if (!defined $a[2]); #set default step
+      $lvl = $lvl*($lvlMax-$lvlMin)/100;
       $lvl = -1*$lvl if ($cmd eq "down");
       $lvl += CUL_HM_getChnLvl($name);
     }
-    $lvl = ($lvl > 100)?100:(($lvl < 0)?0:$lvl);
+    $lvl = ($lvl > $lvlMax)?$lvlMax:(($lvlMin < 0)?$lvlMin:$lvl);
+    Log 1,"General  in:$a[2] new:$lvl min:$lvlMin max:$lvlMax";
+    
     if ($st eq "dimmer"){# at least blind cannot stand ramp time...
       if (!$a[3]){
         $tval = "FFFF";
@@ -7215,6 +7246,26 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
         extert takes benefit of the implementation.
         Nevertheless  - by definition - showInternalValues overrules expert.
         </li>
+    <li><a name="#CUL_HMlevelRange">levelRange</a><br>
+        can be used with dimmer only. It defines the dimmable range to be used with this dimmer. 
+        It is meant to support e.g. LED light that reaches max brightness maybe at 40% and starts with 10%.
+        Level range will normalize the Level to the new range. I.e. set to 100% will physically set the 
+        dimmer to 40%, 0% will set to 10% physically.<br>
+        Impacted are teh commands on, up, down, toggle and pct. <b>Not</b> effected is the off command - 
+        this will set Physically 0% always.<br>
+        To be considered:<br>
+        dimmer level set by peers ant buttons is not impacted. This is controlled by respective device register<br>
+        Readings level may be set to negative or over 100%. It simply results from the calculation and reflects that
+        the physical level is above or below the given range<br>
+        in case of virtual dimmer channels available for the device the attribut needs to be set for 
+        each Channel<br>
+        User should be careful to set min level other then '0'<br>
+        Example:<br>
+        <ul><code>
+          attr myChannel levelRange 0,40<br>
+          attr myChannel levelRange 10,80<br>
+        </code></ul>
+        </li>
     <li><a name="#CUL_HMmodel">model</a>,
         <a name="subType">subType</a><br>
         These attributes are set automatically after a successful pairing.
@@ -7227,7 +7278,7 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
         considered in this case. <br>
         Repeat for burst devices will impact HMLAN transmission capacity.</li>
     <li><a name="#CUL_HMparam">param</a><br>
-        param defines model specific behavior or functions. See models for details</li>
+        param defines model specific behavior or functions. See <a href="#CUL_HMparams"><b>available parameter</b></a> for details</li>
     <li><a name="#CUL_HMrawToReadable">rawToReadable</a><br>
         Used to convert raw KFM100 values to readable data, based on measured
         values. E.g.  fill slowly your container, while monitoring the
@@ -7251,7 +7302,7 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
         attr KFM100 unit Liter
         </li>
   </ul>  <br>
-  <a name="CUL_HMparams"><b>available parameter "param"</b></a>
+  <a name="CUL_HMparams"><b>available parameter for attribut "param"</b></a>
   <ul>
     <li><B>HM-Sen-RD-O</B><br>
     <B>offAtPon</B> heat channel only: force heating off after powerOn<br>
