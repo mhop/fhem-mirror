@@ -1358,13 +1358,13 @@ sub CUL_HM_Parse($$) {#########################################################
               my $vl = ReadingsVal($vh->{NAME},"level","???");
               my $vs = ($vl eq "100"?"on":($vl eq "0"?"off":"$vl"));
               my($clvlMin,$clvlMax)=split",",AttrVal($vh->{NAME}, "levelRange", "0,100");
-              my $plc = int(($pl-$clvlMin)/($clvlMax - $clvlMin)*200)/2;
+              my $plc = int(($pl-$clvlMin)/($clvlMax - $clvlMin)*200+.99)/2;
               $vs = ($plc ne $vl)?"chn:$vs  phys:$plc":$vs;
               push @evtEt,[$vh,1,"state:$vs"];
               push @evtEt,[$vh,1,"phyLevel:$plc"];
             }
             
-            $pl = int(($pl-$lvlMin)/($lvlMax - $lvlMin)*200)/2;
+            $pl = int(($pl-$lvlMin)/($lvlMax - $lvlMin)*200+.99)/2;
             push @evtEt,[$shash,1,"phyLevel:$pl"];      #phys level
             $physLvl = $pl;
           }
@@ -1374,10 +1374,11 @@ sub CUL_HM_Parse($$) {#########################################################
           }
         }
       }
-      $val = int((($val-$lvlMin)/($lvlMax - $lvlMin))*200)/2;
+      my $pVal = $val;# necessary for roper 'off', not logical off
+      $val = int((($val-$lvlMin)/($lvlMax - $lvlMin))*200+.99)/2;
       $physLvl = ReadingsVal($name,"phyLevel",$val)
             if(!defined $physLvl);             #not updated? use old or ignore
-      my $vs = ($val==100 ? "on":($val==0 ? "off":"$val")); # user string...
+      my $vs = ($val==100 ? "on":($pVal==0 ? "off":"$val")); # user string...
       push @evtEt,[$shash,1,"level:$val"];
       push @evtEt,[$shash,1,"pct:$val"]; # duplicate to level - necessary for "slider"
       push @evtEt,[$shash,1,"deviceMsg:$vs$target"] if($chn ne "00");
@@ -3164,7 +3165,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $lvl = -1*$lvl if ($cmd eq "down");
       $lvl += CUL_HM_getChnLvl($name);
     }
-    $lvl = ($lvl > $lvlMax)?$lvlMax:(($lvlMin < 0)?$lvlMin:$lvl);
+    $lvl = ($lvl > $lvlMax)?$lvlMax:(($lvl <= $lvlMin)?0:$lvl);
     
     if ($st eq "dimmer"){# at least blind cannot stand ramp time...
       if (!$a[3]){
@@ -7260,18 +7261,18 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
         Nevertheless  - by definition - showInternalValues overrules expert.
         </li>
     <li><a name="#CUL_HMlevelRange">levelRange</a><br>
-        can be used with dimmer only. It defines the dimmable range to be used with this dimmer. 
-        It is meant to support e.g. LED light that reaches max brightness maybe at 40% and starts with 10%.
-        Level range will normalize the Level to the new range. I.e. set to 100% will physically set the 
-        dimmer to 40%, 0% will set to 10% physically.<br>
-        Impacted are teh commands on, up, down, toggle and pct. <b>Not</b> effected is the off command - 
-        this will set Physically 0% always.<br>
+        can be used with dimmer only. It defines the dimmable range to be used with this dimmer-channel. 
+        It is meant to support e.g. LED light that starts at 10% and reaches maxbrightness at 40%.
+        levelrange will normalize the level to this range. I.e. set to 100% will physically set the 
+        dimmer to 40%, 1% will set to 10% physically. 0% still switches physially off.<br>
+        Impacted are commands on, up, down, toggle and pct. <b>Not</b> effected is the off command 
+        which still set physically 0%.<br>
         To be considered:<br>
-        dimmer level set by peers ant buttons is not impacted. This is controlled by respective device register<br>
-        Readings level may be set to negative or over 100%. It simply results from the calculation and reflects that
-        the physical level is above or below the given range<br>
-        in case of virtual dimmer channels available for the device the attribut needs to be set for 
-        each Channel<br>
+        dimmer level set by peers and buttons is not impacted. Those are controlled by device register<br>
+        Readings level may go to negative or above 100%. This simply results from the calculation and reflects
+        physical level is above or below the given range.<br>
+        In case of virtual dimmer channels available present the attribut needs to be set for 
+        each channel<br>
         User should be careful to set min level other then '0'<br>
         Example:<br>
         <ul><code>
