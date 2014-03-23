@@ -653,7 +653,7 @@ sub CUL_HM_Attr(@) {#################################
       return "use $attrName only for device" if (!$hash->{helper}{role}{dev});
     }
   }
-  elsif($attrName eq "levelRange" ){#General fix me
+  elsif($attrName eq "levelRange" ){
     if ($cmd eq "set"){
       return "use $attrName only for dimmer" if (CUL_HM_Get($defs{$name},$name,"param","subType") ne "dimmer");
       my ($min,$max) = split (",",$attrVal);
@@ -1358,13 +1358,13 @@ sub CUL_HM_Parse($$) {#########################################################
               my $vl = ReadingsVal($vh->{NAME},"level","???");
               my $vs = ($vl eq "100"?"on":($vl eq "0"?"off":"$vl"));
               my($clvlMin,$clvlMax)=split",",AttrVal($vh->{NAME}, "levelRange", "0,100");
-              my $plc = int(($pl-$clvlMin)/($clvlMax - $clvlMin)*50)/2;
+              my $plc = int(($pl-$clvlMin)/($clvlMax - $clvlMin)*200)/2;
               $vs = ($plc ne $vl)?"chn:$vs  phys:$plc":$vs;
               push @evtEt,[$vh,1,"state:$vs"];
               push @evtEt,[$vh,1,"phyLevel:$plc"];
             }
             
-            $pl = int(($pl-$lvlMin)/($lvlMax - $lvlMin)*50)/2;
+            $pl = int(($pl-$lvlMin)/($lvlMax - $lvlMin)*200)/2;
             push @evtEt,[$shash,1,"phyLevel:$pl"];      #phys level
             $physLvl = $pl;
           }
@@ -1374,8 +1374,7 @@ sub CUL_HM_Parse($$) {#########################################################
           }
         }
       }
-      Log 1,"General val:$val min:$lvlMin max:$lvlMax new:".($val-$lvlMin)/($lvlMax - $lvlMin)*100;
-      $val = int(($val-$lvlMin)/($lvlMax - $lvlMin)*50)/2;
+      $val = int((($val-$lvlMin)/($lvlMax - $lvlMin))*200)/2;
       $physLvl = ReadingsVal($name,"phyLevel",$val)
             if(!defined $physLvl);             #not updated? use old or ignore
       my $vs = ($val==100 ? "on":($val==0 ? "off":"$val")); # user string...
@@ -1416,8 +1415,16 @@ sub CUL_HM_Parse($$) {#########################################################
         elsif($dir == 0x30){push @evtEt,[$shash,1,"$eventName:err:$vs" ];}
       }
       if (!$rSUpdt){#dont touch if necessary for dimmer
-        if(($err&0x70) != 0x00){CUL_HM_stateUpdatDly($name,120);}
-        else                   {CUL_HM_unQEntity($name,"qReqStat");}
+        if(($err&0x70) != 0x00){
+          my $wt = $shash->{helper}{stateUpdatDly}
+                         ?$shash->{helper}{stateUpdatDly}
+                         :120;
+          CUL_HM_stateUpdatDly($name,$wt);
+        }
+        else {
+          CUL_HM_unQEntity($name,"qReqStat");
+        }
+        delete $shash->{helper}{stateUpdatDly};
       }
  
       if ($st eq "dimmer"){
@@ -2002,7 +2009,8 @@ sub CUL_HM_parseCommon(@){#####################################################
       push @evtEt,[$chnHash,0,"recentStateType:ack"];
      
       if ($shash->{helper}{tmdOn}){
-        if (not hex(substr($p,6,2))&0x40){# not timedOn, we have to repeat
+        if ((not hex(substr($p,6,2))&0x40) && # not timedOn, we have to repeat
+            $shash->{helper}{tmdOn} eq substr($p,2,2) ){# virtual channels for dimmer may be incorrect
           my ($pre,$nbr,$msg) = unpack 'A4A2A*',$shash->{helper}{prt}{rspWait}{cmd};
           $shash->{helper}{prt}{rspWait}{cmd} = sprintf("%s%02X%s",
                                                     $pre,hex($nbr)+1,$msg);
@@ -2303,7 +2311,6 @@ sub CUL_HM_parseCommon(@){#####################################################
 #   CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IOid($shash).$src);
 #   CUL_HM_ProcessCmdStack($shash);
   }
-
   if ($shash->{helper}{prt}{rspWait}{mNo}             &&
       $shash->{helper}{prt}{rspWait}{mNo} eq $mNo     &&
       !$repeat){
@@ -3121,6 +3128,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "timer value to low" if ($tval eq "0000");
     $ramp = ($ramp && $st eq "dimmer")?CUL_HM_encodeTime16($ramp):"0000";
     delete $hash->{helper}{dlvl};#stop desiredLevel supervision
+    $hash->{helper}{stateUpdatDly} = ($duration>120)?$duration:120;
     CUL_HM_PushCmdStack($hash,"++${flag}11$id${dst}02${chn}C8$ramp$tval");
     $hash = $chnHash; # report to channel if defined
   }
@@ -3143,7 +3151,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$val.$chn);  # SET_LOCK
   }
   elsif($cmd =~ m/^(up|down|pct)$/) { #########################################
-    my ($lvl,$tval,$rval) = ($a[2],"","");
+    my ($lvl,$tval,$rval,$duration) = ($a[2],"","",0);
     $lvl =~ s/(\d*\.?\d*).*/$1/;
     my($lvlMin,$lvlMax)=split",",AttrVal($name, "levelRange", "0,100");
 
@@ -3157,11 +3165,11 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $lvl += CUL_HM_getChnLvl($name);
     }
     $lvl = ($lvl > $lvlMax)?$lvlMax:(($lvlMin < 0)?$lvlMin:$lvl);
-    Log 1,"General  in:$a[2] new:$lvl min:$lvlMin max:$lvlMax";
     
     if ($st eq "dimmer"){# at least blind cannot stand ramp time...
       if (!$a[3]){
         $tval = "FFFF";
+        $duration = 0;
       }
       elsif ($a[3] =~ m /(..):(..):(..)/){
         my ($eH,$eM,$eSec)  = ($1,$2,$3);
@@ -3169,16 +3177,19 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         my @lt = localtime;
         my $ltSec = $lt[2]*3600+$lt[1]*60+$lt[0];# actually strip of date
         $eSec += 3600*24 if ($ltSec > $eSec); # go for the next day
-        $tval = CUL_HM_encodeTime16($eSec - $ltSec);
+        $duration = $eSec - $ltSec;
+        $tval = CUL_HM_encodeTime16($duration);
       }
       else{
-        $tval = CUL_HM_encodeTime16($a[3]);# onTime 0.05..85825945.6, 0=forever
+        $duration = $a[3];
+        $tval = CUL_HM_encodeTime16($duration);# onTime 0.05..85825945.6, 0=forever
       }
       $rval = CUL_HM_encodeTime16((@a > 4)?$a[4]:2.5);# rampTime 0.0..85825945.6, 0=immediate
+      $hash->{helper}{stateUpdatDly} = ($duration>120)?$duration:120;
     }
     # store desiredLevel in and its Cmd in case we have to repeat
     my $lvlx = sprintf("%02X",$lvl*2);
-    if ($tval && $tval ne "FFFF"){
+    if ($tval ne "FFFF"){
       delete $hash->{helper}{dlvl};#stop desiredLevel supervision
     }
     else{
@@ -4370,7 +4381,9 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       my $to = "";
       if ($chn eq "02"){#!!! chn is subtype!!!
         if ($dat =~ m/(..)....(....)/){#lvl ne 0 and timer on
-          $hash->{helper}{tmdOn} = $2 if ($1 ne "00" && $2 !~ m/(0000|FFFF)/);
+          # store Channel in this datafield. 
+          # dimmer may answer with wrong virtual channel - then dont resent!
+          $hash->{helper}{tmdOn} = $sTp if ($1 ne "00" && $2 !~ m/(0000|FFFF)/);
           $to = "timedOn:=1";
         }
       }
@@ -6077,7 +6090,7 @@ sub CUL_HM_procQs($){#process non-wakeup queues
   foreach my $q ("qReqStat","qReqConf"){
     if   (@{$mq->{$q}}){
       my $devN = ${$mq->{$q}}[0];
-      my $ioName = $defs{$devN}{IODev}{NAME};      
+      my $ioName = $defs{$devN}{IODev}{NAME};   
       if(!defined $ioName){   
         AssignIoPort($defs{$devN});
         next  if(!defined $defs{$devN}{IODev}{NAME});
