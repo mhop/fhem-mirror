@@ -300,6 +300,11 @@ SYSMON_updateCurrentReadingsMap($) {
     }
   }
 
+# TEST: TODO
+$rMap->{"io_sda_raw"}         = "TEST";
+$rMap->{"io_sda_diff"}         = "TEST";
+$rMap->{"io_sda"}         = "TEST";
+
   $cur_readings_map = $rMap;
   return $rMap;
 }
@@ -309,8 +314,14 @@ SYSMON_getObsoleteReadingsMap($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	
-	my $rMap;
+	my $rMap; 
 	
+	#return $rMap; # TODO TEST
+	
+	if(!defined($cur_readings_map)) {
+	  SYSMON_updateCurrentReadingsMap($hash);
+  }
+
 	# alle READINGS durchgehen
 	my @cKeys=keys (%{$defs{$name}{READINGS}});
   foreach my $aName (@cKeys) {
@@ -562,7 +573,7 @@ SYSMON_obtainParameters($$)
   $map = SYSMON_getFHEMUptime($hash, $map);
 
   if($m1 gt 0) { # Nur wenn > 0
-    # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg
+    # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg, procstat, iostat
     if($refresh_all || ($ref % $m1) eq 0) {
     	#Log 3, "SYSMON -----------> DEBUG: read CPU-Temp"; 
     	if(SYSMON_isCPUTempRPi($hash)) { # Rasp
@@ -576,6 +587,7 @@ SYSMON_obtainParameters($$)
       }
       $map = SYSMON_getLoadAvg($hash, $map);
       $map = SYSMON_getCPUProcStat($hash, $map);
+      #$map = SYSMON_getDiskStat($hash, $map);
     }
   }
 
@@ -823,6 +835,181 @@ SYSMON_getCPUBogoMIPS($$)
   
 	return $map;
 }
+
+#------------------------------------------------------------------------------
+# leifert Werte aus /proc/diskstat
+# Werte:
+# 1 - major number
+# 2 - minor mumber
+# 3 - device name
+# Dann Datenwerte:
+#   Field  1 -- # of reads issued
+#   Field  2 -- # of reads merged
+#   Field  3 -- # of sectors read
+#   Field  4 -- # of milliseconds spent reading
+#   Field  5 -- # of writes completed
+#   Field  6 -- # of writes merged
+#   Field  7 -- # of sectors written
+#   Field  8 -- # of milliseconds spent writing
+#   Field  9 -- # of I/Os currently in progress
+#   Field 10 -- # of milliseconds spent doing I/Os
+#   Field 11 -- weighted # of milliseconds spent doing I/Os
+# Interessant sind eigentlich "nur" Feld 2 (readin), Feld 5 (write)
+# Wenn es eher "um die zeit" geht, Feld 4 (reading), Feld 8 (writing), Feld 10 (Komplett)
+# Kleiner Hinweis, Fled 1 ist das 4. der Liste, das 3. Giebt den Namen an. 
+# Es giebt für jedes Devine und jede Partition ein Eintrag. 
+# A /proc/diskstats continuously updated and all that is necessary for us - 
+# make measurements for "second field" and "fourth field" in two different moment of time, 
+# receiving a difference of values and dividing it into an interval of time, 
+# we shall have Disk I/O stats in sectors/sec. Multiply this result on 512 (number of bytes in one sector) 
+# we shall have Disk I/O stats in bytes/sec. 
+#
+# ...
+# https://www.kernel.org/doc/Documentation/iostats.txt
+#   Field  1 -- # of reads completed
+#       This is the total number of reads completed successfully.
+#   Field  2 -- # of reads merged, field 6 -- # of writes merged
+#       Reads and writes which are adjacent to each other may be merged for
+#       efficiency.  Thus two 4K reads may become one 8K read before it is
+#       ultimately handed to the disk, and so it will be counted (and queued)
+#       as only one I/O.  This field lets you know how often this was done.
+#   Field  3 -- # of sectors read
+#       This is the total number of sectors read successfully.
+#   Field  4 -- # of milliseconds spent reading
+#       This is the total number of milliseconds spent by all reads (as
+#       measured from __make_request() to end_that_request_last()).
+#   Field  5 -- # of writes completed
+#       This is the total number of writes completed successfully.
+#   Field  6 -- # of writes merged
+#       See the description of field 2.
+#   Field  7 -- # of sectors written
+#       This is the total number of sectors written successfully.
+#   Field  8 -- # of milliseconds spent writing
+#       This is the total number of milliseconds spent by all writes (as
+#       measured from __make_request() to end_that_request_last()).
+#   Field  9 -- # of I/Os currently in progress
+#       The only field that should go to zero. Incremented as requests are
+#       given to appropriate struct request_queue and decremented as they finish.
+#   Field 10 -- # of milliseconds spent doing I/Os
+#       This field increases so long as field 9 is nonzero.
+#   Field 11 -- weighted # of milliseconds spent doing I/Os
+#       This field is incremented at each I/O start, I/O completion, I/O
+#       merge, or read of these stats by the number of I/Os in progress
+#       (field 9) times the number of milliseconds spent doing I/O since the
+#       last update of this field.  This can provide an easy measure of both
+#       I/O completion time and the backlog that may be accumulating.
+#
+# 
+#   Disks vs Partitions
+#   -------------------
+#   
+#   There were significant changes between 2.4 and 2.6 in the I/O subsystem.
+#   As a result, some statistic information disappeared. The translation from
+#   a disk address relative to a partition to the disk address relative to
+#   the host disk happens much earlier.  All merges and timings now happen
+#   at the disk level rather than at both the disk and partition level as
+#   in 2.4.  Consequently, you'll see a different statistics output on 2.6 for
+#   partitions from that for disks.  There are only *four* fields available
+#   for partitions on 2.6 machines.  This is reflected in the examples above.
+#   
+#   Field  1 -- # of reads issued
+#       This is the total number of reads issued to this partition.
+#   Field  2 -- # of sectors read
+#       This is the total number of sectors requested to be read from this
+#       partition.
+#   Field  3 -- # of writes issued
+#       This is the total number of writes issued to this partition.
+#   Field  4 -- # of sectors written
+#       This is the total number of sectors requested to be written to
+#       this partition.
+#------------------------------------------------------------------------------
+sub
+SYSMON_getDiskStat($$)
+{
+	my ($hash, $map) = @_;
+	my @values = SYSMON_execute($hash, "cat /proc/diskstats");
+
+  for my $entry (@values){
+	  $map = SYSMON_getDiskStat_intern($hash, $map, $entry);
+	  #Log 3, "SYSMON-DEBUG-IOSTAT:   ".$entry;
+  }
+
+  return $map;
+}
+
+sub
+SYSMON_getDiskStat_intern($$$) 
+{
+	my ($hash, $map, $entry) = @_;
+	
+	my ($d1, $d2, $pName, $nf1, $nf2, $nf3, $nf4, $nf5, $nf6, $nf7, $nf8, $nf9, $nf10, $nf11) = split(/\s+/, trim($entry));
+	
+	Log 3, "SYSMON-DEBUG-IOSTAT:   ".$pName." = ".$nf1." ".$nf2." ".$nf3." ".$nf4." ".$nf5." ".$nf6." ".$nf7." ".$nf8." ".$nf9." ".$nf10." ".$nf11;
+	
+	# Nur nicht-null-Werte
+	if($nf1 eq "0") {
+		return $map;
+	} 
+	
+	$pName = "io_".$pName;
+	#Log 3, "SYSMON-DEBUG-IOSTAT:   ".$pName;
+	
+	# Partition and 2.6-Kernel?
+	if(defined($nf5)) {
+	  # no
+	  $map->{$pName."_raw"}=$nf1." ".$nf2." ".$nf3." ".$nf4." ".$nf5." ".$nf6." ".$nf7." ".$nf8." ".$nf9." ".$nf10." ".$nf11;
+  } else {
+    $map->{$pName."_raw"}=$nf1." ".$nf2." ".$nf3." ".$nf4;
+  }
+  #$map->{"iostat_test"}="TEST";
+	my $lastVal = ReadingsVal($hash->{NAME},$pName."_raw",undef);
+	Log 3, "SYSMON-DEBUG-IOSTAT:   lastVal: $pName=".$lastVal;
+	if(defined $lastVal) {
+		# Diff. ausrechnen, falls vorherigen Werte vorhanden sind.
+		my($af1, $af2, $af3, $af4, $af5, $af6, $af7, $af8, $af9, $af10, $af11) = split(/\s+/, $lastVal);
+	  
+	  Log 3, "SYSMON-DEBUG-IOSTAT:   X: ".$pName." = ".$af1." ".$af2." ".$af3." ".$af4." ".$af5." ".$af6." ".$af7." ".$af8." ".$af9." ".$af10." ".$af11;
+	  
+	  my $sectorsRead;
+	  my $sectorsWritten;
+	
+	  my $df1 = $nf1-$af1;
+	  my $df2 = $nf2-$af2;
+	  my $df3 = $nf3-$af3;
+	  my $df4 = $nf4-$af4;
+	  # Partition and 2.6-Kernel?
+	  if(defined($nf5)) {
+	  	# no
+	    my $df5 = $nf5-$af5;
+	    my $df6 = $nf6-$af6;
+	    my $df7 = $nf7-$af7;
+	    my $df8 = $nf8-$af8;
+	    my $df9 = $nf9-$af9;
+	    my $df10 = $nf10-$af10;
+	    my $df11 = $nf11-$af11;
+	    $map->{$pName."_diff"}=$df1." ".$df2." ".$df3." ".$df4." ".$df5." ".$df6." ".$df7." ".$df8." ".$df9." ".$df10." ".$df11;
+	    
+      $sectorsRead = $df3;
+      $sectorsWritten = $df7;
+	  } else {
+	    $map->{$pName."_diff"}=$df1." ".$df2." ".$df3." ".$df4;	  	
+	    
+	    $sectorsRead = $df2;
+      $sectorsWritten = $df4;
+	  }
+	  
+	  my $sectorBytes = 512;
+	  
+	  my $BytesRead    = $sectorsRead*$sectorBytes;
+	  my $BytesWritten = $sectorsWritten*$sectorBytes;
+	  
+	  # TODO: Summenwerte
+	  $map->{$pName.""}=sprintf("bytes read: %d bytes written: %d",$BytesRead, $BytesWritten);
+  }
+
+	return $map;
+}
+
 
 #------------------------------------------------------------------------------
 # leifert Werte aus /proc/stat
@@ -1217,6 +1404,11 @@ sub SYSMON_ShowValuesFmt ($$;@)
     }
     
     my $hash = $main::defs{$name};
+    
+    if(!defined($cur_readings_map)) {
+	    SYSMON_updateCurrentReadingsMap($hash);
+    }
+  
     SYSMON_updateCurrentReadingsMap($hash);
 #Log 3, "SYSMON $>name, @data<";
   my @dataDescription = @data;
