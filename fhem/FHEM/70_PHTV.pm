@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.2
+# Version: 1.2.3
 #
 # Major Version History:
 # - 1.2.0 - 2014-03-12
@@ -1387,15 +1387,34 @@ sub PHTV_ReceiveCommand($$$) {
               "PHTV $name: RCV TIMEOUT $service/" . urlDecode($cmd);
         }
 
-        $newstate = "absent";
-        if (
-            ( !defined( $hash->{helper}{AVAILABLE} ) )
-            or ( defined( $hash->{helper}{AVAILABLE} )
-                and $hash->{helper}{AVAILABLE} eq 1 )
-          )
-        {
-            $hash->{helper}{AVAILABLE} = 0;
-            readingsBulkUpdate( $hash, "presence", "absent" );
+        # device is not reachable or
+        # does not even support master command for audio
+        if ( $service eq "audio/volume" ) {
+            $newstate = "absent";
+
+            if (
+                ( !defined( $hash->{helper}{AVAILABLE} ) )
+                or ( defined( $hash->{helper}{AVAILABLE} )
+                    and $hash->{helper}{AVAILABLE} eq 1 )
+              )
+            {
+                $hash->{helper}{AVAILABLE} = 0;
+                readingsBulkUpdate( $hash, "presence", "absent" );
+            }
+        }
+
+        # device behaves naughty
+        else {
+            $newstate = "on";
+
+            # because it does not seem to support the command
+            if ( !defined( $hash->{helper}{supportedAPIcmds}{$service} ) ) {
+                $hash->{helper}{supportedAPIcmds}{$service} = 0;
+                Log3 $name, 3,
+                    "PHTV $name: API command '"
+                  . $service
+                  . "' not supported by device.";
+            }
         }
     }
 
