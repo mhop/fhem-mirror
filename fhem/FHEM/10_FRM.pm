@@ -666,7 +666,11 @@ sub FRM_I2C_Write
 				last;
 			};
 			$package->{direction} eq "i2cread" and do {
-				$firmata->i2c_read($package->{i2caddress},$package->{reg},$package->{nbyte});
+				if (defined $package->{reg}) {
+					$firmata->i2c_readonce($package->{i2caddress},$package->{reg},defined $package->{nbyte} ? $package->{nbyte} : 1);
+				} else {
+					$firmata->i2c_readonce($package->{i2caddress},defined $package->{nbyte} ? $package->{nbyte} : 1);
+				}
 				last;
 			};
 		}
