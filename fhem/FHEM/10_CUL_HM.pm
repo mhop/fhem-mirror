@@ -1358,13 +1358,15 @@ sub CUL_HM_Parse($$) {#########################################################
               my $vl = ReadingsVal($vh->{NAME},"level","???");
               my $vs = ($vl eq "100"?"on":($vl eq "0"?"off":"$vl"));
               my($clvlMin,$clvlMax)=split",",AttrVal($vh->{NAME}, "levelRange", "0,100");
-              my $plc = int(($pl-$clvlMin)/($clvlMax - $clvlMin)*200+.99)/2;
+              my $plc = int(($pl-$clvlMin)/($clvlMax - $clvlMin)*200)/2;
+              $plc = 1 if ($pl && $plc <= 0);
               $vs = ($plc ne $vl)?"chn:$vs  phys:$plc":$vs;
               push @evtEt,[$vh,1,"state:$vs"];
               push @evtEt,[$vh,1,"phyLevel:$plc"];
             }
-            
-            $pl = int(($pl-$lvlMin)/($lvlMax - $lvlMin)*200+.99)/2;
+            $pl = (($pl-$lvlMin)<=0 && $pl)
+                     ? 1
+                     : int(($pl-$lvlMin)/($lvlMax - $lvlMin)*200)/2;
             push @evtEt,[$shash,1,"phyLevel:$pl"];      #phys level
             $physLvl = $pl;
           }
@@ -1375,7 +1377,9 @@ sub CUL_HM_Parse($$) {#########################################################
         }
       }
       my $pVal = $val;# necessary for roper 'off', not logical off
-      $val = int((($val-$lvlMin)/($lvlMax - $lvlMin))*200+.99)/2;
+      $val = (($val-$lvlMin)<=0 && $val)
+                  ? 1
+                  : int((($val-$lvlMin)/($lvlMax - $lvlMin))*200)/2;
       $physLvl = ReadingsVal($name,"phyLevel",$val)
             if(!defined $physLvl);             #not updated? use old or ignore
       my $vs = ($val==100 ? "on":($pVal==0 ? "off":"$val")); # user string...
