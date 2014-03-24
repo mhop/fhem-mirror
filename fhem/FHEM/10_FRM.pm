@@ -43,6 +43,7 @@ my @clients = qw(
   FRM_STEPPER
   OWX
   I2C_LCD
+  I2C_DS1307
   I2C_PC.*
   I2C_MCP23017
   I2C_BMP180
