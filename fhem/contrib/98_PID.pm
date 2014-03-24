@@ -1,5 +1,5 @@
 ##############################################
-# $Id$
+# $Id: 98_PID.pm 4930 2014-02-15 03:59:16Z betateilchen $
 # This module is derived from the contrib/99_PID by Alexander Titzel.
 
 package main;
