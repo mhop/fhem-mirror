@@ -73,14 +73,14 @@ I2C_LCD_Init($$)
   
   $hash->{sizex} = shift @$args;
   $hash->{sizey} = shift @$args;
-  $hash->{address} = shift @$args if (@$args); 
+  $hash->{I2C_Address} = shift @$args if (@$args); 
 
   my $name = $hash->{NAME};
-  if (defined $hash->{address}) {
+  if (defined $hash->{I2C_Address}) {
     eval {
       main::AssignIoPort($hash,AttrVal($hash->{NAME},"IODev",undef));
       require LiquidCrystal_I2C;
-      my $lcd = LiquidCrystal_I2C->new($hash->{address},$hash->{sizex},$hash->{sizey});
+      my $lcd = LiquidCrystal_I2C->new($hash->{I2C_Address},$hash->{sizex},$hash->{sizey});
       $lcd->attach(I2C_LCD_IO->new($hash));
       $lcd->init();
       $hash->{lcd} = $lcd;
@@ -124,7 +124,6 @@ I2C_LCD_Attr($$$$) {
       }
     }
   };
-  return $@ if $@;
   my $ret = I2C_LCD_Catch($@) if $@;
   if ($ret) {
     $hash->{STATE} = "error setting $attribute to $value: ".$ret;
