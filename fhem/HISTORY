@@ -554,3 +554,7 @@
 
 - Fri Mar 07 2014 (betateilchen)
   - First officiel release of configDB via update process 
+
+- Mon Mar 24 2014 (betateilchen)
+  - old module 98_PID.pm moved to contrib
+    will be replaced by 98_PID20.pm in next major release

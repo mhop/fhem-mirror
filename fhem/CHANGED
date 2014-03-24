@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - change:  old module 98_PID.pm moved to contrib as preparation for
+             next major replace. Replaced by 98_PID20.pm (John/betateilchen)
   - change:  openweathermap: added set command „clear“ 
   - change:  MAX: interpret SetTemperature command from WT to HT
   - feature: MAX: retry packets 3 times if missing an ack
