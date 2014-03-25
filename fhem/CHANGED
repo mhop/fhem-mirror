@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: new module 00_RPII2C.pm, 52_I2C_PCA9532.pm, 52_I2C_PCF8574.pm, 52_I2C_SHT21.pm added (klausw)
   - change:  module 71_LISTENLIVE.pm moved to contrib
              module 23_WEBTHERM.pm   moved to contrib
   - change:  module 98_PID.pm        moved to contrib as preparation for
