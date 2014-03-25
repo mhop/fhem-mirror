@@ -170,7 +170,8 @@ at_Attr(@)
     return "startTimes: $name is not relative" if(!$rel);
     my (undef, $hr, $min, $sec, undef) = GetTimeSpec($tspec);
 
-    my $alTime = ($alHr*60+$alMin)*60+$alSec;
+    my $now = time();
+    my $alTime = ($alHr*60+$alMin)*60+$alSec-fhemTzOffset($now);
     my $step = ($hr*60+$min)*60+$sec;
     my $ttime = int($hash->{TRIGGERTIME});
     my $off = ($ttime % 86400) - 86400;
@@ -178,7 +179,7 @@ at_Attr(@)
       $off += $step;
     }
     $ttime += ($alTime-$off);
-    $ttime += $step if($ttime < time());
+    $ttime += $step if($ttime < $now);
 
     RemoveInternalTimer($hash);
     InternalTimer($ttime, "at_Exec", $hash, 0);
