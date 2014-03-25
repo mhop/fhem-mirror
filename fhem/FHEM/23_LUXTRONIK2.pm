@@ -1601,6 +1601,8 @@ LUXTRONIK2_doStatisticDelta ($$$$)
   <br>
   <i>The modul is reported to work with firmware: V1.54C, V1.60, V1.69.</i>
   <br>
+  More Info on the particular <a href="http://www.fhemwiki.de/wiki/Luxtronik_2.0">page of FHEM-Wiki</a> (in German).
+  <br>
   &nbsp;
   <br>
   
@@ -1666,7 +1668,8 @@ LUXTRONIK2_doStatisticDelta ($$$$)
          <br>
          Corrects the clock of the heatpump automatically if a certain <i>delay</i> (10 s - 600 s) against the FHEM time is exeeded. Does a firmware check before.
          <br>
-         <i>(A 'delayDeviceTimeCalc' &lt;= 2 s can be caused by the internal calculation interval of the heat pump controller.)</i></li>
+         <i>(A 'delayDeviceTimeCalc' &lt;= 2 s can be caused by the internal calculation interval of the heat pump controller.)</i>
+         </li><br>
       <li><code>ignoreFirmwareCheck &lt; 0 | 1 &gt;</code>
          <br>
          A firmware check assures before each set operation that a heatpump controller with untested firmware is not damaged accidently.
@@ -1690,9 +1693,10 @@ LUXTRONIK2_doStatisticDelta ($$$$)
   Sie besitzt einen Ethernet Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.
   <br>
   <i>Das Modul wurde bisher mit folgender Steuerungs-Firmware getestet: V1.54C, V1.60, V1.69.</i>
+  <br>
+  Mehr Infos unter im entsprechenden <a href="http://www.fhemwiki.de/wiki/Luxtronik_2.0">Artikel der FHEM-Wiki</a>.
   <br>&nbsp;
   <br>
-  
   <a name="LUXTRONIK2define"></a>
   <b>Define</b>
   <ul>
@@ -1774,7 +1778,8 @@ LUXTRONIK2_doStatisticDelta ($$$$)
       gesetzt ist, dann wird der Firmware-Test ignoriert und neue Firmware kann getestet werden.
       Dieses Attribut wird jedoch ignoriert, wenn die Steuerungs-Firmware bereits als nicht kompatibel berichtet wurde.
       </li><br>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a>
+    </li><br>
   </ul>
 </ul>
 
