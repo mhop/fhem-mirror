@@ -1211,10 +1211,12 @@ sub CUL_HM_Parse($$) {#########################################################
   }
   elsif($md eq "HM-SEN-EP") { #################################################
     if ($mTp eq "40"){
-      my (undef,$counter) = unpack 'A2A2',$p;
-      $counter = hex($counter);
+      my ($chn,$counter) = unpack 'A2A2',$p;
+      $shash = $modules{CUL_HM}{defptr}{$src.$chn}
+                             if($modules{CUL_HM}{defptr}{$src.$chn});
+#      $counter = hex($counter);
       push @evtEt,[$shash,1,"state:".$counter];
-      push @evtEt,[$shash,1,"counter:".$counter];
+      push @evtEt,[$shash,1,"trigger:Short_$counter"];
     }
   }
   elsif($st eq "THSensor") { ##################################################
@@ -5244,7 +5246,7 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   }
   else{
     return "invalid:regname or address"
-	      if($addr<1 ||$addr>255);
+            if($addr<1 ||$addr>255);
   }
   my $dst = substr(CUL_HM_name2Id($name),0,6);
   if(!$regLN){
@@ -5279,8 +5281,8 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
       $dRead = $dReadS;
     }
     else{
-	  if (grep /$regLN../,keys %{$hash->{READINGS}} &&
-	       !$peerId){
+      if (grep /$regLN../,keys %{$hash->{READINGS}} &&
+           !$peerId){
         return "invalid:peer missing";
       }
       return "invalid" if (!defined($dRead) || $dRead eq "");
@@ -5545,7 +5547,7 @@ sub CUL_HM_time2min($) { # minutes -> time
   return $m;
 }
 
-sub CUL_HM_getRegN($$$){
+sub CUL_HM_getRegN($$$){ # get list of register for a model
   my ($st,$md,$chn) = @_;
   my @regArr = keys %{$culHmRegGeneral};
   push @regArr, keys %{$culHmRegType->{$st}}      if($culHmRegType->{$st});

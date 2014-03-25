@@ -1344,7 +1344,6 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
 $culHmSubTypeSets{pushButton}      = $culHmSubTypeSets{remote};
 $culHmSubTypeSets{swi}             = $culHmSubTypeSets{remote};
 
-$culHmSubTypeSets{sensor}          = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{KFM100}          = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{blindActuatorSol}= $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{tipTronic}       = $culHmSubTypeSets{outputUnit};
@@ -1383,7 +1382,7 @@ $culHmModelSets{"HM-RC-19-SW"}         = $culHmModelSets{"HM-RC-19"};
 
 $culHmModelSets{"HM-OU-CM-PCB"}        = $culHmModelSets{"HM-OU-CFM-PL"};
 $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
-
+$culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
 
 #%{$culHmModelSets{"HM-RC-19-SW"}} = %{$culHmModelSets{"HM-RC-19"}}; copy
 
