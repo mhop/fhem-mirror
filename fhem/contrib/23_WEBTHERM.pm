@@ -1,4 +1,4 @@
-# $Id$
+# $Id: 23_WEBTHERM.pm 4793 2014-02-02 11:20:16Z betateilchen $
 ################################################################
 #
 #	This module will connect a webbased thermometer

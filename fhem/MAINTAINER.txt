@@ -88,7 +88,6 @@ FHEM/23_ALL4027.pm           sachag               http://forum.fhem.de Sonstiges
 FHEM/23_LUXTRONIK2.pm        oskarfessel          http://forum.fhem.de Sonstiges
 FHEM/23_WEBIO.pm             sachag               http://forum.fhem.de Sonstiges
 FHEM/23_WEBIO_12DIGITAL.pm   sachag               http://forum.fhem.de Sonstiges
-FHEM/23_WEBTHERM.pm          betateilchen/sachag  http://forum.fhem.de Sonstiges
 FHEM/24_NetIO230B.pm         rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
 FHEM/30_HUEBridge.pm         justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/30_ENECSYSGW.pm         akw                  http://forum.fhem.de Sonstige Systeme
@@ -103,7 +102,7 @@ FHEM/33_readingsProxy.pm     justme1968           http://forum.fhem.de Automatis
 FHEM/32_speedtest.pm         justme1968           http://forum.fhem.de Sonstiges
 FHEM/34_panStamp.pm          justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/34_SWAP.pm              justme1968           http://forum.fhem.de Sonstige Systeme
-FHEM/35_SWAP_0000002200000003.pm              justme1968           http://forum.fhem.de Sonstige Systeme
+FHEM/35_SWAP_0000002200000003.pm     justme1968   http://forum.fhem.de Sonstige Systeme
 FHEM/36_JeeLink.pm           justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/36_PCA301.pm            justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/36_LaCrosse.pm          justme1968           http://forum.fhem.de Sonstige Systeme
@@ -141,7 +140,7 @@ FHEM/66_ECMD.pm              borisneubert         http://forum.fhem.de Sonstiges
 FHEM/67_ECMDDevice.pm        borisneubert         http://forum.fhem.de Sonstiges
 FHEM/70_EGPM.pm              alexus               http://forum.fhem.de Sonstiges
 FHEM/70_ENIGMA2.pm           loredo               http://forum.fhem.de Multimedia
-FHEM/70_JSONMETER.pm         tupol                http://forum.fhem.de Sonstiges / if no reaction please via PM
+FHEM/70_JSONMETER.pm         tupol                http://forum.fhem.de Sonstiges / PM
 FHEM/70_PHTV.pm              loredo               http://forum.fhem.de Multimedia
 FHEM/70_ONKYO_AVR.pm         loredo               http://forum.fhem.de Multimedia
 FHEM/70_SCIVT.pm             rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
@@ -153,8 +152,7 @@ FHEM/70_USBWX.pm             wherzig              http://forum.fhem.de Sonstiges
 FHEM/70_VIERA.pm             teevau               http://forum.fhem.de Sonstiges
 FHEM/70_WS3600.pm            Josch                http://forum.fhem.de Sonstiges
 FHEM/70_XBMC.pm              dennisb              http://forum.fhem.de Multimedia
-FHEM/70_Pushover.pm          Johannes_B           http://forum.fhem.de Unterst�tzende Dienste
-FHEM/71_LISTENLIVE.pm        betateilchen         http://forum.fhem.de Multimedia
+FHEM/70_Pushover.pm          Johannes_B           http://forum.fhem.de Unterstuetzende Dienste
 FHEM/71_YAMAHA_AVR.pm        markusbloch          http://forum.fhem.de Multimedia
 FHEM/71_YAMAHA_BD.pm         markusbloch          http://forum.fhem.de Multimedia
 FHEM/72_FB_CALLMONITOR.pm    markusbloch          http://forum.fhem.de Unterstuetzende Dienste
@@ -197,12 +195,11 @@ FHEM/98_Heating_Control.pm   dietmar63            http://forum.fhem.de Unterstue
 FHEM/98_HTTPMOD.pm           stefanstrobel        http://forum.fhem.de Sonstiges
 FHEM/98_JsonList.pm          mfr69bs              http://forum.fhem.de Automatisierung
 FHEM/98_JsonList2.pm         rudolfkoenig         http://forum.fhem.de Automatisierung
-FHEM/98_PID.pm               betateilchen         http://forum.fhem.de Automatisierung
 FHEM/98_RandomTimer.pm       dietmar63            http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_SVG.pm               rudolfkoenig         http://forum.fhem.de Frontends
 FHEM/98_THRESHOLD.pm         damian-s             http://forum.fhem.de Automatisierung
 FHEM/98_WeekdayTimer.pm      dietmar63            http://forum.fhem.de Unterstuetzende Dienste
-FHEM/98_WOL.pm               dietmar63            http://forum.fhem.de Unterst�tzende Dienste
+FHEM/98_WOL.pm               dietmar63            http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_XmlList.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_autocreate.pm        rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_average.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
@@ -236,6 +233,9 @@ FHEM/lib/Device/Firmata/*    ntruchsess           http://forum.fhem.de Sonstiges
 FHEM/FhemUtils/*             mfr69bs              http://forum.fhem.de Sonstiges
                                                 
 contrib/YAF/*                danielweisensee      http://forum.fhem.de Frontends
+contrib/23_WEBTHERM.pm       betateilchen/sachag  http://forum.fhem.de Sonstiges
+contrib/71_LISTENLIVE.pm     betateilchen         http://forum.fhem.de Multimedia
+contrib/98_PID.pm            betateilchen         http://forum.fhem.de Automatisierung
                                                 
 www/gplot/*                  rudolfkoenig         http://forum.fhem.de Frontends
 www/images/*                 ulimaass             http://forum.fhem.de Frontends
