@@ -155,7 +155,7 @@ pre { white-space: pre-wrap; }
 
 /* ==============     SVG      ============== */ 
 
-svg      { height:32px; width:32px; fill:#1c7efb; }
+svg      { height:32px; width:32px; fill:#1c7efb; vertical-align:middle; margin:2px 0; }
 table.room svg.icon { margin-left: -43px; margin-right:20px; }
 
 svg.icon { margin-left: 7px; margin-right:20px; }

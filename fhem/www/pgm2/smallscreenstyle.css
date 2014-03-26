@@ -75,7 +75,7 @@ button.dist { margin:5px; background:transparent; border:0px; cursor:pointer; }
           -webkit-user-select:none; -moz-user-select:none; -user-select:none;
           border:3px solid; color:#278727; text-align:center; } 
 
-svg { height:32px; width:32px; fill:#278727; }
+svg { height:32px; width:32px; fill:#278727; vertical-align:middle; margin:2px 0; }
 svg.on,svg.FS20_on { fill:orange; }
 
 .changed { color:red; }

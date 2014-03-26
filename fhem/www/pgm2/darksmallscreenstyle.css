@@ -78,7 +78,7 @@ select {  margin-left:5px; margin-right:5px; }
 .downText,.makeSelect select { margin:0.7em; }
 
 
-svg { height:32px; width:32px; fill:#fff; }
+svg { height:32px; width:32px; fill:#fff; vertical-align:middle; margin:2px 0; }
 g.on { fill:red; }
 
 /* next lines are for remotecontrol */
