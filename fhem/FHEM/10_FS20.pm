@@ -81,6 +81,7 @@ my %models = (
     fs20ze      => 'sender',    # FunkTimer (ZeitEinheit?)
     fs20bf      => 'sender',    # BodenFeuchte
     fs20bs      => 'sender',    # Beschattung
+    fs20si3     => 'sender',    # 3 Kanal Schaltinterface
     dummySender => 'sender',
 
     fs20di      => 'dimmer',
@@ -650,7 +651,7 @@ four2hex($$)
           <b>Sender/Sensor</b>: fs20fms fs20hgs fs20irl fs20kse fs20ls
           fs20pira fs20piri fs20piru fs20s16 fs20s20 fs20s4  fs20s4a fs20s4m
           fs20s4u fs20s4ub fs20s8 fs20s8m fs20sd  fs20sn  fs20sr fs20ss
-          fs20str fs20tc1 fs20tc6 fs20tfk fs20tk  fs20uts fs20ze fs20bf<br><br>
+          fs20str fs20tc1 fs20tc6 fs20tfk fs20tk  fs20uts fs20ze fs20bf fs20si3<br><br>
 
           <b>Dimmer</b>: fs20di  fs20di10 fs20du<br><br>
 
@@ -902,7 +903,7 @@ four2hex($$)
       <b>Sender/Sensor</b>: fs20fms fs20hgs fs20irl fs20kse fs20ls
       fs20pira fs20piri fs20piru fs20s16 fs20s20 fs20s4  fs20s4a fs20s4m
       fs20s4u fs20s4ub fs20s8 fs20s8m fs20sd  fs20sn  fs20sr fs20ss
-      fs20str fs20tc1 fs20tc6 fs20tfk fs20tk  fs20uts fs20ze fs20bf<br><br>
+      fs20str fs20tc1 fs20tc6 fs20tfk fs20tk  fs20uts fs20ze fs20bf fs20si3<br><br>
 
       <b>Dimmer</b>: fs20di  fs20di10 fs20du<br><br>
 
