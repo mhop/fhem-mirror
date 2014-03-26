@@ -196,6 +196,7 @@ holiday_Get($@)
 {
   my ($hash, @a) = @_;
 
+  shift(@a) if($a[1] && $a[1] eq "MM-DD");
   return "argument is missing" if(int(@a) != 2);
   my $arg;
 
@@ -211,7 +212,7 @@ holiday_Get($@)
 
   } else {
     return "unknown argument $a[1], ".
-                "choose one of yesterday today tomorrow MM-DD";
+              "choose one of yesterday:noArg today:noArg tomorrow:noArg MM-DD";
 
   }
   return holiday_refresh($hash->{NAME}, $arg);
