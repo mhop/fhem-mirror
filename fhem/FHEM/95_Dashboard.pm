@@ -42,6 +42,7 @@
 #          Custom CSS over new Attribute dashboard_customcss. Fix Bug that affect new groups.
 # 2.07: Fix GroupWidget-Error with readingGroups in hiddenroom
 # 2.08: Fix dashboard_webfrontendfilter Error-Message. Internal changes. Attribute dashboard_colwidth and dashboard_sorting removed.
+# 2.09: dashboard_showfullsize not applied in room "all" resp. "Everything". First small implementation over Dashboard_DetailFN.
 #
 # Known Bugs/Todos:
 # BUG: Nicht alle Inhalte aller Tabs laden, bei Plots dauert die bedienung des Dashboards zu lange. -> elemente hidden?
@@ -94,15 +95,16 @@ my $fwjquery = "jquery.min.js";
 my $fwjqueryui = "jquery-ui.min.js";
 my $dashboardname = "Dashboard"; # Link Text
 my $dashboardhiddenroom = "DashboardRoom"; # Hiddenroom
-my $dashboardversion = "2.08";
+my $dashboardversion = "2.09";
 # -------------------------------------------------------------------------------------------
 
+#############################################################################################
 sub Dashboard_Initialize ($) {
   my ($hash) = @_;
 		
   $hash->{DefFn}       = "Dashboard_define";
   $hash->{UndefFn}     = "Dashboard_undef";
-  #$hash->{FW_detailFn} = "Dashboard_detailFn";    
+  $hash->{FW_detailFn} = "Dashboard_DetailFN";    
   $hash->{AttrFn}      = "Dashboard_attr";
   $hash->{AttrList}    = "disable:0,1 ".
   						 "dashboard_colcount:1,2,3,4,5 ".						 						 
@@ -160,13 +162,33 @@ sub Dashboard_Initialize ($) {
 
 	$data{FWEXT}{jquery}{SCRIPT} = "/pgm2/".$fwjquery if (!$data{FWEXT}{jquery}{SCRIPT});
 	$data{FWEXT}{jqueryui}{SCRIPT} = "/pgm2/".$fwjqueryui if (!$data{FWEXT}{jqueryui}{SCRIPT});
-	$data{FWEXT}{testjs}{SCRIPT} = "/pgm2/dashboard.js";						 
+	$data{FWEXT}{z_dashboard}{SCRIPT} = "/pgm2/dashboard.js" if (!$data{FWEXT}{z_dashboard});					 
   			 
 	$data{FWEXT}{Dashboardx}{LINK} = "?room=".$dashboardhiddenroom;
 	$data{FWEXT}{Dashboardx}{NAME} = $dashboardname;	
 	
   return undef;
 }
+
+sub Dashboard_DetailFN() {
+	my ($name, $d, $room, $pageHash) = @_;
+	my $hash = $defs{$name};
+  
+	my $ret = ""; 
+	$ret .= "<table class=\"block wide\" id=\"dashboardtoolbar\"  style=\"width:100%\">\n";
+	$ret .= "<tr><td><div>\n";   
+	$ret .= "		<div> <a href=\"javascript:dashboard_setposition()\"><button id=\"dashboard_setpositionbutton\" type=\"button\" title=\"Set the Positions\" disabled>Set Positions</button></a>\n";
+	$ret .= "		<a href=\"javascript:dashboard_tooglelock()\"><button id=\"dashboard_tooglelockbutton\" type=\"button\" title=\"Lock Dashboard\" disabled>Lock Dashboard</button></a>\n";
+	$ret .= "	   <a href=\"$FW_ME?room=$dashboardhiddenroom\"><button type=\"button\">Return to Dashboard</button></a>\n";
+	$ret .= "	   <div id=\"resultText\" style=\"padding-top: 8px;\"></div>\n";
+	$ret .= "      </div>\n";
+	$ret .= "   </div></td></tr>\n"; 	
+	$ret .= "</table>\n";
+	return $ret;
+}
+
+#############################################################################################
+#############################################################################################
 
 sub DashboardAsHtml($)
 {
