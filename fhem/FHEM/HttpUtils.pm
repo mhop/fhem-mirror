@@ -199,7 +199,7 @@ HttpUtils_Connect2($)
   $hdr .= "\r\n";
   syswrite $hash->{conn}, $hdr;
   syswrite $hash->{conn}, $data if(defined($data));
-  shutdown $hash->{conn}, 1 if(!$hash->{noshutdown});
+  shutdown $hash->{conn}, 1 if(!$hash->{noshutdown} && $hash->{protocol} ne "https");
 
   if($hash->{callback}) { # Nonblocking read
     $hash->{FD} = $hash->{conn}->fileno();
