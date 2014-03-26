@@ -441,6 +441,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 # addr Dec!!
 # SEC-WM55 02:01 (AES on?)
 # CC-RT    02:01 16:00
+# TC-IT    02:01 16:00
 # SEC-WDS  02:01 16:01(sabotage) ?
 # 4DIS     02:01 ?
 # HM-SEC-MDIR  02:01 ?
