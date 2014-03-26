@@ -13,6 +13,7 @@
 // 2.03: Fix showhelper Bug on lock/unlock. The error that after a trigger action the curren tab is changed to the "old" activetab tab has 
 //			 been fixed.
 // 2.04: Dashboard position near Top in showfullsize-mode. Restore ActiveTab funktion
+// 2.04: dashboard_showfullsize not applied in room "all" resp. "Everything"
 //
 // Known Bugs/Todo's
 // See 95_Dashboard.pm
@@ -234,12 +235,14 @@ $(document).ready( function () {
 	//-------------------------------------------------------------------------------------------------------------------------------------
 	$("body").attr("longpollfilter", ".*") //need for longpoll
 
-	if (params[13] == 1){ //disable roomlist and header	
-		$("#menuScrollArea").remove();
-		$("#hdr").remove();
-		$(".roomoverview:first").remove();
-		$("br:first").remove();
-		$("#content").css({position:   'inherit'});	
+	if (params[13] == 1){ //disable roomlist and header, but not in room Everything	
+		if ($('#content').attr("room") != "all") {
+			$("#menuScrollArea").remove();
+			$("#hdr").remove();
+			$(".roomoverview:first").remove();
+			$("br:first").remove();
+			$("#content").css({position:   'inherit'});	
+		}
 	}
 	
     $(".dashboard_column").sortable({
@@ -302,12 +305,7 @@ $(document).ready( function () {
 			restoreOrder(); 
 			},
 		activate: function (event, ui) {
-			restoreOrder(); 
-			
-			//var activeTab = ($( "#tabs" ).tabs( "option", "active" ))+1;
-			//if (params[11] != activeTab){
-			//	FW_cmd(document.location.pathname+'?XHR=1&cmd.'+params[0]+'=attr '+params[0]+' dashboard_activetab '+activeTab);
-			// }			
+			restoreOrder(); 		
 		}   
 	});	
 	if ($("#dashboard_tabnav").hasClass("dashboard_tabnav_bottom")) { $(".dashboard_tabnav").appendTo(".dashboard_tabs"); } //set Tabs on the Bottom	
