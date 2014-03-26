@@ -251,7 +251,7 @@ sub OWX_Start ($) {
   $hash->{PRESENT} = 1;
   readingsSingleUpdate($hash,"state","defined",1);
   #-- Intiate first alarm detection and eventually conversion in a minute or so
-  InternalTimer(gettimeofday() + $hash->{interval}, "OWX_Kick", $hash,1);
+  InternalTimer(gettimeofday() + $hash->{interval}, "OWX_Kick", $hash,0);
   $hash->{STATE} = "Active";
   return undef;
 }
@@ -902,7 +902,7 @@ sub OWX_Kick($) {
   my $ret;
 
   #-- Call us in n seconds again.
-  InternalTimer(gettimeofday()+ $hash->{interval}, "OWX_Kick", $hash,1);
+  InternalTimer(gettimeofday()+ $hash->{interval}, "OWX_Kick", $hash,0);
   #-- During reset we see if an alarmed device is present.
   OWX_Reset($hash);
    
