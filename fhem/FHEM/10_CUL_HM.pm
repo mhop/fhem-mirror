@@ -554,6 +554,7 @@ sub CUL_HM_Attr(@) {#################################
   }
   elsif($attrName eq "param"){
     my $md  = CUL_HM_Get($hash,$name,"param","model");
+    my $st  = CUL_HM_Get($hash,$name,"param","subType");
     my $chn = substr(CUL_HM_hash2Id($hash),6,2);
     if ($md eq "HM-Sen-RD-O" && $chn eq "02"){
       delete $hash->{helper}{param};
@@ -568,13 +569,22 @@ sub CUL_HM_Attr(@) {#################################
       if ($cmd eq "set"){
         if ($attrVal eq "noOnOff"){# no action
         }
-        elsif ($attrVal =~ m/msgReduce/){#set param
+        elsif ($attrVal =~ m/msgReduce/){# send only each other message
           my (undef,$rCnt) = split(":",$attrVal,2);
           $rCnt=(defined $rCnt && $rCnt =~ m/^\d$/)?$rCnt:1;
           $hash->{helper}{vd}{msgRed}=$rCnt;
         }
         else{
-          return "attribut param not defined for this entity";
+          return "attribut param $attrVal not valid for $name";
+        }
+      }
+    }
+    elsif ($st eq "blindActuator"){
+      if ($cmd eq "set"){
+        if ($attrVal eq "levelInverse"){# no action
+        }
+        else{
+          return "attribut param $attrVal not valid for $name";
         }
       }
       else{
@@ -582,7 +592,7 @@ sub CUL_HM_Attr(@) {#################################
       }
     }
     else{
-      return "attribut param not defined for this entity";
+      return "attribut param not valid for $name";
     }
   }
   elsif($attrName eq "peerIDs"){
@@ -816,7 +826,7 @@ sub CUL_HM_Parse($$) {#########################################################
     elsif($msgStat =~ m/AESCom/){# AES communication to central
       push @evtEt,[$shash,1,"aesCommToDev:".substr($msgStat,7)];
       CUL_HM_pushEvnts();
-      return;
+      return (CUL_HM_pushEvnts(),$name);
     }
   }
   CUL_HM_eventP($shash,"Evt_$msgStat")if ($msgStat);#log io-events
@@ -1382,8 +1392,14 @@ sub CUL_HM_Parse($$) {#########################################################
       $val = (($val-$lvlMin)<=0 && $val)
                   ? 1
                   : int((($val-$lvlMin)/($lvlMax - $lvlMin))*200)/2;
+
+      # blind option: reverse Level Meaning 0 = open, 100 = closed
+      if ("levelInverse" eq AttrVal($name, "param", "")){
+        $pVal = $val = 100-$val;
+      }
       $physLvl = ReadingsVal($name,"phyLevel",$val)
             if(!defined $physLvl);             #not updated? use old or ignore
+
       my $vs = ($val==100 ? "on":($pVal==0 ? "off":"$val")); # user string...
       push @evtEt,[$shash,1,"level:$val"];
       push @evtEt,[$shash,1,"pct:$val"]; # duplicate to level - necessary for "slider"
@@ -3105,10 +3121,11 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                         sprintf("%02X%02s%02X",$lvl*2,$rLocDly,$speed*2));
   }
   elsif($cmd =~ m/^(on|off|toggle)$/) { #######################################
+    my $lvlInv = (AttrVal($name, "param", "") eq "levelInverse")?1:0;
     $hash->{helper}{dlvl} = ( $cmd eq 'off'||
                              ($cmd eq 'toggle' &&CUL_HM_getChnLvl($name) != 0)) 
-                                ? '00'
-                                : 'C8';
+                                ? ($lvlInv?'C8':'00')
+                                : ($lvlInv?'00':'C8');
     my(undef,$lvlMax)=split",",AttrVal($name, "levelRange", "0,100");
     $hash->{helper}{dlvl} = sprintf("%02X",$lvlMax*2) 
           if ($hash->{helper}{dlvl} eq 'C8');
@@ -3162,7 +3179,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd =~ m/^(up|down|pct)$/) { #########################################
     my ($lvl,$tval,$rval,$duration) = ($a[2],"","",0);
     $lvl =~ s/(\d*\.?\d*).*/$1/;
-    my($lvlMin,$lvlMax)=split",",AttrVal($name, "levelRange", "0,100");
+    my($lvlMin,$lvlMax) = split",",AttrVal($name, "levelRange", "0,100");
+    my $lvlInv = (AttrVal($name, "param", "") eq "levelInverse")?1:0;
 
     if ($cmd eq "pct"){
       $lvl = $lvlMin + $lvl*($lvlMax-$lvlMin)/100;
@@ -3170,11 +3188,12 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     else{#dim [<changeValue>] ... [ontime] [ramptime]
       $lvl = 10 if (!defined $a[2]); #set default step
       $lvl = $lvl*($lvlMax-$lvlMin)/100;
-      $lvl = -1*$lvl if ($cmd eq "down");
+      $lvl = -1*$lvl if (($cmd eq "down" && !$lvlInv)|| 
+                         ($cmd ne "down" && $lvlInv));
       $lvl += CUL_HM_getChnLvl($name);
     }
     $lvl = ($lvl > $lvlMax)?$lvlMax:(($lvl <= $lvlMin)?0:$lvl);
-    
+    my $plvl = ($lvlInv)?100-$lvl :$lvl;
     if ($st eq "dimmer"){# at least blind cannot stand ramp time...
       if (!$a[3]){
         $tval = "FFFF";
@@ -3197,17 +3216,17 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $hash->{helper}{stateUpdatDly} = ($duration>120)?$duration:120;
     }
     # store desiredLevel in and its Cmd in case we have to repeat
-    my $lvlx = sprintf("%02X",$lvl*2);
+    $plvl = sprintf("%02X",$plvl*2);
     if ($tval ne "FFFF"){
       delete $hash->{helper}{dlvl};#stop desiredLevel supervision
     }
     else{
-      $hash->{helper}{dlvl} = $lvlx;
+      $hash->{helper}{dlvl} = $plvl;
     }
-    $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."02$chn$lvlx$rval$tval";
+    $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."02$chn$plvl$rval$tval";
     CUL_HM_PushCmdStack($hash,$hash->{helper}{dlvlCmd});
-    CUL_HM_UpdtReadSingle($hash,"level","set_".$lvl,1);
     $state = "set_".$lvl;
+    CUL_HM_UpdtReadSingle($hash,"level",$state,1);
   }
   elsif($cmd eq "stop") { #####################################################
     delete $hash->{helper}{dlvl};#stop desiredLevel supervision
@@ -3730,7 +3749,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "no filename given" if (!$a[2]);
     return "only thru CUL " if (!$hash->{IODev}->{TYPE}
                                  ||($hash->{IODev}->{TYPE} ne "CUL"));
-    # todo General add version check of CUL
+    # todo General add version checsk of CUL
     my $fName = $a[2];
     my $pos = 0;
     my @imA; # image array: image[block][msg]
@@ -7327,15 +7346,20 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
   <a name="CUL_HMparams"><b>available parameter for attribut "param"</b></a>
   <ul>
     <li><B>HM-Sen-RD-O</B><br>
-    <B>offAtPon</B> heat channel only: force heating off after powerOn<br>
-    <B>onAtRain</B> heat channel only: force heating on while status changes to 'rain' and off when it changes to 'dry'<br>
+      <B>offAtPon</B> heat channel only: force heating off after powerOn<br>
+      <B>onAtRain</B> heat channel only: force heating on while status changes to 'rain' and off when it changes to 'dry'<br>
     </li>
     <li><B>virtuals</B><br>
-    <B>noOnOff</B> virtual entity will not toggle state when trigger is received. If this parameter is
-    not given the entity will toggle its state between On and Off with each trigger<br>
-    <B>msgReduce:&lt;No&gt;</B> if channel is used for <a ref="CUL_HMvalvePos"></a> it skips every No message
-    in order to reduce transmit load. Numbers from 0 (no skip) up to 9 can be given. 
-    VD will lose connection with more then 5 skips<br>
+      <B>noOnOff</B> virtual entity will not toggle state when trigger is received. If this parameter is
+      not given the entity will toggle its state between On and Off with each trigger<br>
+      <B>msgReduce:&lt;No&gt;</B> if channel is used for <a ref="CUL_HMvalvePos"></a> it skips every No message
+      in order to reduce transmit load. Numbers from 0 (no skip) up to 9 can be given. 
+      VD will lose connection with more then 5 skips<br>
+    </li>
+    <li><B>blind</B><br>
+      <B>levelInverse</B> while HM considers 100% as open and 0% as closed this may not be 
+      intuitive to all user. Ny default 100%  is open and will be dislayed as 'on'. Setting this param the display will be inverted - 0% will be open and 100% is closed.<br>
+      NOTE: This will apply to readings and set commands. <B>It does not apply to any register. </B><br>
     </li>
   </ul><br>
   <a name="CUL_HMevents"></a>
