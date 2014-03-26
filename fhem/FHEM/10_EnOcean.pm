@@ -219,6 +219,7 @@ my %EnO_subType = (
   "D2.01.07" => "actuator.01",
   "D2.01.08" => "actuator.01",
   "D2.01.09" => "actuator.01",
+  "D2.01.0A" => "actuator.01",
   "D2.01.10" => "actuator.01",
   "D2.01.11" => "actuator.01",
   "D5.00.01" => "contact",
@@ -321,11 +322,13 @@ EnOcean_Get ($@)
   my $name = $hash->{NAME};
   my $data;
   my $destinationID = AttrVal($name, "destinationID", undef);
-  if (!defined $destinationID || $destinationID eq "multicast") {
+  if (AttrVal($name, "comMode", "uniDir") eq "biDir") {
+    $destinationID = $hash->{DEF};
+  } elsif (!defined $destinationID || $destinationID eq "multicast") {
     $destinationID = "FFFFFFFF";
   } elsif ($destinationID eq "unicast") {
     $destinationID = $hash->{DEF};
-  } elsif ($destinationID !~ m/^[\dA-F]{8}$/) {
+  } elsif ($destinationID !~ m/^[\dA-Fa-f]{8}$/) {
     return "DestinationID $destinationID wrong, choose <8-digit-hex-code>.";
   }
   $destinationID = uc($destinationID);
@@ -406,7 +409,9 @@ EnOcean_Set($@)
   }
   my $data;
   my $destinationID = AttrVal($name, "destinationID", undef);
-  if (!defined $destinationID || $destinationID eq "multicast") {
+  if (AttrVal($name, "comMode", "uniDir") eq "biDir") {
+    $destinationID = $hash->{DEF};
+  } elsif (!defined $destinationID || $destinationID eq "multicast") {
     $destinationID = "FFFFFFFF";
   } elsif ($destinationID eq "unicast") {
     $destinationID = $hash->{DEF};
@@ -3664,7 +3669,7 @@ EnOcean_Parse($$)
     } elsif ($st eq "actuator.01") {
       # Electronic switches and dimmers with Energy Measurement and Local Control
       # (D2-01-00 - D2-01-11)
-      my $channel = (hex substr($data, 2, 2)) | 0x1F;
+      my $channel = (hex substr($data, 2, 2)) & 0x1F;
       if ($channel == 31) {$channel = "Input";}
       my $cmd = hex substr($data, 1, 1);
 
@@ -3674,39 +3679,47 @@ EnOcean_Parse($$)
         my $error;
         my $localControl;
         my $dim;
-        if ( hex(substr($data, 2, 2)) | 0x80 == 1) {
-          $overCurrentOff = "executed";
-        } else {
+        push @event, "3:powerFailure" . $channel . ":" . 
+                      (($db[2] & 0x80) ? "enabled":"disabled");
+        push @event, "3:powerFailureDetection" . $channel . ":" .
+                      (($db[2] & 0x40) ? "detected":"not_detected");
+        if (($db[1] & 0x80) == 0) {
           $overCurrentOff = "ready";       
+        } else {
+          $overCurrentOff = "executed";
         }
         push @event, "3:overCurrentOff" . $channel . ":" . $overCurrentOff;
-        if (substr($data, 2, 2) | 0x60 == 1) {
+        if ((($db[1] & 0x60) >> 5) == 1) {
           $error = "warning";
-        } elsif (hex(substr($data, 2, 2)) | 0x60 == 2) {
+        } elsif (((hex(substr($data, 2, 2)) & 0x60) >> 5) == 2) {
           $error = "failure";
         } else {
           $error = "ok";       
         }
         push @event, "3:error" . $channel . ":" . $error;
-        if (hex(substr($data, 4, 2)) | 0x80 == 1) {
-          $localControl = "enabled";
-        } else {
+        if (($db[0] & 0x80) == 0) {
           $localControl = "disabled";       
+        } else {
+          $localControl = "enabled";
         }
         push @event, "3:localControl" . $channel . ":" . $localControl;
-        my $dimValue = hex(substr($data, 4, 2)) | 0x1F;
-        if (hex(substr($data, 4, 2)) | 0x1F == 0) {
+        my $dimValue = $db[0] & 0x7F;
+        if ($dimValue == 0) {
           push @event, "3:channel" . $channel . ":off";
           push @event, "3:state:off";
         } else {
           push @event, "3:channel" . $channel . ":on";
           push @event, "3:state:on";
         }
-        push @event, "3:dim" . $channel . ":" . $dimValue;        
+        if ($channel ne "input" && $channel == 0) {
+          push @event, "3:dim:" . $dimValue;
+        } else {
+          push @event, "3:dim" . $channel . ":" . $dimValue;
+        }
       
       } elsif ($cmd == 7) {
         # actuator measurement response
-        my $unit = hex(substr($data, 2, 2)) | 0xE0;
+        my $unit = $db[4] >> 5;
         if ($unit == 1) {
           $unit = "Wh";
           push @event, "3:energyUnit" . $channel . ":" . $unit;
@@ -5775,6 +5788,8 @@ EnOcean_Undef($$)
         <li>overCurrentShutdown&lt;channel&gt;: off|restart</li>
         <li>overCurrentShutdownReset&lt;channel&gt;: not_active|trigger</li>
         <li>power&lt;channel&gt;: 1/[W|KW]</li>
+        <li>powerFailure&lt;channel&gt;: enabled|disabled</li>
+        <li>powerFailureDetection&lt;channel&gt;: detected|not_detected</li>
         <li>powerUnit&lt;channel&gt;: W|KW</li>        
         <li>rampTime&lt;1...3l&gt;: 1/s</li>
         <li>responseTimeMax: 1/s</li>
