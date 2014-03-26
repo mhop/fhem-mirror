@@ -558,3 +558,6 @@
 - Mon Mar 24 2014 (betateilchen)
   - old module 98_PID.pm moved to contrib
     will be replaced by 98_PID20.pm in next major release
+
+- Wed Mar 26 2014 (John / betateilchen)
+  - added new module 98_PID20.pm as announced replacement for old 98_PID.pm
