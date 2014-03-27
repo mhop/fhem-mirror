@@ -107,7 +107,9 @@ sub GDS_Define($$$) {
 
 	$dummy = "gds_web_".$name;
 	CommandDefine(undef, $dummy." HTTPSRV ".$name." ".$tempDir." GDS ".$name." Files");
-	$attr{$dummy}{"directoryindex"} = $name.".html";
+	$defs{$dummy}{TEMPORARY} = 1;
+	$attr{$dummy}{directoryindex} = $name.".html";
+	$attr{$dummy}{room} = 'hidden';
 	fillMappingTables($hash);
 	initDropdownLists($hash);
 	createIndexFile($hash);
