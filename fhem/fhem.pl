@@ -1586,6 +1586,9 @@ AssignIoPort($;$)
                       $modules{$ht}{AttrList} &&
                       $modules{$ht}{AttrList} =~ m/IODev/);
 
+  $proposed = $attr{$hn}{IODev}
+        if(!$proposed && $attr{$hn} && $attr{$hn}{IODev});
+  
   if($proposed && $defs{$proposed}) {
     $hash->{IODev} = $defs{$proposed};
     $attr{$hn}{IODev} = $proposed if($hasIODevAttr);
