@@ -761,7 +761,7 @@ sub HMLAN_DoInit($) {##########################################################
 
   delete $hash->{helper}{ref};
 
-  HMLAN_condUpdate($hash,0xff);
+  HMLAN_condUpdate($hash,255);
   $hash->{helper}{q}{cap}{$_}=0 foreach (keys %{$hash->{helper}{q}{cap}});
 
   foreach (keys %{$hash->{assIDs}}){delete ($hash->{assIDs}{$_})};# clear IDs - HMLAN might have a reset
