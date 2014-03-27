@@ -76,7 +76,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.06";
+my $owx_version="5.11";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -1123,9 +1123,10 @@ sub OWXSWITCH_GetState($) {
     }else{
       OWX_Reset($master);
       $res=OWX_Complex($master,$owx_dev,$select,4);
-      if( $res eq 0 ){
-        return "not accessible in reading"; 
-      }
+    return "$owx_dev not accessible in reading"
+      if( $res eq 0 );
+    return "$owx_dev has returned invalid data"
+      if( length($res)!=16);
       OWX_Reset($master);
       OWXSWITCH_BinValues($hash,"ds2406.getstate",1,undef,$owx_dev,substr($res,9,3),undef,substr($res,12));
     }  
@@ -1148,9 +1149,10 @@ sub OWXSWITCH_GetState($) {
     }else{
       OWX_Reset($master);
       $res=OWX_Complex($master,$owx_dev,$select,10);
-      if( $res eq 0 ){
-        return "not accessible in reading"; 
-      }
+    return "$owx_dev not accessible in reading"
+      if( $res eq 0 );
+    return "$owx_dev has returned invalid data"
+      if( length($res)!=22);
       OWX_Reset($master);
       return OWXSWITCH_BinValues($hash,"ds2408.getstate",1,undef,$owx_dev,substr($res,9,3),undef,substr($res,12));
     }  
@@ -1172,10 +1174,11 @@ sub OWXSWITCH_GetState($) {
     }else{
       OWX_Reset($master);
       $res=OWX_Complex($master,$owx_dev,"\xF5",2);
-      if( $res eq 0 ){
-        return "not accessible in reading"; 
-      }
-      OWX_Reset($master);
+    return "$owx_dev not accessible in reading"
+      if( $res eq 0 );
+    return "$owx_dev has returned invalid data"
+      if( length($res)!=12);
+      #OWX_Reset($master);
       return OWXSWITCH_BinValues($hash,"ds2413.getstate",1,undef,$owx_dev,substr($res,9,1),undef,substr($res,10));
     }
   } else {
