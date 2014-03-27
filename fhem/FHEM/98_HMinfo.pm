@@ -553,7 +553,7 @@ sub HMinfo_tempList(@) { ######################################################
         @el = ();
         foreach (split(",",$line)){
           if ($defs{$_}){
-            push @el,$_ if ($defs{$_} && $_ =~ m/$filter/);
+            push @el,$_ if ($_ =~ m/$filter/);
           }
           else{
             push @entryNF,$_;
@@ -598,7 +598,7 @@ sub HMinfo_tempList(@) { ######################################################
   return $ret;
 }
 sub HMinfo_tempListTmpl(@) { ##################################################
-  my ($filter,$tmpl,$fName)=@_;
+  my ($filter,$tmpl,$action,$fName)=@_;
   $filter = "." if (!$filter);
   return "no template name given" if (!$tmpl);
   my $ret;
@@ -620,16 +620,19 @@ sub HMinfo_tempListTmpl(@) { ##################################################
   my @exec = ();
   while(<aSave>){
     chomp;
-    if($_ =~ m/^entities:/){
+    my $line = $_;
+    if($line =~ m/^entities:/){
       last if ($found != 0);
-      my $line = $_;
       $line =~s/.*://;
-      foreach (split(",",$line)){
-        $found = 1 if ($defs{$_} && $_ eq $tmpl);
+      foreach my $eN (split(",",$line)){
+        $eN =~ s/ //g;
+        $found = 1 if ($eN eq $tmpl);
       }
     }
-    elsif($found != 1 && $_ =~ m/R_(P[123])?_?._tempList[SMFWT].*\>/){
-      my ($tln,$val) = ($1,$2)if($_ =~ m/(.*)>(.*)/);
+    elsif($found == 1 && $_ =~ m/R_(P[123])?_?._tempList[SMFWT].*\>/){
+      my $rn = $line;
+      $rn =~ s/(R_.*tempList...).*/$1/;
+      my ($tln,$val) = ($1,$2)if($line =~ m/(.*)>(.*)/);
       $tln =~ s/ //g;
       $val =~ tr/ +/ /;
       $val =~ s/^ //;
@@ -640,9 +643,17 @@ sub HMinfo_tempListTmpl(@) { ##################################################
           $val = lc($1)." ".$val;
         }
         $tln =~ s/R_(P._)?._//;
-        my $x = CUL_HM_Set($defs{$eN},$eN,$tln,"prep",split(" ",$val));
-        push @entryFail,$eN." :".$tln." respose:$x" if ($x ne "1");
-        push @exec,$eN." ".$tln." exec ".$val;
+        if ($action eq "verify"){
+          $val = join(" ",split(" ",$val));
+          my $nv = ReadingsVal($eN,$rn,"empty");
+          $nv = join(" ",split(" ",$nv));
+          push @entryFail,$eN." :".$tln." mismatch" if ($val ne $nv);
+        }
+        elsif($action eq "restore"){
+          my $x = CUL_HM_Set($defs{$eN},$eN,$tln,"prep",split(" ",$val));
+          push @entryFail,$eN." :".$tln." respose:$x" if ($x ne "1");
+          push @exec,$eN." ".$tln." exec ".$val;
+        }
       }
     }
     $ret = "failed Entries:\n     "   .join("\n     ",@entryFail) if (scalar@entryFail);
@@ -1045,7 +1056,7 @@ sub HMinfo_GetFn($@) {#########################################################
            ."\n set loadConfig [<typeFilter>] <file>               # restores register and peer readings if missing"
            ."\n set autoReadReg [<typeFilter>]                     # trigger update readings if attr autoReadReg is set"
            ."\n set tempList [<typeFilter>][save|restore|verify][<filename>]# handle tempList of thermostat devices"
-           ."\n set tempListTmpl[<typeFilter>][templateName][<filename>]# program a templist from a template in the file to one or multiple devices"
+           ."\n set tempListTmpl[<typeFilter>][templateName][verify|restore][<filename>]# program a templist from a template in the file to one or multiple devices"
            ."\n  ---infos---"
            ."\n set update                                         # update HMindfo counts"
            ."\n get register [<typeFilter>]                        # devicefilter parse devicename. Partial strings supported"
@@ -1183,9 +1194,10 @@ sub HMinfo_SetFn($@) {#########################################################
     $ret = HMinfo_tempList($filter,$a[0],$fn);
   }
   elsif($cmd eq "tempListTmpl"){##handle thermostat templist from file --------
-    my $fn = $a[1]?$a[1]:"tempList.cfg";
+    my $fn = $a[2]?$a[2]:"tempList.cfg";
+    my $ac = $a[1]?$a[1]:"verify";
     $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
-    $ret = HMinfo_tempListTmpl($filter,$a[0],$fn);
+    $ret = HMinfo_tempListTmpl($filter,$a[0],$ac,$fn);
   }
   elsif($cmd eq "loadConfig") {##action: loadConfig----------------------------
     my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
@@ -1229,8 +1241,8 @@ sub HMinfo_SetFn($@) {#########################################################
 
   ### redirect set commands to get - thus the command also work in webCmd
   elsif(HMinfo_GetFn($hash,$name,"?") =~ m/\b$cmd\b/){##----------------
-    unshift @a,$filter if ($filter);
-    unshift @a,$opt if ($opt);
+    unshift @a,"-f",$filter if ($filter);
+    unshift @a,"-".$opt if ($opt);
     $ret = HMinfo_GetFn($hash,$name,$cmd,@a);
   }
 
@@ -1920,8 +1932,8 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          <li><B>tempList...</B> time and temp couples as used in the set tempList commands</li>
          <br>
      </li>
-     <li><a name="#HMinfotempListTmpl">tempListTmpl</a> <a href="#HMinfoFilter">[filter]</a>[templateName] [&lt;file&gt;]</a><br>
-	    program one or more thermostat lists. The list of thermostats is selected by filter. <br>
+     <li><a name="#HMinfotempListTmpl">tempListTmpl</a> <a href="#HMinfoFilter">[filter]</a>[templateName][verify|restore] [&lt;file&gt;]</a><br>
+	    program one or more thermostat lists. The list of thermostats is selected by filter.<br>
         <ul>
 		<li></B>templateName</B> is the name of the template as being named in the file. The file format ist 
 		identical to <a ref="#HMinfotempList">tempList</a>. If the entity in the file matches templateName the subsequent
