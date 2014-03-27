@@ -1,9 +1,9 @@
 ############################################## 
-# $Id: EGPM2LAN.pm 2013-12-08 10:11:20Z alexus $ 
+# $Id$
 #
 #  based / modified Version 98_EGPMS2LAN from ericl
 #
-#  (c) 2013 Copyright: Alex Storny (moselking at arcor dot de)
+#  (c) 2013, 2014 Copyright: Alex Storny (moselking at arcor dot de)
 #  All rights reserved
 #
 #  This script free software; you can redistribute it and/or modify
@@ -97,11 +97,11 @@ EGPM2LAN_Set($@)
 	  {  #switch single Socket
        EGPM2LAN_Switch($hash, $setcommand, $params, $logLevel);
     }
-    EGPM2LAN_Statusrequest($hash, $logLevel); 
+    EGPM2LAN_Statusrequest($hash, $logLevel, 1); 
   }   
   elsif($setcommand eq "toggle") 
   { 
-    my $currentstate = EGPM2LAN_Statusrequest($hash, $logLevel);
+    my $currentstate = EGPM2LAN_Statusrequest($hash, $logLevel, 1);
     if(defined($currentstate))
     {
     	my @powerstates = split(",", $currentstate);
@@ -111,12 +111,12 @@ EGPM2LAN_Set($@)
     	   $newcommand="on";
     	}
       EGPM2LAN_Switch($hash, $newcommand, $params, $logLevel);
-	    EGPM2LAN_Statusrequest($hash, $logLevel); 
+	    EGPM2LAN_Statusrequest($hash, $logLevel, 0); 
     } 
   } 
   elsif($setcommand eq "statusrequest") 
   { 
-	   EGPM2LAN_Statusrequest($hash, $logLevel); 
+	   EGPM2LAN_Statusrequest($hash, $logLevel, 1); 
   }
   elsif($setcommand eq "clearreadings") 
   { 
@@ -209,8 +209,8 @@ sub EGPM2LAN_GetDeviceInfo($$) {
 }
 
 ################################
-sub EGPM2LAN_Statusrequest($$) { 
-  my ($hash, $logLevel) = @_;
+sub EGPM2LAN_Statusrequest($$$) { 
+  my ($hash, $logLevel, $autoCr) = @_;
   my $name = $hash->{NAME}; 
   
   my $response = CustomGetFileFromURL($hash, "http://".$hash->{IP}."/", 10, "", 0, $logLevel); 
@@ -244,7 +244,7 @@ sub EGPM2LAN_Statusrequest($$) {
                 #Create Socket-Object if not available
                 my $defptr = $modules{EGPM}{defptr}{$name.$index};
 
-                if(AttrVal($name, "autocreate", "on") eq "on" && not defined($defptr))
+                if($autoCr && AttrVal($name, "autocreate", "on") eq "on" && not defined($defptr))
 		{
 		   if(Value("autocreate") eq "active")
 		   {
@@ -295,7 +295,7 @@ sub EGPM2LAN_Statusrequest($$) {
 sub EGPM2LAN_Logoff($$) {
   my ($hash, $logLevel) = @_; 
 
-                       #$quiet, $url, $timeout, $data, $noshutdown, $loglevel
+  #$quiet, $url, $timeout, $data, $noshutdown, $loglevel
   CustomGetFileFromURL($hash, "http://".$hash->{IP}."/login.html", 10, "", 0, $logLevel);
   return 1; 
 } 
@@ -321,10 +321,9 @@ EGPM2LAN_Define($$)
   my $result = EGPM2LAN_Login($hash, 3);
   if($result == 1)
   { 
-    #delayed auto-create 
-    #InternalTimer(gettimeofday()+ 3, "EGPM2LAN_Statusrequest", $hash, 4);
-    EGPM2LAN_Logoff($hash, 4); 
     $hash->{STATE} = "initialized";
+    EGPM2LAN_Statusrequest($hash, 4, 0);
+    EGPM2LAN_Logoff($hash, 4); 
   }
 
   return undef; 
@@ -346,7 +345,7 @@ EGPM2LAN_Define($$)
     <br>
     Creates a Gembird &reg; <a href="http://energenie.com/item.aspx?id=7557" >Energenie EG-PM2-LAN</a> device to switch up to 4 sockets over the network.
     If you have more than one device, it is helpful to connect and set names for your sockets over the web-interface first.
-    The name settings will be adopted to FHEM and helps you to identify the sockets. Please make sure that you&acute;re logged off from the Energenie web-interface otherwise you can&acute;t control it with FHEM at the same time.
+    The name settings will be adopted to FHEM and helps you to identify the sockets. Please make sure that you&acute;re logged off from the Energenie web-interface otherwise you can&acute;t control it with FHEM at the same time.<br>
     <b>EG-PMS2-LAN with surge protector feature was not tested until now.</b>
 </ul><br>
   <a name="EGPM2LANset"></a>
@@ -403,7 +402,7 @@ EGPM2LAN_Define($$)
   <ul>
     <code>define &lt;name&gt; EGPM2LAN &lt;IP-Address&gt; [&lt;Password&gt;]</code><br>
     <br>
-    Das Modul erstellt eine Verbindung zu einer Gembird &reg; <a href="http://energenie.com/item.aspx?id=7557" >Energenie EG-PM2-LAN</a> Steckdosenleiste.
+    Das Modul erstellt eine Verbindung zu einer Gembird &reg; <a href="http://energenie.com/item.aspx?id=7557" >Energenie EG-PM2-LAN</a> Steckdosenleiste und steuert 4 angeschlossene Ger&auml;te..
     Falls mehrere Steckdosenleisten &uuml;ber das Netzwerk gesteuert werden, ist es ratsam, diese zuerst &uuml;ber die Web-Oberfl&auml;che zu konfigurieren und die einzelnen Steckdosen zu benennen. Die Namen werden dann automatisch in die
     Oberfl&auml;che von FHEM &uuml;bernommen. Bitte darauf achten, die Weboberfl&auml;che mit <i>Logoff</i> wieder zu verlassen, da der Zugriff sonst blockiert wird.
 </ul><br>
