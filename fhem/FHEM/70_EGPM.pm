@@ -1,7 +1,7 @@
 ############################################## 
-# $Id: EGPM2LAN.pm 2013-12-08 10:11:20Z alexus $ 
+# $Id$ 
 #
-#  (c) 2013 Copyright: Alex Storny (moselking at arcor dot de)
+#  (c) 2013, 2014 Copyright: Alex Storny (moselking at arcor dot de)
 #  All rights reserved
 #
 #  This script free software; you can redistribute it and/or modify
@@ -26,6 +26,7 @@ package main;
 
 use strict;
 use warnings;
+use SetExtensions;
 
 sub
 EGPM_Initialize($)
@@ -35,7 +36,7 @@ EGPM_Initialize($)
   $hash->{SetFn}     = "EGPM_Set";
   $hash->{GetFn}     = "EGPM_Get";
   $hash->{DefFn}     = "EGPM_Define";
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6". $readingFnAttributes;
+  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 $readingFnAttributes ";
   $hash->{UndefFn}   = "EGPM_Undef";
 }
 
@@ -47,9 +48,10 @@ EGPM_Set($@)
   my $name = shift @a;
   my $parent = $hash->{IODEV};
   my $loglevel = GetLogLevel($name,4);
+  my $cmdList = "off:noArg on:noArg toggle:noArg";
 
   return "no set value specified" if(int(@a) < 1);
-  return "Unknown argument ?, choose one of off:noArg on:noArg toggle:noArg" if($a[0] eq "?");
+  return SetExtensions($hash,$cmdList,$name,@a) if($a[0] eq "?");
 
   if(not Value($parent))
   {
@@ -58,11 +60,18 @@ EGPM_Set($@)
     return $u;
   }
 
-  my $v = join(" ", @a);
-  Log $loglevel, "EGPM set $name $v";
-  CommandSet(undef,$hash->{IODEV}." $v ".$hash->{SOCKETNR});
-  return undef;
+  if($a[0] =~ /^(on|off|toggle)$/)
+  {
+    my $v = join(" ", @a);
+    Log $loglevel, "EGPM set $name $v";
+     CommandSet(undef,$hash->{IODEV}." $v ".$hash->{SOCKETNR});
+     return undef;
+  } else {
+     Log $loglevel, "EGPM set $name $a[0]";
+     return SetExtensions($hash,$cmdList,$name,@a);
+  }
 }
+
 
 ###################################
 sub
@@ -110,14 +119,24 @@ EGPM_Define($$)
   $hash->{IODEV} = $parent;
   $hash->{SOCKETNR} = $socket;
   $hash->{NAME} = $name;
-
+  
   $modules{EGPM}{defptr}{$parent.$socket} = $hash;
 		
   if (defined($attr{$parent}{room}))
   {
     $attr{$name}{room} = $attr{$parent}{room};
   }
-  $hash->{STATE} = "initialized";
+  
+  my $currentstate = ReadingsVal($parent, "state", "?");
+  if ($currentstate eq "?")
+  {
+    $hash->{STATE} = "initialized";
+  }
+  else
+  {
+    my @powerstates = split(":", $currentstate);
+    $hash->{STATE} = trim(substr $powerstates[$socket], 1, 3);
+  }
 
   return undef;
 }
@@ -159,9 +178,11 @@ EGPM_Undef($$)
 
   <a name="EGPMset"></a>
   <b>Set</b>
-  <code>
-    <ul>set &lt;name&gt; &lt;[on|off|toggle]&gt;</code><br>
+    <ul><code>set &lt;name&gt; &lt;[on|off|toggle]&gt;</code><br>
     Switches the socket on or of.
+    </ul>
+    <ul><code>set &lt;name&gt; &lt;[on-for-timer|off-for-timer|on-till|off-till|blink|intervals]&gt;</code><br>
+    Switches the socket for a specified time+duration or n-times. For Details see <a href="#setExtensions">set extensions</a>
     </ul><br>
     Example:
     <ul>
@@ -194,9 +215,8 @@ EGPM_Undef($$)
 <a name="EGPM"></a>
 <h3>EGPM Steckdose</h3>
 <ul>
-
   Definiert eine einzelne Netzwerk-Steckdose vom EGPM2LAN. Diese Definition wird beim Einrichten eines EGPM2LAN automatisch erstellt,
-  wenn das globale FHEM-Attribut AUTOCREATE aktiviert wurde. Für weitere Informationen, siehe Beschreibung von <a href="#EGPM2LAN">EGPM2LAN</a>.
+  wenn das globale FHEM-Attribut AUTOCREATE aktiviert wurde. F&uuml;r weitere Informationen, siehe Beschreibung von <a href="#EGPM2LAN">EGPM2LAN</a>.
   <br><br>
 
   <a name="EGPMdefine"></a>
@@ -209,9 +229,11 @@ EGPM_Undef($$)
 
   <a name="EGPMset"></a>
   <b>Set</b>
-  <code>
-    <ul>set &lt;name&gt; &lt;[on|off|toggle]&gt;</code><br>
+    <ul><code>set &lt;name&gt; &lt;[on|off|toggle]&gt;</code><br>
     Schaltet die Steckdose ein oder aus.
+    </ul>
+    <ul><code>set &lt;name&gt; &lt;[on-for-timer|off-for-timer|on-till|off-till|blink|intervals]&gt;</code><br>
+    Schaltet die Steckdose f&uuml; einen bestimmten Zeitraum oder mehrfach hintereinander. Weitere Infos hierzu unter <a href="#setExtensions">set extensions</a>.
     </ul><br>
     Beispiel:
     <ul>
