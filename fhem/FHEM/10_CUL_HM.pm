@@ -1219,16 +1219,6 @@ sub CUL_HM_Parse($$) {#########################################################
       }
     }
   }
-  elsif($md eq "HM-SEN-EP") { #################################################
-    if ($mTp eq "40"){
-      my ($chn,$counter) = unpack 'A2A2',$p;
-      $shash = $modules{CUL_HM}{defptr}{$src.$chn}
-                             if($modules{CUL_HM}{defptr}{$src.$chn});
-#      $counter = hex($counter);
-      push @evtEt,[$shash,1,"state:".$counter];
-      push @evtEt,[$shash,1,"trigger:Short_$counter"];
-    }
-  }
   elsif($st eq "THSensor") { ##################################################
     if    ($mTp eq "70"){
       my $chn;
@@ -1472,7 +1462,8 @@ sub CUL_HM_Parse($$) {#########################################################
       }
     }
   }
-  elsif($st =~ m /^(remote|pushButton|swi)$/) { ###############################
+  elsif($st =~ m /^(remote|pushButton|swi)$/
+      ||$md eq "HM-SEN-EP") { #################################################
     if($mTp =~ m/^4./) {
       my ($chn, $bno) = map{hex($_)} ($mI[0],$mI[1]);# button/event count 
       my $buttonID = $chn&0x3f;# only 6 bit are valid
@@ -1513,7 +1504,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$chnHash,1,"state:".$state.$target];
       push @evtEt,[$chnHash,1,"trigger:".$trigType."_".$bno];
       push @evtEt,[$shash,1,"battery:". (($chn&0x80)?"low":"ok")];
-      push @evtEt,[$shash,1,"state:$btnName $state$target"];
+      push @evtEt,[$shash,1,"state:$btnName $state$target"] if ($shash ne $chnHash);
     }
   }
   elsif($st eq "powerMeter") {#################################################
@@ -3934,8 +3925,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           my $bStr = sprintf("%02X",$b);
           CUL_HM_PushCmdStack($hash,
                  "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerBtn}00");
-          CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,
-                              hex($peerBtn),4,$burst)
+          CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,hex($peerBtn),4,$burst)
                    if($burst && $cmdB eq "01"); # only if set
           CUL_HM_qAutoRead($name,3);
         }
