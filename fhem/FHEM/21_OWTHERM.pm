@@ -75,7 +75,7 @@ use warnings;
 sub Log($$);
 sub AttrVal($$$);
 
-my $owx_version="5.06";
+my $owx_version="5.11";
 
 my %gets = (
   "id"          => "",
@@ -966,9 +966,10 @@ sub OWXTHERM_GetValues($) {
   } else {
     OWX_Reset($master);
     my $res=OWX_Complex($master,$owx_dev,"\xBE",9);
-    if( $res eq 0 ){
-      return "$owx_dev not accessible in reading"; 
-    }
+    return "$owx_dev not accessible in reading"
+      if( $res eq 0 );
+    return "$owx_dev has returned invalid data"
+      if( length($res)!=19);
     OWXTHERM_BinValues($hash,"ds182x.reading",1,undef,$owx_dev,undef,undef,substr($res,10,9));
   }
 } 

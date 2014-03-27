@@ -76,7 +76,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.06";
+my $owx_version="5.11";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D");
 my @owg_channel = ("A","B","C","D");
@@ -98,6 +98,7 @@ my %gets = (
 );
 
 my %sets = (
+  "initialize"  => "",
   "interval"    => "",
   "AAlarm"      => "",
   "ALow"        => "",
@@ -658,7 +659,7 @@ sub OWAD_Get($@) {
         $value .= "alarmed low, ";
       }
       if (!defined $hash->{owg_shigh}) {
-        $value .= "high aralm undefined";
+        $value .= "high alarm undefined";
       } elsif( $hash->{owg_shigh}->[$i]==0 ) {
         $value .= "high alarm disabled";
       } elsif( $hash->{owg_shigh}->[$i]==1 ) {
@@ -860,7 +861,13 @@ sub OWAD_Set($@) {
   my $name    = $hash->{NAME};
   my $model   = $hash->{OW_MODEL};
  
- #-- set new timer interval
+ #-- re-intialize
+ if($key eq "initialize") {
+    OWADInitializeDevice($hash);
+    return undef;
+  }
+  
+  #-- set new timer interval
   if($key eq "interval") {
     # check value
     return "OWAD: Set with short interval, must be > 1"
@@ -1384,9 +1391,10 @@ sub OWXAD_GetPage($$$) {
     OWX_Reset($master);
     #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
     $res=OWX_Complex($master,$owx_dev,$select,10);
-    if( $res eq 0 ){
-      return "$owx_dev not accessible in reading $page page"; 
-    }
+    return "$owx_dev not accessible in reading page $page"
+      if( $res eq 0 );
+    return "$owx_dev has returned invalid data"
+      if( length($res)!=22);
     #-- for processing we also need the 3 command bytes
     OWXAD_BinValues($hash,"ds2450.get".$page,1,undef,$owx_dev,undef,$final,substr($res,9,13));
   }

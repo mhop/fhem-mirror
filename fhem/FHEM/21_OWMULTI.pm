@@ -70,7 +70,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.06";
+my $owx_version="5.11";
 #-- flexible channel name
 my $owg_channel;
 
@@ -913,9 +913,10 @@ sub OWXMULTI_GetValues($$) {
     OWX_Reset($master);
     $res=OWX_Complex($master,$owx_dev,"\xBE\x00",9);
     #Log 1,"OWXMULTI: data length from reading device is ".length($res)." bytes";
-    if( $res eq 0 ){
-      return "$owx_dev not accessible in 2nd step"; 
-    }
+    return "$owx_dev not accessible in 2nd step"
+      if( $res eq 0 );
+    return "$owx_dev has returned invalid data"
+      if( length($res)!=20);
     OWXMULTI_BinValues($hash,"ds2438.getvdd",1,undef,$owx_dev,undef,undef,substr($res,11));
   }
   #------------------------------------------------------------------------------------
@@ -994,9 +995,10 @@ sub OWXMULTI_GetValues($$) {
     OWX_Reset($master);
     $res=OWX_Complex($master,$owx_dev,"\xBE\x00",9);
     #-- process results
-    if( $res eq 0 ){
-      return "$owx_dev not accessible in 2nd step"; 
-    }
+    return "$owx_dev not accessible in 2nd step"
+      if( $res eq 0 );
+    return "$owx_dev has returned invalid data"
+      if( length($res)!=20);
     OWXMULTI_BinValues($hash,"ds2438.getvad",1,undef,$owx_dev,undef,undef,substr($res,11));
   } 
   return undef;

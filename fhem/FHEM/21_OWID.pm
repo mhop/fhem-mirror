@@ -49,11 +49,13 @@
 package main;
 
 use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
+use Time::HiRes qw(usleep ualarm gettimeofday tv_interval);
+
 use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.06";
+my $owx_version="5.11";
 #-- declare variables
 my %gets = (
   "present"     => "",
@@ -134,6 +136,9 @@ sub OWID_Define ($$) {
     if( $fam eq "01" ){
       $model = "DS2401";
       CommandAttr (undef,"$name model DS2401"); 
+    }elsif( $fam eq "09" ){
+      $model = "DS2502";
+      CommandAttr (undef,"$name model DS2502"); 
     }else{
       $model = "unknown";
       CommandAttr (undef,"$name model unknown"); 
@@ -148,6 +153,9 @@ sub OWID_Define ($$) {
       if( $fam eq "01" ){
         $model = "DS2401";
         CommandAttr (undef,"$name model DS2401"); 
+      }elsif( $fam eq "09" ){
+        $model = "DS2502";
+        CommandAttr (undef,"$name model DS2502"); 
       }else{
         $model = "unknown";
         CommandAttr (undef,"$name model unknown"); 
@@ -157,6 +165,9 @@ sub OWID_Define ($$) {
       if( $model eq "DS2401" ){
         $fam = "01";
         CommandAttr (undef,"$name model DS2401"); 
+      }elsif( $model eq "DS2502" ){
+        $fam = "09";
+        CommandAttr (undef,"$name model DS2502"); 
       }else{
         return "OWID: Unknown 1-Wire device model $model";
       }
@@ -306,7 +317,7 @@ sub OWID_GetValues($) {
   my $hash    = shift;
   
   my $name    = $hash->{NAME};
-  my $value   = "";
+  my $value   = 0;
   my $ret     = "";
   my $offset;
   my $factor;
@@ -317,7 +328,18 @@ sub OWID_GetValues($) {
   
   #-- hash of the busmaster
   my $master       = $hash->{IODev};
-  $value           = OWX_Verify($master,$hash->{ROM_ID});
+  
+  #-- measure elapsed time
+  my $t0 = [gettimeofday];
+
+  $value  = OWX_Verify($master,$hash->{ROM_ID});
+  
+  #my $thr = threads->create('OWX_Verify', $master, $hash->{ROM_ID});
+  #$thr->detach();
+
+  my $t1 = [gettimeofday];
+  my $t0_t1 = tv_interval $t0, $t1;
+  #Log 1,"====> Time for verify = $t0_t1";
   
   #-- generate an event only if presence has changed
   if( $value == 0 ){
