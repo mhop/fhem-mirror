@@ -26,6 +26,7 @@
 
 =head1 AUTHOR - Dirk Hoffmann
 	dirk@FHEM_Forum (forum.fhem.de)
+	modified for use with physical I2C devices by Klaus Wittstock (klausw)
 =cut
 
 package main;
@@ -33,10 +34,9 @@ package main;
 use strict;
 use warnings;
 
-use HiPi::Device::I2C;
 use Time::HiRes qw(usleep);
 use Scalar::Util qw(looks_like_number);
-use Error qw(:try);
+#use Error qw(:try);
 
 use constant {
 	BMP180_I2C_ADDRESS => '0x77',
@@ -51,11 +51,12 @@ sub I2C_BMP180_Attr(@);
 sub I2C_BMP180_Poll($);
 sub I2C_BMP180_Set($@);
 sub I2C_BMP180_Undef($$);
-sub I2C_BMP180_ReadInt($$;$);
 sub I2C_BMP180_readUncompensatedTemperature($);
 sub I2C_BMP180_readUncompensatedPressure($$);
 sub I2C_BMP180_calcTrueTemperature($$);
 sub I2C_BMP180_calcTruePressure($$$);
+
+my $libcheck_hasHiPi = 1;
 
 my %sets = (
 	'readValues' => 1,
@@ -71,15 +72,21 @@ my %sets = (
 sub I2C_BMP180_Initialize($) {
 	my ($hash) = @_;
 
+	eval "use HiPi::Device::I2C;";
+  $libcheck_hasHiPi = 0 if($@);
+	
 	$hash->{DefFn}    = 'I2C_BMP180_Define';
+	$hash->{InitFn}   = 'I2C_BMP180_Init';
 	$hash->{AttrFn}   = 'I2C_BMP180_Attr';
 	$hash->{SetFn}    = 'I2C_BMP180_Set';
 	$hash->{UndefFn}  = 'I2C_BMP180_Undef';
+  $hash->{I2CRecFn} = 'I2C_BMP180_I2CRec';
 
-	$hash->{AttrList} = 'do_not_notify:0,1 showtime:0,1 model:BMP180,BMP085 ' .
+	$hash->{AttrList} = 'IODev do_not_notify:0,1 showtime:0,1 model:BMP180,BMP085 ' .
 	                    'poll_interval:1,2,5,10,20,30 oversampling_settings:0,1,2,3 ' .
-						'roundPressureDecimal:0,1,2 roundTemperatureDecimal:0,1,2 ' .
-						$readingFnAttributes;
+											'roundPressureDecimal:0,1,2 roundTemperatureDecimal:0,1,2 ' .
+											$readingFnAttributes;
+	$hash->{AttrList} .= " useHiPiLib:0,1 " if( $libcheck_hasHiPi );
 }
 
 =head2 I2C_BMP180_Define
@@ -93,58 +100,73 @@ sub I2C_BMP180_Initialize($) {
 sub I2C_BMP180_Define($$) {
 	my ($hash, $def) = @_;
 	my @a = split('[ \t][ \t]*', $def);
-
+	$hash->{STATE} = 'defined';
+	
 	my $name = $a[0];
-	my $dev = $a[2];
 
 	my $msg = '';
-	if( (@a < 3)) {
-		$msg = 'wrong syntax: define <name> I2C_BMP180 devicename';
+	$hash->{HiPi_exists} = $libcheck_hasHiPi if($libcheck_hasHiPi);
+	if (@a == 3) {
+		if ($libcheck_hasHiPi) {
+			$hash->{HiPi_used} = 1;
+		} else {
+			$msg = '$name error: HiPi library not installed';
+		}
+	} elsif((@a < 2)) {
+		$msg = 'wrong syntax: define <name> I2C_BMP180 [devicename]';
 	}
+	if ($msg) {
+		Log3 ($hash, 1, $msg);
+		return $msg;
+	}
+	if ($main::init_done || $hash->{HiPi_used}) {
+    eval { I2C_BMP180_Init( $hash, [ @a[ 2 .. scalar(@a) - 1 ] ] ); };
+    return I2C_BMP180_Catch($@) if $@;
+  }
+	
+}
 
+sub I2C_BMP180_Init($$) {
+	my ( $hash, $args ) = @_;
+	my $name = $hash->{NAME};
+	$hash->{I2C_Address} = hex(BMP180_I2C_ADDRESS);
+	my $msg = '';
 	# create default attributes
 	$msg = CommandAttr(undef, $name . ' poll_interval 5');
 	$msg = CommandAttr(undef, $name . ' oversampling_settings 3');
-
 	if ($msg) {
 		Log3 ($hash, 1, $msg);
 		return $msg;
 	}
 	
-	# check for existing i2c device
-	my $i2cModulesLoaded = 0;
-	$i2cModulesLoaded = 1 if -e $dev;
-
-	if ($i2cModulesLoaded) {
-		$hash->{devBPM180} = HiPi::Device::I2C->new( 
-			devicename	=> $dev,
-			address		=> hex(BMP180_I2C_ADDRESS),
-			busmode		=> 'i2c',
-		);
-		
-		# read calibration data from sensor
-		$hash->{calibrationData}{ac1} = I2C_BMP180_ReadInt($hash, 0xAA);
-		if ( defined($hash->{calibrationData}{ac1}) ) {
-			$hash->{calibrationData}{ac2} = I2C_BMP180_ReadInt($hash, 0xAC);
-			$hash->{calibrationData}{ac3} = I2C_BMP180_ReadInt($hash, 0xAE);
-			$hash->{calibrationData}{ac4} = I2C_BMP180_ReadInt($hash, 0xB0, 0);
-			$hash->{calibrationData}{ac5} = I2C_BMP180_ReadInt($hash, 0xB2, 0);
-			$hash->{calibrationData}{ac6} = I2C_BMP180_ReadInt($hash, 0xB4, 0);
-			$hash->{calibrationData}{b1}  = I2C_BMP180_ReadInt($hash, 0xB6);
-			$hash->{calibrationData}{b2}  = I2C_BMP180_ReadInt($hash, 0xB8);
-			$hash->{calibrationData}{mb}  = I2C_BMP180_ReadInt($hash, 0xBA);
-			$hash->{calibrationData}{mc}  = I2C_BMP180_ReadInt($hash, 0xBC);
-			$hash->{calibrationData}{md}  = I2C_BMP180_ReadInt($hash, 0xBE);
+	if ($hash->{HiPi_used}) {
+		my $dev = shift @$args;
+		my $i2cModulesLoaded = 0;
+		$i2cModulesLoaded = 1 if -e $dev;
+		if ($i2cModulesLoaded) {
+			$hash->{devBPM180} = HiPi::Device::I2C->new( 
+				devicename	=> $dev,
+				address		=> hex(BMP180_I2C_ADDRESS),
+				busmode		=> 'i2c',
+			);
 		} else {
-			return $name . ': Error! I2C failure: Please check your i2c bus ' . $dev . ' and the connected device address: ' . BMP180_I2C_ADDRESS;
+			return $name . ': Error! I2C device not found: ' . $dev . '. Please check kernelmodules must loaded: i2c_bcm2708, i2c_dev';
 		}
-	
-		$hash->{STATE} = 'Initialized';
 	} else {
-		return $name . ': Error! I2C device not found: ' . $dev . '. Please check kernelmodules must loaded: i2c_bcm2708, i2c_dev';
+		AssignIoPort($hash);	
 	}
-	
+	$hash->{STATE} = 'getCalData';
+	I2C_BMP180_i2cread($hash, hex("AA"), 22);
 	return undef;
+}
+
+sub I2C_BMP180_Catch($) {
+  my $exception = shift;
+  if ($exception) {
+    $exception =~ /^(.*)( at.*FHEM.*)$/;
+    return $1;
+  }
+  return undef;
 }
 
 =head2 I2C_BMP180_Attr
@@ -169,7 +191,6 @@ sub I2C_BMP180_Attr (@) {
 			$msg = 'Wrong poll intervall defined. poll_interval must be a number > 0';
 		}
 	}
-
 	return ($msg) ? $msg : undef;
 }
 
@@ -204,8 +225,8 @@ sub I2C_BMP180_Poll($) {
 sub I2C_BMP180_Set($@) {
 	my ($hash, @a) = @_;
 
-	my $name =$a[0];
-	my $cmd = $a[1];
+	my $name = $a[0];
+	my $cmd =  $a[1];
 
 	if(!defined($sets{$cmd})) {
 		return 'Unknown argument ' . $cmd . ', choose one of ' . join(' ', keys %sets)
@@ -214,41 +235,12 @@ sub I2C_BMP180_Set($@) {
 	if ($cmd eq 'readValues') {
 		my $overSamplingSettings = AttrVal($hash->{NAME}, 'oversampling_settings', 3);
 		
-		# query sensor
-		my $ut = I2C_BMP180_readUncompensatedTemperature($hash);
-		my $up = I2C_BMP180_readUncompensatedPressure($hash, $overSamplingSettings);
-		
-		my $temperature = sprintf(
-			'%.' . AttrVal($hash->{NAME}, 'roundTemperatureDecimal', 1) . 'f',
-			I2C_BMP180_calcTrueTemperature($hash, $ut) / 10
-		);
-		
-		my $pressure = sprintf(
-			'%.' . AttrVal($hash->{NAME}, 'roundPressureDecimal', 1) . 'f',
-			I2C_BMP180_calcTruePressure($hash, $up, $overSamplingSettings) / 100
-		);
-
-		my $altitude = AttrVal('global', 'altitude', 0);
-		
-		# simple barometric height formula
-		my $pressureNN = sprintf(
-			'%.' . AttrVal($hash->{NAME}, 'roundPressureDecimal', 1) . 'f',
-			$pressure + ($altitude / 8.5)
-		);
-		
-		readingsBeginUpdate($hash);
-		readingsBulkUpdate(
-			$hash,
-			'state',
-			'T: ' . $temperature . ' P: ' . $pressure . ' P-NN: ' . $pressureNN
-		);
-		readingsBulkUpdate($hash, 'temperature', $temperature);
-		readingsBulkUpdate($hash, 'pressure', $pressure);
-
-		readingsBulkUpdate($hash, 'pressure-nn', $pressureNN);
-		readingsBulkUpdate($hash, 'altitude', $altitude, 0);
-
-		readingsEndUpdate($hash, 1);
+		if (defined($hash->{calibrationData}{ac1})) {	# query sensor
+			I2C_BMP180_readUncompensatedTemperature($hash);
+			I2C_BMP180_readUncompensatedPressure($hash, $overSamplingSettings);
+		} else {																			#..but get calibration variables first
+			I2C_BMP180_i2cread($hash, hex("AA"), 22);
+		}
 	}
 }
 
@@ -267,38 +259,106 @@ sub I2C_BMP180_Undef($$) {
 	return undef;
 }
 
-=head2 I2C_BMP180_ReadInt
-	Title:		I2C_BMP180_ReadInt
-	Function:	Read 2 bytes from i2c device from given register.
-	Returns:	number
-	Args:		named arguments:
-				-argument1 => hash:		$hash			hash of device
-				-argument2 => number:	$register
-				-argument3 => boolean:	$returnSigned	1, if number returned signed (optional)
-=cut
-sub I2C_BMP180_ReadInt($$;$) {
-	my ($hash, $register, $returnSigned) = @_;
-	my $name = $hash->{NAME};
-	
-	$returnSigned = (!defined($returnSigned) || $returnSigned == 1) ? 1 : 0; 
-
-	my $retVal = undef;
-
-	try {
-		my @values = $hash->{devBPM180}->bus_read($register, 2);
-
-		$retVal = $values[0] << 8 | $values[1];
-		
-		# check if we need return signed or unsigned int
-		if ($returnSigned == 1) {
-			$retVal = $retVal >> 15 ? $retVal - 2**16 : $retVal;
+sub I2C_BMP180_I2CRec ($$) {
+	my ($hash, $clientmsg) = @_;
+  my $name = $hash->{NAME};  
+	my $pname = undef;
+	unless ($hash->{HiPi_used}) {#nicht nutzen wenn HiPi Bibliothek in Benutzung
+		my $phash = $hash->{IODev};
+		$pname = $phash->{NAME};
+		while ( my ( $k, $v ) = each %$clientmsg ) { 																#erzeugen von Internals für alle Keys in $clientmsg die mit dem physical Namen beginnen
+			$hash->{$k} = $v if $k =~ /^$pname/ ;
 		}
-
-	} catch Error with {
-		Log3 ($hash, 1, ': ERROR: I2C_BMP180: i2c-bus_read failure');
-	};  
+	}
 	
-	return $retVal;
+	if ( $clientmsg->{direction} && $clientmsg->{reg} && (
+			 ($pname && $clientmsg->{$pname . "_SENDSTAT"} && $clientmsg->{$pname . "_SENDSTAT"} eq "Ok")
+				|| $hash->{HiPi_used}) ) {
+		if ( $clientmsg->{direction} eq "i2cread" && defined($clientmsg->{received}) ) {
+			Log3 $hash, 5, "$name empfangen: $clientmsg->{received}";
+		  I2C_BMP180_GetCal   ($hash, $clientmsg->{received}) if $clientmsg->{reg} == hex("AA");
+			I2C_BMP180_GetTemp  ($hash, $clientmsg->{received}) if $clientmsg->{reg} == hex("F6") && $clientmsg->{nbyte} == 2;
+			I2C_BMP180_GetPress ($hash, $clientmsg->{received}) if $clientmsg->{reg} == hex("F6") && $clientmsg->{nbyte} == 3;
+		}
+	}
+}
+
+sub I2C_BMP180_GetCal ($$) {
+	my ($hash, $rawdata) = @_;
+  my @raw = split(" ",$rawdata);
+	my $n = 0;
+	Log3 $hash, 5, "in get cal: $rawdata";
+	$hash->{calibrationData}{ac1} = I2C_BMP180_GetCalVar($raw[$n++], $raw[$n++]);
+	$hash->{calibrationData}{ac2} = I2C_BMP180_GetCalVar($raw[$n++], $raw[$n++]);
+	$hash->{calibrationData}{ac3} = I2C_BMP180_GetCalVar($raw[$n++], $raw[$n++]);
+	$hash->{calibrationData}{ac4} = I2C_BMP180_GetCalVar($raw[$n++], $raw[$n++], 0);
+	$hash->{calibrationData}{ac5} = I2C_BMP180_GetCalVar($raw[$n++], $raw[$n++], 0);
+	$hash->{calibrationData}{ac6} = I2C_BMP180_GetCalVar($raw[$n++], $raw[$n++], 0);
+	$hash->{calibrationData}{b1}  = I2C_BMP180_GetCalVar($raw[$n++], $raw[$n++]);
+	$hash->{calibrationData}{b2}  = I2C_BMP180_GetCalVar($raw[$n++], $raw[$n++]);
+	$hash->{calibrationData}{mb}  = I2C_BMP180_GetCalVar($raw[$n++], $raw[$n++]);
+	$hash->{calibrationData}{mc}  = I2C_BMP180_GetCalVar($raw[$n++], $raw[$n++]);
+	$hash->{calibrationData}{md}  = I2C_BMP180_GetCalVar($raw[$n++], $raw[$n++]);
+	$hash->{STATE} = 'Initialized';
+	return
+}
+
+sub I2C_BMP180_GetCalVar ($$;$) {
+	my ($msb, $lsb, $returnSigned) = @_;
+
+	$returnSigned = (!defined($returnSigned) || $returnSigned == 1) ? 1 : 0; 
+	my $retVal = undef;
+	$retVal = $msb << 8 | $lsb;
+	# check if we need return signed or unsigned int
+	if ($returnSigned == 1) {
+		$retVal = $retVal >> 15 ? $retVal - 2**16 : $retVal;
+	}
+	return $retVal;	
+}
+
+sub I2C_BMP180_GetTemp ($$) {
+	my ($hash, $rawdata) = @_;
+  my @raw = split(" ",$rawdata);
+  $hash->{uncompTemp} = $raw[0] << 8 | $raw[1];
+}
+
+sub I2C_BMP180_GetPress ($$) {
+	my ($hash, $rawdata) = @_;
+  my @raw = split(" ",$rawdata);
+	my $overSamplingSettings = AttrVal($hash->{NAME}, 'oversampling_settings', 3);
+	
+  my $ut = $hash->{uncompTemp};
+	delete $hash->{uncompTemp};
+	my $up = ( ( ($raw[0] << 16) | ($raw[1] << 8) | $raw[2] ) >> (8 - $overSamplingSettings) );
+
+	my $temperature = sprintf(
+			'%.' . AttrVal($hash->{NAME}, 'roundTemperatureDecimal', 1) . 'f',
+			I2C_BMP180_calcTrueTemperature($hash, $ut) / 10
+		);
+		
+	my $pressure = sprintf(
+		'%.' . AttrVal($hash->{NAME}, 'roundPressureDecimal', 1) . 'f',
+		I2C_BMP180_calcTruePressure($hash, $up, $overSamplingSettings) / 100
+	);
+
+	my $altitude = AttrVal('global', 'altitude', 0);
+		
+	# simple barometric height formula
+	my $pressureNN = sprintf(
+		'%.' . AttrVal($hash->{NAME}, 'roundPressureDecimal', 1) . 'f',
+		$pressure + ($altitude / 8.5)
+	);
+	readingsBeginUpdate($hash);
+	readingsBulkUpdate(
+		$hash,
+		'state',
+		'T: ' . $temperature . ' P: ' . $pressure . ' P-NN: ' . $pressureNN
+	);
+	readingsBulkUpdate($hash, 'temperature', $temperature);
+	readingsBulkUpdate($hash, 'pressure', $pressure);
+	readingsBulkUpdate($hash, 'pressure-nn', $pressureNN);
+	readingsBulkUpdate($hash, 'altitude', $altitude, 0);
+	readingsEndUpdate($hash, 1);	
 }
 
 =head2 I2C_BMP180_readUncompensatedTemperature
@@ -310,17 +370,20 @@ sub I2C_BMP180_ReadInt($$;$) {
 =cut
 sub I2C_BMP180_readUncompensatedTemperature($) {
 	my ($hash) = @_;
-
+	  
 	# Write 0x2E into Register 0xF4. This requests a temperature reading
-	$hash->{devBPM180}->bus_write( (0xF4, 0x2E) );
+	#	$hash->{devBPM180}->bus_write( (0xF4, 0x2E) );
+	I2C_BMP180_i2cwrite($hash, hex("F4"), hex("2E"));
 	
 	usleep(4500);
 
 	# Read the two byte result from address 0xF6
-	my @values = $hash->{devBPM180}->bus_read(0xF6, 2);
+	#my @values = $hash->{devBPM180}->bus_read(0xF6, 2);
+	#my $retVal = $values[0] << 8 | $values[1];
+	I2C_BMP180_i2cread($hash, hex("F6"), 2);
+
 	
-	my $retVal = $values[0] << 8 | $values[1];
-	return $retVal;
+	return;
 }
 
 =head2 I2C_BMP180_readUncompensatedPressure
@@ -336,16 +399,69 @@ sub I2C_BMP180_readUncompensatedPressure($$) {
 
 	# Write 0x34+($overSamplingSettings << 6) into register 0xF4
 	# Request a pressure reading with oversampling setting
-	$hash->{devBPM180}->bus_write( (0xF4, 0x34 + ($overSamplingSettings << 6)) );
+  #	$hash->{devBPM180}->bus_write( (0xF4, 0x34 + ($overSamplingSettings << 6)) );
+	
+	my $data = hex("34") + ($overSamplingSettings << 6);
+	I2C_BMP180_i2cwrite($hash, hex("F4"), $data);
 	
 	# Wait for conversion, delay time dependent on oversampling setting
 	usleep( (2 + (3 << $overSamplingSettings)) * 1000 );
 	
 	# Read the three byte result from 0xF6. 0xF6 = MSB, 0xF7 = LSB and 0xF8 = XLSB
-	my @values = $hash->{devBPM180}->bus_read(0xF6, 3);
-	my $retVal = ( ( ($values[0] << 16) | ($values[1] << 8) | $values[2] ) >> (8 - $overSamplingSettings) );
+	# my @values = $hash->{devBPM180}->bus_read(0xF6, 3);
+	# my $retVal = ( ( ($values[0] << 16) | ($values[1] << 8) | $values[2] ) >> (8 - $overSamplingSettings) );
+	I2C_BMP180_i2cread($hash, hex("F6"), 3);
 	
-	return $retVal;
+	return;
+}
+
+sub I2C_BMP180_i2cread($$$) {
+	my ($hash, $reg, $nbyte) = @_;
+	if ($hash->{HiPi_used}) {
+		my @values = $hash->{devBPM180}->bus_read($reg, $nbyte);
+		I2C_BMP180_I2CRec($hash, {
+			direction  => "i2cread",
+			i2caddress => $hash->{I2C_Address},
+			reg => 				$reg,
+			nbyte => 			$nbyte,
+			received => 	join (' ',@values),
+		});
+	} else {
+		if (defined (my $iodev = $hash->{IODev})) {
+			CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
+			direction  => "i2cread",
+			i2caddress => $hash->{I2C_Address},
+			reg => 				$reg,
+			nbyte => 			$nbyte
+			});
+		} else {
+			return "no IODev assigned to '$hash->{NAME}'";
+		}
+	}
+}
+
+sub I2C_BMP180_i2cwrite($$$) {
+	my ($hash, $reg, @data) = @_;
+	if ($hash->{HiPi_used}) {
+		$hash->{devBPM180}->bus_write($reg, join (' ',@data));
+		I2C_BMP180_I2CRec($hash, {
+			direction  => "i2cwrite",
+			i2caddress => $hash->{I2C_Address},
+			reg => 				$reg,
+			data => 			join (' ',@data),
+		});
+	} else {
+		if (defined (my $iodev = $hash->{IODev})) {
+			CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
+			direction  => "i2cwrite",
+			i2caddress => $hash->{I2C_Address},
+			reg => 				$reg,
+			data => 			join (' ',@data),
+			});
+		} else {
+			return "no IODev assigned to '$hash->{NAME}'";
+		}
+	}
 }
 
 =head2 I2C_BMP180_calcTrueTemperature
@@ -416,46 +532,51 @@ sub I2C_BMP180_calcTruePressure($$$) {
   <p>
     With this module you can read values from the digital pressure sensors BMP180 and BMP085
     via the i2c bus on Raspberry Pi.<br><br>
-    
-    Before you can use the Modul on the Raspberry Pi you must load the I2C kernel
-    modules.<br>
-    Add these two lines to your <b>/etc/modules</b> file to load the kernel modules
-    automaticly during booting your Raspberry Pi.<br>
-    <code><pre>
-     i2c-bcm2708 
-     i2c-dev
-    </pre></code>
-      
-    <b>Please note:</b><br>
-    For the i2c communication, the perl modules HiPi::Device::I2C
-    are required.<br>
-    For a simple automated installation:<br>
-    <code>wget http://raspberry.znix.com/hipifiles/hipi-install<br>
-    perl hipi-install</code><br><br>
-    
-    To change the permissions of the I2C device you must create the following
-    file <b>/etc/udev/rules.d/98_i2c.rules</b> with this content:<br>
-    <code>SUBSYSTEM=="i2c-dev", MODE="0666"</code><br><br>
-    After these changes you must restart your Raspberry Pi.<br><br>
+    <b>There are two possibilities connecting to I2C bus:</b><br>
+    <ul>
+	<li><b>via RPII2C module</b><br>
+		The I2C messages are send through an I2C interface module like <a href="#RPII2C">RPII2C</a>, <a href="#FRM">FRM</a>
+		or <a href="#NetzerI2C">NetzerI2C</a> so this device must be defined first.<br>
+		<b>attribute IODev must be set</b><br><br>
+    </li>
+	<li><b>via HiPi library</b><br>	
+		Add these two lines to your <b>/etc/modules</b> file to load the I2C relevant kernel modules
+		automaticly during booting your Raspberry Pi.<br>
+		<code><pre>	i2c-bcm2708 
+        i2c-dev</pre></code>
+		Install HiPi perl modules:<br>
+		<code><pre>	wget http://raspberry.znix.com/hipifiles/hipi-install
+        perl hipi-install</pre></code>
+		To change the permissions of the I2C device create file:<br>
+		<code><pre>	/etc/udev/rules.d/98_i2c.rules</pre></code>
+		with this content:<br>
+		<code><pre>	SUBSYSTEM=="i2c-dev", MODE="0666"</pre></code>
+		<b>Reboot</b><br><br>
 
-    If you want to use the sensor on the second I2C bus at the P5 connector
-    (only available at the version 2 of the Raspberry Pi) you must add the bold
-    line of this code in your FHEM start script:
-    <code><pre>
-    case "$1" in
-    'start')
+		To use the sensor on the second I2C bus at P5 connector
+		(only for version 2 of Raspberry Pi) you must add the bold
+		line of following code to your FHEM start script:
+		<code><pre>	case "$1" in
+        'start')
         <b>sudo hipi-i2c e 0 1</b>
-        ...
-    </pre></code>
-  <p>
+        ...</pre></code>
+	</li></ul>
+	<p>
   
   <b>Define</b>
   <ul>
-    <code>define BMP180 I2C_BMP180 &lt;I2C device&gt;</code><br>
+    <code>define BMP180 I2C_BMP180 [&lt;I2C device&gt;]</code><br><br>
+	&lt;I2C device&gt; must not be used if you connect via RPII2C module. For HiPi it's mandatory. <br>
     <br>
     Examples:
     <pre>
       define BMP180 I2C_BMP180 /dev/i2c-0
+      attr BMP180 oversampling_settings 3
+      attr BMP180 poll_interval 5
+    </pre>
+	<pre>
+      define BMP180 I2C_BMP180
+      attr BMP180 IODev RPiI2CMod
       attr BMP180 oversampling_settings 3
       attr BMP180 poll_interval 5
     </pre>
@@ -511,61 +632,60 @@ sub I2C_BMP180_calcTruePressure($$$) {
 </ul>
 
 =end html
-=cut
 
-=pod
 =begin html_DE
 
 <a name="I2C_BMP180"></a>
 <h3>I2C_BMP180</h3>
 <ul>
   <a name="I2C_BMP180"></a>
-  <p>
+    <p>
     Dieses Modul erm&ouml;glicht das Auslesen der digitalen (Luft)drucksensoren
     BMP085 und BMP180 &uuml;ber den I2C Bus des Raspberry Pi.<br><br>
-    
-    Vor Verwendung des Moduls m&uuml;ssen auf dem Raspberry Pi die I2C Kernel
-    Module geladen werden.<br>
-    Diese beiden Zeilen m&uuml;ssen in die Datei <b>/etc/modules</b> angef&uuml;gt werden,
-    um die Kernel Module automatisch beim Booten des Raspberry Pis zu laden.<br>
-    
-    <code><pre>
-    i2c-bcm2708 
-    i2c-dev</pre></code>
-    <b>Bemerkung:</b><br>
-    F&uuml;r die Kommunikation &uuml;ber den I2C Bus wird das Perl Modul <b>HiPi::Device::I2C</b>
-    ben&ouml;tigt.<br>
-    Die Installation erfolgt automatisch mit folgenden Befehlen auf der Konsole des 
-    Raspberry Pis:<br>
-    
-    <code><pre>
-    wget http://raspberry.znix.com/hipifiles/hipi-install
-    perl hipi-install</pre></code>
-    
-    Um die Rechte des I2C Devices anzupassen, muss die Datei
-    <b>/etc/udev/rules.d/98_i2c.rules</b> mit folgendem Inhalt erzeugt werden:<br>
-    <code><pre>
-    SUBSYSTEM=="i2c-dev", MODE="0666"</pre></code>
-    Danach muss der Raspberry Pi neu gestartet werden.<br><br>
-    
-    Wenn der Sensor am zweiten I2C Bus am Stecker P5 (nur in der Version 2 des
-    Raspberry Pi vorhanden) verwendet werden soll, muss die fett gedruckte Zeile
-    des folgenden Codes in das FHEM Start Skript aufgenommen werden:
-    <code><pre>
-    case "$1" in
-    'start')
+    <b>Es gibt zwei M&ouml;glichkeiten das Modul mit dem I2C Bus zu verbinden:</b><br>
+	<ul>
+	<li><b>&Uuml;ber das RPII2C Modul</b><br>
+		I2C-Botschaften werden &uuml;ber ein I2C Interface Modul wie beispielsweise das <a href="#RPII2C">RPII2C</a>, <a href="#FRM">FRM</a>
+		oder <a href="#NetzerI2C">NetzerI2C</a> gesendet. Daher muss dieses vorher definiert werden.<br>
+		<b>Das Attribut IODev muss definiert sein.</b><br><br>
+	</li>
+	<li><b>&Uuml;ber die HiPi Bibliothek</b><br>	
+		Diese beiden Zeilen m&uuml;ssen in die Datei <b>/etc/modules</b> angef&uuml;gt werden,
+		um die Kernel Module automatisch beim Booten des Raspberry Pis zu laden.<br>
+		<code><pre>	i2c-bcm2708 
+        i2c-dev</pre></code>
+		Installation des HiPi Perl Moduls:<br>
+		<code><pre>	wget http://raspberry.znix.com/hipifiles/hipi-install
+        perl hipi-install</pre></code>
+		Um die Rechte für die I2C Devices anzupassen, folgende Datei:<br>
+		<code><pre>	/etc/udev/rules.d/98_i2c.rules</pre></code>
+		mit diesem Inhalt anlegen:<br>
+		<code><pre>	SUBSYSTEM=="i2c-dev", MODE="0666"</pre></code>
+		<b>Reboot</b><br><br>
+		Falls der Sensor am zweiten I2C Bus am Stecker P5 (nur in Version 2 des
+		Raspberry Pi) verwendet werden soll, muss die fett gedruckte Zeile
+		des folgenden Codes in das FHEM Start Skript aufgenommen werden:
+		<code><pre>	case "$1" in
+        'start')
         <b>sudo hipi-i2c e 0 1</b>
-        ...
-    </pre></code>
+        ...</pre></code>
+	</li></ul>
   <p>
   
   <b>Define</b>
   <ul>
-    <code>define BMP180 &lt;BMP180_name&gt; &lt;I2C_device&gt;</code><br>
+    <code>define BMP180 &lt;BMP180_name&gt; &lt;I2C_device&gt;</code><br><br>
+	&lt;I2C device&gt; darf nicht verwendet werden, wenn der I2C Bus &uuml;ber das RPII2C Modul angesprochen wird. For HiPi ist es allerdings notwendig. <br>
     <br>
     Beispiel:
     <pre>
       define BMP180 I2C_BMP180 /dev/i2c-0
+      attr BMP180 oversampling_settings 3
+      attr BMP180 poll_interval 5
+    </pre>
+	<pre>
+      define BMP180 I2C_BMP180
+      attr BMP180 IODev RPiI2CMod
       attr BMP180 oversampling_settings 3
       attr BMP180 poll_interval 5
     </pre>
