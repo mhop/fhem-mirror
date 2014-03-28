@@ -83,6 +83,7 @@ sub RPII2C_Define($$) {							#
     return undef;
   }
   $hash->{DeviceName} = "/dev/i2c-".$dev;
+  return $name . ': Error! I2C device not found: ' . $hash->{DeviceName} . '. Please check kernelmodules must loaded: i2c_bcm2708, i2c_dev' unless -e $hash->{DeviceName};
 	$hash->{STATE} = "initialized";
   return undef;
 }
