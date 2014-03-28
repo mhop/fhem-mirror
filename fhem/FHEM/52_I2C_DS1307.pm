@@ -168,13 +168,13 @@ sub I2C_DS1307_Poll {
 # direction  => "i2cread",
 # reg        => $data->{register},
 # nbyte      => scalar(@{$data->{data}}),
-# data       => join (' ',@{$data->{data}})
+# received   => join (' ',@{$data->{data}})
 
 sub I2C_DS1307_Receive {
   my ( $hash, $package ) = @_;
   
   $hash->{DS1307}->receive(
-    split (' ',$package->{data})
+    split (' ',$package->{received})
   );
   main::readingsSingleUpdate( $hash, "datetime", $hash->{DS1307}->getDatetime(), 1 );
 }
