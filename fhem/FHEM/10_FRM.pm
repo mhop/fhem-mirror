@@ -682,7 +682,7 @@ sub
 FRM_i2c_observer
 {
 	my ($data,$hash) = @_;
-	Log3 $hash->{NAME},5,"onI2CMessage address: '".$data->{address}."', register: '".$data->{register}."' data: '".$data->{data}."'";
+	Log3 $hash->{NAME},5,"onI2CMessage address: '".$data->{address}."', register: '".$data->{register}."' data: [".(join(',',@{$data->{data}}))."]";
 	FRM_forall_clients($hash,\&FRM_i2c_update_device,$data);
 }
 
