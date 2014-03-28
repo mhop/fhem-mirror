@@ -25,7 +25,7 @@ sub cloneDummy_Initialize($) {
 
 	$hash->{DefFn}     = "cloneDummy_Define";
 	$hash->{NotifyFn}  = "cloneDummy_Notify";
-  $hash->{AttrList}  = "cloneIgnore ".$readingFnAttributes;
+	$hash->{AttrList}  = "cloneIgnore ".$readingFnAttributes;
 }
 
 sub cloneDummy_Define($$) {
@@ -59,12 +59,12 @@ sub cloneDummy_Notify($$) {
 	
 	readingsBeginUpdate($hash);
 		if (($hs ne "") && ($rname eq $hs) ){
-    readingsBulkUpdate($hash,"_state", $reading);	
+	readingsBulkUpdate($hash,"_state", $reading);	
 	}
-  readingsBulkUpdate($hash,"state", "active");	
+	readingsBulkUpdate($hash,"state", "active");	
 	unless (exists ($check{$rname})) {
 		readingsBulkUpdate($hash, $rname, $rval);
-  }
+	}
 	readingsEndUpdate($hash, 1);
 	
 	return;
@@ -116,7 +116,7 @@ sub cloneDummy_Notify($$) {
 				Usefull to prevent truncated readingnames coming from state events.</li>
 	</ul>
 	<br/>
-	<b>Important: You MUST use different names for cloneDevice and sourceDevice!<br/>
+	<b>Important: You MUST use different names for cloneDevice and sourceDevice!</b><br/>
 </ul>
 
 =end html
@@ -126,42 +126,42 @@ sub cloneDummy_Notify($$) {
 <a name="cloneDummy"></a>
 <h3>cloneDummy</h3>
 <ul>
-  Definiert einen Clon eines Devices oder von FHEM2FHEM im Logmodus uebergebenen Devices und uebernimmt dessen Readings.
-  Sinnvoll um entfernte FHEM-Installationen lesend einzubinden, zum Testen oder Programmieren. 
-  <br><br>
+	Definiert einen Clon eines Devices oder von FHEM2FHEM im Logmodus uebergebenen Devices und uebernimmt dessen Readings.
+	Sinnvoll um entfernte FHEM-Installationen lesend einzubinden, zum Testen oder Programmieren. 
+	<br><br>
 
-  <a name="cloneDummydefine"></a>
-  <b>Define</b>
-  <ul>
-    <code>define &lt;name&gt; cloneDummy &lt;Quelldevice&gt; [reading]</code>
-    <br><br>
-    Aktiviert den cloneDummy, der dann an das Device &lt;Quelldevice&gt; gebunden ist. Mit dem optionalen Parameter reading
+	<a name="cloneDummydefine"></a>
+	<b>Define</b>
+	<ul>
+	<code>define &lt;name&gt; cloneDummy &lt;Quelldevice&gt; [reading]</code>
+	<br><br>
+	Aktiviert den cloneDummy, der dann an das Device &lt;Quelldevice&gt; gebunden ist. Mit dem optionalen Parameter reading
 		wird bestimmt, welches reading im STATE angezeigt wird, stateFormat ist auch weiterhin möglich.
 	<ul>
-    Beispiel: Der cloneDummy wird lesend an den Sensor OWX_26_09FF26010000 gebunden und zeigt im State temperature an.
+	Beispiel: Der cloneDummy wird lesend an den Sensor OWX_26_09FF26010000 gebunden und zeigt im State temperature an.
 	</ul>
 	
-   <ul>
-      <code>define Feuchte cloneDummy OWX_26_09FF26010000 temperature</code><br>
-  </ul>
-  </ul>
-  <br>
+	<ul>
+		<code>define Feuchte cloneDummy OWX_26_09FF26010000 temperature</code><br>
+	</ul>
+	</ul>
+	<br>
 
-  <a name="cloneDummyset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+	<a name="cloneDummyset"></a>
+	<b>Set</b> <ul>N/A</ul><br>
 
-  <a name="cloneDummyget"></a>
-  <b>Get</b> <ul>N/A</ul><br>
+	<a name="cloneDummyget"></a>
+	<b>Get</b> <ul>N/A</ul><br>
 
-  <a name="cloneDummyattr"></a>
-  <b>Attributes</b>
-  <ul>
-    <li>clonIgnore<br>
-			  Eine durch Kommata getrennte Liste der readings, die cloneDummy nicht in eigene readings umwandelt
-        </li><br>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-  </ul>
-  <br>
+	<a name="cloneDummyattr"></a>
+	<b>Attributes</b>
+	<ul>
+	<li>clonIgnore<br>
+			Eine durch Kommata getrennte Liste der readings, die cloneDummy nicht in eigene readings umwandelt
+		</li><br>
+	<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+	</ul>
+	<br>
 
 </ul>
 
