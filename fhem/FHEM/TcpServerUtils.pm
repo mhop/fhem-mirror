@@ -112,6 +112,7 @@ TcpServer_Accept($$)
   $defs{$cname} = \%nhash;
   $selectlist{$nhash{NAME}} = \%nhash;
 
+  my $ret = $clientinfo[0]->setsockopt(SOL_SOCKET, SO_KEEPALIVE, 1);
 
   Log3 $name, 4, "Connection accepted from $nhash{NAME}";
   return \%nhash;
