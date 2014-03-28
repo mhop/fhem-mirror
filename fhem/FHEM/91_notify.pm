@@ -14,7 +14,7 @@ notify_Initialize($)
   $hash->{DefFn} = "notify_Define";
   $hash->{NotifyFn} = "notify_Exec";
   $hash->{AttrFn}   = "notify_Attr";
-  $hash->{AttrList} = "disable:0,1 disabledForIntervals forwardReturnValue:0,1";
+  $hash->{AttrList} = "disable:0,1 disabledForIntervals forwardReturnValue:0,1 showTriggerTime:0,1";
 }
 
 
@@ -69,6 +69,9 @@ notify_Exec($$)
       $found = ("$n:$s" =~ m/^$re$/);
     }
     if($found) {
+      $ntfy->{STATE} = $dev->{NTFY_TRIGGERTIME}
+        if(AttrVal($ln, 'showTriggerTime', 0));
+  
       Log3 $ln, 5, "Triggering $ln";
       my (undef, $exec) = split("[ \t]+", $ntfy->{DEF}, 2);
 
@@ -230,6 +233,9 @@ notify_Attr(@)
         triggers this notify will also return this value. This can cause e.g
         FHEMWEB to display this value, when clicking "on" or "off", which is
         often not intended.</li>
+
+    <li>showTriggerTime<br/>
+        Replace STATE content 'active' by timestamp of last execution.</li>
   </ul>
   <br>
 
