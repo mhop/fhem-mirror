@@ -40,10 +40,10 @@ sub I2C_PCF8574_Set($@) {					#
 		return "wrong value: $val for \"set $name $cmd\" use one of: off, on" 
 			unless(exists($setsP{$val}));
 		substr($cmd,0,4,"");				#Nummer aus String extrahieren
-		return "$name error: Port$cmd is defined as input" if ( $cmd ~~ @inports );		#Prüfen ob entsprechender Port Input ist
+		return "$name error: Port$cmd is defined as input" if ( $cmd ~~ @inports );		#Pruefen ob entsprechender Port Input ist
 		my $sbyte = 0;
 		foreach (0..7) {
-			if ($_ == $cmd) {					#Port der geändert werden soll
+			if ($_ == $cmd) {					#Port der geaendert werden soll
 				$sbyte += $setsP{$val} << (1 * $_);
 			} elsif ($_ ~~ @inports) {#Port der als Input konfiguriert ist wird auf 1 gesetzt
 				$sbyte += 1 << (1 * $_);
@@ -56,7 +56,7 @@ sub I2C_PCF8574_Set($@) {					#
 	} else {
 		my $list = undef;
 		foreach (0..7) {
-			next if ( $_ ~~ @inports );		#Inputs überspringen
+			next if ( $_ ~~ @inports );		#Inputs ueberspringen
 			$list .= "Port" . $_ . ":" . join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) ) . " ";
     }
     return "Unknown argument $a[1], choose one of " . $list;
@@ -89,11 +89,11 @@ sub I2C_PCF8574_Get($@) {
 	#%sendpackage = ( direction => "i2cread", id => (defined( $hash->{ID} )? $hash->{ID} : "00"), i2caddress => $hash->{I2C_Address});
 	%sendpackage = ( i2caddress => $hash->{I2C_Address}, direction => "i2cread");
 	return "$name: no IO device defined" unless ($hash->{IODev});
-	#neu: über CallFn auf eigene Funktion
+	#neu: ueber CallFn auf eigene Funktion
 	my $phash = $hash->{IODev};
   my $pname = $phash->{NAME};
 	CallFn($pname, "I2CWrtFn", $phash, \%sendpackage);
-	#alt: für IOWrite
+	#alt: fuer IOWrite
 	#IOWrite($hash, \%sendpackage); 
 }
 ###################################
@@ -149,7 +149,7 @@ sub I2C_PCF8574_Init($$) {				#
    return "$name I2C Address not valid";
  }
  
-	#für die Nutzung von IOWrite
+	#fuer die Nutzung von IOWrite
   #my $code = ( defined( $hash->{ID} )? $hash->{ID} : "00" ) . " " . $hash->{I2C_Address};
   #my $ncode = 1;
   #my $name = $a[0];
@@ -199,12 +199,12 @@ sub I2C_PCF8574_Poll($) {					#for attr poll_intervall -> readout pin values
   }
 } 
 ###################################
-sub I2C_PCF8574_I2CRec($@) {			# über CallFn vom physical aufgerufen
+sub I2C_PCF8574_I2CRec($@) {			# ueber CallFn vom physical aufgerufen
 	my ($hash, $clientmsg) = @_;
 	my $name = $hash->{NAME};
 	my $phash = $hash->{IODev};
 	my $pname = $phash->{NAME};
-  while ( my ( $k, $v ) = each %$clientmsg ) { 			#erzeugen von Internals für alle Keys in $clientmsg die mit dem physical Namen beginnen
+  while ( my ( $k, $v ) = each %$clientmsg ) { 			#erzeugen von Internals fuer alle Keys in $clientmsg die mit dem physical Namen beginnen
     $hash->{$k} = $v if $k =~ /^$pname/ ;
   } 
 	my $sval;	
@@ -233,7 +233,7 @@ sub I2C_PCF8574_I2CRec($@) {			# über CallFn vom physical aufgerufen
   }
 }
 ###################################
-sub I2C_PCF8574_Parse($$) {	#wird über dispatch vom physical device aufgerufen (dispatch wird im mom nicht verwendet)
+sub I2C_PCF8574_Parse($$) {	#wird ueber dispatch vom physical device aufgerufen (dispatch wird im mom nicht verwendet)
   my ($hash, $msg) = @_;
   my($sid, $addr, @msg) = split(/ /,$msg);
   #Log3 $hash, 4, "Vom Netzerparse $hash->{NAME}: sid: $sid, Msg: @msg";
@@ -351,7 +351,7 @@ sub I2C_PCF8574_Parse($$) {	#wird über dispatch vom physical device aufgerufen (
 <ul>
 	<a name="I2C_PCF8574"></a>
 		Erm&ouml;glicht die Verwendung eines PCF8574 I2C 8 Bit Portexenders. 
-		Auf einem Raspberry Pi kann der Interrupt Pin des PCF8574 mit einem GPIO verbunden werden und &uml;ber die Interrupt Funktionen von <a href="#RPI_GPIO">RPI_GPIO</a> l&aml;sst sich dann ein get für den PCF8574 bei Pegel&aml;nderung ausl&oml;sen.<br>
+		Auf einem Raspberry Pi kann der Interrupt Pin des PCF8574 mit einem GPIO verbunden werden und &uml;ber die Interrupt Funktionen von <a href="#RPI_GPIO">RPI_GPIO</a> l&aml;sst sich dann ein get f&uuml;r den PCF8574 bei Pegel&aml;nderung ausl&oml;sen.<br>
 		I2C-Botschaften werden &uuml;ber ein I2C Interface Modul wie beispielsweise das <a href="#RPII2C">RPII2C</a>, <a href="#FRM">FRM</a>
 		oder <a href="#NetzerI2C">NetzerI2C</a> gesendet. Daher muss dieses vorher definiert werden.<br>
 		<b>Das Attribut IODev muss definiert sein.</b><br>
@@ -400,7 +400,7 @@ sub I2C_PCF8574_Parse($$) {	#wird über dispatch vom physical device aufgerufen (
 		</li>
 		<li>InputPorts<br>
 			Durch Leerzeichen getrennte Portnummern die als Inputs genutzt werden.<br>
-			Ports in dieser Liste können nicht geschrieben werden.<br>
+			Ports in dieser Liste k&ouml;nnen nicht geschrieben werden.<br>
 			Standard: no, g&uuml;ltige Werte: 0 1 2 .. 15<br><br>
 		</li>
 		<li><a href="#IODev">IODev</a></li>
