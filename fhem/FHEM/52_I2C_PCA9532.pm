@@ -414,7 +414,7 @@ sub I2C_PCA9532_UpdReadings($$$) {
 	<a name="I2C_PCA9532"></a>
 		Erm&ouml;glicht die Verwendung eines PCA9532 I2C 16 Kanal PWM IC. 
 		Das PCA9532 hat 2 unabh&auml;ngige PWM Stufen. Jeder Kanal kanne einer der Stufen zugeordnet werden oder direkt auf off/on gesetzt werden.
-		I2C-Botschaften werden &uuml;ber ein I2C Interface Modul wie beispielsweise das <a href="#RPII2C">RPII2C</a>
+		I2C-Botschaften werden &uuml;ber ein I2C Interface Modul wie beispielsweise das <a href="#RPII2C">RPII2C</a>, <a href="#FRM">FRM</a>
 		oder <a href="#NetzerI2C">NetzerI2C</a> gesendet. Daher muss dieses vorher definiert werden.<br>
 		<b>Das Attribut IODev muss definiert sein.</b><br>
 	<a name="I2C_PCA9532Define"></a><br>

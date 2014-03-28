@@ -352,7 +352,7 @@ sub I2C_PCF8574_Parse($$) {	#wird über dispatch vom physical device aufgerufen (
 	<a name="I2C_PCF8574"></a>
 		Erm&ouml;glicht die Verwendung eines PCF8574 I2C 8 Bit Portexenders. 
 		Auf einem Raspberry Pi kann der Interrupt Pin des PCF8574 mit einem GPIO verbunden werden und &uml;ber die Interrupt Funktionen von <a href="#RPI_GPIO">RPI_GPIO</a> l&aml;sst sich dann ein get für den PCF8574 bei Pegel&aml;nderung ausl&oml;sen.<br>
-		I2C-Botschaften werden &uuml;ber ein I2C Interface Modul wie beispielsweise das <a href="#RPII2C">RPII2C</a>
+		I2C-Botschaften werden &uuml;ber ein I2C Interface Modul wie beispielsweise das <a href="#RPII2C">RPII2C</a>, <a href="#FRM">FRM</a>
 		oder <a href="#NetzerI2C">NetzerI2C</a> gesendet. Daher muss dieses vorher definiert werden.<br>
 		<b>Das Attribut IODev muss definiert sein.</b><br>
 	<a name="I2C_PCF8574Define"></a><br>

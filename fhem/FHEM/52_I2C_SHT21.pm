@@ -107,7 +107,7 @@ sub I2C_SHT21_Catch($) {
 }
 
 
-sub I2C_SHT21_Attr (@) {# hier noch WerteÃ¼berprÃ¼fung einfÃ¼gen
+sub I2C_SHT21_Attr (@) {# hier noch Werteüberprüfung einfügen
 	my (undef, $name, $attr, $val) =  @_;
 	my $hash = $defs{$name};
 	my $msg = '';
@@ -317,7 +317,7 @@ sub I2C_SHT21_readHumidity($) {
 <ul>
 	<a name="I2C_SHT21"></a>
 		Erm&ouml;glicht die Verwendung eines SHT21 I2C Feuchtesensors von <a href="www.sensirion.com">Sensirion</a>.
-		I2C-Botschaften werden &uuml;ber ein I2C Interface Modul wie beispielsweise das <a href="#RPII2C">RPII2C</a>
+		I2C-Botschaften werden &uuml;ber ein I2C Interface Modul wie beispielsweise das <a href="#RPII2C">RPII2C</a>, <a href="#FRM">FRM</a>
 		oder <a href="#NetzerI2C">NetzerI2C</a> gesendet. Daher muss dieses vorher definiert werden.<br>
 		<b>Das Attribut IODev muss definiert sein.</b><br>
 	<a name="I2C_SHT21Define"></a><br>
