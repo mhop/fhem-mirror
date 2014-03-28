@@ -266,7 +266,7 @@ sub I2C_BMP180_I2CRec ($$) {
 	unless ($hash->{HiPi_used}) {#nicht nutzen wenn HiPi Bibliothek in Benutzung
 		my $phash = $hash->{IODev};
 		$pname = $phash->{NAME};
-		while ( my ( $k, $v ) = each %$clientmsg ) { 																#erzeugen von Internals für alle Keys in $clientmsg die mit dem physical Namen beginnen
+		while ( my ( $k, $v ) = each %$clientmsg ) { 																#erzeugen von Internals fuer alle Keys in $clientmsg die mit dem physical Namen beginnen
 			$hash->{$k} = $v if $k =~ /^$pname/ ;
 		}
 	}
@@ -657,7 +657,7 @@ sub I2C_BMP180_calcTruePressure($$$) {
 		Installation des HiPi Perl Moduls:<br>
 		<code><pre>	wget http://raspberry.znix.com/hipifiles/hipi-install
         perl hipi-install</pre></code>
-		Um die Rechte für die I2C Devices anzupassen, folgende Datei:<br>
+		Um die Rechte f&uuml;r die I2C Devices anzupassen, folgende Datei:<br>
 		<code><pre>	/etc/udev/rules.d/98_i2c.rules</pre></code>
 		mit diesem Inhalt anlegen:<br>
 		<code><pre>	SUBSYSTEM=="i2c-dev", MODE="0666"</pre></code>
