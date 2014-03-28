@@ -696,7 +696,8 @@ sub FRM_i2c_update_device
 			direction  => "i2cread",
 			reg        => $data->{register},
 			nbyte      => scalar(@{$data->{data}}),
-			received   => join (' ',@{$data->{data}})
+			received   => join (' ',@{$data->{data}}),
+			$hash->{IODev}->{NAME}."_SENDSTAT" => "Ok",
 		});
 	} elsif (defined $hash->{"i2c-address"} && $hash->{"i2c-address"}==$data->{address}) {
 		my $replydata = $data->{data};
