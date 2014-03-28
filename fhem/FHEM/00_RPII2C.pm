@@ -32,7 +32,7 @@ sub RPII2C_Initialize($) {
 # Provider
 	$hash->{Clients} = join (':',@clients);
   #$hash->{WriteFn}  = "RPII2C_Write";    #wird vom client per IOWrite($@) aufgerufen
-  $hash->{I2CWrtFn} = "RPII2C_Write";    #zum testen als alternative für IOWrite
+  $hash->{I2CWrtFn} = "RPII2C_Write";    #zum testen als alternative fÃ¼r IOWrite
 
 # Normal devices
   $hash->{DefFn}   = "RPII2C_Define";
@@ -54,7 +54,7 @@ sub RPII2C_Define($$) {							#
     Log3 undef, 2, $msg;
     return $msg;
   }
-  if(-e $gpioprg) {							#I2C Devices für FHEM User lesbar machen
+  if(-e $gpioprg) {							#I2C Devices fÃ¼r FHEM User lesbar machen
     if(-x $gpioprg) {
       if(-u $gpioprg) {
         my $exp = $gpioprg.' load i2c';
@@ -148,12 +148,12 @@ sub RPII2C_Set($@) {								#writeBlock noch nicht fertig
 	my @sets = ('writeByte', 'writeByteReg', 'writeBlock'); #, 'writeNBlock');
   return "Unknown argument $type, choose one of " . join(" ", @sets) if @a < 2;
 
-	foreach (@a) {																																					#Hexwerte prüfen und in Dezimalwerte wandeln
+	foreach (@a) {																																					#Hexwerte prÃ¼fen und in Dezimalwerte wandeln
 		return "$name: $_ is no 1byte hexadecimal value" if $_ !~ /^(0x|)[0-9A-F]{1,2}$/xi ;
 		$_ = hex;
 	}
   my $i2ca = shift @a;
-	return "$name: I2C Address not valid" unless ($i2ca > 3 && $i2ca < 128);								#prüfe auf Hexzahl zwischen 4 und 7F
+	return "$name: I2C Address not valid" unless ($i2ca > 3 && $i2ca < 128);								#prÃ¼fe auf Hexzahl zwischen 4 und 7F
 
   my $i2chash = { i2caddress => $i2ca, direction => "i2cwrite" };
 	my ($reg, $nbyte, $data) = undef;
@@ -185,7 +185,7 @@ sub RPII2C_Set($@) {								#writeBlock noch nicht fertig
 	$i2chash->{nbyte} = $nbyte if defined($nbyte);
 	$i2chash->{data} = $data if defined($data);
 	RPII2C_HWACCESS($hash, $i2chash);
-	undef $i2chash;																																	#Hash löschen
+	undef $i2chash;																																	#Hash lÃ¶schen
 	return undef;
 }
 ##################################### fertig?
@@ -209,7 +209,7 @@ sub RPII2C_Get($@) {								#
 	  my $status = RPII2C_HWACCESS($hash, $i2chash);
 		#my $received = join(" ", @{$i2chash->{received}});															#als Array
 		my $received = $i2chash->{received};																						#als Scalar
-		undef $i2chash;																																	#Hash löschen
+		undef $i2chash;																																	#Hash lÃ¶schen
 		return "$received transmission: $status";	
 	} 
   return undef;
@@ -235,7 +235,7 @@ sub RPII2C_Write($$) { 							#wird vom Client aufgerufen
 	    my $chash = $main::defs{$d};
 			Log3 $hash, 5, "$name ->Client gefunden: $d". ($main::defs{$d}{I2C_Address} ? ", I2Caddress: $main::defs{$d}{I2C_Address}":"") . ($clientmsg->{data} ? " Data: $clientmsg->{data}" : "");
 	    CallFn($d, "I2CRecFn", $chash, $clientmsg);
-			undef $clientmsg														#Hash löschen nachdem Daten verteilt wurden
+			undef $clientmsg														#Hash lÃ¶schen nachdem Daten verteilt wurden
     }
 	}
   return undef;
@@ -267,7 +267,7 @@ sub RPII2C_HWACCESS($$) {
 				last if $inh != 0;
 				$status = "Ok" if $inh == 0;
 			}
-#hier Mehrfachbeschreibung eines Registers noch entfernen und dafür Bereich mit Registeroperationen beschreiben
+#hier Mehrfachbeschreibung eines Registers noch entfernen und dafÃ¼r Bereich mit Registeroperationen beschreiben
 		} elsif (defined($clientmsg->{reg}) && defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cwrite") {	#Register beschreiben
 		  my @data = split(" ", $clientmsg->{data});
 		  foreach (@data) {
@@ -296,8 +296,8 @@ sub RPII2C_HWACCESS($$) {
 				$rmsg .= " " if $n <= $nbyte;
 				$status = "Ok" if ($n + 1) == $nbyte;
 			}
-			#@{$clientmsg->{received}} = split(" ", $rmsg) if($rmsg);										#Daten als Array übertragen
-			$clientmsg->{received} = $rmsg if($rmsg);																	#Daten als Scalar übertragen
+			#@{$clientmsg->{received}} = split(" ", $rmsg) if($rmsg);										#Daten als Array Ã¼bertragen
+			$clientmsg->{received} = $rmsg if($rmsg);																	#Daten als Scalar Ã¼bertragen
 		} elsif ($clientmsg->{direction} eq "i2cread") {																																#Byte lesen
 			my $nbyte = defined($clientmsg->{nbyte}) ? $clientmsg->{nbyte} : 1;
 			my $rmsg = "";
@@ -309,8 +309,8 @@ sub RPII2C_HWACCESS($$) {
 				$rmsg .= " " if $n <= $nbyte;
 				$status = "Ok" if ($n + 1) == $nbyte;
 			}
-			#@{$clientmsg->{received}} = split(" ", $rmsg) if($rmsg);										#Daten als Array übertragen
-			$clientmsg->{received} = $rmsg if($rmsg);																	#Daten als Scalar übertragen
+			#@{$clientmsg->{received}} = split(" ", $rmsg) if($rmsg);										#Daten als Array Ã¼bertragen
+			$clientmsg->{received} = $rmsg if($rmsg);																	#Daten als Scalar Ã¼bertragen
 		}
 		$hash->{STATE} = $status;
 		$hash->{ERRORCNT} = defined($hash->{ERRORCNT}) ? $hash->{ERRORCNT} += 1 : 1 if $status ne "Ok";
@@ -353,7 +353,8 @@ sub RPII2C_HWACCESS($$) {
 			</li>
 			<li>
 				To access the I2C-Bus the Device::SMBus module is necessary:<br>
-				<code>sudo cpan Device::SMBus</code><br>
+				<code>sudo apt-get install libmoose-perl<br>
+				sudo cpan Device::SMBus</code><br>
 			</li>
 		</ul>
 	<a name="RPII2CDefine"></a><br>
@@ -439,7 +440,7 @@ sub RPII2C_HWACCESS($$) {
 			<li>
 				Dieses Modul nutzt das gpio Utility der <a href="http://wiringpi.com/download-and-install/">WiringPi</a> Bibliothek um FHEM Schreibrechte auf die I2C Schnittstelle zu geben.<br>
 				WiringPi Installation ist hier beschrieben: <a href="#RPI_GPIO">RPI_GPIO</a><br>
-				F&uuml;r andere Systeme (BeagleBone, etc.) oder auch für das Raspberry kann auf WiringPi verzichtet werden. In diesem Fall müssen die Dateien <code>/dev/i2c-x</code> Schreib-/Leserechte, für den User unter dem FHEM läuft, gesetzt bekommen. (z.B. in der etc/init.d/fhem)<br>
+				F&uuml;r andere Systeme (BeagleBone, etc.) oder auch fÃ¼r das Raspberry kann auf WiringPi verzichtet werden. In diesem Fall mÃ¼ssen die Dateien <code>/dev/i2c-x</code> Schreib-/Leserechte, fÃ¼r den User unter dem FHEM lÃ¤uft, gesetzt bekommen. (z.B. in der etc/init.d/fhem)<br>
 			</li>
 			<li>
 				Installation der I2C Abh&auml;ngigkeiten:<br>
@@ -457,7 +458,8 @@ sub RPII2C_HWACCESS($$) {
 			</li>
 			<li>
 				Desweiteren ist das Perl Modul Device::SMBus f&uuml;r den Zugrff auf den I2C Bus notwendig:<br>
-				<code>sudo cpan Device::SMBus</code><br>
+				<code>sudo apt-get install libmoose-perl<br>
+				sudo cpan Device::SMBus</code><br>
 			</li>
 		</ul>
 	<a name="RPII2CDefine"></a><br>
