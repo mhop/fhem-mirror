@@ -824,7 +824,7 @@ DbLog_Get($@)
     $stm .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
     $stm .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
 
-    $stm .= "AND TIMESTAMP > $sqlspec{from_timestamp}
+    $stm .= "AND TIMESTAMP >= $sqlspec{from_timestamp}
              AND TIMESTAMP < $sqlspec{to_timestamp}
              ORDER BY TIMESTAMP";
 
