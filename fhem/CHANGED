@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - bugfix:  DbLog: fixedrange=hour works now correctly
   - bugfix:  Dashboard: dashboard_showfullsize not applied in room "all"
   - feature: new module 98_PID20.pm added (John / betateilchen)
   - feature: new module 00_RPII2C.pm, 52_I2C_PCA9532.pm, 52_I2C_PCF8574.pm,
