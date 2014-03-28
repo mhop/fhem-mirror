@@ -36,7 +36,7 @@ use warnings;
 
 use Time::HiRes qw(usleep);
 use Scalar::Util qw(looks_like_number);
-#use Error qw(:try);
+use Error qw(:try);
 
 use constant {
 	BMP180_I2C_ADDRESS => '0x77',
@@ -357,7 +357,7 @@ sub I2C_BMP180_GetPress ($$) {
 	readingsBulkUpdate($hash, 'temperature', $temperature);
 	readingsBulkUpdate($hash, 'pressure', $pressure);
 	readingsBulkUpdate($hash, 'pressure-nn', $pressureNN);
-	readingsBulkUpdate($hash, 'altitude', $altitude, 0);
+	#readingsBulkUpdate($hash, 'altitude', $altitude, 0);
 	readingsEndUpdate($hash, 1);	
 }
 
@@ -418,14 +418,18 @@ sub I2C_BMP180_readUncompensatedPressure($$) {
 sub I2C_BMP180_i2cread($$$) {
 	my ($hash, $reg, $nbyte) = @_;
 	if ($hash->{HiPi_used}) {
-		my @values = $hash->{devBPM180}->bus_read($reg, $nbyte);
-		I2C_BMP180_I2CRec($hash, {
-			direction  => "i2cread",
-			i2caddress => $hash->{I2C_Address},
-			reg => 				$reg,
-			nbyte => 			$nbyte,
-			received => 	join (' ',@values),
-		});
+		try {
+			my @values = $hash->{devBPM180}->bus_read($reg, $nbyte);
+			I2C_BMP180_I2CRec($hash, {
+				direction  => "i2cread",
+				i2caddress => $hash->{I2C_Address},
+				reg => 				$reg,
+				nbyte => 			$nbyte,
+				received => 	join (' ',@values),
+			});
+		} catch Error with {
+			Log3 ($hash, 1, ': ERROR: '. $hash->{NAME} . ': i2c-bus_read failure');
+		};
 	} else {
 		if (defined (my $iodev = $hash->{IODev})) {
 			CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
@@ -443,13 +447,17 @@ sub I2C_BMP180_i2cread($$$) {
 sub I2C_BMP180_i2cwrite($$$) {
 	my ($hash, $reg, @data) = @_;
 	if ($hash->{HiPi_used}) {
-		$hash->{devBPM180}->bus_write($reg, join (' ',@data));
-		I2C_BMP180_I2CRec($hash, {
-			direction  => "i2cwrite",
-			i2caddress => $hash->{I2C_Address},
-			reg => 				$reg,
-			data => 			join (' ',@data),
-		});
+		try {
+			$hash->{devBPM180}->bus_write($reg, join (' ',@data));
+			I2C_BMP180_I2CRec($hash, {
+				direction  => "i2cwrite",
+				i2caddress => $hash->{I2C_Address},
+				reg => 				$reg,
+				data => 			join (' ',@data),
+			});
+			} catch Error with {
+				Log3 ($hash, 1, ': ERROR: ' . $hash->{NAME} . ': i2c-bus_write failure');
+			}; 
 	} else {
 		if (defined (my $iodev = $hash->{IODev})) {
 			CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
