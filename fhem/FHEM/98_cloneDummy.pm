@@ -162,7 +162,7 @@ sub cloneDummy_Notify($$) {
 	<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 	</ul>
 	<br>
-
+	<b>Wichtig: Es müssen unterschiedliche Namen für &lt;name&gt; und &lt;Quelldevice&gt; verwendet werden!</b><br/>
 </ul>
 
 =end html_DE
