@@ -381,8 +381,9 @@ sub HMinfo_peerCheck(@) { #####################################################
         next if ($_ eq "00000000" ||$_ =~m /$devId/);
         my $cId = $id;
         if ($md eq "HM-CC-RT-DN" && $id =~ m/05$/){ # special RT climate
-          $_ =~ s/04$/05/;  # have to compare with clima_team, not clima
-          $cId =~ s/05$/04/;# will find 04 in peerlist, not 05
+          # special removed due to observations of user - RT should peer team2team - korrekt?
+          # $_ =~ s/04$/05/;  # have to compare with clima_team, not clima
+          # $cId =~ s/05$/04/;# will find 04 in peerlist, not 05
         }
         my $pDid = substr($_,0,6);
         if (!$modules{CUL_HM}{defptr}{$_} && 

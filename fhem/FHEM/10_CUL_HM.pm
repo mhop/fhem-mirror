@@ -579,7 +579,8 @@ sub CUL_HM_Attr(@) {#################################
         }
       }
     }
-    elsif ($st eq "blindActuator"){
+#    elsif ($st eq "blindActuator"){
+    else{
       if ($cmd eq "set"){
         if ($attrVal eq "levelInverse"){# no action
         }
@@ -591,9 +592,9 @@ sub CUL_HM_Attr(@) {#################################
         delete $hash->{helper}{vd}{msgRed};
       }
     }
-    else{
-      return "attribut param not valid for $name";
-    }
+#    else{
+#      return "attribut param not valid for $name";
+#    }
   }
   elsif($attrName eq "peerIDs"){
     if ($cmd eq "set"){
@@ -3864,7 +3865,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $pmd     = AttrVal(CUL_HM_id2Name($peerDst), "model"  , "");
 
     if ($md =~ m/HM-CC-RT-DN/ && $chn eq "05" ){# rt team peers cross from 05 to 04
-      $myBtn = $peerBtn = "04";
+      $myBtn = $peerBtn = "05";
+#      $myBtn = $peerBtn = "04"; was observed by HM - but reality showes that peering should be team 2 team
       $peerChn = "05";
     }
     else{ # normal devices
