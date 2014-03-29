@@ -1,0 +1,20 @@
+# Siehe auch
+# http://de.wikipedia.org/wiki/Feiertage_in_Deutschland
+
+# 1 einzelne Tage
+
+1 01-01 Neujahr
+1 05-01 Tag der Arbeit
+1 08-15 Mariae Himmelfahrt (nur bei ueberwiegend katholischer Bevoelkerung)
+1 10-03 Tag der deutschen Einheit
+1 11-01 Allerheiligen
+1 12-25 1. Weihnachtstag
+1 12-26 2. Weihnachtstag
+
+# 2 Tage relativ zu Ostern
+
+2 -2 Karfreitag
+2  1 Ostermontag
+2 39 Christi Himmelfahrt
+2 50 Pfingsten
+2 60 Fronleichnam
