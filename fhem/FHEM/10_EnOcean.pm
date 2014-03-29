@@ -356,27 +356,29 @@ EnOcean_Get ($@)
       my $channel = shift(@a);
       if (!defined $channel || $channel eq "all") {
         $channel = 30;     
-      } elsif ($channel >= 0 || $channel <= 29) {
-      
       } elsif ($channel eq "input") {
         $channel = 31;
+      } elsif ($channel >= 0 && $channel <= 29) {
+      
       } else {
         return "$cmd <channel> wrong, choose 0...29|all|input.";
       }
       
       if ($cmd eq "state") {
         $cmdID = 3;      
+        Log3 $name, 3, "EnOcean $name get $cmdID $channel.";  
         $data = sprintf "%02X%02X", $cmdID, $channel;
         
       } elsif ($cmd eq "measurement") {
         $cmdID = 6;
         my $query = shift(@a);
+        Log3 $name, 3, "EnOcean $name get $cmdID $channel $query.";  
         if ($query eq "energy") {
           $query = 0;
         } elsif ($query eq "power") {
           $query = 1;
         } else {
-          return "$cmd <query> wrong, choose energy|power.";
+          return "$cmd <channel> <query> wrong, choose 0...30|all|input energy|power.";
         }
         $data = sprintf "%02X%02X", $cmdID, $query << 5 | $channel;
         
@@ -2114,6 +2116,8 @@ EnOcean_Parse($$)
 {
   my ($iohash, $msg) = @_;
   my (undef, $packetType, $rorg, $data, $id, $status, $odata) = split(":", $msg);
+  $odata =~ m/^(..)(........)(..)(..)$/;
+  my ($subTelNum, $destinationID, $RSSI, $securityLevel) = (hex($1), $2, hex($3), hex($4));  
   my $rorgname = $EnO_rorgname{$rorg};
   if (!$rorgname) {
     Log3 undef, 2, "EnOcean RORG ($rorg) received from $id unknown.";
@@ -2126,7 +2130,7 @@ EnOcean_Parse($$)
         Log3 undef, 3, "EnOcean Unknown device with ID $id and RORG $rorgname, please define it.";
         return "UNDEFINED EnO_${rorgname}_$id EnOcean $id $msg";
       } else {
-        Log3 undef, 3, "EnOcean Unknown device with ID $id and RORG $rorgname, set transceiver in teach mode.";
+        Log3 undef, 3, "EnOcean Unknown device with ID $id and RORG $rorgname, activate learning mode.";
         return "";
       }
     } else {
@@ -4127,6 +4131,9 @@ EnOcean_Undef($$)
   <a href="#EnOceanattr">attributes</a>, the behavior of the devices can be
   changed separately.
   <br><br>
+  Fhem and the EnOcean devices must be trained with each other. To this, Fhem
+  must be in the learning mode, see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>
+  and <a href="#TCM_teachMode">teach_mode</a>.<br>
   The teach-in procedure depends on the type of the devices. Switches (EEP RPS)
   and contacts (EEP 1BS) are recognized when receiving the first message.
   Contacts can also send a teach-in telegram. Fhem not need this telegram.
@@ -4138,7 +4145,7 @@ EnOcean_Undef($$)
   <a href="#model">model</a>. If the EEP profile identifier and the manufacturer
   ID are sent the device is clearly identifiable. Fhem automatically assigns
   these devices to the correct profile. Some 4BS, VLD or MSC devices must be paired
-  bidirectional, see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.<br><br>
+  bidirectional, see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.<br><br>
   Fhem supports many of most common EnOcean profiles and manufacturer-specific
   devices. Additional profiles and devices can be added if required.
   <br><br>
@@ -4205,19 +4212,21 @@ EnOcean_Undef($$)
   <a name="EnOceanset"></a>
   <b>Set</b>
   <ul>
-    <li><a name="EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>
+    <li><a name="EnOcean_teach-in">Teach-In / Teach-Out</a>
     <ul>
-    <code>set &lt;name&gt; teach &lt;t/s&gt;</code>
+    <code>set &lt;IODev&gt; teach &lt;t/s&gt;</code>
     <br><br>
-    Set the EnOcean Transceiver module (TCM Modul) in the pairing mode.
+    Set Fhem in the learning mode.<br>
     A device, which is then also put in this state is to paired with
-    Fhem. Pearing is used for some 4BS, VLD and MSC devices,
+    Fhem. Bidirectional Teach-In / Teach-Out is used for some 4BS, VLD and MSC devices,
     e. g. EEP 4BS, RORG A5-20-01 (Battery Powered Actuator).<br>
     Bidirectional 4BS Teach-In and UTE - Universal Uni- and Bidirectional
     Teach-In are supported. 
     <br>
-    <code>name</code> is the name of the TCM Module . <code>t/s</code> is the
-    time for the teach-in period.
+    <code>IODev</code> is the name of the TCM Module.<br>
+    <code>t/s</code> is the time for the learning period.
+    <br><br>
+    Types of learning modes see <a href="#TCM_teachMode">teachMode</a>
     <br><br>
     Example:
     <ul><code>set TCM_0 teach 600</code>
@@ -4278,12 +4287,15 @@ EnOcean_Undef($$)
         1BS Telegram (EEP D5-00-01)<br>
         [tested with Eltako FSR14]
     <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
         <li>closed<br>
           issue closed command</li>
          <li>open<br>
           issue open command</li>
         <li>teach<br>
-          initiate teach-in mode</li>
+          initiate teach-in</li>
     </ul></li>
         The attr subType must be contact. The attribute must be set manually.
     <br><br>
@@ -4355,7 +4367,8 @@ EnOcean_Undef($$)
       <li>desired-temp &lt;value&gt;<br>
           Use the builtin PI regulator, and set the desired temperature to the
           specified degree. The actual value will be taken from the temperature
-          reported by the MD15 or from the attribute actualTemp if it is set.</li>
+          reported by the Battery Powered Actuator, the <a href="#temperatureRefDev">temperatureRefDev</a>
+          or from the attribute <a href="#actualTemp">actualTemp</a> if it is set.</li>
       <li>runInit<br>
           Maintenance Mode (service on): Run init sequence.</li>
       <li>liftSet<br>
@@ -4369,7 +4382,7 @@ EnOcean_Undef($$)
     </ul><br>
     The attr subType must be hvac.01. This is done if the device was
     created by autocreate. To control the device, it must be bidirectional paired,
-    see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.<br>
+    see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.<br>
     The command is not sent until the device wakes up and sends a mesage, usually
     every 10 minutes.
     </li>
@@ -4901,6 +4914,7 @@ EnOcean_Undef($$)
       Name of the device whose reference value is read. The reference values is
       the reading temperature.
     </li>
+    <li><a href="#verbose">verbose</a></li>
     <li><a href="#webCmd">webCmd</a></li>
     </ul>
   </ul>
