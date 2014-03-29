@@ -59,7 +59,8 @@ TCM_Initialize($)
   $hash->{UndefFn} = "TCM_Undef";
   $hash->{GetFn}   = "TCM_Get";
   $hash->{SetFn}   = "TCM_Set";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 blockSenderID:own,no";
+  $hash->{AttrFn}  = "TCM_Attr";
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 blockSenderID:own,no teachMode:always,demand,nearfield";
 }
 
 # Define
@@ -798,6 +799,30 @@ TCM_ReadAnswer($$)
   }
 }
 
+sub
+TCM_Attr(@) {
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+  my $hash = $defs{$name};
+  
+  if ($attrName eq "blockSenderID") {
+    if (!defined $attrVal) {
+    } elsif ($attrVal !~ m/^(own|no)$/) {
+      Log3 $name, 3, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+    
+  } elsif ($attrName eq "teachMode") {
+    if (!defined $attrVal){
+    
+    } elsif ($attrVal !~ m/^(always|demand|nearfield)$/) {
+      Log3 $name, 3, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+
+  }
+  return undef;
+}
+
 # Undef
 sub
 TCM_Undef($$)
@@ -874,11 +899,12 @@ TCM_Undef($$)
     to specify the baudrate: the TCM120 should be opened with 9600 Baud, the
     TCM310 with 57600 baud. For Eltako FGW14 devices, type has to be set to 120 and 
     the baudrate has to be set to 57600 baud if the FGW14 operating mode 
-    rotary switch is on position 6.<br>
+    rotary switch is on position 6.<br><br>
+    
     Example:
     <ul><code>
       define BscBor TCM 120 /dev/ttyACM0@9600<br>
-      define FGW14 TCM 120 /dev/ttyS3@57600
+      define FGW14 TCM 120 /dev/ttyS3@57600<br>
       define TCM310 TCM 310 /dev/ttyACM0@57600<br>
       define TCM310 TCM 310 COM1@57600 (Windows)<br>
     </code></ul>
@@ -896,11 +922,11 @@ TCM_Undef($$)
       Deactivates TCM modem functionality</li>
     <li>modem_on [0000 ... FFFF]<br>
       Activates TCM modem functionality and sets the modem ID</li>
-    <li>teach &lt;t/s&gt; or pairForSec &lt;t/s&gt;<br>
-      Set Fhem in teach-in mode.<br>
-      The command is required for UTE and to teach-in bidirectional actuators
+    <li>teach &lt;t/s&gt;<br>
+      Set Fhem in learning mode, see <a href="#TCM_teachMode">teachMode</a>.<br>
+      The command is always required for UTE and to teach-in bidirectional actuators
       e. g. EEP 4BS (RORG A5-20-XX),
-      see <a href="#EnOcean_teach-in"> Bidirectional Teach-In / Teach-Out</a>.</li>
+      see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.</li>
     <li>reset<br>
       Reset the device</li>
     <li>sensitivity [00|01]<br>
@@ -922,11 +948,11 @@ TCM_Undef($$)
     <li>maturity [00|01]<br>
       Waiting till end of maturity time before received radio telegrams will transmit:
       radio telegrams are send immediately = 00, after the maturity time is elapsed = 01</li>
-    <li>teach &lt;t/s&gt; or pairForSec &lt;t/s&gt;<br>
-      Set Fhem in teach-in mode.<br>
-      The command is required for UTE and to teach-in bidirectional actuators
+    <li>teach &lt;t/s&gt;<br>
+      Set Fhem in learning mode, see <a href="#TCM_teachMode">teachMode</a>.<br>
+      The command is always required for UTE and to teach-in bidirectional actuators
       e. g. EEP 4BS (RORG A5-20-XX),
-      see <a href="#EnOcean_teach-in"> Bidirectional Teach-In / Teach-Out</a>.</li>
+      see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.</li>
     <li>reset<br>
       Reset the device</li>
     <li>repeater [0000|0101|0102]<br>
@@ -977,13 +1003,20 @@ TCM_Undef($$)
   <a name="TCMattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a name="blockSenderID">blockSenderID</a> &lt;own|no&gt;,
+    <li><a name="TCM_blockSenderID">blockSenderID</a> &lt;own|no&gt;,
       [blockSenderID] = own is default.<br>
       Block receiving telegrams with a TCM SenderID sent by repeaters.      
       </li>
     <li><a href="#attrdummy">dummy</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
+    <li><a name="TCM_teachMode">teachMode</a> &lt;always|demand|nearfield&gt;,
+      [teachMode] = demand is default.<br>
+      Learning method for automatic setup of EnOcean devices:<br>    
+      [teachMode] = always: Teach-In/Teach-Out telegrams always accepted, with the exception of bidirectional devices<br>
+      [teachMode] = demand: Teach-In/Teach-Out telegrams accepted if Fhem is in learning mode, see also <code>set &lt;IODev&gt; teach &lt;t/s&gt;</code><br>
+      [teachMode] = nearfield: Teach-In/Teach-Out telegrams accepted if Fhem is in learning mode and the signal strength RSSI >= -60 dBm.<be>
+    </li>
+    <li><a href="#verbose">verbose</a></li>
   </ul>
   <br>
 </ul>
