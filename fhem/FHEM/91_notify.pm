@@ -69,8 +69,8 @@ notify_Exec($$)
       $found = ("$n:$s" =~ m/^$re$/);
     }
     if($found) {
-      $ntfy->{STATE} = $dev->{NTFY_TRIGGERTIME}
-        if(AttrVal($ln, 'showTriggerTime', 0));
+      $ntfy->{STATE} =
+        AttrVal($ln,'showTriggerTime',0) ? $dev->{NTFY_TRIGGERTIME} : 'active';
   
       Log3 $ln, 5, "Triggering $ln";
       my (undef, $exec) = split("[ \t]+", $ntfy->{DEF}, 2);
