@@ -561,3 +561,7 @@
 
 - Wed Mar 26 2014 (John / betateilchen)
   - added new module 98_PID20.pm as announced replacement for old 98_PID.pm
+
+- Sun Mar 30 2014 (C-HERRMANN)
+  - added new module 10_UNIRoll.pm
+  
