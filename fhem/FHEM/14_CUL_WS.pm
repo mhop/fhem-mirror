@@ -392,7 +392,12 @@ CUL_WS_Attr(@)
   <a name="CUL_WSattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#IODev">IODev (!)</a></li>
+    <li><a href="#IODev">IODev</a>
+      Note: by setting this attribute you can define different sets of 8
+      devices in FHEM, each set belonging to a CUL. It is important, however,
+      that a device is only received by the CUL defined, e.g. by using
+      different Frquencies (433MHz vs 868MHz)
+      </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#eventMap">eventMap</a></li>
     <li><a href="#ignore">ignore</a></li>
@@ -404,4 +409,55 @@ CUL_WS_Attr(@)
 </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="CUL_WS"></a>
+<h3>CUL_WS</h3>
+<ul>
+  Das CUL_WS-Modul entschl&uuml;sselt die Nachrichten des Types S300, die von
+  dem CUL empfangen wurden.
+  <br><br>
+
+  <a name="CUL_WSdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; CUL_WS &lt;code&gt; [corr1...corr4]</code> <br>
+    <br>
+        &lt;code&gt; ist der Code, der an dem S300 eingestellt werden muss.
+        G&uuml;ltige Werte sind 1 bis 8 
+    <br>
+    corr1..corr4 entsprechen vier m&ouml;glichen Korrekturwerten, die den
+    jeweiligen Werten hinzuaddiert werden, um die Ger&auml;te zu kalibrieren.
+    Hinweis: Bei den Werten f&uuml;r Regenmengen werden die Korrekturwerte
+    nicht hinzuaddiert, sondern als Faktor mit dem Regenwert multipliziert.
+  </ul>
+  <br>
+
+  <a name="CUL_WSset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="CUL_WSget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="CUL_WSattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <li><a href="#IODev">IODev (!)</a>
+      Achtung: mit diesem Attribut ist es m&ouml;glich mehrere 8-er Sets an
+      S300-er in FHEM zu definieren. Wichtige Voraussetzung allerdings ist,
+      dass nur das spezifizierte CUL das S300 empfangen kann, z.Bsp. durch
+      Frequenztrennung (433MHz vs. 868MHz).
+      </li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#eventMap">eventMap</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#model">model</a> (S300,KS300,ASH2200)</li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+  <br>
+</ul>
+=end html_DE
+
 =cut
