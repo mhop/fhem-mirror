@@ -357,4 +357,110 @@ western_easter($)
 </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="holiday"></a>
+<h3>holiday</h3>
+<ul>
+  <a name="holidaydefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; holiday</code>
+    <br><br>
+    Definiert einen Satz mit Urlaubsinformationen. Das Modul versucht die Datei
+    &lt;name&gt;.holiday im Pfad <a href="#modpath">modpath</a>/FHEM zu
+    &ouml;ffnen.
+    Wenn Eintr&auml;ge im der Datei auf den aktuellen Tag passen wird der STATE
+    der Holiday-Instanz die im <a href="#list">list</a> Befehl angezeigt wird
+    auf die entsprechenden Werte gesetzt. Andernfalls ist der STATE auf den
+    Text "none" gesetzt.
+ 
+    Meistens wird dieser Wert mit einem Perl Script abgefragt: siehe Value() im
+    <a href="#perl">perl</a> Abschnitt oder im globalen Attribut <a
+    href="#holiday2we"> holiday2we</a>.<br> Die Datei wird jede Nacht neu
+    eingelesen um den Wert des aktuellen Tages zu erzeugen.  Auch jeder "get"
+    Befehl liest die Datei neu ein.
+
+    <br><br>
+
+    Holiday file Definition:<br>
+    Die Datei darf Kommentare, beginnend mit #, und Leerzeilen enthalten.  Die
+    entscheidenden Zeilen beginnen mit einer Zahl (Typ) und enthalten durch
+    Leerzeichen getrennte W&ouml;rter, je nach Typ. Die verschiedenen Typen
+    sind:<br>
+    <ul>
+      <li>1<br>
+          Genaues Datum. Argument: &lt;MM-TT&gt; &lt;Feiertag-Name&gt;<br>
+          Beispiel: 1 12-24 Weihnachten
+          </li>
+      <li>2<br>
+          Oster-abh&auml;ngiges Datum. Argument: &lt;Tag-Offset&gt;
+          &lt;Feiertag-Name&gt;.
+          Der Offset wird vom Oster-Sonntag an gez&auml;hlt.
+          <br>
+          Beispiel: 2 1 Oster-Montag<br>
+          Hinweis: Das Osterdatum kann vorher gepr&uuml;ft werden:
+          fhem> { join("-", western_easter(2011)) }
+          </li>
+      <li>3<br>
+          Monats-abh&auml;ngiges Datum. Argument: &lt;X&gt; &lt;Wochentag&gt;
+          &lt;Monat&gt; &lt;Feiertag-Name&gt;.<br>
+          Beispiel:<br>
+          <ul>
+            3  1 Mon 05 Erster Montag In Mai<br>
+            3  2 Mon 05 Zweiter Montag In Mai<br>
+            3 -1 Mon 05 Letzter Montag In Mai<br>
+            3  0 Mon 05 Jeder Montag In Mai<br>
+          </ul>
+          </li>
+      <li>4<br>
+          Intervall. Argument: &lt;MM-TT&gt; &lt;MM-TT&gt; &lt;Feiertag-Name&gt;
+          .<br>
+          Beispiel:<br>
+          <ul>
+            4 06-01 06-30 Sommerferien<br>
+          </ul>
+          </li>
+      <li>5<br>
+          Datum relativ, Wochentags ein fester Urlaubstag/Feiertag. Argument:
+          &lt;X&gt; &lt;Wochentag&gt; &lt;Monat&gt; &lt;Tag&gt; 
+          &lt;Feiertag-Name&gt;<br> Hinweis: Da +0 oder -0 als Offset nicht
+          verboten sind, ist das Verhalten hier nicht definiert, kann sich also
+          ohne Info &auml;ndern;<br>
+          Beispiel:<br>
+          <ul>
+            5 -1 Wed 11 23 Buss und Bettag (erster Mittwoch vor dem 23. Nov)<br>
+            5 1 Mon 01 31 Erster Montag in Februar<br>
+          </ul>
+          </li>
+    </ul>
+    Siehe auch he.holiday im contrib Verzeichnis f&uuml;r offizielle Feiertage
+    in den deutschen Bundesl&auml;ndern Hessen und by.holiday f&uuml;r Bayern.
+  </ul>
+  <br>
+
+  <a name="holidayset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="holidayget"></a>
+  <b>Get</b>
+    <ul>
+      <code>get &lt;name&gt; &lt;MM-DD&gt;</code><br>
+      <code>get &lt;name&gt; yesterday</code><br>
+      <code>get &lt;name&gt; today</code><br>
+      <code>get &lt;name&gt; tomorrow</code><br>
+      <br><br>
+      Gibt den Name des Feiertages zum angebenenen Datum zur&uuml;ck oder den
+      Text none.
+      <br><br>
+    </ul>
+    <br>
+
+  <a name="holidayattr"></a>
+  <b>Attributes</b><ul>N/A</ul><br>
+
+</ul>
+
+=end html_DE
 =cut
