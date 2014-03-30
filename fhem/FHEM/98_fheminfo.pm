@@ -79,6 +79,8 @@ CommandFheminfo($$)
   my $sendStatistics = AttrVal("global","sendStatistics",undef);
   my $moddir   = $attr{global}{modpath}."/FHEM";
   my $uidFile  = $moddir."/FhemUtils/uniqueID";
+  my $upTime;
+     $upTime   = fhemUptime();
 
   if(defined($uniqueID) && $uniqueID eq $uidFile) {
     my $fh;
@@ -170,6 +172,7 @@ CommandFheminfo($$)
   $str .= sprintf("  Arch%*s: %s\n",5," ",$arch);
   $str .= sprintf("  Perl%*s: %s\n",5," ",$perl);
   $str .= sprintf("  uniqueID%*s: %s\n",0," ",$uniqueID);
+  $str .= sprintf("  upTime%*s: %s\n",3,"  ",$upTime); 
   $str .= "\n";
 
   my $contModules;
@@ -364,6 +367,27 @@ sub checkModule($) {
   } else {
     return(1);
   }
+}
+
+sub fhemUptime {
+       my $diff = time - $fhem_started;
+       my ($d,$h,$m,$ret);
+       
+       ($d,$diff) = _myDiv($diff,86400);
+       ($h,$diff) = _myDiv($diff,3600);
+       ($m,$diff) = _myDiv($diff,60);
+
+       $ret  = "";
+       $ret .= "$d days, " if($d >  1);
+       $ret .= "1 day, "   if($d == 1);
+       $ret .= sprintf("%02s:%02s:%02s", $h, $m, $diff);
+
+       return $ret;
+}
+
+sub _myDiv($$) {
+       my ($p1,$p2) = @_;
+       return (int($p1/$p2), $p1 % $p2);
 }
 
 1;
