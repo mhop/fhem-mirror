@@ -191,51 +191,50 @@ sub cfgDB_svnId;
 # VOLATILE- Set if the definition should be saved to the "statefile"
 # NOTIFYDEV - if set, the notifyFn will only be called for this device
 
-use vars qw(%modules);          # List of loaded modules (device/log/etc)
-use vars qw(%defs);             # FHEM device/button definitions
-use vars qw(%attr);             # Attributes
-use vars qw(%interfaces);       # see createInterfaceDefinitions below
-use vars qw(%selectlist);       # devices which want a "select"
-use vars qw(%readyfnlist);      # devices which want a "readyfn"
-use vars qw($readytimeout);     # Polling interval. UNIX: device search only
-$readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
-
-use vars qw(%value);            # Current values, see commandref.html
-use vars qw(%oldvalue);         # Old values, see commandref.html
+use vars qw($devcount);         # Maximum device number, used for storing
+use vars qw($fhem_started);     # used for uptime calculation
 use vars qw($init_done);        #
 use vars qw($internal_data);    # FileLog/DbLog -> SVG data transport
-use vars qw(%cmds);             # Global command name hash.
-use vars qw(%data);             # Hash for user data
-use vars qw($devcount);         # Maximum device number, used for storing
-use vars qw(%defaultattr);      # Default attributes, used by FHEM2FHEM
-use vars qw(%inform);           # Used by telnet_ActivateInform
-use vars qw(%intAt);            # Internal at timer hash, global for benchmark
 use vars qw($nextat);           # Time when next timer will be triggered.
-use vars qw(%ntfyHash);         # hash of devices needed to be notified.
-
+use vars qw($readytimeout);     # Polling interval. UNIX: device search only
 use vars qw($reread_active);
 use vars qw($winService);       # the Windows Service object
+use vars qw(%attr);             # Attributes
+use vars qw(%cmds);             # Global command name hash.
+use vars qw(%data);             # Hash for user data
+use vars qw(%defaultattr);      # Default attributes, used by FHEM2FHEM
+use vars qw(%defs);             # FHEM device/button definitions
+use vars qw(%inform);           # Used by telnet_ActivateInform
+use vars qw(%intAt);            # Internal at timer hash, global for benchmark
+use vars qw(%interfaces);       # see createInterfaceDefinitions below
+use vars qw(%modules);          # List of loaded modules (device/log/etc)
+use vars qw(%ntfyHash);         # hash of devices needed to be notified.
+use vars qw(%oldvalue);         # Old values, see commandref.html
+use vars qw(%readyfnlist);      # devices which want a "readyfn"
+use vars qw(%selectlist);       # devices which want a "select"
+use vars qw(%value);            # Current values, see commandref.html
 
 my $AttrList = "verbose:0,1,2,3,4,5 room group comment alias ".
                 "eventMap userReadings";
-
-my %comments;			# Comments from the include files
-my $currlogfile;		# logfile, without wildcards
 my $currcfgfile="";		# current config/include file
-my $logopened = 0;              # logfile opened or using stdout
-my $rcvdquit;			# Used for quit handling in init files
-my $sig_term = 0;		# if set to 1, terminate (saving the state)
-my $intAtCnt=0;
-my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
-my $duplidx=0;                  # helper for the above pool
-my $readingsUpdateDelayTrigger; # needed internally
+my $currlogfile;		# logfile, without wildcards
 my $cvsid = '$Id$';
+my $duplidx=0;                  # helper for the above pool
+my $evalSpecials;               # Used by EvalSpecials->AnalyzeCommand parameter passing
+my $intAtCnt=0;
+my $logopened = 0;              # logfile opened or using stdout
 my $namedef = "where <name> is a single device name, a list separated by komma (,) or a regexp. See the devspec section in the commandref.html for details.\n";
+my $rcvdquit;			# Used for quit handling in init files
+my $readingsUpdateDelayTrigger; # needed internally
+my $sig_term = 0;		# if set to 1, terminate (saving the state)
+my $wbName = ".WRITEBUFFER";    # Buffuer-name for delayed writing via select
+my %comments;			# Comments from the include files
+my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my @cmdList;                    # Remaining commands in a chain. Used by sleep
-my $evalSpecials;       # Used by EvalSpecials->AnalyzeCommand parameter passing
-my $wbName = ".WRITEBUFFER";
 
 $init_done = 0;
+$readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
+
 
 $modules{Global}{ORDER} = -1;
 $modules{Global}{LOADED} = 1;
@@ -480,6 +479,7 @@ foreach my $d (keys %defs) {
   }
 }
 DoTrigger("global", "INITIALIZED", 1);
+$fhem_started = time;
 
 $attr{global}{motd} .= "Running with root privileges."
         if($^O !~ m/Win/ && $<==0 && $attr{global}{motd} =~ m/^$sc_text/);
