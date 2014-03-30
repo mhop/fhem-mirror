@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>contactEmailRot13</key>
+	<string>wc@wcf-argjbexf.rh</string>
+	<key>contactName</key>
+	<string>Julian Pawlowski</string>
+	<key>description</key>
+	<string>Support for FHEM configuration files.</string>
+	<key>name</key>
+	<string>FHEM</string>
+	<key>uuid</key>
+	<string>346C0915-559F-4946-A6E3-9E20E4ED08F8</string>
+</dict>
+</plist>
