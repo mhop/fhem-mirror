@@ -473,7 +473,8 @@ sub HMinfo_tempList(@) { ######################################################
   my ($filter,$action,$fName)=@_;
   $filter = "." if (!$filter);
   $action = "" if (!$action);
-  my $ret;
+  my %dl =("Sat"=>0,"Sun"=>1,"Mon"=>2,"Tue"=>3,"Wed"=>4,"Thu"=>5,"Fri"=>6);
+  my $ret;;
   if    ($action eq "save"){
     open(aSave, ">$fName") || return("Can't open $fName: $!");
     my @incmpl;
@@ -524,10 +525,13 @@ sub HMinfo_tempList(@) { ######################################################
         }
         push @elAll,@el;
       }
-      elsif(@el && $_ =~ m/R_(P[123])?_?._tempList[SMFWT].*\>/){
+      elsif(@el && $_ =~ m/(R_)?(P[123])?(_?._)?tempList[SMFWT].*\>/){
         my ($tln,$val) = ($1,$2)if($_ =~ m/(.*)>(.*)/);
         $tln =~ s/ //g;
         $val =~ s/ //g;
+        $tln = "R_".$tln if($tln !~ m/^R_/);
+        my $day = $dl{$1} if ($tln =~ m/tempList(...)/);
+        $tln =~s /tempList/${day}_tempList/ if ($tln !~ m/[0-6]_/);
         foreach my $eN(@el){
           my $valR = ReadingsVal($eN,$tln,"");
           $valR =~ s/ //g;
@@ -562,9 +566,12 @@ sub HMinfo_tempList(@) { ######################################################
         }
         push @elAll,@el;
       }
-      elsif(@el && $line =~ m/R_(P[123])?_?._tempList[SMFWT].*\>/){
-        my ($tln,$val) = ($1,$2)if($line =~ m/(.*)>(.*)/);
+      elsif(@el && $_ =~ m/(R_)?(P[123])?(_?._)?tempList[SMFWT].*\>/){
+        my ($tln,$val) = ($1,$2)if($_ =~ m/(.*)>(.*)/);
         $tln =~ s/ //g;
+        $tln = "R_".$tln if($tln !~ m/^R_/);
+        my $day = $dl{$1} if ($tln =~ m/tempList(...)/);
+        $tln =~s /tempList/${day}_tempList/ if ($tln !~ m/[0-6]_/);
         $val =~ tr/ +/ /;
         $val =~ s/^ //;
         $val =~ s/ $//;
@@ -602,6 +609,7 @@ sub HMinfo_tempListTmpl(@) { ##################################################
   my ($filter,$tmpl,$action,$fName)=@_;
   $filter = "." if (!$filter);
   return "no template name given" if (!$tmpl);
+  my %dl =("Sat"=>0,"Sun"=>1,"Mon"=>2,"Tue"=>3,"Wed"=>4,"Thu"=>5,"Fri"=>6);
   my $ret;
   my @el ;
   foreach my $eN(HMinfo_getEntities("d")){#search for devices and select correct channel
@@ -619,6 +627,7 @@ sub HMinfo_tempListTmpl(@) { ##################################################
   my $found = 0;
   my @entryFail = ();
   my @exec = ();
+
   while(<aSave>){
     chomp;
     my $line = $_;
@@ -630,27 +639,30 @@ sub HMinfo_tempListTmpl(@) { ##################################################
         $found = 1 if ($eN eq $tmpl);
       }
     }
-    elsif($found == 1 && $_ =~ m/R_(P[123])?_?._tempList[SMFWT].*\>/){
+
+    elsif($found == 1 && $_ =~ m/(R_)?(P[123])?(_?._)?tempList[SMFWT].*\>/){
       my $rn = $line;
-      $rn =~ s/(R_.*tempList...).*/$1/;
-      my ($tln,$val) = ($1,$2)if($line =~ m/(.*)>(.*)/);
+      $rn =~ s/(.*tempList...).*/$1/;
+      my ($tln,$val) = ($1,$2)if($_ =~ m/(.*)>(.*)/);
       $tln =~ s/ //g;
+      $tln = "R_".$tln if($tln !~ m/^R_/);
+      my $day = $dl{$1} if ($tln =~ m/tempList(...)/);
+      $tln =~s /tempList/${day}_tempList/ if ($tln !~ m/[0-6]_/);
+
       $val =~ tr/ +/ /;
       $val =~ s/^ //;
       $val =~ s/ $//;
       @exec = ();
       foreach my $eN(@el){
-        if ($tln =~ m/(P.)_._tempList/){
-          $val = lc($1)." ".$val;
-        }
-        $tln =~ s/R_(P._)?._//;
         if ($action eq "verify"){
           $val = join(" ",split(" ",$val));
-          my $nv = ReadingsVal($eN,$rn,"empty");
+          my $nv = ReadingsVal($eN,$tln,"empty");
           $nv = join(" ",split(" ",$nv));
           push @entryFail,$eN." :".$tln." mismatch" if ($val ne $nv);
         }
         elsif($action eq "restore"){
+          $val = lc($1)." ".$val if ($tln =~ m/(P.)_._tempList/);
+          $tln =~ s/R_(P._)?._//;
           my $x = CUL_HM_Set($defs{$eN},$eN,$tln,"prep",split(" ",$val));
           push @entryFail,$eN." :".$tln." respose:$x" if ($x ne "1");
           push @exec,$eN." ".$tln." exec ".$val;
@@ -659,6 +671,8 @@ sub HMinfo_tempListTmpl(@) { ##################################################
     }
     $ret = "failed Entries:\n     "   .join("\n     ",@entryFail) if (scalar@entryFail);
   }
+  $ret .= "$tmpl not found in file $fName" if (!$found);
+
   foreach (@exec){
     my @param = split(" ",$_);
     CUL_HM_Set($defs{$param[0]},@param);
