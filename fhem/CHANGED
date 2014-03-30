@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - added:   new module 10_UNIRoll.pm (c-herrmann)
   - feature: cloneDummy: new attribut cloneIgnore
   - feature: cloneDummy: new optional parameter [reading] 
   - bugfix:  Dashboard: dashboard_showfullsize not applied in room "all"
