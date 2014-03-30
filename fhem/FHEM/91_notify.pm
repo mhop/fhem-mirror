@@ -70,7 +70,7 @@ notify_Exec($$)
     }
     if($found) {
       $ntfy->{STATE} =
-        AttrVal($ln,'showTriggerTime',0) ? $dev->{NTFY_TRIGGERTIME} : 'active';
+        AttrVal($ln,'showTriggerTime',1) ? $dev->{NTFY_TRIGGERTIME} : 'active';
   
       Log3 $ln, 5, "Triggering $ln";
       my (undef, $exec) = split("[ \t]+", $ntfy->{DEF}, 2);
@@ -235,7 +235,9 @@ notify_Attr(@)
         often not intended.</li>
 
     <li>showTriggerTime<br/>
-        Replace STATE content 'active' by timestamp of last execution.</li>
+        Show the timestamp of the last execution as the status (STATE) of the
+        notify instance. Default is 1 (on).
+        </li>
   </ul>
   <br>
 
