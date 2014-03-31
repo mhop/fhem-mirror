@@ -308,7 +308,7 @@ sub Heating_Control_UpdatePerlTime($) {
        Heating_Control_Define($hash, $hash->{NAME} . " " . $hash->{TYPE} . " " . $hash->{DEF} );
     }
 }
-################################################################################
+########################################################################
 sub Heating_Control_Update($) {
   my ($myHash) = @_;
   my $hash     = $myHash->{HASH};
@@ -349,7 +349,7 @@ sub Heating_Control_Update($) {
   
   return 1;
 }
-################################################################################
+########################################################################
 sub Heating_Control_FensterOffen ($) {
   my ($hash) = @_;
   my $mod = "[".$hash->{NAME} ."]";                                             ###
@@ -398,7 +398,7 @@ sub Heating_Control_FensterOffen ($) {
   delete $hash->{VERZOEGRUNG};
   return 0;
 }
-################################################################################
+########################################################################
 sub Heating_Control_akt_next_param($$) {
   my ($now, $hash) = @_;
 
@@ -442,6 +442,7 @@ sub Heating_Control_akt_next_param($$) {
 
      }
   }
+  
   $nextSwitch += Heating_Control_DSTOffset($hash, $now, $nextSwitch);
   return ($nowSwitch,$nextSwitch,$newParam,$nextParam);
 }
@@ -504,13 +505,14 @@ sub Heating_Control_Device_Schalten($$$$) {
      }
   }
 }
-################################################################################
+########################################################################
 sub isHeizung($) {
   my ($hash)  = @_;
 
   my %setmodifiers =
-     ("FHT"    =>  "desired-temp",
-     #"HCS"    =>  1,
+     ("FHT"     =>  "desired-temp",
+      "EnOcean" =>  "desired-temp",
+      "PID20"   =>  "desired",
       "MAX"    =>  {  "mode" => "type", "setModifier" => "desiredTemperature",
                       "HeatingThermostatPlus" => 1,
                       "HeatingThermostat"     => 1,
@@ -559,26 +561,37 @@ sub Heating_Control_SetAllTemps() {            # {Heating_Control_SetAllTemps()}
   }
   Log3 undef,  3, "Heating_Control_SetAllTemps() done!";
 }
-################################################################################
+########################################################################
 sub Heating_Control_DSTOffset($$$) {
   my ($hash,$t1,$t2)= @_;
 
   my @lt1 = localtime($t1);
   my @lt2 = localtime($t2);
-
-  # wenn t2 in der ersten Stunde der dst liegt darf nicht gleich 3600 Sekunden abgezogen werden.
-  # dstEin ist immer am letzten Sonntag im März.
-  my $dstEin = timelocal_nocheck(0,0,2,31,2,$lt2[5]);    # 31. Maerz aktuelles Jahr
-  my @aNow = localtime($dstEin);
-  $dstEin += -$lt2[6]*24*3600;                           # letzen Maerzsonntag ermittlen.
-
-  my $offset = $t2 - $dstEin + 1;                        # $secsSinceDstEin
-     $offset = 3600  if ($offset >3600);                 # maximal 3600 Sekunden
-     $offset *=  ($lt1[8] - $lt2[8]);                    # nur wenn Wechsel der dst
-  Log 3, "[$hash->{NAME}] DST offset=$offset" if ($offset != 0);
+  
+  my $offset =0;
+  return $offset    if ($lt1[8] == $lt2[8]);
+  
+  if ($lt1[8] == 0 && $lt2[8] == 1 ) {
+    my $daylightSavingTime = monatsLetzerSonntag (timelocal_nocheck(0,0,2,31,2,$lt2[5]));   # Maerz
+    $offset = -min(($t2 - $daylightSavingTime),3600);
+  } else {
+    #my $daylightSavingTime = monatsLetzerSonntag (timelocal_nocheck(0,0,2,30,9,$lt2[5]));  # Oktober 
+    $offset = 3600;
+  }
+  Log3 $hash, 4, "[$hash->{NAME}] correction daylightSavingtime $offset seconds";
   return $offset;
 }
-################################################################################
+########################################################################
+sub monatsLetzerSonntag ($) {
+    my ($monatsLetzer)= @_;
+	
+    my @lmonatsLetzer       = localtime($monatsLetzer);
+    my $daysSiceLastSunday  = $lmonatsLetzer[6];                                # Tage seit Sonntag
+    my $monatsLetzerSunday  = $monatsLetzer -$daysSiceLastSunday*24*3600+3600;  # letzen Oktobersonntag ermittlen.
+
+    return $monatsLetzerSunday
+}
+########################################################################
 sub SortNumber {
  if($a < $b)
   { return -1; }
@@ -641,7 +654,8 @@ sub SortNumber {
       If no condition is set, all others is interpreted as command. Perl-code is setting up
       by well-known Block with {}.<br>
       Note: if a command is defined only this command are executed. In case of executing
-      a "set desired-temp" command, you must define it explicit.<br>
+      a "set desired-temp" command, you must define it explicitly.<br>
+
       The following parameter are replaced:<br>
         <ol>
           <li>@ => the device to switch</li>
