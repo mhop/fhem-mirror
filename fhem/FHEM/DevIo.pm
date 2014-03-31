@@ -101,7 +101,7 @@ DevIo_SimpleWrite($$$)
   return if(!$hash);
 
   my $name = $hash->{NAME};
-  Log3 $name, 5, "SW: $msg";
+  Log3 ($name, 5, $ishex ? "SW: $msg" : "SW: ".unpack("H*",$msg));
 
   $msg = pack('H*', $msg) if($ishex);
   $hash->{USBDev}->write($msg)    if($hash->{USBDev});
