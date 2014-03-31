@@ -239,14 +239,13 @@ sub OWCOUNT_Define ($$) {
   $hash->{OW_FAMILY}  = $fam;
   $hash->{PRESENT}    = 0;
   $hash->{INTERVAL}   = $interval;
-  $hash->{ASYNC}      = 0; #-- false for now
   
   #-- Couple to I/O device
-  $hash->{IODev}=$attr{$name}{"IODev"} 
-    if( defined($attr{$name}{"IODev"}) );
   AssignIoPort($hash);
-  if( (!defined($hash->{IODev}->{NAME})) || (!defined($hash->{IODev}))  ){
-    return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
+  if( !defined($hash->{IODev}) or !defined($hash->{IODev}->{NAME}) ){
+    return "OWCOUNT: Warning, no 1-Wire I/O device found for $name.";
+  } else {
+    $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0; #-- false for now
   }
 
   $modules{OWCOUNT}{defptr}{$id} = $hash;
@@ -288,7 +287,14 @@ sub OWCOUNT_Attr(@) {
           InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 1);
         }
         last;
-      }
+      };
+      $key eq "IODev" and do {
+        AssignIoPort($hash,$value);
+        if( defined($hash->{IODev}) ) {
+          $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
+        }
+        last;
+      };
     }
   }
   return $ret;
@@ -792,7 +798,7 @@ sub OWCOUNT_GetPage ($$$) {
   if( ($nomemory==0) || ($nomemory==1 && (($page==14)||($page==15))) ){
 
     #-- OWX interface
-    if( $interface eq "OWX" ){
+    if( $interface =~ /^OWX/ ){
       $ret = OWXCOUNT_GetPage($hash,$page,$final);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
@@ -1102,7 +1108,7 @@ sub OWCOUNT_InitializeDevice($) {
   #   the same family ID although the DS2423emu does not fully support the DS2423 commands.
   #   Model attribute will be modified now after checking for memory
   #-- OWX interface
-  if( $interface eq "OWX" ){
+  if( $interface =~ /^OWX/ ){
     $ret = OWXCOUNT_GetPage($hash,14,0);
     $olddata = $hash->{owg_str}->[14];
     $ret  = OWXCOUNT_SetPage($hash,14,$newdata);
@@ -1123,7 +1129,7 @@ sub OWCOUNT_InitializeDevice($) {
   #Log 1,"FIRST CHECK: written $newdata, read ".substr($hash->{owg_str}->[14],0,length($newdata));
   my $nomid = ( substr($hash->{owg_str}->[14],0,length($newdata)) ne $newdata );
    #-- OWX interface
-  if( $interface eq "OWX" ){
+  if( $interface =~ /^OWX/ ){
     $ret = OWXCOUNT_GetPage($hash,0,0);
     $olddata = $hash->{owg_str}->[0];
     $ret  = OWXCOUNT_SetPage($hash,0,$newdata);
@@ -1312,7 +1318,7 @@ sub OWCOUNT_SetPage ($$$) {
     
   if( $nomemory==0 ){
     #-- OWX interface
-    if( $interface eq "OWX" ){
+    if( $interface =~ /^OWX/ ){
       $ret = OWXCOUNT_SetPage($hash,$page,$data);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){

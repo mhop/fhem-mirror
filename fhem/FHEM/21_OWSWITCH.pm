@@ -241,12 +241,13 @@ sub OWSWITCH_Define ($$) {
   $hash->{OW_FAMILY}  = $fam;
   $hash->{PRESENT}    = 0;
   $hash->{INTERVAL}   = $interval;
-  $hash->{ASYNC}      = 0; #-- false for now
   
   #-- Couple to I/O device
   AssignIoPort($hash);
-  if( !defined($hash->{IODev}->{NAME}) || !defined($hash->{IODev}) ){
+  if( !defined($hash->{IODev}) or !defined($hash->{IODev}->{NAME}) ){
     return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
+  } else {
+    $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0; #-- false for now
   }
 
   $main::modules{OWSWITCH}{defptr}{$id} = $hash;
@@ -290,7 +291,14 @@ sub OWSWITCH_Attr(@) {
           InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 1);
         }
         last;
-      }
+      };
+      $key eq "IODev" and do {
+        AssignIoPort($hash,$value);
+        if( defined($hash->{IODev}) ) {
+          $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
+        }
+        last;
+      };
     }
   }
   return $ret;
@@ -479,7 +487,7 @@ sub OWSWITCH_Get($@) {
       if( !defined($fnd) );
 
     #-- OWX interface
-    if( $interface eq "OWX" ){
+    if( $interface =~ /^OWX/ ){
       $ret = OWXSWITCH_GetState($hash);
       #ASYNC OWXSWITCH_AwaitGetState($hash);
     #-- OWFS interface
@@ -497,7 +505,7 @@ sub OWSWITCH_Get($@) {
     return "OWSWITCH: Get needs no parameter when reading gpio"
       if( int(@a)==1 );
 
-    if( $interface eq "OWX" ){
+    if( $interface =~ /^OWX/ ){
       $ret = OWXSWITCH_GetState($hash);
       #ASYNC OWXSWITCH_AwaitGetState($hash);
     }elsif( $interface eq "OWServer" ){
@@ -539,7 +547,7 @@ sub OWSWITCH_GetValues($) {
   
   #-- Get readings according to interface type
   my $interface= $hash->{IODev}->{TYPE};
-  if( $interface eq "OWX" ){
+  if( $interface =~ /^OWX/ ){
     #-- max 3 tries
     for(my $try=0; $try<3; $try++){
       $ret = OWXSWITCH_GetState($hash);
@@ -698,7 +706,7 @@ sub OWSWITCH_Set($@) {
     }
     
     #-- OWX interface
-    if( $interface eq "OWX" ){
+    if( $interface =~ /^OWX/ ){
       $ret1  = OWXSWITCH_GetState($hash);
       $value = 0;
       #-- vax or val ?
@@ -740,7 +748,7 @@ sub OWSWITCH_Set($@) {
     return "OWSWITCH: Set with wrong value for gpio port, must be 0 <= gpio <= ".((1 << $cnumber{$attr{$name}{"model"}})-1)
       if( ! ((int($value) >= 0) && (int($value) <= ((1 << $cnumber{$attr{$name}{"model"}})-1 ))) );
      
-    if( $interface eq "OWX" ){
+    if( $interface =~ /^OWX/ ){
       $ret = OWXSWITCH_SetState($hash,int($value));
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSSWITCH_SetState($hash,int($value));
@@ -921,6 +929,8 @@ sub OWFSSWITCH_SetState($$) {
 #
 ########################################################################################
 
+sub OWXSWITCH_BinValues($$$$$$$$); #define prototype for recursive call;
+
 sub OWXSWITCH_BinValues($$$$$$$$) {
   my ($hash, $context, $success, $reset, $owx_dev, $command, $numread, $res) = @_;
   
@@ -993,8 +1003,7 @@ sub OWXSWITCH_BinValues($$$$$$$$) {
       my $select=sprintf("\x55\x07\x00%c",$statneu);   
       #-- asynchronous mode
       if( $hash->{ASYNC} ){  
-        if (OWX_Execute( $master, "setstateds2406.2.".$value, 1, $owx_dev, $select, 2, undef )) {
-          OWX_Reset($master);
+        if (OWX_Execute( $master, "setstate.ds2406.2.".$value, 1, $owx_dev, $select, 2, undef )) {
           return undef;
     	} else {
           return "device $owx_dev not accessible in writing"; 
@@ -1066,13 +1075,13 @@ sub OWXSWITCH_AwaitGetState($) {
 	if ($master and $owx_dev) {
     #-- family = 12 => DS2406
     if( $family eq "12" ) {
-    	return OWX_AwaitExecuteResponse( $master, "getstateds2406", $owx_dev );
+    	return OWX_AwaitExecuteResponse( $master, "getstate.ds2406", $owx_dev );
     #-- family = 29 => DS2408
     } elsif( $family eq "29" ) {
-    	return OWX_AwaitExecuteResponse( $master, "getstateds2408", $owx_dev );
+    	return OWX_AwaitExecuteResponse( $master, "getstate.ds2408", $owx_dev );
     #-- family = 3A => DS2413
     } elsif( $family eq "3A" ) {
-    	return OWX_AwaitExecuteResponse( $master, "getstateds2413", $owx_dev );
+    	return OWX_AwaitExecuteResponse( $master, "getstate.ds2413", $owx_dev );
   	}
 	}
 	return undef;
@@ -1113,9 +1122,8 @@ sub OWXSWITCH_GetState($) {
     $select=sprintf("\xF5\xDD\xFF"); 
     #-- asynchronous mode
     if( $hash->{ASYNC} ){  
-      if (OWX_Execute( $master, "getstateds2406", 1, $owx_dev, $select, 4, undef )) {
-  		OWX_Reset($master);
-  		return undef;
+      if (OWX_Execute( $master, "getstate.ds2406", 1, $owx_dev, $select, 4, undef )) {
+        return undef;
       } else {
         return "not accessible in reading"; 
       }
@@ -1139,9 +1147,8 @@ sub OWXSWITCH_GetState($) {
     $select=sprintf("\xF0\x88\x00");   
     #-- asynchronous mode
     if( $hash->{ASYNC} ){
-      if (OWX_Execute( $master, "getstateds2408", 1, $owx_dev, $select, 10, undef )) {
-  		OWX_Reset($master);
-  		return undef;
+      if (OWX_Execute( $master, "getstate.ds2408", 1, $owx_dev, $select, 10, undef )) {
+        return undef;
   	  } else {
         return "not accessible in reading"; 
       }
@@ -1164,9 +1171,8 @@ sub OWXSWITCH_GetState($) {
     #-- reading 9 + 1 + 2 data bytes = 12 bytes
     #-- asynchronous mode
     if( $hash->{ASYNC} ){
-      if (OWX_Execute( $master, "getstateds2413", 1, $owx_dev, "\xF5", 2, undef )) {
-   		OWX_Reset($master);
-  		return undef;
+      if (OWX_Execute( $master, "getstate.ds2413", 1, $owx_dev, "\xF5", 2, undef )) {
+        return undef;
       } else {
         return "not accessible in reading"; 
       }
@@ -1222,7 +1228,7 @@ sub OWXSWITCH_SetState($$) {
     #-- reading 9 + 3 + 1 data bytes + 2 CRC bytes = 15 bytes
     #-- asynchronous mode
     if( $hash->{ASYNC} ){  
-      if (OWX_Execute( $master, "setstateds2406.1.".$value, 1, $owx_dev, "\xAA\x07\x00", 3, undef )) {
+      if (OWX_Execute( $master, "setstate.ds2406.1.".$value, 1, $owx_dev, "\xAA\x07\x00", 3, undef )) {
   		return undef;
   	  } else {
         return "not accessible in writing"; 
@@ -1246,10 +1252,9 @@ sub OWXSWITCH_SetState($$) {
     $select=sprintf("\x5A%c%c",$value,255-$value);  
      #-- asynchronous mode
     if( $hash->{ASYNC} ){  
-      if (OWX_Execute( $master, "setstateds2408", 1, $owx_dev, $select, 1, undef )) {
-      OWX_Reset($master);
-  		return undef;
-  	  } else {
+      if (OWX_Execute( $master, "setstate.ds2408", 1, $owx_dev, $select, 1, undef )) {
+        return undef;
+      } else {
         return "device $owx_dev not accessible in writing"; 
       }
     #-- synchronous mode
@@ -1270,10 +1275,9 @@ sub OWXSWITCH_SetState($$) {
     $select=sprintf("\x5A%c%c",252+$value,3-$value);   
      #-- asynchronous mode
     if( $hash->{ASYNC} ){  
-      if (OWX_Execute( $master, "setstateds2413", 1, $owx_dev, $select, 1, undef )) {
-        OWX_Reset($master);
-  		return undef;
-  	  } else {
+      if (OWX_Execute( $master, "setstate.ds2413", 1, $owx_dev, $select, 1, undef )) {
+        return undef;
+      } else {
         return "device $owx_dev not accessible in writing"; 
       }
     #-- synchronous mode
