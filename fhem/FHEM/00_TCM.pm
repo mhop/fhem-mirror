@@ -60,7 +60,7 @@ TCM_Initialize($)
   $hash->{GetFn}   = "TCM_Get";
   $hash->{SetFn}   = "TCM_Set";
   $hash->{AttrFn}  = "TCM_Attr";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 blockSenderID:own,no teachMode:always,demand,nearfield";
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 blockSenderID:own,no learningMode:always,demand,nearfield";
 }
 
 # Define
@@ -122,12 +122,12 @@ TCM_Write($$$)
       # command with ESP3 format
       my $packetType = hex(substr($fn, 6, 2));
       if ($packetType != 1) {
-        Log3 $name, 2, "TCM $name: Packet Type not supported.";
+        Log3 $name, 1, "TCM $name: Packet Type not supported.";
         return;
       }
       my $odataLen = hex(substr($fn, 4, 2));
       if ($odataLen != 0) {
-        Log3 $name, 2, "TCM $name: Radio Telegram with optional Data not supported.";
+        Log3 $name, 1, "TCM $name: Radio Telegram with optional Data not supported.";
         return;
       }    
       #my $mdataLen = hex(substr($fn, 0, 4));
@@ -140,7 +140,7 @@ TCM_Write($$$)
       if($rorgmap{$rorg}) {
         $rorg = $rorgmap{$rorg};
       } else {
-        Log3 $name, 2, "TCM $name: unknown RORG mapping for $rorg";
+        Log3 $name, 1, "TCM $name: unknown RORG mapping for $rorg";
       }
       if ($rorg eq "05" || $rorg eq "06") {
         $bstring = "6B" . $rorg . substr ($msg, 2, 2) . "000000" . substr ($msg, 4);    
@@ -263,7 +263,7 @@ TCM_Read($)
           $d1 = substr($d1, 0, 2);
         }
         if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
-          Log3 $name, 5, "TCM $name Telegram from $id blocked.";        
+          Log3 $name, 4, "TCM $name Telegram from $id blocked.";        
         } else {
           Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status", undef);
         }
@@ -287,7 +287,7 @@ TCM_Read($)
             $d1 = substr($d1, 0, 2);
           }
           if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
-            Log3 $name, 5, "TCM $name Telegram from $id blocked.";        
+            Log3 $name, 4, "TCM $name Telegram from $id blocked.";        
           } else {
             Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status", undef);
           }
@@ -355,7 +355,7 @@ TCM_Read($)
         $hash->{RSSI} = -$RSSI;
         
         if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
-          Log3 $name, 5, "TCM $name Telegram from $id blocked.";        
+          Log3 $name, 4, "TCM $name Telegram from $id blocked.";        
         } else {
           Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:$odata", \%addvals);
         }
@@ -379,26 +379,26 @@ TCM_Read($)
 
       } elsif($packetType == 3) {
         # packet type RADIO_SUB_TEL
-        Log3 $name, 2, "TCM $name packet type RADIO_SUB_TEL not supported: $data";
+        Log3 $name, 1, "TCM $name packet type RADIO_SUB_TEL not supported: $data";
 
       } elsif($packetType == 4) {
         # packet type EVENT
-        Log3 $name, 2, "TCM $name packet type EVENT not supported: $data";
+        Log3 $name, 1, "TCM $name packet type EVENT not supported: $data";
 
       } elsif($packetType == 5) {
         # packet type COMMON_COMMAND
-        Log3 $name, 2, "TCM $name packet type COMMON_COMMAND not supported: $data";
+        Log3 $name, 1, "TCM $name packet type COMMON_COMMAND not supported: $data";
 
       } elsif($packetType == 6) {
         # packet type SMART_ACK_COMMAND
-        Log3 $name, 2, "TCM $name packet type SMART_ACK_COMMAND not supported: $data";
+        Log3 $name, 1, "TCM $name packet type SMART_ACK_COMMAND not supported: $data";
 
       } elsif($packetType == 7) {
         # packet type REMOTE_MAN_COMMAND
-        Log3 $name, 2, "TCM: $name packet type REMOTE_MAN_COMMAND not supported: $data";
+        Log3 $name, 1, "TCM: $name packet type REMOTE_MAN_COMMAND not supported: $data";
 
       } else {
-        Log3 $name, 2, "TCM $name unknown packet type $packetType: $data";
+        Log3 $name, 1, "TCM $name unknown packet type $packetType: $data";
 
       }
 
@@ -807,15 +807,15 @@ TCM_Attr(@) {
   if ($attrName eq "blockSenderID") {
     if (!defined $attrVal) {
     } elsif ($attrVal !~ m/^(own|no)$/) {
-      Log3 $name, 3, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
       CommandDeleteAttr(undef, "$name $attrName");
     }
     
-  } elsif ($attrName eq "teachMode") {
+  } elsif ($attrName eq "learningMode") {
     if (!defined $attrVal){
     
     } elsif ($attrVal !~ m/^(always|demand|nearfield)$/) {
-      Log3 $name, 3, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
       CommandDeleteAttr(undef, "$name $attrName");
     }
 
@@ -923,7 +923,7 @@ TCM_Undef($$)
     <li>modem_on [0000 ... FFFF]<br>
       Activates TCM modem functionality and sets the modem ID</li>
     <li>teach &lt;t/s&gt;<br>
-      Set Fhem in learning mode, see <a href="#TCM_teachMode">teachMode</a>.<br>
+      Set Fhem in learning mode, see <a href="#TCM_learningMode">learningMode</a>.<br>
       The command is always required for UTE and to teach-in bidirectional actuators
       e. g. EEP 4BS (RORG A5-20-XX),
       see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.</li>
@@ -949,7 +949,7 @@ TCM_Undef($$)
       Waiting till end of maturity time before received radio telegrams will transmit:
       radio telegrams are send immediately = 00, after the maturity time is elapsed = 01</li>
     <li>teach &lt;t/s&gt;<br>
-      Set Fhem in learning mode, see <a href="#TCM_teachMode">teachMode</a>.<br>
+      Set Fhem in learning mode, see <a href="#TCM_learningMode">learningMode</a>.<br>
       The command is always required for UTE and to teach-in bidirectional actuators
       e. g. EEP 4BS (RORG A5-20-XX),
       see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.</li>
@@ -1009,12 +1009,12 @@ TCM_Undef($$)
       </li>
     <li><a href="#attrdummy">dummy</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a name="TCM_teachMode">teachMode</a> &lt;always|demand|nearfield&gt;,
-      [teachMode] = demand is default.<br>
+    <li><a name="TCM_learningMode">learningMode</a> &lt;always|demand|nearfield&gt;,
+      [learningMode] = demand is default.<br>
       Learning method for automatic setup of EnOcean devices:<br>    
-      [teachMode] = always: Teach-In/Teach-Out telegrams always accepted, with the exception of bidirectional devices<br>
-      [teachMode] = demand: Teach-In/Teach-Out telegrams accepted if Fhem is in learning mode, see also <code>set &lt;IODev&gt; teach &lt;t/s&gt;</code><br>
-      [teachMode] = nearfield: Teach-In/Teach-Out telegrams accepted if Fhem is in learning mode and the signal strength RSSI >= -60 dBm.<be>
+      [learningMode] = always: Teach-In/Teach-Out telegrams always accepted, with the exception of bidirectional devices<br>
+      [learningMode] = demand: Teach-In/Teach-Out telegrams accepted if Fhem is in learning mode, see also <code>set &lt;IODev&gt; teach &lt;t/s&gt;</code><br>
+      [learningMode] = nearfield: Teach-In/Teach-Out telegrams accepted if Fhem is in learning mode and the signal strength RSSI >= -60 dBm.<be>
     </li>
     <li><a href="#verbose">verbose</a></li>
   </ul>
