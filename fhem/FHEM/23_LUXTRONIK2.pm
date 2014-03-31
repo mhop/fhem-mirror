@@ -540,8 +540,8 @@ LUXTRONIK2_DoUpdate($)
   $return_str .= "|".$heatpump_values[12];
   # 18 - returnTemperatureExtern
   $return_str .= "|".($heatpump_visibility[24]==1 ? $heatpump_values[13] : "no");
-  # 19 - flowRate
-  $return_str .= "|".($heatpump_visibility[240]==1 ? $heatpump_values[155] : "no");
+  # 19 - flowRate 
+  $return_str .= "|".($heatpump_parameters[870]!=0 ? $heatpump_values[155] : "no");
   # 20 - firmware
   my $fwvalue = "";
   for(my $fi=81; $fi<91; $fi++) {
