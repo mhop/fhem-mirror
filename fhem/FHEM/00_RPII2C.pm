@@ -82,12 +82,15 @@ sub RPII2C_Define($$) {							#
     $attr{$name}{dummy} = 1;
     return undef;
   }
-  $hash->{DeviceName} = "/dev/i2c-".$dev;
-  return $name . ': Error! I2C device not found: ' . $hash->{DeviceName} . '. Please check kernelmodules must loaded: i2c_bcm2708, i2c_dev' unless -e $hash->{DeviceName};
+  
+  return $name . ': Error! I2C device not found: /dev/i2c-'.$dev . '. Please check kernelmodules must loaded: i2c_bcm2708, i2c_dev' unless -e "/dev/i2c-".$dev;
+	return $name . ': Error! I2C device not readable: /dev/i2c-'.$dev . '. Please install wiringpi or change access rights for fhem user' unless -r "/dev/i2c-".$dev;
+	return $name . ': Error! I2C device not writable: /dev/i2c-'.$dev . '. Please install wiringpi or change access rights for fhem user' unless -w "/dev/i2c-".$dev;
+	
+	$hash->{DeviceName} = "/dev/i2c-".$dev;
 	$hash->{STATE} = "initialized";
   return undef;
 }
-
 #####################################
 sub RPII2C_Notify {									#
   my ($hash,$dev) = @_;
@@ -205,12 +208,12 @@ sub RPII2C_Get($@) {								#
 		my $i2chash = { i2caddress => hex($a[2]), direction => "i2cread" };
 		$i2chash->{reg}   = hex($a[3]) if defined($a[3]);																			#startadresse zum lesen
 		$i2chash->{nbyte} = $a[4] if defined($a[4]);
-		Log3 $hash, 1, "Reg: ". $i2chash->{reg};
+		#Log3 $hash, 1, "Reg: ". $i2chash->{reg};
 	  my $status = RPII2C_HWACCESS($hash, $i2chash);
 		#my $received = join(" ", @{$i2chash->{received}});															#als Array
 		my $received = $i2chash->{received};																						#als Scalar
 		undef $i2chash;																																	#Hash löschen
-		return "$received transmission: $status";	
+		return (defined($received) ? "received : " . $received ." | " : "" ) . " transmission: $status";	
 	} 
   return undef;
 }
