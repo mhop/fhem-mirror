@@ -489,7 +489,6 @@ sub OWSWITCH_Get($@) {
     #-- OWX interface
     if( $interface =~ /^OWX/ ){
       $ret = OWXSWITCH_GetState($hash);
-      #ASYNC OWXSWITCH_AwaitGetState($hash);
     #-- OWFS interface
     }elsif( $interface eq "OWFS" ){
       $ret = OWFSSWITCH_GetState($hash);
@@ -507,7 +506,6 @@ sub OWSWITCH_Get($@) {
 
     if( $interface =~ /^OWX/ ){
       $ret = OWXSWITCH_GetState($hash);
-      #ASYNC OWXSWITCH_AwaitGetState($hash);
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSSWITCH_GetState($hash);
     }else{
@@ -1062,29 +1060,6 @@ sub OWXSWITCH_BinValues($$$$$$$$) {
   $value = OWSWITCH_FormatValues($hash);
   Log 5, $value;
   return undef;
-}
-
-sub OWXSWITCH_AwaitGetState($) {
-	my ($hash) = @_;
-	
-	#-- ID of the device, hash of the busmaster
-	my $owx_dev = $hash->{ROM_ID};
-	my $master  = $hash->{IODev};
-	my $family  = $hash->{OW_FAMILY}; 
-	
-	if ($master and $owx_dev) {
-    #-- family = 12 => DS2406
-    if( $family eq "12" ) {
-    	return OWX_AwaitExecuteResponse( $master, "getstate.ds2406", $owx_dev );
-    #-- family = 29 => DS2408
-    } elsif( $family eq "29" ) {
-    	return OWX_AwaitExecuteResponse( $master, "getstate.ds2408", $owx_dev );
-    #-- family = 3A => DS2413
-    } elsif( $family eq "3A" ) {
-    	return OWX_AwaitExecuteResponse( $master, "getstate.ds2413", $owx_dev );
-  	}
-	}
-	return undef;
 }
 
 ########################################################################################
