@@ -172,9 +172,12 @@ sub OWLCD_Define ($$) {
   
   #-- Couple to I/O device
   AssignIoPort($hash);
-  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) ) {
-    return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
+  if( !defined($hash->{IODev}) or !defined($hash->{IODev}->{NAME}) ){
+    return "OWLCD: Warning, no 1-Wire I/O device found for $name.";
+  } else {
+    $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0; #-- false for now
   }
+
   $modules{OWLCD}{defptr}{$id} = $hash;
   
   $hash->{STATE} = "Defined";
@@ -214,15 +217,21 @@ sub OWLCD_Attr(@) {
   my $hash = $defs{$name};
   my $ret;
   
- # if ( $do eq "set") {
- # 	ARGUMENT_HANDLER: {
- # 	  #-- empty so far
- # 	};
+  if ( $do eq "set") {
+    ARGUMENT_HANDLER: {
+      $key eq "IODev" and do {
+        AssignIoPort($hash,$value);
+        if( defined($hash->{IODev}) ) {
+          $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
+        }
+        last;
+      };
+    };
  #} elsif ( $do eq "del" ) {
  # 	ARGUMENT_HANDLER: {
  # 	  #-- empty so far
  # 	}
- # }
+  }
   return $ret;
 }
 

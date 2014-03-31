@@ -168,7 +168,14 @@ sub OWMULTI_Attr(@) {
           InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 1);
         }
         last;
-      }
+      };
+      $key eq "IODev" and do {
+        AssignIoPort($hash,$value);
+        if( defined($hash->{IODev}) ) {
+          $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
+        }
+        last;
+      };
     }
   }
   return $ret;
@@ -247,13 +254,15 @@ sub OWMULTI_Define ($$) {
   $hash->{PRESENT}    = 0;
   $hash->{ROM_ID}     = "$fam.$id.$crc";
   $hash->{INTERVAL}   = $interval;
-  $hash->{ASYNC}      = 0; #-- false for now
 
   #-- Couple to I/O device
   AssignIoPort($hash);
-  if( !defined($hash->{IODev}->{NAME}) || !defined($hash->{IODev}) ){
+  if( !defined($hash->{IODev}) or !defined($hash->{IODev}->{NAME}) ){
     return "OWMULTI: Warning, no 1-Wire I/O device found for $name.";
+  } else {
+    $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0; #-- false for now
   }
+
   $main::modules{OWMULTI}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
@@ -457,7 +466,7 @@ sub OWMULTI_Get($@) {
   
   #-- for the other readings we need a new reading
   #-- OWX interface
-  if( $interface eq "OWX" ){
+  if( $interface =~ /^OWX/ ){
     #-- not different from getting all values ..
     $ret = OWXMULTI_GetValues($hash);
     #ASYNC: Need to wait for some return
@@ -520,7 +529,7 @@ sub OWMULTI_GetValues($) {
 
   #-- Get values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
-  if( $interface eq "OWX" ){
+  if( $interface =~ /^OWX/ ){
     #-- max 3 tries
     for(my $try=0; $try<3; $try++){
       $ret = OWXMULTI_GetValues($hash);
@@ -618,7 +627,7 @@ sub OWMULTI_Set($@) {
   $a[2]  = int($value/$factor-$offset);
 
   #-- OWX interface
-  if( $interface eq "OWX" ){
+  if( $interface =~ /^OWX/ ){
     $ret = OWXMULTI_SetValues($hash,@a);
   #-- OWFS interface 
   }elsif( $interface eq "OWServer" ){
@@ -1028,8 +1037,6 @@ sub OWXMULTI_SetValues($@) {
   my $key   = $a[1];
   my $value = $a[2];
 
-  OWX_Reset($master);
-  
   #-- issue the match ROM command \x55 and the write scratchpad command \x4E,
   #   followed by the write EEPROM command \x48
   #
@@ -1046,6 +1053,7 @@ sub OWXMULTI_SetValues($@) {
     } 
   #-- synchronous mode
   } else {
+    OWX_Reset($master);
     my $res=OWX_Complex($master,$owx_dev,$select,0);
     if( $res eq 0 ){
       return "OWXMULTI: Device $owx_dev not accessible"; 
