@@ -971,7 +971,7 @@ sub OWXTHERM_GetValues($) {
   #-- reading 9 + 1 + 8 data bytes and 1 CRC byte = 19 bytes
   #-- asynchronous mode
   if( $hash->{ASYNC} ){
-    OWX_Execute($master,"read",1,$owx_dev,"\xBE",9,undef);
+    OWX_Execute($master,"ds182x.reading",1,$owx_dev,"\xBE",9,undef);
   #-- synchronous mode
   } else {
     OWX_Reset($master);
