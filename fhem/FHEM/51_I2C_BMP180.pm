@@ -36,7 +36,6 @@ use warnings;
 
 use Time::HiRes qw(usleep);
 use Scalar::Util qw(looks_like_number);
-use Error qw(:try);
 
 use constant {
 	BMP180_I2C_ADDRESS => '0x77',
@@ -372,16 +371,12 @@ sub I2C_BMP180_readUncompensatedTemperature($) {
 	my ($hash) = @_;
 	  
 	# Write 0x2E into Register 0xF4. This requests a temperature reading
-	#	$hash->{devBPM180}->bus_write( (0xF4, 0x2E) );
 	I2C_BMP180_i2cwrite($hash, hex("F4"), hex("2E"));
 	
 	usleep(4500);
 
 	# Read the two byte result from address 0xF6
-	#my @values = $hash->{devBPM180}->bus_read(0xF6, 2);
-	#my $retVal = $values[0] << 8 | $values[1];
 	I2C_BMP180_i2cread($hash, hex("F6"), 2);
-
 	
 	return;
 }
@@ -399,8 +394,6 @@ sub I2C_BMP180_readUncompensatedPressure($$) {
 
 	# Write 0x34+($overSamplingSettings << 6) into register 0xF4
 	# Request a pressure reading with oversampling setting
-  #	$hash->{devBPM180}->bus_write( (0xF4, 0x34 + ($overSamplingSettings << 6)) );
-	
 	my $data = hex("34") + ($overSamplingSettings << 6);
 	I2C_BMP180_i2cwrite($hash, hex("F4"), $data);
 	
@@ -408,8 +401,6 @@ sub I2C_BMP180_readUncompensatedPressure($$) {
 	usleep( (2 + (3 << $overSamplingSettings)) * 1000 );
 	
 	# Read the three byte result from 0xF6. 0xF6 = MSB, 0xF7 = LSB and 0xF8 = XLSB
-	# my @values = $hash->{devBPM180}->bus_read(0xF6, 3);
-	# my $retVal = ( ( ($values[0] << 16) | ($values[1] << 8) | $values[2] ) >> (8 - $overSamplingSettings) );
 	I2C_BMP180_i2cread($hash, hex("F6"), 3);
 	
 	return;
@@ -418,7 +409,7 @@ sub I2C_BMP180_readUncompensatedPressure($$) {
 sub I2C_BMP180_i2cread($$$) {
 	my ($hash, $reg, $nbyte) = @_;
 	if ($hash->{HiPi_used}) {
-		try {
+		eval {
 			my @values = $hash->{devBPM180}->bus_read($reg, $nbyte);
 			I2C_BMP180_I2CRec($hash, {
 				direction  => "i2cread",
@@ -427,9 +418,8 @@ sub I2C_BMP180_i2cread($$$) {
 				nbyte => 			$nbyte,
 				received => 	join (' ',@values),
 			});
-		} catch Error with {
-			Log3 ($hash, 1, ': ERROR: '. $hash->{NAME} . ': i2c-bus_read failure');
-		};
+		}; 
+		Log3 ($hash, 1, $hash->{NAME} . ': ' . I2C_BMP180_Catch($@)) if $@;;
 	} else {
 		if (defined (my $iodev = $hash->{IODev})) {
 			CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
@@ -447,7 +437,7 @@ sub I2C_BMP180_i2cread($$$) {
 sub I2C_BMP180_i2cwrite($$$) {
 	my ($hash, $reg, @data) = @_;
 	if ($hash->{HiPi_used}) {
-		try {
+		eval {
 			$hash->{devBPM180}->bus_write($reg, join (' ',@data));
 			I2C_BMP180_I2CRec($hash, {
 				direction  => "i2cwrite",
@@ -455,9 +445,8 @@ sub I2C_BMP180_i2cwrite($$$) {
 				reg => 				$reg,
 				data => 			join (' ',@data),
 			});
-			} catch Error with {
-				Log3 ($hash, 1, ': ERROR: ' . $hash->{NAME} . ': i2c-bus_write failure');
-			}; 
+		}; 
+		Log3 ($hash, 1, $hash->{NAME} . ': ' . I2C_BMP180_Catch($@)) if $@;;
 	} else {
 		if (defined (my $iodev = $hash->{IODev})) {
 			CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
