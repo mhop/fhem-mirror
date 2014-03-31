@@ -358,7 +358,7 @@ EnOcean_Get ($@)
         $channel = 30;     
       } elsif ($channel eq "input") {
         $channel = 31;
-      } elsif ($channel >= 0 && $channel <= 29) {
+      } elsif ($channel + 0 >= 0 && $channel + 0 <= 29) {
       
       } else {
         return "$cmd <channel> wrong, choose 0...29|all|input.";
@@ -1530,7 +1530,7 @@ EnOcean_Set($@)
           readingsSingleUpdate($hash, "channelInput", "on", 1);
           readingsSingleUpdate($hash, "dimInput", $outputVal, 1);
           $channel = 31;
-        } elsif ($channel >= 0 && $channel <= 29) {
+        } elsif ($channel + 0 >= 0 && $channel + 0 <= 29) {
           readingsSingleUpdate($hash, "channel" . $channel, "on", 1);
           readingsSingleUpdate($hash, "dim" . $channel, $outputVal, 1);
         } else {
@@ -2120,22 +2120,35 @@ EnOcean_Parse($$)
   my ($subTelNum, $destinationID, $RSSI, $securityLevel) = (hex($1), $2, hex($3), hex($4));  
   my $rorgname = $EnO_rorgname{$rorg};
   if (!$rorgname) {
-    Log3 undef, 2, "EnOcean RORG ($rorg) received from $id unknown.";
+    Log3 undef, 1, "EnOcean RORG ($rorg) received from $id unknown.";
     return "";
   }
   my $hash = $modules{EnOcean}{defptr}{$id};
   if (!$hash) {
-    if ($rorgname eq "UTE") {
-      if ($iohash->{Teach}) {
-        Log3 undef, 3, "EnOcean Unknown device with ID $id and RORG $rorgname, please define it.";
-        return "UNDEFINED EnO_${rorgname}_$id EnOcean $id $msg";
-      } else {
-        Log3 undef, 3, "EnOcean Unknown device with ID $id and RORG $rorgname, activate learning mode.";
-        return "";
-      }
-    } else {
-      Log3 undef, 3, "EnOcean Unknown device with ID $id and RORG $rorgname, please define it.";
+    # SenderID unknown, created new device
+    my $learningMode = AttrVal($iohash->{NAME}, "learningMode", "demand");
+    if ($learningMode eq "demand" && $iohash->{Teach}) {
+      Log3 undef, 1, "EnOcean Unknown device with ID $id and RORG $rorgname, please define it.";
       return "UNDEFINED EnO_${rorgname}_$id EnOcean $id $msg";
+    } elsif ($learningMode eq "nearfield" && $iohash->{Teach} && $RSSI <= 60) {
+      Log3 undef, 1, "EnOcean Unknown device with ID $id and RORG $rorgname, please define it.";
+      return "UNDEFINED EnO_${rorgname}_$id EnOcean $id $msg";
+    } elsif ($learningMode eq "always") {    
+      if ($rorgname eq "UTE") {
+        if ($iohash->{Teach}) {
+          Log3 undef, 1, "EnOcean Unknown device with ID $id and RORG $rorgname, please define it.";
+          return "UNDEFINED EnO_${rorgname}_$id EnOcean $id $msg";
+        } else {
+          Log3 undef, 1, "EnOcean Unknown device with ID $id and RORG $rorgname, activate learning mode.";
+          return "";
+        }
+      } else {
+        Log3 undef, 1, "EnOcean Unknown device with ID $id and RORG $rorgname, please define it.";
+        return "UNDEFINED EnO_${rorgname}_$id EnOcean $id $msg";
+      }    
+    } else {
+      Log3 undef, 4, "EnOcean Unknown device with ID $id and RORG $rorgname, activate learning mode.";
+      return "";
     }
   }
   my $name = $hash->{NAME};
@@ -2301,7 +2314,10 @@ EnOcean_Parse($$)
   # Single Input Contact (EEP D5-00-01)
   # [Eltako FTK, STM-250]
     push @event, "3:state:" . ($db[0] & 1 ? "closed" : "open");
-    push @event, "3:learnBtn:on" if (!($db[0] & 8));
+    if (!($db[0] & 8)) {
+      push @event, "3:teach-in:EEP D5-00-01 Manufacturer: no ID";
+      Log3 $name, 2, "EnOcean $name teach-in EEP D5-00-01 Manufacturer: no ID";
+    }
 
   } elsif ($rorg eq "A5") {
   # 4BS telegram
@@ -2319,11 +2335,11 @@ EnOcean_Parse($$)
         if($EnO_subType{$st}) {
           $st = $EnO_subType{$st};
           push @event, "3:teach-in:EEP A5-$fn-$tp Manufacturer: $mf";          
-          Log3 $name, 1, "EnOcean $name teach-in EEP A5-$fn-$tp Manufacturer: $mf";
+          Log3 $name, 2, "EnOcean $name teach-in EEP A5-$fn-$tp Manufacturer: $mf";
           $attr{$name}{subType} = $st;
         } else {
           push @event, "3:teach-in:EEP A5-$fn-$tp Manufacturer: $mf not supported";          
-          Log3 $name, 1, "EnOcean $name teach-in EEP A5-$fn-$tp Manufacturer: $mf not supported";
+          Log3 $name, 2, "EnOcean $name teach-in EEP A5-$fn-$tp Manufacturer: $mf not supported";
           $attr{$name}{subType} = "raw";        
         }
 
@@ -2342,31 +2358,31 @@ EnOcean_Parse($$)
             select(undef, undef, undef, 0.5);
             EnOcean_hvac_01Cmd($hash, $name, 128); # 128 == 20 degree C
           } else {
-            Log3 $name, 3, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
+            Log3 $name, 1, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
             return "";
           }
         } elsif ($st eq "hvac.02") {
           if ($teach) {
           } else {
-            Log3 $name, 3, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
+            Log3 $name, 1, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
             return "";
           }        
         } elsif ($st eq "hvac.03") {
           if ($teach) {
           } else {
-            Log3 $name, 3, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
+            Log3 $name, 1, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
             return "";
           }        
         } elsif ($st eq "hvac.10") {
           if ($teach) {
           } else {
-            Log3 $name, 3, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
+            Log3 $name, 1, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
             return "";
           }        
         } elsif ($st eq "hvac.11") {
           if ($teach) {
           } else {
-            Log3 $name, 3, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
+            Log3 $name, 1, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
             return "";
           }        
         }
@@ -2377,6 +2393,7 @@ EnOcean_Parse($$)
         CommandDeleteReading(undef, "$name D[0-9]");
       } else {
         push @event, "3:teach-in:No EEP profile identifier and no Manufacturer ID";
+        Log3 $name, 2, "EnOcean $name teach-in No EEP profile identifier and no Manufacturer ID";
       }
 
     } elsif ($st eq "hvac.01" || $st eq "MD15") {
@@ -3799,9 +3816,9 @@ EnOcean_Parse($$)
             # command will be sent with a delay
             select(undef, undef, undef, 0.1);
             EnOcean_SndRadio(undef, $hash, "D4", $data, $subDef, "00", $id);
-            Log3 $name, 1, "EnOcean $name UTE teach-in-response send to $id";
+            Log3 $name, 2, "EnOcean $name UTE teach-in-response send to $id";
           }
-          Log3 $name, 1, "EnOcean $name UTE teach-in EEP $rorg-$func-$type Manufacturer: $mid";
+          Log3 $name, 2, "EnOcean $name UTE teach-in EEP $rorg-$func-$type Manufacturer: $mid";
           # store attr subType, manufID ...
           CommandSave(undef, undef);          
         } else {
@@ -3817,7 +3834,7 @@ EnOcean_Parse($$)
           # command will be sent with a delay
           select(undef, undef, undef, 0.1);
           EnOcean_SndRadio(undef, $hash, "D4", $data, $defs{$name}{IODev}{BaseID}, "00", $id);        
-          Log3 $name, 1, "EnOcean $name EEP $rorg-$func-$type not supported";
+          Log3 $name, 2, "EnOcean $name EEP $rorg-$func-$type not supported";
           # store attr subType, manufID ...
           CommandSave(undef, undef);          
         }
@@ -3829,14 +3846,14 @@ EnOcean_Parse($$)
         # command will be sent with a delay
         select(undef, undef, undef, 0.1);
         EnOcean_SndRadio(undef, $hash, "D4", $data, AttrVal($name, "subDef", $defs{$name}{IODev}{BaseID}), "00", $id);
-        Log3 $name, 1, "EnOcean $name delete request executed";        
+        Log3 $name, 2, "EnOcean $name delete request executed";        
       } elsif ($teachInReq == 2) {
         # Deletion of Teach-In or Teach-In Request, not specified      
       }      
     } else {
       # Teach-In Respose telegram received
       # no action
-      Log3 $name, 1, "EnOcean $name $data UTE Teach-In Respose telegram received";
+      Log3 $name, 2, "EnOcean $name $data UTE Teach-In Respose telegram received";
     }  
   }
 
@@ -3868,7 +3885,7 @@ sub EnOcean_Attr(@) {
     } elsif ($attrVal =~ m/^\d+(\.\d+)?$/) {
     } else {
       #RemoveInternalTimer($hash);    
-      Log3 $name, 3, "EnOcean $name attribute-value [$attrName] = $attrVal is not a number with positive sign";
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal is not a number with positive sign";
       CommandDeleteAttr(undef, "$name pollInterval");
     }
     
@@ -3876,7 +3893,7 @@ sub EnOcean_Attr(@) {
     if (!defined $attrVal){
     
     } elsif ($attrVal !~ m/^(off|auto|demand|polling|interrupt)$/) {
-      Log3 $name, 3, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
       CommandDeleteAttr(undef, "$name devUpdate");
     }
 
@@ -3888,7 +3905,7 @@ sub EnOcean_Notify(@) {
   my ($hash, $dev) = @_;
   my $name = $hash->{NAME}; 
   if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED$/,@{$dev->{CHANGED}})){
-    Log3($name, 3, "EnOcean $name initialized");
+    Log3($name, 2, "EnOcean $name initialized");
   }
   return undef;
 }
@@ -4133,7 +4150,7 @@ EnOcean_Undef($$)
   <br><br>
   Fhem and the EnOcean devices must be trained with each other. To this, Fhem
   must be in the learning mode, see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>
-  and <a href="#TCM_teachMode">teach_mode</a>.<br>
+  and <a href="#TCM_learningMode">learningMode</a>.<br>
   The teach-in procedure depends on the type of the devices. Switches (EEP RPS)
   and contacts (EEP 1BS) are recognized when receiving the first message.
   Contacts can also send a teach-in telegram. Fhem not need this telegram.
@@ -4226,7 +4243,7 @@ EnOcean_Undef($$)
     <code>IODev</code> is the name of the TCM Module.<br>
     <code>t/s</code> is the time for the learning period.
     <br><br>
-    Types of learning modes see <a href="#TCM_teachMode">teachMode</a>
+    Types of learning modes see <a href="#TCM_learningMode">learningMode</a>
     <br><br>
     Example:
     <ul><code>set TCM_0 teach 600</code>
@@ -5023,7 +5040,6 @@ EnOcean_Undef($$)
      <ul>
          <li>closed</li>
          <li>open</li>
-         <li>learnBtn: on</li>
          <li>state: open|closed</li>
      </ul></li>
         The device should be created by autocreate.
