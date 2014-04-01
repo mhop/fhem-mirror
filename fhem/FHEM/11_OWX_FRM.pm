@@ -132,10 +132,10 @@ sub FRM_OWX_observer
 			};
 			if ($command eq "SEARCH_REPLY") {
 				$self->{devs} = \@owx_devices;
-				main::OWX_AfterSearch($self->{hash},\@owx_devices);
+				main::OWX_ASYNC_AfterSearch($self->{hash},\@owx_devices);
 			} else {
 				$self->{alarmdevs} = \@owx_devices;
-				main::OWX_AfterAlarms($self->{hash},\@owx_devices);
+				main::OWX_ASYNC_AfterAlarms($self->{hash},\@owx_devices);
 			};
 			last;
 		};
@@ -272,14 +272,14 @@ sub execute($$$$$$$) {
 			$micros += ($delay.000);
 		}
 		$delayed->{$owx_dev}->{'until'} = [$seconds,$micros];
-		main::InternalTimer("$seconds.$micros","OWX_Poll",$hash,1);
+		main::InternalTimer("$seconds.$micros","OWX_ASYNC_Poll",$hash,1);
 	}
 	return $success;
 };
 
 sub exit($) {
 	my ($self,$hash) = @_;
-	main::OWX_Disconnected($hash);
+	main::OWX_ASYNC_Disconnected($hash);
 };
 
 sub poll($) {
