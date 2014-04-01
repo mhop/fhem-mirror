@@ -45,7 +45,7 @@ FHEM/10_FS20.pm              rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/10_IT.pm                odroegehorn          http://forum.fhem.de InterTechno
 FHEM/10_MAX.pm               mgehre               http://forum.fhem.de MAX
 FHEM/10_OWServer.pm          borisneubert/mfr69bs http://forum.fhem.de 1Wire
-FHRM/10_UNIRoll.pm           c-herrmann           http://forum.fhem.de SlowRF
+FHEM/10_UNIRoll.pm           c-herrmann           http://forum.fhem.de SlowRF
 FHEM/10_ZWave.pm             rudolfkoenig         http://forum.fhem.de ZWave
 FHEM/10_RESIDENTS.pm         loredo               http://forum.fhem.de Automatisierung
 FHEM/11_FHT.pm               rudolfkoenig         http://forum.fhem.de SlowRF
