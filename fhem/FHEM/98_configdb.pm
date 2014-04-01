@@ -14,7 +14,6 @@ my @pathname;
 sub configdb_Initialize($$) {
   my %hash = (  Fn => "CommandConfigdb",
                Hlp => "info|list|diff|uuid|
-          export|import|
           reorg|recover|backup     ,access additional functions from configDB" );
   $cmds{configdb} = \%hash;
 }
@@ -181,22 +180,33 @@ sub CommandConfigdb($$) {
 			$ret = _cfgDB_Diff($param1, $param2);
 		}
 
-		when ('export') {
-			return "\n Syntax: configdb export <targetFilename> [version]" if @a <2;
-			$param2 = $param2 ? $param2 : 0;
-			my $logtext = "configDB: database backup started into file $param1";
-			$logtext .= " for version $param2";
-			Log3 ('configDB', 4, $logtext);
-			$ret = _cfgDB_Export($param1, $param2);
-		}
-
-		when ('import') {
-			return "\n Syntax: configdb import <sourceFilename>" if @a != 2;
-			open ( FILE, "<./$param1" );
-			my @dbconfig = <FILE>;
-			close ( FILE );
-			$ret = _cfgDB_Execute(undef,@dbconfig);
-		}
+# 		when ('export') {
+# 			return "\n Syntax: configdb export <targetFilename> [version]" if @a <2;
+# 			$param2 = $param2 ? $param2 : 0;
+# 			my $logtext = "configDB: database backup started into file $param1";
+# 			$logtext .= " for version $param2";
+# 			Log3 ('configDB', 4, $logtext);
+# 			$ret = _cfgDB_Export($param1, $param2);
+# 		}
+# 
+# 		when ('import') {
+# 			return "\n Syntax: configdb import <sourceFilename>" if @a != 2;
+# 			open ( FILE, "<./$param1" );
+# 			my @dbconfig = <FILE>;
+# 			my @db2;
+# 			close ( FILE );
+# 			foreach (@dbconfig) {
+# 				my $p = $_;
+# 				my(@p) = split(/\|/,$p,4);
+# 				$p = join(' ',@p);
+# 				$_ = $p;
+# 			}
+# 			$ret  = _cfgDB_Execute(undef,@dbconfig);
+# 			$ret .=	"\n\n".
+# 							"Import executed into running configuration.\n".
+# 							"Please use <save config> to store\n".
+# 							"this configuration into database!";
+# 		}
 
 		when ('info') {
 			Log3('configdb', 4, "info requested.");
@@ -239,8 +249,8 @@ sub CommandConfigdb($$) {
 					"         configdb attr [attribute] [value]\n".
 					"         configdb backup\n".
 					"         configdb diff <device> <version>\n".
-					"         configdb export <targetFilename> [version]".
-					"         configdb import <importFilename>".
+					"         configdb export <targetFilename> [version]\n".
+					"         configdb import <importFilename>\n".
 					"         configdb info\n".
 					"         configdb list [device] [version]\n".
 					"         configdb migrate\n".
