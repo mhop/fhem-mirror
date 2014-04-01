@@ -101,7 +101,7 @@ sub FRM_Undef($) {
 	if (defined $hash->{DeviceName}) {
 		DevIo_Disconnected($hash);
 	};
-	
+	TcpServer_Close($hash);
 	foreach my $d ( sort keys %main::defs ) { # close and dispose open tcp-connection (if any) to free open filedescriptors
 		if ( defined( my $dev = $main::defs{$d} )) {
 			if ( defined( $main::defs{$d}{SNAME} )
