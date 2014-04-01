@@ -75,7 +75,7 @@ use warnings;
 sub Log($$);
 sub AttrVal($$$);
 
-my $owx_version="5.11";
+my $owx_version="5.12";
 
 my %gets = (
   "id"          => "",
@@ -451,7 +451,7 @@ sub OWTHERM_Get($@) {
   #-- OWX interface
   if( $interface =~ /^OWX/ ){
     #-- not different from getting all values ..
-    $ret = OWXTHERM_GetValues($hash);
+    $ret = OWXTHERM_GetValues($hash,1);
     #ASYNC: NEED TO WAIT UNTIL DATA IS THERE
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
@@ -933,9 +933,9 @@ sub OWXTHERM_BinValues($$$$$$$$) {
 #
 ########################################################################################
 
-sub OWXTHERM_GetValues($) {
+sub OWXTHERM_GetValues($@) {
 
-  my ($hash) = @_;
+  my ($hash,$sync) = @_;
   
   #-- For default, perform the conversion now
   my $con=1;
@@ -974,9 +974,12 @@ sub OWXTHERM_GetValues($) {
   #-- NOW ask the specific device
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE
   #-- reading 9 + 1 + 8 data bytes and 1 CRC byte = 19 bytes
+  my $context = "ds182x.reading";
   #-- asynchronous mode
   if( $hash->{ASYNC} ){
-    OWX_Execute($master,"ds182x.reading",1,$owx_dev,"\xBE",9,undef);
+    if (!OWX_Execute($master,$context,1,$owx_dev,"\xBE",9,undef) or ($sync and !OWX_AwaitExecuteResponse($master,$context,$owx_dev))) {
+      return "$owx_dev not accessible in reading";
+    }
   #-- synchronous mode
   } else {
     OWX_Reset($master);
@@ -985,8 +988,9 @@ sub OWXTHERM_GetValues($) {
       if( $res eq 0 );
     return "$owx_dev has returned invalid data"
       if( length($res)!=19);
-    OWXTHERM_BinValues($hash,"ds182x.reading",1,undef,$owx_dev,undef,undef,substr($res,10,9));
+    return OWXTHERM_BinValues($hash,$context,1,undef,$owx_dev,undef,undef,substr($res,10,9));
   }
+  return undef;
 } 
 
 #######################################################################################
