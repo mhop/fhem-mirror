@@ -137,7 +137,7 @@ $owx_debug=0;
 #
 ########################################################################################
 #
-# OWX_Initialize
+# OWX_ASYNC_Initialize
 #
 # Parameter hash = hash of device addressed
 #
@@ -149,15 +149,15 @@ sub OWX_ASYNC_Initialize ($) {
   $hash->{Clients} = ":OWAD:OWCOUNT:OWID:OWLCD:OWMULTI:OWSWITCH:OWTHERM:";
 
   #-- Normal Devices
-  $hash->{DefFn}   = "OWX_ASYNC_Define";
-  $hash->{UndefFn} = "OWX_ASYNC_Undef";
-  $hash->{GetFn}   = "OWX_ASYNC_Get";
-  $hash->{SetFn}   = "OWX_ASYNC_Set";
-  $hash->{NotifyFn} = "OWX_ASYNC_Notify";  
-  $hash->{ReadFn}  = "OWX_Poll";
-  $hash->{ReadyFn} = "OWX_Ready";
-  $hash->{InitFn}  = "OWX_Init";
-  $hash->{AttrList}= "dokick:0,1 async:0,1 IODev";
+  $hash->{DefFn}    = "OWX_ASYNC_Define";
+  $hash->{UndefFn}  = "OWX_ASYNC_Undef";
+  $hash->{GetFn}    = "OWX_ASYNC_Get";
+  $hash->{SetFn}    = "OWX_ASYNC_Set";
+  $hash->{NotifyFn} = "OWX_ASYNC_Notify";
+  $hash->{ReadFn}   = "OWX_ASYNC_Poll";
+  $hash->{ReadyFn}  = "OWX_ASYNC_Ready";
+  $hash->{InitFn}   = "OWX_ASYNC_Init";
+  $hash->{AttrList} = "dokick:0,1 async:0,1 IODev timeout";
   main::LoadModule("OWX");
 }
 
@@ -214,7 +214,7 @@ sub OWX_ASYNC_Define ($$) {
   $hash->{STATE} = "Defined";
 
   if ($main::init_done) {
-    return OWX_Init($hash);
+    return OWX_ASYNC_Init($hash);
   }
 	return undef;
 }
@@ -225,15 +225,15 @@ sub OWX_ASYNC_Notify {
   my $type  = $hash->{TYPE};
 
   if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
-  	OWX_Init($hash);
+  	OWX_ASYNC_Init($hash);
   } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
   }
 }
 
-sub OWX_Ready ($) {
+sub OWX_ASYNC_Ready ($) {
   my $hash = shift;
   unless ( $hash->{STATE} eq "Active" ) {
-    my $ret = OWX_Init($hash);
+    my $ret = OWX_ASYNC_Init($hash);
     if ($ret) {
       Log3 ($hash->{NAME},2,"OWX: Error initializing ".$hash->{NAME}.": ".$ret);
       return undef;
@@ -242,32 +242,32 @@ sub OWX_Ready ($) {
 	return 1;
 };
 
-sub OWX_Poll ($) {
+sub OWX_ASYNC_Poll ($) {
 	my $hash = shift;
 	if (defined $hash->{ASYNC}) {
 		$hash->{ASYNC}->poll($hash);
 	};
 };
 
-sub OWX_Disconnect($) {
+sub OWX_ASYNC_Disconnect($) {
 	my ($hash) = @_;
 	my $async = $hash->{ASYNC};
-	Log3 ($hash->{NAME},3, "OWX_Disconnect");
+	Log3 ($hash->{NAME},3, "OWX_ASYNC_Disconnect");
 	if (defined $async) {
 		$async->exit($hash);
 	};
-	my $times = AttrVal($hash,"timeout",5000) / 50; #timeout in ms, defaults to 1 sec #TODO add attribute timeout?
+	my $times = AttrVal($hash,"timeout",5000) / 50; #timeout in ms, defaults to 1 sec?
 	for (my $i=0;$i<$times;$i++) {
-		OWX_Poll($hash);
+		OWX_ASYNC_Poll($hash);
 		if ($hash->{STATE} ne "Active") {
 			last;
 		}
 	};
 };
 
-sub OWX_Disconnected($) {
+sub OWX_ASYNC_Disconnected($) {
 	my ($hash) = @_;
-	Log3 ($hash->{NAME},4, "OWX_Disconnected");
+	Log3 ($hash->{NAME},4, "OWX_ASYNC_Disconnected");
 	if ($hash->{ASYNC} and $hash->{ASYNC} != $hash->{OWX}) {
 		delete $hash->{ASYNC};
 	};
@@ -312,7 +312,7 @@ sub OWX_ASYNC_Alarms ($) {
 
 #######################################################################################
 #
-# OWX_AwaitAlarmsResponse - Wait for the result of a call to OWX_ASYNC_Alarms 
+# OWX_ASYNC_AwaitAlarmsResponse - Wait for the result of a call to OWX_ASYNC_Alarms 
 #
 # Parameter hash = hash of bus master
 #
@@ -321,7 +321,7 @@ sub OWX_ASYNC_Alarms ($) {
 #
 ########################################################################################
 
-sub OWX_AwaitAlarmsResponse($) {
+sub OWX_ASYNC_AwaitAlarmsResponse($) {
 	my ($hash) = @_;
 
 	#-- get the interface
@@ -342,7 +342,7 @@ sub OWX_AwaitAlarmsResponse($) {
 
 ########################################################################################
 #
-# OWX_AfterAlarms - is called when the search for alarmed devices that was initiated by OWX_ASYNC_Alarms successfully returns
+# OWX_ASYNC_AfterAlarms - is called when the search for alarmed devices that was initiated by OWX_ASYNC_Alarms successfully returns
 #
 # stores device-addresses found in $hash->{ALARMDEVS}
 #
@@ -355,7 +355,7 @@ sub OWX_AwaitAlarmsResponse($) {
 #
 ########################################################################################
 
-sub OWX_AfterAlarms($$) {
+sub OWX_ASYNC_AfterAlarms($$) {
   my ($hash,$alarmed_devs) = @_;
   $hash->{ALARMDEVS} = $alarmed_devs;
   GP_ForallClients($hash,sub {
@@ -384,7 +384,7 @@ sub OWX_AfterAlarms($$) {
 sub OWX_ASYNC_DiscoverAlarms($) {
   my ($hash) = @_;
   if (OWX_ASYNC_Alarms($hash)) {
-  	if (my $alarmed_devs = OWX_AwaitAlarmsResponse($hash)) {
+  	if (my $alarmed_devs = OWX_ASYNC_AwaitAlarmsResponse($hash)) {
       my @owx_alarm_names=();
       my $name = $hash->{NAME};
   	
@@ -429,9 +429,9 @@ sub OWX_ASYNC_DiscoverAlarms($) {
 
 sub OWX_ASYNC_Discover ($) {
 	my ($hash) = @_;
-	if (OWX_Search($hash)) {
-		if (my $owx_devices = OWX_AwaitSearchResponse($hash)) {
-			return OWX_AutoCreate($hash,$owx_devices);			
+	if (OWX_ASYNC_Search($hash)) {
+		if (my $owx_devices = OWX_ASYNC_AwaitSearchResponse($hash)) {
+			return OWX_ASYNC_AutoCreate($hash,$owx_devices);			
 		};
 	} else {
 		return undef;
@@ -440,7 +440,7 @@ sub OWX_ASYNC_Discover ($) {
 
 #######################################################################################
 #
-# OWX_Search - Initiate Search for devices on the 1-Wire bus 
+# OWX_ASYNC_Search - Initiate Search for devices on the 1-Wire bus 
 #
 # Parameter hash = hash of bus master
 #
@@ -448,7 +448,7 @@ sub OWX_ASYNC_Discover ($) {
 #
 ########################################################################################
 
-sub OWX_Search($) {
+sub OWX_ASYNC_Search($) {
 	my ($hash) = @_;
   
 	my $res;
@@ -474,7 +474,7 @@ sub OWX_Search($) {
 
 #######################################################################################
 #
-# OWX_AwaitSearchResponse - Wait for the result of a call to OWX_Search 
+# OWX_ASYNC_AwaitSearchResponse - Wait for the result of a call to OWX_ASYNC_Search 
 #
 # Parameter hash = hash of bus master
 #
@@ -483,7 +483,7 @@ sub OWX_Search($) {
 #
 ########################################################################################
 
-sub OWX_AwaitSearchResponse($) {
+sub OWX_ASYNC_AwaitSearchResponse($) {
 	my ($hash) = @_;
 	#-- get the interface
 	my $async = $hash->{ASYNC};
@@ -505,7 +505,7 @@ sub OWX_AwaitSearchResponse($) {
 
 ########################################################################################
 #
-# OWX_AfterSearch - is called when the search initiated by OWX_Search successfully returns
+# OWX_ASYNC_AfterSearch - is called when the search initiated by OWX_ASYNC_Search successfully returns
 #
 # stores device-addresses found in $hash->{DEVS}
 #
@@ -518,7 +518,7 @@ sub OWX_AwaitSearchResponse($) {
 #
 ########################################################################################
 
-sub OWX_AfterSearch($$) {
+sub OWX_ASYNC_AfterSearch($$) {
   my ($hash,$owx_devs) = @_;
   if (defined $owx_devs and (ref($owx_devs) eq "ARRAY")) {
   	$hash->{DEVS} = $owx_devs;
@@ -538,16 +538,16 @@ sub OWX_AfterSearch($$) {
 
 ########################################################################################
 #
-# OWX_Autocreate - autocreate devices if not already present
+# OWX_ASYNC_Autocreate - autocreate devices if not already present
 #
 # Parameter hash = hash of bus master
-#       owx_devs = Reference to Array of device-address-strings as OWX_AfterSearch stores in $hash->{DEVS}
+#       owx_devs = Reference to Array of device-address-strings as OWX_ASYNC_AfterSearch stores in $hash->{DEVS}
 #
 # Return: List of devices in table format or undef
 #
 ########################################################################################
 
-sub OWX_AutoCreate($$) { 
+sub OWX_ASYNC_AutoCreate($$) { 
   my ($hash,$owx_devs) = @_;
   my $name = $hash->{NAME};
   my ($chip,$acstring,$acname,$exname);
@@ -710,7 +710,7 @@ sub OWX_ASYNC_Get($@) {
 
 #######################################################################################
 # 
-# OWX_Init - Re-Initialize the device 
+# OWX_ASYNC_Init - Re-Initialize the device 
 #
 # Parameter hash = hash of bus master
 #
@@ -719,7 +719,7 @@ sub OWX_ASYNC_Get($@) {
 #
 ########################################################################################
 
-sub OWX_Init ($) {
+sub OWX_ASYNC_Init ($) {
   my ($hash)=@_;
   
   RemoveInternalTimer($hash);
@@ -740,7 +740,7 @@ sub OWX_Init ($) {
 	if (my $err = GP_Catch($@)) {
 	  $hash->{PRESENT} = 0;
 	  $hash->{STATE} = "Init Failed: $err";
-	  return "OWX_Init failed: $err";
+	  return "OWX_ASYNC_Init failed: $err";
 	};
 	$hash->{ASYNC} = $ret;
    	$hash->{INTERFACE} = $owx->{interface};
@@ -794,7 +794,7 @@ sub OWX_ASYNC_Kick($) {
     }
   }
   
-  if (OWX_Search($hash)) {
+  if (OWX_ASYNC_Search($hash)) {
     OWX_ASYNC_Alarms($hash);
   };
   
@@ -864,7 +864,7 @@ sub OWX_ASYNC_Set($@) {
 sub OWX_ASYNC_Undef ($$) {
   my ($hash, $name) = @_;
   RemoveInternalTimer($hash);
-  OWX_Disconnect($hash);
+  OWX_ASYNC_Disconnect($hash);
   return undef;
 }
 
@@ -882,8 +882,8 @@ sub OWX_ASYNC_Undef ($$) {
 sub OWX_ASYNC_Verify ($$) {
 	my ($hash,$dev) = @_;
 	my $address = substr($dev,0,15);
-	if (OWX_Search($hash)) {
-		if (my $owx_devices = OWX_AwaitSearchResponse($hash)) {
+	if (OWX_ASYNC_Search($hash)) {
+		if (my $owx_devices = OWX_ASYNC_AwaitSearchResponse($hash)) {
 		  if (grep {/$address/} @{$owx_devices}) {
 		    return 1;
 			};
@@ -943,7 +943,7 @@ sub OWX_AwaitExecuteResponse($$$) {
 
 	#-- Discover all devices on the 1-Wire bus, they will be found in $hash->{DEVS}
 	if (defined $async and defined $owx_dev and defined $context) {
-		my $times = AttrVal($hash,"timeout",5000) / 50; #timeout in ms, defaults to 1 sec #TODO add attribute timeout?
+		my $times = AttrVal($hash,"timeout",5000) / 50; #timeout in ms, defaults to 1 sec
 		for (my $i=0;$i<$times;$i++) {
 			if(! defined $hash->{replies}{$owx_dev}{$context}) {
 				select (undef,undef,undef,0.05);
@@ -958,7 +958,7 @@ sub OWX_AwaitExecuteResponse($$$) {
 
 ########################################################################################
 #
-# OWX_AfterExecute - is called when a query initiated by OWX_Execute successfully returns
+# OWX_ASYNC_AfterExecute - is called when a query initiated by OWX_Execute successfully returns
 #
 # calls 'AfterExecuteFn' on the devices module (if such is defined)
 # stores data read in $hash->{replies}{$owx_dev}{$context} after calling 'AfterExecuteFn'
@@ -978,7 +978,7 @@ sub OWX_AwaitExecuteResponse($$$) {
 #
 ########################################################################################
 
-sub OWX_AfterExecute($$$$$$$$) {
+sub OWX_ASYNC_AfterExecute($$$$$$$$) {
 	my ( $master, $context, $success, $reset, $owx_dev, $writedata, $numread, $readdata ) = @_;
 
 	Log3 ($master->{NAME},5,"AfterExecute:".
@@ -999,7 +999,7 @@ sub OWX_AfterExecute($$$$$$$$) {
 				  && $hash->{ROM_ID} eq $owx_dev ) {
 				  if ($main::modules{$hash->{TYPE}}{AfterExecuteFn}) {
 				    my $ret = CallFn($d,"AfterExecuteFn", $hash, $context, $success, $reset, $owx_dev, $writedata, $numread, $readdata);
-				    Log3 ($master->{NAME},4,"OWX_AfterExecute [".(defined $owx_dev ? $owx_dev : "unknown owx device")."]: $ret") if ($ret);
+				    Log3 ($master->{NAME},4,"OWX_ASYNC_AfterExecute [".(defined $owx_dev ? $owx_dev : "unknown owx device")."]: $ret") if ($ret);
 				    if ($success) {
 				      readingsSingleUpdate($hash,"PRESENT",1,1) unless ($hash->{PRESENT});
 				    } else {
