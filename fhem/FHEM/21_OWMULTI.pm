@@ -70,7 +70,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.11";
+my $owx_version="5.12";
 #-- flexible channel name
 my $owg_channel;
 
@@ -473,7 +473,7 @@ sub OWMULTI_Get($@) {
   #-- OWX interface
   if( $interface =~ /^OWX/ ){
     #-- not different from getting all values ..
-    $ret = OWXMULTI_GetValues($hash);
+    $ret = OWXMULTI_GetValues($hash,1);
     #ASYNC: Need to wait for some return
   #-- OWFS interface not yet implemented
   }elsif( $interface eq "OWServer" ){
@@ -820,9 +820,9 @@ sub OWXMULTI_BinValues($$$$$$$$) {
 #
 ########################################################################################
 
-sub OWXMULTI_GetValues($$) {
+sub OWXMULTI_GetValues($@) {
 
-  my ($hash,$final) = @_;
+  my ($hash,$sync) = @_;
   
   my ($i,$j,$k,$res,$res2);
    
@@ -999,9 +999,10 @@ sub OWXMULTI_GetValues($$) {
   #-- NOW ask the specific device 
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE
   #-- reading 9 + 2 + 9 data bytes = 20 bytes
+  my $context = "ds2438.getvad";
   #-- asynchronous mode
   if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "ds2438.getvad", 1, $owx_dev, "\xBE\x00", 9, undef )) {
+    if (!OWX_Execute( $master, $context, 1, $owx_dev, "\xBE\x00", 9, undef ) or ($sync and !OWX_AwaitExecuteResponse($master,$context,$owx_dev))) {
       return "$owx_dev not accessible in 2nd step"; 
     }
   #-- synchronous mode
@@ -1013,7 +1014,7 @@ sub OWXMULTI_GetValues($$) {
       if( $res eq 0 );
     return "$owx_dev has returned invalid data"
       if( length($res)!=20);
-    OWXMULTI_BinValues($hash,"ds2438.getvad",1,undef,$owx_dev,undef,undef,substr($res,11));
+    OWXMULTI_BinValues($hash,$context,1,undef,$owx_dev,undef,undef,substr($res,11));
   } 
   return undef;
 }
