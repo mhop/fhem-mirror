@@ -442,10 +442,15 @@ sub OWMULTI_Get($@) {
   #-- get present
   if($a[1] eq "present" ) {
     #-- OWX interface
-    if( $interface eq "OWX" ){
+    if( $interface =~ /^OWX/ ){
       #-- hash of the busmaster
       my $master       = $hash->{IODev};
-      $value           = OWX_Verify($master,$hash->{ROM_ID});
+      #-- asynchronous mode
+      if( $hash->{ASYNC} ){
+        $value = OWX_ASYNC_Verify($master,$hash->{ROM_ID});
+      } else {
+        $value = OWX_Verify($master,$hash->{ROM_ID});
+      }
       $hash->{PRESENT} = $value;
       return "$name.present => $value";
     } else {
