@@ -30,6 +30,19 @@ my %sets = (
 my %gets = (
 );
 
+my %mapping = (
+  'P0' => 'RS',
+  'P1' => 'RW',
+  'P2' => 'E',
+  'P3' => 'LED',
+  'P4' => 'D4',
+  'P5' => 'D5',
+  'P6' => 'D6',
+  'P7' => 'D7',
+);
+
+my @LEDPINS = sort values %mapping;
+
 sub
 I2C_LCD_Initialize($)
 {
@@ -41,7 +54,7 @@ I2C_LCD_Initialize($)
   $hash->{AttrFn}    = "I2C_LCD_Attr";
   $hash->{StateFn}   = "I2C_LCD_State";
   
-  $hash->{AttrList}  = "restoreOnReconnect:on,off restoreOnStartup:on,off IODev model"
+  $hash->{AttrList}  = "restoreOnReconnect:on,off restoreOnStartup:on,off IODev model pinMapping"
   ." backLight:on,off blink:on,off autoClear:on,off autoBreak:on,off $main::readingFnAttributes";
   #  autoScroll:on,off direction:leftToRight,rightToLeft do not work reliably
 }
@@ -60,6 +73,12 @@ I2C_LCD_Define($$)
     };
     return I2C_LCD_Catch($@) if $@;
   }
+  
+  my @keyvalue = ();
+  while (my ($key, $value) = each %mapping) {
+    push @keyvalue,"$key=$value";
+  };
+  $main::attr{$a[0]}{"pinMapping"} = join (',',sort @keyvalue);;
   return undef;
 }
 
@@ -80,7 +99,7 @@ I2C_LCD_Init($$)
     eval {
       main::AssignIoPort($hash,AttrVal($hash->{NAME},"IODev",undef));
       require LiquidCrystal_I2C;
-      my $lcd = LiquidCrystal_I2C->new($hash->{I2C_Address},$hash->{sizex},$hash->{sizey});
+      my $lcd = LiquidCrystal_I2C->new($hash->{I2C_Address},$hash->{sizex},$hash->{sizey},\%mapping);
       $lcd->attach(I2C_LCD_IO->new($hash));
       $lcd->init();
       $hash->{lcd} = $lcd;
@@ -119,8 +138,18 @@ I2C_LCD_Attr($$$$) {
           }
           last;
         };
-      $main::attr{$name}{$attribute}=$value;
-      I2C_LCD_Apply_Attribute($name,$attribute);
+        $attribute eq "pinMapping" and do {
+          foreach my $keyvalue (split (/,/,$value)) {
+            my ($key,$value) = split (/=/,$keyvalue);
+            #Log3 ($name,5,"pinMapping, token: $key=$value, current mapping: $mapping{$key}");
+            die "unknown token $key in attribute pinMapping, valid tokens are ".join (',',keys %mapping) unless (defined $mapping{$key});
+            die "undefined or invalid value for token $key in attribute pinMapping, valid LED-Pins are ".join (',',@LEDPINS) unless $value and grep (/$value/,@LEDPINS);
+            $mapping{$key} = $value; 
+          }
+          last;
+        };
+        $main::attr{$name}{$attribute}=$value;
+        I2C_LCD_Apply_Attribute($name,$attribute);
       }
     }
   };
