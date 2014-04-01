@@ -57,6 +57,7 @@ FileLog_Define($@)
 
   return "wrong syntax: define <name> FileLog filename regexp" if(int(@a) != 4);
 
+  return "Bad regexp: starting with *" if($re =~ m/^\*/);
   eval { "Hallo" =~ m/^$a[3]$/ };
   return "Bad regexp: $@" if($@);
 
@@ -215,6 +216,7 @@ FileLog_Set($@)
     map { $h{$_} = 1 } split(/\|/, $hash->{REGEXP});
     $h{$re} = 1;
     $re = join("|", sort keys %h);
+    return "Bad regexp: starting with *" if($re =~ m/^\*/);
     eval { "Hallo" =~ m/^$re$/ };
     return "Bad regexp: $@" if($@);
     $hash->{REGEXP} = $re;
@@ -228,6 +230,7 @@ FileLog_Set($@)
     return "Cannot remove last regexp part" if(int(keys(%h)) == 1);
     delete $h{$a[2]};
     my $re = join("|", sort keys %h);
+    return "Bad regexp: starting with *" if($re =~ m/^\*/);
     eval { "Hallo" =~ m/^$re$/ };
     return "Bad regexp: $@" if($@);
     $hash->{REGEXP} = $re;
