@@ -35,6 +35,7 @@ notify_Define($$)
   }
 
   # Checking for misleading regexps
+  return "Bad regexp: starting with *" if($re =~ m/^\*/);
   eval { "Hallo" =~ m/^$re$/ };
   return "Bad regexp: $@" if($@);
   $hash->{REGEXP} = $re;
