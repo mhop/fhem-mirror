@@ -581,7 +581,7 @@ sub OWAD_Get($@) {
   if($a[1] eq "reading") {
     #-- OWX interface
     if( $interface =~ /^OWX/ ){
-      $ret = OWXAD_GetPage($hash,"reading",1);
+      $ret = OWXAD_GetPage($hash,"reading",1,1);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"reading",1);
@@ -605,7 +605,7 @@ sub OWAD_Get($@) {
   if($a[1] eq "alarm") {
     #-- OWX interface
     if( $interface =~ /^OWX/ ){
-      $ret = OWXAD_GetPage($hash,"alarm",1);
+      $ret = OWXAD_GetPage($hash,"alarm",1,1);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"alarm",1);
@@ -637,7 +637,7 @@ sub OWAD_Get($@) {
   if($a[1] eq "status") {
     #-- OWX interface
     if( $interface =~ /^OWX/ ){
-      $ret = OWXAD_GetPage($hash,"status",1);
+      $ret = OWXAD_GetPage($hash,"status",1,1);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"status",1);
@@ -1340,9 +1340,9 @@ sub OWXAD_BinValues($$$$$$$$) {
 #
 ########################################################################################
 
-sub OWXAD_GetPage($$$) {
+sub OWXAD_GetPage($$$@) {
 
-  my ($hash,$page,$final) = @_;
+  my ($hash,$page,$final,$sync) = @_;
   
   my ($select, $res, $res2, $res3, @data, $an, $vn);
   
@@ -1391,11 +1391,12 @@ sub OWXAD_GetPage($$$) {
   #=============== wrong value requested ===============================
   } else {
     return "wrong memory page requested from $owx_dev";
-  } 
+  }
+  my $context = "ds2450.get".$page.($final ? ".final" : "");
   #-- asynchronous mode
   if( $hash->{ASYNC} ){
     #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
-    if (!OWX_Execute( $master, "ds2450.get".$page.($final ? ".final" : ""), 1, $owx_dev, $select, 10, undef)) {
+    if (!OWX_Execute( $master, $context, 1, $owx_dev, $select, 10, undef) or ($sync and !OWX_AwaitExecuteResponse($master,$context,$owx_dev))) {
       return "$owx_dev not accessible in reading $page page"; 
     }
   #-- synchronous mode
@@ -1409,7 +1410,7 @@ sub OWXAD_GetPage($$$) {
     return "$owx_dev has returned invalid data"
       if( length($res)!=22);
     #-- for processing we also need the 3 command bytes
-    OWXAD_BinValues($hash,"ds2450.get".$page.($final ? ".final" : ""),1,undef,$owx_dev,$select,10,substr($res,12,10));
+    OWXAD_BinValues($hash,$context,1,undef,$owx_dev,$select,10,substr($res,12,10));
   }
 
   return undef;
