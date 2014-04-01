@@ -256,7 +256,7 @@ sub OWX_ASYNC_Disconnect($) {
 	if (defined $async) {
 		$async->exit($hash);
 	};
-	my $times = AttrVal($hash,"timeout",5000) / 50; #timeout in ms, defaults to 1 sec?
+	my $times = AttrVal($hash->{NAME},"timeout",5000) / 50; #timeout in ms, defaults to 1 sec?
 	for (my $i=0;$i<$times;$i++) {
 		OWX_ASYNC_Poll($hash);
 		if ($hash->{STATE} ne "Active") {
@@ -327,7 +327,7 @@ sub OWX_ASYNC_AwaitAlarmsResponse($) {
 	#-- get the interface
 	my $async           = $hash->{ASYNC};
 	if (defined $async) {
-		my $times = AttrVal($hash,"timeout",5000) / 50; #timeout in ms, defaults to 1 sec #TODO add attribute timeout?
+		my $times = AttrVal($hash->{NAME},"timeout",5000) / 50; #timeout in ms, defaults to 1 sec #TODO add attribute timeout?
 		for (my $i=0;$i<$times;$i++) {
 			if(! defined $hash->{ALARMDEVS} ) {
 				select (undef,undef,undef,0.05);
@@ -490,7 +490,7 @@ sub OWX_ASYNC_AwaitSearchResponse($) {
 
 	#-- Discover all devices on the 1-Wire bus, they will be found in $hash->{DEVS}
 	if (defined $async) {
-		my $times = AttrVal($hash,"timeout",5000) / 50; #timeout in ms, defaults to 1 sec #TODO add attribute timeout?
+		my $times = AttrVal($hash->{NAME},"timeout",5000) / 50; #timeout in ms, defaults to 1 sec #TODO add attribute timeout?
 		for (my $i=0;$i<$times;$i++) {
 			if(! defined $hash->{DEVS} ) {
 				select (undef,undef,undef,0.05);
@@ -849,7 +849,7 @@ sub OWX_ASYNC_Set($@) {
     
   }
   Log3 ($name,3, "OWX_ASYNC_Set $name ".join(" ",@a)." => $res");  
-  DoTrigger($name, undef) if($init_done);
+  DoTrigger($name, undef) if($main::init_done);
   return "OWX_ASYNC_Set => $name ".join(" ",@a)." => $res";
 }
 
@@ -943,7 +943,7 @@ sub OWX_AwaitExecuteResponse($$$) {
 
 	#-- Discover all devices on the 1-Wire bus, they will be found in $hash->{DEVS}
 	if (defined $async and defined $owx_dev and defined $context) {
-		my $times = AttrVal($hash,"timeout",5000) / 50; #timeout in ms, defaults to 1 sec
+		my $times = AttrVal($hash->{NAME},"timeout",5000) / 50; #timeout in ms, defaults to 1 sec
 		for (my $i=0;$i<$times;$i++) {
 			if(! defined $hash->{replies}{$owx_dev}{$context}) {
 				select (undef,undef,undef,0.05);
