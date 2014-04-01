@@ -1403,9 +1403,10 @@ sub CUL_HM_Parse($$) {#########################################################
       
       my $action; #determine action
       push @evtEt,[$shash,1,"timedOn:".(($err&0x40)?"running":"off")];
-      if ($shash->{helper}{dlvl} && defined $err #desired level?
-          && !($err&0x70)){              #stopped and not timedOn
-        if ($mI[2] ne $shash->{helper}{dlvl}){#level not met, repeat
+      if ($shash->{helper}{dlvl} && defined $err){#are we waiting?
+        if ($mI[2] ne $shash->{helper}{dlvl} #level not met?
+            && !($err&0x70)){                #and already stopped not timedOn
+          #level not met, repeat
           Log3 $name,3,"CUL_HM $name repeat, level $mI[2] instead of $shash->{helper}{dlvl}";
           if ($shash->{helper}{dlvlCmd}){# first try
             CUL_HM_PushCmdStack($shash,$shash->{helper}{dlvlCmd});
@@ -1417,8 +1418,8 @@ sub CUL_HM_Parse($$) {#########################################################
             delete $shash->{helper}{dlvl};# we only make one attempt
           }
         }
-        else{
-          delete $shash->{helper}{dlvl};# we only make one attempt
+        else{# either level met, timed on or we are driving...
+          delete $shash->{helper}{dlvl};
         }
       }
       if ($st ne "switch"){
@@ -3209,7 +3210,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     # store desiredLevel in and its Cmd in case we have to repeat
     $plvl = sprintf("%02X",$plvl*2);
-    if ($tval ne "FFFF"){
+    if ($tval && $tval ne "FFFF"){
       delete $hash->{helper}{dlvl};#stop desiredLevel supervision
     }
     else{
@@ -3722,7 +3723,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         $pId = $dst.sprintf("%02X",(($vChn eq "off")?-1:0) + $chn*2);
       }
       elsif($vChn){
-        $pId = CUL_HM_name2Id($vChn).($a[3]?sprintf("%02X",$a[3]):"01");
+        $pId = CUL_HM_name2Id($vChn,$devHash).($a[3]?sprintf("%02X",$a[3]):"01");
       }
       else{
         $pId = $dst.sprintf("%02X",$chn);
