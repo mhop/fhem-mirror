@@ -121,7 +121,7 @@ sub FRM_OWX_observer
 			my $owx_device = $request->{device};
 			my $context = $request->{context};
 			my $writedata = pack "C*",@{$request->{command}->{'write'}} if (defined $request->{command}->{'write'});
-			main::OWX_AfterExecute( $self->{hash},$context,1,$request->{'reset'}, $owx_device, $writedata, $request->{'read'}, $owx_data );
+			main::OWX_ASYNC_AfterExecute( $self->{hash},$context,1,$request->{'reset'}, $owx_device, $writedata, $request->{'read'}, $owx_data );
 			delete $self->{requests}->{$id};
 			last;			
 		};
