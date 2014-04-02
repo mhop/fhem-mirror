@@ -433,18 +433,29 @@ while(time() < 2*3600) {
   sleep(5);
 }
 
+my $cfgErrMsg = "There were error messages while initializing FHEM";
+my $cfgRet="";
 if($attr{global}{configfile} eq 'configDB') {
   my $ret = cfgDB_ReadAll(undef);
-  Log 1, "configDB: $ret" if($ret);
+  $cfgRet .= "configDB: $ret" if($ret);
 
 } else {
   my $ret = CommandInclude(undef, $attr{global}{configfile});
-  Log 1, "configfile: $ret" if($ret);
+  $cfgRet .= "configfile: $ret\n" if($ret);
 
   if($attr{global}{statefile} && -r $attr{global}{statefile}) {
     $ret = CommandInclude(undef, $attr{global}{statefile});
-    Log 1, "statefile: $ret" if($ret);
+    $cfgRet .= "statefile: $ret" if($ret);
   }
+}
+
+if($cfgRet) {
+  $attr{global}{motd} = "$cfgErrMsg,\ncheck the Logfile for details.";
+  Log 1, $cfgRet;
+
+} elsif($attr{global}{motd} =~ m/^$cfgErrMsg/) {
+  $attr{global}{motd} = "";
+
 }
 
 SignalHandling();
