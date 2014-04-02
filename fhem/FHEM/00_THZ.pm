@@ -1,7 +1,7 @@
 ##############################################
 # 00_THZ
-# by immi 03/2014
-# v. 0.078
+# by immi 04/2014
+# v. 0.080
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -76,6 +76,8 @@ my %sets = (
 	"p40fanstage1-Airflow-outlet"	=> {cmd2=>"0A0579", argMin =>  "50", argMax =>  "300" },	#abluft extrated
 	"p41fanstage2-Airflow-outlet"	=> {cmd2=>"0A057A", argMin =>  "50", argMax =>  "300" },	#abluft extrated
 	"p42fanstage3-Airflow-outlet"	=> {cmd2=>"0A057B", argMin =>  "50", argMax =>  "300" },	#abluft extrated
+	"p49SummerModeTemp"		=> {cmd2=>"0A0116", argMin =>  "11", argMax =>  "24" },		#threshold for summer mode !! 
+	"p50SummerModeHysteresis"	=> {cmd2=>"0A05A2", argMin =>  "0.5", argMax =>  "5" },		#Hysteresis for summer mode !! 
 	"holidayBegin_day"		=> {cmd2=>"0A011B", argMin =>  "1", argMax =>  "31"  }, 
 	"holidayBegin_month"		=> {cmd2=>"0A011C", argMin =>  "1", argMax =>  "12"  },
 	"holidayBegin_year"		=> {cmd2=>"0A011D", argMin =>  "12", argMax => "20"  },
@@ -247,6 +249,8 @@ my %gets = (
 	"p40fanstage1-Airflow-outlet"	=> {cmd2=>"0A0579"},			#abluft extrated
 	"p41fanstage2-Airflow-outlet"	=> {cmd2=>"0A057A"},			#abluft extrated
 	"p42fanstage3-Airflow-outlet"	=> {cmd2=>"0A057B"},			#abluft extrated
+	"p49SummerModeTemp"		=> {cmd2=>"0A0116"},		#threshold for summer mode !! 
+	"p50SummerModeHysteresis"	=> {cmd2=>"0A05A2"},		#Hysteresis for summer mode !! 
 	"holidayBegin_day"		=> {cmd2=>"0A011B"}, 
 	"holidayBegin_month"		=> {cmd2=>"0A011C"},
 	"holidayBegin_year"		=> {cmd2=>"0A011D"},
@@ -472,12 +476,14 @@ sub THZ_GetRefresh($) {
 	my $hash=$par->{hash};
 	my $command=$par->{command};
 	my $interval = AttrVal($hash->{NAME}, ("interval_".$command), 0);
-	if ($interval) {
-			$interval = 60 if ($interval < 60); #do not allow intervall <60 sec 
-			InternalTimer(gettimeofday()+ $interval, "THZ_GetRefresh", $par, 1) ;
-	}		
-        my $replyc = "";
-	$replyc = THZ_Get($hash, $hash->{NAME}, $command) if (!($hash->{STATE} eq "disconnected")); 
+	my $replyc = "";
+	if (!($hash->{STATE} eq "disconnected")) {
+	  if ($interval) {
+			  $interval = 60 if ($interval < 60); #do not allow intervall <60 sec 
+			  InternalTimer(gettimeofday()+ $interval, "THZ_GetRefresh", $par, 1) ;
+	  }		
+	  $replyc = THZ_Get($hash, $hash->{NAME}, $command);
+	}
 	return ($replyc);
 }
 
@@ -538,7 +544,7 @@ sub THZ_Ready($)
   my ($hash) = @_;
   if($hash->{STATE} eq "disconnected")
   {
-  select(undef, undef, undef, 0.1); #equivalent to sleep 200ms
+  select(undef, undef, undef, 0.1); #equivalent to sleep 100ms
   return DevIo_OpenDev($hash, 1, "THZ_Refresh_all_gets")
   }	
 		
@@ -592,8 +598,9 @@ sub THZ_Set($@){
   return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if(($arg > $argMax) or ($arg < $argMin));
   }
   
-  if     (substr($cmdHex2,0,4) eq "0A01")  {$arg=$arg*256}		        	# shift 2 times -- the answer look like  0A0120-3A0A01200E00  for year 14
-  elsif  ( (substr($cmdHex2,2,2) eq "1D") or (substr($cmdHex2,2,2)  eq "17") or (substr($cmdHex2,2,2) eq "15") or (substr($cmdHex2,2,2)  eq "14")) 	{$arg= time2quaters($arg) *256   + time2quaters($arg1)} # BeginTime-endtime, in the register is represented  begintime endtime
+  if 	((substr($cmdHex2,0,6) eq "0A0116") or (substr($cmdHex2,0,6) eq "0A05A2"))	 {$arg=$arg*10} #summermode
+  elsif (substr($cmdHex2,0,4) eq "0A01")  {$arg=$arg*256}		        	# shift 2 times -- the answer look like  0A0120-3A0A01200E00  for year 14
+  elsif  ((substr($cmdHex2,2,2) eq "1D") or (substr($cmdHex2,2,2)  eq "17") or (substr($cmdHex2,2,2) eq "15") or (substr($cmdHex2,2,2)  eq "14")) 	{$arg= time2quaters($arg) *256   + time2quaters($arg1)} # BeginTime-endtime, in the register is represented  begintime endtime
   #programFan_ (1D)  funziona;
   elsif  (substr($cmdHex2,0,6) eq "0A05D1") 		  			{$arg= time2quaters($arg1) *256 + time2quaters($arg)} # PartyBeginTime-endtime, in the register is represented endtime begintime
   #partytime (0A05D1) non funziona; 
@@ -903,12 +910,14 @@ sub THZ_Parse($) {
   my ($message) = @_;
   given (substr($message,2,2)) {
   when ("0A")    {
-      if     (substr($message,4,2) eq "01")					{$message = hex(substr($message, 8,2))} 						      # the answer look like  0A0120-3A0A01200E00  for year 14
+      if (substr($message,4,4) eq "0116")						{$message = hex2int(substr($message, 8,4))/10 ." °C" }
+      elsif ((substr($message,4,3) eq "011")	or (substr($message,4,3) eq "012")) 	{$message = hex(substr($message, 8,2))} #holiday						      # the answer look like  0A0120-3A0A01200E00  for year 14
       elsif ((substr($message,4,2) eq "1D") or (substr($message,4,2) eq "17")) 	{$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30  
       elsif (substr($message,4,4) eq "05D1") 				 	{$message = quaters2time(substr($message, 10,2)) ."--". quaters2time(substr($message, 8,2))}  #like above but before stop then start !!!!
       elsif  ((substr($message,4,4) eq "05D3") or (substr($message,4,4) eq "05D4"))   		{$message = quaters2time(substr($message, 10,2)) }  #value 1Ch 28dec is 7 
       elsif  ((substr($message,4,3) eq "056")  or (substr($message,4,4) eq "0570")  or (substr($message,4,4) eq "0575"))		{$message = hex(substr($message, 8,4))}
       elsif  (substr($message,4,3) eq "057")						{$message = hex(substr($message, 8,4)) ." m3/h" }
+      elsif  (substr($message,4,4) eq "05A2")						{$message = hex(substr($message, 8,4))/10 ." K" }
       else 										{$message = hex2int(substr($message, 8,4))/10 ." °C" }
   }  
   when ("0B")    {							   #set parameter HC1
@@ -951,6 +960,7 @@ sub THZ_Parse($) {
   
   
   when ("F4")    {                     #allF4
+    my %SomWinMode = ( "02" =>"winter", "01" => "summer");
     $message =
 		"outside_temp: " 		. hex2int(substr($message, 4,4))/10 . " " .
         	"x08: " 			. hex2int(substr($message, 8,4))/10 . " " .
@@ -963,17 +973,18 @@ sub THZ_Parse($) {
         	"x36: "				. hex2int(substr($message,36,4))/10 . " " .
         	"x40: "				. hex2int(substr($message,40,4))/10 . " " .
 		"integral_switch: "		. hex2int(substr($message,44,4))    . " " .
-		"x48: " 			. hex2int(substr($message,48,4))/10 . " " .
+	        "mode: "		        . $SomWinMode{(substr($message,48,2))}  . " " . 
         	"x52: "				. hex2int(substr($message,52,4))/10 . " " .
         	"room-set-temp: "		. hex2int(substr($message,56,4))/10 . " " .
-        	"x60: " 			. hex2int(substr($message,60,4))/10 . " " .
-        	"x64: "				. hex2int(substr($message,64,4))/10 . " " .
-		"x68: "				. hex2int(substr($message,68,4))/10 . " " .
-        	"x72: "				. hex2int(substr($message,72,4))/10 . " " .
-        	"x76: "				. hex2int(substr($message,76,4))/10 . " " .
-        	"x80: "				. hex2int(substr($message,80,4))/10 ;
+        	"x60: " 			. hex2int(substr($message,60,4)) . " " .
+        	"x64: "				. hex2int(substr($message,64,4)) . " " .
+		"x68: "				. hex2int(substr($message,68,4)) . " " .
+        	"x72: "				. hex2int(substr($message,72,4)) . " " .
+        	"x76: "				. hex2int(substr($message,76,4)) . " " .
+        	"x80: "				. hex2int(substr($message,80,4)) ;
   }
   when ("F5")    {                     #allF5
+    my %SomWinMode = ( "02" =>"winter", "01" => "summer");
     $message =
 		"outside_temp: " 		. hex2int(substr($message, 4,4))/10 . " " .
         	"return_temp: " 		. hex2int(substr($message, 8,4))/10 . " " .
@@ -981,13 +992,13 @@ sub THZ_Parse($) {
         	"heat_temp: "			. hex2int(substr($message,16,4))/10 . " " .
         	"heat-set_temp: " 		. hex2int(substr($message,20,4))/10 . " " .
         	"stellgroesse: "		. hex2int(substr($message,24,4))/10 . " " . 
-		"x28: "				. hex2int(substr($message,28,4))/10 . " " . 
-        	"x32: "				. hex2int(substr($message,32,4))/10 . " " .
-        	"x36: "				. hex2int(substr($message,36,4))/10 . " " .
-        	"x40: "				. hex2int(substr($message,40,4))/10 . " " .
-		"x44: "				. hex2int(substr($message,44,4))/10 . " " .
-		"x48: " 			. hex2int(substr($message,48,4))/10 . " " .
-        	"x52: "				. hex2int(substr($message,52,4))/10;
+	        "mode: "		        . $SomWinMode{(substr($message,30,2))}  . " " . 
+        	"x32: "				. hex2int(substr($message,32,4)) . " " .
+        	"x36: "				. hex2int(substr($message,36,4)) . " " .
+        	"x40: "				. hex2int(substr($message,40,4)) . " " .
+		"x44: "				. hex2int(substr($message,44,4)) . " " .
+		"x48: " 			. hex2int(substr($message,48,4)) . " " .
+        	"x52: "				. hex2int(substr($message,52,4));
   }
 
   
@@ -1050,7 +1061,7 @@ sub THZ_Parse($) {
                   "booster_dhw: "		. hex(substr($message, 16,4))    . " " .
                   "booster_heating: "		. hex(substr($message, 20,4))   ;			
   }
-  when ("D1")    {                     #last10errors non testato e dte non convertita
+  when ("D1")    {                     #last10errors tested only for 1 error   { THZ_Parse("6BD1010115008D07EB030000000000000000000")  }
     $message =    "number_of_faults: "		. hex(substr($message, 4,2))    . " " .
                   #empty
 		  "fault0CODE: "		. hex(substr($message, 8,2))    . " " .
@@ -1122,8 +1133,7 @@ sub THZ_debugread($){
   my ($hash) = @_;
   my ($err, $msg) =("", " ");
   my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
- # my @numbers=('0B14A2', '0B54A2', '0B2000', '0B2010', '0C2000','0A2008','0A3010', '0B54A2', '0B64A2', '0B7000', '0B8010', '0C8000','0A8008','0A9010');
- 
+ #my @numbers=('0A05A2','0A0116'); 
   #my @numbers = (1..255);
   #my @numbers = (1..65535);
   my $indice= "FF";
