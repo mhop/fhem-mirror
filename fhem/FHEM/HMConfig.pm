@@ -1290,7 +1290,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       ,on             =>""
                       ,off            =>""
                       ,toggle         =>""
-                      ,press          =>"[long|short] [<peer>] [<peerChn>]..."
+                      ,press          =>"[long|short] [<peer>] ..."
                       ,inhibit        =>"[on|off]"
                       ,statusRequest  =>""
                       ,peerIODev      =>"[IO] <btn> [set|unset]..."
@@ -1302,7 +1302,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       ,toggle         =>""
                       ,pct            =>"<value> ... [<ontime>] [<ramptime>]"
                       ,stop           =>""
-                      ,press          =>"[long|short] [on|off|<peer>] [<peerChn>] ..."
+                      ,press          =>"[long|short] [on|off|<peer>] ..."
                       ,up             =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,down           =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,inhibit        =>"[on|off]"
@@ -1314,7 +1314,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       ,toggle         =>""
                       ,pct            =>"[<value>] ... [<ontime>]"
                       ,stop           =>""
-                      ,press          =>"[long|short] [on|off|<peer>] [<peerChn>] ..."
+                      ,press          =>"[long|short] [on|off|<peer>] ..."
                       ,up             =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,down           =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,inhibit        =>"[on|off]"
@@ -1367,7 +1367,7 @@ $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
                         ,on             =>""
                         ,off            =>""
                         ,toggle         =>""
-                        ,press          =>"[long|short] [<peer>] [<peerChn>]..."
+                        ,press          =>"[long|short] [<peer>] ..."
                         ,inhibit        =>"[on|off]"},
   "HM-CC-TC"         =>{ burstXmit      =>""},
   "HM-CC-RT-DN"      =>{ burstXmit      =>""
@@ -1414,7 +1414,7 @@ $culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
                          ,level          =>"<level> <relockDly> <speed>..."
                          ,keydef         =>"<btn> <txt1> <txt2>"
                          ,inhibit        =>"[on|off]"
-                         ,press          =>"[long|short] [<peer>] [<peerChn>] ..."
+                         ,press          =>"[long|short] [<peer>] ..."
                          ,peerIODev      =>"[IO] <btn> [set|unset]..."
                         },
   "HM-Sen-RD-O02"     =>{ "on-for-timer" =>"<sec>"
@@ -1458,7 +1458,7 @@ $culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
                          ,on             =>""
                          ,off            =>""
                          ,toggle         =>""
-                         ,press          =>"[long|short] [<peer>] [<peerChn>] ..."
+                         ,press          =>"[long|short] [<peer>] ..."
                          ,inhibit        =>"[on|off]"
                          ,statusRequest  =>""},
 );
