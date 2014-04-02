@@ -526,7 +526,7 @@ readingsGroup_2html($)
         $m = $a if( $multi != 1 );
         my $room = AttrVal($name, "room", "");
         my $group = AttrVal($name, "group", "");
-        my $txt = lookup($mapping,$name,$a,$n,$v,$room,$group,$m);
+        my $txt = lookup($mapping,$name,$a,($multi!=1?"":$n),$v,$room,$group,$m);
 
         if( $nameIcon ) {
           if( my $icon = lookup($nameIcon,$name,$a,$n,$v,$room,$group,"") ) {
