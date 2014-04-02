@@ -57,7 +57,7 @@ FileLog_Define($@)
 
   return "wrong syntax: define <name> FileLog filename regexp" if(int(@a) != 4);
 
-  return "Bad regexp: starting with *" if($re =~ m/^\*/);
+  return "Bad regexp: starting with *" if($a[3] =~ m/^\*/);
   eval { "Hallo" =~ m/^$a[3]$/ };
   return "Bad regexp: $@" if($@);
 
