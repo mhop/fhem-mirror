@@ -2256,47 +2256,47 @@ EnOcean_Parse($$)
         $msg  = $EnO_ptm200btn[($db[0] & 0xE0) >> 5];
         $msg .= "," . $EnO_ptm200btn[($db[0] & 0x0E) >> 1] if ($db[0] & 1);
         $msg .= " released" if (!($db[0] & 0x10));
+        push @event, "3:buttons:" . ($db[0] & 0x10 ? "pressed" : "released");
+        if ($msg =~ m/A0$/) {
+          push @event, "3:channelA:A0";
+        } elsif ($msg =~ m/AI$/) {
+          push @event, "3:channelA:AI";
+        } elsif ($msg =~ m/B0$/) {
+          push @event, "3:channelB:B0";
+        } elsif ($msg =~ m/BI$/) {
+          push @event, "3:channelB:BI";
+        } elsif ($msg =~ m/C0$/) {
+          push @event, "3:channelC:C0";
+        } elsif ($msg =~ m/CI$/) {
+          push @event, "3:channelC:CI";
+        } elsif ($msg =~ m/D0$/) {
+          push @event, "3:channelD:D0";
+        } elsif ($msg =~ m/DI$/) {
+          push @event, "3:channelD:DI";
+        }
 
       } else {
         if ($db[0] == 112) {
           # Key Card, not tested
-          $msg = "keycard inserted";
+          $msg = "keycard_inserted";
   
         } elsif ($db[0] & 0xC0) {
           # Only a Mechanical Handle is setting these bits when nu=0
           $msg = "closed"           if ($db[0] == 0xF0);
           $msg = "open"             if ($db[0] == 0xE0);
           $msg = "tilted"           if ($db[0] == 0xD0);
-          $msg = "open from tilted" if ($db[0] == 0xC0);
+          $msg = "open_from_tilted" if ($db[0] == 0xC0);
 
         } else {
           if($st eq "keycard") {
-            $msg = "keycard removed";
+            $msg = "keycard_removed";
           }
           else {
             $msg = (($db[0] & 0x10) ? "pressed" : "released");
           }
         }
       }
-      push @event, "3:buttons:" . ($db[0] & 0x10 ? "pressed" : "released");
     
-      if ($msg =~ m/A0$/) {
-        push @event, "3:channelA:A0";
-      } elsif ($msg =~ m/AI$/) {
-        push @event, "3:channelA:AI";
-      } elsif ($msg =~ m/B0$/) {
-        push @event, "3:channelB:B0";
-      } elsif ($msg =~ m/BI$/) {
-        push @event, "3:channelB:BI";
-      } elsif ($msg =~ m/C0$/) {
-        push @event, "3:channelC:C0";
-      } elsif ($msg =~ m/CI$/) {
-        push @event, "3:channelC:CI";
-      } elsif ($msg =~ m/D0$/) {
-        push @event, "3:channelD:D0";
-      } elsif ($msg =~ m/DI$/) {
-        push @event, "3:channelD:DI";
-      }
       # released events are disturbing when using a remote, since it overwrites
       # the "real" state immediately. In the case of an Eltako FSB14, FSB61 ...
       # the state should remain released. (by Thomas)
@@ -5011,10 +5011,9 @@ EnOcean_Undef($$)
      <li>Key Card Activated Switch (EEP F6-04-01)<br>
          [Eltako FKC, FKF, FZS, untested]<br>
      <ul>
-         <li>keycard inserted</li>
-         <li>keycard removed</li>
-         <li>buttons: pressed|released</li>         
-         <li>state: keycard inserted|keycard removed</li>
+         <li>keycard_inserted</li>
+         <li>keycard_removed</li>
+         <li>state: keycard_inserted|keycard_removed</li>
      </ul><br>
          Set attr subType to keycard manually.
      </li>
@@ -5026,9 +5025,8 @@ EnOcean_Undef($$)
          <li>closed</li>
          <li>open</li>
          <li>tilted</li>
-         <li>open from tilted</li>
-         <li>buttons: pressed|released</li>         
-         <li>state: closed|open|tilted|open from tilted</li>
+         <li>open_from_tilted</li>
+         <li>state: closed|open|tilted|open_from_tilted</li>
      </ul><br>
         The device windowHandle should be created by autocreate.
      </li>
