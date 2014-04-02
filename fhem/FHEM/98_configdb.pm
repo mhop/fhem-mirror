@@ -180,34 +180,6 @@ sub CommandConfigdb($$) {
 			$ret = _cfgDB_Diff($param1, $param2);
 		}
 
-# 		when ('export') {
-# 			return "\n Syntax: configdb export <targetFilename> [version]" if @a <2;
-# 			$param2 = $param2 ? $param2 : 0;
-# 			my $logtext = "configDB: database backup started into file $param1";
-# 			$logtext .= " for version $param2";
-# 			Log3 ('configDB', 4, $logtext);
-# 			$ret = _cfgDB_Export($param1, $param2);
-# 		}
-# 
-# 		when ('import') {
-# 			return "\n Syntax: configdb import <sourceFilename>" if @a != 2;
-# 			open ( FILE, "<./$param1" );
-# 			my @dbconfig = <FILE>;
-# 			my @db2;
-# 			close ( FILE );
-# 			foreach (@dbconfig) {
-# 				my $p = $_;
-# 				my(@p) = split(/\|/,$p,4);
-# 				$p = join(' ',@p);
-# 				$_ = $p;
-# 			}
-# 			$ret  = _cfgDB_Execute(undef,@dbconfig);
-# 			$ret .=	"\n\n".
-# 							"Import executed into running configuration.\n".
-# 							"Please use <save config> to store\n".
-# 							"this configuration into database!";
-# 		}
-
 		when ('info') {
 			Log3('configdb', 4, "info requested.");
 			$ret = _cfgDB_Info;
