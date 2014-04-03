@@ -50,6 +50,9 @@
 #                        improved source code documentation
 #
 # 2014-03-20 - added     export/import
+# 2014-04-01 - removed   export/import due to not working properly
+#
+# 2014-04-03 - fixed     global attributes not read from version 0
 #
 ##############################################################################
 #
@@ -162,7 +165,8 @@ sub cfgDB_GlobalAttr {
 	my ($sth, @line, $row, @dbconfig);
 
 	my $fhem_dbh = _cfgDB_Connect;
-	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = 'global'" );  
+	my $uuid = $fhem_dbh->selectrow_array('SELECT versionuuid FROM fhemversions WHERE version = 0');
+	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = 'global' and VERSIONUUID = '$uuid'" );  
 	$sth->execute();
 
 	while (@line = $sth->fetchrow_array()) {
@@ -172,7 +176,7 @@ sub cfgDB_GlobalAttr {
 		$attr{global}{$line[2]} = $line[3];
 	}
 
-	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = 'configdb'" );  
+	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = 'configdb' and VERSIONUUID = '$uuid'" );  
 	$sth->execute();
 
 	while (@line = $sth->fetchrow_array()) {
@@ -373,7 +377,7 @@ sub _cfgDB_ReadCfg(@) {
 
 # using a join would be much nicer, but does not work due to sort of join's result
 	my $uuid = $fhem_dbh->selectrow_array('SELECT versionuuid FROM fhemversions WHERE version = 0');
-	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE versionuuid = '$uuid'" );  
+	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE versionuuid = '$uuid' and device <>'configdb'" );  
 
 	$sth->execute();
 	while (@line = $sth->fetchrow_array()) {
