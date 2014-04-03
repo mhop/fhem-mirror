@@ -9,7 +9,6 @@ sub HMinfo_Define($$);
 sub HMinfo_getParam(@);
 sub HMinfo_regCheck(@);
 sub HMinfo_peerCheck(@);
-sub HMinfo_peerCheck(@);
 sub HMinfo_getEntities(@);
 sub HMinfo_SetFn($@);
 sub HMinfo_SetFnDly($);
@@ -451,21 +450,28 @@ sub HMinfo_paramCheck(@) { ####################################################
   my @noIoDev;
   my @noID;
   my @idMismatch;
+  my @aesInval;
   foreach my $eName (@entities){
-    next if (!$defs{$eName}{helper}{role}{dev});
-    my $ehash = $defs{$eName};
-    my $pairId =  CUL_HM_Get($ehash,$eName,"param","PairedTo");
-    my $IoDev =  $ehash->{IODev} if ($ehash->{IODev});
-    my $ioHmId = AttrVal($IoDev->{NAME},"hmId","-");
-    if (!$IoDev)                  { push @noIoDev,$eName;}
-    elsif ($pairId eq "undefined"){ push @noID,$eName;}
-    elsif ($pairId !~ m /$ioHmId/){ push @idMismatch,"$eName paired:$pairId IO attr: $ioHmId";}
+    if ($defs{$eName}{helper}{role}{dev}){
+      my $ehash = $defs{$eName};
+      my $pairId =  CUL_HM_Get($ehash,$eName,"param","PairedTo");
+      my $IoDev =  $ehash->{IODev} if ($ehash->{IODev});
+      my $ioHmId = AttrVal($IoDev->{NAME},"hmId","-");
+      if    (!$IoDev)               { push @noIoDev,$eName;}
+      elsif ($pairId eq "undefined"){ push @noID,$eName;}
+      elsif ($pairId !~ m /$ioHmId/){ push @idMismatch,"$eName paired:$pairId IO attr: $ioHmId";}
+
+      elsif (AttrVal($eName,"aesCommReq",0) && $IoDev->{TYPE} ne "HMLAN")
+                                    { push @aesInval,"$eName ";}
+    }
   }
 
   my $ret = "";
   $ret .="\n\n no IO device assigned"     ."\n    ".(join "\n    ",sort @noIoDev)    if (@noIoDev);
   $ret .="\n\n PairedTo missing/unknown"  ."\n    ".(join "\n    ",sort @noID)       if (@noID);
   $ret .="\n\n PairedTo mismatch to IODev"."\n    ".(join "\n    ",sort @idMismatch) if (@idMismatch);
+  $ret .="\n\n aesCommReq set, IO not compatibel"
+                                          ."\n    ".(join "\n    ",sort @aesInval)   if (@aesInval);
  return  $ret;
 }
 
