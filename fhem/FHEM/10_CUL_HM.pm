@@ -6389,6 +6389,7 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
 =begin html
 
 <a name="CUL_HM"></a>
+
 <h3>CUL_HM</h3>
 <ul>
   Support for eQ-3 HomeMatic devices via the <a href="#CUL">CUL</a> or the <a
@@ -6504,8 +6505,7 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
     </ul>
   </ul><br>
 
-  <a name="CUL_HMset"></a>
-  <b>Set</b>
+  <a name="CUL_HMset"></a><b>Set</b>
   <ul>
      Note: devices which are normally send-only (remote/sensor/etc) must be set
      into pairing/learning mode in order to receive the following commands.
@@ -6588,10 +6588,10 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
         set mydimmer getRegRaw List3 all <br>
       </code></ul>
       </li>
-       <li><B>getSerial</B><a name="CUL_HMgetSerial"></a><br>
+     <li><B>getSerial</B><a name="CUL_HMgetSerial"></a><br>
          Read serial number from device and write it to attribute serialNr.
       </li>
-      <li><B>inhibit [on|off]</B><br>
+     <li><B>inhibit [on|off]</B><br>
          Block / unblock all changes to the actor channel, i.e. actor state is frozen
          until inhibit is set off again. Inhibit can be executed on any actor channel
          but obviously not on sensors - would not make any sense.<br>
@@ -6631,7 +6631,7 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
          Main purpose of this command is to re-store data to a device.
          It is recommended to restore register configuration utilising
          <a href="#CUL_HMregBulk">regBulk</a> subsequent. <br>
-     Example:<br>
+         Example:<br>
      <ul><code>
      set myChannel peerBulk 12345601,<br>
      set myChannel peerBulk self01,self02,FB_Btn_04,FB_Btn_03,<br>
@@ -6716,7 +6716,7 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
 
      <br>
      <B>subType dependent commands:</B>
-     <ul>
+  <ul>
      <br>
     <li>switch
        <ul>
@@ -6758,7 +6758,7 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
           <li><B>toggle</B><a name="CUL_HMtoggle"></a> - toggle the Actor. It will switch from any current
                  level to off or from off to 100%</li>
        </ul>
-     <br>
+       <br>
      </li>
     <li>dimmer, blindActuator<br>
        Dimmer may support virtual channels. Those are autocrated if applicable. Usually there are 2 virtual channels
@@ -6793,7 +6793,7 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
              ramptime is optional an defines the change speed to reach the new level. It is meaningful only for dimmer.
              <br></li>
        </ul>
-    <br>
+      <br>
     </li>
     <li>remotes, pushButton<a name="CUL_HMremote"></a><br>
          This class of devices does not react on requests unless they are put
@@ -6801,16 +6801,16 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
          learn mode is detected. Manual interaction of the user is necessary to
          activate learn mode. Whether commands are pending is reported on
          device level with parameter 'protCmdPend'.
-       <ul>
     </li>
     <li><B>peerIODev [IO] &lt;btn_no&gt; [<u>set</u>|unset]</B><a name="CUL_HMpeerIODev"></a><br>
-         The command is similar to <a href="#CUL_HMpeerChan">peerChan</a></B>. While peerChan
+         The command is similar to <B><a href="#CUL_HMpeerChan">peerChan</a></B>. 
+         While peerChan
          is executed on a remote and peers any remote to any actor channel peerIODev is 
          executed on an actor channel and peer this to an channel of an FHEM IO device.<br>
          An IO device according to eQ3 supports up to 50 virtual buttons. Those
          will be peered/unpeerd to the actor. <a href="CUL_HMpress">press</a> can be
          used to stimulate the related actions as defined in the actor register.
-       <ul>
+    <ul>
     <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>]
         [<u>set</u>|unset] [<u>both</u>|actor|remote]</B><a name="CUL_HMpeerChan"></a><br>
 
@@ -6887,7 +6887,7 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
          </code>
          </ul>
     </li>
-       </ul>
+    </ul>
     </li>
     <li>virtual<a name="CUL_HMvirtual"></a><br>
        <ul>
@@ -7021,7 +7021,8 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
     <li><B>ilum &lt;brightness&gt;&lt;duration&gt; </B><br>
         &lt;brightness&gt; [0-15] of backlight.<br>
         &lt;duration&gt; [0-127] in sec. 0 is permanent 'on'.<br></li>
-    </ul><br></li>
+    </ul><br>
+    </li>
     <li>OutputUnit (HM-OU-CFM-PL)
     <ul>
       <li><B>led &lt;color&gt;[,&lt;color&gt;..] [&lt;repeat&gt..]</B><br>
@@ -7050,7 +7051,8 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
            </ul></code>
 
       </li>
-    </ul><br></li>
+    </ul><br>
+    </li>
     <li>HM-RC-19xxx
       <ul>
       <li><B>alarm &lt;count&gt;</B><br>
@@ -7091,7 +7093,7 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
            </ul></code>
          </li>
       </ul><br>
-      </li>
+    </li>
     <li>keyMatic<br><br>
       <ul>The Keymatic uses the AES signed communication. Therefore the control
       of the Keymatic is only together with the HM-LAN adapter possible. But
@@ -7108,7 +7110,8 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
          Unlocked the door so that the door can be opened.<br>
          [sec]: Sets the delay in seconds after the lock automatically locked
          again.<br>0 - 65535 seconds</li>
-      </ul></li>
+      </ul>
+    </li>
     <li>winMatic <br><br>
       <ul>winMatic provides 2 channels, one for the window control and a second
       for the accumulator.</ul><br>
@@ -7122,7 +7125,8 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
       <li><B>stop</B><br>
          stop movement<br>
          </li>
-      </ul></li>
+      </ul>
+    </li>
     <li>HM-Sys-sRP-Pl<br><br>
     setup the repeater's entries. Up to 36entries can be applied.
     <ul>
@@ -7148,7 +7152,6 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
     </li>
     </ul>
     </li>
-   </ul>
    <br>
      Debugging:
        <ul>
@@ -7167,10 +7170,9 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
        </ul>
   </ul>
   <br>
-
-  <a name="CUL_HMget"></a>
-  <b>Get</b><br>
-     <ul>
+  </ul>
+  <a name="CUL_HMget"></a><b>Get</b><br>
+  <ul>
      <li><B>configSave &lt;filename&gt;</B><a name="CUL_HMconfigSave"></a><br>
          Saves the configuration of an entity into a file. Data is stored in a
          format to be executed from fhem command prompt.<br>
@@ -7242,10 +7244,10 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
          prior to rewrite data to an entity it is necessary to pair the device with FHEM.<br>
          restore will not delete any peered channels, it will just add peer channels.<br>
          </li>
-     <br></ul>
+     <br>
+  </ul>
 
-  <a name="CUL_HMattr"></a>
-  <b>Attributes</b>
+  <a name="CUL_HMattr"></a><b>Attributes</b>
   <ul>
     <li><a href="#eventMap">eventMap</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
@@ -7392,8 +7394,7 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
       NOTE: This will apply to readings and set commands. <B>It does not apply to any register. </B><br>
     </li>
   </ul><br>
-  <a name="CUL_HMevents"></a>
-  <b>Generated events:</b>
+  <a name="CUL_HMevents"></a><b>Generated events:</b>
   <ul>
   <li><B>general</B><br>
       recentStateType:[ack|info] # cannot be used ti trigger notifies<br>
@@ -7565,7 +7566,7 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
   <li><B>sensRain</B><br>
       $val<br>
       powerOn <br>
-      level <val><br>
+      level &lt;val&ge;<br>
         timedOn [running|off]<br> # on is temporary - e.g. started with on-for-timer
       trigger [Long|Short]_$no trigger event from channel<br>
   </li>
@@ -7616,1121 +7617,1118 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
   <br>
 </ul>
 =end html
-
 =begin html_DE
 
-<a name="CUL_HM"></a>
-<h3>CUL_HM</h3>
-<ul>
-Unterstützung für eQ-3 HomeMatic Geräte via <a href="#CUL">CUL</a> oder <a
-href="#HMLAN">HMLAN</a>.<br>
-<br>
-<a name="CUL_HMdefine"></a>
-<b>Define</b>
-<ul>
-<code><B>define &lt;name&gt; CUL_HM &lt;6-digit-hex-code|8-digit-hex-code&gt;</B></code>
-
-<br><br>
-Eine korrekte Gerätedefinition ist der Schlüssel zur einfachen Handhabung der HM-Umgebung.
-<br>
-
-Hintergrund zur Definition:<br>
-HM-Geräte haben eine 3 Byte (6 stelliger HEX-Wert) lange HMid - diese ist Grundlage
-der Adressierung. Jedes Gerät besteht aus einem oder mehreren Kanälen. Die HMid für einen
-Kanal ist die HMid des Gerätes plus die Kanalnummer (1 Byte, 2 Stellen) in
-hexadezimaler Notation.
-Kanäle sollten für alle mehrkanaligen Geräte definiert werden. Einträge für Kanäle
-können nicht angelegt werden wenn das zugehörige Gerät nicht existiert.<br> Hinweis: FHEM
-belegt das Gerät automatisch mit Kanal 1 falls dieser nicht explizit angegeben wird. Daher
-ist bei einkanaligen Geräten keine Definition nötig.<br>
-
-Hinweis: Wird ein Gerät gelöscht werden auch die zugehörigen Kanäle entfernt. <br> Beispiel einer
-vollständigen Definition eines Gerätes mit 2 Kanälen:<br>
-<ul><code>
-define livingRoomSwitch CUL_HM 123456<br>
-define LivingroomMainLight CUL_HM 12345601<br>
-define LivingroomBackLight CUL_HM 12345602<br><br></code>
-</ul>
-
-livingRoomSwitch bezeichnet das zur Kommunikation verwendete Gerät. Dieses wird
-vor den Kanälen definiert um entsprechende Verweise einstellen zu können. <br>
-LivingroomMainLight hat Kanal 01 und behandelt den Lichtstatus, Kanal-Peers
-sowie zugehörige Kanalregister. Falls nicht definiert wird Kanal 01 durch die Geräteinstanz
-abgedeckt.<br> LivingRoomBackLight ist der zweite "Kanal", Kanal 02. Seine
-Definition ist verpflichtend um die Funktion ausführen zu können.<br><br>
-
-Sonderfall Sender: HM behandelt jeden Knopf einer Fernbedienung, Drucktaster und
-ähnliches als Kanal . Es ist möglich (nicht notwendig) einen Kanal pro Knopf zu
-definieren. Wenn alle Kanäle definiert sind ist der Zugriff auf Pairing-Informationen
-sowie auf Kanalregister möglich. Weiterhin werden Verknüpfungen durch Namen besser
-lesbar.<br><br>
-
-define kann auch durch das <a href="#autocreate">autocreate</a>
-Modul aufgerufen werden, zusammen mit dem notwendigen subType Attribut.
-Normalerweise erstellt man <a href="#CULset">hmPairForSec</a> und drückt dann den
-zugehörigen Knopf am Gerät um die Verknüpfung herzustellen oder man verwendet <a
-href="#CULset">hmPairSerial</a> falls das Gerät ein Empfänger und die Seriennummer
-bekannt ist. Autocreate wird dann ein FHEM-Gerät mit allen notwendigen Attributen anlegen.
-Ohne Pairing wird das Gerät keine Befehle von FHEM akzeptieren. Selbst wenn das Pairing
-scheitert legt FHEM möglicherweise das Gerät an. Erfolgreiches Pairen wird
-durch den Eintrag CommandAccepted in den Details zum CUL_HM Gerät angezeigt.<br><br>
-
-Falls autocreate nicht verwendet werden kann muss folgendes spezifiziert werden:<br>
-<ul>
-<li>Der &lt;6-stellige-Hex-Code&gt;oder HMid+ch &lt;8-stelliger-Hex-Code&gt;<br>
-Das ist eine einzigartige, festgelegte Geräteadresse die nicht geändert werden kann (nein,
-man kann sie nicht willkürlich auswählen wie z.B. bei FS20 Geräten). Man kann sie feststellen
-indem man das FHEM-Log durchsucht.</li>
-<li>Das subType Attribut<br>
-Dieses lautet: switch dimmer blindActuator remote sensor swi
-pushButton threeStateSensor motionDetector keyMatic winMatic
-smokeDetector</li>
-<li>Das model Attribut<br>
-ist entsprechend der HM Nomenklatur zu vergeben</li>
-</ul>
-Ohne diese Angaben kann FHEM nicht korrekt mit dem Gerät arbeiten.<br><br>
-
-<b>Hinweise</b>
-<ul>
-<li>Falls das Interface ein Gerät vom Typ CUL ist muss <a href="#rfmode">rfmode </a>
-des zugehörigen CUL/CUN Gerätes auf HomeMatic gesetzt werden.
-Achtung: Dieser Modus ist nur für BidCos/Homematic. Nachrichten von FS20/HMS/EM/S300
-werden durch diese Gerät <b>nicht</b> empfangen. Bereits definierte FS20/HMS
-Geräte müssen anderen Eingängen zugeordnet werden (CUL/FHZ/etc).
-</li>
-</li>
-<li>Nachrichten eines Geräts werden nur richtig interpretiert wenn der Gerätetyp
-bekannt ist. FHEM erhält den Gerätetyp aus einer"pairing request"
-Nachricht, selbst wenn es darauf keine Antwort erhält (siehe <a
-href="#hmPairSerial">hmPairSerial</a> und <a
-href="#hmPairForSec">hmPairForSec</a> um Parinig zu ermöglichen).
-Alternativ, setzen des richtigen subType sowie Modelattributes, für eine Liste der
-möglichen subType-Werte siehe "attr hmdevice ?".</li>
-<a name="HMAES"></a>
-<li>Die sogenannte "AES-Verschlüsselung" ist eigentlich eine Signaturanforderung: Ist sie
-aktiviert wird ein Aktor den erhaltenen Befehl nur ausführen falls er die korrekte
-Antwort auf eine zuvor durch den Aktor gestellte Anfrage erhält. Das bedeutet:
-<ul>
-<li>Die Reaktion auf Befehle ist merklich langsamer, da 3 Nachrichten anstatt einer übertragen
-werden bevor der Befehl vom Aktor ausgeführt wird.</li>
-<li>Jeder Befehl sowie seine Bestätigung durch das Gerät wird in Klartext übertragen, ein externer
-Beobachter kennt somit den Status jedes Geräts.</li>
-<li>Die eingebaute Firmware ist fehlerhaft: Ein "toggle" Befehl wir ausgeführt <b>bevor</b> die
-entsprechende Antwort auf die Signaturanforderung empfangen wurde, zumindest bei einigen Schaltern
-(HM-LC-Sw1-Pl und HM-LC-SW2-PB-FM).</li>
-<li>Der <a href="#HMLAN">HMLAN</a> Konfigurator beantwortet Signaturanforderungen selbstständig,
-ist dabei die 3-Byte-Adresse einer anderen CCU eingestellt welche noch immer das Standardpasswort hat,
-kann dieser Signaturanfragen korrekt beantworten.</li>
-<li>AES-Verschlüsselung kann nicht bei einem CUL als Interface eingesetzt werden, wird allerdings
-durch HMLAN unterstützt. Aufgrund dieser Einschränkungen ist der Einsatz der Homematic-Verschlüsselung
-nicht zu empfehlen!</li>
-</ul>
-</li>
-</ul>
-</ul><br>
-
-<a name="CUL_HMset"></a>
-<b>Set</b>
-<ul>
-Hinweis: Geräte die normalerweise nur senden (Fernbedienung/Sensor/etc.) müssen in den
-Pairing/Lern-Modus gebracht werden um die folgenden Befehle zu empfangen.
-<br>
-<br>
-
-Allgemeine Befehle (verfügbar für die meisten HM-Geräte):
-<ul>
-<li><B>clear &lt;[readings|register|msgEvents]&gt;</B><a name="CUL_HMclear"></a><br>
-Eine Reihe von Variablen kann entfernt werden.<br>
-<ul>
-readings: Alle Messwerte werden gelöscht, neue Werte werden normal hinzugefügt. Kann benutzt werden um alte Daten zu entfernen<br>
-register: Alle in FHEM aufgezeichneten Registerwerte werden entfernt. Dies hat KEINEN Einfluss auf Werte im Gerät.<br>
-msgEvents: Alle Anchrichtenzähler werden gelöscht. Ebenso wird der Befehlsspeicher zurückgesetzt. <br>
-rssi: gesammelte RSSI-Werte werden gelöscht. <br>
-</ul>
-</li>
-<li><B>getConfig</B><a name="CUL_HMgetConfig"></a><br>
-Liest die Hauptkonfiguration eines HM_Gerätes aus. Angewendet auf einen Kanal
-erhält man Pairing-Information, List0, List1 und List3 des ersten internen Peers.
-Außerdem erhält man die Liste der Peers für den gegebenen Kanal. Wenn auf ein Gerät
-angewendet so bekommt man mit diesem Befehl die vorherigen Informationen für alle
-zugeordneten Kanäle. Ausgeschlossen davon sind Konfigurationen zusätzlicher Peers.
-<br> Der Befehl ist eine Abkürzung für eine Reihe anderer Befehle.
-</li>
-<li><B>getRegRaw [List0|List1|List2|List3|List4|List5|List6]
-&lt;peerChannel&gt; </B><a name="CUL_HMgetRegRaw"></a><br>
-Auslesen der Rohdaten des Registersatzes. Eine Beschreibung der Register sprengt
-den Rahmen dieses Dokuments.<br>
-
-Die Register sind in sog. Listen strukturiert welche einen Satz Register enthalten.<br>
-
-List0: Geräteeinstellungen z.B: Einstellungen für CUL-Pairing Temperaturlimit eines Dimmers.<br>
-
-List1: Kanaleinstellungen z.B. benötigte Zeit um Rollo hoch und runter zu fahren.<br>
-
-List3: "link" Einstellungen - d.h. Einstellungen für Peer-Kanal. Das ist eine große Datenmenge!
-Steuert Aktionen bei Empfang eines Triggers vom Peer.<br>
-
-List4: Einstellungen für den Kanal (Taster) einer Fernbedienung.<br><br>
-
-&lt;PeerChannel&gt; verknüpfte HMid+ch, z.B. 4 byte (8 stellige) Zahl wie
-'12345601'. Ist verpflichtend für List3 und List4 und kann ausgelassen werden
-für List0 und 1. <br>
-
-'all' kann verwendet werden um Daten von jedem mit einem Kanal verknüpften Link zu bekommen. <br>
-
-'selfxx' wird verwendet um interne Kanäle zu adressieren (verbunden mit den eingebauten Schaltern
-falls vorhanden). xx ist die Kanalnummer in dezimaler Notation.<br>
-
-Hinweis 1: Ausführung ist abhängig vom Entity. Wenn List1 für ein Gerät statt einem Kanal
-abgefragt wird gibt der Befehl List1 für alle zugehörigen Kanäle aus.
-List3 mit 'peerChannel = all' gibt alle Verbindungen für alle Kanäle eines Gerätes zurück.<br>
-
-Hinweis 2: für 'Sender' siehe auch <a href="#CUL_HMremote">remote</a> <br>
-
-Hinweis 3: Das Abrufen von Informationen kann dauern - besonders für Geräte
-mit vielen Kanälen und Verknüpfungen. Es kann nötig sein das Webinterface manuell neu zu laden
-um die Ergebnisse angezeigt zu bekommen.<br>
-
-Hinweis 4: Direkte Schalter eines HM-Geräts sind standardmäßig ausgeblendet.
-Dennoch sind sie genauso als Verknüpfungen implemetiert. Um Zugriff auf 'internal links'
-zu bekommen ist es notwendig folgendes zu erstellen:<br>
-'set &lt;name&gt; <a href="#CUL_HMregSet">regSet</a> intKeyVisib visib'<br>
-oder<br>
-'set &lt;name&gt; <a href="#CUL_HMregBulk">regBulk</a> RegL_0: 2:81'<br>
-Zurücksetzen lässt es sich indem '81' mit '01' ersetzt wird.<br> example:<br>
-
-<ul><code>
-set mydimmer getRegRaw List1<br>
-set mydimmer getRegRaw List3 all <br>
-</code></ul>
-</li>
-<li><B>getSerial</B><a name="CUL_HMgetSerial"></a><br>
-Auslesen der Seriennummer eines geräts und speichern in Attribut serialNr.
-</li>
-<li><B>inhibit [on|off]</B><br>
-Blockieren/Zulassen aller Kanaländerungen eines Aktors, d.h. Zustand des Aktors ist
-eingefroren bis 'inhibit' wieder deaktiviert wird. 'Inhibit' kann für jeden Aktorkanal
-ausgeführt werden aber natürlich nicht für Sensoren - würde auch keinen Sinn machen.<br>
-Damit ist es praktischerweise möglich Nachrichten ebenso wie verknüpfte Kanalaktionen
-temporär zu unterdrücken ohne sie löschen zu müssen. <br>
-Beispiele:
-<ul><code>
-# Ausführung blockieren<br>
-set keymatic inhibit on <br><br>
-</ul></code>
-</li>
-
-<li><B>pair</B><a name="CUL_HMpair"></a><br>
-Verbinden eines Geräts bekannter Seriennummer (z.b. nach einem Reset)
-mit einer FHEM-Zentrale. Diese Zentrale wird normalerweise durch CUL/CUNO,
-HMLAN,... hergestellt.
-Wenn verbunden melden Geräte ihren Status and FHEM.
-Wenn nicht verbunden wird das Gerät auf bestimmte Anfragen nicht reagieren
-und auch bestimmte Statusinformationen nicht melden. Pairing geschieht auf
-Geräteebene. Kanäle können nicht unabhängig von einem Gerät mit der Zentrale
-verbunden werden.
-Siehe auch <a href="#CUL_HMgetpair">getPair</a> und
-<a href="#CUL_HMunpair">unpair</a>.<br>
-Nicht das Verbinden (mit einer Zentrale) mit verknüpfen (Kanal zu Kanal) oder
-<a href="#CUL_HMpeerChan">peerChan</a> verwechseln.<br>
-</li>
-<li><B>peerBulk</B> &lt;peerch1,peerch2,...&gt; [set|unset]<a name="CUL_HMpeerBulk"></a><br>
-peerBulk fügt Peer-Kanäle zu einem Kanal hinzu. Alle Peers einer Liste werden
-dabei hinzugefügt.<br>
-Peering setzt die Einstellungen einer Verknüpfung auf Standardwerte. Da Peers nicht in Gruppen
-hinzugefügt werden werden sie durch HM standardmäßig als'single' für dieses Gerät
-angelegt. <br>
-Eine ausgeklügeltere Funktion wird gegeben durch
-<a href="#CUL_HMpeerChan">peerChan</a>.<br>
-peerBulk löscht keine vorhandenen Peers sondern bearbeitet nur die Peerliste.
-Andere bereits angelegt Peers werden nicht verändert.<br>
-peerBulk kann verwendet werden um Peers zu löschen indem die <B>unset</B> Option
-mit Standardeinstellungen aufgerufen wird.<br>
-
-Verwendungszweck dieses Befehls ist hauptsächlich das Wiederherstellen
-von Daten eines Geräts.
-Empfehlenswert ist das anschließende Wiederherstellen der Registereinstellung
-mit <a href="#CUL_HMregBulk">regBulk</a>. <br>
-Beispiel:<br>
-<ul><code>
-set myChannel peerBulk 12345601,<br>
-set myChannel peerBulk self01,self02,FB_Btn_04,FB_Btn_03,<br>
-set myChannel peerBulk 12345601 unset # entferne Peer 123456 Kanal 01<br>
-</code></ul>
-</li>
-<li><B>regBulk &lt;reg List&gt;:&lt;peer&gt; &lt;addr1:data1&gt; &lt;addr2:data2&gt;...
-</B><a name="CUL_HMregBulk"></a><br>
-Dieser Befehl ersetzt das bisherige regRaw. Er erlaubt Register mit Rohdaten zu
-beschreiben. Hauptzweck ist das komplette Wiederherstellen eines zuvor gesicherten
-Registers. <br>
-Werte können mit <a href="#CUL_HMgetConfig">getConfig</a> ausgelesen werden. Die
-zurückgegebenen Werte können direkt für diesen Befehl verwendet werden.<br>
-&lt;reg List&gt; bezeichnet die Liste in die geschrieben werden soll. Mögliches Format
-'00', 'RegL_00', '01'...<br>
-&lt;peer&gt; ist eine optionale Angabe falls die Liste ein Peer benötigt.
-Der Peer kann als Kanalname oder als 4-Byte (8 chars) HM-Kanal ID angegeben
-werden.<br>
-&lt;addr1:data1&gt; ist die Liste der Register im Hex-Format.<br>
-Beispiel:<br>
-<ul><code>
-set myChannel regBulk RegL_00: 02:01 0A:17 0B:43 0C:BF 15:FF 00:00<br>
-RegL_03:FB_Btn_07
-01:00 02:00 03:00 04:32 05:64 06:00 07:FF 08:00 09:FF 0A:01 0B:44 0C:54 0D:93 0E:00 0F:00 11:C8 12:00 13:00 14:00 15:00 16:00 17:00 18:00 19:00 1A:00 1B:00 1C:00 1D:FF 1E:93 1F:00 81:00 82:00 83:00 84:32 85:64 86:00 87:FF 88:00 89:FF 8A:21 8B:44 8C:54 8D:93 8E:00 8F:00 91:C8 92:00 93:00 94:00 95:00 96:00 97:00 98:00 99:00 9A:00 9B:00 9C:00 9D:05 9E:93 9F:00 00:00<br>
-set myblind regBulk 01 0B:10<br>
-set myblind regBulk 01 0C:00<br>
-</code></ul>
-myblind setzt die maximale Zeit für das Hochfahren der Rollos auf 25,6 Sekunden</li>
-<li><B>regSet [prep|exec] &lt;regName&gt; &lt;value&gt; &lt;peerChannel&gt;</B><a name="CUL_HMregSet"></a><br>
-Für einige Hauptregister gibt es eine lesbarere Version die Registernamen &lt;regName&gt;
-und Wandlung der Werte enthält. Nur ein Teil der Register wird davon unterstützt.<br>
-Der optionale Parameter [prep|exec] erlaubt das Packen von Nachrichten und verbessert damit
-deutlich die Datenübertragung.
-Benutzung durch senden der Befehle mit Parameter "prep". Daten werden dann für das Senden gesammelt.
-Der letzte Befehl muss den Parameter "exec" habe um die Information zu übertragen.<br>
-&lt;value&gt; enthält die Daten in menschenlesbarer Form die in das Register geschrieben werden.<br>
-&lt;peerChannel&gt; wird benötigt falls das Register 'peerChan' basiert definiert wird.
-Kann ansonsten auf '0' gesetzt werden. Siehe <a
-href="#CUL_HMgetRegRaw">getRegRaw</a> für komplette Definition.<br>
-Unterstützte Register eines Geräts können wie folgt bestimmt werden:<br>
-<ul><code>set regSet ? 0 0</code></ul>
-Eine verkürzte Beschreibung der Register wird zurückgegeben mit:<br>
-<ul><code>set regSet &lt;regname&gt; ? 0</code></ul>
-</li>
-<li><B>reset</B><a name="CUL_HMreset"></a><br>
-Rücksetzen des Geräts auf Werkseinstellungen. Muss danach erneut verbunden werden um es
-mit FHEM zu nutzen.
-</li>
-<li><B>sign [on|off]</B><a name="CUL_HMsign"></a><br>
-Ein- oder ausschalten der Signierung (auch "AES-Verschlüsselung" genannt, siehe <a
-href="#HMAES">note</a>). Achtung: Wird das Gerät über einen CUL eingebunden ist schalten (oder
-deaktivieren der Signierung) nicht möglich, das Gerät muss direkt zurückgesetzt werden.
-</li>
-<li><B>statusRequest</B><a name="CUL_HMstatusRequest"></a><br>
-Aktualisieren des Gerätestatus. Für mehrkanalige Geräte sollte dies kanalbasiert
-erfolgen.
-</li>
-<li><B>unpair</B><a name="CUL_HMunpair"></a><br>
-Aufheben des "Pairings", z.B. um das verbinden mit einem anderen Master zu ermöglichen.
-Siehe <a href="#CUL_HMpair">pair</a> für eine Beschreibung.</li>
-<li><B>virtual &lt;Anzahl an Knöpfen&gt;</B><a name="CUL_HMvirtual"></a><br>
-Konfiguriert eine vorhandene Schaltung als virtuelle Fernbedienung. Die Anzahl der anlegbaren
-Knöpfe ist 1 - 255. Wird der Befehl für die selbe Instanz erneut aufgerufen werden Knöpfe
-hinzugefügt. <br>
-Beispiel für die Anwendung:
-<ul><code>
-define vRemote CUL_HM 100000 # die gewählte HMid darf nicht in Benutzung sein<br>
-set vRemote virtual 20 # definiere eine Fernbedienung mit 20 Knöpfen<br>
-set vRemote_Btn4 peerChan 0 &lt;actorchannel&gt; # verknüpft Knopf 4 und 5 mit dem gewählten Kanal<br>
-set vRemote_Btn4 press<br>
-set vRemote_Btn5 press long<br>
-</code></ul>
-siehe auch <a href="#CUL_HMpress">press</a>
-</li>
-</ul>
-<br>
-<B>subType abhängige Befehle:</B>
-<ul>
-<br>
-<li>switch
-<ul>
-<li><B>on</B> <a name="CUL_HMon"> </a> - setzt Wert auf 100%</li>
-<li><B>off</B><a name="CUL_HMoff"></a> - setzt Wert auf 0%</li>
-<li><B>on-for-timer &lt;sec&gt;</B><a name="CUL_HMonForTimer"></a> -
-Schaltet das Gerät für die gewählte Zeit in Sekunden [0-85825945] an.<br> Hinweis:
-off-for-timer wie bei FS20 wird nicht unterstützt. Kann aber über Kanalregister
-programmiert werden.</li>
-<li><B>on-till &lt;time&gt;</B><a name="CUL_HMonTill"></a> - einschalten bis zum angegebenen Zeitpunkt.<br>
-<ul><code>set &lt;name&gt; on-till 20:32:10<br></code></ul>
-Das momentane Maximum für eine Endzeit liegt bei 24 Stunden.<br>
-</li>
-<li><B>press &lt;[short|long]&gt;&lt;[on|off]&gt;</B><a name="CUL_HMpress"></a><br>
-<B>press &lt;[short|long]&gt;&lt;[noBurst]&gt;</B></a>
-simuliert den Druck auf einen lokalen Knopf oder direkt verbundenen Knopf des Aktors.<br>
-<B>[short|long]</B> wählt aus ob ein kurzer oder langer Tastendruck simuliert werden soll.<br>
-<B>[on|off]</B> ist relevant für Geräte mit direkter Bedienung pro Kanal.
-Verfügbar für Dimmer und Rollo-Aktoren, normalerweise nicht für Schalter.<br>
-<B>[noBurst]</B> ist relevant für Peers die bedingte Bursts unterstützen.
-Dies bewirkt das der Befehl der Warteliste des Peers zugefügt wird. Ein Burst wird anschließend
-<B>nicht </B> ausgeführt da der Befehl wartet bis der Peer aufgewacht ist. Dies führt zu einer
-<B>Verzögerung des Tastendrucks</B>, reduziert aber Übertragungs- und Performanceaufwand. <br>
-</li>
-<li><B>toggle</B><a name="CUL_HMtoggle"></a> - toggled den Aktor. Schaltet vom aktuellen Level auf
-0% oder von 0% auf 100%</li>
-</ul>
-<br>
-</li>
-<li>dimmer, blindActuator<br>
-Dimmer können virtuelle Kanäle unterstützen. Diese werden automatisch angelegt falls vorhanden.
-Normalerweise gibt es 2 virtuelle Kanäle zusätzlich zum primären Kanal. Virtuelle Dimmerkanäle sind
-standardmäßig deaktiviert, können aber parallel zum ersten Kanal benutzt werden um das Licht zu steuern. <br>
-Die virtuellen Kanäle haben Standardnamen SW&lt;channel&gt;_V&lt;nr&gt; z.B. Dimmer_SW1_V1 and Dimmer_SW1_V2.<br>
-Virtuelle Dimmerkanäle unterscheiden sich komplett von virtuellen Knöpfen und Aktoren in FHEM, sind aber
-Teil des HM-Geräts. Dokumentation und Möglichkeiten würde hier aber zu weit führen.<br>
-<ul>
-<li><B>0 - 100 [on-time] [ramp-time]</B><br>
-Setzt den Aktor auf den gegeben Wert (In Prozent)
-mit einer Auflösung von 0.5.<br>
-Bei Dimmern ist optional die Angabe von "on-time" und "ramp-time" möglich, beide in Sekunden mit 0.1s Abstufung.<br>
-"On-time" verhält sich analog dem "on-for-timer".<br>
-"Ramp-time" beträgt standardmäßig 2.5s, 0 bedeutet umgehend.<br>
-</li>
-<li><B><a href="#CUL_HMon">on</a></B></li>
-<li><B><a href="#CUL_HMoff">off</a></B></li>
-<li><B><a href="#CUL_HMpress">press &lt;[short|long]&gt;&lt;[on|off]&gt;</a></B></li>
-<li><B><a href="#CUL_HMtoggle">toggle</a></B></li>
-<li><B><a href="#CUL_HMonForTimer">on-for-timer &lt;sec&gt;</a></B> - Nur Dimmer! <br></li>
-<li><B><a href="#CUL_HMonTill">on-till &lt;time&gt;</a></B> - Nur Dimmer! <br></li>
-<li><B>stop</B> - Stopt Bewegung (Rollo) oder Dimmerrampe</li>
-<li><B>pct &lt;level&gt [&lt;ontime&gt] [&lt;ramptime&gt]</B> - setzt Aktor auf gewünschten <B>absolut Wert</B>.<br>
-Optional können für Dimmer "ontime" und "ramptime" angegeben werden.<br>
-"Ontime" kann dabei in Sekunden angegeben werden. Kann auch als Endzeit angegeben werden im Format hh:mm:ss
-</li>
-<li><B>up [changeValue] [&lt;ontime&gt] [&lt;ramptime&gt]</B> Einen Schritt hochdimmen.</li>
-<li><B>down [changeValue] [&lt;ontime&gt] [&lt;ramptime&gt]</B> Einen Schritt runterdimmen.<br>
-"changeValue" ist optional und gibt den zu ändernden Wert in Prozent an. Mögliche Abstufung dabei ist 0.5%, Standard ist 10%. <br>
-"ontime" ist optional und gibt an wielange der Wert gehalten werden soll. '0' bedeutet endlos und ist Standard.<br>
-"ramptime" ist optional und definiert die Zeit bis eine Änderung den neuen Wert erreicht. Hat nur für Dimmer Bedeutung.
-<br></li>
-</ul>
-<br>
-</li>
-<li>remotes, pushButton<a name="CUL_HMremote"></a><br>
-Diese Geräteart reagiert nicht auf Anfragen, außer sie befinden sich im Lernmodus. FHEM reagiert darauf
-indem alle Anfragen gesammelt werden bis der Lernmodus detektiert wird. Manuelles Eingreifen durch
-den Benutzer ist dazu nötig. Ob Befehle auf Ausführung warten kann auf Geräteebene mit dem Parameter
-'protCmdPend' abgefragt werden.
-<ul>
-<li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>]
-[<u>set</u>|unset] [<u>both</u>|actor|remote]</B><a name="CUL_HMpeerChan"></a><br>
-"peerChan" richtet eine Verbindung zwischen Sender-<B>Kanal</B> und
-Aktor-<B>Kanal</B> ein, bei HM "link" genannt. "Peering" darf dabei nicht
-mit "pairing" verwechselt werden.<br>
-<B>Pairing</B> bezeichnet das Zuordnen eines <B>Geräts</B> zu einer Zentrale.<br>
-<B>Peering</B> bezeichnet das faktische Verbinden von <B>Kanälen</B>.<br>
-Peering erlaubt die direkte Interaktion zwischen Sender und Aktor ohne den Einsatz einer CCU<br>
-Peering eines Senderkanals veranlaßt den Sender nach dem Senden eines Triggers auf die
-Bestätigung eines - jeden - Peers zu warten. Positives Feedback (z.B. grüne LED)
-gibt es dabei nur wenn alle Peers den Befehl bestätigt haben.<br>
-Peering eines Aktorkanals richtet dabei einen Satz von Parametern ein welche die auszuführenden Aktionen
-definieren wenn ein Trigger dieses Peers empfangen wird. Dies bedeutet: <br>
-- nur Trigger von Peers werden ausgeführt<br>
-- die auszuführende Aktion muss für den zugehörigen Trigger eines Peers definiert werden<br>
-Ein Aktorkanal richtet dabei eine Standardaktion beim Peering ein - diese hängt vom Aktor ab.
-Sie kann ebenfalls davon abhängen ob ein oder zwei Tasten <B>ein einem Befehl</B> gepeert werden.
-Peert man einen Schalter mit 2 Tasten kann eine Taste für 'on' und eine andere für 'off' angelegt werden.
-Wenn nur eine Taste definiert wird ist die Funktion wahrscheinlich 'toggle'.<br>
-Die Funktion kann durch programmieren des Register (vom Aktor abhängig) geändert werden.<br>
-
-Auch wenn der Befehl von einer Fernbedienung oder einem Taster kommt hat er direkten Effekt auf
-den Aktor. Das Peering beider Seiten ist quasi unabhängig und hat unterschiedlich Einfluss auf
-Sender und Empfänger.<br>
-Peering eines Aktorkanals mit mehreren Senderkanälen ist ebenso möglich wie das eines Senderkanals
-mit mehreren Empfängerkanälen.<br>
-
-&lt;actChan&gt; ist der zu verknüpfende Aktorkanal.<br>
-
-&lt;btn_no&gt; ist der zu verknüpfende Senderkanal (Knopf). Wird
-'single' gewählt werden die Tasten von 1 an gezählt. Für 'dual' ist btn_no
-die Nummer des zu verwendenden Tasterpaares. Z.B. ist '3' iim Dualmodus das
-dritte Tasterpaar welches mit Tasten 5 und 6 im Singlemodus übereinstimmt.<br>
-
-Wird der Befehl auf einen Kanal angewendet wird btn_no igroriert.
-Muss gesetzt sein, sollte dabei 0 sein.<br>
-
-[single|dual]: Dieser Modus bewirkt das Standardverhalten des Aktors bei Benutzung eines Tasters. Ein Dimmer
-kann z.B. an einen einzelnen oder ein Paar von Tastern angelernt werden. <br>
-Standardeinstellung ist "dual".<br>
-
-'dual' (default) Schalter verknüpft zwei Taster mit einem Aktor. Bei einem Dimmer
-bedeutet das ein Taster für hoch- und einer für runterdimmen. <br>
-
-'single' benutzt nur einen Taster des Senders. Ist z.B. nützlich für einen einfachen Schalter
-der nur zwischen an/aus toggled. Aber auch ein Dimmer kann an nur einen Taster angelernt werden.<br>
-
-[set|unset]: Wählt aus ob Peer hinzugefügt oder entfernt werden soll.<br>
-Hinzufügen ist Standard.<br>
-'set' stellt Peers für einen Kanal ein.<br>
-'unset' entfernt Peer für einen Kanal.<br>
-
-[actor|remote|both] beschränkt die Ausführung auf Aktor oder Fernbedienung.
-Das ermöglicht dem Benutzer das entfernen des Peers vom Fernbedienungskanal ohne
-die Einstellungen am Aktor zu entfernen.<br>
-Standardmäßig gewählt ist "both" für beides.<br>
-
-Example:
-<ul>
-<code>
-set myRemote peerChan 2 mySwActChn single set #Peer zweiten Knopf mit Aktorkanal<br>
-set myRmtBtn peerChan 0 mySwActChn single set #myRmtBtn ist ein Knopf der Fernbedienung. '0' wird hier nicht verarbeitet<br>
-set myRemote peerChan 2 mySwActChn dual set #Verknüpfe Knöpfe 3 und 4<br>
-set myRemote peerChan 3 mySwActChn dual unset #Entferne Peering für Knöpfe 5 und 6<br>
-set myRemote peerChan 3 mySwActChn dual unset aktor #Entferne Peering für Knöpfe 5 und 6 nur im Aktor<br>
-set myRemote peerChan 3 mySwActChn dual set remote #Verknüpfe Knöpfe 5 und 6 nur mit Fernbedienung. Linkeinstellungen mySwActChn werden beibehalten.<br>
-</code>
-</ul>
-</li>
-</ul>
-</li>
-<li>virtual<a name="CUL_HMvirtual"></a><br>
-<ul>
-<li><B><a href="#CUL_HMpeerChan">peerChan</a></B> siehe remote</li>
-<li><B>press [long|short]<a name="CUL_HMpress"></a></B>
-Simuliert einen kurzen (Standard) oder langen Tastendruck. Zu beachten ist dass die momentane
-Implementierung für "long" keine Dauer angibt . Es wird nur ein Trigger vom Typ "long" gesendet.
-</li>
-<li><B>virtTemp &lt;[off -10..50]&gt;<a name="CUL_HMvirtTemp"></a></B>
-Simuliert ein Thermostat. Wenn mit einem Gerät gepeert wird periodisch eine Temperatur gesendet,
-solange bis "off" gewählt wird. Siehe auch <a href="#CUL_HMvirtHum">virtHum</a><br>
-</li>
-<li><B>virtHum &lt;[off -10..50]&gt;<a name="CUL_HMvirtHum"></a></B>
-Simuliert den Feuchtigkeitswert eines Thermostats. Wenn mit einem Gerät verknüpft werden periodisch
-Luftfeuchtigkeit undTemperatur gesendet, solange bis "off" gewählt wird. Siehe auch <a href="#CUL_HMvirtTemp">virtTemp</a><br>
-</li>
-<li><B>valvePos &lt;[off 0..100]&gt;<a name="CUL_HMvalvePos"></a></B>
-steuert einen Ventilantrieb<br>
-</li>
-</ul>
-</li>
-<li>smokeDetector<br>
-Hinweis: All diese Befehle funktionieren momentan nur wenn mehr als ein Rauchmelder
-vorhanden ist, und diese gepeert wurden um eine Gruppe zu bilden. Um die Befehle abzusetzen
-muss der Master dieser gruppe verwendet werden, und momentan muss man raten welcher der Master ist.<br>
-smokeDetector kann folgendermaßen in Gruppen eingeteilt werden:
-<a href="#CUL_HMpeerChan">peerChan</a>. Alle Mitglieder müssen mit dem Master verknüpft werden. Auch der
-Master muss mit peerChan zur Gruppe zugefügt werden - z.B. mit sich selbst verknüpft! Dadurch hat man volle
-Kontrolle über die Gruppe und muss nicht raten.<br>
-<ul>
-<li><B>teamCall</B> - führt einen Netzwerktest unter allen Gruppenmitgliedern aus</li>
-<li><B>alarmOn</B> - löst einen Alarm aus</li>
-<li><B>alarmOff</B> - schaltet den Alarm aus</li>
-</ul>
-</li>
-<li>4Dis (HM-PB-4DIS-WM)
-<ul>
-<li><B>text &lt;btn_no&gt; [on|off] &lt;text1&gt; &lt;text2&gt;</B><br>
-Zeigt Text auf dem Display eines Geräts an. Für diesen Zweck muss zuerst ein set-Befehl
-(oder eine Anzahl davon) abgegeben werden, dann können im "teach-in" Menü des 4Dis mit
-"Central" Daten übertragen werden.<br>
-Falls auf einen Kanal angewendet dürfen btn_no und on|off nicht verwendet werden, nur
-reiner Text.
-Beispiel:
-<ul>
-<code>
-set 4Dis text 1 on On Lamp<br>
-set 4Dis text 1 off Kitchen Off<br>
-<br>
-set 4Dis_chn4 text Kitchen Off<br>
-</code>
-</ul>
-</li>
-</ul>
-<br></li>
-<li>Climate-Control (HM-CC-TC)
-<ul>
-<li><B>desired-temp &lt;temp&gt;</B><br>
-Setzt verschiedene Temperaturen. &lt;temp&gt; muss zwischen 6°C und 30°C liegen, die Auflösung beträgt 0.5°C.</li>
-<li><B>tempListSat [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
-<li><B>tempListSun [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
-<li><B>tempListMon [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
-<li><B>tempListTue [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
-<li><B>tempListThu [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
-<li><B>tempListWed [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
-<li><B>tempListFri [prep|exec] HH:MM temp ... 24:00 temp</B><br>
-Gibt eine Liste mit Temperaturintervallen an. Bis zu 24 Intervall können pro Wochentag definiert werden, die
-Auflösung dabei sind 10 Minuten. Die letzte Zeitangabe muss 24:00 Uhr sein.<br>
-Beispiel: bis 6:00 soll die Temperatur 19°C sein, dann bis 23:00 Uhr 22.5°C, anschließend
-werden bis Mitternacht 19°C gewünscht.<br>
-<code> set th tempListSat 06:00 19 23:00 22.5 24:00 19<br></code>
-</li>
-<li><B>partyMode &lt;HH:MM&gt;&lt;durationDays&gt;</B><br>
-setzt die Steuerung für die angegebene Zeit in den Partymodus. Dazu ist die Endzeit sowie <b>Anzahl an Tagen</b>
-die er dauern soll anzugeben. Falls er am nächsten Tag enden soll ist '1'
-anzugeben<br></li>
-<li><B>systime</B><br>
-setzt Zeit des Klimakanals auf die Systemzeit</li>
-</ul><br>
-</li>
-<li>Climate-Control (HM-CC-RT-DN|HM-CC-RT-DN-BoM)
-<ul>
-<li><B>controlMode &lt;auto|boost|day|night&gt;</B><br></li>
-<li><B>controlManu &lt;temp&gt;</B><br></li>
-<li><B>controlParty &lt;temp&gt;&lt;startDate&gt;&lt;startTime&gt;&lt;endDate&gt;&lt;endTime&gt;</B><br>
-setzt die Steuerung in den Partymodus, definiert Temperatur und Zeitrahmen.<br>
-Beispiel:<br>
-<code>set controlParty 15 03.8.13 20:30 5.8.13 11:30</code></li>
-<li><B>systime</B><br>
-setzt Zeit des Klimakanals auf die Systemzeit</li>
-<li><B>desired-temp &lt;temp&gt;</B><br>
-Setzt verschiedene Temperaturen. &lt;temp&gt; muss zwischen 6°C und 30°C liegen, die Auflösung beträgt 0.5°C.</li>
-<li><B>tempListSat [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
-<li><B>tempListSun [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
-<li><B>tempListMon [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
-<li><B>tempListTue [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
-<li><B>tempListThu [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
-<li><B>tempListWed [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
-<li><B>tempListFri [prep|exec] HH:MM temp ... 24:00 temp</B><br>
-Gibt eine Liste mit Temperaturintervallen an. Bis zu 24 Intervall können pro Wochentag definiert werden, die
-Auflösung dabei sind 10 Minuten. Die letzte Zeitangabe muss immer 24:00 Uhr sein.<br>
-Der optionale Parameter [prep|exec] erlaubt das packen der Nachrichten und verbessert damit deutlich
-die Datenübertragung. Besonders nützlich wenn das Gerät im "Wakeup"-modus betrieben wird.
-Benutzung durch senden der Befehle mit Parameter "prep". Daten werden dann für das Senden gesammelt.
-Der letzte Befehl muss den Parameter "exec" habe um die Information zu übertragen.<br>
-Beispiel: bis 6:00 soll die Temperatur 19°C sein, dann bis 23:00 Uhr 22.5°C, anschließend
-werden bis Mitternacht 19°C gewünscht.<br>
-<code> set th tempListSat 06:00 19 23:00 22.5 24:00 19<br></code>
-<br>
-<code> set th tempListSat prep 06:00 19 23:00 22.5 24:00 19<br>
-set th tempListSun prep 06:00 19 23:00 22.5 24:00 19<br>
-set th tempListMon prep 06:00 19 23:00 22.5 24:00 19<br>
-set th tempListTue exec 06:00 19 23:00 22.5 24:00 19<br></code>
-</li>
-</ul><br>
-</li>
-<li>OutputUnit (HM-OU-LED16)
-<ul>
-<li><B>led [off|red|green|yellow]</B><br>
-schaltet die LED des Kanals auf die gewünschte Farbe. Wird der Befehl auf ein Gerät angewandt so
-werden alle LEDs auf diese Farbe gesetzt.<br>
-Experten können die LEDs separat durch eine 8-stellige Hex-Zahl ansteuern.<br></li>
-<li><B>ilum &lt;Helligkeit&gt;&lt;Dauer&gt; </B><br>
-&lt;Helligkeit&gt; [0-15] der Beleuchtung.<br>
-&lt;Dauer&gt; [0-127] in Sekunden, 0 bedeutet dauernd an.<br></li>
-</ul><br></li>
-<li>OutputUnit (HM-OU-CFM-PL)
-<ul>
-<li><B>led &lt;color&gt;[,&lt;color&gt;..] [&lt;repeat&gt..]</B><br>
-Mögliche Farben sind [redL|greenL|yellowL|redS|greenS|yellowS|pause]. Eine Folge von Farben
-kann durch trennen der Farbeinträge mit ',' eingestellt werden.
-Leerzeichen dürfen in der Liste nicht benutzt werden. 'S' bezeichnet kurze und
-'L' lange Beleuchtungsdauer. <br>
-<b>repeat</b> definiert wie oft die Sequenz ausgeführt werden soll. Standard ist 1.<br>
-</li>
-<li><B>playTone &lt;MP3No&gt[,&lt;MP3No&gt..] [&lt;repeat&gt..]</B><br>
-Spielt eine Reihe von Tönen. Die Liste muss mit ',' getrennt werden. Leerzeichen
-dürfen in der Liste nicht benutzt werden.<br>
-<b>replay</b> kann verwendet werden um den zuletzt gespielten Klang zu wiederholen.<br>
-<b>repeat</b> definiert wie oft die Sequenz ausgeführt werden soll. Standard ist 1.<br>
-Beispiel:
-<ul><code>
-set cfm_Mp3 playTone 3 # MP3 Titel 3 einmal<br>
-set cfm_Mp3 playTone 3 3 # MP3 Titel 3 dreimal<br>
-set cfm_Mp3 playTone 3,6,8,3,4 # MP3 Titelfolge 3,6,8,3,4 einmal<br>
-set cfm_Mp3 playTone 3,6,8,3,4 255# MP3 Titelfolge 3,6,8,3,4 255 mal<br>
-set cfm_Mp3 playTone replay # Wiederhole letzte Sequenz<br>
-<br>
-set cfm_Led led redL 4 # rote LED dreimal lang blinken<br>
-set cfm_Led led redS,redS,redS,redL,redL,redL,redS,redS,redS 255 # SOS 255 mal<br>
-</ul></code>
-
-</li>
-</ul><br></li>
-<li>HM-RC-19xxx
-<ul>
-<li><B>alarm &lt;count&gt;</B><br>
-sendet eine Alarmnachricht an die Steuerung<br></li>
-<li><B>service &lt;count&gt;</B><br>
-sendet eine Servicenachricht an die Steuerung<br></li>
-<li><B>symbol &lt;symbol&gt; [set|unset]</B><br>
-aktiviert ein verfügbares Symbol auf der Steuerung<br></li>
-<li><B>beep [off|1|2|3]</B><br>
-aktiviert Töne<br></li>
-<li><B>backlight [off|on|slow|fast]</B><br>
-aktiviert Hintergrundbeleuchtung<br></li>
-<li><B>display &lt;text&gt; comma unit tone backlight &lt;symbol(s)&gt;
-</B><br>
-Steuert das Display der Steuerung<br>
-&lt;text&gt; : bis zu 5 Zeichen <br>
-comma : 'comma' aktiviert das Komma, 'no' läßt es aus <br>
-[unit] : setzt Einheitensymbole.
-[off|Proz|Watt|x3|C|x5|x6|x7|F|x9|x10|x11|x12|x13|x14|x15]. Momentan sind
-x3..x15 nicht getestet. <br>
-tone : aktiviert einen von 3 Tönen [off|1|2|3]<br>
-backlight: läßt die Hintergrundbeleuchtung aufblinken [off|on|slow|fast]<br>
-&lt;symbol(s)&gt; aktiviert die Anzeige von Symbolen. Mehrere Symbole
-können zu selben Zeit aktiv sein, Verknüpfung erfolgt komma-getrennt. Dabei keine
-Leerzeichen verwenden. Mögliche Symbole:
-[bulb|switch|window|door|blind|scene|phone|bell|clock|arrowUp|arrowDown]<br><br>
-
-Beispiel:
-<ul><code>
-# "Hello" auf dem Display, Symbol bulb an, Hintergrundbeleuchtung, Ton ausgeben<br>
-set FB1 display Hello no off 1 on bulb<br>
-# "1234,5" anzeigen mit Einheit 'W'. Symbole scene,phone,bell und
-# clock sind aktiv. Hintergrundbeleuchtung blinikt schnell, Ausgabe von Ton 2<br>
-set FB1 display 12345 comma Watt 2 fast scene,phone,bell,clock
-</ul></code>
-</li>
-</ul><br>
-</li>
-
-<li>keyMatic<br><br>
-<ul>Keymatic verwendet eine AES-signierte Kommunikation. Deshalb ist die Steuerung von Keymatic
-nur mit dem HM-LAN möglich. But
-Ein CUL kann aber Statusnachrichten von Keymatic mitlesen und darauf
-reagieren.</ul><br>
-<ul>
-<li><B>lock</B><br>
-Schließbolzen fährt in Zu-Position<br></li>
-<li><B>unlock [sec]</B><br>
-Schließbolzen fährt in Auf-Position.<br>
-[sec]: Stellt die Verzögerung ein nach der sich das Schloss automatisch wieder verschließt.<br>
-0 - 65535 Sekunden</li>
-<li><B>open [sec]</B><br>
-Entriegelt die Tür sodass diese geöffnet werden kann.<br>
-[sec]: Stellt die Verzögerung ein nach der sich das Schloss automatisch wieder
-verschließt.<br>0 - 65535 Sekunden</li>
-</ul></li>
-<li>winMatic <br><br>
-<ul>winMatic arbeitet mit 2 Kanälen, einem für die Fenstersteuerung und einem für den Akku.</ul><br>
-<ul>
-<li><B>level &lt;level&gt; &lt;relockDelay&gt; &lt;speed&gt;</B><br>
-stellt den Wert ein. <br>
-&lt;level&gt;: Bereich ist 0% bis 100%<br>
-&lt;relockDelay&gt;: Spanne reicht von 0 bis 65535 Sekunden. 'ignore' kann verwendet werden um den Wert zu ignorieren.<br>
-&lt;speed&gt;: Bereich ist 0% bis 100%<br>
-</li>
-<li><B>stop</B><br>
-stopt die Bewegung<br>
-</li>
-</ul></li>
-<li>HM-Sys-sRP-Pl<br><br>
-legt Einträge für den Repeater an. Bis zu 36 Einträge können angelegt werden.
-<ul>
-<li><B>setRepeat &lt;entry&gt; &lt;sender&gt; &lt;receiver&gt; &lt;broadcast&gt;</B><br>
-&lt;entry&gt; [1..36] Nummer des Eintrags in der Tabelle.<br>
-&lt;sender&gt; Name oder HMid des Senders oder der Quelle die weitergeleitet werden soll<br>
-&lt;receiver&gt; Name oder HMid des Empfängers oder Ziels an das weitergeleitet werden soll<br>
-&lt;broadcast&gt; [yes|no] definiert ob Broadcasts von einer ID weitergeleitet werden sollen.<br>
-<br>
-Kurzanwendung: <br>
-<code>setRepeat setAll 0 0 0<br></code>
-schreibt die gesamte Liste der Geräte neu. Daten kommen vom Attribut repPeer. <br>
-Das Attribut repPeer hat folgendes Format:<br>
-src1:dst1:[y/n],src2:dst2:[y/n],src2:dst2:[y/n],...<br>
-<br>
-Foramtierte Werte von repPeer:<br>
-Number src dst broadcast verify<br>
-number: Nummer des Eintrags in der Liste<br>
-src: Ursprungsgerät der Nachricht - aus Repeater ausgelesen<br>
-dst: Zielgerät der Nachricht - asu den Attributen abgeleitet<br>
-broadcast: sollen Broadcasts weitergeleitet werden - aus Repeater ausgelesen<br>
-verify: stimmen Attribute und ausgelesen Werte überein?<br>
-</li>
-</ul>
-</li>
-</ul>
-<br>
-Debugging:
-<ul>
-<li><B>raw &lt;data&gt; ...</B><br>
-nur für Experimente benötigt.
-Sendet eine Liste von "Roh"-Befehlen. Der erste Befehl wird unmittelbar gesendet,
-die folgenden sobald der vorherige bestätigt wurde. Die Länge wird automatisch
-berechnet und der Nachrichtenzähler wird erhöht wenn die ersten beiden Zeichen ++ sind.
-
-Beispiel (AES aktivieren):<pre>
-set hm1 raw ++A001F100001234560105000000001\
-++A001F10000123456010802010AF10B000C00\
-++A001F1000012345601080801\
-++A001F100001234560106</pre>
-</li>
-</ul>
-</ul>
-<br>
-
-<a name="CUL_HMget"></a>
-<b>Get</b><br>
-<ul>
-<li><B>configSave &lt;filename&gt;</B><a name="CUL_HMconfigSave"></a><br>
-Sichert die Einstellungen eines Eintrags in einer Datei. Die Daten werden in
-einem von der FHEM-Befehlszeile ausführbaren Format gespeichert.<br>
-Die Datei liegt im FHEM Home-Verzeichnis neben der fhem.cfg. Gespeichert wird
-kumulativ- d.h. neue Daten werden an die Datei angehängt. Es liegt am Benutzer das
-doppelte speichern von Einträgen zu vermeiden.<br>
-Ziel der Daten ist NUR die Information eines HM-Gerätes welche IM Gerät gespeichert ist.
-Im Deteil sind das nur die Peer-Liste sowie die Register.
-Durch die Register wird also das Peering eingeschlossen.<br>
-Die Datei ist vom Benutzer les- und editierbar. Zusätzlich gespeicherte Zeitstempel
-helfen dem Nutzer bei der Validierung.<br>
-Einschränkungen:<br>
-Auch wenn alle Daten eines Eintrags in eine Datei gesichert werden so sichert FHEM nur
-die zum Zeitpunkt des Speicherns verfügbaren Daten! Der Nutzer muss also die Daten
-der HM-Hardware auslesen bevor dieser Befehl ausgeführt wird.
-Siehe empfohlenen Ablauf unten.<br>
-Dieser Befehl speichert keine FHEM-Attribute oder Gerätedefinitionen.
-Diese verbleiben in der fhem.cfg.<br>
-Desweiteren werden gesicherte Daten nicht automatisch zurück auf die HM-Hardware geladen.
-Der Benutzer muss die Wiederherstellung auslösen.<br><br>
-Ebenso wie ander Befehle wird 'configSave' am besten auf ein Gerät und nicht auf einen
-Kanal ausgeführt. Wenn auf ein Gerät angewendet werden auch die damit verbundenen Kanäle
-gesichert. <br><br>
-<code>
-Empfohlene Arbeitsfolge für ein Gerät 'HMdev':<br>
-set HMdev clear msgEvents # alte Events löschen um Daten besser kontrollieren zu können<br>
-set HMdev getConfig # Geräte- und Kanalinformation auslesen<br>
-# warten bis Ausführung abgeschlossen ist<br>
-# "protState" sollte dann "CMDs_done" sein<br>
-# es sollten keine Warnungen zwischen "prot" und den Variablen auftauchen<br>
-get configSave myActorFile<br>
-</code>
-</li>
-<li><B>param &lt;paramName&gt;</B><br>
-Gibt den Inhalt der relevanten Parameter eines Eintrags zurück. <br>
-Hinweis: wird der Befehl auf einen Kanal angewandt und 'model' abgefragt so wird das Model
-des inhalteanbietenden Geräts zurückgegeben.
-</li>
-<li><B>reg &lt;addr&gt; &lt;list&gt; &lt;peerID&gt;</B><br>
-liefert den Wert eines Registers zurück. Daten werden aus dem Speicher von FHEM und nicht direkt vom Gerät geholt.
-Falls der Registerinhalt nicht verfügbar ist muss "getConfig" sowie anschließend "getReg" verwendet werden.<br>
-
-&lt;addr&gt; Adresse des Registers in HEX. Registername kann alternativ verwendet werden falls in FHEM bekannt.
-"all" gibt alle dekodierten Register eines Eintrags in einer Liste zurück.<br>
-&lt;list&gt; Liste aus der das Register gewählt wird. Wird der REgistername verwendet wird "list" ignoriert und kann auf '0' gesetzt werden.<br>
-&lt;peerID&gt; identifiziert die Registerbänke für "list3" und "list4". Kann als Dummy gesetzt werden wenn nicht benötigt.<br>
-</li>
-<li><B>regList</B><br>
-gibt eine Liste der von FHEM für dieses Gerät dekodierten Register zurück.<br>
-Beachten dass noch mehr Register für ein Gerät implemetiert sein können.<br>
-</li>
-<li><B>saveConfig &lt;file&gt;</B><a name="CUL_HMsaveConfig"></a><br>
-speichert Peers und Register in einer Datei.<br>
-Gespeichert werden die Daten wie sie in FHEM verfügbar sind. Es ist daher notwendig vor dem Speichern die Daten auszulesen.<br>
-Der Befehl unterstützt Aktionen auf Geräteebene. D.h. wird der Befehl auf ein Gerät angewendet werden auch alle verbundenen Kanaleinträge gesichert.<br>
-Das Speichern der Datei erfolgt kumulativ. Wird ein Eintrag mehrfach in der selben Datei gespeichert so werden die Daten an diese angehängt.
-Der Nutzer kann den Zeitpunkt des Speichern bei Bedarf auslesen.<br>
-Der Inhalt der Datei kann verwendet werden um die Geräteeinstellungen wiederherzustellen. Er stellt alle Peers und Register des Eintrags wieder her.<br>
-Zwänge/Beschränkungen:<br>
-vor dem zurückschreiben der Daten eines Eintrags muss das Gerät mit FHEM verbunden werden.<br>
-"restore" löscht keine verknüpften Kanäle, es fügt nur neue Peers hinzu.<br>
-</li>
-<br></ul>
-<a name="CUL_HMattr"></a>
-<b>Attribute</b>
-<ul>
-<li><a href="#eventMap">eventMap</a></li>
-<li><a href="#do_not_notify">do_not_notify</a></li>
-<li><a href="#ignore">ignore</a></li>
-<li><a href="#dummy">dummy</a></li>
-<li><a href="#showtime">showtime</a></li>
-<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-<li><a href="#actCycle">actCycle</a>
-actCycle &lt;[hhh:mm]|off&gt;<br>
-Bietet eine 'alive' oder besser 'not alive' Erkennung für Geräte. [hhh:mm] ist die maximale Zeit ohne Nachricht eines Geräts. Wenn innerhalb dieser Zeit keine Nachricht empfangen wird so wird das Event"&lt;device&gt; is dead" generiert.
-Sendet das Gerät wieder so wird die Nachricht"&lt;device&gt; is alive" ausgegeben. <br>
-Diese Erkennung wird durch 'autocreate' für jedes Gerät mit zyklischer Statusmeldung angelegt.<br>
-Die Kontrollinstanz ist ein Pseudo-Gerät "ActionDetector" mit der HMId "000000".<br>
-Aufgrund von Performanceüberlegungen liegt die Antwortverzögerung bei 600 Sekunden (10min). Kann über das Attribut "actCycle" des "ActionDetector" kontrolliert werden.<br>
-Sobald die Überwachung aktiviert wurde hat das HM-Gerät 2 Attribute:<br>
-<ul>
-actStatus: Aktivitätsstatus des Geräts<br>
-actCycle: Detektionsspanne [hhh:mm]<br>
-</ul>
-Die gesamte Funktion kann über den "ActionDetector"-Eintrag überprüft werden. Der Status aller Instanzen liegt im READING-Bereich.<br>
-Hinweis: Diese Funktion kann ebenfalls für Geräte ohne zyklische Übertragung aktiviert werden. Es obliegt dem Nutzer eine vernünftige Zeitspanne festzulegen.
-</li>
-<li><a name="expert">expert</a><br>
-Dieses Attribut steuert die Sichtbarkeit der Werte. Damit wird die Darstellung der Geräteparameter kontrolliert.<br>
-3 Level können gewählt werden:<br>
-<ul>
-0_off: Standard. Zeigt die häufigst benutzten Paramter<br>
-1_on: Erweitert. Zeigt alle dekodierten Geräteparameter<br>
-2_full: Alles. Zeigt alle Parameter sowie Registerinformationen im Rohformat. <br>
-</ul>
-Wird 'expert' auf ein Gerät angewendet so gilt dies auch für alle verknüpften Kanäle.
-Kann übergangen werden indem das Attribut ' expert' auch für den Gerätekanal gesetzt wird.<br>
-Das Attribut "showInternalValues" bei den globalen Werten muss ebenfalls überprüft werden.
-"expert" macht sich diese Implementierung zu Nutze.
-Gleichwohl setzt "showInternalValues" - bei Definition - 'expert' außer Kraft .
-</li>
-<li><a name="model">model</a>,
-<a name="subType">subType</a><br>
-Diese Attribute werden bei erfolgreichem Pairing automatisch gesetzt.
-Sie sollten nicht per Hand gesetzt werden und sind notwendig um Gerätenachrichten
-korrekt interpretieren oder senden zu können.</li>
-<li><a name="param">param</a><br>
-'param' definiert modelspezifische Verhalten oder Funktionen. Siehe "models" für Details.</li>
-<li><a name="msgRepeat">msgRepeat</a><br>
-Definiert die Nummer an Wiederholungen falls ein Gerät nicht rechtzeitig antwortet. <br>
-Für Geräte die nur den "Config"-Modus unterstützen sind Wiederholungen nicht erlaubt. <br>
-Bei Geräte mit wakeup-Modus wartet das Gerät bis zum nächsten Aufwachen. Eine längere Verzögerung
-sollte in diesem Fall angedacht werden. <br>
-Wiederholen von Bursts hat Auswirkungen auf die HMLAN Übertragungskapazität.</li>
-<li><a name="burstAccess">burstAccess</a><br>
-kann für eine Geräteinstanz gesetzt werden falls das Model bedingte Bursts erlaubt.
-Das Attribut deaktiviert den Burstbetrieb (0_off) was die Nachrichtenmenge des HMLAN reduziert
-und damit die Wahrscheinlichkeit einer Überlast von HMLAN verringert.<br>
-Einschalten (1_auto) erlaubt kürzere Reaktionszeiten eines Geräts. Der Nutzer muss nicht warten
-bis das Gerät wach ist. <br>
-Zu beacht ist dass das Register "burstRx" im Gerät ebenfalls gesetzt werden muss.</li>
-<li><a name="rawToReadable">rawToReadable</a><br>
-Wird verwendet um Rohdaten von KFM100 in ein lesbares Fomrat zu bringen, basierend auf
-den gemessenen Werten. Z.B. langsames Füllen eines Tanks, während die Werte mit <a href="#inform">inform</a>
-angezeigt werden. Man sieht:
-<ul>
-10 (bei 0%)<br>
-50 (bei 20%)<br>
-79 (bei 40%)<br>
-270 (bei 100%)<br>
-</ul>
-Anwenden dieser Werte: "attr KFM100 rawToReadable 10:0 50:20 79:40 270:100".
-FHEM für damit eine lineare Interpolation der Werte in den gegebenen Grenzen aus.
-</li>
-<li><a name="unit">unit</a><br>
-setzt die gemeldete Einheit des KFM100 falls 'rawToReadable' aktiviert ist. Z.B.<br>
-attr KFM100 unit Liter
-</li>
-<li><a name="autoReadReg">autoReadReg</a><br>
-'0' autoReadReg wird ignoriert.<br>
-'1' führt ein "getConfig" für ein Gerät automatisch nach jedem Neustart von FHEM aus. <br>
-'2' verhält sich wie '1',zusätzlich nach jedem power_on.<br>
-'3' wie '2', zusätzlich bei jedem Schreiben auf das Gerät<br>
-'4' wie '3' und versucht außerdem den Status abzufragen falls dieser nicht verfügbar erscheint.<br>
-'5' kontrolliert 'reglist' und 'peerlist'. Falls das Auslesen unvollständig ist wird 'getConfig' ausgeführt<br>
-'8_stateOnly' aktualisiert nur Statusinformationen aber keine Konfigurationen wie Daten- oder
-Peerregister.<br>
-Ausführung wird verzögert um eine Überlastung beim Start zu vermeiden . Daher werden Aktualisierung und Anzeige
-von Werten abhängig von der Größe der Datenbank verzögert geschehen.<br>
-Empfehlungen und Einschränkungen bei Benutzung:<br>
-<ul>
-Dieses Attribut nur auf ein Gerät oder Kanal 01 anwenden. Nicht auf einzelne Kanäle eines mehrkanaligen
-Geräts anwenden um eine doppelte Ausführung zu vermeiden.<br>
-Verwendung bei Geräten die nur auf den 'config'-Modus reagieren wird nicht empfohlen da die Ausführung
-erst starten wird wenn der Nutzer die Konfiguration vornimmt<br>
-Anwenden auf Geräte mit 'wakeup'-Modus ist nützlich. Zu bedenken ist aber dass die Ausführung
-bis zm "aufwachen" verzögert wird.<br>
-</ul>
-</li>
-</ul> <br>
-<a name="CUL_HMparams"><b>verfügbare Parameter für "param"</b></a>
-<ul>
-<li><B>HM-Sen-RD-O</B><br>
-offAtPon: nur Heizkanäle: erzwingt Ausschalten der Heizung nach einem powerOn<br>
-onAtRain: nur Heizkanäle: erzwingt Einschalten der Heizung bei Status 'rain' und Ausschalten bei Status 'dry'<br>
-</li>
-<li><B>virtuals</B><br>
-noOnOff: eine virtuelle Instanz wird den Status nicht ändern wenn ein Trigger empfangen wird. Ist dieser Paramter
-nicht gegeben so toggled die Instanz ihren Status mit jedem trigger zwischen An und Aus<br>
-msgReduce: falls gesetzt und der Kanal wird für <a ref="CUL_HMvalvePos"></a> genutzt wird jede Nachricht
-außer die der Ventilstellung verworfen um die Nachrichtenmenge zu reduzieren<br>
-</li>
-</ul><br>
-<a name="CUL_HMevents"></a>
-<b>Erzeugte Events:</b>
-<ul>
-<li><B>Allgemein</B><br>
-recentStateType:[ack|info] # kann nicht verwendet werden um Nachrichten zu triggern<br>
-<li>ack zeigt an das eine Statusinformation aus einer Bestätigung abgeleitet wurde</li>
-<li>info zeigt eine automatische Nachricht eines Geräts an</li>
-<li><a name="CUL_HMsabotageAttackId"><b>sabotageAttackId</b></a><br>
-Alarmiert bei Konfiguration des Geräts durch unbekannte Quelle<br></li>
-<li><a name="CUL_HMsabotageAttack"><b>sabotageAttack</b></a><br>
-Alarmiert bei Konfiguration des Geräts welche nicht durch das System ausgelöst wurde<br></li>
-</li>
-<li><B>HM-CC-TC,ROTO_ZEL-STG-RM-FWT</B><br>
-T: $t H: $h<br>
-battery:[low|ok]<br>
-measured-temp $t<br>
-humidity $h<br>
-actuator $vp %<br>
-desired-temp $dTemp<br>
-desired-temp-manu $dTemp #Temperatur falls im manuellen Modus<br>
-desired-temp-cent $dTemp #Temperatur falls im Zentrale-Modus<br>
-windowopen-temp-%d %.1f (sensor:%s)<br>
-tempList$wd hh:mm $t hh:mm $t ...<br>
-displayMode temp-[hum|only]<br>
-displayTemp [setpoint|actual]<br>
-displayTempUnit [fahrenheit|celsius]<br>
-controlMode [manual|auto|central|party]<br>
-tempValveMode [Auto|Closed|Open|unknown]<br>
-param-change offset=$o1, value=$v1<br>
-ValveErrorPosition_for_$dname $vep %<br>
-ValveOffset_for_$dname : $of %<br>
-ValveErrorPosition $vep %<br>
-ValveOffset $of %<br>
-time-request<br>
-trig_&lt;src&gt; &lt;value&gt; #channel was triggered by &lt;src&gt; channel.
-Dieses Event hängt vom kompletten Auslesen der Kanalkonfiguration ab, anderenfalls können Daten
-unvollständig oder fehlerhaft sein.<br>
-trigLast &lt;channel&gt; #letzter empfangener Trigger<br>
-</li>
-<li><B>HM-CC-RT-DN and HM-CC-RT-DN-BoM</B><br>
-state:T: $actTemp desired: $setTemp valve: $vp %<br>
-motorErr: [ok|ValveTight|adjustRangeTooLarge|adjustRangeTooSmall|communicationERR|unknown|lowBat|ValveErrorPosition]
-measured-temp $actTemp<br>
-desired-temp $setTemp<br>
-ValvePosition $vp %<br>
-mode [auto|manu|party|boost]<br>
-battery [low|ok]<br>
-batteryLevel $bat V<br>
-measured-temp $actTemp<br>
-desired-temp $setTemp<br>
-actuator $vp %<br>
-time-request<br>
-trig_&lt;src&gt; &lt;value&gt; #Kanal wurde durch &lt;src&gt; Kanal ausgelößt.
-</li>
-<li><B>HM-CC-VD,ROTO_ZEL-STG-RM-FSA</B><br>
-$vp %<br>
-battery:[critical|low|ok]<br>
-motorErr:[ok|blocked|loose|adjusting range too small|opening|closing|stop]<br>
-ValvePosition:$vp %<br>
-ValveErrorPosition:$vep %<br>
-ValveOffset:$of %<br>
-ValveDesired:$vp % # durch Temperatursteuerung gesetzt <br>
-operState:[errorTargetNotMet|onTarget|adjusting|changed] # operative Bedingung<br>
-operStateErrCnt:$cnt # Anzahl fehlgeschlagener Einstellungen<br>
-</li>
-<li><B>HM-CC-SCD</B><br>
-[normal|added|addedStrong]<br>
-battery [low|ok]<br>
-</li>
-<li><B>HM-SEC-SFA-SM</B><br>
-powerError [on|off]<br>
-sabotageError [on|off]<br>
-battery: [critical|low|ok]<br>
-</li>
-<li><B>HM-LC-BL1-PB-FM</B><br>
-motor: [opening|closing]<br>
-</li>
-<li><B>HM-LC-SW1-BA-PCB</B><br>
-battery: [low|ok]<br>
-</li>
-<li><B>HM-OU-LED16</B><br>
-color $value # in Hex - nur für Gerät<br>
-$value # in Hex - nur für Gerät<br>
-color [off|red|green|orange] # für Kanal <br>
-[off|red|green|orange] # für Kanal <br>
-</li>
-<li><B>HM-OU-CFM-PL</B><br>
-[on|off|$val]<br>
-</li>
-<li><B>HM-Sen-Wa-Od</B><br>
-$level%<br>
-level $level%<br>
-</li>
-<li><B>KFM100</B><br>
-$v<br>
-$cv,$unit<br>
-rawValue:$v<br>
-Sequence:$seq<br>
-content:$cv,$unit<br>
-</li>
-<li><B>KS550/HM-WDS100-C6-O</B><br>
-T: $t H: $h W: $w R: $r IR: $ir WD: $wd WDR: $wdr S: $s B: $b<br>
-temperature $t<br>
-humidity $h<br>
-windSpeed $w<br>
-windDirection $wd<br>
-windDirRange $wdr<br>
-rain $r<br>
-isRaining $ir<br>
-sunshine $s<br>
-brightness $b<br>
-unknown $p<br>
-</li>
-<li><B>HM-Sen-RD-O</B><br>
-lastRain: timestamp # kein Trigger wird erzeugt. Anfang des vorherigen Regen-Zeitstempels
-des Messwerts ist Ende des Regens. <br>
-</li>
-<li><B>THSensor und HM-WDC7000</B><br>
-T: $t H: $h AP: $ap<br>
-temperature $t<br>
-humidity $h<br>
-airpress $ap #nur HM-WDC7000<br>
-</li>
-<li><B>dimmer</B><br>
-overload [on|off]<br>
-overheat [on|off]<br>
-reduced [on|off]<br>
-dim: [up|down|stop]<br>
-</li>
-<li><B>motionDetector</B><br>
-brightness:$b<br>
-alive<br>
-motion on (to $dest)<br>
-motionCount $cnt _next:$nextTr"-"[0x0|0x1|0x2|0x3|15|30|60|120|240|0x9|0xa|0xb|0xc|0xd|0xe|0xf]<br>
-cover [closed|open] # nicht bei HM-Sec-MDIR<br>
-sabotageError [on|off] # nur bei HM-Sec-MDIR<br>
-battery [low|ok]<br>
-devState_raw.$d1 $d2<br>
-</li>
-<li><B>remote/pushButton/outputUnit</B><br>
-<ul> (to $dest) wird hinzugefügt wenn der Knopf gepeert ist und keinen Broadcast sendet<br>
-Freigabe ist nur für verknüpfte Kanäle verfügbar</ul>
-Btn$x onShort<br>
-Btn$x offShort<br>
-Btn$x onLong $counter<br>
-Btn$x offLong $counter<br>
-Btn$x onLongRelease $counter<br>
-Btn$x offLongRelease $counter<br>
-Btn$x onShort (to $dest)<br>
-Btn$x offShort (to $dest)<br>
-Btn$x onLong $counter (to $dest)<br>
-Btn$x offLong $counter (to $dest)<br>
-Btn$x onLongRelease $counter (to $dest)<br>
-Btn$x offLongRelease $counter (to $dest)<br>
-</li>
-<li><B>remote/pushButton</B><br>
-battery [low|ok]<br>
-trigger [Long|Short]_$no trigger event from channel<br>
-</li>
-<li><B>swi</B><br>
-Btn$x toggle<br>
-Btn$x toggle (to $dest)<br>
-battery: [low|ok]<br>
-</li>
-<li><B>switch/dimmer/blindActuator</B><br>
-$val<br>
-powerOn [on|off|$val]<br>
-[unknown|motor|dim] [up|down|stop]:$val<br>
-timedOn [running|off]<br> # "An" ist temporär - z.B. mit dem 'on-for-timer' gestartet
-</li>
-<li><B>sensRain</B><br>
-$val<br>
-powerOn <br>
-level <val><br>
-timedOn [running|off]<br> # "An" ist temporär - z.B. mit dem 'on-for-timer' gestartet
-trigger [Long|Short]_$no trigger event from channel<br>
-</li>
-<li><B>smokeDetector</B><br>
-[off|smoke-Alarm|alive] # für Gruppen-Master<br>
-[off|smoke-forward|smoke-alarm] # für Gruppenmitglieder<br>
-[normal|added|addedStrong] #HM-CC-SCD<br>
-SDteam [add|remove]_$dname<br>
-battery [low|ok]<br>
-smoke_detect [none|&lt;src&gt;]<br>
-teamCall:from $src<br>
-</li>
-<li><B>threeStateSensor</B><br>
-[open|tilted|closed]<br>
-[wet|damp|dry] #nur HM-SEC-WDS<br>
-cover [open|closed] #HM-SEC-WDS und HM-Sec-RHS<br>
-alive yes<br>
-battery [low|ok]<br>
-contact [open|tilted|closed]<br>
-contact [wet|damp|dry] #nur HM-SEC-WDS<br>
-sabotageError [on|off] #nur HM-SEC-SC<br>
-</li>
-<li><B>winMatic</B><br>
-[locked|$value]<br>
-motorError [no|TurnError|TiltError]<br>
-direction [no|up|down|undefined]<br>
-charge [trickleCharge|charge|dischange|unknown]<br>
-airing [inactiv|$air]<br>
-course [tilt|close]<br>
-airing [inactiv|$value]<br>
-contact tesed<br>
-</li>
-<li><B>keyMatic</B><br>
-unknown:40<br>
-battery [low|ok]<br>
-uncertain [yes|no]<br>
-error [unknown|motor aborted|clutch failure|none']<br>
-lock [unlocked|locked]<br>
-[unlocked|locked|uncertain]<br>
-</li>
-</ul>
-<br>
-</ul>
+  <a name="CUL_HM"></a><h3>CUL_HM</h3>
+  <ul>
+    Unterstützung für eQ-3 HomeMatic Geräte via <a href="#CUL">CUL</a> oder <a
+    href="#HMLAN">HMLAN</a>.<br>
+    <br>
+    <a name="CUL_HMdefine"></a><b>Define</b>
+    <ul>
+    <code><B>define &lt;name&gt; CUL_HM &lt;6-digit-hex-code|8-digit-hex-code&gt;</B></code>
+    
+    <br><br>
+    Eine korrekte Gerätedefinition ist der Schlüssel zur einfachen Handhabung der HM-Umgebung.
+    <br>
+    
+    Hintergrund zur Definition:<br>
+    HM-Geräte haben eine 3 Byte (6 stelliger HEX-Wert) lange HMid - diese ist Grundlage
+    der Adressierung. Jedes Gerät besteht aus einem oder mehreren Kanälen. Die HMid für einen
+    Kanal ist die HMid des Gerätes plus die Kanalnummer (1 Byte, 2 Stellen) in
+    hexadezimaler Notation.
+    Kanäle sollten für alle mehrkanaligen Geräte definiert werden. Einträge für Kanäle
+    können nicht angelegt werden wenn das zugehörige Gerät nicht existiert.<br> Hinweis: FHEM
+    belegt das Gerät automatisch mit Kanal 1 falls dieser nicht explizit angegeben wird. Daher
+    ist bei einkanaligen Geräten keine Definition nötig.<br>
+    
+    Hinweis: Wird ein Gerät gelöscht werden auch die zugehörigen Kanäle entfernt. <br> Beispiel einer
+    vollständigen Definition eines Gerätes mit 2 Kanälen:<br>
+    <ul><code>
+      define livingRoomSwitch CUL_HM 123456<br>
+      define LivingroomMainLight CUL_HM 12345601<br>
+      define LivingroomBackLight CUL_HM 12345602<br><br>
+    </code></ul>
+    
+    livingRoomSwitch bezeichnet das zur Kommunikation verwendete Gerät. Dieses wird
+    vor den Kanälen definiert um entsprechende Verweise einstellen zu können. <br>
+    LivingroomMainLight hat Kanal 01 und behandelt den Lichtstatus, Kanal-Peers
+    sowie zugehörige Kanalregister. Falls nicht definiert wird Kanal 01 durch die Geräteinstanz
+    abgedeckt.<br> LivingRoomBackLight ist der zweite "Kanal", Kanal 02. Seine
+    Definition ist verpflichtend um die Funktion ausführen zu können.<br><br>
+    
+    Sonderfall Sender: HM behandelt jeden Knopf einer Fernbedienung, Drucktaster und
+    ähnliches als Kanal . Es ist möglich (nicht notwendig) einen Kanal pro Knopf zu
+    definieren. Wenn alle Kanäle definiert sind ist der Zugriff auf Pairing-Informationen
+    sowie auf Kanalregister möglich. Weiterhin werden Verknüpfungen durch Namen besser
+    lesbar.<br><br>
+    
+    define kann auch durch das <a href="#autocreate">autocreate</a>
+    Modul aufgerufen werden, zusammen mit dem notwendigen subType Attribut.
+    Normalerweise erstellt man <a href="#CULset">hmPairForSec</a> und drückt dann den
+    zugehörigen Knopf am Gerät um die Verknüpfung herzustellen oder man verwendet <a
+    href="#CULset">hmPairSerial</a> falls das Gerät ein Empfänger und die Seriennummer
+    bekannt ist. Autocreate wird dann ein FHEM-Gerät mit allen notwendigen Attributen anlegen.
+    Ohne Pairing wird das Gerät keine Befehle von FHEM akzeptieren. Selbst wenn das Pairing
+    scheitert legt FHEM möglicherweise das Gerät an. Erfolgreiches Pairen wird
+    durch den Eintrag CommandAccepted in den Details zum CUL_HM Gerät angezeigt.<br><br>
+    
+    Falls autocreate nicht verwendet werden kann muss folgendes spezifiziert werden:<br>
+    <ul>
+      <li>Der &lt;6-stellige-Hex-Code&gt;oder HMid+ch &lt;8-stelliger-Hex-Code&gt;<br>
+        Das ist eine einzigartige, festgelegte Geräteadresse die nicht geändert werden kann (nein,
+        man kann sie nicht willkürlich auswählen wie z.B. bei FS20 Geräten). Man kann sie feststellen
+        indem man das FHEM-Log durchsucht.</li>
+      <li>Das subType Attribut<br>
+        Dieses lautet: switch dimmer blindActuator remote sensor swi
+        pushButton threeStateSensor motionDetector keyMatic winMatic
+        smokeDetector</li>
+      <li>Das model Attribut<br>
+      ist entsprechend der HM Nomenklatur zu vergeben</li>
+    </ul>
+    Ohne diese Angaben kann FHEM nicht korrekt mit dem Gerät arbeiten.<br><br>
+    
+    <b>Hinweise</b>
+    <ul>
+      <li>Falls das Interface ein Gerät vom Typ CUL ist muss <a href="#rfmode">rfmode </a>
+        des zugehörigen CUL/CUN Gerätes auf HomeMatic gesetzt werden.
+        Achtung: Dieser Modus ist nur für BidCos/Homematic. Nachrichten von FS20/HMS/EM/S300
+        werden durch diese Gerät <b>nicht</b> empfangen. Bereits definierte FS20/HMS
+        Geräte müssen anderen Eingängen zugeordnet werden (CUL/FHZ/etc).
+      </li>
+      <li>Nachrichten eines Geräts werden nur richtig interpretiert wenn der Gerätetyp
+        bekannt ist. FHEM erhält den Gerätetyp aus einer"pairing request"
+        Nachricht, selbst wenn es darauf keine Antwort erhält (siehe <a
+        href="#hmPairSerial">hmPairSerial</a> und <a
+        href="#hmPairForSec">hmPairForSec</a> um Parinig zu ermöglichen).
+        Alternativ, setzen des richtigen subType sowie Modelattributes, für eine Liste der
+        möglichen subType-Werte siehe "attr hmdevice ?".</li>
+      <a name="HMAES"></a>
+      <li>Die sogenannte "AES-Verschlüsselung" ist eigentlich eine Signaturanforderung: Ist sie
+        aktiviert wird ein Aktor den erhaltenen Befehl nur ausführen falls er die korrekte
+        Antwort auf eine zuvor durch den Aktor gestellte Anfrage erhält. Das bedeutet:
+        <ul>
+          <li>Die Reaktion auf Befehle ist merklich langsamer, da 3 Nachrichten anstatt einer übertragen
+            werden bevor der Befehl vom Aktor ausgeführt wird.</li>
+          <li>Jeder Befehl sowie seine Bestätigung durch das Gerät wird in Klartext übertragen, ein externer
+            Beobachter kennt somit den Status jedes Geräts.</li>
+          <li>Die eingebaute Firmware ist fehlerhaft: Ein "toggle" Befehl wir ausgeführt <b>bevor</b> die
+            entsprechende Antwort auf die Signaturanforderung empfangen wurde, zumindest bei einigen Schaltern
+            (HM-LC-Sw1-Pl und HM-LC-SW2-PB-FM).</li>
+          <li>Der <a href="#HMLAN">HMLAN</a> Konfigurator beantwortet Signaturanforderungen selbstständig,
+            ist dabei die 3-Byte-Adresse einer anderen CCU eingestellt welche noch immer das Standardpasswort hat,
+            kann dieser Signaturanfragen korrekt beantworten.</li>
+          <li>AES-Verschlüsselung kann nicht bei einem CUL als Interface eingesetzt werden, wird allerdings
+            durch HMLAN unterstützt. Aufgrund dieser Einschränkungen ist der Einsatz der Homematic-Verschlüsselung
+            nicht zu empfehlen!</li>
+        </ul>
+      </li>
+    </ul>
+    </ul><br>
+    
+    <a name="CUL_HMset"></a><b>Set</b>
+    <ul>
+      Hinweis: Geräte die normalerweise nur senden (Fernbedienung/Sensor/etc.) müssen in den
+      Pairing/Lern-Modus gebracht werden um die folgenden Befehle zu empfangen.
+      <br>
+      <br>
+      
+      Allgemeine Befehle (verfügbar für die meisten HM-Geräte):
+      <ul>
+        <li><B>clear &lt;[readings|register|msgEvents]&gt;</B><a name="CUL_HMclear"></a><br>
+            Eine Reihe von Variablen kann entfernt werden.<br>
+          <ul>
+            readings: Alle Messwerte werden gelöscht, neue Werte werden normal hinzugefügt. Kann benutzt werden um alte Daten zu entfernen<br>
+            register: Alle in FHEM aufgezeichneten Registerwerte werden entfernt. Dies hat KEINEN Einfluss auf Werte im Gerät.<br>
+            msgEvents: Alle Anchrichtenzähler werden gelöscht. Ebenso wird der Befehlsspeicher zurückgesetzt. <br>
+            rssi: gesammelte RSSI-Werte werden gelöscht. <br>
+          </ul>
+        </li>
+        <li><B>getConfig</B><a name="CUL_HMgetConfig"></a><br>
+          Liest die Hauptkonfiguration eines HM_Gerätes aus. Angewendet auf einen Kanal
+          erhält man Pairing-Information, List0, List1 und List3 des ersten internen Peers.
+          Außerdem erhält man die Liste der Peers für den gegebenen Kanal. Wenn auf ein Gerät
+          angewendet so bekommt man mit diesem Befehl die vorherigen Informationen für alle
+          zugeordneten Kanäle. Ausgeschlossen davon sind Konfigurationen zusätzlicher Peers.
+          <br> Der Befehl ist eine Abkürzung für eine Reihe anderer Befehle.
+        </li>
+        <li><B>getRegRaw [List0|List1|List2|List3|List4|List5|List6]
+          &lt;peerChannel&gt; </B><a name="CUL_HMgetRegRaw"></a><br>
+          Auslesen der Rohdaten des Registersatzes. Eine Beschreibung der Register sprengt
+          den Rahmen dieses Dokuments.<br>
+          
+          Die Register sind in sog. Listen strukturiert welche einen Satz Register enthalten.<br>
+          
+          List0: Geräteeinstellungen z.B: Einstellungen für CUL-Pairing Temperaturlimit eines Dimmers.<br>
+          
+          List1: Kanaleinstellungen z.B. benötigte Zeit um Rollo hoch und runter zu fahren.<br>
+          
+          List3: "link" Einstellungen - d.h. Einstellungen für Peer-Kanal. Das ist eine große Datenmenge!
+          Steuert Aktionen bei Empfang eines Triggers vom Peer.<br>
+          
+          List4: Einstellungen für den Kanal (Taster) einer Fernbedienung.<br><br>
+          
+          &lt;PeerChannel&gt; verknüpfte HMid+ch, z.B. 4 byte (8 stellige) Zahl wie
+          '12345601'. Ist verpflichtend für List3 und List4 und kann ausgelassen werden
+          für List0 und 1. <br>
+          
+          'all' kann verwendet werden um Daten von jedem mit einem Kanal verknüpften Link zu bekommen. <br>
+          
+          'selfxx' wird verwendet um interne Kanäle zu adressieren (verbunden mit den eingebauten Schaltern
+          falls vorhanden). xx ist die Kanalnummer in dezimaler Notation.<br>
+          
+          Hinweis 1: Ausführung ist abhängig vom Entity. Wenn List1 für ein Gerät statt einem Kanal
+          abgefragt wird gibt der Befehl List1 für alle zugehörigen Kanäle aus.
+          List3 mit 'peerChannel = all' gibt alle Verbindungen für alle Kanäle eines Gerätes zurück.<br>
+          
+          Hinweis 2: für 'Sender' siehe auch <a href="#CUL_HMremote">remote</a> <br>
+          
+          Hinweis 3: Das Abrufen von Informationen kann dauern - besonders für Geräte
+          mit vielen Kanälen und Verknüpfungen. Es kann nötig sein das Webinterface manuell neu zu laden
+          um die Ergebnisse angezeigt zu bekommen.<br>
+          
+          Hinweis 4: Direkte Schalter eines HM-Geräts sind standardmäßig ausgeblendet.
+          Dennoch sind sie genauso als Verknüpfungen implemetiert. Um Zugriff auf 'internal links'
+          zu bekommen ist es notwendig folgendes zu erstellen:<br>
+          'set &lt;name&gt; <a href="#CUL_HMregSet">regSet</a> intKeyVisib visib'<br>
+          oder<br>
+          'set &lt;name&gt; <a href="#CUL_HMregBulk">regBulk</a> RegL_0: 2:81'<br>
+          Zurücksetzen lässt es sich indem '81' mit '01' ersetzt wird.<br> example:<br>
+          
+          <ul><code>
+            set mydimmer getRegRaw List1<br>
+            set mydimmer getRegRaw List3 all <br>
+          </code></ul>
+          </li>
+        <li><B>getSerial</B><a name="CUL_HMgetSerial"></a><br>
+          Auslesen der Seriennummer eines geräts und speichern in Attribut serialNr.
+        </li>
+        <li><B>inhibit [on|off]</B><br>
+          Blockieren/Zulassen aller Kanaländerungen eines Aktors, d.h. Zustand des Aktors ist
+          eingefroren bis 'inhibit' wieder deaktiviert wird. 'Inhibit' kann für jeden Aktorkanal
+          ausgeführt werden aber natürlich nicht für Sensoren - würde auch keinen Sinn machen.<br>
+          Damit ist es praktischerweise möglich Nachrichten ebenso wie verknüpfte Kanalaktionen
+          temporär zu unterdrücken ohne sie löschen zu müssen. <br>
+          Beispiele:
+          <ul><code>
+            # Ausführung blockieren<br>
+            set keymatic inhibit on <br><br>
+          </ul></code>
+        </li>
+        
+        <li><B>pair</B><a name="CUL_HMpair"></a><br>
+          Verbinden eines Geräts bekannter Seriennummer (z.b. nach einem Reset)
+          mit einer FHEM-Zentrale. Diese Zentrale wird normalerweise durch CUL/CUNO,
+          HMLAN,... hergestellt.
+          Wenn verbunden melden Geräte ihren Status and FHEM.
+          Wenn nicht verbunden wird das Gerät auf bestimmte Anfragen nicht reagieren
+          und auch bestimmte Statusinformationen nicht melden. Pairing geschieht auf
+          Geräteebene. Kanäle können nicht unabhängig von einem Gerät mit der Zentrale
+          verbunden werden.
+          Siehe auch <a href="#CUL_HMgetpair">getPair</a> und
+          <a href="#CUL_HMunpair">unpair</a>.<br>
+          Nicht das Verbinden (mit einer Zentrale) mit verknüpfen (Kanal zu Kanal) oder
+          <a href="#CUL_HMpeerChan">peerChan</a> verwechseln.<br>
+        </li>
+        <li><B>peerBulk</B> &lt;peerch1,peerch2,...&gt; [set|unset]<a name="CUL_HMpeerBulk"></a><br>
+          peerBulk fügt Peer-Kanäle zu einem Kanal hinzu. Alle Peers einer Liste werden
+          dabei hinzugefügt.<br>
+          Peering setzt die Einstellungen einer Verknüpfung auf Standardwerte. Da Peers nicht in Gruppen
+          hinzugefügt werden werden sie durch HM standardmäßig als'single' für dieses Gerät
+          angelegt. <br>
+          Eine ausgeklügeltere Funktion wird gegeben durch
+          <a href="#CUL_HMpeerChan">peerChan</a>.<br>
+          peerBulk löscht keine vorhandenen Peers sondern bearbeitet nur die Peerliste.
+          Andere bereits angelegt Peers werden nicht verändert.<br>
+          peerBulk kann verwendet werden um Peers zu löschen indem die <B>unset</B> Option
+          mit Standardeinstellungen aufgerufen wird.<br>
+          
+          Verwendungszweck dieses Befehls ist hauptsächlich das Wiederherstellen
+          von Daten eines Geräts.
+          Empfehlenswert ist das anschließende Wiederherstellen der Registereinstellung
+          mit <a href="#CUL_HMregBulk">regBulk</a>. <br>
+          Beispiel:<br>
+          <ul><code>
+            set myChannel peerBulk 12345601,<br>
+            set myChannel peerBulk self01,self02,FB_Btn_04,FB_Btn_03,<br>
+            set myChannel peerBulk 12345601 unset # entferne Peer 123456 Kanal 01<br>
+          </code></ul>
+        </li>
+        <li><B>regBulk &lt;reg List&gt;:&lt;peer&gt; &lt;addr1:data1&gt; &lt;addr2:data2&gt;...
+          </B><a name="CUL_HMregBulk"></a><br>
+          Dieser Befehl ersetzt das bisherige regRaw. Er erlaubt Register mit Rohdaten zu
+          beschreiben. Hauptzweck ist das komplette Wiederherstellen eines zuvor gesicherten
+          Registers. <br>
+          Werte können mit <a href="#CUL_HMgetConfig">getConfig</a> ausgelesen werden. Die
+          zurückgegebenen Werte können direkt für diesen Befehl verwendet werden.<br>
+          &lt;reg List&gt; bezeichnet die Liste in die geschrieben werden soll. Mögliches Format
+          '00', 'RegL_00', '01'...<br>
+          &lt;peer&gt; ist eine optionale Angabe falls die Liste ein Peer benötigt.
+          Der Peer kann als Kanalname oder als 4-Byte (8 chars) HM-Kanal ID angegeben
+          werden.<br>
+          &lt;addr1:data1&gt; ist die Liste der Register im Hex-Format.<br>
+          Beispiel:<br>
+          <ul><code>
+            set myChannel regBulk RegL_00: 02:01 0A:17 0B:43 0C:BF 15:FF 00:00<br>
+            RegL_03:FB_Btn_07
+            01:00 02:00 03:00 04:32 05:64 06:00 07:FF 08:00 09:FF 0A:01 0B:44 0C:54 0D:93 0E:00 0F:00 11:C8 12:00 13:00 14:00 15:00 16:00 17:00 18:00 19:00 1A:00 1B:00 1C:00 1D:FF 1E:93 1F:00 81:00 82:00 83:00 84:32 85:64 86:00 87:FF 88:00 89:FF 8A:21 8B:44 8C:54 8D:93 8E:00 8F:00 91:C8 92:00 93:00 94:00 95:00 96:00 97:00 98:00 99:00 9A:00 9B:00 9C:00 9D:05 9E:93 9F:00 00:00<br>
+            set myblind regBulk 01 0B:10<br>
+            set myblind regBulk 01 0C:00<br>
+            </code></ul>
+          myblind setzt die maximale Zeit für das Hochfahren der Rollos auf 25,6 Sekunden
+        </li>
+        <li><B>regSet [prep|exec] &lt;regName&gt; &lt;value&gt; &lt;peerChannel&gt;</B><a name="CUL_HMregSet"></a><br>
+          Für einige Hauptregister gibt es eine lesbarere Version die Registernamen &lt;regName&gt;
+          und Wandlung der Werte enthält. Nur ein Teil der Register wird davon unterstützt.<br>
+          Der optionale Parameter [prep|exec] erlaubt das Packen von Nachrichten und verbessert damit
+          deutlich die Datenübertragung.
+          Benutzung durch senden der Befehle mit Parameter "prep". Daten werden dann für das Senden gesammelt.
+          Der letzte Befehl muss den Parameter "exec" habe um die Information zu übertragen.<br>
+          &lt;value&gt; enthält die Daten in menschenlesbarer Form die in das Register geschrieben werden.<br>
+          &lt;peerChannel&gt; wird benötigt falls das Register 'peerChan' basiert definiert wird.
+          Kann ansonsten auf '0' gesetzt werden. Siehe <a
+          href="#CUL_HMgetRegRaw">getRegRaw</a> für komplette Definition.<br>
+          Unterstützte Register eines Geräts können wie folgt bestimmt werden:<br>
+          <ul><code>set regSet ? 0 0</code></ul>
+            Eine verkürzte Beschreibung der Register wird zurückgegeben mit:<br>
+          <ul><code>set regSet &lt;regname&gt; ? 0</code></ul>
+        </li>
+        <li><B>reset</B><a name="CUL_HMreset"></a><br>
+          Rücksetzen des Geräts auf Werkseinstellungen. Muss danach erneut verbunden werden um es
+          mit FHEM zu nutzen.
+        </li>
+        <li><B>sign [on|off]</B><a name="CUL_HMsign"></a><br>
+          Ein- oder ausschalten der Signierung (auch "AES-Verschlüsselung" genannt, siehe <a
+          href="#HMAES">note</a>). Achtung: Wird das Gerät über einen CUL eingebunden ist schalten (oder
+          deaktivieren der Signierung) nicht möglich, das Gerät muss direkt zurückgesetzt werden.
+        </li>
+        <li><B>statusRequest</B><a name="CUL_HMstatusRequest"></a><br>
+          Aktualisieren des Gerätestatus. Für mehrkanalige Geräte sollte dies kanalbasiert
+          erfolgen.
+        </li>
+        <li><B>unpair</B><a name="CUL_HMunpair"></a><br>
+          Aufheben des "Pairings", z.B. um das verbinden mit einem anderen Master zu ermöglichen.
+          Siehe <a href="#CUL_HMpair">pair</a> für eine Beschreibung.</li>
+        <li><B>virtual &lt;Anzahl an Knöpfen&gt;</B><a name="CUL_HMvirtual"></a><br>
+          Konfiguriert eine vorhandene Schaltung als virtuelle Fernbedienung. Die Anzahl der anlegbaren
+          Knöpfe ist 1 - 255. Wird der Befehl für die selbe Instanz erneut aufgerufen werden Knöpfe
+          hinzugefügt. <br>
+          Beispiel für die Anwendung:
+          <ul><code>
+            define vRemote CUL_HM 100000 # die gewählte HMid darf nicht in Benutzung sein<br>
+            set vRemote virtual 20 # definiere eine Fernbedienung mit 20 Knöpfen<br>
+            set vRemote_Btn4 peerChan 0 &lt;actorchannel&gt; # verknüpft Knopf 4 und 5 mit dem gewählten Kanal<br>
+            set vRemote_Btn4 press<br>
+            set vRemote_Btn5 press long<br>
+          </code></ul>
+          siehe auch <a href="#CUL_HMpress">press</a>
+        </li>
+      </ul>
+      <br>
+      <B>subType abhängige Befehle:</B>
+      <ul>
+        <br>
+        <li>switch
+          <ul>
+            <li><B>on</B> <a name="CUL_HMon"> </a> - setzt Wert auf 100%</li>
+            <li><B>off</B><a name="CUL_HMoff"></a> - setzt Wert auf 0%</li>
+            <li><B>on-for-timer &lt;sec&gt;</B><a name="CUL_HMonForTimer"></a> -
+              Schaltet das Gerät für die gewählte Zeit in Sekunden [0-85825945] an.<br> Hinweis:
+              off-for-timer wie bei FS20 wird nicht unterstützt. Kann aber über Kanalregister
+              programmiert werden.</li>
+            <li><B>on-till &lt;time&gt;</B><a name="CUL_HMonTill"></a> - einschalten bis zum angegebenen Zeitpunkt.<br>
+              <ul><code>set &lt;name&gt; on-till 20:32:10<br></code></ul>
+              Das momentane Maximum für eine Endzeit liegt bei 24 Stunden.<br>
+            </li>
+            <li><B>press &lt;[short|long]&gt;&lt;[on|off]&gt;</B><a name="CUL_HMpress"></a><br>
+              <B>press &lt;[short|long]&gt;&lt;[noBurst]&gt;</a>
+              simuliert den Druck auf einen lokalen Knopf oder direkt verbundenen Knopf des Aktors.<br>
+              <B>[short|long]</B> wählt aus ob ein kurzer oder langer Tastendruck simuliert werden soll.<br>
+              <B>[on|off]</B> ist relevant für Geräte mit direkter Bedienung pro Kanal.
+              Verfügbar für Dimmer und Rollo-Aktoren, normalerweise nicht für Schalter.<br>
+              <B>[noBurst]</B> ist relevant für Peers die bedingte Bursts unterstützen.
+              Dies bewirkt das der Befehl der Warteliste des Peers zugefügt wird. Ein Burst wird anschließend
+              <B>nicht </B> ausgeführt da der Befehl wartet bis der Peer aufgewacht ist. Dies führt zu einer
+              <B>Verzögerung des Tastendrucks</B>, reduziert aber Übertragungs- und Performanceaufwand. <br>
+            </li>
+            <li><B>toggle</B><a name="CUL_HMtoggle"></a> - toggled den Aktor. Schaltet vom aktuellen Level auf
+              0% oder von 0% auf 100%</li>
+          </ul>
+          <br>
+        </li>
+        <li>dimmer, blindActuator<br>
+          Dimmer können virtuelle Kanäle unterstützen. Diese werden automatisch angelegt falls vorhanden.
+          Normalerweise gibt es 2 virtuelle Kanäle zusätzlich zum primären Kanal. Virtuelle Dimmerkanäle sind
+          standardmäßig deaktiviert, können aber parallel zum ersten Kanal benutzt werden um das Licht zu steuern. <br>
+          Die virtuellen Kanäle haben Standardnamen SW&lt;channel&gt;_V&lt;nr&gt; z.B. Dimmer_SW1_V1 and Dimmer_SW1_V2.<br>
+          Virtuelle Dimmerkanäle unterscheiden sich komplett von virtuellen Knöpfen und Aktoren in FHEM, sind aber
+          Teil des HM-Geräts. Dokumentation und Möglichkeiten würde hier aber zu weit führen.<br>
+          <ul>
+            <li><B>0 - 100 [on-time] [ramp-time]</B><br>
+              Setzt den Aktor auf den gegeben Wert (In Prozent)
+              mit einer Auflösung von 0.5.<br>
+              Bei Dimmern ist optional die Angabe von "on-time" und "ramp-time" möglich, beide in Sekunden mit 0.1s Abstufung.<br>
+              "On-time" verhält sich analog dem "on-for-timer".<br>
+              "Ramp-time" beträgt standardmäßig 2.5s, 0 bedeutet umgehend.<br>
+            </li>
+            <li><B><a href="#CUL_HMon">on</a></B></li>
+            <li><B><a href="#CUL_HMoff">off</a></B></li>
+            <li><B><a href="#CUL_HMpress">press &lt;[short|long]&gt;&lt;[on|off]&gt;</a></B></li>
+            <li><B><a href="#CUL_HMtoggle">toggle</a></B></li>
+            <li><B><a href="#CUL_HMonForTimer">on-for-timer &lt;sec&gt;</a></B> - Nur Dimmer! <br></li>
+            <li><B><a href="#CUL_HMonTill">on-till &lt;time&gt;</a></B> - Nur Dimmer! <br></li>
+            <li><B>stop</B> - Stopt Bewegung (Rollo) oder Dimmerrampe</li>
+            <li><B>pct &lt;level&gt [&lt;ontime&gt] [&lt;ramptime&gt]</B> - setzt Aktor auf gewünschten <B>absolut Wert</B>.<br>
+              Optional können für Dimmer "ontime" und "ramptime" angegeben werden.<br>
+              "Ontime" kann dabei in Sekunden angegeben werden. Kann auch als Endzeit angegeben werden im Format hh:mm:ss
+            </li>
+            <li><B>up [changeValue] [&lt;ontime&gt] [&lt;ramptime&gt]</B> Einen Schritt hochdimmen.</li>
+            <li><B>down [changeValue] [&lt;ontime&gt] [&lt;ramptime&gt]</B> Einen Schritt runterdimmen.<br>
+              "changeValue" ist optional und gibt den zu ändernden Wert in Prozent an. Mögliche Abstufung dabei ist 0.5%, Standard ist 10%. <br>
+              "ontime" ist optional und gibt an wielange der Wert gehalten werden soll. '0' bedeutet endlos und ist Standard.<br>
+              "ramptime" ist optional und definiert die Zeit bis eine Änderung den neuen Wert erreicht. Hat nur für Dimmer Bedeutung.
+            <br></li>
+          </ul>
+          <br>
+        </li>
+        <li>remotes, pushButton<a name="CUL_HMremote"></a><br>
+          Diese Geräteart reagiert nicht auf Anfragen, außer sie befinden sich im Lernmodus. FHEM reagiert darauf
+          indem alle Anfragen gesammelt werden bis der Lernmodus detektiert wird. Manuelles Eingreifen durch
+          den Benutzer ist dazu nötig. Ob Befehle auf Ausführung warten kann auf Geräteebene mit dem Parameter
+          'protCmdPend' abgefragt werden.
+          <ul>
+            <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>]
+              [<u>set</u>|unset] [<u>both</u>|actor|remote]</B><a name="CUL_HMpeerChan"></a><br>
+              "peerChan" richtet eine Verbindung zwischen Sender-<B>Kanal</B> und
+              Aktor-<B>Kanal</B> ein, bei HM "link" genannt. "Peering" darf dabei nicht
+              mit "pairing" verwechselt werden.<br>
+              <B>Pairing</B> bezeichnet das Zuordnen eines <B>Geräts</B> zu einer Zentrale.<br>
+              <B>Peering</B> bezeichnet das faktische Verbinden von <B>Kanälen</B>.<br>
+              Peering erlaubt die direkte Interaktion zwischen Sender und Aktor ohne den Einsatz einer CCU<br>
+              Peering eines Senderkanals veranlaßt den Sender nach dem Senden eines Triggers auf die
+              Bestätigung eines - jeden - Peers zu warten. Positives Feedback (z.B. grüne LED)
+              gibt es dabei nur wenn alle Peers den Befehl bestätigt haben.<br>
+              Peering eines Aktorkanals richtet dabei einen Satz von Parametern ein welche die auszuführenden Aktionen
+              definieren wenn ein Trigger dieses Peers empfangen wird. Dies bedeutet: <br>
+              - nur Trigger von Peers werden ausgeführt<br>
+              - die auszuführende Aktion muss für den zugehörigen Trigger eines Peers definiert werden<br>
+              Ein Aktorkanal richtet dabei eine Standardaktion beim Peering ein - diese hängt vom Aktor ab.
+              Sie kann ebenfalls davon abhängen ob ein oder zwei Tasten <B>ein einem Befehl</B> gepeert werden.
+              Peert man einen Schalter mit 2 Tasten kann eine Taste für 'on' und eine andere für 'off' angelegt werden.
+              Wenn nur eine Taste definiert wird ist die Funktion wahrscheinlich 'toggle'.<br>
+              Die Funktion kann durch programmieren des Register (vom Aktor abhängig) geändert werden.<br>
+              
+              Auch wenn der Befehl von einer Fernbedienung oder einem Taster kommt hat er direkten Effekt auf
+              den Aktor. Das Peering beider Seiten ist quasi unabhängig und hat unterschiedlich Einfluss auf
+              Sender und Empfänger.<br>
+              Peering eines Aktorkanals mit mehreren Senderkanälen ist ebenso möglich wie das eines Senderkanals
+              mit mehreren Empfängerkanälen.<br>
+              
+              &lt;actChan&gt; ist der zu verknüpfende Aktorkanal.<br>
+              
+              &lt;btn_no&gt; ist der zu verknüpfende Senderkanal (Knopf). Wird
+              'single' gewählt werden die Tasten von 1 an gezählt. Für 'dual' ist btn_no
+              die Nummer des zu verwendenden Tasterpaares. Z.B. ist '3' iim Dualmodus das
+              dritte Tasterpaar welches mit Tasten 5 und 6 im Singlemodus übereinstimmt.<br>
+              
+              Wird der Befehl auf einen Kanal angewendet wird btn_no igroriert.
+              Muss gesetzt sein, sollte dabei 0 sein.<br>
+              
+              [single|dual]: Dieser Modus bewirkt das Standardverhalten des Aktors bei Benutzung eines Tasters. Ein Dimmer
+              kann z.B. an einen einzelnen oder ein Paar von Tastern angelernt werden. <br>
+              Standardeinstellung ist "dual".<br>
+              
+              'dual' (default) Schalter verknüpft zwei Taster mit einem Aktor. Bei einem Dimmer
+              bedeutet das ein Taster für hoch- und einer für runterdimmen. <br>
+              
+              'single' benutzt nur einen Taster des Senders. Ist z.B. nützlich für einen einfachen Schalter
+              der nur zwischen an/aus toggled. Aber auch ein Dimmer kann an nur einen Taster angelernt werden.<br>
+              
+              [set|unset]: Wählt aus ob Peer hinzugefügt oder entfernt werden soll.<br>
+              Hinzufügen ist Standard.<br>
+              'set' stellt Peers für einen Kanal ein.<br>
+              'unset' entfernt Peer für einen Kanal.<br>
+              
+              [actor|remote|both] beschränkt die Ausführung auf Aktor oder Fernbedienung.
+              Das ermöglicht dem Benutzer das entfernen des Peers vom Fernbedienungskanal ohne
+              die Einstellungen am Aktor zu entfernen.<br>
+              Standardmäßig gewählt ist "both" für beides.<br>
+              
+              Example:
+              <ul><code>
+                set myRemote peerChan 2 mySwActChn single set #Peer zweiten Knopf mit Aktorkanal<br>
+                set myRmtBtn peerChan 0 mySwActChn single set #myRmtBtn ist ein Knopf der Fernbedienung. '0' wird hier nicht verarbeitet<br>
+                set myRemote peerChan 2 mySwActChn dual set #Verknüpfe Knöpfe 3 und 4<br>
+                set myRemote peerChan 3 mySwActChn dual unset #Entferne Peering für Knöpfe 5 und 6<br>
+                set myRemote peerChan 3 mySwActChn dual unset aktor #Entferne Peering für Knöpfe 5 und 6 nur im Aktor<br>
+                set myRemote peerChan 3 mySwActChn dual set remote #Verknüpfe Knöpfe 5 und 6 nur mit Fernbedienung. Linkeinstellungen mySwActChn werden beibehalten.<br>
+              </code></ul>
+            </li>
+          </ul>
+        
+        </li>
+        <li>virtual<a name="CUL_HMvirtual"></a><br>
+          <ul>
+            <li><B><a href="#CUL_HMpeerChan">peerChan</a></B> siehe remote</li>
+            <li><B>press [long|short]<a name="CUL_HMpress"></a></B>
+              Simuliert einen kurzen (Standard) oder langen Tastendruck. Zu beachten ist dass die momentane
+              Implementierung für "long" keine Dauer angibt . Es wird nur ein Trigger vom Typ "long" gesendet.
+            </li>
+            <li><B>virtTemp &lt;[off -10..50]&gt;<a name="CUL_HMvirtTemp"></a></B>
+              Simuliert ein Thermostat. Wenn mit einem Gerät gepeert wird periodisch eine Temperatur gesendet,
+              solange bis "off" gewählt wird. Siehe auch <a href="#CUL_HMvirtHum">virtHum</a><br>
+            </li>
+            <li><B>virtHum &lt;[off -10..50]&gt;<a name="CUL_HMvirtHum"></a></B>
+              Simuliert den Feuchtigkeitswert eines Thermostats. Wenn mit einem Gerät verknüpft werden periodisch
+              Luftfeuchtigkeit undTemperatur gesendet, solange bis "off" gewählt wird. Siehe auch <a href="#CUL_HMvirtTemp">virtTemp</a><br>
+            </li>
+            <li><B>valvePos &lt;[off 0..100]&gt;<a name="CUL_HMvalvePos"></a></B>
+              steuert einen Ventilantrieb<br>
+            </li>
+          </ul>
+        </li>
+        <li>smokeDetector<br>
+          Hinweis: All diese Befehle funktionieren momentan nur wenn mehr als ein Rauchmelder
+          vorhanden ist, und diese gepeert wurden um eine Gruppe zu bilden. Um die Befehle abzusetzen
+          muss der Master dieser gruppe verwendet werden, und momentan muss man raten welcher der Master ist.<br>
+          smokeDetector kann folgendermaßen in Gruppen eingeteilt werden:
+          <a href="#CUL_HMpeerChan">peerChan</a>. Alle Mitglieder müssen mit dem Master verknüpft werden. Auch der
+          Master muss mit peerChan zur Gruppe zugefügt werden - z.B. mit sich selbst verknüpft! Dadurch hat man volle
+          Kontrolle über die Gruppe und muss nicht raten.<br>
+          <ul>
+            <li><B>teamCall</B> - führt einen Netzwerktest unter allen Gruppenmitgliedern aus</li>
+            <li><B>alarmOn</B> - löst einen Alarm aus</li>
+            <li><B>alarmOff</B> - schaltet den Alarm aus</li>
+          </ul>
+        </li>
+        <li>4Dis (HM-PB-4DIS-WM)
+          <ul>
+            <li><B>text &lt;btn_no&gt; [on|off] &lt;text1&gt; &lt;text2&gt;</B><br>
+              Zeigt Text auf dem Display eines Geräts an. Für diesen Zweck muss zuerst ein set-Befehl
+              (oder eine Anzahl davon) abgegeben werden, dann können im "teach-in" Menü des 4Dis mit
+              "Central" Daten übertragen werden.<br>
+              Falls auf einen Kanal angewendet dürfen btn_no und on|off nicht verwendet werden, nur
+              reiner Text.
+              Beispiel:
+              <ul>
+                <code>
+                  set 4Dis text 1 on On Lamp<br>
+                  set 4Dis text 1 off Kitchen Off<br>
+                  <br>
+                  set 4Dis_chn4 text Kitchen Off<br>
+                </code>
+              </ul>
+            </li>
+          </ul>
+          <br>
+        </li>
+        <li>Climate-Control (HM-CC-TC)
+          <ul>
+            <li><B>desired-temp &lt;temp&gt;</B><br>
+              Setzt verschiedene Temperaturen. &lt;temp&gt; muss zwischen 6°C und 30°C liegen, die Auflösung beträgt 0.5°C.</li>
+            <li><B>tempListSat [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+            <li><B>tempListSun [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+            <li><B>tempListMon [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+            <li><B>tempListTue [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+            <li><B>tempListThu [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+            <li><B>tempListWed [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+            <li><B>tempListFri [prep|exec] HH:MM temp ... 24:00 temp</B><br>
+              Gibt eine Liste mit Temperaturintervallen an. Bis zu 24 Intervall können pro Wochentag definiert werden, die
+              Auflösung dabei sind 10 Minuten. Die letzte Zeitangabe muss 24:00 Uhr sein.<br>
+              Beispiel: bis 6:00 soll die Temperatur 19°C sein, dann bis 23:00 Uhr 22.5°C, anschließend
+              werden bis Mitternacht 19°C gewünscht.<br>
+              <code> set th tempListSat 06:00 19 23:00 22.5 24:00 19<br></code>
+            </li>
+            <li><B>partyMode &lt;HH:MM&gt;&lt;durationDays&gt;</B><br>
+              setzt die Steuerung für die angegebene Zeit in den Partymodus. Dazu ist die Endzeit sowie <b>Anzahl an Tagen</b>
+              die er dauern soll anzugeben. Falls er am nächsten Tag enden soll ist '1'
+              anzugeben<br></li>
+            <li><B>systime</B><br>
+              setzt Zeit des Klimakanals auf die Systemzeit</li>
+          </ul><br>
+        </li>
+        <li>Climate-Control (HM-CC-RT-DN|HM-CC-RT-DN-BoM)
+          <ul>
+            <li><B>controlMode &lt;auto|boost|day|night&gt;</B><br></li>
+            <li><B>controlManu &lt;temp&gt;</B><br></li>
+            <li><B>controlParty &lt;temp&gt;&lt;startDate&gt;&lt;startTime&gt;&lt;endDate&gt;&lt;endTime&gt;</B><br>
+              setzt die Steuerung in den Partymodus, definiert Temperatur und Zeitrahmen.<br>
+              Beispiel:<br>
+              <code>set controlParty 15 03.8.13 20:30 5.8.13 11:30</code></li>
+            <li><B>systime</B><br>
+              setzt Zeit des Klimakanals auf die Systemzeit</li>
+            <li><B>desired-temp &lt;temp&gt;</B><br>
+              Setzt verschiedene Temperaturen. &lt;temp&gt; muss zwischen 6°C und 30°C liegen, die Auflösung beträgt 0.5°C.</li>
+            <li><B>tempListSat [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+            <li><B>tempListSun [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+            <li><B>tempListMon [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+            <li><B>tempListTue [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+            <li><B>tempListThu [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+            <li><B>tempListWed [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
+            <li><B>tempListFri [prep|exec] HH:MM temp ... 24:00 temp</B><br>
+              Gibt eine Liste mit Temperaturintervallen an. Bis zu 24 Intervall können pro Wochentag definiert werden, die
+              Auflösung dabei sind 10 Minuten. Die letzte Zeitangabe muss immer 24:00 Uhr sein.<br>
+              Der optionale Parameter [prep|exec] erlaubt das packen der Nachrichten und verbessert damit deutlich
+              die Datenübertragung. Besonders nützlich wenn das Gerät im "Wakeup"-modus betrieben wird.
+              Benutzung durch senden der Befehle mit Parameter "prep". Daten werden dann für das Senden gesammelt.
+              Der letzte Befehl muss den Parameter "exec" habe um die Information zu übertragen.<br>
+              Beispiel: bis 6:00 soll die Temperatur 19°C sein, dann bis 23:00 Uhr 22.5°C, anschließend
+              werden bis Mitternacht 19°C gewünscht.<br>
+              <code> set th tempListSat 06:00 19 23:00 22.5 24:00 19<br></code>
+              <br>
+              <code> set th tempListSat prep 06:00 19 23:00 22.5 24:00 19<br>
+                set th tempListSun prep 06:00 19 23:00 22.5 24:00 19<br>
+                set th tempListMon prep 06:00 19 23:00 22.5 24:00 19<br>
+                set th tempListTue exec 06:00 19 23:00 22.5 24:00 19<br></code>
+            </li>
+          </ul><br>
+        </li>
+        <li>OutputUnit (HM-OU-LED16)
+        <ul>
+          <li><B>led [off|red|green|yellow]</B><br>
+            schaltet die LED des Kanals auf die gewünschte Farbe. Wird der Befehl auf ein Gerät angewandt so
+            werden alle LEDs auf diese Farbe gesetzt.<br>
+            Experten können die LEDs separat durch eine 8-stellige Hex-Zahl ansteuern.<br></li>
+          <li><B>ilum &lt;Helligkeit&gt;&lt;Dauer&gt; </B><br>
+            &lt;Helligkeit&gt; [0-15] der Beleuchtung.<br>
+            &lt;Dauer&gt; [0-127] in Sekunden, 0 bedeutet dauernd an.<br></li>
+        </ul><br></li>
+        <li>OutputUnit (HM-OU-CFM-PL)
+        <ul>
+          <li><B>led &lt;color&gt;[,&lt;color&gt;..] [&lt;repeat&gt..]</B><br>
+            Mögliche Farben sind [redL|greenL|yellowL|redS|greenS|yellowS|pause]. Eine Folge von Farben
+            kann durch trennen der Farbeinträge mit ',' eingestellt werden.
+            Leerzeichen dürfen in der Liste nicht benutzt werden. 'S' bezeichnet kurze und
+            'L' lange Beleuchtungsdauer. <br>
+            <b>repeat</b> definiert wie oft die Sequenz ausgeführt werden soll. Standard ist 1.<br>
+          </li>
+          <li><B>playTone &lt;MP3No&gt[,&lt;MP3No&gt..] [&lt;repeat&gt..]</B><br>
+            Spielt eine Reihe von Tönen. Die Liste muss mit ',' getrennt werden. Leerzeichen
+            dürfen in der Liste nicht benutzt werden.<br>
+            <b>replay</b> kann verwendet werden um den zuletzt gespielten Klang zu wiederholen.<br>
+            <b>repeat</b> definiert wie oft die Sequenz ausgeführt werden soll. Standard ist 1.<br>
+            Beispiel:
+            <ul><code>
+              set cfm_Mp3 playTone 3 # MP3 Titel 3 einmal<br>
+              set cfm_Mp3 playTone 3 3 # MP3 Titel 3 dreimal<br>
+              set cfm_Mp3 playTone 3,6,8,3,4 # MP3 Titelfolge 3,6,8,3,4 einmal<br>
+              set cfm_Mp3 playTone 3,6,8,3,4 255# MP3 Titelfolge 3,6,8,3,4 255 mal<br>
+              set cfm_Mp3 playTone replay # Wiederhole letzte Sequenz<br>
+              <br>
+              set cfm_Led led redL 4 # rote LED dreimal lang blinken<br>
+              set cfm_Led led redS,redS,redS,redL,redL,redL,redS,redS,redS 255 # SOS 255 mal<br>
+            </ul></code>
+            
+          </li>
+        </ul><br></li>
+        <li>HM-RC-19xxx
+          <ul>
+            <li><B>alarm &lt;count&gt;</B><br>
+              sendet eine Alarmnachricht an die Steuerung<br></li>
+            <li><B>service &lt;count&gt;</B><br>
+              sendet eine Servicenachricht an die Steuerung<br></li>
+            <li><B>symbol &lt;symbol&gt; [set|unset]</B><br>
+              aktiviert ein verfügbares Symbol auf der Steuerung<br></li>
+            <li><B>beep [off|1|2|3]</B><br>
+              aktiviert Töne<br></li>
+            <li><B>backlight [off|on|slow|fast]</B><br>
+              aktiviert Hintergrundbeleuchtung<br></li>
+            <li><B>display &lt;text&gt; comma unit tone backlight &lt;symbol(s)&gt;
+              </B><br>
+              Steuert das Display der Steuerung<br>
+              &lt;text&gt; : bis zu 5 Zeichen <br>
+              comma : 'comma' aktiviert das Komma, 'no' läßt es aus <br>
+              [unit] : setzt Einheitensymbole.
+              [off|Proz|Watt|x3|C|x5|x6|x7|F|x9|x10|x11|x12|x13|x14|x15]. Momentan sind
+              x3..x15 nicht getestet. <br>
+              tone : aktiviert einen von 3 Tönen [off|1|2|3]<br>
+              backlight: läßt die Hintergrundbeleuchtung aufblinken [off|on|slow|fast]<br>
+              &lt;symbol(s)&gt; aktiviert die Anzeige von Symbolen. Mehrere Symbole
+              können zu selben Zeit aktiv sein, Verknüpfung erfolgt komma-getrennt. Dabei keine
+              Leerzeichen verwenden. Mögliche Symbole:
+              [bulb|switch|window|door|blind|scene|phone|bell|clock|arrowUp|arrowDown]<br><br>
+              
+              Beispiel:
+              <ul><code>
+                # "Hello" auf dem Display, Symbol bulb an, Hintergrundbeleuchtung, Ton ausgeben<br>
+                set FB1 display Hello no off 1 on bulb<br>
+                # "1234,5" anzeigen mit Einheit 'W'. Symbole scene,phone,bell und
+                # clock sind aktiv. Hintergrundbeleuchtung blinikt schnell, Ausgabe von Ton 2<br>
+                set FB1 display 12345 comma Watt 2 fast scene,phone,bell,clock
+              </ul></code>
+            </li>
+          </ul><br>
+        </li>
+        
+        <li>keyMatic<br><br>
+          <ul>Keymatic verwendet eine AES-signierte Kommunikation. Deshalb ist die Steuerung von Keymatic
+            nur mit dem HM-LAN möglich. But
+            Ein CUL kann aber Statusnachrichten von Keymatic mitlesen und darauf
+            reagieren.</ul><br>
+          <ul>
+          <li><B>lock</B><br>
+            Schließbolzen fährt in Zu-Position<br></li>
+          <li><B>unlock [sec]</B><br>
+            Schließbolzen fährt in Auf-Position.<br>
+            [sec]: Stellt die Verzögerung ein nach der sich das Schloss automatisch wieder verschließt.<br>
+            0 - 65535 Sekunden</li>
+          <li><B>open [sec]</B><br>
+            Entriegelt die Tür sodass diese geöffnet werden kann.<br>
+            [sec]: Stellt die Verzögerung ein nach der sich das Schloss automatisch wieder
+            verschließt.<br>0 - 65535 Sekunden</li>
+          </ul></li>
+        <li>winMatic <br><br>
+          <ul>winMatic arbeitet mit 2 Kanälen, einem für die Fenstersteuerung und einem für den Akku.</ul><br>
+          <ul>
+          <li><B>level &lt;level&gt; &lt;relockDelay&gt; &lt;speed&gt;</B><br>
+            stellt den Wert ein. <br>
+            &lt;level&gt;: Bereich ist 0% bis 100%<br>
+            &lt;relockDelay&gt;: Spanne reicht von 0 bis 65535 Sekunden. 'ignore' kann verwendet werden um den Wert zu ignorieren.<br>
+            &lt;speed&gt;: Bereich ist 0% bis 100%<br>
+          </li>
+          <li><B>stop</B><br>
+            stopt die Bewegung<br>
+          </li>
+        </ul></li>
+        <li>HM-Sys-sRP-Pl<br><br>
+          legt Einträge für den Repeater an. Bis zu 36 Einträge können angelegt werden.
+          <ul>
+            <li><B>setRepeat &lt;entry&gt; &lt;sender&gt; &lt;receiver&gt; &lt;broadcast&gt;</B><br>
+              &lt;entry&gt; [1..36] Nummer des Eintrags in der Tabelle.<br>
+              &lt;sender&gt; Name oder HMid des Senders oder der Quelle die weitergeleitet werden soll<br>
+              &lt;receiver&gt; Name oder HMid des Empfängers oder Ziels an das weitergeleitet werden soll<br>
+              &lt;broadcast&gt; [yes|no] definiert ob Broadcasts von einer ID weitergeleitet werden sollen.<br>
+              <br>
+              Kurzanwendung: <br>
+              <code>setRepeat setAll 0 0 0<br></code>
+              schreibt die gesamte Liste der Geräte neu. Daten kommen vom Attribut repPeer. <br>
+              Das Attribut repPeer hat folgendes Format:<br>
+              src1:dst1:[y/n],src2:dst2:[y/n],src2:dst2:[y/n],...<br>
+              <br>
+              Foramtierte Werte von repPeer:<br>
+              Number src dst broadcast verify<br>
+              number: Nummer des Eintrags in der Liste<br>
+              src: Ursprungsgerät der Nachricht - aus Repeater ausgelesen<br>
+              dst: Zielgerät der Nachricht - asu den Attributen abgeleitet<br>
+              broadcast: sollen Broadcasts weitergeleitet werden - aus Repeater ausgelesen<br>
+              verify: stimmen Attribute und ausgelesen Werte überein?<br>
+            </li>
+          </ul>
+        </li>
+        
+      </ul>
+      <br>
+      Debugging:
+      <ul>
+        <li><B>raw &lt;data&gt; ...</B><br>
+          nur für Experimente benötigt.
+          Sendet eine Liste von "Roh"-Befehlen. Der erste Befehl wird unmittelbar gesendet,
+          die folgenden sobald der vorherige bestätigt wurde. Die Länge wird automatisch
+          berechnet und der Nachrichtenzähler wird erhöht wenn die ersten beiden Zeichen ++ sind.
+          
+          Beispiel (AES aktivieren):
+          <pre>
+            set hm1 raw ++A001F100001234560105000000001\
+            ++A001F10000123456010802010AF10B000C00\
+            ++A001F1000012345601080801\
+            ++A001F100001234560106
+          </pre>
+        </li>
+      </ul>
+      </ul>
+    <br>
+    
+    <a name="CUL_HMget"></a><b>Get</b><br>
+    <ul>
+      <li><B>configSave &lt;filename&gt;</B><a name="CUL_HMconfigSave"></a><br>
+        Sichert die Einstellungen eines Eintrags in einer Datei. Die Daten werden in
+        einem von der FHEM-Befehlszeile ausführbaren Format gespeichert.<br>
+        Die Datei liegt im FHEM Home-Verzeichnis neben der fhem.cfg. Gespeichert wird
+        kumulativ- d.h. neue Daten werden an die Datei angehängt. Es liegt am Benutzer das
+        doppelte speichern von Einträgen zu vermeiden.<br>
+        Ziel der Daten ist NUR die Information eines HM-Gerätes welche IM Gerät gespeichert ist.
+        Im Deteil sind das nur die Peer-Liste sowie die Register.
+        Durch die Register wird also das Peering eingeschlossen.<br>
+        Die Datei ist vom Benutzer les- und editierbar. Zusätzlich gespeicherte Zeitstempel
+        helfen dem Nutzer bei der Validierung.<br>
+        Einschränkungen:<br>
+        Auch wenn alle Daten eines Eintrags in eine Datei gesichert werden so sichert FHEM nur
+        die zum Zeitpunkt des Speicherns verfügbaren Daten! Der Nutzer muss also die Daten
+        der HM-Hardware auslesen bevor dieser Befehl ausgeführt wird.
+        Siehe empfohlenen Ablauf unten.<br>
+        Dieser Befehl speichert keine FHEM-Attribute oder Gerätedefinitionen.
+        Diese verbleiben in der fhem.cfg.<br>
+        Desweiteren werden gesicherte Daten nicht automatisch zurück auf die HM-Hardware geladen.
+        Der Benutzer muss die Wiederherstellung auslösen.<br><br>
+        Ebenso wie ander Befehle wird 'configSave' am besten auf ein Gerät und nicht auf einen
+        Kanal ausgeführt. Wenn auf ein Gerät angewendet werden auch die damit verbundenen Kanäle
+        gesichert. <br><br>
+        <code>
+          Empfohlene Arbeitsfolge für ein Gerät 'HMdev':<br>
+          set HMdev clear msgEvents # alte Events löschen um Daten besser kontrollieren zu können<br>
+          set HMdev getConfig # Geräte- und Kanalinformation auslesen<br>
+          # warten bis Ausführung abgeschlossen ist<br>
+          # "protState" sollte dann "CMDs_done" sein<br>
+          # es sollten keine Warnungen zwischen "prot" und den Variablen auftauchen<br>
+          get configSave myActorFile<br>
+        </code>
+      </li>
+      <li><B>param &lt;paramName&gt;</B><br>
+        Gibt den Inhalt der relevanten Parameter eines Eintrags zurück. <br>
+        Hinweis: wird der Befehl auf einen Kanal angewandt und 'model' abgefragt so wird das Model
+        des inhalteanbietenden Geräts zurückgegeben.
+      </li>
+      <li><B>reg &lt;addr&gt; &lt;list&gt; &lt;peerID&gt;</B><br>
+        liefert den Wert eines Registers zurück. Daten werden aus dem Speicher von FHEM und nicht direkt vom Gerät geholt.
+        Falls der Registerinhalt nicht verfügbar ist muss "getConfig" sowie anschließend "getReg" verwendet werden.<br>
+        
+        &lt;addr&gt; Adresse des Registers in HEX. Registername kann alternativ verwendet werden falls in FHEM bekannt.
+        "all" gibt alle dekodierten Register eines Eintrags in einer Liste zurück.<br>
+        &lt;list&gt; Liste aus der das Register gewählt wird. Wird der REgistername verwendet wird "list" ignoriert und kann auf '0' gesetzt werden.<br>
+        &lt;peerID&gt; identifiziert die Registerbänke für "list3" und "list4". Kann als Dummy gesetzt werden wenn nicht benötigt.<br>
+      </li>
+      <li><B>regList</B><br>
+        gibt eine Liste der von FHEM für dieses Gerät dekodierten Register zurück.<br>
+        Beachten dass noch mehr Register für ein Gerät implemetiert sein können.<br>
+      </li>
+      <li><B>saveConfig &lt;file&gt;</B><a name="CUL_HMsaveConfig"></a><br>
+        speichert Peers und Register in einer Datei.<br>
+        Gespeichert werden die Daten wie sie in FHEM verfügbar sind. Es ist daher notwendig vor dem Speichern die Daten auszulesen.<br>
+        Der Befehl unterstützt Aktionen auf Geräteebene. D.h. wird der Befehl auf ein Gerät angewendet werden auch alle verbundenen Kanaleinträge gesichert.<br>
+        Das Speichern der Datei erfolgt kumulativ. Wird ein Eintrag mehrfach in der selben Datei gespeichert so werden die Daten an diese angehängt.
+        Der Nutzer kann den Zeitpunkt des Speichern bei Bedarf auslesen.<br>
+        Der Inhalt der Datei kann verwendet werden um die Geräteeinstellungen wiederherzustellen. Er stellt alle Peers und Register des Eintrags wieder her.<br>
+        Zwänge/Beschränkungen:<br>
+        vor dem zurückschreiben der Daten eines Eintrags muss das Gerät mit FHEM verbunden werden.<br>
+        "restore" löscht keine verknüpften Kanäle, es fügt nur neue Peers hinzu.<br>
+      </li>
+    <br></ul>
+    <a name="CUL_HMattr"></a><b>Attribute</b>
+    <ul>
+      <li><a href="#eventMap">eventMap</a></li>
+      <li><a href="#do_not_notify">do_not_notify</a></li>
+      <li><a href="#ignore">ignore</a></li>
+      <li><a href="#dummy">dummy</a></li>
+      <li><a href="#showtime">showtime</a></li>
+      <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+      <li><a href="#actCycle">actCycle</a>
+        actCycle &lt;[hhh:mm]|off&gt;<br>
+        Bietet eine 'alive' oder besser 'not alive' Erkennung für Geräte. [hhh:mm] ist die maximale Zeit ohne Nachricht eines Geräts. Wenn innerhalb dieser Zeit keine Nachricht empfangen wird so wird das Event"&lt;device&gt; is dead" generiert.
+        Sendet das Gerät wieder so wird die Nachricht"&lt;device&gt; is alive" ausgegeben. <br>
+        Diese Erkennung wird durch 'autocreate' für jedes Gerät mit zyklischer Statusmeldung angelegt.<br>
+        Die Kontrollinstanz ist ein Pseudo-Gerät "ActionDetector" mit der HMId "000000".<br>
+        Aufgrund von Performanceüberlegungen liegt die Antwortverzögerung bei 600 Sekunden (10min). Kann über das Attribut "actCycle" des "ActionDetector" kontrolliert werden.<br>
+        Sobald die Überwachung aktiviert wurde hat das HM-Gerät 2 Attribute:<br>
+        <ul>
+          actStatus: Aktivitätsstatus des Geräts<br>
+          actCycle: Detektionsspanne [hhh:mm]<br>
+        </ul>
+        Die gesamte Funktion kann über den "ActionDetector"-Eintrag überprüft werden. Der Status aller Instanzen liegt im READING-Bereich.<br>
+        Hinweis: Diese Funktion kann ebenfalls für Geräte ohne zyklische Übertragung aktiviert werden. Es obliegt dem Nutzer eine vernünftige Zeitspanne festzulegen.
+      </li>
+      <li><a name="expert">expert</a><br>
+        Dieses Attribut steuert die Sichtbarkeit der Werte. Damit wird die Darstellung der Geräteparameter kontrolliert.<br>
+        3 Level können gewählt werden:<br>
+        <ul>
+          0_off: Standard. Zeigt die häufigst benutzten Paramter<br>
+          1_on: Erweitert. Zeigt alle dekodierten Geräteparameter<br>
+          2_full: Alles. Zeigt alle Parameter sowie Registerinformationen im Rohformat. <br>
+        </ul>
+        Wird 'expert' auf ein Gerät angewendet so gilt dies auch für alle verknüpften Kanäle.
+        Kann übergangen werden indem das Attribut ' expert' auch für den Gerätekanal gesetzt wird.<br>
+        Das Attribut "showInternalValues" bei den globalen Werten muss ebenfalls überprüft werden.
+        "expert" macht sich diese Implementierung zu Nutze.
+        Gleichwohl setzt "showInternalValues" - bei Definition - 'expert' außer Kraft .
+      </li>
+      <li><a name="model">model</a>,
+        <a name="subType">subType</a><br>
+        Diese Attribute werden bei erfolgreichem Pairing automatisch gesetzt.
+        Sie sollten nicht per Hand gesetzt werden und sind notwendig um Gerätenachrichten
+        korrekt interpretieren oder senden zu können.</li>
+      <li><a name="param">param</a><br>
+        'param' definiert modelspezifische Verhalten oder Funktionen. Siehe "models" für Details.</li>
+      <li><a name="msgRepeat">msgRepeat</a><br>
+        Definiert die Nummer an Wiederholungen falls ein Gerät nicht rechtzeitig antwortet. <br>
+        Für Geräte die nur den "Config"-Modus unterstützen sind Wiederholungen nicht erlaubt. <br>
+        Bei Geräte mit wakeup-Modus wartet das Gerät bis zum nächsten Aufwachen. Eine längere Verzögerung
+        sollte in diesem Fall angedacht werden. <br>
+        Wiederholen von Bursts hat Auswirkungen auf die HMLAN Übertragungskapazität.</li>
+      <li><a name="burstAccess">burstAccess</a><br>
+        kann für eine Geräteinstanz gesetzt werden falls das Model bedingte Bursts erlaubt.
+        Das Attribut deaktiviert den Burstbetrieb (0_off) was die Nachrichtenmenge des HMLAN reduziert
+        und damit die Wahrscheinlichkeit einer Überlast von HMLAN verringert.<br>
+        Einschalten (1_auto) erlaubt kürzere Reaktionszeiten eines Geräts. Der Nutzer muss nicht warten
+        bis das Gerät wach ist. <br>
+        Zu beacht ist dass das Register "burstRx" im Gerät ebenfalls gesetzt werden muss.</li>
+      <li><a name="rawToReadable">rawToReadable</a><br>
+        Wird verwendet um Rohdaten von KFM100 in ein lesbares Fomrat zu bringen, basierend auf
+        den gemessenen Werten. Z.B. langsames Füllen eines Tanks, während die Werte mit <a href="#inform">inform</a>
+        angezeigt werden. Man sieht:
+        <ul>
+          10 (bei 0%)<br>
+          50 (bei 20%)<br>
+          79 (bei 40%)<br>
+          270 (bei 100%)<br>
+        </ul>
+        Anwenden dieser Werte: "attr KFM100 rawToReadable 10:0 50:20 79:40 270:100".
+        FHEM für damit eine lineare Interpolation der Werte in den gegebenen Grenzen aus.
+      </li>
+      <li><a name="unit">unit</a><br>
+        setzt die gemeldete Einheit des KFM100 falls 'rawToReadable' aktiviert ist. Z.B.<br>
+        attr KFM100 unit Liter
+      </li>
+      <li><a name="autoReadReg">autoReadReg</a><br>
+        '0' autoReadReg wird ignoriert.<br>
+        '1' führt ein "getConfig" für ein Gerät automatisch nach jedem Neustart von FHEM aus. <br>
+        '2' verhält sich wie '1',zusätzlich nach jedem power_on.<br>
+        '3' wie '2', zusätzlich bei jedem Schreiben auf das Gerät<br>
+        '4' wie '3' und versucht außerdem den Status abzufragen falls dieser nicht verfügbar erscheint.<br>
+        '5' kontrolliert 'reglist' und 'peerlist'. Falls das Auslesen unvollständig ist wird 'getConfig' ausgeführt<br>
+        '8_stateOnly' aktualisiert nur Statusinformationen aber keine Konfigurationen wie Daten- oder
+        Peerregister.<br>
+        Ausführung wird verzögert um eine Überlastung beim Start zu vermeiden . Daher werden Aktualisierung und Anzeige
+        von Werten abhängig von der Größe der Datenbank verzögert geschehen.<br>
+        Empfehlungen und Einschränkungen bei Benutzung:<br>
+        <ul>
+          Dieses Attribut nur auf ein Gerät oder Kanal 01 anwenden. Nicht auf einzelne Kanäle eines mehrkanaligen
+          Geräts anwenden um eine doppelte Ausführung zu vermeiden.<br>
+          Verwendung bei Geräten die nur auf den 'config'-Modus reagieren wird nicht empfohlen da die Ausführung
+          erst starten wird wenn der Nutzer die Konfiguration vornimmt<br>
+          Anwenden auf Geräte mit 'wakeup'-Modus ist nützlich. Zu bedenken ist aber dass die Ausführung
+          bis zm "aufwachen" verzögert wird.<br>
+        </ul>
+      </li>
+      </ul> <br>
+    <a name="CUL_HMparams"><b>verfügbare Parameter für "param"</b></a>
+    <ul>
+      <li><B>HM-Sen-RD-O</B><br>
+        offAtPon: nur Heizkanäle: erzwingt Ausschalten der Heizung nach einem powerOn<br>
+        onAtRain: nur Heizkanäle: erzwingt Einschalten der Heizung bei Status 'rain' und Ausschalten bei Status 'dry'<br>
+      </li>
+      <li><B>virtuals</B><br>
+        noOnOff: eine virtuelle Instanz wird den Status nicht ändern wenn ein Trigger empfangen wird. Ist dieser Paramter
+        nicht gegeben so toggled die Instanz ihren Status mit jedem trigger zwischen An und Aus<br>
+        msgReduce: falls gesetzt und der Kanal wird für <a ref="CUL_HMvalvePos"></a> genutzt wird jede Nachricht
+        außer die der Ventilstellung verworfen um die Nachrichtenmenge zu reduzieren<br>
+      </li>
+    </ul><br>
+    <a name="CUL_HMevents"></a>
+    <b>Erzeugte Events:</b>
+    <ul>
+      <li><B>Allgemein</B><br>
+        recentStateType:[ack|info] # kann nicht verwendet werden um Nachrichten zu triggern<br>
+        <li>ack zeigt an das eine Statusinformation aus einer Bestätigung abgeleitet wurde</li>
+        <li>info zeigt eine automatische Nachricht eines Geräts an</li>
+        <li><a name="CUL_HMsabotageAttackId"><b>sabotageAttackId</b></a><br>
+          Alarmiert bei Konfiguration des Geräts durch unbekannte Quelle<br></li>
+        <li><a name="CUL_HMsabotageAttack"><b>sabotageAttack</b></a><br>
+          Alarmiert bei Konfiguration des Geräts welche nicht durch das System ausgelöst wurde<br></li>
+      </li>
+      <li><B>HM-CC-TC,ROTO_ZEL-STG-RM-FWT</B><br>
+        T: $t H: $h<br>
+        battery:[low|ok]<br>
+        measured-temp $t<br>
+        humidity $h<br>
+        actuator $vp %<br>
+        desired-temp $dTemp<br>
+        desired-temp-manu $dTemp #Temperatur falls im manuellen Modus<br>
+        desired-temp-cent $dTemp #Temperatur falls im Zentrale-Modus<br>
+        windowopen-temp-%d %.1f (sensor:%s)<br>
+        tempList$wd hh:mm $t hh:mm $t ...<br>
+        displayMode temp-[hum|only]<br>
+        displayTemp [setpoint|actual]<br>
+        displayTempUnit [fahrenheit|celsius]<br>
+        controlMode [manual|auto|central|party]<br>
+        tempValveMode [Auto|Closed|Open|unknown]<br>
+        param-change offset=$o1, value=$v1<br>
+        ValveErrorPosition_for_$dname $vep %<br>
+        ValveOffset_for_$dname : $of %<br>
+        ValveErrorPosition $vep %<br>
+        ValveOffset $of %<br>
+        time-request<br>
+        trig_&lt;src&gt; &lt;value&gt; #channel was triggered by &lt;src&gt; channel.
+        Dieses Event hängt vom kompletten Auslesen der Kanalkonfiguration ab, anderenfalls können Daten
+        unvollständig oder fehlerhaft sein.<br>
+        trigLast &lt;channel&gt; #letzter empfangener Trigger<br>
+      </li>
+      <li><B>HM-CC-RT-DN and HM-CC-RT-DN-BoM</B><br>
+        state:T: $actTemp desired: $setTemp valve: $vp %<br>
+        motorErr: [ok|ValveTight|adjustRangeTooLarge|adjustRangeTooSmall|communicationERR|unknown|lowBat|ValveErrorPosition]
+        measured-temp $actTemp<br>
+        desired-temp $setTemp<br>
+        ValvePosition $vp %<br>
+        mode [auto|manu|party|boost]<br>
+        battery [low|ok]<br>
+        batteryLevel $bat V<br>
+        measured-temp $actTemp<br>
+        desired-temp $setTemp<br>
+        actuator $vp %<br>
+        time-request<br>
+        trig_&lt;src&gt; &lt;value&gt; #Kanal wurde durch &lt;src&gt; Kanal ausgelößt.
+      </li>
+      <li><B>HM-CC-VD,ROTO_ZEL-STG-RM-FSA</B><br>
+        $vp %<br>
+        battery:[critical|low|ok]<br>
+        motorErr:[ok|blocked|loose|adjusting range too small|opening|closing|stop]<br>
+        ValvePosition:$vp %<br>
+        ValveErrorPosition:$vep %<br>
+        ValveOffset:$of %<br>
+        ValveDesired:$vp % # durch Temperatursteuerung gesetzt <br>
+        operState:[errorTargetNotMet|onTarget|adjusting|changed] # operative Bedingung<br>
+        operStateErrCnt:$cnt # Anzahl fehlgeschlagener Einstellungen<br>
+      </li>
+      <li><B>HM-CC-SCD</B><br>
+        [normal|added|addedStrong]<br>
+        battery [low|ok]<br>
+      </li>
+      <li><B>HM-SEC-SFA-SM</B><br>
+        powerError [on|off]<br>
+        sabotageError [on|off]<br>
+        battery: [critical|low|ok]<br>
+      </li>
+      <li><B>HM-LC-BL1-PB-FM</B><br>
+        motor: [opening|closing]<br>
+      </li>
+      <li><B>HM-LC-SW1-BA-PCB</B><br>
+        battery: [low|ok]<br>
+      </li>
+      <li><B>HM-OU-LED16</B><br>
+        color $value # in Hex - nur für Gerät<br>
+        $value # in Hex - nur für Gerät<br>
+        color [off|red|green|orange] # für Kanal <br>
+        [off|red|green|orange] # für Kanal <br>
+      </li>
+      <li><B>HM-OU-CFM-PL</B><br>
+        [on|off|$val]<br>
+      </li>
+      <li><B>HM-Sen-Wa-Od</B><br>
+        $level%<br>
+        level $level%<br>
+      </li>
+      <li><B>KFM100</B><br>
+        $v<br>
+        $cv,$unit<br>
+        rawValue:$v<br>
+        Sequence:$seq<br>
+        content:$cv,$unit<br>
+      </li>
+      <li><B>KS550/HM-WDS100-C6-O</B><br>
+        T: $t H: $h W: $w R: $r IR: $ir WD: $wd WDR: $wdr S: $s B: $b<br>
+        temperature $t<br>
+        humidity $h<br>
+        windSpeed $w<br>
+        windDirection $wd<br>
+        windDirRange $wdr<br>
+        rain $r<br>
+        isRaining $ir<br>
+        sunshine $s<br>
+        brightness $b<br>
+        unknown $p<br>
+      </li>
+      <li><B>HM-Sen-RD-O</B><br>
+        lastRain: timestamp # kein Trigger wird erzeugt. Anfang des vorherigen Regen-Zeitstempels
+        des Messwerts ist Ende des Regens. <br>
+      </li>
+      <li><B>THSensor und HM-WDC7000</B><br>
+        T: $t H: $h AP: $ap<br>
+        temperature $t<br>
+        humidity $h<br>
+        airpress $ap #nur HM-WDC7000<br>
+      </li>
+      <li><B>dimmer</B><br>
+        overload [on|off]<br>
+        overheat [on|off]<br>
+        reduced [on|off]<br>
+        dim: [up|down|stop]<br>
+      </li>
+      <li><B>motionDetector</B><br>
+        brightness:$b<br>
+        alive<br>
+        motion on (to $dest)<br>
+        motionCount $cnt _next:$nextTr"-"[0x0|0x1|0x2|0x3|15|30|60|120|240|0x9|0xa|0xb|0xc|0xd|0xe|0xf]<br>
+        cover [closed|open] # nicht bei HM-Sec-MDIR<br>
+        sabotageError [on|off] # nur bei HM-Sec-MDIR<br>
+        battery [low|ok]<br>
+        devState_raw.$d1 $d2<br>
+      </li>
+      <li><B>remote/pushButton/outputUnit</B><br>
+        <ul> (to $dest) wird hinzugefügt wenn der Knopf gepeert ist und keinen Broadcast sendet<br>
+          Freigabe ist nur für verknüpfte Kanäle verfügbar</ul>
+        Btn$x onShort<br>
+        Btn$x offShort<br>
+        Btn$x onLong $counter<br>
+        Btn$x offLong $counter<br>
+        Btn$x onLongRelease $counter<br>
+        Btn$x offLongRelease $counter<br>
+        Btn$x onShort (to $dest)<br>
+        Btn$x offShort (to $dest)<br>
+        Btn$x onLong $counter (to $dest)<br>
+        Btn$x offLong $counter (to $dest)<br>
+        Btn$x onLongRelease $counter (to $dest)<br>
+        Btn$x offLongRelease $counter (to $dest)<br>
+      </li>
+      <li><B>remote/pushButton</B><br>
+        battery [low|ok]<br>
+        trigger [Long|Short]_$no trigger event from channel<br>
+      </li>
+      <li><B>swi</B><br>
+        Btn$x toggle<br>
+        Btn$x toggle (to $dest)<br>
+        battery: [low|ok]<br>
+      </li>
+      <li><B>switch/dimmer/blindActuator</B><br>
+        $val<br>
+        powerOn [on|off|$val]<br>
+        [unknown|motor|dim] [up|down|stop]:$val<br>
+        timedOn [running|off]<br> # "An" ist temporär - z.B. mit dem 'on-for-timer' gestartet
+      </li>
+      <li><B>sensRain</B><br>
+        $val<br>
+        powerOn <br>
+        level &lt;val&ge;<br>
+        timedOn [running|off]<br> # "An" ist temporär - z.B. mit dem 'on-for-timer' gestartet
+        trigger [Long|Short]_$no trigger event from channel<br>
+      </li>
+      <li><B>smokeDetector</B><br>
+        [off|smoke-Alarm|alive] # für Gruppen-Master<br>
+        [off|smoke-forward|smoke-alarm] # für Gruppenmitglieder<br>
+        [normal|added|addedStrong] #HM-CC-SCD<br>
+        SDteam [add|remove]_$dname<br>
+        battery [low|ok]<br>
+        smoke_detect [none|&lt;src&gt;]<br>
+        teamCall:from $src<br>
+      </li>
+      <li><B>threeStateSensor</B><br>
+        [open|tilted|closed]<br>
+        [wet|damp|dry] #nur HM-SEC-WDS<br>
+        cover [open|closed] #HM-SEC-WDS und HM-Sec-RHS<br>
+        alive yes<br>
+        battery [low|ok]<br>
+        contact [open|tilted|closed]<br>
+        contact [wet|damp|dry] #nur HM-SEC-WDS<br>
+        sabotageError [on|off] #nur HM-SEC-SC<br>
+      </li>
+      <li><B>winMatic</B><br>
+        [locked|$value]<br>
+        motorError [no|TurnError|TiltError]<br>
+        direction [no|up|down|undefined]<br>
+        charge [trickleCharge|charge|dischange|unknown]<br>
+        airing [inactiv|$air]<br>
+        course [tilt|close]<br>
+        airing [inactiv|$value]<br>
+        contact tesed<br>
+      </li>
+      <li><B>keyMatic</B><br>
+        unknown:40<br>
+        battery [low|ok]<br>
+        uncertain [yes|no]<br>
+        error [unknown|motor aborted|clutch failure|none']<br>
+        lock [unlocked|locked]<br>
+        [unlocked|locked|uncertain]<br>
+      </li>
+    </ul>
+    <br>
+  </ul>
 =end html
 
 =cut
