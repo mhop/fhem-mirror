@@ -134,7 +134,7 @@ sub CUL_HM_Initialize($) {
   $hash->{AttrFn}    = "CUL_HM_Attr";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:1,0 dummy:1,0 "
                        ."showtime:1,0 "
-                       ."serialNr firmware "
+                       ."serialNr firmware .stc .devInfo "
                        ."rawToReadable unit "#"KFM-Sensor" only
                        ."peerIDs repPeers "
                        ."actCycle actStatus "
@@ -142,9 +142,8 @@ sub CUL_HM_Initialize($) {
                        ."expert:0_off,1_on,2_full "
                        ."burstAccess:0_off,1_auto "
                        ."param msgRepeat "
-                       .".stc .devInfo "
                        ."levelRange "
-                       ."aesCommReq:1,0 "
+                       ."aesCommReq:1,0 "      # IO will request AES if 
                        ."rssiLog:1,0 "         # enable writing RSSI to Readings (device only)
                        .$readingFnAttributes;
   #autoReadReg:
@@ -6210,7 +6209,7 @@ sub CUL_HM_autoReadReady($){# capacity for autoread available?
   if (   !$ioName
       || ReadingsVal($ioName,"cond","init") !~ m /^(ok|Overload-released|init)$/#default init for CUL
       || ( defined $defs{$ioName}{helper}{q}
-          && ($defs{$ioName}{helper}{q}{cap}{sum}/16.8)>
+          && ($defs{$ioName}{helper}{q}{cap}{sum}/450)>
                AttrVal($ioName,"hmMsgLowLimit",40))){
     return 0;
   }
