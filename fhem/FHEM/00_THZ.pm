@@ -1,7 +1,7 @@
 ##############################################
 # 00_THZ
 # by immi 04/2014
-# v. 0.080
+# v. 0.081
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -960,7 +960,7 @@ sub THZ_Parse($) {
   
   
   when ("F4")    {                     #allF4
-    my %SomWinMode = ( "02" =>"winter", "01" => "summer");
+    my %SomWinMode = ( "01" =>"winter", "02" => "summer");
     $message =
 		"outside_temp: " 		. hex2int(substr($message, 4,4))/10 . " " .
         	"x08: " 			. hex2int(substr($message, 8,4))/10 . " " .
@@ -969,22 +969,23 @@ sub THZ_Parse($) {
         	"flow_temp: " 			. hex2int(substr($message,20,4))/10 . " " .
         	"heat-set_temp: "		. hex2int(substr($message,24,4))/10 . " " . #soll HC1
 		"heat_temp: "			. hex2int(substr($message,28,4))/10 . " " . #ist
-        	"x32: "				. hex2int(substr($message,32,4))/10 . " " .
-        	"x36: "				. hex2int(substr($message,36,4))/10 . " " .
-        	"x40: "				. hex2int(substr($message,40,4))/10 . " " .
+#	      	"x32: "				. hex2int(substr($message,32,4))/10 . " " .
+        	"mode: "		        . $SomWinMode{(substr($message,38,2))}  . " " .
+#		"x40: "				. hex2int(substr($message,40,4))/10 . " " .
 		"integral_switch: "		. hex2int(substr($message,44,4))    . " " .
-	        "mode: "		        . $SomWinMode{(substr($message,48,2))}  . " " . 
-        	"x52: "				. hex2int(substr($message,52,4))/10 . " " .
-        	"room-set-temp: "		. hex2int(substr($message,56,4))/10 . " " .
-        	"x60: " 			. hex2int(substr($message,60,4)) . " " .
-        	"x64: "				. hex2int(substr($message,64,4)) . " " .
-		"x68: "				. hex2int(substr($message,68,4)) . " " .
-        	"x72: "				. hex2int(substr($message,72,4)) . " " .
-        	"x76: "				. hex2int(substr($message,76,4)) . " " .
-        	"x80: "				. hex2int(substr($message,80,4)) ;
+#		"x48: "				. hex2int(substr($message,40,4))/10 . " " .
+#       	"x52: "				. hex2int(substr($message,52,4))/10 . " " .
+        	"room-set-temp: "		. hex2int(substr($message,56,4))/10 ;
+# 	     	"x60: " 			. hex2int(substr($message,60,4)) . " " .
+# 	    	"x64: "				. hex2int(substr($message,64,4)) . " " .
+#		"x68: "				. hex2int(substr($message,68,4)) . " " .
+#       	"x72: "				. hex2int(substr($message,72,4)) . " " .
+# 	     	"x76: "				. hex2int(substr($message,76,4)) . " " .
+# 	    	"x80: "				. hex2int(substr($message,80,4))
+		;
   }
   when ("F5")    {                     #allF5
-    my %SomWinMode = ( "02" =>"winter", "01" => "summer");
+    my %SomWinMode = ( "01" =>"winter", "02" => "summer");
     $message =
 		"outside_temp: " 		. hex2int(substr($message, 4,4))/10 . " " .
         	"return_temp: " 		. hex2int(substr($message, 8,4))/10 . " " .
@@ -992,13 +993,13 @@ sub THZ_Parse($) {
         	"heat_temp: "			. hex2int(substr($message,16,4))/10 . " " .
         	"heat-set_temp: " 		. hex2int(substr($message,20,4))/10 . " " .
         	"stellgroesse: "		. hex2int(substr($message,24,4))/10 . " " . 
-	        "mode: "		        . $SomWinMode{(substr($message,30,2))}  . " " . 
-        	"x32: "				. hex2int(substr($message,32,4)) . " " .
-        	"x36: "				. hex2int(substr($message,36,4)) . " " .
-        	"x40: "				. hex2int(substr($message,40,4)) . " " .
-		"x44: "				. hex2int(substr($message,44,4)) . " " .
-		"x48: " 			. hex2int(substr($message,48,4)) . " " .
-        	"x52: "				. hex2int(substr($message,52,4));
+	        "mode: "		        . $SomWinMode{(substr($message,30,2))}  ;
+#	     	"x32: "				. hex2int(substr($message,32,4)) . " " .
+#	    	"x36: "				. hex2int(substr($message,36,4)) . " " .
+# 	  	"x40: "				. hex2int(substr($message,40,4)) . " " .
+#		"x44: "				. hex2int(substr($message,44,4)) . " " .
+#		"x48: " 			. hex2int(substr($message,48,4)) . " " .
+#        	"x52: "				. hex2int(substr($message,52,4))
   }
 
   
