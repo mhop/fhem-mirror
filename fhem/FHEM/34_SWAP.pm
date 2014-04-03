@@ -816,6 +816,7 @@ SWAP_updateReadings($$$)
         for( my $i = 0; $i < length($value)-6; $i+=2 ) {
           $v .= sprintf( "%c", hex(substr($value, $i, 2)) );
         }
+        Log3 $name, 4, "$endpoint->{name}: $v";
         #$value = $v;
         readingsBulkUpdate($hash, lc($endpoint->{name}), $v);
       }
