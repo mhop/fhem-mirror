@@ -487,7 +487,16 @@ SWAP_Set($@)
           return "value has to be ". $len ." byte(s) in size" if( $len*2 != length( $arg2 ) );
         }
       } else {
-        my $len = $register->{endpoints}->[0]->{size};
+        my $len = 0;
+        foreach my $endpoint ( @{$register->{endpoints}} ) {
+          if( !defined($endpoint->{position}) ) {
+            $len = $endpoint->{size};
+            last;
+          }
+
+          $len += $endpoint->{size};
+        }
+
         return "value has to be ". $len ." byte(s) in size" if( $len*2 != length( $arg2 ) );
       }
     }
