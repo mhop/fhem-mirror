@@ -70,9 +70,6 @@ notify_Exec($$)
       $found = ("$n:$s" =~ m/^$re$/);
     }
     if($found) {
-      $ntfy->{STATE} =
-        AttrVal($ln,'showTriggerTime',1) ? $dev->{NTFY_TRIGGERTIME} : 'active';
-  
       Log3 $ln, 5, "Triggering $ln";
       my (undef, $exec) = split("[ \t]+", $ntfy->{DEF}, 2);
 
@@ -89,6 +86,9 @@ notify_Exec($$)
       $ret .= " $r" if($r);
     }
   }
+  $ntfy->{STATE} =
+        AttrVal($ln,'showTriggerTime',1) ? $dev->{NTFY_TRIGGERTIME} : 'active';
+  
   return $ret if(AttrVal($ln, "forwardReturnValue", 0));
   return undef;
 }
