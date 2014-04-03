@@ -84,10 +84,10 @@ notify_Exec($$)
       my $r = AnalyzeCommandChain(undef, $exec);
       Log3 $ln, 3, "$ln return value: $r" if($r);
       $ret .= " $r" if($r);
+      $ntfy->{STATE} =
+        AttrVal($ln,'showTriggerTime',1) ? $dev->{NTFY_TRIGGERTIME} : 'active';
     }
   }
-  $ntfy->{STATE} =
-        AttrVal($ln,'showTriggerTime',1) ? $dev->{NTFY_TRIGGERTIME} : 'active';
   
   return $ret if(AttrVal($ln, "forwardReturnValue", 0));
   return undef;
