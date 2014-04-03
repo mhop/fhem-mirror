@@ -1166,6 +1166,15 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"humidity:$h"];
       push @evtEt,[$shash,1,"state:T: $actTemp desired: $setTemp"];
     }
+    elsif($mTp =~ m/^4./) {
+      my ($chn, $tCnt,$lvl) = ($mI[0],$mI[1],hex($mI[2])/2);
+      my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
+      if ($chnHash){
+        push @evtEt,[$chnHash,1,"state:Short".$target];
+        push @evtEt,[$chnHash,1,"trigger:Short_".$tCnt];
+        push @evtEt,[$chnHash,1,"level:$lvl"];
+      }
+    }
     elsif($mTp eq "3F" && $ioId eq $dst) { # Timestamp request
       my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
       push @ack,$shash,"++803F$ioId${src}0204$s2000";
@@ -3932,6 +3941,24 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           CUL_HM_qAutoRead($name,3);
         }
       }
+      # need to send data here- this is a 2 device command... thats why. 
+      my $rxType = CUL_HM_getRxType($devHash);
+      if($rxType & 0x01){#allways
+        CUL_HM_ProcessCmdStack($devHash);
+      }
+      elsif($devHash->{cmdStack}                  &&
+            $devHash->{helper}{prt}{sProc} != 1    # not processing
+            ){
+        if($rxType & 0x02){# handle burst Access devices - add burst Bit
+          my ($pre,$tp,$tail) = unpack 'A2A2A*',$devHash->{cmdStack}[0];
+          $devHash->{cmdStack}[0] = sprintf("%s%02X%s",$pre,(hex($tp)|0x10),$tail);
+          CUL_HM_ProcessCmdStack($devHash);
+        }
+        elsif (CUL_HM_getAttrInt($name,"burstAccess")){ #burstConditional - have a try
+          $hash->{helper}{prt}{wakeup}=1;# start auto-wakeup
+          CUL_HM_SndCmd($devHash,"++B112$id$dst");
+        }
+      }
     }
     if (!$target || $target =~ m/^(actor|both)$/ ){
       if ($modules{CUL_HM}{defptr}{$peerDst}){# is defined or ID only?
@@ -4963,17 +4990,28 @@ sub CUL_HM_ID2PeerList ($$$) {
         delete $hash->{helper}{fkt};
       }
     }
-    elsif( ($md =~ m/HM-CC-RT-DN/      && $chn=~ m/(02|05)/)
-      ||($md eq "HM-TC-IT-WM-W-EU"  && $chn=~ m/(07)/)){
-      CUL_HM_UpdtReadSingle($hash,"state","peered");
+    elsif( ($md =~ m/HM-CC-RT-DN/      && $chn=~ m/(02|05|04)/)
+         ||($md eq "HM-TC-IT-WM-W-EU"  && $chn=~ m/(07)/)){
+      if ($chn eq "04"){
+        #if 04 is peered we are "teamed" -> set channel 05
+        CUL_HM_UpdtReadSingle($modules{CUL_HM}{defptr}{$dHash->{DEF}."05"},"state","peered");
+      }
+      else{
+        CUL_HM_UpdtReadSingle($hash,"state","peered");
+      }
     }
   }
   else{
     delete $hash->{READINGS}{peerList};
     delete $hash->{peerList};
-    if (($md =~ m/HM-CC-RT-DN/     && $chn=~ m/(02|03|05|06)/)
+    if (($md =~ m/HM-CC-RT-DN/     && $chn=~ m/(02|03|04|05|06)/)
       ||($md eq "HM-TC-IT-WM-W-EU" && $chn=~ m/(03|06|07)/)){
-      CUL_HM_UpdtReadSingle($hash,"state","unpeered");
+      if ($chn eq "04"){
+        CUL_HM_UpdtReadSingle($modules{CUL_HM}{defptr}{$dHash->{DEF}."05"},"state","peered");
+      }
+      else{
+        CUL_HM_UpdtReadSingle($hash,"state","unpeered");
+      }
     }
  }
 }
