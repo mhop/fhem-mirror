@@ -747,17 +747,24 @@ sub OWXMULTI_BinValues($$$$$$$$) {
   my ($hash, $context, $success, $reset, $owx_dev, $command, $numread, $res) = @_;
   
   #-- always check for success, unused are reset, numread
-  return unless ($success and $context);
+  return unless ($success and $context =~ /^ds2438.getv[ad]d$/);
+
   #Log 1,"OWXMULTI_BinValues context = $context";
   
   #-- process results
   my  @data=split(//,$res);
-  Log 1, "invalid data length, ".int(@data)." instead of 9 bytes"  
-    if (@data != 9); 
-  Log 1, "conversion not complete or data invalid"  
-    if ((ord($data[0]) & 112)!=0); 
-  Log 1, "invalid CRC"
-    if (OWX_CRC8(substr($res,0,8),$data[8])==0);
+  if (@data != 9) {
+    Log 1, "invalid data length, ".int(@data)." instead of 9 bytes";
+    return;
+  }
+  if ((ord($data[0]) & 112)!=0) {
+    Log 1, "conversion not complete or data invalid";
+    return;
+  }
+  if (OWX_CRC8(substr($res,0,8),$data[8])==0) {
+    Log 1, "invalid CRC";
+    return;
+  }
 
   #-- this must be different for the different device types
   #   family = 26 => DS2438
