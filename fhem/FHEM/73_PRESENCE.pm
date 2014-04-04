@@ -550,7 +550,7 @@ PRESENCE_DoLocalPingScan($)
         if($temp ne "")
         {
             Log3 $name, 5, "PRESENCE ($name) - ping command returned with output:\n$temp";
-            $return = "$name|$local|".($temp =~ /\d+ [Bb]ytes (from|von)/ ? "present" : "absent");
+            $return = "$name|$local|".(($temp =~ /\d+ [Bb]ytes (from|von)/ and not $temp =~ /unreachable/i) ? "present" : "absent");
         }
         else
         { 

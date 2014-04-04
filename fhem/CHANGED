@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - bugfix:  PRESENCE: fixing wrong presence state f√or mode lan-ping
+             when device is unreachable
   - feature: 10_EnOcean: new EEP profiles: D2-01-00 - D2-01-11 (VLD)
   - changed: 00_TCM/10_EnOcean: learning mode (teach-in / teach-out) changed and extended
   - added:   new module 10_UNIRoll.pm (c-herrmann)
