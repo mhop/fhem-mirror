@@ -75,7 +75,7 @@ use warnings;
 sub Log($$);
 sub AttrVal($$$);
 
-my $owx_version="5.12";
+my $owx_version="5.13";
 
 my %gets = (
   "id"          => "",

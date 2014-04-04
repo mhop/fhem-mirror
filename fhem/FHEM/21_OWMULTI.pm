@@ -70,7 +70,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.12";
+my $owx_version="5.13";
 #-- flexible channel name
 my $owg_channel;
 
