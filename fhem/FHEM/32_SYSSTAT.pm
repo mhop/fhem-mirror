@@ -342,7 +342,7 @@ SYSSTAT_GetUpdate($)
   } elsif( AttrVal($name, "synologytemperature", 0) > 0 ) {
     my $temp = SYSSTAT_getSynoTemp($hash);
     if( $temp > 0 && $temp < 200  ) {
-      if( AttrVal($name, "raspberrytemperature", 0) eq 2 ) {
+      if( AttrVal($name, "synologytemperature", 0) eq 2 ) {
           $temp = sprintf( "%.1f", (3 * ReadingsVal($name,"temperature",$temp) + $temp ) / 4 );
         }
       readingsBulkUpdate($hash,"temperature",$temp);
