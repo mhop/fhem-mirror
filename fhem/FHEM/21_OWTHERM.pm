@@ -500,7 +500,7 @@ sub OWTHERM_GetValues($@) {
   
   #-- restart timer for updates
   RemoveInternalTimer($hash);
-  InternalTimer(time()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
+  InternalTimer(time()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 0);
 
   #-- Get values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
