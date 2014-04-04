@@ -1,6 +1,6 @@
 ##############################################
+# $Id: HMConfig.pm 4366 2014-04-04-12 17:26:00Z martinp876 $
 # CUL HomeMatic device configuration data
-# $Id$
 
 #####################################################
 # configuration data for CUL_HM -used to split code and configuration
