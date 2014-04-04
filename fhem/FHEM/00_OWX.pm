@@ -404,6 +404,10 @@ sub OWX_CRC ($) {
       $crc8 = $crc8_table[ $crc8 ^ $owx_ROM_ID[$i] ];
     }  
     return $crc8;
+  } elsif (ref($romid) eq "ARRAY") {
+    for(my $i=0; $i<8; $i++){
+      $crc8 = $crc8_table[ $crc8 ^ $romid->[$i] ];
+    }  
   } else {
     #-- from search string to byte id
     $romid=~s/\.//g;
