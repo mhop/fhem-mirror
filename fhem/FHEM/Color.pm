@@ -160,4 +160,83 @@ BrightnessToChannels($) {
   return @channels;
 }
 
+sub
+rgb2hsv($$$) {
+  my( $r, $g, $b ) = @_;
+  my( $h, $s, $v );
+
+  my $M = ::maxNum( $r, $g, $b );
+  my $m = ::minNum( $r, $g, $b );
+  my $c = $M - $m;
+
+  if ( $c == 0 ) {
+    $h = 0;
+  } elsif ( $M == $r ) {
+    $h = ( 60 * ( ( $g - $b ) / $c ) % 360 ) / 360;
+  } elsif ( $M == $g ) {
+    $h = ( 60 * ( ( $b - $r ) / $c ) + 120 ) / 360;
+  } elsif ( $M == $b ) {
+    $h = ( 60 * ( ( $r - $g ) / $c ) + 240 ) / 360;
+  }
+
+  if ( $M == 0 ) {
+    $s = 0;
+  } else {
+    $s = $c / $M;
+  }
+
+  $v = $M;
+
+  return( $h,$s,$v );
+}
+
+sub
+hsv2rgb($$$) {
+  my ( $h, $s, $v ) = @_;
+  my $r = 0.0;
+  my $g = 0.0;
+  my $b = 0.0;
+
+  if ( $s == 0 ) {
+    $r = $v;
+    $g = $v;
+    $b = $v;
+  } else {
+    my $i = int( $h * 6.0 );
+    my $f = ( $h * 6.0 ) - $i;
+    my $p = $v * ( 1.0 - $s );
+    my $q = $v * ( 1.0 - $s * $f );
+    my $t = $v * ( 1.0 - $s * ( 1.0 - $f ) );
+    $i = $i % 6;
+
+    if ( $i == 0 ) {
+      $r = $v;
+      $g = $t;
+      $b = $p;
+    } elsif ( $i == 1 ) {
+      $r = $q;
+      $g = $v;
+      $b = $p;
+    } elsif ( $i == 2 ) {
+      $r = $p;
+      $g = $v;
+      $b = $t;
+    } elsif ( $i == 3 ) {
+      $r = $p;
+        $g = $q;
+      $b = $v;
+    } elsif ( $i == 4 ) {
+      $r = $t;
+      $g = $p;
+      $b = $v;
+    } elsif ( $i == 5 ) {
+      $r = $v;
+      $g = $p;
+      $b = $q;
+    }
+  }
+
+  return( $r,$g,$b );
+}
+
 1;
