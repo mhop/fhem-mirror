@@ -1,6 +1,6 @@
 ##############################################
 # CUL HomeMatic device configuration data
-# $Id: $Id$
+# $Id$
 
 #####################################################
 # configuration data for CUL_HM -used to split code and configuration
@@ -1470,6 +1470,8 @@ $culHmChanSets{"HM-CC-RT-DN05"}         = $culHmSubTypeSets{"THSensor"};
 $culHmChanSets{"HM-ES-PMSw1-Pl03"}      = $culHmSubTypeSets{"THSensor"};
 
 $culHmChanSets{"WDF-solar02"}           = $culHmSubTypeSets{"blindActuator"};
+
+$culHmChanSets{"HM-OU-CM-PCB01"}        = $culHmChanSets{"HM-OU-CFM-PL02"};
 
 $culHmChanSets{"HM-CC-RT-DN02"}         = $culHmChanSets{"HM-CC-RT-DN00"};
 $culHmChanSets{"HM-CC-RT-DN-BoM00"}     = $culHmChanSets{"HM-CC-RT-DN00"};
