@@ -287,35 +287,45 @@ HUEDevice_SetParam($$@)
     $obj->{'xy'}  = [0+$x, 0+$y];
     $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
   } elsif( $cmd eq "rgb" && $value =~ m/^(..)(..)(..)/) {
-    # calculation from http://www.everyhue.com/vanilla/discussion/94/rgb-to-xy-or-hue-sat-values/p1
     my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
-#Log3 $name, 3, "rgb: ". $r . " " . $g ." ". $b;
 
-    my $X =  1.076450 * $r - 0.237662 * $g + 0.161212 * $b;
-    my $Y =  0.410964 * $r + 0.554342 * $g + 0.034694 * $b;
-    my $Z = -0.010954 * $r - 0.013389 * $g + 1.024343 * $b;
-#Log3 $name, 3, "XYZ: ". $X . " " . $Y ." ". $Y;
+    if( !defined( AttrVal($name, "model", undef) ) )
+      my( $h, $s, $v ) = Color::rgb2hsv($r,$g,$b);
 
-    if( $X != 0
-        || $Y != 0
-        || $Z != 0 ) {
-      my $x = $X / ($X + $Y + $Z);
-      my $y = $Y / ($X + $Y + $Z);
-#Log3 $name, 3, "xyY:". $x . " " . $y ." ". $Y;
+      $obj->{'on'}  = JSON::true;
+      $obj->{'hue'} = int( $h * 65535 );
+      $obj->{'sat'} = int( $s * 254 );
+      $obj->{'bri'} = int( $v * 254 );
+    } else {
+      # calculation from http://www.everyhue.com/vanilla/discussion/94/rgb-to-xy-or-hue-sat-values/p1
 
-      #$x = 0 if( $x < 0 );
-      #$x = 1 if( $x > 1 );
-      #$y = 0 if( $y < 0 );
-      #$y = 1 if( $y > 1 );
-      $Y = 1 if( $Y > 1 );
+      my $X =  1.076450 * $r - 0.237662 * $g + 0.161212 * $b;
+      my $Y =  0.410964 * $r + 0.554342 * $g + 0.034694 * $b;
+      my $Z = -0.010954 * $r - 0.013389 * $g + 1.024343 * $b;
+      #Log3 $name, 3, "rgb: ". $r . " " . $g ." ". $b;
+      #Log3 $name, 3, "XYZ: ". $X . " " . $Y ." ". $Y;
 
-      my $bri  = maxNum($r,$g,$b);
-      #my $bri  = $Y;
+      if( $X != 0
+          || $Y != 0
+          || $Z != 0 ) {
+        my $x = $X / ($X + $Y + $Z);
+        my $y = $Y / ($X + $Y + $Z);
+        #Log3 $name, 3, "xyY:". $x . " " . $y ." ". $Y;
 
-    $obj->{'on'}  = JSON::true;
-    $obj->{'xy'}  = [0+$x, 0+$y];
-    $obj->{'bri'}  = int(254*$bri);
+        #$x = 0 if( $x < 0 );
+        #$x = 1 if( $x > 1 );
+        #$y = 0 if( $y < 0 );
+        #$y = 1 if( $y > 1 );
+        $Y = 1 if( $Y > 1 );
+
+        my $bri  = maxNum($r,$g,$b);
+        #my $bri  = $Y;
+
+        $obj->{'on'}  = JSON::true;
+        $obj->{'xy'}  = [0+$x, 0+$y];
+        $obj->{'bri'}  = int(254*$bri);
         }
+    }
   } elsif( $cmd eq "hsv" && $value =~ m/^(..)(..)(..)/) {
     my( $h, $s, $v ) = (hex($1), hex($2), hex($3));
 
@@ -516,10 +526,20 @@ HUEDevice_Get($@)
     my $g = 0;
     my $b = 0;
 
-    if( ReadingsVal($name,"colormode","") eq "ct" ) {
+    my $cm = ReadingsVal($name,"colormode","");
+    if( $cm eq "ct" ) {
       if( ReadingsVal($name,"ct","") =~ m/(\d+) .*/ ) {
         ($r,$g,$b) = cttorgb($1);
       }
+    } elsif( $cm eq "hs" ) {
+      my $h = ReadingsVal($name,"hue",0) / 65535.0;
+      my $s = ReadingsVal($name,"sat",0) / 254.0;
+      my $v = ReadingsVal($name,"bri",0) / 254.0;
+      ($r,$g,$b) = Color::hsv2rgb($h,$s,$v);
+
+      $r *= 255;
+      $g *= 255;
+      $b *= 255;
     } elsif( ReadingsVal($name,"xy","") =~ m/(.+),(.+)/ ) {
       my ($x,$y) = ($1, $2);
       my $Y = ReadingsVal($name,"bri","") / 254.0;
@@ -532,10 +552,20 @@ HUEDevice_Get($@)
     my $g = 0;
     my $b = 0;
 
-    if( ReadingsVal($name,"colormode","") eq "ct" ) {
+    my $cm = ReadingsVal($name,"colormode","");
+    if( $cm eq "ct" ) {
       if( ReadingsVal($name,"ct","") =~ m/(\d+) .*/ ) {
         ($r,$g,$b) = cttorgb($1);
       }
+    } elsif( $cm eq "hs" ) {
+      my $h = ReadingsVal($name,"hue",0) / 65535.0;
+      my $s = ReadingsVal($name,"sat",0) / 254.0;
+      my $v = 1;
+      ($r,$g,$b) = Color::hsv2rgb($h,$s,$v);
+
+      $r *= 255;
+      $g *= 255;
+      $b *= 255;
     } elsif( ReadingsVal($name,"xy","") =~ m/(.+),(.+)/ ) {
       my ($x,$y) = ($1, $2);
       my $Y = 1;
