@@ -628,63 +628,7 @@ sub HMinfo_tempListTmpl(@) { ##################################################
     push @el,$chN;
   }
   return "no entities selected" if (!scalar @el);
-
-  open(aSave, "$fName") || return("Can't open $fName: $!");
-  my $found = 0;
-  my @entryFail = ();
-  my @exec = ();
-
-  while(<aSave>){
-    chomp;
-    my $line = $_;
-    if($line =~ m/^entities:/){
-      last if ($found != 0);
-      $line =~s/.*://;
-      foreach my $eN (split(",",$line)){
-        $eN =~ s/ //g;
-        $found = 1 if ($eN eq $tmpl);
-      }
-    }
-
-    elsif($found == 1 && $_ =~ m/(R_)?(P[123])?(_?._)?tempList[SMFWT].*\>/){
-      my $rn = $line;
-      $rn =~ s/(.*tempList...).*/$1/;
-      my ($tln,$val) = ($1,$2)if($_ =~ m/(.*)>(.*)/);
-      $tln =~ s/ //g;
-      $tln = "R_".$tln if($tln !~ m/^R_/);
-      my $day = $dl{$1} if ($tln =~ m/tempList(...)/);
-      $tln =~s /tempList/${day}_tempList/ if ($tln !~ m/[0-6]_/);
-
-      $val =~ tr/ +/ /;
-      $val =~ s/^ //;
-      $val =~ s/ $//;
-      @exec = ();
-      foreach my $eN(@el){
-        if ($action eq "verify"){
-          $val = join(" ",split(" ",$val));
-          my $nv = ReadingsVal($eN,$tln,"empty");
-          $nv = join(" ",split(" ",$nv));
-          push @entryFail,$eN." :".$tln." mismatch" if ($val ne $nv);
-        }
-        elsif($action eq "restore"){
-          $val = lc($1)." ".$val if ($tln =~ m/(P.)_._tempList/);
-          $tln =~ s/R_(P._)?._//;
-          my $x = CUL_HM_Set($defs{$eN},$eN,$tln,"prep",split(" ",$val));
-          push @entryFail,$eN." :".$tln." respose:$x" if ($x ne "1");
-          push @exec,$eN." ".$tln." exec ".$val;
-        }
-      }
-    }
-    $ret = "failed Entries:\n     "   .join("\n     ",@entryFail) if (scalar@entryFail);
-  }
-  $ret .= "$tmpl not found in file $fName" if (!$found);
-
-  foreach (@exec){
-    my @param = split(" ",$_);
-    CUL_HM_Set($defs{$param[0]},@param);
-  }
-  close(aSave);
-  return $ret;
+  return CUL_HM_tempListTmpl(join(",",@el),$action,$fName.":".$tmpl);
 }
 
 sub HMinfo_getEntities(@) { ###################################################
@@ -1746,7 +1690,6 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
 <a name="HMinfo"></a>
 <h3>HMinfo</h3>
 <ul>
-  <tr><td>
   HMinfo is a module to support getting an overview  of
   eQ-3 HomeMatic devices as defines in <a href="#CUL_HM">CUL_HM</a>. <br><br>
   <B>Status information and counter</B><br>
@@ -1848,7 +1791,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           statistic over rssi data for HM entities.<br>
       </li>
 	  
-      <li><a name="#HMinfotemplateChk">templateChk <a href="#HMinfoFilter">[filter] &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
+      <li><a name="#HMinfotemplateChk">templateChk</a> <a href="#HMinfoFilter">[filter] &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
          verifies if the register-readings comply to the template <br>
          Parameter are identical to <a href="#HMinfotemplateSet">templateSet</a><br>
          The procedure will check if the register values match the ones provided by the template<br>
@@ -1868,13 +1811,12 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
   </ul>
   <a name="HMinfoset"><b>Set</b></a>
   <ul>
-  even though the commands are more a get funktion they are implemented
-  as set to allow simple web interface usage<br>
+    even though the commands are more a get funktion they are implemented
+    as set to allow simple web interface usage<br>
     <ul>
       <li><a name="#HMinfoupdate">update</a><br>
           updates HM status counter.
       </li>
-
 
       <li><a name="#HMinfoautoReadReg">autoReadReg</a> <a href="#HMinfoFilter">[filter]</a><br>
           schedules a read of the configuration for the CUL_HM devices with attribut autoReadReg set to 1 or higher.
@@ -1914,7 +1856,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       </li>
       
          <br>
-      <li><a name="#HMinfotempList">tempList</a> <a href="#HMinfoFilter">[filter]</a>[save|restore|verify] [&lt;file&gt;]</a><br>
+      <li><a name="#HMinfotempList">tempList</a> <a href="#HMinfoFilter">[filter] [save|restore|verify] [&lt;file&gt;]</a><br>
           this function supports handling of tempList for thermstates.
           It allows templists to be saved in a separate file, verify settings against the file
           and write the templist of the file to the devices. <br>
@@ -1949,14 +1891,14 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          </code></ul>
          File keywords<br>
          <li><B>entities</B> comma separated list of entities which refers to the temp lists following.
-         The actual entity holding the templist must be given - which is channel 04 for RTs or channel 02 for TCs</li>
+           The actual entity holding the templist must be given - which is channel 04 for RTs or channel 02 for TCs</li>
          <li><B>tempList...</B> time and temp couples as used in the set tempList commands</li>
          <br>
      </li>
-     <li><a name="#HMinfotempListTmpl">tempListTmpl</a> <a href="#HMinfoFilter">[filter]</a>[templateName][verify|restore] [&lt;file&gt;]</a><br>
+      <li><a name="#HMinfotempListTmpl">tempListTmpl</a> <a href="#HMinfoFilter">[filter] [templateName][verify|restore] [&lt;file&gt;]</a><br>
 	    program one or more thermostat lists. The list of thermostats is selected by filter.<br>
         <ul>
-		<li></B>templateName</B> is the name of the template as being named in the file. The file format ist 
+		<li><B>templateName</B> is the name of the template as being named in the file. The file format ist 
 		identical to <a ref="#HMinfotempList">tempList</a>. If the entity in the file matches templateName the subsequent
 		temp-settings from the file are bing programmed to all Thermostats that match the filter<br></li>
         <li><B>file</B> name of the file to be used. Default: <B>tempList.cfg</B></li>
@@ -1979,177 +1921,175 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          <br>
          Restrictions:<br>
          <ul>
-         cpRegs will <u>not add any peers</u> or read from the devices. It is up to the user to read register in advance<br>
-         cpRegs is only allowed between <u>identical models</u><br>
-         cpRegs expets that all <u>readings are up-to-date</u>. It is up to the user to ensure data consistency.<br>
+           cpRegs will <u>not add any peers</u> or read from the devices. It is up to the user to read register in advance<br>
+           cpRegs is only allowed between <u>identical models</u><br>
+           cpRegs expets that all <u>readings are up-to-date</u>. It is up to the user to ensure data consistency.<br>
          </ul>
       </li>
       <li><a name="#HMinfotemplateDef">templateDef &lt;name&gt; &lt;param&gt; &lt;desc&gt; &lt;reg1:val1&gt; [&lt;reg2:val2&gt;] ...</a><br>
-          define a template.<br>
-          <b>param</b> gives the names of parameter necesary to execute the template. It is template dependant
-                       and may be onTime or brightnesslevel. A list of parameter needs to be separated with colon<br>
-                       param1:param2:param3<br>
-                       if del is given as parameter the template is removed<br>
-          <b>desc</b> shall give a description of the template<br>
-          <b>reg:val</b> is the registername to be written and the value it needs to be set to.<br>
-          In case the register is from link set and can destinguist between long and short it is necessary to leave the
-          leading sh or lg off. <br>
-          if parameter are used it is necessary to enter p. as value with p0 first, p1 second parameter
+        define a template.<br>
+        <b>param</b> gives the names of parameter necesary to execute the template. It is template dependant
+                     and may be onTime or brightnesslevel. A list of parameter needs to be separated with colon<br>
+                     param1:param2:param3<br>
+                     if del is given as parameter the template is removed<br>
+        <b>desc</b> shall give a description of the template<br>
+        <b>reg:val</b> is the registername to be written and the value it needs to be set to.<br>
+        In case the register is from link set and can destinguist between long and short it is necessary to leave the
+        leading sh or lg off. <br>
+        if parameter are used it is necessary to enter p. as value with p0 first, p1 second parameter
         <br>
         Example<br>
         <ul><code>
-         set hm templateDef SwOnCond level:cond "my description" CtValLo:p0 CtDlyOn:p1 CtOn:geLo<br>
+          set hm templateDef SwOnCond level:cond "my description" CtValLo:p0 CtDlyOn:p1 CtOn:geLo<br>
         </code></ul>
       </li>
       <li><a name="#HMinfotemplateSet">templateSet &lt;entity&gt; &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
-          sets a bunch of register accroding to a given template. Parameter may be added depending on
-          the template setup. <br>
-          templateSet will collect and accumulate all changes. Finally the results are written streamlined.<br>
-         <b>entity:</b> peer is the source entity. Peer needs to be given if a peer behabior beeds to be copied <br>
-         <b>template:</b> one of the programmed template<br>
-         <b>peer:</b> [long|short]:if necessary a peer needs to be given. If no peer is used enter '0'.
-                  with a peer it should be given whether it is for long or short keypress<br>
-         <b>param:</b> number and meaning of parameter depends on the given template<br>
+         sets a bunch of register accroding to a given template. Parameter may be added depending on
+         the template setup. <br>
+         templateSet will collect and accumulate all changes. Finally the results are written streamlined.<br>
+        <b>entity:</b> peer is the source entity. Peer needs to be given if a peer behabior beeds to be copied <br>
+        <b>template:</b> one of the programmed template<br>
+        <b>peer:</b> [long|short]:if necessary a peer needs to be given. If no peer is used enter '0'.
+                 with a peer it should be given whether it is for long or short keypress<br>
+        <b>param:</b> number and meaning of parameter depends on the given template<br>
         Example could be (templates not provided, just theoretical)<br>
         <ul><code>
-         set hm templateSet Licht1 staircase FB1:short 20  <br>
-         set hm templateSet Licht1 staircase FB1:long 100  <br>
+          set hm templateSet Licht1 staircase FB1:short 20  <br>
+          set hm templateSet Licht1 staircase FB1:long 100  <br>
         </code></ul>
         Restrictions:<br>
         <ul>
-         User must ensure to read configuration prior to execution.<br>
-         templateSet may not setup a complete register block but only a part if it. This is up to template design.<br>
-         <br>
+          User must ensure to read configuration prior to execution.<br>
+          templateSet may not setup a complete register block but only a part if it. This is up to template design.<br>
+          <br>
         </ul>
       </li>
     </ul>
+
   </ul>
   <br>
 
-  <a name="HMinfoget"></a>
-  <b>Get</b>
+  <a name="HMinfoget"></a><b>Get</b>
   <ul> N/A </ul>
   <br><br>
-
   <a name="HMinfoattr"><b>Attributes</b></a>
    <ul>
-    <li><a name="#HMinfosumStatus">sumStatus</a><br>
-        Warnings: list of readings that shall be screend and counted based on current presence.
-        I.e. counter is the number of entities with this reading and the same value.
-        Readings to be searched are separated by comma. <br>
-        Example:<br>
-        <ul><code>
-           attr hm sumStatus battery,sabotageError<br>
-        </code></ul>
-        will cause a reading like<br>
-        W_sum_batterie ok:5 low:3<br>
-        W_sum_sabotageError on:1<br>
-        <br>
-        Note: counter with '0' value will not be reported. HMinfo will find all present values autonomously<br>
-        Setting is meant to give user a fast overview of parameter that are expected to be system critical<br>
-    </li>
-    <li><a name="#HMinfosumERROR">sumERROR</a>
-        Similar to sumStatus but with a focus on error conditions in the system.
-        Here user can add reading<b>values</b> that are <b>not displayed</b>. I.e. the value is the
-        good-condition that will not be counted.<br>
-        This way user must not know all error values but it is sufficient to supress known non-ciritical ones.
-        <br>
-        Example:<br>
-        <ul><code>
-           attr hm sumERROR battery:ok,sabotageError:off,overheat:off,Activity:alive:unknown<br>
-        </code></ul>
-        will cause a reading like<br>
-        <ul><code>
-        ERR_batterie low:3<br>
-        ERR_sabotageError on:1<br>
-        ERR_overheat on:3<br>
-        ERR_Activity dead:5<br>
-        </code></ul>
-    </li>
-    <li><a name="#HMinfoautoUpdate">autoUpdate</a>
-        retriggers the command update periodically.<br>
-        Example:<br>
-        <ul><code>
-           attr hm autoUpdate 00:10<br>
-        </code></ul>
-        will trigger the update every 10 min<br>
-    </li>
-    <li><a name="#HMinfoautoArchive">autoArchive</a>
-        if set fhem will update the configFile each time the new data is available.
-        The update will happen with <a ref="#HMinfoautoUpdate">autoUpdate</a>. It will not 
-        work it autoUpdate is not used.<br>
-        see also <a ref="#HMinfoarchConfig">archConfig</a>
-        <br>
-    </li>
-    <li><a name="#HMinfohmAutoReadScan">hmAutoReadScan</a>
-        defines the time in seconds CUL_HM tries to schedule the next autoRead
-        from the queue. Despite this timer FHEM will take care that only one device from the queue will be
-        handled at one point in time. With this timer user can stretch timing even further - to up to 300sec
-        min delay between execution. <br>
-        Setting to 1 still obeys the "only one at a time" prinzip.<br>
-        Note that compressing will increase message load while stretch will extent waiting time.<br>
-    </li>
-    <li><a name="#HMinfohmIoMaxDly">hmIoMaxDly</a>
-        max time in seconds CUL_HM stacks messages if the IO device is not ready to send.
-        If the IO device will not reappear in time all command will be deleted and IOErr will be reported.<br>
-        Note: commands will be executed after the IO device reappears - which could lead to unexpected
-        activity long after command issue.<br>
-        default is 60sec. max value is 3600sec<br>
-    </li>
-    <li><a name="#HMinfoconfigDir">configDir</a>
-        default directory where to store and load configuration files from.
-        This path is used as long as the path is not given in a filename of 
-        a given command.<br>
-        It is used by commands like <a ref="#HMinfotempList">tempList</a> or <a ref="#HMinfosaveConfig">saveConfig</a><br>
-    </li>
-    <li><a name="#HMinfoconfigFilename">configFilename</a>
-        default filename used by 
-        <a ref="#HMinfosaveConfig">saveConfig</a>, 
-        <a ref="#HMinfopurgeConfig">purgeConfig</a>, 
-        <a ref="#HMinfoloadConfig">loadConfig</a><br>
-    </li>
-    <li><a name="#HMinfohmManualOper">hmManualOper</a>
-        set to 1 will prevent any automatic operation, update or default settings
-        in CUL_HM.<br>
-    </li>
-
+     <li><a name="#HMinfosumStatus">sumStatus</a><br>
+       Warnings: list of readings that shall be screend and counted based on current presence.
+       I.e. counter is the number of entities with this reading and the same value.
+       Readings to be searched are separated by comma. <br>
+       Example:<br>
+       <ul><code>
+         attr hm sumStatus battery,sabotageError<br>
+       </code></ul>
+       will cause a reading like<br>
+       W_sum_batterie ok:5 low:3<br>
+       W_sum_sabotageError on:1<br>
+       <br>
+       Note: counter with '0' value will not be reported. HMinfo will find all present values autonomously<br>
+       Setting is meant to give user a fast overview of parameter that are expected to be system critical<br>
+     </li>
+     <li><a name="#HMinfosumERROR">sumERROR</a>
+       Similar to sumStatus but with a focus on error conditions in the system.
+       Here user can add reading<b>values</b> that are <b>not displayed</b>. I.e. the value is the
+       good-condition that will not be counted.<br>
+       This way user must not know all error values but it is sufficient to supress known non-ciritical ones.
+       <br>
+       Example:<br>
+       <ul><code>
+         attr hm sumERROR battery:ok,sabotageError:off,overheat:off,Activity:alive:unknown<br>
+       </code></ul>
+       will cause a reading like<br>
+       <ul><code>
+         ERR_batterie low:3<br>
+         ERR_sabotageError on:1<br>
+         ERR_overheat on:3<br>
+         ERR_Activity dead:5<br>
+       </code></ul>
+     </li>
+     <li><a name="#HMinfoautoUpdate">autoUpdate</a>
+       retriggers the command update periodically.<br>
+       Example:<br>
+       <ul><code>
+         attr hm autoUpdate 00:10<br>
+       </code></ul>
+       will trigger the update every 10 min<br>
+     </li>
+     <li><a name="#HMinfoautoArchive">autoArchive</a>
+       if set fhem will update the configFile each time the new data is available.
+       The update will happen with <a ref="#HMinfoautoUpdate">autoUpdate</a>. It will not 
+       work it autoUpdate is not used.<br>
+       see also <a ref="#HMinfoarchConfig">archConfig</a>
+       <br>
+     </li>
+     <li><a name="#HMinfohmAutoReadScan">hmAutoReadScan</a>
+       defines the time in seconds CUL_HM tries to schedule the next autoRead
+       from the queue. Despite this timer FHEM will take care that only one device from the queue will be
+       handled at one point in time. With this timer user can stretch timing even further - to up to 300sec
+       min delay between execution. <br>
+       Setting to 1 still obeys the "only one at a time" prinzip.<br>
+       Note that compressing will increase message load while stretch will extent waiting time.<br>
+     </li>
+     <li><a name="#HMinfohmIoMaxDly">hmIoMaxDly</a>
+       max time in seconds CUL_HM stacks messages if the IO device is not ready to send.
+       If the IO device will not reappear in time all command will be deleted and IOErr will be reported.<br>
+       Note: commands will be executed after the IO device reappears - which could lead to unexpected
+       activity long after command issue.<br>
+       default is 60sec. max value is 3600sec<br>
+     </li>
+     <li><a name="#HMinfoconfigDir">configDir</a>
+       default directory where to store and load configuration files from.
+       This path is used as long as the path is not given in a filename of 
+       a given command.<br>
+       It is used by commands like <a ref="#HMinfotempList">tempList</a> or <a ref="#HMinfosaveConfig">saveConfig</a><br>
+     </li>
+     <li><a name="#HMinfoconfigFilename">configFilename</a>
+       default filename used by 
+       <a ref="#HMinfosaveConfig">saveConfig</a>, 
+       <a ref="#HMinfopurgeConfig">purgeConfig</a>, 
+       <a ref="#HMinfoloadConfig">loadConfig</a><br>
+     </li>
+     <li><a name="#HMinfohmManualOper">hmManualOper</a>
+       set to 1 will prevent any automatic operation, update or default settings
+       in CUL_HM.<br>
+     </li>
    </ul>
    <br>
   <a name="HMinfovariables"><b>Variables</b></a>
    <ul>
-    <li><b>I_autoReadPend:</b> Info:list of entities which are queued to retrieve config and status.
-                            This is typically scheduled thru autoReadReg</li>
-    <li><b>ERR___rssiCrit:</b> Error:list of devices with RSSI reading n min level </li>
-    <li><b>W_unConfRegs:</b> Warning:list of entities with unconfirmed register changes. Execute getConfig to clear this.</li>
-    <li><b>I_rssiMinLevel:</b> Info:counts of rssi min readings per device, clustered in blocks</li>
-
-    <li><b>ERR__protocol:</b> Error:count of non-recoverable protocol events per device.
-        Those events are NACK, IOerr, ResendFail, CmdDel, CmdPend.<br>
-        Counted are the number of device with those events, not the number of events!</li>
-    <li><b>ERR__protoNames:</b> Error:name-list of devices with non-recoverable protocol events</li>
-    <li><b>I_HM_IOdevices:</b> Info:list of IO devices used by CUL_HM entities</li>
-    <li><b>I_actTotal:</b> Info:action detector state, count of devices with ceratin states</li>
-    <li><b>ERRactNames:</b> Error:names of devices that are not alive according to ActionDetector</li>
-    <li><b>C_sumDefined:</b> Count:defined entities in CUL_HM. Entites might be count as
-        device AND channel if channel funtion is covered by the device itself. Similar to virtual</li>
-    <li><b>ERR_&lt;reading&gt;:</b> Error:count of readings as defined in attribut
-        <a href="#HMinfosumERROR">sumERROR</a>
-        that do not match the good-content. </li>
-    <li><b>ERR_names:</b> Error:name-list of entities that are counted in any ERR_&lt;reading&gt;
-        W_sum_&lt;reading&gt;: count of readings as defined in attribut
-        <a href="#HMinfosumStatus">sumStatus</a>. </li>
-    Example:<br>
-    <ul><code>
-      ERR___rssiCrit LightKittchen,WindowDoor,Remote12<br>
-      ERR__protocol NACK:2 ResendFail:5 CmdDel:2 CmdPend:1<br>
-      ERR__protoNames LightKittchen,WindowDoor,Remote12,Ligth1,Light5<br>
-      ERR_battery: low:2;<br>
-      ERR_names: remote1,buttonClara,<br>
-      I_rssiMinLevel 99&gt;:3 80&lt;:0 60&lt;:7 59&lt;:4<br>
-      W_sum_battery: ok:5;low:2;<br>
-      W_sum_overheat: off:7;<br>
-      C_sumDefined: entities:23 device:11 channel:16 virtual:5;<br>
-    </code></ul>
+     <li><b>I_autoReadPend:</b> Info:list of entities which are queued to retrieve config and status.
+                             This is typically scheduled thru autoReadReg</li>
+     <li><b>ERR___rssiCrit:</b> Error:list of devices with RSSI reading n min level </li>
+     <li><b>W_unConfRegs:</b> Warning:list of entities with unconfirmed register changes. Execute getConfig to clear this.</li>
+     <li><b>I_rssiMinLevel:</b> Info:counts of rssi min readings per device, clustered in blocks</li>
+     
+     <li><b>ERR__protocol:</b> Error:count of non-recoverable protocol events per device.
+         Those events are NACK, IOerr, ResendFail, CmdDel, CmdPend.<br>
+         Counted are the number of device with those events, not the number of events!</li>
+     <li><b>ERR__protoNames:</b> Error:name-list of devices with non-recoverable protocol events</li>
+     <li><b>I_HM_IOdevices:</b> Info:list of IO devices used by CUL_HM entities</li>
+     <li><b>I_actTotal:</b> Info:action detector state, count of devices with ceratin states</li>
+     <li><b>ERRactNames:</b> Error:names of devices that are not alive according to ActionDetector</li>
+     <li><b>C_sumDefined:</b> Count:defined entities in CUL_HM. Entites might be count as
+         device AND channel if channel funtion is covered by the device itself. Similar to virtual</li>
+     <li><b>ERR_&lt;reading&gt;:</b> Error:count of readings as defined in attribut
+         <a href="#HMinfosumERROR">sumERROR</a>
+         that do not match the good-content. </li>
+     <li><b>ERR_names:</b> Error:name-list of entities that are counted in any ERR_&lt;reading&gt;
+         W_sum_&lt;reading&gt;: count of readings as defined in attribut
+         <a href="#HMinfosumStatus">sumStatus</a>. </li>
+     Example:<br>
+     <ul><code>
+       ERR___rssiCrit LightKittchen,WindowDoor,Remote12<br>
+       ERR__protocol NACK:2 ResendFail:5 CmdDel:2 CmdPend:1<br>
+       ERR__protoNames LightKittchen,WindowDoor,Remote12,Ligth1,Light5<br>
+       ERR_battery: low:2;<br>
+       ERR_names: remote1,buttonClara,<br>
+       I_rssiMinLevel 99&gt;:3 80&lt;:0 60&lt;:7 59&lt;:4<br>
+       W_sum_battery: ok:5;low:2;<br>
+       W_sum_overheat: off:7;<br>
+       C_sumDefined: entities:23 device:11 channel:16 virtual:5;<br>
+     </code></ul>
    </ul>
 </ul>
 =end html
