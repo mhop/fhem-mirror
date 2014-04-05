@@ -433,7 +433,7 @@ while(time() < 2*3600) {
   sleep(5);
 }
 
-my $cfgErrMsg = "There were error messages while initializing FHEM";
+my $cfgErrMsg = "Error messages while initializing FHEM:";
 my $cfgRet="";
 if($attr{global}{configfile} eq 'configDB') {
   my $ret = cfgDB_ReadAll(undef);
@@ -450,7 +450,7 @@ if($attr{global}{configfile} eq 'configDB') {
 }
 
 if($cfgRet) {
-  $attr{global}{motd} = "$cfgErrMsg,\ncheck the Logfile for details.";
+  $attr{global}{motd} = "$cfgErrMsg\n$cfgRet";
   Log 1, $cfgRet;
 
 } elsif($attr{global}{motd} =~ m/^$cfgErrMsg/) {
@@ -1521,11 +1521,7 @@ CommandDefine($$)
   return "Cannot load module $m" if($newm eq "UNDEFINED");
   $m = $newm;
 
-  if(!$modules{$m} || !$modules{$m}{DefFn}) {
-    my @m = grep { $modules{$_}{DefFn} || !$modules{$_}{LOADED} }
-                sort keys %modules;
-    return "Unknown module $m, choose one of @m";
-  }
+  return "Unknown module $m" if(!$modules{$m} || !$modules{$m}{DefFn});
 
   my %hash;
 
