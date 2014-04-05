@@ -49,8 +49,8 @@ sub LUXTRONIK2_doStatisticDelta ($$$$) ;
   my $modulVersion = "2014-03-31";
 
 #List of firmware versions that are known to be compatible with this modul
-  my $testedFirmware = "#V1.54C#V1.60#V1.69#";
-  my $compatibleFirmware = "#V1.54C#V1.60#V1.69#";
+  my $testedFirmware = "#V1.52#V1.54C#V1.60#V1.69#";
+  my $compatibleFirmware = "#V1.52#V1.54C#V1.60#V1.69#";
  
 sub ########################################
 LUXTRONIK2_Initialize($)
@@ -838,7 +838,7 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate($hash, "deviceTimeCalc", $value);
      my $delayDeviceTimeCalc=sprintf("%.0f",$a[29]-$a[22]);
      readingsBulkUpdate($hash, "delayDeviceTimeCalc", $delayDeviceTimeCalc);
-     my $durationFetchReadings = sprintf("%.2f",$a[30]-$a[29]);
+     my $durationFetchReadings = sprintf("%.5f",$a[30]-$a[29]);
      readingsBulkUpdate($hash, "durationFetchReadings", $durationFetchReadings);
      #Remember min and max reading durations, will be reset when initializing the device
      if ($hash->{fhem}{durationFetchReadingsMin} == 0 || $hash->{fhem}{durationFetchReadingsMin} > $durationFetchReadings) {
