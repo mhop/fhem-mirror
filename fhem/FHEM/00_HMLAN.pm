@@ -1090,4 +1090,154 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
 </ul>
 
 =end html
+=begin html_DE
+<a name="HMLAN"></a>
+<h3>HMLAN</h3>
+<ul>
+    Das HMLAN ist das fhem-Modul f&uuml;r den eQ-3 HomeMatic LAN Configurator welcher als IO 
+    in FHEM fungiert. Siehe <a href="http://www.fhemwiki.de/wiki/HM-CFG-LAN_LAN_Konfigurations-Adapter">HM-CFG-LAN_LAN_Konfigurations-Adapter</a> zur Konfiguration.<br>
+    Eine weitere Beschreibung, wie der HomeMatic USB Konfigurations-Adapter 
+    <a href="https://git.zerfleddert.de/cgi-bin/gitweb.cgi/hmcfgusb">(HM-CFG-USB)</a> 
+    verwendet werden kann, ist unter dem angegebenen Link zu finden.<br/>
+    <br>
+    Dieses Ger&auml;t kann gleichzeitig mit einer CCU und (nur lesend) mit FHEM verwendet werden. 
+    Hierf&uuml;r ist wie folgt vorzugehen:
+    <ul>
+        <li>Starten des fhem/contrib/tcptee.pl Programms</li>
+        <li>Umleiten der CCU zum local host</li>
+        <li>Ausschalten der LAN-Encryption auf der CCU f&uuml;r den LAN-Configurator</li>
+        <li>Setzen des dummy Attributes f&uuml;r das HMLAN Ger&auml;t in FHEM</li>
+    </ul>
+    <br><br>
+
+    <a name="HMLANdefine"><b>Define</b></a>
+    <ul>
+        <code>define &lt;name&gt; HMLAN &lt;ip-address&gt;[:port]</code><br>
+        <br>
+        Der Standard-Port lautet: 1000.<br/>
+        Wenn keine IP-Adresse angegeben wird, wird auch kein Ger&auml;t ge&ouml;ffnet; man kann 
+	also auch ohne angeschlossene Hardware experimentieren.
+    </ul>
+    <br><br>
+
+    <a name="HMLANset"><b>Set</b></a>
+    <ul>
+        <li><a href="#hmPairForSec">hmPairForSec</a></li>
+        <li><a href="#hmPairSerial">hmPairSerial</a></li>
+    </ul>
+    <br><br>
+
+    <a name="HMLANget"><b>Get</b></a>
+    <ul>
+        N/A
+    </ul>
+    <br><br>
+
+    <a name="HMLANattr"><b>Attributes</b></a>
+    <ul>
+        <li><a href="#do_not_notify">do_not_notify</a></li><br>
+        <li><a href="#attrdummy">dummy</a></li><br>
+        <li><a href="#addvaltrigger">addvaltrigger</a></li><br>
+        <li><a href="#HMLANlogIDs">logIDs</a><br>
+           Schaltet selektives Aufzeichnen der HMLAN Meldungen ein. Eine Liste der 
+           HMIds oder Namen, die aufgezeichnet werden sollen, k&ouml;nnen - getrennt durch 
+           Kommata - eingegeben werden.<br>
+           Die Attribute erlauben ausschließlich die Angabe von Device-IDs und keine Kanal-IDs. 
+           Die Kanal-IDs werden automatisch in Device-IDs umgewandelt.<br>
+           <b>all</b> zeichnet die Original-Meldungen f&uuml;r alle HMIds auf.<br>
+           <b>sys</b> zeichnet alle systemrelevanten Meldungen wie keep-alive auf.<br>
+           <b>all,sys</b> damit wird die Aufzeichnung aller Meldungen eingeschaltet<br>
+        </li>
+        <li><a name="HMLANhmMsgLowLimit">hmMsgLowLimit</a><br>
+            maximale Anzahl der Meldungen, die HMLAN f&uuml;r weniger wichtige Meldungen zur 
+            Ausf&uuml;hrung zul&auml;sst. Bei dar&uuml;ber hinaus gehenden Meldungen wird die Verarbeitung aufgeschoben. <br>
+            HMLAM erlaubt eine maximale Anzahl von Meldungen pro Stunde. Wird diese &uuml;berschritten, 
+            wird die Aussendung der Meldungen blockiert. Nach ungef&auml;hr 90% der maximalen Anzahl 
+            wird die Liste der weniger wichtigen Meldungen (momentan nur CUL_HM autoReadReg) 
+            solange verz&ouml;gert abgearbeitet, bis die Rahmenbedingungen eine weitere Verarbeitung 
+            wieder zulassen. <br>
+            hmMsgLowLimit erm&ouml;glicht eine weitere Reduzierung dieses Grenzwertes.<br>
+            Hinweis: Der HMLAN berechnet die maximale Anzahl der auszusendenden Meldungen 
+            auf Basis einiger Annahmen und ist deshalb mit einer Toleranz behaftet.<br>
+            </li><br>
+        <li><a href="#hmId">hmId</a></li><br>
+        <li><a name="HMLANhmKey">hmKey</a></li><br>
+        <li><a name="HMLANhmKey2">hmKey2</a></li><br>
+        <li><a name="HMLANhmKey3">hmKey3</a></li><br>
+        <li><a name="HMLANhmKey4">hmKey4</a></li><br>
+        <li><a name="HMLANhmKey5">hmKey5</a><br>
+          AES Schl&uuml;ssel f&uuml;r den HMLAN Adapter. <br>
+          Der Schl&uuml;ssel wird in eine hash-Zeichenfolge umgewandelt. Wenn eine Hash-Folge unmittelbar 
+          eingegeben wird, erfolgt keine Umwandlung, sondern eine eine direkte Benutzung der Hash-Folge. 
+          Deshalb kann der Originalschl&uuml;ssel auch nicht entschl&uuml;sselt werden.<br>
+        </li>
+        <li><a href="#hmProtocolEvents">hmProtocolEvents</a></li><br>
+        <li><a name="HMLANrespTime">respTime</a><br>
+          Definiert die maximale Antwortzeit des HMLAN-Adapters in Sekunden. Standardwert ist 1 Sekunde.<br/>
+          L&auml;ngere Zeiten k&ouml;nnen &uuml;bergangsweise in langsamen und instabilen Systemen oder in
+          LAN-Konfigurationen verwendet werden.</li>
+        <li><a name="HMLAN#wdTimer">wdTimer</a><br>
+          Zeit in Sekunden, um den HMLAN zu triggern. Werte zwischen 5 und 25 sind zul&auml;ssig. 
+          Standardwert ist 25 Sekunden.<br>
+          Es wird <B>davon abgeraten</B> diesen Timer zu ver&auml;ndern. Wenn Probleme mit 
+          HMLAN-Abbr&uuml;chen bestehen wird empfohlen die Ursache des Problems zu finden 
+          und zu beheben und nicht die Symptom.</li>
+        <li><a name="HMLANhmLanQlen">hmLanQlen</a><br>
+          Definiert die L&auml;nge der Warteschlange des HMLAN Interfaces. Es ist deshalb die Anzahl 
+          der gleichzeitig zu sendenden Meldungen. Erh&ouml;hung des Wertes kann eine Steigerung der
+          &Uuml;bertragungsgeschwindigkeit verursachen, ebenso k&ouml;nnen wiederholte Aussendungen 
+          Datenverlust bewirken.<br>
+          Die Auswirkungen werden durch die Ereignisse im Protokoll sichtbar.<br>
+          1 - ist ein Wert auf der sicheren Seite und deshalb der Standardwert<br>
+          5 - ist eine kritische L&auml;nge und verursacht wahrscheinlich Meldungsverluste</li>
+    </ul>
+    <a name="HMLANparameter"><b>parameter</b></a>
+    <ul>
+      <li><B>assignedIDs</B><br>
+          HMIds, die einem HMLAM zugeordnet sind und verarbeitet werden. Z.B. ACK werden intern generiert.</li>
+      <li><B>assignedIDsCnt</B><br>
+          Anzahl der IDs, die von FHEM einem HMLAN zugeordnet sind</li>
+      <li><B>assignedIDsReport</B><br>
+          Anzahl der HMIDs, die vom HMLAN als zugeordnet gemeldet werden. 
+          Diese Anzahl sollte mit assignedIDsCnt identisch sein.</li>
+      <li><B>msgKeepAlive</B><br>
+          G&uuml;te der keep-alive Meldungen. <br>
+          <B>dlyMax</B>: maximale Verz&ouml;gerungsdauer zwischen dem geplanten Meldungszeitpunkt 
+          und der tats&auml;chlich gesendeten Meldung.<br>
+          <B>bufferMin</B>: minimal verf&uuml;gbarer Speicher bevor HMLAN voraussichtlich 
+          unterbrochen wird bedingt durch die fehlende keepAlive Meldung. bufferMin 
+          wird auf 30 Sekunden zur&uuml;ckgesetzt wenn das Attribut wdTimer ver&auml;ndert wird.<br>
+          Wenn dlyMax hoch ist (mehrere Sekunden) oder bufferMin geht gegen "0" (normal ist 4) 
+          leidet das System unter den internen Verz&ouml;gerungen. Den Gr&uuml;nden hierf&uuml;r muss 
+          nachgegangen werdensystem. Als schnelle L&ouml;sung kann der Wert f&uuml;r wdTimer 
+          verkleinert werden, um HMLAN schneller zu triggern.</li>
+      <li><B>msgLoadEst</B><br>
+          Absch&auml;tzung der Last auf dem HMLAN. Da HMLAN nur eine begrenzte Kapzit&auml;t hat, 
+          um je Stunde eine bestimmte Anzahl an Meldungen abzusetzen, versucht FHEM 
+          diese Last vorauszuberechnen - siehe auch 
+          <a href="#hmMsgLowLimit">hmMsgLowLimit</a><br></li>
+      <li><B>msgParseDly</B><br>
+          Kalkuliert die Verz&ouml;gerungen einer Meldung vom Zeitpunkt des Abschickens im HMLAN 
+          bis zu Verarbeitung in FHEM. Deshalb ist dies ein Indikator f&uuml;r die Leistungsf&auml;higkeit 
+          des Systems  von FHEM.
+          </li>
+    </ul>
+    <a name="HMLANreadings"><b>Parameter und Readings</b></a>
+    <ul>
+      <li><B>prot_disconnect</B>       <br>letzter HMLAN disconnect</li>
+      <li><B>prot_init</B>             <br>letzter HMLAN init</li>
+      <li><B>prot_keepAlive</B>        <br>HMLAN unterbrochen, wahrscheinlich um langsame 
+      keep-alive Meldungen zu senden.</li>
+      <li><B>prot_ok</B>               <br>letzte HMLAN ok Bedingung</li>
+      <li><B>prot_timeout</B>          <br>letzter HMLAN Timeout</li>
+      <li><B>prot_Warning-HighLoad</B> <br>hohe Auslastung erreicht -  
+        HMLAN hat nur noch 10% seiner Leistungsf&auml;higkeit &uuml;brig</li>
+      <li><B>prot_ERROR-Overload</B>   <br>&Uuml;berlastung - 
+        HMLAN wird zwar Meldungen empfangen aber keine Meldungen mehr absenden</li>
+      <li><B>prot_Overload-released</B><br>&Uuml;berlastung beendet - normale Arbeitsweise ist m&ouml;glich</li>
+    </ul>
+
+</ul>
+=end html
+
 =cut
