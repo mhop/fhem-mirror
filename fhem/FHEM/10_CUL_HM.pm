@@ -6405,13 +6405,14 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   # $template is formated <file>:template - file is optional
   my ($name,$action,$template)=@_; 
   my %dl =("Sat"=>0,"Sun"=>1,"Mon"=>2,"Tue"=>3,"Wed"=>4,"Thu"=>5,"Fri"=>6);
-  my $ret;
+  my $ret = "";
   my @el = split",",$name;
   my ($fName,$tmpl) = split":",$template;
   if (!$tmpl){
     $tmpl = $fName;
     $fName = "tempList.cfg";
   }
+  return "file: $fName for $name does not exist"  if (!(-e $fName));
   open(aSave, "$fName") || return("Can't open $fName: $!");
   my $found = 0;
   my @entryFail = ();

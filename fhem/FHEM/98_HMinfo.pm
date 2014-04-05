@@ -614,9 +614,9 @@ sub HMinfo_tempList(@) { ######################################################
 sub HMinfo_tempListTmpl(@) { ##################################################
   my ($filter,$tmpl,$action,$fName)=@_;
   $filter = "." if (!$filter);
-  return "no template name given" if (!$tmpl);
+#  return "no template name given" if (!$tmpl);
   my %dl =("Sat"=>0,"Sun"=>1,"Mon"=>2,"Tue"=>3,"Wed"=>4,"Thu"=>5,"Fri"=>6);
-  my $ret;
+  my $ret = "";
   my @el ;
   foreach my $eN(HMinfo_getEntities("d")){#search for devices and select correct channel
     next if (!$eN);
@@ -628,7 +628,20 @@ sub HMinfo_tempListTmpl(@) { ##################################################
     push @el,$chN;
   }
   return "no entities selected" if (!scalar @el);
-  return CUL_HM_tempListTmpl(join(",",@el),$action,$fName.":".$tmpl);
+  $tmpl = (!$tmpl)?"":($fName?$fName.":".$tmpl:$tmpl);
+  foreach my $name (@el){
+    my $tmplDev;
+    if (!$tmpl){
+      $tmplDev = AttrVal($name,"tempListTmpl","tempList.cfg:$name");
+    }
+    else{
+      $tmplDev = $tmpl;
+    }
+    my $r = CUL_HM_tempListTmpl($name,$action,$tmplDev);
+    
+    $ret .= ($r?$r:"passed:$name")."\n";
+  }
+  return $ret;
 }
 
 sub HMinfo_getEntities(@) { ###################################################
@@ -1159,9 +1172,9 @@ sub HMinfo_SetFn($@) {#########################################################
     $ret = HMinfo_tempList($filter,$a[0],$fn);
   }
   elsif($cmd eq "tempListTmpl"){##handle thermostat templist from file --------
-    my $fn = $a[2]?$a[2]:"tempList.cfg";
+    my $fn = $a[2]?$a[2]:"";
     my $ac = $a[1]?$a[1]:"verify";
-    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn && $fn !~ m/\//);
     $ret = HMinfo_tempListTmpl($filter,$a[0],$ac,$fn);
   }
   elsif($cmd eq "loadConfig") {##action: loadConfig----------------------------
