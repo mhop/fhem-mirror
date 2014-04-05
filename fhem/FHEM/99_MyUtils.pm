@@ -9,6 +9,7 @@ MyUtils_Initialize($$)
 }
 
 my @rollHoch = (
+  "bad.roll", 
   "arb.rollWeg", 
   "arb.rollTerr",
   "kuch.rollStr",
@@ -31,6 +32,26 @@ my @rollRunter = (
   "schlaf.rollWeg", 
   "schlaf.rollStr"
 );
+
+my @rollWeck = ( 
+  "schlaf.rollWeg", 
+  "schlaf.rollStr"
+);
+
+my @rollTest = ( 
+  "wohn.rollTerrR"
+);
+
+my @rollSchlaf = ( 
+  "schlaf.rollWeg", 
+  "schlaf.rollStr"
+);
+
+my @rollArb = ( 
+  "arb.rollTerr", 
+  "arb.rollWeg", 
+);
+
 
 
 sub myfhem($) {
@@ -94,6 +115,10 @@ sub RollGroup(\@$$)
     }
 }
 
+sub RollTest() {
+     &RollGroup(\@rollTest, "closes", 1);
+}
+
 sub RollAll($$) {
    #Log 1, "################";
    my ($cmd, $delay) = @_;
@@ -105,6 +130,12 @@ sub RollAll($$) {
    else {
      &RollGroup(\@rollHoch, $cmd,$delay);
   }
+}
+
+
+sub RollWeck($) {
+   my ($delay) = @_;
+   &RollGroup(\@rollWeck, "up 5", $delay);
 }
 
 
