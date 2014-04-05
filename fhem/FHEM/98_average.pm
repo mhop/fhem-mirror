@@ -1,6 +1,6 @@
 ##############################################
 # $Id$
-# Avarage computing
+# Average computing
 
 package main;
 use strict;
@@ -14,8 +14,13 @@ average_Initialize($)
   $hash->{DefFn}   = "average_Define";
   $hash->{NotifyFn} = "average_Notify";
   $hash->{NotifyOrderPrefix} = "10-";   # Want to be called before the rest
-  $hash->{AttrList} = "disable:0,1";
-}
+  $hash->{AttrList} = "disable:0,1 " .
+                      "disabledForIntervals " .
+                      "computeMethod:integral,counter " .
+                      "noaverage:0,1 " .
+                      "nominmax:0,1 " .
+                      "floatformat:%0.1f,%0.2f";
+  }
 
 
 ##########################
@@ -38,14 +43,22 @@ average_Define($$$)
   return undef;
 }
 
+
+sub
+avg_setValTime($$$$)
+{
+  my ($r, $rname, $val, $tn) = @_;
+  $r->{$rname}{VAL} = $val;
+  $r->{$rname}{TIME} = $tn; 
+}
 ##########################
 sub
 average_Notify($$)
 {
   my ($avg, $dev) = @_;
-  my $avgName = $avg->{NAME};
+  my $myName = $avg->{NAME};
 
-  return "" if(AttrVal($avgName, "disable", undef));
+  return "" if(IsDisabled($myName));
 
   my $devName = $dev->{NAME};
   my $re = $avg->{REGEXP};
@@ -53,6 +66,12 @@ average_Notify($$)
   my $tn;
   my $myIdx = $max;
 
+  my $doCounter = (AttrVal($myName, "computeMethod", "integral") eq "counter");
+  my $doMMx  = (AttrVal($myName, "nominmax", "0") eq "0");
+  my $doAvg  = (AttrVal($myName, "noaverage", "0") eq "0");
+  my $ffmt   =  AttrVal($myName, "floatformat", "%0.1f");
+  my $r = $dev->{READINGS};
+  
   for (my $i = 0; $i < $max; $i++) {
     my $s = $dev->{CHANGED}[$i];
 
@@ -60,8 +79,8 @@ average_Notify($$)
     # Filtering
     next if(!defined($s));
     my ($evName, $val) = split(" ", $s, 2); # resets $1
-# Log3 $avgName, 1,"mytestavg pre-filter: ".$devName.$evName." s=".$s; 
-    next if($devName !~ m/^$re$/ && "$devName:$s" !~ m/^$re$/ || $s =~ m/_avg_/);
+    next if($devName !~ m/^$re$/ && "$devName:$s" !~ m/^$re$/ ||
+            $s =~ m/(_avg_|_cum_|_min_|_max_|_cnt_)/);
     if(defined($1)) {
       my $reArg = $1;
       if(defined($2)) {
@@ -73,81 +92,95 @@ average_Notify($$)
     next if(!defined($val) || $val !~ m/^(-?\d+\.?\d*)/);
     $val = $1;
 
-# Log3 $avgName, 1,"mytestavg pst-filter: ".$devName.$evName." val=".$val; 
-
     ################
     # Avg computing
     $evName =~ s/[^A-Za-z_-].*//;
     $tn = TimeNow() if(!$tn);
 
-    my $r = $dev->{READINGS};
     my @dNow = split("[ :-]", $tn);
 
-    for(my $idx = 0; $idx <= 1; $idx++) {
+    for(my $idx = 0; $idx <= 1; $idx++) { # 0:day 1:month
 
       my $secNow = 3600*$dNow[3] + 60*$dNow[4] + $dNow[5];
       $secNow += $dNow[2]*86400 if($idx);
 
       my $cumName = "${evName}_cum_" . ($idx ? "month" : "day");
       my $avgName = "${evName}_avg_" . ($idx ? "month" : "day");
-      my $minName = "${evName}_min_" . ($idx ? "month" : "day"); ##MH
-      my $maxName = "${evName}_max_" . ($idx ? "month" : "day"); ##MH
+      my $minName = "${evName}_min_" . ($idx ? "month" : "day");
+      my $maxName = "${evName}_max_" . ($idx ? "month" : "day");
+      my $cntName = "${evName}_cnt_" . ($idx ? "month" : "day");
 
-      if(!$r->{$cumName}) {
-        $r->{$cumName}{VAL} = $secNow*$val;
-        $r->{$avgName}{VAL} = $val;
-        $r->{$maxName}{VAL} = $val; ##MH
-        $r->{$minName}{VAL} = $val; ##MH
-        $r->{$cumName}{TIME} = $r->{$avgName}{TIME} = $tn;
+      if($doCounter && !defined($r->{$cntName})) {
+        avg_setValTime($r, $cntName, 1, $tn);
+        delete $r->{$cumName};         # Reset when switching to counter-mode
+        delete $r->{$avgName};
+      }
+  
+      if($doMMx && (!defined($r->{$maxName}) || !defined($r->{$minName}))) {
+        avg_setValTime($r, $maxName, $val, $tn);
+        avg_setValTime($r, $minName, $val, $tn);
+      }
+
+      if(!defined($r->{$cumName}) || ($doAvg && !defined($r->{$avgName}))) {
+        my $cum = ($doCounter ? $val : $secNow*$val);
+        avg_setValTime($r, $cumName, $cum, $tn);
+        avg_setValTime($r, $avgName, $val, $tn) if ($doAvg);
         next;
       }
-
-      ##MH take care of existing average definitions - just add this one..
-      if(!$r->{$maxName}) {
-        $r->{$maxName}{VAL} = $val;
-        $r->{$maxName}{TIME} = $tn; 
-      }
-      ##MH take care of existing average definitions - just add this one..
-      if(!$r->{$minName}) {
-        $r->{$minName}{VAL} = $val;
-        $r->{$minName}{TIME} = $tn; 
-      }
-
+  
       my @dLast = split("[ :-]", $r->{$cumName}{TIME});
       my $secLast = 3600*$dLast[3] + 60*$dLast[4] + $dLast[5];
       $secLast += $dLast[2]*86400 if($idx);
 
       if($idx == 0 && ($dLast[2] == $dNow[2]) ||
-         $idx == 1 && ($dLast[1] == $dNow[1])) {
-        my $cum = $r->{$cumName}{VAL} + ($secNow-$secLast) * $val;
-        $r->{$cumName}{VAL} = $cum;
-        my $div = ($secNow ? $secNow : 1);
-        $r->{$avgName}{VAL} = sprintf("%0.1f", $cum/$div);
-        ##MH change only if current value bigger than maxvalue
-        if($r->{$maxName}{VAL} < $val) {
-          $r->{$maxName}{VAL} = sprintf("%0.1f", $val); ##MH
-          $r->{$maxName}{TIME} = $tn; ##MH
+         $idx == 1 && ($dLast[1] == $dNow[1])) {         # same day or month
+
+        my $cVal = $r->{$cumName}{VAL};
+        $cVal += ($doCounter ? $val : ($secNow-$secLast) * $val);
+        avg_setValTime($r, $cumName, $cVal, $tn);
+
+        if($doAvg) {
+          my $div = ($secNow ? $secNow : 1);
+          if($doCounter) {
+            $div = $r->{$cntName}{VAL}+1;
+            avg_setValTime($r, $cntName, $div, $tn);
+          }
+          my $lVal = sprintf($ffmt, $r->{$cumName}{VAL}/$div);
+          avg_setValTime($r, $avgName, $lVal, $tn);
         }
 
-        ##MH change only if current value smaller than minvalue
-        if($r->{$minName}{VAL} > $val) {
-          $r->{$minName}{VAL} = sprintf("%0.1f", $val); ##MH
-          $r->{$minName}{TIME} = $tn; ##MH
+        if($doMMx) {
+          avg_setValTime($r, $maxName, sprintf($ffmt,$val), $tn)
+                if($r->{$maxName}{VAL} < $val);
+          avg_setValTime($r, $minName, sprintf($ffmt,$val), $tn)
+                if($r->{$minName}{VAL} > $val);
         }
-      } else {
-        $dev->{CHANGED}[$myIdx++] = "$avgName: ".$r->{$avgName}{VAL};
-        $dev->{CHANGED}[$myIdx++] = "$maxName: ".$r->{$maxName}{VAL}; ##MH
-        $dev->{CHANGED}[$myIdx++] = "$minName: ".$r->{$minName}{VAL}; ##MH
-        $r->{$cumName}{VAL} = $secNow*$val;
-        $r->{$avgName}{VAL} = $val;
 
-        ##MH set to current value
-        $r->{$maxName}{VAL} = sprintf("%0.1f", $val); ##MH
-        $r->{$maxName}{TIME} = $tn; ##MH
-        $r->{$minName}{VAL} = sprintf("%0.1f", $val); ##MH
-        $r->{$minName}{TIME} = $tn; ##MH
+      } else {           # day or month changed: create events and reset values
+
+        if($doAvg) {
+          $dev->{CHANGED}[$myIdx++] = "$avgName: ".$r->{$avgName}{VAL};
+          avg_setValTime($r, $cumName, $secNow*$val, $tn);
+          avg_setValTime($r, $avgName, $val, $tn);
+        }
+
+        if($doCounter) {
+          $dev->{CHANGED}[$myIdx++] = "$cumName: ".$r->{$cumName}{VAL};
+          avg_setValTime($r, $cumName, 0, $tn);
+          avg_setValTime($r, $cntName, 0, $tn) if($doAvg);
+
+        } else {
+          avg_setValTime($r, $cumName, $secNow*$val, $tn);
+
+        }
+
+        if($doMMx) {
+          $dev->{CHANGED}[$myIdx++] = "$maxName: ".$r->{$maxName}{VAL};
+          $dev->{CHANGED}[$myIdx++] = "$minName: ".$r->{$minName}{VAL};
+          avg_setValTime($r, $maxName, sprintf($ffmt, $val), $tn);
+          avg_setValTime($r, $minName, sprintf($ffmt, $val), $tn);
+        }
       }
-      $r->{$cumName}{TIME} = $r->{$avgName}{TIME} = $tn;
     }
   }
   return undef;
@@ -178,7 +211,7 @@ average_Notify($$)
       regexp for <a href="#notify">notify</a>.<br>
       If it matches, and the event is of the form "eventname number", then this
       module computes the daily and monthly average, maximum and minimum values
-      and generates events of the form
+      and sums depending on attribute settings and generates events of the form
       <ul>
         &lt;device&gt; &lt;eventname&gt;_avg_day: &lt;computed_average&gt;
       </ul>
@@ -187,6 +220,9 @@ average_Notify($$)
       </ul>
       <ul>
         &lt;device&gt; &lt;eventname&gt;_max_day: &lt;maximum day value&gt;
+      </ul>
+      <ul>
+        &lt;device&gt; &lt;eventname&gt;_cum_day: &lt;sum of the values during the day&gt;
       </ul>
       and
       <ul>
@@ -198,10 +234,13 @@ average_Notify($$)
       <ul>
         &lt;device&gt; &lt;eventname&gt;_max_month: &lt;maximum month value&gt;
       </ul>
+      <ul>
+        &lt;device&gt; &lt;eventname&gt;_cum_month: &lt;sum of the values during the month&gt;
+      </ul>
 
-      at the beginning of the next day or month respectively.<br>
+      at the beginning of the next day or month respectively depending on attributes defined.<br>
       The current average, minimum, maximum and the cumulated values are stored
-      in the device readings.
+      in the device readings depending on attributes defined.
     </ul>
     <br>
 
@@ -239,6 +278,18 @@ average_Notify($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
+    <li>computeMethod</li>
+      defines how values are added up for the average calculation. This
+      attribute can be set to integral or counter.
+      The integral mode is meant for measuring continuous values like
+      temperature, counter is meant for adding up values, e.g. from a
+      feeding unit. In the first case, the time between the events plays an
+      important role, in the second case not. Default is integral.
+    <li>nominmax</li>
+      don't compute min and max values. Default is 0 (compute min & max).
+    <li>noaverage</li>
+      don't compute average values. Default is 0 (compute avarage).
   </ul>
 
   <a name="averageevents"></a>
@@ -246,6 +297,8 @@ average_Notify($$)
   <ul>
     <li>&lt;eventname&gt;_avg_day: $avg_day</li>
     <li>&lt;eventname&gt;_avg_month: $avg_month</li>
+    <li>&lt;eventname&gt;_cum_day: $cum_day (only if cumtype is set to raw)</li>
+    <li>&lt;eventname&gt;_cum_month: $cum_month (only if cumtype is set to raw)</li>
     <li>&lt;eventname&gt;_min_day: $min_day</li>
     <li>&lt;eventname&gt;_min_month: $min_month</li>
     <li>&lt;eventname&gt;_max_day: $max_day</li>
