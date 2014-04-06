@@ -233,6 +233,7 @@ FHEM/FritzBoxUtils.pm        rudolfkoenig         http://forum.fhem.de FRITZ!Box
 FHEM/HMConfig.pm             martinp876           http://forum.fhem.de HomeMatic
 FHEM/HttpUtils.pm            rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/MaxCommon.pm            mgehre               http://forum.fhem.de MAX
+FHEM/ONKYOdb.pm              loredo               http://forum.fhem.de Multimedia
 FHEM/SetExtensions.pm        rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/TcpServerUtils.pm       rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/lib/Device/Firmata/*    ntruchsess           http://forum.fhem.de Sonstiges
