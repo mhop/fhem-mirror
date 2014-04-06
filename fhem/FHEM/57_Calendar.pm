@@ -361,7 +361,7 @@ sub fromVEvent {
     my @rrparts= split(";", $rrule);
     my %r= map { split("=", $_); } @rrparts;
 
-    my @keywords= qw(FREQ INTERVAL UNTIL COUNT BYMONTHDAY BYDAY BYMONTH);
+    my @keywords= qw(FREQ INTERVAL UNTIL COUNT BYMONTHDAY BYDAY BYMONTH WKST);
     foreach my $k (keys %r) {
       if(not($k ~~ @keywords)) {
         main::Log3 undef, 2, "Calendar: RRULE $rrule is not supported";
@@ -376,6 +376,7 @@ sub fromVEvent {
     $self->{bymonthday} = $r{"BYMONTHDAY"} if(exists($r{"BYMONTHDAY"})); # stored but ignored
     $self->{byday} = $r{"BYDAY"} if(exists($r{"BYDAY"})); # stored but ignored
     $self->{bymonth} = $r{"BYMONTH"} if(exists($r{"BYMONTH"})); # stored but ignored
+    $self->{wkst} = $r{"WKST"} if(exists($r{"WKST"})); # stored but ignored
 
     # advanceToNextOccurance until we are in the future
     my $t = time();
@@ -1120,8 +1121,16 @@ sub Calendar_Undef($$) {
 
   A calendar is a set of calendar events. A calendar event has a summary (usually the title shown in a visual
   representation of the source calendar), a start time, an end time, and zero, one or more alarm times. The calendar events are
-  fetched from the source calendar at the given URL. In case of multiple alarm times for a calendar event, only the
-  earliest alarm time is kept. Recurring calendar events are currently not supported.<p>
+  fetched from the source calendar at the given URL.<p>
+  
+  In case of multiple alarm times for a calendar event, only the
+  earliest alarm time is kept.<p>
+  
+  Recurring calendar events are currently supported to an extent: 
+  FREQ INTERVAL UNTIL COUNT are interpreted, BYMONTHDAY BYDAY BYMONTH WKST 
+  are recognized but not interpreted. The module will get it most likely wrong
+  if you have recurring calendar events with unrecognized or uninterpreted keywords.
+  <p>
 
   A calendar event is identified by its UID. The UID is taken from the source calendar. All non-alphanumerical characters
   are stripped off the UID to make your life easier.<p>
