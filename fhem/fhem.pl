@@ -495,7 +495,7 @@ $fhem_started = time;
 $attr{global}{motd} .= "Running with root privileges."
         if($^O !~ m/Win/ && $<==0 && $attr{global}{motd} =~ m/^$sc_text/);
 $attr{global}{motd} .=
-        "\nRestart fhem for a new check if the problem is fixed,\n".
+        "\nRestart FHEM for a new check if the problem is fixed,\n".
         "or set the global attribute motd to none to supress this message.\n"
         if($attr{global}{motd} =~ m/^$sc_text\n\n./);
 my $motd = $attr{global}{motd};
@@ -2651,6 +2651,27 @@ GetTimeSpec($)
 }
 
 
+sub
+deviceEvents($$)
+{
+  my ($hash, $withState) = @_;
+
+  return undef if(!$hash || !$hash->{CHANGED});
+
+  if($withState) {
+    my $cws = $hash->{CHANGEDWITHSTATE};
+    if(defined($cws)){
+      if(int(@{$cws}) == 0) {
+        @{$cws} = @{$hash->{CHANGED}};
+        push @{$cws}, "state: $hash->{READINGS}{state}{VAL}"
+                if($hash->{READINGS} && $hash->{READINGS}{state});
+      }
+      return $cws;
+    }
+  }
+  return $hash->{CHANGED};
+}
+
 #####################################
 # Do the notification
 sub
@@ -2739,7 +2760,10 @@ DoTrigger($$@)
   $oldvalue{$dev}{TIME} = TimeNow();
   $oldvalue{$dev}{VAL} = $hash->{STATE};
 
-  delete($hash->{CHANGED}) if(!defined($hash->{INTRIGGER}));
+  if(!defined($hash->{INTRIGGER})) {
+    delete($hash->{CHANGED});
+    delete($hash->{CHANGEDWITHSTATE});
+  }
 
   Log 3, "NTFY return: $ret" if($ret);
 
@@ -3559,7 +3583,10 @@ readingsEndUpdate($$)
   if($dotrigger && $init_done) {
     DoTrigger($name, undef, 0) if(!$readingsUpdateDelayTrigger);
   } else {
-    delete($hash->{CHANGED}) if(!defined($hash->{INTRIGGER}));
+    if(!defined($hash->{INTRIGGER})) {
+      delete($hash->{CHANGED});
+      delete($hash->{CHANGEDWITHSTATE})
+    }
   }
   
   return undef;
@@ -3636,7 +3663,10 @@ readingsBulkUpdate($$$@)
   
   my $rv = "$reading: $value";
   if($changed) {
-    $rv = "$value" if($reading eq "state");
+    if($reading eq "state") {
+      $rv = "$value";
+      $hash->{CHANGEDWITHSTATE} = [];
+    }
     addEvent($hash, $rv);
   }
   return $rv;

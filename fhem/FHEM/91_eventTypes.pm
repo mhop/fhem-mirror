@@ -66,14 +66,15 @@ eventTypes_Notify($$)
   my $ln = $me->{NAME};
   return "" if($attr{$ln} && $attr{$ln}{disable});
 
-  return if(!$eventSrc->{CHANGED});
+  my $events = deviceEvents($eventSrc, 1);
+  return if(!$events);
 
   my $t = $eventSrc->{TYPE};
   my $n = $eventSrc->{NAME};
   return if(!defined($n) || !defined($t) || $n eq "global");
 
   my $ret = "";
-  foreach my $oe (@{$eventSrc->{CHANGED}}) {
+  foreach my $oe (@{$events}) {
     $oe = "" if(!defined($oe));
     next if($oe =~ m/ CULHM (SND|RCV) /);
     next if($oe =~ m/ UNKNOWNCODE /);
