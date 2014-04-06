@@ -750,9 +750,10 @@ HUEDevice_Parse($$)
     }
   else
     {
+      $on = 0;
       $s = 'off';
       $percent = 0;
-      if( defined($on) && $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",0);}
+      if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",0);}
     }
 
   if( $percent != $hash->{helper}{percent} ) {readingsBulkUpdate($hash,"level", $percent . ' %');}
