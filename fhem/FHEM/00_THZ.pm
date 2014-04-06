@@ -1,7 +1,7 @@
 ##############################################
 # 00_THZ
 # by immi 04/2014
-# v. 0.081
+# v. 0.082
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -30,6 +30,8 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 use feature ":5.10";
+use SetExtensions;
+
 sub THZ_Read($);
 sub THZ_ReadAnswer($);
 sub THZ_Ready($);
@@ -218,7 +220,7 @@ my %sets = (
 #
 ########################################################################################
 
-my %gets = (
+my %getsonly = (
 #	"hallo"       			=> { },
 #	"debug_read_raw_register_slow"	=> { },
 	"Status_Sol_16"			=> {cmd2=>"16"},
@@ -230,158 +232,10 @@ my %gets = (
         "allFB"     			=> {cmd2=>"FB"},
         "timedate" 			=> {cmd2=>"FC"},
         "firmware" 			=> {cmd2=>"FD"},
-	"p01RoomTempDayHC1"		=> {cmd2=>"0B0005"},   
-	"p02RoomTempNightHC1"		=> {cmd2=>"0B0008"},
-	"p03RoomTempStandbyHC1"		=> {cmd2=>"0B013D"},
-	"p01RoomTempDayHC2"		=> {cmd2=>"0C0005"},
-	"p02RoomTempNightHC2"		=> {cmd2=>"0C0008"},
-	"p03RoomTempStandbyHC2"		=> {cmd2=>"0C013D"},
-	"p04DHWsetDay"			=> {cmd2=>"0A0013"},
-	"p05DHWsetNight"		=> {cmd2=>"0A05BF"},
-	"p07FanStageDay"		=> {cmd2=>"0A056C"},
-	"p08FanStageNight"		=> {cmd2=>"0A056D"},
-	"p09FanStageStandby"		=> {cmd2=>"0A056F"},
-	"p99FanStageParty"		=> {cmd2=>"0A0570"},
-	"p75passiveCooling"		=> {cmd2=>"0A0575"},
-	"p37fanstage1-Airflow-inlet"	=> {cmd2=>"0A0576"},			#zuluft 
-	"p38fanstage2-Airflow-inlet"	=> {cmd2=>"0A0577"},			#zuluft 
-	"p39fanstage3-Airflow-inlet"	=> {cmd2=>"0A0578"},			#zuluft 
-	"p40fanstage1-Airflow-outlet"	=> {cmd2=>"0A0579"},			#abluft extrated
-	"p41fanstage2-Airflow-outlet"	=> {cmd2=>"0A057A"},			#abluft extrated
-	"p42fanstage3-Airflow-outlet"	=> {cmd2=>"0A057B"},			#abluft extrated
-	"p49SummerModeTemp"		=> {cmd2=>"0A0116"},		#threshold for summer mode !! 
-	"p50SummerModeHysteresis"	=> {cmd2=>"0A05A2"},		#Hysteresis for summer mode !! 
-	"holidayBegin_day"		=> {cmd2=>"0A011B"}, 
-	"holidayBegin_month"		=> {cmd2=>"0A011C"},
-	"holidayBegin_year"		=> {cmd2=>"0A011D"},
-	"holidayBegin-time"		=> {cmd2=>"0A05D3"},
-	"holidayEnd_day"		=> {cmd2=>"0A011E"}, 
-	"holidayEnd_month"		=> {cmd2=>"0A011F"},
-	"holidayEnd_year"		=> {cmd2=>"0A0120"}, # the answer look like  0A0120-3A0A01200E00  for year 14
-	"holidayEnd-time"		=> {cmd2=>"0A05D4"}, # the answer look like  0A05D4-0D0A05D40029 41 which is 10:15
-	"party-time"			=> {cmd2=>"0A05D1"}, # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
-	"programHC1_Mo_0"		=> {cmd2=>"0B1410"},  #1 is monday 0 is first prog; start and end; value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
-	"programHC1_Mo_1"		=> {cmd2=>"0B1411"},
-	"programHC1_Mo_2"		=> {cmd2=>"0B1412"},
-	"programHC1_Tu_0"		=> {cmd2=>"0B1420"},
-	"programHC1_Tu_1"		=> {cmd2=>"0B1421"},
-	"programHC1_Tu_2"		=> {cmd2=>"0B1422"},
-	"programHC1_We_0"		=> {cmd2=>"0B1430"},
-	"programHC1_We_1"		=> {cmd2=>"0B1431"},
-	"programHC1_We_2"		=> {cmd2=>"0B1432"},
-	"programHC1_Th_0"		=> {cmd2=>"0B1440"},
-	"programHC1_Th_1"		=> {cmd2=>"0B1441"},
-	"programHC1_Th_2"		=> {cmd2=>"0B1442"},
-	"programHC1_Fr_0"		=> {cmd2=>"0B1450"},
-	"programHC1_Fr_1"		=> {cmd2=>"0B1451"},
-	"programHC1_Fr_2"		=> {cmd2=>"0B1452"},
-	"programHC1_Sa_0"		=> {cmd2=>"0B1460"},
-	"programHC1_Sa_1"		=> {cmd2=>"0B1461"},
-	"programHC1_Sa_2"		=> {cmd2=>"0B1462"},
-	"programHC1_So_0"		=> {cmd2=>"0B1470"},
-	"programHC1_So_1"		=> {cmd2=>"0B1471"},
-	"programHC1_So_2"		=> {cmd2=>"0B1472"},
-	"programHC1_Mo-Fr_0"		=> {cmd2=>"0B1480"},
-	"programHC1_Mo-Fr_1"		=> {cmd2=>"0B1481"},
-	"programHC1_Mo-Fr_3"		=> {cmd2=>"0B1482"},
-	"programHC1_Sa-So_0"		=> {cmd2=>"0B1490"},
-	"programHC1_Sa-So_1"		=> {cmd2=>"0B1491"},
-	"programHC1_Sa-So_3"		=> {cmd2=>"0B1492"},
-	"programHC1_Mo-So_0"		=> {cmd2=>"0B14A0"},
-	"programHC1_Mo-So_1"		=> {cmd2=>"0B14A1"},
-	"programHC1_Mo-So_3"		=> {cmd2=>"0B14A2"},
-	"programHC2_Mo_0"		=> {cmd2=>"0C1510"},  #1 is monday 0 is first prog; start and end; value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
-	"programHC2_Mo_1"		=> {cmd2=>"0C1511"},
-	"programHC2_Mo_2"		=> {cmd2=>"0C1512"},
-	"programHC2_Tu_0"		=> {cmd2=>"0C1520"},
-	"programHC2_Tu_1"		=> {cmd2=>"0C1521"},
-	"programHC2_Tu_2"		=> {cmd2=>"0C1522"},
-	"programHC2_We_0"		=> {cmd2=>"0C1530"},
-	"programHC2_We_1"		=> {cmd2=>"0C1531"},
-	"programHC2_We_2"		=> {cmd2=>"0C1532"},
-	"programHC2_Th_0"		=> {cmd2=>"0C1540"},
-	"programHC2_Th_1"		=> {cmd2=>"0C1541"},
-	"programHC2_Th_2"		=> {cmd2=>"0C1542"},
-	"programHC2_Fr_0"		=> {cmd2=>"0C1550"},
-	"programHC2_Fr_1"		=> {cmd2=>"0C1551"},
-	"programHC2_Fr_2"		=> {cmd2=>"0C1552"},
-	"programHC2_Sa_0"		=> {cmd2=>"0C1560"},
-	"programHC2_Sa_1"		=> {cmd2=>"0C1561"},
-	"programHC2_Sa_2"		=> {cmd2=>"0C1562"},
-	"programHC2_So_0"		=> {cmd2=>"0C1570"},
-	"programHC2_So_1"		=> {cmd2=>"0C1571"},
-	"programHC2_So_2"		=> {cmd2=>"0C1572"},
-	"programHC2_Mo-Fr_0"		=> {cmd2=>"0C1580"},
-	"programHC2_Mo-Fr_1"		=> {cmd2=>"0C1581"},
-	"programHC2_Mo-Fr_3"		=> {cmd2=>"0C1582"},
-	"programHC2_Sa-So_0"		=> {cmd2=>"0C1590"},
-	"programHC2_Sa-So_1"		=> {cmd2=>"0C1591"},
-	"programHC2_Sa-So_3"		=> {cmd2=>"0C1592"},
-	"programHC2_Mo-So_0"		=> {cmd2=>"0C15A0"},
-	"programHC2_Mo-So_1"		=> {cmd2=>"0C15A1"},
-	"programHC2_Mo-So_3"		=> {cmd2=>"0C15A2"},
-	"programDHW_Mo_0"		=> {cmd2=>"0A1710"},
-	"programDHW_Mo_1"		=> {cmd2=>"0A1711"},
-	"programDHW_Mo_2"		=> {cmd2=>"0A1712"},
-	"programDHW_Tu_0"		=> {cmd2=>"0A1720"},
-	"programDHW_Tu_1"		=> {cmd2=>"0A1721"},
-	"programDHW_Tu_2"		=> {cmd2=>"0A1722"},
-	"programDHW_We_0"		=> {cmd2=>"0A1730"},
-	"programDHW_We_1"		=> {cmd2=>"0A1731"},
-	"programDHW_We_2"		=> {cmd2=>"0A1732"},
-	"programDHW_Th_0"		=> {cmd2=>"0A1740"},
-	"programDHW_Th_1"		=> {cmd2=>"0A1741"},
-	"programDHW_Th_2"		=> {cmd2=>"0A1742"},
-	"programDHW_Fr_0"		=> {cmd2=>"0A1750"},
-	"programDHW_Fr_1"		=> {cmd2=>"0A1751"},
-	"programDHW_Fr_2"		=> {cmd2=>"0A1752"},
-	"programDHW_Sa_0"		=> {cmd2=>"0A1760"},
-	"programDHW_Sa_1"		=> {cmd2=>"0A1761"},
-	"programDHW_Sa_2"		=> {cmd2=>"0A1762"},
-	"programDHW_So_0"		=> {cmd2=>"0A1770"},
-	"programDHW_So_1"		=> {cmd2=>"0A1771"},
-	"programDHW_So_2"		=> {cmd2=>"0A1772"},
-	"programDHW_Mo-Fr_0"		=> {cmd2=>"0A1780"},
-	"programDHW_Mo-Fr_1"		=> {cmd2=>"0A1781"},
-	"programDHW_Mo-Fr_2"		=> {cmd2=>"0A1782"},
-	"programDHW_Sa-So_0"		=> {cmd2=>"0A1790"},
-	"programDHW_Sa-So_1"		=> {cmd2=>"0A1791"},
-	"programDHW_Sa-So_2"		=> {cmd2=>"0A1792"},
-	"programDHW_Mo-So_0"		=> {cmd2=>"0A17A0"},
-	"programDHW_Mo-So_1"		=> {cmd2=>"0A17A1"},
-	"programDHW_Mo-So_2"		=> {cmd2=>"0A17A2"},
-	"programFan_Mo_0"		=> {cmd2=>"0A1D10"},
-	"programFan_Mo_1"		=> {cmd2=>"0A1D11"},
-	"programFan_Mo_2"		=> {cmd2=>"0A1D12"},
-	"programFan_Tu_0"		=> {cmd2=>"0A1D20"},
-	"programFan_Tu_1"		=> {cmd2=>"0A1D21"},
-	"programFan_Tu_2"		=> {cmd2=>"0A1D22"},
-	"programFan_We_0"		=> {cmd2=>"0A1D30"},
-	"programFan_We_1"		=> {cmd2=>"0A1D31"},
-	"programFan_We_2"		=> {cmd2=>"0A1D32"},
-	"programFan_Th_0"		=> {cmd2=>"0A1D40"},
-	"programFan_Th_1"		=> {cmd2=>"0A1D41"},
-	"programFan_Th_2"		=> {cmd2=>"0A1D42"},
-	"programFan_Fr_0"		=> {cmd2=>"0A1D50"},
-	"programFan_Fr_1"		=> {cmd2=>"0A1D51"},
-	"programFan_Fr_2"		=> {cmd2=>"0A1D52"},
-	"programFan_Sa_0"		=> {cmd2=>"0A1D60"},
-	"programFan_Sa_1"		=> {cmd2=>"0A1D61"},
-	"programFan_Sa_2"		=> {cmd2=>"0A1D62"},
-	"programFan_So_0"		=> {cmd2=>"0A1D70"},
-	"programFan_So_1"		=> {cmd2=>"0A1D71"},
-	"programFan_So_2"		=> {cmd2=>"0A1D72"},
-	"programFan_Mo-Fr_0"		=> {cmd2=>"0A1D80"},
-	"programFan_Mo-Fr_1"		=> {cmd2=>"0A1D81"},
-	"programFan_Mo-Fr_2"		=> {cmd2=>"0A1D82"},
-	"programFan_Sa-So_0"		=> {cmd2=>"0A1D90"},
-	"programFan_Sa-So_1"		=> {cmd2=>"0A1D91"},
-	"programFan_Sa-So_2"		=> {cmd2=>"0A1D92"},
-	"programFan_Mo-So_0"		=> {cmd2=>"0A1DA0"},
-	"programFan_Mo-So_1"		=> {cmd2=>"0A1DA1"},
-	"programFan_Mo-So_2"		=> {cmd2=>"0A1DA2"}
+	"party-time"			=> {cmd2=>"0A05D1"} # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   );
 
+my %gets=(%getsonly, %sets);
 
 ########################################################################################
 #
@@ -406,7 +260,7 @@ sub THZ_Initialize($)
   $hash->{UndefFn} = "THZ_Undef";
   $hash->{GetFn}   = "THZ_Get";
   $hash->{SetFn}   = "THZ_Set";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 loglevel:0,1,2,3,4,5,6 "
+  $hash->{AttrList}= "IODev do_not_notify:1,0  ignore:0,1 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 "
 		    ."interval_allFB:0,60,120,180,300,600,3600,7200,43200,86400 "
 		    ."interval_history:0,3600,7200,28800,43200,86400 "
 		    ."interval_last10errors:0,3600,7200,28800,43200,86400 "
