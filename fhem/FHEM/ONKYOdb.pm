@@ -23,7 +23,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.0
+# Version: 1.0.1
 #
 # Version History:
 # - 1.0.0 - 2013-12-21
@@ -85,7 +85,6 @@ my $ONKYO_cmds_hr = {
         'isf-mode'                      => 'ISF',
         'late-night'                    => 'LTN',
         'listening-mode'                => 'LMD',
-        'volume'                        => 'MVL',
         'md-recorder'                   => 'CMD',
         'memory-setup'                  => 'MEM',
         'monitor-out-resolution'        => 'RES',
