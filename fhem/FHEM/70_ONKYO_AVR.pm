@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.3
+# Version: 1.0.4
 #
 # Major Version History:
 # - 1.0.0 - 2013-12-16
@@ -432,7 +432,10 @@ sub ONKYO_AVR_GetStatus($;$) {
                 # Video-in resolution
                 my @vidin_res_string = split( / +/, $video_split[1] );
                 my $vidin_res;
-                if (   uc( $vidin_res_string[0] ) ne "UNKNOWN"
+                if (   defined( $vidin_res_string[0] )
+                    && defined( $vidin_res_string[2] )
+                    && defined( $vidin_res_string[3] )
+                    && uc( $vidin_res_string[0] ) ne "UNKNOWN"
                     && uc( $vidin_res_string[2] ) ne "UNKNOWN"
                     && uc( $vidin_res_string[3] ) ne "UNKNOWN" )
                 {
@@ -448,7 +451,10 @@ sub ONKYO_AVR_GetStatus($;$) {
                 # Video-out resolution
                 my @vidout_res_string = split( / +/, $video_split[5] );
                 my $vidout_res;
-                if (   uc( $vidout_res_string[0] ) ne "UNKNOWN"
+                if (   defined( $vidout_res_string[0] )
+                    && defined( $vidout_res_string[2] )
+                    && defined( $vidout_res_string[3] )
+                    && uc( $vidout_res_string[0] ) ne "UNKNOWN"
                     && uc( $vidout_res_string[2] ) ne "UNKNOWN"
                     && uc( $vidout_res_string[3] ) ne "UNKNOWN" )
                 {
