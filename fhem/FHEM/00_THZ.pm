@@ -1,7 +1,7 @@
 ##############################################
 # 00_THZ
 # by immi 04/2014
-# v. 0.082
+# v. 0.083
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -65,8 +65,8 @@ my %sets = (
 	"p01RoomTempDayHC2"		=> {cmd2=>"0C0005", argMin => "13", argMax => "28"  },
 	"p02RoomTempNightHC2"		=> {cmd2=>"0C0008", argMin => "13", argMax => "28"  },
 	"p03RoomTempStandbyHC2"		=> {cmd2=>"0C013D", argMin => "13", argMax => "28"  },
-	"p04DHWsetDay"			=> {cmd2=>"0A0013", argMin => "13", argMax => "46"  },
-	"p05DHWsetNight"		=> {cmd2=>"0A05BF", argMin => "13", argMax => "46"  },
+	"p04DHWsetDay"			=> {cmd2=>"0A0013", argMin => "13", argMax => "47"  },
+	"p05DHWsetNight"		=> {cmd2=>"0A05BF", argMin => "13", argMax => "47"  },
 	"p07FanStageDay"		=> {cmd2=>"0A056C", argMin =>  "0", argMax =>  "3"  },
 	"p08FanStageNight"		=> {cmd2=>"0A056D", argMin =>  "0", argMax =>  "3"  },
 	"p09FanStageStandby"		=> {cmd2=>"0A056F", argMin =>  "0", argMax =>  "3"  },
@@ -232,6 +232,7 @@ my %getsonly = (
         "allFB"     			=> {cmd2=>"FB"},
         "timedate" 			=> {cmd2=>"FC"},
         "firmware" 			=> {cmd2=>"FD"},
+	"reg112"			=> {cmd2=>"0A0112"},  # 1 bereitschaft; 11 in automatik; 3 tagesbetrieb
 	"party-time"			=> {cmd2=>"0A05D1"} # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   );
 
@@ -262,6 +263,10 @@ sub THZ_Initialize($)
   $hash->{SetFn}   = "THZ_Set";
   $hash->{AttrList}= "IODev do_not_notify:1,0  ignore:0,1 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 "
 		    ."interval_allFB:0,60,120,180,300,600,3600,7200,43200,86400 "
+		    ."interval_Status_Sol_16:0,60,120,180,300,600,3600,7200,43200,86400 "
+		    ."interval_Status_DHW_F3:0,60,120,180,300,600,3600,7200,43200,86400 "
+		    ."interval_Status_HC1_F4:0,60,120,180,300,600,3600,7200,43200,86400 "
+		    ."interval_Status_HC2_F5:0,60,120,180,300,600,3600,7200,43200,86400 "
 		    ."interval_history:0,3600,7200,28800,43200,86400 "
 		    ."interval_last10errors:0,3600,7200,28800,43200,86400 "
 		    . $readingFnAttributes;
@@ -987,8 +992,8 @@ my %parsinghash = (
 sub THZ_debugread($){
   my ($hash) = @_;
   my ($err, $msg) =("", " ");
-  my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
- #my @numbers=('0A05A2','0A0116'); 
+ # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
+ my @numbers=('0A0112','0A0126'); 
   #my @numbers = (1..255);
   #my @numbers = (1..65535);
   my $indice= "FF";
@@ -1109,6 +1114,10 @@ sub THZ_Undef($$) {
       attr Mythz interval_allFB 300      # internal polling interval 5min  <br>
       attr Mythz interval_history 28800  # internal polling interval 8h    <br>
       attr Mythz interval_last10errors 86400 # internal polling interval 24h    <br>
+      attr Mythz interval_Status_Sol_16 86400 # internal polling interval 24h    <br>
+      attr Mythz interval_Status_DHW_F3 86400 # internal polling interval 24h    <br>
+      attr Mythz interval_Status_HC1_F4 86400 # internal polling interval 24h    <br>
+      attr Mythz interval_Status_HC2_F5 86400 # internal polling interval 24h    <br>
       define FileLog_Mythz FileLog ./log/Mythz-%Y.log Mythz <br>
       </code></ul>
      <br> 
@@ -1164,9 +1173,13 @@ sub THZ_Undef($$) {
     <br>
       <ul><code>
       define Mythz THZ /dev/ttyUSB0@115200 <br>
-      attr Mythz interval_allFB 300      # Internes Polling Intervall 5min  <br>
-      attr Mythz interval_history 28800  # Internes Polling Intervall 8h    <br>
-      attr Mythz interval_last10errors 86400 # Internes Polling Intervall 24h    <br>
+      attr Mythz interval_allFB 300            # Internes Polling Intervall 5min   <br>
+      attr Mythz interval_history 28800        # Internes Polling Intervall 8h     <br>
+      attr Mythz interval_last10errors 86400   # Internes Polling Intervall 24h    <br>
+      attr Mythz interval_Status_Sol_16 86400  # Internes Polling Intervall 24h    <br>
+      attr Mythz interval_Status_DHW_F3 86400  # Internes Polling Intervall 24h    <br>
+      attr Mythz interval_Status_HC1_F4 86400  # Internes Polling Intervall 24h    <br>
+      attr Mythz interval_Status_HC2_F5 86400  # Internes Polling Intervall 24h    <br>
       define FileLog_Mythz FileLog ./log/Mythz-%Y.log Mythz <br>
       </code></ul>
      <br> 
