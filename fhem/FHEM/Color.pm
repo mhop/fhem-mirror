@@ -160,6 +160,12 @@ BrightnessToChannels($) {
   return @channels;
 }
 
+
+# COLOR SPACE: HSV & RGB(dec)
+# HSV > h=float(0, 1), s=float(0, 1), v=float(0, 1)
+# RGB > r=int(0, 255), g=int(0, 255), b=int(0, 255)
+#
+
 sub
 rgb2hsv($$$) {
   my( $r, $g, $b ) = @_;
@@ -237,6 +243,112 @@ hsv2rgb($$$) {
   }
 
   return( $r,$g,$b );
+}
+
+
+# COLOR SPACE: HSB & RGB(dec)
+# HSB > h=int(0, 65535), s=int(0, 255), b=int(0, 255)
+# RGB > r=int(0, 255), g=int(0, 255), b=int(0, 255)
+#
+
+sub
+hsb2rgb ($$$) {
+    my ( $h, $s, $bri ) = @_;
+
+    my $h2   = $h / 65535.0;
+    my $s2   = $s / 255.0;
+    my $bri2 = $bri / 255.0;
+
+    my $rgb = Color::hsv2rgb( $h2, $s2, $bri2 );
+    my $r   = int( $rgb[0] * 255 );
+    my $g   = int( $rgb[1] * 255 );
+    my $b   = int( $rgb[2] * 255 );
+
+    return ( $h, $s, $bri );
+}
+
+sub
+rgb2hsb ($$$) {
+    my ( $r, $g, $b ) = @_;
+
+    my $r2 = $r / 255.0;
+    my $g2 = $g / 255.0;
+    my $b2 = $b / 255.0;
+
+    my $hsv = Color::rgb2hsv( $r2, $g2, $b2 );
+    my $h   = int( $hsv[0] * 65535 );
+    my $s   = int( $hsv[1] * 255 );
+    my $bri = int( $hsv[2] * 255 );
+
+    return ( $h, $s, $bri );
+}
+
+
+# COLOR SPACE: RGB(hex) & HSV
+# RGB > r=hex(00, FF), g=hex(00, FF), b=hex(00, FF)
+# HSV > h=float(0, 1), s=float(0, 1), v=float(0, 1)
+#
+
+sub
+hex2hsv($) {
+    my ($hex) = @_;
+    my $rgb = Color::hex2rgb($hex);
+
+    return Color::rgb2hsv( $rgb[0], $rgb[1], $rgb[2] );
+}
+
+sub
+hsv2hex($$$) {
+    my ( $h, $s, $v ) = @_;
+    my $rgb = Color::hsv2rgb( $h, $s, $v );
+
+    return Color::rgb2hex( $rgb[0], $rgb[1], $rgb[2] );
+}
+
+
+# COLOR SPACE: RGB(hex) & HSB
+# RGB > r=hex(00, FF), g=hex(00, FF), b=hex(00, FF)
+# HSB > h=int(0, 65535), s=int(0, 255), b=int(0, 255)
+#
+
+sub
+hex2hsb($) {
+    my ($hex) = @_;
+    my $rgb = Color::hex2rgb($hex);
+
+    return Color::rgb2hsb( $rgb[0], $rgb[1], $rgb[2] );
+}
+
+sub
+hsb2hex($$$) {
+    my ( $h, $s, $b ) = @_;
+    my $rgb = Color::hsb2rgb( $h, $s, $b );
+
+    return Color::rgb2hex( $rgb[0], $rgb[1], $rgb[2] );
+}
+
+
+# COLOR SPACE: RGB(hex) & RGB(dec)
+# hex > r=hex(00, FF), s=hex(00, FF), v=hex(00, FF)
+# dec > r=int(0, 255), g=int(0, 255), b=int(0, 255)
+#
+
+sub
+hex2rgb($) {
+    my ($hex) = @_;
+    if ( uc($hex) =~ /^(..)(..)(..)$/ ) {
+        my ( $r, $g, $b ) = ( hex($1), hex($2), hex($3) );
+
+        return ( $r, $g, $b );
+    }
+}
+
+sub
+rgb2hex($$$) {
+    my ( $r, $g, $b ) = @_;
+    my $return = sprintf( "%2.2X%2.2X%2.2X", $r, $g, $b );
+
+    return uc($return);
 }
 
 1;
