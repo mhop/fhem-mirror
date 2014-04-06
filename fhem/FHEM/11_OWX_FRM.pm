@@ -122,8 +122,9 @@ COMMAND_HANDLER: {
       my $owx_data   = pack "C*", @{ $data->{data} };
       my $owx_device = $request->{device};
       my $context    = $request->{context};
-      my $writedata  = pack "C*", @{ $request->{command}->{'write'} } if ( defined $request->{command}->{'write'} );
-      main::OWX_ASYNC_AfterExecute( $self->{hash}, $context, 1, $request->{'reset'}, $owx_device, $writedata, $request->{'read'}, $owx_data );
+      my $reqcommand = $request->{command};
+      my $writedata  = pack "C*", @{ $reqcommand->{'write'} } if ( defined $reqcommand->{'write'} );
+      main::OWX_ASYNC_AfterExecute( $self->{hash}, $context, 1, $reqcommand->{'reset'}, $owx_device, $writedata, $reqcommand->{'read'}, $owx_data);
       delete $self->{requests}->{$id};
       last;
     };
@@ -261,7 +262,8 @@ sub execute($$$$$$$) {
     };
   };
   if ($@) {
-    $self->exit($hash);
+    main::Log3 $hash->{NAME},1,"OWX_FRM: $@";
+    #$self->exit($hash);
   };
 
   if ($delay and $success) {
@@ -287,6 +289,9 @@ sub execute($$$$$$$) {
         delete $delayed->{$owx_dev};
       }
     }
+  }
+  unless ($numread) {
+    main::OWX_ASYNC_AfterExecute( $hash, $context, $success, $reset, $owx_dev, $data, $numread, "" );
   }
   return $success;
 };
