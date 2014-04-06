@@ -617,7 +617,6 @@ CUL_WriteTranslate($$$)
     $msg = substr($msg,6,4) . substr($msg,10);
 
   } elsif($fn eq "cmd") {                                  # internal command
-    $msg = "";
     if($msg eq "speed100") { 
       $fn = "AR";
     } elsif($msg eq "speed10") {
@@ -625,6 +624,7 @@ CUL_WriteTranslate($$$)
     } else {                                        # by default rewrite init
       $fn = $hash->{initString};
     }
+    $msg = "";
 
   } else {
     Log3 $hash, 2, "CUL cannot translate $fn $msg";
