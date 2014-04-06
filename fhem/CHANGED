@@ -1,10 +1,13 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
-  - bugfix:  PRESENCE: fixing wrong presence state f�or mode lan-ping
+  - changed: small update to the documentation of recurring events in
+             57_Calendar.pm
+  - bugfix:  PRESENCE: fixing wrong presence state for mode lan-ping
              when device is unreachable
   - feature: 10_EnOcean: new EEP profiles: D2-01-00 - D2-01-11 (VLD)
-  - changed: 00_TCM/10_EnOcean: learning mode (teach-in / teach-out) changed and extended
+  - changed: 00_TCM/10_EnOcean: learning mode (teach-in / teach-out) changed 
+             and extended
   - added:   new module 10_UNIRoll.pm (c-herrmann)
   - feature: cloneDummy: new attribut cloneIgnore
   - feature: cloneDummy: new optional parameter [reading] 
@@ -16,7 +19,7 @@
              module 23_WEBTHERM.pm   moved to contrib
   - change:  module 98_PID.pm        moved to contrib as preparation for
              next major replace. Replaced by 98_PID20.pm (John/betateilchen)
-  - change:  openweathermap: added set command „clear“ 
+  - change:  openweathermap: added set command "clear" 
   - change:  MAX: interpret SetTemperature command from WT to HT
   - feature: MAX: retry packets 3 times if missing an ack
   - feature: new module 98_cloneDummy.pm added (Joachim)
