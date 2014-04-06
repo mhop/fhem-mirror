@@ -3366,7 +3366,7 @@ EnOcean_Parse($$)
 
     } elsif ($st eq "environmentApp") {
       # Environmental Applications (EEP A5-13-01 ... EEP A5-13-06, EEP A5-13-10)
-      # [Eltako FWS61, untested]
+      # [Eltako FWS61]
       # $db[0]_bit_7 ... $db[0]_bit_4 is the Identifier
       my $identifier = $db[0] >> 4;
       if ($identifier == 1) {
@@ -3379,8 +3379,8 @@ EnOcean_Parse($$)
         my $dawn = sprintf "%d", $db[3] * 999 / 255;
         my $temp = sprintf "%0.1f", -40 + $db[2] * 120 / 255;
         my $windSpeed = sprintf "%0.1f", $db[1] * 70 / 255;
-        my $dayNight = $db[0] & 2 ? "night" : "day";
-        my $isRaining = $db[0] & 1 ? "yes" : "no";
+        my $dayNight = $db[0] & 4 ? "night" : "day";
+        my $isRaining = $db[0] & 2 ? "yes" : "no";
         push @event, "3:brightness:$dawn";
         push @event, "3:dayNight:$dayNight";
         push @event, "3:isRaining:$isRaining";
@@ -5557,7 +5557,7 @@ EnOcean_Undef($$)
      <li>Environmental Applications<br>
          Weather Station (EEP A5-13-01)<br>
          Sun Intensity (EEP A5-13-02)<br>
-         [Eltako FWS61, untested]<br>
+         [Eltako FWS61]<br>
      <ul>
        <li>T: t/&#176C B: E/lx W: Vs/m IR: yes|no</li>
        <li>brightness: E/lx (Sensor Range: E = 0 lx ... 999 lx)</li>
