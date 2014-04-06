@@ -16,7 +16,7 @@ watchdog_Initialize($)
   $hash->{UndefFn} = "watchdog_Undef";
   $hash->{NotifyFn} = "watchdog_Notify";
   $hash->{AttrList} = "disable:0,1 disabledForIntervals ".
-                        "regexp1WontReactivate:0,1";
+                        "regexp1WontReactivate:0,1 addStateEvent:0,1";
 }
 
 
@@ -72,10 +72,12 @@ watchdog_Notify($$)
   my $n   = $dev->{NAME};
   my $re1 = $watchdog->{RE1};
   my $re2 = $watchdog->{RE2};
-  my $max = int(@{$dev->{CHANGED}});
+  
+  my $events = deviceEvents($dev, AttrVal($ln, "addStateEvent", 0));
+  my $max = int(@{$events});
 
   for (my $i = 0; $i < $max; $i++) {
-    my $s = $dev->{CHANGED}[$i];
+    my $s = $events->[$i];
     $s = "" if(!defined($s));
     my $dotTrigger = ($ln eq $n && $s eq "."); # trigger w .
 
@@ -324,8 +326,9 @@ watchdog_Undef($$)
   <b>Get</b> <ul>N/A</ul><br>
 
   <a name="watchdogattr"></a>
-  <b>Attributes</b>
+  <b>Attribute</b>
   <ul>
+    <li><a href="#addStateEvent">addStateEvent</a></li>
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a name="regexp1WontReactivate">regexp1WontReactivate</a><br>

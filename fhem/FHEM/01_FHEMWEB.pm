@@ -121,6 +121,7 @@ FHEMWEB_Initialize($)
     HTTPS:1,0
     JavaScripts
     SVGcache:1,0
+    addStateEvent
     allowedCommands
     allowfrom
     basicAuth
@@ -2062,6 +2063,8 @@ FW_Notify($$)
 
   my @data;
   my %extPage;
+  my $isRaw = ($h->{type} =~ m/raw/);
+  my $events = deviceEvents($dev, AttrVal($FW_wname, "addStateEvent",!$isRaw));
 
   if($h->{type} =~ m/status/) {
     # Why is saving this stuff needed? FLOORPLAN?
@@ -2084,31 +2087,31 @@ FW_Notify($$)
     push @data, "$dn<<$dev->{STATE}<<$txt";
 
     #Add READINGS
-    if($dev->{CHANGED}) {    # It gets deleted sometimes (?)
+    if($events) {    # It gets deleted sometimes (?)
       my $tn = TimeNow();
-      my $max = int(@{$dev->{CHANGED}});
+      my $max = int(@{$events});
       for(my $i = 0; $i < $max; $i++) {
-        if( $dev->{CHANGED}[$i] !~ /: /) {
+        if( $events->[$i] !~ /: /) {
           next; #ignore 'set' commands
         }
-        my ($readingName,$readingVal) = split(": ",$dev->{CHANGED}[$i],2);
+        my ($readingName,$readingVal) = split(": ",$events->[$i],2);
         push @data, "$dn-$readingName<<$readingVal<<$readingVal";
         push @data, "$dn-$readingName-ts<<$tn<<$tn";
       }
     }
   }
 
-  if($h->{type} =~ m/raw/) {
-    if($dev->{CHANGED}) {    # It gets deleted sometimes (?)
+  if($isRaw) {
+    if($events) {    # It gets deleted sometimes (?)
       my $tn = TimeNow();
       if($attr{global}{mseclog}) {
         my ($seconds, $microseconds) = gettimeofday();
         $tn .= sprintf(".%03d", $microseconds/1000);
       }
-      my $max = int(@{$dev->{CHANGED}});
+      my $max = int(@{$events});
       my $dt = $dev->{TYPE};
       for(my $i = 0; $i < $max; $i++) {
-        push @data,("$tn $dt $dn ".$dev->{CHANGED}[$i]."<br>");
+        push @data,("$tn $dt $dn ".$events->[$i]."<br>");
       }
     }
   }
@@ -2618,6 +2621,8 @@ FW_ActivateInform()
       <br>
     </li>
 
+    <li><a href="#addStateEvent">addStateEvent</a></li>
+
     <a name="allowedCommands"></a>
     <li>allowedCommands<br>
         A comma separated list of commands allowed from this FHEMWEB
@@ -3122,6 +3127,8 @@ FW_ActivateInform()
 
       <br>
     </li>
+
+    <li><a href="#addStateEvent">addStateEvent</a></li>
 
     <a name="allowedCommands"></a>
     <li>allowedCommands<br>

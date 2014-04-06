@@ -37,7 +37,8 @@ FileLog_Initialize($)
   $hash->{NotifyFn} = "FileLog_Log";
   $hash->{AttrFn}   = "FileLog_Attr";
   # logtype is used by the frontend
-  $hash->{AttrList} = "disable:0,1 logtype nrarchive archivedir archivecmd";
+  $hash->{AttrList} = "disable:0,1 logtype ".
+                      "nrarchive archivedir archivecmd addStateEvent:0,1";
 
   $hash->{FW_summaryFn}     = "FileLog_fhemwebFn";
   $hash->{FW_detailFn}      = "FileLog_fhemwebFn";
@@ -129,18 +130,19 @@ FileLog_Log($$)
 
   my $ln = $log->{NAME};
   return if($attr{$ln} && $attr{$ln}{disable});
-  return if(!$dev || !defined($dev->{CHANGED}));
+  my $events = deviceEvents($dev, AttrVal($ln, "addStateEvent", 0));
+  return if(!$events);
 
   my $n = $dev->{NAME};
   my $re = $log->{REGEXP};
-  my $max = int(@{$dev->{CHANGED}});
+  my $max = int(@{$events});
   my $tn = $dev->{NTFY_TRIGGERTIME};
   my $ct = $dev->{CHANGETIME};
   my $fh;
   my $switched;
 
   for (my $i = 0; $i < $max; $i++) {
-    my $s = $dev->{CHANGED}[$i];
+    my $s = $events->[$i];
     $s = "" if(!defined($s));
     my $t = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
     if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/ || "$t:$n:$s" =~ m/^$re$/) {
@@ -1397,6 +1399,7 @@ FileLog_sampleDataFn($$$$$)
         </li><br>
 
     <li><a href="#disable">disable</a></li>
+    <li><a href="#addStateEvent">addStateEvent</a></li>
 
     <a name="logtype"></a>
     <li>logtype<br>
@@ -1439,6 +1442,7 @@ FileLog_sampleDataFn($$$$$)
                Text).Eine gnuplot-Definition ist nicht notwendig.  </li> </ul>
                Beispiel:<br> attr ks300log1 logtype
                temp4rain10:Temp/Rain,hum6wind8:Hum/Wind,text:Raw-data </li><br>
+
   </ul>
   <br>
 </ul>
