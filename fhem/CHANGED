@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: new command reload for 57_Calendar.pm forces cleanup
   - changed: small update to the documentation of recurring events in
              57_Calendar.pm
   - bugfix:  PRESENCE: fixing wrong presence state for mode lan-ping
