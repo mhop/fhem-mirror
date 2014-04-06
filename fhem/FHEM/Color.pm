@@ -329,7 +329,7 @@ hsb2hex($$$) {
 
 
 # COLOR SPACE: RGB(hex) & RGB(dec)
-# hex > r=hex(00, FF), s=hex(00, FF), v=hex(00, FF)
+# hex > r=hex(00, FF), g=hex(00, FF), b=hex(00, FF)
 # dec > r=int(0, 255), g=int(0, 255), b=int(0, 255)
 #
 
