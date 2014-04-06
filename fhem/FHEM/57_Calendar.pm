@@ -653,14 +653,14 @@ sub deleteEvent {
 # }
 
 sub updateFromCalendar {
-  my ($self,$calendar)= @_;
+  my ($self,$calendar,$removeall)= @_;
   my $t= time();
   my $uid;
   my $event;
 
   # we first remove all elements which were previously marked for deletion
   foreach $event ($self->events()) {
-    if($event->isDeleted()) {
+    if($event->isDeleted() || $removeall) {
       $self->deleteEvent($event->uid());
     }
   }
@@ -723,15 +723,16 @@ sub Calendar_Initialize($) {
   $hash->{AttrList}=  $readingFnAttributes;
 }
 
-###################################
-sub Calendar_Wakeup($) {
 
-  my ($hash) = @_;
+###################################
+sub Calendar_Wakeup($$) {
+
+  my ($hash,$removeall) = @_;
 
   my $t= time();
   Log3 $hash, 4, "Calendar " . $hash->{NAME} . ": Wakeup";
 
-  Calendar_GetUpdate($hash) if($t>= $hash->{fhem}{nxtUpdtTs});
+  Calendar_GetUpdate($hash,$removeall) if($t>= $hash->{fhem}{nxtUpdtTs});
 
   $hash->{fhem}{lastChkTs}= $t;
   $hash->{fhem}{lastCheck}= FmtDateTime($t);
@@ -809,9 +810,9 @@ sub Calendar_CheckTimes($) {
 
 
 ###################################
-sub Calendar_GetUpdate($) {
+sub Calendar_GetUpdate($$) {
 
-  my ($hash) = @_;
+  my ($hash,$removeall) = @_;
 
   my $t= time();
   $hash->{fhem}{lstUpdtTs}= $t;
@@ -881,7 +882,7 @@ sub Calendar_GetUpdate($) {
   # we now create the events from it
   #main::Debug "Creating events...";
   my $eventsObj= $hash->{fhem}{events};
-  $eventsObj->updateFromCalendar($root);
+  $eventsObj->updateFromCalendar($root,$removeall);
   $hash->{fhem}{events}= $eventsObj;
 
   # we now update the readings
@@ -916,10 +917,14 @@ sub Calendar_Set($@) {
   # usage check
   if((@a == 2) && ($a[1] eq "update")) {
      $hash->{fhem}{nxtUpdtTs}= 0; # force update
-     Calendar_Wakeup($hash);
+     Calendar_Wakeup($hash,0);
      return undef;
+  } elsif((@a == 2) && ($a[1] eq "reload")) {
+     $hash->{fhem}{nxtUpdtTs}= 0; # force update
+     Calendar_Wakeup($hash,1); # remove all events before update
+     return undef;   
   } else {
-    return "Unknown argument $cmd, choose one of update:noArg";
+    return "Unknown argument $cmd, choose one of update:noArg reload:noArg";
   }
 }
 
@@ -1013,7 +1018,7 @@ sub Calendar_Define($$) {
 
   #main::Debug "Interval: ${interval}s";
   $hash->{fhem}{nxtUpdtTs}= 0;
-  Calendar_Wakeup($hash);
+  Calendar_Wakeup($hash,0);
 
   return undef;
 }
@@ -1085,6 +1090,11 @@ sub Calendar_Undef($$) {
 
     Forces the retrieval of the calendar from the URL. The next automatic retrieval is scheduled to occur
     <code>interval</code> seconds later.<br><br>
+    
+    <code>set &lt;name&gt; reload</code><br><br>
+
+    Same as <code>update</code> but all calendar events are removed first.<br><br>
+    
   </ul>
   <br>
 
