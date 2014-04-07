@@ -36,22 +36,25 @@ sub I2C_PCF8574_Set($@) {					#
   my $val = $a[2];
   my @inports = sort(split( " ",AttrVal($name, "InputPorts", "")));
 	my %sendpackage = ( i2caddress => $hash->{I2C_Address}, direction => "i2cwrite" );
-	if ( $cmd && $cmd =~ m/^Port((0|)[0-7])$/i) {
+	if ( $cmd && $cmd =~ m/^P(ort|)((0|)[0-7])(,(P|)(ort|)((0|)[0-7])){0,7}$/i) {
 		return "wrong value: $val for \"set $name $cmd\" use one of: off, on" 
 			unless(exists($setsP{$val}));
-		substr($cmd,0,4,"");				#Nummer aus String extrahieren
-		return "$name error: Port$cmd is defined as input" if ( $cmd ~~ @inports );		#Pruefen ob entsprechender Port Input ist
+		my @scmd = split(",", $cmd);
+		foreach (@scmd) {
+			$_ =~ tr/[a-zA-Z]//d;			#Nummer aus String extrahieren
+			#substr($_,0,4,"");				#Nummer aus String extrahieren
+			return "$name error: Port$cmd is defined as input" if ( $_ ~~ @inports );		#Pruefen ob entsprechender Port Input ist
+		}
 		my $sbyte = 0;
 		foreach (0..7) {
-			if ($_ == $cmd) {					#Port der geaendert werden soll
-				$sbyte += $setsP{$val} << (1 * $_);
-			} elsif ($_ ~~ @inports) {#Port der als Input konfiguriert ist wird auf 1 gesetzt
+			if ($_ ~~ @inports) {#Port der als Input konfiguriert ist wird auf 1 gesetzt
 				$sbyte += 1 << (1 * $_);
+			} elsif( $_ ~~ @scmd ) {#Port der geaendert werden soll
+				$sbyte += $setsP{$val} << (1 * $_);
 			} else {									#alle anderen Portwerte werden den Readings entnommen
 				$sbyte += $setsP{ReadingsVal($name,'Port'.$_,"off")} << (1 * $_);		#->sonst aus dem Reading holen
 			}
 		}
-		#$sendpackage{data} = sprintf("%.2X",$sbyte);
 		$sendpackage{data} = $sbyte;
 	} else {
 		my $list = undef;
@@ -290,13 +293,13 @@ sub I2C_PCF8574_Parse($$) {	#wird ueber dispatch vom physical device aufgerufen 
 	<b>Define</b>
 	<ul>
 		<code>define &lt;name&gt; I2C_PCF8574 &lt;I2C Address&gt;</code><br>
-		where <code>&lt;I2C Address&gt;</code> is an 2 digit hexadecimal value<br>
+		where <code>&lt;I2C Address&gt;</code> is without direction bit<br>
 	</ul>
 
 	<a name="I2C_PCF8574Set"></a>
 	<b>Set</b>
 	<ul>
-		<code>set &lt;name&gt; &lt;port&gt; &lt;value&gt;</code><br><br>
+		<code>set &lt;name&gt; &lt;port[,port[...]]&gt; &lt;value&gt;</code><br><br>
 			<ul>
 			<li><code>&lt;port&gt;</code> is one of Port0 to Port7 and <code>&lt;value&gt;</code> is one of:<br>
 				<ul>
@@ -311,6 +314,8 @@ sub I2C_PCF8574_Parse($$) {	#wird ueber dispatch vom physical device aufgerufen 
 		Example:
 		<ul>
 			<code>set mod1 Port4 on</code><br>
+			<code>set mod1 Port4,Port6 off</code><br>
+			<code>set mod1 Port4,6 on</code><br>
 		</ul><br>
 	</ul>
 
@@ -359,13 +364,13 @@ sub I2C_PCF8574_Parse($$) {	#wird ueber dispatch vom physical device aufgerufen 
 	<b>Define</b>
 	<ul>
 		<code>define &lt;name&gt; I2C_PCF8574 &lt;I2C Address&gt;</code><br>
-		Der Wert <code>&lt;I2C Address&gt;</code> ist ein zweistelliger Hex-Wert<br>
+		Der Wert <code>&lt;I2C Address&gt;</code> ist ohne das Richtungsbit<br>
 	</ul>
 
 	<a name="I2C_PCF8574Set"></a>
 	<b>Set</b>
 	<ul>
-		<code>set &lt;name&gt; &lt;port&gt; &lt;value&gt;</code><br><br>
+		<code>set &lt;name&gt; &lt;port[,port[...]]&gt; &lt;value&gt;</code><br><br>
 			<ul>
 			<li><code>&lt;port&gt;</code> kann Port0 bis Port7 annehmen und <code>&lt;value&gt;</code> folgende Werte:<br>
 				<ul>
@@ -380,6 +385,8 @@ sub I2C_PCF8574_Parse($$) {	#wird ueber dispatch vom physical device aufgerufen 
 		Beispiel:
 		<ul>
 			<code>set mod1 Port4 on</code><br>
+			<code>set mod1 Port4,Port6 off</code><br>
+			<code>set mod1 Port4,6 on</code><br>
 		</ul><br>
 	</ul>
 
