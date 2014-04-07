@@ -288,6 +288,71 @@ FW_querySetSelected(el, val)
     }
 }
 
+//////////////////////////
+// start of script functions
+function
+loadScript(sname, cb)
+{
+  var h = document.head || document.getElementsByTagName('head')[0];
+  var r = h.getAttribute("root");
+  if(!r)
+    r = "/fhem";
+  sname = r+"/"+sname;
+  var arr = h.getElementsByTagName("script");
+  for(var i1=0; i1<arr.length; i1++)
+    if(sname == arr[i1].getAttribute("src"))
+      return;
+  var script = document.createElement("script");
+  script.src = sname;
+  script.async = script.defer = false;
+  script.type = "text/javascript";
+  script.onload = cb;
+  log("Loading "+sname);
+  script.onreadystatechange = function() {
+    if(script.readyState == 'loaded' || script.readyState == 'complete') {
+      script.onreadystatechange = null;
+      if(cb)
+        cb();
+    }
+  }
+  h.appendChild(script);
+}
+
+function
+loadLink(lname)
+{
+  var h = document.head || document.getElementsByTagName('head')[0];
+  var r = h.getAttribute("root");
+  if(!r)
+    r = "/fhem";
+  lname = r+"/"+lname;
+  var arr = h.getElementsByTagName("link");
+  for(var i1=0; i1<arr.length; i1++)
+    if(lname == arr[i1].getAttribute("href"))
+      return;
+  var link = document.createElement("link");
+  link.href = lname;
+  link.rel = "stylesheet";
+  log("Loading "+lname);
+  h.appendChild(link);
+}
+
+function
+scriptAttribute(sname)
+{
+  var attr="";
+  $("head script").each(function(){
+    if($(this).attr("src").indexOf(sname) >= 0)
+      attr = $(this).attr("attr");
+  });
+
+  var ua={};
+  try {ua=JSON.parse(attr);} catch(e){FW_errmsg(sname+" Parameter "+e,5000);}
+  return ua;
+}
+// end of script functions
+//////////////////////////
+
 window.onbeforeunload = function(e)
 { 
   FW_leaving = 1;

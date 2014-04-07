@@ -2926,6 +2926,20 @@ FW_ActivateInform()
         FHEM-Server, and iPad/iPhone as Web-client.
         </li><br>
 
+     <a name="JavaScripts"></a>
+     <li>JavaScripts<br>
+        Space separated list of JavaScript files to be included. The filenames
+        are relative to the www directory.  For each file an additional
+        user-settable FHEMWEB attribute will be created, to pass parameters to
+        the script. The name of this additional attribute gets the Param
+        suffix,  directory and the fhem_ prefix will be deleted. Example:
+        <ul><code>
+          attr WEB JavaScripts codemirror/fhem_codemirror.js<br>
+          attr WEB codemirrorParam { "theme":"blackboard", "lineNumbers":true }
+        </code></ul>
+        </li><br>
+
+
     </ul>
   </ul>
 
@@ -3430,6 +3444,21 @@ FW_ActivateInform()
         durchgefuehrt. Fuer bestimmte Hardware-Kombinationen (langsamer FHEM
         Server, iPad/iPhone als Client) scheint dieses Attribu Ladeprobleme zu
         beheben.
+        </li><br>
+
+     <a name="JavaScripts"></a>
+     <li>JavaScripts<br>
+        Leerzeichen getrennte Liste von JavaScript Dateien, die geladen werden.
+        Die Dateinamen sind relativ zum www Verzeichnis anzugeben. F&uuml;r
+        jede Datei wird ein zus&auml;tzliches Attribut angelegt, damit der
+        Benutzer dem Skript Parameter weiterreichen kann. Bei diesem
+        Attributnamen werden Verzeichnisname und fhem_ Pr&auml;fix entfernt
+        und Param als Suffix hinzugef&uuml;gt. Beispiel:
+
+        <ul><code>
+          attr WEB JavaScripts codemirror/fhem_codemirror.js<br>
+          attr WEB codemirrorParam { "theme":"blackboard", "lineNumbers":true }
+        </code></ul>
         </li><br>
 
     </ul>
