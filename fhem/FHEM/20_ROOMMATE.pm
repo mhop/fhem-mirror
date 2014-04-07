@@ -28,7 +28,7 @@
 # Major Version History:
 # - 1.1.0 - 2014-04-07
 # -- new readings in computer readable format (*_cr)
-# -- format of readings durTimer readings changes from HH:MM:ss to minutes
+# -- format of readings durTimer readings changes from minutes to HH:MM:ss
 #
 # - 1.0.0 - 2014-02-08
 # -- First release
@@ -1413,13 +1413,22 @@ sub ROOMMATE_StartInternalTimers($$) {
       <div style="margin-left: 2em">
         <ul>
           <li>
-            <b>durTimerAbsence</b> - Timer, der die Dauer der Abwesenheit in Minuten anzeigt
+            <b>durTimerAbsence</b> - Timer, der die Dauer der Abwesenheit in normal lesbarem Format anzeigt (Stunden:Minuten:Sekunden)
           </li>
           <li>
-            <b>durTimerPresence</b> - Timer, der die Dauer der Anwesenheit in Minuten anzeigt
+            <b>durTimerAbsence_cr</b> - Timer, der die Dauer der Abwesenheit in Computer lesbarem Format anzeigt (Minuten)
           </li>
           <li>
-            <b>durTimerSleep</b> - Timer, der die Schlafdauer in Minuten anzeigt
+            <b>durTimerPresence</b> - Timer, der die Dauer der Anwesenheit in normal lesbarem Format anzeigt (Stunden:Minuten:Sekunden)
+          </li>
+          <li>
+            <b>durTimerPresence_cr</b> - Timer, der die Dauer der Anwesenheit in Computer lesbarem Format anzeigt (Minuten)
+          </li>
+          <li>
+            <b>durTimerSleep</b> - Timer, der die Schlafdauer in normal lesbarem Format anzeigt (Stunden:Minuten:Sekunden)
+          </li>
+          <li>
+            <b>durTimerSleep_cr</b> - Timer, der die Schlafdauer in Computer lesbarem Format anzeigt (Minuten)
           </li>
           <li>
             <b>lastArrival</b> - Zeitstempel der letzten Ankunft zu Hause
@@ -1431,13 +1440,22 @@ sub ROOMMATE_StartInternalTimers($$) {
             <b>lastDeparture</b> - Zeitstempel des letzten Verlassens des Zuhauses
           </li>
           <li>
-            <b>lastDurAbsence</b> - Dauer der letzten Abwesenheit im folgenden Format: Stunden:Minuten:Sekunden
+            <b>lastDurAbsence</b> - Dauer der letzten Abwesenheit in normal lesbarem Format (Stunden:Minuten:Sekunden)
           </li>
           <li>
-            <b>lastDurPresence</b> - Dauer der letzten Anwesenheit im folgenden Format: Stunden:Minuten:Sekunden
+            <b>lastDurAbsence_cr</b> - Dauer der letzten Abwesenheit in Computer lesbarem Format (Minuten)
           </li>
           <li>
-            <b>lastDurSleep</b> - Dauer des letzten Schlafzyklus im folgenden Format: Stunden:Minuten:Sekunden
+            <b>lastDurPresence</b> - Dauer der letzten Anwesenheit in normal lesbarem Format (Stunden:Minuten:Sekunden)
+          </li>
+          <li>
+            <b>lastDurPresence_cr</b> - Dauer der letzten Anwesenheit in Computer lesbarem Format (Minuten)
+          </li>
+          <li>
+            <b>lastDurSleep</b> - Dauer des letzten Schlafzyklus in normal lesbarem Format (Stunden:Minuten:Sekunden)
+          </li>
+          <li>
+            <b>lastDurSleep_cr</b> - Dauer des letzten Schlafzyklus in Computer lesbarem Format (Minuten)
           </li>
           <li>
             <b>lastLocation</b> - der vorherige Aufenthaltsort

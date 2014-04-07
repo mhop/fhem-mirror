@@ -28,7 +28,7 @@
 # Major Version History:
 # - 1.1.0 - 2014-04-07
 # -- new readings in computer readable format (*_cr)
-# -- format of readings durTimer readings changes from HH:MM:ss to minutes
+# -- format of readings durTimer readings changes from minutes to HH:MM:ss
 #
 # - 1.0.0 - 2014-02-08
 # -- First release
@@ -1210,13 +1210,22 @@ sub RESIDENTS_Datetime2Timestamp($) {
             <b>lastDeparture</b> - Zeitstempel des letzten Verlassens des Zuhauses
           </li>
           <li>
-            <b>lastDurAbsence</b> - Dauer der letzten Abwesenheit im folgenden Format: Stunden:Minuten:Sekunden
+            <b>lastDurAbsence</b> - Dauer der letzten Abwesenheit in normal lesbarem Format (Stunden:Minuten:Sekunden)
           </li>
           <li>
-            <b>lastDurPresence</b> - Dauer der letzten Anwesenheit im folgenden Format: Stunden:Minuten:Sekunden
+            <b>lastDurAbsence_cr</b> - Dauer der letzten Abwesenheit in Computer lesbarem Format (Minuten)
           </li>
           <li>
-            <b>lastDurSleep</b> - Dauer des letzten Schlafzyklus im folgenden Format: Stunden:Minuten:Sekunden
+            <b>lastDurPresence</b> - Dauer der letzten Anwesenheit in normal lesbarem Format (Stunden:Minuten:Sekunden)
+          </li>
+          <li>
+            <b>lastDurPresence_cr</b> - Dauer der letzten Anwesenheit in Computer lesbarem Format (Minuten)
+          </li>
+          <li>
+            <b>lastDurSleep</b> - Dauer des letzten Schlafzyklus in normal lesbarem Format (Stunden:Minuten:Sekunden)
+          </li>
+          <li>
+            <b>lastDurSleep_cr</b> - Dauer des letzten Schlafzyklus in Computer lesbarem Format (Minuten)
           </li>
           <li>
             <b>lastSleep</b> - Zeitstempel des Beginns des letzten Schlafzyklus
