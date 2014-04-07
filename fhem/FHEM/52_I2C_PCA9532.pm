@@ -19,11 +19,11 @@
 #Inhalte des Hashes:
 #i2caddress				00-7F								I2C-Adresse
 #direction				i2cread|i2cwrite		Richtung
-#reg							00-FF|""						Registeradresse (kann weggelassen werden für IC's ohne Registeradressierung)
+#reg							00-FF|""						Registeradresse (kann weggelassen werden fuer IC's ohne Registeradressierung)
 #nbyte						Zahl								Anzahl Register, die bearbeitet werden sollen (im mom 0-99)
-#data							00-FF ... 					Daten die an I2C geschickt werden sollen (müssen, wenn nbyte benutzt wird immer ein Vielfaches Desselben sein)
+#data							00-FF ... 					Daten die an I2C geschickt werden sollen (muessen, wenn nbyte benutzt wird immer ein Vielfaches Desselben sein)
 #received					00-FF ...						Daten die vom I2C empfangen wurden, durch Leerzeichen getrennt (bleibt leer wenn Daten geschrieben werden)
-#pname_SENDSTAT		Ok|error						zeigt Übertragungserfolg an
+#pname_SENDSTAT		Ok|error						zeigt uebertragungserfolg an
 
 package main;
 use strict;
@@ -177,12 +177,12 @@ sub I2C_PCA9532_Set($@) {
 			join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) )
 			unless(exists($setsP{$val}));
     substr($cmd,0,4,"");
-	  return "$name error: Port$cmd is defined as input" if ( $cmd ~~ @inports );		#Prüfen ob entsprechender Port Input ist
+	  return "$name error: Port$cmd is defined as input" if ( $cmd ~~ @inports );		#Pruefen ob entsprechender Port Input ist
 		my $LSreg = int($cmd / 4); 			#Nummer des entspechenden LS Registers
-		my $regaddr = $LSreg + 6;				#Adresse für Controlregister berechnen (LS0 = 0x06)
+		my $regaddr = $LSreg + 6;				#Adresse fuer Controlregister berechnen (LS0 = 0x06)
 		my $n = $LSreg * 4;							#Erster Port in LSx
 		my $sbyte = 0;
-		foreach (reverse 0..3) {				#ensprechendes Controlregister füllen
+		foreach (reverse 0..3) {				#ensprechendes Controlregister fuellen
 		  my $portn = $_ + $n;
 #hier noch alle inputs auf rezessiv setzen
 			if (( $portn) == $cmd ) {		#->wenn aktueller Port dann neuer Wert
@@ -208,7 +208,7 @@ sub I2C_PCA9532_Set($@) {
   } else {
 	  my $list = undef;
     foreach (0..15) {
-		  next if ( $_ ~~ @inports );		#Inputs überspringen
+		  next if ( $_ ~~ @inports );		#Inputs ueberspringen
 			#$list .= "Port" . $_ . ":" . join(',', sort keys %setsP) . " ";
 			$list .= "Port" . $_ . ":" . join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) ) . " ";
     }
@@ -240,20 +240,20 @@ sub I2C_PCA9532_I2CRec($@) {																									# vom physical aufgerufen
   my $name = $hash->{NAME};  
   my $phash = $hash->{IODev};
   my $pname = $phash->{NAME};
-  while ( my ( $k, $v ) = each %$clientmsg ) { 																#erzeugen von Internals für alle Keys in $clientmsg die mit dem physical Namen beginnen
+  while ( my ( $k, $v ) = each %$clientmsg ) { 																#erzeugen von Internals fuer alle Keys in $clientmsg die mit dem physical Namen beginnen
     $hash->{$k} = $v if $k =~ /^$pname/ ;
   } 
-	#hier noch überprüfen, ob Register und Daten ok
+	#hier noch ueberpruefen, ob Register und Daten ok
   if ($clientmsg->{direction} && defined($clientmsg->{reg}) && $clientmsg->{$pname . "_SENDSTAT"} && $clientmsg->{$pname . "_SENDSTAT"} eq "Ok") {
 		if ( $clientmsg->{direction} eq "i2cread" && defined($clientmsg->{received}) ) { # =~ m/^[a-f0-9]{2}$/i) {
-			#my @rec = @{$clientmsg->{received}};							#bei übergabe im hash als array
-			my @rec = split(" ",$clientmsg->{received});			#bei übergabe im als skalar
+			#my @rec = @{$clientmsg->{received}};							#bei uebergabe im hash als array
+			my @rec = split(" ",$clientmsg->{received});			#bei uebergabe im als skalar
 			Log3 $hash, 3, "$name: wrong amount of registers transmitted from $pname" unless (@rec == $clientmsg->{nbyte});
 			foreach (reverse 0..$#rec) {																							#reverse, damit Inputs (Register 0 und 1 als letztes geschrieben werden)
 				I2C_PCA9532_UpdReadings($hash, $_ + $clientmsg->{reg} , $rec[$_]);
 			}
 			readingsSingleUpdate($hash,"state", "Ok", 1);
-		} elsif ( $clientmsg->{direction} eq "i2cwrite" && defined($clientmsg->{data}) ) { # =~ m/^[a-f0-9]{2}$/i) {#readings aktualisieren wenn Übertragung ok
+		} elsif ( $clientmsg->{direction} eq "i2cwrite" && defined($clientmsg->{data}) ) { # =~ m/^[a-f0-9]{2}$/i) {#readings aktualisieren wenn uebertragung ok
 			I2C_PCA9532_UpdReadings($hash, $clientmsg->{reg} , $clientmsg->{data});
 			readingsSingleUpdate($hash,"state", "Ok", 1);
 		
@@ -295,7 +295,7 @@ sub I2C_PCA9532_UpdReadings($$$) {
 		  my $pval = 3 & ( $inh >> ($_ * 2) );
 			my $port = $_ + $n;
 			readingsBulkUpdate($hash, 'Port'.$port , $rsetsP{$pval}) 
-			      if (ReadingsVal($name, 'Port'.$port,"nix") ne $rsetsP{$pval});  #nur wenn Wert geändert
+			      if (ReadingsVal($name, 'Port'.$port,"nix") ne $rsetsP{$pval});  #nur wenn Wert geaendert
 		}
 	} elsif ( $reg == 3) { 											#wenn PWM0 Register
 		readingsBulkUpdate($hash, 'PWM0' , $inh);
@@ -468,7 +468,7 @@ sub I2C_PCA9532_UpdReadings($$$) {
 		</li>
 		<li>InputPorts<br>
 			Durch Leerzeichen getrennte Portnummern die als Inputs genutzt werden.<br>
-			Ports in dieser Liste können nicht geschrieben werden.<br>
+			Ports in dieser Liste k&ouml;nnen nicht geschrieben werden.<br>
 			Standard: no, g&uuml;ltige Werte: 0 1 2 .. 15<br><br>
 		</li>
 		<li>T0/T1<br>
