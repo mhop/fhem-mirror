@@ -38,7 +38,7 @@ install:
 	@-$(foreach DIR,$(DEST), if [ ! -e $(DIR) ]; then mkdir -p $(DIR); fi; )
 	@echo "- fixing permissions in fhem.cfg"
 	perl contrib/commandref_join.pl 
-	@find FHEM docs www contrib -type f -print | xargs chmod 644
+	@find FHEM configDB.pm docs www contrib -type f -print | xargs chmod 644
 	@cp fhem.cfg fhem.cfg.install
 	@-if [ "$(RELATIVE_PATH)" != YES ]; then\
 		perl -pi -e 's,modpath \.,modpath $(MODDIR),' fhem.cfg.install; \
@@ -51,7 +51,7 @@ install:
 	@cp fhem.cfg.install $(RETCDIR)/fhem.cfg
 	@rm fhem.cfg.install
 	@cp fhem.pl $(RBINDIR)
-	@cp -rp FHEM docs www contrib $(RMODDIR)
+	@cp -rp FHEM docs www contrib configDB.pm $(RMODDIR)
 	@cp -rp README_DEMO.txt demolog fhem.cfg.demo $(RDEMODIR)
 	@cp docs/fhem.man $(RMANDIR)/fhem.pl.1
 	@gzip -f -9 $(RMANDIR)/fhem.pl.1
@@ -88,7 +88,7 @@ dist:
 	mkdir .f
 	cp -r fhem.pl fhem.cfg CHANGED HISTORY Makefile README.SVN\
                 demolog fhem.cfg.demo README_DEMO.txt\
-		FHEM contrib docs www webfrontend .f
+		FHEM configDB.pm contrib docs www webfrontend .f
 	mkdir .f/log
 	touch .f/log/empty_file.txt
 	(cd .f; perl contrib/commandref_join.pl)
