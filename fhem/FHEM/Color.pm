@@ -259,7 +259,7 @@ hsb2rgb ($$$) {
     my $s2   = $s / 255.0;
     my $bri2 = $bri / 255.0;
 
-    my $rgb = Color::hsv2rgb( $h2, $s2, $bri2 );
+    my @rgb = Color::hsv2rgb( $h2, $s2, $bri2 );
     my $r   = int( $rgb[0] * 255 );
     my $g   = int( $rgb[1] * 255 );
     my $b   = int( $rgb[2] * 255 );
@@ -275,7 +275,7 @@ rgb2hsb ($$$) {
     my $g2 = $g / 255.0;
     my $b2 = $b / 255.0;
 
-    my $hsv = Color::rgb2hsv( $r2, $g2, $b2 );
+    my @hsv = Color::rgb2hsv( $r2, $g2, $b2 );
     my $h   = int( $hsv[0] * 65535 );
     my $s   = int( $hsv[1] * 255 );
     my $bri = int( $hsv[2] * 255 );
@@ -292,7 +292,7 @@ rgb2hsb ($$$) {
 sub
 hex2hsv($) {
     my ($hex) = @_;
-    my $rgb = Color::hex2rgb($hex);
+    my @rgb = Color::hex2rgb($hex);
 
     return Color::rgb2hsv( $rgb[0], $rgb[1], $rgb[2] );
 }
@@ -300,7 +300,7 @@ hex2hsv($) {
 sub
 hsv2hex($$$) {
     my ( $h, $s, $v ) = @_;
-    my $rgb = Color::hsv2rgb( $h, $s, $v );
+    my @rgb = Color::hsv2rgb( $h, $s, $v );
 
     return Color::rgb2hex( $rgb[0], $rgb[1], $rgb[2] );
 }
@@ -314,7 +314,7 @@ hsv2hex($$$) {
 sub
 hex2hsb($) {
     my ($hex) = @_;
-    my $rgb = Color::hex2rgb($hex);
+    my @rgb = Color::hex2rgb($hex);
 
     return Color::rgb2hsb( $rgb[0], $rgb[1], $rgb[2] );
 }
@@ -322,7 +322,7 @@ hex2hsb($) {
 sub
 hsb2hex($$$) {
     my ( $h, $s, $b ) = @_;
-    my $rgb = Color::hsb2rgb( $h, $s, $b );
+    my @rgb = Color::hsb2rgb( $h, $s, $b );
 
     return Color::rgb2hex( $rgb[0], $rgb[1], $rgb[2] );
 }
