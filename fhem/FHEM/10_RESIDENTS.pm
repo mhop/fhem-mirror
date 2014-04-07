@@ -23,9 +23,13 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.2
+# Version: 1.1.0
 #
 # Major Version History:
+# - 1.1.0 - 2014-04-07
+# -- new readings in computer readable format (*_cr)
+# -- format of readings durTimer readings changes from HH:MM:ss to minutes
+#
 # - 1.0.0 - 2014-02-08
 # -- First release
 #
@@ -792,6 +796,13 @@ sub RESIDENTS_UpdateReadings (@) {
                     $datetime, $hash->{READINGS}{lastSleep}{VAL}
                 )
             );
+            readingsBulkUpdate(
+                $hash,
+                "lastDurSleep_cr",
+                RESIDENTS_TimeDiff(
+                    $datetime, $hash->{READINGS}{lastSleep}{VAL}, "min"
+                )
+            );
         }
 
         readingsBulkUpdate( $hash, "lastState", $hash->{READINGS}{state}{VAL} );
@@ -819,6 +830,14 @@ sub RESIDENTS_UpdateReadings (@) {
                         $datetime, $hash->{READINGS}{lastDeparture}{VAL}
                     )
                 );
+                readingsBulkUpdate(
+                    $hash,
+                    "lastDurAbsence_cr",
+                    RESIDENTS_TimeDiff(
+                        $datetime, $hash->{READINGS}{lastDeparture}{VAL},
+                        "min"
+                    )
+                );
             }
         }
         else {
@@ -835,47 +854,61 @@ sub RESIDENTS_UpdateReadings (@) {
                         $datetime, $hash->{READINGS}{lastArrival}{VAL}
                     )
                 );
+                readingsBulkUpdate(
+                    $hash,
+                    "lastDurPresence_cr",
+                    RESIDENTS_TimeDiff(
+                        $datetime, $hash->{READINGS}{lastArrival}{VAL},
+                        "min"
+                    )
+                );
             }
         }
 
     }
 }
 
-sub RESIDENTS_TimeDiff($$) {
-    my ( $datetimeNow, $datetimeOld ) = @_;
+###################################
+sub RESIDENTS_TimeDiff($$;$) {
+    my ( $datetimeNow, $datetimeOld, $format ) = @_;
 
-    my (
-        $date,         $time,         $date2,    $time2,
-        $y,            $m,            $d,        $hour,
-        $min,          $sec,          $y2,       $m2,
-        $d2,           $hour2,        $min2,     $sec2,
-        $timestampNow, $timestampOld, $timeDiff, $hours,
-        $minutes,      $seconds
-    );
+    my $timestampNow = RESIDENTS_Datetime2Timestamp($datetimeNow);
+    my $timestampOld = RESIDENTS_Datetime2Timestamp($datetimeOld);
+    my $timeDiff     = $timestampNow - $timestampOld;
 
-    ( $date, $time ) = split( ' ', $datetimeNow );
-    ( $y,    $m,   $d )   = split( '-', $date );
-    ( $hour, $min, $sec ) = split( ':', $time );
-    $m -= 01;
-    $timestampNow = timelocal( $sec, $min, $hour, $d, $m, $y );
+    # return seconds
+    return int( $timeDiff + 0.5 ) if ( defined($format) && $format eq "sec" );
 
-    ( $date2, $time2 ) = split( ' ', $datetimeOld );
-    ( $y2,    $m2,   $d2 )   = split( '-', $date2 );
-    ( $hour2, $min2, $sec2 ) = split( ':', $time2 );
-    $m2 -= 01;
-    $timestampOld = timelocal( $sec2, $min2, $hour2, $d2, $m2, $y2 );
+    # return minutes
+    return int( $timeDiff / 60 + 0.5 )
+      if ( defined($format) && $format eq "min" );
 
-    $timeDiff = $timestampNow - $timestampOld;
-    $hours = ( $timeDiff < 3600 ? 0 : int( $timeDiff / 3600 ) );
+    # return human readable format
+    my $hours = ( $timeDiff < 3600 ? 0 : int( $timeDiff / 3600 ) );
     $timeDiff -= ( $hours == 0 ? 0 : ( $hours * 3600 ) );
-    $minutes = ( $timeDiff < 60 ? 0 : int( $timeDiff / 60 ) );
-    $seconds = $timeDiff % 60;
+    my $minutes = ( $timeDiff < 60 ? 0 : int( $timeDiff / 60 ) );
+    my $seconds = $timeDiff % 60;
 
     $hours   = "0" . $hours   if ( $hours < 10 );
     $minutes = "0" . $minutes if ( $minutes < 10 );
     $seconds = "0" . $seconds if ( $seconds < 10 );
 
     return "$hours:$minutes:$seconds";
+}
+
+###################################
+sub RESIDENTS_Datetime2Timestamp($) {
+    my ($datetime) = @_;
+
+    my ( $date, $time, $y, $m, $d, $hour, $min, $sec, $timestamp );
+
+    ( $date, $time ) = split( ' ', $datetime );
+    ( $y,    $m,   $d )   = split( '-', $date );
+    ( $hour, $min, $sec ) = split( ':', $time );
+    $m -= 01;
+    $timestamp = timelocal( $sec, $min, $hour, $d, $m, $y );
+
+    return $timestamp;
 }
 
 1;
@@ -996,13 +1029,22 @@ sub RESIDENTS_TimeDiff($$) {
             <b>lastDeparture</b> - timestamp of last departure from home
           </li>
           <li>
-            <b>lastDurAbsence</b> - duration of last absence from home in following format: hours:minutes:seconds
+            <b>lastDurAbsence</b> - duration of last absence from home in human readable format (hours:minutes:seconds)
           </li>
           <li>
-            <b>lastDurPresence</b> - duration of last presence at home in following format: hours:minutes:seconds
+            <b>lastDurAbsence_cr</b> - duration of last absence from home in computer readable format (minutes)
           </li>
           <li>
-            <b>lastDurSleep</b> - duration of last sleep in following format: hours:minutes:seconds
+            <b>lastDurPresence</b> - duration of last presence at home in human readable format (hours:minutes:seconds)
+          </li>
+          <li>
+            <b>lastDurPresence_cr</b> - duration of last presence at home in computer readable format (minutes)
+          </li>
+          <li>
+            <b>lastDurSleep</b> - duration of last sleep in human readable format (hours:minutes:seconds)
+          </li>
+          <li>
+            <b>lastDurSleep_cr</b> - duration of last sleep in computer readable format (minutes)
           </li>
           <li>
             <b>lastSleep</b> - timestamp of last sleep cycle begin

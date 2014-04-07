@@ -23,9 +23,13 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.3
+# Version: 1.1.0
 #
 # Major Version History:
+# - 1.1.0 - 2014-04-07
+# -- new readings in computer readable format (*_cr)
+# -- format of readings durTimer readings changes from HH:MM:ss to minutes
+#
 # - 1.0.0 - 2014-02-08
 # -- First release
 #
@@ -37,7 +41,6 @@ use strict;
 use warnings;
 use Time::Local;
 use Data::Dumper;
-use SetExtensions;
 
 sub GUEST_Set($@);
 sub GUEST_Define($$);
@@ -420,6 +423,13 @@ sub GUEST_Set($@) {
                         $datetime, $hash->{READINGS}{lastSleep}{VAL}
                     )
                 );
+                readingsBulkUpdate(
+                    $hash,
+                    "lastDurSleep_cr",
+                    GUEST_TimeDiff(
+                        $datetime, $hash->{READINGS}{lastSleep}{VAL}, "min"
+                    )
+                );
             }
 
             # calculate presence state
@@ -490,6 +500,14 @@ sub GUEST_Set($@) {
                                 $datetime, $hash->{READINGS}{lastDeparture}{VAL}
                             )
                         );
+                        readingsBulkUpdate(
+                            $hash,
+                            "lastDurAbsence_cr",
+                            GUEST_TimeDiff(
+                                $datetime,
+                                $hash->{READINGS}{lastDeparture}{VAL}, "min"
+                            )
+                        );
                     }
                 }
                 else {
@@ -504,6 +522,14 @@ sub GUEST_Set($@) {
                             "lastDurPresence",
                             GUEST_TimeDiff(
                                 $datetime, $hash->{READINGS}{lastArrival}{VAL}
+                            )
+                        );
+                        readingsBulkUpdate(
+                            $hash,
+                            "lastDurPresence_cr",
+                            GUEST_TimeDiff(
+                                $datetime, $hash->{READINGS}{lastArrival}{VAL},
+                                "min"
                             )
                         );
                     }
@@ -773,10 +799,9 @@ sub GUEST_DurationTimer($;$) {
         if ( defined( $hash->{READINGS}{lastArrival}{VAL} )
             && $hash->{READINGS}{lastArrival}{VAL} ne "-" )
         {
-            $diff =
+            $durPresence =
               $timestampNow -
               GUEST_Datetime2Timestamp( $hash->{READINGS}{lastArrival}{VAL} );
-            $durPresence = int( $diff / 60 );
         }
     }
 
@@ -789,10 +814,9 @@ sub GUEST_DurationTimer($;$) {
         if ( defined( $hash->{READINGS}{lastDeparture}{VAL} )
             && $hash->{READINGS}{lastDeparture}{VAL} ne "-" )
         {
-            $diff =
+            $durAbsence =
               $timestampNow -
               GUEST_Datetime2Timestamp( $hash->{READINGS}{lastDeparture}{VAL} );
-            $durAbsence = int( $diff / 60 );
         }
     }
 
@@ -803,23 +827,43 @@ sub GUEST_DurationTimer($;$) {
         if ( defined( $hash->{READINGS}{lastSleep}{VAL} )
             && $hash->{READINGS}{lastSleep}{VAL} ne "-" )
         {
-            $diff =
+            $durSleep =
               $timestampNow -
               GUEST_Datetime2Timestamp( $hash->{READINGS}{lastSleep}{VAL} );
-            $durSleep = int( $diff / 60 );
         }
     }
 
+    my $durPresence_hr =
+      ( $durPresence > 0 ) ? GUEST_sec2time($durPresence) : "00:00:00";
+    my $durPresence_cr =
+      ( $durPresence > 60 ) ? int( $durPresence / 60 + 0.5 ) : 0;
+    my $durAbsence_hr =
+      ( $durAbsence > 0 ) ? GUEST_sec2time($durAbsence) : "00:00:00";
+    my $durAbsence_cr =
+      ( $durAbsence > 60 ) ? int( $durAbsence / 60 + 0.5 ) : 0;
+    my $durSleep_hr =
+      ( $durSleep > 0 ) ? GUEST_sec2time($durSleep) : "00:00:00";
+    my $durSleep_cr = ( $durSleep > 60 ) ? int( $durSleep / 60 + 0.5 ) : 0;
+
     readingsBeginUpdate($hash) if ( !$silent );
-    readingsBulkUpdate( $hash, "durTimerPresence", $durPresence )
+    readingsBulkUpdate( $hash, "durTimerPresence_cr", $durPresence_cr )
+      if ( !defined( $hash->{READINGS}{durTimerPresence_cr}{VAL} )
+        || $hash->{READINGS}{durTimerPresence_cr}{VAL} ne $durPresence_cr );
+    readingsBulkUpdate( $hash, "durTimerPresence", $durPresence_hr )
       if ( !defined( $hash->{READINGS}{durTimerPresence}{VAL} )
-        || $hash->{READINGS}{durTimerPresence}{VAL} ne $durPresence );
-    readingsBulkUpdate( $hash, "durTimerAbsence", $durAbsence )
+        || $hash->{READINGS}{durTimerPresence}{VAL} ne $durPresence_hr );
+    readingsBulkUpdate( $hash, "durTimerAbsence_cr", $durAbsence_cr )
+      if ( !defined( $hash->{READINGS}{durTimerAbsence_cr}{VAL} )
+        || $hash->{READINGS}{durTimerAbsence_cr}{VAL} ne $durAbsence_cr );
+    readingsBulkUpdate( $hash, "durTimerAbsence", $durAbsence_hr )
       if ( !defined( $hash->{READINGS}{durTimerAbsence}{VAL} )
-        || $hash->{READINGS}{durTimerAbsence}{VAL} ne $durAbsence );
-    readingsBulkUpdate( $hash, "durTimerSleep", $durSleep )
+        || $hash->{READINGS}{durTimerAbsence}{VAL} ne $durAbsence_hr );
+    readingsBulkUpdate( $hash, "durTimerSleep_cr", $durSleep_cr )
+      if ( !defined( $hash->{READINGS}{durTimerSleep_cr}{VAL} )
+        || $hash->{READINGS}{durTimerSleep_cr}{VAL} ne $durSleep_cr );
+    readingsBulkUpdate( $hash, "durTimerSleep", $durSleep_hr )
       if ( !defined( $hash->{READINGS}{durTimerSleep}{VAL} )
-        || $hash->{READINGS}{durTimerSleep}{VAL} ne $durSleep );
+        || $hash->{READINGS}{durTimerSleep}{VAL} ne $durSleep_hr );
     readingsEndUpdate( $hash, 1 ) if ( !$silent );
 
     GUEST_InternalTimer( "DurationTimer", $timestampNow + 60,
@@ -830,13 +874,22 @@ sub GUEST_DurationTimer($;$) {
 }
 
 ###################################
-sub GUEST_TimeDiff($$) {
-    my ( $datetimeNow, $datetimeOld ) = @_;
+sub GUEST_TimeDiff ($$;$) {
+    my ( $datetimeNow, $datetimeOld, $format ) = @_;
 
     my $timestampNow = GUEST_Datetime2Timestamp($datetimeNow);
     my $timestampOld = GUEST_Datetime2Timestamp($datetimeOld);
     my $timeDiff     = $timestampNow - $timestampOld;
-    my $hours        = ( $timeDiff < 3600 ? 0 : int( $timeDiff / 3600 ) );
+
+    # return seconds
+    return int( $timeDiff + 0.5 ) if ( defined($format) && $format eq "sec" );
+
+    # return minutes
+    return int( $timeDiff / 60 + 0.5 )
+      if ( defined($format) && $format eq "min" );
+
+    # return human readable format
+    my $hours = ( $timeDiff < 3600 ? 0 : int( $timeDiff / 3600 ) );
     $timeDiff -= ( $hours == 0 ? 0 : ( $hours * 3600 ) );
     my $minutes = ( $timeDiff < 60 ? 0 : int( $timeDiff / 60 ) );
     my $seconds = $timeDiff % 60;
@@ -861,6 +914,23 @@ sub GUEST_Datetime2Timestamp($) {
     $timestamp = timelocal( $sec, $min, $hour, $d, $m, $y );
 
     return $timestamp;
+}
+
+###################################
+sub GUEST_sec2time($) {
+    my ($sec) = @_;
+
+    # return human readable format
+    my $hours = ( $sec < 3600 ? 0 : int( $sec / 3600 ) );
+    $sec -= ( $hours == 0 ? 0 : ( $hours * 3600 ) );
+    my $minutes = ( $sec < 60 ? 0 : int( $sec / 60 ) );
+    my $seconds = $sec % 60;
+
+    $hours   = "0" . $hours   if ( $hours < 10 );
+    $minutes = "0" . $minutes if ( $minutes < 10 );
+    $seconds = "0" . $seconds if ( $seconds < 10 );
+
+    return "$hours:$minutes:$seconds";
 }
 
 ###################################
@@ -1101,13 +1171,22 @@ sub GUEST_StartInternalTimers($$) {
       <div style="margin-left: 2em">
         <ul>
           <li>
-            <b>durTimerAbsence</b> - timer to show the duration of absence from home in minutes
+            <b>durTimerAbsence</b> - timer to show the duration of absence from home in human readable format (hours:minutes:seconds)
           </li>
           <li>
-            <b>durTimerPresence</b> - timer to show the duration of presence at home in minutes
+            <b>durTimerAbsence_cr</b> - timer to show the duration of absence from home in computer readable format (minutes)
           </li>
           <li>
-            <b>durTimerSleep</b> - timer to show the duration of sleep in minutes
+            <b>durTimerPresence</b> - timer to show the duration of presence at home in human readable format (hours:minutes:seconds)
+          </li>
+          <li>
+            <b>durTimerPresence_cr</b> - timer to show the duration of presence at home in computer readable format (minutes)
+          </li>
+          <li>
+            <b>durTimerSleep</b> - timer to show the duration of sleep in human readable format (hours:minutes:seconds)
+          </li>
+          <li>
+            <b>durTimerSleep_cr</b> - timer to show the duration of sleep in computer readable format (minutes)
           </li>
           <li>
             <b>lastArrival</b> - timestamp of last arrival at home
@@ -1119,13 +1198,22 @@ sub GUEST_StartInternalTimers($$) {
             <b>lastDeparture</b> - timestamp of last departure from home
           </li>
           <li>
-            <b>lastDurAbsence</b> - duration of last absence from home in following format: hours:minutes:seconds
+            <b>lastDurAbsence</b> - duration of last absence from home in human readable format (hours:minutes:seconds)
           </li>
           <li>
-            <b>lastDurPresence</b> - duration of last presence at home in following format: hours:minutes:seconds
+            <b>lastDurAbsence_cr</b> - duration of last absence from home in computer readable format (minutes)
           </li>
           <li>
-            <b>lastDurSleep</b> - duration of last sleep in following format: hours:minutes:seconds
+            <b>lastDurPresence</b> - duration of last presence at home in human readable format (hours:minutes:seconds)
+          </li>
+          <li>
+            <b>lastDurPresence_cr</b> - duration of last presence at home in computer readable format (minutes)
+          </li>
+          <li>
+            <b>lastDurSleep</b> - duration of last sleep in human readable format (hours:minutes:seconds)
+          </li>
+          <li>
+            <b>lastDurSleep_cr</b> - duration of last sleep in computer readable format (minutes)
           </li>
           <li>
             <b>lastLocation</b> - the prior location
