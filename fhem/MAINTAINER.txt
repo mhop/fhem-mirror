@@ -23,6 +23,7 @@ FHEM/00_HMLAN.pm             martinp876           http://forum.fhem.de HomeMatic
 FHEM/00_KM271.pm             physikus             http://forum.fhem.de Sonstiges
 FHEM/00_LIRC.pm              rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/00_MAXLAN.pm            mgehre               http://forum.fhem.de MAX
+FHEM/00_NetzerI2C.pm         klausw               http://forum.fhem.de Sonstige Systeme
 FHEM/00_OWX.pm               pahenning            http://forum.fhem.de 1Wire
 FHEM/00_RPII2C               klausw               http://forum.fhem.de Einplatinencomputer
 FHEM/00_TCM.pm               klaus-schauer        http://forum.fhem.de EnOcean
@@ -124,6 +125,7 @@ FHEM/50_WS300.pm             Dirk                 http://forum.fhem.de SlowRF
 FHEM/51_BBB_BMP180.pm        betateilchen         http://forum.fhem.de Einplatinencomputer
 FHEM/51_BBB_WATCHDOG.pm      betateilchen         http://forum.fhem.de Einplatinencomputer
 FHEM/51_I2C_BMP180.pm        Dirk                 http://forum.fhem.de Einplatinencomputer
+FHEM/51_Netzer.pm            klausw               http://forum.fhem.de Sonstige Systeme
 FHEM/51_RPI_GPIO.pm          klausw               http://forum.fhem.de Einplatinencomputer
 FHEM/52_I2C_PCA9532          klausw               http://forum.fhem.de FHEM Developement/Sonstige Systeme
 FHEM/52_I2C_PCF8574          klausw               http://forum.fhem.de FHEM Developement/Sonstige Systeme
