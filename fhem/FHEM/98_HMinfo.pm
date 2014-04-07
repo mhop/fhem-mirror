@@ -517,6 +517,7 @@ sub HMinfo_tempList(@) { ######################################################
     my @entryNF = ();
     while(<aSave>){
       chomp;
+      next if($_ =~ m/#/);
       if($_ =~ m/^entities:/){
         my $line = $_;
         $line =~s/.*://;
@@ -559,6 +560,7 @@ sub HMinfo_tempList(@) { ######################################################
     while(<aSave>){
       chomp;
       my $line = $_;
+      next if($line =~ m/#/);
       if($line =~ m/^entities:/){
         $line =~s/.*://;
         @el = ();
