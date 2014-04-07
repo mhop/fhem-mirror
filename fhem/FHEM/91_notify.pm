@@ -139,7 +139,6 @@ notify_Attr(@)
       <code>define b3lampV3 notify btn3 "/usr/local/bin/setlamp "$EVENT""</code><br>
       <code>define b3lampV3 notify btn3 set lamp1 $EVENT;;set lamp2 $EVENT</code><br>
       <code>define wzMessLg notify wz:measured.* "/usr/local/bin/logfht $NAME "$EVENT""</code><br>
-      <!-- <code>define LogHToDB notify .*H:.* {DbLog("$NAME","$EVENT")}</code><br> -->
       <code>define LogUndef notify global:UNDEFINED.* "send-me-mail.sh "$EVENT""</code><br>
     </ul>
     <br>
@@ -191,12 +190,12 @@ notify_Attr(@)
         definition.</li>
       </ul></li>
 
-      <li>To use database logging, define a dblog instance and change the
-      $dbconn parameter in the file.</li>
-
       <li>Following special events will be generated for the device "global"
       <ul>
           <li>INITIALIZED after initialization is finished.</li>
+          <li>REREADCFG after the configuration is reread.</li>
+          <li>SAVE before the configuration is saved.</li>
+          <li>SHUTDOWN before FHEM is shut down.</li>
           <li>DEFINED &lt;devname&gt; after a device is defined.</li>
           <li>DELETED &lt;devname&gt; after a device was deleted.</li>
           <li>RENAMED &lt;old&gt; &lt;new&gt; after a device was renamed.</li>
@@ -261,4 +260,183 @@ notify_Attr(@)
 </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="notify"></a>
+<h3>notify</h3>
+<ul>
+  <br>
+
+  <a name="notifydefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; notify &lt;Suchmuster&gt; &lt;Anweisung&gt;</code>
+    <br><br>
+    F&uuml;hrt eine oder mehrere Anweisungen aus, wenn ein Event generiert
+    wurde, was dem &lt;Suchmuster&gt; (Ger&auml;tename oder
+    Ger&auml;tename:Event) entspricht.
+
+    Die Anweisung ist einer der FHEM <a href="#command">Befehlstypen</a>.
+    Zum Test dient das <a href="#trigger">trigger</a>-Kommando.
+    <br><br>
+
+    Beispiele:
+    <ul>
+      <code>define b3lampV1 notify btn3 set lamp $EVENT</code><br>
+      <code>define b3lampV2 notify btn3 { fhem "set lamp $EVENT" }</code><br>
+      <code>define b3lampV3 notify btn3 "/usr/local/bin/setlamp
+      "$EVENT""</code><br>
+
+      <code>define b3lampV3 notify btn3 set lamp1 $EVENT;;set lamp2
+      $EVENT</code><br>
+
+      <code>define wzMessLg notify wz:measured.* "/usr/local/bin/logfht $NAME
+      "$EVENT""</code><br>
+
+      <code>define LogUndef notify global:UNDEFINED.* "send-me-mail.sh
+      "$EVENT""</code><br>
+
+    </ul>
+    <br>
+
+    Hinweise:
+    <ul>
+      <li><code>&lt;Suchmuster&gt;</code> ist entweder der Name des
+      ausl&ouml;senden ("triggernden") Ger&auml;tes oder die Kombination aus
+      Ger&auml;t und ausl&ouml;sendem Ereignis (Event)
+      <code>Ger&auml;tename:Event</code>.</li>
+
+      <li>Das <code>&lt;Suchmuster&gt;</code> muss exakt (!)
+        entweder dem Ger&auml;tenamen entsprechen oder der Zusammenf&uuml;gung
+        aus Ger&auml;tename:Event.   Events lassen sich mit "inform" in Telnet
+        oder durch Beobachtung des "Event-Monitors" in FHEMWEB ermitteln.</li>
+
+      <li>In der Anweisung von Notify kann das ausl&ouml;sende Ereignis (Event)
+        genutzt werden:
+
+        <ul>
+          <li>Die Anweisung $EVENT wird das komplette Ereignis (Event)
+            beinhalten, z.B.  <code>measured-temp: 21.7 (Celsius)</code></li>
+
+          <li>$EVTPART0,$EVTPART1,$EVTPART2,etc enthalten die durch Leerzeichen
+            getrennten Teile des Events der Reihe nach (im Beispiel also
+            <code>$EVTPART0="measured-temp:", $EVTPART1="21.7",
+            $EVTPART2="(Celsius)"</code>.<br> Diese Daten sind verf&uuml;gbar
+            als lokale Variablen in Perl, als Umgebungs-Variablen f&uuml;r
+            Shell-Scripts, und werden als Text ausgetauscht in
+            FHEM-Kommandos.</li>
+
+          <li>$NAME enth&auml;lt den Namen des Ereignis ausl&ouml;senden
+            Ger&auml;tes, z.B.  <code>myFht</code></li>
+       </ul></li>
+
+      <li>Achtung: Folgende Vorgehensweise ist abgek&uuml;ndigt und wird in
+          einem zuk&uuml;nftigen Release von FHEM nicht mehr unterst&uuml;tzt.
+          Wenn keine der oben genannten Variablen ($NAME/$EVENT/usw.) in der
+          Anweisung gefunden wird, werden Platzhalter ersetzt.
+
+        <ul>
+          <li>Das Zeichen <code>%</code> wird ersetzt mit dem empfangenen
+          Ereignis (Event), z.B. mit <code>on</code> oder <code>off</code> oder
+          <code>measured-temp: 21.7 (Celsius)</code>.
+          </li>
+
+          <li>Das Zeichen <code>@</code> wird ersetzt durch den
+          Ger&auml;tenamen.</li>
+
+          <li>Um % oder @ im Text selbst benutzen zu k&ouml;nnen, m&uuml;ssen
+          sie verdoppelt werden (%% oder @@).</li>
+
+          <li>Anstelle von <code>%</code> und <code>@</code>, k&ouml;nnen die
+          Parameter <code>%EVENT</code> (funktionsgleich mit <code>%</code>),
+          <code>%NAME</code> (funktionsgleich mit <code>@</code>) und
+          <code>%TYPE</code> (enth&auml;lt den Typ des Ger&auml;tes, z.B.
+          <code>FHT</code>) benutzt werden. Die von Leerzeichen unterbrochenen
+          Teile eines Ereignisses (Event) sind verf&uuml;gbar als %EVTPART0,
+          %EVTPART1, usw.  Ein einzeln stehendes <code>%</code> verliert seine
+          %oben beschriebene Bedeutung, falls auch nur einer dieser Parameter
+          %in der Definition auftaucht.</li>
+
+        </ul></li>
+
+      <li>Folgende spezielle Ereignisse werden f&uuml;r das Ger&auml;t "global"
+      erzeugt:
+      <ul>
+          <li>INITIALIZED sobald die Initialization vollst&auml;ndig ist.</li>
+          <li>REREADCFG nachdem die Konfiguration erneut eingelesen wurde.</li>
+          <li>SAVE bevor die Konfiguration gespeichert wird.</li>
+          <li>SHUTDOWN bevor FHEM heruntergefahren wird.</li>
+          <li>DEFINED &lt;devname&gt; nach dem Definieren eines
+          Ger&auml;tes.</li>
+          <li>DELETED &lt;devname&gt; nach dem L&ouml;schen eines
+          Ger&auml;tes.</li>
+          <li>RENAMED &lt;old&gt; &lt;new&gt; nach dem Umbenennen eines
+          Ger&auml;tes.</li>
+          <li>UNDEFINED &lt;defspec&gt; beim Auftreten einer Nachricht f&uuml;r
+          ein undefiniertes Ger&auml;t.</li>
+      </ul></li>
+
+      <li>Notify kann dazu benutzt werden, um Makros f&uuml;r eine manuelle
+        Ausf&uuml;hrung zu speichern. Mit einem <a
+        href="#trigger">trigger</a> Kommando k&ouml;nnen solche Makros dann
+        ausgef&uuml;hrt werden.  Z.B.<br> <code>fhem> define MyMacro notify
+        MyMacro { Log 1, "Hello"}</code><br> <code>fhem> trigger
+        MyMacro</code><br> </li>
+
+    </ul>
+  </ul>
+  <br>
+
+
+  <a name="notifyset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="notifyget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="notifyattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <li><a href="#disable">disable</a></li>
+    <a name="forwardReturnValue"></a>
+    <li>forwardReturnValue<br>
+        R&uuml;ckgabe der Werte eines ausgef&uuml;hrten Kommandos an den
+        Aufrufer.  Die Voreinstellung ist 0 (ausgeschaltet), um weniger
+        Meldungen im Log zu haben.
+        </li>
+
+    <li>showTriggerTime<br/>
+        Zeigt den Zeitstempel der letzten Ausf&uuml;hrung als Status an.
+        Voreinstellung ist 1 (an).
+        </li>
+
+    <a name="addStateEvent"></a>
+    <li>addStateEvent<br>
+      Das mit dem state Reading verkn&uuml;pfte Event ist speziell, da das
+      dazugeh&ouml;rige Prefix "state: " entfernt wird, d.h. $EVENT ist nicht
+      "state: on", sondern nur "on". In manchen F&auml;llen ist es aber
+      erw&uuml;nscht ein zus&auml;tzliches Event zu bekommen, wo "state: " nicht
+      entfernt ist. F&uuml;r diese F&auml;lle sollte addStateEvent auf 1
+      gesetzt werden, die Voreinstellung ist 0 (deaktiviert).<br>
+
+      Achtung:
+      <ul>
+        <li>dieses Attribut muss beim Empf&auml;nger (notify, FileLog, etc)
+        gesetzt werden.</li>
+
+        <li>dieses Attribut zeigt nur f&uuml;r solche Ger&auml;te-Events eine
+        Wirkung, die <a href="#readingFnAttributes">readingFnAttributes</a>
+        unterst&uuml;tzen.</li>
+
+      </ul>
+
+      </li>
+  </ul>
+  <br>
+
+</ul>
+
+=end html_DE
+
 =cut
