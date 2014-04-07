@@ -1,7 +1,7 @@
 ###################LoTT Uniroll###################
 # First release by D. Fuchs and rudolfkoenig
 # improved by c-herrmann
-# $Id: 10_UNIRoll Ver 1.3 2014-03-30 14:53:00 c-herrmann $
+# $Id: 10_UNIRoll Ver 1.3 2014-04-07 12:38:00 c-herrmann $
 # 
 # UNIRoll:no synchronisation, the message protocoll begins directly with datas
 # group address  16 Bit like an housecode
@@ -42,7 +42,7 @@ my %codes = (
   "e" => "up",       #1110 e
   "d" => "stop",     #1101 d
   "b" => "down",     #1011 b
-  "a" => "pos",      # gezielt eine Position anfahren
+  "a" => "pos",      # Pseudobefehl: gezielt eine Position anfahren
 );
 
 use vars qw(%UNIRoll_c2b);   # Peter would like to access it from outside
@@ -66,14 +66,15 @@ UNIRoll_Initialize($)
 # print "UNIRoll_Initialize \n";
   $hash->{Match}     = "^(G|U).*";
   $hash->{SetFn}     = "UNIRoll_Set";
-  $hash->{StateFn}   = "UNIRoll_SetState";
+#  $hash->{StateFn}   = "UNIRoll_SetState";
   $hash->{DefFn}     = "UNIRoll_Define";
   $hash->{UndefFn}   = "UNIRoll_Undef";
   $hash->{ParseFn}   = "UNIRoll_Parse";
   $hash->{AttrFn}    = "UNIRoll_Attr";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ".
                         "ignore:1,0 showtime:1,0 ".
-                        "rMin:slider,0,1,120 rMax:slider,0,1,120 rPos:slider,0,1,120 useRolloPos:1,0 " .
+                        "rMin:slider,0,1,120 rMax:slider,0,1,120 ".
+                        "rPos:slider,0,1,120 useRolloPos:1,0 " .
                         "sendStopBeforeCmd:1,0,2,3 " .
                         "model:".join(",", sort keys %models);
 }
@@ -87,14 +88,6 @@ UNIRoll_Initialize($)
 sub
 UNIRoll_SetState($$$$)   # 4 Skalare Parameter
 {
-  my ($hash, $tim, $vt, $val) = @_;  #@_ Array
-# print "UNIRoll_SetState \n";
-
-  $val = $1 if($val =~ m/^(.*) \d+$/);  # m match Funktion
-  my $name = $hash->{NAME};
-  (undef, $val) = ReplaceEventMap($name, [$name, $val], 0)
-        if($attr{$name}{eventMap});
-  return "setstate $name: undefined value $val" if(!defined($UNIRoll_c2b{$val}));
   return undef;
 }
 
@@ -125,7 +118,8 @@ UNIRoll_Set($@)
   }
 # RolloPos ausführen, wenn aktiviert
   if(AttrVal($name, "useRolloPos", "0") eq "1") {
-    ($c, $tPos) = UNIRoll_RolloPos($hash, $name, $c, $tPos, $a[1]);
+    ($ret, $c, $tPos) = UNIRoll_RolloPos($hash, $name, $c, $tPos, $a[1]);
+	return $ret if(defined($ret) || !defined($c));
   } else {
     return "Please set useRolloPos to 1 to use pos commands with $name." if($c eq "a");
   }
@@ -218,6 +212,8 @@ UNIRoll_Define($$)
 
 # print "Test IoPort $hash def $def code $code.\n";
 
+  $attr{$name}{"webCmd"} = "up:stop:down";
+
   AssignIoPort($hash);  # Gerät anmelden
 }
 
@@ -253,7 +249,6 @@ UNIRoll_Attr(@)
 {
   return if(!$init_done);  # AttrFn erst nach Initialisierung ausführen
   my ($cmd,$name,$aName,$aVal) = @_;
-  $attr{$name}{"webCmd"} = "up:stop:down" if(!defined(AttrVal($name, "webCmd", undef)));
   if($aName eq "useRolloPos") {
     if(defined($aVal) && $aVal == 1) {
       my $st = ReadingsVal($name, "state", "");
@@ -271,6 +266,9 @@ UNIRoll_Attr(@)
       CommandDeleteReading(undef, "$name old.*");
     }
   }
+  return "This attribute cannot be deletet if useRolloPos is activated"
+        if(($aName eq "rMax" || $aName eq "rMin") && $cmd eq "del" && AttrVal($name, "useRolloPos", undef) == 1);
+        
   return "This attribute is read-only and must not be changed!"
         if($aName eq "rPos" && AttrVal($name,"useRolloPos","") eq "1");
 }
@@ -292,9 +290,10 @@ UNIRoll_RolloPos($$$$$)
 # RolloPos - Position Speichern und Positionsbefehle in up/down umwandeln
 # Variablen einlesen
     my($hash, $name, $c, $tPos, $nstate) = @_;
-    my $rMax = AttrVal($name, "rMax", "0");
+	my $ret;
+	my $rMax = AttrVal($name, "rMax", "0");
     my $rMin = AttrVal($name, "rMin", "0");
-    return "Please check rMin and rMax values in attributes" if ($rMax eq "0" || $rMax <= $rMin);
+    return ("Please check rMin and rMax values in attributes", undef, undef) if ($rMax eq "0" || $rMax <= $rMin);
     $rPos = AttrVal($name, "rPos", "0");
     my $oldPos = ReadingsVal($name, "oldPos", "0");
 
@@ -309,7 +308,7 @@ UNIRoll_RolloPos($$$$$)
       readingsSingleUpdate($hash, "oldstate", "$nst 0", 1 );
     }
     if($lasttime > $tdiff) {  # wenn letzter Befehl noch nicht abgeschlossen
-      return undef if($c ne "d");  # wenn kein Stop -> return
+      return (undef, undef, undef) if($c ne "d");  # wenn kein Stop -> return
       RemoveInternalTimer($hash);
       $rPos = $oldPos + $tdiff if($lastcmd eq "down");
       $rPos = $oldPos - $tdiff if($lastcmd eq "up");
@@ -329,7 +328,7 @@ UNIRoll_RolloPos($$$$$)
     }
 # Befehl mit Zeitangabe
     if($c eq "b") { # ab
-      return undef if($rPos >= $rMax);
+      return (undef, undef, undef) if($rPos >= $rMax);
       if($tm >= $rMax - $rPos) {
         $tPos = $rMax - $rPos;
         $rPos = $rMax;
@@ -338,7 +337,7 @@ UNIRoll_RolloPos($$$$$)
         $rPos = $rPos + $tm;
       }
     } elsif($c eq "e") { # auf
-      return undef if($rPos <= $rMin);
+      return (undef, undef, undef) if($rPos <= $rMin);
       if($tm > $rPos) {
         $tPos = $rPos - $rMin;
         $rPos = $rMin;
@@ -347,8 +346,8 @@ UNIRoll_RolloPos($$$$$)
         $rPos = $rPos - $tm;
 	  }
     } elsif($c eq "a") { # pos
-      return if($rPos eq $tm);
-      return "Invalid position $tm for $name. Maximum value is $rMax." if($tm > $rMax);
+      return (undef, undef, undef) if($rPos eq $tm);
+      return ("Invalid position $tm for $name. Maximum value is $rMax.", undef, undef) if($tm > $rMax);
       if($rPos > $tm) { # neue Position kleiner
         $c = "e";
         $tPos = $rPos - $tm;
@@ -371,7 +370,7 @@ DOCMD:
     readingsBulkUpdate($hash, "oldPos", $oldPos, 1 );
     readingsBulkUpdate($hash, "oldstate", $nstate, 1 );
     readingsEndUpdate($hash, 1);
-    return ($c, $tPos);
+    return (undef, $c, $tPos);
   }
 # Ende RolloPos
 
