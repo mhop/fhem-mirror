@@ -138,7 +138,6 @@ DevIo_Expect($$$)
   # The next two lines are required to avoid a deadlock when the remote end closes the connection
   # upon DevIo_OpenDev, as e.g.    netcat -l <port>      does.
   DevIo_CloseDev($hash);
-  sleep(5) if($hash->{USBDEV});
   DevIo_OpenDev($hash, 0, undef); # where to get the initfn from? 
   # write something again
   return undef unless defined(DevIo_SimpleWrite($hash, $msg, 0));
@@ -388,10 +387,6 @@ DevIo_Disconnected($)
   DevIo_CloseDev($hash);
   $readyfnlist{"$name.$dev"} = $hash;               # Start polling
   $hash->{STATE} = "disconnected";
-
-  # Without the following sleep the open of the device causes a SIGSEGV,
-  # and following opens block infinitely. Only a reboot helps.
-  sleep(5) if($hash->{USBDEV});
 
   DoTrigger($name, "DISCONNECTED");
 }
