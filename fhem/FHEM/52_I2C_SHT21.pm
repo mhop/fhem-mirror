@@ -107,7 +107,7 @@ sub I2C_SHT21_Catch($) {
 }
 
 
-sub I2C_SHT21_Attr (@) {# hier noch Werteüberprüfung einfügen
+sub I2C_SHT21_Attr (@) {# hier noch Werteueberpruefung einfuegen
 	my (undef, $name, $attr, $val) =  @_;
 	my $hash = $defs{$name};
 	my $msg = '';
@@ -169,7 +169,7 @@ sub I2C_SHT21_I2CRec ($$) {
   my $name = $hash->{NAME};  
   my $phash = $hash->{IODev};
   my $pname = $phash->{NAME};
-  while ( my ( $k, $v ) = each %$clientmsg ) { 																#erzeugen von Internals fÃ¼r alle Keys in $clientmsg die mit dem physical Namen beginnen
+  while ( my ( $k, $v ) = each %$clientmsg ) { 																#erzeugen von Internals fuer alle Keys in $clientmsg die mit dem physical Namen beginnen
     $hash->{$k} = $v if $k =~ /^$pname/ ;
   } 
 	if ($clientmsg->{direction} && $clientmsg->{type} && $clientmsg->{$pname . "_SENDSTAT"} && $clientmsg->{$pname . "_SENDSTAT"} eq "Ok") {
@@ -228,7 +228,7 @@ sub I2C_SHT21_readTemperature($) {
 	my $i2creq = { i2caddress => $hash->{I2C_Address}, direction => "i2cwrite" };
   $i2creq->{data} = hex("F3");
 	CallFn($pname, "I2CWrtFn", $phash, $i2creq);
-	usleep(85000); #fÃ¼r 14bit
+	usleep(85000); #fuer 14bit
 
 	# Read the two byte result from device
 	my $i2cread = { i2caddress => $hash->{I2C_Address}, direction => "i2cread" };
@@ -250,7 +250,7 @@ sub I2C_SHT21_readHumidity($) {
 	my $i2creq = { i2caddress => $hash->{I2C_Address}, direction => "i2cwrite" };
   $i2creq->{data} = hex("F5");
 	CallFn($pname, "I2CWrtFn", $phash, $i2creq);
-	usleep(39000); #fÃ¼r 12bit
+	usleep(39000); #fuer 12bit
 
 	# Read the two byte result from device
 	my $i2cread = { i2caddress => $hash->{I2C_Address}, direction => "i2cread" };
@@ -340,11 +340,11 @@ sub I2C_SHT21_readHumidity($) {
 			Standard: 5, g&uuml;ltige Werte: 1,2,5,10,20,30<br><br>
 		</li>
 		<li>roundHumidityDecimal<br>
-			Anzahl Dezimalstellen für den Feuchtewert<br>
+			Anzahl Dezimalstellen f&uuml;r den Feuchtewert<br>
 			Standard: 1, g&uuml;ltige Werte: 0 1 2<br><br>
 		</li>
 		<li>roundTemperatureDecimal<br>
-			Anzahl Dezimalstellen für den Temperaturwert<br>
+			Anzahl Dezimalstellen f&uuml;r den Temperaturwert<br>
 			Standard: 1, g&uuml;ltige Werte: 0,1,2<br><br>
 		</li>
 		<li><a href="#IODev">IODev</a></li>
