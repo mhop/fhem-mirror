@@ -1,3 +1,11 @@
+# LiquidCrystal.pm
+#
+# Perl-library to drive LCD-displays controlled by Hitachi HD44780 LCD controller
+# 
+# Copyright (C) 2013/2014 Norbert Truchsess (norbert.truchsess@t-online.de)
+# 
+# based on LiquidCrystal.cpp as of:
+#
 # www.DFRobot.com
 # last updated on 21/12/2011
 # Tim Starling Fix the reset bug (Thanks Tim)
@@ -5,7 +13,7 @@
 # Support Forum: http://www.dfrobot.com/forum/
 # Compatible with the Arduino IDE 1.0
 # Library version:1.1
-
+#
 # When the display powers up, it is configured as follows:
 #
 # 1. Display clear
@@ -25,7 +33,7 @@
 # can't assume that its in that state when a sketch starts (and the
 # LiquidCrystal constructor is called).
 
-package LiquidCrystal_I2C;
+package LiquidCrystal;
 
 use warnings;
 use strict;
@@ -76,6 +84,17 @@ use constant En => 0b00000100;    # Enable bit
 use constant Rw => 0b00000010;    # Read / Write bit
 use constant Rs => 0b00000001;    # Register select bit
 
+our %mapping_bits = (
+  RS  => 0,
+  RW  => 1,
+  E   => 2,
+  LED => 3,
+  D4  => 4,
+  D5  => 5,
+  D6  => 6,
+  D7  => 7,
+);
+
 sub print($$) {
 	my ($self,$c) = @_;
 	my @buf = unpack "c*",$c;
@@ -90,14 +109,45 @@ sub write($$) {
 	return 0;
 }
 
-sub new($$$$) {
-	my ( $class, $lcd_Addr, $lcd_cols, $lcd_rows ) = @_;
-	return bless {
-		Addr         => $lcd_Addr,
+sub new($$$$@) {
+	my ( $class, $lcd_cols, $lcd_rows ) = @_;
+
+  my $lcd = bless {
 		cols         => $lcd_cols,
 		rows         => $lcd_rows,
 		backlightval => LCD_NOBACKLIGHT,
 	}, $class;
+	$lcd->setMapping();
+	return $lcd;
+}
+
+#  $lcd_mapping = {
+#  'P0' => 'RS',
+#  'P1' => 'RW',
+#  'P2' => 'E',
+#  'P3' => 'LED',
+#  'P4' => 'D4',
+#  'P5' => 'D5',
+#  'P6' => 'D6',
+#  'P7' => 'D7',
+#};
+
+sub setMapping(@) {
+  my ( $self, $lcd_mapping ) = @_;
+
+  my %mapping;
+  if ( defined $lcd_mapping ) {
+    while (my ($key, $value) = each %$lcd_mapping) {
+      die "illegal value for MAPPING: $value, must be one of RS,RW,E,LED,D4,D5,D6,D7" unless grep {$value eq $_} keys %mapping_bits;
+      die "illegal value for PIN: $key, must be one of P0..P7" unless $key =~ /^P([\d])$/;
+      $mapping{0x01 << $mapping_bits{$value}} = 0x01 << $1; 
+    }
+  }	else {
+    foreach my $i (0..7) {
+      $mapping{0x01 << $i} = 0x01 << $i;      
+    }
+  }
+  $self->{mapping} = \%mapping;
 }
 
 sub init($) {
@@ -107,7 +157,7 @@ sub init($) {
 
 sub attach($$) {
 	my ($self,$dev) = @_;
-	$self->{I2CDevice} = $dev;
+	$self->{io} = $dev;
 }
 
 sub init_priv($) {
@@ -359,8 +409,16 @@ sub write4bits($$) {
 
 sub expanderWrite($$) {
 	my ( $self, $data ) = @_;
-
-	$self->{I2CDevice}->i2c_write($self->{Addr},($data) | $self->{backlightval});
+	
+	$data |= $self->{backlightval};
+	
+	my $mapped = 0;
+	
+	while (my ($orig, $remapped) = each %{$self->{mapping}}) {
+	  $mapped |= $data & $orig ? $remapped : 0; 
+	}
+	
+	$self->{io}->write($mapped);
 }
 
 sub pulseEnable($$) {
