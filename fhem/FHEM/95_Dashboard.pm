@@ -43,11 +43,11 @@
 # 2.07: Fix GroupWidget-Error with readingGroups in hiddenroom
 # 2.08: Fix dashboard_webfrontendfilter Error-Message. Internal changes. Attribute dashboard_colwidth and dashboard_sorting removed.
 # 2.09: dashboard_showfullsize not applied in room "all" resp. "Everything". First small implementation over Dashboard_DetailFN.
+# 2.10: Internal Changes. Dashboard now not visible in room "all" resp. "Everything". Bugfix for Codemirror.
 #
 # Known Bugs/Todos:
 # BUG: Nicht alle Inhalte aller Tabs laden, bei Plots dauert die bedienung des Dashboards zu lange. -> elemente hidden?
 # BUG: Variabler abstand wird nicht gesichert
-# BUG: dashboard_webfrontendfilter doesn't Work Antwort #469
 # BUG: Überlappen Gruppen andere?
 #
 # Log 1, "[DASHBOARD simple debug] '".$g."' ";
@@ -95,7 +95,7 @@ my $fwjquery = "jquery.min.js";
 my $fwjqueryui = "jquery-ui.min.js";
 my $dashboardname = "Dashboard"; # Link Text
 my $dashboardhiddenroom = "DashboardRoom"; # Hiddenroom
-my $dashboardversion = "2.09";
+my $dashboardversion = "2.10";
 # -------------------------------------------------------------------------------------------
 
 #############################################################################################
@@ -104,7 +104,8 @@ sub Dashboard_Initialize ($) {
 		
   $hash->{DefFn}       = "Dashboard_define";
   $hash->{UndefFn}     = "Dashboard_undef";
-  $hash->{FW_detailFn} = "Dashboard_DetailFN";    
+  $hash->{FW_detailFn} = "Dashboard_DetailFN";  
+  $hash->{FW_summaryFn} = "Dashboard_SummaryFN";  
   $hash->{AttrFn}      = "Dashboard_attr";
   $hash->{AttrList}    = "disable:0,1 ".
   						 "dashboard_colcount:1,2,3,4,5 ".						 						 
@@ -118,21 +119,9 @@ sub Dashboard_Initialize ($) {
 						 #new attribute vers. 2.00
 						 "dashboard_tabcount:1,2,3,4,5,6,7 ".
 						 "dashboard_activetab:1,2,3,4,5,6,7 ".						 
-						 "dashboard_tab1name ".
-						 "dashboard_tab2name ".
-						 "dashboard_tab3name ".
-						 "dashboard_tab4name ".
-						 "dashboard_tab5name ".
-						 "dashboard_tab1groups ".
-						 "dashboard_tab2groups ".
-						 "dashboard_tab3groups ".
-						 "dashboard_tab4groups ".
-						 "dashboard_tab5groups ".						 
-						 "dashboard_tab1sorting ".
-						 "dashboard_tab2sorting ".
-						 "dashboard_tab3sorting ".
-						 "dashboard_tab4sorting ".
-						 "dashboard_tab5sorting ".						 
+						 "dashboard_tab1name dashboard_tab2name dashboard_tab3name dashboard_tab4name dashboard_tab5name ".
+						 "dashboard_tab1groups dashboard_tab2groups dashboard_tab3groups dashboard_tab4groups dashboard_tab5groups ".						 
+						 "dashboard_tab1sorting dashboard_tab2sorting dashboard_tab3sorting dashboard_tab4sorting dashboard_tab5sorting ".						 
 						 "dashboard_width ".
 						 "dashboard_rowcenterheight ".
 						 #new attribute vers. 2.01
@@ -141,29 +130,17 @@ sub Dashboard_Initialize ($) {
 						 #new attribute vers. 2.02
 						 "dashboard_showtabs:tabs-and-buttonbar-at-the-top,tabs-at-the-top-buttonbar-hidden,tabs-and-buttonbar-on-the-bottom,tabs-on-the-bottom-buttonbar-hidden,tabs-and-buttonbar-hidden ".
 						 #new attribute vers. 2.03
-						 "dashboard_tab1icon ".
-						 "dashboard_tab2icon ".
-						 "dashboard_tab3icon ".
-						 "dashboard_tab4icon ".
-						 "dashboard_tab5icon ".
+						 "dashboard_tab1icon dashboard_tab2icon dashboard_tab3icon dashboard_tab4icon dashboard_tab5icon ".
 						 #new attribute vers. 2.04
 						 "dashboard_webfrontendfilter ".
 						 #new attribute vers. 2.06
 						 "dashboard_customcss ".
-						 "dashboard_tab6name ".
-						 "dashboard_tab7name ".
-						 "dashboard_tab6groups ".	
-						 "dashboard_tab7groups ".	
-						 "dashboard_tab6sorting ".	
-						 "dashboard_tab7sorting ".	
-						 "dashboard_tab6icon ".
-						 "dashboard_tab7icon ".						 
+						 "dashboard_tab6name dashboard_tab7name ".
+						 "dashboard_tab6groups dashboard_tab7groups ".	
+						 "dashboard_tab6sorting dashboard_tab7sorting ".	
+						 "dashboard_tab6icon dashboard_tab7icon ".						 
 						 $readingFnAttributes;					  
-
-	$data{FWEXT}{jquery}{SCRIPT} = "/pgm2/".$fwjquery if (!$data{FWEXT}{jquery}{SCRIPT});
-	$data{FWEXT}{jqueryui}{SCRIPT} = "/pgm2/".$fwjqueryui if (!$data{FWEXT}{jqueryui}{SCRIPT});
-	$data{FWEXT}{z_dashboard}{SCRIPT} = "/pgm2/dashboard.js" if (!$data{FWEXT}{z_dashboard});					 
-  			 
+	   			 
 	$data{FWEXT}{Dashboardx}{LINK} = "?room=".$dashboardhiddenroom;
 	$data{FWEXT}{Dashboardx}{NAME} = $dashboardname;	
 	
@@ -187,79 +164,114 @@ sub Dashboard_DetailFN() {
 	return $ret;
 }
 
+sub Dashboard_define ($$) {
+	my ($hash, $def) = @_;
+	readingsSingleUpdate( $hash, "state", "Initialized", 0 );
+	#CheckInstallation($hash);
+	CheckDashboardEntry($hash);
+	return;
+}
+
+sub Dashboard_undef ($$) {
+	my ($hash,$arg) = @_;
+	RemoveInternalTimer($hash);
+	return undef;
+}
+
+sub Dashboard_attr($$$) {
+	#my ($cmd, $name, $attrName, $attrVal) = @_;
+	return;  
+}
+
 #############################################################################################
 #############################################################################################
 
 sub DashboardAsHtml($)
 {
- my ($d) = @_;
+	my ($d) = @_; 
+	Dashboard_SummaryFN($FW_wname,$d,$FW_room,undef);
+}
+
+sub Dashboard_SummaryFN($$$$)
+{
+	my ($FW_wname, $d, $room, $pageHash) = @_; 	 
  
- my $ret = "";
- my $showbuttonbar = "hidden";
- my $debugfield = "hidden";
+	my $ret = "";
+	my $showbuttonbar = "hidden";
+	my $debugfield = "hidden";
+
+	my $h = $defs{$d};
+	my $name = $defs{$d}{NAME};
+	my $id = $defs{$d}{NR};
  
- my $h = $defs{$d};
- my $name = $defs{$d}{NAME};
- my $id = $defs{$d}{NR};
+	######################### Read Dashboard Attributes and set Default-Values ####################################
+	my $disable = AttrVal($defs{$d}{NAME}, "disable", 0);
+	my $colcount = AttrVal($defs{$d}{NAME}, "dashboard_colcount", 1);
+	my $colwidth = AttrVal($defs{$d}{NAME}, "dashboard_rowcentercolwidth", 100);
+	my $colheight = AttrVal($defs{$d}{NAME}, "dashboard_rowcenterheight", 400); 
+	my $rowtopheight = AttrVal($defs{$d}{NAME}, "dashboard_rowtopheight", 250);
+	my $rowbottomheight = AttrVal($defs{$d}{NAME}, "dashboard_rowbottomheight", 250); 
+	my $showhelper = AttrVal($defs{$d}{NAME}, "dashboard_showhelper", 1);
+	my $showtabs = AttrVal($defs{$d}{NAME}, "dashboard_showtabs", "tabs-and-buttonbar-at-the-top"); 
+	my $showtooglebuttons = AttrVal($defs{$d}{NAME}, "dashboard_showtooglebuttons", 1); 
+	my $showfullsize  = AttrVal($defs{$d}{NAME}, "dashboard_showfullsize", 0); 
+	my $webfrontendfilter = AttrVal($defs{$d}{NAME}, "dashboard_webfrontendfilter", "*"); 
+	my $customcss = AttrVal($defs{$d}{NAME}, "dashboard_customcss", "none");
  
- ######################### Read Dashboard Attributes and set Default-Values ####################################
- my $disable = AttrVal($defs{$d}{NAME}, "disable", 0);
- my $colcount = AttrVal($defs{$d}{NAME}, "dashboard_colcount", 1);
- my $colwidth = AttrVal($defs{$d}{NAME}, "dashboard_rowcentercolwidth", 100);
- my $colheight = AttrVal($defs{$d}{NAME}, "dashboard_rowcenterheight", 400); 
- my $rowtopheight = AttrVal($defs{$d}{NAME}, "dashboard_rowtopheight", 250);
- my $rowbottomheight = AttrVal($defs{$d}{NAME}, "dashboard_rowbottomheight", 250); 
- my $showhelper = AttrVal($defs{$d}{NAME}, "dashboard_showhelper", 1);
- my $showtabs = AttrVal($defs{$d}{NAME}, "dashboard_showtabs", "tabs-and-buttonbar-at-the-top"); 
- my $showtooglebuttons = AttrVal($defs{$d}{NAME}, "dashboard_showtooglebuttons", 1); 
- my $showfullsize  = AttrVal($defs{$d}{NAME}, "dashboard_showfullsize", 0); 
- my $webfrontendfilter = AttrVal($defs{$d}{NAME}, "dashboard_webfrontendfilter", "*"); 
- my $customcss = AttrVal($defs{$d}{NAME}, "dashboard_customcss", "none");
+	my $row = AttrVal($defs{$d}{NAME}, "dashboard_row", "center");
+	my $debug = AttrVal($defs{$d}{NAME}, "dashboard_debug", "0");
+	my $lockstate = AttrVal($defs{$d}{NAME}, "dashboard_lockstate", "unlock");
  
- my $row = AttrVal($defs{$d}{NAME}, "dashboard_row", "center");
- my $debug = AttrVal($defs{$d}{NAME}, "dashboard_debug", "0");
- my $lockstate = AttrVal($defs{$d}{NAME}, "dashboard_lockstate", "unlock");
- 
- my $activetab = AttrVal($defs{$d}{NAME}, "dashboard_activetab", 1); 
- my $tabcount = AttrVal($defs{$d}{NAME}, "dashboard_tabcount", 1);  
- my $dbwidth = AttrVal($defs{$d}{NAME}, "dashboard_width", "100%"); 
- my @tabnames = (AttrVal($defs{$d}{NAME}, "dashboard_tab1name", "Dashboard-Tab 1"), 
+	my $activetab = AttrVal($defs{$d}{NAME}, "dashboard_activetab", 1); 
+	my $tabcount = AttrVal($defs{$d}{NAME}, "dashboard_tabcount", 1);  
+	my $dbwidth = AttrVal($defs{$d}{NAME}, "dashboard_width", "100%"); 
+	my @tabnames = (AttrVal($defs{$d}{NAME}, "dashboard_tab1name", "Dashboard-Tab 1"), 
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab2name", "Dashboard-Tab 2"),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab3name", "Dashboard-Tab 3"),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab4name", "Dashboard-Tab 4"),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab5name", "Dashboard-Tab 5"),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab6name", "Dashboard-Tab 6"),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab7name", "Dashboard-Tab 7"));
- my @tabgroups = (AttrVal($defs{$d}{NAME}, "dashboard_tab1groups", ""), 
+	my @tabgroups = (AttrVal($defs{$d}{NAME}, "dashboard_tab1groups", ""), 
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab2groups", ""),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab3groups", ""),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab4groups", ""),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab5groups", ""),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab6groups", ""),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab7groups", ""));			
- my @tabsortings = (AttrVal($defs{$d}{NAME}, "dashboard_tab1sorting", ""), 
+	my @tabsortings = (AttrVal($defs{$d}{NAME}, "dashboard_tab1sorting", ""), 
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab2sorting", ""),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab3sorting", ""),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab4sorting", ""),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab5sorting", ""),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab6sorting", ""),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab7sorting", ""));							   
- my @tabicons = (AttrVal($defs{$d}{NAME}, "dashboard_tab1icon", ""),
-							AttrVal($defs{$d}{NAME}, "dashboard_tab2icon", ""),
-							AttrVal($defs{$d}{NAME}, "dashboard_tab3icon", ""),
-							AttrVal($defs{$d}{NAME}, "dashboard_tab4icon", ""),
-							AttrVal($defs{$d}{NAME}, "dashboard_tab5icon", ""),
-							AttrVal($defs{$d}{NAME}, "dashboard_tab6icon", ""),
-							AttrVal($defs{$d}{NAME}, "dashboard_tab7icon", ""));
-							   
+	my @tabicons = (AttrVal($defs{$d}{NAME}, "dashboard_tab1icon", ""),
+								AttrVal($defs{$d}{NAME}, "dashboard_tab2icon", ""),
+								AttrVal($defs{$d}{NAME}, "dashboard_tab3icon", ""),
+								AttrVal($defs{$d}{NAME}, "dashboard_tab4icon", ""),
+								AttrVal($defs{$d}{NAME}, "dashboard_tab5icon", ""),
+								AttrVal($defs{$d}{NAME}, "dashboard_tab6icon", ""),
+								AttrVal($defs{$d}{NAME}, "dashboard_tab7icon", ""));
+ ############################################################################################# 
+ ###################### Build Device View for Room "all" and for Wrong Configurations #################################
+	$ret .= "<table>";
+	$ret .= "<tr><td><div class=\"devType\">".$defs{$d}{TYPE}."</div></td></tr>";
+	$ret .= "<tr><td><table id=\"TYPE_".$defs{$d}{TYPE}."\" class=\"block wide\">";
+	$ret .= "<tbody><tr>";   
+	$ret .= "<td><div><a href=\"$FW_ME?detail=$d\">$d</a></div></td>";
+	$ret .= "<td><div>".$defs{$d}{STATE}."</div></td>";	
+	$ret .= "</tr></tbody>";
+	$ret .= "</table></td></tr>";
+	$ret .= "</table>";
  #############################################################################################
-  
+ 
  if ($disable == 1) { 
-	$defs{$d}{STATE} = "disabled"; 
+	readingsSingleUpdate( $defs{$d}, "state", "Disabled", 0 );
 	return $ret;
  }
  unless (@tabgroups) { 
-	$defs{$d}{STATE} = "No Groups set"; 
+ 	readingsSingleUpdate( $defs{$d}, "state", "No Groups set", 0 );
 	return $ret;
  }
  
@@ -267,15 +279,8 @@ sub DashboardAsHtml($)
  if ($webfrontendfilter ne "*") {
     my $filterhit = 0;
 	my @webfilter = split(",", $webfrontendfilter); 
-	for (my $i=0;$i<@webfilter;$i++){
-
-		if (trim($FW_wname) eq trim($webfilter[$i]) ) { $filterhit = 1; }
-	} 
-	if ($filterhit == 0) {
-	#  $ret .= "No Dashboard configured for ".$FW_wname."<br>";  
-	#  $ret .= "Set Attribute dashboard_webfrontendfilter, see <a href=\"/fhem?detail=$d\" title=\"".$name."\">Details</a>";
-	  return $ret; 
-	}
+	for (my $i=0;$i<@webfilter;$i++){ if (trim($FW_wname) eq trim($webfilter[$i]) ) { $filterhit = 1; } } 
+	if ($filterhit == 0) {  return $ret; }
  }
  ##################################################################################
  
@@ -299,57 +304,68 @@ sub DashboardAsHtml($)
  }
  #-------------------------------------------------------------------------------------------------
  
- $ret .= "<table class=\"roomoverview dashboard\" id=\"dashboard\">\n";
- 
- $ret .= "<tr><td><div class=\"dashboardhidden\">\n"; 
- $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_attr\" value=\"$name,$dbwidth,$showhelper,$lockstate,$showbuttonbar,$colheight,$showtooglebuttons,$colcount,$rowtopheight,$rowbottomheight,$tabcount,$activetab,$colwidth,$showfullsize,$customcss\">\n";
- $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_jsdebug\" value=\"\">\n";
- $ret .= "</div></td></tr>\n"; 
- $ret .= "<tr><td><div id=\"tabs\" class=\"dashboard_tabs\">\n";  
- 
- ########################### Dashboard Tab-Liste ##############################################
- my $tabshow = "hidden";	
- my $tabicon = "";
- if ($showtabs eq "tabs-and-buttonbar-at-the-top" || $showtabs eq "tabs-at-the-top-buttonbar-hidden") { $tabshow = "top";}
- if ($showtabs eq "tabs-and-buttonbar-on-the-bottom" || $showtabs eq "tabs-on-the-bottom-buttonbar-hidden") { $tabshow = "bottom";}
-	
- $ret .= "	<ul id=\"dashboard_tabnav\" class=\"dashboard_tabnav dashboard_tabnav_".$tabshow."\">\n";	   
- if ($showtabs ne "tabs-at-the-top-buttonbar-hidden" &&  $showtabs ne "tabs-on-the-bottom-buttonbar-hidden" && $showtabs ne "tabs-and-buttonbar-hidden") { $ret .= BuildButtonBar($d,$showtabs,$showfullsize); }
-    
-  for (my $i=0;$i<$tabcount;$i++){ 
-	$tabicon = ""; 
-	if ($tabicons[$i] ne "") { $tabicon = FW_makeImage($tabicons[$i],$tabicons[$i],"dashboard_tabicon") . "&nbsp;"; }
-    $ret .= "    <li class=\"dashboard_tab dashboard_tab_".$tabshow."\">".$tabicon."<a href=\"#dashboard_tab".$i."\">".trim($tabnames[$i])."</a></li>"; 
- } 
- $ret .= "	</ul>\n"; 
- ##############################################################################################
- 
- for (my $t=0;$t<$tabcount;$t++){ 
- 	my @tabgroup = split(",", $tabgroups[$t]); #Set temp. position for groups without an stored position
-	for (my $i=0;$i<@tabgroup;$i++){
-		my @stabgroup = split(":", trim($tabgroup[$i]));		
- 		if (index($tabsortings[$t],trim($stabgroup[0])) < 0) { $tabsortings[$t] = $tabsortings[$t]."t".$t."c".GetMaxColumnId($row,$colcount).",".trim($stabgroup[0]).",true,0,0:"; }
-	}	
-		
-	%group = BuildGroupList($tabgroups[$t]);	 
-	$ret .= "	<div id=\"dashboard_tab".$t."\" data-tabwidgets=\"".$tabsortings[$t]."\" class=\"dashboard_tabpanel\">\n";
-	$ret .= "   <ul class=\"dashboard_tabcontent\">\n";
-	$ret .= "	<table class=\"dashboard_tabcontent\">\n";	 
-		##################### Top Row (only one Column) #############################################
-		if ($row eq "top-center-bottom" || $row eq "top-center" || $row eq "top"){ $ret .= BuildDashboardTopRow($t,$id,$tabgroups[$t],$tabsortings[$t]); }		
-		##################### Center Row (max. 5 Column) ############################################
-		if ($row eq "top-center-bottom" || $row eq "top-center" || $row eq "center-bottom" || $row eq "center"){ $ret .= BuildDashboardCenterRow($t,$id,$tabgroups[$t],$tabsortings[$t],$colcount);} 
-		############################# Bottom Row (only one Column) ############################################
-		if ($row eq "top-center-bottom" || $row eq "center-bottom" || $row eq "bottom"){ $ret .= BuildDashboardBottomRow($t,$id,$tabgroups[$t],$tabsortings[$t]); }
-		#############################################################################################	 
-	 $ret .= "	</table>\n";
-	 $ret .= " 	</ul>\n";
-	 $ret .= "	</div>\n"; 
+ if ($room && $room ne "all") {
+		$ret = "";
+		 
+		$ret .= "<script>\n"; 
+		$ret .= "		loadScript(\"pgm2/$fwjquery\");\n";
+		$ret .= "		loadScript(\"pgm2/$fwjqueryui\");\n";
+		$ret .= "		loadScript(\"pgm2/dashboard.js\");\n";
+		$ret .= "</script>\n";			 
+		 		 
+		$ret .= "<table class=\"roomoverview dashboard\" id=\"dashboard\">\n";
+		 
+		 $ret .= "<tr><td><div class=\"dashboardhidden\">\n"; 
+		 $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_attr\" value=\"$name,$dbwidth,$showhelper,$lockstate,$showbuttonbar,$colheight,$showtooglebuttons,$colcount,$rowtopheight,$rowbottomheight,$tabcount,$activetab,$colwidth,$showfullsize,$customcss\">\n";
+		 $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_jsdebug\" value=\"\">\n";
+		 $ret .= "</div></td></tr>\n"; 
+		 $ret .= "<tr><td><div id=\"tabs\" class=\"dashboard_tabs\">\n";  
+		 
+		 ########################### Dashboard Tab-Liste ##############################################
+		 my $tabshow = "hidden";	
+		 my $tabicon = "";
+		 if ($showtabs eq "tabs-and-buttonbar-at-the-top" || $showtabs eq "tabs-at-the-top-buttonbar-hidden") { $tabshow = "top";}
+		 if ($showtabs eq "tabs-and-buttonbar-on-the-bottom" || $showtabs eq "tabs-on-the-bottom-buttonbar-hidden") { $tabshow = "bottom";}
+			
+		 $ret .= "	<ul id=\"dashboard_tabnav\" class=\"dashboard_tabnav dashboard_tabnav_".$tabshow."\">\n";	   
+		 if ($showtabs ne "tabs-at-the-top-buttonbar-hidden" &&  $showtabs ne "tabs-on-the-bottom-buttonbar-hidden" && $showtabs ne "tabs-and-buttonbar-hidden") { $ret .= BuildButtonBar($d,$showtabs,$showfullsize); }
+			
+		  for (my $i=0;$i<$tabcount;$i++){ 
+			$tabicon = ""; 
+			if ($tabicons[$i] ne "") { $tabicon = FW_makeImage($tabicons[$i],$tabicons[$i],"dashboard_tabicon") . "&nbsp;"; }
+			$ret .= "    <li class=\"dashboard_tab dashboard_tab_".$tabshow."\">".$tabicon."<a href=\"#dashboard_tab".$i."\">".trim($tabnames[$i])."</a></li>"; 
+		 } 
+		 $ret .= "	</ul>\n"; 
+		 ##############################################################################################
+		 
+		 for (my $t=0;$t<$tabcount;$t++){ 
+			my @tabgroup = split(",", $tabgroups[$t]); #Set temp. position for groups without an stored position
+			for (my $i=0;$i<@tabgroup;$i++){
+				my @stabgroup = split(":", trim($tabgroup[$i]));		
+				if (index($tabsortings[$t],trim($stabgroup[0])) < 0) { $tabsortings[$t] = $tabsortings[$t]."t".$t."c".GetMaxColumnId($row,$colcount).",".trim($stabgroup[0]).",true,0,0:"; }
+			}	
+				
+			%group = BuildGroupList($tabgroups[$t]);	 
+			$ret .= "	<div id=\"dashboard_tab".$t."\" data-tabwidgets=\"".$tabsortings[$t]."\" class=\"dashboard_tabpanel\">\n";
+			$ret .= "   <ul class=\"dashboard_tabcontent\">\n";
+			$ret .= "	<table class=\"dashboard_tabcontent\">\n";	 
+				##################### Top Row (only one Column) #############################################
+				if ($row eq "top-center-bottom" || $row eq "top-center" || $row eq "top"){ $ret .= BuildDashboardTopRow($t,$id,$tabgroups[$t],$tabsortings[$t]); }		
+				##################### Center Row (max. 5 Column) ############################################
+				if ($row eq "top-center-bottom" || $row eq "top-center" || $row eq "center-bottom" || $row eq "center"){ $ret .= BuildDashboardCenterRow($t,$id,$tabgroups[$t],$tabsortings[$t],$colcount);} 
+				############################# Bottom Row (only one Column) ############################################
+				if ($row eq "top-center-bottom" || $row eq "center-bottom" || $row eq "bottom"){ $ret .= BuildDashboardBottomRow($t,$id,$tabgroups[$t],$tabsortings[$t]); }
+				#############################################################################################	 
+			 $ret .= "	</table>\n";
+			 $ret .= " 	</ul>\n";
+			 $ret .= "	</div>\n"; 
+		 }
+		 $ret .= "</div></td></tr>\n";
+		 $ret .= "</table>\n";
  }
- $ret .= "</div></td></tr>\n";
- $ret .= "</table>\n";
- 
- return $ret; 
+
+ return $ret;   
+  
 }
 
 sub BuildDashboardTopRow($$$$){
@@ -578,19 +594,19 @@ sub CheckInstallation($) {
 
  unless (-e $FW_dir."/pgm2/".$fwjquery) {
 	Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."] Missing File ".$FW_dir."/pgm2/".$fwjquery;
-	$hash->{STATE} = 'Missing File, see LogFile for Details';
+	readingsSingleUpdate( $hash, "state", "Missing File, see LogFile for Details", 0 );
  } 
  unless (-e $FW_dir."/pgm2/".$fwjqueryui) {
 	Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."] Missing File ".$FW_dir."/pgm2/".$fwjqueryui;
-	$hash->{STATE} = 'Missing File, see LogFile for Details';
+	readingsSingleUpdate( $hash, "state", "Missing File, see LogFile for Details", 0 );
  } 
  unless (-e $FW_dir."/pgm2/dashboard.js") {
 	Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."] Missing File ".$FW_dir."/pgm2/dashboard.js";
-	$hash->{STATE} = 'Missing File, see LogFile for Details';
+	readingsSingleUpdate( $hash, "state", "Missing File, see LogFile for Details", 0 );
  }  
  unless (-e $FW_icondir."/default/dashboardicons.png") {
 	Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."] Missing File ".$FW_icondir."/default/dashboardicons.png";
-	$hash->{STATE} = 'Missing File, see LogFile for Details';
+	readingsSingleUpdate( $hash, "state", "Missing File, see LogFile for Details", 0 );
  }  
 }
 
@@ -661,36 +677,7 @@ sub CreateDashboardEntry($) {
  
 } 
 
-sub Dashboard_define ($$) {
- my ($hash, $def) = @_;
- my $name = $hash->{NAME}; 
 
- $hash->{STATE} = 'Initialized';  
-  
- CheckInstallation($hash);
- CheckDashboardEntry($hash);
- 
- return;
-}
-
-sub Dashboard_undef ($$) {
-  my ($hash,$arg) = @_;
-  
-  RemoveInternalTimer($hash);
-  
-  return undef;
-}
-
-sub Dashboard_detailFn() {
-  my ($name, $d, $room, $pageHash) = @_;
-  my $hash = $defs{$name};
-  return; 
-}
-
-sub Dashboard_attr($$$) {
-  my ($cmd, $name, $attrName, $attrVal) = @_;
-  return;  
-}
 
 1;
 
