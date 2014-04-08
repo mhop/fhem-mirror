@@ -5026,8 +5026,7 @@ sub CUL_HM_ID2PeerList ($$$) {
       if ($chn eq "04"){
         #if 04 is peered we are "teamed" -> set channel 05
         my $ch05H = $modules{CUL_HM}{defptr}{$dHash->{DEF}."05"};
-        CUL_HM_UpdtReadSingle($ch05H,"state","peered",0)
-            if($ch05H);
+        CUL_HM_UpdtReadSingle($ch05H,"state","peered",0) if($ch05H);
       }
       else{
         CUL_HM_UpdtReadSingle($hash,"state","peered",0);
@@ -5040,7 +5039,8 @@ sub CUL_HM_ID2PeerList ($$$) {
     if (($md =~ m/HM-CC-RT-DN/     && $chn=~ m/(02|03|04|05|06)/)
       ||($md eq "HM-TC-IT-WM-W-EU" && $chn=~ m/(03|06|07)/)){
       if ($chn eq "04"){
-        CUL_HM_UpdtReadSingle($modules{CUL_HM}{defptr}{$dHash->{DEF}."05"},"state","peered");
+        my $ch05H = $modules{CUL_HM}{defptr}{$dHash->{DEF}."05"};
+        CUL_HM_UpdtReadSingle($ch05H,"state","unpeered")) if($ch05H);
       }
       else{
         CUL_HM_UpdtReadSingle($hash,"state","unpeered");
