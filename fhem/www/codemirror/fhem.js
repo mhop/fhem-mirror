@@ -843,20 +843,16 @@ var keywords = ["at","attr","define","delete","deleteattr","deletereading","disp
   "AttrVal","OldTimestamp","OldValue","ReadingsVal","ReadingsTimestamp","Value"];
 var variables = ["$defs","$hms","$hour","$isdst","$mday","$min","$month","$sec","$wday","$we","$yday","$year"];
 var devices = [];
-var devtypes = [];
 
 CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, options) {
 
 	if( devices.length == 0 ) {
-		$.getJSON( '/fhem?cmd=jsonlist&XHR=1', function ( data ) {
+		$.getJSON( '/fhem?cmd=jsonlist2&XHR=1', function ( data ) {
 			data.Results.foreach( function(k,v) {
-			    devtypes.push(v);
-				v.devices.foreach( function(m,n) {
-					devices.push(n);
-				});
+			    devices.push(v);
 			});
 			devices.sort(function (a, b) {
-				return a.NAME.toLowerCase().localeCompare(b.NAME.toLowerCase());
+				return a.Name.toLowerCase().localeCompare(b.Name.toLowerCase());
 			});
 			hintfhem(cm,callback,options);
 		});
@@ -931,7 +927,7 @@ CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, option
 	function getDeviceAttributes(device) {
 		var attrs = [];
 		if( device != null ) {
-			device.attrs.foreach(function(k,v) {
+			device.PossibleAttrs.split(' ').foreach(function(k,v) {
 				attrs.push(v.split(':')[0]);
 			});
 			attrs.sort(function (a, b) {
@@ -944,7 +940,7 @@ CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, option
 	function getDeviceSets(device) {
 		var attrs = [];
 		if( device != null ) {
-			device.sets.foreach(function(k,v) {
+			device.PossibleSets.split(' ').foreach(function(k,v) {
 				attrs.push(v.split(':')[0]);
 			});
 			attrs.sort(function (a, b) {
@@ -957,13 +953,9 @@ CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, option
 	function getDeviceReadings(device) {
 		var readings = [];
 		if( device != null ) {
-			device.READINGS.foreach(function(k,v) {
-				for( var key in v ) {
-					if( key != "measured" ) {
-						readings.push(key);
-					}
-				}
-			});
+			for( var key in device.Readings ) {
+				readings.push(key);
+			}
 			readings.sort(function (a, b) {
 				return a.toLowerCase().localeCompare(b.toLowerCase());
 			});
@@ -977,7 +969,7 @@ CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, option
 			middle      = Math.floor((stopIndex + startIndex)/2);
 		var iname = null;
 		name = name.toLowerCase();
-		while( (iname = items[middle].NAME.toLowerCase()) != name && startIndex < stopIndex){
+		while( (iname = items[middle].Name.toLowerCase()) != name && startIndex < stopIndex){
 			//adjust search area
 			if (name < iname){
 				stopIndex = middle - 1;
@@ -998,12 +990,12 @@ CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, option
 				res.push({text:v,className:"hintkeyword"});
 		});
 		devs.foreach( function( k, v ) {
-			if( v.NAME.lastIndexOf(word,0)==0) {
-				if( v.ATTR  && v.ATTR.alias != null) {
-					res.push({ text:v.NAME, displayText: v.NAME + " # " + v.ATTR.alias});
+			if( v.Name.lastIndexOf(word,0)==0) {
+				if( v.Attributes  && v.Attributes.alias != null) {
+					res.push({ text:v.Name, displayText: v.Name + " # " + v.Attributes.alias});
 				}
 				else {
-					res.push(v.NAME);
+					res.push(v.Name);
 				}
 			}
 		});
