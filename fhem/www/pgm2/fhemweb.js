@@ -347,7 +347,13 @@ scriptAttribute(sname)
   });
 
   var ua={};
-  try {ua=JSON.parse(attr);} catch(e){FW_errmsg(sname+" Parameter "+e,5000);}
+  if(attr && attr != "") {
+    try {
+      ua=JSON.parse(attr);
+    } catch(e){
+      FW_errmsg(sname+" Parameter "+e,5000);
+    }
+  }
   return ua;
 }
 // end of script functions
