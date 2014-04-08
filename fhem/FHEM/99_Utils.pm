@@ -175,6 +175,11 @@ sub UntoggleIndirect($$$)
   return;
 }
 
+sub 
+IsInt($)
+{
+  defined $_[0] && $_[0] =~ /^[+-]?\d+$/;
+}
 
 1;
 
