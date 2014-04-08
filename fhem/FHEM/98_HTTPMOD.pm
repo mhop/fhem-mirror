@@ -26,6 +26,7 @@
 #   2014-1-6    extended error handling and added documentation 
 #   2014-1-15   added readingsExpr to allow some computation on raw values before put in readings
 #   2014-3-13   added noShutdown and disable attributes
+#	2014-4-8	fixed noShutdown check
                     
 package main;
 
@@ -250,7 +251,7 @@ sub HTTPMOD_GetUpdate($)
         delete $hash->{data};
     }
     
-	if (AttrVal($name, "disable", undef)) {
+	if (AttrVal($name, "noShutdown", undef)) {
         $hash->{noshutdown} = 1;
     } else {
         delete $hash->{noshutdown};
