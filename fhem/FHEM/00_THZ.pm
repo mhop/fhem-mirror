@@ -1,7 +1,7 @@
 ##############################################
 # 00_THZ
 # by immi 04/2014
-# v. 0.083
+# v. 0.084
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -72,6 +72,8 @@ my %sets = (
 	"p09FanStageStandby"		=> {cmd2=>"0A056F", argMin =>  "0", argMax =>  "3"  },
 	"p99FanStageParty"		=> {cmd2=>"0A0570", argMin =>  "0", argMax =>  "3"  },
 	"p75passiveCooling"		=> {cmd2=>"0A0575", argMin =>  "0", argMax =>  "2"  },
+	"p33BoosterTimeoutDHW"		=> {cmd2=>"0A0588", argMin =>  "0", argMax =>  "200" }, #during DHW heating
+	"p79BoosterTimeoutHC"		=> {cmd2=>"0A05A0", argMin =>  "0", argMax =>  "60" }, #delayed enabling of booster heater
 	"p37fanstage1-Airflow-inlet"	=> {cmd2=>"0A0576", argMin =>  "50", argMax =>  "300"},		#zuluft 
 	"p38fanstage2-Airflow-inlet"	=> {cmd2=>"0A0577", argMin =>  "50", argMax =>  "300" },	#zuluft 
 	"p39fanstage3-Airflow-inlet"	=> {cmd2=>"0A0578", argMin =>  "50", argMax =>  "300" },	#zuluft 
@@ -232,7 +234,7 @@ my %getsonly = (
         "allFB"     			=> {cmd2=>"FB"},
         "timedate" 			=> {cmd2=>"FC"},
         "firmware" 			=> {cmd2=>"FD"},
-	"reg112"			=> {cmd2=>"0A0112"},  # 1 bereitschaft; 11 in automatik; 3 tagesbetrieb
+	"OperatingMode"			=> {cmd2=>"0A0112"},  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
 	"party-time"			=> {cmd2=>"0A05D1"} # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   );
 
@@ -464,7 +466,7 @@ sub THZ_Set($@){
   elsif  (substr($cmdHex2,0,6) eq "0A05D1") 		  			{$arg= time2quaters($arg1) *256 + time2quaters($arg)} # PartyBeginTime-endtime, in the register is represented endtime begintime
   #partytime (0A05D1) non funziona; 
   elsif  ((substr($cmdHex2,0,6) eq "0A05D3") or (substr($cmdHex2,0,6) eq "0A05D4")) 	{$arg= time2quaters($arg)} # holidayBeginTime-endtime
-  elsif  ((substr($cmdHex2,0,5) eq "0A056") or (substr($cmdHex2,0,5) eq "0A057"))	{ } 				# fann speed: do not multiply
+  elsif  ((substr($cmdHex2,0,5) eq "0A056") or (substr($cmdHex2,0,5) eq "0A057") or (substr($cmdHex2,0,6) eq "0A0588") or (substr($cmdHex2,0,6) eq "0A05A0"))	{ } 				# fann speed and boostetimeout: do not multiply
   else 			             {$arg=$arg*10} 
   #return ($arg);  
   THZ_Write($hash,  "02"); 			# STX start of text
@@ -769,14 +771,17 @@ sub THZ_Parse($) {
   my ($message) = @_;
   given (substr($message,2,2)) {
   when ("0A")    {
+     my %OpMode = ("1" =>"Standby", "11" => "Automatic", "3" =>"DAYmode", "4" =>"SetBack", "5" =>"DHWmode", "14" =>"Manual", "0" =>"Emergency");   
       if (substr($message,4,4) eq "0116")						{$message = hex2int(substr($message, 8,4))/10 ." °C" }
+      elsif (substr($message,4,4) eq "0112") 						{$message = $OpMode{hex(substr($message, 8,2))} }
       elsif ((substr($message,4,3) eq "011")	or (substr($message,4,3) eq "012")) 	{$message = hex(substr($message, 8,2))} #holiday						      # the answer look like  0A0120-3A0A01200E00  for year 14
-      elsif ((substr($message,4,2) eq "1D") or (substr($message,4,2) eq "17")) 	{$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30  
-      elsif (substr($message,4,4) eq "05D1") 				 	{$message = quaters2time(substr($message, 10,2)) ."--". quaters2time(substr($message, 8,2))}  #like above but before stop then start !!!!
-      elsif  ((substr($message,4,4) eq "05D3") or (substr($message,4,4) eq "05D4"))   		{$message = quaters2time(substr($message, 10,2)) }  #value 1Ch 28dec is 7 
-      elsif  ((substr($message,4,3) eq "056")  or (substr($message,4,4) eq "0570")  or (substr($message,4,4) eq "0575"))		{$message = hex(substr($message, 8,4))}
-      elsif  (substr($message,4,3) eq "057")						{$message = hex(substr($message, 8,4)) ." m3/h" }
-      elsif  (substr($message,4,4) eq "05A2")						{$message = hex(substr($message, 8,4))/10 ." K" }
+      elsif ((substr($message,4,2) eq "1D") or (substr($message,4,2) eq "17")) 		{$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30  
+      elsif (substr($message,4,4) eq "05D1") 				 		{$message = quaters2time(substr($message, 10,2)) ."--". quaters2time(substr($message, 8,2))}  #like above but before stop then start !!!!
+      elsif ((substr($message,4,4) eq "05D3") or (substr($message,4,4) eq "05D4"))   	{$message = quaters2time(substr($message, 10,2)) }  #value 1Ch 28dec is 7 
+      elsif ((substr($message,4,3) eq "056")  or (substr($message,4,4) eq "0570")  or (substr($message,4,4) eq "0575"))	{$message = hex(substr($message, 8,4))}
+      elsif (substr($message,4,3) eq "057")						{$message = hex(substr($message, 8,4)) ." m3/h" }
+      elsif (substr($message,4,4) eq "05A2")						{$message = hex(substr($message, 8,4))/10 ." K" }
+      elsif ((substr($message,4,4) eq "0588") or (substr($message,4,4) eq "05A0"))	{$message = hex(substr($message, 8,4)) ." min" }
       else 										{$message = hex2int(substr($message, 8,4))/10 ." °C" }
   }  
   when ("0B")    {							   #set parameter HC1
