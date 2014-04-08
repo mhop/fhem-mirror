@@ -1842,6 +1842,7 @@ sub CUL_HM_Parse($$) {#########################################################
   #------------ parse if FHEM or virtual actor is destination   ---------------
 
   if(AttrVal($dname, "subType", "none") eq "virtual"){# see if need for answer
+    my $sendAck = 0;
     if($mTp =~ m/^4/ && @mI > 1) { #Push Button event
       my ($recChn,$trigNo) = (hex($mI[0]),hex($mI[1]));# button number/event count
       my $longPress = ($recChn & 0x40)?"long":"short";
@@ -1852,6 +1853,7 @@ sub CUL_HM_Parse($$) {#########################################################
         my $dChName = CUL_HM_id2Name($dChId);
         if(($attr{$dChName}{peerIDs}?$attr{$dChName}{peerIDs}:"") =~m/$recId/){
           my $dChHash = $defs{$dChName};
+          $sendAck = 1;
           $dChHash->{helper}{trgLgRpt} = 0
                 if (!defined($dChHash->{helper}{trgLgRpt}));
           $dChHash->{helper}{trgLgRpt} +=1;
@@ -1896,7 +1898,7 @@ sub CUL_HM_Parse($$) {#########################################################
         CUL_HM_respPendRm($dhash);
       }
     }
-    push @ack,$dhash,$mNo."8002".$dst.$src."00" if (hex($mFlg)&0x20 && (!@ack));
+    push @ack,$dhash,$mNo."8002".$dst.$src."00" if (hex($mFlg)&0x20 && (!@ack) && $sendAck);
   }
   elsif($ioId eq $dst){# if fhem is destination check if we need to react
     if($mTp =~ m/^4./ && $p =~ m/^(..)/ &&  #Push Button event
@@ -3794,10 +3796,23 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $modules{CUL_HM}{helper}{updateDst} = $dst;
     $modules{CUL_HM}{helper}{updateId} = $id;
     $modules{CUL_HM}{helper}{updateNbr} = 10;
-    my $msg;
     Log3 $name,2,"CUL_HM fwUpdate started for $name";
-    CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
+    my $manual = 0;
+    if ($manual == 1){
+      $modules{CUL_HM}{helper}{updateStep} = 1;
+      CUL_HM_FWupdateSpeed($name,100);
+      InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim",$dst.$id."00",0);
+      select(undef, undef, undef, (0.1));
+      CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
                         ."3011$id${dst}CA");
+      select(undef, undef, undef, (0.1));
+      CUL_HM_SndCmd($hash,"0A20CB$id${dst}105B11F815470B081A1C191D1BC71C001DB221B623EA");
+      select(undef, undef, undef, (0.1));
+    }
+    else{
+      CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
+                        ."3011$id${dst}CA");
+    }
     #InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim",$dst."00000000",0);
   }
   elsif($cmd eq "postEvent") { ################################################
@@ -5035,6 +5050,7 @@ sub CUL_HM_ID2PeerList ($$$) {
 }
 sub CUL_HM_peerChId($$) {# in:<IDorName> <deviceID>, out:channelID
   my($pId,$dId)=@_;
+  return "" if (!$pId);
   my $iId = CUL_HM_id2IoId($dId);
   my ($pSc,$pScNo) = unpack 'A4A*',$pId; #helper for shortcut spread
   return $dId.sprintf("%02X",'0'.$pScNo) if ($pSc eq 'self');
