@@ -43,9 +43,10 @@ my %sets = (
 
 my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42); # rAmpl(dB) 
 
-my $clientsSlowRF    = ":FS20:FHT.*:KS300:USF1000:BS:HMS: " .
-                       ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_RFR:CUL_HOERMANN: " .
-                       ":ESA2000:CUL_IR:CUL_TX:Revolt:IT:STACKABLE_CC:";
+my $clientsSlowRF    = ":FS20:FHT.*:KS300:USF1000:BS:HMS: ".
+                       ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_HOERMANN: ".
+                       ":ESA2000:CUL_IR:CUL_TX:Revolt:IT:UNIRoll: ".
+                       ":STACKABLE_CC:CUL_RFR:";
 my $clientsHomeMatic = ":CUL_HM:HMS:CUL_IR:STACKABLE_CC:"; 
 my $clientsMAX       = ":CUL_MAX:HMS:CUL_IR:STACKABLE_CC:";
 
@@ -67,6 +68,7 @@ my %matchListSlowRF = (
     "F:Revolt"    => "^r......................\$",
     "G:IT"        => "^i......\$",
     "H:STACKABLE_CC"=>"^\\*",
+    "I:UNIRoll"   => "^[0-9A-F]{5}(B|D|E)",
 );
 my %matchListHomeMatic = (
     "1:CUL_HM" => "^A....................",
