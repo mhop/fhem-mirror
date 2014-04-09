@@ -469,32 +469,38 @@ A line ending with \ will be concatenated with the next one, so long lines
           energy1:counters.A { ReadingsVal("myMultiMeter","counters.A",0)/1250.0;; },
           energy2:counters.B { ReadingsVal("myMultiMeter","counters.B",0)/1250.0;; }
       </code></ul>
-    <code>&lt;modifier&gt;</code> can take one of these values:
-    <ul>
-      <li>none: the same as it would not have been given at all.</li>
-      <li>difference: the reading is set to the difference between the current
-          and the previously evaluated value.</li>
-      <li>differential: the reading is set to the difference between the
-          current and the previously evaluated value divided by the time in
-          seconds between the current and the previous evaluation. Granularity
-          of time is one second. No value is calculated if the time past is
-          below one second.  Useful to calculate rates.</li>
-      <li>offset: if the current evaluated value is smaler than the previously
-          evaluated value the reading is incremented by the previous value.
-          the reading can then be used as an offset correct for a counter that
-          is reset for example due to a power loss.</li>
-      <li>monotonic: if the difference between the current and the previously
-          evaluated value is positive the reading is incremented by this difference.
-          this allows to derive a monotonic growing counter from an original counter
-          even if the original will be rest by a power loss</li>
-    </ul>
-    Example:<br>
-    <ul><code>attr myPowerMeter userReadings power 
-      differential { ReadingsVal("myPowerMeter","counters.A",0)/1250.0;; }
-    </code></ul>
-    Note: user readings with modifiers difference and differential store the
-    calculated values internally. The user reading is set earliest at the
-    second evaluation. Beware of stale values when changing definitions!
+      <code>&lt;modifier&gt;</code> can take one of these values:
+      <ul>
+        <li>none: the same as it would not have been given at all.</li>
+        <li>difference: the reading is set to the difference between the current
+            and the previously evaluated value.</li>
+        <li>differential: the reading is set to the difference between the
+            current and the previously evaluated value divided by the time in
+            seconds between the current and the previous evaluation. Granularity
+            of time is one second. No value is calculated if the time past is
+            below one second.  Useful to calculate rates.</li>
+        <li>offset: if the current evaluated value is smaler than the previously
+            evaluated value the reading is incremented by the previous value.
+            the reading can then be used as an offset correct for a counter that
+            is reset for example due to a power loss.</li>
+        <li>monotonic: if the difference between the current and the previously
+            evaluated value is positive the reading is incremented by this difference.
+            this allows to derive a monotonic growing counter from an original counter
+            even if the original will be rest by a power loss</li>
+      </ul>
+      Example:<br>
+      <ul><code>attr myPowerMeter userReadings power 
+        differential { ReadingsVal("myPowerMeter","counters.A",0)/1250.0;; }
+      </code></ul>
+      Notes:
+      <ul>
+        <li>user readings with modifiers difference and differential store the
+        calculated values internally. The user reading is set earliest at the
+        second evaluation. Beware of stale values when changing
+        definitions!</li>
+      <li>the name of the defined Readings consists of alphanumeric characters
+        with underscore (_) and the minus (-) sign.</li>
+      </ul>
     </li><br>
     </ul>
   <br>
