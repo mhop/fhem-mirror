@@ -147,6 +147,7 @@ FHEM/66_ECMD.pm              borisneubert         http://forum.fhem.de Sonstiges
 FHEM/67_ECMDDevice.pm        borisneubert         http://forum.fhem.de Sonstiges
 FHEM/70_EGPM.pm              alexus               http://forum.fhem.de Sonstiges
 FHEM/70_ENIGMA2.pm           loredo               http://forum.fhem.de Multimedia
+FHEM/70_Jabber.pm            BioS                 http://forum.fhem.de Unterstuetzende Dienste
 FHEM/70_JSONMETER.pm         tupol                http://forum.fhem.de Sonstiges / PM
 FHEM/70_PHTV.pm              loredo               http://forum.fhem.de Multimedia
 FHEM/70_ONKYO_AVR.pm         loredo               http://forum.fhem.de Multimedia
