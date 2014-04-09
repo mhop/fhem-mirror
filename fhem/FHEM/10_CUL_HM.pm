@@ -5040,7 +5040,7 @@ sub CUL_HM_ID2PeerList ($$$) {
       ||($md eq "HM-TC-IT-WM-W-EU" && $chn=~ m/(03|06|07)/)){
       if ($chn eq "04"){
         my $ch05H = $modules{CUL_HM}{defptr}{$dHash->{DEF}."05"};
-        CUL_HM_UpdtReadSingle($ch05H,"state","unpeered")) if($ch05H);
+        CUL_HM_UpdtReadSingle($ch05H,"state","unpeered") if($ch05H);
       }
       else{
         CUL_HM_UpdtReadSingle($hash,"state","unpeered");
