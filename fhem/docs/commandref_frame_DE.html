@@ -508,9 +508,13 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
       attr myPowerMeter userReadings power differential
         { ReadingsVal("myPowerMeter","counters.A",0)/1250.0}
     </code></ul>
-    Achtung: Falls difference oder differential spezifiziert ist, dann werden
-    f&uuml;r die Berechnung &auml;ltere Werte ben&ouml;tigt, d.h. der Wert wird
-    fr&uuml;hestens beim zweiten &Auml;nderung gesetzt.
+    Achtung:<ul>
+      <li>Falls difference oder differential spezifiziert ist, dann werden
+        f&uuml;r die Berechnung &auml;ltere Werte ben&ouml;tigt, d.h. der Wert
+        wird fr&uuml;hestens beim zweiten &Auml;nderung gesetzt.</li>
+      <li>der Name der definierten Readings besteht aus alphanumerischen
+        Zeichen, Unterstrich (_) und Minus-Zeichen (-).</li>
+      </ul>
     </li><br>
 
 
