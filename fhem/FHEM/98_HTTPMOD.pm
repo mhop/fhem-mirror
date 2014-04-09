@@ -26,7 +26,9 @@
 #   2014-1-6    extended error handling and added documentation 
 #   2014-1-15   added readingsExpr to allow some computation on raw values before put in readings
 #   2014-3-13   added noShutdown and disable attributes
-#	2014-4-8	fixed noShutdown check
+#   2014-4-8    fixed noShutdown check
+#   2014-4-9    added Attribute timeout as suggested by Frank
+#
                     
 package main;
 
@@ -77,6 +79,7 @@ sub HTTPMOD_Initialize($)
       "requestData.* " .
       "disable:0,1 " .
       "noShutdown:0,1 " .
+      "timeout " .
       $readingFnAttributes;  
 }
 
@@ -109,8 +112,8 @@ sub HTTPMOD_Define($$)
     
     # for non blocking HTTP Get
     $hash->{callback} = \&HTTPMOD_Read;
-    $hash->{timeout}  = 2;
-    #$hash->{loglevel} = 3;
+    $hash->{timeout}  = AttrVal($name, "timeout", 2);
+    #$hash->{timeout}  = 2;
     
     # initial request after 2 secs, there timer is set to interval for further update
     InternalTimer(gettimeofday()+2, "HTTPMOD_GetUpdate", $hash, 0); 
@@ -251,7 +254,7 @@ sub HTTPMOD_GetUpdate($)
         delete $hash->{data};
     }
     
-	if (AttrVal($name, "noShutdown", undef)) {
+    if (AttrVal($name, "noShutdown", undef)) {
         $hash->{noshutdown} = 1;
     } else {
         delete $hash->{noshutdown};
