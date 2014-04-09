@@ -162,8 +162,7 @@ I2C_LCD_Attr($$$$) {
       }
     }
   };
-#  my $ret = I2C_LCD_Catch($@) if $@;
-  my $ret = $@;
+  my $ret = I2C_LCD_Catch($@) if $@;
   if ($ret) {
     $hash->{STATE} = "error setting $attribute to $value: ".$ret;
     return "cannot $command attribute $attribute to $value for $name: ".$ret;
