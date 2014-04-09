@@ -83,7 +83,7 @@ sub HMinfo_Attr(@) {###########################################################
               ||$attrVal >300 );
       ## implement new timer to CUL_HM
       $modules{CUL_HM}{hmAutoReadScan}=$attrVal;
-        CUL_HM_queueAutoRead(""); #will restart timer
+      CUL_HM_procQs("");
     }
   }
   elsif($attrName eq "hmIoMaxDly"){#
