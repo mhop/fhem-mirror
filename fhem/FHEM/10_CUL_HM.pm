@@ -338,11 +338,11 @@ sub CUL_HM_updateConfig($){
     $webCmd  = AttrVal($name,"webCmd",undef);
     if(!defined $webCmd){
       if    ($st eq "virtual"      ){
-          if   ($hash->{helper}{fkt} eq "sdLead")    {$webCmd="teamCall:alarmOn:alarmOff";}
-          elsif($hash->{helper}{fkt} eq "vdCtrl")    {$webCmd="valvePos";}
-          elsif($hash->{helper}{fkt} eq "virtThSens"){$webCmd="virtTemp:virtHum";}
-          elsif ($hash->{helper}{role}{chn})         {$webCmd="press short:press long";}
-          else                                       {$webCmd="virtual";}
+          if   ($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "sdLead")    {$webCmd="teamCall:alarmOn:alarmOff";}
+          elsif($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "vdCtrl")    {$webCmd="valvePos";}
+          elsif($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "virtThSens"){$webCmd="virtTemp:virtHum";}
+          elsif($hash->{helper}{role}{chn})                                  {$webCmd="press short:press long";}
+          else                                                               {$webCmd="virtual";}
 
       }elsif((!$hash->{helper}{role}{chn} &&
                $md !~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/)
@@ -3550,6 +3550,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $action = "verify";#defaults
     my $template = AttrVal($name,"tempListTmpl","tempList.cfg:$name");
     for my $ax ($a[2],$a[3]){
+      next if (!$ax);
       if ($ax =~ m/^(verify|restore)$/){
         $action = $ax;
       }
@@ -6056,7 +6057,7 @@ sub CUL_HM_UpdtReadSingle(@) { #update single reading and trigger the event
 }
 sub CUL_HM_setAttrIfCh($$$$) {
   my ($name,$att,$val,$trig) = @_;
-  if($attr{$name}{$att} ne $val){
+  if(AttrVal($name,$att,"") ne $val){
     DoTrigger($name,$trig.":".$val) if($trig);
     $attr{$name}{$att} = $val;
   }
