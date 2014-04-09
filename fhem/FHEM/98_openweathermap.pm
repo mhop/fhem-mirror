@@ -434,7 +434,7 @@ sub UpdateReadings($$$){
 			readingsBulkUpdate($hash, $prefix."sunrise",		$jsonWeather->{city}{sun}{rise});
 			readingsBulkUpdate($hash, $prefix."sunset",			$jsonWeather->{city}{sun}{set});
 			readingsBulkUpdate($hash, $prefix."stationId",		$jsonWeather->{city}{id});
-			readingsBulkUpdate($hash, $prefix."stationName",	$jsonWeather->{city}{name});
+			readingsBulkUpdate($hash, $prefix."stationName",	utf8ToLatin1($jsonWeather->{city}{name}));
 			readingsBulkUpdate($hash, $prefix."stationCountry",	$jsonWeather->{city}{country});
 			readingsBulkUpdate($hash, $prefix."stationLat",		sprintf("%.4f",$jsonWeather->{city}{coord}{lat}));
 			readingsBulkUpdate($hash, $prefix."stationLon",		sprintf("%.4f",$jsonWeather->{city}{coord}{lon}));
@@ -479,7 +479,7 @@ sub UpdateReadings($$$){
 			readingsBulkUpdate($hash, "_decodedWith",			"JSON");
 			readingsBulkUpdate($hash, $prefix."stationId",    $jsonWeather->{id});
 			readingsBulkUpdate($hash, $prefix."lastRxCode",   $jsonWeather->{cod});
-			readingsBulkUpdate($hash, $prefix."stationName",  $jsonWeather->{name});
+			readingsBulkUpdate($hash, $prefix."stationName",  utf8ToLatin1($jsonWeather->{name}));
 			readingsBulkUpdate($hash, $prefix."humidity",     $jsonWeather->{main}{humidity});
 			readingsBulkUpdate($hash, $prefix."pressureAbs",  $jsonWeather->{main}{pressure});
 			readingsBulkUpdate($hash, $prefix."pressureRel",  $jsonWeather->{main}{sea_level});
