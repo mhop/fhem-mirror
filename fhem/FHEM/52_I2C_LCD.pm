@@ -153,7 +153,8 @@ I2C_LCD_Attr($$$$) {
             $newMapping{$key} = $value; 
           }
           $hash->{mapping} = \%newMapping;
-          I2C_LCD_Init($hash,split (' ',$hash->{DEF})) if ($main::init_done);
+          my @def = split (' ',$hash->{DEF});
+          I2C_LCD_Init($hash,\@def) if ($main::init_done);
           last;
         };
         $main::attr{$name}{$attribute}=$value;
@@ -161,7 +162,8 @@ I2C_LCD_Attr($$$$) {
       }
     }
   };
-  my $ret = I2C_LCD_Catch($@) if $@;
+#  my $ret = I2C_LCD_Catch($@) if $@;
+  my $ret = $@;
   if ($ret) {
     $hash->{STATE} = "error setting $attribute to $value: ".$ret;
     return "cannot $command attribute $attribute to $value for $name: ".$ret;
