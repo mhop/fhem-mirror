@@ -453,7 +453,7 @@ if($cfgRet) {
   $attr{global}{motd} = "$cfgErrMsg\n$cfgRet";
   Log 1, $cfgRet;
 
-} elsif($attr{global}{motd} =~ m/^$cfgErrMsg/) {
+} elsif($attr{global}{motd} && $attr{global}{motd} =~ m/^$cfgErrMsg/) {
   $attr{global}{motd} = "";
 
 }
