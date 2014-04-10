@@ -17,7 +17,7 @@ sub I2C_PCF8574_Initialize($) {
 
   #$hash->{Match}     = ".*";
   $hash->{DefFn}     = 	"I2C_PCF8574_Define";
-	  $hash->{InitFn}   = 'I2C_PCF8574_Init';
+	$hash->{InitFn}  	 = 'I2C_PCF8574_Init';
   $hash->{AttrFn}    = 	"I2C_PCF8574_Attr";
   $hash->{SetFn}     = 	"I2C_PCF8574_Set";
   $hash->{GetFn}     = 	"I2C_PCF8574_Get";
@@ -40,16 +40,17 @@ sub I2C_PCF8574_Set($@) {					#
 		return "wrong value: $val for \"set $name $cmd\" use one of: off, on" 
 			unless(exists($setsP{$val}));
 		my @scmd = split(",", $cmd);
+		my $msg = undef;
 		foreach (@scmd) {
 			$_ =~ tr/[a-zA-Z]//d;			#Nummer aus String extrahieren
-			#substr($_,0,4,"");				#Nummer aus String extrahieren
-			return "$name error: Port$cmd is defined as input" if ( $_ ~~ @inports );		#Pruefen ob entsprechender Port Input ist
+			$msg .= (defined $msg ? "," : "") . "Port" . $_ if ( $_ ~~ @inports );		#Pruefen ob entsprechender Port Input ist
 		}
+		return "$name error: $msg is defined as input" if $msg;
 		my $sbyte = 0;
 		foreach (0..7) {
-			if ($_ ~~ @inports) {#Port der als Input konfiguriert ist wird auf 1 gesetzt
+			if ($_ ~~ @inports) {						#Port der als Input konfiguriert ist wird auf 1 gesetzt
 				$sbyte += 1 << (1 * $_);
-			} elsif( $_ ~~ @scmd ) {#Port der geaendert werden soll
+			} elsif( $_ ~~ @scmd ) {					#Port der geaendert werden soll
 				$sbyte += $setsP{$val} << (1 * $_);
 			} else {									#alle anderen Portwerte werden den Readings entnommen
 				$sbyte += $setsP{ReadingsVal($name,'Port'.$_,"off")} << (1 * $_);		#->sonst aus dem Reading holen
@@ -62,7 +63,8 @@ sub I2C_PCF8574_Set($@) {					#
 			next if ( $_ ~~ @inports );		#Inputs ueberspringen
 			$list .= "Port" . $_ . ":" . join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) ) . " ";
     }
-    return "Unknown argument $a[1], choose one of " . $list;
+    return "Unknown argument $a[1], choose one of " . $list if defined $list;
+		return "Unknown argument $a[1]";
 	}
 	return "$name: no IO device defined" unless ($hash->{IODev});
   my $phash = $hash->{IODev};
@@ -408,7 +410,7 @@ sub I2C_PCF8574_Parse($$) {	#wird ueber dispatch vom physical device aufgerufen 
 		<li>InputPorts<br>
 			Durch Leerzeichen getrennte Portnummern die als Inputs genutzt werden.<br>
 			Ports in dieser Liste k&ouml;nnen nicht geschrieben werden.<br>
-			Standard: no, g&uuml;ltige Werte: 0 1 2 .. 15<br><br>
+			Standard: no, g&uuml;ltige Werte: 0 1 2 .. 7<br><br>
 		</li>
 		<li><a href="#IODev">IODev</a></li>
 		<li><a href="#ignore">ignore</a></li>
