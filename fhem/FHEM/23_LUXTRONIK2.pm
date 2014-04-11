@@ -49,8 +49,8 @@ sub LUXTRONIK2_doStatisticDelta ($$$$) ;
   my $modulVersion = "2014-03-31";
 
 #List of firmware versions that are known to be compatible with this modul
-  my $testedFirmware = "#V1.52#V1.54C#V1.60#V1.69#";
-  my $compatibleFirmware = "#V1.52#V1.54C#V1.60#V1.69#";
+  my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.69#";
+  my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.69#";
  
 sub ########################################
 LUXTRONIK2_Initialize($)
@@ -838,7 +838,7 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate($hash, "deviceTimeCalc", $value);
      my $delayDeviceTimeCalc=sprintf("%.0f",$a[29]-$a[22]);
      readingsBulkUpdate($hash, "delayDeviceTimeCalc", $delayDeviceTimeCalc);
-     my $durationFetchReadings = sprintf("%.5f",$a[30]-$a[29]);
+     my $durationFetchReadings = sprintf("%.2f",$a[30]-$a[29]);
      readingsBulkUpdate($hash, "durationFetchReadings", $durationFetchReadings);
      #Remember min and max reading durations, will be reset when initializing the device
      if ($hash->{fhem}{durationFetchReadingsMin} == 0 || $hash->{fhem}{durationFetchReadingsMin} > $durationFetchReadings) {
@@ -1175,6 +1175,9 @@ LUXTRONIK2_doStatisticThermalPower ($$$$$$$)
    my $value1;
    my $value2;
    my $value3;
+   $last[3] += $currAmbTemp;
+   $last[4] += $currHeatSourceIn;
+   $last[5]++;
    
    if ($last[0] != $MonitoredOpState && $currOpState == $MonitoredOpState ) {
       $saveCurrent = 1;
@@ -1182,14 +1185,14 @@ LUXTRONIK2_doStatisticThermalPower ($$$$$$$)
       $saveCurrent = 1;
       $value2 = ($currOpHours - $last[2])/60;
       if ($value2 > 9.5) {
-         $value1 = ($currAmbTemp +  $last[3]) / 2;
+         $value1 = $last[3] / $last[5];
          $returnStr = "aT: " . sprintf "%.1f", $value1;
          $value1 = $currHeatQuantity -  $last[1];
          $value3 = $value1 * 60 / $value2;
          $returnStr .= " thP: " . sprintf "%.1f", $value3;
          $returnStr .= " t: " . sprintf "%.0f", $value2;
          $returnStr .= " DQ: " . sprintf "%.1f", $value1;
-         $value1 = ($currHeatSourceIn +  $last[4]) / 2;
+         $value1 = $last[4] / $last[5];
          $returnStr .= " iT: " . sprintf "%.1f", $value1;
       }
    }
@@ -1197,8 +1200,6 @@ LUXTRONIK2_doStatisticThermalPower ($$$$$$$)
       $last[0] = $currOpState;
       $last[1] = $currHeatQuantity;
       $last[2] = $currOpHours;
-      $last[3] = $currAmbTemp;
-      $last[4] = $currHeatSourceIn;
       $hash->{fhem}{"statThermalPowerOpState_".$MonitoredOpState} = join( " ", @last);
    }
    return $returnStr;
@@ -1614,7 +1615,7 @@ LUXTRONIK2_doStatisticDelta ($$$$)
   <br>
   It has a built-in ethernet port, so it can be directly integrated into a local area network (LAN).
   <br>
-  <i>The modul is reported to work with firmware: V1.54C, V1.60, V1.69.</i>
+  <i>The modul is reported to work with firmware: V1.51, V1.54C, V1.60, V1.69.</i>
   <br>
   More Info on the particular <a href="http://www.fhemwiki.de/wiki/Luxtronik_2.0">page of FHEM-Wiki</a> (in German).
   <br>
@@ -1711,7 +1712,7 @@ LUXTRONIK2_doStatisticDelta ($$$$)
   <br>
   Sie besitzt einen Ethernet Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.
   <br>
-  <i>Das Modul wurde bisher mit folgender Steuerungs-Firmware getestet: V1.54C, V1.60, V1.69.</i>
+  <i>Das Modul wurde bisher mit folgender Steuerungs-Firmware getestet: V1.51, V1.54C, V1.60, V1.69.</i>
   <br>
   Mehr Infos im entsprechenden <u><a href="http://www.fhemwiki.de/wiki/Luxtronik_2.0">Artikel der FHEM-Wiki</a></u>.
   <br>&nbsp;
@@ -1742,7 +1743,7 @@ LUXTRONIK2_doStatisticDelta ($$$$)
          </li><br>
      <li><code>returnTemperatureSetBack &lt;Temperatur&gt;</code>
          <br>
-         Absenkung oder Anhebung der Rücklauftemperatur um -5&deg;C - + 5&deg;C
+         Absenkung oder Anhebung der R&uuml:cklauftemperatur von -5&deg;C bis + 5&deg;C
          </li><br>
      <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
          <br>
