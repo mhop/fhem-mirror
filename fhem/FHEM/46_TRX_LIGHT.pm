@@ -64,6 +64,7 @@ my %light_device_codes = (	# HEXSTRING => "NAME", "name of reading",
 	0x1400 => [ "LIGHTWAVERF", "light"], # LightwaveRF
 	0x1401 => [ "EMW100", "light"], # EMW100
 	0x1402 => [ "BBSB", "light"], # BBSB
+	0x1406 => [ "TRC02", "light"], # RGB TRC02
 	# 0x15: Lighting6
 	0x1500 => [ "BLYSS", "light"], # Blyss
 );
@@ -91,6 +92,7 @@ my %light_device_commands = (	# HEXSTRING => commands
 	0x1400 => [ "off", "on", "all_off", "mood1", "mood2", "mood3", "mood4", "mood5", "reserved1", "reserved2", "unlock", "lock", "all_lock", "close", "stop", "open", "level"], # LightwaveRF, Siemens
 	0x1401 => [ "off", "on", "learn"], # EMW100 GAO/Everflourish
 	0x1402 => [ "off", "on", "all_off", "all_on"], # BBSB new types
+	0x1406 => [ "off", "on", "bright", "dim", "vivid", "pale", "color"], # TRC02
 	# 0x15: Lighting6
 	0x1500 => [ "off", "on", "all_off", "all_on"], # Blyss
 );
@@ -191,6 +193,7 @@ TRX_LIGHT_Set($@)
   my $command = $a[1];
   my $command_state = $a[1];
   my $level = 0;
+  my $color = 0;
   my $arg3 = "";
 
   # special for on-till
@@ -204,6 +207,9 @@ TRX_LIGHT_Set($@)
   	$arg3 = $a[2];
 	if ($na == 3 && $command eq "level" ) {
 	  	$level = $a[2];
+	} 
+	elsif ($na == 3 && $command eq "color" ) {
+	  	$color = $a[2];
 	} 
   } 
 
@@ -258,6 +264,9 @@ TRX_LIGHT_Set($@)
 	my $l = join(" ", sort @$rec); 
 	if ($device_type eq "AC" || $device_type eq "HOMEEASY" || $device_type eq "ANSLUT") {
   		$l =~ s/ level / level:slider,0,1,15 /; 
+	}
+	elsif ($device_type eq "TRC02") {
+  		$l =~ s/ color / color:slider,14,2,128 /; 
 	}
   	#my $error = "Unknown command $command, choose one of $l"; 
   	my $error = "Unknown command $command, choose one of $l "."on-till on-for-timer"; 
@@ -367,6 +376,11 @@ TRX_LIGHT_Set($@)
 		Log3 $name, 1, "TRX_LIGHT_Set() lighting5 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
 		return "error set name=$name  deviceid=$deviceid";
   	}
+	if ($command eq "color") {
+		$cmnd = $color;
+		$command .= sprintf " %d", $color;
+		$command_state = $command;
+	} 
   	$hex_prefix = sprintf "0A14";
   	$hex_command = sprintf "%02x%02x%s%02x%02x00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd, $level; 
 	if ($command eq "level") {
@@ -420,7 +434,7 @@ TRX_LIGHT_Define($$)
   $devicelog = $a[4] if (int(@a) > 4);
   $commandcodes = $a[5] if ($type eq "PT2262" && int(@a) > 5);
 
-  if ($type ne "X10" && $type ne "ARC" && $type ne "MS14A" && $type ne "AB400D" && $type ne "WAVEMAN" && $type ne "EMW200" && $type ne "IMPULS" && $type ne "RISINGSUN" && $type ne "PHILIPS_SBC" && $type ne "AC" && $type ne "HOMEEASY" && $type ne "ANSLUT" && $type ne "KOPPLA" && $type ne "LIGHTWAVERF" && $type ne "EMW100" && $type ne "BBSB" && $type ne "PT2262") {
+  if ($type ne "X10" && $type ne "ARC" && $type ne "MS14A" && $type ne "AB400D" && $type ne "WAVEMAN" && $type ne "EMW200" && $type ne "IMPULS" && $type ne "RISINGSUN" && $type ne "PHILIPS_SBC" && $type ne "AC" && $type ne "HOMEEASY" && $type ne "ANSLUT" && $type ne "KOPPLA" && $type ne "LIGHTWAVERF" && $type ne "EMW100" && $type ne "BBSB" && $type ne "TRC02" && $type ne "PT2262") {
   	Log3 $name, 1,"TRX_LIGHT_Define() wrong type: $type";
   	return "TRX_LIGHT: wrong type: $type";
   }
