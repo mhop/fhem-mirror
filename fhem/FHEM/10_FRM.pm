@@ -348,7 +348,7 @@ sub FRM_DoInit($) {
 	
 	my $name = $shash->{NAME};
 	
-  	my $firmata_io = Firmata_IO->new($hash);
+  	my $firmata_io = Firmata_IO->new($hash,$name);
 	my $device = Device::Firmata::Platform->attach($firmata_io) or return 1;
 
 	$shash->{FirmataDevice} = $device;
@@ -600,28 +600,29 @@ sub FRM_Catch($) {
 
 package Firmata_IO;
 
-sub new {
-	my ($class,$hash) = @_;
-	return bless {
-		hash => $hash,
-	}, $class;
+sub new($$) {
+  my ($class,$hash,$name) = @_;
+  return bless {
+    hash => $hash,
+    name => $name,
+  }, $class;
 }
 
 sub data_write {
-   	my ( $self, $buf ) = @_;
-   	my $hash = $self->{hash};
-    main::Log3 $hash->{NAME},5,$hash->{FD}.">".join(",",map{sprintf"%02x",ord$_}split//,$buf);
-   	main::DevIo_SimpleWrite($hash,$buf,undef);
+  my ( $self, $buf ) = @_;
+  my $hash = $self->{hash};
+  main::Log3 $self->{name},5,"FRM:>".unpack "H*",$buf;
+  main::DevIo_SimpleWrite($hash,$buf,undef);
 }
 
 sub data_read {
-    my ( $self, $bytes ) = @_;
-   	my $hash = $self->{hash};
-    my $string = main::DevIo_SimpleRead($hash);
-    if (defined $string ) {
-   	    main::Log3 $hash->{NAME},5,$hash->{FD}."<".join(",",map{sprintf"%02x",ord$_}split//,$string);
-   	}
-    return $string;
+  my ( $self, $bytes ) = @_;
+  my $hash = $self->{hash};
+  my $string = main::DevIo_SimpleRead($hash);
+  if (defined $string ) {
+    main::Log3 $self->{name},5,"FRM:<".unpack "H*",$string;
+  }
+  return $string;
 }
 
 package main;
