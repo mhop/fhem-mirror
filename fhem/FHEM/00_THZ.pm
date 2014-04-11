@@ -1,7 +1,7 @@
 ##############################################
 # 00_THZ
 # by immi 04/2014
-# v. 0.084
+# v. 0.085
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -59,6 +59,7 @@ sub THZ_Refresh_all_gets($);
 ########################################################################################
 
 my %sets = (
+	"OperatingMode"			=> {cmd2=>"0A0112" },  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
 	"p01RoomTempDayHC1"		=> {cmd2=>"0B0005", argMin => "13", argMax => "28"  },   
 	"p02RoomTempNightHC1"		=> {cmd2=>"0B0008", argMin => "13", argMax => "28"  },
 	"p03RoomTempStandbyHC1"		=> {cmd2=>"0B013D", argMin => "13", argMax => "28"  },
@@ -234,11 +235,13 @@ my %getsonly = (
         "allFB"     			=> {cmd2=>"FB"},
         "timedate" 			=> {cmd2=>"FC"},
         "firmware" 			=> {cmd2=>"FD"},
-	"OperatingMode"			=> {cmd2=>"0A0112"},  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
 	"party-time"			=> {cmd2=>"0A05D1"} # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   );
 
 my %gets=(%getsonly, %sets);
+
+my %OpMode = ("1" =>"Standby", "11" => "Automatic", "3" =>"DAYmode", "4" =>"SetBack", "5" =>"DHWmode", "14" =>"Manual", "0" =>"Emergency");   
+my %Rev_OpMode = reverse %OpMode;
 
 ########################################################################################
 #
@@ -449,26 +452,30 @@ sub THZ_Set($@){
   my $argMax = $cmdhash->{argMax};
   my $argMin = $cmdhash->{argMin};
   if  ((substr($cmdHex2,0,6) eq "0A05D1") or (substr($cmdHex2,2,2) eq "1D") or (substr($cmdHex2,2,2)  eq "17") or (substr($cmdHex2,2,2) eq "15") or (substr($cmdHex2,2,2)  eq "14")) {
-  ($arg, $arg1)=split('--', $arg);
-  if (($arg ne "n.a.") and ($arg1 ne "n.a.")) {
-    return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if(($arg1 gt $argMax) or ($arg1 lt $argMin));
-    return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if(($arg gt $argMax) or ($arg lt $argMin));
+    ($arg, $arg1)=split('--', $arg);
+      if (($arg ne "n.a.") and ($arg1 ne "n.a.")) {
+        return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if(($arg1 gt $argMax) or ($arg1 lt $argMin));
+        return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if(($arg gt $argMax) or ($arg lt $argMin));
+        }
     }
-  }
+  elsif (substr($cmdHex2,0,6) eq "0A0112") {
+    $arg1=$arg;
+    $arg=$Rev_OpMode{$arg};
+    return "Unknown argument $arg1: $cmd supports  " . join(" ", sort values %OpMode) if(!defined($arg));
+    }
   else {
-  return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if(($arg > $argMax) or ($arg < $argMin));
-  }
-  
+    return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if(($arg > $argMax) or ($arg < $argMin));
+    }
+    
   if 	((substr($cmdHex2,0,6) eq "0A0116") or (substr($cmdHex2,0,6) eq "0A05A2"))	 {$arg=$arg*10} #summermode
   elsif (substr($cmdHex2,0,4) eq "0A01")  {$arg=$arg*256}		        	# shift 2 times -- the answer look like  0A0120-3A0A01200E00  for year 14
   elsif  ((substr($cmdHex2,2,2) eq "1D") or (substr($cmdHex2,2,2)  eq "17") or (substr($cmdHex2,2,2) eq "15") or (substr($cmdHex2,2,2)  eq "14")) 	{$arg= time2quaters($arg) *256   + time2quaters($arg1)} # BeginTime-endtime, in the register is represented  begintime endtime
-  #programFan_ (1D)  funziona;
   elsif  (substr($cmdHex2,0,6) eq "0A05D1") 		  			{$arg= time2quaters($arg1) *256 + time2quaters($arg)} # PartyBeginTime-endtime, in the register is represented endtime begintime
   #partytime (0A05D1) non funziona; 
   elsif  ((substr($cmdHex2,0,6) eq "0A05D3") or (substr($cmdHex2,0,6) eq "0A05D4")) 	{$arg= time2quaters($arg)} # holidayBeginTime-endtime
   elsif  ((substr($cmdHex2,0,5) eq "0A056") or (substr($cmdHex2,0,5) eq "0A057") or (substr($cmdHex2,0,6) eq "0A0588") or (substr($cmdHex2,0,6) eq "0A05A0"))	{ } 				# fann speed and boostetimeout: do not multiply
   else 			             {$arg=$arg*10} 
-  #return ($arg);  
+    
   THZ_Write($hash,  "02"); 			# STX start of text
   ($err, $msg) = THZ_ReadAnswer($hash);		#Expectedanswer1    is  "10"  DLE data link escape
   my $msgtmp= $msg;
@@ -771,8 +778,7 @@ sub THZ_Parse($) {
   my ($message) = @_;
   given (substr($message,2,2)) {
   when ("0A")    {
-     my %OpMode = ("1" =>"Standby", "11" => "Automatic", "3" =>"DAYmode", "4" =>"SetBack", "5" =>"DHWmode", "14" =>"Manual", "0" =>"Emergency");   
-      if (substr($message,4,4) eq "0116")						{$message = hex2int(substr($message, 8,4))/10 ." °C" }
+       if (substr($message,4,4) eq "0116")						{$message = hex2int(substr($message, 8,4))/10 ." °C" }
       elsif (substr($message,4,4) eq "0112") 						{$message = $OpMode{hex(substr($message, 8,2))} }
       elsif ((substr($message,4,3) eq "011")	or (substr($message,4,3) eq "012")) 	{$message = hex(substr($message, 8,2))} #holiday						      # the answer look like  0A0120-3A0A01200E00  for year 14
       elsif ((substr($message,4,2) eq "1D") or (substr($message,4,2) eq "17")) 		{$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30  
@@ -997,8 +1003,8 @@ my %parsinghash = (
 sub THZ_debugread($){
   my ($hash) = @_;
   my ($err, $msg) =("", " ");
- # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
- my @numbers=('0A0112','0A0126'); 
+  my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
+ #my @numbers=('0A0112','0A0126'); 
   #my @numbers = (1..255);
   #my @numbers = (1..65535);
   my $indice= "FF";
