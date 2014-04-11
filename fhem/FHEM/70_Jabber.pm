@@ -33,10 +33,10 @@
 # You will need the following perl Module and all it's depencies for this to work: 
 # Net::Jabber
 # For using the SSL features and to connect securly to a Jabber server you also need this perl Module:
-# Authen::SASL
+# Net::SSLeay
 #
 # The recommended debian packages to be installed are these: 
-# libnet-jabber-perl libnet-xmpp-perl libxml-stream-perl libdigest-sha1-perl libauthen-sasl-perl
+# libnet-jabber-perl libnet-xmpp-perl libxml-stream-perl libdigest-sha1-perl libauthen-sasl-perl libnet-ssleay-perl
 #
 # Have Phun!
 #
@@ -157,6 +157,18 @@ Jabber_Define($$)
     $hash->{helper}{port} = $port;
     $hash->{helper}{tls} = $tls;
     $hash->{helper}{ssl} = $ssl;
+    if ($tls == 1 || $ssl == 1) {
+       if(!eval("require Net::SSLeay;")) {
+          $hash->{STATE} = "Disconnected (Module error)";
+          $hash->{CONNINFO} = "Missing perl Module Net::SSLeay for TLS or SSL connection.";
+          return undef;
+       }
+    }
+    if(!eval("require Authen::SASL;")) {
+       $hash->{STATE} = "Disconnected (Module error)";
+       $hash->{CONNINFO} = "Missing perl Module Authen::SASL for Jabber Authentication.";
+       return undef;
+    }    
     Jabber_CheckConnection($hash) if($init_done);
     InternalTimer(gettimeofday()+$attr{$name}{PollTimer}, "Jabber_PollMessages", $hash,0);
     return undef;
@@ -324,7 +336,7 @@ sub Jabber_CheckConnection($)
                             hostname=>$hash->{helper}{server}, 
                             port=>$hash->{helper}{port}, 
                             tls=>$hash->{helper}{tls},
-			    ssl=>$hash->{helper}{ssl}
+                            ssl=>$hash->{helper}{ssl}
                             );
                             
     if (!defined($connectionstatus)) {
@@ -456,7 +468,16 @@ sub Jabber_INC_Message {
   but free, Open Source and normally encrypted.<br>
   <br> 
   You need an account on a Jabber Server, you can find free services and more information on <a href="http://www.jabber.org/">jabber.org</a><br>
-  Discuss the module in the <a href="http://forum.fhem.de/index.php/topic,16215.0.html">specific thread here</a>.<br>
+  Discuss the module in the <a href="http://forum.fhem.de/index.php/topic,18967.0.html">specific thread here</a>.<br>
+  <br>
+  This Module requires the following perl Modules to be installed (using SSL):<br>
+  <ul>
+    <li>Net::Jabber</li>
+    <li>Net::XMPP</li>
+    <li>Authen::SASL</li>
+    <li>XML::Stream</li>
+    <li>Net::SSLeay</li>
+  </ul>
   <br>
   <br>
   <a name="JabberDefine"></a>
@@ -574,7 +595,16 @@ sub Jabber_INC_Message {
   jedoch frei Verf&uuml;gbar, open Source und normalerweise Verschl&uuml;sselt (was Serverabh&auml;ngig ist).<br>
   <br> 
   F&uuml;r dieses Modul brauchst du einen Account auf einem Jabber Server. Kostenlose accounts und Server findet man unter <a href="http://www.jabber.org/">jabber.org</a><br>
-  Diskussionen zu diesem Modul findet man im <a href="http://forum.fhem.de/index.php/topic,16215.0.html">FHEM Forum hier</a>.<br>
+  Diskussionen zu diesem Modul findet man im <a href="http://forum.fhem.de/index.php/topic,18967.0.html">FHEM Forum hier</a>.<br>
+  <br>
+  Dieses Modul ben&ouml;tigt die folgenden Perl Module (inkl. SSL M&ouml;glichkeit)<br>
+  <ul>
+    <li>Net::Jabber</li>
+    <li>Net::XMPP</li>
+    <li>Authen::SASL</li>
+    <li>XML::Stream</li>
+    <li>Net::SSLeay</li>
+  </ul>
   <br>
   <br>
   <a name="JabberDefine"></a>
