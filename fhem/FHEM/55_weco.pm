@@ -105,15 +105,21 @@ sub weco_send($) {
 		$data .= "&$key=$value";
 	}
 
-	Log3 ($name, 4, "weco $name data sent: $data");
-	$url .= $data;
-	my $response = GetFileFromURL($url);
-	Log3 ($name, 4, "weco $name server response: $response");
-	
 	readingsBeginUpdate($hash);
+	if(defined($data)) {
 		readingsBulkUpdate($hash, "data", $data);
+		Log3 ($name, 4, "weco $name data sent: $data");
+		$url .= $data;
+		my $response = GetFileFromURL($url);
 		readingsBulkUpdate($hash, "response", $response);
+		Log3 ($name, 4, "weco $name server response: $response");
 		readingsBulkUpdate($hash, "state", "active");
+	} else {
+		Log3 ($name, 4, "weco $name no data");
+		readingsBulkUpdate($hash, "state", "defined");
+		$attr{$name}{wecoInterval} = 60;
+	}
+	
 	readingsEndUpdate($hash, 1);
 
 	InternalTimer(gettimeofday()+$attr{$name}{wecoInterval}, "weco_send", $hash, 0) unless($local == 1);
