@@ -40,17 +40,14 @@ use HttpUtils;
 
 sub weco_Initialize($) {
 	my ($hash) = @_;
-	my $name = $hash->{NAME};
-	my $found;
 
 	$hash->{DefFn}			= "weco_Define";
 	$hash->{UndefFn}		= "weco_Undef";
-	$hash->{AttrList}	=	"disable:0,1 ".
-	"wecoInterval:600,1800,3600 wecotest:true,false ".
-	"wecohu wecote wecodp wecopr wecopcv wecopcf wecowd wecows wecowsbft wecowg wecopa ".
-	"wecopai wecopaest wecouv wecosd wecosc wecovi wecoch wecocm wecocl wecodc wecoww ".
-	$readingFnAttributes;
-
+	$hash->{AttrList}	=	"disable:1,0 ".
+		"wecoInterval:600,1800,3600 wecotest:true,false ".
+		"wecohu wecote wecodp wecopr wecopcv wecopcf wecowd wecows wecowsbft wecowg wecopa ".
+		"wecopai wecopaest wecouv wecosd wecosc wecovi wecoch wecocm wecocl wecodc wecoww ".
+		$readingFnAttributes;
 }
 
 sub weco_Define($$$) {
@@ -102,8 +99,8 @@ sub weco_send($) {
 		$key = substr($key,4,length($key)-4);
 		($d, $r, $o) = split(":", $value);
 		if(defined($r)) {
-			$o     = 0 if(!defined($o));
-			$value = ReadingsVal($d, $r, "") + $o;
+			$o     = (defined($o)) ? $o : 0;
+			$value = ReadingsVal($d, $r, 0) + $o;
 		}
 		$data .= "&$key=$value";
 	}
