@@ -1314,11 +1314,13 @@ sub HMinfo_loadConfig($@) {####################################################
   my @el = ();
   my @elincmpl = ();
   my @entryNF = ();
+  my %changes;
+  my @rUpdate;
   while(<aSave>){
     chomp;
     my $line = $_;
     next if (   $line !~ m/set .* (peerBulk|regBulk) .*/
-             && $line !~ m/attr .*/);
+             && $line !~ m/setreading .*/);
     my ($cmd1,$eN,$cmd,$param) = split(" ",$line,4);
     next if ($eN !~ m/$filter/);
     if (!$eN || !$defs{$eN}){
@@ -1326,6 +1328,7 @@ sub HMinfo_loadConfig($@) {####################################################
       next;
     }
     if   ($cmd1 eq "setreading"){
+      $changes{$eN}{$cmd}=$param if (!$defs{$eN}{READINGS}{$cmd});
       $defs{$eN}{READINGS}{$cmd}{VAL} = $param;
       $defs{$eN}{READINGS}{$cmd}{TIME} = "from archive";
     }
@@ -1342,26 +1345,36 @@ sub HMinfo_loadConfig($@) {####################################################
       }
     }
     elsif($cmd eq "regBulk"){
+      next if($param !~ m/RegL_0[0-9]:/);
+
       my $exp = CUL_HM_getAttrInt($eN,"expert");
       $param =~ s/\.RegL/RegL/;
       $param =~ s/RegL/\.RegL/ if ($exp != 2);
       my ($reg,$data) = split(" ",$param,2);
-      
+      my $rl = join",",CUL_HM_reglUsed($eN);
+      my $r2 = $reg;
+      $r2 =~ s/^\.//;
+
+      next if ($rl !~ m/$r2/);
+
       if ($data !~ m/00:00/){
         push @elincmpl,"$eN reg list:$reg";
         next;
       }
-      if (!$defs{$eN}{READINGS}{$reg}){
-        my ($list,$pN) = ($1,$2) if ($reg =~ m/RegL_(..):(.*)/);
-        my $pId = CUL_HM_peerChId($pN,substr($defs{$eN}{DEF},0,6));
-        $defs{$eN}{READINGS}{$reg}{VAL} = $data;
-        $defs{$eN}{READINGS}{$reg}{TIME} = "from archive";
-        CUL_HM_updtRegDisp($defs{$eN},$list,$pId);
-        push @el,"$eN reg list:$reg";
-      }
+      $changes{$eN}{$reg}=$data if (!$defs{$eN}{READINGS}{$reg});
     }
   }
   close(aSave);
+  foreach my $eN (keys %changes){
+    foreach my $reg (keys %{$changes{$eN}}){
+      $defs{$eN}{READINGS}{$reg}{VAL} = $changes{$eN}{$reg};
+      $defs{$eN}{READINGS}{$reg}{TIME} = "from archive";
+      my ($list,$pN) = ($1,$2) if ($reg =~ m/RegL_(..):(.*)/);
+      my $pId = CUL_HM_peerChId($pN,substr($defs{$eN}{DEF},0,6));
+      CUL_HM_updtRegDisp($defs{$eN},$list,$pId);
+      push @el,"$eN reg list:$reg";    
+    }
+  }
   $ret .= "\nadded data:\n     "          .join("\n     ",@el)       if (scalar@el);
   $ret .= "\nfile data incomplete:\n     ".join("\n     ",@elincmpl) if (scalar@elincmpl);
   $ret .= "\nentries not defind:\n     "  .join("\n     ",@entryNF)  if (scalar@entryNF);
