@@ -1905,7 +1905,8 @@ sub CUL_HM_Parse($$) {#########################################################
        (hex($mFlg)&0x20)){  #response required Flag
       my ($recChn) = (hex($1));# button number/event count
                 # fhem CUL shall ack a button press
-      push @ack,$shash,$mNo."8002".$dst.$src."0101".(($recChn&1)?"C8":"00")."00";
+#      push @ack,$shash,$mNo."8002".$dst.$src."0101".(($recChn&1)?"C8":"00")."00";
+      push @ack,$shash,$mNo."8002$dst$src"."00";
       Log3 $name,5,"CUL_HM $name prep ACK for $recChn";
     }
   }
