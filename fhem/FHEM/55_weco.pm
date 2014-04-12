@@ -1,4 +1,4 @@
-# $Id:  $
+# $Id$
 ####################################################################################################
 #
 #	55_weco.pm
@@ -97,7 +97,8 @@ sub weco_send($) {
 	my ($data, $d, $r, $o);
 	my $a = $attr{$name};
 	while ( my ($key, $value) = each($a) ) {
-		next if substr($key,4,1) ~~ ["I"] ;
+		next if substr($key,0,4) ne 'weco';
+		next if substr($key,4,1) ~~ ["I"];
 		$key = substr($key,4,length($key)-4);
 		($d, $r, $o) = split(":", $value);
 		if(defined($r)) {
