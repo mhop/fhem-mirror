@@ -286,6 +286,16 @@ sub myRemoveInternalTimer($$) {
       RemoveInternalTimer($myHash);
    }
 }
+########################################################################
+sub myGetHashIndirekt ($$) {
+  my ($myHash, $function) = @_;
+  
+  if (!defined($myHash->{HASH})) {
+    Log 3, "[$function] myHash not valid"; 
+    return undef;
+  };  
+  return $myHash->{HASH};  
+}
 ################################################################################
 sub Twilight_Midnight($) {
    my ($myHash) = @_;
@@ -731,4 +741,130 @@ sub twilight($$$$) {
 </ul>
 
 =end html
+
+=begin html_DE
+<a name="Twilight"></a>
+<h3>Twilight</h3>
+<ul>
+  <br>
+
+  <a name="Twilightdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; Twilight &lt;latitude&gt; &lt;longitude&gt; [&lt;indoor_horizon&gt; [&lt;Weather_Position&gt;]]</code><br>
+    <br>
+    Erstellt ein virtuelles Device f&uuml;r die D&auml;mmerungsberechnung (Zwielicht)<br><br>
+
+  <b>latitude, longitude (geografische L&auml;nge & Breite)</b>
+  <br>
+    Die Parameter <b>latitude</b> und <b>longitude</b> sind Dezimalzahlen welche die Position auf der Erde bestimmen, f&uuml;r welche der Dämmerungs-Status berechnet werden soll.
+    <br><br>
+  <b>indoor_horizon</b>
+  <br>
+	   Der Parameter <b>indoor_horizon</b> bestimmt einen virtuellen Horizont gr&ouml;&szlig;er 0, der f&uuml;r die Berechnung der D&auml;mmerung innerhalb von R&auml;men genutzt werden kann (Typische Werte sind zwischen 0 und 6).
+    <br><br>
+  <b>Weather_Position</b>
+  <br>
+	   Der Parameter <b>Weather_Position</b> ist die Yahoo! Wetter-ID welche f&uuml;r den Bezug der Wetterinformationen gebraucht wird. Gehe auf http://weather.yahoo.com/ und gebe einen Ort (ggf. PLZ) ein. In der URL der daraufhin geladenen Seite ist an letzter Stelle die ID. Beispiel: München, Deutschland -> 676757
+    <br><br>
+
+    Ein Twilight-Device berechnet periodisch die D&auml;mmerungszeiten und -phasen w&auml;hrend des Tages.
+    Es berechnet ein virtuelles "Licht"-Element das einen Indikator f&uuml;r die momentane Tageslichtmenge ist.
+    Neben der Position auf der Erde wird es vom sog. "indoor horizon" (Beispielsweise hohe Geb&auml;de oder Berge)
+    und dem Wetter beeinflusst. Schlechtes Wetter f&uuml;hrt zu einer Reduzierung des Tageslichts f&uuml;r den ganzen Tag.
+    Das berechnete Licht liegt zwischen 0 und 6 wobei die Werte folgendes bedeuten:<br><br>
+  <b>light</b>
+  <br>
+	<code>0 - Totale Nacht, die Sonne ist mind. -18 Grad hinter dem Horizont</code><br>
+	<code>1 - Astronomische D&auml;mmerung, die Sonne ist zw. -12 und -18 Grad hinter dem Horizont</code><br>
+	<code>2 - Nautische D&auml;mmerung, die Sonne ist zw. -6 and -12 Grad hinter dem Horizont</code><br>
+	<code>3 - Zivile/B&uuml;rgerliche D&auml;mmerung, die Sonne ist zw. 0 and -6 hinter dem Horizont</code><br>
+	<code>4 - "indoor twilight", die Sonne ist zwischen dem Wert indoor_horizon und 0 Grad hinter dem Horizont (wird nicht verwendet wenn indoor_horizon=0)</code><br>
+	<code>5 - Wetterbedingte D&auml;mmerung, die Sonne ist zwischen indoor_horizon und einem virtuellen Wetter-Horizonz (der Wetter-Horizont ist Wetterabh&auml;ngig (optional)</code><br>
+	<code>6 - Maximales Tageslicht</code><br>
+	<br>
+ <b>Azimut, Elevation, Twilight (Seitenwinkel, Höhenwinkel, D&auml;mmerung)</b>
+ <br>
+   Das Modul berechnet zus&auml;tzlich Azimuth und Elevation der Sonne. Diese Werte k&ouml;nnen zur Rolladensteuerung verwendet werden.<br><br>
+   
+Das Reading <b>Twilight</b> wird als neuer "(twi)light" Wert hinzugef&uuml;gt. Er wird aus der Elevation der Sonne mit folgender Formel abgeleitet: (Elevation+12)/18 * 100). Das erlaubt eine detailliertere Kontrolle der Lampen w&auml;hrend Sonnenauf - und untergang. Dieser Wert ist zwischen 0% und 100% wenn die Elevation zwischen -12&deg; und 6&deg;
+
+   <br><br>
+Wissenswert dazu ist, dass die Sonne, abh&auml;gnig vom Breitengrad, bestimmte Elevationen nicht erreicht. Im Juni und Juli liegt die Sonne in Mitteleuropa nie unter -18&deg;. In n&ouml;rdlicheren Gebieten (Norwegen, ...) kommt die Sonne beispielsweise nicht &uuml;ber 0&deg.
+   <br><br>
+   All diese Aspekte m&uuml;ssen ber&uuml;cksichtigt werden bei Schaltungen die auf Twilight basieren.
+ 	<br><br>
+
+	Beispiel:
+    <pre>
+      define myTwilight Twilight 49.962529  10.324845 3 676757
+    </pre>
+  </ul>
+  <br>
+
+  <a name="Twilightset"></a>
+  <b>Set </b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+
+  <a name="Twilightget"></a>
+  <b>Get</b>
+  <ul>
+
+    <code>get &lt;name&gt; &lt;reading&gt;</code><br><br>
+    <table>
+    <tr><td><b>light</b></td><td>der aktuelle virtuelle Tageslicht-Wert</td></tr>
+    <tr><td><b>nextEvent</b></td><td>Name des n&auml;chsten Events</td></tr>
+    <tr><td><b>nextEventTime</b></td><td>die Zeit wann das n&auml;chste Event wahrscheinlich passieren wird (w&auml;hrend Lichtphase 5 und 6 wird dieser Wert aktualisiert wenn sich das Wetter &auml;ndert)</td></tr>
+    <tr><td><b>sr_astro</b></td><td>Zeit des astronomitschen Sonnenaufgangs</td></tr>
+    <tr><td><b>sr_naut</b></td><td>Zeit des nautischen Sonnenaufgangs</td></tr>
+    <tr><td><b>sr_civil</b></td><td>Zeit des zivilen/b&uuml;rgerlichen Sonnenaufgangs</td></tr>
+    <tr><td><b>sr</b></td><td>Zeit des Sonnenaufgangs</td></tr>
+    <tr><td><b>sr_indoor</b></td><td>Zeit des "indoor" Sonnenaufgangs</td></tr>
+    <tr><td><b>sr_weather</b></td><td>"Wert" des Wetters beim Sonnenaufgang</td></tr>
+    <tr><td><b>ss_weather</b></td><td>"Wert" des Wetters beim Sonnenuntergang</td></tr>
+    <tr><td><b>ss_indoor</b></td><td>Zeit des "indoor" Sonnenuntergangs</td></tr>
+    <tr><td><b>ss</b></td><td>Zeit des Sonnenuntergangs</td></tr>
+    <tr><td><b>ss_civil</b></td><td>Zeit des zivilen/b&uuml;rgerlichen Sonnenuntergangs</td></tr>
+    <tr><td><b>ss_nautic</b></td><td>Zeit des nautischen Sonnenuntergangs</td></tr>
+    <tr><td><b>ss_astro</b></td><td>Zeit des astro. Sonnenuntergangs</td></tr>
+    <tr><td><b>azimuth</b></td><td>aktueller Azimuth der Sonne. 0&deg; ist Norden 180&deg; ist S&uuml;den</td></tr>
+    <tr><td><b>compasspoint</b></td><td>Ein Wortwert des Kompass-Werts</td></tr>
+    <tr><td><b>elevation</b></td><td>the elevaltion of the sun</td></tr>
+    <tr><td><b>twilight</b></td><td>Prozentualer Wert eines neuen "(twi)light" Wertes: (elevation+12)/18 * 100) </td></tr>
+    <tr><td><b>twilight_weather</b></td><td>Prozentualer Wert eines neuen "(twi)light" Wertes: (elevation-WEATHER_HORIZON+12)/18 * 100). Wenn ein Wetterwert vorhanden ist, ist es immer etwas dunkler als bei klarem Wetter.</td></tr>
+    <tr><td><b>condition</b></td><td>Yahoo! Wetter code</td></tr>
+    <tr><td><b>condition_txt</b></td><td>Yahoo! Wetter code als Text</td></tr>
+    <tr><td><b>horizon</b></td><td>Wert des aktuellen Horizont 0&deg;, -6&deg;, -12&deg;, -18&deg;</td></tr>
+    </table>
+
+  </ul>
+  <br>
+
+  <a name="Twilightattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+  <br>
+
+  <a name="Twilightfunc"></a>
+  <b>Functions</b>
+  <ul>
+     <li><b>twilight</b>(<b>$twilight</b>, <b>$reading</b>, <b>$min</b>, <b>$max</b>)</li> - implementiert eine Routine um die D&auml;mmerungszeiten wie Sonnenaufgang mit min und max Werten zu berechnen.<br><br>
+     <table>
+     <tr><td><b>$twilight</b></td><td>Name der twiligh Instanz</td></tr>
+     <tr><td><b>$reading</b></td><td>Name des zu verwendenden Readings. Beispiel: ss_astro, ss_weather ...</td></tr>
+     <tr><td><b>$min</b></td><td>Parameter min time - optional</td></tr>
+     <tr><td><b>$max</b></td><td>Parameter max time - optional</td></tr>
+     </table>
+  </ul>
+  <br>
+
+</ul>
+
+=end html_DE
 =cut

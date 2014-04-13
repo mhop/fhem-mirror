@@ -45,10 +45,10 @@ sub WOL_Set($@) {
   Log3 $hash, 3, "[$name] set $name $v";
   
   if      ($v eq "on")  {
-     $hash->{STATE}  = $v;
+     readingsSingleUpdate($hash, "state", $v, 1);
      Log3 $hash, 3, "[$name] waking  $name with MAC $hash->{MAC} IP $hash->{IP} ";
   } elsif ($v eq "off") {
-     $hash->{STATE}  = $v;
+     readingsSingleUpdate($hash, "state", $v, 1);
      my $cmd = AttrVal($name, "shutdownCmd", "");
      if ($cmd eq "") {
        Log3 $hash, 3, "[$name] no shutdown command given (see shutdownCmd attribute)!";
