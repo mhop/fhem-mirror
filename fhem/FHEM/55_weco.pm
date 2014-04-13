@@ -115,11 +115,12 @@ sub weco_send($) {
 		Log3 ($name, 4, "weco $name server response: $response");
 		readingsBulkUpdate($hash, "state", "active");
 	} else {
+		CommandDeleteReading(undef, "$name data");
+		CommandDeleteReading(undef, "$name response");
 		Log3 ($name, 4, "weco $name no data");
 		readingsBulkUpdate($hash, "state", "defined");
 		$attr{$name}{wecoInterval} = 60;
 	}
-	
 	readingsEndUpdate($hash, 1);
 
 	InternalTimer(gettimeofday()+$attr{$name}{wecoInterval}, "weco_send", $hash, 0) unless($local == 1);
