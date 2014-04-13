@@ -454,7 +454,7 @@ sub HMinfo_paramCheck(@) { ####################################################
   foreach my $eName (@entities){
     if ($defs{$eName}{helper}{role}{dev}){
       my $ehash = $defs{$eName};
-      my $pairId =  CUL_HM_Get($ehash,$eName,"param","PairedTo");
+      my $pairId =  CUL_HM_Get($ehash,$eName,"param","R-pairCentral");
       my $IoDev =  $ehash->{IODev} if ($ehash->{IODev});
       my $ioHmId = AttrVal($IoDev->{NAME},"hmId","-");
       if    (!$IoDev)               { push @noIoDev,$eName;}
@@ -1346,7 +1346,6 @@ sub HMinfo_loadConfig($@) {####################################################
     }
     elsif($cmd eq "regBulk"){
       next if($param !~ m/RegL_0[0-9]:/);
-
       my $exp = CUL_HM_getAttrInt($eN,"expert");
       $param =~ s/\.RegL/RegL/;
       $param =~ s/RegL/\.RegL/ if ($exp != 2);
@@ -1361,7 +1360,8 @@ sub HMinfo_loadConfig($@) {####################################################
         push @elincmpl,"$eN reg list:$reg";
         next;
       }
-      $changes{$eN}{$reg}=$data if (!$defs{$eN}{READINGS}{$reg});
+      $changes{$eN}{$reg}=$data if (!$defs{$eN}{READINGS}{$reg} || 
+                                     $defs{$eN}{READINGS}{$reg}{VAL} !~ m/00:00/);
     }
   }
   close(aSave);
