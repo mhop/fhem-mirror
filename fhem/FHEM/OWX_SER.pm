@@ -7,7 +7,7 @@
 # Prof. Dr. Peter A. Henning
 # Norbert Truchsess
 #
-# $Id: 11_OWX_SER.pm 2013-03 - pahenning $
+# $Id: OWX_SER.pm 2013-04 - ntruchsess $
 #
 ########################################################################################
 #
@@ -43,7 +43,7 @@ no warnings 'deprecated';
 sub new() {
 	my $class = shift;
 	
-	require "$main::attr{global}{modpath}/FHEM/11_OWX_Executor.pm";
+	require "$main::attr{global}{modpath}/FHEM/OWX_Executor.pm";
 	
 	my $self = OWX_Executor->new();
 	
@@ -202,7 +202,7 @@ sub pt_execute($$$$$$$) {
   }
   
   #-- for debugging
-  if( $main::owx_debug > 1){
+  if( $main::owx_async_debug > 1){
     main::Log3($self->{name},3,"OWX_SER::Execute: Sending out ".unpack ("H*",$select));
   }
   $self->block($select);
@@ -213,7 +213,7 @@ sub pt_execute($$$$$$$) {
 
   my $res = $self->{string_in};
   #-- for debugging
-  if( $main::owx_debug > 1){
+  if( $main::owx_async_debug > 1){
     main::Log3($self->{name},3,"OWX_SER::Execute: Receiving ".unpack ("H*",$res));
   }
 
@@ -286,7 +286,7 @@ sub initialize($) {
 
   my $interface;
   
-  require "$main::attr{global}{modpath}/FHEM/11_OWX_DS2480.pm";
+  require "$main::attr{global}{modpath}/FHEM/OWX_DS2480.pm";
   my $ds2480 = OWX_DS2480->new($self);
   
   #-- timing byte for DS2480
@@ -350,7 +350,7 @@ sub initialize($) {
   if ($interface eq "DS2480") {
     return $ds2480;
   } elsif ($interface eq "DS9097") {
-    require "$main::attr{global}{modpath}/FHEM/11_OWX_DS9097.pm";
+    require "$main::attr{global}{modpath}/FHEM/OWX_DS9097.pm";
     return OWX_DS9097->new($self);
   } else {
     die $ress;
