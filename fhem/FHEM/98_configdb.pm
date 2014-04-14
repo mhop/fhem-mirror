@@ -275,7 +275,7 @@ sub CommandConfigdb($$) {
 			<b>IMPORTANT:</b>
 			<ul><br/>
 				<li>This file <b>must</b> be named "configDB.conf"</li>
-				<li>This file <b>must</b> be located in your fhem main directory, e.g. /opt/fhem</li>
+				<li>This file <b>must</b> be located in the same directory containing fhem.pl and configDB.pm, e.g. /opt/fhem</li>
 			</ul>
 			<br/>
 			<pre>
@@ -514,7 +514,7 @@ Ver 0 always indicates the currently running configuration.<br/>
 			<b>WICHTIG:</b>
 			<ul><br/>
 				<li>Diese Datei <b>muss</b> den Namen "configDB.conf" haben</li>
-				<li>Diese Datei <b>muss</b> im fhem Verzeichnis liegen, z.B. /opt/fhem</li>
+				<li>Diese Datei <b>muss</b> im gleichen Verzeichnis liegen wie fhem.pl und configDB.pm, z.B. /opt/fhem</li>
 			</ul>
 			<br/>
 			<pre>
