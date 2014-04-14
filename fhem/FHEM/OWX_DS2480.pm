@@ -7,7 +7,7 @@
 # Prof. Dr. Peter A. Henning
 # Norbert Truchsess
 #
-# $Id: 11_OWX_SER.pm 2013-03 - pahenning $
+# $Id: OWX_DS2480.pm 2013-04 - ntruchsess $
 #
 ########################################################################################
 #
@@ -98,7 +98,7 @@ sub query ($$$) {
   $hwdevice->baudrate($serial->{baud});
   $hwdevice->write_settings;
 
-  if( $main::owx_debug > 2){
+  if( $main::owx_async_debug > 2){
     main::Log3($serial->{name},3, "OWX_DS2480.query sending out: ".unpack ("H*",$cmd));
   }
   
@@ -134,10 +134,10 @@ sub read() {
   $serial->{string_in} .= $string_part;                            
   $serial->{retcount} += $count_in;		
   $serial->{num_reads}++;
-  if( $main::owx_debug > 2){
+  if( $main::owx_async_debug > 2){
     main::Log3($serial->{name},3, "OWX_DS2480 read: Loop no. $serial->{num_reads}");
   }
-  if( $main::owx_debug > 2){	
+  if( $main::owx_async_debug > 2){	
     main::Log3($serial->{name},3, "OWX_DS2480 read: Receiving in loop no. $serial->{num_reads} ".unpack("H*",$string_part));
   }
   return $count_in > 0 ? 1 : undef;
