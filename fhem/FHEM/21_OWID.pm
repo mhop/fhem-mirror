@@ -55,7 +55,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.11";
+my $owx_version="5.12";
 #-- declare variables
 my %gets = (
   "present"     => "",
@@ -347,7 +347,11 @@ sub OWID_GetValues($) {
   #-- measure elapsed time
   my $t0 = [gettimeofday];
 
-  $value  = OWX_Verify($master,$hash->{ROM_ID});
+  if( $hash->{ASYNC} ){
+    $value = OWX_ASYNC_Verify($master,$hash->{ROM_ID});
+  } else {
+    $value = OWX_Verify($master,$hash->{ROM_ID});
+  }
   
   #my $thr = threads->create('OWX_Verify', $master, $hash->{ROM_ID});
   #$thr->detach();
