@@ -5781,21 +5781,26 @@ sub CUL_HM_TCITRTtempReadings($$@) {# parse RT - TC-IT temperature readings
       my $dayRead = "";
       my @time;
       my @temp;
-       
-      foreach (unpack '(A4)*',substr($tempRegs,$day *13*4,13*4)){
-        my $h = hex($_);
-        push @temp,($h >> 9)/2;
-        $h = ($h & 0x1ff) * 5;
-        $h = sprintf("%02d:%02d",int($h / 60),($h%60));
-        push @time,$h;
+      if (length($tempRegs)<($day+1) *13*4) {
+        push (@changedRead,"R_$idxN{$lst}${day}_tempList$days[$day]:incomplete");
+        $setting .= "Temp set $idxN{$lst}: ${day}_".$days[$day]." incomplete\n";
       }
-      for (my $idx = 0;$idx<13;$idx++){
-        my $entry = sprintf(" %s %3.01f",$time[$idx],$temp[$idx]);
-          $setting .= "Temp set $idxN{$lst}: ${day}_".$days[$day].$entry." C\n";
-          $dayRead .= $entry;
-        last if ($time[$idx] eq "24:00");
+      else{
+        foreach (unpack '(A4)*',substr($tempRegs,$day *13*4,13*4)){
+          my $h = hex($_);
+          push @temp,($h >> 9)/2;
+          $h = ($h & 0x1ff) * 5;
+          $h = sprintf("%02d:%02d",int($h / 60),($h%60));
+          push @time,$h;
+        }
+        for (my $idx = 0;$idx<13;$idx++){
+          my $entry = sprintf(" %s %3.01f",$time[$idx],$temp[$idx]);
+            $setting .= "Temp set $idxN{$lst}: ${day}_".$days[$day].$entry." C\n";
+            $dayRead .= $entry;
+          last if ($time[$idx] eq "24:00");
+        }
+        push (@changedRead,"R_$idxN{$lst}${day}_tempList$days[$day]:$dayRead");
       }
-      push (@changedRead,"R_$idxN{$lst}${day}_tempList$days[$day]:$dayRead");
     }
   }
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
