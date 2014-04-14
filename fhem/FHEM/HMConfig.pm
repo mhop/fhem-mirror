@@ -1321,12 +1321,12 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       ,statusRequest  =>""
                       ,peerIODev      =>"[IO] <btn> [set|unset]..."
                       },
-  remote           =>{ peerChan       =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"},
+  remote           =>{ peerChan       =>"<btnNumber> <actChn> ... [single|dual|reverse] [set|unset] [actor|remote|both]"},
   threeStateSensor =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
 #                     ,statusRequest  =>""
                       },
   THSensor         =>{ peerChan       =>"0 <actChn> ... single [set|unset] [actor|remote|both]"},
-  virtual          =>{ peerChan       =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"
+  virtual          =>{ peerChan       =>"<btnNumber> <actChn> ... [single|dual|reverse] [set|unset] [actor|remote|both]"
                       ,press          =>"[long|short] [noBurst] ..."
                       ,postEvent      =>"<condition>"},
   smokeDetector    =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] actor"},
@@ -1409,7 +1409,7 @@ $culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
                          ,statusRequest  =>""
                          ,sysTime        =>""},
   "HM-OU-CFM-PL01"    =>{ led            =>"<color>[,<color>...] [<repeat>]"},
-  "HM-OU-CFM-PL02"    =>{ playTone       =>"<MP3No>[,<MP3No>...] [<repeat>]"},
+  "HM-OU-CFM-PL02"    =>{ playTone       =>"[replay|<MP3No>[,<MP3No>...]] [<repeat>]"},
   "HM-SEC-WIN01"      =>{ stop           =>"",
                          ,level          =>"<level> <relockDly> <speed>..."
                          ,keydef         =>"<btn> <txt1> <txt2>"

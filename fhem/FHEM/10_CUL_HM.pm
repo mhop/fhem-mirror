@@ -3909,7 +3909,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 
     if ($md =~ m/HM-CC-RT-DN/ && $chn eq "05" ){# rt team peers cross from 05 to 04
       $myBtn = $peerBtn = "05";
-#      $myBtn = $peerBtn = "04"; was observed by HM - but reality showes that peering should be team 2 team
       $peerChn = "05";
     }
     else{ # normal devices
@@ -3921,7 +3920,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "$peerN not a CUL_HM device"                           if(   ($target ne "remote") 
                                                                      && (!$peerHash || $peerHash->{TYPE} ne "CUL_HM")
                                                                      &&  $defs{$devName}{IODev}->{NAME} ne $peerN);
-    return "$single must be single or dual"                       if($single !~ m/^(single|dual)$/);
+    return "$single must be single, dual or reverse"              if($single !~ m/^(single|dual|reverse)$/);
     return "$set must be set or unset"                            if($set    !~ m/^(set|unset)$/);
     return "$target must be [actor|remote|both]"                  if($target !~ m/^(actor|remote|both)$/);
     return "use - single [set|unset] actor - for smoke detector"  if( $st eq "smokeDetector"       && ($single ne "single" || $target ne "actor"));
@@ -3930,22 +3929,28 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 
     my $pSt = CUL_HM_Get($peerHash,$peerHash->{NAME},"param","subType");
 
-    $single = ($single eq "single")?1:"";#default to dual
     
     if ($set eq "unset"){$set = 0;$cmdB ="02";}
     else                {$set = 1;$cmdB ="01";}
 
     my ($b1,$b2,$nrCh2Pair);
-    $b1 = ($roleC) ? hex($myBtn) : ($single?$bNo : ($bNo*2 - 1));
-    if ($single){
+    $b1 = ($roleC) ? hex($myBtn) : (($single eq "single")?$bNo : ($bNo*2 - 1));
+    if ($single eq "single"){
       $b2 = $b1;
       $b1 = 0 if ($st eq "smokeDetector" ||$pSt eq "smokeDetector");
       $nrCh2Pair = 1;
     }
-    else{
+    elsif($single eq "dual"){
+      $single = 0;
       $b2 = $b1 + 1;
       $nrCh2Pair = 2;
     }
+    else{#($single eq "reverse")
+      $single = 0;
+      $b2 = $b1++;
+      $nrCh2Pair = 2;
+    }
+    return "$b2 = $b1";
     $target = "both" if ($st eq "virtual" && $pSt eq "smokeDetector");
 
     # First the remote (one loop for on, one for off)
@@ -4180,6 +4185,7 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
   # autocreate undefined channels
   my @chanTypesList = split(',',$culHmModel->{$mId}{chn});
   foreach my $chantype (@chanTypesList){
+    Log 1,"General  $chantype";
     my ($chnTpName,$chnStart,$chnEnd) = split(':',$chantype);
     my $chnNoTyp = 1;
     for (my $chnNoAbs = $chnStart; $chnNoAbs <= $chnEnd;$chnNoAbs++){
@@ -6923,7 +6929,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
          will be peered/unpeerd to the actor. <a href="CUL_HMpress">press</a> can be
          used to stimulate the related actions as defined in the actor register.
     <ul>
-    <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>][<u>set</u>|unset] [<u>both</u>|actor|remote]</B>
+    <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>|reverse][<u>set</u>|unset] [<u>both</u>|actor|remote]</B>
         <a name="CUL_HMpeerChan"></a><br>
 
          peerChan will establish a connection between a sender- <B>channel</B> and
@@ -6972,6 +6978,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
 
          'dual' (default) Button pairs two buttons to one actuator. With a
          dimmer this means one button for dim-up and one for dim-down. <br>
+
+         'reverse' identical to dual - but button order is reverse.<br>
 
          'single' uses only one button of the sender. It is useful for e.g. for
          simple switch actuator to toggle on/off. Nevertheless also dimmer can
@@ -8138,7 +8146,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           den Benutzer ist dazu n&ouml;tig. Ob Befehle auf Ausf&uuml;hrung warten kann auf Ger&auml;teebene mit dem Parameter
           'protCmdPend' abgefragt werden.
           <ul>
-            <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>]
+            <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>|reverse]
               [<u>set</u>|unset] [<u>both</u>|actor|remote]</B><a name="CUL_HMpeerChan"></a><br>
               "peerChan" richtet eine Verbindung zwischen Sender-<B>Kanal</B> und
               Aktor-<B>Kanal</B> ein, bei HM "link" genannt. "Peering" darf dabei nicht
@@ -8181,6 +8189,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
               
               'dual' (default) Schalter verkn&uuml;pft zwei Taster mit einem Aktor. Bei einem Dimmer
               bedeutet das ein Taster f&uuml;r hoch- und einer f&uuml;r runterdimmen. <br>
+              
+              'reverse' identisch zu dual - nur die Reihenfolge der Buttons ist gedreht<br>
               
               'single' benutzt nur einen Taster des Senders. Ist z.B. n&uuml;tzlich f&uuml;r einen einfachen Schalter
               der nur zwischen an/aus toggled. Aber auch ein Dimmer kann an nur einen Taster angelernt werden.<br>
