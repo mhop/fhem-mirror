@@ -76,7 +76,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.11";
+my $owx_version="5.12";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -493,7 +493,7 @@ sub OWSWITCH_Get($@) {
 
     #-- OWX interface
     if( $interface =~ /^OWX/ ){
-      $ret = OWXSWITCH_GetState($hash);
+      $ret = OWXSWITCH_GetState($hash,1);
     #-- OWFS interface
     }elsif( $interface eq "OWFS" ){
       $ret = OWFSSWITCH_GetState($hash);
@@ -510,7 +510,7 @@ sub OWSWITCH_Get($@) {
       if( int(@a)==1 );
 
     if( $interface =~ /^OWX/ ){
-      $ret = OWXSWITCH_GetState($hash);
+      $ret = OWXSWITCH_GetState($hash,1);
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSSWITCH_GetState($hash);
     }else{
@@ -710,7 +710,7 @@ sub OWSWITCH_Set($@) {
     
     #-- OWX interface
     if( $interface =~ /^OWX/ ){
-      $ret1  = OWXSWITCH_GetState($hash);
+      $ret1  = OWXSWITCH_GetState($hash,1);
       $value = 0;
       #-- vax or val ?
       for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
@@ -1075,8 +1075,8 @@ sub OWXSWITCH_BinValues($$$$$$$$) {
 #
 ########################################################################################
 
-sub OWXSWITCH_GetState($) {
-  my ($hash) = @_;
+sub OWXSWITCH_GetState($@) {
+  my ($hash,$sync) = @_;
   
   my ($select, $res, $res2, $res3, @data);
   
@@ -1101,12 +1101,11 @@ sub OWXSWITCH_GetState($) {
     #-- reading 9 + 3 + 2 data bytes + 2 CRC bytes = 16 bytes
     $select=sprintf("\xF5\xDD\xFF"); 
     #-- asynchronous mode
-    if( $hash->{ASYNC} ){  
-      if (OWX_Execute( $master, "getstate.ds2406", 1, $owx_dev, $select, 4, undef )) {
-        return undef;
-      } else {
-        return "not accessible in reading"; 
+    if( $hash->{ASYNC} ){
+      if (!OWX_Execute( $master, "getstate.ds2406", 1, $owx_dev, $select, 4, undef ) or ($sync and !OWX_AwaitExecuteResponse($master,"getstate.ds2406",$owx_dev))) {
+        return "not accessible for reading";
       }
+      return undef;
      #-- synchronous mode
     }else{
       OWX_Reset($master);
@@ -1127,11 +1126,10 @@ sub OWXSWITCH_GetState($) {
     $select=sprintf("\xF0\x88\x00");   
     #-- asynchronous mode
     if( $hash->{ASYNC} ){
-      if (OWX_Execute( $master, "getstate.ds2408", 1, $owx_dev, $select, 10, undef )) {
-        return undef;
-  	  } else {
-        return "not accessible in reading"; 
+      if (!OWX_Execute( $master, "getstate.ds2408", 1, $owx_dev, $select, 10, undef ) or ($sync and !OWX_AwaitExecuteResponse($master,"getstate.ds2408",$owx_dev))) {
+        return "not accessible for reading";
       }
+      return undef;
     #-- synchronous mode
     }else{
       OWX_Reset($master);
@@ -1151,11 +1149,10 @@ sub OWXSWITCH_GetState($) {
     #-- reading 9 + 1 + 2 data bytes = 12 bytes
     #-- asynchronous mode
     if( $hash->{ASYNC} ){
-      if (OWX_Execute( $master, "getstate.ds2413", 1, $owx_dev, "\xF5", 2, undef )) {
-        return undef;
-      } else {
-        return "not accessible in reading"; 
+      if (!OWX_Execute( $master, "getstate.ds2413", 1, $owx_dev, "\xF5", 2, undef ) or ($sync and !OWX_AwaitExecuteResponse($master,"getstate.ds2413",$owx_dev))) {
+        return "not accessible for reading";
       }
+      return undef;
     #-- synchronous mode
     }else{
       OWX_Reset($master);
