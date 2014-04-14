@@ -1,33 +1,29 @@
 ########################################################################################
 #
-# OWX.pm
+# OWX_ASYNC.pm
 #
 # FHEM module to commmunicate with 1-Wire bus devices
-# * via an active DS2480/DS2482/DS2490/DS9097U bus master interface attached to an USB port
-# * via a passive DS9097 interface attached to an USB port
-# * via a network-attached CUNO
-# * via a COC attached to a Raspberry Pi
-# * via an Arduino running OneWireFirmata attached to USB
+# * via an active DS2480 bus master interface attached to an USB port
+# * via an Arduino running CopnfigurableFirmata attached to USB
+# * via an Arduino running CopnfigurableFirmata connecting to FHEM via Ethernet
 #
-# Prof. Dr. Peter A. Henning
 # Norbert Truchsess
+# Prof. Dr. Peter A. Henning
 #
-# $Id: 00_OWX.pm 2013-03 - pahenning $
+# $Id: 00_OWX_ASYNC.pm 2013-04 - ntruchsess $
 #
 ########################################################################################
 #
-# define <name> OWX <serial-device> for USB interfaces or
-# define <name> OWX <cuno/coc-device> for a CUNO or COC interface
-# define <name> OWX <arduino-pin> for a Arduino/Firmata (10_FRM.pm) interface
+# define <name> OWX_ASYNC <serial-device> for USB interfaces or
+# define <name> OWX_ASYNC <arduino-pin> for a Arduino/Firmata (10_FRM.pm) interface
 #    
 # where <name> may be replaced by any name string 
 #       <serial-device> is a serial (USB) device
-#       <cuno/coc-device> is a CUNO or COC device
 #       <arduino-pin> is an Arduino pin 
 #
 # get <name> alarms                 => find alarmed 1-Wire devices (not with CUNO)
 # get <name> devices                => find all 1-Wire devices 
-# get <name> version                => OWX version number
+# get <name> version                => OWX_ASYNC version number
 #
 # set <name> interval <seconds>     => set period for temperature conversion and alarm testing
 # set <name> followAlarms on/off    => determine whether an alarm is followed by a search for
@@ -37,6 +33,8 @@
 #                                      bus to do a temperature conversion, 
 #                                      and to make an alarm check
 #                                      0 if not
+#
+# attr <name> interval <seconds>    => set period for temperature conversion and alarm testing
 #
 ########################################################################################
 #
@@ -86,7 +84,7 @@ use Time::HiRes qw(gettimeofday);
 require "$main::attr{global}{modpath}/FHEM/DevIo.pm";
 sub Log3($$$);
 
-use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
+use vars qw{%owg_family %gets %sets $owx_async_version $owx_async_debug};
 # 1-Wire devices 
 # http://owfs.sourceforge.net/family.html
 %owg_family = (
@@ -127,9 +125,9 @@ my %attrs = (
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_version=4.6;
+$owx_async_version=5.0;
 #-- Debugging 0,1,2,3
-$owx_debug=0;
+$owx_async_debug=0;
 
 ########################################################################################
 #
@@ -153,11 +151,12 @@ sub OWX_ASYNC_Initialize ($) {
   $hash->{UndefFn}  = "OWX_ASYNC_Undef";
   $hash->{GetFn}    = "OWX_ASYNC_Get";
   $hash->{SetFn}    = "OWX_ASYNC_Set";
+  $hash->{AttrFn}   = "OWX_ASYNC_Attr";
   $hash->{NotifyFn} = "OWX_ASYNC_Notify";
   $hash->{ReadFn}   = "OWX_ASYNC_Poll";
   $hash->{ReadyFn}  = "OWX_ASYNC_Ready";
   $hash->{InitFn}   = "OWX_ASYNC_Init";
-  $hash->{AttrList} = "dokick:0,1 async:0,1 IODev timeout";
+  $hash->{AttrList} = "dokick:0,1 interval IODev timeout";
   main::LoadModule("OWX");
 }
 
@@ -174,9 +173,9 @@ sub OWX_ASYNC_Define ($$) {
 	my @a = split("[ \t][ \t]*", $def);
   
 	#-- check syntax
-   	return "OWX: Syntax error - must be define <name> OWX <serial-device>|<cuno/coc-device>|<arduino-pin>" if(int(@a) < 3);
+   	return "OWX: Syntax error - must be define <name> OWX <serial-device>|<arduino-pin>" if(int(@a) < 3);
 
-	Log3 ($hash->{NAME},2,"OWX: Warning - Some parameter(s) ignored, must be define <name> OWX <serial-device>|<cuno/coc-device>|<arduino-pin>") if( int(@a)>3 );
+	Log3 ($hash->{NAME},2,"OWX: Warning - Some parameter(s) ignored, must be define <name> OWX <serial-device>|<arduino-pin>") if( int(@a)>3 );
 	my $dev = $a[2];
   
   $hash->{NOTIFYDEV} = "global";
@@ -217,6 +216,35 @@ sub OWX_ASYNC_Define ($$) {
     return OWX_ASYNC_Init($hash);
   }
 	return undef;
+}
+
+#######################################################################################
+#
+# OWTX_Attr - Set one attribute value for device
+#
+#  Parameter hash = hash of device addressed
+#            a = argument array
+#
+########################################################################################
+
+sub OWX_ASYNC_Attr(@) {
+  my ($do,$name,$key,$value) = @_;
+  
+  my $hash = $main::defs{$name};
+  my $ret;
+  
+  if ( $do eq "set") {
+  	ARGUMENT_HANDLER: {
+      $key eq "interval" and do {
+        $hash->{interval} = $value;
+        if ($main::init_done) {
+          OWX_ASYNC_Kick($hash);
+        }
+        last;
+      };
+    }
+  }
+  return $ret;
 }
 
 sub OWX_ASYNC_Notify {
@@ -700,7 +728,7 @@ sub OWX_ASYNC_Get($@) {
     return $res
         
   } elsif( $a[1] eq "version") {
-    return $owx_version;
+    return $owx_async_version;
     
   } else {
     return "OWX: Get with unknown argument $a[1], choose one of ". 
@@ -753,7 +781,7 @@ sub OWX_ASYNC_Init ($) {
   InternalTimer(gettimeofday()+10, "OWX_ASYNC_Discover", $hash,0);
   
   #-- Default settings
-  $hash->{interval}     = 300;          # kick every 5 minutes
+  $hash->{interval}     = AttrVal($hash->{NAME},"interval",300);          # kick every 5 minutes
   $hash->{followAlarms} = "off";
   $hash->{ALARMED}      = "no";
   
@@ -1020,35 +1048,34 @@ sub OWX_ASYNC_AfterExecute($$$$$$$$) {
 =pod
 =begin html
 
-<a name="OWX"></a>
-        <h3>OWX</h3>
+<a name="OWX_ASYNC"></a>
+        <h3>OWX_ASYNC</h3>
         <p> FHEM module to commmunicate with 1-Wire bus devices</p>
         <ul>
-            <li>via an active DS2480/DS2482/DS2490/DS9097U bus master interface attached to an USB
-                port or </li>
-            <li>via a passive DS9097 interface attached to an USB port or</li>
-            <li>via a network-attached CUNO or through a COC on the RaspBerry Pi</li>
-            <li>via an Arduino running OneWireFirmata attached to USB</li>
-        </ul> Internally these interfaces are vastly different, read the corresponding <a
-            href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire"> Wiki pages </a>
+            <li>via an active DS2480 bus master interface attached to an USB port or </li>
+            <li>via an Arduino running ConfigurableFirmata attached to USB</li>
+            <li>via an Arduino running ConfigurableFirmata connecting to FHEM via Ethernet</li>
+        </ul>
+        <p>Internally these interfaces are vastly different, read the corresponding <a
+            href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire"> Wiki pages </a></p>
+        <p>OWX_ASYNC does pretty much the same job as <a href="#OWX">OWX</a> does, but using
+        	an asynchronous mode of communication</p> 
         <br />
         <br />
         <h4>Example</h4><br />
         <p>
-            <code>define OWio1 OWX /dev/ttyUSB1</code>
+            <code>define OWio1 OWX_ASYNC /dev/ttyUSB1</code>
             <br />
-            <code>define OWio2 OWX COC</code>
-            <br />
-            <code>define OWio3 OWX 10</code>
+            <code>define OWio3 OWX_ASYNC 10</code>
             <br />
         </p>
         <br />
-        <a name="OWXdefine"></a>
+        <a name="OWX_ASYNCdefine"></a>
         <h4>Define</h4>
         <p>
-            <code>define &lt;name&gt; OWX &lt;serial-device&gt;</code> or <br />
-            <code>define &lt;name&gt; OWX &lt;cuno/coc-device&gt;</code> or <br />
-            <code>define &lt;name&gt; OWX &lt;arduino-pin&gt;</code>
+            <code>define &lt;name&gt; OWX_ASYNC &lt;serial-device&gt;</code> or <br />
+            <code>define &lt;name&gt; OWX_ASYNC &lt;cuno/coc-device&gt;</code> or <br />
+            <code>define &lt;name&gt; OWX_ASYNC &lt;arduino-pin&gt;</code>
             <br /><br /> Define a 1-Wire interface to communicate with a 1-Wire bus.<br />
             <br />
         </p>
@@ -1065,30 +1092,30 @@ sub OWX_ASYNC_AfterExecute($$$$$$$$) {
                 use <a href="#IODev">IODev</a> attribute to select which FRM device to use.</li>
         </ul>
         <br />
-        <a name="OWXset"></a>
+        <a name="OWX_ASYNCset"></a>
         <h4>Set</h4>
         <ul>
-            <li><a name="owx_interval">
+            <li><a name="owx_async_interval">
                     <code>set &lt;name&gt; interval &lt;value&gt;</code>
                 </a>
-                <br />sets the time period in seconds for "kicking" the 1-Wire bus when the <a href="#OWXdokick">dokick attribute</a> is set (default
+                <br />sets the time period in seconds for "kicking" the 1-Wire bus when the <a href="#OWX_ASYNCdokick">dokick attribute</a> is set (default
                 is 300 seconds).
             </li>
-            <li><a name="owx_followAlarms">
+            <li><a name="owx_async_followAlarms">
                     <code>set &lt;name&gt; followAlarms on|off</code>
                 </a>
                 <br /><br /> instructs the module to start an alarm search in case a reset pulse
                 discovers any 1-Wire device which has the alarm flag set. </li>
         </ul>
         <br />
-        <a name="OWXget"></a>
+        <a name="OWX_ASYNCget"></a>
         <h4>Get</h4>
         <ul>
-            <li><a name="owx_alarms"></a>
+            <li><a name="owx_async_alarms"></a>
                 <code>get &lt;name&gt; alarms</code>
                 <br /><br /> performs an "alarm search" for devices on the 1-Wire bus and, if found,
                 generates an event in the log (not with CUNO). </li>
-            <li><a name="owx_devices"></a>
+            <li><a name="owx_async_devices"></a>
                 <code>get &lt;name&gt; devices</code>
                 <br /><br /> redicovers all devices on the 1-Wire bus. If a device found has a
                 previous definition, this is automatically used. If a device is found but has no
@@ -1096,14 +1123,14 @@ sub OWX_ASYNC_AfterExecute($$$$$$$$) {
                 autodeleted. </li>
         </ul>
         <br />
-        <a name="OWXattr"></a>
+        <a name="OWX_ASYNCattr"></a>
         <h4>Attributes</h4>
         <ul>
-            <li><a name="OWXdokick"><code>attr &lt;name&gt; dokick 0|1</code></a>
+            <li><a name="OWX_ASYNCdokick"><code>attr &lt;name&gt; dokick 0|1</code></a>
                 <br />1 if the interface regularly kicks thermometers on the bus to do a temperature conversion, 
                and to perform an alarm check, 0 if not</li>
-            <li><a name="OWXIODev"><code>attr &lt;name&gt; IODev <FRM-device></code></a>
-                <br />assignes a specific FRM-device to OWX when working through an Arduino. 
+            <li><a name="OWX_ASYNCIODev"><code>attr &lt;name&gt; IODev <FRM-device></code></a>
+                <br />assignes a specific FRM-device to OWX_ASYNC when working through an Arduino. 
                 Required only if there is more than one FRM defined.</li>
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
                     href="#event-on-update-reading">event-on-update-reading</a>, <a
