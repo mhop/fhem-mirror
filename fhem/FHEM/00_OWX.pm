@@ -130,7 +130,8 @@ sub OWX_Initialize ($) {
   $hash->{GetFn}   = "OWX_Get";
   $hash->{SetFn}   = "OWX_Set";
   $hash->{NotifyFn} = "OWX_Notify";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 buspower:real,parasitic IODev";
+  $hash->{AttrFn}  = "OWX_Attr";
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 buspower:real,parasitic dokick:1,0 interval IODev";
 
   #-- Adapt to FRM
   $hash->{InitFn}   = "FRM_OWX_Init";
@@ -244,7 +245,7 @@ sub OWX_Start ($) {
   InternalTimer(gettimeofday()+10, "OWX_Discover", $hash,0);
   
   #-- Default settings
-  $hash->{interval}     = 300;          # kick every 5 minutes
+  $hash->{interval}     = AttrVal($hash->{NAME},"interval",300);          # kick every 5 minutes
   $hash->{followAlarms} = "off";
   $hash->{ALARMED}      = "no";
   
@@ -265,6 +266,40 @@ sub OWX_Notify {
   	OWX_Start($hash);
   } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
   }
+}
+
+#######################################################################################
+#
+# OWTX_Attr - Set one attribute value for device
+#
+#  Parameter hash = hash of device addressed
+#            a = argument array
+#
+########################################################################################
+
+sub OWX_Attr(@) {
+  my ($do,$name,$key,$value) = @_;
+  
+  my $hash = $defs{$name};
+  my $ret;
+  
+  if ( $do eq "set") {
+  	ARGUMENT_HANDLER: {
+      $key eq "buspower" and do {
+        #-- check value
+        $attr{$hash->{NAME}}{dokick} = $value eq "real" ? 1 : 0;
+        last;
+      };
+      $key eq "interval" and do {
+        $hash->{interval} = $value;
+        if ($main::init_done) {
+          OWX_Kick($hash);
+        }
+        last;
+      };
+    }
+  }
+  return $ret;
 }
 
 ########################################################################################
@@ -911,7 +946,7 @@ sub OWX_Kick($) {
   OWX_Reset($hash);
    
   #-- Only if we have real power on the bus
-  if( defined($attr{$hash->{NAME}}{buspower}) &&  ($attr{$hash->{NAME}}{buspower} eq "real") ){
+  if( AttrVal($hash->{NAME},"dokick",0) ) {
     #-- issue the skip ROM command \xCC followed by start conversion command \x44 
     $ret = OWX_Complex($hash,"","\xCC\x44",0);
     if( $ret eq 0 ){
@@ -1010,7 +1045,7 @@ sub OWX_Set($@) {
     
   }
   Log GetLogLevel($name,3), "OWX_Set $name ".join(" ",@a)." => $res";  
-  DoTrigger($name, undef) if($init_done);
+  DoTrigger($name, undef) if($main::init_done);
   return "OWX_Set => $name ".join(" ",@a)." => $res";
 }
 
