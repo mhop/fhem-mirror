@@ -1964,7 +1964,7 @@ CommandReload($$)
   $modules{$m}{ORDER} = $order;
   $modules{$m}{LOADED} = 1;
   $modules{$m}{defptr} = $defptr if($defptr);
-  $modules{$m}{ldata} = $defptr if($ldata);
+  $modules{$m}{ldata} = $ldata if($ldata);
 
   return undef;
 }
