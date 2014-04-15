@@ -1111,7 +1111,7 @@ sub sendRequest($$)
   parameters for serial devices.
 
   </td><td>
-  <img src="http://busware.de/show_image.php?id=269" width="100%" height="100%"/>
+  <img src="IMG_0483.jpg" width="100%" height="100%"/>
   </td></tr>
   </table>
 
