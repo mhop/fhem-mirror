@@ -1005,6 +1005,7 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
                          ,noMinMax4Manu   =>1,daylightSaveTime=>1,sendWeatherData =>1
                          ,modePrioParty   =>1,modePrioManu    =>1,weekPrgSel      =>1
                          },
+  "HM-TC-IT-WM-W-EU07"=>{ sign            =>1},
   "HM-ES-PMSw1-Pl01"  =>{ OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1
                          ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
                          ,CtValLo         =>1,CtValHi         =>1
@@ -1059,7 +1060,6 @@ $culHmRegChan{"HM-CC-RT-DN-BoM06"}    = $culHmRegChan{"HM-CC-RT-DN06"};
 
 $culHmRegChan{"HM-TC-IT-WM-W-EU03"}   = $culHmRegChan{"HM-CC-RT-DN03"};
 $culHmRegChan{"HM-TC-IT-WM-W-EU06"}   = $culHmRegChan{"HM-CC-RT-DN06"};
-$culHmRegChan{"HM-TC-IT-WM-W-EU07"}   = $culHmRegType{remote};        # type hash
 
 $culHmRegChan{"ROTO_ZEL-STG-RM-FWT02"}= $culHmRegChan{"HM-CC-TC02"};
 $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
