@@ -1278,30 +1278,32 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     <a name="modpath"></a>
     <li>modpath<br>
         Mit modpath geben Sie den Pfad zu dem Verzeichnis der <code>FHEM</code> 
-    Module an. Der Pfad enh&auml;lt <b>nicht</b> das Verzeichnis FHEM. Durch das 
-    setzen der Attribute, wird das Verzeichnis nach Dateinamen in der Form NN_&lt;NAME&gt;.pm, 
-    und sie werden f&uuml;r die Definition von Ger&auml;ten unter dem Namen
-        &lt;NAME&gt; verf&uuml;gbar gemacht. Wenn das erste Ger&auml;t&nbsp; des Typs &lt;NAME&gt; definiert 
-    wird, werden die entsprechenden Module geladen und in dem Modul die 
-    entsprechende Function mit dem Namen
-        &lt;NAME&gt;_Initialize wird aufgerufen. Eine Ausnahme bilden Module die 
-    mit der Nummer 99 im Dateinamen beginnen. Diese sind&nbsp; enhalten 
-    PERL-Hilfsfunktionen. Die Module werden zur Startzeit geladen (i.e.
-        modpath attribute definition time).
-    </li><br>
+        Module an. Der Pfad enh&auml;lt <b>nicht</b> das Verzeichnis FHEM.
+        Durch das setzen der Attribute, wird das Verzeichnis nach Dateinamen in
+        der Form NN_&lt;NAME&gt;.pm, und sie werden f&uuml;r die Definition von
+        Ger&auml;ten unter dem Namen &lt;NAME&gt; verf&uuml;gbar gemacht. Wenn
+        das erste Ger&auml;t&nbsp; des Typs &lt;NAME&gt; definiert wird, werden
+        die entsprechenden Module geladen und in dem Modul die entsprechende
+        Function mit dem Namen &lt;NAME&gt;_Initialize wird aufgerufen. Eine
+        Ausnahme bilden Module die mit der Nummer 99 im Dateinamen beginnen.
+        Diese sind&nbsp; enhalten PERL-Hilfsfunktionen. Die Module werden zur
+        Startzeit geladen (i.e.  modpath attribute definition time).  </li><br>
 
     <a name="motd"></a>
     <li>motd<br>
-        Nachricht des Tages. Wird im Begr&uuml;ßungsbildschirm von FHEM angezeigt,
-        oder direkt beim Start einer &quot;telnet&quot; Sitzung, bevor der fhem&gt; Prompt 
-    erscheint. Der SecurityCheck setzt motd wenn es bisher nicht gesetzt ist. Um 
-    das zu verhindern, k&ouml;nnen sie den Wert von motd auf &quot;none&quot; setzen
+        Nachricht des Tages. Wird im Begr&uuml;ßungsbildschirm von FHEM
+        angezeigt, oder direkt beim Start einer &quot;telnet&quot; Sitzung,
+        bevor der fhem&gt; Prompt erscheint. Der SecurityCheck setzt motd wenn
+        es bisher nicht gesetzt ist. Um das zu verhindern, k&ouml;nnen sie den
+        Wert von motd auf &quot;none&quot; setzen.
+        motd wird auch verwendet, um Fehlermeldungen w&auml;hrend des
+        fhem-Starts zu sammeln und anzuzeigen.
     </li><br>
 
     <a name="mseclog"></a>
     <li>mseclog<br>
-        Wenn dieses Attribut gesetzt ist, enthalten Datums/Zeiteintr&auml;ge (timestamp) 
-    in der Logdatei einen Millisekunden-Eintrag.
+        Wenn dieses Attribut gesetzt ist, enthalten Datums/Zeiteintr&auml;ge
+        (timestamp) in der Logdatei einen Millisekunden-Eintrag.
     </li><br>
 
     <a name="nofork"></a>
