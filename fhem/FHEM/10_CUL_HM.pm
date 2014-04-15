@@ -3950,7 +3950,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $b2 = $b1++;
       $nrCh2Pair = 2;
     }
-    return "$b2 = $b1";
+
     $target = "both" if ($st eq "virtual" && $pSt eq "smokeDetector");
 
     # First the remote (one loop for on, one for off)
@@ -4185,7 +4185,6 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
   # autocreate undefined channels
   my @chanTypesList = split(',',$culHmModel->{$mId}{chn});
   foreach my $chantype (@chanTypesList){
-    Log 1,"General  $chantype";
     my ($chnTpName,$chnStart,$chnEnd) = split(':',$chantype);
     my $chnNoTyp = 1;
     for (my $chnNoAbs = $chnStart; $chnNoAbs <= $chnEnd;$chnNoAbs++){
