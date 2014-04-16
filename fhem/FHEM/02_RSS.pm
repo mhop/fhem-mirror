@@ -46,7 +46,7 @@ RSS_Initialize($) {
     my ($hash) = @_;
     $hash->{DefFn}   = "RSS_Define";
     #$hash->{AttrFn}  = "RSS_Attr";
-    $hash->{AttrList}= "size bg tmin";
+    $hash->{AttrList}= "size bg bgcolor tmin";
     $hash->{SetFn}   = "RSS_Set";
 
     RSS_addExtension("RSS_CGI","rss","RSS");
@@ -384,6 +384,16 @@ RSS_itemLine {
   $S->line($x1,$y1,$x2,$y2,RSS_color($S,$params{rgb}));  
 }
 
+sub
+RSS_itemRect {
+  my ($S,$x1,$y1,$x2,$y2,$filled,%params)= @_;
+  if($filled) {
+    $S->filledRectangle($x1,$y1,$x2,$y2,RSS_color($S,$params{rgb}));
+  } else {
+    $S->rectangle($x1,$y1,$x2,$y2,RSS_color($S,$params{rgb})); 
+  }
+}
+
 ##################
 sub
 RSS_evalLayout($$@) {
@@ -495,6 +505,12 @@ RSS_evalLayout($$@) {
             ($x2,$y2)= RSS_xy($S, $x2,$y2,%params);
             $format //= 1; # set format to 1 as default thickness for the line
             RSS_itemLine($S,$x1,$y1,$x2,$y2, $format,%params);
+          } elsif($cmd eq "rect") {
+            ($x1,$y1,$x2,$y2,$format)= split("[ \t]+", $def, 5);
+            ($x1,$y1)= RSS_xy($S, $x1,$y1,%params);
+            ($x2,$y2)= RSS_xy($S, $x2,$y2,%params);
+            $format //= 0; # set format to 0 as default (not filled)
+            RSS_itemRect($S,$x1,$y1,$x2,$y2, $format,%params);
           } elsif($cmd eq "time") {
             ($x,$y)= split("[ \t]+", $def, 2);
             ($x,$y)= RSS_xy($S, $x,$y,%params);
@@ -554,8 +570,10 @@ RSS_returnJPEG($) {
   my $S;
   # let's create a blank image, we will need it in most cases. 
   $S= GD::Image->newTrueColor($width,$height);
-  $S->colorAllocate(0,0,0); # black is the background
-
+  my $bgcolor = AttrVal($name,'bgcolor','000000'); #default bg color = black
+  $bgcolor = RSS_color($S, $bgcolor);
+  # $S->colorAllocate(0,0,0); # other colors seem not to work (issue with GD)
+  $S->fill(0,0,$bgcolor);
   # wrap to make problems with GD non-lethal
 
   eval {
@@ -715,6 +733,9 @@ RSS_CGI(){
     <li>size<br>The dimensions of the JPEG picture in the format
     <code>&lt;width&gt;x&lt;height&gt;</code>.</li><br>
     <li>bg<br>The directory that contains the background pictures (must be in JPEG format).</li><br>
+    <li>bgcolor &lt;color&gt;<br>Sets the background color. &lt;color&gt; is 
+    a 6-digit hex number, every 2 digits  determining the red, green and blue 
+    color components as in HTML color codes (e.g.<code>FF0000</code> for red, <code>C0C0C0</code> for light gray).</li><br>
     <li>tmin<br>The background picture is shown at least <code>tmin</code> seconds,
     no matter how frequently the RSS feed consumer accesses the page.</li><br>
   </ul>
@@ -839,6 +860,7 @@ RSS_CGI(){
     <li>seconds &lt;x&gt; &lt;y&gt; &lt;format&gt<br>Renders the curent seconds. Maybe usefull for a RSS Clock. With option colon a : </li><br>
     <li>date &lt;x&gt; &lt;y&gt;<br>Renders the current date in DD:MM:YYY format.</li><br>
     <li>line &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; [&lt;thickness&gt;]<br>Draws a line from position (&lt;x1&gt;, &lt;y1&gt;) to position (&lt;x2&gt;, &lt;y2&gt;) with optional thickness (default=1).</li><br>
+    <li>rect &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; [&lt;filled&gt;]<br>Draws a rectangle with corners at positions (&lt;x1&gt;, &lt;y1&gt;) and (&lt;x2&gt;, &lt;y2&gt;), which is filled if the &lt;filled&gt; parameter is set and not zero.</li><br>
     <li>img &lt;x&gt; &lt;y&gt; &lt;['w' or 'h']s&gt; &lt;imgtype&gt; &lt;srctype&gt; &lt;arg&gt; <br>Renders a picture at the
     position (&lt;x&gt;, &lt;y&gt;). The &lt;imgtype&gt; is one of <code>gif</code>, <code>jpeg</code>, <code>png</code>.
     The picture is scaled by the factor &lt;s&gt; (a decimal value). If 'w' or 'h' is in front of scale-value the value is used to set width or height to the value in pixel. If &lt;srctype&gt; is <code>file</code>, the picture
