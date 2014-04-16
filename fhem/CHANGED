@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: new layout command rect and new attribute bgcolor for RSS
   - added:   new module 55_weco.pm (betateilchen)
   - added:   new module 70_Jabber.pm (BioS)
   - bugfix:  Dashboard: use "loadScript" for load JavaScripts
