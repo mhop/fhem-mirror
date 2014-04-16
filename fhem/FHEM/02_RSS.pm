@@ -104,7 +104,7 @@ RSS_Define($$) {
     
   RSS_readLayout($hash);
   
-  $hash->{STATE} = $name;
+  $hash->{STATE} = 'defined'; #$name;
   return undef;
 }
 
@@ -637,7 +637,7 @@ RSS_returnJPEG($) {
     # evaluate layout
     #
     RSS_evalLayout($S, $name, $defs{$name}{fhem}{layout});
-
+    $defs{$name}{STATE} = localtime();
   }; warn $@ if $@;
     
   #
