@@ -13,7 +13,7 @@
 // 2.03: Fix showhelper Bug on lock/unlock. The error that after a trigger action the curren tab is changed to the "old" activetab tab has 
 //			 been fixed.
 // 2.04: Dashboard position near Top in showfullsize-mode. Restore ActiveTab funktion
-// 2.04: dashboard_showfullsize not applied in room "all" resp. "Everything"
+// 2.05: Delete function for set lockstate
 //
 // Known Bugs/Todo's
 // See 95_Dashboard.pm
@@ -142,21 +142,6 @@ function showdebugMessage(msg){
 	document.getElementById("dashboard_jsdebug").value = msg;
 }
 
-function dashboard_tooglelock(){
- var params = (document.getElementById("dashboard_attr").value).split(","); //get current Configuration
- if (params[3] == "lock"){ //current state lock, do unlock
-	params[3] = "unlock"; 	
-	$("#dashboard_button_lock").button( "option", "label", "Lock" );
-	dashboard_unsetlock();
- } else { //current state unlock, set lock
-	params[3] = "lock"; 
-	$("#dashboard_button_lock").button( "option", "label", "Unlock" );
-	dashboard_setlock();
- } 
- document.getElementById("dashboard_attr").value = params; 
- FW_cmd(document.location.pathname+'?XHR=1&cmd.'+params[0]+'=attr '+params[0]+' dashboard_lockstate '+params[3]);
-}
-
 function dashboard_setlock(){
 	$("#dashboard_button_lock").prepend('<span class="dashboard_button_icon dashboard_button_iconlock"></span>');  
 	//############################################################
@@ -235,14 +220,12 @@ $(document).ready( function () {
 	//-------------------------------------------------------------------------------------------------------------------------------------
 	$("body").attr("longpollfilter", ".*") //need for longpoll
 
-	if (params[13] == 1){ //disable roomlist and header, but not in room Everything	
-		if ($('#content').attr("room") != "all") {
-			$("#menuScrollArea").remove();
-			$("#hdr").remove();
-			$(".roomoverview:first").remove();
-			$("br:first").remove();
-			$("#content").css({position:   'inherit'});	
-		}
+	if (params[13] == 1){ //disable roomlist and header	
+		$("#menuScrollArea").remove();
+		$("#hdr").remove();
+		$(".roomoverview:first").remove();
+		$("br:first").remove();
+		$("#content").css({position:   'inherit'});	
 	}
 	
     $(".dashboard_column").sortable({
@@ -305,7 +288,7 @@ $(document).ready( function () {
 			restoreOrder(); 
 			},
 		activate: function (event, ui) {
-			restoreOrder(); 		
+			restoreOrder(); 
 		}   
 	});	
 	if ($("#dashboard_tabnav").hasClass("dashboard_tabnav_bottom")) { $(".dashboard_tabnav").appendTo(".dashboard_tabs"); } //set Tabs on the Bottom	
@@ -325,21 +308,8 @@ $(document).ready( function () {
 		}
 	});	
 	
-	$("#dashboard_button_lock").button({
-		create: function( event, ui ) {
-			dashboard_modifyWidget();
-			if (params[3] == "lock") { 
-				$(this).button( "option", "label", "Unlock" );
-				dashboard_setlock();  
-			} else {
-				$(this).button( "option", "label", "Lock" );
-				dashboard_unsetlock();
-			}
-		}
-	});	
-	
+	dashboard_modifyWidget();
+	if (params[3] == "lock") {dashboard_setlock();} else {dashboard_unsetlock();}	
 	if (params[14] != "none" ) {$('<style type="text/css">'+params[14]+'</style>').appendTo($('head')); }
   }	
 });
-
-
