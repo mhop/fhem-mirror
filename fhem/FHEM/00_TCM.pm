@@ -265,7 +265,7 @@ TCM_Read($)
         if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
           Log3 $name, 4, "TCM $name Telegram from $id blocked.";        
         } else {
-          Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status", undef);
+          Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:01FFFFFFFF0000", undef);
         }
 
       } else {
@@ -289,7 +289,7 @@ TCM_Read($)
           if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
             Log3 $name, 4, "TCM $name Telegram from $id blocked.";        
           } else {
-            Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status", undef);
+            Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:01FFFFFFFF0000", undef);
           }
          }
       }
