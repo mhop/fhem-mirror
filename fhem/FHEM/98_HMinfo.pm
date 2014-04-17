@@ -631,6 +631,7 @@ sub HMinfo_tempListTmpl(@) { ##################################################
   }
   return "no entities selected" if (!scalar @el);
   $tmpl = (!$tmpl)?"":($fName?$fName.":".$tmpl:$tmpl);
+  my @rs;
   foreach my $name (@el){
     my $tmplDev;
     if (!$tmpl){
@@ -641,8 +642,9 @@ sub HMinfo_tempListTmpl(@) { ##################################################
     }
     my $r = CUL_HM_tempListTmpl($name,$action,$tmplDev);
     
-    $ret .= ($r?$r:"passed:$name")."\n";
+    push @rs,  "$tmplDev -> ".($r?$r:"passed:$name")."\n";
   }
+  $ret .= join "",sort @rs;
   return $ret;
 }
 
