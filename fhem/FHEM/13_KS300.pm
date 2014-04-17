@@ -327,14 +327,10 @@ KS300_windIndex($)
 <a name="KS300"></a>
 <h3>KS300</h3>
 <ul>
-  Fhem can receive the KS300 radio (868.35 MHz) messages through <a
-  href="#FHZ">FHZ</a>, <a href="WS300">WS300</a> or an <a href="#CUL">CUL</a>
-  device, so one of them must be defined first.<br>
-  This module services messages received by the FHZ device, if you use one of
-  the other alternetives, see the <a href="#WS300">WS300</a> or <a
-  href="#CUL_WS">CUL_WS</a> entries.<br>
-  Note: The KS555 is also reported to work.<br>
-  <br>
+  Fhem can receive the KS300 or KS555 radio messages through the <a
+  href="#FHZ">FHZ</a>, <a href="WS300">WS300</a> or <a href="#CUL">CUL</a>, so
+  one of them must be defined first.<br> This module services messages received
+  by the FHZ or CUL.<br> <br>
 
   <a name="KS300define"></a>
   <b>Define</b>
@@ -342,12 +338,10 @@ KS300_windIndex($)
     <code>define &lt;name&gt; KS300 &lt;housecode&gt; [ml/raincounter [wind-factor]]</code>
     <br><br>
 
-    <code>&lt;housecode&gt;</code> is a four digit hex number,
-    corresponding to the address of the KS300 device, right now it is ignored.
-    The ml/raincounter defaults to 255 ml, but it must be specified if you wish
-    to set the wind factor, which defaults to 1.0.
-    <br>
-
+    <code>&lt;housecode&gt;</code> is a four digit hex number, it must be
+    specified foir historic reasons, and it is ignored.
+    The ml/raincounter defaults to 255 ml, and it must be specified if you wish
+    to set the wind factor, which defaults to 1.0.  <br>
     Examples:
     <ul>
       <code>define ks1 KS300 1234</code><br>
@@ -379,15 +373,79 @@ KS300_windIndex($)
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#model">model</a> (ks300)</li>
     <li>rainadjustment<br>
-        If this attribute is set, fhem automatically accounts for rain counter
-        resets after a battery change and random counter switches as experienced
-        by some users. The raw rain counter values are adjusted by an offset
-        in order to flatten out the sudden large increases and decreases in
-        the received rain counter values. Default is off.</li>
+        If this attribute is set, fhem automatically considers rain counter
+        resets after a battery change and random counter switches as
+        experienced by some users.  Default is 0 (off).</li>
   </ul>
   <br>
 
 </ul>
 
 =end html
+
+
+=begin html_DE
+
+<a name="KS300"></a>
+<h3>KS300</h3>
+<ul>
+  Fhem kann KS300 bzw. KS555 Funktelegramme mit einem <a href="#FHZ">FHZ</a>,
+  einem <a href="WS300">WS300</a> oder einem <a href="#CUL">CUL</a> empfangen.
+  Daher muss eines von diesen zuerst definiert sein.<br> Dieses Modul behandelt
+  Nachrichten die mittels CUL oder FHZ empfangen werden.<br>
+  <br>
+
+  <a name="KS300define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; KS300 &lt;housecode&gt; [ml/raincounter [wind-factor]]</code>
+    <br><br>
+
+    <code>&lt;housecode&gt;</code> ist ein vierstelliger HEX-Wert, der aus
+    historischen Gr&uuml;nden angegeben werden muss, es wird ignoriert.  Der
+    ml/raincounter hat einen Default-Wert von 255ml, und muss angegeben sein
+    wenn man den Wind-Faktor setzen will. Dieser hat einen Default-Wert von
+    1.0.<br>
+    Beispiele:
+    <ul>
+      <code>define ks1 KS300 1234</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="KS300set"></a>
+  <b>Set </b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+  <a name="KS300get"></a>
+  <b>Get</b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+  <a name="KS300attr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#IODev">IODev</a></li>
+    <li><a href="#eventMap">eventMap</a></li><br>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#model">model</a> (ks300)</li>
+    <li>rainadjustment<br>
+        Wenn dieses Attribut gesetzt ist, Regenmesser resets werden automatisch
+        ber&uuml;cksichtigt.  Resets treten beim Wechsel der Batterie und nach
+        Beobachtung einiger Benutzer auch nach zuf&auml;lligen Schaltzyklen
+        auf. Die Voreinstellung ist 0 (aus).</li>
+  </ul>
+  <br>
+
+</ul>
+
+=end html_DE
+
 =cut
