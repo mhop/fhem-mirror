@@ -291,7 +291,7 @@ FW_querySetSelected(el, val)
 //////////////////////////
 // start of script functions
 function
-loadScript(sname, cb)
+loadScript(sname, callback)
 {
   var h = document.head || document.getElementsByTagName('head')[0];
   var r = h.getAttribute("root");
@@ -300,19 +300,22 @@ loadScript(sname, cb)
   sname = r+"/"+sname;
   var arr = h.getElementsByTagName("script");
   for(var i1=0; i1<arr.length; i1++)
-    if(sname == arr[i1].getAttribute("src"))
+    if(sname == arr[i1].getAttribute("src")) {
+      if(callback)
+        callback();
       return;
+    }
   var script = document.createElement("script");
   script.src = sname;
   script.async = script.defer = false;
   script.type = "text/javascript";
-  script.onload = cb;
+  script.onload = callback;
   log("Loading "+sname);
   script.onreadystatechange = function() {
     if(script.readyState == 'loaded' || script.readyState == 'complete') {
       script.onreadystatechange = null;
-      if(cb)
-        cb();
+      if(callback)
+        callback();
     }
   }
   h.appendChild(script);
