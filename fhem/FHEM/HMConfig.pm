@@ -419,7 +419,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   brightness      =>{a=>  4.0,s=>0.4,l=>0,min=>0  ,max=>15      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Display brightness"},
   energyOpt       =>{a=>  8.0,s=>1.0,l=>0,min=>0  ,max=>127     ,c=>''         ,f=>2       ,u=>'s'   ,d=>1,t=>"energy Option: Duration of ilumination"},
 # sec_mdir
-  cyclicInfoMsg   =>{a=>  9.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message"          ,lit=>{off=>0,on=>1}},
+  cyclicInfoMsg   =>{a=>  9.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message"          ,lit=>{off=>0,on=>1}},#General should be 200?
   sabotageMsg     =>{a=> 16.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"enable sabotage message" ,lit=>{off=>0,on=>1}},
   cyclicInfoMsgDis=>{a=> 17.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message"},
   lowBatLimit     =>{a=> 18.0,s=>1.0,l=>0,min=>10 ,max=>12      ,c=>''         ,f=>10      ,u=>'V'   ,d=>1,t=>"low batterie limit, step .1V"},
