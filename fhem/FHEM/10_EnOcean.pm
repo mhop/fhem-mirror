@@ -1,5 +1,13 @@
 ##############################################
 # $Id$
+# 2014-04-16 klaus.schauer
+# Added new EEP 2.1 profiles: 
+# Added new EEP 2.5 profiles: 
+# Added new EEP 2.6 profiles:
+# EnOcean_Notify():
+# EnOcean_Attr():
+# subType switch: parse logic improved
+# commandref: further explanations added
 
 package main;
 
@@ -2254,58 +2262,46 @@ EnOcean_Parse($$)
         # Theoretically there can be a released event with some of the A0, BI
         # pins set, but with the plastic cover on this wont happen.
         $msg  = $EnO_ptm200btn[($db[0] & 0xE0) >> 5];
-        $msg .= "," . $EnO_ptm200btn[($db[0] & 0x0E) >> 1] if ($db[0] & 1);
+        $msg .= " " . $EnO_ptm200btn[($db[0] & 0x0E) >> 1] if ($db[0] & 1);
         $msg .= " released" if (!($db[0] & 0x10));
         push @event, "3:buttons:" . ($db[0] & 0x10 ? "pressed" : "released");
-        if ($msg =~ m/A0$/) {
-          push @event, "3:channelA:A0";
-        } elsif ($msg =~ m/AI$/) {
-          push @event, "3:channelA:AI";
-        } elsif ($msg =~ m/B0$/) {
-          push @event, "3:channelB:B0";
-        } elsif ($msg =~ m/BI$/) {
-          push @event, "3:channelB:BI";
-        } elsif ($msg =~ m/C0$/) {
-          push @event, "3:channelC:C0";
-        } elsif ($msg =~ m/CI$/) {
-          push @event, "3:channelC:CI";
-        } elsif ($msg =~ m/D0$/) {
-          push @event, "3:channelD:D0";
-        } elsif ($msg =~ m/DI$/) {
-          push @event, "3:channelD:DI";
-        }
-
+        if ($msg =~ m/A0/) {push @event, "3:channelA:A0";}
+        if ($msg =~ m/AI/) {push @event, "3:channelA:AI";}
+        if ($msg =~ m/B0/) {push @event, "3:channelB:B0";}
+        if ($msg =~ m/BI/) {push @event, "3:channelB:BI";}
+        if ($msg =~ m/C0/) {push @event, "3:channelC:C0";}
+        if ($msg =~ m/CI/) {push @event, "3:channelC:CI";}
+        if ($msg =~ m/D0/) {push @event, "3:channelD:D0";}
+        if ($msg =~ m/DI/) {push @event, "3:channelD:DI";}
       } else {
         if ($db[0] == 112) {
           # Key Card, not tested
-          $msg = "keycard_inserted";
-  
+          $msg = "keycard_inserted";  
         } elsif ($db[0] & 0xC0) {
-          # Only a Mechanical Handle is setting these bits when nu=0
+          # Only a Mechanical Handle is setting these bits when NU = 0
           $msg = "closed"           if ($db[0] == 0xF0);
           $msg = "open"             if ($db[0] == 0xE0);
           $msg = "tilted"           if ($db[0] == 0xD0);
           $msg = "open_from_tilted" if ($db[0] == 0xC0);
-
+        } elsif ($st eq "keycard") {
+          $msg = "keycard_removed";          
         } else {
-          if($st eq "keycard") {
-            $msg = "keycard_removed";
-          }
-          else {
-            $msg = (($db[0] & 0x10) ? "pressed" : "released");
-          }
+          $msg = (($db[0] & 0x10) ? "pressed" : "released");
+          push @event, "3:buttons:" . ($db[0] & 0x10 ? "pressed" : "released");          
         }
-      }
-    
+      }    
       # released events are disturbing when using a remote, since it overwrites
       # the "real" state immediately. In the case of an Eltako FSB14, FSB61 ...
       # the state should remain released. (by Thomas)
-      $event = "buttons" if ($msg =~ m/released$/ &&
-                             $model ne "FT55" && $model ne "FSB14" &&
-                             $model ne "FSB61" && $model ne "FSB70" &&
-                             $model ne "FSM12" && $model ne "FSM61" &&
-                             $model ne "FTS12" &&
-                             AttrVal($name, "sensorMode", "switch") ne "pushbutton");
+      if ($msg =~ m/released$/ &&
+          AttrVal($name, "sensorMode", "switch") ne "pushbutton" &&
+          $model ne "FT55" && $model ne "FSB14" &&
+          $model ne "FSB61" && $model ne "FSB70" &&
+          $model ne "FSM12" && $model ne "FSM61" &&
+          $model ne "FTS12") {
+        $event = "buttons"; 
+        $msg = "released";            
+      }
     }
     push @event, "3:$event:$msg";
 
@@ -4951,10 +4947,10 @@ EnOcean_Undef($$)
          <li>CI</li>
          <li>D0</li>
          <li>DI</li>
-         <li>&lt;BtnX,BtnY&gt; First and second action where BtnX and BtnY is
-             one of the above, e.g. A0,BI or D0,CI</li>
+         <li>&lt;BtnX BtnY&gt; First and second action where BtnX and BtnY is
+             one of the above, e.g. A0 BI or D0 CI</li>
          <li>buttons: pressed|released</li>
-         <li>state: &lt;BtnX&gt; released</li>
+         <li>state: &lt;BtnX&gt; [&lt;BtnY&gt;]</li>
      </ul><br>
          Switches (remote controls) or actors with more than one
          (pair) keys may have multiple channels e. g. B0/BI, A0/AI with one
@@ -4969,13 +4965,19 @@ EnOcean_Undef($$)
          <li>AI</li>
          <li>B0</li>
          <li>BI</li>
+         <li>C0</li>
+         <li>CI</li>
+         <li>D0</li>
+         <li>DI</li>
+         <li>&lt;BtnX BtnY&gt; First and second action where BtnX and BtnY is
+             one of the above, e.g. A0 BI or D0 CI</li>
          <li>released</li>
          <li>buttons: pressed|released</li>         
-         <li>state: A0|AI|B0|BI|released</li>
+         <li>state: &lt;BtnX&gt; [&lt;BtnY&gt;] [released]</li>
      </ul><br>
          The status of the device may become "released", this
          is not the case for a normal switch.<br>
-         Set attr model to FT55|FSM12|FSM61|FTS12 manually.
+         Set attr model to FT55|FSM12|FSM61|FTS12 or attr sensorMode to pushbutton manually.
      </li>
      <br><br>
 
