@@ -19,7 +19,7 @@ Version 0.50
 
 =cut
 
-our $VERSION = '0.54';
+our $VERSION = '0.55';
 our $DEBUG = 0;
 
 
