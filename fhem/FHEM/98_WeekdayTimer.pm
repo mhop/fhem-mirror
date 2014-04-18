@@ -65,7 +65,6 @@ sub WeekdayTimer_Undef($$){
 
 sub WeekdayTimer_UpdatePerlTime($) {
     my ($hash) = @_;
-
     Heating_Control_UpdatePerlTime($hash);
 }
 
@@ -85,7 +84,8 @@ sub WeekdayTimer_SetAllParms() {  # {WeekdayTimer_SetAllParms()}
            next;
         }
      }
-     WeekdayTimer_Update($hash);
+     my $myHash->{HASH}=$hash;
+     WeekdayTimer_Update($myHash);
      Log3 undef, 3, "WeekdayTimer_Update() for $hash->{NAME} done!";
   }
   Log3 undef,  3, "WeekdayTimer_SetAllParms() done!";
