@@ -46,7 +46,7 @@ RSS_Initialize($) {
     my ($hash) = @_;
     $hash->{DefFn}   = "RSS_Define";
     #$hash->{AttrFn}  = "RSS_Attr";
-    $hash->{AttrList}= "size bg bgcolor tmin";
+    $hash->{AttrList}= "size bg bgcolor tmin refresh areas";
     $hash->{SetFn}   = "RSS_Set";
 
     RSS_addExtension("RSS_CGI","rss","RSS");
@@ -80,7 +80,7 @@ RSS_Define($$) {
 
   my @a = split("[ \t]+", $def);
 
-  return "Usage: define <name> RSS jpg hostname filename"  if(int(@a) != 5);
+  return "Usage: define <name> RSS jpg|png hostname filename"  if(int(@a) != 5);
   my $name= $a[0];
   my $style= $a[2];
   my $hostname= $a[3];
@@ -131,7 +131,8 @@ sub
 RSS_getURL($) {
   my ($hostname)= @_;
   # http://hostname:8083/fhem
-  return "http://$hostname:" . $defs{$FW_wname}{PORT} . $FW_ME;
+  my $proto = (AttrVal($FW_wname, 'HTTPS', 0) == 1) ? 'https' : 'http';
+  return $proto."://$hostname:" . $defs{$FW_wname}{PORT} . $FW_ME;
 }
 
 # ##################
@@ -190,10 +191,12 @@ RSS_splitRequest($) {
   } else {
     # http://hostname:8083/fhem/rss/myDeviceName.rss
     # http://hostname:8083/fhem/rss/myDeviceName.jpg
+    # http://hostname:8083/fhem/rss/myDeviceName.png
+    # http://hostname:8083/fhem/rss/myDeviceName.html
     my $call= $request;
     $call =~ s/^.*\/rss\/([^\/]*)$/$1/;
     my $name= $call;
-    $name =~ s/^(.*)\.(jpg|rss)$/$1/;
+    $name =~ s/^(.*)\.(jpg|png|rss|html)$/$1/;
     my $ext= $call;
     $ext =~ s/^$name\.(.*)$/$1/;
     return ($name,$ext);
@@ -206,10 +209,26 @@ RSS_returnRSS($) {
   my ($name) = @_;
 
   my $url= RSS_getURL($defs{$name}{fhem}{hostname});
- 
-  my $code= "<rss version='2.0' xmlns:media='http://search.yahoo.com/mrss/'><channel><title>$name</title><ttl>1</ttl><item><media:content url='$url/rss/$name.jpg' type='image/jpeg'/></item></channel></rss>";
+  my $type = $defs{$name}{fhem}{style};
+  my $mime = ($type eq 'png')? 'image/png' : 'image/jpeg';
+  my $code= "<rss version='2.0' xmlns:media='http://search.yahoo.com/mrss/'><channel><title>$name</title><ttl>1</ttl><item><media:content url='$url/rss/$name.$type' type='$mime'/></item></channel></rss>";
   
   return ("application/xml; charset=utf-8", $code);
+}
+
+##################
+sub
+RSS_returnHTML($) {
+  my ($name) = @_;
+
+  my $url= RSS_getURL($defs{$name}{fhem}{hostname});
+  my $type = $defs{$name}{fhem}{style};
+  my $img= "$url/rss/$name.$type";
+  my $refresh= AttrVal($name, 'refresh', 60);
+  my $areas= AttrVal($name, 'areas', "");
+  my $mime = ($type eq 'png')? 'image/png' : 'image/jpeg';
+  my $code= "<html>\n <head>\n  <title>$name</title>\n  <meta http-equiv=\"refresh\" content=\"$refresh\"/>\n </head>\n <body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\">\n  <img src=\"$img\" usemap=\"#map\"/>\n  <map name=\"map\" id=\"map\">\n   $areas\n  </map>\n </body>\n</html>";
+  return ("text/html; charset=utf-8", $code);
 }
 
 ##################
@@ -547,8 +566,8 @@ RSS_evalLayout($$@) {
 
 ##################
 sub
-RSS_returnJPEG($) {
-  my ($name)= @_;
+RSS_returnIMG($$) {
+  my ($name,$type)= @_;
 
   my ($width,$height)= split(/x/, AttrVal($name,"size","800x600"));
 
@@ -641,9 +660,10 @@ RSS_returnJPEG($) {
   }; warn $@ if $@;
     
   #
-  # return jpeg image
+  # return image
   #
-  return ("image/jpeg; charset=utf-8", $S->jpeg);
+  return ("image/jpeg; charset=utf-8", $S->jpeg) if $type eq 'jpg';
+  return ("image/png; charset=utf-8", $S->png) if $type eq 'png';
 }
   
 ##################
@@ -652,9 +672,9 @@ RSS_returnJPEG($) {
 sub
 RSS_CGI(){
 
-  my ($request) = @_;   # /rss or /rss/name.rss or /rss/name.jpg
+  my ($request) = @_;   # /rss or /rss/name.rss or /rss/name.jpg or /rss/name.png
 
-  my ($name,$ext)= RSS_splitRequest($request); # name, ext (rss, jpg)
+  my ($name,$ext)= RSS_splitRequest($request); # name, ext (rss, jpg, png)
 
   if(defined($name)) {
     if($ext eq "") {
@@ -665,9 +685,13 @@ RSS_CGI(){
     }
   
     if($ext eq "jpg") {
-          return RSS_returnJPEG($name);
+          return RSS_returnIMG($name,'jpg');
+    } elsif($ext eq "png") {
+          return RSS_returnIMG($name,'png');
     } elsif($ext eq "rss") {
           return RSS_returnRSS($name);
+    } elsif($ext eq "html") {
+          return RSS_returnHTML($name);
     }
   } else {
     return RSS_Overview();
@@ -689,31 +713,60 @@ RSS_CGI(){
 <a name="RSS"></a>
 <h3>RSS</h3>
 <ul>
-  Provides a freely configurable RSS feed.<p>
+  Provides a freely configurable RSS feed and HTML page.<p>
 
-  Currently a media RSS feed delivering status pictures in JPEG format is supported. This media
-  RSS feed can be used to feed a status display to a network-enabled photo frame.<p>
+  The media RSS feed delivers status pictures either in JPEG or PNG format. 
+  
+  This media RSS feed can be used to feed a status display to a 
+  network-enabled photo frame.<p>
+  
+  In addition, a periodically refreshing HTML page is generated that shows the picture
+  with an optional HTML image map.<p>
 
   You need to have the perl module <code>GD</code> installed. This module is most likely not
   available for small systems like Fritz!Box.<p>
-  RSS is an extension to <a href="#FHEMWEB">FHEMWEB</a>. You must install FHEMWEB to use RSS.</p>
+  RSS is an extension to <a href="#FHEMWEB">FHEMWEB</a>. You must install FHEMWEB to use RSS.<p>
+  
+  Beginners might find the <a href="http://forum.fhem.de/index.php/topic,22520.0.html">RSS Workshop</a> useful.<p>
 
   <a name="RSSdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; RSS jpg &lt;hostname&gt; &lt;filename&gt;</code><br><br>
+    <code>define &lt;name&gt; RSS jpg|png &lt;hostname&gt; &lt;filename&gt;</code><br><br>
 
-    Defines the RSS feed. <code>jpg</code> is a fixed literal to allow for future
-    extensions. <code>&lt;hostname&gt;</code> is the hostname of the fhem server as
+    Defines the RSS feed. <code>jpg</code> and <code>png</code> are fixed literals to select output format.
+    <code>&lt;hostname&gt;</code> is the hostname of the fhem server as
     seen from the consumer of the RSS feed. <code>&lt;filename&gt;</code> is the
     name of the file that contains the <a href="RSSlayout">layout definition</a>.<p>
 
-    Examples:
+    Examples
     <ul>
       <code>define FrameRSS RSS jpg host.example.org /etc/fhem/layout</code><br>
-      <code>define MyRSS RSS jpg 192.168.1.222 /var/fhem/conf/layout.txt</code><br>
+      <code>define MyRSS RSS png 192.168.1.222 /var/fhem/conf/layout.txt</code><br>
     </ul>
     <br>
+
+    The RSS feeds are at
+    <ul>
+        <code>http://host.example.org:8083/fhem/rss/FrameRSS.rss</code><br>
+        <code>http://192/168.1.222:8083/fhem/rss/MyRSS.rss</code><br>
+    </ul>
+    <br>
+    
+    The pictures are at 
+    <ul>
+        <code>http://host.example.org:8083/fhem/rss/FrameRSS.jpg</code><br>
+        <code>http://192/168.1.222:8083/fhem/rss/MyRSS.png</code><br>
+    </ul>
+    <br>
+    
+    The HTML pages are at 
+    <ul>
+        <code>http://host.example.org:8083/fhem/rss/FrameRSS.html</code><br>
+        <code>http://192/168.1.222:8083/fhem/rss/MyRSS.html</code><br>
+    </ul>
+    <br>
+    
   </ul>
 
   <a name="RSSset"></a>
@@ -730,7 +783,7 @@ RSS_CGI(){
   <b>Attributes</b>
   <br><br>
   <ul>
-    <li>size<br>The dimensions of the JPEG picture in the format
+    <li>size<br>The dimensions of the picture in the format
     <code>&lt;width&gt;x&lt;height&gt;</code>.</li><br>
     <li>bg<br>The directory that contains the background pictures (must be in JPEG format).</li><br>
     <li>bgcolor &lt;color&gt;<br>Sets the background color. &lt;color&gt; is 
@@ -738,6 +791,10 @@ RSS_CGI(){
     color components as in HTML color codes (e.g.<code>FF0000</code> for red, <code>C0C0C0</code> for light gray).</li><br>
     <li>tmin<br>The background picture is shown at least <code>tmin</code> seconds,
     no matter how frequently the RSS feed consumer accesses the page.</li><br>
+    <li>refresh<br>Time after which the HTML page is automatically reloaded.</li><br>
+    <li>areas<br>HTML code that goes into the image map.<br>
+        Example: <code>attr FrameRSS areas &lt;area shape="rect" coords="0,0,200,200" href="http://fhem.de"/&gt;&lt;area shape="rect" coords="600,400,799,599" href="http://has:8083/fhem" target="_top"/&gt;</code>
+    </li><br>
   </ul>
   <br><br>
 
@@ -754,20 +811,21 @@ RSS_CGI(){
   Example:
   <ul><code>http://host.example.org:8083/fhem/rss/FrameRSS.rss</code></ul><p>
 
-  The media RSS feed points to a dynamically generated JPEG picture. The URL of the JPEG picture
-  belonging to the RSS feed is <code>http://hostname:port/fhem/rss/name.jpg</code>, i.e. the URL
-  of the RSS feed with the extension <code>rss</code> changed to <code>jpg</code>.<p>
+  The media RSS feed points to a dynamically generated picture. The URL of the picture
+  belonging to the RSS can be found by replacing the extension ".rss" in feed's URL by ".jpg" or ".png"
+  depending on defined output format,<p>
 
   Example:
   <ul><code>http://host.example.org:8083/fhem/rss/FrameRSS.jpg</code></ul><p>
+  <ul><code>http://192.168.100.200:8083/fhem/rss/FrameRSS.png</code></ul><p>
 
-  To render the JPEG picture the current, or, if <code>tmin</code> seconds have elapsed, the next
+  To render the picture the current, or, if <code>tmin</code> seconds have elapsed, the next
   JPEG picture from the directory <code>bg</code> is chosen and scaled to the dimensions given
   in <code>size</code>. The background is black if no usable JPEG picture can be found. Next the
   script in the <a href="RSSlayout">layout definition</a> is used to superimpose items on
   the background.<p>
 
-  You can directly access the URL of the JPEG picture in your browser. Reload the page to see
+  You can directly access the URL of the picture in your browser. Reload the page to see
   how it works.<p>
 
   The media RSS feed advertises to refresh after 1 minute (ttl). Some photo frames ignore it and
@@ -857,7 +915,7 @@ RSS_CGI(){
     access device readings and do some programming on the fly. See below for examples.</li><br>
     <li>textbox &lt;x&gt; &lt;y&gt; &lt;boxwidth&gt; &lt;text&gt;<br>Same as before but text is rendered in a box of horizontal width &lt;boxwidth&gt;.</li><br> 
     <li>time &lt;x&gt; &lt;y&gt;<br>Renders the current time in HH:MM format.</li><br>
-    <li>seconds &lt;x&gt; &lt;y&gt; &lt;format&gt<br>Renders the curent seconds. Maybe usefull for a RSS Clock. With option colon a : </li><br>
+    <li>seconds &lt;x&gt; &lt;y&gt; &lt;format&gt<br>Renders the curent seconds. Maybe useful for a RSS Clock.</li><br>
     <li>date &lt;x&gt; &lt;y&gt;<br>Renders the current date in DD:MM:YYY format.</li><br>
     <li>line &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; [&lt;thickness&gt;]<br>Draws a line from position (&lt;x1&gt;, &lt;y1&gt;) to position (&lt;x2&gt;, &lt;y2&gt;) with optional thickness (default=1).</li><br>
     <li>rect &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; [&lt;filled&gt;]<br>Draws a rectangle with corners at positions (&lt;x1&gt;, &lt;y1&gt;) and (&lt;x2&gt;, &lt;y2&gt;), which is filled if the &lt;filled&gt; parameter is set and not zero.</li><br>
