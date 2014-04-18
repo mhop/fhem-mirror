@@ -38,6 +38,11 @@ sub RandomTimer_Initialize($)
 {
   my ($hash) = @_;
 
+  if(!$modules{Twilight}{LOADED} && -f "$attr{global}{modpath}/FHEM/59_Twilight.pm") {
+    my $ret = CommandReload(undef, "59_Twilight");
+    Log3 undef, 1, $ret if($ret);
+  }
+
   $hash->{DefFn}     = "RandomTimer_Define";
   $hash->{UndefFn}   = "RandomTimer_Undef";
   $hash->{AttrFn}    = "RandomTimer_Attr";
