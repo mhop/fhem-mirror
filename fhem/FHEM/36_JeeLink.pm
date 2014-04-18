@@ -18,14 +18,42 @@ sub JeeLink_Write($$);
 
 sub JeeLink_SimpleWrite(@);
 
-my $clientsJeeLink = ":PCA301:EC3000:RoomNode:LaCrosse:";
+my $clientsJeeLink = ":PCA301:EC3000:RoomNode:LaCrosse:ETH200comfort:CUL_IR:HX2272:FS20:AliRF";
 
 my %matchListPCA301 = (
-    "1:PCA301" => "^\\S+\\s+24",
-    "2:EC3000" => "^\\S+\\s+22",
-    "3:RoomNode" => "^\\S+\\s+11",
-    "4:LaCrosse" => "^\\S+\\s+9 ",
+    "1:PCA301"          => "^\\S+\\s+24",
+    "2:EC3000"          => "^\\S+\\s+22",
+    "3:RoomNode"        => "^\\S+\\s+11",
+    "4:LaCrosse"        => "^\\S+\\s+9 ",
+    "5:AliRF"           => "^\\S+\\s+5 ",
 );
+
+my %matchListJeeLink433 = (
+    "1:CUL_IR"  => "^I............\$",  #I
+    "2:HX2272"  => "^O01[A-F0-9]{4}\$", #O0112A0
+);
+my %matchListJeeLink868 = (
+    "1:LaCrosse"                        => "^F01[A-F0-9]{8}\$", #F019205396A
+    "2:ETH200comfort"                   => "^F020[AC][0-9A-F]{8}\$", #F020A01004200
+    "3:CUL_IR"                          => "^I............\$",  #I
+    "4:FS20"                            => "^O02[A-F0-9]{8}\$", #O02D28C0000
+);
+
+my %RxListJeeLink = (
+        "HX2272" => "Or",
+        "FS20" => "Or",
+        "LaCrosse"      => "Fr01",
+);
+
+#my %JeeLinkCmds = (
+#       "868" => {
+#               "FS20"                  => "Or",
+#               "LaCrosse"      => "Fr01",
+#       },
+#       "433" => {
+#               "HX2272"                => "Or",
+#       },
+#);
 
 sub
 JeeLink_Initialize($)
@@ -40,15 +68,19 @@ JeeLink_Initialize($)
   $hash->{ReadyFn} = "JeeLink_Ready";
 
 # Normal devices
-  $hash->{DefFn}   = "JeeLink_Define";
+  $hash->{DefFn}        = "JeeLink_Define";
   $hash->{FingerprintFn}   = "JeeLink_Fingerprint";
-  $hash->{UndefFn} = "JeeLink_Undef";
-  $hash->{GetFn}   = "JeeLink_Get";
-  $hash->{SetFn}   = "JeeLink_Set";
-  #$hash->{AttrFn}  = "JeeLink_Attr";
-  #$hash->{AttrList}= "";
+  $hash->{UndefFn}      = "JeeLink_Undef";
+  $hash->{GetFn}        = "JeeLink_Get";
+  $hash->{SetFn}        = "JeeLink_Set";
+  $hash->{AttrFn}       = "JeeLink_Attr";
+  $hash->{AttrList} = "Clients MatchList"
+                      ." DebounceTime BeepLong BeepShort BeepDelay"
+                      ." tune " . join(" ", map { "tune_$_" } keys %RxListJeeLink)
+                      ." $readingFnAttributes";
 
   $hash->{ShutdownFn} = "JeeLink_Shutdown";
+
 }
 sub
 JeeLink_Fingerprint($$)
@@ -77,7 +109,7 @@ JeeLink_Define($$)
   $dev .= "\@57600" if( $dev !~ m/\@/ );
 
   $hash->{Clients} = $clientsJeeLink;
-  $hash->{MatchList} = \%matchListPCA301;
+  #$hash->{MatchList} = \%matchListJeeLink;
 
   $hash->{DeviceName} = $dev;
 
@@ -132,12 +164,12 @@ JeeLink_Set($@)
 
   my $name = shift @a;
   my $cmd = shift @a;
-  my $arg = shift @a;
-  my $arg2 = shift @a;
+  my $arg = join(" ", @a);
 
-  my $list = "raw";
-  $list .= " LaCrossePairForSec";
-  return $list if( $cmd eq '?' );
+
+  my $list = "beep raw led:on,off led-on-for-timer LaCrossePairForSec setReceiverMode:LaCrosse,HX2272,FS20";
+  return $list if( $cmd eq '?' || $cmd eq '');
+
 
   if($cmd eq "raw") {
     #return "\"set JeeLink $cmd\" needs exactly one parameter" if(@_ != 4);
@@ -145,10 +177,80 @@ JeeLink_Set($@)
     Log3 $name, 4, "set $name $cmd $arg";
     JeeLink_SimpleWrite($hash, $arg);
 
+        } elsif( $cmd eq "beep" ) {
+                # +    = Langer Piep
+                # -    = Kurzer Piep
+                # anderes = Pause
+                my $longbeep = AttrVal($name, "BeepLong", "250");
+                my $shortbeep = AttrVal($name, "BeepShort", "100");
+                my $delaybeep = AttrVal($name, "BeepDelay", "0.25");
+
+                for(my $i=0;$i<length($arg);$i++) {
+                        my $x=substr($arg,$i,1);
+                        if($x eq "+") {
+                                # long beep
+                                JeeLink_Write($hash, "bFF" . $longbeep);
+                        } elsif($x eq "-") {
+                                # short beep
+                                JeeLink_Write($hash, "bFF" . $shortbeep);
+                        }
+                        select(undef, undef, undef, $delaybeep);
+                }
+
   } elsif( $cmd eq "LaCrossePairForSec" ) {
-    return "Usage: set $name LaCrossePairForSec <seconds_active> [ignore_battery]" if(!$arg || $arg !~ m/^\d+$/ || ($arg2 && $arg2 ne "ignore_battery") );
-    $hash->{LaCrossePair} = $arg2?2:1;
-    InternalTimer(gettimeofday()+$arg, "JeeLink_RemoveLaCrossePair", $hash, 0);
+                my @args = split(' ', $arg);
+
+                return "Usage: set $name LaCrossePairForSec <seconds_active> [ignore_battery]" if(!$arg || $args[0] !~ m/^\d+$/ || ($args[1] && $args[1] ne "ignore_battery") );
+                $hash->{LaCrossePair} = $args[1]?2:1;
+                InternalTimer(gettimeofday()+$args[0], "JeeLink_RemoveLaCrossePair", $hash, 0);
+
+        } elsif( $cmd eq "setReceiverMode" ) {
+
+                return "Usage: set $name setReceiverMode (LaCrosse,HX2272,FS20)"  if($arg !~ m/^(LaCrosse|HX2272|FS20)$/);
+
+                #Get tune values of Transceiver if needed (TX+RX)
+                my $TuneStr = undef;
+                my $AttrStr = AttrVal($name, "tune_" . $arg, undef);
+                $AttrStr = AttrVal($name, "tune", undef) if(!(defined $AttrStr));
+                $TuneStr = JeeLink_CalcTuneCmd($AttrStr) if(defined $AttrStr);
+
+                JeeLink_Write($hash, $RxListJeeLink{$arg});     #set receiver
+                JeeLink_Write($hash, "t" . $TuneStr) if(defined $TuneStr); #set modified tune
+
+                #reset debounce time for OOK Signals
+        if($RxListJeeLink{$arg} =~ m/^O/) {
+                my $DebStr = AttrVal($name, "DebounceTime", undef);
+                JeeLink_Write($hash, "Od" . $DebStr) if(defined $DebStr);
+        }
+
+                JeeLink_Write($hash, "f");  # update RFM configuration in FHEM (returns e.g. "FSK-868MHz")
+
+                Log3 $name, 4, "set $name $cmd $arg";
+
+        } elsif ($cmd =~ m/^led$/i) {
+
+                return "Unknown argument $cmd, choose one of $list" if($arg !~ m/^(on|off)$/i);
+
+    Log3 $name, 4, "set $name $cmd $arg";
+    JeeLink_Write($hash, "l" . ($arg eq "on" ? "1" : "0") );
+
+  } elsif ($cmd =~ m/led-on-for-timer/i) {
+
+        return "Unknown argument $cmd, choose one of $list" if($arg !~ m/^[0-9]+$/i);
+
+        #remove timer if there is one active
+        if($modules{JeeLink}{ldata}{$name}) {
+        CommandDelete(undef, $name . "_timer");
+        delete $modules{JeeLink}{ldata}{$name};
+        }
+
+        Log3 $name, 4, "set $name on";
+    JeeLink_Write($hash, "l" . "1");
+
+        my $to = sprintf("%02d:%02d:%02d", $arg/3600, ($arg%3600)/60, $arg%60);
+        $modules{JeeLink}{ldata}{$name} = $to;
+    Log3 $name, 4, "Follow: +$to setstate $name off";
+    CommandDefine(undef, $name."_timer at +$to {fhem(\"set $name led" ." off\")}");
 
   } else {
     return "Unknown argument $cmd, choose one of ".$list;
@@ -161,15 +263,37 @@ JeeLink_Set($@)
 sub
 JeeLink_Get($@)
 {
-  my ($hash, $name, $cmd ) = @_;
+  my ($hash, $name, $cmd, @msg ) = @_;
+  my $arg = join(" ", @msg);
 
-  my $list = "devices:noArg initJeeLink:noArg";
+  my $list = "devices:noArg initJeeLink:noArg RFMconfig:noArg updateAvailRam:noArg raw";
 
   if( $cmd eq "devices" ) {
-    JeeLink_SimpleWrite($hash, "l");
+        if($hash->{VERSION} =~m/JeeNode -- HomeControl -/ ) {
+        JeeLink_SimpleWrite($hash, "h");
+    } else {
+        JeeLink_SimpleWrite($hash, "l");
+        }
   } elsif( $cmd eq "initJeeLink" ) {
-    JeeLink_SimpleWrite($hash, "0c");
-    JeeLink_SimpleWrite($hash, "2c");
+
+        $hash->{STATE} = "Opened";
+
+        if($hash->{VERSION} =~m/JeeNode -- HomeControl -/ ) {
+                JeeLink_SimpleWrite($hash, "o");
+        } else {
+            JeeLink_SimpleWrite($hash, "0c");
+        JeeLink_SimpleWrite($hash, "2c");
+                }
+
+        } elsif ($cmd eq "raw" ) {
+                return "raw => 01" if($arg =~ m/^Ir/);  ## Needed for CUL_IR usage (IR-Receive is always on for JeeLinks
+
+        } elsif ($cmd eq "RFMconfig" ) {
+                JeeLink_SimpleWrite($hash, "f");
+
+        } elsif ($cmd eq "updateAvailRam" ) {
+                        JeeLink_SimpleWrite($hash, "m");
+
   } else {
     return "Unknown argument $cmd, choose one of ".$list;
   }
@@ -183,7 +307,7 @@ JeeLink_Clear($)
   my $hash = shift;
 
   # Clear the pipe
-  $hash->{RA_Timeout} = 0.1;
+  $hash->{RA_Timeout} = 1;
   for(;;) {
     my ($err, undef) = JeeLink_ReadAnswer($hash, "Clear", 0, undef);
     last if($err && $err =~ m/^Timeout/);
@@ -202,9 +326,14 @@ JeeLink_DoInit($)
 
   my $val;
 
-  #JeeLink_Clear($hash);
+  JeeLink_Clear($hash);
 
   $hash->{STATE} = "Opened";
+
+  #Reset JeeNode and set quite mode
+  JeeLink_SimpleWrite($hash, "o");
+  sleep(2);
+  JeeLink_SimpleWrite($hash, "q1");  # turn quiet mode on
 
   # Reset the counter
   delete($hash->{XMIT_TIME});
@@ -305,12 +434,18 @@ JeeLink_XmitLimitCheck($$)
 sub
 JeeLink_Write($$)
 {
-  my ($hash,$msg) = @_;
-  my $name = $hash->{NAME};
+        my ($hash, $cmd, $msg) = @_;
+        my $name = $hash->{NAME};
+        my $arg = $cmd;
+        $arg .= " " . $msg if(defined($msg));
 
-  Log3 $name, 5, "$name sending $msg";
+        #Modify command for CUL_IR
+        $arg =~ s/^\s+|\s+$//g;
+        $arg =~ s/^Is/I/i;  #SendIR command is "I" not "Is" for JeeLink devices
 
-  JeeLink_AddQueue($hash, $msg);
+  Log3 $name, 5, "$name sending $arg";
+
+  JeeLink_AddQueue($hash, $arg);
   #JeeLink_SimpleWrite($hash, $msg);
 }
 
@@ -425,27 +560,44 @@ JeeLink_Parse($$$$)
   return if($dmsg =~ m/^-> ack/ );                 # ignore send ack
 
   if($dmsg =~ m/^\[/ ) {
-    $hash->{VERSION} = $dmsg;
+        $hash->{VERSION} = $dmsg;
 
     if( $hash->{STATE} eq "Opened" ) {
       if( $dmsg =~m /pcaSerial/ ) {
+        $hash->{MatchList} = \%matchListPCA301;
         JeeLink_SimpleWrite($hash, "1a" ); # led on
         JeeLink_SimpleWrite($hash, "1q" ); # quiet mode
         JeeLink_SimpleWrite($hash, "0x" ); # hex mode off
         JeeLink_SimpleWrite($hash, "0a" ); # led off
         JeeLink_SimpleWrite($hash, "l" );  # list known devices
+
       } elsif( $dmsg =~m /ec3kSerial/ ) {
+        $hash->{MatchList} = \%matchListPCA301;
         #JeeLink_SimpleWrite($hash, "ec");
+
+      } elsif( $dmsg =~m /JeeNode -- HomeControl -/ ) {
+        $hash->{MatchList} = \%matchListJeeLink433 if($dmsg =~ m/433MHz/);
+                                $hash->{MatchList} = \%matchListJeeLink868 if($dmsg =~ m/868MHz/);
+          JeeLink_SimpleWrite($hash, "q1");  # turn quiet mode on
+                                JeeLink_SimpleWrite($hash, "a0");  # turn activity led off
+                                JeeLink_SimpleWrite($hash, "f");  # get RFM frequence config
+                                JeeLink_SimpleWrite($hash, "m");        # show used ram on jeenode
       }
+      $hash->{STATE} = "Initialized";
+        }
+        return;
 
-    $hash->{STATE} = "Initialized";
-   }
+  } elsif ( $dmsg =~ m/^(OOK|FSK)\-(433|868)MHz/ ) {
+        readingsSingleUpdate($hash,"RFM-config",$dmsg,0);
+        return;
 
-    return;
-  }
+  } elsif ( $dmsg =~ m/^Ram available: </ ) {
+        $dmsg =~ s/^.*<(.*)>.*$/$1/;
+        readingsSingleUpdate($hash,"RAM-Available",$dmsg,0);
+        return;
 
-  if( $dmsg =~m /drecvintr exit/ ) {
-    JeeLink_SimpleWrite($hash, "ec");
+  } elsif( $dmsg =~ m/drecvintr exit/ ) {
+        JeeLink_SimpleWrite($hash, "ec", 1);
     return;
   }
 
@@ -462,12 +614,74 @@ JeeLink_Parse($$$$)
     $addvals{LQI} = $lqi;
   }
 
-  if( $rmsg =~ m/(\S* )(\d+)(.*)/ ) {
-    my $node = $2 & 0x1F;              #mask HDR -> it is handled by the skech
-    $dmsg = $1.$node.$3;
-  }
+#Adapt JeeLink command (O02D28C0000) to match FS20 command ("^81..(04|0c)..0101a001") from CUL
+        my $dmsgMod = $dmsg;
+        if( $dmsg =~ m/^O02[A-F0-9]{8}/ ) {  #O02D28C0100
+                my $dev = substr($dmsg, 3, 4);
+                my $btn = substr($dmsg, 7, 2);
+                my $cde = substr($dmsg, 9, 2);
+          # Msg format:
+        # 81 0b 04 f7 0101 a001 HHHH 01 00 11
+                $dmsgMod = "810b04f70101a001" . lc($dev) . lc($btn) . "00" . lc($cde);
+                #Log 1, "Modified F20 command: " . $dmsgMod;
+        }
 
-  Dispatch($hash, $dmsg, \%addvals);
+#Adapt JeeLink command (F019204356A) to LaCrosse module standard syntax "OK 9 32 1 4 91 62" ("^\\S+\\s+9 ")
+        elsif( $dmsg =~ m/^F01[A-F0-9]{8}/ ) {
+                #
+                # Message Format:
+                #
+                # .- [0] -. .- [1] -. .- [2] -. .- [3] -. .- [4] -.
+                # |       | |       | |       | |       | |       |
+                # SSSS.DDDD DDN_.TTTT TTTT.TTTT WHHH.HHHH CCCC.CCCC
+                # |  | |     ||  |  | |  | |  | ||      | |       |
+                # |  | |     ||  |  | |  | |  | ||      | `--------- CRC
+                # |  | |     ||  |  | |  | |  | |`-------- Humidity
+                # |  | |     ||  |  | |  | |  | |
+                # |  | |     ||  |  | |  | |  | `---- weak battery
+                # |  | |     ||  |  | |  | |  |
+                # |  | |     ||  |  | |  | `----- Temperature T * 0.1
+                # |  | |     ||  |  | |  |
+                # |  | |     ||  |  | `---------- Temperature T * 1
+                # |  | |     ||  |  |
+                # |  | |     ||  `--------------- Temperature T * 10
+                # |  | |     | `--- new battery
+                # |  | `---------- ID
+                # `---- START
+                #
+                #
+
+                my( $addr, $type, $channel, $temperature, $humidity, $batInserted ) = 0.0;
+
+                $addr = sprintf( "%02X", ((hex(substr($dmsg,3,2)) & 0x0F) << 2) | ((hex(substr($dmsg,5,2)) & 0xC0) >> 6) );
+                $type = ((hex(substr($dmsg,5,2)) & 0xF0) >> 4); # not needed by LaCrosse Module
+                #$channel = 1; ## $channel = (hex(substr($dmsg,5,2)) & 0x0F);
+
+                $temperature = ( ( ((hex(substr($dmsg,5,2)) & 0x0F) * 100) + (((hex(substr($dmsg,7,2)) & 0xF0) >> 4) * 10) + (hex(substr($dmsg,7,2)) & 0x0F) ) / 10) - 40;
+                return if($temperature >= 60 || $temperature <= -40);
+
+                $humidity = hex(substr($dmsg,9,2));
+                $batInserted = ( (hex(substr($dmsg,5,2)) & 0x20) << 2 );
+
+                #build string for 36_LaCrosse.pm
+                $dmsgMod = "OK 9 $addr ";
+                        #bogus check humidity + eval 2 channel TX25IT
+                if (($humidity >= 0 && $humidity <= 99) || $humidity == 106 || ($humidity >= 128 && $humidity <= 227) || $humidity == 234) {
+                        $dmsgMod .= (1 | $batInserted);
+                } elsif ($humidity == 125 || $humidity == 253 ) {
+                        $dmsgMod .= (2 | $batInserted);
+                }
+
+                $temperature = (($temperature* 10 + 1000) & 0xFFFF);
+                $dmsgMod .= " " . (($temperature >> 8) & 0xFF)  . " " . ($temperature & 0xFF) . " $humidity";
+        }
+
+#  if( $rmsg =~ m/(\S* )(\d+)(.*)/ ) {
+#    my $node = $2 & 0x1F;              #mask HDR -> it is handled by the skech
+#    $dmsg = $1.$node.$3;
+#  }
+
+  Dispatch($hash, $dmsgMod, \%addvals);
 }
 
 
@@ -511,11 +725,71 @@ JeeLink_SimpleWrite(@)
 sub
 JeeLink_Attr(@)
 {
-  my @a = @_;
+  my ($cmd,$name,$aName,$aVal) = @_;
+  my $hash = $defs{$name};
+
+  if( $aName eq "Clients" ) {
+    $hash->{Clients} = $aVal;
+    $hash->{Clients} = $clientsJeeLink if( !$hash->{Clients}) ;
+  } elsif( $aName =~ "MatchList" ) {
+    $hash->{MatchList} = $aVal;
+    $hash->{MatchList} = \%matchListPCA301 if( !$hash->{Clients} );
+  } elsif($aName =~ m/^tune/i) { #tune attribute freq / rx:bWidth / rx:rAmpl / rx:sens / tx:deviation / tx:power
+  # Frequenze: Fc =860+ F x0.0050MHz
+        # LNA Gain [dB] = MAX -6, -14, -20
+        # RX Bandwidth [kHz] = -, 400, 340, 270, 200, 134, 67
+        # DRSSI [dB] = -103, -97, -91, -85, -79, -73
+        # Deviation [kHz] = 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240
+        # OuputPower [dBm] = 0, -3, -6, -9, -12, -15, -18, -21
+
+        return "Usage: attr $name $aName <Frequence> <Rx:Bandwidth> <Rx:Amplitude> <Rx:Sens> <Tx:Deviation> <Tx:Power>"
+                if(!$aVal || $aVal !~ m/^(4|8)[\d]{2}.[\d]{3} (0|400|340|270|200|134|67) (0|\-6|\-14|\-20) (\-103|\-97|\-91|\-85|\-79|\-73) (15|30|45|60|75|90|105|120|135|150|165|180|195|210|225|240) (0|\-3|\-6|\-9|\-12|\-15|\-18|\-21)/ );
+
+        my $TuneStr = JeeLink_CalcTuneCmd($aVal);
+
+    JeeLink_Write($hash, "t" . $TuneStr);
+
+  } elsif ($aName eq "DebounceTime") {
+
+                return "Usage: attr $name $aName <OOK-Protocol-Number><DebounceTime>"
+                        if($aVal !~ m/^[0-9]{3,5}$/);
+
+    #Log3 $name, 4, "set $name $cmd $arg";
+    JeeLink_Write($hash, "Od" . $aVal);
+  }
 
   return undef;
 }
 
+sub JeeLink_CalcTuneCmd($) {
+
+        my ($str) = @_;
+
+        my ($freq, $rxbwidth, $rxampl, $rxsens, $txdev, $txpower) = split(' ', $str ,6);
+
+        my $sfreq;
+        if($freq < 800) {
+                $sfreq = sprintf("%03X", ($freq-430)/0.0025);
+        } else {
+                $sfreq = sprintf("%03X", ($freq-860)/0.0050);
+        }
+
+        my $sbwidth = sprintf("%01X", JeeLink_getIndexOfArray($rxbwidth,(0, 400, 340, 270, 200, 134, 67)));
+        my $sampl = sprintf("%01X", JeeLink_getIndexOfArray($rxampl,(0, -6, -14, -20)));
+        my $ssens = sprintf("%01X", JeeLink_getIndexOfArray($rxsens,    (-103, -97, -91, -85, -79, -73)));
+
+        my $sdev = sprintf("%01X", JeeLink_getIndexOfArray($txdev,      (15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240)));
+        my $soutpupower = sprintf("%01X", JeeLink_getIndexOfArray($txpower,     (0, -3, -6, -9, -12, -15, -18, -21)));
+
+        return $sfreq . $sbwidth . $sampl . $ssens . $sdev . $soutpupower;
+}
+
+sub JeeLink_getIndexOfArray($@) {
+
+        my ($value, @array) = @_;
+        my ($ivalue) = grep { $array[$_] == $value } 0..$#array;
+        return $ivalue;
+}
 1;
 
 =pod
@@ -587,6 +861,8 @@ JeeLink_Attr(@)
   <a name="JeeLink_Attr"></a>
   <b>Attributes</b>
   <ul>
+    <li>Clients</li>
+    <li>MatchList</li>
   </ul>
   <br>
 </ul>
