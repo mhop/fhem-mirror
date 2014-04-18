@@ -1,6 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: 36_JeeLink: added LaCrosse, ETH200comfort, CUL_IR,
+             HX2272 and FS20 modes from ulli
+             added AliRF
+             added Clients and MatchList attribute
   - feature: 02_RSS.pm: HTTPS enabled, png as image type added, autofreshing
              HTML page with image map added
   - feature: ECMD and ECMDDevice completely reworked, see
