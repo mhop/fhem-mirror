@@ -5547,13 +5547,23 @@ sub CUL_HM_getChnLvl($){# in: name out: vit or phys level
 
 #--------------- Conversion routines for register settings---------------------
 sub CUL_HM_initRegHash() { #duplicate short and long press register
+  my $mp = "./FHEM";
+  opendir(DH, $mp) || return;
+  foreach my $m (grep /^HMConfig_(.*)\.pm$/,readdir(DH)) {
+    my $file = "$mp$m";
+    no strict "refs";
+      my $ret = do $file;
+    use strict "refs";
+    Log3 undef, 1, "Error loading file: $file:\n $@" if(!$ret) ;
+  }
+  closedir(DH);
 
   foreach my $reg (keys %{$culHmRegDefShLg}){ #update register list
     %{$culHmRegDefine->{"sh".$reg}} = %{$culHmRegDefShLg->{$reg}};
     %{$culHmRegDefine->{"lg".$reg}} = %{$culHmRegDefShLg->{$reg}};
     $culHmRegDefine->{"lg".$reg}{a} +=0x80;
   }
-  foreach my $rN (keys %{$culHmRegDefine}){#create literal inverse for fast search
+  foreach my $rN  (keys %{$culHmRegDefine}){#create literal inverse for fast search
     if ($culHmRegDefine->{$rN}{lit}){# literal assigned => create inverse
       foreach my $lit (keys %{$culHmRegDefine->{$rN}{lit}}){
         $culHmRegDefine->{$rN}{litInv}{$culHmRegDefine->{$rN}{lit}{$lit}}=$lit;
