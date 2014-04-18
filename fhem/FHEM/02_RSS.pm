@@ -749,21 +749,21 @@ RSS_CGI(){
     The RSS feeds are at
     <ul>
         <code>http://host.example.org:8083/fhem/rss/FrameRSS.rss</code><br>
-        <code>http://192/168.1.222:8083/fhem/rss/MyRSS.rss</code><br>
+        <code>http://192.168.1.222:8083/fhem/rss/MyRSS.rss</code><br>
     </ul>
     <br>
     
     The pictures are at 
     <ul>
         <code>http://host.example.org:8083/fhem/rss/FrameRSS.jpg</code><br>
-        <code>http://192/168.1.222:8083/fhem/rss/MyRSS.png</code><br>
+        <code>http://192.168.1.222:8083/fhem/rss/MyRSS.png</code><br>
     </ul>
     <br>
     
     The HTML pages are at 
     <ul>
         <code>http://host.example.org:8083/fhem/rss/FrameRSS.html</code><br>
-        <code>http://192/168.1.222:8083/fhem/rss/MyRSS.html</code><br>
+        <code>http://192.168.1.222:8083/fhem/rss/MyRSS.html</code><br>
     </ul>
     <br>
     
