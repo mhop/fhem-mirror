@@ -391,7 +391,7 @@ sub HMinfo_peerCheck(@) { #####################################################
         next if ($pId eq "00000000" ||$pId =~m /$devId/);
         if ($md eq "HM-CC-RT-DN" && $id =~ m/(0[45])$/){ # special RT climate
           my $c = $1 eq "04"?"05":"04";
-          push @peerIDsNoPeer if ($pId !~ m/$c$/);
+          push @peerIDsNoPeer,$eName." pID:".$pId if ($pId !~ m/$c$/);
         }
         my $pDid = substr($pId,0,6);
         if (!$modules{CUL_HM}{defptr}{$pId} && 
