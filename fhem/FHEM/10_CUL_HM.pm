@@ -3903,20 +3903,22 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "please enter peer"                                    if(!$peerId);
     $peerId .= "01" if( length($peerId)==6);
 
-    my ($peerChn,$peerBtn,$peerHash,$myBtn,$cmdB);
+    my @pCh;
+    my ($peerHash,$dSet,$cmdB);
     my $peerDst = substr($peerId,0,6);
     my $pmd     = AttrVal(CUL_HM_id2Name($peerDst), "model"  , "");
 
     if ($md =~ m/HM-CC-RT-DN/ && $chn eq "05" ){# rt team peers cross from 05 to 04
-      $myBtn = $peerBtn = "05";
-      $peerChn = "05";
+      @pCh = (undef,"04","05");
+      $chn = "04";
+      $single = "dual";
+      $dSet = 1;#Dual set - set 2 channels for "remote"
     }
     else{ # normal devices
-      $peerBtn = $peerChn = substr($peerId,6,2); # chan peeredd to remote
-      $myBtn = $chn;
+      $pCh[1] = $pCh[2] = substr($peerId,6,2);
     }
-    $peerHash = $modules{CUL_HM}{defptr}{$peerDst.$peerChn}if ($modules{CUL_HM}{defptr}{$peerDst.$peerChn});
-    $peerHash = $modules{CUL_HM}{defptr}{$peerDst}         if (!$peerHash);
+    $peerHash = $modules{CUL_HM}{defptr}{$peerDst.$pCh[1]}if ($modules{CUL_HM}{defptr}{$peerDst.$pCh[1]});
+    $peerHash = $modules{CUL_HM}{defptr}{$peerDst}        if (!$peerHash);
     return "$peerN not a CUL_HM device"                           if(   ($target ne "remote") 
                                                                      && (!$peerHash || $peerHash->{TYPE} ne "CUL_HM")
                                                                      &&  $defs{$devName}{IODev}->{NAME} ne $peerN);
@@ -3924,8 +3926,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "$set must be set or unset"                            if($set    !~ m/^(set|unset)$/);
     return "$target must be [actor|remote|both]"                  if($target !~ m/^(actor|remote|both)$/);
     return "use - single [set|unset] actor - for smoke detector"  if( $st eq "smokeDetector"       && ($single ne "single" || $target ne "actor"));
-    return "use - single - for ".$st                              if(($st =~ m/(threeStateSensor|thermostat|motionDetector)/) && ($single ne "single"));
-    return "TC WindowRec only peers to channel 01 single"         if( $pmd =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/ && $peerChn eq "03" && $myBtn ne "01" && $set eq "set");
+    return "use - single - for ".$st                              if(($st =~ m/(threeStateSensor|motionDetector)/) && ($single ne "single"));
+    return "TC WindowRec only peers to channel 01 single"         if( $pmd =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/ && $pCh[1] eq "03" && $chn ne "01" && $set eq "set");
 
     my $pSt = CUL_HM_Get($peerHash,$peerHash->{NAME},"param","subType");
 
@@ -3933,25 +3935,28 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     if ($set eq "unset"){$set = 0;$cmdB ="02";}
     else                {$set = 1;$cmdB ="01";}
 
-    my ($b1,$b2,$nrCh2Pair);
-    $b1 = ($roleC) ? hex($myBtn) : (($single eq "single")?$bNo : ($bNo*2 - 1));
+    my (@b,$nrCh2Pair);
+    $b[1] = ($roleC) ? hex($chn) : (($single eq "single")?$bNo : ($bNo*2 - 1));
     if ($single eq "single"){
-      $b2 = $b1;
-      $b1 = 0 if ($st eq "smokeDetector" ||$pSt eq "smokeDetector");
+      $b[2] = $b[1];
+      $b[1] = 0 if ($st eq "smokeDetector" ||$pSt eq "smokeDetector");
       $nrCh2Pair = 1;
     }
     elsif($single eq "dual"){
       $single = 0;
-      $b2 = $b1 + 1;
+      $b[2] = $b[1] + 1;
       $nrCh2Pair = 2;
     }
     else{#($single eq "reverse")
       $single = 0;
-      $b2 = $b1++;
+      $b[2] = $b[1]++;
       $nrCh2Pair = 2;
     }
 
-    $target = "both" if ($st eq "virtual" && $pSt eq "smokeDetector");
+    if ( $pSt eq "smokeDetector"){
+      $b[1] = $b[2];
+      $target = "both" if ($st eq "virtual");
+    }
 
     # First the remote (one loop for on, one for off)
     if (!$target || $target =~ m/^(remote|both)$/){
@@ -3963,19 +3968,17 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                            :"0100";
       }
       for(my $i = 1; $i <= $nrCh2Pair; $i++) {
-        my $b = ($i==1 ? $b1 : $b2);
-        $b = $b2 if ($pSt eq "smokeDetector");
         if ($st eq "virtual"){
-          my $btnName = CUL_HM_id2Name($dst.sprintf("%02X",$b));
-          return "button ".$b." not defined for virtual remote ".$name
+          my $btnName = CUL_HM_id2Name($dst.sprintf("%02X",$b[$i]));
+          return "button ".$b[$i]." not defined for virtual remote ".$name
               if (!defined $attr{$btnName});
-          CUL_HM_ID2PeerList ($btnName,$peerDst.$peerBtn,$set); #upd. peerlist
+          CUL_HM_ID2PeerList ($btnName,$peerDst.$pCh[$i],$set); #upd. peerlist
         }
         else{
-          my $bStr = sprintf("%02X",$b);
+          my $bStr = sprintf("%02X",$b[$i]);
           CUL_HM_PushCmdStack($hash,
-                 "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerBtn}00");
-          CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,hex($peerBtn),4,$burst)
+                 "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}$pCh[$i]00");
+          CUL_HM_pushConfig($hash,$id, $dst,$b[$i],$peerDst,hex($pCh[$i]),4,$burst)
                    if($burst && $cmdB eq "01"); # only if set
           CUL_HM_qAutoRead($name,3);
         }
@@ -4002,14 +4005,19 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     if (!$target || $target =~ m/^(actor|both)$/ ){
       if ($modules{CUL_HM}{defptr}{$peerDst}){# is defined or ID only?
         if ($pSt eq "virtual"){
-          CUL_HM_ID2PeerList ($peerN,$dst.sprintf("%02X",$b2),$set);
-          CUL_HM_ID2PeerList ($peerN,$dst.sprintf("%02X",$b1),$set) 
-                if ($b1 & !$single);
+          CUL_HM_ID2PeerList ($peerN,$dst.sprintf("%02X",$b[2]),$set);
+          CUL_HM_ID2PeerList ($peerN,$dst.sprintf("%02X",$b[1]),$set) 
+                if ($b[1] & !$single);
         }
         else{
           my $peerFlag = CUL_HM_getFlag($peerHash);
-          CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",
-              $peerFlag,$id,$peerDst,$peerChn,$cmdB,$dst,$b2,$b1 ));
+          if ($dSet){
+           CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X00",$peerFlag,$id,$peerDst,$pCh[1],$cmdB,$dst,$b[1]));
+           CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X00",$peerFlag,$id,$peerDst,$pCh[2],$cmdB,$dst,$b[2] ));
+         }
+          else{
+            CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",$peerFlag,$id,$peerDst,$pCh[1],$cmdB,$dst,$b[2],$b[1] ));
+          }
           if(CUL_HM_getRxType($peerHash) & 0x80){
             my $pDevHash = CUL_HM_id2Hash($peerDst);#put on device
             CUL_HM_pushConfig($pDevHash,$id,$peerDst,0,0,0,0,"0101");#set burstRx
@@ -4022,7 +4030,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return ("",1) if ($target && $target eq "remote");#Nothing for actor
   }
   else{
-    return "$cmd not impelmented - contact sysop";
+    return "$cmd not implemented - contact sysop";
   }
 
   CUL_HM_UpdtReadSingle($hash,"state",$state,1) if($state);
