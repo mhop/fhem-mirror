@@ -31,13 +31,8 @@ use Time::HiRes qw(gettimeofday);
 
 sub ECMDDevice_Get($@);
 sub ECMDDevice_Set($@);
+sub ECMDDevice_Attr($@);
 sub ECMDDevice_Define($$);
-
-my %gets= (
-);
-
-my %sets= (
-);
 
 ###################################
 sub
@@ -45,20 +40,24 @@ ECMDDevice_Initialize($)
 {
   my ($hash) = @_;
 
+  $hash->{Match}     = ".+"; 
+  
   $hash->{GetFn}     = "ECMDDevice_Get";
   $hash->{SetFn}     = "ECMDDevice_Set";
   $hash->{DefFn}     = "ECMDDevice_Define";
+  $hash->{ParseFn}   = "ECMDDevice_Parse";
 
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5 ".
+  $hash->{AttrFn}    = "ECMDDevice_Attr";
+  $hash->{AttrList}  = "IODev class ".
                         $readingFnAttributes;
 }
 
 ###################################
 sub
-ECMDDevice_AnalyzeCommand($)
+ECMDDevice_AnalyzeCommand($$)
 {
-        my ($ecmd)= @_;
-        Log 5, "ECMDDevice: Analyze command >$ecmd<";
+        my ($hash, $ecmd)= @_;
+        Log3 $hash, 5, "ECMDDevice: Analyze command >$ecmd<";
         return AnalyzePerlCommand(undef, $ecmd);
 }
 
@@ -76,6 +75,7 @@ ECMDDevice_GetDeviceParams($)
         return;
 }
 
+#############################
 sub
 ECMDDevice_DeviceParams2Specials($)
 {
@@ -91,26 +91,39 @@ ECMDDevice_DeviceParams2Specials($)
         return %specials;
 }
 
+sub
+ECMDDevice_ReplaceSpecials($%)
+{
+        my ($s, %specials)= @_;
+
+        # perform macro substitution
+        foreach my $special (keys %specials) {
+          $s =~ s/$special/$specials{$special}/g;
+        }
+        return $s;
+}
+
 ###################################
 sub
 ECMDDevice_Changed($$$)
 {
         my ($hash, $cmd, $value)= @_;
-        
 
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash, $cmd, $value, 1) if(defined($value));
+        if(defined($value) && $value ne "") {
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate($hash, $cmd, $value);
 
-        my $state= $cmd;
-        $state.= " $value" if(defined($value));
-        readingsBulkUpdate($hash, "state", $state, 0);
+          my $state= $cmd;
+          $state.= " $value";
+          readingsBulkUpdate($hash, "state", $state);
 
-        readingsEndUpdate($hash, 1);
+          readingsEndUpdate($hash, 1);
 
-        my $name= $hash->{NAME};
-        Log GetLogLevel($name, 4), "ECMDDevice $name $state";
+          my $name= $hash->{NAME};
+          Log3 $hash, 4 , "ECMDDevice $name $state";
 
-        return $state;
+          return $state;
+        }
 
 }
 
@@ -120,19 +133,13 @@ ECMDDevice_PostProc($$$)
 {
   my ($hash, $postproc, $value)= @_;
 
-  # the following lines are commented out because we do not want specials to be evaluated
-  # this is mainly due to the unwanted substitution of single semicolons by double semicolons
-  #my %specials= ECMDDevice_DeviceParams2Specials($hash);
-  #my $command= EvalSpecials($postproc, %specials);
-  # we pass the command verbatim instead
-  # my $command= $postproc;
-
   if($postproc) {
         my %specials= ECMDDevice_DeviceParams2Specials($hash);
-        my $command= EvalSpecials($postproc, %specials);
+        my $command= ECMDDevice_ReplaceSpecials($postproc, %specials);
 	$_= $value;
-	Log 5, "Postprocessing $value with perl command $command.";
+	Log3 $hash, 5, "Postprocessing \"" . escapeLogLine($value) . "\" with perl command $command.";
 	$value= AnalyzePerlCommand(undef, $command);
+	Log3 $hash, 5, "Postprocessed value is \"" . escapeLogLine($value) . "\".";
   }
   return $value;
 }
@@ -153,10 +160,13 @@ ECMDDevice_Get($@)
         my $IOhash= $hash->{IODev};
         my $classname= $hash->{fhem}{classname};
         if(!defined($IOhash->{fhem}{classDefs}{$classname}{gets}{$cmdname})) {
-                return "$name error: unknown command $cmdname";
+                my $gets= $IOhash->{fhem}{classDefs}{$classname}{gets};
+                return "$name error: unknown argument $cmdname, choose one of " .
+                  (join " ", sort keys %$gets);
         }
 
         my $ecmd= $IOhash->{fhem}{classDefs}{$classname}{gets}{$cmdname}{cmd};
+        my $expect= $IOhash->{fhem}{classDefs}{$classname}{gets}{$cmdname}{expect};
         my $params= $IOhash->{fhem}{classDefs}{$classname}{gets}{$cmdname}{params};
         my $postproc= $IOhash->{fhem}{classDefs}{$classname}{gets}{$cmdname}{postproc};
 
@@ -169,15 +179,15 @@ ECMDDevice_Get($@)
 
                 my $i= 0;
                 foreach my $param (@params) {
-                        Log 5, "Parameter %". $param . " is " . $a[$i];
+                        Log3 $hash, 5, "Parameter %". $param . " is " . $a[$i];
                         $specials{"%".$param}= $a[$i++];
                 }
         }
-        $ecmd= EvalSpecials($ecmd, %specials);
+        $ecmd= ECMDDevice_ReplaceSpecials($ecmd, %specials);
 
-        my $r = ECMDDevice_AnalyzeCommand($ecmd);
+        my $r = ECMDDevice_AnalyzeCommand($hash, $ecmd);
 
-        my $v= IOWrite($hash, $r);
+        my $v= IOWrite($hash, $r, $expect);
 
 	$v= ECMDDevice_PostProc($hash, $postproc, $v);
 
@@ -200,10 +210,11 @@ ECMDDevice_Set($@)
         my $classname= $hash->{fhem}{classname};
         if(!defined($IOhash->{fhem}{classDefs}{$classname}{sets}{$cmdname})) {
 		my $sets= $IOhash->{fhem}{classDefs}{$classname}{sets};
-                return "Unknown argument ?, choose one of " . join(' ', keys %$sets);
+                return "Unknown argument $cmdname, choose one of " . join(' ', sort keys %$sets);
         }
 
         my $ecmd= $IOhash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{cmd};
+        my $expect= $IOhash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{expect};
         my $params= $IOhash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{params};
         my $postproc= $IOhash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{postproc};
 
@@ -219,11 +230,11 @@ ECMDDevice_Set($@)
                         $specials{"%".$param}= $a[$i++];
                 }
         }
-        $ecmd= EvalSpecials($ecmd, %specials);
+        $ecmd= ECMDDevice_ReplaceSpecials($ecmd, %specials);
 
-        my $r = ECMDDevice_AnalyzeCommand($ecmd);
+        my $r = ECMDDevice_AnalyzeCommand($hash, $ecmd);
 
-        my $v= IOWrite($hash, $r);
+        my $v= IOWrite($hash, $r, $expect);
 
 	$v= ECMDDevice_PostProc($hash, $postproc, $v);
 
@@ -232,50 +243,132 @@ ECMDDevice_Set($@)
 
 }
 
+#############################
+sub
+ECMDDevice_Parse($$)
+{
+  # we never come here if $msg does not match $hash->{MATCH} in the first place
+  
+  # NOTE: we will update all matching readings for all devices, not just the first!
+  
+  my ($IOhash, $msg) = @_;        # IOhash points to the ECMD, not to the ECMDDevice
+
+  my @matches;
+  my $name= $IOhash->{NAME};
+  
+  #Debug "Trying to find a match for \"" . escapeLogLine($msg) ."\"";
+  # walk over all clients
+  foreach my $d (keys %defs) {
+    my $hash= $defs{$d};
+    if($hash->{TYPE} eq "ECMDDevice" && $hash->{IODev} eq $IOhash) {
+      my $classname= $hash->{fhem}{classname};
+      my $classDef= $IOhash->{fhem}{classDefs}{$classname};
+      #Debug "  Checking device $d with class $classname...";
+      next unless(defined($classDef->{readings}));
+      #Debug "   Trying to find a match in class $classname...";
+      my %specials= ECMDDevice_DeviceParams2Specials($hash);
+      # we run over all readings in that classdef
+      foreach my $r (keys %{$classDef->{readings}}) {
+        my $regex= ECMDDevice_ReplaceSpecials($classDef->{readings}{$r}{match}, %specials);
+        #Debug "      Trying to match reading $r with regular expressing \"$regex\".";
+        if($msg =~ m/$regex/) {
+          # we found a match
+          Log3 $IOhash, 5, "$name: match regex $regex for reading $r of device $d with class $classname";
+          push @matches, $d;
+          my $postproc= $classDef->{readings}{$r}{postproc};
+          my $value= ECMDDevice_PostProc($hash, $postproc, $msg);
+          Log3 $hash, 5, "postprocessed value is $value";
+          ECMDDevice_Changed($hash, $r, $value);
+        }
+      }
+    }  
+  }
+  
+  return @matches if(@matches);
+  return "UNDEFINED ECMDDevice message $msg";  
+  
+}
+
+#####################################
+sub
+ECMDDevice_AssignClass($$@)
+{
+    my ($hash,$classname,@a)= @_;
+    
+    my $name= $hash->{NAME};
+    
+    my $IOhash= $hash->{IODev};
+    if(!defined($IOhash)) {
+            my $err= "ECMDDevice $name error: no I/O device.";
+            Log3 $hash, 1, $err;
+            return $err;
+    }
+           
+    
+    if(!defined($IOhash->{fhem}{classDefs}{$classname}{filename})) {
+            my $err= "ECMDDevice $name error: unknown class $classname (I/O device is " 
+                      . $IOhash->{NAME} . ").";
+            Log3 $hash, 1, $err;
+            return $err;
+    }
+
+    $hash->{fhem}{classname}= $classname;
+    
+    my @prms= ECMDDevice_GetDeviceParams($hash);
+    my $numparams= 0;
+    $numparams= $#prms+1 if(defined($prms[0]));
+    #Log 5, "ECMDDevice $classname requires $numparams parameter(s): ". join(" ", @prms);
+
+    # verify identical number of parameters
+    if($numparams != $#a+1) {
+            my $err= "$name error: wrong number of parameters";
+            Log3 $hash, 1, $err;
+            return $err;
+    }
+
+    # set parameters
+    for(my $i= 0; $i< $numparams; $i++) {
+            $hash->{fhem}{params}{$prms[$i]}= $a[$i];
+    }
+    
+    return undef; # OK
+}
+
+#####################################
+sub
+ECMDDevice_Attr($@)
+{
+
+  my @a = @_;
+  my $hash= $defs{$a[1]};
+
+  if($a[0] eq "set" && $a[2] eq "class") {
+    my ($classname,@prms)= split " ", $a[3];
+    return ECMDDevice_AssignClass($hash, $classname, @prms);
+  } else {
+    return undef;
+  }
+}
 
 #############################
-
 sub
 ECMDDevice_Define($$)
 {
         my ($hash, $def) = @_;
         my @a = split("[ \t]+", $def);
 
-        return "Usage: define <name> ECMDDevice <classname> [...]"    if(int(@a) < 3);
+        return "Usage: define <name> ECMDDevice [<classname> [...]]"    if(int(@a) < 2);
         my $name= $a[0];
-        my $classname= $a[2];
-
+        
         AssignIoPort($hash);
 
-        my $IOhash= $hash->{IODev};
-        if(!defined($IOhash->{fhem}{classDefs}{$classname}{filename})) {
-                my $err= "$name error: unknown class $classname.";
-                Log 1, $err;
-                return $err;
+        if(int(@a)> 2) {
+          my $classname= $a[2];
+          shift @a; shift @a; shift @a;
+          return ECMDDevice_AssignClass($hash, $classname, @a);
+        } else {
+          return undef;
         }
-
-        $hash->{fhem}{classname}= $classname;
-
-        my @prms= ECMDDevice_GetDeviceParams($hash);
-        my $numparams= 0;
-        $numparams= $#prms+1 if(defined($prms[0]));
-        #Log 5, "ECMDDevice $classname requires $numparams parameter(s): ". join(" ", @prms);
-
-        # keep only the parameters
-        shift @a; shift @a; shift @a;
-
-        # verify identical number of parameters
-        if($numparams != $#a+1) {
-                my $err= "$name error: wrong number of parameters";
-                Log 1, $err;
-                return $err;
-        }
-
-        # set parameters
-        for(my $i= 0; $i< $numparams; $i++) {
-                $hash->{fhem}{params}{$prms[$i]}= $a[$i];
-        }
-        return undef;
 }
 
 1;
@@ -290,17 +383,27 @@ ECMDDevice_Define($$)
   <a name="ECMDDevicedefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; ECMDDevice &lt;classname&gt; [&lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]]</code>
+    <code>define &lt;name&gt; ECMDDevice [&lt;classname&gt; [&lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]]]</code>
     <br><br>
 
     Defines a logical ECMD device. The number of given parameters must match those given in
-    the <a href="#ECMDClassdef">class definition</a> of the device class <code>&lt;classname&gt;</code>.
+    the <a href="#ECMDClassdef">class definition</a> of the device class <code>&lt;classname&gt;</code>.<p>
+    
+    Normally, the logical ECMDDevice is attached to the latest previously defined physical ECMD device
+    for I/O. Use the <code>IODev</code> attribute of the logical ECMDDevice to attach to any
+    physical ECMD device, e.g. <code>attr myRelais2 IODev myAVRNETIO</code>. In such a case the correct
+    reference to the class cannot be made at the time of definition of the device. Thus, you need to
+    omit the &lt;classname&gt; and &lt;parameter&gt; references in the definition of the device and use the
+    <code>class</code> <a href="#ECMDDeviceattr">attribute</a> instead.
     <br><br>
 
     Examples:
     <ul>
       <code>define myADC ECMDDevice ADC</code><br>
       <code>define myRelais1 ECMDDevice relais 8</code><br>
+      <code>define myRelais2 ECMDDevice</code><br>
+      <code>attr myRelais2 IODev myAVRNETIO</code><br>
+      <code>attr myRelais2 class relais 8</code>
     </ul>
     <br>
   </ul>
@@ -346,8 +449,13 @@ ECMDDevice_Define($$)
   <a name="ECMDDeviceattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li>
+    <li>class<br>
+    If you omit the &lt;classname&gt; and &lt;parameter&gt; references in the 
+    <a href="#ECMDDevicedefine">definition</a> of the device, you have to add them
+    separately as an attribute. Example: <code>attr myRelais2 class relais 8</code>.</li>
+    <li><a href="#verbose">verbose</a></li>
     <li><a href="#eventMap">eventMap</a></li>
+    <li><a href="#IODev">IODev</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br><br>
@@ -363,8 +471,10 @@ ECMDDevice_Define($$)
 
         The class definition file <code>/etc/fhem/ADC.classdef</code> looks as follows:<br><br>
         <code>
-                get value cmd {"adc get %channel"}  <br>
+                get value cmd {"adc get %channel\n"}  <br>
                 get value params channel<br>
+                get value expect "\d+\n"<br>
+                get value postproc { s/^(\d+)\n$/$1/;; $_ }<br>
         </code>
         <br>
         In the fhem configuration file or on the fhem command line we do the following:<br><br>
@@ -377,9 +487,9 @@ ECMDDevice_Define($$)
         <br>
         The get command is evaluated as follows: <code>get value</code> has one named parameter
         <code>channel</code>. In the example the literal <code>1</code> is given and thus <code>%channel</code>
-        is replaced by <code>1</code> to yield <code>"adc get 1"</code> after macro substitution. Perl
+        is replaced by <code>1</code> to yield <code>"adc get 1\n"</code> after macro substitution. Perl
         evaluates this to a literal string which is send as a plain ethersex command to the AVR-NET-IO. The
-        board returns something like <code>024</code> for the current value of  analog/digital converter number 1.
+        board returns something like <code>024\n</code> for the current value of  analog/digital converter number 1. The postprocessor keeps only the digits.
         <br><br>
 
    </ul>
@@ -394,8 +504,9 @@ ECMDDevice_Define($$)
         The class definition file <code>/etc/fhem/relais.classdef</code> looks as follows:<br><br>
         <code>
                 params pinmask<br>
-                set on cmd {"io set ddr 2 ff\nioset port 2 0%pinmask\nwait 1000\nio set port 2 00"}<br>
-		set on postproc {s/^OK\nOK\nOK\nOK$/success/; "$_" eq "success" ? "ok" : "error"; }<br>
+                set on cmd {"io set ddr 2 ff\n\000ioset port 2 0%pinmask\n\000wait 1000\n\000io set port 2 00\n"}<br>
+                set on expect ".*"<br>
+                set on postproc {s/^OK\nOK\nOK\nOK\n$/success/; "$_" eq "success" ? "ok" : "error"; }<br>
         </code>
         <br>
         In the fhem configuration file or on the fhem command line we do the following:<br><br>
@@ -408,26 +519,56 @@ ECMDDevice_Define($$)
         <br>
         The set command is evaluated as follows: <code>%pinmask</code>
         is replaced by <code>8</code> to yield
-        <code>"io set ddr 2 ff\nioset port 2 08\nwait 1000\nio set port 2 00"</code> after macro substitution. Perl
-        evaluates this to a literal string. This string is split into lines (without trailing newline characters)
+        <code>"io set ddr 2 ff\n\000io set port 2 08\n\000wait 1000\n\000io set port 2 00\n\000"</code> after macro substitution. Perl
+        evaluates this to a literal string. This string is split into lines (with trailing newline characters)
         <code>
         <ul>
-        <li>io set ddr 2 ff</li>
-        <li>ioset port 2 08</li>
-        <li>wait 1000</li>
-        <li>io set port 2 00</li>
+        <li>io set ddr 2 ff\n</li>
+        <li>ioset port 2 08\n</li>
+        <li>wait 1000\n</li>
+        <li>io set port 2 00\n</li>
         </ul>
         </code>
-        These lines are sent as a plain ethersex commands to the AVR-NET-IO one by one. Each line is terminated with
-        a newline character unless <a href="#ECMDattr">the <code>nonl</code> attribute of the ECMDDevice</a> is set. After
-        each line the answer from the ECMDDevice is read back. They are concatenated with newlines and returned
-        for further processing, e.g. by the <code>postproc</code> command.      
-	For any of the four plain ethersex commands, the AVR-NET-IO returns the string <code>OK</code>. They are
-	concatenated and separated by line breaks (\n). The postprocessor takes the result from <code>$_</code>,
-	substitutes it by the string <code>success</code> if it is <code>OK\nOK\nOK\nOK</code>, and then either
+        These lines are sent as a plain ethersex commands to the AVR-NET-IO one by one. After
+        each line the answer from the physical device is read back. They are concatenated with \000 chars and returned
+        for further processing by the <code>postproc</code> command.      
+	For any of the four plain ethersex commands, the AVR-NET-IO returns the string <code>OK\n</code>. They are
+	concatenated. The postprocessor takes the result from <code>$_</code>,
+	substitutes it by the string <code>success</code> if it is <code>OK\nOK\nOK\nOK\n</code>, and then either
 	returns the string <code>ok</code> or the string <code>error</code>.
+	<br><br>
 
    </ul>
+
+  <b>Example 3</b>
+  <br><br>
+  <ul>
+        The following example shows how to implement a sandbox.<br><br>
+
+        The class definition file <code>/etc/fhem/DummyServer.classdef</code> looks as follows:<br><br>
+        <code>
+                reading foo match "\d+\n"<br>
+                reading foo postproc { s/^(\d+).*$/$1/;; $_ }<br>
+        </code>
+        <br>
+        In the fhem configuration file or on the fhem command line we do the following:<br><br>
+        <code>
+                define myDummyServer ECMD telnet localhost:9999        # define the physical device<br>
+                set myDummyServer classdef DummyServer /etc/fhem/DummyServer.classdef       # define the device class DummyServer<br>
+                define myDummyClient ECDMDevice DummyServer # define a logical device with device class DummyServer<br>
+        </code>
+        <p>
+        On a Unix command line, run <code>netcat -l 9999</code>. This makes netcat listening on port 9999. Data received on that port are printed on stdout. Data input from stdin is sent to the other end of an incoming connection.<p>
+        
+        Start FHEM.<p>
+        
+        Then enter the number 4711 at the stdin of the running netcat server.<p>
+               
+        FHEM sees <code>4711\n</code> coming in from the netcat dummy server. The incoming string matches the regular expression of the <code>foo</code> reading. The postprocessor is used to strip any trailing garbage from the digits. The result 4711 is used to update the <code>foo</code> reading.
+        <br><br>
+
+   </ul>
+
 
 
 </ul>
