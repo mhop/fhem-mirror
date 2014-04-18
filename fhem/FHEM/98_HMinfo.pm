@@ -341,8 +341,19 @@ sub HMinfo_regCheck(@) { ######################################################
           || !$ehash->{READINGS}{$rNm}{VAL})            {push @mReg, $rNm;}
       elsif ( $ehash->{READINGS}{$rNm}{VAL} !~ m/00:00/){push @iReg, $rNm;}
     }
-    push @regChPend,$eName                        if ($ehash->{helper}{shadowReg} && 
-                                                      keys %{$ehash->{helper}{shadowReg}});
+    if ($ehash->{helper}{shadowReg}){
+      foreach my $rl (keys %{$ehash->{helper}{shadowReg}}){
+        delete $ehash->{helper}{shadowReg}{$rl} if ($ehash->{helper}{shadowReg}{$rl} eq $ehash->{READINGS}{$rl}{VAL});
+      }
+      if (keys %{$ehash->{helper}{shadowReg}}){
+        push @regChPend,$eName;
+      }
+      else{
+        delete $ehash->{helper}{shadowReg};
+      }
+      
+    }      
+                                                      
     push @regMissing,$eName.":\t".join(",",@mReg) if (scalar @mReg);
     push @regIncompl,$eName.":\t".join(",",@iReg) if (scalar @iReg);
   }
@@ -376,26 +387,24 @@ sub HMinfo_peerCheck(@) { #####################################################
     }
     else{# work on a valid list:
       next if ($st eq "repeater");
-      foreach (split",",$peerIDs){
-        next if ($_ eq "00000000" ||$_ =~m /$devId/);
-        my $cId = $id;
-        if ($md eq "HM-CC-RT-DN" && $id =~ m/0[45]$/){ # special RT climate
-          # special removed due to observations of user - RT should peer team2team - korrekt?
-          $_ =~ s/05$/04/;  # have to compare with clima_team, not clima
-          $cId =~ s/04$/05/;# will find 05 in peerlist, not 04
+      foreach my $pId (split",",$peerIDs){
+        next if ($pId eq "00000000" ||$pId =~m /$devId/);
+        if ($md eq "HM-CC-RT-DN" && $id =~ m/(0[45])$/){ # special RT climate
+          my $c = $1 eq "04"?"05":"04";
+          push @peerIDsNoPeer if ($pId !~ m/$c$/);
         }
-        my $pDid = substr($_,0,6);
-        if (!$modules{CUL_HM}{defptr}{$_} && 
+        my $pDid = substr($pId,0,6);
+        if (!$modules{CUL_HM}{defptr}{$pId} && 
             (!$pDid || !$modules{CUL_HM}{defptr}{$pDid})){
           next if($pDid && CUL_HM_id2IoId($id) eq $pDid);
-          push @peerIDnotDef,$eName." id:".$_;
+          push @peerIDnotDef,$eName." id:".$pId;
         }
         else{
-          my $pName = CUL_HM_id2Name($_);
+          my $pName = CUL_HM_id2Name($pId);
           $pName =~s/_chn:01//;           #chan 01 could be covered by device
           my $pPlist = AttrVal($pName,"peerIDs","");
           push @peerIDsNoPeer,$eName." p:".$pName 
-                if (!$pPlist || $pPlist !~ m/$cId/);
+                if (!$pPlist || $pPlist !~ m/$id/);
         }
       }
     }
