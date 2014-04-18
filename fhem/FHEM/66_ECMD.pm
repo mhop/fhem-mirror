@@ -11,21 +11,17 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
+use DevIo;
 
 
-#sub ECMD_Attr(@);
+sub ECMD_Attr($@);
 sub ECMD_Clear($);
 #sub ECMD_Parse($$$$$);
-#sub ECMD_Read($);
+sub ECMD_Read($);
 sub ECMD_ReadAnswer($$);
 #sub ECMD_Ready($);
-sub ECMD_Write($$);
+sub ECMD_Write($$$);
 
-sub ECMD_OpenDev($$);
-sub ECMD_CloseDev($);
-sub ECMD_SimpleWrite(@);
-sub ECMD_SimpleRead($);
-sub ECMD_Disconnected($);
 
 use vars qw {%attr %defs};
 
@@ -37,8 +33,8 @@ ECMD_Initialize($)
 
 # Provider
   $hash->{WriteFn} = "ECMD_Write";
-  #$hash->{ReadFn} = "ECMD_Read";
-  $hash->{Clients}= ":ECMDDevice:";
+  $hash->{ReadFn}  = "ECMD_Read";
+  $hash->{Clients} = ":ECMDDevice:";
 
 # Consumer
   $hash->{DefFn}   = "ECMD_Define";
@@ -46,7 +42,7 @@ ECMD_Initialize($)
   $hash->{GetFn}   = "ECMD_Get";
   $hash->{SetFn}   = "ECMD_Set";
   $hash->{AttrFn}  = "ECMD_Attr";
-  $hash->{AttrList}= "classdefs nonl loglevel:0,1,2,3,4,5";
+  $hash->{AttrList}= "classdefs logTraffic:0,1,2,3,4,5 timeout";
 }
 
 #####################################
@@ -64,14 +60,14 @@ ECMD_Define($$)
     Log 2, $msg;
     return $msg;
   }
-
-  ECMD_CloseDev($hash);
+  
+  DevIo_CloseDev($hash);
 
   $hash->{Protocol}= $protocol;
   my $devicename= $a[3];
   $hash->{DeviceName} = $devicename;
 
-  my $ret = ECMD_OpenDev($hash, 0);
+  my $ret = DevIo_OpenDev($hash, 0, undef);
   return $ret;
 }
 
@@ -83,179 +79,19 @@ ECMD_Undef($$)
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
 
+  # deleting port for clients
   foreach my $d (sort keys %defs) {
     if(defined($defs{$d}) &&
        defined($defs{$d}{IODev}) &&
-       $defs{$d}{IODev} == $hash)
-      {
+       $defs{$d}{IODev} == $hash) {
         my $lev = ($reread_active ? 4 : 2);
         Log3 $hash, $lev, "deleting port for $d";
         delete $defs{$d}{IODev};
       }
   }
 
-  ECMD_CloseDev($hash);
+  DevIo_CloseDev($hash);
   return undef;
-}
-
-#####################################
-sub
-ECMD_CloseDev($)
-{
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-  my $dev = $hash->{DeviceName};
-
-  return if(!$dev);
-
-  if($hash->{TCPDev}) {
-    $hash->{TCPDev}->close();
-    delete($hash->{TCPDev});
-
-  } elsif($hash->{USBDev}) {
-    $hash->{USBDev}->close() ;
-    delete($hash->{USBDev});
-
-  }
-  ($dev, undef) = split("@", $dev); # Remove the baudrate
-  delete($selectlist{"$name.$dev"});
-  delete($readyfnlist{"$name.$dev"});
-  delete($hash->{FD});
-
-
-}
-
-########################
-sub
-ECMD_OpenDev($$)
-{
-  my ($hash, $reopen) = @_;
-  my $protocol = $hash->{Protocol};
-  my $name = $hash->{NAME};
-  my $devicename = $hash->{DeviceName};
-
-
-  $hash->{PARTIAL} = "";
-  Log3 $hash, 3, "ECMD opening $name (protocol $protocol, device $devicename)"
-        if(!$reopen);
-
-  if($hash->{Protocol} eq "telnet") {
-
-
-    # This part is called every time the timeout (5sec) is expired _OR_
-    # somebody is communicating over another TCP connection. As the connect
-    # for non-existent devices has a delay of 3 sec, we are sitting all the
-    # time in this connect. NEXT_OPEN tries to avoid this problem.
-    if($hash->{NEXT_OPEN} && time() < $hash->{NEXT_OPEN}) {
-      return;
-    }
-
-    my $conn;
-    eval {
-	local $SIG{ALRM} = sub { die 'Timed Out'; }; 
-	alarm 10;
-	$conn = IO::Socket::INET->new(PeerAddr => $devicename, timeout => 5);
-    };
-    alarm 0;
-    $conn= undef if $@;
-#    return "Error: timeout." if ( $@ && $@ =~ /Timed Out/ );
-#    return "Error: Eval corrupted: $@" if $@;
-    if($conn) {
-      delete($hash->{NEXT_OPEN})
-
-    } else {
-      Log3 $hash, 3, "Can't connect to $devicename: $!" if(!$reopen);
-      $readyfnlist{"$name.$devicename"} = $hash;
-      $hash->{STATE} = "disconnected";
-      $hash->{NEXT_OPEN} = time()+60;
-      return "";
-    }
-
-    $hash->{TCPDev} = $conn;
-    $hash->{FD} = $conn->fileno();
-    delete($readyfnlist{"$name.$devicename"});
-    $selectlist{"$name.$devicename"} = $hash;
-
-  } else {
-
-    my $baudrate;
-    ($devicename, $baudrate) = split("@", $devicename);
-
-    my $po;
-    if ($^O=~/Win/) {
-     require Win32::SerialPort;
-     $po = new Win32::SerialPort ($devicename);
-    } else  {
-     require Device::SerialPort;
-     $po = new Device::SerialPort ($devicename);
-    }
-
-    if(!$po) {
-      return undef if($reopen);
-      Log3 $hash, 3, "Can't open $devicename: $!";
-      $readyfnlist{"$name.$devicename"} = $hash;
-      $hash->{STATE} = "disconnected";
-      return "";
-    }
-
-    $hash->{USBDev} = $po;
-    if( $^O =~ /Win/ ) {
-      $readyfnlist{"$name.$devicename"} = $hash;
-    } else {
-      $hash->{FD} = $po->FILENO;
-      delete($readyfnlist{"$name.$devicename"});
-      $selectlist{"$name.$devicename"} = $hash;
-    }
-
-    if($baudrate) {
-      $po->reset_error();
-      Log3 $hash, 3, "ECMD setting $name baudrate to $baudrate";
-      $po->baudrate($baudrate);
-      $po->databits(8);
-      $po->parity('none');
-      $po->stopbits(1);
-      $po->handshake('none');
-
-      # This part is for some Linux kernel versions whih has strange default
-      # settings.  Device::SerialPort is nice: if the flag is not defined for your
-      # OS then it will be ignored.
-      $po->stty_icanon(0);
-      #$po->stty_parmrk(0); # The debian standard install does not have it
-      $po->stty_icrnl(0);
-      $po->stty_echoe(0);
-      $po->stty_echok(0);
-      $po->stty_echoctl(0);
-
-      # Needed for some strange distros
-      $po->stty_echo(0);
-      $po->stty_icanon(0);
-      $po->stty_isig(0);
-      $po->stty_opost(0);
-      $po->stty_icrnl(0);
-    }
-
-    $po->write_settings;
-
-
-  }
-
-  if($reopen) {
-    Log3 $hash, 1, "ECMD $name ($devicename) reappeared";
-  } else {
-    Log3 $hash, 3, "ECMD device opened";
-  }
-
-  $hash->{STATE}= "";       # Allow InitDev to set the state
-  my $ret  = ECMD_DoInit($hash);
-
-  if($ret) {
-    Log3 $hash, 1,  "$ret";
-    ECMD_CloseDev($hash);
-    Log3 $hash, 1, "Cannot init $name ($devicename), ignoring it";
-  }
-
-  DoTrigger($name, "CONNECTED") if($reopen);
-  return $ret;
 }
 
 #####################################
@@ -267,96 +103,69 @@ ECMD_DoInit($)
   my $msg = undef;
 
   ECMD_Clear($hash);
-  #ECMD_SimpleWrite($hash, "version");
-  #my ($err,$version)= ECMD_ReadAnswer($hash, "version");
-  #return "$name: $err" if($err);
-  #Log 2, "ECMD version: $version";
-  #$hash->{VERSION} = $version;
-
+ 
   $hash->{STATE} = "Initialized" if(!$hash->{STATE});
 
   return undef;
 }
 
-########################
+#####################################
 sub
-ECMD_SimpleWrite(@)
+dq($) 
 {
-  my ($hash, $msg, $nonl) = @_;
-  return if(!$hash);
-
-  $msg .= "\n" unless($nonl);
-  $hash->{USBDev}->write($msg) if($hash->{USBDev});
-  syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
-
-  select(undef, undef, undef, 0.001);
+  my ($s)= @_;
+  $s= "<nothing>" unless(defined($s));
+  return "\"" . escapeLogLine($s) . "\"";
 }
 
-########################
 sub
-ECMD_SimpleRead($)
+ECMD_Log($$$)
 {
-  my ($hash) = @_;
-
-  if($hash->{USBDev}) {
-    return $hash->{USBDev}->input();
-  }
-
-  if($hash->{TCPDev}) {
-    my $buf;
-    if(!defined(sysread($hash->{TCPDev}, $buf, 1024))) {
-      ECMD_Disconnected($hash);
-      return undef;
-    }
-
-    return $buf;
-  }
-  return undef;
+  my ($hash, $loglevel, $logmsg)= @_;
+  my $name= $hash->{NAME};
+  $loglevel= AttrVal($name, "logTraffic", undef) unless(defined($loglevel)); 
+  return unless(defined($loglevel)); 
+  Log3 $hash, $loglevel , "$name: $logmsg";
 }
 
 #####################################
-# This is a direct read for commands like get
 sub
-ECMD_ReadAnswer($$)
+ECMD_SimpleRead($) 
 {
-  my ($hash, $arg) = @_;
+  my $hash = shift;
+  my $answer= DevIo_SimpleRead($hash);
+  ECMD_Log $hash, undef, "read " . dq($answer);
+  return $answer;
+}
 
-  #Log 5, "ECMD reading answer for get $arg...";
+sub
+ECMD_SimpleWrite($$) 
+{
+  my ($hash, $msg) = @_;
+  ECMD_Log $hash, undef, "write " . dq($msg);
+  DevIo_SimpleWrite($hash, $msg, 0);
+}
 
-  return ("No FD", undef)
-        if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
-
-  my ($data, $rin) = ("", '');
-  my $buf;
-  my $to = 3;                                         # 3 seconds timeout
-  $to = $hash->{RA_Timeout} if($hash->{RA_Timeout});  # ...or less
-  #Log 5, "Timeout is $to seconds";
-  for(;;) {
-
-        return ("Error: device lost when reading answer for get $arg", undef)
-                if(!$hash->{FD});
-
-        vec($rin, $hash->{FD}, 1) = 1;
-        my $nfound = select($rin, undef, undef, $to);
-        if($nfound < 0) {
-                next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
-                my $err = $!;
-                ECMD_Disconnected($hash);
-                return("Error reading answer for get $arg: $err", undef);
-        }
-        return ("Error: timeout reading answer for get $arg", undef)
-              if($nfound == 0);
-
-      $buf = ECMD_SimpleRead($hash);
-      return ("No data", undef) if(!defined($buf));
-
-      if($buf) {
-        chomp $buf; # remove line break
-        Log3 $hash, 5, "ECMD (ReadAnswer): $buf";
-        $data .= $buf;
-      }
-      return (undef, $data)
+sub
+ECMD_SimpleExpect($$$)
+{
+  my ($hash, $msg, $expect) = @_;
+ 
+  ECMD_Log $hash, undef, "write " . dq($msg) . ", expect $expect";
+  my $answer= DevIo_Expect($hash, $msg, AttrVal($hash->{NAME}, "timeout", 3.0));
+  
+  if(defined($answer)) {
+    ECMD_Log $hash, undef, "read " . dq($answer);
+    if($answer !~ m/^$expect$/) {
+    ECMD_Log $hash, 1, "unexpected answer " . dq($answer) . " received (wrote " . 
+         dq($msg) . ", expected $expect)";
+    }
+  } else {
+    ECMD_Log $hash, 1, "no answer received (wrote " . 
+         dq($msg) . ", expected $expect)";
   }
+  
+  return $answer;
 }
 
 #####################################
@@ -374,34 +183,7 @@ ECMD_Clear($)
   my $hash = shift;
 
   # Clear the pipe
-  $hash->{RA_Timeout} = 0.1;
-  for(;;) {
-    my ($err, undef) = ECMD_ReadAnswer($hash, "clear");
-    last if($err && $err =~ m/^Error/);
-  }
-  delete($hash->{RA_Timeout});
-}
-
-#####################################
-sub
-ECMD_Disconnected($)
-{
-  my $hash = shift;
-  my $dev = $hash->{DeviceName};
-  my $name = $hash->{NAME};
-
-  return if(!defined($hash->{FD}));                 # Already deleted o
-
-  Log3 $hash, 1, "$dev disconnected, waiting to reappear";
-  ECMD_CloseDev($hash);
-  $readyfnlist{"$name.$dev"} = $hash;               # Start polling
-  $hash->{STATE} = "disconnected";
-
-  # Without the following sleep the open of the device causes a SIGSEGV,
-  # and following opens block infinitely. Only a reboot helps.
-  sleep(5);
-
-  DoTrigger($name, "DISCONNECTED");
+  DevIo_TimeoutRead($hash, 0.1);
 }
 
 #####################################
@@ -416,26 +198,24 @@ ECMD_Get($@)
   my $cmd= $a[1];
   my $arg = ($a[2] ? $a[2] : "");
   my @args= @a; shift @args; shift @args;
-  my ($msg, $err);
+  my ($answer, $err);
 
   return "No get $cmd for dummies" if(IsDummy($name));
 
   if($cmd eq "raw") {
         return "get raw needs an argument" if(@a< 3);
-        my $nonl= AttrVal($name, "nonl", 0);
+        #my $nonl= AttrVal($name, "nonl", 0);
         my $ecmd= join " ", @args;
-        Log3 $hash, 5, $ecmd;
-        ECMD_SimpleWrite($hash, $ecmd, $nonl);
-        ($err, $msg) = ECMD_ReadAnswer($hash, "raw");
-        return $err if($err);
+        #ecmd .= "\n" unless($nonl);
+        $answer= ECMD_SimpleExpect($hash, $ecmd, ".*");
   }  else {
         return "get $cmd: unknown command ";
   }
 
-  $hash->{READINGS}{$cmd}{VAL} = $msg;
+  $hash->{READINGS}{$cmd}{VAL} = $answer;
   $hash->{READINGS}{$cmd}{TIME} = TimeNow();
 
-  return "$name $cmd => $msg";
+  return "$name $cmd => $answer";
 }
 
 #####################################
@@ -469,8 +249,12 @@ ECMD_EvalClassDef($$$)
         #       params <params>                         parameters for device definition
         #       get <cmdname> cmd {<perlexpression>}    defines a get command
         #       get <cmdname> params <params>           parameters for get command
+        #       get <cmdname> expect regex              expected regex for get command
+        #       get <cmdname> postproc { <perl command> } postprocessor for get command
         #       set <cmdname> cmd {<perlexpression>}    defines a set command
+        #       set <cmdname> expect regex              expected regex for set command
         #       set <cmdname> params <params>           parameters for get command
+        #       set <cmdname> postproc { <perl command> } postprocessor for set command
         #       all lines are optional
         #
         # eaxmple class definition 1:
@@ -483,27 +267,69 @@ ECMD_EvalClassDef($$$)
         #       set stop cmd {"io set ddr 2 ff\nio set port 2 1%btnstop\nwait 1000\nio set port 2 00"}
         #       set down cmd {"io set ddr 2 ff\nio set port 2 1%btndown\nwait 1000\nio set port 2 00"}
 
-	my $cont= "";
+        my $cont= "";
         foreach my $line (@classdef) {
                 # kill trailing newline
                 chomp $line;
                 # kill comments and blank lines
                 $line=~ s/\#.*$//;
                 $line=~ s/\s+$//;
-		$line= $cont . $line;
-		if($line=~ s/\\$//) { $cont= $line; undef $line; }
+                $line= $cont . $line;
+                if($line=~ s/\\$//) { $cont= $line; undef $line; }
                 next unless($line);
-		$cont= "";
+                $cont= "";
                 Log3 $hash, 5, "$name: evaluating >$line<";
                 # split line into command and definition
                 my ($cmd, $def)= split("[ \t]+", $line, 2);
-                if($cmd eq "nonl") {
-                        Log3 $hash, 5, "$name: no newline";
-                        $hash->{fhem}{classDefs}{$classname}{nonl}= 1;
-                }
-                elsif($cmd eq "params") {
+                #if($cmd eq "nonl") {
+                #        Log3 $hash, 5, "$name: no newline";
+                #        $hash->{fhem}{classDefs}{$classname}{nonl}= 1;
+                #}
+                
+                #
+                # params
+                #
+                if($cmd eq "params") {
                         Log3 $hash, 5, "$name: parameters are $def";
                         $hash->{fhem}{classDefs}{$classname}{params}= $def;
+                #
+                # reading
+                #
+                } elsif($cmd eq "reading") {
+                        my ($readingname, $spec, $arg)= split("[ \t]+", $def, 3);
+                        #
+                        # match
+                        #
+                        if($spec eq "match") {
+                                if($arg !~ m/^"(.*)"$/s) {
+                                        Log3 $hash, 1, "$name: match for reading $readingname is not enclosed in double quotes.";
+                                        next;
+                                }
+                                $arg = $1;
+                                Log3 $hash, 5, "$name: reading $readingname will match $arg";
+                                 $hash->{fhem}{classDefs}{$classname}{readings}{$readingname}{match}= $arg;
+                        # 
+                        # postproc
+                        #
+                        } elsif($spec eq "postproc") {
+                                if($arg !~ m/^{.*}$/s) {
+                                        Log3 $hash, 1, "$name: postproc command for reading $readingname is not a perl command.";
+                                        next;
+                                }
+                                $arg =~ s/^(\\\n|[ \t])*//;           # Strip space or \\n at the beginning
+                                $arg =~ s/[ \t]*$//;
+                                Log3 $hash, 5, "$name: reading $readingname postprocessor defined as $arg";
+                                $hash->{fhem}{classDefs}{$classname}{readings}{$readingname}{postproc}= $arg;
+                        #
+                        # anything else
+                        #
+                        } else {
+                                Log3 $hash, 1, 
+                                         "$name: illegal spec $spec for reading $readingname for class $classname in file $filename.";
+                        }
+                #
+                # set, get
+                #
                 } elsif($cmd eq "set" || $cmd eq "get") {
                         my ($cmdname, $spec, $arg)= split("[ \t]+", $def, 3);
                         if($spec eq "params") {
@@ -542,6 +368,22 @@ ECMD_EvalClassDef($$$)
                                         Log3 $hash, 5, "$name: get $cmdname postprocessor defined as $arg";
                                         $hash->{fhem}{classDefs}{$classname}{gets}{$cmdname}{postproc}= $arg;
                                 }
+                        } elsif($spec eq "expect") {
+                                if($arg !~ m/^"(.*)"$/s) {
+                                        Log3 $hash, 1, "$name: expect for $cmd $cmdname is not enclosed in double quotes.";
+                                        next;
+                                }
+                                $arg = $1;
+                                if($cmd eq "set") {
+                                        Log3 $hash, 5, "$name: set $cmdname expects $arg";
+                                        $hash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{expect}= $arg;
+                                } elsif($cmd eq "get") {
+                                        Log3 $hash, 5, "$name: get $cmdname expects $arg";
+                                        $hash->{fhem}{classDefs}{$classname}{gets}{$cmdname}{expect}= $arg;
+                                }
+                        } else {
+                                Log3 $hash, 1, 
+                                         "$name: illegal spec $spec for $cmd $cmdname for class $classname in file $filename.";
                         }
                 } else {
                         Log3 $hash, 1, "$name: illegal tag $cmd for class $classname in file $filename.";
@@ -586,8 +428,8 @@ sub
 ECMD_Reopen($)
 {
   my ($hash) = @_;
-  ECMD_CloseDev($hash);
-  ECMD_OpenDev($hash, 1);
+  DevIo_CloseDev($hash);
+  DevIo_OpenDev($hash, 1, undef);
 
   return undef;
 }
@@ -617,28 +459,46 @@ ECMD_Set($@)
 }
 
 #####################################
-sub
-ECMD_Write($$)
+# called from the global loop, when the select for hash->{FD} reports data
+sub ECMD_Read($) 
 {
-  my ($hash,$msg) = @_;
-  my $answer;
-  my @r;
-  my @ecmds= split "\n", $msg;
-  my $nonl= AttrVal($hash->{NAME}, "nonl", 0);
-  foreach my $ecmd (@ecmds) {
-        Log3 $hash, 5, "$hash->{NAME} sending $ecmd";
-        ECMD_SimpleWrite($hash, $ecmd, $nonl);
-        $answer= ECMD_ReadAnswer($hash, "$ecmd");
-        if(defined($answer)) {
-          push @r, $answer;
-          Log3 $hash, 5, $answer;
-        } else {
-          Log3 $hash, 5, "no answer received";
-        }  
-  }
+  my ($hash) = @_;
+  my $buf = ECMD_SimpleRead($hash);
+  return if($buf eq "");
   
-  return join("\n", @r) unless($#r<0);
-  return undef;
+  ECMD_Log $hash, 5,  "Spontaneously received " . dq($buf);
+  Dispatch($hash, $buf, undef);  # dispatch result to ECMDDevices
+}
+
+#####################################
+sub
+ECMD_Write($$$)
+{
+  my ($hash,$msg,$expect) = @_;
+  my $name= $hash->{NAME};
+  my $answer;
+  my $ret= "";
+  my $requestSeparator= "\000"; # AttrVal($hash, "requestSeparator", "\000");
+  my $responseSeparator= ""; # AttrVal($hash, "responseSeparator", "");
+  my @ecmds= split $requestSeparator, $msg;
+  #my @ecmds= split "\n", $msg;
+  #my $nonl= AttrVal($name, "nonl", 0);
+  ECMD_Log $hash, 5, "command split into " . ($#ecmds+1) . " parts." if($#ecmds>0);
+  foreach my $ecmd (@ecmds) {
+        ECMD_Log $hash, 5, "sending command " . dq($ecmd);
+        my $msg .= $ecmd;
+        #$msg.= "\n" unless($nonl);
+        if(defined($expect)) {
+          $answer= ECMD_SimpleExpect($hash, $msg, $expect);
+          $answer= "" unless(defined($answer));
+          ECMD_Log $hash, 5, "received answer " . dq($answer);
+          $answer.= $responseSeparator if($#ecmds>0);
+          $ret.= $answer;
+        } else {
+          ECMD_SimpleWrite($hash, $msg);
+        }
+  }
+  return $ret;
 }
 
 #####################################
@@ -656,7 +516,8 @@ ECMD_Write($$)
   of such a device is the AVR microcontroller board AVR-NET-IO from
   <a href="http://www.pollin.de">Pollin</a> with
   <a href="http://www.ethersex.de/index.php/ECMD">ECMD</a>-enabled
-  <a href="http://www.ethersex.de">Ethersex</a> firmware.<p>
+  <a href="http://www.ethersex.de">Ethersex</a> firmware. The original
+  NetServer firmware from Pollin works as well.<p>
 
   A physical ECMD device can host any number of logical ECMD devices. Logical
   devices are defined as <a href="#ECMDDevice">ECMDDevice</a>s in fhem.
@@ -740,96 +601,129 @@ ECMD_Write($$)
     <li>classdefs<br>A colon-separated list of &lt;classname&gt;=&lt;filename&gt;.
     The list is automatically updated if a class definition is added. You can
     directly set the attribute.</li>
+    <li>logTraffic &lt;loglevel&gt;<br>Enables logging of sent and received datagrams with the given loglevel. Control characters in the logged datagrams are escaped, i.e. a double backslash is shown for a single backslash, \n is shown for a line feed character, etc.</li>
+    <li>timeout &lt;seconds&gt;<br>Time in seconds to wait for a reply from the physical ECMD device before FHEM assumes that something has gone wrong. The default is 3 seconds if this attribute is not set.</li> 
+    <!--
     <li>nonl<br>A newline (\n) is automatically appended to every command string sent to the device
     unless this attribute is set. Please note that newlines (\n) in a command string are interpreted
     as separators to split the command string into several commands and are never literally sent.</li>
+    -->
+    <li><a href="#verbose">verbose</a></li>
   </ul>
   <br><br>
-
+  
+  <a name="ECMDDatagram"></a>
+  <b>Datagram monitoring and matching</b>
+  <br><br>
+  
+  Data to and from the physical device is processed as is. In particular, if you need to send a line feed you have to include send a \n control character. On the other hand, control characters like line feeds are not stripped from the data received. This needs to be considered when defining a <a href="#ECMDClassdef">class definition</a>.<p>
+  
+  For debugging purposes, especially when designing a <a href="#ECMDClassdef">class definition</a>, it is advisable to turn traffic logging on. Use <code>attr myECMD logTraffic 3</code> to log all data to and from the physical device at level 3. A typical response might look like <code>21.2\n</code>, i.e. a floating point number followed by a newline.<p>
+  
+  Data received from the physical device is processed as it comes in chunks. If for some reason a datagram from the device is split in transit, pattern matching and processing will most likely fail.
+  <br><br>
+  
+  <a name="ECMDConnection"></a>
+  <b>Connection error handling</b>
+  <br><br>
+  
+  This modules handles unexpected disconnects of devices as follows (on Windows only for TCP connections):<p>
+  
+  Disconnects are detected if and only if data from the device in reply to data sent to the device cannot be received with at most two attempts. FHEM waits at most 3 seconds (or the time specified in the <code>timeout</code> attribute, see <a href="#ECMDattr">Attributes</a>). After the first failed attempt, the connection to the device is closed and reopened again. The state of the device
+  is <code>failed</code>. Then the data is sent again to the device. If still no reply is received, the state of the device is <code>disconnected</code>, otherwise <code>opened</code>. You will have to fix the problem and then use <code>set myECMD reopen</code> to reconnect to the device.<p>
+  
+  Please design your class definitions in such a way that the double sending of data does not bite you in any case.
+  <br><br>
 
   <a name="ECMDClassdef"></a>
   <b>Class definition</b>
   <br><br>
-  <ul>
+  
+    The class definition for a logical ECMD device class is contained in a text file.
+    The text file is made up of single lines. Empty lines and text beginning with #
+    (hash) are ignored. Therefore make sure not to use hashes in commands.<br>
 
-        The class definition for a logical ECMD device class is contained in a text file.
-        The text file is made up of single lines. Empty lines and text beginning with #
-        (hash) are ignored. Therefore make sure not to use hashes in commands.<br>
+    The following commands are recognized in the device class definition:<br><br>
+    <ul>
+            <li><code>params &lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]</code><br><br>
+            Declares the names of the named parameters that must be present in the
+            <a href="#ECMDDevicedefine">definition of the logical ECMD device</a>.
+            <br><br>
+            </li>
 
-        The following commands are recognized in the device class definition:<br><br>
-        <ul>
-                <li><code>params &lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]</code><br><br>
-                Declares the names of the named parameters that must be present in the
-                <a href="#ECMDDevicedefine">definition of the logical ECMD device</a>.
-                <br><br>
-                </li>
+            <li><code>set &lt;commandname&gt; cmd { <a href="#perl">&lt;perl special&gt;</a> }</code><br>
+            <code>get &lt;commandname&gt; cmd { <a href="#perl">&lt;perl special&gt;</a> }</code>
+            <br><br>
+            Declares a new set or get command <code>&lt;commandname&gt;</code>. If the user invokes the set or get command <code>&lt;commandname&gt;</code>, the string that results from the execution of the &lt;perl special&gt; is sent to the physical device.<p>
+            A \000 (octal representation of control char with code zero) can be used to split the command into chunks. This is required for sending multiple <a href="http://www.ethersex.de/index.php/ECMD">Ethersex commands</a> for one command in the class definition. The result string for the command is the
+            concatenation of all responses received from the physical device. Use \x00 for literal zero bytes.
+            <br><br>
+            </li>
 
-                <li><code>set &lt;commandname&gt; cmd { <a href="#perl">&lt;perl special&gt;</a> }</code>
-                <br><br>
-                Declares a new set command <code>&lt;commandname&gt;</code>.
-                <br><br>
-                </li>
+            <li>
+            <code>set &lt;commandname&gt; expect "&lt;regex&gt;"</code><br>
+            <code>get &lt;commandname&gt; expect "&lt;regex&gt;"</code>
+            <br><br>
+            Declares what FHEM expects to receive after the execution of the get or set command <code>&lt;commandname&gt;</code>. <code>&lt;regex&gt;</code> is a Perl regular expression. The double quotes around the regular expression are mandatory and they are not part of the regular expression itself. Particularly, broken connections can only be detected if something is expected (see <a href="#ECMDConnection">Connection error handling</a>).
+            <br><br>
+            </li>
 
-                <li><code>get &lt;commandname&gt; cmd { <a href="#perl">&lt;perl special&gt;</a> }</code>
-                <br><br>
-                Declares a new get command <code>&lt;commandname&gt;</code>.
-                <br><br>
-                </li>
+            <li>
+            <code>set &lt;commandname&gt; postproc { <a href="#perl">&lt;perl special&gt;</a> }</code><br>
+            <code>get &lt;commandname&gt; postproc { <a href="#perl">&lt;perl special&gt;</a> }</code>
+            <br><br>
+            Declares a postprocessor for the command <code>&lt;commandname&gt;</code>. The data received from the physical device in reply to the get or set command <code>&lt;commandname&gt;</code> is processed by the Perl code <code>&lt;perl command&gt;</code>. The perl code operates on <code>$_</code>. Make sure to return the result in <code>$_</code> as well. The result of the perl command is shown as the result of the get or set command.
+            <br><br>
+            </li>
 
-                <li>
-		<code>set &lt;commandname&gt; postproc { &lt;perl command&gt }</code><br>
-		<code>get &lt;commandname&gt; postproc { &lt;perl command&gt }</code>
-                <br><br>
-                Declares a postprocessor for the command <code>&lt;commandname&gt;</code>.
-                <br><br>
-                </li>
+            <li>
+            <code>set &lt;commandname&gt; params &lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]</code><br>
+            <code>get &lt;commandname&gt; params &lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]</code>
+            <br><br>
+            Declares the names of the named parameters that must be present in the
+            set or get command <code>&lt;commandname&gt;</code></a>. Be careful not to use a parameter name that
+            is already used in the device definition (see <code>params</code> above).
+            <br><br>
+            </li>
 
+            <li>
+            <code>reading &lt;reading&gt; match "&lt;regex&gt;"</code>
+            <br><br>
+            Declares a new reading named <code>&lt;reading&gt;</code>. A spontaneous data transmission from the physical device that matches the Perl regular expression <code>&lt;regex&gt;</code> is evaluated to become the value of the named reading. All ECMDDevice devices belonging to the ECMD device with readings with matching regular expressions will receive an update of the said readings.
+            <br><br>
+            </li>
+            
+            <li>
+            <code>reading &lt;reading&gt; postproc { <a href="#perl">&lt;perl special&gt;</a> }</code>
+            <br><br>
+            Declares a postprocessor for the reading <code>&lt;reading&gt;</code>. The data received for the named reading is processed by the Perl code <code>&lt;perl command&gt;</code>. This works analogously to the <code>postproc</code> spec for set and get commands.
+            <br><br>
+            </li>
 
-                <li>
-                <code>set &lt;commandname&gt; params &lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]</code><br>
-                <code>get &lt;commandname&gt; params &lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]</code>
-                <br><br>
-                Declares the names of the named parameters that must be present in the
-                set or get command <code>&lt;commandname&gt;</code></a>. Be careful not to use a parameter name that
-                is already used in the device definition (see <code>params</code> above).
-                <br><br>
-                </li>
+            
 
-        </ul>
-
-        The perl specials in the definitions of the set and get commands can
-        contain macros. Apart from the rules outlined in the <a
-        href="#perl">documentation of perl specials</a> in fhem, the following
-        rules apply:<br><br>
-        <ul>
-          <li>The character @ will be replaced with the device
-          name. To use @ in the text itself, use the double mode (@@).</li>
-
-          <li>The macro <code>%NAME</code> will expand to the device name (same
-          as <code>@</code>).</li>
-
-          <li>The macro <code>%&lt;parameter&gt;</code> will expand to the
-          current value of the named parameter. This can be either a parameter
-          from the device definition or a parameter from the set or get
-          command.</li>
-
-          <li>The macro substitution occurs before perl evaluates the
-          expression. It is a plain text substitution.</li>
-
-          <li>If in doubt what happens, run the commands with loglevel 5 and
-          observe the log file.</li>
-      </ul><br><br>
-
-      <!--Neither apply the rules outlined in the <a href="#perl">documentation of perl specials</a>
-      for the <code>&lt;perl command&gt</code> in the postprocessor definitions nor can it contain macros.
-      This is to avoid undesired side effects from e.g. doubling of semicolons.<br><br>-->
-      The rules outlined in the <a href="#perl">documentation of perl specials</a>
-      for the <code>&lt;perl command&gt</code> in the postprocessor definitions apply.
-      <b>Note:</b> Beware of undesired side effects from e.g. doubling of semicolons!
-
-      The <code>perl command</code> acts on <code>$_</code>. The result of the perl command is the
-      final result of the get or set command.
+            
     </ul>
+
+    The perl specials in the definitions above can
+    contain macros:<br><br>
+    <ul>
+      <li>The macro <code>%NAME</code> will expand to the device name.</li>
+      <li>The macro <code>%TYPE</code> will expand to the device type.</li>
+      <li>The macro <code>%&lt;parameter&gt;</code> will expand to the
+      current value of the named parameter. This can be either a parameter
+      from the device definition or a parameter from the set or get
+      command.</li>
+      <li>The macro substitution occurs before perl evaluates the
+      expression. It is a plain text substitution. Be careful not to use parameters with overlapping names like
+      <code>%pin</code> and <code>%pin1</code>.</li>
+      <li>If in doubt what happens, run the commands with loglevel 5 and
+      inspect the log file.</li>
+  </ul><br><br>
+
+  The rules outlined in the <a href="#perl">documentation of perl specials</a>
+  for the <code>&lt;perl command&gt</code> in the postprocessor definitions apply.
+  <b>Note:</b> Beware of undesired side effects from e.g. doubling of semicolons!
 </ul>
 
 =end html
