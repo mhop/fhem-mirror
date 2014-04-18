@@ -153,6 +153,9 @@ sub cfgDB_Init {
 #	create TABLE fhemstate if nonexistent
 	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemstate(stateString TEXT)");
 
+#	create TABLE fhemfilesave if nonexistent
+	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemfilesave(filename TEXT, line TEXT)");
+
 #	close database connection
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
@@ -615,6 +618,45 @@ sub _cfgDB_Diff($$) {
 	return $ret;
 }
 
+sub _cfgDB_Fileimport($) {
+	my ($filename) = @_;
+	my $path = $attr{global}{modpath};
+	$path .= "/$filename";
+	my $counter = 0;
+	my $fhem_dbh = _cfgDB_Connect;
+	$fhem_dbh->do("delete from fhemfilesave where filename = '$path'");
+	my $sth = $fhem_dbh->prepare('INSERT INTO fhemfilesave values (?, ?)');
+	open (in,"<$path") || die $!;
+	while (<in>){
+		$counter++;
+		my $line = substr($_,0,length($_)-1);
+		$sth->execute($path, $line);
+	}
+	close in;
+	$sth->finish();
+	$fhem_dbh->commit();
+	$fhem_dbh->disconnect();
+	return "$counter lines written from file $filename to database";
+}
+
+sub _cfgDB_Fileexport($) {
+	my ($filename) = @_;
+	my $path = $attr{global}{modpath};
+	$path .= "/$filename";
+	my $counter = 0;
+	my $fhem_dbh = _cfgDB_Connect;
+	my $sth = $fhem_dbh->prepare( "SELECT * FROM fhemfilesave WHERE filename = '$path'" );  
+	$sth->execute();
+	open( FILE, ">$path" );
+	while (my @line = $sth->fetchrow_array()) {
+		$counter++;
+		print FILE $line[1], "\n";
+	}
+	close ( FILE );
+	$sth->finish();
+	$fhem_dbh->disconnect();
+	return "$counter lines read from database into file $filename";
+}
 
 1;
 
