@@ -180,6 +180,16 @@ sub CommandConfigdb($$) {
 			$ret = _cfgDB_Diff($param1, $param2);
 		}
 
+		when ('fileexport') {
+			return "\n Syntax: configdb fileexport <pathToFile>" if @a != 2;
+			$ret = _cfgDB_Fileexport $param1;
+		}
+
+		when ('fileimport') {
+			return "\n Syntax: configdb fileimport <pathToFile>" if @a != 2;
+			$ret = _cfgDB_Fileimport $param1;
+		}
+
 		when ('info') {
 			Log3('configdb', 4, "info requested.");
 			$ret = _cfgDB_Info;
@@ -378,7 +388,7 @@ sub CommandConfigdb($$) {
 			from current version 0 with version &lt;version&gt;<br/>
 			Example for valid request:<br/>
 			<br/>
-			<code>get configDB telnetPort 1</code><br/>
+			<code>configdb diff telnetPort 1</code><br/>
 			<br/>
 			will show a result like this:
 			<pre>
@@ -392,6 +402,22 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 			Exports specified version from config database into file &lt;targetFilename&gt;<br/>
 			Default version if not specified = 0<br/>
 			The target file can be imported again, if needed.<br/>
+<br/>
+
+		<li><code>configdb fileexport &lt;targetFilename&gt;</code></li><br/>
+			Exports specified fhem file from database into filesystem.
+			Example:<br/>
+			<br/>
+			<code>configdb fileexport FHEM/99_myUtils.pm</code><br/>
+			<br/>
+<br/>
+
+		<li><code>configdb fileimport &lt;sourceFilename&gt;</code></li><br/>
+			Imports specified fhem file from from filesystem into database.
+			Example:<br/>
+			<br/>
+			<code>configdb fileimport FHEM/99_myUtils.pm</code><br/>
+			<br/>
 <br/>
 
 		<li><code>configdb info</code></li><br/>
@@ -635,6 +661,22 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 			Exportiert die angegebene Version aus der Konfigurationsdatenbank in die Datei &lt;zielDateiname&gt;<br/>
 			Standardversion, falls nicht angegeben = 0<br/>
 			Die Zieldatei kann sp&auml;ter f&uuml;r die Wiederherstellung verwendet werden.<br/>
+<br/>
+
+		<li><code>configdb fileexport &lt;zielDatei&gt;</code></li><br/>
+			Schreibt die angegebene Datei aus der Datenbank in das Dateisystem.
+			Beispiel:<br/>
+			<br/>
+			<code>configdb fileexport FHEM/99_myUtils.pm</code><br/>
+			<br/>
+<br/>
+
+		<li><code>configdb fileimport &lt;quellDatei&gt;</code></li><br/>
+			Liest die angegbene Datei aus dem Dateisystem und schreibt den Inhalt in die Datenbank.
+			Beispiel:<br/>
+			<br/>
+			<code>configdb fileimport FHEM/99_myUtils.pm</code><br/>
+			<br/>
 <br/>
 
 		<li><code>configdb info</code></li><br/>
