@@ -394,7 +394,7 @@ ZWDongle_Write($$$@)
   my ($hash,$fn,$msg,$noStack) = @_;
 
   if(!$noStack && $msg =~ m/^13/) { # SEND_DATA, wait for ACK
-    InternalTimer(gettimeofday()+0.1, "ZWave_HandleSendStack", $hash, 0)
+    InternalTimer(gettimeofday()+0.5, "ZWave_HandleSendStack", $hash, 0)
       if(!int(@{$hash->{SendStack}}));
     push @{$hash->{SendStack}}, $msg;
     return if(int(@{$hash->{SendStack}}) > 1);
