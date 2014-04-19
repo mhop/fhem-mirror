@@ -682,18 +682,18 @@ sub _cfgDB_Filelist {
 	return $ret;
 }
 
-sub _cfgDB_Readlayout($) {
+sub _cfgDB_Readfile($) {
 	my ($filename) = @_;
 	my $fhem_dbh = _cfgDB_Connect;
 	my $sth = $fhem_dbh->prepare( "SELECT line FROM fhemfilesave WHERE filename = '$filename'" );  
 	$sth->execute();
-	my @layout;
+	my @outfile;
 	while (my @line = $sth->fetchrow_array()) {
-		push @layout, "$line[0] ";
+		push @outfile, "$line[0] ";
 	}
 	$sth->finish();
 	$fhem_dbh->disconnect();
-	return (int(@layout)) ? join("\n",@layout) : undef;
+	return (int(@outfile)) ? join("\n",@outfile) : undef;
 }
 
 
