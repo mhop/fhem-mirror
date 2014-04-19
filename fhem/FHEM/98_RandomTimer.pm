@@ -30,6 +30,7 @@ use strict;
 use warnings;
 use IO::Socket;
 use Time::HiRes qw(gettimeofday);
+use Time::Local 'timelocal_nocheck';
 
 sub RandomTimer_stopTimeReached($);
 sub schaltZeitenErmitteln ($$);
