@@ -619,7 +619,11 @@ ZWave_Parse($$@)
     return $ret;
 
   } elsif($cmd eq "ZW_SEND_DATA") {
-    Log3 $ioName, 2, "$ioName ERROR: SEND_DATA returned $id" if($id ne "00");
+    if($id ne "00") {
+      Log3 $ioName, 2, "$ioName ERROR: SEND_DATA returned $id";
+    } else {
+      ZWave_HandleSendStack($iodev);
+    }
     return "";
   }
 

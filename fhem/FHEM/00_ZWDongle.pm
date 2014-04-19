@@ -410,9 +410,10 @@ ZWave_HandleSendStack($)
 {
   my $hash = shift;
   shift @{$hash->{SendStack}};
+  RemoveInternalTimer($hash);   # remove timer to avoid re-trigger
   return if(!@{$hash->{SendStack}});
   ZWDongle_Write($hash, "00", $hash->{SendStack}->[0], 1);
-  InternalTimer(gettimeofday()+0.1, "ZWave_HandleSendStack", $hash, 0);
+  InternalTimer(gettimeofday()+0.5, "ZWave_HandleSendStack", $hash, 0);
 }
 
 #####################################
@@ -509,7 +510,6 @@ ZWDongle_ReadAnswer($$$)
         if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
   my $to = ($hash->{RA_Timeout} ? $hash->{RA_Timeout} : 3);
 
-  shift @{$hash->{SendStack}};   # Hope this is right.
   for(;;) {
 
     my $buf;
