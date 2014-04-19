@@ -201,11 +201,7 @@ sub CommandConfigdb($$) {
 				$filename  = $attr{global}{modpath};
 				$filename .= "/$param1";
 			}
-			if ( -w $filename ) {
-				$ret = _cfgDB_Fileexport $filename;
-			} else {
-				$ret = "\n Write error on file $filename";
-			}
+			$ret = _cfgDB_Fileexport $filename;
 		}
 
 		when ('fileimport') {
