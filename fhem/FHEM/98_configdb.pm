@@ -180,14 +180,54 @@ sub CommandConfigdb($$) {
 			$ret = _cfgDB_Diff($param1, $param2);
 		}
 
+		when ('filedelete') {
+			return "\n Syntax: configdb fileexport <pathToFile>" if @a != 2;
+			my $filename;
+			if(substr($param1,0,1) eq '/') {
+				$filename = $param1;
+			} else {
+				$filename  = $attr{global}{modpath};
+				$filename .= "/$param1";
+			}
+			$ret = _cfgDB_Filedelete $filename;
+		}
+
 		when ('fileexport') {
 			return "\n Syntax: configdb fileexport <pathToFile>" if @a != 2;
-			$ret = _cfgDB_Fileexport $param1;
+			my $filename;
+			if(substr($param1,0,1) eq '/') {
+				$filename = $param1;
+			} else {
+				$filename  = $attr{global}{modpath};
+				$filename .= "/$param1";
+			}
+			if ( -w $filename ) {
+				$ret = _cfgDB_Fileexport $filename;
+			} else {
+				$ret = "\n Write error on file $filename";
+			}
 		}
 
 		when ('fileimport') {
 			return "\n Syntax: configdb fileimport <pathToFile>" if @a != 2;
-			$ret = _cfgDB_Fileimport $param1;
+			my $filename;
+			if(substr($param1,0,1) eq '/') {
+				$filename = $param1;
+			} else {
+				$filename  = $attr{global}{modpath};
+				$filename .= "/$param1";
+			}
+			if ( -r $filename ) {
+				$ret = _cfgDB_Fileimport $filename;
+			} elsif ( -e $filename) {
+				$ret = "\n Read error on file $filename";
+			} else {
+				$ret = "\n File $filename not found.";
+			}
+		}
+
+		when ('filelist') {
+			return _cfgDB_Filelist;
 		}
 
 		when ('info') {
@@ -404,6 +444,11 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 			The target file can be imported again, if needed.<br/>
 <br/>
 
+		<li><code>configdb filedelete &lt;Filename&gt;</code></li><br/>
+			Delete file from database.<br/>
+			<br/>
+<br/>
+
 		<li><code>configdb fileexport &lt;targetFilename&gt;</code></li><br/>
 			Exports specified fhem file from database into filesystem.
 			Example:<br/>
@@ -417,6 +462,11 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 			Example:<br/>
 			<br/>
 			<code>configdb fileimport FHEM/99_myUtils.pm</code><br/>
+			<br/>
+<br/>
+
+		<li><code>configdb filelist</code></li><br/>
+			Show a list with all filenames stored in database.<br/>
 			<br/>
 <br/>
 
@@ -663,6 +713,11 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 			Die Zieldatei kann sp&auml;ter f&uuml;r die Wiederherstellung verwendet werden.<br/>
 <br/>
 
+		<li><code>configdb filedelete &lt;Dateiname&gt;</code></li><br/>
+			L&ouml;scht eine gespeicherte Datei aus der Datenbank.<br/>
+			<br/>
+<br/>
+
 		<li><code>configdb fileexport &lt;zielDatei&gt;</code></li><br/>
 			Schreibt die angegebene Datei aus der Datenbank in das Dateisystem.
 			Beispiel:<br/>
@@ -676,6 +731,11 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 			Beispiel:<br/>
 			<br/>
 			<code>configdb fileimport FHEM/99_myUtils.pm</code><br/>
+			<br/>
+<br/>
+
+		<li><code>configdb filelist</code></li><br/>
+			Liefert eine Liste mit allen Namen der gespeicherten Dateien.<br/>
 			<br/>
 <br/>
 
