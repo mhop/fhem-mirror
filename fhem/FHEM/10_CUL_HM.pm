@@ -1663,11 +1663,9 @@ sub CUL_HM_Parse($$) {#########################################################
   }
   elsif($st eq "motionDetector") { ############################################
     # Code with help of Bassem
-    my $state;
-    if(($mTp eq "10" ||$mTp eq "02") && $p =~ m/^0601(..)(..)/) {
-      my $err;
-      ($state, $err) = ($1, hex($2));
-      my $bright = hex($state);
+    my $state = $mI[2];
+    if(($mTp eq "10" ||$mTp eq "02") && $p =~ m/^0601..../) {
+      my ($err,$bright)=(hex($mI[3]),hex($mI[2]));
       push @evtEt,[$shash,1,"brightness:".$bright];
       if ($md eq "HM-Sec-MDIR"){
         push @evtEt,[$shash,1,"sabotageError:".(($err&0x0E)?"on":"off")];
@@ -1677,10 +1675,8 @@ sub CUL_HM_Parse($$) {#########################################################
       }
       push @evtEt,[$shash,1,"battery:".   (($err&0x80)?"low"  :"ok"  )];
     }
-    elsif($mTp eq "41" && $p =~ m/^01(..)(..)(..)/) {#01 is channel
-      my($cnt,$bright,$nextTr);
-      ($cnt,$state,$nextTr) = (hex($1),$2,(hex($3)>>4));
-      $bright = hex($state);
+    elsif($mTp eq "41") {#01 is channel
+      my($cnt,$bright,$nextTr) = (hex($mI[1]),hex($mI[2]),hex($mI[3])>>4);
       my @nextVal = ("0x0","0x1","0x2","0x3","15" ,"30" ,"60" ,"120",
                      "240","0x9","0xa","0xb","0xc","0xd","0xe","0xf");
       push @evtEt,[$shash,1,"state:motion"];
@@ -1691,6 +1687,7 @@ sub CUL_HM_Parse($$) {#########################################################
     elsif($mTp eq "70" && $p =~ m/^7F(..)(.*)/) {
       my($d1, $d2) = ($1, $2);
       push @evtEt,[$shash,1,"devState_raw$d1:$d2"];
+      $state = 0;
     }
 
     if($ioId eq $dst && hex($mFlg)&0x20 && $state){
@@ -5558,7 +5555,7 @@ sub CUL_HM_initRegHash() { #duplicate short and long press register
   my $mp = "./FHEM";
   opendir(DH, $mp) || return;
   foreach my $m (grep /^HMConfig_(.*)\.pm$/,readdir(DH)) {
-    my $file = "$mp$m";
+    my $file = "${mp}/$m";
     no strict "refs";
       my $ret = do $file;
     use strict "refs";
