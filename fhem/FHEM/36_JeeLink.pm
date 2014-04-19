@@ -571,9 +571,6 @@ JeeLink_Parse($$$$)
       } elsif( $dmsg =~m /JeeNode -- HomeControl -/ ) {
         $hash->{MatchList} = \%matchListJeeLink433 if($dmsg =~ m/433MHz/);
                                 $hash->{MatchList} = \%matchListJeeLink868 if($dmsg =~ m/868MHz/);
-        #Reset JeeNode and set quite mode
-        JeeLink_SimpleWrite($hash, "o");
-        sleep(2);
         JeeLink_SimpleWrite($hash, "q1");  # turn quiet mode on
         JeeLink_SimpleWrite($hash, "a0");  # turn activity led off
         JeeLink_SimpleWrite($hash, "f");   # get RFM frequence config
