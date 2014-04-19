@@ -200,7 +200,8 @@ HttpUtils_Connect2($)
   $hdr .= "\r\n";
   syswrite $hash->{conn}, $hdr;
   syswrite $hash->{conn}, $data if(defined($data));
-  shutdown $hash->{conn}, 1 if(!$hash->{noshutdown} && $hash->{protocol} ne "https");
+  shutdown $hash->{conn}, 1 if($hash->{shutdown} ||
+                               (defined($hash->{noshutdown}) && $hash->{noshutdown} == 0));
 
   if($hash->{callback}) { # Nonblocking read
     $hash->{FD} = $hash->{conn}->fileno();
@@ -299,7 +300,8 @@ HttpUtils_ParseAnswer($$)
 #  mandatory:
 #    url, callback
 #  optional(default):
-#    hideurl(0),timeout(4),data(""),noshutdown(0),loglevel(4),header(""),
+#    hideurl(0),timeout(4),data(""),loglevel(4),header(""),
+#    noshutdown(1),shutdown(0),
 #    method($data ? "POST" : "GET")
 # Example:
 #   HttpUtils_NonblockingGet({

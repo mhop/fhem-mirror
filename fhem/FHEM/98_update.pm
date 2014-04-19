@@ -451,6 +451,7 @@ update_DoUpdate(@)
   my $getUpdates;
   ($fail,$getUpdates) = update_GetRemoteFiles($BRANCH,$url,$updateFiles_ref,$cl);
   $ret .= $getUpdates if($getUpdates);
+  return $ret if($fail);
 
   foreach my $pack (@packages) {
     # write local controlfile
