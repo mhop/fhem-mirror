@@ -267,7 +267,7 @@ JeeLink_Get($@)
   my $list = "devices:noArg initJeeLink:noArg RFMconfig:noArg updateAvailRam:noArg raw";
 
   if( $cmd eq "devices" ) {
-        if($hash->{VERSION} =~m/JeeNode -- HomeControl -/ ) {
+        if($hash->{model} =~m/JeeNode -- HomeControl -/ ) {
         JeeLink_SimpleWrite($hash, "h");
     } else {
         JeeLink_SimpleWrite($hash, "l");
@@ -276,7 +276,7 @@ JeeLink_Get($@)
 
         $hash->{STATE} = "Opened";
 
-        if($hash->{VERSION} =~m/JeeNode -- HomeControl -/ ) {
+        if($hash->{model} =~m/JeeNode -- HomeControl -/ ) {
                 JeeLink_SimpleWrite($hash, "o");
         } else {
             JeeLink_SimpleWrite($hash, "0c");
@@ -553,7 +553,7 @@ JeeLink_Parse($$$$)
   return if($dmsg =~ m/^-> ack/ );                 # ignore send ack
 
   if($dmsg =~ m/^\[/ ) {
-        $hash->{VERSION} = $dmsg;
+        $hash->{model} = $dmsg;
 
     if( $hash->{STATE} eq "Opened" ) {
       if( $dmsg =~m /pcaSerial/ ) {
