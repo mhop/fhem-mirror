@@ -682,6 +682,21 @@ sub _cfgDB_Filelist {
 	return $ret;
 }
 
+sub _cfgDB_Readlayout($) {
+	my ($filename) = @_;
+	my $fhem_dbh = _cfgDB_Connect;
+	my $sth = $fhem_dbh->prepare( "SELECT line FROM fhemfilesave WHERE filename = '$filename'" );  
+	$sth->execute();
+	my @layout;
+	while (my @line = $sth->fetchrow_array()) {
+		push @layout, "$line[0] ";
+	}
+	$sth->finish();
+	$fhem_dbh->disconnect();
+	return (int(@layout)) ? join("\n",@layout) : undef;
+}
+
+
 1;
 
 =pod
