@@ -66,6 +66,7 @@ LUXTRONIK2_Initialize($)
                  "allowSetParameter:0,1 ".
                  "autoSynchClock:slider,10,5,300 ".
                  "boilerVolumn ".
+                 "devicePowerWatt:slider,1000,16000,100 ".
                  "doStatistics:0,1 ".
                  "ignoreFirmwareCheck:0,1 ".
                  "statusHTML ".
@@ -159,6 +160,7 @@ LUXTRONIK2_Notify(@) {
             heatingSystemCirculationPump => "heatingSystemCircPump",
             hotWaterCirculationPumpExtern => "hotWaterCircPumpExtern",
             currentThermalOutput => "thermalPower",
+            returnTemperaturSetBack => "returnTemperatureSetBack",
             statGradientBoilerTempLoss => "statBoilerGradientHeatUp' and 'statBoilerGradientCoolDown" ); 
       my $oldReading;
       my $newReading;
@@ -626,7 +628,6 @@ LUXTRONIK2_UpdateDone($)
   my ($string) = @_;
   my $value = "";
   my $state = "";
-  
   return unless(defined($string));
 
   my @a = split("\\|",$string);
@@ -637,6 +638,9 @@ LUXTRONIK2_UpdateDone($)
 
   return if($hash->{helper}{DISABLED});
 
+  my $cop = 0;
+  my $devicePower = AttrVal($hash->{NAME}, "devicePowerWatt", 0);
+  
   Log3 $hash, 5, "$name: LUXTRONIK2_UpdateDone: $string";
 
   #Define Status Messages
@@ -818,7 +822,11 @@ LUXTRONIK2_UpdateDone($)
      if ($a[10] == 0 
            && $a[11] == 1
           && $averageAmbientTemperature >= $thresholdHeatingLimit) {
-      $value = "Heizungsgrenze (Aus)";
+          if ($ambientTemperature>15 ) {
+            $value = "Heizungsgrenze (Aus)";
+          } else {
+            $value = "Frostschutz trotz Heizungsgrenze";
+          }
      } else {
        $value = $heatingState{$a[46]};
       $value = "unbekannt (".$a[46].")" unless $value;
@@ -859,7 +867,7 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate( $hash, "flowTemperature", $flowTemperature);
      readingsBulkUpdate( $hash, "returnTemperature", $returnTemperature);
      readingsBulkUpdate( $hash, "returnTemperatureTarget",LUXTRONIK2_CalcTemp($a[17]));
-     readingsBulkUpdate( $hash, "returnTemperaturSetBack",LUXTRONIK2_CalcTemp($a[54]));
+     readingsBulkUpdate( $hash, "returnTemperatureSetBack",LUXTRONIK2_CalcTemp($a[54]));
      if ($a[18] !~ /no/) {readingsBulkUpdate( $hash, "returnTemperatureExtern",LUXTRONIK2_CalcTemp($a[18]));}
      if ($a[19] !~ /no/) {readingsBulkUpdate( $hash, "flowRate",$a[19]);}
      readingsBulkUpdate( $hash, "heatSourceIN",$heatSourceIN);
@@ -905,8 +913,14 @@ LUXTRONIK2_UpdateDone($)
      #WM[kW] = delta_Temp [K] * Durchfluss [l/h] / ( 3.600 [kJ/kWh] / ( 4,179 [kJ/(kg*K)] (H2O Wärmekapazität bei 30 & 40°C) * 0,994 [kg/l] (H2O Dichte bei 35°C) )  
      my $thermalPower = 0;
      # 0=Heizen, 5=Brauchwasser, 7=Abtauen, 16=Durchflussüberwachung 
-     if ($a[3] =~ /^(0|5|16)$/ ) { $thermalPower = sprintf "%.1f", abs($flowTemperature - $returnTemperature) * $a[19] / 866.65; }
-     readingsBulkUpdate( $hash, "thermalPower", $thermalPower);
+     if ($a[3] =~ /^(0|5|16)$/ ) { 
+         $thermalPower = abs($flowTemperature - $returnTemperature) * $a[19] / 866.65; 
+         if ($devicePower > 0) {
+            $cop = $thermalPower *1000 / $devicePower;
+            readingsBulkUpdate( $hash, "COP", sprintf "%.2f", $cop);
+         }
+     }
+     readingsBulkUpdate( $hash, "thermalPower", sprintf "%.1f", $thermalPower);
 
      # Solar
      if ($a[50] !~ /no/) {readingsBulkUpdate($hash, "solarCollectorTemperature", LUXTRONIK2_CalcTemp($a[50]));}
@@ -924,7 +938,10 @@ LUXTRONIK2_UpdateDone($)
      }
     # State update
       $value = "$opStateHeatPump1 $opStateHeatPump2 - $opStateHeatPump3";
-      if ($thermalPower != 0) { $value .= " ($thermalPower kW)"; }
+      if ($thermalPower != 0) { 
+         $value .= " (".sprintf ("%.1f", $thermalPower)." kW";
+         if ($devicePower>0) {$value .= ", COP: ".sprintf ("%.2f", $cop);}
+         $value .= ")"; }
       readingsBulkUpdate($hash, "state", $value);
      
       readingsEndUpdate($hash,1);
@@ -1178,6 +1195,7 @@ LUXTRONIK2_doStatisticThermalPower ($$$$$$$)
    $last[3] += $currAmbTemp;
    $last[4] += $currHeatSourceIn;
    $last[5]++;
+   my $devicePower = AttrVal($hash->{NAME}, "devicePowerWatt", 0);
    
    if ($last[0] != $MonitoredOpState && $currOpState == $MonitoredOpState ) {
       $saveCurrent = 1;
@@ -1194,6 +1212,10 @@ LUXTRONIK2_doStatisticThermalPower ($$$$$$$)
          $returnStr .= " DQ: " . sprintf "%.1f", $value1;
          $value1 = $last[4] / $last[5];
          $returnStr .= " iT: " . sprintf "%.1f", $value1;
+         if ($devicePower>0) {
+            $value1 = $value3 *1000 / $devicePower;
+            $returnStr .= " COP: " . sprintf "%.2f", $value1;
+         }
       }
    }
    if ($saveCurrent == 1) {
@@ -1794,6 +1816,9 @@ LUXTRONIK2_doStatisticDelta ($$$$)
       gegen&uuml;ber der FHEM Zeit erreicht ist. Zuvor wird die Kompatibilit&auml;t der Firmware &uuml;berpr&uuml;ft.<br>
       <i>(Ein Ger&auml;tewert 'delayDeviceTimeCalc' &lt;= 2 s ist auf die internen Berechnungsintervale der
       W&auml;rmepumpensteuerung zur&uuml;ckzuf&uuml;hren.)</i>
+      </li><br>
+    <li><code>devicePowerWatt</code><br>
+      Betriebsleistung der Wäremepumper zur Berechung der Arbeitszahl (erzeugte Wärme pro elektrische Energieeinheit)
       </li><br>
    <li><code>ignoreFirmwareCheck &lt; 0 | 1 &gt;</code>
       <br>
