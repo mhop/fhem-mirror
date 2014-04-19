@@ -618,19 +618,48 @@ sub _cfgDB_Diff($$) {
 	return $ret;
 }
 
-sub _cfgDB_Fileimport($) {
+sub _cfgDB_Filedelete($) {
 	my ($filename) = @_;
-	my $path = $attr{global}{modpath};
-	$path .= "/$filename";
+	my $fhem_dbh = _cfgDB_Connect;
+	my $ret = $fhem_dbh->do("delete from fhemfilesave where filename = '$filename'");
+	$fhem_dbh->commit();
+	$fhem_dbh->disconnect();
+	if($ret > 0) {
+		$ret = "File $filename deleted from database ($ret lines)";
+	} else {
+		$ret = "File $filename not found in database.";
+	}
+	return $ret;
+}
+
+sub _cfgDB_Fileexport($) {
+	my ($filename) = @_;
 	my $counter = 0;
 	my $fhem_dbh = _cfgDB_Connect;
-	$fhem_dbh->do("delete from fhemfilesave where filename = '$path'");
+	my $sth = $fhem_dbh->prepare( "SELECT * FROM fhemfilesave WHERE filename = '$filename'" );  
+	$sth->execute();
+	open( FILE, ">$filename" );
+	while (my @line = $sth->fetchrow_array()) {
+		$counter++;
+		print FILE $line[1], "\n";
+	}
+	close ( FILE );
+	$sth->finish();
+	$fhem_dbh->disconnect();
+	return "$counter lines written from database into file $filename";
+}
+
+sub _cfgDB_Fileimport($) {
+	my ($filename) = @_;
+	my $counter = 0;
+	my $fhem_dbh = _cfgDB_Connect;
 	my $sth = $fhem_dbh->prepare('INSERT INTO fhemfilesave values (?, ?)');
-	open (in,"<$path") || die $!;
+	$fhem_dbh->do("delete from fhemfilesave where filename = '$filename'");
+	open (in,"<$filename") || die $!;
 	while (<in>){
 		$counter++;
 		my $line = substr($_,0,length($_)-1);
-		$sth->execute($path, $line);
+		$sth->execute($filename, $line);
 	}
 	close in;
 	$sth->finish();
@@ -639,23 +668,18 @@ sub _cfgDB_Fileimport($) {
 	return "$counter lines written from file $filename to database";
 }
 
-sub _cfgDB_Fileexport($) {
-	my ($filename) = @_;
-	my $path = $attr{global}{modpath};
-	$path .= "/$filename";
-	my $counter = 0;
+sub _cfgDB_Filelist {
+	my $ret =	"Files found in database:\n".
+						"------------------------------------------------------------\n";
 	my $fhem_dbh = _cfgDB_Connect;
-	my $sth = $fhem_dbh->prepare( "SELECT * FROM fhemfilesave WHERE filename = '$path'" );  
+	my $sth = $fhem_dbh->prepare( "SELECT filename FROM fhemfilesave group by filename order by filename" );  
 	$sth->execute();
-	open( FILE, ">$path" );
-	while (my @line = $sth->fetchrow_array()) {
-		$counter++;
-		print FILE $line[1], "\n";
+	while (my $line = $sth->fetchrow_array()) {
+		$ret .= "$line\n";
 	}
-	close ( FILE );
 	$sth->finish();
 	$fhem_dbh->disconnect();
-	return "$counter lines read from database into file $filename";
+	return $ret;
 }
 
 1;
