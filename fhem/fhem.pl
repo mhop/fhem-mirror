@@ -94,6 +94,7 @@ sub addToWritebuffer($$);
 sub attrSplit($);
 sub computeClientArray($$);
 sub concatc($$$);
+sub configDBUsed();
 sub createInterfaceDefinitions();
 sub createNtfyHash();
 sub devspec2array($);
@@ -402,7 +403,7 @@ $winService ||= {};
 # Server initialization
 doGlobalDef($ARGV[0]);
 
-if($attr{global}{configfile} eq 'configDB') {
+if(configDBUsed()) {
   eval "use configDB";
   Log 1, $@ if($@);
   cfgDB_Init();
@@ -435,7 +436,7 @@ while(time() < 2*3600) {
 
 my $cfgErrMsg = "Error messages while initializing FHEM:";
 my $cfgRet="";
-if($attr{global}{configfile} eq 'configDB') {
+if(configDBUsed()) {
   my $ret = cfgDB_ReadAll(undef);
   $cfgRet .= "configDB: $ret" if($ret);
 
@@ -1145,7 +1146,7 @@ CommandRereadCfg($$)
   my $name = ($cl ? $cl->{NAME} : "__anonymous__");
   my $cfgfile = ($param ? $param : $attr{global}{configfile});
   return "Cannot open $cfgfile: $!"
-        if(! -f $cfgfile && $attr{global}{configfile} ne 'configDB');
+        if(! -f $cfgfile && !configDBUsed());
 
   $attr{global}{configfile} = $cfgfile;
   WriteStatefile();
@@ -1170,7 +1171,7 @@ CommandRereadCfg($$)
   doGlobalDef($cfgfile);
   my $ret;
   
-  if($attr{global}{configfile} eq 'configDB') {
+  if(configDBUsed()) {
     $ret = cfgDB_ReadAll($cl);
 
   } else {
@@ -1210,7 +1211,7 @@ CommandQuit($$)
 sub
 WriteStatefile()
 {
-  if($attr{global}{configfile} eq 'configDB') {
+  if(configDBUsed()) {
     cfgDB_SaveState();
     return "";
   }
@@ -1279,7 +1280,7 @@ CommandSave($$)
 
   WriteStatefile();
 
-  if($attr{global}{configfile} eq 'configDB') {
+  if(configDBUsed()) {
     $ret = cfgDB_SaveCfg();
     return ($ret ? $ret : "Saved configuration to the DB");
   }
@@ -2400,7 +2401,7 @@ CommandVersion($$)
   my ($cl, $param) = @_;
 
   my @ret = ("# $cvsid");
-  push @ret, cfgDB_svnId if $attr{global}{configfile} eq 'configDB';
+  push @ret, cfgDB_svnId if(configDBUsed());
   foreach my $m (sort keys %modules) {
     next if(!$modules{$m}{LOADED} || $modules{$m}{ORDER} < 0);
     Log 4, "Looking for SVN Id in module $m";
@@ -3855,5 +3856,10 @@ notifyRegexpChanged($$)
   }
 }
 
+sub
+configDBUsed()
+{ 
+  return ($attr{global}{configfile} eq 'configDB');
+}
 
 1;

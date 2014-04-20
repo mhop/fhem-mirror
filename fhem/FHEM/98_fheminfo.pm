@@ -309,7 +309,7 @@ sub checkConfigFile($) {
   my $name = "fheminfo";
   my $configFile = AttrVal("global","configfile","");
 
-  if($configFile && $configFile ne 'configDB') {
+  if($configFile && !configDBUsed()) {
     my $fh;
     if(!open($fh,"<".$configFile)) {
       return "Can't open $configFile: $!";

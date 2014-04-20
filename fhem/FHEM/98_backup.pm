@@ -54,7 +54,7 @@ CommandBackup($$)
   my $msg;
   my $ret;
 
-  return "Backup is not supported for configDB" if($configfile eq 'configDB');
+  return "Backup is not supported for configDB" if(configDBUsed());
 
   # set backupdir
   my $backupdir;
