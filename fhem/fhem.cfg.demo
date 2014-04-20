@@ -14,6 +14,7 @@ define telnetPort telnet 7072 global
 attr telnetPort room System
 
 define WEB FHEMWEB 8083 global
+attr WEB JavaScripts codemirror/fhem_codemirror.js
 attr WEB hiddenroom DashboardRoom
 attr WEB iconPath openautomation:fhemSVG
 attr WEB room System
@@ -45,17 +46,20 @@ define CUL_0 CUL none 0000
 attr CUL_0 dummy 1
 attr CUL_0 room System
 define Outdoor FS20 1234 11
+attr Outdoor IODev CUL_0
 attr Outdoor Light AllLights
 attr Outdoor group Single Lights
 attr Outdoor icon light_outdoor
 attr Outdoor room Light
 define Office FS20 1234 12
+attr Office IODev CUL_0
 attr Office Light AllLights
 attr Office group Single Lights
 attr Office icon light_office
 attr Office model fs20st
 attr Office room Light
 define Livingroom FS20 1234 13
+attr Livingroom IODev CUL_0
 attr Livingroom Light AllLights
 attr Livingroom eventMap off:dim0% on:dim100%
 attr Livingroom group Single Lights
@@ -69,6 +73,7 @@ attr AllLights group Structure
 attr AllLights icon light_light
 attr AllLights room Light
 define Alarm FS20 1234 14
+attr Alarm IODev CUL_0
 attr Alarm Light AllLights
 attr Alarm follow-on-for-timer 1
 attr Alarm group Single Lights
@@ -76,6 +81,7 @@ attr Alarm icon light_wall_2
 attr Alarm room Light
 attr Alarm webCmd blink 5 1
 define Garden KS300 1234
+attr Garden IODev CUL_0
 attr Garden group Sensors
 attr Garden room Sensors
 define Log.Garden FileLog demolog/garden.log Sens.Out:T:.*
@@ -133,6 +139,7 @@ attr Screen room Cinema
 attr Screen setList up:noArg down:noArg
 attr Screen webCmd down:up
 define CeilingLight FS20 0001 01
+attr CeilingLight IODev CUL_0
 attr CeilingLight eventMap off:dim0% on:dim100%
 attr CeilingLight group Light
 attr CeilingLight icon light_ceiling_light
@@ -140,6 +147,7 @@ attr CeilingLight model dummyDimmer
 attr CeilingLight room Cinema
 attr CeilingLight webCmd on:off:dim
 define ReadingLight FS20 0001 02
+attr ReadingLight IODev CUL_0
 attr ReadingLight eventMap off:dim0% on:dim100%
 attr ReadingLight group Light
 attr ReadingLight icon light_floor_lamp
