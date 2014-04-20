@@ -183,7 +183,7 @@ sub CommandConfigdb($$) {
 		when ('filedelete') {
 			return "\n Syntax: configdb fileexport <pathToFile>" if @a != 2;
 			my $filename;
-			if(substr($param1,0,1) eq '/') {
+			if($param1 =~ m,^[./],) {
 				$filename = $param1;
 			} else {
 				$filename  = $attr{global}{modpath};
@@ -195,7 +195,7 @@ sub CommandConfigdb($$) {
 		when ('fileexport') {
 			return "\n Syntax: configdb fileexport <pathToFile>" if @a != 2;
 			my $filename;
-			if(substr($param1,0,1) eq '/') {
+			if($param1 =~ m,^[./],) {
 				$filename = $param1;
 			} else {
 				$filename  = $attr{global}{modpath};
@@ -207,7 +207,7 @@ sub CommandConfigdb($$) {
 		when ('fileimport') {
 			return "\n Syntax: configdb fileimport <pathToFile>" if @a != 2;
 			my $filename;
-			if(substr($param1,0,1) eq '/') {
+			if($param1 =~ m,^[./],) {
 				$filename = $param1;
 			} else {
 				$filename  = $attr{global}{modpath};
