@@ -320,6 +320,9 @@ sub CommandConfigdb($$) {
 			<br/>
 			To export a file for modification you can use the command:<br/>
 			<code>configdb fileexport FHEM/myrss.layout</code><br/>
+			<br/>
+			Each fileimport into database will overwrite the file if it already exists in database.<br/>
+			<br/>
 		</ul><br/>
 <br/>
 
@@ -611,6 +614,9 @@ Ver 0 always indicates the currently running configuration.<br/>
 			<br/>
 			Der Export einer Datei zur Bearbeitung erfolgt mit dem Befehl<br/>
 			<code>configdb fileexport FHEM/myrss.layout</code><br/>
+			<br/>
+			Jeder Neuimport einer bereits in der Datenbank gespeicherten Datei &uuml;berschreibt die vorherige Datei in der Datenbank.<br/>
+			<br/>
 		</ul><br/>
 <br/>
 
