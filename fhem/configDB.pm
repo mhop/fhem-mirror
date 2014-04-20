@@ -54,6 +54,11 @@
 #
 # 2014-04-03 - fixed     global attributes not read from version 0
 #
+# 2014-04-18 - added     commands fileimport, fileexport
+# 2014 04-19 - added     commands filelist, filedelete
+#                        interface cfgDB_Readfile for interaction
+#                        with other modules
+#
 ##############################################################################
 #
 
@@ -78,6 +83,7 @@ sub _cfgDB_ReadCfg(@);
 sub _cfgDB_ReadState(@);
 sub _cfgDB_Rotate($);
 sub _cfgDB_Uuid;
+sub _cfgDB_Filelist(;$);
 
 ##################################################
 # Read configuration file for DB connection
@@ -330,6 +336,18 @@ sub cfgDB_SaveState {
 # return SVN Id, called by fhem's CommandVersion
 sub cfgDB_svnId { 
 	return "# ".'$Id$' 
+}
+
+sub cfgDB_FW_fileList(@$) {
+	my ($dir,$re,@ret) = @_;
+	my @files = split(/\n/, _cfgDB_Filelist('notitle'));
+	foreach my $f (@files) {
+		next if( $f !~ m/^$dir/ );
+		$f =~ s,$dir\/,,;
+		next if($f !~ m,^$re$,);
+		push @ret, "$f.";
+	}
+	return @ret;
 }
 
 ##################################################
@@ -618,6 +636,9 @@ sub _cfgDB_Diff($$) {
 	return $ret;
 }
 
+# functions used for file handling
+#
+#   delete file from database
 sub _cfgDB_Filedelete($) {
 	my ($filename) = @_;
 	my $fhem_dbh = _cfgDB_Connect;
@@ -632,6 +653,7 @@ sub _cfgDB_Filedelete($) {
 	return $ret;
 }
 
+#   export file from database to filesystem
 sub _cfgDB_Fileexport($) {
 	my ($filename) = @_;
 	my $counter = 0;
@@ -649,12 +671,13 @@ sub _cfgDB_Fileexport($) {
 	return "$counter lines written from database into file $filename";
 }
 
+#   import file from filesystem into database
 sub _cfgDB_Fileimport($) {
 	my ($filename) = @_;
 	my $counter = 0;
 	my $fhem_dbh = _cfgDB_Connect;
-	my $sth = $fhem_dbh->prepare('INSERT INTO fhemfilesave values (?, ?)');
 	$fhem_dbh->do("delete from fhemfilesave where filename = '$filename'");
+	my $sth = $fhem_dbh->prepare('INSERT INTO fhemfilesave values (?, ?)');
 	open (in,"<$filename") || die $!;
 	while (<in>){
 		$counter++;
@@ -668,9 +691,12 @@ sub _cfgDB_Fileimport($) {
 	return "$counter lines written from file $filename to database";
 }
 
-sub _cfgDB_Filelist {
+#   show a list containing all file(names) in database
+sub _cfgDB_Filelist(;$) {
+	my ($notitle) = @_;
 	my $ret =	"Files found in database:\n".
 						"------------------------------------------------------------\n";
+	$ret = "" if $notitle;
 	my $fhem_dbh = _cfgDB_Connect;
 	my $sth = $fhem_dbh->prepare( "SELECT filename FROM fhemfilesave group by filename order by filename" );  
 	$sth->execute();
@@ -682,10 +708,11 @@ sub _cfgDB_Filelist {
 	return $ret;
 }
 
+#   read a file from database and return content as string
 sub _cfgDB_Readfile($) {
 	my ($filename) = @_;
 	my $fhem_dbh = _cfgDB_Connect;
-	my $sth = $fhem_dbh->prepare( "SELECT line FROM fhemfilesave WHERE filename = '$filename'" );  
+	my $sth = $fhem_dbh->prepare( "SELECT line FROM fhemfilesave WHERE filename LIKE '$filename'" );  
 	$sth->execute();
 	my @outfile;
 	while (my @line = $sth->fetchrow_array()) {
@@ -696,6 +723,68 @@ sub _cfgDB_Readfile($) {
 	return (int(@outfile)) ? join("\n",@outfile) : undef;
 }
 
+sub _cfgDB_Writefile($$) {
+	my ($filename,$content) = @_;
+	my @c = split(/\n/,$content);
+
+	my $fhem_dbh = _cfgDB_Connect;
+	$fhem_dbh->do("delete from fhemfilesave where filename = '$filename'");
+	my $sth = $fhem_dbh->prepare('INSERT INTO fhemfilesave values (?, ?)');
+	foreach (@c){
+		$sth->execute($filename,$_);
+	}
+	$sth->finish();
+	$fhem_dbh->commit();
+	$fhem_dbh->disconnect();
+	return;
+}
+
+#   read 99ers from database
+sub cfgDB_Read99($) {
+  my $counter = 0;
+  my $ret;
+  my $fhem_dbh = _cfgDB_Connect;
+  my $sth  = $fhem_dbh->prepare( "SELECT filename FROM fhemfilesave WHERE filename like '%/99_%.pm' group by filename" );
+  my $sth2 = $fhem_dbh->prepare( "SELECT line     FROM fhemfilesave WHERE filename = ( ? )");
+  $sth->execute();
+  while (my $file = $sth->fetchrow_array()) {
+    Log3 undef, 5, "Loading $file from database";
+    $sth2->execute($file);
+    no strict "refs";
+    eval {
+      while (my @line = $sth2->fetchrow_array()) {
+        $ret = eval $line[0];
+        if($@) {
+          Log3 undef, 1, "reload: Error:Modul $file deactivated:\n $@";
+          last;
+        }
+        last if($line[0] eq '1;');
+      }
+    };
+    $sth2->finish();
+
+    if($ret) {
+      my $m = $file;
+      $m =~ s,.*([0-9][0-9])_,,;
+      $m =~ s,.pm,,;
+      use strict "refs";
+      my ($defptr, $ldata);
+      if($modules{$m}) {
+        $defptr = $modules{$m}{defptr};
+        $ldata = $modules{$m}{ldata};
+      }
+      $modules{$m} = \%hash;
+      $modules{$m}{ORDER}  = 99;
+      $modules{$m}{LOADED} = 1;
+      $modules{$m}{defptr} = $defptr if($defptr);
+      $modules{$m}{ldata}  = $ldata if($ldata);
+      $counter++;
+    }
+  }
+  $sth->finish();
+  $fhem_dbh->disconnect();
+  return $counter;
+}
 
 1;
 
