@@ -297,6 +297,32 @@ sub CommandConfigdb($$) {
 		Furthermore, configDB offers a versioning of several configuration together with the possibility to restore a former configuration.<br/>
 		Access to database is provided via perl's database interface DBI.<br/>
 		<br/>
+
+		<b>Interaction with other modules</b><br/>
+		<ul><br/>
+			Currently modules 02_RSS.pm and 95_holiday.pm will use configDB to read their configuration data from database<br/> 
+			instead of formerly used configuration files inside the filesystem.<br/>
+			This requires you to import your configuration files from filesystem into database.<br/>
+			<br/>
+			Example:<br/>
+			<code>configdb fileimport FHEM/nrw.holiday</code><br/>
+			<code>configdb fileimport FHEM/myrss.layout</code><br/>
+			<br/>
+			<b>This does not affect the definitons of your holiday or RSS entities.</b><br/>
+			The given filenames in the definitions will be translated automatically to find the correct entries inside the database.<br/>
+			<br/>
+			If you want to create a new RSS-layout or a new holiday definition file, <br/>
+			you have to do this inside the filesystem and import it into database.<br/>
+			<br/>
+			To change a configuration file stored in database, you have to export it to filesystem, and change it there.<br/>
+			Afterwards you have to reimport it into database.<br/>
+			A more easy solution for this task will be provided soon.<br/>
+			<br/>
+			To export a file for modification you can use the command:<br/>
+			<code>configdb fileexport FHEM/myrss.layout</code><br/>
+		</ul><br/>
+<br/>
+
 		<b>Prerequisits / Installation</b><br/>
 		<ul><br/>
 		<li>Please install perl package Text::Diff if not already installed on your system.</li><br/>
@@ -562,6 +588,32 @@ Ver 0 always indicates the currently running configuration.<br/>
 		jederzeit eine &auml;ltere Version wiederherstellen zu k&ouml;nnen.<br/>
 		Der Zugriff auf die Datenbank erfolgt &uuml;ber die perl-eigene Datenbankschnittstelle DBI.<br/>
 		<br/>
+
+		<b>Zusammenspiel mit anderen fhem Modulen</b><br/>
+		<ul><br/>
+			Momentan verwenden die Module 02_RSS.pm und 95_holiday.pm die configDB um ihre Konfigurationsdaten von dort zu lesen<br/>
+			anstatt aus den bisherigen Konfigurationsdateien im Dateisystem.<br/>
+			Hierzu ist es notwendig, die Konfigurationsdateien aus dem Dateisystem in die Datenbank zu importieren.<br/>
+			<br/>
+			Beispiel:<br/>
+			<code>configdb fileimport FHEM/nrw.holiday</code><br/>
+			<code>configdb fileimport FHEM/myrss.layout</code><br/>
+			<br/>
+			<b>Dies hat keinerlei Auswirkungen auf die Definition der holiday oder RSS Instanzen.</b><br/>
+			Die dort verwendeten Dateinamen werden automtisch umgesetzt, um die zugeh&ouml;rigen Daten in der Datenbank zu finden.<br/>
+			<br/>
+			Um ein neues RSS Layout oder eine neue holiday-Datei anzulegen und zu verwenden, muss diese Datei zuerst im Dateisystem angelegt<br/>
+			und dann in die Datenbank importiert werden.<br/>
+			<br/>
+			Um eine in der Datenbank vorhandene Datei zu bearbeiten, muss es zuerst aus der Datenbank in das Dateisystem exportiert<br/>
+			und anschliessend dort bearbeitet werden. Danach muss die ge&auml;nderte Datei wieder in die Datenbank importiert werden.<br/>
+			Eine Vereinfachung dieser Vorgehensweise ist derzeit in der Entwicklung.<br/>
+			<br/>
+			Der Export einer Datei zur Bearbeitung erfolgt mit dem Befehl<br/>
+			<code>configdb fileexport FHEM/myrss.layout</code><br/>
+		</ul><br/>
+<br/>
+
 		<b>Voraussetzungen / Installation</b><br/>
 		<ul><br/>
 		<li>Bitte das perl Paket Text::Diff installieren, falls noch nicht auf dem System vorhanden.</li><br/>
