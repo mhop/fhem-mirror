@@ -1,13 +1,5 @@
 ##############################################
 # $Id$
-# 2014-04-16 klaus.schauer
-# Added new EEP 2.1 profiles: 
-# Added new EEP 2.5 profiles: 
-# Added new EEP 2.6 profiles:
-# EnOcean_Notify():
-# EnOcean_Attr():
-# subType switch: parse logic improved
-# commandref: further explanations added
 
 package main;
 
@@ -256,6 +248,8 @@ my @EnO_models = qw (
   FTS12
 );
 
+my @EnO_defaultChannel = ("all","input",0..29);
+
 # Initialize
 sub
 EnOcean_Initialize($)
@@ -275,7 +269,9 @@ EnOcean_Initialize($)
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
                        "showtime:1,0 " .
                        "actualTemp angleMax:slider,-180,20,180 angleMin:slider,-180,20,180 " .
-                       "angleTime:0,1,2,3,4,5,6 comMode:biDir,uniDir destinationID " .
+                       "angleTime:0,1,2,3,4,5,6 comMode:biDir,uniDir " .
+                       "defaultChannel:" . join(",", @EnO_defaultChannel) . " " .
+                       "destinationID " .
                        "devChannel devUpdate:off,auto,demand,polling,interrupt dimValueOn " .
                        "disable:0,1 disabledForIntervals " .
                        "gwCmd:" . join(",", sort @EnO_gwCmd) . " humidityRefDev " .
@@ -362,6 +358,7 @@ EnOcean_Get ($@)
       shift(@a);
       my $cmdID;
       my $channel = shift(@a);
+      $channel = AttrVal($name, "defaultChannel", undef) if (!defined $channel);
       if (!defined $channel || $channel eq "all") {
         $channel = 30;     
       } elsif ($channel eq "input") {
@@ -1528,6 +1525,7 @@ EnOcean_Set($@)
           }
         }
         $channel = shift(@a);
+        $channel = AttrVal($name, "defaultChannel", undef) if (!defined $channel);
         if (!defined $channel || $channel eq "all") {
           CommandDeleteReading(undef, "$name channel.*");          
           CommandDeleteReading(undef, "$name dim.*");          
@@ -1542,7 +1540,7 @@ EnOcean_Set($@)
           readingsSingleUpdate($hash, "channel" . $channel, "on", 1);
           readingsSingleUpdate($hash, "dim" . $channel, $outputVal, 1);
         } else {
-          return "$cmd $channel wrong, choose 0...39|all|input.";
+          return "$cmd $channel wrong, choose 0...29|all|input.";
         }     
         readingsSingleUpdate($hash, "state", "on", 1);
         $data = sprintf "%02X%02X%02X", $cmdID, $dimValTimer << 5 | $channel, $outputVal;
@@ -1552,6 +1550,7 @@ EnOcean_Set($@)
         $cmdID = 1;
         $outputVal = 0;
         $channel = shift(@a);
+        $channel = AttrVal($name, "defaultChannel", undef) if (!defined $channel);
         if (!defined $channel || $channel eq "all") {
           CommandDeleteReading(undef, "$name channel.*");          
           CommandDeleteReading(undef, "$name dim.*");          
@@ -1579,6 +1578,7 @@ EnOcean_Set($@)
           return "Usage: $cmd variable is not numeric or out of range.";
         }
         $channel = shift(@a);
+        $channel = AttrVal($name, "defaultChannel", undef) if (!defined $channel);
         if (!defined $channel) {
           CommandDeleteReading(undef, "$name channel.*");          
           CommandDeleteReading(undef, "$name dim.*");          
@@ -1922,7 +1922,7 @@ EnOcean_Set($@)
                   ($measurementDelta | 0x0F) << 4 | $unitCmd, ($measurementDelta | 0xFF00) >> 8,
                   $responseTimeMax, $responseTimeMin;
       } else {
-        my $cmdList = "dim:slider,0,1,100 on:noArg off:noArg local measurement";
+        my $cmdList = "dim:slider,0,1,100 on off local measurement";
         return SetExtensions ($hash, $cmdList, $name, @a);
       }
       Log3 $name, 3, "EnOcean set $name $cmd $data";
@@ -3788,7 +3788,7 @@ EnOcean_Parse($$)
       my $devChannel = sprintf "%02X", $db[5];
       my $subType = "$rorg.$func.$type";
       my $teachInReq = ($db[6] & 0x30) >> 4;
-      if ($teachInReq == 0) {
+      if ($teachInReq == 0 || $teachInReq == 2) {
       # Teach-In Request
         if($EnO_subType{$subType}) {
           # EEP Teach-In
@@ -4656,7 +4656,7 @@ EnOcean_Undef($$)
     <br><br>
     
     <li>Electronic switches and dimmers with Energy Measurement and Local Control (D2-01-00 - D2-01-11)<br>
-        [Telefunken Funktionsstecker]<br>
+        [Telefunken Funktionsstecker, PEHA Easyclick]<br>
     <ul>
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
@@ -4697,6 +4697,7 @@ EnOcean_Undef($$)
         specify the measurement unit</li>
     </ul><br>
        [channel] = 0...29|all|input, all is default<br>
+       The default channel can be specified with the attr <a href="#EnOcean_defaultChannel">defaultChannel</a>.<br>     
        [rampTime] = 1..3|switch|stop, switch is default<br>
        The attr subType must be actuator.01. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
@@ -4726,7 +4727,7 @@ EnOcean_Undef($$)
   <b>Get</b>
   <ul>
     <li>Electronic switches and dimmers with Energy Measurement and Local Control (D2-01-00 - D2-01-11)<br>
-        [Telefunken Funktionsstecker]<br>
+        [Telefunken Funktionsstecker, PEHA Easyclick]<br>
     <ul>
     <code>get &lt;name&gt; &lt;value&gt;</code>
     <br><br>
@@ -4736,7 +4737,7 @@ EnOcean_Undef($$)
        <li>measurement &lt;channel&gt; energy|power<br>
          </li>
     </ul><br>
-       <br>
+       The default channel can be specified with the attr <a href="#EnOcean_defaultChannel">defaultChannel</a>.<br>     
        The attr subType must be actuator.01. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
        see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
@@ -4780,6 +4781,9 @@ EnOcean_Undef($$)
     </li>
     <li><a name="devChannel">devChannel</a> 00 ... FF, [devChannel] = FF is default<br>
       Number of the individual device channel, FF = all channels supported by the device 
+    </li>
+    <li><a name="EnOcean_defaultChannel">defaultChannel</a> all|input|0 ... 29, [defaultChannel] = all is default<br>
+      Default device channel
     </li>
     <li><a name="destinationID">destinationID</a> multicast|unicast|00000001 ... FFFFFFFF,
       [destinationID] = multicast is default<br>
@@ -5797,7 +5801,7 @@ EnOcean_Undef($$)
      <br><br>
 
      <li>Electronic switches and dimmers with Energy Measurement and Local Control (D2-01-00 - D2-01-11)<br>
-         [Telefunken Funktionsstecker]<br>
+         [Telefunken Funktionsstecker, PEHA Easyclick]<br>
      <ul>
         <li>on</li>
         <li>off</li>
