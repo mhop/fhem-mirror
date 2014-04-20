@@ -62,15 +62,26 @@ RSS_readLayout($) {
   my $filename= $hash->{fhem}{filename};
   my $name= $hash->{NAME};
 
-  if(open(LAYOUT, $filename)) {
-    my @layout= <LAYOUT>;
-    $hash->{fhem}{layout}= join("", @layout);
-    close(LAYOUT);
+  if($attr{global}{configfile} eq 'configDB') {
+    my $layout = _cfgDB_Readlayout($filename);
+    if(!(defined($layout))) {
+      $hash->{fhem}{layout}= ("text 0.1 0.1 'Layout definition not found in database!'");
+      Log 1, "RSS $name: Layout $filename not found in database";
+    } else {
+      $hash->{fhem}{layout} = $layout;
+    }
   } else {
-    $hash->{fhem}{layout}= ();
-    Log 1, "RSS $name: Cannot open $filename";
+    if(open(LAYOUT, $filename)) {
+      my @layout= <LAYOUT>;
+      $hash->{fhem}{layout}= join("", @layout);
+      close(LAYOUT);
+    } else {
+      $hash->{fhem}{layout}= ();
+      Log 1, "RSS $name: Cannot open $filename";
+    }
   }
-}  
+}
+
  
 ##################
 sub
