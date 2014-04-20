@@ -566,7 +566,7 @@ JeeLink_Parse($$$$)
 
       } elsif( $dmsg =~m /ec3kSerial/ ) {
         $hash->{MatchList} = \%matchListPCA301;
-        #JeeLink_SimpleWrite($hash, "ec");
+        #JeeLink_SimpleWrite($hash, "ec", 1);
 
       } elsif( $dmsg =~m /JeeNode -- HomeControl -/ ) {
         $hash->{MatchList} = \%matchListJeeLink433 if($dmsg =~ m/433MHz/);
@@ -590,7 +590,7 @@ JeeLink_Parse($$$$)
         return;
 
   } elsif( $dmsg =~ m/drecvintr exit/ ) {
-        JeeLink_SimpleWrite($hash, "ec");
+        JeeLink_SimpleWrite($hash, "ec",1);
     return;
   }
 
