@@ -62,7 +62,7 @@ holiday_refresh($$)
 
   my $fname = $attr{global}{modpath} . "/FHEM/" . $hash->{NAME} . ".holiday";
   my @holidayfile;
-  if($attr{global}{configfile} eq 'configDB') {
+  if(configDBUsed()) {
     my $hfile = _cfgDB_Readfile($fname);
     return "Holiday file not found in database." unless defined $hfile;
     @holidayfile = split("\n", $hfile);
