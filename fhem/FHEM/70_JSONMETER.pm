@@ -78,7 +78,7 @@ sub JSONMETER_doStatisticDelta ($$$$);
   my @jsonFields = (
     [3, "meterType", "meterType", 0] # {"meterId": "0000000061015736", "meterType": "Simplex", "interval": 0, "entry": [
    ,[4, "timestamp", "deviceTime", 0] # {"timestamp": 1389296286, "periodEntries": [
-   ,[3, "cnt", "electricityConsumed", 2] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
+   ,[3, "cnt", "electricityConsumed", 3] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
    ,[3, "pwr", "electricityPower", 1] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
    ,[1, "010000090B00", "deviceTime", 0] #   { "obis":"010000090B00","value":"dd.mm.yyyy,hh:mm"}
    ,[2, "0.0.0", "meterID", 0] # {"obis": "0.0.0", "scale": 0, "value": 1627477814, "unit": "", "valueString": "0000000061015736" }, 
@@ -429,9 +429,9 @@ JSONMETER_ReadFromUrl($)
       if ($message =~ /^HTTP\/1.\d 404 Not Found/) {
            return "$name|0|Error: URL 'http://$ip:$port/$pathString' returned 'Error 404: Page Not Found'";
       }
-      
+
       $message = encode_base64($message,"");
-      
+
       return "$name|1|$message" ;
    }
 
@@ -447,7 +447,7 @@ JSONMETER_ParseJsonFile($)
   my $hash = $defs{$a[0]};
   my $name = $hash->{NAME};
   my $value;
-  my $returnStr;
+  my $returnStr ="";
   my $statisticType;
   
   delete($hash->{helper}{RUNNING_PID});
