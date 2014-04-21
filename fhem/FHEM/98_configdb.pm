@@ -226,6 +226,11 @@ sub CommandConfigdb($$) {
 			return _cfgDB_Filelist;
 		}
 
+		when ('fileshow') {
+			my $r = _cfgDB_Readfile($param1);
+			return ($r)?$r:"File $param1 not found in database.";
+		}
+
 		when ('info') {
 			Log3('configdb', 4, "info requested.");
 			$ret = _cfgDB_Info;
