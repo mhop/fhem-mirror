@@ -151,7 +151,7 @@ sub CommandConfigdb($$) {
 					my $val = $attr{configdb}{$c};
 					$val =~ s/;/;;/g;
 					$val =~ s/\n/\\\n/g;
-					$ret .= "attr configdb $c $val";
+					$ret .= "attr configdb $c $val\n";
 				}
 			} elsif($param2 eq "") {
 			# delete attribute

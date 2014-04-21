@@ -534,7 +534,8 @@ sub _cfgDB_Info {
 # count files stored in database
 	$row = $fhem_dbh->selectall_arrayref("SELECT filename from fhemfilesave group by filename");
 	$count = @$row;
-	$f = ($count>1) ? "s" : "";
+	$count = ($count)?$count:'No';
+	$f = ("$count" ne '1') ? "s" : "";
 	$row = " fhemfilesave: $count file$f stored in database";
 	push @r, $row;
 	push @r, $l;
@@ -687,8 +688,9 @@ sub _cfgDB_Fileexport($) {
 }
 
 #   import file from filesystem into database
-sub _cfgDB_Fileimport($) {
-	my ($filename) = @_;
+sub _cfgDB_Fileimport($;$) {
+	my ($filename,$doDelete) = @_;
+	$doDelete = (defined($doDelete)) ? 1 : 0;
 	my $counter = 0;
 	my $fhem_dbh = _cfgDB_Connect;
 	$fhem_dbh->do("delete from fhemfilesave where filename = '$filename'");
@@ -703,6 +705,7 @@ sub _cfgDB_Fileimport($) {
 	$sth->finish();
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
+	unlink($filename) if($attr{configdb}{deleteimported} || $doDelete );
 	return "$counter lines written from file $filename to database";
 }
 
