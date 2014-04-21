@@ -500,6 +500,11 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 			<br/>
 <br/>
 
+		<li><code>configdb fileshow &lt;Filename&gt;</code></li><br/>
+			Show content of specified file stored in database.<br/>
+			<br/>
+<br/>
+
 		<li><code>configdb info</code></li><br/>
 			Returns some database statistics<br/>
 <pre>
@@ -795,6 +800,11 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 
 		<li><code>configdb filelist</code></li><br/>
 			Liefert eine Liste mit allen Namen der gespeicherten Dateien.<br/>
+			<br/>
+<br/>
+
+		<li><code>configdb fileshow &lt;Dateiname&gt;</code></li><br/>
+			Zeigt den Inhalt einer in der Datenbank gespeichert Datei an.<br/>
 			<br/>
 <br/>
 
