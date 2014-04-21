@@ -734,7 +734,7 @@ sub _cfgDB_Readfile($) {
 	$sth->execute();
 	my @outfile;
 	while (my @line = $sth->fetchrow_array()) {
-		push @outfile, "$line[0] ";
+		push @outfile, "$line[0]";
 	}
 	$sth->finish();
 	$fhem_dbh->disconnect();
@@ -749,7 +749,7 @@ sub _cfgDB_Writefile($$) {
 	$fhem_dbh->do("delete from fhemfilesave where filename = '$filename'");
 	my $sth = $fhem_dbh->prepare('INSERT INTO fhemfilesave values (?, ?)');
 	foreach (@c){
-		$sth->execute($filename,$_);
+		$sth->execute($filename,rtrim($_));
 	}
 	$sth->finish();
 	$fhem_dbh->commit();
