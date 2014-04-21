@@ -55,9 +55,13 @@
 # 2014-04-03 - fixed     global attributes not read from version 0
 #
 # 2014-04-18 - added     commands fileimport, fileexport
-# 2014 04-19 - added     commands filelist, filedelete
+# 2014-04-19 - added     commands filelist, filedelete
 #                        interface cfgDB_Readfile for interaction
 #                        with other modules
+#
+# 2014-04-21 - added     interface functions for FHEMWEB and fhem.pl
+#                        to show files in "Edit files" and use them
+#                        with CommandReload() mechanism
 #
 ##############################################################################
 #
@@ -739,51 +743,20 @@ sub _cfgDB_Writefile($$) {
 	return;
 }
 
-#   read 99ers from database
-sub cfgDB_Read99($) {
-  my $counter = 0;
+#   read filelist containing 99_ files in database
+sub cfgDB_Read99() {
   my $ret;
   my $fhem_dbh = _cfgDB_Connect;
   my $sth  = $fhem_dbh->prepare( "SELECT filename FROM fhemfilesave WHERE filename like '%/99_%.pm' group by filename" );
-  my $sth2 = $fhem_dbh->prepare( "SELECT line     FROM fhemfilesave WHERE filename = ( ? )");
   $sth->execute();
-  while (my $file = $sth->fetchrow_array()) {
-    Log3 undef, 5, "Loading $file from database";
-    $sth2->execute($file);
-    no strict "refs";
-    eval {
-      while (my @line = $sth2->fetchrow_array()) {
-        $ret = eval $line[0];
-        if($@) {
-          Log3 undef, 1, "reload: Error:Modul $file deactivated:\n $@";
-          last;
-        }
-        last if($line[0] eq '1;');
-      }
-    };
-    $sth2->finish();
-
-    if($ret) {
-      my $m = $file;
-      $m =~ s,.*([0-9][0-9])_,,;
-      $m =~ s,.pm,,;
-      use strict "refs";
-      my ($defptr, $ldata);
-      if($modules{$m}) {
-        $defptr = $modules{$m}{defptr};
-        $ldata = $modules{$m}{ldata};
-      }
-      $modules{$m} = \%hash;
-      $modules{$m}{ORDER}  = 99;
-      $modules{$m}{LOADED} = 1;
-      $modules{$m}{defptr} = $defptr if($defptr);
-      $modules{$m}{ldata}  = $ldata if($ldata);
-      $counter++;
-    }
+  while (my $line = $sth->fetchrow_array()) {
+    $line =~ m,^(.*)/([^/]*)$,; # Split into dir and file
+    $ret .= "$2,"; # 
   }
   $sth->finish();
   $fhem_dbh->disconnect();
-  return $counter;
+  $ret =~ s/,$//;
+  return $ret;
 }
 
 1;
