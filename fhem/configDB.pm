@@ -63,6 +63,8 @@
 #                        to show files in "Edit files" and use them
 #                        with CommandReload() mechanism
 #
+#              modified  _cfgDB_Info to show number of files in db
+#
 ##############################################################################
 #
 
@@ -478,7 +480,7 @@ sub _cfgDB_Migrate {
 
 # show database statistics
 sub _cfgDB_Info {
-	my ($l, @r);
+	my ($l, @r, @row_ary, $f);
 	for my $i (1..65){ $l .= '-';}
 #	$l .= "\n";
 	push @r, $l;
@@ -518,14 +520,23 @@ sub _cfgDB_Info {
 
 # read state table statistics
 	$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemstate');
+	$f = ($count>1) ? "s" : "";
 # read state table creation time
 	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemstate WHERE STATESTRING like '#%'" );  
 	$sth->execute();
 	while ($row = $sth->fetchrow_array()) {
 		(undef,$row) = split(/#/,$row);
-		$row = " fhemstate: $count entries saved: $row";
+		$row = " fhemstate: $count entrie$f saved: $row";
 		push @r, $row;
 	}
+	push @r, $l;
+
+# count files stored in database
+	$row = $fhem_dbh->selectall_arrayref("SELECT filename from fhemfilesave group by filename");
+	$count = @$row;
+	$f = ($count>1) ? "s" : "";
+	$row = " fhemfilesave: $count file$f stored in database";
+	push @r, $row;
 	push @r, $l;
 
 	$fhem_dbh->disconnect();
