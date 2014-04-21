@@ -66,7 +66,7 @@ sub new() {
 	$self->{pt_verify} = PT_THREAD(\&pt_verify);
 	$self->{pt_execute} = PT_THREAD(\&pt_execute);
 	
-	$self->{timeout} = [1,0]; #default timeout 1 sec.
+	$self->{timeout} = 1.0; #default timeout 1 sec.
 
 	return bless $self,$class;	
 }
@@ -268,6 +268,7 @@ sub initialize($) {
   } else {
     main::Log3($hash->{NAME},1,$msg." defined");
   }
+
   $hwdevice->reset_error();
   $hwdevice->baudrate(9600);
   $hwdevice->databits(8);
@@ -277,7 +278,14 @@ sub initialize($) {
   $hwdevice->write_settings;
   #-- store with OWX device
   $self->{hwdevice}   = $hwdevice;
-  
+
+  #force master reset in DS2480
+  $hwdevice->purge_all;
+  $hwdevice->baudrate(4800);
+  $hwdevice->write_settings;
+  $hwdevice->write(sprintf("\x00"));
+  select(undef,undef,undef,0.5);
+
   #-- Third step detect busmaster on serial interface
   
   my $name = $self->{name};
@@ -292,18 +300,22 @@ sub initialize($) {
   #-- timing byte for DS2480
   $ds2480->start_query();
   $ds2480->query("\xC1",1);
-  do {
-    $ds2480->read();
-  } while (!$ds2480->response_ready());
+  eval {   #ignore timeout
+    do {
+      $ds2480->read();
+    } while (!$ds2480->response_ready());
+  };
     
   #-- Max 4 tries to detect an interface
   for($l=0;$l<100;$l++) {
     #-- write 1-Wire bus (Fig. 2 of Maxim AN192)
     $ds2480->start_query();
     $ds2480->query("\x17\x45\x5B\x0F\x91",5);
-    do {
-      $ds2480->read();
-    } while (!$ds2480->response_ready());
+    eval {   #ignore timeout
+      do {
+        $ds2480->read();
+      } while (!$ds2480->response_ready());
+    };
     $res = $ds2480->{string_in};
     #-- process 4/5-byte string for detection
     if( !defined($res)){
@@ -347,6 +359,7 @@ sub initialize($) {
     }
   }
   $self->{interface} = $interface;
+  main::Log3($hash->{NAME},1, $ress);
   if ($interface eq "DS2480") {
     return $ds2480;
   } elsif ($interface eq "DS9097") {

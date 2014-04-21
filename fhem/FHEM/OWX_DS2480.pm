@@ -129,7 +129,7 @@ sub read() {
   return undef unless (defined $hwdevice);
 
   #-- read the data - looping for slow devices suggested by Joachim Herold
-  my ($count_in, $string_part) = $hwdevice->read(48);  
+  my ($count_in, $string_part) = $hwdevice->read(255);  
   return undef if (not defined $count_in or not defined $string_part);
   $serial->{string_in} .= $string_part;                            
   $serial->{retcount} += $count_in;		
@@ -153,7 +153,7 @@ sub response_ready() {
 sub start_query() {
   my ($serial) = @_;
   #read and discard any outstanding data from previous commands:
-  while($serial->read()) {};
+  while($serial->read(255)) {};
 
   $serial->{string_in} = "";
   $serial->{num_reads} = 0;
