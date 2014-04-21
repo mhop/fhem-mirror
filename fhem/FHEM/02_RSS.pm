@@ -62,8 +62,8 @@ RSS_readLayout($) {
   my $filename= $hash->{fhem}{filename};
   my $name= $hash->{NAME};
 
-  if($attr{global}{configfile} eq 'configDB') {
-    my $layout = _cfgDB_Readlayout($filename);
+  if(configDBUsed()) {
+    my $layout = _cfgDB_Readfile($filename);
     if(!(defined($layout))) {
       $hash->{fhem}{layout}= ("text 0.1 0.1 'Layout definition not found in database!'");
       Log 1, "RSS $name: Layout $filename not found in database";
