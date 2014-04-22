@@ -1923,7 +1923,19 @@ CommandReload($$)
   $param =~ s,/,,g;
   $param =~ s,\.pm$,,g;
   my $file = "$attr{global}{modpath}/FHEM/$param.pm";
-  return "Can't read $file: $!" if(! -r "$file");
+  my $cfgDB = '-';
+
+  if( ! -r "$file" ) {
+    if(configDBUsed()) {
+      # try to find the file in configDB
+      my $r = _cfgDB_Fileexport($file); # create file temporarily
+      return "Can't read $file from configDB." if ($r =~ m/^0/);
+      $cfgDB = 'X';
+    } else {
+      # configDB not used and file not found: it's a real error!
+      return "Can't read $file: $!";
+    }
+  }
 
   my $m = $param;
   $m =~ s,^([0-9][0-9])_,,;
@@ -1933,6 +1945,7 @@ CommandReload($$)
   no strict "refs";
   my $ret = eval {
     my $ret=do "$file";
+    unlink($file) if($cfgDB eq 'X'); # delete temp file
     if(!$ret) {
       Log 1, "reload: Error:Modul $param deactivated:\n $@";
       return $@;
@@ -2095,6 +2108,14 @@ GlobalAttr($$$$)
     push @INC, $modpath if(!grep(/\Q$modpath\E/, @INC));
     $attr{global}{version} = $cvsid;
     my $counter = 0;
+
+    if(configDBUsed()) {
+      my @dbList = split(/,/,cfgDB_Read99()); # retrieve filelist from configDB
+      foreach my $m (@dbList) {
+        CommandReload(undef, $m);
+        $counter++;
+      }
+    }
 
     foreach my $m (sort readdir(DH)) {
       next if($m !~ m/^([0-9][0-9])_(.*)\.pm$/);

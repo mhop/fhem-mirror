@@ -490,6 +490,9 @@ SVG_WriteGplot($)
   print FH "plot ".join(",\\\n     ", @plot)."\n";
   close(FH);
 
+  # import the file into database and delete it.
+  _cfgDB_Fileimport($fName,1) if(configDBUsed());
+
   return 0;
 }
 
@@ -507,8 +510,19 @@ SVG_readgplotfile($$)
      if($defs{$wl} && $defs{$wl}{LOGDEVICE} && $defs{$defs{$wl}{LOGDEVICE}});
   $ldType = $wl if(!$ldType);
 
-  open(FH, $gplot_pgm) || return (FW_fatal("$gplot_pgm: $!"), undef);
-  while(my $l = <FH>) {
+  my @svgplotfile;
+  if(configDBUsed()) {
+    my $hfile = _cfgDB_Readfile($gplot_pgm);
+    return (FW_fatal("$gplot_pgm: $!"), undef) unless defined $hfile;
+    @svgplotfile = split("\n", $hfile);
+  } else {
+    open(FH, $gplot_pgm) || return (FW_fatal("$gplot_pgm: $!"), undef);
+    @svgplotfile = <FH>;
+    close(FH);
+  }
+
+  foreach my $l (@svgplotfile) {
+    $l = "$l\n" unless $l =~ m/\n$/;
     $l =~ s/\r//g;
     my $plotfn = undef;
     if($l =~ m/^#$ldType (.*)$/) {
@@ -532,7 +546,6 @@ SVG_readgplotfile($$)
       push(@filelog, $plotfn);
     }
   }
-  close(FH);
 
   return (undef, \@data, $plot, \@filelog);
 }
@@ -767,7 +780,7 @@ SVG_showLog($)
 
   my $gplot_pgm = "$FW_gplotdir/$type.gplot";
 
-  if(!-r $gplot_pgm) {
+  if(!-r $gplot_pgm && !configDBUsed()) {
     my $msg = "Cannot read $gplot_pgm";
     Log3 $FW_wname, 1, $msg;
 
