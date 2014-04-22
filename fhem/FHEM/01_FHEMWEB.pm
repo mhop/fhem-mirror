@@ -1327,6 +1327,7 @@ FW_fileList($)
     push(@ret, $f);
   }
   closedir(DH);
+  @ret = cfgDB_FW_fileList($dir,$re,@ret) if (configDBUsed());
   return sort @ret;
 }
 
@@ -1478,16 +1479,19 @@ FW_displayFileList($@)
   $hid =~ s/[^A-Za-z]/_/g;
   FW_pO "<div class=\"fileList $hid\">$heading</div>";
   FW_pO "<table class=\"block fileList\">";
+  my $cfgDB = "";
   my $row = 0;
   foreach my $f (@files) {
+    $cfgDB = ($f =~ s,\.configDB$,,);
+    $cfgDB = ($cfgDB) ? "configDB" : "";
     FW_pO "<tr class=\"" . ($row?"odd":"even") . "\">";
-    FW_pH "cmd=style edit $f", $f, 1;
+    FW_pH "cmd=style edit $f $cfgDB", $f, 1;
     FW_pO "</tr>";
     $row = ($row+1)%2;
   }
   FW_pO "</table>";
   FW_pO "<br>";
-} 
+}
 
 ##################
 sub
@@ -1533,14 +1537,15 @@ FW_style($$)
     FW_displayFileList("Own modules and helper files",
         FW_fileList("$MW_dir/^(.*sh|[0-9][0-9].*Util.*pm|.*cfg|.*holiday".
                                   "|.*layout)\$"));
-    FW_displayFileList("styles",
-        FW_fileList("$FW_cssdir/^.*(css|svg)\$"));
     FW_displayFileList("gplot files",
         FW_fileList("$FW_gplotdir/^.*gplot\$"));
+    FW_displayFileList("styles",
+        FW_fileList("$FW_cssdir/^.*(css|svg)\$"));
     FW_pO $end;
 
   } elsif($a[1] eq "select") {
-    my @fl = grep { $_ !~ m/(floorplan|dashboard)/ } FW_fileList("$FW_cssdir/.*style.css");
+    my @fl = grep { $_ !~ m/(floorplan|dashboard)/ }
+                        FW_fileList("$FW_cssdir/.*style.css");
     FW_pO "$start<table class=\"block fileList\">";
     my $row = 0;
     foreach my $file (@fl) {
@@ -1564,17 +1569,24 @@ FW_style($$)
 
   } elsif($a[1] eq "edit") {
     my $fileName = $a[2]; 
-    $fileName =~ s,.*/,,g;        # Little bit of security
-    my $filePath = FW_fileNameToPath($fileName);
-    if(!open(FH, $filePath)) {
-      FW_pO "<div id=\"content\">$filePath: $!</div>";
-      return;
+    my $data = "";
+    my $cfgDB = defined($a[3]) ? $a[3] : "";
+    if ($cfgDB eq 'configDB') {
+      my $filePath = FW_fileNameToPath($fileName);
+      $data = _cfgDB_Readfile($filePath);
+    } else {
+      $fileName =~ s,.*/,,g;        # Little bit of security
+      my $filePath = FW_fileNameToPath($fileName);
+      if(!open(FH, $filePath)) {
+        FW_pO "<div id=\"content\">$filePath: $!</div>";
+        return;
+      }
+      $data = join("", <FH>);
+      close(FH);
     }
-    my $data = join("", <FH>);
-    close(FH);
 
     $data =~ s/&/&amp;/g;
-	
+
     my $ncols = $FW_ss ? 40 : 80;
     FW_pO "<div id=\"content\">";
     FW_pO "<form method=\"$FW_formmethod\">";
@@ -1583,7 +1595,7 @@ FW_style($$)
     FW_pO     FW_submit("saveAs", "Save as");
     FW_pO     FW_textfieldv("saveName", 30, "saveName", $fileName);
     FW_pO     "<br><br>";
-    FW_pO     FW_hidden("cmd", "style save $fileName");
+    FW_pO     FW_hidden("cmd", "style save $fileName $cfgDB");
     FW_pO     "<textarea name=\"data\" cols=\"$ncols\" rows=\"30\">" .
                 "$data</textarea>";
     FW_pO "</form>";
@@ -1591,25 +1603,36 @@ FW_style($$)
 
   } elsif($a[1] eq "save") {
     my $fileName = $a[2];
+    my $cfgDB = defined($a[3]) ? $a[3] : "";
     $fileName = $FW_webArgs{saveName}
         if($FW_webArgs{saveAs} && $FW_webArgs{saveName});
     $fileName =~ s,.*/,,g;        # Little bit of security
     my $filePath = FW_fileNameToPath($fileName);
 
-    if(!open(FH, ">$filePath")) {
-      FW_pO "<div id=\"content\">$filePath: $!</div>";
-      return;
-    }
-    $FW_data =~ s/\r//g if($^O !~ m/Win/);
-    binmode (FH);
-    print FH $FW_data;
-    close(FH);
+    if($cfgDB ne 'configDB') { # save file to filesystem
+      if(!open(FH, ">$filePath")) {
+        FW_pO "<div id=\"content\">$filePath: $!</div>";
+        return;
+      }
+      $FW_data =~ s/\r//g if($^O !~ m/Win/);
+      binmode (FH);
+      print FH $FW_data;
+      close(FH);
+      my $ret = FW_fC("rereadcfg") if($filePath eq $attr{global}{configfile});
+      $ret = FW_fC("reload $fileName") if($fileName =~ m,\.pm$,);
+      $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" : "Saved the file $fileName");
+      FW_style("style list", $ret);
+      $ret = "";
 
-    my $ret = FW_fC("rereadcfg") if($filePath eq $attr{global}{configfile});
-    $ret = FW_fC("reload $fileName") if($fileName =~ m,\.pm$,);
-    $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" : "Saved the file $fileName");
-    FW_style("style list", $ret);
-    $ret = "";
+    } else { # save file to configDB
+      $FW_data =~ s/\r//g if($^O !~ m/Win/);
+      _cfgDB_Writefile($filePath, $FW_data);
+      my $ret = FW_fC("reload $fileName") if($fileName =~ m,\.pm$,);
+      $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" :
+                        "Saved the file $fileName to configDB");
+      FW_style("style list", $ret);
+      $ret = "";
+    }
 
   } elsif($a[1] eq "iconFor") {
     FW_iconTable("iconFor", "icon", "style setIF $a[2] %s", undef);
