@@ -63,8 +63,7 @@ cm_wait()
   if(ltype) {
     $("head").append(
       '<style type="text/css">'+
-        '.CodeMirror {height: auto;}'+
-        '.CodeMirror-scroll {overflow-y: hidden; overflow-x: auto;}'+
+        '.CodeMirror {height: ' + (window.innerHeight - 150) + 'px;}'+
       '</style>');
   }
 
