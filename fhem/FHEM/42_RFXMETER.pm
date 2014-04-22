@@ -9,7 +9,7 @@
 # help. I own an USB-RFXCOM-Receiver (433.92MHz, USB, order code 80002)
 # and highly recommend it.
 #
-# Willi Herzig, 2010
+# (c) 2010-2014 Copyright: Willi Herzig (Willi.Herzig@gmail.com)
 #
 #  This script is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
