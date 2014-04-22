@@ -351,7 +351,7 @@ sub cfgDB_FW_fileList(@$) {
 		next if( $f !~ m/^$dir/ );
 		$f =~ s,$dir\/,,;
 		next if($f !~ m,^$re$,);
-		push @ret, "$f.";
+		push @ret, "$f.configDB";
 	}
 	return @ret;
 }
