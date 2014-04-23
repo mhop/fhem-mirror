@@ -554,6 +554,13 @@ LightScene_Set($@)
     LightScene_updateHelper( $hash, AttrVal($name,"switchingOrder",undef) );
 
     return undef;
+  } elsif( $cmd eq "updateToJson" && $LightScene_hasDataDumper && $LightScene_hasJSON ) {
+    $LightScene_hasJSON = 0;
+    LightScene_Load($hash);
+    LightScene_updateHelper( $hash, AttrVal($name,"switchingOrder",undef) );
+    $LightScene_hasJSON = 1;
+    LightScene_Save();
+    return undef;
   }
 
 
