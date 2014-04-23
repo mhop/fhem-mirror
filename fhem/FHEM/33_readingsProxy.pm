@@ -48,18 +48,14 @@ readingsProxy_updateDevices($)
 
   my %list;
 
+  delete $hash->{DEVICE};
+  delete  $hash->{READING};
+
   my @params = split(" ", $hash->{DEF});
-  while (@params) {
-    my $param = shift(@params);
-
-    my @device = split(":", $param);
-
-    if( defined($defs{$device[0]})
-        && defined($defs{$device[0]}) ) {
-      $list{$device[0]} = 1;
-      $hash->{DEVICE} = $device[0];
-      $hash->{READING} = $device[1];
-    }
+  if( defined($defs{$params[0]}) ) {
+    $list{$params[0]} = 1;
+    $hash->{DEVICE} = $params[0];
+    $hash->{READING} = $params[1];
   }
 
   $hash->{CONTENT} = \%list;
