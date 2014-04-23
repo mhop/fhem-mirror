@@ -32,6 +32,8 @@
 # * "TFATS34C"	is TFA TS34C, Cresta
 # * "WT450H"	is WT260,WT260H,WT440H,WT450,WT450H
 # * "VIKING_02038" is Viking 02035,02038 (02035 has no humidity)
+# * "RUBICSON"  is Rubicson 
+# * "EW109"     is EW109
 #
 # temperature/humidity/pressure sensors (TEMPHYDROBARO):
 # * "BTHR918"	is BTHR918
@@ -447,6 +449,14 @@ sub TRX_WEATHER_common_temp {
 	0x08 => "WS2300", # La Crosse WS2300
 	0x09 => "RUBICSON", # RUBiCSON
 	0x0a => "TFA_303133", # TFA 30.3133
+	0x0b => "RES_TEMP1", # Reserved for future use
+	0x0c => "RES_TEMP2", # Reserved for future use
+	0x0d => "RES_TEMP3", # Reserved for future use
+	0x0e => "RES_TEMP4", # Reserved for future use
+	0x0f => "RES_TEMP5", # Reserved for future use
+	0x10 => "RES_TEMP6", # Reserved for future use
+	0x11 => "RES_TEMP7", # Reserved for future use
+	0x12 => "RES_TEMP8", # Reserved for future use
   );
 
   if (exists $devname{$bytes->[1]}) {
@@ -544,6 +554,16 @@ sub TRX_WEATHER_common_temphydro {
 	0x07 => "TFATS34C", 
 	0x08 => "WT450H", # WT260,WT260H,WT440H,WT450,WT450H
 	0x09 => "VIKING_02038", # Viking 02035,02038 (02035 has no humidity)
+	0x0a => "RUBICSON", # Rubicson 
+	0x0b => "EW109", # EW109 
+	0x0c => "RES_TEMPHUM1", # Reserved for future use 
+	0x0d => "RES_TEMPHUM2", # Reserved for future use 
+	0x0e => "RES_TEMPHUM3", # Reserved for future use 
+	0x0f => "RES_TEMPHUM4", # Reserved for future use 
+	0x10 => "RES_TEMPHUM5", # Reserved for future use 
+	0x11 => "RES_TEMPHUM6", # Reserved for future use 
+	0x12 => "RES_TEMPHUM7", # Reserved for future use 
+	0x13 => "RES_TEMPHUM8", # Reserved for future use 
   );
 
   if (exists $devname{$bytes->[1]}) {
