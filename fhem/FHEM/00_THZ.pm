@@ -282,7 +282,7 @@ sub THZ_Initialize($)
   $hash->{UndefFn} = "THZ_Undef";
   $hash->{GetFn}   = "THZ_Get";
   $hash->{SetFn}   = "THZ_Set";
-  $hash->{AttrFn}  = "THZ_Attr"; 
+#  $hash->{AttrFn}  = "THZ_Attr"; 
   $hash->{AttrList}= "IODev do_not_notify:1,0  ignore:0,1 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 "
 		    ."interval_sGlobal:0,60,120,180,300,600,3600,7200,43200,86400 "
 		    ."interval_sSol:0,60,120,180,300,600,3600,7200,43200,86400 "
