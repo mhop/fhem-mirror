@@ -1,7 +1,7 @@
 ##############################################
 # 00_THZ
 # by immi 04/2014
-# v. 0.085
+# v. 0.089
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -54,20 +54,31 @@ sub THZ_Refresh_all_gets($);
 
 ########################################################################################
 #
-# %sets - all supported protocols are listed
+# %sets - all supported protocols are listed  59E
 # 
 ########################################################################################
 
 my %sets = (
-	"OperatingMode"			=> {cmd2=>"0A0112" },  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
+	"pOpMode"			=> {cmd2=>"0A0112"  },  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
 	"p01RoomTempDayHC1"		=> {cmd2=>"0B0005", argMin => "13", argMax => "28"  },   
 	"p02RoomTempNightHC1"		=> {cmd2=>"0B0008", argMin => "13", argMax => "28"  },
 	"p03RoomTempStandbyHC1"		=> {cmd2=>"0B013D", argMin => "13", argMax => "28"  },
+	"p13GradientHC1"		=> {cmd2=>"0B010E", argMin => "0",  argMax =>  "5"  }, # 0..5 rappresentato/100
+	"p14LowEnDHC1"			=> {cmd2=>"0B059E", argMin => "0",  argMax => "20"  },   #in °K 0..20°K rappresentato/10
+	"p15RoomInfluenceHC1"		=> {cmd2=>"0B010F", argMin => "0",  argMax => "10"  },   # 0..10 rappresentato/10
+	"p19FlowProportionHC1"		=> {cmd2=>"0B059D", argMin => "0",  argMax => "100"  }, #in % 0..100%
+	
 	"p01RoomTempDayHC2"		=> {cmd2=>"0C0005", argMin => "13", argMax => "28"  },
 	"p02RoomTempNightHC2"		=> {cmd2=>"0C0008", argMin => "13", argMax => "28"  },
 	"p03RoomTempStandbyHC2"		=> {cmd2=>"0C013D", argMin => "13", argMax => "28"  },
-	"p04DHWsetDay"			=> {cmd2=>"0A0013", argMin => "13", argMax => "47"  },
-	"p05DHWsetNight"		=> {cmd2=>"0A05BF", argMin => "13", argMax => "47"  },
+	"p16GradientHC2"		=> {cmd2=>"0C010E", argMin => "0",  argMax =>  "5"  }, # /100
+	"p17LowEndHC2"			=> {cmd2=>"0C059E", argMin => "0",  argMax => "20"  },
+	"p18RoomInfluenceHC2"		=> {cmd2=>"0C010F", argMin => "0",  argMax => "10"  },   #in °C 0..10°C rappresentato/10
+	
+	"p04DHWsetDay"			=> {cmd2=>"0A0013", argMin => "13", argMax => "48"  },
+	"p05DHWsetNight"		=> {cmd2=>"0A05BF", argMin => "13", argMax => "48"  },
+	"p06DHWsetStandby"		=> {cmd2=>"0A0581", argMin => "13", argMax => "48"  },
+	"p11DHWsetManual"		=> {cmd2=>"0A0580", argMin => "13", argMax => "54"  },
 	"p07FanStageDay"		=> {cmd2=>"0A056C", argMin =>  "0", argMax =>  "3"  },
 	"p08FanStageNight"		=> {cmd2=>"0A056D", argMin =>  "0", argMax =>  "3"  },
 	"p09FanStageStandby"		=> {cmd2=>"0A056F", argMin =>  "0", argMax =>  "3"  },
@@ -75,22 +86,26 @@ my %sets = (
 	"p75passiveCooling"		=> {cmd2=>"0A0575", argMin =>  "0", argMax =>  "2"  },
 	"p33BoosterTimeoutDHW"		=> {cmd2=>"0A0588", argMin =>  "0", argMax =>  "200" }, #during DHW heating
 	"p79BoosterTimeoutHC"		=> {cmd2=>"0A05A0", argMin =>  "0", argMax =>  "60" }, #delayed enabling of booster heater
-	"p37fanstage1-Airflow-inlet"	=> {cmd2=>"0A0576", argMin =>  "50", argMax =>  "300"},		#zuluft 
-	"p38fanstage2-Airflow-inlet"	=> {cmd2=>"0A0577", argMin =>  "50", argMax =>  "300" },	#zuluft 
-	"p39fanstage3-Airflow-inlet"	=> {cmd2=>"0A0578", argMin =>  "50", argMax =>  "300" },	#zuluft 
-	"p40fanstage1-Airflow-outlet"	=> {cmd2=>"0A0579", argMin =>  "50", argMax =>  "300" },	#abluft extrated
-	"p41fanstage2-Airflow-outlet"	=> {cmd2=>"0A057A", argMin =>  "50", argMax =>  "300" },	#abluft extrated
-	"p42fanstage3-Airflow-outlet"	=> {cmd2=>"0A057B", argMin =>  "50", argMax =>  "300" },	#abluft extrated
+	"p46UnschedVent0"		=> {cmd2=>"0A0571", argMin =>  "0", argMax =>  "900"},	 #in min
+	"p45UnschedVent1"		=> {cmd2=>"0A0572", argMin =>  "0", argMax =>  "900"},	 #in min
+	"p44UnschedVent2"		=> {cmd2=>"0A0573", argMin =>  "0", argMax =>  "900"},	 #in min
+	"p43UnschedVent3"		=> {cmd2=>"0A0574", argMin =>  "0", argMax =>  "900"},	 #in min
+	"p37Fanstage1AirflowInlet"	=> {cmd2=>"0A0576", argMin =>  "50", argMax =>  "300"},		#zuluft 
+	"p38Fanstage2AirflowInlet"	=> {cmd2=>"0A0577", argMin =>  "50", argMax =>  "300" },	#zuluft 
+	"p39Fanstage3AirflowInlet"	=> {cmd2=>"0A0578", argMin =>  "50", argMax =>  "300" },	#zuluft 
+	"p40Fanstage1AirflowOutlet"	=> {cmd2=>"0A0579", argMin =>  "50", argMax =>  "300" },	#abluft extrated
+	"p41Fanstage2AirflowOutlet"	=> {cmd2=>"0A057A", argMin =>  "50", argMax =>  "300" },	#abluft extrated
+	"p42Fanstage3AirflowOutlet"	=> {cmd2=>"0A057B", argMin =>  "50", argMax =>  "300" },	#abluft extrated
 	"p49SummerModeTemp"		=> {cmd2=>"0A0116", argMin =>  "11", argMax =>  "24" },		#threshold for summer mode !! 
 	"p50SummerModeHysteresis"	=> {cmd2=>"0A05A2", argMin =>  "0.5", argMax =>  "5" },		#Hysteresis for summer mode !! 
-	"holidayBegin_day"		=> {cmd2=>"0A011B", argMin =>  "1", argMax =>  "31"  }, 
-	"holidayBegin_month"		=> {cmd2=>"0A011C", argMin =>  "1", argMax =>  "12"  },
-	"holidayBegin_year"		=> {cmd2=>"0A011D", argMin =>  "12", argMax => "20"  },
-	"holidayBegin-time"		=> {cmd2=>"0A05D3", argMin =>  "00:00", argMax =>  "23:59"},
-	"holidayEnd_day"		=> {cmd2=>"0A011E", argMin =>  "1", argMax =>  "31"  }, 
-	"holidayEnd_month"		=> {cmd2=>"0A011F", argMin =>  "1", argMax =>  "12"  },
-	"holidayEnd_year"		=> {cmd2=>"0A0120", argMin =>  "12", argMax => "20"  }, 
-	"holidayEnd-time"		=> {cmd2=>"0A05D4", argMin =>  "00:00", argMax =>  "23:59"}, # the answer look like  0A05D4-0D0A05D40029 for year 41 which is 10:15
+	"pHolidayBeginDay"		=> {cmd2=>"0A011B", argMin =>  "1", argMax =>  "31"  }, 
+	"pHolidayBeginMonth"		=> {cmd2=>"0A011C", argMin =>  "1", argMax =>  "12"  },
+	"pHolidayBeginYear"		=> {cmd2=>"0A011D", argMin =>  "12", argMax => "20"  },
+	"pHolidayBeginTime"		=> {cmd2=>"0A05D3", argMin =>  "00:00", argMax =>  "23:59"},
+	"pHolidayEndDay"		=> {cmd2=>"0A011E", argMin =>  "1", argMax =>  "31"  }, 
+	"pHolidayEndMonth"		=> {cmd2=>"0A011F", argMin =>  "1", argMax =>  "12"  },
+	"pHolidayEndYear"		=> {cmd2=>"0A0120", argMin =>  "12", argMax => "20"  }, 
+	"pHolidayEndTime"		=> {cmd2=>"0A05D4", argMin =>  "00:00", argMax =>  "23:59"}, # the answer look like  0A05D4-0D0A05D40029 for year 41 which is 10:15
 	#"party-time"			=> {cmd2=>"0A05D1", argMin =>  "00:00", argMax =>  "23:59"}, # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
 	"programHC1_Mo_0"		=> {cmd2=>"0B1410", argMin =>  "00:00", argMax =>  "23:59"},  #1 is monday 0 is first prog; start and end; value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
 	"programHC1_Mo_1"		=> {cmd2=>"0B1411", argMin =>  "00:00", argMax =>  "23:59"},
@@ -226,23 +241,24 @@ my %sets = (
 my %getsonly = (
 #	"hallo"       			=> { },
 #	"debug_read_raw_register_slow"	=> { },
-	"Status_Sol_16"			=> {cmd2=>"16"},
-	"Status_DHW_F3"			=> {cmd2=>"F3"},
-	"Status_HC1_F4"			=> {cmd2=>"F4"},
-	"Status_HC2_F5"			=> {cmd2=>"F5"},
-	"history"			=> {cmd2=>"09"},
-	"last10errors"			=> {cmd2=>"D1"},
-        "allFB"     			=> {cmd2=>"FB"},
-        "timedate" 			=> {cmd2=>"FC"},
-        "firmware" 			=> {cmd2=>"FD"},
+	"sSol"				=> {cmd2=>"16"},
+	"sDHW"				=> {cmd2=>"F3"},
+	"sHC1"				=> {cmd2=>"F4"},
+	"sHC2"				=> {cmd2=>"F5"},
+	"sHistory"			=> {cmd2=>"09"},
+	"sLast10errors"			=> {cmd2=>"D1"},
+        "sGlobal"	     		=> {cmd2=>"FB"},  #allFB
+        "sTimedate" 			=> {cmd2=>"FC"},
+        "sFirmware" 			=> {cmd2=>"FD"},
 	"party-time"			=> {cmd2=>"0A05D1"} # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   );
 
 my %gets=(%getsonly, %sets);
 
-my %OpMode = ("1" =>"Standby", "11" => "Automatic", "3" =>"DAYmode", "4" =>"SetBack", "5" =>"DHWmode", "14" =>"Manual", "0" =>"Emergency");   
+my %OpMode = ("1" =>"standby", "11" => "automatic", "3" =>"DAYmode", "4" =>"setback", "5" =>"DHWmode", "14" =>"manual", "0" =>"emergency");   
 my %Rev_OpMode = reverse %OpMode;
-
+my %OpModeHC = ("1" =>"normal", "2" => "setback", "3" =>"standby", "4" =>"restart", "5" =>"restart");
+my %SomWinMode = ( "01" =>"winter", "02" => "summer");
 ########################################################################################
 #
 # THZ_Initialize($)
@@ -266,14 +282,15 @@ sub THZ_Initialize($)
   $hash->{UndefFn} = "THZ_Undef";
   $hash->{GetFn}   = "THZ_Get";
   $hash->{SetFn}   = "THZ_Set";
+  $hash->{AttrFn}  = "THZ_Attr"; 
   $hash->{AttrList}= "IODev do_not_notify:1,0  ignore:0,1 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 "
-		    ."interval_allFB:0,60,120,180,300,600,3600,7200,43200,86400 "
-		    ."interval_Status_Sol_16:0,60,120,180,300,600,3600,7200,43200,86400 "
-		    ."interval_Status_DHW_F3:0,60,120,180,300,600,3600,7200,43200,86400 "
-		    ."interval_Status_HC1_F4:0,60,120,180,300,600,3600,7200,43200,86400 "
-		    ."interval_Status_HC2_F5:0,60,120,180,300,600,3600,7200,43200,86400 "
-		    ."interval_history:0,3600,7200,28800,43200,86400 "
-		    ."interval_last10errors:0,3600,7200,28800,43200,86400 "
+		    ."interval_sGlobal:0,60,120,180,300,600,3600,7200,43200,86400 "
+		    ."interval_sSol:0,60,120,180,300,600,3600,7200,43200,86400 "
+		    ."interval_sDHW:0,60,120,180,300,600,3600,7200,43200,86400 "
+		    ."interval_sHC1:0,60,120,180,300,600,3600,7200,43200,86400 "
+		    ."interval_sHC2:0,60,120,180,300,600,3600,7200,43200,86400 "
+		    ."interval_sHistory:0,3600,7200,28800,43200,86400 "
+		    ."interval_sLast10errors:0,3600,7200,28800,43200,86400 "
 		    . $readingFnAttributes;
 }
 
@@ -407,12 +424,10 @@ sub THZ_Ready($)
 {
   my ($hash) = @_;
   if($hash->{STATE} eq "disconnected")
-  {
+  { RemoveInternalTimer($hash);
   select(undef, undef, undef, 0.1); #equivalent to sleep 100ms
   return DevIo_OpenDev($hash, 1, "THZ_Refresh_all_gets")
   }	
-		
-  
     # This is relevant for windows/USB only
   my $po = $hash->{USBDev};
   if($po) {
@@ -468,13 +483,15 @@ sub THZ_Set($@){
     }
     
   if 	((substr($cmdHex2,0,6) eq "0A0116") or (substr($cmdHex2,0,6) eq "0A05A2"))	 {$arg=$arg*10} #summermode
-  elsif (substr($cmdHex2,0,4) eq "0A01")  {$arg=$arg*256}		        	# shift 2 times -- the answer look like  0A0120-3A0A01200E00  for year 14
+  elsif (substr($cmdHex2,0,4) eq "0A01") 					 {$arg=$arg*256}		        	# shift 2 times -- the answer look like  0A0120-3A0A01200E00  for year 14
   elsif  ((substr($cmdHex2,2,2) eq "1D") or (substr($cmdHex2,2,2)  eq "17") or (substr($cmdHex2,2,2) eq "15") or (substr($cmdHex2,2,2)  eq "14")) 	{$arg= time2quaters($arg) *256   + time2quaters($arg1)} # BeginTime-endtime, in the register is represented  begintime endtime
   elsif  (substr($cmdHex2,0,6) eq "0A05D1") 		  			{$arg= time2quaters($arg1) *256 + time2quaters($arg)} # PartyBeginTime-endtime, in the register is represented endtime begintime
   #partytime (0A05D1) non funziona; 
   elsif  ((substr($cmdHex2,0,6) eq "0A05D3") or (substr($cmdHex2,0,6) eq "0A05D4")) 	{$arg= time2quaters($arg)} # holidayBeginTime-endtime
-  elsif  ((substr($cmdHex2,0,5) eq "0A056") or (substr($cmdHex2,0,5) eq "0A057") or (substr($cmdHex2,0,6) eq "0A0588") or (substr($cmdHex2,0,6) eq "0A05A0"))	{ } 				# fann speed and boostetimeout: do not multiply
-  else 			             {$arg=$arg*10} 
+  elsif  ((substr($cmdHex2,0,5) eq "0A056") or (substr($cmdHex2,0,5) eq "0A057") or (substr($cmdHex2,0,6) eq "0A0588") or (substr($cmdHex2,0,6) eq "0A05A0") or (substr($cmdHex2,0,6) eq "0B059D"))	{ } 				# fann speed and boostetimeout: do not multiply
+  elsif  (substr($cmdHex2,2,4) eq "010E") 					{$arg=$arg*100} 		#gradientHC1 &HC2
+  elsif  (substr($cmdHex2,2,4) eq "010F") 					{$arg=$arg*256*10} 		#gradientHC1 &HC2
+  else 			             						{$arg=$arg*10} 
     
   THZ_Write($hash,  "02"); 			# STX start of text
   ($err, $msg) = THZ_ReadAnswer($hash);		#Expectedanswer1    is  "10"  DLE data link escape
@@ -482,6 +499,7 @@ sub THZ_Set($@){
   if ($msg eq "10") {
     $cmdHex2=THZ_encodecommand(($cmdHex2 . sprintf("%04X", $arg)),"set");
     THZ_Write($hash,  $cmdHex2); 		# send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
+    select(undef, undef, undef, 0.1); #maybe important for older firmware 
     ($err, $msg) = THZ_ReadAnswer($hash);	#Expectedanswer     is "10",		DLE data link escape 
      }
    $msgtmp=  $msgtmp  ."\n" ."set--" . $cmdHex2  ."\n" . $msg; 
@@ -785,17 +803,24 @@ sub THZ_Parse($) {
       elsif (substr($message,4,4) eq "05D1") 				 		{$message = quaters2time(substr($message, 10,2)) ."--". quaters2time(substr($message, 8,2))}  #like above but before stop then start !!!!
       elsif ((substr($message,4,4) eq "05D3") or (substr($message,4,4) eq "05D4"))   	{$message = quaters2time(substr($message, 10,2)) }  #value 1Ch 28dec is 7 
       elsif ((substr($message,4,3) eq "056")  or (substr($message,4,4) eq "0570")  or (substr($message,4,4) eq "0575"))	{$message = hex(substr($message, 8,4))}
+      elsif ((substr($message,4,4) eq "0588") or (substr($message,4,4) eq "05A0")  or (substr($message,4,4) eq "0571") or (substr($message,4,4) eq "0572") or (substr($message,4,4) eq "0573") or (substr($message,4,4) eq "0574")) {$message = hex(substr($message, 8,4)) ." min" }
       elsif (substr($message,4,3) eq "057")						{$message = hex(substr($message, 8,4)) ." m3/h" }
       elsif (substr($message,4,4) eq "05A2")						{$message = hex(substr($message, 8,4))/10 ." K" }
-      elsif ((substr($message,4,4) eq "0588") or (substr($message,4,4) eq "05A0"))	{$message = hex(substr($message, 8,4)) ." min" }
       else 										{$message = hex2int(substr($message, 8,4))/10 ." °C" }
   }  
   when ("0B")    {							   #set parameter HC1
       if (substr($message,4,2) eq "14")  {$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
+      elsif (substr($message,4,4) eq "059E")						{$message = hex(substr($message, 8,4)) ." K" }
+      elsif (substr($message,4,4) eq "059D")						{$message = hex(substr($message, 8,4)) ." %" }
+      elsif (substr($message,4,4) eq "010E")						{$message = hex(substr($message, 8,4))/100}
+      elsif (substr($message,4,4) eq "010F")						{$message = hex(substr($message, 8,2))/10 . " °C"}
       else 				 {$message = hex2int(substr($message, 8,4))/10 ." °C"  }
   }
   when ("0C")    {							   #set parameter HC2
       if (substr($message,4,2) eq "15")  {$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
+      elsif (substr($message,4,4) eq "059E")						{$message = hex(substr($message, 8,4)) ." K" }
+      elsif (substr($message,4,4) eq "010E")						{$message = hex(substr($message, 8,4))/100}
+      elsif (substr($message,4,4) eq "010F")						{$message = hex(substr($message, 8,2))/10  . " °C"}
       else 				 {$message = hex2int(substr($message, 8,4))/10 ." °C"  }
   }
   
@@ -830,22 +855,21 @@ sub THZ_Parse($) {
   
   
   when ("F4")    {                     #allF4
-    my %SomWinMode = ( "01" =>"winter", "02" => "summer");
     $message =
-		"outside_temp: " 		. hex2int(substr($message, 4,4))/10 . " " .
+		"outsideTemp: " 		. hex2int(substr($message, 4,4))/10 . " " .
         	"x08: " 			. hex2int(substr($message, 8,4))/10 . " " .
-        	"return_temp: "			. hex2int(substr($message,12,4))/10 . " " .
-        	"integral_heat: "		. hex2int(substr($message,16,4))    . " " .
-        	"flow_temp: " 			. hex2int(substr($message,20,4))/10 . " " .
-        	"heat-set_temp: "		. hex2int(substr($message,24,4))/10 . " " . #soll HC1
-		"heat_temp: "			. hex2int(substr($message,28,4))/10 . " " . #ist
+        	"returnTemp: "			. hex2int(substr($message,12,4))/10 . " " .
+        	"integralHeat: "		. hex2int(substr($message,16,4))    . " " .
+        	"flowTemp: " 			. hex2int(substr($message,20,4))/10 . " " .
+        	"heatSetTemp: "		. hex2int(substr($message,24,4))/10 . " " . #soll HC1
+		"heatTemp: "			. hex2int(substr($message,28,4))/10 . " " . #ist
 #	      	"x32: "				. hex2int(substr($message,32,4))/10 . " " .
-        	"mode: "		        . $SomWinMode{(substr($message,38,2))}  . " " .
+        	"seasonMode: "		        . $SomWinMode{(substr($message,38,2))}  . " " .
 #		"x40: "				. hex2int(substr($message,40,4))/10 . " " .
-		"integral_switch: "		. hex2int(substr($message,44,4))    . " " .
-#		"x48: "				. hex2int(substr($message,40,4))/10 . " " .
-#       	"x52: "				. hex2int(substr($message,52,4))/10 . " " .
-        	"room-set-temp: "		. hex2int(substr($message,56,4))/10 ;
+		"integralSwitch: "		. hex2int(substr($message,44,4))    . " " .
+		"opMode: "			. $OpModeHC{hex(substr($message,48,2))}  . " " .
+#       	"x52: "				. hex2int(substr($message,52,4)) . " " .
+        	"roomSetTemp: "		. hex2int(substr($message,56,4))/10 ;
 # 	     	"x60: " 			. hex2int(substr($message,60,4)) . " " .
 # 	    	"x64: "				. hex2int(substr($message,64,4)) . " " .
 #		"x68: "				. hex2int(substr($message,68,4)) . " " .
@@ -855,17 +879,16 @@ sub THZ_Parse($) {
 		;
   }
   when ("F5")    {                     #allF5
-    my %SomWinMode = ( "01" =>"winter", "02" => "summer");
     $message =
-		"outside_temp: " 		. hex2int(substr($message, 4,4))/10 . " " .
-        	"return_temp: " 		. hex2int(substr($message, 8,4))/10 . " " .
-        	"vorlauftemp: "			. hex2int(substr($message,12,4))/10 . " " .
-        	"heat_temp: "			. hex2int(substr($message,16,4))/10 . " " .
-        	"heat-set_temp: " 		. hex2int(substr($message,20,4))/10 . " " .
+		"outsideTemp: " 		. hex2int(substr($message, 4,4))/10 . " " .
+        	"returnTemp: " 		. hex2int(substr($message, 8,4))/10 . " " .
+        	"vorlaufTemp: "			. hex2int(substr($message,12,4))/10 . " " .
+        	"heatSetTemp: "		. hex2int(substr($message,16,4))/10 . " " .
+        	"heatTemp: " 			. hex2int(substr($message,20,4))/10 . " " .
         	"stellgroesse: "		. hex2int(substr($message,24,4))/10 . " " . 
-	        "mode: "		        . $SomWinMode{(substr($message,30,2))}  ;
+	        "seasonMode: "		        . $SomWinMode{(substr($message,30,2))}  . " " .
 #	     	"x32: "				. hex2int(substr($message,32,4)) . " " .
-#	    	"x36: "				. hex2int(substr($message,36,4)) . " " .
+	    	"opMode: "			. $OpModeHC{hex(substr($message,36,2))} ;
 # 	  	"x40: "				. hex2int(substr($message,40,4)) . " " .
 #		"x44: "				. hex2int(substr($message,44,4)) . " " .
 #		"x48: " 			. hex2int(substr($message,48,4)) . " " .
@@ -883,54 +906,54 @@ sub THZ_Parse($) {
               	  "Date: " 		. (hex(substr($message,12,2))+2000)  .	"/"		. hex(substr($message,14,2)) . "/"		. hex(substr($message,16,2));
   }
   when ("FB")    {                     #allFB
-    $message =    "outside_temp: " 				. hex2int(substr($message, 8,4))/10 . " " .
-        	  "flow_temp: "					. hex2int(substr($message,12,4))/10 . " " .  #Vorlauf Temperatur
-        	  "return_temp: "				. hex2int(substr($message,16,4))/10 . " " .  #Rücklauf Temperatur
-        	  "hot_gas_temp: " 				. hex2int(substr($message,20,4))/10 . " " .  #Heißgas Temperatur		
-        	  "dhw_temp: "					. hex2int(substr($message,24,4))/10 . " " .  #Speicher Temperatur current cilinder water temperature
-        	  "flow_temp_HC2: "				. hex2int(substr($message,28,4))/10 . " " .  #Vorlauf TemperaturHK2
-		  "evaporator_temp: "				. hex2int(substr($message,36,4))/10 . " " .  #Speicher Temperatur    
-        	  "condenser_temp: "				. hex2int(substr($message,40,4))/10 . " " .  
-        	  "Mixer_open: "				. ((hex(substr($message,45,1)) &  0b0001) / 0b0001) . " " .	#status bit
-		  "Mixer_closed: "				. ((hex(substr($message,45,1)) &  0b0010) / 0b0010) . " " .	#status bit
-		  "HeatPipeValve: "				. ((hex(substr($message,45,1)) &  0b0100) / 0b0100) . " " .	#status bit
-		  "DiverterValve: "				. ((hex(substr($message,45,1)) &  0b1000) / 0b1000) . " " .	#status bit
-		  "DHW_Pump: "					. ((hex(substr($message,44,1)) &  0b0001) / 0b0001) . " " .	#status bit
-		  "HeatingCircuit_Pump: "			. ((hex(substr($message,44,1)) &  0b0010) / 0b0010) . " " .	#status bit
-		  "Solar_Pump: "				. ((hex(substr($message,44,1)) &  0b1000) / 0b1000) . " " .	#status bit
-		  "Compressor: "				. ((hex(substr($message,47,1)) &  0b1000) / 0b1000) . " " .	#status bit
-		  "BoosterStage3: "				. ((hex(substr($message,46,1)) &  0b0001) / 0b0001) . " " .	#status bit
-		  "BoosterStage2: "				. ((hex(substr($message,46,1)) &  0b0010) / 0b0010) . " " .	#status bit
-		  "BoosterStage1: "				. ((hex(substr($message,46,1)) &  0b0100) / 0b0100). " " .	#status bit
-		  "HighPressureSensor: "			. (1-((hex(substr($message,49,1)) &  0b0001) / 0b0001)) . " " .	#status bit  #P1 	inverterd?
-		  "LowPressureSensor: "				. (1-((hex(substr($message,49,1)) &  0b0010) / 0b0010)) . " " .	#status bit  #P3  inverterd?
-		  "EvaporatorIceMonitor: "			. ((hex(substr($message,49,1)) &  0b0100) / 0b0100). " " .	#status bit  #N3
-		  "SignalAnode: "				. ((hex(substr($message,49,1)) &  0b1000) / 0b1000). " " .	#status bit  #S1
-		  "EVU_release: "				. ((hex(substr($message,48,1)) &  0b0001) / 0b0001). " " . 	#status bit 
-		  "OvenFireplace: "				. ((hex(substr($message,48,1)) &  0b0010) / 0b0010). " " .  	#status bit
+    $message =    "outsideTemp: " 				. hex2int(substr($message, 8,4))/10 . " " .
+        	  "flowTemp: "					. hex2int(substr($message,12,4))/10 . " " .  #Vorlauf Temperatur
+        	  "returnTemp: "				. hex2int(substr($message,16,4))/10 . " " .  #Rücklauf Temperatur
+        	  "hotGasTemp: " 				. hex2int(substr($message,20,4))/10 . " " .  #Heißgas Temperatur		
+        	  "dhwTemp: "					. hex2int(substr($message,24,4))/10 . " " .  #Speicher Temperatur current cilinder water temperature
+        	  "flowTempHC2: "				. hex2int(substr($message,28,4))/10 . " " .  #Vorlauf TemperaturHK2
+		  "evaporatorTemp: "				. hex2int(substr($message,36,4))/10 . " " .  #Speicher Temperatur    
+        	  "condenserTemp: "				. hex2int(substr($message,40,4))/10 . " " .  
+        	  "mixerOpen: "				. ((hex(substr($message,45,1)) &  0b0001) / 0b0001) . " " .	#status bit
+		  "mixerClosed: "				. ((hex(substr($message,45,1)) &  0b0010) / 0b0010) . " " .	#status bit
+		  "heatPipeValve: "				. ((hex(substr($message,45,1)) &  0b0100) / 0b0100) . " " .	#status bit
+		  "diverterValve: "				. ((hex(substr($message,45,1)) &  0b1000) / 0b1000) . " " .	#status bit
+		  "dhwPump: "					. ((hex(substr($message,44,1)) &  0b0001) / 0b0001) . " " .	#status bit
+		  "heatingCircuitPump: "			. ((hex(substr($message,44,1)) &  0b0010) / 0b0010) . " " .	#status bit
+		  "solarPump: "					. ((hex(substr($message,44,1)) &  0b1000) / 0b1000) . " " .	#status bit
+		  "compressor: "				. ((hex(substr($message,47,1)) &  0b1000) / 0b1000) . " " .	#status bit
+		  "boosterStage3: "				. ((hex(substr($message,46,1)) &  0b0001) / 0b0001) . " " .	#status bit
+		  "boosterStage2: "				. ((hex(substr($message,46,1)) &  0b0010) / 0b0010) . " " .	#status bit
+		  "boosterStage1: "				. ((hex(substr($message,46,1)) &  0b0100) / 0b0100). " " .	#status bit
+		  "highPressureSensor: "			. (1-((hex(substr($message,49,1)) &  0b0001) / 0b0001)) . " " .	#status bit  #P1 	inverterd?
+		  "lowPressureSensor: "				. (1-((hex(substr($message,49,1)) &  0b0010) / 0b0010)) . " " .	#status bit  #P3  inverterd?
+		  "evaporatorIceMonitor: "			. ((hex(substr($message,49,1)) &  0b0100) / 0b0100). " " .	#status bit  #N3
+		  "signalAnode: "				. ((hex(substr($message,49,1)) &  0b1000) / 0b1000). " " .	#status bit  #S1
+		  "rvuRelease: "				. ((hex(substr($message,48,1)) &  0b0001) / 0b0001). " " . 	#status bit 
+		  "ovenFireplace: "				. ((hex(substr($message,48,1)) &  0b0010) / 0b0010). " " .  	#status bit
 		  "STB: "					. ((hex(substr($message,48,1)) &  0b0100) / 0b0100). " " .	#status bit  	
-		  "OutputVentilatorPower: "			. hex(substr($message,50,4))/10  	. " " .
-        	  "InputVentilatorPower: " 			. hex(substr($message,54,4))/10  	. " " .
-        	  "MainVentilatorPower: "			. hex(substr($message,58,4))/10  	. " " .
-        	  "OutputVentilatorSpeed: "			. hex(substr($message,62,4))/1   	. " " .  # m3/h
-        	  "InputVentilatorSpeed: " 			. hex(substr($message,66,4))/1   	. " " .  # m3/h
-        	  "MainVentilatorSpeed: "			. hex(substr($message,70,4))/1   	. " " .  # m3/h
-                  "Outside_tempFiltered: "			. hex2int(substr($message,74,4))/10     . " " .
-                  "Rel_humidity: "				. hex2int(substr($message,78,4))/10	. " " .
-		  "DEW_point: "					. hex2int(substr($message,86,4))/1	. " " .
+		  "outputVentilatorPower: "			. hex(substr($message,50,4))/10  	. " " .
+        	  "inputVentilatorPower: " 			. hex(substr($message,54,4))/10  	. " " .
+        	  "mainVentilatorPower: "			. hex(substr($message,58,4))/10  	. " " .
+        	  "outputVentilatorSpeed: "			. hex(substr($message,62,4))/1   	. " " .  # m3/h
+        	  "inputVentilatorSpeed: " 			. hex(substr($message,66,4))/1   	. " " .  # m3/h
+        	  "mainVentilatorSpeed: "			. hex(substr($message,70,4))/1   	. " " .  # m3/h
+                  "outside_tempFiltered: "			. hex2int(substr($message,74,4))/10     . " " .
+                  "relHumidity: "				. hex2int(substr($message,78,4))/10	. " " .
+		  "dewPoint: "					. hex2int(substr($message,86,4))/1	. " " .
 		  "P_Nd: "					. hex2int(substr($message,86,4))/100	. " " .	#bar
 		  "P_Hd: "					. hex2int(substr($message,90,4))/100	. " " .  #bar
-		  "Actual_power_Qc: "				. hex2int(substr($message,94,8))/1      . " " .	#kw
-		  "Actual_power_Pel: "				. hex2int(substr($message,102,4))/1     . " " .	#kw
-		  "collector_temp: " 				. hex2int(substr($message, 4,4))/10  . " " .	#kw
-		  "inside_temp: " 				. hex2int(substr($message, 32,4))/10 ;	#Innentemperatur 
+		  "actualPower_Qc: "				. hex2int(substr($message,94,8))/1      . " " .	#kw
+		  "actualPower_Pel: "				. hex2int(substr($message,102,4))/1     . " " .	#kw
+		  "collectorTemp: " 				. hex2int(substr($message, 4,4))/10  . " " .	#kw
+		  "insideTemp: " 				. hex2int(substr($message, 32,4))/10 ;	#Innentemperatur 
   }
   when ("09")    {                     #operating history
-    $message =    "compressor_heating: "	. hex(substr($message, 4,4))    . " " .
-                  "compressor_cooling: "	. hex(substr($message, 8,4))    . " " .
-                  "compressor_dhw: "		. hex(substr($message, 12,4))    . " " .
-                  "booster_dhw: "		. hex(substr($message, 16,4))    . " " .
-                  "booster_heating: "		. hex(substr($message, 20,4))   ;			
+    $message =    "compressorHeating: "	. hex(substr($message, 4,4))    . " " .
+                  "compressorCooling: "	. hex(substr($message, 8,4))    . " " .
+                  "compressorDHW: "		. hex(substr($message, 12,4))    . " " .
+                  "boosterDHW: "		. hex(substr($message, 16,4))    . " " .
+                  "boosterHeating: "		. hex(substr($message, 20,4))   ;			
   }
   when ("D1")    {                     #last10errors tested only for 1 error   { THZ_Parse("6BD1010115008D07EB030000000000000000000")  }
     $message =    "number_of_faults: "		. hex(substr($message, 4,2))    . " " .
@@ -1003,8 +1026,8 @@ my %parsinghash = (
 sub THZ_debugread($){
   my ($hash) = @_;
   my ($err, $msg) =("", " ");
-  my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
- #my @numbers=('0A0112','0A0126'); 
+ # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
+ my @numbers=('0A056E','0A0126'); 
   #my @numbers = (1..255);
   #my @numbers = (1..65535);
   my $indice= "FF";
@@ -1045,8 +1068,22 @@ sub THZ_debugread($){
   }
 }
 
+#######################################
+#THZ_Attr($) 
+#in case of change of attribute starting with interval_ refresh all
+########################################################################################
 
-
+sub THZ_Attr(@) {
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+  my $hash = $defs{$name};
+  if( $attrName =~ /^interval_/ ) {
+  DevIo_CloseDev($hash);
+  RemoveInternalTimer($hash);
+  #sleep 1;
+  DevIo_OpenDev($hash, 1, "THZ_Refresh_all_gets");
+  }
+  return undef;
+}
 
 
 
@@ -1101,6 +1138,7 @@ sub THZ_Undef($$) {
    This module is not working if you have an older firmware; Nevertheless, "parsing" could be easily updated, because now the registers are well described.
   https://answers.launchpad.net/heatpumpmonitor/+question/100347  <br>
    Implemented: read of status parameters and read/write of configuration parameters.
+   A complete description can be found in the 00_THZ wiki http://www.fhemwiki.de/wiki/Tecalor_THZ_Heatpump
   <br><br>
 
   <a name="THZdefine"></a>
@@ -1122,13 +1160,13 @@ sub THZ_Undef($$) {
     <br>
       <ul><code>
       define Mythz THZ /dev/ttyUSB0@115200 <br>
-      attr Mythz interval_allFB 300      # internal polling interval 5min  <br>
-      attr Mythz interval_history 28800  # internal polling interval 8h    <br>
-      attr Mythz interval_last10errors 86400 # internal polling interval 24h    <br>
-      attr Mythz interval_Status_Sol_16 86400 # internal polling interval 24h    <br>
-      attr Mythz interval_Status_DHW_F3 86400 # internal polling interval 24h    <br>
-      attr Mythz interval_Status_HC1_F4 86400 # internal polling interval 24h    <br>
-      attr Mythz interval_Status_HC2_F5 86400 # internal polling interval 24h    <br>
+      attr Mythz interval_sGlobal 	300      # internal polling interval 5min  <br>
+      attr Mythz interval_sHistory 	28800  # internal polling interval 8h    <br>
+      attr Mythz interval_sLast10errors 86400 # internal polling interval 24h    <br>
+      attr Mythz interval_sSol	 	86400 # internal polling interval 24h    <br>
+      attr Mythz interval_sDHW	 	86400 # internal polling interval 24h    <br>
+      attr Mythz interval_sHC1	 	86400 # internal polling interval 24h    <br>
+      attr Mythz interval_sHC2	 	86400 # internal polling interval 24h    <br>
       define FileLog_Mythz FileLog ./log/Mythz-%Y.log Mythz <br>
       </code></ul>
      <br> 
@@ -1137,8 +1175,8 @@ sub THZ_Undef($$) {
     <br>
       <ul><code>
       define Mythz THZ /dev/ttyUSB0@115200 <br>
-      define atMythzFB at +*00:05:00 {fhem "get Mythz allFB","1";;return()}    <br>
-      define atMythz09 at +*08:00:00 {fhem "get Mythz history","1";;return()}   <br>
+      define atMythzFB at +*00:05:00 {fhem "get Mythz sGlobal","1";;return()}    <br>
+      define atMythz09 at +*08:00:00 {fhem "get Mythz sHistory","1";;return()}   <br>
       define FileLog_Mythz FileLog ./log/Mythz-%Y.log Mythz <br>
       </code></ul>
       
@@ -1163,6 +1201,7 @@ sub THZ_Undef($$) {
   beschrieben wurden.
   https://answers.launchpad.net/heatpumpmonitor/+question/100347  <br>
   Implementiert: Lesen der Statusinformation sowie Lesen und Schreiben einzelner Einstellungen.
+  Genauere Beschreinung des Modules --> 00_THZ wiki http://www.fhemwiki.de/wiki/Tecalor_THZ_W%C3%A4rmepumpe
   <br><br>
 
   <a name="THZdefine"></a>
@@ -1184,13 +1223,13 @@ sub THZ_Undef($$) {
     <br>
       <ul><code>
       define Mythz THZ /dev/ttyUSB0@115200 <br>
-      attr Mythz interval_allFB 300            # Internes Polling Intervall 5min   <br>
-      attr Mythz interval_history 28800        # Internes Polling Intervall 8h     <br>
-      attr Mythz interval_last10errors 86400   # Internes Polling Intervall 24h    <br>
-      attr Mythz interval_Status_Sol_16 86400  # Internes Polling Intervall 24h    <br>
-      attr Mythz interval_Status_DHW_F3 86400  # Internes Polling Intervall 24h    <br>
-      attr Mythz interval_Status_HC1_F4 86400  # Internes Polling Intervall 24h    <br>
-      attr Mythz interval_Status_HC2_F5 86400  # Internes Polling Intervall 24h    <br>
+      attr Mythz interval_sGlobal 	 300            # Internes Polling Intervall 5min   <br>
+      attr Mythz interval_sHistory 	 28800        # Internes Polling Intervall 8h     <br>
+      attr Mythz interval_sLast10errors	 86400   # Internes Polling Intervall 24h    <br>
+      attr Mythz interval_sSol		 86400  # Internes Polling Intervall 24h    <br>
+      attr Mythz interval_sDHW		 86400  # Internes Polling Intervall 24h    <br>
+      attr Mythz interval_sHC1		 86400  # Internes Polling Intervall 24h    <br>
+      attr Mythz interval_sHC2		 86400  # Internes Polling Intervall 24h    <br>
       define FileLog_Mythz FileLog ./log/Mythz-%Y.log Mythz <br>
       </code></ul>
      <br> 
@@ -1199,8 +1238,8 @@ sub THZ_Undef($$) {
     <br>
       <ul><code>
       define Mythz THZ /dev/ttyUSB0@115200 <br>
-      define atMythzFB at +*00:05:00 {fhem "get Mythz allFB","1";;return()}    <br>
-      define atMythz09 at +*08:00:00 {fhem "get Mythz history","1";;return()}   <br>
+      define atMythzFB at +*00:05:00 {fhem "get Mythz sGlobal","1";;return()}    <br>
+      define atMythz09 at +*08:00:00 {fhem "get Mythz sHistory","1";;return()}   <br>
       define FileLog_Mythz FileLog ./log/Mythz-%Y.log Mythz <br>
       </code></ul>
       
