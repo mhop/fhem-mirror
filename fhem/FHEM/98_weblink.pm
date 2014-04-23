@@ -28,7 +28,7 @@ weblink_Define($$)
   my ($hash, $def) = @_;
   my ($name, $type, $wltype, $link) = split("[ \t]+", $def, 4);
   my %thash = ( link=>1, image=>1, iframe=>1, htmlCode=>1, 
-                cmdList=>1, readings=>1,
+                cmdList=>1,
                 fileplot=>1, dbplot=>1);
   
   if(!$link || !$thash{$wltype}) {
@@ -123,81 +123,6 @@ weblink_FwFn($$$$)
     $ret .= "</table></td></tr>";
     $ret .= "</table><br>";
 
-  } elsif($wltype eq "readings") {
-    my @params = split(" ", $link);
-
-    my @devices;
-    my $mapping;
-    my $show_heading = 1;
-    my $show_state = 1;
-    my $show_time = 1;
-
-    while (@params) {
-      my $param = shift(@params);
-      
-      if( $param eq '*noheading' ) {
-        $show_heading = 0;
-      }elsif( $param eq '*notime' ) {
-        $show_time = 0;
-      }
-      elsif( $param eq '*nostate' ) {
-        $show_state = 0;
-      }elsif( $param =~ m/^{/) {
-        $mapping = eval $param ." ". join( " ", @params );
-        last;
-      } else {
-        my @device = split(":", $param);
-
-        if( defined($defs{$device[0]}) ) {
-          push @devices, [@device];
-        } else {
-          foreach my $d (sort keys %defs) {
-            next if( IsIgnored($d) );
-            next if( $d !~ m/$device[0]/);
-            push @devices, [$d,$device[1]];
-          }
-        }
-      }
-    }
-                
-    my $row = 1;
-    $ret .= "<table>";
-    $ret .= "<tr><td><div class=\"devType\"><a href=\"/fhem?detail=$d\">".AttrVal($d, "alias", $d)."</a></div></td></tr>" if( $show_heading );
-    $ret .= "<tr><td><table class=\"block wide\">";
-    foreach my $device (@devices) {
-      my $h = $defs{@{$device}[0]};
-      my $regex = @{$device}[1];
-      my $name = $h->{NAME};
-      next if( !$h );
-      foreach my $n (sort keys %{$h->{READINGS}}) {
-        next if( $n =~ m/^\./);
-        next if( $n eq "state" && !$show_state );
-        next if( defined($regex) &&  $n !~ m/$regex/);
-        my $val = $h->{READINGS}->{$n};
-                
-        if(ref($val)) {
-          my ($v, $t) = ($val->{VAL}, $val->{TIME});
-          $v = FW_htmlEscape($v);
-          $t = "" if(!$t);
-                
-          $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
-          $row++;
-                
-          my $m = $n;
-          $m = $mapping->{$n} if( defined($mapping) && defined($mapping->{$n}) );
-          $m = $mapping->{$name.".".$n} if( defined($mapping) && defined($mapping->{$name.".".$n}) );
-          $m =~ s/\$NAME/$name/g;
-          $ret .= "<td><div class=\"dname\"><a href=\"/fhem?detail=$name\">$m</a></div></td>";;
-          $ret .= "<td><div informId=\"$name-$n\">$v</div></td>";
-          $ret .= "<td><div informId=\"$name-$n-ts\">$t</div></td>" if( $show_time );
-        }         
-      }
-    }
-    $ret .= "</table></td></tr>";
-    $ret .= "<tr><td><div class=\"devType\"><a style=\"color:#ff8888\" href=\"/fhem/docs/commandref.html#readingsGroup\">weblink readings is deprecated. please use readingsGroup instead.</a></div></td></tr>";
-    $ret .= "</table>";
-    $ret .= "</br>";
-    
   }
 
   return $ret;
@@ -233,7 +158,6 @@ weblink_FwFn($$$$)
     Notes:
     <ul>
       <li>For cmdList &lt;argument&gt; consist of a list of space separated icon:label:cmd triples.</li>
-      <li>The readings type is deprecated. Use <a href="#readingGroup">readingGroup</a> instead.</li>
     </ul>
   </ul>
 
