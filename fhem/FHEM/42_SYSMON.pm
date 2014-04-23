@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.3.8";
+my $VERSION = "1.4.0";
 
 use constant {
   DATE            => "date",
@@ -58,7 +58,14 @@ use constant {
 use constant {
   ETH0        => "eth0",
   WLAN0       => "wlan0",
-  DIFF_SUFFIX => "_diff"
+  DIFF_SUFFIX => "_diff",
+  FB_WLAN_STATE       => "wlan_state",
+  FB_WLAN_GUEST_STATE => "wlan_guest_state",
+  FB_INET_IP          => "internet_ip",
+  FB_INET_STATE       => "internet_state",
+  FB_N_TIME_CTRL      => "night_time_ctrl",
+  FB_NUM_NEW_MESSAGES => "num_new_messages",
+  FB_FW_VERSION       => "fw_version_info",
 };
 
 use constant FS_PREFIX => "~ ";
@@ -275,6 +282,7 @@ SYSMON_updateCurrentReadingsMap($) {
 	    $nName = "vdsl";
 		  $rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	   
 	  } else {
 	  	my $nName = ETH0;
 	  	$rMap->{$nName}         = "Network adapter ".$nName;
@@ -285,7 +293,18 @@ SYSMON_updateCurrentReadingsMap($) {
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
     }
   }
-
+  
+  if(SYSMON_isFB($hash)) {
+    # FB WLAN state
+	  $rMap->{+FB_WLAN_STATE}       = "WLAN State";
+	  $rMap->{+FB_WLAN_GUEST_STATE} = "WLAN Guest State";
+	  $rMap->{+FB_INET_IP}          = "Internet IP";
+	  $rMap->{+FB_INET_STATE}       = "Internet connection state";
+	  $rMap->{+FB_N_TIME_CTRL}      = "night time control";
+	  $rMap->{+FB_NUM_NEW_MESSAGES} = "new messages";
+	  $rMap->{+FB_FW_VERSION}       = "firmware info";
+  }
+  
 	# User defined
 	my $userdefined = AttrVal($name, "user-defined", undef);
   if(defined $userdefined) {
@@ -515,13 +534,17 @@ SYSMON_Update($@)
   } else {
 	  # Beim ersten mal alles aktualisieren!
 	  if(!$u_first_mark) {
-	    $u_first_mark = 1;
 	    $refresh_all = 1;
 	  }
 
 	  # Parameter holen
     my $map = SYSMON_obtainParameters($hash, $refresh_all);
 
+    # Mark setzen 
+    if(!$u_first_mark) {
+	    $u_first_mark = 1;
+	  }
+	  
     $hash->{STATE} = "Active";
     #my $state = $map->{LOADAVG};
     #readingsBulkUpdate($hash,"state",$state);
@@ -543,7 +566,7 @@ SYSMON_Update($@)
     
   }
 
-  readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
+  readingsEndUpdate($hash,defined($hash->{LOCAL}) ? 0 : 1);
 }
 
 sub
@@ -564,10 +587,16 @@ SYSMON_obtainParameters($$)
 
   my $ref =  int(time()/$base);
 	my ($m1, $m2, $m3, $m4) = split(/\s+/, $im);
-	
+	 
 	# Einmaliges
-	$map = SYSMON_getCPUBogoMIPS($hash, $map);
-  
+	if(!$u_first_mark) {
+	  $map = SYSMON_getCPUBogoMIPS($hash, $map);
+	
+	  if(SYSMON_isFB($hash)) {
+	    $map = SYSMON_FBVersionInfo($hash, $map);
+    }
+  }
+
 	# immer aktualisieren: uptime, uptime_text, fhemuptime, fhemuptime_text, idletime, idletime_text
   $map = SYSMON_getUptime($hash, $map);
   $map = SYSMON_getFHEMUptime($hash, $map);
@@ -599,7 +628,7 @@ SYSMON_obtainParameters($$)
   }
 
   if($m3 gt 0) { # Nur wenn > 0
-    # M3: eth0, eth0_diff, wlan0, wlan0_diff
+    # M3: eth0, eth0_diff, wlan0, wlan0_diff, wlan_on (FritzBox)
     my $update_ns = ($refresh_all || ($ref % $m3) eq 0);
     #if($refresh_all || ($ref % $m3) eq 0) {
     my $networks = AttrVal($name, "network-interfaces", undef);
@@ -630,6 +659,14 @@ SYSMON_obtainParameters($$)
           $map = SYSMON_getNetworkInfo($hash, $map, WLAN0);
           #Log 3, "SYSMON>>>>>>>>>>>>>>>>>>>>>>>>> ".$map->{+WLAN0};
         }
+      }
+      if(SYSMON_isFB($hash)) {
+      	$map = SYSMON_getFBWLANState($hash, $map);
+      	$map = SYSMON_getFBWLANGuestState($hash, $map);
+      	$map = SYSMON_getFBInetIP($hash, $map);
+      	$map = SYSMON_getFBInetConnectionState($hash, $map);
+      	$map = SYSMON_getFBNightTimeControl($hash, $map);
+      	$map = SYSMON_getFBNumNewMessages($hash, $map);
       }
     }
   }
@@ -963,7 +1000,9 @@ SYSMON_getDiskStat_intern($$$)
   }
   #$map->{"iostat_test"}="TEST";
 	my $lastVal = ReadingsVal($hash->{NAME},$pName."_raw",undef);
-	Log 3, "SYSMON-DEBUG-IOSTAT:   lastVal: $pName=".$lastVal;
+	if(defined($lastVal)) {
+  	Log 3, "SYSMON-DEBUG-IOSTAT:   lastVal: $pName=".$lastVal;
+  }
 	if(defined $lastVal) {
 		# Diff. ausrechnen, falls vorherigen Werte vorhanden sind.
 		my($af1, $af2, $af3, $af4, $af5, $af6, $af7, $af8, $af9, $af10, $af11) = split(/\s+/, $lastVal);
@@ -1365,6 +1404,149 @@ sub SYSMON_getNetworkInfo ($$$)
 }
 
 #------------------------------------------------------------------------------
+# Liefert Informationen, ob WLAN an oder aus ist (nur FritzBox)
+# Parameter: HASH; MAP
+#------------------------------------------------------------------------------
+sub SYSMON_getFBWLANState($$)
+{
+	my ($hash, $map) = @_;
+	
+	#logF($hash, "SYSMON_getFBWLANState", "");
+	
+	$map->{+FB_WLAN_STATE}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r wlan settings/ap_enabled",1);
+	
+	return $map;
+}
+
+#------------------------------------------------------------------------------
+# Liefert Informationen, ob WLAN-Gastzugang an oder aus ist (nur FritzBox)
+# Parameter: HASH; MAP
+#------------------------------------------------------------------------------
+sub SYSMON_getFBWLANGuestState($$)
+{
+	my ($hash, $map) = @_;
+	
+	#logF($hash, "SYSMON_getFBWLANGuestState", "");
+	
+	$map->{+FB_WLAN_GUEST_STATE}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r wlan settings/guest_ap_enabled",1);
+	
+	return $map;
+}
+
+#------------------------------------------------------------------------------
+# Liefert IP Adresse im Internet (nur FritzBox)
+# Parameter: HASH; MAP
+#------------------------------------------------------------------------------
+sub SYSMON_getFBInetIP($$)
+{
+	my ($hash, $map) = @_;
+	
+	$map->{+FB_INET_IP}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r dslstatistic status/ifacestat0/ipaddr");
+	
+	return $map;
+}
+
+#------------------------------------------------------------------------------
+# Liefert Status Internet-Verbindung (nur FritzBox)
+# Parameter: HASH; MAP
+#------------------------------------------------------------------------------
+sub SYSMON_getFBInetConnectionState($$)
+{
+	my ($hash, $map) = @_;
+	
+	$map->{+FB_INET_STATE}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r dslstatistic status/ifacestat0/connection_status");
+	
+	return $map;
+}
+
+#------------------------------------------------------------------------------
+# Liefert Status Klingelsperre (nur FritzBox)
+# Parameter: HASH; MAP
+#------------------------------------------------------------------------------
+sub SYSMON_getFBNightTimeControl($$)
+{
+	my ($hash, $map) = @_;
+	
+	$map->{+FB_N_TIME_CTRL}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r box settings/night_time_control_enabled",1);
+	
+	return $map;
+}
+
+#------------------------------------------------------------------------------
+# Liefert Anzahl der nicht abgehörten Nachrichten auf dem Anrufbeantworter (nur FritzBox)
+# Parameter: HASH; MAP
+#------------------------------------------------------------------------------
+sub SYSMON_getFBNumNewMessages($$)
+{
+	my ($hash, $map) = @_;
+	
+	$map->{+FB_NUM_NEW_MESSAGES}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r tam status/NumNewMessages");
+	
+	return $map;
+}
+
+# TODO: FritzBox-Infos: Dateien /var/env oder /proc/sys/urlader/environment. 
+
+#------------------------------------------------------------------------------
+# Liefert Informationen zu verschiedenen Eigenschaften durch Aufruf von entsprechenden Befehlen
+# Parameter: HASH; cmd; Art (Interpretieren als: 1=on/off)
+#------------------------------------------------------------------------------
+sub SYSMON_acquireInfo_intern($$;$)
+{
+	my ($hash, $cmd, $art) = @_;
+	
+	logF($hash, "SYSMON_acquireInfo_intern", "cmd: ".$cmd);
+	
+	my $str = trim(SYSMON_execute($hash, $cmd));
+	my $ret;
+	
+	if(!defined($art)) { $art= 0; }
+
+  $ret = $str;
+  if($art == 1) {
+    if($str+0 == 1) {
+	   $ret="on";
+    } else {
+      if($str+0 == 0) {
+        $ret="off";
+	    }	else {
+	  	  $ret="unknown";
+	    }
+    }
+  }
+	return $ret;
+}
+
+sub SYSMON_FBVersionInfo($$)
+{
+	my ($hash, $map) = @_;
+	
+  my $data = SYSMON_execute($hash, "/etc/version --version --date");
+  
+  my($v, $d, $t) = split(/\s+/, $data);
+  
+  my $version = "";
+  if(defined($v)) { $version = $v; }
+  if(defined($d)) { $version.= " ".$d; }
+  if(defined($t)) { $version.= " ".$t; }
+  
+  #if(defined($data[0])) {
+  #	#Version
+  #	$version = $data[0];
+  #}
+  #if(defined($data[1])) {
+  #	#Date
+  #	$version = $version." ".$data[1];
+  #}
+  
+  if($version ne "") {
+  	$map->{+FB_FW_VERSION}=$version;
+  }
+  
+  return $map;
+}
+
+#------------------------------------------------------------------------------
 # Systemparameter als HTML-Tabelle ausgeben
 # Parameter: Name des SYSMON-Geraetes (muss existieren), dessen Daten zur Anzeige gebracht werden sollen.
 # (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix]],...)
@@ -1732,6 +1914,35 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <li>user defined<br>
         These readings provide output of commands, which are passed to the operating system. 
+    </li>
+    <br>
+    <b>FritzBox specific Readings</b>
+    <li>wlan_state<br>
+        WLAN state: on/off
+    </li>
+    <br>
+    <li>wlan_guest_state<br>
+        GuestWLAN state: on/off
+    </li>
+    <br>
+    <li>internet_ip<br>
+        current IP-Adresse
+    </li>
+    <br>
+    <li>internet_state<br>
+        state of the Internet connection: connected/disconnected
+    </li>
+    <br>
+    <li>night_time_ctrl<br>
+        state night time control (do not disturb): on/off
+    </li>
+    <br>
+    <li>num_new_messages<br>
+        Number of new Voice Mail messages
+    </li>
+    <br>
+    <li>fw_version_info<br>
+        Information on the installed firmware version: <VersionNum> <creation date> <time>
     </li>
     <br>
   <br>
@@ -2170,6 +2381,35 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <li>Benutzerdefinierte Eintr&auml;ge<br>
         Diese Readings sind Ausgaben der Kommanden, die an das Betriebssystem &uuml;bergeben werden.
         Die entsprechende Angaben werden im Attribut <code>user-defined</code> vorgenommen.
+    </li>
+    <br>
+    <b>FritzBox-spezifische Readings</b>
+    <li>wlan_state<br>
+        WLAN-Status: on/off
+    </li>
+    <br>
+    <li>wlan_guest_state<br>
+        Gast-WLAN-Status: on/off
+    </li>
+    <br>
+    <li>internet_ip<br>
+        aktuelle IP-Adresse
+    </li>
+    <br>
+    <li>internet_state<br>
+        Status der Internetverbindung: connected/disconnected
+    </li>
+    <br>
+    <li>night_time_ctrl<br>
+        Status der Klingelsperre on/off
+    </li>
+    <br>
+    <li>num_new_messages<br>
+        Anzahl der neuen Anrufbeantworter-Meldungen
+    </li>
+    <br>
+    <li>fw_version_info<br>
+        Angaben zu der installierten Firmware-Version: <VersionNr> <Erstelldatum> <Zeit>
     </li>
     <br>
   <br>
