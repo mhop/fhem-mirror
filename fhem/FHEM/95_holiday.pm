@@ -17,6 +17,7 @@ holiday_Initialize($)
   $hash->{DefFn}    = "holiday_Define";
   $hash->{GetFn}    = "holiday_Get";
   $hash->{UndefFn}  = "holiday_Undef";
+  $hash->{AttrList} = $readingFnAttributes;
 }
 
 
@@ -192,12 +193,15 @@ holiday_refresh($$)
   InternalTimer($nt, "holiday_refresh", $name, 0);
 
   if($internal) {
-    $hash->{STATE} = $found;
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, 'state', $found);
+    readingsBulkUpdate($hash, 'yesterday', CommandGet(undef,"$name yesterday"));
+    readingsBulkUpdate($hash, 'tomorrow',  CommandGet(undef,"$name tomorrow"));
+    readingsEndUpdate($hash,1);
     return undef;
   } else {
     return $found;
   }
-
 }
 
 sub
@@ -467,7 +471,9 @@ western_easter($)
     <br>
 
   <a name="holidayattr"></a>
-  <b>Attributes</b><ul>N/A</ul><br>
+  <b>Attributes</b><ul>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    </ul><br>
 
 </ul>
 
