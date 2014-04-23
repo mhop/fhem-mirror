@@ -244,8 +244,8 @@ Ext.define('FHEM.controller.ChartController', {
                                 // in that case, we will skip the entry
                                 if (key !== "" && 
                                     key.lastIndexOf(":") + 1 === key.length && 
-                                    !Ext.Array.contains(keyArray, key.replace(":", ""))) {
-                                        keyArray.push(key.replace(":", ""));
+                                    !Ext.Array.contains(keyArray, splitArr[1] + "." + key.replace(":", ""))) {
+                                        keyArray.push(splitArr[1] + "." + key.replace(":", ""));
                                         keyIndexArray.push(i);
                                 }
                                 

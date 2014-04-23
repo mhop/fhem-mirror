@@ -527,7 +527,7 @@ Ext.define('FHEM.view.LineChartPanel', {
                             allowBlank: false,
                             disabled: true,
                             labelWidth: 90,
-                            inputWidth: 110,
+                            inputWidth: 190,
                             store: Ext.create('FHEM.store.ReadingsStore', {
                                 queryMode: 'remote',
                                 proxy: {
