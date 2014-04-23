@@ -7,7 +7,7 @@
 #       IMPULS, AC (KlikAanKlikUit, NEXA, CHACON, HomeEasy UK),
 #       HomeEasy EU, ANSLUT, Ikea Koppla
 #
-#     Copyright (C) 2012,2013 by Willi Herzig
+#     Copyright (C) 2012-2014 by Willi Herzig (Willi.Herzig@gmail.com)
 #
 #     This file is part of fhem.
 #
@@ -52,6 +52,9 @@ my %light_device_codes = (	# HEXSTRING => "NAME", "name of reading",
 	0x1005 => [ "IMPULS", "light"],
 	0x1006 => [ "RISINGSUN", "light"],
 	0x1007 => [ "PHILIPS_SBC", "light"],
+	0x1008 => [ "ENER010", "light"], # Energenie ENER010: untested
+	0x1009 => [ "ENER5", "light"], # Energenie 5-gang: untested
+	0x100A => [ "COCO_GDR2", "light"], # COCO GDR2-2000R: untestedCOCO
 	# 0x11: Lighting2
 	0x1100 => [ "AC", "light"],
 	0x1101 => [ "HOMEEASY", "light"],
@@ -64,9 +67,27 @@ my %light_device_codes = (	# HEXSTRING => "NAME", "name of reading",
 	0x1400 => [ "LIGHTWAVERF", "light"], # LightwaveRF
 	0x1401 => [ "EMW100", "light"], # EMW100
 	0x1402 => [ "BBSB", "light"], # BBSB
+	0x1403 => [ "MDREMOTE", "light"], # MDREMOTE LED dimmer
+	0x1404 => [ "RSL2", "light"], # Conrad RSL2
+	0x1405 => [ "LIVOLO", "light"], # Livolo
 	0x1406 => [ "TRC02", "light"], # RGB TRC02
 	# 0x15: Lighting6
 	0x1500 => [ "BLYSS", "light"], # Blyss
+	# 0x16: Chime
+	0x1600 => [ "BYRONSX", "light"], # Byron SX
+	# 0x17: Fan
+	0x1700 => [ "SIEMENS_SF01", "light"], # Siemens SF01
+	# 0x18: Curtain1
+	0x1800 => [ "HARRISON", "light"], # Harrison Curtain
+	# 0x19: Blinds1
+	0x1900 => [ "ROLLER_TROL", "light"], # Roller Trol
+	0x1901 => [ "HASTA_OLD", "light"], # Hasta old
+	0x1902 => [ "AOK_RF01", "light"], # A-OK RF01
+	0x1903 => [ "AOK_AC114", "light"], # A-OK AC114
+	0x1904 => [ "RAEX_YR1326", "light"], # Raex YR1326
+	0x1905 => [ "MEDIA_MOUNT", "light"], # Media Mount
+	0x1906 => [ "DC106", "light"], # DC/RMF/Yooda
+	0x1907 => [ "FOREST", "light"], # Forest
 );
 
 my %light_device_commands = (	# HEXSTRING => commands
@@ -79,6 +100,9 @@ my %light_device_commands = (	# HEXSTRING => commands
 	0x1005 => [ "off", "on"], # IMPULS
 	0x1006 => [ "off", "on"], # RisingSun
 	0x1007 => [ "off", "on", "", "", "", "all_off", "all_on"], # Philips SBC
+	0x1008 => [ "off", "on", "", "", "", "all_off", "all_on"], # Energenie ENER010
+	0x1009 => [ "off", "on"], # Energenie 5-gang
+	0x100A => [ "off", "on"], # COCO GDR2-2000R
 	# 0x11: Lighting2
 	0x1100 => [ "off", "on", "level", "all_off", "all_on", "all_level"], # AC
 	0x1101 => [ "off", "on", "level", "all_off", "all_on", "all_level"], # HOMEEASY
@@ -92,9 +116,27 @@ my %light_device_commands = (	# HEXSTRING => commands
 	0x1400 => [ "off", "on", "all_off", "mood1", "mood2", "mood3", "mood4", "mood5", "reserved1", "reserved2", "unlock", "lock", "all_lock", "close", "stop", "open", "level"], # LightwaveRF, Siemens
 	0x1401 => [ "off", "on", "learn"], # EMW100 GAO/Everflourish
 	0x1402 => [ "off", "on", "all_off", "all_on"], # BBSB new types
+	0x1403 => [ "power", "light", "bright", "dim", "100", "50", "25", "mode+", "speed-", "speed+", "mode-"], # MDREMOTE
+	0x1404 => [ "off", "on", "all_off", "all_on"], # Conrad RSL
+	0x1405 => [ "all_off", "on_off", "dim+", "dim-"], # Livolo
 	0x1406 => [ "off", "on", "bright", "dim", "vivid", "pale", "color"], # TRC02
 	# 0x15: Lighting6
-	0x1500 => [ "off", "on", "all_off", "all_on"], # Blyss
+	0x1500 => [ "on", "off", "all_on", "all_off"], # Blyss
+	# 0x16: Chime
+	0x1600 => [ "", "tubular3_1", "solo1", "bigben1", "", "tubular2_1", "tubular2_2", "", "", "solo2", " ", "", "", "tubular3_2"], # Byron SX
+	# 0x17: Fan
+	0x1700 => [ "", "timer", "-", "learn", "+", "confirm", "light", "on", "off"], # Siemens SF01
+	# 0x18: Curtain1
+	0x1800 => [ "open", "close", "stop", "program"], # Harrison Curtain
+	# 0x19: Blinds1
+	0x1900 => [ "open", "close", "stop", "confirm_pair", "set_limit"], # Roller Trol
+	0x1901 => [ "open", "close", "stop", "confirm_pair", "set_limit"], # Hasta old
+	0x1902 => [ "open", "close", "stop", "confirm_pair"], # A-OK RF01
+	0x1903 => [ "open", "close", "stop", "confirm_pair"], # A-OK AC114
+	0x1904 => [ "open", "close", "stop", "confirm_pair", "set_upper_limit", "set_lower_limit", "delete_limits", "change_dir", "left", "right"], # Raex YR1326
+	0x1905 => [ "down", "up", "stop"], # Media Mount
+	0x1906 => [ "open", "close", "stop", "confirm"], # DC/RMF/Yooda
+	0x1907 => [ "open", "close", "stop", "confirm_pair"], # Forest
 );
 
 my %light_device_c2b;        # DEVICE_TYPE->hash (reverse of light_device_codes)
@@ -108,7 +150,7 @@ TRX_LIGHT_Initialize($)
     $light_device_c2b{$light_device_codes{$k}->[0]} = $k;
   }
 
-  $hash->{Match}     = "^..(10|11|12|13|14).*";
+  $hash->{Match}     = "^..(10|11|12|13|14|15|16|17|18|19).*";
   $hash->{SetFn}     = "TRX_LIGHT_Set";
   $hash->{DefFn}     = "TRX_LIGHT_Define";
   $hash->{UndefFn}   = "TRX_LIGHT_Undef";
@@ -389,6 +431,58 @@ TRX_LIGHT_Set($@)
 	} 
   	Log3 $name, 5, "TRX_LIGHT_Set() lighting5 name=$name device_type=$device_type, deviceid=$deviceid command=$command";
   	Log3 $name, 5, "TRX_LIGHT_Set() lighting5 hexline=$hex_prefix$hex_command";
+ } elsif ($protocol_type == 0x16) {
+	# Chime
+  	if (uc($deviceid) =~ /^[0-9A-F][0-9A-F]$/ ) {
+		;
+  	} else {
+		Log3 $name, 1, "TRX_LIGHT_Set() chime wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
+		return "error set name=$name  deviceid=$deviceid";
+  	}
+  	$hex_prefix = sprintf "0716";
+  	$hex_command = sprintf "%02x%02x%s%02xx00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd; 
+  	Log3 $name, 5, "TRX_LIGHT_Set() chime name=$name device_type=$device_type, deviceid=$deviceid command=$command";
+  	Log3 $name, 5, "TRX_LIGHT_Set() chime hexline=$hex_prefix$hex_command";
+ } elsif ($protocol_type == 0x17) {
+	# fan
+  	if (uc($deviceid) =~ /^[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]$/ ) {
+		;
+  	} else {
+		Log3 $name, 1, "TRX_LIGHT_Set() fan wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
+		return "error set name=$name  deviceid=$deviceid";
+  	}
+  	$hex_prefix = sprintf "0717";
+  	$hex_command = sprintf "%02x%02x%s%02xx00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd; 
+  	Log3 $name, 5, "TRX_LIGHT_Set() fan name=$name device_type=$device_type, deviceid=$deviceid command=$command";
+  	Log3 $name, 5, "TRX_LIGHT_Set() fan hexline=$hex_prefix$hex_command";
+ } elsif ($protocol_type == 0x18) {
+	# curtain1
+  	my $house;
+  	my $unit;
+  	if ($deviceid =~ /(.)(.*)/ ) {
+		$house = ord("$1");
+		$unit = $2;
+  	} else {
+		Log3 $name, 1, "TRX_LIGHT_Set() curtain1 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
+		return "error set name=$name  deviceid=$deviceid";
+  	}
+
+  	$hex_prefix = sprintf "0718";
+  	$hex_command = sprintf "%02x%02x%02x%02x%02x00", $device_type_num & 0xff, $seqnr, $house, $unit, $cmnd; 
+  	Log3 $name, 5, "TRX_LIGHT_Set() curtain1 name=$name device_type=$device_type, deviceid=$deviceid house=$house, unit=$unit command=$command";
+  	Log3 $name, 5,"TRX_LIGHT_Set curtain1 hexline=$hex_prefix$hex_command";
+ } elsif ($protocol_type == 0x19) {
+	# Blinds1
+  	if (uc($deviceid) =~ /^[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]$/ ) {
+		;
+  	} else {
+		Log3 $name, 1, "TRX_LIGHT_Set() Blinds1 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
+		return "error set name=$name  deviceid=$deviceid";
+  	}
+  	$hex_prefix = sprintf "0919";
+  	$hex_command = sprintf "%02x%02x%s%02x00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd; 
+  	Log3 $name, 5, "TRX_LIGHT_Set() Blinds1 name=$name device_type=$device_type, deviceid=$deviceid command=$command";
+  	Log3 $name, 5, "TRX_LIGHT_Set() Blinds1 hexline=$hex_prefix$hex_command";
   } else {
 	return "No set implemented for $device_type . Unknown protocol type";	
   }
@@ -434,11 +528,10 @@ TRX_LIGHT_Define($$)
   $devicelog = $a[4] if (int(@a) > 4);
   $commandcodes = $a[5] if ($type eq "PT2262" && int(@a) > 5);
 
-  if ($type ne "X10" && $type ne "ARC" && $type ne "MS14A" && $type ne "AB400D" && $type ne "WAVEMAN" && $type ne "EMW200" && $type ne "IMPULS" && $type ne "RISINGSUN" && $type ne "PHILIPS_SBC" && $type ne "AC" && $type ne "HOMEEASY" && $type ne "ANSLUT" && $type ne "KOPPLA" && $type ne "LIGHTWAVERF" && $type ne "EMW100" && $type ne "BBSB" && $type ne "TRC02" && $type ne "PT2262") {
+  if ($type ne "X10" && $type ne "ARC" && $type ne "MS14A" && $type ne "AB400D" && $type ne "WAVEMAN" && $type ne "EMW200" && $type ne "IMPULS" && $type ne "RISINGSUN" && $type ne "PHILIPS_SBC" && $type ne "AC" && $type ne "HOMEEASY" && $type ne "ANSLUT" && $type ne "KOPPLA" && $type ne "LIGHTWAVERF" && $type ne "EMW100" && $type ne "BBSB" && $type ne "TRC02" && $type ne "PT2262" && $type ne "ENER010" && $type ne "ENER5" && $type ne "COCO_GDR2" && $type ne "MDREMOTE" && $type ne "RSL2" && $type ne "LIVOLO" && $type ne "BLYSS" && $type ne "BYRONSX" && $type ne "SIEMENS_SF01" && $type ne "HARRISON" && $type ne "ROLLER_TROL" && $type ne "HASTA_OLD" && $type ne "AOK_RF01" && $type ne "AOK_AC114" && $type ne "RAEX_YR1326" && $type ne "MEDIA_MOUNT" && $type ne "DC106" && $type ne "FOREST") {
   	Log3 $name, 1,"TRX_LIGHT_Define() wrong type: $type";
   	return "TRX_LIGHT: wrong type: $type";
   }
-
   my $my_type;
   if ($type eq "MS14A") {
 	$my_type = "X10"; # device will be received as X10	
@@ -519,7 +612,7 @@ sub TRX_LIGHT_parse_X10 ($$)
 
   my $device;
   my $data;
-  if ($type == 0x10) {
+  if ($type == 0x10 || $type == 0x18) {
   	my $dev_first = "?";
 
   	my %x10_housecode =
@@ -561,6 +654,12 @@ sub TRX_LIGHT_parse_X10 ($$)
   	$data = $bytes->[7];
   } elsif ($type == 0x15) {
   	$device = sprintf '%02x%02x%c%d', $bytes->[3], $bytes->[4], $bytes->[5], $bytes->[6];
+  	$data = $bytes->[7];
+  } elsif ($type == 0x17) { # Fan
+  	$device = sprintf '%02x%02x%02x', $bytes->[3], $bytes->[4], $bytes->[5];
+  	$data = $bytes->[6];
+  } elsif ($type == 0x19) { # Blinds1
+  	$device = sprintf '%02x%02x%02x%02x', $bytes->[3], $bytes->[4], $bytes->[5], $bytes->[6];
   	$data = $bytes->[7];
   } else {
 	$error = sprintf "TRX_LIGHT: wrong type=%02x", $type;
@@ -873,7 +972,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     <code>&lt;type&gt;</code>
     <ul>
       specifies the type of the device: <br>
-    X10 lighting devices:
+      Lighting devices:
         <ul>
           <li> <code>MS14A</code> (X10 motion sensor. Reports [normal|alert] on the first deviceid (motion sensor) and [on|off] for the second deviceid (light sensor)) </li>
           <li> <code>X10</code> (All other x10 devices. Report [off|on|dim|bright|all_off|all_on] on both deviceids.)</li>
@@ -884,11 +983,32 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
           <li> <code>IMPULS</code> (IMPULS devices. Report [off|on].)</li>
           <li> <code>RISINGSUN</code> (RisingSun devices. Report [off|on].)</li>
           <li> <code>PHILIPS_SBC</code> (Philips SBC devices. Send [off|on|all_off|all_on].)</li>
+          <li> <code>ENER010</code> (Energenie ENER010 devices. deviceid: [A-P][1-4]. Send [off|on|all_off|all_on].)</li>
+          <li> <code>ENER5</code> (Energenie 5-gang devices. deviceid: [A-P][1-10]. Send [off|on].)</li>
+          <li> <code>COCO_GDR2</code> (ECOCO GDR2-2000R devices. deviceid: [A-D][1-4]. Send [off|on].)</li>
           <li> <code>AC</code> (AC devices. AC is the protocol used by different brands with units having a learning mode button: KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. Report [off|on|level &lt;NUM&gt;|all_off|all_on|all_level &lt;NUM&gt;].)</li>
           <li> <code>HOMEEASY</code> (HomeEasy EU devices. Report [off|on|level|all_off|all_on|all_level].)</li>
           <li> <code>ANSLUT</code> (Anslut devices. Report [off|on|level|all_off|all_on|all_level].)</li>
-          <li> <code>PT2262</code> (Devices using PT2262/PT2272 (coder/decoder) chip. To use this enable Lighting4 in RFXmngr. Please note that this disables ARC. For more information see <a href="http://www.fhemwiki.de/wiki/RFXtrx#PT2262_empfangen_und_senden_mit_TRX_LIGHT.pm">FHEM-Wiki</a>
-)</li>
+          <li> <code>PT2262</code> (Devices using PT2262/PT2272 (coder/decoder) chip. To use this enable Lighting4 in RFXmngr. Please note that this disables ARC. For more information see <a href="http://www.fhemwiki.de/wiki/RFXtrx#PT2262_empfangen_und_senden_mit_TRX_LIGHT.pm">FHEM-Wiki</a>)</li>
+	  <li> <code>LIGHTWAVERF</code> (LightwaveRF devices. Commands ["off", "on", "all_off", "mood1", "mood2", "mood3", "mood4", "mood5", "reserved1", "reserved2", "unlock", "lock", "all_lock", "close", "stop", "open", "level"].)</li>
+	  <li> <code>EMW100</code> (EMW100 devices. Commands ["off", "on", "learn"].)</li>
+	  <li> <code>BBSB</code> (BBSB devices. Commands ["off", "on", "all_off", "all_on"].)</li>
+	  <li> <code>MDREMOTE</code> (MDREMOTE LED dimmer devices. Commands ["power", "light", "bright", "dim", "100", "50", "25", "mode+", "speed-", "speed+", "mode-"].)</li>
+	  <li> <code>RSL2</code> (Conrad RSL2 devices. Commands ["off", "on", "all_off", "all_on"].)</li>
+	  <li> <code>LIVOLO</code> (Livolo devices. Commands ["all_off", "on_off", "dim+", "dim-"].)</li>
+	  <li> <code>TRC02</code> (RGB TRC02 devices. Commands ["off", "on", "bright", "dim", "vivid", "pale", "color"].)</li>
+	  <li> <code>BLYSS</code> (Blyss devices. deviceid: [A-P][1-5]. Commands ["off", "on", "all_off", "all_on"].)</li>
+	  <li> <code>BYRONSX</code> (Byron SX chime devices. deviceid: 00-FF. Commands [ "tubular3_1", "solo1", "bigben1", "tubular2_1", "tubular2_2", "solo2", "tubular3_2"].)</li>
+	  <li> <code>SIEMENS_SF01</code> (Siemens SF01 devices. deviceid: 000000-007FFF. Commands [ "timer", "-", "learn", "+", "confirm", "light", "on", "off" ].)</li>
+	  <li> <code>HARRISON</code> (Harrison curtain devices. deviceid: 00-FF. Commands [ "open", "close", "stop", "program" ].)</li>
+	  <li> <code>ROLLER_TROL</code> (Roller Trol blind devices. deviceid: 00000100-00FFFF0F. Commands [ "open", "close", "stop", "confirm_pair", "set_limit" ].)</li>
+	  <li> <code>HASTA_OLD</code> (Hasta old blind devices. deviceid: 00000100-00FFFF0F. Commands [ "open", "close", "stop", "confirm_pair", "set_limit" ].)</li>
+	  <li> <code>AOK_RF01</code> (A-OK RF01 blind devices. deviceid: 00000100-FFFFFF0F. Commands [ "open", "close", "stop", "confirm_pair" ].)</li>
+	  <li> <code>AOK_AC114</code> (A-OK AC114 blind devices. deviceid: 00000100-FFFFFF0F. Commands [ "open", "close", "stop", "confirm_pair" ].)</li>
+	  <li> <code>RAEX_YR1326</code> (Raex YR1326 blind devices. deviceid: 00000100-FFFFFF0F. Commands [ "open", "close", "stop", "confirm_pair", "set_upper_limit", "set_lower_limit", "delete_limits", "change_dir", "left", "right"].)</li>
+	  <li> <code>MEDIA_MOUNT</code> (Media Mount blind devices. deviceid: 00000100-FFFFFF0F. Commands [ "down", "up", "stop" ].)</li>
+	  <li> <code>DC106</code> (DC/RMF/Yooda blind devices. deviceid: 00000100-FFFFFFF0. Commands [ "open", "close", "stop", "confirm" ].)</li>
+	  <li> <code>FOREST</code> (Forest blind devices. deviceid: 00000100-FFFFFFF0. Commands [ "open", "close", "stop", "confirm_pair" ].)</li>
         </ul>
     </ul>
     <br>
@@ -898,6 +1018,9 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     A lighting device normally has a house code A..P followed by a unitcode 1..16 (example "B1").<br>
     For AC, HomeEasy EU and ANSLUT it is a 10 Character-Hex-String for the deviceid, consisting of <br>
 	- unid-id: 8-Char-Hex: 00000001 to 03FFFFFF<br>
+	- unit-code: 2-Char-Hex: 01 to 10  <br>
+    For LIGHTWAVERF, EMW100, BBSB, MDREMOTE, RSL2, LIVOLO and TRC02 it is a 8 Character-Hex-String for the deviceid, consisting of <br>
+	- unid-id: 8-Char-Hex: 000001 to FFFFFF<br>
 	- unit-code: 2-Char-Hex: 01 to 10  <br>
     </ul>
     <br>
