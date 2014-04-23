@@ -226,6 +226,25 @@ sub CommandConfigdb($$) {
 			return _cfgDB_Filelist;
 		}
 
+		when ('filemove') {
+			return "\n Syntax: configdb filemove <pathToFile>" if @a != 2;
+			my $filename;
+			if($param1 =~ m,^[./],) {
+				$filename = $param1;
+			} else {
+				$filename  = $attr{global}{modpath};
+				$filename .= "/$param1";
+			}
+			if ( -r $filename ) {
+				$ret  = _cfgDB_Fileimport ($filename,1);
+				$ret .= "\nFile $filename deleted from local filesystem.";
+			} elsif ( -e $filename) {
+				$ret = "\n Read error on file $filename";
+			} else {
+				$ret = "\n File $filename not found.";
+			}
+		}
+
 		when ('fileshow') {
 			my $r = _cfgDB_Readfile($param1);
 			return ($r)?$r:"File $param1 not found in database.";
@@ -307,7 +326,8 @@ sub CommandConfigdb($$) {
 		<ul><br/>
 			Currently the fhem modules<br/>
 			<br/>
-						<li>02_RSS.pm</li>
+			<li>02_RSS.pm</li>
+			<li>93_DbLog.pm</li>
 			<li>95_holiday.pm</li>
 			<li>98_SVG.pm</li>
 			<br/>
@@ -477,7 +497,7 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 <br/>
 
 		<li><code>configdb fileexport &lt;targetFilename&gt;</code></li><br/>
-			Exports specified fhem file from database into filesystem.
+			Exports specified fhem file from database into filesystem.<br/>
 			Example:<br/>
 			<br/>
 			<code>configdb fileexport FHEM/99_myUtils.pm</code><br/>
@@ -485,7 +505,7 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 <br/>
 
 		<li><code>configdb fileimport &lt;sourceFilename&gt;</code></li><br/>
-			Imports specified fhem file from from filesystem into database.
+			Imports specified fhem file from from filesystem into database.<br/>
 			Example:<br/>
 			<br/>
 			<code>configdb fileimport FHEM/99_myUtils.pm</code><br/>
@@ -494,6 +514,15 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 
 		<li><code>configdb filelist</code></li><br/>
 			Show a list with all filenames stored in database.<br/>
+			<br/>
+<br/>
+
+		<li><code>configdb filemove &lt;sourceFilename&gt;</code></li><br/>
+			Imports specified fhem file from from filesystem into database and<br/>
+			deletes the file from local filesystem afterwards.<br/>
+			Example:<br/>
+			<br/>
+			<code>configdb filemove FHEM/99_myUtils.pm</code><br/>
 			<br/>
 <br/>
 
@@ -604,6 +633,7 @@ Ver 0 always indicates the currently running configuration.<br/>
 			Momentan verwenden die Module<br/>
 			<br/>
 			<li>02_RSS.pm</li>
+			<li>93_DbLog.pm</li>
 			<li>95_holiday.pm</li>
 			<li>98_SVG.pm</li>
 			<br/>
@@ -785,7 +815,7 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 <br/>
 
 		<li><code>configdb fileimport &lt;quellDatei&gt;</code></li><br/>
-			Liest die angegbene Datei aus dem Dateisystem und schreibt den Inhalt in die Datenbank.
+			Liest die angegbene Datei aus dem Dateisystem und schreibt den Inhalt in die Datenbank.<br/>
 			Beispiel:<br/>
 			<br/>
 			<code>configdb fileimport FHEM/99_myUtils.pm</code><br/>
@@ -794,6 +824,15 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 
 		<li><code>configdb filelist</code></li><br/>
 			Liefert eine Liste mit allen Namen der gespeicherten Dateien.<br/>
+			<br/>
+<br/>
+
+		<li><code>configdb filemove &lt;quellDatei&gt;</code></li><br/>
+			Liest die angegbene Datei aus dem Dateisystem und schreibt den Inhalt in die Datenbank.<br/>
+			Anschliessend wird die Datei aus dem lokalen Dateisystem gel&ouml;scht.<br/>
+			Beispiel:<br/>
+			<br/>
+			<code>configdb filemove FHEM/99_myUtils.pm</code><br/>
 			<br/>
 <br/>
 
