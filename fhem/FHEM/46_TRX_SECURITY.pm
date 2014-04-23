@@ -50,9 +50,11 @@ my %security_device_codes = (	# HEXSTRING => "NAME", "name of reading",
 	0x2002 => [ "KR18", "key" ],
 	0x2003 => [ "KD101", "smoke" ],
 	0x2004 => [ "VISONIC_WINDOW", "window" ],
-	0x2005 => [ "VISONIC_REMOTE", "key" ],
-	0x2006 => [ "VISONIC_WINDOW", "window" ],
-	0x2007 => [ "Meiantech", "alarm" ],
+	0x2005 => [ "VISONIC_MOTION", "motion" ],
+	0x2006 => [ "VISONIC_REMOTE", "key" ],
+	0x2007 => [ "VISONIC_WINDOW_AUX", "window" ],
+	0x2008 => [ "MEIANTECH", "alarm" ],
+	0x2009 => [ "SA30", "alarm" ],
 );
 
 my %security_device_commands = (	# HEXSTRING => commands
@@ -60,7 +62,12 @@ my %security_device_commands = (	# HEXSTRING => commands
 	0x2000 => [ "Closed", "", "Open", "", "", "", ""], # DS10A
 	0x2001 => [ "", "", "", "", "alert", "normal", ""], # MS10A
 	0x2002 => [ "", "", "", "", "", "", "Panic", "EndPanic", "", "Arm_Away", "Arm_Away_Delayed", "Arm_Home", "Arm_Home_Delayed", "Disarm"], # KR18
-	0x2003 => [ "", "", "", "", "", "", "alert", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "pair",], # KD101
+	0x2003 => [ "", "", "", "", "", "", "alert", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "pair"], # KD101
+	0x2004 => [ "normal", "", "alert"], #VISONIC_WINDOW
+	0x2005 => [ "", "", "", "", "motion", "nomotion", "alert"], #VISONIC_MOTION
+	0x2008 => [  "", "", "", "", "", "", "Panic", "", "IR", "Arm_Away", "", "Arm_Home", "", "Disarm"], #MEIANTECH
+ 	0x2009 => [ "", "", "", "", "", "", "alert", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "pair"], #SA30
+
 );
 
 my %security_device_c2b;        # DEVICE_TYPE->hash (reverse of security_device_codes)
@@ -159,11 +166,11 @@ TRX_SECURITY_Set($@)
                 $id2 = $2;
                 $id3 = $3;
   	} else {
-		Log3 $name, 1,"TRX_SECURITY_Set() lightning1 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
+		Log3 $name, 1,"TRX_SECURITY_Set() security1 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
 		return "error set name=$name  deviceid=$deviceid";
   	}
 
-	# lightning1
+	# security1
   	$hex_prefix = sprintf "0820";
   	$hex_command = sprintf "%02x%02x%02s%02s%02s%02x00", $device_type_num & 0xff, $seqnr, $id1, $id2, $id3, $cmnd; 
   	Log3 $name, 5,"TRX_SECURITY_Set() name=$name device_type=$device_type, deviceid=$deviceid id1=$id1, id2=$id2, id3=$id3, command=$command";
@@ -238,7 +245,7 @@ TRX_SECURITY_Define($$)
   }
   my $device_name = "TRX".$DOT.$my_type.$DOT.$deviceid;
 
-  if ($type ne "DS10A" && $type ne "SD90" && $type ne "MS10A" && $type ne "MS14A" && $type ne "KR18" && $type ne "KD101" && $type ne "VISONIC_WINDOW" & $type ne "VISONIC_MOTION" & $type ne "VISONIC_REMOTE" && $type ne "GD18" && $type ne "WD18") {
+  if ($type ne "DS10A" && $type ne "SD90" && $type ne "MS10A" && $type ne "MS14A" && $type ne "KR18" && $type ne "KD101" && $type ne "VISONIC_WINDOW" && $type ne "VISONIC_MOTION" && $type ne "VISONIC_WINDOW_AUX" && $type ne "VISONIC_REMOTE" && $type ne "MEIANTECH" && $type ne "SA30" && $type ne "GD18" && $type ne "WD18") {
   	Log3 $hash, 1,"TRX_SECURITY_Define() wrong type: $type";
   	return "TRX_SECURITY: wrong type: $type";
   }
@@ -305,7 +312,7 @@ sub TRX_SECURITY_parse_X10Sec($$) {
 	0x04 => [ "VISONIC_WINDOW", "window" ],	# Visonic PowerCode door/window sensor – primary contact (with alive packets)
 	0x05 => [ "VISONIC_MOTION", "motion" ],	# Visonic PowerCode motion sensor (with alive packets)
 	0x06 => [ "VISONIC_REMOTE", "key" ],	# Visonic CodeSecure (no alive packets)
-	0x07 => [ "VISONIC_WINDOW", "window" ],	# Visonic PowerCode door/window sensor – auxiliary contact (no alive packets)
+	0x07 => [ "VISONIC_WINDOW_AUX", "window" ],	# Visonic PowerCode door/window sensor – auxiliary contact (no alive packets)
   );
 
   my $dev_type;
@@ -443,7 +450,7 @@ sub TRX_SECURITY_parse_X10Sec($$) {
   } 
 
   $current = $command;
-  if (($device_type eq "DS10A") || ($device_type eq "VISONIC_WINDOW")) {
+  if (($device_type eq "DS10A") || ($device_type eq "VISONIC_WINDOW") || ($device_type eq "VISONIC_WINDOW_AUX")) {
 	$current = "Error";
 	$current = "Open" if ($command eq "alert");
 	$current = "Closed" if ($command eq "normal");
