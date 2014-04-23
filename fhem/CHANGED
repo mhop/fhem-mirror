@@ -1,6 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: SYSMON: many FritzBox specific readings: 
+             wlan_state, wlan_guest_state, internet_ip, internet_state, 
+             night_time_ctrl, num_new_messages, fw_version_info
   - feature: configDB: added command fileshow
   - feature: configDB: added commands filelist and filedelete
   - feature: configDB: added commands fileimport and fileexport
