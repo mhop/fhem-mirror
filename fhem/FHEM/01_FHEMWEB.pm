@@ -497,7 +497,7 @@ FW_answerCall($)
     }
     my $filter = $me->{inform}{filter};
     $filter = "NAME=.*" if($filter eq "room=all");
-    $filter = "room!=.*" if($filter eq "room=Unsorted");
+    $filter = "room!=.+" if($filter eq "room=Unsorted");
 
     my %h = map { $_ => 1 } devspec2array($filter);
     $me->{inform}{devices} = \%h;
