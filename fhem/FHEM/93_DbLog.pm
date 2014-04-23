@@ -1,3 +1,4 @@
+
 ##############################################
 # $Id$
 #
@@ -68,31 +69,33 @@ sub DbLog_Define($@)
 
   return "Can't connect to database." if(!DbLog_Connect($hash));
 
-#  $hash->{STATE} = "active";
   readingsSingleUpdate($hash, 'state', 'active', 1);
 
   return undef;
 }
 
 #####################################
-sub DbLog_Undef($$)
-{
+sub DbLog_Undef($$) {
   my ($hash, $name) = @_;
+
   my $dbh= $hash->{DBH};
   $dbh->disconnect() if(defined($dbh));
+  
   return undef;
 }
 
 #####################################
-sub DbLog_Shutdown($)
-{  my ($hash) = @_;
- my $name = $hash->{NAME};
- my $shutdownWait = AttrVal($name,"shutdownWait",undef);
- if(defined($shutdownWait)) {
-   Log3($name, 2, "DbLog $name waiting for shutdown");
-   sleep($shutdownWait);
- }
- return undef; }
+sub DbLog_Shutdown($) {  
+  my ($hash) = @_;
+  
+  my $name = $hash->{NAME};
+  my $shutdownWait = AttrVal($name,"shutdownWait",undef);
+  if(defined($shutdownWait)) {
+    Log3($name, 2, "DbLog $name waiting for shutdown");
+    sleep($shutdownWait);
+  }
+  return undef; 
+}
 
 
 ################################################################
@@ -126,13 +129,21 @@ sub DbLog_ParseEvent($$$)
 {
   my ($device, $type, $event)= @_;
   my @result;
+  my $reading;
+  my $value;
+  my $unit;
 
-  # split the event into reading and argument
+  # split the event into reading, value and unit
   # "day-temp: 22.0 (Celsius)" -> "day-temp", "22.0 (Celsius)"
   my @parts   = split(/: /,$event);
-  my $reading = shift @parts;
-  my $value   = join(": ", @parts);
-  my $unit    = "";
+  $reading = shift @parts;
+  if(@parts == 2) { 
+    $value = $parts[0];
+    $unit  = $parts[1];
+  } else {
+    $value   = join(": ", @parts);
+    $unit    = "";
+  } 
 
   #default
   if(!defined($reading)) { $reading = ""; }
@@ -142,9 +153,12 @@ sub DbLog_ParseEvent($$$)
     $value= $event;
   }
 
-  #TODO: globales abfangen von 
+  #globales Abfangen von 
   # - temperature
   # - humidity
+  if   ($reading =~ m(^temperature)) { $unit= "Â°C"; } # wenn reading mit temperature beginnt
+  elsif($reading =~ m(^humidity)) { $unit= "%"; }
+
 
   # the interpretation of the argument depends on the device type
   # EMEM, M232Counter, M232Voltage return plain numbers
@@ -567,13 +581,26 @@ sub DbLog_Connect($)
   my ($hash)= @_;
 
   my $configfilename= $hash->{CONFIGURATION};
-  if(!open(CONFIG, $configfilename)) {
-    Log3 $hash->{NAME}, 1, "Cannot open database configuration file $configfilename.";
-    return 0; }
-  my @config=<CONFIG>;
-  close(CONFIG);
-
-  my %dbconfig;
+  my @config;
+  my %dbconfig; 
+  
+  if(configDBUsed()) {
+    # Verwendung der configDB anstatt fhem.cfg
+    my $c  = _cfgDB_Readfile($configfilename);
+    if(! $c) {
+      Log3 $hash->{NAME}, 1, "Cannot open database configuration file $configfilename.";
+      return 0;
+    }
+    @config = split(/\n/,$c);
+  } else {
+    if(!open(CONFIG, $configfilename)) {
+      Log3 $hash->{NAME}, 1, "Cannot open database configuration file $configfilename.";
+      return 0; 
+    }
+    @config=<CONFIG>;
+    close(CONFIG);
+  }
+ 
   eval join("", @config);
 
   my $dbconn= $dbconfig{connection};
@@ -639,8 +666,7 @@ sub DbLog_Connect($)
 # param2: pointer : DBFilehandle
 # param3: string  : SQL
 ################################################################
-sub
-DbLog_ExecSQL1($$$)
+sub DbLog_ExecSQL1($$$)
 {
   my ($hash,$dbh,$sql)= @_;
 
@@ -652,8 +678,7 @@ DbLog_ExecSQL1($$$)
   return $sth;
 }
 
-sub
-DbLog_ExecSQL($$)
+sub DbLog_ExecSQL($$)
 {
   my ($hash,$sql)= @_;
   Log3 $hash->{NAME}, 4, "Executing $sql";
@@ -1887,7 +1912,7 @@ sub dbReadings($@) {
       <ul>
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature</code></li>
         <li><code>get myDbLog current ALL - - %:temperature</code></li><br>
-            Damit erhält man alle aktuellen Readings "temperature" von allen in der DB geloggten Devices.
+            Damit erh?lt man alle aktuellen Readings "temperature" von allen in der DB geloggten Devices.
             Achtung: bei Nutzung von Jokerzeichen auf die historyTabelle kann man sein FHEM aufgrund langer Laufzeit lahmlegen!
         <li><code>get myDbLog - - 2012-11-10_10 2012-11-10_20 KS300:temperature::int1</code><br>
            gibt Daten aus von 10Uhr bis 20Uhr am 10.11.2012</li>
