@@ -99,13 +99,16 @@ SVG_Set($@)
                  $hash->{GPLOTFILE} . ":".
                  $hash->{LOGFILE};
 
-  open(SFH, $srcName) || return "Can't open $srcName: $!";
-  open(DFH, ">$dstName") || return "Can't open $dstName: $!";
-  while(my $l = <SFH>) {
-    print DFH $l;
+  if(configDBUsed()) { # copy template.gplot inside configDB
+    _cfgDB_Writefile($dstName,_cfgDB_Readfile($srcName)); 
+  } else {
+    open(SFH, $srcName) || return "Can't open $srcName: $!";
+    open(DFH, ">$dstName") || return "Can't open $dstName: $!";
+    while(my $l = <SFH>) {
+      print DFH $l;
+    }
+    close(SFH); close(DFH);
   }
-  close(SFH); close(DFH);
-
   return undef;
 }
 
