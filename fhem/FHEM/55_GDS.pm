@@ -587,10 +587,11 @@ sub decodeCAPData($$){
 sub checkCAPValid($){
 	my ($expires) = @_;
 	my $valid = 0;
+	my $offset = ReadingsVal('gdsOffset','state',0);
 	$expires =~ s/T/ /;
 	$expires =~ s/\+/ \+/;
 	$expires = time_str2num($expires);
-	$valid = 1 if($expires gt time);
+	$valid = 1 if($expires gt (time-$offset));
 	return $valid;
 }
 
