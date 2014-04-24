@@ -130,7 +130,8 @@ sub _configdb_backup {
 sub CommandConfigdb($$) {
 	my ($cl, $param) = @_;
 
-	my @a = split(/ /,$param);
+#	my @a = split(/ /,$param);
+	my @a = split("[ \t][ \t]*", $param);
 	my ($cmd, $param1, $param2) = @a;
 	$cmd    = $cmd    ? $cmd    : "";
 	$param1 = $param1 ? $param1 : "";
