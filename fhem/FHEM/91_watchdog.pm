@@ -26,10 +26,21 @@ sub
 watchdog_Define($$)
 {
   my ($watchdog, $def) = @_;
-  my ($name, $type, $re1, $to, $re2, $command) = split("[ \t]+", $def, 6);
+  my ($name, $type, $re1, $to, $re2, $cmd) = split("[ \t]+", $def, 6);
   
-  return "Usage: define <name> watchdog <re1> <timeout> <re2> <command>"
-    if(!$command);
+
+  if(defined($watchdog->{TO})) { # modify
+    $re1 = $watchdog->{RE1} if(!defined($re1));
+    $to  = $watchdog->{TO}  if(!defined($to));
+    $re2 = $watchdog->{RE2} if(!defined($re2));
+    $cmd = $watchdog->{CMD} if(!defined($cmd));
+    $watchdog->{DEF} = "$re1 $to $re2 $cmd";
+
+  } else {
+    return "Usage: define <name> watchdog <re1> <timeout> <re2> <command>"
+      if(!$cmd);
+
+  }
 
   # Checking for misleading regexps
   eval { "Hallo" =~ m/^$re1$/ };
@@ -45,8 +56,7 @@ watchdog_Define($$)
   $watchdog->{RE1} = $re1;
   $watchdog->{RE2} = $re2;
   $watchdog->{TO}  = $to;
-  $watchdog->{CMD} = $command;
-
+  $watchdog->{CMD} = $cmd;
 
   if($re1 eq ".") {
     watchdog_Activate($watchdog)
@@ -215,6 +225,8 @@ watchdog_Undef($$)
           command once it has triggered (unless you restart fhem)</li>
       <li>a generic watchdog (one watchdog responsible for more devices) is
           currently not possible.</li>
+      <li>with modify all parameters are optional, and will not be changed if
+          not specified.</li>
     </ul>
 
     <br>
@@ -313,6 +325,9 @@ watchdog_Undef($$)
 
       <li>Ein generischer Watchdog (ein Watchdog, verantwortlich f&uuml;r
       mehrere Devices) ist derzeit nicht m&ouml;glich.</li>
+
+      <li>Bei modify sind alle Parameter optional, und werden nicht geaendert,
+      falls nicht spezifiziert.</li>
 
     </ul>
 
