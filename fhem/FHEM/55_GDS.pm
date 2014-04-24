@@ -584,10 +584,24 @@ sub decodeCAPData($$){
 	return;
 }
 
+# sub
+# _calctz($@)
+# {
+  # my ($nt,@lt) = @_;
+
+  # my $off = $lt[2]*3600+$lt[1]*60+$lt[0];
+  # $off = 12*3600-$off;
+  # $nt += $off;  # This is noon, localtime
+
+  # my @gt = gmtime($nt);
+
+  # return (12-$gt[2]);
+# }
+
 sub checkCAPValid($){
 	my ($expires) = @_;
 	my $valid = 0;
-	my $offset = ReadingsVal('gdsOffset','state',0);
+	my $offset = _calctz(time,localtime(time))*3600; # used from 99_SUNRISE_EL
 	$expires =~ s/T/ /;
 	$expires =~ s/\+/ \+/;
 	$expires = time_str2num($expires);
