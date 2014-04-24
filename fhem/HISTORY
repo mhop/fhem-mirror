@@ -565,3 +565,6 @@
 - Sun Mar 30 2014 (C-HERRMANN)
   - added new module 10_UNIRoll.pm
   
+- Sun Apr 24 2014 (kaihs)
+  - added new module 02_FRAMEBUFFER.pm
+  - added new module 51_TSL2561.pm

@@ -31,6 +31,7 @@ FHEM/00_THZ.pm               immiimmi             http://forum.fhem.de Sonstiges
 FHEM/00_TUL.pm               hotmaz               http://forum.fhem.de KNX/EIB
 FHEM/00_ZWDongle.pm          rudolfkoenig         http://forum.fhem.de ZWave
 FHEM/01_FHEMWEB.pm           rudolfkoenig         http://forum.fhem.de Frontends
+FHEM/02_FRAMEBUFFER.pm       kaihs                http://forum.fhem.de Frontends
 FHEM/02_HTTPSRV.pm           borisneubert         http://forum.fhem.de Frontends
 FHEM/02_RSS.pm               borisneubert         http://forum.fhem.de Frontends
 FHEM/09_BS.pm                borisneubert         http://forum.fhem.de SlowRF
@@ -130,6 +131,7 @@ FHEM/51_RPI_GPIO.pm          klausw               http://forum.fhem.de Einplatin
 FHEM/52_I2C_PCA9532          klausw               http://forum.fhem.de FHEM Developement/Sonstige Systeme
 FHEM/52_I2C_PCF8574          klausw               http://forum.fhem.de FHEM Developement/Sonstige Systeme
 FHEM/52_I2C_SHT21            klausw               http://forum.fhem.de FHEM Developement/Sonstige Systeme
+FHEM/52_I2C_TSL2561          kaihs                http://forum.fhem.de FHEM Developement/Sonstige Systeme
 FHEM/55_GDS.pm               betateilchen         http://forum.fhem.de Unterstuetzende Dienste
 FHEM/55_PIFACE.pm            klaus.schauer        http://forum.fhem.de Einplatinencomputer
 FHEM/55_weco.pm              betateilchen         http://forum.fhem.de Unterstuetzende Dienste
