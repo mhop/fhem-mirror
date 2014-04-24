@@ -90,7 +90,7 @@ sub WriteStatefile();
 sub XmlEscape($);
 sub addEvent($$);
 sub addToAttrList($);
-sub addToWritebuffer($$);
+sub addToWritebuffer($$@);
 sub attrSplit($);
 sub computeClientArray($$);
 sub concatc($$$);
@@ -600,10 +600,17 @@ while (1) {
         my $ret = syswrite($hash->{CD}, $wb);
         if(!$ret || $ret < 0) {
           Log 4, "Write error to $p, deleting $hash->{NAME}";
+          TcpServer_Close($hash);
           CommandDelete(undef, $hash->{NAME});
         } else {
           if($ret == length($wb)) {
             delete($hash->{$wbName});
+            if($hash->{WBCallback}) {
+              no strict "refs";
+              my $ret = &{$hash->{WBCallback}}($hash);
+              use strict "refs";
+              delete $hash->{WBCallback};
+            }
           } else {
             $hash->{$wbName} = substr($wb, $ret);
           }
@@ -3827,10 +3834,26 @@ Debug($) {
 }
 
 sub
-addToWritebuffer($$)
+addToWritebuffer($$@)
 {
-  my ($hash, $txt) = @_;
+  my ($hash, $txt, $callback) = @_;
 
+  if(defined($hash->{pid})) {  # Wont go to the main select in a forked process
+    my ($off, $len) = (0, length($txt));
+    while($off < $len) {
+      my $ret = syswrite($hash->{CD}, $txt, $len-$off, $off);
+      last if(!$ret || $ret <= 0);
+      $off += $ret;
+    }
+    if($callback) {
+      no strict "refs";
+      my $ret = &{$callback}($hash);
+      use strict "refs";
+    }
+    return;
+  }
+
+  $hash->{WBCallback} = $callback;
   if(!$hash->{$wbName}) {
     $hash->{$wbName} = $txt;
   } elsif(length($hash->{$wbName}) < 102400) {

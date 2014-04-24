@@ -69,9 +69,9 @@ use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by SVG
 use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by SVG
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 use vars qw(@FW_fhemwebjs);# List of fhemweb*js scripts to load
-use vars qw($FW_detail);   # currently selected device for detail view
-use vars qw($FW_cmdret);   # Returned data by the fhem call
-use vars qw($FW_room);      # currently selected room
+use vars qw($FW_detail);  # currently selected device for detail view
+use vars qw($FW_cmdret);  # Returned data by the fhem call
+use vars qw($FW_room);    # currently selected room
 use vars qw($FW_formmethod);
 use vars qw(%FW_visibleDeviceHash);
 
@@ -380,19 +380,25 @@ FW_Read($)
   my $expires = ($cacheable?
                         ("Expires: ".localtime($now+900)." GMT\r\n") : "");
   Log3 $FW_wname, 4, "$arg / RL:$length / $FW_RETTYPE / $compressed / $expires";
-  print $c "HTTP/1.1 200 OK\r\n",
-           "Content-Length: $length\r\n",
-           $expires, $compressed, $FW_headercors,
-           "Content-Type: $FW_RETTYPE\r\n\r\n",
-           $FW_RET;
+  $hash->{pid} = $pid if(defined($pid));
+  addToWritebuffer($hash, 
+           "HTTP/1.1 200 OK\r\n" .
+           "Content-Length: $length\r\n" .
+           $expires . $compressed . $FW_headercors .
+           "Content-Type: $FW_RETTYPE\r\n\r\n" .
+           $FW_RET, "FW_closeConn");
+}
 
+sub
+FW_closeConn($)
+{
+  my ($hash) = @_;
   # Needed for slow server+iPad/iPhone. Forum #20294
-  if(AttrVal($FW_wname, "closeConn", undef)) {
+  if(AttrVal($hash->{SNAME}, "closeConn", undef)) {
     TcpServer_Close($hash);
     delete($defs{$hash->{NAME}});
   }
-
-  exit if(defined($pid));
+  exit if(defined($hash->{pid}));
 }
 
 ###########################
@@ -926,7 +932,8 @@ FW_doDetail($)
   FW_makeTable("Readings", $d, $h->{READINGS});
 
   my $attrList = getAllAttr($d);
-  my $roomList = "multiple,".join(",", sort map { $_ =~ s/ /#/g ;$_} keys %FW_rooms);
+  my $roomList = "multiple,".join(",", 
+                sort map { $_ =~ s/ /#/g ;$_} keys %FW_rooms);
   $attrList =~ s/room /room:$roomList /;
   FW_makeSelect($d, "attr", $attrList,"attr");
 
