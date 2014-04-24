@@ -955,7 +955,6 @@ sub CUL_HM_Parse($$) {#########################################################
     }
     elsif(($mTp eq '02' &&$sType eq '01')||    # ackStatus
           ($mTp eq '10' &&$sType eq '06')){    # infoStatus
-      $chn = substr($p,2,2);
       my $dTemp = hex(substr($p,4,2))/2;
       $dTemp = ($dTemp < 6 )?'off':
                ($dTemp >30 )?'on' :sprintf("%0.1f", $dTemp);
@@ -1012,11 +1011,11 @@ sub CUL_HM_Parse($$) {#########################################################
   elsif($md =~ m/(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/) { ###########################
     if($mTp eq "02" && $p =~ m/^(..)(..)(..)(..)/) {#subtype+chn+value+err
       my ($chn,$vp, $err) = (hex($2),hex($3), hex($4));
-        $chn = sprintf("%02X",$chn&0x3f);
+      $chn = sprintf("%02X",$chn&0x3f);
       $vp = int($vp)/2;   # valve position in %
       push @evtEt,[$shash,1,"ValvePosition:$vp"];
       push @evtEt,[$shash,1,"state:$vp"];
-       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
+      $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
 
       my $stErr = ($err >>1) & 0x7;    # Status-Byte Evaluation
@@ -1279,8 +1278,7 @@ sub CUL_HM_Parse($$) {#########################################################
     if (($mTp eq "02" && $p =~ m/^01/) || #Ack_Status
         ($mTp eq "10" && $p =~ m/^06/)) { #Info_Status
 
-      my ($subType,$chn,$val,$err) = ($1,hex($2),$3,hex($4))
-                          if($p =~ m/^(..)(..)(..)(..)/);
+      my ($subType,$chn,$val,$err) = ($mI[0],hex($mI[1]),$mI[2],hex($mI[3]));
       $chn = sprintf("%02X",$chn&0x3f);
       my $chId = $src.$chn;
       $shash = $modules{CUL_HM}{defptr}{$chId}
@@ -1307,7 +1305,7 @@ sub CUL_HM_Parse($$) {#########################################################
 
       push @evtEt,[$shash,0,'.level:'.($val eq "off"?"0":"100")];
 
-      if ($mNo eq "00" && $chn eq "02" && $val eq "on"){
+      if    ($mNo eq "00" && $chn eq "02" && $val eq "on"){
         $hHash->{helper}{pOn} = 1;
       }
       elsif ($mNo eq "01" && $chn eq "01" &&
@@ -1324,13 +1322,11 @@ sub CUL_HM_Parse($$) {#########################################################
       }
     }
     elsif ($mTp eq "41")   { #eventonAtRain
-      my ($chn,$bno,$val) = unpack('(A2)*',$p);
-      my $mdCh = $md.$chn;
+      my ($chn,$bno,$val) = @mI;
       $chn = sprintf("%02X",hex($chn)&0x3f);
-      my $chId = $src.$chn;
-      $shash = $modules{CUL_HM}{defptr}{$chId}
-                             if($modules{CUL_HM}{defptr}{$chId});
-      push @evtEt,[$shash,1,"trigger:".hex($bno).":".$lvlStr{mdCh}{$mdCh}{$val}.$target];
+      $shash = $modules{CUL_HM}{defptr}{$src.$chn}
+                             if($modules{CUL_HM}{defptr}{$src.$chn});
+      push @evtEt,[$shash,1,"trigger:".hex($bno).":".$lvlStr{mdCh}{$md.$chn}{$val}.$target];
       if ($mNo eq "01" && $bno eq "01" &&
           $hHash->{helper}{pOn} && $hHash->{helper}{pOn} == 1){
         $pon = 1;
@@ -1482,17 +1478,16 @@ sub CUL_HM_Parse($$) {#########################################################
       my $state = "";
       my $chnHash = $modules{CUL_HM}{defptr}{$src.sprintf("%02X",$buttonID)};
 
-      if ($chnHash){# use userdefined name - ignore this irritating on-off naming
+      if ($chnHash){# use userdefined name - ignore irritating on-off naming
         $btnName = $chnHash->{NAME};
       }
       else{# Button not defined, use default naming
         $chnHash = $shash;
         if ($st eq "swi"){#maintain history for event naming
-            $btnName = "Btn$chn";
+          $btnName = "Btn$chn";
         }
         else{
-          my $btn = int((($chn&0x3f)+1)/2);
-          $btnName = "Btn$btn";
+          $btnName = "Btn".int(($buttonID+1)/2);
           $state = ($chn&1 ? "off" : "on")
         }
       }
@@ -1512,10 +1507,10 @@ sub CUL_HM_Parse($$) {#########################################################
         $trigType = "Short";
       }
       $shash->{helper}{addVal} = $chn;   #store to handle changesFread
-      push @evtEt,[$chnHash,1,"state:".$state.$target];
+      push @evtEt,[$chnHash,1,"state:".$state.$target] if ($shash ne $chnHash);
       push @evtEt,[$chnHash,1,"trigger:".$trigType."_".$bno];
       push @evtEt,[$shash,1,"battery:". (($chn&0x80)?"low":"ok")];
-      push @evtEt,[$shash,1,"state:$btnName $state$target"] if ($shash ne $chnHash);
+      push @evtEt,[$shash,1,"state:$btnName $state$target"];
     }
   }
   elsif($st eq "powerMeter") {#################################################
