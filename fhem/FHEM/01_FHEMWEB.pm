@@ -1345,9 +1345,10 @@ FW_fileList($)
 sub
 FW_outputChunk($$$)
 {
-  my ($c, $buf, $d) = @_;
+  my ($hash, $buf, $d) = @_;
   $buf = $d->deflate($buf) if($d);
-  print $c sprintf("%x\r\n", length($buf)), $buf, "\r\n" if(length($buf));
+  addToWritebuffer($hash, sprintf("%x\r\n", length($buf)).$buf."\r\n", "", 1)
+    if(length($buf));
 }
 
 sub
@@ -1356,7 +1357,6 @@ FW_returnFileAsStream($$$$$)
   my ($path, $suffix, $type, $doEsc, $cacheable) = @_;
 
   my $etag;
-  my $c = $FW_chash->{CD};
 
   if($cacheable) {
     #Check for If-None-Match header (ETag)
@@ -1369,6 +1369,7 @@ FW_returnFileAsStream($$$$$)
 
     $etag = (stat($path))[9]; #mtime
     if(defined($etag) && defined($if_none_match) && $etag eq $if_none_match) {
+      my $c = $FW_chash->{CD};
       print $c "HTTP/1.1 304 Not Modified\r\n",
         $FW_headercors, "\r\n";
       return -1;
@@ -1386,29 +1387,31 @@ FW_returnFileAsStream($$$$$)
   my $expires = $cacheable ? ("Expires: ".gmtime(time()+900)." GMT\r\n"): "";
   my $compr = ((int(@FW_enc) == 1 && $FW_enc[0] =~ m/gzip/) && $FW_use_zlib) ?
                 "Content-Encoding: gzip\r\n" : "";
-  print $c "HTTP/1.1 200 OK\r\n",
-           $compr, $expires, $FW_headercors, $etag,
-           "Transfer-Encoding: chunked\r\n",
-           "Content-Type: $type; charset=$FW_encoding\r\n\r\n";
+  addToWritebuffer($FW_chash, 
+           "HTTP/1.1 200 OK\r\n".
+           $compr . $expires . $FW_headercors . $etag .
+           "Transfer-Encoding: chunked\r\n" .
+           "Content-Type: $type; charset=$FW_encoding\r\n\r\n", "", 1);
 
   my $d = Compress::Zlib::deflateInit(-WindowBits=>31) if($compr);
-  FW_outputChunk($c, $FW_RET, $d);
+  FW_outputChunk($FW_chash, $FW_RET, $d);
   my $buf;
   while(sysread(FH, $buf, 2048)) {
     if($doEsc) { # FileLog special
       $buf =~ s/</&lt;/g;
       $buf =~ s/>/&gt;/g;
     }
-    FW_outputChunk($c, $buf, $d);
+    FW_outputChunk($FW_chash, $buf, $d);
   }
   close(FH);
-  FW_outputChunk($c, $suffix, $d);
+  FW_outputChunk($FW_chash, $suffix, $d);
 
   if($compr) {
     $buf = $d->flush();
-    print $c sprintf("%x\r\n", length($buf)), $buf, "\r\n" if($buf);
+    addToWritebuffer($FW_chash,sprintf("%x\r\n",length($buf)).$buf."\r\n","",1)
+      if($buf);
   }
-  print $c "0\r\n\r\n";
+  addToWritebuffer($FW_chash, "0\r\n\r\n", "", 1);
   return -1;
 }
 

@@ -3836,7 +3836,7 @@ Debug($) {
 sub
 addToWritebuffer($$@)
 {
-  my ($hash, $txt, $callback) = @_;
+  my ($hash, $txt, $callback, $nolimit) = @_;
 
   if(defined($hash->{pid})) {  # Wont go to the main select in a forked process
     my ($off, $len) = (0, length($txt));
@@ -3856,7 +3856,7 @@ addToWritebuffer($$@)
   $hash->{WBCallback} = $callback;
   if(!$hash->{$wbName}) {
     $hash->{$wbName} = $txt;
-  } elsif(length($hash->{$wbName}) < 102400) {
+  } elsif($nolimit || length($hash->{$wbName}) < 102400) {
     $hash->{$wbName} .= $txt;
   }
 }
