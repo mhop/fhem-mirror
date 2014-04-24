@@ -1,7 +1,7 @@
 ##############################################
 # 00_THZ
 # by immi 04/2014
-# v. 0.089
+# v. 0.090
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -98,6 +98,8 @@ my %sets = (
 	"p42Fanstage3AirflowOutlet"	=> {cmd2=>"0A057B", argMin =>  "50", argMax =>  "300" },	#abluft extrated
 	"p49SummerModeTemp"		=> {cmd2=>"0A0116", argMin =>  "11", argMax =>  "24" },		#threshold for summer mode !! 
 	"p50SummerModeHysteresis"	=> {cmd2=>"0A05A2", argMin =>  "0.5", argMax =>  "5" },		#Hysteresis for summer mode !! 
+	"p78DualModePoint"		=> {cmd2=>"0A01AC", argMin =>  "-10", argMax =>  "20" },		
+	
 	"pHolidayBeginDay"		=> {cmd2=>"0A011B", argMin =>  "1", argMax =>  "31"  }, 
 	"pHolidayBeginMonth"		=> {cmd2=>"0A011C", argMin =>  "1", argMax =>  "12"  },
 	"pHolidayBeginYear"		=> {cmd2=>"0A011D", argMin =>  "12", argMax => "20"  },
@@ -250,6 +252,10 @@ my %getsonly = (
         "sGlobal"	     		=> {cmd2=>"FB"},  #allFB
         "sTimedate" 			=> {cmd2=>"FC"},
         "sFirmware" 			=> {cmd2=>"FD"},
+	"s0A03AE" 			=> {cmd2=>"0A03AE"},
+	"s0A03AF" 			=> {cmd2=>"0A03AF"},
+	"s0A03B0" 			=> {cmd2=>"0A03B0"},
+	"s0A03B1" 			=> {cmd2=>"0A03B1"},
 	"party-time"			=> {cmd2=>"0A05D1"} # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   );
 
@@ -482,7 +488,7 @@ sub THZ_Set($@){
     return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if(($arg > $argMax) or ($arg < $argMin));
     }
     
-  if 	((substr($cmdHex2,0,6) eq "0A0116") or (substr($cmdHex2,0,6) eq "0A05A2"))	 {$arg=$arg*10} #summermode
+  if 	((substr($cmdHex2,0,6) eq "0A0116") or (substr($cmdHex2,0,6) eq "0A05A2") or (substr($cmdHex2,0,6) eq "0A01AC"))	 {$arg=$arg*10} #summermode
   elsif (substr($cmdHex2,0,4) eq "0A01") 					 {$arg=$arg*256}		        	# shift 2 times -- the answer look like  0A0120-3A0A01200E00  for year 14
   elsif  ((substr($cmdHex2,2,2) eq "1D") or (substr($cmdHex2,2,2)  eq "17") or (substr($cmdHex2,2,2) eq "15") or (substr($cmdHex2,2,2)  eq "14")) 	{$arg= time2quaters($arg) *256   + time2quaters($arg1)} # BeginTime-endtime, in the register is represented  begintime endtime
   elsif  (substr($cmdHex2,0,6) eq "0A05D1") 		  			{$arg= time2quaters($arg1) *256 + time2quaters($arg)} # PartyBeginTime-endtime, in the register is represented endtime begintime
@@ -492,12 +498,11 @@ sub THZ_Set($@){
   elsif  (substr($cmdHex2,2,4) eq "010E") 					{$arg=$arg*100} 		#gradientHC1 &HC2
   elsif  (substr($cmdHex2,2,4) eq "010F") 					{$arg=$arg*256*10} 		#gradientHC1 &HC2
   else 			             						{$arg=$arg*10} 
-    
   THZ_Write($hash,  "02"); 			# STX start of text
   ($err, $msg) = THZ_ReadAnswer($hash);		#Expectedanswer1    is  "10"  DLE data link escape
-  my $msgtmp= $msg;
+  my $msgtmp= $msg . " sent" . $arg ."---";
   if ($msg eq "10") {
-    $cmdHex2=THZ_encodecommand(($cmdHex2 . sprintf("%04X", $arg)),"set");
+    $cmdHex2=THZ_encodecommand(($cmdHex2 . substr((sprintf("%04X", $arg)), -4)),"set");  #04X converts to hex and fills up 0s; for negative, it must be trunckated. 
     THZ_Write($hash,  $cmdHex2); 		# send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
     select(undef, undef, undef, 0.1); #maybe important for older firmware 
     ($err, $msg) = THZ_ReadAnswer($hash);	#Expectedanswer     is "10",		DLE data link escape 
@@ -802,7 +807,7 @@ sub THZ_Parse($) {
       elsif ((substr($message,4,2) eq "1D") or (substr($message,4,2) eq "17")) 		{$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30  
       elsif (substr($message,4,4) eq "05D1") 				 		{$message = quaters2time(substr($message, 10,2)) ."--". quaters2time(substr($message, 8,2))}  #like above but before stop then start !!!!
       elsif ((substr($message,4,4) eq "05D3") or (substr($message,4,4) eq "05D4"))   	{$message = quaters2time(substr($message, 10,2)) }  #value 1Ch 28dec is 7 
-      elsif ((substr($message,4,3) eq "056")  or (substr($message,4,4) eq "0570")  or (substr($message,4,4) eq "0575"))	{$message = hex(substr($message, 8,4))}
+      elsif ((substr($message,4,3) eq "056")  or (substr($message,4,4) eq "0570")  or (substr($message,4,4) eq "0575") or (substr($message,4,4) eq "03AE") or (substr($message,4,4) eq "03AF") or (substr($message,4,4) eq "03B0") or (substr($message,4,4) eq "03B1") )	{$message = hex(substr($message, 8,4))}
       elsif ((substr($message,4,4) eq "0588") or (substr($message,4,4) eq "05A0")  or (substr($message,4,4) eq "0571") or (substr($message,4,4) eq "0572") or (substr($message,4,4) eq "0573") or (substr($message,4,4) eq "0574")) {$message = hex(substr($message, 8,4)) ." min" }
       elsif (substr($message,4,3) eq "057")						{$message = hex(substr($message, 8,4)) ." m3/h" }
       elsif (substr($message,4,4) eq "05A2")						{$message = hex(substr($message, 8,4))/10 ." K" }
@@ -1027,7 +1032,7 @@ sub THZ_debugread($){
   my ($hash) = @_;
   my ($err, $msg) =("", " ");
  # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
- my @numbers=('0A056E','0A0126'); 
+ my @numbers=('0A03AE','0A03AF', '0A03B0', '0A03B1'); 
   #my @numbers = (1..255);
   #my @numbers = (1..65535);
   my $indice= "FF";
