@@ -26,6 +26,7 @@ sub FW_makeEdit($$$);
 sub FW_makeImage(@);
 sub FW_makeTable($$$@);
 sub FW_makeTableFromArray($$@);
+sub FW_myPrint($$);
 sub FW_pF($@);
 sub FW_pH(@);
 sub FW_pHPlain(@);
@@ -1345,10 +1346,21 @@ FW_fileList($)
 sub
 FW_outputChunk($$$)
 {
-  my ($hash, $buf, $d) = @_;
+  my ($c, $buf, $d) = @_;
   $buf = $d->deflate($buf) if($d);
-  addToWritebuffer($hash, sprintf("%x\r\n", length($buf)).$buf."\r\n", "", 1)
-    if(length($buf));
+  FW_myPrint($c, sprintf("%x\r\n", length($buf)).$buf."\r\n") if(length($buf));
+}
+
+sub
+FW_myPrint($$)
+{
+  my ($c, $buf) = @_;
+  my ($off, $len) = (0, length($buf));
+  while($off < $len) {
+    my $ret = syswrite($c, $buf, $len-$off, $off);
+    last if(!$ret || $ret < 0);
+    $off += $ret;
+  }
 }
 
 sub
@@ -1358,6 +1370,7 @@ FW_returnFileAsStream($$$$$)
 
   my $etag;
 
+  my $c = $FW_chash->{CD};
   if($cacheable) {
     #Check for If-None-Match header (ETag)
     my @if_none_match_lines = grep /If-None-Match/, @FW_httpheader;
@@ -1369,9 +1382,8 @@ FW_returnFileAsStream($$$$$)
 
     $etag = (stat($path))[9]; #mtime
     if(defined($etag) && defined($if_none_match) && $etag eq $if_none_match) {
-      my $c = $FW_chash->{CD};
-      print $c "HTTP/1.1 304 Not Modified\r\n",
-        $FW_headercors, "\r\n";
+      FW_myPrint($c,"HTTP/1.1 304 Not Modified\r\n".
+                    $FW_headercors . "\r\n");
       return -1;
     }
   }
@@ -1387,31 +1399,29 @@ FW_returnFileAsStream($$$$$)
   my $expires = $cacheable ? ("Expires: ".gmtime(time()+900)." GMT\r\n"): "";
   my $compr = ((int(@FW_enc) == 1 && $FW_enc[0] =~ m/gzip/) && $FW_use_zlib) ?
                 "Content-Encoding: gzip\r\n" : "";
-  addToWritebuffer($FW_chash, 
-           "HTTP/1.1 200 OK\r\n".
-           $compr . $expires . $FW_headercors . $etag .
-           "Transfer-Encoding: chunked\r\n" .
-           "Content-Type: $type; charset=$FW_encoding\r\n\r\n", "", 1);
+  FW_myPrint($c, "HTTP/1.1 200 OK\r\n".
+                  $compr . $expires . $FW_headercors . $etag .
+                  "Transfer-Encoding: chunked\r\n" .
+                  "Content-Type: $type; charset=$FW_encoding\r\n\r\n");
 
   my $d = Compress::Zlib::deflateInit(-WindowBits=>31) if($compr);
-  FW_outputChunk($FW_chash, $FW_RET, $d);
+  FW_outputChunk($c, $FW_RET, $d);
   my $buf;
   while(sysread(FH, $buf, 2048)) {
     if($doEsc) { # FileLog special
       $buf =~ s/</&lt;/g;
       $buf =~ s/>/&gt;/g;
     }
-    FW_outputChunk($FW_chash, $buf, $d);
+    FW_outputChunk($c, $buf, $d);
   }
   close(FH);
-  FW_outputChunk($FW_chash, $suffix, $d);
+  FW_outputChunk($c, $suffix, $d);
 
   if($compr) {
     $buf = $d->flush();
-    addToWritebuffer($FW_chash,sprintf("%x\r\n",length($buf)).$buf."\r\n","",1)
-      if($buf);
+    FW_myPrint($c,sprintf("%x\r\n",length($buf)).$buf."\r\n") if($buf);
   }
-  addToWritebuffer($FW_chash, "0\r\n\r\n", "", 1);
+  FW_myPrint($c, "0\r\n\r\n");
   return -1;
 }
 
