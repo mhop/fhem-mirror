@@ -14,7 +14,11 @@ use GD;
 use feature qw/switch/;
 use vars qw(%data);
 use HttpUtils;
-require "98_SVG.pm"; # enable use of plotAsPng() 
+#require "98_SVG.pm"; # enable use of plotAsPng() 
+sub plotAsPng(@); # forward declaration will be enough 
+  # to ensure correct function
+  # and will avoid reloading 98_SVG.pm
+  # during fhem startup/rereadcfg
 
 my @cmd_halign= qw(halign thalign ihalign);
 my @cmd_valign= qw(valign tvalign ivalign);
