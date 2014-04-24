@@ -1,12 +1,4 @@
 /* Author: svenson08*/
-.dashboard_buttonbar { background: none repeat scroll 0 0 #111111; border: 1px solid #FFFFFF; padding: 4px; margin: 0 .5em 0 0.4em; float: left; }			
-.dashboard_buttonbar_top { border-bottom-width: 0; border-top-left-radius: 8px; border-top-right-radius: 8px; }
-.dashboard_buttonbar_bottom { border-top-width: 0; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; box-shadow: 5px 5px 5px #000000; }
-				 
-.dashboard_button { border-radius: 8px; float: left; color: #1c94c4; font-weight: bold; font-size: 0.8em; background-repeat:no-repeat;
-					background-position: 4px 2px; border: 1px solid #cccccc; padding: 0.2em 0.7em 0.2em 0.4em; }
-.dashboard_button_changed { color: red; font-weight:bold; }
-
 .dashboard_column { float: left; }
 .dashboard_columnhelper { border: 1px dotted #CCCCCC; }
 
@@ -24,11 +16,15 @@
 						float: left; background-image: url(../images/default/dashboardicons.png); }	
 .dashboard_button_iconplus { margin: 0.1em 0.4em; float: right; background-position: -65px 0px; }
 .dashboard_button_iconminus { margin: 0.1em 0.4em; float: right; background-position: -52px 0px; }
-.dashboard_button_iconset { background-position: -26px 0px; }	
-.dashboard_button_iconlock { background-position: 0px 0px; }
-.dashboard_button_iconunlock { background-position: -13px 0px; }
-.dashboard_button_icondetail { background-position: -39px 0px; }
-.dashboard_button_iconback { margin: 0.1em 0.4em; float: right; background-position: -91px 0px; }
+.dashboard-button {	display: inline-block; padding: 0 .6em;	height: 1.9em; cursor: pointer;
+					background-color: #f5f5f5; background-repeat:no-repeat !important; background-position: 7px;	
+					border: 1px solid #FFFFFF; border-radius: 4px; margin-top: 2px; width: 14px; position: absolute;}
+.dashboard-button-defineDetails{right: 10px; background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyBpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNSBXaW5kb3dzIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOkY4NjYwOTg0NEJFQzExRTI4MjI3OTFCOEEyNzY2MzE2IiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOkY4NjYwOTg1NEJFQzExRTI4MjI3OTFCOEEyNzY2MzE2Ij4gPHhtcE1NOkRlcml2ZWRGcm9tIHN0UmVmOmluc3RhbmNlSUQ9InhtcC5paWQ6Rjg2NjA5ODI0QkVDMTFFMjgyMjc5MUI4QTI3NjYzMTYiIHN0UmVmOmRvY3VtZW50SUQ9InhtcC5kaWQ6Rjg2NjA5ODM0QkVDMTFFMjgyMjc5MUI4QTI3NjYzMTYiLz4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz7i4cyWAAAAsElEQVR42mJgoCEwA+IPUGxGrKZkIE6AsjOB+D8UZyKJReHTDNOwGoifIPEfAvFGJH4gIQMIYZyuWI3mCm8oRhZfhCvA0pCcvRGLmnVI3klDD9gPaE50gopvRDLMG00NSA8DCw6vcELpX0hifwnFeRrUef+hzsXlhSfYvMCA5GTkQPSAYvTAxQoyyYlGJiQDviOxFwPxCyQ+iL0eh1oUEA7EfniSciySPG0yE8kAIMAAicRYTX3YPyoAAAAASUVORK5CYII=') !important;}
+.dashboard-button-setPosition{right: 45px; background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAYUlEQVR4XtWRUQrAMAhDneyg9mT2ptugHRaCY/FnLJAveWKifCW7AS3Avlj2AmzrFUrDIYhgJNwvN4VcBDwiYC5/CyclBpDDoe2poATGEuegs3AswCUIk/8+pl2K8uE/6ATG4BstrVLVgQAAAABJRU5ErkJggg==') !important;}
+.dashboard-button-goBack{right: 80px; background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABmJLR0QA/wD/AP+gvaeTAAAAZ0lEQVQ4jd3RMQqDQBBA0YekV0wj3v8QNqZTJBEtPY42K9l2p0s+TDHF/zAMf8kTE4aovOPEp1TucGRyE5XXUhnmJJfMCFUKVMp55EuLzfeENhBUY0mRA30kkr/xHQnckQWvaODHuADAUSEXjMLoMwAAAABJRU5ErkJggg==') !important;}
+.dashboard-button-editTab{right: 115px;}
+.ui-state-disabled {cursor: default; opacity: 0.35;}
+
 
 .ui-resizable { position: relative; }
 .ui-resizable-handle { position: absolute; font-size: 0.1px; }
@@ -38,8 +34,6 @@
 .ui-sortable-placeholder { border: 1px dotted #FFFFFF;  visibility: visible !important; 
 						   height: 25px !important; width: 150px; }
 						   		
-
-/* Neue CSS Einträge für Dashboard-Tabs */						
 .dashboard { padding: 0; margin: 0; }
 .dashboard_tabnav {	list-style: none; margin: 0; padding: 0 .5em 0; }
 .dashboard_tabnav:before,

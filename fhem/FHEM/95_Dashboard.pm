@@ -1,4 +1,5 @@
-﻿########################################################################################
+﻿# $Id:$
+########################################################################################
 #
 # 95_Dashboard.pm
 #
@@ -44,6 +45,8 @@
 # 2.08: Fix dashboard_webfrontendfilter Error-Message. Internal changes. Attribute dashboard_colwidth and dashboard_sorting removed.
 # 2.09: dashboard_showfullsize not applied in room "all" resp. "Everything". First small implementation over Dashboard_DetailFN.
 # 2.10: Internal Changes. Lock/Unlock now only in Detail view. Attribut dashboard_lockstate are obsolet.
+# 2.11: Attribute dashboard_showhelper ist obolet. Erase tabs-at-the-top-buttonbar-hidden and tabs-on-the-bottom-buttonbar-hidden values 
+#       from Attribute dashboard_showtabs. Change Buttonbar Style. Clear CSS and Dashboard.js.
 #
 # Known Bugs/Todos:
 # BUG: Nicht alle Inhalte aller Tabs laden, bei Plots dauert die bedienung des Dashboards zu lange. -> elemente hidden?
@@ -96,7 +99,7 @@ my $fwjquery = "jquery.min.js";
 my $fwjqueryui = "jquery-ui.min.js";
 my $dashboardname = "Dashboard"; # Link Text
 my $dashboardhiddenroom = "DashboardRoom"; # Hiddenroom
-my $dashboardversion = "2.10";
+my $dashboardversion = "2.11";
 # -------------------------------------------------------------------------------------------
 
 #############################################################################################
@@ -111,11 +114,11 @@ sub Dashboard_Initialize ($) {
   $hash->{AttrList}    = "disable:0,1 ".
   						 "dashboard_colcount:1,2,3,4,5 ".						 						 
 						 "dashboard_debug:0,1 ".						 
-						 "dashboard_lockstate:dont-use-this-attribut ".
+						 "dashboard_lockstate:dont-use-this-attribut ". #obolet since 04.2014
 						 "dashboard_rowtopheight ".
 						 "dashboard_rowbottomheight ".
 						 "dashboard_row:top,center,bottom,top-center,center-bottom,top-center-bottom ".						 
-						 "dashboard_showhelper:0,1 ".
+						 "dashboard_showhelper:dont-use-this-attribut ". #obolet since 04.2014
 						 "dashboard_showtooglebuttons:0,1 ".						 
 						 #new attribute vers. 2.00
 						 "dashboard_tabcount:1,2,3,4,5,6,7 ".
@@ -141,7 +144,8 @@ sub Dashboard_Initialize ($) {
 						 "dashboard_rowcentercolwidth ".
 						 "dashboard_showfullsize:0,1 ".
 						 #new attribute vers. 2.02
-						 "dashboard_showtabs:tabs-and-buttonbar-at-the-top,tabs-at-the-top-buttonbar-hidden,tabs-and-buttonbar-on-the-bottom,tabs-on-the-bottom-buttonbar-hidden,tabs-and-buttonbar-hidden ".
+						 #"dashboard_showtabs:tabs-and-buttonbar-at-the-top,tabs-at-the-top-buttonbar-hidden,tabs-and-buttonbar-on-the-bottom,tabs-on-the-bottom-buttonbar-hidden,tabs-and-buttonbar-hidden ".
+						 "dashboard_showtabs:tabs-and-buttonbar-at-the-top,tabs-and-buttonbar-on-the-bottom,tabs-and-buttonbar-hidden ".
 						 #new attribute vers. 2.03
 						 "dashboard_tab1icon ".
 						 "dashboard_tab2icon ".
@@ -178,9 +182,9 @@ sub Dashboard_DetailFN() {
 	my $ret = ""; 
 	$ret .= "<table class=\"block wide\" id=\"dashboardtoolbar\"  style=\"width:100%\">\n";
 	$ret .= "<tr><td><div>\n";   
-	$ret .= "		<div> <a href=\"javascript:dashboard_setposition()\"><button id=\"dashboard_setpositionbutton\" type=\"button\" title=\"Set the Positions\" disabled>Set Positions</button></a>\n";
+#	$ret .= "		<div> <a href=\"javascript:dashboard_setposition()\"><button id=\"dashboard_setpositionbutton\" type=\"button\" title=\"Set the Positions\" disabled>Set Positions</button></a>\n";
 	$ret .= "	   <a href=\"$FW_ME?room=$dashboardhiddenroom\"><button type=\"button\">Return to Dashboard</button></a>\n";
-	$ret .= "	   <div id=\"resultText\" style=\"padding-top: 8px;\"></div>\n";
+#	$ret .= "	   <div id=\"resultText\" style=\"padding-top: 8px;\"></div>\n";
 	$ret .= "      </div>\n";
 	$ret .= "   </div></td></tr>\n"; 	
 	$ret .= "</table>\n";
@@ -191,14 +195,10 @@ sub Dashboard_Set($@) {
 	my ( $hash, $name, $cmd, @args ) = @_;
 	
 	if ( $cmd eq "lock" ) {
-		#$attr{$name}{dashboard_lockstate} = "lock";
 		readingsSingleUpdate( $hash, "lockstate", "lock", 0 ); 
-		#$hash->{LOCKSTATE} = "lock";
 		return;
 	} elsif ( $cmd eq "unlock" ) {
-		#$attr{$name}{dashboard_lockstate} = "unlock";
 		readingsSingleUpdate( $hash, "lockstate", "unlock", 0 );
-		#$hash->{LOCKSTATE} = "unlock";
 		return;
 	}else { 
 		return "Unknown argument " . $cmd . ", choose one of lock:noArg unlock:noArg";
@@ -253,13 +253,15 @@ sub Dashboard_SummaryFN($$$$)
  my $id = $defs{$d}{NR};
  
  ######################### Read Dashboard Attributes and set Default-Values ####################################
+ my $lockstate = ($defs{$d}->{READINGS}{lockstate}{VAL}) ? $defs{$d}->{READINGS}{lockstate}{VAL} : "unlock";
+ my $showhelper = ($lockstate eq "unlock") ? 1 : 0; 
+  
  my $disable = AttrVal($defs{$d}{NAME}, "disable", 0);
  my $colcount = AttrVal($defs{$d}{NAME}, "dashboard_colcount", 1);
  my $colwidth = AttrVal($defs{$d}{NAME}, "dashboard_rowcentercolwidth", 100);
  my $colheight = AttrVal($defs{$d}{NAME}, "dashboard_rowcenterheight", 400); 
  my $rowtopheight = AttrVal($defs{$d}{NAME}, "dashboard_rowtopheight", 250);
- my $rowbottomheight = AttrVal($defs{$d}{NAME}, "dashboard_rowbottomheight", 250); 
- my $showhelper = AttrVal($defs{$d}{NAME}, "dashboard_showhelper", 1);
+ my $rowbottomheight = AttrVal($defs{$d}{NAME}, "dashboard_rowbottomheight", 250);  
  my $showtabs = AttrVal($defs{$d}{NAME}, "dashboard_showtabs", "tabs-and-buttonbar-at-the-top"); 
  my $showtooglebuttons = AttrVal($defs{$d}{NAME}, "dashboard_showtooglebuttons", 1); 
  my $showfullsize  = AttrVal($defs{$d}{NAME}, "dashboard_showfullsize", 0); 
@@ -268,10 +270,6 @@ sub Dashboard_SummaryFN($$$$)
  
  my $row = AttrVal($defs{$d}{NAME}, "dashboard_row", "center");
  my $debug = AttrVal($defs{$d}{NAME}, "dashboard_debug", "0");
- 
- my $lockstate = ($defs{$d}->{READINGS}{lockstate}{VAL}) ? $defs{$d}->{READINGS}{lockstate}{VAL} : "unlock";
-Log 1, "[DASHBOARD simple debug] ".$defs{$d}->{READINGS}{lockstate}{VAL}; 
- #my $lockstate = AttrVal($defs{$d}{NAME}, "dashboard_lockstate", "unlock");
  
  my $activetab = AttrVal($defs{$d}{NAME}, "dashboard_activetab", 1); 
  my $tabcount = AttrVal($defs{$d}{NAME}, "dashboard_tabcount", 1);  
@@ -362,18 +360,13 @@ Log 1, "[DASHBOARD simple debug] ".$defs{$d}->{READINGS}{lockstate}{VAL};
 	 $ret .= "<tr><td><div id=\"tabs\" class=\"dashboard_tabs\">\n";  
 	 
 	 ########################### Dashboard Tab-Liste ##############################################
-	 my $tabshow = "hidden";	
 	 my $tabicon = "";
-	 if ($showtabs eq "tabs-and-buttonbar-at-the-top" || $showtabs eq "tabs-at-the-top-buttonbar-hidden") { $tabshow = "top";}
-	 if ($showtabs eq "tabs-and-buttonbar-on-the-bottom" || $showtabs eq "tabs-on-the-bottom-buttonbar-hidden") { $tabshow = "bottom";}
+	 $ret .= "	<ul id=\"dashboard_tabnav\" class=\"dashboard_tabnav dashboard_tabnav_".$showbuttonbar."\">\n";	   
 		
-	 $ret .= "	<ul id=\"dashboard_tabnav\" class=\"dashboard_tabnav dashboard_tabnav_".$tabshow."\">\n";	   
-	 if ($showtabs ne "tabs-at-the-top-buttonbar-hidden" &&  $showtabs ne "tabs-on-the-bottom-buttonbar-hidden" && $showtabs ne "tabs-and-buttonbar-hidden") { $ret .= BuildButtonBar($d,$showtabs,$showfullsize); }
-		
-	  for (my $i=0;$i<$tabcount;$i++){ 
+	 for (my $i=0;$i<$tabcount;$i++){ 
 		$tabicon = ""; 
-		if ($tabicons[$i] ne "") { $tabicon = FW_makeImage($tabicons[$i],$tabicons[$i],"dashboard_tabicon") . "&nbsp;"; }
-		$ret .= "    <li class=\"dashboard_tab dashboard_tab_".$tabshow."\">".$tabicon."<a href=\"#dashboard_tab".$i."\">".trim($tabnames[$i])."</a></li>"; 
+		if ($tabicons[$i] ne "") { $tabicon = FW_makeImage($tabicons[$i],$tabicons[$i],"dashboard_tabicon")."&nbsp;"; }
+		$ret .= "    <li class=\"dashboard_tab dashboard_tab_".$showbuttonbar."\">".$tabicon."<a href=\"#dashboard_tab".$i."\">".trim($tabnames[$i])."</a></li>"; 
 	 } 
 	 $ret .= "	</ul>\n"; 
 	 ##############################################################################################
@@ -456,30 +449,6 @@ sub BuildDashboardBottomRow($$$$){
  $ret .= "		</div>\n";
  $ret .= "</div>\n";
  $ret .= "</td></tr>\n";
- return $ret;
-}
-
-sub BuildButtonBar($$$){
- my ($d,$pos,$fullsize) = @_;
- my $ret = "";
- my $cssclass = "hidden";
- 
- if ($pos eq "tabs-and-buttonbar-at-the-top") { $cssclass = "top"; }
- if ($pos eq "tabs-and-buttonbar-on-the-bottom") { $cssclass = "bottom"; }
- 
-  if ($fullsize eq "1" && $pos ne "hidden" ) {
-	 $ret .= "<div class=\"dashboard_buttonbar dashboard_buttonbar_".$cssclass."\">\n"; 
-	 $ret .= "	<div class=\"dashboard_button\"> <a id=\"dashboard_button_back\" href=\"/\" title=\"Back\"><span class=\"dashboard_button_icon dashboard_button_iconback\"></span></a> </div>\n";
-	 $ret .= "</div>\n";	 
- }
- 
- if ($pos ne "hidden") {
-	 $ret .= "<div class=\"dashboard_buttonbar dashboard_buttonbar_".$cssclass."\">\n";
-	 $ret .= "	<div class=\"dashboard_button\"> <a id=\"dashboard_button_set\" href=\"javascript:dashboard_setposition()\" title=\"Set the Position\"><span class=\"dashboard_button_icon dashboard_button_iconset\"></span>Set</a> </div>\n";
-	 $ret .= "	<div class=\"dashboard_button\"> <a id=\"dashboard_button_detail\" href=\"/fhem?detail=$d\" title=\"Dashboard Details\"><span class=\"dashboard_button_icon dashboard_button_icondetail\"></span>Detail</a> </div>\n";		
-	 $ret .= "</div>\n";
- } 
- 
  return $ret;
 }
 
@@ -676,6 +645,20 @@ sub CheckDashboardAttributUssage($) { # replaces old disused attributes and thei
 	{ FW_fC("deleteattr ".$d." dashboard_lockstate"); }
 	Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."]"." Using an outdated no longer used Attribute or Value. This has been corrected. Don't forget to save config. [dashboard_lockstate]";
  } 
+ my $showhelper = AttrVal($defs{$d}{NAME}, "dashboard_showhelper", ""); # outdates 04.2014 
+ if ($showhelper ne "") {
+	{ FW_fC("deleteattr ".$d." dashboard_showhelper"); }
+	Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."]"." Using an outdated no longer used Attribute or Value. This has been corrected. Don't forget to save config. [dashboard_showhelper]";
+ }  
+ my $showtabs = AttrVal($defs{$d}{NAME}, "dashboard_showtabs", ""); # delete values 04.2014 
+ if ($showtabs eq "tabs-at-the-top-buttonbar-hidden") {
+	{ FW_fC("set ".$d." dashboard_showtabs tabs-and-buttonbar-at-the-top"); }
+	Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."]"." Using an outdated no longer used Attribute or Value. This has been corrected. Don't forget to save config. [tabs-at-the-top-buttonbar-hidden]";
+ }
+ if ($showtabs eq "tabs-on-the-bottom-buttonbar-hidden") {
+	{ FW_fC("set ".$d." dashboard_showtabs tabs-and-buttonbar-on-the-bottom"); } 
+	Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."]"." Using an outdated no longer used Attribute or Value. This has been corrected. Don't forget to save config. [tabs-on-the-bottom-buttonbar-hidden]";
+ }  
 }
 
 sub CreateDashboardEntry($) {
@@ -733,8 +716,6 @@ sub CreateDashboardEntry($) {
 	attr anyViews dashboard_colcount 2<br>
 	attr anyViews dashboard_rowcentercolwidth 30,70<br>
 	attr anyViews dashboard_tab1groups &lt;Group1&gt;,&lt;Group2&gt;,&lt;Group3&gt;<br>
-	attr anyViews dashboard_lockstate unlock<br>
-	attr anyViews dashboard_showhelper 1<br>
 	</code>	
   </ul>
   <br>
@@ -742,7 +723,10 @@ sub CreateDashboardEntry($) {
   <a name="Dashboardset"></a>
   <b>Set</b> 
   <ul>
-	N/A
+    <code>set &lt;name&gt; lock</code><br><br>
+	locks the Dashboard so that no position changes can be made<br>
+	<code>set &lt;name&gt; unlock</code><br><br>
+    unlock the Dashboard<br>
   </ul>
   <br>
   
@@ -938,12 +922,6 @@ sub CreateDashboardEntry($) {
     <li>dashboard_tab7icon<br>
 		Set the icon for a Tab. There must exist an icon with the name ico.png in the modpath directory. If the image is referencing an SVG icon, then you can use the @colorname suffix to color the image. 
     </li><br>		
-  <a name="dashboard_lockstate"></a>		
-    <li>dashboard_lockstate<br>
-        When set to "unlock" you can edit the Dashboard. When set to "lock" no change can be made. <br>
-		If the bar is hidden dashboard_lockstate is "lock". Editing is possible only with activated switch panel.<br>
-		Default: unlock
-    </li><br>	
   <a name="dashboard_colcount"></a>	
     <li>dashboard_colcount<br>
         Number of columns in which the groups can be displayed. Nevertheless, it is possible to have multiple groups <br>
@@ -957,14 +935,9 @@ sub CreateDashboardEntry($) {
     </li><br>		
  <a name="dashboard_showtabs"></a>	
     <li>dashboard_showtabs<br>
-		Displays the Tabs on top or bottom, or hides them. This also applies to the Buttonbar. If the Buttonbar is hidden dashboard_lockstate the "lock" is used.<br>
+		Displays the Tabs/Buttonbar on top or bottom, or hides them. If the Buttonbar is hidden lockstate is "lock" is used.<br>
 		Default: tabs-and-buttonbar-at-the-top
     </li><br>
- <a name="dashboard_showhelper"></a>		
-    <li>dashboard_showhelper<br>
-        Displays frames in order to facilitate the positioning of the groups.<br>
-		Default: 1
-    </li><br>	 
  <a name="dashboard_showtooglebuttons"></a>		
     <li>dashboard_showtooglebuttons<br>
         Displays a Toogle Button on each Group do collapse.<br>
@@ -1005,8 +978,6 @@ sub CreateDashboardEntry($) {
 	attr anyViews dashboard_colcount 2<br>
 	attr anyViews dashboard_rowcentercolwidth 30,70<br>
 	attr anyViews dashboard_tab1groups &lt;Group1&gt;,&lt;Group2&gt;,&lt;Group3&gt;<br>
-	attr anyViews dashboard_lockstate unlock<br>
-	attr anyViews dashboard_showhelper 1<br>
 	</code>	
   </ul>
   <br>
@@ -1014,7 +985,10 @@ sub CreateDashboardEntry($) {
   <a name="Dashboardset"></a>
   <b>Set</b> 
   <ul>
-	N/A
+    <code>set &lt;name&gt; lock</code><br><br>
+	Sperrt das Dashboard so das keine Positionsänderungen vorgenommen werden können<br>
+	<code>set &lt;name&gt; unlock</code><br><br>
+    Entsperrt das Dashboard<br>
   </ul>
   <br>
   
@@ -1210,12 +1184,6 @@ sub CreateDashboardEntry($) {
     <li>dashboard_tab7icon<br>
 		Zeigt am Tab ein Icon an. Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es sich um ein SVG Icon kann der Suffix @colorname für die Farbe des Icons angegeben werden.
     </li><br>		
-  <a name="dashboard_lockstate"></a>		
-    <li>dashboard_lockstate<br>
-		Bei Dashboard Einstellung "unlock" kann dieses bearbeitet werden. Bei der Einstellung "lock" können keine Änderung vorgenommen werden. <br>
-		Wenn die Leiste ausgeblendet ist (dashboard_showtabs) ist das Dashboard gespert. Die Bearbeitung ist daher nur mit sichtbarer Buttonbar möglich ist.<br>
-		Standard: unlock
-    </li><br>	
   <a name="dashboard_colcount"></a>	
     <li>dashboard_colcount<br>
 		Die Anzahl der Spalten in der  Gruppen dargestellt werden können. Dennoch ist es möglich, mehrere Gruppen <br>
@@ -1230,14 +1198,9 @@ sub CreateDashboardEntry($) {
     </li><br>		
  <a name="dashboard_showtabs"></a>	
     <li>dashboard_showtabs<br>
-		Zeigt die Tabs des Dashboards oben oder unten an, oder blendet diese aus. Dies gilt auch für die Schalterleiste. Wenn die Schalterleiste ausgeblendet wird ist das Dashboard gespert.<br>
+		Zeigt die Tabs/Schalterleiste des Dashboards oben oder unten an, oder blendet diese aus. Wenn die Schalterleiste ausgeblendet wird ist das Dashboard gespert.<br>
 		Standard: tabs-and-buttonbar-at-the-top
     </li><br>	
- <a name="dashboard_showhelper"></a>		
-    <li>dashboard_showhelper<br>
-		Blendet Ränder ein, die eine Positionierung der Gruppen erleichtern. <br>
-		Standard: 1
-    </li><br>	 
  <a name="dashboard_showtooglebuttons"></a>		
     <li>dashboard_showtooglebuttons<br>
 		Zeigt eine Schaltfläche in jeder Gruppe mit der man diese auf- und zuklappen kann.<br>

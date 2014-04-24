@@ -14,11 +14,22 @@
 //			 been fixed.
 // 2.04: Dashboard position near Top in showfullsize-mode. Restore ActiveTab funktion
 // 2.05: Delete function for set lockstate
+// 2.06: change Set and Detail Button.
 //
 // Known Bugs/Todo's
 // See 95_Dashboard.pm
 //########################################################################################
 //########################################################################################
+
+
+var dashboard_name = "unknown";
+var dashboard_fullsize = false;
+var dashboard_buttonbar = "top";
+
+//Only use for debugging
+function showdebugMessage(msg){
+	document.getElementById("dashboard_jsdebug").value = msg;
+}
 
 function saveOrder() {
 	var EndSaveResult = "";
@@ -53,7 +64,7 @@ function saveOrder() {
 	//------------------------------------------------------------------------		
 	//--------------------- Store new Positions ------------------------
 	if (EndSaveResult != "") { $("#tabs .ui-tabs-panel:visible").data("tabwidgets",EndSaveResult); } //store widgetposition in active tab Widget
-	document.getElementById("dashboard_button_set").classList.add('dashboard_button_changed'); //Mark that the Changes are not saved
+	$("#setPosition").button({disabled: false}); //Mark that the Changes are not saved
 	//------------------------------------------------------------------------
 }
 
@@ -137,11 +148,6 @@ function GetColWidth(ColCount, ColWidth){
  return aColWidth;
 }
 
-//Only use for debugging
-function showdebugMessage(msg){
-	document.getElementById("dashboard_jsdebug").value = msg;
-}
-
 function dashboard_setlock(){
 	$("#dashboard_button_lock").prepend('<span class="dashboard_button_icon dashboard_button_iconlock"></span>');  
 	//############################################################
@@ -171,15 +177,15 @@ function dashboard_setposition(){
  for (var i = 0, n = params[10]; i < n; i++ ) {
 	if ($("#dashboard_tab"+i).data("tabwidgets") != null) {	
 		var j = i+1;
-		FW_cmd(document.location.pathname+'?XHR=1&cmd.'+params[0]+'=attr '+params[0]+' dashboard_tab'+j+'sorting '+$("#dashboard_tab"+i).data("tabwidgets"));
+		FW_cmd(document.location.pathname+'?XHR=1&cmd.'+dashboard_name+'=attr '+dashboard_name+' dashboard_tab'+j+'sorting '+$("#dashboard_tab"+i).data("tabwidgets"));
 	}
  }
- document.getElementById("dashboard_button_set").classList.remove('dashboard_button_changed'); 
+ $("#setPosition").button({disabled: true});
  //--------------------------------------------------------------------- 
  //--------------------- store active Tab ------------------------------
  var activeTab = ($( "#tabs" ).tabs( "option", "active" ))+1;
  if (params[11] != activeTab){
-	FW_cmd(document.location.pathname+'?XHR=1&cmd.'+params[0]+'=attr '+params[0]+' dashboard_activetab '+activeTab);
+	FW_cmd(document.location.pathname+'?XHR=1&cmd.'+dashboard_name+'=attr '+dashboard_name+' dashboard_activetab '+activeTab);
  }
  //--------------------------------------------------------------------- 
 }
@@ -212,15 +218,41 @@ function dashboard_modifyWidget(){
 		});		
 }
 
+function adddashboardButton(position, text, id, hint) {
+    $("#" + id).button();
+	var my_button = '<span id="' + id + '" title="'+hint+'" class="dashboard-button dashboard-button-custom dashboard-button-'+id+' dashboard-state-default" style="">'+text+'</span>';
+	$("#dashboard_tabnav").prepend(my_button);	 
+}
+
+function dashboard_buildButtons() {
+	adddashboardButton("top", "", "defineDetails", "Show Details");
+	$("#defineDetails").click(function () {location.href=document.location.pathname+'?detail='+dashboard_name;});
+	
+	adddashboardButton("top", "", "setPosition", "Set Position");
+	$("#setPosition").button({disabled: true});		
+	$("#setPosition").click(function () {dashboard_setposition()});	
+	
+	//adddashboardButton("top", "XX", "editTab", "Edit Tab");
+	//$("#editTab").click(function () {alert("comming soon")});	
+	
+	if (dashboard_fullsize == true) {
+		adddashboardButton("top", "", "goBack", "Back");
+		$("#goBack").click(function () {location.href=document.location.pathname;});
+	}
+}
+
 $(document).ready( function () {
   var dbattr = document.getElementById("dashboard_attr");
   if (dbattr) {
 	//--------------------------------- Attribute des Dashboards ------------------------------------------------------------------
 	var params = (document.getElementById("dashboard_attr").value).split(","); //get current Configuration
+	dashboard_name = params[0];
+	dashboard_buttonbar = params[4];
+	dashboard_fullsize = (params[13] == 1) ? true : false;
 	//-------------------------------------------------------------------------------------------------------------------------------------
 	$("body").attr("longpollfilter", ".*") //need for longpoll
 
-	if (params[13] == 1){ //disable roomlist and header	
+	if (dashboard_fullsize == 1){ //disable roomlist and header	
 		$("#menuScrollArea").remove();
 		$("#hdr").remove();
 		$(".roomoverview:first").remove();
@@ -232,12 +264,7 @@ $(document).ready( function () {
         connectWith: ['.dashboard_column', '.ui-row'],
 		cursor: 'move',
         stop: function() { saveOrder(); }
-    }); 
-	
-	if (params[4] == "hidden") {	
-		dashboard_modifyWidget();
-		dashboard_setlock();		
-	} 
+    });
 
 	if (params[6] == 1){ //ToogleButton show/hide	
 		$(".dashboard_widget")
@@ -286,30 +313,18 @@ $(document).ready( function () {
 		create: function(event, ui) { 
 			$( "#tabs" ).tabs( "option", "active", params[11]-1 ); //set active Tab
 			restoreOrder(); 
-			},
+		},
 		activate: function (event, ui) {
 			restoreOrder(); 
-		}   
+		}		
 	});	
 	if ($("#dashboard_tabnav").hasClass("dashboard_tabnav_bottom")) { $(".dashboard_tabnav").appendTo(".dashboard_tabs"); } //set Tabs on the Bottom	
 	$(".dashboard_tab_hidden").css("display", "none"); //hide Tabs
 	//-------------------------------------------------------------------------------------------------------------------------------------		
-	
-	
-	$("#dashboard_button_set").button({
-		create: function( event, ui ) {
-			$(this).addClass("dashboard_button_iconset");
-		}
-	});
-	
-	$("#dashboard_button_detail").button({
-		create: function( event, ui ) {
-			$(this).addClass("dashboard_button_icondetail");
-		}
-	});	
-	
+		
 	dashboard_modifyWidget();
-	if (params[3] == "lock") {dashboard_setlock();} else {dashboard_unsetlock();}	
+	if (dashboard_buttonbar != "hidden") dashboard_buildButtons();
+	if ((params[3] == "lock") || (dashboard_buttonbar == "hidden")) {dashboard_setlock();} else {dashboard_unsetlock();}	
 	if (params[14] != "none" ) {$('<style type="text/css">'+params[14]+'</style>').appendTo($('head')); }
   }	
 });
