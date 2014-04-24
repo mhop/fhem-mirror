@@ -23,12 +23,14 @@ sub ZWave_HandleSendStack($);
 # http://www.digiwave.dk/en/programming/an-introduction-to-the-z-wave-protocol/
 # http://open-zwave.googlecode.com/svn-history/r426/trunk/cpp/src/Driver.cpp
 # http://buzzdavidson.com/?p=68
+# https://bitbucket.org/bradsjm/aeonzstickdriver
 my %sets = (
   "addNode"   => { cmd   => "4a%02x@",     # ZW_ADD_NODE_TO_NETWORK',
                    param => {on=>0x81, off=>0x05 } },
   "removeNode"=> { cmd   => "4b%02x@",     # ZW_REMOVE_NODE_FROM_NETWORK',
                    param => {on=>0x81, off=>0x05 } },
   "createNode"=> { cmd   => "60%02x"  },  # ZW_REQUEST_NODE_INFO',
+  "neighborUpdate"=> { cmd   => "48" },    # ZW_REQUEST_NODE_NEIGHBOR_UPDATE
 );
 
 my %gets = (
@@ -39,6 +41,7 @@ my %gets = (
   "homeId"    => "20",     # MEMORY_GET_ID
   "version"   => "15",     # ZW_GET_VERSION
   "raw"       => "%s",
+  "neighborList" => "80%02x0101", # GET_ROUTING_TABLE_LINE  include dead links, include non-routing neigbors
 );
 
 # Known controller function. 
@@ -336,6 +339,18 @@ ZWDongle_Get($@)
       push @list, "Security:" . ($r[3]&0x1);
       $msg = join(" ", @list);
     }
+
+  } elsif($type eq "neighborList") {            ############################
+    return "$name: Bogus data received" if(int(@r) != 31);
+    my @list;
+    for my $byte (0..28) {
+      my $bits = $r[2+$byte];
+      for my $bit (0..7) {
+        push @list, $byte*8+$bit+1 if($bits & (1<<$bit));
+      }
+    }
+    $msg = join(",", @list);
+
   }
 
   $type .= "_".join("_", @a) if(@a);

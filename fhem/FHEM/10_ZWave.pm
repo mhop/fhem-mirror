@@ -625,6 +625,18 @@ ZWave_Parse($$@)
       ZWave_HandleSendStack($iodev);
     }
     return "";
+
+  } elsif($cmd eq "ZW_REQUEST_NODE_NEIGHBOR_UPDATE") {
+    if ($id eq "21") {
+      $evt = 'STARTED';
+    } elsif ($id eq "22") {
+      $evt = 'DONE';
+    } elsif ($id eq "23") {
+      $evt = 'FAILED';
+    } else {
+      $evt = 'unknown';
+    }
+
   }
 
   if($evt) {
