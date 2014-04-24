@@ -1,6 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - added:   new modules 10_Itach_IR and 88_Itach_IRDevice to
+             use Itach WF2IR or IP2IR to be used as universal 
+             infrared remotecontrol
   - added:   new module 51_I2C_TSL2561.pm (kaihs)
   - added:   new module 02_FRAMEBUFFER.pm (kaihs)
   - feature: SYSMON: many FritzBox specific readings: 
