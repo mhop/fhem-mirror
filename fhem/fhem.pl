@@ -95,7 +95,6 @@ sub attrSplit($);
 sub computeClientArray($$);
 sub concatc($$$);
 sub configDBUsed();
-sub createInterfaceDefinitions();
 sub createNtfyHash();
 sub devspec2array($);
 sub doGlobalDef($);
@@ -108,12 +107,6 @@ sub fhemTzOffset($);
 sub getAllAttr($);
 sub getAllGets($);
 sub getAllSets($);
-sub getGetters($);
-sub getGettersForInterface($);
-sub getInterfaces($);
-sub getReadingsForInterface($);
-sub getSetters($);
-sub getSettersForInterface($);
 sub latin1ToUtf8($);
 sub myrename($$);
 sub notifyRegexpChanged($$);
@@ -207,7 +200,6 @@ use vars qw(%defaultattr);      # Default attributes, used by FHEM2FHEM
 use vars qw(%defs);             # FHEM device/button definitions
 use vars qw(%inform);           # Used by telnet_ActivateInform
 use vars qw(%intAt);            # Internal at timer hash, global for benchmark
-use vars qw(%interfaces);       # see createInterfaceDefinitions below
 use vars qw(%modules);          # List of loaded modules (device/log/etc)
 use vars qw(%ntfyHash);         # hash of devices needed to be notified.
 use vars qw(%oldvalue);         # Old values, see commandref.html
@@ -400,6 +392,14 @@ if($^O =~ m/Win/) {
 $winService ||= {};
 
 ###################################################
+# initialize the readings semantics meta information
+# this must come before any module is loaded
+eval { # make errors non-lethal
+  require FHEM::RTypes;
+  RTypes_Initialize();
+};
+
+###################################################
 # Server initialization
 doGlobalDef($ARGV[0]);
 
@@ -468,9 +468,6 @@ if($pfn) {
   close(PID);
 }
 
-# create the global interface definitions
-createInterfaceDefinitions();
-
 my $gp = $attr{global}{port};
 if($gp) {
   Log 3, "Converting 'attr global port $gp' to 'define telnetPort telnet $gp'";
@@ -490,6 +487,9 @@ foreach my $d (keys %defs) {
     delete $defs{$d}{IODevMissing};
   }
 }
+
+RTypes_ShowTypeLibrary();
+
 DoTrigger("global", "INITIALIZED", 1);
 $fhem_started = time;
 
@@ -3320,146 +3320,11 @@ addEvent($$)
   push(@{$hash->{CHANGED}}, $event);
 }
 
-################################################################
-#
-# Meta-information for devices
-# This part maintained by Boris Neubert omega at online dot de
-#
-################################################################
-
-
-# get the names of interfaces for the device represented by the $hash
-# empty list is returned if interfaces are not defined
-sub
-getInterfaces($) {
-  my ($hash)= @_;
-  #Debug "getInterfaces(" . $hash->{NAME} .")= ".$hash->{internals}{interfaces};
-  if(defined($hash->{internals}{interfaces})) {
-    return split(/:/, $hash->{internals}{interfaces});
-  } else {
-    return ();
-  }
-}
-
-# get the names of the setters for a named interface
-# empty list is returned if interface is not defined
-sub
-getSettersForInterface($) {
-  my $interface= shift;
-  if(defined($interface)) {
-    return split /:/, $interfaces{$interface}{setters};
-  } else {
-    return ();
-  }
-}
-
-# get the names of the getters for a named interface
-# empty list is returned if interface is not defined
-sub
-getGettersForInterface($) {
-  my $interface= shift;
-  if(defined($interface)) {
-    return split /:/, $interfaces{$interface}{getters};
-  } else {
-    return ();
-  }
-}
-
-# get the names of the readings for a named interface
-# empty list is returned if interface is not defined
-sub
-getReadingsForInterface($) {
-  my $interface= shift;
-  if(defined($interface)) {
-    return split /:/, $interfaces{$interface}{readings};
-  } else {
-    return ();
-  }
-}
-
-# get the names of the setters for the device represented by the $hash
-# empty list is returned if interfaces are not defined
-sub
-getSetters($) {
-  my ($hash)= @_;
-  my ($interface, @setters);
-  #Debug "getSetters...";
-  foreach $interface (getInterfaces($hash)) {
-    #Debug "Interface $interface";
-    push @setters, getSettersForInterface($interface);
-  } 
-  return @setters;
-}
-
-# get the names of the getters for the device represented by the $hash
-# empty list is returned if interfaces are not defined
-sub
-getGetters($) {
-  my ($hash)= @_;
-  my @getters;
-  my $interface;
-  foreach $interface (getInterfaces($hash)) {
-    push @getters, getGettersForInterface($interface);
-  }
-  return @getters;
-}
-
 sub 
 concatc($$$) {
   my ($separator,$a,$b)= @_;;
   return($a && $b ?  $a . $separator . $b : $a . $b);
 }
-
-
-# this creates the standard interface definitions as in
-# http://fhemwiki.de/wiki/DevelopmentInterfaces
-sub
-createInterfaceDefinitions() {
-
-  #Log 2, "Creating interface definitions...";
-  # The interfaces list below consists of lines with the 
-  # pipe-separated parts
-  # - name
-  # - ancestor
-  # - colon separated list of readings
-  # - colon-separated list of getters
-  # - colon-separated list of setters
-  # If no getters are listed they are considered identical
-  # to the readings.
-  # Ancestors must be listed before descendants.
-  # Two interfaces can share a subset of readings, getters and setters
-  # if and only if one interface is the ancestor of the other.
-  my $IDefs= <<EOD;
-interface||||
-switch|interface|onoff||
-switch_active|switch|||
-switch_passive|switch|||on:off
-dimmer|switch_passive|level||dimto:dimup:dimdown
-temperature|interface|temperature||
-humidity|interface|humidity||
-wind|interface|wind||
-power|interface|power:maxPower:energy||
-EOD
-  
-  my ($i,@p);
-  foreach $i (split /\n/, $IDefs) {
-    my ($interface,$ancestor,$readings,$getters,$setters)= split /\|/, $i;
-    $getters= $readings unless($getters);
-    if($ancestor) {
-      $readings=  concatc(":", $interfaces{$ancestor}{readings}, $readings);
-      $getters=  concatc(":", $interfaces{$ancestor}{getters}, $getters);
-      $setters=  concatc(":", $interfaces{$ancestor}{setters}, $setters);
-    }
-    $interfaces{$interface}{ancestor}= $ancestor;
-    $interfaces{$interface}{readings}= $readings;
-    $interfaces{$interface}{getters}= $getters;
-    $interfaces{$interface}{setters}= $setters;
-    Log 5, "Interface \"$interface\": " .
-           "readings \"$readings\", getters \"$getters\", setters \"$setters\"";
-  }
-
-}
-
 
 ################################################################
 #
