@@ -759,6 +759,18 @@ sub _cfgDB_Writefile($$) {
 	return;
 }
 
+sub _cfgDB_Updatefile($) {
+	my ($filename) = @_;
+	my $fhem_dbh = _cfgDB_Connect;
+	my $id = $fhem_dbh->selectrow_array("SELECT filename from fhemfilesave where filename = '$filename'");
+	$fhem_dbh->disconnect();
+	if($id) {
+		_cfgDB_Fileimport($filename,1) if $id;
+		Log 5, "file $filename updated in configDB";
+	}
+	return;
+}
+
 #   read filelist containing 99_ files in database
 sub cfgDB_Read99() {
   my $ret;
