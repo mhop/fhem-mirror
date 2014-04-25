@@ -743,7 +743,7 @@ sub CUL_HM_Parse($$) {#########################################################
   my ($msg,$msgStat,$myRSSI,$msgIO) = split(":",$msgIn,4);
   # Msg format: Allnnffttssssssddddddpp...
   my ($t,$len,$mNo,$mFlg,$mTp,$src,$dst,$p) = unpack 'A1A2A2A2A2A6A6A*',$msg;
-
+  my $mFlgH = hex($mFlg);
   return if (!$iohash ||
              ref($iohash) ne 'HASH'  ||
              $t ne 'A'  || 
@@ -768,7 +768,7 @@ sub CUL_HM_Parse($$) {#########################################################
                     ($dst eq $id ? $ioName :
                                    $dst));
   if(!$shash && $mTp eq "00") { # generate device
-    my $md = substr($p, 2, 4);
+    my $md = $mI[1].$mI[2];
     $md = $culHmModel->{$md}{name}  ?
               $culHmModel->{$md}{name} :
               "ID_".$md;
@@ -837,7 +837,7 @@ sub CUL_HM_Parse($$) {#########################################################
   my $md = AttrVal($name, "model"  , "");
   my $tn = TimeNow();
   CUL_HM_storeRssi($name,
-                   "at_".((hex($mFlg)&0x40)?"rpt_":"").$ioName,# repeater?
+                   "at_".(($mFlgH&0x40)?"rpt_":"").$ioName,# repeater?
                    $myRSSI);
 
   # +++++ check for duplicate or repeat ++++
@@ -908,14 +908,14 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,$sM];
     }
     else {
-      push @evtEt,[$shash,1,"unknown:$p"       ];
+      push @evtEt,[$shash,1,"unknown:$p"];
     }
   }
   elsif($md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/) { ###########################
-    my ($sType,$chn) = ($1,$2) if($p && $p =~ m/^(..)(..)/);
-    if($mTp eq "70" && $p =~ m/^(....)(..)/) { # weather event
+    my ($sType,$chn) = ($mI[0],$mI[1]);
+    if($mTp eq "70") { # weather event
       $chn = '01'; # fix definition
-      my (    $t,      $h) =  (hex($1), hex($2));# temp is 15 bit signed
+      my (    $t,      $h) =  (hex($mI[0].$mI[1]), hex($mI[2]));# temp is 15 bit signed
       $t = sprintf("%2.1f",($t & 0x3fff)/10*(($t & 0x4000)?-1:1));
       my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
       if ($chnHash){
@@ -927,10 +927,10 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"measured-temp:$t"];
       push @evtEt,[$shash,1,"humidity:$h"];
     }
-    elsif($mTp eq "58" && $p =~ m/^(..)(..)/) {# climate event
+    elsif($mTp eq "58") {# climate event
       $chn = '02'; # fix definition
       my (   $d1,     $vp) = # adjust_command[0..4] adj_data[0..250]
-         (    $1, hex($2));
+         (    $mI[0], hex($mI[1]));
       $vp = int($vp/2.56+0.5);   # valve position in %
       my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
       if($chnHash){
@@ -955,10 +955,10 @@ sub CUL_HM_Parse($$) {#########################################################
     }
     elsif(($mTp eq '02' &&$sType eq '01')||    # ackStatus
           ($mTp eq '10' &&$sType eq '06')){    # infoStatus
-      my $dTemp = hex(substr($p,4,2))/2;
+      my $dTemp = hex($mI[2])/2;
       $dTemp = ($dTemp < 6 )?'off':
                ($dTemp >30 )?'on' :sprintf("%0.1f", $dTemp);
-      my $err = hex(substr($p,6,2));
+      my $err = hex($mI[3]);
       my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
       if($chnHash){
         my $chnName = $chnHash->{NAME};
@@ -1009,8 +1009,8 @@ sub CUL_HM_Parse($$) {#########################################################
     }
   }
   elsif($md =~ m/(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/) { ###########################
-    if($mTp eq "02" && $p =~ m/^(..)(..)(..)(..)/) {#subtype+chn+value+err
-      my ($chn,$vp, $err) = (hex($2),hex($3), hex($4));
+    if($mTp eq "02" && @mI > 2) {#subtype+chn+value+err
+      my ($chn,$vp, $err) = map{hex($_)} @mI[1..3];
       $chn = sprintf("%02X",$chn&0x3f);
       $vp = int($vp)/2;   # valve position in %
       push @evtEt,[$shash,1,"ValvePosition:$vp"];
@@ -1685,7 +1685,7 @@ sub CUL_HM_Parse($$) {#########################################################
       $state = 0;
     }
 
-    if($ioId eq $dst && hex($mFlg)&0x20 && $state){
+    if($ioId eq $dst && $mFlgH&0x20 && $state){
       push @ack,$shash,$mNo."8002".$ioId.$src."0101${state}00";
     }
   }
@@ -1722,7 +1722,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"SDunknownMsg:$p"] if(!@evtEt);
     }
 
-    if($ioId eq $dst && (hex($mFlg)&0x20)){  # Send Ack/Nack
+    if($ioId eq $dst && ($mFlgH&0x20)){  # Send Ack/Nack
       push @ack,$shash,$mNo."8002".$ioId.$src.($mFlg.$mTp eq "A001" ? "80":"00");
     }
   }
@@ -1859,7 +1859,7 @@ sub CUL_HM_Parse($$) {#########################################################
             $stAck = '01'.$dChNo.(($stT eq "ON")?"C8":"00")."00"
           }
           
-          if (hex($mFlg)&0x20){
+          if ($mFlgH & 0x20){
             $longPress .= "_Release";
             $dChHash->{helper}{trgLgRpt}=0;
             push @ack,$dhash,$mNo."8002".$dst.$src.$stAck;
@@ -1890,16 +1890,19 @@ sub CUL_HM_Parse($$) {#########################################################
         CUL_HM_respPendRm($dhash);
       }
     }
-    push @ack,$dhash,$mNo."8002".$dst.$src."00" if (hex($mFlg)&0x20 && (!@ack) && $sendAck);
+    push @ack,$dhash,$mNo."8002".$dst.$src."00" if ($mFlgH & 0x20 && (!@ack) && $sendAck);
   }
   elsif($ioId eq $dst){# if fhem is destination check if we need to react
-    if($mTp =~ m/^4./ && $p =~ m/^(..)/ &&  #Push Button event
-       (hex($mFlg)&0x20)){  #response required Flag
-      my ($recChn) = (hex($1));# button number/event count
+    if($mTp =~ m/^4./ &&  #Push Button event
+       ($mFlgH & 0x20)){  #response required Flag
                 # fhem CUL shall ack a button press
-#      push @ack,$shash,$mNo."8002".$dst.$src."0101".(($recChn&1)?"C8":"00")."00";
-      push @ack,$shash,$mNo."8002$dst$src"."00";
-      Log3 $name,5,"CUL_HM $name prep ACK for $recChn";
+#      if($mFlgH & 0x02){
+        push @ack,$shash,$mNo."8002$dst$src"."00";
+#      }
+#      else{
+#        push @ack,$shash,$mNo."8002".$dst.$src."0101".((hex($mI[0])&1)?"C8":"00")."00";
+#      }
+      Log3 $name,5,"CUL_HM $name prep ACK for $mI[0]";
     }
   }
 
@@ -1908,7 +1911,7 @@ sub CUL_HM_Parse($$) {#########################################################
   #        parser did not supress
   push @ack,$shash, $mNo."8002".$ioId.$src."00"
       if(   ($ioId eq $dst)   #are we adressee
-         && (hex($mFlg)&0x20) #response required Flag
+         && ($mFlgH & 0x20)   #response required Flag
          && @evtEt            #only ack if we identified it
          && (!@ack)           #sender requested ACK
          );
@@ -2299,7 +2302,6 @@ sub CUL_HM_parseCommon(@){#####################################################
     $ret = "done";
   }
   elsif($mTp =~ m /^4[01]/){ #someone is triggered##########
-    CUL_HM_stateUpdatDly($dhash->{NAME},10) if ($mFlgH & 0x20 && $dhash);
     my $chn = hex(substr($p,0,2));
     my $long = ($chn & 0x40)?"long":"short";
     $chn = $chn & 0x3f;
@@ -2316,13 +2318,14 @@ sub CUL_HM_parseCommon(@){#####################################################
       $level = $long;
     }
 
-    my @peers = split(",",AttrVal($cName,"peerIDs",""));
-    foreach my $peer (grep !/00000000/,@peers){
+    my @peers = grep !/00000000/,split(",",AttrVal($cName,"peerIDs",""));
+    foreach my $peer (grep /$dst/,@peers){
       my $pName = CUL_HM_id2Name($peer);
       $pName = CUL_HM_id2Name(substr($peer,0,6)) if (!$defs{$pName});
       next if (!$defs{$pName});#||substr($peer,0,6) ne $dst
       push @evtEt,[$defs{$pName},1,"trig_$cName:$level"];
       push @evtEt,[$defs{$pName},1,"trigLast:$cName ".(($level ne "-")?":$level":"")];
+      CUL_HM_stateUpdatDly($pName,10);
     }
     return "";
   }
@@ -3711,7 +3714,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $pressCnt = (!$hash->{helper}{count}?1:$hash->{helper}{count}+1)%256;
     $hash->{helper}{count}=$pressCnt;# remember for next round
     if ($st eq 'virtual'){#serve all peers of virtual button
-      my @peerList = map{substr($_,0,6)} split(',',AttrVal($name,"peerIDs",""));
+      my @peerLchn = split(',',AttrVal($name,"peerIDs",""));
+      my @peerList = map{substr($_,0,6)} @peerLchn;
       @peerList = grep !/^$/,CUL_HM_noDup(@peerList);
       @peerList = ('000000') if (scalar@peerList == 0);#send broadcast if no peer
       foreach my $peer (sort @peerList){
@@ -3725,7 +3729,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                        $peerFlag,$dst,$peer,
                        hex($chn)+$mode,
                        $pressCnt));
-
+        foreach my $pCh(grep /$peer/,@peerLchn){
+          CUL_HM_stateUpdatDly(CUL_HM_id2Name($pCh),10);
+        }
         if ($rxt & 0x80){#burstConditional
           CUL_HM_SndCmd($pHash, "++B112$id".substr($peer,0,6))
                 if($vChn ne "noBurst");
