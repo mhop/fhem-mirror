@@ -38,6 +38,7 @@
   <developer id="34" name="justme">
     <dev id="3" name="rgbdriver" label="RGB driver board with IR"/>
     <dev id="7" name="statusmon" label="Status Monitor"/>
+    <dev id="8" name="indoorsensor" label="Indoor Multi Sensor"/>
     <dev id="16" name="epd" label="ePaper Display"/>
     <dev id="4294967295" name="streamtest" label="PanStream Test"/>
     <dev id="15" name="panfirmata" label="PanStream Firmata"/>
