@@ -5,7 +5,7 @@
 # based on 02_RSS.pm 
 #
 ##############################################
-# $Id: $
+# $Id$
 
 package main;
 use strict;
