@@ -126,7 +126,8 @@ sub GDS_Define($$$) {
 	} else {
 		Log3($name, 3, "GDS $name: No datafile (alerts) found");
 	}
-	readingsSingleUpdate($hash, "state", "active",1);
+	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
+	readingsSingleUpdate($hash, 'state', 'active',1);
 
 	return undef;
 }
