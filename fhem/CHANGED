@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - added:   new module 36_EC3000.pm (justme1968)
+  - feature: IT: added support for set-extensions (justme1968)
   - added:   new modules 10_Itach_IR and 88_Itach_IRDevice to
              use Itach WF2IR or IP2IR to be used as universal 
              infrared remotecontrol
