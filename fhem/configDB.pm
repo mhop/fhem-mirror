@@ -768,7 +768,7 @@ sub _cfgDB_Updatefile($) {
 		_cfgDB_Fileimport($filename,1) if $id;
 		Log 5, "file $filename updated in configDB";
 	}
-	return;
+	return "";
 }
 
 #   read filelist containing 99_ files in database
