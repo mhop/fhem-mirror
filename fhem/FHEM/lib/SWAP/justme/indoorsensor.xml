@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<device>
+  <developer>justme</developer>
+  <product>Indoor Multi Sensor</product>
+  <pwrdownmode>false</pwrdownmode>
+  <regular>
+    <reg name="Temperature, Humidity and Pressure" id="11">
+      <endpoint name="Temperature" type="num" dir="inp">
+        <position>0</position>
+        <size>2</size>
+        <units>
+          <unit name="C" factor="0.1" offset="-50"/>
+          <unit name="F" factor="0.18" offset="-58"/>
+          <unit name="K" factor="0.1" offset="223.15"/>
+        </units>
+      </endpoint>
+      <endpoint name="Humidity" type="num" dir="inp">
+        <position>2</position>
+        <size>2</size>
+        <units>
+          <unit name="%" factor="0.1" offset="0"/>
+        </units>
+      </endpoint>
+      <endpoint name="Pressure" type="num" dir="inp">
+        <position>4</position>
+        <size>4</size>
+        <units>
+          <unit name="mbar" factor="0.01" offset="0"/>
+          <unit name="Pa" factor="1" offset="0"/>
+          <unit name="bar" factor="0.00001" offset="0"/>
+        </units>
+      </endpoint>
+    </reg>
+    <reg name="Bri" id="12" hwmask="04">
+      <endpoint name="Brightness" type="num" dir="inp">
+        <size>2</size>
+        <units>
+          <unit factor="1" offset="0"/>
+        </units>
+      </endpoint>
+    </reg>         
+    <reg name="Desired Temperature" id="13">
+      <endpoint name="DesiredTemperature" type="num" dir="out">
+        <size>2</size>
+        <units>
+          <unit name="C" factor="0.1" offset="-50"/>
+          <unit name="F" factor="0.18" offset="-58"/>
+          <unit name="K" factor="0.1" offset="223.15"/>
+        </units>
+      </endpoint>
+    </reg>         
+    <reg name="Text" id="14">
+      <endpoint name="PopUp Timeout" type="num" dir="out">
+        <position>0</position>
+        <size>2</size>
+      </endpoint>
+      <endpoint name="Prioity" type="num" dir="out">
+        <position>2</position>
+        <size>1</size>
+      </endpoint>
+      <endpoint name="Text" type="str" dir="out">
+        <position>3</position>
+        <size>24</size>
+      </endpoint>
+    </reg>
+  </regular>
+</device>
