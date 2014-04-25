@@ -628,13 +628,13 @@ ZWave_Parse($$@)
 
   } elsif($cmd eq "ZW_REQUEST_NODE_NEIGHBOR_UPDATE") {
     if ($id eq "21") {
-      $evt = 'STARTED';
+      $evt = 'started';
     } elsif ($id eq "22") {
-      $evt = 'DONE';
+      $evt = 'done';
     } elsif ($id eq "23") {
-      $evt = 'FAILED';
+      $evt = 'failed';
     } else {
-      $evt = 'unknown';
+      $evt = 'unknown'; # should never happen
     }
 
   }
