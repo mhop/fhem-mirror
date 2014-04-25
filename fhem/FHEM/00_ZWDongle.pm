@@ -645,6 +645,12 @@ ZWDongle_Ready($)
     device upon reception of the answer. Used for previously included nodes,
     see the nodeList get command below.</li>
 
+  <li>neighborUpdate<br>
+    Requests controller to update his routing table which is based on
+    slave's neighbor list. The update may take significant time to complete.
+    With the event "done" or "failed" ZWDongle will notify the end of the update process.
+    To read node's neighbor list see neighborList get below.</li>
+
   </ul>
   <br>
 
@@ -665,6 +671,10 @@ ZWDongle_Ready($)
   <li>nodeInfo<br>
     return node specific information. Needed by developers only.</li>
 
+  <li>neighborList id<br>
+    returns the list of neighbor nodeIds of specified node.
+    Provides insights to actual network topology.
+    List includes dead links and non-routing neighbors</li>
 
   <li>raw<br>
     Send raw data to the controller. Developer only.</li>
@@ -688,6 +698,8 @@ ZWDongle_Ready($)
   <li>ZW_REMOVE_NODE_TO_NETWORK [learnReady|nodeFound|slave|controller|done|failed]
     </li>
   <li>UNDEFINED ZWave_${type6}_$id ZWave $homeId $id $classes"
+    </li>
+  <li>ZW_REQUEST_NODE_NEIGHBOR_UPDATE [started|done|failed]
     </li>
   </ul>
 
