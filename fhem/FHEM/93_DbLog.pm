@@ -591,7 +591,8 @@ sub DbLog_Connect($)
       Log3 $hash->{NAME}, 1, "Cannot open database configuration file $configfilename.";
       return 0;
     }
-    @config = split(/\n/,$c);
+    @config = $c;
+
   } else {
     if(!open(CONFIG, $configfilename)) {
       Log3 $hash->{NAME}, 1, "Cannot open database configuration file $configfilename.";
