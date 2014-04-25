@@ -65,6 +65,8 @@
 #
 #              modified  _cfgDB_Info to show number of files in db
 #
+# 2014-04-23 - added     command fileshow, filemove
+#
 ##############################################################################
 #
 
@@ -770,6 +772,15 @@ sub cfgDB_Read99() {
   $sth->finish();
   $fhem_dbh->disconnect();
   $ret =~ s/,$//;
+  return $ret;
+}
+
+sub cfgDB_Fileversion($$) {
+  my ($file,$ret) = @_;
+  my $fhem_dbh = _cfgDB_Connect;
+  my $id = $fhem_dbh->selectrow_array("SELECT line from fhemfilesave where filename = '$file' and line like '%$Id:%'");
+  $fhem_dbh->disconnect();
+  $ret = ($id) ? $id : $ret;
   return $ret;
 }
 
