@@ -109,22 +109,18 @@ ECMDDevice_Changed($$$)
 {
         my ($hash, $cmd, $value)= @_;
 
+        readingsBeginUpdate($hash);
+        my $state= $cmd;
+
         if(defined($value) && $value ne "") {
-          readingsBeginUpdate($hash);
           readingsBulkUpdate($hash, $cmd, $value);
-
-          my $state= $cmd;
           $state.= " $value";
-          readingsBulkUpdate($hash, "state", $state);
-
-          readingsEndUpdate($hash, 1);
-
-          my $name= $hash->{NAME};
-          Log3 $hash, 4 , "ECMDDevice $name $state";
-
-          return $state;
         }
-
+        readingsBulkUpdate($hash, "state", $state);
+        readingsEndUpdate($hash, 1);
+        my $name= $hash->{NAME};
+        Log3 $hash, 4 , "ECMDDevice $name $state";
+        return $state;
 }
 
 ###################################
