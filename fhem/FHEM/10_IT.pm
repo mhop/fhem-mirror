@@ -6,9 +6,12 @@
 # Published under GNU GPL License
 ######################################################package main;
 
+# $Id$
+
 use strict;
 use warnings;
 
+use SetExtensions;
 
 my %codes = (
   "XMIToff" 		=> "off",
@@ -90,64 +93,59 @@ IT_Do_On_Till($@)
 sub
 IT_Set($@)
 {
-  my ($hash, @a) = @_;
+  my ($hash, $name, @a) = @_;
+
   my $ret = undef;
   my $na = int(@a);
   my $message;
 
-  return "no set value specified" if($na < 2 || $na > 3);
+  return "no set value specified" if($na < 1);
 
-  my $c = $it_c2b{$a[1]};
-  if(!defined($c)) {
+  my $list = "";
+  $list .= "off:noArg on:noArg " if( AttrVal($name, "model", "") ne "itremote" );
+  $list .= "dimUp:noArg dimDown:noArg on-till" if( AttrVal($name, "model", "") eq "itdimmer" );
 
-    # Model specific set arguments
-    if(defined($attr{$a[0]}) && defined($attr{$a[0]}{"model"})) {
-      my $mt = $models{$attr{$a[0]}{"model"}};
-      return "Unknown argument $a[1], choose one of "
-                                               if($mt && $mt eq "sender");
-      return "Unknown argument $a[1], choose one of $it_simple"
-                                               if($mt && $mt eq "simple");
-    }
-    return "Unknown argument $a[1], choose one of " .
-                                join(" ", sort keys %it_c2b);
-  }
+  return SetExtensions($hash, $list, $name, @a) if( $a[0] eq "?" );
+  return SetExtensions($hash, $list, $name, @a) if( !grep( $_ =~ /^$a[0]($|:)/, split( ' ', $list ) ) );
 
-  return IT_Do_On_Till($hash, @a) if($a[1] eq "on-till");
-  return "Bad time spec" if($na == 3 && $a[2] !~ m/^\d*\.?\d+$/);
+  my $c = $it_c2b{$a[0]};
+
+  return IT_Do_On_Till($hash, @a) if($a[0] eq "on-till");
+  return "Bad time spec" if($na == 2 && $a[1] !~ m/^\d*\.?\d+$/);
 
   my $io = $hash->{IODev};
 
 	## Do we need to change RFMode to SlowRF??
-  if(defined($attr{$a[0]}) && defined($attr{$a[0]}{"switch_rfmode"})) {
-  	if ($attr{$a[0]}{"switch_rfmode"} eq "1") {			# do we need to change RFMode of IODev
+  if(defined($attr{$name}) && defined($attr{$name}{"switch_rfmode"})) {
+  	if ($attr{$name}{"switch_rfmode"} eq "1") {			# do we need to change RFMode of IODev
   		  my $ret = CallFn($io->{NAME}, "AttrFn", "set", ($io->{NAME}, "rfmode", "SlowRF"));
  	 	}	
 	}
 
   ## Do we need to change ITrepetition ??	
-  if(defined($attr{$a[0]}) && defined($attr{$a[0]}{"ITrepetition"})) {
-  	$message = "isr".$attr{$a[0]}{"ITrepetition"};
+  if(defined($attr{$name}) && defined($attr{$name}{"ITrepetition"})) {
+  	$message = "isr".$attr{$name}{"ITrepetition"};
 		CUL_SimpleWrite($io, $message);
-		Log GetLogLevel($a[0],4), "IT set ITrepetition: $message for $io->{NAME}";
+		Log GetLogLevel($name,4), "IT set ITrepetition: $message for $io->{NAME}";
 	}
 
   ## Do we need to change ITfrequency ??	
-  if(defined($attr{$a[0]}) && defined($attr{$a[0]}{"ITfrequency"})) {
-    my $f = $attr{$a[0]}{"ITfrequency"}/26*65536;
+  if(defined($attr{$name}) && defined($attr{$name}{"ITfrequency"})) {
+    my $f = $attr{$name}{"ITfrequency"}/26*65536;
     my $f2 = sprintf("%02x", $f / 65536);
     my $f1 = sprintf("%02x", int($f % 65536) / 256);
     my $f0 = sprintf("%02x", $f % 256);
     
     my $arg = sprintf("%.3f", (hex($f2)*65536+hex($f1)*256+hex($f0))/65536*26);
-    Log GetLogLevel($a[0],4), "Setting ITfrequency (0D,0E,0F) to $f2 $f1 $f0 = $arg MHz";
+    Log GetLogLevel($name,4), "Setting ITfrequency (0D,0E,0F) to $f2 $f1 $f0 = $arg MHz";
     CUL_SimpleWrite($hash, "if$f2$f1$f0");
 	}
 	
-  my $v = join(" ", @a);
+  my $v = $name ." ". join(" ", @a);
   $message = "is".uc($hash->{XMIT}.$hash->{$c});
 	
 	## Log that we are going to switch InterTechno
-  Log GetLogLevel($a[0],2), "IT set $v";
+  Log GetLogLevel($name,2), "IT set $v";
   (undef, $v) = split(" ", $v, 2);	# Not interested in the name...
 
 	## Send Message to IODev and wait for correct answer
@@ -159,21 +157,21 @@ IT_Set($@)
   }
 
   ## Do we need to change ITrepetition back??	
-  if(defined($attr{$a[0]}) && defined($attr{$a[0]}{"ITrepetition"})) {
+  if(defined($attr{$name}) && defined($attr{$name}{"ITrepetition"})) {
   	$message = "isr".$it_defrepetition;
 		CUL_SimpleWrite($io, $message);
-		Log GetLogLevel($a[0],4), "IT set ITrepetition back: $message for $io->{NAME}";
+		Log GetLogLevel($name,4), "IT set ITrepetition back: $message for $io->{NAME}";
 	}
 
   ## Do we need to change ITfrequency back??	
-  if(defined($attr{$a[0]}) && defined($attr{$a[0]}{"ITfrequency"})) {
-    Log GetLogLevel($a[0],4), "Setting ITfrequency back to 433.92 MHz";
+  if(defined($attr{$name}) && defined($attr{$name}{"ITfrequency"})) {
+    Log GetLogLevel($name,4), "Setting ITfrequency back to 433.92 MHz";
     CUL_SimpleWrite($hash, "if0");
 	}
 
 	## Do we need to change RFMode back to HomeMatic??
-  if(defined($attr{$a[0]}) && defined($attr{$a[0]}{"switch_rfmode"})) {
-  	if ($attr{$a[0]}{"switch_rfmode"} eq "1") {			# do we need to change RFMode of IODev
+  if(defined($attr{$name}) && defined($attr{$name}{"switch_rfmode"})) {
+  	if ($attr{$name}{"switch_rfmode"} eq "1") {			# do we need to change RFMode of IODev
   		  my $ret = CallFn($io->{NAME}, "AttrFn", "set", ($io->{NAME}, "rfmode", "HomeMatic"));
  	 	}	
 	}
@@ -383,6 +381,7 @@ IT_Parse($$)
     off
     on
     on-till           # Special, see the note
+    <li><a href="#setExtensions">set extensions</a> are supported.</li>
 </pre>
     Examples:
     <ul>
@@ -493,7 +492,194 @@ IT_Parse($$)
   </ul>
 </ul>
 
-
-
 =end html
+
+=begin html_DE
+
+<a name="IT"></a>
+<h3>IT - InterTechno</h3>
+<ul>
+  Das InterTechno 433MHZ Protokoll wird von einer Vielzahl von Ger&auml;ten 
+	benutzt. Diese geh&ouml;ren entweder zur Kategorie Sender/Sensoren oder zur 
+	Kategorie Empf&auml;nger/Aktoren. Derzeit ist nur das SENDEN von InterTechno 
+	Befehlen m&ouml;glich, so dass dieses Modul nur die Bedienung von Ger&auml;ten wie 
+	Schalter, Dimmer usw. &uuml;ber ein <a href="#CUL">CUL</a> unterst&uuml;tzt; der 
+	CUL muss daher bereits definiert sein.
+
+  <br><br>
+
+  <a name="ITdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; IT &lt;housecode&gt; &lt;on-code&gt; &lt;off-code&gt;
+    [&lt;dimup-code&gt;] [&lt;dimdown-code&gt;] </code>
+    <br>oder<br>
+    <code>define &lt;name&gt; IT &lt;ITRotarySwitches|FLS100RotarySwitches&gt; </code>
+    <br><br>
+
+   Der Wert von housecode ist abh&auml;ngig vom verwendeten Ger&auml;t und besteht aus zehn Ziffern InterTechno-Code. 
+   Da dieser ein tri-State-Protokoll ist, k&ouml;nnen die Ziffern jeweils 0/1/F annehmen.
+   <br>
+   Bit 11/12 werden f&uuml;r Schalten oder Dimmen verwendet. Da die Hersteller verschiedene Codes verwenden, k&ouml;nnen hier die 
+   (2-stelligen) Codes f&uuml;r an, aus, heller und dunkler (on/off/dimup/dimdown) als tri-State-Ziffern (0/1/F) festgelegt werden.
+	<br>
+   Der Wert des ITRotary-Schalters setzt sich aus dem Wert des Buchstaben-Schalters A-P und dem numerischen Schalter 1-16 
+   des InterTechno-Ger&auml;tes zusammen, z.B. A1 oder G12.
+<br>
+   Der Wert des FLS100Rotary-Schalters setzt sich aus dem Wert des Schalters I,II,II,IV und dem numerischen Schalter 1-4 
+   des InterTechno-Ger&auml;tes zusammen, z.B. I2 oder IV4.
+<br>
+   Die Werte der ITRotary-Schalter und FLS100Rotary-Schalter werden intern in housecode-Werte umgewandelt.
+<br>
+   <ul>
+   <li><code>&lt;housecode&gt;</code> 10 Ziffern lange tri-State-Zahl (0/1/F) abh&auml;ngig vom benutzten Ger&auml;t.</li>
+   <li><code>&lt;on-code&gt;</code> 2 Ziffern lange tri-State-Zahl, die den Einschaltbefehl enth&auml;lt;
+     die Zahl wird an den housecode angef&uuml;gt, um den 12-stelligen IT-Sendebefehl zu bilden.</li>
+   <li><code>&lt;off-code&gt;</code> 2 Ziffern lange tri-State-Zahl, die den Ausschaltbefehl enth&auml;lt;
+     die Zahl wird an den housecode angef&uuml;gt, um den 12-stelligen IT-Sendebefehl zu bilden.</li>
+   <li>Der optionale <code>&lt;dimup-code&gt;</code> ist eine 2 Ziffern lange tri-State-Zahl, die den Befehl zum Heraufregeln enth&auml;lt;
+     die Zahl wird an den housecode angef&uuml;gt, um den 12-stelligen IT-Sendebefehl zu bilden.</li>
+   <li>Der optionale <code>&lt;dimdown-code&gt;</code> ist eine 2 Ziffern lange tri-State-Zahl, die den Befehl zum Herunterregeln enth&auml;lt;
+     die Zahl wird an den housecode angef&uuml;gt, um den 12-stelligen IT-Sendebefehl zu bilden.</li>
+   </ul>
+   <br>
+
+    Beispiele:
+    <ul>
+      <code>define lamp IT 01FF010101 11 00 01 10</code><br>
+      <code>define roll1 IT 111111111F 11 00 01 10</code><br>
+      <code>define otherlamp IT 000000000F 11 10 00 00</code><br>
+      <code>define otherroll1 IT FFFFFFF00F 11 10</code><br>
+      <code>define itswitch1 IT A1</code><br>
+      <code>define lamp IT J10</code><br>
+      <code>define flsswitch1 IT IV1</code><br>
+      <code>define lamp IT II2</code>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="ITset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt]</code>
+    <br><br>
+    wobei <code>value</code> eines der folgenden Schl&uuml;sselw&ouml;rter ist:<br>
+    <pre>
+    dimdown
+    dimup
+    off
+    on
+    on-till           # siehe Anmerkungen
+    <li>Die <a href="#setExtensions">set extensions</a> werden unterst&uuml;tzt.</li>
+</pre>
+    Beispiele:
+    <ul>
+      <code>set lamp on</code><br>
+      <code>set lamp1,lamp2,lamp3 on</code><br>
+      <code>set lamp1-lamp3 on</code><br>
+      <code>set lamp off</code><br>
+    </ul>
+    <br>
+    Anmerkungen:
+    <ul>
+      <li>on-till erfordert eine Zeitangabe im "at"-Format (HH:MM:SS, HH:MM
+      oder { &lt;perl code&gt; }, wobei dieser Perl-Code eine Zeitangabe zur&uuml;ckgibt).
+      Ist die aktuelle Zeit gr&ouml;&szlig;er als die Zeitangabe, wird der Befehl verworfen, 
+      andernfalls wird ein Einschaltbefehl gesendet und f&uuml;r die Zeitangabe ein 
+      Ausschaltbefehl mittels "at"-Befehl angelegt.
+      </li>
+    </ul>
+  </ul>
+  <br>
+
+  <b>Get</b> <ul>N/A (nicht vorhanden)</ul><br>
+
+  <a name="ITattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <a name="IODev"></a>
+    <li>IODev<br>
+        Spezifiziert das physische Ger&auml;t, das die Ausstrahlung der Befehle f&uuml;r das 
+        "logische" Ger&auml;t ausf??hrt. Ein Beispiel f&uuml;r ein physisches Ger&auml;t ist ein CUL.<br>
+        Anmerkung: Beim Start weist fhem einem InterTechno-Ger&auml;t kein IO-Ger&auml;t zu. 
+        Das Attribut IODev ist daher IMMER zu setzen.</li><br>
+
+    <a name="eventMap"></a>
+    <li>eventMap<br>
+      Ersetzt Namen von Ereignissen und set Parametern. Die Liste besteht dabei 
+      aus mit Doppelpunkt verbundenen Wertepaaren, die durch Leerzeichen getrennt 
+      sind. Der erste Teil des Wertepaares ist der "alte" Wert, der zweite der neue/gew&uuml;nschte. 
+      Ist das erste Zeichen der Werteliste ein Komma (,) oder ein Schr&auml;gsstrich (/), wird 
+      das Leerzeichen als Listenzeichen durch dieses ersetzt. Dies erlaubt die Benutzung 
+      von Leerzeichen innerhalb der Werte.
+      Beispiele:<ul><code>
+      attr store eventMap on:open off:closed<br>
+      attr store eventMap /on-for-timer 10:open/off:closed/<br>
+      set store open
+      </code></ul>
+    </li><br>
+
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <a name="attrdummy"></a>
+    <li>dummy<br>
+      Mit der Eigenschaft dummy lassen sich Ger&auml;te definieren, die keine physikalischen Befehle 
+      senden sollen. Verkn&uuml;pfte notifys werden trotzdem ausgef&uuml;hrt. Damit kann z.B. auf Sendebefehle 
+      reagiert werden, die &uuml;ber die Weboberfl&auml;che ausgel&ouml;st wurden, ohne dass der Befehl physikalisch
+      gesendet wurde.
+    </li><br>
+
+    <li><a href="#loglevel">loglevel</a></li><br>
+
+    <li><a href="#showtime">showtime</a></li><br>
+
+    <a name="model"></a>
+    <li>model<br>
+      Hiermit kann das Modell des IT-Ger&auml;ts n&auml;her beschrieben werden. Diese 
+      Eigenschaft wird (im Moment) nicht von fhem ausgewertet.
+      Mithilfe dieser Information k&ouml;nnen externe Programme oder Web-Interfaces
+      Ger&auml;teklassen unterscheiden, um geeignete Kommandos zu senden (z.B. "on" 
+      oder "off" an Schalter, aber "dim..%" an Dimmer usw.). Die Schreibweise 
+      der Modellbezeichnung sollten der dem Ger&auml;t mitgelieferten Dokumentation
+      in Kleinbuchstaben ohne Leerzeichen entsprechen. 
+      Andere Zeichen als <code>a-z 0-9</code> und <code>-</code> (Bindestrich)
+      sollten vermieden werden. Dies ist die Liste der "offiziellen" Modelltypen:<br>
+        <b>Sender/Sensor</b>: itremote<br>
+
+        <b>Dimmer</b>: itdimmer<br>
+
+        <b>Empf&auml;nger/Actor</b>: itswitch
+    </li><br>
+
+
+    <a name="ignore"></a>
+    <li>ignore<br>
+      Durch das Setzen dieser Eigenschaft wird das Ger&auml;t nicht durch fhem beachtet,
+      z.B. weil es einem Nachbarn geh&ouml;rt. Aktivit&auml;ten dieses Ger&auml;tes erzeugen weder
+      Log-Eintr&auml;ge noch reagieren notifys darauf, erzeugte Kommandos werden ignoriert
+      (wie bei Verwendung des Attributes <a href="#attrdummy">dummy</a> werden keine 
+      Signale gesendet). Das Ger&auml;t ist weder in der Ausgabe des list-Befehls enthalten
+      (au&szlig;er es wird explizit aufgerufen), noch wird es bei Befehlen ber&uuml;cksichtigt, 
+      die mit Platzhaltern in Namensangaben arbeiten (siehe <a href="#devspec">devspec</a>).
+      Sie werden weiterhin mit der speziellen devspec (Ger&auml;tebeschreibung) "ignored=1" gefunden.
+        </li><br>
+
+  </ul>
+  <br>
+
+  <a name="ITevents"></a>
+  <b>Erzeugte Ereignisse (Events):</b>
+  <ul>
+     Ein IT-Ger&auml;t kann folgende Ereignisse generieren:
+     <li>on</li>
+     <li>off</li>
+     <li>dimdown</li>
+     <li>dimup<br></li>
+     Welche Ereignisse erzeugt werden ist ger&auml;teabh&auml;ngig und kann evtl. am Ger&auml;t eingestellt werden.
+  </ul>
+</ul>
+
+
+
+=end html_DE
+
 =cut
