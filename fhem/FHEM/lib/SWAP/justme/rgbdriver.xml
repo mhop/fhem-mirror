@@ -54,7 +54,7 @@
         <size>1</size>
       </endpoint>
     </reg>
-    <reg name="RGB" id="11" swversion="00020000" hwmask="0x40">
+    <reg name="RGB" id="11" swversion="00020000" hwmask="40">
       <endpoint name="RGBlevel" type="bin" dir="out">
         <size>4</size>
       </endpoint>
@@ -75,7 +75,7 @@
         <size>1</size>
       </endpoint>
     </reg>
-    <reg name="RGB" id="11" swversion="00020000" hwmask="0x80">
+    <reg name="RGB" id="11" swversion="00020000" hwmask="80">
       <endpoint name="RGBlevel" type="bin" dir="out">
         <size>5</size>
       </endpoint>
