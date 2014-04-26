@@ -483,8 +483,6 @@ foreach my $d (keys %defs) {
   }
 }
 
-RTypes_ShowTypeLibrary();
-
 DoTrigger("global", "INITIALIZED", 1);
 $fhem_started = time;
 
