@@ -1,4 +1,3 @@
-
 ##############################################
 # $Id$
 #
@@ -67,9 +66,12 @@ sub DbLog_Define($@)
   #remember PID for plotfork
   $hash->{PID} = $$;
 
-  return "Can't connect to database." if(!DbLog_Connect($hash));
+  # read configuration data
+  my $ret = _DbLog_readCfg($hash);
+  return $ret if ($ret); # return on error while reading configuration
 
-  readingsSingleUpdate($hash, 'state', 'active', 1);
+  readingsSingleUpdate($hash, 'state', 'waiting for connection', 1);
+  eval { DbLog_Connect($hash); };
 
   return undef;
 }
@@ -413,7 +415,8 @@ sub DbLog_Push(@) {
   $unit     = substr($unit,0, $columns{UNIT});
 
   $dbh->{RaiseError} = 1;
-  
+  $dbh->{PrintError} = 0;  
+
   $dbh->begin_work();
   
   my $sth_ih = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)") if (lc($DbLogType) =~ m(history) );
@@ -447,7 +450,8 @@ sub DbLog_Push(@) {
   }
   else {
     $dbh->commit();
-    $dbh->{RaiseError} = 0;  
+    $dbh->{RaiseError} = 0; 
+    $dbh->{PrintError} = 1;
   }
 
   return $dbh->{RaiseError};
@@ -576,46 +580,48 @@ sub DbLog_implode_datetime($$$$$$) {
 # Verbindung zur DB aufbauen
 #
 ################################################################
-sub DbLog_Connect($)
-{
+sub _DbLog_readCfg($){
   my ($hash)= @_;
+  my $name = $hash->{NAME};
 
   my $configfilename= $hash->{CONFIGURATION};
   my @config;
   my %dbconfig; 
+  my $ret;
   
   if(configDBUsed()) {
     # Verwendung der configDB anstatt fhem.cfg
     my $c  = _cfgDB_Readfile($configfilename);
     if(! $c) {
-      Log3 $hash->{NAME}, 1, "Cannot open database configuration file $configfilename.";
-      return 0;
+      $ret = "Cannot read configuration file $configfilename from configDB.";
+      Log3 $hash->{NAME}, 1, $ret;
+      return $ret;
     }
     @config = $c;
-
   } else {
     if(!open(CONFIG, $configfilename)) {
-      Log3 $hash->{NAME}, 1, "Cannot open database configuration file $configfilename.";
-      return 0; 
+      $ret = "Cannot open database configuration file $configfilename.";
+      Log3 $hash->{NAME}, 1, $ret;
+      return $ret;
     }
     @config=<CONFIG>;
     close(CONFIG);
   }
- 
+
   eval join("", @config);
 
-  my $dbconn= $dbconfig{connection};
-  my $dbuser= $dbconfig{user};
-  my $dbpassword= $dbconfig{password};
+  $hash->{dbconn}     = $dbconfig{connection};
+  $hash->{dbuser}     = $dbconfig{user};
+  $attr{"sec$name"}{secret} = $dbconfig{password};
 
   #check the database model
-  if($dbconn =~ m/pg:/i) {
+  if($hash->{dbconn} =~ m/pg:/i) {
     $hash->{DBMODEL}="POSTGRESQL";
-  } elsif ($dbconn =~ m/mysql:/i) {
+  } elsif ($hash->{dbconn} =~ m/mysql:/i) {
     $hash->{DBMODEL}="MYSQL";
-  } elsif ($dbconn =~ m/oracle:/i) {
+  } elsif ($hash->{dbconn} =~ m/oracle:/i) {
     $hash->{DBMODEL}="ORACLE";
-  } elsif ($dbconn =~ m/sqlite:/i) {
+  } elsif ($hash->{dbconn} =~ m/sqlite:/i) {
     $hash->{DBMODEL}="SQLITE";
   } else {
     $hash->{DBMODEL}="unknown";
@@ -623,14 +629,30 @@ sub DbLog_Connect($)
     Log3 $hash->{NAME}, 3, "Only Mysql, Postgresql, Oracle, SQLite are fully supported.";
     Log3 $hash->{NAME}, 3, "It may cause SQL-Erros during generating plots.";
   }
+	return;
+}
 
+sub DbLog_Connect($)
+{
+  my ($hash)= @_;
+  my $name = $hash->{NAME};
+  my $dbconn     = $hash->{dbconn};
+  my $dbuser     = $hash->{dbuser};
+  my $dbpassword = $attr{"sec$name"}{secret};
+  
   Log3 $hash->{NAME}, 3, "Connecting to database $dbconn with user $dbuser";
-  my $dbh = DBI->connect_cached("dbi:$dbconn", $dbuser, $dbpassword);
+  my $dbh = DBI->connect_cached("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0 });
   if(!$dbh) {
-    Log3 $hash->{NAME}, 2, "Can't connect to $dbconn: $DBI::errstr";
+    RemoveInternalTimer($hash);
+    Log3 $hash->{NAME}, 4, 'DbLog: Trying to connect to database';
+    InternalTimer(time+5, 'DbLog_Connect', $hash, 0);
+    Log3 $hash->{NAME}, 4, 'Waiting for database connection';
     return 0;
   }
+
   Log3 $hash->{NAME}, 3, "Connection to db $dbconn established for pid $$";
+  readingsSingleUpdate($hash, 'state', 'connected', 1);
+
   $hash->{DBH}= $dbh;
   
   if ($hash->{DBMODEL} eq "SQLITE") {
@@ -648,11 +670,19 @@ sub DbLog_Connect($)
   
   # creating an own connection for the webfrontend, saved as DBHF in Hash
   # this makes sure that the connection doesnt get lost due to other modules
-  my $dbhf = DBI->connect_cached("dbi:$dbconn", $dbuser, $dbpassword);
-  if(!$dbhf) {
-    Log3 $hash->{NAME}, 2, "Can't connect to $dbconn: $DBI::errstr";
+  my $dbhf = DBI->connect_cached("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0 });
+  if(!$dbh) {
+    RemoveInternalTimer($hash);
+    Log3 $hash->{NAME}, 4, 'DbLog: Trying to connect to database';
+    InternalTimer(time+5, 'DbLog_Connect', $hash, 0);
+    Log3 $hash->{NAME}, 4, 'Waiting for database connection';
     return 0;
   }
+
+#  if(!$dbhf) {
+#   Log3 $hash->{NAME}, 2, "Can't connect to $dbconn: $DBI::errstr";
+#    return 0;
+#  }
   Log3 $hash->{NAME}, 3, "Connection to db $dbconn established";
   $hash->{DBHF}= $dbhf;
 
@@ -1053,7 +1083,7 @@ DbLog_Get($@)
 sub DbLog_Set($@) {
 	my ($hash, @a) = @_;
 	my $name = $hash->{NAME};
-	my $usage = "Unknown argument, choose one of reopen:noArg count:noArg deleteOldDays userCommand";
+	my $usage = "Unknown argument, choose one of reopen:noArg rereadcfg:noArg count:noArg deleteOldDays userCommand";
 	return $usage if(int(@a) < 2);
 	my $dbh = $hash->{DBH};
 	my $ret;
@@ -1062,10 +1092,20 @@ sub DbLog_Set($@) {
 
 		when ('reopen') {
 			Log3($name, 4, "DbLog $name: Reopen requested.");
-			$dbh->commit();
+			$dbh->commit() if(! $dbh->{AutoCommit});
 			$dbh->disconnect();
 			DbLog_Connect($hash);
 			$ret = "Reopen executed.";
+		}
+
+		when ('rereadcfg') {
+			Log3($name, 4, "DbLog $name: Rereadcfg requested.");
+			$dbh->commit() if(! $dbh->{AutoCommit});
+			$dbh->disconnect();
+			$ret = _DbLog_readCfg($hash);
+			return $ret if $ret;
+			DbLog_Connect($hash);
+			$ret = "Rereadcfg executed.";
 		}
 
 		when ('count') {
@@ -1495,6 +1535,10 @@ sub dbReadings($@) {
     <code>set &lt;name&gt; reopen </code><br/><br/>
       <ul>Perform a database disconnect and immediate reconnect to clear cache and flush journal file.</ul><br/>
 
+    <code>set &lt;name&gt; rereadcfg </code><br/><br/>
+      <ul>Perform a database disconnect and immediate reconnect to clear cache and flush journal file.<br/>
+      Probably same behavior als reopen, but rereadcfg will read the configuration data before reconnect.</ul><br/>
+
     <code>set &lt;name&gt; count </code><br/><br/>
       <ul>Count records in tables current and history and write results into readings countCurrent and countHistory.</ul><br/>
 
@@ -1770,7 +1814,7 @@ sub dbReadings($@) {
                       z.B. <code>71</code></li>
       <li>UNIT: Einheit, ermittelt aus dem Event, z.B. <code>%</code></li>
     </ol>
-    Der Wert des Rreadings ist optimiert f&ouml;r eine automatisierte Nachverarbeitung
+    Der Wert des Readings ist optimiert f&ouml;r eine automatisierte Nachverarbeitung
     z.B. <code>yes</code> ist transformiert nach <code>1</code>
     <br><br>
     Die gespeicherten Werte k&ouml;nnen mittels GET Funktion angezeigt werden:
@@ -1791,7 +1835,12 @@ sub dbReadings($@) {
   <ul>
     <code>set &lt;name&gt; reopen </code><br/><br/>
       <ul>Schlie&szlig;t die Datenbank und &ouml;ffnet sie danach sofort wieder. Dabei wird die Journaldatei geleert und neu angelegt.<br/>
-	  Verbessert den Datendurchsatz und vermeidet Speicherplatzprobleme.</ul><br/>
+      Verbessert den Datendurchsatz und vermeidet Speicherplatzprobleme.</ul><br/>
+
+    <code>set &lt;name&gt; rereadcfg </code><br/><br/>
+      <ul>Schlie&szlig;t die Datenbank und &ouml;ffnet sie danach sofort wieder. Dabei wird die Journaldatei geleert und neu angelegt.<br/>
+      Verbessert den Datendurchsatz und vermeidet Speicherplatzprobleme.<br/>
+      Zwischen dem Schlie&szlig;en der Verbindung und dem Neuverbinden werden die Konfigurationsdaten neu gelesen</ul><br/>
 
     <code>set &lt;name&gt; count </code><br/><br/>
       <ul>Z&auml;hlt die Datens&auml;tze in den Tabellen current und history und schreibt die Ergebnisse in die Readings countCurrent und countHistory.</ul><br/>
