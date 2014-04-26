@@ -153,6 +153,8 @@ sub GDS_Set($@) {
 	my $usage =	"Unknown argument, choose one of clear:noArg help:noArg rereadcfg:noArg update:noArg ".
 				"conditions:".$sList." ";
 
+	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
+
 	my $command		= lc($a[1]);
 	my $parameter	= $a[2] if(defined($a[2]));
 
@@ -221,6 +223,8 @@ sub GDS_Get($@) {
 				"radarmap:".$cmapList." ".
 				"warningsmap:"."Deutschland,Bodensee,".$bulaList." ".
 				"warnings:".$bulaList;
+
+	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
 
 	my ($result, $datensatz, $found);
 
