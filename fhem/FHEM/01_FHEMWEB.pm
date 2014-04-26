@@ -651,10 +651,25 @@ FW_answerCall($)
   if($FW_cmdret) {
     $FW_detail = "";
     $FW_room = "";
-    $FW_cmdret = FW_htmlEscape($FW_cmdret);
-    $FW_cmdret =~ s/>/&gt;/g;
+
+    if( $FW_cmdret !~ m/<html>.*<\/html>/ ) {
+      $FW_cmdret = FW_htmlEscape($FW_cmdret);
+
+      my @lines = split( /\n/, $FW_cmdret );
+      $FW_cmdret = "";
+      foreach my $line (@lines) {
+        $FW_cmdret .= "\n" if( $FW_cmdret );
+        foreach my $word ( split( / /, $line ) ) {
+          $word = "<a href=\"$FW_ME$FW_subdir?detail=$word\">$word</a>"
+                if( $defs{$word} );
+          $FW_cmdret .= "$word ";
+        }
+      }
+
+      $FW_cmdret = "<pre>$FW_cmdret</pre>" if($FW_cmdret =~ m/\n/);
+    }
+
     FW_pO "<div id=\"content\">";
-    $FW_cmdret = "<pre>$FW_cmdret</pre>" if($FW_cmdret =~ m/\n/);
     if($FW_ss) {
       FW_pO "<div class=\"tiny\">$FW_cmdret</div>";
     } else {
