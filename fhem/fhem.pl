@@ -392,14 +392,6 @@ if($^O =~ m/Win/) {
 $winService ||= {};
 
 ###################################################
-# initialize the readings semantics meta information
-# this must come before any module is loaded
-eval { # make errors non-lethal
-  require FHEM::RTypes;
-  RTypes_Initialize();
-};
-
-###################################################
 # Server initialization
 doGlobalDef($ARGV[0]);
 
@@ -417,12 +409,10 @@ setGlobalAttrBeforeFork($attr{global}{configfile});
 
 Log 1, $_ for eval{@{$winService->{ServiceLog}};};
 
+# Go to background if the logfile is a real file (not stdout)
 if($^O =~ m/Win/ && !$attr{global}{nofork}) {
   $attr{global}{nofork}=1;
 }
-
-
-# Go to background if the logfile is a real file (not stdout)
 if($attr{global}{logfile} ne "-" && !$attr{global}{nofork}) {
   defined(my $pid = fork) || die "Can't fork: $!";
   exit(0) if $pid;
@@ -433,6 +423,11 @@ if($attr{global}{logfile} ne "-" && !$attr{global}{nofork}) {
 while(time() < 2*3600) {
   sleep(5);
 }
+
+###################################################
+# initialize the readings semantics meta information
+require RTypes;
+RTypes_Initialize();
 
 my $cfgErrMsg = "Error messages while initializing FHEM:";
 my $cfgRet="";
@@ -3216,6 +3211,7 @@ setGlobalAttrBeforeFork($)
     $v =~ s/#.*//;
     $v =~ s/ .*$//;
     $attr{global}{$n} = $v;
+    GlobalAttr("set", "global", $n, $v);
   }
   close(FH);
 }
