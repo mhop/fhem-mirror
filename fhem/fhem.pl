@@ -2430,7 +2430,12 @@ CommandVersion($$)
     Log 4, "Looking for SVN Id in module $m";
     my $fn = "$attr{global}{modpath}/FHEM/".$modules{$m}{ORDER}."_$m.pm";
     if(!open(FH, $fn)) {
-      push @ret, "$fn: $!";
+      my $ret = "$fn: $!";
+      if(configDBUsed()){
+        Log 4, "Looking for module $m in configDB to find SVN Id";
+        $ret = cfgDB_Fileversion($fn,$ret);
+      }
+      push @ret, $ret;
     } else {
       push @ret, map { chomp; $_ } grep(/# \$Id:/, <FH>);
     }
