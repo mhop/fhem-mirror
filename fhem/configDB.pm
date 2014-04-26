@@ -67,11 +67,14 @@
 #
 # 2014-04-23 - added     command fileshow, filemove
 #
+# 2014-04-26 - added     migration to generic file handling
+#
 ##############################################################################
 #
 
 use DBI;
-use Data::Dumper;
+#use Data::Dumper; # for debugging only
+
 ##################################################
 # Forward declarations for functions in fhem.pl
 #
@@ -175,13 +178,15 @@ sub cfgDB_Init {
 	return;
 }
 
-# read and set attributes for 'global'
+# read attributes
 sub cfgDB_AttrRead($) {
 	my ($readSpec) = @_;
-	my($row, @line,@rets);
+	my ($row, $sql, @line, @rets);
 	my $fhem_dbh = _cfgDB_Connect;
 	my $uuid = $fhem_dbh->selectrow_array('SELECT versionuuid FROM fhemversions WHERE version = 0');
-	my $sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE (DEVICE = 'global' OR DEVICE = 'configdb') and VERSIONUUID = '$uuid'" );  
+	$sql = "SELECT * FROM fhemconfig WHERE DEVICE = '$readSpec' AND VERSIONUUID = '$uuid'";
+	$sql = "SELECT * FROM fhemconfig WHERE (DEVICE = 'global' OR DEVICE = 'configdb') and VERSIONUUID = '$uuid'" if($readSpec eq 'global');  
+	my $sth = $fhem_dbh->prepare( $sql );  
 	$sth->execute();
 	while (@line = $sth->fetchrow_array()) {
 		$row = "$line[1],$line[2],$line[3]";
@@ -191,34 +196,54 @@ sub cfgDB_AttrRead($) {
 	return @rets;
 }
 
-sub cfgDB_GlobalAttr {
-	my (@line, $row);
+### work in process ###################
+# create generice read and write function
+# for filehandling to be used from fhem.pl
+# and other fhem modules
+
+sub cfgDB_FileRead($) {
+	my ($filename) = @_;
+	my $fhem_dbh = _cfgDB_Connect;
+	my $sth = $fhem_dbh->prepare( "SELECT line FROM fhemfilesave WHERE filename LIKE '$filename'" );  
+	$sth->execute();
+	my @outfile;
+	while (my @line = $sth->fetchrow_array()) {
+		push @outfile, "$line[0]";
+	}
+	$sth->finish();
+	$fhem_dbh->disconnect();
+	return (int(@outfile)) ? @outfile : undef;
+}
+
+sub cfgDB_FileWrite($@) {
+	my ($filename,@content) = @_;
 
 	my $fhem_dbh = _cfgDB_Connect;
-	my $uuid = $fhem_dbh->selectrow_array('SELECT versionuuid FROM fhemversions WHERE version = 0');
-	my $sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = ( ? ) and VERSIONUUID = '$uuid'" );  
-
-	$sth->execute('global');
-	while (@line = $sth->fetchrow_array()) {
-		$row = "$line[0] $line[1] $line[2] $line[3]";
-		$line[3] =~ s/#.*//;
-		$line[3] =~ s/ .*$//;
-		$attr{global}{$line[2]} = $line[3];
-		GlobalAttr("set", "global", $line[2], $line[3]);
+	$fhem_dbh->do("delete from fhemfilesave where filename = '$filename'");
+	my $sth = $fhem_dbh->prepare('INSERT INTO fhemfilesave values (?, ?)');
+	foreach (@content){
+		$sth->execute($filename,rtrim($_));
 	}
-
-	$sth->execute('configdb');
-	while (@line = $sth->fetchrow_array()) {
-		$row = "$line[0] $line[1] $line[2] $line[3]";
-		$line[3] =~ s/#.*//;
-		$line[3] =~ s/ .*$//;
-		$attr{configdb}{$line[2]} = $line[3];
-		GlobalAttr("set", "global", $line[2], $line[3]);
-	}
-
+	$sth->finish();
+	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
 	return;
 }
+
+sub cfgDB_FileUpdate($) {
+	my ($filename) = @_;
+	my $fhem_dbh = _cfgDB_Connect;
+	my $id = $fhem_dbh->selectrow_array("SELECT filename from fhemfilesave where filename = '$filename'");
+	$fhem_dbh->disconnect();
+	if($id) {
+		_cfgDB_Fileimport($filename,1) if $id;
+		Log 5, "file $filename updated in configDB";
+	}
+	return "";
+}
+
+#
+#######################################
 
 # read and execute all commands from
 # fhemconfig and fhemstate
@@ -375,7 +400,7 @@ sub cfgDB_FW_fileList(@$) {
 sub cfgDB_Read99() {
   my $ret;
   my $fhem_dbh = _cfgDB_Connect;
-  my $sth  = $fhem_dbh->prepare( "SELECT filename FROM fhemfilesave WHERE filename like '%/99_%.pm' group by filename" );
+  my $sth = $fhem_dbh->prepare( "SELECT filename FROM fhemfilesave WHERE filename like '%/99_%.pm' group by filename" );
   $sth->execute();
   while (my $line = $sth->fetchrow_array()) {
     $line =~ m,^(.*)/([^/]*)$,; # Split into dir and file
@@ -499,7 +524,7 @@ sub _cfgDB_Uuid{
 # not called from fhem.pl directly
 #
 
-# migrate existing fhem config into database
+#   migrate existing fhem config into database
 sub _cfgDB_Migrate {
 	my $ret;
 	$ret = "Starting migration...\n";
@@ -520,7 +545,7 @@ sub _cfgDB_Migrate {
 
 }
 
-# show database statistics
+#   show database statistics
 sub _cfgDB_Info {
 	my ($l, @r, @row_ary, $f);
 	for my $i (1..65){ $l .= '-';}
@@ -587,7 +612,7 @@ sub _cfgDB_Info {
 	return join("\n", @r);
 }
 
-# recover former config from database archive
+#   recover former config from database archive
 sub _cfgDB_Recover($) {
 	my ($version) = @_;
 	my ($cmd, $count, $ret);
@@ -630,7 +655,7 @@ sub _cfgDB_Recover($) {
 	return $ret;
 }
 
-# delete old configurations
+#   delete old configurations
 sub _cfgDB_Reorg(;$) {
 	my ($lastversion) = @_;
 	$lastversion = ($lastversion > 0) ? $lastversion : 3;
@@ -643,7 +668,7 @@ sub _cfgDB_Reorg(;$) {
 	return " Result after database reorg:\n"._cfgDB_Info;
 }
 
-# list device(s) from given version
+#   list device(s) from given version
 sub _cfgDB_List(;$$) {
 	my ($search,$searchversion) = @_;
 	$search = $search ? $search : "%";
@@ -665,7 +690,7 @@ sub _cfgDB_List(;$$) {
 	return $ret;
 }
 
-# called from cfgDB_Diff
+#   called from cfgDB_Diff
 sub __cfgDB_Diff($$$) {
 	my ($fhem_dbh,$search,$searchversion) = @_;
 	my ($sql, $sth, @line, $ret);
@@ -679,7 +704,7 @@ sub __cfgDB_Diff($$$) {
 	return $ret;
 }
 
-# compare device configurations from 2 versions
+#   compare device configurations from 2 versions
 sub _cfgDB_Diff($$) {
 	my ($search,$searchversion) = @_;
 	use Text::Diff;
@@ -694,6 +719,7 @@ sub _cfgDB_Diff($$) {
 	return $ret;
 }
 
+##################################################
 # functions used for file handling
 #
 #   delete file from database
@@ -768,38 +794,61 @@ sub _cfgDB_Filelist(;$) {
 	return $ret;
 }
 
-#   read a file from database and return content as string
-sub _cfgDB_Readfile($) {
-	my ($filename) = @_;
-	my $fhem_dbh = _cfgDB_Connect;
-	my $sth = $fhem_dbh->prepare( "SELECT line FROM fhemfilesave WHERE filename LIKE '$filename'" );  
-	$sth->execute();
-	my @outfile;
-	while (my @line = $sth->fetchrow_array()) {
-		push @outfile, "$line[0]";
-	}
-	$sth->finish();
-	$fhem_dbh->disconnect();
-	return (int(@outfile)) ? join("\n",@outfile) : undef;
-}
 
-#   write content to file
-sub _cfgDB_Writefile($$) {
-	my ($filename,$content) = @_;
-	my @c = split(/\n/,$content);
+#######################################
+#
+# DEPRECATED functions
+# will be removed 2014-06-15
+#
+#######################################
+
+
+# replaced by cfgDB_AttrRead()
+sub cfgDB_GlobalAttr {
+	my (@line, $row);
 
 	my $fhem_dbh = _cfgDB_Connect;
-	$fhem_dbh->do("delete from fhemfilesave where filename = '$filename'");
-	my $sth = $fhem_dbh->prepare('INSERT INTO fhemfilesave values (?, ?)');
-	foreach (@c){
-		$sth->execute($filename,rtrim($_));
+	my $uuid = $fhem_dbh->selectrow_array('SELECT versionuuid FROM fhemversions WHERE version = 0');
+	my $sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = ( ? ) and VERSIONUUID = '$uuid'" );  
+
+	$sth->execute('global');
+	while (@line = $sth->fetchrow_array()) {
+		$row = "$line[0] $line[1] $line[2] $line[3]";
+		$line[3] =~ s/#.*//;
+		$line[3] =~ s/ .*$//;
+		$attr{global}{$line[2]} = $line[3];
+		GlobalAttr("set", "global", $line[2], $line[3]);
 	}
-	$sth->finish();
-	$fhem_dbh->commit();
+
+	$sth->execute('configdb');
+	while (@line = $sth->fetchrow_array()) {
+		$row = "$line[0] $line[1] $line[2] $line[3]";
+		$line[3] =~ s/#.*//;
+		$line[3] =~ s/ .*$//;
+		$attr{configdb}{$line[2]} = $line[3];
+		GlobalAttr("set", "global", $line[2], $line[3]);
+	}
+
 	$fhem_dbh->disconnect();
 	return;
 }
 
+# deprecated - replaced by cfgDB_FileRead()
+sub _cfgDB_Readfile($) {
+	my ($filename) = @_;
+	my @outfile = cfgDB_FileRead($filename);
+	return (int(@outfile)) ? join("\n",@outfile) : undef;
+}
+
+# deprecated - replaced by cfgDB_FileWrite()
+sub _cfgDB_Writefile($$) {
+	my ($filename,$content) = @_;
+	my @c = split(/\n/,$content);
+	cfgDB_FileWrite($filename,@c);
+	return;
+}
+
+# deprecated - replaced by cfgDB_FileUpdate()
 sub _cfgDB_Updatefile($) {
 	my ($filename) = @_;
 	my $fhem_dbh = _cfgDB_Connect;
