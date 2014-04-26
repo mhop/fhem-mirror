@@ -71,7 +71,7 @@
 #
 
 use DBI;
-
+use Data::Dumper;
 ##################################################
 # Forward declarations for functions in fhem.pl
 #
@@ -129,9 +129,6 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 # Basic functions needed for DB configuration
 # directly called from fhem.pl
 #
-# cfgDB_Init, cfgDB_GlobalAttr, cfgDB_ReadAll
-# cfgDB_SaveCfg, cfgDB_SaveState, cfgDB_svnId
-#
 
 # initialize database, create tables if necessary
 sub cfgDB_Init {
@@ -179,14 +176,28 @@ sub cfgDB_Init {
 }
 
 # read and set attributes for 'global'
+sub cfgDB_AttrRead {
+	my($row, @line,@rets);
+	my $fhem_dbh = _cfgDB_Connect;
+	my $uuid = $fhem_dbh->selectrow_array('SELECT versionuuid FROM fhemversions WHERE version = 0');
+	my $sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE (DEVICE = 'global' OR DEVICE = 'configdb') and VERSIONUUID = '$uuid'" );  
+	$sth->execute();
+	while (@line = $sth->fetchrow_array()) {
+		$row = "$line[1],$line[2],$line[3]";
+		push @rets, $row;
+	}
+	$fhem_dbh->disconnect();
+	return @rets;
+}
+
 sub cfgDB_GlobalAttr {
-	my ($sth, @line, $row, @dbconfig);
+	my (@line, $row);
 
 	my $fhem_dbh = _cfgDB_Connect;
 	my $uuid = $fhem_dbh->selectrow_array('SELECT versionuuid FROM fhemversions WHERE version = 0');
-	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = 'global' and VERSIONUUID = '$uuid'" );  
-	$sth->execute();
+	my $sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = ( ? ) and VERSIONUUID = '$uuid'" );  
 
+	$sth->execute('global');
 	while (@line = $sth->fetchrow_array()) {
 		$row = "$line[0] $line[1] $line[2] $line[3]";
 		$line[3] =~ s/#.*//;
@@ -195,9 +206,7 @@ sub cfgDB_GlobalAttr {
 		GlobalAttr("set", "global", $line[2], $line[3]);
 	}
 
-	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = 'configdb' and VERSIONUUID = '$uuid'" );  
-	$sth->execute();
-
+	$sth->execute('configdb');
 	while (@line = $sth->fetchrow_array()) {
 		$row = "$line[0] $line[1] $line[2] $line[3]";
 		$line[3] =~ s/#.*//;
@@ -360,6 +369,33 @@ sub cfgDB_FW_fileList(@$) {
 	}
 	return @ret;
 }
+
+#   read filelist containing 99_ files in database
+sub cfgDB_Read99() {
+  my $ret;
+  my $fhem_dbh = _cfgDB_Connect;
+  my $sth  = $fhem_dbh->prepare( "SELECT filename FROM fhemfilesave WHERE filename like '%/99_%.pm' group by filename" );
+  $sth->execute();
+  while (my $line = $sth->fetchrow_array()) {
+    $line =~ m,^(.*)/([^/]*)$,; # Split into dir and file
+    $ret .= "$2,"; # 
+  }
+  $sth->finish();
+  $fhem_dbh->disconnect();
+  $ret =~ s/,$//;
+  return $ret;
+}
+
+#   find SVN Id
+sub cfgDB_Fileversion($$) {
+  my ($file,$ret) = @_;
+  my $fhem_dbh = _cfgDB_Connect;
+  my $id = $fhem_dbh->selectrow_array("SELECT line from fhemfilesave where filename = '$file' and line like '%$Id:%'");
+  $fhem_dbh->disconnect();
+  $ret = ($id) ? $id : $ret;
+  return $ret;
+}
+
 
 ##################################################
 # Basic functions needed for DB configuration
@@ -746,6 +782,7 @@ sub _cfgDB_Readfile($) {
 	return (int(@outfile)) ? join("\n",@outfile) : undef;
 }
 
+#   write content to file
 sub _cfgDB_Writefile($$) {
 	my ($filename,$content) = @_;
 	my @c = split(/\n/,$content);
@@ -774,30 +811,6 @@ sub _cfgDB_Updatefile($) {
 	return "";
 }
 
-#   read filelist containing 99_ files in database
-sub cfgDB_Read99() {
-  my $ret;
-  my $fhem_dbh = _cfgDB_Connect;
-  my $sth  = $fhem_dbh->prepare( "SELECT filename FROM fhemfilesave WHERE filename like '%/99_%.pm' group by filename" );
-  $sth->execute();
-  while (my $line = $sth->fetchrow_array()) {
-    $line =~ m,^(.*)/([^/]*)$,; # Split into dir and file
-    $ret .= "$2,"; # 
-  }
-  $sth->finish();
-  $fhem_dbh->disconnect();
-  $ret =~ s/,$//;
-  return $ret;
-}
-
-sub cfgDB_Fileversion($$) {
-  my ($file,$ret) = @_;
-  my $fhem_dbh = _cfgDB_Connect;
-  my $id = $fhem_dbh->selectrow_array("SELECT line from fhemfilesave where filename = '$file' and line like '%$Id:%'");
-  $fhem_dbh->disconnect();
-  $ret = ($id) ? $id : $ret;
-  return $ret;
-}
 
 1;
 
