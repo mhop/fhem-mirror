@@ -79,6 +79,7 @@ sub AnalyzeCommandChain($$;$);
 sub AttrVal($$$);
 sub Debug($);
 sub Log3($$$);
+sub GlobalAttr($$$$);
 
 ##################################################
 # Forward declarations inside this library
@@ -191,6 +192,7 @@ sub cfgDB_GlobalAttr {
 		$line[3] =~ s/#.*//;
 		$line[3] =~ s/ .*$//;
 		$attr{global}{$line[2]} = $line[3];
+		GlobalAttr("set", "global", $line[2], $line[3]);
 	}
 
 	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = 'configdb' and VERSIONUUID = '$uuid'" );  
@@ -201,6 +203,7 @@ sub cfgDB_GlobalAttr {
 		$line[3] =~ s/#.*//;
 		$line[3] =~ s/ .*$//;
 		$attr{configdb}{$line[2]} = $line[3];
+		GlobalAttr("set", "global", $line[2], $line[3]);
 	}
 
 	$fhem_dbh->disconnect();
