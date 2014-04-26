@@ -788,6 +788,7 @@ update_GetRemoteFiles($$$$)
         print FH $fileContent;
         close (FH);
         Log 5, "update write $localFile";
+        $writeError .= _cfgDB_Updatefile($localFile) if(configDBUsed());
       } else {
         delete $updateFiles_ref->{$f};
         Log 1, "update Can't write $localFile: $!";
