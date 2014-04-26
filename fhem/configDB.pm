@@ -95,6 +95,7 @@ sub _cfgDB_ReadCfg(@);
 sub _cfgDB_ReadState(@);
 sub _cfgDB_Rotate($);
 sub _cfgDB_Uuid;
+sub _cfgDB_Info;
 sub _cfgDB_Filelist(;$);
 
 ##################################################
@@ -289,7 +290,6 @@ sub cfgDB_SaveCfg {
 			my $def = $defs{$d}{DEF};
 			if(defined($def)) {
 				$def =~ s/;/;;/g;
-				$def =~ s/\n/\\\n/g;
 			} else {
 				$dev = "";
 			}
@@ -301,7 +301,6 @@ sub cfgDB_SaveCfg {
 				($a eq "configfile" || $a eq "version"));
 			my $val = $attr{$d}{$a};
 			$val =~ s/;/;;/g;
-			$val =~ s/\n/\\\n/g;
 			push @rowList, "attr $d $a $val";
 		}
 	}
@@ -309,7 +308,6 @@ sub cfgDB_SaveCfg {
 		foreach my $a (sort keys %{$attr{configdb}}) {
 			my $val = $attr{configdb}{$a};
 			$val =~ s/;/;;/g;
-			$val =~ s/\n/\\\n/g;
 			push @rowList, "attr configdb $a $val";
 		}
 
