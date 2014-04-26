@@ -69,6 +69,7 @@
 # 2014-04-23 - added     command fileshow, filemove
 #
 # 2014-04-26 - added     migration to generic file handling
+#              fixed     problem on migration of multiline DEFs
 #
 ##############################################################################
 #
@@ -136,7 +137,7 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 #
 
 # initialize database, create tables if necessary
-sub cfgDB_Init {
+  sub cfgDB_Init {
 ##################################################
 #	Create non-existing database tables 
 #	Create default config entries if necessary
@@ -181,7 +182,7 @@ sub cfgDB_Init {
 }
 
 # read attributes
-sub cfgDB_AttrRead($) {
+  sub cfgDB_AttrRead($) {
 	my ($readSpec) = @_;
 	my ($row, $sql, @line, @rets);
 	my $fhem_dbh = _cfgDB_Connect;
@@ -192,18 +193,20 @@ sub cfgDB_AttrRead($) {
 	$sth->execute();
 	while (@line = $sth->fetchrow_array()) {
 		$row = "$line[1],$line[2],$line[3]";
-		push @rets, $row;
+		if($line[1] eq 'configdb') {
+			$attr{configdb}{$line[2]} = $line[3];
+		} else {
+			push @rets, $row;
+		}
 	}
 	$fhem_dbh->disconnect();
 	return @rets;
 }
 
-### work in process ###################
-# create generice read and write function
-# for filehandling to be used from fhem.pl
-# and other fhem modules
+# functions for filehandling to be called
+# from fhem.pl and other fhem modules
 
-sub cfgDB_FileRead($) {
+  sub cfgDB_FileRead($) {
 	my ($filename) = @_;
 	my $fhem_dbh = _cfgDB_Connect;
 	my $sth = $fhem_dbh->prepare( "SELECT line FROM fhemfilesave WHERE filename LIKE '$filename'" );  
@@ -217,7 +220,7 @@ sub cfgDB_FileRead($) {
 	return (int(@outfile)) ? @outfile : undef;
 }
 
-sub cfgDB_FileWrite($@) {
+  sub cfgDB_FileWrite($@) {
 	my ($filename,@content) = @_;
 
 	my $fhem_dbh = _cfgDB_Connect;
@@ -232,7 +235,7 @@ sub cfgDB_FileWrite($@) {
 	return;
 }
 
-sub cfgDB_FileUpdate($) {
+  sub cfgDB_FileUpdate($) {
 	my ($filename) = @_;
 	my $fhem_dbh = _cfgDB_Connect;
 	my $id = $fhem_dbh->selectrow_array("SELECT filename from fhemfilesave where filename = '$filename'");
@@ -244,12 +247,10 @@ sub cfgDB_FileUpdate($) {
 	return "";
 }
 
-#
-#######################################
-
 # read and execute all commands from
 # fhemconfig and fhemstate
-sub cfgDB_ReadAll($){
+
+  sub cfgDB_ReadAll($){
 	my ($cl) = @_;
 	my $ret;
 	# add Config Rows to commandfile
@@ -264,7 +265,8 @@ sub cfgDB_ReadAll($){
 
 # rotate all older versions to versionnumber+1
 # save running configuration to version 0
-sub cfgDB_SaveCfg {
+
+  sub cfgDB_SaveCfg {
 	my (%devByNr, @rowList);
 
 	map { $devByNr{$defs{$_}{NR}} = $_ } keys %defs;
@@ -291,6 +293,7 @@ sub cfgDB_SaveCfg {
 			my $def = $defs{$d}{DEF};
 			if(defined($def)) {
 				$def =~ s/;/;;/g;
+				$def =~ s/\n/\n /g;
 			} else {
 				$dev = "";
 			}
@@ -325,7 +328,7 @@ sub cfgDB_SaveCfg {
 }
 
 # save statefile
-sub cfgDB_SaveState {
+  sub cfgDB_SaveState {
 	my ($out,$val,$r,$rd,$t,@rowList);
 
 	$t = localtime;
@@ -379,11 +382,12 @@ sub cfgDB_SaveState {
 }
 
 # return SVN Id, called by fhem's CommandVersion
-sub cfgDB_svnId { 
+  sub cfgDB_svnId { 
 	return "# ".'$Id$' 
 }
 
-sub cfgDB_FW_fileList(@$) {
+# return filelist depending on directory and regexp
+  sub cfgDB_FW_fileList(@$) {
 	my ($dir,$re,@ret) = @_;
 	my @files = split(/\n/, _cfgDB_Filelist('notitle'));
 	foreach my $f (@files) {
@@ -395,8 +399,8 @@ sub cfgDB_FW_fileList(@$) {
 	return @ret;
 }
 
-#   read filelist containing 99_ files in database
-sub cfgDB_Read99() {
+# read filelist containing 99_ files in database
+  sub cfgDB_Read99() {
   my $ret;
   my $fhem_dbh = _cfgDB_Connect;
   my $sth = $fhem_dbh->prepare( "SELECT filename FROM fhemfilesave WHERE filename like '%/99_%.pm' group by filename" );
@@ -411,8 +415,8 @@ sub cfgDB_Read99() {
   return $ret;
 }
 
-#   find SVN Id
-sub cfgDB_Fileversion($$) {
+# return SVN Id from file stored in database
+  sub cfgDB_Fileversion($$) {
   my ($file,$ret) = @_;
   my $fhem_dbh = _cfgDB_Connect;
   my $id = $fhem_dbh->selectrow_array("SELECT line from fhemfilesave where filename = '$file' and line like '%$Id:%'");
