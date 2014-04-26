@@ -52,10 +52,19 @@ readingsProxy_updateDevices($)
   delete  $hash->{READING};
 
   my @params = split(" ", $hash->{DEF});
-  if( defined($defs{$params[0]}) ) {
-    $list{$params[0]} = 1;
-    $hash->{DEVICE} = $params[0];
-    $hash->{READING} = $params[1];
+  while (@params) {
+    my $param = shift(@params);
+
+    my @device = split(":", $param);
+
+    if( defined($defs{$device[0]})
+        && defined($defs{$device[0]}) ) {
+      $list{$device[0]} = 1;
+      $hash->{DEVICE} = $device[0];
+      $hash->{READING} = $device[1];
+
+      $hash->{READING} = "state" if( !$hash->{READING} );
+    }
   }
 
   $hash->{CONTENT} = \%list;
@@ -69,7 +78,7 @@ sub readingsProxy_Define($$)
 
   my @args = split("[ \t]+", $def);
 
-  return "Usage: define <name> readingsProxy <device>+"  if(@args < 3);
+  return "Usage: define <name> readingsProxy <device>:<reading>"  if(@args != 3);
 
   my $name = shift(@args);
   my $type = shift(@args);
