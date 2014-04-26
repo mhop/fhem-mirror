@@ -176,7 +176,8 @@ sub cfgDB_Init {
 }
 
 # read and set attributes for 'global'
-sub cfgDB_AttrRead {
+sub cfgDB_AttrRead($) {
+	my ($readSpec) = @_;
 	my($row, @line,@rets);
 	my $fhem_dbh = _cfgDB_Connect;
 	my $uuid = $fhem_dbh->selectrow_array('SELECT versionuuid FROM fhemversions WHERE version = 0');
