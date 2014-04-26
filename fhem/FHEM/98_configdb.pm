@@ -247,8 +247,9 @@ sub CommandConfigdb($$) {
 		}
 
 		when ('fileshow') {
-			my $r = _cfgDB_Readfile($param1);
-			return ($r)?$r:"File $param1 not found in database.";
+			my @rets = cfgDB_FileRead($param1);
+			my $r = (int(@rets)) ? join "\n",@rets : "File $param1 not found in database.";
+			return $r;
 		}
 
 		when ('info') {
