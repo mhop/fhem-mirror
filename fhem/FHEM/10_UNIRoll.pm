@@ -1,7 +1,7 @@
 ###################LoTT Uniroll###################
 # First release by D. Fuchs and rudolfkoenig
 # improved by c-herrmann
-# $Id: 10_UNIRoll Ver 1.3 2014-04-07 12:38:00 c-herrmann $
+# $Id$
 # 
 # UNIRoll:no synchronisation, the message protocoll begins directly with datas
 # group address  16 Bit like an housecode
@@ -85,11 +85,11 @@ UNIRoll_Initialize($)
 ## nur sporadisch, insbesondere wenn es von einem "at" gesendet wurde.
 
 #####################################
-sub
-UNIRoll_SetState($$$$)   # 4 Skalare Parameter
-{
-  return undef;
-}
+# sub
+# UNIRoll_SetState($$$$)   # 4 Skalare Parameter
+# {
+#  return undef;
+# }
 
 ###################################
 sub
