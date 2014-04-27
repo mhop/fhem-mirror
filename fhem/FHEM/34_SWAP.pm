@@ -99,11 +99,24 @@ SWAP_loadDevices()
   my $_products = {};
 
   my $file_name = "$attr{global}{modpath}/FHEM/lib/SWAP/devices.xml";
-
-  if( ! -e $file_name ){
+  if( !SWAP_loadDevicesHelper( $file_name, $_developers, $_products ) ) {
     Log3 undef, 2, "could not read $file_name";
-    return ($_developers,$_products);
   }
+
+  $file_name = "$attr{global}{modpath}/FHEM/lib/SWAP/devices-local.xml";
+  if( !SWAP_loadDevicesHelper( $file_name, $_developers, $_products ) ) {
+    Log3 undef, 4, "could not read $file_name";
+  }
+
+  return ($_developers,$_products);
+}
+
+sub
+SWAP_loadDevicesHelper($$$)
+{
+  my ($file_name, $_developers, $_products) = @_;
+
+  return 0 if( ! -e $file_name );
 
   my $developers = XMLin($file_name, KeyAttr => { }, ForceArray => [ 'dev' ]);
 
@@ -126,7 +139,7 @@ SWAP_loadDevices()
     }
   }
 
-  return ($_developers,$_products);
+  return 1;
 }
 sub
 readDeviceXML($$)
