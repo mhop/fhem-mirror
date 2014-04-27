@@ -67,12 +67,12 @@ RSS_readLayout($) {
   my $name= $hash->{NAME};
 
   if(configDBUsed()) {
-    my $layout = _cfgDB_Readfile($filename);
-    if(!(defined($layout))) {
+    my @layout = cfgDB_FileRead($filename);
+    if(!(int(@layout))) {
       $hash->{fhem}{layout}= ("text 0.1 0.1 'Layout definition not found in database!'");
       Log 1, "RSS $name: Layout $filename not found in database";
     } else {
-      $hash->{fhem}{layout} = $layout;
+      $hash->{fhem}{layout} = join("\n", @layout);
     }
   } else {
     if(open(LAYOUT, $filename)) {
@@ -266,8 +266,13 @@ RSS_xy {
 sub
 RSS_color {
   my ($S,$rgb)= @_;
+  my $alpha = 0;
   my @d= split("", $rgb);
-  return $S->colorResolve(hex("$d[0]$d[1]"),hex("$d[2]$d[3]"),hex("$d[4]$d[5]"));
+  if(length($rgb) == 8) {
+    $alpha = hex("$d[6]$d[7]"); 
+    $alpha = ($alpha < 127) ? $alpha : 127;
+  }
+  return $S->colorAllocateAlpha(hex("$d[0]$d[1]"),hex("$d[2]$d[3]"),hex("$d[4]$d[5]"),$alpha);
 }
 
 sub
@@ -743,6 +748,12 @@ RSS_CGI(){
   RSS is an extension to <a href="#FHEMWEB">FHEMWEB</a>. You must install FHEMWEB to use RSS.<p>
   
   Beginners might find the <a href="http://forum.fhem.de/index.php/topic,22520.0.html">RSS Workshop</a> useful.<p>
+  
+  A note on colors: Colors are specified as 6- or 8-digit hex numbers, 
+  every 2 digits determining the red, green and blue color components as in HTML 
+  color codes. The optional 7th and 8th digit code the alpha channel (transparency from 
+  00 to 7F). Examples: <code>FF0000</code> for red, <code>C0C0C0</code> for light 
+  gray, <code>1C1C1C40</code> for semi-transparent gray.<p>
 
   <a name="RSSdefine"></a>
   <b>Define</b>
@@ -801,9 +812,7 @@ RSS_CGI(){
     <li>size<br>The dimensions of the picture in the format
     <code>&lt;width&gt;x&lt;height&gt;</code>.</li><br>
     <li>bg<br>The directory that contains the background pictures (must be in JPEG format).</li><br>
-    <li>bgcolor &lt;color&gt;<br>Sets the background color. &lt;color&gt; is 
-    a 6-digit hex number, every 2 digits  determining the red, green and blue 
-    color components as in HTML color codes (e.g.<code>FF0000</code> for red, <code>C0C0C0</code> for light gray).</li><br>
+    <li>bgcolor &lt;color&gt;<br>Sets the background color. </li><br>
     <li>tmin<br>The background picture is shown at least <code>tmin</code> seconds,
     no matter how frequently the RSS feed consumer accesses the page.</li><br>
     <li>refresh<br>Time after which the HTML page is automatically reloaded.</li><br>
@@ -900,9 +909,7 @@ RSS_CGI(){
     (e.g. <code>/usr/share/fonts/truetype/arial.ttf</code>),
     whatever works on your system.</li><br>
 
-    <li>rgb "&lt;color&gt;"<br>Sets the color. &lt;color&gt; is a 6-digit hex number, every 2 digits
-    determining the red, green and blue color components as in HTML color codes (e.g.
-    <code>FF0000</code> for red, <code>C0C0C0</code> for light gray). You can use
+    <li>rgb "&lt;color&gt;"<br>Sets the color. You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;color&gt.</li><br>
 
     <li>pt &lt;pt&gt;<br>Sets the font size in points.</li><br>
