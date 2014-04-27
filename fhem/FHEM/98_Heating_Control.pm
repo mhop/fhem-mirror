@@ -518,7 +518,10 @@ sub isHeizung($) {
 
   my %setmodifiers =
      ("FHT"     =>  "desired-temp",
-      "EnOcean" =>  "desired-temp",
+     #"EnOcean" =>  "desired-temp",
+      "EnOcean" =>  {  "mode" => "subType", "setModifier" => "desired-temp",
+                       "roomSensorControl.05"  => 1,
+                       "hvac.01"               => 1 },
       "PID20"   =>  "desired",
       "MAX"     =>  {  "mode" => "type", "setModifier" => "desiredTemperature",
                        "HeatingThermostatPlus" => 1,
