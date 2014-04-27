@@ -223,6 +223,25 @@ sub CommandConfigdb($$) {
 			}
 		}
 
+		when ('binfileimport') {
+			return "\n Syntax: configdb fileimport <pathToFile>" if @a != 2;
+			my $filename;
+			if($param1 =~ m,^[./],) {
+				$filename = $param1;
+			} else {
+				$filename  = $attr{global}{modpath};
+				$filename .= "/$param1";
+			}
+			if ( -r $filename ) {
+				my $filesize = -s $filename;
+				$ret = _cfgDB_binFileimport($filename,$filesize);
+			} elsif ( -e $filename) {
+				$ret = "\n Read error on file $filename";
+			} else {
+				$ret = "\n File $filename not found.";
+			}
+		}
+
 		when ('filelist') {
 			return _cfgDB_Filelist;
 		}

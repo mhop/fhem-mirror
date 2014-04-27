@@ -174,6 +174,9 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 #	create TABLE fhemfilesave if nonexistent
 	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemfilesave(filename TEXT, line TEXT)");
 
+#	create TABLE fhembinfilesave if nonexistent
+	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhembinfilesave(filename TEXT, content BLOB)");
+
 #	close database connection
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
@@ -726,10 +729,28 @@ sub _cfgDB_Diff($$) {
 # functions used for file handling
 #
 #   delete file from database
-sub _cfgDB_Filedelete($) {
+
+sub _cfgDB_Filefind($) {
 	my ($filename) = @_;
 	my $fhem_dbh = _cfgDB_Connect;
-	my $ret = $fhem_dbh->do("delete from fhemfilesave where filename = '$filename'");
+	my @dbtable = ('fhemfilesave','fhembinfilesave');
+	my $retfile;
+	foreach (@dbtable) {
+		$retfile = $_;
+		my $ret = $fhem_dbh->selectrow_array("SELECT COUNT(*) from $retfile where filename = '$filename'");
+		last if $ret;
+		$retfile = undef;
+	}
+	$fhem_dbh->disconnect();
+	return $retfile;
+}
+
+sub _cfgDB_Filedelete($) {
+	my ($filename) = @_;
+	my $dbtable = _cfgDB_Filefind($filename);
+	return "File $filename not found in database." if(!$dbtable);
+	my $fhem_dbh = _cfgDB_Connect;
+	my $ret = $fhem_dbh->do("delete from $dbtable where filename = '$filename'");
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
 	if($ret > 0) {
@@ -743,19 +764,38 @@ sub _cfgDB_Filedelete($) {
 #   export file from database to filesystem
 sub _cfgDB_Fileexport($) {
 	my ($filename) = @_;
-	my $counter = 0;
+	my $dbtable = _cfgDB_Filefind($filename);
+	return "File $filename not found in database." if(!$dbtable);
+	my $counter  = 0;
+	my $binfile  = ($dbtable eq 'fhembinfilesave') ? 1 : 0;
+	my $sunit    = ($binfile) ? 'bytes' : 'lines';
 	my $fhem_dbh = _cfgDB_Connect;
-	my $sth = $fhem_dbh->prepare( "SELECT * FROM fhemfilesave WHERE filename = '$filename'" );  
+	my $sth      = $fhem_dbh->prepare( "SELECT * FROM $dbtable WHERE filename = '$filename'" );  
 	$sth->execute();
-	open( FILE, ">$filename" );
-	while (my @line = $sth->fetchrow_array()) {
-		$counter++;
-		print FILE $line[1], "\n";
+
+	if($binfile) {          # write binfile
+
+		my $blobContent = $sth->fetchrow_array();
+		$counter = length($blobContent);
+		open( FILE,">$filename" );
+			binmode(FILE);
+			print FILE $blobContent;
+		close( FILE );
+
+	} else {                # write textfile
+
+		open( FILE, ">$filename" );
+		while (my @line = $sth->fetchrow_array()) {
+			$counter++;
+			print FILE $line[1], "\n";
+		}
+		close ( FILE );
+
 	}
-	close ( FILE );
+	
 	$sth->finish();
 	$fhem_dbh->disconnect();
-	return "$counter lines written from database into file $filename";
+	return "$counter $sunit written from database into file $filename";
 }
 
 #   import file from filesystem into database
@@ -780,6 +820,27 @@ sub _cfgDB_Fileimport($;$) {
 	return "$counter lines written from file $filename to database";
 }
 
+sub _cfgDB_binFileimport($;$) {
+	my ($filename,$filesize,$doDelete) = @_;
+	$doDelete = (defined($doDelete)) ? 1 : 0;
+
+	open (in,"<$filename") || die $!;
+		my $blobContent;
+		binmode(in);
+		my $readBytes = read(in, $blobContent, $filesize);
+	close(in);
+	my $fhem_dbh = _cfgDB_Connect;
+	$fhem_dbh->do("delete from fhembinfilesave where filename = '$filename'");
+	my $sth = $fhem_dbh->prepare('INSERT INTO fhembinfilesave values (?, ?)');
+	$sth->execute($filename, $blobContent);
+	$sth->finish();
+	$fhem_dbh->commit();
+	$fhem_dbh->disconnect();
+
+	unlink($filename) if(($attr{configdb}{deleteimported} || $doDelete) && $readBytes);
+	return "$readBytes bytes written from file $filename to database";
+}
+
 #   show a list containing all file(names) in database
 sub _cfgDB_Filelist(;$) {
 	my ($notitle) = @_;
@@ -787,12 +848,15 @@ sub _cfgDB_Filelist(;$) {
 						"------------------------------------------------------------\n";
 	$ret = "" if $notitle;
 	my $fhem_dbh = _cfgDB_Connect;
-	my $sth = $fhem_dbh->prepare( "SELECT filename FROM fhemfilesave group by filename order by filename" );  
-	$sth->execute();
-	while (my $line = $sth->fetchrow_array()) {
-		$ret .= "$line\n";
+	my @dbtable = ('fhemfilesave','fhembinfilesave');
+	foreach (@dbtable) {
+		my $sth = $fhem_dbh->prepare( "SELECT filename FROM $_ group by filename order by filename" );  
+		$sth->execute();
+		while (my $line = $sth->fetchrow_array()) {
+			$ret .= "$line\n";
+		}
+		$sth->finish();
 	}
-	$sth->finish();
 	$fhem_dbh->disconnect();
 	return $ret;
 }
