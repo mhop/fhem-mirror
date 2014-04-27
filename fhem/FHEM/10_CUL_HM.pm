@@ -3968,7 +3968,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
 
     if ( $pSt eq "smokeDetector"){
-      $b[1] = $b[2];
       $target = "both" if ($st eq "virtual");
     }
 
@@ -3984,8 +3983,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       for(my $i = 1; $i <= $nrCh2Pair; $i++) {
         if ($st eq "virtual"){
           my $btnName = CUL_HM_id2Name($dst.sprintf("%02X",$b[$i]));
-          return "button ".$b[$i]." not defined for virtual remote ".$name
-              if (!defined $attr{$btnName});
+          next if (!defined $attr{$btnName});
           CUL_HM_ID2PeerList ($btnName,$peerDst.$pCh[$i],$set); #upd. peerlist
         }
         else{
