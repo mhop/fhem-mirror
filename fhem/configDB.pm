@@ -577,7 +577,7 @@ sub _cfgDB_Info {
 # read versions table statistics
 	my $count;
 	$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemconfig');
-	push @r, " fhemconfig: $count entries\n";
+	push @r, " config: $count entries\n";
 
 # read versions creation time
 	$sql = "SELECT * FROM fhemconfig as c join fhemversions as v on v.versionuuid=c.versionuuid ".
@@ -601,7 +601,7 @@ sub _cfgDB_Info {
 	$sth->execute();
 	while ($row = $sth->fetchrow_array()) {
 		(undef,$row) = split(/#/,$row);
-		$row = " fhemstate: $count entrie$f saved: $row";
+		$row = " state: $count entrie$f saved: $row";
 		push @r, $row;
 	}
 	push @r, $l;
@@ -609,9 +609,11 @@ sub _cfgDB_Info {
 # count files stored in database
 	$row = $fhem_dbh->selectall_arrayref("SELECT filename from fhemfilesave group by filename");
 	$count = @$row;
+	$row = $fhem_dbh->selectall_arrayref("SELECT filename from fhembinfilesave group by filename");
+	$count += @$row;
 	$count = ($count)?$count:'No';
 	$f = ("$count" ne '1') ? "s" : "";
-	$row = " fhemfilesave: $count file$f stored in database";
+	$row = " filesave: $count file$f stored in database";
 	push @r, $row;
 	push @r, $l;
 
