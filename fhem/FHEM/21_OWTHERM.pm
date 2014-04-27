@@ -9,8 +9,6 @@
 #
 # $Id$
 #
-# Disclaimer: No code of the former OWTEMP module is contained here
-#
 ########################################################################################
 #
 # define <name> OWTHERM [<model>] <ROM_ID> [interval] or <FAM_ID>.<ROM_ID> [interval]
@@ -72,10 +70,10 @@ package main;
 use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
-sub Log($$);
+sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="5.13";
+my $owx_version="5.14";
 
 my %gets = (
   "id"          => "",
@@ -235,14 +233,15 @@ sub OWTHERM_Define ($$) {
   AssignIoPort($hash);
   if( !defined($hash->{IODev}) or !defined($hash->{IODev}->{NAME}) ){
     return "OWTHERM: Warning, no 1-Wire I/O device found for $name.";
+  #-- if coupled, test if ASYNC or not
   } else {
-    $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0; #-- false for now
+    $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0; 
   }
 
   $modules{OWTHERM}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
-  Log 3, "OWTHERM: Device $name defined."; 
+  Log3 $name, 3, "OWTHERM: Device $name defined."; 
    
   #-- Start timer for updates
   InternalTimer(time()+10, "OWTHERM_GetValues", $hash, 0);
@@ -278,22 +277,21 @@ sub OWTHERM_Attr(@) {
           RemoveInternalTimer($hash);
           InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
         }
-        last;
-      };
-      #-- resolution modified at runtime
-      $key eq "resolution" and do {
+    	  last;
+     };
+     #-- resolution modified at runtime
+     $key eq "resolution" and do {
         $hash->{owg_cf} = $value;
         last;
-      };
-      #-- alarm settings modified at runtime
-      $key =~ m/(.*)(Low|High)/  and do {
-        #-- safeguard against uninitialized devices
-        return undef
-          if( $hash->{READINGS}{"state"}{VAL} eq "defined" ); 
-        $ret = OWTHERM_Set($hash,($name,$key,$value));
-        last;
-      };
-      $key eq "IODev" and do {
+     };
+     #-- alarm settings modified at runtime
+     $key =~ m/(.*)(Low|High)/  and do {
+       #-- safeguard against uninitialized devices
+       return undef
+         if( $hash->{READINGS}{"state"}{VAL} eq "defined" ); 
+       $ret = OWTHERM_Set($hash,($name,$key,$value));
+       };
+     $key eq "IODev" and do {
         AssignIoPort($hash,$value);
         if( defined($hash->{IODev}) ) {
           $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
@@ -339,7 +337,7 @@ sub OWTHERM_FormatValues($) {
     $factor = 1.8;
   } else {
     $abbr="?";
-    Log 3, "OWTHERM_FormatValues: Unknown temperature unit $unit";
+    Log3 $name, 3, "OWTHERM_FormatValues: Unknown temperature unit $unit";
   }
   #-- these values are rather complex to obtain, therefore save them in the hash
   $hash->{READINGS}{"temperature"}{UNIT}     = $unit;
@@ -514,7 +512,7 @@ sub OWTHERM_GetValues($@) {
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSTHERM_GetValues($hash);
   }else{
-    Log 3, "OWTHERM: GetValues with wrong IODev type $interface";
+    Log3 $name, 3, "OWTHERM: GetValues with wrong IODev type $interface";
     return 1;
   }
 
@@ -562,7 +560,7 @@ sub OWTHERM_InitializeDevice($) {
     $factor = 1.8;
   } else {
     $abbr="?";
-    Log 3, "OWTHERM_InitializeDevice: unknown unit $unit";
+    Log3 $name, 3, "OWTHERM_InitializeDevice: unknown unit $unit";
   }
   #-- these values are rather complex to obtain, therefore save them in the hash
   $hash->{READINGS}{"temperature"}{TYPE} = "temperature";
@@ -577,14 +575,14 @@ sub OWTHERM_InitializeDevice($) {
     if( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
       if( !(defined($attr{$hash->{IODev}->{NAME}}{dokick})) || 
            ( defined($attr{$hash->{IODev}->{NAME}}{dokick}) && ($attr{$hash->{IODev}->{NAME}}{dokick} eq "0") )){
-        Log 1,"OWTHERM: Attribute tempConv=onkick changed to onread for $name because interface is not kicking";
+        Log3 $name, 1,"OWTHERM: Attribute tempConv=onkick changed to onread for $name because interface is not kicking";
         $attr{$name}{tempConv}="onread";
       }
     }
   }elsif( $interface eq "OWServer" ){
     if( !(defined($attr{$name}{tempConv})) ||
          (defined($attr{$name}{tempConv}) && ($attr{$name}{tempConv} eq "onread") ) ){
-      Log 1,"OWTHERM: Attribute tempConv=onread changed to onkick for $name because interface is OWFS";
+      Log3 $name, 1,"OWTHERM: Attribute tempConv=onread changed to onkick for $name because interface is OWFS";
       $attr{$name}{tempConv}="onread";
     }
   }  
@@ -713,7 +711,7 @@ sub OWTHERM_Set($@) {
   #-- process results
   $hash->{PRESENT} = 1; 
   OWTHERM_FormatValues($hash); 
-  Log 4, "OWTHERM: Set $hash->{NAME} $key $value";
+  Log3 $name, 4, "OWTHERM: Set $hash->{NAME} $key $value";
   
   return undef;
 }
@@ -782,7 +780,7 @@ sub OWFSTHERM_GetValues($) {
   #-- and now from raw to formatted values
   $hash->{PRESENT}  = 1;
   my $value = OWTHERM_FormatValues($hash);
-  Log 5, $value;
+  Log3 $name, 5, $value;
   return undef;
 }
 
@@ -845,12 +843,12 @@ sub OWXTHERM_BinValues($$$$$$$$) {
   #-- always check for success, unused are reset, numread
   return unless ($success and ($context =~ /.*reading.*/));
  
-  #Log 1,"OWXTHERM_BinValues context = $context";
+  #Log3 $name, 1,"OWXTHERM_BinValues context = $context";
   
   my ($i,$j,$k,@data,$ow_thn,$ow_tln);
   my $change = 0;
 
-  #Log 1,"OWXTHERM: data length from reading device is ".length($res)." bytes";
+  #Log3 $name, 1,"OWXTHERM: data length from reading device is ".length($res)." bytes";
   #-- process results
   if( $res eq 0 ){
     return "$owx_dev not accessible in 2nd step"; 
@@ -921,7 +919,7 @@ sub OWXTHERM_BinValues($$$$$$$$) {
   #-- and now from raw to formatted values
   $hash->{PRESENT}  = 1;
   my $value = OWTHERM_FormatValues($hash);
-  Log 5, $value;
+  Log3  $hash->{NAME}, 5, $value;
   return undef;
 }
 
