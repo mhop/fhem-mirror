@@ -71,6 +71,8 @@
 # 2014-04-26 - added     migration to generic file handling
 #              fixed     problem on migration of multiline DEFs
 #
+# 2014-04-27 - added     new functions for binfile handling
+#
 ##############################################################################
 #
 
@@ -728,8 +730,8 @@ sub _cfgDB_Diff($$) {
 ##################################################
 # functions used for file handling
 #
-#   delete file from database
 
+#   find dbtable for file
 sub _cfgDB_Filefind($) {
 	my ($filename) = @_;
 	my $fhem_dbh = _cfgDB_Connect;
@@ -745,6 +747,7 @@ sub _cfgDB_Filefind($) {
 	return $retfile;
 }
 
+#   delete file from database
 sub _cfgDB_Filedelete($) {
 	my ($filename) = @_;
 	my $dbtable = _cfgDB_Filefind($filename);
@@ -798,7 +801,7 @@ sub _cfgDB_Fileexport($) {
 	return "$counter $sunit written from database into file $filename";
 }
 
-#   import file from filesystem into database
+#   import text-file into database
 sub _cfgDB_Fileimport($;$) {
 	my ($filename,$doDelete) = @_;
 	$doDelete = (defined($doDelete)) ? 1 : 0;
@@ -820,6 +823,7 @@ sub _cfgDB_Fileimport($;$) {
 	return "$counter lines written from file $filename to database";
 }
 
+#   import bin-file into database
 sub _cfgDB_binFileimport($;$) {
 	my ($filename,$filesize,$doDelete) = @_;
 	$doDelete = (defined($doDelete)) ? 1 : 0;
