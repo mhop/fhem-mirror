@@ -526,10 +526,18 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 <br/>
 
 		<li><code>configdb fileimport &lt;sourceFilename&gt;</code></li><br/>
-			Imports specified fhem file from from filesystem into database.<br/>
+			Imports specified text file from from filesystem into database.<br/>
 			Example:<br/>
 			<br/>
 			<code>configdb fileimport FHEM/99_myUtils.pm</code><br/>
+			<br/>
+<br/>
+
+		<li><code>configdb binfileimport &lt;sourceFilename&gt;</code></li><br/>
+			Imports specified binary file from from filesystem into database.<br/>
+			Example:<br/>
+			<br/>
+			<code>configdb binfileimport www/images/bla.png</code><br/>
 			<br/>
 <br/>
 
@@ -836,10 +844,18 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 <br/>
 
 		<li><code>configdb fileimport &lt;quellDatei&gt;</code></li><br/>
-			Liest die angegbene Datei aus dem Dateisystem und schreibt den Inhalt in die Datenbank.<br/>
+			Liest die angegbene Textdatei aus dem Dateisystem und schreibt den Inhalt in die Datenbank.<br/>
 			Beispiel:<br/>
 			<br/>
 			<code>configdb fileimport FHEM/99_myUtils.pm</code><br/>
+			<br/>
+<br/>
+
+		<li><code>configdb binfileimport &lt;quellDatei&gt;</code></li><br/>
+			Liest die angegbene Bin&auml;rdatei aus dem Dateisystem und schreibt den Inhalt in die Datenbank.<br/>
+			Beispiel:<br/>
+			<br/>
+			<code>configdb binfileimport www/images/bla.png</code><br/>
 			<br/>
 <br/>
 
