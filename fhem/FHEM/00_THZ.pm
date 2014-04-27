@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 04/2014
-# v. 0.090
+# v. 0.092
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -50,6 +50,7 @@ sub time2quaters($);
 sub THZ_debugread($);
 sub THZ_GetRefresh($);
 sub THZ_Refresh_all_gets($);
+sub THZ_Get_Comunication($$);
 
 
 
@@ -68,14 +69,12 @@ my %sets = (
 	"p14LowEnDHC1"			=> {cmd2=>"0B059E", argMin => "0",  argMax => "20"  },   #in °K 0..20°K rappresentato/10
 	"p15RoomInfluenceHC1"		=> {cmd2=>"0B010F", argMin => "0",  argMax => "10"  },   # 0..10 rappresentato/10
 	"p19FlowProportionHC1"		=> {cmd2=>"0B059D", argMin => "0",  argMax => "100"  }, #in % 0..100%
-	
 	"p01RoomTempDayHC2"		=> {cmd2=>"0C0005", argMin => "13", argMax => "28"  },
 	"p02RoomTempNightHC2"		=> {cmd2=>"0C0008", argMin => "13", argMax => "28"  },
 	"p03RoomTempStandbyHC2"		=> {cmd2=>"0C013D", argMin => "13", argMax => "28"  },
 	"p16GradientHC2"		=> {cmd2=>"0C010E", argMin => "0",  argMax =>  "5"  }, # /100
 	"p17LowEndHC2"			=> {cmd2=>"0C059E", argMin => "0",  argMax => "20"  },
 	"p18RoomInfluenceHC2"		=> {cmd2=>"0C010F", argMin => "0",  argMax => "10"  },   #in °C 0..10°C rappresentato/10
-	
 	"p04DHWsetDay"			=> {cmd2=>"0A0013", argMin => "13", argMax => "48"  },
 	"p05DHWsetNight"		=> {cmd2=>"0A05BF", argMin => "13", argMax => "48"  },
 	"p06DHWsetStandby"		=> {cmd2=>"0A0581", argMin => "13", argMax => "48"  },
@@ -253,15 +252,13 @@ my %getsonly = (
         "sGlobal"	     		=> {cmd2=>"FB"},  #allFB
         "sTimedate" 			=> {cmd2=>"FC"},
         "sFirmware" 			=> {cmd2=>"FD"},
-	"s0A03AE" 			=> {cmd2=>"0A03AE"},
-	"s0A03AF" 			=> {cmd2=>"0A03AF"},
-	"s0A03B0" 			=> {cmd2=>"0A03B0"},
-	"s0A03B1" 			=> {cmd2=>"0A03B1"},
+	"sHeatRecoveredDay" 		=> {cmd2=>"0A03AE", cmd3=>"0A03AF", unit =>"Wh"},
+	"sHeatRecoveredTotal" 		=> {cmd2=>"0A03B0", cmd3=>"0A03B1", unit =>"kWh"},
+	#"sAllE8"			=> {cmd2=>"E8"},
 	"party-time"			=> {cmd2=>"0A05D1"} # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   );
 
 my %gets=(%getsonly, %sets);
-
 my %OpMode = ("1" =>"standby", "11" => "automatic", "3" =>"DAYmode", "4" =>"setback", "5" =>"DHWmode", "14" =>"manual", "0" =>"emergency");   
 my %Rev_OpMode = reverse %OpMode;
 my %OpModeHC = ("1" =>"normal", "2" => "setback", "3" =>"standby", "4" =>"restart", "5" =>"restart");
@@ -298,6 +295,8 @@ sub THZ_Initialize($)
 		    ."interval_sHC2:0,60,120,180,300,600,3600,7200,43200,86400 "
 		    ."interval_sHistory:0,3600,7200,28800,43200,86400 "
 		    ."interval_sLast10errors:0,3600,7200,28800,43200,86400 "
+		    ."internal_sHeatRecoveredDay:0,3600,7200,28800,43200,86400 "
+		    ."internal_sHeatRecoveredTotal:0,3600,7200,28800,43200,86400 "
 		    . $readingFnAttributes;
 }
 
@@ -561,15 +560,51 @@ sub THZ_Get($@){
   return "Unknown argument $cmd, choose one of " .
         join(" ", sort keys %gets) if(!defined($cmdhash));
 
-           
+  my $cmdHex2 = $cmdhash->{cmd2};
+  if(defined($cmdHex2) ) {
+      ($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
+      if (defined($err))  {return ($msg ."\n msg2 " . $err);}
+      $msg = THZ_Parse($msg);
+  }
+  
+  my $cmdHex3 = $cmdhash->{cmd3};
+  if(defined($cmdHex3)) {
+      my $msg3= " ";
+      ($err, $msg3) = THZ_Get_Comunication($hash,  $cmdHex3);
+      if (defined($err))  {return ($msg3 ."\n msg3 " . $err);}
+      $msg = THZ_Parse($msg3) * 1000 + $msg  ;
+  }	            		
+   
+  my $unit = $cmdhash->{unit};
+  if(defined($cmdHex3)) {
+    $msg = $msg . " " . $unit;
+  }  
+    
+  my $activatetrigger =1;
+  readingsSingleUpdate($hash, $cmd, $msg, $activatetrigger);
+  return ($msg);
+	       
+}
+
+
+
+#####################################
+#
+# THZ_Get_Comunication- provides a method for reading comunication called from THZ_Get
+#
+# Parameter hash and CMD2 or 3 
+#
+########################################################################################
+sub THZ_Get_Comunication($$) {
+my ($hash, $cmdHex) = @_;
+my ($err, $msg) =("", " ");
 	            		
   THZ_Write($hash,  "02"); 			# STX start of text
   ($err, $msg) = THZ_ReadAnswer($hash);		#Expectedanswer1    is  "10"  DLE data link escape
   
-  my $cmdHex2 = $cmdhash->{cmd2};
-   if(defined($cmdHex2) and ($msg eq "10") ) {
-    $cmdHex2=THZ_encodecommand($cmdHex2,"get");
-      THZ_Write($hash,  $cmdHex2); 		# send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
+   if ($msg eq "10")  {
+    $cmdHex=THZ_encodecommand($cmdHex,"get");
+      THZ_Write($hash,  $cmdHex); 		# send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
      ($err, $msg) = THZ_ReadAnswer($hash);	#Expectedanswer2     is "1002",		DLE data link escape -- STX start of text
     }
     
@@ -578,18 +613,8 @@ sub THZ_Get($@){
      ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer3 // read from the heatpump
      THZ_Write($hash,  "10");
      }
-   
-   if (defined($err))  {return ($msg ."\n" . $err);}
-   else {   
-	($err, $msg) = THZ_decode($msg); 	#clean up and remove footer and header
-        if (defined($err))  {return ($msg ."\n" . $err);}
-	else {   
-        $msg = THZ_Parse($msg);
-	my $activatetrigger =1;
-	readingsSingleUpdate($hash, $cmd, $msg, $activatetrigger);
-	return ($msg);
-	}    
-    }    
+   if (!(defined($err)))  {($err, $msg) = THZ_decode($msg);} 	#clean up and remove footer and header
+   return($err, $msg) ;
 }
 
 
@@ -857,10 +882,30 @@ sub THZ_Parse($) {
         	"x40: "				. hex2int(substr($message,40,4));
   }
   
+  when ("E8")    {                     #sAllE8
+    $message =  $message . " " .
+		"x04: " 			. hex2int(substr($message, 4,4)) . " " .
+        	"x08: " 			. hex2int(substr($message, 8,4)) . " " .
+        	"x12: "				. hex2int(substr($message,12,4)) . " " .
+        	"x16: "				. hex2int(substr($message,16,4)) . " " .
+        	"x20: " 			. hex2int(substr($message,20,4)) . " " .
+        	"x24: "				. hex2int(substr($message,24,4)) . " " . 
+		"x28: "				. hex2int(substr($message,28,4)) . " " . 
+	      	"x32: "				. hex2int(substr($message,32,4)) . " " .
+        	"x36: "			        . hex2int(substr($message,36,4)) . " " .
+		"x40: "				. hex2int(substr($message,40,4)) . " " .
+		"x44: "				. hex2int(substr($message,44,4)) . " " .
+		"x48: "				. hex2int(substr($message,48,4)) . " " .
+        	"x52: "				. hex2int(substr($message,52,4)) . " " .
+        	"x52: "				. hex2int(substr($message,56,4)) . " " .
+ 	     	"x60d: " 			. hex2int(substr($message,60,4)) . " " .
+ 	    	"x64: "				. hex2int(substr($message,64,4)) . " " .
+		"x68: "				. hex2int(substr($message,68,4)) . " " .
+         	"x72: "				. hex2int(substr($message,72,4)) ;
+  }  
   
   
-  
-  when ("F4")    {                     #allF4
+  when ("F4")    {                     #allF4 HC1
     $message =
 		"outsideTemp: " 		. hex2int(substr($message, 4,4))/10 . " " .
         	"x08: " 			. hex2int(substr($message, 8,4))/10 . " " .
@@ -884,7 +929,7 @@ sub THZ_Parse($) {
 # 	    	"x80: "				. hex2int(substr($message,80,4))
 		;
   }
-  when ("F5")    {                     #allF5
+  when ("F5")    {                     #allF5  HC2
     $message =
 		"outsideTemp: " 		. hex2int(substr($message, 4,4))/10 . " " .
         	"returnTemp: " 		. hex2int(substr($message, 8,4))/10 . " " .
