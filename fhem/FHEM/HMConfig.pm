@@ -18,6 +18,7 @@ use vars qw(%culHmRegType);
 use vars qw(%culHmRegModel);
 use vars qw(%culHmRegChan);
 use vars qw(%culHmGlobalGets);
+use vars qw(%culHmVrtGets);
 use vars qw(%culHmSubTypeGets);
 use vars qw(%culHmModelGets);
 use vars qw(%culHmGlobalSetsDevice);
@@ -182,7 +183,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   "006D" => {name=>"HM-OU-LED16"             ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''       ,lst=>'p'            ,chn=>"Led:1:16",},
   "006E" => {name=>"HM-LC-Dim1L-CV-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "006F" => {name=>"HM-LC-Dim1L-Pl-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
-  "0070" => {name=>"HM-LC-Dim2L-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",},#
+  "0070" => {name=>"HM-LC-Dim2L-SM-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",},#
   "0071" => {name=>"HM-LC-Dim1T-Pl-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "0072" => {name=>"HM-LC-Dim1T-CV-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "0073" => {name=>"HM-LC-Dim1T-FM-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
@@ -270,6 +271,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   "00D2" => {name=>"HM-LC-Bl1-FM-2"          ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)
   "8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",},
+  "FFF0" => {name=>"CCU-FHEM"                ,st=>'virtual'           ,cyc=>''      ,rxt=>''       ,lst=>''             ,chn=>"Btn:1:50",},
 
   #  "HM-LGW-O-TW-W-EU" #Funk LAN Gateway
 #################open:---------------------------
@@ -420,7 +422,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   energyOpt       =>{a=>  8.0,s=>1.0,l=>0,min=>0  ,max=>127     ,c=>''         ,f=>2       ,u=>'s'   ,d=>1,t=>"energy Option: Duration of ilumination"},
 # sec_mdir
   cyclicInfoMsg   =>{a=>  9.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message"          ,lit=>{off=>0,on=>200}},
-  sabotageMsg     =>{a=> 16.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"enable sabotage message" ,lit=>{off=>0,on=>200}},# changed to 200
+  sabotageMsg     =>{a=> 16.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"enable sabotage message" ,lit=>{off=>0,on=>1}},# sc needs 1 - others?
   cyclicInfoMsgDis=>{a=> 17.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message"},
   lowBatLimit     =>{a=> 18.0,s=>1.0,l=>0,min=>10 ,max=>12      ,c=>''         ,f=>10      ,u=>'V'   ,d=>1,t=>"low batterie limit, step .1V"},
   lowBatLimitBA   =>{a=> 18.0,s=>1.0,l=>0,min=>5  ,max=>15      ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
@@ -896,10 +898,10 @@ $culHmRegModel{"KS888"}               = $culHmRegModel{"HM-WDS100-C6-O"};
 $culHmRegModel{"HM-SEC-SC-2"}         = $culHmRegModel{"HM-SEC-SC"};
 
 $culHmRegModel{"HM-LC-Dim1L-Pl-2"}    = $culHmRegModel{"HM-LC-Dim1L-Pl"};#rf_d
-$culHmRegModel{"HM-LC-Dim1L-CV"}      = $culHmRegModel{"HM-LC-Dim1L-Pl"};
+$culHmRegModel{"HM-LC-DIM1L-CV"}      = $culHmRegModel{"HM-LC-Dim1L-Pl"};
 $culHmRegModel{"Schueco-263-132"}     = $culHmRegModel{"HM-LC-Dim1L-Pl"};
-$culHmRegModel{"HM-LC-Dim2L-CV"}      = $culHmRegModel{"HM-LC-Dim1L-Pl"};
-$culHmRegModel{"HM-LC-Dim2L-SM"}      = $culHmRegModel{"HM-LC-Dim1L-Pl"};
+$culHmRegModel{"HM-LC-DIM2L-CV"}      = $culHmRegModel{"HM-LC-Dim1L-Pl"};
+$culHmRegModel{"HM-LC-DIM2L-SM"}      = $culHmRegModel{"HM-LC-Dim1L-Pl"};
 
 $culHmRegModel{"HM-LC-Dim1L-Pl-644"}  = $culHmRegModel{"HM-LC-Dim1L-CV-2"};#RF_DIM_1l_644
 $culHmRegModel{"HM-LC-Dim1L-CV-644"}  = $culHmRegModel{"HM-LC-Dim1L-CV-2"};
@@ -1234,6 +1236,11 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
   cmdList    => "",
   saveConfig => "<filename> ...",
 );
+%culHmVrtGets = (
+  param      => "<param>",
+  cmdList    => "",
+  saveConfig => "<filename> ...",
+);
 %culHmSubTypeGets = (
   none4Type  =>{ "test"=>"" },
 );
@@ -1251,8 +1258,8 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
 );
 %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
   raw           => "data ...",
-  virtual       =>"<noButtons>",
-  clear         => "[readings|register|rssi|msgEvents]",
+  virtual       => "<noButtons>",
+  clear         => "[readings|rssi|msgEvents]",
 );
 %culHmGlobalSetsDevice = (# all devices but virtuals
   raw           => "data ...",
@@ -1463,6 +1470,8 @@ $culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
                          ,press          =>"[long|short] [<peer>] ..."
                          ,inhibit        =>"[on|off]"
                          ,statusRequest  =>""},
+
+  "CCU-FHEM00"        =>{ update  =>""},
 );
 # clones- - - - - - - - - - - - - - - - -
 #$culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};

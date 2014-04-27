@@ -19,6 +19,7 @@ my $culHmRegType          =\%HMConfig::culHmRegType;
 my $culHmRegModel         =\%HMConfig::culHmRegModel;
 my $culHmRegChan          =\%HMConfig::culHmRegChan;
 my $culHmGlobalGets       =\%HMConfig::culHmGlobalGets;
+my $culHmVrtGets          =\%HMConfig::culHmVrtGets;
 my $culHmSubTypeGets      =\%HMConfig::culHmSubTypeGets;
 my $culHmModelGets        =\%HMConfig::culHmModelGets;
 my $culHmGlobalSetsDevice =\%HMConfig::culHmGlobalSetsDevice;
@@ -218,7 +219,7 @@ sub CUL_HM_updateConfig($){
       $hash->{helper}{role}{vrt} = 1;
       next;
     }
-    CUL_HM_ID2PeerList($name,"",1);       # update peerList out of peerIDs
+    CUL_HM_ID2PeerList($name,"",1); # update peerList out of peerIDs
 
     my $chn = substr($id."00",6,2);
     my $st  = CUL_HM_Get($hash,$name,"param","subType");
@@ -317,7 +318,7 @@ sub CUL_HM_updateConfig($){
     CUL_HM_ActAdd($id,$actCycle) if ($actCycle );#add 2 ActionDetect?
     # --- set default attrubutes if missing ---
     if (   $hash->{helper}{role}{dev}
-        && AttrVal($name,"subType","") ne "virtual"){
+        && $st ne "virtual"){
       $attr{$name}{expert}     = AttrVal($name,"expert"     ,"2_full");
       $attr{$name}{autoReadReg}= AttrVal($name,"autoReadReg","4_reqStatus");
     }
@@ -338,11 +339,13 @@ sub CUL_HM_updateConfig($){
     $webCmd  = AttrVal($name,"webCmd",undef);
     if(!defined $webCmd){
       if    ($st eq "virtual"      ){
-          if   ($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "sdLead")    {$webCmd="teamCall:alarmOn:alarmOff";}
-          elsif($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "vdCtrl")    {$webCmd="valvePos";}
-          elsif($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "virtThSens"){$webCmd="virtTemp:virtHum";}
-          elsif($hash->{helper}{role}{chn})                                  {$webCmd="press short:press long";}
-          else                                                               {$webCmd="virtual";}
+        if   ($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "sdLead")    {$webCmd="teamCall:alarmOn:alarmOff";}
+        elsif($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "vdCtrl")    {$webCmd="valvePos";}
+        elsif($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "virtThSens"){$webCmd="virtTemp:virtHum";}
+        elsif(!$hash->{helper}{role}{dev})                                 {$webCmd="press short:press long";}
+        elsif($md =~ m/^virtual_/)                                         {$webCmd="virtual";}
+        elsif($md eq "CCU-FHEM")                                           {$webCmd="virtual:update";
+                                                                            CUL_HM_UpdtCentral($name);}
 
       }elsif((!$hash->{helper}{role}{chn} &&
                $md !~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/)
@@ -424,6 +427,7 @@ sub CUL_HM_Define($$) {##############################
       delete $devHash->{helper}{role}{chn};#device no longer
       delete $devHash->{peerList};
       delete $devHash->{READINGS}{peerList};
+      delete $attr{$devName}{peerIDs};
     }
   }
   else{# define a device
@@ -602,7 +606,7 @@ sub CUL_HM_Attr(@) {#################################
       my $id = $hash->{DEF};
       if ($id ne $K_actDetID && $attrVal){# if not action detector
         my @ids = grep /......../,split(",",$attrVal);
-        $attr{$name}{peerIDs} = join",",@ids;
+        $attr{$name}{peerIDs} = join",",@ids if (@ids);
         CUL_HM_ID2PeerList($name,"",1);       # update peerList out of peerIDs
       }
     }
@@ -1390,7 +1394,7 @@ sub CUL_HM_Parse($$) {#########################################################
                   : int((($val-$lvlMin)/($lvlMax - $lvlMin))*200)/2;
 
       # blind option: reverse Level Meaning 0 = open, 100 = closed
-      if ("levelInverse" eq AttrVal($name, "param", "")){
+      if ("levelInverse" eq AttrVal($name, "param", "")){;
         $pVal = $val = 100-$val;
       }
       $physLvl = ReadingsVal($name,"phyLevel",$val)
@@ -1577,7 +1581,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"flags:".     (($flag)?"none"     :$flag  )];
     }
   }
-  elsif($st eq "virtual"){ ####################################################
+  elsif($st eq "virtual" && $md =~ m/^virtual_/){ #############################
     # possibly add code to count all acks that are paired.
     if($mTp eq "02") {# this must be a reflection from what we sent, ignore
       push @evtEt,[$shash,1,""];
@@ -1833,7 +1837,8 @@ sub CUL_HM_Parse($$) {#########################################################
 
   #------------ parse if FHEM or virtual actor is destination   ---------------
 
-  if(AttrVal($dname, "subType", "none") eq "virtual"){# see if need for answer
+  if(   AttrVal($dname, "subType", "none") eq "virtual"
+     && AttrVal($dname, "model", "none") =~ m/^virtual_/){# see if need for answer
     my $sendAck = 0;
     if($mTp =~ m/^4/ && @mI > 1) { #Push Button event
       my ($recChn,$trigNo) = (hex($mI[0]),hex($mI[1]));# button number/event count
@@ -1896,12 +1901,12 @@ sub CUL_HM_Parse($$) {#########################################################
     if($mTp =~ m/^4./ &&  #Push Button event
        ($mFlgH & 0x20)){  #response required Flag
                 # fhem CUL shall ack a button press
-#      if($mFlgH & 0x02){
+      if ($md =~ m/HM-SEC-SC/){
+        push @ack,$shash,$mNo."8002".$dst.$src."0101".((hex($mI[0])&1)?"C8":"00")."00";
+      }
+      else{
         push @ack,$shash,$mNo."8002$dst$src"."00";
-#      }
-#      else{
-#        push @ack,$shash,$mNo."8002".$dst.$src."0101".((hex($mI[0])&1)?"C8":"00")."00";
-#      }
+      }
       Log3 $name,5,"CUL_HM $name prep ACK for $mI[0]";
     }
   }
@@ -2478,16 +2483,19 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   my $fkt   = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
 
   my $h = undef;
-  $h = $culHmGlobalGets->{$cmd};
+  $h = $culHmGlobalGets->{$cmd}       if(!$roleV);
+  $h = $culHmVrtGets->{$cmd}          if($roleV);
   $h = $culHmSubTypeGets->{$st}{$cmd} if(!defined($h) && $culHmSubTypeGets->{$st});
   $h = $culHmModelGets->{$md}{$cmd}   if(!defined($h) && $culHmModelGets->{$md});
   my @h;
   @h = split(" ", $h) if($h);
 
   if(!defined($h)) {
-    my @arr = keys %{$culHmGlobalGets};
+    my @arr;
+    push @arr, keys %{$culHmGlobalGets}         if(!$roleV);
+    push @arr, keys %{$culHmVrtGets}            if($roleV);
     push @arr, keys %{$culHmSubTypeGets->{$st}} if($culHmSubTypeGets->{$st});
-    push @arr, keys %{$culHmModelGets->{$md}} if($culHmModelGets->{$md});
+    push @arr, keys %{$culHmModelGets->{$md}}   if($culHmModelGets->{$md});
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr);
 
     return $usg;
@@ -2737,7 +2745,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr1);
     $usg =~ s/ pct/ pct:slider,0,1,100/;
-    $usg =~ s/ virtual/ virtual:slider,1,1,40/;
+    $usg =~ s/ virtual/ virtual:slider,1,1,50/;
 
     return $usg;
   }
@@ -3678,15 +3686,17 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     CUL_HM_PushCmdStack($hash, $msg);
     CUL_HM_parseSDteam("41",$dst,$dst,"01".$p);
   }
+
   elsif($cmd eq "virtual") { ##################################################
-      $state = "";
+    $state = "";
     my (undef,undef,$maxBtnNo) = @a;
-    return "please give a number between 1 and 255"
-       if ($maxBtnNo < 1 ||$maxBtnNo > 255);# arbitrary - 255 should be max
+    return "please give a number between 1 and 50"
+       if ($maxBtnNo < 1 ||$maxBtnNo > 50);# arbitrary - 255 should be max
     return $name." already defines as ".$attr{$name}{subType}
        if ($attr{$name}{subType} && $attr{$name}{subType} ne "virtual");
     $attr{$name}{subType} = "virtual";
-    $attr{$name}{model}   = "virtual_".$maxBtnNo;
+    $attr{$name}{model}   = "virtual_".$maxBtnNo 
+       if (!$attr{$name}{model} ||$attr{$name}{model} =~ m/^virtual_/);
     my $devId = $hash->{DEF};
     for (my $btn=1;$btn <= $maxBtnNo;$btn++){
       my $chnName = $name."_Btn".$btn;
@@ -3700,7 +3710,13 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       CommandDelete(undef,$hash->{$channel})
             if (hex($chNo) > $maxBtnNo);
     }
+    CUL_HM_UpdtCentral($name) if ($md eq "CCU_FHEM");
   }
+  elsif($cmd eq "update") { ##################################################
+    $state = "";
+    CUL_HM_UpdtCentral($name);
+  }
+
   elsif($cmd eq "press") { ####################################################
     my $mode = 0;
     if ($a[2]){
@@ -4975,11 +4991,11 @@ sub CUL_HM_protState($$){
 sub CUL_HM_ID2PeerList ($$$) {
   my($name,$peerID,$set) = @_;
   my $peerIDs = AttrVal($name,"peerIDs","");
+  return if (!$peerID && !$peerIDs);
   my $hash = $defs{$name};
   $peerIDs =~ s/$peerID//g;         #avoid duplicate, support unset
   $peerID =~ s/^000000../00000000/;  #correct end detector
   $peerIDs.= $peerID."," if($set);
-
   my %tmpHash = map { $_ => 1 } split(",",$peerIDs);#remove duplicates
   $peerIDs = "";                                    #clear list
   my $peerNames = "";                               #prepare names
@@ -6128,6 +6144,25 @@ sub CUL_HM_storeRssi(@){
   CUL_HM_UpdtReadSingle($hash,"rssi_".$peerName,$val,1) 
         if (AttrVal($name,"rssiLog",undef));
  return ;
+}
+sub CUL_HM_UpdtCentral($){
+  my $name = shift;
+  my $id = CUL_HM_name2Id($name);
+  my @myIos;
+  foreach (CUL_HM_noDup(grep !/^$/,map{AttrVal($_,"IODev","")}keys %defs)){
+    push @myIos,$_ if (CUL_HM_Id($defs{$_} eq $defs{$name}{DEF}));
+  }
+  $defs{$name}{assignedIOs} = join(",",@myIos);
+  foreach my $ccuBId (CUL_HM_noDup(grep /$id/ ,map{split ",",AttrVal($_,"peerIDs","")}keys %defs)){
+    my $btnS = substr($ccuBId,6,2);
+    my $btn = hex($btnS) + 0;
+    next if (!$btn);
+    CommandDefine(undef,$name."_Btn$btn CUL_HM $ccuBId")
+        if (!$modules{CUL_HM}{defptr}{$ccuBId});
+    foreach my $pn (grep !/^$/,map{$_ if (AttrVal($_,"peerIDs","") =~ m/$id$btnS/)}keys %defs){
+      CUL_HM_ID2PeerList ($name."_Btn$btn",CUL_HM_name2Id($pn),1);
+    }
+  }
 }
 
 sub CUL_HM_stateUpdatDly($$){#delayed queue of status-request
