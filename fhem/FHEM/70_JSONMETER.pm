@@ -57,10 +57,10 @@ sub JSONMETER_ParseJsonFile($);
 sub JSONMETER_UpdateAborted($);
 sub JSONMETER_doStatisticMinMax ($$$); 
 sub JSONMETER_doStatisticMinMaxSingle ($$$$);
-sub JSONMETER_doStatisticDelta ($$$$);
-
+sub JSONMETER_doStatisticDelta ($$$$$);
+sub JSONMETER_doStatisticDeltaSingle ($$$$$$);
 # Modul Version for remote debugging
-  my $modulVersion = "2014-03-03";
+  my $modulVersion = "2014-04-26";
 
  ##############################################################
  # Syntax: meterType => port URL-Path
@@ -71,44 +71,45 @@ sub JSONMETER_doStatisticDelta ($$$$);
                   );
 
  ##############################################################
- # Syntax: valueType, code, FHEM reading name, statisticType
+ # Syntax: valueType, code, FHEM reading name, statisticType, tariffType
  #     valueType: 1=OBISvalue | 2=OBISvalueString | 3=jsonProperty | 4=jsonPropertyTime
  #     statisticType: 0=noStatistic | 1=maxMinStatistic | 2=integralTimeStatistic | 3=State+IntegralTimeStatistic
+ #     tariffType: 0 = tariff cannot be selected, 1 = tariff can be selected via reading "activeTariff"
  ##############################################################
   my @jsonFields = (
-    [3, "meterType", "meterType", 0] # {"meterId": "0000000061015736", "meterType": "Simplex", "interval": 0, "entry": [
-   ,[4, "timestamp", "deviceTime", 0] # {"timestamp": 1389296286, "periodEntries": [
-   ,[3, "cnt", "electricityConsumed", 3] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
-   ,[3, "pwr", "electricityPower", 1] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
-   ,[1, "010000090B00", "deviceTime", 0] #   { "obis":"010000090B00","value":"dd.mm.yyyy,hh:mm"}
-   ,[2, "0.0.0", "meterID", 0] # {"obis": "0.0.0", "scale": 0, "value": 1627477814, "unit": "", "valueString": "0000000061015736" }, 
-   ,[1, "0100000000FF", "meterID", 0] #  #   { "obis":"0100000000FF","value":"xxxxx"},
-   ,[2, "0.2.0", "firmware", 0] # {"obis": "0.2.0", "scale": 0, "value": 0, "unit": "", "valueString": "V320090704" }, 
-   ,[1, "1.7.0|0100010700FF", "electricityPower", 1]  # {"obis": "1.7.0", "scale": 0, "value": 392, "unit": "W", "valueString": "0000392" }, 
-   ,[1, "0100150700FF", "electricityPowerPhase1", 1] # {"obis":"0100150700FF","value":209.40,"unit":"W"},
-   ,[1, "0100290700FF", "electricityPowerPhase2", 1] # {"obis":"0100290700FF","value":14.27,"unit":"W"},
-   ,[1, "01003D0700FF", "electricityPowerPhase3", 1] # {"obis":"01003D0700FF","value":89.40,"unit":"W"},
-   ,[1, "1.8.0|0101010800FF", "electricityConsumed", 3] # {"obis": "1.8.0", "scale": 0, "value": 8802276, "unit": "Wh", "valueString": "0008802.276" }, 
-   ,[1, "1.8.1|0101010801FF", "electricityConsumedTariff1", 2] # {"obis":"0101010801FF","value":33.53,"unit":"kWh"},               
-   ,[1, "1.8.2|0101010802FF", "electricityConsumedTariff2", 2] # {"obis":"0101010802FF","value":33.53,"unit":"kWh"},               
-   ,[1, "1.8.3|0101010803FF", "electricityConsumedTariff3", 2] # {"obis":"0101010803FF","value":33.53,"unit":"kWh"},               
-   ,[1, "1.8.4|0101010804FF", "electricityConsumedTariff4", 2] # {"obis":"0101010804FF","value":33.53,"unit":"kWh"},               
-   ,[1, "1.8.5|0101010805FF", "electricityConsumedTariff5", 2] # {"obis":"0101010805FF","value":33.53,"unit":"kWh"},               
-   ,[1, "010001080080", "electricityConsumedToday", 0] 
-   ,[1, "010001080081", "electricityConsumedYesterday", 0] 
-   ,[1, "010001080082", "electricityConsumedLastWeek", 0] 
-   ,[1, "010001080083", "electricityConsumedLastMonth", 0] 
-   ,[1, "010001080084", "electricityConsumedLastYear", 0] 
-   ,[1, "010002080080", "electricityProducedToday", 0] 
-   ,[1, "010002080081", "electricityProducedYesterday", 0] 
-   ,[1, "010002080082", "electricityProducedLastWeek", 0] 
-   ,[1, "010002080083", "electricityProducedLastMonth", 0] 
-   ,[1, "010002080084", "electricityProducedLastYear", 0] 
-   ,[1, "0101020800FF", "electricityPowerOutput", 1]
-   ,[1, "010020070000", "electricityVoltagePhase1", 1] #{"obis":"010020070000","value":237.06,"unit":"V"},               
-   ,[1, "010034070000", "electricityVoltagePhase2", 1] # {"obis":"010034070000","value":236.28,"unit":"V"},               
-   ,[1, "010048070000", "electricityVoltagePhase3", 1] # {"obis":"010048070000","value":236.90,"unit":"V"},
-   ,[1, "01000E070000", "electricityFrequency", 1] # {"obis":"01000E070000","value":49.950,"unit":"Hz"}
+    [3, "meterType", "meterType", 0, 0] # {"meterId": "0000000061015736", "meterType": "Simplex", "interval": 0, "entry": [
+   ,[4, "timestamp", "deviceTime", 0, 0] # {"timestamp": 1389296286, "periodEntries": [
+   ,[3, "cnt", "electricityConsumed", 3, 1] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
+   ,[3, "pwr", "electricityPower", 1, 0] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
+   ,[1, "010000090B00", "deviceTime", 0, 0] #   { "obis":"010000090B00","value":"dd.mm.yyyy,hh:mm"}
+   ,[2, "0.0.0", "meterID", 0, 0] # {"obis": "0.0.0", "scale": 0, "value": 1627477814, "unit": "", "valueString": "0000000061015736" }, 
+   ,[1, "0100000000FF", "meterID", 0, 0] #  #   { "obis":"0100000000FF","value":"xxxxx"},
+   ,[2, "0.2.0", "firmware", 0, 0] # {"obis": "0.2.0", "scale": 0, "value": 0, "unit": "", "valueString": "V320090704" }, 
+   ,[1, "1.7.0|0100010700FF", "electricityPower", 1, 0]  # {"obis": "1.7.0", "scale": 0, "value": 392, "unit": "W", "valueString": "0000392" }, 
+   ,[1, "0100150700FF", "electricityPowerPhase1", 1, 0] # {"obis":"0100150700FF","value":209.40,"unit":"W"},
+   ,[1, "0100290700FF", "electricityPowerPhase2", 1, 0] # {"obis":"0100290700FF","value":14.27,"unit":"W"},
+   ,[1, "01003D0700FF", "electricityPowerPhase3", 1, 0] # {"obis":"01003D0700FF","value":89.40,"unit":"W"},
+   ,[1, "1.8.0|0101010800FF", "electricityConsumed", 3, 1] # {"obis": "1.8.0", "scale": 0, "value": 8802276, "unit": "Wh", "valueString": "0008802.276" }, 
+   ,[1, "1.8.1|0101010801FF", "electricityConsumedTariff1", 2, 0] # {"obis":"0101010801FF","value":33.53,"unit":"kWh"},               
+   ,[1, "1.8.2|0101010802FF", "electricityConsumedTariff2", 2, 0] # {"obis":"0101010802FF","value":33.53,"unit":"kWh"},               
+   ,[1, "1.8.3|0101010803FF", "electricityConsumedTariff3", 2, 0] # {"obis":"0101010803FF","value":33.53,"unit":"kWh"},               
+   ,[1, "1.8.4|0101010804FF", "electricityConsumedTariff4", 2, 0] # {"obis":"0101010804FF","value":33.53,"unit":"kWh"},               
+   ,[1, "1.8.5|0101010805FF", "electricityConsumedTariff5", 2, 0] # {"obis":"0101010805FF","value":33.53,"unit":"kWh"},               
+   ,[1, "010001080080", "electricityConsumedToday", 0, 0] 
+   ,[1, "010001080081", "electricityConsumedYesterday", 0, 0] 
+   ,[1, "010001080082", "electricityConsumedLastWeek", 0, 0] 
+   ,[1, "010001080083", "electricityConsumedLastMonth", 0, 0] 
+   ,[1, "010001080084", "electricityConsumedLastYear", 0, 0] 
+   ,[1, "010002080080", "electricityProducedToday", 0, 0] 
+   ,[1, "010002080081", "electricityProducedYesterday", 0, 0] 
+   ,[1, "010002080082", "electricityProducedLastWeek", 0, 0] 
+   ,[1, "010002080083", "electricityProducedLastMonth", 0, 0] 
+   ,[1, "010002080084", "electricityProducedLastYear", 0, 0] 
+   ,[1, "0101020800FF", "electricityPowerOutput", 1, 0]
+   ,[1, "010020070000", "electricityVoltagePhase1", 1, 0] #{"obis":"010020070000","value":237.06,"unit":"V"},               
+   ,[1, "010034070000", "electricityVoltagePhase2", 1, 0] # {"obis":"010034070000","value":236.28,"unit":"V"},               
+   ,[1, "010048070000", "electricityVoltagePhase3", 1, 0] # {"obis":"010048070000","value":236.90,"unit":"V"},
+   ,[1, "01000E070000", "electricityFrequency", 1, 0] # {"obis":"01000E070000","value":49.950,"unit":"Hz"}
    );
   ##############################################################
 
@@ -129,9 +130,6 @@ JSONMETER_Initialize($)
                 ."pathString "
                 ."port "
                 ."alwaysAnalyse:0,1 "
-                ."electricityTariff "
-                ."electricityTariff1 "
-                ."electricityTariff2 "
                 .$readingFnAttributes;
 
 } # end JSONMETER_Initialize
@@ -248,10 +246,15 @@ JSONMETER_Set($$@)
       return undef;
    }
    elsif ($cmd eq 'resetStatistics') {
-      foreach (sort keys %{ $hash->{READINGS} }) {
-         if ($_ =~ /^\.?stat/ && $_ ne "state") {
-            delete $hash->{READINGS}{$_};
-            $resultStr .= "$name: Reading '$_' deleted\n";
+      if ($val =~ /all|statElectricityConsumed\.\.\.|statElectricityConsumedTariff\.\.\.|statElectricityPower\.\.\./) {
+         my $regExp;
+         if ($val eq "all") { $regExp = "stat"; } 
+         else { $regExp = $val; } 
+         foreach (sort keys %{ $hash->{READINGS} }) {
+            if ($_ =~ /^\.?$regExp/ && $_ ne "state") {
+               delete $hash->{READINGS}{$_};
+               $resultStr .= " " . $_;
+            }
          }
       }
       WriteStatefile();
@@ -262,8 +265,14 @@ JSONMETER_Set($$@)
       $hash->{INTERVAL}=$val;
       return "$name: Polling interval set to $val seconds.";
    }
+   elsif($cmd eq 'activeTariff' && int(@_)==4 ) {
+      $val = 0 if( $val < 1 || $val > 9 );
+      readingsSingleUpdate($hash,"activeTariff",$val, 1);
+      return "$name: activeTariff set to $val.";
+   }
    my $list = "statusRequest:noArg"
-         ." resetStatistics:noArg"
+         ." activeTariff:0,1,2,3,4,5,6,7,8,9"
+         ." resetStatistics:all,statElectricityConsumed...,statElectricityConsumedTariff...,statElectricityPower..."
          ." restartJsonAnalysis:noArg"
          ." INTERVAL:slider,0,10,600";
    return "Unknown argument $cmd, choose one of $list";
@@ -475,36 +484,37 @@ if ( $a[1] == 1 ){
       {
          for(my $i=0; $i<=$#fields; $i++) 
          {
-            if ($$f[0] =~ /^[15]$/) { 
+            # if ($$f[0] =~ /^[15]$/) { 
+            if ($$f[0] == 1) { 
                if ($fields[$i] =~ /"obis"\s*:\s*"($$f[1])"\s*[,}]/ && $fields[$i] =~ /"value"/) {
-                  $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3]";
+                  $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[4]";
                   Log3 $name,4,"$name: OBIS code \"$$f[1]\" will be stored in $$f[2]";
                   $returnStr .= "OBIS code \"$$f[1]\" will be extracted as reading '$$f[2]' (statistic type: $$f[3]) from part $i:\n$fields[$i]\n\n";
                }
             } elsif ($$f[0] == 2) { 
                if ($fields[$i] =~ /"obis"\s*:\s*"($$f[1])"\s*[,}]/ && $fields[$i] =~ /"valueString"/) {
-                  $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3]";
+                  $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[4]";
                   Log3 $name,4,"$name: OBIS code \"$$f[1]\" will be stored in $$f[2]";
                   $returnStr .= "OBIS code \"$$f[1]\" will be extracted as reading '$$f[2]' (statistic type: $$f[3]) from part $i:\n$fields[$i]\n\n";
                }
             } elsif ($$f[0] == 3) { 
                if ($fields[$i] =~ /"($$f[1])"\s*:/) {
-                  $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[1]";
+                  $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[4] $$f[1]";
                   Log3 $name,4,"$name: Property \"$$f[1]\" will be stored in $$f[2]";
                   $returnStr .= "Property \"$$f[1]\" will be extracted as reading '$$f[2]' (statistic type: $$f[3]) from part $i:\n$fields[$i]\n\n";
               }
             } elsif ($$f[0] == 4) { 
                if ($fields[$i] =~ /"($$f[1])"\s*:/) {
-                  $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[1]";
+                  $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[4] $$f[1]";
                   Log3 $name,4,"$name: Property \"$$f[1]\" will be stored in $$f[2]";
                   $returnStr .= "Property \"$$f[1]\" will be extracted as reading '$$f[2]' (statistic type: $$f[3]) from part $i:\n$fields[$i]\n\n";
                }
-            } elsif ($$f[0] == 6) { 
-               if ($fields[$i] =~ /"($$f[1])"\s*:/) {
-                  $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[1]";
-                  Log3 $name,4,"$name: Property \"$$f[1]\" will be stored in $$f[2]";
-                  $returnStr .= "Property \"$$f[1]\" will be extracted as reading '$$f[2]' (statistic type: $$f[3]) from part $i:\n$fields[$i]\n\n";
-               }
+            # } elsif ($$f[0] == 6) { 
+               # if ($fields[$i] =~ /"($$f[1])"\s*:/) {
+                  # $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[4] $$f[1]";
+                  # Log3 $name,4,"$name: Property \"$$f[1]\" will be stored in $$f[2]";
+                  # $returnStr .= "Property \"$$f[1]\" will be extracted as reading '$$f[2]' (statistic type: $$f[3]) from part $i:\n$fields[$i]\n\n";
+               # }
             }   
          }
       }
@@ -532,7 +542,8 @@ if ( $a[1] == 1 ){
       $statisticType = 0;
       Log3 $name, 5, "$name: Handle $_";
       my @b = split / /, $_ ;
-      if ($b[1] == 1) { #obis value
+    #obis value
+      if ($b[1] == 1) { 
          if ($fields[$b[0]] =~ /"value"\s*:\s*"(.*?)"\s*[,\}]/g || $fields[$b[0]] =~ /"value"\s*:\s*(.*?)\s*[,\}]/g) {
             $value = $1;
             # $value =~ s/^\s+|\s+$//g;
@@ -544,7 +555,8 @@ if ( $a[1] == 1 ){
             Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
             $returnStr .= "Could not extract value for reading '$b[2]' from part $b[0]:\n$fields[$b[0]]\n\n";
          }
-      } elsif   ($b[1] == 2) { #obis valueString
+    #obis valueString
+      } elsif ($b[1] == 2) { 
          if ($fields[$b[0]] =~ /"valueString"\s*:\s*"(.*?)"\s*[,}]/g ) {
             $value = $1;
             Log3 $name, 4, "$name: Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
@@ -555,8 +567,9 @@ if ( $a[1] == 1 ){
             Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
             $returnStr .= "Could not extract value for reading '$b[2]' from part $b[0]:\n$fields[$b[0]]\n\n";
          }
-      } elsif   ($b[1] == 3) { # JSON-Property  
-         if ($fields[$b[0]] =~ /"$b[4]"\s*:\s*"(.*?)"\s*[,}]/g || $fields[$b[0]] =~ /"$b[4]"\s*:\s*(.*?)\s*[,}]/g ) {
+    # JSON-Property
+      } elsif ($b[1] == 3) { 
+         if ($fields[$b[0]] =~ /"$b[5]"\s*:\s*"(.*?)"\s*[,}]/g || $fields[$b[0]] =~ /"$b[4]"\s*:\s*(.*?)\s*[,}]/g ) {
             $value = $1;
             $value =~ /^ *\d+(,\d\d\d)+/ && $value =~ s/,| //g;
             Log3 $name, 4, "$name: Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
@@ -567,8 +580,9 @@ if ( $a[1] == 1 ){
             Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
             $returnStr .= "Could not extract value for reading '$b[2]' from part $b[0]:\n$fields[$b[0]]\n\n";
          }
-      } elsif   ($b[1] == 4) {  # JSON-Property Time
-         if ($fields[$b[0]] =~ /"$b[4]"\s*:\s"?(\d*)"?\s*[,}]/g ) {
+    # JSON-Property Time
+      } elsif ($b[1] == 4) {  
+         if ($fields[$b[0]] =~ /"$b[5]"\s*:\s"?(\d*)"?\s*[,}]/g ) {
             $value = $1;
             Log3 $name, 4, "$name: Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
             $returnStr .= "Value \"$value\" for reading '$b[2]' extracted from part $b[0]:\n$fields[$b[0]]\n\n";
@@ -582,12 +596,14 @@ if ( $a[1] == 1 ){
       }
      
       if ( AttrVal($name,"doStatistics",0) == 1) { 
+         my $activeTariff = ReadingsVal($name,"activeTariff",0);
+         if ($b[4] == 0) { $activeTariff = 0;}
          # JSONMETER_doStatisticMinMax $hash, $readingName, $value
          if ($statisticType == 1 ) { JSONMETER_doStatisticMinMax $hash, "stat".ucfirst($b[2]), $value ; }
-         # JSONMETER_doStatisticDelta: $hash, $readingName, $value, $special
-         if ($statisticType == 2 ) { JSONMETER_doStatisticDelta $hash, "stat".ucfirst($b[2]), $value, 0 ; }
-         # JSONMETER_doStatisticDelta: $hash, $readingName, $value, $special
-         if ($statisticType == 3 ) { JSONMETER_doStatisticDelta $hash, "stat".ucfirst($b[2]), $value, 1 ; }
+         # JSONMETER_doStatisticDelta: $hash, $readingName, $value, $special, $activeTariff
+         if ($statisticType == 2 ) { JSONMETER_doStatisticDelta $hash, "stat".ucfirst($b[2]), $value, 0, $activeTariff ; }
+         # JSONMETER_doStatisticDelta: $hash, $readingName, $value, $special, $activeTariff
+         if ($statisticType == 3 ) { JSONMETER_doStatisticDelta $hash, "stat".ucfirst($b[2]), $value, 1, $activeTariff ; }
       }
     }
 
@@ -706,112 +722,143 @@ JSONMETER_doStatisticMinMaxSingle ($$$$)
 
 # Calculates deltas for day, month and year
 sub ######################################## 
-JSONMETER_doStatisticDelta ($$$$) 
+JSONMETER_doStatisticDelta ($$$$$) 
 {
-   my ($hash, $readingName, $value, $special) = @_;
+   my ($hash, $readingName, $value, $special, $activeTariff) = @_;
    my $dummy;
-
-   my @curr = split / /, $hash->{READINGS}{$readingName}{VAL} || "";
-   my @start = split / /,  $hash->{READINGS}{"." . $readingName . "Start"}{VAL} || "";  
-
-   my $saveLast=0;
-   my @last;
-   if (exists ($hash->{READINGS}{$readingName."Last"})) { 
-     @last = split / /,  $hash->{READINGS}{$readingName."Last"}{VAL};
-   } else {
-      @last = split / /,  "Day: - Month: - Year: -";
-   }
-   
    my $result;
-   my $yearLast;
-   my $monthLast;
-   my $dayLast;
-   my $dayNow;
-   my $monthNow;
-   my $yearNow;
    
-  # Determine date of last and current reading
-   if (exists($hash->{READINGS}{$readingName}{TIME})) {
-      ($yearLast, $monthLast, $dayLast) = ($hash->{READINGS}{$readingName}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d)/);
+   my $deltaValue;
+   my $previousTariff; 
+   my $showDate;
+   
+ # Determine if time period switched (day, month, year)
+ # Get deltaValue and Tariff of previous call
+   my $periodSwitch = 0;
+   my $yearLast; my $monthLast; my $dayLast; my $dayNow; my $monthNow; my $yearNow;
+   if (exists($hash->{READINGS}{"." . $readingName . "Before"})) {
+      ($yearLast, $monthLast, $dayLast) = ($hash->{READINGS}{"." . $readingName . "Before"}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d)/);
+      $yearLast -= 1900;
+      $monthLast --;
+      ($dummy, $deltaValue, $dummy, $previousTariff, $dummy, $showDate) = split / /,  $hash->{READINGS}{"." . $readingName . "Before"}{VAL} || "";
+      $deltaValue = $value - $deltaValue;
    } else {
       ($dummy, $dummy, $dummy, $dayLast, $monthLast, $yearLast) = localtime;
-      $yearLast += 1900;
-      $monthLast ++;
-      $start[1] = $value;
-      $start[3] = $value;
-      $start[5] = $value;
-      $start[7] = 6; 
-      $curr[7] = strftime "%Y-%m-%d_%H:%M:%S", localtime(); # Start
+      $deltaValue = 0;
+      $previousTariff = 0; 
+      $showDate = 6;
+      #Aufräumen von letzter Modul-Version
+      if (exists($hash->{READINGS}{$readingName})) { delete($hash->{READINGS}{$readingName});}
+      if (exists($hash->{READINGS}{".".$readingName."Start"})) { delete($hash->{READINGS}{".".$readingName."Start"});}
    }
    ($dummy, $dummy, $dummy, $dayNow, $monthNow, $yearNow) = localtime;
-   $yearNow += 1900;
-   $monthNow ++;
+   if ($yearNow != $yearLast) { $periodSwitch = 3; }
+   elsif ($monthNow != $monthLast) { $periodSwitch = 2; }
+   elsif ($dayNow != $dayLast) { $periodSwitch = 1; }
+
+   # Determine if "since" value has to be shown in current and last reading
+   if ($periodSwitch == 3) {
+      if ($showDate == 1) { $showDate = 0; } # Do not show the "since:" value for year changes anymore
+      if ($showDate >= 2) { $showDate = 1; } # Shows the "since:" value for the first year change
+   }
+   if ($periodSwitch >= 2){
+      if ($showDate == 3) { $showDate = 2; } # Do not show the "since:" value for month changes anymore
+      if ($showDate >= 4) { $showDate = 3; } # Shows the "since:" value for the first month change
+   }
+   if ($periodSwitch >= 1){
+      if ($showDate == 5) { $showDate = 4; } # Do not show the "since:" value for day changes anymore
+      if ($showDate >= 6) { $showDate = 5; } # Shows the "since:" value for the first day change
+   }
+
+ # JSONMETER_doStatisticDeltaSingle; $hash, $readingName, $deltaValue, $special, $periodSwitch, $showDate, $firstCall
+   JSONMETER_doStatisticDeltaSingle ($hash, $readingName, $deltaValue, $special, $periodSwitch, $showDate);
+
+   foreach (1,2,3,4,5,6,7,8,9) {
+      if ( $previousTariff == $_ ) {
+         JSONMETER_doStatisticDeltaSingle ($hash, $readingName."Tariff".$_, $deltaValue, 0, $periodSwitch, $showDate);
+      } elsif ($activeTariff == $_ || ($periodSwitch > 0 && exists($hash->{READINGS}{$readingName . "Tariff".$_}))) {
+         JSONMETER_doStatisticDeltaSingle ($hash, $readingName."Tariff".$_, 0, 0 , $periodSwitch, $showDate);
+      }
+   }
+      
+   # Hidden storage of current values for next call(before values)
+   $result = "Value: $value Tariff: $activeTariff ShowDate: $showDate";  
+   readingsBulkUpdate($hash, ".".$readingName."Before", $result);
    
-  # Yearly Statistic
-   if ($yearNow != $yearLast){
+   return ;
+}
+
+sub ######################################## 
+JSONMETER_doStatisticDeltaSingle ($$$$$$) 
+{
+   my ($hash, $readingName, $deltaValue, $special, $periodSwitch, $showDate) = @_;
+   my $dummy;
+   my $result; 
+
+ # get existing statistic reading
+   my @curr;
+   if (exists($hash->{READINGS}{$readingName}{VAL})) {
+      @curr = split / /, $hash->{READINGS}{$readingName}{VAL} || "";
+   } else {
+      $curr[1] = 0; $curr[3] = 0;  $curr[5] = 0;
+      $curr[7] = strftime "%Y-%m-%d_%H:%M:%S", localtime(); # start
+   }
+   
+ # get statistic values of previous period
+   my @last;
+   if ($periodSwitch >= 1) {
+      if (exists ($hash->{READINGS}{$readingName."Last"})) { 
+         @last = split / /,  $hash->{READINGS}{$readingName."Last"}{VAL};
+      } else {
+         @last = split / /,  "Day: - Month: - Year: -";
+      }
+   }
+   
+ # Do statistic
+   $curr[1] += $deltaValue;
+   $curr[3] += $deltaValue;
+   $curr[5] += $deltaValue;
+
+ # If change of year, change yearly statistic
+   if ($periodSwitch == 3){
       $last[5] = $curr[5];
-      $start[5] = $value;
-     # Do not show the "since:" value for year changes anymore
-      if ($start[7] == 1) { $start[7] = 0; }
-     # Shows the "since:" value for the first year change
-      if ($start[7] >= 2) { 
-         $last[7] = $curr[7];
-         $start[7] = 1;
-      }
+      $curr[5] = 0;
+      if ($showDate == 1) { $last[7] = $curr[7]; }
    }
-   $curr[5] = $value - $start[5];
 
-  # Monthly Statistic 
-   if ($monthNow != $monthLast){
+ # If change of month, change monthly statistic 
+   if ($periodSwitch >= 2){
       $last[3] = $curr[3];
-      $start[3] = $value;
-     # Do not show the "since:" value for month changes anymore
-      if ($start[7] == 3) { $start[7] = 2; }
-     # Shows the "since:" value for the first month change
-      if ($start[7] >= 4) { 
-         $last[7] = $curr[7];
-         $start[7] = 3;
-      }
+      $curr[3] = 0;
+      if ($showDate == 3) { $last[7] = $curr[7];}
    }
-   $curr[3] = $value - $start[3];
 
-   # Daily Statistic
-   if ($dayNow != $dayLast){
+ # If change of day, change daily statistic
+   if ($periodSwitch >= 1){
       $last[1] = $curr[1];
-      $start[1] = $value;
-     # Do not show the "since:" value for day changes anymore
-      if ($start[7] == 5) { $start[7] = 4; }
-     # Shows the "since:" value for the first day change
-      if ($start[7] >= 6) { 
+      $curr[1] = 0;
+      if ($showDate == 5) {
          $last[7] = $curr[7];
-         $start[7] = 5;
-        # Next monthly and yearly values start at 00:00
-         $curr[7] = strftime "%Y-%m-%d", localtime(); # Start
-         $start[3] = $value;
-         $start[5] = $value;
+        # Next monthly and yearly values start at 00:00 and show only date (no time)
+         $curr[3] = 0;
+         $curr[5] = 0;
+         $curr[7] = strftime "%Y-%m-%d", localtime(); # start
       }
-      $saveLast = 1;
    }
-   $curr[1] = $value - $start[1];
-   
-  # Store internal calculation values
-   $result = "Day: $start[1] Month: $start[3] Year: $start[5] ShowDate: $start[7]";  
-   readingsBulkUpdate($hash, ".".$readingName."Start", $result);
 
-  # Store visible Reading
+ # Store visible statistic readings (delta values)
    $result = "Day: $curr[1] Month: $curr[3] Year: $curr[5]";
-   if ($start[7] != 0 ) { $result .= " (since: $curr[7] )"; }
+   if ( $showDate >=2 ) { $result .= " (since: $curr[7] )"; }
    readingsBulkUpdate($hash,$readingName,$result);
    
    if ($special == 1) { readingsBulkUpdate($hash,$readingName."Today",$curr[1]) };
 
-   if ($saveLast == 1) {
+ # if changed, store previous visible statistic (delta) values
+   if ($periodSwitch >= 1) {
       $result = "Day: $last[1] Month: $last[3] Year: $last[5]";
-      if ( $start[7] =~ /1|3|5/ ) { $result .= " (since: $last[7] )";}
+      if ( $showDate =~ /1|3|5/ ) { $result .= " (since: $last[7] )";}
       readingsBulkUpdate($hash,$readingName."Last",$result); 
    }
- 
-   return ;
 }
 
 1;
@@ -865,16 +912,29 @@ JSONMETER_doStatisticDelta ($$$$)
 
   <b>Set</b>
   <ul>
-      <li><code>INTERVAL &lt;polling interval&gt;</code><br>
-        Polling interval in seconds
-        </li><br>
-      <li><code>statusRequest</code><br>
-          Update device information
-          </li><br>
-      <li><code>restartJsonAnalysis</code><br>
-          Restarts the analysis of the json file for known readings (compliant to the OBIS standard).
-        <br>
-        This analysis happens normally only once if readings have been found.</li>
+     <li><code>activeTariff &lt; 0 - 9 &gt;</code>
+         <br>
+         Allows the separate measurement of the consumption (doStatistics = 1) within different tariffs for all gages that miss this built-in capability (e.g. LS110). Also the possible gain of a change to a time-dependent tariff can be evaluated with this.<br>
+         This value must be set at the correct point of time in accordance to the existing or planned tariff <b>by the FHEM command "at"</b>.<br>
+         0 = without separate tariffs
+       </li><br>
+     <li><code>INTERVAL &lt;polling interval&gt;</code>
+         <br>
+         Polling interval in seconds
+       </li><br>
+     <li><code>resetStatistics &lt;all|statElectricityConsumed...|statElectricityConsumedTariff...|statElectricityPower...&gt;</code>
+         <br>
+         Deletes the selected statistic values.
+         </li><br>
+     <li><code>restartJsonAnalysis</code><br>
+         Restarts the analysis of the json file for known readings (compliant to the OBIS standard).
+         <br>
+         This analysis happens normally only once if readings have been found.
+       </li><br>
+     <li><code>statusRequest</code>
+         <br>
+         Update device information
+       </li>
   </ul>
   <br>
   
@@ -968,10 +1028,20 @@ JSONMETER_doStatisticDelta ($$$$)
   <br>
   <b>Set</b>
   <ul>
-      <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
+       <li><code>activeTariff &lt; 0 - 9 &gt;</code>
+         <br>
+         Erlaubt die gezielte, separate Erfassung der statistischen Verbrauchswerte (doStatistics = 1) für verschiedene Tarife (Doppelstromz&auml;hler), wenn der Stromz&auml;hler dies selbst nicht unterscheiden kann (z.B. LS110) oder wenn gepr&uuml;ft werden soll, ob ein zeitabh&auml;ngiger Tarif preiswerter w&auml;re.<br>
+         Dieser Wert muss entsprechend des vorhandenen oder geplanten Tarifes zum jeweiligen Zeitpunkt z.B. durch den FHEM-Befehl "at" gesetzt werden.<br>
+         0 = tariflos 
+      </li><br>
+     <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
          <br>
          Abfrageinterval in Sekunden
       </li><br>
+      <li><code>resetStatistics &lt;all|statElectricityConsumed...|statElectricityConsumedTariff...|statElectricityPower...&gt;</code>
+         <br>
+         Löscht die ausgewählten statisischen Werte.
+         </li><br>
       <li><code>restartJsonAnalysis</code>
         <br>
         Neustart der Analyse der json-Datei zum Auffinden bekannter Ger&auml;tewerte (kompatibel zum OBIS Standard).

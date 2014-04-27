@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: JSONMETER: time depending tariffs added (activeTariff)
   - updated: codemirror version 3.24
   - feature: new module 35_SWAP_0000002200000008 for panstamp
              indoor multi sensor board with tft
