@@ -1562,9 +1562,6 @@ LUXTRONIK2_doStatisticDelta ($$$$$)
       $deltaValue = 0;
       $previousTariff = 0; 
       $showDate = 6;
-      #Aufräumen von letzter Modul-Version
-      if (exists($hash->{READINGS}{$readingName})) { delete($hash->{READINGS}{$readingName});}
-      if (exists($hash->{READINGS}{".".$readingName."Start"})) { delete($hash->{READINGS}{".".$readingName."Start"});}
    }
    ($dummy, $dummy, $dummy, $dayNow, $monthNow, $yearNow) = localtime;
    if ($yearNow != $yearLast) { $periodSwitch = 3; }
@@ -1646,21 +1643,21 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$)
 
  # If change of year, change yearly statistic
    if ($periodSwitch == 3){
-      $last[5] = $curr[5];
+      $last[5] = sprintf("%.0f",$curr[5] / $factor);
       $curr[5] = 0;
       if ($showDate == 1) { $last[7] = $curr[7]; }
    }
 
  # If change of month, change monthly statistic 
    if ($periodSwitch >= 2){
-      $last[3] = $curr[3];
+      $last[3] = sprintf("%.0f",$curr[3] / $factor);
       $curr[3] = 0;
       if ($showDate == 3) { $last[7] = $curr[7];}
    }
 
  # If change of day, change daily statistic
    if ($periodSwitch >= 1){
-      $last[1] = $curr[1];
+      $last[1] = sprintf("%.0f",$curr[1] / $factor);
       $curr[1] = 0;
       if ($showDate == 5) {
          $last[7] = $curr[7];
