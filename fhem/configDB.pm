@@ -192,8 +192,9 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 	my ($row, $sql, @line, @rets);
 	my $fhem_dbh = _cfgDB_Connect;
 	my $uuid = $fhem_dbh->selectrow_array('SELECT versionuuid FROM fhemversions WHERE version = 0');
-	$sql = "SELECT * FROM fhemconfig WHERE DEVICE = '$readSpec' AND VERSIONUUID = '$uuid'";
-	$sql = "SELECT * FROM fhemconfig WHERE (DEVICE = 'global' OR DEVICE = 'configdb') and VERSIONUUID = '$uuid'" if($readSpec eq 'global');  
+	$sql = "SELECT * FROM fhemconfig WHERE COMMAND = 'attr' AND DEVICE = '$readSpec' AND VERSIONUUID = '$uuid'";
+	$sql = "SELECT * FROM fhemconfig WHERE COMMAND = 'attr' AND (DEVICE = 'global' OR DEVICE = 'configdb') and VERSIONUUID = '$uuid'" 
+					if($readSpec eq 'global');  
 	my $sth = $fhem_dbh->prepare( $sql );  
 	$sth->execute();
 	while (@line = $sth->fetchrow_array()) {
@@ -727,6 +728,16 @@ sub _cfgDB_Diff($$) {
 	$ret = "\nNo differences found!" if !$ret;
 	$ret = "compare device: $search in current version 0 (left) to version: $searchversion (right)\n$ret\n";
 	return $ret;
+}
+
+sub _cfgDB_AttrTypeSet($$){
+	my ($dName,$tName) = @_;
+	my @typeAttr = cfgDB_AttrRead($tName);
+	foreach my $ta (@typeAttr) {
+		my (undef,$n,$v) = split(/,/,$ta);
+		$attr{$dName}{$n} = $v;
+	}
+	return;
 }
 
 ##################################################
