@@ -60,7 +60,7 @@ sub JSONMETER_doStatisticMinMaxSingle ($$$$);
 sub JSONMETER_doStatisticDelta ($$$$$);
 sub JSONMETER_doStatisticDeltaSingle ($$$$$$);
 # Modul Version for remote debugging
-  my $modulVersion = "2014-04-26";
+  my $modulVersion = "2014-04-28";
 
  ##############################################################
  # Syntax: meterType => port URL-Path
@@ -569,7 +569,7 @@ if ( $a[1] == 1 ){
          }
     # JSON-Property
       } elsif ($b[1] == 3) { 
-         if ($fields[$b[0]] =~ /"$b[5]"\s*:\s*"(.*?)"\s*[,}]/g || $fields[$b[0]] =~ /"$b[4]"\s*:\s*(.*?)\s*[,}]/g ) {
+         if ($fields[$b[0]] =~ /"$b[5]"\s*:\s*"(.*?)"\s*[,}]/g || $fields[$b[0]] =~ /"$b[5]"\s*:\s*(.*?)\s*[,}]/g ) {
             $value = $1;
             $value =~ /^ *\d+(,\d\d\d)+/ && $value =~ s/,| //g;
             Log3 $name, 4, "$name: Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
@@ -747,9 +747,6 @@ JSONMETER_doStatisticDelta ($$$$$)
       $deltaValue = 0;
       $previousTariff = 0; 
       $showDate = 6;
-      #Aufräumen von letzter Modul-Version
-      if (exists($hash->{READINGS}{$readingName})) { delete($hash->{READINGS}{$readingName});}
-      if (exists($hash->{READINGS}{".".$readingName."Start"})) { delete($hash->{READINGS}{".".$readingName."Start"});}
    }
    ($dummy, $dummy, $dummy, $dayNow, $monthNow, $yearNow) = localtime;
    if ($yearNow != $yearLast) { $periodSwitch = 3; }
