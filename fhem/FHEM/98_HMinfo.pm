@@ -906,6 +906,7 @@ sub HMinfo_GetFn($@) {#########################################################
     my @fheml = ();
     foreach my $dName (HMinfo_getEntities($opt,$filter)){
       my $peerIDs = AttrVal($dName,"peerIDs",undef);
+      next if(!$peerIDs);
       my $dId = unpack 'A6',CUL_HM_name2Id($dName);
       my @pl = ();
       foreach (split",",$peerIDs){

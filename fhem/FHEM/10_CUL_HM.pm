@@ -285,6 +285,9 @@ sub CUL_HM_updateConfig($){
     }
     elsif ($st eq "virtual" ) {#setup virtuals
       $hash->{helper}{role}{vrt} = 1;
+      if($hash->{helper}{role}{dev} && $md eq "CCU-FHEM"){
+        CUL_HM_UpdtCentral($name);
+      }
       if (   $hash->{helper}{fkt} 
           && $hash->{helper}{fkt} =~ m/^(vdCtrl|virtThSens)$/){
         my $vId = substr($id."01",0,8);
@@ -316,7 +319,7 @@ sub CUL_HM_updateConfig($){
 
     my $actCycle = AttrVal($name,"actCycle",undef);
     CUL_HM_ActAdd($id,$actCycle) if ($actCycle );#add 2 ActionDetect?
-    # --- set default attrubutes if missing ---
+    # --- set default attributes if missing ---
     if (   $hash->{helper}{role}{dev}
         && $st ne "virtual"){
       $attr{$name}{expert}     = AttrVal($name,"expert"     ,"2_full");
@@ -344,8 +347,7 @@ sub CUL_HM_updateConfig($){
         elsif($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "virtThSens"){$webCmd="virtTemp:virtHum";}
         elsif(!$hash->{helper}{role}{dev})                                 {$webCmd="press short:press long";}
         elsif($md =~ m/^virtual_/)                                         {$webCmd="virtual";}
-        elsif($md eq "CCU-FHEM")                                           {$webCmd="virtual:update";
-                                                                            CUL_HM_UpdtCentral($name);}
+        elsif($md eq "CCU-FHEM")                                           {$webCmd="virtual:update";}
 
       }elsif((!$hash->{helper}{role}{chn} &&
                $md !~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/)
@@ -469,7 +471,7 @@ sub CUL_HM_Rename($$$) {#############################
   my ($name, $oldName) = @_;
   my $HMid = CUL_HM_name2Id($name);
   my $hash = $defs{$name};
-  if (length($HMid) == 8){# we are channel, inform the device
+  if (!$hash->{helper}{role}{dev}){# we are channel, inform the device
     $hash->{chanNo} = substr($HMid,6,2);
     my $devHash = CUL_HM_id2Hash(substr($HMid,0,6));
     $hash->{device} = $devHash->{NAME};
@@ -480,6 +482,7 @@ sub CUL_HM_Rename($$$) {#############################
       my $chnHash = $defs{$hash->{$_}};
       $chnHash->{device} = $name;
     }
+    CUL_HM_UpdtCentral($name) if (AttrVal($name, "model", "") eq "CCU-FHEM");
   }
   if ($hash->{helper}{role}{chn}){
     my $HMidCh = substr($HMid."01",0,8);
@@ -627,9 +630,16 @@ sub CUL_HM_Attr(@) {#################################
   elsif($attrName eq "model" && $hash->{helper}{role}{dev}){
     delete $hash->{helper}{rxType}; # needs new calculation
     delete $hash->{helper}{mId};
+    if ($attrVal eq "CCU-FHEM"){
+      $attr{$name}{subType} = "virtual";
+      $updtReq = 1;
+      CUL_HM_UpdtCentral($name);
+    }
+    else{
+      CUL_HM_hmInitMsg($hash);
+    }
     $attr{$name}{$attrName} = $attrVal if ($cmd eq "set");
-    CUL_HM_hmInitMsg($hash);
-  }
+ }
   elsif($attrName eq "aesCommReq" ){
     return "use $attrName only for device" if (!$hash->{helper}{role}{dev});
     if ($cmd eq "set"){
@@ -1901,7 +1911,7 @@ sub CUL_HM_Parse($$) {#########################################################
     if($mTp =~ m/^4./ &&  #Push Button event
        ($mFlgH & 0x20)){  #response required Flag
                 # fhem CUL shall ack a button press
-      if ($md =~ m/HM-SEC-SC/){
+      if ($md =~ m/HM-SEC-SC/){# SCs - depending on FW version - do not accept ACK only. Especially if peered
         push @ack,$shash,$mNo."8002".$dst.$src."0101".((hex($mI[0])&1)?"C8":"00")."00";
       }
       else{
@@ -5092,7 +5102,7 @@ sub CUL_HM_peerChName($$) {#in:<IDorName> <deviceID>, out:name
   my $iId = CUL_HM_id2IoId($dId);
   my($pDev,$pChn) = unpack'A6A2',$pId;
   return 'self'.$pChn if ($pDev eq $dId);
-  return 'fhem'.$pChn if ($pDev eq $iId);
+  return 'fhem'.$pChn if ($pDev eq $iId && !defined $modules{CUL_HM}{defptr}{$pDev});
   return CUL_HM_id2Name($pId);
 }
 sub CUL_HM_getMId($) {#in: hash(chn or dev) out:model key (key for %culHmModel)
@@ -6147,8 +6157,13 @@ sub CUL_HM_UpdtCentral($){
   my $name = shift;
   my $id = CUL_HM_name2Id($name);
   my @myIos;
+  delete $defs{$_}{owner_CCU} foreach (grep !/^$/,
+                                       map{InternalVal($_,"owner_CCU","")eq$name?$_:""}
+                                       keys %defs);
+
   foreach (CUL_HM_noDup(grep !/^$/,map{AttrVal($_,"IODev","")}keys %defs)){
-    push @myIos,$_ if (CUL_HM_Id($defs{$_} eq $defs{$name}{DEF}));
+    push @myIos,$_ if (CUL_HM_Id($defs{$_}) eq $defs{$name}{DEF});
+    $defs{$_}{owner_CCU} = $name;
   }
   $defs{$name}{assignedIOs} = join(",",@myIos);
   foreach my $ccuBId (CUL_HM_noDup(grep /$id/ ,map{split ",",AttrVal($_,"peerIDs","")}keys %defs)){
@@ -6161,6 +6176,24 @@ sub CUL_HM_UpdtCentral($){
       CUL_HM_ID2PeerList ($name."_Btn$btn",CUL_HM_name2Id($pn),1);
     }
   }
+  CUL_HM_UpdtCentralState($name);
+}
+sub CUL_HM_UpdtCentralState($){
+  my $name = shift;
+  return if (!$defs{$name});
+  my $state = "";
+  foreach(split",",$defs{$name}{assignedIOs}){
+    my $cnd = ReadingsVal($_,"cond","");
+    if ($cnd){
+      $state .= $_.":$cnd" if ($cnd !~ m/(init|ok)/);
+    }
+    else{
+      my $st = InternalVal($_,"STATE","");
+      $state .= $_.":$st" if ($st !~ m/([iI]nit|ok)/);
+    }
+  };
+  $state = "IOs_ok" if (!$state);
+  $defs{$name}{STATE} = $state;
 }
 
 sub CUL_HM_stateUpdatDly($$){#delayed queue of status-request

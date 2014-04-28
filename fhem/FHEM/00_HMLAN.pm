@@ -936,6 +936,8 @@ sub HMLAN_condUpdate($$) {#####################################################
         if($hashQ->{answerPend} < $hashQ->{hmLanQlen});#allow transmit
   }
   readingsEndUpdate($hash,1);
+  my $ccu = InternalVal($name,"owner_CCU","");
+  CUL_HM_UpdtCentralState($ccu) if ($ccu);
 }
 
 sub HMLAN_noDup(@) {#return list with no duplicates
