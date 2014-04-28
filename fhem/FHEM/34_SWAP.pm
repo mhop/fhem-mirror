@@ -118,7 +118,7 @@ SWAP_loadDevicesHelper($$$)
 
   return 0 if( ! -e $file_name );
 
-  my $developers = XMLin($file_name, KeyAttr => { }, ForceArray => [ 'dev' ]);
+  my $developers = XMLin($file_name, KeyAttr => { }, ForceArray => [ 'developer', 'dev' ]);
 
   foreach my $developer (@{$developers->{developer}}){
     my $developer_id = $developer->{id};
