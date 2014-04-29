@@ -301,6 +301,14 @@ sub CommandConfigdb($$) {
 			$ret = _cfgDB_Reorg($a[1]);
 		}
 
+		when ('search') {
+			return "\n Syntax: configdb search <searchTerm> [searchVersion]" if @a < 2;
+			$param1 = $param1 ? $param1 : '%';
+			$param2 = $param2 ? $param2 : 0;
+			Log3('configdb', 4, "configdb: list requested for device: $param1 in version $param2.");
+			$ret = _cfgDB_Search($param1,$param2);
+		}
+
 		when ('uuid') {
 			$param1 = _cfgDB_Uuid;
 			Log3('configdb', 4, "configdb: uuid requested: $param1");
@@ -311,19 +319,20 @@ sub CommandConfigdb($$) {
 			$ret =	"\n Syntax:\n".
 					"         configdb attr [attribute] [value]\n".
 					"         configdb backup\n".
-					"         configDB binfileimport <pathToFilename>\n"
+					"         configDB binfileimport <pathToFilename>\n".
 					"         configdb diff <device> <version>\n".
-					"         configDB filedelete <pathToFilename>\n"
-					"         configDB fileimport <pathToFilename>\n"
-					"         configDB fileexport <pathToFilename>\n"
-					"         configDB filelist\n"
-					"         configDB filemove <pathToFilename>\n"
-					"         configDB fileshow <pathToFilename>\n"
+					"         configDB filedelete <pathToFilename>\n".
+					"         configDB fileimport <pathToFilename>\n".
+					"         configDB fileexport <pathToFilename>\n".
+					"         configDB filelist\n".
+					"         configDB filemove <pathToFilename>\n".
+					"         configDB fileshow <pathToFilename>\n".
 					"         configdb info\n".
 					"         configdb list [device] [version]\n".
 					"         configdb migrate\n".
 					"         configdb recover <version>\n".
 					"         configdb reorg [keepVersions]\n".
+					"         configdb search <searchTerm> [version]\n".
 					"         configdb uuid\n".
 					"";
 		}
@@ -613,6 +622,29 @@ Ver 0 always indicates the currently running configuration.<br/>
 			This function can be used to create a nightly running job for<br/>
 			database reorganisation when called from an at-Definition.<br/>
 		<br/>
+
+		<li><code>configdb search <searchTerm> [searchVersion]</code></li><br/>
+			Search for specified searchTerm in any given version (default=0)<br/>
+<pre>
+Example:
+
+configdb search %2286BC%
+
+Result:
+
+search result for: %2286BC% in version: 0 
+-------------------------------------------------------------------------------- 
+define az_RT CUL_HM 2286BC 
+define az_RT_Clima CUL_HM 2286BC04 
+define az_RT_Climate CUL_HM 2286BC02 
+define az_RT_ClimaTeam CUL_HM 2286BC05 
+define az_RT_remote CUL_HM 2286BC06 
+define az_RT_Weather CUL_HM 2286BC01 
+define az_RT_WindowRec CUL_HM 2286BC03 
+attr Melder_FAl peerIDs 00000000,2286BC03, 
+attr Melder_FAr peerIDs 00000000,2286BC03, 
+</pre>
+<br/>
 
 		<li><code>configdb uuid</code></li><br/>
 			Returns a uuid that can be used for own purposes.<br/>
@@ -926,6 +958,29 @@ Ver 0 bezeichnet immer die aktuell verwendete Konfiguration.<br/>
 			Standardwert f&uuml;r den optionalen Parameter keep = 3.<br/>
 			Mit dieser Funktion l&auml;&szlig;t sich eine n&auml;chtliche Reorganisation per at umsetzen.<br/>
 		<br/>
+
+		<li><code>configdb search <suchBegriff> [inVersion]</code></li><br/>
+			Sucht nach dem Suchbegriff in der angegeben Konfigurationsversion (default=0)<br/>
+<pre>
+Beispiel:
+
+configdb search %2286BC%
+
+Ergebnis:
+
+search result for: %2286BC% in version: 0 
+-------------------------------------------------------------------------------- 
+define az_RT CUL_HM 2286BC 
+define az_RT_Clima CUL_HM 2286BC04 
+define az_RT_Climate CUL_HM 2286BC02 
+define az_RT_ClimaTeam CUL_HM 2286BC05 
+define az_RT_remote CUL_HM 2286BC06 
+define az_RT_Weather CUL_HM 2286BC01 
+define az_RT_WindowRec CUL_HM 2286BC03 
+attr Melder_FAl peerIDs 00000000,2286BC03, 
+attr Melder_FAr peerIDs 00000000,2286BC03, 
+</pre>
+<br/>
 
 		<li><code>configdb uuid</code></li><br/>
 			Liefert eine uuid, die man f&uuml;r eigene Zwecke verwenden kann.<br/>

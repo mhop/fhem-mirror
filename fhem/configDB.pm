@@ -705,6 +705,29 @@ sub _cfgDB_List(;$$) {
 	return $ret;
 }
 
+sub _cfgDB_Search($;$) {
+	my ($search,$searchversion) = @_;
+	return 'Syntax error.' if(!(defined($search)));
+	$searchversion = $searchversion ? $searchversion : 0;
+	my $fhem_dbh = _cfgDB_Connect;
+	my ($sql, $sth, @line, $row, @result, $ret);
+	$sql = "SELECT command, device, p1, p2 FROM fhemconfig as c join fhemversions as v ON v.versionuuid=c.versionuuid ".
+	       "WHERE v.version = '$searchversion' AND command not like '#create%' ".
+	       "AND (device like '$search%' OR P1 like '$search%' OR P2 like '$search%') ".
+	       "ORDER BY lower(device),command DESC";
+	$sth = $fhem_dbh->prepare( $sql);
+	$sth->execute();
+	push @result, "search result for: $search in version: $searchversion";
+	push @result, "--------------------------------------------------------------------------------";
+	while (@line = $sth->fetchrow_array()) {
+		$row = "$line[0] $line[1] $line[2] $line[3]";
+		push @result, "$row";
+	}
+	$fhem_dbh->disconnect();
+	$ret = join("\n", @result);
+	return $ret;
+}
+
 #   called from cfgDB_Diff
 sub __cfgDB_Diff($$$) {
 	my ($fhem_dbh,$search,$searchversion) = @_;
