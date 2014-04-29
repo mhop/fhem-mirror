@@ -47,7 +47,7 @@ sub LUXTRONIK2_doStatisticDelta ($$$$$) ;
 sub LUXTRONIK2_doStatisticDeltaSingle ($$$$$$);
 
 # Modul Version for remote debugging
-  my $modulVersion = "2014-04-26";
+  my $modulVersion = "2014-04-29";
 
 #List of firmware versions that are known to be compatible with this modul
   my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.69#V1.70#";
@@ -220,7 +220,7 @@ LUXTRONIK2_Set($$@)
       elsif ($val =~ /all|statAmbientTemp\.\.\.|statElectricity\.\.\.|statHours\.\.\.|statHeatQ\.\.\./) {
          my $regExp;
          if ($val eq "all") { $regExp = "stat"; } 
-         else { $regExp = $val; } 
+         else { $regExp = substr $val, 0, -3; } 
          foreach (sort keys %{ $hash->{READINGS} }) {
             if ($_ =~ /^\.?$regExp/ && $_ ne "state") {
                delete $hash->{READINGS}{$_};

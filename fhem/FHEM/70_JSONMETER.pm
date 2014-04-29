@@ -60,7 +60,7 @@ sub JSONMETER_doStatisticMinMaxSingle ($$$$);
 sub JSONMETER_doStatisticDelta ($$$$$);
 sub JSONMETER_doStatisticDeltaSingle ($$$$$$);
 # Modul Version for remote debugging
-  my $modulVersion = "2014-04-28";
+  my $modulVersion = "2014-04-29";
 
  ##############################################################
  # Syntax: meterType => port URL-Path
@@ -249,7 +249,7 @@ JSONMETER_Set($$@)
       if ($val =~ /all|statElectricityConsumed\.\.\.|statElectricityConsumedTariff\.\.\.|statElectricityPower\.\.\./) {
          my $regExp;
          if ($val eq "all") { $regExp = "stat"; } 
-         else { $regExp = $val; } 
+         else { $regExp = substr $val, 0, -3; } 
          foreach (sort keys %{ $hash->{READINGS} }) {
             if ($_ =~ /^\.?$regExp/ && $_ ne "state") {
                delete $hash->{READINGS}{$_};
@@ -735,36 +735,42 @@ JSONMETER_doStatisticDelta ($$$$$)
  # Determine if time period switched (day, month, year)
  # Get deltaValue and Tariff of previous call
    my $periodSwitch = 0;
-   my $yearLast; my $monthLast; my $dayLast; my $dayNow; my $monthNow; my $yearNow;
+   my $yearLast; my $monthLast; my $dayLast; my $hourLast;  my $hourNow; my $dayNow; my $monthNow; my $yearNow;
    if (exists($hash->{READINGS}{"." . $readingName . "Before"})) {
-      ($yearLast, $monthLast, $dayLast) = ($hash->{READINGS}{"." . $readingName . "Before"}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d)/);
+      ($yearLast, $monthLast, $dayLast, $hourLast) = ($hash->{READINGS}{"." . $readingName . "Before"}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d) (\d\d)/);
       $yearLast -= 1900;
       $monthLast --;
       ($dummy, $deltaValue, $dummy, $previousTariff, $dummy, $showDate) = split / /,  $hash->{READINGS}{"." . $readingName . "Before"}{VAL} || "";
       $deltaValue = $value - $deltaValue;
    } else {
-      ($dummy, $dummy, $dummy, $dayLast, $monthLast, $yearLast) = localtime;
+      ($dummy, $dummy, $hourLast, $dayLast, $monthLast, $yearLast) = localtime;
       $deltaValue = 0;
       $previousTariff = 0; 
-      $showDate = 6;
+      $showDate = 8;
    }
-   ($dummy, $dummy, $dummy, $dayNow, $monthNow, $yearNow) = localtime;
-   if ($yearNow != $yearLast) { $periodSwitch = 3; }
-   elsif ($monthNow != $monthLast) { $periodSwitch = 2; }
-   elsif ($dayNow != $dayLast) { $periodSwitch = 1; }
+   ($dummy, $dummy, $hourNow, $dayNow, $monthNow, $yearNow) = localtime;
+
+   if ($yearNow != $yearLast) { $periodSwitch = 4; }
+   elsif ($monthNow != $monthLast) { $periodSwitch = 3; }
+   elsif ($dayNow != $dayLast) { $periodSwitch = 2; }
+   elsif ($hourNow != $hourLast) { $periodSwitch = 1; }
 
    # Determine if "since" value has to be shown in current and last reading
-   if ($periodSwitch == 3) {
+   if ($periodSwitch == 4) {
       if ($showDate == 1) { $showDate = 0; } # Do not show the "since:" value for year changes anymore
       if ($showDate >= 2) { $showDate = 1; } # Shows the "since:" value for the first year change
    }
-   if ($periodSwitch >= 2){
+   if ($periodSwitch >= 3){
       if ($showDate == 3) { $showDate = 2; } # Do not show the "since:" value for month changes anymore
       if ($showDate >= 4) { $showDate = 3; } # Shows the "since:" value for the first month change
    }
-   if ($periodSwitch >= 1){
+   if ($periodSwitch >= 2){
       if ($showDate == 5) { $showDate = 4; } # Do not show the "since:" value for day changes anymore
       if ($showDate >= 6) { $showDate = 5; } # Shows the "since:" value for the first day change
+   }
+   if ($periodSwitch >= 1){
+      if ($showDate == 7) { $showDate = 6; } # Do not show the "since:" value for day changes anymore
+      if ($showDate >= 8) { $showDate = 7; } # Shows the "since:" value for the first hour change
    }
 
  # JSONMETER_doStatisticDeltaSingle; $hash, $readingName, $deltaValue, $special, $periodSwitch, $showDate, $firstCall
@@ -779,9 +785,9 @@ JSONMETER_doStatisticDelta ($$$$$)
    }
       
    # Hidden storage of current values for next call(before values)
-   $result = "Value: $value Tariff: $activeTariff ShowDate: $showDate";  
+   $result = "Value: $value Tariff: $activeTariff ShowDate: $showDate ";  
    readingsBulkUpdate($hash, ".".$readingName."Before", $result);
-   
+
    return ;
 }
 
@@ -796,9 +802,10 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
    my @curr;
    if (exists($hash->{READINGS}{$readingName}{VAL})) {
       @curr = split / /, $hash->{READINGS}{$readingName}{VAL} || "";
+      if ($curr[0] eq "Day:") { $curr[9]=$curr[7]; $curr[7]=$curr[5]; $curr[5]=$curr[3]; $curr[3]=$curr[1]; $curr[1]=0; }
    } else {
-      $curr[1] = 0; $curr[3] = 0;  $curr[5] = 0;
-      $curr[7] = strftime "%Y-%m-%d_%H:%M:%S", localtime(); # start
+      $curr[1] = 0; $curr[3] = 0;  $curr[5] = 0; $curr[7] = 0;
+      $curr[9] = strftime "%Y-%m-%d_%H:%M:%S", localtime(); # start
    }
    
  # get statistic values of previous period
@@ -806,8 +813,9 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
    if ($periodSwitch >= 1) {
       if (exists ($hash->{READINGS}{$readingName."Last"})) { 
          @last = split / /,  $hash->{READINGS}{$readingName."Last"}{VAL};
+         if ($last[0] eq "Day:") { $last[9]=$last[7]; $last[7]=$last[5]; $last[5]=$last[3]; $last[3]=$last[1]; $last[1]="-"; }
       } else {
-         @last = split / /,  "Day: - Month: - Year: -";
+         @last = split / /,  "Hour: - Day: - Month: - Year: -";
       }
    }
    
@@ -815,45 +823,53 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
    $curr[1] += $deltaValue;
    $curr[3] += $deltaValue;
    $curr[5] += $deltaValue;
+   $curr[7] += $deltaValue;
 
  # If change of year, change yearly statistic
-   if ($periodSwitch == 3){
-      $last[5] = $curr[5];
-      $curr[5] = 0;
-      if ($showDate == 1) { $last[7] = $curr[7]; }
+   if ($periodSwitch == 4){
+      $last[7] = $curr[7];
+      $curr[7] = 0;
+      if ($showDate == 1) { $last[9] = $curr[9]; }
    }
 
  # If change of month, change monthly statistic 
-   if ($periodSwitch >= 2){
-      $last[3] = $curr[3];
-      $curr[3] = 0;
-      if ($showDate == 3) { $last[7] = $curr[7];}
+   if ($periodSwitch >= 3){
+      $last[5] = $curr[5];
+      $curr[5] = 0;
+      if ($showDate == 3) { $last[9] = $curr[9];}
    }
 
  # If change of day, change daily statistic
-   if ($periodSwitch >= 1){
-      $last[1] = $curr[1];
-      $curr[1] = 0;
+   if ($periodSwitch >= 2){
+      $last[3] = $curr[3];
+      $curr[3] = 0;
       if ($showDate == 5) {
-         $last[7] = $curr[7];
+         $last[9] = $curr[9];
         # Next monthly and yearly values start at 00:00 and show only date (no time)
-         $curr[3] = 0;
          $curr[5] = 0;
-         $curr[7] = strftime "%Y-%m-%d", localtime(); # start
+         $curr[7] = 0;
+         $curr[9] = strftime "%Y-%m-%d", localtime(); # start
       }
    }
 
+ # If change of hour, change hourly statistic 
+   if ($periodSwitch >= 1){
+      $last[1] = $curr[1];
+      $curr[1] = 0;
+      if ($showDate == 7) { $last[9] = $curr[9];}
+   }
+
  # Store visible statistic readings (delta values)
-   $result = "Day: $curr[1] Month: $curr[3] Year: $curr[5]";
-   if ( $showDate >=2 ) { $result .= " (since: $curr[7] )"; }
+   $result = "Hour: $curr[1] Day: $curr[3] Month: $curr[5] Year: $curr[7]";
+   if ( $showDate >=2 ) { $result .= " (since: $curr[9] )"; }
    readingsBulkUpdate($hash,$readingName,$result);
    
-   if ($special == 1) { readingsBulkUpdate($hash,$readingName."Today",$curr[1]) };
+   if ($special == 1) { readingsBulkUpdate($hash,$readingName."Today",$curr[3]) };
 
  # if changed, store previous visible statistic (delta) values
    if ($periodSwitch >= 1) {
-      $result = "Day: $last[1] Month: $last[3] Year: $last[5]";
-      if ( $showDate =~ /1|3|5/ ) { $result .= " (since: $last[7] )";}
+      $result = "Hour: $last[1] Day: $last[3] Month: $last[5] Year: $last[7]";
+      if ( $showDate =~ /1|3|5|7/ ) { $result .= " (since: $last[9] )";}
       readingsBulkUpdate($hash,$readingName."Last",$result); 
    }
 }
