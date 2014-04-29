@@ -131,8 +131,11 @@ eventTypes_Set($@)
 {
   my ($hash, @a) = @_;
 
-  return "Unknown argument $a[1], choose one of flush" if($a[1] ne "flush");
-  return eventTypes_Shutdown($hash, $hash->{NAME});
+  return $modules{eventTypes}{ldata} = undef
+        if($a[1] eq "clear");
+  return eventTypes_Shutdown($hash, $hash->{NAME})
+        if($a[1] eq "flush");
+  return "Unknown argument $a[1], choose one of clear:noArg flush:noArg";
 }
 
 ###################################
