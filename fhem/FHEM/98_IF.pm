@@ -180,10 +180,14 @@ EvalAllIf($)
     ($beginning,$eval,$err,$tailBlock)=GetBlockIf($tailBlock,'[\{\}]');
     return ($eval,$err) if ($err);
     if ($eval) {
+      if (substr($eval,0,1) eq "(") {
         my $ret = eval $eval;
         return($eval." ",$@) if ($@);
         $eval=$ret;
-     }
+      } else {
+        $eval="{".$eval."}";
+      }
+    }
     $cmd.=$beginning.$eval;
   }
   return ($cmd,"");
@@ -397,16 +401,16 @@ CommandIF($$)
   <br>
   Filter by "on" and "off" in the status of the device "move":<br>
   <br>
-  <code>define activity notify move IF ([move:&STATE:[(on|off)] eq "on" and $we) (set lamp off)<br></code>
+  <code>define activity notify move IF ([move:&STATE:[(on|off)]] eq "on" and $we) (set lamp off)<br></code>
   <br>
   Example of the use of Readings in the then-case:<br>
   <br>
   <code>define temp at 18:00 IF ([outdoor:temperature] > 10) (set lampe [dummy])<br></code>
   <br>
-  If an expression is to be evaluated first in a FHEM command, then it must be enclosed in braces.<br>
+  If an expression is to be evaluated first in a FHEM command, then it must be enclosed in brackets.<br>
   For example, if at 18:00 clock the outside temperature is higher than 10 degrees, the desired temperature is increased by 1 degree:<br>
   <br>
-  <code>define temp at 18:00 IF ([outdoor:temperature] > 10) (set thermostat desired-temp {[thermostat:desired-temp:d]+1})<br></code>
+  <code>define temp at 18:00 IF ([outdoor:temperature] > 10) (set thermostat desired-temp {([thermostat:desired-temp:d]+1)})<br></code>
   <br>
   Multiple commands are separated by a comma instead of a semicolon, thus eliminating the doubling, quadrupling, etc. of the semicolon:<br>
   <br>
@@ -450,6 +454,7 @@ CommandIF($$)
   <br>
   In der Bedingung des IF-Befehls wird die vollständige Syntax des Perl-if unterstützt. Mögliche Operatoren sind u. a.:<br>
   <br>
+  <ol>
   ++ -- Inkrementieren, Dekrementieren<br>
   ** Potenzierung<br>
   ! ~ logische und bitweise Negation<br>
@@ -465,6 +470,7 @@ CommandIF($$)
   not                            logische Negation<br>
   and                            logisches UND<br>
   or xor                         logisches ODER (inklusiv/exklusiv)<br>
+  </ol>
 <br>
 <b>Features:</b><br>
 <br>
@@ -485,7 +491,7 @@ CommandIF($$)
 <br>
  <li>Ausführung von Perl-Befehlen im dann- und sonst-Fall ist weiterhin möglich<br></li>
 <br>
- <li>Auswertung von Ausdrücken in geschweiften Klammen innerhalb eines FHEM-Befehls ist möglich<br></li>
+ <li>Auswertung von Perl-Ausdrücken in geschweiften Klammen innerhalb eines FHEM-Befehls ist möglich<br></li>
 <br>
  <li>ELSE-Fall ist optional<br></li>
  </ul>
@@ -524,7 +530,9 @@ CommandIF($$)
   <br>
   <code>define check at +00:10 IF ([outdoor:state] eq "open") (set switch1 on)<br></code>
   <br>
-  Geschachtelte Angabe von zwei IF-Befehlen (kann in mehreren Zeilen mit Einrückungen zwecks übersichtlicher Darstellung in der DEF-Eingabe eingegeben werden):<br>
+  Geschachtelte Angabe von mehreren IF-Befehlen kann in mehreren Zeilen mit Einrückungen zwecks übersichtlicher 
+  Darstellung über FHEM-Weboberfläche in der DEF-Eingabe eingegeben werden.<br>
+  Die erste Zeile "define test notify lamp " muss mit einem Leerzeichen enden, bevor die Zeile mit Enter umgebrochen wird - das ist eine Eigenschaft von FHEM und nicht von IF:<br>
   <br>
   <code>define test notify lamp <br>
   IF ([lamp] eq "on") (<br>
@@ -543,22 +551,42 @@ CommandIF($$)
      (set switch on)<br>
     </ol>
   <br></code>
+  Mehrzeilige Eingaben in der cfg-Datei müssen dagegen jeweils am Zeilenende mit \ verknüpft werden (das ist eine Eigenschaft von FHEM und nicht von IF):<br>
+  <br>
+  <code>define test notify lamp \<br>
+  IF ([lamp] eq "on") (\<br>
+  <ol>
+    IF ([outdoor:humidity] < 70)\<br>
+    <ol>
+      (set lamp off)\<br>
+    </ol>
+    ELSE\<br>
+    <ol>
+      (set lamp on)\<br>
+    </ol>
+  </ol>
+  ) ELSE\<br>
+    <ol>
+     (set switch on)<br>
+    </ol>
+  <br></code>
+
   Filtern nach Zahlen im Reading "temperature":<br>
   <br>
   <code>define settemp at 22:00 IF ([tempsens:temperature:d] >= 10) (set heating on)<br></code>
   <br>
   Filtern nach "on" und "off" im Status des Devices "move":<br>
   <br>
-  <code>define activity notify move IF ([move:&STATE:[(on|off)] eq "on" and $we) (set lamp off)<br></code>
+  <code>define activity notify move IF ([move:&STATE:[(on|off)]] eq "on" and $we) (set lamp off)<br></code>
   <br>
   Beispiel für die Nutzung von Readings im dann-Fall:<br>
   <br>
   <code>define temp at 18:00 IF ([outdoor:temperature] > 10) (set lampe [dummy])<br></code>
   <br>
-  Falls bei einem FHEM-Befehl ein Ausdruck mit Readings zuvor ausgewertet werden soll, so muss er in geschweifte Klammern gesetzt werden.<br>
+  Falls bei einem FHEM-Befehl ein Perl-Ausdruck mit Readings zuvor ausgewertet werden soll, so muss er in geschweifte und runde Klammern gesetzt werden.<br>
   Beispiel: Wenn um 18:00 Uhr die Außentemperatur höher ist als 10 Grad, dann wird die Solltemperatur um 1 Grad erhöht.<br>
   <br>
-  <code>define temp at 18:00 IF ([outdoor:temperature] > 10) (set thermostat desired-temp {[thermostat:desired-temp:d]+1})<br></code>
+  <code>define temp at 18:00 IF ([outdoor:temperature] > 10) (set thermostat desired-temp {([thermostat:desired-temp:d]+1)})<br></code>
   <br>
   Mehrerer Befehle werden durch ein Komma statt durch ein Semikolon getrennt, dadurch entfällt das Doppeln, Vervierfachen usw. des Semikolons:<br>
   <br>
