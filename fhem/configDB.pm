@@ -101,6 +101,7 @@ sub _cfgDB_Rotate($);
 sub _cfgDB_Uuid;
 sub _cfgDB_Info;
 sub _cfgDB_Filelist(;$);
+sub _cfgDB_Reorg(;$$);
 
 ##################################################
 # Read configuration file for DB connection
@@ -330,6 +331,8 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 	foreach (@rowList) { _cfgDB_InsertLine($fhem_dbh, $uuid, $_); }
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
+	my $maxVersions = AttrVal('configdb','maxversions',0);
+	_cfgDB_Reorg($maxVersions,1) if($maxVersions);
 	return 'configDB saved.';
 }
 
@@ -667,8 +670,8 @@ sub _cfgDB_Recover($) {
 }
 
 #   delete old configurations
-sub _cfgDB_Reorg(;$) {
-	my ($lastversion) = @_;
+sub _cfgDB_Reorg(;$$) {
+	my ($lastversion,$quiet) = @_;
 	$lastversion = ($lastversion > 0) ? $lastversion : 3;
 	Log3('configDB', 4, "DB Reorg started, keeping last $lastversion versions.");
 	my $fhem_dbh = _cfgDB_Connect;
@@ -676,6 +679,7 @@ sub _cfgDB_Reorg(;$) {
 	$fhem_dbh->do("delete from fhemversions where version > $lastversion");
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
+	return if(defined($quiet));
 	return " Result after database reorg:\n"._cfgDB_Info;
 }
 
