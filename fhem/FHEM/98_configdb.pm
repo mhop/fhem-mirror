@@ -311,9 +311,14 @@ sub CommandConfigdb($$) {
 			$ret =	"\n Syntax:\n".
 					"         configdb attr [attribute] [value]\n".
 					"         configdb backup\n".
+					"         configDB binfileimport <pathToFilename>\n"
 					"         configdb diff <device> <version>\n".
-					"         configdb export <targetFilename> [version]\n".
-					"         configdb import <importFilename>\n".
+					"         configDB filedelete <pathToFilename>\n"
+					"         configDB fileimport <pathToFilename>\n"
+					"         configDB fileexport <pathToFilename>\n"
+					"         configDB filelist\n"
+					"         configDB filemove <pathToFilename>\n"
+					"         configDB fileshow <pathToFilename>\n"
 					"         configdb info\n".
 					"         configdb list [device] [version]\n".
 					"         configdb migrate\n".
@@ -505,12 +510,6 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 | 1|define telnetPort telnet 7072 global  | 1|define telnetPort telnet 7072 global  |
 * 2|attr telnetPort room telnet           *  |                                      |
 +--+--------------------------------------+--+--------------------------------------+</pre>
-
-		<li><code>configdb export &lt;targetFilename&gt; [version];</code></li><br/>
-			Exports specified version from config database into file &lt;targetFilename&gt;<br/>
-			Default version if not specified = 0<br/>
-			The target file can be imported again, if needed.<br/>
-<br/>
 
 		<li><code>configdb filedelete &lt;Filename&gt;</code></li><br/>
 			Delete file from database.<br/>
@@ -823,12 +822,6 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 | 1|define telnetPort telnet 7072 global  | 1|define telnetPort telnet 7072 global  |
 * 2|attr telnetPort room telnet           *  |                                      |
 +--+--------------------------------------+--+--------------------------------------+</pre>
-
-		<li><code>configdb export &lt;zielDateiname&gt; [version];</code></li><br/>
-			Exportiert die angegebene Version aus der Konfigurationsdatenbank in die Datei &lt;zielDateiname&gt;<br/>
-			Standardversion, falls nicht angegeben = 0<br/>
-			Die Zieldatei kann sp&auml;ter f&uuml;r die Wiederherstellung verwendet werden.<br/>
-<br/>
 
 		<li><code>configdb filedelete &lt;Dateiname&gt;</code></li><br/>
 			L&ouml;scht eine gespeicherte Datei aus der Datenbank.<br/>
