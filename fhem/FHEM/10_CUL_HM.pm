@@ -5140,7 +5140,7 @@ sub CUL_HM_getRxType($) { #in:hash(chn or dev) out:binary coded Rx type
       $rxtEntity |= ($rxtOfModel =~ m/f/)?0x80:0;#burstConditional
     }
     $rxtEntity = 1 if (!$rxtEntity);#always
-    $hash->{helper}{rxType} = $rxtEntity;
+    $hash->{helper}{rxType} = $rxtEntity if ($MId);#store if ID is prooven
   }
   return $rxtEntity;
 }

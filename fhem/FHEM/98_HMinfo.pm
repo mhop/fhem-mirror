@@ -592,7 +592,6 @@ sub HMinfo_tempList(@) { ######################################################
         $val =~ tr/ +/ /;
         $val =~ s/^ //;
         $val =~ s/ $//;
-        @exec = ();
         foreach my $eN(@el){
           if ($tln =~ m/(P.)_._tempList/){
             $val = lc($1)." ".$val;
@@ -604,7 +603,7 @@ sub HMinfo_tempList(@) { ######################################################
             $list =~ s/\>.*//;
             push @entryFail,$eN." :".$list." respose:$x";
           }
-          push @exec,$eN." ".$tln." exec ".$val;
+          push @exec,"$eN $tln exec $val" if (!(grep /$eN/,@exec));
         }
       }
     }
