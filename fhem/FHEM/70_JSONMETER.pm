@@ -697,16 +697,19 @@ JSONMETER_doStatisticMinMaxSingle ($$$$)
       my @a = split / /, $hash->{READINGS}{"." . $readingName}{VAL}; # Internal values
       my @b = split / /, $lastReading;
     # Do calculations
+      $a[1]++; # Count
+      $a[3] += $value; # Sum
+      if ($value < $b[1]) { $b[1]=$value; } # Min
+      $b[3] = sprintf "%.0f" , $a[3] / $a[1]; # Avg
+      if ($value > $b[5]) { $b[5]=$value; } # Max
+
+    # in case of period change, save "last" values and reset counters
       if ($saveLast) {
+         $result = "Min: $b[1] Avg: $b[3] Max: $b[5]";
+         if ($a[5] == 1) { $result .= " (since: $b[7] )"; }
          readingsBulkUpdate($hash, $readingName . "Last", $lastReading);
          $a[1] = 1;   $a[3] = $value;   $a[5] = 0;
          $b[1] = $value;   $b[3] = $value;   $b[5] = $value;
-      } else {
-         $a[1]++; # Count
-         $a[3] += $value; # Sum
-         if ($value < $b[1]) { $b[1]=$value; } # Min
-         $b[3] = sprintf "%.0f" , $a[3] / $a[1]; # Avg
-         if ($value > $b[5]) { $b[5]=$value; } # Max
       }
     # Store internal calculation values
       $result = "Count: $a[1] Sum: $a[3] ShowDate: $a[5]";  
