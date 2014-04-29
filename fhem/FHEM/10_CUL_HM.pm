@@ -225,6 +225,7 @@ sub CUL_HM_updateConfig($){
     my $st  = CUL_HM_Get($hash,$name,"param","subType");
     my $md  = CUL_HM_Get($hash,$name,"param","model");
 
+    $hash->{helper}{role}{prs} = 1 if(CUL_HM_Set($hash,$name,"?") =~ m /press/ && $st ne "virtual");
     foreach my $rName ("D-firmware","D-serialNr",".D-devInfo",".D-stc"){
       # move certain attributes to readings for future handling
       my $aName = $rName;
@@ -639,7 +640,10 @@ sub CUL_HM_Attr(@) {#################################
       CUL_HM_hmInitMsg($hash);
     }
     $attr{$name}{$attrName} = $attrVal if ($cmd eq "set");
- }
+  }
+  elsif($attrName eq "subType"){
+    $updtReq = 1;
+  }
   elsif($attrName eq "aesCommReq" ){
     return "use $attrName only for device" if (!$hash->{helper}{role}{dev});
     if ($cmd eq "set"){
@@ -3742,21 +3746,21 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     if ($st eq 'virtual'){#serve all peers of virtual button
       my @peerLchn = split(',',AttrVal($name,"peerIDs",""));
       my @peerList = map{substr($_,0,6)} @peerLchn;
-      @peerList = grep !/^$/,CUL_HM_noDup(@peerList);
-      @peerList = ('000000') if (scalar@peerList == 0);#send broadcast if no peer
+      @peerList = grep !/000000/,grep !/^$/,CUL_HM_noDup(@peerList);
+      my $pc =  sprintf("%02X%02X",hex($chn)+$mode,$pressCnt);# msg end
+      my $snd = 0;
       foreach my $peer (sort @peerList){
-        my ($pHash,$peerFlag,$rxt) = ($hash,'A4',1);
-        if ($peer ne '000000'){
-          $pHash = CUL_HM_id2Hash($peer);
-          $rxt = CUL_HM_getRxType($pHash);
-          $peerFlag = ($rxt & 0x02)?"B4":"A4" if($vChn ne "noBurst");#burst
-        }
-        CUL_HM_PushCmdStack($pHash, sprintf("++%s40%s%s%02X%02X",
-                       $peerFlag,$dst,$peer,
-                       hex($chn)+$mode,
-                       $pressCnt));
+        my ($pHash,$peerFlag,$rxt);
+        $pHash = CUL_HM_id2Hash($peer);
+        next if (!$pHash->{helper}{role}{prs});
+        $rxt = CUL_HM_getRxType($pHash);
+        $peerFlag = ($rxt & 0x02)?"B4":"A4" if($vChn ne "noBurst");#burst
+        CUL_HM_PushCmdStack($pHash,"++${peerFlag}40$dst$peer$pc");
+        $snd = 1;
         foreach my $pCh(grep /$peer/,@peerLchn){
-          CUL_HM_stateUpdatDly(CUL_HM_id2Name($pCh),10);
+          my $n = CUL_HM_id2Name($pCh);
+          $n =~s/_chn:.*//;
+          CUL_HM_stateUpdatDly($n,10);
         }
         if ($rxt & 0x80){#burstConditional
           CUL_HM_SndCmd($pHash, "++B112$id".substr($peer,0,6))
@@ -3765,6 +3769,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         else{
           CUL_HM_ProcessCmdStack($pHash);
         }
+      }
+      if(!$snd){# send 2 broadcast if no relevant peers 
+        CUL_HM_PushCmdStack($hash,"++8440${dst}000000$pc");
       }
     }
     else{#serve internal channels for actor
