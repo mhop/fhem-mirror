@@ -1453,7 +1453,7 @@ sub CUL_HM_Parse($$) {#########################################################
         elsif($dir == 0x30){push @evtEt,[$shash,1,"$eventName:err:$vs" ];}
       }
       if (!$rSUpdt){#dont touch if necessary for dimmer
-        if(($err&0x70) != 0x00){
+        if(($err&0x70) == 0x10 || ($err&0x70) == 0x20){
           my $wt = $shash->{helper}{stateUpdatDly}
                          ?$shash->{helper}{stateUpdatDly}
                          :120;
