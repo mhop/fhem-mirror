@@ -1171,7 +1171,7 @@ sub THZ_Undef($$) {
 
 sub THZ_PrintcurveSVG {
 my $ret =  <<'END';
-<?xml version="1.0" encoding="UTF-8"?> <!DOCTYPE svg> <svg width="800" height="160" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<?xml version="1.0" encoding="UTF-8"?> <!DOCTYPE svg> <svg width="800" height="163" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
 <style type="text/css"><![CDATA[
 text       { font-family:Times; font-size:12px; }
 text.title { font-size:16px; }
@@ -1213,14 +1213,14 @@ polyline { stroke:black; fill:none; }
 </defs>
 <rect x="48" y="19.2" width="704" height="121.6" rx="8" ry="8" fill="none" class="border"/>
 <text x="12" y="80" text-anchor="middle" class="ylabel" transform="rotate(270,12,80)">HC1 heat SetTemp °C</text>
-<text x="399" y="160" class="xlabel" text-anchor="middle">outside temperature filtered °C</text>
+<text x="399" y="163" class="xlabel" text-anchor="middle">outside temperature filtered °C</text>
 <text x="44" y="156.8" class="ylabel" text-anchor="middle">-15</text>
-<text x="165" y="156.8" class="ylabel" text-anchor="middle">-9</text>  <polyline points="165,19.2 165,140.8" class="hgrid"/>
-<text x="282" y="156.8" class="ylabel" text-anchor="middle">-3</text>  <polyline points="282,19.2 282,140.8" class="hgrid"/>
-<text x="399" y="156.8" class="ylabel" text-anchor="middle">3</text>   <polyline points="399,19.2 399,140.8" class="hgrid"/>
-<text x="517" y="156.8" class="ylabel" text-anchor="middle">9</text>   <polyline points="517,19.2 517,140.8" class="hgrid"/>
-<text x="634" y="156.8" class="ylabel" text-anchor="middle">15</text>  <polyline points="634,19.2 634,140.8" class="hgrid"/>
-<text x="751" y="156.8" class="ylabel" text-anchor="middle">21</text>  <polyline points="751,19.2 751,140.8" class="hgrid"/>
+<text x="165" y="156" class="ylabel" text-anchor="middle">-9</text>  <polyline points="165,19.2 165,140.8" class="hgrid"/>
+<text x="282" y="156" class="ylabel" text-anchor="middle">-3</text>  <polyline points="282,19.2 282,140.8" class="hgrid"/>
+<text x="399" y="156" class="ylabel" text-anchor="middle">3</text>   <polyline points="399,19.2 399,140.8" class="hgrid"/>
+<text x="517" y="156" class="ylabel" text-anchor="middle">9</text>   <polyline points="517,19.2 517,140.8" class="hgrid"/>
+<text x="634" y="156" class="ylabel" text-anchor="middle">15</text>  <polyline points="634,19.2 634,140.8" class="hgrid"/>
+<text x="751" y="156" class="ylabel" text-anchor="middle">21</text>  <polyline points="751,19.2 751,140.8" class="hgrid"/>
 <g>
   <polyline points="44,140 49,140"/> <text x="39.2" y="144" class="ylabel" text-anchor="end">15</text>
   <polyline points="44,110 49,110"/> <text x="39.2" y="114" class="ylabel" text-anchor="end">19</text>
@@ -1250,9 +1250,7 @@ my $b= -10 * $p13GradientHC1 / $roomSetTemp;
 my $c= -0.01;
 my $Simul_heatSetTemp;
 
-open (MYFILE, '>/share/simone/txt.txt');
-print MYFILE ($outside_tempFiltered ." xx " . $heatSetTemp  );
-close (MYFILE); 
+
 
 $ret .='<polyline id="line_0"   title="Actual Working point" style="stroke-width:2" class="l0" points="';
 my ($px,$py) = ((($outside_tempFiltered+15)*(750-49)/(15+21)+49),(($heatSetTemp-31)*(140-19)/(15-31)+19)); 
@@ -1271,9 +1269,7 @@ for(my $i = -15; $i < 22; $i++) {
 }
 $ret .= '"/> </svg>';
 
-open (MYFILE, '>/share/simone/data.svg');
-print MYFILE ($ret);
-close (MYFILE); 
+
 my $FW_RETTYPE = "image/svg+xml";
 return ($FW_RETTYPE, $ret);
 #return $ret;
