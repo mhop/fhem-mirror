@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 04/2014
-# v. 0.092
+# v. 0.093
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -51,6 +51,7 @@ sub THZ_debugread($);
 sub THZ_GetRefresh($);
 sub THZ_Refresh_all_gets($);
 sub THZ_Get_Comunication($$);
+sub THZ_PrintcurveSVG;
 
 
 
@@ -295,9 +296,10 @@ sub THZ_Initialize($)
 		    ."interval_sHC2:0,60,120,180,300,600,3600,7200,43200,86400 "
 		    ."interval_sHistory:0,3600,7200,28800,43200,86400 "
 		    ."interval_sLast10errors:0,3600,7200,28800,43200,86400 "
-		    ."internal_sHeatRecoveredDay:0,3600,7200,28800,43200,86400 "
-		    ."internal_sHeatRecoveredTotal:0,3600,7200,28800,43200,86400 "
+		    ."interval_sHeatRecoveredDay:0,1200,3600,7200,28800,43200,86400 "
+		    ."interval_sHeatRecoveredTotal:0,3600,7200,28800,43200,86400 "
 		    . $readingFnAttributes;
+  $data{FWEXT}{"/THZ_PrintcurveSVG"}{FUNC} = "THZ_PrintcurveSVG";
 }
 
 
@@ -1159,11 +1161,126 @@ sub THZ_Undef($$) {
   DevIo_CloseDev($hash); 
   return undef;
 }
+#####################################
+# sub THZ_PrintcurveSVG
+# plots heat curve
+#define wl_hr weblink htmlCode {THZ_PrintcurveSVG}
+# da mettere dentro lo style per funzionare sopra        svg      { height:200px; width:800px;}
+#define wl_hr2 weblink htmlCode <div class="SVGplot"><embed src="/fhem/THZ_PrintcurveSVG/" type="image/svg+xml" width="800" height="160" name="wl_7"/></div> <a href="/fhem?detail=wl_hr2">wl_hr2</a><br>
+#####################################
+
+sub THZ_PrintcurveSVG {
+my $ret =  <<'END';
+<?xml version="1.0" encoding="UTF-8"?> <!DOCTYPE svg> <svg width="800" height="160" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<style type="text/css"><![CDATA[
+text       { font-family:Times; font-size:12px; }
+text.title { font-size:16px; }
+text.copy  { text-decoration:underline; stroke:none; fill:blue;    }
+text.paste { text-decoration:underline; stroke:none; fill:blue;    }
+polyline { stroke:black; fill:none; }
+.border  { stroke:black; fill:url(#gr_bg); }
+.vgrid   { stroke:gray;  stroke-dasharray:2,6; }
+.hgrid   { stroke:gray;  stroke-dasharray:2,6; }
+.pasted  { stroke:black; stroke-dasharray:1,1; }
+.l0 { stroke:red;     }  text.l0 { stroke:none; fill:red;     } 
+.l1 { stroke:green;   }  text.l1 { stroke:none; fill:green;   }
+.l0dot   { stroke:red;   stroke-dasharray:2,4; }  text.ldot { stroke:none; fill:red; } 
+]]></style>
+<defs>
+  <linearGradient id="gr_bg" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%" style="stop-color:#FFFFF7; stop-opacity:1"/>
+    <stop offset="100%" style="stop-color:#FFFFC7; stop-opacity:1"/>
+  </linearGradient>
+  <linearGradient id="gr_0" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%" style="stop-color:#f00; stop-opacity:.6"/>
+    <stop offset="100%" style="stop-color:#f88; stop-opacity:.4"/>
+  </linearGradient>
+  <linearGradient id="gr_1" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%" style="stop-color:#291; stop-opacity:.6"/>
+    <stop offset="100%" style="stop-color:#8f7; stop-opacity:.4"/>
+  </linearGradient>
+  <pattern id="gr0_stripe" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(-45 2 2)">
+      <path d="M -1,2 l 6,0" stroke="#f00" stroke-width="0.5"/>
+  </pattern>
+  <pattern id="gr1_stripe" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45 2 2)">
+      <path d="M -1,2 l 6,0" stroke="green" stroke-width="0.5"/>
+  </pattern>
+  <linearGradient id="gr0_gyr" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%" style="stop-color:#f00; stop-opacity:.6"/>
+    <stop offset="50%" style="stop-color:#ff0; stop-opacity:.6"/>
+    <stop offset="100%" style="stop-color:#0f0; stop-opacity:.6"/>
+  </linearGradient>
+</defs>
+<rect x="48" y="19.2" width="704" height="121.6" rx="8" ry="8" fill="none" class="border"/>
+<text x="12" y="80" text-anchor="middle" class="ylabel" transform="rotate(270,12,80)">HC1 heat SetTemp °C</text>
+<text x="399" y="160" class="xlabel" text-anchor="middle">outside temperature filtered °C</text>
+<text x="44" y="156.8" class="ylabel" text-anchor="middle">-15</text>
+<text x="165" y="156.8" class="ylabel" text-anchor="middle">-9</text>  <polyline points="165,19.2 165,140.8" class="hgrid"/>
+<text x="282" y="156.8" class="ylabel" text-anchor="middle">-3</text>  <polyline points="282,19.2 282,140.8" class="hgrid"/>
+<text x="399" y="156.8" class="ylabel" text-anchor="middle">3</text>   <polyline points="399,19.2 399,140.8" class="hgrid"/>
+<text x="517" y="156.8" class="ylabel" text-anchor="middle">9</text>   <polyline points="517,19.2 517,140.8" class="hgrid"/>
+<text x="634" y="156.8" class="ylabel" text-anchor="middle">15</text>  <polyline points="634,19.2 634,140.8" class="hgrid"/>
+<text x="751" y="156.8" class="ylabel" text-anchor="middle">21</text>  <polyline points="751,19.2 751,140.8" class="hgrid"/>
+<g>
+  <polyline points="44,140 49,140"/> <text x="39.2" y="144" class="ylabel" text-anchor="end">15</text>
+  <polyline points="44,110 49,110"/> <text x="39.2" y="114" class="ylabel" text-anchor="end">19</text>
+  <polyline points="44,80 49,80"/>   <text x="39.2" y="84" class="ylabel" text-anchor="end">23</text>
+  <polyline points="44,49 49,49"/>   <text x="39.2" y="53" class="ylabel" text-anchor="end">27</text>
+  <polyline points="44,19 49,19"/>   <text x="39.2" y="23" class="ylabel" text-anchor="end">31</text>
+</g>
+<g>
+  <polyline points="751,140 756,140"/> <text x="760.8" y="144" class="ylabel">15</text>
+  <polyline points="751,110 756,110"/> <text x="760.8" y="114" class="ylabel">19</text>
+  <polyline points="751,80 756,80"/>   <text x="760.8" y="84" class="ylabel">23</text>
+  <polyline points="751,49 756,49"/>   <text x="760.8" y="53" class="ylabel">27</text>
+  <polyline points="751,19 756,19"/>   <text x="760.8" y="23" class="ylabel">31</text>
+</g>
+<text  line_id="line_0" x="100" y="105.2"  class="l0">Actual working point</text>
+<text line_id="line_1" x="100" y="121.2" class="l1">Heat curve</text>
+END
 
 
+my $roomSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",0))[21];
+my $p13GradientHC1 = ReadingsVal("Mythz","p13GradientHC1",0);
+my $heatSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",0))[11];
+my $outside_tempFiltered =(split ' ',ReadingsVal("Mythz","sGlobal",0))[65];
+my $p14LowEnDHC1 =(split ' ',ReadingsVal("Mythz","p14LowEnDHC1",0))[0];
+my $a= 1.5 + ($roomSetTemp * 1.3) + $p14LowEnDHC1; 
+my $b= -10 * $p13GradientHC1 / $roomSetTemp; 
+my $c= -0.01;
+my $Simul_heatSetTemp;
+
+open (MYFILE, '>/share/simone/txt.txt');
+print MYFILE ($outside_tempFiltered ." xx " . $heatSetTemp  );
+close (MYFILE); 
+
+$ret .='<polyline id="line_0"   title="Actual Working point" style="stroke-width:2" class="l0" points="';
+my ($px,$py) = ((($outside_tempFiltered+15)*(750-49)/(15+21)+49),(($heatSetTemp-31)*(140-19)/(15-31)+19)); 
+ $ret.= ($px-3) . "," . ($py)   ." ";
+ $ret.=  ($px)  . "," . ($py-3) ." ";
+ $ret.= ($px+3) . "," . ($py) ." ";
+ $ret.= ($px)   . "," . ($py+3)  ." ";
+ $ret.= ($px-3)   . "," . ($py)  ." ";
+$ret .= '"/>';
+
+$ret .='<polyline id="line_1"  title="Heat Curve" class="l1" points="';
+
+for(my $i = -15; $i < 22; $i++) {
+ $Simul_heatSetTemp = $i * $i * $c + $i * $b + $a; 
+ $ret.= (($i+15)*(750-49)/(15+21)+49) . "," . (($Simul_heatSetTemp-31)*(140-19)/(15-31)+19) ." ";
+}
+$ret .= '"/> </svg>';
+
+open (MYFILE, '>/share/simone/data.svg');
+print MYFILE ($ret);
+close (MYFILE); 
+my $FW_RETTYPE = "image/svg+xml";
+return ($FW_RETTYPE, $ret);
+#return $ret;
+}
 
 
-
+#####################################
 
 
 
