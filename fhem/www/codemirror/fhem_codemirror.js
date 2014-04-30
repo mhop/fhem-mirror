@@ -60,12 +60,12 @@ cm_wait()
     attr[a] = userAttr[a];
 
   loadLink("codemirror/"+attr.theme+".css");
-  if(ltype) {
-    $("head").append(
-      '<style type="text/css">'+
-        '.CodeMirror {height: ' + (window.innerHeight - 150) + 'px;}'+
-      '</style>');
-  }
+  $("head").append(
+    '<style type="text/css">'+
+      (ltype ? 
+      '.CodeMirror {height: ' + (window.innerHeight - 150) + 'px;}':
+      '.CodeMirror {width:  ' + (window.innerWidth  - 300) + 'px;}')+
+    '</style>');
 
   loadScript("codemirror/"+type+".js", function(){
     log("Calling CodeMirror");

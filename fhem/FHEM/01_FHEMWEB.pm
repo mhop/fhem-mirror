@@ -2067,6 +2067,7 @@ FW_makeEdit($$$)
   FW_pO "</td>";
 
   $val =~ s,\\\n,\n,g;
+  $val = FW_htmlEscape($val);
   my $eval = $val;
   $eval = "<pre>$eval</pre>" if($eval =~ m/\n/);
   FW_pO "<td>";
@@ -2348,6 +2349,7 @@ sub
 FW_htmlEscape($)
 {
   my ($txt) = @_;
+  $txt =~ s/&/&amp;/g;
   $txt =~ s/</&lt;/g;
   $txt =~ s/>/&gt;/g;
   return $txt;
