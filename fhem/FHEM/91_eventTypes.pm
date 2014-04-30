@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 91_eventTypes.pm 2982 2013-03-24 17:47:28Z rudolfkoenig $
+# $Id$
 package main;
 use IO::File;
 
@@ -184,7 +184,17 @@ eventTypes_Get($@)
   <br>
 
   <a name="eventTypesset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set</b>
+  <ul>
+      <li>flush<br>
+        used to write all collected event types into datafile.
+      </li>
+      <br/>
+      <li>clear<br>
+        used to clear the internal table containing all collected event types.
+      </li>
+  </ul>
+  <br>
 
   <a name="eventTypesget"></a>
   <b>Get</b>
