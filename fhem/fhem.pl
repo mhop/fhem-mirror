@@ -1877,17 +1877,20 @@ CommandList($$)
     if($arg[1]) {
       foreach my $sdev (@list) { # Show a Hash-Entry or Reading for each device
 
-        if($defs{$sdev} &&
-           $defs{$sdev}{$arg[1]}) {
-          $str .= $sdev . " " .
-                  $defs{$sdev}{$arg[1]} . "\n";
+        if($defs{$sdev}) {
+          if($defs{$sdev}{$arg[1]}) {
+            $str .= sprintf("%-20s %s\n", $sdev, $defs{$sdev}{$arg[1]});
 
-        } elsif($defs{$sdev} &&
-           $defs{$sdev}{READINGS} &&
-           $defs{$sdev}{READINGS}{$arg[1]}) {
-          $str .= $sdev . " ".
-                  $defs{$sdev}{READINGS}{$arg[1]}{TIME} . " " .
-                  $defs{$sdev}{READINGS}{$arg[1]}{VAL} . "\n";
+          } elsif($defs{$sdev}{READINGS} &&
+                  $defs{$sdev}{READINGS}{$arg[1]}) {
+            $str .= sprintf("%-20s %s %s\n", $sdev,
+                    $defs{$sdev}{READINGS}{$arg[1]}{TIME},
+                    $defs{$sdev}{READINGS}{$arg[1]}{VAL});
+
+          } elsif($attr{$sdev} && $attr{$sdev}{$arg[1]}) {
+            $str .= sprintf("%-20s %s\n", $sdev, $attr{$sdev}{$arg[1]});
+
+          }
         }
       }
 
