@@ -2115,7 +2115,7 @@ GlobalAttr($$$$)
     if(configDBUsed()) {
       my @dbList = split(/,/,cfgDB_Read99()); # retrieve filelist from configDB
       foreach my $m (@dbList) {
-        CommandReload(undef, $m);
+        CommandReload(undef, $m) if(!$modules{$2}{$m});
         $counter++;
       }
     }
