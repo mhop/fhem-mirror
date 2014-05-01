@@ -2466,6 +2466,10 @@ sub CUL_HM_pushEvnts(){########################################################
   my ($h,$x) = ("","");
   my @evts = ();
   foreach my $e(@evtEt){
+    if(scalar(@{$e} != 3)){
+      Log 2,"CUL_HM set reading invalid:".join(",",@{$e});
+      next;
+    }
     if ($h ne ${$e}[0] || $x ne ${$e}[1]){
       push @ent,CUL_HM_UpdtReadBulk($h,$x,@evts);
       @evts = ();
