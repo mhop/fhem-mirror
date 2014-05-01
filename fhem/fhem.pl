@@ -1228,8 +1228,11 @@ WriteStatefile()
 
   foreach my $d (sort keys %defs) {
     next if($defs{$d}{TEMPORARY});
-    print SFH "define $d $defs{$d}{TYPE} $defs{$d}{DEF}\n"
-        if($defs{$d}{VOLATILE});
+    if($defs{$d}{VOLATILE}) {
+      my $def = $defs{$d}{DEF};
+      $def =~ s/;/;;/g; # follow-on-for-timer at
+      print SFH "define $d $defs{$d}{TYPE} $def\n";
+    }
 
     my $val = $defs{$d}{STATE};
     if(defined($val) &&
