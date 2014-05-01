@@ -54,6 +54,8 @@ sub DoSet(@);
 sub Dispatch($$$);
 sub DoTrigger($$@);
 sub EvalSpecials($%);
+sub FileRead($);
+sub FileWrite($@);
 sub FmtDateTime($);
 sub FmtTime($);
 sub GetLogLevel(@);
@@ -3774,6 +3776,52 @@ sub
 configDBUsed()
 { 
   return ($attr{global}{configfile} eq 'configDB');
+}
+
+sub
+FileRead($)
+{
+  my ($fname) = @_;
+  my ($err, @ret);
+
+  if(configDBUsed()) {
+    @ret = cfgDB_FileRead($fname);
+    $err = "$fname not found in the database." if(@ret==1 && !defined($ret[0]));
+
+  } else {
+    if(open(FH, $fname)) {
+      @ret = <FH>;
+      close(FH);
+    } else {
+      $err = "Can't open $fname: $!";
+    }
+  }
+
+  return ($err, @ret);
+}
+
+sub
+FileWrite($@)
+{
+  my ($fname, @rows) = @_;
+  my ($err, @ret);
+
+  if(configDBUsed()) {
+    return cfgDB_FileWrite($fname, @rows);
+
+  } else {
+    if(open(FH, ">$fname")) {
+      foreach my $l (@rows) {
+        print FH $l;
+      }
+      close(FH);
+      return undef;
+
+    } else {
+      return "Can't open $fname: $!";
+
+    }
+  }
 }
 
 1;

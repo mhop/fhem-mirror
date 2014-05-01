@@ -99,17 +99,10 @@ SVG_Set($@)
                  $hash->{GPLOTFILE} . ":".
                  $hash->{LOGFILE};
 
-  if(configDBUsed()) { # copy template.gplot inside configDB
-    _cfgDB_Writefile($dstName,_cfgDB_Readfile($srcName)); 
-  } else {
-    open(SFH, $srcName) || return "Can't open $srcName: $!";
-    open(DFH, ">$dstName") || return "Can't open $dstName: $!";
-    while(my $l = <SFH>) {
-      print DFH $l;
-    }
-    close(SFH); close(DFH);
-  }
-  return undef;
+  my ($err,@rows) = FileRead($srcName);
+  return $err if($err);
+  $err = FileWrite($dstName, @rows);
+  return $err;
 }
 
 ##################
@@ -448,26 +441,24 @@ SVG_WriteGplot($)
 
   my $fName = $FW_webArgs{gplotName};
   return if(!$fName);
-  if(!open(FH, ">$fName")) {
-    FW_pO "SVG_WriteGplot: Can't write $fName";
-    return 0;
-  }
-  print FH "# Created by FHEM/98_SVG.pm, ".TimeNow()."\n";
-  print FH "set terminal png transparent size <SIZE> crop\n";
-  print FH "set output '<OUT>.png'\n";
-  print FH "set xdata time\n";
-  print FH "set timefmt \"%Y-%m-%d_%H:%M:%S\"\n";
-  print FH "set xlabel \" \"\n";
-  print FH "set title '$FW_webArgs{title}'\n";
-  print FH "set ytics ".$FW_webArgs{ytics}."\n";
-  print FH "set y2tics ".$FW_webArgs{y2tics}."\n";
-  print FH "set grid".($FW_webArgs{gridy}  ? " ytics" :"").
+
+  my @rows;
+  push @rows, "# Created by FHEM/98_SVG.pm, ".TimeNow()."\n";
+  push @rows, "set terminal png transparent size <SIZE> crop\n";
+  push @rows, "set output '<OUT>.png'\n";
+  push @rows, "set xdata time\n";
+  push @rows, "set timefmt \"%Y-%m-%d_%H:%M:%S\"\n";
+  push @rows, "set xlabel \" \"\n";
+  push @rows, "set title '$FW_webArgs{title}'\n";
+  push @rows, "set ytics ".$FW_webArgs{ytics}."\n";
+  push @rows, "set y2tics ".$FW_webArgs{y2tics}."\n";
+  push @rows, "set grid".($FW_webArgs{gridy}  ? " ytics" :"").
                       ($FW_webArgs{gridy2} ? " y2tics":"")."\n";
-  print FH "set ylabel \"$FW_webArgs{ylabel}\"\n";
-  print FH "set y2label \"$FW_webArgs{y2label}\"\n";
-  print FH "set yrange $FW_webArgs{yrange}\n" if($FW_webArgs{yrange});
-  print FH "set y2range $FW_webArgs{y2range}\n" if($FW_webArgs{y2range});
-  print FH "\n";
+  push @rows, "set ylabel \"$FW_webArgs{ylabel}\"\n";
+  push @rows, "set y2label \"$FW_webArgs{y2label}\"\n";
+  push @rows, "set yrange $FW_webArgs{yrange}\n" if($FW_webArgs{yrange});
+  push @rows, "set y2range $FW_webArgs{y2range}\n" if($FW_webArgs{y2range});
+  push @rows, "\n";
 
   my $ld = $FW_webArgs{logdevicetype};
   my @plot;
@@ -480,7 +471,7 @@ SVG_WriteGplot($)
             join(":", map { $v[$_] =~ s/:/\\x3a/g if($_<$#v); $v[$_] } 0..$#v) :
             $v[0];
 
-    print FH "#$ld $r\n";
+    push @rows, "#$ld $r\n";
     push @plot, "\"<IN>\" using 1:2 axes ".
                 ($FW_webArgs{"axes_$i"} eq "right" ? "x1y2" : "x1y1").
                 ($FW_webArgs{"title_$i"} eq "notitle" ? " notitle" :
@@ -489,12 +480,11 @@ SVG_WriteGplot($)
                 " lw "    .$FW_webArgs{"width_$i"} .
                 " with "  .$FW_webArgs{"type_$i"};
   }
-  print FH "\n";
-  print FH "plot ".join(",\\\n     ", @plot)."\n";
-  close(FH);
+  push @rows, "\n";
+  push @rows, "plot ".join(",\\\n     ", @plot)."\n";
 
-  # import the file into database and delete it.
-  _cfgDB_Fileimport($fName,1) if(configDBUsed());
+  my $err = FileWrite($fName, @rows);
+  FW_pO "SVG_WriteGplot: $err" if($err);
 
   return 0;
 }
@@ -513,16 +503,8 @@ SVG_readgplotfile($$)
      if($defs{$wl} && $defs{$wl}{LOGDEVICE} && $defs{$defs{$wl}{LOGDEVICE}});
   $ldType = $wl if(!$ldType);
 
-  my @svgplotfile;
-  if(configDBUsed()) {
-    my $hfile = _cfgDB_Readfile($gplot_pgm);
-    return (FW_fatal("$gplot_pgm: $!"), undef) unless defined $hfile;
-    @svgplotfile = split("\n", $hfile);
-  } else {
-    open(FH, $gplot_pgm) || return (FW_fatal("$gplot_pgm: $!"), undef);
-    @svgplotfile = <FH>;
-    close(FH);
-  }
+  my ($err, @svgplotfile) = FileRead($gplot_pgm);
+  return ("$err", undef) if($err);
 
   foreach my $l (@svgplotfile) {
     $l = "$l\n" unless $l =~ m/\n$/;
@@ -783,7 +765,8 @@ SVG_showLog($)
 
   my $gplot_pgm = "$FW_gplotdir/$type.gplot";
 
-  if(!-r $gplot_pgm && !configDBUsed()) {
+  my ($err, $cfg, $plot, $flog) = SVG_readgplotfile($wl, $gplot_pgm);
+  if($err) {
     my $msg = "Cannot read $gplot_pgm";
     Log3 $FW_wname, 1, $msg;
 
@@ -811,9 +794,6 @@ SVG_showLog($)
       my $f = 0;     # From the beginning of time...
       my $t = 9;     # till the end
 
-      my ($err, $cfg, $plot, $flog) = SVG_readgplotfile($wl, $gplot_pgm);
-      return ($FW_RETTYPE, $err) if($err);
-
       # Read the data from the filelog
       my $oll = $attr{global}{verbose};
       $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
@@ -839,9 +819,6 @@ SVG_showLog($)
       close(FH);
 
     } elsif($pm eq "gnuplot-scroll") {
-      my ($err, $cfg, $plot, $flog) = SVG_readgplotfile($wl, $gplot_pgm);
-      return ($FW_RETTYPE, $err) if($err);
-
       # Read the data from the filelog
       my ($f,$t)=($SVG_devs{$d}{from}, $SVG_devs{$d}{to});
       my $oll = $attr{global}{verbose};
@@ -878,9 +855,6 @@ SVG_showLog($)
     unlink("$tmpfile.png");
 
   } elsif($pm eq "SVG") {
-    my ($err, $cfg, $plot, $flog) = SVG_readgplotfile($wl, $gplot_pgm);
-    return ($FW_RETTYPE, $err) if($err);
-
     my ($f,$t)=($SVG_devs{$d}{from}, $SVG_devs{$d}{to});
     $f = 0 if(!$f);     # From the beginning of time...
     $t = 9 if(!$t);     # till the end
