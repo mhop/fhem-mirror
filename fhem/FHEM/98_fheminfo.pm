@@ -164,6 +164,8 @@ CommandFheminfo($$)
     }
   }
 
+  $info{modules}{configDB}{configDB} = 'unknown' if (configDBUsed());
+
   my $str;
   $str  = "Fhem info:\n";
   $str .= sprintf("  Release%*s: %s\n",2," ",$release);
