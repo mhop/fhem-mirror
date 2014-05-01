@@ -130,6 +130,7 @@ FHEMWEB_Initialize($)
     closeConn:1,0
     column
     defaultRoom
+    editFileList
     endPlotNow:1,0
     endPlotToday:1,0
     fwcompress:0,1
@@ -1340,8 +1341,9 @@ FW_fileList($)
   my ($fname) = @_;
   $fname =~ m,^(.*)/([^/]*)$,; # Split into dir and file
   my ($dir,$re) = ($1, $2);
-  return if(!$re);
-  $dir =~ s/%L/$attr{global}{logdir}/g if($dir =~ m/%/ && $attr{global}{logdir}); # %L present and log directory defined
+  return $fname if(!$re);
+  $dir =~ s/%L/$attr{global}{logdir}/g # %L present and log directory defined
+        if($dir =~ m/%/ && $attr{global}{logdir});
   $re =~ s/%./[A-Za-z0-9]*/g;    # logfile magic (%Y, etc)
   my @ret;
   return @ret if(!opendir(DH, $dir));
@@ -1567,15 +1569,18 @@ FW_style($$)
 
     $attr{global}{configfile} =~ m,([^/]*)$,;
     my $cfgFileName = $1;
-    FW_displayFileList("config file", $cfgFileName)
-                                if(!configDBUsed());
-    FW_displayFileList("Own modules and helper files",
-        FW_fileList("$MW_dir/^(.*sh|[0-9][0-9].*Util.*pm|.*cfg|.*holiday".
-                                  "|.*layout)\$"));
-    FW_displayFileList("gplot files",
-        FW_fileList("$FW_gplotdir/^.*gplot\$"));
-    FW_displayFileList("styles",
-        FW_fileList("$FW_cssdir/^.*(css|svg)\$"));
+
+    my $fList = configDBUsed() ? "" : "config file:$cfgFileName,";
+    $fList .= "Own modules and helper files:".
+            "$MW_dir/^(.*sh|[0-9][0-9].*Util.*pm|.*cfg|.*holiday|.*layout)\$,";
+    $fList .= "gplot files:$FW_gplotdir/^.*gplot\$,";
+    $fList .= "styles:$FW_cssdir/^.*(css|svg)\$";
+    $fList = AttrVal($FW_wname,"editFileList", $fList); 
+    foreach my $nr (split(",",$fList)) {
+      my ($n,$r) = split(":",$nr);
+      FW_displayFileList($n, FW_fileList($r));
+    }
+
     FW_pO $end;
 
   } elsif($a[1] eq "select") {
@@ -2999,6 +3004,17 @@ FW_ActivateInform()
         </code></ul>
         </li><br>
 
+     <a name="editFileList"></a>
+     <li>editFileList<br>
+        Comma separated list of Name:Regexp pairs, used to specify the blocks
+        presented under the "Edit Files" Menu entry.
+        Note: only some directories are "writeable": FHEM, www/pgm2, www/gplot, 
+        depending on the file ending.
+        Example:<ul><code>
+          attr WEB editFileList config file:fhem.cfg,Modules:FHEM/.*.pm
+        </code></ul>
+        </li><br>
+
 
     </ul>
   </ul>
@@ -3518,6 +3534,17 @@ FW_ActivateInform()
         <ul><code>
           attr WEB JavaScripts codemirror/fhem_codemirror.js<br>
           attr WEB codemirrorParam { "theme":"blackboard", "lineNumbers":true }
+        </code></ul>
+        </li><br>
+
+     <a name="editFileList"></a>
+     <li>editFileList<br>
+        Komma getrennte Liste von Doppelpunkt getrennten Name:Regexp Paare.
+        Wird verwendet, um die Bloecke in Edit-Files zu spezifizieren.
+        Achtung: nur bestimmte Verzeichnisse (FHEM, www/pgm2, www/gplot) sind
+        schreibbar, Abhaengig von der Dateiendung.
+        Beispiel:<ul><code>
+          attr WEB editFileList config file:fhem.cfg,Modules:FHEM/.*.pm
         </code></ul>
         </li><br>
 
