@@ -90,7 +90,7 @@ FHEM/21_OWTEMP.pm            mfr69bs              http://forum.fhem.de 1Wire (de
 FHEM/21_OWTHERM.pm           pahenning            http://forum.fhem.de 1Wire
 FHEM/22_ALL3076.pm           sachag               http://forum.fhem.de Snstiges
 FHEM/23_ALL4027.pm           sachag               http://forum.fhem.de Sonstiges
-FHEM/23_LUXTRONIK2.pm        oskarfessel          http://forum.fhem.de Sonstiges
+FHEM/23_LUXTRONIK2.pm        tupol                http://forum.fhem.de Sonstiges (PM: http://forum.fhem.de/index.php?action=pm;sa=send;u=5432)
 FHEM/23_WEBIO.pm             sachag               http://forum.fhem.de Sonstiges
 FHEM/23_WEBIO_12DIGITAL.pm   sachag               http://forum.fhem.de Sonstiges
 FHEM/24_NetIO230B.pm         rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
@@ -154,7 +154,7 @@ FHEM/67_ECMDDevice.pm        borisneubert         http://forum.fhem.de Sonstiges
 FHEM/70_EGPM.pm              alexus               http://forum.fhem.de Sonstiges
 FHEM/70_ENIGMA2.pm           loredo               http://forum.fhem.de Multimedia
 FHEM/70_Jabber.pm            BioS                 http://forum.fhem.de Unterstuetzende Dienste
-FHEM/70_JSONMETER.pm         tupol                http://forum.fhem.de Sonstiges / PM
+FHEM/70_JSONMETER.pm         tupol                http://forum.fhem.de Sonstiges (PM: http://forum.fhem.de/index.php?action=pm;sa=send;u=5432)
 FHEM/70_PHTV.pm              loredo               http://forum.fhem.de Multimedia
 FHEM/70_ONKYO_AVR.pm         loredo               http://forum.fhem.de Multimedia
 FHEM/70_SCIVT.pm             rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
