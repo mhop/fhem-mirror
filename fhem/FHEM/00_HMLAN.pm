@@ -216,6 +216,8 @@ sub HMLAN_Attr(@) {############################################################
   }
   elsif($aName eq "hmId"){
     if ($cmd eq "set"){
+      my $owner = InternalVal($name,"owner_CCU",undef);
+      return "device owned by $owner" if ($owner);
       return "wrong syntax: hmId must be 6-digit-hex-code (3 byte)"
         if ($aVal !~ m/^[A-F0-9]{6}$/i);
     }

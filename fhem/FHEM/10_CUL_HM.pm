@@ -133,7 +133,8 @@ sub CUL_HM_Initialize($) {
   $hash->{GetFn}     = "CUL_HM_Get";
   $hash->{RenameFn}  = "CUL_HM_Rename";
   $hash->{AttrFn}    = "CUL_HM_Attr";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:1,0 dummy:1,0 "
+  $hash->{AttrList}  = "do_not_notify:1,0 ignore:1,0 dummy:1,0 "
+                       ."IODev IOList "               #IOList is for CCU only
                        ."showtime:1,0 "
                        ."serialNr firmware .stc .devInfo "
                        ."rawToReadable unit "#"KFM-Sensor" only
@@ -669,6 +670,13 @@ sub CUL_HM_Attr(@) {#################################
   elsif($attrName eq "IODev"){
     if ($cmd eq "set"){
       return "use $attrName only for device" if (!$hash->{helper}{role}{dev});
+    }
+  }
+  elsif($attrName eq "IOList"){
+    if ($cmd eq "set"){
+      return "use $attrName only for ccu device" 
+            if (!$hash->{helper}{role}{dev}
+                || AttrVal($name,"model","CCU-FHEM") !~ "CCU-FHEM");
     }
   }
   elsif($attrName eq "autoReadReg"){
@@ -6168,13 +6176,29 @@ sub CUL_HM_UpdtCentral($){
   my $name = shift;
   my $id = CUL_HM_name2Id($name);
   my @myIos;
-  delete $defs{$_}{owner_CCU} foreach (grep !/^$/,
-                                       map{InternalVal($_,"owner_CCU","")eq$name?$_:""}
-                                       keys %defs);
+  delete $defs{$_}{owner_CCU} 
+        foreach (grep !/^$/,
+                 map{InternalVal($_,"owner_CCU","") eq $name ? $_ : ""}
+                 keys %defs);
 
   foreach (CUL_HM_noDup(grep !/^$/,map{AttrVal($_,"IODev","")}keys %defs)){
     push @myIos,$_ if (CUL_HM_Id($defs{$_}) eq $defs{$name}{DEF});
-    $defs{$_}{owner_CCU} = $name;
+  }
+  foreach my $ioN(split",",AttrVal($name,"IOList","")){
+    if ($defs{$ioN}){
+      if ( $defs{$ioN}{TYPE} eq "HMLAN"){;
+      }
+      elsif($defs{$ioN}{TYPE} eq "CUL"){
+        my $x = CommandAttr(undef, "$ioN rfmode HomeMatic") 
+              if (AttrVal($ioN,"rfmode","") ne "HomeMatic");
+      }
+      else {
+        next;
+      }
+      CommandAttr(undef, "$ioN hmId $defs{$name}{DEF}")
+              if (AttrVal($ioN,"hmId","") ne $defs{$name}{DEF});
+      $defs{$ioN}{owner_CCU} = $name;
+    }
   }
   $defs{$name}{assignedIOs} = join(",",@myIos);
   foreach my $ccuBId (CUL_HM_noDup(grep /$id/ ,map{split ",",AttrVal($_,"peerIDs","")}keys %defs)){
@@ -6187,20 +6211,37 @@ sub CUL_HM_UpdtCentral($){
       CUL_HM_ID2PeerList ($name."_Btn$btn",CUL_HM_name2Id($pn),1);
     }
   }
+  my $io = AttrVal($name,"IODev","empty");
+  if (AttrVal($name,"IOList","") !~ m/$io/){
+    foreach(split",",AttrVal($name,"IOList","")){
+      if ($defs{$_}){
+        $attr{$name}{IODev} = $_;
+        last;
+      }
+    }
+  }
   CUL_HM_UpdtCentralState($name);
 }
 sub CUL_HM_UpdtCentralState($){
   my $name = shift;
   return if (!$defs{$name});
   my $state = "";
-  foreach(split",",$defs{$name}{assignedIOs}){
-    my $cnd = ReadingsVal($_,"cond","");
+  my @IOl = split",",AttrVal($name,"IOList","");
+  foreach my $e (split",",$defs{$name}{assignedIOs}){
+    $state .= "$e:UAS," if (!grep /$e/,@IOl);
+  }
+  foreach my $ioN (@IOl){
+    my $cnd = ReadingsVal($ioN,"cond","");
     if ($cnd){
-      $state .= $_.":$cnd" if ($cnd !~ m/(init|ok)/);
+      $state .= "$ioN:".($cnd !~ m/(init|ok)/?$cnd:"ok").",";
     }
     else{
-      my $st = InternalVal($_,"STATE","");
-      $state .= $_.":$st" if ($st !~ m/([iI]nit|ok)/);
+      my $st = InternalVal($ioN,"STATE","unknown");
+      $state .= "$ioN:".($st !~ m/([iI]nit|ok)/?$st:"ok").",";
+    }
+    if (AttrVal($ioN,"hmId","") ne $defs{$name}{DEF}){
+      Log 1,"CUL_HM correct hmId for assigned IO $ioN";
+      $attr{$ioN}{hmId} = $defs{$name}{DEF};
     }
   };
   $state = "IOs_ok" if (!$state);
