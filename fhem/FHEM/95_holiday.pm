@@ -62,19 +62,10 @@ holiday_refresh($$)
   }
 
   my $fname = $attr{global}{modpath} . "/FHEM/" . $hash->{NAME} . ".holiday";
-  my @holidayfile;
-  if(configDBUsed()) {
-    my $hfile = _cfgDB_Readfile($fname);
-    return "Holiday file not found in database." unless defined $hfile;
-    @holidayfile = split("\n", $hfile);
-  } else {
-    return "Can't open $fname: $!" if(!open(FH, $fname));
-    @holidayfile = <FH>;
-    close(LAYOUT);
-  }
+  my ($err, @holidayfile) = FileRead($fname);
+  return $err if($err);
 
   my @foundList;
-
   foreach my $l (@holidayfile) {
     next if($l =~ m/^\s*#/);
     next if($l =~ m/^\s*$/);
