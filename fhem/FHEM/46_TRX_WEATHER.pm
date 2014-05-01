@@ -66,6 +66,7 @@
 # Energy Sensors:
 # * "CM160"	is OWL CM119, CM160
 # * "CM180"	is OWL CM180
+# * "REVOLT"	is Revolt
 #
 # Weighing scales (WEIGHT): 
 # * "BWR101" is Oregon Scientific BWR101
@@ -115,7 +116,7 @@ TRX_WEATHER_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^..(50|51|52|54|55|56|57|58|5a|5d).*";
+  $hash->{Match}     = "^..(50|51|52|54|55|56|57|58|5a|5c|5d).*";
   $hash->{DefFn}     = "TRX_WEATHER_Define";
   $hash->{UndefFn}   = "TRX_WEATHER_Undef";
   $hash->{ParseFn}   = "TRX_WEATHER_Parse";
@@ -139,7 +140,7 @@ TRX_WEATHER_Define($$)
   my $name = $a[0];
   my $code = $a[2];
 
-  if (($code =~ /^CM160/) || ($code =~ /^CM180/)) {
+  if (($code =~ /^CM160/) || ($code =~ /^CM180/) || ($code =~ /^REVOLT/)) {
   	return "wrong syntax: define <name> TRX_WEATHER code [scale_current scale_total add_total]" if (int(@a) != 3 && int(@a) != 6);
   	$hash->{scale_current} = ((int(@a) == 6) ? $a[3] : 1);
   	$hash->{scale_total} = ((int(@a) == 6) ? $a[4] : 1.0);
@@ -189,6 +190,8 @@ my %types =
    # Energy usage sensors
    0x5A11 => { part => 'ENERGY', method => \&TRX_WEATHER_common_energy, },
    0x5B13 => { part => 'ENERGY2', method => \&TRX_WEATHER_common_energy2, },
+   0x5c0f => { part => 'ENERGY3', method => \&TRX_WEATHER_common_energy3, },
+
     # WEIGHT
    0x5D08 => { part => 'WEIGHT', method => \&TRX_WEATHER_common_weight, },
   );
@@ -1040,6 +1043,107 @@ sub TRX_WEATHER_common_energy2 {
   return @res;
 }
 
+# ------------------------------------------------------------
+#  T R X _ W E A T H E R _ c o m m o n _ e n e r g y 3
+#
+# devices: REVOLT
+sub TRX_WEATHER_common_energy3 {
+    	my $type = shift;
+	my $longids = shift;
+    	my $bytes = shift;
+
+  my $subtype = sprintf "%02x", $bytes->[1];
+  my $dev_type;
+
+  my %devname =
+    (	# HEXSTRING => "NAME"
+	0x01 => "REVOLT", # Revolt 
+  );
+
+  if (exists $devname{$bytes->[1]}) {
+  	$dev_type = $devname{$bytes->[1]};
+  } else {
+  	Log3 undef, 3, "TRX_WEATHER: common_energy3 error undefined subtype=$subtype";
+  	my @res = ();
+  	return @res;
+  }
+
+  #my $seqnbr = sprintf "%02x", $bytes->[2];
+
+  my $dev_str = $dev_type;
+  $dev_str .= $DOT.sprintf("%02x%02x", $bytes->[3],$bytes->[4]);
+
+  my @res = ();
+
+  # hexline debugging
+  if ($TRX_HEX_debug) {
+    my $hexline = ""; for (my $i=0;$i<@$bytes;$i++) { $hexline .= sprintf("%02x",$bytes->[$i]);} 
+    push @res, { device => $dev_str, type => 'hexline', current => $hexline, units => 'hex', };
+  }
+
+  my $energy_voltage = $bytes->[5];
+  push @res, {
+	device => $dev_str,
+	type => 'energy_voltage',
+	current => $energy_voltage,
+	units => 'V',
+  };
+
+  my $energy_current = ($bytes->[6] * 256 + $bytes->[7]) / 100;
+
+  push @res, {
+	device => $dev_str,
+	type => 'energy_current_revolt',
+	current => $energy_current,
+	units => 'A',
+  };
+
+  my $energy_power = ($bytes->[8] * 256 + $bytes->[9]) / 10;
+
+  push @res, {
+	device => $dev_str,
+	type => 'energy_power',
+	current => $energy_power,
+	units => 'W',
+  };
+
+  my $energy_total = ($bytes->[10] * 256 + $bytes->[11]) / 100;
+
+  push @res, {
+	device => $dev_str,
+	type => 'energy_total',
+	current => $energy_total,
+	units => 'kWh',
+  };
+
+  my $energy_pf = $bytes->[12] / 100;
+  push @res, {
+	device => $dev_str,
+	type => 'energy_pf',
+	current => $energy_pf,
+	units => '',
+  };
+
+  my $energy_freq = $bytes->[13];
+  push @res, {
+	device => $dev_str,
+	type => 'energy_freq',
+	current => $energy_freq,
+	units => 'Hz',
+  };
+
+  my $rssi = ($bytes->[14] & 0xf0) >> 4;
+
+  if ($trx_rssi == 1) {
+  	push @res, {
+		device => $dev_str,
+		type => 'rssi',
+		current => sprintf("%d",$rssi),
+  	};
+  }
+
+  return @res;
+}
 
 # ------------------------------------------------------------
 #
@@ -1344,6 +1448,18 @@ TRX_WEATHER_Parse($$)
 			$sensor = "energy_ch3";
 			readingsBulkUpdate($def, $sensor, $energy_current);
 	}
+	elsif ($i->{type} eq "energy_current_revolt") { 
+			my $energy_current = $i->{current};
+			if (defined($def->{scale_current})) {
+				$energy_current = $energy_current * $def->{scale_current};
+				Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name scale_current=".$def->{scale_current};			
+			}
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name energy_current=".$energy_current;			
+			#$val .= "ECUR: ".$energy_current." ";
+
+			$sensor = "energy_current";
+			readingsBulkUpdate($def, $sensor, $energy_current." ".$i->{units});
+	}
 	elsif ($i->{type} eq "energy_total") { 
 			my $energy_total = $i->{current};
 			if (defined($def->{scale_total}) && defined($def->{add_total})) {
@@ -1356,6 +1472,39 @@ TRX_WEATHER_Parse($$)
 			$sensor = "energy_total";
 			#readingsBulkUpdate($def, $sensor, $energy_total." ".$i->{units});
 			readingsBulkUpdate($def, $sensor, $energy_total);
+	}
+	elsif ($i->{type} eq "energy_power") { 
+			my $energy_power = $i->{current};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name energy_power=$energy_power";			
+			$val .= "EPOW: ".$energy_power." ";
+
+			$sensor = "energy_power";
+			readingsBulkUpdate($def, $sensor, $energy_power." ".$i->{units});
+	}
+	elsif ($i->{type} eq "energy_voltage") { 
+			my $energy_voltage = $i->{current};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name energy_voltage=$energy_voltage";			
+			#$val .= "V: ".$energy_voltage." ";
+
+			$sensor = "voltage";
+			readingsBulkUpdate($def, $sensor, $energy_voltage." ".$i->{units});
+	}
+	elsif ($i->{type} eq "energy_pf") { 
+			my $energy_pf = $i->{current};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name energy_pf=$energy_pf";			
+			#$val .= "PF: ".$energy_pf." ";
+
+			$sensor = "energy_pf";
+			readingsBulkUpdate($def, $sensor, $energy_pf." ".$i->{units});
+	}
+	elsif ($i->{type} eq "energy_freq") { 
+			my $energy_freq = $i->{current};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name energy_freq=$energy_freq";			
+			#$val .= "FREQ: ".$energy_freq." ";
+
+			$sensor = "frequency";
+			readingsBulkUpdate($def, $sensor, $energy_freq." ".$i->{units});
+
 	}
 	elsif ($i->{type} eq "weight") { 
 			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name weight ".$i->{current};
