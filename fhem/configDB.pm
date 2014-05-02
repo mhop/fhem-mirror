@@ -199,11 +199,10 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 	my $sth = $fhem_dbh->prepare( $sql );  
 	$sth->execute();
 	while (@line = $sth->fetchrow_array()) {
-		$row = "$line[1],$line[2],$line[3]";
 		if($line[1] eq 'configdb') {
 			$attr{configdb}{$line[2]} = $line[3];
 		} else {
-			push @rets, $row;
+			push @rets, "attr $line[1] $line[2] $line[3]";
 		}
 	}
 	$fhem_dbh->disconnect();
