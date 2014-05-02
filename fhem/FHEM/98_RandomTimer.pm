@@ -122,6 +122,8 @@ sub RandomTimer_SetTimer($)
 
   my $now = time();
   my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime($now);
+  
+  $hash->{active} = 0;
 
   schaltZeitenErmitteln($hash, $now);
   
@@ -150,7 +152,7 @@ sub RandomTimer_Exec($) {
   
    # Wenn aktiv aber disabled, dann timer abschalten, Meldung ausgeben.
    my $active   = RandomTimer_isAktiv($hash);
-   my $disabled = RandomTimer_disable($hash);
+   my $disabled = RandomTimer_isDisabled($hash);
    my $stopTimeReached = RandomTimer_stopTimeReached($hash);
 
    if ($active) {
@@ -402,7 +404,7 @@ sub get_switchmode ($) {
    }
 }
 ########################################################################
-sub RandomTimer_disable($) {
+sub RandomTimer_isDisabled($) {
    my ($hash) = @_;
 
    my $disable     = AttrVal($hash->{NAME}, "disable",     0 );
@@ -417,7 +419,7 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
      my $hash = $modules{RandomTimer}{defptr}{$hc};
     
      my $myHash->{HASH}=$hash;
-     RandomTimer_Exec($myHash);
+     RandomTimer_SetTimer($myHash);
      Log3 undef, 3, "RandomTimer_Wakeup() for $hash->{NAME} done!";
   }
   Log3 undef,  3, "RandomTimer_Wakeup() done!";
