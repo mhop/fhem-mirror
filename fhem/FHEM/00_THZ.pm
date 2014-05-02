@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 04/2014
-# v. 0.093
+# v. 0.094
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -506,7 +506,7 @@ sub THZ_Set($@){
   if ($msg eq "10") {
     $cmdHex2=THZ_encodecommand(($cmdHex2 . substr((sprintf("%04X", $arg)), -4)),"set");  #04X converts to hex and fills up 0s; for negative, it must be trunckated. 
     THZ_Write($hash,  $cmdHex2); 		# send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
-    select(undef, undef, undef, 0.1); #maybe important for older firmware 
+    select(undef, undef, undef, 0.2); #maybe important for older firmware 
     ($err, $msg) = THZ_ReadAnswer($hash);	#Expectedanswer     is "10",		DLE data link escape 
      }
    $msgtmp=  $msgtmp  ."\n" ."set--" . $cmdHex2  ."\n" . $msg; 
@@ -571,6 +571,7 @@ sub THZ_Get($@){
   
   my $cmdHex3 = $cmdhash->{cmd3};
   if(defined($cmdHex3)) {
+     select(undef, undef, undef, 0.1);
       my $msg3= " ";
       ($err, $msg3) = THZ_Get_Comunication($hash,  $cmdHex3);
       if (defined($err))  {return ($msg3 ."\n msg3 " . $err);}
@@ -843,7 +844,7 @@ sub THZ_Parse($) {
   }  
   when ("0B")    {							   #set parameter HC1
       if (substr($message,4,2) eq "14")  {$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
-      elsif (substr($message,4,4) eq "059E")						{$message = hex(substr($message, 8,4)) ." K" }
+      elsif (substr($message,4,4) eq "059E")						{$message = hex(substr($message, 8,4))/10  ." K" }
       elsif (substr($message,4,4) eq "059D")						{$message = hex(substr($message, 8,4)) ." %" }
       elsif (substr($message,4,4) eq "010E")						{$message = hex(substr($message, 8,4))/100}
       elsif (substr($message,4,4) eq "010F")						{$message = hex(substr($message, 8,2))/10 . " °C"}
@@ -851,7 +852,7 @@ sub THZ_Parse($) {
   }
   when ("0C")    {							   #set parameter HC2
       if (substr($message,4,2) eq "15")  {$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
-      elsif (substr($message,4,4) eq "059E")						{$message = hex(substr($message, 8,4)) ." K" }
+      elsif (substr($message,4,4) eq "059E")						{$message = hex(substr($message, 8,4))/10  ." K" }
       elsif (substr($message,4,4) eq "010E")						{$message = hex(substr($message, 8,4))/100}
       elsif (substr($message,4,4) eq "010F")						{$message = hex(substr($message, 8,2))/10  . " °C"}
       else 				 {$message = hex2int(substr($message, 8,4))/10 ." °C"  }
@@ -1223,17 +1224,17 @@ polyline { stroke:black; fill:none; }
 <text x="751" y="156" class="ylabel" text-anchor="middle">21</text>  <polyline points="751,19.2 751,140.8" class="hgrid"/>
 <g>
   <polyline points="44,140 49,140"/> <text x="39.2" y="144" class="ylabel" text-anchor="end">15</text>
-  <polyline points="44,110 49,110"/> <text x="39.2" y="114" class="ylabel" text-anchor="end">19</text>
-  <polyline points="44,80 49,80"/>   <text x="39.2" y="84" class="ylabel" text-anchor="end">23</text>
-  <polyline points="44,49 49,49"/>   <text x="39.2" y="53" class="ylabel" text-anchor="end">27</text>
-  <polyline points="44,19 49,19"/>   <text x="39.2" y="23" class="ylabel" text-anchor="end">31</text>
+  <polyline points="44,110 49,110"/> <text x="39.2" y="114" class="ylabel" text-anchor="end">23</text>
+  <polyline points="44,80 49,80"/>   <text x="39.2" y="84" class="ylabel" text-anchor="end">21</text>
+  <polyline points="44,49 49,49"/>   <text x="39.2" y="53" class="ylabel" text-anchor="end">39</text>
+  <polyline points="44,19 49,19"/>   <text x="39.2" y="23" class="ylabel" text-anchor="end">47</text>
 </g>
 <g>
   <polyline points="751,140 756,140"/> <text x="760.8" y="144" class="ylabel">15</text>
-  <polyline points="751,110 756,110"/> <text x="760.8" y="114" class="ylabel">19</text>
-  <polyline points="751,80 756,80"/>   <text x="760.8" y="84" class="ylabel">23</text>
-  <polyline points="751,49 756,49"/>   <text x="760.8" y="53" class="ylabel">27</text>
-  <polyline points="751,19 756,19"/>   <text x="760.8" y="23" class="ylabel">31</text>
+  <polyline points="751,110 756,110"/> <text x="760.8" y="114" class="ylabel">23</text>
+  <polyline points="751,80 756,80"/>   <text x="760.8" y="84" class="ylabel">31</text>
+  <polyline points="751,49 756,49"/>   <text x="760.8" y="53" class="ylabel">39</text>
+  <polyline points="751,19 756,19"/>   <text x="760.8" y="23" class="ylabel">47</text>
 </g>
 <text  line_id="line_0" x="100" y="105.2"  class="l0">Actual working point</text>
 <text line_id="line_1" x="100" y="121.2" class="l1">Heat curve</text>
@@ -1245,15 +1246,15 @@ my $p13GradientHC1 = ReadingsVal("Mythz","p13GradientHC1",0);
 my $heatSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",0))[11];
 my $outside_tempFiltered =(split ' ',ReadingsVal("Mythz","sGlobal",0))[65];
 my $p14LowEnDHC1 =(split ' ',ReadingsVal("Mythz","p14LowEnDHC1",0))[0];
-my $a= 1.5 + ($roomSetTemp * 1.3) + $p14LowEnDHC1; 
-my $b= -10 * $p13GradientHC1 / $roomSetTemp; 
-my $c= -0.01;
+my $a= 1 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEnDHC1; 
+my $b= -14 * $p13GradientHC1 / $roomSetTemp; 
+my $c= -1 * $p13GradientHC1 /75;
 my $Simul_heatSetTemp;
 
 
 
 $ret .='<polyline id="line_0"   title="Actual Working point" style="stroke-width:2" class="l0" points="';
-my ($px,$py) = ((($outside_tempFiltered+15)*(750-49)/(15+21)+49),(($heatSetTemp-31)*(140-19)/(15-31)+19)); 
+my ($px,$py) = ((($outside_tempFiltered+15)*(750-49)/(15+21)+49),(($heatSetTemp-47)*(140-19)/(15-47)+19)); 
  $ret.= ($px-3) . "," . ($py)   ." ";
  $ret.=  ($px)  . "," . ($py-3) ." ";
  $ret.= ($px+3) . "," . ($py) ." ";
@@ -1265,7 +1266,7 @@ $ret .='<polyline id="line_1"  title="Heat Curve" class="l1" points="';
 
 for(my $i = -15; $i < 22; $i++) {
  $Simul_heatSetTemp = $i * $i * $c + $i * $b + $a; 
- $ret.= (($i+15)*(750-49)/(15+21)+49) . "," . (($Simul_heatSetTemp-31)*(140-19)/(15-31)+19) ." ";
+ $ret.= (($i+15)*(750-49)/(15+21)+49) . "," . (($Simul_heatSetTemp-47)*(140-19)/(15-47)+19) ." ";
 }
 $ret .= '"/> </svg>';
 
