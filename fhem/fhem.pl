@@ -1932,7 +1932,6 @@ CommandReload($$)
   $param =~ s,\.pm$,,g;
   my $file = "$attr{global}{modpath}/FHEM/$param.pm";
   my $cfgDB = '-';
-
   if( ! -r "$file" ) {
     if(configDBUsed()) {
       # try to find the file in configDB
@@ -3209,13 +3208,15 @@ setGlobalAttrBeforeFork($)
 {
   my ($f) = @_;
 
+  my ($err, @rows);
   if($f eq 'configDB') {
-    cfgDB_GlobalAttr();
-    return;
+    @rows = cfgDB_attrRead('global');
+  } else {
+    ($err, @rows) = FileRead($f);
+    die("$err\n") if($err);
   }
 
-  open(FH, $f) || die("Cant open $f: $!\n");
-  while(my $l = <FH>) {
+  foreach my $l (@rows) {
     $l =~ s/[\r\n]//g;
     next if($l !~ m/^attr\s+global\s+([^\s]+)\s+(.*)$/);
     my ($n,$v) = ($1,$2);
@@ -3224,7 +3225,6 @@ setGlobalAttrBeforeFork($)
     $attr{global}{$n} = $v;
     GlobalAttr("set", "global", $n, $v);
   }
-  close(FH);
 }
 
 
