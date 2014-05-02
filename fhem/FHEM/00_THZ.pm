@@ -608,6 +608,7 @@ my ($err, $msg) =("", " ");
    if ($msg eq "10")  {
     $cmdHex=THZ_encodecommand($cmdHex,"get");
       THZ_Write($hash,  $cmdHex); 		# send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
+     select(undef, undef, undef, 0.1); 		# delay added for Tom!!!!!!
      ($err, $msg) = THZ_ReadAnswer($hash);	#Expectedanswer2     is "1002",		DLE data link escape -- STX start of text
     }
     
@@ -1225,7 +1226,7 @@ polyline { stroke:black; fill:none; }
 <g>
   <polyline points="44,140 49,140"/> <text x="39.2" y="144" class="ylabel" text-anchor="end">15</text>
   <polyline points="44,110 49,110"/> <text x="39.2" y="114" class="ylabel" text-anchor="end">23</text>
-  <polyline points="44,80 49,80"/>   <text x="39.2" y="84" class="ylabel" text-anchor="end">21</text>
+  <polyline points="44,80 49,80"/>   <text x="39.2" y="84" class="ylabel" text-anchor="end">31</text>
   <polyline points="44,49 49,49"/>   <text x="39.2" y="53" class="ylabel" text-anchor="end">39</text>
   <polyline points="44,19 49,19"/>   <text x="39.2" y="23" class="ylabel" text-anchor="end">47</text>
 </g>
