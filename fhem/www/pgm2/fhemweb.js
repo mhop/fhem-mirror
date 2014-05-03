@@ -187,16 +187,17 @@ FW_delayedStart()
 function
 FW_selChange(sel, list, elName)
 {
-  var value;
+  var cmd, value;
   var l = list.split(" ");
   for(var i=0; i < l.length; i++) {
     cmd = l[i];
-    var off = l[i].indexOf(":");
+    var off = cmd.indexOf(":");
     if(off >= 0)
-      cmd = l[i].substring(0, off);
+      cmd = cmd.substring(0, off);
     if(cmd == sel) {
       if(off >= 0)
         value = l[i].substring(off+1);
+      break;
     }
   }
   var el = document.getElementsByName(elName)[0];
