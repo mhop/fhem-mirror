@@ -684,7 +684,7 @@ readingsGroup_Notify($$)
         Log3 $name, 5, "$name: not on any display, ignoring notify";
         return undef;
       } else {
-        if( $FW_visibleDeviceHash{$name} ) {
+        if( defined($FW_visibleDeviceHash{$name}) ) {
         } else {
           Log3 $name, 5, "$name: no longer visible, ignoring notify";
           delete( $hash->{mayBeVisible} );
