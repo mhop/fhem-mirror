@@ -1,4 +1,4 @@
-@import url("dashboard_darkstyle.css");
+@import url("darkCommon.css");
 
 /* Author: Till */
 body     { background-color: #444444; background-image:url(../images/default/fhemicon_dark.png); background-repeat:no-repeat; color: #CCCCCC; font-family:Arial, Helvetica, sans-serif; font-size:13px;}

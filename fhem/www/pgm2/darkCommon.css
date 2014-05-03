@@ -1,0 +1,6 @@
+@import url("dashboard_darkstyle.css");
+
+/* jQuery-UI mods */
+div.ui-dialog { border:3px solid white; padding: 0.2em; }
+div.ui-dialog div.ui-dialog-titlebar { display:none; }
+div.ui-widget-content { background:#444444; color:#CCCCCC; }
