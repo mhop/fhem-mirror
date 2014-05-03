@@ -154,7 +154,10 @@ sub cfgDB_Init;
 sub cfgDB_ReadAll($);
 sub cfgDB_SaveState;
 sub cfgDB_SaveCfg;
-sub cfgDB_GlobalAttr;
+sub cfgDB_AttrRead($);
+sub cfgDB_ReadFile($);
+sub cfgDB_UpdateFile($);
+sub cfgDB_WriteFile($@);
 sub cfgDB_svnId;
 
 ##################################################
@@ -2120,7 +2123,8 @@ GlobalAttr($$$$)
       my $list = cfgDB_Read99(); # retrieve filelist from configDB
       if($list) {
         foreach my $m (split(/,/,$list)) {
-          CommandReload(undef, $m) if(!$modules{$m}{LOADED});
+          $m =~ m/^([0-9][0-9])_(.*)\.pm$/;
+          CommandReload(undef, $m) if(!$modules{$2}{LOADED});
           $counter++;
         }
       }
