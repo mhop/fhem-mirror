@@ -361,8 +361,8 @@ readingsGroup_2html($)
       $h = $hash if( !$h );
       $regex = $device->[0];
     }
-    my $name = $h->{NAME};
     next if( !$h );
+    my $name = $h->{NAME};
 
     my @list = (undef);
     @list = split(",",$regex) if( $regex );
