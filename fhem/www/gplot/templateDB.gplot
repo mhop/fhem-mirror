@@ -1,0 +1,19 @@
+# template file for use with DbLog
+# $Id$
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+
+set title '<L1>'
+set ylabel "Humidity"
+set y2label "Temperature"
+set grid
+set ytics
+set y2tics
+
+#DbLog device:reading::
+
+plot "<IN>" using 1:2 title 'Line 1' with lines
