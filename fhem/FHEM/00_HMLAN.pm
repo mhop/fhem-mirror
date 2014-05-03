@@ -569,7 +569,8 @@ sub HMLAN_Parse($$) {##########################################################
       HMLAN_UpdtMsgLoad($name,(21))
             if (   $letter eq "E"
                 && (hex($flg)&0x60) == 0x20 # ack but not from repeater
-                && $dst eq $attr{$name}{hmId});
+                && $dst eq $attr{$name}{hmId}
+                && $hash->{assignedIDs} =~ m/$src/);
     }
 
     my $rssi = hex($mFld[4])-65536;
