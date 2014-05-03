@@ -159,6 +159,7 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 	my $count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemconfig');
 	if($count < 1) {
 #		insert default entries to get fhem running
+		$fhem_dbh->commit();
 		my $uuid = _cfgDB_Uuid;
 		$fhem_dbh->do("INSERT INTO fhemversions values (0, '$uuid')");
 		_cfgDB_InsertLine($fhem_dbh, $uuid, '#created by cfgDB_Init');
@@ -911,37 +912,6 @@ sub _cfgDB_Filelist(;$) {
 # will be removed 2014-06-15
 #
 #######################################
-
-
-# replaced by cfgDB_AttrRead()
-sub cfgDB_GlobalAttr {
-	my (@line, $row);
-
-	my $fhem_dbh = _cfgDB_Connect;
-	my $uuid = $fhem_dbh->selectrow_array('SELECT versionuuid FROM fhemversions WHERE version = 0');
-	my $sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = ( ? ) and VERSIONUUID = '$uuid'" );  
-
-	$sth->execute('global');
-	while (@line = $sth->fetchrow_array()) {
-		$row = "$line[0] $line[1] $line[2] $line[3]";
-		$line[3] =~ s/#.*//;
-		$line[3] =~ s/ .*$//;
-		$attr{global}{$line[2]} = $line[3];
-		GlobalAttr("set", "global", $line[2], $line[3]);
-	}
-
-	$sth->execute('configdb');
-	while (@line = $sth->fetchrow_array()) {
-		$row = "$line[0] $line[1] $line[2] $line[3]";
-		$line[3] =~ s/#.*//;
-		$line[3] =~ s/ .*$//;
-		$attr{configdb}{$line[2]} = $line[3];
-		GlobalAttr("set", "global", $line[2], $line[3]);
-	}
-
-	$fhem_dbh->disconnect();
-	return;
-}
 
 # deprecated - replaced by cfgDB_FileRead()
 sub _cfgDB_Readfile($) {
