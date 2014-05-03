@@ -2117,10 +2117,12 @@ GlobalAttr($$$$)
     my $counter = 0;
 
     if(configDBUsed()) {
-      my @dbList = split(/,/,cfgDB_Read99()); # retrieve filelist from configDB
-      foreach my $m (@dbList) {
-        CommandReload(undef, $m) if(!$modules{$m}{LOADED});
-        $counter++;
+      my $list = cfgDB_Read99(); # retrieve filelist from configDB
+      if($list) {
+        foreach my $m (split(/,/,$list)) {
+          CommandReload(undef, $m) if(!$modules{$m}{LOADED});
+          $counter++;
+        }
       }
     }
 
@@ -3210,7 +3212,7 @@ setGlobalAttrBeforeFork($)
 
   my ($err, @rows);
   if($f eq 'configDB') {
-    @rows = cfgDB_attrRead('global');
+    @rows = cfgDB_AttrRead('global');
   } else {
     ($err, @rows) = FileRead($f);
     die("$err\n") if($err);
