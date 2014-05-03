@@ -8,6 +8,29 @@ MyUtils_Initialize($$)
     my ($hash) = @_;
 }
 
+use constant {
+  STATE_IDLE => 0,
+  STATE_HOCH => 1,
+  STATE_RUNTER => 2,
+  STATE_SCHLITZ => 3,
+};
+
+
+my @rolls = (
+    { roll => "wohn.rollTerrR", dir=>"W", typ=>"n", temp=>"wohn.fht",   tempS=>21, win=>"wohn.fenTerr", state=>STATE_IDLE, },
+    { roll => "wohn.rollTerrL", dir=>"W", typ=>"n", temp=>"wohn.fht",   tempS=>21, win=>"",             state=>STATE_IDLE, },
+    { roll => "wohn.rollSofa",  dir=>"S", typ=>"n", temp=>"wohn.fht",   tempS=>21, win=>"",             state=>STATE_IDLE, },
+    { roll => "ess.roll",       dir=>"S", typ=>"n", temp=>"wohn.fht",   tempS=>21, win=>"",             state=>STATE_IDLE, },
+    { roll => "kuch.rollBar",   dir=>"S", typ=>"n", temp=>"wohn.fht",   tempS=>21, win=>"",             state=>STATE_IDLE, },
+    { roll => "kuch.rollStr",   dir=>"O", typ=>"n", temp=>"wohn.fht",   tempS=>21, win=>"",             state=>STATE_IDLE, },
+    { roll => "arb.rollTerr",   dir=>"W", typ=>"n", temp=>"studio.fht", tempS=>21, win=>"",             state=>STATE_IDLE, },
+    { roll => "arb.rollWeg",    dir=>"S", typ=>"n", temp=>"studio.fht", tempS=>21, win=>"",             state=>STATE_IDLE, },
+    { roll => "bad.roll",       dir=>"S", typ=>"n", temp=>"bad.fht",    tempS=>23, win=>"",             state=>STATE_IDLE, },
+    { roll => "schlaf.rollWeg", dir=>"S", typ=>"s", temp=>"schlaf.fht", tempS=>18, win=>"",             state=>STATE_IDLE, },
+    { roll => "schlaf.rollStr", dir=>"O", typ=>"s", temp=>"schlaf.fht", tempS=>18, win=>"",             state=>STATE_IDLE, },
+);
+
+
 my @rollHoch = (
   "bad.roll", 
   "arb.rollWeg", 
@@ -19,6 +42,7 @@ my @rollHoch = (
   "wohn.rollTerrL",
   "wohn.rollTerrR"
 );
+
 my @rollRunter = ( 
   "wohn.rollTerrR", 
   "wohn.rollTerrL",
@@ -136,6 +160,105 @@ sub RollAll($$) {
 sub RollWeck($) {
    my ($delay) = @_;
    &RollGroup(\@rollWeck, "up 5", $delay);
+   myfhem("set wach 1");
+}
+
+sub Dbg($) {
+    Log 1,$_[0];
+}
+
+
+sub RollCheck() {
+#    Dbg("RollCheck\n");
+    my $temp=20;
+    my $wett;
+    my $twil;
+    my $fen;
+    my $r;
+    my $sr;
+    my $i=0;
+    my $delay=11;
+
+    for $r ( @rolls ) {
+
+	my $tempH=0;
+	my $sonne=0;
+	my $tag=0;
+        my $skipRunter=0;
+        my $skipHoch=0;
+	my @tparts = gmtime($i*$delay+1);
+        my $t=sprintf ("%02d:%02d:%02d",@tparts[2,1,0]);
+	my @tparts2 = gmtime($i*$delay+40);
+        my $t2=sprintf ("%02d:%02d:%02d",@tparts2[2,1,0]);
+
+#	Dbg("r:g ".$r->{roll}." / ".$r->{temp}."\n");
+
+        $temp=ReadingsVal($r->{temp},"measured-temp", 99);
+	if($temp > $r->{tempS}) {
+	    $tempH=1;
+	}
+	
+        $wett=ReadingsVal("wetter", "code", 99);
+        $sr=Value("sonnenrichtung");
+	if($wett==30 || $wett==32 || $wett==34 || $wett==36) { # sonnig, heiter, heiss
+	    if (index($sr, $r->{dir}) != -1) {
+		$sonne=1;
+	    }
+	}
+
+        $twil=Value("twil");
+	if($twil>=3 && $twil<10) {
+	    $tag=1;
+	}
+
+        if($r->{win} ne "") {
+	    $fen=Value($r->{win});
+            Dbg("test win:$r->{roll}-$fen");	
+            if ($fen eq "Open") {
+		Dbg("$r->{roll}:skipR");
+                $skipRunter=1;
+	    }
+        }
+        if($r->{typ} eq "s") {
+	    if(Value("wach") eq "0") {
+		$skipHoch=1;
+            }
+	}
+
+#       Dbg("  tempH:$tempH so:$sonne tag:$tag skipR:$skipRunter");
+
+	if( $tag and $sonne and $tempH) {
+            if($r->{state}!=STATE_SCHLITZ) {
+                if(!$skipRunter) { 
+		    myfhem("define r".$i." at +".$t." set ".$r->{roll}." closes");
+		    myfhem("define ru".$i." at +".$t2." set ".$r->{roll}." up 7");
+		    Dbg("RollChg: $r->{roll} - runter schlitz\n");
+                }
+                $r->{state}=STATE_SCHLITZ;
+	    }
+	}
+	
+	if($tag && !$sonne) {
+            if($r->{state}!=STATE_HOCH) {
+                if(!$skipHoch) { 
+		    myfhem("define r".$i." at +".$t." set ".$r->{roll}." opens");
+		    Dbg("RollChg: $r->{roll} - hoch\n");
+		}
+                $r->{state}=STATE_HOCH;
+	    }
+	}
+
+	if(!$tag) {
+            if($r->{state}!=STATE_RUNTER) {
+		if(!$skipRunter) {
+		    myfhem("define r".$i." at +".$t." set ".$r->{roll}." closes");
+		    Dbg("RollChg: $r->{roll} -  runter\n");
+		}
+                $r->{state}=STATE_RUNTER;
+	    }
+	}
+	$i=$i+1;
+    } # for
 }
 
 
