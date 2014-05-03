@@ -44,6 +44,7 @@ sub FW_textfield($$$);
 sub FW_textfieldv($$$$);
 sub FW_updateHashes();
 sub FW_visibleDevices(;$);
+sub FW_widgetOverride($$);
 
 use vars qw($FW_dir);     # base directory for web server
 use vars qw($FW_icondir); # icon base directory
@@ -161,7 +162,7 @@ FHEMWEB_Initialize($)
   ###############
   # Initialize internal structures
   map { addToAttrList($_) } ( "webCmd", "icon", "devStateIcon",
-                                "sortby", "devStateStyle");
+                              "widgetOverride",  "sortby", "devStateStyle");
   InternalTimer(time()+60, "FW_closeOldClients", 0, 0);
 
   $FW_dir      = "$attr{global}{modpath}/www";
@@ -941,8 +942,8 @@ FW_doDetail($)
   FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME\">";
   FW_pO FW_hidden("detail", $d);
 
-  FW_makeSelect($d, "set", getAllSets($d), "set");
-  FW_makeSelect($d, "get", getAllGets($d), "get");
+  FW_makeSelect($d, "set", FW_widgetOverride($d, getAllSets($d)), "set");
+  FW_makeSelect($d, "get", FW_widgetOverride($d, getAllGets($d)), "get");
 
   FW_makeTable("Internals", $d, $h);
   FW_makeTable("Readings", $d, $h->{READINGS});
@@ -951,6 +952,7 @@ FW_doDetail($)
   my $roomList = "multiple,".join(",", 
                 sort map { $_ =~ s/ /#/g ;$_} keys %FW_rooms);
   $attrList =~ s/room /room:$roomList /;
+  $attrList = FW_widgetOverride($d, $attrList);
   FW_makeSelect($d, "attr", $attrList,"attr");
 
   FW_makeTable("Attributes", $d, $attr{$d}, "deleteattr");
@@ -1258,6 +1260,7 @@ FW_showRoom()
         $row++;
 
         my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
+        $allSets = FW_widgetOverride($d, $allSets);
 
         my $colSpan = ($usuallyAtEnd{$d} ? ' colspan="2"' : '');
         FW_pO "<td informId=\"$d\"$colSpan>$txt</td>";
@@ -2495,6 +2498,28 @@ FW_ActivateInform()
   $FW_activateInform = 1;
 }
 
+sub
+FW_widgetOverride($$)
+{
+  my ($d, $str) = @_;
+
+  return $str if(!$str);
+
+  my $da = AttrVal($d, "widgetOverride", "");
+  my $fa = AttrVal($FW_wname, "widgetOverride", "");
+  return $str if(!$da && !$fa);
+
+  my @list;
+  push @list, split(" ", $fa) if($fa);
+  push @list, split(" ", $da) if($da);
+  foreach my $na (@list) {
+    my ($n,$a) = split(":", $na);
+    $str =~ s/\b($n)\b(:[^ ]*)?/$1:$a/g;
+  }
+  return $str;
+}
+
+
 1;
 
 =pod
@@ -2935,7 +2960,30 @@ FW_ActivateInform()
         The first specified command is looked up in the "set device ?" list
         (see the <a href="#setList">setList</a> attribute for dummy devices).
         If <b>there</b> it contains some known modifiers (colon, followed
-        by a comma separated list), then a different widget will be displayed:
+        by a comma separated list), then a different widget will be displayed.
+        See also the widgetOverride attribute below. Examples:
+        <ul>
+          define d1 dummy<br>
+          attr d1 webCmd state<br>
+          attr d1 setList state:on,off<br>
+          define d2 dummy<br>
+          attr d2 webCmd state<br>
+          attr d2 setList state:slider,0,1,10<br>
+          define d3 dummy<br>
+          attr d3 webCmd state<br>
+          attr d3 setList state:time<br>
+        </ul>
+        If the command is state, then the value will be used as a command.<br>
+        Note: this is an attribute for the displayed device, not for the FHEMWEB
+        instance.
+        </li>
+        <br>
+
+
+    <a name="widgetOverride"></a>
+    <li>widgetOverride<br>
+        Space spearate list of name:modifier pairs, to override the widget
+        for a set/get/attribute specified by the module author.
         <ul>
           <li>if the modifier is ":noArg", then no further input field is
             displayed </li>
@@ -2949,21 +2997,12 @@ FW_ActivateInform()
             multiple values can be selected, the result is comma separated.</li>
           <li>else a dropdown with all the modifier values is displayed</li>
         </ul>
-        If the command is state, then the value will be used as a command.<br>
-        Examples for the modifier:
+        If this attribute is specified for a FHEMWEB instance, then it is
+        applied to all devices shown. Examples:
         <ul>
-          define d1 dummy<br>
-          attr d1 webCmd state<br>
-          attr d1 setList state:on,off<br>
-          define d2 dummy<br>
-          attr d2 webCmd state<br>
-          attr d2 setList state:slider,0,1,10<br>
-          define d3 dummy<br>
-          attr d3 webCmd state<br>
-          attr d3 setList state:time<br>
+          attr FS20dev widgetOverride on-till:time<br>
+          attr WEB room:textField<br>
         </ul>
-        Note: this is an attribute for the displayed device, not for the FHEMWEB
-        instance.
         </li>
         <br>
 
@@ -3442,7 +3481,30 @@ FW_ActivateInform()
         Der erste angegebene Befehl wird in der "set device ?" list
         nachgeschlagen (Siehe das <a href="#setList">setList</a> Attrib
         f&uuml;r Dummy Ger&auml;te).  Wenn <b>dort</b> bekannte Modifier sind,
-        wird ein anderes Widget angezeigt:
+        wird ein anderes Widget angezeigt. Siehe auch widgetOverride.<br>
+        Wenn der Befehl state ist, wird der Wert als Kommando interpretiert.<br>
+        Beispiele:
+        <ul>
+          define d1 dummy<br>
+          attr d1 webCmd state<br>
+          attr d1 setList state:on,off<br>
+          define d2 dummy<br>
+          attr d2 webCmd state<br>
+          attr d2 setList state:slider,0,1,10<br>
+          define d3 dummy<br>
+          attr d3 webCmd state<br>
+          attr d3 setList state:time<br>
+        </ul>
+        Anmerkung: dies ist ein Attribut f&uuml;r das anzuzeigende Ger&auml;t,
+        nicht f&uuml;r die FHEMWEBInstanz.
+        </li><br>
+
+
+    <a name="widgetOverride"></a>
+    <li>widgetOverride<br>
+        Leerzeichen separierte Liste von Name/Modifier Paaren, mit dem man den
+        vom Modulautor fuer einen bestimmten Parameter (Set/Get/Attribut)
+        vorgesehene Widgets aendern kann.
         <ul>
           <li>Ist der Modifier ":noArg", wird kein weiteres Eingabefeld
               angezeigt.</li>
@@ -3458,28 +3520,19 @@ FW_ActivateInform()
             JavaScript programmierter Slider angezeigt</li>
 
           <li>Ist der Modifier ":multiple,val1,val2,...", dann ein
-            Mehrfachauswahl ist m&ouml;glich, das Ergebnis ist Komma-separiert.</li>
+            Mehrfachauswahl ist m&ouml;glich, das Ergebnis ist
+            Komma-separiert.</li>
 
           <li>In allen anderen F&auml;llen erscheint ein Dropdown mit allen
             Modifier Werten.</li>
         </ul>
-
-        Wenn der Befehl state ist, wird der Wert als Kommando interpretiert.<br>
-        Beispiele f&uuml;r modifier:
+        Falls das Attribut f&uuml;r eine WEB Instanz gesetzt wurde, dann wird
+        es bei allen von diesem Web-Instan angezeigten Ger&auml;ten angewendet.
+        Beispiele:
         <ul>
-          define d1 dummy<br>
-          attr d1 webCmd state<br>
-          attr d1 setList state:on,off<br>
-          define d2 dummy<br>
-          attr d2 webCmd state<br>
-          attr d2 setList state:slider,0,1,10<br>
-          define d3 dummy<br>
-          attr d3 webCmd state<br>
-          attr d3 setList state:time<br>
+          attr FS20dev widgetOverride on-till:time<br>
+          attr WEB room:textField<br>
         </ul>
-
-        Anmerkung: dies ist ein Attribut f&uuml;r das anzuzeigende Ger&auml;t,
-        nicht f&uuml;r die FHEMWEBInstanz.
         </li><br>
 
      <a name="column"></a>
