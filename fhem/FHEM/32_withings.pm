@@ -47,7 +47,6 @@ withings_Initialize($)
   $hash->{GetFn}    = "withings_Get";
   $hash->{AttrFn}   = "withings_Attr";
   $hash->{AttrList} = "IODev ".
-                      "debug:1 ".
                       "disable:1 ".
                       "interval ".
                       "logfile ".
