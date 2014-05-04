@@ -310,13 +310,10 @@ LUXTRONIK2_GetUpdate($)
   if(!$hash->{LOCAL}) {
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "LUXTRONIK2_GetUpdate", $hash, 1);
+    return undef if( AttrVal($name, "disable", 0 ) == 1 );
   }
 
   my $host = $hash->{HOST};
-
-  if( !$hash->{LOCAL} ) {
-    return undef if( AttrVal($name, "disable", 0 ) == 1 );
-  }
 
   $hash->{helper}{RUNNING_PID} = BlockingCall("LUXTRONIK2_DoUpdate", $name."|".$host, "LUXTRONIK2_UpdateDone", 25, "LUXTRONIK2_UpdateAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
 }
@@ -760,7 +757,7 @@ LUXTRONIK2_UpdateDone($)
       $heatPumpPower *= 1 + ($flowTemperature-35) * AttrVal($name, "heatPumpElectricalPowerFactor", 0);
    }
    readingsBulkUpdate( $hash, "thermalPower", sprintf "%.1f", $thermalPower);
-   if ($heatPumpPower >-1 ) { readingsBulkUpdate( $hash, "heatPumpElectricalPowerEstimated", sprintf "%.0f", $heatPumpPower); }
+   if ($heatPumpPower >-1 ) {    readingsBulkUpdate( $hash, "heatPumpElectricalPowerEstimated", sprintf "%.0f", $heatPumpPower); }
    if ($heatPumpPower > 0) {
      $cop = $thermalPower * 1000 / $heatPumpPower;
      readingsBulkUpdate( $hash, "COP", sprintf "%.2f", $cop);

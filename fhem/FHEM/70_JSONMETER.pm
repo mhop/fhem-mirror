@@ -326,6 +326,7 @@ JSONMETER_GetUpdate($)
    if(!$hash->{LOCAL} && $hash->{INTERVAL} > 0) {
       RemoveInternalTimer($hash);
       InternalTimer(gettimeofday()+$hash->{INTERVAL}, "JSONMETER_GetUpdate", $hash, 1);
+      return undef if( AttrVal($name, "disable", 0 ) == 1 );
    }
 
    

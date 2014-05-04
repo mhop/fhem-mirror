@@ -37,8 +37,10 @@ use strict;
 use warnings;
 use Time::Local;
 
-sub statistics_doStatisticMinMax ($$$$);
+sub statistics_PeriodChange($);
+sub statistics_doStatisticMinMax ($$$$$);
 sub statistics_doStatisticMinMaxSingle ($$$$$$);
+sub statistics_DoStatistics ($$$);
 
 # Modul Version for remote debugging
   my $modulVersion = "2014-05-04";
@@ -54,8 +56,9 @@ sub statistics_doStatisticMinMaxSingle ($$$$$$);
    ,["KS300", "temperature", 1, 1] 
    ,["KS300", "wind", 1, 0] 
    ,["KS300", "rain", 2, 1] 
+   ,["FBDECT", "current", 1, 3] 
    ,["FBDECT", "energy", 2, 0] 
-   ,["FBDECT", "power", 1, 2] 
+   ,["FBDECT", "power", 1, 1] 
    ,["FBDECT", "voltage", 1, 1] 
   );
 ##############################################################
@@ -66,12 +69,13 @@ statistics_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn}   = "statistics_Define";
+  $hash->{UndefFn}  = "LUXTRONIK2_Undefine";
   $hash->{NotifyFn} = "statistics_Notify";
 
   $hash->{NotifyOrderPrefix} = "10-";   # Want to be called before the rest
   $hash->{AttrList} = "disable:0,1 "
                    ."DayChangeTime "
-                   ."CorrectionValue "
+                   ."excludedReadings "
                    .$readingFnAttributes;
 }
 
@@ -96,15 +100,88 @@ statistics_Define($$)
   $hash->{DEV_REGEXP} = $devname;
 
   $hash->{STATE} = "active";
+  
+  RemoveInternalTimer($hash);
+  
+  #Run period change procedure each hour.
+  my $periodEndTime = 3600 * (int( gettimeofday() / 3600 ) + 1) ;
+  InternalTimer( $periodEndTime, "statistics_PeriodChange", $hash, 0);
+  
+  return undef;
+}
+
+sub ########################################
+statistics_Undefine($$)
+{
+  my ($hash, $arg) = @_;
+
+  RemoveInternalTimer($hash);
+
   return undef;
 }
 
 
-##########################
-sub
+sub ########################################
 statistics_Notify($$)
 {
-  my ($hash, $dev) = @_;
+   my ($hash, $dev) = @_;
+   statistics_DoStatistics $hash, $dev, 0;
+
+   return;
+}
+
+
+sub ########################################
+statistics_PeriodChange($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $dummy;
+  
+  RemoveInternalTimer($hash);
+  #Run period change procedure each hour.
+  my $periodEndTime = 3600 * (int( gettimeofday() / 3600 ) + 1 );
+  InternalTimer( $periodEndTime, "statistics_PeriodChange", $hash, 0);
+  return if( AttrVal($name, "disable", 0 ) == 1 );
+
+ # Determine if time period switched (day, month, year)
+ # Get deltaValue and Tariff of previous call
+ 
+   my $periodSwitch = 1;
+   my $yearLast;
+   my $monthLast;
+   my $dayLast;
+   my $dayNow;
+   my $monthNow;
+   my $yearNow;
+
+   ($dummy, $dummy, $dummy, $dayLast, $monthLast, $yearLast) = localtime (gettimeofday()-1800);
+   ($dummy, $dummy, $dummy, $dayNow, $monthNow, $yearNow) = localtime (gettimeofday());
+
+   if ($yearNow != $yearLast) { $periodSwitch = 4; }
+   elsif ($monthNow != $monthLast) { $periodSwitch = 3; }
+   elsif ($dayNow != $dayLast) { $periodSwitch = 2; }
+
+   foreach my $r (keys $hash->{READINGS}) 
+   {
+      if ($r =~ /^monitoredDevices.*/) {
+         Log3 $name,5,"$name: Starting period change statistics (Type: $periodSwitch) for all devices of reading $r";
+         my $devNameArray = split /,/, $r; 
+         foreach my $devName ($devNameArray) {
+            Log3 $name,5,"$name: Doing period change statistics for device $devName";
+            # statistics_DoStatistics($hash, $defs{$devName}, $periodSwitch);
+         }
+      }
+   }
+
+   return undef;
+}
+
+##########################
+sub
+statistics_DoStatistics($$$)
+{
+  my ($hash, $dev, $periodSwitch) = @_;
   my $hashName = $hash->{NAME};
   my $devName = $dev->{NAME};
   my $devType = $dev->{TYPE};
@@ -125,8 +202,8 @@ statistics_Notify($$)
    {
       $readingName = $$f[1];
     # notifing device type is known and the device has also the known reading
-      if ($$f[0] eq $devType && exists ($dev->{READINGS}{$readingName})) { 
-         if ($$f[2] == 1) { statistics_doStatisticMinMax ($hash, $dev, $readingName, $$f[3]);}
+      if ($$f[0] eq $devType ) { 
+         if ($$f[2] == 1) { statistics_doStatisticMinMax ($hash, $dev, $readingName, $$f[3], $periodSwitch);}
       }
    }
    
@@ -145,49 +222,22 @@ statistics_Notify($$)
 
 # Calculates single MaxMin Values and informs about end of day and month
 sub ######################################## 
-statistics_doStatisticMinMax ($$$$) 
+statistics_doStatisticMinMax ($$$$$) 
 {
-   my ($hash, $dev, $readingName, $decPlaces) = @_;
-   my $dummy;
+   my ($hash, $dev, $readingName, $decPlaces, $periodSwitch) = @_;
 
-   my $lastReading;
-   my $lastSums;
-   my @newReading;
+   return if not exists ($dev->{READINGS}{$readingName});
    
-   my $yearLast;
-   my $monthLast;
-   my $dayLast;
-   my $dayNow;
-   my $monthNow;
-   my $yearNow;
-   
-   my $prefix = $hash->{PREFIX};
    my $value = $dev->{READINGS}{$readingName}{VAL};
-   $value =~ s/^([\d.]*).*/$1/eg;
+   $value = ($value =~ s/^([\d.]*)/$1/eg);
 
-   # Determine date of last and current reading
-   if (exists($dev->{READINGS}{$prefix.ucfirst($readingName)."Day"}{TIME})) {
-      ($yearLast, $monthLast, $dayLast) = $dev->{READINGS}{$prefix.ucfirst($readingName)."Day"}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d)/;
-   } else {
-      ($dummy, $dummy, $dummy, $dayLast, $monthLast, $yearLast) = localtime;
-      $yearLast += 1900;
-      $monthLast ++;
-   }
-   ($dummy, $dummy, $dummy, $dayNow, $monthNow, $yearNow) = localtime;
-   $yearNow += 1900;
-   $monthNow ++;
-
+  # statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast, decPlaces
   # Daily Statistic
-   #statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast, decPlaces
-   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName."Day", $value, ($dayNow != $dayLast), $decPlaces;
-   
+   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName."Day", $value, ($periodSwitch >= 2), $decPlaces;
   # Monthly Statistic 
-   #statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast, decPlaces
-   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName."Month", $value, ($monthNow != $monthLast), $decPlaces;
-    
+   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName."Month", $value, ($periodSwitch >= 3), $decPlaces;
   # Yearly Statistic 
-   #statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast, decPlaces
-   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName."Year", $value, ($yearNow != $yearLast), $decPlaces;
+   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName."Year", $value, ($periodSwitch == 4), $decPlaces;
 
    return ;
 
@@ -203,65 +253,66 @@ statistics_doStatisticMinMaxSingle ($$$$$$)
    
    my $statReadingName = $hash->{PREFIX};
    $statReadingName .= ucfirst($readingName);
+   my @hidden;
+   my @stat;
+   my $firstRun = not exists($hash->{READINGS}{$hiddenReadingName});
    
-   my $lastReading = $dev->{READINGS}{$statReadingName}{VAL} || "";
-   
- # Initializing
-   if ( $lastReading eq "" ) { 
-      my $since = strftime "%Y-%m-%d_%H:%M:%S", localtime(); 
-      $result = "Count: 1 Sum: $value ShowDate: 1";
-      readingsSingleUpdate($hash, $hiddenReadingName, $result,0);
-
-      $value = sprintf( "%.".$decPlaces."f", $value);
-      $result = "Min: $value Avg: $value Max: $value (since: $since )";
-      readingsSingleUpdate($dev, $statReadingName, $result,0);
-
- # Calculations
-   } else { 
-      my @a = split / /, $hash->{READINGS}{$hiddenReadingName}{VAL}; # Internal values
-      my @b = split / /, $lastReading;
-    # Do calculations
-      $a[1]++; # Count
-      $a[3] += $value; # Sum
-      if ($value < $b[1]) { $b[1]=$value; } # Min
-      $b[3] = $a[3] / $a[1]; # Avg
-      if ($value > $b[5]) { $b[5]=$value; } # Max
-
-    # in case of period change, save "last" values and reset counters
-      if ($saveLast) {
-         $result = "Min: $b[1] Avg: $b[3] Max: $b[5]";
-         if ($a[5] == 1) { $result .= " (since: $b[7] )"; }
-         readingsSingleUpdate($dev, $statReadingName . "Last", $lastReading,0);
-         $a[1] = 1;   $a[3] = $value;   $a[5] = 0;
-         $b[1] = $value;   $b[3] = $value;   $b[5] = $value;
-      }
-    # Store internal calculation values
-      $result = "Count: $a[1] Sum: $a[3] ShowDate: $a[5]";  
-      readingsSingleUpdate($hash, $hiddenReadingName, $result,0);
-    # Store visible Reading
-      $result = "Min: ". sprintf( "%.".$decPlaces."f", $b[1]);
-      $result .= " Avg: ". sprintf( "%.".$decPlaces."f", $b[3]);
-      $result .= " Max: ". sprintf( "%.".$decPlaces."f", $b[5]);
-      if ($a[5] == 1) { $result .= " (since: $b[7] )"; }
-      readingsSingleUpdate($dev, $statReadingName, $result,0);
+   if ( $firstRun ) { 
+  # Show since-Value
+      $hidden[1] = 0; $hidden[3] = 0; $hidden[9] = 1;
+      $stat[1] = $value; $stat[3] = $value; $stat[5] = $value;
+      $stat[7] = strftime ("%Y-%m-%d_%H:%M:%S",localtime());
+   } else {
+  # Do calculations if hidden reading exists
+      @hidden = split / /, $hash->{READINGS}{$hiddenReadingName}{VAL}; # Internal values
+      @stat = split / /, $dev->{READINGS}{$statReadingName}{VAL};
+      my $timeDiff = gettimeofday()-$hidden[7];
+      $hidden[1] += $hidden[5] * $timeDiff; # sum
+      $hidden[3] += $timeDiff; # time
+      if ($value < $stat[1]) { $stat[1]=$value; } # Min
+      $stat[3] = $hidden[1] / $hidden[3]; # Avg
+      if ($value > $stat[5]) { $stat[5]=$value; } # Max
    }
+
+  # Prepare new current reading
+   $result = "Min: ". sprintf( "%.".$decPlaces."f", $stat[1]);
+   $result .= " Avg: ". sprintf( "%.".$decPlaces."f", $stat[3]);
+   $result .= " Max: ". sprintf( "%.".$decPlaces."f", $stat[5]);
+   if ($hidden[9] == 1) { $result .= " (since: $stat[7] )"; }
+
+  # Store current reading as last reading, Reset current reading
+   if ($saveLast) { 
+      readingsSingleUpdate($dev, $statReadingName . "Last", $result,0); 
+      $hidden[1] = 0; $hidden[3] = 0; $hidden[9] = 0; # No since value anymore
+      $result = "Min: $value Avg: $value Max: $value";
+   }
+
+  # Store current reading
+   readingsSingleUpdate($dev, $statReadingName, $result,0);
+  
+  # Store hidden reading
+   $result = "Sum: $hidden[1] Time: $hidden[3] LastValue: ".$value." LastTime: ".gettimeofday()." ShowDate: $hidden[9]";
+   readingsSingleUpdate($hash, $hiddenReadingName, $result,0);
+
    return;
 }
 
 
 # Calculates deltas for day, month and year
 sub ######################################## 
-statistics_doStatisticDelta ($$$$$) 
+statistics_doStatisticDelta ($$$$) 
 {
-   my ($hash, $readingName, $value, $special, $activeTariff) = @_;
+   my ($hash, $dev, $readingName, $decPlaces) = @_;
    my $dummy;
    my $result;
    
    my $deltaValue;
    my $previousTariff; 
    my $showDate;
-   
- # Determine if time period switched (day, month, year)
+
+   my $value = $dev->{READINGS}{$readingName}{VAL};
+
+   # Determine if time period switched (day, month, year)
  # Get deltaValue and Tariff of previous call
    my $periodSwitch = 0;
    my $yearLast; my $monthLast; my $dayLast; my $hourLast;  my $hourNow; my $dayNow; my $monthNow; my $yearNow;
@@ -269,7 +320,7 @@ statistics_doStatisticDelta ($$$$$)
       ($yearLast, $monthLast, $dayLast, $hourLast) = ($hash->{READINGS}{"." . $readingName . "Before"}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d) (\d\d)/);
       $yearLast -= 1900;
       $monthLast --;
-      ($dummy, $deltaValue, $dummy, $previousTariff, $dummy, $showDate) = split / /,  $hash->{READINGS}{"." . $readingName . "Before"}{VAL} || "";
+      ($dummy, $deltaValue, $dummy, $showDate) = split / /,  $hash->{READINGS}{"." . $readingName . "Before"}{VAL} || "";
       $deltaValue = $value - $deltaValue;
    } else {
       ($dummy, $dummy, $hourLast, $dayLast, $monthLast, $yearLast) = localtime;
@@ -302,28 +353,20 @@ statistics_doStatisticDelta ($$$$$)
       if ($showDate >= 8) { $showDate = 7; } # Shows the "since:" value for the first hour change
    }
 
- # statistics_doStatisticDeltaSingle; $hash, $readingName, $deltaValue, $special, $periodSwitch, $showDate, $firstCall
-   statistics_doStatisticDeltaSingle ($hash, $readingName, $deltaValue, $special, $periodSwitch, $showDate);
+ # statistics_doStatisticDeltaSingle; $hash, $readingName, $deltaValue, $periodSwitch, $showDate, $firstCall
+   statistics_doStatisticDeltaSingle ($hash, $readingName, $deltaValue, $periodSwitch, $showDate);
 
-   foreach (1,2,3,4,5,6,7,8,9) {
-      if ( $previousTariff == $_ ) {
-         statistics_doStatisticDeltaSingle ($hash, $readingName."Tariff".$_, $deltaValue, 0, $periodSwitch, $showDate);
-      } elsif ($activeTariff == $_ || ($periodSwitch > 0 && exists($hash->{READINGS}{$readingName . "Tariff".$_}))) {
-         statistics_doStatisticDeltaSingle ($hash, $readingName."Tariff".$_, 0, 0 , $periodSwitch, $showDate);
-      }
-   }
-      
-   # Hidden storage of current values for next call(before values)
-   $result = "Value: $value Tariff: $activeTariff ShowDate: $showDate ";  
+ # Hidden storage of current values for next call(before values)
+   $result = "Value: $value ShowDate: $showDate ";  
    readingsBulkUpdate($hash, ".".$readingName."Before", $result);
 
    return ;
 }
 
 sub ######################################## 
-statistics_doStatisticDeltaSingle ($$$$$$) 
+statistics_doStatisticDeltaSingle ($$$$$) 
 {
-   my ($hash, $readingName, $deltaValue, $special, $periodSwitch, $showDate) = @_;
+   my ($hash, $readingName, $deltaValue, $periodSwitch, $showDate) = @_;
    my $dummy;
    my $result; 
 
@@ -393,8 +436,6 @@ statistics_doStatisticDeltaSingle ($$$$$$)
    if ( $showDate >=2 ) { $result .= " (since: $curr[9] )"; }
    readingsBulkUpdate($hash,$readingName,$result);
    
-   if ($special == 1) { readingsBulkUpdate($hash,$readingName."Today",$curr[3]) };
-
  # if changed, store previous visible statistic (delta) values
    if ($periodSwitch >= 1) {
       $result = "Hour: $last[1] Day: $last[3] Month: $last[5] Year: $last[7]";
