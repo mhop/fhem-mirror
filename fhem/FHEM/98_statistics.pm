@@ -37,25 +37,26 @@ use strict;
 use warnings;
 use Time::Local;
 
-sub statistics_doStatisticMinMax ($$$);
+sub statistics_doStatisticMinMax ($$$$);
+sub statistics_doStatisticMinMaxSingle ($$$$$$);
 
 # Modul Version for remote debugging
-  my $modulVersion = "2014-04-29";
+  my $modulVersion = "2014-05-04";
 
 ##############################################################
-# Syntax: deviceType, readingName, statisticType
+# Syntax: deviceType, readingName, statisticType, decimalPlaces
 #     statisticType: 0=noStatistic | 1=maxMinAvgStatistic | 2=integralTimeStatistic | 3=onOffTimeCount
 ##############################################################
   my @knownDeviceReadings = (
-    ["CUL_WS", "humidity", 1]
-   ,["CUL_WS", "temperature", 1] 
-   ,["KS300", "humidity", 1]
-   ,["KS300", "temperature", 1] 
-   ,["KS300", "wind", 1] 
-   ,["KS300", "rain", 2] 
-   ,["FBDECT", "energy", 2] 
-   ,["FBDECT", "power", 1] 
-   ,["FBDECT", "voltage", 1] 
+    ["CUL_WS", "humidity", 1, 0]
+   ,["CUL_WS", "temperature", 1, 1] 
+   ,["KS300", "humidity", 1, 0]
+   ,["KS300", "temperature", 1, 1] 
+   ,["KS300", "wind", 1, 0] 
+   ,["KS300", "rain", 2, 1] 
+   ,["FBDECT", "energy", 2, 0] 
+   ,["FBDECT", "power", 1, 2] 
+   ,["FBDECT", "voltage", 1, 1] 
   );
 ##############################################################
 
@@ -125,7 +126,7 @@ statistics_Notify($$)
       $readingName = $$f[1];
     # notifing device type is known and the device has also the known reading
       if ($$f[0] eq $devType && exists ($dev->{READINGS}{$readingName})) { 
-         if ($$f[2] == 1) { statistics_doStatisticMinMax ($hash, $dev, $readingName);}
+         if ($$f[2] == 1) { statistics_doStatisticMinMax ($hash, $dev, $readingName, $$f[3]);}
       }
    }
    
@@ -144,9 +145,9 @@ statistics_Notify($$)
 
 # Calculates single MaxMin Values and informs about end of day and month
 sub ######################################## 
-statistics_doStatisticMinMax ($$$) 
+statistics_doStatisticMinMax ($$$$) 
 {
-   my ($hash, $dev, $readingName) = @_;
+   my ($hash, $dev, $readingName, $decPlaces) = @_;
    my $dummy;
 
    my $lastReading;
@@ -160,10 +161,11 @@ statistics_doStatisticMinMax ($$$)
    my $monthNow;
    my $yearNow;
    
-   my $value = $dev->{READINGS}{$readingName}{VAL};
    my $prefix = $hash->{PREFIX};
-   
-  # Determine date of last and current reading
+   my $value = $dev->{READINGS}{$readingName}{VAL};
+   $value =~ s/^([\d.]*).*/$1/eg;
+
+   # Determine date of last and current reading
    if (exists($dev->{READINGS}{$prefix.ucfirst($readingName)."Day"}{TIME})) {
       ($yearLast, $monthLast, $dayLast) = $dev->{READINGS}{$prefix.ucfirst($readingName)."Day"}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d)/;
    } else {
@@ -176,16 +178,16 @@ statistics_doStatisticMinMax ($$$)
    $monthNow ++;
 
   # Daily Statistic
-   #statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast
-   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName."Day", $value, ($dayNow != $dayLast);
+   #statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast, decPlaces
+   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName."Day", $value, ($dayNow != $dayLast), $decPlaces;
    
   # Monthly Statistic 
-   #statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast
-   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName."Month", $value, ($monthNow != $monthLast);
+   #statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast, decPlaces
+   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName."Month", $value, ($monthNow != $monthLast), $decPlaces;
     
   # Yearly Statistic 
-   #statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast
-   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName."Year", $value, ($yearNow != $yearLast);
+   #statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast, decPlaces
+   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName."Year", $value, ($yearNow != $yearLast), $decPlaces;
 
    return ;
 
@@ -193,9 +195,9 @@ statistics_doStatisticMinMax ($$$)
 
 # Calculates single MaxMin Values and informs about end of day and month
 sub ######################################## 
-statistics_doStatisticMinMaxSingle ($$$$$) 
+statistics_doStatisticMinMaxSingle ($$$$$$) 
 {
-   my ($hash, $dev, $readingName, $value, $saveLast) = @_;
+   my ($hash, $dev, $readingName, $value, $saveLast, $decPlaces) = @_;
    my $result;
    my $hiddenReadingName = ".".$dev->{NAME}.".".$readingName;
    
@@ -209,6 +211,8 @@ statistics_doStatisticMinMaxSingle ($$$$$)
       my $since = strftime "%Y-%m-%d_%H:%M:%S", localtime(); 
       $result = "Count: 1 Sum: $value ShowDate: 1";
       readingsSingleUpdate($hash, $hiddenReadingName, $result,0);
+
+      $value = sprintf( "%.".$decPlaces."f", $value);
       $result = "Min: $value Avg: $value Max: $value (since: $since )";
       readingsSingleUpdate($dev, $statReadingName, $result,0);
 
@@ -220,7 +224,7 @@ statistics_doStatisticMinMaxSingle ($$$$$)
       $a[1]++; # Count
       $a[3] += $value; # Sum
       if ($value < $b[1]) { $b[1]=$value; } # Min
-      $b[3] = sprintf "%.0f" , $a[3] / $a[1]; # Avg
+      $b[3] = $a[3] / $a[1]; # Avg
       if ($value > $b[5]) { $b[5]=$value; } # Max
 
     # in case of period change, save "last" values and reset counters
@@ -235,7 +239,9 @@ statistics_doStatisticMinMaxSingle ($$$$$)
       $result = "Count: $a[1] Sum: $a[3] ShowDate: $a[5]";  
       readingsSingleUpdate($hash, $hiddenReadingName, $result,0);
     # Store visible Reading
-      $result = "Min: $b[1] Avg: $b[3] Max: $b[5]";  
+      $result = "Min: ". sprintf( "%.".$decPlaces."f", $b[1]);
+      $result .= " Avg: ". sprintf( "%.".$decPlaces."f", $b[3]);
+      $result .= " Max: ". sprintf( "%.".$decPlaces."f", $b[5]);
       if ($a[5] == 1) { $result .= " (since: $b[7] )"; }
       readingsSingleUpdate($dev, $statReadingName, $result,0);
    }
@@ -417,7 +423,7 @@ statistics_doStatisticDeltaSingle ($$$$$$)
     <br>&nbsp;
     <li><code>[Prefix]</code>
       <br>
-      Optional. Default is <i>stat</i>
+      Optional. Prefix set is place before statistical data. Default is <i>stat</i>
     </li><br>
     <li><code>&lt;DeviceNameRegExp&gt;</code>
       <br>
@@ -467,7 +473,7 @@ statistics_doStatisticDeltaSingle ($$$$$$)
     <br>&nbsp;
     <li><code>[Prefix]</code>
       <br>
-      Optional. Standardm&auml;ssig <i>stat</i>
+      Optional. Der Prefix wird vor den Namen der statistischen Gerätewerte gesetzt. Standardm&auml;ssig <i>stat</i>
     </li><br>
     <li><code>&lt;Ger&auml;teNameRegExp&gt;</code>
       <br>
