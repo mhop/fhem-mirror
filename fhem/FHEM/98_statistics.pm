@@ -229,7 +229,7 @@ statistics_doStatisticMinMax ($$$$$)
    return if not exists ($dev->{READINGS}{$readingName});
    
    my $value = $dev->{READINGS}{$readingName}{VAL};
-   $value = ($value =~ s/^([\d.]*)/$1/eg);
+   $value =~ s/^([\d.]*)/$1/eg;
 
   # statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast, decPlaces
   # Daily Statistic
@@ -261,7 +261,7 @@ statistics_doStatisticMinMaxSingle ($$$$$$)
   # Show since-Value
       $hidden[1] = 0; $hidden[3] = 0; $hidden[9] = 1;
       $stat[1] = $value; $stat[3] = $value; $stat[5] = $value;
-      $stat[7] = strftime ("%Y-%m-%d_%H:%M:%S",localtime());
+      $stat[7] = strftime ("%Y-%m-%d_%H:%M:%S",localtime()  );
    } else {
   # Do calculations if hidden reading exists
       @hidden = split / /, $hash->{READINGS}{$hiddenReadingName}{VAL}; # Internal values
