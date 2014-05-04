@@ -27,12 +27,10 @@ package main;
 use strict;
 use warnings;
 
-
 sub
 RTypes_Initialize() {
   
-  # Logging is not yet available at this stage
-  
+  Log3 undef, 5, "Initializing Type Library:";
 }
 
 sub
