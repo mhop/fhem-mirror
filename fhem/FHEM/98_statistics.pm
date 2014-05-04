@@ -228,8 +228,9 @@ statistics_doStatisticMinMax ($$$$$)
 
    return if not exists ($dev->{READINGS}{$readingName});
    
+  # Get reading, cut out first number without units
    my $value = $dev->{READINGS}{$readingName}{VAL};
-   $value =~ s/^([\d.]*)/$1/eg;
+   $value =~ s/^([\d.]*).*/$1/eg;
 
   # statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast, decPlaces
   # Daily Statistic
