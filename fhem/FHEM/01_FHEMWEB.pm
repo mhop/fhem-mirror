@@ -2145,9 +2145,11 @@ FW_Notify($$)
       FW_readIcons($h->{iconPath});
     }
 
-    my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
-    ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir) = @old;
-    push @data, "$dn<<$dev->{STATE}<<$txt";
+    if( !$modules{$defs{$dn}{TYPE}}{FW_atPageEnd} ) {
+      my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
+      ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir) = @old;
+      push @data, "$dn<<$dev->{STATE}<<$txt";
+    }
 
     #Add READINGS
     if($events) {    # It gets deleted sometimes (?)
