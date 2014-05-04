@@ -16,6 +16,7 @@ I2C_PC.*
 I2C_MCP23017
 I2C_BMP180
 I2C_SHT21
+I2C_TSL2561
 );
 
 my $gpioprg = "/usr/local/bin/gpio";		#WiringPi GPIO utility
