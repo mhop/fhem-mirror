@@ -1271,4 +1271,207 @@ sub Calendar_Undef($$) {
 
 
 =end html
+=begin html_DE
+
+<a name="Calendar"></a>
+<h3>Kalender</h3>
+<ul>
+  <br>
+
+  <a name="Calendardefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; Calendar ical url &lt;URL&gt; [&lt;interval&gt;]</code><br>
+    <code>define &lt;name&gt; Calendar ical file &lt;FILENAME&gt; [&lt;interval&gt;]</code><br>
+    <br>
+    Definiert ein Kalender-Device.<br><br>
+
+    Ein Kalender-Device ermittelt periodisch Ereignisse aus einem Quell-Kalender. Dieser kann eine URL oder eine Datei sein. Die Datei muss im iCal-Format vorliegen.<br><br>
+
+    Beginnt die URL mit <code>https://</code>, muss das Perl-Modul IO::Socket::SSL installiert sein
+    (use <code>cpan -i IO::Socket::SSL</code>).<br><br>
+
+    Hinweis f&uuml;r Nutzer des Google-Kalenders: Du kann direkt die private iCal-URL des Google Kalender nutzen.
+    <!--Google App accounts do not work since requests to the URL
+    get redirected first and the fhem mechanism for retrieving data via http/https cannot handle this. -->
+    Sollte Deine Google-Kalender-URL mit <code>https://</code> beginnen und das Perl-Modul IO::Socket::SSL ist nicht auf Deinem Systeme installiert, kannst Du in der URL  <code>https://</code> durch <code>http://</code> ersetzen, falls keine automatische Umleitung auf die <code>https://</code> URL erfolgt. 
+    Solltest Du unsicher sein, ob dies der Fall ist, &uuml;berpr&uuml;fe es bitte zuerst mit Deinem Browser.<br><br>
+
+    Der optionale Paramter <code>interval</code> bestimmt die Zeit in Sekunden zwischen den Updates. Default-Wert ist 3600 (1 Stunde).<br><br>
+
+    Beispiele:
+    <pre>
+      define MeinKalender Calendar ical url https://www.google.com&shy;/calendar/ical/john.doe%40example.com&shy;/private-foo4711/basic.ics
+      define DeinKalender Calendar ical url http://www.google.com&shy;/calendar/ical/jane.doe%40example.com&shy;/private-bar0815/basic.ics 86400
+      define IrgendeinKalender Calendar ical file /home/johndoe/calendar.ics
+      </pre>
+  </ul>
+  <br>
+
+  <a name="Calendarset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; update</code><br><br>
+
+    Erzwingt das Einlesen des Kalenders von der definierten URL. Das n&auml;chste automatische Einlesen erfolgt 
+    <code>interval</code> Sekunden sp&auml;ter.<br><br>
+  </ul>
+  <br>
+
+
+  <a name="Calendarget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; full|text|summary|location|alarm|start|end &lt;reading&gt|&lt;uid&gt; [max]</code><br><br>
+
+    Gibt - Zeile f&uuml;r Zeile - den vollen Status, eine textbasierte Darstellung, eine Zusammenfassung (Betreff, Titel), den Ort, die Alarmzeit, die Startzeit oder die Endzeit des/der Kalender-Ereignisse aus, die im Reading &lt;reading&gt gelistet werden oder die durch die UID &lt;uid&gt identifiziert werden. Der optionale Parameter <code>max</code> limitiert die Anzahl der zur&uuml;ckgegebenen Lines.<br><br>
+
+    <code>get &lt;name&gt; find &lt;regexp&gt;</code><br><br>
+
+    Gibt - Zeile f&uuml;r Zeile - die UIDs aller Kalender-Ereignisse zur&uuml;ck, deren Zusammenfassung  der Regular Expression 
+    &lt;regexp&gt; entspricht.<br><br>
+
+  </ul>
+
+  <br>
+
+  <a name="Calendarattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+  <br>
+
+  <b>Beschreibung</b>
+  <ul>
+
+  Ein Kalender ist eine Menge von Kalender-Ereignissen. Ein Kalender-Ereignis hat eine Zusammenfassung (normalerweise der Titel, welcher im Quell-Kalender angezeigt wird), eine Startzeit, eine Endzeit und keine, eine oder mehrere Alarmzeiten. Die Kalender-Ereignisse werden
+  aus dem Quellkalender ermittelt, welcher &uuml;ber die URL angegeben wird. Sollten mehrere Alarmzeiten f&uuml;r ein Kalender-Ereignis existieren, wird nur der fr&uuml;heste Alarmzeitpunkt behalten. Wiederkehrende Kalendereinträge werden in einem gewissen Umfang unterst&uuml;tzt: 
+  FREQ INTERVAL UNTIL COUNT werden ausgewertet, BYMONTHDAY BYDAY BYMONTH WKST 
+  werden erkannt aber nicht ausgewertet. Das Modul wird es sehr wahrscheinlich falsch machen, wenn Du wiederkehrende Kalender-Ereignisse mit unerkannten oder nicht ausgewerteten Schlüsselworten hast.<p>
+
+  Ein Kalender-Ereignis wird durch seine UID identifiziert. Die UID wird vom Quellkalender bezogen. Um das Leben leichter zu machen, werden alle nicht-alphanumerischen Zeichen automatisch aus der UID entfernt.<p>
+
+  Ein Kalender-Ereignis kann sich in einem der folgenden Zustände befinden:
+  <table border="1">
+  <tr><td>new</td><td>Das Kalender-Ereignis wurde das erste Mal beim letzten Update gefunden. Entweder war dies das erste Mal des Kalenderzugriffs oder Du hast einen neuen Kalendereintrag zum Quellkalender hinzugef&uuml;gt.</td></tr>
+  <tr><td>known</td><td>Das Kalender-Ereignis existierte bereits vor dem letzten Update.</td></tr>
+  <tr><td>updated</td><td>Das Kalender-Ereignis existierte bereits vor dem letzten Update, wurde aber ge&auml;ndert.</td></tr>
+  <tr><td>deleted</td><td>Das Kalender-Ereignis existierte bereits vor dem letzten Update, wurde aber seitdem gel&ouml;scht. Das Kalender-Ereignis wird beim n&auml;chsten Update von allen Listen entfernt.</td></tr>
+  </table><br>
+  Kalender-Ereignisse, welche vollst&auml;ndig in der Vergangenheit liegen (aktuelle Zeit liegt nach dem Ende-Termin des Kalendereintrags) werden nicht bezogen und sind daher nicht im Kalender verf&uuml;gbar.
+  <p>
+
+  Ein Kalender-Ereignis kann sich in einem der folgenden Modi befinden:
+  <table border="1">
+  <tr><td>upcoming</td><td>Weder die Alarmzeit noch die Startzeit des Kalendereintrags ist erreicht.</td></tr>
+  <tr><td>alarm</td><td>Die Alarmzeit ist &uuml;berschritten, aber die Startzeit des Kalender-Ereignisses ist noch nicht erreicht.</td></tr>
+  <tr><td>start</td><td>Die Startzeit ist &uuml;berschritten, aber die Ende-Zeit des Kalender-Ereignisses ist noch nicht erreicht.</td></tr>
+  <tr><td>end</td><td>Die Ende-Zeit des Kalender-Ereignisses wurde &uuml;berschritten.</td></tr>
+  </table><br>
+  Ein Kalender-Ereignis wechselt umgehend von einem Modus zum Anderen, wenn die Zeit f&uuml;r eine &Auml;nderung erreicht wurde. Dies wird dadurch erreicht, dass auf die fr&uuml;heste zuk&uuml;nftige Zeit aller Alarme, Start- oder Endezeiten aller Kalender-Ereignisse gewartet wird.
+  <p>
+
+  Ein Kalender-Device hat verschiedene Readings. Mit Ausnahme von <code>calname</code> stellt jedes Reading eine Semikolon-getrennte Liste von UIDs von Kalender-Ereignisse dar, welche bestimmte Zust&auml;nde haben:
+  <table border="1">
+  <tr><td>calname</td><td>Name des Kalenders</td></tr>
+  <tr><td>all</td><td>Alle Ereignisse</td></tr>
+  <tr><td>modeAlarm</td><td>Ereignisse im Alarm-Modus</td></tr>
+  <tr><td>modeAlarmOrStart</td><td>Ereignisse im Alarm- oder Startmodus</td></tr>
+  <tr><td>modeAlarmed</td><td>Ereignisse, welche gerade in den Alarmmodus gewechselt haben</td></tr>
+  <tr><td>modeChanged</td><td>Ereignisse, welche gerade in irgendeiner Form ihren Modus gewechselt haben</td></tr>
+  <tr><td>modeEnd</td><td>Ereignisse im Endemodus</td></tr>
+  <tr><td>modeEnded</td><td>Ereignisse, welche gerade vom Start- in den Endemodus gewechselt haben</td></tr>
+  <tr><td>modeStart</td><td>Ereignisse im Startmodus</td></tr>
+  <tr><td>modeStarted</td><td>Ereignisse, welche gerade in den Startmodus gewechselt haben</td></tr>
+  <tr><td>modeUpcoming</td><td>Ereignisse im zuk&uuml;nftigen Modus</td></tr>
+  <tr><td>stateChanged</td><td>Ereignisse, welche gerade in irgendeiner Form ihren Status gewechselt haben</td></tr>
+  <tr><td>stateDeleted</td><td>Ereignisseim Status "deleted"</td></tr>
+  <tr><td>stateNew</td><td>Ereignisse im Status "new"</td></tr>
+  <tr><td>stateUpdated</td><td>Ereignisse im Status "updated"</td></tr>
+  </table>
+  </ul>
+  <p>
+  
+  Wenn ein Kalender-Ereignis ge&auml;ndert wurde, wird ein Event in der Form
+  <code>changed: UID mode</code> getriggert, wobei mode den gegenw&auml;rtigen Modus des Kalender-Ereignisse nach der &Auml;nderung darstellt.
+  
+  <p>
+
+  <b>Anwendungsbeispiele</b>
+  <ul>
+    <i>Zeige alle Kalendereintr&auml;ge inkl. Details</i><br><br>
+    <ul>
+    <code>
+    get MyCalendar full all<br>
+    2767324dsfretfvds7dsfn3e4&shy;dsa234r234sdfds6bh874&shy;googlecom   known    alarm 31.05.2012 17:00:00 07.06.2012 16:30:00-07.06.2012 18:00:00 Erna for coffee<br>
+    992hydf4y44awer5466lhfdsr&shy;gl7tin6b6mckf8glmhui4&shy;googlecom   known upcoming                     08.06.2012 00:00:00-09.06.2012 00:00:00 Vacation
+    </code><br><br>
+    </ul>
+
+    <i>Zeige Kalendereintr&auml;ge in Deinem Bilderrahmen</i><br><br>
+    <ul>
+    F&uuml;ge eine Zeile in die <a href="#RSSlayout">layout description</a> ein, um Kalendereintr&auml;ge im Alarm- oder Startmodus anzuzeigen:<br><br>
+    <code>text 20 60 { fhem("get MyCalendar text modeAlarmOrStart") }</code><br><br>
+    Dies kann dann z.B. so aussehen:<br><br>
+    <code>
+    07.06.12 16:30 Erna zum Kaffee<br>
+    08.06.12 00:00 Urlaub
+    </code><br><br>
+    </ul>
+
+    <i>Schalte das Licht ein, wenn Erna kommt</i><br><br>
+    <ul>
+    Finde zuerst die UID des Kalendereintrags:<br><br>
+    <code>
+    get MyCalendar find .*Erna.*<br>
+    2767324dsfretfvds7dsfn3e4&shy;dsa234r234sdfds6bh874&shy;googlecom
+    </code><br><br>
+    Definiere dann ein notify:<br><br>
+    <code>
+    define ErnaComes notify MyCalendar:modeStarted.*2767324dsfretfvds7dsfn3e4&shy;dsa234r234sdfds6bh874&shy;googlecom.* set MyLight on
+    </code><br><br>
+    Du kannst auch ein Logging aufsetzen:<br><br>
+    <code>
+    define LogErna notify MyCalendar:modeAlarmed.*2767324dsfretfvds7dsfn3e4&shy;dsa234r234sdfds6bh874&shy;googlecom.* { Log3 %NAME, 1, "ALARM name=%NAME event=%EVENT part1=%EVTPART0 part2=%EVTPART1" }
+    </code><br><br>
+    </ul>
+
+    <i>Schalte die Aktoren an und aus</i><br><br>
+    <ul>
+    Stell Dir einen Kalender vor, dessen Zusammenfassungen (Betreff, Titel) die Namen von Devices in Deiner fhem-Installation sind.
+    Du willst nun die entsprechenden Devices an- und ausschalten wenn das Kalender-Ereignis beginnt bzw. endet.<br><br>
+   <code>
+    define SwitchActorOn  notify MyCalendar:modeStarted.* { 
+                my $reading="%EVTPART0";; 
+                my $uid= "%EVTPART1";; 
+                my $actor= fhem("get MyCalendar summary $uid");; 
+                if(defined $actor) { 
+                   fhem("set $actor on") 
+                } 
+    }<br><br>
+    define SwitchActorOff  notify MyCalendar:modeEnded.* { 
+                my $reading="%EVTPART0";; 
+                my $uid= "%EVTPART1";; 
+                my $actor= fhem("get MyCalendar summary $uid");; 
+                if(defined $actor) { 
+                   fhem("set $actor off") 
+                } 
+    }
+    </code><br><br>
+    Auch hier kann ein Logging aufgesetzt werden:<br><br>
+    <code>
+    define LogActors notify MyCalendar:mode(Started|Ended).* { my $reading= "%EVTPART0";; my $uid= "%EVTPART1";; my $actor= fhem("get MyCalendar summary $uid");; Log 3 %NAME, 1, "Actor: $actor, Reading $reading" }
+    </code><br><br>
+    </ul>
+
+
+  </ul>
+
+
+</ul>
+
+
+=end html_DE
 =cut
+
