@@ -677,7 +677,7 @@ SYSSTAT_getStat($)
   <PRE>
   define sysstatlog FileLog /usr/local/FHEM/var/log/sysstat-%Y-%m.log sysstat
   attr sysstatlog nrarchive 1
-  define wl_sysstat weblink fileplot sysstatlog:sysstat:CURRENT
+  define svg_sysstat SVG sysstatlog:sysstat:CURRENT
   attr wl_sysstat label "Load Min: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"
   attr wl_sysstat room System
   </PRE></li>
@@ -794,7 +794,7 @@ SYSSTAT_getStat($)
   <pre>
   define sysstatlog FileLog /usr/local/FHEM/var/log/sysstat-%Y-%m.log sysstat
   attr sysstatlog nrarchive 1
-  define wl_sysstat weblink fileplot sysstatlog:sysstat:CURRENT
+  define svg_sysstat SVG sysstatlog:sysstat:CURRENT
   attr wl_sysstat label "Load Min: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"
   attr wl_sysstat room System
   </pre></li>

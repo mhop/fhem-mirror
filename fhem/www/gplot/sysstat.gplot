@@ -1,12 +1,12 @@
 ############################
-# Display the system load values 
+# Display the system load values
 #
 # Corresponding FileLog definition:
 # define sysstatlog FileLog /usr/local/FHEM/var/log/sysstat-%Y-%m.log sysstat
 # attr sysstatlog nrarchive 1
 #
 # Corresponding FileLog definition:
-# define wl_sysstat weblink fileplot sysstatlog:sysstat:CURRENT
+# define svg_sysstat SVG sysstatlog:sysstat:CURRENT
 # attr wl_sysstat label "Load Min: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"
 # attr wl_sysstat room System
 
@@ -18,7 +18,11 @@ set xlabel " "
 set title '<L1>'
 
 set ylabel "Load"
+set y2label "&#xb0;C"
 
 #FileLog 4:load:0:
+#FileLog 4:temperature:0:
 
-plot "< awk '/load:/ {print $1, $4}' <IN>" using 1:2 ls l0 axes x1y1 title 'Load' with lines
+plot \
+  1:2 ls l0 axes x1y1 title 'Load' with lines
+  1:2 ls l2 axes x1y2 title 'Temperature (&#xb0;C)' with lines
