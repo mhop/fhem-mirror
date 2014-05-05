@@ -569,6 +569,8 @@ SYSMON_Update($@)
   readingsEndUpdate($hash,defined($hash->{LOCAL}) ? 0 : 1);
 }
 
+# Schattenmap mit den zuletzt gesammelten Werten (merged)
+my %shadow_map;
 sub
 SYSMON_obtainParameters($$)
 {
@@ -721,8 +723,34 @@ SYSMON_obtainParameters($$)
 	    }
     }
   }
+  
+  # Aktuelle Werte in ShattenHash mergen
+  my %hashT = %{$map};
+  @shadow_map{ keys %hashT } = values %hashT;
 
   return $map;
+}
+
+#------------------------------------------------------------------------------
+# Liefert gesammelte Werte ( = Readings)
+# Parameter: array der gewuenschten keys (Readings names)
+# Beispiele:
+#   {(SYSMON_getValues())->{'fs_root'}}
+#   {(SYSMON_getValues(("cpu_freq","cpu_temp")))->{"cpu_temp"}}
+#   {join(" ", keys (SYSMON_getValues()))}
+#   {join(" ", keys (SYSMON_getValues(("cpu_freq","cpu_temp"))))}
+#------------------------------------------------------------------------------
+sub
+SYSMON_getValues(;@)
+{
+	my @filter_keys = @_;
+	if(scalar(@filter_keys)>0) {
+		my %clean_hash;
+    @clean_hash{ @filter_keys } = @shadow_map{ @filter_keys };
+    return \%clean_hash;
+	}
+	# alles liefern
+  return \%shadow_map;
 }
 
 #------------------------------------------------------------------------------
@@ -894,7 +922,7 @@ SYSMON_getCPUBogoMIPS($$)
 # Interessant sind eigentlich "nur" Feld 2 (readin), Feld 5 (write)
 # Wenn es eher "um die zeit" geht, Feld 4 (reading), Feld 8 (writing), Feld 10 (Komplett)
 # Kleiner Hinweis, Fled 1 ist das 4. der Liste, das 3. Giebt den Namen an. 
-# Es giebt für jedes Devine und jede Partition ein Eintrag. 
+# Es giebt fuer jedes Devine und jede Partition ein Eintrag. 
 # A /proc/diskstats continuously updated and all that is necessary for us - 
 # make measurements for "second field" and "fourth field" in two different moment of time, 
 # receiving a difference of values and dividing it into an interval of time, 
@@ -1055,7 +1083,7 @@ SYSMON_getDiskStat_intern($$$)
 # Werte:
 #   neuCPUuser, neuCPUnice, neuCPUsystem, neuCPUidle, neuCPUiowait, neuCPUirq, neuCPUsoftirq
 # Differenzberechnung:
-#   CPUuser = neuCPUuser - altCPUuser (für alle anderen analog)
+#   CPUuser = neuCPUuser - altCPUuser (fuer alle anderen analog)
 #   GesammtCPU = CPUuser + CPUnice + CPUsystem + CPUidle + CPUiowait + CPUirq + CPUsoftirq
 # Belastung in %:
 #   ProzCPUuser = (CPUuser / GesammtCPU) * 100
@@ -1073,7 +1101,7 @@ SYSMON_getCPUProcStat($$)
     $map = SYSMON_getCPUProcStat_intern($hash, $map, $entry);
   }
   
-  # Wenn nur eine CPU vorhanden ist, löschen Werte für CPU0 (nur Gesamt belassen)
+  # Wenn nur eine CPU vorhanden ist, loeschen Werte fuer CPU0 (nur Gesamt belassen)
   if(!defined($map->{"stat_cpu1"})){
   	delete $map->{"stat_cpu0"};
   	delete $map->{"stat_cpu0_diff"};
@@ -1322,7 +1350,7 @@ sub SYSMON_getNetworkInfo ($$$)
     #           UP BROADCAST RUNNING MULTICAST  MTU:1500  Metrik:1
     #           RX packets:339826 errors:0 dropped:45 overruns:0 frame:0
     #           TX packets:533293 errors:0 dropped:0 overruns:0 carrier:0
-    #           Kollisionen:0 Sendewarteschlangenlänge:1000
+    #           Kollisionen:0 Sendewarteschlangenlaenge:1000
     #           RX bytes:25517384 (24.3 MiB)  TX bytes:683970999 (652.2 MiB)
 
     foreach (@dataThroughput) {
@@ -1473,7 +1501,7 @@ sub SYSMON_getFBNightTimeControl($$)
 }
 
 #------------------------------------------------------------------------------
-# Liefert Anzahl der nicht abgehörten Nachrichten auf dem Anrufbeantworter (nur FritzBox)
+# Liefert Anzahl der nicht abgehoerten Nachrichten auf dem Anrufbeantworter (nur FritzBox)
 # Parameter: HASH; MAP
 #------------------------------------------------------------------------------
 sub SYSMON_getFBNumNewMessages($$)
@@ -2164,6 +2192,11 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <ul>
     According to SYSMON_ShowValuesHTML, but formatted as plain text.<br>
     </ul><br>
+    
+  <b>Reading values with perl: SYSMON_getValues([&lt;array of desired keys&gt;])</b><br><br>
+    <ul>
+    Returns a hash ref with desired values. If no array is passed, all values are returned.<br>
+    </ul><br>
 
   <b>Examples:</b><br><br>
     <ul>
@@ -2639,9 +2672,14 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <code>define sysv2 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: &deg;C', 'cpu_freq:CPU Frequenz: MHz'))}</code>
     </ul><br>
     
-    <b>Text output method (see Weblink): SYSMON_ShowValuesText(&lt;SYSMON-Instance&gt;[,&lt;Liste&gt;])</b><br><br>
+    <b>Text-Ausgabe-Methode (see Weblink): SYSMON_ShowValuesText(&lt;SYSMON-Instance&gt;[,&lt;Liste&gt;])</b><br><br>
     <ul>
     Analog SYSMON_ShowValuesHTML, jedoch formatiert als reines Text.<br>
+    </ul><br>
+    
+    <b>Readings-Werte mit Perl lesen: SYSMON_getValues([&lt;Liste der gew&uuml;nschten Schl&uuml;ssel&gt;])</b><br><br>
+    <ul>
+    Liefert ein Hash-Ref mit den gew&uuml;nschten Werten. Wenn keine Liste (array) &uuml;bergeben wird, werden alle Werte geliefert.<br>
     </ul><br>
 
   <b>Beispiele:</b><br><br>
