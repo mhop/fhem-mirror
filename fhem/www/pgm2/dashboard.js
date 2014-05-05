@@ -25,6 +25,7 @@
 var dashboard_name = "unknown";
 var dashboard_fullsize = false;
 var dashboard_buttonbar = "top";
+var dashboard_lockstate = "lock";
 
 //Only use for debugging
 function showdebugMessage(msg){
@@ -33,7 +34,7 @@ function showdebugMessage(msg){
 
 function saveOrder() {
 	var EndSaveResult = "";
-	var ActiveTab = $("#tabs .ui-tabs-panel:visible").attr("id").substring(14,13);	
+	var ActiveTab = $("#dashboardtabs .ui-tabs-panel:visible").attr("id").substring(14,13);	
 	//------------------- Build new Position string ----------------------
     $(".dashboard_column").each(function(index, value){        
 		var colid = value.id;
@@ -63,14 +64,14 @@ function saveOrder() {
     });	
 	//------------------------------------------------------------------------		
 	//--------------------- Store new Positions ------------------------
-	if (EndSaveResult != "") { $("#tabs .ui-tabs-panel:visible").data("tabwidgets",EndSaveResult); } //store widgetposition in active tab Widget
+	if (EndSaveResult != "") { $("#dashboardtabs .ui-tabs-panel:visible").data("tabwidgets",EndSaveResult); } //store widgetposition in active tab Widget
 	$("#setPosition").button({disabled: false}); //Mark that the Changes are not saved
 	//------------------------------------------------------------------------
 }
 
 function restoreOrder() {
  var params = (document.getElementById("dashboard_attr").value).split(","); //get current Configuration
- var ActiveTab = $("#tabs .ui-tabs-panel:visible");
+ var ActiveTab = $("#dashboardtabs .ui-tabs-panel:visible");
  var ActiveTabId = ActiveTab.attr("id").substring(14,13);
  var aColWidth = GetColWidth(params[7],params[12]);
 
@@ -149,7 +150,7 @@ function GetColWidth(ColCount, ColWidth){
 }
 
 function dashboard_setlock(){
-	$("#dashboard_button_lock").prepend('<span class="dashboard_button_icon dashboard_button_iconlock"></span>');  
+	//$("#dashboard_button_lock").prepend('<span class="dashboard_button_icon dashboard_button_iconlock"></span>');  
 	//############################################################
 	$( ".dashboard_column" ).sortable( "option", "disabled", true );
 	$( ".dashboard_widget" ).removeClass("dashboard_widgethelper");
@@ -161,7 +162,7 @@ function dashboard_setlock(){
 function dashboard_unsetlock(){
 	var params = (document.getElementById("dashboard_attr").value).split(","); //get current Configuration
 
-	$("#dashboard_button_lock").prepend('<span class="dashboard_button_icon dashboard_button_iconunlock"></span>');
+	//$("#dashboard_button_lock").prepend('<span class="dashboard_button_icon dashboard_button_iconunlock"></span>');
 	//############################################################
 	$( ".dashboard_column" ).sortable( "option", "disabled", false );
 	if (params[2] == 1) { $( ".dashboard_widget" ).addClass("dashboard_widgethelper"); } else { $( ".dashboard_widget" ).removeClass("dashboard_widgethelper"); }//Show Widget-Helper Frame
@@ -183,7 +184,7 @@ function dashboard_setposition(){
  $("#setPosition").button({disabled: true});
  //--------------------------------------------------------------------- 
  //--------------------- store active Tab ------------------------------
- var activeTab = ($( "#tabs" ).tabs( "option", "active" ))+1;
+ var activeTab = ($( "#dashboardtabs" ).tabs( "option", "active" ))+1;
  if (params[11] != activeTab){
 	FW_cmd(document.location.pathname+'?XHR=1&cmd.'+dashboard_name+'=attr '+dashboard_name+' dashboard_activetab '+activeTab);
  }
@@ -218,9 +219,31 @@ function dashboard_modifyWidget(){
 		});		
 }
 
+function dashboard_openModal(tabid) {
+	$("#dashboard-dialog-tabs").tabs();
+	$("#tabID").html("TabID: "+tabid);
+	$("#tabTitle").val(	$($("#dashboardtabs li")[tabid]).text()   );
+
+	$("#tabEdit").dialog( { 
+		modal: true, 
+		title: "Dashboard-Tab Details",
+		resizable: false,
+		width:350,
+		buttons: {
+			"Ok": function() {
+					/*$($("#dashboardtabs li")[tabid]).text($("#tabTitle").val());*/			
+					$(this).dialog("close");
+				}
+		},
+		create: function( event, ui ) {
+			$(this).parent().removeClass().addClass( "dashboard dashboard-dialog ui-dialog ui-widget ui-widget-content ui-corner-all ui-front ui-dialog-buttons ui-draggable" ); 
+		}
+	});
+}
+
 function adddashboardButton(position, text, id, hint) {
     $("#" + id).button();
-	var my_button = '<span id="' + id + '" title="'+hint+'" class="dashboard-button dashboard-button-custom dashboard-button-'+id+' dashboard-state-default" style="">'+text+'</span>';
+	var my_button = '<span id="' + id + '" title="'+hint+'" class="dashboard dashboard-button dashboard-button-custom dashboard-button-'+id+' dashboard-state-default" style="">'+text+'</span>';
 	$("#dashboard_tabnav").prepend(my_button);	 
 }
 
@@ -228,13 +251,14 @@ function dashboard_buildButtons() {
 	adddashboardButton("top", "", "defineDetails", "Show Details");
 	$("#defineDetails").click(function () {location.href=document.location.pathname+'?detail='+dashboard_name;});
 	
-	adddashboardButton("top", "", "setPosition", "Set Position");
-	$("#setPosition").button({disabled: true});		
-	$("#setPosition").click(function () {dashboard_setposition()});	
-	
-	//adddashboardButton("top", "XX", "editTab", "Edit Tab");
-	//$("#editTab").click(function () {alert("comming soon")});	
-	
+	if (dashboard_lockstate  != "lock"){
+		adddashboardButton("top", "", "setPosition", "Set Position");
+		$("#setPosition").button({disabled: true});		
+		$("#setPosition").click(function () {dashboard_setposition()});	
+		
+//		adddashboardButton("top", "XX", "editTab", "Edit Tab");	
+//		$("#editTab").click(function () {dashboard_openModal($( "#dashboardtabs" ).tabs( "option", "active" ))});
+	}
 	if (dashboard_fullsize == true) {
 		adddashboardButton("top", "", "goBack", "Back");
 		$("#goBack").click(function () {location.href=document.location.pathname;});
@@ -247,6 +271,7 @@ $(document).ready( function () {
 	//--------------------------------- Attribute des Dashboards ------------------------------------------------------------------
 	var params = (document.getElementById("dashboard_attr").value).split(","); //get current Configuration
 	dashboard_name = params[0];
+	dashboard_lockstate = params[3];
 	dashboard_buttonbar = params[4];
 	dashboard_fullsize = (params[13] == 1) ? true : false;
 	//-------------------------------------------------------------------------------------------------------------------------------------
@@ -308,10 +333,11 @@ $(document).ready( function () {
 	}
 		
 	//--------------------------------- Dashboard Tabs ------------------------------------------------------------------------------
-	$("#tabs").tabs({
+	$("#dashboardtabs").tabs({
 		active: 0,
 		create: function(event, ui) { 
-			$( "#tabs" ).tabs( "option", "active", params[11]-1 ); //set active Tab
+			$(this).find('li').addClass("ui-corner-bottom");
+			$( "#dashboardtabs" ).tabs( "option", "active", params[11]-1 ); //set active Tab
 			restoreOrder(); 
 		},
 		activate: function (event, ui) {
@@ -324,7 +350,7 @@ $(document).ready( function () {
 		
 	dashboard_modifyWidget();
 	if (dashboard_buttonbar != "hidden") dashboard_buildButtons();
-	if ((params[3] == "lock") || (dashboard_buttonbar == "hidden")) {dashboard_setlock();} else {dashboard_unsetlock();}	
+	if ((dashboard_lockstate  == "lock") || (dashboard_buttonbar == "hidden")) {dashboard_setlock();} else {dashboard_unsetlock();}	
 	if (params[14] != "none" ) {$('<style type="text/css">'+params[14]+'</style>').appendTo($('head')); }
   }	
 });
