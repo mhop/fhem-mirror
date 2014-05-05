@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: new Method: SYSMON_getValues([desired keys])
   - feature: JSONMETER: hourly statistics
   - feature: configdb: new command search
   - feature: LUXTRONIK2: estimation of electrical power consumption, 
