@@ -677,6 +677,7 @@ sub CUL_HM_Attr(@) {#################################
       return "use $attrName only for ccu device" 
             if (!$hash->{helper}{role}{dev}
                 || AttrVal($name,"model","CCU-FHEM") !~ "CCU-FHEM");
+      CUL_HM_UpdtCentral($name);
     }
   }
   elsif($attrName eq "autoReadReg"){
@@ -728,7 +729,6 @@ sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
 }
 sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
   my ($hash)=@_;
-  return if(!(CUL_HM_getRxType($hash) & 0x10));
 
   my $oldChn = $hash->{helper}{io}{newChn};
   my @p = unpack 'A8A2A*',$oldChn;
@@ -4139,7 +4139,7 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
       elsif(  ($vc ne "init" && $hashVd->{msgRed} <= $hashVd->{miss})
             || $hash->{helper}{virtTC} ne "00") {
           $hashVd->{msgSent} = 1;
-          CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s%s"
+          CUL_HM_SndCmd($hashVd,sprintf("%02X%s%s%s"
                                              ,$msgCnt
                                              ,$hashVd->{cmd}
                                              ,$hash->{helper}{virtTC}
@@ -4148,7 +4148,7 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
       InternalTimer($tn+10,"CUL_HM_valvePosTmr","valveTmr:$vId",0);
     }
     elsif ($hashVd->{typ} == 2){
-      CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s"
+      CUL_HM_SndCmd($hashVd,sprintf("%02X%s%s"
                                         ,$msgCnt
                                         ,$hashVd->{cmd}
                                         ,$hashVd->{val}));
