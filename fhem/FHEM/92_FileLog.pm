@@ -759,7 +759,8 @@ RESCAN:
       my @lda = split("[_:]", $lastdate{$hd});
       my $ts = "12:00:00";                   # middle timestamp
       $ts = "$lda[1]:30:00" if($hd == 13);
-      my $line = sprintf("%s_%s %0.1f\n", $lda[0],$ts, $h->{last2}-$h->{last1});
+      my $line = sprintf("%s_%s %0.1f\n", $lda[0],$ts,
+                defined($h->{last1}) ? $h->{last2}-$h->{last1} : 0);
 
       if($outf eq "-") {
         $h->{ret} .= $line;
