@@ -111,6 +111,7 @@ readingsProxy_update($$)
   my $value_fn = AttrVal( $name, "valueFn", "" );
   if( $value_fn =~ m/^{.*}$/ ) {
     my $VALUE = $value;
+    my $LASTCMD = ReadingsVal($name,"lastCmd",undef);
 
     my $value_fn = eval $value_fn;
     Log3 $name, 3, $name .": valueFn: ". $@ if($@);
@@ -211,15 +212,20 @@ readingsProxy_Set($@)
   my $v = join(" ", @a);
   my $set_fn = AttrVal( $hash->{NAME}, "setFn", "" );
   if( $set_fn =~ m/^{.*}$/ ) {
+    my $CMD = $a[0];
     my $DEVICE = $hash->{DEVICE};
     my $READING = $hash->{READING};
-    my $CMD = $a[0];
     my $ARGS = join(" ", @a[1..$#a]);
 
     my $set_fn = eval $set_fn;
     Log3 $name, 3, $name .": setFn: ". $@ if($@);
+
+    readingsSingleUpdate($hash, "lastCmd", $a[0], 0);
+
     return undef if( !defined($set_fn) );
     $v = $set_fn if( $set_fn );
+  } else {
+    readingsSingleUpdate($hash, "lastCmd", $a[0], 0);
   }
 
   Log3 $name, 4, "$name: set hash->{DEVICE} $v";
@@ -328,7 +334,7 @@ readingsProxy_Get($@)
         everything else -> use this instead</li>
       <li>setFn<br>
         perl expresion that will return the set command forwarded to the parent device.
-        has access to $DEVICE, $READING, $CMD and $ARGS.<br>
+        has access to $CMD, $DEVICE, $READING and $ARGS.<br>
         undef -> do nothing<br>
         ""    -> pass-through<br>
         everything else -> use this instead<br>
@@ -337,7 +343,7 @@ readingsProxy_Get($@)
         </li>
       <li>valueFn<br>
         perl expresion that will return the value that sould be used as state.
-        has access to $DEVICE, $READING, $CMD and $VALUE.<br>
+        has access to $LASTCMD, $DEVICE, $READING and $VALUE.<br>
         undef -> do nothing<br>
         ""    -> pass-through<br>
         everything else -> use this instead<br>
