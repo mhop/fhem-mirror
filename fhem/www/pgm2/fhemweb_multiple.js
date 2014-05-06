@@ -27,7 +27,7 @@ FW_multipleSelect(el)
       for(var i1=0; i1<sel.length; i1++)
         selObj[sel[i1]] = 1;
 
-      var vArr = $(el).attr("allVals").replace("#", " ").split(",");
+      var vArr = $(el).attr("allVals").replace(/#/g, " ").split(",");
       var table = "";
       for(var i1=1; i1<vArr.length; i1++) {
         var v = vArr[i1];
