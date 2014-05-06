@@ -229,7 +229,9 @@ sub
 FW_Undef($$)
 {
   my ($hash, $arg) = @_;
-  return TcpServer_Close($hash);
+  my $ret = TcpServer_Close($hash);
+  %FW_visibleDeviceHash = FW_visibleDevices();
+  return $ret;
 }
 
 #####################################
