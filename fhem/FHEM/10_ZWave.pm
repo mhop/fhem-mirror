@@ -123,6 +123,8 @@ my %zwave_class = (
                "0340031f"  => "state:manual",  }, } ,
   THERMOSTAT_OPERATING_STATE=>{ id => '42', },
   THERMOSTAT_SETPOINT      => { id => '43',
+    set   => { setpointHeating => "010101%02x",
+               setpointCooling => "010201%02x"},
     get   => { setpoint => "02" },
     parse => { "064303(..)(..)(....)" => 'sprintf("temperature:%0.1f %s %s", '.
                  'hex($3)/(10**int(hex($2)/32)), '.
@@ -850,6 +852,16 @@ s2Hex($)
   <li>tmManual<br>
     set the thermostat mode to off, cooling, heating or manual.
     </li>
+
+  <br><br><b>Class THERMOSTAT_SETPOINT</b>
+  <li>setpointHeating value<br>
+    set the thermostat to heat to the given value.
+    The value is a whole number and read as celsius.
+  </li>
+  <li>setpointCooling value<br>
+    set the thermostat to heat to the given value.
+    The value is a whole number and read as celsius.
+  </li>
 
   <br><br><b>Class WAKE_UP</b>
   <li>wakeupInterval value<br>
