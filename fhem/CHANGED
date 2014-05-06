@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: FB_CALLMONITOR: new reading "missed_call_line" indicating
+             the line number which received the missed call
   - feature: YAMAHA_AVR current* readings will be erased in case they
              not applicable
   - feature: YAMAHA_AVR currentTitle available for TUNER
