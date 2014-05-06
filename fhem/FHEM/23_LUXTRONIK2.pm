@@ -754,7 +754,7 @@ LUXTRONIK2_UpdateDone($)
    if ($a[3] =~ /^(0|5|16)$/ ) { 
       $thermalPower = abs($flowTemperature - $returnTemperature) * $a[19] / 866.65; 
       $heatPumpPower = AttrVal($name, "heatPumpElectricalPowerWatt", -1);
-      $heatPumpPower *= 1 + ($flowTemperature-35) * AttrVal($name, "heatPumpElectricalPowerFactor", 0);
+      $heatPumpPower *= (1 + ($flowTemperature-35) * AttrVal($name, "heatPumpElectricalPowerFactor", 0));
    }
    readingsBulkUpdate( $hash, "thermalPower", sprintf "%.1f", $thermalPower);
    if ($heatPumpPower >-1 ) {    readingsBulkUpdate( $hash, "heatPumpElectricalPowerEstimated", sprintf "%.0f", $heatPumpPower); }
@@ -1602,10 +1602,10 @@ LUXTRONIK2_doStatisticDelta ($$$$$)
 
    my $activeTariff = ReadingsVal($name,"activeTariff",0);
 
-   if ( $electricalPower != 0 ) {
+   if ( $electricalPower >0 || ($electricalPower == 0 && $periodSwitch > 0) ) {
       my $readingNamePower = $readingName;
          $readingNamePower =~ s/Hours/Electricity/ ;
-      if ($electricalPower > 0) {
+      if ($activeTariff > 0) {
          foreach (1,2,3,4,5,6,7,8,9) {
             if ( $previousTariff == $_ ) {
                LUXTRONIK2_doStatisticDeltaSingle ($hash, $readingNamePower."Tariff".$_, $deltaValue * $electricalPower, $factor, $periodSwitch, $showDate);
@@ -1613,6 +1613,8 @@ LUXTRONIK2_doStatisticDelta ($$$$$)
                LUXTRONIK2_doStatisticDeltaSingle ($hash, $readingNamePower."Tariff".$_, 0, $factor, $periodSwitch, $showDate);
             }
          }
+      } else {
+         LUXTRONIK2_doStatisticDeltaSingle ($hash, $readingNamePower, $deltaValue * $electricalPower, $factor, $periodSwitch, $showDate);
       }
    }
  # Hidden storage of current values for next call(before values)
