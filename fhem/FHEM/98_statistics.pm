@@ -421,7 +421,7 @@ statistics_doStatisticDelta ($$$$$)
 <h3>statistics</h3>
 <ul>
   This modul calculates for certain readings of given devices statistical values and adds them to the devices.
-  &nbsp;
+  <br>&nbsp;
   <br>
   
   <b>Define</b>
@@ -441,7 +441,7 @@ statistics_doStatisticDelta ($$$$$)
       Until now the following device types and readings are analysed:
       <ul><li><b>CUL_WS:</b> humidity, temperature</li>
           <li><b>KS300:</b> humidity, temperature, wind, rain</li>
-          <li><b>FBDECT:</b> energy, power, voltage</li>
+          <li><b>FBDECT:</b> energy, power, voltage, current</li>
       </ul>
     </li>
   </ul>
@@ -460,7 +460,7 @@ statistics_doStatisticDelta ($$$$$)
   <a name="JSONMETERattr"></a>
    <b>Attributes</b>
    <ul>
-    <li><code>excludedReadings</code>
+    <li><code>excludedReadings <code>&lt;Device:ReadingNameRegExp&gt;</code></code>
       <br>
       Regular expression of the readings that shall be excluded from the statistics.<br>
       The reading have to be entered in the form <i>deviceName:readingName</i>. E.g. "FritzDect:current|Sensor_.*:humidity"
@@ -477,7 +477,7 @@ statistics_doStatisticDelta ($$$$$)
 <h3>statistics</h3>
 <ul>
   Dieses Modul wertet von den angegebenen Ger&auml;ten bestimmte Werte statistisch aus und f&uuml;gt sie den jeweiligen Ger&auml;ten als neue Werte hinzu.
-  &nbsp;
+  <br>&nbsp;
   <br>
   
   <b>Define</b>
@@ -516,7 +516,7 @@ statistics_doStatisticDelta ($$$$$)
   <a name="JSONMETERattr"></a>
    <b>Attributes</b>
    <ul>
-    <li><code>excludedReadings</code>
+    <li><code>excludedReadings &lt;Ger&auml;teName:WertRegExp&gt;</code>
       <br>
       Regul&auml;rer Ausdruck der Ger&auml;tewerte, f&uuml;r die keine Statistiken gebildet werden sollen.<br>
       Die Ger&auml;tewerte werden in der Form <i>Ge&auml;tename:Ge&auml;tewert</i> angegeben. Z.B. "FritzDect:current|Sensor_.*:humidity"
