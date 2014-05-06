@@ -428,9 +428,9 @@ if($cfgDB_dbconn =~ m/pg:/i) {
   sub cfgDB_Fileversion($$) {
   my ($file,$ret) = @_;
   my $fhem_dbh = _cfgDB_Connect;
-  my $id = $fhem_dbh->selectrow_array("SELECT line from fhemfilesave where filename = '$file' and line like '%$Id:%'");
+  my $id = $fhem_dbh->selectrow_array("SELECT line from fhemfilesave where filename = '$file' and line like '%\$Id:%'");
   $fhem_dbh->disconnect();
-  $ret = ($id) ? $id : $ret;
+  $ret = ($id) ? $id : "$file - no SVN Id found!";
   return $ret;
 }
 
