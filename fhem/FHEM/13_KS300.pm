@@ -253,10 +253,10 @@ KS300_Parse($$)
       $difft = 1 if(!$difft);                    # Don't want illegal division.
       $t /= $difft; $h /= $difft; $w /= $difft; $e = $v[1] - $cv[9];
 
+      $val = sprintf("T: %.1f  H: %d  W: %.1f  R: %.1f", $t, $h, $w, $e);
+      readingsBulkUpdate($def, 'avg_day', $val, $d[2]!=$sd[2]);
 
       if($d[2] != $sd[2]) {                      # Day changed
-        $val = sprintf("T: %.1f  H: %d  W: %.1f  R: %.1f", $t, $h, $w, $e);
-        readingsBulkUpdate($def, 'avg_day', $val);
         $val = "$tm T: 0 H: 0 W: 0 R: $v[1]";
         readingsBulkUpdate($def, 'cum_day', $val, 0);
 
@@ -272,10 +272,10 @@ KS300_Parse($$)
           $cmv[0], $t, $h, $w, $cmv[8]+$e);
           readingsBulkUpdate($def, 'cum_month', $val, 0);
 
+          $val = sprintf("T: %.1f  H: %d  W: %.1f  R: %.1f",
+                        $t/$cmv[0], $h/$cmv[0], $w/$cmv[0], $cmv[8]+$e);
+          readingsBulkUpdate($def, 'avg_month', $val, $d[1]!=$sd[1]);
           if($d[1] != $sd[1]) {                  # Month changed, report it
-            $val = sprintf("T: %.1f  H: %d  W: %.1f  R: %.1f",
-                          $t/$cmv[0], $h/$cmv[0], $w/$cmv[0], $cmv[8]+$e);
-            readingsBulkUpdate($def, 'avg_month', $val);
             $val = "0 T: 0 H: 0 W: 0 R: 0";
             readingsBulkUpdate($def, 'cum_month', $val, 0);
           }
