@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 00_RPII2C.pm klausw
+# $Id$
 package main;
 
 use strict;
