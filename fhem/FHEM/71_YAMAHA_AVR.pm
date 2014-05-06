@@ -169,37 +169,62 @@ YAMAHA_AVR_GetStatus($;$)
 		{
 			Log3 $name, 4, "YAMAHA_AVR $name: check for extended informations";
 		
-			my $infos = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Info>GetParam</Play_Info></$1></YAMAHA_AV>");
+            my $infos = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Info>GetParam</Play_Info></$1></YAMAHA_AV>");
 	    
-			if($infos =~ /<Meta_Info>.*?<Artist>(.+?)<\/Artist>.*?<\/Meta_Info>/)
-			{
-				readingsBulkUpdate($hash, "currentArtist", YAMAHA_AVR_html2txt($1));
-			}
-			
-			if($infos =~ /<Meta_Info>.*?<Station>(.+?)<\/Station>.*?<\/Meta_Info>/)
-			{
-				readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
-			}
-			elsif($infos =~ /<Meta_Info>.*?<Program_Service>(.+?)<\/Program_Service>.*?<\/Meta_Info>/)
-			{
-				readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
-			}
-			
-			if($infos =~ /<Meta_Info>.*?<Channel>(.+?)<\/Channel>.*?<\/Meta_Info>/)
-			{
-				readingsBulkUpdate($hash, "currentChannel", $1);
-			}
-			
-			if($infos =~ /<Meta_Info>.*?<Album>(.+?)<\/Album>.*?<\/Meta_Info>/)
-			{
-				readingsBulkUpdate($hash, "currentAlbum", YAMAHA_AVR_html2txt($1));
-			}
-			
-			if($infos =~ /<Meta_Info>.*?<Song>(.+?)<\/Song>.*?<\/Meta_Info>/)
-			{
-				readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));
-			}
-			
+            if($infos =~ /<Meta_Info>.*?<Artist>(.+?)<\/Artist>.*?<\/Meta_Info>/)
+            {
+                readingsBulkUpdate($hash, "currentArtist", YAMAHA_AVR_html2txt($1));
+            }
+            else
+            {
+                readingsBulkUpdate($hash, "currentArtist", "", 0);
+            }
+
+            if($infos =~ /<Meta_Info>.*?<Station>(.+?)<\/Station>.*?<\/Meta_Info>/)
+            {
+                readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
+            }
+            elsif($infos =~ /<Meta_Info>.*?<Program_Service>(.+?)<\/Program_Service>.*?<\/Meta_Info>/)
+            {
+                readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
+            }
+            else
+            {
+                readingsBulkUpdate($hash, "currentStation", "", 0);
+            }
+            
+            
+            if($infos =~ /<Meta_Info>.*?<Channel>(.+?)<\/Channel>.*?<\/Meta_Info>/)
+            {
+                readingsBulkUpdate($hash, "currentChannel", $1);
+            }
+            else
+            {
+                readingsBulkUpdate($hash, "currentChannel", "", 0);
+            }
+            
+            if($infos =~ /<Meta_Info>.*?<Album>(.+?)<\/Album>.*?<\/Meta_Info>/)
+            {
+                readingsBulkUpdate($hash, "currentAlbum", YAMAHA_AVR_html2txt($1));
+            }
+            else
+            {
+                readingsBulkUpdate($hash, "currentAlbum", "", 0);
+            }
+            
+            if($infos =~ /<Meta_Info>.*?<Song>(.+?)<\/Song>.*?<\/Meta_Info>/)
+            {
+                readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));
+            }
+            elsif($infos =~ /<Meta_Info>.*?<Radio_Text_A>(.+?)<\/Radio_Text_A>.*?<\/Meta_Info>/)	
+            {											
+                readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));		
+            }		
+            else
+            {
+                readingsBulkUpdate($hash, "currentTitle", "", 0);
+            }
+            
 			if($infos =~ /<Playback_Info>(.+?)<\/Playback_Info>/)
 			{
 				readingsBulkUpdate($hash, "playStatus", lc($1));
