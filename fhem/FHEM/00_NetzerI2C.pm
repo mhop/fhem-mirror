@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 00_Netzer_I2C.pm klausw
+# $Id$
 package main;
 
 use strict;
