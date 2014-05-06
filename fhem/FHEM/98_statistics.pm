@@ -5,7 +5,6 @@
 #  Copyright notice
 #
 #  (c) 2014 Torsten Poitzsch < torsten . poitzsch at gmx . de >
-#   inspired by 98_rain.pm of Andreas Vogt
 #
 #  This module computes statistic data of and for readings of other modules
 #
@@ -48,7 +47,7 @@ sub statistics_doStatisticDelta ($$$$$);
 
 ##############################################################
 # Syntax: deviceType, readingName, statisticType, decimalPlaces
-#     statisticType: 0=noStatistic | 1=maxMinAvgStatistic | 2=integralTimeStatistic | 3=onOffTimeCount
+#     statisticType: 0=noStatistic | 1=minMaxAvg | 2=deltaTime | 3=stateTimeCount
 ##############################################################
   my @knownDeviceReadings = (
     ["CUL_WS", "humidity", 1, 0]
@@ -69,9 +68,10 @@ statistics_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{DefFn}   = "statistics_Define";
-  $hash->{UndefFn}  = "LUXTRONIK2_Undefine";
+  $hash->{DefFn}    = "statistics_Define";
+  $hash->{UndefFn}  = "statistics_Undefine";
   $hash->{NotifyFn} = "statistics_Notify";
+  $hash->{NOTIFYDEV} = "global";
 
   $hash->{NotifyOrderPrefix} = "10-";   # Want to be called before the rest
   $hash->{AttrList} = "disable:0,1 "
@@ -91,23 +91,23 @@ statistics_Define($$)
     if(3>@a || @a>4);
 
   my $name = $a[0];
-  my $devname = $a[2];
+  my $devName = $a[2];
 
   if (@a == 4) {$hash->{PREFIX} = $a[3];}
   else {$hash->{PREFIX} = "stat";}
  
-  eval { "Hallo" =~ m/^$devname$/ };
+  eval { "Hallo" =~ m/^$devName$/ };
   return "Bad regexp: $@" if($@);
-  $hash->{DEV_REGEXP} = $devname;
+  $hash->{DEV_REGEXP} = $devName;
 
   $hash->{STATE} = "active";
-  
+
   RemoveInternalTimer($hash);
   
-  #Run period change procedure each hour.
+ # Run period change procedure each full hour.
   my $periodEndTime = 3600 * (int( gettimeofday() / 3600 ) + 1) ;
   InternalTimer( $periodEndTime, "statistics_PeriodChange", $hash, 0);
-  
+
   return undef;
 }
 
@@ -126,7 +126,45 @@ sub ########################################
 statistics_Notify($$)
 {
    my ($hash, $dev) = @_;
-   statistics_DoStatistics $hash, $dev, 0;
+   my $name = $hash->{NAME};
+   my $devName = $dev->{NAME};
+
+ # Delete old Readings of monitored devices at startup
+  if ($devName eq "global" && grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}})){
+     foreach my $r (keys $hash->{READINGS}) 
+      {
+         if ($r =~ /^monitoredDevices.*/) {
+            Log3 $name,5,"$name: Initialization - Delete old reading $r.";
+            delete($hash->{READINGS}{$r}); 
+         }
+      }
+      return;
+   }
+  
+ # Return if the notifying device is not monitored
+  return "" if(!defined($hash->{DEV_REGEXP}));
+  my $regexp = $hash->{DEV_REGEXP};
+  if($devName !~ m/^($regexp)$/) {
+      Log3 $name,5,"$name: Notification of '".$dev->{NAME}."' received. Device not monitored.";
+      return "" ;
+  }
+
+  # Check if it notifies only for the statistic values
+   my $prefix = $hash->{PREFIX};
+   my $normalReadingFound = 0;
+   my $max = int(@{$dev->{CHANGED}});   
+   for (my $i = 0; $i < $max; $i++) {
+      my $s = $dev->{CHANGED}[$i];
+      next if(!defined($s));
+      if ($s !~ /^$prefix[A-Z]/) { $normalReadingFound = 1;}
+   }
+
+   if ($normalReadingFound==1) {
+      statistics_DoStatistics $hash, $dev, 0;
+      Log3 $name,5,"$name: Notification of '".$dev->{NAME}."' received. Update statistics.";
+   } else {
+      Log3 $name,5,"$name: Notification of '".$dev->{NAME}."' received but for my own readings only.";
+   }
 
    return;
 }
@@ -143,12 +181,14 @@ statistics_PeriodChange($)
   #Run period change procedure each hour.
   my $periodEndTime = 3600 * (int( gettimeofday() / 3600 ) + 1 );
   InternalTimer( $periodEndTime, "statistics_PeriodChange", $hash, 0);
+  Log3 $name,5,"$name: Next period change will be calculated at ".strftime ("%H:%M:%S", localtime($periodEndTime));
+
   return if( AttrVal($name, "disable", 0 ) == 1 );
 
  # Determine if time period switched (day, month, year)
  # Get deltaValue and Tariff of previous call
  
-   my $periodSwitch = 1;
+   my $periodSwitch = 0;
    my $yearLast;
    my $monthLast;
    my $dayLast;
@@ -167,10 +207,10 @@ statistics_PeriodChange($)
    {
       if ($r =~ /^monitoredDevices.*/) {
          Log3 $name,5,"$name: Starting period change statistics (Type: $periodSwitch) for all devices of reading $r";
-         my $devNameArray = split /,/, $hash->{READINGS}{$r}; 
-         foreach my $devName ($devNameArray) {
+         my @devNameArray = split /,/, $hash->{READINGS}{$r}; 
+         foreach my $devName (@devNameArray) {
             Log3 $name,5,"$name: Doing period change statistics for device $devName";
-            # statistics_DoStatistics($hash, $defs{$devName}, $periodSwitch);
+            statistics_DoStatistics($hash, $defs{$devName}, $periodSwitch);
          }
       }
    }
@@ -189,17 +229,15 @@ statistics_DoStatistics($$$)
   
   return "" if(AttrVal($hashName, "disable", undef));
 
- # Return if the notifying device is not monitored
-  return "" if(!defined($hash->{DEV_REGEXP}));
-  my $regexp = $hash->{DEV_REGEXP};
-  return "" if($devName !~ m/^($regexp)$/);
-  
   my $output = $devName." (".$devType.")" ;
   my $max = int(@{$dev->{CHANGED}});   
   my $readingName;
   my $value;
   my $exclReadings = AttrVal($hashName, "excludedReadings", "");
 
+   readingsBeginUpdate($hash);
+   readingsBeginUpdate($dev);
+   
   # Loop through all known device types and readings
    foreach my $f (@knownDeviceReadings) 
    {
@@ -213,6 +251,8 @@ statistics_DoStatistics($$$)
          if ($$f[2] == 2) { statistics_doStatisticDelta ($hash, $dev, $readingName, $$f[3], $periodSwitch);}
       }
    }
+   if ($periodSwitch >0) {readingsEndUpdate($dev,1);}
+   else {readingsEndUpdate($dev,0);}
    
  # Record device as monitored
    my $monReadingName = "monitoredDevices".$devType;
@@ -221,8 +261,10 @@ statistics_DoStatistics($$$)
    if ($monReadingValue !~ /$temp/) {
       if($monReadingValue eq "") { $monReadingValue = $devName;}
       else {$monReadingValue .= ",".$devName;}
-      readingsSingleUpdate($hash,$monReadingName,$monReadingValue,0);
+      readingsBulkUpdate($hash,$monReadingName,$monReadingValue);
    } 
+   readingsEndUpdate($hash,1);
+  
 
   return undef;
 }
@@ -290,17 +332,17 @@ statistics_doStatisticMinMaxSingle ($$$$$$)
 
   # Store current reading as last reading, Reset current reading
    if ($saveLast) { 
-      readingsSingleUpdate($dev, $statReadingName . "Last", $result,0); 
+      readingsBulkUpdate($dev, $statReadingName . "Last", $result); 
       $hidden[1] = 0; $hidden[3] = 0; $hidden[9] = 0; # No since value anymore
       $result = "Min: $value Avg: $value Max: $value";
    }
 
   # Store current reading
-   readingsSingleUpdate($dev, $statReadingName, $result,0);
+   readingsBulkUpdate($dev, $statReadingName, $result);
   
   # Store hidden reading
    $result = "Sum: $hidden[1] Time: $hidden[3] LastValue: ".$value." LastTime: ".int(gettimeofday())." ShowDate: $hidden[9]";
-   readingsSingleUpdate($hash, $hiddenReadingName, $result,0);
+   readingsBulkUpdate($hash, $hiddenReadingName, $result);
 
    return;
 }
@@ -396,18 +438,18 @@ statistics_doStatisticDelta ($$$$$)
  # Store visible statistic readings (delta values)
    $result = "Hour: $stat[1] Day: $stat[3] Month: $stat[5] Year: $stat[7]";
    if ( $showDate >=2 ) { $result .= " (since: $stat[9] )"; }
-   readingsSingleUpdate($dev,$statReadingName,$result,0);
+   readingsBulkUpdate($dev,$statReadingName,$result);
    
  # if changed, store previous visible statistic (delta) values
    if ($periodSwitch >= 1) {
       $result = "Hour: $last[1] Day: $last[3] Month: $last[5] Year: $last[7]";
       if ( $showDate =~ /1|3|5|7/ ) { $result .= " (since: $last[9] )";}
-      readingsSingleUpdate($dev,$statReadingName."Last",$result,0); 
+      readingsBulkUpdate($dev,$statReadingName."Last",$result); 
    }
    
   # Store hidden reading
    $result = "LastValue: $value ShowDate: $showDate ";  
-   readingsSingleUpdate($hash, $hiddenReadingName, $result,0);
+   readingsBulkUpdate($hash, $hiddenReadingName, $result);
 
    return ;
 }
@@ -519,7 +561,7 @@ statistics_doStatisticDelta ($$$$$)
     <li><code>excludedReadings &lt;Ger&auml;teName:WertRegExp&gt;</code>
       <br>
       Regul&auml;rer Ausdruck der Ger&auml;tewerte, f&uuml;r die keine Statistiken gebildet werden sollen.<br>
-      Die Ger&auml;tewerte werden in der Form <i>Ge&auml;tename:Ge&auml;tewert</i> angegeben. Z.B. "FritzDect:current|Sensor_.*:humidity"
+      Die Ger&auml;tewerte werden in der Form <i>Ger&auml;tename:Ger&auml;tewert</i> angegeben. Z.B. "FritzDect:current|Sensor_.*:humidity"
       <br>
     </li><br>
    </ul>
