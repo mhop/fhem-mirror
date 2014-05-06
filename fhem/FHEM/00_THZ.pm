@@ -1,8 +1,8 @@
 ##############################################
 # 00_THZ
 # $Id$
-# by immi 04/2014
-# v. 0.094
+# by immi 05/2014
+# v. 0.095
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -255,6 +255,8 @@ my %getsonly = (
         "sFirmware" 			=> {cmd2=>"FD"},
 	"sHeatRecoveredDay" 		=> {cmd2=>"0A03AE", cmd3=>"0A03AF", unit =>"Wh"},
 	"sHeatRecoveredTotal" 		=> {cmd2=>"0A03B0", cmd3=>"0A03B1", unit =>"kWh"},
+	"sHeatDHWDay" 			=> {cmd2=>"0A092A", cmd3=>"0A092B", unit =>"Wh"},
+	"sHeatDHWTotal" 		=> {cmd2=>"0A092C", cmd3=>"0A092D", unit =>"kWh"},
 	#"sAllE8"			=> {cmd2=>"E8"},
 	"party-time"			=> {cmd2=>"0A05D1"} # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   );
@@ -298,6 +300,8 @@ sub THZ_Initialize($)
 		    ."interval_sLast10errors:0,3600,7200,28800,43200,86400 "
 		    ."interval_sHeatRecoveredDay:0,1200,3600,7200,28800,43200,86400 "
 		    ."interval_sHeatRecoveredTotal:0,3600,7200,28800,43200,86400 "
+		    ."interval_sHeatDHWDay:0,1200,3600,7200,28800,43200,86400 "
+		    ."interval_sHeatDHWTotal:0,3600,7200,28800,43200,86400 "
 		    . $readingFnAttributes;
   $data{FWEXT}{"/THZ_PrintcurveSVG"}{FUNC} = "THZ_PrintcurveSVG";
 }
@@ -344,11 +348,12 @@ sub THZ_Define($$)
 sub THZ_Refresh_all_gets($) {
   my ($hash) = @_;
   RemoveInternalTimer($hash);
-  my $timedelay= 5;
+  my $timedelay= 5; 						#strart after 5 seconds
   foreach  my $cmdhash  (keys %gets) {
     my %par = ( command => $cmdhash, hash => $hash );
     RemoveInternalTimer(\%par);
-    InternalTimer(gettimeofday() + ($timedelay++) , "THZ_GetRefresh", \%par, 0); 
+    InternalTimer(gettimeofday() + ($timedelay++) , "THZ_GetRefresh", \%par, 0);		#increment 1.3s $timedelay++
+    $timedelay += 0.3;
   }  #refresh all registers; the register with interval_command ne 0 will keep on refreshing
 }
 
@@ -366,11 +371,11 @@ sub THZ_GetRefresh($) {
 	my $command=$par->{command};
 	my $interval = AttrVal($hash->{NAME}, ("interval_".$command), 0);
 	my $replyc = "";
-	if (!($hash->{STATE} eq "disconnected")) {
-	  if ($interval) {
+	if ($interval) {
 			  $interval = 60 if ($interval < 60); #do not allow intervall <60 sec 
 			  InternalTimer(gettimeofday()+ $interval, "THZ_GetRefresh", $par, 1) ;
-	  }		
+	}
+	if (!($hash->{STATE} eq "disconnected")) {
 	  $replyc = THZ_Get($hash, $hash->{NAME}, $command);
 	}
 	return ($replyc);
@@ -837,7 +842,7 @@ sub THZ_Parse($) {
       elsif ((substr($message,4,2) eq "1D") or (substr($message,4,2) eq "17")) 		{$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30  
       elsif (substr($message,4,4) eq "05D1") 				 		{$message = quaters2time(substr($message, 10,2)) ."--". quaters2time(substr($message, 8,2))}  #like above but before stop then start !!!!
       elsif ((substr($message,4,4) eq "05D3") or (substr($message,4,4) eq "05D4"))   	{$message = quaters2time(substr($message, 10,2)) }  #value 1Ch 28dec is 7 
-      elsif ((substr($message,4,3) eq "056")  or (substr($message,4,4) eq "0570")  or (substr($message,4,4) eq "0575") or (substr($message,4,4) eq "03AE") or (substr($message,4,4) eq "03AF") or (substr($message,4,4) eq "03B0") or (substr($message,4,4) eq "03B1") )	{$message = hex(substr($message, 8,4))}
+      elsif ((substr($message,4,3) eq "056")  or (substr($message,4,4) eq "0570")  or (substr($message,4,4) eq "0575") or (substr($message,4,4) eq "03AE") or (substr($message,4,4) eq "03AF") or (substr($message,4,4) eq "03B0") or (substr($message,4,4) eq "03B1") or (substr($message,4,3) eq "092") )	{$message = hex(substr($message, 8,4))}
       elsif ((substr($message,4,4) eq "0588") or (substr($message,4,4) eq "05A0")  or (substr($message,4,4) eq "0571") or (substr($message,4,4) eq "0572") or (substr($message,4,4) eq "0573") or (substr($message,4,4) eq "0574")) {$message = hex(substr($message, 8,4)) ." min" }
       elsif (substr($message,4,3) eq "057")						{$message = hex(substr($message, 8,4)) ." m3/h" }
       elsif (substr($message,4,4) eq "05A2")						{$message = hex(substr($message, 8,4))/10 ." K" }
@@ -1163,6 +1168,10 @@ sub THZ_Undef($$) {
   DevIo_CloseDev($hash); 
   return undef;
 }
+
+
+
+
 #####################################
 # sub THZ_PrintcurveSVG
 # plots heat curve
@@ -1215,14 +1224,14 @@ polyline { stroke:black; fill:none; }
 </defs>
 <rect x="48" y="19.2" width="704" height="121.6" rx="8" ry="8" fill="none" class="border"/>
 <text x="12" y="80" text-anchor="middle" class="ylabel" transform="rotate(270,12,80)">HC1 heat SetTemp °C</text>
-<text x="399" y="163" class="xlabel" text-anchor="middle">outside temperature filtered °C</text>
-<text x="44" y="156.8" class="ylabel" text-anchor="middle">-15</text>
-<text x="165" y="156" class="ylabel" text-anchor="middle">-9</text>  <polyline points="165,19.2 165,140.8" class="hgrid"/>
-<text x="282" y="156" class="ylabel" text-anchor="middle">-3</text>  <polyline points="282,19.2 282,140.8" class="hgrid"/>
-<text x="399" y="156" class="ylabel" text-anchor="middle">3</text>   <polyline points="399,19.2 399,140.8" class="hgrid"/>
-<text x="517" y="156" class="ylabel" text-anchor="middle">9</text>   <polyline points="517,19.2 517,140.8" class="hgrid"/>
-<text x="634" y="156" class="ylabel" text-anchor="middle">15</text>  <polyline points="634,19.2 634,140.8" class="hgrid"/>
-<text x="751" y="156" class="ylabel" text-anchor="middle">21</text>  <polyline points="751,19.2 751,140.8" class="hgrid"/>
+<text x="399" y="163.2" class="xlabel" text-anchor="middle">outside temperature filtered °C</text>
+<text x="44" y="155" class="ylabel" text-anchor="middle">-15</text>
+<text x="165" y="155" class="ylabel" text-anchor="middle">-9</text>  <polyline points="165,19.2 165,140.8" class="hgrid"/>
+<text x="282" y="155" class="ylabel" text-anchor="middle">-3</text>  <polyline points="282,19.2 282,140.8" class="hgrid"/>
+<text x="399" y="155" class="ylabel" text-anchor="middle">3</text>   <polyline points="399,19.2 399,140.8" class="hgrid"/>
+<text x="517" y="155" class="ylabel" text-anchor="middle">9</text>   <polyline points="517,19.2 517,140.8" class="hgrid"/>
+<text x="634" y="155" class="ylabel" text-anchor="middle">15</text>  <polyline points="634,19.2 634,140.8" class="hgrid"/>
+<text x="751" y="155" class="ylabel" text-anchor="middle">21</text>  <polyline points="751,19.2 751,140.8" class="hgrid"/>
 <g>
   <polyline points="44,140 49,140"/> <text x="39.2" y="144" class="ylabel" text-anchor="end">15</text>
   <polyline points="44,110 49,110"/> <text x="39.2" y="114" class="ylabel" text-anchor="end">23</text>
@@ -1237,8 +1246,6 @@ polyline { stroke:black; fill:none; }
   <polyline points="751,49 756,49"/>   <text x="760.8" y="53" class="ylabel">39</text>
   <polyline points="751,19 756,19"/>   <text x="760.8" y="23" class="ylabel">47</text>
 </g>
-<text  line_id="line_0" x="100" y="105.2"  class="l0">Actual working point</text>
-<text line_id="line_1" x="100" y="121.2" class="l1">Heat curve</text>
 END
 
 
@@ -1252,25 +1259,29 @@ my $b= -14 * $p13GradientHC1 / $roomSetTemp;
 my $c= -1 * $p13GradientHC1 /75;
 my $Simul_heatSetTemp;
 
+#labels ######################
+$ret .= '<text line_id="line_1" x="70" y="105.2" class="l1"> --- heat curve</text>' ;
+$ret .= '<text  line_id="line_0" x="70" y="121.2"  class="l0"> --- working point: outside_tempFiltered=';
+$ret .=  $outside_tempFiltered . ' heatSetTemp=' . $heatSetTemp . '</text>';
 
 
-$ret .='<polyline id="line_0"   title="Actual Working point" style="stroke-width:2" class="l0" points="';
+#title ######################
+$ret .= '<text id="svg_title" x="400" y="14.4" class="title" text-anchor="middle">';
+$ret .=  'roomSetTemp=' . $roomSetTemp . ' p13GradientHC1=' . $p13GradientHC1 . ' p14LowEnDHC1= ' . $p14LowEnDHC1  .  '</text>';
+
+
+#point ######################
+$ret .='<polyline id="line_0"   style="stroke-width:2" class="l0" points="';
 my ($px,$py) = ((($outside_tempFiltered+15)*(750-49)/(15+21)+49),(($heatSetTemp-47)*(140-19)/(15-47)+19)); 
- $ret.= ($px-3) . "," . ($py)   ." ";
- $ret.=  ($px)  . "," . ($py-3) ." ";
- $ret.= ($px+3) . "," . ($py) ." ";
- $ret.= ($px)   . "," . ($py+3)  ." ";
- $ret.= ($px-3)   . "," . ($py)  ." ";
-$ret .= '"/>';
+ $ret.= ($px-3) . "," . ($py)   ." " . ($px)  . "," . ($py-3) ." " . ($px+3) . "," . ($py) ." " . ($px)   . "," . ($py+3)  ." " . ($px-3)   . "," . ($py)  ." " . '"/>';
 
+#curve ######################
 $ret .='<polyline id="line_1"  title="Heat Curve" class="l1" points="';
-
 for(my $i = -15; $i < 22; $i++) {
  $Simul_heatSetTemp = $i * $i * $c + $i * $b + $a; 
  $ret.= (($i+15)*(750-49)/(15+21)+49) . "," . (($Simul_heatSetTemp-47)*(140-19)/(15-47)+19) ." ";
 }
 $ret .= '"/> </svg>';
-
 
 my $FW_RETTYPE = "image/svg+xml";
 return ($FW_RETTYPE, $ret);
