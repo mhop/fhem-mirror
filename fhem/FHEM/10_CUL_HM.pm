@@ -3640,10 +3640,12 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           my $ph = CUL_HM_id2Hash($pId[0]);
           return "peerID $pId[0] is not assigned to a device " if (!$ph);
           $hash->{helper}{vd}{typ} = 1; #valvePos
+          my $idDev = substr($pId[0],0,6);
+          $hash->{helper}{vd}{nDev}  =  CUL_HM_id2Name($idDev);
           $hash->{helper}{vd}{id}  = $modules{CUL_HM}{defptr}{$pId[0]}
                                                 ?$pId[0]
-                                                :substr($pId[0],0,6);
-          $hash->{helper}{vd}{cmd} = "A258$dst".substr($pId[0],0,6);
+                                                :$idDev;
+          $hash->{helper}{vd}{cmd} = "A258$dst$idDev";
           CUL_HM_UpdtReadBulk($ph,1,
                            "state:set_$valu %",
                            "ValveDesired:$valu %");
@@ -4139,7 +4141,7 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
       elsif(  ($vc ne "init" && $hashVd->{msgRed} <= $hashVd->{miss})
             || $hash->{helper}{virtTC} ne "00") {
           $hashVd->{msgSent} = 1;
-          CUL_HM_SndCmd($hashVd,sprintf("%02X%s%s%s"
+          CUL_HM_SndCmd($defs{$hashVd->{nDev}},sprintf("%02X%s%s%s"
                                              ,$msgCnt
                                              ,$hashVd->{cmd}
                                              ,$hash->{helper}{virtTC}
@@ -4148,7 +4150,7 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
       InternalTimer($tn+10,"CUL_HM_valvePosTmr","valveTmr:$vId",0);
     }
     elsif ($hashVd->{typ} == 2){
-      CUL_HM_SndCmd($hashVd,sprintf("%02X%s%s"
+      CUL_HM_SndCmd($defs{$hashVd->{nDev}},sprintf("%02X%s%s"
                                         ,$msgCnt
                                         ,$hashVd->{cmd}
                                         ,$hashVd->{val}));
