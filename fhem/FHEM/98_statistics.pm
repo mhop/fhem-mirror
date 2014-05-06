@@ -459,7 +459,13 @@ statistics_doStatisticDelta ($$$$$)
 
   <a name="JSONMETERattr"></a>
    <b>Attributes</b>
-   <ul>not implemented yet
+   <ul>
+    <li><code>excludedReadings</code>
+      <br>
+      Regular expression of the readings that shall be excluded from the statistics.<br>
+      The reading have to be entered in the form <i>deviceName:readingName</i>. E.g. "FritzDect:current|Sensor_.*:humidity"
+      <br>
+    </li><br>
    </ul>
 </ul>
 
@@ -470,7 +476,7 @@ statistics_doStatisticDelta ($$$$$)
 <a name="statistics"></a>
 <h3>statistics</h3>
 <ul>
-  Dieses Modul wertet von den angegebenen Ger&auml;ten bestimmte Werte statistisch aus und fügt sie den jeweiligen Ger&auml;ten als neue Werte hinzu.
+  Dieses Modul wertet von den angegebenen Ger&auml;ten bestimmte Werte statistisch aus und f&uuml;gt sie den jeweiligen Ger&auml;ten als neue Werte hinzu.
   &nbsp;
   <br>
   
@@ -482,16 +488,16 @@ statistics_doStatisticDelta ($$$$$)
     <br>&nbsp;
     <li><code>[Prefix]</code>
       <br>
-      Optional. Der Prefix wird vor den Namen der statistischen Gerätewerte gesetzt. Standardm&auml;ssig <i>stat</i>
+      Optional. Der Prefix wird vor den Namen der statistischen Ger&auml;tewerte gesetzt. Standardm&auml;ssig <i>stat</i>
     </li><br>
     <li><code>&lt;Ger&auml;teNameRegExp&gt;</code>
       <br>
-      Regularer Ausdruck für den Ger&auml;tenamen. !!! Nicht die Gerätewerte !!!
+      Regularer Ausdruck f&uuml;r den Ger&auml;tenamen. !!! Nicht die Ger&auml;tewerte !!!
       <br>
       Derzeit werden folgende Ger&auml;tetypen und Ger&auml;tewerte ausgewertet:
       <ul><li><b>CUL_WS:</b> humidity, temperature</li>
           <li><b>KS300:</b> humidity, temperature, wind, rain</li>
-          <li><b>FBDECT:</b> energy, power, voltage</li>
+          <li><b>FBDECT:</b> energy, power, voltage, current</li>
       </ul>
     </li>
   </ul>
@@ -509,7 +515,13 @@ statistics_doStatisticDelta ($$$$$)
 
   <a name="JSONMETERattr"></a>
    <b>Attributes</b>
-   <ul>noch nicht implementiert
+   <ul>
+    <li><code>excludedReadings</code>
+      <br>
+      Regul&auml;rer Ausdruck der Ger&auml;tewerte, f&uuml;r die keine Statistiken gebildet werden sollen.<br>
+      Die Ger&auml;tewerte werden in der Form <i>Ge&auml;tename:Ge&auml;tewert</i> angegeben. Z.B. "FritzDect:current|Sensor_.*:humidity"
+      <br>
+    </li><br>
    </ul>
 </ul>
 
