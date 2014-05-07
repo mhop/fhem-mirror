@@ -553,6 +553,8 @@ sub decodeCAPData($$){
 	$readings{a_onset}			= $alertsXml->{info}[$info]{onset};
 	$readings{a_expires}		= $alertsXml->{info}[$info]{expires};
 	$readings{a_valid}			= checkCAPValid($readings{a_expires});
+	$readings{a_onset_local}		= capTrans($readings{a_onset});
+	$readings{a_expires_local}	= capTrans($readings{a_expires});
 
 # text informations
 	$readings{a_headline}		= $alertsXml->{info}[$info]{headline};
@@ -612,6 +614,20 @@ sub checkCAPValid($){
 	$expires = time_str2num($expires);
 	$valid = 1 if($expires gt (time-$offset));
 	return $valid;
+}
+
+sub capTrans($) {
+	my ($t) = @_;
+	my $valid = 0;
+	my $offset = _calctz(time,localtime(time))*3600; # used from 99_SUNRISE_EL
+	$t =~ s/T/ /;
+	$t =~ s/\+/ \+/;
+	$t = time_str2num($t);
+	my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime($t+$offset);
+	$mon  += 1;
+	$year += 1900;
+	$t = sprintf "%02s.%02s.%02s %02s:%02s:%02s\n", $mday, $mon, $year, $hour, $min, $sec;
+	return $t;
 }
 
 sub findCAPWarnCellId($$){
@@ -1123,6 +1139,8 @@ sub initDropdownLists($){
 #				changed	FTP Timeout
 #
 #	2014-02-26	added	attribute gdsPassiveFtp
+#
+#	2014-05-07	added readings a_onset_local & a_expires_local
 #
 ####################################################################################################
 #
