@@ -230,7 +230,7 @@ FW_Undef($$)
 {
   my ($hash, $arg) = @_;
   my $ret = TcpServer_Close($hash);
-  %FW_visibleDeviceHash = FW_visibleDevices();
+  %FW_visibleDeviceHash = FW_visibleDevices() if($hash->{inform});
   return $ret;
 }
 
@@ -2479,7 +2479,7 @@ sub
 FW_visibleDevices(;$)
 {
   my($FW_wname) = @_; 
- 
+
   my %devices = (); 
   foreach my $d (sort keys %defs) {
     next if(!defined($defs{$d}));
