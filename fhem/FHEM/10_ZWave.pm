@@ -133,15 +133,15 @@ my %zwave_class = (
   THERMOSTAT_FAN_STATE     => { id => '45', },
   CLIMATE_CONTROL_SCHEDULE => { id => '46',
     get   => { ccsOverride  => "07", },
-    parse => { "0446080079" => "ccsOverride:no override mode frost protection",
-               "044608007a" => "ccsOverride:no override mode energy saving",
-               "044608007f" => "ccsOverride:no override mode unused",
-               "0446080179" => "ccsOverride:temporary override mode frost protection",
-               "044608017a" => "ccsOverride:temporary override mode energy saving",
-               "044608017f" => "ccsOverride:temporary override mode unused",
-               "0446080279" => "ccsOverride:permanent override mode frost protection",
-               "044608027a" => "ccsOverride:permanent override mode energy saving",
-               "044608027f" => "ccsOverride:permanent override mode unused", }, },
+    parse => { "0446080079" => "ccsOverride:no, frost protection",
+               "044608007a" => "ccsOverride:no, energy saving",
+               "044608007f" => "ccsOverride:no, unused",
+               "0446080179" => "ccsOverride:temporary, frost protection",
+               "044608017a" => "ccsOverride:temporary, energy saving",
+               "044608017f" => "ccsOverride:temporary, unused",
+               "0446080279" => "ccsOverride:permanent, frost protection",
+               "044608027a" => "ccsOverride:permanent, energy saving",
+               "044608027f" => "ccsOverride:permanent, unused", }, },
   THERMOSTAT_SETBACK       => { id => '47', },
   DOOR_LOCK_LOGGING        => { id => '4c', },
   SCHEDULE_ENTRY_LOCK      => { id => '4e', },
@@ -1105,7 +1105,7 @@ s2Hex($)
   <li>temperature:$temp [C|F] [heating|cooling]</li>
 
   <br><br><b>Class CLIMATE_CONTROL_SCHEDULE</b>
-  <li>ccsOverride:[no|temporary|permanent] override mode [frost protection|energy saving|unused]</li>
+  <li>ccsOverride:[no|temporary|permanent], [frost protection|energy saving|unused]</li>
 
   <br><br><b>Class VERSION</b>
   <li>version:Lib A Prot x.y App a.b</li>
