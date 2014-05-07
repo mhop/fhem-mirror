@@ -134,13 +134,18 @@ statistics_Notify($$)
      foreach my $r (keys $hash->{READINGS}) 
       {
          if ($r =~ /^monitoredDevices.*/) {
-            Log3 $name,5,"$name: Initialization - Delete old reading $r.";
+            Log3 $name,5,"$name: Initialization - Delete old reading '$r'.";
             delete($hash->{READINGS}{$r}); 
          }
       }
       return;
    }
   
+ # ignore my own notifications
+  if($devName eq $name) {
+      Log3 $name,5,"$name: Notifications of myself received.";
+      return "" ;
+  }
  # Return if the notifying device is not monitored
   return "" if(!defined($hash->{DEV_REGEXP}));
   my $regexp = $hash->{DEV_REGEXP};
@@ -161,11 +166,13 @@ statistics_Notify($$)
 
    if ($normalReadingFound==1) {
       statistics_DoStatistics $hash, $dev, 0;
-      Log3 $name,5,"$name: Notification of '".$dev->{NAME}."' received. Update statistics.";
+      Log3 $name,4,"$name: Notification of '".$dev->{NAME}."' received. Update statistics.";
    } else {
       Log3 $name,5,"$name: Notification of '".$dev->{NAME}."' received but for my own readings only.";
    }
-
+   
+   WriteStatefile();
+   
    return;
 }
 
@@ -188,7 +195,7 @@ statistics_PeriodChange($)
  # Determine if time period switched (day, month, year)
  # Get deltaValue and Tariff of previous call
  
-   my $periodSwitch = 0;
+   my $periodSwitch = 1;
    my $yearLast;
    my $monthLast;
    my $dayLast;
@@ -206,10 +213,10 @@ statistics_PeriodChange($)
    foreach my $r (keys $hash->{READINGS}) 
    {
       if ($r =~ /^monitoredDevices.*/) {
-         Log3 $name,5,"$name: Starting period change statistics (Type: $periodSwitch) for all devices of reading $r";
-         my @devNameArray = split /,/, $hash->{READINGS}{$r}; 
+         Log3 $name,4,"$name: Starting period change statistics (Type: $periodSwitch) for all devices of reading '$r'";
+         my @devNameArray = split /,/, $hash->{READINGS}{$r}{VAL}; 
          foreach my $devName (@devNameArray) {
-            Log3 $name,5,"$name: Doing period change statistics for device $devName";
+            Log3 $name,4,"$name: Doing period change statistics for device '$devName'";
             statistics_DoStatistics($hash, $defs{$devName}, $periodSwitch);
          }
       }
@@ -229,10 +236,7 @@ statistics_DoStatistics($$$)
   
   return "" if(AttrVal($hashName, "disable", undef));
 
-  my $output = $devName." (".$devType.")" ;
-  my $max = int(@{$dev->{CHANGED}});   
   my $readingName;
-  my $value;
   my $exclReadings = AttrVal($hashName, "excludedReadings", "");
 
    readingsBeginUpdate($hash);
@@ -356,7 +360,8 @@ statistics_doStatisticDelta ($$$$$)
    my $dummy;
    my $result;
    my $showDate;
-
+   my $name = $hash->{NAME};
+   
    return if not exists ($dev->{READINGS}{$readingName});
    
   # Get reading, cut out first number without units
@@ -378,6 +383,7 @@ statistics_doStatisticDelta ($$$$$)
       @stat = split / /, "Hour: 0 Day: 0 Month: 0 Year: 0";
       $stat[9] = strftime ("%Y-%m-%d_%H:%M:%S",localtime()  );
       @last = split / /,  "Hour: - Day: - Month: - Year: -";
+      Log3 $name,4,"$name: Initializing statistic of $hiddenReadingName.";
    } else {
   # Do calculations if hidden reading exists
       @stat = split / /, $dev->{READINGS}{$statReadingName}{VAL};
@@ -391,10 +397,10 @@ statistics_doStatisticDelta ($$$$$)
       my $deltaValue = $value - $hidden[1];
       
     # Do statistic
-      $stat[1] += $deltaValue;
-      $stat[3] += $deltaValue;
-      $stat[5] += $deltaValue;
-      $stat[7] += $deltaValue;
+      $stat[1] = sprintf( "%.".$decPlaces."f", $stat[1] + $deltaValue);
+      $stat[3] = sprintf( "%.".$decPlaces."f", $stat[3] + $deltaValue);
+      $stat[5] = sprintf( "%.".$decPlaces."f", $stat[5] + $deltaValue);
+      $stat[7] = sprintf( "%.".$decPlaces."f", $stat[7] + $deltaValue);
 
     # Determine if "since" value has to be shown in current and last reading
     # If change of year, change yearly statistic
@@ -403,6 +409,7 @@ statistics_doStatisticDelta ($$$$$)
          $stat[7] = 0;
          if ($showDate == 1) { $showDate = 0; } # Do not show the "since:" value for year changes anymore
          if ($showDate >= 2) { $showDate = 1; $last[9] = $stat[9]; } # Shows the "since:" value for the first year change
+         Log3 $name,4,"$name: Shifting current year in last value of $statReadingName.";
       }
     # If change of month, change monthly statistic 
       if ($periodSwitch >= 3){
@@ -410,6 +417,7 @@ statistics_doStatisticDelta ($$$$$)
          $stat[5] = 0;
          if ($showDate == 3) { $showDate = 2; } # Do not show the "since:" value for month changes anymore
          if ($showDate >= 4) { $showDate = 3; $last[9] = $stat[9]; } # Shows the "since:" value for the first month change
+         Log3 $name,4,"$name: Shifting current month in last value of $statReadingName.";
       }
     # If change of day, change daily statistic
       if ($periodSwitch >= 2){
@@ -424,6 +432,7 @@ statistics_doStatisticDelta ($$$$$)
             $stat[7] = 0;
             $stat[9] = strftime "%Y-%m-%d", localtime(); # start
          } 
+         Log3 $name,4,"$name: Shifting current day in last value of $statReadingName.";
       }
     # If change of hour, change hourly statistic 
       if ($periodSwitch >= 1){
@@ -431,6 +440,7 @@ statistics_doStatisticDelta ($$$$$)
          $stat[1] = 0;
          if ($showDate == 7) { $showDate = 6; } # Do not show the "since:" value for day changes anymore
          if ($showDate >= 8) { $showDate = 7; $last[9] = $stat[9]; } # Shows the "since:" value for the first hour change
+         Log3 $name,4,"$name: Shifting current hour in last value of $statReadingName.";
       }
    }
 
@@ -439,17 +449,20 @@ statistics_doStatisticDelta ($$$$$)
    $result = "Hour: $stat[1] Day: $stat[3] Month: $stat[5] Year: $stat[7]";
    if ( $showDate >=2 ) { $result .= " (since: $stat[9] )"; }
    readingsBulkUpdate($dev,$statReadingName,$result);
+   Log3 $name,5,"$name: Store $result in $statReadingName";
    
  # if changed, store previous visible statistic (delta) values
    if ($periodSwitch >= 1) {
       $result = "Hour: $last[1] Day: $last[3] Month: $last[5] Year: $last[7]";
       if ( $showDate =~ /1|3|5|7/ ) { $result .= " (since: $last[9] )";}
       readingsBulkUpdate($dev,$statReadingName."Last",$result); 
+      Log3 $name,4,"$name: Store $result in ".$statReadingName."Last.";
    }
    
   # Store hidden reading
    $result = "LastValue: $value ShowDate: $showDate ";  
    readingsBulkUpdate($hash, $hiddenReadingName, $result);
+   Log3 $name,5,"$name: Store $result in $hiddenReadingName";
 
    return ;
 }
