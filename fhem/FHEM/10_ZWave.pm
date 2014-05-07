@@ -131,7 +131,17 @@ my %zwave_class = (
                  'hex($2)&8 ? "F":"C", $1==1 ? "heating":"cooling")' }, },
   THERMOSTAT_FAN_MODE      => { id => '44', },
   THERMOSTAT_FAN_STATE     => { id => '45', },
-  CLIMATE_CONTROL_SCHEDULE => { id => '46', },
+  CLIMATE_CONTROL_SCHEDULE => { id => '46',
+    get   => { ccsOverride  => "07", },
+    parse => { "0446080079" => "ccsOverride:no override mode frost protection",
+               "044608007a" => "ccsOverride:no override mode energy saving",
+               "044608007f" => "ccsOverride:no override mode unused",
+               "0446080179" => "ccsOverride:temporary override mode frost protection",
+               "044608017a" => "ccsOverride:temporary override mode energy saving",
+               "044608017f" => "ccsOverride:temporary override mode unused",
+               "0446080279" => "ccsOverride:permanent override mode frost protection",
+               "044608027a" => "ccsOverride:permanent override mode energy saving",
+               "044608027f" => "ccsOverride:permanent override mode unused", }, },
   THERMOSTAT_SETBACK       => { id => '47', },
   DOOR_LOCK_LOGGING        => { id => '4c', },
   SCHEDULE_ENTRY_LOCK      => { id => '4e', },
@@ -963,6 +973,11 @@ s2Hex($)
     request the setpoint
     </li>
 
+  <br><br><b>Class CLIMATE_CONTROL_SCHEDULE</b>
+  <li>ccsOverride<br>
+    request the climate control schedule override report
+    </li>
+
   <br><br><b>Class VERSION</b>
   <li>version<br>
     return the version information of this node in the form:<br>
@@ -1088,6 +1103,9 @@ s2Hex($)
 
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
   <li>temperature:$temp [C|F] [heating|cooling]</li>
+
+  <br><br><b>Class CLIMATE_CONTROL_SCHEDULE</b>
+  <li>ccsOverride:[no|temporary|permanent] override mode [frost protection|energy saving|unused]</li>
 
   <br><br><b>Class VERSION</b>
   <li>version:Lib A Prot x.y App a.b</li>
