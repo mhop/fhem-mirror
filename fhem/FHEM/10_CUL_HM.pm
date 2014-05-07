@@ -1697,7 +1697,8 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"battery:".   (($err&0x80)?"low"  :"ok"  )];
     }
     elsif($mTp eq "41") {#01 is channel
-      my($cnt,$bright,$nextTr) = (hex($mI[1]),hex($mI[2]),hex($mI[3])>>4);
+      my($cnt,$bright,$nextTr) = (hex($mI[1]),hex($mI[2]),
+                                  ((@mI >2)?(hex($mI[3])>>4):0));
       my @nextVal = ("0x0","0x1","0x2","0x3","15" ,"30" ,"60" ,"120",
                      "240","0x9","0xa","0xb","0xc","0xd","0xe","0xf");
       push @evtEt,[$shash,1,"state:motion"];
