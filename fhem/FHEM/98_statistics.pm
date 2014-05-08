@@ -60,6 +60,8 @@ sub statistics_doStatisticDelta ($$$$$);
    ,["FBDECT", "energy", 2, 0] 
    ,["FBDECT", "power", 1, 1] 
    ,["FBDECT", "voltage", 1, 1] 
+   ,["FS20", "state", 3, 1] 
+   ,["dummy", "state", 3, 1] 
   );
 ##############################################################
 
@@ -129,16 +131,28 @@ statistics_Notify($$)
    my $name = $hash->{NAME};
    my $devName = $dev->{NAME};
 
- # Delete old Readings of monitored devices at startup
-  if ($devName eq "global" && grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}})){
-     foreach my $r (keys $hash->{READINGS}) 
-      {
+ # At startup: delete old Readings of monitored devices and rebuild from hidden readings 
+  if ($devName eq "global" && grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}})) {
+      my %unknownDevices;
+     foreach my $r (keys $hash->{READINGS}) {
+         if ($r =~ /^\.(.*):.*/) { $unknownDevices{$1}++; }
+     }
+     foreach my $r (keys $hash->{READINGS}) {
          if ($r =~ /^monitoredDevices.*/) {
             Log3 $name,5,"$name: Initialization - Delete old reading '$r'.";
             delete($hash->{READINGS}{$r}); 
          }
       }
-      return;
+     my $val="";
+     foreach my $device (sort (keys(%unknownDevices))) {
+        if ($val ne "") { $val.=","; }
+        $val .= $device;
+     }
+     if ($val ne "") {
+       Log3 $name,4,"$name: Initialization - Found hidden readings for device(s) '$val'.";
+       readingsSingleUpdate($hash,"monitoredDevicesUnknownType",$val,1);
+     }
+     return;
    }
   
  # ignore my own notifications
@@ -265,7 +279,19 @@ statistics_DoStatistics($$$)
    if ($monReadingValue !~ /$temp/) {
       if($monReadingValue eq "") { $monReadingValue = $devName;}
       else {$monReadingValue .= ",".$devName;}
-      readingsBulkUpdate($hash,$monReadingName,$monReadingValue);
+      readingsBulkUpdate($hash,$monReadingName,$monReadingValue,1);
+
+      my $monReadingValue = ReadingsVal($hashName,"monitoredDevicesUnknownType","");
+      if ($monReadingValue =~ /$temp/) {
+         $monReadingValue =~ s/$devName//;
+         $monReadingValue =~ s/,,/,/;
+         $monReadingValue =~ s/^,//;
+         if ($monReadingValue ne "") {
+            readingsBulkUpdate($hash,"monitoredDevicesUnknownType",$monReadingValue,1);
+         } else {
+            delete $hash->{READINGS}{monitoredDevicesUnknownType};
+         }
+      }
    } 
    readingsEndUpdate($hash,1);
   
@@ -329,9 +355,7 @@ statistics_doStatisticMinMaxSingle ($$$$$$)
    }
 
   # Prepare new current reading
-   $result = "Min: ". sprintf( "%.".$decPlaces."f", $stat[1]);
-   $result .= " Avg: ". sprintf( "%.".$decPlaces."f", $stat[3]);
-   $result .= " Max: ". sprintf( "%.".$decPlaces."f", $stat[5]);
+   $result = sprintf( "Min: %.".$decPlaces."f Avg: %.".$decPlaces."f Max: %.".$decPlaces."f", $stat[1], $stat[3], $stat[5]);
    if ($hidden[9] == 1) { $result .= " (since: $stat[7] )"; }
 
   # Store current reading as last reading, Reset current reading
@@ -342,11 +366,11 @@ statistics_doStatisticMinMaxSingle ($$$$$$)
    }
 
   # Store current reading
-   readingsBulkUpdate($dev, $statReadingName, $result);
+   readingsBulkUpdate($dev, $statReadingName, $result, 1);
   
   # Store hidden reading
    $result = "Sum: $hidden[1] Time: $hidden[3] LastValue: ".$value." LastTime: ".int(gettimeofday())." ShowDate: $hidden[9]";
-   readingsBulkUpdate($hash, $hiddenReadingName, $result);
+   readingsBulkUpdate($hash, $hiddenReadingName, $result, 0);
 
    return;
 }
@@ -444,25 +468,24 @@ statistics_doStatisticDelta ($$$$$)
       }
    }
 
-
  # Store visible statistic readings (delta values)
    $result = "Hour: $stat[1] Day: $stat[3] Month: $stat[5] Year: $stat[7]";
    if ( $showDate >=2 ) { $result .= " (since: $stat[9] )"; }
-   readingsBulkUpdate($dev,$statReadingName,$result);
-   Log3 $name,5,"$name: Store $result in '$statReadingName'";
+   readingsBulkUpdate($dev,$statReadingName,$result, 1);
+   Log3 $name,5,"$name: Store '$result' in '$statReadingName'";
    
  # if changed, store previous visible statistic (delta) values
    if ($periodSwitch >= 1) {
       $result = "Hour: $last[1] Day: $last[3] Month: $last[5] Year: $last[7]";
       if ( $showDate =~ /1|3|5|7/ ) { $result .= " (since: $last[9] )"; }
-      readingsBulkUpdate($dev,$statReadingName."Last",$result); 
-      Log3 $name,4,"$name: Store $result in '".$statReadingName."Last'.";
+      readingsBulkUpdate($dev,$statReadingName."Last",$result, 1); 
+      Log3 $name,4,"$name: Store '$result' in '".$statReadingName."Last'.";
    }
    
   # Store hidden reading
    $result = "LastValue: $value ShowDate: $showDate ";  
-   readingsBulkUpdate($hash, $hiddenReadingName, $result);
-   Log3 $name,5,"$name: Store $result in '$hiddenReadingName'.";
+   readingsBulkUpdate($hash, $hiddenReadingName, $result, 0);
+   Log3 $name,5,"$name: Store '$result' in '$hiddenReadingName'.";
 
    return ;
 }
