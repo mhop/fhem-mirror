@@ -1917,6 +1917,9 @@ sub CUL_HM_Parse($$) {#########################################################
         CUL_HM_respPendRm($dhash);
       }
     }
+    else{
+      $sendAck = 1;
+    }
     push @ack,$dhash,$mNo."8002".$dst.$src."00" if ($mFlgH & 0x20 && (!@ack) && $sendAck);
   }
   elsif($ioId eq $dst){# if fhem is destination check if we need to react
@@ -2209,6 +2212,7 @@ sub CUL_HM_parseCommon(@){#####################################################
     }
     elsif($subType eq "02" ||$subType eq "03"){ #ParamResp==================
       if ($pendType eq "RegisterRead"){
+        $repeat = 1;#prevent stop for messagenumber match
         my $chnSrc = $src.$shash->{helper}{prt}{rspWait}{forChn};
         my $chnHash = $modules{CUL_HM}{defptr}{$chnSrc};
         $chnHash = $shash if (!$chnHash);
@@ -4140,17 +4144,35 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
       }
       elsif(  ($vc ne "init" && $hashVd->{msgRed} <= $hashVd->{miss})
             || $hash->{helper}{virtTC} ne "00") {
-          $hashVd->{msgSent} = 1;
+         $hashVd->{msgSent} = 1;
+#        CUL_HM_SndCmd($defs{$hashVd->{nDev}},sprintf("%02X%s%s%s"
+#                                             ,$msgCnt
+#                                             ,"A112221133150B94"
+#                                             ,""
+#                                             ,""));
+#        if ($defs{$hashVd->{nDev}}->{cmdStack}){
+#          my $mcA = sprintf("%02X",$msgCnt);
+#          CUL_HM_PushCmdStack($defs{$hashVd->{nDev}},sprintf("%02X%s%s%s"
+#                                               ,$msgCnt
+#                                               ,$hashVd->{cmd}
+#                                               ,$hash->{helper}{virtTC}
+#                                               ,$hashVd->{val}));
+#
+#          CUL_HM_SndCmd($defs{$hashVd->{nDev}}, $mcA.'A1121743BF150B94');
+#          CUL_HM_ProcessCmdStack($defs{$hashVd->{nDev}});
+#        }
+#        else{
           CUL_HM_SndCmd($defs{$hashVd->{nDev}},sprintf("%02X%s%s%s"
                                              ,$msgCnt
                                              ,$hashVd->{cmd}
                                              ,$hash->{helper}{virtTC}
                                              ,$hashVd->{val}));
+#        }
       }
       InternalTimer($tn+10,"CUL_HM_valvePosTmr","valveTmr:$vId",0);
     }
-    elsif ($hashVd->{typ} == 2){
-      CUL_HM_SndCmd($defs{$hashVd->{nDev}},sprintf("%02X%s%s"
+    elsif ($hashVd->{typ} == 2){#send to broadcast
+      CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s"
                                         ,$msgCnt
                                         ,$hashVd->{cmd}
                                         ,$hashVd->{val}));
