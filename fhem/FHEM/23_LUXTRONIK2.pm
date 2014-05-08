@@ -1858,7 +1858,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$)
      Durch einen Firmware-Test wird vor jeder Set-Operation sichergestellt, dass W&auml;rmepumpen mit ungetester Firmware nicht unabsichtlich besch&auml;digt werden.
        <li><code>activeTariff &lt; 0 - 9 &gt;</code>
          <br>
-         Erlaubt die gezielte, separate Erfassung der statistischen Verbrauchswerte (doStatistics = 1) für verschiedene Tarife (Doppelstromz&auml;hler)<br>
+         Erlaubt die gezielte, separate Erfassung der statistischen Verbrauchswerte (doStatistics = 1) f&uuml;r verschiedene Tarife (Doppelstromz&auml;hler)<br>
          Dieser Wert muss entsprechend des vorhandenen oder geplanten Tarifes zum jeweiligen Zeitpunkt z.B. durch den FHEM-Befehl "at" gesetzt werden.<br>
          0 = tariflos 
       </li><br>
@@ -1872,7 +1872,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$)
          </li><br>
      <li><code>resetStatistics &lt;all|statBoilerGradientCoolDownMin|statAmbientTemp...|statElectricity...|statHours...|statHeatQ...&gt;</code>
          <br>
-         Löscht die ausgewählten statisischen Werte.
+         L&ouml;scht die ausgew&auml;hlten statisischen Werte.
          </li><br>
      <li><code>returnTemperatureSetBack &lt;Temperatur&gt;</code>
          <br>
@@ -1915,7 +1915,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$)
       W&auml;rmepumpensteuerung zur&uuml;ckzuf&uuml;hren.)</i>
       </li><br>
     <li><code>compressor2ElectricalPowerWatt</code><br>
-      Betriebsleistung des zweiten Kompressors zur Berechung der Arbeitszahl (erzeugte Wärme pro elektrische Energieeinheit)
+      Betriebsleistung des zweiten Kompressors zur Berechung der Arbeitszahl (erzeugte W&auml;rme pro elektrische Energieeinheit)
       und Absch&auml;tzung des elektrischen Verbrauches (Auswertungen noch nicht implementiert)
       </li><br>
     <li><code>doStatistics &lt; 0 | 1 &gt;</code>
@@ -1927,14 +1927,14 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$)
       F&uuml;r grafische Auswertungen k&ouml;nnen die Werte der Form 'stat<i>ReadingName</i><b>Last</b>' genutzt werden.
       </li><br>
     <li><code>heatPumpElectricalPowerWatt</code><br>
-      Betriebsleistung der W&auml;remepumpe bei einer Vorlauftemperatur von 35 &deg;C zur Berechung der Arbeitszahl (erzeugte Wärme pro elektrische Energieeinheit)
+      Betriebsleistung der W&auml;remepumpe bei einer Vorlauftemperatur von 35 &deg;C zur Berechung der Arbeitszahl (erzeugte W&auml;rme pro elektrische Energieeinheit)
       und Absch&auml;tzung des elektrischen Verbrauches
       </li><br>
     <li><code>heatPumpElectricalPowerFactor</code><br>
-         Änderung der elektrischen Leistungsaufnahme per 1 K Vorlauftemperaturdifferenz zu 35 &deg;C (z.B. 2% pro 1 K = 0,02)<br>
+         &Auml;nderung der elektrischen Leistungsaufnahme per 1 K Vorlauftemperaturdifferenz zu 35 &deg;C (z.B. 2% pro 1 K = 0,02)<br>
          </li><br>
     <li><code>heatHeatRodElectricalPowerWatt</code><br>
-      Betriebsleistung der Heizstäbe zur Absch&auml;tzung des elektrischen Verbrauches
+      Betriebsleistung der Heizst&auml;be zur Absch&auml;tzung des elektrischen Verbrauches
       </li><br>
    <li><code>ignoreFirmwareCheck &lt; 0 | 1 &gt;</code>
       <br>
