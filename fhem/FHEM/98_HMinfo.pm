@@ -343,7 +343,9 @@ sub HMinfo_regCheck(@) { ######################################################
     }
     if ($ehash->{helper}{shadowReg}){
       foreach my $rl (keys %{$ehash->{helper}{shadowReg}}){
-        delete $ehash->{helper}{shadowReg}{$rl} if ($ehash->{helper}{shadowReg}{$rl} eq $ehash->{READINGS}{$rl}{VAL});
+        delete $ehash->{helper}{shadowReg}{$rl} 
+              if ($ehash->{READINGS}{$rl} && 
+                  $ehash->{READINGS}{$rl}{VAL} eq $ehash->{helper}{shadowReg}{$rl});
       }
       if (keys %{$ehash->{helper}{shadowReg}}){
         push @regChPend,$eName;
