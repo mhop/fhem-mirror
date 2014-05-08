@@ -568,3 +568,10 @@
 - Sun Apr 24 2014 (kaihs)
   - added new module 02_FRAMEBUFFER.pm
   - added new module 51_TSL2561.pm
+
+- Thu May 08 2014 (tobiasfaust)
+  - added new global modules function $hash->{DbLog_splitFn}
+    to let split the generated events by the own module
+    into readingsname, value and unit
+  - added new module contrib/97_SprinkleControl.pm
+  - added new module contrib/98_Sprinkle.pm

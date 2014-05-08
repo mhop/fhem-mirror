@@ -674,7 +674,7 @@ sub Text2Speech_WriteStats($$$$){
       last;
     } 
   }
-  return undef if($defs{$DbLogDev}{STATE} ne "active"); # muss active sein!
+  return undef if($defs{$DbLogDev}{STATE} !~ m/(active|connected)/); # muss active sein!
 
   # den letzten Value von "Usage" ermitteln um dann die Staistik um 1 zu erhoehen.
   my @LastValue = DbLog_Get($defs{$DbLogDev}, "", "current", "array", "-", "-", $hash->{NAME} ."|". $file.":Usage");
