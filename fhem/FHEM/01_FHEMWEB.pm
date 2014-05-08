@@ -3005,7 +3005,7 @@ FW_widgetOverride($$)
         applied to all devices shown. Examples:
         <ul>
           attr FS20dev widgetOverride on-till:time<br>
-          attr WEB room:textField<br>
+          attr WEB widgetOverride room:textField<br>
         </ul>
         </li>
         <br>
@@ -3535,7 +3535,7 @@ FW_widgetOverride($$)
         Beispiele:
         <ul>
           attr FS20dev widgetOverride on-till:time<br>
-          attr WEB room:textField<br>
+          attr WEB widgetOverride room:textField<br>
         </ul>
         </li><br>
 
