@@ -851,9 +851,9 @@ LUXTRONIK2_UpdateDone($)
            && $a[11] == 1
           && $averageAmbientTemperature >= $thresholdHeatingLimit) {
           if ($ambientTemperature>=10 ) {
-            $value = "Heizungsgrenze (Soll 15&deg;C)";
+            $value = "Heizungsgrenze (Soll 1&#176;C)";
           } else {
-            $value = "Frostschutz (Soll 20&deg;C)";
+            $value = "Frostschutz (Soll 20&#176;C)";
           }
      } else {
        $value = $heatingState{$a[46]};
@@ -861,9 +861,9 @@ LUXTRONIK2_UpdateDone($)
      # Consider heating reduction limit
       if ($a[46] == 0) {
         if ($thresholdTemperatureSetBack <= $ambientTemperature) { 
-          $value .= " ".LUXTRONIK2_CalcTemp($a[47])." C"; 
+          $value .= " ".LUXTRONIK2_CalcTemp($a[47])."°C"; 
         } else {
-          $value = "Normal da < $thresholdTemperatureSetBack C"; 
+          $value = "Normal da < ".$thresholdTemperatureSetBack."°C"; 
         }
       }
      }
@@ -910,9 +910,9 @@ LUXTRONIK2_UpdateDone($)
      LUXTRONIK2_storeReadings $hash, "counterHoursHeatPump", $a[33], 3600, $doStatistic, $heatPumpPower;
      LUXTRONIK2_storeReadings $hash, "counterHoursHeating", $a[34], 3600, $doStatistic, $heatPumpPower;
      LUXTRONIK2_storeReadings $hash, "counterHoursHotWater", $a[35], 3600, $doStatistic, $heatPumpPower;
-     LUXTRONIK2_storeReadings $hash, "counterHeatQHeating", $a[36], 10, ($a[19] !~ /no/ ? $doStatistic : 0), 0;
-     LUXTRONIK2_storeReadings $hash, "counterHeatQHotWater", $a[37], 10, ($a[19] !~ /no/ ? $doStatistic : 0), 0;
-     LUXTRONIK2_storeReadings $hash, "counterHeatQTotal", $a[36] + $a[37], 10, ($a[19] !~ /no/ ? $doStatistic : 0), 0;
+     LUXTRONIK2_storeReadings $hash, "counterHeatQHeating", $a[36], 10, ($a[19] !~ /no/ ? $doStatistic : 0), -1;
+     LUXTRONIK2_storeReadings $hash, "counterHeatQHotWater", $a[37], 10, ($a[19] !~ /no/ ? $doStatistic : 0), -1;
+     LUXTRONIK2_storeReadings $hash, "counterHeatQTotal", $a[36] + $a[37], 10, ($a[19] !~ /no/ ? $doStatistic : 0), -1;
       
      
    # Input / Output status
@@ -949,7 +949,7 @@ LUXTRONIK2_UpdateDone($)
         $value .= "$opStateHeatPump1<br>\n";
         $value .= "$opStateHeatPump2<br>\n";
         $value .= "$opStateHeatPump3<br>\n";
-        $value .= "Brauchwasser: $hotWaterTemperature&deg;C";
+        $value .= "Brauchwasser: ".$hotWaterTemperature."&#176;C";
         readingsBulkUpdate($hash,"floorplanHTML",$value);
      }
     # State update
@@ -1602,7 +1602,7 @@ LUXTRONIK2_doStatisticDelta ($$$$$)
 
    my $activeTariff = ReadingsVal($name,"activeTariff",0);
 
-   if ( $electricalPower >0 || ($electricalPower == 0 && $periodSwitch > 0) ) {
+   if ( $electricalPower >=0 ) {
       my $readingNamePower = $readingName;
          $readingNamePower =~ s/Hours/Electricity/ ;
       if ($activeTariff > 0) {
