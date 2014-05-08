@@ -44,6 +44,10 @@ sub DbLog_Initialize($)
            "shutdownWait";
 
   addToAttrList("DbLogExclude");
+
+  $hash->{FW_detailFn}      = "DbLog_fhemwebFn";
+  $hash->{SVG_sampleDataFn} = "DbLog_sampleDataFn";
+
 }
 
 ###############################################################
@@ -134,6 +138,18 @@ sub DbLog_ParseEvent($$$)
   my $reading;
   my $value;
   my $unit;
+
+  my $dtype = $defs{$device}{TYPE};
+  if($modules{$dtype}{DbLog_splitFn}) {
+    # let the module do the job!
+    Log 4,"DbLog_ParseEvent calling external DbLog_splitFn for type: $dtype";
+    no strict "refs";
+    ($reading,$value,$unit) = 
+        &{$modules{$dtype}{DbLog_splitFn}}($event);
+    use strict "refs";
+    @result= ($reading,$value,$unit);
+    return @result;
+  }
 
   # split the event into reading, value and unit
   # "day-temp: 22.0 (Celsius)" -> "day-temp", "22.0 (Celsius)"
@@ -585,30 +601,14 @@ sub _DbLog_readCfg($){
   my $name = $hash->{NAME};
 
   my $configfilename= $hash->{CONFIGURATION};
-  my @config;
   my %dbconfig; 
   my $ret;
-  
-  if(configDBUsed()) {
-    # Verwendung der configDB anstatt fhem.cfg
-    my $c  = _cfgDB_Readfile($configfilename);
-    if(! $c) {
-      $ret = "Cannot read configuration file $configfilename from configDB.";
-      Log3 $hash->{NAME}, 1, $ret;
-      return $ret;
-    }
-    @config = $c;
-  } else {
-    if(!open(CONFIG, $configfilename)) {
-      $ret = "Cannot open database configuration file $configfilename.";
-      Log3 $hash->{NAME}, 1, $ret;
-      return $ret;
-    }
-    @config=<CONFIG>;
-    close(CONFIG);
-  }
 
-  eval join("", @config);
+# use generic fileRead to get configuration data
+  my ($err, @config) = FileRead($configfilename);
+  return $err if($err);
+
+  eval join("\n", @config);
 
   $hash->{dbconn}     = $dbconfig{connection};
   $hash->{dbuser}     = $dbconfig{user};
@@ -1444,8 +1444,83 @@ sub chartQuery($@) {
     return $jsonstring;
 }
 
+#########################
+sub
+DbLog_fhemwebFn($$$$)
+{
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+
+   my $ret;
+   my $newIdx=1;
+   while($defs{"SVG_${d}_$newIdx"}) {
+     $newIdx++;
+   }
+   my $name = "SVG_${d}_$newIdx";
+   $ret .= FW_pH("cmd=define $name SVG $d:templateDB:HISTORY;".
+                  "set $name copyGplotFile&detail=$name",
+                  "<div class=\"dval\">Create SVG plot from DbLog</div>", 0, "dval", 1);
+ 
+   return $ret;
+
+}
+
+sub
+DbLog_sampleDataFn($$$$$)
+{
+  my ($dlName, $dlog, $max, $conf, $wName) = @_;
+  my $desc = "Device:Reading";
+  my @htmlArr;
+  my @example;
+  my @colregs;
+  my $counter;
+
+  my $currentPresent = AttrVal($dlName,'DbLogType','Current');
+  if($currentPresent =~ m/Current/) {
+  # Table Current present, use it for sample data
+
+    my $dbhf = $defs{$dlName}{DBHF};
+    my $query = "select device,reading,value from current where device <> '' group by device,reading order by device,reading";
+    my $sth = $dbhf->prepare( $query );  
+    $sth->execute();
+    while (my @line = $sth->fetchrow_array()) {
+      $counter++;
+      push (@example, join (" ",@line)) if($counter <= 8); # show max 8 examples
+      push (@colregs, "$line[0]:$line[1]"); # push all eventTypes to selection list
+    }
+    my $cols = join(",", sort @colregs);
+
+    $max = 8 if($max > 8);
+    for(my $r=0; $r < $max; $r++) {
+      my @f = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
+      my $ret = "";
+      $ret .= SVG_sel("par_${r}_0", $cols, "$f[0]:$f[1]");
+#      $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
+#      $ret .= SVG_txt("par_${r}_3", "", $f[3], 3); # Function
+#      $ret .= SVG_txt("par_${r}_4", "", $f[4], 3); # RegExp
+      push @htmlArr, $ret;
+    }
+
+  } else {
+  # Table Current not present, so create an empty input field
+    push @example, "No sample data due to missing table 'Current'";
+
+    $max = 8 if($max > 8);
+    for(my $r=0; $r < $max; $r++) {
+      my @f = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
+      my $ret = "";
+      $ret .= SVG_txt("par_${r}_0", "", "$f[0]:$f[1]:$f[2]:$f[3]:$f[4]", 20);
+#      $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
+#      $ret .= SVG_txt("par_${r}_3", "", $f[3], 3); # Function
+#      $ret .= SVG_txt("par_${r}_4", "", $f[4], 3); # RegExp
+      push @htmlArr, $ret;
+    }
+
+  }
+
+  return ($desc, \@htmlArr, join("<br>", @example));
+}
+
 #
-# provide new functions:
 # get <dbLog> ReadingsVal       <device> <reading> <default>
 # get <dbLog> ReadingsTimestamp <device> <reading> <default>
 #

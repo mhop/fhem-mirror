@@ -1,5 +1,16 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: DbLog: (thanks to betateilchen)
+             * added new global modules function $hash->{DbLog_splitFn}
+               to let split the generated events by the own module
+               into readingsname, value and unit 
+             * added SVG_sampleDataFn
+             * added FW_detailFn
+  - added:   new module contrib/97_SprinkleControl.pm (tobiasfaust)
+  - added:   new module contrib/98_Sprinkle.pm (tobiasfaust)
+             both modules helps to control the sprinkles in your garden
+             --> take a look to the Wiki-Article 
+             http://www.fhemwiki.de/wiki/Bew%C3%A4sserungssteuerung
   - feature: FB_CALLMONITOR: new reading "missed_call_line" indicating
              the line number which received the missed call
   - feature: YAMAHA_AVR current* readings will be erased in case they
