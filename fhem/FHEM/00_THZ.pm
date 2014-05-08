@@ -68,14 +68,14 @@ my %sets = (
 	"p03RoomTempStandbyHC1"		=> {cmd2=>"0B013D", argMin => "13", argMax => "28"  },
 	"p13GradientHC1"		=> {cmd2=>"0B010E", argMin => "0",  argMax =>  "5"  }, # 0..5 rappresentato/100
 	"p14LowEndHC1"			=> {cmd2=>"0B059E", argMin => "0",  argMax => "20"  },   #in °K 0..20°K rappresentato/10
-	"p15RoomInfluenceHC1"		=> {cmd2=>"0B010F", argMin => "0",  argMax => "10"  },   # 0..10 rappresentato/10
+	"p15RoomInfluenceHC1"		=> {cmd2=>"0B010F", argMin => "0",  argMax => "100"  },  
 	"p19FlowProportionHC1"		=> {cmd2=>"0B059D", argMin => "0",  argMax => "100"  }, #in % 0..100%
 	"p01RoomTempDayHC2"		=> {cmd2=>"0C0005", argMin => "13", argMax => "28"  },
 	"p02RoomTempNightHC2"		=> {cmd2=>"0C0008", argMin => "13", argMax => "28"  },
 	"p03RoomTempStandbyHC2"		=> {cmd2=>"0C013D", argMin => "13", argMax => "28"  },
 	"p16GradientHC2"		=> {cmd2=>"0C010E", argMin => "0",  argMax =>  "5"  }, # /100
 	"p17LowEndHC2"			=> {cmd2=>"0C059E", argMin => "0",  argMax => "20"  },
-	"p18RoomInfluenceHC2"		=> {cmd2=>"0C010F", argMin => "0",  argMax => "10"  },   #in °C 0..10°C rappresentato/10
+	"p18RoomInfluenceHC2"		=> {cmd2=>"0C010F", argMin => "0",  argMax => "100"  },   
 	"p04DHWsetDay"			=> {cmd2=>"0A0013", argMin => "13", argMax => "48"  },
 	"p05DHWsetNight"		=> {cmd2=>"0A05BF", argMin => "13", argMax => "48"  },
 	"p06DHWsetStandby"		=> {cmd2=>"0A0581", argMin => "13", argMax => "48"  },
@@ -310,7 +310,7 @@ sub THZ_Initialize($)
 		    ."interval_sHeatRecoveredTotal:0,3600,7200,28800,43200,86400 "
 		    ."interval_sHeatDHWDay:0,1200,3600,7200,28800,43200,86400 "
 		    ."interval_sHeatDHWTotal:0,3600,7200,28800,43200,86400 "
-		     ."interval_sHeatHCDay:0,1200,3600,7200,28800,43200,86400 "
+		    ."interval_sHeatHCDay:0,1200,3600,7200,28800,43200,86400 "
 		    ."interval_sHeatHCTotal:0,3600,7200,28800,43200,86400 "
 		    ."interval_sElectrDHWDay:0,1200,3600,7200,28800,43200,86400 "
 		    ."interval_sElectrDHWTotal:0,3600,7200,28800,43200,86400 "
@@ -1267,13 +1267,13 @@ END
 my $roomSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",0))[21];
 my $p13GradientHC1 = ReadingsVal("Mythz","p13GradientHC1",0);
 my $heatSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",0))[11];
-my $RoomInfluenceHC1 = (split ' ',ReadingsVal("Mythz","p15RoomInfluenceHC1",0))[0];
+my $p15RoomInfluenceHC1 = (split ' ',ReadingsVal("Mythz","p15RoomInfluenceHC1",0))[0];
 my $outside_tempFiltered =(split ' ',ReadingsVal("Mythz","sGlobal",0))[65];
 my $p14LowEndHC1 =(split ' ',ReadingsVal("Mythz","p14LowEndHC1",0))[0];
 my $a= 1 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1; 
 my $b= -14 * $p13GradientHC1 / $roomSetTemp; 
 my $c= -1 * $p13GradientHC1 /75;
-my $Simul_heatSetTemp;
+my $Simul_heatSetTemp; 
 
 #labels ######################
 $ret .= '<text line_id="line_1" x="70" y="105.2" class="l1"> --- heat curve</text>' ;
@@ -1283,7 +1283,7 @@ $ret .=  $outside_tempFiltered . ' heatSetTemp=' . $heatSetTemp . '</text>';
 
 #title ######################
 $ret .= '<text id="svg_title" x="400" y="14.4" class="title" text-anchor="middle">';
-$ret .=  'roomSetTemp=' . $roomSetTemp . ' p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  'RoomInfluenceHC1=' . $RoomInfluenceHC1 . '</text>';
+$ret .=  'roomSetTemp=' . $roomSetTemp . ' p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  ' p15RoomInfluenceHC1=' . $p15RoomInfluenceHC1 . '</text>';
 
 
 #point ######################
