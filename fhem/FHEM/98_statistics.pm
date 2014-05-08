@@ -283,9 +283,8 @@ statistics_DoStatistics($$$)
 
       my $monReadingValue = ReadingsVal($hashName,"monitoredDevicesUnknownType","");
       if ($monReadingValue =~ /$temp/) {
-         $monReadingValue =~ s/$devName//;
-         $monReadingValue =~ s/,,/,/;
-         $monReadingValue =~ s/^,//;
+         $monReadingValue =~ s/$devName,?//;
+         $monReadingValue =~ s/,$//;
          if ($monReadingValue ne "") {
             readingsBulkUpdate($hash,"monitoredDevicesUnknownType",$monReadingValue,1);
          } else {
