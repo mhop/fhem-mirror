@@ -74,9 +74,22 @@ package main;
 use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
+
+#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
+BEGIN {
+	if (!grep(/FHEM\/lib$/,@INC)) {
+		foreach my $inc (grep(/FHEM$/,@INC)) {
+			push @INC,$inc."/lib";
+		};
+	};
+};
+
+use ProtoThreads;
+no warnings 'deprecated';
+
 sub Log($$);
 
-my $owx_version="5.12";
+my $owx_version="5.14";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -149,8 +162,6 @@ sub OWSWITCH_Initialize ($) {
   $hash->{owg_val} = [];
   $hash->{owg_vax} = [];
   
-  #-- ASYNC this function is needed for asynchronous execution of the device reads 
-  $hash->{AfterExecuteFn} = "OWXSWITCH_BinValues";
   #-- make sure OWX is loaded so OWX_CRC is available if running with OWServer
   main::LoadModule("OWX");	
 }
@@ -288,7 +299,7 @@ sub OWSWITCH_Attr(@) {
         $hash->{INTERVAL} = $value;
         if ($init_done) {
           RemoveInternalTimer($hash);
-          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 1);
+          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 0);
         }
         last;
       };
@@ -492,8 +503,13 @@ sub OWSWITCH_Get($@) {
       if( !defined($fnd) );
 
     #-- OWX interface
-    if( $interface =~ /^OWX/ ){
-      $ret = OWXSWITCH_GetState($hash,1);
+    if( $interface eq "OWX" ){
+      $ret = OWXSWITCH_GetState($hash);
+    }elsif( $interface eq "OWX_ASYNC") {
+      #TODO use OWX_ASYNC_Schedule instead
+      my $task = PT_THREAD(\&OWXSWITCH_PT_GetState);
+      while ($task->PT_SCHEDULE($hash)) { OWX_ASYNC_Poll($hash->{IODev}); };
+      $ret = $task->PT_RETVAL();
     #-- OWFS interface
     }elsif( $interface eq "OWFS" ){
       $ret = OWFSSWITCH_GetState($hash);
@@ -509,8 +525,13 @@ sub OWSWITCH_Get($@) {
     return "OWSWITCH: Get needs no parameter when reading gpio"
       if( int(@a)==1 );
 
-    if( $interface =~ /^OWX/ ){
-      $ret = OWXSWITCH_GetState($hash,1);
+    if( $interface eq "OWX" ){
+      $ret = OWXSWITCH_GetState($hash);
+    }elsif( $interface eq "OWX_ASYNC" ){
+      #TODO use OWX_ASYNC_Schedule instead
+      my $task = PT_THREAD(\&OWXSWITCH_PT_GetState);
+      while ($task->PT_SCHEDULE($hash)) { OWX_ASYNC_Poll($hash->{IODev}); };
+      $ret = $task->PT_RETVAL();
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSSWITCH_GetState($hash);
     }else{
@@ -546,16 +567,22 @@ sub OWSWITCH_GetValues($) {
 
   #-- restart timer for updates
   RemoveInternalTimer($hash);
-  InternalTimer(time()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 1);
+  InternalTimer(time()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 0);
   
   #-- Get readings according to interface type
   my $interface= $hash->{IODev}->{TYPE};
-  if( $interface =~ /^OWX/ ){
+  if( $interface eq "OWX" ){
     #-- max 3 tries
     for(my $try=0; $try<3; $try++){
       $ret = OWXSWITCH_GetState($hash);
       return if( !defined($ret) );
-    } 
+    }
+  }elsif( $interface eq "OWX_ASYNC" ){
+    eval {
+      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXSWITCH_PT_GetState),$hash );
+    };
+    return unless $@;
+    $ret = GP_Catch($@);
   }elsif( $interface eq "OWServer" ){
      $ret = OWFSSWITCH_GetState($hash);
   }else{
@@ -650,7 +677,7 @@ sub OWSWITCH_Set($@) {
     # update timer
     $hash->{INTERVAL} = $value;
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 1);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 0);
     return undef;
   }
     
@@ -709,8 +736,8 @@ sub OWSWITCH_Set($@) {
     }
     
     #-- OWX interface
-    if( $interface =~ /^OWX/ ){
-      $ret1  = OWXSWITCH_GetState($hash,1);
+    if( $interface eq "OWX" ){
+      $ret1  = OWXSWITCH_GetState($hash);
       $value = 0;
       #-- vax or val ?
       for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
@@ -719,7 +746,12 @@ sub OWSWITCH_Set($@) {
         $value += ($nval<<$i) 
           if( $i == $fnd );  
       }
-      $ret2 = OWXSWITCH_SetState($hash,$value); 
+      $ret2 = OWXSWITCH_SetState($hash,$value);
+    }elsif( $interface eq "OWX_ASYNC"){
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXSWITCH_PT_SetOutput),$hash,$fnd,$nval );
+      };
+      $ret2 = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret1  = OWFSSWITCH_GetState($hash);
@@ -751,8 +783,13 @@ sub OWSWITCH_Set($@) {
     return "OWSWITCH: Set with wrong value for gpio port, must be 0 <= gpio <= ".((1 << $cnumber{$attr{$name}{"model"}})-1)
       if( ! ((int($value) >= 0) && (int($value) <= ((1 << $cnumber{$attr{$name}{"model"}})-1 ))) );
      
-    if( $interface =~ /^OWX/ ){
+    if( $interface eq "OWX" ){
       $ret = OWXSWITCH_SetState($hash,int($value));
+    }elsif( $interface eq "OWX_ASYNC" ){
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXSWITCH_PT_SetState),$hash,int($value) );
+      };
+      $ret = GP_Catch($@) if $@;
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSSWITCH_SetState($hash,int($value));
     }else{
@@ -932,8 +969,6 @@ sub OWFSSWITCH_SetState($$) {
 #
 ########################################################################################
 
-sub OWXSWITCH_BinValues($$$$$$$$); #define prototype for recursive call;
-
 sub OWXSWITCH_BinValues($$$$$$$$) {
   my ($hash, $context, $success, $reset, $owx_dev, $command, $numread, $res) = @_;
   
@@ -994,36 +1029,7 @@ sub OWXSWITCH_BinValues($$$$$$$$) {
   #-- Now for context setstate
   }elsif ( $context =~ /.*setstate.*/){
     #-- family = 12 => DS2406 -------------------------------------------------------
-    #-- first step
-    if( ($context =~ /setstate\.ds2406\.1\..*/) or ($context =~ /ds2406\.setstate\.1\..*/) ) {
-      $value = substr($context,-1);
-      my $stat    = ord(substr($res,0,1));
-      my $statneu = ( $stat & 159 ) | (($value<<5) & 96) ; 
-      #-- call the second step
-      #-- issue the match ROM command \x55 and the write status command
-      #   \x55 at address TA1 = \x07 TA2 = \x00
-      #-- reading 9 + 4 + 2 data bytes = 15 bytes
-      my $select=sprintf("\x55\x07\x00%c",$statneu);   
-      #-- asynchronous mode
-      if( $hash->{ASYNC} ){  
-        if (OWX_Execute( $master, "setstate.ds2406.2.".$value, 1, $owx_dev, $select, 2, undef )) {
-          return undef;
-    	} else {
-          return "device $owx_dev not accessible in writing"; 
-        }
-      #-- synchronous mode
-      }else{  
-        OWX_Reset($master);
-        $res=OWX_Complex($master,$owx_dev,$select,2);
-        if( $res eq 0 ){
-          return "device $owx_dev not accessible in writing"; 
-        }
-        OWX_Reset($master);
-        return OWXSWITCH_BinValues($hash,"ds2406.setstate.2.".$value,1,undef,$owx_dev,$select,undef,substr($res,13));
-      }
-    #-- family = 12 => DS2406 -------------------------------------------------------
-    #-- second step from above
-    }elsif( ($context =~ /setstate\.ds2406\.2\..*/) or ($context =~ /ds2406\.setstate\.2\..*/) ) {
+    if( ($context =~ /setstate\.ds2406\..*/) or ($context =~ /ds2406\.setstate\..*/) ) {
       $value = substr($context,-1);
       @data=split(//,$res);
       if( int(@data) != 2){
@@ -1031,13 +1037,11 @@ sub OWXSWITCH_BinValues($$$$$$$$) {
       }
       Log 1,"invalid CRC"
         if (OWX_CRC16($command,$data[0],$data[1]) == 0);
-      
       #-- put into local buffer
       $hash->{owg_val}->[0] = $value % 2;
       $hash->{owg_vax}->[0] = $value % 2;
       $hash->{owg_val}->[1] = int($value / 2);
       $hash->{owg_vax}->[1] = int($value / 2);
-
     #-- family = 29 => DS2408 -------------------------------------------------------
     }elsif( ($context eq "setstate.ds2408") or ($context eq "ds2408.setstate") ) {
       @data=split(//,$res);
@@ -1100,23 +1104,14 @@ sub OWXSWITCH_GetState($@) {
     #   \xF5 plus the two byte channel control and the value
     #-- reading 9 + 3 + 2 data bytes + 2 CRC bytes = 16 bytes
     $select=sprintf("\xF5\xDD\xFF"); 
-    #-- asynchronous mode
-    if( $hash->{ASYNC} ){
-      if (!OWX_Execute( $master, "getstate.ds2406", 1, $owx_dev, $select, 4, undef ) or ($sync and !OWX_AwaitExecuteResponse($master,"getstate.ds2406",$owx_dev))) {
-        return "not accessible for reading";
-      }
-      return undef;
-     #-- synchronous mode
-    }else{
-      OWX_Reset($master);
-      $res=OWX_Complex($master,$owx_dev,$select,4);
+    OWX_Reset($master);
+    $res=OWX_Complex($master,$owx_dev,$select,4);
     return "$owx_dev not accessible in reading"
       if( $res eq 0 );
     return "$owx_dev has returned invalid data"
       if( length($res)!=16);
-      OWX_Reset($master);
-      OWXSWITCH_BinValues($hash,"ds2406.getstate",1,undef,$owx_dev,substr($res,9,3),undef,substr($res,12));
-    }  
+    OWX_Reset($master);
+    OWXSWITCH_BinValues($hash,"ds2406.getstate",1,undef,$owx_dev,substr($res,9,3),undef,substr($res,12));
   #-- family = 29 => DS2408
   }elsif( $hash->{OW_FAMILY} eq "29" ) {
     #=============== get gpio values ===============================
@@ -1124,46 +1119,28 @@ sub OWXSWITCH_GetState($@) {
     #   \xF5 plus the two byte channel target address
     #-- reading 9 + 3 + 8 data bytes + 2 CRC bytes = 22 bytes
     $select=sprintf("\xF0\x88\x00");   
-    #-- asynchronous mode
-    if( $hash->{ASYNC} ){
-      if (!OWX_Execute( $master, "getstate.ds2408", 1, $owx_dev, $select, 10, undef ) or ($sync and !OWX_AwaitExecuteResponse($master,"getstate.ds2408",$owx_dev))) {
-        return "not accessible for reading";
-      }
-      return undef;
-    #-- synchronous mode
-    }else{
-      OWX_Reset($master);
-      $res=OWX_Complex($master,$owx_dev,$select,10);
+    OWX_Reset($master);
+    $res=OWX_Complex($master,$owx_dev,$select,10);
     return "$owx_dev not accessible in reading"
       if( $res eq 0 );
     return "$owx_dev has returned invalid data"
       if( length($res)!=22);
-      OWX_Reset($master);
-      return OWXSWITCH_BinValues($hash,"ds2408.getstate",1,undef,$owx_dev,substr($res,9,3),undef,substr($res,12));
-    }  
+    OWX_Reset($master);
+    return OWXSWITCH_BinValues($hash,"ds2408.getstate",1,undef,$owx_dev,substr($res,9,3),undef,substr($res,12));
   #-- family = 3A => DS2413
   }elsif( $hash->{OW_FAMILY} eq "3A" ) {
     #=============== get gpio values ===============================
     #-- issue the match ROM command \x55 and the read gpio command
     #   \xF5 plus 2 empty bytes
     #-- reading 9 + 1 + 2 data bytes = 12 bytes
-    #-- asynchronous mode
-    if( $hash->{ASYNC} ){
-      if (!OWX_Execute( $master, "getstate.ds2413", 1, $owx_dev, "\xF5", 2, undef ) or ($sync and !OWX_AwaitExecuteResponse($master,"getstate.ds2413",$owx_dev))) {
-        return "not accessible for reading";
-      }
-      return undef;
-    #-- synchronous mode
-    }else{
-      OWX_Reset($master);
-      $res=OWX_Complex($master,$owx_dev,"\xF5",2);
+    OWX_Reset($master);
+    $res=OWX_Complex($master,$owx_dev,"\xF5",2);
     return "$owx_dev not accessible in reading"
       if( $res eq 0 );
     return "$owx_dev has returned invalid data"
       if( length($res)!=12);
-      #OWX_Reset($master);
-      return OWXSWITCH_BinValues($hash,"ds2413.getstate",1,undef,$owx_dev,substr($res,9,1),undef,substr($res,10));
-    }
+    #OWX_Reset($master);
+    return OWXSWITCH_BinValues($hash,"ds2413.getstate",1,undef,$owx_dev,substr($res,9,1),undef,substr($res,10));
   } else {
     return "unknown device family $hash->{OW_FAMILY}\n";
   }
@@ -1203,23 +1180,220 @@ sub OWXSWITCH_SetState($$) {
     #-- issue the match ROM command \x55 and the read status command
     #   \xAA at address TA1 = \x07 TA2 = \x00   
     #-- reading 9 + 3 + 1 data bytes + 2 CRC bytes = 15 bytes
-    #-- asynchronous mode
-    if( $hash->{ASYNC} ){  
-      if (OWX_Execute( $master, "setstate.ds2406.1.".$value, 1, $owx_dev, "\xAA\x07\x00", 3, undef )) {
-  		return undef;
-  	  } else {
-        return "not accessible in writing"; 
-      }
-    #-- synchronous mode
-    }else{  
-      OWX_Reset($master);
-      $res  = OWX_Complex($master,$owx_dev,"\xAA\x07\x00",3);
-      if( $res eq 0 ){
-        return "device $owx_dev not accessible in writing"; 
-      }
-      OWX_Reset($master);
-      return OWXSWITCH_BinValues($hash,"ds2406.setstate.1.".$value,1,undef,$owx_dev,undef,undef,substr($res,12));
+    OWX_Reset($master);
+    $res  = OWX_Complex($master,$owx_dev,"\xAA\x07\x00",3);
+    if( $res eq 0 ){
+      return "device $owx_dev not accessible in writing"; 
     }
+    OWX_Reset($master);
+    
+    my $stat    = ord(substr($res,12,1));
+    my $statneu = ( $stat & 159 ) | (($value<<5) & 96) ; 
+    #-- call the second step
+    #-- issue the match ROM command \x55 and the write status command
+    #   \x55 at address TA1 = \x07 TA2 = \x00
+    #-- reading 9 + 4 + 2 data bytes = 15 bytes
+    my $select=sprintf("\x55\x07\x00%c",$statneu);   
+    OWX_Reset($master);
+    $res=OWX_Complex($master,$owx_dev,$select,2);
+    if( $res eq 0 ){
+      return "device $owx_dev not accessible in writing"; 
+    }
+    OWX_Reset($master);
+    return OWXSWITCH_BinValues($hash,"ds2406.setstate.$value",1,undef,$owx_dev,undef,undef,substr($res,13));
+  #--  family = 29 => DS2408
+  } elsif( $hash->{OW_FAMILY} eq "29" ) {
+    #=============== set gpio values ===============================
+    #-- issue the match ROM command \x55 and  the write gpio command
+    #   \x5A plus the value byte and its complement
+    $select=sprintf("\x5A%c%c",$value,255-$value);  
+    OWX_Reset($master);
+    $res=OWX_Complex($master,$owx_dev,$select,1);
+    if( $res eq 0 ){
+      return "device $owx_dev not accessible in writing"; 
+    }
+    OWX_Reset($master);
+    return OWXSWITCH_BinValues($hash,"ds2408.setstate",1,undef,$owx_dev,undef,undef,substr($res,12));
+  #-- family = 3A => DS2413      
+  } elsif( $hash->{OW_FAMILY} eq "3A" ) {
+    #=============== set gpio values ===============================
+    #-- issue the match ROM command \x55 and the write gpio command
+    #   \x5A plus the value byte and its complement
+    $select=sprintf("\x5A%c%c",252+$value,3-$value);   
+    OWX_Reset($master);
+    $res=OWX_Complex($master,$owx_dev,$select,1);
+    if( $res eq 0 ){
+      return "device $owx_dev not accessible in writing"; 
+    }
+    OWX_Reset($master);
+    return OWXSWITCH_BinValues($hash,"ds2413.setstate",1,undef,$owx_dev,undef,undef,substr($res,12));
+  }else {
+    return "unknown device family $hash->{OW_FAMILY}\n";
+  }
+}
+
+########################################################################################
+#
+# OWXSWITCH_PT_GetState - Get gpio ports from device asynchronous
+#
+# Parameter hash = hash of device addressed
+#
+########################################################################################
+
+sub OWXSWITCH_PT_GetState($) {
+  my ($thread,$hash) = @_;
+  
+  my ($select, $res, $res2, $res3, @data, $response);
+  
+  #-- ID of the device
+  my $owx_dev = $hash->{ROM_ID};
+  
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+  
+  PT_BEGIN($thread);
+  
+  #-- reset presence
+  $hash->{PRESENT}  = 0;
+  
+  my ($i,$j,$k);
+  
+  #-- family = 12 => DS2406
+  if( $hash->{OW_FAMILY} eq "12" ) {
+    #=============== get gpio values ===============================
+    #-- issue the match ROM command \x55 and the access channel command
+    #   \xF5 plus the two byte channel control and the value
+    #-- reading 9 + 3 + 2 data bytes + 2 CRC bytes = 16 bytes
+    $select=sprintf("\xF5\xDD\xFF");
+    unless(OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 4)) {
+      PT_EXIT("device $owx_dev not accessible in reading");
+    }
+    PT_WAIT_UNTIL(defined $thread->{ExecuteResponse});
+    $response = $thread->{ExecuteResponse};
+    unless ($response->{success}) {
+      PT_EXIT("$owx_dev has returned invalid data");
+    }
+    unless (length($response->{readdata}) == 4) { 
+      PT_EXIT("$owx_dev has returned invalid data");
+    }
+    OWXSWITCH_BinValues($hash,"ds2406.getstate",1,1,$owx_dev,$response->{writedata},4,$response->{readdata});
+  #-- family = 29 => DS2408
+  }elsif( $hash->{OW_FAMILY} eq "29" ) {
+    #=============== get gpio values ===============================
+    #-- issue the match ROM command \x55 and the read PIO rtegisters command
+    #   \xF5 plus the two byte channel target address
+    #-- reading 9 + 3 + 8 data bytes + 2 CRC bytes = 22 bytes
+    $select=sprintf("\xF0\x88\x00");   
+    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 10)) {
+      PT_EXIT("device $owx_dev not accessible in reading");
+    }
+    PT_WAIT_UNTIL($thread->{ExecuteResponse});
+    $response = $thread->{ExecuteResponse};
+    unless ($response->{success}) {
+      PT_EXIT("$owx_dev has returned invalid data");
+    }
+    unless (length($response->{readdata}) == 10) {
+      PT_EXIT("$owx_dev has returned invalid data")
+    };
+    OWXSWITCH_BinValues($hash,"ds2408.getstate",1,1,$owx_dev,$response->{writedata},10,$response->{readdata});
+  #-- family = 3A => DS2413
+  }elsif( $hash->{OW_FAMILY} eq "3A" ) {
+    #=============== get gpio values ===============================
+    #-- issue the match ROM command \x55 and the read gpio command
+    #   \xF5 plus 2 empty bytes
+    #-- reading 9 + 1 + 2 data bytes = 12 bytes
+    $select = "\xF5";
+    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 2)) {
+      PT_EXIT("device $owx_dev not accessible in reading");
+    }
+    PT_WAIT_UNTIL($thread->{ExecuteResponse});
+    $response = $thread->{ExecuteResponse};
+    unless ($response->{success}) {
+      PT_EXIT("$owx_dev has returned invalid data");
+    }
+    unless (length($response->{readdata}) == 2) {
+      PT_EXIT("$owx_dev has returned invalid data");
+    }
+    OWXSWITCH_BinValues($hash,"ds2413.getstate",1,1,$owx_dev,$response->{writedata},2,$response->{readdata});
+  } else {
+    PT_EXIT("unknown device family $hash->{OW_FAMILY}\n");
+  }
+  PT_END;
+}
+
+########################################################################################
+#
+# OWXSWITCH_PT_SetState - Set gpio ports of device asynchronous
+#
+# Parameter hash = hash of device addressed
+#           value = integer value for device outputs
+#
+########################################################################################
+
+sub OWXSWITCH_PT_SetState($$) {
+
+  my ($thread,$hash,$value) = @_;
+  
+  my ($select,$res,@data);
+  
+  #-- ID of the device
+  my $owx_dev = $hash->{ROM_ID};
+  
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+
+  PT_BEGIN($thread);
+
+  #--  family = 12 => DS2406
+  if( $hash->{OW_FAMILY} eq "12" ) {
+    #=============== set gpio values ===============================
+    # Writing the output state via the access channel command does
+    # not work contrary to documentation. Using the write status command 
+    #-- issue the match ROM command \x55 and the read status command
+    #   \xAA at address TA1 = \x07 TA2 = \x00   
+    #-- reading 9 + 3 + 1 data bytes + 2 CRC bytes = 15 bytes
+
+    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, "\xAA\x07\x00", 3)) {
+      PT_EXIT("device $owx_dev not accessible in writing");
+    }
+    PT_WAIT_UNTIL($thread->{ExecuteResponse});
+    unless ($thread->{ExecuteResponse}->{success}) {
+      PT_EXIT("state could not be set for device $owx_dev");
+    }
+    $res = $thread->{ExecuteResponse}->{readdata};
+
+    #-- first step
+    my $stat    = ord(substr($res,0,1));
+    my $statneu = ( $stat & 159 ) | (($value<<5) & 96) ; 
+    #-- call the second step
+    #-- issue the match ROM command \x55 and the write status command
+    #   \x55 at address TA1 = \x07 TA2 = \x00
+    #-- reading 9 + 4 + 2 data bytes = 15 bytes
+    $select=sprintf("\x55\x07\x00%c",$statneu);   
+
+    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 2)) {
+      PT_EXIT("device $owx_dev not accessible in writing");
+    }
+    PT_WAIT_UNTIL($thread->{ExecuteResponse});
+    unless ($thread->{ExecuteResponse}->{success}) {
+      PT_EXIT("state could not be set for device $owx_dev");
+    }
+    $res = $thread->{ExecuteResponse}->{readdata};
+    my $command = $thread->{ExecuteResponse}->{writedata};
+    
+    #-- second step from above
+    @data=split(//,$res);
+    if( int(@data) != 2){
+      PT_EXIT("state could not be set for device $owx_dev");
+    }
+    Log 1,"invalid CRC"
+      if (OWX_CRC16($command,$data[0],$data[1]) == 0);
+      
+    #-- put into local buffer
+    $hash->{owg_val}->[0] = $value % 2;
+    $hash->{owg_vax}->[0] = $value % 2;
+    $hash->{owg_val}->[1] = int($value / 2);
+    $hash->{owg_vax}->[1] = int($value / 2);
    
   #--  family = 29 => DS2408
   } elsif( $hash->{OW_FAMILY} eq "29" ) {
@@ -1227,49 +1401,82 @@ sub OWXSWITCH_SetState($$) {
     #-- issue the match ROM command \x55 and  the write gpio command
     #   \x5A plus the value byte and its complement
     $select=sprintf("\x5A%c%c",$value,255-$value);  
-     #-- asynchronous mode
-    if( $hash->{ASYNC} ){  
-      if (OWX_Execute( $master, "setstate.ds2408", 1, $owx_dev, $select, 1, undef )) {
-        return undef;
-      } else {
-        return "device $owx_dev not accessible in writing"; 
-      }
-    #-- synchronous mode
-    }else{  
-      OWX_Reset($master);
-      $res=OWX_Complex($master,$owx_dev,$select,1);
-      if( $res eq 0 ){
-        return "device $owx_dev not accessible in writing"; 
-      }
-      OWX_Reset($master);
-      return OWXSWITCH_BinValues($hash,"ds2408.setstate",1,undef,$owx_dev,undef,undef,substr($res,12));
+
+    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 1)) {
+      PT_EXIT("device $owx_dev not accessible in writing");
     }
+    PT_WAIT_UNTIL($thread->{ExecuteResponse});
+    unless ($thread->{ExecuteResponse}->{success}) {
+      PT_EXIT("state could not be set for device $owx_dev");
+    }
+    $res = $thread->{ExecuteResponse}->{readdata};
+
+    @data=split(//,$res);
+    if (@data != 1) {
+      PT_EXIT("invalid data length, ".int(@data)." instead of 1 bytes");
+    }
+    if( $data[0] ne "\xAA") {
+      PT_EXIT("state could not be set for device $owx_dev");
+    }
+
   #-- family = 3A => DS2413      
   } elsif( $hash->{OW_FAMILY} eq "3A" ) {
     #=============== set gpio values ===============================
     #-- issue the match ROM command \x55 and the write gpio command
     #   \x5A plus the value byte and its complement
     $select=sprintf("\x5A%c%c",252+$value,3-$value);   
-     #-- asynchronous mode
-    if( $hash->{ASYNC} ){  
-      if (OWX_Execute( $master, "setstate.ds2413", 1, $owx_dev, $select, 1, undef )) {
-        return undef;
-      } else {
-        return "device $owx_dev not accessible in writing"; 
-      }
-    #-- synchronous mode
-    }else{  
-      OWX_Reset($master);
-      $res=OWX_Complex($master,$owx_dev,$select,1);
-      if( $res eq 0 ){
-        return "device $owx_dev not accessible in writing"; 
-      }
-      OWX_Reset($master);
-      return OWXSWITCH_BinValues($hash,"ds2413.setstate",1,undef,$owx_dev,undef,undef,substr($res,12));
+    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 1)) {
+      PT_EXIT("device $owx_dev not accessible in writing");
     }
-  }else {
-    return "unknown device family $hash->{OW_FAMILY}\n";
+    PT_WAIT_UNTIL($thread->{ExecuteResponse});
+    unless ($thread->{ExecuteResponse}->{success}) {
+      PT_EXIT("state could not be set for device $owx_dev");
+    }
+    $res = $thread->{ExecuteResponse}->{readdata};
+
+    @data=split(//,$res);
+    if (@data != 1) {
+      PT_EXIT("invalid data length, ".int(@data)." instead of 1 bytes");
+    } 
+    if( $data[0] ne "\xAA") {
+      PT_EXIT("state could not be set for device $owx_dev");
+    }
+  } else {
+    PT_EXIT("unknown device family $hash->{OW_FAMILY}\n");
   }
+  PT_END;
+}
+
+sub OWXSWITCH_PT_SetOutput($$$) {
+
+  my ($thread,$hash,$fnd,$nval) = @_;
+  
+  my ($ret,$value);
+  
+  PT_BEGIN($thread);
+
+  $thread->{task} = PT_THREAD(\&OWXSWITCH_PT_GetState);
+  PT_WAIT_THREAD($thread->{task},$hash);
+  $ret = $thread->{task}->PT_RETVAL();
+  if ($ret) {
+    PT_EXIT($ret);
+  }
+  $value = 0;
+  #-- vax or val ?
+  for (my $i=0;$i<$cnumber{$attr{$hash->{NAME}}{"model"}};$i++){
+    $value += ($hash->{owg_vax}->[$i]<<$i) 
+      if( $i != $fnd );
+    $value += ($nval<<$i) 
+      if( $i == $fnd );  
+  }
+  $thread->{value} = $value;
+  $thread->{task} = PT_THREAD(\&OWXSWITCH_PT_SetState);
+  PT_WAIT_THREAD($thread->{task},$hash,$thread->{value});
+  $ret = $thread->{task}->PT_RETVAL();
+  if ($ret) {
+    PT_EXIT($ret);
+  }
+  PT_END;
 }
 
 1;

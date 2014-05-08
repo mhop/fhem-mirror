@@ -213,7 +213,7 @@ sub nextItem($) {
 	};
 	if ($item) {
 	  if($item->{context}) {
-	    main::Log3 $hash->{NAME},5,"OWX_Executor: item $item->{context} for $item->{address} eligible to run";
+	    main::Log3 $hash->{NAME},5,"OWX_Executor: item $item->{context} for ".(defined $item->{address} ? $item->{address} : "---")." eligible to run";
 	  } else {
 	    main::Log3 $hash->{NAME},5,"OWX_Executor: command $item->{command} eligible to run";
 	  }
