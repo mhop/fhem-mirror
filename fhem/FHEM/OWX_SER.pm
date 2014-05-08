@@ -189,9 +189,9 @@ sub pt_execute($$$$$$$) {
        $rom_id[$i]=hex(substr($dev,2*$i,2));
     }
     $select=sprintf("\x55%c%c%c%c%c%c%c%c",@rom_id).$data; 
-  #-- has no match ROM part
+  #-- has no match ROM part, issue skip ROM command (0xCC:)
   } else {
-    $select=$data;
+    $select="\xCC".$data;
   }
   #-- has receive data part
   if( $numread >0 ){

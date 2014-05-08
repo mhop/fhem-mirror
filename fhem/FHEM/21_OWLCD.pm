@@ -60,9 +60,23 @@ package main;
 use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
+
+#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
+BEGIN {
+	if (!grep(/FHEM\/lib$/,@INC)) {
+		foreach my $inc (grep(/FHEM$/,@INC)) {
+			push @INC,$inc."/lib";
+		};
+	};
+};
+
+use GPUtils qw(:all);
+use ProtoThreads;
+no warnings 'deprecated';
+
 sub Log3($$$);
 
-my $owx_version="3.35";
+my $owx_version="3.36";
 #-- controller may be HD44780 or KS0073 
 #   these values have to be changed for different display 
 #   geometries or memory maps
@@ -118,13 +132,12 @@ sub OWLCD_Initialize ($) {
   $hash->{UndefFn}  = "OWLCD_Undef";
   $hash->{GetFn}    = "OWLCD_Get";
   $hash->{SetFn}    = "OWLCD_Set";
+  $hash->{InitFn}   = "OWLCD_Init";
   $hash->{AttrFn}   = "OWLCD_Attr";
   my $attlist       = "IODev do_not_notify:0,1 showtime:0,1 ".
                       "";
   $hash->{AttrList} = $attlist; 
 
-  #-- this function is needed for asynchronous execution of the device reads 
-  $hash->{AfterExecuteFn} = "OWXLCD_BinValues";
   #-- make sure OWX is loaded so OWX_CRC is available if running with OWServer
   main::LoadModule("OWX");	
 }
@@ -183,12 +196,20 @@ sub OWLCD_Define ($$) {
   $modules{OWLCD}{defptr}{$id} = $hash;
   
   $hash->{STATE} = "Defined";
-  Log3 $name,3, "OWLCD:   Device $name defined."; 
+  Log3 $name,3, "OWLCD:   Device $name defined.";
+  
+  if (($hash->{IODev}->{TYPE} eq "OWX") or $main::init_done) {
+    return OWLCD_Init($hash);
+  }
+  return undef;
+}
 
+sub OWLCD_Init($) {
+  my ($hash) = @_;
   #-- Initialization reading according to interface type
   my $interface= $hash->{IODev}->{TYPE};
   #-- OWX interface
-  if( $interface =~ /^OWX/ ){
+  if( $interface eq "OWX" ){
     OWXLCD_InitializeDevice($hash);
     #-- set backlight on
     OWXLCD_SetFunction($hash,"bklon",0); 
@@ -196,6 +217,17 @@ sub OWLCD_Define ($$) {
     OWXLCD_SetIcon($hash,0,0);
     #-- erase alarm state
     OWXLCD_SetFunction($hash,"gpio",15);
+  } elsif ( $interface eq "OWX_ASYNC" ) {
+    eval {
+      OWXLCD_InitializeDevice($hash);
+      #-- set backlight on
+      OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_SetFunction),$hash,"bklon",0);
+      #-- erase all icons
+      OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_SetIcon),$hash,0,0);
+      #-- erase alarm state
+      OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_SetFunction),$hash,"gpio",15);
+    };
+    return GP_Catch($@) if $@;
   #-- Unknown interface
   }else{
     return "OWLCD: Wrong IODev type $interface";
@@ -286,29 +318,61 @@ sub OWLCD_Get($@) {
   
   #-- get gpio states
   if($a[1] eq "gpio") {
-    $value = OWXLCD_Get($hash,"gpio");
-    return "$name.gpio => $value";
+    if ($hash->{ASYNC}) {
+      my $task = PT_THREAD(\&OWXLCD_PT_Get);
+      while ($task->PT_SCHEDULE($hash,"gpio")) { OWX_ASYNC_Poll($hash->{IODev}); };
+      $ret = $task->PT_RETVAL();
+      return $ret if $ret;
+      return "$name.gpio => ".main::ReadingsVal($hash->{NAME},"gpio","");
+    } else {
+      $value = OWXLCD_Get($hash,"gpio");
+      return "$name.gpio => $value";
+    }
   } 
   
   #-- get gpio counters
   if($a[1] eq "counter") {
-    $value = OWXLCD_Get($hash,"counter");
-    return "$name.counter => $value";
+    if ($hash->{ASYNC}) {
+      my $task = PT_THREAD(\&OWXLCD_PT_Get);
+      while ($task->PT_SCHEDULE($hash,"counter")) { OWX_ASYNC_Poll($hash->{IODev}); };
+      $ret = $task->PT_RETVAL();
+      return $ret if $ret;
+      return "$name.counter => ".main::ReadingsVal($hash->{NAME},"counter","");
+    } else {
+      $value = OWXLCD_Get($hash,"counter");
+      return "$name.counter => $value";
+    }
   } 
   
   #-- get version
   if($a[1] eq "version") {
-    $value = OWXLCD_Get($hash,"version");
-    return "$name.version => $owx_version (LCD firmware $value)";
+    if ($hash->{ASYNC}) {
+      my $task = PT_THREAD(\&OWXLCD_PT_Get);
+      while ($task->PT_SCHEDULE($hash,"version")) { OWX_ASYNC_Poll($hash->{IODev}); };
+      $ret = $task->PT_RETVAL();
+      return $ret if $ret;
+      return "$name.gpio => ".main::ReadingsVal($hash->{NAME},"version","");
+    } else {
+      $value = OWXLCD_Get($hash,"version");
+      return "$name.version => $owx_version (LCD firmware $value)";
+    }
   }
   
   #-- get EEPROM content
   if($a[1] eq "memory") {
-   my $page  = (defined $a[2] and $a[2] =~ m/\d/) ? int($a[2]) : 0;
-   Log3 $name,1,"Calling GetMemory with page $page";
-    $value = OWXLCD_GetMemory($hash,$page);
-    return "$name $reading $page => $value";
-  }  
+    my $page  = (defined $a[2] and $a[2] =~ m/\d/) ? int($a[2]) : 0;
+    Log3 $name,1,"Calling GetMemory with page $page";
+    if ($hash->{ASYNC}) {
+      my $task = PT_THREAD(\&OWXLCD_PT_GetMemory);
+      while ($task->PT_SCHEDULE($hash,$page)) { OWX_ASYNC_Poll($hash->{IODev}); };
+      $ret = $task->PT_RETVAL();
+      return $ret if $ret;
+      return "$name $reading $page => ".main::ReadingsVal($hash->{NAME},"memory$page","");
+    } else {
+      $value = OWXLCD_GetMemory($hash,$page);
+      return "$name $reading $page => $value";
+    }
+  }
 }
 
 #######################################################################################
@@ -394,7 +458,14 @@ sub OWLCD_Set($@) {
     #-- check value and write to device
     return "OWLCD: Set with wrong value for gpio port, must be 0 <= gpio <= 7"
       if( ! ((int($value) >= 0) && (int($value) <= 7)) );
-    OWXLCD_SetFunction($hash, "gpio", int($value));
+    if ($hash->{ASYNC}) {
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", int($value) );
+      };
+      return GP_Catch($@) if $@;
+    } else {
+      OWXLCD_SetFunction($hash, "gpio", int($value));
+    }
     return undef;
   }
   
@@ -402,9 +473,23 @@ sub OWLCD_Set($@) {
   if($key eq "lcd") {
     #-- check value and write to device   
     if( uc($value) eq "ON"){
-      OWXLCD_SetFunction($hash, "lcdon", 0);
+      if ($hash->{ASYNC}) {
+        eval {
+          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "lcdon", 0 );
+        };
+        return GP_Catch($@) if $@;
+      } else {
+        OWXLCD_SetFunction($hash, "lcdon", 0);
+      }
     }elsif( uc($value) eq "OFF" ){
-      OWXLCD_SetFunction($hash, "lcdoff", 0);
+      if ($hash->{ASYNC}) {
+        eval {
+          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "lcdoff", 0 );
+        };
+        return GP_Catch($@) if $@;
+      } else {
+        OWXLCD_SetFunction($hash, "lcdoff", 0);
+      }
     } else {
       return "OWLCD: Set with wrong value for lcd, must be on/off"
     }
@@ -415,9 +500,23 @@ sub OWLCD_Set($@) {
   if($key eq "backlight") {
     #-- check value and write to device   
     if( uc($value) eq "ON"){
-      OWXLCD_SetFunction($hash, "bklon", 0);
+      if ($hash->{ASYNC}) {
+        eval {
+          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "blkon", 0 );
+        };
+        return GP_Catch($@) if $@;
+      } else {
+        OWXLCD_SetFunction($hash, "bklon", 0);
+      }
     }elsif( uc($value) eq "OFF" ){
-      OWXLCD_SetFunction($hash, "bkloff", 0);
+      if ($hash->{ASYNC}) {
+        eval {
+          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "blkoff", 0 );
+        };
+        return GP_Catch($@) if $@;
+      } else {
+        OWXLCD_SetFunction($hash, "bkloff", 0);
+      }
     } else {
       return "OWLCD: Set with wrong value for backlight, must be on/off"
     }
@@ -426,9 +525,18 @@ sub OWLCD_Set($@) {
   
   #-- reset
   if($key eq "reset") {
-    OWXLCD_SetFunction($hash,"reset",0);
-    OWXLCD_SetIcon($hash,0,0);
-    OWXLCD_SetFunction($hash,"gpio",15);
+    if ($hash->{ASYNC}) {
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "reset", 0 );
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, 0, 0 );
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 15 );
+      };
+      return GP_Catch($@) if $@;
+    } else {
+      OWXLCD_SetFunction($hash,"reset",0);
+      OWXLCD_SetIcon($hash,0,0);
+      OWXLCD_SetFunction($hash,"gpio",15);
+    }
     return undef;
   }
   
@@ -439,21 +547,63 @@ sub OWLCD_Set($@) {
     #-- check value and write to device  
     if( $icon == 16 ){
       if( uc($value) eq "OFF" ){
-        OWXLCD_SetIcon($hash, 16, 0);
+        if ($hash->{ASYNC}) {
+          eval {
+            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, 16, 0 );
+          };
+          return GP_Catch($@) if $@;
+        } else {
+          OWXLCD_SetIcon($hash, 16, 0);
+        }
       }elsif( uc($value) eq "BLINK" ){
-        OWXLCD_SetIcon($hash, 16, 6);
+        if ($hash->{ASYNC}) {
+          eval {
+            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, 16, 6 );
+          };
+          return GP_Catch($@) if $@;
+        } else {
+          OWXLCD_SetIcon($hash, 16, 6);
+        }
       }elsif(  ((int($value) > 0) && (int($value) < 6)) ){
-        OWXLCD_SetIcon($hash, 16, int($value));
+        if ($hash->{ASYNC}) {
+          eval {
+            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, 16, int($value) );
+          };
+          return GP_Catch($@) if $@;
+        } else {
+          OWXLCD_SetIcon($hash, 16, int($value));
+        }
       } else {
         return "OWLCD: Set with wrong value for icon #16, must be 0..5/off/blink"
       }  
     }else{
       if( uc($value) eq "OFF"){
-        OWXLCD_SetIcon($hash, $icon, 0);
+        if ($hash->{ASYNC}) {
+          eval {
+            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, $icon, 0 );
+          };
+          return GP_Catch($@) if $@;
+        } else {
+          OWXLCD_SetIcon($hash, $icon, 0);
+        }
       }elsif( uc($value) eq "ON" ){
-        OWXLCD_SetIcon($hash, $icon, 1);
+        if ($hash->{ASYNC}) {
+          eval {
+            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, $icon, 1 );
+          };
+          return GP_Catch($@) if $@;
+        } else {
+          OWXLCD_SetIcon($hash, $icon, 1);
+        }
       }elsif( uc($value) eq "BLINK" ){
-        OWXLCD_SetIcon($hash, $icon, 2);
+        if ($hash->{ASYNC}) {
+          eval {
+            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, $icon, 2 );
+          };
+          return GP_Catch($@) if $@;
+        } else {
+          OWXLCD_SetIcon($hash, $icon, 2);
+        }
       } else {
         return "OWLCD: Set with wrong value for icon $icon, must be on/off/blink"
       }
@@ -469,7 +619,14 @@ sub OWLCD_Set($@) {
     return "OWLCD: Wrong line length, must be <= ".$lcdchars 
       if( length($value) > $lcdchars );
     #-- check value and write to device   
-     OWXLCD_SetLine($hash,$line,$value);
+    if ($hash->{ASYNC}) {
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash, $line, $value );
+      };
+      return GP_Catch($@) if $@;
+    } else {
+      OWXLCD_SetLine($hash,$line,$value);
+    }
     return undef;
   }
   
@@ -480,24 +637,59 @@ sub OWLCD_Set($@) {
     return "OWLCD: Wrong line length, must be <=16 " 
       if( length($value) > 16 );
     #-- check value and write to device   
-     Log3 $name,1,"Calling SetMemory with page $line";
-     OWXLCD_SetMemory($hash,$line,$value);
-     return undef;
+    Log3 $name,1,"Calling SetMemory with page $line";
+    if ($hash->{ASYNC}) {
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetMemory), $hash, $line, $value );
+      };
+      return GP_Catch($@) if $@;
+    } else {
+      OWXLCD_SetMemory($hash,$line,$value);
+    }
+    return undef;
   }
   
   #-- set alert
   if($key eq "alert") {
     if(lc($value) eq "beep") {
-      OWXLCD_SetFunction($hash,"gpio",14);
+      if ($hash->{ASYNC}) {
+        eval {
+          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 14 );
+        };
+        return GP_Catch($@) if $@;
+      } else {
+        OWXLCD_SetFunction($hash,"gpio",14);
+      }
       return undef;
     }elsif(lc($value) eq "red") {
-      OWXLCD_SetFunction($hash,"gpio",13);
+      if ($hash->{ASYNC}) {
+        eval {
+          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 13 );
+        };
+        return GP_Catch($@) if $@;
+      } else {
+        OWXLCD_SetFunction($hash,"gpio",13);
+      }
       return undef;
     }elsif(lc($value) eq "yellow") {
-      OWXLCD_SetFunction($hash,"gpio",11);
+      if ($hash->{ASYNC}) {
+        eval {
+          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 11 );
+        };
+        return GP_Catch($@) if $@;
+      } else {
+        OWXLCD_SetFunction($hash,"gpio",11);
+      }
       return undef;
     }elsif( (lc($value) eq "off") || (lc($value) eq "none") ) {
-      OWXLCD_SetFunction($hash,"gpio",15);
+      if ($hash->{ASYNC}) {
+        eval {
+          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 15 );
+        };
+        return GP_Catch($@) if $@;
+      } else {
+        OWXLCD_SetFunction($hash,"gpio",15);
+      }
       return undef;
     }else{
       return "OWLCD: Set with wrong value for alert type, must be beep/red/yellow/off";
@@ -506,10 +698,20 @@ sub OWLCD_Set($@) {
   
   #-- start test
   if($key eq "test") {
-    OWXLCD_SetLine($hash,0,"Hallo Welt");
-    OWXLCD_SetLine($hash,1,"Mary had a big lamb");
-    OWXLCD_SetLine($hash,2,"Solar 4.322 kW ");
-    OWXLCD_SetLine($hash,3,"\x5B\x5C\x5E\x7B\x7C\x7E\xBE");
+    if ($hash->{ASYNC}) {
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash,0,"Hallo Welt"); 
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash,1,"Mary had a big lamb"); 
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash,2,"Solar 4.322 kW "); 
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash,3,"\x5B\x5C\x5E\x7B\x7C\x7E\xBE");
+      };
+      return GP_Catch($@) if $@; 
+    } else {
+      OWXLCD_SetLine($hash,0,"Hallo Welt");
+      OWXLCD_SetLine($hash,1,"Mary had a big lamb");
+      OWXLCD_SetLine($hash,2,"Solar 4.322 kW ");
+      OWXLCD_SetLine($hash,3,"\x5B\x5C\x5E\x7B\x7C\x7E\xBE");
+    }
     return undef;
   }
 }
@@ -568,23 +770,65 @@ sub OWXLCD_Byte($$$) {
     return "OWXLCD: Wrong byte write attempt";
   } 
 
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "byte", 1, $owx_dev, $select, 0, 0 )) {
-      return "OWLCD: Device $owx_dev not accessible for writing a byte";
-    }
-  #-- synchronous mode
-  } else {
-    #-- write to device
-    OWX_Reset($master);
-    $res=OWX_Complex($master,$owx_dev,$select,0);
-    #-- process results
-    if( $res eq 0 ){
-      return "OWLCD: Device $owx_dev not accessible for writing a byte"; 
-    }
-  } 
-  
+  #-- write to device
+  OWX_Reset($master);
+  $res=OWX_Complex($master,$owx_dev,$select,0);
+  #-- process results
+  if( $res eq 0 ){
+    return "OWLCD: Device $owx_dev not accessible for writing a byte"; 
+  }
+
   return undef;
+}
+
+########################################################################################
+#
+# OWXLCD_PT_Byte - write a single byte to the LCD device async
+#
+# Parameter hash = hash of device addressed
+#           cmd = register or data
+#           byte = byte
+#
+########################################################################################
+
+sub OWXLCD_PT_Byte($$$) {
+
+  my ($thread,$hash,$cmd,$byte) = @_;
+
+  my ($select);
+  
+  #-- ID of the device
+  my $owx_dev = $hash->{ROM_ID};
+  
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+  
+  my ($i,$j,$k);
+  
+  PT_BEGIN($thread);
+  
+  #=============== write to LCD register ===============================
+  if ( $cmd eq "register" ) {
+    #-- issue the read LCD register command \x10
+    $select = sprintf("\x10%c",$byte);
+  #=============== write to LCD data ===============================
+  }elsif ( $cmd eq "data" ) {
+    #-- issue the read LCD data command \x12
+    $select = sprintf("\x12%c",$byte);
+  #=============== wrong value requested ===============================
+  } else {
+    return "OWXLCD: Wrong byte write attempt";
+  } 
+
+  #"byte"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
+    PT_EXIT("OWLCD: Device $owx_dev not accessible for writing a byte");
+  }
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("OWLCD: Device $owx_dev error writing a byte");
+  }
+  PT_END;
 }
 
 ########################################################################################
@@ -598,14 +842,12 @@ sub OWXLCD_Byte($$$) {
 
 sub OWXLCD_Get($$) {
 
-  my ($hash,$cmd,$value) = @_;
+  my ($hash,$cmd) = @_;
 
   my ($select, $select2, $len, $addr, $res, $res2);
   
   #-- ID of the device
   my $owx_dev = $hash->{ROM_ID};
-  my $owx_rnf = substr($owx_dev,3,12);
-  my $owx_f   = substr($owx_dev,0,2);
   
   #-- hash of the busmaster
   my $master = $hash->{IODev};
@@ -630,41 +872,91 @@ sub OWXLCD_Get($$) {
   } else {
     return "OWXLCD: Wrong get attempt";
   } 
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "get.prepare", 1, $owx_dev, $select, 0, 0 )) {
-      return "OWLCD: Device $owx_dev not accessible for reading";
-    }
-  #-- synchronous mode
-  } else {
-    #-- write to device
-    OWX_Reset($master);
-    $res=OWX_Complex($master,$owx_dev,$select,0);
-    #-- process results
-    if( $res eq 0 ){
-      return "OWLCD: Device $owx_dev not accessible for reading";
-    } 
-  }
+  #-- write to device
+  OWX_Reset($master);
+  $res=OWX_Complex($master,$owx_dev,$select,0);
+  #-- process results
+  if( $res eq 0 ){
+    return "OWLCD: Device $owx_dev not accessible for reading";
+  } 
   
   #-- issue the read scratchpad command \xBE
   $select2 = "\xBE";
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "get.".$cmd, 1, $owx_dev, $select2, $len, 0 ) or !OWX_AwaitExecuteResponse($master,"get.".$cmd,$owx_dev)) {
-      return "OWLCD: Device $owx_dev not accessible for reading in 2nd step";
-    }
-  #-- synchronous mode
-  } else {
-    #-- write to device
-    OWX_Reset($master);
-    $res=OWX_Complex($master,$owx_dev,$select2,$len); 
-    #-- process results
-    if( $res eq 0 ){
-      return "OWLCD: Device $owx_dev not accessible for reading in 2nd step"; 
-    }
-    OWXLCD_BinValues($hash, "get.".$cmd, 1, 1, $owx_dev, $select2, $len, substr($res,10));
+  #-- write to device
+  OWX_Reset($master);
+  $res=OWX_Complex($master,$owx_dev,$select2,$len); 
+  #-- process results
+  if( $res eq 0 ){
+    return "OWLCD: Device $owx_dev not accessible for reading in 2nd step"; 
   }
+  OWXLCD_BinValues($hash, "get.".$cmd, 1, 1, $owx_dev, $select2, $len, substr($res,10));
+
   return main::ReadingsVal($hash->{NAME},$cmd,"");
+}
+
+########################################################################################
+#
+# OWXLCD_PT_Get - get values from the LCD device async
+#
+# Parameter hash = hash of device addressed
+#           cmd  = command string
+#
+########################################################################################
+
+sub OWXLCD_PT_Get($$) {
+
+  my ($thread,$hash,$cmd) = @_;
+
+  my ($select);
+  
+  #-- ID of the device
+  my $owx_dev = $hash->{ROM_ID};
+  
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+  
+  my ($i,$j,$k);
+
+  PT_BEGIN($thread);
+  #=============== fill scratch with gpio ports ===============================
+  if ( $cmd eq "gpio" ) {
+    #-- issue the read GPIO command \x22 (1 byte)
+    $select = "\x22";
+    $thread->{len}     = 1;
+  #=============== fill scratch with gpio counters ===============================
+  }elsif ( $cmd eq "counter" ) {
+    #-- issue the read counter command \x23 (8 bytes)
+    $select = "\x23";
+    $thread->{len}     = 8;
+  #=============== fill scratch with version ===============================
+  }elsif ( $cmd eq "version" ) {
+    #-- issue the read version command \x41
+    $select = "\x41";
+    $thread->{len}     = 16;
+  } else {
+    PT_EXIT("OWXLCD: Wrong get attempt");
+  } 
+  #"get.prepare"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
+    PT_EXIT("OWLCD: Device $owx_dev not accessible for reading");
+  }
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("OWLCD: Device $owx_dev error writing a byte");
+  }
+  
+  #-- issue the read scratchpad command \xBE
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, "\xBE", $thread->{len} )) {
+    PT_EXIT("OWLCD: Device $owx_dev not accessible for reading in 2nd step");
+  }
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  my $response = $thread->{ExecuteResponse};
+  unless ($response->{success}) {
+    PT_EXIT("OWLCD: Device $owx_dev error writing a byte");
+  }
+  OWXLCD_BinValues($hash, "get.".$cmd, 1, 1, $owx_dev, $response->{writedata}, $response->{numread}, $response->{readdata});
+
+  PT_END;
 }
 
 ########################################################################################
@@ -695,21 +987,65 @@ sub OWXLCD_GetMemory($$) {
   #-- issue the match ROM command \x55 and the copy eeprom to scratchpad command \x4E
   #Log 1," page read is ".$page;
   $select = sprintf("\4E%c\x10\x37",$page);  
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "prepare", 1, $owx_dev, $select, 0, 0 )) {
-      return "OWLCD: Device $owx_dev not accessible for reading";
-    }
-  #-- synchronous mode
-  } else {
-    #-- write to device
-    OWX_Reset($master);
-    $res=OWX_Complex($master,$owx_dev,$select,0);
-   
-    #-- process results
-    if( $res eq 0 ){
-      return "OWLCD: Device $owx_dev not accessible for reading";
-    } 
+  #-- write to device
+  OWX_Reset($master);
+  $res=OWX_Complex($master,$owx_dev,$select,0);
+  #-- process results
+  if( $res eq 0 ){
+    return "OWLCD: Device $owx_dev not accessible for reading";
+  } 
+  
+  #-- sleeping for some time
+  #select(undef,undef,undef,0.5);
+  
+  #-- issue the match ROM command \x55 and the read scratchpad command \xBE
+  $select = "\xBE";
+  #-- write to device
+  OWX_Reset($master);
+  $res=OWX_Complex($master,$owx_dev,$select,16); 
+  #-- process results
+  if( $res eq 0 ){
+    return "OWLCD: Device $owx_dev not accessible for reading in 2nd step"; 
+  }
+  OWXLCD_BinValues($hash, "get.memory.$page", 1, 1, $owx_dev, $select, 16, substr($res,11,16));
+  #-- process results (10 bytes or more have been sent)
+  #$res2 = substr($res,11,16);
+  #return $res2;
+  return main::ReadingsVal($hash->{NAME},"memory$page","");
+}
+
+########################################################################################
+#
+# OWXLCD_PT_GetMemory - get memory page from LCD device async (EXPERIMENTAL)
+#
+# Parameter hash = hash of device addressed
+#           page = memory page address
+#
+########################################################################################
+
+sub OWXLCD_PT_GetMemory($$) {
+
+  my ($thread,$hash,$page) = @_;
+
+  my ($select);
+  
+  #-- ID of the device
+  my $owx_dev = $hash->{ROM_ID};
+  
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+  
+  PT_BEGIN($thread);
+  #-- issue the match ROM command \x55 and the copy eeprom to scratchpad command \x4E
+  #Log 1," page read is ".$page;
+  $select = sprintf("\4E%c\x10\x37",$page);
+  #"prepare"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
+    PT_EXIT("OWLCD: Device $owx_dev not accessible for reading memory");
+  }
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("OWLCD: Device $owx_dev error reading memory");
   }
   
   #-- sleeping for some time
@@ -717,26 +1053,21 @@ sub OWXLCD_GetMemory($$) {
   
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE
   $select = "\xBE";
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "get.memory.$page", 1, $owx_dev, $select,16, 0 ) or !OWX_AwaitExecuteResponse($master,"get.memory.$page",$owx_dev)) {
-      return "OWLCD: Device $owx_dev not accessible for reading in 2nd step";
-    }
-  #-- synchronous mode
-  } else {
-    #-- write to device
-    OWX_Reset($master);
-    $res=OWX_Complex($master,$owx_dev,$select,16); 
-    #-- process results
-    if( $res eq 0 ){
-      return "OWLCD: Device $owx_dev not accessible for reading in 2nd step"; 
-    }
-    OWXLCD_BinValues($hash, "get.memory.$page", 1, 1, $owx_dev, $select, 16, substr($res,11,16));
-    #-- process results (10 bytes or more have been sent)
-    #$res2 = substr($res,11,16);
-    #return $res2;
+  #"get.memory.$page"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select,16 )) {
+    PT_EXIT("OWLCD: Device $owx_dev not accessible for reading in 2nd step");
   }
-  return main::ReadingsVal($hash->{NAME},"memory$page","");
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  my $response = $thread->{ExecuteResponse};
+  unless ($response->{success}) {
+    PT_EXIT("OWLCD: Device $owx_dev error reading memory in 2nd step");
+  }
+  
+  OWXLCD_BinValues($hash, "get.memory.$page", 1, 1, $owx_dev, $response->{writedata}, $response->{numread}, $response->{readdata});
+  #-- process results (10 bytes or more have been sent)
+  #$res2 = substr($res,11,16);
+  #return $res2;
+  PT_END;
 }
 
 ########################################################################################
@@ -754,8 +1085,6 @@ sub OWXLCD_InitializeDevice($) {
     
   #-- ID of the device
   my $owx_dev = $hash->{ROM_ID};
-  my $owx_rnf = substr($owx_dev,3,12);
-  my $owx_f   = substr($owx_dev,0,2);
   
   #-- hash of the busmaster
   my $master = $hash->{IODev};
@@ -772,21 +1101,31 @@ sub OWXLCD_InitializeDevice($) {
     #-- Entry Mode Set: cursor auto increment = \x06
     #OWXLCD_Byte($hash,"register",6);
 
-    #-- Function Set: 4 bit data size, RE => 1, blink Enable = \x26
-    OWXLCD_Byte($hash,"register",38);
-    
-    #-- Ext. Function Set: 4 line mode = \x09
-    OWXLCD_Byte($hash,"register",9);
-
-    #-- Function Set: 4 bit data size, RE => 0 = \x20
-    OWXLCD_Byte($hash,"register",32);
-
-    #-- Display ON/OFF: display on, cursor off, blink off = \x0C
-    OWXLCD_Byte($hash,"register",12);
-
-    #-- Clear Display 
-    OWXLCD_Byte($hash,"register",1);
-    
+    if ($hash->{ASYNC}) {
+      eval {
+        OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register",38);
+        OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register", 9);
+        OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register",32);
+        OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register",12);
+        OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register", 1);
+      };
+      return GP_Catch($@) if $@;
+    } else {
+      #-- Function Set: 4 bit data size, RE => 1, blink Enable = \x26
+      OWXLCD_Byte($hash,"register",38);
+      
+      #-- Ext. Function Set: 4 line mode = \x09
+      OWXLCD_Byte($hash,"register",9);
+  
+      #-- Function Set: 4 bit data size, RE => 0 = \x20
+      OWXLCD_Byte($hash,"register",32);
+  
+      #-- Display ON/OFF: display on, cursor off, blink off = \x0C
+      OWXLCD_Byte($hash,"register",12);
+  
+      #-- Clear Display 
+      OWXLCD_Byte($hash,"register",1);
+    }
     return undef;
   #-- or else
   } else {
@@ -847,23 +1186,80 @@ sub OWXLCD_SetFunction($$$) {
     return "OWXLCD: Wrong function selected";
   } 
   
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "set.function", 1, $owx_dev, $select, 0, 0 )) {
-      return "OWLCD: Device $owx_dev not accessible for writing";
-    }
-  #-- synchronous mode
-  } else {
-    #-- write to device
-    OWX_Reset($master);
-    $res=OWX_Complex($master,$owx_dev,$select,0);
-    #-- process results
-    if( $res eq 0 ){
-      return "OWLCD: Device $owx_dev not accessible for writing"; 
-    }
+  #-- write to device
+  OWX_Reset($master);
+  $res=OWX_Complex($master,$owx_dev,$select,0);
+  #-- process results
+  if( $res eq 0 ){
+    return "OWLCD: Device $owx_dev not accessible for writing"; 
   }
   
   return undef;
+}
+
+########################################################################################
+#
+# OWXLCD_PT_SetFunction - write state and values of the LCD device async
+#
+# Parameter hash  = hash of device addressed
+#           cmd   = command string
+#           value = data value
+#
+########################################################################################
+
+sub OWXLCD_PT_SetFunction($$$) {
+
+  my ($thread,$hash,$cmd,$value) = @_;
+
+  my ($select);
+  
+  #-- ID of the device, hash of the busmaster
+  my $owx_dev = $hash->{ROM_ID};
+  my $master  = $hash->{IODev};
+  
+  my ($i,$j,$k);
+  
+  PT_BEGIN($thread);
+  
+  #=============== set gpio ports ===============================
+  if ( $cmd eq "gpio" ) {
+    #-- issue the write GPIO command 
+    #   \x21 followed by the data value (= integer 0 - 7)
+    $select = sprintf("\x21%c",$value); 
+  #=============== switch LCD on ===============================
+  }elsif ( $cmd eq "lcdon" ) {
+    #-- issue the lcd on cmd
+    $select = "\x03";
+  #=============== switch LCD off ===============================
+  }elsif ( $cmd eq "lcdoff" ) {
+    #-- issue the lcd off cmd
+    $select = "\x05";
+  #=============== switch LCD backlight on ===============================
+  }elsif ( $cmd eq "bklon" ) {
+    #-- issue the backlight on cmd
+    $select = "\x08";
+  #=============== switch LCD backlight off ===============================
+  }elsif ( $cmd eq "bkloff" ) {
+    #-- issue the backlight off cmd
+    $select = "\x07";
+  #=============== switch LCD backlight off ===============================
+  }elsif ( $cmd eq "reset" ) {
+    #-- issue the clear LCD command
+    $select = "\x49";
+  #=============== wrong write attempt ===============================
+  } else {
+    return "OWXLCD: Wrong function selected";
+  } 
+  #"set.function"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
+    PT_EXIT("OWLCD: Device $owx_dev not accessible for writing");
+  }
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("OWLCD: Device $owx_dev error writing");
+  }
+  
+  PT_END;
 }
 
 ########################################################################################
@@ -893,38 +1289,20 @@ sub OWXLCD_SetIcon($$$) {
     if( $icon == 0){   
       #-- 4 bit data size, RE => 1, blink Enable = \x26     
       $select = "\x10\x26";
-      #-- asynchronous mode
-      if( $hash->{ASYNC} ){
-        OWX_Execute( $master, "set.icon.1", 1, $owx_dev, $select, 0, 0 );
-      #-- synchronous mode
-      } else {
-        OWX_Reset($master);
-        $res=OWX_Complex($master,$owx_dev,$select,0);
-      }
+      OWX_Reset($master);
+      $res=OWX_Complex($master,$owx_dev,$select,0);
       
       #-- SEGRAM addres to 0 = \x40,
       $select = "\x10\x40";
       #-- write 16 zeros to scratchpad
       $select .= "\x4E\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-      #-- asynchronous mode
-      if( $hash->{ASYNC} ){
-        OWX_Execute( $master, "set.icon.2", 1, $owx_dev, $select, 0, 0 );
-      #-- synchronous mode
-      } else {
-        OWX_Reset($master);
-        $res=OWX_Complex($master,$owx_dev,$select,0);
-      }
+      OWX_Reset($master);
+      $res=OWX_Complex($master,$owx_dev,$select,0);
       
       #-- issue the copy scratchpad to LCD command \x48
       $select="\x48";  
-      #-- asynchronous mode
-      if( $hash->{ASYNC} ){
-        OWX_Execute( $master, "set.icon.3", 1, $owx_dev, $select, 0, 0 );
-      #-- synchronous mode
-      } else {
-        OWX_Reset($master);
-        $res=OWX_Complex($master,$owx_dev,$select,0);
-      }
+      OWX_Reset($master);
+      $res=OWX_Complex($master,$owx_dev,$select,0);
     } else {
       #-- determine data value
       if( int($icon) != 16 ){
@@ -958,52 +1336,171 @@ sub OWXLCD_SetIcon($$$) {
       }
       #-- 4 bit data size, RE => 1, blink Enable = \x26
       $select = "\x10\x26";
-      #-- asynchronous mode
-      if( $hash->{ASYNC} ){
-        OWX_Execute( $master, "set.icon.4", 1, $owx_dev, $select, 0, 0 );
-      #-- synchronous mode
-      } else {
-        OWX_Reset($master);
-        $res=OWX_Complex($master,$owx_dev,$select,0);
-      }
+      OWX_Reset($master);
+      $res=OWX_Complex($master,$owx_dev,$select,0);
      
       #-- SEGRAM addres to 0 = \x40 + icon address
       $select = sprintf("\x10%c",63+$icon);
-      #-- asynchronous mode
-      if( $hash->{ASYNC} ){
-        OWX_Execute( $master, "set.icon.5", 1, $owx_dev, $select, 0, 0 );
-      #-- synchronous mode
-      } else {
-        OWX_Reset($master);
-        $res=OWX_Complex($master,$owx_dev,$select,0);
-      }
+      OWX_Reset($master);
+      $res=OWX_Complex($master,$owx_dev,$select,0);
       
       #-- data
       $select = sprintf("\x12%c",$data);
-      #-- asynchronous mode
-      if( $hash->{ASYNC} ){
-        OWX_Execute( $master, "set.icon.6", 1, $owx_dev, $select, 0, 0 );
-      #-- synchronous mode
-      } else {
-        OWX_Reset($master);
-        $res=OWX_Complex($master,$owx_dev,$select,0);
-      }   
+      OWX_Reset($master);
+      $res=OWX_Complex($master,$owx_dev,$select,0);
     }  
     
     #-- return to normal state
     $select = "\x10\x20";
-    #-- asynchronous mode
-    if( $hash->{ASYNC} ){
-      OWX_Execute( $master, "set.icon.7", 1, $owx_dev, $select, 0, 0 );
-    #-- synchronous mode
-    } else {
-      OWX_Reset($master);
-      $res=OWX_Complex($master,$owx_dev,$select,0);
-    }
+    OWX_Reset($master);
+    $res=OWX_Complex($master,$owx_dev,$select,0);
   #-- or else
   } else {
     return "OWXLCD: Wrong LCD controller type";
   }
+}
+
+########################################################################################
+#
+# OWXLCD_PT_SetIcon - set one of the icons async
+#
+# Parameter hash  = hash of device addressed
+#           icon  = address of the icon used = 0,1 .. 16 (0 = all off)
+#           value = data value: 0 = off, 1 = on, 2 = blink
+#                   for battery icon 16: 0 = off, 1 = empty ... 5 = full, 6 = empty blink
+#
+########################################################################################
+
+sub OWXLCD_PT_SetIcon($$$) {
+  my ($thread,$hash,$icon,$value) = @_;
+
+  my ($i,$data,$select, $res);
+    
+  #-- ID of the device, hash of the busmaster
+  my $owx_dev = $hash->{ROM_ID};
+  my $master  = $hash->{IODev};
+  
+  PT_BEGIN($thread);
+  
+  #-- only for KS0073
+  if ( $lcdcontroller eq "KS0073"){
+    
+    #-- write 16 zeros to erase all icons
+    if( $icon == 0){
+      #-- 4 bit data size, RE => 1, blink Enable = \x26     
+      $select = "\x10\x26";
+      #"set.icon.1"
+      unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
+        PT_EXIT("Device $owx_dev not accessible for writing");
+      }
+      PT_WAIT_UNTIL($thread->{ExecuteResponse});
+      unless ($thread->{ExecuteResponse}->{success}) {
+        PT_EXIT("OWLCD: Device $owx_dev error writing");
+      }
+      
+      #-- SEGRAM addres to 0 = \x40,
+      $select = "\x10\x40";
+      #-- write 16 zeros to scratchpad
+      $select .= "\x4E\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+      #"set.icon.2"
+      unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
+        PT_EXIT("Device $owx_dev not accessible for writing");
+      }
+      PT_WAIT_UNTIL($thread->{ExecuteResponse});
+      unless ($thread->{ExecuteResponse}->{success}) {
+        PT_EXIT("OWLCD: Device $owx_dev error writing");
+      }
+      
+      #-- issue the copy scratchpad to LCD command \x48
+      $select="\x48";  
+      #"set.icon.3"
+      unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
+        PT_EXIT("Device $owx_dev not accessible for writing");
+      }
+      PT_WAIT_UNTIL($thread->{ExecuteResponse});
+      unless ($thread->{ExecuteResponse}->{success}) {
+        PT_EXIT("OWLCD: Device $owx_dev error writing");
+      }
+    } else {
+      #-- determine data value
+      if( int($icon) != 16 ){
+        if( $value == 0 ){
+          $data = 0;
+        } elsif ( $value == 1) {
+          $data = 16;
+        } elsif ( $value == 2) {
+          $data = 80;
+        } else {
+          PT_EXIT("OWXLCD: Wrong data value $value for icon $icon");
+        }
+      } else {
+        if( $value == 0 ){
+          $data = 0;
+        } elsif ( $value == 1) {
+          $data = 16;
+        } elsif ( $value == 2) {
+          $data = 24;
+        } elsif ( $value == 3) {
+          $data = 28;
+        } elsif ( $value == 4) {
+          $data = 30;
+        } elsif ( $value == 5) {
+          $data = 31;
+        } elsif ( $value == 6) {
+          $data = 80;
+        } else {
+          PT_EXIT("OWXLCD: Wrong data value $value for icon $icon");
+        }
+      }
+      #-- 4 bit data size, RE => 1, blink Enable = \x26
+      $select = "\x10\x26";
+      #"set.icon.4"
+      unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
+        PT_EXIT("Device $owx_dev not accessible for writing");
+      }
+      PT_WAIT_UNTIL($thread->{ExecuteResponse});
+      unless ($thread->{ExecuteResponse}->{success}) {
+        PT_EXIT("OWLCD: Device $owx_dev error writing");
+      }
+     
+      #-- SEGRAM addres to 0 = \x40 + icon address
+      $select = sprintf("\x10%c",63+$icon);
+      #"set.icon.5"
+      unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
+        PT_EXIT("Device $owx_dev not accessible for writing");
+      }
+      PT_WAIT_UNTIL($thread->{ExecuteResponse});
+      unless ($thread->{ExecuteResponse}->{success}) {
+        PT_EXIT("OWLCD: Device $owx_dev error writing");
+      }
+      
+      #-- data
+      $select = sprintf("\x12%c",$data);
+      #"set.icon.6"
+      unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
+        PT_EXIT("Device $owx_dev not accessible for writing");
+      }
+      PT_WAIT_UNTIL($thread->{ExecuteResponse});
+      unless ($thread->{ExecuteResponse}->{success}) {
+        PT_EXIT("OWLCD: Device $owx_dev error writing");
+      }
+    }  
+    
+    #-- return to normal state
+    $select = "\x10\x20";
+    #"set.icon.7"
+    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
+      PT_EXIT("Device $owx_dev not accessible for writing");
+    }
+    PT_WAIT_UNTIL($thread->{ExecuteResponse});
+    unless ($thread->{ExecuteResponse}->{success}) {
+      PT_EXIT("OWLCD: Device $owx_dev error writing");
+    }
+  #-- or else
+  } else {
+    PT_EXIT("OWXLCD: Wrong LCD controller type");
+  }
+  PT_END;
 }
 
 ########################################################################################
@@ -1060,25 +1557,13 @@ sub OWXLCD_SetLine($$$) {
   #-- issue the match ROM command \x55 and the write scratchpad command \x4E
   #   followed by LCD page address and the text 
   $select=sprintf("\x4E%c",$lcdpage[$line]).$msgA;
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    $res = OWX_Execute( $master, "set.line.1", 1, $owx_dev, $select, 0, 0 );
-  #-- synchronous mode
-  } else {
-    OWX_Reset($master);
-    $res=OWX_Complex($master,$owx_dev,$select,0);
-  }
+  OWX_Reset($master);
+  $res=OWX_Complex($master,$owx_dev,$select,0);
   
   #-- issue the copy scratchpad to LCD command \x48
   $select="\x48";  
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    $res3 = OWX_Execute( $master, "set.line.2", 1, $owx_dev, $select, 0, 0 );
-  #-- synchronous mode
-  } else {
-    OWX_Reset($master);
-    $res3=OWX_Complex($master,$owx_dev,$select,0);
-  }
+  OWX_Reset($master);
+  $res3=OWX_Complex($master,$owx_dev,$select,0);
   
   #-- if second string available:
   if( defined($msgB) ) {
@@ -1086,25 +1571,13 @@ sub OWXLCD_SetLine($$$) {
     #-- issue the match ROM command \x55 and the write scratchpad command \x4E
     #   followed by LCD page address and the text 
     $select=sprintf("\x4E%c",$lcdpage[$line]+16).$msgB;      
-    #-- asynchronous mode
-    if( $hash->{ASYNC} ){
-      $res2 = OWX_Execute( $master, "set.line.3", 1, $owx_dev, $select, 0, 0 );
-    #-- synchronous mode
-    } else {
-      OWX_Reset($master);
-      $res2=OWX_Complex($master,$owx_dev,$select,0);
-    }
+    OWX_Reset($master);
+    $res2=OWX_Complex($master,$owx_dev,$select,0);
    
     #-- issue the copy scratchpad to LCD command \x48
     $select="\x48";  
-    #-- asynchronous mode
-    if( $hash->{ASYNC} ){
-      $res3 = OWX_Execute( $master, "set.line.4", 1, $owx_dev, $select, 0, 0 );
-    #-- synchronous mode
-    } else {
-      OWX_Reset($master);
-      $res3=OWX_Complex($master,$owx_dev,$select,0);
-    }
+    OWX_Reset($master);
+    $res3=OWX_Complex($master,$owx_dev,$select,0);
   }
   
   #-- process results
@@ -1114,6 +1587,112 @@ sub OWXLCD_SetLine($$$) {
   
   return undef;
 
+}
+
+########################################################################################
+#
+# OWXLCD_PT_SetLine - set one of the display lines async
+#
+# Parameter hash  = hash of device addressed
+#           line  = line number (0..3)
+#           msg   = data string to be written
+#
+########################################################################################
+
+sub OWXLCD_PT_SetLine($$$) {
+
+  my ($thread,$hash,$line,$msg) = @_;
+  
+  my ($select, $i, $msgA, $msgB);
+  
+  #-- ID of the device, hash of the busmaster
+  my $owx_dev = $hash->{ROM_ID};
+  my $master  = $hash->{IODev};
+  
+  $line = int($line);  
+  
+  PT_BEGIN($thread);
+  
+  $msg =   defined($msg) ? $msg : "";
+  $msg = OWXLCD_Trans($msg);
+  
+  #-- split if longer than 16 bytes, fill each with blanks
+  #   has already been checked to be <= $lcdchars
+  if( $lcdchars > 16 ){
+    if( length($msg) > 16 ) {
+      $msgA = substr($msg,0,16);
+      $msgB = substr($msg,16,length($msg)-16);
+      for($i = 0;$i<$lcdchars-length($msg);$i++){
+        $msgB .= "\x20";
+      }
+    } else {
+      $msgA = $msg;
+      for($i = 0;$i<16-length($msg);$i++){
+        $msgA .= "\x20";
+      }
+      for($i = 0;$i<$lcdchars-16;$i++){
+        $msgB .= "\x20";
+      }
+    }
+  }else{
+    $msgA = $msg;
+    for($i = 0;$i<$lcdchars-length($msg);$i++){
+      $msgA .= "\x20";
+    }
+    $msgB = undef;
+  }
+  $thread->{msgB} = $msgB;
+   
+  #-- issue the match ROM command \x55 and the write scratchpad command \x4E
+  #   followed by LCD page address and the text 
+  $select=sprintf("\x4E%c",$lcdpage[$line]).$msgA;
+  #"set.line.1"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
+    PT_EXIT("Device $owx_dev not accessible for writing");
+  }
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("OWLCD: Device $owx_dev error writing");
+  }
+  
+  #-- issue the copy scratchpad to LCD command \x48
+  $select="\x48";  
+  #"set.line.2"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
+    PT_EXIT("Device $owx_dev not accessible for writing");
+  }
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("OWLCD: Device $owx_dev error writing");
+  }
+  
+  #-- if second string available:
+  if( defined($thread->{msgB}) ) {
+    #select(undef,undef,undef,0.005); 
+    #-- issue the match ROM command \x55 and the write scratchpad command \x4E
+    #   followed by LCD page address and the text 
+    $select=sprintf("\x4E%c",$lcdpage[$line]+16).$thread->{msgB};
+    #"set.line.3"
+    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
+      PT_EXIT("Device $owx_dev not accessible for writing");
+    }
+    PT_WAIT_UNTIL($thread->{ExecuteResponse});
+    unless ($thread->{ExecuteResponse}->{success}) {
+      PT_EXIT("OWLCD: Device $owx_dev error writing");
+    }
+   
+    #-- issue the copy scratchpad to LCD command \x48
+    $select="\x48";  
+    #"set.line.4"
+    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
+      PT_EXIT("Device $owx_dev not accessible for writing");
+    }
+    PT_WAIT_UNTIL($thread->{ExecuteResponse});
+    unless ($thread->{ExecuteResponse}->{success}) {
+      PT_EXIT("OWLCD: Device $owx_dev error writing");
+    }
+  }
+  PT_END;
 }
 
 ########################################################################################
@@ -1178,26 +1757,14 @@ sub OWXLCD_SetMemory($$$) {
   #   followed by LCD page address and the text 
   #Log 1," page written is ".$page;
   $select=sprintf("\x4E\%c",$page).$msgA;
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    $res = OWX_Execute( $master, "set.memory.page", 1, $owx_dev, $select, 0, 0 );
-  #-- synchronous mode
-  } else {
-    OWX_Reset($master);
-    $res=OWX_Complex($master,$owx_dev,$select,0);
-  }
+  OWX_Reset($master);
+  $res=OWX_Complex($master,$owx_dev,$select,0);
   
   #-- issue the copy scratchpad to EEPROM command \x39
   $select = "\x39"; 
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    $res2 = OWX_Execute( $master, "set.memory.copy", 1, $owx_dev, $select, 0, 0 );
-  #-- synchronous mode
-  } else {
-    OWX_Reset($master);
-    $res2=OWX_Complex($master,$owx_dev,$select,0);
-  }
- 
+  OWX_Reset($master);
+  $res2=OWX_Complex($master,$owx_dev,$select,0);
+  
   #-- process results
   if( ($res eq 0) || ($res2 eq 0) ){
     return "OWLCD: Device $owx_dev not accessible for writing"; 
@@ -1205,6 +1772,63 @@ sub OWXLCD_SetMemory($$$) {
   
   return undef;
 
+}
+
+########################################################################################
+#
+# OWXLCD_PT_SetMemory - set internal nonvolatile memory async
+#
+# Parameter hash  = hash of device addressed
+#           page  = page number (0..14)
+#           msg   = data string to be written
+#
+########################################################################################
+
+sub OWXLCD_PT_SetMemory($$$) {
+
+  my ($thread,$hash,$page,$msg) = @_;
+  
+  my ($select, $i, $msgA);
+  
+  #-- ID of the device, hash of the busmaster
+  my $owx_dev = $hash->{ROM_ID};
+  my $master  = $hash->{IODev};
+  
+  PT_BEGIN($thread);
+  
+  $page = int($page);
+  $msg =   defined($msg) ? $msg : "";
+  
+  #-- fillup with blanks
+  $msgA = $msg;
+  for($i = 0;$i<16-length($msg);$i++){
+    $msgA .= "\x20";
+  }
+   
+  #-- issue the match ROM command \x55 and the write scratchpad command \x4E
+  #   followed by LCD page address and the text 
+  #Log 1," page written is ".$page;
+  $select=sprintf("\x4E\%c",$page).$msgA;
+  #"set.memory.page"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
+    PT_EXIT("Device $owx_dev not accessible for writing");
+  }
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("OWLCD: Device $owx_dev error writing");
+  }
+  
+  #-- issue the copy scratchpad to EEPROM command \x39
+  $select = "\x39"; 
+  #"set.memory.copy"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
+    PT_EXIT("Device $owx_dev not accessible for writing");
+  }
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("OWLCD: Device $owx_dev error writing");
+  }
+  PT_END;
 }
 
 sub OWXLCD_BinValues($$$$$$$$) {

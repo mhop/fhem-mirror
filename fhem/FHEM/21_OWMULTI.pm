@@ -68,9 +68,21 @@ package main;
 use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
+#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
+BEGIN {
+	if (!grep(/FHEM\/lib$/,@INC)) {
+		foreach my $inc (grep(/FHEM$/,@INC)) {
+			push @INC,$inc."/lib";
+		};
+	};
+};
+
+use ProtoThreads;
+no warnings 'deprecated';
+
 sub Log($$);
 
-my $owx_version="5.13";
+my $owx_version="5.14";
 #-- flexible channel name
 my $owg_channel;
 
@@ -118,7 +130,6 @@ sub OWMULTI_Initialize ($) {
   $hash->{UndefFn} = "OWMULTI_Undef";
   $hash->{GetFn}   = "OWMULTI_Get";
   $hash->{SetFn}   = "OWMULTI_Set";
-  $hash->{AfterExecuteFn} = "OWXMULTI_BinValues";
   $hash->{AttrFn}  = "OWMULTI_Attr";
 
   #tempOffset = a temperature offset added to the temperature reading for correction 
@@ -134,8 +145,6 @@ sub OWMULTI_Initialize ($) {
   $hash->{owg_val}->[2] = undef;
   $hash->{owg_val}->[1] = undef;
                      
-  #-- this function is needed for asynchronous execution of the device reads 
-  $hash->{AfterExecuteFn} = "OWXMULTI_BinValues";
   #-- make sure OWX is loaded so OWX_CRC is available if running with OWServer
   main::LoadModule("OWX");	
 }
@@ -165,7 +174,7 @@ sub OWMULTI_Attr(@) {
         $hash->{INTERVAL} = $value;
         if ($init_done) {
           RemoveInternalTimer($hash);
-          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 1);
+          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 0);
         }
         last;
       };
@@ -471,10 +480,14 @@ sub OWMULTI_Get($@) {
   
   #-- for the other readings we need a new reading
   #-- OWX interface
-  if( $interface =~ /^OWX/ ){
+  if( $interface eq "OWX" ){
     #-- not different from getting all values ..
-    $ret = OWXMULTI_GetValues($hash,1);
-    #ASYNC: Need to wait for some return
+    $ret = OWXMULTI_GetValues($hash);
+  }elsif( $interface eq "OWX_ASYNC"){
+    #TODO use OWX_ASYNC_Schedule instead
+    my $task = PT_THREAD(\&OWXMULTI_PT_GetValues);
+    while ($task->PT_SCHEDULE($hash)) { OWX_ASYNC_Poll($hash->{IODev}); };
+    $ret = $task->PT_RETVAL();
   #-- OWFS interface not yet implemented
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSMULTI_GetValues($hash);
@@ -529,18 +542,23 @@ sub OWMULTI_GetValues($) {
   
   #-- restart timer for updates
   RemoveInternalTimer($hash);
-  InternalTimer(time()+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 1);
+  InternalTimer(time()+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 0);
 
 
   #-- Get values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
-  if( $interface =~ /^OWX/ ){
+  if( $interface eq "OWX" ){
     #-- max 3 tries
     for(my $try=0; $try<3; $try++){
       $ret = OWXMULTI_GetValues($hash);
       #ASYNC: Need to wait for some result
       return if( !defined($ret) );
-    } 
+    }
+  }elsif( $interface eq "OWX_ASYNC" ){
+    eval {
+      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXMULTI_PT_GetValues),$hash );
+    };
+    $ret = GP_Catch($@) if $@;
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSMULTI_GetValues($hash);
   }else{
@@ -613,7 +631,7 @@ sub OWMULTI_Set($@) {
     # update timer
     $hash->{INTERVAL} = $value;
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 1);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 0);
     return undef;
   }
 
@@ -632,8 +650,13 @@ sub OWMULTI_Set($@) {
   $a[2]  = int($value/$factor-$offset);
 
   #-- OWX interface
-  if( $interface =~ /^OWX/ ){
+  if( $interface eq "OWX" ){
     $ret = OWXMULTI_SetValues($hash,@a);
+  }elsif( $interface eq "OWX_ASYNC" ){
+    eval {
+      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXMULTI_PT_SetValues),$hash,@a );
+    };
+    $ret = GP_Catch($@) if $@;
   #-- OWFS interface 
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSMULTI_SetValues($hash,@a);
@@ -827,9 +850,9 @@ sub OWXMULTI_BinValues($$$$$$$$) {
 #
 ########################################################################################
 
-sub OWXMULTI_GetValues($@) {
+sub OWXMULTI_GetValues($) {
 
-  my ($hash,$sync) = @_;
+  my ($hash) = @_;
   
   my ($i,$j,$k,$res,$res2);
    
@@ -843,186 +866,98 @@ sub OWXMULTI_GetValues($@) {
   #------------------------------------------------------------------------------------
   #-- switch the device to current measurement off, VDD only
   #-- issue the match ROM command \x55 and the write scratchpad command
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "ds2438.writestatusvdd", 1, $owx_dev, "\x4E\x00\x08", 0, undef )) {
-      return "$owx_dev write status failed";
-     }
-   #-- synchronous mode
-   } else {
-     OWX_Reset($master);
-     if( OWX_Complex($master,$owx_dev,"\x4E\x00\x08",0) eq 0 ){
-      return "$owx_dev write status failed";
-    } 
+  OWX_Reset($master);
+  if( OWX_Complex($master,$owx_dev,"\x4E\x00\x08",0) eq 0 ){
+    return "$owx_dev write status failed";
   }
   
   #-- copy scratchpad to register
   #-- issue the match ROM command \x55 and the copy scratchpad command
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "ds2438.copyscratchpadvdd", 1, $owx_dev, "\x48\x00", 0, undef )) {
-      return "$owx_dev copy scratchpad failed"; 
-    }
-  #-- synchronous mode
-  } else {
-    OWX_Reset($master);
-    if( OWX_Complex($master,$owx_dev,"\x48\x00",0) eq 0){
-      return "$owx_dev copy scratchpad failed"; 
-    }
+  OWX_Reset($master);
+  if( OWX_Complex($master,$owx_dev,"\x48\x00",0) eq 0){
+    return "$owx_dev copy scratchpad failed"; 
   }
   
   #-- initiate temperature conversion
   #-- conversion needs some 12 ms !
   #-- issue the match ROM command \x55 and the start conversion command
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "ds2438.temperaturconversionvdd", 1, $owx_dev, "\x44", 0, 12 )) {
-      return "$owx_dev temperature conversion failed";
-    } 
-   #-- synchronous mode
-  } else {
-    OWX_Reset($master);
-    if( OWX_Complex($master,$owx_dev,"\x44",0) eq 0 ){
-      return "$owx_dev temperature conversion failed";
-    } 
-    select(undef,undef,undef,0.012);
-  }
+  OWX_Reset($master);
+  if( OWX_Complex($master,$owx_dev,"\x44",0) eq 0 ){
+    return "$owx_dev temperature conversion failed";
+  } 
+  select(undef,undef,undef,0.012);
   
   #-- initiate voltage conversion
   #-- conversion needs some 6 ms  !
   #-- issue the match ROM command \x55 and the start conversion command
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "ds2438.voltageconversionvdd", 1, $owx_dev, "\xB4", 0, 6 )) {
-      return "$owx_dev voltage conversion failed";
-    } 
-  #-- synchronous mode
-  } else {
-    OWX_Reset($master);
-    if( OWX_Complex($master,$owx_dev,"\xB4",0) eq 0 ){
-      return "$owx_dev voltage conversion failed";
-    } 
-    select(undef,undef,undef,0.006);
-  }
+  OWX_Reset($master);
+  if( OWX_Complex($master,$owx_dev,"\xB4",0) eq 0 ){
+    return "$owx_dev voltage conversion failed";
+  } 
+  select(undef,undef,undef,0.006);
   
   #-- from memory to scratchpad
   #-- copy needs some 12 ms !
   #-- issue the match ROM command \x55 and the recall memory command
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "ds2438.recallmemoryvdd", 1, $owx_dev, "\xB8\x00", 0, 12 )) {
-       return "$owx_dev recall memory failed";
-    } 
-  #-- synchronous mode
-  } else {
-    OWX_Reset($master);
-    if( OWX_Complex($master,$owx_dev,"\xB8\x00",0) eq 0 ){
-       return "$owx_dev recall memory failed";
-    } 
-    select(undef,undef,undef,0.012);
-  }
+  OWX_Reset($master);
+  if( OWX_Complex($master,$owx_dev,"\xB8\x00",0) eq 0 ){
+     return "$owx_dev recall memory failed";
+  } 
+  select(undef,undef,undef,0.012);
   #-- NOW ask the specific device 
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE
   #-- reading 9 + 2 + 9 data bytes = 20 bytes
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "ds2438.getvdd", 1, $owx_dev, "\xBE\x00", 9, undef )) {
-      return "$owx_dev not accessible in 2nd step"; 
-    }
-  #-- synchronous mode
-  } else {
-    OWX_Reset($master);
-    $res=OWX_Complex($master,$owx_dev,"\xBE\x00",9);
-    #Log 1,"OWXMULTI: data length from reading device is ".length($res)." bytes";
-    return "$owx_dev not accessible in 2nd step"
-      if( $res eq 0 );
-    return "$owx_dev has returned invalid data"
-      if( length($res)!=20);
-    OWXMULTI_BinValues($hash,"ds2438.getvdd",1,undef,$owx_dev,undef,undef,substr($res,11));
-  }
+  OWX_Reset($master);
+  $res=OWX_Complex($master,$owx_dev,"\xBE\x00",9);
+  #Log 1,"OWXMULTI: data length from reading device is ".length($res)." bytes";
+  return "$owx_dev not accessible in 2nd step"
+    if( $res eq 0 );
+  return "$owx_dev has returned invalid data"
+    if( length($res)!=20);
+  OWXMULTI_BinValues($hash,"ds2438.getvdd",1,undef,$owx_dev,undef,undef,substr($res,11));
   #------------------------------------------------------------------------------------
   #-- switch the device to current measurement off, V external only
   #-- issue the match ROM command \x55 and the write scratchpad command
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "ds2438.writestatusvad", 1, $owx_dev, "\x4E\x00\x00", 0, undef )) {
-      return "$owx_dev write status failed";
-    } 
-  #-- synchronous mode
-  } else {
-    OWX_Reset($master);
-    if( OWX_Complex($master,$owx_dev,"\x4E\x00\x00",0) eq 0 ){
-      return "$owx_dev write status failed";
-    } 
-  }
+  OWX_Reset($master);
+  if( OWX_Complex($master,$owx_dev,"\x4E\x00\x00",0) eq 0 ){
+    return "$owx_dev write status failed";
+  } 
   #-- copy scratchpad to register
   #-- issue the match ROM command \x55 and the copy scratchpad command
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "ds2438.copyscratchpadvad", 1, $owx_dev, "\x48\x00", 0, undef )) {
+  OWX_Reset($master);
+  if( OWX_Complex($master,$owx_dev,"\x48\x00",0) eq 0){
     return "$owx_dev copy scratchpad failed"; 
-    }
-  #-- synchronous mode
-  } else {
-    OWX_Reset($master);
-    if( OWX_Complex($master,$owx_dev,"\x48\x00",0) eq 0){
-      return "$owx_dev copy scratchpad failed"; 
-    }
   }
   #-- initiate voltage conversion
   #-- conversion needs some 6 ms  !
   #-- issue the match ROM command \x55 and the start conversion command
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "ds2438.voltageconversionvad", 1, $owx_dev, "\xB4", 0, 6 )) {
-      return "$owx_dev voltage conversion failed";
-    } 
-  #-- synchronous mode
-  } else {
-    OWX_Reset($master);
-    if( OWX_Complex($master,$owx_dev,"\xB4",0) eq 0 ){
-      return "$owx_dev voltage conversion failed";
-    } 
-    select(undef,undef,undef,0.006);
-  }
+  OWX_Reset($master);
+  if( OWX_Complex($master,$owx_dev,"\xB4",0) eq 0 ){
+    return "$owx_dev voltage conversion failed";
+  } 
+  select(undef,undef,undef,0.006);
  
   #-- from memory to scratchpad
   #-- copy needs some 12 ms !
   #-- issue the match ROM command \x55 and the recall memory command
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "ds2438.recallmemoryvad", 1, $owx_dev, "\xB8\x00", 0, 12 )) {
-       return "$owx_dev recall memory failed";
-    } 
-  #-- synchronous mode
-  } else {
-    OWX_Reset($master);
-    if( OWX_Complex($master,$owx_dev,"\xB8\x00",0) eq 0 ){
-       return "$owx_dev recall memory failed";
-    } 
-    select(undef,undef,undef,0.012);
-  }
+  OWX_Reset($master);
+  if( OWX_Complex($master,$owx_dev,"\xB8\x00",0) eq 0 ){
+     return "$owx_dev recall memory failed";
+  } 
+  select(undef,undef,undef,0.012);
   
   #-- NOW ask the specific device 
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE
   #-- reading 9 + 2 + 9 data bytes = 20 bytes
   my $context = "ds2438.getvad";
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, $context, 1, $owx_dev, "\xBE\x00", 9, undef ) or ($sync and !OWX_AwaitExecuteResponse($master,$context,$owx_dev))) {
-      return "$owx_dev not accessible in 2nd step"; 
-    }
-  #-- synchronous mode
-  } else {
-    OWX_Reset($master);
-    $res=OWX_Complex($master,$owx_dev,"\xBE\x00",9);
-    #-- process results
-    return "$owx_dev not accessible in 2nd step"
-      if( $res eq 0 );
-    return "$owx_dev has returned invalid data"
-      if( length($res)!=20);
-    OWXMULTI_BinValues($hash,$context,1,undef,$owx_dev,undef,undef,substr($res,11));
-  } 
+  OWX_Reset($master);
+  $res=OWX_Complex($master,$owx_dev,"\xBE\x00",9);
+  #-- process results
+  return "$owx_dev not accessible in 2nd step"
+    if( $res eq 0 );
+  return "$owx_dev has returned invalid data"
+    if( length($res)!=20);
+  OWXMULTI_BinValues($hash,$context,1,undef,$owx_dev,undef,undef,substr($res,11));
   return undef;
 }
   
@@ -1059,21 +994,233 @@ sub OWXMULTI_SetValues($@) {
   #   3. \x48 sent by WriteBytePower after match ROM => command ok, no effect on EEPROM
   
   my $select=sprintf("\x4E%c%c\x48",0,0); 
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "setvalues", 1, $owx_dev, $select, 0, undef )) {
-      return "OWXMULTI: Device $owx_dev not accessible"; 
-    } 
-  #-- synchronous mode
-  } else {
-    OWX_Reset($master);
-    my $res=OWX_Complex($master,$owx_dev,$select,0);
-    if( $res eq 0 ){
-      return "OWXMULTI: Device $owx_dev not accessible"; 
-    } 
-  }
+  OWX_Reset($master);
+  my $res=OWX_Complex($master,$owx_dev,$select,0);
+  if( $res eq 0 ){
+    return "OWXMULTI: Device $owx_dev not accessible"; 
+  } 
   
   return undef;
+}
+
+########################################################################################
+#
+# OWXMULTI_PT_GetValues - Get reading from one device async
+#
+# Parameter hash = hash of device addressed
+#           final= 1 if FormatValues is to be called
+#
+########################################################################################
+
+sub OWXMULTI_PT_GetValues($) {
+
+  my ($thread,$hash) = @_;
+  
+  my ($i,$j,$k,$res,$res2,$response);
+   
+  #-- ID of the device
+  my $owx_dev = $hash->{ROM_ID};
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+  
+  PT_BEGIN($thread);
+  #-- reset presence
+  $hash->{PRESENT}  = 0;
+  #------------------------------------------------------------------------------------
+  #-- switch the device to current measurement off, VDD only
+  #-- issue the match ROM command \x55 and the write scratchpad command
+  #"ds2438.writestatusvdd"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, "\x4E\x00\x08", 0)) {
+    PT_EXIT("$owx_dev not accessible for writing status");
+  }
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("$owx_dev write status failed");
+  }
+  
+  #-- copy scratchpad to register
+  #-- issue the match ROM command \x55 and the copy scratchpad command
+  #"ds2438.copyscratchpadvdd"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, "\x48\x00", 0)) {
+    PT_EXIT("$owx_dev not accessible to copy scratchpad"); 
+  }
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("$owx_dev copy scratchpad failed"); 
+  }
+  
+  #-- initiate temperature conversion
+  #-- conversion needs some 12 ms !
+  #-- issue the match ROM command \x55 and the start conversion command
+  #"ds2438.temperaturconversionvdd"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, "\x44", 0)) {
+    PT_EXIT("$owx_dev not accessible for temperature conversion");
+  } 
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("$owx_dev temperature conversion failed");
+  }
+  #TODO implement async wait
+  select(undef,undef,undef,0.012);
+  
+  #-- initiate voltage conversion
+  #-- conversion needs some 6 ms  !
+  #-- issue the match ROM command \x55 and the start conversion command
+  #"ds2438.voltageconversionvdd"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, "\xB4", 0)) {
+    PT_EXIT("$owx_dev not accessible for voltage conversion");
+  } 
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("$owx_dev voltage conversion failed");
+  }
+  #TODO implement async wait
+  select(undef,undef,undef,0.006);
+  
+  #-- from memory to scratchpad
+  #-- copy needs some 12 ms !
+  #-- issue the match ROM command \x55 and the recall memory command
+  #"ds2438.recallmemoryvdd"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, "\xB8\x00", 0)) {
+    PT_EXIT("$owx_dev not accessible for recall memory");
+  } 
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("$owx_dev recall memory failed");
+  }
+  #TODO implement async wait
+  select(undef,undef,undef,0.012);
+  #-- NOW ask the specific device 
+  #-- issue the match ROM command \x55 and the read scratchpad command \xBE
+  #-- reading 9 + 2 + 9 data bytes = 20 bytes
+  #"ds2438.getvdd"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, "\xBE\x00", 9)) {
+    PT_EXIT("$owx_dev not accessible in 2nd step"); 
+  }
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  $response = $thread->{ExecuteResponse};
+  unless ($response->{success}) {
+    PT_EXIT("$owx_dev not accessible in 2nd step"); 
+  }
+  $res = $response->{readdata};
+  unless (defined $res and length($res)==9) {
+    PT_EXIT("$owx_dev has returned invalid data");
+  }
+  OWXMULTI_BinValues($hash,"ds2438.getvdd",1,undef,$owx_dev,undef,undef,$res);
+  #------------------------------------------------------------------------------------
+  #-- switch the device to current measurement off, V external only
+  #-- issue the match ROM command \x55 and the write scratchpad command
+  #"ds2438.writestatusvad"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, "\x4E\x00\x00", 0)) {
+    PT_EXIT("$owx_dev not accessible to write status");
+  } 
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("$owx_dev write status failed");
+  }
+  #-- copy scratchpad to register
+  #-- issue the match ROM command \x55 and the copy scratchpad command
+  #"ds2438.copyscratchpadvad"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, "\x48\x00", 0)) {
+    PT_EXIT("$owx_dev not accessible to copy scratchpad"); 
+  }
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("$owx_dev copy scratchpad failed"); 
+  }
+  #-- initiate voltage conversion
+  #-- conversion needs some 6 ms  !
+  #-- issue the match ROM command \x55 and the start conversion command
+  #"ds2438.voltageconversionvad"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, "\xB4", 0)) {
+    PT_EXIT("$owx_dev not accessible for voltage conversion");
+  } 
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("$owx_dev voltage conversion failed");
+  }
+  #TODO implement async wait
+  select(undef,undef,undef,0.006);
+ 
+  #-- from memory to scratchpad
+  #-- copy needs some 12 ms !
+  #-- issue the match ROM command \x55 and the recall memory command
+  #"ds2438.recallmemoryvad"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, "\xB8\x00", 0)) {
+    PT_EXIT("$owx_dev not accessible to recall memory");
+  }
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("$owx_dev recall memory failed");
+  }
+  #TODO implement async wait
+  select(undef,undef,undef,0.012);
+  
+  #-- NOW ask the specific device 
+  #-- issue the match ROM command \x55 and the read scratchpad command \xBE
+  #-- reading 9 + 2 + 9 data bytes = 20 bytes
+  #"ds2438.getvad"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, "\xBE\x00", 9)) {
+    PT_EXIT("$owx_dev not accessible in 2nd step"); 
+  }
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  $response = $thread->{ExecuteResponse};
+  unless ($response->{success}) {
+    PT_EXIT("$owx_dev not accessible in 2nd step"); 
+  }
+  #-- process results
+  $res = $response->{readdata};
+  unless (defined $res and length($res)==9) {
+    PT_EXIT("$owx_dev has returned invalid data");
+  }
+  OWXMULTI_BinValues($hash,"ds2438.getvad",1,undef,$owx_dev,undef,undef,$res);
+  PT_END;
+}
+  
+#######################################################################################
+#
+# OWXMULTI_PT_SetValues - Set values in device async
+# 
+# Parameter hash = hash of device addressed
+#           a = argument array
+#
+########################################################################################
+
+sub OWXMULTI_PT_SetValues($@) {
+  my ($thread,$hash, @a) = @_;
+  
+  my ($i,$j,$k);
+  
+  my $name = $hash->{NAME};
+  #-- ID of the device
+  my $owx_dev = $hash->{ROM_ID};
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+ 
+  PT_BEGIN($thread);
+  #-- define vars
+  my $key   = $a[1];
+  my $value = $a[2];
+
+  #-- issue the match ROM command \x55 and the write scratchpad command \x4E,
+  #   followed by the write EEPROM command \x48
+  #
+  #   so far writing the EEPROM does not work properly.
+  #   1. \x48 directly appended to the write scratchpad command => command ok, no effect on EEPROM
+  #   2. \x48 appended to match ROM => command not ok. 
+  #   3. \x48 sent by WriteBytePower after match ROM => command ok, no effect on EEPROM
+  
+  my $select=sprintf("\x4E%c%c\x48",0,0);
+  #"setvalues"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0)) {
+    PT_EXIT("OWXMULTI: Device $owx_dev not accessible"); 
+  }
+  PT_WAIT_UNTIL($thread->{ExecuteResponse});
+  unless ($thread->{ExecuteResponse}->{success}) {
+    PT_EXIT("OWXMULTI: error setting values in $owx_dev"); 
+  }
+  
+  PT_END;
 }
 
 1;
