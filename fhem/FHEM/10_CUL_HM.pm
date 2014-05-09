@@ -5457,7 +5457,7 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
 
   $data = ($data>>$pos) & (0xffffffff>>(32-$size));
   if (!$conversion){                ;# do nothing
-  } elsif($conversion eq "lit"     ){$data = $reg->{litInv}{$data}?$reg->{litInv}{$data}:"undef lit:$data";
+  } elsif($conversion eq "lit"     ){$data = defined $reg->{litInv}{$data}?$reg->{litInv}{$data}:"undef lit:$data";
   } elsif($conversion eq "fltCvT"  ){$data = CUL_HM_CvTflt($data);
   } elsif($conversion eq "fltCvT60"){$data = CUL_HM_CvTflt60($data);
   } elsif($conversion eq "min2time"){$data = CUL_HM_min2time($data);
