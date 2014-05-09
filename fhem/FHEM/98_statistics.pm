@@ -1,4 +1,5 @@
 ##############################################
+# $Id$
 #
 #  98_statistic.pm
 #
@@ -227,11 +228,13 @@ statistics_PeriodChange($)
    foreach my $r (keys $hash->{READINGS}) 
    {
       if ($r =~ /^monitoredDevices.*/) {
-         Log3 $name,4,"$name: Starting period change statistics (Type: $periodSwitch) for all devices of reading '$r'";
-         my @devNameArray = split /,/, $hash->{READINGS}{$r}{VAL}; 
-         foreach my $devName (@devNameArray) {
-            Log3 $name,4,"$name: Doing period change statistics for device '$devName'";
-            statistics_DoStatistics($hash, $defs{$devName}, $periodSwitch);
+         if ($r !~/UnknownTypes|Unsupported/) {
+            Log3 $name,4,"$name: Starting period change statistics (Type: $periodSwitch) for all devices of reading '$r'";
+            my @devNameArray = split /,/, $hash->{READINGS}{$r}{VAL}; 
+            foreach my $devName (@devNameArray) {
+               Log3 $name,4,"$name: Doing period change statistics for device '$devName'";
+               statistics_DoStatistics($hash, $defs{$devName}, $periodSwitch);
+            }
          }
       }
    }
@@ -247,6 +250,7 @@ statistics_DoStatistics($$$)
   my $hashName = $hash->{NAME};
   my $devName = $dev->{NAME};
   my $devType = $dev->{TYPE};
+  my $statisticDone = 0;
   
   return "" if(AttrVal($hashName, "disable", undef));
 
@@ -264,7 +268,8 @@ statistics_DoStatistics($$$)
     # notifing device type is known and the device has also the known reading
     # No statistic for excluded Readings
       my $completeReadingName = $devName.":".$readingName;
-      if ($$f[0] eq $devType && $completeReadingName !~ m/^($exclReadings)$/ ) { 
+      if ($$f[0] eq $devType && $completeReadingName !~ m/^($exclReadings)$/ ) {
+         $statisticDone = 1;
          if ($$f[2] == 1) { statistics_doStatisticMinMax ($hash, $dev, $readingName, $$f[3], $periodSwitch);}
          if ($$f[2] == 2) { statistics_doStatisticDelta ($hash, $dev, $readingName, $$f[3], $periodSwitch);}
       }
@@ -273,7 +278,9 @@ statistics_DoStatistics($$$)
    else {readingsEndUpdate($dev,0);}
    
  # Record device as monitored
-   my $monReadingName = "monitoredDevices".$devType;
+   my $monReadingName;
+   if ($statisticDone ==1) { $monReadingName = "monitoredDevices".$devType; }
+   else {$monReadingName = "monitoredDevicesUnsupported"; $devName .= "($devType)"}
    my $monReadingValue = ReadingsVal($hashName,$monReadingName,"");
    my $temp = '^'.$devName.'$|^'.$devName.',|,'.$devName.'$|,'.$devName.',';
    if ($monReadingValue !~ /$temp/) {
