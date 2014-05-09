@@ -125,6 +125,7 @@ sub HMLAN_Define($$) {#########################################################
   $hash->{assignedIDs} = "";
   HMLAN_condUpdate($hash,253);#set disconnected
   $hash->{STATE} = "disconnected";
+  $hash->{owner} = "";
 
   my $ret = DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
   return $ret;
