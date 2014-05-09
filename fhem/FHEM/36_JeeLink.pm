@@ -109,7 +109,7 @@ JeeLink_Define($$)
   $dev .= "\@57600" if( $dev !~ m/\@/ );
 
   $hash->{Clients} = $clientsJeeLink;
-  #$hash->{MatchList} = \%matchListJeeLink;
+  $hash->{MatchList} = \%matchListPCA301;
 
   $hash->{DeviceName} = $dev;
 
