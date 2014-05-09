@@ -564,6 +564,9 @@ JeeLink_Parse($$$$)
         JeeLink_SimpleWrite($hash, "0a" ); # led off
         JeeLink_SimpleWrite($hash, "l" );  # list known devices
 
+      } elsif( $dmsg =~m /LaCrosseITPlusReader/ ) {
+        $hash->{MatchList} = \%matchListPCA301;
+
       } elsif( $dmsg =~m /ec3kSerial/ ) {
         $hash->{MatchList} = \%matchListPCA301;
         #JeeLink_SimpleWrite($hash, "ec", 1);
@@ -577,8 +580,9 @@ JeeLink_Parse($$$$)
         JeeLink_SimpleWrite($hash, "m");   # show used ram on jeenode
       }
       $hash->{STATE} = "Initialized";
-        }
-        return;
+    }
+
+    return;
 
   } elsif ( $dmsg =~ m/^(OOK|FSK)\-(433|868)MHz/ ) {
         readingsSingleUpdate($hash,"RFM-config",$dmsg,0);
