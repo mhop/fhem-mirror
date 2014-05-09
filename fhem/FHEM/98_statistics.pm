@@ -103,7 +103,7 @@ statistics_Define($$)
   return "Bad regexp: $@" if($@);
   $hash->{DEV_REGEXP} = $devName;
 
-  $hash->{STATE} = "active";
+  $hash->{STATE} = "wating for notifications";
 
   RemoveInternalTimer($hash);
   
@@ -297,8 +297,12 @@ statistics_DoStatistics($$$)
    
  # Record device as monitored
    my $monReadingName;
-   if ($statisticDone ==1) { $monReadingName = "monitoredDevices".$devType; }
-   else {$monReadingName = "monitoredDevicesUnsupported"; $devName .= "($devType)"}
+   if ($statisticDone ==1) { 
+      $monReadingName = "monitoredDevices".$devType; 
+      readingsBulkUpdate($hash,"state","Last calculated device: $devName",1);
+   } else {
+      $monReadingName = "monitoredDevicesUnsupported"; $devName .= "($devType)",
+   }
    my $monReadingValue = ReadingsVal($hashName,$monReadingName,"");
    if ($monReadingValue !~ /$regExp/) {
       if($monReadingValue eq "") { $monReadingValue = $devName;}
@@ -316,6 +320,7 @@ statistics_DoStatistics($$$)
          }
       }
    } 
+
    readingsEndUpdate($hash,1);
   
 
