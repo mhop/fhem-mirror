@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 05/2014
-# v. 0.096
+# v. 0.097
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -254,7 +254,7 @@ my %getsonly = (
         "sTimedate" 			=> {cmd2=>"FC"},
         "sFirmware" 			=> {cmd2=>"FD"},
 	"sBoostDHWTotal" 		=> {cmd2=>"0A0924", cmd3=>"0A0925", unit =>"kWh"},
-	"sBoostHCTotal"	 		=> {cmd2=>"0A0926", cmd3=>"0A0927", unit =>"kWh"},
+	"sBoostHCTotal"	 		=> {cmd2=>"0A0928", cmd3=>"0A0929", unit =>"kWh"},
 	"sHeatRecoveredDay" 		=> {cmd2=>"0A03AE", cmd3=>"0A03AF", unit =>"Wh"},
 	"sHeatRecoveredTotal" 		=> {cmd2=>"0A03B0", cmd3=>"0A03B1", unit =>"kWh"},
 	"sHeatDHWDay" 			=> {cmd2=>"0A092A", cmd3=>"0A092B", unit =>"Wh"},
