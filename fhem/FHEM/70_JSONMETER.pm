@@ -1,4 +1,5 @@
 ###############################################################
+# $Id$
 #
 #  70_JSONMETER.pm
 #
@@ -814,13 +815,11 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
    
  # get statistic values of previous period
    my @last;
-   if ($periodSwitch >= 1) {
-      if (exists ($hash->{READINGS}{$readingName."Last"})) { 
-         @last = split / /,  $hash->{READINGS}{$readingName."Last"}{VAL};
-         if ($last[0] eq "Day:") { $last[9]=$last[7]; $last[7]=$last[5]; $last[5]=$last[3]; $last[3]=$last[1]; $last[1]="-"; }
-      } else {
-         @last = split / /,  "Hour: - Day: - Month: - Year: -";
-      }
+   if (exists ($hash->{READINGS}{$readingName."Last"})) { 
+      @last = split / /,  $hash->{READINGS}{$readingName."Last"}{VAL};
+      if ($last[0] eq "Day:") { $last[9]=$last[7]; $last[7]=$last[5]; $last[5]=$last[3]; $last[3]=$last[1]; $last[1]="-"; }
+   } else {
+      @last = split / /,  "Hour: - Day: - Month: - Year: -";
    }
    
  # Do statistic
