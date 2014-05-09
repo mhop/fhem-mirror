@@ -86,7 +86,7 @@ ReadingValIf($$$)
   my $element;
     $r=$defs{$name}{READINGS}{$reading}{VAL};
     if ($regExp) {
-      $element = ($r =~  /$regExp/) ? $1 : "";
+      $element = ($r =~ /$regExp/) ? $1 : "";
     } else {
       $element=$r;
     }
@@ -155,6 +155,7 @@ ReplaceAllReadingsIf($$)
           my $ret = eval $block;
           return($block." ",$@) if ($@);
   #        return($eval,"no reading value") if (!$ret);
+          $ret =~ s/'/\\'/g;
           $block=$ret;
         }
       } else {
@@ -202,27 +203,31 @@ ParseCommandsIf($)
   my $err="";
   my $parsedCmd="";
   my $pos=0;
-
+  $tailBlock =~ s/;/;;/g;
   while ($tailBlock ne "") {
     if ($tailBlock=~ /^\s*\{/) { # perl block
       ($beginning,$currentBlock,$err,$tailBlock)=GetBlockIf($tailBlock,'[\{\}]'); 
       return ($currentBlock,$err) if ($err);
-      return($currentBlock, 'use "'." instead of '") if ($currentBlock =~ /'/);
-      $parsedCmd.="{".$currentBlock."}";
+      $parsedCmd.=$currentBlock;
     }
     if ($tailBlock =~ /^\s*IF/) {
       ($beginning,$currentBlock,$err,$tailBlock)=GetBlockIf($tailBlock,'[\(\)]'); #condition
       return ($currentBlock,$err) if ($err);
-      $parsedCmd.=$beginning."(".$currentBlock.")";
+      $parsedCmd.="fhem('".$beginning."(".$currentBlock.")";
       ($beginning,$currentBlock,$err,$tailBlock)=GetBlockIf($tailBlock,'[\(\)]'); #if case
       return ($currentBlock,$err) if ($err);
+      $currentBlock =~ s/'/\\'/g;
+      $currentBlock =~ s/;/;;/g;
       $parsedCmd.=$beginning."(".$currentBlock.")";
       if ($tailBlock =~ /^\s*ELSE/) {
         ($beginning,$currentBlock,$err,$tailBlock)=GetBlockIf($tailBlock,'[\(\)]'); #else case
         return ($currentBlock,$err) if ($err);
+      $currentBlock =~ s/'/\\'/g;
+      $currentBlock =~ s/;/;;/g;
       $parsedCmd.=$beginning."(".$currentBlock.")";
       }
-    } else { #repalce Readings if no IF command
+      $parsedCmd.="')";
+    } else { #replace Readings if no IF command
       if ($tailBlock =~ /^\s*\(/) { # remove bracket  
         ($beginning,$currentBlock,$err,$tailBlock)=GetBlockIf($tailBlock,'[\(\)]'); 
         return ($currentBlock,$err) if ($err);
@@ -236,13 +241,13 @@ ParseCommandsIf($)
           $tailBlock="";
         }
        if ($currentBlock ne "") {
-         return($currentBlock, 'use "'." instead of '") if ($currentBlock =~ /'/);
+         $currentBlock =~ s/'/\\'/g;
          ($currentBlock,$err)=ReplaceAllReadingsIf($currentBlock,1);
          return ($currentBlock,$err) if ($err);
          ($currentBlock,$err)=EvalAllIf($currentBlock);
-         $currentBlock =~ s/;/;;;;/g;
+         $currentBlock =~ s/;/;;/g;
          return ($currentBlock,$err) if ($err);
-         $parsedCmd.=$currentBlock;
+         $parsedCmd.="fhem('".$currentBlock."')";
          $parsedCmd.=";;" if ($tailBlock);
        } else {
          $parsedCmd.=";;" if ($tailBlock);
@@ -303,8 +308,8 @@ CmdIf($)
     return ($else_cmd,$err) if ($err);
   }
   my $perl_cmd="{if(".$cond.")";
-  $perl_cmd .="{fhem('".$if_cmd."')}";
-  $perl_cmd .= "else{fhem('".$else_cmd."')}" if ($else_cmd);
+  $perl_cmd .="{".$if_cmd."}";
+  $perl_cmd .= "else{".$else_cmd."}" if ($else_cmd);
   $perl_cmd.="}";
   return($perl_cmd,"");
 }
