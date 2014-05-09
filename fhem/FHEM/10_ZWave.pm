@@ -168,7 +168,14 @@ my %zwave_class = (
     parse => { "..7105(..)(..)" => '"alarm_type_$1:level $2"',}, },
   MANUFACTURER_SPECIFIC    => { id => '72', },
   POWERLEVEL               => { id => '73', },
-  PROTECTION               => { id => '75', },
+  PROTECTION               => { id => '75',
+    set   => { protectionOff => "0100",
+               protectionSeq => "0101",
+               protectionOn  => "0102", },
+    get   => { protection    => "02", },
+    parse => { "032600"      => "protection:off",
+               "032601"      => "protection:seq",
+               "032602"      => "protection:on", }, },
   LOCK                     => { id => '76', },
   NODE_NAMING              => { id => '77', },
   FIRMWARE_UPDATE_MD       => { id => '7a', },
@@ -840,6 +847,14 @@ s2Hex($)
     Reset the configuration parameter for the cfgAddress parameter to its
     default value.  See the device documentation to determine this value.</li>
 
+  <br><br><b>Class PROTECTION</b>
+  <li>protectionOff<br>
+    device is unprotected</li>
+  <li>protectionOn<br>
+    device is protected</li>
+  <li>protectionSeq<br>
+    device can be operated, if a certain sequence is keyed.</li>
+
   <br><br><b>Class SWITCH_BINARY</b>
   <li>on<br>
     switch the device on</li>
@@ -935,6 +950,10 @@ s2Hex($)
     <b>Note:</b> This is the best way to create the secondary nodes of a
     MULTI_CHANNEL device. The device is only created for channel 2 or greater.
     </li>
+
+  <br><br><b>Class PROTECTION</b>
+  <li>protection<br>
+    returns the protection state. It can be on, off or seq.</li>
 
   <br><br><b>Class SENSOR_ALARM</b>
   <li>alarm alarmType<br>
@@ -1052,6 +1071,9 @@ s2Hex($)
   <br><br><b>Class MULTI_CHANNEL</b>
   <li>endpoints:total X $dynamic $identical</li>
   <li>mcCapability_X:class1 class2 ...</li>
+
+  <br><br><b>Class PROTECTION</b>
+  <li>protection:[on|off|seq]</li>
 
   <br><br><b>Class SENSOR_ALARM</b>
   <li>alarm_type_X:level Y node $nodeID seconds $seconds</li>
