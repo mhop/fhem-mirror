@@ -263,7 +263,7 @@ statistics_DoStatistics($$$)
       my $servedBy = $dev->{helper}{_98_statistics};
       if ($servedBy ne $hashName) {
          my $monReadingValue = ReadingsVal($hashName,"monitoredDevicesUnserved","");
-         if ($monReadingValue !~ /regExp/) {
+         if ($monReadingValue !~ /$regExp/) {
             if($monReadingValue eq "") { $monReadingValue = $devName;}
             else {$monReadingValue .= ",".$devName;}
             readingsSingleUpdate($hash,"monitoredDevicesUnserved",$monReadingValue,1);
