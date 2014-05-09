@@ -133,9 +133,9 @@ statistics_Notify($$)
    my $devName = $dev->{NAME};
 
  # At startup: delete old Readings of monitored devices and rebuild from hidden readings 
-  if ($devName eq "global" && grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}})) {
+  if ($devName eq "global" && grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}}) && exists ($hash->{READINGS})) {
       my %unknownDevices;
-     foreach my $r (keys $hash->{READINGS}) {
+     foreach my $r (keys ($hash->{READINGS})) {
          if ($r =~ /^\.(.*):.*/) { $unknownDevices{$1}++; }
      }
      foreach my $r (keys $hash->{READINGS}) {
@@ -254,9 +254,27 @@ statistics_DoStatistics($$$)
   
   return "" if(AttrVal($hashName, "disable", undef));
 
-  my $readingName;
-  my $exclReadings = AttrVal($hashName, "excludedReadings", "");
+   my $readingName;
+   my $exclReadings = AttrVal($hashName, "excludedReadings", "");
+   my $regExp = '^'.$devName.'$|^'.$devName.',|,'.$devName.'$|,'.$devName.',';
 
+ # Return if the notifying device is already served by another statistics instance
+   if (exists ($dev->{helper}{_98_statistics})) {
+      my $servedBy = $dev->{helper}{_98_statistics};
+      if ($servedBy ne $hashName) {
+         my $monReadingValue = ReadingsVal($hashName,"monitoredDevicesUnserved","");
+         if ($monReadingValue !~ /regExp/) {
+            if($monReadingValue eq "") { $monReadingValue = $devName;}
+            else {$monReadingValue .= ",".$devName;}
+            readingsSingleUpdate($hash,"monitoredDevicesUnserved",$monReadingValue,1);
+            Log3 $hashName,3,"$hashName: Device '$devName' identified as supported but already servered by '$servedBy'.";
+         }
+         return;
+      }
+   } else {
+      $dev->{helper}{_98_statistics}=$hashName;
+   }
+   
    readingsBeginUpdate($hash);
    readingsBeginUpdate($dev);
    
@@ -282,14 +300,13 @@ statistics_DoStatistics($$$)
    if ($statisticDone ==1) { $monReadingName = "monitoredDevices".$devType; }
    else {$monReadingName = "monitoredDevicesUnsupported"; $devName .= "($devType)"}
    my $monReadingValue = ReadingsVal($hashName,$monReadingName,"");
-   my $temp = '^'.$devName.'$|^'.$devName.',|,'.$devName.'$|,'.$devName.',';
-   if ($monReadingValue !~ /$temp/) {
+   if ($monReadingValue !~ /regExp/) {
       if($monReadingValue eq "") { $monReadingValue = $devName;}
       else {$monReadingValue .= ",".$devName;}
       readingsBulkUpdate($hash,$monReadingName,$monReadingValue,1);
 
       my $monReadingValue = ReadingsVal($hashName,"monitoredDevicesUnknownType","");
-      if ($monReadingValue =~ /$temp/) {
+      if ($monReadingValue =~ /$regExp/) {
          $monReadingValue =~ s/$devName,?//;
          $monReadingValue =~ s/,$//;
          if ($monReadingValue ne "") {
