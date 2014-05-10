@@ -240,18 +240,18 @@ ParseCommandsIf($)
           $currentBlock=$tailBlock;
           $tailBlock="";
         }
-       if ($currentBlock ne "") {
-         $currentBlock =~ s/'/\\'/g;
-         ($currentBlock,$err)=ReplaceAllReadingsIf($currentBlock,1);
-         return ($currentBlock,$err) if ($err);
-         ($currentBlock,$err)=EvalAllIf($currentBlock);
-         $currentBlock =~ s/;/;;/g;
-         return ($currentBlock,$err) if ($err);
-         $parsedCmd.="fhem('".$currentBlock."')";
+        if ($currentBlock =~ /[^\s]/g) { 
+          $currentBlock =~ s/'/\\'/g;
+          ($currentBlock,$err)=ReplaceAllReadingsIf($currentBlock,1);
+          return ($currentBlock,$err) if ($err);
+          ($currentBlock,$err)=EvalAllIf($currentBlock);
+          $currentBlock =~ s/;/;;/g;
+          return ($currentBlock,$err) if ($err);
+          $parsedCmd.="fhem('".$currentBlock."')";
+          $parsedCmd.=";;" if ($tailBlock);
+        } else {
          $parsedCmd.=";;" if ($tailBlock);
-       } else {
-         $parsedCmd.=";;" if ($tailBlock);
-       }
+        }
     }
   }
   return($parsedCmd,"");
