@@ -301,8 +301,9 @@ statistics_DoStatistics($$$)
       $monReadingName = "monitoredDevices".$devType; 
       readingsBulkUpdate($hash,"state","Updated stats for: $devName",1);
    } else {
-      $monReadingName = "monitoredDevicesUnsupported"; 
-      $regExp = '^$devName($devType)$|^$devName($devType),|,$devName($devType)$|,$devName($devType),';
+      $monReadingName = "monitoredDevicesUnsupported";
+      $devName .= "#$devType";
+      $regExp = '^'.$devName.'$|^'.$devName.',|,'.$devName.'$|,'.$devName.',';
    }
    my $monReadingValue = ReadingsVal($hashName,$monReadingName,"");
    if ($monReadingValue !~ /$regExp/) {
