@@ -2,7 +2,6 @@
 # $Id$
 #
 #  98_statistic.pm
-#
 #  Copyright notice
 #
 #  (c) 2014 Torsten Poitzsch < torsten . poitzsch at gmx . de >
