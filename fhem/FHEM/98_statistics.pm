@@ -44,7 +44,7 @@ sub statistics_doStatisticMinMaxSingle ($$$$$$);
 sub statistics_doStatisticDelta ($$$$$); 
 
 # Modul Version for remote debugging
-  my $modulVersion = "2014-05-04";
+  my $modulVersion = "2014-05-10";
 
 ##############################################################
 # Syntax: deviceType, readingName, statisticType, decimalPlaces
@@ -133,12 +133,12 @@ statistics_Notify($$)
    my $devName = $dev->{NAME};
 
  # At startup: delete old Readings of monitored devices and rebuild from hidden readings 
-  if ($devName eq "global" && grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}}) && exists ($hash->{READINGS})) {
-      my %unknownDevices;
-     foreach my $r (keys ($hash->{READINGS})) {
+  if ($devName eq "global" && grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}})) {
+     my %unknownDevices;
+     foreach my $r (keys %{$hash->{READINGS}}) {
          if ($r =~ /^\.(.*):.*/) { $unknownDevices{$1}++; }
      }
-     foreach my $r (keys $hash->{READINGS}) {
+     foreach my $r (keys %{$hash->{READINGS}}) {
          if ($r =~ /^monitoredDevices.*/) {
             Log3 $name,5,"$name: Initialization - Delete old reading '$r'.";
             delete($hash->{READINGS}{$r}); 
@@ -225,7 +225,7 @@ statistics_PeriodChange($)
    elsif ($monthNow != $monthLast) { $periodSwitch = 3; }
    elsif ($dayNow != $dayLast) { $periodSwitch = 2; }
 
-   foreach my $r (keys $hash->{READINGS}) 
+   foreach my $r (keys %{$hash->{READINGS}}) 
    {
       if ($r =~ /^monitoredDevices.*/) {
          if ($r !~/UnknownTypes|Unsupported/) {
@@ -299,7 +299,7 @@ statistics_DoStatistics($$$)
    my $monReadingName;
    if ($statisticDone ==1) { 
       $monReadingName = "monitoredDevices".$devType; 
-      readingsBulkUpdate($hash,"state","Last calculated device: $devName",1);
+      readingsBulkUpdate($hash,"state","Updated stats for: $devName",1);
    } else {
       $monReadingName = "monitoredDevicesUnsupported"; $devName .= "($devType)",
    }
