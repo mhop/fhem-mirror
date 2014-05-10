@@ -479,11 +479,12 @@ WeatherIconIMGTag($) {
 
 #####################################
 sub
-WeatherAsHtmlV($)
+WeatherAsHtmlV($;$)
 {
 
-  my ($d) = @_;
+  my ($d,$items) = @_;
   $d = "<none>" if(!$d);
+  $items = 6 if( !$items );
   return "$d is not a Weather instance<br>"
         if(!$defs{$d} || $defs{$d}{TYPE} ne "Weather");
 
@@ -497,7 +498,7 @@ WeatherAsHtmlV($)
         ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""),
         ReadingsVal($d, "wind_condition", ""));
 
-  for(my $i=1; $i<=5; $i++) {
+  for(my $i=1; $i<$items; $i++) {
     $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherMin">min %s°C</span> <span class="weatherMax">max %s°C</span></td></tr>',
         $width,
         WeatherIconIMGTag(ReadingsVal($d, "fc${i}_icon", "")),
@@ -511,18 +512,19 @@ WeatherAsHtmlV($)
 }
 
 sub
-WeatherAsHtml($)
+WeatherAsHtml($;$)
 {
-  my ($d) = @_;
-  WeatherAsHtmlV($d);
+  my ($d,$i) = @_;
+  WeatherAsHtmlV($d,$i);
 }
 
 sub
-WeatherAsHtmlH($)
+WeatherAsHtmlH($;$)
 {
 
-  my ($d) = @_;
+  my ($d,$items) = @_;
   $d = "<none>" if(!$d);
+  $items = 6 if( !$items );
   return "$d is not a Weather instance<br>"
         if(!$defs{$d} || $defs{$d}{TYPE} ne "Weather");
 
@@ -536,14 +538,14 @@ WeatherAsHtmlH($)
   
   # icons
   $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "icon", "")));
-  for(my $i=1; $i<=5; $i++) {
+  for(my $i=1; $i<$items; $i++) {
     $ret .= sprintf('<td class="weatherIcon" width=%d>%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "fc${i}_icon", "")));
   }
   $ret .= '</tr>';
   
   # condition
   $ret .= sprintf('<tr><td class="weatherDay">%s</td>', ReadingsVal($d, "condition", ""));
-  for(my $i=1; $i<=5; $i++) {
+  for(my $i=1; $i<$items; $i++) {
     $ret .= sprintf('<td class="weatherDay">%s: %s</td>', ReadingsVal($d, "fc${i}_day_of_week", ""),
         ReadingsVal($d, "fc${i}_condition", ""));
   }
@@ -551,14 +553,14 @@ WeatherAsHtmlH($)
   
   # temp/hum | min
   $ret .= sprintf('<tr><td class="weatherMin">%s°C %s%%</td>', ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""));
-  for(my $i=1; $i<=5; $i++) {
+  for(my $i=1; $i<$items; $i++) {
     $ret .= sprintf('<td class="weatherMin">min %s°C</td>', ReadingsVal($d, "fc${i}_low_c", ""));
   }
   $ret .= '</tr>';
   
   # wind | max
   $ret .= sprintf('<tr><td class="weatherMax">%s</td>', ReadingsVal($d, "wind_condition", ""));
-  for(my $i=1; $i<=5; $i++) {
+  for(my $i=1; $i<$items; $i++) {
     $ret .= sprintf('<td class="weatherMax">max %s°C</td>', ReadingsVal($d, "fc${i}_high_c", ""));
   }
   $ret .= "</tr></table>";
@@ -567,13 +569,13 @@ WeatherAsHtmlH($)
 }
 
 sub
-WeatherAsHtmlD($)
+WeatherAsHtmlD($;$)
 {
-  my ($d) = @_;
+  my ($d,$i) = @_;
   if($FW_ss) {
-    WeatherAsHtmlV($d);
+    WeatherAsHtmlV($d,$i);
   } else {
-    WeatherAsHtmlH($d);
+    WeatherAsHtmlH($d,$i);
   }
 }
 
@@ -624,7 +626,7 @@ WeatherAsHtmlD($)
     The module provides four additional functions <code>WeatherAsHtml</code>, <code>WeatherAsHtmlV</code>, <code>WeatherAsHtmlH</code> and
     <code>WeatherAsHtmlD</code>. The former two functions are identical: they return the HTML code for a
     vertically arranged weather forecast. The third function returns the HTML code for a horizontally arranged weather forecast. The 
-    latter function dynamically picks the orientation depending on wether a smallscreen style is set (vertical layout) or not (horizontal layout).<br><br>
+    latter function dynamically picks the orientation depending on wether a smallscreen style is set (vertical layout) or not (horizontal layout). Each version accepts an additional paramter to limit the numer of icons to display.<br><br>
     Example:
     <pre>
       define MyWeatherWeblink weblink htmlCode { WeatherAsHtmlH("MyWeather") }
@@ -721,7 +723,7 @@ WeatherAsHtmlD($)
       define Forecast Weather 673513 1800
      </pre>
      
-    Das Modul unterstützt zusätzlich vier verschiedene Funktionen <code>WeatherAsHtml</code>, <code>WeatherAsHtmlV</code>, <code>WeatherAsHtmlH</code> und <code>WeatherAsHtmlD</code>. Die ersten beiden Funktionen sind identisch: sie erzeugen den HTML-Code für eine vertikale Darstellung des Wetterberichtes. Die dritte Funktion liefert den HTML-Code für eine horizontale Darstellung des Wetterberichtes. Die letztgenannte Funktion wählt automatisch eine Ausrichtung, die abhängig davon ist, ob ein Smallcreen Style ausgewählt ist (vertikale Darstellung) oder nicht (horizontale Darstellung).<br><br>
+    Das Modul unterstützt zusätzlich vier verschiedene Funktionen <code>WeatherAsHtml</code>, <code>WeatherAsHtmlV</code>, <code>WeatherAsHtmlH</code> und <code>WeatherAsHtmlD</code>. Die ersten beiden Funktionen sind identisch: sie erzeugen den HTML-Code für eine vertikale Darstellung des Wetterberichtes. Die dritte Funktion liefert den HTML-Code für eine horizontale Darstellung des Wetterberichtes. Die letztgenannte Funktion wählt automatisch eine Ausrichtung, die abhängig davon ist, ob ein Smallcreen Style ausgewählt ist (vertikale Darstellung) oder nicht (horizontale Darstellung). Alle vier Funnktionen akzeptieren einen zusätzlichen optionalen Paramter um die Anzahl der darzustellenden Icons anzugeben.<br><br>
     Beispiel:
     <pre>
       define MyWeatherWeblink weblink htmlCode { WeatherAsHtmlH("MyWeather") }
