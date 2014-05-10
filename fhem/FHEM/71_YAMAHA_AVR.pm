@@ -231,6 +231,14 @@ YAMAHA_AVR_GetStatus($;$)
 			}
 			
 		}
+        else
+        {
+            readingsBulkUpdate($hash, "currentAlbum", "", 0);
+            readingsBulkUpdate($hash, "currentTitle", "", 0);
+            readingsBulkUpdate($hash, "currentChannel", "", 0);
+            readingsBulkUpdate($hash, "currentStation", "", 0);
+            readingsBulkUpdate($hash, "currentArtist", "", 0);
+        }
     }
     
     # input name as it is displayed on the receivers front display
@@ -1122,6 +1130,7 @@ sub YAMAHA_AVR_html2txt($)
 
     $string =~ s/&nbsp;/ /g;
     $string =~ s/&amp;/&/g;
+    $string =~ s/&apos;/'/g;
     $string =~ s/(\xe4|&auml;)/ä/g;
     $string =~ s/(\xc4|&Auml;)/Ä/g;
     $string =~ s/(\xf6|&ouml;)/ö/g;
