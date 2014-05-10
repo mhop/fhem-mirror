@@ -48,7 +48,7 @@ sub LUXTRONIK2_doStatisticDelta ($$$$$) ;
 sub LUXTRONIK2_doStatisticDeltaSingle ($$$$$$);
 
 # Modul Version for remote debugging
-  my $modulVersion = "2014-05-03";
+  my $modulVersion = "2014-05-10";
 
 #List of firmware versions that are known to be compatible with this modul
   my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.69#V1.70#";
@@ -1509,7 +1509,7 @@ LUXTRONIK2_doStatisticMinMaxSingle ($$$$)
       $a[1]++; # Count
       $a[3] += $value; # Sum
       if ($value < $b[1]) { $b[1]=$value; } # Min
-      $b[3] = sprintf "%.1f" , $a[3] / $a[1]; # Avg
+      if ($a[1]>0) {$b[3] = sprintf "%.1f" , $a[3] / $a[1];} # Avg
       if ($value > $b[5]) { $b[5]=$value; } # Max
 
       # in case of period change, save "last" values and reset counters

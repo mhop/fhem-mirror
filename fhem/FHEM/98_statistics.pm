@@ -378,7 +378,7 @@ statistics_doStatisticMinMaxSingle ($$$$$$)
       $hidden[1] += $hidden[5] * $timeDiff; # sum
       $hidden[3] += $timeDiff; # time
       if ($value < $stat[1]) { $stat[1]=$value; } # Min
-      $stat[3] = $hidden[1] / $hidden[3]; # Avg
+      if ($hidden[3]>0) {$stat[3] = $hidden[1] / $hidden[3];} # Avg
       if ($value > $stat[5]) { $stat[5]=$value; } # Max
    }
 
