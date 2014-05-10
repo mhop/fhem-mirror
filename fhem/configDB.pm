@@ -852,7 +852,9 @@ sub _cfgDB_Fileimport($;$) {
 	open (in,"<$filename") || die $!;
 	while (<in>){
 		$counter++;
-		my $line = substr($_,0,length($_)-1);
+		my $line = $_;
+		$line =~ s/\n//;
+#		my $line = substr($_,0,length($_)-1);
 		$sth->execute($filename, $line);
 	}
 	close in;
