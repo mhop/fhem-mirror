@@ -279,7 +279,7 @@ FW_Read($)
   }
 
   $hash->{BUF} .= $buf;
-  if($defs{$FW_wname}{SSL}) {
+  if($defs{$FW_wname}{SSL} && $c->can('pending')) {
     while($c->pending()) {
       sysread($c, $buf, 1024);
       $hash->{BUF} .= $buf;
