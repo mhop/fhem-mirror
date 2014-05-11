@@ -182,8 +182,22 @@ SYSMON_updateCurrentReadingsMap($) {
   $rMap->{"idletime"}        = "Idle time";
   $rMap->{"idletime_text"}   = "Idle time";
   $rMap->{"loadavg"}         = "Load average";
+  $rMap->{"loadavg_1"}       = "Load average 1";
+  $rMap->{"loadavg_5"}       = "Load average 5";
+  $rMap->{"loadavg_15"}      = "Load average 15";
+  
   $rMap->{"ram"}             = "RAM";
+  $rMap->{"ram_total"}       = "RAM total";
+  $rMap->{"ram_used"}        = "RAM used";
+  $rMap->{"ram_free"}        = "RAM free";
+  $rMap->{"ram_free_percent"}= "RAM free %";
+  
   $rMap->{"swap"}            = "swap";
+  $rMap->{"swap_total"}      = "swap total";
+  $rMap->{"swap_used"}       = "swap used";
+  $rMap->{"swap_free"}       = "swap free";
+  $rMap->{"swap_used_percent"}= "swap used %";
+  
   $rMap->{"uptime"}          = "System up time";
   $rMap->{"uptime_text"}     = "System up time";
 
@@ -192,6 +206,15 @@ SYSMON_updateCurrentReadingsMap($) {
   $rMap->{"stat_cpu_diff"}     = "CPU statistics (diff)";
   $rMap->{"stat_cpu_percent"}  = "CPU statistics (diff, percent)";
   $rMap->{"stat_cpu_text"}     = "CPU statistics (text)";
+  
+  $rMap->{"stat_cpu_user_percent"} = "CPU statistics user %";
+  $rMap->{"stat_cpu_nice_percent"} = "CPU statistics nice %";
+  $rMap->{"stat_cpu_sys_percent"}  = "CPU statistics sys %";
+  $rMap->{"stat_cpu_idle_percent"} = "CPU statistics idle %";
+  $rMap->{"stat_cpu_io_percent"}   = "CPU statistics io %";
+  $rMap->{"stat_cpu_irq_percent"}  = "CPU statistics irq %";
+  $rMap->{"stat_cpu_sirq_percent"} = "CPU statistics sirq %";
+  
   # CPU 0-7 (sollte reichen)
   for my $i (0..7) { 
     $rMap->{"stat_cpu".$i}            = "CPU".$i." statistics";
@@ -206,17 +229,24 @@ SYSMON_updateCurrentReadingsMap($) {
     my @filesystem_list = split(/,\s*/, trim($filesystems));
     foreach (@filesystem_list) {
       my($fName, $fDef, $nComment) = split(/:/, $_);
+      my $fPt; 
       if(defined $nComment) {
-      	$rMap->{$fName}       =  $nComment;
+      	$fPt = $nComment;
       } else {
 	      if(defined $fDef) {
 	    	  # Benannte
-		      $rMap->{$fName}     = "Filesystem ".$fDef;
+	    	  $fPt = "Filesystem ".$fDef;
 	      } else {
 	    	  # Unbenannte
-	    	  $rMap->{$fName}     = "Mount point ".$fName;
+	    	  $fPt = "Mount point ".$fName;
 	      }
 	    }
+	    
+	    $rMap->{$fName}         =  $fPt;
+	    $rMap->{$fName."_used"} =  $fPt." (used)";
+	    $rMap->{$fName."_used_percent"} =  $fPt." (used %)";
+	    $rMap->{$fName."_free"} =  $fPt." (free)";
+	    
     }
   } else {
   	$rMap->{"root"}     = "Filesystem /";
@@ -228,20 +258,24 @@ SYSMON_updateCurrentReadingsMap($) {
   	my @networkadapters_list = split(/,\s*/, trim($networkadapters));
     foreach (@networkadapters_list) {
       my($nName, $nDef, $nComment) = split(/:/, $_);
+      my $nPt; 
       if(defined $nComment) {
-      	$rMap->{$nName}           =  $nComment;
-      	$rMap->{$nName."_diff"}   =  $nComment." (diff)";
+      	$nPt = $nComment;
       } else {
 	      if(defined $nDef) {
 	    	  # Benannte
-		      $rMap->{$nName}         = "Network ".$nDef;
-		      $rMap->{$nName."_diff"} = "Network ".$nDef." (diff)";
+	    	  $nPt = "Network ".$nDef;
 	      } else {
 	    	  # Unbenannte
-	    	  $rMap->{$nName}         = "Network adapter ".$nName;
-	    	  $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    	  $nPt = "Network adapter ".$nName;
 	      }
 	    }
+	    
+	    $rMap->{$nName}           =  $nPt;
+      $rMap->{$nName."_diff"}   =  $nPt." (diff)";
+	    $rMap->{$nName."_rx"}     =  $nPt." (RX)";
+	    $rMap->{$nName."_tx"}     =  $nPt." (TX)";
+	    
     }
   } else {
   	# Default Networkadapters
@@ -250,47 +284,69 @@ SYSMON_updateCurrentReadingsMap($) {
   		my $nName = "ath0";
 		  $rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
 	    
 	    $nName = "ath1";
 		  $rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
 	    
 	    $nName = "cpmac0";
 		  $rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
 	    
 	    $nName = "dsl";
       $rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
 	    
 	    $nName = ETH0;
 		  $rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
 	    
 	    $nName = "guest";
 	  	$rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
 	    
 	    $nName = "hotspot";
     	$rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
 	    
 	    $nName = "lan";
 		  $rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
 	    
 	    $nName = "vdsl";
 		  $rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
-	   
+	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+	    
 	  } else {
 	  	my $nName = ETH0;
 	  	$rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
-      
+      $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+	    
       $nName = WLAN0;
       $rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
     }
   }
   
@@ -579,11 +635,13 @@ SYSMON_obtainParameters($$)
 
 	my $map;
 
-	my $base=0;
+	my $base=$DEFAULT_INTERVAL_BASE; 
 	my $im = "1 1 1 10";
-	# Wenn wesentliche Parameter nicht definiert sind, soll ktualisierung immer vorgenommen werden
-	if((defined $hash->{INTERVAL_BASE}) && (defined $hash->{INTERVAL_MULTIPLIERS})) {
+	# Wenn wesentliche Parameter nicht definiert sind, soll aktualisierung immer vorgenommen werden
+	if((defined $hash->{INTERVAL_BASE})) {
   	$base = $hash->{INTERVAL_BASE};
+  }
+  if((defined $hash->{INTERVAL_MULTIPLIERS})) {
   	$im = $hash->{INTERVAL_MULTIPLIERS};
   }
 
