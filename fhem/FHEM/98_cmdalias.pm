@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 98_cmdalias.pm 3738 2013-08-18 14:13:59Z rudolfkoenig $
+# $Id$
 # Avarage computing
 
 package main;

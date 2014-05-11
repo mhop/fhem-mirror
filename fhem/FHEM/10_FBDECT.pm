@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 10_FBDECT.pm 2779 2013-02-21 08:52:27Z rudolfkoenig $
+# $Id$
 package main;
 
 # TODO: test multi-dev, test on the FB

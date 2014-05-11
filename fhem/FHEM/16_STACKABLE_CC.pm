@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 16_STACKABLE_CC.pm 3738 2013-08-18 14:13:59Z rudolfkoenig $
+# $Id$
 package main;
 use strict;
 use warnings;
