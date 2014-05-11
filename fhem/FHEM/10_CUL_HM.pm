@@ -1140,30 +1140,38 @@ sub CUL_HM_Parse($$) {#########################################################
   }
   elsif($md eq "HM-TC-IT-WM-W-EU") { ##########################################
     my %ctlTbl=( 0=>"auto", 1=>"manu", 2=>"party",3=>"boost");
-    if   ($mTp eq "10" && $p =~ m/^0B/) {#info-level
+    if( ( $mTp eq "10" && $mI[0] eq '0B')  #info-level
+      ||( $mTp eq "02" && $mI[0] eq '01')) {#ack-status
       my @d = map{hex($_)} unpack 'A2A4(A2)*',$p;
       my ($chn,$setTemp,$actTemp, $cRep,$bat,$lbat,$wRep, $ctrlMode) =
           ("02",$d[1],$d[1],      $d[2],$d[2],$d[2],$d[2],$d[3]);
-      $setTemp    =(($setTemp    >>10) & 0x3f )/2;
-      $actTemp    =(($actTemp        ) & 0x3ff)/10;
-      $actTemp    = -1 * $actTemp if ($d[1] & 0x200 );# obey signed
       $bat        =(($bat            ) & 0x1f)/10+1.5;
       $lbat       = ($lbat           ) & 0x80;
       $ctrlMode   = ($ctrlMode   >> 6) & 0x3  ;
-      $actTemp = sprintf("%2.1f",$actTemp);
-      $setTemp = ($setTemp < 5 )?'off':
-                 ($setTemp >30 )?'on' :sprintf("%.1f",$setTemp);
 
       my $dHash = $shash;
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
-      push @evtEt,[$shash,1,"measured-temp:$actTemp"];
+      if ($mTp eq "10"){
+        $setTemp    =(($setTemp    >>10) & 0x3f )/2;
+        $actTemp    =(($actTemp        ) & 0x3ff)/10;
+        $actTemp    = -1 * $actTemp if ($d[1] & 0x200 );# obey signed
+        $actTemp = sprintf("%2.1f",$actTemp);
+        push @evtEt,[$shash,1,"measured-temp:$actTemp"];
+        push @evtEt,[$dHash,1,"measured-temp:$actTemp"];
+      }
+      else{#actTemp is not provided in ack message - use old value
+        $actTemp = ReadingsVal($name,"measured-temp",0);
+        $setTemp  =(hex($mI[2]) & 0x3f )/2;
+      }
+      $setTemp = ($setTemp < 5 )?'off':
+                 ($setTemp >30 )?'on' :sprintf("%.1f",$setTemp);
+
       push @evtEt,[$shash,1,"desired-temp:$setTemp"];
       push @evtEt,[$shash,1,"mode:$ctlTbl{$ctrlMode}"];
       push @evtEt,[$shash,1,"state:T: $actTemp desired: $setTemp"];
       push @evtEt,[$dHash,1,"battery:".($lbat?"low":"ok")];
       push @evtEt,[$dHash,1,"batteryLevel:$bat"];
-      push @evtEt,[$dHash,1,"measured-temp:$actTemp"];
       push @evtEt,[$dHash,1,"desired-temp:$setTemp"];
     }
     elsif($mTp eq "70"){
@@ -1766,10 +1774,9 @@ sub CUL_HM_Parse($$) {#########################################################
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
       push @evtEt,[$shash,1,"alive:yes"];
       push @evtEt,[$shash,1,"battery:". (($err&0x80)?"low"  :"ok"  )];
-      if (   $md eq "HM-SEC-SC" ||
-             $md eq "HM-Sec-RHS"){push @evtEt,[$shash,1,"sabotageError:".(($err&0x0E)?"on":"off")];
-      }elsif($md ne "HM-SEC-WDS"){push @evtEt,[$shash,1,"cover:"        .(($err&0x0E)?"open" :"closed")];
-      }
+      if (  $md eq "HM-SEC-SC" ||
+            $md eq "HM-Sec-RHS"){push @evtEt,[$shash,1,"sabotageError:".(($err&0x0E)?"on"   :"off")];}
+      elsif($md ne "HM-SEC-WDS"){push @evtEt,[$shash,1,"cover:"        .(($err&0x0E)?"open" :"closed")];}
     }
     elsif($mTp eq "41"){
       ($chn,$cnt,$state)=(hex($1),$2,$3) if($p =~ m/^(..)(..)(..)/);
