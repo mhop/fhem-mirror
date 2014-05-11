@@ -1776,6 +1776,7 @@ sub CUL_HM_Parse($$) {#########################################################
       $chn = sprintf("%02X",$chn&0x3f);
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
+      push @evtEt,[$shash,1,"battery:". ((hex($mI[1])&0x80)?"low"  :"ok"  )];
     }
     if (defined($state)){# if state was detected post events
       my $txt;
