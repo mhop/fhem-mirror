@@ -5631,45 +5631,45 @@ sub CUL_HM_initRegHash() { #duplicate short and long press register
   }
   closedir(DH);
 
-  foreach my $reg (keys %{$culHmRegDefShLg}){ #update register list
-    %{$culHmRegDefine->{"sh".$reg}} = %{$culHmRegDefShLg->{$reg}};
-    %{$culHmRegDefine->{"lg".$reg}} = %{$culHmRegDefShLg->{$reg}};
-    $culHmRegDefine->{"lg".$reg}{a} +=0x80;
-  }
-  foreach my $rN  (keys %{$culHmRegDefine}){#create literal inverse for fast search
-    if ($culHmRegDefine->{$rN}{lit}){# literal assigned => create inverse
-      foreach my $lit (keys %{$culHmRegDefine->{$rN}{lit}}){
-        $culHmRegDefine->{$rN}{litInv}{$culHmRegDefine->{$rN}{lit}{$lit}}=$lit;
-      }
-    }
-  }
-  foreach my $type(sort(keys %{$culHmRegType})){ #update references to register
-    foreach my $reg (sort(keys %{$culHmRegType->{$type}})){
-      if ($culHmRegDefShLg->{$reg}){
-        delete $culHmRegType->{$type}{$reg};
-        $culHmRegType->{$type}{"sh".$reg} = 1;
-        $culHmRegType->{$type}{"lg".$reg} = 1;
-      }
-    }
-  }
-  foreach my $type(sort(keys %{$culHmRegModel})){ #update references to register
-    foreach my $reg (sort(keys %{$culHmRegModel->{$type}})){
-      if ($culHmRegDefShLg->{$reg}){
-        delete $culHmRegModel->{$type}{$reg};
-        $culHmRegModel->{$type}{"sh".$reg} = 1;
-        $culHmRegModel->{$type}{"lg".$reg} = 1;
-      }
-    }
-  }
-  foreach my $type(sort(keys %{$culHmRegChan})){ #update references to register
-    foreach my $reg (sort(keys %{$culHmRegChan->{$type}})){
-      if ($culHmRegDefShLg->{$reg}){
-        delete $culHmRegChan->{$type}{$reg};
-        $culHmRegChan->{$type}{"sh".$reg} = 1;
-        $culHmRegChan->{$type}{"lg".$reg} = 1;
-      }
-    }
-  }
+# foreach my $reg (keys %{$culHmRegDefShLg}){ #update register list
+#   %{$culHmRegDefine->{"sh".$reg}} = %{$culHmRegDefShLg->{$reg}};
+#   %{$culHmRegDefine->{"lg".$reg}} = %{$culHmRegDefShLg->{$reg}};
+#     $culHmRegDefine->{"lg".$reg}{a} +=0x80;
+# }
+# foreach my $rN  (keys %{$culHmRegDefine}){#create literal inverse for fast search
+#   if ($culHmRegDefine->{$rN}{lit}){# literal assigned => create inverse
+#     foreach my $lit (keys %{$culHmRegDefine->{$rN}{lit}}){
+#       $culHmRegDefine->{$rN}{litInv}{$culHmRegDefine->{$rN}{lit}{$lit}}=$lit;
+#     }
+#   }
+# }
+#  foreach my $type(sort(keys %{$culHmRegType})){ #update references to register
+#    foreach my $reg (sort(keys %{$culHmRegType->{$type}})){
+#      if ($culHmRegDefShLg->{$reg}){
+#        delete $culHmRegType->{$type}{$reg};
+#        $culHmRegType->{$type}{"sh".$reg} = 1;
+#        $culHmRegType->{$type}{"lg".$reg} = 1;
+#      }
+#    }
+#  }
+#  foreach my $type(sort(keys %{$culHmRegModel})){ #update references to register
+#    foreach my $reg (sort(keys %{$culHmRegModel->{$type}})){
+#      if ($culHmRegDefShLg->{$reg}){
+#        delete $culHmRegModel->{$type}{$reg};
+#        $culHmRegModel->{$type}{"sh".$reg} = 1;
+#        $culHmRegModel->{$type}{"lg".$reg} = 1;
+#      }
+#    }
+#  }
+#  foreach my $type(sort(keys %{$culHmRegChan})){ #update references to register
+#    foreach my $reg (sort(keys %{$culHmRegChan->{$type}})){
+#      if ($culHmRegDefShLg->{$reg}){
+#        delete $culHmRegChan->{$type}{$reg};
+#        $culHmRegChan->{$type}{"sh".$reg} = 1;
+#        $culHmRegChan->{$type}{"lg".$reg} = 1;
+#      }
+#    }
+#  }
 }
 
 my %fltCvT60 = (1=>127,60=>7620);

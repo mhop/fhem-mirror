@@ -421,7 +421,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   brightness      =>{a=>  4.0,s=>0.4,l=>0,min=>0  ,max=>15      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Display brightness"},
   energyOpt       =>{a=>  8.0,s=>1.0,l=>0,min=>0  ,max=>127     ,c=>''         ,f=>2       ,u=>'s'   ,d=>1,t=>"energy Option: Duration of ilumination"},
 # sec_mdir
-  cyclicInfoMsg   =>{a=>  9.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message"          ,lit=>{off=>0,on=>200}},
+  cyclicInfoMsg   =>{a=>  9.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message"          ,lit=>{off=>0,on=>1,on_100=>200}},
   sabotageMsg     =>{a=> 16.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"enable sabotage message" ,lit=>{off=>0,on=>1}},# sc needs 1 - others?
   cyclicInfoMsgDis=>{a=> 17.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message"},
   lowBatLimit     =>{a=> 18.0,s=>1.0,l=>0,min=>10 ,max=>12      ,c=>''         ,f=>10      ,u=>'V'   ,d=>1,t=>"low batterie limit, step .1V"},
@@ -1721,5 +1721,46 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                      TEMP     => '00,4,$val=((hex($val)&0x3FFF)/10)*((hex($val)&0x4000)?-1:1)',
                      HUM      => '04,2,$val=(hex($val))', } },
 );
+
+
+  foreach my $reg (keys %culHmRegDefShLg){ #update register list
+    %{$culHmRegDefine{"sh".$reg}} = %{$culHmRegDefShLg{$reg}};
+    %{$culHmRegDefine{"lg".$reg}} = %{$culHmRegDefShLg{$reg}};
+    $culHmRegDefine{"lg".$reg}{a} +=0x80;
+  }
+  foreach my $rN  (keys %culHmRegDefine){#create literal inverse for fast search
+    if ($culHmRegDefine{$rN}{lit}){# literal assigned => create inverse
+      foreach my $lit (keys %{$culHmRegDefine{$rN}{lit}}){
+        $culHmRegDefine{$rN}{litInv}{$culHmRegDefine{$rN}{lit}{$lit}}=$lit;
+      }
+    }
+  }
+  foreach my $type (keys %culHmRegType){ #update references to register
+    foreach my $reg (keys %{$culHmRegType{$type}}){
+      if ($culHmRegDefShLg{$reg}){
+        delete $culHmRegType{$type}{$reg};
+        $culHmRegType{$type}{"sh".$reg} = 1;
+        $culHmRegType{$type}{"lg".$reg} = 1;
+      }
+    }
+  }
+  foreach my $type(keys %culHmRegModel){ #update references to register
+    foreach my $reg (keys %{$culHmRegModel{$type}}){
+      if ($culHmRegDefShLg{$reg}){
+        delete $culHmRegModel{$type}{$reg};
+        $culHmRegModel{$type}{"sh".$reg} = 1;
+        $culHmRegModel{$type}{"lg".$reg} = 1;
+      }
+    }
+  }
+  foreach my $type (keys %culHmRegChan){ #update references to register
+    foreach my $reg (keys %{$culHmRegChan{$type}}){
+      if ($culHmRegDefShLg{$reg}){
+        delete $culHmRegChan{$type}{$reg};
+        $culHmRegChan{$type}{"sh".$reg} = 1;
+        $culHmRegChan{$type}{"lg".$reg} = 1;
+      }
+    }
+  }
 
 1;
