@@ -1293,7 +1293,7 @@ sub HMInfo_help(){ ############################################################
            ."\n"
            ."\n set cpRegs <src:peer> <dst:peer>"
            ."\n            copy register for a channel or behavior of channel/peer"
-           ."\n set templateDef <entity> <templateName> <param1[:<param2>...] <description> <reg1>:<val1> [<reg2>:<val2>] ... "
+           ."\n set templateDef <templateName> <param1[:<param2>...] <description> <reg1>:<val1> [<reg2>:<val2>] ... "
            ."\n                 define a template"
            ."\n set templateSet <entity> <templateName> <peer:[long|short]> [<param1> ...] "
            ."\n                 write register according to a given template"
@@ -1543,7 +1543,7 @@ sub HMinfo_templateDef(@){#####################################################
       return " empty reg value for $r";
     }
     elsif($v =~ m/^p(.)/){
-      return ($1+1)." params are necessary, only $paramNo aregiven"
+      return ($1+1)." params are necessary, only $paramNo given"
             if (($1+1)>$paramNo);
     }
     $HMConfig::culHmTpl{$name}{reg}{$r} = $v;
