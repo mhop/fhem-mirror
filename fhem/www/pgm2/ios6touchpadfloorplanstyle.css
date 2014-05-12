@@ -1,0 +1,177 @@
+/* iOS 6 Theme for FHEM */
+/* by Sandra Ohmayer */
+/* http://www.animeschatten.net */
+
+#menu {
+height: 100vh;
+}
+#fpmenu.fp_arrange   {
+position:absolute; top:20px; left:220px; 
+}
+/*iPad Skalierung*/
+/* iPads (landscape) ----------- */
+@media only screen
+and (min-device-width : 768px)
+and (max-device-width : 1024px)
+and (orientation : landscape) {
+body {
+width:1024px;
+}
+#menu {
+height: 748px;
+}
+}
+
+/* iPads (portrait) ----------- */
+@media only screen
+and (min-device-width : 768px)
+and (max-device-width : 1024px)
+and (orientation : portrait) {
+body {
+width:768px;
+}
+#menu {
+height: 1004px;
+}
+}
+body     {
+background-color: #F7F7F7;
+background-repeat:no-repeat;
+margin: 0px;
+padding: 0px;
+font: normal 9px Helvetica, Sans-serif;
+text-decoration:none;
+color: #385487;
+font-weight:normal;
+}
+
+body[id~=Media]     { background-color: #A5A5A5;
+                        font-family:Arial, sans-serif; 
+                        font-size:9px;  
+                        background-image:url(../icons/Media.bak);
+                        background-repeat:no-repeat;  }
+
+#logo    { position:absolute; top: 10px; left: 10px; 
+           width:64px;  height:67px; background-image:url(../icons/fhem_smallscreen); }
+#backimg {
+	position:absolute; top:0px; left:201px;
+}
+#menu.floorplan   { 
+overflow: auto;
+width: 200px;
+background-color: #d7dadf;
+position:absolute;
+top:0px;
+font-size:14px;
+margin:0px;
+padding:0px;
+border-right: 1px solid #000000;
+}
+#menu.floorplan a {
+padding-left: 10px;
+vertical-align: middle;
+color:#000000;
+text-shadow: 0px 1px #FFFFFF;
+font-weight:bold;
+}
+
+#menu.floorplan table {
+margin-bottom: 10px;
+border-spacing:0px;
+padding:0px;
+width: 100%;
+-moz-box-shadow: 0px 1px 2px #ebedee, 0px -1px #b7b9bb; 
+-webkit-box-shadow: 0px 1px 2px #ebedee, 0px -1px #b7b9bb; 
+box-shadow: 0px 1px 2px #ebedee, 0px -1px #b7b9bb; 
+}
+
+#menu.floorplan tr {
+background-image: -webkit-gradient(
+linear,
+right top,
+right bottom,
+color-stop(0, #F8F9FA),
+color-stop(0.02, #EBEDEF),
+color-stop(0.04, #E4E6EA),
+color-stop(0.96, #E2E5E8),
+color-stop(0.98, #D4D7D9),
+color-stop(1, #B7B9BB)
+);
+background-image: -o-linear-gradient(bottom, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%);
+background-image: -moz-linear-gradient(bottom, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%);
+background-image: -webkit-linear-gradient(top, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%);
+background-image: -ms-linear-gradient(bottom, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%);
+background-image: linear-gradient(to bottom, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%);
+height: 44px;
+}
+
+#fpmenu.fp_arrange   {
+	z-index:99;
+min-width:310px; font-size:9px; border:1px solid gray;
+background-color:#F7F7F7;
+}
+#startcontent {position:absolute; top:20px; left:180px; text-align:left; font-size: 16px; } 
+table a:hover {font-weight:bold;}
+#hdr     { position:absolute; top:10px; left:180px; border:1px solid gray; }
+#content { position:absolute; top:50px; left:180px; bottom:10px; right:10px; text-align:center}
+#errmsg { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:40px; z-index: 10; }
+img {  border-style: none; }
+
+.fp_Grundriss   {border:0px solid gray;}
+
+      .devicename     {font-size: 11px; text-align:center; }
+      .devicestate    {text-align:center; }
+      .devicecommands {font-size:14px; text-align:center; }
+      .devicetimestamp{font-size:10px; text-align:center; }
+
+#sz_Rollo.devicename     {font-size:14px;}
+#sz_Rollo.devicecommands {font-size:12px; text-align:center; }
+#ez_Aussensensor.devicestate  {color:green; font-size:30px; }
+#HomeStatus.devicestate  {color:green; font-size:30px; }
+table.dummy              {min-width:100px; }
+table.FHT                {min-width:100px; }
+#wakeup.devicestate      {color:green; font-size:11px; }
+#ez_FHT.devicestate      {color:green; font-size:30px; }
+#Home.fp_Grundriss       {font-size:14px; width:100px; }
+#Home.fp_Media           {font-size:14px; text-align:left; }
+#Media                   {font-size:14px; }
+#Grundriss               {font-size:14px; text-align:left; }
+.fp_tempvalue            {color:red; font-size:20px; }
+.fp_humvalue             {color:blue; font-size:20px; } 
+
+.screen {
+	position:absolute;
+	top:0px;
+	left: 201px;
+}
+
+h2,h3,h4 { color:#52865D; line-height:1.3;
+           margin-top:1.5em; font-family:Arial,Sans-serif; }
+.at {
+	width:100px;
+
+}
+
+/* detail-selector & slider */
+select {  margin-left:5px; margin-right:5px; }
+.set,.attr { margin-bottom:5px; float:left; }
+.slider { float:left; width:140px; height:26px; border:2px solid; color:grey; }
+.set .slider { background:#F0F0D8; border-radius:8px; }
+/* timepicker */
+.set .set { margin-bottom:2px; margin-top:3px; }
+
+.handle { position:relative; cursor:pointer; width:50px;
+          height:20px; line-height:20px; user-select:none;
+          border:3px solid; color:#278727; text-align:center; } 
+.downText { margin-top:2px; }
+
+/* next lines are for openautomation-svg */
+svg { height:32px; width:32px; fill:#fff; vertical-align:middle; margin:2px 0; }
+g.on { fill:red; }
+
+/* next lines are for remotecontrol */
+.rc_body              { border-style: solid; border-color: gray; border-width: 2px; 
+                        padding: 5px; background: #C8C8B0; font-size:6px;}
+.rc_button            { padding: 5px 7px;}
+.rc_button img        { border-style: solid; border-width: 1px; border-color: transparent; }
+.rc_button img:active { border-color: gray; }

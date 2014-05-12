@@ -1,0 +1,49 @@
+/* iOS 6 Theme for FHEM */
+/* by Sandra Ohmayer */
+/* http://www.animeschatten.net */
+
+.background { fill:#f7f7f7; }
+
+text { 
+font: normal 10px Helvetica, Sans-serif;
+fill:#000000;}
+text.title {
+font: normal 14px Helvetica, Sans-serif;
+font-weight:bold;
+fill:#4c566c;
+text-shadow: 0px 1px #FFFFFF;
+}
+text.copy { text-decoration:underline; stroke:none; fill:blue;}
+text.paste { text-decoration:underline; stroke:none; fill:blue;}
+
+polyline { stroke:black; fill:none; }
+.border { stroke:black; fill:url(#gr_bg);}
+.vgrid { stroke:gray; stroke-dasharray:2,6;}
+.hgrid { stroke:gray; stroke-dasharray:2,6;}
+.pasted { stroke:black; stroke-dasharray:1,1;}
+
+.l0 { stroke:red;     }  text.l0 { stroke:none; fill:red;     } 
+.l1 { stroke:green;   }  text.l1 { stroke:none; fill:green;   } 
+.l2 { stroke:blue;    }  text.l2 { stroke:none; fill:blue;    }
+.l3 { stroke:magenta; }  text.l3 { stroke:none; fill:magenta; }
+.l4 { stroke:brown;   }  text.l4 { stroke:none; fill:brown;   }
+.l5 { stroke:black;   }  text.l5 { stroke:none; fill:black;   }
+.l6 { stroke:olive;   }  text.l6 { stroke:none; fill:olive;   }
+.l7 { stroke:gray;    }  text.l7 { stroke:none; fill:gray;    }
+.l8 { stroke:yellow;  }  text.l8 { stroke:none; fill:yellow;  }
+
+.l0fill{ stroke:#f00; fill:url(#gr_0); }  text.l0fill{ stroke:none; fill:#f00; }
+.l1fill{ stroke:#291; fill:url(#gr_1); }  text.l1fill{ stroke:none; fill:#291; }
+.l2fill{ stroke:#00f; fill:url(#gr_2); }  text.l2fill{ stroke:none; fill:#00f; }
+.l3fill{ stroke:#f0f; fill:url(#gr_3); }  text.l3fill{ stroke:none; fill:#f0f; }
+.l4fill{ stroke:#ff0; fill:url(#gr_4); }  text.l4fill{ stroke:none; fill:#ff0; }
+.l5fill{ stroke:#0ff; fill:url(#gr_5); }  text.l5fill{ stroke:none; fill:#0ff; }
+.l6fill{ stroke:#000; fill:url(#gr_6); }  text.l6fill{ stroke:none; fill:#000; }
+
+.l0dot   { stroke:red;   stroke-dasharray:2,4; }  text.ldot { stroke:none; fill:red; } 
+.l1dot   { stroke:green; stroke-dasharray:2,4; }  text.ldot { stroke:none; fill:green; } 
+
+.l0fill_stripe {stroke:red; fill:url(#gr0_stripe);}   text.l0fill_stripe {stroke:none; fill:red;}
+.l1fill_stripe {stroke:green; fill:url(#gr1_stripe);} text.l1fill_stripe {stroke:none; fill:green;}
+
+.l0fill_gyr {stroke:red; fill:url(#gr0_gyr);} text.l0fill_gyr {stroke:none; fill:red;}
