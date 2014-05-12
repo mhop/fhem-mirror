@@ -1430,7 +1430,7 @@ $culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
                          ,off            =>""
                          ,toggle         =>""},
   "HM-CC-RT-DN00"     =>{ sysTime        =>""
-                         ,fwUpdate       =>"<filename>"
+                         ,fwUpdate       =>"<filename> <bootTime> ..."
                         },
   "HM-CC-RT-DN04"     =>{ controlMode    =>"[auto|manu|boost|day|night]"
                          ,controlManu    =>"[on|off|5.0..30.0]"
