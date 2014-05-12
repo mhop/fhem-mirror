@@ -52,7 +52,7 @@ body[id~=Media]     { background-color: #A5A5A5;
                         background-repeat:no-repeat;  }
 
 #logo    { 
-position:absolute; top:5px; left:-196px;
+position:absolute; top:5px; left:5px;
 width:29px; height:29px;
 z-index:99;
 background-image: url(../images/fhemSVG/system_fhem.svg),-webkit-gradient(
