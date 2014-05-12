@@ -1726,7 +1726,7 @@ sub SYSMON_ShowValuesFmt ($$;@)
   
   my $map = SYSMON_obtainParameters($hash, 1);
 
-  my $div_class="";
+  my $div_class="sysmon";
 
   my $htmlcode;
   if($format == 1) {
