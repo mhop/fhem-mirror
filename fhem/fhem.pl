@@ -3791,8 +3791,7 @@ FileRead($)
   my ($err, @ret);
 
   if(configDBUsed()) {
-    @ret = cfgDB_FileRead($fname);
-    $err = "$fname not found in the database." if(@ret==1 && !defined($ret[0]));
+    ($err, @ret) = cfgDB_FileRead($fname);
 
   } else {
     if(open(FH, $fname)) {
