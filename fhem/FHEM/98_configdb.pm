@@ -13,14 +13,14 @@ my @pathname;
 
 sub configdb_Initialize($$) {
   my %hash = (  Fn => "CommandConfigdb",
-               Hlp => "info|list|diff|uuid|
-          reorg|recover|backup     ,access additional functions from configDB" );
+               Hlp => "help     ,access additional functions from configDB" );
   $cmds{configdb} = \%hash;
 }
 
 #####################################
 
 sub _configdb_rM($$) {
+  # read moddir
   my ($modpath,$backupdir) = @_;
   my $msg;
   my $ret;
@@ -43,6 +43,7 @@ sub _configdb_rM($$) {
 }
 
 sub _configdb_cA($) {
+  # create archive
   my $backupdir = shift;
   my $backupcmd = (!defined($attr{global}{backupcmd}) ? undef : $attr{global}{backupcmd});
   my $symlink = (!defined($attr{global}{backupsymlink}) ? "no" : $attr{global}{backupsymlink});
@@ -205,25 +206,25 @@ sub CommandConfigdb($$) {
 			$ret = _cfgDB_Fileexport $filename;
 		}
 
-		when ('fileimport') {
-			return "\n Syntax: configdb fileimport <pathToFile>" if @a != 2;
-			my $filename;
-			if($param1 =~ m,^[./],) {
-				$filename = $param1;
-			} else {
-				$filename  = $attr{global}{modpath};
-				$filename .= "/$param1";
-			}
-			if ( -r $filename ) {
-				$ret = _cfgDB_Fileimport $filename;
-			} elsif ( -e $filename) {
-				$ret = "\n Read error on file $filename";
-			} else {
-				$ret = "\n File $filename not found.";
-			}
-		}
+# 		when ('fileimport') {
+# 			return "\n Syntax: configdb fileimport <pathToFile>" if @a != 2;
+# 			my $filename;
+# 			if($param1 =~ m,^[./],) {
+# 				$filename = $param1;
+# 			} else {
+# 				$filename  = $attr{global}{modpath};
+# 				$filename .= "/$param1";
+# 			}
+# 			if ( -r $filename ) {
+# 				$ret = _cfgDB_Fileimport $filename;
+# 			} elsif ( -e $filename) {
+# 				$ret = "\n Read error on file $filename";
+# 			} else {
+# 				$ret = "\n File $filename not found.";
+# 			}
+# 		}
 
-		when ('binfileimport') {
+		when ('fileimport') {
 			return "\n Syntax: configdb fileimport <pathToFile>" if @a != 2;
 			my $filename;
 			if($param1 =~ m,^[./],) {
@@ -240,6 +241,10 @@ sub CommandConfigdb($$) {
 			} else {
 				$ret = "\n File $filename not found.";
 			}
+		}
+
+		when ('binfileimport') {
+			return "\n configdb binfileimport is deprecated.\n Please use configdb fileimport.";
 		}
 
 		when ('filelist') {
@@ -319,7 +324,6 @@ sub CommandConfigdb($$) {
 			$ret =	"\n Syntax:\n".
 					"         configdb attr [attribute] [value]\n".
 					"         configdb backup\n".
-					"         configDB binfileimport <pathToFilename>\n".
 					"         configdb diff <device> <version>\n".
 					"         configDB filedelete <pathToFilename>\n".
 					"         configDB fileimport <pathToFilename>\n".
@@ -538,14 +542,6 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 			Example:<br/>
 			<br/>
 			<code>configdb fileimport FHEM/99_myUtils.pm</code><br/>
-			<br/>
-<br/>
-
-		<li><code>configdb binfileimport &lt;sourceFilename&gt;</code></li><br/>
-			Imports specified binary file from from filesystem into database.<br/>
-			Example:<br/>
-			<br/>
-			<code>configdb binfileimport www/images/bla.png</code><br/>
 			<br/>
 <br/>
 
@@ -873,14 +869,6 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 			Beispiel:<br/>
 			<br/>
 			<code>configdb fileimport FHEM/99_myUtils.pm</code><br/>
-			<br/>
-<br/>
-
-		<li><code>configdb binfileimport &lt;quellDatei&gt;</code></li><br/>
-			Liest die angegbene Bin&auml;rdatei aus dem Dateisystem und schreibt den Inhalt in die Datenbank.<br/>
-			Beispiel:<br/>
-			<br/>
-			<code>configdb binfileimport www/images/bla.png</code><br/>
 			<br/>
 <br/>
 
