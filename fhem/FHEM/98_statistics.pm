@@ -2,6 +2,7 @@
 # $Id$
 #
 #  98_statistic.pm
+#
 #  Copyright notice
 #
 #  (c) 2014 Torsten Poitzsch < torsten . poitzsch at gmx . de >
@@ -52,16 +53,21 @@ sub statistics_doStatisticDelta ($$$$$);
   my @knownDeviceReadings = (
     ["CUL_WS", "humidity", 1, 0]
    ,["CUL_WS", "temperature", 1, 1] 
-   ,["KS300", "humidity", 1, 0]
-   ,["KS300", "temperature", 1, 1] 
-   ,["KS300", "wind", 1, 0] 
-   ,["KS300", "rain", 2, 1] 
+   ,["dummy", "state", 3, 1] 
    ,["FBDECT", "current", 1, 3] 
    ,["FBDECT", "energy", 2, 0] 
    ,["FBDECT", "power", 1, 1] 
    ,["FBDECT", "voltage", 1, 1] 
+   ,["FRM_IN", "counter", 2, 0] 
+   ,["FRM_IN", "power", 1, 2] 
    ,["FS20", "state", 3, 1] 
-   ,["dummy", "state", 3, 1] 
+   ,["KS300", "humidity", 1, 0]
+   ,["KS300", "temperature", 1, 1] 
+   ,["KS300", "wind", 1, 0] 
+   ,["KS300", "rain", 2, 1] 
+   ,["OREGON", "humidity", 1, 1] 
+   ,["OREGON", "rain", 2, 1] 
+   ,["OREGON", "temperature", 1, 1] 
   );
 ##############################################################
 
@@ -274,7 +280,6 @@ statistics_DoStatistics($$$)
       $dev->{helper}{_98_statistics}=$hashName;
    }
    
-   readingsBeginUpdate($hash);
    readingsBeginUpdate($dev);
    
   # Loop through all known device types and readings
@@ -294,11 +299,12 @@ statistics_DoStatistics($$$)
    if ($periodSwitch >0) {readingsEndUpdate($dev,1);}
    else {readingsEndUpdate($dev,0);}
    
- # Record device as monitored
+
+   # Record device as monitored
    my $monReadingName;
    if ($statisticDone == 1) { 
       $monReadingName = "monitoredDevices".$devType; 
-      readingsBulkUpdate($hash,"state","Updated stats for: $devName",1);
+      readingsSingleUpdate($hash,"state","Updated stats for: $devName",1);
    } else {
       $monReadingName = "monitoredDevicesUnsupported";
       $devName .= "#$devType";
@@ -308,22 +314,19 @@ statistics_DoStatistics($$$)
    if ($monReadingValue !~ /$regExp/) {
       if($monReadingValue eq "") { $monReadingValue = $devName;}
       else {$monReadingValue .= ",".$devName;}
-      readingsBulkUpdate($hash,$monReadingName,$monReadingValue,1);
+      readingsSingleUpdate($hash,$monReadingName,$monReadingValue,1);
 
       my $monReadingValue = ReadingsVal($hashName,"monitoredDevicesUnknownType","");
       if ($monReadingValue =~ /$regExp/) {
          $monReadingValue =~ s/$devName,?//;
          $monReadingValue =~ s/,$//;
          if ($monReadingValue ne "") {
-            readingsBulkUpdate($hash,"monitoredDevicesUnknownType",$monReadingValue,1);
+            readingsSingleUpdate($hash,"monitoredDevicesUnknownType",$monReadingValue,1);
          } else {
             delete $hash->{READINGS}{monitoredDevicesUnknownType};
          }
       }
    } 
-
-   readingsEndUpdate($hash,1);
-  
 
   return undef;
 }
@@ -389,17 +392,17 @@ statistics_doStatisticMinMaxSingle ($$$$$$)
 
   # Store current reading as last reading, Reset current reading
    if ($saveLast) { 
-      readingsBulkUpdate($dev, $statReadingName . "Last", $result); 
+      readingsBulkUpdate($dev, $statReadingName . "Last", $result, 1); 
       $hidden[1] = 0; $hidden[3] = 0; $hidden[9] = 0; # No since value anymore
       $result = "Min: $value Avg: $value Max: $value";
    }
 
   # Store current reading
-   readingsBulkUpdate($dev, $statReadingName, $result, 1);
+   readingsBulkUpdate($dev, $statReadingName, $result, 0);
   
   # Store hidden reading
    $result = "Sum: $hidden[1] Time: $hidden[3] LastValue: ".$value." LastTime: ".int(gettimeofday())." ShowDate: $hidden[9]";
-   readingsBulkUpdate($hash, $hiddenReadingName, $result, 0);
+   readingsSingleUpdate($hash, $hiddenReadingName, $result, 0);
 
    return;
 }
@@ -513,7 +516,7 @@ statistics_doStatisticDelta ($$$$$)
    
   # Store hidden reading
    $result = "LastValue: $value ShowDate: $showDate ";  
-   readingsBulkUpdate($hash, $hiddenReadingName, $result, 0);
+   readingsSingleUpdate($hash, $hiddenReadingName, $result, 0);
    Log3 $name,5,"$name: Store '$result' in '$hiddenReadingName'.";
 
    return ;
@@ -547,8 +550,10 @@ statistics_doStatisticDelta ($$$$$)
       <br>
       Until now the following device types and readings are analysed:
       <ul><li><b>CUL_WS:</b> humidity, temperature</li>
-          <li><b>KS300:</b> humidity, temperature, wind, rain</li>
-          <li><b>FBDECT:</b> energy, power, voltage, current</li>
+          <li><b>FBDECT:</b> current, energy, power, voltage</li>
+          <li><b>FRM_IN:</b> count, power</li>
+          <li><b>KS300:</b> humidity, temperature, rain, wind</li>
+          <li><b>OREGON:</b> humidity, rain, temperature</li>
       </ul>
     </li>
   </ul>
@@ -603,8 +608,10 @@ statistics_doStatisticDelta ($$$$$)
       <br>
       Derzeit werden folgende Ger&auml;tetypen und Ger&auml;tewerte ausgewertet:
       <ul><li><b>CUL_WS:</b> humidity, temperature</li>
-          <li><b>KS300:</b> humidity, temperature, wind, rain</li>
-          <li><b>FBDECT:</b> energy, power, voltage, current</li>
+          <li><b>FBDECT:</b> current, energy, power, voltage</li>
+          <li><b>FRM_IN:</b> count, power</li>
+          <li><b>KS300:</b> humidity, temperature, rain, wind</li>
+          <li><b>OREGON:</b> humidity, rain, temperature</li>
       </ul>
     </li>
   </ul>
