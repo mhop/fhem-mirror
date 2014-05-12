@@ -57,16 +57,32 @@ sub cloneDummy_Notify($$) {
 	$rname = substr($rname,0,length($rname)-1);
 	my %check = map { $_ => 1 } split(/,/,AttrVal($hn,'cloneIgnore',''));
 	
-	readingsBeginUpdate($hash);
+	# When more than one FHEM2FHEM instance is used to tap into RF traffic, 
+	# we may get duplicate readings for the same sensor information. 
+	# Use CheckDuplicate to prevent multiple events in this case.
+	#
+	# Currently, clonedummy  accepts a device name rather than a REGEXP, so
+	# we can assume that all duplicates will have the same device name
+	# (rather than different IODEV names as is the case with other modules)
+	# - so we ned to leave empty the first parameter for CheckDuplicate()
+	#
+	# If cloneDummy should be changed to accepting more than one device, we
+	# will may want to adapt the call to CheckDuplicate. 
+	my ($isdup, $idx) = CheckDuplicate("", "$hn: $reading", undef);
+	if ($isdup) {
+		Log3 $hash, 4, "cloneDummy: drop duplicate <$dn> <$hn> <$reading> ***";
+	} else {
+		Log3 $hash, 4, "cloneDummy: publish unique <$dn> <$hn> <$reading>";
+		readingsBeginUpdate($hash);
 		if (($hs ne "") && ($rname eq $hs) ){
-	readingsBulkUpdate($hash,"_state", $reading);	
+			readingsBulkUpdate($hash,"_state", $reading);	
+		}
+		readingsBulkUpdate($hash,"state", "active");	
+		unless (exists ($check{$rname})) {
+			readingsBulkUpdate($hash, $rname, $rval);
+		}
+		readingsEndUpdate($hash, 1);
 	}
-	readingsBulkUpdate($hash,"state", "active");	
-	unless (exists ($check{$rname})) {
-		readingsBulkUpdate($hash, $rname, $rval);
-	}
-	readingsEndUpdate($hash, 1);
-	
 	return;
 }
 
@@ -79,7 +95,11 @@ sub cloneDummy_Notify($$) {
 <h3>cloneDummy</h3>
 <ul>
 	This module provides a cloneDummy which will receive readings from any other device sending data to fhem.<br/>
-	E.g. may be used in an FHEM2FHEM environment<br/>
+	E.g. may be used in an FHEM2FHEM environment.
+        Duplicate source events which may occur within the time given by the global attribute <a href="#dupTimeout">dupTimeout</a>, 
+	will be suppressed in order to avoid overhead. The value of this attribute is to be changed with great care, as it 
+	affects other parts of FHEM, too. 
+	<br/>
 	<br/> 
 
 	<a name="cloneDummydefine"></a>
@@ -127,7 +147,11 @@ sub cloneDummy_Notify($$) {
 <h3>cloneDummy</h3>
 <ul>
 	Definiert einen Clon eines Devices oder von FHEM2FHEM im Logmodus uebergebenen Devices und uebernimmt dessen Readings.
-	Sinnvoll um entfernte FHEM-Installationen lesend einzubinden, zum Testen oder Programmieren. 
+	Sinnvoll um entfernte FHEM-Installationen lesend einzubinden, zum Testen oder Programmieren.
+	Dabei werden die von FHEM2FHEM in Form von Events weitergereichten entfernten Device-Readings in eigene Readings übernommen.
+	Identische Events, die innerhalb der durch das globale Attribut <a href="#dupTimeout">dupTimeout</a> vorgegebenen Zeit auftreten, 
+        werden zusammengefasst, um überflüssige Events zu verhindern. Dieses Attribut ist mit bedacht zu ändern, da sich seine Auswirkungen
+	auch auf andere Bereiche von FHEM erstreckt.
 	<br><br>
 
 	<a name="cloneDummydefine"></a>
