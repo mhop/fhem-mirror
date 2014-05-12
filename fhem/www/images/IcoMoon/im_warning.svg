@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Generator: IcoMoon.io -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="512"
+   height="512"
+   viewBox="0 0 512 512"
+   fill="#000000"
+   id="svg2"
+   version="1.1"
+   inkscape:version="0.48.2 r9819"
+   sodipodi:docname="warning.svg">
+  <metadata
+     id="metadata73">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs71" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="640"
+     inkscape:window-height="480"
+     id="namedview69"
+     showgrid="false"
+     inkscape:zoom="0.4609375"
+     inkscape:cx="256"
+     inkscape:cy="256"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg2" />
+  <path
+     d="M 256.00,79.362 L 83.583,448.00 L 428.417,448.00 L 256.00,79.362 Z M 256.00,0.00 L 256.00,0.00 C 267.035,0.00 278.07,7.441 286.442,22.324 L 504.978,457.88 C 521.723,487.646 507.478,512.00 473.327,512.00 L 38.673,512.00 C 4.521,512.00 -9.722,487.646 7.021,457.88 L 225.558,22.324 C 233.93,7.441 244.965,0.00 256.00,0.00 ZM 224.00,384.00A32.00,32.00 2520.00 1,0 288.00,384A32.00,32.00 2520.00 1,0 224.00,384zM 256.00,192.00 C 273.673,192.00 288.00,206.327 288.00,224.00 L 278.00,320.00 L 234.00,320.00 L 224.00,224.00 C 224.00,206.327 238.327,192.00 256.00,192.00 Z"
+     id="path67" />
+</svg>

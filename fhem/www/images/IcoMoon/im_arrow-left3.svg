@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Generator: IcoMoon.io -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="512"
+   height="512"
+   viewBox="0 0 512 512"
+   fill="#000000"
+   id="svg2"
+   version="1.1"
+   inkscape:version="0.48.2 r9819"
+   sodipodi:docname="arrow-left3.svg">
+  <metadata
+     id="metadata73">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs71" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="640"
+     inkscape:window-height="480"
+     id="namedview69"
+     showgrid="false"
+     inkscape:zoom="0.4609375"
+     inkscape:cx="256"
+     inkscape:cy="256"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg2" />
+  <path
+     d="M 256.00,0.00C 397.385,0.00, 512.00,114.615, 512.00,256.00s -114.615,256.00, -256.00,256.00s -256.00-114.615, -256.00-256.00S 114.615,0.00, 256.00,0.00z M 256.00,464.00 c 114.875,0.00 208.00-93.125 208.00-208.00S 370.875,48.00, 256.00,48.00s -208.00,93.125, -208.00,208.00S 141.125,464.00, 256.00,464.00zM 105.372,233.373l 128.001-128.00c 12.496-12.497 32.757-12.497 45.254,0.00c 12.497,12.497 12.497,32.758,0.00,45.255L 205.255,224.00 L 384.00,224.00 c 17.673,0.00 32.00,14.327 32.00,32.00c0.00,17.673, -14.327,32.00, -32.00,32.00l-178.745,0.00 l 73.373,73.372c 12.497,12.497 12.497,32.759,0.00,45.256 C 272.379,412.876, 264.189,416.00, 256.00,416.00s -16.379-3.124, -22.627-9.372l -128.001-128.00C 92.876,266.131, 92.876,245.869, 105.372,233.373z"
+     id="path67" />
+</svg>

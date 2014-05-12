@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Generator: IcoMoon.io -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="512"
+   height="512"
+   viewBox="0 0 512 512"
+   fill="#000000"
+   id="svg2"
+   version="1.1"
+   inkscape:version="0.48.2 r9819"
+   sodipodi:docname="blogger2.svg">
+  <metadata
+     id="metadata73">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs71" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="640"
+     inkscape:window-height="480"
+     id="namedview69"
+     showgrid="false"
+     inkscape:zoom="0.4609375"
+     inkscape:cx="256"
+     inkscape:cy="256"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg2" />
+  <path
+     d="M 426.674,0.00L 85.325,0.00 C 38.202,0.00,0.00,38.209,0.00,85.341l0.00,341.318 C0.00,473.792, 38.202,512.00, 85.325,512.00l 341.348,0.00 c 47.125,0.00, 85.324-38.208, 85.324-85.341L 512.00,85.341C 512.00,38.209, 473.798,0.00, 426.674,0.00z M 448.00,324.049 C 448.00,392.544, 392.257,448.00, 323.278,448.00L 188.869,448.00 C 119.941,448.00, 64.00,392.544, 64.00,324.049L 64.00,188.00 c 0.048-68.50, 55.94-124.00, 124.869-124.00l 62.934,0.00 C 320.779,64.00, 376.002,115.50, 376.00,184.00c 0.901,12.847, 12.461,24.00, 25.646,24.00l 0.448,0.00 l 21.078,0.00 C 436.959,208.00, 448.00,222.467, 448.00,236.156L 448.00,324.049 zM 352.00,320.00c0.00,17.60-14.40,32.00-32.00,32.00L 192.00,352.00 c-17.60,0.00-32.00-14.40-32.00-32.00l0.00,0.00c0.00-17.60, 14.40-32.00, 32.00-32.00l 128.00,0.00 C 337.60,288.00, 352.00,302.40, 352.00,320.00 L 352.00,320.00zM 288.00,192.00c0.00,17.60-14.40,32.00-32.00,32.00l-64.00,0.00 c-17.60,0.00-32.00-14.40-32.00-32.00l0.00,0.00c0.00-17.60, 14.40-32.00, 32.00-32.00l 64.00,0.00 C 273.60,160.00, 288.00,174.40, 288.00,192.00L 288.00,192.00 z"
+     id="path67" />
+</svg>
