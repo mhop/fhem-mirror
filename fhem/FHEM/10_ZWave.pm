@@ -147,6 +147,7 @@ my %zwave_class = (
   SCHEDULE_ENTRY_LOCK      => { id => '4e', },
   BASIC_WINDOW_COVERING    => { id => '50', },
   MTP_WINDOW_COVERING      => { id => '51', },
+  CRC_16_ENCAP             => { id => '56', },
   MULTI_CHANNEL            => { id => '60',  # Version 2, aka MULTI_INSTANCE
     get   => { mcEndpoints => "07",     # Endpoints
                mcCapability=> "09%02x"},
