@@ -71,8 +71,8 @@ sub CUL_HM_getMId($);
 sub CUL_HM_getRxType($);
 sub CUL_HM_getFlag($);
 sub CUL_HM_getAssChnIds($);
-sub CUL_HM_Id($);
-sub CUL_HM_IOid($);
+sub CUL_HM_h2IoId($);
+sub CUL_HM_IoId($);
 sub CUL_HM_hash2Id($);
 sub CUL_HM_hash2Name($);
 sub CUL_HM_name2Hash($);
@@ -785,7 +785,7 @@ sub CUL_HM_Parse($$) {#########################################################
   my $shash = CUL_HM_id2Hash($src); #sourcehash - will be modified to channel entity
   my $devH = $shash;                # source device hash
   my $dhash = CUL_HM_id2Hash($dst); # destination device hash
-  my $id = CUL_HM_Id($iohash);
+  my $id = CUL_HM_h2IoId($iohash);
   my $ioName = $iohash->{NAME};
   $evtDly = 1;# switch delay trigger on
   CUL_HM_statCnt($ioName,"r");
@@ -839,7 +839,7 @@ sub CUL_HM_Parse($$) {#########################################################
   $respRemoved = 0;  #set to 'no response in this message' at start
 
   my $name = $shash->{NAME};
-  my $ioId = CUL_HM_Id($devH->{IODev});
+  my $ioId = CUL_HM_h2IoId($devH->{IODev});
   $ioId = $id if(!$ioId);
   if (CUL_HM_getAttrInt($name,"ignore")){
     CUL_HM_pushEvnts();
@@ -862,9 +862,10 @@ sub CUL_HM_Parse($$) {#########################################################
   my $st = AttrVal($name, "subType", "");
   my $md = AttrVal($name, "model"  , "");
   my $tn = TimeNow();
-  CUL_HM_storeRssi($name,
-                   "at_".(($mFlgH&0x40)?"rpt_":"").$ioName,# repeater?
-                   $myRSSI);
+  CUL_HM_storeRssi($name
+                  ,"at_".(($mFlgH&0x40)?"rpt_":"").$ioName # repeater?
+                  ,$myRSSI
+                  ,$mNo);
 
   # +++++ check for duplicate or repeat ++++
   my $msgX = "No:$mNo - t:$mTp s:$src d:$dst ".($p?$p:"");
@@ -1995,7 +1996,7 @@ sub CUL_HM_parseCommon(@){#####################################################
     if(($mFlgH & 0xA2) == 0x82){ #wakeup signal
       CUL_HM_appFromQ($shash->{NAME},"wu");# stack cmds if waiting
       if ($shash->{cmdStack}){
-        CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IOid($shash).$src);
+        CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IoId($shash).$src);
         CUL_HM_ProcessCmdStack($shash);
       }
     }
@@ -2060,9 +2061,10 @@ sub CUL_HM_parseCommon(@){#####################################################
     elsif($subType eq "01"){ #ACKinfo#################
       $success = "yes";
       my $rssi = substr($p,8,2);# --calculate RSSI
-      CUL_HM_storeRssi($shash->{NAME},
-                        ($dhash?$dhash->{NAME}:$shash->{IODev}{NAME}),
-                        (-1)*(hex($rssi)))
+      CUL_HM_storeRssi( $shash->{NAME}
+                       ,($dhash?$dhash->{NAME}:$shash->{IODev}{NAME})
+                       ,(-1)*(hex($rssi))
+                       ,$mNo)
             if ($rssi && $rssi ne '00' && $rssi ne'80');
       $reply = "ACKStatus";
       
@@ -2109,7 +2111,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       my $chnhash = $modules{CUL_HM}{defptr}{$chn?$src.$chn:$src};
       $chnhash = $shash if(!$chnhash);
       push @evtEt,[$chnhash,0,"CommandAccepted:$success"];
-      CUL_HM_ProcessCmdStack($shash) if(CUL_HM_IOid($shash) eq $dst);
+      CUL_HM_ProcessCmdStack($shash) if(CUL_HM_IoId($shash) eq $dst);
       delete $shash->{helper}{prt}{wuReSent}
               if (!$shash->{helper}{prt}{mmcS});
     }
@@ -2124,7 +2126,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         ||(    $ioHash->{hmPairSerial}
             && $ioHash->{hmPairSerial} eq $attr{$shash->{NAME}}{serialNr})){
       # pairing requested - shall we?      
-      my $ioId = CUL_HM_Id($ioHash);
+      my $ioId = CUL_HM_h2IoId($ioHash);
       if( $mFlg.$mTp ne "0400") {
         # pair now
         Log3 $shash,3, "CUL_HM pair: $shash->{NAME} "
@@ -2158,7 +2160,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 
     if($paired == 0 && CUL_HM_getRxType($shash) & 0x04){#no pair -send config?
       CUL_HM_appFromQ($shash->{NAME},"cf");   # stack cmds if waiting
-      my $ioId = CUL_HM_Id($shash->{IODev});
+      my $ioId = CUL_HM_h2IoId($shash->{IODev});
       $respRemoved = 1;#force command stack processing
     }
     $ret = "done";
@@ -2189,7 +2191,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           my $reqPeer = $chnhash->{helper}{getCfgList};
           if ($reqPeer){
             my $flag = CUL_HM_getFlag($shash);
-            my $id = CUL_HM_IOid($shash);
+            my $id = CUL_HM_IoId($shash);
             my @peerID = split(",",($attr{$chnName}{peerIDs}?
                                     $attr{$chnName}{peerIDs}:""));
             foreach my $l (split ",",$chnhash->{helper}{getCfgListNo}){
@@ -2310,9 +2312,10 @@ sub CUL_HM_parseCommon(@){#####################################################
     }
     elsif($subType eq "06"){ #reply to status request=======================
       my $rssi = substr($p,8,2);# --calculate RSSI
-      CUL_HM_storeRssi($shash->{NAME},
-                       ($dhash?$dhash->{NAME}:$shash->{IODev}{NAME}),
-                       (-1)*(hex($rssi)))
+      CUL_HM_storeRssi( $shash->{NAME}
+                       ,($dhash?$dhash->{NAME}:$shash->{IODev}{NAME})
+                       ,(-1)*(hex($rssi))
+                       ,$mNo)
             if ($rssi && $rssi ne '00' && $rssi ne'80');
       @{$modules{CUL_HM}{helper}{qReqStat}} = grep { $_ ne $shash->{NAME} }
                                        @{$modules{CUL_HM}{helper}{qReqStat}};
@@ -2370,7 +2373,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   }
   elsif($mTp eq "70"){ #Time to trigger TC##################
     #send wakeup and process command stack
-#   CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IOid($shash).$src);
+#   CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IoId($shash).$src);
 #   CUL_HM_ProcessCmdStack($shash);
   }
   if ($shash->{helper}{prt}{rspWait}{mNo}             &&
@@ -2796,7 +2799,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 
   AssignIoPort($defs{$devName}) 
         if (!$defs{$devName}{IODev}||!$defs{$devName}{IODev}{NAME});
-  my $id = CUL_HM_IOid($defs{$devName});
+  my $id = CUL_HM_IoId($defs{$devName});
   return "no IO device identified" if(length($id) != 6 );
 
   #convert 'old' commands to current methodes like regSet and regBulk...
@@ -3824,14 +3827,16 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
   }
   elsif($cmd eq "fwUpdate") { #################################################
-    return "implementation pending";
     return "no filename given" if (!$a[2]);
     return "only thru CUL " if (!$hash->{IODev}->{TYPE}
                                  ||($hash->{IODev}->{TYPE} ne "CUL"));
     # todo add version checks of CUL
-    my $fName = $a[2];
-    my $pos = 0;
+    my ($fName,$pos,$enterBL) = ($a[2],0,($a[3] ? $a[3]+0 : 10));
     my @imA; # image array: image[block][msg]
+
+    return "Illegal waitTime $enterBL - enter a value between 10 and 300" 
+         if ($enterBL < 10 || $enterBL>300);    
+
     open(aUpdtF, $fName) || return("Can't open $fName: $!");
     while(<aUpdtF>){
       my $line = $_;
@@ -3847,7 +3852,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     close(aUpdtF);
     # --- we are prepared start update---
-    InternalTimer(gettimeofday()+5,"CUL_HM_FWupdateEnd","fail:notInBootLoader",0);
     $modules{CUL_HM}{helper}{updating} = 1;
     $modules{CUL_HM}{helper}{updatingName} = $name;
     $modules{CUL_HM}{helper}{updateData} = \@imA;
@@ -3856,22 +3860,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $modules{CUL_HM}{helper}{updateId} = $id;
     $modules{CUL_HM}{helper}{updateNbr} = 10;
     Log3 $name,2,"CUL_HM fwUpdate started for $name";
-    my $manual = 0;
-    if ($manual == 1){
-      $modules{CUL_HM}{helper}{updateStep} = 1;
-      CUL_HM_FWupdateSpeed($name,100);
-      InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim",$dst.$id."00",0);
-      select(undef, undef, undef, (0.1));
-      CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
+    CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
                         ."3011$id${dst}CA");
-      select(undef, undef, undef, (0.1));
-      CUL_HM_SndCmd($hash,"0A20CB$id${dst}105B11F815470B081A1C191D1BC71C001DB221B623EA");
-      select(undef, undef, undef, (0.1));
-    }
-    else{
-      CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
-                        ."3011$id${dst}CA");
-    }
+    InternalTimer(gettimeofday()+$enterBL,"CUL_HM_FWupdateEnd","fail:notInBootLoader",0);
     #InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim",$dst."00000000",0);
   }
   elsif($cmd eq "postEvent") { ################################################
@@ -4232,7 +4223,7 @@ sub CUL_HM_weather(@) {#periodically send weather data
   my(undef,$name) = split(':',$in);
   my $hash = $defs{$name};
   my $dName = CUL_HM_getDeviceName($name) ;
-  my $ioId = CUL_HM_IOid($defs{$dName});
+  my $ioId = CUL_HM_IoId($defs{$dName});
   CUL_HM_SndCmd($hash,"++8670".$ioId."00000000".$hash->{helper}{weather});
   InternalTimer(gettimeofday()+150,"CUL_HM_weather","weather:$name",0);
 }
@@ -4289,7 +4280,7 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
 sub CUL_HM_getConfig($){
   my $hash = shift;
   my $flag = CUL_HM_getFlag($hash);
-  my $id = CUL_HM_IOid($hash);
+  my $id = CUL_HM_IoId($hash);
   my $dst = substr($hash->{DEF},0,6);
   my $name = $hash->{NAME};
   CUL_HM_configUpdate($name);
@@ -4829,7 +4820,7 @@ sub CUL_HM_respPendTout($) {
       Log3 $name,4,"CUL_HM_Resend: $name nr ".$pHash->{rspWait}{reSent};
       if ($hash->{protCondBurst}&&$hash->{protCondBurst} eq "on" ){
         #timeout while conditional burst was active. try re-wakeup
-        my $addr = CUL_HM_IOid($hash);
+        my $addr = CUL_HM_IoId($hash);
         $pHash->{rspWaitSec}{$_} = $pHash->{rspWait}{$_}
                     foreach (keys%{$pHash->{rspWait}});
         CUL_HM_SndCmd($hash,"++B112$addr$HMid");
@@ -4879,11 +4870,12 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
   my $mNo = $modules{CUL_HM}{helper}{updateNbr};
   my $mNoA = sprintf("%02X",$mNo);
   return if ($mIn !~ m/$mNoA..02$dst${id}00/&&$mIn !~ m/0010${dst}00000000/);
-  if ($step == 0){#check bootloader entered - now chnage speed
+  if ($step == 0){#check bootloader entered - now change speed
     return if ($mIn =~ m/$mNoA..02$dst${id}00/);
     Log3 $name,2,"CUL_HM fwUpdate $name entered mode - switch speed";
     $mNo = (++$mNo)%256; $mNoA = sprintf("%02X",$mNo);
-    CUL_HM_SndCmd($hash,"${mNoA}20CB$id${dst}105B11F815470B081A1C191D1BC71C001DB221B623EA");
+    CUL_HM_SndCmd($hash,"${mNoA}00CB$id${dst}105B11F81547");
+#    CUL_HM_SndCmd($hash,"${mNoA}20CB$id${dst}105B11F815470B081A1C191D1BC71C001DB221B623EA");
     select(undef, undef, undef, (0.04));
     CUL_HM_FWupdateSpeed($name,100);
     select(undef, undef, undef, (0.04));
@@ -5237,14 +5229,14 @@ sub CUL_HM_getAssChnNames($) { #in: name out:list of assotiated chan and device
 #          $val  = $defs{$name}{READINGS}{$rlName}?$defs{$name}{READINGS}{$rlName}{VAL} :"";
 #          $time = $hash->{READINGS}{$rlName}     ?$hash->{READINGS}{$rlName}{time}     :"";
 
-sub CUL_HM_Id($) {#in: ioHash out: ioHMid
+sub CUL_HM_h2IoId($) {      #in: ioHash out: ioHMid
   my ($io) = @_;
   return "000000" if (ref($io) ne 'HASH');
 
   my $fhtid = defined($io->{FHTID}) ? $io->{FHTID} : "0000";
   return AttrVal($io->{NAME},"hmId","F1$fhtid");
 }
-sub CUL_HM_IOid($) {#in: hash out: id of IO device
+sub CUL_HM_IoId($) {        #in: hash out: IO_id
   my ($hash) = @_;
   my $dHash = CUL_HM_getDeviceHash($hash);
   my $ioHash = $dHash->{IODev};
@@ -5252,6 +5244,23 @@ sub CUL_HM_IOid($) {#in: hash out: id of IO device
   my $fhtid = defined($ioHash->{FHTID}) ? $ioHash->{FHTID} : "0000";
   return AttrVal($ioHash->{NAME},"hmId","F1$fhtid");
 }
+sub CUL_HM_id2IoId($) {     #in: id, out:Id of assigned IO
+  my ($id) = @_;
+  ($id) = unpack 'A6',$id;#get device ID
+  return "" if (!$modules{CUL_HM}{defptr}{$id} ||
+                !$modules{CUL_HM}{defptr}{$id}->{IODev} ||
+                !$modules{CUL_HM}{defptr}{$id}->{IODev}->{NAME});
+  my $ioHash = $modules{CUL_HM}{defptr}{$id}->{IODev};
+  my $fhtid = defined($ioHash->{FHTID}) ? $ioHash->{FHTID} : "0000";
+  return AttrVal($ioHash->{NAME},"hmId","F1$fhtid");
+}
+sub CUL_HM_name2IoName($) { #in: hash out: IO_id
+  my ($name) = @_;
+  my $dHash = CUL_HM_getDeviceHash($defs{$name});
+  my $ioHash = $dHash->{IODev};
+  return $ioHash->{NAME} ? $ioHash->{NAME} : "";
+}
+
 sub CUL_HM_hash2Id($) {  #in: id,   out:hash
   my ($hash) = @_;
   return $hash->{DEF};
@@ -5273,7 +5282,7 @@ sub CUL_HM_name2Id(@) { #in: name or HMid ==>out: HMid, "" if no match
   return "000000"            if($name eq "broadcast");        #broadcast
   return substr($idHash->{DEF},0,6).sprintf("%02X",$1)
                              if($idHash && ($name =~ m/self(.*)/));
-  return CUL_HM_IOid($idHash).sprintf("%02X",$1)
+  return CUL_HM_IoId($idHash).sprintf("%02X",$1)
                              if($idHash && ($name =~ m/fhem(.*)/));
   return AttrVal($name,"hmId",""); # could be IO device
 }
@@ -5301,16 +5310,6 @@ sub CUL_HM_id2Hash($) {#in: id, out:hash
   return $modules{CUL_HM}{defptr}{$id} if ($modules{CUL_HM}{defptr}{$id});
   $id = substr($id,0,6);
   return $modules{CUL_HM}{defptr}{$id}?($modules{CUL_HM}{defptr}{$id}):undef;
-}
-sub CUL_HM_id2IoId($) {#in: id, out:Id of assigned IO
-  my ($id) = @_;
-  ($id) = unpack 'A6',$id;#get device ID
-  return "" if (!$modules{CUL_HM}{defptr}{$id} ||
-                !$modules{CUL_HM}{defptr}{$id}->{IODev} ||
-                !$modules{CUL_HM}{defptr}{$id}->{IODev}->{NAME});
-  my $ioHash = $modules{CUL_HM}{defptr}{$id}->{IODev};
-  my $fhtid = defined($ioHash->{FHTID}) ? $ioHash->{FHTID} : "0000";
-  return AttrVal($ioHash->{NAME},"hmId","F1$fhtid");
 }
 sub CUL_HM_getDeviceHash($) {#in: hash out: devicehash
   my ($hash) = @_;
@@ -5481,7 +5480,7 @@ sub CUL_HM_updtRegDisp($$$) {
   my $listNo = $list+0;
   my $name = $hash->{NAME};
   my $devId = substr(CUL_HM_name2Id($name),0,6);
-  my $ioId = CUL_HM_IOid(CUL_HM_id2Hash($devId));
+  my $ioId = CUL_HM_IoId(CUL_HM_id2Hash($devId));
   my $pReg = ($peerId && $peerId ne '00000000' )?
      CUL_HM_peerChName($peerId,$devId)."-":"";
   $pReg=~s/:/-/;
@@ -6176,12 +6175,42 @@ sub CUL_HM_noDupInString($) {#return string with no duplicates, comma separated
   return join ",",CUL_HM_noDup(split ",",$str);
 }
 sub CUL_HM_storeRssi(@){
-  my ($name,$peerName,$val) = @_;
+  my ($name,$peerName,$val,$mNo) = @_;
   return if (!$val);
   if (AttrVal($peerName,"subType","") eq "virtual"){
-    my $h = InternalVal($peerName,"IODev","");
+    my $h = InternalVal($name,"IODev","");#CUL_HM_name2IoName($peerName);
     $peerName = $h->{NAME};
   }
+  
+  $defs{$name}{helper}{xxx}{mNo} = "" if (!$defs{$name}{helper}{xxx});
+  my ($mVal,$mPn,$hashMax) = ($val,substr($peerName,3),$defs{$name}{helper}{xxx});
+  if ($hashMax->{mNo} ne $mNo){# new message
+    delete $defs{$name}{helper}{xxx};
+    $defs{$name}{helper}{xxx}{mNo} = $mNo;
+    $hashMax = $defs{$name}{helper}{xxx};
+    $hashMax->{max} = $mPn;
+    $mVal +=2 if(CUL_HM_name2IoName($name) eq $mPn);
+    $hashMax->{io}{$mPn} = $mVal;
+  }
+  else{
+    if ($mPn =~ m /^rpt_(.*)/){# map repeater to io device, use max rssi
+      $mPn = $1;
+      $mVal = $hashMax->{io}{$mPn} 
+            if(   $hashMax->{io}{$mPn} 
+               && $hashMax->{io}{$mPn} > $mVal
+               );
+    }
+    $mVal +=2 if(CUL_HM_name2IoName($name) eq $mPn);
+    $hashMax->{io}{$mPn} = $mVal;
+    my $max = -200;
+    foreach (keys %{$hashMax->{io}}){
+      if ($hashMax->{io}{$_}>$max){
+        $hashMax->{max} = $_;
+        $max = $hashMax->{io}{$_};
+      }
+    }
+  }
+  
   $defs{$name}{helper}{rssi}{$peerName}{lst} = $val;
   my $rssiP = $defs{$name}{helper}{rssi}{$peerName};
   $rssiP->{min} = $val if (!$rssiP->{min} || $rssiP->{min} > $val);
@@ -6214,7 +6243,7 @@ sub CUL_HM_UpdtCentral($){
                  keys %defs);
 
   foreach (CUL_HM_noDup(grep !/^$/,map{AttrVal($_,"IODev","")}keys %defs)){
-    push @myIos,$_ if (CUL_HM_Id($defs{$_}) eq $defs{$name}{DEF});
+    push @myIos,$_ if (CUL_HM_h2IoId($defs{$_}) eq $defs{$name}{DEF});
   }
   foreach my $ioN(split",",AttrVal($name,"IOList","")){
     if ($defs{$ioN}){
@@ -7085,6 +7114,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
          activate learn mode. Whether commands are pending is reported on
          device level with parameter 'protCmdPend'.
     </li>
+    <ul>
     <li><B>peerIODev [IO] &lt;btn_no&gt; [<u>set</u>|unset]</B><a name="CUL_HMpeerIODev"></a><br>
          The command is similar to <B><a href="#CUL_HMpeerChan">peerChan</a></B>. 
          While peerChan
@@ -7093,7 +7123,6 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
          An IO device according to eQ3 supports up to 50 virtual buttons. Those
          will be peered/unpeerd to the actor. <a href="CUL_HMpress">press</a> can be
          used to stimulate the related actions as defined in the actor register.
-    <ul>
     <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>|reverse][<u>set</u>|unset] [<u>both</u>|actor|remote]</B>
         <a name="CUL_HMpeerChan"></a><br>
 
@@ -7288,6 +7317,10 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
 
     <li>Climate-Control (HM-CC-RT-DN|HM-CC-RT-DN-BoM)
     <ul>
+      <li><B>fwUpdate &lt;filename&gt; [&lt;waitTime&gt;] </B><br>
+          update Fw of the device. User must provide the appropriate file. 
+          waitTime can be given optional. In case the device needs to be set to 
+          FW update mode manually this is the time the system will wait. </li>
       <li><B>controlMode &lt;auto|boost|day|night&gt;</B><br></li>
       <li><B>controlManu &lt;temp&gt;</B><br></li>
       <li><B>controlParty &lt;temp&gt;&lt;startDate&gt;&lt;startTime&gt;&lt;endDate&gt;&lt;endTime&gt;</B><br>
@@ -8440,6 +8473,10 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         </li>
         <li>Climate-Control (HM-CC-TC)
           <ul>
+            <li><B>fwUpdate &lt;filename&gt; [&lt;waitTime&gt;] </B><br>
+                update Fw des Device. Der User muss das passende FW file bereitstellen. 
+                waitTime ist optional. Es ist die Wartezeit, um das Device manuell in den FW-update-mode
+                zu versetzen.</li>
             <li><B>desired-temp &lt;temp&gt;</B><br>
               Setzt verschiedene Temperaturen. &lt;temp&gt; muss zwischen 6°C und 30°C liegen, die Aufl&ouml;sung betr&auml;gt 0.5°C.</li>
             <li><B>tempListSat [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
