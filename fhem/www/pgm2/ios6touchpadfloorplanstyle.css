@@ -20,6 +20,10 @@ width:1024px;
 #menu {
 height: 748px;
 }
+#backimg {
+width:823px !important;
+height: 748px !important;
+}
 }
 
 /* iPads (portrait) ----------- */
@@ -32,6 +36,10 @@ width:768px;
 }
 #menu {
 height: 1004px;
+}
+#backimg {
+width:567px !important;
+height: 1004px !important;
 }
 }
 body     {
@@ -93,7 +101,7 @@ padding:0px;
 border-right: 1px solid #000000;
 }
 #menu.floorplan a {
-padding-left: 10px;
+padding-left: 12px;
 display:block;
 vertical-align: middle;
 color:#000000;
@@ -149,10 +157,6 @@ background-image: -webkit-linear-gradient(top, #6C6C6C 0%, #505050 2%, #1B1B1C 9
 background-image: -ms-linear-gradient(bottom, #6C6C6C 0%, #505050 2%, #1B1B1C 96%, #232323 98%, #000000 100%);
 background-image: linear-gradient(to bottom, #6C6C6C 0%, #505050 2%, #1B1B1C 96%, #232323 98%, #000000 100%);
 
--moz-box-shadow: 0px 1px 4px #b4b6ba;
--webkit-box-shadow: 0px 1px 4px #b4b6ba;
-box-shadow: 0px 1px 4px #b4b6ba;
-
 border-radius:5px 5px 0px 0px;
 }
 
@@ -163,8 +167,9 @@ text-shadow: 0px -1px #000000;
 
 #menu.floorplan tr:first-child td {
 	text-align:center;
-	padding-right: 10px;
+	padding-right: 12px;
 }
+
 
 #fpmenu.fp_arrange   {
 	z-index:99;
