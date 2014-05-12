@@ -58,7 +58,7 @@ sub statistics_doStatisticDelta ($$$$$);
    ,["FBDECT", "energy", 2, 0] 
    ,["FBDECT", "power", 1, 1] 
    ,["FBDECT", "voltage", 1, 1] 
-   ,["FRM_IN", "counter", 2, 0] 
+   ,["FRM_IN", "count", 2, 0] 
    ,["FRM_IN", "power", 1, 2] 
    ,["FS20", "state", 3, 1] 
    ,["KS300", "humidity", 1, 0]
