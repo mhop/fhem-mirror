@@ -93,6 +93,7 @@ my %FW_icons;      # List of icons
 my @FW_iconDirs;   # Directory search order for icons
 my $FW_RETTYPE;    # image/png or the like
 my %FW_rooms;      # hash of all rooms
+my %FW_groups;     # hash of all groups
 my %FW_types;      # device types, for sorting
 my %FW_hiddengroup;# hash of hidden groups
 my $FW_inform;
@@ -778,6 +779,16 @@ FW_updateHashes()
     }
   }
 
+  #################
+  # Make a group  hash
+  %FW_groups = ();
+  foreach my $d (keys %defs ) {
+    next if(IsIgnored($d));
+    foreach my $r (split(",", AttrVal($d, "group", ""))) {
+      $FW_groups{$r}{$d} = 1;
+    }
+  }  
+  
   ###############
   # Needed for type sorting
   %FW_types = ();
@@ -953,7 +964,10 @@ FW_doDetail($)
   my $attrList = getAllAttr($d);
   my $roomList = "multiple,".join(",", 
                 sort map { $_ =~ s/ /#/g ;$_} keys %FW_rooms);
+  my $groupList = "multiple,".join(",", 
+                sort map { $_ =~ s/ /#/g ;$_} keys %FW_groups);				
   $attrList =~ s/room /room:$roomList /;
+  $attrList =~ s/group /group:$groupList /;
   $attrList = FW_widgetOverride($d, $attrList);
   FW_makeSelect($d, "attr", $attrList,"attr");
 
