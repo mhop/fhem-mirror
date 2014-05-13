@@ -1,0 +1,220 @@
+/* jQuery-UI mods */
+
+/*.ui-dialog {
+	top: 150px !important; 
+	left: 300px !important; 
+	}
+	*/
+
+.ui-corner-all {
+	border-radius: 10px !important;
+}
+.ui-widget {
+    font-family: Helvetica, Sans-serif !important; 
+    font-size: 14px !important; 
+	font-weight:bold !important;
+	color:#000000 !important;
+text-shadow: 0px 1px #FFFFFF !important;
+}
+.ui-dialog table {
+	border-spacing:5px!important;
+	margin:0px!important;
+	padding:0px!important;
+	width:100%!important;
+}
+
+.ui-dialog .ui-dialog-titlebar { display:none; }
+.ui-button {
+	color:#FFFFFF !important;
+text-shadow: 0px -1px #000000 !important;
+background:none !important;
+background-color:transparent !important;
+border:none !important;
+}
+.ui-widget-overlay {
+	background:none !important;
+	background-color:#000000 !important;
+	opacity:0.5 !important;
+}
+.ui-dialog-buttonpane {
+background-image: -webkit-gradient(
+linear,
+right top,
+right bottom,
+color-stop(0, #C0E2FC),
+color-stop(0.02, #44AAF8),
+color-stop(0.04, #0589F5),
+color-stop(0.96, #015DE6),
+color-stop(0.98, #0157D8),
+color-stop(1, #014BBB),
+color-stop(1, #1B72FF)
+) !important;
+background-image: -o-linear-gradient(bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
+background-image: -moz-linear-gradient(bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
+background-image: -webkit-linear-gradient(top, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
+background-image: -ms-linear-gradient(bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
+background-image: linear-gradient(to bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
+height:44px;
+	border-radius: 0px 0px 10px 10px !important;
+}
+.ui-dialog {
+	background:none !important;
+background-image: -webkit-gradient(
+linear,
+right top,
+right bottom,
+color-stop(0, #F8F9FA),
+color-stop(0.02, #EBEDEF),
+color-stop(0.04, #E4E6EA),
+color-stop(0.96, #E2E5E8),
+color-stop(0.98, #D4D7D9),
+color-stop(1, #B7B9BB)
+) !important;
+background-image: -o-linear-gradient(bottom, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%) !important;
+background-image: -moz-linear-gradient(bottom, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%) !important;
+background-image: -webkit-linear-gradient(top, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%) !important;
+background-image: -ms-linear-gradient(bottom, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%) !important;
+background-image: linear-gradient(to bottom, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%) !important;
+
+}
+.checkbox {
+    margin:0 auto;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -o-user-select: none;
+    user-select: none;
+    position:relative;
+    display: block;
+    width:76px;
+	height:26px;
+}    
+
+.checkbox input[type=checkbox] {
+	position:absolute;
+	left:0;
+	top:0;
+	z-index:99;
+}
+.checkbox input[type=checkbox]:active{
+    right:0px;
+}
+.checkbox input[type=checkbox] + label {
+		position:absolute;
+	left:0;
+	top:0;
+    display: block;
+    cursor:pointer;
+    width: 76px;
+    overflow: hidden;
+    background:#fff;
+    -webkit-border-radius:3px;
+    -moz-border-radius:3px;
+    border-radius:3px;
+    background:-webkit-linear-gradient(left, #2d5ba8 50%, #999 50%) no-repeat -20px 0;
+    background:-moz-linear-gradient(left, #2d5ba8 50%, #999 50%) no-repeat -20px 0;
+    -webkit-transition: background-position 0.3s ease-in-out;
+    -moz-transition: background-position 0.3s ease-in-out;
+}
+
+.checkbox input[type=checkbox] + label span,
+.checkbox input[type=checkbox] + label span:before,
+.checkbox input[type=checkbox] + label span:after{
+    text-align:center;
+    display:block;
+    width:50px;
+    height:26px;
+    line-height:26px;
+    position:absolute;
+    top:-1px;
+    font-weight:bold;
+    text-indent: 0;
+    -webkit-box-shadow:inset 1px 2px 2px 0 rgba(0,0,0,.2);
+    -moz-box-shadow:inset 1px 2px 2px 0 rgba(0,0,0,.2);
+    box-shadow:inset 1px 2px 2px 0 rgba(0,0,0,.2);
+}
+.checkbox input[type=checkbox] + label span{
+    text-indent: -9999px;
+    top:0;
+    position:relative;
+    left:0;
+    width:26px;
+    -webkit-border-radius:3px;
+    -moz-border-radius:3px;
+    border-radius:3px;
+    background:-webkit-linear-gradient(#efefef 1px, #cecece 1px, #fbfbfb);
+    background:-moz-linear-gradient(#efefef 1px, #cecece 1px, #fbfbfb);
+    -webkit-transition: left 0.3s ease-in-out;
+    -moz-transition: left 0.3s ease-in-out;
+    border:solid 1px;
+    border-color: #919191 #9f9f9f #999999 #90aacf;
+    -webkit-box-shadow:none;
+    -moz-box-shadow:none;
+    box-shadow:none;
+}
+.checkbox input[type=checkbox] + label span:before{
+    color:#eee;
+    text-shadow:0 1px rgba(255,255,255,.1), 0 -1px rgba(0,0,0,.3);
+    content:"I";
+background-image: -webkit-gradient(
+linear,
+right top,
+right bottom,
+color-stop(0, #C0E2FC),
+color-stop(0.02, #44AAF8),
+color-stop(0.04, #0589F5),
+color-stop(0.96, #015DE6),
+color-stop(0.98, #0157D8),
+color-stop(1, #014BBB),
+color-stop(1, #1B72FF)
+) !important;
+background-image: -o-linear-gradient(bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
+background-image: -moz-linear-gradient(bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
+background-image: -webkit-linear-gradient(top, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
+background-image: -ms-linear-gradient(bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
+background-image: linear-gradient(to bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
+    border-top:solid 1px #133676;
+    border-bottom:solid 1px #6587b7;
+    border-radius:1px 0 0 1px;
+    left:-50px;
+}
+.checkbox input[type=checkbox] + label span:after{
+    color:#888;
+    content:"O";
+    left:auto;
+    right:-50px;
+    background:-webkit-linear-gradient(#ddd, #eee);
+    background:-moz-linear-gradient(#ddd, #eee);
+    border-top:solid 1px #7d7d7d;
+    border-bottom:solid 1px #c0c0c0;
+}
+.checkbox input[type=checkbox] + label:active span{
+    left:0px;
+}
+.checkbox input[type=checkbox]:checked + label:active span{
+    left:40px;
+}
+.checkbox input[type=checkbox]:checked + label span{
+    left:50px;
+}
+.checkbox input[type=checkbox]:checked + label{
+    background-position:20px;
+}
+
+.checkbox:before,
+.checkbox:after{
+    content: " ";
+    display:block;
+    position:absolute;
+    top:0;
+    left:75px;
+    width:1px;
+    height:27px;
+    border:solid #fff;
+    border-width:1px 0;
+    z-index:20;
+    background:#999;
+}
+.checkbox:before{
+    left:0;
+}
