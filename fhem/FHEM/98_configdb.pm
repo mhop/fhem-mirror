@@ -206,24 +206,6 @@ sub CommandConfigdb($$) {
 			$ret = _cfgDB_Fileexport $filename;
 		}
 
-# 		when ('fileimport') {
-# 			return "\n Syntax: configdb fileimport <pathToFile>" if @a != 2;
-# 			my $filename;
-# 			if($param1 =~ m,^[./],) {
-# 				$filename = $param1;
-# 			} else {
-# 				$filename  = $attr{global}{modpath};
-# 				$filename .= "/$param1";
-# 			}
-# 			if ( -r $filename ) {
-# 				$ret = _cfgDB_Fileimport $filename;
-# 			} elsif ( -e $filename) {
-# 				$ret = "\n Read error on file $filename";
-# 			} else {
-# 				$ret = "\n File $filename not found.";
-# 			}
-# 		}
-
 		when ('fileimport') {
 			return "\n Syntax: configdb fileimport <pathToFile>" if @a != 2;
 			my $filename;
@@ -286,7 +268,7 @@ sub CommandConfigdb($$) {
 			$param1 = $param1 ? $param1 : '%';
 			$param2 = $param2 ? $param2 : 0;
 			Log3('configdb', 4, "configdb: list requested for device: $param1 in version $param2.");
-			$ret = _cfgDB_List($param1,$param2);
+			$ret = _cfgDB_Search($param1,$param2,1);
 		}
 
 		when ('migrate') {
