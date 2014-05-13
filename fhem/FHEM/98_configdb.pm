@@ -261,7 +261,8 @@ sub CommandConfigdb($$) {
 				$filename .= "/$param1";
 			}
 			if ( -r $filename ) {
-				$ret  = _cfgDB_Fileimport ($filename,1);
+				my $filesize = -s $filename;
+				$ret  = _cfgDB_binFileimport ($filename,$filesize,1);
 				$ret .= "\nFile $filename deleted from local filesystem.";
 			} elsif ( -e $filename) {
 				$ret = "\n Read error on file $filename";
