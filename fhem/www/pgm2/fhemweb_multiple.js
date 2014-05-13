@@ -31,9 +31,10 @@ FW_multipleSelect(el)
       var table = "";
       for(var i1=1; i1<vArr.length; i1++) {
         var v = vArr[i1];
-        table += '<tr>'+
-          '<td><input name="'+v+'" type="checkbox"'+
-                          (selObj[v] ? " checked" : "")+'/></td>'+
+        table += '<tr>'+ // funny stuff for ios6 style, forum #23561
+          '<td><div class="checkbox"><input name="'+v+'" type="checkbox"'+
+                (selObj[v] ? " checked" : "")+'/>'+
+                        '<label for="'+v+'"><span></span></label></div></td>'+
           '<td><label for="' +v+'">'+v+'</label></td></tr>';
         delete(selObj[v]);
       }
