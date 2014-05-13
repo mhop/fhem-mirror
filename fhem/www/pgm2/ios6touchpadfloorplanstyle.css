@@ -2,6 +2,8 @@
 /* by Sandra Ohmayer */
 /* http://www.animeschatten.net */
 
+@import url("ios6touchpadstyle.css");
+
 #menu {
 height: 100vh;
 }
@@ -43,14 +45,7 @@ height: 1004px !important;
 }
 }
 body     {
-background-color: #F7F7F7;
-background-repeat:no-repeat;
-margin: 0px;
-padding: 0px;
 font: normal 9px Helvetica, Sans-serif;
-text-decoration:none;
-color: #385487;
-font-weight:normal;
 }
 
 body[id~=Media]     { background-color: #A5A5A5;
@@ -58,33 +53,6 @@ body[id~=Media]     { background-color: #A5A5A5;
                         font-size:9px;  
                         background-image:url(../icons/Media.bak);
                         background-repeat:no-repeat;  }
-
-#logo    { 
-position:absolute; top:5px; left:5px;
-width:29px; height:29px;
-z-index:99;
-background-image: url(../images/fhemSVG/system_fhem.svg),-webkit-gradient(
-linear,
-right top,
-right bottom,
-color-stop(0, #E7EBF5),
-color-stop(0.02, #C8D4E9),
-color-stop(0.76, #5274B3),
-color-stop(0.98, #204994)
-);
-background-image: url(../images/fhemSVG/system_fhem.svg),-o-linear-gradient(bottom, #E7EBF5 0%, #C8D4E9 2%, #5274B3 76%, #204994 98%);
-background-image: url(../images/fhemSVG/system_fhem.svg),-moz-linear-gradient(bottom, #E7EBF5 0%, #C8D4E9 2%, #5274B3 76%, #204994 98%);
-background-image: url(../images/fhemSVG/system_fhem.svg),-webkit-linear-gradient(top, #E7EBF5 0%, #C8D4E9 2%, #5274B3 76%, #204994 98%);
-background-image: url(../images/fhemSVG/system_fhem.svg),-ms-linear-gradient(bottom, #E7EBF5 0%, #C8D4E9 2%, #5274B3 76%, #204994 98%);
-background-image: url(../images/fhemSVG/system_fhem.svg),linear-gradient(to bottom, #E7EBF5 0%, #C8D4E9 2%, #5274B3 76%, #204994 98%);
-
-background-size: 25px 25px, contain;
-background-position: 2px 2px, 0px 0px;
-background-repeat:no-repeat;
-border-radius:5px;
-border: 2px solid #000000;
-background-color:#4b6dab;
-}
 
 #backimg {
 	position:absolute; top:0px; left:201px;
@@ -101,7 +69,7 @@ padding:0px;
 border-right: 1px solid #000000;
 }
 #menu.floorplan a {
-padding-left: 12px;
+padding-left: 7px;
 display:block;
 vertical-align: middle;
 color:#000000;
@@ -167,7 +135,7 @@ text-shadow: 0px -1px #000000;
 
 #menu.floorplan tr:first-child td {
 	text-align:center;
-	padding-right: 12px;
+	padding-right: 7px;
 }
 
 
