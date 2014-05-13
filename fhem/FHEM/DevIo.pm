@@ -323,7 +323,7 @@ DevIo_OpenDev($$$)
     my $ret  = &$initfn($hash);
     if($ret) {
       DevIo_CloseDev($hash);
-      Log3 $name, 1, "Cannot init $dev, ignoring it";
+      Log3 $name, 1, "Cannot init $dev, ignoring it ($name)";
     }
   }
 
@@ -370,6 +370,7 @@ DevIo_CloseDev($@)
   delete($selectlist{"$name.$dev"});
   delete($readyfnlist{"$name.$dev"});
   delete($hash->{FD});
+  delete($hash->{EXCEPT_FD});
 }
 
 sub
@@ -383,7 +384,7 @@ DevIo_Disconnected($)
 
   return if(!defined($hash->{FD}));                 # Already deleted or RFR
 
-  Log3 $name, 1, "$dev disconnected, waiting to reappear";
+  Log3 $name, 1, "$dev disconnected, waiting to reappear ($name)";
   DevIo_CloseDev($hash);
   $readyfnlist{"$name.$dev"} = $hash;               # Start polling
   $hash->{STATE} = "disconnected";
