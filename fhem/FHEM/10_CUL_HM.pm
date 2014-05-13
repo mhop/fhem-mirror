@@ -1781,10 +1781,11 @@ sub CUL_HM_Parse($$) {#########################################################
     }
     elsif($mTp eq "41"){
       ($chn,$cnt,$state)=(hex($1),$2,$3) if($p =~ m/^(..)(..)(..)/);
-      $chn = sprintf("%02X",$chn&0x3f);
+      my $err = $chn & 0x80;
+      $chn = sprintf("%02X",$chn & 0x3f);
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
-      push @evtEt,[$shash,1,"battery:". ((hex($mI[1])&0x80)?"low"  :"ok"  )];
+      push @evtEt,[$shash,1,"battery:". ($err?"low"  :"ok"  )];
     }
     if (defined($state)){# if state was detected post events
       my $txt;
