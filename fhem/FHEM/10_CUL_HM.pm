@@ -3226,7 +3226,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$val.$chn);  # SET_LOCK
   }
   elsif($cmd =~ m/^(up|down|pct)$/) { #########################################
-    my ($lvl,$tval,$rval,$duration) = ($a[2],"","",0);
+    my ($lvl,$tval,$rval,$duration) = (($a[2]?$a[2]:0),"","",0);
     $lvl =~ s/(\d*\.?\d*).*/$1/;
     my($lvlMin,$lvlMax) = split",",AttrVal($name, "levelRange", "0,100");
     my $lvlInv = (AttrVal($name, "param", "") eq "levelInverse")?1:0;
@@ -3828,8 +3828,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif($cmd eq "fwUpdate") { #################################################
     return "no filename given" if (!$a[2]);
-    return "only thru CUL " if (!$hash->{IODev}->{TYPE}
-                                 ||($hash->{IODev}->{TYPE} ne "CUL"));
+#    return "only thru CUL " if (!$hash->{IODev}->{TYPE}
+#                                 ||($hash->{IODev}->{TYPE} ne "CUL"));
     # todo add version checks of CUL
     my ($fName,$pos,$enterBL) = ($a[2],0,($a[3] ? $a[3]+0 : 10));
     my @imA; # image array: image[block][msg]
@@ -6182,12 +6182,12 @@ sub CUL_HM_storeRssi(@){
     $peerName = $h->{NAME};
   }
   
-  $defs{$name}{helper}{xxx}{mNo} = "" if (!$defs{$name}{helper}{xxx});
-  my ($mVal,$mPn,$hashMax) = ($val,substr($peerName,3),$defs{$name}{helper}{xxx});
+  $defs{$name}{helper}{mRssi}{mNo} = "" if (!$defs{$name}{helper}{mRssi});
+  my ($mVal,$mPn,$hashMax) = ($val,substr($peerName,3),$defs{$name}{helper}{mRssi});
   if ($hashMax->{mNo} ne $mNo){# new message
-    delete $defs{$name}{helper}{xxx};
-    $defs{$name}{helper}{xxx}{mNo} = $mNo;
-    $hashMax = $defs{$name}{helper}{xxx};
+    delete $defs{$name}{helper}{mRssi};
+    $defs{$name}{helper}{mRssi}{mNo} = $mNo;
+    $hashMax = $defs{$name}{helper}{mRssi};
     $hashMax->{max} = $mPn;
     $mVal +=2 if(CUL_HM_name2IoName($name) eq $mPn);
     $hashMax->{io}{$mPn} = $mVal;
