@@ -3,8 +3,9 @@
 /* http://www.animeschatten.net */
 
 @import url("ios6dashboard.css");
+@import url("ios6Common.css");
 
-#content {
+#content, #right {
 width: 763px;
 /* Firefox */
 width: -moz-calc(100% - 261px);
@@ -15,7 +16,7 @@ width: -o-calc(100% - 261px);
 /* Standard */
 width: calc(100% - 261px);
 }
-#content, #menu {
+#content, #menu, #right {
 /*old*/
 height: 704px;
 /* Firefox */
@@ -40,10 +41,10 @@ and (orientation : landscape) {
 body {
 width:1024px;
 }
-#content {
+#content, #right {
 width: 763px;
 }
-#content, #menu {
+#content, #menu, #right {
 height: 704px;
 }
 #hdr input {
@@ -59,10 +60,10 @@ and (orientation : portrait) {
 body {
 width:768px;
 }
-#content, #menu {
+#content, #menu, #right {
 height: 960px;
 }
-#content {
+#content, #right {
 width: 507px;
 }
 #hdr input {
@@ -101,7 +102,7 @@ border:1px solid #d4d7db;
 border-bottom-color:#c6c8cd;
 background-color:#f7f7f7;
 padding-left: 1.5em; 
-margin:20px;
+margin:7px;
 outline: none; 
 -moz-box-shadow: 0px 1px #f7f7f7, inset 0px 1px 1px #b6b8bd, inset 0px -2px 2px #ffffff;
 -webkit-box-shadow: 0px 1px #f7f7f7, inset 0px 1px 1px #b6b8bd, inset 0px -2px  2px #ffffff;
@@ -117,6 +118,7 @@ border-radius: 2px;
 select,input[type="submit"],input[type="reset"],input[type="button"] {
 -webkit-appearance: none;
 width:35%;
+min-width:90px;
 font: normal 14px Helvetica, Sans-serif;
 height:25px;
 }
@@ -127,94 +129,12 @@ height: 25px;
 tr.column td { padding:0; vertical-align:top;}
 
 /* Documentation */
-h2,h3,h4 { color:#52865D; line-height:1.3;
-margin-top:1.5em; font-family:Arial,Sans-serif; }
+h2,h3,h4 { line-height:1.3;
+margin-top:1.5em; }
 div.dist { padding-top:0.3em; }
 button.dist { margin:10px; background:transparent; border:0px; cursor:pointer; }
 div.block { border:1px solid gray; background: #F8F8E0; padding:0.7em; }
 
-
-
-/* jQuery-UI mods */
-.ui-corner-all {
-	border-radius: 10px !important;
-}
-.ui-widget {
-    font-family: Helvetica, Sans-serif !important; 
-    font-size: 14px !important; 
-	font-weight:bold !important;
-	color:#000000 !important;
-text-shadow: 0px 1px #FFFFFF !important;
-}
-.ui-dialog table {
-	border-spacing:5px!important;
-	margin:0px!important;
-	padding:0px!important;
-	width:100%!important;
-}
-.ui-dialog .ui-dialog-titlebar { display:none; }
-.ui-button {
-	color:#FFFFFF !important;
-text-shadow: 0px -1px #000000 !important;
-background:none !important;
-background-color:transparent !important;
-border:none !important;
-}
-.ui-widget-overlay {
-	background:none !important;
-	background-color:#000000 !important;
-	opacity:0.5 !important;
-}
-.ui-dialog-buttonpane {
-background-image: -webkit-gradient(
-linear,
-right top,
-right bottom,
-color-stop(0, #C0E2FC),
-color-stop(0.02, #44AAF8),
-color-stop(0.04, #0589F5),
-color-stop(0.96, #015DE6),
-color-stop(0.98, #0157D8),
-color-stop(1, #014BBB),
-color-stop(1, #1B72FF)
-) !important;
-background-image: -o-linear-gradient(bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
-background-image: -moz-linear-gradient(bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
-background-image: -webkit-linear-gradient(top, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
-background-image: -ms-linear-gradient(bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
-background-image: linear-gradient(to bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%) !important;
-height:44px;
-	border-radius: 0px 0px 10px 10px !important;
-}
-.ui-dialog {
-	background:none !important;
-background-image: -webkit-gradient(
-linear,
-right top,
-right bottom,
-color-stop(0, #F8F9FA),
-color-stop(0.02, #EBEDEF),
-color-stop(0.04, #E4E6EA),
-color-stop(0.96, #E2E5E8),
-color-stop(0.98, #D4D7D9),
-color-stop(1, #B7B9BB)
-) !important;
-background-image: -o-linear-gradient(bottom, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%) !important;
-background-image: -moz-linear-gradient(bottom, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%) !important;
-background-image: -webkit-linear-gradient(top, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%) !important;
-background-image: -ms-linear-gradient(bottom, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%) !important;
-background-image: linear-gradient(to bottom, #F8F9FA 0%, #EBEDEF 2%, #E4E6EA 4%, #E2E5E8 96%, #D4D7D9 98%, #B7B9BB 100%) !important;
-
-}
-/*
-div.ui-widget-content td:first-child {
-	height: 28px;
-		width: 77px;
-		border: 1px solid #979797;
-		border-radius: 20px;
-		overflow: hidden;
-	}
-*/
 pre { white-space: pre-wrap; }
 svg { 
 height:28px;
@@ -318,7 +238,7 @@ border-spacing:0px;
 padding:0px;
 }
 
-#content {
+#content, #right {
 background-color:#e0e3e8;
 background:#e0e3e8;
 
@@ -337,7 +257,7 @@ width:100%;
 float: left;
 } 
 
-#right { position:absolute; top:20px; left:180px; }
+#right { margin-top:44px; }
 #console { width:100%; height:100%; position:absolute; overflow-y:auto;}
 #errmsg  { background-color: #000000; color: #FFFFFF;
 position:absolute; top:0px; right:0px; z-index: 10; }
@@ -558,10 +478,11 @@ background-image:
 #919191);
 background-repeat: no-repeat, repeat-x; 
 }
-.get,.set,.attr { 
-margin-top:20px;
-margin-bottom:20px;
-float:left; }
+.get, .set, .attr {
+    float: left;
+    margin-bottom: 10px;
+    margin-top: 10px;
+}
 .handle {	position:relative;
 -webkit-box-shadow: inset 0px 1px #e8e8e8;
 -moz-box-shadow: inset 0px 1px #e8e8e8;
@@ -621,5 +542,3 @@ background:#C8C8B0; font-size:6px;}
 .rc_button img { border-style:solid; border-width:1px;
 border-color:transparent; }
 .rc_button img:active { border-color: gray; }
-
-
