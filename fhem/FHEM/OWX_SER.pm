@@ -148,7 +148,7 @@ sub pt_alarms () {
 ########################################################################################
 
 sub pt_execute($$$$$$$) {
-  my ($thread, $self, $hash, $context, $reset, $address, $writedata, $numread) = @_;
+  my ($thread, $self, $hash, $context, $reset, $dev, $writedata, $numread) = @_;
 
   PT_BEGIN($thread);
   
@@ -160,13 +160,10 @@ sub pt_execute($$$$$$$) {
 
   $self->reset() if ($reset);
 
-  my $dev = $address;
-  my $data = $writedata;
-  
+  $writedata = "" unless defined $writedata;
+
   my $select;
-  my $res2 = "";
-  my ($i,$j,$k);
-  
+
   #-- has match ROM part
   if( $dev ){#		command   => EXECUTE,
 #		context   => $context,
@@ -188,13 +185,13 @@ sub pt_execute($$$$$$$) {
     for(my $i=0;$i<8;$i++){
        $rom_id[$i]=hex(substr($dev,2*$i,2));
     }
-    $select=sprintf("\x55%c%c%c%c%c%c%c%c",@rom_id).$data; 
+    $select=sprintf("\x55%c%c%c%c%c%c%c%c",@rom_id).$writedata; 
   #-- has no match ROM part, issue skip ROM command (0xCC:)
   } else {
-    $select="\xCC".$data;
+    $select="\xCC".$writedata;
   }
   #-- has receive data part
-  if( $numread >0 ){
+  if( $numread ){
     #$numread += length($data);
     for( my $i=0;$i<$numread;$i++){
       $select .= "\xFF";
