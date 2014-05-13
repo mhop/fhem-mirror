@@ -6629,7 +6629,10 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   # $name is comma separated list of names
   # $template is formated <file>:template - file is optional
   my ($name,$action,$template)=@_; 
-  my %dl =("Sat"=>0,"Sun"=>1,"Mon"=>2,"Tue"=>3,"Wed"=>4,"Thu"=>5,"Fri"=>6);
+  my %dl  = (Sat=>0,Sun=>1,Mon=>2,Tue=>3,Wed=>4,Thu=>5,Fri=>6);
+  my %dlf = (1=>{Sat=>0,Sun=>0,Mon=>0,Tue=>0,Wed=>0,Thu=>0,Fri=>0},
+             2=>{Sat=>0,Sun=>0,Mon=>0,Tue=>0,Wed=>0,Thu=>0,Fri=>0},
+             3=>{Sat=>0,Sun=>0,Mon=>0,Tue=>0,Wed=>0,Thu=>0,Fri=>0});
   my $ret = "";
   my @el = split",",$name;
   my ($fName,$tmpl) = split":",$template;
@@ -6656,13 +6659,23 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       }
     }
 
-    elsif($found == 1 && $_ =~ m/(R_)?(P[123])?(_?._)?tempList[SMFWT].*\>/){
-      my $rn = $line;
-      $rn =~ s/(.*tempList...).*/$1/;
-      my ($tln,$val) = ($1,$2)if($_ =~ m/(.*)>(.*)/);
+    elsif($found == 1 && $line =~ m/(R_)?(P[123])?(_?._)?tempList[SMFWT].*\>/){
+      my $prg = $1 if($line =~ m/P(.)_/);
+      $prg = 1 if (!$prg);
+      my ($tln,$val) = ($1,$2)if($line =~ m/(.*)>(.*)/);
       $tln =~ s/ //g;
       $tln = "R_".$tln if($tln !~ m/^R_/);
-      my $day = $dl{$1} if ($tln =~ m/tempList(...)/);
+      my $dayTxt = $1 if ($tln =~ m/tempList(...)/);
+      if (!defined $dl{$dayTxt}){
+        push @entryFail," undefined daycode:$dayTxt";
+        next;
+      }
+      if ($dlf{$prg}{$dayTxt}){
+        push @entryFail," duplicate daycode:$dayTxt";        
+        next;
+      }
+      $dlf{$prg}{$dayTxt} = 1;
+      my $day = $dl{$dayTxt};
       $tln =~s /tempList/${day}_tempList/ if ($tln !~ m/[0-6]_/);
 
       $val =~ tr/ +/ /;
@@ -6685,10 +6698,24 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         }
       }
     }
+
     $ret = "failed Entries:\n     "   .join("\n     ",@entryFail) if (scalar@entryFail);
   }
-  $ret .= "$tmpl not found in file $fName" if (!$found);
-
+  if (!$found){
+    $ret .= "$tmpl not found in file $fName";
+  }
+  else{
+    if(CUL_HM_Get($defs{$name},$name,"param","model") ne "HM-TC-IT-WM-W-EU02"){
+      delete $dlf{2};
+      delete $dlf{3};
+    }
+    foreach my $p (keys %dlf){
+      my @unprg = grep !/^$/,map {$dlf{$p}{$_}?"":$_} keys %{$dlf{$p}};
+      my $cnt = scalar @unprg;
+      if ($cnt > 0 && $cnt < 7) {$ret .= "\n incomplete template for prog $p days:".join(",",@unprg);}
+      elsif ($cnt == 7) {$ret .= "\n unprogrammed prog $p ";}
+    }
+  }
   foreach (@exec){
     my @param = split(" ",$_);
     CUL_HM_Set($defs{$param[0]},@param);
