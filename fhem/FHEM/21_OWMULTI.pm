@@ -82,7 +82,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="5.14";
+my $owx_version="5.15";
 #-- flexible channel name
 my $owg_channel;
 
@@ -777,16 +777,13 @@ sub OWXMULTI_BinValues($$$$$$$$) {
   #-- process results
   my  @data=split(//,$res);
   if (@data != 9) {
-    Log 1, "invalid data length, ".int(@data)." instead of 9 bytes";
-    return;
+    return "invalid data length, ".int(@data)." instead of 9 bytes";
   }
   if ((ord($data[0]) & 112)!=0) {
-    Log 1, "conversion not complete or data invalid";
-    return;
+    return "conversion not complete or data invalid";
   }
   if (OWX_CRC8(substr($res,0,8),$data[8])==0) {
-    Log 1, "invalid CRC";
-    return;
+    return "invalid CRC";
   }
 
   #-- this must be different for the different device types
@@ -854,7 +851,7 @@ sub OWXMULTI_GetValues($) {
 
   my ($hash) = @_;
   
-  my ($i,$j,$k,$res,$res2);
+  my ($i,$j,$k,$res,$ret);
    
   #-- ID of the device
   my $owx_dev = $hash->{ROM_ID};
@@ -914,7 +911,8 @@ sub OWXMULTI_GetValues($) {
     if( $res eq 0 );
   return "$owx_dev has returned invalid data"
     if( length($res)!=20);
-  OWXMULTI_BinValues($hash,"ds2438.getvdd",1,undef,$owx_dev,undef,undef,substr($res,11));
+  $ret = OWXMULTI_BinValues($hash,"ds2438.getvdd",1,undef,$owx_dev,undef,undef,substr($res,11));
+  return $ret if (defined $ret);
   #------------------------------------------------------------------------------------
   #-- switch the device to current measurement off, V external only
   #-- issue the match ROM command \x55 and the write scratchpad command
@@ -957,8 +955,7 @@ sub OWXMULTI_GetValues($) {
     if( $res eq 0 );
   return "$owx_dev has returned invalid data"
     if( length($res)!=20);
-  OWXMULTI_BinValues($hash,$context,1,undef,$owx_dev,undef,undef,substr($res,11));
-  return undef;
+  return OWXMULTI_BinValues($hash,$context,1,undef,$owx_dev,undef,undef,substr($res,11));
 }
   
 #######################################################################################
@@ -1016,7 +1013,7 @@ sub OWXMULTI_PT_GetValues($) {
 
   my ($thread,$hash) = @_;
   
-  my ($i,$j,$k,$res,$res2,$response);
+  my ($i,$j,$k,$res,$ret,$response);
    
   #-- ID of the device
   my $owx_dev = $hash->{ROM_ID};
@@ -1106,7 +1103,10 @@ sub OWXMULTI_PT_GetValues($) {
   unless (defined $res and length($res)==9) {
     PT_EXIT("$owx_dev has returned invalid data");
   }
-  OWXMULTI_BinValues($hash,"ds2438.getvdd",1,undef,$owx_dev,undef,undef,$res);
+  $ret = OWXMULTI_BinValues($hash,"ds2438.getvdd",1,undef,$owx_dev,undef,undef,$res);
+  if (defined $ret) {
+    PT_EXIT($ret);
+  }
   #------------------------------------------------------------------------------------
   #-- switch the device to current measurement off, V external only
   #-- issue the match ROM command \x55 and the write scratchpad command
@@ -1173,7 +1173,10 @@ sub OWXMULTI_PT_GetValues($) {
   unless (defined $res and length($res)==9) {
     PT_EXIT("$owx_dev has returned invalid data");
   }
-  OWXMULTI_BinValues($hash,"ds2438.getvad",1,undef,$owx_dev,undef,undef,$res);
+  $ret = OWXMULTI_BinValues($hash,"ds2438.getvad",1,undef,$owx_dev,undef,undef,$res);
+  if (defined $ret) {
+    PT_EXIT($ret);
+  }
   PT_END;
 }
   
