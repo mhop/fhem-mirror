@@ -119,12 +119,6 @@ sr_alt($$$$$$$)
 }
 
 sub
-_sr($$$$$$)
-{
-    _sr_alt($defaultaltit,@_);
-}
-
-sub
 _sr_alt($$$$$$$)
 {
   my ($altit,$needrise, $needset, $y, $m, $dy, $offset) = @_;
