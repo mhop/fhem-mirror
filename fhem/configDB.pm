@@ -275,7 +275,8 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 	my $id = $fhem_dbh->selectrow_array("SELECT filename from fhembinfilesave where filename = '$filename'");
 	$fhem_dbh->disconnect();
 	if($id) {
-		_cfgDB_Fileimport($filename,1) if $id;
+		my $filesize = -s $filename;
+		_cfgDB_Fileimport($filename,$filesize,1) if $id;
 		Log 5, "file $filename updated in configDB";
 	}
 	return "";
@@ -975,7 +976,8 @@ sub _cfgDB_Updatefile($) {
 	my $id = $fhem_dbh->selectrow_array("SELECT filename from fhembinfilesave where filename = '$filename'");
 	$fhem_dbh->disconnect();
 	if($id) {
-		_cfgDB_Fileimport($filename,1) if $id;
+		my $filesize = -s $filename;
+		_cfgDB_binFileimport($filename,$filesize,1) if $id;
 		Log 5, "file $filename updated in configDB";
 	}
 	return "";
