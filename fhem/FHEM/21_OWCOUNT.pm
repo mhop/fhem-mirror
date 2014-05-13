@@ -99,7 +99,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="5.19";
+my $owx_version="5.21";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -803,12 +803,9 @@ sub OWCOUNT_GetPage ($$$@) {
   my $interface= $hash->{IODev}->{TYPE};
   my $name    = $hash->{NAME};
   my $ret; 
-  my $oldfinal= $final;
   
   #-- check if memory usage has been disabled
   my $nomemory  = defined($attr{$name}{"nomemory"}) ? $attr{$name}{"nomemory"} : 0;
-  $final=0
-    if($nomemory==1);
   
   #-- even if memory usage has been disabled, we need to read the page because it contains the counter values
   if( ($nomemory==0) || ($nomemory==1 && (($page==14)||($page==15))) ){
@@ -1600,7 +1597,7 @@ sub OWXCOUNT_BinValues($$$$$$$$) {
       if( int(@data) < 42);
     #return "invalid data"
     #  if (ord($data[17])<=0); 
-    Log3 $name,1,"invalid CRC, ".ord($data[40])." ".ord($data[41])
+    return "invalid CRC, ".ord($data[40])." ".ord($data[41])
       if (OWX_CRC16($select.substr($res,0,40),$data[40],$data[41]) == 0);
       
     #-- first 3 command, next 32 are memory
@@ -1709,7 +1706,6 @@ sub OWXCOUNT_GetPage($$$) {
   return "$owx_dev has returned invalid data"
     if( length($res)!=54);
   return OWXCOUNT_BinValues($hash,$context,1,1,$owx_dev,$select,42,substr($res,12));
-  return undef;
 }
 
 ########################################################################################

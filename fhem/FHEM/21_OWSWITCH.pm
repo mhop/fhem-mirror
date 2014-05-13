@@ -89,7 +89,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="5.14";
+my $owx_version="5.15";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -1035,7 +1035,7 @@ sub OWXSWITCH_BinValues($$$$$$$$) {
       if( int(@data) != 2){
         return "state could not be set for device $owx_dev";
       }
-      Log 1,"invalid CRC"
+      return "invalid CRC"
         if (OWX_CRC16($command,$data[0],$data[1]) == 0);
       #-- put into local buffer
       $hash->{owg_val}->[0] = $value % 2;
@@ -1082,7 +1082,7 @@ sub OWXSWITCH_BinValues($$$$$$$$) {
 sub OWXSWITCH_GetState($@) {
   my ($hash,$sync) = @_;
   
-  my ($select, $res, $res2, $res3, @data);
+  my ($select, $res, @data);
   
   #-- ID of the device
   my $owx_dev = $hash->{ROM_ID};
@@ -1111,7 +1111,7 @@ sub OWXSWITCH_GetState($@) {
     return "$owx_dev has returned invalid data"
       if( length($res)!=16);
     OWX_Reset($master);
-    OWXSWITCH_BinValues($hash,"ds2406.getstate",1,undef,$owx_dev,substr($res,9,3),undef,substr($res,12));
+    return OWXSWITCH_BinValues($hash,"ds2406.getstate",1,undef,$owx_dev,substr($res,9,3),undef,substr($res,12));
   #-- family = 29 => DS2408
   }elsif( $hash->{OW_FAMILY} eq "29" ) {
     #=============== get gpio values ===============================
@@ -1193,7 +1193,7 @@ sub OWXSWITCH_SetState($$) {
     #-- issue the match ROM command \x55 and the write status command
     #   \x55 at address TA1 = \x07 TA2 = \x00
     #-- reading 9 + 4 + 2 data bytes = 15 bytes
-    my $select=sprintf("\x55\x07\x00%c",$statneu);   
+    $select=sprintf("\x55\x07\x00%c",$statneu);
     OWX_Reset($master);
     $res=OWX_Complex($master,$owx_dev,$select,2);
     if( $res eq 0 ){
@@ -1243,7 +1243,7 @@ sub OWXSWITCH_SetState($$) {
 sub OWXSWITCH_PT_GetState($) {
   my ($thread,$hash) = @_;
   
-  my ($select, $res, $res2, $res3, @data, $response);
+  my ($select, $ret, @data, $response);
   
   #-- ID of the device
   my $owx_dev = $hash->{ROM_ID};
@@ -1276,7 +1276,10 @@ sub OWXSWITCH_PT_GetState($) {
     unless (length($response->{readdata}) == 4) { 
       PT_EXIT("$owx_dev has returned invalid data");
     }
-    OWXSWITCH_BinValues($hash,"ds2406.getstate",1,1,$owx_dev,$response->{writedata},4,$response->{readdata});
+    $ret = OWXSWITCH_BinValues($hash,"ds2406.getstate",1,1,$owx_dev,$response->{writedata},4,$response->{readdata});
+    if (defined $ret) {
+      PT_EXIT($ret);
+    }
   #-- family = 29 => DS2408
   }elsif( $hash->{OW_FAMILY} eq "29" ) {
     #=============== get gpio values ===============================
@@ -1295,7 +1298,10 @@ sub OWXSWITCH_PT_GetState($) {
     unless (length($response->{readdata}) == 10) {
       PT_EXIT("$owx_dev has returned invalid data")
     };
-    OWXSWITCH_BinValues($hash,"ds2408.getstate",1,1,$owx_dev,$response->{writedata},10,$response->{readdata});
+    $ret = OWXSWITCH_BinValues($hash,"ds2408.getstate",1,1,$owx_dev,$response->{writedata},10,$response->{readdata});
+    if (defined $ret) {
+      PT_EXIT($ret);
+    }
   #-- family = 3A => DS2413
   }elsif( $hash->{OW_FAMILY} eq "3A" ) {
     #=============== get gpio values ===============================
@@ -1314,7 +1320,10 @@ sub OWXSWITCH_PT_GetState($) {
     unless (length($response->{readdata}) == 2) {
       PT_EXIT("$owx_dev has returned invalid data");
     }
-    OWXSWITCH_BinValues($hash,"ds2413.getstate",1,1,$owx_dev,$response->{writedata},2,$response->{readdata});
+    $ret = OWXSWITCH_BinValues($hash,"ds2413.getstate",1,1,$owx_dev,$response->{writedata},2,$response->{readdata});
+    if (defined $ret) {
+      PT_EXIT($ret);
+    }
   } else {
     PT_EXIT("unknown device family $hash->{OW_FAMILY}\n");
   }
@@ -1386,8 +1395,9 @@ sub OWXSWITCH_PT_SetState($$) {
     if( int(@data) != 2){
       PT_EXIT("state could not be set for device $owx_dev");
     }
-    Log 1,"invalid CRC"
-      if (OWX_CRC16($command,$data[0],$data[1]) == 0);
+    if (OWX_CRC16($command,$data[0],$data[1]) == 0) {
+      PT_EXIT("invalid CRC");
+    }
       
     #-- put into local buffer
     $hash->{owg_val}->[0] = $value % 2;

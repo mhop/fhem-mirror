@@ -90,7 +90,7 @@ use ProtoThreads;
 no warnings 'deprecated';
 sub Log($$);
 
-my $owx_version="5.13";
+my $owx_version="5.14";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D");
 my @owg_channel = ("A","B","C","D");
@@ -1443,9 +1443,7 @@ sub OWXAD_GetPage($$$@) {
   return "$owx_dev has returned invalid data"
     if( length($res)!=22);
   #-- for processing we also need the 3 command bytes
-  OWXAD_BinValues($hash,$context,1,undef,$owx_dev,$select,10,substr($res,12,10));
-
-  return undef;
+  return OWXAD_BinValues($hash,$context,1,undef,$owx_dev,$select,10,substr($res,12,10));
 }
 
 ########################################################################################
