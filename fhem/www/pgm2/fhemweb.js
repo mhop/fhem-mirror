@@ -3,6 +3,9 @@ var FW_pollConn;
 var FW_curLine; // Number of the next line in FW_pollConn.responseText to parse
 var FW_widgets = new Object(); // to be filled by fhemweb_*.js
 var FW_leaving;
+var isIE = (navigator.appVersion.indexOf("MSIE") > 0);
+var isiOS = navigator.userAgent.match(/(iPad|iPhone|iPod)/);
+
 
 function
 log(txt)
@@ -310,15 +313,28 @@ loadScript(sname, callback)
   script.src = sname;
   script.async = script.defer = false;
   script.type = "text/javascript";
-  script.onload = callback;
+
+
   log("Loading "+sname);
-  script.onreadystatechange = function() {
-    if(script.readyState == 'loaded' || script.readyState == 'complete') {
-      script.onreadystatechange = null;
+  if(isIE) {
+    script.onreadystatechange = function() {
+      if(script.readyState == 'loaded' || script.readyState == 'complete') {
+        script.onreadystatechange = null;
+        if(callback)
+          callback();
+      }
+    }
+  } else {
+    if(isiOS)
+      FW_pollConn.abort();
+    script.onload = function(){
       if(callback)
         callback();
+      if(isiOS)
+        FW_longpoll();
     }
   }
+  
   h.appendChild(script);
 }
 

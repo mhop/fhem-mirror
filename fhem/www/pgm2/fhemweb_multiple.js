@@ -39,10 +39,13 @@ FW_multipleSelect(el)
         delete(selObj[v]);
       }
 
+      var selArr=[];
+      for(var i1 in selObj)
+        selArr.push(i1);
       $('body').append(
         '<div id="multidlg" style="display:none">'+
           '<table>'+table+'</table><input id="md_freeText" '+
-                'value="'+Object.keys(selObj).join(',')+'"/>'+
+                'value="'+selArr.join(',')+'"/>'+
         '</div>');
 
       $('#multidlg').dialog(
