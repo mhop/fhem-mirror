@@ -346,7 +346,8 @@ scriptAttribute(sname)
 {
   var attr="";
   $("head script").each(function(){
-    if($(this).attr("src").indexOf(sname) >= 0)
+    var attr = $(this).attr("src");
+    if(attr && attr.indexOf(sname) >= 0)
       attr = $(this).attr("attr");
   });
 
