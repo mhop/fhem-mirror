@@ -4,11 +4,20 @@
 
 @import url("ios6touchpadstyle.css");
 
-#menu {
-height: 100vh;
+#backimg {
+width: 823px !important;
+/* Firefox */
+width: -moz-calc(100% - 201px) !important;
+/* WebKit */
+width: -webkit-calc(100% - 201px) !important;
+/* Opera */
+width: -o-calc(100% - 201px) !important;
+/* Standard */
+width: calc(100% - 201px) !important;
 }
+
 #fpmenu.fp_arrange   {
-position:fixed; bottom:10px; left:0px; 
+position:fixed; bottom:10px; left:7px; 
 }
 /*iPad Skalierung*/
 /* iPads (landscape) ----------- */
@@ -46,7 +55,21 @@ height: 1004px !important;
 }
 body     {
 font: normal 9px Helvetica, Sans-serif;
-background-color: #d7dadf;
+background-image: -webkit-gradient(
+	linear,
+	left top,
+	right top,
+	color-stop(0.2, #D7DADF),
+	color-stop(0.2, #000000)
+);
+background-image: -o-linear-gradient(right, #D7DADF 20%, #000000 20%);
+background-image: -moz-linear-gradient(right, #D7DADF 20%, #000000 20%);
+background-image: -webkit-linear-gradient(to right, #D7DADF 20%, #000000 20%);
+background-image: -ms-linear-gradient(right, #D7DADF 20%, #000000 20%);
+background-image: linear-gradient(to right, #D7DADF 20%, #000000 20%);
+background-position: 0 0;
+background-size: 1000px 2500px;
+background-repeat:no-repeat;
 }
 
 body[id~=Media]     { background-color: #A5A5A5;
