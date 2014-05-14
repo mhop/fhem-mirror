@@ -90,6 +90,12 @@ a {
 color:#000000;
 font-weight:bold;
 text-decoration:none; }
+
+a:hover {
+cursor:pointer;
+color:#777777;
+}
+
 img      { border-style:none; }
 
 div.dist { padding-top:0.3em; }
@@ -110,7 +116,7 @@ box-shadow: 0px 1px #f7f7f7, inset 0px 1px 1px #b6b8bd, inset 0px -2px 2px #ffff
 }
 textarea, input[type="text"] {
 -webkit-appearance: none;
-width:80%;
+width:90%;
 }
 input[type="checkbox"] {
 border-radius: 2px;
@@ -292,6 +298,22 @@ font-size:16px;
 text-shadow: 0px 1px #FFFFFF;
 padding:20px 0px 0px 0px; }
 
+.devType table, .makeTable table {
+font-weight:normal;
+color:#385487;
+font-size:14px;
+padding:0px; }
+
+.devType table a, .makeTable table a {
+font-weight:bold;
+color:#000000;
+font-size:14px;
+padding:0px;
+}
+.devType table a:hover, .makeTable table a:hover {
+color:#777777;
+}
+
 .wide    { width:100%; }
 
 .block {
@@ -329,14 +351,6 @@ table.block td {
 border-top: 1px solid #fdfdfd;
 border-bottom: 1px solid #cbcbcb;
 }
-
-.roomoverview table.block td a{
-color: #385487;
-}
-.roomoverview table.block td:first-child a {
-color: #000000;
-font-weight:bold;
-}
 table.block tr:first-child td {
 border-top:none;
 }
@@ -346,7 +360,6 @@ border-bottom:none;
 
 .block td:first-child { 
 padding-left: 10px;
-color:#000000;
 font-weight:bold;
 }
 
@@ -423,9 +436,19 @@ background-image: -webkit-linear-gradient(top, #C0E2FC 0%, #44AAF8 2%, #0589F5 4
 background-image: -ms-linear-gradient(bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%);
 background-image: linear-gradient(to bottom, #C0E2FC 0%, #44AAF8 2%, #0589F5 4%, #015DE6 96%, #0157D8 98%, #014BBB 100%, #1B72FF 100%);
 }
-table.block tr.sel a,table.room tr.sel a{ 
+table.room tr.sel a{ 
 color:#FFFFFF;
 text-shadow: 0px -1px #000000; 
+}
+table.room tr.sel a:hover{ 
+text-shadow: 0px -1px #333333;
+}
+
+table.room a:hover svg { 
+background-color:#777777;
+}
+table.room tr.sel a:hover svg { 
+background-color:#333333;
 }
 
 .changed { color:red; }
@@ -433,6 +456,13 @@ text-shadow: 0px -1px #000000;
 
 }
 
+.FileLog td:first-child {
+    font-weight: normal;
+	width:180px;
+}
+.FileLog td:nth-child(2) {
+	width:100px;
+}
 /* Widgets */
 .makeTable  {
 width: 100%;
