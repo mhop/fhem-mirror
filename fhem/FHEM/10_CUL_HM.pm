@@ -4905,7 +4905,6 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
     RemoveInternalTimer("fail:SpeedChangeFailed");
     RemoveInternalTimer("fail:Block".($step-1));
     if ($blocks < $step){#last block
-      CUL_HM_FWupdateSpeed($name,10);
       CUL_HM_FWupdateEnd("done");
       Log3 $name,2,"CUL_HM fwUpdate completed";
     }
