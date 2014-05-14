@@ -249,7 +249,7 @@ sub RPII2C_HWACCESS($$) {
     my ($hash, $clientmsg) = @_;
 		my $status = "error";
 		my $inh = undef;
-		Log3 $hash, 5, "$hash->{NAME}: HWaccess I2CAddr: " . sprintf("%.2X", $clientmsg->{i2caddress});
+		Log3 $hash, 5, "$hash->{NAME}: HWaccess I2CAddr: " . sprintf("0x%.2X", $clientmsg->{i2caddress});
 		my $dev = Device::SMBus->new(
 			I2CBusDevicePath => $hash->{DeviceName},
 			I2CDeviceAddress => hex( sprintf("%.2X", $clientmsg->{i2caddress}) ),
@@ -259,7 +259,7 @@ sub RPII2C_HWACCESS($$) {
 			my $dataref = \@data;
 			$inh = $dev->writeBlockData( $clientmsg->{reg} , $dataref );
 			my $wr = join(" ", @{$dataref});
-			Log3 $hash, 5, "$hash->{NAME}: Block schreiben Register: " . sprintf("%.2X", $clientmsg->{reg}) . " Inhalt: " . $wr . " N: ". int(@data) ." Returnvar.: $inh";
+			Log3 $hash, 5, "$hash->{NAME}: Block schreiben Register: " . sprintf("0x%.2X", $clientmsg->{reg}) . " Inhalt: " . $wr . " N: ". int(@data) ." Returnvar.: $inh";
 			$status = "Ok" if $inh == 0;
 #kommt wieder weg#################
 		} elsif (defined($clientmsg->{nbyte}) && defined($clientmsg->{reg}) && defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cwrite") {	#Registerbereich (mehrfach) beschreiben
@@ -276,7 +276,7 @@ sub RPII2C_HWACCESS($$) {
 		  my @data = split(" ", $clientmsg->{data});
 		  foreach (@data) {
 				$inh = $dev->writeByteData($clientmsg->{reg},$_);
-				Log3 $hash, 5, "$hash->{NAME}; Register ".sprintf("%.2X", $clientmsg->{reg})." schreiben - Inhalt: " .sprintf("%.2X",$_) . " Returnvar.: $inh";
+				Log3 $hash, 5, "$hash->{NAME}; Register ".sprintf("0x%.2X", $clientmsg->{reg})." schreiben - Inhalt: " .sprintf("0x%.2X",$_) . " Returnvar.: $inh";
 				last if $inh != 0;
 				$status = "Ok" if $inh == 0;
 			} 
@@ -293,7 +293,7 @@ sub RPII2C_HWACCESS($$) {
 			my $rmsg = "";
 			for (my $n = 0; $n < $nbyte; $n++) {
 				$inh = $dev->readByteData($clientmsg->{reg} + $n );
-				Log3 $hash, 5, "$hash->{NAME}; Register ".sprintf("%.2X", $clientmsg->{reg} + $n )." lesen - Inhalt: ".sprintf("%.2X",$inh);
+				Log3 $hash, 5, "$hash->{NAME}; Register ".sprintf("0x%.2X", $clientmsg->{reg} + $n )." lesen - Inhalt: ".sprintf("0x%.2X",$inh);
 				last if ($inh < 0);
 				#$rmsg .= sprintf("%.2X",$inh);
 				$rmsg .= $inh;
