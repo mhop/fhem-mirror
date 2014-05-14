@@ -1,0 +1,36 @@
+/* iOS 6 Theme for FHEM */
+/* by Sandra Ohmayer */
+/* http://www.animeschatten.net */
+
+@import url("ios6dashboard.css");
+@import url("ios6Common.css");
+@import url("ios6touchpadstyle.css");
+
+/*For smaller Desktop-Screens*/
+
+#content, #right {
+width: 763px;
+/* Firefox */
+width: -moz-calc(100% - 261px);
+/* WebKit */
+width: -webkit-calc(100% - 261px);
+/* Opera */
+width: -o-calc(100% - 261px);
+/* Standard */
+width: calc(100% - 261px);
+}
+#content, #menu, #right {
+/*old*/
+height: 704px;
+/* Firefox */
+height: -moz-calc(100vh - 44px);
+/* WebKit */
+height: -webkit-calc(100vh - 44px);
+/* Opera */
+height: -o-calc(100vh - 44px);
+/* Standard */
+height: calc(100vh - 44px);
+}
+#hdr input {
+width: 80%;
+}
