@@ -344,9 +344,9 @@ sub cfgDB_SaveCfg() {
 			my $def = $defs{$d}{DEF};
 			if(defined($def)) {
 				$def =~ s/;/;;/g;
-				$def =~ s/\n/\n /g;
+				$def =~ s/\n/\\\n/g;
 			} else {
-				$dev = "";
+				$def = "";
 			}
 			push @rowList, "define $d $defs{$d}{TYPE} $def";
 		}
@@ -509,14 +509,17 @@ sub _cfgDB_InsertLine($$$$) {
 # pass command table to AnalyzeCommandChain
 sub _cfgDB_Execute($@) {
 	my ($cl, @dbconfig) = @_;
-	my ($ret,$r2);
-	foreach (@dbconfig){
-		my $l = $_;
+	my (@ret);
+
+	foreach my $l (@dbconfig) {
 		$l =~ s/[\r\n]//g;
-		$r2 = AnalyzeCommandChain($cl, $l);
-		$ret .= "$r2\n" if($r2);
+		if($l =~ m/\\*$/) {		# Multiline commands
+			$l =~ s/\\/\n/g;
+		}
+		my $tret = AnalyzeCommandChain($cl, $l);
+		push @ret, $tret if(defined($tret));
 	}
-	return $ret if($ret);
+	return join("\n", @ret) if(@ret);
 	return undef;
 }
 
@@ -527,7 +530,7 @@ sub _cfgDB_ReadCfg(@) {
 	my $fhem_dbh = _cfgDB_Connect;
 	my ($sth, @line, $row);
 
-# using a join would be much nicer, but does not work due to sort of join's result
+# maybe this will be done with join later
 	my $uuid = $fhem_dbh->selectrow_array('SELECT versionuuid FROM fhemversions WHERE version = 0');
 	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE versionuuid = '$uuid' and device <>'configdb' order by version" );  
 
