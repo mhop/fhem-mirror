@@ -160,49 +160,46 @@ sub pt_execute($$$$$$$) {
 
   $self->reset() if ($reset);
 
-  $writedata = "" unless defined $writedata;
+  if (defined $writedata or $numread) {
 
-  my $select;
-
-  #-- has match ROM part
-  if( $dev ){#		command   => EXECUTE,
-#		context   => $context,
-#		reset     => $reset,
-#		address   => $owx_dev,
-#		writedata => $data,
-#		numread   => $numread,
-#		delay     => $delay
-
-    
-    #-- ID of the device
-    my $owx_rnf = substr($dev,3,12);
-    my $owx_f   = substr($dev,0,2);
-
-    #-- 8 byte 1-Wire device address
-    my @rom_id  =(0,0,0,0 ,0,0,0,0); 
-    #-- from search string to byte id
-    $dev=~s/\.//g;
-    for(my $i=0;$i<8;$i++){
-       $rom_id[$i]=hex(substr($dev,2*$i,2));
-    }
-    $select=sprintf("\x55%c%c%c%c%c%c%c%c",@rom_id).$writedata; 
-  #-- has no match ROM part, issue skip ROM command (0xCC:)
-  } else {
-    $select="\xCC".$writedata;
-  }
-  #-- has receive data part
-  if( $numread ){
-    #$numread += length($data);
-    for( my $i=0;$i<$numread;$i++){
-      $select .= "\xFF";
-    };
-  }
+    my $select;
   
-  #-- for debugging
-  if( $main::owx_async_debug > 1){
-    main::Log3($self->{name},3,"OWX_SER::Execute: Sending out ".unpack ("H*",$select));
+    #-- has match ROM part
+    if( $dev ) {
+          
+      #-- ID of the device
+      my $owx_rnf = substr($dev,3,12);
+      my $owx_f   = substr($dev,0,2);
+  
+      #-- 8 byte 1-Wire device address
+      my @rom_id  =(0,0,0,0 ,0,0,0,0); 
+      #-- from search string to byte id
+      $dev=~s/\.//g;
+      for(my $i=0;$i<8;$i++){
+         $rom_id[$i]=hex(substr($dev,2*$i,2));
+      }
+      $select=sprintf("\x55%c%c%c%c%c%c%c%c",@rom_id); 
+    #-- has no match ROM part, issue skip ROM command (0xCC:)
+    } else {
+      $select="\xCC";
+    }
+    if (defined $writedata) {
+      $select.=$writedata;
+    }
+    #-- has receive data part
+    if( $numread ) {
+      #$numread += length($data);
+      for( my $i=0;$i<$numread;$i++){
+        $select .= "\xFF";
+      };
+    }
+    
+    #-- for debugging
+    if( $main::owx_async_debug > 1){
+      main::Log3($self->{name},3,"OWX_SER::Execute: Sending out ".unpack ("H*",$select));
+    }
+    $self->block($select);
   }
-  $self->block($select);
   
   PT_WAIT_UNTIL($self->response_ready());
   
