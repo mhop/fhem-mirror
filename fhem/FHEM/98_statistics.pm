@@ -40,7 +40,8 @@ use Time::Local;
 sub statistics_PeriodChange($);
 sub statistics_DoStatistics ($$$);
 sub statistics_doStatisticMinMax ($$$$$);
-sub statistics_doStatisticMinMaxSingle ($$$$$$);
+sub statistics_doStatisticMinMaxSingle ($$$$$$$);
+sub statistics_storeSingleReadings ($$$$$$$$$$);
 sub statistics_doStatisticDelta ($$$$$); 
 sub statistics_getStoredDevices($);
 
@@ -100,18 +101,18 @@ statistics_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{DefFn}    = "statistics_Define";
-  $hash->{UndefFn}  = "statistics_Undefine";
-  $hash->{NotifyFn} = "statistics_Notify";
+  $hash->{DefFn}     = "statistics_Define";
+  $hash->{UndefFn}   = "statistics_Undefine";
+  $hash->{NotifyFn}  = "statistics_Notify";
   $hash->{NOTIFYDEV} = "global";
-  $hash->{SetFn} = "statistics_Set";
+  $hash->{SetFn}     = "statistics_Set";
 
   $hash->{NotifyOrderPrefix} = "10-";   # Want to be called before the rest
   $hash->{AttrList} = "disable:0,1 "
                    ."dayChangeTime "
                    ."excludedReadings "
                    ."periodChangePreset "
-                   ."singleReadings "
+                   ."singularReadings "
                    .$readingFnAttributes;
 }
 
@@ -139,8 +140,8 @@ statistics_Define($$)
 
   RemoveInternalTimer($hash);
   
- # Run period change procedure each full hour (1 second before).
-  my $periodEndTime = 3600 * ( int(gettimeofday()/3600) + 1 ) - 10 ;
+ # Run period change procedure next full hour (15 seconds before).
+  my $periodEndTime = 3600 * ( int(gettimeofday()/3600) + 1 ) - 15 ;
   InternalTimer( $periodEndTime, "statistics_PeriodChange", $hash, 0);
 
   return undef;
@@ -249,7 +250,7 @@ statistics_Notify($$)
 
    if ($normalReadingFound==1) {
       statistics_DoStatistics $hash, $dev, 0;
-      Log3 $name,4,"$name: Notification of '".$dev->{NAME}."' received. Update statistics.";
+      Log3 $name,5,"$name: Notification of '".$dev->{NAME}."' received. Update statistics.";
    } else {
       Log3 $name,5,"$name: Notification of '".$dev->{NAME}."' received but for my own readings only.";
    }
@@ -266,21 +267,34 @@ statistics_PeriodChange($)
    my ($hash) = @_;
    my $name = $hash->{NAME};
    my $dummy;
+   my $val;
    my $periodChangePreset = AttrVal($name, "periodChangePreset", 10);
 
-   my $dayChangeTime = 0;
+  # Determine the next day change time
+   my @th=localtime();
+   my $dayChangeDelay = 0;
+   my $dayChangeTime = timelocal(0,0,0,$th[3],$th[4],$th[5]+1900);
    if (AttrVal($name, "dayChangeTime", "00:00") =~ /(\d+):(\d+)/ && $1<24 && $1 >=0 && $2<60 && $2>=0) {
-      $dayChangeTime = $1 * 3600 + $2 * 60;
+      $dayChangeDelay = $1 * 3600 + $2 * 60;
+      $dayChangeTime += $dayChangeDelay;
    }
-   
+
    RemoveInternalTimer($hash);
- # Run period change procedure each full hour (1 second before).
-   my $periodEndTime = 3600 * ( int(gettimeofday()/3600) + 1 ) - $periodChangePreset ;
-   InternalTimer( $periodEndTime, "statistics_PeriodChange", $hash, 0);
-   Log3 $name,5,"$name: Next period change will be calculated at ".strftime ("%H:%M:%S", localtime($periodEndTime));
+ # Run period change procedure each full hour ("periodChangePreset" second before).
+   my $periodEndTime = 3600 * ( int((gettimeofday()+1800)/3600) + 1 ) - $periodChangePreset ;
+ # Run procedure also for given dayChangeTime  
+   $val = "";
+   if ( gettimeofday() < $dayChangeTime && $dayChangeTime < $periodEndTime) {
+      $periodEndTime = $dayChangeTime;
+      $val = " (Day Change)";
+   } 
+   $val = strftime ("%Y-%m-%d %H:%M:%S", localtime($periodEndTime)) . $val;
+   InternalTimer( $periodEndTime, "statistics_PeriodChange", $hash, 1);
+   readingsSingleUpdate($hash, "nextPeriodChangeCalc", $val, 0);
+   Log3 $name,4,"$name: Next period change will be calculated at ".strftime ("%H:%M:%S", localtime($periodEndTime));
 
    return if( AttrVal($name, "disable", 0 ) == 1 );
-
+   
  # Determine if time period switched (day, month, year)
  # Get deltaValue and Tariff of previous call
  
@@ -288,12 +302,14 @@ statistics_PeriodChange($)
    my $yearLast;
    my $monthLast;
    my $dayLast;
+   my $minuteNow;
+   my $hourNow;
    my $dayNow;
    my $monthNow;
    my $yearNow;
 
    ($dummy, $dummy, $dummy, $dayLast, $monthLast, $yearLast) = localtime (gettimeofday() - 1800);
-   ($dummy, $dummy, $dummy, $dayNow, $monthNow, $yearNow) = localtime (gettimeofday() + 10 + $periodChangePreset);
+   ($dummy, $minuteNow, $hourNow, $dayNow, $monthNow, $yearNow) = localtime (gettimeofday() + 10 + $periodChangePreset);
 
    if ($yearNow != $yearLast) { $periodSwitch = 4; }
    elsif ($monthNow != $monthLast) { $periodSwitch = 3; }
@@ -404,20 +420,21 @@ statistics_doStatisticMinMax ($$$$$)
 {
    my ($hash, $dev, $readingName, $decPlaces, $periodSwitch) = @_;
    my $name = $hash->{NAME};
+   my $devName = $dev->{NAME};
    return if not exists ($dev->{READINGS}{$readingName});
-   
+  
   # Get reading, cut out first number without units
    my $value = $dev->{READINGS}{$readingName}{VAL};
    $value =~ s/^[\D]*([\d.]*).*/$1/eg;
 
-   Log3 $name, 5, "Calculating min/avg/max statistics for '$readingName=$value'";
+   Log3 $name, 4, "Calculating min/avg/max statistics for '".$dev->{NAME}.":$readingName = $value'";
   # statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast, decPlaces
   # Daily Statistic
-   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName."Day", $value, ($periodSwitch >= 2), $decPlaces;
+   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Day", $value, ($periodSwitch >= 2), $decPlaces;
   # Monthly Statistic 
-   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName."Month", $value, ($periodSwitch >= 3), $decPlaces;
+   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Month", $value, ($periodSwitch >= 3), $decPlaces;
   # Yearly Statistic 
-   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName."Year", $value, ($periodSwitch == 4), $decPlaces;
+   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Year", $value, ($periodSwitch == 4), $decPlaces;
 
    return ;
 
@@ -425,19 +442,20 @@ statistics_doStatisticMinMax ($$$$$)
 
 # Calculates single MaxMin Values and informs about end of day and month
 sub ######################################## 
-statistics_doStatisticMinMaxSingle ($$$$$$) 
+statistics_doStatisticMinMaxSingle ($$$$$$$) 
 {
-   my ($hash, $dev, $readingName, $value, $saveLast, $decPlaces) = @_;
+   my ($hash, $dev, $readingName, $period, $value, $saveLast, $decPlaces) = @_;
    my $result;
-   my $hiddenReadingName = ".".$dev->{NAME}.":".$readingName;
+   my $hiddenReadingName = ".".$dev->{NAME}.":".$readingName.$period;
    my $name=$hash->{NAME};
+   my $devName = $dev->{NAME};
    
    my $statReadingName = $hash->{PREFIX};
-   $statReadingName .= ucfirst($readingName);
+   $statReadingName .= ucfirst($readingName).$period;
    my @hidden;
    my @stat;
    my $firstRun = not exists($hash->{READINGS}{$hiddenReadingName});
-   
+ 
    if ( $firstRun ) { 
   # Show since-Value
       $hidden[1] = 0; $hidden[3] = 0; $hidden[9] = 1;
@@ -469,16 +487,27 @@ statistics_doStatisticMinMaxSingle ($$$$$$)
 
   # Store current reading
    readingsBulkUpdate($dev, $statReadingName, $result, 0);
-      Log3 $name, 5, "Set '$statReadingName'='$result'";
-  
+   Log3 $name, 5, "Set '$statReadingName'='$result'";
+ 
+  # Store single readings
+   my $singularReadings = AttrVal($name, "singularReadings", "");
+   if ($singularReadings ne "") {
+      # statistics_storeSingleReadings $hashName,$singleReading,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$value,$saveLast
+      my $statValue = sprintf  "%.".$decPlaces."f", $stat[1];
+      statistics_storeSingleReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Min",$period,$statValue,$value,$saveLast);
+      $statValue = sprintf  "%.".$decPlaces."f", $stat[3];
+      statistics_storeSingleReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Avg",$period,$statValue,$value,$saveLast);
+      $statValue = sprintf  "%.".$decPlaces."f", $stat[5];
+      statistics_storeSingleReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Max",$period,$statValue,$value,$saveLast);
+   }
+
   # Store hidden reading
    $result = "Sum: $hidden[1] Time: $hidden[3] LastValue: ".$value." LastTime: ".int(gettimeofday())." ShowDate: $hidden[9]";
    readingsSingleUpdate($hash, $hiddenReadingName, $result, 0);
-      Log3 $name, 5, "Set '$hiddenReadingName'='$result'";
+   Log3 $name, 5, "Set '$hiddenReadingName'='$result'";
 
    return;
 }
-
 
 # Calculates deltas for day, month and year
 sub ######################################## 
@@ -495,7 +524,7 @@ statistics_doStatisticDelta ($$$$$)
   # Get reading, cut out first number without units
    my $value = $dev->{READINGS}{$readingName}{VAL};
    $value =~ s/^[\D]*([\d.]*).*/$1/eg;
-   Log3 $name, 5, "Calculating delta statistics for '$readingName=$value'";
+   Log3 $name, 4, "Calculating delta statistics for '".$dev->{NAME}.":$readingName = $value'";
 
    my $hiddenReadingName = ".".$dev->{NAME}.":".$readingName;
    
@@ -585,6 +614,16 @@ statistics_doStatisticDelta ($$$$$)
       readingsBulkUpdate($dev,$statReadingName."Last",$result, 1); 
       Log3 $name,4,"$name: Set '".$statReadingName."Last'='$result'";
    }
+
+ # Store single readings
+   my $singularReadings = AttrVal($name, "singularReadings", "");
+   if ($singularReadings ne "") {
+      # statistics_storeSingleReadings $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$value,$saveLast
+      statistics_storeSingleReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Hour",$stat[1],$last[1],$periodSwitch >= 1);
+      statistics_storeSingleReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Day",$stat[1],$last[1],$periodSwitch >= 2);
+      statistics_storeSingleReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Month",$stat[1],$last[1],$periodSwitch >= 3);
+      statistics_storeSingleReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Year",$stat[1],$last[1],$periodSwitch >= 4);
+   }
    
   # Store hidden reading
    $result = "LastValue: $value ShowDate: $showDate ";  
@@ -593,6 +632,30 @@ statistics_doStatisticDelta ($$$$$)
 
    return ;
 }
+
+
+sub ####################
+statistics_storeSingleReadings ($$$$$$$$$$)
+{
+   my ($hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$value,$saveLast) = @_;
+   return if $singularReadings eq "";
+
+   if ($statType eq "Delta") { $statReadingName .= $period;}
+   else { $statReadingName .= $statType;}
+   my $devName=$dev->{NAME};
+   if ("$devName:$readingName:$statType:$period" =~ /^($singularReadings)$/) {
+      if ($saveLast) {
+         readingsBulkUpdate($dev, $statReadingName."Last", $statValue, 1);
+         Log3 $hashName, 5, "Set ".$statReadingName."Last = $statValue";
+         readingsBulkUpdate($dev, $statReadingName, $value, 1);
+         Log3 $hashName, 5, "Set ".$statReadingName."Last = $value";
+      } else {
+         readingsBulkUpdate($dev, $statReadingName, $statValue, 1);
+         Log3 $hashName, 5, "Set ".$statReadingName." = $statValue";
+      } 
+   }
+}
+
 
 sub ####################
 statistics_getStoredDevices ($)
@@ -620,6 +683,12 @@ statistics_getStoredDevices ($)
 <h3>statistics</h3>
 <ul>
   This modul calculates for certain readings of given devices statistical values and adds them to the devices.
+  <br>
+   Until now the following device types and readings are analysed:
+   <ul>
+      <li><b>Minimal, average  and maximal values:</b> current, humidity, temperature, voltage, wind, windSpeed</li>
+      <li><b>Delta values:</b> count, energy, power, total, rain, rain_total</li>
+   </ul>
   <br>&nbsp;
   <br>
   
@@ -637,13 +706,6 @@ statistics_getStoredDevices ($)
       <br>
       Regular expression of device names. !!! Not the device readings !!!
       <br>
-      Until now the following device types and readings are analysed:
-      <ul><li><b>CUL_WS:</b> humidity, temperature</li>
-          <li><b>FBDECT:</b> current, energy, power, voltage</li>
-          <li><b>FRM_IN:</b> count, power</li>
-          <li><b>KS300:</b> humidity, temperature, rain, wind</li>
-          <li><b>OREGON:</b> humidity, rain, temperature</li>
-      </ul>
     </li>
   </ul>
   
@@ -658,13 +720,20 @@ statistics_getStoredDevices ($)
   </ul>
   <br>
 
-  <a name="JSONMETERattr"></a>
+  <a name="statisticsattr"></a>
    <b>Attributes</b>
    <ul>
-    <li><code>excludedReadings <code>&lt;Device:ReadingNameRegExp&gt;</code></code>
+    <li><code>excludedReadings <code>&lt;DeviceRegExp:ReadingNameRegExp&gt;</code></code>
       <br>
       Regular expression of the readings that shall be excluded from the statistics.<br>
       The reading have to be entered in the form <i>deviceName:readingName</i>. E.g. "FritzDect:current|Sensor_.*:humidity"
+      <br>
+    </li><br>
+    <li><code>singularReadings &lt;DeviceRegExp:ReadingRegExp&gt;:statTypes<i>(Min|Avg|Max|Delta)</i>:period<i>(Hour|Day|Month|Year)</i></code>
+      <br>
+      Regulare expression of statistic values, which shall not be shown in summary but also in singular readings
+      <br>
+      z.B. <code>Wettersensor:rain:Delta:(Hour|Day))|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
       <br>
     </li><br>
    </ul>
@@ -678,6 +747,13 @@ statistics_getStoredDevices ($)
 <h3>statistics</h3>
 <ul>
   Dieses Modul wertet von den angegebenen Ger&auml;ten bestimmte Werte statistisch aus und f&uuml;gt sie den jeweiligen Ger&auml;ten als neue Werte hinzu.
+  <br>
+  Derzeit werden folgende Ger&auml;tewerte ausgewertet:
+   <ul>
+      <li><b>Minimal-, Mittel- und Maximalwerte:</b> current, humidity, temperature, voltage, wind, windSpeed</li>
+      <li><b>Deltawerte:</b> count, energy, power, total, rain, rain_total</li>
+      <li><b>Dauer und Anzahl:</b> noch nicht implementiert</li>
+  </ul>
   <br>&nbsp;
   <br>
   
@@ -695,11 +771,6 @@ statistics_getStoredDevices ($)
       <br>
       Regularer Ausdruck f&uuml;r den Ger&auml;tenamen. !!! Nicht die Ger&auml;tewerte !!!
       <br>
-      Derzeit werden folgende Ger&auml;tewerte ausgewertet:
-      <ul>
-         <li><b>Minimal-, Mittel- und Maximalwerte:</b> current, humidity, temperature, voltage, wind</li>
-         <li><b>Deltawerte:</b> count, energy, power, total, rain, rain_total</li>
-      </ul>
     </li>
   </ul>
   
@@ -708,21 +779,17 @@ statistics_getStoredDevices ($)
    <ul>
       <li><code>resetStatistics &lt;All|Ger&auml;tename&gt;</code>
       <br>
-      Setzt die Statistiken der ausgew&auml;hlten Ger&auml;te zurück
+      Setzt die Statistiken der ausgew&auml;hlten Ger&auml;te zur&uuml;ck
       <br></li>
   </ul>
   <br>
 
   <b>Get</b>
-   <ul>
-      <li><code>resetStatistics &lt;All|Ger&auml;tename&gt;</code>
-      <br>
-      Setzt die Statistiken der ausgew&auml;hlten Ger&auml;te zurück
-      <br></li>
+   <ul>nicht implementiert
   </ul>
   <br>
 
-  <a name="JSONMETERattr"></a>
+  <a name="statisticsattr"></a>
    <b>Attributes</b>
    <ul>
     <li><code>dayChangeTime &lt;Zeit&gt;</code>
@@ -730,9 +797,9 @@ statistics_getStoredDevices ($)
       <b>noch nicht implementiert</b>
       <br>
     </li><br>
-    <li><code>excludedReadings &lt;RegExpGer&auml;tename:RegExpGer&auml;tewert&gt;</code>
+    <li><code>excludedReadings &lt;Ger&auml;tenameRegExp:Ger&auml;tewertRegExp&gt;</code>
       <br>
-      regulärer Ausdruck der Ger&auml;tewerte die nicht ausgewertet werden sollen.
+      regul&auml;rer Ausdruck der Ger&auml;tewerte die nicht ausgewertet werden sollen.
       z.B. "FritzDect:current|Sensor_.*:humidity"
       <br>
     </li><br>
@@ -740,15 +807,14 @@ statistics_getStoredDevices ($)
       <br>
       Start der Berechnung der periodischen Daten, standardm&auml;ssig 10 Sekunden vor der vollen Stunde,
       <br>
-      erlaubt die korrekte zeitliche Zuordnung in Plots, kann je nach Systemauslastung verringert oder vergrößert werden
+      erlaubt die korrekte zeitliche Zuordnung in Plots, kann je nach Systemauslastung verringert oder vergr&ouml;ßert werden
       <br>
     </li><br>
-    <li><code>singleReadings &lt;Ger&auml;tename:Ger&auml;tewert&gt;:Statistiktypen(Min|Avg|Max|Delta):ZeitPeriode(Hour|Day|Month|Year)</code>
+    <li><code>singularReadings &lt;Ger&auml;tenameRegExp:Ger&auml;tewertRegExp&gt;:Statistiktypen<i>(Min|Avg|Max|Delta)</i>:ZeitPeriode<i>(Hour|Day|Month|Year)</i></code>
       <br>
-      <b>noch nicht implementiert</b>
-      Durch Kommas getrennte Liste von statistischen Werten, die nicht nur in zusammengefassten sondern auch als einzelne Werte gespeichert werden sollen.
+      Regulärer Ausdruck statistischer Werte, die nicht nur in zusammengefassten sondern auch als einzelne Werte gespeichert werden sollen.
       <br>
-      z.B. "Wettersensor:rain:Delta:Day,FritzDect:current:Avg|Max:Hour"
+      z.B. <code>Wettersensor:rain:Delta:(Hour|Day))|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
       <br>
     </li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a>
