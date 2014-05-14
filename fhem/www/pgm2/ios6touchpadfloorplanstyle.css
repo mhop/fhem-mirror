@@ -8,7 +8,7 @@
 height: 100vh;
 }
 #fpmenu.fp_arrange   {
-position:absolute; top:20px; left:220px; 
+position:fixed; bottom:10px; left:0px; 
 }
 /*iPad Skalierung*/
 /* iPads (landscape) ----------- */
@@ -46,6 +46,7 @@ height: 1004px !important;
 }
 body     {
 font: normal 9px Helvetica, Sans-serif;
+background-color: #d7dadf;
 }
 
 body[id~=Media]     { background-color: #A5A5A5;
@@ -60,12 +61,12 @@ body[id~=Media]     { background-color: #A5A5A5;
 #menu.floorplan   { 
 overflow: auto;
 width: 200px;
-background-color: #d7dadf;
 position:absolute;
 top:0px;
 font-size:14px;
 margin:0px;
 padding:0px;
+background-color:transparent;
 border-right: 1px solid #000000;
 }
 #menu.floorplan a {
@@ -140,16 +141,25 @@ text-shadow: 0px -1px #000000;
 
 
 #fpmenu.fp_arrange   {
-	z-index:99;
-min-width:310px; font-size:9px; border:1px solid gray;
-background-color:#F7F7F7;
-opacity:0.5;
+width:200px; 
+font-size:9px;
 }
+#fpmenu.fp_arrange input, #fpmenu.fp_arrange select {
+width:180px;
+margin:2px;
+}
+#fpmenu.fp_arrange input[type=text] {
+width:157px;
+}
+#fpmenu.fp_arrange #fp_ar_input_top, #fpmenu.fp_arrange #fp_ar_input_left {
+	width:57px;
+}
+
 #startcontent {position:absolute; top:20px; left:180px; text-align:left; font-size: 16px; } 
 table a:hover {font-weight:bold;}
 #hdr     { position:absolute; top:10px; left:180px; border:1px solid gray; }
 #content { position:absolute; top:50px; left:180px; bottom:10px; right:10px; text-align:left}
-#errmsg { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:40px; z-index: 10; }
+#errmsg { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; right:0px; z-index: 10; }
 img {  border-style: none; }
 
 .fp_Grundriss   {border:0px solid gray;}
@@ -200,7 +210,6 @@ select {  margin-left:5px; margin-right:5px; }
 .downText { margin-top:2px; }
 
 /* next lines are for openautomation-svg */
-svg { height:32px; width:32px; fill:#fff; vertical-align:middle; margin:2px 0; }
 g.on { fill:red; }
 
 /* next lines are for remotecontrol */
