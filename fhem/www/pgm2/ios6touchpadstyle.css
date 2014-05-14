@@ -2,8 +2,8 @@
 /* by Sandra Ohmayer */
 /* http://www.animeschatten.net */
 
-@import url("ios6dashboard.css");
 @import url("ios6Common.css");
+@import url("ios6dashboard.css");
 
 #content, #right {
 width: 763px;
@@ -583,6 +583,12 @@ background-image: linear-gradient(to bottom, #666666 0%, #CBCBCB 100%);
 
 .SVGplot {
 	text-align:center;
+}
+
+.sysmon table {
+	border-spacing:0px;
+	padding:0px;
+	font-weight:normal;
 }
 
 /* next lines are for remotecontrol */
