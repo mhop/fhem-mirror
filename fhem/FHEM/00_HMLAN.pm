@@ -401,7 +401,7 @@ sub HMLAN_Write($$$) {#########################################################
                              substr($msg, 16, 6));
 
     if (   $mtype eq "02" && $src eq $hash->{owner} && length($msg) == 24
-        && $hash->{assignedIDs} =~ m/$dst/){
+        && defined $hash->{assIDs}{$dst}){
       # Acks are generally send by HMLAN autonomously
       # Special
       Log3 $hash, 5, "HMLAN: Skip ACK";
@@ -419,14 +419,34 @@ sub HMLAN_Write($$$) {#########################################################
       HMLAN_SimpleWrite($hash, $IDadd);
       $hash->{helper}{$dst}{name} = CUL_HM_id2Name($dst);
       $hash->{assIDs}{$dst} = 1;
-      $hash->{assignedIDs}=join(',',keys %{$hash->{assIDs}});
-      $hash->{assignedIDsCnt}=scalar(keys %{$hash->{assIDs}});
+      my @asId = HMLAN_noDup(keys %{$hash->{assIDs}});
+      $hash->{assignedIDs}=join(',',@asId);
+      $hash->{assignedIDsCnt}=scalar(@asId);
     }
   }
   elsif($msg =~ m /init:(......)/){
-    if ($modules{CUL_HM}{defptr}{$1} &&
-        $modules{CUL_HM}{defptr}{$1}{helper}{io}{newChn} ){
-      HMLAN_SimpleWrite($hash,$modules{CUL_HM}{defptr}{$1}{helper}{io}{newChn});
+    my $dst = $1;
+    if ($modules{CUL_HM}{defptr}{$dst} &&
+        $modules{CUL_HM}{defptr}{$dst}{helper}{io}{newChn} ){
+      HMLAN_SimpleWrite($hash,$modules{CUL_HM}{defptr}{$dst}{helper}{io}{newChn});
+      $hash->{helper}{$dst}{name} = CUL_HM_id2Name($dst);
+      $hash->{assIDs}{$dst} = 1;
+      my @asId = HMLAN_noDup(keys %{$hash->{assIDs}});
+      $hash->{assignedIDs}=join(',',@asId);
+      $hash->{assignedIDsCnt}=scalar(@asId);
+    }
+    return;
+  }
+  elsif($msg =~ m /remove:(......)/){
+    my $dst = $1;
+    if ($modules{CUL_HM}{defptr}{$dst} &&
+        $modules{CUL_HM}{defptr}{$dst}{helper}{io}{newChn} ){
+      HMLAN_SimpleWrite($hash,"-$dst");
+      delete $hash->{helper}{$dst};
+      delete $hash->{assIDs}{$dst};
+      my @asId = HMLAN_noDup(keys %{$hash->{assIDs}});
+      $hash->{assignedIDs}=join(',',@asId);
+      $hash->{assignedIDsCnt}=scalar(@asId);
     }
     return;
   }
@@ -750,6 +770,7 @@ sub HMLAN_SimpleWrite(@) {#####################################################
   $msg .= "\r\n" unless($nonl);
   syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
 }
+
 sub HMLAN_DoInit($) {##########################################################
   my ($hash) = @_;
   my $name = $hash->{NAME};
@@ -758,7 +779,7 @@ sub HMLAN_DoInit($) {##########################################################
   delete $hash->{READINGS}{state};
 
   HMLAN_SimpleWrite($hash, "A$id") if($id ne "999999");
-  HMLAN_SimpleWrite($hash, "C");
+  HMLAN_assignIDs($hash);
   HMLAN_writeAesKey($name);
   my $s2000 = sprintf("%02X", HMLAN_secSince2000());
   HMLAN_SimpleWrite($hash, "T$s2000,04,00,00000000");
@@ -768,8 +789,6 @@ sub HMLAN_DoInit($) {##########################################################
   HMLAN_condUpdate($hash,255);
   $hash->{helper}{q}{cap}{$_}=0 foreach (keys %{$hash->{helper}{q}{cap}});
 
-  foreach (keys %{$hash->{assIDs}}){delete ($hash->{assIDs}{$_})};# clear IDs - HMLAN might have a reset
-  delete ($hash->{assIDs}{$_}) foreach (keys %{$hash->{assIDs}});# clear IDs - HMLAN might have a reset
   $hash->{helper}{q}{keepAliveRec} = 1; # ok for first time
   $hash->{helper}{q}{keepAliveRpt} = 0; # ok for first time
 
@@ -786,6 +805,15 @@ sub HMLAN_DoInit($) {##########################################################
 
   return undef;
 }
+sub HMLAN_assignIDs($){
+  # remove all assigned IDs and assign the ones from list
+  my ($hash) = @_;
+  HMLAN_SimpleWrite($hash, "C"); #clear all assigned IDs
+
+  my @ids = split",",InternalVal($hash->{NAME},"assignedIDs","");
+  HMLAN_Write($hash,"","init:$_") foreach(@ids);
+}
+
 sub HMLAN_writeAesKey($) {#####################################################
   my ($name) = @_;
 
