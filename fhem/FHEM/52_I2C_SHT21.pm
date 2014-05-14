@@ -108,10 +108,16 @@ sub I2C_SHT21_Catch($) {
 
 
 sub I2C_SHT21_Attr (@) {# hier noch Werteueberpruefung einfuegen
-	my (undef, $name, $attr, $val) =  @_;
+	my ($command, $name, $attr, $val) =  @_;
 	my $hash = $defs{$name};
 	my $msg = '';
-
+	if ($command && $command eq "set" && $attr && $attr eq "IODev") {
+		if ($main::init_done and (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $val)) {
+			main::AssignIoPort($hash,$val);
+			my @def = split (' ',$hash->{DEF});
+			I2C_SHT21_Init($hash,\@def) if (defined ($hash->{IODev}));
+		}
+	}
 	if ($attr eq 'poll_interval') {
 		#my $pollInterval = (defined($val) && looks_like_number($val) && $val > 0) ? $val : 0;
 		
@@ -122,9 +128,9 @@ sub I2C_SHT21_Attr (@) {# hier noch Werteueberpruefung einfuegen
 			$msg = 'Wrong poll intervall defined. poll_interval must be a number > 0';
 		}
 	} elsif ($attr eq 'roundHumidityDecimal') {
-		$msg = 'Wrong $attr defined. Use one of 0, 1, 2' if defined($val) && $val >= 0 && $val <= 2 ;
+		$msg = 'Wrong $attr defined. Use one of 0, 1, 2' if defined($val) && $val <= 0 && $val >= 2 ;
 	} elsif ($attr eq 'roundTemperatureDecimal') {
-		$msg = 'Wrong $attr defined. Use one of 0, 1, 2' if defined($val) && $val >= 0 && $val <= 2 ;
+		$msg = 'Wrong $attr defined. Use one of 0, 1, 2' if defined($val) && $val <= 0 && $val >= 2 ;
 	} 
 	return ($msg) ? $msg : undef;
 }
