@@ -890,6 +890,16 @@ readingsGroup_Attr($$$)
     } else {
       delete $hash->{alwaysTrigger};
     }
+  } elsif( $attrName eq "sortDevices" ) {
+    if( $cmd eq "set" ) {
+      $attrVal = 1 if($attrVal);
+      $attr{$name}{$attrName} = $attrVal;
+    } else {
+      delete $attr{$name}{$attrName};
+    }
+
+    my $hash = $defs{$name};
+    readingsGroup_updateDevices($hash);
   }
 
   if( $cmd eq "set" ) {
