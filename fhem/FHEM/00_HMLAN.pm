@@ -407,7 +407,7 @@ sub HMLAN_Write($$$) {#########################################################
       Log3 $hash, 5, "HMLAN: Skip ACK";
       return;
     }
-#   my $IDHM  = '+'.$dst.',01,00,F1EF'; #used by HMconfig - meanning??
+#   my $IDHM  = '+'.$dst.',01,00,F1EF'; # used by HMconfig - meaning??
 #   my $IDadd = '+'.$dst;               # guess: add ID?
 #   my $IDack = '+'.$dst.',02,00,';     # guess: ID acknowledge
 #   my $IDack = '+'.$dst.',FF,00,';     # guess: ID acknowledge

@@ -322,22 +322,21 @@ sub CUL_HM_updateConfig($){
     my $actCycle = AttrVal($name,"actCycle",undef);
     CUL_HM_ActAdd($id,$actCycle) if ($actCycle );#add 2 ActionDetect?
     # --- set default attributes if missing ---
-    if (   $hash->{helper}{role}{dev}
-        && $st ne "virtual"){
-      $attr{$name}{expert}     = AttrVal($name,"expert"     ,"2_full");
-      $attr{$name}{autoReadReg}= AttrVal($name,"autoReadReg","4_reqStatus");
+    if ($hash->{helper}{role}{dev}){
+      if( $st ne "virtual"){
+        $attr{$name}{expert}     = AttrVal($name,"expert"     ,"2_full");
+        $attr{$name}{autoReadReg}= AttrVal($name,"autoReadReg","4_reqStatus");
+        CUL_HM_hmInitMsg($hash);
+      }
+      if (CUL_HM_getRxType($hash)&0x02){#burst dev must restrict retries!
+        $attr{$name}{msgRepeat} = 1 if (!$attr{$name}{msgRepeat});
+      }
     }
     CUL_HM_Attr("attr",$name,"expert",$attr{$name}{expert}) 
           if ($attr{$name}{expert});#need update after readings are available
-
     if ($chn eq "03" && 
         $md =~ /(-TC|ROTO_ZEL-STG-RM-FWT|HM-CC-RT-DN)/){
       $attr{$name}{stateFormat} = "last:trigLast";
-    }
-
-    if ( $hash->{helper}{role}{dev} && CUL_HM_getRxType($hash)&0x02){#burst dev
-      #burst devices must restrict retries!
-      $attr{$name}{msgRepeat} = 1 if (!$attr{$name}{msgRepeat});
     }
     # -+-+-+-+-+ add default web-commands
     my $webCmd;
@@ -718,7 +717,8 @@ sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
   my @p;
   if (!($rxt & ~0x04)){@p = ("00","01","FE1F");}#config only
   elsif($rxt & 0x10)  {@p = ("00","01","1E");  }#lazyConfig
-  else                {@p = ("00","01","1E");  }
+  else                {@p = ("00","01","00");  }
+#  else                {@p = ("00","01","1E");  }
   if (AttrVal($hash->{NAME},"aesCommReq",0)){
     $p[0] = sprintf("%02X",($p[0] + 1));
     $p[2] = ($p[2]eq "")?"1E":$p[2];
