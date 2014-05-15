@@ -279,7 +279,7 @@ padding: 0px 30px 0px 30px;
 
 }
 #content table {
-width:100%;
+width:100% !important;
 }
 
 #menuScrollArea { 

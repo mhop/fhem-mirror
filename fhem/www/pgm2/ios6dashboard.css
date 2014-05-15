@@ -1,6 +1,8 @@
-/* Author: svenson08*/
-
-/*TODO for iOS6*/
+/* Strukture author: svenson08*/
+/* Edit for */
+/* iOS 6 Theme for FHEM */
+/* by Sandra Ohmayer */
+/* http://www.animeschatten.net */
 
 .dashboard_column { float: left; }
 .dashboard_columnhelper { border: 1px dotted #808080; }
@@ -9,13 +11,20 @@
 .dashboard_content.table { box-shadow: none !important; border-radius: 0 0 8px 8px !important; border: 1px none #278727!important;
 					border-left: 1px solid #278727 !important; border-right: 1px solid #278727 !important; border-bottom: 1px solid #278727 !important;}					
 					
-.dashboard_button_icon { width: 13px; height: 14px; background-repeat: no-repeat; 
+.dashboard_button_icon { width: 13px ; height: 14px; background-repeat: no-repeat; 
 						float: left; background-image: url(../images/default/dashboardicons.png); }	
 .dashboard_button_iconplus { margin: 0.1em 0.4em; float: right; background-position: -65px -16px; }
 .dashboard_button_iconminus { margin: 0.1em 0.4em; float: right; background-position: -52px -16px; }
-.dashboard-button {	display: inline-block; padding: 0 .6em;	height: 1.9em; cursor: pointer;
-					background-color: #f5f5f5; background-repeat:no-repeat !important; background-position: 7px;	
-					border: 1px solid #278727; border-radius: 4px; margin-top: 2px; width: 14px; position: absolute;}
+.dashboard-button {	
+display: inline-block; 
+padding: 0 .6em;	
+height: 1.9em; cursor: pointer;
+background-color: #f5f5f5 !important; 
+background-repeat:no-repeat !important; 
+background-position: 7px !important;	
+					border: 1px solid #278727 !important; 
+					border-radius: 4px !important; 
+					margin-top: 2px; width: 14px; position: absolute;}
 .dashboard-button-defineDetails{right: 10px; background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyBpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNSBXaW5kb3dzIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOkY4NjYwOTg0NEJFQzExRTI4MjI3OTFCOEEyNzY2MzE2IiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOkY4NjYwOTg1NEJFQzExRTI4MjI3OTFCOEEyNzY2MzE2Ij4gPHhtcE1NOkRlcml2ZWRGcm9tIHN0UmVmOmluc3RhbmNlSUQ9InhtcC5paWQ6Rjg2NjA5ODI0QkVDMTFFMjgyMjc5MUI4QTI3NjYzMTYiIHN0UmVmOmRvY3VtZW50SUQ9InhtcC5kaWQ6Rjg2NjA5ODM0QkVDMTFFMjgyMjc5MUI4QTI3NjYzMTYiLz4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz7i4cyWAAAAsElEQVR42mJgoCEwA+IPUGxGrKZkIE6AsjOB+D8UZyKJReHTDNOwGoifIPEfAvFGJH4gIQMIYZyuWI3mCm8oRhZfhCvA0pCcvRGLmnVI3klDD9gPaE50gopvRDLMG00NSA8DCw6vcELpX0hifwnFeRrUef+hzsXlhSfYvMCA5GTkQPSAYvTAxQoyyYlGJiQDviOxFwPxCyQ+iL0eh1oUEA7EfniSciySPG0yE8kAIMAAicRYTX3YPyoAAAAASUVORK5CYII=') !important;}
 .dashboard-button-setPosition{right: 45px; background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAYUlEQVR4XtWRUQrAMAhDneyg9mT2ptugHRaCY/FnLJAveWKifCW7AS3Avlj2AmzrFUrDIYhgJNwvN4VcBDwiYC5/CyclBpDDoe2poATGEuegs3AswCUIk/8+pl2K8uE/6ATG4BstrVLVgQAAAABJRU5ErkJggg==') !important;}
 .dashboard-button-goBack{right: 80px; background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABmJLR0QA/wD/AP+gvaeTAAAAZ0lEQVQ4jd3RMQqDQBBA0YekV0wj3v8QNqZTJBEtPY42K9l2p0s+TDHF/zAMf8kTE4aovOPEp1TucGRyE5XXUhnmJJfMCFUKVMp55EuLzfeENhBUY0mRA30kkr/xHQnckQWvaODHuADAUSEXjMLoMwAAAABJRU5ErkJggg==') !important;}
@@ -35,7 +44,15 @@
 
 .dashboard .ui-sortable-placeholder {border: 1px dotted #278727;  visibility: visible !important; height: 25px !important; width: 150px;}
 					
-.dashboard .block.wide {border-radius: 5px;}
+.dashboard .block.wide {
+	padding:0px !important;
+	border-spacing:0px !important;
+}
+.dashboard table.block tr {
+	height:40px !important;
+}
+.dashboard .block input, table.block select {
+}
 .dashboard_tabcontent {width: 100%; padding: 0; margin: 0; }
 .dashboard .dashboard_row {width: 100%; height: inherit; padding: 0;}
 .dashboard .dashboard_columncenter {height: inherit;}
