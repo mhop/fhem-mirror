@@ -512,10 +512,8 @@ sub _cfgDB_Execute($@) {
 	my (@ret);
 
 	foreach my $l (@dbconfig) {
-		$l =~ s/[\r\n]//g;
-		if($l =~ m/\\*$/) {		# Multiline commands
-			$l =~ s/\\/\n/g;
-		}
+		$l =~ s/[\r\n]/\n/g;
+		$l =~ s/\\\n/\n/g;
 		my $tret = AnalyzeCommandChain($cl, $l);
 		push @ret, $tret if(defined($tret));
 	}
