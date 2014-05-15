@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 05/2014
-# v. 0.097
+# v. 0.098
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -100,7 +100,6 @@ my %sets = (
 	"p49SummerModeTemp"		=> {cmd2=>"0A0116", argMin =>  "11", argMax =>  "24" },		#threshold for summer mode !! 
 	"p50SummerModeHysteresis"	=> {cmd2=>"0A05A2", argMin =>  "0.5", argMax =>  "5" },		#Hysteresis for summer mode !! 
 	"p78DualModePoint"		=> {cmd2=>"0A01AC", argMin =>  "-10", argMax =>  "20" },		
-	
 	"pHolidayBeginDay"		=> {cmd2=>"0A011B", argMin =>  "1", argMax =>  "31"  }, 
 	"pHolidayBeginMonth"		=> {cmd2=>"0A011C", argMin =>  "1", argMax =>  "12"  },
 	"pHolidayBeginYear"		=> {cmd2=>"0A011D", argMin =>  "12", argMax => "20"  },
@@ -1263,17 +1262,15 @@ polyline { stroke:black; fill:none; }
 </g>
 END
 
-
+my $insideTemp=(split ' ',ReadingsVal("Mythz","sGlobal",0))[81];
+$insideTemp="n.a." if ($insideTemp eq "-60"); #in case internal room sensor not connected
 my $roomSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",0))[21];
 my $p13GradientHC1 = ReadingsVal("Mythz","p13GradientHC1",0);
 my $heatSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",0))[11];
 my $p15RoomInfluenceHC1 = (split ' ',ReadingsVal("Mythz","p15RoomInfluenceHC1",0))[0];
 my $outside_tempFiltered =(split ' ',ReadingsVal("Mythz","sGlobal",0))[65];
 my $p14LowEndHC1 =(split ' ',ReadingsVal("Mythz","p14LowEndHC1",0))[0];
-my $a= 1 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1; 
-my $b= -14 * $p13GradientHC1 / $roomSetTemp; 
-my $c= -1 * $p13GradientHC1 /75;
-my $Simul_heatSetTemp; 
+
 
 #labels ######################
 $ret .= '<text line_id="line_1" x="70" y="105.2" class="l1"> --- heat curve</text>' ;
@@ -1283,7 +1280,14 @@ $ret .=  $outside_tempFiltered . ' heatSetTemp=' . $heatSetTemp . '</text>';
 
 #title ######################
 $ret .= '<text id="svg_title" x="400" y="14.4" class="title" text-anchor="middle">';
-$ret .=  'roomSetTemp=' . $roomSetTemp . ' p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  ' p15RoomInfluenceHC1=' . $p15RoomInfluenceHC1 . '</text>';
+$ret .=  'roomSetTemp=' . $roomSetTemp . ' p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  ' p15RoomInfluenceHC1=' . $p15RoomInfluenceHC1 . " insideTemp=" . $insideTemp .' </text>';
+
+#equation####################
+$insideTemp=$roomSetTemp if ($insideTemp eq "n.a."); 
+my $a= 1 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1 + $p15RoomInfluenceHC1 * $p13GradientHC1 * ($roomSetTemp - $insideTemp); 
+my $b= -14 * $p13GradientHC1 / $roomSetTemp; 
+my $c= -1 * $p13GradientHC1 /75;
+my $Simul_heatSetTemp; 
 
 
 #point ######################
