@@ -362,8 +362,8 @@ scriptAttribute(sname)
 {
   var attr="";
   $("head script").each(function(){
-    var attr = $(this).attr("src");
-    if(attr && attr.indexOf(sname) >= 0)
+    var src = $(this).attr("src");
+    if(src && src.indexOf(sname) >= 0)
       attr = $(this).attr("attr");
   });
 
