@@ -501,7 +501,8 @@ SVG_readgplotfile($$)
 
   my $ldType = $defs{$defs{$wl}{LOGDEVICE}}{TYPE}
      if($defs{$wl} && $defs{$wl}{LOGDEVICE} && $defs{$defs{$wl}{LOGDEVICE}});
-  $ldType = $wl if(!$ldType);
+  $ldType = $defs{$wl}{TYPE}
+     if(!$ldType && $defs{$wl});
 
   my ($err, @svgplotfile) = FileRead($gplot_pgm);
   return ("$err", undef) if($err);

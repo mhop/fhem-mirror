@@ -465,7 +465,7 @@ FileLog_logWrapper($)
     }
     FW_pO "<table><tr><td>";
     FW_pO "<td>";
-    my $logtype = $defs{$d}{TYPE};
+    my $logtype = $defs{$d}{NAME};
     my $wl = "&amp;pos=" . join(";", map {"$_=$FW_pos{$_}"} keys %FW_pos);
     my $arg = "$FW_ME/SVG_showLog&dev=$logtype&logdev=$d".
                 "&gplotfile=$type&logfile=$file$wl";
