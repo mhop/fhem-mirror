@@ -626,7 +626,6 @@ sub HMinfo_tempList(@) { ######################################################
 sub HMinfo_tempListTmpl(@) { ##################################################
   my ($filter,$tmpl,$action,$fName)=@_;
   $filter = "." if (!$filter);
-#  return "no template name given" if (!$tmpl);
   my %dl =("Sat"=>0,"Sun"=>1,"Mon"=>2,"Tue"=>3,"Wed"=>4,"Thu"=>5,"Fri"=>6);
   my $ret = "";
   my @el ;
@@ -640,19 +639,20 @@ sub HMinfo_tempListTmpl(@) { ##################################################
     push @el,$chN;
   }
   return "no entities selected" if (!scalar @el);
-  $tmpl = (!$tmpl)?"":($fName?$fName.":".$tmpl:$tmpl);
+  $tmpl = (!$tmpl) ? ""
+                   : ($fName ? $fName.":".$tmpl
+                             : $tmpl);
   my @rs;
   foreach my $name (@el){
     my $tmplDev;
-    if (!$tmpl){
-      $tmplDev = AttrVal($name,"tempListTmpl","tempList.cfg:$name");
-    }
-    else{
-      $tmplDev = $tmpl;
-    }
+    $tmplDev = $tmpl ? $tmpl
+                     : AttrVal($name,"tempListTmpl","tempList.cfg:$name");
+
     my $r = CUL_HM_tempListTmpl($name,$action,$tmplDev);
-    
-    push @rs,  "$tmplDev -> ".($r?$r:"passed:$name")."\n";
+
+    push @rs,  ($r ? "fail  : $tmplDev for $name: $r"
+                   : "passed: $tmplDev for $name")
+               ."\n";
   }
   $ret .= join "",sort @rs;
   return $ret;
@@ -890,6 +890,15 @@ sub HMinfo_GetFn($@) {#########################################################
                          .HMinfo_peerCheck(@entities)
                          .HMinfo_burstCheck(@entities)
                          .HMinfo_paramCheck(@entities);
+
+    my @td = (devspec2array("model=HM-CC-RT-DN.*:FILTER=chanNo=04:FILTER=tempListTmpl=.*"),
+              devspec2array("model=HM.*-TC.*:FILTER=chanNo=02:FILTER=tempListTmpl=.*"));
+    my @tlr;
+    foreach my $e (@td){
+      my $tr = CUL_HM_tempListTmpl($e,"verify",AttrVal($e,"tempListTmpl","tempList.cfg:$e"));
+      push @tlr,$tr if($tr);
+    }
+    $ret .= "\templist mismatch \n    ".join("\n    ",@tlr) if (@tlr);
   }
   elsif($cmd eq "templateChk"){##template: see if it applies ------------------
     my $repl;
@@ -1187,6 +1196,9 @@ sub HMinfo_SetFn($@) {#########################################################
     $ret = HMinfo_tempList($filter,$a[0],$fn);
   }
   elsif($cmd eq "tempListTmpl"){##handle thermostat templist from file --------
+    if ($a[0] =~ m/(verify|restore)/){#allow default template - i.e. not specified
+      unshift @a,"";
+    }
     my $fn = $a[2]?$a[2]:"";
     my $ac = $a[1]?$a[1]:"verify";
     $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn && $fn !~ m/\//);
