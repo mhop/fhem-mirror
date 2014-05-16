@@ -727,6 +727,8 @@ ZWave_Parse($$@)
         push @event, $val;
       }
     }
+    Log3 $hash, 4, "$hash->{NAME}: $className $arg generated no event"
+        if(!@event);
   }
 
   my $wu = $baseHash->{WakeUp};
