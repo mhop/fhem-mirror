@@ -67,6 +67,7 @@ YAMAHA_AVR_GetStatus($;$)
     my ($hash, $local) = @_;
     my $name = $hash->{NAME};
     my $power;
+   
     
     $local = 0 unless(defined($local));
 
@@ -217,9 +218,24 @@ YAMAHA_AVR_GetStatus($;$)
                 readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));
             }
             elsif($infos =~ /<Meta_Info>.*?<Radio_Text_A>(.+?)<\/Radio_Text_A>.*?<\/Meta_Info>/)	
-            {											
+            {		
+                my $tmp = $1;
+                
+                if($infos =~ /<Meta_Info>.*?<Radio_Text_A>(.+?)<\/Radio_Text_A>.*?<Radio_Text_B>(.+?)<\/Radio_Text_B>.*?<\/Meta_Info>/)	
+                {											
+                    readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1." ".$2));		
+                }	
+                else
+                {
+                    readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($tmp));		
+                }
+            }	
+            elsif($infos =~ /<Meta_Info>.*?<Radio_Text_B>(.+?)<\/Radio_Text_B>.*?<\/Meta_Info>/)	
+            {		
+               
                 readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));		
-            }		
+               
+            }	
             else
             {
                 readingsBulkUpdate($hash, "currentTitle", "", 0);
