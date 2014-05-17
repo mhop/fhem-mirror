@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: YAMAHA_AVR: new set commands and readings for controlling
+             the sound output behavior (Enhancer, DSP and straight 
+             output). For details, see commandref.
   - bugfix:  configdb filemove not working after previous changes 
   - change:  IMPORTANT CHANGES TO configDB!
              changed: all files will be imported as binary
