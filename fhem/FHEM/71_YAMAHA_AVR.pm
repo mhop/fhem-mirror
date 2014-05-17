@@ -76,7 +76,7 @@ YAMAHA_AVR_GetStatus($;$)
     my $device = $hash->{helper}{ADDRESS};
 
     # get the model informations and available zones if no informations are available
-    if(not defined($hash->{ACTIVE_ZONE}) or not defined($hash->{helper}{ZONES}) or not defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
+    if(not defined($hash->{ACTIVE_ZONE}) or not defined($hash->{helper}{ZONES}) or not defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}) or not defined($hash->{helper}{DSP_MODES}))
     {
 		unless(defined(YAMAHA_AVR_getModel($hash)))
         {
@@ -164,7 +164,7 @@ YAMAHA_AVR_GetStatus($;$)
     # current input same as the corresponding set command name
     if($return =~ /<Input_Sel>(.+)<\/Input_Sel>/)
     {
-		readingsBulkUpdate($hash, "input", YAMAHA_AVR_InputParam2Fhem(lc($1), 0));
+		readingsBulkUpdate($hash, "input", YAMAHA_AVR_Param2Fhem(lc($1), 0));
 		
 		if($return =~ /<Src_Name>(.+?)<\/Src_Name>/)
 		{
@@ -263,6 +263,22 @@ YAMAHA_AVR_GetStatus($;$)
 		readingsBulkUpdate($hash, "inputName", $1);
     }
     
+    if($return =~ /<Surround>.*?<Current>.*?<Straight>(.+?)<\/Straight>.*?<\/Current>.*?<\/Surround>/)
+    {
+        readingsBulkUpdate($hash, "straight", lc($1));
+    }
+    
+    if($return =~ /<Surround>.*?<Current>.*?<Enhancer>(.+?)<\/Enhancer>.*?<\/Current>.*?<\/Surround>/)
+    {
+        readingsBulkUpdate($hash, "enhancer", lc($1));
+    }
+    
+    if($return =~ /<Surround>.*?<Current>.*?<Sound_Program>(.+?)<\/Sound_Program>.*?<\/Current>.*?<\/Surround>/)
+    {
+        readingsBulkUpdate($hash, "dsp", YAMAHA_AVR_Param2Fhem($1, 0));
+    }
+   
+    
     readingsEndUpdate($hash, 1);
     
     YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
@@ -336,19 +352,22 @@ YAMAHA_AVR_Set($@)
     
     my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
     
-    my $inputs_piped = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{INPUTS}), 0) : "" ;
-    my $inputs_comma = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{INPUTS}), 1) : "" ;
+    my $inputs_piped = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{INPUTS}), 0) : "" ;
+    my $inputs_comma = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{INPUTS}), 1) : "" ;
    
     
 
-    my $scenes_piped = defined($hash->{helper}{SCENES}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{SCENES}), 0) : "" ;
-    my $scenes_comma = defined($hash->{helper}{SCENES}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{SCENES}), 1) : "" ;
+    my $scenes_piped = defined($hash->{helper}{SCENES}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{SCENES}), 0) : "" ;
+    my $scenes_comma = defined($hash->{helper}{SCENES}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{SCENES}), 1) : "" ;
+    
+    my $dsp_modes_piped = defined($hash->{helper}{DSP_MODES}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{DSP_MODES}), 0) : "" ;
+    my $dsp_modes_comma = defined($hash->{helper}{DSP_MODES}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{DSP_MODES}), 1) : "" ;
     
        
     return "No Argument given" if(!defined($a[1]));     
     
     my $what = $a[1];
-    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg volumeStraight:slider,-80,1,16 volume:slider,0,1,100 volumeUp volumeDown input:".$inputs_comma." mute:on,off,toggle remoteControl:setup,up,down,left,right,return,option,display,tunerPresetUp,tunerPresetDown,enter ".(defined($hash->{helper}{SCENES})?"scene:".$scenes_comma." ":"")."statusRequest:noArg";
+    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg volumeStraight:slider,-80,1,16 volume:slider,0,1,100 volumeUp volumeDown input:".$inputs_comma." mute:on,off,toggle remoteControl:setup,up,down,left,right,return,option,display,tunerPresetUp,tunerPresetDown,enter ".(defined($hash->{helper}{SCENES})?"scene:".$scenes_comma." ":"").($hash->{helper}{SELECTED_ZONE} eq "mainzone" ? "straight:on,off ".(defined($hash->{helper}{SCENES}) ? "dsp:".$dsp_modes_comma." " : "")." enhancer:on,off " : "")."statusRequest:noArg";
 
     # Depending on the status response, use the short or long Volume command
 
@@ -396,7 +415,7 @@ YAMAHA_AVR_Set($@)
 					{
 						if($a[2] =~ /^($inputs_piped)$/)
 						{
-							$command = YAMAHA_AVR_getInputParam($hash, $a[2]);
+							$command = YAMAHA_AVR_getParam($hash, $a[2], $hash->{helper}{INPUTS});
 							if(defined($command) and length($command) > 0)
 							{
 								$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Input><Input_Sel>".$command."</Input_Sel></Input></$zone></YAMAHA_AV>");
@@ -441,7 +460,7 @@ YAMAHA_AVR_Set($@)
 				{
 					if($a[2] =~ /^($scenes_piped)$/)
 					{
-						$command = YAMAHA_AVR_getSceneName($hash, $a[2]);
+						$command = YAMAHA_AVR_getParamName($hash, $a[2], $hash->{helper}{SCENES});
 						if(defined($command) and length($command) > 0)
 						{
 							$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Scene><Scene_Sel>".$command."</Scene_Sel></Scene></$zone></YAMAHA_AV>");
@@ -583,6 +602,68 @@ YAMAHA_AVR_Set($@)
 			    }
 			}
 	    }
+        elsif($what eq "dsp")
+	    {
+            if(defined($a[2]))
+			{
+				
+				if(not $dsp_modes_piped eq "")
+				{
+					if($a[2] =~ /^($dsp_modes_piped)$/)
+					{
+						$command = YAMAHA_AVR_getParamName($hash, $a[2],$hash->{helper}{DSP_MODES});
+						if(defined($command) and length($command) > 0)
+						{
+							$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Sound_Program>$command</Sound_Program></Current></Program_Sel></Surround></$zone></YAMAHA_AV>");
+						}
+						else
+						{
+							return "invalid dsp mode: ".$a[2];
+						}
+
+						if(not $result =~ /RC="0"/)
+						{
+							# if the returncode isn't 0, than the command was not successful
+							return "Could not set dsp mode to ".$a[2].".";
+						}
+					}
+					else
+					{
+						return $usage;
+					}
+				}
+				else
+				{
+					return "No DSP presets are avaible. Please try an statusUpdate.";
+				}
+			}
+			else
+			{
+				return $dsp_modes_piped eq "" ? "No dsp presets are available. Please try an statusUpdate." : "No dsp preset was given";
+			}
+        }
+        elsif($what eq "straight")
+	    {
+            if($a[2] eq "on")
+			{
+			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Straight>On</Straight></Current></Program_Sel></Surround></$zone></YAMAHA_AV>");
+			}
+			elsif($a[2] eq "off")
+			{
+			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Straight>Off</Straight></Current></Program_Sel></Surround></$zone></YAMAHA_AV>");
+			}
+        }
+        elsif($what eq "enhancer")
+	    {
+            if($a[2] eq "on")
+			{
+			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Enhancer>On</Enhancer></Current></Program_Sel></Surround></$zone></YAMAHA_AV>");
+			}
+			elsif($a[2] eq "off")
+			{
+			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Enhancer>Off</Enhancer></Current></Program_Sel></Surround></$zone></YAMAHA_AV>");
+			}
+        }
 	    elsif($what eq "remoteControl")
 	    {
 			
@@ -846,30 +927,17 @@ YAMAHA_AVR_SendCommand($$;$)
 
 
 #############################
-# Converts all Inputs to FHEM usable command lists
-sub YAMAHA_AVR_InputParam2Fhem($$)
-{
-    my ($inputs, $replace_pipes) = @_;
-
-   
-    $inputs =~ s/\s+//g;
-    $inputs =~ s/,//g;
-    $inputs =~ s/\(/_/g;
-    $inputs =~ s/\)//g;
-    $inputs =~ s/\|/,/g if($replace_pipes == 1);
-
-    return $inputs;
-}
-
-#############################
-# Converts all Zones to FHEM usable command lists
+# Converts all Values to FHEM usable command lists
 sub YAMAHA_AVR_Param2Fhem($$)
 {
     my ($param, $replace_pipes) = @_;
 
    
     $param =~ s/\s+//g;
+    $param =~ s/,//g;
     $param =~ s/_//g;
+    $param =~ s/\(/_/g;
+    $param =~ s/\)//g;
     $param =~ s/\|/,/g if($replace_pipes == 1);
 
     return lc $param;
@@ -881,38 +949,25 @@ sub YAMAHA_AVR_Param2Fhem($$)
 sub YAMAHA_AVR_getZoneName($$)
 {
 	my ($hash, $zone) = @_;
-	my $item;
-   
-	return undef if(not defined($hash->{helper}{ZONES}));
-   
-	my @commands = split("\\|", $hash->{helper}{ZONES});
-
-	foreach $item (@commands)
-    {
-		if(YAMAHA_AVR_Param2Fhem($item, 0) eq $zone)
-		{
-			return $item;
-		}
-    }
-    
-	return undef;
+	 return YAMAHA_AVR_getParamName($hash, $zone, $hash->{helper}{ZONES});
     
 }
+
 
 #############################
 # Returns the Yamaha Parameter Name for the FHEM like aquivalents
-sub YAMAHA_AVR_getSceneName($$)
+sub YAMAHA_AVR_getParamName($$$)
 {
-	my ($hash, $scene) = @_;
+	my ($hash, $name, $list) = @_;
 	my $item;
    
-	return undef if(not defined($hash->{helper}{SCENES}));
+	return undef if(not defined($list));
   
-	my @commands = split("\\|", $hash->{helper}{SCENES});
+	my @commands = split("\\|",  $list);
 
     foreach $item (@commands)
     {
-		if(YAMAHA_AVR_Param2Fhem($item, 0) eq $scene)
+		if(YAMAHA_AVR_Param2Fhem($item, 0) eq $name)
 		{
 			return $item;
 		}
@@ -922,25 +977,7 @@ sub YAMAHA_AVR_getSceneName($$)
     
 }
 
-#############################
-# Returns the Yamaha Parameter Name for the FHEM like input channel
-sub YAMAHA_AVR_getInputParam($$)
-{
-	my ($hash, $command) = @_;
-	my $item;
-	my @commands = split("\\|", $hash->{helper}{INPUTS});
 
-    foreach $item (@commands)
-    {
-		if(lc(YAMAHA_AVR_InputParam2Fhem($item, 0)) eq $command)
-		{
-			return $item;
-		}
-    }
-    
-    return undef;
-    
-}
 
 #############################
 # queries the receiver model, system-id, version and all available zones
@@ -1012,6 +1049,23 @@ sub YAMAHA_AVR_getModel($)
 
     }
     
+    
+    if($response =~ /<Menu Func_Ex="Surround" Title_1="Surround">.*?<Get>(.+?)<\/Get>/)
+    {
+    
+        my $modes = $1;
+    
+        while($modes =~ /<Direct.*?>(.+?)<\/Direct>/gc)
+        {
+            if(defined($hash->{helper}{DSP_MODES}) and length($hash->{helper}{DSP_MODES}) > 0)
+            {
+                $hash->{helper}{DSP_MODES} .= "|";
+            }
+
+            $hash->{helper}{DSP_MODES} .= $1;
+
+        }
+    }
     # uncommented line for zone detection testing
     #
     # $hash->{helper}{ZONES} .= "|Zone_2";
@@ -1144,8 +1198,9 @@ sub YAMAHA_AVR_html2txt($)
 
     my ($string) = @_;
 
-    $string =~ s/&nbsp;/ /g;
     $string =~ s/&amp;/&/g;
+    $string =~ s/&amp;/&/g;
+    $string =~ s/&nbsp;/ /g;
     $string =~ s/&apos;/'/g;
     $string =~ s/(\xe4|&auml;)/ä/g;
     $string =~ s/(\xc4|&Auml;)/Ä/g;
@@ -1154,6 +1209,7 @@ sub YAMAHA_AVR_html2txt($)
     $string =~ s/(\xfc|&uuml;)/ü/g;
     $string =~ s/(\xdc|&Uuml;)/Ü/g;
     $string =~ s/(\xdf|&szlig;)/ß/g;
+    
     $string =~ s/<.+?>//g;
     $string =~ s/(^\s+|\s+$)//g;
 
@@ -1255,6 +1311,9 @@ sub YAMAHA_AVR_html2txt($)
 <li><b>volumeUp</b> [0-100] &nbsp;&nbsp;-&nbsp;&nbsp; increases the volume level by 5% or the value of attribute volumeSteps (optional the increasing level can be given as argument, which will be used instead)</li>
 <li><b>volumeDown</b> [0-100] &nbsp;&nbsp;-&nbsp;&nbsp; decreases the volume level by 5% or the value of attribute volumeSteps (optional the decreasing level can be given as argument, which will be used instead)</li>
 <li><b>mute</b> on|off|toggle &nbsp;&nbsp;-&nbsp;&nbsp; activates volume mute</li>
+<li><b>dsp</b> hallinmunich,hallinvienna,... &nbsp;&nbsp;-&nbsp;&nbsp; sets the DSP mode to the given preset</li>
+<li><b>enhancer</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the internal sound enhancer</li>
+<li><b>straight</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; bypasses all sound enhancement features and plays the sound straight directly</li> 
 <li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current status of the device</li>
 <li><b>remoteControl</b> up,down,... &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands as listed below</li>
 
@@ -1355,11 +1414,14 @@ sub YAMAHA_AVR_html2txt($)
   </ul>
   <b>Generated Readings/Events:</b><br>
   <ul>
+  <li><b>dsp</b> - The current selected DSP mode for sound output</li>
+  <li><b>enhancer</b> - The status of the internal sound enhancer (can be "on" or "off")</li>
   <li><b>input</b> - The selected input source according to the FHEM input commands</li>
   <li><b>inputName</b> - The input description as seen on the receiver display</li>
   <li><b>mute</b> - Reports the mute status of the receiver or zone (can be "on" or "off")</li>
   <li><b>power</b> - Reports the power status of the receiver or zone (can be "on" or "off")</li>
   <li><b>presence</b> - Reports the presence status of the receiver or zone (can be "absent" or "present"). In case of an absent device, it cannot be controlled via FHEM anymore.</li>
+  <li><b>straight</b> - indicates if all sound enhancement features are bypassed or not ("on" =&gt; all features are bypassed, "off" =&gt; sound enhancement features are used).</li>
   <li><b>volume</b> - Reports the current volume level of the receiver or zone in percentage values (between 0 and 100 %)</li>
   <li><b>volumeStraight</b> - Reports the current volume level of the receiver or zone in decibel values (between -80.5 and +15.5 dB)</li>
   <li><b>state</b> - Reports the current power state and an absence of the device (can be "on", "off" or "absent")</li>
@@ -1461,6 +1523,8 @@ sub YAMAHA_AVR_html2txt($)
 <ul>
 <li><b>on</b> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver ein</li>
 <li><b>off</b> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver aus</li>
+<li><b>dsp</b> hallinmunich,hallinvienna,... &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert das entsprechende DSP Preset</li>
+<li><b>enhancer</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert den Sound Enhancer f&uuml;r einen verbesserten Raumklang</li>
 <li><b>input</b> hdmi1,hdmiX,... &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt den Eingangskanal (es werden nur die tats&auml;chlich verf&uuml;gbaren Eing&auml;nge angeboten)</li>
 <li><b>scene</b> scene1,sceneX &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt eine vorgefertigte Szene aus</li>
 <li><b>volume</b> 0...100 &nbsp;&nbsp;-&nbsp;&nbsp; Setzt die Lautst&auml;rke in Prozent (0 bis 100%)</li>
@@ -1468,6 +1532,7 @@ sub YAMAHA_AVR_html2txt($)
 <li><b>volumeUp</b> [0...100] &nbsp;&nbsp;-&nbsp;&nbsp; Erh&ouml;ht die Lautst&auml;rke um 5% oder entsprechend dem Attribut volumeSteps (optional kann der Wert auch als Argument angehangen werden, dieser hat dann Vorang) </li>
 <li><b>volumeDown</b> [0...100] &nbsp;&nbsp;-&nbsp;&nbsp; Veringert die Lautst&auml;rke um 5% oder entsprechend dem Attribut volumeSteps (optional kann der Wert auch als Argument angehangen werden, dieser hat dann Vorang) </li>
 <li><b>mute</b> on,off,toggle &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver stumm</li>
+<li><b>straight</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Gibt das Signal direkt und unver&auml;ndert aus (ohne DSP und Enhancer).</li>
 <li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; Fragt den aktuell Status des Receivers ab</li>
 <li><b>remoteControl</b> up,down,... &nbsp;&nbsp;-&nbsp;&nbsp; Sendet Fernbedienungsbefehle wie im n&auml;chsten Abschnitt beschrieben</li>
 </ul>
@@ -1564,6 +1629,8 @@ sub YAMAHA_AVR_html2txt($)
   </ul>
   <b>Generierte Readings/Events:</b><br>
   <ul>
+  <li><b>dsp</b> - Das aktuell aktive DSP Preset</li>
+  <li><b>enhancer</b> - Der Status des Enhancers ("on" =&gt; an, "off" =&gt; aus)</li>
   <li><b>input</b> - Der ausgew&auml;hlte Eingang entsprechend dem FHEM-Kommando</li>
   <li><b>inputName</b> - Die Eingangsbezeichnung, so wie sie am Receiver eingestellt wurde und auf dem Display erscheint</li>
   <li><b>mute</b> - Der aktuelle Stumm-Status ("on" =&gt; Stumm, "off" =&gt; Laut)</li>
@@ -1571,6 +1638,7 @@ sub YAMAHA_AVR_html2txt($)
   <li><b>presence</b> - Die aktuelle Empfangsbereitschaft ("present" =&gt; empfangsbereit, "absent" =&gt; nicht empfangsbereit, z.B. Stromausfall)</li>
   <li><b>volume</b> - Der aktuelle Lautst&auml;rkepegel in Prozent (zwischen 0 und 100 %)</li>
   <li><b>volumeStraight</b> - Der aktuelle Lautst&auml;rkepegel in Dezibel (zwischen -80.0 und +15 dB)</li>
+  <li><b>straight</b> - Zeigt an, ob soundverbessernde Features umgangen werden oder nicht ("on" =&gt; soundverbessernde Features werden umgangen, "off" =&gt; soundverbessernde Features werden benutzt)</li>
   <li><b>state</b> - Der aktuelle Schaltzustand (power-Reading) oder die Abwesenheit des Ger&auml;tes (m&ouml;gliche Werte: "on", "off" oder "absent")</li>
   <br><br><u>Eingangsabh&auml;ngige Readings/Events:</u><br>
   <li><b>currentChannel</b> - Nummer des Eingangskanals (nur bei SIRIUS)</li>
