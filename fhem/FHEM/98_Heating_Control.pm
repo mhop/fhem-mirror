@@ -261,7 +261,7 @@ sub Heating_Control_ParseSwitchingProfile($$$) {
     } elsif ($time =~  m/^[0-2][0-9](:[0-5][0-9]){2,2}$/g) {  #  HH:MM:SS
       ;                                                       #  ok.
     } else {
-      Log3 $hash, 1, "[$name] invalid time in $name <$time> HH:MM[:SS]";
+      Log3 $hash, 1, "[$name] invalid time <$time> HH:MM[:SS]";
       return 0;
     }
 
@@ -518,41 +518,45 @@ sub isHeizung($) {
 
   my %setmodifiers =
      ("FHT"     =>  "desired-temp",
-     #"EnOcean" =>  "desired-temp",
-      "EnOcean" =>  {  "mode" => "subType", "setModifier" => "desired-temp",
+      "PID20"   =>  "desired",
+      "EnOcean" =>  {  "subTypeReading" => "subType", "setModifier" => "desired-temp",
                        "roomSensorControl.05"  => 1,
                        "hvac.01"               => 1 },
-      "PID20"   =>  "desired",
-      "MAX"     =>  {  "mode" => "type", "setModifier" => "desiredTemperature",
+      "MAX"     =>  {  "subTypeReading" => "type", "setModifier" => "desiredTemperature",
                        "HeatingThermostatPlus" => 1,
                        "HeatingThermostat"     => 1,
                        "WallMountedThermostat" => 1 },
-      "CUL_HM"  =>  {  "mode" => "model","setModifier" => "desired-temp",
+      "CUL_HM"  =>  {  "subTypeReading" => "model","setModifier" => "desired-temp",
                        "HM-CC-TC"              => 1,
                        "HM-TC-IT-WM-W-EU"      => 1,
                        "HM-CC-RT-DN"           => 1 } );
-
   my $dHash = $defs{$hash->{DEVICE}};                                           ###
   my $dType = $dHash->{TYPE};
+  Log3 $hash, 5, "dType------------>$dType";
   return ""   if (!defined($dType));
 
   my $setModifier = $setmodifiers{$dType};
      $setModifier = ""  if (!defined($setModifier));
   if (ref($setModifier)) {
 
-      my $mode = $setmodifiers{$dType}{mode};
+      my $subTypeReading = $setmodifiers{$dType}{subTypeReading};
+      Log3 $hash, 5, "subTypeReading------------>$subTypeReading";
+      
       my $model;
-      if ($mode eq "model" ) {
-         $model = AttrVal($hash->{DEVICE}, "model", "nF");
-      } elsif   ($mode eq "type") {
+      if ($subTypeReading eq "type" ) {
          $model = $dHash->{type};
-      }
+      } else {   
+         $model = AttrVal($hash->{DEVICE}, $subTypeReading, "nF");
+      }        
+      Log3 $hash, 5, "model------------>$model";
+      
       if (defined($setmodifiers{$dType}{$model})) {
          $setModifier = $setmodifiers{$dType}{setModifier}
       } else {
          $setModifier = "";
       }
   }
+  Log3 $hash, 5, "setModifier------------>$setModifier";
   return $setModifier;
 }
 
