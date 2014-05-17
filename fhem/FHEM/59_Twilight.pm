@@ -146,7 +146,7 @@ sub Twilight_Define($$)
   $hash->{LATITUDE}       = $latitude;
   $hash->{LONGITUDE}      = $longitude;
   $hash->{WEATHER}        = $weather;
-  $hash->{SUNPOS_OFFSET}  = 30;
+  $hash->{SUNPOS_OFFSET}  = 1;
  
   Twilight_sunposTimerSet($hash);
   myRemoveInternalTimer("Midnight", $hash);
@@ -298,16 +298,18 @@ sub myGetHashIndirekt ($$) {
 }
 ################################################################################
 sub Twilight_Midnight($) {
-   my ($myHash) = @_;
-   my $hash     = $myHash->{HASH};
+  my ($myHash) = @_;
+  my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
+  return if (!defined($hash));
 
   Twilight_TwilightTimes      ($hash, "Mid");
   Twilight_StandardTimerSet   ($hash);
 }
 ################################ ################################################
 sub Twilight_WeatherTimerUpdate($) {
-   my ($myHash) = @_;
-   my $hash     = $myHash->{HASH};
+  my ($myHash) = @_;
+  my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
+  return if (!defined($hash));
 
   Twilight_TwilightTimes      ($hash, "Wea");
   Twilight_StandardTimerSet   ($hash);
@@ -347,7 +349,9 @@ sub Twilight_sunposTimerSet($) {
 sub Twilight_fireEvent($)
 {
    my ($myHash) = @_;
-   my $hash     = $myHash->{HASH};
+   my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
+   return if (!defined($hash));
+
    my $name     = $hash->{NAME};
    my $sx       = $myHash->{MODIFIER};
 
@@ -452,7 +456,9 @@ sub Twilight_getWeatherHorizon($)
 sub Twilight_sunpos($)
 {
   my ($myHash) = @_;
-  my $hash = $myHash->{HASH};
+  my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
+  return if (!defined($hash));
+
   my $hashName = $hash->{NAME};
 
   return "" if(AttrVal($hashName, "disable", undef));
@@ -461,7 +467,6 @@ sub Twilight_sunpos($)
   my ($dSeconds,$dMinutes,$dHours,$iDay,$iMonth,$iYear,$wday,$yday,$isdst) = gmtime(time);
   $iMonth++;
   $iYear += 100;
-  $dSeconds = 0;
 
   my $dLongitude = $hash->{LONGITUDE};
   my $dLatitude  = $hash->{LATITUDE};
@@ -470,14 +475,14 @@ sub Twilight_sunpos($)
   my $pi=3.14159265358979323846;
   my $twopi=(2*$pi);
   my $rad=($pi/180);
-  my $dEarthMeanRadius=6371.01;    # In km
+  my $dEarthMeanRadius=6371.01;       # In km
   my $dAstronomicalUnit=149597890;    # In km
 
   # Calculate difference in days between the current Julian Day
   # and JD 2451545.0, which is noon 1 January 2000 Universal Time
 
   # Calculate time of the day in UT decimal hours
-  my $dDecimalHours=$dHours + ($dMinutes + $dSeconds / 60.0 ) / 60.0;
+  my $dDecimalHours=$dHours + $dMinutes/60.0 + $dSeconds/3600.0;
 
   # Calculate current Julian Day
   my $iYfrom2000=$iYear;#expects now as YY ;
@@ -530,10 +535,6 @@ sub Twilight_sunpos($)
   $dZenithAngle=($dZenithAngle + $dParallax) / $rad;
   my $dElevation=90 - $dZenithAngle;
 
-  # set readings
-  $dAzimuth   = int(100*$dAzimuth  )/100;
-  $dElevation = int(100*$dElevation)/100;
-
   my $twilight = int(($dElevation+12.0)/18.0 * 1000)/10;
      $twilight = 100 if ($twilight>100);
      $twilight = 0   if ($twilight<  0);
@@ -541,6 +542,10 @@ sub Twilight_sunpos($)
   my $twilight_weather = int(($dElevation-$hash->{WEATHER_HORIZON}+12.0)/18.0 * 1000)/10;
      $twilight_weather = 100 if ($twilight_weather>100);
      $twilight_weather = 0   if ($twilight_weather<  0);
+
+  # set readings
+  $dAzimuth   = int(100*$dAzimuth  )/100;
+  $dElevation = int(100*$dElevation)/100;
 
   my $compassPoint   = Twilight_CompassPoint($dAzimuth);
 

@@ -133,7 +133,7 @@ sub RandomTimer_SetTimer($)
   
   my $secToMidnight = 24*3600 -(3600*$hour + 60*$min + $sec);
 
-  my $setExecTime = max($now+1, $hash->{startTime});
+  my $setExecTime = max($now, $hash->{startTime});
   myRemoveInternalTimer("Exec",     $hash);
   myInternalTimer      ("Exec",     $setExecTime, "RandomTimer_Exec", $hash, 0);
 
