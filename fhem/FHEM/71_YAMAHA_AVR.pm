@@ -95,7 +95,7 @@ YAMAHA_AVR_GetStatus($;$)
         }
     }
     
-    my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
+    my $zone = YAMAHA_AVR_getParamName($hash, $hash->{ACTIVE_ZONE}, $hash->{helper}{ZONES});
     
     if(not defined($zone))
     {
@@ -105,7 +105,7 @@ YAMAHA_AVR_GetStatus($;$)
     
     my $return = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>");
     
-    Log3 $name, 4, "YAMAHA_AVR: GetStatus-Request returned: $return" if(defined($return));
+    #Log3 $name, 4, "YAMAHA_AVR: GetStatus-Request returned: $return" if(defined($return));
     
     if(not defined($return) or $return eq "")
     {
@@ -278,6 +278,37 @@ YAMAHA_AVR_GetStatus($;$)
         readingsBulkUpdate($hash, "dsp", YAMAHA_AVR_Param2Fhem($1, 0));
     }
    
+    if($return =~ /<Surround>.*?<_3D_Cinema_DSP>(.+?)<\/_3D_Cinema_DSP>*?<\/Surround>/)
+    {
+        readingsBulkUpdate($hash, "3dCinemaDsp", lc($1));
+    }
+    
+    if($return =~ /<Sound_Video>.*?<Adaptive_DRC>(.+?)<\/Adaptive_DRC>.*?<\/Sound_Video>/)
+    {
+        readingsBulkUpdate($hash, "adaptiveDrc", lc($1));
+    }
+    
+    if($return =~ /<Power_Control>.*?<Sleep>(.+?)<\/Sleep>.*?<\/Power_Control>/)
+    {
+        readingsBulkUpdate($hash, "sleep", YAMAHA_AVR_Param2Fhem($1, 0));
+    }
+    
+    if($return =~ /<Sound_Video>.*?<Direct>.*?<Mode>(.+?)<\/Mode>.*?<\/Direct>.*?<\/Sound_Video>/)
+    {
+        readingsBulkUpdate($hash, "direct", lc($1));
+        $hash->{helper}{DIRECT_TAG} = "Direct"; 
+    }
+    elsif($return =~ /<Sound_Video>.*?<Pure_Direct>.*?<Mode>(.+?)<\/Mode>.*?<\/Pure_Direct>.*?<\/Sound_Video>/)
+    {
+        readingsBulkUpdate($hash, "direct", lc($1));
+        $hash->{helper}{DIRECT_TAG} = "Pure_Direct";
+    }
+    else
+    {
+        delete($hash->{helper}{DIRECT_TAG}) if(exists($hash->{helper}{DIRECT_TAG}));
+    }
+    
+    
     
     readingsEndUpdate($hash, 1);
     
@@ -350,7 +381,7 @@ YAMAHA_AVR_Set($@)
 		YAMAHA_AVR_getInputs($hash);
     }
     
-    my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
+    my $zone = YAMAHA_AVR_getParamName($hash, $hash->{ACTIVE_ZONE}, $hash->{helper}{ZONES});
     
     my $inputs_piped = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{INPUTS}), 0) : "" ;
     my $inputs_comma = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{INPUTS}), 1) : "" ;
@@ -367,7 +398,7 @@ YAMAHA_AVR_Set($@)
     return "No Argument given" if(!defined($a[1]));     
     
     my $what = $a[1];
-    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg volumeStraight:slider,-80,1,16 volume:slider,0,1,100 volumeUp volumeDown input:".$inputs_comma." mute:on,off,toggle remoteControl:setup,up,down,left,right,return,option,display,tunerPresetUp,tunerPresetDown,enter ".(defined($hash->{helper}{SCENES})?"scene:".$scenes_comma." ":"").($hash->{helper}{SELECTED_ZONE} eq "mainzone" ? "straight:on,off ".(defined($hash->{helper}{SCENES}) ? "dsp:".$dsp_modes_comma." " : "")." enhancer:on,off " : "")."statusRequest:noArg";
+    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg volumeStraight:slider,-80,1,16 volume:slider,0,1,100 volumeUp volumeDown input:".$inputs_comma." mute:on,off,toggle remoteControl:setup,up,down,left,right,return,option,display,tunerPresetUp,tunerPresetDown,enter ".(defined($hash->{helper}{SCENES})?"scene:".$scenes_comma." ":"").($hash->{helper}{SELECTED_ZONE} eq "mainzone" ? "straight:on,off 3dCinemaDsp:off,auto adaptiveDrc:off,auto ".(exists($hash->{helper}{DIRECT_TAG}) ? "direct:on,off " : "").(exists($hash->{helper}{DSP_MODES}) ? "dsp:".$dsp_modes_comma." " : "")." enhancer:on,off " : "")."sleep:off,30min,60min,90min,120min,last statusRequest:noArg";
 
     # Depending on the status response, use the short or long Volume command
 
@@ -415,7 +446,7 @@ YAMAHA_AVR_Set($@)
 					{
 						if($a[2] =~ /^($inputs_piped)$/)
 						{
-							$command = YAMAHA_AVR_getParam($hash, $a[2], $hash->{helper}{INPUTS});
+							$command = YAMAHA_AVR_getParamName($hash, $a[2], $hash->{helper}{INPUTS});
 							if(defined($command) and length($command) > 0)
 							{
 								$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Input><Input_Sel>".$command."</Input_Sel></Input></$zone></YAMAHA_AV>");
@@ -603,7 +634,7 @@ YAMAHA_AVR_Set($@)
 			}
 	    }
         elsif($what eq "dsp")
-	    {
+        {
             if(defined($a[2]))
 			{
 				
@@ -611,122 +642,259 @@ YAMAHA_AVR_Set($@)
 				{
 					if($a[2] =~ /^($dsp_modes_piped)$/)
 					{
-						$command = YAMAHA_AVR_getParamName($hash, $a[2],$hash->{helper}{DSP_MODES});
-						if(defined($command) and length($command) > 0)
-						{
-							$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Sound_Program>$command</Sound_Program></Current></Program_Sel></Surround></$zone></YAMAHA_AV>");
-						}
-						else
-						{
-							return "invalid dsp mode: ".$a[2];
-						}
+                        $command = YAMAHA_AVR_getParamName($hash, $a[2],$hash->{helper}{DSP_MODES});
+                        if(defined($command) and length($command) > 0)
+                        {
+                            $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Sound_Program>$command</Sound_Program></Current></Program_Sel></Surround></$zone></YAMAHA_AV>");
+                        }
+                        else
+                        {
+                            return "invalid dsp mode: ".$a[2];
+                        }
 
-						if(not $result =~ /RC="0"/)
-						{
-							# if the returncode isn't 0, than the command was not successful
-							return "Could not set dsp mode to ".$a[2].".";
-						}
-					}
-					else
-					{
-						return $usage;
-					}
-				}
-				else
-				{
-					return "No DSP presets are avaible. Please try an statusUpdate.";
-				}
-			}
-			else
-			{
-				return $dsp_modes_piped eq "" ? "No dsp presets are available. Please try an statusUpdate." : "No dsp preset was given";
-			}
+                        if(not $result =~ /RC="0"/)
+                        {
+                            # if the returncode isn't 0, than the command was not successful
+                            return "Could not set dsp mode to ".$a[2].".";
+                        }
+                    }
+                    else
+                    {
+                        return $usage;
+                    }
+                }
+                else
+                {
+                    return "No DSP presets are avaible. Please try an statusUpdate.";
+                }
+            }
+            else
+            {
+                return $dsp_modes_piped eq "" ? "No dsp presets are available. Please try an statusUpdate." : "No dsp preset was given";
+            }
         }
         elsif($what eq "straight")
-	    {
+        {
+        
+            $result = undef;
+              
             if($a[2] eq "on")
-			{
-			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Straight>On</Straight></Current></Program_Sel></Surround></$zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "off")
-			{
-			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Straight>Off</Straight></Current></Program_Sel></Surround></$zone></YAMAHA_AV>");
-			}
+            {
+                $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Straight>On</Straight></Current></Program_Sel></Surround></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "off")
+            {
+                $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Straight>Off</Straight></Current></Program_Sel></Surround></$zone></YAMAHA_AV>");
+            }
+            else
+            {
+                return $usage;
+            }
+            
+            if(not defined($result) or not $result =~ /RC="0"/)
+            {
+                # if the returncode isn't 0, than the command was not successful
+                return "Could not set straight to ".$a[2].".";
+            }
+        }
+        elsif($what eq "3dCinemaDsp")
+	    {
+        
+            $result = undef;
+            
+            if($a[2] eq "auto")
+            {
+                $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><_3D_Cinema_DSP>Auto</_3D_Cinema_DSP></Surround></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "off")
+            {
+                $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><_3D_Cinema_DSP>Off</_3D_Cinema_DSP></Surround></$zone></YAMAHA_AV>");
+            }
+            else
+            {
+                return $usage;
+            }
+            
+            if(not defined($result) or not $result =~ /RC="0"/)
+            {
+                # if the returncode isn't 0, than the command was not successful
+                return "Could not set 3dCinemaDsp to ".$a[2].".";
+            }
+        }
+        elsif($what eq "adaptiveDrc")
+	    {
+        
+            $result = undef;
+            
+            if($a[2] eq "auto")
+            {
+                $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Adaptive_DRC>Auto</Adaptive_DRC></Sound_Video></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "off")
+            {
+                $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Adaptive_DRC>Off</Adaptive_DRC></Sound_Video></$zone></YAMAHA_AV>");
+            }
+            else
+            {
+                return $usage;
+            }
+
+            if(not defined($result) or not $result =~ /RC="0"/)
+            {
+                # if the returncode isn't 0, than the command was not successful
+                return "Could not set adaptiveDrc to ".$a[2].".";
+            }
         }
         elsif($what eq "enhancer")
-	    {
+        {
+        
+            $result = undef;
+            
             if($a[2] eq "on")
-			{
-			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Enhancer>On</Enhancer></Current></Program_Sel></Surround></$zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "off")
-			{
-			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Enhancer>Off</Enhancer></Current></Program_Sel></Surround></$zone></YAMAHA_AV>");
-			}
+            {
+                $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Enhancer>On</Enhancer></Current></Program_Sel></Surround></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "off")
+            {
+                $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surround><Program_Sel><Current><Enhancer>Off</Enhancer></Current></Program_Sel></Surround></$zone></YAMAHA_AV>");
+            }
+            else
+            {
+                return $usage;
+            }
+             
+            if(not defined($result) or not $result =~ /RC="0"/)
+            {
+                # if the returncode isn't 0, than the command was not successful
+                return "Could not set enhancer to ".$a[2].".";
+            }
         }
-	    elsif($what eq "remoteControl")
+        elsif($what eq "direct" and exists($hash->{helper}{DIRECT_TAG}))
+        {
+        
+            $result = undef;
+            
+            if($a[2] eq "on")
+            {
+                $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><".$hash->{helper}{DIRECT_TAG}."><Mode>On</Mode></".$hash->{helper}{DIRECT_TAG}."></Sound_Video></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "off")
+            {
+                $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><".$hash->{helper}{DIRECT_TAG}."><Mode>Off</Mode></".$hash->{helper}{DIRECT_TAG}."></Sound_Video></$zone></YAMAHA_AV>");
+            }
+            else
+            {
+                return $usage;
+            }
+             
+            if(not defined($result) or not $result =~ /RC="0"/)
+            {
+                # if the returncode isn't 0, than the command was not successful
+                return "Could not set direct to ".$a[2].".";
+            }
+        }
+        elsif($what eq "sleep")
 	    {
+            $result = undef;
+
+            if($a[2] eq "off")
+            {
+                $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Sleep>Off</Sleep></Power_Control></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "30min")
+            {
+                $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Sleep>30 min</Sleep></Power_Control></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "60min")
+			{
+                $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Sleep>60 min</Sleep></Power_Control></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "90min")
+			{
+                $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Sleep>90 min</Sleep></Power_Control></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "120min")
+			{
+                $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Sleep>120 min</Sleep></Power_Control></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "last")
+			{
+                $result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Sleep>Last</Sleep></Power_Control></$zone></YAMAHA_AV>");
+            }
+            else
+            {
+                return $usage;
+            }
+            
+            if(not defined($result) or not $result =~ /RC="0"/)
+            {
+                # if the returncode isn't 0, than the command was not successful
+                return "Could not set sleep timer to ".$a[2].".";
+            }
+        }
+        elsif($what eq "remoteControl")
+        {
+
+            # the RX-Vx75 series use a different tag name to access the remoteControl commands
+            my $control_tag = ($hash->{MODEL} =~ /RX-V\d75/ ? "Cursor_Control" : "List_Control");
 			
-			# the RX-Vx75 series use a different tag name to access the remoteControl commands
-			my $control_tag = ($hash->{MODEL} =~ /RX-V\d75/ ? "Cursor_Control" : "List_Control");
-			
-			if($a[2] eq "up")
-			{
-			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Up</Cursor></$control_tag></$zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "down")
-			{
-			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Down</Cursor></$control_tag></$zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "left")
-			{
-			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Left</Cursor></$control_tag></$zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "right")
-			{
-			    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Right</Cursor></$control_tag></$zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "display")
-			{
-			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Menu_Control>Display</Menu_Control></$control_tag></$zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "return")
-			{
-			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Return</Cursor></$control_tag></$zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "enter")
-			{
-			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Sel</Cursor></$control_tag></$zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "setup")
-			{
-			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Menu_Control>On Screen</Menu_Control></$control_tag></$zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "option")
-			{
-			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Menu_Control>Option</Menu_Control></$control_tag></$zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "tunerPresetUp")
-			{
-			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><Preset_Sel>Up</Preset_Sel></Preset></Play_Control></Tuner></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "tunerPresetDown")
-			{
-			    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><Preset_Sel>Down</Preset_Sel></Preset></Play_Control></Tuner></YAMAHA_AV>");
-			}
-			else
-			{
-			    return $usage;
-			}
-	    }
-		elsif($what eq "statusRequest")
-		{
-			# Will be executed anyway on the end of the function			
-		}
-	    else
-	    {
-			return $usage;
-	    }
+            if($a[2] eq "up")
+            {
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Up</Cursor></$control_tag></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "down")
+            {
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Down</Cursor></$control_tag></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "left")
+            {
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Left</Cursor></$control_tag></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "right")
+            {
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Right</Cursor></$control_tag></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "display")
+            {
+                YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Menu_Control>Display</Menu_Control></$control_tag></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "return")
+            {
+                YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Return</Cursor></$control_tag></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "enter")
+            {
+                YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Cursor>Sel</Cursor></$control_tag></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "setup")
+            {
+                YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Menu_Control>On Screen</Menu_Control></$control_tag></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "option")
+            {
+                YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><$control_tag><Menu_Control>Option</Menu_Control></$control_tag></$zone></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "tunerPresetUp")
+            {
+                YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><Preset_Sel>Up</Preset_Sel></Preset></Play_Control></Tuner></YAMAHA_AV>");
+            }
+            elsif($a[2] eq "tunerPresetDown")
+            {
+                YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><Preset_Sel>Down</Preset_Sel></Preset></Play_Control></Tuner></YAMAHA_AV>");
+            }
+            else
+            {
+                return $usage;
+            }
+        }
+        elsif($what eq "statusRequest")
+        {
+            # Will be executed anyway on the end of the function			
+        }
+        else
+        {
+            return $usage;
+        }
 	
     
     # Call the GetStatus() Function to retrieve the new values after setting something (with local flag, so the internal timer is not getting interupted)
@@ -792,7 +960,7 @@ YAMAHA_AVR_Define($$)
     # In case of a redefine, check the zone parameter if the specified zone exist, otherwise use the main zone
     if(defined($hash->{helper}{ZONES}) and length($hash->{helper}{ZONES}) > 0)
     {
-		if(defined(YAMAHA_AVR_getZoneName($hash, lc $hash->{helper}{SELECTED_ZONE})))
+		if(defined(YAMAHA_AVR_getParamName($hash, lc $hash->{helper}{SELECTED_ZONE}, $hash->{helper}{ZONES})))
 		{
 	    
 		    $hash->{ACTIVE_ZONE} = lc $hash->{helper}{SELECTED_ZONE};
@@ -944,14 +1112,6 @@ sub YAMAHA_AVR_Param2Fhem($$)
 
 }
 
-#############################
-# Returns the Yamaha Zone Name for the FHEM like zone attribute
-sub YAMAHA_AVR_getZoneName($$)
-{
-	my ($hash, $zone) = @_;
-	 return YAMAHA_AVR_getParamName($hash, $zone, $hash->{helper}{ZONES});
-    
-}
 
 
 #############################
@@ -1038,6 +1198,8 @@ sub YAMAHA_AVR_getModel($)
     
     return undef unless(defined($response));
 
+    delete($hash->{helper}{ZONES}) if(exists($hash->{helper}{ZONES}));
+    
     while($response =~ /<Menu Func="Subunit" Title_1="(.+?)" YNC_Tag="(.+?)">/gc)
     {
         if(defined($hash->{helper}{ZONES}) and length($hash->{helper}{ZONES}) > 0)
@@ -1049,6 +1211,7 @@ sub YAMAHA_AVR_getModel($)
 
     }
     
+    delete( $hash->{helper}{DSP_MODES}) if(exists($hash->{helper}{DSP_MODES}));
     
     if($response =~ /<Menu Func_Ex="Surround" Title_1="Surround">.*?<Get>(.+?)<\/Get>/)
     {
@@ -1071,11 +1234,11 @@ sub YAMAHA_AVR_getModel($)
     # $hash->{helper}{ZONES} .= "|Zone_2";
     
     $hash->{ZONES_AVAILABLE} = YAMAHA_AVR_Param2Fhem($hash->{helper}{ZONES}, 1);
-    
+   
     # if explicitly given in the define command, set the desired zone
-    if(defined(YAMAHA_AVR_getZoneName($hash, lc $hash->{helper}{SELECTED_ZONE})))
+    if(defined(YAMAHA_AVR_getParamName($hash, lc $hash->{helper}{SELECTED_ZONE}, $hash->{helper}{ZONES})))
     {
-		Log3 $name, 4, "YAMAHA_AVR: using zone ".YAMAHA_AVR_getZoneName($hash, lc $hash->{helper}{SELECTED_ZONE});
+		Log3 $name, 4, "YAMAHA_AVR: using zone ".YAMAHA_AVR_getParamName($hash, lc $hash->{helper}{SELECTED_ZONE}, $hash->{helper}{ZONES});
 		$hash->{ACTIVE_ZONE} = lc $hash->{helper}{SELECTED_ZONE};
     }
     else
@@ -1111,8 +1274,8 @@ sub YAMAHA_AVR_getInputs($)
     my ($hash) = @_;  
     my $name = $hash->{NAME};
     my $address = $hash->{helper}{ADDRESS};
-    
-    my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
+   
+    my $zone = YAMAHA_AVR_getParamName($hash, $hash->{ACTIVE_ZONE}, $hash->{helper}{ZONES});
     
     return undef if (not defined($zone) or $zone eq "");
     
@@ -1126,11 +1289,8 @@ sub YAMAHA_AVR_getInputs($)
     
     return undef unless (defined($response));
 
-    
     delete($hash->{helper}{INPUTS}) if(defined($hash->{helper}{INPUTS}));
 
-    
-    
 	while($response =~ /<Param>(.+?)<\/Param>/gc)
 	{
 	    if(defined($hash->{helper}{INPUTS}) and length($hash->{helper}{INPUTS}) > 0)
@@ -1147,11 +1307,9 @@ sub YAMAHA_AVR_getInputs($)
     # query all available scenes
     $response = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Scene><Scene_Sel_Item>GetParam</Scene_Sel_Item></Scene></$zone></YAMAHA_AV>", 5);
     
-	delete($hash->{helper}{SCENES}) if(defined($hash->{helper}{SCENES}));
-  
     return undef unless (defined($response));
     
- 
+    delete($hash->{helper}{SCENES}) if(defined($hash->{helper}{SCENES}));
     
     # get all available scenes from response
     while($response =~ /<Item_\d+>.*?<Param>(.+?)<\/Param>.*?<RW>(\w+)<\/RW>.*?<\/Item_\d+>/gc)
@@ -1313,7 +1471,11 @@ sub YAMAHA_AVR_html2txt($)
 <li><b>mute</b> on|off|toggle &nbsp;&nbsp;-&nbsp;&nbsp; activates volume mute</li>
 <li><b>dsp</b> hallinmunich,hallinvienna,... &nbsp;&nbsp;-&nbsp;&nbsp; sets the DSP mode to the given preset</li>
 <li><b>enhancer</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the internal sound enhancer</li>
-<li><b>straight</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; bypasses all sound enhancement features and plays the sound straight directly</li> 
+<li><b>3dCinemaDsp</b> auto|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the CINEMA DSP 3D mode</li>
+<li><b>adaptiveDrc</b> auto|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the Adaptive DRC</li>
+<li><b>straight</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; bypasses the internal codec converter and plays the original sound codec</li>
+<li><b>direct</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; bypasses all internal sound enhancement features and plays the sound straight directly</li> 
+<li><b>sleep</b> off,30min,60min,...,last &nbsp;&nbsp;-&nbsp;&nbsp; activates the internal sleep timer</li>
 <li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current status of the device</li>
 <li><b>remoteControl</b> up,down,... &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands as listed below</li>
 
@@ -1414,16 +1576,20 @@ sub YAMAHA_AVR_html2txt($)
   </ul>
   <b>Generated Readings/Events:</b><br>
   <ul>
+  <li><b>3dCinemaDsp</b> - The status of the CINEMA DSP 3D mode (can be "auto" or "off")</li>
+  <li><b>adaptiveDrc</b> - The status of the Adaptive DRC (can be "auto" or "off")</li>
   <li><b>dsp</b> - The current selected DSP mode for sound output</li>
+  <li><b>direct</b> - indicates if all sound enhancement features are bypassed or not ("on" =&gt; all features are bypassed, "off" =&gt; sound enhancement features are used).</li>
   <li><b>enhancer</b> - The status of the internal sound enhancer (can be "on" or "off")</li>
   <li><b>input</b> - The selected input source according to the FHEM input commands</li>
   <li><b>inputName</b> - The input description as seen on the receiver display</li>
   <li><b>mute</b> - Reports the mute status of the receiver or zone (can be "on" or "off")</li>
   <li><b>power</b> - Reports the power status of the receiver or zone (can be "on" or "off")</li>
   <li><b>presence</b> - Reports the presence status of the receiver or zone (can be "absent" or "present"). In case of an absent device, it cannot be controlled via FHEM anymore.</li>
-  <li><b>straight</b> - indicates if all sound enhancement features are bypassed or not ("on" =&gt; all features are bypassed, "off" =&gt; sound enhancement features are used).</li>
   <li><b>volume</b> - Reports the current volume level of the receiver or zone in percentage values (between 0 and 100 %)</li>
   <li><b>volumeStraight</b> - Reports the current volume level of the receiver or zone in decibel values (between -80.5 and +15.5 dB)</li>
+  <li><b>sleep</b> - indicates if the internal sleep timer is activated or not.</li>
+  <li><b>straight</b> - indicates if the internal sound codec converter is bypassed or not (can be "on" or "off")</li>
   <li><b>state</b> - Reports the current power state and an absence of the device (can be "on", "off" or "absent")</li>
   <br><br><u>Input dependent Readings/Events:</u><br>
   <li><b>currentChannel</b> - Number of the input channel (SIRIUS only)</li>
@@ -1525,6 +1691,9 @@ sub YAMAHA_AVR_html2txt($)
 <li><b>off</b> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver aus</li>
 <li><b>dsp</b> hallinmunich,hallinvienna,... &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert das entsprechende DSP Preset</li>
 <li><b>enhancer</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert den Sound Enhancer f&uuml;r einen verbesserten Raumklang</li>
+<li><b>3dCinemaDsp</b> auto,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert den CINEMA DSP 3D Modus</li>
+<li><b>adaptiveDrc</b> auto,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert Adaptive DRC</li>
+<li><b>direct</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Umgeht alle internen soundverbessernden Ma&szlig;nahmen (Equalizer, Enhancer, Adaptive DRC,...) und gibt das Signal unverf&auml;lscht wieder</li>
 <li><b>input</b> hdmi1,hdmiX,... &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt den Eingangskanal (es werden nur die tats&auml;chlich verf&uuml;gbaren Eing&auml;nge angeboten)</li>
 <li><b>scene</b> scene1,sceneX &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt eine vorgefertigte Szene aus</li>
 <li><b>volume</b> 0...100 &nbsp;&nbsp;-&nbsp;&nbsp; Setzt die Lautst&auml;rke in Prozent (0 bis 100%)</li>
@@ -1532,7 +1701,8 @@ sub YAMAHA_AVR_html2txt($)
 <li><b>volumeUp</b> [0...100] &nbsp;&nbsp;-&nbsp;&nbsp; Erh&ouml;ht die Lautst&auml;rke um 5% oder entsprechend dem Attribut volumeSteps (optional kann der Wert auch als Argument angehangen werden, dieser hat dann Vorang) </li>
 <li><b>volumeDown</b> [0...100] &nbsp;&nbsp;-&nbsp;&nbsp; Veringert die Lautst&auml;rke um 5% oder entsprechend dem Attribut volumeSteps (optional kann der Wert auch als Argument angehangen werden, dieser hat dann Vorang) </li>
 <li><b>mute</b> on,off,toggle &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver stumm</li>
-<li><b>straight</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Gibt das Signal direkt und unver&auml;ndert aus (ohne DSP und Enhancer).</li>
+<li><b>straight</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Umgeht die interne Codec-Umwandlung und gibt den Original-Codec wieder.</li>
+<li><b>sleep</b> off,30min,60min,...,last &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert den internen Sleep-Timer zum automatischen Abschalten</li>
 <li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; Fragt den aktuell Status des Receivers ab</li>
 <li><b>remoteControl</b> up,down,... &nbsp;&nbsp;-&nbsp;&nbsp; Sendet Fernbedienungsbefehle wie im n&auml;chsten Abschnitt beschrieben</li>
 </ul>
@@ -1629,6 +1799,8 @@ sub YAMAHA_AVR_html2txt($)
   </ul>
   <b>Generierte Readings/Events:</b><br>
   <ul>
+  <li><b>3dCinemaDsp</b> - Der Status des CINEMA DSP 3D-Modus ("auto" =&gt; an, "off" =&gt; aus)</li>
+  <li><b>adaptiveDrc</b> - Der Status des Adaptive DRC ("auto" =&gt; an, "off" =&gt; aus)</li>
   <li><b>dsp</b> - Das aktuell aktive DSP Preset</li>
   <li><b>enhancer</b> - Der Status des Enhancers ("on" =&gt; an, "off" =&gt; aus)</li>
   <li><b>input</b> - Der ausgew&auml;hlte Eingang entsprechend dem FHEM-Kommando</li>
@@ -1638,7 +1810,9 @@ sub YAMAHA_AVR_html2txt($)
   <li><b>presence</b> - Die aktuelle Empfangsbereitschaft ("present" =&gt; empfangsbereit, "absent" =&gt; nicht empfangsbereit, z.B. Stromausfall)</li>
   <li><b>volume</b> - Der aktuelle Lautst&auml;rkepegel in Prozent (zwischen 0 und 100 %)</li>
   <li><b>volumeStraight</b> - Der aktuelle Lautst&auml;rkepegel in Dezibel (zwischen -80.0 und +15 dB)</li>
-  <li><b>straight</b> - Zeigt an, ob soundverbessernde Features umgangen werden oder nicht ("on" =&gt; soundverbessernde Features werden umgangen, "off" =&gt; soundverbessernde Features werden benutzt)</li>
+  <li><b>direct</b> - Zeigt an, ob soundverbessernde Features umgangen werden oder nicht ("on" =&gt; soundverbessernde Features werden umgangen, "off" =&gt; soundverbessernde Features werden benutzt)</li>
+  <li><b>straight</b> - Zeigt an, ob die interne Codec Umwandlung umgangen wird oder nicht ("on" =&gt; Codec Umwandlung wird umgangen, "off" =&gt; Codec Umwandlung wird benutzt)</li>
+  <li><b>sleep</b> - Zeigt den Status des internen Sleep-Timers an</li>
   <li><b>state</b> - Der aktuelle Schaltzustand (power-Reading) oder die Abwesenheit des Ger&auml;tes (m&ouml;gliche Werte: "on", "off" oder "absent")</li>
   <br><br><u>Eingangsabh&auml;ngige Readings/Events:</u><br>
   <li><b>currentChannel</b> - Nummer des Eingangskanals (nur bei SIRIUS)</li>
