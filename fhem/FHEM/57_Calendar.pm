@@ -516,6 +516,9 @@ sub advanceToNextOccurance {
     } elsif($self->{freq} eq "WEEKLY") {
       # special handling for WEEKLY and BYDAY
       if(exists($self->{byday})) {
+        # this fails for intervals > 1
+        # BYDAY with prefix (e.g. -1SU or 2MO) is not recognized
+        # BYDAY with list (e.g. SU,TU,TH) is not recognized
         my ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat);
         my $preventloop = 0;        
         do {
@@ -1137,8 +1140,9 @@ sub Calendar_Undef($$) {
   earliest alarm time is kept.<p>
   
   Recurring calendar events are currently supported to an extent: 
-  FREQ INTERVAL UNTIL COUNT are interpreted, BYMONTHDAY BYDAY BYMONTH WKST 
-  are recognized but not interpreted. The module will get it most likely wrong
+  FREQ INTERVAL UNTIL COUNT are interpreted, BYMONTHDAY BYMONTH WKST 
+  are recognized but not interpreted. BYDAY is only correctly interpreted for weekly events.
+  The module will get it most likely wrong
   if you have recurring calendar events with unrecognized or uninterpreted keywords.
   <p>
 
@@ -1347,8 +1351,9 @@ sub Calendar_Undef($$) {
 
   Ein Kalender ist eine Menge von Kalender-Ereignissen. Ein Kalender-Ereignis hat eine Zusammenfassung (normalerweise der Titel, welcher im Quell-Kalender angezeigt wird), eine Startzeit, eine Endzeit und keine, eine oder mehrere Alarmzeiten. Die Kalender-Ereignisse werden
   aus dem Quellkalender ermittelt, welcher &uuml;ber die URL angegeben wird. Sollten mehrere Alarmzeiten f&uuml;r ein Kalender-Ereignis existieren, wird nur der fr&uuml;heste Alarmzeitpunkt behalten. Wiederkehrende Kalendereinträge werden in einem gewissen Umfang unterst&uuml;tzt: 
-  FREQ INTERVAL UNTIL COUNT werden ausgewertet, BYMONTHDAY BYDAY BYMONTH WKST 
-  werden erkannt aber nicht ausgewertet. Das Modul wird es sehr wahrscheinlich falsch machen, wenn Du wiederkehrende Kalender-Ereignisse mit unerkannten oder nicht ausgewerteten Schlüsselworten hast.<p>
+  FREQ INTERVAL UNTIL COUNT werden ausgewertet, BYMONTHDAY BYMONTH WKST 
+  werden erkannt aber nicht ausgewertet. BYDAY wird nur für wöchentliche Kalender-Ereignisse
+  korrekt behandelt. Das Modul wird es sehr wahrscheinlich falsch machen, wenn Du wiederkehrende Kalender-Ereignisse mit unerkannten oder nicht ausgewerteten Schlüsselworten hast.<p>
 
   Ein Kalender-Ereignis wird durch seine UID identifiziert. Die UID wird vom Quellkalender bezogen. Um das Leben leichter zu machen, werden alle nicht-alphanumerischen Zeichen automatisch aus der UID entfernt.<p>
 
