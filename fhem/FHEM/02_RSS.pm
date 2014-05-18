@@ -66,26 +66,16 @@ RSS_readLayout($) {
   my $filename= $hash->{fhem}{filename};
   my $name= $hash->{NAME};
 
-  if(configDBUsed()) {
-    my @layout = cfgDB_FileRead($filename);
-    if(!(int(@layout))) {
-      $hash->{fhem}{layout}= ("text 0.1 0.1 'Layout definition not found in database!'");
-      Log 1, "RSS $name: Layout $filename not found in database";
-    } else {
-      $hash->{fhem}{layout} = join("\n", @layout);
-    }
+  my ($err, @layoutfile) = FileRead($filename);
+  if($err) {
+    Log 1, "RSS $name: $err";
+    $hash->{fhem}{layout}= ("text 0.1 0.1 'Error: $err'");
   } else {
-    if(open(LAYOUT, $filename)) {
-      my @layout= <LAYOUT>;
-      $hash->{fhem}{layout}= join("", @layout);
-      close(LAYOUT);
-    } else {
-      $hash->{fhem}{layout}= ();
-      Log 1, "RSS $name: Cannot open $filename";
-    }
+    $hash->{fhem}{layout}= join("\n", @layoutfile);
+    $hash->{fhem}{layout} =~ s/\n\n/\n/g;
   }
+  return;
 }
-
  
 ##################
 sub
@@ -493,7 +483,13 @@ RSS_evalLayout($$@) {
           } elsif($cmd eq "font") {
             $params{font}= $def;
           } elsif($cmd eq "pt") {
-            $params{pt}= $def;
+	    $def= AnalyzePerlCommand(undef, $def);
+            if($def =~ m/^[+-]/) {
+              $params{pt} += $def;
+            } else {
+              $params{pt} =  $def;
+            }
+            $params{pt}  = 6 if($params{pt} < 0);
           } elsif($cmd eq "moveto") {
             my ($tox,$toy)= split('[ \t]+', $def, 2);
             my ($x,$y)= RSS_xy($S, $tox,$toy,%params);
@@ -649,25 +645,33 @@ RSS_returnIMG($$) {
 				if($bgnr > $#bgfiles) { $bgnr= 0; }
 				$defs{$name}{fhem}{bgnr}= $bgnr;
 				my $bgfile= $bgdir . "/" . $bgfiles[$bgnr];
-				my $bg= newFromJpeg GD::Image($bgfile);
-				my ($bgwidth,$bgheight)= $bg->getBounds();
-				if($bgwidth != $width or $bgheight != $height) {
-					# we need to resize
-					my ($w,$h);
-					my ($u,$v)= ($bgwidth/$width, $bgheight/$height);
-					if($u>$v) {
-						$w= $width;
-						$h= $bgheight/$u;
-					} else {
-						$h= $height;
-						$w= $bgwidth/$v;
-					}
-					$S->copyResized($bg,($width-$w)/2,($height-$h)/2,0,0,$w,$h,$bgwidth,$bgheight);
+				my $filetype =(split(/\./,$bgfile))[-1];
+				my $bg;
+				$bg= newFromGif  GD::Image($bgfile) if $filetype =~ m/^gif$/i;
+				$bg= newFromJpeg GD::Image($bgfile) if $filetype =~ m/^jpe?g$/i;
+				$bg= newFromPng  GD::Image($bgfile) if $filetype =~ m/^png$/i;
+				if(defined($bg)) {
+				  my ($bgwidth,$bgheight)= $bg->getBounds();
+				  if($bgwidth != $width or $bgheight != $height) {
+					  # we need to resize
+					  my ($w,$h);
+					  my ($u,$v)= ($bgwidth/$width, $bgheight/$height);
+					  if($u>$v) {
+						  $w= $width;
+						  $h= $bgheight/$u;
+					  } else {
+						  $h= $height;
+						  $w= $bgwidth/$v;
+					  }
+					  $S->copyResized($bg,($width-$w)/2,($height-$h)/2,0,0,$w,$h,$bgwidth,$bgheight);
+				  } else {
+					  # size is as required
+					  # kill the predefined image and take the original
+					  $S= undef;
+					  $S= $bg;
+				  }
 				} else {
-					# size is as required
-					# kill the predefined image and take the original
-					$S = undef;
-					$S= $bg;
+				  $S= undef;
 				}
 			}
 		}
@@ -811,7 +815,8 @@ RSS_CGI(){
   <ul>
     <li>size<br>The dimensions of the picture in the format
     <code>&lt;width&gt;x&lt;height&gt;</code>.</li><br>
-    <li>bg<br>The directory that contains the background pictures (must be in JPEG format).</li><br>
+    <li>bg<br>The directory that contains the background pictures (must be in JPEG, GIF or PNG format, file 
+    format is guessed from file name extension).</li><br>
     <li>bgcolor &lt;color&gt;<br>Sets the background color. </li><br>
     <li>tmin<br>The background picture is shown at least <code>tmin</code> seconds,
     no matter how frequently the RSS feed consumer accesses the page.</li><br>
@@ -912,7 +917,10 @@ RSS_CGI(){
     <li>rgb "&lt;color&gt;"<br>Sets the color. You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;color&gt.</li><br>
 
-    <li>pt &lt;pt&gt;<br>Sets the font size in points.</li><br>
+    <li>pt &lt;pt&gt;<br>Sets the font size in points. A + or - sign in front of the the number given 
+    for &lt;pt&gt signifies a change of the font size relative to the current size. Otherwise the absolute
+    size is set. You can use
+    <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;pt&gt.</li><br>
     
     <li>thalign|ihalign|halign "left"|"center"|"right"<br>Sets the horizontal alignment of text, image or both. Defaults to left-aligned. You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> instead of the literal alignment control word.</li><br>
