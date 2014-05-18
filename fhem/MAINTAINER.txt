@@ -103,6 +103,7 @@ FHEM/32_SYSSTAT.pm           justme1968           http://forum.fhem.de Unterstue
 FHEM/32_mailcheck.pm         justme1968           http://forum.fhem.de Automatisierung
 FHEM/32_withings.pm          justme1968           http://forum.fhem.de Sonstiges
 FHEM/33_readingsGroup.pm     justme1968           http://forum.fhem.de Frontends
+FHEM/33_readingsHistory.pm   justme1968           http://forum.fhem.de Frontends
 FHEM/33_readingsProxy.pm     justme1968           http://forum.fhem.de Automatisierung
 FHEM/32_speedtest.pm         justme1968           http://forum.fhem.de Sonstiges
 FHEM/34_panStamp.pm          justme1968           http://forum.fhem.de Sonstige Systeme
