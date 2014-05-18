@@ -39,12 +39,12 @@
    showguides="true"
    inkscape:guide-bbox="true"
    inkscape:zoom="0.65373961"
-   inkscape:cx="184.80125"
+   inkscape:cx="-108.12884"
    inkscape:cy="180.5"
    inkscape:window-x="0"
    inkscape:window-y="0"
    inkscape:window-maximized="0"
-   inkscape:current-layer="light_x5F_led_x5F_stripe_x5F_rgb" />
+   inkscape:current-layer="g5" />
 <g
    id="light_x5F_led_x5F_stripe_x5F_rgb"
    transform="matrix(1.581924,0,0,1.581924,-105.27141,-106.12836)">
@@ -105,7 +105,7 @@
 			</g>
 		</g>
 		<path
-   style="fill:none;stroke:#000000;stroke-width:10;stroke-miterlimit:10;stroke-opacity:1"
+   style="fill:none;stroke-width:10.00048043;stroke-miterlimit:4;stroke-dasharray:none"
    d="m 121.034,136.573 c 0,7.544 -6.116,13.66 -13.66,13.66 H 89.16 c -7.544,0 -13.66,-6.116 -13.66,-13.66 V 88.004 c 0,-7.544 6.116,-13.66 13.66,-13.66 h 18.213 c 7.544,0 13.66,6.116 13.66,13.66 v 48.569 z"
    id="path31"
    inkscape:connector-curvature="0" />
