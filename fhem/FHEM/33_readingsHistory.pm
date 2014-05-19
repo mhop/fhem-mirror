@@ -136,7 +136,7 @@ readingsHistory_Define($$)
 
   $hash->{HAS_DataDumper} = $readingsHistory_hasDataDumper;
 
-  $hash->{fhem}{lines} = [] if( !defined($hash->{fhem}{lines}) );
+  $hash->{fhem}{history} = [] if( !defined($hash->{fhem}{history}) );
 
   readingsHistory_updateDevices($hash);
 
@@ -287,7 +287,12 @@ readingsHistory_2html($)
 
   my $lines = "";
   for (my $i = 0; $i < $rows; $i++) {
-    $lines .= @{$hash->{fhem}{lines}}[$i] if( @{$hash->{fhem}{lines}}[$i] );
+    my $line = $hash->{fhem}{history}[$i];
+    if( ref($line) eq 'ARRAY' ) {
+      $lines .= $line->[2] if( $line );
+    } else {
+      $lines .= $line if( $line );
+    }
     $lines .= "<br>";
   }
 
@@ -314,6 +319,11 @@ readingsHistory_detailFn()
   return readingsHistory_2html($d);
 }
 
+sub
+readingsHistory_Notify($$$)
+{
+  my ($hash,$reading,$value) = @_;
+}
 sub
 readingsHistory_Notify($$)
 {
@@ -424,17 +434,18 @@ readingsHistory_Notify($$)
           my $value_format = readingsHistory_lookup2($value_format,$n,$reading,$value);
           next if( !defined($value_format) );
           if( $value_format =~ m/%/ ) {
-            $s = sprintf( $value_format, $value );
+            $value_format = sprintf( $value_format, $value );
           } elsif( $value_format ) {
-            $s = $value_format;
+            $value_format = $value_format;
           }
 
-          my @t = localtime;
+          my $t = time;
+          my @lt = localtime($t);
           my $tm;
           if( $timestampFormat ) {
-            $tm = strftime( $timestampFormat, @t );
+            $tm = strftime( $timestampFormat, @lt );
           } else {
-            $tm = sprintf("%02d:%02d:%02d", $t[2], $t[1], $t[0] );
+            $tm = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0] );
           }
 
           my $show_links = !AttrVal( $name, "nolinks", "0" );
@@ -450,15 +461,18 @@ readingsHistory_Notify($$)
             $m = readingsHistory_lookup($mapping,$n,$a,$reading,$value,$room,$group,$m);
           }
 
-          my $line = "$tm&nbsp;&nbsp;$m $s";
-          $line = "$tm&nbsp;&nbsp;<a href=\"$FW_ME$FW_subdir?detail=$n\">$m</a> $s" if( $show_links );
+          my $msg = "$tm&nbsp;&nbsp;$m $value_format";
+          $msg = "$tm&nbsp;&nbsp;<a href=\"$FW_ME$FW_subdir?detail=$n\">$m</a> $value_format" if( $show_links );
 
-          while( @{$hash->{fhem}{lines}} >= AttrVal($name,"rows", 5 ) ) {
-            pop @{$hash->{fhem}{lines}};
+          my $entry = [$t, $n, $s,$msg];
+          #my $entry = [$t, $n, "$reading: $value", $msg];
+
+          while( @{$hash->{fhem}{history}} >= AttrVal($name,"rows", 5 ) ) {
+            pop @{$hash->{fhem}{history}};
           }
-          unshift( @{$hash->{fhem}{lines}}, $line );
+          unshift( @{$hash->{fhem}{history}}, $entry );
 
-          DoTrigger( "$name", "history: $line" ) if( $hash->{mayBeVisible} );
+          DoTrigger( "$name", "history: $msg" ) if( $hash->{mayBeVisible} );
         }
       }
     }
@@ -489,9 +503,9 @@ readingsHistory_Save()
   my $hash;
   for my $d (keys %defs) {
     next if($defs{$d}{TYPE} ne "readingsHistory");
-    next if( !defined($defs{$d}{fhem}{lines}) );
+    next if( !defined($defs{$d}{fhem}{history}) );
 
-    $hash->{$d} = $defs{$d}{fhem}{lines};
+    $hash->{$d} = $defs{$d}{fhem}{history};
   }
 
   if(open(FH, ">$statefile")) {
@@ -542,7 +556,7 @@ readingsHistory_Load($)
     } elsif( $readingsHistory_hasDataDumper ) {
       $decoded = eval $encoded;
     }
-    $hash->{fhem}{lines} = $decoded->{$hash->{NAME}} if( defined($decoded->{$hash->{NAME}}) );
+    $hash->{fhem}{history} = $decoded->{$hash->{NAME}} if( defined($decoded->{$hash->{NAME}}) );
   } else {
     my $msg = "readingsHistory_Load: Cannot open $statefile: $!";
     Log3 undef, 1, $msg;
@@ -558,28 +572,34 @@ readingsHistory_Set($@)
   my $list = "clear:noArgs add";
 
   if( $cmd eq "clear" ) {
-    $hash->{fhem}{lines} = [];
+    $hash->{fhem}{history} = [];
 
-    my @t = localtime;
-    my $tm = sprintf("%02d:%02d:%02d", $t[2], $t[1], $t[0] );
-    my $line = "$tm&nbsp;&nbsp;--clear--";
+    my $t = time;
+    my @lt = localtime($t);
+    my $tm = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0] );
+    my $msg = "$tm&nbsp;&nbsp;--clear--";
 
-    unshift( @{$hash->{fhem}{lines}}, $line );
+    my $entry = [$t,"", $cmd, $msg];
 
-    DoTrigger( "$name", "clear: $line" ) if( $hash->{mayBeVisible} );
+    unshift( @{$hash->{fhem}{history}}, $entry );
+
+    DoTrigger( "$name", "clear: $msg" ) if( $hash->{mayBeVisible} );
 
     return undef;
   } elsif ( $cmd eq "add" ) {
-    my @t = localtime;
-    my $tm = sprintf("%02d:%02d:%02d", $t[2], $t[1], $t[0] );
-    my $line = "$tm&nbsp;&nbsp;$param ". join( " ", @a );
+    my $t = time;
+    my @lt = localtime($t);
+    my $tm = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0] );
+    my $msg = "$tm&nbsp;&nbsp;$param ". join( " ", @a );
 
-    while( @{$hash->{fhem}{lines}} >= AttrVal($name,"rows", 5 ) ) {
-      pop @{$hash->{fhem}{lines}};
+    my $entry = [$t,"", "$param ". join( " ", @a ),$msg];
+
+    while( @{$hash->{fhem}{history}} >= AttrVal($name,"rows", 5 ) ) {
+      pop @{$hash->{fhem}{history}};
     }
-    unshift( @{$hash->{fhem}{lines}}, $line );
+    unshift( @{$hash->{fhem}{history}}, $entry );
 
-    DoTrigger( "$name", "history: $line" ) if( $hash->{mayBeVisible} );
+    DoTrigger( "$name", "history: $msg" ) if( $hash->{mayBeVisible} );
     return undef;
   }
 
@@ -591,6 +611,8 @@ readingsHistory_Get($@)
 {
   my ($hash, @a) = @_;
 
+  my $list = "history:noArgs html:noArgs";
+
   my $name = $a[0];
   return "$name: get needs at least one parameter" if(@a < 2);
 
@@ -599,10 +621,23 @@ readingsHistory_Get($@)
   my $ret = "";
   if( $cmd eq "html" ) {
     return readingsHistory_2html($hash);
+  } elsif( $cmd eq "history" ) {
+    my $rows = AttrVal($name,"rows", 5 );
+    $rows = 1 if( $rows < 1 );
+
+    for (my $i = 0; $i < $rows; $i++) {
+      my $line = $hash->{fhem}{history}[$i];
+      if( ref($line) eq 'ARRAY' ) {
+        $ret .= "$line->[0]\t$line->[1]\t$line->[2]\t$line->[3]" if( $line );
+      } else {
+        $ret .= $line if( $line );
+      }
+      $ret .= "\n";
+    }
+    return $ret;
   }
 
-  return undef;
-  return "Unknown argument $cmd, choose one of html:noArg";
+  return "Unknown argument $cmd, choose one of $list";
 }
 
 sub
@@ -666,14 +701,16 @@ readingsHistory_Attr($$$)
     <b>Set</b>
     <ul>
       <li>add ...<br>
-        directly add text as new line to history.<br>
+        directly add text as new line to history.</li>
       <li>clear<br>
-        clear the history.<br>
+        clear the history.</li>
     </ul><br>
 
   <a name="readingsHistory_Get"></a>
     <b>Get</b>
     <ul>
+      <li>history<br>
+        list history</li>
     </ul><br>
 
   <a name="readingsHistory_Attr"></a>
