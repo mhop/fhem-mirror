@@ -175,7 +175,7 @@ LightScene_2html($)
 
   $ret .= "</table></td></tr>";
   $ret .= "</table>";
-  $ret .= "</br>";
+  $ret .= "<br>";
 
   return $ret;
 }
@@ -908,9 +908,9 @@ LightScene_editTable($) {
         in addition to reading names the list can also contain expressions of the form <code>abc -> xyz</code>
         or <code>get cba -> set uvw</code> to map reading abc to set xyz or get cba to set uvw. the list can be given as a
         string or as a perl expression enclosed in {} that returns this string.<br>
-        <code>attr myReceiver lightSceneParamsToSave volume,channel</code></br>
+        <code>attr myReceiver lightSceneParamsToSave volume,channel</code><br>
         <code>attr myHueDevice lightSceneParamsToSave {(Value($DEVICE) eq "off")?"state":"bri : xy"}</code></li>
-        <code>attr myDimmer lightSceneParamsToSave state@{if($value=~m/(\d+)/){$1}else{$value}}</code></br>
+        <code>attr myDimmer lightSceneParamsToSave state@{if($value=~m/(\d+)/){$1}else{$value}}</code><br>
       <li>lightSceneRestoreOnlyIfChanged<br>
         this attribute can be set on the lightscene and/or on the individual devices included in a scene.
         the device settings have precedence over the scene setting.<br>

@@ -310,7 +310,7 @@ usb-sensors-linux</a></li>
   <a name="CO20_Readings"></a>
   <b>Readings</b>
   <ul>
-    <li>voc</br>
+    <li>voc<br>
       CO2 equivalents in the range of 450-2000ppm.</li>
   </ul><br>
 
