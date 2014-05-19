@@ -433,7 +433,7 @@ update_DoUpdate(@)
 
   # do a backup first
   my $configfile = AttrVal("global", "configfile", "");
-  my $doBackup = AttrVal("global", "backup_before_update", !configDBUsed());
+  my $doBackup = AttrVal("global", "backup_before_update", 1);
 
   if ($doBackup) {
     my $cmdret = AnalyzeCommand(undef, "backup");

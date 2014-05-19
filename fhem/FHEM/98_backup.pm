@@ -49,12 +49,12 @@ CommandBackup($$)
   my ($cl, $param) = @_;
 
   my $modpath = $attr{global}{modpath};
-  my $configfile = (!defined($attr{global}{configfile}) ? undef : $attr{global}{configfile});
-  my $statefile  = (!defined($attr{global}{statefile}) ? undef : $attr{global}{statefile});
+  my $configfile = AttrVal("global", "configfile", undef);
+  my $statefile  = AttrVal("global", "statefile", undef);
   my $msg;
   my $ret;
 
-  return "Backup is not supported for configDB" if(configDBUsed());
+  Log 1, "NOTE: make sure you have a database backup!" if(configDBUsed());
 
   # set backupdir
   my $backupdir;
@@ -81,12 +81,18 @@ CommandBackup($$)
     }
   }
 
-  # get pathnames to archiv
-  push @pathname, $configfile;
-  Log 4, "backup include: '$configfile'";
-  $ret = parseConfig($configfile);
-  push @pathname, $statefile;
-  Log 4, "backup include: '$statefile'";
+  if(configDBUsed()) {
+    # add configDB configuration file
+    push @pathname, 'configDB.conf';
+    Log 4, "backup include: 'configDB.conf'";
+  } else {
+    # get pathnames to archiv
+    push @pathname, $configfile;
+    Log 4, "backup include: '$configfile'";
+    $ret = parseConfig($configfile);
+    push @pathname, $statefile;
+    Log 4, "backup include: '$statefile'";
+  }
   $ret = readModpath($modpath,$backupdir);
 
   # create archiv
